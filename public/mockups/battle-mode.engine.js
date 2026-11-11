@@ -8698,9 +8698,72 @@
     const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
     for(const p of SQUAD)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
     for(const o of OPP)FORMKARTE[o.n]=FORMWERTE[r(FORMWERTE.length)];
+    // P4-MESSSCHALTER (nur Abnahmemessung, s. formModusMessung() in window.__arena): im Modus
+    // "echt" zieht dieselbe Saat zusaetzlich ein Einsatzlisten-Szenario je Seite (FORM_MESS),
+    // das Vorrang vor der Ersatzkarte hat. Grundlauf und Hebungslauf von einflussVon() sehen
+    // damit in Lauf i dasselbe Szenario (gepaart). Im Spiel steht der Modus immer auf "ersatz",
+    // FORM_MESS bleibt null — bit-identisch.
+    FORM_MESS=FORM_MESS_MODUS==="echt"?zieheFormSzenarioEcht((saat^0x5bd1e995)>>>0,[SQUAD,OPP]):null;
   }
   const formVon=(n)=>FORMKARTE[n]||0;
   const stufenWert=()=>INTENSITAET[STUFE].wert;
+
+  // ===================================================================================
+  // ECHTE FORMKARTE UND INTENSITAET (P4, docs/design/formkarten-motor-p4-11-11.md).
+  //
+  // Bis hierher nahm JEDE Baufunktion `formVon(p.n)+stufenWert()` — die Ersatzkarte aus
+  // zieheFormkarten() und die feste Stufe "normal". Was der Manager in der Einsatzliste
+  // gespielt hat (Karten −8..+8, x2 bei Farbgleichheit, Schonen/Normal/Push), kam nie an.
+  //
+  // Die echte Wahl kommt jetzt ueber DASSELBE Rohr wie Slot und Haltung: den `place`-Eintrag
+  // aus der Aufstellung (`{d, slot, form, intensitaet}`, gebaut von buildArenaAufstellung() in
+  // lib/foundation/battle-arena/arena-aufstellung-adapter.ts — dieselbe Funktion fuer Vorlauf,
+  // Pods und Arena-Anzeige). Sie greift nur, wenn
+  //   - der Eintrag zur GERADE gebauten Disziplin gehoert (`e.d===d`), und
+  //   - ein Zahlwert `form` gesetzt ist.
+  // Welche Disziplinen den Wert bekommen, entscheidet allein die App-Seite
+  // (FORMKARTEN_ECHT_DISCIPLINE_IDS in lib/battle/arena-resolved-disciplines.ts): nur
+  // Disziplinen, die mit echten Karten ihre rho-/Pp-Abnahme bestanden haben. Fuer alle anderen
+  // fehlt `form`, und breitPunkteVon() liefert Zeichen fuer Zeichen den alten Ausdruck
+  // `formVon(p.n)+stufenWert()` — bit-identisch.
+  //
+  // FORM_MESS ist nur fuer die Abnahmemessung (disziplinProbe/einflussVon mit
+  // `formModus:"echt"`): eine Map Name -> {form, int}, die Vorrang hat. Im Spiel immer null.
+  let FORM_MESS=null;
+  let FORM_MESS_MODUS="ersatz";
+  function formEchtVon(n,d){
+    if(FORM_MESS&&FORM_MESS.has(n))return FORM_MESS.get(n);
+    const e=place[n];
+    if(e&&e.d===d&&typeof e.form==="number"&&Number.isFinite(e.form))
+      return {form:e.form,int:INTENSITAET[e.intensitaet]?e.intensitaet:"normal"};
+    return null;
+  }
+  function breitPunkteVon(p,d){
+    const e=formEchtVon(p.n,d);
+    return e?e.form+INTENSITAET[e.int].wert:formVon(p.n)+stufenWert();
+  }
+  // MESS-SZENARIO "echt" (nur Abnahmemessung): je SEITE ein Kartenwert wie in der Einsatzliste
+  // (legacy-lineup-modifiers.ts, calculateFormModifierForSide): Primaerkarte aus dem Kartenpool
+  // eines Teams (positiv 0/2/4/8 oder negativ 0/−2/−4/−8, je zur Haelfte), mit p=0,5 eine
+  // positive Zweitkarte, jede Karte mit p=0,25 farbgleich (x2); dazu je Seite eine Intensitaet
+  // (gleichverteilt). Der Wert gilt fuer JEDEN Spieler der Seite gleich — genau wie
+  // `formPerPlayer` in der Wertung. Bewusst die BREITE Variante (auch negative Karten, auch
+  // Doppelkarten), nicht die KI-Gewohnheit (eine positive Karte): die Abnahme soll den
+  // unguenstigen Fall sehen. Saat mit hohen Bits wie zieheFormkarten().
+  function zieheFormSzenarioEcht(saat,seiten){
+    let z=saat;
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
+    const K=[0,2,4,8], STUFEN=["schonen","normal","push"];
+    const karte=()=>K[r(4)]*(r(4)===0?2:1);
+    const m=new Map();
+    for(const kader of seiten){
+      let form=karte()*(r(2)===0?1:-1);
+      if(r(2)===0)form+=karte();
+      const int=STUFEN[r(3)];
+      for(const p of kader)m.set(p.n,{form,int});
+    }
+    return m;
+  }
 
   // ===================================================================================
   // EINE GEWICHTUNG, NICHT ZWEI.
@@ -11028,7 +11091,7 @@
     const bauSpieler=(p,seite,idx)=>{
       const {sl,gesetzt:slotGesetzt}=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,feldspielDisc);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -20273,7 +20336,7 @@
     const setz=(p,seite,idx)=>{
       const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,buehneDisc);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -36839,7 +36902,7 @@
   // Fingerabdruck in mehreren Tests bit-identisch geprueft wird) auch nur ein Bit zu aendern.
   function kampfwerteVorschau(p,d,slId){
     const engPunkte=slId?slotAufschlag(p,slId,d):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engPunkte+breitPunkte+eigHebung(p,d);
     const eigWert=eigOhneMutator+eigMutator(p,d);
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
@@ -36981,6 +37044,13 @@
           place[n].wechselPaarBonus=e.wechselPaarBonus;
           place[n].wechselPaarGeber=e.wechselPaarGeber;
           place[n].wechselPaarEingespielt=e.wechselPaarEingespielt===true;
+        }
+        // P4 ECHTE FORMKARTE/INTENSITAET (s. breitPunkteVon()): nur uebernommen, wenn `form` eine
+        // endliche Zahl ist — die App setzt das Feld ausschliesslich fuer Disziplinen in
+        // FORMKARTEN_ECHT_DISCIPLINE_IDS. Fehlt es, bleibt `place[n]` exakt wie oben.
+        if(typeof e.form==="number"&&Number.isFinite(e.form)){
+          place[n].form=e.form;
+          if(e.intensitaet==="schonen"||e.intensitaet==="normal"||e.intensitaet==="push")place[n].intensitaet=e.intensitaet;
         }
         order[n]=slotOrd(e.slot);
       }
@@ -37402,9 +37472,10 @@
       // einen Blick, WER da steht, und nicht nur zwei Buchstaben.
       const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
       ico.appendChild(figurKlein(p,40));
-      const fk=formVon(p.n);
-      if(fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent="+"+fk;
-        fm.title="Formkarte des Spieltags: +"+fk+" auf den Disziplinwert";ico.appendChild(fm);}
+      // P4: die GESPIELTE Karte, wo es sie gibt (formEchtVon), sonst wie bisher die Ersatzkarte.
+      const fe=formEchtVon(p.n,disc), fk=fe?fe.form:formVon(p.n);
+      if(fe?fk!==0:fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent=(fk>0?"+":"")+fk;
+        fm.title=(fe?"Gespielte Formkarte: ":"Formkarte des Spieltags: ")+(fk>0?"+":"")+fk+" auf den Disziplinwert";ico.appendChild(fm);}
       if(gesetzt||anderswo)ico.title=anderswo?("steht in "+DISCS[pl.d].label):("steht auf "+(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot));
       r.appendChild(ico);
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
@@ -38452,7 +38523,7 @@
     // Doppelbuchung, die das Konzeptdokument (Abschnitt 5.2) benennt — und der eng-Weg hob zwei
     // Attribute staerker als die uebrigen, verschob also Einflussanteile gegen die Matrix.
     const engPunkte=(slId?slotAufschlag(p,slId,d,slotDef):0);     // haengt an der Position
-    const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
+    const breitPunkte=breitPunkteVon(p,d);                       // trifft jeden gleich
     // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
     // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
     // Battlefield fiel der Basiswert damit auf 0, und `eigWert` bestand nur aus Slot-,
@@ -47682,7 +47753,7 @@
       // haengt, den sie gar nicht hatten.
       const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,d):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,d);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,d,true),d);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,d,false),d);
       const w=spurtWerte(p,attr);
@@ -53127,15 +53198,15 @@
       teile.push(["Slot",slotAufschlag(p,sl,dId),
         "Passung zum Profil von "+(slotDef?slotDef.label:sl)+" (+"+(slotDef?slotDef.gross:"?")+" +"+(slotDef?slotDef.klein:"?")+")."]);
     }
-    const fk=formVon(p.n);
-    if(fk)teile.push(["Form",fk,"Formkarte des Spieltags."]);
+    const fe=formEchtVon(p.n,dId), fk=fe?fe.form:formVon(p.n);
+    if(fk)teile.push(["Form",fk,fe?"Gespielte Formkarte (Einsatzliste).":"Formkarte des Spieltags."]);
     if(!istGegner){
       const tr=traitTreffer(p);
       if(tr.netto)teile.push(["Mutator",tr.netto,
         [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"+"+t)].join(", ")+
         " — +"+MUTATOR_REGEL.jeTreffer+" auf jedes Attribut je Treffer"]);
-      const iv=stufenWert();
-      if(iv)teile.push(["Intensität",iv,INTENSITAET[STUFE].label]);
+      const ivStufe=fe?fe.int:STUFE, iv=fe?INTENSITAET[fe.int].wert:stufenWert();
+      if(iv)teile.push(["Intensität",iv,INTENSITAET[ivStufe].label]);
     }
     const summe=teile.reduce((a,[,v])=>a+v,0);
     return {teile,summe};
@@ -56910,7 +56981,7 @@
   function bfffaKaempfer(p,side,slotId,slotDef,idx){
     const d="battlefield";
     const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
@@ -57972,7 +58043,7 @@
   function mdffaKaempfer(p,side,slotId,slotDef){
     const d="mini-dm";
     const engPunkte=slotId?slotAufschlagMit(p,slotId,d,slotDef):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
@@ -61671,6 +61742,10 @@
     // scripts/ziehe-hockey-pps-referenz.ts Rollen-Diagnose) — ohne dieses Feld koennte
     // `computeIndividualBoxscorePpsFromFixtureResults()` (lib/resolve/battle-mode-arena-team-
     // points.ts) die beiden Rollen nicht getrennt gegen ihre je eigene Referenz normieren.
+    // P4-MESSSCHALTER: "echt" = Einsatzlisten-Szenario je Seite statt Ersatzkarte (s.
+    // zieheFormSzenarioEcht()), "ersatz" = Spielverhalten. Liefert den vorherigen Modus.
+    formModusMessung:(m)=>{const v=FORM_MESS_MODUS; FORM_MESS_MODUS=m==="echt"?"echt":"ersatz";
+      if(FORM_MESS_MODUS==="ersatz")FORM_MESS=null; return v;},
     spieleFeldspiel:(fd,saat)=>{
       if(typeof FELDSPIEL_ART==="undefined"||!FELDSPIEL_ART[fd])return null;
       const M=MOTOREN[fd]; if(!M)return null;
