@@ -50,7 +50,7 @@ describe("syncBillbee", () => {
 
     expect(report.products).toBe(1);
     expect(report.orders).toBe(1);
-    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2"]);
+    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2", "all:2"]);
 
     const articles = await db.prisma.article.findMany({ orderBy: { nameRaw: "asc" } });
     const a = articles.find((x) => x.nameRaw === A)!;

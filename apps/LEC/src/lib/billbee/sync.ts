@@ -8,10 +8,10 @@ import { loadBillbeeConfig } from "./credentials";
 import { LOOKBACK_DAYS, dedupeOrders, diagnoseOrders, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
 
 /**
- * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der letzten 365 Tage aus der Billbee-API
+ * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der gesamten Historie aus der Billbee-API
  * und schreibt sie ueber dieselbe Pipeline wie der Datei-Import. Der Datei-Import bleibt als Rueckfall.
  *
- * Ersetzt werden die Fenster 30/90/365; ein per Datei importiertes "all"-Fenster bleibt unberuehrt.
+ * Ersetzt werden alle Fenster 30/90/365/Gesamt -- alles kommt aus denselben Bestellungen.
  */
 
 export interface BillbeeSyncOptions {
@@ -64,7 +64,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   const rawProducts = await client.getAll<Record<string, unknown>>("/products");
   const masters = rawProducts.map(mapProduct).filter((m): m is MasterProduct => m !== null);
 
-  // 2. Bestellungen der letzten 365 Tage
+  // 2. Bestellungen (gesamte Historie)
   const since = new Date(now.getTime() - LOOKBACK_DAYS * 86_400_000);
   const fetched = await client.getAll<Record<string, unknown>>("/orders", {
     minOrderDate: since.toISOString().slice(0, 10),
@@ -83,7 +83,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     masters.map((m) => m.row)
   );
 
-  // Einzelverkaeufe (Datum, Menge, Preis): ersetzt jeden Abruf die der letzten 365 Tage.
+  // Einzelverkaeufe (Datum, Menge, Preis): ersetzt bei jedem Abruf alle.
   const excludeStates = opts.excludeStates ?? excludeStatesFromEnv();
   const idByName = new Map((await prisma.article.findMany({ select: { id: true, nameNormalized: true } })).map((a) => [a.nameNormalized, a.id]));
   const saleRows = extractSales(orders, { excludeStates }).flatMap((r) => {
