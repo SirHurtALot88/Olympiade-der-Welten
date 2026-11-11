@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
+import { boardVk, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -277,6 +277,15 @@ function EbayActions({ row }: { row: SortimentRow }) {
       )}
       <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
         {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
+      </a>
+      <a
+        className="chip"
+        href={cardmarketLink(row, cleanTitle(row.nameRaw).pack)}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Sucht die Karte bei Cardmarket (deutsch, ab NM)"
+      >
+        Bei Cardmarket ansehen ↗
       </a>
     </div>
   );
