@@ -224,8 +224,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         )}
 
         {row.today && (
-          <>
-            <h4>Was ein Verkauf heute bringt</h4>
+          <Group id="heute" title="Was ein Verkauf heute bringt">
             <section className="bd-dt-grid today">
               <Stat
                 tone={row.today.profitPerUnit < 0 ? "crit" : row.today.marginPct < 0.25 ? "warn" : "good"}
@@ -251,12 +250,10 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 tone={lastSale != null && row.stock > 0 && lastSale > 90 ? "crit" : undefined}
               />
             </section>
-          </>
+          </Group>
         )}
 
-        <h4>
-          Verkäufe {trend && <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span>}
-        </h4>
+        <Group id="verkaeufe" title="Verkäufe" extra={trend ? <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span> : null}>
         <table className="bd-dt-t">
           <thead>
             <tr>
@@ -280,9 +277,22 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             })}
           </tbody>
         </table>
+        </Group>
 
-        <details>
-        <summary>Ergebnis je Stück (historischer Schnitt)</summary>
+        {detail?.market && (
+          <Group id="cardmarket" title="Cardmarket" extra={marketDir ? <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span> : null}>
+            <table className="bd-dt-t">
+              <tbody>
+                <tr><td>Tiefstpreis</td><td className="r">{eur(detail.market.low)}</td></tr>
+                <tr><td>Ø 1 / 7 / 30 Tage</td><td className="r">{eur(detail.market.avg1)} / {eur(detail.market.avg7)} / {eur(detail.market.avg30)}</td></tr>
+                <tr><td>Trend</td><td className="r">{eur(detail.market.trend)}</td></tr>
+                <tr><td>Stand</td><td className="r">{day(detail.market.fetchedAt)}</td></tr>
+              </tbody>
+            </table>
+          </Group>
+        )}
+
+        <Group id="ergebnis" title="Ergebnis je Stück (historischer Schnitt)" defaultOpen={false}>
         <table className="bd-dt-t">
           <tbody>
             <tr><td>DB I (nach Wareneinsatz)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
@@ -290,13 +300,10 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <tr><td>DB III (mit Fixkosten)</td><td className="r">{eur(row.dbIIIPerUnit)} · {formatPercent(row.dbIIIPercent)} %</td></tr>
           </tbody>
         </table>
-        </details>
+        </Group>
 
         {detail && detail.sales.length > 0 && (
-          <>
-            <h4>
-              Letzte Verkäufe <span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>
-            </h4>
+          <Group id="letzte" title="Letzte Verkäufe" extra={<span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>}>
             <table className="bd-dt-t">
               <thead>
                 <tr>
@@ -320,10 +327,10 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
             {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} geladenen Verkäufen.</p>}
-          </>
+          </Group>
         )}
 
-        <h4>Warenbewegungen</h4>
+        <Group id="bewegungen" title="Warenbewegungen">
         {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen. Startbestand: {row.stock} Stk – Änderungen werden ab dem nächsten Billbee-Abgleich festgehalten.</p>}
         {movements.length > 0 && (
           <>
@@ -345,8 +352,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <p className="bd-fig-note">Verkäufe stammen aus Billbee. Bestandsänderungen schreibt die App bei jedem Billbee-Abgleich selbst mit (Billbee liefert keine Lagerhistorie) und zeigt sie nur, soweit Verkäufe sie nicht erklären. Einkäufe gibt es nur, wenn sie importiert wurden.</p>
           </>
         )}
+        </Group>
 
-        <h4>Einkäufe</h4>
+        <Group id="einkaeufe" title="Einkäufe">
         {failed && <p className="bd-none">Details konnten nicht geladen werden.</p>}
         {!detail && !failed && <p className="bd-none">Lädt …</p>}
         {detail && detail.purchases.length === 0 && <p className="bd-none">Keine Einkäufe importiert.</p>}
@@ -372,11 +380,10 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             </table>
           </>
         )}
+        </Group>
 
         {detail && detail.reports.length > 0 && (
-          <>
-            <details>
-            <summary>eBay-Verkaufsberichte</summary>
+          <Group id="berichte" title="eBay-Verkaufsberichte" defaultOpen={false}>
             <table className="bd-dt-t">
               <thead>
                 <tr><th>Zeitraum</th><th className="r">Stück</th><th className="r">Ø Preis</th></tr>
@@ -392,27 +399,44 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
             <p className="bd-fig-note">Verkaufsdaten liegen nur je Berichtszeitraum vor, nicht je Einzelverkauf.</p>
-            </details>
-          </>
+          </Group>
         )}
 
-        {detail?.market && (
-          <>
-            <h4>
-              Cardmarket {marketDir && <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span>}
-            </h4>
-            <table className="bd-dt-t">
-              <tbody>
-                <tr><td>Tiefstpreis</td><td className="r">{eur(detail.market.low)}</td></tr>
-                <tr><td>Ø 1 / 7 / 30 Tage</td><td className="r">{eur(detail.market.avg1)} / {eur(detail.market.avg7)} / {eur(detail.market.avg30)}</td></tr>
-                <tr><td>Trend</td><td className="r">{eur(detail.market.trend)}</td></tr>
-                <tr><td>Stand</td><td className="r">{day(detail.market.fetchedAt)}</td></tr>
-              </tbody>
-            </table>
-          </>
-        )}
       </aside>
     </div>
+  );
+}
+
+/** Einklappbare Gruppe im Drawer; der Zustand bleibt je Gruppe im Browser gespeichert (localStorage). */
+function Group({ id, title, extra, defaultOpen = true, children }: { id: string; title: string; extra?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  const key = `lec.drawer.${id}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      const v = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+      return v === "1" ? true : v === "0" ? false : defaultOpen;
+    } catch {
+      return defaultOpen;
+    }
+  });
+  function toggle() {
+    setOpen((o) => {
+      try {
+        window.localStorage.setItem(key, o ? "0" : "1");
+      } catch {
+        /* ohne Speicher bleibt es bei der Sitzung */
+      }
+      return !o;
+    });
+  }
+  return (
+    <section className="bd-grp">
+      <button type="button" className="bd-grp-h" onClick={toggle} aria-expanded={open}>
+        <span className="bd-grp-caret">{open ? "▾" : "▸"}</span>
+        {title}
+        {extra}
+      </button>
+      {open && children}
+    </section>
   );
 }
 

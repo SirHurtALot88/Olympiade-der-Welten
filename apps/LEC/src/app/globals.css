@@ -222,6 +222,10 @@ tbody tr:hover { background: var(--panel2); }
 table.resizable th:first-child, table.resizable td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
 table.resizable tbody tr:hover td:first-child { background: var(--panel2); }
 @media (max-width: 600px) { .bd-dt-grid { grid-template-columns: repeat(2, 1fr) !important; } .bd-dt-stat small { display: block !important; } }
+.bd-grp { margin-top: 18px; }
+.bd-grp-h { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: 0; padding: 4px 0; cursor: pointer; font: inherit; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; text-align: left; }
+.bd-grp-h:hover { color: var(--ink); }
+.bd-grp-caret { width: 12px; font-size: 11px; color: var(--faint); }
 .bd-dt details { margin-top: 14px; }
 .bd-dt details > summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 4px 0; }
 .bd-dt-grid.today { grid-template-columns: repeat(4, 1fr); margin-top: 6px; }
