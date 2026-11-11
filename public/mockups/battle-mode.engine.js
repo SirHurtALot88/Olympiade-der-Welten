@@ -45140,13 +45140,14 @@
   // Runner, window.__olyBahnFlags VOR dem Laden gesetzt wird. Die echte App setzt beides
   // nie, deshalb bleibt `spurtFormat` immer "klassisch" und bauSpurt()/stepSpurt() laufen
   // bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs, GESAMT-Hash
-  // unveraendert). "hatz" baut stattdessen das Wellen-Ausscheidungsformat (baueHatz(),
-  // stepSpurtHatz() -- beide nahe stepSpurt() unten). Bewusst NUR fuer Spurt (einziger
-  // heute vorhandener Schluessel) -- ein kuenftiges zweites Format (HYROX-Stationen, s.
-  // Design-Dokument) ergaenzt hier einen weiteren Wert, keinen weiteren Schalter. Die GROSSE
-  // Entscheidung "wie waehlt das Spiel das Format" (Saisonkalender/Hash/Liga-Einstellung,
-  // Design-Dokument Abschnitt 6) ist ausdruecklich NICHT Teil dieses Schalters -- er ist nur
-  // der Mess-/Vorschau-Zugriff, den noch niemand hatte.
+  // unveraendert). "hatz" baut das Wellen-Ausscheidungsformat (baueHatz(), stepSpurtHatz()
+  // -- beide nahe stepSpurt() unten), "hyrox" das Stationen-Format (baueHyroxStationen(),
+  // stepSpurtHyrox(), s. docs/design/spurt-format-hyrox-stationen-08-11.md). Bewusst NUR
+  // fuer Spurt (einziger heute vorhandener Schluessel) -- ein weiteres Format ergaenzt
+  // hier einen weiteren Wert, keinen weiteren Schalter. Die GROSSE Entscheidung "wie
+  // waehlt das Spiel das Format" (Saisonkalender/Hash/Liga-Einstellung, Hatz-Design-
+  // Dokument Abschnitt 6) ist ausdruecklich NICHT Teil dieses Schalters -- er ist nur der
+  // Mess-/Vorschau-Zugriff, den noch niemand hatte.
   const BAHN_FLAGS={spurtFormat:"klassisch"};
   try{
     const startFlags=window.__olyBahnFlags;
@@ -46579,6 +46580,15 @@
   // der vorab (baueHatz(), deterministisch aus derselben Saat) berechnete Wellenplan:
   // {welle, finale, ende, rausIds, revealed}. `null` ausserhalb der Hatz.
   let bahnHatzAktiv=false, HATZ_WELLEN=null;
+  // HYROX-STATIONEN (Format 3, 08.11., s. docs/design/spurt-format-hyrox-stationen-08-11.md):
+  // dasselbe Muster wie bahnHatzAktiv/HATZ_WELLEN direkt darueber, nur fuer das dritte
+  // Spurt-Format. `bahnHyroxAktiv` nur waehrend BAHN_FLAGS.spurtFormat==="hyrox" true.
+  // `HYROX_STATIONEN` ist die vorab (baueHyroxStationen(), deterministisch aus derselben
+  // Saat) berechnete Stationsliste fuer die Ueberlagerungs-Zeichnung ({pos, bild, name,
+  // gruppe}, dieselben sieben Positionen wie BA().hindernisse/hindernisBilder/
+  // hindernisNamen) -- die eigentliche ZEITWIRKUNG steht je Laeufer in `u.hyroxZeit`
+  // (s. baueHyroxStationen()). `null` ausserhalb von Hyrox.
+  let bahnHyroxAktiv=false, HYROX_STATIONEN=null;
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -47977,6 +47987,15 @@
     bahnHatzAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hatz");
     HATZ_WELLEN=null;
     if(bahnHatzAktiv)baueHatz();
+    // HYROX-STATIONEN (Format 3, 08.11., s. Hook-Punkt-Liste in
+    // docs/design/spurt-format-die-hatz-08-11.md Abschnitt 7 und
+    // docs/design/spurt-format-hyrox-stationen-08-11.md): derselbe Schalter, derselbe
+    // Hook-Punkt wie bahnHatzAktiv direkt darueber -- NUR fuer Spurt (`art.spurt`), NUR
+    // explizit angefordert. Ohne das Flag bleibt `bahnHyroxAktiv` false und bauSpurt()
+    // endet bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs).
+    bahnHyroxAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hyrox");
+    HYROX_STATIONEN=null;
+    if(bahnHyroxAktiv)baueHyroxStationen();
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -48790,9 +48809,138 @@
     ctx.restore();
   }
 
+  // ===================================================================================
+  // HYROX-STATIONEN (Format 3, 08.11.). Chris' Kritik an Spurt: "lame im Vergleich zu
+  // Time Trial" -- und die Erinnerung, dass die sieben Stationen im Boden (Huerde/
+  // Balken/Palisade/Seil/Wassergraben/Mauer/Strohballen, `BAHN_ART.spurt.hindernisBilder`/
+  // `hindernisNamen`) heute reine Kulisse sind: JEDE von ihnen laeuft ueber denselben
+  // generischen Huerden-Stolper (HUERDEN_TYP(i) aus `hindernisTypen`, unabhaengig vom
+  // gezeigten Bild) -- eine "Wassergraben"-Station bremst mechanisch genauso wie eine
+  // "Huerde", nur mit einem anderen Sprite darunter. Dieses Format macht die STATIONEN
+  // selbst zur Mechanik, mit einer inhaltlich passenden Sub-Skill-Kombination je Gruppe --
+  // Design/Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md.
+  //
+  // RUNDKURS? NEIN -- dieselbe Entscheidung wie bei der Hatz (s. deren Kopfkommentar/
+  // Design-Dokument Abschnitt 2): die Bahn bleibt LINEAR, die sieben Stationen liegen an
+  // denselben Positionen wie heute (BA().hindernisse, 0,14..0,86 Streckenanteile).
+  //
+  // SIEBEN STATIONEN, DREI CHECKS. Sieben unabhaengige rr()-Wuerfe je Laeufer wuerden das
+  // Ergebnis verwaschen (CLAUDE.md, "Mehr Ereignisse helfen fast nie" -- derselbe Befund,
+  // der die Hatz von einem auf fuenf GROB passende Wuerfe je Welle gebracht hat, hier
+  // andersherum: von sieben AUF drei). Gruppiert nach Inhalt, nicht nach Position:
+  //   TECHNIK  (Huerde + Balken)              -- TECHNIK/WENDIGKEIT (bestehendes Rezept)
+  //   KLETTERN (Palisade + Seil)               -- TECHNIK/ROBUST (Grip & Durchhalten)
+  //   KRAFT    (Wassergraben + Mauer + Strohballen) -- WUCHT/STEHEN (Schieben/Tragen/Kaelte aushalten)
+  // Jede Gruppe liest AUSSCHLIESSLICH die sieben bestehenden Spurt-Sub-Skills (s. "DIE
+  // SIEBEN ROLLEN" am Kopf von BAHN_ART, dasselbe Rezept wie Klassisch/Hatz) -- keine neue
+  // Sub-Skill-Formel, nur eine andere KOMBINATION, exakt wie bei der Hatz.
+  //
+  // `u.fertig` TRAEGT HIER EINE ECHTE ZEIT (wie Klassisch/Time-Trial), KEINEN RANG (anders
+  // als die Hatz): `baueHyroxStationen()` berechnet je Laeufer einmal, deterministisch aus
+  // der Renn-Saat, eine Zielzeit `u.hyroxZeit` aus Grundtempo (ANTRITT/ENDTEMPO) minus den
+  // drei Stationschecks. `stepSpurtHyrox()` laesst die Uhr laufen und traegt `u.fertig`
+  // ein, sobald `rennT` die Zielzeit erreicht -- MOTOREN["spurt"].wert() (der generische
+  // Bahn-Zweig, unveraendert) sortiert danach aufsteigend nach `bahnZeit(u)=u.fertig`
+  // (startT ist bei Spurt immer 0) und vergibt -(Platz). Kein eigener wert()-Zweig noetig.
+  const HYROX_MIN_SEK=6;
+  // BASIS/SKALA MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}) -- Objekte statt
+  // simplen `const`s, dasselbe Muster wie HATZ_RAUSCHEN_AKTUELL (s. dort).
+  const HYROX_BASIS_SEK_AKTUELL={wert:26}, HYROX_SKALA_SEK_AKTUELL={wert:0.165};
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md
+  // Abschnitt 5). `pace` ist die Strecke zwischen den Stationen (Antritt/Endtempo-Mix wie
+  // im klassischen Format), die drei Stationsgewichte zusammen tragen die Haelfte des
+  // Scores -- die Stationen sollen wirklich etwas kosten, nicht nur ein kleiner Zuschlag
+  // neben dem Lauftempo sein. MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}).
+  const HYROX_W={pace:0.40, technik:0.20, kletter:0.20, kraft:0.20};
+  const HYROX_RAUSCHEN_AKTUELL={wert:0.18};
+  // DREI UNABHAENGIGE WUERFE statt sieben (Kalibrierweg, s. Design-Dokument) -- je einer
+  // fuer die Strecke und die drei Stationsgruppen, dieselbe Glaettung wie bei der Hatz
+  // (fuenf Wuerfe statt einem je Welle).
+  function hyroxScore(u){
+    const W=HYROX_W, rauschen=HYROX_RAUSCHEN_AKTUELL.wert;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const pace=0.55*(u.ANTRITT||0)+0.45*(u.ENDTEMPO||0);
+    // TECHNIK-STATIONEN (Huerde+Balken): Tritt-Technik und Balance -- dasselbe Paar, das
+    // der klassische Huerdenlauf an jeder Huerde schon nutzt.
+    const technik=0.6*(u.TECHNIK||0)+0.4*(u.WENDIGKEIT||0);
+    // KLETTER-STATIONEN (Palisade+Seil): ueberwiegend ROBUST (Festhalten/Durchhalten unter
+    // Schmerz -- health/torment/will/dex), TECHNIK nur als Nebenweg (wer wenig Grip hat,
+    // kommt ueber geschickte Technik trotzdem rueber, nur langsamer) -- "mehrere Wege zum
+    // Erfolg" (CLAUDE.md).
+    const kletter=0.3*(u.TECHNIK||0)+0.7*(u.ROBUST||0);
+    // KRAFT-STATIONEN (Wassergraben+Mauer+Strohballen): Schieben/Tragen (WUCHT) als
+    // Primaerweg, STEHEN (Kaelte/Erschoepfung aushalten) als zweiter Kanal -- die drei
+    // haertesten Stationen am Streckenende, bewusst zusammengefasst statt dreifach
+    // gewuerfelt.
+    const kraft=0.55*(u.WUCHT||0)+0.45*(u.STEHEN||0);
+    return wurf(pace*W.pace)+wurf(technik*W.technik)+wurf(kletter*W.kletter)+wurf(kraft*W.kraft);
+  }
+  // STATIONSLISTE FUER DIE ZEICHNUNG (reine Anzeige -- dieselben sieben Positionen/Bilder/
+  // Namen wie BA().hindernisse/hindernisBilder/hindernisNamen, nur mit ihrer Gruppe
+  // (Technik/Klettern/Kraft) markiert, damit die Ueberlagerung zeigen kann, WELCHER Check
+  // gerade zaehlt). Kein Einfluss auf rr()/wert()/u.hyroxZeit -- die liegen schon fest,
+  // bevor dieses Array gebaut wird.
+  const HYROX_GRUPPE_JE_STATION=["technik","technik","kletter","kletter","kraft","kraft","kraft"];
+  function baueHyroxStationen(){
+    const art=BA(), pos=art.hindernisse||[], bilder=art.hindernisBilder||[], namen=art.hindernisNamen||[];
+    HYROX_STATIONEN=pos.map((p,i)=>({pos:p, bild:bilder[i]||null, name:namen[i]||("Station "+(i+1)),
+      gruppe:HYROX_GRUPPE_JE_STATION[i%HYROX_GRUPPE_JE_STATION.length]}));
+    for(const u of LAEUFER){
+      const score=hyroxScore(u);
+      u.hyroxZeit=Math.max(HYROX_MIN_SEK, HYROX_BASIS_SEK_AKTUELL.wert-HYROX_SKALA_SEK_AKTUELL.wert*score);
+      u.hyroxStationIdx=-1;   // kosmetisch: welche Station zuletzt eine Arbeits-Pose ausgeloest hat
+    }
+  }
+  function stepSpurtHyrox(dt){
+    if(done)return;
+    rennT+=dt;
+    for(const u of LAEUFER){
+      if(u.stolper>0)u.stolper-=dt;
+      if(u.fertig!=null)continue;
+      const z=u.hyroxZeit||HYROX_BASIS_SEK_AKTUELL.wert;
+      const vorher=u.pos||0;
+      // KOSMETISCHER FORTSCHRITT (reine Anzeige -- schreibt nur `u.pos`/`u.bahn`/`u.stolper`,
+      // nie rr()/wert()/u.hyroxZeit, dasselbe Prinzip wie die Positions-Animation der Hatz).
+      u.pos=Math.max(0,Math.min(0.99, rennT/z));
+      u.bahn=u.bahnZ;
+      // ARBEITS-POSE AN JEDER STATION: beim Ueberschreiten einer Stationsmarke kurz dieselbe
+      // "liegt"/Stolper-Pose zeigen, mit der ein Huerdensturz im klassischen Format schon
+      // arbeitet (CLAUDE.md, PixelLab-Tod-Animationen -- hier kein Sturz, aber dasselbe
+      // Wiederverwendungsprinzip: bestehende Pose statt neuer Animation). Rein kosmetisch,
+      // die Zeit steht durch `u.hyroxZeit` schon fest.
+      for(let i=0;i<HYROX_STATIONEN.length;i++){
+        const st=HYROX_STATIONEN[i];
+        if(vorher<st.pos&&u.pos>=st.pos){ u.stolper=Math.max(u.stolper||0,0.4); u.hyroxStationIdx=i; }
+      }
+      if(rennT>=z){ u.pos=1; u.fertig=z; rennFertig.push(u); }
+    }
+    if(rennFertig.length>=LAEUFER.length)done=true;
+  }
+  // STATIONS-UEBERLAGERUNG (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset: die sieben Sprites zeichnet `zeichneBoden()`
+  // bereits (Batch 15 Kulissen-Rework); diese Funktion ergaenzt nur ein kleines Gruppen-
+  // Schild ueber jeder Station, damit sichtbar ist, dass TECHNIK/KLETTERN/KRAFT jetzt
+  // echte Checks sind, nicht nur ein Bild.
+  function zeichneHyroxUeberlagerung(){
+    if(!HYROX_STATIONEN||!HYROX_STATIONEN.length)return;
+    const GRUPPEN_LABEL={technik:"TECHNIK", kletter:"KLETTERN", kraft:"KRAFT"};
+    const GRUPPEN_FARBE={technik:"rgba(69,176,201,0.85)", kletter:"rgba(242,160,61,0.85)", kraft:"rgba(199,68,68,0.9)"};
+    ctx.save();
+    ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
+    for(const st of HYROX_STATIONEN){
+      const x=camX(st.pos), y=bahnY(0)-34;
+      ctx.fillStyle=GRUPPEN_FARBE[st.gruppe]||"rgba(120,120,120,0.85)";
+      ctx.fillRect(x-28,y-14,56,16);
+      ctx.fillStyle="#fff";
+      ctx.fillText(GRUPPEN_LABEL[st.gruppe]||"", x, y-2);
+    }
+    ctx.restore();
+  }
+
   function stepSpurt(dt){
     if(done)return;
     if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
+    if(bahnHyroxAktiv){ stepSpurtHyrox(dt); return; }
     rennT+=dt;
     // S-N5b: Stationsduelle buchen (reine Buchhaltung neben dem Laeufer, s. stationsDuellSchritt).
     stationsDuellSchritt();
@@ -50781,6 +50929,9 @@
     // ohne `bahnHatzAktiv` ist das ein No-Op -- die Figuren selbst zeichnet der Rest dieser
     // Funktion unveraendert (u.raus/u.pos tragen die Hatz-Information schon, s. dort).
     if(bahnHatzAktiv)zeichneHatzUeberlagerung();
+    // HYROX-STATIONEN (s. BAHN_FLAGS/stepSpurtHyrox): No-Op ausserhalb des Formats,
+    // dasselbe Muster wie der Hatz-Zweig direkt darueber.
+    if(bahnHyroxAktiv)zeichneHyroxUeberlagerung();
     // TEAM-FEIER STAFFEL (Konzept 3.3): Teamfarben einmal je Frame (Befund B5). Nur Staffel --
     // jede andere Bahn zeichnet ohne Feier-Publikum und bleibt Zeichen fuer Zeichen wie vorher.
     const staffelFeier=!!BA().staffel;
@@ -59323,11 +59474,15 @@
       // Anzeigefeld -- ohne diese zwei Zeilen wuerde ein headless Messlauf MITTEN in einem
       // sichtbaren Hatz-Rennen (M.sichern()/M.bau()/.../M.zurueck()) das sichtbare Rennen
       // nach der Messung faelschlich wieder als Hatz (oder umgekehrt) zeigen.
-      bahnHatzAktiv, HATZ_WELLEN};
+      bahnHatzAktiv, HATZ_WELLEN,
+      // HYROX-STATIONEN: dieselbe Begruendung wie bei den zwei Zeilen direkt darueber --
+      // ohne sie wuerde ein headless Messlauf ein sichtbares Hyrox-Rennen verwechseln.
+      bahnHyroxAktiv, HYROX_STATIONEN};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
     bahnHatzAktiv=!!a.bahnHatzAktiv; HATZ_WELLEN=a.HATZ_WELLEN??null;
+    bahnHyroxAktiv=!!a.bahnHyroxAktiv; HYROX_STATIONEN=a.HYROX_STATIONEN??null;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -61073,7 +61228,7 @@
     // (oder weglassen) ist der unveraenderte Standard. Unbekannte Werte werden ignoriert.
     // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
     bahnFlags:(neu)=>{
-      if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"))
+      if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"||neu.spurtFormat==="hyrox"))
         BAHN_FLAGS.spurtFormat=neu.spurtFormat;
       return {...BAHN_FLAGS};
     },
@@ -61091,6 +61246,20 @@
         if(Number.isFinite(Number(neu.rauschenFinale)))HATZ_RAUSCHEN_AKTUELL.finale=Number(neu.rauschenFinale);
       }
       return {...HATZ_W, finale:{...HATZ_W_FINALE}, rauschen:HATZ_RAUSCHEN_AKTUELL.nichtFinale, rauschenFinale:HATZ_RAUSCHEN_AKTUELL.finale};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "HYROX-STATIONEN" (nur Messung/QA, dasselbe Muster wie
+    // hatzGewichte direkt darueber): erlaubt scripts/messe-spurt-hyrox-einfluss.mjs/
+    // miss-spurt-hyrox-rangtreue.mjs, HYROX_W/HYROX_RAUSCHEN_AKTUELL/HYROX_BASIS_SEK/
+    // HYROX_SKALA_SEK innerhalb einer Browser-Sitzung durchzuprobieren. Kein echtes Spiel
+    // ruft das auf; BAHN_ART.spurt.rezept bleibt unberuehrt.
+    hyroxGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HYROX_W))if(Number.isFinite(Number(neu[k])))HYROX_W[k]=Number(neu[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HYROX_RAUSCHEN_AKTUELL.wert=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.basis)))HYROX_BASIS_SEK_AKTUELL.wert=Number(neu.basis);
+        if(Number.isFinite(Number(neu.skala)))HYROX_SKALA_SEK_AKTUELL.wert=Number(neu.skala);
+      }
+      return {...HYROX_W, rauschen:HYROX_RAUSCHEN_AKTUELL.wert, basis:HYROX_BASIS_SEK_AKTUELL.wert, skala:HYROX_SKALA_SEK_AKTUELL.wert};
     },
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
