@@ -12,6 +12,7 @@ interface Status {
     deactivated: number;
     orders: number;
     ebayItemIds?: number;
+    recent?: { newestOrderAt: string | null; days: { day: string; orders: number; states: Record<string, number> }[] };
     duplicateMasters?: number;
     windows: { window: string; articles: number; units: number }[];
     diagnostics?: {
@@ -160,6 +161,13 @@ export function BillbeeSyncCard() {
               Datenprüfung: {r.diagnostics.duplicates} doppelt gelieferte Bestellungen entfernt, {r.diagnostics.fractionalItems} Positionen mit gebrochener Menge.
               {r.diagnostics.fractionalSamples.length > 0 && (
                 <> Beispiele: {r.diagnostics.fractionalSamples.map((s) => `${s.name} (${s.qty}x, Bestellung ${s.order})`).join("; ")}.</>
+              )}
+              {r.recent && (
+                <>
+                  <br />
+                  Bestellungen letzte Tage: {r.recent.days.map((d) => `${d.day}: ${d.orders} (${Object.entries(d.states).map(([s, n]) => `Status ${s}: ${n}`).join(", ")})`).join(" · ")}
+                  {r.recent.newestOrderAt && <> · jüngste Bestellung {new Date(r.recent.newestOrderAt).toLocaleString("de-DE")}</>}
+                </>
               )}
               <br />
               Meistverkauft (365 T): {r.diagnostics.top.map((t) => `${t.name}: ${t.units} Stück in ${t.orders} Bestellungen (max. ${t.maxLine} je Position)`).join(" · ")}

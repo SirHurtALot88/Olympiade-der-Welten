@@ -141,6 +141,28 @@ export interface OrderDiagnostics {
   top: { name: string; units: number; orders: number; maxLine: number }[];
 }
 
+/** Bestellungen der letzten Tage je Datum und Status plus der juengste Bestellzeitpunkt: zeigt, ob Billbee ueberhaupt Bestellungen von heute liefert. */
+export function recentOrderDays(orders: Json[], now: Date, days = 4): { newestOrderAt: string | null; days: { day: string; orders: number; states: Record<string, number> }[] } {
+  const byDay = new Map<string, { orders: number; states: Record<string, number> }>();
+  let newest = -Infinity;
+  for (const o of orders) {
+    const t = Date.parse(String(o.CreatedAt ?? o.OrderDate ?? ""));
+    if (Number.isNaN(t)) continue;
+    if (t > newest) newest = t;
+    const day = new Date(t).toISOString().slice(0, 10);
+    const cur = byDay.get(day) ?? { orders: 0, states: {} };
+    cur.orders++;
+    const st = String(num(o.State ?? o.OrderStateId) ?? "?");
+    cur.states[st] = (cur.states[st] ?? 0) + 1;
+    byDay.set(day, cur);
+  }
+  const from = new Date(now.getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  return {
+    newestOrderAt: Number.isFinite(newest) ? new Date(newest).toISOString() : null,
+    days: [...byDay].filter(([d]) => d >= from).sort(([a], [b]) => (a < b ? 1 : -1)).map(([day, v]) => ({ day, ...v })),
+  };
+}
+
 export function diagnoseOrders(orders: Json[], duplicates: number, opts: { excludeStates?: number[] } = {}): OrderDiagnostics {
   const exclude = new Set(opts.excludeStates ?? []);
   const byName = new Map<string, { name: string; units: number; orders: Set<string>; maxLine: number }>();
