@@ -45,6 +45,8 @@ export interface ArticleAggregate {
   active: boolean;
   /** Von Chris manuell ausgeblendet. */
   hidden?: boolean;
+  /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
+  lastSoldAt?: Date | null;
   /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
    * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
    * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
@@ -160,6 +162,8 @@ export interface SortimentRow {
   active: boolean;
   /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
   hidden?: boolean;
+  /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
+  lastSoldAt?: string | null;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
   /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
   ranks?: {
@@ -654,6 +658,7 @@ export function buildSortimentRow(
     windows: windowMetrics,
     active: a.active,
     hidden: a.hidden === true,
+    lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,

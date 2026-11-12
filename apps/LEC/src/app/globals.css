@@ -218,6 +218,9 @@ tbody td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-al
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--panel2); }
 .bd-row-click { cursor: pointer; }
+table.bd th.bd-th-sort { cursor: pointer; user-select: none; }
+table.bd th.bd-th-sort:hover { color: var(--ink); }
+.bd-sort-arrow { margin-left: 4px; font-size: 9px; color: var(--accent); }
 /* Artikelspalte der Tabelle "Alle Spalten" bleibt beim Querscrollen stehen */
 table.resizable th:first-child, table.resizable td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
 table.resizable tbody tr:hover td:first-child { background: var(--panel2); }
@@ -412,7 +415,7 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
   table.bd td.bd-c-rec { grid-column: 1 / -1; order: 1; }
   table.bd td.bd-c-vk { order: 2; } table.bd td.bd-c-mk { order: 3; }
   table.bd td.bd-c-margin { order: 4; } table.bd td.bd-c-verdict { order: 5; }
-  table.bd td.bd-c-stock { order: 6; } table.bd td.bd-c-sales { order: 7; }
+  table.bd td.bd-c-stock { order: 6; } table.bd td.bd-c-sales { order: 7; } table.bd td.bd-c-last { order: 7; }
   table.bd td.bd-c-ek { order: 8; } table.bd td.bd-c-avg { order: 9; }
   .bd-range { max-width: none; min-width: 0; width: 100%; }
   .bd-track { width: 100%; }

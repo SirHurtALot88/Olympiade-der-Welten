@@ -227,6 +227,12 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
   const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
+  // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
+  const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
+    const v = searchParams0.get("bestand");
+    return v === "1" || v === "2-3" || v === "4-9" || v === "10+" ? v : null;
+  });
+  const [boardReverse, setBoardReverse] = useState(searchParams0.get("rev") === "1");
   const [onlyMarketFalling, setOnlyMarketFalling] = useState(initialFlags.has("marktfaellt"));
   const [onlyNameCheck, setOnlyNameCheck] = useState(initialFlags.has("namecheck"));
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
@@ -258,6 +264,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
     if (view === "alles") params.set("ansicht", "alles");
     if (boardSort !== "abweichung") params.set("sort", boardSort);
+    if (boardReverse) params.set("rev", "1");
+    if (stockBand) params.set("bestand", stockBand);
     const flags = [
       onlyLadenhueter && "ladenhueter",
       onlySoldOut && "ausverkauft",
@@ -271,7 +279,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, onlyLadenhueter, onlySoldOut, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -346,6 +354,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyNameCheck) {
       result = result.filter((r) => r.codeName?.mismatch);
     }
+    if (stockBand) {
+      const [lo, hi] = stockBand === "10+" ? [10, Infinity] : stockBand.split("-").map(Number).concat(stockBand.includes("-") ? [] : [Number(stockBand)]);
+      result = result.filter((r) => r.stock >= lo && r.stock <= (hi ?? lo));
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -359,11 +371,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !stockBand) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyMarketFalling, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -378,8 +390,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => !r.hidden && r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
-  const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyMarketFalling || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const boardRows = useMemo(() => sortBoard(filtered, boardSort, boardReverse).slice(0, visibleCount), [filtered, boardSort, boardReverse, visibleCount]);
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -498,6 +510,23 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         >
           nur Ladenhüter
         </button>
+        <span className="fsep" />
+        <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 700, letterSpacing: ".05em" }}>BESTAND</span>
+        {(["1", "2-3", "4-9", "10+"] as const).map((b) => (
+          <button
+            key={b}
+            type="button"
+            className={`chip${stockBand === b ? " on" : ""}`}
+            onClick={() => {
+              setStockBand((cur) => (cur === b ? null : b));
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title={`Nur Artikel mit ${b === "10+" ? "10 oder mehr" : b === "1" ? "genau 1" : b.replace("-", " bis ")} Stück im Lager`}
+          >
+            {b === "1" ? "1 Stk" : b === "10+" ? "10+ Stk" : `${b.replace("-", "–")} Stk`}
+          </button>
+        ))}
+        <span className="fsep" />
         <button
           type="button"
           className={`chip${onlySoldOut ? " on" : ""}`}
@@ -584,7 +613,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           <div className="bd-toolbar">
             <label>
               Sortierung
-              <select value={boardSort} onChange={(e) => setBoardSort(e.target.value as BoardSortKey)}>
+              <select value={boardSort} onChange={(e) => { setBoardSort(e.target.value as BoardSortKey); setBoardReverse(false); }}>
                 {(Object.keys(BOARD_SORT_LABEL) as BoardSortKey[]).map((k) => (
                   <option key={k} value={k}>
                     {BOARD_SORT_LABEL[k]}
@@ -596,7 +625,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
+          <PreisBoard rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
