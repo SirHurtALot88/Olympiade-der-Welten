@@ -57,7 +57,7 @@ export async function loadArticleAggregates(
   prisma: PrismaClient,
   opts: { includeHidden?: boolean } = {}
 ): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -72,7 +72,10 @@ export async function loadArticleAggregates(
       select: { articleId: true, ebayItemId: true },
       orderBy: { reportTo: "desc" },
     }),
+    // Letzter Einzelverkauf je Artikel (Spalte "Letzter Verkauf")
+    prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
   ]);
+  const lastSoldByArticle = new Map(lastSales.map((s) => [s.articleId, s._max.soldAt]));
   const factItemByArticle = new Map<string, string>();
   for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
 
@@ -151,6 +154,7 @@ export async function loadArticleAggregates(
       stock: article.stock,
       active: article.active,
       hidden: article.hidden,
+      lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
       // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
       // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
       currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),

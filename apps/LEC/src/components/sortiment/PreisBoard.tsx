@@ -1,5 +1,6 @@
 "use client";
 
+import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
@@ -98,30 +99,45 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
 
 interface Props {
   rows: SortimentRow[];
+  sortKey?: BoardSortKey;
+  reversed?: boolean;
+  onSort?: (key: BoardSortKey) => void;
   imageVersions: Record<string, string>;
   imageSrc: (articleId: string, version: string) => string;
   onPreview: (p: { src: string; x: number; y: number } | null) => void;
   onOpen: (articleId: string) => void;
 }
 
-export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+/** Tage seit dem letzten Verkauf; null ohne Verkauf. */
+export function daysSince(iso: string | null | undefined, now = Date.now()): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
+export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+  const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
+    <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
+      {label}
+      {sortKey === key && <span className="bd-sort-arrow">{reversed ? "▲" : "▼"}</span>}
+    </th>
+  );
   return (
     <div className="bd-wrap">
       <table className="bd">
         <thead>
           <tr>
-            <th>Artikel</th>
-            <th className="r" title="Lagerbestand in Stück">Bestand</th>
-            <th className="r" title="Verkaufte Stück in 365 Tagen (darunter 90 Tage)">Verkäufe</th>
-            <th className="r" title="Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)">Ø EK</th>
-            <th className="r" title="Durchschnittlicher Verkaufspreis je Stück (365 T)">Ø VK</th>
-            <th className="r">Dein VK</th>
-            <th>Empfohlener VK</th>
-            <th className="r">Marktwert</th>
-            <th className="r" title="Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst">
-              Marge
-            </th>
-            <th>Urteil</th>
+            {head("name", "Artikel")}
+            {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
+            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage)")}
+            {head("letzterVerkauf", "Letzter Verkauf", "r", "Vor wie vielen Tagen zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
+            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)")}
+            {head("avgvk", "Ø VK", "r", "Durchschnittlicher Verkaufspreis je Stück (365 T)")}
+            {head("vk", "Dein VK", "r")}
+            {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
+            {head("marktwert", "Marktwert", "r")}
+            {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
+            {head("abweichung", "Urteil")}
           </tr>
         </thead>
         <tbody>
@@ -178,6 +194,13 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}
                   <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
+                </td>
+                <td data-label="Letzter Verkauf" className="r bd-num bd-c-last">
+                  {(() => {
+                    const d = daysSince(row.lastSoldAt);
+                    if (d === null) return <span className="bd-none">—</span>;
+                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} T`}</span>;
+                  })()}
                 </td>
                 <td data-label="Ø EK" className="r bd-num bd-c-ek">
                   {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}

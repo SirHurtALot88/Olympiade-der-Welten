@@ -166,3 +166,14 @@ describe("Verkaeufe, Bestand, Mengen", () => {
     expect(formatQty(2762.67)).toBe("2762,67");
   });
 });
+
+describe("Sortierung nach letztem Verkauf und Umkehren", () => {
+  const r = (name: string, lastSoldAt: string | null, stock = 1) => ({ nameRaw: name, lastSoldAt, stock, ek: 0, avgVkRealized: 0, windows: {} }) as unknown as SortimentRow;
+  const rows = [r("alt", "2025-01-01T00:00:00Z"), r("nie", null), r("neu", "2026-11-10T00:00:00Z")];
+  it("juengster Verkauf zuerst, ohne Verkauf ganz hinten", () => {
+    expect(sortBoard(rows, "letzterVerkauf").map((x) => x.nameRaw)).toEqual(["neu", "alt", "nie"]);
+  });
+  it("umkehren dreht die Reihenfolge", () => {
+    expect(sortBoard(rows, "letzterVerkauf", true).map((x) => x.nameRaw)).toEqual(["nie", "alt", "neu"]);
+  });
+});

@@ -31,7 +31,7 @@ export function boardGap(row: SortimentRow): BoardGap | null {
   return { euro: 0, percent: 0, target: null };
 }
 
-export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "gewinnMonat" | "kapital" | "reichweite" | "name";
+export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "gewinnMonat" | "kapital" | "reichweite" | "letzterVerkauf" | "ek" | "avgvk" | "name";
 
 export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   abweichung: "Größte Abweichung",
@@ -43,6 +43,9 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   gewinnMonat: "Gewinn je Monat",
   kapital: "Gebundenes Kapital",
   reichweite: "Reichweite (längste zuerst)",
+  letzterVerkauf: "Letzter Verkauf (jüngster zuerst)",
+  ek: "Ø EK",
+  avgvk: "Ø VK",
   name: "Name",
 };
 
@@ -50,7 +53,7 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
  * "Groesste Abweichung": Artikel mit belastbarem Urteil und Abweichung zuerst, nach |€| absteigend;
  * dann die im Rahmen, zuletzt die ohne Urteil. Bei Gleichstand nach Name — die Reihenfolge ist stabil.
  */
-export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): SortimentRow[] {
+export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey, reverse = false): SortimentRow[] {
   const byName = (a: SortimentRow, b: SortimentRow) => a.nameRaw.localeCompare(b.nameRaw, "de");
   const marketValue = (r: SortimentRow) => r.market?.value ?? r.market?.range?.max ?? -1;
   const rank = (r: SortimentRow): number => {
@@ -84,10 +87,21 @@ export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): Sor
         return (b.today?.capitalBound ?? -1) - (a.today?.capitalBound ?? -1) || byName(a, b);
       case "reichweite":
         return (b.stockMonthsCover ?? -1) - (a.stockMonthsCover ?? -1) || byName(a, b);
+      case "letzterVerkauf": {
+        // jüngster zuerst; ohne Verkauf ganz hinten
+        const ta = a.lastSoldAt ? Date.parse(a.lastSoldAt) : -Infinity;
+        const tb = b.lastSoldAt ? Date.parse(b.lastSoldAt) : -Infinity;
+        return tb === ta ? byName(a, b) : tb > ta ? 1 : -1;
+      }
+      case "ek":
+        return b.ek - a.ek || byName(a, b);
+      case "avgvk":
+        return b.avgVkRealized - a.avgVkRealized || byName(a, b);
       case "name":
         return byName(a, b);
     }
   });
+  if (reverse) copy.reverse();
   return copy;
 }
 
