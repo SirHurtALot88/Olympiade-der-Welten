@@ -190,6 +190,14 @@ export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, ima
                 </td>
                 <td data-label="Bestand" className="r bd-num bd-c-stock">
                   {row.stock > 0 ? formatQty(row.stock) : <span className="bd-none">0</span>}
+                  {row.reorderDue && (
+                    <small
+                      className="bd-reorder"
+                      title={`Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock} (aus Billbee)${row.reorderQty ? `, Soll ${row.desiredStock}: ${row.reorderQty} Stk fehlen` : ""}`}
+                    >
+                      nachbestellen
+                    </small>
+                  )}
                 </td>
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}

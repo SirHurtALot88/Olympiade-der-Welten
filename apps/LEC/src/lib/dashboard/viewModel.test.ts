@@ -495,3 +495,17 @@ describe("Reichweite des Bestands", () => {
     expect(row(0, 12, 6).stockMonthsCover).toBeCloseTo(6, 5);
   });
 });
+
+describe("Nachbestellen faellig (Mindestbestand aus Billbee)", () => {
+  const r = (stock: number, minStock: number | null, desiredStock: number | null = null, active = true) =>
+    buildSortimentRow(article("N", { stock, active, minStock, desiredStock, currentVk: 5, currentEk: 1, windows: { "365": agg({ qty: 6 }) } }), "beobachten", DEFAULT_COST_SETTINGS, null);
+  it("auf oder unter dem Mindestbestand: faellig, mit Fehlmenge bis zum Soll", () => {
+    expect(r(2, 2, 6)).toMatchObject({ reorderDue: true, reorderQty: 4 });
+    expect(r(1, 2)).toMatchObject({ reorderDue: true, reorderQty: null });
+  });
+  it("ueber dem Mindestbestand, ohne Mindestbestand oder ausgelaufen: nicht faellig", () => {
+    expect(r(3, 2).reorderDue).toBe(false);
+    expect(r(0, null).reorderDue).toBe(false);
+    expect(r(0, 2, 6, false).reorderDue).toBe(false);
+  });
+});

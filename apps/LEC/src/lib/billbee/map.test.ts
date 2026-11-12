@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ebayItemIdOf, extractSales, mapOrders, mapProduct, titleOf } from "./map";
+import { ebayItemIdOf, stockLimitsOf, extractSales, mapOrders, mapProduct, titleOf } from "./map";
 
 const NOW = new Date("2026-10-13T12:00:00Z");
 
@@ -109,5 +109,14 @@ describe("ebayItemIdOf", () => {
     expect(ebayItemIdOf({ Sources: [{ Source: "Amazon", SourceId: "B0123456789" }, { Source: "eBay", ApiAccountName: "lec", SourceId: "226616298122" }] })).toBe("226616298122");
     expect(ebayItemIdOf({ Sources: [{ Source: "eBay", SourceId: "abc" }] })).toBeNull();
     expect(ebayItemIdOf({})).toBeNull();
+  });
+});
+
+describe("stockLimitsOf", () => {
+  it("liest Meldebestand und Soll-Bestand, 0 oder fehlend gilt als nicht gepflegt", () => {
+    expect(stockLimitsOf({ StockWarning: 2, StockDesired: 6 })).toEqual({ minStock: 2, desiredStock: 6 });
+    expect(stockLimitsOf({ StockMinimum: "3" })).toEqual({ minStock: 3, desiredStock: null });
+    expect(stockLimitsOf({ StockWarning: 0, StockDesired: 0 })).toEqual({ minStock: null, desiredStock: null });
+    expect(stockLimitsOf({})).toEqual({ minStock: null, desiredStock: null });
   });
 });

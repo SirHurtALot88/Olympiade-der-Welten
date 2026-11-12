@@ -47,6 +47,11 @@ export interface ArticleAggregate {
   hidden?: boolean;
   /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
   lastSoldAt?: Date | null;
+  /** Verkaufstempo je Monat aus den Einzelverkaeufen (gewichtet, siehe pace.ts); null/fehlt = Rueckfall auf die Fenster. */
+  paceMonth?: number | null;
+  /** Mindest-/Meldebestand und Soll-Bestand aus Billbee; null = nicht gepflegt. */
+  minStock?: number | null;
+  desiredStock?: number | null;
   /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
    * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
    * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
@@ -164,6 +169,12 @@ export interface SortimentRow {
   hidden?: boolean;
   /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
   lastSoldAt?: string | null;
+  minStock?: number | null;
+  desiredStock?: number | null;
+  /** Bestand liegt auf oder unter dem Mindestbestand aus Billbee: nachbestellen. */
+  reorderDue?: boolean;
+  /** Fehlmenge bis zum Soll-Bestand (nur wenn nachbestellen faellig und Soll gepflegt). */
+  reorderQty?: number | null;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
   /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
   ranks?: {
@@ -587,7 +598,8 @@ export function buildSortimentRow(
   // Tempo je Monat: das HOEHERE aus 90-Tage- und 365-Tage-Tempo. 90 Tage allein schwanken zu stark (ein einziger Verkauf
   // ergab bei 10 Verkaeufen im Jahr "12 Monate Reichweite", Chris 12.11.); das Jahr allein uebersieht einen anziehenden
   // Absatz. Ohne Verkauf in 90 Tagen gilt das Jahrestempo, damit auch der schlechteste Fall eine Reichweite bekommt.
-  const paceMonth = Math.max(velocityPerMonth, (a.windows["365"]?.qty ?? 0) / 12);
+  // Bevorzugt aus den Einzelverkaeufen (Datum und Menge, gewichtet); ohne diese Daten das hoehere aus 90- und 365-Tage-Fenster.
+  const paceMonth = a.paceMonth != null && a.paceMonth > 0 ? a.paceMonth : Math.max(velocityPerMonth, (a.windows["365"]?.qty ?? 0) / 12);
   const stockMonthsCover = a.stock > 0 && paceMonth > 0 ? a.stock / paceMonth : null;
 
   // "Was bringt ein Verkauf heute": heutiger VK und heutiger EK, nur variable Kosten (DB II, ohne Fixkosten).
@@ -661,6 +673,10 @@ export function buildSortimentRow(
     active: a.active,
     hidden: a.hidden === true,
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
+    minStock: a.minStock ?? null,
+    desiredStock: a.desiredStock ?? null,
+    reorderDue: a.active && (a.minStock ?? 0) > 0 && a.stock <= (a.minStock ?? 0),
+    reorderQty: a.active && (a.minStock ?? 0) > 0 && a.stock <= (a.minStock ?? 0) && (a.desiredStock ?? 0) > a.stock ? (a.desiredStock as number) - a.stock : null,
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
