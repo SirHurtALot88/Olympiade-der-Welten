@@ -43,6 +43,9 @@ model Article {
   imageFetchedAt DateTime?
   /// Von Chris im Sortiment ausgeblendet (z. B. gibt es den Artikel nicht mehr): erscheint nicht in den Listen, bleibt aber erhalten.
   hidden         Boolean  @default(false)
+  /// Mindest-/Meldebestand und Soll-Bestand aus dem Billbee-Artikelstamm (StockWarning / StockDesired); null = nicht gepflegt.
+  minStock       Int?
+  desiredStock   Int?
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?

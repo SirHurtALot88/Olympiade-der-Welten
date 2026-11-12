@@ -35,6 +35,8 @@ export interface BillbeeSyncReport {
   ebayItemIds: number;
   /** Stammartikel, die nach der Namens-Normalisierung denselben Artikel ergeben (z. B. Einzelkarte und Playset). */
   duplicateMasters: number;
+  /** Artikel, bei denen Billbee einen Mindest-/Meldebestand liefert (0 = Feld nicht gepflegt oder nicht geliefert). */
+  minStockCount: number;
   windows: { window: string; articles: number; units: number }[];
   /** Auffaelligkeiten in den gelieferten Bestellungen (Doppelte, gebrochene Mengen, Spitzenreiter). */
   diagnostics: OrderDiagnostics;
@@ -93,6 +95,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
 
   // eBay-Artikelnummern aus Billbee. Eine vom Shop-Abruf bestaetigte Nummer (ebayPrice gesetzt) bleibt: der Shop zeigt, was gerade gelistet ist.
   let ebayIds = 0;
+  let minStockCount = 0;
   const seenMasters = new Set<string>();
   let duplicateMasters = 0;
   for (const m of masters) {
@@ -101,6 +104,9 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
       continue;
     }
     seenMasters.add(m.row.nameNormalized);
+    // Mindest-/Soll-Bestand aus Billbee (auch zuruecksetzen, wenn dort nicht mehr gepflegt)
+    await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { minStock: m.minStock, desiredStock: m.desiredStock } });
+    if (m.minStock !== null) minStockCount++;
     if (!m.ebayItemId) continue;
     const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized, ebayPrice: null }, data: { ebayItemId: m.ebayItemId } });
     ebayIds += res.count;
@@ -142,6 +148,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     sales: saleRows.length,
     ebayItemIds: ebayIds,
     duplicateMasters,
+    minStockCount,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
     recent: recentOrderDays(orders, now),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),

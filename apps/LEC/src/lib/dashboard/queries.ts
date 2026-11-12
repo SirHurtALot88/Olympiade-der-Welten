@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
 import { marketValueOf, type LatestQuote } from "./marketComparison";
+import { weightedMonthlyPace } from "./pace";
 import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
 export interface ArticleAggregatesResult {
@@ -57,7 +58,7 @@ export async function loadArticleAggregates(
   prisma: PrismaClient,
   opts: { includeHidden?: boolean } = {}
 ): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -74,7 +75,12 @@ export async function loadArticleAggregates(
     }),
     // Letzter Einzelverkauf je Artikel (Spalte "Letzter Verkauf")
     prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
+    // Einzelverkaeufe des letzten Jahres fuer das gewichtete Verkaufstempo
+    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true } }),
   ]);
+  const salesByArticle = new Map<string, { soldAt: Date; qty: number }[]>();
+  for (const s of recentSales) (salesByArticle.get(s.articleId) ?? salesByArticle.set(s.articleId, []).get(s.articleId)!).push(s);
+  const nowForPace = new Date();
   const lastSoldByArticle = new Map(lastSales.map((s) => [s.articleId, s._max.soldAt]));
   const factItemByArticle = new Map<string, string>();
   for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
@@ -155,6 +161,9 @@ export async function loadArticleAggregates(
       active: article.active,
       hidden: article.hidden,
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
+      paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
+      minStock: article.minStock,
+      desiredStock: article.desiredStock,
       // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
       // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
       currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),

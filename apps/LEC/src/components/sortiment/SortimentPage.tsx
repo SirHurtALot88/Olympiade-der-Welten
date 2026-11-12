@@ -234,6 +234,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
   const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
+  const [onlyReorder, setOnlyReorder] = useState(initialFlags.has("nachbestellen"));
+  const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
   // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
   const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
     const v = searchParams0.get("bestand");
@@ -276,6 +278,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const flags = [
       onlyLadenhueter && "ladenhueter",
       onlySoldOut && "ausverkauft",
+      onlyReorder && "nachbestellen",
       onlyMarketFalling && "marktfaellt",
       onlyNameCheck && "namecheck",
       showNoStock && "ohnebestand",
@@ -286,7 +289,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -365,6 +368,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       const [lo, hi] = stockBand === "10+" ? [10, Infinity] : stockBand.split("-").map(Number).concat(stockBand.includes("-") ? [] : [Number(stockBand)]);
       result = result.filter((r) => r.stock >= lo && r.stock <= (hi ?? lo));
     }
+    if (onlyReorder) {
+      result = result.filter((r) => r.reorderDue);
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -378,11 +384,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !stockBand) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !stockBand) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -398,7 +404,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort, boardReverse).slice(0, visibleCount), [filtered, boardSort, boardReverse, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -534,6 +540,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {reorderCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyReorder ? " on" : ""}`}
+            onClick={() => {
+              setOnlyReorder((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Bestand liegt auf oder unter dem Mindestbestand aus Billbee"
+          >
+            Nachbestellen fällig ({reorderCount})
+          </button>
+        )}
         <button
           type="button"
           className={`chip${onlySoldOut ? " on" : ""}`}

@@ -184,7 +184,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}${row.ranks?.marge ? ` · Platz #${row.ranks.marge}/${row.ranks.total}` : ""}` : undefined}
           />
-          <Stat tone={noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={noSale90 ? "kein Verkauf in 90 Tagen" : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={row.reorderDue || noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.reorderDue ? `Nachbestellen: Mindestbestand ${row.minStock}${row.reorderQty ? `, Soll ${row.desiredStock} (${row.reorderQty} fehlen)` : ""}` : noSale90 ? "kein Verkauf in 90 Tagen" : row.minStock ? `Mindestbestand ${row.minStock}${row.desiredStock ? `, Soll ${row.desiredStock}` : ""} · ` + (row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : "") : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
           <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 

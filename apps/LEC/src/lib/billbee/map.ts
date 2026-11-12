@@ -48,6 +48,18 @@ export interface MasterProduct {
   cost: number | null;
   /** eBay-Artikelnummer (Billbee: Product.Sources[].SourceId der eBay-Anbindung), falls hinterlegt. */
   ebayItemId: string | null;
+  /** Mindest-/Meldebestand und Soll-Bestand laut Artikelstamm; null, wenn nicht gepflegt (0 gilt als nicht gepflegt). */
+  minStock: number | null;
+  desiredStock: number | null;
+}
+
+/** Mindest- und Soll-Bestand aus dem Artikelstamm (Feldnamen tolerant gelesen: StockWarning / StockMinimum, StockDesired). */
+export function stockLimitsOf(p: Json): { minStock: number | null; desiredStock: number | null } {
+  const pos = (v: unknown) => {
+    const n = num(v);
+    return n !== null && n > 0 ? Math.round(n) : null;
+  };
+  return { minStock: pos(p.StockWarning ?? p.StockMinimum ?? p.MinStock), desiredStock: pos(p.StockDesired) };
 }
 
 /** eBay-Artikelnummer aus den Marktplatz-Quellen eines Billbee-Artikels (tolerant gelesen). */
@@ -87,6 +99,7 @@ export function mapProduct(p: Json): MasterProduct | null {
     id: p.Id !== undefined && p.Id !== null ? String(p.Id) : null,
     cost,
     ebayItemId: ebayItemIdOf(p),
+    ...stockLimitsOf(p),
   };
 }
 
