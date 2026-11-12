@@ -72,7 +72,9 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   const since = new Date(now.getTime() - LOOKBACK_DAYS * 86_400_000);
   const fetched = await client.getAll<Record<string, unknown>>("/orders", {
     minOrderDate: since.toISOString().slice(0, 10),
-    maxOrderDate: now.toISOString().slice(0, 10),
+    // Billbee liest ein reines Datum als 00:00 Uhr: mit "heute" fehlten alle Bestellungen des heutigen Tages bis zum naechsten Tag
+    // (sichtbar als Bestandsabgang ohne Verkauf). Darum bis einschliesslich morgen.
+    maxOrderDate: new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10),
   });
   const { orders, duplicates } = dedupeOrders(fetched);
   const results = mapOrders(orders, masters, { now, excludeStates: opts.excludeStates ?? excludeStatesFromEnv() });

@@ -32,6 +32,18 @@ describe("syncBillbee", () => {
     await db.cleanup();
   });
 
+  it("fragt Bestellungen bis einschliesslich morgen ab, damit Bestellungen von heute nicht fehlen", async () => {
+    const seen: string[] = [];
+    const fetchFn = (async (url: URL) => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith("/orders")) seen.push(u.searchParams.get("maxOrderDate") ?? "");
+      if (u.pathname.endsWith("/products")) return json({ Paging: { TotalPages: 1 }, Data: [] });
+      return json({ Paging: { TotalPages: 1 }, Data: [] });
+    }) as unknown as typeof fetch;
+    await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn });
+    expect(seen[0]).toBe("2026-10-14"); // NOW = 13.10.
+  });
+
   it("verlangt Zugangsdaten", async () => {
     await expect(syncBillbee(db.prisma, { config: null })).rejects.toBeInstanceOf(BillbeeNotConfigured);
   });
