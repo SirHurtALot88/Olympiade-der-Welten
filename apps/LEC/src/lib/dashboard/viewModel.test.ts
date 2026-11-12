@@ -475,3 +475,23 @@ describe("Plaetze im Vergleich zu den aktiven Artikeln", () => {
     expect(by("Alt").ranks).toBeUndefined();
   });
 });
+
+describe("Reichweite des Bestands", () => {
+  const settings = DEFAULT_COST_SETTINGS;
+  const row = (w90: number, w365: number, stock: number) =>
+    buildSortimentRow(
+      article("R", { stock, currentVk: 5, currentEk: 1, windows: { "90": agg({ qty: w90, revenue: w90 * 5 }), "365": agg({ qty: w365, revenue: w365 * 5 }) } }),
+      "beobachten",
+      settings,
+      null
+    );
+  it("nimmt das hoehere aus 90- und 365-Tage-Tempo: 10 Verkaeufe im Jahr, 1 in 90 Tagen, Bestand 4 -> rund 4,8 Monate", () => {
+    expect(row(1, 10, 4).stockMonthsCover).toBeCloseTo(4 / (10 / 12), 5);
+  });
+  it("zieht der Absatz an, gilt das 90-Tage-Tempo", () => {
+    expect(row(6, 10, 4).stockMonthsCover).toBeCloseTo(4 / 2, 5);
+  });
+  it("ohne Verkauf in 90 Tagen gilt das Jahrestempo", () => {
+    expect(row(0, 12, 6).stockMonthsCover).toBeCloseTo(6, 5);
+  });
+});

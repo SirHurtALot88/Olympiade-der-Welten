@@ -584,8 +584,10 @@ export function buildSortimentRow(
   }
 
   const velocityPerMonth = monthlyVelocity(a);
-  // Rueckfall auf das 365-Tage-Tempo, wenn in 90 Tagen nichts lief -- sonst bekommt gerade der schlechteste Fall keine Reichweite.
-  const paceMonth = velocityPerMonth > 0 ? velocityPerMonth : (a.windows["365"]?.qty ?? 0) / 12;
+  // Tempo je Monat: das HOEHERE aus 90-Tage- und 365-Tage-Tempo. 90 Tage allein schwanken zu stark (ein einziger Verkauf
+  // ergab bei 10 Verkaeufen im Jahr "12 Monate Reichweite", Chris 12.11.); das Jahr allein uebersieht einen anziehenden
+  // Absatz. Ohne Verkauf in 90 Tagen gilt das Jahrestempo, damit auch der schlechteste Fall eine Reichweite bekommt.
+  const paceMonth = Math.max(velocityPerMonth, (a.windows["365"]?.qty ?? 0) / 12);
   const stockMonthsCover = a.stock > 0 && paceMonth > 0 ? a.stock / paceMonth : null;
 
   // "Was bringt ein Verkauf heute": heutiger VK und heutiger EK, nur variable Kosten (DB II, ohne Fixkosten).
