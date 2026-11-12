@@ -19,6 +19,7 @@ import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
 import { ArtikelDetail } from "./ArtikelDetail";
+import { daysSince } from "./PreisBoard";
 import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
 import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
@@ -55,6 +56,7 @@ type ColId =
   | "artikel"
   | "rank"
   | "verkaeufe"
+  | "letzterverkauf"
   | "umsatz"
   | "avgpreis"
   | "avgvk"
@@ -80,6 +82,7 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 276, min: 170 },
   { id: "rank", label: "Rank", def: 62, min: 50, align: "r" },
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
+  { id: "letzterverkauf", label: "Letzter Verkauf", def: 100, min: 80, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
@@ -114,6 +117,7 @@ const COLS: ColumnDef<ColId>[] = [
 const SORTABLE_COLS: ColId[] = [
   "rank",
   "verkaeufe",
+  "letzterverkauf",
   "umsatz",
   "avgpreis",
   "avgvk",
@@ -159,6 +163,9 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
       return w?.rank ?? Number.POSITIVE_INFINITY;
     case "verkaeufe":
       return w?.qty ?? 0;
+    case "letzterverkauf":
+      // jüngster Verkauf = größter Wert; ohne Verkauf ganz hinten
+      return row.lastSoldAt ? Date.parse(row.lastSoldAt) : Number.NEGATIVE_INFINITY;
     case "umsatz":
       return w?.revenue ?? 0;
     case "avgpreis":
@@ -693,6 +700,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                     <td className="r num">{w?.rank ?? "—"}</td>
                     <td className="r">
                       <MicroVelocity values={row.velocity} max={maxVelocity} />
+                    </td>
+                    <td className="r num">
+                      {(() => {
+                        const d = daysSince(row.lastSoldAt);
+                        if (d === null) return <span className="p-muted">—</span>;
+                        return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                      })()}
                     </td>
                     <td className="r num">€ {formatEuro(w?.revenue ?? 0)}</td>
                     <td className="r num">{w && w.qty > 0 ? `${formatEuroCents(w.avgPrice)} €` : "—"}</td>
