@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { UpdateButton } from "./UpdateButton";
 
 type NavKey =
   | "dashboard"
@@ -55,6 +56,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="sidefoot">
+        <UpdateButton />
         <a href="/einstellungen" className={active === "einstellungen" ? "active" : undefined} style={{ color: "inherit", textDecoration: "underline dotted" }}>
           Einstellungen &amp; Datenstand
         </a>
