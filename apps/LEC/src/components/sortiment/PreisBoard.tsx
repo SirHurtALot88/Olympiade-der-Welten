@@ -199,7 +199,7 @@ export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, ima
                   {(() => {
                     const d = daysSince(row.lastSoldAt);
                     if (d === null) return <span className="bd-none">—</span>;
-                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} T`}</span>;
+                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
                   })()}
                 </td>
                 <td data-label="Ø EK" className="r bd-num bd-c-ek">
