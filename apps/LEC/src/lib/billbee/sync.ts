@@ -5,7 +5,7 @@ import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
 import { loadActiveCostSettings } from "../dashboard/queries";
 import { BillbeeClient, type BillbeeConfig } from "./client";
 import { loadBillbeeConfig } from "./credentials";
-import { LOOKBACK_DAYS, dedupeOrders, diagnoseOrders, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
+import { LOOKBACK_DAYS, dedupeOrders, diagnoseOrders, recentOrderDays, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
 
 /**
  * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der gesamten Historie aus der Billbee-API
@@ -38,6 +38,8 @@ export interface BillbeeSyncReport {
   windows: { window: string; articles: number; units: number }[];
   /** Auffaelligkeiten in den gelieferten Bestellungen (Doppelte, gebrochene Mengen, Spitzenreiter). */
   diagnostics: OrderDiagnostics;
+  /** Bestellungen der letzten Tage je Datum/Status und juengster Bestellzeitpunkt (Pruefung auf fehlende Bestellungen von heute). */
+  recent: ReturnType<typeof recentOrderDays>;
   startedAt: string;
   finishedAt: string;
 }
@@ -141,6 +143,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     ebayItemIds: ebayIds,
     duplicateMasters,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
+    recent: recentOrderDays(orders, now),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,
     finishedAt: new Date().toISOString(),
