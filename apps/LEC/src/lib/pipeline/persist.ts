@@ -175,9 +175,9 @@ export async function persistBillbeeArtikel(
   let upserted = 0;
   // Bestand VOR dem Import merken: jede Abweichung wird als Warenbewegung mitgeschrieben
   // (Billbee liefert keine Lagerhistorie; der erste Stand eines Artikels ist nur Ausgangswert).
-  const before = new Map<string, { id: string; stock: number; active: boolean; vk: number | null }>();
-  for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true, currentVk: true } })) {
-    before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active, vk: a.currentVk });
+  const before = new Map<string, { id: string; stock: number; active: boolean; vk: number | null; ek: number | null }>();
+  for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true, currentVk: true, currentEk: true } })) {
+    before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active, vk: a.currentVk, ek: a.currentEk });
   }
   // Erster Abgleich ueber die API = Startbestand: der alte Stand stammt aus einem Datei-Import und waere
   // kein verlaesslicher Vergleich. Bewegungen werden erst ab dem zweiten API-Abgleich mitgeschrieben.
@@ -195,6 +195,10 @@ export async function persistBillbeeArtikel(
     // VK-Aenderung mitschreiben (nur wenn beide Staende bekannt sind; der erste Stand ist nur Ausgangswert).
     if (hadApiRun && prev && prev.vk !== null && row.currentVk !== null && Math.abs(prev.vk - row.currentVk) > 0.004) {
       await prisma.priceChange.create({ data: { articleId: prev.id, before: prev.vk, after: row.currentVk } });
+    }
+    // EK-Aenderung mitschreiben (Chris, 13.11.): zeigt, wie aktuell der Einkaufspreis ist.
+    if (hadApiRun && prev && prev.ek !== null && row.currentEk !== null && Math.abs(prev.ek - row.currentEk) > 0.004) {
+      await prisma.ekChange.create({ data: { articleId: prev.id, before: prev.ek, after: row.currentEk } });
     }
     await prisma.article.upsert({
       where: { nameNormalized: row.nameNormalized },

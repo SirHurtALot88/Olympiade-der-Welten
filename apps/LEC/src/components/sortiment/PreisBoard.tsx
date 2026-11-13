@@ -220,6 +220,16 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 </td>
                 <td data-label="Ø EK" className="r bd-num bd-c-ek">
                   {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
+                  {(() => {
+                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
+                    const d = daysSince(row.lastEkAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
+                      </small>
+                    );
+                  })()}
                 </td>
                 <td data-label="Ø VK" className="r bd-num bd-c-avg">
                   {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
