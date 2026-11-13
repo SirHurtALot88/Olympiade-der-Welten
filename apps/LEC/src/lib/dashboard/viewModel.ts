@@ -53,6 +53,8 @@ export interface ArticleAggregate {
   ebayEndedAt?: Date | null;
   /** Kartentyp laut YGOPRODeck ("Synchro Monster" ...), null = noch nicht bestimmt. */
   cardType?: string | null;
+  /** Der eBay-Shop-Abruf hat dieses Angebot zuletzt gesehen (eBay-Preis gesetzt). */
+  ebayListed?: boolean;
   /** Von Chris zum Auslisten markiert. */
   delistMarkedAt?: Date | null;
   /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
@@ -188,6 +190,7 @@ export interface SortimentRow {
   /** Seltenheit aus dem Titel, Kartenart (Synchro, Xyz, Zauber ...) und Ordner nach Chris' Ordnerstruktur. */
   /** ISO: zum Auslisten markiert (Drawer-Knopf), null = nicht markiert. */
   delistMarkedAt?: string | null;
+  ebayListed?: boolean;
   rarity?: string | null;
   kartenart?: Kartenart | null;
   ordner?: Ordner | null;
@@ -725,6 +728,7 @@ export function buildSortimentRow(
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
     delistMarkedAt: a.delistMarkedAt ? a.delistMarkedAt.toISOString() : null,
+    ebayListed: a.ebayListed === true,
     ...kartenFelder(a.nameRaw, a.cardType),
     lifecycle: assessLifecycle({
       active: a.active,

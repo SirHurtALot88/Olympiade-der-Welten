@@ -97,3 +97,18 @@ describe("25th-Anniversary-Neuauflage gegen Original (LOB, MRD ...)", () => {
     expect(resolveMarket(idx, null, "Yu-Gi-Oh! LOB-E008 Card 8 Super Rare NM", {})).toMatchObject({ idProduct: 1007 });
   });
 });
+
+describe("Set-Zuordnung ueber die Kartenliste (Jaccard)", () => {
+  // Set SETA hat 3 Karten (A, B, C). Expansion 1 = genau diese 3 Karten; Expansion 2 = Sammelset mit 3 + 6 weiteren Karten.
+  const mk = (name: string, code: string) => ({ name, card_sets: [{ set_code: code }] });
+  const cards = [mk("Alpha", "SETA-EN001"), mk("Beta", "SETA-EN002"), mk("Gamma", "SETA-EN003"), mk("D", "SAMM-EN001"), mk("E", "SAMM-EN002"), mk("F", "SAMM-EN003"), mk("G", "SAMM-EN004"), mk("H", "SAMM-EN005"), mk("I", "SAMM-EN006")];
+  const prod = (idProduct: number, idExpansion: number, name: string) => ({ idProduct, idExpansion, name, idCategory: 5, categoryName: "Yugioh Single", idMetacard: 1, dateAdded: "2020-01-01 00:00:00" });
+  const products = [
+    ...["Alpha", "Beta", "Gamma"].map((n, i) => prod(10 + i, 1, n)),
+    ...["Alpha", "Beta", "Gamma", "D", "E", "F", "G", "H", "I"].map((n, i) => prod(20 + i, 2, n)),
+  ];
+  it("waehlt die Expansion, deren Kartenliste dem Set gleicht, nicht das Sammelset", () => {
+    const idx = buildCatalogIndex(cards as never, products as never, []);
+    expect(idx.expansionsByPrefix.get("SETA")).toEqual([1]);
+  });
+});

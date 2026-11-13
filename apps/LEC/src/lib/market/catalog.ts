@@ -79,6 +79,7 @@ export function buildCatalogIndex(ygoCards: YgoCard[], cmProducts: CmProduct[], 
 
   const nameByCode = new Map<string, string>();
   const votes = new Map<string, Map<number, number>>();
+  const uniq = new Map<string, Map<number, Set<string>>>();
   for (const card of ygoCards) {
     if (!card.name) continue;
     const exps = (productsByName.get(card.name.toLowerCase()) ?? []).map((p) => p.idExpansion);
@@ -88,13 +89,36 @@ export function buildCatalogIndex(ygoCards: YgoCard[], cmProducts: CmProduct[], 
       if (!nameByCode.has(code)) nameByCode.set(code, card.name);
       const v = votes.get(prefixOf(code)) ?? votes.set(prefixOf(code), new Map()).get(prefixOf(code))!;
       for (const e of exps) v.set(e, (v.get(e) ?? 0) + 1);
+      // eindeutige Kartennamen je Praefix und Expansion (Basis der Jaccard-Wertung unten; mehrere Seltenheiten zaehlen nur einmal)
+      const u = uniq.get(prefixOf(code)) ?? uniq.set(prefixOf(code), new Map()).get(prefixOf(code))!;
+      for (const e of new Set(exps)) (u.get(e) ?? u.set(e, new Set()).get(e)!).add(card.name);
     }
   }
+  // Zuordnung Set-Praefix -> Cardmarket-Expansionen ueber die Kartennamen des Sets (Chris, 13.11.): viele alte Karten stehen in
+  // Dutzenden Expansionen (Strukturdecks, Neudrucke). Gewinnt die Expansion, deren Kartenliste dem Set am besten gleicht
+  // (Jaccard: gemeinsame Namen / (Namen des Sets + Produkte der Expansion - gemeinsame)). Ein Set mit 45 Karten passt zu einer
+  // Expansion mit 45 Produkten besser als zu einem Sammelset mit 300, das alle 45 nur enthaelt.
+  const namesPerPrefixForScore = new Map<string, Set<string>>();
+  for (const card of ygoCards) {
+    for (const set of card.card_sets ?? []) {
+      const code = set.set_code?.toUpperCase();
+      if (!code || !card.name) continue;
+      (namesPerPrefixForScore.get(prefixOf(code)) ?? namesPerPrefixForScore.set(prefixOf(code), new Set()).get(prefixOf(code))!).add(card.name);
+    }
+  }
+  const namesPerExpansion = new Map<number, Set<string>>();
+  for (const p of cmProducts) (namesPerExpansion.get(p.idExpansion) ?? namesPerExpansion.set(p.idExpansion, new Set()).get(p.idExpansion)!).add(p.name.toLowerCase());
   const expansionsByPrefix = new Map<string, number[]>();
-  for (const [pre, v] of votes) {
-    const top = Math.max(0, ...v.values());
-    if (top === 0) continue;
-    expansionsByPrefix.set(pre, [...v].filter(([, n]) => n >= top * 0.5).map(([e]) => e));
+  for (const [pre, byExp] of uniq) {
+    const maxCommon = Math.max(0, ...[...byExp.values()].map((x) => x.size));
+    if (maxCommon === 0) continue;
+    const setSize = namesPerPrefixForScore.get(pre)?.size ?? 0;
+    const scored = [...byExp]
+      .filter(([, names]) => names.size >= maxCommon * 0.5)
+      .map(([e, names]) => ({ e, j: names.size / Math.max(1, setSize + (namesPerExpansion.get(e)?.size ?? names.size) - names.size) }));
+    const bestJ = Math.max(...scored.map((x) => x.j));
+    // Nur die klar besten behalten; ein Neudruck mit gleicher Kartenliste (gleiches j) bleibt als zweite Expansion erhalten
+    expansionsByPrefix.set(pre, scored.filter((x) => x.j >= bestJ * 0.8).map((x) => x.e));
   }
 
   // 25th-Anniversary-Neuauflagen: vollstaendige Sets, deren Produkte alle im Fenster 14.-16.04.2023 angelegt wurden
