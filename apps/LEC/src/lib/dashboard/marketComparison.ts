@@ -1,4 +1,5 @@
 import type { ArticleAggregate } from "./viewModel";
+import { applyStaleDiscount, staleDiscountPct } from "../pricing/staleDecay";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import {
   computeHk,
@@ -80,6 +81,9 @@ export interface MarketComparisonRow {
    */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Ladenhüter-Abschlag auf targetMin/targetOpt (0..0,3), 0 = keiner; daysSinceSale = Tage seit dem letzten Verkauf. */
+  staleDiscount: number;
+  daysSinceSale: number | null;
   /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
   capped: boolean;
   /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
@@ -174,6 +178,14 @@ export function buildMarketComparisonRow(
     else if (classifyAgainstRange(ownVk, hi) === "zu_teuer") status = "zu_teuer";
   }
 
+  // Ladenhueter-Abschlag: lange ohne Verkauf (mit Bestand) -> empfohlener VK sinkt, nie unter Kostendeckung (Deckungsbeitrag 0).
+  const daysSinceSale = a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : null;
+  const staleDiscount = staleDiscountPct(daysSinceSale, a.stock);
+  if (target !== null && staleDiscount > 0) {
+    target = applyStaleDiscount({ min: target.min, opt: target.opt }, staleDiscount, corridor.vkContribution);
+    if (marketValue !== null) status = classifyAgainstRange(ownVk, target);
+  }
+
   // Nachfrage-Beweis (Chris, 14.10.): Ein Preis, zu dem sich der Artikel schon mehrfach verkauft hat,
   // ist nicht "zu teuer", egal was der Marktwert rechnerisch hergibt. Nur "zu teuer" wird so entkraeftet;
   // "zu guenstig" bleibt (dort liegt Geld auf dem Tisch).
@@ -232,6 +244,8 @@ export function buildMarketComparisonRow(
     marketRange,
     targetMin: target ? target.min : null,
     targetOpt: target ? target.opt : null,
+    staleDiscount,
+    daysSinceSale,
     capped,
     marginReachable,
     marginAtMarket,
