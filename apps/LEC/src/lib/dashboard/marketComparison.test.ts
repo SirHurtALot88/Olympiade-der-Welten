@@ -229,9 +229,9 @@ describe("marketValueOf mit guenstigstem Angebot (ab)", () => {
     const { marketValueOf } = await import("./marketComparison");
     expect(marketValueOf(q({ priceFrom: 6 }), 1)).toBeCloseTo((32 + 12) / 6);
   });
-  it("ein extrem billiges Angebot (unter 40 % des Mittels) zaehlt nicht", async () => {
+  it("auch ein sehr billiges Angebot zaehlt (doppelt), sonst ist der Marktwert zu hoch", async () => {
     const { marketValueOf } = await import("./marketComparison");
-    expect(marketValueOf(q({ priceFrom: 0.5 }), 1)).toBeCloseTo(8);
+    expect(marketValueOf(q({ priceFrom: 0.5 }), 1)).toBeCloseTo((32 + 1) / 6);
   });
 });
 

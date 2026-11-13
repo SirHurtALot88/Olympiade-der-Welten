@@ -19,8 +19,9 @@ Chris schickt ein Foto je Karte. Antwort immer im gleichen Format, so schnell wi
      meist 1 bis 4 Treffer, das „ab“ ordnet den Eintrag zu).
 5. **Preis rechnen genau wie die LEC-Seite** (`computeMarketTargetRange`, `contributionMarginForPrice`, Standard-Kostensätze,
    shopweit ca. 2.565 Stück/Jahr, Werbesatz GOOD für die Marge):
-   - **Marktwert** = Mittel aus Trend, Ø 1, Ø 7, Ø 30 Tage und dem **„ab“ doppelt** (nur wenn „ab“ ≥ 40 % des Mittels der Schnitte,
-     so rechnet die Seite). Chris' DE-„ab“ aus seinem Screenshot hat Vorrang vor dem Katalog-„ab“ (der gilt über alle Sprachen).
+   - **Marktwert** = Mittel aus Trend, Ø 1, Ø 7, Ø 30 Tage und dem **„ab“ doppelt**, **„ab“ zählt immer**, auch wenn es weit unter den Schnitten
+     liegt (Chris, 13.11.: sonst ist der Marktwert zu hoch, z. B. Nummer C1000 mit Schnitten um 1 € und ab 0,05 €). Chris' DE-„ab“ aus seinem Screenshot
+     hat Vorrang vor dem Katalog-„ab“ (der gilt über alle Sprachen).
    - **Empfohlener VK** = Zielspanne 25–33 % Marge, Mindestpreis 4,99 €, Marktdeckel bei teuren Karten.
    - **Marge und Gewinn**: Nachkauf zum Marktwert als EK (wie die Spalte „Marge Nachkauf“ in LEC). Bei Karten über etwa 25 € Marktwert
      rechnet Chris **mit EK 25 €**, weil teure Karten nie nachgekauft werden (Einmalverkauf).
