@@ -58,7 +58,7 @@ export async function loadArticleAggregates(
   prisma: PrismaClient,
   opts: { includeHidden?: boolean } = {}
 ): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales, lastPriceChanges] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -77,7 +77,10 @@ export async function loadArticleAggregates(
     prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
     // Einzelverkaeufe des letzten Jahres fuer das gewichtete Verkaufstempo
     prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true } }),
+    // Letzte VK-Aenderung je Artikel (Billbee-Abgleich und eBay-Shop-Abruf schreiben sie mit)
+    prisma.priceChange.groupBy({ by: ["articleId"], _max: { at: true } }),
   ]);
+  const lastPriceChangeByArticle = new Map(lastPriceChanges.map((c) => [c.articleId, c._max.at]));
   const salesByArticle = new Map<string, { soldAt: Date; qty: number }[]>();
   for (const s of recentSales) (salesByArticle.get(s.articleId) ?? salesByArticle.set(s.articleId, []).get(s.articleId)!).push(s);
   const nowForPace = new Date();
@@ -162,6 +165,7 @@ export async function loadArticleAggregates(
       hidden: article.hidden,
       ebayEndedAt: article.ebayEndedAt,
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
+      lastPriceChangeAt: lastPriceChangeByArticle.get(article.id) ?? null,
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
       minStock: article.minStock,
       desiredStock: article.desiredStock,

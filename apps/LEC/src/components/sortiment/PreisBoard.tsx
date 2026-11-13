@@ -228,6 +228,16 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
                   <EbayLink row={row} />
+                  {(() => {
+                    // Letzte Preisanpassung: nur wenn aufgezeichnet (Billbee- und eBay-Shop-Abgleich), farbig in Tagen
+                    const d = daysSince(row.lastPriceChangeAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte aufgezeichnete Preisänderung (grün bis 30 Tage, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "Preis heute geändert" : `Preis vor ${d} T geändert`}
+                      </small>
+                    );
+                  })()}
                 </td>
                 <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />

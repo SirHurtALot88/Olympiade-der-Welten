@@ -101,4 +101,17 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     await run();
     expect((await get(sold.id))?.hidden).toBe(false);
   });
+
+  it("eine Aenderung des eBay-Preises wird als Preisaenderung mitgeschrieben", async () => {
+    const a = await article("Yu-Gi-Oh! TST-DE010 Preisaenderung NM");
+    await db.prisma.article.update({ where: { id: a.id }, data: { ebayPrice: 5.99, ebayPriceAt: new Date() } });
+    await syncArticleImages(db.prisma, opts(fakeFetch([tile("666666666", "Yu-Gi-Oh! TST-DE010 Preisaenderung NM", "EEEEEEEEEE", "6,99")])));
+    const log = await db.prisma.priceChange.findMany({ where: { articleId: a.id } });
+    expect(log).toHaveLength(1);
+    expect(log[0].before).toBeCloseTo(5.99);
+    expect(log[0].after).toBeCloseTo(6.99);
+    // gleicher Preis bei erneutem Abruf: keine zweite Zeile
+    await syncArticleImages(db.prisma, opts(fakeFetch([tile("666666666", "Yu-Gi-Oh! TST-DE010 Preisaenderung NM", "EEEEEEEEEE", "6,99")])));
+    expect(await db.prisma.priceChange.count({ where: { articleId: a.id } })).toBe(1);
+  });
 });

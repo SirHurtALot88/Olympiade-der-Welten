@@ -50,6 +50,8 @@ export interface ArticleAggregate {
   ebayEndedAt?: Date | null;
   /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
   lastSoldAt?: Date | null;
+  /** Zeitpunkt der letzten aufgezeichneten VK-Aenderung, null = keine bekannt. */
+  lastPriceChangeAt?: Date | null;
   /** Verkaufstempo je Monat aus den Einzelverkaeufen (gewichtet, siehe pace.ts); null/fehlt = Rueckfall auf die Fenster. */
   paceMonth?: number | null;
   /** Mindest-/Meldebestand und Soll-Bestand aus Billbee; null = nicht gepflegt. */
@@ -176,6 +178,8 @@ export interface SortimentRow {
   ebayEndedAt?: string | null;
   /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
   lastSoldAt?: string | null;
+  /** ISO: letzte aufgezeichnete VK-Aenderung, null = keine bekannt. */
+  lastPriceChangeAt?: string | null;
   minStock?: number | null;
   desiredStock?: number | null;
   /** Bestand liegt auf oder unter dem Mindestbestand aus Billbee: nachbestellen. */
@@ -692,6 +696,7 @@ export function buildSortimentRow(
     hidden: a.hidden === true,
     ebayEndedAt: a.ebayEndedAt ? a.ebayEndedAt.toISOString() : null,
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
+    lastPriceChangeAt: a.lastPriceChangeAt ? a.lastPriceChangeAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
     ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
