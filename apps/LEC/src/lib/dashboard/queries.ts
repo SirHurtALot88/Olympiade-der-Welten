@@ -160,6 +160,7 @@ export async function loadArticleAggregates(
       stock: article.stock,
       active: article.active,
       hidden: article.hidden,
+      ebayEndedAt: article.ebayEndedAt,
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
       minStock: article.minStock,

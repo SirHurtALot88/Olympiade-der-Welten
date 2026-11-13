@@ -77,7 +77,7 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     expect(aggregates.find((x) => x.articleId === gone.id)?.currentVk).toBeCloseTo(4.99);
   });
 
-  it("bei eBay beendet: ausverkaufte werden einmal ausgeblendet, Artikel mit Bestand nicht, Wiedereinblenden bleibt", async () => {
+  it("bei eBay beendet: alle werden einmal ausgeblendet, Wiedereinblenden bleibt", async () => {
     const stays = await article("Yu-Gi-Oh! TST-DE005 Bleibt NM");
     const sold = await article("Yu-Gi-Oh! TST-DE006 Ausverkauft NM", { stock: 0 });
     const stocked = await article("Yu-Gi-Oh! TST-DE007 Mit Bestand NM", { stock: 3 });
@@ -89,11 +89,11 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     const run = () => syncArticleImages(db.prisma, { ...opts(fakeFetch([tile("555555555", "Yu-Gi-Oh! TST-DE005 Bleibt NM", "DDDDDDDDDD", "2,99")])), minListingsForEnded: 1 });
     const report = await run();
     expect(report.ended).toBe(3);
-    expect(report.endedHidden).toBe(1);
-    expect((await db.prisma.article.findUnique({ where: { id: reorder.id } }))?.hidden).toBe(false);
+    expect(report.endedHidden).toBe(3);
+    expect((await db.prisma.article.findUnique({ where: { id: reorder.id } }))?.hidden).toBe(true);
     const get = (id: string) => db.prisma.article.findUnique({ where: { id } });
     expect((await get(sold.id))?.hidden).toBe(true);
-    expect((await get(stocked.id))?.hidden).toBe(false);
+    expect((await get(stocked.id))?.hidden).toBe(true);
     expect((await get(stocked.id))?.ebayEndedAt).not.toBeNull();
     expect((await get(never.id))?.ebayEndedAt).toBeNull();
     expect((await get(stays.id))?.ebayEndedAt).toBeNull();

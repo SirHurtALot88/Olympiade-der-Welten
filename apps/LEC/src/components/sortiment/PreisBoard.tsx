@@ -178,6 +178,7 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}
+                        {row.ebayEndedAt && <span className="bd-rar" title={`Seit ${row.ebayEndedAt.slice(0, 10)} nicht mehr im eBay-Shop`}>bei eBay beendet</span>}
                         {dupGroups?.has(row.articleId) && (
                           <span className="bd-rar" title={row.nameRaw}>
                             Doppelt? · Bestand {row.stock} · eBay {row.ebayItemId ?? "–"} · {row.lastSoldAt ? `letzter Verkauf vor ${daysSince(row.lastSoldAt)} T` : "nie verkauft"}

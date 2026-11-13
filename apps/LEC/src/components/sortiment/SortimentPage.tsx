@@ -235,6 +235,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
   const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
   const [onlyReorder, setOnlyReorder] = useState(initialFlags.has("nachbestellen"));
+  const [onlyEnded, setOnlyEnded] = useState(initialFlags.has("ebaybeendet"));
+  const endedCount = useMemo(() => rows.filter((r) => !!r.ebayEndedAt && r.active).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
   const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
@@ -282,6 +284,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       onlySoldOut && "ausverkauft",
       onlyReorder && "nachbestellen",
       onlyDup && "doppelt",
+      onlyEnded && "ebaybeendet",
       onlyMarketFalling && "marktfaellt",
       onlyNameCheck && "namecheck",
       showNoStock && "ohnebestand",
@@ -292,7 +295,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -340,7 +343,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const normalizedQuery = query.trim().length > 0 ? normalizedNameKey(query) : "";
     const upperQuery = query.trim().toUpperCase();
     // Ausgeblendete nur in der eigenen Ansicht (zum Wieder-Einblenden), sonst nirgends.
-    let result = rows.filter((r) => (showHidden ? r.hidden === true : r.hidden !== true));
+    // Bei eBay beendet, in Billbee noch gefuehrt: alle (auch die automatisch ausgeblendeten), damit man sie in Billbee deaktivieren kann.
+    let result = onlyEnded ? rows.filter((r) => !!r.ebayEndedAt && r.active) : rows.filter((r) => (showHidden ? r.hidden === true : r.hidden !== true));
 
     if (normalizedQuery) {
       result = result.filter(
@@ -386,17 +390,17 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
-    if (!showDiscontinued && !showHidden) {
+    if (!showDiscontinued && !showHidden && !onlyEnded) {
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !stockBand) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -417,7 +421,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -553,6 +557,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {endedCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyEnded ? " on" : ""}`}
+            onClick={() => {
+              setOnlyEnded((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Bei eBay nicht mehr im Shop, in Billbee aber noch als aktiver Artikel geführt: dort deaktivieren. Diese Artikel sind im Sortiment automatisch ausgeblendet und tauchen nur hier auf."
+          >
+            Bei eBay beendet, Billbee führt noch ({endedCount})
+          </button>
+        )}
         {dupGroups.size > 0 && (
           <button
             type="button"

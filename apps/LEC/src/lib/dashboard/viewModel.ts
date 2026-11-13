@@ -46,6 +46,8 @@ export interface ArticleAggregate {
   active: boolean;
   /** Von Chris manuell ausgeblendet. */
   hidden?: boolean;
+  /** Seit wann der Artikel laut eBay-Shopseite nicht mehr gelistet ist (Festpreis-Angebote bleiben sonst stehen). */
+  ebayEndedAt?: Date | null;
   /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
   lastSoldAt?: Date | null;
   /** Verkaufstempo je Monat aus den Einzelverkaeufen (gewichtet, siehe pace.ts); null/fehlt = Rueckfall auf die Fenster. */
@@ -170,6 +172,8 @@ export interface SortimentRow {
   active: boolean;
   /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
   hidden?: boolean;
+  /** ISO: bei eBay beendet seit (null = gelistet/unbekannt). */
+  ebayEndedAt?: string | null;
   /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
   lastSoldAt?: string | null;
   minStock?: number | null;
@@ -686,6 +690,7 @@ export function buildSortimentRow(
     windows: windowMetrics,
     active: a.active,
     hidden: a.hidden === true,
+    ebayEndedAt: a.ebayEndedAt ? a.ebayEndedAt.toISOString() : null,
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
