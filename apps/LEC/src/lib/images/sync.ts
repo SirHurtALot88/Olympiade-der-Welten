@@ -205,11 +205,22 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   // Bei eBay beendet: war dem eBay-Shop zugeordnet (Angebotsnummer oder Verkaufsbericht), steht aber nicht mehr auf der Shopseite.
   // Beim ERSTEN Erkennen werden ausverkaufte Artikel ausgeblendet; wer sie danach wieder einblendet, bleibt eingeblendet.
   // Nur bei vollstaendigem Abruf und plausibler Angebotszahl, sonst wuerde eine Drosselung alles ausblenden.
+  // Korrektur zur ersten Fassung (13.11.): damals wurden auch im letzten Jahr verkaufte, ausverkaufte Artikel ausgeblendet.
+  // Alles, was am 13.11. so ausgeblendet wurde und sich im letzten Jahr verkauft hat, kommt zurueck.
+  {
+    const recent = (await prisma.sale.groupBy({ by: ["articleId"], where: { soldAt: { gte: new Date(now.getTime() - 365 * 86_400_000) } } })).map((x) => x.articleId);
+    if (recent.length > 0 && now.getTime() < Date.parse("2026-11-15T00:00:00Z")) {
+      await prisma.article.updateMany({
+        where: { hidden: true, id: { in: recent }, ebayEndedAt: { gte: new Date("2026-11-13T00:00:00Z"), lt: new Date("2026-11-14T00:00:00Z") } },
+        data: { hidden: false },
+      });
+    }
+  }
   let ended = 0;
   let endedHidden = 0;
   const listedIds = new Set(jobs.filter((j) => j.ebayItemId).map((j) => j.articleId));
   const pricedBefore = articles.length > 0 ? await prisma.article.count({ where: { OR: [{ ebayItemId: { not: null } }, { ebayEndedAt: { not: null } }] } }) : 0;
-  if (emptyPages.length === 0 && listedIds.size >= (options.minListingsForEnded ?? 50) && listedIds.size >= pricedBefore * 0.3) {
+  if (emptyPages.length === 0 && listedIds.size >= (options.minListingsForEnded ?? 50) && (options.minListingsForEnded !== undefined || listedIds.size >= pricedBefore * 0.3)) {
     const withFacts = (await prisma.ebayListingFact.findMany({ where: { articleId: { not: null } }, select: { articleId: true }, distinct: ["articleId"] })).map((f) => f.articleId as string);
     const candidates = await prisma.article.findMany({
       where: { ebayEndedAt: null, id: { notIn: [...listedIds] }, OR: [{ ebayItemId: { not: null } }, { id: { in: withFacts } }] },
@@ -218,7 +229,12 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     ended = candidates.length;
     if (candidates.length > 0) {
       await prisma.article.updateMany({ where: { id: { in: candidates.map((c) => c.id) } }, data: { ebayEndedAt: now } });
-      const soldOut = candidates.filter((c) => c.stock <= 0).map((c) => c.id);
+      // eBay beendet das Angebot oft, sobald der Bestand 0 ist: ausverkaufte Artikel, die sich im letzten Jahr verkauft haben,
+      // sind Nachbestell-Kandidaten und bleiben sichtbar (Chris, 13.11.).
+      const soldRecently = new Set(
+        (await prisma.sale.groupBy({ by: ["articleId"], where: { soldAt: { gte: new Date(now.getTime() - 365 * 86_400_000) } } })).map((x) => x.articleId)
+      );
+      const soldOut = candidates.filter((c) => c.stock <= 0 && !soldRecently.has(c.id)).map((c) => c.id);
       if (soldOut.length > 0) {
         const res = await prisma.article.updateMany({ where: { id: { in: soldOut }, hidden: false }, data: { hidden: true } });
         endedHidden = res.count;

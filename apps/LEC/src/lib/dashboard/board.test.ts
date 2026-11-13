@@ -177,3 +177,18 @@ describe("Sortierung nach letztem Verkauf und Umkehren", () => {
     expect(sortBoard(rows, "letzterVerkauf", true).map((x) => x.nameRaw)).toEqual(["nie", "alt", "neu"]);
   });
 });
+
+describe("findDuplicateGroups", () => {
+  const r = (articleId: string, nameRaw: string, setCode = "RA03-DE225", hidden = false) => ({ articleId, nameRaw, setCode, hidden });
+  it("findet gleichen Code/Seltenheit/Auflage mit verschiedenem Namen", async () => {
+    const { findDuplicateGroups } = await import("./board");
+    const g = findDuplicateGroups([
+      r("a", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum Secret Rare NM 1st"),
+      r("b", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum SecR NM 1st"),
+      r("c", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Secret Rare NM 1st"),
+      r("d", "Yu-Gi-Oh! RA03-DE226 Anderer Platinum Secret Rare NM 1st", "RA03-DE226"),
+      r("e", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum Secret Rare NM 1st", "RA03-DE225", true),
+    ]);
+    expect([...g.keys()].sort()).toEqual(["a", "b"]);
+  });
+});

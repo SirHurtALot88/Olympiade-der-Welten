@@ -1,5 +1,5 @@
 import type { SortimentRow } from "./viewModel";
-import { RARITY_NAMES, rarityKey } from "../market/rarity";
+import { RARITY_NAMES, rarityKey, rarityFromTitle } from "../market/rarity";
 import { buildCardmarketSearchUrl } from "../pricing/marketPrice";
 
 /**
@@ -231,4 +231,22 @@ export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "
 /** Mengen ohne Nachkommastellen, wenn ganz; sonst auf zwei Stellen (krumme Mengen sollen auffallen). */
 export function formatQty(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ",");
+}
+
+/**
+ * Moegliche Doppelte: gleicher Set-Code, gleiche Seltenheit, gleiche Auflage und gleiche Packgroesse, aber verschiedene Namen
+ * (z. B. "Fischborg-Strahlschuetze" und "Fischborg-Strahlschuetze Platinum SecR"). Nur nicht ausgeblendete Artikel.
+ * Liefert je Artikel-ID den Gruppenschluessel; Einzelartikel kommen nicht vor.
+ */
+export function findDuplicateGroups(rows: Pick<SortimentRow, "articleId" | "setCode" | "nameRaw" | "hidden">[]): Map<string, string> {
+  const groups = new Map<string, string[]>();
+  for (const r of rows) {
+    if (r.hidden || !r.setCode) continue;
+    const t = cleanTitle(r.nameRaw);
+    const key = [r.setCode.toUpperCase(), rarityFromTitle(r.nameRaw) ?? "", t.edition ?? "", t.pack].join("|");
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(r.articleId);
+  }
+  const out = new Map<string, string>();
+  for (const [key, ids] of groups) if (ids.length >= 2) for (const id of ids) out.set(id, key);
+  return out;
 }
