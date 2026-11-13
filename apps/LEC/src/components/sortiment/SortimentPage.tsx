@@ -21,6 +21,7 @@ import { PreisBoard } from "./PreisBoard";
 import { ArtikelDetail } from "./ArtikelDetail";
 import { daysSince } from "./PreisBoard";
 import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
+import { KARTENART_FARBE, ORDNER, type Kartenart } from "@/lib/market/kartenart";
 import { BOARD_SORT_LABEL, findDuplicateGroups, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
@@ -73,6 +74,8 @@ type ColId =
   | "dbIIpct"
   | "dbIIIpct"
   | "klasse"
+  | "kartenart"
+  | "rarity"
   | "status"
   | "stock"
   | "potvk"
@@ -108,6 +111,9 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "dbIIpct", label: "DB II %", def: 76, min: 60, align: "r" },
   { id: "dbIIIpct", label: "DB III %", def: 80, min: 60, align: "r" },
   { id: "klasse", label: "Klasse", def: 100, min: 80 },
+  // Chris' Ordnerstruktur: Kartenart (Synchro, Xyz, Zauber ...) und Seltenheit, damit man zum Auslisten schnell die Karten im Ordner findet
+  { id: "kartenart", label: "Kategorie", def: 130, min: 90 },
+  { id: "rarity", label: "Rarität", def: 130, min: 90 },
   { id: "status", label: "Status", def: 116, min: 90 },
   { id: "stock", label: "Stk", def: 62, min: 50, align: "r" },
   { id: "potvk", label: "pot. VK€", def: 90, min: 70, align: "r" },
@@ -225,6 +231,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const raw = searchParams.get("klasse");
     return raw ? new Set(raw.split(",").filter((c): c is ArticleClass => CLASS_ORDER.includes(c as ArticleClass))) : new Set();
   });
+  const [ordnerFilter, setOrdnerFilter] = useState<string>(searchParams.get("ordner") ?? "");
+  const [artFilter, setArtFilter] = useState<string>(searchParams.get("art") ?? "");
   const [statusFilter, setStatusFilter] = useState<Set<RowPriceStatus>>(new Set());
   const [marketFilter, setMarketFilter] = useState<Set<MarketFilter>>(() => {
     const raw = searchParams.get("markt");
@@ -239,6 +247,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const endedCount = useMemo(() => rows.filter((r) => !!r.ebayEndedAt && r.active).length, [rows]);
   const [onlyLife, setOnlyLife] = useState(initialFlags.has("lebenszyklus"));
   const lifeCount = useMemo(() => rows.filter((r) => !!r.lifecycle).length, [rows]);
+  const [onlyMarked, setOnlyMarked] = useState(initialFlags.has("auslistenmarkiert"));
+  const markedCount = useMemo(() => rows.filter((r) => !!r.delistMarkedAt && !r.hidden).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
   const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
@@ -258,6 +268,16 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
   const [showDiscontinued, setShowDiscontinued] = useState(initialFlags.has("ausgelaufen"));
   const [showHidden, setShowHidden] = useState(initialFlags.has("ausgeblendet"));
+  const artCounts = useMemo(() => {
+    const art = new Map<string, number>();
+    const ordner = new Map<string, number>();
+    for (const r of rows) {
+      if (r.hidden || !r.active) continue;
+      if (r.kartenart) art.set(r.kartenart, (art.get(r.kartenart) ?? 0) + 1);
+      if (r.ordner) ordner.set(r.ordner, (ordner.get(r.ordner) ?? 0) + 1);
+    }
+    return { art, ordner };
+  }, [rows]);
   const hiddenCount = useMemo(() => rows.filter((r) => r.hidden).length, [rows]);
   // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
   // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
@@ -276,6 +296,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (query.trim()) params.set("q", query.trim());
     if (selectedWindow !== "90") params.set("fenster", selectedWindow);
     if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
+    if (ordnerFilter) params.set("ordner", ordnerFilter);
+    if (artFilter) params.set("art", artFilter);
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
     if (view === "alles") params.set("ansicht", "alles");
     if (boardSort !== "abweichung") params.set("sort", boardSort);
@@ -286,6 +308,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       onlySoldOut && "ausverkauft",
       onlyReorder && "nachbestellen",
       onlyDup && "doppelt",
+      onlyMarked && "auslistenmarkiert",
       onlyLife && "lebenszyklus",
       onlyEnded && "ebaybeendet",
       onlyMarketFalling && "marktfaellt",
@@ -298,7 +321,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -362,6 +385,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (statusFilter.size > 0) {
       result = result.filter((r) => statusFilter.has(r.priceStatus));
     }
+    if (ordnerFilter) result = result.filter((r) => r.ordner === ordnerFilter);
+    if (artFilter) result = result.filter((r) => r.kartenart === artFilter);
     if (marketFilter.size > 0) {
       result = result.filter((r) => matchesMarketFilter(r.market, marketFilter));
     }
@@ -387,6 +412,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyLife) {
       result = result.filter((r) => !!r.lifecycle);
     }
+    if (onlyMarked) {
+      result = result.filter((r) => !!r.delistMarkedAt);
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -400,13 +428,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyEnded && !stockBand) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -427,7 +455,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -510,6 +538,34 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         </div>
       <div className="filterrow">
+        <span className="flabel" title="Deine Ordner: 1 Starlight/Platinum/Ultimate/Collector's, 2 Secret-Monster, 3 farbige Monster, 4 Monster Ultra bis Common, 5 Zauber/Fallen">
+          Ordner
+        </span>
+        <select value={ordnerFilter} onChange={(e) => { setOrdnerFilter(e.target.value); setVisibleCount(PAGE_SIZE); }} aria-label="Ordner">
+          <option value="">alle Ordner</option>
+          {Object.values(ORDNER).map((o) => (
+            <option key={o} value={o}>
+              {o} ({artCounts.ordner.get(o) ?? 0})
+            </option>
+          ))}
+        </select>
+        <span className="flabel" title="Kartenart laut YGOPRODeck: Synchro (weiß), Xyz (schwarz), Fusion (lila), Link (blau), Ritual (hellblau), Pendel, Normal, Effekt, Zauber, Falle">
+          Kartenart
+        </span>
+        <select value={artFilter} onChange={(e) => { setArtFilter(e.target.value); setVisibleCount(PAGE_SIZE); }} aria-label="Kartenart">
+          <option value="">alle Kartenarten</option>
+          {(["Synchro", "Xyz", "Fusion", "Link", "Ritual", "Pendel", "Normal", "Effekt", "Zauber", "Falle"] as Kartenart[]).map((a) => (
+            <option key={a} value={a}>
+              {a}{KARTENART_FARBE[a] ? ` (${KARTENART_FARBE[a]})` : ""} ({artCounts.art.get(a) ?? 0})
+            </option>
+          ))}
+        </select>
+        {(ordnerFilter || artFilter) && (
+          <button type="button" className="chip" onClick={() => { setOrdnerFilter(""); setArtFilter(""); }}>
+            zurücksetzen
+          </button>
+        )}
+        <span className="fsep" />
         <span className="flabel">Klasse</span>
         {CLASS_ORDER.map((cls) => (
           <button
@@ -563,6 +619,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {markedCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyMarked ? " on" : ""}`}
+            onClick={() => {
+              setOnlyMarked((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Karten, die du im Drawer zum Auslisten markiert hast. Kombiniere mit Ordner und Kartenart, um sie im Ordner schnell zu finden."
+          >
+            Zum Auslisten markiert ({markedCount})
+          </button>
+        )}
         {lifeCount > 0 && (
           <button
             type="button"
@@ -875,6 +944,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                       {formatPercent(row.dbIIIPercent)}%
                     </td>
                     <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
+                    <td style={{ fontSize: 11.5 }} title={row.ordner ?? "Kartenart noch nicht bestimmt (YGOPRODeck-Abruf der Bilder holt sie)"}>
+                      {row.kartenart ? `${row.kartenart}${KARTENART_FARBE[row.kartenart] ? ` · ${KARTENART_FARBE[row.kartenart]}` : ""}` : <span className="p-muted">—</span>}
+                    </td>
+                    <td style={{ fontSize: 11.5 }}>{row.rarity ?? <span className="p-muted">—</span>}</td>
                     <td>
                       <span className={`pill ${pill.cls}`}>
                         <span className="dot" />

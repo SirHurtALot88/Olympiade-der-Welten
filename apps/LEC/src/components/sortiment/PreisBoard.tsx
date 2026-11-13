@@ -189,6 +189,8 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                       <div className="bd-sub">
                         {row.setCode && <CopyCode setCode={row.setCode} />}
                         {rarity && <span className="bd-rar">{rarity}</span>}
+                        {row.kartenart && <span className="bd-rar" title={row.ordner ?? undefined}>{row.kartenart}</span>}
+                        {row.delistMarkedAt && <span className="bd-rar" style={{ color: "var(--crit)" }} title="Von dir zum Auslisten markiert">zum Auslisten</span>}
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}

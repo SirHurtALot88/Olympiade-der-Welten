@@ -52,6 +52,23 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
     }
   }
 
+  async function setDelist(marked: boolean) {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/article-delist/${encodeURIComponent(row.articleId)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ marked }),
+      });
+      if (r.ok) {
+        router.refresh();
+        onClose();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setHidden(hidden: boolean) {
     setBusy(true);
     try {
@@ -190,7 +207,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             Den Code in Billbee und bei eBay korrigieren.
           </div>
         )}
-        <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} />
+        <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} onToggleDelist={() => setDelist(!row.delistMarkedAt)} />
 
         <section className="bd-dt-grid">
           <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "aus eBay (Stand des letzten Shop-Abrufs)" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
@@ -511,7 +528,7 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
   );
 }
 
-function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void }) {
+function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void; onToggleDelist: () => void }) {
   const l = ebayLinks(row);
   const cm = cardmarketLink(row, cleanTitle(row.nameRaw).pack);
   return (
@@ -529,6 +546,19 @@ function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow;
           Bei Cardmarket ansehen ↗
         </a>
       )}
+      <button
+        type="button"
+        className={`chip${row.delistMarkedAt ? " on" : ""}`}
+        onClick={onToggleDelist}
+        disabled={busy}
+        title={
+          row.delistMarkedAt
+            ? "Markierung zurücknehmen"
+            : `Karte zum Auslisten vormerken, damit du sie später im Ordner findest (Filter „Zum Auslisten markiert“)${row.ordner ? ` · ${row.ordner}` : ""}`
+        }
+      >
+        {row.delistMarkedAt ? "✓ Zum Auslisten markiert (aufheben)" : "Zum Auslisten markieren"}
+      </button>
       <button type="button" className="chip" onClick={onToggleHidden} disabled={busy} title={hidden ? "Artikel wieder in die Listen aufnehmen" : "Artikel aus allen Listen ausblenden (Daten bleiben erhalten)"}>
         {hidden ? "Wieder einblenden" : "Ausblenden"}
       </button>
