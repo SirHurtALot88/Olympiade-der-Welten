@@ -203,18 +203,18 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   }
 
   // Bei eBay beendet: war dem eBay-Shop zugeordnet (Angebotsnummer oder Verkaufsbericht), steht aber nicht mehr auf der Shopseite.
-  // Beim ERSTEN Erkennen werden ausverkaufte Artikel ausgeblendet; wer sie danach wieder einblendet, bleibt eingeblendet.
+  // Beim ERSTEN Erkennen werden diese Artikel ausgeblendet (auch mit Bestand: Chris will beendete nicht mehr im Sortiment); wer sie danach wieder einblendet, bleibt eingeblendet.
   // Nur bei vollstaendigem Abruf und plausibler Angebotszahl, sonst wuerde eine Drosselung alles ausblenden.
-  // Korrektur zur ersten Fassung (13.11.): damals wurden auch im letzten Jahr verkaufte, ausverkaufte Artikel ausgeblendet.
-  // Alles, was am 13.11. so ausgeblendet wurde und sich im letzten Jahr verkauft hat, kommt zurueck.
-  {
-    const recent = (await prisma.sale.groupBy({ by: ["articleId"], where: { soldAt: { gte: new Date(now.getTime() - 365 * 86_400_000) } } })).map((x) => x.articleId);
-    if (recent.length > 0 && now.getTime() < Date.parse("2026-11-15T00:00:00Z")) {
-      await prisma.article.updateMany({
-        where: { hidden: true, id: { in: recent }, ebayEndedAt: { gte: new Date("2026-11-13T00:00:00Z"), lt: new Date("2026-11-14T00:00:00Z") } },
-        data: { hidden: false },
-      });
-    }
+  // Chris, 13.11.: Festpreis-Angebote beendet eBay nicht (nur Auktionen) - was nicht mehr im Shop steht, ist wirklich weg.
+  // Die am 13.11. noch mit Vorsicht (Bestand/Verkaeufe) eingeblendet gelassenen werden jetzt ebenfalls ausgeblendet.
+  // Nur einmal je Prozessstart, damit ein spaeteres Wiedereinblenden von Hand bleibt.
+  const g = globalThis as { __lecEndedBackfill?: boolean };
+  if (!g.__lecEndedBackfill && now.getTime() < Date.parse("2026-11-16T00:00:00Z")) {
+    g.__lecEndedBackfill = true;
+    await prisma.article.updateMany({
+      where: { hidden: false, ebayEndedAt: { gte: new Date("2026-11-13T00:00:00Z"), lt: new Date("2026-11-14T00:00:00Z") } },
+      data: { hidden: true },
+    });
   }
   let ended = 0;
   let endedHidden = 0;
@@ -229,12 +229,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     ended = candidates.length;
     if (candidates.length > 0) {
       await prisma.article.updateMany({ where: { id: { in: candidates.map((c) => c.id) } }, data: { ebayEndedAt: now } });
-      // eBay beendet das Angebot oft, sobald der Bestand 0 ist: ausverkaufte Artikel, die sich im letzten Jahr verkauft haben,
-      // sind Nachbestell-Kandidaten und bleiben sichtbar (Chris, 13.11.).
-      const soldRecently = new Set(
-        (await prisma.sale.groupBy({ by: ["articleId"], where: { soldAt: { gte: new Date(now.getTime() - 365 * 86_400_000) } } })).map((x) => x.articleId)
-      );
-      const soldOut = candidates.filter((c) => c.stock <= 0 && !soldRecently.has(c.id)).map((c) => c.id);
+      const soldOut = candidates.map((c) => c.id);
       if (soldOut.length > 0) {
         const res = await prisma.article.updateMany({ where: { id: { in: soldOut }, hidden: false }, data: { hidden: true } });
         endedHidden = res.count;
