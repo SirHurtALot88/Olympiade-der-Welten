@@ -36,8 +36,8 @@ Dazu kurze Hinweise (Version zu prüfen, „ab“ ausgelassen, Zustand). Keine S
 
 ## Zustand GD/LP
 
-Der Preisführer hat keinen Zustandsfilter. Vorläufig 40 % Abschlag auf den Marktwert für GD annehmen und als Annahme kennzeichnen;
-besser ist das „ab“ mit Filter Good/Deutschland von Chris.
+Der Preisführer hat keinen Zustandsfilter (Preise gelten für NM). Abschläge auf die Cardmarket-Preise (Chris, 13.11.): **EX 85 %, GD 70 %, LP 60 %, PL 45 %, Poor 30 %**
+(`apps/LEC/src/lib/market/condition.ts`, gilt auch in LEC). „Played“ im Titel zählt als PL. Besser bleibt das „ab“ mit Filter Zustand/Deutschland von Chris.
 
 ## Offene Punkte
 
