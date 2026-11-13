@@ -24,7 +24,7 @@ function article(id: string, currentVk: number, stock: number, qty90 = 0): Artic
 }
 
 function quote(trend: number, extra: Partial<LatestQuote> = {}): LatestQuote {
-  return { priceFrom: trend * 0.8, priceTrend: trend, priceAvg30: trend, priceAvg7: trend, priceAvg1: null, available: 10, fetchedAt: new Date(), matchQuality: "eindeutig", ...extra };
+  return { priceFrom: null, priceTrend: trend, priceAvg30: trend, priceAvg7: trend, priceAvg1: null, available: 10, fetchedAt: new Date(), matchQuality: "eindeutig", ...extra };
 }
 
 describe("marketHints", () => {

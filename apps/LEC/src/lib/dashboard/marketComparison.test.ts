@@ -222,3 +222,15 @@ describe("buildMarketComparisonRow", () => {
     expect(row.stale).toBe(false);
   });
 });
+
+describe("marketValueOf mit guenstigstem Angebot (ab)", () => {
+  const q = (extra: Record<string, unknown>) => ({ priceFrom: null, priceTrend: 8, priceAvg1: 8, priceAvg7: 8, priceAvg30: 8, available: 5, fetchedAt: new Date(), matchQuality: "eindeutig", ...extra }) as never;
+  it("ab zieht den Marktwert mit herunter, wenn plausibel", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q({ priceFrom: 6 }), 1)).toBeCloseTo((32 + 6) / 5);
+  });
+  it("ein extrem billiges Angebot (unter 40 % des Mittels) zaehlt nicht", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q({ priceFrom: 0.5 }), 1)).toBeCloseTo(8);
+  });
+});
