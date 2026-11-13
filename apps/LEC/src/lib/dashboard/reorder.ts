@@ -12,6 +12,8 @@
  */
 export const REORDER_RULES = {
   coverMonthsDue: 1.5,
+  /** Bestellmenge ohne Soll-Bestand: so viele Monate Verkaufstempo sollen danach im Lager sein */
+  orderCoverMonths: 3,
   minUnitsPerYear: 2,
   minUnitProfitSingleSale: 3,
   defaultSnoozeDays: 90,
@@ -30,6 +32,8 @@ export interface ReorderInput {
   unitsAll: number;
   /** Reichweite in Monaten; null ohne Tempo */
   coverMonths: number | null;
+  /** Verkaufstempo in Stueck pro Monat; null/0 ohne Tempo */
+  paceMonth?: number | null;
   /** Deckungsbeitrag (DB II) je Stueck, null wenn unbekannt */
   unitProfit: number | null;
   snoozeUntil: Date | null;
@@ -50,7 +54,12 @@ export function assessReorder(i: ReorderInput): ReorderResult {
   if (!i.active) return none;
   const snoozed = i.snoozeUntil !== null && i.snoozeUntil.getTime() > i.now.getTime();
   const snoozedUntil = snoozed ? i.snoozeUntil!.toISOString() : null;
-  const qtyFor = (stock: number) => (i.desiredStock !== null && i.desiredStock > stock ? i.desiredStock - stock : null);
+  const qtyFor = (stock: number) => {
+    if (i.desiredStock !== null && i.desiredStock > stock) return i.desiredStock - stock;
+    const byPace = Math.ceil((i.paceMonth ?? 0) * REORDER_RULES.orderCoverMonths);
+    const target = Math.max(byPace, (i.minStock ?? 0) + 1, 1);
+    return Math.max(1, target - Math.max(stock, 0));
+  };
 
   const belowMin = (i.minStock ?? 0) > 0 && i.stock <= (i.minStock as number);
   const computedBasis = i.units365 > 0 && (i.stock <= 0 || (i.coverMonths !== null && i.coverMonths <= REORDER_RULES.coverMonthsDue));

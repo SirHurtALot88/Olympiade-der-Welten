@@ -684,7 +684,7 @@ export function buildSortimentRow(
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
-    ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null)),
+    ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
@@ -735,7 +735,7 @@ export function buildFullSortiment(
     .map(withRanks);
 }
 
-function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProfit: number | null) {
+function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProfit: number | null, paceMonth: number | null) {
   const r = assessReorder({
     active: a.active,
     stock: a.stock,
@@ -744,6 +744,7 @@ function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProf
     units365: a.windows["365"]?.qty ?? 0,
     unitsAll: a.windows.all?.qty ?? 0,
     coverMonths,
+    paceMonth,
     unitProfit,
     snoozeUntil: a.reorderSnoozeUntil ?? null,
     now: new Date(),
@@ -974,7 +975,8 @@ export function buildRecommendations(
       kind: "nachkaufen",
       title: `${shortName(c.article.nameRaw)} nachkaufen.`,
       detail:
-        (row.reorderReason === "mindestbestand" ? `Bestand ${c.article.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}${row.reorderQty ? ` (Soll ${row.desiredStock}, ${row.reorderQty} Stk fehlen)` : ""}. ` : row.reorderReason === "ausverkauft" ? "Ausverkauft bei laufendem Absatz. " : "Bestand wird knapp. ") +
+        (row.reorderReason === "mindestbestand" ? `Bestand ${c.article.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}. ` : row.reorderReason === "ausverkauft" ? "Ausverkauft bei laufendem Absatz. " : "Bestand wird knapp. ") +
+        `Empfehlung: ${row.reorderQty ?? 1} Stk nachbestellen. ` +
         c.reason +
         (row?.today ? ` Bestand ${c.article.stock} Stk${cover !== null ? ` (reicht ca. ${cover.toFixed(1).replace(".", ",")} Monate)` : ""}. Nachkauf höchstens zu ${row.today.maxEk25 !== null ? row.today.maxEk25.toFixed(2) : "–"} € EK${row.market?.value != null ? `, Marktwert ${row.market.value.toFixed(2)} €` : ""}.` : ""),
       effect: `≈ € ${expectedDbII.toFixed(0)} / 90 T erwartet (DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · ${dbIIPerUnit.toFixed(2)} €/Stk × ${qty90} Stk)`,

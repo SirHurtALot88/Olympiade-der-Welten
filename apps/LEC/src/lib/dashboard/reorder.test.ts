@@ -33,3 +33,14 @@ describe("assessReorder", () => {
     expect(assessReorder({ ...base, snoozeUntil: new Date("2026-11-01T00:00:00Z") }).due).toBe(true);
   });
 });
+
+describe("Bestellmenge", () => {
+  const base = { active: true, stock: 1, minStock: 1, desiredStock: null, units365: 10, unitsAll: 10, coverMonths: 1.2, unitProfit: 5, snoozeUntil: null, now: new Date("2026-11-13") };
+  it("ohne Soll aus Verkaufstempo (3 Monate)", () => {
+    expect(assessReorder({ ...base, paceMonth: 1 }).qty).toBe(2);
+    expect(assessReorder({ ...base, paceMonth: 2 }).qty).toBe(5);
+  });
+  it("mindestens eine Stueck ueber Mindestbestand", () => {
+    expect(assessReorder({ ...base, paceMonth: 0 }).qty).toBe(1);
+  });
+});
