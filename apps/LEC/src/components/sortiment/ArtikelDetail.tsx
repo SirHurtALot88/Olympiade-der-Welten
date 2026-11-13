@@ -195,7 +195,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         <section className="bd-dt-grid">
           <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "aus eBay (Stand des letzten Shop-Abrufs)" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.staleDiscount ? `−${Math.round(m.staleDiscount * 100)} % Ladenhüter-Abschlag: seit ${m.daysSinceSale} Tagen kein Verkauf` : m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
-          <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Ø aus Trend, 1, 7, 30 Tage und letztem EK" />
+          <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Ø aus Trend, 1, 7, 30 Tage, ab (doppelt) und letztem EK" />
           <Stat
             tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}
             label="Marge Nachkauf"
@@ -332,7 +332,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           <Group id="cardmarket" title="Cardmarket" extra={marketDir ? <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span> : null}>
             <table className="bd-dt-t">
               <tbody>
-                <tr><td>Tiefstpreis</td><td className="r">{eur(detail.market.low)}</td></tr>
+                <tr title="Günstigstes Angebot („ab“): zählt doppelt im Marktwert, wenn plausibel"><td style={{ fontWeight: 700, color: "#f5b942" }}>ab (günstigstes Angebot)</td><td className="r" style={{ fontWeight: 700, color: "#f5b942" }}>{eur(detail.market.low)}</td></tr>
                 <tr><td>Ø 1 / 7 / 30 Tage</td><td className="r">{eur(detail.market.avg1)} / {eur(detail.market.avg7)} / {eur(detail.market.avg30)}</td></tr>
                 <tr><td>Trend</td><td className="r">{eur(detail.market.trend)}</td></tr>
                 <tr><td>Stand</td><td className="r">{day(detail.market.fetchedAt)}</td></tr>
