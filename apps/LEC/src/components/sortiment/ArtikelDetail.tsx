@@ -34,6 +34,24 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
+  const [snoozeDays, setSnoozeDays] = useState(90);
+  async function setSnooze(days: number | null) {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/article-reorder/${encodeURIComponent(row.articleId)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ days }),
+      });
+      if (r.ok) {
+        router.refresh();
+        onClose();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setHidden(hidden: boolean) {
     setBusy(true);
     try {
@@ -195,6 +213,37 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             </b>{" "}
             – {m.provenByDemand ? "der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : "Preis wird gezahlt."}
           </p>
+        )}
+
+        {(row.reorderDue || row.reorderSnoozedUntil || row.reorderSkipReason) && (
+          <div className={row.reorderDue ? "bd-dt-warn" : "bd-dt-note"}>
+            {row.reorderDue && (
+              <>
+                <b>Nachbestellen fällig</b>
+                {row.reorderReason === "mindestbestand" ? ` – Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}${row.reorderQty ? `, Soll ${row.desiredStock} (${row.reorderQty} Stk fehlen)` : ""}.` : row.reorderReason === "ausverkauft" ? " – ausverkauft, der Artikel verkauft sich." : " – der Bestand reicht nur noch etwa 1,5 Monate."}
+                <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <button type="button" className="chip" disabled={busy} onClick={() => void setSnooze(snoozeDays)} title="Du hast den Artikel geprüft und willst ihn jetzt nicht nachbestellen: er verschwindet für die gewählte Zeit aus „Nachbestellen fällig“ und den Empfehlungen">
+                    Erstmal nicht nachbestellen
+                  </button>
+                  <select value={snoozeDays} onChange={(e) => setSnoozeDays(Number(e.target.value))} aria-label="Zurückstellen für">
+                    <option value={30}>30 Tage</option>
+                    <option value={60}>60 Tage</option>
+                    <option value={90}>90 Tage</option>
+                    <option value={180}>180 Tage</option>
+                  </select>
+                </div>
+              </>
+            )}
+            {!row.reorderDue && row.reorderSnoozedUntil && (
+              <>
+                <b>Nachbestellung zurückgestellt bis {day(row.reorderSnoozedUntil)}.</b>{" "}
+                <button type="button" className="chip" disabled={busy} onClick={() => void setSnooze(null)}>
+                  Wieder aktivieren
+                </button>
+              </>
+            )}
+            {!row.reorderDue && !row.reorderSnoozedUntil && row.reorderSkipReason}
+          </div>
         )}
 
         {detail && (

@@ -505,7 +505,10 @@ describe("Nachbestellen faellig (Mindestbestand aus Billbee)", () => {
   });
   it("ueber dem Mindestbestand, ohne Mindestbestand oder ausgelaufen: nicht faellig", () => {
     expect(r(3, 2).reorderDue).toBe(false);
-    expect(r(0, null).reorderDue).toBe(false);
+    expect(r(20, null).reorderDue).toBe(false); // viel Bestand, kein Mindestbestand
     expect(r(0, 2, 6, false).reorderDue).toBe(false);
+  });
+  it("ohne Mindestbestand rechnerisch faellig: ausverkauft mit Verkaeufen im Jahr", () => {
+    expect(r(0, null)).toMatchObject({ reorderDue: true, reorderReason: "ausverkauft" });
   });
 });

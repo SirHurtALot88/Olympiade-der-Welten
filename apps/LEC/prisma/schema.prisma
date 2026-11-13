@@ -46,6 +46,8 @@ model Article {
   /// Mindest-/Meldebestand und Soll-Bestand aus dem Billbee-Artikelstamm (StockWarning / StockDesired); null = nicht gepflegt.
   minStock       Int?
   desiredStock   Int?
+  /// "Erstmal nicht nachbestellen": bis zu diesem Zeitpunkt gilt der Artikel nicht als faellig (Chris, 13.11.).
+  reorderSnoozeUntil DateTime?
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?
