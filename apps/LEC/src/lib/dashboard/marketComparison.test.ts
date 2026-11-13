@@ -234,3 +234,13 @@ describe("marketValueOf mit guenstigstem Angebot (ab)", () => {
     expect(marketValueOf(q({ priceFrom: 0.5 }), 1)).toBeCloseTo(8);
   });
 });
+
+describe("Zustandsabschlag im Marktwert", () => {
+  const q = { priceFrom: null, priceTrend: 10, priceAvg1: 10, priceAvg7: 10, priceAvg30: 10, available: 5, fetchedAt: new Date(), matchQuality: "eindeutig" } as never;
+  it("rechnet NM-Preise mit dem Zustandsfaktor herunter, den letzten EK nicht", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q, 1, null, 0.5)).toBeCloseTo(5);
+    expect(marketValueOf(q, 1, 4, 0.5)).toBeCloseTo((4 * 5 + 4) / 5);
+    expect(marketValueOf(q, 1)).toBeCloseTo(10);
+  });
+});

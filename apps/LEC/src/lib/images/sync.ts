@@ -185,7 +185,15 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   // Aktuelle Angebotspreise zuerst und unabhaengig vom Bild: ein haengender Bilder-Abruf darf den VK nicht veralten lassen.
   const now = new Date();
   const priced = jobs.filter((j) => j.ebayItemId && j.price !== null);
+  // Alter eBay-Preis je Artikel: eine Aenderung wird als Preisaenderung mitgeschrieben (Anzeige "Preis vor X T geaendert").
+  const oldEbayPrice = new Map(
+    (await prisma.article.findMany({ where: { id: { in: priced.map((j) => j.articleId) } }, select: { id: true, ebayPrice: true } })).map((a) => [a.id, a.ebayPrice])
+  );
   await runLimited(priced, 8, async (job) => {
+    const before = oldEbayPrice.get(job.articleId);
+    if (before != null && job.price !== null && Math.abs(before - job.price) > 0.004) {
+      await prisma.priceChange.create({ data: { articleId: job.articleId, before, after: job.price } });
+    }
     await prisma.article.update({
       where: { id: job.articleId },
       data: { ebayItemId: job.ebayItemId, ebayPrice: job.price, ebayPriceAt: now, ebayEndedAt: null },
