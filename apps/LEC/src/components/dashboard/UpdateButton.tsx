@@ -7,6 +7,7 @@ interface SyncState {
   configured: boolean;
   running: boolean;
   lastError: string | null;
+  lastErrorAt?: string | null;
   lastReport: { finishedAt: string } | null;
 }
 
@@ -71,6 +72,11 @@ export function UpdateButton() {
         Stand {ago(state?.lastReport?.finishedAt, now)}
         {state?.lastError && !running ? " · letzter Abruf fehlgeschlagen" : ""}
       </span>
+      {state?.lastError && !running && (
+        <span className="upd-stand" role="alert" title={state.lastError} style={{ display: "block", color: "var(--crit)", marginTop: 4, whiteSpace: "normal", wordBreak: "break-word" }}>
+          Grund{state.lastErrorAt ? ` (${ago(state.lastErrorAt, now)})` : ""}: {state.lastError.length > 160 ? `${state.lastError.slice(0, 160)} …` : state.lastError}
+        </span>
+      )}
     </div>
   );
 }

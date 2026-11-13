@@ -203,7 +203,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}${row.ranks?.marge ? ` · Platz #${row.ranks.marge}/${row.ranks.total}` : ""}` : undefined}
           />
           <Stat tone={row.reorderDue || noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={[row.stockMonthsCover ? `Reichweite ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : row.stock > 0 ? "kein Verkaufstempo" : null, row.reorderDue ? `Nachbestellen: ${row.reorderQty ?? 1} Stk` : noSale90 ? "kein Verkauf in 90 Tagen" : null, row.minStock ? `Min ${row.minStock}${row.desiredStock ? ` · Soll ${row.desiredStock}` : ""}` : null].filter(Boolean).join(" · ")} />
-          <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
+          <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={[row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : null, row.lastEkAt ? `zuletzt vor ${Math.max(0, Math.floor((Date.now() - Date.parse(row.lastEkAt)) / 86_400_000))} T geändert/gekauft` : null].filter(Boolean).join(" · ") || undefined} />
         </section>
 
         {m?.soldAt && (
