@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSetCodeIndex, lookupCardImageId, toEnglishSetCode, ygoImageUrl } from "./ygoprodeck";
+import { buildSetCodeIndex, buildSetCodeTypeIndex, lookupCardImageId, lookupCardType, toEnglishSetCode, ygoImageUrl } from "./ygoprodeck";
 
 describe("toEnglishSetCode", () => {
   it("tauscht DE gegen EN, die Nummer bleibt", () => {
@@ -31,5 +31,14 @@ describe("buildSetCodeIndex", () => {
 
   it("baut die Bild-URL", () => {
     expect(ygoImageUrl(5318639)).toBe("https://images.ygoprodeck.com/images/cards/5318639.jpg");
+  });
+});
+
+describe("Kartentyp-Index", () => {
+  it("ordnet deutsche Set-Codes ueber den englischen dem Typ zu", () => {
+    const idx = buildSetCodeTypeIndex({ data: [{ type: "Synchro Monster", card_sets: [{ set_code: "RA02-EN048" }] }, { type: "Spell Card", card_sets: [{ set_code: "LOB-EN100" }] }, { card_sets: [{ set_code: "X-EN001" }] }] });
+    expect(lookupCardType(idx, "RA02-DE048")).toBe("Synchro Monster");
+    expect(lookupCardType(idx, "LOB-DE100")).toBe("Spell Card");
+    expect(lookupCardType(idx, "X-DE001")).toBeNull();
   });
 });

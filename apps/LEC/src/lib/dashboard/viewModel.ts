@@ -1,5 +1,7 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
+import { kartenartOf, ordnerOf, type Kartenart, type Ordner } from "../market/kartenart";
+import { rarityFromTitle } from "../market/rarity";
 import { assessLifecycle, type Lifecycle } from "./lifecycle";
 import { assessReorder } from "./reorder";
 import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
@@ -49,6 +51,10 @@ export interface ArticleAggregate {
   hidden?: boolean;
   /** Seit wann der Artikel laut eBay-Shopseite nicht mehr gelistet ist (Festpreis-Angebote bleiben sonst stehen). */
   ebayEndedAt?: Date | null;
+  /** Kartentyp laut YGOPRODeck ("Synchro Monster" ...), null = noch nicht bestimmt. */
+  cardType?: string | null;
+  /** Von Chris zum Auslisten markiert. */
+  delistMarkedAt?: Date | null;
   /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
   lastSoldAt?: Date | null;
   /** Zeitpunkt der letzten aufgezeichneten VK-Aenderung, null = keine bekannt. */
@@ -179,6 +185,12 @@ export interface SortimentRow {
   hidden?: boolean;
   /** ISO: bei eBay beendet seit (null = gelistet/unbekannt). */
   ebayEndedAt?: string | null;
+  /** Seltenheit aus dem Titel, Kartenart (Synchro, Xyz, Zauber ...) und Ordner nach Chris' Ordnerstruktur. */
+  /** ISO: zum Auslisten markiert (Drawer-Knopf), null = nicht markiert. */
+  delistMarkedAt?: string | null;
+  rarity?: string | null;
+  kartenart?: Kartenart | null;
+  ordner?: Ordner | null;
   /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
   lastSoldAt?: string | null;
   /** ISO: letzte aufgezeichnete VK-Aenderung, null = keine bekannt. */
@@ -712,6 +724,8 @@ export function buildSortimentRow(
     lastEkAt: a.lastEkAt ? a.lastEkAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
+    delistMarkedAt: a.delistMarkedAt ? a.delistMarkedAt.toISOString() : null,
+    ...kartenFelder(a.nameRaw, a.cardType),
     lifecycle: assessLifecycle({
       active: a.active,
       hidden: a.hidden === true,
@@ -768,6 +782,12 @@ export function buildFullSortiment(
     })
     .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop))
     .map(withRanks);
+}
+
+function kartenFelder(nameRaw: string, cardType: string | null | undefined) {
+  const rarity = rarityFromTitle(nameRaw);
+  const kartenart = kartenartOf(cardType);
+  return { rarity, kartenart, ordner: ordnerOf(rarity, kartenart) };
 }
 
 function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProfit: number | null, paceMonth: number | null) {

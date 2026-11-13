@@ -6,7 +6,7 @@ import { ebayImageUrl, parseStorePage, parseTotalListings, storePageUrl, type St
 
 const STORE_PAGE_SIZE = 48;
 import { matchListingsToArticles, type ImageMatchKind } from "./match";
-import { YGO_CARDINFO_URL, buildSetCodeIndex, lookupCardImageId, ygoImageUrl } from "./ygoprodeck";
+import { YGO_CARDINFO_URL, buildSetCodeIndex, buildSetCodeTypeIndex, lookupCardType, lookupCardImageId, ygoImageUrl } from "./ygoprodeck";
 
 /** Wie ein Artikel an sein Bild kam. "set_code" = YGOPRODeck-Rueckfall. */
 export type ImageSourceKind = ImageMatchKind | "set_code";
@@ -56,6 +56,8 @@ export interface SyncReport {
   priced: number;
   /** Artikel, die nicht mehr im Shop stehen (eBay-Preis geleert). */
   delisted: number;
+  /** Neu bestimmte Kartentypen (fuer Kartenart und Ordner). */
+  cardTypesSet: number;
   /** Neu als bei eBay beendet erkannt / davon ausgeblendet (ausverkauft). */
   ended: number;
   endedHidden: number;
@@ -127,7 +129,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   const fetchFn = options.fetchFn ?? fetch;
 
   const articles = await prisma.article.findMany({
-    select: { id: true, nameNormalized: true, packQty: true, setCode: true, imageGuid: true, imageFile: true, imageMatchedBy: true },
+    select: { id: true, nameNormalized: true, packQty: true, setCode: true, cardType: true, imageGuid: true, imageFile: true, imageMatchedBy: true },
   });
   const current = new Map(articles.map((a) => [a.id, a]));
 
@@ -161,10 +163,22 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
       (!a.imageFile || a.imageMatchedBy === "set_code")
   );
   const fallbackMisses: string[] = [];
-  if (!options.skipFallback && needFallback.length > 0) {
+  // Kartentyp (Synchro, Xyz, Zauber ...) fuer Kartenart und Ordner: einmal je Artikel, aus derselben YGOPRODeck-Datei
+  const needTypes = articles.filter((a) => a.setCode && !a.cardType);
+  let cardTypesSet = 0;
+  if (!options.skipFallback && (needFallback.length > 0 || needTypes.length > 0)) {
     const res = await fetchFn(YGO_CARDINFO_URL, { headers: BROWSER_HEADERS });
     if (!res.ok) throw new Error(`YGOPRODeck antwortet mit HTTP ${res.status}`);
-    const index = buildSetCodeIndex(await res.json());
+    const cardInfo = await res.json();
+    const index = buildSetCodeIndex(cardInfo);
+    const typeIndex = buildSetCodeTypeIndex(cardInfo);
+    for (const a of needTypes) {
+      const type = lookupCardType(typeIndex, a.setCode!);
+      if (type) {
+        await prisma.article.update({ where: { id: a.id }, data: { cardType: type } });
+        cardTypesSet++;
+      }
+    }
     for (const a of needFallback) {
       const cardId = lookupCardImageId(index, a.setCode!);
       if (cardId === null) {
@@ -303,6 +317,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     fallbackMissSample: fallbackMisses.slice(0, 50),
     fallbackMissCount: fallbackMisses.length,
     articlesWithImage,
+    cardTypesSet,
     articlesTotal: articles.length,
     startedAt,
     finishedAt: new Date().toISOString(),

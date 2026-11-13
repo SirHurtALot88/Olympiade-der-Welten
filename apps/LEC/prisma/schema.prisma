@@ -59,6 +59,10 @@ model Article {
   ebayPriceAt    DateTime?
   /// Seit wann der Artikel laut Shopseite nicht mehr bei eBay gelistet ist (null = gelistet/unbekannt). Beim ersten Erkennen blendet der Abruf ausverkaufte Artikel aus.
   ebayEndedAt    DateTime?
+  /// Kartentyp laut YGOPRODeck ("Synchro Monster", "Spell Card" ...), fuer Kartenart und Ordner; null = noch nicht bestimmt.
+  cardType       String?
+  /// Von Chris zum Auslisten markiert (Drawer-Knopf), um die Karte spaeter im Ordner zu finden; null = nicht markiert.
+  delistMarkedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

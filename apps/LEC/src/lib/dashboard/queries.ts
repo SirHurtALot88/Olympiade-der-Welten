@@ -173,6 +173,8 @@ export async function loadArticleAggregates(
       active: article.active,
       hidden: article.hidden,
       ebayEndedAt: article.ebayEndedAt,
+      cardType: article.cardType,
+      delistMarkedAt: article.delistMarkedAt,
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
       lastPriceChangeAt: lastPriceChangeByArticle.get(article.id) ?? null,
       lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
