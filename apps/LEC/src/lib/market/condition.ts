@@ -10,10 +10,10 @@ export type CardCondition = "NM" | "EX" | "GD" | "LP" | "PL" | "PO";
 export const CONDITION_FACTOR: Record<CardCondition, number> = {
   NM: 1,
   EX: 0.85,
-  GD: 0.75,
-  LP: 0.65,
-  PL: 0.5,
-  PO: 0.35,
+  GD: 0.7,
+  LP: 0.6,
+  PL: 0.45,
+  PO: 0.3,
 };
 
 const WORDS: [RegExp, CardCondition][] = [
