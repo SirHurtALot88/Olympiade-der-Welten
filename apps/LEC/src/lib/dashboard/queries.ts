@@ -164,6 +164,7 @@ export async function loadArticleAggregates(
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
       minStock: article.minStock,
       desiredStock: article.desiredStock,
+      reorderSnoozeUntil: article.reorderSnoozeUntil,
       // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
       // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
       currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),

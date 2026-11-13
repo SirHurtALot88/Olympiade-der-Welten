@@ -1,5 +1,6 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
+import { assessReorder } from "./reorder";
 import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
 import { titleNameMismatch } from "../market/names";
 import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
@@ -52,6 +53,8 @@ export interface ArticleAggregate {
   /** Mindest-/Meldebestand und Soll-Bestand aus Billbee; null = nicht gepflegt. */
   minStock?: number | null;
   desiredStock?: number | null;
+  /** "Erstmal nicht nachbestellen": bis dahin nicht faellig. */
+  reorderSnoozeUntil?: Date | null;
   /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
    * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
    * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
@@ -175,6 +178,12 @@ export interface SortimentRow {
   reorderDue?: boolean;
   /** Fehlmenge bis zum Soll-Bestand (nur wenn nachbestellen faellig und Soll gepflegt). */
   reorderQty?: number | null;
+  /** Warum faellig: Mindestbestand aus Billbee, ausverkauft oder knappe Reichweite. */
+  reorderReason?: "mindestbestand" | "ausverkauft" | "reichweite" | null;
+  /** Zurueckgestellt bis (ISO), solange in der Zukunft. */
+  reorderSnoozedUntil?: string | null;
+  /** Warum ein knapper Artikel nicht zum Nachbestellen vorgeschlagen wird (zu wenig Verkaeufe/Gewinn). */
+  reorderSkipReason?: string | null;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
   /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
   ranks?: {
@@ -675,8 +684,7 @@ export function buildSortimentRow(
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
-    reorderDue: a.active && (a.minStock ?? 0) > 0 && a.stock <= (a.minStock ?? 0),
-    reorderQty: a.active && (a.minStock ?? 0) > 0 && a.stock <= (a.minStock ?? 0) && (a.desiredStock ?? 0) > a.stock ? (a.desiredStock as number) - a.stock : null,
+    ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null)),
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
@@ -725,6 +733,22 @@ export function buildFullSortiment(
     })
     .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop))
     .map(withRanks);
+}
+
+function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProfit: number | null) {
+  const r = assessReorder({
+    active: a.active,
+    stock: a.stock,
+    minStock: a.minStock ?? null,
+    desiredStock: a.desiredStock ?? null,
+    units365: a.windows["365"]?.qty ?? 0,
+    unitsAll: a.windows.all?.qty ?? 0,
+    coverMonths,
+    unitProfit,
+    snoozeUntil: a.reorderSnoozeUntil ?? null,
+    now: new Date(),
+  });
+  return { reorderDue: r.due, reorderQty: r.qty, reorderReason: r.reason, reorderSnoozedUntil: r.snoozedUntil, reorderSkipReason: r.skipReason };
 }
 
 /** Setzt auf jede Zeile den Platz unter den AKTIVEN Artikeln (Chris, 11.11.: ausgelaufene zaehlen nicht mit). */
@@ -934,14 +958,13 @@ export function buildRecommendations(
   // FIX 4: effectValue = Erwartungswert der naechsten ~3 Monate (DB II/Stk x 90T-Velocity),
   // NICHT mehr die Lebenszeit-DB-II-Summe -- die sagt nichts darueber aus, was ein Nachkauf
   // heute noch bringt (siehe KONZEPT §2 Bundle-Falle: Lebenszeit-Zahlen taeuschen).
-  for (const c of classified.filter((c) => c.articleClass === "champion")) {
+  // Alle faelligen Artikel (siehe reorder.ts: Mindestbestand aus Billbee oder rechnerisch knapp UND es lohnt sich;
+  // zurueckgestellte erscheinen nicht), nicht mehr nur Champions.
+  for (const c of classified) {
     const row = sortimentByArticleId.get(c.article.articleId);
-    // Nur nachkaufen, wenn der Bestand knapp wird: leer bei laufendem Absatz oder Reichweite unter 1,5 Monaten.
-    // Reicht der Bestand fuer viele Monate, ist ein Nachkauf kein Gewinn, sondern gebundenes Kapital.
-    const cover = row?.stockMonthsCover ?? null;
-    const q90 = c.article.windows["90"]?.qty ?? 0;
-    const lowStock = c.article.stock <= 0 ? q90 > 0 : cover !== null && cover < 1.5;
-    if (row && !lowStock) continue;
+    // Ohne bekannten EK keine Kaufempfehlung (dort steht stattdessen "EK pflegen", siehe FIX 1).
+    if (!row?.reorderDue || row.ekMissing) continue;
+    const cover = row.stockMonthsCover ?? null;
     const dbIIPerUnit = row?.dbIIPerUnit ?? 0;
     const dbIIPercentLifetime = row?.dbIIPercent ?? 0;
     const qty90 = c.article.windows["90"]?.qty ?? 0;
@@ -951,6 +974,7 @@ export function buildRecommendations(
       kind: "nachkaufen",
       title: `${shortName(c.article.nameRaw)} nachkaufen.`,
       detail:
+        (row.reorderReason === "mindestbestand" ? `Bestand ${c.article.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}${row.reorderQty ? ` (Soll ${row.desiredStock}, ${row.reorderQty} Stk fehlen)` : ""}. ` : row.reorderReason === "ausverkauft" ? "Ausverkauft bei laufendem Absatz. " : "Bestand wird knapp. ") +
         c.reason +
         (row?.today ? ` Bestand ${c.article.stock} Stk${cover !== null ? ` (reicht ca. ${cover.toFixed(1).replace(".", ",")} Monate)` : ""}. Nachkauf höchstens zu ${row.today.maxEk25 !== null ? row.today.maxEk25.toFixed(2) : "–"} € EK${row.market?.value != null ? `, Marktwert ${row.market.value.toFixed(2)} €` : ""}.` : ""),
       effect: `≈ € ${expectedDbII.toFixed(0)} / 90 T erwartet (DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · ${dbIIPerUnit.toFixed(2)} €/Stk × ${qty90} Stk)`,

@@ -193,7 +193,7 @@ export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, ima
                   {row.reorderDue && (
                     <small
                       className="bd-reorder"
-                      title={`Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock} (aus Billbee)${row.reorderQty ? `, Soll ${row.desiredStock}: ${row.reorderQty} Stk fehlen` : ""}`}
+                      title={row.reorderReason === "mindestbestand" ? `Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock} (aus Billbee)${row.reorderQty ? `, Soll ${row.desiredStock}: ${row.reorderQty} Stk fehlen` : ""}` : row.reorderReason === "ausverkauft" ? "Ausverkauft, der Artikel verkauft sich" : "Bestand reicht nur noch etwa 1,5 Monate"}
                     >
                       nachbestellen
                     </small>
