@@ -38,7 +38,7 @@ function fakeFetch(tiles: string[], failImages = false): typeof fetch {
   }) as typeof fetch;
 }
 
-async function article(name: string, extra: { currentVk?: number } = {}) {
+async function article(name: string, extra: { currentVk?: number; stock?: number } = {}) {
   return db.prisma.article.create({
     data: { nameNormalized: normalizedNameKey(name), nameRaw: name, setCode: null, ...extra },
   });
@@ -75,5 +75,26 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     expect((await db.prisma.article.findUnique({ where: { id: stays.id } }))?.ebayPrice).toBeCloseTo(2.99);
     const { aggregates } = await loadArticleAggregates(db.prisma);
     expect(aggregates.find((x) => x.articleId === gone.id)?.currentVk).toBeCloseTo(4.99);
+  });
+
+  it("bei eBay beendet: ausverkaufte werden einmal ausgeblendet, Artikel mit Bestand nicht, Wiedereinblenden bleibt", async () => {
+    const stays = await article("Yu-Gi-Oh! TST-DE005 Bleibt NM");
+    const sold = await article("Yu-Gi-Oh! TST-DE006 Ausverkauft NM", { stock: 0 });
+    const stocked = await article("Yu-Gi-Oh! TST-DE007 Mit Bestand NM", { stock: 3 });
+    const never = await article("Yu-Gi-Oh! TST-DE008 Nie gelistet NM", { stock: 0 });
+    for (const x of [sold, stocked]) await db.prisma.article.update({ where: { id: x.id }, data: { ebayItemId: "999" + x.id.slice(-6).replace(/\D/g, "1") } });
+    const run = () => syncArticleImages(db.prisma, { ...opts(fakeFetch([tile("555555555", "Yu-Gi-Oh! TST-DE005 Bleibt NM", "DDDDDDDDDD", "2,99")])), minListingsForEnded: 1 });
+    const report = await run();
+    expect(report.ended).toBe(2);
+    expect(report.endedHidden).toBe(1);
+    const get = (id: string) => db.prisma.article.findUnique({ where: { id } });
+    expect((await get(sold.id))?.hidden).toBe(true);
+    expect((await get(stocked.id))?.hidden).toBe(false);
+    expect((await get(stocked.id))?.ebayEndedAt).not.toBeNull();
+    expect((await get(never.id))?.ebayEndedAt).toBeNull();
+    expect((await get(stays.id))?.ebayEndedAt).toBeNull();
+    await db.prisma.article.update({ where: { id: sold.id }, data: { hidden: false } });
+    await run();
+    expect((await get(sold.id))?.hidden).toBe(false);
   });
 });

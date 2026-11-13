@@ -57,6 +57,8 @@ model Article {
   /// Set-Codes, die zum Namen im Titel passen (nur wenn Name und Code nicht zusammenpassen).
   codeHint        String?
   ebayPriceAt    DateTime?
+  /// Seit wann der Artikel laut Shopseite nicht mehr bei eBay gelistet ist (null = gelistet/unbekannt). Beim ersten Erkennen blendet der Abruf ausverkaufte Artikel aus.
+  ebayEndedAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
