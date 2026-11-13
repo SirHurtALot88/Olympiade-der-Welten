@@ -247,6 +247,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const endedCount = useMemo(() => rows.filter((r) => !!r.ebayEndedAt && r.active).length, [rows]);
   const [onlyLife, setOnlyLife] = useState(initialFlags.has("lebenszyklus"));
   const lifeCount = useMemo(() => rows.filter((r) => !!r.lifecycle).length, [rows]);
+  const [onlyNoShop, setOnlyNoShop] = useState(initialFlags.has("nichtimshop"));
+  // Nur sinnvoll, wenn der eBay-Shop-Abruf schon gelaufen ist (mindestens ein Artikel hat einen bestaetigten Shop-Preis)
+  const shopSynced = useMemo(() => rows.some((r) => r.ebayListed), [rows]);
+  const noShopCount = useMemo(() => rows.filter((r) => shopSynced && r.active && !r.hidden && !r.ebayListed && !r.ebayEndedAt).length, [rows, shopSynced]);
   const [onlyMarked, setOnlyMarked] = useState(initialFlags.has("auslistenmarkiert"));
   const markedCount = useMemo(() => rows.filter((r) => !!r.delistMarkedAt && !r.hidden).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
@@ -309,6 +313,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       onlyReorder && "nachbestellen",
       onlyDup && "doppelt",
       onlyMarked && "auslistenmarkiert",
+      onlyNoShop && "nichtimshop",
       onlyLife && "lebenszyklus",
       onlyEnded && "ebaybeendet",
       onlyMarketFalling && "marktfaellt",
@@ -321,7 +326,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -415,6 +420,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyMarked) {
       result = result.filter((r) => !!r.delistMarkedAt);
     }
+    if (onlyNoShop) {
+      result = result.filter((r) => r.active && !r.ebayListed && !r.ebayEndedAt);
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -428,13 +436,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyEnded && !stockBand) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -455,7 +463,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
-  const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyNoShop || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -619,6 +627,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {noShopCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyNoShop ? " on" : ""}`}
+            onClick={() => {
+              setOnlyNoShop((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Aktive Artikel, die der eBay-Shop-Abruf nicht findet: das Angebot ist beendet oder der Artikel nie eingestellt, oder der Titel passt nicht zum Billbee-Namen. Prüfen und bei Bedarf ausblenden/auslisten."
+          >
+            Nicht im eBay-Shop gefunden ({noShopCount})
+          </button>
+        )}
         {markedCount > 0 && (
           <button
             type="button"
