@@ -1,11 +1,14 @@
 import type { ArticleAggregate } from "./viewModel";
 import { conditionFactor, conditionOf, type CardCondition } from "../market/condition";
+import { dynamicMargin, roundToStep99 } from "../pricing/dynamicVk";
 import { applyStaleDiscount, staleDiscountPct } from "../pricing/staleDecay";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import {
   computeHk,
   computePriceCorridor,
   computeMarketTargetRange,
+  marketCapFactor,
+  targetPriceForMargin,
   type MarketTargetRange,
   contributionMarginForPrice,
   fixedCostPerUnit,
@@ -89,6 +92,9 @@ export interface MarketComparisonRow {
    */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Dynamischer empfohlener VK (siehe dynamicVk.ts) und seine Begruendung; null ohne Marktwert. Laeuft parallel zur festen Spanne. */
+  dynamicVk: number | null;
+  dynamicNote: string | null;
   /** Zustand aus dem Titel und Anteil vom NM-Preis, mit dem der Marktwert gerechnet ist (NM = 1). */
   condition: CardCondition;
   conditionFactor: number;
@@ -218,6 +224,34 @@ export function buildMarketComparisonRow(
     provenByDemand = true;
   }
 
+  // Dynamischer VK (parallel zur festen Spanne): Zielmarge aus Tempo, Reichweite, Markt und Preisbeweis, dann dieselben Grenzen
+  // wie die feste Spanne (Marktdeckel, Ladenhueter-Abschlag, Nachfrage-Beweis, Mindestpreis, Deckungsbeitrag 0), Preisstufen auf .99.
+  let dynamicVk: number | null = null;
+  let dynamicNote: string | null = null;
+  if (marketValue !== null && marketValue > 0) {
+    const trend7vs30 = quote.priceAvg7 != null && quote.priceAvg30 != null && quote.priceAvg30 > 0 ? quote.priceAvg7 / quote.priceAvg30 - 1 : null;
+    const dyn = dynamicMargin({
+      paceMonth: a.paceMonth ?? null,
+      stock: a.stock,
+      marketValue,
+      trend7vs30,
+      fromVsTrend: quote.priceFrom != null && quote.priceTrend != null && quote.priceTrend > 0 ? quote.priceFrom / quote.priceTrend : null,
+      salesSincePriceChange: a.salesSincePriceChange ?? null,
+      daysSincePriceChange: a.lastPriceChangeAt ? Math.floor((Date.now() - a.lastPriceChangeAt.getTime()) / 86_400_000) : null,
+    });
+    const raw = targetPriceForMargin({ ek: marketValue, kind, packSize: a.packQty, shop }, dyn.margin, costSettings.adFeeRateGood, costSettings);
+    if (raw !== null) {
+      let p = raw;
+      const capFactor = marketCapFactor(marketValue);
+      if (capFactor !== null) p = Math.min(p, capFactor * marketValue);
+      if (staleDiscount > 0 && target) p = Math.min(p, target.opt);
+      if (soldAtVk && (trend7vs30 ?? 0) > -0.15 && ownVk > 0) p = Math.max(p, ownVk);
+      p = Math.max(p, corridor.vkContribution);
+      dynamicVk = roundToStep99(p);
+      dynamicNote = dyn.note;
+    }
+  }
+
   let deltaPercent: number | null = provenByDemand ? 0 : null;
   if (target !== null && ownVk > 0 && !provenByDemand) {
     deltaPercent = ownVk < target.min ? (ownVk - target.min) / target.min : ownVk > target.opt ? (ownVk - target.opt) / target.opt : 0;
@@ -257,6 +291,8 @@ export function buildMarketComparisonRow(
     marketRange,
     targetMin: target ? target.min : null,
     targetOpt: target ? target.opt : null,
+    dynamicVk,
+    dynamicNote,
     condition,
     conditionFactor: condFactor,
     staleDiscount,

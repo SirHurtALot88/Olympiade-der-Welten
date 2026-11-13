@@ -1,5 +1,6 @@
 "use client";
 
+import { SORTIMENT_LABEL } from "@/lib/dashboard/lifecycle";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
@@ -211,7 +212,15 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
 
         <section className="bd-dt-grid">
           <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "aus eBay (Stand des letzten Shop-Abrufs)" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
-          <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.staleDiscount ? `−${Math.round(m.staleDiscount * 100)} % Ladenhüter-Abschlag: seit ${m.daysSinceSale} Tagen kein Verkauf` : m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
+          <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={[m?.staleDiscount ? `−${Math.round(m.staleDiscount * 100)} % Ladenhüter-Abschlag: seit ${m.daysSinceSale} Tagen kein Verkauf` : m?.capped ? "mit Marktdeckel" : "25–33 % Marge", m?.dynamicVk != null ? `dynamisch ${eur(m.dynamicVk)} (${m.dynamicNote ?? ""})` : null].filter(Boolean).join(" · ")} />
+          {row.sortiment && (
+            <Stat
+              tone={row.sortiment.status === "auslisten" ? "crit" : row.sortiment.status === "behalten" ? "good" : "warn"}
+              label="Sortiment"
+              value={SORTIMENT_LABEL[row.sortiment.status]}
+              hint={`${row.sortiment.reason}${row.daysAtPrice != null ? ` · ${row.daysAtPrice} T am Preis` : ""}`}
+            />
+          )}
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint={`Ø aus Trend, 1, 7, 30 Tage, ab (doppelt) und letztem EK${m?.conditionFactor && m.conditionFactor < 1 ? ` · Zustand ${m.condition}: ${Math.round(m.conditionFactor * 100)} % vom NM-Preis` : ""}`} />
           <Stat
             tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}

@@ -146,6 +146,15 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
     prisma.marketPrice.createMany({ data: rows }),
   ]);
 
+  // Verlauf behalten (Chris, 13.11.): je Abruf eine Zeile fuer aktive Artikel mit eindeutigem Marktwert. Pro Preisfuehrer-Stand nur einmal
+  // (der Preisfuehrer wird taeglich neu erzeugt), damit mehrfache Abrufe am Tag den Verlauf nicht aufblaehen.
+  const activeIds = new Set((await prisma.article.findMany({ where: { isCard: true, active: true }, select: { id: true } })).map((a) => a.id));
+  const already = new Set((await prisma.marketPriceHistory.findMany({ where: { at: fetchedAt }, select: { articleId: true } })).map((h) => h.articleId));
+  const history = rows
+    .filter((r) => r.matchQuality === "eindeutig" && activeIds.has(r.articleId) && !already.has(r.articleId))
+    .map((r) => ({ articleId: r.articleId, at: fetchedAt, priceFrom: r.priceFrom ?? null, priceTrend: r.priceTrend ?? null, priceAvg1: r.priceAvg1 ?? null, priceAvg7: r.priceAvg7 ?? null, priceAvg30: r.priceAvg30 ?? null }));
+  for (let i = 0; i < history.length; i += 500) await prisma.marketPriceHistory.createMany({ data: history.slice(i, i + 500) });
+
   report.finishedAt = new Date().toISOString();
   return report;
 }
