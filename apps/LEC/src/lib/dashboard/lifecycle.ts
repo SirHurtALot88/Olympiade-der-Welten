@@ -24,3 +24,56 @@ export const LIFECYCLE_LABEL: Record<Lifecycle, { label: string; hint: string }>
   auslaufen: { label: "Auslaufen lassen", hint: "Am Mindestpreis und seit über 180 Tagen kein Verkauf: nicht nachkaufen, den Rest verkaufen lassen." },
   auslisten: { label: "Auslisten", hint: "Am Mindestpreis und seit über einem Jahr kein Verkauf: Angebot beenden, die Karten bündeln (Lot) oder anders loswerden." },
 };
+
+
+/**
+ * Sortiment-Status je Artikel (Konzept PREIS_DYNAMIK_KONZEPT.md, Chris 13.11.): Behalten, Beobachten, Preis prüfen (geschützt) oder eine
+ * der drei Massnahmen oben. Die Uhr ist "Tage am aktuellen Preis ohne Verkauf": seit dem spaeteren aus letztem Verkauf und letzter
+ * Preisaenderung (nie verkaufte: seit dem geschaetzten Alter des Angebots). Eine Preisaenderung setzt die Uhr zurueck, damit ein
+ * frisch korrigierter Artikel nicht gleich als Ladenhueter gilt.
+ */
+export type SortimentStatus = "behalten" | "beobachten" | "pruefen" | Lifecycle;
+
+export interface SortimentInput {
+  active: boolean;
+  hidden: boolean;
+  stock: number;
+  vk: number;
+  units365: number;
+  /** Gewinn je Stueck (DB II) bei heutigem Preis; null = unbekannt. */
+  unitProfit: number | null;
+  lastSoldDays: number | null;
+  lastPriceChangeDays: number | null;
+  /** Geschaetztes Mindestalter des eBay-Angebots in Tagen (nur fuer nie verkaufte). */
+  listedDays: number | null;
+}
+
+export function daysAtPrice(i: Pick<SortimentInput, "lastSoldDays" | "lastPriceChangeDays" | "listedDays">): number | null {
+  const base = i.lastSoldDays ?? i.listedDays;
+  if (base === null && i.lastPriceChangeDays === null) return null;
+  // spaeteres Ereignis = kleinere Tage-Zahl
+  const candidates = [i.lastSoldDays, i.lastPriceChangeDays].filter((d): d is number => d !== null);
+  return candidates.length > 0 ? Math.min(...candidates) : base;
+}
+
+export function assessSortiment(i: SortimentInput): { status: SortimentStatus; reason: string } | null {
+  if (!i.active || i.hidden || i.stock <= 0) return null;
+  // Frisch geaendert: abwarten, die Wirkung des neuen Preises ist noch nicht messbar
+  if (i.lastPriceChangeDays !== null && i.lastPriceChangeDays <= 30) return { status: "pruefen", reason: `Preis erst vor ${i.lastPriceChangeDays} Tagen geändert: abwarten, bevor etwas entschieden wird.` };
+  if (i.units365 >= 2 || (i.units365 >= 1 && (i.unitProfit ?? 0) >= 3)) return { status: "behalten", reason: `${i.units365} Verkauf${i.units365 === 1 ? "" : "e"} in 365 Tagen${i.unitProfit !== null ? `, ${i.unitProfit.toFixed(2).replace(".", ",")} € Gewinn je Stück` : ""}.` };
+  const neverSold = i.lastSoldDays === null && i.units365 === 0;
+  if (neverSold && (i.listedDays === null || i.listedDays < 365)) return { status: "pruefen", reason: i.listedDays === null ? "Nie verkauft, Alter des Angebots unbekannt: Preis und Titel prüfen." : `Nie verkauft, erst seit etwa ${i.listedDays} Tagen online: Preis und Titel prüfen.` };
+  const days = daysAtPrice(i);
+  const action = assessLifecycle({ active: i.active, hidden: i.hidden, stock: i.stock, vk: i.vk, daysSinceSale: days });
+  if (action) return { status: action, reason: `${days} Tage am aktuellen Preis ohne Verkauf.` };
+  return { status: "beobachten", reason: i.units365 === 1 ? "1 Verkauf in 365 Tagen mit geringem Gewinn." : `${days ?? "?"} Tage am aktuellen Preis ohne Verkauf.` };
+}
+
+export const SORTIMENT_LABEL: Record<SortimentStatus, string> = {
+  behalten: "Behalten",
+  beobachten: "Beobachten",
+  pruefen: "Preis prüfen",
+  preis_senken: "Preis senken",
+  auslaufen: "Auslaufen lassen",
+  auslisten: "Auslisten",
+};

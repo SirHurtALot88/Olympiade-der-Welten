@@ -189,6 +189,12 @@ export async function loadArticleAggregates(
       delistMarkedAt: article.delistMarkedAt,
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
       lastPriceChangeAt: lastPriceChangeByArticle.get(article.id) ?? null,
+      // Verkaeufe seit der letzten Preisaenderung (letzte 12 Monate): Preisbeweis fuer den dynamischen VK
+      salesSincePriceChange: ((): number | null => {
+        const at = lastPriceChangeByArticle.get(article.id);
+        if (!at) return null;
+        return (salesByArticle.get(article.id) ?? []).filter((x) => x.soldAt > at).reduce((n, x) => n + x.qty, 0);
+      })(),
       lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
       listedDays: listedDaysAtLeast(listedIndex, article.ebayItemId ?? factItemByArticle.get(article.id) ?? null, firstSoldByArticle.get(article.id) ?? null),
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,

@@ -17,3 +17,24 @@ describe("assessLifecycle", () => {
     expect(assessLifecycle({ ...base, hidden: true })).toBeNull();
   });
 });
+
+import { assessSortiment, daysAtPrice } from "./lifecycle";
+
+describe("assessSortiment", () => {
+  const base = { active: true, hidden: false, stock: 1, vk: 9.99, units365: 0, unitProfit: null, lastSoldDays: null, lastPriceChangeDays: null, listedDays: null };
+  it("schuetzt frisch geaenderte Preise", () => {
+    expect(assessSortiment({ ...base, lastSoldDays: 400, lastPriceChangeDays: 10 })?.status).toBe("pruefen");
+  });
+  it("behaelt Artikel mit zwei Verkaeufen im Jahr", () => {
+    expect(assessSortiment({ ...base, units365: 2, lastSoldDays: 40 })?.status).toBe("behalten");
+  });
+  it("schuetzt nie verkaufte, junge Angebote", () => {
+    expect(assessSortiment({ ...base, listedDays: 100 })?.status).toBe("pruefen");
+  });
+  it("Uhr zaehlt ab dem spaeteren Ereignis", () => {
+    expect(daysAtPrice({ lastSoldDays: 300, lastPriceChangeDays: 50, listedDays: null })).toBe(50);
+  });
+  it("ignoriert inaktive", () => {
+    expect(assessSortiment({ ...base, active: false })).toBeNull();
+  });
+});

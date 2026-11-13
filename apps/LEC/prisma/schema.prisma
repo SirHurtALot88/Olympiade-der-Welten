@@ -73,6 +73,7 @@ model Article {
   stockLog     StockMovement[]
   priceLog     PriceChange[]
   ekLog        EkChange[]
+  marketHistory MarketPriceHistory[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -243,6 +244,22 @@ model EkChange {
   at        DateTime @default(now())
   before    Float
   after     Float
+
+  @@index([articleId, at])
+}
+
+/// Verlauf der Cardmarket-Preise je Artikel (Chris, 13.11.2026): MarketPrice haelt nur den letzten Stand und wird bei jedem Abruf ersetzt.
+/// Je Marktabruf eine Zeile fuer aktive Artikel mit eindeutigem Marktwert; Grundlage fuer Trend- und Preisentscheidungen.
+model MarketPriceHistory {
+  id         String   @id @default(cuid())
+  articleId  String
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at         DateTime
+  priceFrom  Float?
+  priceTrend Float?
+  priceAvg1  Float?
+  priceAvg7  Float?
+  priceAvg30 Float?
 
   @@index([articleId, at])
 }

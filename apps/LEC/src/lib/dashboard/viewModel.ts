@@ -2,7 +2,7 @@ import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
 import { kartenartOf, ordnerOf, type Kartenart, type Ordner } from "../market/kartenart";
 import { rarityFromTitle } from "../market/rarity";
-import { assessLifecycle, type Lifecycle } from "./lifecycle";
+import { assessLifecycle, assessSortiment, daysAtPrice, type Lifecycle, type SortimentStatus } from "./lifecycle";
 import { assessReorder } from "./reorder";
 import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
 import { titleNameMismatch } from "../market/names";
@@ -61,6 +61,8 @@ export interface ArticleAggregate {
   lastSoldAt?: Date | null;
   /** Zeitpunkt der letzten aufgezeichneten VK-Aenderung, null = keine bekannt. */
   lastPriceChangeAt?: Date | null;
+  /** Verkaeufe seit der letzten Preisaenderung; null = keine Aenderung bekannt. */
+  salesSincePriceChange?: number | null;
   /** Letzte EK-Aenderung oder letzter Einkauf, das Spaetere; null = unbekannt. */
   lastEkAt?: Date | null;
   /** Geschaetztes Mindestalter des eBay-Angebots in Tagen (aus der Artikelnummer, siehe listedAge.ts); null = unbekannt. */
@@ -218,6 +220,10 @@ export interface SortimentRow {
   reorderSkipReason?: string | null;
   /** Lange nicht verkauft: Preis senken, Auslaufen lassen oder Auslisten (null = unauffaellig). */
   lifecycle?: Lifecycle | null;
+  /** Sortiment-Status mit Begruendung (Behalten, Beobachten, Preis prüfen oder eine der Massnahmen). */
+  sortiment?: { status: SortimentStatus; reason: string } | null;
+  /** Tage am aktuellen Preis ohne Verkauf (seit dem spaeteren aus letztem Verkauf und letzter Preisaenderung). */
+  daysAtPrice?: number | null;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
   /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
   ranks?: {
@@ -261,6 +267,9 @@ export interface SortimentMarket {
   /** Zustand und Abschlagsfaktor auf den NM-Preis (NM = 1). */
   condition?: string;
   conditionFactor?: number;
+  /** Dynamischer empfohlener VK und Begruendung (parallel zur festen Spanne). */
+  dynamicVk?: number | null;
+  dynamicNote?: string | null;
   staleDiscount?: number;
   daysSinceSale?: number | null;
   /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
@@ -735,14 +744,7 @@ export function buildSortimentRow(
     delistMarkedAt: a.delistMarkedAt ? a.delistMarkedAt.toISOString() : null,
     ebayListed: a.ebayListed === true,
     ...kartenFelder(a.nameRaw, a.cardType),
-    lifecycle: assessLifecycle({
-      active: a.active,
-      hidden: a.hidden === true,
-      stock: a.stock,
-      vk: vkForCorridor,
-      // Nie verkauft: das geschaetzte Mindestalter des Angebots zaehlt wie die Tage ohne Verkauf
-      daysSinceSale: a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : (a.listedDays ?? null),
-    }),
+    ...lebenszyklusFelder(a, vkForCorridor, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null)),
     ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
@@ -792,6 +794,27 @@ export function buildFullSortiment(
     })
     .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop))
     .map(withRanks);
+}
+
+/** Tage seit einem Zeitpunkt (null ohne Zeitpunkt). */
+const daysSinceDate = (d: Date | null | undefined): number | null => (d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000)) : null);
+
+function lebenszyklusFelder(a: ArticleAggregate, vk: number, unitProfit: number | null) {
+  const input = {
+    active: a.active,
+    hidden: a.hidden === true,
+    stock: a.stock,
+    vk,
+    units365: a.windows["365"]?.qty ?? 0,
+    unitProfit,
+    lastSoldDays: daysSinceDate(a.lastSoldAt),
+    lastPriceChangeDays: daysSinceDate(a.lastPriceChangeAt),
+    listedDays: a.listedDays ?? null,
+  };
+  const days = daysAtPrice(input);
+  const sortiment = assessSortiment(input);
+  const massnahme = sortiment && (sortiment.status === "preis_senken" || sortiment.status === "auslaufen" || sortiment.status === "auslisten") ? sortiment.status : null;
+  return { lifecycle: massnahme as Lifecycle | null, sortiment, daysAtPrice: days };
 }
 
 function kartenFelder(nameRaw: string, cardType: string | null | undefined) {
