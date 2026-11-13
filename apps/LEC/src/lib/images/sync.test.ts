@@ -82,11 +82,15 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     const sold = await article("Yu-Gi-Oh! TST-DE006 Ausverkauft NM", { stock: 0 });
     const stocked = await article("Yu-Gi-Oh! TST-DE007 Mit Bestand NM", { stock: 3 });
     const never = await article("Yu-Gi-Oh! TST-DE008 Nie gelistet NM", { stock: 0 });
+    const reorder = await article("Yu-Gi-Oh! TST-DE009 Ausverkauft aber gelaufen NM", { stock: 0 });
+    await db.prisma.article.update({ where: { id: reorder.id }, data: { ebayItemId: "888000009" } });
+    await db.prisma.sale.create({ data: { articleId: reorder.id, soldAt: new Date(), qty: 1, unitPrice: 5, source: "test" } });
     for (const x of [sold, stocked]) await db.prisma.article.update({ where: { id: x.id }, data: { ebayItemId: "999" + x.id.slice(-6).replace(/\D/g, "1") } });
     const run = () => syncArticleImages(db.prisma, { ...opts(fakeFetch([tile("555555555", "Yu-Gi-Oh! TST-DE005 Bleibt NM", "DDDDDDDDDD", "2,99")])), minListingsForEnded: 1 });
     const report = await run();
-    expect(report.ended).toBe(2);
+    expect(report.ended).toBe(3);
     expect(report.endedHidden).toBe(1);
+    expect((await db.prisma.article.findUnique({ where: { id: reorder.id } }))?.hidden).toBe(false);
     const get = (id: string) => db.prisma.article.findUnique({ where: { id } });
     expect((await get(sold.id))?.hidden).toBe(true);
     expect((await get(stocked.id))?.hidden).toBe(false);

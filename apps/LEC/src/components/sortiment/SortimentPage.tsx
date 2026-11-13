@@ -21,7 +21,7 @@ import { PreisBoard } from "./PreisBoard";
 import { ArtikelDetail } from "./ArtikelDetail";
 import { daysSince } from "./PreisBoard";
 import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
-import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
+import { BOARD_SORT_LABEL, findDuplicateGroups, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
 import { MicroVelocity, Corridor, STATUS_PILL } from "@/components/dashboard/SortimentTable";
@@ -235,6 +235,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
   const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
   const [onlyReorder, setOnlyReorder] = useState(initialFlags.has("nachbestellen"));
+  const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
+  const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
   // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
   const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
@@ -279,6 +281,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       onlyLadenhueter && "ladenhueter",
       onlySoldOut && "ausverkauft",
       onlyReorder && "nachbestellen",
+      onlyDup && "doppelt",
       onlyMarketFalling && "marktfaellt",
       onlyNameCheck && "namecheck",
       showNoStock && "ohnebestand",
@@ -289,7 +292,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -371,6 +374,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyReorder) {
       result = result.filter((r) => r.reorderDue);
     }
+    if (onlyDup) {
+      result = result.filter((r) => dupGroups.has(r.articleId));
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -384,11 +390,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !stockBand) {
-      result = result.filter((r) => r.stock > 0);
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !stockBand) {
+      // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
+      const yearAgo = Date.now() - 365 * 86_400_000;
+      result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -403,8 +411,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => !r.hidden && r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
-  const boardRows = useMemo(() => sortBoard(filtered, boardSort, boardReverse).slice(0, visibleCount), [filtered, boardSort, boardReverse, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const boardRows = useMemo(() => {
+    const sorted = sortBoard(filtered, boardSort, boardReverse);
+    // Doppelte-Filter: Mitglieder einer Gruppe direkt untereinander
+    if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
+    return sorted.slice(0, visibleCount);
+  }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -540,6 +553,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {dupGroups.size > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyDup ? " on" : ""}`}
+            onClick={() => {
+              setOnlyDup((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Gleicher Set-Code, gleiche Seltenheit und Auflage, aber verschiedene Namen: meist derselbe Artikel doppelt angelegt. Bestand, eBay-Nummer und letzter Verkauf stehen nebeneinander."
+          >
+            Mögliche Doppelte ({dupGroups.size})
+          </button>
+        )}
         {reorderCount > 0 && (
           <button
             type="button"
@@ -594,7 +620,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               setShowNoStock((v) => !v);
               setVisibleCount(PAGE_SIZE);
             }}
-            title="Standard: nur Artikel mit Bestand. Einschalten, um auch Artikel ohne Bestand zu sehen."
+            title="Standard: Artikel mit Bestand plus aktive Artikel ohne Bestand, die nachbestellt werden sollen oder sich im letzten Jahr verkauft haben. Einschalten, um wirklich alle ohne Bestand zu sehen."
           >
             auch ohne Bestand
           </button>
@@ -651,7 +677,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
+          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>

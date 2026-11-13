@@ -99,6 +99,8 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
 
 interface Props {
   rows: SortimentRow[];
+  /** Nur im Doppelte-Filter gesetzt: zeigt eBay-Nummer und letzten Verkauf direkt in der Zeile. */
+  dupGroups?: Map<string, string>;
   sortKey?: BoardSortKey;
   reversed?: boolean;
   onSort?: (key: BoardSortKey) => void;
@@ -115,7 +117,7 @@ export function daysSince(iso: string | null | undefined, now = Date.now()): num
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
 }
 
-export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
   const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
     <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
       {label}
@@ -176,6 +178,11 @@ export function PreisBoard({ rows, sortKey, reversed, onSort, imageVersions, ima
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}
+                        {dupGroups?.has(row.articleId) && (
+                          <span className="bd-rar" title={row.nameRaw}>
+                            Doppelt? · Bestand {row.stock} · eBay {row.ebayItemId ?? "–"} · {row.lastSoldAt ? `letzter Verkauf vor ${daysSince(row.lastSoldAt)} T` : "nie verkauft"}
+                          </span>
+                        )}
                         {row.codeName?.mismatch && (
                           <span
                             className="bd-rar bd-namewarn"
