@@ -36,15 +36,23 @@ export interface LatestQuote {
 
 /**
  * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
- * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage und, wenn bekannt, deinem letzten EK (Chris, 11.11.:
+ * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7, Ø 30 Tage, dem guenstigsten Angebot ("ab", wenn plausibel) und, wenn bekannt, deinem letzten EK (Chris, 11.11.:
  * ein einzelner Wert, vor allem der 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
  * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
  */
+/** Untergrenze (Anteil am Mittel der Schnitte), ab der das guenstigste Angebot in den Marktwert eingeht. */
+export const FROM_PLAUSIBLE_SHARE = 0.4;
+
 export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
   const pack = Math.max(1, packQty);
   const cardParts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
   if (cardParts.length === 0) return null;
+  // Guenstigstes Angebot ("ab", Chris 13.11.): faellt der Preis, liegt es unter den Schnitten und zieht den Marktwert mit herunter.
+  // Der Preisfuehrer kennt es nur ueber ALLE Sprachen und Zustaende; ein einzelnes billiges Fremdsprach-/Spielspuren-Angebot
+  // soll den Wert nicht entwerten, deshalb zaehlt es nur, wenn es mindestens 40 % des Mittels der Schnitte erreicht.
+  const meanOfCards = cardParts.reduce((s, v) => s + v, 0) / cardParts.length;
+  if (quote.priceFrom != null && quote.priceFrom >= FROM_PLAUSIBLE_SHARE * meanOfCards) cardParts.push(quote.priceFrom);
   // Je Artikel (Karte x Pack-Menge); der letzte EK steht schon je Artikel und federt Ausreisser ab (Chris, 11.11.).
   const parts = cardParts.map((v) => v * pack);
   if (lastEk != null && lastEk > 0) parts.push(lastEk);
