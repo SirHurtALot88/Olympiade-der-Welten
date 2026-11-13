@@ -22,6 +22,8 @@ export interface BillbeeSyncOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Bestellstatus-IDs, die nicht zaehlen. Standard: Umgebungsvariable BILLBEE_EXCLUDE_STATES, sonst 8 (storniert). */
   excludeStates?: number[];
+  /** Fortschritt fuer die Anzeige (Seitenleiste): Prozent 0..100 und was gerade passiert. */
+  onProgress?: (percent: number, label: string) => void;
 }
 
 export interface BillbeeSyncReport {
@@ -68,18 +70,23 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   const now = opts.now ?? new Date();
   const client = new BillbeeClient(config, { fetchFn: opts.fetchFn, minGapMs: opts.minGapMs, sleep: opts.sleep });
 
-  // 1. Artikelstamm
-  const rawProducts = await client.getAll<Record<string, unknown>>("/products");
+  const progress = (pct: number, label: string) => opts.onProgress?.(Math.max(0, Math.min(100, Math.round(pct))), label);
+  progress(1, "Verbinde mit Billbee …");
+
+  // 1. Artikelstamm (0 bis 20 %)
+  const rawProducts = await client.getAll<Record<string, unknown>>("/products", {}, 250, 400, (p, t) => progress(1 + (19 * p) / Math.max(1, t), `Artikelstamm laden (Seite ${p} von ${t})`));
   const masters = rawProducts.map(mapProduct).filter((m): m is MasterProduct => m !== null);
 
   // 2. Bestellungen (gesamte Historie)
   const since = new Date(now.getTime() - LOOKBACK_DAYS * 86_400_000);
+  progress(20, "Bestellungen laden …");
   const fetched = await client.getAll<Record<string, unknown>>("/orders", {
     minOrderDate: since.toISOString().slice(0, 10),
     // Billbee liest ein reines Datum als 00:00 Uhr: mit "heute" fehlten alle Bestellungen des heutigen Tages bis zum naechsten Tag
     // (sichtbar als Bestandsabgang ohne Verkauf). Darum bis einschliesslich morgen.
     maxOrderDate: new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10),
-  });
+  }, 250, 400, (p, t) => progress(20 + (50 * p) / Math.max(1, t), `Bestellungen laden (Seite ${p} von ${t})`));
+  progress(72, "Bestellungen auswerten …");
   const { orders, duplicates } = dedupeOrders(fetched);
   const results = mapOrders(orders, masters, { now, excludeStates: opts.excludeStates ?? excludeStatesFromEnv() });
 
@@ -87,7 +94,9 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   const costSettings = await loadActiveCostSettings(prisma);
   const aliases = await loadAliasMap(prisma);
   const plan = buildImportPlan(results, null, costSettings, { aliases, knownFeePerUnit: await knownFeePerUnit(prisma) });
+  progress(78, "Verkaufszahlen speichern …");
   await persistImportPlan(prisma, plan);
+  progress(86, "Artikel und Bestand speichern …");
   await persistBillbeeArtikel(
     prisma,
     masters.map((m) => m.row)
@@ -112,6 +121,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     ebayIds += res.count;
   }
 
+  progress(93, "Einzelverkäufe speichern …");
   // Einzelverkaeufe (Datum, Menge, Preis): ersetzt bei jedem Abruf alle.
   const excludeStates = opts.excludeStates ?? excludeStatesFromEnv();
   const idByName = new Map((await prisma.article.findMany({ select: { id: true, nameNormalized: true } })).map((a) => [a.nameNormalized, a.id]));
@@ -122,6 +132,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   await prisma.sale.deleteMany({ where: { source: "billbee-api" } });
   for (let i = 0; i < saleRows.length; i += 500) await prisma.sale.createMany({ data: saleRows.slice(i, i + 500) });
 
+  progress(98, "Abschließen …");
   // Alles, was der Stamm nicht (mehr) aktiv fuehrt, ist ausgelaufen.
   let deactivated = 0;
   if (masters.length > 0) {

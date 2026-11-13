@@ -161,6 +161,14 @@ a {
 .upd { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .upd .chip { align-self: flex-start; }
 .upd-stand { font-size: 11px; color: var(--faint); }
+.upd-bar { height: 6px; border-radius: 3px; background: var(--line, rgba(255,255,255,.12)); overflow: hidden; }
+.upd-bar-fill { height: 100%; background: var(--accent, #4c8dff); transition: width .4s ease; }
+.upd-toast { position: fixed; right: 20px; bottom: 20px; z-index: 1000; max-width: min(420px, calc(100vw - 40px)); display: flex; flex-direction: column; gap: 4px; padding: 12px 36px 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.4; background: var(--card, #1b1b24); border: 1px solid var(--line, rgba(255,255,255,.18)); box-shadow: 0 8px 28px rgba(0,0,0,.45); color: var(--text, #e8e8f0); }
+.upd-toast-ok { border-color: var(--good, #3ecf8e); }
+.upd-toast-fehler { border-color: var(--crit, #ff5d5d); }
+.upd-toast-x { position: absolute; top: 4px; right: 8px; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; opacity: .7; }
+.upd-toast-x:hover { opacity: 1; }
+.upd-toast span { word-break: break-word; }
 .sidefoot { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; }
 
 /* ---------- Main ---------- */
