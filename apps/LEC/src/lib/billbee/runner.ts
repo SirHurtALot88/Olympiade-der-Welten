@@ -10,6 +10,8 @@ export interface BillbeeSyncState {
   lastError: string | null;
   /** ISO-Zeit des letzten fehlgeschlagenen Abrufs (fuer die Anzeige in der Seitenleiste). */
   lastErrorAt?: string | null;
+  /** Fortschritt des laufenden Abrufs (null, wenn keiner laeuft). */
+  progress?: { percent: number; label: string } | null;
 }
 
 declare global {
@@ -34,7 +36,8 @@ export async function startBillbeeSync(prisma: PrismaClient): Promise<boolean> {
   s.running = true;
   s.lastError = null;
   s.lastErrorAt = null;
-  syncBillbee(prisma)
+  s.progress = { percent: 0, label: "Starte …" };
+  syncBillbee(prisma, { onProgress: (percent, label) => (s.progress = { percent, label }) })
     .then((r) => {
       s.lastReport = r;
     })
@@ -46,6 +49,7 @@ export async function startBillbeeSync(prisma: PrismaClient): Promise<boolean> {
     })
     .finally(() => {
       s.running = false;
+      s.progress = null;
     });
   return true;
 }

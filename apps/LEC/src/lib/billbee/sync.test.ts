@@ -44,6 +44,21 @@ describe("syncBillbee", () => {
     expect(seen[0]).toBe("2026-10-14"); // NOW = 13.10.
   });
 
+  it("meldet den Fortschritt in steigenden Prozenten mit Seitenzahlen", async () => {
+    const calls: [number, string][] = [];
+    const fetchFn = (async (url: URL) => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith("/products")) return json({ Paging: { TotalPages: 3 }, Data: [] });
+      return json({ Paging: { TotalPages: 2 }, Data: [] });
+    }) as unknown as typeof fetch;
+    await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn, onProgress: (p, l) => calls.push([p, l]) });
+    const pcts = calls.map((c) => c[0]);
+    expect(pcts).toEqual([...pcts].sort((a, b) => a - b));
+    expect(Math.max(...pcts)).toBeLessThan(100);
+    expect(calls.some(([, l]) => l.includes("Seite 3 von 3"))).toBe(true);
+    expect(calls.some(([, l]) => l.includes("Bestellungen laden (Seite 2 von 2)"))).toBe(true);
+  });
+
   it("verlangt Zugangsdaten", async () => {
     await expect(syncBillbee(db.prisma, { config: null })).rejects.toBeInstanceOf(BillbeeNotConfigured);
   });
