@@ -2,6 +2,7 @@
 
 import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
+import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
 import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
@@ -79,6 +80,19 @@ export function EbayLink({ row }: { row: SortimentRow }) {
 
 export function VerdictBadge({ row }: { row: SortimentRow }) {
   const m = row.market;
+  // Lange nicht verkauft: statt „zu günstig“ der Lebenszyklus (zu dem Preis kauft ihn niemand)
+  if (row.lifecycle) {
+    const l = LIFECYCLE_LABEL[row.lifecycle];
+    const color = row.lifecycle === "auslisten" ? "var(--crit)" : "var(--warn)";
+    return (
+      <div className="bd-verdict">
+        <span className="bd-pill" title={l.hint} style={{ color, borderColor: color }}>
+          <i style={{ background: color }} />
+          {l.label}
+        </span>
+      </div>
+    );
+  }
   if (!m || !m.rated) return <span className="bd-none">{m ? "ohne Urteil" : "—"}</span>;
   const v = VERDICT[m.status];
   const gap = boardGap(row);

@@ -1,5 +1,6 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
+import { assessLifecycle, type Lifecycle } from "./lifecycle";
 import { assessReorder } from "./reorder";
 import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
 import { titleNameMismatch } from "../market/names";
@@ -196,6 +197,8 @@ export interface SortimentRow {
   reorderSnoozedUntil?: string | null;
   /** Warum ein knapper Artikel nicht zum Nachbestellen vorgeschlagen wird (zu wenig Verkaeufe/Gewinn). */
   reorderSkipReason?: string | null;
+  /** Lange nicht verkauft: Preis senken, Auslaufen lassen oder Auslisten (null = unauffaellig). */
+  lifecycle?: Lifecycle | null;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
   /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
   ranks?: {
@@ -709,6 +712,13 @@ export function buildSortimentRow(
     lastEkAt: a.lastEkAt ? a.lastEkAt.toISOString() : null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
+    lifecycle: assessLifecycle({
+      active: a.active,
+      hidden: a.hidden === true,
+      stock: a.stock,
+      vk: vkForCorridor,
+      daysSinceSale: a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : null,
+    }),
     ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,

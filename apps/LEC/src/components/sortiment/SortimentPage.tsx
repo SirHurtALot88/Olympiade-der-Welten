@@ -237,6 +237,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const [onlyReorder, setOnlyReorder] = useState(initialFlags.has("nachbestellen"));
   const [onlyEnded, setOnlyEnded] = useState(initialFlags.has("ebaybeendet"));
   const endedCount = useMemo(() => rows.filter((r) => !!r.ebayEndedAt && r.active).length, [rows]);
+  const [onlyLife, setOnlyLife] = useState(initialFlags.has("lebenszyklus"));
+  const lifeCount = useMemo(() => rows.filter((r) => !!r.lifecycle).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
   const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
@@ -284,6 +286,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       onlySoldOut && "ausverkauft",
       onlyReorder && "nachbestellen",
       onlyDup && "doppelt",
+      onlyLife && "lebenszyklus",
       onlyEnded && "ebaybeendet",
       onlyMarketFalling && "marktfaellt",
       onlyNameCheck && "namecheck",
@@ -295,7 +298,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -381,6 +384,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) {
       result = result.filter((r) => dupGroups.has(r.articleId));
     }
+    if (onlyLife) {
+      result = result.filter((r) => !!r.lifecycle);
+    }
     if (onlySoldOut) {
       result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
     }
@@ -394,13 +400,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyEnded && !stockBand) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -421,7 +427,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -557,6 +563,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
+        {lifeCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyLife ? " on" : ""}`}
+            onClick={() => {
+              setOnlyLife((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Seit über 180 Tagen kein Verkauf, Bestand da: Preis senken (über 6 €), Auslaufen lassen (Mindestpreis) oder Auslisten (Mindestpreis und über ein Jahr)"
+          >
+            Preis senken / Auslaufen / Auslisten ({lifeCount})
+          </button>
+        )}
         {endedCount > 0 && (
           <button
             type="button"
