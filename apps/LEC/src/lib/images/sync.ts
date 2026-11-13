@@ -25,6 +25,8 @@ export type ImageSourceKind = ImageMatchKind | "set_code";
  */
 
 export interface SyncOptions {
+  /** Unter so vielen erkannten Angeboten wird nichts als beendet markiert (Schutz vor leerem/gedrosseltem Abruf). Standard 50. */
+  minListingsForEnded?: number;
   imageDir: string;
   fetchFn?: typeof fetch;
   /** Obergrenze fuer Shopseiten (48 Angebote je Seite). */
@@ -54,6 +56,9 @@ export interface SyncReport {
   priced: number;
   /** Artikel, die nicht mehr im Shop stehen (eBay-Preis geleert). */
   delisted: number;
+  /** Neu als bei eBay beendet erkannt / davon ausgeblendet (ausverkauft). */
+  ended: number;
+  endedHidden: number;
   /** Artikel mit Set-Code, die auch YGOPRODeck nicht kennt (Stichprobe). */
   fallbackMissSample: string[];
   fallbackMissCount: number;
@@ -183,7 +188,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   await runLimited(priced, 8, async (job) => {
     await prisma.article.update({
       where: { id: job.articleId },
-      data: { ebayItemId: job.ebayItemId, ebayPrice: job.price, ebayPriceAt: now },
+      data: { ebayItemId: job.ebayItemId, ebayPrice: job.price, ebayPriceAt: now, ebayEndedAt: null },
     });
   });
   // Nicht mehr gelistet (und der Abruf war vollstaendig): kein aktueller eBay-Preis mehr.
@@ -195,6 +200,30 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
       data: { ebayPrice: null, ebayPriceAt: null },
     });
     delisted = res.count;
+  }
+
+  // Bei eBay beendet: war dem eBay-Shop zugeordnet (Angebotsnummer oder Verkaufsbericht), steht aber nicht mehr auf der Shopseite.
+  // Beim ERSTEN Erkennen werden ausverkaufte Artikel ausgeblendet; wer sie danach wieder einblendet, bleibt eingeblendet.
+  // Nur bei vollstaendigem Abruf und plausibler Angebotszahl, sonst wuerde eine Drosselung alles ausblenden.
+  let ended = 0;
+  let endedHidden = 0;
+  const listedIds = new Set(jobs.filter((j) => j.ebayItemId).map((j) => j.articleId));
+  const pricedBefore = articles.length > 0 ? await prisma.article.count({ where: { OR: [{ ebayItemId: { not: null } }, { ebayEndedAt: { not: null } }] } }) : 0;
+  if (emptyPages.length === 0 && listedIds.size >= (options.minListingsForEnded ?? 50) && listedIds.size >= pricedBefore * 0.3) {
+    const withFacts = (await prisma.ebayListingFact.findMany({ where: { articleId: { not: null } }, select: { articleId: true }, distinct: ["articleId"] })).map((f) => f.articleId as string);
+    const candidates = await prisma.article.findMany({
+      where: { ebayEndedAt: null, id: { notIn: [...listedIds] }, OR: [{ ebayItemId: { not: null } }, { id: { in: withFacts } }] },
+      select: { id: true, stock: true },
+    });
+    ended = candidates.length;
+    if (candidates.length > 0) {
+      await prisma.article.updateMany({ where: { id: { in: candidates.map((c) => c.id) } }, data: { ebayEndedAt: now } });
+      const soldOut = candidates.filter((c) => c.stock <= 0).map((c) => c.id);
+      if (soldOut.length > 0) {
+        const res = await prisma.article.updateMany({ where: { id: { in: soldOut }, hidden: false }, data: { hidden: true } });
+        endedHidden = res.count;
+      }
+    }
   }
 
   await runLimited(jobs, 4, async (job) => {
@@ -250,6 +279,8 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     unmatchedCount: unmatched.length,
     priced: priced.length,
     delisted,
+    ended,
+    endedHidden,
     fallbackMissSample: fallbackMisses.slice(0, 50),
     fallbackMissCount: fallbackMisses.length,
     articlesWithImage,

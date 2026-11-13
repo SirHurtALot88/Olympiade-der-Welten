@@ -14,6 +14,9 @@ interface Report {
   unmatchedCount: number;
   priced: number;
   delisted: number;
+  /** Neu als bei eBay beendet erkannt / davon ausgeblendet (ausverkauft). */
+  ended: number;
+  endedHidden: number;
   fallbackMissSample: string[];
   fallbackMissCount: number;
   finishedAt: string;
@@ -90,7 +93,7 @@ export function ImageSyncCard() {
           Letzter Lauf {fmtTime(r.finishedAt)}: {r.listings} eBay-Angebote auf {r.pages} Seiten gelesen
           {r.emptyPages.length > 0 && <span className="down"> ({r.emptyPages.length} Seiten blieben leer — später erneut laufen lassen)</span>}.
           <br />
-          Preise gesetzt: {r.priced}{r.delisted > 0 ? `, nicht mehr gelistet: ${r.delisted}` : ""}.
+          Preise gesetzt: {r.priced}{r.delisted > 0 ? `, nicht mehr gelistet: ${r.delisted}` : ""}.{r.ended > 0 ? ` Neu bei eBay beendet: ${r.ended}, davon ausgeblendet: ${r.endedHidden}.` : ""}
           <br />
           Zugeordnet: {r.matchedBy.item_id} über eBay-Nummer, {r.matchedBy.name} über Namen, {r.matchedBy.alias} über Alias,{" "}
           {r.matchedBy.set_code} über YGOPRODeck. Neu geladen {r.downloaded}, unverändert {r.unchanged}
