@@ -1,3 +1,4 @@
+import { ITEM_ID_RE, buildListedIndex, listedDaysAtLeast, type ListedSample } from "./listedAge";
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
@@ -58,7 +59,7 @@ export async function loadArticleAggregates(
   prisma: PrismaClient,
   opts: { includeHidden?: boolean } = {}
 ): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales, lastPriceChanges, lastEkChanges, lastPurchases] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales, lastPriceChanges, lastEkChanges, lastPurchases, firstSales] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -82,6 +83,8 @@ export async function loadArticleAggregates(
     // Letzte EK-Aenderung (Billbee-Abgleich) und letzter Einkauf (Einkaufsliste): das Spaetere zeigt, wie aktuell der EK ist
     prisma.ekChange.groupBy({ by: ["articleId"], _max: { at: true } }),
     prisma.purchase.groupBy({ by: ["articleId"], _max: { date: true } }),
+    // Erster Einzelverkauf je Artikel: Grundlage fuer das geschaetzte Mindestalter des eBay-Angebots (listedAge.ts)
+    prisma.sale.groupBy({ by: ["articleId"], _min: { soldAt: true } }),
   ]);
   const lastEkAtByArticle = new Map<string, Date>();
   for (const c of lastEkChanges) if (c._max.at) lastEkAtByArticle.set(c.articleId, c._max.at);
@@ -94,8 +97,16 @@ export async function loadArticleAggregates(
   for (const s of recentSales) (salesByArticle.get(s.articleId) ?? salesByArticle.set(s.articleId, []).get(s.articleId)!).push(s);
   const nowForPace = new Date();
   const lastSoldByArticle = new Map(lastSales.map((s) => [s.articleId, s._max.soldAt]));
+  const firstSoldByArticle = new Map(firstSales.map((s) => [s.articleId, s._min.soldAt]));
   const factItemByArticle = new Map<string, string>();
   for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
+  const listedSamples: ListedSample[] = [];
+  for (const a of articles) {
+    const itemId = a.ebayItemId ?? factItemByArticle.get(a.id) ?? null;
+    const first = firstSoldByArticle.get(a.id);
+    if (itemId && ITEM_ID_RE.test(itemId) && first) listedSamples.push({ itemId: Number(itemId), firstSoldAt: first });
+  }
+  const listedIndex = buildListedIndex(listedSamples);
 
   // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
   const latestQuoteByArticle = new Map<string, LatestQuote>();
@@ -179,6 +190,7 @@ export async function loadArticleAggregates(
       lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
       lastPriceChangeAt: lastPriceChangeByArticle.get(article.id) ?? null,
       lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
+      listedDays: listedDaysAtLeast(listedIndex, article.ebayItemId ?? factItemByArticle.get(article.id) ?? null, firstSoldByArticle.get(article.id) ?? null),
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
       minStock: article.minStock,
       desiredStock: article.desiredStock,

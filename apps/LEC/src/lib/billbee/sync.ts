@@ -5,7 +5,9 @@ import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
 import { loadActiveCostSettings } from "../dashboard/queries";
 import { BillbeeClient, type BillbeeConfig } from "./client";
 import { loadBillbeeConfig } from "./credentials";
-import { LOOKBACK_DAYS, dedupeOrders, diagnoseOrders, recentOrderDays, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
+import { rarityFromTitle } from "../market/rarity";
+import { isPokemonArticleName } from "../parsing/cardFilter";
+import { LOOKBACK_DAYS, makeCanonicalizer, matchSaleBySetCode, summarizeRecentOrders, type OrderCheck, dedupeOrders, diagnoseOrders, recentOrderDays, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
 
 /**
  * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der gesamten Historie aus der Billbee-API
@@ -44,6 +46,12 @@ export interface BillbeeSyncReport {
   diagnostics: OrderDiagnostics;
   /** Bestellungen der letzten Tage je Datum/Status und juengster Bestellzeitpunkt (Pruefung auf fehlende Bestellungen von heute). */
   recent: ReturnType<typeof recentOrderDays>;
+  /** Bestellungen der letzten 60 Tage in Kurzform: fuer die Suche "Bestellung pruefen" (wurde sie geliefert, zaehlt sie, fehlt ein Artikel?). */
+  recentOrders: OrderCheck[];
+  /** Verkaeufe, deren Name keinem Artikel entsprach und die ueber den Set-Code im Namen zugeordnet wurden. */
+  salesMatchedBySetCode: number;
+  /** Pokemon-Artikel, die bei diesem Abgleich neu ausgeblendet wurden. */
+  pokemonHidden: number;
   startedAt: string;
   finishedAt: string;
 }
@@ -88,7 +96,8 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   }, 250, 400, (p, t) => progress(20 + (50 * p) / Math.max(1, t), `Bestellungen laden (Seite ${p} von ${t})`));
   progress(72, "Bestellungen auswerten …");
   const { orders, duplicates } = dedupeOrders(fetched);
-  const results = mapOrders(orders, masters, { now, excludeStates: opts.excludeStates ?? excludeStatesFromEnv() });
+  const canonical = makeCanonicalizer(masters, rarityFromTitle);
+  const results = mapOrders(orders, masters, { now, excludeStates: opts.excludeStates ?? excludeStatesFromEnv(), canonical });
 
   // 3. Plan + Schreiben ueber die bestehende Pipeline
   const costSettings = await loadActiveCostSettings(prisma);
@@ -124,13 +133,35 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   progress(93, "Einzelverkäufe speichern …");
   // Einzelverkaeufe (Datum, Menge, Preis): ersetzt bei jedem Abruf alle.
   const excludeStates = opts.excludeStates ?? excludeStatesFromEnv();
-  const idByName = new Map((await prisma.article.findMany({ select: { id: true, nameNormalized: true } })).map((a) => [a.nameNormalized, a.id]));
-  const saleRows = extractSales(orders, { excludeStates }).flatMap((r) => {
-    const articleId = idByName.get(r.nameNormalized);
+  const articleRows = await prisma.article.findMany({ select: { id: true, nameNormalized: true, nameRaw: true, setCode: true, active: true } });
+  const idByName = new Map(articleRows.map((a) => [a.nameNormalized, a.id]));
+  const activeById = new Map(articleRows.map((a) => [a.id, a.active]));
+  const activeRows = articleRows.filter((a) => a.active);
+  let matchedBySetCode = 0;
+  const saleRows = extractSales(orders, { excludeStates, canonical }).flatMap((r) => {
+    let articleId = idByName.get(r.nameNormalized);
+    // Der Name der Bestellposition ergibt einen eigenen (ausgelaufenen) Artikel, obwohl es zur selben Karte einen aktiven Artikel gibt
+    // (Titel nachtraeglich geaendert, anderer Zustand im Namen): der Verkauf gehoert zum aktiven Artikel. Eindeutigkeit ueber Set-Code
+    // und Seltenheit, sonst bleibt es beim Namen. Hat gar kein Artikel den Namen, gilt derselbe Weg.
+    if (!articleId || activeById.get(articleId) === false) {
+      const viaCode = matchSaleBySetCode(r.nameRaw, activeRows, rarityFromTitle);
+      if (viaCode && viaCode !== articleId) {
+        articleId = viaCode;
+        matchedBySetCode++;
+      }
+    }
     return articleId ? [{ articleId, soldAt: r.soldAt, qty: r.qty, unitPrice: r.unitPrice, orderRef: r.orderRef, source: "billbee-api" }] : [];
   });
   await prisma.sale.deleteMany({ where: { source: "billbee-api" } });
   for (let i = 0; i < saleRows.length; i += 500) await prisma.sale.createMany({ data: saleRows.slice(i, i + 500) });
+
+  // Pokemon-Karten gehoeren nicht ins Sortiment (Chris, 13.11.): ausblenden, die Verkaeufe bleiben in den Shop-Summen erhalten.
+  const pokemon = articleRows.filter((a) => isPokemonArticleName(a.nameRaw)).map((a) => a.id);
+  let pokemonHidden = 0;
+  if (pokemon.length > 0) {
+    const res = await prisma.article.updateMany({ where: { id: { in: pokemon }, hidden: false }, data: { hidden: true } });
+    pokemonHidden = res.count;
+  }
 
   progress(98, "Abschließen …");
   // Alles, was der Stamm nicht (mehr) aktiv fuehrt, ist ausgelaufen.
@@ -162,6 +193,9 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     minStockCount,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
     recent: recentOrderDays(orders, now),
+    salesMatchedBySetCode: matchedBySetCode,
+    pokemonHidden,
+    recentOrders: summarizeRecentOrders(orders, now, (n) => idByName.has(n), { excludeStates }),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,
     finishedAt: new Date().toISOString(),

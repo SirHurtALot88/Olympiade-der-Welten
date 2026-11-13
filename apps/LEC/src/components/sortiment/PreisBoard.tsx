@@ -230,7 +230,14 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Letzter Verkauf" className="r bd-num bd-c-last">
                   {(() => {
                     const d = daysSince(row.lastSoldAt);
-                    if (d === null) return <span className="bd-none">—</span>;
+                    if (d === null)
+                      return row.listedDays != null ? (
+                        <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                          nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
+                        </span>
+                      ) : (
+                        <span className="bd-none">—</span>
+                      );
                     return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
                   })()}
                 </td>

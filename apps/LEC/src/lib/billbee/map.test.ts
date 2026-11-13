@@ -120,3 +120,55 @@ describe("stockLimitsOf", () => {
     expect(stockLimitsOf({})).toEqual({ minStock: null, desiredStock: null });
   });
 });
+
+describe("summarizeRecentOrders", () => {
+  it("zeigt Nummer, Status, Ausschluss und ob zur Position ein Artikel existiert", async () => {
+    const { summarizeRecentOrders } = await import("./map");
+    const now = new Date("2026-11-13T12:00:00Z");
+    const orders = [
+      { OrderNumber: "16-1", BillBeeOrderId: 1, CreatedAt: "2026-11-12T10:00:00Z", State: 4, OrderItems: [{ Quantity: 1, TotalPrice: 21.99, Product: { Title: "Yu-Gi-Oh! DUPO-DE002 Dunkle Kavallerie Ultra Rare 1st NM" } }] },
+      { OrderNumber: "16-2", BillBeeOrderId: 2, CreatedAt: "2026-11-11T10:00:00Z", State: 8, OrderItems: [{ Quantity: 1, TotalPrice: 5, Product: { Title: "Unbekannt X" } }] },
+      { OrderNumber: "16-OLD", BillBeeOrderId: 3, CreatedAt: "2025-01-01T10:00:00Z", State: 4, OrderItems: [] },
+    ];
+    const r = summarizeRecentOrders(orders, now, (n) => n.includes("dunkle kavallerie"), { excludeStates: [8] });
+    expect(r.map((o) => o.nr)).toEqual(["16-1", "16-2"]);
+    expect(r[0].lines[0]).toMatchObject({ qty: 1, article: true });
+    expect(r[0].lines[0].unitPrice).toBeCloseTo(21.99);
+    expect(r[1].excluded).toBe(true);
+    expect(r[1].lines[0].article).toBe(false);
+  });
+});
+
+describe("matchSaleBySetCode", () => {
+  const rarityOf = (n: string) => (/ultra/i.test(n) ? "Ultra Rare" : /secret/i.test(n) ? "Secret Rare" : null);
+  it("ordnet ueber den Set-Code zu, wenn genau ein Artikel ihn traegt", async () => {
+    const { matchSaleBySetCode } = await import("./map");
+    const arts = [{ id: "a", setCode: "DUPO-DE002", nameRaw: "Yu-Gi-Oh! DUPO-DE002 Dunkle Kavallerie Ultra Rare 1st NM" }, { id: "b", setCode: "DUPO-DE003", nameRaw: "x" }];
+    expect(matchSaleBySetCode("Yu-Gi-Oh! DUPO-DE002 Dunkle Kavallerie Ultra Rare 1st EX", arts, rarityOf)).toBe("a");
+    expect(matchSaleBySetCode("Kein Code hier", arts, rarityOf)).toBeNull();
+    expect(matchSaleBySetCode("Yu-Gi-Oh! ZZZZ-DE001 Unbekannt", arts, rarityOf)).toBeNull();
+  });
+  it("bei mehreren Artikeln mit dem Code entscheidet die Seltenheit, sonst nichts", async () => {
+    const { matchSaleBySetCode } = await import("./map");
+    const arts = [{ id: "u", setCode: "AB01-DE001", nameRaw: "AB01-DE001 X Ultra Rare" }, { id: "s", setCode: "AB01-DE001", nameRaw: "AB01-DE001 X Secret Rare" }];
+    expect(matchSaleBySetCode("AB01-DE001 X Secret Rare NM", arts, rarityOf)).toBe("s");
+    expect(matchSaleBySetCode("AB01-DE001 X NM", arts, rarityOf)).toBeNull();
+  });
+});
+
+describe("makeCanonicalizer: Zwillings-Artikel vermeiden", () => {
+  it("ordnet eine Bestellposition mit abweichendem Namen dem Stammartikel mit gleichem Set-Code zu", async () => {
+    const { makeCanonicalizer, mapOrders: mapO, extractSales: extract } = await import("./map");
+    const master = { row: { nameRaw: "Yu-Gi-Oh! DUPO-DE002 Dunkle Kavallerie Ultra Rare 1st NM", nameNormalized: "dupo-de002 dunkle kavallerie ultra rare 1st", packQty: 1, setCode: "DUPO-DE002", isCard: true, stock: 4, currentVk: 11.99, currentEk: 2, statusRaw: null }, sku: null, id: null, cost: 2, ebayItemId: null, minStock: null, desiredStock: null };
+    const canonical = makeCanonicalizer([master], () => "Ultra Rare");
+    const orders = [{ CreatedAt: "2026-11-01T10:00:00Z", State: 4, OrderNumber: "N1", OrderItems: [{ Quantity: 1, TotalPrice: 21.99, Product: { Title: "Yu-Gi-Oh! DUPO-DE002 Dunkle Kavallerie Rare Played" } }] }];
+    const sales = extract(orders, { canonical });
+    expect(sales[0].nameNormalized).toBe(master.row.nameNormalized);
+    const res = mapO(orders, [master], { now: new Date("2026-11-13T00:00:00Z"), canonical });
+    const names = res.flatMap((r) => r.rows.map((x) => x.nameNormalized));
+    expect(new Set(names)).toEqual(new Set([master.row.nameNormalized]));
+    // ohne Canonicalizer entsteht der Zwilling
+    const plain = mapO(orders, [master], { now: new Date("2026-11-13T00:00:00Z") });
+    expect(plain.flatMap((r) => r.rows.map((x) => x.nameNormalized))[0]).not.toBe(master.row.nameNormalized);
+  });
+});

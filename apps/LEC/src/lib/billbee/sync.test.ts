@@ -59,6 +59,21 @@ describe("syncBillbee", () => {
     expect(calls.some(([, l]) => l.includes("Bestellungen laden (Seite 2 von 2)"))).toBe(true);
   });
 
+  it("blendet Pokemon-Artikel aus und ordnet Verkaeufe mit geaendertem Titel ueber den Set-Code zu", async () => {
+    await db.prisma.article.create({ data: { nameNormalized: "pokemon 078/162 flutter mane", nameRaw: "Pokemon 078/162 Flutter Mane Holo NM", setCode: null, packQty: 1, isCard: true, active: true } });
+    await db.prisma.article.create({ data: { nameNormalized: "abcd-de001 alpha rare", nameRaw: "Yu-Gi-Oh! ABCD-DE001 Alpha Rare NM", setCode: "ABCD-DE001", packQty: 1, isCard: true, active: true } });
+    const fetchFn = (async (url: URL) => {
+      const p = new URL(String(url)).pathname;
+      if (p.endsWith("/products")) return json({ Paging: { TotalPages: 1 }, Data: [] });
+      return json({ Paging: { TotalPages: 1 }, Data: [{ CreatedAt: "2026-10-05T10:00:00Z", State: 4, OrderNumber: "N1", OrderItems: [{ Quantity: 1, TotalPrice: 9, Product: { Title: "Yu-Gi-Oh! ABCD-DE001 Umbenannte Karte Super Rare NM" } }] }] });
+    }) as unknown as typeof fetch;
+    const report = await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn });
+    expect(report.pokemonHidden).toBe(1);
+    expect((await db.prisma.article.findUnique({ where: { nameNormalized: "pokemon 078/162 flutter mane" } }))?.hidden).toBe(true);
+    expect(report.salesMatchedBySetCode).toBe(1);
+    expect(await db.prisma.sale.count()).toBe(1);
+  });
+
   it("verlangt Zugangsdaten", async () => {
     await expect(syncBillbee(db.prisma, { config: null })).rejects.toBeInstanceOf(BillbeeNotConfigured);
   });
