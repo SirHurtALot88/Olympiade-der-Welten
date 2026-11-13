@@ -2,6 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+interface OrderHit {
+  nr: string;
+  at: string;
+  state: number | null;
+  excluded: boolean;
+  lines: { name: string; qty: number; unitPrice: number; article: boolean }[];
+}
+interface OrderCheckResult {
+  checked: boolean;
+  found?: number;
+  hits?: OrderHit[];
+  message?: string;
+  error?: string;
+  lastRun?: string;
+}
+
 interface Status {
   configured: boolean;
   source: string | null;
@@ -188,6 +204,60 @@ export function BillbeeSyncCard() {
         <button type="button" className="chip" onClick={() => void start()} disabled={status.running}>
           Jetzt aktualisieren
         </button>
+      )}
+
+      {status?.configured && !editing && <OrderCheck />}
+    </div>
+  );
+}
+
+
+/** "Bestellung prüfen": fehlt ein Verkauf in der Seite, zeigt das, ob Billbee die Bestellung geliefert hat und was mit ihren Positionen geschah. */
+function OrderCheck() {
+  const [nr, setNr] = useState("");
+  const [res, setRes] = useState<OrderCheckResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function check() {
+    if (nr.trim().length < 3) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/billbee/order?nr=${encodeURIComponent(nr.trim())}`, { cache: "no-store" });
+      setRes((await r.json()) as OrderCheckResult);
+    } catch {
+      setRes({ checked: false, message: "Keine Verbindung zum Server." });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div style={{ marginTop: 14, fontSize: 12.5 }}>
+      <b>Bestellung prüfen</b>{" "}
+      <span style={{ color: "var(--faint)" }}>(Fehlt ein Verkauf? Bestellnummer aus Billbee eingeben, zum Beispiel 16-15356-57206)</span>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        <input value={nr} onChange={(e) => setNr(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void check()} placeholder="Bestellnummer" style={{ minWidth: 220 }} aria-label="Bestellnummer" />
+        <button type="button" className="chip" onClick={() => void check()} disabled={busy || nr.trim().length < 3}>
+          Prüfen
+        </button>
+      </div>
+      {res && (
+        <div style={{ marginTop: 8, lineHeight: 1.5 }}>
+          {res.message && <div className={res.checked ? "down" : undefined}>{res.message}</div>}
+          {res.error && <div className="down">{res.error}</div>}
+          {res.hits?.map((h) => (
+            <div key={h.nr} style={{ marginTop: 6 }}>
+              <b>{h.nr}</b> · {new Date(h.at).toLocaleString("de-DE")} · Status {h.state ?? "?"}
+              {h.excluded ? <span className="down"> · Status zählt nicht (z. B. storniert): wird nicht als Verkauf gespeichert</span> : <span> · geliefert, zählt als Verkauf</span>}
+              <ul style={{ margin: "4px 0 0 18px" }}>
+                {h.lines.map((l, i) => (
+                  <li key={i}>
+                    {l.qty} × {l.name} · {l.unitPrice.toFixed(2).replace(".", ",")} €{" "}
+                    {l.article ? "· Artikel gefunden" : <span className="down">· kein Artikel mit diesem Namen: Position wird nicht gespeichert (Name in Billbee passt nicht zum Artikelstamm)</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

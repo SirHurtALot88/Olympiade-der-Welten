@@ -63,6 +63,8 @@ export interface ArticleAggregate {
   lastPriceChangeAt?: Date | null;
   /** Letzte EK-Aenderung oder letzter Einkauf, das Spaetere; null = unbekannt. */
   lastEkAt?: Date | null;
+  /** Geschaetztes Mindestalter des eBay-Angebots in Tagen (aus der Artikelnummer, siehe listedAge.ts); null = unbekannt. */
+  listedDays?: number | null;
   /** Verkaufstempo je Monat aus den Einzelverkaeufen (gewichtet, siehe pace.ts); null/fehlt = Rueckfall auf die Fenster. */
   paceMonth?: number | null;
   /** Mindest-/Meldebestand und Soll-Bestand aus Billbee; null = nicht gepflegt. */
@@ -200,6 +202,8 @@ export interface SortimentRow {
   lastPriceChangeAt?: string | null;
   /** ISO: letzte EK-Aenderung oder letzter Einkauf; null = unbekannt. */
   lastEkAt?: string | null;
+  /** Mindestens so viele Tage ist der Artikel bei eBay eingestellt (Schaetzung), null = unbekannt. */
+  listedDays?: number | null;
   minStock?: number | null;
   desiredStock?: number | null;
   /** Bestand liegt auf oder unter dem Mindestbestand aus Billbee: nachbestellen. */
@@ -725,6 +729,7 @@ export function buildSortimentRow(
     lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
     lastPriceChangeAt: a.lastPriceChangeAt ? a.lastPriceChangeAt.toISOString() : null,
     lastEkAt: a.lastEkAt ? a.lastEkAt.toISOString() : null,
+    listedDays: a.listedDays ?? null,
     minStock: a.minStock ?? null,
     desiredStock: a.desiredStock ?? null,
     delistMarkedAt: a.delistMarkedAt ? a.delistMarkedAt.toISOString() : null,
@@ -735,7 +740,8 @@ export function buildSortimentRow(
       hidden: a.hidden === true,
       stock: a.stock,
       vk: vkForCorridor,
-      daysSinceSale: a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : null,
+      // Nie verkauft: das geschaetzte Mindestalter des Angebots zaehlt wie die Tage ohne Verkauf
+      daysSinceSale: a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : (a.listedDays ?? null),
     }),
     ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
     stock: a.stock,
