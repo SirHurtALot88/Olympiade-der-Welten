@@ -1,4 +1,5 @@
 import type { ArticleAggregate } from "./viewModel";
+import { conditionFactor, conditionOf, type CardCondition } from "../market/condition";
 import { applyStaleDiscount, staleDiscountPct } from "../pricing/staleDecay";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import {
@@ -45,7 +46,7 @@ export const FROM_PLAUSIBLE_SHARE = 0.4;
 /** "ab" zaehlt doppelt (Chris, 13.11.): es spiegelt den aktuellen Stand besser als die traegen Schnitte, vor allem bei fallendem Preis. */
 export const FROM_WEIGHT = 2;
 
-export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null): number | null {
+export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null, factor = 1): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
   const pack = Math.max(1, packQty);
   const cardParts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
@@ -56,15 +57,16 @@ export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: numb
   const meanOfCards = cardParts.reduce((s, v) => s + v, 0) / cardParts.length;
   if (quote.priceFrom != null && quote.priceFrom >= FROM_PLAUSIBLE_SHARE * meanOfCards) for (let i = 0; i < FROM_WEIGHT; i++) cardParts.push(quote.priceFrom);
   // Je Artikel (Karte x Pack-Menge); der letzte EK steht schon je Artikel und federt Ausreisser ab (Chris, 11.11.).
-  const parts = cardParts.map((v) => v * pack);
+  // Zustandsabschlag (EX/GD/LP/PL/Poor) nur auf die Cardmarket-Preise: sie gelten fuer NM, der letzte EK ist ein echter Betrag.
+  const parts = cardParts.map((v) => v * pack * factor);
   if (lastEk != null && lastEk > 0) parts.push(lastEk);
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
-export function marketRangeOf(quote: LatestQuote, packQty: number): { min: number; max: number; variants: number } | null {
+export function marketRangeOf(quote: LatestQuote, packQty: number, factor = 1): { min: number; max: number; variants: number } | null {
   if (quote.matchQuality !== "mehrdeutig" || quote.priceMin == null || quote.priceMax == null) return null;
   const pack = Math.max(1, packQty);
-  return { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 };
+  return { min: quote.priceMin * pack * factor, max: quote.priceMax * pack * factor, variants: quote.variants ?? 0 };
 }
 
 export interface MarketComparisonRow {
@@ -91,6 +93,9 @@ export interface MarketComparisonRow {
    */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Zustand aus dem Titel und Anteil vom NM-Preis, mit dem der Marktwert gerechnet ist (NM = 1). */
+  condition: CardCondition;
+  conditionFactor: number;
   /** Ladenhüter-Abschlag auf targetMin/targetOpt (0..0,3), 0 = keiner; daysSinceSale = Tage seit dem letzten Verkauf. */
   staleDiscount: number;
   daysSinceSale: number | null;
@@ -160,8 +165,10 @@ export function buildMarketComparisonRow(
   const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings, { kind, packSize: a.packQty, shop });
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
-  const marketValue = marketValueOf(quote, pack, a.currentEk);
-  const marketRange = marketRangeOf(quote, pack);
+  const condition = conditionOf(a.nameRaw);
+  const condFactor = conditionFactor(a.nameRaw);
+  const marketValue = marketValueOf(quote, pack, a.currentEk, condFactor);
+  const marketRange = marketRangeOf(quote, pack, condFactor);
 
   const rangeFor = (marketPerUnit: number): MarketTargetRange =>
     computeMarketTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
@@ -233,7 +240,7 @@ export function buildMarketComparisonRow(
       ? contributionMarginForPrice(ownVk, { ek: lastEk, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
       : null;
   // Gegen den reinen Cardmarket-Wert pruefen (ohne den eigenen EK), sonst zoege der EK die Messlatte selbst mit hoch.
-  const cardOnlyValue = marketValueOf(quote, pack);
+  const cardOnlyValue = marketValueOf(quote, pack, null, condFactor);
   const ekAboveMarket = cardOnlyValue !== null && cardOnlyValue > 0 && ek > cardOnlyValue * 1.5;
 
   const marketEk = quote.priceFrom !== null ? computeMarketEk(quote.priceFrom, a.packQty, hk.buyShipping) : null;
@@ -254,6 +261,8 @@ export function buildMarketComparisonRow(
     marketRange,
     targetMin: target ? target.min : null,
     targetOpt: target ? target.opt : null,
+    condition,
+    conditionFactor: condFactor,
     staleDiscount,
     daysSinceSale,
     capped,

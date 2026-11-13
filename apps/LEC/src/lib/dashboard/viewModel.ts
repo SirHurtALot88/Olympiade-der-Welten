@@ -232,6 +232,9 @@ export interface SortimentMarket {
   /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
   capped: boolean;
   /** Ladenhüter-Abschlag (0..0,3) auf die Zielspanne und Tage seit dem letzten Verkauf. */
+  /** Zustand und Abschlagsfaktor auf den NM-Preis (NM = 1). */
+  condition?: string;
+  conditionFactor?: number;
   staleDiscount?: number;
   daysSinceSale?: number | null;
   /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
@@ -650,6 +653,8 @@ export function buildSortimentRow(
       targetMin: m.targetMin,
       targetOpt: m.targetOpt,
       capped: m.capped,
+      condition: m.condition,
+      conditionFactor: m.conditionFactor,
       staleDiscount: m.staleDiscount,
       daysSinceSale: m.daysSinceSale,
       marginReachable: m.marginReachable,
