@@ -202,7 +202,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}${row.ranks?.marge ? ` · Platz #${row.ranks.marge}/${row.ranks.total}` : ""}` : undefined}
           />
-          <Stat tone={row.reorderDue || noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.reorderDue ? `Nachbestellen: Mindestbestand ${row.minStock}${row.reorderQty ? `, Soll ${row.desiredStock} (${row.reorderQty} fehlen)` : ""}` : noSale90 ? "kein Verkauf in 90 Tagen" : row.minStock ? `Mindestbestand ${row.minStock}${row.desiredStock ? `, Soll ${row.desiredStock}` : ""} · ` + (row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : "") : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={row.reorderDue || noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={[row.stockMonthsCover ? `Reichweite ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : row.stock > 0 ? "kein Verkaufstempo" : null, row.reorderDue ? `Nachbestellen: ${row.reorderQty ?? 1} Stk` : noSale90 ? "kein Verkauf in 90 Tagen" : null, row.minStock ? `Min ${row.minStock}${row.desiredStock ? ` · Soll ${row.desiredStock}` : ""}` : null].filter(Boolean).join(" · ")} />
           <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 
@@ -220,7 +220,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             {row.reorderDue && (
               <>
                 <b>Nachbestellen fällig</b>
-                {row.reorderReason === "mindestbestand" ? ` – Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}${row.reorderQty ? `, Soll ${row.desiredStock} (${row.reorderQty} Stk fehlen)` : ""}.` : row.reorderReason === "ausverkauft" ? " – ausverkauft, der Artikel verkauft sich." : " – der Bestand reicht nur noch etwa 1,5 Monate."}
+                {row.reorderReason === "mindestbestand" ? ` – Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}. Empfehlung: ${row.reorderQty ?? 1} Stk nachbestellen${row.stockMonthsCover ? `, Reichweite jetzt ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : ""}.` : row.reorderReason === "ausverkauft" ? ` – ausverkauft, der Artikel verkauft sich. Empfehlung: ${row.reorderQty ?? 1} Stk nachbestellen.` : ` – Reichweite nur noch ca. ${(row.stockMonthsCover ?? 0).toFixed(1).replace(".", ",")} Monate. Empfehlung: ${row.reorderQty ?? 1} Stk nachbestellen.`}
                 <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <button type="button" className="chip" disabled={busy} onClick={() => void setSnooze(snoozeDays)} title="Du hast den Artikel geprüft und willst ihn jetzt nicht nachbestellen: er verschwindet für die gewählte Zeit aus „Nachbestellen fällig“ und den Empfehlungen">
                     Erstmal nicht nachbestellen

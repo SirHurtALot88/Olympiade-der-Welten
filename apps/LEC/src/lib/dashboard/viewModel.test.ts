@@ -501,7 +501,8 @@ describe("Nachbestellen faellig (Mindestbestand aus Billbee)", () => {
     buildSortimentRow(article("N", { stock, active, minStock, desiredStock, currentVk: 5, currentEk: 1, windows: { "365": agg({ qty: 6 }) } }), "beobachten", DEFAULT_COST_SETTINGS, null);
   it("auf oder unter dem Mindestbestand: faellig, mit Fehlmenge bis zum Soll", () => {
     expect(r(2, 2, 6)).toMatchObject({ reorderDue: true, reorderQty: 4 });
-    expect(r(1, 2)).toMatchObject({ reorderDue: true, reorderQty: null });
+    // ohne Soll: Menge aus Tempo (3 Monate) bzw. mindestens Mindestbestand + 1
+    expect(r(1, 2)).toMatchObject({ reorderDue: true, reorderQty: 2 });
   });
   it("ueber dem Mindestbestand, ohne Mindestbestand oder ausgelaufen: nicht faellig", () => {
     expect(r(3, 2).reorderDue).toBe(false);
