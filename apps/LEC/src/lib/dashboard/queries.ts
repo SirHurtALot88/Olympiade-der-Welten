@@ -204,7 +204,11 @@ export async function loadArticleAggregates(
         return (salesByArticle.get(article.id) ?? []).filter((x) => x.soldAt > at).reduce((n, x) => n + x.qty, 0);
       })(),
       lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
-      listedDays: listedDaysAtLeast(listedIndex, article.ebayItemId ?? factItemByArticle.get(article.id) ?? null, firstSoldByArticle.get(article.id) ?? null),
+      // Mindestalter: erst aus der eBay-Nummer, sonst Tage seit der ersten Erfassung in LEC (Opus 14.11.). Unterschaetzt
+      // alte Ladenhueter, solange die DB jung ist, erfindet aber kein Alter.
+      listedDays:
+        listedDaysAtLeast(listedIndex, article.ebayItemId ?? factItemByArticle.get(article.id) ?? null, firstSoldByArticle.get(article.id) ?? null) ??
+        Math.max(0, Math.floor((Date.now() - article.createdAt.getTime()) / 86_400_000)),
       paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
       minStock: article.minStock,
       desiredStock: article.desiredStock,

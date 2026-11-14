@@ -108,3 +108,12 @@ Spezifikation für später:
 **Warten.** Es fehlt das JSON einer echten Billbee-Bestellung, ohne Kundendaten. Die Route `api/billbee/order` („Bestellung prüfen“) liefert es; nur Chris kann sie auslösen. Danach gilt Prio 1, Aufwand M.
 
 Formel: Marge der Bestellung = Σ Positionen (Stückpreis × Menge) − Σ EK − tatsächliche eBay-Gebühren − tatsächliches Porto, sofern in der Bestellung vorhanden − Verpackungspauschale. Danach ersetzt der echte Wert die Pauschalen in DB II, sobald es mindestens 200 Bestellungen mit Werten gibt. Das ist dieselbe Schwelle wie `MIN_ORDERS_FOR_MEASURE`.
+
+## Umsetzungsstand 14.11. (Paket E)
+
+- Punkt 3 Stand-Zeile: umgesetzt (`/api/stand`, `lib/dashboard/stand.ts`, Seitenleiste).
+- Punkt 2 Reichweite/GMROI: umgesetzt (`lib/cockpit/capital.ts`, `CapitalCard`), mit Lücken-Hinweis, ohne Ampel.
+- Punkt 5 Alte Komponenten: gelöscht (topflop, marktpreise, empfehlungen, Recommendations, CardmarketPlaceholder, MoversPanels, topFlop.ts). Die drei Umleitungsseiten bleiben.
+- Punkt 9 Alter unbekannt: Rückfall auf Tage seit erster Erfassung (`Article.createdAt`) in `queries.ts`. Unterschätzt alte Ladenhüter, solange die DB jung ist.
+- Punkt 7 verworfen; Punkt 8 Mitkäufe und Land/Versandart verworfen.
+- Offen: 4 Handy (Drawer zuerst), 8 Preis-/Marktlinie, 6 ab 15.12., 10 wartet auf Order-JSON, 1 Filterleiste verkleinert.
