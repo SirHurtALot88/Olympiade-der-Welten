@@ -161,6 +161,47 @@ Priorität: 1 = bald bauen, 2 = lohnt sich, 3 = nur wenn Zeit. Alle Webquellen a
 
 ---
 
+## Entscheidungen 14.11.
+
+Antworten auf Chris' Rückfragen (über den Koordinator). Grundlage: Code-Stand 14.11. (`viewModel.ts` `buildRecommendations`, `classification.ts`, `lifecycle.ts`).
+
+**1. Eine Ladenhüter-Definition.** Kapital-Altersklassen über alle aktiven, nicht ausgeblendeten Artikel mit Bestand > 0 und EK > 0. Alter = Tage seit letztem `Sale.soldAt`; nie verkauft: das größere aus Tagen seit `Article.createdAt` und geschätztem Angebotsalter (`listedDaysAtLeast`). Namen: **Frisch** 0–90, **Ruhig** 91–180, **Langsam** 181–365, **Ladenhüter** über 365 Tage. Chris sieht: „Ladenhüter: X € in N Artikeln“ plus die drei anderen Segmente. Nie verkaufte Artikel tragen in jedem Segment ein Kennzeichen „ohne Verkauf, Alter geschätzt“. „Kapitalbinder“ entfällt als Begriff; der Abverkaufsblock = Langsam + Ladenhüter. Die Status-Maßnahmen (Preis senken, Auslaufen, Auslisten) bleiben Aufgaben, keine Kapitalgruppe. Risiko: `createdAt` ist der erste LEC-Import, also zu jung; ohne die Schätzung aus der eBay-Nummer käme kein nie verkaufter Artikel über 365 Tage.
+
+**2. Sortiment-Zielspanne als einzige Preis-Ampel:** einverstanden, mit zwei Bedingungen. (a) Ohne eindeutigen Marktwert gibt es kein Urteil, und das zeigt die Ampel als „offen“ samt Anzahl an. (b) Die Ampel misst nur am Markt; eine Karte, die zu teuer eingekauft wurde, steht trotzdem „im Rahmen“. Deshalb bleibt die EK-Sicht als zweite Spalte, umbenannt in **„Marge am eigenen EK“** (unter 25 % / 25–33 % / darüber / kein EK). Sie ist keine Ampel für Preisänderungen, sondern eine Prüfung des Einkaufs. Risiko: Der Preisführer filtert weder Zustand noch Sprache.
+
+**3. Dashboard-Kennzahlen.**
+- Kapital nach Alter = Σ `stock` × `currentEk` je Segment (siehe 1).
+- Reichweite (Monate) = dasselbe Kapital ÷ (Σ `SaleWindow[365].ek` ÷ 12).
+- GMROI = Σ `SaleWindow[365].dbI` ÷ Kapital heute.
+- Für Reichweite und GMROI gilt: nur Artikel mit EK zählen im Zähler und im Nenner, sonst entsteht eine Phantommarge (dbI = Umsatz).
+- Umschlag entfällt, weil er der Kehrwert der Reichweite ist.
+- Alle drei werden nur als Shopsumme bzw. je Ordner oder Preisband gezeigt, nie je Artikel. Bei Bestand 1–5 und 0–2 Verkäufen je Karte ist der Artikelwert Zufall.
+- Sie verschweigen Artikel ohne EK; deren Zahl steht deshalb daneben.
+- GMROI rechnet mit dem Kapital am Stichtag statt dem Durchschnittsbestand.
+- Läuft gut: Top nach Gewinn/Monat (DB II €).
+- Läuft schlecht: Verlust trotz Verkäufen (365 T) und „Markt fällt, Bestand liegt“.
+- Muss weg: Langsam + Ladenhüter.
+- Gestrichen: Sell-Through und Rang je Artikel, Ranglisten nach DB II %, Lebenszeit-Fenster, Betriebsausgaben-Quote.
+
+**4. Empfehlungen.**
+- Behalten:
+  - `lot_bilden` als Dashboard-Block „Muss weg“.
+  - `ek_pflegen` und die drei `daten_pruefen`-Fälle (Name ≠ Code → Aufräumen; Verlust trotz Verkäufen und krumme Stückzahl → Daten prüfen).
+- Redundant und weg:
+  - `preis_anpassen` (Preis ändern).
+  - `nachkaufen` (Nachbestellen).
+  - `auslisten` aus der Low-Runner-Klasse: Negative Marge mit Verkäufen ist ein Preis- oder EK-Fall, er wandert in „Preis ändern“ bzw. „Daten prüfen“.
+
+**5. Was nicht verloren gehen darf.** Von Marktpreise: die Abdeckung (mit Marktwert / mehrdeutig / älter als 30 T) in den Datenstand, und später Verkaufspreis gegen Marktwert je Preisband. Von Top/Flop: nur „Top nach DB II €“, das in „Läuft gut“ aufgeht.
+
+**6. Trennung „Daten prüfen“ / „Aufräumen“:** einverstanden.
+- Ergänzen in „Daten prüfen“:
+  - EK über 150 % des Marktwerts (meist ein Tippfehler im EK).
+  - Bestand > 0 ohne VK.
+  - Krumme Stückzahl.
+  - Marktwert mehrdeutig bei Bestand > 0.
+- Ergänzen in „Aufräumen“: aktiv, aber nicht im eBay-Shop gefunden.
+
 ## 6. Quellen (alle abgerufen am 14.11.2026)
 
 Gelesen (15 Seiten):
