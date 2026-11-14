@@ -45729,12 +45729,38 @@ button.foundation-team-portrait-card {
   }
 }
 
-/* --- Top-Kader: Top-6 Portraitkarten (identisch zum bestehenden
-   Home, reponsive über auto-fit statt fixer Spaltenzahl) ---------- */
+/* --- Top-Kader: Top-6 Portraitkarten ---------------------------------
+   Fable-Audit 14.11. #1: `auto-fit, minmax(210px, 1fr)` liess den Browser
+   die Spaltenzahl aus der verfuegbaren Breite ableiten — bei den meisten
+   Desktop-Breiten kam dabei 5 heraus, und Karte #6 (der Kader hat 6 bis
+   zum Minimum) stand dann allein in einer zweiten Zeile neben vier
+   leeren Kachelbreiten. Feste Spaltenzahlen, die 6 ohne Rest teilen
+   (1/2/3/6), schliessen die Luecke bei JEDER Breite, nicht nur zufaellig:
+   3 Spalten im ueblichen Desktop-Bereich (2 volle Zeilen zu 3), 6 Spalten
+   erst ab sehr breiten/Cinema-Bildschirmen (eine Zeile), darunter 2 bzw. 1
+   Spalte fuer schmalere Breiten. */
 .is-new-look .nl-home-portrait-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--nl-s4);
+}
+
+@media (max-width: 760px) {
+  .is-new-look .nl-home-portrait-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .is-new-look .nl-home-portrait-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1700px) {
+  .is-new-look .nl-home-portrait-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 .is-new-look .nl-home-board-meta {
@@ -55211,12 +55237,18 @@ button.foundation-team-portrait-card {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--nl-s4);
-  /* T7-Fix (Audit-Befund F4): die sticky Aktions-Leiste hängt am unteren
-     Rand des Viewports und legte sich beim Scrollen direkt über die
-     Kartentitel der jeweils letzten sichtbaren Reihe. Reservierter
-     Bodenabstand in Höhe der Leiste sorgt dafür, dass die letzte Kartenreihe
-     immer Luft hat, statt darunter zu verschwinden. */
-  padding-bottom: calc(var(--nl-s3) + 96px);
+}
+
+/* Fable-Audit 14.11. #5: das Detailpanel (Kosten-Kurven + Upgrade/Wartung/Downgrade)
+   landet jetzt INLINE im Grid, direkt nach der ausgewählten Karte — `grid-column: 1 / -1`
+   spannt es über die volle Breite, wodurch die Nachbarkarten automatisch eine Zeile tiefer
+   rutschen, statt von einem darüber schwebenden Panel verdeckt zu werden (vorher: T7-Fix
+   unten, `position: sticky` auf der Aktionsleiste — entfernt, s. `.nl-facility-action-bar`). */
+.is-new-look .nl-facility-inline-detail {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
 }
 
 .is-new-look .nl-facility-card {
@@ -55393,9 +55425,10 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-facility-action-bar {
-  position: sticky;
-  bottom: var(--nl-s3);
-  z-index: 5;
+  /* War `position: sticky; bottom: …; z-index: 5` — legte sich beim Scrollen über die
+     jeweils unterste sichtbare Kartenreihe (Fable-Audit 14.11. #5). Die Leiste rendert jetzt
+     inline direkt bei der ausgewählten Karte (`.nl-facility-inline-detail`), braucht also
+     kein Pinning an den Viewport mehr. */
   display: flex;
   align-items: center;
   justify-content: space-between;

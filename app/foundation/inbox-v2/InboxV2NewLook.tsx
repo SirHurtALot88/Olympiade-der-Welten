@@ -536,11 +536,17 @@ export default function InboxV2NewLook({
    */
   const urgencyGroups = useMemo(() => groupInboxItemsByUrgency(displayedItems), [displayedItems]);
 
-  /** Eine Karte, ein Renderer — in jeder Gruppe dieselbe Anatomie, damit sie sich nie auseinanderleben. */
-  const renderItemCard = (item: InboxV2Item, index: number) => {
+  /**
+   * Eine Karte, ein Renderer — in jeder Gruppe dieselbe Anatomie, damit sie sich nie
+   * auseinanderleben. Der Ton der Karte kommt bewusst von der GRUPPE (`groupTone`), nicht mehr
+   * von der rohen `item.severity`: eine Beobachtung mit `severity: "warning"` landet zwar wegen
+   * `lane: "watch"` in „Kann warten", trug aber vorher trotzdem Orange — optisch ununterscheidbar
+   * von „Heute sinnvoll" (Fable-Audit 14.11., Abschnitt 2). `INBOX_URGENCY_GROUPS` definiert den
+   * Ton bereits pro Gruppe (risk/warn/neutral) — die Karte übernimmt ihn jetzt 1:1 von dort.
+   */
+  const renderItemCard = (item: InboxV2Item, index: number, groupTone: NlTone) => {
     const meta = getCategoryMeta(item.category);
     const CategoryIcon = meta.icon;
-    const severityTone = getSeverityTone(item.severity);
     const statusLabel = getStatusLabel(item);
     const isSelected = selectedItemId === item.id;
     const isAutoResolving = isAutoResolvingInboxItemId(item.id);
@@ -558,11 +564,11 @@ export default function InboxV2NewLook({
         <NlCard
           interactive
           onClick={() => activateItem(item.id)}
-          className={`nl-inbox-card ${nlToneClass(severityTone)}${isCritical ? " is-critical" : ""}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          className={`nl-inbox-card ${nlToneClass(groupTone)}${isCritical ? " is-critical" : ""}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
           data-testid={`nl-inbox-card-${item.id}`}
         >
           <div className="nl-inbox-card-row">
-            <span className={`nl-inbox-card-icon ${nlToneClass(severityTone)}`} title={meta.label}>
+            <span className={`nl-inbox-card-icon ${nlToneClass(groupTone)}`} title={meta.label}>
               <CategoryIcon />
             </span>
             <div className="nl-inbox-card-copy">
@@ -668,7 +674,7 @@ export default function InboxV2NewLook({
                 {group.title} <span className="nl-tnum">({formatNlNumber(groupItems.length, 0)})</span> — einblenden
               </summary>
               <ul className="nl-inbox-list" aria-label={group.title}>
-                {groupItems.map((item, index) => renderItemCard(item, index))}
+                {groupItems.map((item, index) => renderItemCard(item, index, group.tone))}
               </ul>
             </details>
           );
@@ -686,7 +692,7 @@ export default function InboxV2NewLook({
               <span className="nl-inbox-group-count nl-tnum">{formatNlNumber(groupItems.length, 0)}</span>
             </header>
             <ul className="nl-inbox-list" aria-label={group.title}>
-              {groupItems.map((item, index) => renderItemCard(item, index))}
+              {groupItems.map((item, index) => renderItemCard(item, index, group.tone))}
             </ul>
           </section>
         );
