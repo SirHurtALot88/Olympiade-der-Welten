@@ -81,6 +81,17 @@ describe("cardmarketCode", () => {
   });
 });
 
+describe("ebayLinks: Seller Hub", () => {
+  it("sucht die aktiven Angebote nach dem Code, wie er im Titel steht", () => {
+    const l = ebayLinks({ ebayItemId: null, setCode: "RA05-DE081", nameRaw: "x" });
+    expect(l.manage).toBe("https://www.ebay.de/sh/lst/active?keyword=RA05-DE081&source=filterbar&action=search");
+  });
+  it("faellt ohne Code auf den Namen zurueck, URL-kodiert", () => {
+    const l = ebayLinks({ ebayItemId: null, setCode: null, nameRaw: "Lieder der Beherrscher" });
+    expect(new URL(l.manage).searchParams.get("keyword")).toBe("Lieder der Beherrscher");
+  });
+});
+
 describe("ebayLinks", () => {
   it("verlinkt direkt zum Angebot, wenn die Artikelnummer bekannt ist", () => {
     const l = ebayLinks({ ebayItemId: "227444381442", setCode: "OP27-DE010", nameRaw: "x" });
