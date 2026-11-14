@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DashboardViewModel } from "@/lib/dashboard/viewModel";
 import type { SaleWindowKey } from "@/lib/parsing/date";
 import { AppShell } from "@/components/shell/AppShell";
@@ -10,6 +10,8 @@ import { SortimentTable } from "./SortimentTable";
 import { OperatingQuotas } from "./OperatingQuotas";
 import { Recommendations } from "./Recommendations";
 import { CardmarketPlaceholder } from "./CardmarketPlaceholder";
+import { TASKS, taskCounts } from "@/lib/dashboard/tasks";
+import { findDuplicateGroups } from "@/lib/dashboard/board";
 
 interface Props {
   viewModel: DashboardViewModel;
@@ -19,6 +21,7 @@ const SORTIMENT_PREVIEW_LIMIT = 8;
 
 export function DashboardShell({ viewModel }: Props) {
   const [selectedWindow, setSelectedWindow] = useState<SaleWindowKey>("90");
+  const counts = useMemo(() => taskCounts(viewModel.sortiment, new Set(findDuplicateGroups(viewModel.sortiment).keys())), [viewModel.sortiment]);
 
   return (
     <AppShell
@@ -34,6 +37,15 @@ export function DashboardShell({ viewModel }: Props) {
         </>
       }
     >
+      <nav className="today-row" aria-label="Heute zu tun">
+        <b>Heute</b>
+        {TASKS.filter((t) => t.key !== "alle").map((t) => (
+          <a key={t.key} href={`/sortiment?aufgabe=${t.key}`} className={`today-chip${counts[t.key] > 0 ? " todo" : " zero"}`} title={t.hint}>
+            {t.label} <i>{counts[t.key].toLocaleString("de-DE")}</i>
+          </a>
+        ))}
+      </nav>
+
       <KpiRow
         windows={viewModel.windows}
         selected={selectedWindow}
