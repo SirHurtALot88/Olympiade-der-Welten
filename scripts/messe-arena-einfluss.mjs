@@ -25,7 +25,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
 import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
@@ -92,9 +92,10 @@ const pfad = process.argv[4]
   : resolve(dirname(fileURLToPath(import.meta.url)), "..", "public", "mockups", "battle-mode.html");
 const datei = pathToFileURL(pfad).href;
 
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
-});
+const festerPfad = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const browser = await chromium.launch(
+  existsSync(festerPfad) ? { executablePath: festerPfad } : {},
+);
 const seite = await browser.newPage();
 // KEIN AUDIOCONTEXT IM MESSLAUF (Speicherleck-Fix, 01.10.). einflussVon() laeuft als EIN
 // synchroner evaluate()-Aufruf ueber (1 + 12 x Teilnehmer) x n Spiele. Die Ton-Schicht
