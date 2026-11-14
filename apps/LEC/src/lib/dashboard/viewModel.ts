@@ -134,6 +134,8 @@ export interface MoverItem {
   ek: number;
   dbIPercent: number;
   dbIIPercent: number;
+  /** DB II in Euro im betrachteten Fenster (negativ = Verlust). */
+  dbIIEuro: number;
 }
 
 /** Kennzahlen je Zeitfenster fuer Chris' Dashboard-Spalten (PAGES_CONCEPT §B). */
@@ -434,16 +436,13 @@ export function buildDashboardViewModel(
     .slice(0, 4)
     .map((a) => toMoverItem(a, "30"));
 
-  // Laeuft schlecht: schlechteste Lebenszeit-DB-II-% unter Artikeln mit Verkaeufen.
+  // Laeuft schlecht: die Artikel, die in den letzten 90 Tagen in Euro am meisten verloren haben (DB II negativ).
+  // Nur mit bekanntem EK: ohne EK waere der "Verlust" eine Datenluecke (UX_KONZEPT_GESAMT.md, Aufgabe 5).
   const moversBad: MoverItem[] = articles
-    .filter((a) => (a.windows.all?.qty ?? 0) > 0 && (a.windows.all?.dbII ?? 0) < 0)
-    .sort(
-      (a, b) =>
-        pct(a.windows.all!.dbII, a.windows.all!.revenue) -
-        pct(b.windows.all!.dbII, b.windows.all!.revenue)
-    )
+    .filter((a) => (a.windows["90"]?.qty ?? 0) > 0 && (a.windows["90"]?.dbII ?? 0) < 0 && !hasNoEkData(a))
+    .sort((a, b) => (a.windows["90"]?.dbII ?? 0) - (b.windows["90"]?.dbII ?? 0))
     .slice(0, 4)
-    .map((a) => toMoverItem(a, "all"));
+    .map((a) => toMoverItem(a, "90"));
 
   // Vollstaendige Sortiment-Liste (PAGES_CONCEPT Vorarbeit: kein slice(0,20)/
   // revenue>0-Filter mehr -- Ladenhueter mit 0 € muessen auf /sortiment
@@ -511,6 +510,7 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
     ek: agg.ek,
     dbIPercent: pct(agg.dbI, agg.revenue),
     dbIIPercent: pct(agg.dbII, agg.revenue),
+    dbIIEuro: agg.dbII,
   };
 }
 
@@ -1110,7 +1110,7 @@ export function buildRecommendations(
       id: "lot_bilden",
       kind: "lot_bilden",
       title: "Kapitalbinder abverkaufen.",
-      detail: `${ladenhueter.length} Ladenhüter (0 Verk. in 365 T) und ${slow.length} langsame Kapitalbinder (Bestand reicht über 12 Monate oder seit 90 Tagen kein Verkauf) — abverkaufen oder als Lot bündeln.${unknownNote}`,
+      detail: `${ladenhueter.length} Ladenhüter (0 Verk. in 365 T, zusammen € ${knownItems.filter((i) => i.why === "Ladenhüter").reduce((n, i) => n + i.boundCapital, 0).toFixed(0)} gebunden) und ${slow.length} langsame Kapitalbinder (Bestand reicht über 12 Monate oder seit 90 Tagen kein Verkauf) — abverkaufen oder als Lot bündeln.${unknownNote}`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
       effectValue: boundCapital,
       items: items.slice(0, 50),

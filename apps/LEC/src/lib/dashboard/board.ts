@@ -253,3 +253,13 @@ export function findDuplicateGroups(rows: Pick<SortimentRow, "articleId" | "setC
   for (const [key, ids] of groups) if (ids.length >= 2) for (const id of ids) out.set(id, key);
   return out;
 }
+
+/**
+ * Preis auf eine ,99-Stufe: bei Erhoehung auf die naechste ,99 darueber oder gleich, bei Senkung auf die naechste ,99 darunter oder gleich
+ * (nie unter 4,99). Nur Anzeige in LEC; der Preis wird bei eBay von Hand geaendert (Chris: Preise enden auf ,99).
+ */
+export function to99(price: number, direction: "up" | "down"): number {
+  const cents = Math.round(price * 100);
+  const k = direction === "up" ? Math.ceil((cents + 1) / 100) : Math.floor((cents + 1) / 100);
+  return Math.max(4.99, (100 * Math.max(1, k) - 1) / 100);
+}

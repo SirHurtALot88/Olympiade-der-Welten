@@ -6,10 +6,7 @@ import type { SaleWindowKey } from "@/lib/parsing/date";
 import { AppShell } from "@/components/shell/AppShell";
 import { KpiRow } from "./KpiRow";
 import { MoversPanels } from "./MoversPanels";
-import { SortimentTable } from "./SortimentTable";
 import { OperatingQuotas } from "./OperatingQuotas";
-import { Recommendations } from "./Recommendations";
-import { CardmarketPlaceholder } from "./CardmarketPlaceholder";
 import { TASKS, taskCounts } from "@/lib/dashboard/tasks";
 import { findDuplicateGroups } from "@/lib/dashboard/board";
 
@@ -17,7 +14,6 @@ interface Props {
   viewModel: DashboardViewModel;
 }
 
-const SORTIMENT_PREVIEW_LIMIT = 8;
 
 export function DashboardShell({ viewModel }: Props) {
   const [selectedWindow, setSelectedWindow] = useState<SaleWindowKey>("90");
@@ -41,7 +37,7 @@ export function DashboardShell({ viewModel }: Props) {
         <b>Heute</b>
         {TASKS.filter((t) => t.key !== "alle").map((t) => (
           <a key={t.key} href={`/sortiment?aufgabe=${t.key}`} className={`today-chip${counts[t.key] > 0 ? " todo" : " zero"}`} title={t.hint}>
-            {t.label} <i>{counts[t.key].toLocaleString("de-DE")}</i>
+            {t.label} <i>{counts[t.key] > 0 ? counts[t.key].toLocaleString("de-DE") : "✓"}</i>
           </a>
         ))}
       </nav>
@@ -55,24 +51,15 @@ export function DashboardShell({ viewModel }: Props) {
 
       <MoversPanels good={viewModel.moversGood} bad={viewModel.moversBad} />
 
-      <SortimentTable
-        rows={viewModel.sortiment}
-        limit={SORTIMENT_PREVIEW_LIMIT}
-        headerExtra={
-          <a className="col-reset" href="/sortiment" style={{ textDecoration: "none" }}>
-            Alle {viewModel.sortiment.length} ansehen →
-          </a>
-        }
-      />
-
       <section className="grid-2">
-        <CardmarketPlaceholder count={viewModel.totals.marketPriceCount} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <OperatingQuotas quotas={viewModel.quotas} />
-          <Recommendations
-            recommendations={viewModel.recommendations.slice(0, 4)}
-            totalCount={viewModel.recommendations.length}
-          />
+        <OperatingQuotas quotas={viewModel.quotas} />
+        <div className="card" style={{ padding: "15px 16px" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Weiter</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <a className="chip" href="/sortiment" title="Alle Artikel mit Preis-Urteil, Bestand und Verkäufen.">Sortiment ({viewModel.sortiment.length}) →</a>
+            <a className="chip" href="/empfehlungen" title="Alle Empfehlungen (EK pflegen, Preise, Kapitalbinder).">Empfehlungen ({viewModel.recommendations.length}) →</a>
+            <a className="chip" href="/cockpit" title="Leitplanken: Marge, Tempo, Kapital.">Leitplanken →</a>
+          </div>
         </div>
       </section>
     </AppShell>

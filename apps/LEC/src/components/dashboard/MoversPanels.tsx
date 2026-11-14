@@ -1,5 +1,5 @@
 import type { MoverItem } from "@/lib/dashboard/viewModel";
-import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
+import { formatEuroCents, formatPercent } from "@/lib/format";
 
 interface Props {
   good: MoverItem[];
@@ -50,32 +50,20 @@ export function MoversPanels({ good, bad }: Props) {
       <div className="card">
         <h3>
           <span className="hdot" style={{ background: "var(--crit)" }} />
-          Läuft schlecht / bindet Kapital <span className="r">Lebenszeit-DB II · Verlust</span>
+          Läuft schlecht <span className="r" title="Artikel, die in den letzten 90 Tagen nach Gebühren, Versand und Verpackung Verlust gemacht haben (DB II negativ), nur mit bekanntem EK.">Verlust · 90 Tage</span>
         </h3>
         <div className="movers">
-          {bad.length === 0 && <EmptyRow text="Keine Verlust-Artikel gefunden." />}
+          {bad.length === 0 && <EmptyRow text="Kein Artikel mit Verlust in 90 Tagen." />}
           {bad.map((item) => (
-            <div className="mover" key={item.articleId}>
+            <a className="mover" key={item.articleId} href={`/sortiment?q=${encodeURIComponent(item.setCode ?? item.nameRaw)}`} style={{ textDecoration: "none", color: "inherit" }}>
               <div className="nm">{item.nameRaw}</div>
-              <div className="rev down">{formatPercent(item.dbIIPercent)}%</div>
+              <div className="rev down">−€ {formatEuroCents(Math.abs(item.dbIIEuro))}</div>
               <div className="meta">
                 <span>{item.qty} verkauft</span>
-                <span className="down">DB II negativ</span>
+                <span>EK € {formatEuroCents(item.ek)}</span>
               </div>
-              <div className="bar">
-                <i
-                  style={{
-                    width: `${Math.min(100, Math.max(4, Math.abs(item.dbIIPercent) * 100))}%`,
-                    background: "var(--crit)",
-                  }}
-                />
-              </div>
-            </div>
+            </a>
           ))}
-        </div>
-        <div style={{ padding: "2px 16px 12px", fontSize: 11, color: "var(--faint)" }}>
-          Bar = Verlusttiefe (gleiche Skala). Umsatz-Summe der gezeigten Artikel: €{" "}
-          {formatEuro(bad.reduce((s, i) => s + i.revenue, 0))}.
         </div>
       </div>
     </section>
