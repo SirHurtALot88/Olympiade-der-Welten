@@ -160,6 +160,8 @@ export interface EbayLinks {
   revise: string | null;
   /** Suche im eigenen Shop, wenn die Artikelnummer unbekannt ist. */
   search: string;
+  /** Verkaeufer-Cockpit (Seller Hub), aktive Angebote gefiltert auf die Karte: von dort aus beendet man das Angebot. */
+  manage: string;
 }
 
 const SHOP = "https://www.ebay.de/str/lordenterichcards";
@@ -206,6 +208,7 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
     view: id ? `https://www.ebay.de/itm/${id}` : null,
     revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
     search: `${SHOP}?_nkw=${encodeURIComponent(term)}`,
+    manage: `https://www.ebay.de/sh/lst/active?keyword=${encodeURIComponent(term)}&source=filterbar&action=search`,
   };
 }
 

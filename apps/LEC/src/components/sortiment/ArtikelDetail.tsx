@@ -547,6 +547,9 @@ function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { ro
           Preis bei eBay ändern ↗
         </a>
       )}
+      <a className="chip" href={l.manage} target="_blank" rel="noopener noreferrer" title="Öffnet deine aktiven eBay-Angebote (Seller Hub), gefiltert auf diese Karte. Dort kannst du das Angebot beenden.">
+        Bei eBay beenden ↗
+      </a>
       <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
         {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
       </a>
