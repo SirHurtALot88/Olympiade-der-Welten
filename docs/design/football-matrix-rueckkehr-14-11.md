@@ -102,27 +102,25 @@ erledigen.
 
 ### rho (`node scripts/miss-alle-disziplinen.mjs 48 football`)
 
-| | Vorher (Override) | Nachher (Matrix) |
-|---|---:|---:|
-| rho je Spiel (Median) | 0,807 | **0,794** |
-| Spannweite | — | 0,143 |
-| rho Saison (Median) | 0,902 | **0,811** |
-| Spannweite | — | 0,126 |
-| Abnahme (CLAUDE.md-Schranke 0,80) | bestanden | **knapp** (0,70–0,80) |
+**KORRIGIERT (14.11., später am Tag).** Die erste Messung (0,794) lief gegen die zu dem
+Zeitpunkt noch veraltete `data/generated/kaderfamilie-live-save.json` (Save-Stand "19.8.2026",
+gezogen 03.09.) — exakt der Vorbehalt, den diese Sektion ursprünglich selbst schon benannte.
+Frisch gezogen (`git fetch origin live-save` + `scripts/ziehe-kader-familie.ts`, neuer Save "Oly
+New Game Custom 31.10.2026") ergibt sich ein ganz anderes Bild:
 
-Chris akzeptiert diese Bewegung ausdrücklich ("die spirit usw stats werden halt anders
-verteilt") — kein Stopp-Kriterium, nur ehrlich berichtet. **Ein Vorbehalt zur Zahl selbst:**
-`eig` (die Eignungsseite der rho-Korrelation) liest für real geladene Kaderdaten zuerst
-`p.d[disziplin]`, bevor es auf `gewichtet(p.a, BASIS_JE_DISC)` zurückfällt — und
-`data/generated/kaderfamilie-live-save.json` (die Messgrundlage) trägt für jeden Spieler ein
-VORBERECHNETES `d.football` aus der Zeit, als die Datei zuletzt gezogen wurde (mit dem Override).
-Diese Session hatte keinen frischen Live-Save-Zugriff (CLAUDE.md "An die Spielstände kommen"
-bräuchte `git fetch origin live-save` + Entpacken), also blieb diese Kader-Datei unverändert —
-die gemessene rho-Bewegung (0,807→0,794) kommt deshalb vermutlich NUR aus dem kleineren
-Slot-Bonus-Pfad, nicht aus einer vollständig neu berechneten Eignung. Die **Richtung** (rho
-sinkt, weil Eignung und Mechanik jetzt wieder stärker divergieren) ist mit hoher Sicherheit
-richtig — der exakte Wert 0,794 ist eine Untergrenze für die Bewegung, nicht notwendigerweise der
-finale Wert nach einem vollständigen Kaderfamilie-Neuzug mit `scripts/ziehe-kader-familie.ts`.
+| | Override (alt) | Matrix, alte Kaderfamilie | Matrix, FRISCHE Kaderfamilie |
+|---|---:|---:|---:|
+| rho je Spiel (Median) | 0,807 | 0,794 ("knapp") | **0,270** ("durchgefallen") |
+| Spannweite | — | 0,143 | **0,789** |
+| rho Saison (Median) | 0,902 | 0,811 | **0,238** |
+| Spannweite | — | 0,126 | **0,853** |
+
+Die alte Kaderfamilie hat die Bewegung massiv unterschätzt. **0,270 ist die ehrliche, aktuelle
+Zahl** — weit unter der 0,80-Schranke, mit einer riesigen Spannweite (0,789), die zeigt: die
+Mechanik ordnet die fünf Kader-Paarungen höchst inkonsistent. Chris akzeptiert eine rho-Bewegung
+durch die Matrix-Rückkehr ausdrücklich ("die spirit usw stats werden halt anders verteilt") —
+aber 0,270 ist kein "Tradeoff" mehr, sondern ein Totalausfall der Rangtreue. Das macht die
+anstehende Rezept-Rekalibrierung (s. Abschnitt 4) dringlich, nicht optional.
 
 ### Isolationsnachweis (`node scripts/miss-alle-disziplinen.mjs 24`, alle zwanzig Disziplinen)
 
