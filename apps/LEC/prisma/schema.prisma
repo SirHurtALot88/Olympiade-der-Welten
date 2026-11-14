@@ -74,6 +74,7 @@ model Article {
   priceLog     PriceChange[]
   ekLog        EkChange[]
   marketHistory MarketPriceHistory[]
+  losses       StockLoss[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -260,6 +261,23 @@ model MarketPriceHistory {
   priceAvg1  Float?
   priceAvg7  Float?
   priceAvg30 Float?
+
+  @@index([articleId, at])
+}
+
+/// Retouren, Reklamationen und Schwund (beschaedigt, verloren), von Chris im Drawer erfasst (14.11.2026): Billbee fuehrt das nicht als Kosten.
+/// Der Verlust wird zum EK des Artikels bewertet (Stueck x currentEk), solange kein Stueckpreis gespeichert ist.
+model StockLoss {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  /// "retoure" | "reklamation" | "beschaedigt" | "verloren"
+  kind      String
+  qty       Int
+  /// Wert je Stueck zum Zeitpunkt der Erfassung (EK), null = unbekannt.
+  unitEk    Float?
+  note      String?
 
   @@index([articleId, at])
 }

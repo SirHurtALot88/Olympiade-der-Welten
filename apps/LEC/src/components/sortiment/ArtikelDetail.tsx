@@ -1,5 +1,6 @@
 "use client";
 
+import { ArtikelKennzahlen, SchwundBlock, type KennzahlenData, type LossRow } from "./ArtikelKennzahlen";
 import { SORTIMENT_LABEL } from "@/lib/dashboard/lifecycle";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,9 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 /** Detail-Fenster zu einem Artikel: Preise, Verkaeufe, Einkauf, Bestand. Rein lesend. */
 
 interface Detail {
+  kennzahlen: KennzahlenData | null;
+  losses: LossRow[];
+  lossCost: number;
   purchases: { date: string; qty: number; unitEk: number; buyShipping: number; source: string }[];
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
@@ -376,6 +380,17 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </tbody>
         </table>
         </Group>
+
+        {detail?.kennzahlen && (
+          <Group id="kennzahlen" title="Kennzahlen (Markt, Bestand, Preisänderungen)" defaultOpen={false}>
+            <ArtikelKennzahlen k={detail.kennzahlen} />
+          </Group>
+        )}
+        {detail && (
+          <Group id="schwund" title={`Schwund & Retouren${detail.losses.length > 0 ? ` (${detail.losses.length})` : ""}`} defaultOpen={false}>
+            <SchwundBlock articleId={row.articleId} losses={detail.losses} lossCost={detail.lossCost} />
+          </Group>
+        )}
 
         {detail && detail.sales.length > 0 && (
           <Group id="letzte" title="Letzte Verkäufe" extra={<span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>}>
