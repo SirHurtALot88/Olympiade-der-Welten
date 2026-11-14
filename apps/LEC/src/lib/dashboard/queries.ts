@@ -4,7 +4,8 @@ import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
 import { marketValueOf, type LatestQuote } from "./marketComparison";
 import { weightedMonthlyPace } from "./pace";
-import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
+import { orderStats } from "./orderStats";
+import { LIVE_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
 export interface ArticleAggregatesResult {
   aggregates: ArticleAggregate[];
@@ -23,7 +24,7 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     where: { active: true },
     orderBy: { version: "desc" },
   });
-  if (!active) return DEFAULT_COST_SETTINGS;
+  if (!active) return LIVE_COST_SETTINGS;
   return {
     buyShippingUnderFive: active.buyShippingUnderFive,
     buyShippingFive: active.buyShippingFive,
@@ -46,6 +47,13 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     adFeeRateSingle: active.adFeeRateSingle,
     adFeeRateMin: active.adFeeRateMin,
     adFeeRateGood: active.adFeeRateGood,
+    volumeBasedCosts: active.volumeBasedCosts,
+    shippingDomesticLow: active.shippingDomesticLow,
+    shippingDomesticHigh: active.shippingDomesticHigh,
+    shippingHighShare: active.shippingHighShare,
+    itemsPerOrder: active.itemsPerOrder,
+    packagingYearly: active.packagingYearly,
+    buyOrdersPerYear: active.buyOrdersPerYear,
   };
 }
 
@@ -77,7 +85,7 @@ export async function loadArticleAggregates(
     // Letzter Einzelverkauf je Artikel (Spalte "Letzter Verkauf")
     prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
     // Einzelverkaeufe des letzten Jahres fuer das gewichtete Verkaufstempo
-    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true } }),
+    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true, orderRef: true } }),
     // Letzte VK-Aenderung je Artikel (Billbee-Abgleich und eBay-Shop-Abruf schreiben sie mit)
     prisma.priceChange.groupBy({ by: ["articleId"], _max: { at: true } }),
     // Letzte EK-Aenderung (Billbee-Abgleich) und letzter Einkauf (Einkaufsliste): das Spaetere zeigt, wie aktuell der EK ist
@@ -218,7 +226,10 @@ export async function loadArticleAggregates(
     };
   });
 
-  return { aggregates: opts.includeHidden ? aggregates : aggregates.filter((a) => !a.hidden), allAggregates: aggregates, costSettings };
+  // Artikel je Bestellung aus den echten Billbee-Verkaeufen (365 Tage); ersetzt den Standardwert, sobald genug Bestellungen vorliegen.
+  const measured = orderStats(recentSales.filter((s) => s.soldAt >= new Date(nowForPace.getTime() - 365 * 86_400_000)));
+  const effectiveSettings: CostSettingsValues = measured.itemsPerOrder ? { ...costSettings, itemsPerOrder: measured.itemsPerOrder } : costSettings;
+  return { aggregates: opts.includeHidden ? aggregates : aggregates.filter((a) => !a.hidden), allAggregates: aggregates, costSettings: effectiveSettings };
 }
 
 /**

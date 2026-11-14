@@ -323,6 +323,14 @@ model CostSettings {
   /// UNGENUTZT seit 13.10.2026: der Korridor ist 25-33 % Deckungsbeitrags-Marge (src/lib/pricing/costEngine.ts).
   marginMinMultiplier         Float    @default(1.33)
   marginGoodMultiplier        Float    @default(1.66)
+  /// Neue Kalkulation nach Volumen (14.11.2026): Versand, Verpackung, Einkaufs-Versand als Jahreskosten / verkaufte Stueck.
+  volumeBasedCosts            Boolean  @default(true)
+  shippingDomesticLow         Float    @default(0.95)
+  shippingDomesticHigh        Float    @default(1.1)
+  shippingHighShare           Float    @default(0.15)
+  itemsPerOrder               Float    @default(1.72)
+  packagingYearly             Float    @default(217)
+  buyOrdersPerYear            Float    @default(904)
   createdAt                   DateTime @default(now())
 }
 
