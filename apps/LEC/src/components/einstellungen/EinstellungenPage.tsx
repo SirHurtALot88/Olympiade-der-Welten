@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CostSettingsValues } from "@/lib/pricing/costSettings";
 import { DB_MARGIN_MIN, DB_MARGIN_OPT, totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
-import { PREVIEW_EXAMPLES, buildCostPreview, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
+import { PREVIEW_EXAMPLES, buildCostPreview, compareCostModels, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
 import { formatEuroCents } from "@/lib/format";
 import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
 import { AppShell } from "@/components/shell/AppShell";
@@ -186,6 +186,7 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
     [parsed, shopVolume]
   );
   const facts = useMemo(() => deriveCostFacts(parsed, shopVolume), [parsed, shopVolume]);
+  const comparison = useMemo(() => (shopVolume ? compareCostModels(PREVIEW_EXAMPLES[0], parsed, shopVolume) : null), [parsed, shopVolume]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -297,6 +298,40 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
               Korridor inkl. Deckungsbeitrags-Grenze.
             </div>
           </div>
+
+          {comparison && (
+            <div className="card" style={{ padding: "15px 16px 16px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Nebenkosten je Stück: feste Werte gegen Kalkulation nach Volumen</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
+                Beispiel {PREVIEW_EXAMPLES[0].label.toLowerCase()} (VK {eur(PREVIEW_EXAMPLES[0].vk)}), bei {shopVolume?.units365d.toLocaleString("de-DE")} verkauften Stück in 365 Tagen. „Alt“ sind die festen Stückwerte, „neu“ die
+                Jahreskosten geteilt durch das echte Verkaufsvolumen. Aktiv ist: {parsed.volumeBasedCosts ? "neu (nach Volumen)" : "alt (feste Werte)"}.
+              </div>
+              <table className="bd-dt-t" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr><th>Posten</th><th className="r">alt</th><th className="r">neu</th></tr>
+                </thead>
+                <tbody>
+                  {comparison.rows.map((r) => (
+                    <tr key={r.label}>
+                      <td>{r.label}</td>
+                      <td className="r">{eur(r.oldValue)}</td>
+                      <td className="r">{eur(r.newValue)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ fontWeight: 700 }}>
+                    <td>Nebenkosten ohne EK</td>
+                    <td className="r">{eur(comparison.oldTotal)}</td>
+                    <td className="r">{eur(comparison.newTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Empfohlener Mindestpreis (VK-MIN)</td>
+                    <td className="r">{eur(comparison.oldVkMin)}</td>
+                    <td className="r">{eur(comparison.newVkMin)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {feeCheck && (
             <div className="card" style={{ padding: "15px 16px 16px" }}>
