@@ -32,7 +32,7 @@ from PIL import Image, ImageDraw, ImageFilter
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL / "scripts" / "lib"))
 from kulissen_werkzeug import (LH, LW, flicken, freistellen, lade_szenenbilder, linien_entfernen,  # noqa: E402
-                               linien_maske, seitlich_fuellen, speichere_quelle)
+                               linien_maske, seitlich_fuellen, speichere_quelle, tribuenen_mischen)
 
 SZENEN = WURZEL / "public" / "szenen"
 SPRITES = WURZEL / "public" / "sprites"
@@ -87,7 +87,9 @@ def baue_tennis(variante: str) -> Image.Image:
 
     lein = np.zeros((LH, LW, 3), np.uint8)
     t0, t1 = T_TRIBUENE
-    lein[:T_BAND_H] = np.asarray(welt.crop((0, t0, 1920, t1)).resize((LW, T_BAND_H), Image.LANCZOS))
+    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a.
+    band = tribuenen_mischen(welt.crop((0, t0, 1920, t1)).resize((LW, T_BAND_H), Image.LANCZOS), 3, saat=3)
+    lein[:T_BAND_H] = np.asarray(band)
 
     # Belag in Szenen-Massstab (1 px Szene ~ 1 px Leinwand), oben an der Bande beginnend, nach unten
     # gespiegelt fortgesetzt. Rasen und Sand: Auslauf und Platz sind derselbe Belag, also eine Flaeche.
@@ -423,11 +425,12 @@ def baue_basketball(variante: str) -> Image.Image:
     um = welt.crop(BB_UMLAUF)
     um = um.resize((um.width * 2, um.height * 2), Image.NEAREST)
     lein.paste(kacheln_gespiegelt(um, LW, LH), (0, 0))
-    # Tribuenenstreifen oben und unten (unten gespiegelt: Publikum "gegenueber")
+    # Tribuenenstreifen oben und unten (unten gespiegelt: Publikum "gegenueber"). Gemischt statt eines
+    # Blocks im Takt (Kulissen-Audit 08.11., Abschnitt 4.8a; tribuenen_mischen()-Kommentar s. dort).
     t0, t1 = BB_TRIBUENE
     trib = welt.crop((0, t0, 1920, t1))
     th = 54
-    trib = trib.resize((LW, th), Image.LANCZOS)
+    trib = tribuenen_mischen(trib.resize((LW, th), Image.LANCZOS), 3, saat=0)
     lein.paste(trib, (0, 0))
     lein.paste(trib, (0, LH - th))
     # Belag ohne Linien im Feld
@@ -467,7 +470,8 @@ def baue_football(variante: str) -> Image.Image:
     lein = streifen_kacheln(breit, LW, LH, saat=41)
     t0, t1 = FB_TRIBUENE
     th = 46
-    trib = welt.crop((0, t0, 1920, t1)).resize((LW, th), Image.LANCZOS)
+    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a.
+    trib = tribuenen_mischen(welt.crop((0, t0, 1920, t1)).resize((LW, th), Image.LANCZOS), 3, saat=1)
     lein.paste(trib, (0, 0))
     lein.paste(trib, (0, LH - th))
     belag = welt.crop(FB_BELAG)
@@ -498,7 +502,8 @@ def baue_hockey(variante: str) -> Image.Image:
     o0, o1 = HK_OBEN[variante]
     oben = welt.crop((0, o0, 1840, o1))
     oh = round(oben.height * LW / 1840)
-    lein.paste(oben.resize((LW, oh), Image.LANCZOS), (0, 0))
+    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a.
+    lein.paste(tribuenen_mischen(oben.resize((LW, oh), Image.LANCZOS), 3, saat=2), (0, 0))
     # Erst das Logo flicken, dann alle Linien (weiss, rot, blau, auch die blassen Schriftzuege) aus der
     # ganzen Spielflaeche nehmen — ein kleines Musterstueck gespiegelt ergab ein Kaleidoskop.
     welt = flicken(welt, HK_LOGO, [], (252, 230, 1588, 540), ring=6, schritt=3)
@@ -771,7 +776,18 @@ def baue_staffel(variante: str) -> Image.Image:
     lein.paste(flaeche, (0, 0))
     trib = welt.crop(ST_TRIBUENE)
     trib = trib.resize((LW, round(trib.height * LW / trib.width * 1.6)), Image.LANCZOS)
+    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a.
+    trib = tribuenen_mischen(trib, 3, saat=4)
     lein.paste(trib, (0, 0))
+    # ZWEITE TRIBUENENSEITE UNTEN (Kulissen-Audit 08.11., Abschnitt 4.8c, Politur — bisher nur oben,
+    # wie Basketball/Football/Hockey es mit ihrem zweiten Tribuenenband schon tun). Die Szene zeigt nur
+    # eine Tribuenenseite; gespiegelt als Gegenueber. Nur der schmale Streifen UNTERHALB der Bahnkurve
+    # (OVAL_CY+OVAL_R_AUSSEN*OVAL_STAUCH, s. bodenSpurtOval() im Motor) -- sonst ueberdeckte die
+    # Tribuene die untere Kurve selbst, bevor der Ring unten am Schluss ueber die Maske kommt.
+    marge = round(LH - (ST_CY + ST_RA * ST_ST))
+    if marge > 4:
+        trib_unten = trib.transpose(Image.FLIP_TOP_BOTTOM).resize((LW, marge), Image.LANCZOS)
+        lein.paste(trib_unten, (0, LH - marge))
     tartan = welt.crop(ST_TARTAN)
     tartan = linien_entfernen(tartan, linien_maske(tartan))
     tartan = tartan.resize((round(tartan.width * 0.6), round(tartan.height * 0.6)), Image.LANCZOS)
