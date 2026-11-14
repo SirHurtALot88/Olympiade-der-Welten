@@ -384,7 +384,7 @@ describe("Kosten nach Volumen (volumeBasedCosts, 14.11.2026)", () => {
   const shop = { units365d: 2850, unitsAtOrAboveThreshold: 60 };
   it("Versand: Ø Porto je Sendung / Artikel je Bestellung, Pack bleibt fest", () => {
     const avg = 0.95 * 0.85 + 1.1 * 0.15;
-    expect(shippingPerUnit("single", V)).toBeCloseTo(avg / 1.72, 8);
+    expect(shippingPerUnit("single", V)).toBeCloseTo(avg / 1.5, 8);
     expect(shippingPerUnit("pack", V)).toBe(S.shippingPack);
     expect(shippingPerUnit("single", S)).toBe(S.shippingSingle); // alter Modus
   });

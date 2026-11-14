@@ -308,7 +308,7 @@ korrekt, die App rechnet **keine Umsatzsteuer**.
 **Stand 14.11.2026, Kalkulation nach Volumen (Chris):** Versand, Verpackung und Einkaufs-Versand sind keine festen Stückwerte mehr,
 sondern Jahreskosten geteilt durch die echten verkauften Stück der letzten 365 Tage (wie die Fixkosten). Schalter `volumeBasedCosts`
 (an im Betrieb, aus in den alten Engine-Tests). Versand Inland = Ø Porto je Sendung (0,95 € Standard, 1,10 € bei mehr Karten, Anteil 15 %)
-÷ Ø Artikel je Bestellung (aus den Billbee-Verkäufen gemessen, Standard 1,72); Ausland bleibt außen vor (Käufer zahlt 6,99 / 9,99 €).
+÷ Ø Artikel je Bestellung (aus den Billbee-Verkäufen gemessen, Standard 1,50: Billbee 1.658 Bestellungen, eBay 2.481 Stück bis 14.11.2026); Ausland bleibt außen vor (Käufer zahlt 6,99 / 9,99 €).
 Verpackung = 217 € im Jahr (2 × 65 € Versandtaschen + 87 € Toploader) ÷ Stück. Einkaufs-Versand = 904 Einkaufsbestellungen im Jahr
 (753 Lexoffice-Belege bis Oktober, hochgerechnet) × 1,15 € Porto ÷ Stück. Die 753 Belege sind EINKÄUFE, nicht Verkäufe.
 Verkaufsvolumen laut eBay-Auswertung: 2.481 Stück bis 14.11.2026 (ca. 2.850 im Jahr), Umsatz 23.448,70 €.
