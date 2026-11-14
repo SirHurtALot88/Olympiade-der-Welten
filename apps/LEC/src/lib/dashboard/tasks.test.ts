@@ -31,6 +31,23 @@ describe("matchesTask", () => {
   });
 });
 
+describe("Daten pruefen", () => {
+  const w = (qty: number) => ({ "365": { qty } }) as never;
+  it("EK fehlt bei Bestand oder Verkauf; Verlust trotz 3 Verkaeufen; EK ueber 150 % vom Marktwert", () => {
+    expect(matchesTask("daten", { ...base, ekMissing: true }, none)).toBe(true);
+    expect(matchesTask("daten", { ...base, ekMissing: true, stock: 0 }, none)).toBe(false);
+    expect(matchesTask("daten", { ...base, ekMissing: true, stock: 0, windows: w(2) }, none)).toBe(true);
+    expect(matchesTask("daten", { ...base, ekMissing: false, windows: w(3), dbIIPercent: -0.1 }, none)).toBe(true);
+    expect(matchesTask("daten", { ...base, ekMissing: false, windows: w(2), dbIIPercent: -0.1 }, none)).toBe(false);
+    expect(matchesTask("daten", { ...base, ekMissing: false, ek: 16, market: { value: 10 } as never }, none)).toBe(true);
+    expect(matchesTask("daten", { ...base, ekMissing: false, ek: 14, market: { value: 10 } as never }, none)).toBe(false);
+  });
+  it("Aufraeumen hat Vorrang vor Daten pruefen", () => {
+    expect(matchesTask("daten", { ...base, ekMissing: true, ebayEndedAt: "2026-11-01" }, none)).toBe(false);
+    expect(matchesTask("aufraeumen", { ...base, ekMissing: true, ebayEndedAt: "2026-11-01" }, none)).toBe(true);
+  });
+});
+
 describe("taskCounts und isTaskKey", () => {
   it("zaehlt je Aufgabe", () => {
     const c = taskCounts([base, { ...base, articleId: "b", reorderDue: true }, { ...base, articleId: "c", hidden: true, reorderDue: true }], none);
