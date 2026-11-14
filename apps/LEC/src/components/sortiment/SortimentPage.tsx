@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { TASKS, isTaskKey, matchesTask, taskCounts, type TaskKey } from "@/lib/dashboard/tasks";
 import { KapitalPanel } from "./KapitalPanel";
 import { ArtikelDetail } from "./ArtikelDetail";
 import { daysSince } from "./PreisBoard";
@@ -256,6 +257,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const markedCount = useMemo(() => rows.filter((r) => !!r.delistMarkedAt && !r.hidden).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
   const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
+  // Aufgaben-Reiter (Tagesgeschaeft): fester Filter mit Zaehler, per ?aufgabe=... aufrufbar
+  const [task, setTask] = useState<TaskKey>(() => {
+    const v = searchParams0.get("aufgabe");
+    return isTaskKey(v) ? v : "alle";
+  });
+  const dupIds = useMemo(() => new Set(dupGroups.keys()), [dupGroups]);
+  const counts = useMemo(() => taskCounts(rows, dupIds), [rows, dupIds]);
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
   // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
   const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
@@ -304,6 +312,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (ordnerFilter) params.set("ordner", ordnerFilter);
     if (artFilter) params.set("art", artFilter);
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
+    if (task !== "alle") params.set("aufgabe", task);
     if (view === "alles") params.set("ansicht", "alles");
     if (boardSort !== "abweichung") params.set("sort", boardSort);
     if (boardReverse) params.set("rev", "1");
@@ -327,7 +336,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, task, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -437,13 +446,16 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
+    if (task !== "alle") {
+      result = result.filter((r) => matchesTask(task, r, dupIds));
+    }
+    if (task === "alle" && stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, task, dupIds, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -506,6 +518,25 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       }
       footer={<span>Alle Zahlen serverseitig berechnet · Filter/Sortierung laufen clientseitig.</span>}
     >
+      <div className="bd-tasks" role="tablist" aria-label="Aufgaben">
+        {TASKS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={task === t.key}
+            className={`bd-task${task === t.key ? " on" : ""}${t.key !== "alle" && counts[t.key] > 0 && task !== t.key ? " has" : ""}`}
+            title={t.hint}
+            onClick={() => {
+              setTask(t.key);
+              setVisibleCount(PAGE_SIZE);
+            }}
+          >
+            {t.label}
+            <span className="bd-task-n">{counts[t.key].toLocaleString("de-DE")}</span>
+          </button>
+        ))}
+      </div>
       <div className="bd-cards" role="group" aria-label="VK gegen Marktwert">
         {(
           [

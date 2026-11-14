@@ -637,3 +637,20 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
   .bd-dt-actions { position: static; }
   .bd-dt-stat small { white-space: normal; }
 }
+
+
+/* --- Aufgaben-Reiter im Sortiment und Zeile "Heute" im Dashboard --- */
+.bd-tasks { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+.bd-task { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.bd-task:hover { color: var(--ink); }
+.bd-task.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.bd-task-n { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--faint); }
+.bd-task.has .bd-task-n { color: var(--ink); }
+.bd-task.on .bd-task-n { color: var(--accent-ink); }
+.today-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+.today-row > b { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.today-chip { display: inline-flex; gap: 8px; align-items: center; text-decoration: none; color: var(--ink); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; }
+.today-chip:hover { border-color: var(--accent); }
+.today-chip i { font-style: normal; font-variant-numeric: tabular-nums; }
+.today-chip.todo i { color: var(--crit); }
+.today-chip.zero { color: var(--muted); font-weight: 500; }
