@@ -51,6 +51,7 @@ import {
   getSponsorV3SalaryFactor,
   getSponsorV3Terms,
   rerollSponsorV3TermsForNewSeason,
+  resolveSponsorLeagueTier,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Faktoren sind auf 2 Stellen gewuerfelt; ein Rundungsrest ist keine Abweichung. */
@@ -100,6 +101,12 @@ export function applySponsorSalaryFactorOfCurrentSeason(gameState: GameState): S
     const gerollt = rerollSponsorV3TermsForNewSeason(terms, {
       newSalaryFactor: saisonFaktor,
       contractYear,
+      // DIESELBE LIGA wie bei der Unterschrift dieser Saison — ohne sie baute der Nachtrag die Leiter
+      // eines Split-Vertrags OHNE den Topf-Faktor 0,6/0,4 und ohne Zonen-Term neu, also hoeher als
+      // unterschrieben. Ohne Liga-Split `undefined`, unveraendert.
+      leagueTier: resolveSponsorLeagueTier(gameState, teamId),
+      // Kein `leagueSize`: der Nachtrag rechnet den Vertrag in SEINEM Rangraum nach (Leiterlaenge),
+      // er baut ihn nicht nebenbei auf eine andere Sprossenzahl um.
     });
     // Kam nichts zurueck, was den Faktor traegt (die Wachen im Reroll koennen aussteigen), bleibt der
     // Vertrag unveraendert stehen — eine halb umgeschriebene Leiter waere schlimmer als eine alte.

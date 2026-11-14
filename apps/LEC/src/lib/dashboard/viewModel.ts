@@ -1,11 +1,17 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
+import { kartenartOf, ordnerOf, type Kartenart, type Ordner } from "../market/kartenart";
+import { rarityFromTitle } from "../market/rarity";
+import { assessLifecycle, assessSortiment, daysAtPrice, type Lifecycle, type SortimentStatus } from "./lifecycle";
+import { assessReorder } from "./reorder";
 import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
 import { titleNameMismatch } from "../market/names";
 import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
 import {
+  computeEbayFees,
   computeHk,
+  DB_MARGIN_MIN,
   computePriceCorridor,
   classifyPriceStatus,
   computeShopVolume,
@@ -41,6 +47,33 @@ export interface ArticleAggregate {
   /** true = im juengsten Billbee-Artikelstamm-Export vorhanden (aktueller Katalog). false = nur aus
    * der Verkaufshistorie bekannt -> ausgelaufen/nicht mehr im Sortiment. */
   active: boolean;
+  /** Von Chris manuell ausgeblendet. */
+  hidden?: boolean;
+  /** Seit wann der Artikel laut eBay-Shopseite nicht mehr gelistet ist (Festpreis-Angebote bleiben sonst stehen). */
+  ebayEndedAt?: Date | null;
+  /** Kartentyp laut YGOPRODeck ("Synchro Monster" ...), null = noch nicht bestimmt. */
+  cardType?: string | null;
+  /** Der eBay-Shop-Abruf hat dieses Angebot zuletzt gesehen (eBay-Preis gesetzt). */
+  ebayListed?: boolean;
+  /** Von Chris zum Auslisten markiert. */
+  delistMarkedAt?: Date | null;
+  /** Zeitpunkt des letzten Einzelverkaufs (Billbee), null ohne Verkauf. */
+  lastSoldAt?: Date | null;
+  /** Zeitpunkt der letzten aufgezeichneten VK-Aenderung, null = keine bekannt. */
+  lastPriceChangeAt?: Date | null;
+  /** Verkaeufe seit der letzten Preisaenderung; null = keine Aenderung bekannt. */
+  salesSincePriceChange?: number | null;
+  /** Letzte EK-Aenderung oder letzter Einkauf, das Spaetere; null = unbekannt. */
+  lastEkAt?: Date | null;
+  /** Geschaetztes Mindestalter des eBay-Angebots in Tagen (aus der Artikelnummer, siehe listedAge.ts); null = unbekannt. */
+  listedDays?: number | null;
+  /** Verkaufstempo je Monat aus den Einzelverkaeufen (gewichtet, siehe pace.ts); null/fehlt = Rueckfall auf die Fenster. */
+  paceMonth?: number | null;
+  /** Mindest-/Meldebestand und Soll-Bestand aus Billbee; null = nicht gepflegt. */
+  minStock?: number | null;
+  desiredStock?: number | null;
+  /** "Erstmal nicht nachbestellen": bis dahin nicht faellig. */
+  reorderSnoozeUntil?: Date | null;
   /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
    * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
    * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
@@ -88,6 +121,8 @@ export interface DeadCapital {
   count: number;
   totalArticles: number;
   percent: number;
+  /** Gebundenes Kapital (Bestand x EK) der Ladenhueter in Euro; null, wenn kein Bestand bekannt. */
+  euro?: number | null;
 }
 
 export interface MoverItem {
@@ -152,6 +187,54 @@ export interface SortimentRow {
   windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
   /** true = im aktuellen Billbee-Artikelstamm-Katalog (nicht ausgelaufen). */
   active: boolean;
+  /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
+  hidden?: boolean;
+  /** ISO: bei eBay beendet seit (null = gelistet/unbekannt). */
+  ebayEndedAt?: string | null;
+  /** Seltenheit aus dem Titel, Kartenart (Synchro, Xyz, Zauber ...) und Ordner nach Chris' Ordnerstruktur. */
+  /** ISO: zum Auslisten markiert (Drawer-Knopf), null = nicht markiert. */
+  delistMarkedAt?: string | null;
+  ebayListed?: boolean;
+  rarity?: string | null;
+  kartenart?: Kartenart | null;
+  ordner?: Ordner | null;
+  /** ISO-Zeitpunkt des letzten Einzelverkaufs, null ohne Verkauf. */
+  lastSoldAt?: string | null;
+  /** ISO: letzte aufgezeichnete VK-Aenderung, null = keine bekannt. */
+  lastPriceChangeAt?: string | null;
+  /** ISO: letzte EK-Aenderung oder letzter Einkauf; null = unbekannt. */
+  lastEkAt?: string | null;
+  /** Mindestens so viele Tage ist der Artikel bei eBay eingestellt (Schaetzung), null = unbekannt. */
+  listedDays?: number | null;
+  minStock?: number | null;
+  desiredStock?: number | null;
+  /** Bestand liegt auf oder unter dem Mindestbestand aus Billbee: nachbestellen. */
+  reorderDue?: boolean;
+  /** Fehlmenge bis zum Soll-Bestand (nur wenn nachbestellen faellig und Soll gepflegt). */
+  reorderQty?: number | null;
+  /** Warum faellig: Mindestbestand aus Billbee, ausverkauft oder knappe Reichweite. */
+  reorderReason?: "mindestbestand" | "ausverkauft" | "reichweite" | null;
+  /** Zurueckgestellt bis (ISO), solange in der Zukunft. */
+  reorderSnoozedUntil?: string | null;
+  /** Warum ein knapper Artikel nicht zum Nachbestellen vorgeschlagen wird (zu wenig Verkaeufe/Gewinn). */
+  reorderSkipReason?: string | null;
+  /** Lange nicht verkauft: Preis senken, Auslaufen lassen oder Auslisten (null = unauffaellig). */
+  lifecycle?: Lifecycle | null;
+  /** Sortiment-Status mit Begruendung (Behalten, Beobachten, Preis prüfen oder eine der Massnahmen). */
+  sortiment?: { status: SortimentStatus; reason: string } | null;
+  /** Tage am aktuellen Preis ohne Verkauf (seit dem spaeteren aus letztem Verkauf und letzter Preisaenderung). */
+  daysAtPrice?: number | null;
+  /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
+  /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
+  ranks?: {
+    total: number;
+    windows: Partial<Record<SaleWindowKey, { qty: number | null; revenue: number | null }>>;
+    marge: number | null;
+    gewinnMonat: number | null;
+  };
+  today?: { profitPerUnit: number; marginPct: number; perMonth: number | null; inStock: number | null; maxEk25: number | null; capitalBound: number | null };
+  /** Verkaeufe je Monat (aus 90 Tagen) -- Basis fuer Gewinn je Monat. */
+  perMonth?: number;
   /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
   stock: number;
   /** Stk x aktueller Listen-VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
@@ -180,6 +263,15 @@ export interface SortimentMarket {
   targetOpt: number | null;
   /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
   capped: boolean;
+  /** Ladenhüter-Abschlag (0..0,3) auf die Zielspanne und Tage seit dem letzten Verkauf. */
+  /** Zustand und Abschlagsfaktor auf den NM-Preis (NM = 1). */
+  condition?: string;
+  conditionFactor?: number;
+  /** Dynamischer empfohlener VK und Begruendung (parallel zur festen Spanne). */
+  dynamicVk?: number | null;
+  dynamicNote?: string | null;
+  staleDiscount?: number;
+  daysSinceSale?: number | null;
   /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
   marginReachable: boolean;
   /** Deckungsbeitrags-Marge des heutigen VK bei Nachkauf zum Marktwert. */
@@ -197,6 +289,8 @@ export interface SortimentMarket {
   provenByDemand: boolean;
   soldAt: { qty: number; avg: number; days: 90 | 365 } | null;
   fetchedAt: string;
+  /** Ø 7 Tage gegen Ø 30 Tage am Markt (z. B. -0,12 = 12 % darunter); null ohne beide Werte. */
+  trend7vs30?: number | null;
 }
 
 export interface OperatingQuotas {
@@ -215,6 +309,10 @@ export interface RecommendationLotItem {
    * (`active === false`): dann ist der Bestand per Definition unbekannt, nicht 0 --
    * eine erfundene 0 waere hier schlimmer als eine ehrliche Luecke. */
   boundCapital: number | null;
+  /** Marktwert (Cardmarket) je Stueck, falls bekannt: was ein Abverkauf zum Marktpreis braucht. */
+  marketValue?: number | null;
+  /** Warum der Artikel in der Liste steht (Ladenhueter, langsam, kein Verkauf in 90 T). */
+  why?: string;
 }
 
 export interface Recommendation {
@@ -278,7 +376,9 @@ export function shopVolumeFromAggregates(
 
 export function buildDashboardViewModel(
   articles: ArticleAggregate[],
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  /** Alle Artikel inkl. ausgeblendeter: Basis fuer shopweite Mengen (Fixkosten je Stueck). */
+  shopArticles?: ArticleAggregate[]
 ): DashboardViewModel {
   const windowKeys: SaleWindowKey[] = ["30", "90", "365", "all"];
 
@@ -318,6 +418,10 @@ export function buildDashboardViewModel(
     count: deadArticles.length,
     totalArticles: withHistory.length,
     percent: pct(deadArticles.length, withHistory.length),
+    euro: (() => {
+      const caps = deadArticles.map((a) => boundCapitalOf(a)).filter((v): v is number => v !== null);
+      return caps.length > 0 ? caps.reduce((s, v) => s + v, 0) : null;
+    })(),
   };
 
   // Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1).
@@ -345,7 +449,7 @@ export function buildDashboardViewModel(
   // revenue>0-Filter mehr -- Ladenhueter mit 0 € muessen auf /sortiment
   // sichtbar sein). Die Dashboard-Vorschau schneidet clientseitig auf die
   // ersten N Zeilen (siehe SortimentTable `limit`-Prop).
-  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings);
+  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings, shopArticles);
 
   const quotaWindow = windows["365"].revenue > 0 ? windows["365"] : windows.all;
   const quotaAgg = articles.reduce(
@@ -549,7 +653,30 @@ export function buildSortimentRow(
   }
 
   const velocityPerMonth = monthlyVelocity(a);
-  const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
+  // Tempo je Monat: das HOEHERE aus 90-Tage- und 365-Tage-Tempo. 90 Tage allein schwanken zu stark (ein einziger Verkauf
+  // ergab bei 10 Verkaeufen im Jahr "12 Monate Reichweite", Chris 12.11.); das Jahr allein uebersieht einen anziehenden
+  // Absatz. Ohne Verkauf in 90 Tagen gilt das Jahrestempo, damit auch der schlechteste Fall eine Reichweite bekommt.
+  // Bevorzugt aus den Einzelverkaeufen (Datum und Menge, gewichtet); ohne diese Daten das hoehere aus 90- und 365-Tage-Fenster.
+  const paceMonth = a.paceMonth != null && a.paceMonth > 0 ? a.paceMonth : Math.max(velocityPerMonth, (a.windows["365"]?.qty ?? 0) / 12);
+  const stockMonthsCover = a.stock > 0 && paceMonth > 0 ? a.stock / paceMonth : null;
+
+  // "Was bringt ein Verkauf heute": heutiger VK und heutiger EK, nur variable Kosten (DB II, ohne Fixkosten).
+  let today: SortimentRow["today"];
+  if (vkForCorridor > 0 && !ekMissing && (a.currentEk ?? 0) + ekPerUnit > 0) {
+    const ekNow = a.currentEk !== null && a.currentEk > 0 ? a.currentEk : ekPerUnit;
+    const varNonEk = Math.max(0, hk.total - hk.ek - hk.fixedCostShare);
+    // Werbesatz MIN wie die 25-%-Linie des Korridors, damit Block und Board dieselbe Grenze meinen.
+    const fees = computeEbayFees(vkForCorridor, costSettings.adFeeRateMin, costSettings).total;
+    const profit = vkForCorridor - fees - varNonEk - ekNow;
+    today = {
+      profitPerUnit: profit,
+      marginPct: profit / vkForCorridor,
+      perMonth: paceMonth > 0 ? profit * paceMonth : null,
+      inStock: a.stock > 0 ? profit * a.stock : null,
+      maxEk25: Math.max(0, vkForCorridor * (1 - DB_MARGIN_MIN) - fees - varNonEk),
+      capitalBound: a.active && a.stock > 0 ? a.stock * ekNow : null,
+    };
+  }
 
   // Cardmarket-Marktwert und Zielspanne: dieselbe Zeile wie auf /marktpreise (eine Rechnung, keine zweite).
   let marketInfo: SortimentMarket | null = null;
@@ -561,6 +688,10 @@ export function buildSortimentRow(
       targetMin: m.targetMin,
       targetOpt: m.targetOpt,
       capped: m.capped,
+      condition: m.condition,
+      conditionFactor: m.conditionFactor,
+      staleDiscount: m.staleDiscount,
+      daysSinceSale: m.daysSinceSale,
       marginReachable: m.marginReachable,
       margin: m.marginAtMarket,
       status: m.status,
@@ -574,10 +705,13 @@ export function buildSortimentRow(
       provenByDemand: m.provenByDemand,
       soldAt: m.soldAtVk,
       fetchedAt: m.fetchedAt.toISOString(),
+      trend7vs30: a.marketQuote.priceAvg7 != null && a.marketQuote.priceAvg30 != null && a.marketQuote.priceAvg30 > 0 ? a.marketQuote.priceAvg7 / a.marketQuote.priceAvg30 - 1 : null,
     };
   }
 
   return {
+    today,
+    perMonth: paceMonth,
     articleId: a.articleId,
     nameRaw: a.nameRaw,
     setCode: a.setCode,
@@ -599,6 +733,19 @@ export function buildSortimentRow(
     ekMissing,
     windows: windowMetrics,
     active: a.active,
+    hidden: a.hidden === true,
+    ebayEndedAt: a.ebayEndedAt ? a.ebayEndedAt.toISOString() : null,
+    lastSoldAt: a.lastSoldAt ? a.lastSoldAt.toISOString() : null,
+    lastPriceChangeAt: a.lastPriceChangeAt ? a.lastPriceChangeAt.toISOString() : null,
+    lastEkAt: a.lastEkAt ? a.lastEkAt.toISOString() : null,
+    listedDays: a.listedDays ?? null,
+    minStock: a.minStock ?? null,
+    desiredStock: a.desiredStock ?? null,
+    delistMarkedAt: a.delistMarkedAt ? a.delistMarkedAt.toISOString() : null,
+    ebayListed: a.ebayListed === true,
+    ...kartenFelder(a.nameRaw, a.cardType),
+    ...lebenszyklusFelder(a, vkForCorridor, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null)),
+    ...reorderFields(a, stockMonthsCover, today?.profitPerUnit ?? (referenceAgg && referenceAgg.qty > 0 ? dbIIPerUnit : null), paceMonth),
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
@@ -629,10 +776,11 @@ export function buildSortimentRow(
 export function buildFullSortiment(
   articles: ArticleAggregate[],
   classified: ClassifiedArticle[],
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  shopArticles?: ArticleAggregate[]
 ): SortimentRow[] {
   const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
-  const shop = shopVolumeFromAggregates(articles, costSettings);
+  const shop = shopVolumeFromAggregates(shopArticles ?? articles, costSettings);
   return [...articles]
     .sort((a, b) => {
       const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
@@ -644,8 +792,87 @@ export function buildFullSortiment(
         (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
       );
     })
-    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop));
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop))
+    .map(withRanks);
 }
+
+/** Tage seit einem Zeitpunkt (null ohne Zeitpunkt). */
+const daysSinceDate = (d: Date | null | undefined): number | null => (d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000)) : null);
+
+function lebenszyklusFelder(a: ArticleAggregate, vk: number, unitProfit: number | null) {
+  const input = {
+    active: a.active,
+    hidden: a.hidden === true,
+    stock: a.stock,
+    vk,
+    units365: a.windows["365"]?.qty ?? 0,
+    unitProfit,
+    lastSoldDays: daysSinceDate(a.lastSoldAt),
+    lastPriceChangeDays: daysSinceDate(a.lastPriceChangeAt),
+    listedDays: a.listedDays ?? null,
+  };
+  const days = daysAtPrice(input);
+  const sortiment = assessSortiment(input);
+  const massnahme = sortiment && (sortiment.status === "preis_senken" || sortiment.status === "auslaufen" || sortiment.status === "auslisten") ? sortiment.status : null;
+  return { lifecycle: massnahme as Lifecycle | null, sortiment, daysAtPrice: days };
+}
+
+function kartenFelder(nameRaw: string, cardType: string | null | undefined) {
+  const rarity = rarityFromTitle(nameRaw);
+  const kartenart = kartenartOf(cardType);
+  return { rarity, kartenart, ordner: ordnerOf(rarity, kartenart) };
+}
+
+function reorderFields(a: ArticleAggregate, coverMonths: number | null, unitProfit: number | null, paceMonth: number | null) {
+  const r = assessReorder({
+    active: a.active,
+    stock: a.stock,
+    minStock: a.minStock ?? null,
+    desiredStock: a.desiredStock ?? null,
+    units365: a.windows["365"]?.qty ?? 0,
+    unitsAll: a.windows.all?.qty ?? 0,
+    coverMonths,
+    paceMonth,
+    unitProfit,
+    snoozeUntil: a.reorderSnoozeUntil ?? null,
+    now: new Date(),
+  });
+  return { reorderDue: r.due, reorderQty: r.qty, reorderReason: r.reason, reorderSnoozedUntil: r.snoozedUntil, reorderSkipReason: r.skipReason };
+}
+
+/** Setzt auf jede Zeile den Platz unter den AKTIVEN Artikeln (Chris, 11.11.: ausgelaufene zaehlen nicht mit). */
+function withRanks(row: SortimentRow, _i: number, all: SortimentRow[]): SortimentRow {
+  const rank = (value: number | null, get: (r: SortimentRow) => number | null, pool: SortimentRow[]): number | null => {
+    if (value === null || !(value > 0)) return null;
+    let better = 0;
+    for (const r of pool) {
+      const v = get(r);
+      if (v !== null && v > value) better++;
+    }
+    return better + 1;
+  };
+  if (!row.active) return row;
+  const pool = rankPoolCache.get(all) ?? all.filter((r) => r.active);
+  rankPoolCache.set(all, pool);
+  const windows: NonNullable<SortimentRow["ranks"]>["windows"] = {};
+  for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
+    windows[key] = {
+      qty: rank(row.windows[key]?.qty ?? null, (r) => r.windows[key]?.qty ?? null, pool),
+      revenue: rank(row.windows[key]?.revenue ?? null, (r) => r.windows[key]?.revenue ?? null, pool),
+    };
+  }
+  return {
+    ...row,
+    ranks: {
+      total: pool.length,
+      windows,
+      marge: rank(row.market?.margin ?? null, (r) => r.market?.margin ?? null, pool),
+      gewinnMonat: rank(row.today?.perMonth ?? null, (r) => r.today?.perMonth ?? null, pool),
+    },
+  };
+}
+
+const rankPoolCache = new WeakMap<SortimentRow[], SortimentRow[]>();
 
 /** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
 export const LABELS_DE: Record<ArticleClass, string> = {
@@ -777,7 +1004,7 @@ export function buildRecommendations(
       kind: "auslisten",
       title: `${shortName(c.article.nameRaw)} auslisten.`,
       detail: c.reason,
-      effect: `bindet € ${Math.abs(dbIILifetime).toFixed(0)}`,
+      effect: `Verlust bisher € ${Math.abs(dbIILifetime).toFixed(0)}`,
       effectValue: Math.abs(dbIILifetime),
       linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
@@ -820,8 +1047,13 @@ export function buildRecommendations(
   // FIX 4: effectValue = Erwartungswert der naechsten ~3 Monate (DB II/Stk x 90T-Velocity),
   // NICHT mehr die Lebenszeit-DB-II-Summe -- die sagt nichts darueber aus, was ein Nachkauf
   // heute noch bringt (siehe KONZEPT §2 Bundle-Falle: Lebenszeit-Zahlen taeuschen).
-  for (const c of classified.filter((c) => c.articleClass === "champion")) {
+  // Alle faelligen Artikel (siehe reorder.ts: Mindestbestand aus Billbee oder rechnerisch knapp UND es lohnt sich;
+  // zurueckgestellte erscheinen nicht), nicht mehr nur Champions.
+  for (const c of classified) {
     const row = sortimentByArticleId.get(c.article.articleId);
+    // Ohne bekannten EK keine Kaufempfehlung (dort steht stattdessen "EK pflegen", siehe FIX 1).
+    if (!row?.reorderDue || row.ekMissing) continue;
+    const cover = row.stockMonthsCover ?? null;
     const dbIIPerUnit = row?.dbIIPerUnit ?? 0;
     const dbIIPercentLifetime = row?.dbIIPercent ?? 0;
     const qty90 = c.article.windows["90"]?.qty ?? 0;
@@ -830,7 +1062,11 @@ export function buildRecommendations(
       id: `nachkaufen:${c.article.articleId}`,
       kind: "nachkaufen",
       title: `${shortName(c.article.nameRaw)} nachkaufen.`,
-      detail: c.reason,
+      detail:
+        (row.reorderReason === "mindestbestand" ? `Bestand ${c.article.stock} liegt auf oder unter dem Mindestbestand ${row.minStock}. ` : row.reorderReason === "ausverkauft" ? "Ausverkauft bei laufendem Absatz. " : "Bestand wird knapp. ") +
+        `Empfehlung: ${row.reorderQty ?? 1} Stk nachbestellen. ` +
+        c.reason +
+        (row?.today ? ` Bestand ${c.article.stock} Stk${cover !== null ? ` (reicht ca. ${cover.toFixed(1).replace(".", ",")} Monate)` : ""}. Nachkauf höchstens zu ${row.today.maxEk25 !== null ? row.today.maxEk25.toFixed(2) : "–"} € EK${row.market?.value != null ? `, Marktwert ${row.market.value.toFixed(2)} €` : ""}.` : ""),
       effect: `≈ € ${expectedDbII.toFixed(0)} / 90 T erwartet (DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · ${dbIIPerUnit.toFixed(2)} €/Stk × ${qty90} Stk)`,
       effectValue: expectedDbII,
       linkQuery: c.article.setCode ?? c.article.nameRaw,
@@ -843,14 +1079,24 @@ export function buildRecommendations(
   // FIX 2: boundCapital = Bestand x EK/Stk (siehe `boundCapitalOf`), NICHT mehr der
   // Lebenszeit-EK bereits verkaufter Stuecke. Artikel ohne Bestandsimport (`null`) werden
   // NICHT als 0 mitsummiert (siehe Filter unten), sondern separat ausgewiesen.
+  // Dazu die langsamen Kapitalbinder: Bestand reicht ueber 12 Monate oder seit 90 Tagen nichts verkauft.
   const ladenhueter = classified.filter((c) => c.articleClass === "ladenhueter");
-  if (ladenhueter.length > 0) {
-    const items: RecommendationLotItem[] = ladenhueter
-      .map((c) => ({
+  const slow = classified.filter((c) => {
+    if (c.articleClass === "ladenhueter" || !c.article.active || c.article.stock <= 0) return false;
+    const r = sortimentByArticleId.get(c.article.articleId);
+    const noSale90 = (c.article.windows["90"]?.qty ?? 0) === 0 && (c.article.windows["365"]?.qty ?? 0) > 0;
+    return noSale90 || (r?.stockMonthsCover ?? 0) > 12;
+  });
+  if (ladenhueter.length + slow.length > 0) {
+    const lotRows = [...ladenhueter.map((c) => ({ c, why: "Ladenhüter" })), ...slow.map((c) => ({ c, why: (sortimentByArticleId.get(c.article.articleId)?.stockMonthsCover ?? 0) > 12 ? "Bestand reicht über 12 Monate" : "kein Verkauf in 90 Tagen" }))];
+    const items: RecommendationLotItem[] = lotRows
+      .map(({ c, why }) => ({
         articleId: c.article.articleId,
         nameRaw: c.article.nameRaw,
         setCode: c.article.setCode,
         boundCapital: boundCapitalOf(c.article),
+        marketValue: sortimentByArticleId.get(c.article.articleId)?.market?.value ?? null,
+        why,
       }))
       .sort((a, b) => (b.boundCapital ?? -1) - (a.boundCapital ?? -1));
     const knownItems = items.filter((i): i is RecommendationLotItem & { boundCapital: number } => i.boundCapital !== null);
@@ -863,8 +1109,8 @@ export function buildRecommendations(
     recommendations.push({
       id: "lot_bilden",
       kind: "lot_bilden",
-      title: "Ladenhüter zu Lots bündeln.",
-      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.${unknownNote}`,
+      title: "Kapitalbinder abverkaufen.",
+      detail: `${ladenhueter.length} Ladenhüter (0 Verk. in 365 T) und ${slow.length} langsame Kapitalbinder (Bestand reicht über 12 Monate oder seit 90 Tagen kein Verkauf) — abverkaufen oder als Lot bündeln.${unknownNote}`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
       effectValue: boundCapital,
       items: items.slice(0, 50),

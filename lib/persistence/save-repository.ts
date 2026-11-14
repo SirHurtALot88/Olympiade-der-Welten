@@ -6,6 +6,7 @@ import type {
   GameState,
   MappingReport,
   MatchdayState,
+  MerklisteEintrag,
   Player,
   PlayerBaselineRecord,
   PlayerBaselineWriteGuardEvent,
@@ -26,7 +27,7 @@ import type {
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
-import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
+import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
@@ -153,6 +154,12 @@ type GameMetadata = {
   teamCaptains?: GameState["teamCaptains"];
   // #8: Nutzer-Entscheidungen (erledigt/verworfen) auf Inbox-Items müssen den Reload überleben.
   gameInboxItems?: GameState["gameInboxItems"];
+  // MERKLISTE: Lesezeichen auf Teams/Spieler (lib/merkliste/merkliste-service.ts) fehlten hier
+  // komplett — weder im Schreib- noch im Lesezweig dieser Datei stand `merkliste` je drin. Der
+  // Stern wirkte innerhalb der Sitzung (React hielt ihn im lokalen `gameState`), aber jeder Kalt-
+  // Load (Reload, neue Sitzung, Serverneustart) baute den Spielstand ohne dieses Feld neu auf —
+  // "0 Einträge. Noch nichts gemerkt.", obwohl gerade gemerkt wurde.
+  merkliste?: MerklisteEintrag[];
 };
 
 type PlayerSavePayload =
@@ -1382,6 +1389,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.teamCaptains ? { teamCaptains: gameMetadata.teamCaptains } : {}),
     // #8: Persistierte Inbox-Status-Overrides (erledigt/verworfen) wiederherstellen.
     ...(gameMetadata?.gameInboxItems ? { gameInboxItems: gameMetadata.gameInboxItems } : {}),
+    // Merkliste (Lesezeichen auf Teams/Spieler) wiederherstellen — siehe Begründung am Typ
+    // `GameMetadata` oben.
+    ...(gameMetadata?.merkliste ? { merkliste: gameMetadata.merkliste } : {}),
     season,
     seasonState,
     matchdayState,
@@ -1409,7 +1419,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // berücksichtigt werden"): jeder noch nicht abgerechnete Vertrag traegt danach den Faktor der
   // LAUFENDEN Saison. Steht AUSSERHALB von M1, damit er auch die von M1 frisch gebauten Leitern
   // sieht, und innerhalb des Faktor-Seeds, damit er den echten Saisonfaktor liest statt der 1,0.
+  // MIGRATION M3 (PR #1384): bei Liga-Split noch nicht abgerechnete 32er-Vertragsleitern auf die
+  // liga-lokalen 16 Sprossen umbauen. Aussen um den Gehaltsfaktor-Nachtrag, damit sie den Faktor der
+  // laufenden Saison am Vertrag schon vorfindet; idempotent (eine 16er-Leiter ist kein Kandidat).
   const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+    withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
     // Endsaison-Nachtrag: Bestandsvertraege ohne `contractEndSeasonNumber` bekommen sie hier
@@ -1425,6 +1439,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     ),
@@ -1830,6 +1845,9 @@ function createPersistedSaveRecord(input: {
       teamCaptains: guardedGameState.teamCaptains,
       // #8: Inbox-Status-Overrides (erledigt/verworfen) dauerhaft schreiben.
       gameInboxItems: guardedGameState.gameInboxItems,
+      // Merkliste (Lesezeichen auf Teams/Spieler) dauerhaft schreiben — siehe Begründung am Typ
+      // `GameMetadata` oben. Ohne diese Zeile ueberlebt kein Stern einen Kalt-Load.
+      merkliste: guardedGameState.merkliste,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
     replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);

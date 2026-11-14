@@ -22,18 +22,20 @@ data/generated/kulissen-quellen/<disziplin>/<variante>.png (1240x470); baue-aren
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 WURZEL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(WURZEL / "scripts" / "lib"))
-from kulissen_werkzeug import (LH, LW, flicken, lade_szenenbilder, linien_entfernen, linien_maske,  # noqa: E402
-                               seitlich_fuellen, speichere_quelle)
+from kulissen_werkzeug import (LH, LW, flicken, freistellen, lade_szenenbilder, linien_entfernen,  # noqa: E402
+                               linien_maske, seitlich_fuellen, speichere_quelle)
 
 SZENEN = WURZEL / "public" / "szenen"
+SPRITES = WURZEL / "public" / "sprites"
 MID = LW / 2
 
 
@@ -516,36 +518,215 @@ def baue_hockey(variante: str) -> Image.Image:
 # ---------------------------------------------------------------------------------------- Spurt
 # Motor (bodenSpurtGerade): Bahnband oben=H*0.14 .. unten=H*0.94, Bahnlinien, Stationen (Huerden,
 # Balken, Mauer, Seil …), Start/Ziel zeichnet der Motor nach den Renn-Werten (HUERDEN_N, camX). Szene
-# (bg 1680x960, HYROX-Halle in Draufsicht): Publikum oben/unten, Asphalt, blaue Laufbahn. Kulisse: oben
-# Publikum + Hallenboden, im Bahnband der blaue Belag der Laufschleife (Stueck zwischen den Pfeilen),
-# unten Publikum. Die Stationen der Szene (Schlitten, Rudergeraete …) kommen nicht mit.
-SP_OBEN, SP_UNTEN = round(LH * 0.14), round(LH * 0.94)
+# (bg 1680x960, HYROX-Halle in Draufsicht): Publikum oben/unten, Hallenboden mit Rudergeraeten,
+# Kettlebell-Staendern, Schlitten, Anzeigetafel, Scheinwerferkegeln und den IN-/OUT-/FINISH-Boegen.
+#
+# KULISSEN BATCH 15 (08.11., Audit-Rang 3 — Chris' eigene Kritik, "das Vorher-Bild hatte mehr
+# Charakter"): die ERSTE Fassung (Batch 6, 07.11.) nahm von alldem nur den Asphalt und zwei
+# 40-px-Publikumsstreifen — der Befund "80 % einfarbig blaues Band" aus
+# docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 2/4.3. Diese Fassung holt die Halle
+# tatsaechlich ins Bild, nach demselben "Rahmen statt Material"-Muster wie Batch 12 (Showcase/
+# Breaking) und Batch 13/14 (Takeshi/Climbing) — nur dass hier so gut wie nichts neu bestellt werden
+# muss: Schlitten, Rudergeraete, Boegen und Anzeigetafel STEHEN SCHON in der Rohszene, sie wurden nur
+# nie geschnitten. Band-Geometrie (SP_OBEN/SP_UNTEN), HUERDEN_N()/camX() und alle Stationspositionen
+# bleiben unangetastet — dieses Skript aendert nur, WAS auf und um das Band gezeichnet wird:
+#
+#   - Kopfstreifen (0..SP_OBEN): drei Ebenen uebereinander statt 40 px Publikum. Fern: ein
+#     gemaltes Hallendach mit Traegern und Lichtbaendern (keine Vorlage in der Szene — reiner
+#     Vektor, Farbsprache deckt sich zufaellig mit der "HALLE"-Stimmung aus
+#     docs/design/einsatzliste-gesamtkonzept-visuell-08-11.md Abschnitt 3.2, Hallendach-Traeger
+#     #2B2F36 / Lichtbaender #F2EFE6 — unabhaengig gewaehlt, fuer ein anderes Dokument). Mitte: die
+#     Tribuene der Szene. Vorne: eine Gerätezeile aus Rudergeraeten und Schlitten-Symbolen, als
+#     dunkle Silhouette direkt ueber der Bahn — UND die Anzeigetafel der Szene (FINISH-Uhr), als
+#     eigenes, hoeheres Landmark rechts, wie in der Rohszene.
+#   - Bahnband: unveraendert der blaue Loop-Belag (SP_BELAG), die Kacheltechnik von Batch 6 bleibt.
+#   - Fussstreifen (SP_UNTEN..H): eine Sponsoren-Bande (Vektor, kein Vorbild in der Szene) mit ein
+#     paar kleinen Betreuer-Silhouetten statt eines zweiten Publikumsstreifens (Audit: "kein
+#     zweites Publikum").
+#
+# Die Boegen (IN/FINISH) UND die Stationsumfeld-/Lichtebene zeichnet NICHT dieses Skript, sondern
+# der Motor selbst (bodenSpurtGerade(), Kulissen Batch 15 dort): die Bahn zoomt/scrollt mit `cam`,
+# und das Standbild hier kennt camX() nicht — nur der Motor weiss, wo Start/Ziel/Stationen gerade
+# auf dem Bildschirm stehen. spurt_requisiten() unten liefert dafuer nur die beiden freigestellten
+# Bogen-Sprites nach public/sprites/arena/.
+SP_OBEN, SP_UNTEN = round(LH * 0.14), round(LH * 0.94)  # 66, 442
 SP_PUBLIKUM_OBEN = (0, 0, 1680, 40)
-SP_PUBLIKUM_UNTEN = (0, 912, 1680, 960)
-SP_ASPHALT = (640, 440, 820, 480)
 SP_BELAG = (520, 66, 760, 134)
+SP_RUDER_ROW = (822, 192, 1398, 290)  # eine Reihe Rudergeraete, ohne die zweite Reihe darunter
+SP_SLED = (222, 198, 260, 232)  # ein Schlitten samt Gewichtsscheibe, Kunstrasen-Bahn 1
+SP_ANZEIGETAFEL = (1409, 198, 1560, 390)  # "FINISH"-Uhr samt Staender, ohne den Bahnrand rechts
+SP_FINISH_BOGEN = (1516, 388, 1676, 528)
+SP_IN_BOGEN = (715, 668, 866, 792)
+
+SP_HALLE_DACH_TOP = (22, 24, 29)
+SP_HALLE_DACH_BOT = (36, 40, 48)
+SP_LICHTBAND = (242, 239, 230)
+SP_H_DACH, SP_H_TRIB, SP_H_GER = 12, 24, 30  # Summe = SP_OBEN
+assert SP_H_DACH + SP_H_TRIB + SP_H_GER == SP_OBEN
 
 
-def band_breit(stueck: Image.Image, breite: int) -> Image.Image:
-    aus = Image.new("RGB", (breite, stueck.height))
-    for i, x in enumerate(range(0, breite, stueck.width)):
-        aus.paste(stueck if i % 2 == 0 else stueck.transpose(Image.FLIP_LEFT_RIGHT), (x, 0))
-    return aus
+def _sp_hallendach(breite: int, hoehe: int) -> Image.Image:
+    """Fern: Hallendach mit Traegern und Lichtbaendern (Audit 4.3) — reiner Vektor, die Szene zeigt
+    keine Decke (Draufsicht)."""
+    a = np.zeros((hoehe, breite, 3), dtype=np.float32)
+    for y in range(hoehe):
+        u = y / max(1, hoehe - 1)
+        a[y, :] = [SP_HALLE_DACH_TOP[k] + (SP_HALLE_DACH_BOT[k] - SP_HALLE_DACH_TOP[k]) * u for k in range(3)]
+    im = Image.fromarray(a.astype(np.uint8)).convert("RGBA")
+    d = ImageDraw.Draw(im)
+    for x0 in range(-20, breite + 40, 62):
+        d.line([(x0, hoehe), (x0 + 30, 0)], fill=(12, 13, 17, 160), width=2)
+    for i in range(5):
+        cx = breite * (0.05 + i * 0.22)
+        bw = breite * 0.13
+        d.rectangle((cx, hoehe * 0.28, cx + bw, hoehe * 0.28 + 2), fill=SP_LICHTBAND + (230,))
+        d.rectangle((cx - 3, hoehe * 0.28 - 1, cx + bw + 3, hoehe * 0.28 + 4), fill=SP_LICHTBAND + (40,))
+    return im.convert("RGB")
+
+
+def _sp_geraetezeile(bg: Image.Image, breite: int, hoehe: int) -> Image.Image:
+    """Vorne: Rudergeraete + Schlitten als dunkle Silhouetten, knapp ueber der Bahn (Audit 4.3)."""
+    ruder = bg.crop(SP_RUDER_ROW)
+    sc = hoehe / ruder.height
+    ruder2 = ruder.resize((round(ruder.width * sc), hoehe), Image.LANCZOS)
+    sled = bg.crop(SP_SLED)
+    scs = hoehe / sled.height
+    sled2 = sled.resize((round(sled.width * scs), hoehe), Image.LANCZOS)
+    einheit = Image.new("RGB", (ruder2.width * 2 + sled2.width, hoehe))
+    einheit.paste(ruder2, (0, 0))
+    einheit.paste(sled2, (ruder2.width, 0))
+    einheit.paste(ruder2, (ruder2.width + sled2.width, 0))
+    aus = Image.new("RGB", (breite + einheit.width, hoehe))
+    x = 0
+    while x < aus.width:
+        aus.paste(einheit, (x, 0))
+        x += einheit.width
+    aus = aus.crop((0, 0, breite, hoehe))
+    a = np.asarray(aus, dtype=np.float32) * 0.72  # Silhouette, nicht Grundflaeche
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+
+def _sp_kopfstreifen(bg: Image.Image) -> Image.Image:
+    kopf = Image.new("RGB", (LW, SP_OBEN))
+    kopf.paste(_sp_hallendach(LW, SP_H_DACH), (0, 0))
+    trib = bg.crop(SP_PUBLIKUM_OBEN).resize((LW, SP_H_TRIB), Image.LANCZOS)
+    kopf.paste(trib, (0, SP_H_DACH))
+    kopf.paste(_sp_geraetezeile(bg, LW, SP_H_GER), (0, SP_H_DACH + SP_H_TRIB))
+    # Anzeigetafel: eigenes, groesseres Landmark rechts aussen (wie in der Rohszene), haengt von der
+    # Traverse bis fast an die Geraetezeile herunter — deckt bewusst Tribuene UND Geraetezeile ab.
+    tafel = bg.crop(SP_ANZEIGETAFEL)
+    th = SP_H_TRIB + SP_H_GER + 4
+    sc = th / tafel.height
+    tafel2 = tafel.resize((round(tafel.width * sc), th), Image.LANCZOS)
+    kopf.paste(tafel2, (round(LW * 0.885), SP_H_DACH - 2))
+    return kopf
+
+
+def _sp_sponsorenbande(breite: int, hoehe: int) -> Image.Image:
+    """Fussstreifen, oberer Teil: Bande mit Sponsoren (Audit 4.3) — kein Vorbild in der Szene,
+    reiner Vektor wie die Bandenschilder bei Tennis/Football."""
+    im = Image.new("RGB", (breite, hoehe), (16, 18, 24))
+    d = ImageDraw.Draw(im)
+    farben = [(190, 60, 60), (60, 130, 190), (205, 172, 55), (55, 170, 120), (170, 80, 170)]
+    segb = 150
+    i, x = 0, 0
+    while x < breite:
+        d.rectangle((x, 0, x + segb - 3, hoehe - 1), fill=farben[i % len(farben)])
+        d.rectangle((x + 10, hoehe * 0.22, x + segb - 13, hoehe * 0.78), fill=(246, 246, 244))
+        x += segb
+        i += 1
+    return im
+
+
+def _sp_betreuer(h: int) -> Image.Image:
+    w = max(5, round(h * 0.42))
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.ellipse((w * 0.28, 0, w * 0.72, h * 0.26), fill=(230, 210, 185, 255))
+    d.polygon([(w * 0.5, h * 0.24), (w * 0.08, h * 0.56), (w * 0.18, h * 0.60),
+               (w * 0.5, h * 0.40), (w * 0.82, h * 0.60), (w * 0.92, h * 0.56)], fill=(70, 78, 92, 255))
+    d.rectangle((w * 0.30, h * 0.24, w * 0.70, h * 0.68), fill=(70, 78, 92, 255))
+    d.rectangle((w * 0.30, h * 0.66, w * 0.46, h), fill=(28, 28, 34, 255))
+    d.rectangle((w * 0.54, h * 0.66, w * 0.70, h), fill=(28, 28, 34, 255))
+    return im
+
+
+def _sp_fussstreifen() -> Image.Image:
+    """Fussstreifen: Bande mit Sponsoren und ein paar Betreuer, KEIN zweites Publikum (Audit 4.3)."""
+    h = LH - SP_UNTEN
+    hb, hf = 14, h - 14
+    im = Image.new("RGB", (LW, h))
+    im.paste(_sp_sponsorenbande(LW, hb), (0, 0))
+    im.paste(Image.new("RGB", (LW, hf), (26, 28, 34)), (0, hb))
+    fig = _sp_betreuer(hf - 2)
+    for f in (0.07, 0.24, 0.42, 0.60, 0.77, 0.93):
+        im.paste(fig, (round(LW * f), hb + 1), fig)
+    return im
 
 
 def baue_spurt(variante: str) -> Image.Image:
     bg = lade_szenenbilder(SZENEN / "spurt" / f"{variante}.html")["bg"].convert("RGB")
-    lein = kacheln_gespiegelt(bg.crop(SP_ASPHALT), LW, LH)
-    po = bg.crop(SP_PUBLIKUM_OBEN)
-    po = po.resize((round(po.width * 0.9), round(po.height * 0.9)), Image.LANCZOS)
-    lein.paste(band_breit(po, LW), (0, 0))
-    pu = bg.crop(SP_PUBLIKUM_UNTEN)
-    pu = pu.resize((round(pu.width * 0.9), round(pu.height * 0.9)), Image.LANCZOS)
-    lein.paste(band_breit(pu, LW), (0, LH - pu.height))
+    lein = Image.new("RGB", (LW, LH))
     belag = bg.crop(SP_BELAG)
     belag = belag.resize((belag.width * 2, belag.height * 2), Image.NEAREST)
     lein.paste(kacheln_gespiegelt(belag, LW, SP_UNTEN - SP_OBEN), (0, SP_OBEN))
+    lein.paste(_sp_kopfstreifen(bg), (0, 0))
+    lein.paste(_sp_fussstreifen(), (0, SP_UNTEN))
     return lein
+
+
+def spurt_requisiten() -> None:
+    """Die beiden Bahn-Boegen (IN/FINISH) fuer den MOTOR (nicht fuer die Kulisse hier): aus der
+    HYROX-Rohszene freigestellt (kulissen_werkzeug.freistellen — kettengeflutete Alpha, kein manuell
+    genanntes Hintergrundgruen/-blau noetig) und nach public/sprites/arena/ geschrieben, dieselbe
+    Stelle wie jede andere Motor-Requisite (A_TEILE in battle-mode.engine.js). Kein PixelLab-Auftrag:
+    die Rohszene fuehrt beide Boegen bereits (Audit woertlich), es fehlte nur der Schnitt.
+
+        python3 -I scripts/baue-kulisse-buehnen.py --spurt-requisiten
+    """
+    bg = Image.open(SZENEN / "spurt" / "hyrox.jpg").convert("RGB")
+    ziel = SPRITES / "arena"
+    eintraege = {
+        "spurt_bogen_in.png": (SP_IN_BOGEN, "gelb-schwarzer IN-Bogen am Streckenanfang der Kunstrasen-Schleife"),
+        "spurt_bogen_finish.png": (SP_FINISH_BOGEN, "roter FINISH-Bogen samt Anzeigetafel-Sockel am Streckenende"),
+    }
+    quellen_pfad = ziel / "quellen.json"
+    text = quellen_pfad.read_text(encoding="utf-8")
+    vorhanden = json.loads(text)
+    anhaengen = []
+    for datei, (box, beschreibung) in eintraege.items():
+        bild = freistellen(bg.crop(box), 26)
+        bild.save(ziel / datei, optimize=True)
+        print(f"spurt-requisit: -> {(ziel / datei).relative_to(WURZEL)} ({bild.size[0]}x{bild.size[1]})")
+        if datei in vorhanden:
+            print(f"  (quellen.json fuehrt {datei} schon — Eintrag bleibt wie er ist, kein erneutes Anhaengen)")
+            continue
+        x0, y0, x1, y1 = box
+        wert = {
+            "paket": "PixelLab (Asset-Runde, ueber die Spurt-Rohszene)",
+            "quelle": "public/szenen/spurt/hyrox.jpg",
+            "schnitt": f"x={x0} y={y0} {x1 - x0}x{y1 - y0}, kettengeflutet freigestellt (kulissen_werkzeug.freistellen, Schwelle 26)",
+            "beschreibung": beschreibung,
+            "skript": "python3 -I scripts/baue-kulisse-buehnen.py --spurt-requisiten",
+            "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+            "erzeugt": "2026-11-08",
+        }
+        # Textgenau angehaengt (nicht per json.dumps() der GANZEN Datei neu serialisiert): die Datei
+        # hat eine Einrueckung von 1 Leerzeichen je Ebene und Einfuegereihenfolge als Lesereihenfolge
+        # -- ein voller Reserialize haette ueber 2000 Zeilen Diff erzeugt, obwohl nur zwei Eintraege
+        # dazukommen. json.dumps(wert, indent=1) liefert dieselbe Verschachtelung ab Ebene 2; nur die
+        # erste Zeile ("{") bekommt den Schluessel vorangestellt, alle Zeilen ab der zweiten eine
+        # zusaetzliche Stufe Einrueckung (sie stehen eine Ebene tiefer als ein Wurzel-Objekt).
+        block = json.dumps(wert, indent=1, ensure_ascii=False)
+        zeilen = block.splitlines()
+        zeilen = [zeilen[0]] + [" " + z for z in zeilen[1:]]
+        anhaengen.append(f' "{datei}": ' + "\n".join(zeilen))
+    if anhaengen:
+        assert text.endswith("}\n"), "quellen.json endet nicht wie erwartet auf '}\\n'"
+        text = text[: -len("}\n")].rstrip()
+        text += ",\n" + ",\n".join(anhaengen) + "\n}\n"
+        quellen_pfad.write_text(text, encoding="utf-8")
+        json.loads(text)  # sofort gegenlesen: die handgenaehte Datei muss gueltiges JSON bleiben
 
 
 # ---------------------------------------------------------------------------------------- Staffel
@@ -686,6 +867,9 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
 
 
 def main() -> None:
+    if "--spurt-requisiten" in sys.argv[1:]:
+        spurt_requisiten()
+        return
     disziplinen = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BAUER)
     for d in disziplinen:
         for v in VARIANTEN[d]:

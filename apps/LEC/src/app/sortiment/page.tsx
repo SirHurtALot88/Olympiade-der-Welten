@@ -8,7 +8,7 @@ import { SortimentPage } from "@/components/sortiment/SortimentPage";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
+  const { aggregates, costSettings } = await loadArticleAggregates(prisma, { includeHidden: true });
   const classified = classifyArticles(aggregates);
   const rows = buildFullSortiment(aggregates, classified, costSettings);
 
@@ -32,14 +32,15 @@ export default async function Page() {
 
   // "Aktiv" = im Billbee-Artikelstamm-Katalog vorhanden (Chris' Ergaenzung:
   // die reine Verkaufshistorie enthaelt auch laengst ausgelaufene Artikel).
-  const activeCount = rows.filter((r) => r.active).length;
-  const discontinuedCount = rows.length - activeCount;
-  const ladenhueterCount = rows.filter((r) => r.articleClass === "ladenhueter").length;
+  const shown = rows.filter((r) => !r.hidden); // Ausgeblendete zaehlen in keiner Anzeige-Zahl
+  const activeCount = shown.filter((r) => r.active).length;
+  const discontinuedCount = shown.length - activeCount;
+  const ladenhueterCount = shown.filter((r) => r.articleClass === "ladenhueter").length;
 
   return (
     <SortimentPage
       rows={rows}
-      totalCount={rows.length}
+      totalCount={shown.length}
       activeCount={activeCount}
       discontinuedCount={discontinuedCount}
       ladenhueterCount={ladenhueterCount}

@@ -2,7 +2,7 @@
 // Arena in voller Aufloesung (1240x470 ueber toDataURL, nicht den herunterskalierten CSS-Ausschnitt)
 // fuer eine Disziplin und eine gepinnte Kulissen-Variante (window.__arena.kulisseQa).
 //
-// Aufruf: node scripts/screenshot-kulisse.mjs <disziplin> [variante|-] [wartenMs] [ausgabe] [--pod] [--ohne-kulisse]
+// Aufruf: node scripts/screenshot-kulisse.mjs <disziplin> [variante|-] [wartenMs] [ausgabe] [--pod] [--ohne-kulisse] [--format=hatz|hyrox]
 //   <disziplin>     window.__arena.setDisc()-Name.
 //   [variante]      Kulissen-Id aus battle-mode.kulissen.js ("-" = Hash-Wahl des Motors).
 //   [wartenMs]      Wartezeit nach dem Anpfiff (Default 2500).
@@ -10,6 +10,13 @@
 //   --pod           nur Battlefield: Vier-Team-Pod aus data/generated/kaderfamilie-live-save.json
 //                   anzeigen (derselbe Weg wie echterKader.battlefieldPod vom Host).
 //   --ohne-kulisse  window.__ARENA_KULISSEN vor dem Motor leeren -> alter Boden (Vorher-Bild).
+//   --format=hatz   nur Spurt (Format-Fundament, 08.11., s. BAHN_FLAGS in battle-mode.engine.js):
+//                   fordert "Die Hatz" ueber window.__arena.bahnFlags() an, statt des heutigen
+//                   Huerdenlaufs. Ohne den Schalter unveraendert "klassisch".
+//   --format=hyrox  nur Spurt, dasselbe Prinzip: fordert "HYROX-Stationen" an (s.
+//                   docs/design/spurt-format-hyrox-stationen-08-11.md). Dieses Skript brauchte
+//                   dafuer KEINE Codeaenderung -- `format` geht ungeprueft an bahnFlags() durch,
+//                   das seit 08.11. auch "hyrox" als gueltigen Wert kennt.
 //
 // Reine Anzeige-Sonde: liest nichts in die Simulation zurueck. HTTP statt file:// (absolute
 // Sprite-Pfade, s. screenshot-disziplin.mjs).
@@ -43,12 +50,13 @@ function starteServer() {
 
 const POD = process.argv.includes("--pod");
 const OHNE = process.argv.includes("--ohne-kulisse");
+const FORMAT = process.argv.find((a) => a.startsWith("--format="))?.split("=")[1] || null;
 const arg = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const disziplin = arg[0];
 if (!disziplin) { console.error("Nutzung: node scripts/screenshot-kulisse.mjs <disziplin> [variante|-] [wartenMs] [ausgabe] [--pod] [--ohne-kulisse]"); process.exit(1); }
 const variante = arg[1] && arg[1] !== "-" ? arg[1] : null;
 const wartenMs = Number(arg[2] || 2500);
-const out = arg[3] || path.join(WURZEL, "tmp-ux-audit", `kulisse-${disziplin}-${variante || "hash"}${POD ? "-pod" : ""}.png`);
+const out = arg[3] || path.join(WURZEL, "tmp-ux-audit", `kulisse-${disziplin}-${variante || "hash"}${POD ? "-pod" : ""}${FORMAT ? "-" + FORMAT : ""}.png`);
 mkdirSync(path.dirname(out), { recursive: true });
 
 let pod = null;
@@ -73,12 +81,13 @@ try {
   }
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
-  await seite.evaluate(({ d, v, pod }) => {
+  await seite.evaluate(({ d, v, pod, format }) => {
     const A = window.__arena;
+    if (format && A.bahnFlags) A.bahnFlags({ spurtFormat: format });
     A.setDisc(d);
     if (pod && A.battlefieldPodAnzeigen) A.battlefieldPodAnzeigen(pod);
     if (A.kulisseQa) A.kulisseQa(v);
-  }, { d: disziplin, v: variante, pod });
+  }, { d: disziplin, v: variante, pod, format: FORMAT });
   await seite.click("#t2");
   await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false, figuren: false });
   await seite.click("#play");

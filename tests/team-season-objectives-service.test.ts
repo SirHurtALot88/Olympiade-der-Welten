@@ -1597,6 +1597,105 @@ describe("board goal targets: expectation, upset-avoidance, transfer ceiling, si
     expect(objective.status).toBe("failed");
   });
 
+  describe("Liga-Split: erwarteter Rang bleibt ligalokal, kein Pauschalbonus fuer Liga 2", () => {
+    // Zwei Ligen, jeweils 2 Teams, mit DERSELBEN internen Staerke-/Rang-Verteilung: der staerkere
+    // Teil jeder Liga wird erster, der schwaechere zweiter — exakt das, was die Kaderstaerke in
+    // beiden Ligen fuer sich erwartet. Liga 1 ist insgesamt staerker als Liga 2 (92/32 vs. 90/30),
+    // genau das Szenario, das ueber alle 4 Teams hinweg jedem Liga-2-Team automatisch einen
+    // erwarteten Rang von 3..4 zuweist, obwohl es ligaintern nur 1..2 geben kann.
+    const rowsByTeamId = new Map([
+      ["l1-strong", createRow("l1-strong", { ppsTotal: 92, marketValueTotal: 200, rank: 1 })],
+      ["l1-weak", createRow("l1-weak", { ppsTotal: 32, marketValueTotal: 60, rank: 2 })],
+      ["l2-strong", createRow("l2-strong", { ppsTotal: 90, marketValueTotal: 190, rank: 1 })],
+      ["l2-weak", createRow("l2-weak", { ppsTotal: 30, marketValueTotal: 55, rank: 2 })],
+    ]);
+    const leagueByTeamId = {
+      "l1-strong": "liga1",
+      "l1-weak": "liga1",
+      "l2-strong": "liga2",
+      "l2-weak": "liga2",
+    } as const;
+    const gameStateWithSplit = createGameState({
+      teams: [
+        createTeam({ teamId: "l1-strong", shortCode: "l1-strong" }),
+        createTeam({ teamId: "l1-weak", shortCode: "l1-weak" }),
+        createTeam({ teamId: "l2-strong", shortCode: "l2-strong" }),
+        createTeam({ teamId: "l2-weak", shortCode: "l2-weak" }),
+      ],
+    });
+    gameStateWithSplit.seasonState.leagueByTeamId = { ...leagueByTeamId };
+
+    it("computeTeamExpectation ranks a Liga-2 team only against its own league when split is active", () => {
+      const l2WeakRow = rowsByTeamId.get("l2-weak")!;
+
+      // OHNE gameState (Legacy/Nicht-Split): weiterhin global ueber alle 4 Teams gerankt — l2-weak
+      // ist global Letzter (Rang 4), obwohl es ligaintern nur Letzter von 2 (Rang 2) sein kann.
+      const legacy = computeTeamExpectation({ row: l2WeakRow, rowsByTeamId, identity: null });
+      expect(legacy.expectedRank).toBe(4);
+      expect(legacy.teamCount).toBe(4);
+
+      // MIT aktivem Liga-Split: nur gegen l2-strong verglichen -> Rang 2 von 2, exakt der Rang, den
+      // es auch ligaintern tatsaechlich belegt (row.rank = 2).
+      const scoped = computeTeamExpectation({ row: l2WeakRow, rowsByTeamId, identity: null, gameState: gameStateWithSplit });
+      expect(scoped.expectedRank).toBe(2);
+      expect(scoped.teamCount).toBe(2);
+    });
+
+    it("getExpectationRankObjective no longer auto-rewards a Liga-2 team just for playing in the weaker league", () => {
+      const l2WeakRow = rowsByTeamId.get("l2-weak")!;
+      const l2WeakTeam = createTeam({ teamId: "l2-weak", shortCode: "l2-weak" });
+      const identity = createIdentity("l2-weak", { ambition: 5 });
+
+      // VOR DEM FIX (kein gameState -> globale Vergleichsbasis): l2-weak gilt global als Rang 4
+      // erwartet, belegt ligaintern aber Rang 2 -> rankDelta > 0 -> automatischer Bonus, obwohl das
+      // Team exakt seine (ligainterne) Erwartung erfuellt hat, nicht mehr.
+      const buggy = getExpectationRankObjective({
+        team: l2WeakTeam,
+        identity,
+        profile: null,
+        row: l2WeakRow,
+        rowsByTeamId,
+      });
+      expect(buggy.boardConfidenceDelta ?? 0).toBeGreaterThan(0);
+      expect(buggy.rewardCash ?? 0).toBeGreaterThan(0);
+
+      // NACH DEM FIX (gameState mit aktivem Liga-Split): erwarteter Rang ist jetzt ligalokal (2 von
+      // 2) und deckt sich mit dem tatsaechlichen ligalokalen Rang (2) -> kein rankDelta, also kein
+      // Pauschalbonus mehr nur dafuer, in der schwaecheren Liga zu spielen.
+      const fixed = getExpectationRankObjective({
+        team: l2WeakTeam,
+        identity,
+        profile: null,
+        row: l2WeakRow,
+        rowsByTeamId,
+        gameState: gameStateWithSplit,
+      });
+      expect(fixed.boardConfidenceDelta ?? 0).toBeLessThanOrEqual(0.15);
+      expect(fixed.rewardCash).toBeUndefined();
+
+      // Gegenprobe: ein Liga-1-Team, das ligaintern exakt seine (ligainterne) Erwartung erfuellt,
+      // bekommt ebenfalls keinen Pauschalbonus — Liga-Split darf also nicht zu UNGUNSTEN von Liga 1
+      // ausschlagen, nur die Liga-2-Bevorzugung muss verschwinden.
+      const l1WeakRow = rowsByTeamId.get("l1-weak")!;
+      const l1Fixed = getExpectationRankObjective({
+        team: createTeam({ teamId: "l1-weak", shortCode: "l1-weak" }),
+        identity: createIdentity("l1-weak", { ambition: 5 }),
+        profile: null,
+        row: l1WeakRow,
+        rowsByTeamId,
+        gameState: gameStateWithSplit,
+      });
+      expect(l1Fixed.boardConfidenceDelta ?? 0).toBeLessThanOrEqual(0.15);
+      expect(l1Fixed.rewardCash).toBeUndefined();
+
+      // Und beide Liga-2- und Liga-1-Teams, die ligaintern IDENTISCH performen (jeweils Letzter
+      // ihrer 2er-Liga), muessen nach dem Fix dasselbe Ergebnis bekommen — vorher bekam nur Liga 2
+      // automatisch den Bonus.
+      expect(fixed.boardConfidenceDelta).toBe(l1Fixed.boardConfidenceDelta);
+      expect(fixed.status).toBe(l1Fixed.status);
+    });
+  });
+
   it("getUpsetAvoidanceObjective returns null for weak, low-ambition teams", () => {
     const rowsByTeamId = new Map([
       ["weak", createRow("weak", { ppsTotal: 20, marketValueTotal: 40 })],

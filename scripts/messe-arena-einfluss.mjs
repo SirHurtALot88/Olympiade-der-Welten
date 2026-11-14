@@ -25,6 +25,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
+import { writeFileSync } from "node:fs";
 import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
@@ -45,6 +46,14 @@ const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
 // --je-seite=N (27.10., additiv): Kadergroesse einer ARENA-Disziplin fuer diese Messung (z.B.
 // Battlefield 2/4/6 je Seite). Ohne den Schalter misst das Skript bei ARENA_ART[d].jeSeite wie bisher.
 const JE_SEITE = Number(schalterWert("je-seite") ?? 0) || null;
+// --rohdaten=<datei.json> (10.11., additiv): schreibt zusaetzlich die ROHEN Attributgewinne
+// (`reihen[].gewinn` aus einflussVon, mittlerer Spielwert-Gewinn je +15 auf dem Attribut) samt
+// Matrix, n, Saatversatz und gemessener Datei als JSON. Grund: bei Hockey ist ein einzelner
+// n=48-Strom zu verrauscht fuer die Abnahme (Rauschboden 35-40 Pp, docs/design/hockey-pp-
+// messbasis-10-11.md Abschnitt 3); abnahmefaehig ist erst der GEPOOLTE Wert ueber drei Stroeme,
+// und Poolen geht nur ueber die Gewinne, nicht ueber die gerundeten Anteile. Poolen:
+// `node scripts/poole-arena-einfluss.mjs a.json b.json c.json`. Ohne den Schalter unveraendert.
+const ROHDATEN = schalterWert("rohdaten") ?? null;
 // --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv),
 // s. scripts/lib/rangtreue-messung.mjs. Ohne sie misst das Skript den Motor mit allen Flags aus.
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
@@ -164,6 +173,15 @@ for (const r of e.reihen) {
     `${r.attribut.padEnd(15)} ${String(r.anteil).padStart(6)} % ${String(soll).padStart(6)}   ` +
       `${(diff > 0 ? "+" : "") + diff.toFixed(1)}`,
   );
+}
+if (ROHDATEN) {
+  writeFileSync(resolve(ROHDATEN), JSON.stringify({
+    disziplin: e.disziplin, laeufe: e.laeufe, anhebung: e.anhebung, mutatorModus: e.mutatorModus ?? null,
+    saatVersatz: SAAT_VERSATZ, jeSeite: JE_SEITE, datei: pfad, dauerSekunden: Number(dauer),
+    abweichungPp: e.abweichungPp, seitenfehler: fehler.length, matrix,
+    reihen: e.reihen.map((r) => ({ attribut: r.attribut, gewinn: r.gewinn, anteil: r.anteil })),
+  }, null, 2) + "\n");
+  console.log(`\nRohdaten geschrieben: ${resolve(ROHDATEN)}`);
 }
 console.log("\nSeitenfehler:", fehler.length ? fehler.slice(0, 5) : "keine");
 if (chassisWarnung) console.log("\n" + chassisWarnung);

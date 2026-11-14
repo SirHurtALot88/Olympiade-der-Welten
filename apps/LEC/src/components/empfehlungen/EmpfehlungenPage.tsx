@@ -189,7 +189,7 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
                   <span className={`chip ${chip.cls}`}>{chip.label}</span>
                   <span className="eff">{rec.effect}</span>
                   {!isLot && rec.linkQuery && (
-                    <a href={`/sortiment?q=${encodeURIComponent(rec.linkQuery)}`} className="chip" style={{ textDecoration: "none" }}>
+                    <a href={`/sortiment?q=${encodeURIComponent(rec.linkQuery)}${rec.id.includes(":") ? `&artikel=${encodeURIComponent(rec.id.split(":")[1])}&flags=ohnebestand` : ""}`} className="chip" style={{ textDecoration: "none" }}>
                       Im Sortiment ansehen →
                     </a>
                   )}
@@ -227,9 +227,10 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
                         <span style={{ minWidth: 0 }}>
                           {item.nameRaw}
                           {item.setCode && <span className="code" style={{ marginLeft: 8 }}>{item.setCode}</span>}
+                          {item.why && <span style={{ marginLeft: 8, color: "var(--faint)" }}>· {item.why}</span>}
                         </span>
                         <span className="num" style={{ flex: "none", color: "var(--faint)" }}>
-                          {item.boundCapital !== null ? `€ ${item.boundCapital.toFixed(0)}` : "Bestand unbekannt"}
+                          {item.boundCapital !== null ? `€ ${item.boundCapital.toFixed(0)} gebunden` : "Bestand unbekannt"}{item.marketValue != null ? ` · Markt ${item.marketValue.toFixed(2).replace(".", ",")} €` : ""}
                         </span>
                       </div>
                     ))}
