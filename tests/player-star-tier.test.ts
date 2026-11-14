@@ -101,7 +101,12 @@ describe("Star-Tier: Renderpfade", () => {
     const presetText = read("lib/foundation/player-portrait-stat-presets.ts");
     expect(presetText).toContain('starTierStatExtra("OVR", input.ovrRank)');
     expect(presetText).toContain('starTierStatExtra("PPs", input.ppsRank)');
-    expect(presetText).toContain('starTierStatExtra("MVS", input.mvsRank)');
+    // Fable-Audit 14.11. #2: MVS steht vor Spieltag 1 auf einer echten 0 (nicht `null`), und
+    // mit ihr lag jeder Spieler auf Rang 1 — "0,0 · #1" für alle gleichzeitig. Der MVS-Rang
+    // fließt jetzt nur noch in Tier/Chip ein, wenn `mvsAlsGuete` die 0 nicht schon verworfen hat
+    // (`mvsRankForDisplay`), sonst bliebe die Sterne-Stufe an derselben erfundenen Bewertung
+    // hängen, die die Zahl selbst schon nicht mehr zeigt.
+    expect(presetText).toContain('starTierStatExtra("MVS", mvsRankForDisplay)');
     // Das Heat-Band bleibt daneben bestehen — beide Aussagen sind gewollt.
     expect(presetText).toContain("heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr)");
   });
