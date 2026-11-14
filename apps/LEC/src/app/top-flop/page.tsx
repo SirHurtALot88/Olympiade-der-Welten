@@ -1,15 +1,6 @@
-import { prisma } from "@/lib/db/client";
-import { loadArticleAggregates } from "@/lib/dashboard/queries";
-import { classifyArticles } from "@/lib/dashboard/viewModel";
-import { classifiedToRecord } from "@/lib/dashboard/topFlop";
-import { TopFlopPage } from "@/components/topflop/TopFlopPage";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function Page() {
-  const { aggregates } = await loadArticleAggregates(prisma);
-  const classified = classifyArticles(aggregates);
-  const classByArticleId = classifiedToRecord(classified);
-
-  return <TopFlopPage articles={aggregates} classByArticleId={classByArticleId} />;
+/** Top/Flop ist im Dashboard aufgegangen (Läuft gut, Läuft schlecht, Muss weg): UX_KONZEPT_GESAMT.md, Entscheidungen 14.11. */
+export default function Page() {
+  redirect("/");
 }

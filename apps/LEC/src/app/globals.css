@@ -704,3 +704,10 @@ a.mover, a.mover * { text-decoration: none; color: inherit; }
 a.mover .rev.down { color: var(--crit); }
 a.mover .meta, a.mover .meta span { color: var(--muted); }
 .dash-sub a { text-decoration: underline dotted; }
+
+/* Einstellungen auf dem Handy einspaltig, nichts laeuft ueber */
+@media (max-width: 760px) {
+  main [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  main .card { max-width: 100%; overflow-x: auto; }
+}
+@media (max-width: 920px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } .grid-2 > * { min-width: 0; } }

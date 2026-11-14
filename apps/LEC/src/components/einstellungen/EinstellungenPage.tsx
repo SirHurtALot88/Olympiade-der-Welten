@@ -11,7 +11,6 @@ import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
 import { ImageSyncCard } from "./ImageSyncCard";
 import { BillbeeSyncCard } from "./BillbeeSyncCard";
 import type { FeeCheckBand } from "@/lib/pricing/feeCheck";
-import { BetriebszahlenCard } from "./BetriebszahlenCard";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -300,7 +299,12 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
             </div>
           </div>
 
-          <BetriebszahlenCard settings={parsed} />
+          <div className="card" style={{ padding: "15px 16px 16px" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Betriebszahlen je Jahr</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Einkäufe, Verkäufe, Versand und der eBay-Kostenvergleich stehen jetzt unter <a href="/cockpit">Finanzen</a> (am Ende, eingeklappt).
+            </div>
+          </div>
 
           {comparison && (
             <div className="card" style={{ padding: "15px 16px 16px" }}>

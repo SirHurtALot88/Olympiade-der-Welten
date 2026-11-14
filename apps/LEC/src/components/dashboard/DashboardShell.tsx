@@ -59,7 +59,6 @@ export function DashboardShell({ viewModel }: Props) {
           <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Weiter</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <a className="chip" href="/sortiment" title="Alle Artikel mit Preis-Urteil, Bestand und Verkäufen.">Sortiment ({viewModel.sortiment.length}) →</a>
-            <a className="chip" href="/empfehlungen" title="Alle Empfehlungen (EK pflegen, Preise, Kapitalbinder).">Empfehlungen ({viewModel.recommendations.length}) →</a>
             <a className="chip" href="/cockpit" title="Finanzen: Marge, Kapital, Tempo.">Finanzen →</a>
           </div>
         </div>
