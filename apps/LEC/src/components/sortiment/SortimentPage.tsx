@@ -264,6 +264,47 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   });
   const dupIds = useMemo(() => new Set(dupGroups.keys()), [dupGroups]);
   const counts = useMemo(() => taskCounts(rows, dupIds), [rows, dupIds]);
+  // Auswahl und Vormerkung (nur Markierung in LEC; bei eBay passiert nichts)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [markedLocal, setMarkedLocal] = useState<Map<string, boolean>>(new Map());
+  const [markBusy, setMarkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<{ ids: string[] } | null>(null);
+  useEffect(() => {
+    setSelected(new Set());
+    setBulkNote(null);
+  }, [task]);
+  useEffect(() => {
+    if (!bulkNote) return;
+    const t = window.setTimeout(() => setBulkNote(null), 10_000);
+    return () => window.clearTimeout(t);
+  }, [bulkNote]);
+  async function markMany(ids: string[], on: boolean) {
+    setMarkBusy(true);
+    try {
+      const done: string[] = [];
+      for (const id of ids) {
+        const r = await fetch(`/api/article-delist/${encodeURIComponent(id)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ marked: on }) });
+        if (r.ok) done.push(id);
+      }
+      setMarkedLocal((prev) => {
+        const next = new Map(prev);
+        for (const id of done) next.set(id, on);
+        return next;
+      });
+      if (done.length > 0) router.refresh();
+      return done;
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = (ids: string[], on: boolean) => setSelected(on ? new Set(ids) : new Set());
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
   // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
   const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
@@ -836,7 +877,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
+          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} task={task} selected={selected} onToggleSelect={toggleSelect} onToggleAll={toggleAll} marked={markedLocal} onMark={(id, on) => void markMany([id], on)} busyMark={markBusy} />
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
@@ -1047,6 +1088,52 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="cardpreview" src={preview.src} alt="" style={{ left: preview.x, top: preview.y }} />
+      )}
+      {(selected.size > 0 || bulkNote) && (
+        <div className="bd-bulk" role="region" aria-label="Sammelaktionen">
+          {selected.size > 0 ? (
+            <>
+              <b>{selected.size} ausgewählt</b>
+              <button
+                type="button"
+                className="chip"
+                disabled={markBusy}
+                title="Merkt die ausgewählten Karten zum Auslisten vor (nur eine Markierung in LEC, bei eBay passiert nichts)."
+                onClick={async () => {
+                  const ids = Array.from(selected);
+                  const done = await markMany(ids, true);
+                  setSelected(new Set());
+                  if (done.length > 0) setBulkNote({ ids: done });
+                }}
+              >
+                Zum Auslisten vormerken
+              </button>
+              <button
+                type="button"
+                className="chip"
+                title="Kopiert die Set-Codes der ausgewählten Karten, einen je Zeile, in die Zwischenablage."
+                onClick={() => {
+                  const codes = rows.filter((r) => selected.has(r.articleId) && r.setCode).map((r) => r.setCode as string);
+                  void navigator.clipboard?.writeText(codes.join("\n"));
+                }}
+              >
+                Set-Codes kopieren
+              </button>
+              <button type="button" className="chip" onClick={() => setSelected(new Set())}>
+                Auswahl aufheben
+              </button>
+            </>
+          ) : (
+            bulkNote && (
+              <>
+                <b>{bulkNote.ids.length} vorgemerkt</b>
+                <button type="button" className="chip" disabled={markBusy} onClick={async () => { await markMany(bulkNote.ids, false); setBulkNote(null); }}>
+                  Rückgängig
+                </button>
+              </>
+            )
+          )}
+        </div>
       )}
     </AppShell>
   );

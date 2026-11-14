@@ -4,6 +4,7 @@ import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
 import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty, to99 } from "@/lib/dashboard/board";
+import type { TaskKey } from "@/lib/dashboard/tasks";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -122,6 +123,15 @@ interface Props {
   imageSrc: (articleId: string, version: string) => string;
   onPreview: (p: { src: string; x: number; y: number } | null) => void;
   onOpen: (articleId: string) => void;
+  /** Aktiver Aufgaben-Reiter: ausser "alle" gibt es Auswahlkaesten und die Spalte "Aktion". */
+  task?: TaskKey;
+  selected?: ReadonlySet<string>;
+  onToggleSelect?: (articleId: string) => void;
+  onToggleAll?: (articleIds: string[], on: boolean) => void;
+  /** Lokaler Stand der Vormerkung (nach dem Klick, bis die Seite neu geladen hat). */
+  marked?: ReadonlyMap<string, boolean>;
+  onMark?: (articleId: string, marked: boolean) => void;
+  busyMark?: boolean;
 }
 
 /** Tage seit dem letzten Verkauf; null ohne Verkauf. */
@@ -131,7 +141,11 @@ export function daysSince(iso: string | null | undefined, now = Date.now()): num
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
 }
 
-export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen, task = "alle", selected, onToggleSelect, onToggleAll, marked, onMark, busyMark }: Props) {
+  const withTask = task !== "alle";
+  // In den Aufgaben-Reitern ohne Preisfrage entfaellt der Marktwert, damit die Spalte "Aktion" Platz hat
+  const showMarkt = task === "alle" || task === "preis";
+  const allSelected = withTask && rows.length > 0 && rows.every((r) => selected?.has(r.articleId));
   const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
     <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
       {label}
@@ -140,18 +154,24 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
   );
   return (
     <div className="bd-wrap">
-      <table className="bd">
+      <table className={withTask ? "bd bd-task" : "bd"}>
         <thead>
           <tr>
+            {withTask && (
+              <th className="bd-th-sel">
+                <input type="checkbox" aria-label="Alle sichtbaren auswählen" checked={allSelected} onChange={(e) => onToggleAll?.(rows.map((r) => r.articleId), e.target.checked)} />
+              </th>
+            )}
             {head("name", "Artikel")}
             {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
             {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage), darunter wann zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
             {head("vk", "Dein VK", "r")}
             {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
             {head("abweichung", "Urteil")}
-            {head("marktwert", "Marktwert", "r")}
+            {showMarkt && head("marktwert", "Marktwert", "r")}
             {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
             {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T), darunter dein durchschnittlicher Verkaufspreis (Ø VK)")}
+            {withTask && <th className="bd-th-act">Aktion</th>}
           </tr>
         </thead>
         <tbody>
@@ -161,7 +181,12 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
             const clean = cleanTitle(row.nameRaw);
             const v = imageVersions[row.articleId];
             return (
-              <tr key={row.articleId} onClick={() => onOpen(row.articleId)}>
+              <tr key={row.articleId} className={withTask && (marked?.get(row.articleId) ?? !!row.delistMarkedAt) && task === "auslisten" ? "bd-row-marked" : undefined} onClick={() => onOpen(row.articleId)}>
+                {withTask && (
+                  <td className="bd-c-sel" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label="Zeile auswählen" checked={selected?.has(row.articleId) ?? false} onChange={() => onToggleSelect?.(row.articleId)} />
+                  </td>
+                )}
                 <td className="bd-c-art">
                   <div className="bd-art">
                     {v ? (
@@ -260,9 +285,9 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Urteil" className="bd-c-verdict">
                   <VerdictBadge row={row} />
                 </td>
-                <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
+{showMarkt && (                <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
                   {m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${formatEuroCents(m.range.max)} €` : <span className="bd-none">—</span>}
-                </td>
+                </td>)}
                 <td
                   data-label="Marge bei Nachkauf"
                   className="r bd-num bd-c-margin"
@@ -286,12 +311,32 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                     Ø VK {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : "—"}
                   </small>
                 </td>
+                {withTask && (
+                  <td data-label="Aktion" className="bd-c-act" onClick={(e) => e.stopPropagation()}>
+                    {(() => {
+                      const l = ebayLinks(row);
+                      const isMarked = marked?.get(row.articleId) ?? !!row.delistMarkedAt;
+                      return (
+                        <>
+                          {task === "auslisten" && onMark && (
+                            <button type="button" className={`chip${isMarked ? " on" : ""}`} disabled={busyMark} onClick={() => onMark(row.articleId, !isMarked)} title={isMarked ? "Markierung zurücknehmen." : "Karte zum Auslisten vormerken (nur eine Markierung in LEC, bei eBay passiert nichts)."}>
+                              {isMarked ? "Vorgemerkt · Rückgängig" : "Vormerken"}
+                            </button>
+                          )}
+                          <a className="chip" href={l.revise ?? l.view ?? l.search} target="_blank" rel="noopener noreferrer" title={l.revise ? "Öffnet das Bearbeiten-Formular des Angebots bei eBay." : "Öffnet das Angebot bzw. die Suche im eBay-Shop."}>
+                            eBay ↗
+                          </a>
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
               </tr>
             );
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={9} className="bd-empty">
+              <td colSpan={(withTask ? 11 : 9) - (showMarkt ? 0 : 1)} className="bd-empty">
                 Keine Artikel für diese Auswahl.
               </td>
             </tr>
