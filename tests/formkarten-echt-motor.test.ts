@@ -2,8 +2,9 @@
  * P4 — ECHTE FORMKARTEN UND INTENSITAET IM MOTOR (docs/design/formkarten-motor-p4-11-11.md).
  *
  * Haelt fest:
- *   1. Fuer eine freigeschaltete Disziplin (FORMKARTEN_ECHT_DISCIPLINE_IDS, Pilot: time-trial)
- *      traegt der Aufstellungseintrag die GESPIELTE Form (Kartenwerte, x2 bei Farbgleichheit, wie
+ *   1. Fuer eine freigeschaltete Disziplin (FORMKARTEN_ECHT_DISCIPLINE_IDS: time-trial, Pilot
+ *      11.11.; spurt, Welle 1 erste Disziplin, 14.11.) traegt der Aufstellungseintrag die
+ *      GESPIELTE Form (Kartenwerte, x2 bei Farbgleichheit, wie
  *      `calculateFormModifierForSide`) und die Intensitaet der Seite.
  *   2. "Plan schlaegt Entwurf" gilt auch hier (dieselbe Funktion wie die Wertung).
  *   3. Jede NICHT freigeschaltete Disziplin bekommt die Felder nicht — der Eintrag bleibt exakt
@@ -69,6 +70,24 @@ function spielstand(opts: {
 describe("P4: echte Formkarte im Aufstellungs-Rohr", () => {
   it("Pilot time-trial ist freigeschaltet", () => {
     expect(FORMKARTEN_ECHT_DISCIPLINE_IDS.has("time-trial")).toBe(true);
+  });
+
+  it("Welle 1, erste Disziplin spurt ist freigeschaltet (14.11.)", () => {
+    expect(FORMKARTEN_ECHT_DISCIPLINE_IDS.has("spurt")).toBe(true);
+  });
+
+  it("spurt: gespielte Karten (+4 farbgleich x2, +2) und Push landen bei JEDEM Spieler der Seite", () => {
+    const a = buildArenaAufstellung(
+      spielstand({
+        disciplineId: "spurt",
+        category: "speed",
+        modifiers: { d1: { primaryFormCardId: "fc-a-pos", secondaryFormCardId: "fc-b-pos", intensity: "push" } },
+      }),
+      "t1",
+      "md-1",
+    );
+    expect(a["Name a"]).toMatchObject({ d: "spurt", form: 10, intensitaet: "push" });
+    expect(a["Name b"]).toMatchObject({ d: "spurt", form: 10, intensitaet: "push" });
   });
 
   it("time-trial: gespielte Karten (+4 farbgleich x2, +2) und Push landen bei JEDEM Spieler der Seite", () => {
