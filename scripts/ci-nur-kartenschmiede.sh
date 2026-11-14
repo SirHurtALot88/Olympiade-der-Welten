@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Sagt der CI, ob eine Änderung NUR die Kartenschmiede (Moosgrab) betrifft.
+# Sagt der CI, ob eine Änderung NUR eigenständige Nebenprojekte betrifft: die Kartenschmiede (Moosgrab)
+# und das LEC-Cockpit (Lord Enterich Cards, apps/LEC) -- beide werden vom Oly-Code nicht gelesen.
 #
 #   bash scripts/ci-nur-kartenschmiede.sh <basis-sha> [kopf, Standard HEAD]
 #
 # Gibt "true" oder "false" aus. Dann laufen statt der Oly-Suiten (Build, Browser-Smokes,
-# volle Testsuite, Persistenz, Rangtreue) nur die Kartenschmiede-Prüfungen. Die Kartenschmiede ist
+# volle Testsuite, Persistenz, Rangtreue) nur die Prüfungen des jeweiligen Nebenprojekts (Jobs
+# `kartenschmiede` und `lec`). Die Kartenschmiede ist
 # eine eigenständige HTML-Seite (apps/kartenschmiede) und wird vom Oly-Code nicht gelesen.
 #
 # Im Zweifel immer "false", also die volle CI: ohne Basis (manueller Lauf, erster Push eines
@@ -32,7 +34,7 @@ if [[ -z "$dateien" ]]; then
   exit 0
 fi
 
-fremd="$(grep -v -E '^(apps/kartenschmiede/|lib/kartenschmiede/|tests/kartenschmiede[^/]*\.test\.ts$|scripts/kartenschmiede-[^/]*$|docs/design/moosgrab-[^/]*\.md$)' <<<"$dateien" || true)"
+fremd="$(grep -v -E '^(apps/kartenschmiede/|apps/LEC/|docs/enterich-cards/|lib/kartenschmiede/|tests/kartenschmiede[^/]*\.test\.ts$|scripts/kartenschmiede-[^/]*$|docs/design/moosgrab-[^/]*\.md$)' <<<"$dateien" || true)"
 
 if [[ -z "$fremd" ]]; then
   echo true

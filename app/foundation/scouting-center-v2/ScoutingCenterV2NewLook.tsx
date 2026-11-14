@@ -206,6 +206,9 @@ export default function ScoutingCenterV2NewLook({
   const rosterGap = rosterKnown && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
   const rosterMinimumMet = rosterKnown ? rosterCount >= rosterMinimum : rosterCount > 0;
   const readyToBuyEntries = queueEntries.filter((entry) => entry.isFullyScouted);
+  // Seit 11.11.: unbegrenzte Wunschliste, davon nur die obersten X nicht fertigen aktiv.
+  const activeQueueCount = queueEntries.filter((entry) => (entry.queueState ?? (entry.isActiveSlot ? "active" : "waiting")) === "active").length;
+  const waitingQueueCount = queueEntries.filter((entry) => entry.queueState === "waiting").length;
   const focusEntry = queueEntries.find((entry) => entry.isFocusTarget && !entry.isFullyScouted) ?? null;
 
   // #71 — Achsen-Mini-Radar nur für VOLL gescoutete Ziele (Fog-of-War-safe: bei
@@ -486,18 +489,18 @@ export default function ScoutingCenterV2NewLook({
             eyebrow="Scouting-Warteschlange"
             title="Wishlist — per Drag & Drop sortieren"
           >
-            <p className="nl-scout-muted">
-              {scoutPipeline
-                ? scoutPipeline.draftSuspended
-                  ? `${queueEntries.length} auf der Wishlist · Draft ohne Limit`
-                  : `${queueEntries.length} auf der Wishlist · ${scoutPipeline.maxSlots} aktive Slots`
-                : `${queueEntries.length} auf der Wishlist`}
-              {" — Platz 1 zuerst, Rest folgt automatisch."}
+            <p className="nl-scout-muted" data-testid="scouting-queue-summary">
+              {`${queueEntries.length} gemerkt · ${activeQueueCount}${
+                wishlistSlotLimit != null ? ` von ${wishlistSlotLimit}` : ""
+              } werden gescoutet${readyToBuyEntries.length > 0 ? ` · ${readyToBuyEntries.length} fertig` : ""}${
+                waitingQueueCount > 0 ? ` · ${waitingQueueCount} warten` : ""
+              }`}
+              {" — die Liste ist unbegrenzt; fertig gescoutete geben ihren Slot an den nächsten ab. Klick auf den Kreis öffnet den Scout-Bericht."}
             </p>
             <ScoutingPriorityQueue
               entries={queueEntries}
               focusEtaLabel={focusEtaLabel}
-              slotLimit={scoutPipeline?.draftSuspended ? null : (scoutPipeline?.maxSlots ?? wishlistSlotLimit)}
+              slotLimit={wishlistSlotLimit ?? scoutPipeline?.maxSlots ?? null}
               selectedReportPlayerId={selectedReportPlayerId}
               onReorder={(playerId, targetIndex) => onReorderQueue?.(playerId, targetIndex)}
               onOpenPlayer={onOpenPlayer}

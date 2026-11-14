@@ -17,6 +17,7 @@ import {
   resolveSponsorLeagueTier,
   sponsorV3GuaranteedLadder,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 
 const BRAND_HISTORY_LIMIT = 4;
 
@@ -165,6 +166,11 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
             // dieser Stelle bereits deren Fenster, siehe Kommentar oben) — `undefined`, solange der
             // Split nicht aktiv ist (heute immer).
             leagueTier: resolveSponsorLeagueTier(gameState, team.teamId),
+            // RANGRAUM DER NEUEN SAISON (16 bei Liga-Split, sonst 32). Hier — und nur hier — wird eine
+            // in einem Split-Spielstand noch mit 32 Sprossen unterschriebene Mehrjahresleiter auf die
+            // liga-lokalen 16 Plaetze umgebaut: zum Saisonwechsel, wo ohnehin Gehaltsfaktor, Erosion
+            // und Liga (Entscheidung 10.6) neu einfliessen, nie mitten in einer laufenden Saison.
+            leagueSize: sponsorRangraumFuer(gameState),
           },
         )
       : null;

@@ -1,17 +1,18 @@
 /**
- * PIXEL-SZENEN JE DISZIPLIN — die neuen Pixel-Art-Arenen (Spielfeld, Tribüne, HUD) aus der
- * Asset-Runde vom 01./02.11., im Spiel unter `public/szenen/<disziplinId>/`.
+ * PIXEL-SZENEN JE DISZIPLIN — die Pixel-Art-Arenen (Spielfeld, Tribüne, HUD) aus der
+ * Asset-Runde vom 01./02.11., als Quelldateien unter `public/szenen/<disziplinId>/`.
  *
- * Jede Szene ist eine eigenstaendige, selbstlaufende HTML-Datei (Bilder eingebettet, nur
- * Zeitfahren laedt seine Ebenen aus dem Nachbarordner). Daneben liegt ein Standbild
- * (`poster`), das die Arena zeigt, bevor die Szene geladen wird — die HTML-Dateien sind
- * 0,2–3,8 MB gross und werden deshalb erst auf Klick geladen.
- *
- * WICHTIG — was die Szene ist und was nicht: Sie spielt einen festen Demo-Ablauf mit den
- * Demo-Figuren der Asset-Runde (Kiti, Wurzelbert, Arlen, Johanna …). Sie ist NICHT an das
- * Ergebnis des Spieltags gekoppelt; das Ergebnis kommt weiter aus der Buehne darunter.
- * `focus` beschreibt, welcher Ausschnitt der Demo-Seite die eigentliche Arena ist (die
- * Demo-Seiten tragen daneben Entwickler-Erklaertexte, die Spieler nicht sehen sollen).
+ * KEINE DEMOS MEHR IM SPIEL (11.11., Chris: „KEINE DEMOS mehr! das soll nicht einfach abgespult
+ * werden! das muss sauber simuliert sein durch unsere engine und das in JEDER disziplin").
+ * Die selbstlaufenden HTML-Szenen (`demo`) spielen einen festen Ablauf mit den Demo-Figuren der
+ * Asset-Runde (Kiti, Wurzelbert, Arlen, Johanna …) und sind NICHT an den Spieltag gekoppelt; ihre
+ * Standbilder (`poster`) tragen dieselben Demo-Figuren eingebrannt. Beides bleibt nur noch als
+ * QUELLE für die Werkzeuge liegen (scripts/baue-arena-kulissen.py schneidet daraus die sauberen
+ * Hintergründe der Battle Arena, die Szenen-Tests prüfen die Varianten) — gezeigt wird im Spiel
+ * keins von beiden. Die Pixel-Arena über der Bühne zeigt stattdessen `kulisse`: denselben
+ * Hintergrund, den der Motor in der Battle Arena zeichnet (`public/sprites/kulissen/…`, ohne
+ * Demo-Figuren, Hindernisse zugemalt), plus die echte eigene Aufstellung. Das eigentliche Spiel
+ * mit den echten Figuren läuft in der Battle Arena (Battle Mode) bzw. auf der Bühne darunter.
  *
  * Schluessel = disziplinId wie in `NATIVE_PRIMITIVE` (DisciplineStageArena.tsx).
  */
@@ -19,9 +20,12 @@
 export type DisciplineSceneVariant = {
   id: string;
   label: string;
-  /** Selbstlaufende Szene (HTML). `null` = es gibt nur das Standbild. */
+  /** Selbstlaufende Demo-Szene (HTML) — nur noch Werkzeug-Quelle, im Spiel nie gezeigt. */
   demo: string | null;
+  /** Standbild der Demo-Szene (mit eingebrannten Demo-Figuren) — nur noch Werkzeug-Quelle. */
   poster: string;
+  /** Sauberer Hintergrund ohne Demo-Figuren (dieselbe Datei wie in der Battle Arena), `null` = keiner. */
+  kulisse: string | null;
 };
 
 export type DisciplineScene = {
@@ -33,6 +37,22 @@ export type DisciplineScene = {
 };
 
 const S = "/szenen";
+const K = "/sprites/kulissen";
+
+/** Varianten, fuer die scripts/baue-arena-kulissen.py (noch) keinen sauberen Hintergrund
+ *  geschnitten hat — dort zeigt die Pixel-Arena kein Bild statt eines Demo-Standbilds.
+ *  tests/discipline-scenes.test.ts haelt die Liste mit public/sprites/kulissen/ deckungsgleich. */
+const OHNE_KULISSE = new Set([
+  "staffel/stabwechsel",
+  "takeshis-castle/burg",
+  "takeshis-castle/eisfestung",
+  "takeshis-castle/dschungel",
+  "speed-schach/turniersaal",
+]);
+
+function kulisseVon(disciplineId: string, id: string): string | null {
+  return OHNE_KULISSE.has(`${disciplineId}/${id}`) ? null : `${K}/${disciplineId}/${id}.jpg`;
+}
 
 function v(disciplineId: string, id: string, label: string, opts?: { demo?: string | null; poster?: string }): DisciplineSceneVariant {
   return {
@@ -40,6 +60,7 @@ function v(disciplineId: string, id: string, label: string, opts?: { demo?: stri
     label,
     demo: opts?.demo === undefined ? `${S}/${disciplineId}/${id}.html` : opts.demo,
     poster: opts?.poster ?? `${S}/${disciplineId}/${id}.jpg`,
+    kulisse: kulisseVon(disciplineId, id),
   };
 }
 
@@ -49,6 +70,7 @@ function zeitfahrenKarte(id: string, label: string): DisciplineSceneVariant {
     label,
     demo: `${S}/time-trial/${id}/index.html`,
     poster: `${S}/time-trial/${id}/poster.jpg`,
+    kulisse: kulisseVon("time-trial", id),
   };
 }
 
@@ -63,9 +85,8 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "spurt",
     title: "Spurt (HYROX)",
     note: "Laufschleife mit Stationen, Zuschauern und wartenden Teamkollegen.",
-    // Bis 03.11. nur das Standbild hyrox.jpg (demo: null). kurs.html ist die erste abspielbare
-    // Szene: dasselbe Bild als Kulisse, die eingebrannten Figuren herausgenommen, Demo-Figuren
-    // laufen darauf (scripts/baue-spurt-szene.py).
+    // Bis 03.11. nur das Standbild hyrox.jpg (demo: null). kurs.html war die erste abspielbare
+    // Demo-Szene (scripts/baue-spurt-szene.py); im Spiel steht seit 11.11. nur die Kulisse.
     variants: [v("spurt", "kurs", "HYROX-Kurs")],
   },
   "takeshis-castle": {

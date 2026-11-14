@@ -10,6 +10,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
 import { ImageSyncCard } from "./ImageSyncCard";
 import { BillbeeSyncCard } from "./BillbeeSyncCard";
+import type { FeeCheckBand } from "@/lib/pricing/feeCheck";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -146,9 +147,10 @@ interface Props {
   authEnabled: boolean;
   /** Shopweite 365-Tage-Mengen aus dem letzten Import (null = noch kein Import). */
   shopVolume: ShopVolume | null;
+  feeCheck?: FeeCheckBand[];
 }
 
-export function EinstellungenPage({ costSettings, importBatches, authEnabled, shopVolume }: Props) {
+export function EinstellungenPage({ costSettings, importBatches, authEnabled, shopVolume, feeCheck }: Props) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   // Reine Anzeige (Chris, 13.10.: "dort soll nichts per Hand eingepflegt werden").
@@ -274,6 +276,30 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
               Korridor inkl. Deckungsbeitrags-Grenze.
             </div>
           </div>
+
+          {feeCheck && (
+            <div className="card" style={{ padding: "15px 16px 16px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>eBay-Gebührensatz: echt gegen Modell</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
+                Echt = Gebühren / Umsatz aus deinen eBay-Verkaufsberichten, Modell = Formel aus den Kostensätzen oben. Weicht es deutlich ab, stimmen Provision oder Werbesatz nicht mehr.
+              </div>
+              <table className="bd-dt-t" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr><th>Preisband</th><th className="r">Stück</th><th className="r">echt</th><th className="r">Modell</th></tr>
+                </thead>
+                <tbody>
+                  {feeCheck.map((b) => (
+                    <tr key={b.label}>
+                      <td>{b.label}</td>
+                      <td className="r">{b.units.toLocaleString("de-DE")}</td>
+                      <td className="r">{b.actualRate != null ? `${(b.actualRate * 100).toFixed(1).replace(".", ",")} %` : "—"}</td>
+                      <td className="r">{(b.modelRate * 100).toFixed(1).replace(".", ",")} %</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <ImportHistoryCard batches={importBatches} />
 

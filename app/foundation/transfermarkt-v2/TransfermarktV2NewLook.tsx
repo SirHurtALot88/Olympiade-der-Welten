@@ -440,6 +440,8 @@ export type TransfermarktV2NewLookProps = {
   wishlistEntries: TransferWishlistEntry[];
   scoutingIntelByPlayerId: Record<string, number>;
   scoutingActiveWishlistPlayerIds: string[];
+  /** Voll gescoutete Wunschlisten-Spieler (belegen keinen Slot mehr). */
+  scoutingCompletedWishlistPlayerIds?: string[];
   scoutingPipelineCapacity: { occupied: number; max: number | null; draftSuspended?: boolean } | null;
   onFocusWishlistEntry: (entry: TransferWishlistEntry) => void;
   onOpenWishlistDeal: (entry: TransferWishlistEntry) => void;
@@ -933,6 +935,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     wishlistEntries,
     scoutingIntelByPlayerId,
     scoutingActiveWishlistPlayerIds,
+    scoutingCompletedWishlistPlayerIds = [],
     scoutingPipelineCapacity,
     onFocusWishlistEntry,
     onOpenWishlistDeal,
@@ -956,6 +959,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     ? "Geschätzt — Schätzwerte auf Basis des Scouting-Standes, genaue Teamwirkung erst nach mehr Intel."
     : undefined;
   const scoutingActiveSet = new Set(scoutingActiveWishlistPlayerIds);
+  const scoutingCompletedSet = new Set(scoutingCompletedWishlistPlayerIds);
+  const scoutingSlotsFull = Boolean(
+    scoutingPipelineCapacity &&
+      scoutingPipelineCapacity.max != null &&
+      scoutingPipelineCapacity.max > 0 &&
+      scoutingActiveWishlistPlayerIds.length >= scoutingPipelineCapacity.max,
+  );
 
   // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
   const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
@@ -1260,7 +1270,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             tone="soc"
             sub={
               scoutingPipelineCapacity
-                ? `${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max ?? "∞"} Scouting`
+                ? `${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max ?? "∞"} aktiv`
                 : "Kandidaten"
             }
             onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
@@ -2243,7 +2253,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     title={
                       selectedPlayerWishlisted
                         ? "Von der Wunschliste nehmen — Scouting-Slot wird frei."
-                        : wishlistDisabledReason ?? "Spieler auf die Wunschliste setzen und bevorzugt scouten."
+                        : wishlistDisabledReason ??
+                          (scoutingSlotsFull
+                            ? "Auf die Wunschliste setzen — alle Scout-Slots sind belegt, er wartet, bis oben einer fertig wird."
+                            : "Spieler auf die Wunschliste setzen und bevorzugt scouten.")
                     }
                     onClick={onToggleSelectedWishlist}
                   >
@@ -2685,9 +2698,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           eyebrow="Wunschliste & Scouting"
           title={
             scoutingPipelineCapacity?.draftSuspended
-              ? `${wishlistEntries.length} gemerkt · Draft ohne Limit`
+              ? `${wishlistEntries.length} gemerkt · Draft`
               : scoutingPipelineCapacity
-                ? `${wishlistEntries.length}/${scoutingPipelineCapacity.max ?? "∞"} Scouting-Slots`
+                ? `${wishlistEntries.length} gemerkt · ${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max ?? "∞"} Scout-Slots aktiv`
                 : `${wishlistEntries.length} gemerkt`
           }
         >
@@ -2701,6 +2714,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 const portraitSrc = appendMediaImageVariant(portraitBase, "preview") ?? portraitBase;
                 const intel = scoutingIntelByPlayerId[entry.playerId] ?? null;
                 const isActiveScout = scoutingActiveSet.has(entry.playerId);
+                const isCompletedScout = scoutingCompletedSet.has(entry.playerId);
                 return (
                   <article className="nl-market-wishlist-chip" role="listitem" key={entry.id}>
                     <button
@@ -2734,7 +2748,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                           className={`nl-market-signal-chip ${
                             scoutingPipelineCapacity?.draftSuspended
                               ? nlToneClass("accent")
-                              : isActiveScout
+                              : isActiveScout || isCompletedScout
                                 ? nlToneClass("good")
                                 : nlToneClass("neutral")
                           }`}
@@ -2743,7 +2757,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                             ? "Draft"
                             : isActiveScout
                               ? `Scout aktiv ${intel ?? 0}%`
-                              : "Nur gemerkt"}
+                              : isCompletedScout
+                                ? "Fertig gescoutet"
+                                : "Wartet auf Scout-Slot"}
                         </span>
                       </span>
                     </button>

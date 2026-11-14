@@ -21,6 +21,7 @@ import {
 } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getScoutingIntelMilestone } from "@/lib/scouting/scouting-hub-targets-service";
 import { buildPlayerAxisStarProfile, revealAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildScoutVerdict, type ScoutVerdict } from "@/lib/scouting/scout-verdict-service";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 
@@ -71,6 +72,8 @@ export type ScoutingReportData = {
     hiddenPositiveCount: number;
     hiddenNegativeCount: number;
   };
+  /** Scout-Urteil (Note 1+ bis 6, Empfehlung, Begründung) — siehe scout-verdict-service.ts. */
+  verdict?: ScoutVerdict | null;
 };
 
 /**
@@ -255,5 +258,6 @@ export function buildScoutingReport(input: {
       hiddenPositiveCount: traitView.hiddenPositiveTraitCount,
       hiddenNegativeCount: traitView.hiddenNegativeTraitCount,
     },
+    verdict: buildScoutVerdict({ gameState: input.gameState, teamId: input.teamId, playerId: player.id }),
   };
 }

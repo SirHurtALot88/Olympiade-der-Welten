@@ -1,6 +1,8 @@
 "use client";
 
+import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
+import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
 import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
@@ -78,6 +80,19 @@ export function EbayLink({ row }: { row: SortimentRow }) {
 
 export function VerdictBadge({ row }: { row: SortimentRow }) {
   const m = row.market;
+  // Lange nicht verkauft: statt „zu günstig“ der Lebenszyklus (zu dem Preis kauft ihn niemand)
+  if (row.lifecycle) {
+    const l = LIFECYCLE_LABEL[row.lifecycle];
+    const color = row.lifecycle === "auslisten" ? "var(--crit)" : "var(--warn)";
+    return (
+      <div className="bd-verdict">
+        <span className="bd-pill" title={l.hint} style={{ color, borderColor: color }}>
+          <i style={{ background: color }} />
+          {l.label}
+        </span>
+      </div>
+    );
+  }
   if (!m || !m.rated) return <span className="bd-none">{m ? "ohne Urteil" : "—"}</span>;
   const v = VERDICT[m.status];
   const gap = boardGap(row);
@@ -98,30 +113,47 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
 
 interface Props {
   rows: SortimentRow[];
+  /** Nur im Doppelte-Filter gesetzt: zeigt eBay-Nummer und letzten Verkauf direkt in der Zeile. */
+  dupGroups?: Map<string, string>;
+  sortKey?: BoardSortKey;
+  reversed?: boolean;
+  onSort?: (key: BoardSortKey) => void;
   imageVersions: Record<string, string>;
   imageSrc: (articleId: string, version: string) => string;
   onPreview: (p: { src: string; x: number; y: number } | null) => void;
   onOpen: (articleId: string) => void;
 }
 
-export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+/** Tage seit dem letzten Verkauf; null ohne Verkauf. */
+export function daysSince(iso: string | null | undefined, now = Date.now()): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
+export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+  const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
+    <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
+      {label}
+      {sortKey === key && <span className="bd-sort-arrow">{reversed ? "▲" : "▼"}</span>}
+    </th>
+  );
   return (
     <div className="bd-wrap">
       <table className="bd">
         <thead>
           <tr>
-            <th>Artikel</th>
-            <th className="r" title="Lagerbestand in Stück">Bestand</th>
-            <th className="r" title="Verkaufte Stück in 365 Tagen (darunter 90 Tage)">Verkäufe</th>
-            <th className="r" title="Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)">Ø EK</th>
-            <th className="r" title="Durchschnittlicher Verkaufspreis je Stück (365 T)">Ø VK</th>
-            <th className="r">Dein VK</th>
-            <th>Empfohlener VK</th>
-            <th className="r">Marktwert</th>
-            <th className="r" title="Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst">
-              Marge
-            </th>
-            <th>Urteil</th>
+            {head("name", "Artikel")}
+            {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
+            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage)")}
+            {head("letzterVerkauf", "Letzter Verkauf", "r", "Vor wie vielen Tagen zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
+            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)")}
+            {head("avgvk", "Ø VK", "r", "Durchschnittlicher Verkaufspreis je Stück (365 T)")}
+            {head("vk", "Dein VK", "r")}
+            {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
+            {head("marktwert", "Marktwert", "r")}
+            {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
+            {head("abweichung", "Urteil")}
           </tr>
         </thead>
         <tbody>
@@ -157,9 +189,17 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                       <div className="bd-sub">
                         {row.setCode && <CopyCode setCode={row.setCode} />}
                         {rarity && <span className="bd-rar">{rarity}</span>}
+                        {row.kartenart && <span className="bd-rar" title={row.ordner ?? undefined}>{row.kartenart}</span>}
+                        {row.delistMarkedAt && <span className="bd-rar" style={{ color: "var(--crit)" }} title="Von dir zum Auslisten markiert">zum Auslisten</span>}
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}
+                        {row.ebayEndedAt && <span className="bd-rar" title={`Seit ${row.ebayEndedAt.slice(0, 10)} nicht mehr im eBay-Shop`}>bei eBay beendet</span>}
+                        {dupGroups?.has(row.articleId) && (
+                          <span className="bd-rar" title={row.nameRaw}>
+                            Doppelt? · Bestand {row.stock} · eBay {row.ebayItemId ?? "–"} · {row.lastSoldAt ? `letzter Verkauf vor ${daysSince(row.lastSoldAt)} T` : "nie verkauft"}
+                          </span>
+                        )}
                         {row.codeName?.mismatch && (
                           <span
                             className="bd-rar bd-namewarn"
@@ -174,21 +214,63 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                 </td>
                 <td data-label="Bestand" className="r bd-num bd-c-stock">
                   {row.stock > 0 ? formatQty(row.stock) : <span className="bd-none">0</span>}
+                  {row.reorderDue && (
+                    <small
+                      className="bd-reorder"
+                      title={row.reorderReason === "mindestbestand" ? `Bestand ${row.stock} liegt auf oder unter dem Mindestbestand ${row.minStock} (aus Billbee)${row.reorderQty ? `, Soll ${row.desiredStock}: ${row.reorderQty} Stk fehlen` : ""}` : row.reorderReason === "ausverkauft" ? "Ausverkauft, der Artikel verkauft sich" : "Bestand reicht nur noch etwa 1,5 Monate"}
+                    >
+                      nachbestellen
+                    </small>
+                  )}
                 </td>
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}
                   <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
                 </td>
+                <td data-label="Letzter Verkauf" className="r bd-num bd-c-last">
+                  {(() => {
+                    const d = daysSince(row.lastSoldAt);
+                    if (d === null)
+                      return row.listedDays != null ? (
+                        <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                          nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
+                        </span>
+                      ) : (
+                        <span className="bd-none">—</span>
+                      );
+                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                  })()}
+                </td>
                 <td data-label="Ø EK" className="r bd-num bd-c-ek">
                   {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
+                  {(() => {
+                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
+                    const d = daysSince(row.lastEkAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
+                      </small>
+                    );
+                  })()}
                 </td>
                 <td data-label="Ø VK" className="r bd-num bd-c-avg">
                   {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
                 </td>
-                <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
+                <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "eBay-Shoppreis (Rückfall, wenn Billbee keinen VK hat)" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
                   <EbayLink row={row} />
+                  {(() => {
+                    // Letzte Preisanpassung: nur wenn aufgezeichnet (Billbee- und eBay-Shop-Abgleich), farbig in Tagen
+                    const d = daysSince(row.lastPriceChangeAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte aufgezeichnete Preisänderung (grün bis 30 Tage, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "Preis heute geändert" : `Preis vor ${d} T geändert`}
+                      </small>
+                    );
+                  })()}
                 </td>
                 <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />
@@ -224,7 +306,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
 
 function marketTitle(m: NonNullable<SortimentRow["market"]>): string {
   if (m.range) return `${m.range.variants} Varianten im Set, die Seltenheit lässt sich nicht eindeutig zuordnen — Spanne statt Einzelwert`;
-  if (m.how === "seltenheit") return "Cardmarket-7-Tage-Schnitt der Variante mit der Seltenheit aus deinem Titel";
-  if (m.how === "einzige_variante") return "Cardmarket-7-Tage-Schnitt (die Karte hat im Set nur eine Variante)";
-  return "Cardmarket-7-Tage-Schnitt";
+  if (m.how === "seltenheit") return "Mittelwert (Cardmarket-Trend, Ø 1/7/30 Tage, letzter EK) der Variante mit der Seltenheit aus deinem Titel";
+  if (m.how === "einzige_variante") return "Mittelwert aus Cardmarket und letztem EK (die Karte hat im Set nur eine Variante)";
+  return "Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage und letztem EK";
 }

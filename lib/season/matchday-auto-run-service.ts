@@ -18,7 +18,13 @@ import {
   type LegacyMatchdayCommitThroughSide,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
-import { kickoffArenaVorlauf, stelleArenaVorlaufSicher, type ArenaModus } from "@/lib/battle/arena-vorlauf-service";
+import {
+  beschleunigeArenaVorlaufPerQuickSim,
+  kickoffArenaVorlauf,
+  stelleArenaVorlaufSicher,
+  type ArenaModus,
+  type ArenaVorlaufKickoffErgebnis,
+} from "@/lib/battle/arena-vorlauf-service";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import {
   buildLegacyMatchdayResolvePreview,
@@ -110,7 +116,10 @@ export type MatchdayAutoRunParams = {
      * Aufruf, die UI pollt weiter. `"inline"` (Default hier, fuer Skripte -- Smoke-Tests, Admin-
      * Simulation, Bootstrap, s. Plan Abschnitt 1.1): wartet synchron auf den Vorlauf. `"aus"`:
      * kein Vorlauf, die Engine markiert jede offene Arena-Disziplin selbst als
-     * `arena_ausgefallen:nicht_ausgefuehrt` (Notschalter/Tests ohne Chromium).
+     * `arena_ausgefallen:nicht_ausgefuehrt` (Notschalter/Tests ohne Chromium). `"quick-sim"`
+     * (27.10., NUR der "⏩ Quick-Sim"-Knopf der Buehne): wartet auf einen Vorlauf per Node-Runner
+     * statt Chromium (`beschleunigeArenaVorlaufPerQuickSim()`), faellt bei einem Node-Fehler auf
+     * `"hintergrund"` zurueck.
      */
     arenaModus?: ArenaModus;
   };
@@ -947,10 +956,20 @@ export async function runLocalMatchdayAutoRun(
   if (!dryRun && activeResolve.preview.status === "ready") {
     const arenaModus: ArenaModus = params.options?.arenaModus ?? "inline";
     if (arenaModus !== "aus") {
-      const vorlaufErgebnis =
-        arenaModus === "inline"
-          ? await stelleArenaVorlaufSicher(scope, {}, persistence)
-          : kickoffArenaVorlauf(scope, {}, persistence);
+      // QUICK-SIM (27.10.): NUR dieser Modus nimmt den Node-Runner (`beschleunigeArenaVorlaufPerQuickSim()`,
+      // wartet auf Node, nie auf Chromium, faellt bei einem Node-Fehler auf den Hintergrund-Vorlauf
+      // zurueck). `"hintergrund"`/`"inline"` bleiben unveraendert beim Chromium-Vorlauf.
+      let vorlaufErgebnis: ArenaVorlaufKickoffErgebnis;
+      let quickSimMetriken: Record<string, string | number> = {};
+      if (arenaModus === "inline") {
+        vorlaufErgebnis = await stelleArenaVorlaufSicher(scope, {}, persistence);
+      } else if (arenaModus === "quick-sim") {
+        const quickSim = await beschleunigeArenaVorlaufPerQuickSim(scope, {}, persistence);
+        vorlaufErgebnis = quickSim;
+        quickSimMetriken = { quickSimWeg: quickSim.weg, quickSimDauerMs: quickSim.dauerMs };
+      } else {
+        vorlaufErgebnis = kickoffArenaVorlauf(scope, {}, persistence);
+      }
       // `applicable: false` (Manager Mode oder kein arena-aufgeloester Spieltag): GAR KEIN
       // Schritt, unveraendertes Verhalten -- derselbe Sicherheitsrahmen wie im Kickoff-Mantel.
       if (!vorlaufErgebnis.applicable) {
@@ -966,7 +985,7 @@ export async function runLocalMatchdayAutoRun(
           canContinue: false,
           warnings: [],
           blockingReasons: ["arena_vorlauf_laeuft"],
-          metrics: { arenaModus },
+          metrics: { arenaModus, ...quickSimMetriken },
           plannedWrites: 0,
           appliedWrites: 0,
           auditId: null,
@@ -1094,6 +1113,7 @@ export async function runLocalMatchdayAutoRun(
           blockingReasons: [],
           metrics: {
             arenaModus,
+            ...quickSimMetriken,
             vorlaufStatus: vorlaufErgebnis.status,
             disziplinenGesamt,
             disziplinenAusgefallen,

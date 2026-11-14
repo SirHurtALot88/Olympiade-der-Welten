@@ -43,6 +43,16 @@ import { zaehleEntwickelteSpieler } from "@/lib/progression/spieler-entwicklung-
  * Verschlechterung in jedem bestehenden Spielstand, nicht in einem neuen. Deshalb: Erzeugung raus,
  * Auswertung bleibt. `form_color_cover` steht bewusst NICHT mehr im (entfernten) Key-Katalog, aber
  * hier — es ist kein Waisen-Zweig, echte Spielstaende benutzen den Key weiterhin.
+ *
+ * GENAU DESHALB WAR PR #1384s ANNAHME NUR TEILWEISE RICHTIG: die PR liess diese Datei bewusst
+ * unangetasst, mit der Begruendung "Altziele, die nicht mehr erzeugt werden" — richtig fuer die
+ * ERZEUGUNGSSEITE (siehe oben), falsch fuer die AUSWERTUNGSSEITE. `underdog_story`/`golden_fairytale`
+ * (`expectedRankForTeam` unten) vergleichen einen aus `computeTeamExpectation` gewonnenen erwarteten
+ * Rang mit dem tatsaechlichen Endrang (`finalRankForTeam`) — und laufen damit in dasselbe
+ * 16-vs-32-Rangraum-Problem, das PR #1384 im Sponsor-Vertragsmodell (`sponsor-v3-offer-service.ts`)
+ * gefixt hat: bei aktivem Liga-Split ist der Endrang liga-lokal (1..LEAGUE_SIZE), der erwartete Rang
+ * ohne explizites `gameState` aber weiter global (1..TEAM_COUNT_TOTAL). Fix: `expectedRankForTeam`
+ * reicht `gameState` jetzt durch, exakt das Muster aus PR #1379 (`getExpectationRankObjective`).
  */
 export function evaluateSponsorRankObjective(currentRank: number | null, targetRank: number) {
   if (currentRank == null) return "open" as const;
@@ -243,11 +253,24 @@ function startRankForTeam(gameState: GameState, teamId: string): number | null {
   return null;
 }
 
-function expectedRankForTeam(rows: TeamManagementSnapshotRow[], teamId: string): number | null {
+/**
+ * DER GLEICHE 16-VS-32-RANGRAUM-BUG WIE IM SPONSOR-VERTRAGSMODELL (PR #1384), NUR HIER:
+ * `finalRankForTeam` liest `row.rank`/`standings[teamId].rank` — bei aktivem Liga-Split liga-lokal
+ * 1..LEAGUE_SIZE (`team-management-overview.ts` Zeile ~204). `computeTeamExpectation` rankt dagegen
+ * ALLE Teams aus `rowsByTeamId`, also global 1..TEAM_COUNT_TOTAL — AUSSER man uebergibt `gameState`,
+ * dann skaliert sie seit #1379 (`resolveLeagueScopedRows`) selbst auf die eigene Liga herunter.
+ * Ohne `gameState` (wie es hier bis zu diesem Fix stand) bekommt jedes Liga-2-Team einen erwarteten
+ * Rang von ~17..32, der nie mit seinem liga-lokalen Endrang 1..16 vergleichbar ist — `underdog_story`
+ * / `golden_fairytale` (die einzigen Aufrufer, ueber `computeObjectiveProgressMetric`) zeigten so
+ * pauschal ein Overachievement von rund +LEAGUE_SIZE Raengen, auch wenn ein Team seine Erwartung
+ * exakt getroffen hat. Nachgemessen am Live-Save-Abbild: Liga-2-Team auf liga-lokalem Rang 8/16,
+ * global erwarteter Rang 24 statt liga-lokal erwarteter Rang 8 → Metrik 16 statt der korrekten 0.
+ */
+function expectedRankForTeam(gameState: GameState, rows: TeamManagementSnapshotRow[], teamId: string): number | null {
   const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
   const row = rowsByTeamId.get(teamId);
   if (!row) return null;
-  return computeTeamExpectation({ row, rowsByTeamId, identity: null }).expectedRank;
+  return computeTeamExpectation({ row, rowsByTeamId, identity: null, gameState }).expectedRank;
 }
 
 function parseRivalTeamId(targetValue: SponsorOfferComponent["targetValue"]): string | null {
@@ -297,7 +320,7 @@ export function computeObjectiveProgressMetric(
   switch (key) {
     case "underdog_story":
     case "golden_fairytale": {
-      const expected = expectedRankForTeam(rows, teamId);
+      const expected = expectedRankForTeam(gameState, rows, teamId);
       const final = finalRankForTeam(gameState, teamId, row);
       if (expected == null || final == null) return null;
       return expected - final;
