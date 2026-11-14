@@ -66,3 +66,20 @@ Hinweis: Die frühere Annahme „3.400 Stück im Jahr“ in `KONZEPT.md` war zu 
 (2022 enthält zusätzlich 2 Bestellungen ohne Shop, 13,94 €.)
 
 Beobachtung (Chris): weniger Bestellungen, aber höherer Warenkorb. Der Warenkorb steigt (8,00 € → 13,29 €, +66 %) durch teurere Karten, nicht durch mehr Karten je Bestellung: die Artikel je Bestellung liegen stabil bei 1,45 bis 1,57. Das Porto je Sendung fällt dadurch relativ weniger ins Gewicht (Anteil vom Umsatz 14 % → ca. 11 %). Die Kosten für Verpackung und Versand je Bestellung steigen dagegen (1,28 € → ca. 1,51 €, +18 %), vermutlich Portoerhöhungen und mehr Sendungen mit Tracking.
+
+## Lexoffice-Buchungen „Kosten für Verpackung und Transport“ 2026 (von Chris, 14.11.2026)
+
+19 Buchungen, Summe 2.344,02 € (14.01. bis 14.10.2026). Aufgeschlüsselt:
+
+| Posten | Buchungen | Summe |
+|---|---|---:|
+| Deutsche Post, große Beträge (Portokasse/Frankierung) | 10 (55,65 € bis 288,00 €) | 1.900,65 € |
+| Deutsche Post, 7,00 € | 3 | 21,00 € |
+| Deutsche Post, 66,00 € (3×) und 72,00 € (1×) — vermutlich die 4 × 25 Einschreiben-Marken | 4 | 270,00 € |
+| Amazon 64,84 € (07.04., vermutlich Versandtaschen) und Raid'n'Trade 87,53 € (18.06., vermutlich Toploader) | 2 | 152,37 € |
+
+Daraus:
+- Das Porto kommt von der Deutschen Post (Zahlungsausgänge), nicht über eBay-Etiketten. Eine Doppelzählung mit den eBay-Verkaufskosten ist deshalb nicht zu erwarten.
+- Porto gesamt ohne Einschreiben: 1.921,65 € in 9,5 Monaten, bei ca. 1.496 Bestellungen (1.658 bis 14.11., auf 14.10. gekürzt) sind das ca. 1,28 € je Bestellung inkl. Ausland und Tracking; das Inland-Standardporto der Kalkulation (0,97 €) liegt darunter, der Rest ist Ausland/Tracking.
+- Verpackungsmaterial: 152,37 € bis Oktober, plus 65 € Taschen am 14.11.: zusammen 217 € (= Wert in der Kalkulation).
+- Wenn die vier Buchungen mit 66/72 € die Einschreiben-Marken sind: 270 € für 100 Marken = 2,70 € je Marke (Kalkulation nutzt 2,35 €). Von Chris zu bestätigen.
