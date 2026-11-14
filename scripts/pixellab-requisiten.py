@@ -117,6 +117,20 @@ AUFTRAEGE = {
     # --- Speed-Schach: sechs Figuren in einer Reihe, damit sie aus einem Guss sind ---
     "schach": dict(art="schach", gen=(288, 48),
         prompt=f"row of six ivory white chess pieces side by side, evenly spaced, from left to right: small round pawn, castle tower rook, horse head knight, bishop with pointed mitre, queen with a spiked crown, tallest king with a cross on top, front view, {STIL}"),
+
+    # --- Climbing: Kulissen-QS 08.11. (Rahmen statt Material, Rang 2 des Audits). Drei NEUE
+    # Requisiten (art="neu", wie takeshi_torii/-kirschbaum/-tribuene in Batch 13: kein altes
+    # Format zu treffen, Ziel ist die eigene gen-Box) fuer die Boden-/Wandfuss-Zone, die bodenWand()
+    # jetzt zeichnet (docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.2: "unten der
+    # Boden (Matten, Sicherer, Kreidebeutel, Hallenboden ...)", "Eisfall mit ... Eiszapfen am
+    # Ueberhang"). Front-/Seitenansicht wie hind_huerde/falle_tuer oben, NICHT DRAUF: die Wand ist
+    # eine senkrechte Flaeche von vorn, keine Draufsicht-Karte.
+    "climbing_matte": dict(art="neu", datei="arena/climbing_matte.png", gen=(48, 48),
+        prompt=f"square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, {STIL}"),
+    "climbing_kreidebeutel": dict(art="neu", datei="arena/climbing_kreidebeutel.png", gen=(20, 26),
+        prompt=f"small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, {STIL}"),
+    "climbing_eiszapfen": dict(art="neu", datei="arena/climbing_eiszapfen.png", gen=(30, 42), anker="mitte",
+        prompt=f"a cluster of hanging translucent light blue ice icicles pointing downward, front view, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -413,7 +427,27 @@ def baue_korb(name, a):
     return True
 
 
-BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach}
+def baue_neu(name, a):
+    """Brandneue Requisiten ohne Vorgaenger-Datei (kein ALTE_BOX-Eintrag noetig, uebernommen aus
+    Batch 13/Takeshi): der Rohkandidat wird auf seine Alpha-Begrenzung beschnitten, in die eigene
+    gen-Box eingepasst und mittig (anker="mitte") oder unten buendig (Default) auf eine neue,
+    transparente Leinwand genau dieser Box gesetzt."""
+    q = roh(name)
+    if q is None:
+        return False
+    bw, bh = a["gen"]
+    inh = einpassen(zuschnitt(q), bw, bh)
+    neu = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    ox = (bw - inh.width) // 2
+    oy = (bh - inh.height) // 2 if a.get("anker") == "mitte" else bh - inh.height
+    neu.alpha_composite(inh, (ox, oy))
+    os.makedirs(os.path.join(SPRITES, os.path.dirname(a["datei"])), exist_ok=True)
+    neu.save(os.path.join(SPRITES, a["datei"]))
+    return True
+
+
+BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach,
+         "neu": baue_neu}
 
 
 def einsetzen(args):
