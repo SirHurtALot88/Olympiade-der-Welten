@@ -1237,7 +1237,8 @@ describe("CI-Weiche für die Kartenschmiede", () => {
   it("jeder Oly-Job in ci.yml hängt an der Weiche", () => {
     const liste = jobs("ci.yml");
     expect(liste.map(j => j.name)).toContain("kartenschmiede");
-    const ohne = liste.filter(j => !["weiche", "kartenschmiede"].includes(j.name) && !amGleis(j.rumpf)).map(j => j.name);
+    expect(liste.map(j => j.name)).toContain("lec");
+    const ohne = liste.filter(j => !["weiche", "kartenschmiede", "lec"].includes(j.name) && !amGleis(j.rumpf)).map(j => j.name);
     expect(ohne).toEqual([]);
   });
 

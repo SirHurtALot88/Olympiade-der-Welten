@@ -63,16 +63,33 @@ function resolveDebtCautionBuffer(gameState: GameState, teamId: string, rosterMw
 }
 
 /**
+ * S1-MW-Rücklagequote, Finanz-Vorsicht-skaliert (Bug #106): dieselbe Finance-Achse, die den S2+
+ * Soft-Ratio unten steuert (`getTeamCashSalarySoftTarget`, 0.25–0.75 symmetrisch um 0.5), skaliert
+ * hier die MW-Basisquote um denselben Faktor. Bei neutralem `finances` (5 → Soft-Ratio 0.5) bleibt
+ * die Quote exakt `PLANNER_LIQUIDITY_BUFFER_MW_RATIO` (0.1) — unverändertes Verhalten im Default-Fall.
+ *
+ * VORHER: `resolveTeamLiquidityBufferTarget` gab `mwBuffer` für Saison 1 zurück, BEVOR überhaupt
+ * irgendein Finance-Wert gelesen wurde — ein finanziell vorsichtiges Team (hohe `identity.finances`)
+ * bekam exakt dieselbe Kader-Rücklage wie ein finanziell sorgloses Team mit identischem Kader-
+ * Marktwert. Für S2+ floss dieselbe Finance-Achse längst ein (`baseSoftRatio` unten); S1 blieb außen vor.
+ */
+function resolveSeason1LiquidityBufferMwRatio(gameState: GameState, teamId: string): number {
+  const softRatio = getTeamCashSalarySoftTarget(gameState, teamId);
+  return Math.round(PLANNER_LIQUIDITY_BUFFER_MW_RATIO * (softRatio / 0.5) * 1000) / 1000;
+}
+
+/**
  * S2+ liquidity buffer: finance-scaled cash/salary target (0.25–0.75× own salary),
  * floored by league-median salary anchor. Excess cash above this buffer is spendable.
  */
 export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: string): number {
   const rosterMw = resolveTeamRosterMarketValue(gameState, teamId);
   const debtCautionBuffer = resolveDebtCautionBuffer(gameState, teamId, rosterMw);
-  const mwBuffer = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_LIQUIDITY_BUFFER_MW_RATIO) + debtCautionBuffer);
   if (!usesSingleCashPlanningPolicy(gameState)) {
-    return mwBuffer;
+    const mwRatio = resolveSeason1LiquidityBufferMwRatio(gameState, teamId);
+    return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * mwRatio) + debtCautionBuffer);
   }
+  const mwBuffer = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_LIQUIDITY_BUFFER_MW_RATIO) + debtCautionBuffer);
   const salary = getTeamSalarySum(gameState, teamId);
   if (salary <= 0) {
     const leagueMedian = getLeagueMedianTeamSalary(gameState);

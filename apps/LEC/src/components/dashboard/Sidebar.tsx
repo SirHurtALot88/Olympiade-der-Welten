@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { UpdateButton } from "./UpdateButton";
 
 type NavKey =
   | "dashboard"
@@ -18,6 +19,7 @@ type NavKey =
 const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: "dashboard", label: "Dashboard", href: "/" },
   { key: "sortiment", label: "Sortiment", href: "/sortiment" },
+  { key: "cockpit", label: "Leitplanken", href: "/cockpit" },
 ];
 
 /** Ordnet die aktuelle Route dem Sidebar-Eintrag zu (aktiver Zustand aus der Route). */
@@ -54,6 +56,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="sidefoot">
+        <UpdateButton />
         <a href="/einstellungen" className={active === "einstellungen" ? "active" : undefined} style={{ color: "inherit", textDecoration: "underline dotted" }}>
           Einstellungen &amp; Datenstand
         </a>

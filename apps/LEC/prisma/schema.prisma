@@ -41,6 +41,13 @@ model Article {
   /// "item_id" | "name" | "alias" — wie das Angebot dem Artikel zugeordnet wurde.
   imageMatchedBy String?
   imageFetchedAt DateTime?
+  /// Von Chris im Sortiment ausgeblendet (z. B. gibt es den Artikel nicht mehr): erscheint nicht in den Listen, bleibt aber erhalten.
+  hidden         Boolean  @default(false)
+  /// Mindest-/Meldebestand und Soll-Bestand aus dem Billbee-Artikelstamm (StockWarning / StockDesired); null = nicht gepflegt.
+  minStock       Int?
+  desiredStock   Int?
+  /// "Erstmal nicht nachbestellen": bis zu diesem Zeitpunkt gilt der Artikel nicht als faellig (Chris, 13.11.).
+  reorderSnoozeUntil DateTime?
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?
@@ -50,6 +57,12 @@ model Article {
   /// Set-Codes, die zum Namen im Titel passen (nur wenn Name und Code nicht zusammenpassen).
   codeHint        String?
   ebayPriceAt    DateTime?
+  /// Seit wann der Artikel laut Shopseite nicht mehr bei eBay gelistet ist (null = gelistet/unbekannt). Beim ersten Erkennen blendet der Abruf ausverkaufte Artikel aus.
+  ebayEndedAt    DateTime?
+  /// Kartentyp laut YGOPRODeck ("Synchro Monster", "Spell Card" ...), fuer Kartenart und Ordner; null = noch nicht bestimmt.
+  cardType       String?
+  /// Von Chris zum Auslisten markiert (Drawer-Knopf), um die Karte spaeter im Ordner zu finden; null = nicht markiert.
+  delistMarkedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -57,6 +70,10 @@ model Article {
   saleWindows  SaleWindow[]
   purchases    Purchase[]
   sales        Sale[]
+  stockLog     StockMovement[]
+  priceLog     PriceChange[]
+  ekLog        EkChange[]
+  marketHistory MarketPriceHistory[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -181,7 +198,7 @@ model MarketPrice {
 }
 
 /// Einzelverkauf (eine Bestellposition) aus der Billbee-API: Datum, Menge, Preis je Stueck (brutto).
-/// Wird je Abruf fuer die letzten 365 Tage ersetzt (source "billbee-api").
+/// Wird je Abruf komplett ersetzt (gesamte Historie) (source "billbee-api").
 model Sale {
   id        String   @id @default(cuid())
   articleId String
@@ -193,6 +210,58 @@ model Sale {
   source    String
 
   @@index([articleId, soldAt])
+}
+
+/// Bestandsaenderung eines Artikels, bei jedem Billbee-Abruf festgehalten (Billbee selbst liefert keine Lagerhistorie).
+model StockMovement {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  before    Int
+  after     Int
+
+  @@index([articleId, at])
+}
+
+/// Aenderung des Listen-VK eines Artikels, bei jedem Billbee-Abgleich festgehalten (Billbee liefert keine Preishistorie).
+model PriceChange {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  before    Float
+  after     Float
+
+  @@index([articleId, at])
+}
+
+/// Aenderung des Einkaufspreises (Billbee-Artikelstamm CostPrice), bei jedem Billbee-Abgleich festgehalten (Chris, 13.11.): zeigt, wie aktuell der EK ist.
+model EkChange {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  before    Float
+  after     Float
+
+  @@index([articleId, at])
+}
+
+/// Verlauf der Cardmarket-Preise je Artikel (Chris, 13.11.2026): MarketPrice haelt nur den letzten Stand und wird bei jedem Abruf ersetzt.
+/// Je Marktabruf eine Zeile fuer aktive Artikel mit eindeutigem Marktwert; Grundlage fuer Trend- und Preisentscheidungen.
+model MarketPriceHistory {
+  id         String   @id @default(cuid())
+  articleId  String
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at         DateTime
+  priceFrom  Float?
+  priceTrend Float?
+  priceAvg1  Float?
+  priceAvg7  Float?
+  priceAvg30 Float?
+
+  @@index([articleId, at])
 }
 
 /// Zugangsdaten zu Fremddiensten (Billbee), verschluesselt (AES-256-GCM, Schluessel aus LEC_AUTH_SECRET).

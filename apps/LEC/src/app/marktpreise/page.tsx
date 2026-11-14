@@ -12,7 +12,7 @@ function urgency(r: ReturnType<typeof buildMarketComparisonRow>): number {
 }
 
 export default async function Page() {
-  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
+  const { aggregates, allAggregates, costSettings } = await loadArticleAggregates(prisma);
 
   const quotes = await prisma.marketPrice.findMany({ orderBy: { fetchedAt: "desc" } });
   const latestByArticle = new Map<string, (typeof quotes)[number]>();
@@ -20,7 +20,7 @@ export default async function Page() {
     if (!latestByArticle.has(q.articleId)) latestByArticle.set(q.articleId, q);
   }
 
-  const shop = shopVolumeFromAggregates(aggregates, costSettings);
+  const shop = shopVolumeFromAggregates(allAggregates, costSettings);
   const rows = aggregates
     .filter((a) => latestByArticle.has(a.articleId))
     .map((a) => buildMarketComparisonRow(a, latestByArticle.get(a.articleId)!, costSettings, shop))

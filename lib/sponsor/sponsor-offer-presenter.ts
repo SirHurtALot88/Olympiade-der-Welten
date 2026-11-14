@@ -383,9 +383,10 @@ export function buildSponsorOfferPresentation(input: {
 export function buildSponsorV3Presentation(
   offer: SponsorOffer,
   /**
-   * Rangraum des Spielstands (`sponsorRangraumFuer`): bei Liga-Split liga-lokal 16. Die eingefrorene
-   * Leiter hat 32 Sprossen, ein Team einer 16er-Liga kann aber nur Platz 1..16 erreichen — der
-   * schlechteste ERREICHBARE Platz ist deshalb Platz 16, nicht Sprosse 32.
+   * Rangraum des Spielstands (`sponsorRangraumFuer`): bei Liga-Split liga-lokal 16. Neue Vertraege
+   * haben dann selbst 16 Sprossen; Bestandsvertraege aus der laufenden Saison koennen noch 32 tragen,
+   * ein Team einer 16er-Liga erreicht aber nur Platz 1..16 — der schlechteste ERREICHBARE Platz ist
+   * deshalb Platz 16, nicht Sprosse 32.
    */
   leagueSize: number = LEAGUE_SIZE,
 ): SponsorV3Presentation | null {

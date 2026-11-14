@@ -182,6 +182,11 @@ import climbingPpsReferenzJson from "@/data/generated/climbing-pps-referenz.json
 // live-save-Abbild vom 27.10., NACH der Kalibrierrunde 3 (32 Ticks, Tresor 45) — die Referenz
 // gehoert zu genau diesem Motorstand, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
 import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
+// TDM (TDM-Gefecht-Verdrahtung 11.11.): gezogen von scripts/ziehe-buehne-pps-referenz.ts tdm
+// (Chassis "kampf", s. ARENA_KAMPF_DISCIPLINE_IDS/spieleTdmGefecht) gegen das live-save-Abbild
+// vom 10.11. -- derselbe rohe Boxscore-Wert, den die Liga ab jetzt tatsaechlich bucht
+// (g.kaempfer[].wert aus tdmGefecht()), nicht mehr ein Mass der alten PPS-Duell-Bruecke.
+import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -470,6 +475,19 @@ export const CLIMBING_INDIVIDUAL_PPS_MAX = 5.5;
 export const CLIMBING_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * TDM (TDM-Gefecht-Verdrahtung 11.11., s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS` in
+ * arena-resolved-disciplines.ts): `tdmGefecht()`s eigene Impact-Kurve ueber dieselbe
+ * `ppsAusArenaImpact()`-Formel wie jede andere resolved Disziplin -- eigene Referenz aus
+ * demselben Grund wie bei jeder vorigen Welle (der rohe Boxscore-Wert, `g.kaempfer[].wert`,
+ * liegt auf seiner eigenen 0..100-Skala, s. tdmGefecht() in battle-mode.engine.js).
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben
+ * Grund wie bei jeder vorigen Welle (s. `STAFFEL_INDIVIDUAL_PPS_MAX`-Kommentar).
+ */
+export const TDM_INDIVIDUAL_PPS_MAX = 5.5;
+export const TDM_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -583,6 +601,9 @@ const FOOTBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(footballPpsR
 const CLIMBING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(climbingPpsReferenzJson as ArenaPpsReferenzJson);
 // I-SPY (27.10.): keine Rolle mit eigener Wertformel -- `feldgroessenTorwart` fehlt in der Datei.
 const I_SPY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(iSpyPpsReferenzJson as ArenaPpsReferenzJson);
+// TDM (TDM-Gefecht-Verdrahtung 11.11.): keine Rolle mit eigener Wertformel (anders als Hockeys
+// Torwart) -- `feldgroessenTorwart` fehlt in der Datei, genau wie bei jeder Nicht-Hockey-Disziplin.
+const TDM_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(tdmPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -835,6 +856,21 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       anteilMitte: I_SPY_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 6 (dataAdapter.ts), einzeln nachgesehen.
       katalogStandardgroesse: 6,
+    },
+  ],
+  // ==================== TDM-GEFECHT-VERDRAHTUNG (11.11.) ====================
+  // tdmGefecht() ueber das neue Kampf-Chassis, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`
+  // (arena-resolved-disciplines.ts) fuer die Abnahmezahlen.
+  [
+    "tdm",
+    {
+      referenzFeldgroessen: TDM_PPS_REFERENZ_FELDGROESSEN,
+      max: TDM_INDIVIDUAL_PPS_MAX,
+      anteilMitte: TDM_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 3 (dataAdapter.ts), NICHT die Motor-Feldgroesse
+      // (ARENA_ART.tdm.jeSeite ist 6) -- einzeln nachgesehen, dieselbe Falle wie bei jeder
+      // vorigen Welle.
+      katalogStandardgroesse: 3,
     },
   ],
 ]);

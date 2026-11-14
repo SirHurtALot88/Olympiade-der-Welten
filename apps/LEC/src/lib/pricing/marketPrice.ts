@@ -49,10 +49,10 @@ export class ManualMarketPriceProvider implements MarketPriceProvider {
  * deutsche Karten/Verkaeufer, Mindestzustand NM, Menge = Pack-Groesse. `base`
  * ist die vom Nutzer/Chris angegebene Produkt-URL-Basis (Set + Kartenname).
  */
-export function buildCardmarketUrl(base: string, packQty: number): string {
+export function buildCardmarketUrl(base: string, packQty: number, language: "DE" | "EN" = "DE"): string {
   const params = new URLSearchParams({
     sellerCountry: "7",
-    language: "3",
+    language: language === "EN" ? "1" : "3",
     minCondition: "2",
     amount: String(Math.max(1, packQty)),
   });
@@ -76,9 +76,13 @@ export function computeMarketEk(priceFrom: number, packQty: number, buyShipping:
  * von dort zum exakten Produkt durch. Die harten DE/DE-Parameter gelten auch
  * fuer die Suchergebnisliste.
  */
-export function buildCardmarketSearchUrl(nameOrSetCode: string, packQty: number): string {
-  const base = `https://www.cardmarket.com/de/YuGiOh/Products/Search?searchString=${encodeURIComponent(nameOrSetCode)}`;
-  return buildCardmarketUrl(base, packQty);
+export function buildCardmarketSearchUrl(
+  nameOrSetCode: string,
+  packQty: number,
+  opts: { game?: "YuGiOh" | "Pokemon"; language?: "DE" | "EN" } = {}
+): string {
+  const base = `https://www.cardmarket.com/de/${opts.game ?? "YuGiOh"}/Products/Search?searchString=${encodeURIComponent(nameOrSetCode)}`;
+  return buildCardmarketUrl(base, packQty, opts.language ?? "DE");
 }
 
 export type MarketStatus = "zu_guenstig" | "im_korridor" | "zu_teuer";

@@ -227,3 +227,51 @@ für die ersten drei fehlt dafür ohnehin ein echter "gebucht"-Begriff aus der P
 Sonde baut sich für sie nur einen Ad-hoc-Vergleich über `diszSonde()`, s. Skript-Kopfkommentar
 Abschnitt "WICHTIG"), für Hockey läuft die Saison bis zur Pp-Korrektur sowieso noch über die
 PPS-Brücke. Keiner der vier war Teil dieses Auftrags.
+
+*(Stand 10.11. Battlefield (Duell) und Hockey wurden danach, im Rahmen von PR #1372 selbst, aus
+Zeitgründen nur mit 4–6 statt 24 Saaten geprüft — s. Abschnitt 7 für die Nachbestätigung mit der
+vollen Stichprobe.)*
+
+## 7. Nachtrag 11.11.: Battlefield (Duell) und Hockey mit den vollen 24 Saaten nachbestätigt
+
+PR #1372 selbst hat den Anzeige-Treue-Fix (fester `1/60`-Takt der Buchung) zusätzlich zu den fünf
+Bahn-Duell-Disziplinen auch auf TDM, Mini-DM, Battlefield (Duell) und Hockey ausgeweitet. Für
+Battlefield (Duell) und Hockey reichte die Zeit im damaligen Lauf nur für eine kleine Stichprobe
+(4–6 Saaten, 100 % Trefferquote) statt der vollen 24 — reine Mess-Nachbestätigung, kein
+Code-Umbau, auf dem aktuellen `main` (`a6ee6b0e3`, enthält den Fix):
+
+```
+node scripts/miss-anzeige-treue-rest.mjs battlefield hockey --saaten=24
+```
+
+| Ziel | Saaten mit Abweichung |
+|---|---:|
+| Battlefield (Duell) | 0 / 24 |
+| Hockey | 0 / 24 |
+
+**Entwarnung für beide, mit voller Stichprobe.** Log-Ausgabe wörtlich:
+
+```
+battlefield (kampf) uebereinstimmend (24/24)
+hockey (feldspiel) uebereinstimmend (24/24)
+=== Zusammenfassung ===
+Fuer alle geprueften Disziplinen stimmen gezeigte und gebuchte Endreihenfolge/Sieger in allen
+geprueften Saaten ueberein.
+```
+
+Damit ist der PR-#1372-Fix für alle neun betroffenen Disziplinen (5 Bahn-Duell + TDM, Mini-DM,
+Battlefield-Duell, Hockey) mit der vollen 24-Saaten-Stichprobe abgedeckt — die 4-6-Saaten-Probe
+aus PR #1372 selbst war kein Zufallstreffer.
+
+Einschränkung wie im Skript-Kopfkommentar beschrieben: für Battlefield (Duell) gibt es in der
+Produktion keinen eigenen "gebucht"-Begriff aus der Tick-Simulation (Saisonergebnis kommt aus der
+PPS-Duell-Brücke) — die Sonde vergleicht hier, ob die Simulation selbst anzeige-treu wäre, nicht
+die tatsächliche Saison-Buchung. Für Hockey gilt dieselbe Einschränkung abgeschwächt: die Mechanik
+ist nachweislich anzeige-treu, auch wenn Hockeys Saison-Ergebnis heute noch über die PPS-Brücke
+läuft statt über diese Simulation.
+
+Nebenbefund: der Hockey-Lauf allein brauchte für die vollen 24 Saaten deutlich über zwei Stunden
+Realzeit (Chromium-Renderer durchgehend bei ~98 % CPU, kein Hang) — wer diese Sonde erneut fährt,
+sollte das Zeitbudget entsprechend großzügig ansetzen und die Ausgabe line-gepuffert in eine Datei
+umleiten (`stdbuf -oL -eL node ... > log 2>&1`), da Node sie sonst bis zum Prozessende vollständig
+puffert.

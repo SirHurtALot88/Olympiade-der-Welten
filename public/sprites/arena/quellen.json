@@ -1068,5 +1068,23 @@
    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
    "url": "https://opengameart.org/content/lpc-terrains"
   }
+ },
+ "spurt_bogen_in.png": {
+  "paket": "PixelLab (Asset-Runde, ueber die Spurt-Rohszene)",
+  "quelle": "public/szenen/spurt/hyrox.jpg",
+  "schnitt": "x=715 y=668 151x124, kettengeflutet freigestellt (kulissen_werkzeug.freistellen, Schwelle 26)",
+  "beschreibung": "gelb-schwarzer IN-Bogen am Streckenanfang der Kunstrasen-Schleife",
+  "skript": "python3 -I scripts/baue-kulisse-buehnen.py --spurt-requisiten",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08"
+ },
+ "spurt_bogen_finish.png": {
+  "paket": "PixelLab (Asset-Runde, ueber die Spurt-Rohszene)",
+  "quelle": "public/szenen/spurt/hyrox.jpg",
+  "schnitt": "x=1516 y=388 160x140, kettengeflutet freigestellt (kulissen_werkzeug.freistellen, Schwelle 26)",
+  "beschreibung": "roter FINISH-Bogen samt Anzeigetafel-Sockel am Streckenende",
+  "skript": "python3 -I scripts/baue-kulisse-buehnen.py --spurt-requisiten",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08"
  }
 }

@@ -108,7 +108,14 @@ export class BillbeeClient {
   }
 
   /** Alle Seiten einer Listen-Abfrage; folgt Paging.TotalPages. */
-  async getAll<T>(path: string, params: Record<string, string | number | undefined> = {}, pageSize = 250, maxPages = 400): Promise<T[]> {
+  async getAll<T>(
+    path: string,
+    params: Record<string, string | number | undefined> = {},
+    pageSize = 250,
+    maxPages = 400,
+    /** Fortschritt: nach jeder Seite (Seite, Gesamtzahl der Seiten). */
+    onPage?: (page: number, totalPages: number) => void
+  ): Promise<T[]> {
     const out: T[] = [];
     let totalPages = 1;
     for (let page = 1; page <= totalPages && page <= maxPages; page++) {
@@ -116,6 +123,7 @@ export class BillbeeClient {
       if (body.ErrorMessage) throw new BillbeeError(`Billbee: ${body.ErrorMessage}`, null);
       out.push(...(body.Data ?? []));
       totalPages = body.Paging?.TotalPages ?? 1;
+      onPage?.(page, Math.min(totalPages, maxPages));
     }
     return out;
   }

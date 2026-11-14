@@ -47,16 +47,49 @@ jobs:
     timeout-minutes: 5
     outputs:
       nur_kartenschmiede: ${{ steps.pruefe.outputs.nur_kartenschmiede }}
+      kartenschmiede_beruehrt: ${{ steps.beruehrt.outputs.kartenschmiede }}
+      lec_beruehrt: ${{ steps.beruehrt.outputs.lec }}
     steps:
       - uses: actions/checkout@v4
       - id: pruefe
         env:
           BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
         run: echo "nur_kartenschmiede=$(bash scripts/ci-nur-kartenschmiede.sh "$BASIS")" | tee -a "$GITHUB_OUTPUT"
+      # Welches Nebenprojekt wurde angefasst? Jedes fährt nur seine eigenen Prüfungen.
+      - id: beruehrt
+        env:
+          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          echo "kartenschmiede=$(bash scripts/ci-beruehrt.sh "$BASIS" '^(apps/kartenschmiede/|lib/kartenschmiede/|tests/kartenschmiede|scripts/kartenschmiede-|docs/design/moosgrab-)')" | tee -a "$GITHUB_OUTPUT"
+          echo "lec=$(bash scripts/ci-beruehrt.sh "$BASIS" '^(apps/LEC/|docs/enterich-cards/)')" | tee -a "$GITHUB_OUTPUT"
+
+  # LEC-Cockpit (Lord Enterich Cards): eigene Prüfungen, unabhängig von der Oly-CI. Läuft, sobald
+  # apps/LEC oder docs/enterich-cards berührt ist -- auch zusätzlich zur Oly-CI, wenn beides geändert wurde.
+  lec:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.lec_beruehrt == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/LEC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/LEC/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Typen
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npx vitest run
 
   kartenschmiede:
     needs: weiche
-    if: needs.weiche.outputs.nur_kartenschmiede == 'true'
+    if: needs.weiche.outputs.nur_kartenschmiede == 'true' && needs.weiche.outputs.kartenschmiede_beruehrt == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

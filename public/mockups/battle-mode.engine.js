@@ -4618,23 +4618,87 @@
     return true;
   }
   // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
-  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
-  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
-  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
-  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
-  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  //   u.down (ohne vizSturz) -> "tod"    (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.vizSturz             -> "treffer" (dieselbe Einmal-dann-halten-Formel, aber auf dem
+  //                              treffer-Streifen -- s. STURZ STATT TOD unten)
+  //   u.lunge>0              -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken          -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung            -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst                  -> Grundpose der Blickrichtung (Stehen)
   // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
   // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
-  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o./Sturz.
+  //
+  // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3): die
+  // 360-Pixel-Figuren haben vier Animationsarten (walk/angriff/treffer/tod), und Chris hat
+  // Tod-Animationen am 07.11. ausdruecklich blutig/dramatisch freigegeben (CLAUDE.md, Abschnitt
+  // "PixelLab-Tod-Animationen"). Vorher bildete diese Funktion JEDES `u.down`/`u.vizSturz` auf
+  // "tod" ab -- ein Abrutschen am Klettergriff, ein Eiskunstlauf-Sturz, ein Showcase-Patzer und
+  // ein Hockey-Bodycheck sahen damit wie ein echter K.o./Tod aus, und wuerden mit jeder
+  // kuenftigen Politur an den Tod-Animationen zunehmend blutiger. `u.vizSturz` ist seit
+  // stepKuer() (Eiskunstlauf) und der Showcase-Akrobatik ohnehin das eigene, rein
+  // praesentationale Sturz-Feld (bewusst GETRENNT vom Kampf-/Simulationsfeld `u.down`, s. die
+  // Kommentare an den Setzstellen) -- jetzt setzen Climbing (zeichneSpurt, `u.stolper>0`) und
+  // Hockey (HK_STURZ) es ebenfalls, und diese Funktion liest es: ein Sturz zeigt die
+  // treffer- (Hit-/Taumel-)Animation statt der Tod-Animation. Ein ECHTER K.o. (Arena/TDM/
+  // Battlefield, `u.down` OHNE `vizSturz`) bleibt unveraendert "tod". Rein praesentational --
+  // `istUnten` fasst beide Faelle weiterhin zusammen (haelt Laufzyklus/Waffen/Effekte an, s.
+  // unten), nur die ART-Wahl und die Standbild-Ersatzpose unterscheiden jetzt zusaetzlich nach
+  // `istSturz`.
+  //
+  // PIXEL-FIGUR ANGRIFF-AUSNAHMEN (10.11., Backlog #52 "Enforcer greift nur mit Fluegeln an,
+  // keine echte Angriffsanimation"): die Angriff-Animation EXISTIERT fuer Enforcer (und wird
+  // korrekt geladen/ausgewaehlt, s. die Zustandswahl oben) -- der Fehler sitzt im BLATT selbst,
+  // nicht in der Auswahllogik. Per Augenschein an den einzelnen Spalten (identify/crop, 80x80 je
+  // Spalte): enforcer/angriff-south.png zerfaellt an Spalte 15 von 17 in ein generisches, vom
+  // Charakter abgekoppeltes Fluegel-Aufleuchten -- kein Koerper, keine Ruestung, kein Hammer mehr
+  // sichtbar, nur ein goldener Fluegel-Umriss. Spalte 16 (das rechnerische Ende der Lunge-Animation,
+  // s. `f` unten -- also genau die Spalte, die beim Treffer-Moment am laengsten zu sehen ist) zeigt
+  // die Figur zwar wieder, aber mit demselben unpassenden Fluegel-Hintergrund. Ost/Nord zeigen an
+  // ihrer letzten Spalte nur einen goldenen Schwung-/Bewegungsschleier HINTER der weiterhin
+  // sichtbaren Figur (wie bei anderen Figuren, z.B. eradicator/zhyrak -- s. dortige Blaetter),
+  // keinen Koerperverlust, deshalb dort KEINE Sperre.
+  //
+  // Systematisch nachgeprueft (10.11.): alle 19 Figuren, die laut der alten B_FIGUR-Fluegel-Liste
+  // (Kommentar bei DISZIPLIN_WAFFE/VOLLBILD_SCHLAEGER weiter unten, "Othrama, Enforcer, Elyon, ...")
+  // gefluegelt sind UND ein eigenes 360-PixelLab-Blatt (public/sprites/figuren/<slug>) haben. Nur
+  // Lumen Serene zeigt denselben Fehler, dort sogar ausgepraegter: angriff-south.png verliert den
+  // Koerper bereits ab Spalte 7 von 17 (statt erst ab 15) und bekommt ihn bis Spalte 16 nur
+  // bruchstueckhaft zurueck. Othrama/Whispra/Harbinger/Hellvoice/Sunny/Xylaris/Cadrael/Raven/Nimri/
+  // Yuko/Mushu/Brobot/Sanctrix/Leviathan/Butterfly zeigen an ihrer letzten Spalte durchgehend eine
+  // ECHTE, zum Charakter passende Waffen-/Elementareffekt-Spalte (Schwert, Feuer, Eis, Funken...),
+  // keinen Koerperverlust -- keine Sperre noetig. Dyrth zeigt eine abweichende, aber in sich
+  // stimmige Sturzflug-/Tauch-Pose (kein Fluegel-Abbruch) -- ebenfalls keine Sperre.
+  //
+  // Eine NEUE PixelLab-Bestellung fuer die kaputten Spalten braucht Chris' ausdrueckliche Freigabe
+  // (CLAUDE.md "PixelLab-Tod-Animationen": Charaktere/Animationen sind freigabepflichtig) und ist
+  // hier bewusst NICHT erfolgt. Bis dahin reines Wiederverwenden bestehender, bereits freigegebener
+  // Spalten desselben Blatts -- dieselbe Reuse-statt-Neubau-Philosophie wie beim Sturz-statt-Tod-Fix
+  // (PR #1386): PIXEL_ANGRIFF_SPERRFRAMES listet je Figur/Richtung die gesperrten Spalten
+  // (0-basiert), angriffFrameSicher() faellt von einer gesperrten Spalte auf die naechstniedrigere
+  // ungesperrte zurueck (Minimum 0 -- eine Figur ohne jede gute Spalte ab 0 wuerde dort einfrieren,
+  // kommt in der Tabelle unten aber nicht vor). Rein praesentational: veraendert nur, welche
+  // vorhandene Spalte gezeichnet wird, nichts an u.lunge/der Simulation/dem Wertungs-Fingerabdruck.
+  const PIXEL_ANGRIFF_SPERRFRAMES={
+    "Enforcer":{south:[15]},
+    "Lumen Serene":{south:[7,8,9,10,11,12,13]},
+  };
+  function angriffFrameSicher(name,dir,f){
+    const sperr=name&&PIXEL_ANGRIFF_SPERRFRAMES[name]&&PIXEL_ANGRIFF_SPERRFRAMES[name][dir];
+    if(!sperr||!sperr.length)return f;
+    while(f>0&&sperr.includes(f))f--;
+    return f;
+  }
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
     const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
     const fussY=y+PIXEL_FUSS*G;
-    const istUnten=!!u.down||!!u.vizSturz;
+    const istSturz=!!u.vizSturz;
+    const istUnten=!!u.down||istSturz;
     let rec=pixelAnzeige.get(u);
     // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
-    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    // Ansicht): gleich das Endbild der K.o./Sturz-Animation statt sie von vorn abzuspielen.
     if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
     if(typeof u.hp==="number"){
       if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
@@ -4646,7 +4710,7 @@
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
-    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    const art=istUnten?(istSturz?"treffer":"tod"):istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4674,8 +4738,13 @@
         const e=z.bilder.get(stamm+"-"+d+".png");
         if(e&&e.im&&e.mass){
           let f;
-          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
-          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          // `istUnten` statt des literalen art==="tod": ein Sturz waehlt oben den
+          // treffer-Streifen (`art="treffer"`), spielt ihn aber mit derselben
+          // Einmal-dann-letztes-Bild-Formel wie ein echter K.o. ab (ueber `rec.downT`, nicht
+          // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
+          // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
+          if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
             const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
@@ -4698,11 +4767,14 @@
     let dx=0,dy=0,winkel=0;
     if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
     else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
-    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
-    else if(art==="tod"){
+    // `istUnten` vor dem literalen art==="treffer"-Zweig: ohne Animationsstreifen (Grundpose-
+    // Ersatzbewegung) soll ein Sturz genauso umkippen wie ein echter K.o. (neutraler als die
+    // HP-Zuck-Wobble unten, die bei einem zeitlich unbegrenzten Sturz nie zur Ruhe kaeme).
+    else if(istUnten){
       const k=Math.min(1,(t-(rec.downT??t))/0.5);
       winkel=(vor<0?-1:1)*k*Math.PI/2;
-    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    }else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
     zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
@@ -11599,6 +11671,22 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // STURZ STATT TOD, NICHT-AUFZAEHLBAR GESETZT (Opus-Review 10.11., Fingerabdruck-Fund): ein
+  // einfaches `traeger.vizSturz=true` haette den Wertungs-Fingerabdruck verschoben, OBWOHL
+  // wert()/sieger()/punkte NICHT ein einziges Bit anders ausfallen (nachgemessen,
+  // scripts/pruefe-wertung-fingerabdruck.mjs) -- `A.spiele("hockey",s).protokoll` (fsZuege)
+  // haengt an manchen Eintraegen eine rohe Objektreferenz auf den Spieler (`deckt`, s. die
+  // Zyklus-Behandlung im Fingerabdruck-Skript), und ein neues AUFZAEHLBARES Feld auf diesem
+  // Objekt taucht dort beim JSON.stringify() prompt wieder auf, rein als Artefakt der
+  // Protokoll-Rohreferenz, nicht als Wertungsaenderung. `Object.defineProperty(...,{enumerable:
+  // false})` haelt `u.vizSturz` fuer zeichnePixelFigur()/jeden gewoehnlichen Lesezugriff
+  // unveraendert lesbar, aber unsichtbar fuer JSON.stringify()/{...u}/for-in -- genau das macht
+  // aus einer zufaelligen Protokoll-Verschiebung wieder ein bit-identisches Protokoll.
+  function vizSturzSetzen(u,wert){
+    if(!Object.getOwnPropertyDescriptor(u,"vizSturz"))
+      Object.defineProperty(u,"vizSturz",{value:wert,writable:true,configurable:true,enumerable:false});
+    else u.vizSturz=wert;
+  }
   // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
   // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
   // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
@@ -15153,7 +15241,13 @@
         // Bully in der Zone des bestraften Teams, und der Gefoulte bekommt die Scheibe.
         if(rr()<HK_FOUL_ANTEIL&&verhaengeStrafe(decker,traeger,"Bandencheck")){
           traeger.taumeltBis=fsT+HK_TAUMEL;
-          traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+          // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt
+          // 5.3): `down` bleibt das Simulationsfeld (sperrt den Spieler fuer Passziel-/
+          // Deckungs-Filter wie bisher, bit-identisch). `vizSturz` ist ZUSAETZLICH rein
+          // praesentational, genau wie bei stepKuer()/Showcase -- zeichnePixelFigur() liest es,
+          // um einen Hockey-Sturz auf die treffer- statt die tod-Animation zu legen. Fuer jede
+          // andere Disziplin bleibt das Feld immer undefined, also ohne jede Wirkung.
+          traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
           traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
           // DIE UEBERZAHL BEGINNT MIT DEM PUCK. Ein Bully tief in der Zone war der erste
           // Entwurf und ist gemessen falsch: der Anspielpunkt lag regelmaessig weiter als
@@ -15171,7 +15265,8 @@
           return;
         }
         traeger.taumeltBis=fsT+HK_TAUMEL;
-        traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+        // Sturz statt Tod: s. Kommentar im Foul-Zweig direkt oberhalb.
+        traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
         decker.checks++;
         // TON (Assets 80->100, TON_KATALOG.hockey.treffer): der sitzende, nicht gepfiffene
         // Bodycheck — der zu harte Zweig oben endet stattdessen in verhaengeStrafe()/pfiff.
@@ -16117,7 +16212,7 @@
     // 12 Spielen endete so, 3 von 6 mit noch laufendem Taumeln). Diese beiden Zeilen sind
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
-      if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.down&&fsT>=u.downBis){u.down=false;vizSturzSetzen(u,false);}
       // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
@@ -38532,6 +38627,29 @@
     const gesetzt=inDisc(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // TDM-GEFECHT (Verdrahtung 11.11., s. Kopfkommentar bei tdmDuellRoster() weiter unten):
+    // das vorab entschiedene Gefecht ersetzt den alten kontinuierlichen Zweikampf-Aufbau
+    // unten vollstaendig fuer TDM -- frueher Return, kein Byte der Reihen-/Slot-Logik darunter
+    // wird fuer diese Disziplin noch erreicht. `tdmDuellRoster()` (statt einer zweiten Kopie
+    // der Rollenauswahl hier) ist dieselbe Funktion, die auch `spieleTdmGefecht()` fuer die
+    // Headless-Buchung ruft -- GARANTIERT dieselben zwei Seiten, "gezeigt = gebucht".
+    if(d==="tdm"){
+      const {mine:mineTdm,gegner:gegnerTdm}=tdmDuellRoster();
+      if(mineTdm.length&&gegnerTdm.length){
+        const alleTdm=[...mineTdm,...gegnerTdm];
+        const g=tdmGefecht([mineTdm,gegnerTdm],seed,n);
+        const seitenZaehlerTdm=[0,0];
+        U=g.kaempfer.map((k,i)=>{
+          const p=alleTdm[i];
+          const idxSeite=seitenZaehlerTdm[k.side]++;
+          const seitenGroesse=k.side===0?mineTdm.length:gegnerTdm.length;
+          return baueEinheit(p,k.side,1,idxSeite,seitenGroesse,i,k.slot,
+            order[p.n]||slotOrd(k.slot),zielOf[p.n],d,SLOTVON[k.slot]);
+        });
+        tdmReplayStarten(g);
+      }
+      return;
+    }
     // BATTLEFIELD: eigene Rollen je Kadergroesse (bfSlotsFuer), sonst unveraendert slotListe.
     const kSlotsHeim=bfSlotsFuer(d,mine.length);
     const slotListeHeim=kSlotsHeim||slotListe;
@@ -40435,6 +40553,13 @@
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
+    // TDM-GEFECHT (Verdrahtung 11.11.): das Gefecht steht fest, die Arena spielt es nur ab
+    // (tdmReplaySchritt, s. dort) -- dasselbe Abfang-Muster wie Battlefields KP.pod.replay
+    // direkt darunter. `tdmReplay` gibt es nur, wenn build()s TDM-Zweig die Rollenauswahl zu
+    // zwei nichtleeren Seiten aufloesen konnte (s. tdmDuellRoster/tdmReplayStarten) -- sonst
+    // bleibt `U` leer und der alte Zweig unten wird (wirkungslos, weil `U` dann leer ist)
+    // trotzdem erreicht, statt dass hier ein Fehler entsteht.
+    if(tdmReplayAktiv()){ tdmReplaySchritt(dt); return; }
     t+=dt;
     // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
     // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
@@ -42538,6 +42663,10 @@
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
     "hind_mauer","hind_heu","hind_feuer",
+    // Kulissen Batch 15 (Spurt, Rang 3 des Audits): IN-/FINISH-Bogen, aus der HYROX-Rohszene
+    // freigestellt (scripts/baue-kulisse-buehnen.py bogen_requisiten(), kulissen_werkzeug.freistellen),
+    // nicht aus PixelLab bestellt -- die Rohszene fuehrte sie laut Audit ohnehin schon.
+    "spurt_bogen_in","spurt_bogen_finish",
     // Takeshi's Castle: zehn Fallen-Typen + Burg-Kulisse auf vierzehn Stationen, s.
     // BAHN_ART["takeshis-castle"].fallenBild und zeichneFalleTakeshi() weiter unten
     // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
@@ -44004,6 +44133,60 @@
         +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
       ctx.lineWidth=3; ctx.strokeText(leg,W/2,oben-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,oben-16);
     }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Stationsumfeld im Belag" +
+    // "Licht"): unter jeder Station ein Bodenmerkmal in Bahnbreite, darueber ein Scheinwerferkegel
+    // -- beides VOR den Bahnlinien/Stationskacheln gezeichnet (Z-Reihenfolge unten unveraendert),
+    // damit die Station sichtbar AUF ihrem eigenen Fleck steht statt auf gleichfoermigem Blau.
+    // Exakt an camX(HUERDEN_N()[i]), also denselben Weltkoordinaten, mit denen stepSpurt rechnet
+    // (HUERDEN_N()/camX() selbst bleiben unangetastet) -- reine Anzeige, liest nur BA()/bodenSaat,
+    // schreibt nichts, kein rr()-Aufruf. Nur bei aktiver Kulisse und nur fuer Spurt selbst: dieselbe
+    // Funktion bedient als Fallback auch Staffel/Climbing/Takeshi-ohne-Route (s. Kommentar an
+    // bodenSpurtGerade() oben), deren Kulisse und Stationstypen etwas ganz anderes sind.
+    if(mitKulisse&&BA().spurt){
+      const stationsBoden={
+        // Audit woertlich: "nasse Pfuetze und Spritzer am Wassergraben". Die Spritzer hell/weiss
+        // statt blau: Wasser-auf-Wasser gibt sonst kaum Kontrast gegen den Bahnbelag.
+        wasser:(x,i)=>{ ctx.fillStyle="rgba(40,95,150,.5)"; ctx.fillRect(x-34,oben,68,unten-oben);
+          for(let k=0;k<16;k++){ const sy=oben+(unten-oben)*bodenSaat(i*97+k), sx=x+(bodenSaat(i*97+k+500)-0.5)*60;
+            ctx.fillStyle="rgba(226,242,250,"+(0.30+bodenSaat(i*97+k+900)*0.30)+")";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.6+bodenSaat(i*97+k+300)*2.6,1.1+bodenSaat(i*97+k+700)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Kiesbett um die Bruchsteinmauer".
+        mauer:(x,i)=>{ for(let k=0;k<28;k++){ const sy=oben+(unten-oben)*bodenSaat(i*131+k), sx=x+(bodenSaat(i*131+k+500)-0.5)*54;
+            const t=bodenSaat(i*131+k+200);
+            ctx.fillStyle="rgba("+Math.round(168+t*40)+","+Math.round(150+t*34)+","+Math.round(120+t*28)+",.78)";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.8+bodenSaat(i*131+k+300)*2.8,1.2+bodenSaat(i*131+k+330)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Mattenstreifen unter Huerden".
+        huerde:(x)=>{ ctx.fillStyle="rgba(122,59,53,.5)"; ctx.fillRect(x-20,oben,40,unten-oben);
+          ctx.fillStyle="rgba(210,100,78,.24)"; ctx.fillRect(x-20,oben,40,3); ctx.fillRect(x-20,unten-3,40,3); },
+        // Saegemehl-Landeflaeche unter dem Balancier-Balken, dieselbe Idee wie die Huerdenmatte.
+        balken:(x,i)=>{ ctx.fillStyle="rgba(214,188,132,.14)"; ctx.fillRect(x-22,oben,44,unten-oben);
+          for(let k=0;k<22;k++){ const sy=oben+(unten-oben)*bodenSaat(i*151+k), sx=x+(bodenSaat(i*151+k+500)-0.5)*40;
+            ctx.fillStyle="rgba(230,206,150,"+(0.30+bodenSaat(i*151+k+700)*0.28)+")"; ctx.fillRect(sx,sy,2.2,2.2); } },
+        // Festgetretener Sandwall vor der Palisadenwand.
+        wand:(x)=>{ const g=ctx.createRadialGradient(x,unten-18,4,x,unten-18,38);
+          g.addColorStop(0,"rgba(104,76,50,.55)"); g.addColorStop(1,"rgba(104,76,50,0)");
+          ctx.fillStyle=g; ctx.fillRect(x-44,oben,88,unten-oben); },
+        // Ausgetretener Erdpfad unter dem Schwingseil.
+        seil:(x)=>{ ctx.fillStyle="rgba(86,66,44,.48)"; ctx.fillRect(x-17,oben,34,unten-oben);
+          ctx.fillStyle="rgba(140,112,76,.26)"; ctx.fillRect(x-6,oben,12,unten-oben); },
+        // Lose Strohhalme um den Strohballen.
+        heu:(x,i)=>{ for(let k=0;k<20;k++){ const sy=oben+(unten-oben)*bodenSaat(i*181+k), sx=x+(bodenSaat(i*181+k+500)-0.5)*48;
+            ctx.strokeStyle="rgba(232,206,112,"+(0.42+bodenSaat(i*181+k+700)*0.3)+")"; ctx.lineWidth=1.3;
+            ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+6+bodenSaat(i*181+k+300)*5,sy-1.5); ctx.stroke(); } },
+      };
+      const bilderSt=BA().hindernisBilder||[];
+      HUERDEN_N().forEach((h,i)=>{
+        const x=camX(h); if(x<-80||x>W+80)return;
+        const fn=stationsBoden[bilderSt[i]]; if(fn)fn(x,i);
+        // Scheinwerferkegel von oben auf jede Station (Audit: "wie Gewichtheben") -- hell/dunkel
+        // Rhythmus entlang der Bahn statt gleichfoermigem Blau. Niedrige Deckkraft (Lehre aus
+        // Batch 12/14): Laeufer, Ringe und Namen bleiben lesbar.
+        const kegel=ctx.createLinearGradient(x,oben-10,x,unten);
+        kegel.addColorStop(0,"rgba(255,244,214,.16)"); kegel.addColorStop(1,"rgba(255,244,214,0)");
+        ctx.fillStyle=kegel; ctx.beginPath();
+        ctx.moveTo(x,oben-10); ctx.lineTo(x-54,unten); ctx.lineTo(x+54,unten); ctx.closePath(); ctx.fill();
+      });
+    }
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
     const BN=BAHNEN_N();
@@ -44079,6 +44262,28 @@
       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
       ctx.setLineDash([]);
     }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Boegen an Start und Ziel"): der
+    // IN-Bogen am Startpunkt, der FINISH-Bogen an der Ziellinie, genau an camX(0)/camX(1) -- denselben
+    // Werten, die die Start-/Ziellinie zwei Bloecke darueber schon zeichnet. Ersetzt nichts an Start/
+    // Ziel selbst (die Linien bleiben), gibt dem Band nur sichtbar Anfang und Ende. Beide Sprites aus
+    // der HYROX-Rohszene freigestellt (s. A_TEILE-Kommentar oben).
+    //
+    // NACHBESSERUNG (Chris, 08.11., zum ersten Stand dieses Batches): "komsiche riesige Tore!
+    // Das sieht richtig weird aus" -- auf die VOLLE Bandhoehe skaliert (alle zwoelf Bahnen
+    // uebereinander, ~80 % von H) wirkte der Bogen wie ein Rohr quer durchs Bild, nicht wie ein
+    // Ziel-Bogen. Ein echter Start-/Zielbogen ist ein Landmark am oberen Bandrand, keine
+    // Wand ueber die ganze Bahnbreite -- gedeckelt auf einen Bruchteil der Bandhoehe, anstatt
+    // sie auszufuellen.
+    if(mitKulisse&&BA().spurt){
+      if(aDa("spurt_bogen_in")&&xStart>-220&&xStart<W+220){
+        const im=aBild.spurt_bogen_in, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xStart-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+      if(aDa("spurt_bogen_finish")&&xZiel>-220&&xZiel<W+220){
+        const im=aBild.spurt_bogen_finish, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xZiel-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+    }
     if(BA().takeshi&&aDa("burg_tor")&&xZiel>-60&&xZiel<W+60){
       // DAS BURGTOR am Ziel (Teil B.3) — unter der Kamera wie die Ziellinie selbst, und
       // die Ruestkammer-Deko der Emperor's Guards davor (Pranger, Fussblock, Holzstapel, Fass).
@@ -44105,6 +44310,14 @@
     // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
     // Bilder ueber rennT. Kein Zeitpreis — die Mechanik bekommt kein achtes Ereignis.
     if(BA().feuerZiel&&aDa("hind_feuer")&&xZiel>-40&&xZiel<W+40){
+      // Verbrannter Boden am Feuersprung (Kulissen Batch 15, Audit-Beispiel woertlich uebernommen):
+      // ein russiger Fleck in Bahnbreite hinter der Ziellinie, VOR den Flammen gezeichnet, nur bei
+      // aktiver Kulisse (ohne Kulisse blieb dieser Ausschnitt bit-identisch zum Vorherstand).
+      if(mitKulisse){
+        const g=ctx.createRadialGradient(xZiel-20,(oben+unten)/2,6,xZiel-20,(oben+unten)/2,(unten-oben)*0.6);
+        g.addColorStop(0,"rgba(18,14,12,.5)"); g.addColorStop(1,"rgba(18,14,12,0)");
+        ctx.fillStyle=g; ctx.fillRect(xZiel-80,oben,100,unten-oben);
+      }
       const f=aBild.hind_feuer, fr=Math.floor(rennT*8)%5;
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+16;
@@ -44992,6 +45205,26 @@
   // gewichtet sie in deren Richtung. Ob das aufgeht, sagt nicht die Absicht, sondern
   //   node scripts/messe-arena-einfluss.mjs <disziplin> 12
   // ===================================================================================
+  // FORMAT-FUNDAMENT (08.11., docs/design/spurt-format-die-hatz-08-11.md): dasselbe Muster
+  // wie BUEHNE_FLAGS oben (s. dort) — ein Schalter fuer ein ZWEITES Format EINER Disziplin,
+  // der NUR ueber window.__arena.bahnFlags({...}) (Messskripte) oder, fuer den Headless-
+  // Runner, window.__olyBahnFlags VOR dem Laden gesetzt wird. Die echte App setzt beides
+  // nie, deshalb bleibt `spurtFormat` immer "klassisch" und bauSpurt()/stepSpurt() laufen
+  // bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs, GESAMT-Hash
+  // unveraendert). "hatz" baut das Wellen-Ausscheidungsformat (baueHatz(), stepSpurtHatz()
+  // -- beide nahe stepSpurt() unten), "hyrox" das Stationen-Format (baueHyroxStationen(),
+  // stepSpurtHyrox(), s. docs/design/spurt-format-hyrox-stationen-08-11.md). Bewusst NUR
+  // fuer Spurt (einziger heute vorhandener Schluessel) -- ein weiteres Format ergaenzt
+  // hier einen weiteren Wert, keinen weiteren Schalter. Die GROSSE Entscheidung "wie
+  // waehlt das Spiel das Format" (Saisonkalender/Hash/Liga-Einstellung, Hatz-Design-
+  // Dokument Abschnitt 6) ist ausdruecklich NICHT Teil dieses Schalters -- er ist nur der
+  // Mess-/Vorschau-Zugriff, den noch niemand hatte.
+  const BAHN_FLAGS={spurtFormat:"klassisch"};
+  try{
+    const startFlags=window.__olyBahnFlags;
+    if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string")
+      BAHN_FLAGS.spurtFormat=startFlags.spurtFormat;
+  }catch(e){}
   const BAHN_ART={
     spurt:{
       // `spurt:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt
@@ -46411,6 +46644,22 @@
   let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // DIE HATZ (Format-Fundament, s. BAHN_FLAGS/baueHatz/stepSpurtHatz): `bahnHatzAktiv` ist
+  // NUR waehrend eines mit BAHN_FLAGS.spurtFormat==="hatz" gebauten Spurt-Rennens true --
+  // bauSpurt() setzt es bei JEDEM Aufruf neu (s. dort, Ende der Funktion), stepSpurt()/
+  // zeichneSpurt() lesen es nur, um auf die Hatz-Varianten umzuschalten. `HATZ_WELLEN` ist
+  // der vorab (baueHatz(), deterministisch aus derselben Saat) berechnete Wellenplan:
+  // {welle, finale, ende, rausIds, revealed}. `null` ausserhalb der Hatz.
+  let bahnHatzAktiv=false, HATZ_WELLEN=null;
+  // HYROX-STATIONEN (Format 3, 08.11., s. docs/design/spurt-format-hyrox-stationen-08-11.md):
+  // dasselbe Muster wie bahnHatzAktiv/HATZ_WELLEN direkt darueber, nur fuer das dritte
+  // Spurt-Format. `bahnHyroxAktiv` nur waehrend BAHN_FLAGS.spurtFormat==="hyrox" true.
+  // `HYROX_STATIONEN` ist die vorab (baueHyroxStationen(), deterministisch aus derselben
+  // Saat) berechnete Stationsliste fuer die Ueberlagerungs-Zeichnung ({pos, bild, name,
+  // gruppe}, dieselben sieben Positionen wie BA().hindernisse/hindernisBilder/
+  // hindernisNamen) -- die eigentliche ZEITWIRKUNG steht je Laeufer in `u.hyroxZeit`
+  // (s. baueHyroxStationen()). `null` ausserhalb von Hyrox.
+  let bahnHyroxAktiv=false, HYROX_STATIONEN=null;
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -47802,6 +48051,22 @@
     // einer unterwegs ist.
     if(art.startAbstand&&LAEUFER.length)
       bahnFokus=[...LAEUFER].sort((a,b)=>(a.startT||0)-(b.startT||0))[0].id;
+    // DIE HATZ (Format-Fundament, 08.11.): NUR fuer Spurt (`art.spurt`) und nur, wenn
+    // explizit angefordert (BAHN_FLAGS.spurtFormat, s. dort) -- ohne das Flag bleibt
+    // `bahnHatzAktiv` false und bauSpurt() endet hier bit-identisch zu vorher. `art.spurt`
+    // statt `d==="spurt"`, dasselbe Gate wie bei spurtSaeuleSetzen() direkt darueber.
+    bahnHatzAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hatz");
+    HATZ_WELLEN=null;
+    if(bahnHatzAktiv)baueHatz();
+    // HYROX-STATIONEN (Format 3, 08.11., s. Hook-Punkt-Liste in
+    // docs/design/spurt-format-die-hatz-08-11.md Abschnitt 7 und
+    // docs/design/spurt-format-hyrox-stationen-08-11.md): derselbe Schalter, derselbe
+    // Hook-Punkt wie bahnHatzAktiv direkt darueber -- NUR fuer Spurt (`art.spurt`), NUR
+    // explizit angefordert. Ohne das Flag bleibt `bahnHyroxAktiv` false und bauSpurt()
+    // endet bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs).
+    bahnHyroxAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hyrox");
+    HYROX_STATIONEN=null;
+    if(bahnHyroxAktiv)baueHyroxStationen();
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -48447,8 +48712,306 @@
     return {seite:fuehrend, delta:Math.max(0,rennT-zeitFuehrendBeiPH), unklar:false};
   }
 
+  // ===================================================================================
+  // DIE HATZ — FORMAT 2 FUER SPURT (08.11., docs/design/spurt-format-die-hatz-08-11.md).
+  //
+  // ZEICHENFRAGE AUS DEM ENTWURF, HIER ENTSCHIEDEN: Rundkurs bleibt eine THEMATISCHE
+  // Umdeutung, das Bahn-Chassis bleibt linear. `istOval()` (s. dort, "!!BA().staffel")
+  // zeichnet zwar schon einen Rundkurs, ist aber fest an die Staffel verdrahtet -- genau
+  // ZWEI Bahnen fuer zwei MANNSCHAFTEN (ovalPunkt() liest `OVAL_SPUR0+u.bahnZ`, bahnZ nur
+  // 0/1). Zwoelf EINZELNE Laeufer auf einem echten Rundkurs zu zeigen (eigene Spurzuteilung,
+  // Ueberrunden, Start/Ziel-Geometrie fuer zwoelf statt zwei) ist ein eigenes Zeichenprojekt,
+  // kein Format-Fundament. Der "Rundkurs" bleibt deshalb eine THEMATISCHE Umdeutung: der
+  // Fegearm jagt auf der GERADEN Bahn von hinten nach vorn, "eine Runde" ist eine Welle.
+  //
+  // ABLAUF. Wellen zu je HATZ_WELLEN_DAUER Sim-Sekunden (Entwurf: ~12), dazwischen
+  // HATZ_NEUORDNUNG_DAUER Sekunden Neuordnung (keine Ausdauer-Belohnung ueber Wellen
+  // hinweg -- stamina ist mit 4 das schwaechste Matrixgewicht, s. CLAUDE.md). Jede Welle
+  // bewertet alle noch aktiven Laeufer mit `hatzWelleScore()` und entfernt die beiden mit
+  // der schwaechsten Note -- AUSSER der letzten Welle (<=4 noch aktiv): die bewertet ALLE
+  // Verbliebenen auf einen Schlag, die unteren zwei werden Rang 3/4, die oberen zwei direkt
+  // Rang 1/2 (der "Sprint der verbliebenen zwei um Platz 1" aus dem Entwurf -- eine Welle
+  // entscheidet beides, keine sechste Phase).
+  //
+  // SUB-SKILLS: ausschliesslich das bestehende Spurt-Rezept (BAHN_ART.spurt.rezept, s.
+  // "DIE SIEBEN ROLLEN" am Kopf von BAHN_ART) -- ANTRITT/TECHNIK/WENDIGKEIT/WUCHT/ROBUST/
+  // STEHEN/ENDTEMPO werden NICHT neu gewichtet (die Matrix ist gesperrt, CLAUDE.md), nur
+  // anders KOMBINIERT: ANTRITT in jeder Welle ausser der letzten ("jede Welle ein
+  // Neustart"), ENDTEMPO nur in der letzten. HATZ_W/HATZ_RAUSCHEN sind das einzige freie
+  // Rad dieser Kalibrierung -- Kalibrierweg (Startwerte, Messwerte, Korrekturen) steht in
+  // docs/design/spurt-format-die-hatz-08-11.md.
+  //
+  // `u.fertig` TRAEGT HIER DEN RANG, NICHT EINE ZEIT. MOTOREN["spurt"].wert() (der
+  // generische Bahn-Zweig, unveraendert) sortiert nach `bahnZeit(u)=u.fertig-(u.startT||0)`
+  // aufsteigend und vergibt -(Platz) -- fuer Spurt ist `u.startT` immer 0 (kein
+  // `art.startAbstand`), also bahnZeit(u)===u.fertig. Weil `baueHatz()` JEDEM Laeufer einen
+  // EINDEUTIGEN Rang 1..N zuweist (`u.hatzRang`) und `stepSpurtHatz()` genau diesen Rang
+  // als `u.fertig` eintraegt, reproduziert der bestehende, unveraenderte Zweig exakt die
+  // Ausscheidereihenfolge -- kein eigener wert()-Zweig fuer "hatz" noetig.
+  const HATZ_WELLEN_DAUER=12, HATZ_NEUORDNUNG_DAUER=3;
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-die-hatz-08-11.md).
+  // ZWEI KOMBINATIONS-PROFILE, nicht eines: eine fruehe Welle entscheidet nur 2 von N
+  // Raengen (Gedraenge, viel Chaos/Rauschen passt dazu) -- die letzte Welle entscheidet
+  // Rang 1-4 auf einen Schlag und soll dabei hoeren lassen, WER wirklich besser ist (wenig
+  // Rauschen, mehr ENDTEMPO/STEHEN statt ANTRITT/WUCHT). Kalibrierweg im Design-Dokument.
+  const HATZ_W={haupt:0.36, technik:0.16, wendig:0.06, wucht:0.08, robust:0.20, stehen:0.14};
+  const HATZ_W_FINALE={haupt:0.52, technik:0.10, wendig:0.00, wucht:0.00, robust:0.12, stehen:0.26};
+  // MUTIERBAR NUR UEBER window.__arena.hatzGewichte({...}) (s. dort) -- Objekte statt
+  // simplen `const`s, damit die Kalibrierungs-Schnittstelle sie innerhalb einer Sitzung
+  // aendern kann, ohne die Seite neu zu laden.
+  const HATZ_RAUSCHEN_AKTUELL={nichtFinale:0.25, finale:0.02};
+  // FUENF UNABHAENGIGE WUERFE STATT EINEM (Kalibrierweg, s. Design-Dokument): eine Welle hat
+  // laut Entwurf "zwei Huerden, ein Rempel-Fenster" -- EIN einzelner verrauschter
+  // Gesamt-Score (ein rr()-Wurf) machte das Messergebnis instabil (Pp schwankte zwischen 20
+  // und 37 je nach Laufzahl, s. PR-Beschreibung): bei nur einem Wurf entscheidet eine
+  // einzelne ungluecklich gezogene Zahl ueber die ganze Welle, und WELCHES Attribut davon
+  // profitiert, haengt empfindlich von der genauen Gewichtsmischung ab. Fuenf separat
+  // gewuerfelte Teilereignisse (Antritt/Endtempo, zwei Huerden, Rempel-Fenster, Stehen)
+  // glaetten das genauso, wie die sieben Huerden/hundert Ticks des klassischen Formats es
+  // tun -- derselbe Grund, aus dem CLASSISCH ueberhaupt stabil misst.
+  function hatzWelleScore(u,finale){
+    const W=finale?HATZ_W_FINALE:HATZ_W;
+    const rauschen=finale?HATZ_RAUSCHEN_AKTUELL.finale:HATZ_RAUSCHEN_AKTUELL.nichtFinale;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const haupt=finale?(u.ENDTEMPO||0):(u.ANTRITT||0);
+    // SECHS UNABHAENGIGE WUERFE statt einem gemeinsamen (Kalibrierweg, s. Design-Dokument):
+    // je einer fuer Antritt/Endtempo, die zwei Huerden (Technik/Wendigkeit), den Rempler
+    // (Wucht), das Wegstecken (Robust) und das Stehen -- dieselbe Glaettung, die das
+    // klassische Format ueber Dutzende Ticks/sieben Huerden ohnehin bekommt.
+    return wurf(haupt*W.haupt) + wurf((u.TECHNIK||0)*W.technik) + wurf((u.WENDIGKEIT||0)*W.wendig)
+         + wurf((u.WUCHT||0)*W.wucht) + wurf((u.ROBUST||0)*W.robust) + wurf((u.STEHEN||0)*W.stehen);
+  }
+  function baueHatz(){
+    let aktiv=[...LAEUFER], naechsterRang=aktiv.length, welleIdx=0, letzteBleibt=null, t=0;
+    HATZ_WELLEN=[];
+    while(aktiv.length>2){
+      const finale=aktiv.length<=4;
+      const bewertet=aktiv.map(u=>({u,score:hatzWelleScore(u,finale)})).sort((a,b)=>a.score-b.score);
+      const rausN=finale?(aktiv.length-2):Math.min(2,aktiv.length-2);
+      const raus=bewertet.slice(0,rausN), bleibt=bewertet.slice(rausN);
+      // Innerhalb der Rausgruppe: der schwaechste (Index 0, Note am niedrigsten) bekommt den
+      // schlechtesten noch freien Rang.
+      for(let i=0;i<raus.length;i++)raus[raus.length-1-i].u.hatzRang=naechsterRang--;
+      t+=HATZ_WELLEN_DAUER;
+      HATZ_WELLEN.push({welle:welleIdx, finale, ende:t, rausIds:raus.map(x=>x.u.id), revealed:false});
+      aktiv=bleibt.map(x=>x.u); letzteBleibt=bleibt;
+      if(!finale)t+=HATZ_NEUORDNUNG_DAUER;
+      welleIdx++;
+    }
+    if(!HATZ_WELLEN.length)HATZ_WELLEN.push({welle:0, finale:true, ende:HATZ_WELLEN_DAUER, rausIds:[], revealed:false});
+    // Die letzten (<=2) Laeufer: Reihenfolge aus der zuletzt berechneten Wellen-Note oben
+    // ("letzteBleibt") -- oder, falls das Feld mit <=2 Laeufern startet (sehr kleine
+    // Ersatzaufstellung, Edge-Case), eine letzte eigene Bewertung.
+    const rest=(letzteBleibt?letzteBleibt.filter(x=>aktiv.includes(x.u))
+      :aktiv.map(u=>({u,score:hatzWelleScore(u,true)}))).sort((a,b)=>a.score-b.score);
+    for(let i=0;i<rest.length;i++)rest[rest.length-1-i].u.hatzRang=naechsterRang--;
+    for(const u of LAEUFER)if(u.hatzRang==null)u.hatzRang=naechsterRang--; // Sicherheitsnetz
+  }
+  function hatzAktuelleWelle(){
+    if(!HATZ_WELLEN)return null;
+    return HATZ_WELLEN.find(w=>!w.revealed)||HATZ_WELLEN[HATZ_WELLEN.length-1]||null;
+  }
+  function stepSpurtHatz(dt){
+    if(done)return;
+    rennT+=dt;
+    const letzte=HATZ_WELLEN[HATZ_WELLEN.length-1];
+    for(const w of HATZ_WELLEN){
+      if(w.revealed||rennT<w.ende)continue;
+      w.revealed=true;
+      for(const id of w.rausIds){
+        const u=LAEUFER.find(x=>x.id===id); if(!u)continue;
+        // `u.fertig`=Rang (s. Kopfkommentar), `u.raus`/`u.stolper` sind reine Anzeige --
+        // dieselbe Dimm-/"liegt"-Behandlung, die Takeshi's Castle/ein Hürdensturz schon
+        // bekommen (s. zeichneSpurt, "AUSGESCHIEDEN"/`down:u.stolper>0`). Niemand faellt
+        // hier generisch nach vorn/hinten um (CLAUDE.md, PixelLab-Tod-Animationen): die
+        // vom Fegearm Erwischten liegen sichtbar auf der Bahn, dieselbe Pose wie ein
+        // Huerdensturz -- nicht die 0815-Umkipp-Variante, die der Abschnitt ausschliesst.
+        u.fertig=u.hatzRang; u.raus=true; u.stolper=Math.max(u.stolper||0,1);
+        rennFertig.push(u);
+      }
+      if(w===letzte){
+        const rest=LAEUFER.filter(x=>x.fertig==null).sort((a,b)=>(a.hatzRang||99)-(b.hatzRang||99));
+        for(const u of rest){ u.fertig=u.hatzRang; rennFertig.push(u); }
+      }
+    }
+    // KOSMETISCHE POSITIONS-ANIMATION (reine Anzeige -- schreibt nur `u.pos`, nie
+    // `u.fertig`/rr()/MOTOREN["spurt"].wert()). Ausgeschiedene bleiben stehen, wo der Arm
+    // sie erwischt hat.
+    const gesamtWellen=HATZ_WELLEN.length;
+    for(const u of LAEUFER){
+      if(u.raus)continue;
+      const w=hatzAktuelleWelle();
+      const localStart=w?w.ende-HATZ_WELLEN_DAUER:0;
+      const frac=w?Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER)):1;
+      const basis=w?(w.welle+frac)/gesamtWellen:1;
+      const jitter=((u.id*53)%37)/37*0.015;
+      u.pos=Math.max(0,Math.min(0.97, basis*0.92+jitter));
+      u.bahn=u.bahnZ;
+    }
+    if(rennT>=letzte.ende+0.05||rennFertig.length>=LAEUFER.length)done=true;
+  }
+  // SWEEP-ARM/BEDROHUNGS-OVERLAY (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset (Auftrag: "zuerst pruefen, ob ein
+  // bestehendes Panzertier wiederverwendbar ist" -- geprueft, s. PR-Beschreibung: kein
+  // passendes vorhanden, "medibull" ist ein Sanitaeter-Maskottchen, kein Bedroher) --
+  // stattdessen derselbe prozedurale Balken, mit dem das Bahn-Chassis auch sonst Zustand
+  // zeichnet (Hot-Seat-Podest, Ziellinie), damit kein Asset-Generierungsprojekt an einem
+  // Format-Fundament haengt.
+  function zeichneHatzUeberlagerung(){
+    const w=hatzAktuelleWelle(); if(!w)return;
+    const localStart=w.ende-HATZ_WELLEN_DAUER;
+    const frac=Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER));
+    // ETWAS HINTER DEM NACHZUEGLER, NIE AUF GLEICHER HOEHE (sonst verschwindet der duenne
+    // Balken optisch unter den Laeufer-Sprites, die ERST NACH diesem Aufruf gezeichnet
+    // werden, s. Kopfkommentar/PR-Beschreibung "Screenshot-Beleg"): der Arm bleibt 0,05
+    // Streckenanteile HINTER der Welle, bis er sie im letzten Fuenftel der Welle einholt.
+    const n=Math.max(1,BAHNEN_N());
+    const y0=bahnY(0)-26, y1=bahnY(n-1)+26;
+    const welleZielPos=Math.min(0.95,((w.welle+1)/Math.max(1,HATZ_WELLEN.length))*0.92);
+    const armPos=Math.max(0,welleZielPos-0.06+frac*0.06);
+    const xPos=camX(armPos);
+    ctx.save();
+    ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
+    ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
+    ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(w.finale?"ENDSPURT":"FEGEARM",xPos,y0-8);
+    ctx.restore();
+  }
+
+  // ===================================================================================
+  // HYROX-STATIONEN (Format 3, 08.11.). Chris' Kritik an Spurt: "lame im Vergleich zu
+  // Time Trial" -- und die Erinnerung, dass die sieben Stationen im Boden (Huerde/
+  // Balken/Palisade/Seil/Wassergraben/Mauer/Strohballen, `BAHN_ART.spurt.hindernisBilder`/
+  // `hindernisNamen`) heute reine Kulisse sind: JEDE von ihnen laeuft ueber denselben
+  // generischen Huerden-Stolper (HUERDEN_TYP(i) aus `hindernisTypen`, unabhaengig vom
+  // gezeigten Bild) -- eine "Wassergraben"-Station bremst mechanisch genauso wie eine
+  // "Huerde", nur mit einem anderen Sprite darunter. Dieses Format macht die STATIONEN
+  // selbst zur Mechanik, mit einer inhaltlich passenden Sub-Skill-Kombination je Gruppe --
+  // Design/Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md.
+  //
+  // RUNDKURS? NEIN -- dieselbe Entscheidung wie bei der Hatz (s. deren Kopfkommentar/
+  // Design-Dokument Abschnitt 2): die Bahn bleibt LINEAR, die sieben Stationen liegen an
+  // denselben Positionen wie heute (BA().hindernisse, 0,14..0,86 Streckenanteile).
+  //
+  // SIEBEN STATIONEN, DREI CHECKS. Sieben unabhaengige rr()-Wuerfe je Laeufer wuerden das
+  // Ergebnis verwaschen (CLAUDE.md, "Mehr Ereignisse helfen fast nie" -- derselbe Befund,
+  // der die Hatz von einem auf fuenf GROB passende Wuerfe je Welle gebracht hat, hier
+  // andersherum: von sieben AUF drei). Gruppiert nach Inhalt, nicht nach Position:
+  //   TECHNIK  (Huerde + Balken)              -- TECHNIK/WENDIGKEIT (bestehendes Rezept)
+  //   KLETTERN (Palisade + Seil)               -- TECHNIK/ROBUST (Grip & Durchhalten)
+  //   KRAFT    (Wassergraben + Mauer + Strohballen) -- WUCHT/STEHEN (Schieben/Tragen/Kaelte aushalten)
+  // Jede Gruppe liest AUSSCHLIESSLICH die sieben bestehenden Spurt-Sub-Skills (s. "DIE
+  // SIEBEN ROLLEN" am Kopf von BAHN_ART, dasselbe Rezept wie Klassisch/Hatz) -- keine neue
+  // Sub-Skill-Formel, nur eine andere KOMBINATION, exakt wie bei der Hatz.
+  //
+  // `u.fertig` TRAEGT HIER EINE ECHTE ZEIT (wie Klassisch/Time-Trial), KEINEN RANG (anders
+  // als die Hatz): `baueHyroxStationen()` berechnet je Laeufer einmal, deterministisch aus
+  // der Renn-Saat, eine Zielzeit `u.hyroxZeit` aus Grundtempo (ANTRITT/ENDTEMPO) minus den
+  // drei Stationschecks. `stepSpurtHyrox()` laesst die Uhr laufen und traegt `u.fertig`
+  // ein, sobald `rennT` die Zielzeit erreicht -- MOTOREN["spurt"].wert() (der generische
+  // Bahn-Zweig, unveraendert) sortiert danach aufsteigend nach `bahnZeit(u)=u.fertig`
+  // (startT ist bei Spurt immer 0) und vergibt -(Platz). Kein eigener wert()-Zweig noetig.
+  const HYROX_MIN_SEK=6;
+  // BASIS/SKALA MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}) -- Objekte statt
+  // simplen `const`s, dasselbe Muster wie HATZ_RAUSCHEN_AKTUELL (s. dort).
+  const HYROX_BASIS_SEK_AKTUELL={wert:26}, HYROX_SKALA_SEK_AKTUELL={wert:0.165};
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md
+  // Abschnitt 5). `pace` ist die Strecke zwischen den Stationen (Antritt/Endtempo-Mix wie
+  // im klassischen Format), die drei Stationsgewichte zusammen tragen die Haelfte des
+  // Scores -- die Stationen sollen wirklich etwas kosten, nicht nur ein kleiner Zuschlag
+  // neben dem Lauftempo sein. MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}).
+  const HYROX_W={pace:0.40, technik:0.20, kletter:0.20, kraft:0.20};
+  const HYROX_RAUSCHEN_AKTUELL={wert:0.18};
+  // DREI UNABHAENGIGE WUERFE statt sieben (Kalibrierweg, s. Design-Dokument) -- je einer
+  // fuer die Strecke und die drei Stationsgruppen, dieselbe Glaettung wie bei der Hatz
+  // (fuenf Wuerfe statt einem je Welle).
+  function hyroxScore(u){
+    const W=HYROX_W, rauschen=HYROX_RAUSCHEN_AKTUELL.wert;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const pace=0.55*(u.ANTRITT||0)+0.45*(u.ENDTEMPO||0);
+    // TECHNIK-STATIONEN (Huerde+Balken): Tritt-Technik und Balance -- dasselbe Paar, das
+    // der klassische Huerdenlauf an jeder Huerde schon nutzt.
+    const technik=0.6*(u.TECHNIK||0)+0.4*(u.WENDIGKEIT||0);
+    // KLETTER-STATIONEN (Palisade+Seil): ueberwiegend ROBUST (Festhalten/Durchhalten unter
+    // Schmerz -- health/torment/will/dex), TECHNIK nur als Nebenweg (wer wenig Grip hat,
+    // kommt ueber geschickte Technik trotzdem rueber, nur langsamer) -- "mehrere Wege zum
+    // Erfolg" (CLAUDE.md).
+    const kletter=0.3*(u.TECHNIK||0)+0.7*(u.ROBUST||0);
+    // KRAFT-STATIONEN (Wassergraben+Mauer+Strohballen): Schieben/Tragen (WUCHT) als
+    // Primaerweg, STEHEN (Kaelte/Erschoepfung aushalten) als zweiter Kanal -- die drei
+    // haertesten Stationen am Streckenende, bewusst zusammengefasst statt dreifach
+    // gewuerfelt.
+    const kraft=0.55*(u.WUCHT||0)+0.45*(u.STEHEN||0);
+    return wurf(pace*W.pace)+wurf(technik*W.technik)+wurf(kletter*W.kletter)+wurf(kraft*W.kraft);
+  }
+  // STATIONSLISTE FUER DIE ZEICHNUNG (reine Anzeige -- dieselben sieben Positionen/Bilder/
+  // Namen wie BA().hindernisse/hindernisBilder/hindernisNamen, nur mit ihrer Gruppe
+  // (Technik/Klettern/Kraft) markiert, damit die Ueberlagerung zeigen kann, WELCHER Check
+  // gerade zaehlt). Kein Einfluss auf rr()/wert()/u.hyroxZeit -- die liegen schon fest,
+  // bevor dieses Array gebaut wird.
+  const HYROX_GRUPPE_JE_STATION=["technik","technik","kletter","kletter","kraft","kraft","kraft"];
+  function baueHyroxStationen(){
+    const art=BA(), pos=art.hindernisse||[], bilder=art.hindernisBilder||[], namen=art.hindernisNamen||[];
+    HYROX_STATIONEN=pos.map((p,i)=>({pos:p, bild:bilder[i]||null, name:namen[i]||("Station "+(i+1)),
+      gruppe:HYROX_GRUPPE_JE_STATION[i%HYROX_GRUPPE_JE_STATION.length]}));
+    for(const u of LAEUFER){
+      const score=hyroxScore(u);
+      u.hyroxZeit=Math.max(HYROX_MIN_SEK, HYROX_BASIS_SEK_AKTUELL.wert-HYROX_SKALA_SEK_AKTUELL.wert*score);
+      u.hyroxStationIdx=-1;   // kosmetisch: welche Station zuletzt eine Arbeits-Pose ausgeloest hat
+    }
+  }
+  function stepSpurtHyrox(dt){
+    if(done)return;
+    rennT+=dt;
+    for(const u of LAEUFER){
+      if(u.stolper>0)u.stolper-=dt;
+      if(u.fertig!=null)continue;
+      const z=u.hyroxZeit||HYROX_BASIS_SEK_AKTUELL.wert;
+      const vorher=u.pos||0;
+      // KOSMETISCHER FORTSCHRITT (reine Anzeige -- schreibt nur `u.pos`/`u.bahn`/`u.stolper`,
+      // nie rr()/wert()/u.hyroxZeit, dasselbe Prinzip wie die Positions-Animation der Hatz).
+      u.pos=Math.max(0,Math.min(0.99, rennT/z));
+      u.bahn=u.bahnZ;
+      // ARBEITS-POSE AN JEDER STATION: beim Ueberschreiten einer Stationsmarke kurz dieselbe
+      // "liegt"/Stolper-Pose zeigen, mit der ein Huerdensturz im klassischen Format schon
+      // arbeitet (CLAUDE.md, PixelLab-Tod-Animationen -- hier kein Sturz, aber dasselbe
+      // Wiederverwendungsprinzip: bestehende Pose statt neuer Animation). Rein kosmetisch,
+      // die Zeit steht durch `u.hyroxZeit` schon fest.
+      for(let i=0;i<HYROX_STATIONEN.length;i++){
+        const st=HYROX_STATIONEN[i];
+        if(vorher<st.pos&&u.pos>=st.pos){ u.stolper=Math.max(u.stolper||0,0.4); u.hyroxStationIdx=i; }
+      }
+      if(rennT>=z){ u.pos=1; u.fertig=z; rennFertig.push(u); }
+    }
+    if(rennFertig.length>=LAEUFER.length)done=true;
+  }
+  // STATIONS-UEBERLAGERUNG (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset: die sieben Sprites zeichnet `zeichneBoden()`
+  // bereits (Batch 15 Kulissen-Rework); diese Funktion ergaenzt nur ein kleines Gruppen-
+  // Schild ueber jeder Station, damit sichtbar ist, dass TECHNIK/KLETTERN/KRAFT jetzt
+  // echte Checks sind, nicht nur ein Bild.
+  function zeichneHyroxUeberlagerung(){
+    if(!HYROX_STATIONEN||!HYROX_STATIONEN.length)return;
+    const GRUPPEN_LABEL={technik:"TECHNIK", kletter:"KLETTERN", kraft:"KRAFT"};
+    const GRUPPEN_FARBE={technik:"rgba(69,176,201,0.85)", kletter:"rgba(242,160,61,0.85)", kraft:"rgba(199,68,68,0.9)"};
+    ctx.save();
+    ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
+    for(const st of HYROX_STATIONEN){
+      const x=camX(st.pos), y=bahnY(0)-34;
+      ctx.fillStyle=GRUPPEN_FARBE[st.gruppe]||"rgba(120,120,120,0.85)";
+      ctx.fillRect(x-28,y-14,56,16);
+      ctx.fillStyle="#fff";
+      ctx.fillText(GRUPPEN_LABEL[st.gruppe]||"", x, y-2);
+    }
+    ctx.restore();
+  }
+
   function stepSpurt(dt){
     if(done)return;
+    if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
+    if(bahnHyroxAktiv){ stepSpurtHyrox(dt); return; }
     rennT+=dt;
     // S-N5b: Stationsduelle buchen (reine Buchhaltung neben dem Laeufer, s. stationsDuellSchritt).
     stationsDuellSchritt();
@@ -50433,6 +50996,13 @@
   }
   function zeichneSpurt(){
     zeichneBoden();
+    // DIE HATZ (s. BAHN_FLAGS/stepSpurtHatz): nur die zusaetzliche Bedrohungs-Zeichnung,
+    // ohne `bahnHatzAktiv` ist das ein No-Op -- die Figuren selbst zeichnet der Rest dieser
+    // Funktion unveraendert (u.raus/u.pos tragen die Hatz-Information schon, s. dort).
+    if(bahnHatzAktiv)zeichneHatzUeberlagerung();
+    // HYROX-STATIONEN (s. BAHN_FLAGS/stepSpurtHyrox): No-Op ausserhalb des Formats,
+    // dasselbe Muster wie der Hatz-Zweig direkt darueber.
+    if(bahnHyroxAktiv)zeichneHyroxUeberlagerung();
     // TEAM-FEIER STAFFEL (Konzept 3.3): Teamfarben einmal je Frame (Befund B5). Nur Staffel --
     // jede andere Bahn zeichnet ohne Feier-Publikum und bleibt Zeichen fuer Zeichen wie vorher.
     const staffelFeier=!!BA().staffel;
@@ -50585,7 +51155,12 @@
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
         // S-N5b: dieselbe Pose auch im Stationsduell (stationsDuellStoss, rein kosmetisch).
-        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3):
+        // `down` bleibt wie bisher (haelt die Figur an, s. die down-gesperrten Zweige oben in
+        // dieser Funktion) -- `vizSturz` ist zusaetzlich, rein praesentational, genauso wie bei
+        // stepKuer()/Showcase, und laesst zeichnePixelFigur() beim Abrutschen (Climbing) bzw.
+        // Stolpern (Huerden/Staffel) die treffer- statt die tod-Animation zeigen.
+        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,vizSturz:u.stolper>0,hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
@@ -55986,7 +56561,13 @@
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   mutatorenGrundzustand();
   zieheFormkarten(20260823);
-  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
+  // BOOTSTRAP-AUFRUF VERSCHOBEN (Verdrahtung 11.11., s. Kommentar bei seiner neuen Stelle
+  // ganz am Modulende): `reset()` baut hier synchron die Standarddisziplin ("tdm", s.
+  // `let disc="tdm"` oben) -- seit TDM ueber `tdmGefecht()`/`tdmSchlagwechsel()` laeuft, braucht
+  // dieser Bau Funktionen/Konstanten (mdffaZufall, mdffaMisch, bfPodPlatzierungAus, TDM_GEFECHT
+  // u.a.), die TEXTLICH erst weiter unten im Modul stehen -- an DIESER Stelle waeren sie noch
+  // in ihrer Temporal-Dead-Zone (`let`/`const`, kein `function`). Der Aufruf selbst steht
+  // deshalb jetzt ganz am Ende der Datei, nach jeder Deklaration.
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
   // schreibgeschuetzt zum Nachmessen bereit; das Spiel liest davon nichts.
@@ -56828,6 +57409,456 @@
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
     return {...g, platzierung:pl, lebend, anteil, teamWert};
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT — SEIT 11.11. DER ECHTE WERTUNGSPFAD (Verdrahtung, s.
+  // lib/battle/arena-headless-runner.ts "ARENA_KAMPF_DISCIPLINE_IDS" und
+  // lib/battle/arena-resolved-disciplines.ts "TDM_GEFECHT_VORLAUF_AKTIV").
+  //
+  // Chris woertlich: „Das was auf dem Feld passiert soll auch das in den Stats sein! Und
+  // das in jeder Disziplin!" TDM lief bis zu dieser Verdrahtung produktiv ueber die
+  // PPS-Duell-Bruecke (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte
+  // Zweikampf (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s.
+  // Kommentar bei ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. Dieser Block entstand
+  // 10.11. als reiner Mess-/Prototyp-Schritt (additiv, an nichts angeschlossen) und ist seit
+  // 11.11. der tatsaechliche Wertungspfad: `spieleTdmGefecht()` (s.u.) ist der Headless-
+  // Einstiegspunkt fuer die Buchung, `build()`s TDM-Zweig (s. dort, tdmReplayStarten) spielt
+  // GENAU DASSELBE Gefecht fuer die Live-Anzeige ab — "gezeigt = gebucht" durch dieselbe
+  // Berechnung auf beiden Seiten, nicht durch einen Tick-Taktabgleich (TDM braucht den
+  // Anzeige-Treue-Fix aus PR #1372/`anzeigeSechzigstel()` deshalb NICHT: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick, ruft `stepSim()`/`anzeigeSechzigstel()` nie).
+  // Nach demselben Vorbild wie bfffaGefecht() (Battlefield-Pod, 02.11., bestand rho
+  // 0,861-0,923 / Pp 4,8-20,2 bei k=2..6). Jede Zeile des urspruenglichen Prototyp-Blocks blieb
+  // additiv: kein bestehender Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen
+  // (slotAufschlag, mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert,
+  // eigHebung, eigMutator, gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus,
+  // normalisiereSaat — alle schon vorher da). Neu durch die Verdrahtung kommen NUR
+  // `spieleTdmGefecht()`, `tdmReplayStarten()`/`tdmReplaySchritt()`/`tdmReplayEreignis()` und die
+  // EINE Zeile in `stepSim()` dazu, die bei aktivem Replay frueh zurueckkehrt (s. dort) — exakt
+  // das Muster, mit dem `KP.pod.replay` dort schon Battlefield abfaengt.
+  // `node scripts/pruefe-wertung-fingerabdruck.mjs` zeigt deshalb ab dieser PR eine Aenderung
+  // NUR in den TDM-Zeilen (s. docs/design/tdm-gefecht-abnahme-10-11.md fuer die Abnahmezahlen).
+  //
+  // ANDERS ALS BATTLEFIELD: TDM ist "reines Deathmatch" (ARENA_ART.tdm-Kommentar sagt das
+  // ausdruecklich, ebenso der Kommentar bei ARENA_DOMINATION oben: "TDM und Mini-DM bleiben
+  // reines Deathmatch"), kein Kontrollpunkt-Gefecht — also kein `orte`, kein Erobern, keine
+  // Rotation. Die Rollen sind ebenfalls FEST (SLOTS_JE_DISC.tdm, sechs Stueck, unabhaengig von
+  // der Kadergroesse k — derselbe feste Pfad, den Mini-DM vor seiner Sechs-Rollen-Erweiterung
+  // hatte), nicht wie Battlefields BATTLEFIELD_SLOTS_JE_K.
+  //
+  // JEDES der neun TDM-Matrixgewichte (BASIS_JE_DISC.tdm, bit-identisch zur gesperrten Matrix
+  // — TDM hat KEINEN Eintrag in spiel-eignung-overrides.ts) bekommt einen eigenen, benannten
+  // Kanal — Budget-Methode, CLAUDE.md:
+  //   health 20         STAND: die Lebenspunkte.
+  //   power 28, torment 2  WUCHT: Schadenshoehe je Treffer (der dominante Kanal, wie die
+  //                      Matrix es vorgibt — Power ist mit Abstand das schwerste Attribut).
+  //   awareness 2        TREFFER: Chance, dass ein Schlag ueberhaupt landet.
+  //   stamina 14         AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst.
+  //   spirit 12          DECKUNG: mindert jeden erlittenen Treffer.
+  //   intelligence 6     SCHWACHSTELLE: Zielwahl trifft den angeschlagensten Gegner statt
+  //                      zufaellig.
+  //   determination 6    LETZTER ATEM: ein toedlicher Treffer laesst einmal stehen.
+  //   charisma 10        BEFEHL: eigener Wucht-Multiplikator — ein Anfuehrer schlaegt mit mehr
+  //                      Nachdruck zu (es gibt in TDM keine Eroberung, auf die Charisma sonst
+  //                      ginge, vgl. Battlefield/`erobern`).
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)`, exakt
+  // wie in bfffaKaempfer()/mdffaKaempfer(). `kappa` fuer die Grundkanaele (Stand, Wucht,
+  // Treffer, Ausdauer), `kappaWege` fuer die taktischen Kanaele (Deckung, Schwachstelle, Atem,
+  // Befehl) — dieselbe Aufteilung wie bei Battlefield.
+  const TDM_GEFECHT_GRUND=Object.freeze({
+    takte:20, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    befehl:{basis:1},
+    wertung:{ko:15, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4},
+    // ANZEIGE-TAKT (Verdrahtung 11.11., s. tdmReplaySchritt() weiter unten): reine
+    // Sekunden-pro-Takt-Vorgabe fuer die Live-Wiedergabe, beeinflusst tdmSchlagwechsel()
+    // selbst NICHT (die rechnet taktlos in diskreten Runden) -- dieselbe Rolle wie
+    // BFFFA.taktSek fuer Battlefields Replay. Additiv: kein bestehender Leser dieses Objekts
+    // (tdmGefechtEinfluss/-Sonde/-Parameter) liest `taktSek`, die schon gemessenen rho-/
+    // Pp-Zahlen bleiben deshalb unberuehrt.
+    taktSek:4
+  });
+  const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
+  let TDM_GEFECHT=tdmGefechtGrund();
+  const TDM_ZWECK={ziel:21, schwachstelle:22, treffer:23, atem:24};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie bfffaKaempfer()/mdffaKaempfer(). `idx`
+  // ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel fuer mdffaZufall).
+  function tdmKaempfer(p,side,slotId,slotDef,idx){
+    const d="tdm";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=TDM_GEFECHT, R=P.mitte||50, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["power","torment"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      befehl:klemme(P.befehl.basis+weg(H.befehl,["charisma"]),0.2,3),
+      // Laufzustand
+      raus:false, rausTakt:null, atemWeg:false, wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, schwachstellen:0}
+    };
+  }
+
+  // DAS GEFECHT. `kaempfer` sind tdmKaempfer() (Index = idx), `N` die Seitenzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente — dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Jeder Takt: Zielwahl (Schwachstelle via Intelligence, sonst
+  // gleichverteilt unter allen lebenden Gegnern JEDER anderen Seite — bei den zwei Seiten, die
+  // ein echtes TDM-Spiel hat, einfach "der Gegner"), gleichzeitige Schlaege, K.o. mit einmaligem
+  // letzten Atem (Determination), Seiten-Ausscheiden. Rueckgabe wie bfffaGefecht, ohne `orte`.
+  function tdmSchlagwechsel(kaempfer,saat,N){
+    const P=TDM_GEFECHT, Z=TDM_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const lebendeSeiten=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    const schnapp=()=>({k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeSeiten().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ZIELWAHL, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus)continue;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach});
+      }
+      // 2) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit)
+      // mindert, Befehl (Charisma) hebt den eigenen Schlag, Schwachstelle gibt Bonus.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel,schwach}=x;
+        A.st.schlaege++;
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx}); continue; }
+        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, wucht:Math.round(dmg*10)/10});
+      }
+      // 3) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; ereignisse.push({typ:"atem", wer:k.idx}); continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; punkte[bester.side]++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx});
+      }
+      // 4) AUSSCHEIDEN: eine Seite ohne Stehende ist raus.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t; ereignisse.push({typ:"seite-raus", side:s});
+      }
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      takte.push({t, ereignisse, ...schnapp()});
+    }
+    if(ende==="zeit"&&lebendeSeiten().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte — sonst kostete ein schneller Sieg
+    // den Sieger genau die Taktpunkte, die er sich erkaempft hat (dieselbe Regel wie bfffaGefecht).
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // DIE OEFFENTLICHE FUNKTION AUS DER AUFGABE: `tdmGefecht(seiten, saat, jeSeite)`. `seiten` ist
+  // eine Liste von Spielerlisten (ArenaSpieler[], je Seite ein Kader — im echten Spiel immer
+  // zwei, s. Kopfkommentar), `saat` die Kampfsaat, `jeSeite` (optional) die Kadergroesse k
+  // (steuert nur, wie viele der sechs festen Rollen SLOTS_JE_DISC.tdm vergeben werden — ohne
+  // Angabe die Rosterlaenge der ersten Seite). Baut die Kaempfer (liest FORMKARTE/MUTATOREN/
+  // ATTR_HEBUNG wie jede andere Gefecht-Bau-Funktion dieses Motors — dieselben Eingaben liefern
+  // dasselbe Ergebnis) und entscheidet das Gefecht in einem Schritt. Rueckgabe im selben Format
+  // wie bfPodLauf()s "gefecht"-Zweig (ohne die Battlefield-eigenen Felder besitz/erob/amOrt/
+  // wechsel/besucht, die TDM nicht hat), damit Mess-Sonden sie identisch lesen koennen.
+  function tdmGefecht(seiten,saat,jeSeite){
+    const N=seiten.length;
+    if(N<2)throw new Error("tdmGefecht: braucht mindestens zwei Seiten, bekam "+N+".");
+    const k=jeSeite||seiten[0].length||ARENA_ART.tdm.jeSeite;
+    const rollen=slotsVon("tdm").slice(0,Math.max(1,Math.min(6,Math.round(k))));
+    const saatN=normalisiereSaat(saat);
+    let idx=0;
+    const kaempfer=[];
+    seiten.forEach((team,side)=>{
+      team.forEach((p,i)=>{
+        const slotId=rollen[i%rollen.length].id;
+        kaempfer.push(tdmKaempfer(p,side,slotId,SLOTVON[slotId],idx++));
+      });
+    });
+    const g=tdmSchlagwechsel(kaempfer,saatN,N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s&&!x.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s).reduce((a,x)=>a+x.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt,teamWert);
+    const summe=kaempfer.reduce((a,x)=>a+Math.max(0,x.wert),0)||1;
+    return {disziplin:"tdm", saat:saatN, format:"gefecht", ende:g.ende, takte:g.gespielt,
+      teams:Array.from({length:N},(_,s)=>({side:s, punkte:+g.punkte[s].toFixed(1),
+        lebend:pl.lebend[s], rausT:pl.rausT[s], eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s],
+        wertung:+teamWert[s].toFixed(3)})),
+      kaempfer:kaempfer.map(x=>({n:x.n, side:x.side, slot:x.slot, eig:x.eigOhneMutator,
+        wert:+(Math.max(0,x.wert)/summe*100).toFixed(3), roh:+x.wert.toFixed(3), ko:x.st.kos, down:!!x.raus})),
+      gefecht:g};
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie battlefieldPodSonde(): `kader` Liste von Team-Kadern,
+  // `opt.gruppen` Liste von ZWEIERGRUPPEN (Indizes in `kader` — TDM ist zwei Seiten, nicht vier),
+  // `opt.n` Kaempfe je Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k. Gemessen wird `eig` OHNE
+  // Mutator gegen `wert` (Anteil am Gesamtbeitrag) — exakt die Groessen von disziplinProbe().
+  function tdmGefechtSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          FORMKARTE={};
+          mdffaFormkartenFuer(teams,(20260823+versatz+gi*7919+i*104729)>>>0);
+          MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+            :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          const r=tdmGefecht(teams,saat,o.jeSeite);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.takte, ende:r.ende, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"tdm", format:"gefecht", events};
+  }
+
+  // PP-ABNAHME (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon()/
+  // battlefieldPodEinfluss(), aber mit SQUAD/OPP direkt als die zwei TDM-Seiten — TDM braucht,
+  // anders als Battlefields Vier-Team-Pod, keine Zusatzteams, weil es schon im echten Spiel nur
+  // zwei Seiten hat.
+  function tdmGefechtEinfluss(n,plus,saatVersatz,mutatorModus,jeSeite){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(teams,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel((20260823+versatz+i*15485863)>>>0);
+      else if(modus==="aus")MUTATOREN=[];
+      return tdmGefecht(teams,1337+versatz+i*7919,jeSeite);
+    };
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.tdm||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,kk)=>acc+Math.abs((reihen.find(r=>r.attribut===kk)||{anteil:0}).anteil-(W[kk]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"tdm", format:"gefecht", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.tdm.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // MESS-SONDE fuer die Kalibrierung (wie battlefieldPodParameter/miniDmFfaParameter): `neu` wird
+  // tief in den Grundwert TDM_GEFECHT_GRUND gemischt, null/undefined setzt zurueck. Ruft im
+  // Spielbetrieb niemand (TDM ist nicht an diese Funktionen angeschlossen) — nur die Mess-/
+  // Kalibrierskripte dieses Prototyps.
+  function tdmGefechtParameter(neu){
+    const misch=(a,b)=>{ for(const k2 in b){ if(b[k2]&&typeof b[k2]==="object"&&!Array.isArray(b[k2])&&a[k2]&&typeof a[k2]==="object")misch(a[k2],b[k2]); else a[k2]=b[k2]; } return a; };
+    TDM_GEFECHT=neu?misch(tdmGefechtGrund(),JSON.parse(JSON.stringify(neu))):tdmGefechtGrund();
+    return JSON.parse(JSON.stringify(TDM_GEFECHT));
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT-VERDRAHTUNG (11.11.): `spieleTdmGefecht()` ist jetzt der Headless-
+  // Einstiegspunkt fuer die Buchung (s. lib/battle/arena-headless-runner.ts,
+  // "ARENA_KAMPF_DISCIPLINE_IDS"), `tdmReplay*` spielt dasselbe Gefecht fuer die Live-Anzeige
+  // ab (build()s TDM-Zweig, s. dort) -- nach demselben Muster wie Battlefields "DAS REPLAY"
+  // weiter unten, aber ohne Orte/Eroberung/Rotation (TDM ist reines Deathmatch, kein
+  // Kontrollpunkt-Gefecht) und ohne Respawn (tdmSchlagwechsel() kennt keinen, anders als der
+  // alte Echtzeit-Zweikampf -- `schalteAus()`s TDM-Zweig (disc==="tdm", oben) bleibt deshalb
+  // fuer das neue Gefecht ABSICHTLICH ungenutzt: er plant einen Respawn (`downBis`), den es
+  // im neuen Protokoll nicht mehr gibt, und seine Ticker-Zeile ("faellt — zurueck in Xs")
+  // waere hier schlicht falsch. s. tdmReplayKo() unten fuer die eigene, respawnfreie
+  // Buchfuehrung.
+  //
+  // "GEZEIGT = GEBUCHT" ENTSTEHT HIER NICHT UEBER EINEN TICK-TAKTABGLEICH (anders als der
+  // Anzeige-Treue-Fix PR #1372/`anzeigeSechzigstel()` fuer die kontinuierliche Bahn-/Kampf-/
+  // Feldspiel-Physik), SONDERN UEBER DIESELBE BERECHNUNG AUF BEIDEN SEITEN: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick (reines Takt-Protokoll, kein `stepSim()`-Aufruf
+  // in `tdmSchlagwechsel()`), Headless und Live-Anzeige rufen sie mit DERSELBEN Saat und
+  // DENSELBEN zwei Seiten (`tdmDuellRoster()`, EINE Implementierung fuer beide) -- `stepSim()`
+  // tickt fuer TDM danach nur noch den FERTIGEN Ablauf ab (`tdmReplaySchritt`), wuerfelt
+  // nichts mehr. `anzeigeSechzigstel()` braucht deshalb KEINE eigene TDM-Gefecht-Behandlung
+  // (nachgesehen, nicht angenommen): ihr `istKampf(disc)`-Zweig greift nur, solange
+  // `stepSim()` den alten kontinuierlichen Pfad erreicht -- der Replay-Abfang gleich am Kopf
+  // von `stepSim()` (s. dort) kehrt fuer TDM vorher zurueck.
+
+  // DIESELBE ROLLENAUSWAHL WIE build()s TDM-Zweig, hier als eigene Funktion, damit Headless-
+  // Buchung (spieleTdmGefecht) und Live-Anzeige (build()) garantiert dieselben zwei Seiten
+  // sehen — "gezeigt = gebucht" entsteht aus DIESER einen Implementierung, nicht aus zwei
+  // Kopien, die auseinanderlaufen koennten. SQUAD/OPP/place sind globale, aus
+  // `window.__olyArenaKader` gefuellte Singletons (s. "BRUECKE ZUR ECHTEN APP"), deshalb ohne
+  // `disc`-Abhaengigkeit aufrufbar.
+  function tdmDuellRoster(){
+    const d="tdm", n=jeSeiteVon(d);
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    return {mine,gegner,n};
+  }
+
+  // HEADLESS-EINSTIEGSPUNKT, exakt im Format von `spieleFeldspiel()`/`spieleBuehneDuell()`
+  // (s. arena-headless-runner.ts, "ARENA_KAMPF_DISCIPLINE_IDS"): EIN Aufruf, EIN fertiges
+  // Ergebnis, unabhaengig von der aktuell gezeigten `disc`. `seiten`/`boxscore` tragen
+  // dieselben Groessen, die `computeIndividualBoxscorePpsFromFixtureResults()`/
+  // `runBattleModeArenaMatchday()` (battle-mode-arena-team-points.ts) fuer jede andere
+  // resolved Disziplin schon lesen.
+  function spieleTdmGefecht(fd,saat){
+    if(fd!=="tdm")return null;
+    const {mine,gegner,n}=tdmDuellRoster();
+    if(!mine.length||!gegner.length)return null;
+    const g=tdmGefecht([mine,gegner],saat,n);
+    return {disziplin:fd, seiten:[g.teams[0].punkte,g.teams[1].punkte],
+      boxscore:g.kaempfer.map(k=>({name:k.n, wert:k.wert}))};
+  }
+
+  // ANMARSCH (Sekunden): keine "Orte", zu denen gelaufen wird (anders als Battlefields
+  // BF_REPLAY_ANMARSCH=6) -- nur eine kurze Pause, bevor der erste Takt faellt.
+  const TDM_REPLAY_ANMARSCH=3;
+  // `null` ausserhalb TDM oder vor dem ersten `tdmReplayStarten()`-Aufruf.
+  let tdmReplay=null;
+
+  // build()s TDM-Zweig ruft dies NACH dem Bau von U (s. dort) -- `g` ist dasselbe Objekt, das
+  // `tdmGefecht()` zurueckgibt; `g.gefecht.takte` ist das fertige Takt-Protokoll aus
+  // `tdmSchlagwechsel()`. `taktSek` kommt aus `TDM_GEFECHT` (additiv ergaenzt, s.
+  // TDM_GEFECHT_GRUND oben) -- reiner Anzeige-Takt, beeinflusst `tdmGefecht()` selbst nicht.
+  function tdmReplayStarten(g){
+    tdmReplay={g, erledigt:new Set(), ende:TDM_REPLAY_ANMARSCH+g.gefecht.gespielt*TDM_GEFECHT.taktSek};
+  }
+  const tdmReplayAktiv=()=>disc==="tdm"&&!!tdmReplay;
+
+  // EIN KO OHNE RESPAWN (s. Kopfkommentar oben): schlanke eigene Buchfuehrung statt
+  // `schalteAus()`. `still`: nur die Zahlen nachziehen (Endstand-Aufholen beim Replay-Ende),
+  // ohne Ticker-Zeile/Highlight-Drosselung anzufassen.
+  function tdmReplayKo(tg,von,still){
+    tg.st.tode++;
+    if(von){ von.st.ko++; verteileKo(tg,von); }
+    tg.down=true;
+    if(still)return;
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+    // ANDERS ALS schalteAus()s `disc!=="tdm"`-Ausschluss: im neuen, respawnfreien Protokoll
+    // IST "Seite ohne Stehende" ein echter, endgueltiger Zustand (nicht mehr ein Zufallsbild
+    // zwischen zwei Respawns) -- "entscheidend" gilt deshalb hier bewusst auch fuer TDM.
+    const entscheidend=live(tg.side).length===0;
+    const big=kampfGrossDrosseln(ersteAusschaltung||entscheidend, ersteAusschaltung||entscheidend);
+    const kind=kampfKoKind(entscheidend,false,false,ersteAusschaltung);
+    feed(tg.side,tg.n+" fällt.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von?von.n:undefined,"ereignis");
+  }
+
+  // EIN TAKT-EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN — dieselbe Bauart wie
+  // `bfPodReplayEreignis()`, ohne Orte/Eroberung (TDM hat beides nicht). `still`: nur den
+  // Endzustand nachziehen (Zahlen, ohne Spur/Schwebeschrift/Feed-Zeile).
+  function tdmReplayEreignis(e,still){
+    const U_=(i)=>i!=null?U[i]:null;
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const d=e.wucht||0;
+        Z.hp=Math.max(0,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A){A.tgt=Z; if(!still)A.lunge=0.16;} break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02));
+        if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+          feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": { const Z=U_(e.ziel); if(Z&&!Z.down)tdmReplayKo(Z,U_(e.wer),still); break; }
+      default: break;
+    }
+  }
+
+  // DER REPLAY-TAKT. `dt` wie jeder andere `stepSim()`-Aufruf. Bewegung bleibt bewusst
+  // einfach (kein Orte-System wie bei Battlefield): wer noch steht, ruckt beim eigenen
+  // Treffer kurz auf sein Ziel zu (`lunge`, s. tdmReplayEreignis) — dieselbe Anzeige-Geste,
+  // die der alte Echtzeit-Zweikampf fuer Nahkampf-Treffer ohnehin schon nutzt.
+  function tdmReplaySchritt(dt){
+    t+=dt;
+    const R=tdmReplay, g=R.g, D=TDM_GEFECHT.taktSek, takte=g.gefecht.takte, gespielt=g.gefecht.gespielt;
+    const takt=t<TDM_REPLAY_ANMARSCH?0:Math.min(gespielt,1+Math.floor((t-TDM_REPLAY_ANMARSCH)/D));
+    const imTakt=takt>=1?takte[takt-1]:null;
+    const taktStart=TDM_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    for(const u of U)u.lunge=Math.max(0,(u.lunge||0)-dt);
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=takt+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben";
+        const zeitpunkt=istSchlag?0.12+0.66*(((e.wer??0)*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        tdmReplayEreignis(e,false);
+      });
+    }
+    if(t>=R.ende){
+      takte.forEach((tk,ti)=>tk.ereignisse.forEach((e,ei)=>{
+        const schl=(ti+1)+":"+ei;
+        if(!R.erledigt.has(schl)){ R.erledigt.add(schl); tdmReplayEreignis(e,true); }
+      }));
+      finish();
+    }
+    updateHud();
   }
 
   // ===================================================================================
@@ -58509,10 +59540,20 @@
       staffelWechselAnzeige, staffelVerlauf, staffelBeinMarken, staffelAnkerGezeigt,
       staffelBeinDuellGemeldet, spurtStationBest, spurtFotofinishGezeigt,
       spurtStationStats, cam, camR, bahnWahl, bahnFokus, bahnFokusAuto, ttPanelSig,
-      routeCache, waldCache};
+      routeCache, waldCache,
+      // DIE HATZ (s. BAHN_FLAGS/baueHatz): gehoert hier dazu wie jedes andere Bahn-
+      // Anzeigefeld -- ohne diese zwei Zeilen wuerde ein headless Messlauf MITTEN in einem
+      // sichtbaren Hatz-Rennen (M.sichern()/M.bau()/.../M.zurueck()) das sichtbare Rennen
+      // nach der Messung faelschlich wieder als Hatz (oder umgekehrt) zeigen.
+      bahnHatzAktiv, HATZ_WELLEN,
+      // HYROX-STATIONEN: dieselbe Begruendung wie bei den zwei Zeilen direkt darueber --
+      // ohne sie wuerde ein headless Messlauf ein sichtbares Hyrox-Rennen verwechseln.
+      bahnHyroxAktiv, HYROX_STATIONEN};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
+    bahnHatzAktiv=!!a.bahnHatzAktiv; HATZ_WELLEN=a.HATZ_WELLEN??null;
+    bahnHyroxAktiv=!!a.bahnHyroxAktiv; HYROX_STATIONEN=a.HYROX_STATIONEN??null;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -60158,6 +61199,47 @@
     figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
       ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
+    // AUFKLAERUNGS-NEBEL-SONDE (Bugticket #69, 10.11.: "Seraph-11 zeigt schwarzen Platzhalter
+    // ('?') statt PixelLab-Figur in Battlefield" -- Nachpruefung ergab: kein Verdrahtungsfehler
+    // und keine fehlende PixelLab-Figur (Seraph-11 hat eine vollstaendige, s.
+    // data/generated/figuren-sprites.json), sondern der AUFKLAERUNGS-NEBEL selbst, s. dessen
+    // Kommentar bei NEBEL_SICHT_RADIUS oben: jede gegnerische Figur bleibt in Battlefield
+    // Silhouette mit "?", bis eine eigene Figur ihr nahegekommen ist. Reine Lesesonde, identische
+    // Formel wie dort bei "imNebel" -- kein rr()/wert()/stepSim-Bezug, kein Einfluss auf eine
+    // Messung. Erzwingt wie kulisseProbe() einen frischen draw(), damit nebelSichtBis die
+    // aktuellen Positionen widerspiegelt, auch wenn gerade kein rAF-Frame lief.
+    battlefieldNebelStand:()=>{
+      try{draw();}catch(e){}
+      return U.map(u=>({n:u.n, side:u.side, down:!!u.down, nebelSichtBis:u.nebelSichtBis||0, t,
+        imNebel:disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t)}));
+    },
+    // Dieselbe Sonde, aber DETERMINISTISCH und headless (wie arenaFormationsProbe() oben):
+    // baut Battlefield mit `saat` ueber den aktuell geladenen SQUAD/OPP, laesst stepSimStumm()
+    // +draw() (fuer die Nebel-Buchhaltung) `sekunden` virtuelle Sekunden laufen und meldet je
+    // Figur, ob sie IRGENDWANN ("jeFogged") bzw. am ENDE des Fensters ("amEndeFogged") als
+    // Silhouette galt. Sichert/stellt wie arenaFormationsProbe() den Motorzustand wieder her --
+    // reine Messsonde, kein Einfluss auf eine echte Messung.
+    battlefieldNebelProbe:(saat,sekunden)=>{
+      const M=MOTOREN.battlefield; if(!M)return null;
+      const g=M.sichern();
+      try{
+        if(M.vorher)M.vorher();
+        M.bau(saat);
+        const schritte=Math.max(0,Math.round((sekunden||0)*60));
+        const spuren=new Map();
+        for(let i=0;i<schritte&&!done;i++){
+          stepSimStumm(1/60);
+          try{draw();}catch(e){}
+          for(const u of U){
+            const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+            const eintrag=spuren.get(u.n)||{side:u.side,jeFogged:false,amEndeFogged:false};
+            eintrag.amEndeFogged=imNebel; eintrag.jeFogged=eintrag.jeFogged||imNebel;
+            spuren.set(u.n,eintrag);
+          }
+        }
+        return [...spuren.entries()].map(([n,v])=>({n,...v}));
+      } finally { M.zurueck(g); }
+    },
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
@@ -60210,6 +61292,45 @@
         for(const k of Object.keys(BUEHNE_FLAGS))
           if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
       return {...BUEHNE_FLAGS};
+    },
+    // FORMAT-FUNDAMENT SPURT (s. BAHN_FLAGS/baueHatz, 08.11.): dasselbe Muster wie
+    // buehneFlags direkt darueber, nur fuer die Bahn. {spurtFormat:"hatz"} schaltet "Die
+    // Hatz" fuer den naechsten bauSpurt()-Aufruf an dieser Seite ein, {spurtFormat:"klassisch"}
+    // (oder weglassen) ist der unveraenderte Standard. Unbekannte Werte werden ignoriert.
+    // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
+    bahnFlags:(neu)=>{
+      if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"||neu.spurtFormat==="hyrox"))
+        BAHN_FLAGS.spurtFormat=neu.spurtFormat;
+      return {...BAHN_FLAGS};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "DIE HATZ" (nur Messung/QA, s. HATZ_W/HATZ_RAUSCHEN nahe
+    // stepSpurt): erlaubt scripts/messe-spurt-hatz-einfluss.mjs/miss-spurt-hatz-rangtreue.mjs,
+    // die Kombinationsgewichte INNERHALB einer Browser-Sitzung durchzuprobieren, ohne die
+    // Engine jedes Mal neu zu laden. Kein echtes Spiel ruft das auf; die Matrix-Gewichte
+    // selbst (BAHN_ART.spurt.rezept) bleiben unberuehrt.
+    hatzGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HATZ_W))if(Number.isFinite(Number(neu[k])))HATZ_W[k]=Number(neu[k]);
+        if(neu.finale&&typeof neu.finale==="object")
+          for(const k of Object.keys(HATZ_W_FINALE))if(Number.isFinite(Number(neu.finale[k])))HATZ_W_FINALE[k]=Number(neu.finale[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HATZ_RAUSCHEN_AKTUELL.nichtFinale=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.rauschenFinale)))HATZ_RAUSCHEN_AKTUELL.finale=Number(neu.rauschenFinale);
+      }
+      return {...HATZ_W, finale:{...HATZ_W_FINALE}, rauschen:HATZ_RAUSCHEN_AKTUELL.nichtFinale, rauschenFinale:HATZ_RAUSCHEN_AKTUELL.finale};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "HYROX-STATIONEN" (nur Messung/QA, dasselbe Muster wie
+    // hatzGewichte direkt darueber): erlaubt scripts/messe-spurt-hyrox-einfluss.mjs/
+    // miss-spurt-hyrox-rangtreue.mjs, HYROX_W/HYROX_RAUSCHEN_AKTUELL/HYROX_BASIS_SEK/
+    // HYROX_SKALA_SEK innerhalb einer Browser-Sitzung durchzuprobieren. Kein echtes Spiel
+    // ruft das auf; BAHN_ART.spurt.rezept bleibt unberuehrt.
+    hyroxGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HYROX_W))if(Number.isFinite(Number(neu[k])))HYROX_W[k]=Number(neu[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HYROX_RAUSCHEN_AKTUELL.wert=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.basis)))HYROX_BASIS_SEK_AKTUELL.wert=Number(neu.basis);
+        if(Number.isFinite(Number(neu.skala)))HYROX_SKALA_SEK_AKTUELL.wert=Number(neu.skala);
+      }
+      return {...HYROX_W, rauschen:HYROX_RAUSCHEN_AKTUELL.wert, basis:HYROX_BASIS_SEK_AKTUELL.wert, skala:HYROX_SKALA_SEK_AKTUELL.wert};
     },
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
@@ -60835,6 +61956,15 @@
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
+    // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
+    // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine
+    // Rechenfunktion (auch von den Mess-/Kalibrierskripten direkt genutzt), `spieleTdmGefecht`
+    // ist der Headless-Einstiegspunkt (s. arena-headless-runner.ts).
+    tdmGefecht,
+    tdmGefechtSonde,
+    tdmGefechtEinfluss,
+    tdmGefechtParameter,
+    spieleTdmGefecht,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
@@ -61678,6 +62808,39 @@
         fertig:u.fertig!=null, aktiv:!!u.aktiv, raus:!!u.raus,
         vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3)}))
     }),
+    // GEZEIGT = GEBUCHT, FIGUR FUER FIGUR (Chris 11.11.: "KEINE DEMOS mehr! das soll nicht einfach
+    // abgespult werden! das muss sauber simuliert sein durch unsere engine"; Pilot Climbing,
+    // docs/design/bahn-echte-simulation-rollout-11-11.md). Zwei reine Lese-Sonden, kein rr(),
+    // kein Schreibzugriff auf LAEUFER/Saat/Wertung:
+    //   bahnFigurenProbe()   die Bahn, wie sie GERADE gezeichnet wird: je Laeufer Name (= die
+    //                        PixelLab-Figur, pixelFigurLaden(u.n)), Seite, Motor-Fortschritt
+    //                        `pos`, die gezeichnete Stelle laeuferXY() und -- an der Wand -- der
+    //                        gezeichnete Hoehenanteil climbAnzeigeAnteil().
+    //   bahnSpurProbe(bd,s)  der GEBUCHTE Lauf (dieselbe Schleife wie bahnLauf(): M.bau(saat),
+    //                        stepSpurt(1/60) bis done/rennT>=90), aber mit `pos` je Laeufer nach
+    //                        JEDEM Tick mitgeschrieben. Danach M.zurueck() wie bahnLauf().
+    // tests/bahn-climbing-gezeigt-gleich-gebucht.test.ts legt beide nebeneinander.
+    bahnFigurenProbe:()=>{
+      if(!istBahn(disc)||typeof LAEUFER==="undefined")return null;
+      const wand=istWand();
+      return {disc, rennT, wand,
+        laeufer:LAEUFER.map(u=>{ const p=laeuferXY(u);
+          return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, fertig:u.fertig!=null, x:p.x, y:p.y,
+            anzeige:wand?climbAnzeigeAnteil(u):null, sturz:wand?u.vizFallVon!=null:false,
+            figurAngemeldet:pixelFigurenImSpiel.includes(u.n)}; })};
+    },
+    bahnSpurProbe:(bd,saat)=>{
+      if(typeof BAHN_ART==="undefined"||!BAHN_ART[bd])return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+      const spur=[]; let guard=0;
+      stumm=true;
+      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; spur.push(LAEUFER.map(u=>u.pos)); } }
+      finally { stumm=false; }
+      const namen=LAEUFER.map(u=>({id:u.id, n:u.n, seite:u.seite}));
+      M.zurueck(gesichert);
+      return {disziplin:bd, saat:saat||1337, namen, spur};
+    },
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
@@ -62476,5 +63639,18 @@
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>PP_MATRIX_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
+
+  // BOOTSTRAP-AUFRUF (verschoben hierher bei der TDM-Gefecht-Verdrahtung 11.11., urspruenglich
+  // direkt nach `zieheFormkarten(20260823)` weit oben im Modul, s. Kommentar dort): `reset()`
+  // ruft `build()` synchron fuer die Standarddisziplin ("tdm", `let disc="tdm"` oben) auf, und
+  // TDM baut seit dieser PR ueber `tdmGefecht()`/`tdmSchlagwechsel()` -- Funktionen, die ERST
+  // HIER, am Modulende, lexikalisch alle initialisiert sind (mdffaZufall/mdffaMisch,
+  // bfPodPlatzierungAus, TDM_GEFECHT u.a. sind `let`/`const`, keine gehobenen `function`-
+  // Deklarationen). An der alten Stelle waere jeder dieser Bezeichner noch in seiner Temporal-
+  // Dead-Zone gewesen -- nachgemessen beim ersten Playwright-Smoke-Test dieser PR
+  // ("Cannot access 'TDM_GEFECHT'/'mdffaMisch' before initialization"). Reine Verschiebung,
+  // keine inhaltliche Aenderung: `window.__arena` steht jetzt sogar schon VOR diesem Aufruf
+  // (vorher erst danach), jeder bestehende Aufrufer wartet ohnehin erst auf dessen Erscheinen.
+  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
 
 })();
