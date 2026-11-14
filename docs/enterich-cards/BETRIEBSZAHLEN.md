@@ -83,3 +83,10 @@ Daraus:
 - Porto gesamt ohne Einschreiben: 1.921,65 € in 9,5 Monaten, bei ca. 1.496 Bestellungen (1.658 bis 14.11., auf 14.10. gekürzt) sind das ca. 1,28 € je Bestellung inkl. Ausland und Tracking; das Inland-Standardporto der Kalkulation (0,97 €) liegt darunter, der Rest ist Ausland/Tracking.
 - Verpackungsmaterial: 152,37 € bis Oktober, plus 65 € Taschen am 14.11.: zusammen 217 € (= Wert in der Kalkulation).
 - Wenn die vier Buchungen mit 66/72 € die Einschreiben-Marken sind: 270 € für 100 Marken = 2,70 € je Marke (Kalkulation nutzt 2,35 €). Von Chris zu bestätigen.
+
+## Korrekturen und Ergänzungen von Chris (14.11.2026, später)
+
+- Die 270 € (Buchungen 66 € ×3 und 72 €) sind **Ausland und Tracking**, nicht die Einschreiben-Marken (die stecken in den großen Deutsche-Post-Beträgen). Die Einschreiben-Marke bleibt bei 2,35 €.
+- eBay-Versandetiketten gibt es, aber sehr selten; das Porto kommt praktisch immer von der Deutschen Post.
+- Einkäufe 2026: **8.061 € bis 31.10.** bei 753 Belegen (Ø 10,71 € je Einkauf, 2025: 8,94 €).
+- Die eBay-Verkaufskosten enthalten das Shop-Abo (1.140 €). Modell (Provision + Anzeigen + Fixgebühr) plus Shop-Abo liegt 2024 und 2025 innerhalb von etwa einem Prozentpunkt (siehe Einstellungen, Karte „Betriebszahlen je Jahr“).
