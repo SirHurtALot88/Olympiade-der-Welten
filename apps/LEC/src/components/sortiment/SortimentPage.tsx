@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { KapitalPanel } from "./KapitalPanel";
 import { ArtikelDetail } from "./ArtikelDetail";
 import { daysSince } from "./PreisBoard";
 import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
@@ -788,6 +789,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <button type="button" onClick={() => setValueRange(null)} aria-label="Eingrenzung aufheben">×</button>
             </span>
           )}
+          <KapitalPanel rows={rows} />
           <div className="bd-toolbar">
             <label>
               Sortierung
