@@ -724,15 +724,14 @@ export default function HomeV2NewLook({
                 rosterRank={player.rosterRank}
                 highlight={getPlayerHighlightLabel(player)}
                 rankFrameClass={getPlayerRankFrameClass(index)}
-                caRating={player.caRating}
-                poRangeMin={player.poRangeMin}
-                poRangeMax={player.poRangeMax}
                 variant="home"
                 context="teamGrid"
                 newLook
-                known
+                known={player.starsKnown}
                 caStars={player.caStars}
-                poStars={player.poStars}
+                poStarRange={player.poStarRange}
+                caScore={player.caScore}
+                poScoreRange={player.poScoreRange}
                 portraitLoading={index < 2 ? "eager" : "lazy"}
                 portraitFetchPriority={index < 2 ? "high" : "auto"}
                 onOpen={() => onOpenPlayer(player.playerId)}

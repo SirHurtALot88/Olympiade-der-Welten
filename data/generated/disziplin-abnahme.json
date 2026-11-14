@@ -539,16 +539,36 @@
    "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
   },
   "tdm": {
-   "rhoJeSpiel": 0.324,
+   "chassis": "kampf",
+   "rhoJeSpiel": 0.813,
+   "rhoSpannweite": 0.321,
+   "rhoSaison": 0.857,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs 24 --je-seite=2..6 --pp --stroeme=0,10000000",
+    "spiele": 24,
+    "kaderVarianten": 10,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "k=6 (Standard-Motorfeldgroesse ARENA_ART.tdm.jeSeite), Saatstrom 0; Median ueber k=2..6 beider Stroeme liegt bei 0,800-0,827, s. Anmerkung"
+   },
    "pp": [
-    51.4
+    16.8,
+    14.2
    ],
-   "datum": "2026-10-07",
-   "quelle": "docs/design/gesamtstand-audit-13-10.md",
-   "rhoFrisch": false,
-   "ppFrisch": false,
-   "commit": "unbekannt",
-   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+   "ppMessung": {
+    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=24 --pp-je-seite=6",
+    "laeufe": 24,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-11-10",
+   "commit": "9b986f6b7",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "TDM-Gefecht-Verdrahtung 11.11.: tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324, Zahl oben war aus docs/design/gesamtstand-audit-13-10.md uebernommen und galt der nie wirklich angeschlossenen Echtzeit-Simulation). Neu gemessen auf main NACH dem Anzeige-Treue-Fix PR #1372 (rho war beim urspruenglichen Prototyp 10.11. noch 0,808-0,829 -- die 0,800-0,827 hier sind der aktuelle, leicht niedrigere main-Stand, weiterhin klar ueber der Schranke)."
   },
   "mini-dm": {
    "format": "4-Team-FFA (gespielt), 4 Rollenrunden je Event",

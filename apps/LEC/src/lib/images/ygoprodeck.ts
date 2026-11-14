@@ -24,6 +24,7 @@ export function toEnglishSetCode(setCode: string): string {
 
 interface CardInfoResponse {
   data?: {
+    type?: string;
     card_sets?: { set_code?: string }[];
     card_images?: { id?: number }[];
   }[];
@@ -44,5 +45,22 @@ export function buildSetCodeIndex(json: CardInfoResponse): Map<string, number> {
 }
 
 export function lookupCardImageId(index: Map<string, number>, setCode: string): number | null {
+  return index.get(toEnglishSetCode(setCode)) ?? null;
+}
+
+/** Set-Code (englisch, gross) -> Kartentyp ("Synchro Monster", "Spell Card" ...): Grundlage fuer Kartenart und Ordner. */
+export function buildSetCodeTypeIndex(json: CardInfoResponse): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const card of json.data ?? []) {
+    if (!card.type) continue;
+    for (const set of card.card_sets ?? []) {
+      const code = set.set_code?.toUpperCase();
+      if (code && !index.has(code)) index.set(code, card.type);
+    }
+  }
+  return index;
+}
+
+export function lookupCardType(index: Map<string, string>, setCode: string): string | null {
   return index.get(toEnglishSetCode(setCode)) ?? null;
 }

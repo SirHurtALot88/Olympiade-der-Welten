@@ -27,6 +27,7 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { SPONSOR_OBJ_FATIGUE_CAP } from "@/lib/sponsor/sponsor-special-objectives";
+import { buildInitialLeagueAssignment, LEAGUE_SIZE } from "@/lib/season/league-split";
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
 /**
@@ -142,6 +143,65 @@ describe("sponsor bonus objectives — Auswertung bestehender Alt-Vertraege", ()
     const res = evaluateSpecialComponentStage(gs, teamId, comp);
     expect(res.metric).toBe(expected - Math.max(1, expected - 6));
     expect(res.fraction).toBeCloseTo(0.7, 5); // +6 → mittlere Stufe
+  }, 60000);
+
+  // Bug-Report Chris (10.11.): "Liga-Split: Sponsorziel 'underdog_story'/'golden_fairytale'
+  // vergleicht erwarteten Rang falsch." Ursache: `expectedRankForTeam` rief `computeTeamExpectation`
+  // bisher OHNE `gameState` auf — bei aktivem Liga-Split blieb der erwartete Rang damit global
+  // (1..TEAM_COUNT_TOTAL), waehrend der tatsaechliche Endrang (`finalRankForTeam` liest
+  // `standings[teamId].rank`) liga-lokal ist (1..LEAGUE_SIZE). Exakt das Rangraum-Problem, das PR
+  // #1384 im Sponsor-Vertragsmodell gefixt hat (`sponsorRangraumFuer`), nur hier unentdeckt, weil die
+  // PR die Auswertungsseite bewusst nicht anfasste ("Altziele, die nicht mehr erzeugt werden" — das
+  // stimmt fuer die Erzeugung, nicht fuer die Auswertung bestehender Vertraege, siehe Kopf-Kommentar
+  // in sponsor-objective-evaluator.ts). Am Live-Save-Abbild nachgemessen: ein Liga-2-Team auf
+  // liga-lokalem Endrang 8/16 bekam global einen erwarteten Rang von 24 statt liga-lokal 8 — macht
+  // aus einer EXAKT getroffenen Erwartung (Delta 0) ein gemessenes "Overachievement" von +16.
+  it("Liga-Split: underdog_story vergleicht den erwarteten Rang liga-lokal, nicht mehr global", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    gs.seasonState.leagueByTeamId = buildInitialLeagueAssignment(gs.teams);
+    const teamId = gs.teams.find((team) => gs.seasonState.leagueByTeamId![team.teamId] === "liga2")!.teamId;
+
+    const rows = buildTeamSeasonOverviewRows({ gameState: gs });
+    const rowsByTeamId = new Map(rows.map((r) => [r.teamId, r] as const));
+    const row = rowsByTeamId.get(teamId)!;
+
+    // `buildInitialLeagueAssignment` sortiert nach Budget absteigend und packt die obere Haelfte in
+    // Liga 1 — ein Liga-2-Team liegt also ZWANGSLAEUFIG in der global schwaecheren Haelfte: sein
+    // GLOBALER erwarteter Rang (ohne gameState) liegt automatisch jenseits von LEAGUE_SIZE, sein
+    // LIGA-LOKALER (mit gameState, seit #1379/#1384-Muster) dagegen innerhalb 1..LEAGUE_SIZE.
+    const globalExpected = computeTeamExpectation({ row, rowsByTeamId, identity: null }).expectedRank;
+    const localExpected = computeTeamExpectation({ row, rowsByTeamId, identity: null, gameState: gs }).expectedRank;
+    expect(globalExpected).toBeGreaterThan(LEAGUE_SIZE);
+    expect(localExpected).toBeLessThanOrEqual(LEAGUE_SIZE);
+    // Dokumentiert die Groesse des behobenen Fehlers: vor dem Fix haette genau diese Differenz als
+    // falsches Overachievement in der Metrik gesteckt.
+    expect(globalExpected - localExpected).toBeGreaterThanOrEqual(10);
+
+    // Team trifft seine LIGA-LOKALE Erwartung exakt — kein echtes Overachievement.
+    setRank(gs, teamId, localExpected);
+
+    const comp: SponsorOfferComponent = {
+      componentId: "special-underdog-story-liga-split",
+      kind: "special",
+      label: "Underdog-Story (über Erwartung abschneiden)",
+      targetValue: "underdog",
+      rewardCash: 5,
+      specialKey: "underdog_story",
+      stages: [
+        { threshold: 3, fraction: 0.4, label: "+3" },
+        { threshold: 6, fraction: 0.7, label: "+6" },
+        { threshold: 9, fraction: 1.0, label: "+9" },
+      ],
+    };
+
+    const res = evaluateSpecialComponentStage(gs, teamId, comp);
+    // NACH DEM FIX: liga-lokale Erwartung exakt getroffen → Metrik 0, keine Stufe erreicht. VOR dem
+    // Fix waere hier `globalExpected - localExpected` (>= 10, oft >= LEAGUE_SIZE) herausgekommen —
+    // genug fuer die hoechste Stufe (+9), ohne dass das Team irgendetwas ueberdurchschnittlich
+    // geleistet hat.
+    expect(res.metric).toBe(0);
+    expect(res.fraction).toBe(0);
+    expect(res.stageIndex).toBe(-1);
   }, 60000);
 
   it("cellar_escape: invertierter Endrang, erste Stufe = raus aus Bottom-5", () => {

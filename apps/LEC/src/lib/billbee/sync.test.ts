@@ -32,11 +32,53 @@ describe("syncBillbee", () => {
     await db.cleanup();
   });
 
+  it("fragt Bestellungen bis einschliesslich morgen ab, damit Bestellungen von heute nicht fehlen", async () => {
+    const seen: string[] = [];
+    const fetchFn = (async (url: URL) => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith("/orders")) seen.push(u.searchParams.get("maxOrderDate") ?? "");
+      if (u.pathname.endsWith("/products")) return json({ Paging: { TotalPages: 1 }, Data: [] });
+      return json({ Paging: { TotalPages: 1 }, Data: [] });
+    }) as unknown as typeof fetch;
+    await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn });
+    expect(seen[0]).toBe("2026-10-14"); // NOW = 13.10.
+  });
+
+  it("meldet den Fortschritt in steigenden Prozenten mit Seitenzahlen", async () => {
+    const calls: [number, string][] = [];
+    const fetchFn = (async (url: URL) => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith("/products")) return json({ Paging: { TotalPages: 3 }, Data: [] });
+      return json({ Paging: { TotalPages: 2 }, Data: [] });
+    }) as unknown as typeof fetch;
+    await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn, onProgress: (p, l) => calls.push([p, l]) });
+    const pcts = calls.map((c) => c[0]);
+    expect(pcts).toEqual([...pcts].sort((a, b) => a - b));
+    expect(Math.max(...pcts)).toBeLessThan(100);
+    expect(calls.some(([, l]) => l.includes("Seite 3 von 3"))).toBe(true);
+    expect(calls.some(([, l]) => l.includes("Bestellungen laden (Seite 2 von 2)"))).toBe(true);
+  });
+
+  it("blendet Pokemon-Artikel aus und ordnet Verkaeufe mit geaendertem Titel ueber den Set-Code zu", async () => {
+    await db.prisma.article.create({ data: { nameNormalized: "pokemon 078/162 flutter mane", nameRaw: "Pokemon 078/162 Flutter Mane Holo NM", setCode: null, packQty: 1, isCard: true, active: true } });
+    await db.prisma.article.create({ data: { nameNormalized: "abcd-de001 alpha rare", nameRaw: "Yu-Gi-Oh! ABCD-DE001 Alpha Rare NM", setCode: "ABCD-DE001", packQty: 1, isCard: true, active: true } });
+    const fetchFn = (async (url: URL) => {
+      const p = new URL(String(url)).pathname;
+      if (p.endsWith("/products")) return json({ Paging: { TotalPages: 1 }, Data: [] });
+      return json({ Paging: { TotalPages: 1 }, Data: [{ CreatedAt: "2026-10-05T10:00:00Z", State: 4, OrderNumber: "N1", OrderItems: [{ Quantity: 1, TotalPrice: 9, Product: { Title: "Yu-Gi-Oh! ABCD-DE001 Umbenannte Karte Super Rare NM" } }] }] });
+    }) as unknown as typeof fetch;
+    const report = await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn });
+    expect(report.pokemonHidden).toBe(1);
+    expect((await db.prisma.article.findUnique({ where: { nameNormalized: "pokemon 078/162 flutter mane" } }))?.hidden).toBe(true);
+    expect(report.salesMatchedBySetCode).toBe(1);
+    expect(await db.prisma.sale.count()).toBe(1);
+  });
+
   it("verlangt Zugangsdaten", async () => {
     await expect(syncBillbee(db.prisma, { config: null })).rejects.toBeInstanceOf(BillbeeNotConfigured);
   });
 
-  it("schreibt Bestand, VK, EK und die drei Fenster; Rest wird ausgelaufen", async () => {
+  it("schreibt Bestand, VK, EK und die vier Fenster; Rest wird ausgelaufen", async () => {
     // B existiert schon (aktiv), steht aber nicht mehr im Stamm.
     await db.prisma.article.create({ data: { nameNormalized: "abcd-de002 beta rare", nameRaw: B, setCode: "ABCD-DE002", packQty: 1, isCard: true, active: true } });
 
@@ -50,7 +92,7 @@ describe("syncBillbee", () => {
 
     expect(report.products).toBe(1);
     expect(report.orders).toBe(1);
-    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2"]);
+    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2", "all:2"]);
 
     const articles = await db.prisma.article.findMany({ orderBy: { nameRaw: "asc" } });
     const a = articles.find((x) => x.nameRaw === A)!;
@@ -71,7 +113,7 @@ describe("syncBillbee", () => {
 
     // zweiter Lauf: idempotent, genau ein Snapshot je Fenster
     await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn: fakeBillbee([{ Id: 1, SKU: "A", Title: A, Price: 6.99, CostPrice: 2.5, StockCurrent: 3 }]) });
-    expect(await db.prisma.saleWindow.count({ where: { articleId: a.id } })).toBe(3);
+    expect(await db.prisma.saleWindow.count({ where: { articleId: a.id } })).toBe(4);
     expect(await db.prisma.sale.count({ where: { articleId: a.id } })).toBe(1);
     expect((await db.prisma.article.findUnique({ where: { id: a.id } }))!.stock).toBe(3);
   });

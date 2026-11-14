@@ -62,4 +62,13 @@ describe("syncMarketPrices: Name gegen Code", () => {
     expect(await mp(unknown.id)).toBeNull();
     expect((await db.prisma.article.findUnique({ where: { id: unknown.id } }))!.codeNameDe).toBe("Blitzsturm");
   });
+
+  it("haelt den Preisverlauf: ein Eintrag je Preisfuehrer-Stand und aktivem Artikel, bei Wiederholung nicht doppelt", async () => {
+    const right = await db.prisma.article.create({ data: { nameRaw: "Yu-Gi-Oh! RA04-DE094 Blitzsturm Super Rare NM", nameNormalized: "ra04-de094 blitzsturm super rare", setCode: "RA04-DE094", packQty: 1, isCard: true, active: true } });
+    await syncMarketPrices(db.prisma, fetchFn);
+    await syncMarketPrices(db.prisma, fetchFn);
+    const h = await db.prisma.marketPriceHistory.findMany({ where: { articleId: right.id } });
+    expect(h).toHaveLength(1);
+    expect(h[0].priceAvg7).toBe(27.67);
+  });
 });
