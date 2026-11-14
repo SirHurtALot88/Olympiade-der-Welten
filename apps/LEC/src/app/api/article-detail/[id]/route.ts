@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [purchases, facts, market, sales, stockLog, priceLog, article, history, losses, allStock, allPrice] = await Promise.all([
+  const [purchases, facts, market, sales, stockLog, priceLog, article, history, losses, allStock, allPrice, ekLog] = await Promise.all([
     prisma.purchase.findMany({ where: { articleId: id }, orderBy: { date: "desc" }, take: 50 }),
     prisma.ebayListingFact.findMany({ where: { articleId: id }, orderBy: { reportTo: "desc" }, take: 20 }),
     prisma.marketPrice.findFirst({ where: { articleId: id, source: "cardmarket-priceguide" }, orderBy: { fetchedAt: "desc" } }),
@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     prisma.stockLoss.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 50 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, before: true, after: true } }),
     prisma.priceChange.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, before: true, after: true } }),
+    prisma.ekChange.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 10, select: { at: true, before: true, after: true } }),
   ]);
   const now = new Date();
   const kennzahlen = article
@@ -37,6 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const lossCost = losses.reduce((n, l) => n + l.qty * (l.unitEk ?? article?.currentEk ?? 0), 0);
   return NextResponse.json({
     kennzahlen,
+    ekLog: ekLog.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
     losses: losses.map((l) => ({ id: l.id, at: l.at.toISOString(), kind: l.kind, qty: l.qty, unitEk: l.unitEk, note: l.note })),
     lossCost,
     purchases: purchases.map((p) => ({

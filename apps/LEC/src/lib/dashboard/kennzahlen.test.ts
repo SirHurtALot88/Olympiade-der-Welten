@@ -96,3 +96,44 @@ describe("capitalByGroup", () => {
     expect(g[0].daysOfCover).toBeCloseTo(365);
   });
 });
+
+import { monthlyBars, salesPattern } from "./kennzahlen";
+
+describe("monthlyBars", () => {
+  it("summiert Stueck je Monat, aeltester Monat zuerst, ignoriert Aelteres", () => {
+    const now = new Date("2026-11-14T12:00:00Z");
+    const bars = monthlyBars(
+      [
+        { soldAt: d("2026-11-02"), qty: 2, unitPrice: 1 },
+        { soldAt: d("2026-11-10"), qty: 1, unitPrice: 1 },
+        { soldAt: d("2026-09-15"), qty: 4, unitPrice: 1 },
+        { soldAt: d("2025-11-20"), qty: 5, unitPrice: 1 }, // genau 12 Monate zurueck: erster Balken
+        { soldAt: d("2025-10-20"), qty: 9, unitPrice: 1 }, // zu alt
+      ],
+      now
+    );
+    expect(bars).toHaveLength(12);
+    expect(bars[11]).toEqual({ label: "11.26", qty: 3 });
+    expect(bars[9].qty).toBe(4);
+    expect(bars[0]).toEqual({ label: "12.25", qty: 0 });
+    expect(bars.reduce((n, b) => n + b.qty, 0)).toBe(7);
+  });
+});
+
+describe("salesPattern", () => {
+  it("rechnet Rhythmus, laengste Pause und Mengen je Verkauf", () => {
+    const p = salesPattern([
+      { soldAt: d("2026-01-01"), qty: 1, unitPrice: 1 },
+      { soldAt: d("2026-01-11"), qty: 3, unitPrice: 1 },
+      { soldAt: d("2026-02-10"), qty: 1, unitPrice: 1 },
+    ]);
+    expect(p.avgGapDays).toBeCloseTo(20);
+    expect(p.longestGapDays).toBe(30);
+    expect(p.singles).toBe(2);
+    expect(p.multi).toBe(1);
+  });
+  it("liefert ohne zwei Verkaufstage keine Abstaende", () => {
+    expect(salesPattern([{ soldAt: d("2026-01-01"), qty: 1, unitPrice: 1 }]).avgGapDays).toBeNull();
+    expect(salesPattern([]).count).toBe(0);
+  });
+});

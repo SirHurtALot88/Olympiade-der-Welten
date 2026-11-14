@@ -304,3 +304,54 @@ export function capitalByGroup(rows: CapitalRowInput[]): CapitalGroup[] {
     })
     .sort((a, b) => b.capital - a.capital);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Verkaufsmuster je Artikel (Drawer): Monatsbalken, Rhythmus, Mengen je Verkauf
+// ---------------------------------------------------------------------------------------------
+
+export interface MonthBar {
+  /** "MM.JJ" */
+  label: string;
+  qty: number;
+}
+
+/** Verkaufte Stueck je Kalendermonat fuer die letzten `months` Monate (aeltester zuerst, laufender Monat zuletzt). */
+export function monthlyBars(sales: SaleLite[], now: Date = new Date(), months = 12): MonthBar[] {
+  const bars: MonthBar[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    bars.push({ label: `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`, qty: 0 });
+  }
+  const first = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1).getTime();
+  for (const s of sales) {
+    const at = new Date(s.soldAt);
+    if (at.getTime() < first || at.getTime() > now.getTime()) continue;
+    const idx = (at.getFullYear() - new Date(first).getFullYear()) * 12 + (at.getMonth() - new Date(first).getMonth());
+    if (idx >= 0 && idx < months) bars[idx].qty += s.qty;
+  }
+  return bars;
+}
+
+export interface SalesPattern {
+  /** Anzahl Verkaufszeilen. */
+  count: number;
+  /** Ø Tage zwischen zwei Verkaufstagen; null bei weniger als zwei Verkaufstagen. */
+  avgGapDays: number | null;
+  /** Laengste Pause zwischen zwei Verkaufstagen in Tagen. */
+  longestGapDays: number | null;
+  /** Verkaufszeilen mit genau einem Stueck / mit zwei oder mehr. */
+  singles: number;
+  multi: number;
+}
+
+export function salesPattern(sales: SaleLite[]): SalesPattern {
+  const days = [...new Set(sales.map((s) => Math.floor(t(s.soldAt) / DAY)))].sort((a, b) => a - b);
+  const gaps = days.slice(1).map((d, i) => d - days[i]);
+  return {
+    count: sales.length,
+    avgGapDays: gaps.length > 0 ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null,
+    longestGapDays: gaps.length > 0 ? Math.max(...gaps) : null,
+    singles: sales.filter((s) => s.qty === 1).length,
+    multi: sales.filter((s) => s.qty > 1).length,
+  };
+}
