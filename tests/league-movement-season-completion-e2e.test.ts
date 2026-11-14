@@ -20,7 +20,11 @@ import {
   SEASON_COMPLETION_CONFIRM_TOKEN,
 } from "@/lib/season/season-completion-service";
 import { LEAGUE_SIZE, RELEGATION_COUNT, buildInitialLeagueAssignment } from "@/lib/season/league-split";
-import { SPONSOR_TOPF_FAKTOR_JE_LIGA } from "@/lib/sponsor/sponsor-liga-leiter";
+import {
+  SPONSOR_TOPF_FAKTOR_JE_LIGA,
+  SPONSOR_ZONE_ABSTIEG_RANKS,
+  SPONSOR_ZONE_AUFSTIEG_RANKS,
+} from "@/lib/sponsor/sponsor-liga-leiter";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import { applyLeagueMovementOnce, computeLeagueMovement } from "@/lib/season/league-movement-service";
 import {
@@ -398,10 +402,13 @@ describe("league_movement — Saisonende-Seite ohne Cockpit-Lauf (next_season_se
     }
 
     // Sponsoren: der gerollte Vertrag jedes Wechslers entspricht dem Neubau gegen die NEUE Liga —
-    // nicht dem gegen die alte. Absteiger verlieren. Fuer Aufsteiger wird bewusst nur „anders als
-    // vorher" geprueft, nicht „mehr": die Leiter laeuft ueber 32 globale Raenge, und ein Team mit
-    // Startrang 29..32 faellt in Liga 1 in die Abstiegszone (Raenge 30..32) — dort zahlt Liga 1
-    // heute weniger als Liga 2 (eigene Modellfrage in `sponsor-liga-leiter.ts`, nicht Teil dieses Tests).
+    // nicht dem gegen die alte. Absteiger verlieren TOPF (0,4 statt 0,6): jede Sprosse AUSSERHALB der
+    // Zonen zahlt in Liga 2 weniger. Der ANKER ist dafuer kein Mass mehr: seit die Leiter liga-lokal 16
+    // Sprossen hat (PR #1384), sind die Zonen 3 von 16 Plaetzen, und der eingefrorene Startrang eines
+    // Absteigers (Liga-1-Platz 14..16) liegt in Liga 1 mitten in der Abstiegszone (−6) — in Liga 2
+    // dagegen nicht, und dort kommt der Aufstiegsbonus auf Platz 1..3 (+6) dazu. Der Liga-1-Anker kann
+    // deshalb unter dem Liga-2-Anker liegen; das ist der Zonen-Term aus Plan Abschnitt 4, kein Fehler.
+    // Spiegelbildlich fuer Aufsteiger wird nur „anders als vorher" geprueft.
     const newSalaryFactor = getSponsorV3SalaryFactor(saved);
     const movers = [
       ...expected.promoted.map((change) => ({ ...change, direction: "up" as const })),
@@ -419,7 +426,14 @@ describe("league_movement — Saisonende-Seite ohne Cockpit-Lauf (next_season_se
       const withOldTier = rerollSponsorV3TermsForNewSeason(oldTerms, { newSalaryFactor, contractYear, leagueTier: mover.fromTier });
       expect(rolled!.anchor).toBeCloseTo(withNewTier.anchor, 9);
       expect(rolled!.anchor).not.toBeCloseTo(withOldTier.anchor, 6);
-      if (mover.direction === "down") expect(rolled!.anchor).toBeLessThan(withOldTier.anchor);
+      if (mover.direction === "down") {
+        // Ausserhalb beider Zonen (Liga-2-Aufstiegszone 1..3, Liga-1-Abstiegszone 14..16) zahlt die
+        // Liga-2-Leiter jede Sprosse weniger — das ist der kleinere Topf, sauber vom Zonen-Term getrennt.
+        const laenge = rolled!.baseLadder.length;
+        for (let rank = SPONSOR_ZONE_AUFSTIEG_RANKS + 1; rank <= laenge - SPONSOR_ZONE_ABSTIEG_RANKS; rank += 1) {
+          expect(rolled!.baseLadder[rank - 1]!).toBeLessThan(withOldTier.baseLadder[rank - 1]!);
+        }
+      }
       checked += 1;
     }
     expect(checked).toBeGreaterThanOrEqual(2);

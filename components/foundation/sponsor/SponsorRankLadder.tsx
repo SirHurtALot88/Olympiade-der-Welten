@@ -3,7 +3,8 @@
 import { buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter";
 
 /**
- * Grafische Gewinnstufen-Leiter (Meister … Platz 32) mit hervorgehobener aktuell erreichter Stufe.
+ * Grafische Gewinnstufen-Leiter (Meister … Platz 16, bei Legacy-Spielstaenden Platz 32) mit
+ * hervorgehobener aktuell erreichter Stufe.
  *
  * Lag vorher nur inline in `SponsorOfferCardNewLook` und war damit ausschliesslich auf der eigenen
  * Angebotskarte zu sehen; ueberall sonst standen die Gewinnstufen als gequetschte Textzeile
@@ -16,6 +17,7 @@ export function SponsorRankLadder({
   baseCash,
   currentTeamRank,
   formatCash,
+  leagueSize,
 }: {
   /** Gelockte curveShape-Rang-Payout-Leiter (1..32) — dieselbe Quelle, aus der das Settlement zahlt. */
   rankLadder: number[];
@@ -23,8 +25,10 @@ export function SponsorRankLadder({
   /** Aktueller Liga-Rang des Teams; `null` blendet die Hervorhebung aus. */
   currentTeamRank: number | null;
   formatCash: (value: number) => string;
+  /** Rangraum des Spielstands (`sponsorRangraumFuer`); Default die heutige Ligagroesse. */
+  leagueSize?: number;
 }) {
-  const tierRows = buildSponsorRankTierRows({ baseCash, rankLadder, includeFloorRung: true });
+  const tierRows = buildSponsorRankTierRows({ baseCash, rankLadder, includeFloorRung: true, leagueSize });
 
   // Hoechste Stufe, deren Rang-Schwelle der aktuelle Liga-Rang erfuellt
   // (Meilensteine sind aufsteigend schwerer sortiert).

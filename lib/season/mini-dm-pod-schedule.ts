@@ -7,6 +7,12 @@
  * unveraendert. Der Rest dieses Kopfkommentars beschreibt die (unveraenderte) Bildung am
  * urspruenglichen Mini-DM-Fall.
  *
+ * ABGELOEST (11.11., Spieltagsmodell-Kopplung): die unten begruendete EIGENE Permutation ist nur
+ * noch Rueckfall. Steht fuer den Spieltag ein Liga-Spielplan (`seasonState.schedule`), entstehen die
+ * Pods aus genau dessen Duell-Paaren (`getFixturePairsForPool`/`buildPodGroupsFromFixturePairs`) --
+ * Chris: die Gegner der Duell-Disziplin muessen aus der eigenen Vierergruppe kommen. Bereits
+ * gewertete Spieltage behalten ihre gebuchten Gruppen (`getBookedPods`).
+ *
  * MINI-DM VIERERGRUPPEN (PODS) — additiv, parallel zu `Fixture`/`RoundPairing`, ohne deren Form
  * zu aendern (Chris' Entscheidung, 14.09., "mini-dm-spielplan-verankerung": "additiver, zum
  * bestehenden Modell paralleler Datensatz", NICHT eine Erweiterung von `Fixture` selbst — siehe
@@ -62,7 +68,7 @@ import {
   isViererPodDiscipline,
   MINI_DM_DISCIPLINE_ID,
 } from "@/lib/season/season-discipline-schedule";
-import { buildCircleRounds } from "@/lib/season/season-fixture-schedule";
+import { buildCircleRounds, getOpponentOf } from "@/lib/season/season-fixture-schedule";
 import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 
 // Dasselbe seeded-RNG-Muster wie in season-fixture-schedule.ts/season-discipline-schedule.ts --
@@ -154,6 +160,131 @@ function getMiniDmTeamPools(gameState: GameState): Array<{ tier: LeagueTier | nu
 }
 
 /**
+ * SPIELTAGSMODELL-KOPPLUNG (11.11., Chris' Meldung "Gruppe D"): die Vierergruppen eines Spieltags
+ * werden aus den DUELL-PAARUNGEN DESSELBEN SPIELTAGS gebildet (`seasonState.schedule`), nicht mehr
+ * aus einer eigenen, davon unabhaengigen Team-Permutation. Je zwei Paarungen der Runde verschmelzen
+ * zu einem Pod ("{A-B}+{C-D} -> Pod{A,B,C,D}", wie bisher -- nur mit DEN Paaren, die an diesem
+ * Spieltag auch tatsaechlich die Duell-Disziplin spielen). Damit gilt per Konstruktion: wer in einem
+ * Pod mit {B,C,D} steht, spielt die Duell-Disziplin desselben Spieltags gegen genau einen davon, und
+ * die beiden anderen spielen gegeneinander.
+ *
+ * Die Rotation ueber die Saison bleibt die des Spielplans: jeder Spieltag hat eine andere
+ * Round-Robin-Runde, also andere Paare und damit andere Gruppen. Welche zwei Paare zusammenkommen,
+ * entscheidet ein Seed aus Disziplin, Liga und dem Paar-Satz selbst (kanonisch sortiert) -- zwei
+ * Pod-Disziplinen desselben Spieltags losen dadurch unabhaengig. Fallen beide Saison-Vorkommen auf
+ * denselben Paar-Satz (Doppel-Rundenplan: Hin- und Rueckrunde haben dieselben Paare), verschmilzt
+ * Vorkommen 2 versetzt (Paar 1+2, 3+4, ..., 7+0 statt 0+1, 2+3, ...): dann teilt kein Pod von
+ * Vorkommen 2 seine Zusammensetzung mit einem von Vorkommen 1.
+ *
+ * `null`, wenn die Paarungen dieses Spieltags den Pool nicht exakt abdecken (kein Spielplan, Legacy-
+ * Dummy-Paarung, Teamzahl nicht durch 4 teilbar) -- dann bleibt es bei der alten Permutation.
+ */
+function getFixturePairsForPool(
+  gameState: GameState,
+  matchdayId: string,
+  pool: { tier: LeagueTier | null; teamIds: string[] },
+): Array<[string, string]> | null {
+  if (pool.teamIds.length < 4 || pool.teamIds.length % 4 !== 0) {
+    return null;
+  }
+  const poolSet = new Set(pool.teamIds);
+  const pairs: Array<[string, string]> = [];
+  const seen = new Set<string>();
+  for (const fixture of gameState.seasonState.schedule ?? []) {
+    if (fixture.matchdayId !== matchdayId) continue;
+    const inPool = poolSet.has(fixture.homeTeamId);
+    if (inPool !== poolSet.has(fixture.awayTeamId)) {
+      // Eine Paarung ueber die Poolgrenze hinweg -- kein sauberer Liga-Spielplan.
+      return null;
+    }
+    if (!inPool) continue;
+    if (fixture.homeTeamId === fixture.awayTeamId || seen.has(fixture.homeTeamId) || seen.has(fixture.awayTeamId)) {
+      return null;
+    }
+    seen.add(fixture.homeTeamId);
+    seen.add(fixture.awayTeamId);
+    pairs.push([fixture.homeTeamId, fixture.awayTeamId]);
+  }
+  if (seen.size !== poolSet.size) {
+    return null;
+  }
+  return pairs;
+}
+
+/**
+ * Reine Funktion: die Duell-Paare eines Spieltags (beliebige Reihenfolge) -> Vierer-Pods aus je zwei
+ * Paaren. Exportiert fuer Tests. `occurrenceInSeason === 2` verschmilzt versetzt (s. oben).
+ */
+export function buildPodGroupsFromFixturePairs(
+  pairs: ReadonlyArray<readonly [string, string]>,
+  seed: string,
+  occurrenceInSeason: 1 | 2,
+): string[][] {
+  if (pairs.length < 2) {
+    return [];
+  }
+  // Kanonisch (Heim/Auswaerts egal, Reihenfolge egal): derselbe Paar-Satz ergibt dieselbe Ordnung.
+  const kanonisch = pairs
+    .map(([a, b]) => (a <= b ? [a, b] : [b, a]) as [string, string])
+    .sort((x, y) => (x[0] === y[0] ? x[1].localeCompare(y[1]) : x[0].localeCompare(y[0])));
+  const signatur = kanonisch.map(([a, b]) => `${a}-${b}`).join("|");
+  const order = shuffleSeeded(kanonisch, `${seed}:paare:${hashToUint(signatur)}`);
+  const n = order.length - (order.length % 2);
+  const shift = occurrenceInSeason === 2 && n > 2 ? 1 : 0;
+  const pods: string[][] = [];
+  for (let index = 0; index < n; index += 2) {
+    const first = order[(index + shift) % n]!;
+    const second = order[(index + 1 + shift) % n]!;
+    pods.push([first[0], first[1], second[0], second[1]]);
+  }
+  return pods;
+}
+
+/**
+ * Bereits GEBUCHTE Vierergruppen dieses Spieltags/dieser Disziplin (`DisciplineResultRecord.miniDmPod`
+ * gueltiger Spieltagsergebnisse der laufenden Saison). Ein gewerteter Spieltag behaelt so genau die
+ * Gruppen, mit denen er gewertet wurde -- auch fuer Staende, die vor der Kopplung oben gewertet
+ * wurden (Replay, Spielplan-Tab, erneuter Resolve).
+ */
+function getBookedPods(gameState: GameState, matchdayId: string, disciplineId: string, occurrenceInSeason: 1 | 2): MiniDmPod[] {
+  const seasonId = gameState.season.id;
+  const resultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter(
+        (result) =>
+          result.matchdayId === matchdayId &&
+          (result.seasonId == null || result.seasonId === seasonId) &&
+          result.status !== "superseded" &&
+          result.status !== "voided",
+      )
+      .map((result) => result.id),
+  );
+  if (resultIds.size === 0) {
+    return [];
+  }
+  const splitActive = isLeagueSplitActive(gameState);
+  const byPodId = new Map<string, readonly string[]>();
+  for (const row of gameState.seasonState.disciplineResults ?? []) {
+    if (row.disciplineId !== disciplineId || !resultIds.has(row.matchdayResultId)) continue;
+    const pod = row.miniDmPod;
+    if (pod && pod.teamIds.length === 4 && !byPodId.has(pod.podId)) {
+      byPodId.set(pod.podId, pod.teamIds);
+    }
+  }
+  return [...byPodId.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([podId, teamIds]) => ({
+      id: podId,
+      disciplineId,
+      seasonId,
+      matchdayId,
+      leagueTier: splitActive ? gameState.seasonState.leagueByTeamId?.[teamIds[0]!] ?? null : null,
+      occurrenceInSeason,
+      teamIds: [...teamIds] as [string, string, string, string],
+    }));
+}
+
+/**
  * Steht `disciplineId` an `matchdayId` (D1 oder D2), UND welches Saison-Vorkommen ist es -- oder
  * `null`, wenn diese Disziplin an diesem Spieltag gar nicht laeuft.
  */
@@ -207,6 +338,11 @@ export function getPodsForMatchday(
     return [];
   }
 
+  const gebucht = getBookedPods(gameState, matchdayId, disciplineId, occurrenceInSeason);
+  if (gebucht.length > 0) {
+    return gebucht;
+  }
+
   const saveId = options?.saveId ?? "normalized-local-save";
   const seasonId = gameState.season.id;
   const pods: MiniDmPod[] = [];
@@ -216,8 +352,19 @@ export function getPodsForMatchday(
       continue;
     }
     const tierLabel = pool.tier ?? "legacy-pool";
-    const seed = `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:occurrence-${occurrenceInSeason}`;
-    const groups = buildMiniDmPodGroups(pool.teamIds, seed);
+    // Erst aus den Duell-Paaren des Spieltags (Spieltagsmodell-Kopplung, s. `getFixturePairsForPool`),
+    // nur ohne passenden Spielplan die alte, vom Spielplan unabhaengige Permutation.
+    const fixturePairs = getFixturePairsForPool(gameState, matchdayId, pool);
+    const groups = fixturePairs
+      ? buildPodGroupsFromFixturePairs(
+          fixturePairs,
+          `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:spielplan-kopplung-v2`,
+          occurrenceInSeason,
+        )
+      : buildMiniDmPodGroups(
+          pool.teamIds,
+          `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:occurrence-${occurrenceInSeason}`,
+        );
     groups.forEach((teamIds, podIndex) => {
       pods.push({
         id: `${podIdPraefix(disciplineId)}:${seasonId}:${tierLabel}:${matchdayId}:${podIndex}`,
@@ -264,6 +411,57 @@ export function getPodDisciplineSlotsForMatchday(
     if (slot && isViererPodDiscipline(slot.disciplineId)) {
       slots.push({ disciplineId: slot.disciplineId, displayName: slot.displayName, disciplineSide });
     }
+  }
+  return slots;
+}
+
+/**
+ * GEGNER DES SPIELTAGS JE DISZIPLIN (11.11., Chris: "man sollte auch in der Einsatzliste sehen, wer
+ * die Gegner am aktuellen Spieltag sind"). Je Slot (D1, D2) entweder die drei anderen Teams der
+ * Vierergruppe (`art: "pod"`) oder der eine Duell-Gegner aus dem Spielplan (`art: "duell"`, leer
+ * ohne Spielplan-Eintrag). Dieselben Quellen wie Resolve und Spielplan-Tab -- keine eigene Ableitung.
+ */
+export type SpieltagsGegnerSlot = {
+  disciplineId: string;
+  displayName: string;
+  disciplineSide: "d1" | "d2";
+  art: "pod" | "duell";
+  gegnerTeamIds: string[];
+};
+
+export function getSpieltagsGegnerFuerTeam(
+  gameState: GameState,
+  teamId: string,
+  matchdayId: string,
+  options?: { saveId?: string | null },
+): SpieltagsGegnerSlot[] {
+  const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId, options);
+  if (!entry) return [];
+  const slots: SpieltagsGegnerSlot[] = [];
+  for (const [slot, disciplineSide] of [
+    [entry.discipline1, "d1"],
+    [entry.discipline2, "d2"],
+  ] as const) {
+    if (!slot) continue;
+    if (isViererPodDiscipline(slot.disciplineId)) {
+      const pod = getPodForTeam(gameState, teamId, matchdayId, slot.disciplineId, options);
+      slots.push({
+        disciplineId: slot.disciplineId,
+        displayName: slot.displayName,
+        disciplineSide,
+        art: "pod",
+        gegnerTeamIds: pod ? pod.teamIds.filter((id) => id !== teamId) : [],
+      });
+      continue;
+    }
+    const gegner = getOpponentOf(gameState, teamId, matchdayId);
+    slots.push({
+      disciplineId: slot.disciplineId,
+      displayName: slot.displayName,
+      disciplineSide,
+      art: "duell",
+      gegnerTeamIds: gegner ? [gegner] : [],
+    });
   }
   return slots;
 }

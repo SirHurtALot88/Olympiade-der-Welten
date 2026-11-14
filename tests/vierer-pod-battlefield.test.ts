@@ -1,8 +1,9 @@
 /**
  * VIERER-POD-VERALLGEMEINERUNG + BATTLEFIELD ALS PPS-POD (01.11., Chris' Freigabe "eine 4er-Diszi je
  * Bereich pow/spe/men/soc"). Deckt ab:
- *   (a) Mini-DMs Pod-Seed und Pod-IDs sind BYTE-IDENTISCH zum Stand vor der Verallgemeinerung
- *       (bestehende Saves kuendigen dieselben Gruppen an, FFA-Vorlauf-Seeds bleiben gueltig).
+ *   (a) Mini-DMs Pod-IDs sind unveraendert; die Gruppen kommen seit 11.11. aus den Duell-Paaren
+ *       des Spieltags (Spieltagsmodell-Kopplung, tests/spieltagsmodell-pod-duell-kopplung.test.ts),
+ *       ohne Spielplan bleibt der alte Seed byte-identisch.
  *   (b) Battlefield bekommt EIGENE, frisch geloste Gruppen (Seed traegt die Disziplin-ID) -- auch
  *       am selben Spieltag/Vorkommen wie Mini-DM (Chris' Entscheidung 2).
  *   (c) Nicht-Pod-Disziplinen bekommen nie Pods.
@@ -23,6 +24,7 @@ import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday
 import { MINI_DM_POD_TEAM_PUNKTE } from "@/lib/resolve/mini-dm-pod-resolve";
 import {
   buildMiniDmPodGroups,
+  buildPodGroupsFromFixturePairs,
   getMiniDmPodsForMatchday,
   getPodDisciplineSlotsForMatchday,
   getPodForTeam,
@@ -64,6 +66,9 @@ function buildScheduleState(d1: ReturnType<typeof slot> | null, d2: ReturnType<t
   } as unknown as GameState;
 }
 
+const fixturePaare = (gs: GameState) =>
+  gs.seasonState.schedule.map((fixture) => [fixture.homeTeamId, fixture.awayTeamId] as [string, string]);
+
 const gruppenSchluessel = (gruppen: readonly (readonly string[])[]) => gruppen.map((teamIds) => [...teamIds].sort().join(",")).sort();
 
 describe("Vierer-Pod-Disziplinen: Konfiguration", () => {
@@ -79,15 +84,27 @@ describe("Vierer-Pod-Disziplinen: Konfiguration", () => {
 });
 
 describe("getPodsForMatchday (verallgemeinerte Gruppenbildung)", () => {
-  it("(a) Mini-DM: Seed und Pod-IDs byte-identisch zum Stand vor der Verallgemeinerung", () => {
+  it("(a) Mini-DM: Pod-IDs unveraendert; Gruppen aus den Duell-Paaren des Spieltags (Kopplung 11.11.)", () => {
     const gs = buildScheduleState(slot("mini-dm", "Mini DM", 1), null);
     const pods = getMiniDmPodsForMatchday(gs, "md1", { saveId: SAVE_ID });
-    // Der alte, unveraenderte Seed-String (mini-dm-pod-schedule.ts vor 01.11.).
-    const erwartet = buildMiniDmPodGroups(TEAMS16, `${SAVE_ID}:s1:mini-dm-pods-v1:legacy-pool:occurrence-1`);
+    const erwartet = buildPodGroupsFromFixturePairs(
+      fixturePaare(gs),
+      `${SAVE_ID}:s1:mini-dm-pods-v1:legacy-pool:spielplan-kopplung-v2`,
+      1,
+    );
     expect(pods.map((pod) => pod.teamIds)).toEqual(erwartet);
     expect(pods.map((pod) => pod.id)).toEqual([0, 1, 2, 3].map((i) => `minidm-pod:s1:legacy-pool:md1:${i}`));
     expect(pods.every((pod) => pod.disciplineId === "mini-dm")).toBe(true);
     expect(getPodsForMatchday(gs, "md1", "mini-dm", { saveId: SAVE_ID })).toEqual(pods);
+  });
+
+  it("(a) Mini-DM ohne Spielplan: Rueckfall auf den alten Seed, byte-identisch zum Stand vor 01.11.", () => {
+    const gs = buildScheduleState(slot("mini-dm", "Mini DM", 1), null);
+    gs.seasonState.schedule = [];
+    const pods = getMiniDmPodsForMatchday(gs, "md1", { saveId: SAVE_ID });
+    const erwartet = buildMiniDmPodGroups(TEAMS16, `${SAVE_ID}:s1:mini-dm-pods-v1:legacy-pool:occurrence-1`);
+    expect(pods.map((pod) => pod.teamIds)).toEqual(erwartet);
+    expect(pods.map((pod) => pod.id)).toEqual([0, 1, 2, 3].map((i) => `minidm-pod:s1:legacy-pool:md1:${i}`));
   });
 
   it("(b) Battlefield: eigene Pods (vier Vierer, alle 16 Teams), eigene ID, Disziplin-ID im Seed", () => {
@@ -97,7 +114,11 @@ describe("getPodsForMatchday (verallgemeinerte Gruppenbildung)", () => {
     expect(new Set(pods.flatMap((pod) => pod.teamIds)).size).toBe(16);
     expect(pods.every((pod) => pod.teamIds.length === 4 && pod.disciplineId === "battlefield")).toBe(true);
     expect(pods.map((pod) => pod.id)).toEqual([0, 1, 2, 3].map((i) => `battlefield-pod:s1:legacy-pool:md1:${i}`));
-    const erwartet = buildMiniDmPodGroups(TEAMS16, `${SAVE_ID}:s1:battlefield-pods-v1:legacy-pool:occurrence-1`);
+    const erwartet = buildPodGroupsFromFixturePairs(
+      fixturePaare(gs),
+      `${SAVE_ID}:s1:battlefield-pods-v1:legacy-pool:spielplan-kopplung-v2`,
+      1,
+    );
     expect(pods.map((pod) => pod.teamIds)).toEqual(erwartet);
     // Mini-DM-Wrapper sieht an diesem Spieltag nichts -- Battlefield ist nicht Mini-DM.
     expect(getMiniDmPodsForMatchday(gs, "md1", { saveId: SAVE_ID })).toEqual([]);

@@ -1,0 +1,416 @@
+{
+  "disziplin": "tdm",
+  "format": "gefecht",
+  "spiele": 4,
+  "stroeme": [
+    0,
+    10000000
+  ],
+  "teams": [
+    "Vigilante Wranglers",
+    "Armageddon Aftermath",
+    "Cold Steel",
+    "Dire Legion",
+    "Golden Gladiators",
+    "Silver Soldiers",
+    "Mortal Sin",
+    "Natures Wrath",
+    "Pirate Crew",
+    "Raging Lunatics"
+  ],
+  "paare": [
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      0,
+      4
+    ],
+    [
+      0,
+      5
+    ],
+    [
+      0,
+      6
+    ],
+    [
+      0,
+      7
+    ],
+    [
+      0,
+      8
+    ],
+    [
+      0,
+      9
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      1,
+      3
+    ],
+    [
+      1,
+      4
+    ],
+    [
+      1,
+      5
+    ],
+    [
+      1,
+      6
+    ],
+    [
+      1,
+      7
+    ],
+    [
+      1,
+      8
+    ],
+    [
+      1,
+      9
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      2,
+      4
+    ],
+    [
+      2,
+      5
+    ],
+    [
+      2,
+      6
+    ],
+    [
+      2,
+      7
+    ],
+    [
+      2,
+      8
+    ],
+    [
+      2,
+      9
+    ],
+    [
+      3,
+      4
+    ],
+    [
+      3,
+      5
+    ],
+    [
+      3,
+      6
+    ],
+    [
+      3,
+      7
+    ],
+    [
+      3,
+      8
+    ],
+    [
+      3,
+      9
+    ]
+  ],
+  "laeufe": [
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 2,
+      "versatz": 0,
+      "sekunden": 0.716,
+      "msJeKampf": 5.966666666666667,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8076084672459558,
+      "rhoMittel": 0.7813929989893765,
+      "rhoMin": 0.48360787869237376,
+      "rhoMax": 0.916108940036101,
+      "paareUnter80": 14,
+      "rhoSaison": 0.8383717024832572,
+      "star1": 65,
+      "star2": 91.66666666666667,
+      "starLetzt": 0,
+      "paarGross": 90.82727272727273,
+      "paarMittel": 71.02518959913326,
+      "paarKlein": 57.70901194353963,
+      "teamBesterGewinnt": 88.33333333333333,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 11.666666666666666,
+      "endeAllein": 65.83333333333333,
+      "endeZeit": 34.166666666666664,
+      "dauerMittel": 15.308333333333334
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 2,
+      "versatz": 10000000,
+      "sekunden": 0.831,
+      "msJeKampf": 6.925,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8176745734333979,
+      "rhoMittel": 0.7933433716570671,
+      "rhoMin": 0.5854349954180399,
+      "rhoMax": 0.932056746817064,
+      "paareUnter80": 14,
+      "rhoSaison": 0.82914777888942,
+      "star1": 63.333333333333336,
+      "star2": 85.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 91.33748714536326,
+      "paarMittel": 72.02170963364993,
+      "paarKlein": 57.744750477229346,
+      "teamBesterGewinnt": 89.16666666666667,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 10.833333333333334,
+      "endeAllein": 68.33333333333333,
+      "endeZeit": 31.666666666666668,
+      "dauerMittel": 15.416666666666666
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 3,
+      "versatz": 0,
+      "sekunden": 0.495,
+      "msJeKampf": 4.125,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8142645695084638,
+      "rhoMittel": 0.7807238363907116,
+      "rhoMin": 0.5437780934695472,
+      "rhoMax": 0.9178976601125719,
+      "paareUnter80": 14,
+      "rhoSaison": 0.8304840992988362,
+      "star1": 70,
+      "star2": 92.5,
+      "starLetzt": 0,
+      "paarGross": 90.85124264617602,
+      "paarMittel": 70.87332053742803,
+      "paarKlein": 56.54037610619469,
+      "teamBesterGewinnt": 85.83333333333333,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 14.166666666666666,
+      "endeAllein": 66.66666666666667,
+      "endeZeit": 33.333333333333336,
+      "dauerMittel": 15.233333333333333
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 3,
+      "versatz": 10000000,
+      "sekunden": 0.592,
+      "msJeKampf": 4.933333333333334,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8104238100219574,
+      "rhoMittel": 0.7871619475940937,
+      "rhoMin": 0.5222693461450763,
+      "rhoMax": 0.9177255700668946,
+      "paareUnter80": 14,
+      "rhoSaison": 0.8256422047384796,
+      "star1": 60,
+      "star2": 87.5,
+      "starLetzt": 0,
+      "paarGross": 91.21261164059221,
+      "paarMittel": 71.20772946859903,
+      "paarKlein": 57.11538461538461,
+      "teamBesterGewinnt": 87.5,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 12.5,
+      "endeAllein": 66.66666666666667,
+      "endeZeit": 33.333333333333336,
+      "dauerMittel": 15.391666666666667
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 4,
+      "versatz": 0,
+      "sekunden": 0.648,
+      "msJeKampf": 5.4,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8101770719491077,
+      "rhoMittel": 0.7800444482028326,
+      "rhoMin": 0.4595140044418761,
+      "rhoMax": 0.9198635171158182,
+      "paareUnter80": 13,
+      "rhoSaison": 0.8540469626669189,
+      "star1": 65,
+      "star2": 93.33333333333333,
+      "starLetzt": 0,
+      "paarGross": 90.55188043611417,
+      "paarMittel": 72.50875302989496,
+      "paarKlein": 57.67819706498952,
+      "teamBesterGewinnt": 90,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 10,
+      "endeAllein": 63.333333333333336,
+      "endeZeit": 36.666666666666664,
+      "dauerMittel": 15.608333333333333
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 4,
+      "versatz": 10000000,
+      "sekunden": 0.752,
+      "msJeKampf": 6.266666666666667,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8159189895704133,
+      "rhoMittel": 0.7885128409283412,
+      "rhoMin": 0.5656468794121757,
+      "rhoMax": 0.9149335588207566,
+      "paareUnter80": 15,
+      "rhoSaison": 0.8605414421928184,
+      "star1": 62.5,
+      "star2": 89.16666666666667,
+      "starLetzt": 0,
+      "paarGross": 90.93686976715762,
+      "paarMittel": 73.17786238781615,
+      "paarKlein": 57.90703713321215,
+      "teamBesterGewinnt": 86.66666666666667,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 13.333333333333334,
+      "endeAllein": 60.833333333333336,
+      "endeZeit": 39.166666666666664,
+      "dauerMittel": 15.8
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 5,
+      "versatz": 0,
+      "sekunden": 0.546,
+      "msJeKampf": 4.55,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8166422751974339,
+      "rhoMittel": 0.7897757291269102,
+      "rhoMin": 0.5375239917556291,
+      "rhoMax": 0.9298912545512035,
+      "paareUnter80": 12,
+      "rhoSaison": 0.8804769740549557,
+      "star1": 60.833333333333336,
+      "star2": 88.33333333333333,
+      "starLetzt": 0,
+      "paarGross": 92.20204094730762,
+      "paarMittel": 73.816606311433,
+      "paarKlein": 58.09635722679201,
+      "teamBesterGewinnt": 90,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 10,
+      "endeAllein": 64.16666666666667,
+      "endeZeit": 35.833333333333336,
+      "dauerMittel": 15.5
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 5,
+      "versatz": 10000000,
+      "sekunden": 0.474,
+      "msJeKampf": 3.95,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.829243323002075,
+      "rhoMittel": 0.7974211011704088,
+      "rhoMin": 0.5526355002343252,
+      "rhoMax": 0.9399538535384743,
+      "paareUnter80": 13,
+      "rhoSaison": 0.8827015366466008,
+      "star1": 65,
+      "star2": 90,
+      "starLetzt": 0,
+      "paarGross": 92.58002560819462,
+      "paarMittel": 73.84695335845134,
+      "paarKlein": 59.72712302987532,
+      "teamBesterGewinnt": 90,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 10,
+      "endeAllein": 63.333333333333336,
+      "endeZeit": 36.666666666666664,
+      "dauerMittel": 15.808333333333334
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 6,
+      "versatz": 0,
+      "sekunden": 0.389,
+      "msJeKampf": 3.2416666666666667,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.824814828169919,
+      "rhoMittel": 0.7976910513714333,
+      "rhoMin": 0.6051988915676725,
+      "rhoMax": 0.9242542395287736,
+      "paareUnter80": 13,
+      "rhoSaison": 0.8573380008993242,
+      "star1": 70.83333333333333,
+      "star2": 91.66666666666667,
+      "starLetzt": 0,
+      "paarGross": 92.77540241448692,
+      "paarMittel": 72.1353482260184,
+      "paarKlein": 57.8317710902812,
+      "teamBesterGewinnt": 90.83333333333333,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 9.166666666666666,
+      "endeAllein": 65,
+      "endeZeit": 35,
+      "dauerMittel": 15.916666666666666
+    },
+    {
+      "format": "gefecht (N=2)",
+      "jeSeite": 6,
+      "versatz": 10000000,
+      "sekunden": 0.477,
+      "msJeKampf": 3.975,
+      "events": 120,
+      "paare": 30,
+      "rhoMedian": 0.8114896878608275,
+      "rhoMittel": 0.8047981667724032,
+      "rhoMin": 0.5707152942090017,
+      "rhoMax": 0.929510304514253,
+      "paareUnter80": 14,
+      "rhoSaison": 0.8506413001825845,
+      "star1": 61.666666666666664,
+      "star2": 95.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 92.72526780088216,
+      "paarMittel": 73.29070981210856,
+      "paarKlein": 59.45711452652454,
+      "teamBesterGewinnt": 89.16666666666667,
+      "teamBesterOben2": 100,
+      "teamBesterLetzter": 10.833333333333334,
+      "endeAllein": 61.666666666666664,
+      "endeZeit": 38.333333333333336,
+      "dauerMittel": 16.075
+    }
+  ],
+  "kontrolle": []
+}

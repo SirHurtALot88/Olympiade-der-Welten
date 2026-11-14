@@ -76,3 +76,65 @@ describe("Arena · PixelLab-Figuren statt Baukasten", () => {
     expect(kopf).toContain("const b=pixFig?BAU_PIXEL:(BAU[u.n]||BAU_STD);");
   });
 });
+
+/**
+ * ANGRIFF-SPERRFRAMES (10.11., Backlog #52 "Enforcer greift nur mit Fluegeln an"): Enforcers und
+ * Lumen Serenes Angriff-Blaetter brechen an bestimmten Spalten in ein vom Charakter abgekoppeltes
+ * Fluegel-Aufleuchten um (Bildbefund, s. Kommentar bei PIXEL_ANGRIFF_SPERRFRAMES im Motor) -- die
+ * Auswahllogik selbst war nie der Fehler. angriffFrameSicher() faengt genau diese Spalten ab und
+ * faellt auf die naechstniedrigere GUTE Spalte desselben, bereits vorhandenen Blatts zurueck,
+ * ohne irgendetwas an u.lunge/der Simulation zu aendern. Die Funktion ist eine reine
+ * Index-Abbildung ohne DOM-Abhaengigkeit, deshalb hier direkt aus dem Motor-Quelltext extrahiert
+ * und ausgewertet statt ueber eine Leinwand/einen Browser.
+ */
+function angriffFrameSicherModul(): { angriffFrameSicher: (name: string | null, dir: string, f: number) => number; sperrframes: Record<string, Record<string, number[]>> } {
+  const start = MOTOR.indexOf("const PIXEL_ANGRIFF_SPERRFRAMES=");
+  const ende = MOTOR.indexOf("\n  function zeichnePixelFigur(", start);
+  expect(start, "PIXEL_ANGRIFF_SPERRFRAMES nicht gefunden").toBeGreaterThan(-1);
+  expect(ende).toBeGreaterThan(start);
+  const quelle = MOTOR.slice(start, ende);
+  const fabrik = new Function(`${quelle}\nreturn {angriffFrameSicher, sperrframes: PIXEL_ANGRIFF_SPERRFRAMES};`);
+  return fabrik();
+}
+
+describe("Arena · PixelLab-Figuren · Angriff-Sperrframes (Backlog #52)", () => {
+  it("Enforcer Sueden: die kaputte Spalte 15 faellt auf die letzte gute Spalte 14 zurueck", () => {
+    const { angriffFrameSicher } = angriffFrameSicherModul();
+    expect(angriffFrameSicher("Enforcer", "south", 15)).toBe(14);
+  });
+
+  it("Enforcer: unbetroffene Spalten/Richtungen bleiben unveraendert", () => {
+    const { angriffFrameSicher } = angriffFrameSicherModul();
+    expect(angriffFrameSicher("Enforcer", "south", 16)).toBe(16);
+    expect(angriffFrameSicher("Enforcer", "south", 0)).toBe(0);
+    expect(angriffFrameSicher("Enforcer", "south", 14)).toBe(14);
+    expect(angriffFrameSicher("Enforcer", "east", 16)).toBe(16);
+    expect(angriffFrameSicher("Enforcer", "north", 16)).toBe(16);
+  });
+
+  it("Lumen Serene Sueden: jede kaputte Spalte (7-13) faellt auf die letzte gute Spalte 6 zurueck", () => {
+    const { angriffFrameSicher } = angriffFrameSicherModul();
+    for (let f = 7; f <= 13; f++) {
+      expect(angriffFrameSicher("Lumen Serene", "south", f), `Spalte ${f}`).toBe(6);
+    }
+    expect(angriffFrameSicher("Lumen Serene", "south", 6)).toBe(6);
+    expect(angriffFrameSicher("Lumen Serene", "south", 16)).toBe(16);
+    expect(angriffFrameSicher("Lumen Serene", "east", 10)).toBe(10);
+  });
+
+  it("jede andere Figur (kein Tabelleneintrag) ist unveraendert -- kein globaler Seiteneffekt", () => {
+    const { angriffFrameSicher } = angriffFrameSicherModul();
+    expect(angriffFrameSicher("Draco", "south", 16)).toBe(16);
+    expect(angriffFrameSicher(null, "south", 16)).toBe(16);
+    expect(angriffFrameSicher(undefined as unknown as string, "east", 9)).toBe(9);
+  });
+
+  it("die Tabelle selbst sperrt nie Spalte 0 (sonst gaebe es keine garantiert gute Ersatzspalte)", () => {
+    const { sperrframes } = angriffFrameSicherModul();
+    for (const [name, richtungen] of Object.entries(sperrframes)) {
+      for (const [dir, spalten] of Object.entries(richtungen)) {
+        expect(spalten, `${name}/${dir}`).not.toContain(0);
+      }
+    }
+  });
+});

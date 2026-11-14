@@ -27,7 +27,12 @@ export type FoundationDisciplineStageHostProps = {
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
   // Bucht die zu Ende gespielte Disziplin (siehe DisciplineStageArenaProps).
   onCommitDiscipline?:
-    | ((side: "d1" | "d2", shownPreview: LegacyMatchdayResolvePreview | null) => Promise<unknown>)
+    | ((
+        side: "d1" | "d2",
+        shownPreview: LegacyMatchdayResolvePreview | null,
+        /** `quickSim`: die Disziplin endete per "⏩ Quick-Sim" (s. `commitArenaDiscipline`). */
+        optionen?: { quickSim?: boolean },
+      ) => Promise<unknown>)
     | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
   roomContext?: FoundationRoomContext | null;

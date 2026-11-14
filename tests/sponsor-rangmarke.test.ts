@@ -26,6 +26,8 @@ import {
   RANGMARKEN_BLOECKE,
   schalteAlleLeihgabenNachTabelle,
   schalteLeihgaben,
+  sponsorRangBloecke,
+  sponsorRangraumFuer,
 } from "@/lib/sponsor/sponsor-rangmarke";
 
 describe("Die Bloecke", () => {
@@ -37,41 +39,80 @@ describe("Die Bloecke", () => {
     );
   });
 
+  it("ist bei 16 Teams alle 2 Plaetze eine Stufe", () => {
+    expect([...RANGMARKEN_BLOECKE]).toEqual([14, 12, 10, 8, 6, 4, 2, 1]);
+  });
+
   it("ordnet jeden Rang der kleinsten Sprosse zu, die ihn noch enthaelt", () => {
     expect(blockFuerRang(1)).toBe(1);
+    expect(blockFuerRang(2)).toBe(2);
     expect(blockFuerRang(3)).toBe(4);
-    expect(blockFuerRang(5)).toBe(8);
-    expect(blockFuerRang(14)).toBe(16);
-    expect(blockFuerRang(30)).toBe(28);
+    expect(blockFuerRang(5)).toBe(6);
+    expect(blockFuerRang(7)).toBe(8);
+    expect(blockFuerRang(13)).toBe(14);
+    // Der unterste Block (15, 16) liegt unter der weitesten Sprosse und landet dort.
+    expect(blockFuerRang(15)).toBe(14);
     // Auch ausserhalb der Tabelle bleibt es eine Zahl statt eines Absturzes.
-    expect(blockFuerRang(99)).toBe(28);
+    expect(blockFuerRang(99)).toBe(14);
     expect(blockFuerRang(0)).toBe(1);
+  });
+
+  it("behaelt im Legacy-32er-Modus die alten 4er-Bloecke", () => {
+    expect(blockFuerRang(1, 32)).toBe(1);
+    expect(blockFuerRang(3, 32)).toBe(4);
+    expect(blockFuerRang(5, 32)).toBe(8);
+    expect(blockFuerRang(14, 32)).toBe(16);
+    expect(blockFuerRang(30, 32)).toBe(28);
+    expect(blockFuerRang(99, 32)).toBe(28);
+  });
+});
+
+describe("Der Rangraum des Spielstands", () => {
+  it("ist bei Liga-Split liga-lokal 16, sonst (Legacy) 32", () => {
+    const split = { seasonState: { leagueByTeamId: { a: "liga1", b: "liga2" } } } as unknown as GameState;
+    const legacy = { seasonState: {} } as unknown as GameState;
+    expect(sponsorRangraumFuer(split)).toBe(16);
+    expect(sponsorRangraumFuer(legacy)).toBe(32);
+    expect(sponsorRangraumFuer(null)).toBe(16);
+  });
+
+  it("leitet die Bloecke fuer beide Groessen aus derselben Formel ab", () => {
+    expect(sponsorRangBloecke(16)).toEqual([14, 12, 10, 8, 6, 4, 2, 1]);
+    expect(sponsorRangBloecke(32)).toEqual([28, 24, 20, 16, 12, 8, 4, 1]);
   });
 });
 
 describe("Die Marke selbst", () => {
   it("liegt NIE ueber dem eigenen Startblock — das waere die alte Zielfalle", () => {
-    for (let rang = 1; rang <= 32; rang += 1) {
-      for (const haerte of ["mild", "hart"] as const) {
-        const marke = baueRangmarke({ startRang: rang, haerte });
-        // „Ueber dem Startblock" hiesse: eine KLEINERE Zahl als der eigene Block.
-        expect(marke, `Rang ${rang}/${haerte}`).toBeGreaterThanOrEqual(blockFuerRang(rang));
+    for (const leagueSize of [16, 32]) {
+      for (let rang = 1; rang <= leagueSize; rang += 1) {
+        for (const haerte of ["mild", "hart"] as const) {
+          const marke = baueRangmarke({ startRang: rang, haerte, leagueSize });
+          // „Ueber dem Startblock" hiesse: eine KLEINERE Zahl als der eigene Block.
+          expect(marke, `Rang ${rang}/${haerte}/${leagueSize}`).toBeGreaterThanOrEqual(blockFuerRang(rang, leagueSize));
+          // Und nie ausserhalb der Tabelle.
+          expect(marke, `Rang ${rang}/${haerte}/${leagueSize}`).toBeLessThanOrEqual(leagueSize);
+        }
       }
     }
   });
 
   it("setzt hart den eigenen Block, mild einen darunter", () => {
-    expect(baueRangmarke({ startRang: 14, haerte: "hart" })).toBe(16);
-    expect(baueRangmarke({ startRang: 14, haerte: "mild" })).toBe(20);
+    expect(baueRangmarke({ startRang: 7, haerte: "hart" })).toBe(8);
+    expect(baueRangmarke({ startRang: 7, haerte: "mild" })).toBe(10);
     expect(baueRangmarke({ startRang: 1, haerte: "hart" })).toBe(1);
-    expect(baueRangmarke({ startRang: 1, haerte: "mild" })).toBe(4);
+    expect(baueRangmarke({ startRang: 1, haerte: "mild" })).toBe(2);
+    // Legacy-32er-Modus unveraendert.
+    expect(baueRangmarke({ startRang: 14, haerte: "hart", leagueSize: 32 })).toBe(16);
+    expect(baueRangmarke({ startRang: 14, haerte: "mild", leagueSize: 32 })).toBe(20);
   });
 
   it("laesst dem untersten Block eine Marke, die er halten kann", () => {
-    // Unter „Top 28" gibt es keine Sprosse mehr. Ohne diesen Zweig haette ausgerechnet das
+    // Unter „Top 14" gibt es keine Sprosse mehr. Ohne diesen Zweig haette ausgerechnet das
     // schwaechste Team eine Leihe, die es nie nutzen kann.
-    expect(baueRangmarke({ startRang: 30, haerte: "mild" })).toBe(32);
-    expect(marktGehalten({ aktuellerRang: 32, marke: 32 })).toBe(true);
+    expect(baueRangmarke({ startRang: 15, haerte: "mild" })).toBe(16);
+    expect(marktGehalten({ aktuellerRang: 16, marke: 16 })).toBe(true);
+    expect(baueRangmarke({ startRang: 30, haerte: "mild", leagueSize: 32 })).toBe(32);
   });
 
   it("gilt als gehalten, solange es gar keinen Rang gibt", () => {

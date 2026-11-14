@@ -2,6 +2,7 @@ import { registeredRateBelowThreshold } from "../pricing/costEngine";
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardViewModel,
+  buildFullSortiment,
   buildRecommendations,
   buildSortimentRow,
   shopVolumeFromAggregates,
@@ -453,5 +454,62 @@ describe("DB III (Vollkosten-Ergebnis)", () => {
     });
     const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
     expect(row.dbIIIPerUnit).toBeCloseTo(row.dbIIPerUnit, 5);
+  });
+});
+
+describe("Plaetze im Vergleich zu den aktiven Artikeln", () => {
+  it("zaehlt nur aktive Artikel, Platz 1 = bester, ohne Verkauf kein Platz", () => {
+    const articles: ArticleAggregate[] = [
+      article("A", { windows: { "90": agg({ qty: 5, revenue: 50 }) } }),
+      article("B", { windows: { "90": agg({ qty: 9, revenue: 90 }) } }),
+      article("Alt", { active: false, windows: { "90": agg({ qty: 99, revenue: 990 }) } }), // ausgelaufen zaehlt nicht
+      article("C"),
+    ];
+    const classified = articles.map((a) => ({ article: a, articleClass: "beobachten" as const, reason: "", label: "Beobachten" }));
+    const rows = buildFullSortiment(articles, classified, DEFAULT_COST_SETTINGS);
+    const by = (n: string) => rows.find((r) => r.nameRaw === n)!;
+    expect(by("B").ranks?.windows["90"]?.qty).toBe(1);
+    expect(by("A").ranks?.windows["90"]?.qty).toBe(2);
+    expect(by("A").ranks?.total).toBe(3);
+    expect(by("C").ranks?.windows["90"]?.qty).toBeNull();
+    expect(by("Alt").ranks).toBeUndefined();
+  });
+});
+
+describe("Reichweite des Bestands", () => {
+  const settings = DEFAULT_COST_SETTINGS;
+  const row = (w90: number, w365: number, stock: number) =>
+    buildSortimentRow(
+      article("R", { stock, currentVk: 5, currentEk: 1, windows: { "90": agg({ qty: w90, revenue: w90 * 5 }), "365": agg({ qty: w365, revenue: w365 * 5 }) } }),
+      "beobachten",
+      settings,
+      null
+    );
+  it("nimmt das hoehere aus 90- und 365-Tage-Tempo: 10 Verkaeufe im Jahr, 1 in 90 Tagen, Bestand 4 -> rund 4,8 Monate", () => {
+    expect(row(1, 10, 4).stockMonthsCover).toBeCloseTo(4 / (10 / 12), 5);
+  });
+  it("zieht der Absatz an, gilt das 90-Tage-Tempo", () => {
+    expect(row(6, 10, 4).stockMonthsCover).toBeCloseTo(4 / 2, 5);
+  });
+  it("ohne Verkauf in 90 Tagen gilt das Jahrestempo", () => {
+    expect(row(0, 12, 6).stockMonthsCover).toBeCloseTo(6, 5);
+  });
+});
+
+describe("Nachbestellen faellig (Mindestbestand aus Billbee)", () => {
+  const r = (stock: number, minStock: number | null, desiredStock: number | null = null, active = true) =>
+    buildSortimentRow(article("N", { stock, active, minStock, desiredStock, currentVk: 5, currentEk: 1, windows: { "365": agg({ qty: 6 }) } }), "beobachten", DEFAULT_COST_SETTINGS, null);
+  it("auf oder unter dem Mindestbestand: faellig, mit Fehlmenge bis zum Soll", () => {
+    expect(r(2, 2, 6)).toMatchObject({ reorderDue: true, reorderQty: 4 });
+    // ohne Soll: Menge aus Tempo (3 Monate) bzw. mindestens Mindestbestand + 1
+    expect(r(1, 2)).toMatchObject({ reorderDue: true, reorderQty: 2 });
+  });
+  it("ueber dem Mindestbestand, ohne Mindestbestand oder ausgelaufen: nicht faellig", () => {
+    expect(r(3, 2).reorderDue).toBe(false);
+    expect(r(20, null).reorderDue).toBe(false); // viel Bestand, kein Mindestbestand
+    expect(r(0, 2, 6, false).reorderDue).toBe(false);
+  });
+  it("ohne Mindestbestand rechnerisch faellig: ausverkauft mit Verkaeufen im Jahr", () => {
+    expect(r(0, null)).toMatchObject({ reorderDue: true, reorderReason: "ausverkauft" });
   });
 });
