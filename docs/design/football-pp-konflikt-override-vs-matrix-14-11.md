@@ -1,3 +1,12 @@
+> **UEBERHOLT (14.11., selber Tag).** Chris hat die Frage direkt entschieden (im Chat, nicht per
+> PR-Review): „football muss zu unserem system mit der matrix zurückkehren" — Weg A aus
+> `football-matrix-entscheidung.md`, nicht eine der drei unten vorgeschlagenen Optionen. Der
+> Override ist zurueckgebaut; was dabei GEMESSEN wurde (inklusive einer wichtigen Ueberraschung:
+> Pp sinkt dadurch NICHT auf nahe 0) steht in `football-matrix-rueckkehr-14-11.md`. Dieses
+> Dokument bleibt als Befund/Historie stehen (die NERVENSTAERKE-Nebenweg-Messung und die
+> TEAMGEIST-/PASSSCHUTZ-Historie sind weiterhin gueltiger Kontext), nur der Options-Teil ist
+> erledigt.
+
 # Football: Pp-Konflikt Override vs. Matrix — Befund und Optionen
 
 Keine Rezeptrunde, keine Implementierung — eine Entscheidungsvorlage, wie
