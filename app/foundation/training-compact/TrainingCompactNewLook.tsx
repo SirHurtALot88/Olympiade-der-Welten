@@ -107,7 +107,7 @@ const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string;
   { id: "all", label: "Alle", hint: "Kompletter Kader" },
 ];
 
-type NlTrainingGlyphKind = "recommend" | "wish" | "signature" | "weak" | "risk" | "trait";
+type NlTrainingGlyphKind = "recommend" | "wish" | "signature" | "weak" | "risk" | "trait" | "match";
 
 /** Konsistentes Inline-SVG-Icon-Set statt gemischter Emoji (💡/⚑/★/▼/◆). */
 function NlTrainingGlyph({ kind }: { kind: NlTrainingGlyphKind }) {
@@ -155,6 +155,22 @@ function NlTrainingGlyph({ kind }: { kind: NlTrainingGlyphKind }) {
       return (
         <svg {...shared}>
           <path d="M8 1.8 14.2 8 8 14.2 1.8 8 8 1.8Z" fill="currentColor" />
+        </svg>
+      );
+    case "match":
+      // Haken (Trainingsklasse passt bereits) — bewusst ein ANDERES Icon als der
+      // Vorschlag-Stern, nicht nur dessen Fehlen (Fable-Audit 14.11., Abschnitt 10):
+      // "Stern vs. kein Icon" sah auf den ersten Blick gleich "vorschlagsartig" aus.
+      return (
+        <svg {...shared}>
+          <path
+            d="M3 8.6 6.3 11.9 13 4.6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "risk":
@@ -987,7 +1003,7 @@ function NlTrainingPlayerRow({
                   : `Keine Klasse verspricht deutlich mehr als ${currentTrainingClassLabel} (Unterschied unter 0,3 SP) — Wechsel lohnt aktuell nicht.`
               }
             >
-              {currentTrainingClassLabel} passt
+              <NlTrainingGlyph kind="match" /> {currentTrainingClassLabel} passt
             </span>
           )}
         </td>
