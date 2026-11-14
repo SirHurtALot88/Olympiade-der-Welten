@@ -711,3 +711,12 @@ a.mover .meta, a.mover .meta span { color: var(--muted); }
   main .card { max-width: 100%; overflow-x: auto; }
 }
 @media (max-width: 920px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } .grid-2 > * { min-width: 0; } }
+
+/* Stand-Zeile in der Seitenleiste */
+.stand { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; font-size: 11px; color: var(--faint); }
+.stand-i { display: inline-flex; align-items: center; gap: 4px; }
+.stand-i i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); display: inline-block; }
+.stand-ok i { background: var(--good, #3fb97a); }
+.stand-warn i { background: var(--warn, #e0b341); }
+.stand-crit i { background: var(--crit, #e5604d); }
+.stand-warn, .stand-crit { color: var(--text, inherit); }
