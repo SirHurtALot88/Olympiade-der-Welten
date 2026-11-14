@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "../pipeline/testDb";
 import { loadActiveCostSettings, loadArticleAggregates, saveCostSettings } from "./queries";
 import { buildSortimentRow } from "./viewModel";
-import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
+import { DEFAULT_COST_SETTINGS, LIVE_COST_SETTINGS } from "../pricing/costSettings";
 
 let db: TestDb;
 
@@ -16,17 +16,17 @@ afterEach(async () => {
 describe("loadActiveCostSettings", () => {
   it("faellt auf die Konzept-Defaults zurueck, wenn noch keine Version gespeichert ist", async () => {
     const settings = await loadActiveCostSettings(db.prisma);
-    expect(settings).toEqual(DEFAULT_COST_SETTINGS);
+    expect(settings).toEqual(LIVE_COST_SETTINGS);
   });
 });
 
 describe("CostSettings-Schema", () => {
-  it("Spalten-Defaults der DB (Migration) stimmen mit DEFAULT_COST_SETTINGS ueberein", async () => {
+  it("Spalten-Defaults der DB (Migration) stimmen mit LIVE_COST_SETTINGS ueberein", async () => {
     // Regression: Defaults in Schema/Migration und TypeScript duerfen nicht auseinanderlaufen
-    // (Fixkosten 1140/840/360/50/1839, Einkaufs-Versand 50 %, Einschreiben 2,35/30/100).
+    // (Fixkosten 1140/840/360/50/1839, Einkaufs-Versand 50 %, Einschreiben 2,35/30/100, Kosten nach Volumen an).
     await db.prisma.costSettings.create({ data: {} });
     const loaded = await loadActiveCostSettings(db.prisma);
-    expect(loaded).toEqual(DEFAULT_COST_SETTINGS);
+    expect(loaded).toEqual(LIVE_COST_SETTINGS);
   });
 
   it("speichert und laedt die neuen Felder (Anteil, Einschreiben, Lizenz, Sonstige)", async () => {
@@ -66,6 +66,8 @@ describe("saveCostSettings", () => {
 
 describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () => {
   async function seed(extra: { currentVk?: number | null; ebayPrice?: number | null; packQty?: number; setCode?: string } = {}) {
+    // Handgerechnete Erwartungen gelten fuer die festen Stueckwerte (alter Modus), nicht fuer die Kalkulation nach Volumen.
+    await saveCostSettings(db.prisma, DEFAULT_COST_SETTINGS);
     const article = await db.prisma.article.create({
       data: {
         nameNormalized: "yu-gi-oh! tst-de001 testkarte ultra rare nm 1st",

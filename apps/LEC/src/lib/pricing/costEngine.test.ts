@@ -15,6 +15,8 @@ import {
   fixedCostPerUnit,
   fullCostMarginAt,
   registeredCostPerUnit,
+  shippingPerUnit,
+  packagingPerUnit,
   registeredRateBelowThreshold,
   totalFixedYearly,
   type HkInput,
@@ -374,5 +376,33 @@ describe("Marktdeckel fuer teure Karten", () => {
       const r = computeMarketTargetRange(m, ctx, S);
       expect(r.opt).toBeGreaterThanOrEqual(r.min * 1.0599);
     }
+  });
+});
+
+describe("Kosten nach Volumen (volumeBasedCosts, 14.11.2026)", () => {
+  const V = { ...S, volumeBasedCosts: true };
+  const shop = { units365d: 2850, unitsAtOrAboveThreshold: 60 };
+  it("Versand: Ø Porto je Sendung / Artikel je Bestellung, Pack bleibt fest", () => {
+    const avg = 0.95 * 0.85 + 1.1 * 0.15;
+    expect(shippingPerUnit("single", V)).toBeCloseTo(avg / 1.72, 8);
+    expect(shippingPerUnit("pack", V)).toBe(S.shippingPack);
+    expect(shippingPerUnit("single", S)).toBe(S.shippingSingle); // alter Modus
+  });
+  it("Verpackung: Jahreskosten / verkaufte Stueck; ohne Volumen der alte Wert", () => {
+    expect(packagingPerUnit("single", shop, V)).toBeCloseTo(217 / 2850, 8);
+    expect(packagingPerUnit("pack", shop, V)).toBeCloseTo((217 / 2850) * (S.packagingPack / S.packagingSingle), 8);
+    expect(packagingPerUnit("single", null, V)).toBe(S.packagingSingle);
+    expect(packagingPerUnit("single", shop, S)).toBe(S.packagingSingle);
+  });
+  it("Einkaufs-Versand: Porto aller Einkaufsbestellungen / verkaufte Stueck", () => {
+    const input = { ek: 1, kind: "single" as const, fixedCostPerUnit: 0, vk: 5, shop };
+    expect(buyShippingShare(input, V)).toBeCloseTo((904 * 1.15) / 2850, 8);
+    expect(buyShippingShare({ ...input, shop: null }, V)).toBeCloseTo(1.15 * 0.5, 8); // ohne Volumen alte Regel
+  });
+  it("HK nutzt die neuen Saetze", () => {
+    const hk = computeHk({ ek: 2, kind: "single", fixedCostPerUnit: 0, vk: 5, shop }, V);
+    expect(hk.shipping).toBeCloseTo(shippingPerUnit("single", V), 8);
+    expect(hk.packaging).toBeCloseTo(217 / 2850, 8);
+    expect(hk.buyShipping).toBeCloseTo((904 * 1.15) / 2850, 8);
   });
 });
