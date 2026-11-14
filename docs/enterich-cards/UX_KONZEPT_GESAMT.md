@@ -422,3 +422,94 @@ Die Aufgaben 1 bis 13 sind zusammen etwa ein bis zwei Tage und ändern keine Rec
 - **Heller Modus.** `layout.tsx` setzt das dunkle Thema fest. Die Farbregeln nutzen die vorhandenen Tokens und gelten damit in beiden; den hellen Modus habe ich nicht gesehen.
 - **Unsicher, weil nur an Demo-Daten gesehen:** alle Zählerstände, die Seitenhöhen und die Aussage, dass das neue Dashboard bei 1440 px auf einen Bildschirm passt. Mit echten Artikelnamen (länger, mit Zusätzen wie „1st“, „NM“) können Zeilen umbrechen; nach Aufgabe 14 mit dem echten Bestand prüfen.
 - **Nicht gesehen:** der Aufgaben-Reiter und die Zeile „Heute“ am Bildschirm (nur im Code), die Kompakt-Liste am Handy, `/login`. Die Hydration-Meldung „1 Issue“ auf `/sortiment` aus `UX_VORSCHLAEGE.md` besteht weiter.
+
+## 9. Entscheidungen 14.11.
+
+Antworten auf die Rückfragen von Chris. Stand: Aufgaben 1, 4, 5, 9 sind gemergt. Aufgabe 7 war keine Rechenabweichung: 323 € sind die Ladenhüter, 1.147 € sind Ladenhüter plus langsame Artikel. Beide Zahlen brauchen deshalb verschiedene Namen (siehe 9.8).
+
+### 9.1 Name der Seite (E1)
+
+**„Finanzen“ bleibt**, mit der Unterzeile „Marge · Kapital · Tempo“. Ein Menüpunkt braucht ein Wort; die drei Begriffe, in denen Chris denkt, sind die Abschnitte der Seite. Adresse `/cockpit` bleibt. Risiko: der gewohnte Name ist weg; eine Woche lang im Hover des Menüpunkts „früher: Leitplanken“.
+
+### 9.2 Farbe von „zu günstig“ und „zu teuer“ (E2)
+
+**Beide gelb, aber nicht nur am Pfeil unterschieden.** „↑ zu günstig“ ist ein gefülltes gelbes Schild, „↓ zu teuer“ ein gelbes Schild nur mit Umriss. Dazu kommen das Wort selbst und die Zeile darunter („↑ auf 29,99 €“ / „↓ auf 14,99 €“). Blau bleibt allein Cardmarket. Risiko: beim Überfliegen einer gemischten Liste liest man langsamer als mit zwei Farben. Ausweg, falls Chris nach einer Woche stolpert: „zu teuer“ wieder blau, dann bekommt die Marktwert-Raute Grau.
+
+### 9.3 EK-basierte Preis-Ampel auf Finanzen
+
+**Umbenennen, nicht streichen.** Sie beantwortet eine eigene Frage (trägt mein VK meinen eigenen Einkauf?), darf aber die Wörter des Urteils nicht benutzen.
+
+| | Text |
+|---|---|
+| Titel | „Marge auf eigenen EK“ |
+| Unterzeile | „Dein VK gegen deinen EK plus Kosten · aktive Artikel“ |
+| Segmente | „unter 25 % Marge“ (gelb) · „25–33 % Marge“ (grün) · „über 33 % Marge“ (grau) · „EK fehlt“ (grau) |
+| Hover | „Rechnet mit deinem eigenen Einkaufspreis. Das Urteil im Sortiment rechnet mit dem Marktwert.“ |
+| Chip im Sortiment (Menü „Klasse“) | „Marge unter 25 % (eigener EK)“; ersetzt den in 5.4 genannten Chip „VK unter Kosten“ |
+
+Jedes Segment verlinkt ins Sortiment. Risiko: gering; die Zahlen 6 / 25 / 83 / 102 bleiben, nur die Namen ändern sich.
+
+### 9.4 Vormerken in der Zeile und als Sammelaktion (E3)
+
+- **Ort:** nur im Reiter „Auslisten“, letzte Spalte „Aktion“, Knopf „Vormerken“ links neben „eBay ↗“. In allen anderen Reitern steht die Aktion im Menü „⋯“.
+- **Rückgängig ohne neues Feld:** Nach dem Klick bleibt die Zeile stehen, wird blass, der Knopf heißt „Vorgemerkt · Rückgängig“. „Rückgängig“ ruft denselben Endpunkt (`api/article-delist/[id]`) zum Aufheben der Vormerkung. Der Zustand „gerade vorgemerkt“ lebt nur im Browser; beim nächsten Laden steht die Zeile im Reiter „Markiert“, wo „Vormerkung aufheben“ im Menü „⋯“ bleibt. Vorher prüfen, dass der Endpunkt das Aufheben schon kann (der Drawer hebt heute auf).
+- **Sammelleiste unten:** „{n} ausgewählt“ · [Zum Auslisten vormerken] · [Set-Codes kopieren] · „Auswahl aufheben“. Nach der Aktion zehn Sekunden lang: „{n} vorgemerkt · Rückgängig“.
+- Risiko: versehentliches Vormerken vieler Artikel; es ändert nichts bei eBay und ist aufhebbar.
+
+### 9.5 Top/Flop, Empfehlungen, Marktpreise (E5)
+
+| Seite | Information | Wohin |
+|---|---|---|
+| Top/Flop | Top-Seller (Umsatz 90 T) | Dashboard „Läuft gut“; volle Liste: Sortiment, Sortierung nach Gewinn |
+| | Margen-Champions (DB II %) | entfällt; Prozent ohne Euro führt in die Irre (3 Stück, 55 € Umsatz) |
+| | Low-Runner | Dashboard „Läuft schlecht“ (nach Euro), Reiter „Daten prüfen“ |
+| | Ladenhüter mit „€ gebunden“ | Dashboard „Muss weg“; Sortiment, Klasse Ladenhüter, Sortierung „Gebunden“ |
+| Empfehlungen | Auslisten, Preis anpassen, Nachkaufen | Reiter „Auslisten“, „Preis ändern“, „Nachbestellen“ |
+| | EK pflegen, Daten prüfen | Reiter „Daten prüfen“ |
+| | Lot bilden | Chip im Menü „Klasse“ |
+| | vier Kopfkacheln (Kapital, Verlust p. a., verschenkte Marge, Nachkauf-Kandidaten) | Kapital: „Muss weg“; verschenkte Marge: Fuß von „Läuft schlecht“; die übrigen entfallen (Zähler stehen in „Heute“) |
+| | „Ausblenden“ je Empfehlung, Umschalter „€-Effekt / Dringlichkeit“ | entfällt |
+| Marktpreise | Tabelle VK, EK, Marktwert, Zielspanne, Ampel | Reiter „Preis ändern“ |
+| | EK gegenüber Markt | Chip „EK über Markt“ |
+| | Preisverlauf des gewählten Artikels | Drawer, Gruppe „Markt“ |
+| | „Preisliste vom“ | Stand-Zeile in der Seitenleiste |
+
+Reihenfolge: erst die Ziele bauen, dann umleiten, die Komponenten eine Woche liegen lassen, dann löschen. `/empfehlungen` wird erst umgeleitet, wenn der Reiter „Daten prüfen“ da ist.
+
+### 9.6 „Daten prüfen“ gegen „Aufräumen“ (E7)
+
+**Zwei Reiter**, „Aufräumen“ hat Vorrang.
+
+- **Aufräumen** (unverändert): aktiv und bei eBay beendet; oder doppelt angelegt; oder Name passt nicht zum Set-Code.
+- **Daten prüfen:** nicht ausgeblendet, aktiv, **nicht** in „Aufräumen“, und eines von beiden: (a) EK fehlt und der Artikel hat Bestand oder einen Verkauf in 365 T; (b) EK bekannt, mindestens 3 Verkäufe in 365 T und Marge (verkauft) unter 0.
+
+Risiko: (a) kann in echten Daten sehr groß sein (in der Demo 102). Sortierung nach Umsatz 90 T hält das Wichtige oben.
+
+### 9.7 Betriebszahlen (E6)
+
+„Betriebszahlen je Jahr“ samt „eBay-Verkaufskosten: Modell gegen eBay“ wird die **letzte Karte auf Finanzen, zugeklappt**, Kopfzeile „Betriebszahlen je Jahr · 2022 bis 2026“. In den Einstellungen bleibt an der Stelle ein Link „Betriebszahlen stehen jetzt unter Finanzen →“. Risiko: gering; die Karte ist eine reine Anzeige.
+
+### 9.8 Dashboard: genaue Definitionen
+
+Nur Daten, die LEC hat. Aus `KENNZAHLEN_RECHERCHE.md` übernehme ich **Kapital nach Alter** in „Muss weg“, weil es die Arbeit steuert (welche Altersklasse räume ich zuerst?). **Umschlag und Reichweite des Shops** gehören nach Finanzen in „Kapital & Tempo“; sie sind eine Lage, keine Aufgabe.
+
+| Block | Wer zählt | Kopf | Liste | Fuß |
+|---|---|---|---|---|
+| **Läuft gut** | aktiv, Verkauf in 30 T, Marge (verkauft) nicht negativ | „{n} Artikel (Champion + Solide) tragen {x} % vom Umsatz 365 T“ | 5 Zeilen nach Gewinn (DB II €) in 30 T: Name · „+96 €“ · Stück · Bestand · Marker „NACHBESTELLEN“. Ohne EK: „EK fehlt“ statt Betrag, eingeordnet nach Umsatz | „Ausverkauft, lief gut: {n}“ |
+| **Läuft schlecht** | aktiv, behalten wir, aber etwas stimmt nicht | „{n} fallen ab · {n} mit Verlust · {n} zu günstig“ | 3 Zeilen Verlust in 90 T (EK bekannt, DB II € unter 0, nach Euro); 2 Zeilen Klasse „Fällt ab“ nach Umsatz 365 T mit „Stück je Monat 365 T → 90 T“ | „Zu günstig: {x} € liegen gelassen“ (Zählung des Sortiments) |
+| **Muss weg** | Bestand über 0 und Ladenhüter oder mit Maßnahme | „Ladenhüter: {n} Artikel · {x} € gebunden“ und darunter „Langsam (181–365 T): {y} €“; so stehen 323 € und der Rest zu 1.147 € nebeneinander und heißen verschieden | Balken Kapital nach Alter seit letztem Verkauf: 0–90 / 91–180 / 181–365 / über 365 T, je Segment Euro und Link; darunter 5 Zeilen nach Bestand × EK: Name · Euro · Tage · Maßnahme | „Auslisten {n} · Markiert {n} · Bei eBay beendet {n}“ |
+
+Überall klein dabei, wenn es zutrifft: „{n} Artikel ohne EK nicht eingerechnet“.
+
+### 9.9 Umsetzung in vier PRs
+
+Jede PR läuft für sich.
+
+| PR | Inhalt | Aufgaben aus 7 |
+|---|---|---|
+| **A: Wörter und Farben** | „zu teuer“ gelb mit Umriss, „zu günstig“ gelb gefüllt, Marge neutral; „im Rahmen“ überall; „Marge auf eigenen EK“ in `DistributionCard`; Klasse „Streichkandidat“; Schreibweise „12,99 €“; Menüpunkt „Finanzen“; Stand-Zeile | 3, 6, 10, 11, 12 |
+| **B: Sortiment** | Reiter „Daten prüfen“; Spalten und Sortierung je Reiter; „Vormerken“ in der Zeile, Sammelleiste; Adress-Parameter für Klasse, Urteil, Sortierung, Artikel; Urteilskacheln als Chip-Zeile | 2, 8, 15, 16, 17 |
+| **C: Dashboard** | Drei Blöcke nach 9.8, Kapital nach Alter, Kennzahl „Ergebnis“, alle Zeilen und Zahlen verlinkt (braucht die Parameter aus B) | 14, Handy-Teil von 22 |
+| **D: Seiten zusammenlegen** | Umleitungen für Top/Flop, Marktpreise, Empfehlungen; Finanzen kürzen; Betriebszahlen umziehen; Einstellungen ordnen | 13, 19, 20 |
+
+Danach, nicht in diesen vier: Filterleiste (18), Löschen der alten Komponenten (21), restliches Handy (22).
