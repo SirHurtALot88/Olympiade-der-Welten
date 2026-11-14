@@ -418,22 +418,22 @@
   },
   "spurt": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.91,
-   "rhoSpannweite": 0.142,
-   "rhoSaison": 0.963,
+   "rhoJeSpiel": 0.938,
+   "rhoSpannweite": 0.126,
+   "rhoSaison": 0.951,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 spurt",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 spurt",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    19.4,
-    14.9
+    18.5,
+    15.4
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs spurt (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs spurt 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -442,8 +442,13 @@
      10000000
     ]
    },
-   "datum": "2026-10-16",
-   "commit": "ace43062",
+   "datum": "2026-11-14",
+   "commit": "ca22942b8",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-motor-p4-11-11.md",
+    "ersatzVorher": { "rhoJeSpiel": 0.91, "rhoSpannweite": 0.142, "rhoSaison": 0.963, "pp": [19.4, 14.9], "datum": "2026-10-16", "commit": "ace43062" }
+   },
    "rhoFrisch": true,
    "ppFrisch": true
   },
