@@ -512,8 +512,30 @@ window.__ARENA_REZEPTE = {
   //   der Kader-Spannweite (0,17-0,22), also von Null nicht unterscheidbar.
   // Die Kommentare unten zu einzelnen Sub-Skills beschreiben den Stand VOR dieser Runde.
   // ===============================================================================
+  // STAMINA RUNTER / SPIRIT RAUF (Chris 10.11., Task #99): die relativen Gewichte der
+  // zwei Attribute verschoben, NICHT die Matrix (die bleibt bei stamina 10/spirit 12).
+  // Betroffen sind genau die drei Sub-Skills, die vorher Stamina trugen UND einen echten
+  // Live-Kanal haben (AUFBAU: Passchance/Fehlpass/Aufbau-Skala; LAUFTEMPO: tempoPx, der
+  // groesste einzelne Bewegungs-Kanal im Live-Motor; AUSDAUER: der Bodycheck-Wucht-
+  // Kontrast) — kein drittes Attribut in diesen drei Zeilen angefasst. ABSCHLUSS/TECHNIK/
+  // ZWEITCHANCE/ABWEHR/TEAMGEIST/SCHUSS_NAH/SCHUSS_FERN/PARADE bleiben Zeichen fuer Zeichen
+  // wie in der Pp-Rebalance-Runde (10.11.) oben — kleinerer Blast-Radius, klarer zuzuordnen.
+  //
+  // ZWEITE FASSUNG, HALBIERT (gemessen, nicht geraten): die erste Fassung verschob die
+  // volle Punktzahl 1:1 von stamina zu spirit und mass gepoolt (3 Stroeme, n=24/Strom,
+  // s. Branch-PR) spirit bei 15,8 % gegen Matrix 12 (+3,8 Pp, 3,3 SE) — ein echter, neuer
+  // Capbruch. Nebenbefund: dexterity stieg im selben Lauf auf 10,3 % (+6,3 Pp, 8,9 SE),
+  // OBWOHL dexterity in keiner der drei Zeilen angefasst wurde — einflussVon() normiert auf
+  // Anteile, die sich zu 100 % aufsummieren; stamina so stark zu senken druckt automatisch
+  // JEDES andere Attribut nach oben, auch ohne eigene Rezeptaenderung. Diese Fassung
+  // halbiert dieselbe Verschiebung in allen drei Zeilen (stamina faellt weniger stark, der
+  // Renormierungs-Schub auf dexterity/andere faellt entsprechend kleiner aus) und bleibt
+  // damit naeher an einer messbaren, aber capkonformen Bewegung.
+  // Gemessen vorher/nachher: s. Branch-PR (Pp gepoolt ueber drei Saatstroeme, rho
+  // kaderfest, scripts/pruefe-wertung-fingerabdruck.mjs nur im Hockey-Eintrag veraendert).
+  // ===============================================================================
   hockey:{
-    AUFBAU:      {spirit:30,stamina:20,speed:20,health:15,awareness:8,power:7},
+    AUFBAU:      {spirit:35,stamina:15,speed:20,health:15,awareness:8,power:7},
     // Sinkhorn gab hier 63/37 (Power/Spirit) — auf dem Testkader korreliert Spirit mit der
     // Eignung NEGATIV (rho -0,34), Power stark positiv (rho 0,68). Nachjustiert auf 82/18,
     // ohne die von B.2 vorgesehenen Attribute zu verlassen (s. Blockkommentar oben).
@@ -522,7 +544,7 @@ window.__ARENA_REZEPTE = {
     ZWEITCHANCE: {health:70,torment:15,power:9,spirit:6},
     ABWEHR:      {speed:26,health:24,will:24,determination:11,power:9,torment:6},
     TEAMGEIST:   {spirit:54,torment:46},
-    AUSDAUER:    {stamina:51,health:22,will:22,spirit:5},
+    AUSDAUER:    {stamina:40,health:22,will:22,spirit:16},
     // SCHUSS_NAH fuehrt jetzt Health statt Power — gemessen BESSER als beim alten Rezept
     // (Sub-Skill-Korrelation zur Eignung 0,36 -> 0,76 auf dem Testkader), deshalb hier vom
     // Sinkhorn-Lauf unveraendert uebernommen.
@@ -532,7 +554,7 @@ window.__ARENA_REZEPTE = {
     // Blockkommentar oben) — Speed korreliert auf dem Testkader praktisch gar nicht mit der
     // Eignung (rho -0,06). Nachjustiert auf 47/30/23, Power wieder fuehrend wie geplant.
     SCHUSS_FERN: {power:52,speed:27,awareness:21},
-    LAUFTEMPO:   {stamina:52,speed:44,dexterity:4},
+    LAUFTEMPO:   {speed:44,stamina:45,spirit:7,dexterity:4},
     // PARADE FUEHRT HEALTH, nicht Awareness — nachgezogen, weil der Slot es so ausweist.
     // Der Torwart-Slot (SLOTS_JE_DISC.hockey, aus dem Generator) traegt gross:"health",
     // klein:"awareness" und hebt im Profil health auf 26. Im Aufstellungsbildschirm steht
