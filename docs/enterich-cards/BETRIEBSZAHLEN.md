@@ -52,3 +52,17 @@ Verpackung und Transport gesamt (Lexoffice, inkl. Einschreiben, Ausland, Taschen
 Gegenprobe der Kalkulation nach Volumen (Inland 0,97 € je Sendung, Verpackung 217 €, Einschreiben 235 €): 2025 ca. 2.390 €, 2026 ca. 2.300 €. Der Rest (ca. 480 bis 590 € im Jahr) ist Ausland und Tracking, das die Käufer mit 6,99 € bzw. 9,99 € bezahlen.
 
 Hinweis: Die frühere Annahme „3.400 Stück im Jahr“ in `KONZEPT.md` war zu hoch; 2025 waren es 3.055, 2026 liegt hochgerechnet bei ca. 2.850.
+
+## Billbee „Verkäufe pro Tag“ nach Auftragsdatum (von Chris, 14.11.2026)
+
+| Jahr | Bestellungen | Umsatz | Ø Warenkorb | Stück (eBay) | Artikel je Bestellung | Verpackung + Versand je Bestellung |
+|---|---:|---:|---:|---:|---:|---:|
+| 2022 | 2.244 | 17.945,38 € | 8,00 € | offen | offen | offen |
+| 2023 | 2.147 | 19.038,05 € | 8,87 € | ca. 3.117 | ca. 1,45 | 1,28 € |
+| 2024 | 2.528 | 26.263,97 € | 10,39 € | 3.828 | 1,51 | 1,32 € |
+| 2025 | 1.944 | 23.093,02 € | 11,88 € | 3.055 | 1,57 | 1,48 € |
+| 2026 bis 14.11. | 1.658 | 22.029,21 € | 13,29 € | 2.481 | 1,50 | ca. 1,51 € (hochgerechnet) |
+
+(2022 enthält zusätzlich 2 Bestellungen ohne Shop, 13,94 €.)
+
+Beobachtung (Chris): weniger Bestellungen, aber höherer Warenkorb. Der Warenkorb steigt (8,00 € → 13,29 €, +66 %) durch teurere Karten, nicht durch mehr Karten je Bestellung: die Artikel je Bestellung liegen stabil bei 1,45 bis 1,57. Das Porto je Sendung fällt dadurch relativ weniger ins Gewicht (Anteil vom Umsatz 14 % → ca. 11 %). Die Kosten für Verpackung und Versand je Bestellung steigen dagegen (1,28 € → ca. 1,51 €, +18 %), vermutlich Portoerhöhungen und mehr Sendungen mit Tracking.
