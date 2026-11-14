@@ -8,8 +8,13 @@
  *   2. "Plan schlaegt Entwurf" gilt auch hier (dieselbe Funktion wie die Wertung).
  *   3. Jede NICHT freigeschaltete Disziplin bekommt die Felder nicht — der Eintrag bleibt exakt
  *      `{d, slot}`, der Motor faellt auf die Ersatzkarte zurueck (bit-identisch).
- *   4. Der Motor liest die Werte an genau einer Stelle (`breitPunkteVon`) in allen sieben
- *      Baufunktionen; der alte Ausdruck steht nur noch als Rueckfall im Helfer.
+ *   4. Der Motor liest die Werte an genau einer Stelle (`breitPunkteVon`) in jeder Baufunktion,
+ *      die `formVon(p.n)+stufenWert()` verwendet; der alte Ausdruck steht nur noch als Rueckfall
+ *      im Helfer. Beim Merge mit main (14.11.) kam `tdmKaempfer()` (TDM-Gefecht, PR #1387, nach
+ *      dem Branch-Punkt dieser PR auf main gewandert) mit genau diesem alten Ausdruck dazu —
+ *      ebenfalls auf `breitPunkteVon()` umgestellt, bit-identisch, da "tdm" NICHT in
+ *      `FORMKARTEN_ECHT_DISCIPLINE_IDS` steht (Abschnitt 1.5 der Doku: TDM/Hockey/Football
+ *      bleiben PPS-Duell-Bruecke). Deshalb acht, nicht sieben, Treffer.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -134,8 +139,9 @@ describe("P4: der Motor liest die echte Form an einer Stelle", () => {
     "utf8",
   );
 
-  it("alle sieben Baufunktionen nehmen breitPunkteVon()", () => {
-    expect(motor.match(/=breitPunkteVon\(p,/g)?.length).toBe(7);
+  it("alle Baufunktionen, die die Ersatzkarte lasen, nehmen breitPunkteVon()", () => {
+    // 7 aus dieser PR + tdmKaempfer() (TDM-Gefecht, seit dem Merge mit main, s. Klassenkommentar).
+    expect(motor.match(/=breitPunkteVon\(p,/g)?.length).toBe(8);
   });
 
   it("der alte Ausdruck steht nur noch als Rueckfall im Helfer", () => {

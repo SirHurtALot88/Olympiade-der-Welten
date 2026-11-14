@@ -57492,7 +57492,7 @@
   function tdmKaempfer(p,side,slotId,slotDef,idx){
     const d="tdm";
     const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
