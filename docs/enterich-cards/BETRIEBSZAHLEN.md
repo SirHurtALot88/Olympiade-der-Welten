@@ -37,14 +37,15 @@ Beobachtung: Das Porto liegt über die drei Jahre stabil bei ca. 13 % der Einkau
 eBay „Prüfen Sie Ihren Umsatz“, Bericht 1. Jan bis 31. Dez 2025, Vergleich mit 2024:
 
 - 2025: Gesamtumsatz 24.135,12 €, Verkaufskosten inkl. Versand 7.993,22 € (33,1 % vom Umsatz), Umsatz nach Kosten 16.141,90 €, 3.055 Stück, Ø 7,90 € je Artikel.
-- Veränderung 2025 gegen 2024: Umsatz −13,0 %, Stück −20,4 %, Ø-Preis +9,3 %. Daraus 2024 (zurückgerechnet): ca. 3.838 Stück, ca. 27.740 € Umsatz.
+- Veränderung 2025 gegen 2024: Umsatz −13,0 %, Stück −20,4 %, Ø-Preis +9,3 %.
+- 2024 (eBay-Bericht 1.1. bis 31.12.2024): Gesamtumsatz 27.630,02 € (Festpreis 27.428,53 €, Auktionen 201,49 €), Verkaufskosten inkl. Versand 8.694,68 € (31,5 % vom Umsatz), Umsatz nach Kosten 18.935,34 €, 3.828 Stück, Ø 7,22 € je Artikel. Gegen 2023: Umsatz +40,5 %, Stück +22,8 %, Ø-Preis +14,4 %. Daraus 2023 (zurückgerechnet): ca. 3.117 Stück, ca. 19.660 € Umsatz, Ø ca. 6,31 €.
 
 Verpackung und Transport gesamt (Lexoffice, inkl. Einschreiben, Ausland, Taschen):
 
 | Jahr | Verpackung + Versand | Stück | € je Stück | % vom Umsatz |
 |---|---:|---:|---:|---:|
-| 2023 | 2.757 € | offen | offen | offen |
-| 2024 | 3.327 € | ca. 3.838 | 0,87 € | ca. 12,0 % |
+| 2023 | 2.757 € | ca. 3.117 | 0,88 € | ca. 14,0 % |
+| 2024 | 3.327 € | 3.828 | 0,87 € | 12,0 % |
 | 2025 | 2.870 € | 3.055 | 0,94 € | 11,9 % |
 | 2026 (hochgerechnet) | ca. 2.880 € | ca. 2.850 | 1,01 € | ca. 10,7 % |
 
