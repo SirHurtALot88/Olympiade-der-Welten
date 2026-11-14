@@ -19,7 +19,7 @@ type NavKey =
 const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: "dashboard", label: "Dashboard", href: "/" },
   { key: "sortiment", label: "Sortiment", href: "/sortiment" },
-  { key: "cockpit", label: "Leitplanken", href: "/cockpit" },
+  { key: "cockpit", label: "Finanzen", href: "/cockpit" },
 ];
 
 /** Ordnet die aktuelle Route dem Sidebar-Eintrag zu (aktiver Zustand aus der Route). */

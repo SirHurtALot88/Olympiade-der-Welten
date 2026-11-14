@@ -16,7 +16,7 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
   const latestImport = vm.imports.reduce<Date | null>((acc, i) => (i.createdAt && (!acc || i.createdAt > acc) ? i.createdAt : acc), null);
   return (
     <AppShell
-      title="Leitplanken"
+      title="Finanzen"
       subtitle={
         <>
           {vm.totals.articles.toLocaleString("de-DE")} Kartenartikel · {vm.totals.active.toLocaleString("de-DE")} aktiv · Datenstand{" "}
@@ -63,11 +63,11 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
           note="Klassen aus der regelbasierten Einstufung (Velocity 30/90/365 T, Momentum, DB II). Ladenhüter = 0 Verkäufe in 365 T trotz Historie oder Bestand."
         />
         <DistributionCard
-          title="Preis-Ampel"
-          scope="aktive Artikel · Listen-VK vs. Korridor"
+          title="Marge auf eigenen EK"
+          scope="Dein VK gegen deinen EK plus Kosten · aktive Artikel"
           distribution={vm.priceStatus}
           classPrefix="ck-p"
-          note={`Aktueller Listen-VK gegen die Zielspanne: ${pct(vm.corridor.minMargin)} (Minimum) bis ${pct(vm.corridor.goodMargin)} (Optimum) Deckungsbeitrags-Marge vor Fixkosten, gerechnet mit dem EK des Artikels, mindestens 4,99 €. „Kein EK“ = ohne Einkaufspreis ist keine Spanne berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist.`}
+          note={`Rechnet mit deinem eigenen Einkaufspreis; das Urteil „zu günstig / zu teuer“ im Sortiment rechnet mit dem Marktwert. Aktueller Listen-VK gegen die Zielspanne: ${pct(vm.corridor.minMargin)} (Minimum) bis ${pct(vm.corridor.goodMargin)} (Optimum) Deckungsbeitrags-Marge vor Fixkosten, gerechnet mit dem EK des Artikels, mindestens 4,99 €. „Kein EK“ = ohne Einkaufspreis ist keine Spanne berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist.`}
         />
       </div>
 

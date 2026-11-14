@@ -184,8 +184,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const effect = k?.priceEffects[0] ?? null;
 
   // Entscheidungszeile
-  const priceWord = !m?.rated ? "kein Urteil" : m.status === "im_korridor" ? "passt" : m.status === "zu_guenstig" ? "zu günstig" : "zu teuer";
-  const priceTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : m.status === "zu_guenstig" ? "warn" : "info";
+  const priceWord = !m?.rated ? "kein Urteil" : m.status === "im_korridor" ? "passt" : m.status === "zu_guenstig" ? "↑ zu günstig" : "↓ zu teuer";
+  const priceTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : "warn";
   const sortimentTone: Tone = !row.sortiment ? undefined : row.sortiment.status === "auslisten" ? "crit" : row.sortiment.status === "behalten" ? "good" : "warn";
   const reorderTip =
     row.reorderReason === "mindestbestand"

@@ -146,10 +146,10 @@
 .ck-k-faellt_ab { background: var(--warn); }
 .ck-k-low_runner { background: var(--crit); }
 .ck-k-ladenhueter { background: #7a2e2e; }
-.ck-p-ueber_gut { background: var(--ck-s2); }
+.ck-p-ueber_gut { background: var(--faint); }
 .ck-p-im_korridor { background: var(--ck-s3); }
 .ck-p-ziel_unerreichbar { background: var(--warn); }
-.ck-p-unter_min { background: var(--crit); }
+.ck-p-unter_min { background: var(--warn); }
 .ck-p-kein_ek { background: var(--faint); }
 
 /* ---------- Saeulen (Tempo) ---------- */

@@ -11,10 +11,10 @@ export const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", 
 export type PriceStatusKey = SortimentRow["priceStatus"];
 export const PRICE_STATUS_ORDER: PriceStatusKey[] = ["ueber_gut", "im_korridor", "unter_min", "kein_ek"];
 export const PRICE_STATUS_LABELS: Record<PriceStatusKey, string> = {
-  ueber_gut: "zu teuer",
-  im_korridor: "im Korridor",
-  unter_min: "zu günstig",
-  kein_ek: "kein EK",
+  ueber_gut: "über 33 % Marge",
+  im_korridor: "25–33 % Marge",
+  unter_min: "unter 25 % Marge",
+  kein_ek: "EK fehlt",
 };
 
 export interface DistributionSegment<K extends string> {

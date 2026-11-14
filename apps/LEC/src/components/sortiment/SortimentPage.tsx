@@ -618,8 +618,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
-        <span className="flabel" title="Korridor mit deinem eigenen EK (Billbee); „kein EK“ = ohne Einkaufspreis keine Rechnung möglich">
-          eigener EK
+        <span className="flabel" title="Marge deines VK am eigenen EK (Billbee). „EK fehlt“ = ohne Einkaufspreis keine Rechnung möglich. Das Preis-Urteil oben (zu günstig / zu teuer) rechnet mit dem Marktwert.">
+          Marge am eigenen EK
         </span>
         {STATUS_ORDER.map((status) => (
           <button

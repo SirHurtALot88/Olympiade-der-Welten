@@ -1,5 +1,6 @@
 import type { MoverItem } from "@/lib/dashboard/viewModel";
 import { formatEuroCents, formatPercent } from "@/lib/format";
+import { cleanTitle } from "@/lib/dashboard/board";
 
 interface Props {
   good: MoverItem[];
@@ -18,7 +19,7 @@ export function MoversPanels({ good, bad }: Props) {
           {good.length === 0 && <EmptyRow text="Noch keine Verkäufe im 30-Tage-Fenster." />}
           {good.map((item) => (
             <div className="mover" key={item.articleId}>
-              <div className="nm">{item.nameRaw}</div>
+              <div className="nm" title={item.nameRaw}>{cleanTitle(item.nameRaw).name || item.nameRaw}</div>
               <div className="rev">€ {formatEuroCents(item.revenue)}</div>
               <div className="meta">
                 <span>{item.qty} Stk</span>
@@ -56,7 +57,7 @@ export function MoversPanels({ good, bad }: Props) {
           {bad.length === 0 && <EmptyRow text="Kein Artikel mit Verlust in 90 Tagen." />}
           {bad.map((item) => (
             <a className="mover" key={item.articleId} href={`/sortiment?q=${encodeURIComponent(item.setCode ?? item.nameRaw)}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="nm">{item.nameRaw}</div>
+              <div className="nm" title={item.nameRaw}>{cleanTitle(item.nameRaw).name || item.nameRaw}</div>
               <div className="rev down">−€ {formatEuroCents(Math.abs(item.dbIIEuro))}</div>
               <div className="meta">
                 <span>{item.qty} verkauft</span>

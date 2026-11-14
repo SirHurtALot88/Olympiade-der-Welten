@@ -880,7 +880,7 @@ export const LABELS_DE: Record<ArticleClass, string> = {
   solide: "Solide",
   beobachten: "Beobachten",
   faellt_ab: "Fällt ab",
-  low_runner: "Auslisten",
+  low_runner: "Streichkandidat",
   ladenhueter: "Ladenhüter",
 };
 
