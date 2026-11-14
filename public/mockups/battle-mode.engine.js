@@ -4689,7 +4689,26 @@
     while(f>0&&sperr.includes(f))f--;
     return f;
   }
+  // Anzeige-Uhr fuer die Pixel-Figuren (s. Kommentar in zeichnePixelFigur): je Chassis die Uhr,
+  // die dort wirklich laeuft. Nur lesend.
+  function pixelAnzeigeUhr(){
+    if(istFeldspiel(disc))return fsT;
+    if(istBuehne(disc))return buehneT;
+    if(istBahn(disc))return rennT;
+    return t;
+  }
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
+    // EIGENE ANZEIGE-UHR JE CHASSIS (Arena-Review 14.11.): diese Funktion las bis hierher das
+    // modulglobale `t` -- das ist aber die KAMPF-Uhr und laeuft nur in stepSim()s Kampf-Zweig
+    // (und im TDM-Replay). In Feldspiel, Buehne und Bahn steht `t` still, deshalb war dort
+    //   - der Gehzyklus eingefroren (Basketball: 18 von 18 walk-Streifen zeigten ueber das ganze
+    //     Spiel genau EIN Bild -- die Figur glitt mit einem Standbild uebers Parkett),
+    //   - jeder Sturz (`u.vizSturz`: Climbing, Eiskunstlauf, Hockey, Spurt, Takeshi) auf Bild 0
+    //     des treffer-Streifens festgehalten -- der aufrechten Ausgangspose, also KEIN sichtbarer
+    //     Sturz (PR #1386 "Sturz statt Tod" lief dadurch ins Leere).
+    // pixelAnzeigeUhr() liefert die Uhr des aktiven Chassis (fsT/buehneT/rennT, sonst `t`).
+    // Rein lesend, kein rr(), keine Zuweisung an Simulationszustand.
+    const T=pixelAnzeigeUhr();
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
     const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
@@ -4701,15 +4720,24 @@
     // Ansicht): gleich das Endbild der K.o./Sturz-Animation statt sie von vorn abzuspielen.
     if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
     if(typeof u.hp==="number"){
-      if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
+      if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=T;
       rec.hp=u.hp;
     }
-    if(rec.trefferT>t)rec.trefferT=-1e9;          // neue Partie: Uhr lief zurueck
-    if(istUnten){ if(rec.downT==null||rec.downT>t)rec.downT=t; } else rec.downT=null;
-    const trefferSeit=t-rec.trefferT;
+    if(rec.trefferT>T)rec.trefferT=-1e9;          // neue Partie: Uhr lief zurueck
+    if(istUnten){ if(rec.downT==null||rec.downT>T)rec.downT=T; } else rec.downT=null;
+    const trefferSeit=T-rec.trefferT;
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
-    const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
+    // FELDSPIEL GLITT OHNE LAUFANIMATION (Arena-Review 14.11.): die Schwelle `>=3` stammt vom
+    // Baukasten-Pfad, wo u.vx eine Geschwindigkeit ist. Im Feldspiel-Live-Motor
+    // (bewegeSpielerLive) ist u.vx aber der TATSAECHLICHE SCHRITT JE TICK (dt=1/60, s. Opus-
+    // Review-Fund #12 dort) -- 3 px/Tick sind 180 px/s, und jeder langsamere Lauf (Screen-Bremse,
+    // Puste, Jog in die Formation; Basis 230 px/s) lag darunter: gemessen glitten die Pixel-Figuren
+    // im Football in mehr als der Haelfte ihrer Bewegungsbilder in der Standpose uebers Feld.
+    // Dort setzt der Motor u.vx/u.vy beim Stehen exakt auf 0, jeder echte Schritt ist >0 --
+    // deshalb gilt im Feldspiel jeder Schritt als Gehen. Rein zeichnend, liest nur u.vx/u.vy.
+    const schrittL1=Math.abs(u.vx||0)+Math.abs(u.vy||0);
+    const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||schrittL1>=3||(istFeldspiel(disc)&&schrittL1>0.25);
     const art=istUnten?(istSturz?"treffer":"tod"):istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
@@ -4743,11 +4771,11 @@
           // Einmal-dann-letztes-Bild-Formel wie ein echter K.o. ab (ueber `rec.downT`, nicht
           // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
           // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
-          if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          if(istUnten)f=Math.min(n-1,Math.floor((T-rec.downT)/0.9*n));
           else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
-            const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
+            const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(T*7*n/9+u.id);
             f=Math.floor(((zyklus%n)+n)%n);
           }
           if(!isFinite(f))f=n-1;
@@ -4765,16 +4793,16 @@
     if(!geladen(pe)&&wunschPose==="west"&&geladen(z.bilder.get("east.png"))){ pe=z.bilder.get("east.png"); poseSpiegeln=true; }
     if(!geladen(pe))pe=grund;
     let dx=0,dy=0,winkel=0;
-    if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
+    if(art==="walk")dy=-Math.abs(Math.sin((T*7+u.id)*Math.PI/4.5))*1.6*G;
     else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
     // `istUnten` vor dem literalen art==="treffer"-Zweig: ohne Animationsstreifen (Grundpose-
     // Ersatzbewegung) soll ein Sturz genauso umkippen wie ein echter K.o. (neutraler als die
     // HP-Zuck-Wobble unten, die bei einem zeitlich unbegrenzten Sturz nie zur Ruhe kaeme).
     else if(istUnten){
-      const k=Math.min(1,(t-(rec.downT??t))/0.5);
+      const k=Math.min(1,(T-(rec.downT??T))/0.5);
       winkel=(vor<0?-1:1)*k*Math.PI/2;
     }else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
-    else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    else if(u.vizJubel)dy=-Math.abs(Math.sin(T*6+u.id))*4*G;
     zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
@@ -29496,9 +29524,30 @@
     // bewegt sich mit jedem enthuellten Zug, statt bis kurz vor Schluss auf 0 zu stehen. Der
     // ECHTE Endstand (sobald `done`) bleibt unveraendert bei den Brettsiegen.
     if(done)return bretter(0)+" : "+bretter(1);
+    // NULLSUMME STATT STAND (Arena-Review 14.11.): die Vorteils-SUMME je Seite (Punkt 18 oben)
+    // ist ein Nullsummenwert -- jedes Brett traegt bei der einen Seite +v und bei der anderen
+    // rund -v ein. Die Kopfzeile zeigte dadurch waehrend des ganzen Spiels "X : -X" (gemessen:
+    // Speed-Schach "1277 : -1277", Tennis "1151 : -1151", Fechten "978 : -992"), bevor sie beim
+    // Abpfiff auf die Brettsiege ("4 : 2") sprang -- zwei Waehrungen, eine davon negativ.
+    // Jetzt laeuft dieselbe Waehrung wie der Endstand mit: wie viele Bretter/Plaetze/Bahnen die
+    // Seite GERADE vorn hat. Dieselben kein-Spoiler-Quellen wie vorher (laufender Vorteil, beim
+    // Fechten der laufend enthuellte Trefferstand `u.treffer`, der auch auf den Bahnen steht),
+    // reine Anzeige, kein rr().
     const laufendVorteil=(u)=>(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+laufendVorteil(u),0);
-    return summe(0)+" : "+summe(1);
+    const laufendWert=(u)=>BB().fechten?(u.treffer||0):laufendVorteil(u);
+    const brettVon=(u)=>u.rubberIdx??u.brett;
+    const vorn=(s)=>{
+      const gezaehlt=new Set(); let n=0;
+      for(const u of TEILNEHMER){
+        const k=brettVon(u);
+        if(u.side!==s||k==null||gezaehlt.has(k))continue;
+        gezaehlt.add(k);
+        const g=TEILNEHMER.find(v=>v.side!==s&&brettVon(v)===k);
+        if(laufendWert(u)>(g?laufendWert(g):0))n++;
+      }
+      return n;
+    };
+    return vorn(0)+" : "+vorn(1);
   }
   function updateHudBuehne(){
     // UHR-ANGLEICHUNG (Broadcast-Audit Runde 2, Punkt 10, 30.09.): bislang stand hier rohes
@@ -55892,6 +55941,27 @@
       const e=ECK[k.side];
       const unten=k.raus&&now>=k.rausT;
       if(!zf){
+        // BAUKASTEN STATT PLAETTCHEN (Arena-Review 14.11.): ein Spieler ohne eigene PixelLab-Figur
+        // erschien hier als farbiges Oval mit zwei Initialen -- in Chris' aktivem Battle-Save
+        // gilt das fuer 207 von 367 Kaderspielern, also fuer die Mehrheit jeder Mini-DM-Runde.
+        // Ueberall sonst in der Arena steht fuer sie die Baukasten-Figur (zeichneSprite(),
+        // Zuordnung ueber BAU[name] wie dort). Dieselbe hier: Blick zur Mitte (bzw. zum Ziel beim
+        // Ausfall), beim Ausscheiden die liegende "hurt"-Pose, auf die Figurenhoehe dieser Szene
+        // skaliert. Rein zeichnend; das Oval bleibt nur Notnagel, falls zeichneSprite() wirft.
+        try{
+          const l=k.lunge, imAngriff=l&&now>=l.t&&now<=l.t+l.d*2&&!unten;
+          let bx=0,by=0;
+          if(imAngriff){ const zi=ECK[l.ziel]; bx=zi.x-e.x; by=zi.y-e.y; }
+          else { bx=MITTE.x-e.x; by=MITTE.y-e.y; }
+          const nb=Math.hypot(bx,by)||1;
+          const stell={n:k.n,id:k.side*7+1,side:k.side,vx:bx/nb*5,vy:by/nb*5,hp:k.hp,max:k.max,
+            lunge:imAngriff?Math.max(0.01,0.2*(1-(now-l.t)/(l.d*2))):0,down:unten,groesse:null,vizOhneSchild:true};
+          const sk=FIG_H/(HOEHEN_BEZUG*1.25);
+          cx.save(); cx.translate(p.x,p.y); cx.scale(sk,sk);
+          zeichneSprite(cx,stell,0,-PIXEL_FUSS);
+          cx.restore();
+          return;
+        }catch(err){ try{cx.restore();}catch(e2){} }
         cx.save(); cx.translate(p.x,p.y);
         if(unten)cx.rotate(Math.PI/2*Math.min(1,(now-k.rausT)/0.4));
         cx.fillStyle=FARBE_HELL[k.side]; cx.beginPath(); cx.ellipse(0,-34,18,34,0,0,Math.PI*2); cx.fill();
