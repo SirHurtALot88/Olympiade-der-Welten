@@ -332,6 +332,28 @@ verschwindet. `deploy/hetzner/git-repo-aufraeumen.sh` raeumt das per `git gc --p
 laeuft seitdem woechentlich (sonntags 04:10) als dritter Cron neben den beiden Push-Crons, s.
 `install-live-save-cron.sh`.
 
+**Dritter Blockierer, gefunden am 14.11.: `/var/lib/containerd`, nicht `/etc/docker/daemon.json`.**
+Docker laeuft hier ueber den **separaten System-Containerd-Dienst** (`/run/containerd/containerd.sock`,
+eigener systemd-Dienst `containerd.service`) — der hat eine **eigene** Datenwurzel, unabhaengig von
+Dockers `data-root`. Alle Schreibvorgaenge beim Layer-Entpacken laufen tatsaechlich unter
+`/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/...` — das stand schon in der allerersten
+"no space left"-Fehlermeldung, wurde aber zunaechst uebersehen, weil `docker info` eine andere
+("Docker Root Dir") zeigt und man die fuer die ganze Wahrheit haelt. Am 14.11. waren es 23 GB, davon
+**13 GB per `docker system prune -af` reclaimbar** (Reste gescheiterter Build-Versuche; Docker spricht
+dafuer mit Containerd, auch wenn dessen Root separat liegt). Pruefen mit:
+```sh
+du -sh /var/lib/containerd
+docker system df
+docker system prune -af
+```
+Es gibt daneben `deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh` (14.11., PR #1435), das
+NUR Dockers eigene Datenwurzel (`/etc/docker/daemon.json`, Images/Volumes/Build-Cache) auf das bislang
+ungenutzte Hetzner-Volume (`/mnt/HC_Volume_106761772`, 20 GB; `/mnt/volume-hel1-1` ist trotz Namens
+**kein** eigenes Mount, sondern ein gewoehnlicher Ordner auf `sda1`) umzieht — das allein reicht nicht,
+weil Containerds Root davon unberuehrt bleibt. Wird `/var/lib/containerd` zum wiederkehrenden Problem,
+muesste als naechstes containerd selbst umgezogen werden (`root`/`state` in `/etc/containerd/config.toml`),
+nicht nochmal nur Dockers `data-root`.
+
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
 Chris am 18.10.: Moosgrab soll nicht jedes Mal die Oly-CI fahren. Ein Push oder PR, der **nur**
