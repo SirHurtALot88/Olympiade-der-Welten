@@ -332,6 +332,19 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </Group>
         )}
 
+        {detail?.market && (
+          <Group id="cardmarket" title="Cardmarket" extra={marketDir ? <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span> : null}>
+            <table className="bd-dt-t">
+              <tbody>
+                <tr title="Günstigstes Angebot („ab“): zählt doppelt im Marktwert, wenn plausibel"><td style={{ fontWeight: 700, color: "#f5b942" }}>ab (günstigstes Angebot)</td><td className="r" style={{ fontWeight: 700, color: "#f5b942" }}>{eur(detail.market.low)}</td></tr>
+                <tr><td>Ø 1 / 7 / 30 Tage</td><td className="r">{eur(detail.market.avg1)} / {eur(detail.market.avg7)} / {eur(detail.market.avg30)}</td></tr>
+                <tr><td>Trend</td><td className="r">{eur(detail.market.trend)}</td></tr>
+                <tr><td>Stand</td><td className="r">{day(detail.market.fetchedAt)}</td></tr>
+              </tbody>
+            </table>
+          </Group>
+        )}
+
         <Group id="verkaeufe" title="Verkäufe" extra={trend ? <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span> : null}>
         <table className="bd-dt-t">
           <thead>
@@ -358,19 +371,6 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         </table>
         </Group>
 
-        {detail?.market && (
-          <Group id="cardmarket" title="Cardmarket" extra={marketDir ? <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span> : null}>
-            <table className="bd-dt-t">
-              <tbody>
-                <tr title="Günstigstes Angebot („ab“): zählt doppelt im Marktwert, wenn plausibel"><td style={{ fontWeight: 700, color: "#f5b942" }}>ab (günstigstes Angebot)</td><td className="r" style={{ fontWeight: 700, color: "#f5b942" }}>{eur(detail.market.low)}</td></tr>
-                <tr><td>Ø 1 / 7 / 30 Tage</td><td className="r">{eur(detail.market.avg1)} / {eur(detail.market.avg7)} / {eur(detail.market.avg30)}</td></tr>
-                <tr><td>Trend</td><td className="r">{eur(detail.market.trend)}</td></tr>
-                <tr><td>Stand</td><td className="r">{day(detail.market.fetchedAt)}</td></tr>
-              </tbody>
-            </table>
-          </Group>
-        )}
-
         <Group id="ergebnis" title="Ergebnis je Stück (historischer Schnitt)" defaultOpen={false}>
         <table className="bd-dt-t">
           <tbody>
@@ -392,35 +392,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </Group>
         )}
 
-        {detail && detail.sales.length > 0 && (
-          <Group id="letzte" title="Letzte Verkäufe" extra={<span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>}>
-            <table className="bd-dt-t">
-              <thead>
-                <tr>
-                  <th>Datum</th>
-                  <th className="r">Stück</th>
-                  <th className="r">Preis je Stück</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.sales.slice(0, 15).map((x, i) => {
-                  const age = (Date.now() - new Date(x.soldAt).getTime()) / 86_400_000;
-                  const tone = age <= 90 ? "age-green" : age <= 365 ? "age-yellow" : "age-red";
-                  return (
-                    <tr key={i} className={tone} title={age <= 90 ? "in den letzten 90 Tagen" : age <= 365 ? "vor 91 bis 365 Tagen" : "vor mehr als 365 Tagen"}>
-                      <td>{day(x.soldAt)}</td>
-                      <td className="r">{x.qty}</td>
-                      <td className="r">{eur(x.unitPrice)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} geladenen Verkäufen.</p>}
-          </Group>
-        )}
-
-        <Group id="bewegungen" title="Warenbewegungen">
+        <Group id="bewegungen" title="Warenbewegungen und letzte Verkäufe" defaultOpen={false} extra={<span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>}>
         {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen. Startbestand: {row.stock} Stk – Änderungen werden ab dem nächsten Billbee-Abgleich festgehalten.</p>}
         {movements.length > 0 && (
           <>
@@ -429,14 +401,18 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 <tr><th>Datum</th><th>Art</th><th className="r">Menge</th><th style={{ paddingLeft: 16 }}>Preis / Detail</th></tr>
               </thead>
               <tbody>
-                {movements.map((x, i) => (
-                  <tr key={i}>
+                {movements.map((x, i) => {
+                  const age = (Date.now() - new Date(x.at).getTime()) / 86_400_000;
+                  const tone = x.kind === "Verkauf" ? (age <= 90 ? "age-green" : age <= 365 ? "age-yellow" : "age-red") : undefined;
+                  return (
+                  <tr key={i} className={tone}>
                     <td>{day(x.at)}</td>
                     <td>{x.kind}</td>
                     <td className="r" style={{ whiteSpace: "nowrap", color: x.delta > 0 ? "var(--good)" : undefined }}>{x.delta > 0 ? "+" : "−"}{Math.abs(x.delta)} Stk</td>
                     <td style={{ paddingLeft: 16 }}>{x.note}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <p className="bd-fig-note">Verkäufe stammen aus Billbee. Bestandsänderungen schreibt die App bei jedem Billbee-Abgleich selbst mit (Billbee liefert keine Lagerhistorie) und zeigt sie nur, soweit Verkäufe sie nicht erklären. Einkäufe gibt es nur, wenn sie importiert wurden.</p>
@@ -444,7 +420,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         )}
         </Group>
 
-        <Group id="einkaeufe" title="Einkäufe">
+        <Group id="einkaeufe" title="Einkäufe" defaultOpen={false}>
         {failed && <p className="bd-none">Details konnten nicht geladen werden.</p>}
         {!detail && !failed && <p className="bd-none">Lädt …</p>}
         {detail && detail.purchases.length === 0 && <p className="bd-none">Keine Einkäufe importiert.</p>}

@@ -552,3 +552,37 @@ button.bd-bar-seg:hover { filter: brightness(1.2); }
   .bd-ebay { margin-left: 4px; padding: 0 4px; }
   .bd-c-stock, .bd-c-sales, .bd-c-ek, .bd-c-avg { font-size: 12.5px; }
 }
+
+
+/* --- UX-Schnelle-Gewinne (UX_VORSCHLAEGE.md, 14.11.): Formularfelder im dunklen Thema, Fokus, Handy --- */
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+select, input[type="text"], input[type="search"], input[type="number"] { background: var(--panel2); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 12px; max-width: 100%; }
+select.chip, input.chip { padding: 3px 9px; }
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bottomnav { display: none; }
+@media (max-width: 920px) {
+  .bottomnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--panel); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+  .bottomnav a { flex: 1; text-align: center; padding: 12px 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: none; }
+  .bottomnav a.active { color: var(--accent-ink); box-shadow: inset 0 2px 0 var(--accent); }
+  .app main { padding-bottom: 64px; }
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .app main { min-width: 0; }
+  .bd-dt-kv td, .bd-dt-kv th { word-break: break-word; }
+  .bd-dt-kv tr { display: block; padding: 4px 0; border-top: 1px solid var(--line); }
+  .bd-dt-kv td { display: block; border-top: 0; padding: 1px 0; }
+  .bd-dt-kv td:first-child { color: var(--muted); }
+  .bd-dt-kv td.r { text-align: left; font-weight: 600; }
+}
+
+/* Kompakt-Liste auf Laptop-Breite (1280 px und darunter bis 1360): schmaler, damit Marge und Ø EK ohne Seitwaertsrollen sichtbar sind */
+@media (min-width: 761px) and (max-width: 1360px) {
+  table.bd th, table.bd td { padding-left: 5px; padding-right: 5px; }
+  .bd-art { min-width: 150px; gap: 8px; }
+  .bd-name { max-width: 140px; }
+  .bd-range { min-width: 120px; max-width: 150px; }
+  .bd-reorder { font-size: 9px; letter-spacing: 0; }
+  .bd-vk { font-size: 13px; }
+  .bd-c-verdict .bd-pill { padding-left: 6px; padding-right: 6px; }
+}

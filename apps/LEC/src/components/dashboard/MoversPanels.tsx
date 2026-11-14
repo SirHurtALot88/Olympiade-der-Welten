@@ -22,14 +22,23 @@ export function MoversPanels({ good, bad }: Props) {
               <div className="rev">€ {formatEuroCents(item.revenue)}</div>
               <div className="meta">
                 <span>{item.qty} Stk</span>
-                <span>EK € {formatEuroCents(item.ek)}</span>
-                <span className="up">DB I {formatPercent(item.dbIPercent)}%</span>
+                {item.ek > 0 ? (
+                  <>
+                    <span>EK € {formatEuroCents(item.ek)}</span>
+                    <span className="up">DB I {formatPercent(item.dbIPercent)}%</span>
+                  </>
+                ) : (
+                  <span style={{ color: "var(--warn)" }} title="Für diesen Artikel ist kein Einkaufspreis hinterlegt, deshalb gibt es keine Marge.">
+                    EK fehlt
+                  </span>
+                )}
               </div>
               <div className="bar">
                 <i
                   style={{
-                    width: `${Math.min(100, Math.max(4, item.dbIPercent * 100))}%`,
-                    background: "var(--good)",
+                    width: item.ek > 0 ? `${Math.min(100, Math.max(4, item.dbIPercent * 100))}%` : "100%",
+                    background: item.ek > 0 ? "var(--good)" : "var(--faint)",
+                    opacity: item.ek > 0 ? 1 : 0.35,
                   }}
                 />
               </div>

@@ -32,7 +32,7 @@ export function ArtikelKennzahlen({ k }: { k: KennzahlenData }) {
   const m = k.saleVsMarket;
   const o = k.outOfStock;
   return (
-    <table className="bd-dt-t">
+    <table className="bd-dt-t bd-dt-kv">
       <tbody>
         <tr>
           <td>Verkaufspreis gegen Markt</td>
@@ -47,7 +47,7 @@ export function ArtikelKennzahlen({ k }: { k: KennzahlenData }) {
         <tr>
           <td>Tage ohne Bestand</td>
           <td className="r">
-            {de1(o.daysOut)} von {de1(o.daysOut + o.daysIn)} Tagen ({Math.round(o.outShare * 100)} %)
+            {Math.round(o.daysOut)} von {Math.round(o.daysOut + o.daysIn)} Tagen ({Math.round(o.outShare * 100)} %)
             {o.missedUnits !== null && o.missedUnits >= 0.5 ? ` · ca. ${de1(o.missedUnits)} Stk verpasst` : ""}
           </td>
         </tr>
@@ -127,7 +127,7 @@ export function SchwundBlock({ articleId, losses, lossCost }: { articleId: strin
         </button>
       </div>
       {losses.length > 0 && (
-        <table className="bd-dt-t">
+        <table className="bd-dt-t bd-dt-kv">
           <tbody>
             {losses.map((l) => (
               <tr key={l.id}>

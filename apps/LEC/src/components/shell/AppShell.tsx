@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { BottomNav, Sidebar } from "@/components/dashboard/Sidebar";
 
 interface Props {
   title: string;
@@ -38,6 +38,7 @@ export function AppShell({ title, subtitle, topbarRight, footer, children }: Pro
           {footer}
         </footer>
       </main>
+      <BottomNav />
     </div>
   );
 }
