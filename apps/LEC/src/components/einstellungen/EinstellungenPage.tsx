@@ -11,6 +11,7 @@ import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
 import { ImageSyncCard } from "./ImageSyncCard";
 import { BillbeeSyncCard } from "./BillbeeSyncCard";
 import type { FeeCheckBand } from "@/lib/pricing/feeCheck";
+import { BetriebszahlenCard } from "./BetriebszahlenCard";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -298,6 +299,8 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
               Korridor inkl. Deckungsbeitrags-Grenze.
             </div>
           </div>
+
+          <BetriebszahlenCard settings={parsed} />
 
           {comparison && (
             <div className="card" style={{ padding: "15px 16px 16px" }}>
