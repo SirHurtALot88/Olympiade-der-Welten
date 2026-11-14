@@ -27,6 +27,39 @@
  * Kaufphasen-Warnung warf beim RENDERN der Arena) fängt er nicht. Ein Renderfehler zeigt sich nur
  * beim Rendern. Dafür gibt es `fahre-render-waechter.ts` daneben — 15 Sekunden, und die laufen
  * direkt im bestehenden Pflicht-Job mit.
+ *
+ * CI-OOM-FUND (14.11., dedizierte Root-Cause-Untersuchung, reproduziert unter kuenstlichem
+ * Speicherdruck -- NICHT per Vermutung): dieses Skript rief bislang ALLE gefundenen Dateien in
+ * EINEM `npx vitest run`-Aufruf. `vitest.config.ts` setzt kein `pool`/`poolOptions` (Vitest 4:
+ * keine Nesting-Optionen mehr, s. Migrationshinweis "pool work rework" -- die relevanten Stellgrößen
+ * sind jetzt die Top-Level-Optionen `isolate`/`maxWorkers`), und sein Default-Scheduling teilt
+ * mehrere Testdateien auf denselben geforkten Worker-Prozess auf, sobald mehr Dateien als
+ * CPU-Kerne vorhanden sind -- GENAU das Muster, das der Job `arena-chromium-tests` fuer echtes
+ * Chromium bereits dokumentiert (s. dessen Kommentar in `.github/workflows/ci.yml`) und dort durch
+ * FUENF GETRENNTE `npx vitest run`-Aufrufe behebt (ein Aufruf = ein frischer Node-Prozess, der
+ * seinen gesamten Speicher beim Beenden garantiert freigibt). Ohne echtes Chromium betrifft dasselbe
+ * Muster hier eine andere, kleinere Gruppe von Dateien: die, die ueber `fuehreLigaSetupDraftAus()`
+ * einen VOLLEN 32-Team-Liga-Draft aufbauen (mehrstellig MB grosse Spielstaende je Aufbau). Lokal
+ * reproduziert: `npx vitest run tests/arena-vorlauf-service.test.ts tests/
+ * arena-vorlauf-parity.test.ts tests/battle-mode-arena-ausfall-sichtbar.test.ts tests/
+ * battle-mode-auto-run-invarianten.test.ts --execArgv=--max-old-space-size=900` (900 MB simuliert
+ * den knapperen Anteil eines CI-Worker-Prozesses) endet zuverlaessig in "JavaScript heap out of
+ * memory", mit denselben Worker-Abstuerzen, die in CI auftraten. `SCHWERE_DATEIEN` unten sind
+ * GENAU diese Dateien (plus ihre direkten Geschwister, dieselbe `bauFrischenBattleSaveMitVollemFeld()`-
+ * Familie) -- jede davon laeuft jetzt in einem EIGENEN `npx vitest run`-Aufruf, komplett getrennt
+ * vom Batch der restlichen (leichten) Persistenz-Suiten. Zusaetzlich bekam jede dieser Dateien
+ * (ausser `arena-vorlauf-service.test.ts`, das den Fix schon seit 18.10. hat) einen fehlenden
+ * `invalidateLocalTransfermarktCachesForSave()`-Aufruf nachgetragen (derselbe Fund wie beim
+ * 18.10.-Fix: `localMarketContextCache` haelt sonst pro Testlauf einen weiteren Eintrag fest).
+ * BEWUSST eine kurze, benannte Liste statt einer weiteren automatischen Erkennung: anders als die
+ * generelle "ist das eine Persistenz-Suite" Frage oben ist "baut diese Datei einen vollen
+ * 32-Team-Liga-Draft auf" kein Signatur-Treffer, der sich zuverlaessig an einem einzelnen Import
+ * festmachen laesst (`fuehreLigaSetupDraftAus` taucht auch in leichten, synthetischen Tests auf,
+ * z. B. `tests/liga-draft-ueberlebt-schreibkonflikt.test.ts`, das mit einer Fake-Ablage ohne echte
+ * 32 Teams arbeitet) -- eine falsche automatische Erkennung wuerde entweder leichte Dateien unnoetig
+ * isolieren (Laufzeit) oder eine neue schwere Datei NICHT isolieren (genau der Fehler, den sie
+ * beheben soll). Wer eine neue `bauFrischenBattleSaveMitVollemFeld()`-Kopie anlegt, trägt sie hier
+ * nach UND ruft `invalidateLocalTransfermarktCachesForSave()` darin auf.
  */
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -34,6 +67,15 @@ import { join } from "node:path";
 
 const TEST_ORDNER = join(process.cwd(), "tests");
 const SIGNATUREN = ["lib/persistence/", "createPersistenceService", "OLY_APP_SQLITE_PATH"];
+
+// s. CI-OOM-FUND oben -- jede dieser Dateien baut (mehrfach) einen vollen 32-Team-Liga-Draft auf
+// und laeuft deshalb in einem EIGENEN Prozess, nicht im gemeinsamen Batch.
+const SCHWERE_DATEIEN = [
+  "tests/arena-vorlauf-service.test.ts",
+  "tests/arena-vorlauf-parity.test.ts",
+  "tests/arena-eingabe-instabil.test.ts",
+  "tests/arena-eingabe-stabil.test.ts",
+];
 
 function sammleTestdateien(ordner: string): string[] {
   const treffer: string[] = [];
@@ -65,5 +107,22 @@ if (suiten.length === 0) {
   process.exit(1);
 }
 
-console.log(`Persistenz-Suiten: ${suiten.length} Dateien`);
-execFileSync("npx", ["vitest", "run", ...suiten], { stdio: "inherit" });
+// s. CI-OOM-FUND oben: SCHWERE_DATEIEN laufen getrennt, je ein eigener `npx vitest run`-Aufruf
+// (ein eigener Node-Prozess je Datei) -- nicht im gemeinsamen Batch unten. Nicht gefundene Namen
+// (z. B. eine umbenannte/entfernte Datei) sind ein Fehler in dieser Liste, keine stille Luecke.
+const fehlendeSchwereDateien = SCHWERE_DATEIEN.filter((datei) => !suiten.includes(datei));
+if (fehlendeSchwereDateien.length > 0) {
+  console.error(
+    `SCHWERE_DATEIEN nennt Dateien, die die Persistenz-Erkennung nicht (mehr) findet: ${fehlendeSchwereDateien.join(", ")}. Liste in scripts/fahre-persistenz-suiten.ts pruefen.`,
+  );
+  process.exit(1);
+}
+const leichteSuiten = suiten.filter((datei) => !SCHWERE_DATEIEN.includes(datei));
+
+console.log(`Persistenz-Suiten: ${suiten.length} Dateien (${SCHWERE_DATEIEN.length} davon einzeln isoliert, s. CI-OOM-FUND)`);
+for (const schwereDatei of SCHWERE_DATEIEN) {
+  console.log(`Persistenz-Suiten · isoliert: ${schwereDatei}`);
+  execFileSync("npx", ["vitest", "run", schwereDatei], { stdio: "inherit" });
+}
+console.log(`Persistenz-Suiten · Batch: ${leichteSuiten.length} Dateien`);
+execFileSync("npx", ["vitest", "run", ...leichteSuiten], { stdio: "inherit" });

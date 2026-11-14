@@ -333,22 +333,34 @@ jobs:
   # zusammenhaengende, nicht ueberlappende Bloecke (`calculateShardRange`). Die Vereinigung aller
   # `count` Shards ist dadurch per Konstruktion identisch zur ungeshardeten Liste -- keine Datei
   # doppelt, keine vergessen -- vorausgesetzt jeder Shard sieht denselben Checkout und denselben
-  # `vitest run`-Aufruf ohne zusaetzliche Dateifilter (hier der Fall: alle vier Matrix-Jobs
-  # checken denselben Commit aus und unterscheiden sich nur in `--shard`). Mit genau diesem
-  # Algorithmus lokal gegen die aktuelle Dateiliste nachgerechnet (1083 Dateien, Stand 25.10.):
-  # 271/271/271/270 je Shard, Summe 1083, 0 Duplikate, 0 fehlende.
+  # `vitest run`-Aufruf mit denselben Dateifiltern (hier der Fall: alle vier Matrix-Jobs checken
+  # denselben Commit aus, bekommen dieselben `--exclude`-Flags s. unten, und unterscheiden sich nur
+  # in `--shard`). Dieser Beweis gilt STRUKTURELL fuer jede Dateizahl, die in `--shard` hineinlaeuft
+  # -- nicht nur fuer die konkrete Zahl, die zuletzt nachgerechnet wurde (25.10., 1083 Dateien:
+  # 271/271/271/270). Seit dem Ausschluss der `SCHWERE_DATEIEN` unten (14.11., s. deren Kommentar)
+  # ist die tatsaechliche Zahl kleiner und wurde fuer diesen PR NICHT neu nachgerechnet -- hier
+  # bewusst keine erfundene Praezision statt der alten, jetzt leicht zu hohen Zahl.
   #
-  # ARENA-CHROMIUM-OOM GEPRUEFT, TRIFFT HIER NICHT ZU: die vier schwersten Dateien
-  # (tests/arena-vorlauf-parity.test.ts, tests/arena-vorlauf-service.test.ts,
-  # tests/battle-mode-arena-ausfall-sichtbar.test.ts, tests/battle-mode-auto-run-invarianten.test.ts)
-  # laufen im Job `arena-chromium-tests` oben bewusst als VIER GETRENNTE Prozesse, weil ein
-  # gemeinsamer Lauf mit echtem, installiertem Chromium frueher mit "JavaScript heap out of
-  # memory" abstuerzte. DIESER Job hier installiert aber KEIN Chromium und setzt KEIN
-  # `OLY_ARENA_CHROMIUM_PFLICHT=1` -- alle vier Dateien greifen deshalb auf ihr
-  # `describe.skipIf(!CHROMIUM_VERFUEGBAR)` zurueck (s. die Dateien selbst, Variable
-  # `UEBERSPRINGEN`) und ueberspringen ihre teuren Chromium-Suiten komplett, unabhaengig davon, in
-  # welchen der vier Shards sie fallen. Das OOM-Risiko aus `arena-chromium-tests` entsteht also
-  # gar nicht erst in diesem Job, egal wie die Dateien hier verteilt werden.
+  # ARENA-CHROMIUM-OOM: TRIFFT HIER TEILWEISE ZU, KORRIGIERTER BEFUND (14.11., ersetzt die
+  # urspruengliche Einschaetzung vom 25.10. -- Beleg, warum "nachmessen statt annehmen" auch fuer
+  # die eigenen frueheren Kommentare gilt). Die alte Analyse nahm an, alle vier im Job
+  # `arena-chromium-tests` einzeln gefahrenen Dateien
+  # (tests/arena-vorlauf-parity.test.ts, tests/arena-vorlauf-service.test.ts, tests/
+  # battle-mode-arena-ausfall-sichtbar.test.ts, tests/battle-mode-auto-run-invarianten.test.ts)
+  # wuerden hier (kein Chromium installiert) komplett auf `describe.skipIf(!CHROMIUM_VERFUEGBAR)`
+  # zurueckfallen und nichts Schweres tun. Das stimmt fuer DREI der vier Dateien, aber NICHT fuer
+  # `arena-vorlauf-parity.test.ts`: deren "Bruecken-Pfad"-Testfall (chromium-UNABHAENGIG, bewusst
+  # NICHT im `describe.skipIf` -- er soll ja GENAU ohne Chromium laufen) baut trotzdem einen vollen
+  # 32-Team-Liga-Draft auf. Zusammen mit `tests/arena-vorlauf-service.test.ts` (das dasselbe tut,
+  # mehrfach) sowie `tests/arena-eingabe-instabil.test.ts`/`tests/arena-eingabe-stabil.test.ts`
+  # (dieselbe Familie, selbst nie als "schwerste Dateien" benannt, weil sie kein Chromium brauchen
+  # und deshalb nie im `arena-chromium-tests`-Job auffielen) landen bei mehr Dateien als CPU-Kernen
+  # mehrere dieser 32-Team-Aufbauten im selben geforkten Worker-Prozess -- lokal reproduziert mit
+  # genau diesem "JavaScript heap out of memory"-Absturz (s. `scripts/fahre-persistenz-suiten.ts`
+  # fuer die Details und den Reproduktionsbefehl). Deshalb werden dieselben vier Dateien
+  # (`SCHWERE_DATEIEN` unten) jetzt auch hier aus dem Shard-Batch herausgenommen und EINMAL (nicht
+  # viermal -- nur auf Shard 1) als eigene, getrennte Prozesse gefahren, exakt das Muster, das
+  # `arena-chromium-tests` fuer den Chromium-Fall bereits vormacht.
   full-test-suite:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
@@ -369,7 +381,31 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:import-exists
-      - run: npx vitest run --shard=${{ matrix.shard }}/4
+      # SCHWERE_DATEIEN (s. Kopfkommentar, CI-OOM-FUND 14.11.) aus dem geshardeten Batch ausgeschlossen
+      # -- dieselben vier Dateien, die der Schritt "Schwere Dateien" unten auf Shard 1 einzeln faehrt.
+      # `--exclude` auf ALLEN vier Matrix-Jobs identisch, damit der Shard-Beweis oben (dieselben
+      # Dateifilter in jedem Shard) weiter gilt.
+      - run: >-
+          npx vitest run --shard=${{ matrix.shard }}/4
+          --exclude "**/arena-vorlauf-service.test.ts"
+          --exclude "**/arena-vorlauf-parity.test.ts"
+          --exclude "**/arena-eingabe-instabil.test.ts"
+          --exclude "**/arena-eingabe-stabil.test.ts"
+      # NUR auf Shard 1 (nicht auf allen vier), sonst liefe jede dieser Dateien viermal statt
+      # einmal. Je ein eigener `npx vitest run`-Aufruf = ein frischer Node-Prozess je Datei, der
+      # seinen Speicher beim Beenden garantiert freigibt -- s. Kopfkommentar fuer die Herleitung.
+      - name: "Schwere Dateien 1/4: arena-vorlauf-service (einzeln, s. CI-OOM-FUND)"
+        if: ${{ matrix.shard == 1 }}
+        run: npx vitest run tests/arena-vorlauf-service.test.ts
+      - name: "Schwere Dateien 2/4: arena-vorlauf-parity (einzeln, s. CI-OOM-FUND)"
+        if: ${{ matrix.shard == 1 }}
+        run: npx vitest run tests/arena-vorlauf-parity.test.ts
+      - name: "Schwere Dateien 3/4: arena-eingabe-instabil (einzeln, s. CI-OOM-FUND)"
+        if: ${{ matrix.shard == 1 }}
+        run: npx vitest run tests/arena-eingabe-instabil.test.ts
+      - name: "Schwere Dateien 4/4: arena-eingabe-stabil (einzeln, s. CI-OOM-FUND)"
+        if: ${{ matrix.shard == 1 }}
+        run: npx vitest run tests/arena-eingabe-stabil.test.ts
 
   # ARENA-CHROMIUM-TESTS (PR 3/K1, Opus-Review 18.10.) — der einzige Job, der die paar Tests
   # faehrt, die ECHTES Chromium brauchen, UM ETWAS ZU BEWEISEN (nicht nur, um es zu tolerieren).
