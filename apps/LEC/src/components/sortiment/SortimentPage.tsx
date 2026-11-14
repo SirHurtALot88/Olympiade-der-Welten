@@ -86,7 +86,7 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 276, min: 170 },
   { id: "rank", label: "Rank", def: 62, min: 50, align: "r" },
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
-  { id: "letzterverkauf", label: "Letzter Verkauf", def: 100, min: 80, align: "r" },
+  { id: "letzterverkauf", label: "Letzter Verkauf", def: 120, min: 90, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },

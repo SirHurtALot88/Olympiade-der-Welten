@@ -16,7 +16,7 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
   const latestImport = vm.imports.reduce<Date | null>((acc, i) => (i.createdAt && (!acc || i.createdAt > acc) ? i.createdAt : acc), null);
   return (
     <AppShell
-      title="Cockpit"
+      title="Leitplanken"
       subtitle={
         <>
           {vm.totals.articles.toLocaleString("de-DE")} Kartenartikel · {vm.totals.active.toLocaleString("de-DE")} aktiv · Datenstand{" "}

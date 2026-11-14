@@ -145,15 +145,13 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
           <tr>
             {head("name", "Artikel")}
             {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
-            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage)")}
-            {head("letzterVerkauf", "Letzter Verkauf", "r", "Vor wie vielen Tagen zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
-            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)")}
-            {head("avgvk", "Ø VK", "r", "Durchschnittlicher Verkaufspreis je Stück (365 T)")}
+            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage), darunter wann zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
             {head("vk", "Dein VK", "r")}
             {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
+            {head("abweichung", "Urteil")}
             {head("marktwert", "Marktwert", "r")}
             {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
-            {head("abweichung", "Urteil")}
+            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T), darunter dein durchschnittlicher Verkaufspreis (Ø VK)")}
           </tr>
         </thead>
         <tbody>
@@ -226,36 +224,20 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}
                   <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
-                </td>
-                <td data-label="Letzter Verkauf" className="r bd-num bd-c-last">
-                  {(() => {
-                    const d = daysSince(row.lastSoldAt);
-                    if (d === null)
-                      return row.listedDays != null ? (
-                        <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
-                          nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
-                        </span>
-                      ) : (
-                        <span className="bd-none">—</span>
-                      );
-                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
-                  })()}
-                </td>
-                <td data-label="Ø EK" className="r bd-num bd-c-ek">
-                  {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
-                  {(() => {
-                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
-                    const d = daysSince(row.lastEkAt);
-                    if (d === null) return null;
-                    return (
-                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
-                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
-                      </small>
-                    );
-                  })()}
-                </td>
-                <td data-label="Ø VK" className="r bd-num bd-c-avg">
-                  {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
+                  <small className="bd-sub90" style={{ display: "block" }} title="Letzter Verkauf">
+                    {(() => {
+                      const d = daysSince(row.lastSoldAt);
+                      if (d === null)
+                        return row.listedDays != null ? (
+                          <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                            nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
+                          </span>
+                        ) : (
+                          <span className="bd-none">—</span>
+                        );
+                      return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                    })()}
+                  </small>
                 </td>
                 <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "eBay-Shoppreis (Rückfall, wenn Billbee keinen VK hat)" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
@@ -275,6 +257,9 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />
                 </td>
+                <td data-label="Urteil" className="bd-c-verdict">
+                  <VerdictBadge row={row} />
+                </td>
                 <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
                   {m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${formatEuroCents(m.range.max)} €` : <span className="bd-none">—</span>}
                 </td>
@@ -285,15 +270,28 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 >
                   {m?.margin != null ? `${formatPercent(m.margin)} %` : <span className="bd-none">—</span>}
                 </td>
-                <td data-label="Urteil" className="bd-c-verdict">
-                  <VerdictBadge row={row} />
+                <td data-label="Ø EK" className="r bd-num bd-c-ek">
+                  {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
+                  {(() => {
+                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
+                    const d = daysSince(row.lastEkAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
+                      </small>
+                    );
+                  })()}
+                  <small className="bd-pchg" style={{ display: "block", color: "var(--muted)" }} title="Durchschnittlicher Verkaufspreis je Stück (365 T)">
+                    Ø VK {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : "—"}
+                  </small>
                 </td>
               </tr>
             );
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={10} className="bd-empty">
+              <td colSpan={9} className="bd-empty">
                 Keine Artikel für diese Auswahl.
               </td>
             </tr>

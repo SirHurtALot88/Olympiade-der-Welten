@@ -64,3 +64,19 @@ export function Sidebar() {
     </aside>
   );
 }
+
+/** Untere Navigationsleiste fuer schmale Bildschirme (die Seitenleiste ist unter 920 px ausgeblendet). */
+export function BottomNav() {
+  const pathname = usePathname();
+  const active = navKeyForPath(pathname ?? "/");
+  const items = [...NAV_ITEMS, { key: "einstellungen" as NavKey, label: "Einstellungen", href: "/einstellungen" }];
+  return (
+    <nav className="bottomnav" aria-label="Hauptnavigation">
+      {items.map((item) => (
+        <a key={item.key} href={item.href} className={item.key === active ? "active" : undefined} aria-current={item.key === active ? "page" : undefined}>
+          {item.label}
+        </a>
+      ))}
+    </nav>
+  );
+}

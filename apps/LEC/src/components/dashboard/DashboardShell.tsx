@@ -22,7 +22,7 @@ export function DashboardShell({ viewModel }: Props) {
 
   return (
     <AppShell
-      title="Cockpit"
+      title="Dashboard"
       subtitle="Was läuft — und was Kapital bindet"
       footer={
         <>
