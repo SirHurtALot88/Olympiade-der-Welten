@@ -3,7 +3,7 @@
 import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
-import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty, to99 } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -104,7 +104,7 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
       </span>
       {gap && gap.target !== null && (
         <span className="bd-delta">
-          {gap.euro < 0 ? "↑" : "↓"} auf {eur(gap.target)}
+          {gap.euro < 0 ? "↑" : "↓"} auf {eur(to99(gap.target, gap.euro < 0 ? "up" : "down"))}
         </span>
       )}
     </div>

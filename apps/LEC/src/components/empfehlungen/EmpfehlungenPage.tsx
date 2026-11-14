@@ -125,7 +125,7 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
         </div>
         <div className="card kpi" style={{ borderColor: "var(--crit)" }}>
           <div className="lab" style={{ color: "var(--crit)" }}>
-            Verlust p.a. <span>· Low-Runner</span>
+            Verlust (Lebenszeit) <span>· Low-Runner</span>
           </div>
           <div className="val" style={{ color: "var(--crit)" }}>
             € <span className="num">{formatEuro(kpis.lowRunnerLoss)}</span>
