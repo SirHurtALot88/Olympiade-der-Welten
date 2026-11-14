@@ -18,9 +18,12 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { KapitalPanel } from "./KapitalPanel";
 import { ArtikelDetail } from "./ArtikelDetail";
+import { daysSince } from "./PreisBoard";
 import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
-import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
+import { KARTENART_FARBE, ORDNER, type Kartenart } from "@/lib/market/kartenart";
+import { BOARD_SORT_LABEL, findDuplicateGroups, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
 import { MicroVelocity, Corridor, STATUS_PILL } from "@/components/dashboard/SortimentTable";
@@ -46,15 +49,16 @@ const MARKET_PILL: Record<SortimentMarket["status"], { cls: string; label: strin
 
 function marketHow(m: SortimentMarket): string {
   if (m.range) return `${m.range.variants} Varianten im Set, die Seltenheit lässt sich nicht eindeutig zuordnen — Spanne statt Einzelwert`;
-  if (m.how === "seltenheit") return "Cardmarket-7-Tage-Schnitt der Variante mit der Seltenheit aus deinem Titel";
-  if (m.how === "einzige_variante") return "Cardmarket-7-Tage-Schnitt (die Karte hat im Set nur eine Variante)";
-  return "Cardmarket-7-Tage-Schnitt";
+  if (m.how === "seltenheit") return "Mittelwert (Cardmarket-Trend, Ø 1/7/30 Tage, letzter EK) der Variante mit der Seltenheit aus deinem Titel";
+  if (m.how === "einzige_variante") return "Mittelwert aus Cardmarket und letztem EK (die Karte hat im Set nur eine Variante)";
+  return "Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage und letztem EK";
 }
 
 type ColId =
   | "artikel"
   | "rank"
   | "verkaeufe"
+  | "letzterverkauf"
   | "umsatz"
   | "avgpreis"
   | "avgvk"
@@ -71,6 +75,8 @@ type ColId =
   | "dbIIpct"
   | "dbIIIpct"
   | "klasse"
+  | "kartenart"
+  | "rarity"
   | "status"
   | "stock"
   | "potvk"
@@ -80,11 +86,12 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 276, min: 170 },
   { id: "rank", label: "Rank", def: 62, min: 50, align: "r" },
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
+  { id: "letzterverkauf", label: "Letzter Verkauf", def: 100, min: 80, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
-  // Aktueller VK = Angebotspreis aus dem eBay-Shop (live, alle 6 Stunden), sonst Billbee-Artikelstamm.
-  { id: "listingvk", label: "Akt. VK (eBay)", def: 104, min: 80, align: "r" },
+  // Aktueller VK = Preis aus dem Billbee-Artikelstamm; der eBay-Shop-Preis ist nur Rückfall.
+  { id: "listingvk", label: "Akt. VK", def: 104, min: 80, align: "r" },
   // Cardmarket-Block: was kostet die Karte heute (Marktwert), wo sollte der VK stehen (25-33 %
   // Deckungsbeitrag bei Nachkauf zum Marktwert), und stimmt dein VK damit ueberein.
   { id: "marktwert", label: "Marktwert", def: 112, min: 80, align: "r" },
@@ -105,6 +112,9 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "dbIIpct", label: "DB II %", def: 76, min: 60, align: "r" },
   { id: "dbIIIpct", label: "DB III %", def: 80, min: 60, align: "r" },
   { id: "klasse", label: "Klasse", def: 100, min: 80 },
+  // Chris' Ordnerstruktur: Kartenart (Synchro, Xyz, Zauber ...) und Seltenheit, damit man zum Auslisten schnell die Karten im Ordner findet
+  { id: "kartenart", label: "Kategorie", def: 130, min: 90 },
+  { id: "rarity", label: "Rarität", def: 130, min: 90 },
   { id: "status", label: "Status", def: 116, min: 90 },
   { id: "stock", label: "Stk", def: 62, min: 50, align: "r" },
   { id: "potvk", label: "pot. VK€", def: 90, min: 70, align: "r" },
@@ -114,6 +124,7 @@ const COLS: ColumnDef<ColId>[] = [
 const SORTABLE_COLS: ColId[] = [
   "rank",
   "verkaeufe",
+  "letzterverkauf",
   "umsatz",
   "avgpreis",
   "avgvk",
@@ -159,6 +170,9 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
       return w?.rank ?? Number.POSITIVE_INFINITY;
     case "verkaeufe":
       return w?.qty ?? 0;
+    case "letzterverkauf":
+      // jüngster Verkauf = größter Wert; ohne Verkauf ganz hinten
+      return row.lastSoldAt ? Date.parse(row.lastSoldAt) : Number.NEGATIVE_INFINITY;
     case "umsatz":
       return w?.revenue ?? 0;
     case "avgpreis":
@@ -201,7 +215,10 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
 
 export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions, band }: Props) {
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const searchParams0 = useSearchParams();
+  // Weitere Filter stehen als kommagetrennte Flags in der Adresse, damit Neuladen und Zurueck sie behalten.
+  const initialFlags = new Set((searchParams0.get("flags") ?? "").split(",").filter(Boolean));
+  const [detailId, setDetailId] = useState<string | null>(searchParams0.get("artikel"));
   const detailRow = useMemo(() => (detailId ? rows.find((r) => r.articleId === detailId) ?? null : null), [detailId, rows]);
   const router = useRouter();
   const pathname = usePathname();
@@ -215,6 +232,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const raw = searchParams.get("klasse");
     return raw ? new Set(raw.split(",").filter((c): c is ArticleClass => CLASS_ORDER.includes(c as ArticleClass))) : new Set();
   });
+  const [ordnerFilter, setOrdnerFilter] = useState<string>(searchParams.get("ordner") ?? "");
+  const [artFilter, setArtFilter] = useState<string>(searchParams.get("art") ?? "");
   const [statusFilter, setStatusFilter] = useState<Set<RowPriceStatus>>(new Set());
   const [marketFilter, setMarketFilter] = useState<Set<MarketFilter>>(() => {
     const raw = searchParams.get("markt");
@@ -222,18 +241,52 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   });
   // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
-  const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
-  const [onlyNameCheck, setOnlyNameCheck] = useState(false);
+  const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
+  const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
+  const [onlyReorder, setOnlyReorder] = useState(initialFlags.has("nachbestellen"));
+  const [onlyEnded, setOnlyEnded] = useState(initialFlags.has("ebaybeendet"));
+  const endedCount = useMemo(() => rows.filter((r) => !!r.ebayEndedAt && r.active).length, [rows]);
+  const [onlyLife, setOnlyLife] = useState(initialFlags.has("lebenszyklus"));
+  const lifeCount = useMemo(() => rows.filter((r) => !!r.lifecycle).length, [rows]);
+  const [onlyNoShop, setOnlyNoShop] = useState(initialFlags.has("nichtimshop"));
+  // Nur sinnvoll, wenn der eBay-Shop-Abruf schon gelaufen ist (mindestens ein Artikel hat einen bestaetigten Shop-Preis)
+  const shopSynced = useMemo(() => rows.some((r) => r.ebayListed), [rows]);
+  const noShopCount = useMemo(() => rows.filter((r) => shopSynced && r.active && !r.hidden && !r.ebayListed && !r.ebayEndedAt).length, [rows, shopSynced]);
+  const [onlyMarked, setOnlyMarked] = useState(initialFlags.has("auslistenmarkiert"));
+  const markedCount = useMemo(() => rows.filter((r) => !!r.delistMarkedAt && !r.hidden).length, [rows]);
+  const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
+  const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
+  const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
+  // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
+  const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
+    const v = searchParams0.get("bestand");
+    return v === "1" || v === "2-3" || v === "4-9" || v === "10+" ? v : null;
+  });
+  const [boardReverse, setBoardReverse] = useState(searchParams0.get("rev") === "1");
+  const [onlyMarketFalling, setOnlyMarketFalling] = useState(initialFlags.has("marktfaellt"));
+  const [onlyNameCheck, setOnlyNameCheck] = useState(initialFlags.has("namecheck"));
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
-  const [boardSort, setBoardSort] = useState<BoardSortKey>("abweichung");
+  const [boardSort, setBoardSort] = useState<BoardSortKey>(((searchParams.get("sort") as BoardSortKey | null) && (searchParams.get("sort") as string) in BOARD_SORT_LABEL ? searchParams.get("sort") : "abweichung") as BoardSortKey);
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
-  const [showDiscontinued, setShowDiscontinued] = useState(false);
+  const [showDiscontinued, setShowDiscontinued] = useState(initialFlags.has("ausgelaufen"));
+  const [showHidden, setShowHidden] = useState(initialFlags.has("ausgeblendet"));
+  const artCounts = useMemo(() => {
+    const art = new Map<string, number>();
+    const ordner = new Map<string, number>();
+    for (const r of rows) {
+      if (r.hidden || !r.active) continue;
+      if (r.kartenart) art.set(r.kartenart, (art.get(r.kartenart) ?? 0) + 1);
+      if (r.ordner) ordner.set(r.ordner, (ordner.get(r.ordner) ?? 0) + 1);
+    }
+    return { art, ordner };
+  }, [rows]);
+  const hiddenCount = useMemo(() => rows.filter((r) => r.hidden).length, [rows]);
   // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
   // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
-  const [showNoStock, setShowNoStock] = useState(false);
+  const [showNoStock, setShowNoStock] = useState(initialFlags.has("ohnebestand"));
   const stockKnown = useMemo(() => rows.some((r) => r.stock > 0), [rows]);
   const stockFilter = !showNoStock && stockKnown;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -248,12 +301,33 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (query.trim()) params.set("q", query.trim());
     if (selectedWindow !== "90") params.set("fenster", selectedWindow);
     if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
+    if (ordnerFilter) params.set("ordner", ordnerFilter);
+    if (artFilter) params.set("art", artFilter);
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
     if (view === "alles") params.set("ansicht", "alles");
+    if (boardSort !== "abweichung") params.set("sort", boardSort);
+    if (boardReverse) params.set("rev", "1");
+    if (stockBand) params.set("bestand", stockBand);
+    const flags = [
+      onlyLadenhueter && "ladenhueter",
+      onlySoldOut && "ausverkauft",
+      onlyReorder && "nachbestellen",
+      onlyDup && "doppelt",
+      onlyMarked && "auslistenmarkiert",
+      onlyNoShop && "nichtimshop",
+      onlyLife && "lebenszyklus",
+      onlyEnded && "ebaybeendet",
+      onlyMarketFalling && "marktfaellt",
+      onlyNameCheck && "namecheck",
+      showNoStock && "ohnebestand",
+      showDiscontinued && "ausgelaufen",
+      showHidden && "ausgeblendet",
+    ].filter(Boolean);
+    if (flags.length > 0) params.set("flags", flags.join(","));
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view]);
+  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -300,7 +374,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().length > 0 ? normalizedNameKey(query) : "";
     const upperQuery = query.trim().toUpperCase();
-    let result = rows;
+    // Ausgeblendete nur in der eigenen Ansicht (zum Wieder-Einblenden), sonst nirgends.
+    // Bei eBay beendet, in Billbee noch gefuehrt: alle (auch die automatisch ausgeblendeten), damit man sie in Billbee deaktivieren kann.
+    let result = onlyEnded ? rows.filter((r) => !!r.ebayEndedAt && r.active) : rows.filter((r) => (showHidden ? r.hidden === true : r.hidden !== true));
 
     if (normalizedQuery) {
       result = result.filter(
@@ -315,6 +391,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (statusFilter.size > 0) {
       result = result.filter((r) => statusFilter.has(r.priceStatus));
     }
+    if (ordnerFilter) result = result.filter((r) => r.ordner === ordnerFilter);
+    if (artFilter) result = result.filter((r) => r.kartenart === artFilter);
     if (marketFilter.size > 0) {
       result = result.filter((r) => matchesMarketFilter(r.market, marketFilter));
     }
@@ -327,17 +405,45 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyNameCheck) {
       result = result.filter((r) => r.codeName?.mismatch);
     }
+    if (stockBand) {
+      const [lo, hi] = stockBand === "10+" ? [10, Infinity] : stockBand.split("-").map(Number).concat(stockBand.includes("-") ? [] : [Number(stockBand)]);
+      result = result.filter((r) => r.stock >= lo && r.stock <= (hi ?? lo));
+    }
+    if (onlyReorder) {
+      result = result.filter((r) => r.reorderDue);
+    }
+    if (onlyDup) {
+      result = result.filter((r) => dupGroups.has(r.articleId));
+    }
+    if (onlyLife) {
+      result = result.filter((r) => !!r.lifecycle);
+    }
+    if (onlyMarked) {
+      result = result.filter((r) => !!r.delistMarkedAt);
+    }
+    if (onlyNoShop) {
+      result = result.filter((r) => r.active && !r.ebayListed && !r.ebayEndedAt);
+    }
+    if (onlySoldOut) {
+      result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
+    }
+    if (onlyMarketFalling) {
+      result = result.filter((r) => r.stock > 0 && r.market?.trend7vs30 != null && r.market.trend7vs30 < -0.05);
+    }
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
-    if (!showDiscontinued) {
+    if (!showDiscontinued && !showHidden && !onlyEnded) {
       result = result.filter((r) => r.active);
     }
-    if (stockFilter) {
-      result = result.filter((r) => r.stock > 0);
+    // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
+      // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
+      const yearAgo = Date.now() - 365 * 86_400_000;
+      result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, stockFilter]);
+  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -349,11 +455,16 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   }, [filtered, sort, selectedWindow]);
 
   // Zaehler je Markt-Filter ueber die aktiven Artikel (ohne die anderen Filter), damit man sieht, wie viele es sind.
-  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
+  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => !r.hidden && r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
-  const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
+  const boardRows = useMemo(() => {
+    const sorted = sortBoard(filtered, boardSort, boardReverse);
+    // Doppelte-Filter: Mitglieder einer Gruppe direkt untereinander
+    if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
+    return sorted.slice(0, visibleCount);
+  }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
+  const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyNoShop || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -436,6 +547,34 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         </div>
       <div className="filterrow">
+        <span className="flabel" title="Deine Ordner: 1 Starlight/Platinum/Ultimate/Collector's, 2 Secret-Monster, 3 farbige Monster, 4 Monster Ultra bis Common, 5 Zauber/Fallen">
+          Ordner
+        </span>
+        <select value={ordnerFilter} onChange={(e) => { setOrdnerFilter(e.target.value); setVisibleCount(PAGE_SIZE); }} aria-label="Ordner">
+          <option value="">alle Ordner</option>
+          {Object.values(ORDNER).map((o) => (
+            <option key={o} value={o}>
+              {o} ({artCounts.ordner.get(o) ?? 0})
+            </option>
+          ))}
+        </select>
+        <span className="flabel" title="Kartenart laut YGOPRODeck: Synchro (weiß), Xyz (schwarz), Fusion (lila), Link (blau), Ritual (hellblau), Pendel, Normal, Effekt, Zauber, Falle">
+          Kartenart
+        </span>
+        <select value={artFilter} onChange={(e) => { setArtFilter(e.target.value); setVisibleCount(PAGE_SIZE); }} aria-label="Kartenart">
+          <option value="">alle Kartenarten</option>
+          {(["Synchro", "Xyz", "Fusion", "Link", "Ritual", "Pendel", "Normal", "Effekt", "Zauber", "Falle"] as Kartenart[]).map((a) => (
+            <option key={a} value={a}>
+              {a}{KARTENART_FARBE[a] ? ` (${KARTENART_FARBE[a]})` : ""} ({artCounts.art.get(a) ?? 0})
+            </option>
+          ))}
+        </select>
+        {(ordnerFilter || artFilter) && (
+          <button type="button" className="chip" onClick={() => { setOrdnerFilter(""); setArtFilter(""); }}>
+            zurücksetzen
+          </button>
+        )}
+        <span className="fsep" />
         <span className="flabel">Klasse</span>
         {CLASS_ORDER.map((cls) => (
           <button
@@ -472,6 +611,123 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         >
           nur Ladenhüter
         </button>
+        <span className="fsep" />
+        <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 700, letterSpacing: ".05em" }}>BESTAND</span>
+        {(["1", "2-3", "4-9", "10+"] as const).map((b) => (
+          <button
+            key={b}
+            type="button"
+            className={`chip${stockBand === b ? " on" : ""}`}
+            onClick={() => {
+              setStockBand((cur) => (cur === b ? null : b));
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title={`Nur Artikel mit ${b === "10+" ? "10 oder mehr" : b === "1" ? "genau 1" : b.replace("-", " bis ")} Stück im Lager`}
+          >
+            {b === "1" ? "1 Stk" : b === "10+" ? "10+ Stk" : `${b.replace("-", "–")} Stk`}
+          </button>
+        ))}
+        <span className="fsep" />
+        {noShopCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyNoShop ? " on" : ""}`}
+            onClick={() => {
+              setOnlyNoShop((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Aktive Artikel, die der eBay-Shop-Abruf nicht findet: das Angebot ist beendet oder der Artikel nie eingestellt, oder der Titel passt nicht zum Billbee-Namen. Prüfen und bei Bedarf ausblenden/auslisten."
+          >
+            Nicht im eBay-Shop gefunden ({noShopCount})
+          </button>
+        )}
+        {markedCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyMarked ? " on" : ""}`}
+            onClick={() => {
+              setOnlyMarked((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Karten, die du im Drawer zum Auslisten markiert hast. Kombiniere mit Ordner und Kartenart, um sie im Ordner schnell zu finden."
+          >
+            Zum Auslisten markiert ({markedCount})
+          </button>
+        )}
+        {lifeCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyLife ? " on" : ""}`}
+            onClick={() => {
+              setOnlyLife((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Seit über 180 Tagen kein Verkauf, Bestand da: Preis senken (über 6 €), Auslaufen lassen (Mindestpreis) oder Auslisten (Mindestpreis und über ein Jahr)"
+          >
+            Preis senken / Auslaufen / Auslisten ({lifeCount})
+          </button>
+        )}
+        {endedCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyEnded ? " on" : ""}`}
+            onClick={() => {
+              setOnlyEnded((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Bei eBay nicht mehr im Shop, in Billbee aber noch als aktiver Artikel geführt: dort deaktivieren. Diese Artikel sind im Sortiment automatisch ausgeblendet und tauchen nur hier auf."
+          >
+            Bei eBay beendet, Billbee führt noch ({endedCount})
+          </button>
+        )}
+        {dupGroups.size > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyDup ? " on" : ""}`}
+            onClick={() => {
+              setOnlyDup((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Gleicher Set-Code, gleiche Seltenheit und Auflage, aber verschiedene Namen: meist derselbe Artikel doppelt angelegt. Bestand, eBay-Nummer und letzter Verkauf stehen nebeneinander."
+          >
+            Mögliche Doppelte ({dupGroups.size})
+          </button>
+        )}
+        {reorderCount > 0 && (
+          <button
+            type="button"
+            className={`chip${onlyReorder ? " on" : ""}`}
+            onClick={() => {
+              setOnlyReorder((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Bestand liegt auf oder unter dem Mindestbestand aus Billbee"
+          >
+            Nachbestellen fällig ({reorderCount})
+          </button>
+        )}
+        <button
+          type="button"
+          className={`chip${onlySoldOut ? " on" : ""}`}
+          onClick={() => {
+            setOnlySoldOut((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Bestand 0, aber in den letzten 90 Tagen verkauft: Nachkauf prüfen"
+        >
+          ausverkauft, lief gut
+        </button>
+        <button
+          type="button"
+          className={`chip${onlyMarketFalling ? " on" : ""}`}
+          onClick={() => {
+            setOnlyMarketFalling((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Marktpreis (Ø 7 Tage) mehr als 5 % unter Ø 30 Tage, Bestand liegt: Preis prüfen, nicht nachkaufen"
+        >
+          Markt fällt, Bestand liegt
+        </button>
         <button
           type="button"
           className={`chip${onlyNameCheck ? " on" : ""}`}
@@ -491,7 +747,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               setShowNoStock((v) => !v);
               setVisibleCount(PAGE_SIZE);
             }}
-            title="Standard: nur Artikel mit Bestand. Einschalten, um auch Artikel ohne Bestand zu sehen."
+            title="Standard: Artikel mit Bestand plus aktive Artikel ohne Bestand, die nachbestellt werden sollen oder sich im letzten Jahr verkauft haben. Einschalten, um wirklich alle ohne Bestand zu sehen."
           >
             auch ohne Bestand
           </button>
@@ -506,6 +762,17 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           title="Artikel zeigen, die nur in der Verkaufshistorie stehen (nicht im aktuellen Billbee-Artikelstamm)"
         >
           auch ausgelaufene zeigen
+        </button>
+        <button
+          type="button"
+          className={`chip${showHidden ? " on" : ""}`}
+          onClick={() => {
+            setShowHidden((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Manuell ausgeblendete Artikel zeigen – im Detailfenster lassen sie sich wieder einblenden"
+        >
+          Ausgeblendete ({hiddenCount})
         </button>
       </div>
       </details>
@@ -522,10 +789,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <button type="button" onClick={() => setValueRange(null)} aria-label="Eingrenzung aufheben">×</button>
             </span>
           )}
+          <KapitalPanel rows={rows} />
           <div className="bd-toolbar">
             <label>
               Sortierung
-              <select value={boardSort} onChange={(e) => setBoardSort(e.target.value as BoardSortKey)}>
+              <select value={boardSort} onChange={(e) => { setBoardSort(e.target.value as BoardSortKey); setBoardReverse(false); }}>
                 {(Object.keys(BOARD_SORT_LABEL) as BoardSortKey[]).map((k) => (
                   <option key={k} value={k}>
                     {BOARD_SORT_LABEL[k]}
@@ -537,14 +805,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
-          {detailRow && (
-            <ArtikelDetail
-              row={detailRow}
-              imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
-              onClose={() => setDetailId(null)}
-            />
-          )}
+          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
@@ -576,7 +837,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                 // Fallback realisierter Ø-VK, wenn kein Artikelstamm-Preis vorliegt.
                 const vkForCorridor = row.listingVk ?? row.avgVkRealized;
                 return (
-                  <tr key={row.articleId}>
+                  <tr key={row.articleId} className="bd-row-click" onClick={() => setDetailId(row.articleId)}>
                     <td>
                       <div className="artcell">
                         {imageVersions[row.articleId] ? (
@@ -613,6 +874,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                     <td className="r">
                       <MicroVelocity values={row.velocity} max={maxVelocity} />
                     </td>
+                    <td className="r num">
+                      {(() => {
+                        const d = daysSince(row.lastSoldAt);
+                        if (d === null) return <span className="p-muted">—</span>;
+                        return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                      })()}
+                    </td>
                     <td className="r num">€ {formatEuro(w?.revenue ?? 0)}</td>
                     <td className="r num">{w && w.qty > 0 ? `${formatEuroCents(w.avgPrice)} €` : "—"}</td>
                     <td className="r num">{row.avgVkRealized > 0 ? `${formatEuroCents(row.avgVkRealized)} €` : "—"}</td>
@@ -622,7 +890,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                         row.listingVkSource === "ebay"
                           ? `Aktueller Angebotspreis aus deinem eBay-Shop${row.listingVkAt ? ` (Stand ${new Date(row.listingVkAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : ""}`
                           : row.listingVkSource === "billbee"
-                            ? "Aus dem Billbee-Artikelstamm (bei eBay gerade nicht gelistet)"
+                            ? "Aus dem Billbee-Artikelstamm (dort pflegen, beim nächsten Abgleich übernommen)"
                             : undefined
                       }
                     >
@@ -699,6 +967,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                       {formatPercent(row.dbIIIPercent)}%
                     </td>
                     <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
+                    <td style={{ fontSize: 11.5 }} title={row.ordner ?? "Kartenart noch nicht bestimmt (YGOPRODeck-Abruf der Bilder holt sie)"}>
+                      {row.kartenart ? `${row.kartenart}${KARTENART_FARBE[row.kartenart] ? ` · ${KARTENART_FARBE[row.kartenart]}` : ""}` : <span className="p-muted">—</span>}
+                    </td>
+                    <td style={{ fontSize: 11.5 }}>{row.rarity ?? <span className="p-muted">—</span>}</td>
                     <td>
                       <span className={`pill ${pill.cls}`}>
                         <span className="dot" />
@@ -733,6 +1005,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </div>
         )}
       </section>
+      )}
+      {detailRow && (
+        <ArtikelDetail
+          row={detailRow}
+          imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
+          onClose={() => setDetailId(null)}
+        />
       )}
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element

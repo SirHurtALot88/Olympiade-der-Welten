@@ -30,6 +30,7 @@ import {
   estimateExpectedPayout,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { SponsorSeasonRankTable } from "@/components/foundation/sponsor/SponsorSeasonRankTable";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
@@ -249,6 +250,8 @@ export function SponsorOfferCardNewLook({
     (component) => component.kind !== "special" && component.kind !== "overperformance",
   );
   const baseCash = offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+  // Rangraum des Spielstands: 16 bei Liga-Split (liga-lokale Tabelle), 32 bei Legacy-Spielstaenden.
+  const rankSpace = sponsorRangraumFuer(gameState);
   // Audit #4: gelockte curveShape-Rang-Leiter (== Settlement) einmal bauen und in die Gewinnstufen-Leiter
   // reichen, damit die angezeigten Stufenbeträge der echten Auszahlung entsprechen.
   const offerRankPayoutLadder = useMemo(
@@ -381,6 +384,7 @@ export function SponsorOfferCardNewLook({
                           rankPayouts={entry.rankPayouts}
                           currentTeamRank={currentTeamRank}
                           formatCash={formatCash}
+                          leagueSize={rankSpace}
                         />
                       </div>
                     </details>
@@ -508,7 +512,16 @@ export function SponsorOfferCardNewLook({
                 <div className="nl-sponsor-reward-tile-head">
                   <SponsorRewardIcon kind="rank" />
                   <span>{getSponsorComponentKindLabel(component.kind)}</span>
-                  <strong className="nl-tnum">{formatCash(component.rewardCash)}</strong>
+                  {/* Spanne der Gewinnstufen = Titel minus schlechtester ERREICHBARER Platz. Die
+                      gespeicherte `rewardCash` rechnet gegen Sprosse 32 der eingefrorenen Leiter; in
+                      einer 16er-Liga ist Platz 16 das Ende, darunter liegt kein erreichbarer Rang. */}
+                  <strong className="nl-tnum">
+                    {formatCash(
+                      presentation.v3
+                        ? Math.max(0, Math.round((presentation.v3.guaranteedTop - presentation.v3.guaranteedFloor) * 10) / 10)
+                        : component.rewardCash,
+                    )}
+                  </strong>
                   {currentTeamRank != null ? (
                     <small className="nl-sponsor-rank-current-hint">Aktuell #{currentTeamRank}</small>
                   ) : null}
@@ -530,6 +543,7 @@ export function SponsorOfferCardNewLook({
                       rankLadder={offerRankPayoutLadder}
                       currentTeamRank={currentTeamRank}
                       formatCash={formatCash}
+                      leagueSize={rankSpace}
                     />
                   </details>
                 ) : (
@@ -538,6 +552,7 @@ export function SponsorOfferCardNewLook({
                     rankLadder={offerRankPayoutLadder}
                     currentTeamRank={currentTeamRank}
                     formatCash={formatCash}
+                    leagueSize={rankSpace}
                   />
                 )}
                 {/* P3 — Überperformance-Modul (familien-differenziert) als konkrete, bezifferte Zeile unter der

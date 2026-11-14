@@ -6,7 +6,8 @@
  * KI-Bewertung und Settlement ausschliesslich aus diesem Block — eine Rechenstelle, deshalb kann die
  * harte Projekt-Invariante "Anzeige == Settlement" nicht durch eine zweite Variante brechen.
  *
- * DER TRAEGER IST DIESELBE 32er-LEITER WIE IN V2, nur anders befuellt: seit dem Sponsor-Ligaleiter-
+ * DER TRAEGER IST DIE RANGLEITER WIE IN V2 — 32 Sprossen ohne Liga-Split, 16 liga-lokale Sprossen bei
+ * aktivem Split (`sponsorRangraumFuer`) —, nur anders befuellt: seit dem Sponsor-Ligaleiter-
  * Umbau steht darin die geshapete LIGALEITER (Sockel nach Startrang + Wertungstopf nach Endrang,
  * `sponsorKurvenLeiter` in sponsor-liga-leiter.ts), einmal um den teameigenen Erwartungsanker
  * getiltet. Die Kurvenform ist damit wieder ein Erzeugungs-Feld — nicht mehr nur Anzeige-Etikett. Was
@@ -27,6 +28,7 @@ import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import { SPONSOR_LEIH_BONUS } from "@/lib/sponsor/sponsor-leih-ziele";
 import { SPONSOR_BODEN, sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getLeagueOf, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { SPONSOR_CURVE_SHAPE_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import {
@@ -35,6 +37,7 @@ import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
   sponsorV3GuaranteedLadder,
+  sponsorV3IstGueltigeLeiterLaenge,
   sponsorV3LadderValue,
   sponsorV3Settle,
   sponsorV3TiltedLadder,
@@ -240,11 +243,25 @@ export function sponsorV3WertFaktorFuerKarte(input: { rarity: string; leihVerzic
  * lesen will (Versicherungswert), klammert an seiner eigenen Stelle.
  */
 export function sponsorV3EingefrorenerSockel(
-  terms: Pick<SponsorV3ContractTerms, "startRank" | "rarity" | "leihVerzicht">,
+  terms: Pick<SponsorV3ContractTerms, "startRank" | "rarity" | "leihVerzicht"> &
+    Partial<Pick<SponsorV3ContractTerms, "rankLadder">>,
 ): number {
   const wertFaktor = sponsorV3WertFaktorFuerKarte(terms);
   const verzicht = Math.max(0, terms.leihVerzicht ?? 0);
-  return sponsorSockelFuerStartrang(terms.startRank) * wertFaktor - verzicht;
+  // Der Sockel haengt am Startrang IM RANGRAUM DER LEITER: eine 16er-Leiter (Liga-Split) reicht vom
+  // Min-Sockel auf Platz 1 bis zum Max-Sockel auf Platz 16, nicht auf Platz 32.
+  return sponsorSockelFuerStartrang(terms.startRank, sponsorV3LeiterRangraum(terms)) * wertFaktor - verzicht;
+}
+
+/**
+ * DER RANGRAUM EINES EINGEFRORENEN VERTRAGS: die Laenge seiner Leiter, wenn sie gueltig ist (16 bei
+ * Liga-Split, 32 sonst), andernfalls 32. Ein bestehender Vertrag wird damit immer in DEM Rangraum
+ * gelesen und neu gerechnet, in dem er unterschrieben wurde — eine 32er-Leiter aus einem Split-
+ * Spielstand bleibt eine 32er-Leiter, bis der Saisonwechsel sie ausdruecklich neu baut.
+ */
+export function sponsorV3LeiterRangraum(terms: Partial<Pick<SponsorV3ContractTerms, "rankLadder">>): number {
+  const length = terms.rankLadder?.length ?? 0;
+  return sponsorV3IstGueltigeLeiterLaenge(length) ? length : 32;
 }
 
 export function buildSponsorV3Terms(input: {
@@ -313,11 +330,18 @@ export function buildSponsorV3Terms(input: {
   // LIGA-SPLIT PR4: Topf-Rabatt + Zonen-Term nur, wenn der Split aktiv ist UND das Team einer Liga
   // zugeordnet ist — siehe `resolveSponsorLeagueTier`. Heute immer `undefined` (Legacy-Verhalten).
   const leagueTier = resolveSponsorLeagueTier(input.gameState, input.teamId);
+  // DER RANGRAUM DES SPIELSTANDS: 16 bei aktivem Liga-Split (Start- und Endrang zaehlen liga-lokal),
+  // 32 bei Spielstaenden ohne Split — dieselbe Quelle, aus der die Anzeige ihre Gewinnstufen baut
+  // (`sponsorRangraumFuer`, PR #1377). Bis hierher baute dieser Pfad auch in einer 16er-Liga eine
+  // 32er-Leiter: die Teams landeten nur auf deren oberen 16 Sprossen, Sockel, Anker und Risiko waren
+  // ueber eine Spanne gemittelt, die es in ihrer Liga gar nicht gibt.
+  const leagueSize = sponsorRangraumFuer(input.gameState);
   const baseLadder = sponsorKurvenLeiter({
     shape: input.curveShape,
     startRank: input.startRank,
     salaryFactor,
     leagueTier,
+    leagueSize,
   }).map((wert) => wert * wertFaktor);
   return buildSponsorV3TermsCore({
     baseLadder,
@@ -387,6 +411,18 @@ export function rerollSponsorV3TermsForNewSeason(
      * zu vor diesem PR.
      */
     leagueTier?: LeagueTier;
+    /**
+     * RANGRAUM DER NEUEN SAISON — wie viele Sprossen die neu gebaute Leiter hat (`sponsorRangraumFuer`
+     * am Aufrufer: 16 bei aktivem Liga-Split, sonst 32). Der Saisonwechsel
+     * (`advanceSponsorContractsForNewSeason`) uebergibt ihn ausdruecklich — DORT wird eine in einem
+     * Split-Spielstand noch mit 32 Sprossen unterschriebene Mehrjahresleiter auf 16 umgebaut, genau wie
+     * Chris' Entscheidung 10.6 sie beim Auf-/Abstieg auf die neue Liga umbaut.
+     *
+     * Weggelassen bleibt der Rangraum des Vertrags selbst (`sponsorV3LeiterRangraum`): der Lade-
+     * Backfill des Gehaltsfaktors und die Laufzeit-Vorschau rechnen einen Vertrag damit in DEM
+     * Rangraum nach, in dem er unterschrieben wurde, statt ihn nebenbei umzubauen.
+     */
+    leagueSize?: number;
   },
 ): SponsorV3ContractTerms {
   if (!terms.curveShape) {
@@ -432,10 +468,15 @@ export function rerollSponsorV3TermsForNewSeason(
     // seiner Karte steht. Dieser Zweig laeuft NUR beim Saisonwechsel und NUR fuer Altvertraege — er
     // wird also von keinem gewoehnlichen Spieldurchlauf beruehrt. Passiert etwas hier, bleibt die
     // eingefrorene Leiter stehen, statt sie durch eine leere zu ersetzen.
-    if (terms.baseLadder?.length !== 32 || terms.rankLadder?.length !== 32) {
+    //
+    // Ohne Kurvenform laesst sich die Leiter nicht in einen anderen Rangraum umbauen — sie wird nur
+    // skaliert und behaelt ihre Laenge (16 oder 32, beide gueltig). Sockel und Anker rechnen im
+    // Rangraum DIESER Leiter.
+    const altLaenge = terms.rankLadder?.length ?? 0;
+    if (!sponsorV3IstGueltigeLeiterLaenge(altLaenge) || terms.baseLadder?.length !== altLaenge) {
       return terms;
     }
-    const altSockel = sponsorSockelFuerStartrang(terms.startRank);
+    const altSockel = sponsorSockelFuerStartrang(terms.startRank, altLaenge);
     const skala = input.newSalaryFactor / alterFaktor;
     const skaliere = (leiter: number[]) => leiter.map((wert) => altSockel + (wert - altSockel) * skala);
     const skalierteBasis = skaliere(terms.baseLadder);
@@ -443,7 +484,7 @@ export function rerollSponsorV3TermsForNewSeason(
       ...terms,
       baseLadder: skalierteBasis,
       rankLadder: skaliere(terms.rankLadder),
-      anchor: sponsorV3Anchor(skalierteBasis, sponsorV3AnchorWeights(terms.startRank)),
+      anchor: sponsorV3Anchor(skalierteBasis, sponsorV3AnchorWeights(terms.startRank, undefined, altLaenge)),
       salaryFactor: input.newSalaryFactor,
     };
   }
@@ -451,12 +492,20 @@ export function rerollSponsorV3TermsForNewSeason(
   // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit — und die
   // Einmal-Regel (Rarität wirkt als Hoehe ODER als Kurs, nie beides) gilt hier genauso.
   const wertFaktor = sponsorV3WertFaktorFuerKarte(terms);
-  const sockel = sponsorSockelFuerStartrang(terms.startRank) * wertFaktor;
+  // Rangraum der neu gebauten Leiter: ausdruecklich vom Aufrufer (Saisonwechsel), sonst der des
+  // Vertrags. Der eingefrorene Startrang wird in diesen Rangraum geklammert — er ist in einem
+  // Split-Spielstand ohnehin liga-lokal (1..16), die Klammer greift nur als Wache.
+  const leagueSize = input.leagueSize != null && sponsorV3IstGueltigeLeiterLaenge(input.leagueSize)
+    ? input.leagueSize
+    : sponsorV3LeiterRangraum(terms);
+  const startRank = Math.max(1, Math.min(leagueSize, Math.round(terms.startRank)));
+  const sockel = sponsorSockelFuerStartrang(startRank, leagueSize) * wertFaktor;
   const newBaseLadderRaw = sponsorKurvenLeiter({
     shape: terms.curveShape,
-    startRank: terms.startRank,
+    startRank,
     salaryFactor: input.newSalaryFactor,
     leagueTier: input.leagueTier,
+    leagueSize,
   }).map((wert) => wert * wertFaktor);
   const multiplier = getSponsorTermMultiplier(input.contractYear);
   // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
@@ -470,7 +519,7 @@ export function rerollSponsorV3TermsForNewSeason(
   const baseLadder = newBaseLadderRaw.map((value) =>
     Math.max(0, sockel + multiplier * (value - sockel) - verzicht),
   );
-  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const weights = sponsorV3AnchorWeights(startRank, undefined, leagueSize);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, terms.tilt);
   return {
@@ -478,6 +527,7 @@ export function rerollSponsorV3TermsForNewSeason(
     baseLadder,
     rankLadder,
     anchor,
+    startRank,
     salaryFactor: input.newSalaryFactor,
   };
 }
@@ -531,7 +581,9 @@ export function applySponsorV3ToOffers(input: {
       leihZielKey: input.leihZielKeys?.[index] ?? null,
     });
     const ladder = sponsorV3GuaranteedLadder(terms);
-    const floor = ladder[31]!;
+    // Die LETZTE Sprosse der Leiter — Platz 16 bei Liga-Split, Platz 32 sonst. Hier stand `ladder[31]`:
+    // bei einer 16er-Leiter undefined, und die Basis-Komponente der Karte waere NaN geworden.
+    const floor = ladder[ladder.length - 1]!;
     const topRank = ladder[0]!;
     const carriesGoal = terms.goalSize > 0 && terms.goalKey != null;
     const components = offer.components
@@ -591,7 +643,8 @@ export function sponsorV3SettlementParts(input: {
   // Saisonbasis und Tabellenplatz kommen aus dem REINEN Kurventeil; der Sockelabzug −p·G steht
   // vollstaendig in der Sonderziel-Zeile. Sonst versteckte sich der Abzug in der Basiszeile und die
   // Sonderziel-Zeile behauptete einen Gewinn, den es so nicht gibt.
-  const atFloor = sponsorV3LadderValue(terms, 32);
+  const ranks = terms.rankLadder.length || 32;
+  const atFloor = sponsorV3LadderValue(terms, ranks);
   const atRank = sponsorV3LadderValue(terms, finalRank);
   const withGoal = sponsorV3Settle(terms, finalRank, goalFraction);
   const tiltLabel = terms.tilt > 0 ? "Ambition" : terms.tilt < 0 ? "Sicherheit" : "Basis";
@@ -610,7 +663,7 @@ export function sponsorV3SettlementParts(input: {
       met: atRank > atFloor,
       reason:
         `Endrang ${finalRank ?? "—"} gegen Startrang ${terms.startRank} · Liga-Benchmark ` +
-        `${round1(terms.baseLadder[Math.max(0, Math.min(31, (finalRank ?? 32) - 1))] ?? 0)} C` +
+        `${round1(terms.baseLadder[Math.max(0, Math.min(ranks - 1, (finalRank ?? ranks) - 1))] ?? 0)} C` +
         (terms.tilt === 0 ? "" : ` · ${tiltLabel} ${terms.tilt > 0 ? "+" : ""}${Math.round(terms.tilt * 100)} %`),
     },
   ];
@@ -672,7 +725,12 @@ export function getSponsorV3Terms(
 ): SponsorV3ContractTerms | null {
   const terms = (entry as { sponsorV3?: SponsorV3ContractTerms } | null | undefined)?.sponsorV3;
   if (!terms || terms.version !== 3) return null;
-  if (!Array.isArray(terms.rankLadder) || terms.rankLadder.length !== 32) return null;
-  if (!Array.isArray(terms.baseLadder) || terms.baseLadder.length !== 32) return null;
+  // GUELTIG SIND 32 UND 16 SPROSSEN — und beide Leitern gleich lang. Bis zum Umbau des Vertragsmodells
+  // auf den Liga-Split stand hier „genau 32". Eine 16er-Leiter (neue Vertraege bei aktivem Split) waere
+  // daran gescheitert, und das ist nicht harmlos: das Settlement faellt bei `null` still auf
+  // `buildMigratedSponsorV3Terms` zurueck und zahlt die Preisgeld-Benchmark statt der Karte.
+  // Bestehende 32er-Vertraege — auch in Split-Spielstaenden — bleiben gueltig und rechnen unveraendert.
+  if (!Array.isArray(terms.rankLadder) || !sponsorV3IstGueltigeLeiterLaenge(terms.rankLadder.length)) return null;
+  if (!Array.isArray(terms.baseLadder) || terms.baseLadder.length !== terms.rankLadder.length) return null;
   return terms;
 }

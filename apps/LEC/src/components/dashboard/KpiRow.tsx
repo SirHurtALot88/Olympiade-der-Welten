@@ -73,11 +73,20 @@ export function KpiRow({ windows, selected, onSelect, deadCapital }: Props) {
             Totes Kapital · Ladenhüter
           </div>
           <div className="val" style={{ color: "var(--crit)" }}>
-            <span className="num">{formatPercent(deadCapital.percent)}</span>
-            <small>%</small>
+            {deadCapital.euro != null ? (
+              <>
+                <span className="num">{Math.round(deadCapital.euro).toLocaleString("de-DE")}</span>
+                <small>€ gebunden</small>
+              </>
+            ) : (
+              <>
+                <span className="num">{formatPercent(deadCapital.percent)}</span>
+                <small>%</small>
+              </>
+            )}
           </div>
           <div className="delta flat">
-            {deadCapital.count} / {deadCapital.totalArticles} · 0 Verk. in 365 T
+            {deadCapital.count} / {deadCapital.totalArticles} Artikel ({formatPercent(deadCapital.percent)} %) · 0 Verk. in 365 T
           </div>
         </div>
       </section>
