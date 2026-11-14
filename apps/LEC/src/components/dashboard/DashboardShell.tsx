@@ -5,9 +5,10 @@ import type { DashboardViewModel } from "@/lib/dashboard/viewModel";
 import type { SaleWindowKey } from "@/lib/parsing/date";
 import { AppShell } from "@/components/shell/AppShell";
 import { KpiRow } from "./KpiRow";
-import { MoversPanels } from "./MoversPanels";
+import { DashboardBlocks } from "./DashboardBlocks";
 import { OperatingQuotas } from "./OperatingQuotas";
 import { TASKS, taskCounts } from "@/lib/dashboard/tasks";
+import { capitalByAge } from "@/lib/dashboard/kapitalAlter";
 import { findDuplicateGroups } from "@/lib/dashboard/board";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 export function DashboardShell({ viewModel }: Props) {
   const [selectedWindow, setSelectedWindow] = useState<SaleWindowKey>("90");
+  const age = useMemo(() => capitalByAge(viewModel.sortiment), [viewModel.sortiment]);
   const counts = useMemo(() => taskCounts(viewModel.sortiment, new Set(findDuplicateGroups(viewModel.sortiment).keys())), [viewModel.sortiment]);
 
   return (
@@ -46,10 +48,10 @@ export function DashboardShell({ viewModel }: Props) {
         windows={viewModel.windows}
         selected={selectedWindow}
         onSelect={setSelectedWindow}
-        deadCapital={viewModel.deadCapital}
+        age={age}
       />
 
-      <MoversPanels good={viewModel.moversGood} bad={viewModel.moversBad} />
+      <DashboardBlocks rows={viewModel.sortiment} moversBad={viewModel.moversBad} age={age} />
 
       <section className="grid-2">
         <OperatingQuotas quotas={viewModel.quotas} />
