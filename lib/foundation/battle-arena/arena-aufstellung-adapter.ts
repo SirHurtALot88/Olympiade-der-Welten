@@ -1,6 +1,13 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { hasSlotCountSpecificRoles, resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { nutztEchteFormkarten } from "@/lib/battle/formkarten-echt-disziplinen";
+import {
+  calculateFormModifierForSide,
+  getFormCardColorForDisciplineCategory,
+  getTeamFormCardOptions,
+  resolveEffectiveLineupModifiers,
+} from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   buildStaffelWechselPaarBonusByNehmer,
   STAFFEL_DISCIPLINE_ID,
@@ -57,6 +64,13 @@ export type ArenaAufstellungEintrag = {
   wechselPaarBonus?: number;
   wechselPaarGeber?: string;
   wechselPaarEingespielt?: boolean;
+  /**
+   * P4 (lib/battle/formkarten-echt-disziplinen.ts): die in der Einsatzliste GESPIELTE Form je
+   * Spieler (`formPerPlayer` der Seite) und die Intensitaet der Seite. Nur gesetzt fuer Disziplinen
+   * in `FORMKARTEN_ECHT_DISCIPLINE_IDS`; sonst fehlen beide Felder und der Eintrag ist exakt der alte.
+   */
+  form?: number;
+  intensitaet?: "schonen" | "normal" | "push";
 };
 
 /** Spielername -> Platzierung. Der Motor schluesselt `place` ueber den NAMEN, nicht die ID. */
@@ -127,6 +141,40 @@ export function buildArenaAufstellung(
     return Math.max(eigene.length, ...eigene.map((e) => e.slotIndex + 1));
   };
 
+  // P4 ECHTE FORMKARTE/INTENSITAET: je Seite EINMAL gerechnet, mit genau der Funktion der Wertung
+  // (calculateFormModifierForSide, "Plan schlaegt Entwurf" ueber resolveEffectiveLineupModifiers),
+  // damit Motor und Spieltagswertung dieselbe Zahl sehen. Nur fuer freigeschaltete Disziplinen.
+  const formJeSeite = new Map<string, { form: number; intensitaet: "schonen" | "normal" | "push" }>();
+  const echteFormDerSeite = (disciplineId: string, side: "d1" | "d2") => {
+    const schluessel = `${disciplineId}|${side}`;
+    const vorhanden = formJeSeite.get(schluessel);
+    if (vorhanden) return vorhanden;
+    const modifiers = resolveEffectiveLineupModifiers({
+      modifiers: entwurf.modifiers,
+      formCardPlans: (gameState.seasonState?.formCardPlans ?? []).filter(
+        (plan) => plan.seasonId === entwurf.seasonId && plan.teamId === teamId,
+      ),
+      seasonId: entwurf.seasonId,
+      teamId,
+      matchdayId,
+    });
+    const kategorie = (gameState.disciplines ?? []).find((discipline) => discipline.id === disciplineId)?.category;
+    const ergebnis = calculateFormModifierForSide({
+      modifiers,
+      disciplineSide: side,
+      disciplineColor: getFormCardColorForDisciplineCategory(kategorie),
+      playerCount: 1,
+      formCards: getTeamFormCardOptions({ gameState, seasonId: entwurf.seasonId, teamId, lineupId: entwurf.lineupId }),
+    });
+    const stufe = modifiers[side].intensity;
+    const wert = {
+      form: Number.isFinite(ergebnis.formPerPlayer) ? ergebnis.formPerPlayer : 0,
+      intensitaet: stufe === "conserve" ? ("schonen" as const) : stufe === "push" ? ("push" as const) : ("normal" as const),
+    };
+    formJeSeite.set(schluessel, wert);
+    return wert;
+  };
+
   for (const eintrag of entwurf.entries) {
     const spielerId = eintrag.activePlayerId
       ? spielerZuKaderzeile.get(eintrag.activePlayerId) ?? eintrag.playerId
@@ -141,6 +189,10 @@ export function buildArenaAufstellung(
     if (!slot) continue;
 
     aufstellung[name] = { d: eintrag.disciplineId, slot };
+    if (nutztEchteFormkarten(eintrag.disciplineId)) {
+      const echt = echteFormDerSeite(eintrag.disciplineId, eintrag.disciplineSide);
+      aufstellung[name] = { ...aufstellung[name], form: echt.form, intensitaet: echt.intensitaet };
+    }
   }
 
   // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus faehrt am NEHMER mit (s. Typkommentar oben).
