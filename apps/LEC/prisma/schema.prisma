@@ -328,7 +328,7 @@ model CostSettings {
   shippingDomesticLow         Float    @default(0.95)
   shippingDomesticHigh        Float    @default(1.1)
   shippingHighShare           Float    @default(0.15)
-  itemsPerOrder               Float    @default(1.72)
+  itemsPerOrder               Float    @default(1.5)
   packagingYearly             Float    @default(217)
   buyOrdersPerYear            Float    @default(904)
   createdAt                   DateTime @default(now())

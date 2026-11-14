@@ -6,7 +6,8 @@
  * Berechnungs-Tests).
  *
  * Betriebszahlen hinter den Defaults (von Chris bestaetigt, nicht raten):
- * - ca. 3.400 verkaufte Stueck/Jahr in 1.980 Verkaufs-Bestellungen (Ø 1,72 Artikel/Bestellung)
+ * - Stand 14.11.2026 laut eBay/Billbee: 2.481 Stueck in 1.658 Bestellungen seit 1.1. (Ø 1,50 Artikel/Bestellung), hochgerechnet ca. 2.850 Stueck
+ *   in ca. 1.900 Bestellungen/Jahr (aeltere Zahl: 3.400 Stueck in 1.980 Bestellungen, Ø 1,72)
  * - ca. 840 Einkaufs-Bestellungen/Jahr (Ø 2-5 Artikel)
  * - Jahresfixkosten laut EUeR (Lexoffice) ca. 4.179 EUR: Abos 2.340 (eBay-Shop 1.140 + Billbee 840 +
  *   Lexoffice 360) + Verpackungslizenzen 50 + Sonstige 1.839 (Telekom 540, AfA 199, Beitraege 141,
@@ -105,7 +106,7 @@ export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
   shippingDomesticLow: 0.95,
   shippingDomesticHigh: 1.1,
   shippingHighShare: 0.15,
-  itemsPerOrder: 1.72,
+  itemsPerOrder: 1.5,
   packagingYearly: 217,
   buyOrdersPerYear: 904,
 };
