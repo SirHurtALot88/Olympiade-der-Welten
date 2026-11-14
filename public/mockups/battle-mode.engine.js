@@ -39216,6 +39216,10 @@
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n,"ereignis");
     }
+    // TON (Fable-Brainstorm 14.11., Punkt 2): s. TON_KATALOG-Kommentar bei "tdm:{" oben --
+    // jede K.o.-Meldung bekommt ihren Ton, unabhaengig von `big` (eine Ausschaltung ist von
+    // Natur aus selten genug). Reine Praesentation, kein rr()-Aufruf.
+    sfx(disc,"ausschaltung");
   }
 
   // GROSSER TREFFER STATT "HAT UEBERHAUPT EIN LABEL" (Opus-Ingame-Review, 27.09.): vorher war
@@ -39272,6 +39276,11 @@
     // 144). kind nur noch, wenn die Zeile wirklich ein Banner ist -- derselbe Fund und dieselbe
     // Loesung wie beim Tennis-Ticker-Fix (T-N1, 04.10.).
     const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false);
+    // TON (Fable-Brainstorm 14.11., Punkt 2): nur auf `gross` -- bei mehreren Kaempfern mit
+    // hoher Schlagfrequenz waere ein Ton auf JEDEN Treffer ein Dauerrauschen, kein Ereignis
+    // (s. TON_KATALOG-Kommentar bei "tdm:{" oben). `gross` ist hier schon fertig berechnet,
+    // kein zweiter kampfGrossDrosseln()-Verbrauch.
+    if(gross)sfx(disc,"treffer");
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
       gross,undefined,
       gross?"grosserTreffer":undefined,undefined,undefined,"routine");
@@ -40164,6 +40173,9 @@
         // "routine" in feed() fuer JEDEN Geschosstreffer. kind nur noch, wenn die Zeile
         // wirklich ein Banner ist.
         const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false);
+        // TON (Fable-Brainstorm 14.11., Punkt 2): dasselbe `gross`-Gate wie bei nahschlag()
+        // oben, derselbe Grund (Tongewitter bei hoher Schussfrequenz vermeiden).
+        if(gross)sfx(disc,"treffer");
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
           gross,undefined,
@@ -43107,6 +43119,43 @@
       gebrochen: {synth:(vol)=>{ tonSchlag(vol,120,35,0.32); tonRauschen((vol??0.6)*0.5,200,0.35,false); }},
       gibtauf:   {synth:(vol)=>tonSchlag((vol??0.6)*0.75,180,55,0.22)}
     },
+    // TDM/MINI-DM/BATTLEFIELD (Fable-Brainstorm 14.11., Abschnitt 3 Punkte 1-3): die drei
+    // einzigen Disziplinen, die bislang KEINEN TON_KATALOG-Eintrag hatten (Basketball galt
+    // lange als vierte Luecke, hat aber laengst sein eigenes, datei-basiertes bkSfx()-System
+    // oben -- geprueft, kein Nachbau hier noetig). Alle drei teilen sich nahschlag()/
+    // schrittPfeile()/treffer()/schalteAus() (s. dort) -- "treffer" feuert deshalb nur auf
+    // GROSSE Treffer (dieselbe grosserTreffer()-Schwelle wie der Ticker), sonst waere der
+    // Ton bei mehreren Kaempfern mit schneller Schlagfrequenz ein Dauerrauschen statt eines
+    // Ereignisses. "ausschaltung" feuert auf jedes schalteAus() (K.o./Fall), das ist von
+    // Natur aus seltener. Reine Synth-Primitive, kein neues Audio-Asset.
+    tdm:{
+      treffer:     {synth:(vol)=>tonSchlag(vol,260,90,0.14)},
+      ausschaltung:{synth:(vol)=>{ tonSchlag(vol,220,50,0.24); tonRauschen((vol??0.6)*0.5,500,0.22,false); }},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    // MINI-DM (Punkt 3): die drei Kulissen-Varianten (Grube/Saegewerk/Strom-Kaefig,
+    // battle-mode.kulissen.js) waren bisher nur optisch unterscheidbar. `publikum` liest
+    // `kulisseAktiv.id` (gesetzt von kulisseWaehlen() oben, pro Begegnung deterministisch
+    // aus Saat+Paarung, kein rr()) und waehlt je Variante eine eigene Bandmitte fuer
+    // tonRauschen(): hohe, enge Bandmitte fuer das Saegeblatt-Surren, tiefe fuer das
+    // Strom-Kaefig-Knistern/-Summen, die neutrale TDM-Bandmitte fuer die namenlose
+    // Basis-Grube. Kein sechster Grundbaustein -- dieselbe Komposition wie ueberall im
+    // Katalog, nur die Auswahl ist neu.
+    "mini-dm":{
+      treffer:     {synth:(vol)=>tonSchlag(vol,240,80,0.13)},
+      ausschaltung:{synth:(vol)=>{ tonBuzzer(vol,0.22); tonSchlag((vol??0.6)*0.7,180,45,0.18); }},
+      publikum:    {loop:true, synth:(vol)=>{
+        const variante=(kulisseAktiv&&kulisseAktiv.disc==="mini-dm")?kulisseAktiv.id:"basis";
+        if(variante==="saegewerk")return tonRauschen(vol,3200,0,true);
+        if(variante==="strom-kaefig")return tonRauschen(vol,140,0,true);
+        return tonRauschen(vol,500,0,true);
+      }}
+    },
+    battlefield:{
+      treffer:     {synth:(vol)=>tonSchlag(vol,250,85,0.14)},
+      ausschaltung:{synth:(vol)=>{ tonSchlag(vol,210,45,0.26); tonRauschen((vol??0.6)*0.5,460,0.24,false); }},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,480,0,true)}
+    },
     "takeshis-castle":{
       falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
       sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
@@ -45427,6 +45476,22 @@
     ctx.beginPath(); bahnPfad(rAussen); ctx.stroke();
     ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=3;
     ctx.beginPath(); bahnPfad(rInnen); ctx.stroke();
+
+    // ---- 3b. BAHNNUMMERN (Kulissen-Audit 08.11., Abschnitt 4.8c, Politur): jede echte Bahn
+    // traegt ihre Nummer, innen=1 bis aussen=OVAL_BAHNEN (World Athletics zaehlt Bahn 1 von
+    // innen). Etwas VOR der Ziellinie (anteil -0.045), damit die Ziffern die Wechselzonen-
+    // Dreiecke aus Schritt 4 und den "ZIEL"-Schriftzug aus Schritt 5 nicht ueberdecken. Reine
+    // Anzeige -- liest nur ovalSpurR()/bahnPunkt(), die die Simulation ohnehin schon fuer die
+    // Wechselzonen benutzt.
+    ctx.save();
+    ctx.font="600 10px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="rgba(255,255,255,.5)";
+    for(let i=0;i<OVAL_BAHNEN;i++){
+      const p=bahnPunkt(-0.045,ovalSpurR(i));
+      ctx.fillText(String(i+1),p.x,p.y);
+    }
+    ctx.restore();
 
     // ---- 4. WECHSELZONEN. Auf einer echten Staffelbahn steht in der Bahnmitte an jeder
     // Zone ein Dreieck (30-m-Zone, World Athletics seit 2018). Bei uns liegen die Zonen an
@@ -57465,6 +57530,12 @@
     // Datei. tonLoopStart()/-Stop() sind selbst try/catch-abgesichert (No-Op ohne
     // AudioContext bzw. vor der ersten Nutzergeste).
     if(disc==="breaking"){ if(running)tonLoopStart("breaking"); else tonLoopStop(); }
+    // TON-SCHICHT, TDM/MINI-DM/BATTLEFIELD-PUBLIKUM (Fable-Brainstorm 14.11., Punkte 2/3):
+    // derselbe Play/Pause-Rahmen wie Breaking/Basketball oben. Mini-DMs Loop waehlt die
+    // Bandmitte selbst anhand der gezogenen Kulisse (s. TON_KATALOG["mini-dm"].publikum).
+    if(disc==="tdm"){ if(running)tonLoopStart("tdm"); else tonLoopStop(); }
+    if(disc==="mini-dm"){ if(running)tonLoopStart("mini-dm"); else tonLoopStop(); }
+    if(disc==="battlefield"){ if(running)tonLoopStart("battlefield"); else tonLoopStop(); }
   }
   document.getElementById("play").addEventListener("click",()=>{
     // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
