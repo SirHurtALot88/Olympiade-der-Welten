@@ -17,9 +17,9 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 type Verdict = "zu_guenstig" | "im_korridor" | "zu_teuer";
 
 const VERDICT: Record<Verdict, { label: string; cls: string; color: string }> = {
-  zu_guenstig: { label: "zu günstig", cls: "bd-v-low", color: "var(--warn)" },
+  zu_guenstig: { label: "↑ zu günstig", cls: "bd-v-low", color: "var(--warn)" },
   im_korridor: { label: "im Rahmen", cls: "bd-v-ok", color: "var(--good)" },
-  zu_teuer: { label: "zu teuer", cls: "bd-v-high", color: "var(--market)" },
+  zu_teuer: { label: "↓ zu teuer", cls: "bd-v-high", color: "var(--warn)" },
 };
 
 const eur = (v: number) => `${formatEuroCents(v)} €`;
@@ -266,7 +266,7 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td
                   data-label="Marge bei Nachkauf"
                   className="r bd-num bd-c-margin"
-                  style={{ color: m?.margin == null ? undefined : m.margin < 0 ? "var(--crit)" : m.margin < 0.25 ? "var(--warn)" : "var(--good)" }}
+                  style={{ color: m?.margin != null && m.margin < 0 ? "var(--crit)" : undefined }}
                 >
                   {m?.margin != null ? `${formatPercent(m.margin)} %` : <span className="bd-none">—</span>}
                 </td>

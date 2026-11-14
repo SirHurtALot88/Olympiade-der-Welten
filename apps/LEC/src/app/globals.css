@@ -655,3 +655,10 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
 .today-chip.todo i { color: var(--warn); }
 .today-chip.zero i { color: var(--good); }
 .today-chip.zero { color: var(--muted); font-weight: 500; }
+
+/* --- Paket A (UX-Gesamtkonzept, Entscheidungen 14.11.): "zu günstig" und "zu teuer" beide gelb, "zu teuer" als Umriss; Blau bleibt Cardmarket --- */
+.bd-v-low { background: var(--warn-bg); color: var(--warn); }
+.bd-v-high { background: transparent; color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); }
+.bd-card-low::before, .bd-card-high::before { background: var(--warn); }
+.bd-card-low .bd-card-n, .bd-card-high .bd-card-n { color: var(--warn); }
+.p-muted-pill { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
