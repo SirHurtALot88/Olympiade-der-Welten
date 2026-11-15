@@ -199,12 +199,12 @@ describe("determineArenaDisciplineContexts · Mini-DM-Praesenz ohne Set-Mitglied
         saveId: "s",
         seasonId: "se",
         matchdayId: "m1",
-        contextMeta: { d1DisciplineId: "mini-dm", d2DisciplineId: "showcase" },
+        contextMeta: { d1DisciplineId: "mini-dm", d2DisciplineId: "fechten" },
       },
     };
     const ergebnis = determineArenaDisciplineContexts([fakeContext] as unknown as Parameters<typeof determineArenaDisciplineContexts>[0]);
     expect(ergebnis.miniDmPresent).toBe(true);
-    expect(ergebnis.arenaDisciplineIds).toContain("showcase");
+    expect(ergebnis.arenaDisciplineIds).toContain("fechten");
     expect(ergebnis.arenaDisciplineIds).not.toContain("mini-dm");
     expect(ergebnis.mutatorTraitsByDisciplineId.has("mini-dm")).toBe(true);
   });
