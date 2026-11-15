@@ -146,6 +146,21 @@ aber die verbindliche Pflichtschranke. Wo ein Rezept zwischen "knapp unter 25" u
 rho sinkt" wählen muss, hat die rho-Schranke (>0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
 Kosten von rho optimieren.
 
+**Falls die Matrix doch angepasst werden muss: Ausgleichspflicht über alle 20 Disziplinen.**
+Chris am 15.11., wörtlich: „wenn du die gewichtungen in der matrix anpassen würdest für eine diszi
+müsstest du das bei anderen auch machen damit es unterm strich wieder sauber ist, momentan wird
+jedes attribut über 20 disziplinen fast gleich gewichetet bis auf 1-2 Punkte unterschied. und das
+MUSS so bleiben“ — nachgemessen exakt bestätigt: jedes der zwölf Attribute summiert sich über alle
+20 Disziplinen auf genau 166 oder 167 Punkte. Das ändert nichts an der Sperre oben — die Matrix
+bleibt der Normalfall unangetastet, und das bleibt die endgültige Entscheidung für alle zwanzig
+Disziplinen. Es gilt nur als zusätzliche Nebenbedingung, **falls** Chris für einen bestimmten,
+dokumentierten Einzelfall ausdrücklich eine Ausnahme freigibt: „Wenn du die matrix anpassen musst
+dann nur so dass das in summe weiter aufgeht und vorsichtig sein und vor allem den aktuellen
+ursprungsstand der matrix speichern“ — vor jeder solchen Änderung den aktuellen Stand sichern
+(Muster: `docs/design/matrix-backups/`), jede Erhöhung bei einer Disziplin durch eine Senkung bei
+anderen Disziplinen **desselben Attributs** ausgleichen, und die neue Zeilensumme nachrechnen statt
+schätzen. Volle Herleitung und Tabelle: `docs/design/matrix-ausgleichspflicht-15-11.md`.
+
 **Design-Leitlinie, nicht nur für eine Disziplin: mehrere Wege zum Erfolg.** Chris am 21.09., im
 Kontext der I-Spy-Konzeptrunde (`docs/design/i-spy-schatzsuche-konzept-21-09.md`, Mehrwege-Truhen),
 danach ausdrücklich verallgemeinert: „das ist jetzt auch nur ein Beispiel — auf genau diese Art und
