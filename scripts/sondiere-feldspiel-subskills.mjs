@@ -20,7 +20,7 @@
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { mkdtempSync, copyFileSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, copyFileSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -97,7 +97,8 @@ try {
     subskills.map((s) => `    ${s}: {${zuordnung[s]}:100}`).join(",\n") + "\n  }";
   writeFileSync(path.join(ordner, "battle-mode.rezepte.js"), ersetzteQuelle(orthogonal), "utf8");
 
-  const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+  const festerPfad = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+  const browser = await chromium.launch(existsSync(festerPfad) ? { executablePath: festerPfad } : {});
   const seite = await browser.newPage();
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
