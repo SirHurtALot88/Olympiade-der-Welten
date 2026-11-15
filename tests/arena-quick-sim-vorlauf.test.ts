@@ -10,6 +10,7 @@ import {
   beschleunigeArenaVorlaufPerQuickSim,
   kickoffArenaVorlauf,
   stelleArenaVorlaufSicher,
+  teileBahnPodDisziplinenAb,
 } from "@/lib/battle/arena-vorlauf-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
@@ -88,8 +89,34 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const seasonId = aktuell.gameState.season.id;
     const matchdayId = aktuell.gameState.matchdayState.matchdayId;
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
-    const arenaDisziplinen = [spieltag?.discipline1?.disciplineId, spieltag?.discipline2?.disciplineId].filter(
+    const arenaDisziplinenKandidaten = [spieltag?.discipline1?.disciplineId, spieltag?.discipline2?.disciplineId].filter(
       (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id),
+    );
+    // CI-FLAKE-FIX (15.11., Befund: dieselben vier Assertions zweimal unter hoher CI-Last auf zwei
+    // inhaltlich unbeteiligten PRs fehlgeschlagen, nie lokal, nie in `main`s eigenem Push-Lauf):
+    // Mitgliedschaft in `ARENA_RESOLVED_DISCIPLINE_IDS` allein reicht NICHT, um sicherzustellen, dass
+    // die vier Tests unten ihre injizierten Node-/Chromium-Fakes (`runArenaFixturesNodeImpl`/
+    // `runArenaFixturesImpl`) tatsaechlich treffen. `teileBahnPodDisziplinenAb()` -- DIESELBE Funktion,
+    // die `ermittleAnwendbarkeit()` in der Produktion (`arena-vorlauf-service.ts`) ruft -- nimmt
+    // Bahn-Pod-faehige Disziplinen (Staffel/Takeshi's Castle) aus dem generischen Zweier-Duell-Loop
+    // heraus und in `bahnPodDisciplineIds` hinein, SOBALD fuer diesen Spieltag echte Vierer-Pods
+    // existieren -- bei 32 Teams (dieser Aufbau) praktisch immer der Fall. Landete der ZUFAELLIGE
+    // Saison-Spielplan (jeder `previewNewGameSetup()`-Aufruf erzeugt einen neuen) GENAU eine dieser
+    // beiden Disziplinen auf Spieltag 1, blieb `arenaDisciplineIds` -- der generische Loop, den die
+    // Fakes fuettern -- LEER, waehrend diese Funktion trotzdem "arena-aufgeloeste Disziplin gefunden"
+    // meldete: keiner der Fakes wurde je aufgerufen, und alle vier Tests scheiterten auf eine Art, die
+    // wie eine Zeit-/Lastrace aussah (`weg: "node"` statt `"chromium_rueckfall"`, `0` statt `>0`
+    // Aufrufe, `bisWahr`-Timeout bei Zeile ~236) -- tatsaechlich aber ein reiner Zufallstreffer bei der
+    // Spielplan-Generierung war (nachgestellt: ca. 1 von 8 frischen Saves trifft Staffel ODER
+    // Takeshi's Castle auf D1/D2). Unter hoher CI-Last (viele parallele Laeufe = viele unabhaengige
+    // Zufallsziehungen in kurzer Zeit) tritt dieser seltene Treffer in der Summe haeufiger mindestens
+    // einmal auf, auch wenn an JEDEM EINZELNEN Lauf nichts lastabhaengig ist -- deshalb hier dieselbe
+    // Pod-Klassifizierung wie die Produktion pruefen, statt sie zu uebersehen, und bei einem leeren
+    // Ergebnis denselben Retry nehmen wie bei "gar keine arena-aufgeloeste Disziplin".
+    const { arenaDisciplineIds: arenaDisziplinen } = teileBahnPodDisziplinenAb(
+      aktuell.gameState,
+      { saveId, seasonId, matchdayId },
+      arenaDisziplinenKandidaten,
     );
     if (arenaDisziplinen.length === 0) {
       invalidateLocalTransfermarktCachesForSave(saveId);
