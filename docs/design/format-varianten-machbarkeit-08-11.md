@@ -17,6 +17,7 @@ kommt ein **spielbarer Prototyp**.
 
 | Frage | Antwort |
 |---|---|
+| **Nachmessung 15.11. (Abschnitt 4.3)** | Gegen die neue Kaderfamilie (Task #136, **anderer Spielstand**, nie zur Kalibrierung genutzt): Schweizer Runden rho **0,895 / 0,895**, Pp **13,8 / 14,0** (vorher 0,853 / 0,857 und 11,3 / 9,9). Der gemeinsame Ring fällt weiter durch (rho 0,538 / 0,538). Die empfohlene Korrektur „Fables Grubenbild mit Eins-gegen-eins-Seilen" ist genau die Schweizer Fassung des Prototyps (Ansicht „Grube"), es gibt dafür nichts nachzubauen. Zusätzlich behoben: verrutschte Animationsausschnitte der Figuren (Befund aus PR #1352). |
 | Wie wechselt Gewichtheben heute das Format? | Eine `if`-Weiche in `bauBuehne()` auf `BUEHNE_FLAGS.gewichthebenSandsack`. Die echte App setzt dieses Flag **nie**. Im Spiel läuft immer das Hantel-Duell. Eine Formatwahl gibt es noch nirgends (Abschnitt 1). |
 | Bedient Tauziehen die Gewichtheben-Matrix? | Ja, wenn es **dieselben fünf Teilwerte** liest (LAST, TECHNIK, NERVEN, ANSAGE, ERHOLUNG) und **kein Ausdauerformat** wird. stamina wiegt 2, charisma 23. Ein Tauziehen, das auf Zähigkeit setzt, fällt bei Pp durch (Abschnitt 2). |
 | „Alle gegen alle“: passt das in die Architektur? | Ja, und zwar **innerhalb der bestehenden Zwei-Team-Begegnung**: zwölf Zieher, kein neuer Spielplan, keine neue Buchung. Der Sandsack-Weg-C (zwölf Figuren gleichzeitig) ist das bauliche Vorbild. Ein Vier-Team-Pod ginge auch, ist aber viel teurer (Abschnitt 3). |
@@ -177,6 +178,33 @@ die Ring-Variante der Sonde (`spieleGrube()`). In die Schweizer Fassung sind sie
 zusätzlich will, ist eine Designfrage. Fables eigenes Risiko 2 (Charisma-Übergewicht bei zwei
 ANSAGE-Hebeln) spricht eher dagegen.
 
+### 4.3 Nachmessung 15.11.: neue Kaderfamilie
+
+`data/generated/kaderfamilie-live-save.json` ist am 15.11. (Task #136) neu gezogen worden, aus einem
+**anderen Spielstand** (`new-game-1793476611202-0dwpok` statt `new-game-1787123325719-swnjlk`):
+dieselben fünf Teamnamen, andere Spieler. Die Sonde liest die Familie direkt, die Konstanten des
+Prototyps sind unverändert. Zur Kontrolle reproduziert die alte Familie die Zahlen aus 4.1 exakt
+(0,853 / Pp 11,3).
+
+| Format | rho je Spiel (Strom 0 / 1) | Validität je Paarung | Star Rang 1 / Top 2 | Pp (Strom 0 / 1) |
+|---|---:|---|---:|---:|
+| **Schweizer Runden** | **0,895 / 0,895** | 0,86–1,00 | 92–94 % / 99 % | **13,8 / 14,0** |
+| Grube, gemeinsamer Ring | 0,538 / 0,538 | 0,36–0,80 | 77–78 % / 78–79 % | 14,5 / 14,4 |
+| zum Vergleich: Hantel heute (`disziplin-abnahme.json`, Task #136, mit Motor-Kanälen) | 0,892 | — | — | 8,5 / 10,0 |
+
+Pp-Anteile Schweizer, Strom 0: power 34,5 (Matrix 28), charisma 23,1 (23), die übrigen innerhalb
+weniger Punkte; kein Nullattribut trägt.
+
+**Lesart.** Die Zahlen haben sich nicht verschlechtert; die Schweizer Fassung ist auf einem nie
+gesehenen Spielstand sogar besser, der Ring schlechter. Das stützt den Befund aus 4.2: Das Problem
+des Rings ist strukturell, die Eins-gegen-eins-Seile tragen. Die Sonde bleibt eine Vorab-Sonde ohne
+Slot-, Trait- und Formkanäle, nicht mit der Hantel-Zahl direkt vergleichbar.
+
+**Zur empfohlenen Korrektur.** Fables Bild mit Eins-gegen-eins-Seilen ist bereits die Ansicht
+„Grube" des Prototyps: zwölf Zieher um den Schacht, sechs gekreuzte Seile, Mechanik `spiele()`
+(Schweizer). `spieleGrube()` existiert nur als Messung der verworfenen Ring-Mechanik. Es gibt keine
+weitere Variante nachzuziehen.
+
 ---
 
 ## 5. Governance: wie eine Format-Variante durch die Abnahme geht
@@ -270,7 +298,11 @@ Bilder: `format-varianten-tauziehen-grube-runde1-08-11.png`, `…-grube-runde3-0
    Spielerwert. Ob und wie es zählt, entscheidet Chris.
 7. **Darstellung:** Fall-/Platsch-Animation (heute gedrehtes, ausgeblendetes Standbild),
    Seilphysik, Namensschilder bei engen Speichen. Dazu eine eigene „Zieh“-Pose als
-   PixelLab-Animation: Heute ist es das gekippte Standbild.
+   PixelLab-Animation: Heute ist es das gekippte Standbild. *(Seit 09.11. gilt: keine neue
+   PixelLab-Animation ohne Chris' ausdrückliche Freigabe, CLAUDE.md. Bis dahin bleibt es beim
+   gekippten Standbild.)* Behoben am 15.11.: Die Animationsblätter haben größere Zellen (104 px)
+   als das Standbild (`c` = 80); der Prototyp schneidet jetzt mit der Blatthöhe zu wie der
+   Knockout-Prototyp, die Figuren sind nicht mehr verrutscht.
 8. **Formatwahl, Kaderbildschirm, Picker, PPS-Referenz** (Abschnitt 6).
 
 ---

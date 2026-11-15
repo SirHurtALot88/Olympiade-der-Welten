@@ -119,13 +119,16 @@ function zeichneFigur(u,x,y,richtung,zustand,t,extra){
   let im=null, sx=0, c=s?s.c:80;
   if(s){
     const anim=zustand==="walk"?s.walk:zustand==="jubel"?s.jubel:zustand==="treffer"?s.treffer:null;
-    if(anim&&anim.im.complete&&anim.im.naturalWidth){ im=anim.im; sx=(Math.floor(t*10)%anim.n)*c; }
+    // Animationsblaetter haben groessere, quadratische Zellen als das Standbild (z. B. 104 statt 80,
+    // zentriert gepolstert): Zellbreite = Blatthoehe, Massstab wie beim Standbild (Befund aus PR #1352).
+    if(anim&&anim.im.complete&&anim.im.naturalWidth){ im=anim.im; const fw=im.naturalHeight; sx=(Math.floor(t*10)%anim.n)*fw; c=fw; }
     else { im=spiegeln?s.west:s.east; if(!(im.complete&&im.naturalWidth))im=null; }
     if(anim&&im===anim.im&&spiegeln){ g.scale(-1,1); }
   }
   // Lehnen: Zieher haengen sich nach hinten ins Seil (Drehpunkt Fuesse)
   if(extra.lehne){ g.rotate((richtung==="east"?-1:1)*extra.lehne); }
-  if(im){ g.drawImage(im,sx,0,c,c,-ZELLE/2,-ZELLE+6,ZELLE,ZELLE); }
+  if(im){ const gr=s&&im!==s.east&&im!==s.west?ZELLE*c/s.c:ZELLE;
+    g.drawImage(im,sx,0,c,c,-gr/2,-ZELLE+6-(gr-ZELLE)/2,gr,gr); }
   else { g.fillStyle=FARBE[u.side]; g.fillRect(-9,-40,18,40); }
   g.restore();
 }
