@@ -35,6 +35,8 @@ model Article {
   /// Kartenbild aus Chris' eigenem eBay-Shop (siehe src/lib/images/). Einmal
   /// gefunden und abgelegt, danach nur neu geladen, wenn sich das Angebotsbild aendert.
   ebayItemId     String?
+  /// Billbee-Artikel-ID (Product.Id aus dem Artikelstamm), fuer den Link in die Billbee-Artikelbearbeitung im Drawer.
+  billbeeId      String?
   imageGuid      String?
   /// Dateiname im Bildordner neben der SQLite (Volume lec-data), null = kein Bild.
   imageFile      String?

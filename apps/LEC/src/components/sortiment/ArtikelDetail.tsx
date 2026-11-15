@@ -10,11 +10,13 @@ import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { conditionOf } from "@/lib/market/condition";
 import { formatEuroCents, formatPercent } from "@/lib/format";
+import { PreisMarktLinie } from "./PreisMarktLinie";
 import { monthlyBars, salesPattern, type PriceEffect } from "@/lib/dashboard/kennzahlen";
 
 /** Detail-Fenster zu einem Artikel: Preise, Verkaeufe, Einkauf, Bestand. Rein lesend. */
 
 interface Detail {
+  billbeeId?: string | null;
   kennzahlen: KennzahlenData | null;
   losses: LossRow[];
   lossCost: number;
@@ -22,6 +24,8 @@ interface Detail {
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
   priceLog: { at: string; before: number; after: number }[];
+  priceHistory?: { at: string; before: number; after: number }[];
+  marketHistory?: { at: string; priceAvg7: number | null }[];
   stockLog: { at: string; before: number; after: number }[];
   ekLog: { at: string; before: number; after: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
@@ -218,6 +222,17 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               <span className="bd-rar" title="Zustand laut Titel">{m?.condition ?? conditionOf(row.nameRaw)}</span>
               {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
               {!row.active && <span className="bd-rar">ausgelaufen</span>}
+              {detail?.billbeeId && (
+                <a
+                  className={`bd-rar bd-billbee${row.ekMissing ? " bd-billbee-ek" : ""}`}
+                  href={`https://app.billbee.io/app_v2/article/edit/${encodeURIComponent(detail.billbeeId)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Artikel in Billbee bearbeiten (Preise, Einkauf, Bestand) – öffnet in neuem Tab"
+                >
+                  {row.ekMissing ? "EK in Billbee eintragen ↗" : "In Billbee öffnen ↗"}
+                </a>
+              )}
             </div>
           </div>
         </header>
@@ -434,6 +449,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
           )}
+          {detail && <PreisMarktLinie currentVk={vk ?? null} priceLog={detail.priceHistory ?? []} market={detail.marketHistory ?? []} sales={sales} />}
           {sales.length > 0 && (
             <details className="bd-sub-det">
               <summary title="Verkäufe aus Billbee, neueste zuerst. Farbe: grün bis 90 Tage, gelb bis 365 Tage, rot älter.">Einzelverkäufe ({sales.length})</summary>

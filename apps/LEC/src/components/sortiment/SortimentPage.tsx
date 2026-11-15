@@ -517,6 +517,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
+  const activeChips: { key: string; label: string; off: () => void }[] = [];
+  if (ordnerFilter) activeChips.push({ key: "ordner", label: `Ordner ${ordnerFilter}`, off: () => setOrdnerFilter("") });
+  if (artFilter) activeChips.push({ key: "art", label: `Kartenart ${artFilter}`, off: () => setArtFilter("") });
+  classFilter.forEach((cls) => activeChips.push({ key: `klasse-${cls}`, label: `Klasse ${LABELS_DE[cls]}`, off: () => toggleClass(cls) }));
+  statusFilter.forEach((st) => activeChips.push({ key: `status-${st}`, label: `Marge am EK: ${STATUS_PILL[st].label}`, off: () => toggleStatus(st) }));
+  marketFilter.forEach((f) => activeChips.push({ key: `markt-${f}`, label: MARKET_FILTER_LABEL[f], off: () => toggleMarket(f) }));
+  if (stockBand) activeChips.push({ key: "bestand", label: `Bestand ${stockBand}`, off: () => setStockBand(null) });
+  if (valueRange) activeChips.push({ key: "wert", label: `Marktwert ${valueRange.label}`, off: () => setValueRange(null) });
+  if (onlyLadenhueter) activeChips.push({ key: "lh", label: "nur Ladenhüter", off: () => setOnlyLadenhueter(false) });
+  if (showNoStock) activeChips.push({ key: "ohnebestand", label: "ohne Bestand", off: () => setShowNoStock(false) });
+  if (showHidden) activeChips.push({ key: "hidden", label: "Ausgeblendete", off: () => setShowHidden(false) });
+  if (showDiscontinued) activeChips.push({ key: "ausgelaufen", label: "Ausgelaufene", off: () => setShowDiscontinued(false) });
+  if (query.trim()) activeChips.push({ key: "q", label: `Suche „${query.trim()}“`, off: () => setQuery("") });
   const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyNoShop || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
@@ -601,6 +614,25 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
       </div>
+      {activeChips.length > 0 && (
+        <div className="bd-active" role="group" aria-label="Aktive Filter">
+          <span className="bd-active-l">Aktiv</span>
+          {activeChips.map((c) => (
+            <button key={c.key} type="button" className="chip on" title="Filter entfernen" onClick={c.off}>
+              {c.label} ×
+            </button>
+          ))}
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              activeChips.forEach((c) => c.off());
+            }}
+          >
+            alle zurücksetzen
+          </button>
+        </div>
+      )}
       <details className="bd-more" open={extraFiltersActive}>
         <summary>
           Weitere Filter{extraFiltersActive ? " · aktiv" : ""}
