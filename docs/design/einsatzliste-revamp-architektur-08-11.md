@@ -712,6 +712,13 @@ Die Staffel hatte denselben Fehler und hat seit 11.10. `staffelNachSlot`. Bis di
 haben, zeichnet das Mini-Feld ihre Plätze als „Darstellung“ (gestrichelt). Für die Reparatur gibt
 es einen eigenen Task; sie braucht die rho- und Pp-Abnahme.
 
+**Nachtrag 15.11.:** Die Reparatur ist mit PR #1360 (`dd6be9df9`) auf `main`: `bauBuehne()` paart
+`art.duell` (Tennis, Fechten, Speed-Schach), Gewichtheben und die Breaking-Kette über
+`mineGeordnet`/`gegnerGeordnet` nach Slot. Diese fünf zeichnet das Mini-Feld jetzt als „Motor“
+(`BUEHNE_NACH_SLOT` in `formation-registry.ts`, Drift-Wächter in `tests/einsatzliste-formation.test.ts`).
+Wettessen und die Auftritts-Bühnen (Showcase, I-Spy, Eiskunstlauf) hat #1360 nicht angefasst; sie
+bleiben „Darstellung“.
+
 ### 7.4 Sichtprüfung (lokaler Dev-Server, frische Spielstände, nichts gespeichert)
 
 Aufbau:

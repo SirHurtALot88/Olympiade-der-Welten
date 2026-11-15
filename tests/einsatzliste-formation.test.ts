@@ -193,14 +193,24 @@ describe("Formations-Geometrie: Vollständigkeit über alle 20 Disziplinen", () 
     expect(cy("routereader")).toBeLessThan(cy("paceclimber"));
   });
 
-  it("Staffel ist Motor (Bein = Slot), die Bühnen sind Darstellung (Befund: Motor paart nach Kaderliste)", () => {
+  it("Staffel ist Motor (Bein = Slot); Duell-/Heben-/Ketten-Bühnen paaren seit #1360 nach Slot, Auftritte bleiben Darstellung", () => {
     const staffel = formationFuerSeite("staffel", 6);
     expect(staffel.plaetze.every((p) => p.verbindlichkeit === "motor")).toBe(true);
     expect(staffel.plaetze.map((p) => p.x)).toEqual([...staffel.plaetze.map((p) => p.x)].sort((a, b) => a - b));
     expect(staffel.plaetze[5]!.zeile).toContain("Schlussläufer");
-    for (const d of ["gewichtheben", "tennis", "fechten", "speed-schach", "breaking", "wettessen", "showcase", "eiskunstlauf", "i-spy"]) {
+    for (const d of ["gewichtheben", "tennis", "fechten", "speed-schach", "breaking"]) {
+      expect(formationFuerSeite(d, 6).plaetze.every((p) => p.verbindlichkeit === "motor"), d).toBe(true);
+    }
+    for (const d of ["wettessen", "showcase", "eiskunstlauf", "i-spy"]) {
       expect(formationFuerSeite(d, 6).plaetze.every((p) => p.verbindlichkeit === "darstellung"), d).toBe(true);
     }
+  });
+
+  it("Drift-Wächter: der Motor paart Duell, Heben und Breaking-Kette über die slot-geordneten Kopien", () => {
+    expect(ENGINE).toContain("const mineGeordnet=nachSlotgeordnet(mine), gegnerGeordnet=nachSlotgeordnet(gegner);");
+    expect(ENGINE).toContain("baueHebenDuelle(art,mineGeordnet,gegnerGeordnet)");
+    expect(ENGINE).toContain("baueGauntlet(art,mineGeordnet,gegnerGeordnet)");
+    expect(ENGINE).toContain("x.n===mineGeordnet[i].n");
   });
 
   it("Gegner nur dort auf dem Feld, wo eine Paarung/Gegenseite gezeichnet werden darf", () => {

@@ -37,6 +37,9 @@
  * Showcase/Eiskunstlauf/Wettessen/I-Spy (Auftrittsreihenfolge). Die Staffel hatte denselben
  * Fehler und hat seit 11.10. `staffelNachSlot`. Bis die Bühnen dasselbe bekommen, sind ihre
  * Plätze hier "darstellung" — die Einsatzliste behauptet keine Paarung, die der Kampf nicht fährt.
+ * NACHTRAG 15.11.: PR #1360 hat Gewichtheben, Tennis, Fechten, Speed-Schach und Breaking auf
+ * Slot-Paarung umgestellt (`mineGeordnet`/`gegnerGeordnet`); diese fünf sind jetzt "motor"
+ * (`BUEHNE_NACH_SLOT`). Wettessen und die Auftritts-Bühnen bleiben "darstellung".
  *
  * NUR ANZEIGE. Keine Importe (wie `einsatzliste-anzeige.ts`), damit nichts hieraus versehentlich
  * in Resolve, KI-Vorschlag oder Arena zurückwirkt.
@@ -408,7 +411,16 @@ function rennplanRollen(disziplin: string): Record<string, FormationsRolle> {
 }
 
 const BUEHNE_BELEG =
-  "Bühne: der Motor paart/reiht heute nach Kaderliste (inDisc, TDM-sortiert), nicht nach Slot — Befund 08.11.";
+  "Bühne: der Motor reiht die Auftritte nach Kaderliste (inDisc, TDM-sortiert), nicht nach Slot — Befund 08.11.";
+
+/**
+ * Seit PR #1360 (15.11.) paart `bauBuehne()` Duelle, Heben und Breaking-Kette über
+ * `mineGeordnet`/`gegnerGeordnet` nach dem gesetzten Slot — dort hält der Motor die Reihenfolge.
+ * Wettessen und die Auftritts-Bühnen (Showcase, I-Spy, Eiskunstlauf) hat der Fix nicht
+ * angefasst; sie bleiben "darstellung".
+ */
+const BUEHNE_NACH_SLOT: ReadonlySet<string> = new Set(["gewichtheben", "tennis", "fechten", "speed-schach", "breaking"]);
+const BUEHNE_SLOT_BELEG = "Bühne: bauBuehne() paart nach Slot (mineGeordnet/gegnerGeordnet, PR #1360)";
 
 function buehnenLeiste(
   disziplin: string,
@@ -428,8 +440,8 @@ function buehnenLeiste(
       feld === "bogen"
         ? { x0: 0.1, x1: 0.9, y: 0.7, bogen: -0.4 }
         : { x0: 0.1, x1: 0.9, y: gegner === "keiner" ? 0.5 : 0.3 },
-    indexVerbindlichkeit: "darstellung",
-    indexBeleg: BUEHNE_BELEG,
+    indexVerbindlichkeit: BUEHNE_NACH_SLOT.has(disziplin) ? "motor" : "darstellung",
+    indexBeleg: BUEHNE_NACH_SLOT.has(disziplin) ? BUEHNE_SLOT_BELEG : BUEHNE_BELEG,
     indexZeile,
   };
 }
@@ -663,8 +675,8 @@ const FORMATIONEN: readonly FormationsDefinition[] = [
     anordnung: "ring",
     ring: { x: 0.36, y: 0.5 },
     leiste: { x0: 0.2, x1: 0.11, y: 0.12, y1: 0.88 },
-    indexVerbindlichkeit: "darstellung",
-    indexBeleg: BUEHNE_BELEG,
+    indexVerbindlichkeit: "motor",
+    indexBeleg: BUEHNE_SLOT_BELEG,
     indexZeile: (index) => (index === 0 ? "Platz 1 — eröffnet im Ring." : `Platz ${index + 1} in der Kette — kommt, wenn der Vordermann aufgibt.`),
   },
 ];
