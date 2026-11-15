@@ -42739,7 +42739,19 @@
     if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
     const meta=(echterKader&&echterKader.meta)||{};
     const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
-    const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))||liste[kulisseHash(schluessel)%liste.length];
+    // KULISSEN-FUNDAMENT (Baustein 1, 15.11., lib/battle/arena-kulisse.ts): steht die Kulisse
+    // fuer diese Disziplin schon VOR dem reset() fest (Spielplan/Vorschau hat sie gebucht,
+    // echterKader.kulisseByDisciplineId), nimmt der Motor genau diese -- "gezeigt = gebucht",
+    // derselbe Gedanke wie bei seedByDisciplineId/mutatorenByDisciplineId. Nur eine ID, die
+    // tatsaechlich in der geladenen Liste steht, zaehlt (Regel "kein Effekt ohne Bild"); fehlt
+    // die Buchung oder ist die ID nicht (mehr) in der Liste, bleibt die bisherige Hash-Wahl
+    // unberuehrt -- byte-identisch zu vorher fuer jeden Aufrufer ohne dieses Feld. Der
+    // Sicht-QA-Pin (kulisseQaId) geht beidem vor, wie schon vorher.
+    const gebuchteKarte=echterKader&&echterKader.kulisseByDisciplineId;
+    const gebuchteId=(gebuchteKarte&&typeof gebuchteKarte==="object")?gebuchteKarte[disc]:null;
+    const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))
+      ||(gebuchteId&&liste.find(k=>k.id===gebuchteId))
+      ||liste[kulisseHash(schluessel)%liste.length];
     kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
     if(!kulisseBilder[v.bild]){
       const im=new Image();

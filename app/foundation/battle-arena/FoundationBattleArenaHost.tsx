@@ -545,7 +545,11 @@ export default function FoundationBattleArenaHost({
     const seasonId = gameState.season?.id;
     const matchdayId = gameState.matchdayState?.matchdayId;
     if (!saveId || saveId === "loading-save" || !seasonId || !matchdayId) {
-      return { seedByDisciplineId: {} as Record<string, number>, istKeinGewertetesDuell: false };
+      return {
+        seedByDisciplineId: {} as Record<string, number>,
+        kulisseByDisciplineId: {} as Record<string, string>,
+        istKeinGewertetesDuell: false,
+      };
     }
     return resolveArenaHostSeeds({
       saveId,
@@ -555,10 +559,15 @@ export default function FoundationBattleArenaHost({
       heimTeamId,
       gastTeamId,
       fixtureIndex: spieltagFixtureIndex,
+      // KULISSEN-FUNDAMENT (Baustein 1, 15.11.): `kulisseByDisciplineId` braucht den NUMERISCHEN
+      // Spieltag (`Season.currentMatchday`), nicht `matchdayId` -- s. Kommentar in
+      // `lib/battle/arena-kulisse.ts`.
+      spieltag: gameState.season?.currentMatchday ?? null,
     });
   }, [
     saveId,
     gameState.season?.id,
+    gameState.season?.currentMatchday,
     gameState.matchdayState?.matchdayId,
     arenaDisziplinSlotsThisMatchday,
     heimTeamId,
@@ -566,6 +575,10 @@ export default function FoundationBattleArenaHost({
     spieltagFixtureIndex,
   ]);
   const arenaSeedByDisciplineId = arenaHostSeed.seedByDisciplineId;
+  // KULISSEN-FUNDAMENT (Baustein 1, 15.11.): "gezeigt = gebucht" -- der Motor nimmt diese Karte,
+  // wenn sie fuer die aktuelle Disziplin einen Eintrag hat, und faellt sonst auf seinen eigenen
+  // Hash zurueck (`kulisseWaehlen()`, s. Kommentar dort). Reine Anzeige, keine Spielwirkung.
+  const arenaKulisseByDisciplineId = arenaHostSeed.kulisseByDisciplineId;
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
   // sonst gibt es nichts, dessen Saat falsch sein koennte.
   const keinGewertetesDuell =
@@ -864,6 +877,10 @@ export default function FoundationBattleArenaHost({
         // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
         // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
         seedByDisciplineId: arenaSeedByDisciplineId,
+        // KULISSEN-FUNDAMENT (Baustein 1, 15.11., s. `arenaKulisseByDisciplineId`-Kommentar
+        // oben) — leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin
+        // ist. Gelesen von `kulisseWaehlen()` in battle-mode.engine.js, rein darstellend.
+        kulisseByDisciplineId: arenaKulisseByDisciplineId,
         // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
         mutatorenByDisciplineId,
         // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
@@ -969,6 +986,7 @@ export default function FoundationBattleArenaHost({
     teams,
     gameState,
     arenaSeedByDisciplineId,
+    arenaKulisseByDisciplineId,
     mutatorenByDisciplineId,
     miniDmFfaTeams,
     miniDmFfaK,

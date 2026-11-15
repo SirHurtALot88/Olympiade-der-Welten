@@ -1,5 +1,6 @@
 import type { Fixture } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
+import { buildKulisseByDisciplineId } from "@/lib/battle/arena-kulisse";
 
 /**
  * DIE HOST-SAATBERECHNUNG, HERAUSGEZOGEN (PR4 "Determinismus-Feinschliff", Plan
@@ -32,11 +33,27 @@ export type ArenaHostSeedInput = {
   gastTeamId: string;
   /** `teamId -> sein Fixture dieses Spieltags`, s. `baueFixtureIndex()`. */
   fixtureIndex: ReadonlyMap<string, Fixture>;
+  /**
+   * KULISSEN-FUNDAMENT (Baustein 1, 15.11., `lib/battle/arena-kulisse.ts`): der numerische
+   * Spieltag (`Season.currentMatchday`), NICHT `matchdayId` -- nur fuer `kulisseByDisciplineId`
+   * gebraucht, s. dortiger Kommentar. Optional: fehlt er, bleibt `kulisseByDisciplineId` leer,
+   * ohne dass `seedByDisciplineId` davon beruehrt wird.
+   */
+  spieltag?: number | string | null;
 };
 
 export type ArenaHostSeedResult = {
   /** Je Disziplin der normalisierte Zahl-Seed — nur gesetzt, wenn heim/gast das echte Fixture sind. */
   seedByDisciplineId: Record<string, number>;
+  /**
+   * KULISSEN-FUNDAMENT (Baustein 1, 15.11.): je Disziplin die VOR dem Spieltag gebuchte
+   * Kulissen-ID, aus demselben `echtesFixture` wie `seedByDisciplineId` -- "gezeigt = gebucht",
+   * derselbe Gedanke wie bei `mutatorenByDisciplineId` im Host. Der Motor
+   * (`kulisseWaehlen()`/`battle-mode.engine.js`) nimmt sie, wenn gesetzt, und faellt sonst auf
+   * seinen eigenen Hash zurueck -- reine Anzeige, keine Spielwirkung. Leer bei fehlendem
+   * `spieltag` oder ohne echtes Fixture, genau wie `seedByDisciplineId`.
+   */
+  kulisseByDisciplineId: Record<string, string>;
   /**
    * `true`, wenn fuer `heimTeamId` an diesem Spieltag KEIN Fixture existiert, oder es existiert,
    * aber `gastTeamId` ist nicht dessen Gegner (in beliebiger Orientierung). In diesem Fall bleibt
@@ -49,8 +66,8 @@ export type ArenaHostSeedResult = {
 };
 
 export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedResult {
-  const { saveId, seasonId, matchdayId, disciplineIds, heimTeamId, gastTeamId, fixtureIndex } = input;
-  const leer: ArenaHostSeedResult = { seedByDisciplineId: {}, istKeinGewertetesDuell: false };
+  const { saveId, seasonId, matchdayId, disciplineIds, heimTeamId, gastTeamId, fixtureIndex, spieltag } = input;
+  const leer: ArenaHostSeedResult = { seedByDisciplineId: {}, kulisseByDisciplineId: {}, istKeinGewertetesDuell: false };
   if (!saveId || !seasonId || !matchdayId || !heimTeamId || !gastTeamId || heimTeamId === gastTeamId) {
     return leer;
   }
@@ -63,7 +80,7 @@ export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedR
 
   if (!istDasGewaehltePaar || !echtesFixture) {
     // Kein Fixture dieses Spieltags fuer dieses Paar -- kein Eintrag, Motor faellt auf 1337.
-    return { seedByDisciplineId: {}, istKeinGewertetesDuell: true };
+    return { seedByDisciplineId: {}, kulisseByDisciplineId: {}, istKeinGewertetesDuell: true };
   }
 
   const seedByDisciplineId: Record<string, number> = {};
@@ -81,5 +98,18 @@ export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedR
       }),
     );
   }
-  return { seedByDisciplineId, istKeinGewertetesDuell: false };
+  // KULISSEN-FUNDAMENT (Baustein 1, 15.11.): dasselbe `echtesFixture`, derselbe Seed-Weg --
+  // `spieltag` fehlt ohne Season-Kontext (Headless-/Testaufrufer ohne ihn): dann bleibt die
+  // Karte leer, `seedByDisciplineId` oben ist davon unberuehrt.
+  const kulisseByDisciplineId =
+    spieltag == null
+      ? {}
+      : buildKulisseByDisciplineId({
+          saveId,
+          seasonId,
+          spieltag,
+          disciplineIds,
+          fixture: echtesFixture,
+        });
+  return { seedByDisciplineId, kulisseByDisciplineId, istKeinGewertetesDuell: false };
 }

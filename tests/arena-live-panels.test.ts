@@ -177,6 +177,7 @@ describe("buildArenaFixturesPanel", () => {
                 occurrenceInSeason: null,
                 miniDmPodIdHeim: null,
                 miniDmPodIdGast: null,
+                kulisse: null,
               },
               {
                 disciplineId: "hockey",
@@ -194,6 +195,7 @@ describe("buildArenaFixturesPanel", () => {
                 occurrenceInSeason: null,
                 miniDmPodIdHeim: null,
                 miniDmPodIdGast: null,
+                kulisse: null,
               },
             ],
             istRueckspiel: false,
