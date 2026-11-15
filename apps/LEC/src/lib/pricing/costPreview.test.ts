@@ -73,3 +73,21 @@ describe("Einstellungen-Vorschau", () => {
     expect(f.fixedYearlyTotal).toBe(4229);
   });
 });
+
+describe("compareCostModels", () => {
+  const shop = { units365d: 2850, unitsAtOrAboveThreshold: 60 };
+  const ex = { label: "Günstige Karte", kind: "single" as const, ek: 0.9, vk: 4.99 };
+  it("zeigt die Nebenkosten alt gegen neu und die Wirkung auf VK-MIN", async () => {
+    const { compareCostModels } = await import("./costPreview");
+    const { LIVE_COST_SETTINGS } = await import("./costSettings");
+    const c = compareCostModels(ex, LIVE_COST_SETTINGS, shop);
+    const row = (l: string) => c.rows.find((r) => r.label === l)!;
+    expect(row("Einkaufs-Versand").oldValue).toBeCloseTo(0.575, 8);
+    expect(row("Einkaufs-Versand").newValue).toBeCloseTo((904 * 1.15) / 2850, 8);
+    expect(row("Versand Inland").oldValue).toBeCloseTo(0.67, 8);
+    expect(row("Verpackung").newValue).toBeCloseTo(217 / 2850, 8);
+    expect(row("Fixkosten-Anteil").newValue).toBeCloseTo(row("Fixkosten-Anteil").oldValue, 8);
+    expect(c.newTotal).toBeLessThan(c.oldTotal);
+    expect(c.newVkMin).toBeLessThan(c.oldVkMin);
+  });
+});

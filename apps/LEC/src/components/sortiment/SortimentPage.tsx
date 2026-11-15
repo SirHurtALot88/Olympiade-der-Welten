@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { TASKS, isTaskKey, matchesTask, taskCounts, type TaskKey } from "@/lib/dashboard/tasks";
 import { KapitalPanel } from "./KapitalPanel";
 import { ArtikelDetail } from "./ArtikelDetail";
 import { daysSince } from "./PreisBoard";
@@ -86,7 +87,7 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 276, min: 170 },
   { id: "rank", label: "Rank", def: 62, min: 50, align: "r" },
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
-  { id: "letzterverkauf", label: "Letzter Verkauf", def: 100, min: 80, align: "r" },
+  { id: "letzterverkauf", label: "Letzter Verkauf", def: 120, min: 90, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
@@ -256,6 +257,54 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const markedCount = useMemo(() => rows.filter((r) => !!r.delistMarkedAt && !r.hidden).length, [rows]);
   const [onlyDup, setOnlyDup] = useState(initialFlags.has("doppelt"));
   const dupGroups = useMemo(() => findDuplicateGroups(rows), [rows]);
+  // Aufgaben-Reiter (Tagesgeschaeft): fester Filter mit Zaehler, per ?aufgabe=... aufrufbar
+  const [task, setTask] = useState<TaskKey>(() => {
+    const v = searchParams0.get("aufgabe");
+    return isTaskKey(v) ? v : "alle";
+  });
+  const dupIds = useMemo(() => new Set(dupGroups.keys()), [dupGroups]);
+  const counts = useMemo(() => taskCounts(rows, dupIds), [rows, dupIds]);
+  // Auswahl und Vormerkung (nur Markierung in LEC; bei eBay passiert nichts)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [markedLocal, setMarkedLocal] = useState<Map<string, boolean>>(new Map());
+  const [markBusy, setMarkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<{ ids: string[] } | null>(null);
+  useEffect(() => {
+    setSelected(new Set());
+    setBulkNote(null);
+  }, [task]);
+  useEffect(() => {
+    if (!bulkNote) return;
+    const t = window.setTimeout(() => setBulkNote(null), 10_000);
+    return () => window.clearTimeout(t);
+  }, [bulkNote]);
+  async function markMany(ids: string[], on: boolean) {
+    setMarkBusy(true);
+    try {
+      const done: string[] = [];
+      for (const id of ids) {
+        const r = await fetch(`/api/article-delist/${encodeURIComponent(id)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ marked: on }) });
+        if (r.ok) done.push(id);
+      }
+      setMarkedLocal((prev) => {
+        const next = new Map(prev);
+        for (const id of done) next.set(id, on);
+        return next;
+      });
+      if (done.length > 0) router.refresh();
+      return done;
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = (ids: string[], on: boolean) => setSelected(on ? new Set(ids) : new Set());
   const reorderCount = useMemo(() => rows.filter((r) => r.reorderDue && !r.hidden).length, [rows]);
   // Bestandsfilter: nur Artikel mit genau dieser Menge (zählt als "mit Bestand", auch ohne den Standardfilter)
   const [stockBand, setStockBand] = useState<"1" | "2-3" | "4-9" | "10+" | null>(() => {
@@ -304,6 +353,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (ordnerFilter) params.set("ordner", ordnerFilter);
     if (artFilter) params.set("art", artFilter);
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
+    if (task !== "alle") params.set("aufgabe", task);
     if (view === "alles") params.set("ansicht", "alles");
     if (boardSort !== "abweichung") params.set("sort", boardSort);
     if (boardReverse) params.set("rev", "1");
@@ -327,7 +377,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
+  }, [query, selectedWindow, classFilter, ordnerFilter, artFilter, marketFilter, task, view, boardSort, boardReverse, stockBand, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -437,13 +487,16 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
+    if (task !== "alle") {
+      result = result.filter((r) => matchesTask(task, r, dupIds));
+    }
+    if (task === "alle" && stockFilter && !showHidden && !normalizedQuery && !onlySoldOut && !onlyReorder && !onlyDup && !onlyLife && !onlyMarked && !onlyNoShop && !onlyEnded && !stockBand) {
       // Ohne Bestand bleiben aktive Artikel sichtbar, die man nachbestellen will: fällig, zurückgestellt oder im letzten Jahr verkauft (Chris, 13.11.).
       const yearAgo = Date.now() - 365 * 86_400_000;
       result = result.filter((r) => r.stock > 0 || (r.active && (r.reorderDue || !!r.reorderSnoozedUntil || (!!r.lastSoldAt && new Date(r.lastSoldAt).getTime() >= yearAgo))));
     }
     return result;
-  }, [rows, query, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, task, dupIds, classFilter, ordnerFilter, artFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyReorder, onlyDup, onlyLife, onlyMarked, onlyNoShop, onlyEnded, dupGroups, onlyMarketFalling, stockBand, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -464,6 +517,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyDup) sorted.sort((a, b) => (dupGroups.get(a.articleId) ?? "").localeCompare(dupGroups.get(b.articleId) ?? ""));
     return sorted.slice(0, visibleCount);
   }, [filtered, boardSort, boardReverse, visibleCount, onlyDup, dupGroups]);
+  const activeChips: { key: string; label: string; off: () => void }[] = [];
+  if (ordnerFilter) activeChips.push({ key: "ordner", label: `Ordner ${ordnerFilter}`, off: () => setOrdnerFilter("") });
+  if (artFilter) activeChips.push({ key: "art", label: `Kartenart ${artFilter}`, off: () => setArtFilter("") });
+  classFilter.forEach((cls) => activeChips.push({ key: `klasse-${cls}`, label: `Klasse ${LABELS_DE[cls]}`, off: () => toggleClass(cls) }));
+  statusFilter.forEach((st) => activeChips.push({ key: `status-${st}`, label: `Marge am EK: ${STATUS_PILL[st].label}`, off: () => toggleStatus(st) }));
+  marketFilter.forEach((f) => activeChips.push({ key: `markt-${f}`, label: MARKET_FILTER_LABEL[f], off: () => toggleMarket(f) }));
+  if (stockBand) activeChips.push({ key: "bestand", label: `Bestand ${stockBand}`, off: () => setStockBand(null) });
+  if (valueRange) activeChips.push({ key: "wert", label: `Marktwert ${valueRange.label}`, off: () => setValueRange(null) });
+  if (onlyLadenhueter) activeChips.push({ key: "lh", label: "nur Ladenhüter", off: () => setOnlyLadenhueter(false) });
+  if (showNoStock) activeChips.push({ key: "ohnebestand", label: "ohne Bestand", off: () => setShowNoStock(false) });
+  if (showHidden) activeChips.push({ key: "hidden", label: "Ausgeblendete", off: () => setShowHidden(false) });
+  if (showDiscontinued) activeChips.push({ key: "ausgelaufen", label: "Ausgelaufene", off: () => setShowDiscontinued(false) });
+  if (query.trim()) activeChips.push({ key: "q", label: `Suche „${query.trim()}“`, off: () => setQuery("") });
   const extraFiltersActive = ordnerFilter !== "" || artFilter !== "" || showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyReorder || onlyDup || onlyLife || onlyMarked || onlyNoShop || onlyEnded || onlyMarketFalling || stockBand !== null || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
@@ -506,6 +572,25 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       }
       footer={<span>Alle Zahlen serverseitig berechnet · Filter/Sortierung laufen clientseitig.</span>}
     >
+      <div className="bd-tasks" role="tablist" aria-label="Aufgaben">
+        {TASKS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={task === t.key}
+            className={`bd-task${task === t.key ? " on" : ""}${t.key !== "alle" && counts[t.key] > 0 && task !== t.key ? " has" : ""}`}
+            title={t.hint}
+            onClick={() => {
+              setTask(t.key);
+              setVisibleCount(PAGE_SIZE);
+            }}
+          >
+            {t.label}
+            <span className="bd-task-n">{counts[t.key].toLocaleString("de-DE")}</span>
+          </button>
+        ))}
+      </div>
       <div className="bd-cards" role="group" aria-label="VK gegen Marktwert">
         {(
           [
@@ -529,6 +614,25 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
       </div>
+      {activeChips.length > 0 && (
+        <div className="bd-active" role="group" aria-label="Aktive Filter">
+          <span className="bd-active-l">Aktiv</span>
+          {activeChips.map((c) => (
+            <button key={c.key} type="button" className="chip on" title="Filter entfernen" onClick={c.off}>
+              {c.label} ×
+            </button>
+          ))}
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              activeChips.forEach((c) => c.off());
+            }}
+          >
+            alle zurücksetzen
+          </button>
+        </div>
+      )}
       <details className="bd-more" open={extraFiltersActive}>
         <summary>
           Weitere Filter{extraFiltersActive ? " · aktiv" : ""}
@@ -587,8 +691,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </button>
         ))}
         <span className="fsep" />
-        <span className="flabel" title="Korridor mit deinem eigenen EK (Billbee); „kein EK“ = ohne Einkaufspreis keine Rechnung möglich">
-          eigener EK
+        <span className="flabel" title="Marge deines VK am eigenen EK (Billbee). „EK fehlt“ = ohne Einkaufspreis keine Rechnung möglich. Das Preis-Urteil oben (zu günstig / zu teuer) rechnet mit dem Marktwert.">
+          Marge am eigenen EK
         </span>
         {STATUS_ORDER.map((status) => (
           <button
@@ -805,7 +909,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
+          <PreisBoard dupGroups={onlyDup ? dupGroups : undefined} rows={boardRows} sortKey={boardSort} reversed={boardReverse} onSort={(k) => { if (k === boardSort) setBoardReverse((r) => !r); else { setBoardSort(k); setBoardReverse(false); } }} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} task={task} selected={selected} onToggleSelect={toggleSelect} onToggleAll={toggleAll} marked={markedLocal} onMark={(id, on) => void markMany([id], on)} busyMark={markBusy} />
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
@@ -1016,6 +1120,52 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="cardpreview" src={preview.src} alt="" style={{ left: preview.x, top: preview.y }} />
+      )}
+      {(selected.size > 0 || bulkNote) && (
+        <div className="bd-bulk" role="region" aria-label="Sammelaktionen">
+          {selected.size > 0 ? (
+            <>
+              <b>{selected.size} ausgewählt</b>
+              <button
+                type="button"
+                className="chip"
+                disabled={markBusy}
+                title="Merkt die ausgewählten Karten zum Auslisten vor (nur eine Markierung in LEC, bei eBay passiert nichts)."
+                onClick={async () => {
+                  const ids = Array.from(selected);
+                  const done = await markMany(ids, true);
+                  setSelected(new Set());
+                  if (done.length > 0) setBulkNote({ ids: done });
+                }}
+              >
+                Zum Auslisten vormerken
+              </button>
+              <button
+                type="button"
+                className="chip"
+                title="Kopiert die Set-Codes der ausgewählten Karten, einen je Zeile, in die Zwischenablage."
+                onClick={() => {
+                  const codes = rows.filter((r) => selected.has(r.articleId) && r.setCode).map((r) => r.setCode as string);
+                  void navigator.clipboard?.writeText(codes.join("\n"));
+                }}
+              >
+                Set-Codes kopieren
+              </button>
+              <button type="button" className="chip" onClick={() => setSelected(new Set())}>
+                Auswahl aufheben
+              </button>
+            </>
+          ) : (
+            bulkNote && (
+              <>
+                <b>{bulkNote.ids.length} vorgemerkt</b>
+                <button type="button" className="chip" disabled={markBusy} onClick={async () => { await markMany(bulkNote.ids, false); setBulkNote(null); }}>
+                  Rückgängig
+                </button>
+              </>
+            )
+          )}
+        </div>
       )}
     </AppShell>
   );

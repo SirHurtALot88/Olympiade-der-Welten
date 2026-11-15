@@ -35,6 +35,8 @@ model Article {
   /// Kartenbild aus Chris' eigenem eBay-Shop (siehe src/lib/images/). Einmal
   /// gefunden und abgelegt, danach nur neu geladen, wenn sich das Angebotsbild aendert.
   ebayItemId     String?
+  /// Billbee-Artikel-ID (Product.Id aus dem Artikelstamm), fuer den Link in die Billbee-Artikelbearbeitung im Drawer.
+  billbeeId      String?
   imageGuid      String?
   /// Dateiname im Bildordner neben der SQLite (Volume lec-data), null = kein Bild.
   imageFile      String?
@@ -323,6 +325,14 @@ model CostSettings {
   /// UNGENUTZT seit 13.10.2026: der Korridor ist 25-33 % Deckungsbeitrags-Marge (src/lib/pricing/costEngine.ts).
   marginMinMultiplier         Float    @default(1.33)
   marginGoodMultiplier        Float    @default(1.66)
+  /// Neue Kalkulation nach Volumen (14.11.2026): Versand, Verpackung, Einkaufs-Versand als Jahreskosten / verkaufte Stueck.
+  volumeBasedCosts            Boolean  @default(true)
+  shippingDomesticLow         Float    @default(0.95)
+  shippingDomesticHigh        Float    @default(1.1)
+  shippingHighShare           Float    @default(0.15)
+  itemsPerOrder               Float    @default(1.5)
+  packagingYearly             Float    @default(217)
+  buyOrdersPerYear            Float    @default(904)
   createdAt                   DateTime @default(now())
 }
 

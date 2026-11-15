@@ -10,6 +10,8 @@ nur mit Pixeln der PixelLab-Szenen (public/szenen/), deterministisch, ohne API.
   jedes Linienpixel nimmt das naechste freie Pixel quer zur Linie.
 - freistellen(): ein Requisit (Bogen, Schild …) vom Rand her kettengeflutet freistellen, ohne dass
   jemand die Hintergrundfarbe(n) von Hand nennen muss (Kulissen Batch 15, Spurt).
+- tribuenen_mischen(): ein Tribuenenstreifen aus mindestens drei verschiedenen Bloecken statt eines
+  Blocks im Takt (Kulissen-Qualitaets-Audit 08.11., Abschnitt 4.8a; Fable-Brainstorm 14.11., Punkt 5).
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 WURZEL = Path(__file__).resolve().parent.parent.parent
 QUELLEN = WURZEL / "data" / "generated" / "kulissen-quellen"
@@ -167,6 +169,34 @@ def freistellen(bild: Image.Image, schwelle: int = 26) -> Image.Image:
                 dq.append((nx, ny))
     alpha = np.where(bg, 0, 255).astype(np.uint8)
     return Image.fromarray(np.dstack([np.asarray(rgb), alpha]), "RGBA")
+
+
+def tribuenen_mischen(streifen: Image.Image, teile: int = 3, saat: int = 0) -> Image.Image:
+    """Ein Tribuenenstreifen, in `teile` gleich breite Abschnitte zerlegt, jeder Abschnitt mit einer
+    eigenen, leichten Variante (Spiegelung, Helligkeit, Farbton) ueber dem bereits vorhandenen
+    Pixelmaterial -- kein neues Asset, keine neue PixelLab-Bestellung. Die PixelLab-Rohszenen zeigen
+    ihre Zuschauermenge als EIN Muster, das sich ueber die volle Breite im immer gleichen Rhythmus
+    wiederholt (gemessen: identische Chevron-Bloecke, Kulissen-Qualitaets-Audit 08.11., Abschnitt
+    4.8a: "Tribuenenstreifen aus mindestens drei verschiedenen Bloecken mischen statt eines Blocks im
+    Takt"). Ohne diese Funktion bleibt das Original-Zebramuster sichtbar, egal wie oft der Streifen
+    ueber die Leinwandbreite gestreckt wird -- das Problem sitzt in der Quelle, nicht in einem
+    Kachel-Loop dieses Projekts. `saat` verschiebt die Reihenfolge der Varianten je Disziplin/
+    Variante, damit nicht jede Tribuene denselben Rhythmus zeigt."""
+    b = streifen.convert("RGB")
+    breite, hoehe = b.size
+    grenzen = [round(i * breite / teile) for i in range(teile + 1)]
+    varianten = (
+        (lambda im: im),
+        (lambda im: im.transpose(Image.FLIP_LEFT_RIGHT)),
+        (lambda im: ImageEnhance.Brightness(im).enhance(0.84)),
+        (lambda im: ImageEnhance.Color(ImageEnhance.Brightness(im).enhance(1.1)).enhance(0.78)),
+    )
+    aus = Image.new("RGB", (breite, hoehe))
+    for i in range(teile):
+        x0, x1 = grenzen[i], grenzen[i + 1]
+        stueck = b.crop((x0, 0, x1, hoehe))
+        aus.paste(varianten[(i + saat) % len(varianten)](stueck), (x0, 0))
+    return aus
 
 
 def speichere_quelle(disziplin: str, variante: str, bild: Image.Image) -> Path:

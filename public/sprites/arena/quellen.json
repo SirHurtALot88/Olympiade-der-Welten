@@ -1129,6 +1129,66 @@
   "erzeugt": "2026-11-08",
   "verwendung": "Takeshi's Castle, Kulissen-QS Batch 13 — drei Tribuenenbloecke entlang der Route (s. bodenTakeshiRoute() Schritt 8b, 'Publikum und Fernsehshow')"
  },
+ "climbing_matte.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    48,
+    48
+   ],
+   "job": "172b67f2-df39-41f2-983c-8d85bd583bc5",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_matte.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_matte (art=\"neu\": brandneue Requisite, eigene gen-Box statt Alpha-Box einer alten Datei)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 (Rang 2 des Audits docs/design/kulissen-qualitaets-audit-08-11.md) — Kachel fuer die Hallenmatten-Bodenzone der Variante \"wand\", s. bodenWand()"
+ },
+ "climbing_kreidebeutel.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    20,
+    26
+   ],
+   "job": "94397d27-04cd-4c99-9d8f-2840b961352c",
+   "kandidat": 6,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_kreidebeutel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_kreidebeutel (art=\"neu\")",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 — Kreidebeutel am Wandfuss neben einzelnen Sicherern, s. bodenWand()"
+ },
+ "climbing_eiszapfen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a cluster of hanging translucent light blue ice icicles pointing downward, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    30,
+    42
+   ],
+   "job": "6d645eaf-89f4-4532-b50f-94dce49f7bb8",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_eiszapfen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_eiszapfen (art=\"neu\")",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 — Eiszapfen am obersten Ueberhang-Band der Variante \"eis\", s. bodenWand()"
+ },
  "spurt_bogen_in.png": {
   "paket": "PixelLab (Asset-Runde, ueber die Spurt-Rohszene)",
   "quelle": "public/szenen/spurt/hyrox.jpg",
@@ -1146,5 +1206,13 @@
   "skript": "python3 -I scripts/baue-kulisse-buehnen.py --spurt-requisiten",
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-08"
+ },
+ "hyrox_halle.jpg": {
+  "paket": "abgeleitet aus public/szenen/spurt/hyrox.jpg (PixelLab, Asset-Runde 01./02.11.)",
+  "quelle": "public/szenen/spurt/hyrox.jpg",
+  "beschreibung": "Draufsicht-Kulisse der Hallenrunde (Hallenrunde-PR): dieselben sechs Flicken wie scripts/baue-spurt-szene.py (PATCHES/clean_bg(), Demo-Figuren heraus) plus drei weitere, die die uebrigen Schlitten vom Kunstrasen nehmen (dort stehen jetzt die Stationssprites)",
+  "skript": "python3 -I scripts/baue-hyrox-halle.py",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt -- kein neuer PixelLab-Auftrag, reine Bildableitung",
+  "erzeugt": "2026-11-09"
  }
 }

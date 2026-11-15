@@ -106,6 +106,9 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  // P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem
+  // Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
+  if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
   staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 

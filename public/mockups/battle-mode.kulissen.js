@@ -267,13 +267,13 @@ window.__ARENA_KULISSEN={
    "id": "riviera",
    "label": "Sandplatz Riviera",
    "bild": "/sprites/kulissen/tennis/riviera.jpg",
-   "dunkel": 0.13
+   "dunkel": 0.14
   },
   {
    "id": "dach",
    "label": "Hochhausdach",
    "bild": "/sprites/kulissen/tennis/dach.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.07
   }
  ],
  "time-trial": [

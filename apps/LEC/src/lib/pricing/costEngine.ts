@@ -78,6 +78,10 @@ export interface HkInput {
  * Bestellmenge bekannt ist (Einkaufs-Import), greift er wieder.
  */
 export function buyShippingShare(input: HkInput, settings: CostSettingsValues): number {
+  // Neu (volumeBasedCosts): Porto aller Einkaufsbestellungen im Jahr / verkaufte Stueck, statt "Bestellporto x 50 %" je Stueck.
+  if (settings.volumeBasedCosts && input.shop && input.shop.units365d > 0) {
+    return (settings.buyOrdersPerYear * settings.buyShippingUnderFive) / input.shop.units365d;
+  }
   const qty = input.purchaseQty ?? 1;
   const orderPostage = qty < 5 ? settings.buyShippingUnderFive : settings.buyShippingFive;
   return orderPostage * settings.buyShippingShareFactor;
@@ -155,13 +159,31 @@ export interface HkBreakdown {
   total: number;
 }
 
+/**
+ * Versand je Stueck (Inland). Neu: durchschnittliches Porto je Sendung (Standard/Aufschlag-Stufe nach Anteil) geteilt durch die
+ * Artikel je Bestellung. Packs behalten den festen Wert. Ohne `volumeBasedCosts` der alte feste Stueckwert.
+ */
+export function shippingPerUnit(kind: ItemKind, settings: CostSettingsValues): number {
+  if (kind === "pack" || !settings.volumeBasedCosts) return kind === "pack" ? settings.shippingPack : settings.shippingSingle;
+  const avgPostage = settings.shippingDomesticLow * (1 - settings.shippingHighShare) + settings.shippingDomesticHigh * settings.shippingHighShare;
+  return avgPostage / Math.max(1, settings.itemsPerOrder);
+}
+
+/** Verpackung je Stueck. Neu: Jahreskosten / verkaufte Stueck (365 T); ohne Volumen der alte feste Wert. Pack-Aufschlag wie bisher (0,062 zu 0,053). */
+export function packagingPerUnit(kind: ItemKind, shop: ShopVolume | null, settings: CostSettingsValues): number {
+  const base = kind === "pack" ? settings.packagingPack : settings.packagingSingle;
+  if (!settings.volumeBasedCosts || !shop || !(shop.units365d > 0)) return base;
+  const perUnit = settings.packagingYearly / shop.units365d;
+  return kind === "pack" ? perUnit * (settings.packagingPack / settings.packagingSingle) : perUnit;
+}
+
 /** Selbstkosten HK (KONZEPT §7.3), ohne eBay-Verkaufsgebuehr. */
 export function computeHk(input: HkInput, settings: CostSettingsValues): HkBreakdown {
   const isPack = input.kind === "pack";
   const buyShipping = buyShippingShare(input, settings);
-  const shipping = isPack ? settings.shippingPack : settings.shippingSingle;
+  const shipping = shippingPerUnit(input.kind, settings);
   const registeredMail = registeredCostPerUnit(input.vk, input.shop, settings);
-  const packaging = isPack ? settings.packagingPack : settings.packagingSingle;
+  const packaging = packagingPerUnit(input.kind, input.shop, settings);
   const fixed = input.fixedCostPerUnit;
 
   const total = input.ek + buyShipping + shipping + registeredMail + packaging + fixed;

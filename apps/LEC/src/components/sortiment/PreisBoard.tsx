@@ -3,7 +3,8 @@
 import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
-import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty, to99 } from "@/lib/dashboard/board";
+import type { TaskKey } from "@/lib/dashboard/tasks";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -17,9 +18,9 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 type Verdict = "zu_guenstig" | "im_korridor" | "zu_teuer";
 
 const VERDICT: Record<Verdict, { label: string; cls: string; color: string }> = {
-  zu_guenstig: { label: "zu günstig", cls: "bd-v-low", color: "var(--warn)" },
+  zu_guenstig: { label: "↑ zu günstig", cls: "bd-v-low", color: "var(--warn)" },
   im_korridor: { label: "im Rahmen", cls: "bd-v-ok", color: "var(--good)" },
-  zu_teuer: { label: "zu teuer", cls: "bd-v-high", color: "var(--market)" },
+  zu_teuer: { label: "↓ zu teuer", cls: "bd-v-high", color: "var(--warn)" },
 };
 
 const eur = (v: number) => `${formatEuroCents(v)} €`;
@@ -104,7 +105,7 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
       </span>
       {gap && gap.target !== null && (
         <span className="bd-delta">
-          {gap.euro < 0 ? "↑" : "↓"} auf {eur(gap.target)}
+          {gap.euro < 0 ? "↑" : "↓"} auf {eur(to99(gap.target, gap.euro < 0 ? "up" : "down"))}
         </span>
       )}
     </div>
@@ -122,6 +123,15 @@ interface Props {
   imageSrc: (articleId: string, version: string) => string;
   onPreview: (p: { src: string; x: number; y: number } | null) => void;
   onOpen: (articleId: string) => void;
+  /** Aktiver Aufgaben-Reiter: ausser "alle" gibt es Auswahlkaesten und die Spalte "Aktion". */
+  task?: TaskKey;
+  selected?: ReadonlySet<string>;
+  onToggleSelect?: (articleId: string) => void;
+  onToggleAll?: (articleIds: string[], on: boolean) => void;
+  /** Lokaler Stand der Vormerkung (nach dem Klick, bis die Seite neu geladen hat). */
+  marked?: ReadonlyMap<string, boolean>;
+  onMark?: (articleId: string, marked: boolean) => void;
+  busyMark?: boolean;
 }
 
 /** Tage seit dem letzten Verkauf; null ohne Verkauf. */
@@ -131,7 +141,11 @@ export function daysSince(iso: string | null | undefined, now = Date.now()): num
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
 }
 
-export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen }: Props) {
+export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen, task = "alle", selected, onToggleSelect, onToggleAll, marked, onMark, busyMark }: Props) {
+  const withTask = task !== "alle";
+  // In den Aufgaben-Reitern ohne Preisfrage entfaellt der Marktwert, damit die Spalte "Aktion" Platz hat
+  const showMarkt = task === "alle" || task === "preis";
+  const allSelected = withTask && rows.length > 0 && rows.every((r) => selected?.has(r.articleId));
   const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
     <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
       {label}
@@ -140,20 +154,24 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
   );
   return (
     <div className="bd-wrap">
-      <table className="bd">
+      <table className={withTask ? "bd bd-task" : "bd"}>
         <thead>
           <tr>
+            {withTask && (
+              <th className="bd-th-sel">
+                <input type="checkbox" aria-label="Alle sichtbaren auswählen" checked={allSelected} onChange={(e) => onToggleAll?.(rows.map((r) => r.articleId), e.target.checked)} />
+              </th>
+            )}
             {head("name", "Artikel")}
             {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
-            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage)")}
-            {head("letzterVerkauf", "Letzter Verkauf", "r", "Vor wie vielen Tagen zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
-            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)")}
-            {head("avgvk", "Ø VK", "r", "Durchschnittlicher Verkaufspreis je Stück (365 T)")}
+            {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage), darunter wann zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
             {head("vk", "Dein VK", "r")}
             {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
-            {head("marktwert", "Marktwert", "r")}
-            {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
             {head("abweichung", "Urteil")}
+            {showMarkt && head("marktwert", "Marktwert", "r")}
+            {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
+            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T), darunter dein durchschnittlicher Verkaufspreis (Ø VK)")}
+            {withTask && <th className="bd-th-act">Aktion</th>}
           </tr>
         </thead>
         <tbody>
@@ -163,7 +181,12 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
             const clean = cleanTitle(row.nameRaw);
             const v = imageVersions[row.articleId];
             return (
-              <tr key={row.articleId} onClick={() => onOpen(row.articleId)}>
+              <tr key={row.articleId} className={withTask && (marked?.get(row.articleId) ?? !!row.delistMarkedAt) && task === "auslisten" ? "bd-row-marked" : undefined} onClick={() => onOpen(row.articleId)}>
+                {withTask && (
+                  <td className="bd-c-sel" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label="Zeile auswählen" checked={selected?.has(row.articleId) ?? false} onChange={() => onToggleSelect?.(row.articleId)} />
+                  </td>
+                )}
                 <td className="bd-c-art">
                   <div className="bd-art">
                     {v ? (
@@ -226,36 +249,20 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}
                   <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
-                </td>
-                <td data-label="Letzter Verkauf" className="r bd-num bd-c-last">
-                  {(() => {
-                    const d = daysSince(row.lastSoldAt);
-                    if (d === null)
-                      return row.listedDays != null ? (
-                        <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
-                          nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
-                        </span>
-                      ) : (
-                        <span className="bd-none">—</span>
-                      );
-                    return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
-                  })()}
-                </td>
-                <td data-label="Ø EK" className="r bd-num bd-c-ek">
-                  {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
-                  {(() => {
-                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
-                    const d = daysSince(row.lastEkAt);
-                    if (d === null) return null;
-                    return (
-                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
-                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
-                      </small>
-                    );
-                  })()}
-                </td>
-                <td data-label="Ø VK" className="r bd-num bd-c-avg">
-                  {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
+                  <small className="bd-sub90" style={{ display: "block" }} title="Letzter Verkauf">
+                    {(() => {
+                      const d = daysSince(row.lastSoldAt);
+                      if (d === null)
+                        return row.listedDays != null ? (
+                          <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                            nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
+                          </span>
+                        ) : (
+                          <span className="bd-none">—</span>
+                        );
+                      return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                    })()}
+                  </small>
                 </td>
                 <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "eBay-Shoppreis (Rückfall, wenn Billbee keinen VK hat)" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
@@ -275,25 +282,61 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />
                 </td>
-                <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
-                  {m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${formatEuroCents(m.range.max)} €` : <span className="bd-none">—</span>}
-                </td>
-                <td
-                  data-label="Marge bei Nachkauf"
-                  className="r bd-num bd-c-margin"
-                  style={{ color: m?.margin == null ? undefined : m.margin < 0 ? "var(--crit)" : m.margin < 0.25 ? "var(--warn)" : "var(--good)" }}
-                >
-                  {m?.margin != null ? `${formatPercent(m.margin)} %` : <span className="bd-none">—</span>}
-                </td>
                 <td data-label="Urteil" className="bd-c-verdict">
                   <VerdictBadge row={row} />
                 </td>
+{showMarkt && (                <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
+                  {m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${formatEuroCents(m.range.max)} €` : <span className="bd-none">—</span>}
+                </td>)}
+                <td
+                  data-label="Marge bei Nachkauf"
+                  className="r bd-num bd-c-margin"
+                  style={{ color: m?.margin != null && m.margin < 0 ? "var(--crit)" : undefined }}
+                >
+                  {m?.margin != null ? `${formatPercent(m.margin)} %` : <span className="bd-none">—</span>}
+                </td>
+                <td data-label="Ø EK" className="r bd-num bd-c-ek">
+                  {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
+                  {(() => {
+                    // Wie aktuell ist der EK? Letzte EK-Aenderung (Billbee) oder letzter Einkauf, farbig in Tagen
+                    const d = daysSince(row.lastEkAt);
+                    if (d === null) return null;
+                    return (
+                      <small className="bd-pchg" title="Letzte EK-Änderung oder letzter Einkauf (grün bis 30 Tage = sehr aktuell, gelb bis 90, rot älter)" style={{ display: "block", color: d <= 30 ? "var(--good)" : d <= 90 ? "var(--warn)" : "var(--crit)" }}>
+                        {d === 0 ? "EK heute" : `EK vor ${d} T`}
+                      </small>
+                    );
+                  })()}
+                  <small className="bd-pchg" style={{ display: "block", color: "var(--muted)" }} title="Durchschnittlicher Verkaufspreis je Stück (365 T)">
+                    Ø VK {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : "—"}
+                  </small>
+                </td>
+                {withTask && (
+                  <td data-label="Aktion" className="bd-c-act" onClick={(e) => e.stopPropagation()}>
+                    {(() => {
+                      const l = ebayLinks(row);
+                      const isMarked = marked?.get(row.articleId) ?? !!row.delistMarkedAt;
+                      return (
+                        <>
+                          {task === "auslisten" && onMark && (
+                            <button type="button" className={`chip${isMarked ? " on" : ""}`} disabled={busyMark} onClick={() => onMark(row.articleId, !isMarked)} title={isMarked ? "Markierung zurücknehmen." : "Karte zum Auslisten vormerken (nur eine Markierung in LEC, bei eBay passiert nichts)."}>
+                              {isMarked ? "Vorgemerkt · Rückgängig" : "Vormerken"}
+                            </button>
+                          )}
+                          <a className="chip" href={l.revise ?? l.view ?? l.search} target="_blank" rel="noopener noreferrer" title={l.revise ? "Öffnet das Bearbeiten-Formular des Angebots bei eBay." : "Öffnet das Angebot bzw. die Suche im eBay-Shop."}>
+                            eBay ↗
+                          </a>
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
               </tr>
             );
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={10} className="bd-empty">
+              <td colSpan={(withTask ? 11 : 9) - (showMarkt ? 0 : 1)} className="bd-empty">
                 Keine Artikel für diese Auswahl.
               </td>
             </tr>

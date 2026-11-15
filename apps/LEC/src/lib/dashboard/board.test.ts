@@ -203,3 +203,17 @@ describe("findDuplicateGroups", () => {
     expect([...g.keys()].sort()).toEqual(["a", "b"]);
   });
 });
+
+import { to99 } from "./board";
+describe("to99", () => {
+  it("erhoeht auf die naechste ,99 darueber oder gleich", () => {
+    expect(to99(29.52, "up")).toBe(29.99);
+    expect(to99(29.99, "up")).toBe(29.99);
+    expect(to99(30.0, "up")).toBe(30.99);
+  });
+  it("senkt auf die naechste ,99 darunter oder gleich, nie unter 4,99", () => {
+    expect(to99(14.54, "down")).toBe(13.99);
+    expect(to99(14.99, "down")).toBe(14.99);
+    expect(to99(3.2, "down")).toBe(4.99);
+  });
+});

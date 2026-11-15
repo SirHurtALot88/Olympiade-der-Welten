@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CostSettingsValues } from "@/lib/pricing/costSettings";
 import { DB_MARGIN_MIN, DB_MARGIN_OPT, totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
-import { PREVIEW_EXAMPLES, buildCostPreview, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
+import { PREVIEW_EXAMPLES, buildCostPreview, compareCostModels, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
 import { formatEuroCents } from "@/lib/format";
 import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
 import { AppShell } from "@/components/shell/AppShell";
@@ -15,7 +15,7 @@ import type { FeeCheckBand } from "@/lib/pricing/feeCheck";
 type Unit = "eur" | "percent" | "x" | "count";
 
 interface FieldMeta {
-  key: keyof CostSettingsValues;
+  key: NumKey;
   label: string;
   unit: Unit;
   /** Abgeleiteter Wert direkt neben dem Eingabefeld (z. B. die jeweils andere Zeitbasis). */
@@ -29,12 +29,15 @@ interface Group {
   fields: FieldMeta[];
 }
 
+/** Nur die Zahlenfelder der Kostensaetze (die Anzeige hier rechnet mit Zahlen, nicht mit dem Schalter volumeBasedCosts). */
+type NumKey = { [K in keyof CostSettingsValues]: CostSettingsValues[K] extends number ? K : never }[keyof CostSettingsValues];
+
 const eur = (v: number) => `${formatEuroCents(v)} €`;
 
 /** Fixkosten-Felder sind JAHRESwerte. Der Monatswert steht daneben, damit ein Monatspreis nicht
  * versehentlich in ein Jahresfeld wandert (95 € im Jahresfeld ist der Fehler, der monatelang
  * unentdeckt blieb). */
-const yearlyField = (key: keyof CostSettingsValues, name: string): FieldMeta => ({
+const yearlyField = (key: NumKey, name: string): FieldMeta => ({
   key,
   label: `${name} — € pro JAHR`,
   unit: "eur",
@@ -45,12 +48,17 @@ const GROUPS: Group[] = [
   {
     title: "Einkaufs-Versand",
     note: (s) =>
-      `Das Porto fällt je BESTELLUNG an. Einkalkuliert wird nur der eingestellte Anteil: ` +
+      s.volumeBasedCosts
+        ? `Kalkulation nach Volumen: ${toDisplay(s.buyOrdersPerYear, "count")} Einkaufsbestellungen im Jahr × ${eur(s.buyShippingUnderFive)} Porto = ${eur(
+            s.buyOrdersPerYear * s.buyShippingUnderFive
+          )} im Jahr, geteilt durch die verkauften Stück der letzten 365 Tage (siehe Vorschau). Der Anteil unten gilt nur als Rückfall ohne Verkaufsvolumen.`
+        : `Das Porto fällt je BESTELLUNG an. Einkalkuliert wird nur der eingestellte Anteil: ` +
       `${eur(s.buyShippingUnderFive)} × ${toDisplay(s.buyShippingShareFactor, "percent")} % = ${eur(
         s.buyShippingUnderFive * s.buyShippingShareFactor
       )} je Einheit. Die Staffel „ab 5 Stk“ ist derzeit ungenutzt (der Import rechnet mit 3 Stk je Bestellung).`,
     fields: [
       { key: "buyShippingUnderFive", label: "Bestellporto unter 5 Stk — € je Bestellung", unit: "eur" },
+      { key: "buyOrdersPerYear", label: "Einkaufsbestellungen pro JAHR (Lexoffice-Belege hochgerechnet)", unit: "count" },
       { key: "buyShippingFive", label: "Bestellporto ab 5 Stk — € je Bestellung", unit: "eur" },
       {
         key: "buyShippingShareFactor",
@@ -61,10 +69,23 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: "Versand & Verpackung — Einzel",
+    title: "Versand & Verpackung nach Volumen — Einzel",
+    note: (s) =>
+      s.volumeBasedCosts
+        ? `Versand Inland: Ø Porto je Sendung ${eur(s.shippingDomesticLow * (1 - s.shippingHighShare) + s.shippingDomesticHigh * s.shippingHighShare)} ÷ ${toDisplay(
+            s.itemsPerOrder,
+            "x"
+          )} Artikel je Bestellung = ${eur((s.shippingDomesticLow * (1 - s.shippingHighShare) + s.shippingDomesticHigh * s.shippingHighShare) / Math.max(1, s.itemsPerOrder))} je Stück. ` +
+          `Ausland bleibt außen vor (der Käufer zahlt 6,99 / 9,99 €). Verpackung: Jahreskosten geteilt durch die verkauften Stück der letzten 365 Tage. Die Artikel je Bestellung misst die App aus den Billbee-Verkäufen, sobald genug Bestellungen vorliegen.`
+        : "Alter Modus: feste Stückwerte.",
     fields: [
-      { key: "shippingSingle", label: "Versand (Brief) — € je Stück", unit: "eur" },
-      { key: "packagingSingle", label: "Verpackung — € je Stück", unit: "eur" },
+      { key: "shippingDomesticLow", label: "Porto Inland, Standard — € je Sendung", unit: "eur" },
+      { key: "shippingDomesticHigh", label: "Porto Inland, mehr Karten — € je Sendung", unit: "eur" },
+      { key: "shippingHighShare", label: "Anteil Sendungen zur höheren Stufe", unit: "percent" },
+      { key: "itemsPerOrder", label: "Ø Artikel je Bestellung (wird aus Billbee gemessen)", unit: "x" },
+      { key: "packagingYearly", label: "Versandtaschen und Toploader — € pro JAHR", unit: "eur" },
+      { key: "shippingSingle", label: "Rückfall: Versand (Brief) — € je Stück", unit: "eur" },
+      { key: "packagingSingle", label: "Rückfall: Verpackung — € je Stück", unit: "eur" },
     ],
   },
   {
@@ -165,6 +186,7 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
     [parsed, shopVolume]
   );
   const facts = useMemo(() => deriveCostFacts(parsed, shopVolume), [parsed, shopVolume]);
+  const comparison = useMemo(() => (shopVolume ? compareCostModels(PREVIEW_EXAMPLES[0], parsed, shopVolume) : null), [parsed, shopVolume]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -277,6 +299,47 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
             </div>
           </div>
 
+          <div className="card" style={{ padding: "15px 16px 16px" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Betriebszahlen je Jahr</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Einkäufe, Verkäufe, Versand und der eBay-Kostenvergleich stehen jetzt unter <a href="/cockpit">Finanzen</a> (am Ende, eingeklappt).
+            </div>
+          </div>
+
+          {comparison && (
+            <div className="card" style={{ padding: "15px 16px 16px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Nebenkosten je Stück: feste Werte gegen Kalkulation nach Volumen</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
+                Beispiel {PREVIEW_EXAMPLES[0].label.toLowerCase()} (VK {eur(PREVIEW_EXAMPLES[0].vk)}), bei {shopVolume?.units365d.toLocaleString("de-DE")} verkauften Stück in 365 Tagen. „Alt“ sind die festen Stückwerte, „neu“ die
+                Jahreskosten geteilt durch das echte Verkaufsvolumen. Aktiv ist: {parsed.volumeBasedCosts ? "neu (nach Volumen)" : "alt (feste Werte)"}.
+              </div>
+              <table className="bd-dt-t" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr><th>Posten</th><th className="r">alt</th><th className="r">neu</th></tr>
+                </thead>
+                <tbody>
+                  {comparison.rows.map((r) => (
+                    <tr key={r.label}>
+                      <td>{r.label}</td>
+                      <td className="r">{eur(r.oldValue)}</td>
+                      <td className="r">{eur(r.newValue)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ fontWeight: 700 }}>
+                    <td>Nebenkosten ohne EK</td>
+                    <td className="r">{eur(comparison.oldTotal)}</td>
+                    <td className="r">{eur(comparison.newTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Empfohlener Mindestpreis (VK-MIN)</td>
+                    <td className="r">{eur(comparison.oldVkMin)}</td>
+                    <td className="r">{eur(comparison.newVkMin)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {feeCheck && (
             <div className="card" style={{ padding: "15px 16px 16px" }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>eBay-Gebührensatz: echt gegen Modell</div>
@@ -352,7 +415,7 @@ function PreviewColumn({ pv, parsed }: { pv: CostPreview; parsed: CostSettingsVa
         <span>{eur(hk.ek)}</span>
       </div>
       <div className="row">
-        <span className="muted">+ Einkaufs-Versand ({toDisplay(parsed.buyShippingShareFactor, "percent")} % Porto)</span>
+        <span className="muted">+ Einkaufs-Versand{parsed.volumeBasedCosts ? " (nach Volumen)" : ` (${toDisplay(parsed.buyShippingShareFactor, "percent")} % Porto)`}</span>
         <span>{eur(hk.buyShipping)}</span>
       </div>
       <div className="row">
