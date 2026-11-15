@@ -153,20 +153,19 @@ describe("ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * I-SPY IST JETZT DRIN (27.10., Task #197) -- loest den Regressionstest ab, der seit
-   * Produktivierungswelle 2 bewusst rot-bei-Anschluss angelegt war ("Wird I-Spy spaeter ueber
-   * 0,80 gehoben, faellt dieser Test absichtlich rot und ist DANN mit der neuen Zahl zu
-   * aktualisieren"). Die neue Zahl: Kalibrierrunde 3 (32 Ticks, Tresor 45) hebt rho je Spiel
-   * auf 0,817/0,811 (n=48, zwei Saatstroeme), Pp 14,6/15,0 -- s. data/generated/
-   * disziplin-abnahme.json und docs/design/organisch-tdm-battlefield-ispy-27-10.md. Der Schutz,
-   * den der alte Test leisten sollte ("es waere ja nur ein Eintrag" darf die Rangtreue-Achse
-   * nicht ueberstimmen), liegt weiter bei tests/disziplin-abnahme-guard.test.ts. Technisch laeuft
-   * I-Spy nicht ueber das Duell-, sondern ueber das Auftritt-Chassis (`schatzsuche:true`, kein
-   * `duell` mehr seit dem 21.09.).
+   * I-SPY WAR DRIN, STEHT SEIT 15.11. WIEDER DRAUSSEN (SHOWCASE-I-SPY-REGRESSION-NACHTRAG,
+   * lib/battle/arena-resolved-disciplines.ts): von 27.10. bis 15.11. in `ARENA_RESOLVED_
+   * DISCIPLINE_IDS` (Kalibrierrunde 3, rho 0,817/0,811), eine frische Neumessung (Task #136, PR
+   * #1481) fand rho 0,776 je Spiel bei n=48 -- bestaetigt unter der 0,80-Schranke. `ARENA_
+   * ANGESCHLOSSENE_DISCIPLINE_IDS`/die Chassis-Zugehoerigkeit (Auftritt, nicht Duell) bleiben
+   * unberuehrt -- Engine/Config sind weiterhin vollstaendig, nur die Mengen-Zugehoerigkeit zur
+   * Wertung aendert sich. Der Schutz, den ein spaeterer Wiederanstieg braucht ("es waere ja nur
+   * ein Eintrag" darf die Rangtreue-Achse nicht ueberstimmen), liegt bei
+   * tests/disziplin-abnahme-guard.test.ts.
    */
-  it("enthaelt I-Spy (Kalibrierrunde 3, 27.10.) -- ueber das Auftritt-Chassis, nicht das Duell-Chassis", () => {
+  it("I-Spy ist angeschlossen (Auftritt-Chassis, nicht Duell-Chassis), aber seit der Regression vom 15.11. NICHT mehr gewertet", () => {
     expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(false);
     expect(ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has("i-spy")).toBe(true);
     expect(ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has("i-spy")).toBe(false);
   });
