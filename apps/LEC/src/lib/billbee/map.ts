@@ -46,6 +46,32 @@ export interface MasterProduct {
   id: string | null;
   /** Netto-Einkaufspreis je Stueck laut Artikelstamm. */
   cost: number | null;
+  /** eBay-Artikelnummer (Billbee: Product.Sources[].SourceId der eBay-Anbindung), falls hinterlegt. */
+  ebayItemId: string | null;
+  /** Mindest-/Meldebestand und Soll-Bestand laut Artikelstamm; null, wenn nicht gepflegt (0 gilt als nicht gepflegt). */
+  minStock: number | null;
+  desiredStock: number | null;
+}
+
+/** Mindest- und Soll-Bestand aus dem Artikelstamm (Feldnamen tolerant gelesen: StockWarning / StockMinimum, StockDesired). */
+export function stockLimitsOf(p: Json): { minStock: number | null; desiredStock: number | null } {
+  const pos = (v: unknown) => {
+    const n = num(v);
+    return n !== null && n > 0 ? Math.round(n) : null;
+  };
+  return { minStock: pos(p.StockWarning ?? p.StockMinimum ?? p.MinStock), desiredStock: pos(p.StockDesired) };
+}
+
+/** eBay-Artikelnummer aus den Marktplatz-Quellen eines Billbee-Artikels (tolerant gelesen). */
+export function ebayItemIdOf(p: Json): string | null {
+  const sources = Array.isArray(p.Sources) ? (p.Sources as Json[]) : [];
+  for (const src of sources) {
+    if (!src || typeof src !== "object") continue;
+    const label = `${src.Source ?? ""} ${src.ApiAccountName ?? ""}`;
+    const id = String(src.SourceId ?? src.ExternalId ?? "").trim();
+    if (/ebay/i.test(label) && /^\d{9,14}$/.test(id)) return id;
+  }
+  return null;
 }
 
 /** Ein Artikel aus /products; null bei Titelloser oder deaktivierter Zeile. */
@@ -72,16 +98,21 @@ export function mapProduct(p: Json): MasterProduct | null {
     sku: p.SKU ? String(p.SKU) : null,
     id: p.Id !== undefined && p.Id !== null ? String(p.Id) : null,
     cost,
+    ebayItemId: ebayItemIdOf(p),
+    ...stockLimitsOf(p),
   };
 }
+
+/** So weit zurueck werden Bestellungen geholt (Basis fuer das Fenster "Gesamt"). */
+export const LOOKBACK_DAYS = 3650;
 
 const WINDOW_DAYS: { key: SaleWindowKey; days: number }[] = [
   { key: "30", days: 30 },
   { key: "90", days: 90 },
   { key: "365", days: 365 },
+  // "Gesamt": ebenfalls aus den Bestellungen, damit es keine zweite Quelle mit abweichenden Zahlen gibt.
+  { key: "all", days: LOOKBACK_DAYS },
 ];
-
-export const LOOKBACK_DAYS = 365;
 
 /** Billbee-Bestellnummer/-Id; Grundlage, um doppelt gelieferte Bestellungen zu erkennen. */
 function orderKey(o: Json): string | null {
@@ -123,6 +154,28 @@ export interface OrderDiagnostics {
   top: { name: string; units: number; orders: number; maxLine: number }[];
 }
 
+/** Bestellungen der letzten Tage je Datum und Status plus der juengste Bestellzeitpunkt: zeigt, ob Billbee ueberhaupt Bestellungen von heute liefert. */
+export function recentOrderDays(orders: Json[], now: Date, days = 4): { newestOrderAt: string | null; days: { day: string; orders: number; states: Record<string, number> }[] } {
+  const byDay = new Map<string, { orders: number; states: Record<string, number> }>();
+  let newest = -Infinity;
+  for (const o of orders) {
+    const t = Date.parse(String(o.CreatedAt ?? o.OrderDate ?? ""));
+    if (Number.isNaN(t)) continue;
+    if (t > newest) newest = t;
+    const day = new Date(t).toISOString().slice(0, 10);
+    const cur = byDay.get(day) ?? { orders: 0, states: {} };
+    cur.orders++;
+    const st = String(num(o.State ?? o.OrderStateId) ?? "?");
+    cur.states[st] = (cur.states[st] ?? 0) + 1;
+    byDay.set(day, cur);
+  }
+  const from = new Date(now.getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  return {
+    newestOrderAt: Number.isFinite(newest) ? new Date(newest).toISOString() : null,
+    days: [...byDay].filter(([d]) => d >= from).sort(([a], [b]) => (a < b ? 1 : -1)).map(([day, v]) => ({ day, ...v })),
+  };
+}
+
 export function diagnoseOrders(orders: Json[], duplicates: number, opts: { excludeStates?: number[] } = {}): OrderDiagnostics {
   const exclude = new Set(opts.excludeStates ?? []);
   const byName = new Map<string, { name: string; units: number; orders: Set<string>; maxLine: number }>();
@@ -159,6 +212,8 @@ export function diagnoseOrders(orders: Json[], duplicates: number, opts: { exclu
 
 export interface OrderMapOptions {
   now: Date;
+  /** Ordnet Positionen mit abweichendem Namen dem Stammartikel zu (siehe makeCanonicalizer). */
+  canonical?: (nameRaw: string, normalized: string) => MasterProduct | null;
   /** Bestellstatus-IDs, die nicht zaehlen (storniert u. a.). */
   excludeStates?: number[];
 }
@@ -199,7 +254,14 @@ export function mapOrders(orders: Json[], masters: MasterProduct[], opts: OrderM
       const qty = num(item.Quantity) ?? 0;
       if (qty <= 0) continue;
       const lineTotal = num(item.TotalPrice) ?? (num(item.UnitPrice) ?? 0) * qty;
-      const { normalized, packQty } = normalizeArticleName(nameRaw);
+      let { normalized, packQty } = normalizeArticleName(nameRaw);
+      let displayName = nameRaw;
+      const master = opts.canonical?.(nameRaw, normalized) ?? null;
+      if (master) {
+        normalized = master.row.nameNormalized;
+        packQty = master.row.packQty;
+        displayName = master.row.nameRaw;
+      }
       const unitCost =
         num(product.CostPrice) ??
         (product.SKU ? costBySku.get(String(product.SKU)) : undefined) ??
@@ -214,7 +276,7 @@ export function mapOrders(orders: Json[], masters: MasterProduct[], opts: OrderM
           ((): BillbeeRow => {
             const fresh: BillbeeRow = {
               sku: product.SKU ? String(product.SKU) : null,
-              nameRaw,
+              nameRaw: displayName,
               nameNormalized: normalized,
               packQty,
               setCode: extractSetCode(nameRaw),
@@ -240,6 +302,8 @@ export function mapOrders(orders: Json[], masters: MasterProduct[], opts: OrderM
 
 export interface SaleRow {
   nameNormalized: string;
+  /** Name der Bestellposition, wie Billbee ihn liefert (fuer die Zuordnung ueber den Set-Code). */
+  nameRaw: string;
   soldAt: Date;
   qty: number;
   /** Preis je Stueck, brutto (Positionssumme / Menge). */
@@ -248,7 +312,7 @@ export interface SaleRow {
 }
 
 /** Einzelverkaeufe (eine Zeile je Bestellposition) der Bestellungen; Stornos ausgenommen. */
-export function extractSales(orders: Json[], opts: { excludeStates?: number[] } = {}): SaleRow[] {
+export function extractSales(orders: Json[], opts: { excludeStates?: number[]; canonical?: (nameRaw: string, normalized: string) => MasterProduct | null } = {}): SaleRow[] {
   const exclude = new Set(opts.excludeStates ?? []);
   const out: SaleRow[] = [];
   for (const order of orders) {
@@ -265,8 +329,11 @@ export function extractSales(orders: Json[], opts: { excludeStates?: number[] } 
       const qty = num(item.Quantity) ?? 0;
       if (!nameRaw || qty <= 0) continue;
       const lineTotal = num(item.TotalPrice) ?? (num(item.UnitPrice) ?? 0) * qty;
+      const normalizedName = normalizeArticleName(nameRaw).normalized;
+      const master = opts.canonical?.(nameRaw, normalizedName) ?? null;
       out.push({
-        nameNormalized: normalizeArticleName(nameRaw).normalized,
+        nameNormalized: master ? master.row.nameNormalized : normalizedName,
+        nameRaw: master ? master.row.nameRaw : nameRaw,
         soldAt,
         qty,
         unitPrice: lineTotal / qty,
@@ -275,4 +342,99 @@ export function extractSales(orders: Json[], opts: { excludeStates?: number[] } 
     }
   }
   return out;
+}
+
+export interface OrderCheckLine {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  /** Gibt es einen Artikel mit diesem Namen? Ohne Artikel wird die Position nicht als Verkauf gespeichert. */
+  article: boolean;
+}
+
+export interface OrderCheck {
+  nr: string;
+  id: string | null;
+  at: string;
+  state: number | null;
+  /** Der Bestellstatus zaehlt nicht (zum Beispiel storniert). */
+  excluded: boolean;
+  lines: OrderCheckLine[];
+}
+
+/** Bestellungen der letzten Tage in Kurzform fuer die Suche "Bestellung pruefen" (Einstellungen): neueste zuerst, hoechstens `cap`. */
+export function summarizeRecentOrders(
+  orders: Json[],
+  now: Date,
+  hasArticle: (nameNormalized: string) => boolean,
+  opts: { excludeStates?: number[]; days?: number; cap?: number } = {}
+): OrderCheck[] {
+  const exclude = new Set(opts.excludeStates ?? []);
+  const from = now.getTime() - (opts.days ?? 60) * 86_400_000;
+  const out: OrderCheck[] = [];
+  for (const order of orders) {
+    const at = new Date(String(order.CreatedAt ?? order.OrderDate ?? ""));
+    if (Number.isNaN(at.getTime()) || at.getTime() < from) continue;
+    const state = num(order.State ?? order.OrderStateId);
+    const items = Array.isArray(order.OrderItems) ? (order.OrderItems as Json[]) : [];
+    const lines: OrderCheckLine[] = [];
+    for (const item of items) {
+      const product = (item.Product && typeof item.Product === "object" ? item.Product : {}) as Json;
+      if (!isSaleItem(item, product)) continue;
+      const name = titleOf(product.Title) || titleOf(item.Title ?? item.Name);
+      const qty = num(item.Quantity) ?? 0;
+      if (!name) continue;
+      const total = num(item.TotalPrice) ?? (num(item.UnitPrice) ?? 0) * qty;
+      lines.push({ name, qty, unitPrice: qty > 0 ? total / qty : 0, article: hasArticle(normalizeArticleName(name).normalized) });
+    }
+    const nr = order.OrderNumber ?? order.BillBeeOrderId ?? order.Id;
+    out.push({
+      nr: nr !== undefined && nr !== null ? String(nr) : "",
+      id: order.BillBeeOrderId !== undefined && order.BillBeeOrderId !== null ? String(order.BillBeeOrderId) : order.Id !== undefined && order.Id !== null ? String(order.Id) : null,
+      at: at.toISOString(),
+      state,
+      excluded: state !== null && exclude.has(state),
+      lines,
+    });
+  }
+  return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, opts.cap ?? 800);
+}
+
+const SET_CODE_RE = /\b([A-Z0-9]{2,5}-(?:DE|EN)[A-Z]?\d{2,3})\b/i;
+
+/**
+ * Rueckfall, wenn der Name einer Bestellposition zu keinem Artikel passt (Titel in Billbee nachtraeglich geaendert, anderer Zustand,
+ * andere Schreibweise): der Set-Code im Namen (DUPO-DE002) ordnet den Verkauf zu, wenn genau ein Artikel diesen Code hat oder die
+ * Seltenheit im Namen genau einen von mehreren trifft. Sonst null (lieber keinen Verkauf zuordnen als einen falschen).
+ */
+export function matchSaleBySetCode(
+  nameRaw: string,
+  articles: { id: string; setCode: string | null; nameRaw: string }[],
+  rarityOf: (name: string) => string | null
+): string | null {
+  const m = nameRaw.match(SET_CODE_RE);
+  if (!m) return null;
+  const code = m[1].toUpperCase();
+  const same = articles.filter((a) => a.setCode && a.setCode.toUpperCase() === code);
+  if (same.length === 1) return same[0].id;
+  if (same.length === 0) return null;
+  const rarity = rarityOf(nameRaw);
+  if (!rarity) return null;
+  const byRarity = same.filter((a) => rarityOf(a.nameRaw) === rarity);
+  return byRarity.length === 1 ? byRarity[0].id : null;
+}
+
+/**
+ * Bestellpositionen, deren Name zu keinem Artikel des Stamms passt (Titel nachtraeglich geaendert, anderer Zustand im Namen), werden dem
+ * Stammartikel zugeordnet, der denselben Set-Code (und bei mehreren dieselbe Seltenheit) traegt: sonst entsteht ein ausgelaufener
+ * Zwilling und der Verkauf fehlt beim echten Artikel (Chris, 13.11.: Dunkle Kavallerie). Eindeutigkeit ist Pflicht, sonst bleibt der Name.
+ */
+export function makeCanonicalizer(masters: MasterProduct[], rarityOf: (name: string) => string | null): (nameRaw: string, normalized: string) => MasterProduct | null {
+  const byNormalized = new Map(masters.map((m) => [m.row.nameNormalized, m]));
+  const cands = masters.map((m) => ({ id: m.row.nameNormalized, setCode: m.row.setCode, nameRaw: m.row.nameRaw }));
+  return (nameRaw, normalized) => {
+    if (byNormalized.has(normalized)) return null;
+    const id = matchSaleBySetCode(nameRaw, cands, rarityOf);
+    return id ? (byNormalized.get(id) ?? null) : null;
+  };
 }

@@ -4618,23 +4618,98 @@
     return true;
   }
   // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
-  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
-  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
-  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
-  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
-  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  //   u.down (ohne vizSturz) -> "tod"    (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.vizSturz             -> "treffer" (dieselbe Einmal-dann-halten-Formel, aber auf dem
+  //                              treffer-Streifen -- s. STURZ STATT TOD unten)
+  //   u.lunge>0              -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken          -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung            -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst                  -> Grundpose der Blickrichtung (Stehen)
   // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
   // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
-  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o./Sturz.
+  //
+  // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3): die
+  // 360-Pixel-Figuren haben vier Animationsarten (walk/angriff/treffer/tod), und Chris hat
+  // Tod-Animationen am 07.11. ausdruecklich blutig/dramatisch freigegeben (CLAUDE.md, Abschnitt
+  // "PixelLab-Tod-Animationen"). Vorher bildete diese Funktion JEDES `u.down`/`u.vizSturz` auf
+  // "tod" ab -- ein Abrutschen am Klettergriff, ein Eiskunstlauf-Sturz, ein Showcase-Patzer und
+  // ein Hockey-Bodycheck sahen damit wie ein echter K.o./Tod aus, und wuerden mit jeder
+  // kuenftigen Politur an den Tod-Animationen zunehmend blutiger. `u.vizSturz` ist seit
+  // stepKuer() (Eiskunstlauf) und der Showcase-Akrobatik ohnehin das eigene, rein
+  // praesentationale Sturz-Feld (bewusst GETRENNT vom Kampf-/Simulationsfeld `u.down`, s. die
+  // Kommentare an den Setzstellen) -- jetzt setzen Climbing (zeichneSpurt, `u.stolper>0`) und
+  // Hockey (HK_STURZ) es ebenfalls, und diese Funktion liest es: ein Sturz zeigt die
+  // treffer- (Hit-/Taumel-)Animation statt der Tod-Animation. Ein ECHTER K.o. (Arena/TDM/
+  // Battlefield, `u.down` OHNE `vizSturz`) bleibt unveraendert "tod". Rein praesentational --
+  // `istUnten` fasst beide Faelle weiterhin zusammen (haelt Laufzyklus/Waffen/Effekte an, s.
+  // unten), nur die ART-Wahl und die Standbild-Ersatzpose unterscheiden jetzt zusaetzlich nach
+  // `istSturz`.
+  //
+  // PIXEL-FIGUR ANGRIFF-AUSNAHMEN (10.11., Backlog #52 "Enforcer greift nur mit Fluegeln an,
+  // keine echte Angriffsanimation"): die Angriff-Animation EXISTIERT fuer Enforcer (und wird
+  // korrekt geladen/ausgewaehlt, s. die Zustandswahl oben) -- der Fehler sitzt im BLATT selbst,
+  // nicht in der Auswahllogik. Per Augenschein an den einzelnen Spalten (identify/crop, 80x80 je
+  // Spalte): enforcer/angriff-south.png zerfaellt an Spalte 15 von 17 in ein generisches, vom
+  // Charakter abgekoppeltes Fluegel-Aufleuchten -- kein Koerper, keine Ruestung, kein Hammer mehr
+  // sichtbar, nur ein goldener Fluegel-Umriss. Spalte 16 (das rechnerische Ende der Lunge-Animation,
+  // s. `f` unten -- also genau die Spalte, die beim Treffer-Moment am laengsten zu sehen ist) zeigt
+  // die Figur zwar wieder, aber mit demselben unpassenden Fluegel-Hintergrund. Ost/Nord zeigen an
+  // ihrer letzten Spalte nur einen goldenen Schwung-/Bewegungsschleier HINTER der weiterhin
+  // sichtbaren Figur (wie bei anderen Figuren, z.B. eradicator/zhyrak -- s. dortige Blaetter),
+  // keinen Koerperverlust, deshalb dort KEINE Sperre.
+  //
+  // Systematisch nachgeprueft (10.11.): alle 19 Figuren, die laut der alten B_FIGUR-Fluegel-Liste
+  // (Kommentar bei DISZIPLIN_WAFFE/VOLLBILD_SCHLAEGER weiter unten, "Othrama, Enforcer, Elyon, ...")
+  // gefluegelt sind UND ein eigenes 360-PixelLab-Blatt (public/sprites/figuren/<slug>) haben. Nur
+  // Lumen Serene zeigt denselben Fehler, dort sogar ausgepraegter: angriff-south.png verliert den
+  // Koerper bereits ab Spalte 7 von 17 (statt erst ab 15) und bekommt ihn bis Spalte 16 nur
+  // bruchstueckhaft zurueck. Othrama/Whispra/Harbinger/Hellvoice/Sunny/Xylaris/Cadrael/Raven/Nimri/
+  // Yuko/Mushu/Brobot/Sanctrix/Leviathan/Butterfly zeigen an ihrer letzten Spalte durchgehend eine
+  // ECHTE, zum Charakter passende Waffen-/Elementareffekt-Spalte (Schwert, Feuer, Eis, Funken...),
+  // keinen Koerperverlust -- keine Sperre noetig. Dyrth zeigt eine abweichende, aber in sich
+  // stimmige Sturzflug-/Tauch-Pose (kein Fluegel-Abbruch) -- ebenfalls keine Sperre.
+  //
+  // Eine NEUE PixelLab-Bestellung fuer die kaputten Spalten braucht Chris' ausdrueckliche Freigabe
+  // (CLAUDE.md "PixelLab-Tod-Animationen": Charaktere/Animationen sind freigabepflichtig) und ist
+  // hier bewusst NICHT erfolgt. Bis dahin reines Wiederverwenden bestehender, bereits freigegebener
+  // Spalten desselben Blatts -- dieselbe Reuse-statt-Neubau-Philosophie wie beim Sturz-statt-Tod-Fix
+  // (PR #1386): PIXEL_ANGRIFF_SPERRFRAMES listet je Figur/Richtung die gesperrten Spalten
+  // (0-basiert), angriffFrameSicher() faellt von einer gesperrten Spalte auf die naechstniedrigere
+  // ungesperrte zurueck (Minimum 0 -- eine Figur ohne jede gute Spalte ab 0 wuerde dort einfrieren,
+  // kommt in der Tabelle unten aber nicht vor). Rein praesentational: veraendert nur, welche
+  // vorhandene Spalte gezeichnet wird, nichts an u.lunge/der Simulation/dem Wertungs-Fingerabdruck.
+  const PIXEL_ANGRIFF_SPERRFRAMES={
+    "Enforcer":{south:[15]},
+    "Lumen Serene":{south:[7,8,9,10,11,12,13]},
+  };
+  function angriffFrameSicher(name,dir,f){
+    const sperr=name&&PIXEL_ANGRIFF_SPERRFRAMES[name]&&PIXEL_ANGRIFF_SPERRFRAMES[name][dir];
+    if(!sperr||!sperr.length)return f;
+    while(f>0&&sperr.includes(f))f--;
+    return f;
+  }
+  //
+  // HYROX-ARBEITSPOSEN (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md
+  // Abschnitt 2): drei zusaetzliche, OPTIONALE Arten -- `u.hyroxPose` (gesetzt in zeichneSpurt()
+  // aus dem rein kosmetischen `u.hyroxGruppe`/`u.stolper`, s. dort) nennt TECHNIK/KLETTERN/KRAFT,
+  // HYROX_PIXEL_ART uebersetzt das in den Art-Schluessel der Figur. Hat die Figur KEINE eigene
+  // Animation dieser Art (die grosse Mehrheit -- bisher nur "cassandra" bestellt, s. PR-
+  // Beschreibung fuer den Fahrplan zum vollen Bestand), faellt zeichnePixelFigur() auf den
+  // bestehenden "angriff"-Zweig zurueck (ausgeloest ueber denselben `u.lunge`-Wert, den
+  // zeichneSpurt() fuer genau diesen Fall mitgibt) -- eine Ausfallschritt-Pose statt der
+  // vorherigen liegenden "tod"-Pose, ohne dass diese Funktion dafuer eine eigene Formel braucht.
+  const HYROX_PIXEL_ART={technik:"hyroxTechnik", kletter:"hyroxKletter", kraft:"hyroxKraft"};
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
     const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
     const fussY=y+PIXEL_FUSS*G;
-    const istUnten=!!u.down||!!u.vizSturz;
+    const istSturz=!!u.vizSturz;
+    const istUnten=!!u.down||istSturz;
     let rec=pixelAnzeige.get(u);
     // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
-    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    // Ansicht): gleich das Endbild der K.o./Sturz-Animation statt sie von vorn abzuspielen.
     if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
     if(typeof u.hp==="number"){
       if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
@@ -4646,7 +4721,13 @@
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
-    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    // HYROX-EIGENE ARBEITSPOSE, WENN VORHANDEN (s. Kommentar an HYROX_PIXEL_ART oben): hat diese
+    // Figur keine eigene Animation der gerade aktiven Gruppe, bleibt `hyroxGid` falsy und `art`
+    // faellt unveraendert auf den bestehenden istAngriff-Zweig zurueck (`u.lunge` steht waehrend
+    // einer Hyrox-Station ohnehin schon >0, s. zeichneSpurt()).
+    const hyroxGid=u.hyroxPose&&HYROX_PIXEL_ART[u.hyroxPose];
+    const hyroxEigen=hyroxGid&&fig.a[hyroxGid];
+    const art=istUnten?(istSturz?"treffer":"tod"):hyroxEigen?hyroxGid:istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4674,8 +4755,14 @@
         const e=z.bilder.get(stamm+"-"+d+".png");
         if(e&&e.im&&e.mass){
           let f;
-          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
-          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          // `istUnten` statt des literalen art==="tod": ein Sturz waehlt oben den
+          // treffer-Streifen (`art="treffer"`), spielt ihn aber mit derselben
+          // Einmal-dann-letztes-Bild-Formel wie ein echter K.o. ab (ueber `rec.downT`, nicht
+          // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
+          // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
+          if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art===hyroxGid)f=Math.max(0,Math.min(n-1,Math.floor((u.hyroxProg||0)*n)));
+          else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
             const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
@@ -4698,11 +4785,14 @@
     let dx=0,dy=0,winkel=0;
     if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
     else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
-    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
-    else if(art==="tod"){
+    // `istUnten` vor dem literalen art==="treffer"-Zweig: ohne Animationsstreifen (Grundpose-
+    // Ersatzbewegung) soll ein Sturz genauso umkippen wie ein echter K.o. (neutraler als die
+    // HP-Zuck-Wobble unten, die bei einem zeitlich unbegrenzten Sturz nie zur Ruhe kaeme).
+    else if(istUnten){
       const k=Math.min(1,(t-(rec.downT??t))/0.5);
       winkel=(vor<0?-1:1)*k*Math.PI/2;
-    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    }else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
     zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
@@ -7902,8 +7992,10 @@
   // <<< GENERIERT: arena-daten — nicht von Hand ändern
   // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:
   //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)
-  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)
-  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen)
+  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Mini-DM)
+  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen, inkl. Mini-DM-FFA-
+  //     Rollen je Kadergroesse k=2..6, PR 2 des 6-PR-Plans 21.10.; Battlefield-Rollen
+  //     je Kadergroesse k=2..6, eigene Zusammensetzung je k, 27.10.)
   // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.
   const BASIS_JE_DISC={
     "tdm": {power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2},
@@ -7922,39 +8014,15 @@
     "breaking": {will:28,torment:22,health:18,power:10,determination:10,stamina:8,dexterity:2,intelligence:2},
     "wettessen": {will:26,health:22,stamina:22,determination:16,intelligence:8,torment:6},
     "basketball": {spirit:22,intelligence:16,awareness:14,charisma:11,speed:10,dexterity:8,power:7,stamina:6,torment:6},
-    "football": {power:22,health:18,speed:14,torment:12,determination:10,awareness:8,stamina:6,dexterity:4,will:3,spirit:3},
+    "football": {spirit:25,torment:16,health:14,awareness:11,will:10,determination:8,power:6,stamina:6,charisma:4},
     "eiskunstlauf": {charisma:28,dexterity:18,spirit:16,awareness:14,speed:10,intelligence:8,determination:6},
     "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
     "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
   };
-  // PP_MATRIX_JE_DISC — die GESPERRTE Eignungsmatrix fuer die Pp-Pflichtpruefung, CLAUDE.md
-  // woertlich: "die Pp-Pflichtpruefung laeuft ausdruecklich gegen die Matrix, nicht gegen den
-  // Override" (Abschnitt "Die Eignungsmatrix ist gesperrt"). BASIS_JE_DISC ist dafuer NICHT
-  // immer die richtige Quelle: seit PR #934 (16.09., football-balance-runde-nach-e3-15-09.md
-  // Abschnitt 6) speist BASIS_JE_DISC.football bewusst aus `spiel-eignung-overrides.ts`
-  // (power 22/health 18/speed 14/torment 12/determination 10/awareness 8/stamina 6/dexterity 4/
-  // will 3/spirit 3) statt aus der Matrix — legitim fuer `mitAufschlag()`/die Kaderanzeige
-  // (genau der Zweck, fuer den der Override eingefuehrt wurde), aber eine STILLE
-  // Falschmessung fuer jedes Skript, das `window.__arena.matrix()`/einflussVon()s
-  // abweichungPp als Pp-Abnahmezahl nimmt: football ist die EINZIGE Disziplin mit einem
-  // Override, jede andere Zeile in BASIS_JE_DISC ist bereits bit-identisch zur Matrix in
-  // lib/player-generator/official-discipline-weights.ts. Gefunden bei der Football-Pp-
-  // Diagnose (Task #196, 25.10.): die seit Monaten berichteten Football-Pp-Zahlen (47,3 bis
-  // 71,1, zuletzt 64,6/61,7) massen alle gegen DIESEN Override, nicht gegen die echte,
-  // gesperrte Matrix (power 6/health 14/determination 8/stamina 6/awareness 11/will 10/
-  // charisma 4/spirit 25/torment 16) — macht die bisherigen Zahlen UNGUELTIG als Pp-
-  // Pflichtpruefung, nicht nur ungenau (spirit allein wiegt in der echten Matrix 25 Pp,
-  // im Override nur 3; charisma fehlt im Override komplett). NUR die Pp-Messwerkzeuge
-  // (einflussVon()s `W`, der `matrix()`-Export) lesen ab jetzt diese Tabelle;
-  // BASIS_JE_DISC selbst, `mitAufschlag()` und `betroffeneAttribute()` bleiben UNVERAENDERT
-  // auf dem Override — Produktions-/Kaderverhalten ist dadurch bit-identisch, nur die
-  // Mess-/Berichtsseite misst jetzt gegen das richtige Ziel.
-  const PP_MATRIX_JE_DISC={...BASIS_JE_DISC,
-    football:{power:6,health:14,determination:8,stamina:6,awareness:11,will:10,charisma:4,spirit:25,torment:16}};
   const SLOTS_JE_DISC={
     "tdm":[
-      {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
-      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und hält Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
+      {id:"vanguard",label:"Vanguard",text:"Oeffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
+      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und haelt Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
       {id:"shotcaller",label:"Shotcaller",text:"Ordnet den Fight über Intelligence und Charisma.",gross:"charisma",klein:"intelligence",last:"power",mueh:"low",profil:{power:25.6,health:18.3,charisma:14.4,stamina:12.8,spirit:11,intelligence:8.7,determination:5.5,awareness:1.9,torment:1.9}},
       {id:"holdline",label:"Hold Line",text:"Stabilisiert knappe Phasen mit Health und Determination.",gross:"health",klein:"determination",last:"stamina",mueh:"medium",profil:{health:25.4,power:24.8,stamina:12.5,spirit:10.7,charisma:8.9,determination:8.7,intelligence:5.4,awareness:1.9,torment:1.9}},
       {id:"rallypoint",label:"Rally Point",text:"Hebt Team-Momentum über Spirit und Charisma.",gross:"spirit",klein:"charisma",last:"power",mueh:"low",profil:{power:24.7,health:17.7,spirit:17.3,charisma:13.4,stamina:12.4,determination:5.4,intelligence:5.4,awareness:1.9,torment:1.9}},
@@ -7962,46 +8030,46 @@
     ],
     "mini-dm":[
       {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
-      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
       {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:19,health:16.3,will:15.4,dexterity:13,power:12.7,stamina:12.7,intelligence:5.5,spirit:5.5}},
       {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:20.4,stamina:18.9,health:16.7,power:13.7,will:11.7,intelligence:8,spirit:8,dexterity:2.8}}
     ],
     "battlefield":[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
       {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
-      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
       {id:"spotter",label:"Spotter",text:"Liest Lücken über Awareness und Intelligence — rotiert zu unbewachten Punkten und nimmt neutrale Punkte besonders schnell.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
+      {id:"disruptor",label:"Disruptor",text:"Stoert gegnerische Plaene mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
     ],
     "gewichtheben":[
       {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
       {id:"safelift",label:"Safe Lift",text:"Sichert Punkte über Health und Determination.",gross:"health",klein:"determination",last:"power",mueh:"low",profil:{power:24.4,health:21.4,charisma:20.1,determination:15.4,will:6.2,speed:5.3,dexterity:5.3,stamina:1.8}},
       {id:"pressurelift",label:"Pressure Lift",text:"Geht aggressiv in schwere Versuche.",gross:"charisma",klein:"power",last:"health",mueh:"high",profil:{power:31.4,charisma:28.4,health:13,determination:9.8,will:5.8,speed:5,dexterity:5,stamina:1.8}},
-      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausführung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
-      {id:"gripanchor",label:"Grip Anchor",text:"Hält über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
-      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom großen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
+      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausfuehrung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
+      {id:"gripanchor",label:"Grip Anchor",text:"Haelt über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
+      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom grossen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
     ],
     "climbing":[
       {id:"routereader",label:"Route Reader",text:"Findet die Linie über Determination und Awareness.",gross:"determination",klein:"awareness",last:"stamina",mueh:"low",profil:{stamina:22.9,determination:21.4,awareness:11.4,speed:10.6,dexterity:10.6,health:8.9,power:7.1,will:7.1}},
-      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Züge.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
-      {id:"paceclimber",label:"Pace Climber",text:"Hält Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
+      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Zuege.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
+      {id:"paceclimber",label:"Pace Climber",text:"Haelt Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
       {id:"endurancewall",label:"Endurance Wall",text:"Klettert stabil über Stamina und Health.",gross:"stamina",klein:"health",last:"dexterity",mueh:"high",profil:{stamina:31.4,determination:13.7,health:13.4,speed:10.3,dexterity:10.3,power:6.9,awareness:6.9,will:6.9}},
-      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Züge über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
+      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Zuege über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
       {id:"summitpush",label:"Summit Push",text:"Zieht den Schluss über Determination und Will.",gross:"will",klein:"determination",last:"stamina",mueh:"high",profil:{stamina:24.3,determination:18.8,will:12.8,health:11.3,power:8.5,awareness:8.5,dexterity:8.1,speed:7.6}}
     ],
     "staffel":[
       {id:"startrunner",label:"Start Runner",text:"Bringt die Staffel mit Speed in Position.",gross:"speed",klein:"stamina",last:"awareness",mueh:"medium",profil:{speed:29.4,stamina:19.4,spirit:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"tempolink",label:"Tempo Link",text:"Hält Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
+      {id:"tempolink",label:"Tempo Link",text:"Haelt Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
       {id:"batontech",label:"Baton Tech",text:"Sichert Wechsel über Awareness und Dexterity.",gross:"awareness",klein:"dexterity",last:"stamina",mueh:"low",profil:{speed:21.3,awareness:17.3,stamina:14.2,spirit:14.2,dexterity:11.4,charisma:8.9,will:7.2,determination:3.6,health:1.9}},
       {id:"curverunner",label:"Curve Runner",text:"Braucht Speed und Will für schwierige Abschnitte.",gross:"speed",klein:"will",last:"dexterity",mueh:"medium",profil:{speed:29.4,stamina:13.9,spirit:13.9,will:11.4,awareness:10.4,charisma:8.7,dexterity:7,determination:3.5,health:1.8}},
       {id:"chaserunner",label:"Chase Runner",text:"Jagt Rückstände mit Spirit und Speed.",gross:"spirit",klein:"speed",last:"stamina",mueh:"high",profil:{speed:27.4,spirit:21.4,stamina:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"anchor",label:"Anchor",text:"Schließt die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
+      {id:"anchor",label:"Anchor",text:"Schliesst die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
     ],
     "time-trial":[
-      {id:"pacer",label:"Pacer",text:"Hält die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"pacer",label:"Pacer",text:"Haelt die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"linereader",label:"Line Reader",text:"Findet Sekunden über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"speed",mueh:"low",profil:{intelligence:23.4,dexterity:21.8,speed:19.2,awareness:15.4,stamina:13.1,power:4.4,torment:2.7}},
-      {id:"aerodrive",label:"Aero Drive",text:"Drückt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"aerodrive",label:"Aero Drive",text:"Drueckt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"splitcontrol",label:"Split Control",text:"Kontrolliert Zwischenzeiten über Intelligence.",gross:"intelligence",klein:"stamina",last:"dexterity",mueh:"low",profil:{intelligence:23.4,dexterity:21.6,speed:19,stamina:18.4,awareness:10.4,power:4.4,torment:2.7}},
       {id:"risksegment",label:"Risk Segment",text:"Nimmt Risiko über Dexterity und Torment.",gross:"dexterity",klein:"torment",last:"awareness",mueh:"high",profil:{dexterity:30.4,speed:19.9,intelligence:16.3,stamina:13.6,awareness:10.9,power:4.6,torment:4.5}},
       {id:"finishkick",label:"Finish Kick",text:"Holt den Schluss über Speed und Power.",gross:"stamina",klein:"awareness",last:"stamina",mueh:"high",profil:{speed:21.1,stamina:20,dexterity:17.4,awareness:15.3,intelligence:15.1,power:8.1,torment:3}}
@@ -8011,30 +8079,30 @@
       {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"awareness",last:"speed",mueh:"low",profil:{dexterity:17.3,speed:16.1,determination:13.4,will:12.5,torment:12.5,awareness:10.1,power:9,health:5.4,stamina:3.6}},
-      {id:"drivephase",label:"Drive Phase",text:"Drückt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
+      {id:"drivephase",label:"Drive Phase",text:"Drueckt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
       {id:"photofinish",label:"Photo Finish",text:"Braucht Nerven und Torment für den letzten Meter.",gross:"will",klein:"torment",last:"speed",mueh:"medium",profil:{will:17.5,torment:17.5,dexterity:12.9,determination:11.8,power:11.5,health:9.5,awareness:7.4,stamina:6.2,speed:5.9}}
     ],
     "tennis":[
       {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
-      {id:"return",label:"Return",text:"Liest Aufschläge über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
-      {id:"rallycontrol",label:"Rally Control",text:"Hält Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
+      {id:"return",label:"Return",text:"Liest Aufschlaege über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
+      {id:"rallycontrol",label:"Rally Control",text:"Haelt Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
       {id:"netpressure",label:"Net Pressure",text:"Greift über Dexterity und Speed an.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:19.8,awareness:18,dexterity:17.3,spirit:16.2,stamina:10.9,speed:8.7,determination:5.5,charisma:3.7}},
       {id:"matchiq",label:"Match IQ",text:"Gewinnt Muster über Intelligence und Determination.",gross:"intelligence",klein:"determination",last:"stamina",mueh:"low",profil:{intelligence:27.4,awareness:17.7,spirit:16,stamina:10.7,dexterity:10.7,determination:8.7,speed:5.4,charisma:3.6}},
       {id:"tiebreak",label:"Tiebreak Clutch",text:"Braucht Spirit und Awareness im Druckmoment.",gross:"spirit",klein:"stamina",last:"determination",mueh:"high",profil:{spirit:23.7,awareness:18.2,stamina:14.6,dexterity:13.2,intelligence:11.3,speed:6.4,determination:6.3,charisma:6.2}}
     ],
     "hockey":[
       {id:"powerforward",label:"Power Forward",text:"Geht dahin, wo es weh tut.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:21.2,health:19,spirit:10.7,speed:10.4,stamina:8.9,torment:8.8,awareness:6.3,determination:3.9,dexterity:3.9,will:3.9}},
-      {id:"defensivewall",label:"Defensive Wall",text:"Schließt Räume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
-      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und hält den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
+      {id:"defensivewall",label:"Defensive Wall",text:"Schliesst Raeume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
+      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und haelt den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
       {id:"playmaker",label:"Playmaker",text:"Verbindet Linien über Power und Awareness.",gross:"awareness",klein:"power",last:"health",mueh:"medium",profil:{power:19.4,health:14.3,spirit:11.3,speed:11,awareness:10.5,stamina:9.3,torment:9.3,determination:4.1,dexterity:4.1,will:4.1}},
       {id:"transition",label:"Transition Runner",text:"Dreht Tempo über Speed und Stamina.",gross:"speed",klein:"stamina",last:"power",mueh:"high",profil:{speed:17.5,power:14.3,health:14.1,stamina:13.8,spirit:11.1,torment:9.1,awareness:6.5,determination:4,dexterity:4,will:4}},
-      {id:"slotfinisher",label:"Slot Finisher",text:"Schließt Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
+      {id:"slotfinisher",label:"Slot Finisher",text:"Schliesst Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
     ],
     "showcase":[
-      {id:"stagelead",label:"Stage Lead",text:"Trägt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"stagelead",label:"Stage Lead",text:"Traegt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"crowdhook",label:"Crowd Hook",text:"Holt Publikum über Charisma und Showcase-Power.",gross:"charisma",klein:"power",last:"intelligence",mueh:"low",profil:{charisma:32.4,power:14.4,spirit:13.6,determination:11.9,intelligence:8.6,dexterity:7.7,speed:6.9,health:2.7,torment:1.8}},
       {id:"styletech",label:"Style Tech",text:"Belohnt saubere Details über Determination und Dexterity.",gross:"determination",klein:"dexterity",last:"charisma",mueh:"medium",profil:{charisma:23.8,determination:19.4,spirit:14.1,dexterity:12.4,power:9.7,intelligence:8.9,speed:7.1,health:2.7,torment:1.9}},
-      {id:"controlbeat",label:"Control Beat",text:"Führt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
+      {id:"controlbeat",label:"Control Beat",text:"Fuehrt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
       {id:"bigmoment",label:"Big Moment",text:"Lebt von Charisma und Spirit im Spotlight.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"finale",label:"Finale",text:"Setzt den Schlussakzent über Spirit.",gross:"speed",klein:"spirit",last:"power",mueh:"medium",profil:{charisma:17,spirit:15.1,power:13.5,speed:13.3,determination:11.8,intelligence:11.3,dexterity:10.6,health:4.6,torment:2.9}}
     ],
@@ -8045,11 +8113,11 @@
       {id:"calculation",label:"Calculation Core",text:"Rechnet Linien über Intelligence.",gross:"determination",klein:"intelligence",last:"awareness",mueh:"low",profil:{intelligence:22.5,determination:20.6,awareness:14.7,will:13.6,dexterity:10.1,speed:10,charisma:8.6}}
     ],
     "takeshis-castle":[
-      {id:"gatecrash",label:"Gate Crash",text:"Öffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
+      {id:"gatecrash",label:"Gate Crash",text:"Oeffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
       {id:"balancerun",label:"Balance Run",text:"Bleibt sauber über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"will",mueh:"medium",profil:{will:19.9,determination:16.3,intelligence:15.9,charisma:12.7,dexterity:8.7,awareness:7.3,torment:6.4,stamina:5.5,health:3.7,speed:3.7}},
       {id:"trapreader",label:"Trap Reader",text:"Liest Fallen über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"determination",mueh:"low",profil:{will:20,determination:16.4,intelligence:14.4,charisma:12.8,awareness:11.5,torment:6.4,stamina:5.5,dexterity:5.5,health:3.7,speed:3.7}},
-      {id:"ironwill",label:"Iron Will",text:"Beißt sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
-      {id:"chaosdodge",label:"Chaos Dodge",text:"Überlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
+      {id:"ironwill",label:"Iron Will",text:"Beisst sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
+      {id:"chaosdodge",label:"Chaos Dodge",text:"Ueberlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
@@ -8062,14 +8130,14 @@
     ],
     "wettessen":[
       {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
-      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kräfte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
-      {id:"ironstomach",label:"Iron Stomach",text:"Hält Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kraefte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
+      {id:"ironstomach",label:"Iron Stomach",text:"Haelt Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"tablefocus",label:"Table Focus",text:"Bleibt klar über Determination und Intelligence.",gross:"determination",klein:"intelligence",last:"health",mueh:"low",profil:{will:23,determination:21.4,health:19.4,stamina:19.4,intelligence:11.4,torment:5.4}},
       {id:"secondwind",label:"Second Wind",text:"Kommt über Will und Stamina zurück.",gross:"will",klein:"stamina",last:"health",mueh:"medium",profil:{will:31.4,stamina:25.4,health:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"finalbite",label:"Final Bite",text:"Zieht den Schluss über Determination und Torment.",gross:"determination",klein:"torment",last:"will",mueh:"high",profil:{will:27.8,determination:20.7,health:20.4,stamina:16.1,torment:10.1,intelligence:5}}
     ],
     "basketball":[
-      {id:"floorgeneral",label:"Floor General",text:"Führt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
+      {id:"floorgeneral",label:"Floor General",text:"Fuehrt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
       {id:"rimpressure",label:"Rim Pressure",text:"Attackiert den Korb über Awareness und Speed.",gross:"awareness",klein:"speed",last:"spirit",mueh:"high",profil:{awareness:19.4,spirit:19.4,intelligence:14.1,speed:13.4,charisma:9.7,dexterity:7.1,power:6.2,stamina:5.4,torment:5.4}},
       {id:"perimeter",label:"Perimeter",text:"Schafft Winkel über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"power",mueh:"medium",profil:{intelligence:21.4,spirit:19.4,awareness:12.4,dexterity:11.4,charisma:9.7,speed:8.9,power:6.2,stamina:5.4,torment:5.4}},
       {id:"helpdefense",label:"Help Defense",text:"Rotiert über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"speed",mueh:"medium",profil:{spirit:25.4,awareness:19.4,intelligence:13.7,charisma:9.5,speed:8.6,dexterity:6.9,power:6.1,stamina:5.2,torment:5.2}},
@@ -8077,16 +8145,16 @@
       {id:"fastbreak",label:"Fast Break",text:"Läuft Punkte über Speed und Dexterity.",gross:"power",klein:"stamina",last:"stamina",mueh:"high",profil:{intelligence:13.6,charisma:13.3,spirit:13.1,speed:11.9,power:11.4,stamina:9.7,torment:9.7,awareness:8.8,dexterity:8.7}}
     ],
     "football":[
-      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:27.4,health:21.4,speed:11.8,torment:10.2,determination:8.5,awareness:6.8,stamina:5.1,dexterity:3.5,will:2.6,spirit:2.6}},
-      {id:"routeburst",label:"Route Burst",text:"Schafft Separation über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"stamina",mueh:"medium",profil:{power:20,speed:19.4,health:16.4,torment:10.9,determination:9.1,awareness:7.3,dexterity:5.8,stamina:5.5,will:2.8,spirit:2.8}},
-      {id:"quarterback",label:"Quarterback",text:"Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).",gross:"power",klein:"determination",last:"torment",mueh:"low",profil:{power:27.4,health:15.6,determination:13.4,speed:12.1,torment:10.4,awareness:7,stamina:5.3,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
-      {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"kickerpunter",label:"Kicker/Punter",text:"Hält die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:23.2,speed:16.2,determination:11.4,power:10.3,stamina:9.5,awareness:8.5,torment:7.8,will:4.5,spirit:4.5,dexterity:4.1}}
+      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{spirit:23.5,health:16.6,torment:15.1,awareness:10.4,will:9.4,power:8,determination:7.6,stamina:5.7,charisma:3.8}},
+      {id:"routeburst",label:"Route Burst",text:"Löst sich über Will und Charisma statt über reines Tempo.",gross:"will",klein:"charisma",last:"stamina",mueh:"medium",profil:{spirit:23.6,torment:15.1,will:13.3,health:13.2,awareness:10.4,determination:7.6,power:5.7,stamina:5.7,charisma:5.3}},
+      {id:"quarterback",label:"Quarterback",text:"Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).",gross:"power",klein:"determination",last:"torment",mueh:"low",profil:{spirit:23.6,torment:15.1,health:13.3,determination:10.6,awareness:10.4,will:9.5,power:8,stamina:5.7,charisma:3.8}},
+      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{spirit:22.6,torment:20.1,awareness:13.6,health:12.7,will:9.1,determination:7.3,power:5.5,stamina:5.5,charisma:3.7}},
+      {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{spirit:23.5,torment:18.6,health:13.2,awareness:10.4,will:9.4,power:8,determination:7.6,stamina:5.7,charisma:3.8}},
+      {id:"kickerpunter",label:"Kicker/Punter",text:"Haelt die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"spirit",klein:"health",last:"torment",mueh:"low",profil:{spirit:33.1,health:15.1,torment:12.1,awareness:10.9,will:9.3,stamina:7.8,determination:7.5,charisma:3.6,power:0.9}}
     ],
     "eiskunstlauf":[
-      {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
-      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Sprünge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
+      {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
+      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Spruenge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
       {id:"spingrace",label:"Spin Grace",text:"Sammelt Stil über Charisma und Spirit.",gross:"charisma",klein:"spirit",last:"dexterity",mueh:"medium",profil:{charisma:33.4,spirit:19.4,dexterity:15.1,awareness:11.8,speed:8.4,intelligence:6.8,determination:5.1}},
       {id:"programflow",label:"Program Flow",text:"Verbindet Elemente über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{charisma:24.7,spirit:21.4,dexterity:15.9,awareness:12.4,intelligence:11.4,speed:8.9,determination:5.4}},
       {id:"crowdmoment",label:"Crowd Moment",text:"Hebt den Auftritt über Charisma.",gross:"charisma",klein:"awareness",last:"determination",mueh:"medium",profil:{charisma:33.4,awareness:17.4,dexterity:15.2,spirit:13.5,speed:8.5,intelligence:6.8,determination:5.2}},
@@ -8098,24 +8166,17 @@
       {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
       {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
       {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
-      {id:"finaltouch",label:"Final Touch",text:"Schließt enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
     ],
     "i-spy":[
       {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
       {id:"patternlock",label:"Pattern Lock",text:"Verkettet Hinweise über Intelligence und Spirit.",gross:"intelligence",klein:"spirit",last:"speed",mueh:"low",profil:{intelligence:23.4,spirit:16.4,torment:14.7,will:10.4,charisma:7.8,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
       {id:"socialread",label:"Social Read",text:"Liest Verhalten über Torment und Charisma.",gross:"torment",klein:"charisma",last:"intelligence",mueh:"medium",profil:{torment:22.4,intelligence:15.8,charisma:12.4,spirit:11.4,will:10.5,determination:7.1,speed:7.1,dexterity:7.1,awareness:4.5,health:1.8}},
-      {id:"logicchain",label:"Logic Chain",text:"Baut Lösungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
-      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffällig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
+      {id:"logicchain",label:"Logic Chain",text:"Baut Loesungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffaellig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
       {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
-  // MINI-DM-FFA-ROLLEN JE KADERGROESSE k=2..6 (PR 2 des 6-PR-Plans, 21.10. — der FFA-
-  // Kampfmotor auf 6 Rollen erweitert). NICHT dasselbe wie SLOTS_JE_DISC["mini-dm"] oben
-  // (das bleibt unangetastet beim 4er-Set, s. slotZahl() im Generator-Skript) — dieser
-  // Block speist ausschliesslich MINI_DM_FFA_SLOTS_JE_K weiter unten, der neue, separate
-  // Mechanismus fuer variable FFA-Kadergroessen. Aus derselben echten Quelle wie oben
-  // (resolveSlotRolesForDiscipline("mini-dm","mini-dm",k), lib/lineups/matchday-slot-
-  // roles.ts) — "gezeigt ist gleich gespielt".
   const MINI_DM_FFA_SLOTS_JE_K={
     2:[
       {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
@@ -8148,46 +8209,58 @@
       {id:"lasthit",label:"Last Hit",text:"Braucht Nerven für den finalen Zugriff.",gross:"intelligence",klein:"spirit",last:"dexterity",mueh:"medium",profil:{torment:17.9,stamina:17.4,will:14.9,health:13.8,power:12.1,intelligence:9.5,spirit:9.5,dexterity:5.1}}
     ]
   };
-  // BATTLEFIELD-ROLLEN JE KADERGROESSE k=2..6 (Chris 27.10.: "es kann bei 2 spielern ja andere
-  // slots geben als bei 6 spielern! auch DAS ist erlaubt"). Anders als MINI_DM_FFA_SLOTS_JE_K
-  // nicht nur ein anderes Profil derselben gekuerzten Liste, sondern eine ANDERE ZUSAMMENSETZUNG
-  // je k (ROLE_THEME_IDS_BY_SLOT_COUNT in lib/lineups/matchday-slot-roles.ts): bei k=2 Siege
-  // Core + Morale Anchor statt Commander + Spotter. build() waehlt je Seite die Liste fuer ihre
-  // tatsaechliche Kopfzahl und gibt baueEinheit() das k-Profil mit (slotDef). Aus derselben
-  // echten Quelle (resolveSlotRolesForDiscipline("battlefield","battlefield",k)).
   const BATTLEFIELD_SLOTS_JE_K={
     2:[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"spirit",klein:"charisma",last:"torment",mueh:"medium",profil:{charisma:22.1,intelligence:17.6,spirit:17.6,awareness:11,health:8.8,torment:8.6,power:5.6,determination:4.4,stamina:4.4}}
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"spirit",klein:"charisma",last:"torment",mueh:"medium",profil:{charisma:22.1,intelligence:17.6,spirit:17.6,awareness:11,health:8.8,torment:8.6,power:5.6,determination:4.4,stamina:4.4}}
     ],
     3:[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
       {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"charisma",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:24.8,spirit:14.2,awareness:12.3,intelligence:12.3,torment:10.2,health:9.8,power:6.9,determination:4.8,stamina:4.8}}
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"charisma",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:24.8,spirit:14.2,awareness:12.3,intelligence:12.3,torment:10.2,health:9.8,power:6.9,determination:4.8,stamina:4.8}}
     ],
     4:[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
       {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
-      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"awareness",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:19.4,spirit:16.5,awareness:13.7,torment:11.8,health:10.9,intelligence:8.8,power:8.3,determination:5.3,stamina:5.3}}
+      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"awareness",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:19.4,spirit:16.5,awareness:13.7,torment:11.8,health:10.9,intelligence:8.8,power:8.3,determination:5.3,stamina:5.3}}
     ],
     5:[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
       {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
-      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
-      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:21.7,spirit:18.3,health:11.8,intelligence:10.7,awareness:10.3,power:9.4,torment:6.6,determination:5.7,stamina:5.7}}
+      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"disruptor",label:"Disruptor",text:"Stoert gegnerische Plaene mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:21.7,spirit:18.3,health:11.8,intelligence:10.7,awareness:10.3,power:9.4,torment:6.6,determination:5.7,stamina:5.7}}
     ],
     6:[
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
       {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
-      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
       {id:"spotter",label:"Spotter",text:"Liest Lücken über Awareness und Intelligence — rotiert zu unbewachten Punkten und nimmt neutrale Punkte besonders schnell.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
+      {id:"disruptor",label:"Disruptor",text:"Stoert gegnerische Plaene mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
     ]
   };
   // >>> ENDE GENERIERT: arena-daten
+  // PP_MATRIX_JE_DISC — die GESPERRTE Eignungsmatrix fuer die Pp-Pflichtpruefung, CLAUDE.md
+  // woertlich: "die Pp-Pflichtpruefung laeuft ausdruecklich gegen die Matrix, nicht gegen den
+  // Override" (Abschnitt "Die Eignungsmatrix ist gesperrt"). Bis zum 14.11. war BASIS_JE_DISC
+  // dafuer NICHT immer die richtige Quelle, weil Footballs Override (`spiel-eignung-
+  // overrides.ts`) BASIS_JE_DISC.football von der Matrix abweichen liess (s. Git-Historie
+  // dieser Zeile, Task #196/25.10.) — football war die einzige Disziplin, deren Zeile in
+  // BASIS_JE_DISC nicht bit-identisch zur Matrix war. Chris hat diesen Football-Override am
+  // 14.11. zurueckgenommen ("football muss zu unserem system mit der matrix zurückkehren",
+  // docs/design/football-matrix-rueckkehr-14-11.md): `spielEignungOverrides.football` existiert
+  // nicht mehr, `resolveDisciplineWeightProfile("football")` liefert jetzt dieselbe Matrix wie
+  // `officialDisciplineWeightMatrix.football`, und BASIS_JE_DISC.football (s. oben, generiert)
+  // ist seitdem wieder bit-identisch zur Matrix — wie bei den anderen achtzehn Disziplinen, die
+  // `messe-arena-einfluss.mjs`/`einflussVon()` je abnehmen (Mini-DM bleibt die einzige
+  // verbleibende Ausnahme, misst aber ueber ihr eigenes Werkzeug, scripts/
+  // miss-mini-dm-ffa-abnahme.mjs, nicht hier). Diese Zeile ist deshalb jetzt ein reiner Alias,
+  // bewusst AUSSERHALB des GENERIERT-Markers (direkt danach), damit der naechste Lauf von
+  // scripts/generiere-arena-daten.ts sie nicht wieder verschluckt — genau das ist zuvor
+  // passiert, als sie noch INNERHALB des Markers stand.
+  const PP_MATRIX_JE_DISC=BASIS_JE_DISC;
   // Reihe und Befehl je Slot — die Inszenierung, nicht die Regel. Das Spiel kennt keine
   // Reihen; dass ein Breaker vorprescht und ein Skirmisher flankiert, ist eine Entscheidung
   // dieses Entwurfs. Fuer die 18 noch nicht gebauten Disziplinen greift die Ersatzregel
@@ -8626,9 +8699,72 @@
     const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
     for(const p of SQUAD)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
     for(const o of OPP)FORMKARTE[o.n]=FORMWERTE[r(FORMWERTE.length)];
+    // P4-MESSSCHALTER (nur Abnahmemessung, s. formModusMessung() in window.__arena): im Modus
+    // "echt" zieht dieselbe Saat zusaetzlich ein Einsatzlisten-Szenario je Seite (FORM_MESS),
+    // das Vorrang vor der Ersatzkarte hat. Grundlauf und Hebungslauf von einflussVon() sehen
+    // damit in Lauf i dasselbe Szenario (gepaart). Im Spiel steht der Modus immer auf "ersatz",
+    // FORM_MESS bleibt null — bit-identisch.
+    FORM_MESS=FORM_MESS_MODUS==="echt"?zieheFormSzenarioEcht((saat^0x5bd1e995)>>>0,[SQUAD,OPP]):null;
   }
   const formVon=(n)=>FORMKARTE[n]||0;
   const stufenWert=()=>INTENSITAET[STUFE].wert;
+
+  // ===================================================================================
+  // ECHTE FORMKARTE UND INTENSITAET (P4, docs/design/formkarten-motor-p4-11-11.md).
+  //
+  // Bis hierher nahm JEDE Baufunktion `formVon(p.n)+stufenWert()` — die Ersatzkarte aus
+  // zieheFormkarten() und die feste Stufe "normal". Was der Manager in der Einsatzliste
+  // gespielt hat (Karten −8..+8, x2 bei Farbgleichheit, Schonen/Normal/Push), kam nie an.
+  //
+  // Die echte Wahl kommt jetzt ueber DASSELBE Rohr wie Slot und Haltung: den `place`-Eintrag
+  // aus der Aufstellung (`{d, slot, form, intensitaet}`, gebaut von buildArenaAufstellung() in
+  // lib/foundation/battle-arena/arena-aufstellung-adapter.ts — dieselbe Funktion fuer Vorlauf,
+  // Pods und Arena-Anzeige). Sie greift nur, wenn
+  //   - der Eintrag zur GERADE gebauten Disziplin gehoert (`e.d===d`), und
+  //   - ein Zahlwert `form` gesetzt ist.
+  // Welche Disziplinen den Wert bekommen, entscheidet allein die App-Seite
+  // (FORMKARTEN_ECHT_DISCIPLINE_IDS in lib/battle/arena-resolved-disciplines.ts): nur
+  // Disziplinen, die mit echten Karten ihre rho-/Pp-Abnahme bestanden haben. Fuer alle anderen
+  // fehlt `form`, und breitPunkteVon() liefert Zeichen fuer Zeichen den alten Ausdruck
+  // `formVon(p.n)+stufenWert()` — bit-identisch.
+  //
+  // FORM_MESS ist nur fuer die Abnahmemessung (disziplinProbe/einflussVon mit
+  // `formModus:"echt"`): eine Map Name -> {form, int}, die Vorrang hat. Im Spiel immer null.
+  let FORM_MESS=null;
+  let FORM_MESS_MODUS="ersatz";
+  function formEchtVon(n,d){
+    if(FORM_MESS&&FORM_MESS.has(n))return FORM_MESS.get(n);
+    const e=place[n];
+    if(e&&e.d===d&&typeof e.form==="number"&&Number.isFinite(e.form))
+      return {form:e.form,int:INTENSITAET[e.intensitaet]?e.intensitaet:"normal"};
+    return null;
+  }
+  function breitPunkteVon(p,d){
+    const e=formEchtVon(p.n,d);
+    return e?e.form+INTENSITAET[e.int].wert:formVon(p.n)+stufenWert();
+  }
+  // MESS-SZENARIO "echt" (nur Abnahmemessung): je SEITE ein Kartenwert wie in der Einsatzliste
+  // (legacy-lineup-modifiers.ts, calculateFormModifierForSide): Primaerkarte aus dem Kartenpool
+  // eines Teams (positiv 0/2/4/8 oder negativ 0/−2/−4/−8, je zur Haelfte), mit p=0,5 eine
+  // positive Zweitkarte, jede Karte mit p=0,25 farbgleich (x2); dazu je Seite eine Intensitaet
+  // (gleichverteilt). Der Wert gilt fuer JEDEN Spieler der Seite gleich — genau wie
+  // `formPerPlayer` in der Wertung. Bewusst die BREITE Variante (auch negative Karten, auch
+  // Doppelkarten), nicht die KI-Gewohnheit (eine positive Karte): die Abnahme soll den
+  // unguenstigen Fall sehen. Saat mit hohen Bits wie zieheFormkarten().
+  function zieheFormSzenarioEcht(saat,seiten){
+    let z=saat;
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
+    const K=[0,2,4,8], STUFEN=["schonen","normal","push"];
+    const karte=()=>K[r(4)]*(r(4)===0?2:1);
+    const m=new Map();
+    for(const kader of seiten){
+      let form=karte()*(r(2)===0?1:-1);
+      if(r(2)===0)form+=karte();
+      const int=STUFEN[r(3)];
+      for(const p of kader)m.set(p.n,{form,int});
+    }
+    return m;
+  }
 
   // ===================================================================================
   // EINE GEWICHTUNG, NICHT ZWEI.
@@ -9337,11 +9473,14 @@
       // PROTOTYP-SCHALTER mit Footballs eigenen Gewichten (power 22, health 18, speed 14,
       // torment 12, determination 10, awareness 8, stamina 6, dexterity 4, spirit 3, will 3,
       // PR #803) — weil die Anzeige-Ordnung (p.d.football aus der Matrix) und die
-      // Spiel-Ordnung auseinanderliefen (rho 0,427). Jetzt liest die Anzeige-/Kauf-Seite
-      // GENAU DIESE Gewichte, ueber lib/player-generator/spiel-eignung-overrides.ts:
-      // p.d.football und BASIS_JE_DISC.football tragen sie, `produktionsWert` in bauSpieler
-      // liefert damit dieselbe Rangfolge wie der Schalter, und Football faellt auf die
-      // Standardzeile zurueck wie jede andere Disziplin. Eine Quelle statt zwei.
+      // Spiel-Ordnung auseinanderliefen (rho 0,427). Zwischen dem 10.09. und dem 14.11. las
+      // die Anzeige-/Kauf-Seite GENAU DIESE Gewichte ueber einen Eintrag in
+      // `lib/player-generator/spiel-eignung-overrides.ts`. RUECKGAENGIG GEMACHT (14.11.,
+      // Chris: „football muss zu unserem system mit der matrix zurückkehren" —
+      // docs/design/football-matrix-rueckkehr-14-11.md): der Override-Eintrag ist entfernt,
+      // `p.d.football`/`BASIS_JE_DISC.football` tragen jetzt wieder die offizielle Matrix
+      // (spirit 25, torment 16, health 14, awareness 11, will 10, determination 8, power 6,
+      // stamina 6, charisma 4) wie jede andere Disziplin ohne Override. Eine Quelle statt zwei.
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
       // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
       // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht),
@@ -10956,7 +11095,7 @@
     const bauSpieler=(p,seite,idx)=>{
       const {sl,gesetzt:slotGesetzt}=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,feldspielDisc);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -10973,10 +11112,12 @@
       // p.d.tdm ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken.
       // Bis zum 10.09. stand hier eine Verzweigung auf `FB().spielEignung` — ein
       // Prototyp-Schalter, mit dem NUR Football seine Eignung an der Anzeige-Ordnung vorbei
-      // aus p.a rechnete. Der ist weg: Footballs Gewichte stehen jetzt in
-      // lib/player-generator/spiel-eignung-overrides.ts und speisen p.d.football wie
-      // BASIS_JE_DISC.football, also liefert `produktionsWert` dieselbe Rangfolge. Jede
-      // Disziplin faehrt wieder dieselbe eine Zeile (Fable-Entscheidung E3).
+      // aus p.a rechnete. Der ist weg: zwischen dem 10.09. und dem 14.11. standen Footballs
+      // eigene Gewichte stattdessen in lib/player-generator/spiel-eignung-overrides.ts; seit
+      // deren Rueckbau (Chris 14.11., docs/design/football-matrix-rueckkehr-14-11.md) hat
+      // Football dort gar keinen Eintrag mehr und faellt wie jede andere Disziplin auf die
+      // offizielle Matrix zurueck. `produktionsWert`/`p.d.football`/`BASIS_JE_DISC.football`
+      // liefern damit alle dieselbe, matrixbasierte Rangfolge — eine Zeile, eine Quelle.
       const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         // groesse (Skala 1-10, s. groesseFaktor): reine ZEICHEN-Angabe fuer zeichneSprite,
@@ -11536,6 +11677,22 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // STURZ STATT TOD, NICHT-AUFZAEHLBAR GESETZT (Opus-Review 10.11., Fingerabdruck-Fund): ein
+  // einfaches `traeger.vizSturz=true` haette den Wertungs-Fingerabdruck verschoben, OBWOHL
+  // wert()/sieger()/punkte NICHT ein einziges Bit anders ausfallen (nachgemessen,
+  // scripts/pruefe-wertung-fingerabdruck.mjs) -- `A.spiele("hockey",s).protokoll` (fsZuege)
+  // haengt an manchen Eintraegen eine rohe Objektreferenz auf den Spieler (`deckt`, s. die
+  // Zyklus-Behandlung im Fingerabdruck-Skript), und ein neues AUFZAEHLBARES Feld auf diesem
+  // Objekt taucht dort beim JSON.stringify() prompt wieder auf, rein als Artefakt der
+  // Protokoll-Rohreferenz, nicht als Wertungsaenderung. `Object.defineProperty(...,{enumerable:
+  // false})` haelt `u.vizSturz` fuer zeichnePixelFigur()/jeden gewoehnlichen Lesezugriff
+  // unveraendert lesbar, aber unsichtbar fuer JSON.stringify()/{...u}/for-in -- genau das macht
+  // aus einer zufaelligen Protokoll-Verschiebung wieder ein bit-identisches Protokoll.
+  function vizSturzSetzen(u,wert){
+    if(!Object.getOwnPropertyDescriptor(u,"vizSturz"))
+      Object.defineProperty(u,"vizSturz",{value:wert,writable:true,configurable:true,enumerable:false});
+    else u.vizSturz=wert;
+  }
   // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
   // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
   // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
@@ -15090,7 +15247,13 @@
         // Bully in der Zone des bestraften Teams, und der Gefoulte bekommt die Scheibe.
         if(rr()<HK_FOUL_ANTEIL&&verhaengeStrafe(decker,traeger,"Bandencheck")){
           traeger.taumeltBis=fsT+HK_TAUMEL;
-          traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+          // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt
+          // 5.3): `down` bleibt das Simulationsfeld (sperrt den Spieler fuer Passziel-/
+          // Deckungs-Filter wie bisher, bit-identisch). `vizSturz` ist ZUSAETZLICH rein
+          // praesentational, genau wie bei stepKuer()/Showcase -- zeichnePixelFigur() liest es,
+          // um einen Hockey-Sturz auf die treffer- statt die tod-Animation zu legen. Fuer jede
+          // andere Disziplin bleibt das Feld immer undefined, also ohne jede Wirkung.
+          traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
           traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
           // DIE UEBERZAHL BEGINNT MIT DEM PUCK. Ein Bully tief in der Zone war der erste
           // Entwurf und ist gemessen falsch: der Anspielpunkt lag regelmaessig weiter als
@@ -15108,7 +15271,8 @@
           return;
         }
         traeger.taumeltBis=fsT+HK_TAUMEL;
-        traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+        // Sturz statt Tod: s. Kommentar im Foul-Zweig direkt oberhalb.
+        traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
         decker.checks++;
         // TON (Assets 80->100, TON_KATALOG.hockey.treffer): der sitzende, nicht gepfiffene
         // Bodycheck — der zu harte Zweig oben endet stattdessen in verhaengeStrafe()/pfiff.
@@ -16054,7 +16218,7 @@
     // 12 Spielen endete so, 3 von 6 mit noch laufendem Taumeln). Diese beiden Zeilen sind
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
-      if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.down&&fsT>=u.downBis){u.down=false;vizSturzSetzen(u,false);}
       // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
@@ -17153,7 +17317,7 @@
     // wie Papier und das Feld verliert jede Tiefe.
     const eis=ctx.createLinearGradient(0,k.o,0,k.u);
     eis.addColorStop(0,"#dce9f2"); eis.addColorStop(0.5,"#eef5fa"); eis.addColorStop(1,"#d3e2ee");
-    eisRundweg(k,0); ctx.fillStyle=eis; ctx.fill();
+    if(!kulisseSichtbar()){ eisRundweg(k,0); ctx.fillStyle=eis; ctx.fill(); }
     // Bande: aussen der Rahmen, innen die gelbe Kickleiste am Boden — dieselbe Ordnung
     // wie in echt (Plexiglas oben, gelbe Leiste unten).
     ctx.lineWidth=7; ctx.strokeStyle="#f2f4f7"; eisRundweg(k,0); ctx.stroke();
@@ -17302,12 +17466,19 @@
     // Disziplin zeichnen, ohne dass zwischendurch reset() lief — dasselbe Bookkeeping wie
     // bodenBuehne() fuer hebenPublikumAn bzw. bodenSpurt() fuer takeshiPublikumAn.
     if(feldspielDisc!=="hockey"&&hockeyPublikumAn){ tonLoopStop(); hockeyPublikumAn=false; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Basketball bekommt
+    // Tribuene und Belag (Parkett bzw. Streetcourt) der PixelLab-Szene; das Feld liegt in der Kulisse
+    // genau auf W*0.06..W*0.94 x 60..H-60. Ersetzt Verlauf, Zuschauer-Sprites und Parkett-Kachel;
+    // Linien, Zonen und Koerbe zeichnet der Motor weiter. Football (Batch 5): Belag im Feld
+    // W*0.04..W*0.96 x 50..H-50, Yard-Linien/Zahlen vom Motor. Hockey (Batch 5): Eis der Szene im
+    // RINK-Rundweg, eisflaeche() laesst dann nur seine Eisfuellung weg.
+    const mitKulisse=kulisseZeichnen();
     const g=ctx.createLinearGradient(0,0,0,H);
     // Ausserhalb der Spielflaeche: Rasenton fuer die Feldsportarten, kalte Halle fuer
     // das Eis. Ein gruener Rand um eine Eisflaeche liest sich sofort falsch.
     if(feldspielDisc==="hockey"){ g.addColorStop(0,"#141c26"); g.addColorStop(1,"#0d141c"); }
     else { g.addColorStop(0,"#1c2e1e"); g.addColorStop(1,"#152418"); }
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    if(!mitKulisse){ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
     if(feldspielDisc==="football"){
       // Ein echtes Football-Feld: zwei Endzonen, Yard-Linien alle 10 %, Mittellinie
       // betont — zeichnerisch sogar einfacher als der Basketball-Court, weil es nur
@@ -17362,7 +17533,7 @@
     // und unten. Zwei Wipp-Bilder im Blatt (je 40x66 bei x=0/40) — welches gerade zeigt,
     // haengt an `t` (Spielzeit), damit die Menge im Takt der Zeit "atmet", ohne einen
     // eigenen Animationszustand fuehren zu muessen.
-    if(bkDa("zuschauer")){
+    if(!mitKulisse&&bkDa("zuschauer")){
       const zFrame=Math.floor(t*2)%2, zw=40, zh=66;
       const zReihen=[{y:60-zh*0.55},{y:H-60-zh*0.45}];
       for(const {y} of zReihen)
@@ -17373,8 +17544,10 @@
     // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
     // Grund-/Deckenlinien eines hochkant gedachten Courts.
     const parkett=bkMust("parkett");
+    if(!mitKulisse){
     ctx.fillStyle=parkett||"rgba(120,84,46,.18)";
     ctx.fillRect(W*0.06,60,W*0.88,H-120);
+    }
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     ctx.strokeRect(W*0.06,60,W*0.88,H-120);
     ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
@@ -20155,6 +20328,21 @@
     const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    // NACH SLOT GEORDNET, NICHT NACH KADERLISTE (Chris, 08.11.): `mine`/`gegner` stehen in
+    // SQUAD-Reihenfolge (`inDisc()` filtert nur, sortiert nicht nach dem GESETZTEN Slot) --
+    // fuer `art.duell` (Speed-Schach/Tennis/Fechten) entscheidet aber, welches Brett i auf
+    // beiden Seiten denselben Slot zusammenbringt (Serve gegen Serve, nicht Serve gegen
+    // Tiebreak, nur weil beide zufaellig an Kaderlistenplatz i stehen). Ausdruecklich NICHT
+    // hier in `mine`/`gegner` selbst umsortiert -- die speisen `setz()`/`slotFuer(p,idx)`
+    // weiter unten, und fuer die ERSATZ-Bank (keine echte Aufstellung, `place[p.n]` leer)
+    // IST `idx` der einzige Slot-Anker; eine Vorab-Umsortierung waere dort zirkulaer. Nur
+    // die drei Stellen, die Bretter wirklich PAAREN (unten im `art.duell`-Block, im
+    // Tennis-Doppel-Paket und in der Fechtstaffel-Warteschlange), lesen stattdessen diese
+    // beiden Kopien. Fuer die Ersatzbank (bereits nach Diszi-Wert sortiert, kein echter Slot)
+    // ist `slotFuer` von Anfang an index-basiert -- der Sort hier ist dort ein No-Op.
+    const slotRang=(s)=>{const pos=slotListe.findIndex(x=>x.id===s);return pos>=0?pos:slotListe.length;};
+    const nachSlotgeordnet=(arr)=>arr.map((p,i)=>({p,r:slotRang(slotFuer(p,i))})).sort((x,y)=>x.r-y.r).map(x=>x.p);
+    const mineGeordnet=nachSlotgeordnet(mine), gegnerGeordnet=nachSlotgeordnet(gegner);
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN — derselbe Fehler wie im Feldspiel vor seiner Korrektur:
     // `istGegner` schaltete Slot-Aufschlag und Stufenwert fuer die Gastseite komplett ab.
@@ -20169,7 +20357,7 @@
     const setz=(p,seite,idx)=>{
       const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,buehneDisc);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -20349,12 +20537,21 @@
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=6){ baueSandsackParallel(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=2){ baueSandsack6v6(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=1){ baueSandsackWegC(art,mine,gegner,saat); return; }
-    if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
+    // baueHebenDuelle() PAART SELBST SCHON "UEBER DEN SLOT" (s. Kommentar dort) -- das setzt
+    // aber voraus, dass Index i wirklich Rolle i ist, und genau das stimmte bisher nicht
+    // (dieselbe Kaderlisten-statt-Slot-Luecke wie im `art.duell`-Block oben): `mineGeordnet`/
+    // `gegnerGeordnet` lösen das ein. `baueSandsackFinale` bleibt bei `mine`/`gegner` -- sie
+    // paart keine Einzelduelle, sondern verteilt Stationen INNERHALB einer Teamseite
+    // (`sandsackZuteilung`), unberuehrt von dieser Korrektur.
+    if(art.heben){ baueHebenDuelle(art,mineGeordnet,gegnerGeordnet); baueSandsackFinale(art,mine,gegner,saat); return; }
     // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
     // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
     // selbst (chronologische Kampf-Reihenfolge statt der generischen REIHENFOLGE ganz unten,
     // die fuer unabhaengige Einzelauftritte gedacht ist).
-    if(art.gauntlet){ baueGauntlet(art,mine,gegner); return; }
+    // baueGauntlet() haelt die Kettenreihenfolge fuer Chris' Slot-6-Anker-Dramaturgie
+    // (s. Kommentar dort) fuer bereits slot-echt -- dieselbe falsche Annahme wie beim
+    // `art.duell`-Block oben. `mineGeordnet`/`gegnerGeordnet` lösen das ein.
+    if(art.gauntlet){ baueGauntlet(art,mineGeordnet,gegnerGeordnet); return; }
     // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
     // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
     // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
@@ -20375,9 +20572,12 @@
       // diese Zeile fehlte hier bisher, weil die Duell-Variante (anders als Heben) inline
       // in bauBuehne() steht statt in einer eigenen Funktion.
       const duellBretter=Math.min(mine.length,gegner.length);
+      // Brett i paart jetzt denselben Slot-Rang auf beiden Seiten (`mineGeordnet`/
+      // `gegnerGeordnet`, s. Kommentar bei ihrer Definition oben) statt der i-ten Position
+      // in der Kaderliste.
       for(let i=0;i<duellBretter;i++){
-        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
-        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[i].n);
         if(!a||!b)continue;
         let lauf=0; const verlauf=[];
         for(let r=0;r<art.rundenN;r++){
@@ -20555,10 +20755,10 @@
       // Paar) ist eine Ausbaustufe, kein Teil dieses Paketes (s. PR-Beschreibung).
       if(art.tennis&&duellBretter>=2){
         const dbA=duellBretter-2, dbB=duellBretter-1;
-        const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbA].n);
-        const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbB].n);
-        const b0=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbA].n);
-        const b1=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbB].n);
+        const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbA].n);
+        const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbB].n);
+        const b0=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[dbA].n);
+        const b1=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[dbB].n);
         if(a0&&a1&&b0&&b1){
           const rubberIdx=dbA;
           const verlaufPaar=a0.verlauf.map((v,ri)=>v+(a1.verlauf[ri]??0));
@@ -20583,8 +20783,9 @@
     // dann Gefecht 2, ... statt des generischen "Durchgang 1 aller Bahnen, dann Durchgang
     // 2"-Rhythmus (REIHENFOLGE-Block unten) -- dasselbe Startreihenfolge-Muster, das
     // Eiskunstlauf (E-F1)/Showcase (S-F1) oben schon nutzen (eigener fruehzeitiger `return`,
-    // bevor der generische Block greift). `mine[i]`/`gegner[i]` stehen bereits in Chris'
-    // Aufstellungsreihenfolge (Slot 1 zuerst, s. `slotFuer()` oben) -- Slot 1 eroeffnet die
+    // bevor der generische Block greift). `mineGeordnet[i]`/`gegnerGeordnet[i]` (s. Kommentar
+    // bei ihrer Definition oben) stehen in Chris'
+    // Aufstellungsreihenfolge (Slot 1 zuerst) -- Slot 1 eroeffnet die
     // Staffel, der letzte gesetzte Slot ist der Anker, der real einen Rueckstand noch drehen
     // kann, genau das Drama, das Chris am 22.09. fuer Breaking bestellt hat ("so kann zb ein
     // starker spieler auf slot 6 noch mal richtig aufholen"), hier aber das REALE Format der
@@ -20606,12 +20807,17 @@
     // "PERIODE BEENDET", "BRETT ENTSCHIEDEN"), die `gegner.aktuell` gegen `u.aktuell`
     // vergleichen, vergleichen beide Seiten DESSELBEN Gefechts und bleiben deshalb unveraendert
     // korrekt -- veraendert ist nur, WANN das naechste Gefecht ueberhaupt an die Reihe kommt.
+    //
+    // `mineGeordnet[i]`/`gegnerGeordnet[i]` (nicht `mine[i]`/`gegner[i]`) -- dieselbe
+    // Slot-Paarung wie im `art.duell`-Block oben, sonst zeigt die Warteschlange ein anderes
+    // Gefecht i, als dort tatsaechlich auf Brett i stand (Chris, 08.11., s. Kommentar bei
+    // der Definition von `mineGeordnet` oben).
     if(art.fechten){
       buehneQueue=[];
       const duellBretter=Math.min(mine.length,gegner.length);
       for(let i=0;i<duellBretter;i++){
-        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
-        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[i].n);
         for(let r=0;r<art.rundenN;r++){
           if(a)buehneQueue.push(a);
           if(b)buehneQueue.push(b);
@@ -24914,9 +25120,10 @@
       const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
       if(!a||!b)continue;
       // PAARUNG UEBER DEN SLOT, nicht ueber die Punktzahl: mein Power Opener gegen ihren
-      // Power Opener. Beide Seiten bekommen ihre Rollen in derselben Listenreihenfolge
-      // (slotsVon), der Index ist damit die Rolle. Ein bewusst schwach besetzter Slot ist
-      // dadurch ein Zug und kein Unfall.
+      // Power Opener. `mine`/`gegner` sind hier (seit 08.11.) die nach Slot geordneten
+      // Kopien (`mineGeordnet`/`gegnerGeordnet`, s. Aufrufstelle in bauBuehne()), der Index
+      // ist damit wirklich die Rolle, nicht mehr nur die Kaderlisten-Position. Ein bewusst
+      // schwach besetzter Slot ist dadurch ein Zug und kein Unfall.
       const plan=HEBEN_ROLLEN[i%HEBEN_ROLLEN.length];
       a.rolle=plan.rolle; b.rolle=plan.rolle; a.duellNr=i; b.duellNr=i;
       a.gegnerN=b.n; b.gegnerN=a.n;
@@ -26265,8 +26472,10 @@
   }
 
   // Baut die gesamte Kette VOR dem ersten Frame (wie jeder andere Buehnen-Baustein: bauen,
-  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind die feste Aufstellungsreihenfolge
-  // (Team-Slot 1..n, s. bauBuehne()) -- "Kampfreihenfolge: Team-Slots in fester Reihenfolge".
+  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind hier (seit 08.11.) die nach Slot
+  // geordneten Kopien (`mineGeordnet`/`gegnerGeordnet`, s. Aufrufstelle und Kommentar bei
+  // ihrer Definition in bauBuehne()) -- Team-Slot 1..n in echter Aufstellungsreihenfolge,
+  // nicht mehr Kaderlisten-Reihenfolge.
   function baueGauntlet(art,mine,gegner){
     const A=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const B=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
@@ -29625,6 +29834,12 @@
   }
 
   function bodenBuehne(){
+    // KULISSE (Kulissen-Integration 07.11., s. kulisseZeichnen und scripts/baue-kulisse-
+    // buehnen.py): gibt es fuer diese Buehne eine illustrierte Umgebung (Fechthalle/Schlosshof,
+    // Park/Abteil beim Speed-Schach), ersetzt sie Verlauf und Scheinwerferkegel. Die Bank unten
+    // (die anderen Bahnen/Bretter) bleibt als halbdurchsichtiges Podest lesbar darueber.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     // BUeHNE STATT SANDPLATZ. Ein Podest mit Scheinwerferkegeln statt der Kampfarena —
     // die Kosmetik sagt sofort, dass hier niemand kaempft.
     const g=ctx.createLinearGradient(0,0,0,H);
@@ -29636,7 +29851,15 @@
       ctx.fillStyle=s;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x-90,H);ctx.lineTo(x+90,H);
       ctx.closePath();ctx.fill();
     }
-    ctx.fillStyle="#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
+    }
+    if(mitKulisse){
+      // Kopfzeile ("Bahn 1 von 6", "Brett 4 von 6 · Zug ...") steht ohne eigenen Kasten im Bild:
+      // ueber Laub, Tribuene oder Abteildecke braucht sie einen dunklen Himmel.
+      const kopf=ctx.createLinearGradient(0,0,0,110);
+      kopf.addColorStop(0,"rgba(8,6,12,.62)");kopf.addColorStop(1,"rgba(8,6,12,0)");
+      ctx.fillStyle=kopf;ctx.fillRect(0,0,W,110);
+    }
+    ctx.fillStyle=mitKulisse?"rgba(24,19,32,.78)":"#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
     ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
     for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*W/8,H*0.78);ctx.lineTo(i*W/8,H);ctx.stroke();}
     // Publikums-Loop beenden, falls wir GERADE von Gewichtheben herkommen (s. bodenHeben
@@ -30110,17 +30333,22 @@
     if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
 
+    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
+    // eine echte Grundlinien-Uebertragung. Linien jetzt aus tennisPlatzGeometrie() (s.
+    // Kommentar dort), nicht mehr lokal dupliziert.
+    const {topY,botY,netY,breiteBei,einzugAussen}=tennisPlatzGeometrie();
+
+    // KULISSE (Kulissen-Integration 07.11., s. kulisseZeichnen und scripts/baue-kulisse-
+    // buehnen.py): Tribuene und Belag der PixelLab-Szene (Rasen, Sand, Hartplatz). Der Belag
+    // liegt in der Kulisse schon genau im Trapez von tennisPlatzGeometrie() -- deshalb faellt
+    // hier nur die gemalte Grundflaeche weg; Linien und Netz zeichnet der Motor weiter selbst.
+    if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Umraum -- der Platz selbst (unten) traegt schon genug Farbe,
     // anders als bodenBuehne()s neutrales violettes Podest braucht es hier keinen eigenen
     // Scheinwerferkegel-Akzent.
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#141826"); g.addColorStop(1,"#0a0c14");
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-
-    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
-    // eine echte Grundlinien-Uebertragung. Linien jetzt aus tennisPlatzGeometrie() (s.
-    // Kommentar dort), nicht mehr lokal dupliziert.
-    const {topY,botY,netY,breiteBei,einzugAussen}=tennisPlatzGeometrie();
 
     // Gruener Auslauf, dann blauer Hartplatz obendrauf (US-Open-Palette).
     ctx.fillStyle="#1c5c3a";
@@ -30133,6 +30361,7 @@
     ctx.moveTo(W/2-breiteBei(topY),topY); ctx.lineTo(W/2+breiteBei(topY),topY);
     ctx.lineTo(W/2+breiteBei(botY),botY); ctx.lineTo(W/2-breiteBei(botY),botY);
     ctx.closePath(); ctx.fill();
+    }
 
     // WEISSE LINIEN: Aussenlinie (Doppel), Einzel-Seitenlinien, Aufschlaglinien,
     // Mittelaufschlaglinie -- keine erfundene Form, das Standard-Tennisplatzbild.
@@ -30165,6 +30394,12 @@
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
     if(!showcasePublikumAn){ tonLoopStart("showcase"); showcasePublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Theater, Festival-
+    // buehne oder Zirkus aus der PixelLab-Szene, Buehnenkante auf der Rampe (H*0.86). Ersetzt Verlauf,
+    // Vorhaenge, Rampenlicht und Publikums-Silhouetten; Fuehrungssaum und Jury-Pult bleiben.
+    const vorhangH=H*0.16;
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
 
     // GRUNDFLAECHE: waermeres, violetteres Theaterlicht statt bodenBuehne()s neutralem
     // Wettkampf-Podest.
@@ -30174,7 +30409,6 @@
 
     // ROTER VORHANG oben, zwei Portale mit je vier gerafften Falten (showcase.tsx' Curtain-
     // Motiv, hier als Canvas-Primitiv statt SVG-Pfad).
-    const vorhangH=H*0.16;
     [[0,W*0.18],[W*0.82,W]].forEach(([x0,x1])=>{
       const falten=4, fw=(x1-x0)/falten;
       for(let i=0;i<falten;i++){
@@ -30193,6 +30427,7 @@
     // wie bodenEis() (dezent, beim Fuehrungswechsel kurz voll gesaettigt), Chris'
     // "ohne Stats sehen, wer fuehrt" jetzt auch fuer Showcase. Solange niemand gepunktet
     // hat, bleibt die alte, neutrale Goldlinie stehen.
+    }
     const fuehrungSide=showcaseFuehrung();
     if(fuehrungSide!=null){
       if(showcaseSaumSide!==fuehrungSide){ showcaseSaumSide=fuehrungSide; showcaseSaumSeit=buehneT; }
@@ -30210,6 +30445,7 @@
     // damit die Silhouetten (naeher an der Kamera, s. unten) davor stehen statt darin zu
     // versinken.
     const rampY=H*0.86;
+    if(!mitKulisse){
     ctx.fillStyle="#2a2233";ctx.fillRect(0,rampY-4,W,10);
     for(let i=0;i<11;i++){
       const rx=W*0.06+i*(W*0.88)/10;
@@ -30217,6 +30453,7 @@
       beam.addColorStop(0,"rgba(255,232,180,.20)");beam.addColorStop(1,"rgba(255,232,180,0)");
       ctx.fillStyle=beam;ctx.beginPath();ctx.arc(rx,rampY,H*0.28,Math.PI,0);ctx.fill();
       ctx.fillStyle="#f6c750";ctx.beginPath();ctx.arc(rx,rampY,2.4,0,6.2832);ctx.fill();
+    }
     }
 
     // JURY-PULT MIT DREI BUZZERN am unteren Rand -- showcase.tsx' "JURY BUZZER-PULT"-Zeile,
@@ -30239,6 +30476,7 @@
     // (dort zuletzt/vorne gezeichnet, Kommentar "Audience silhouette at bottom"). Ragt bewusst
     // etwas ueber den unteren Bildrand hinaus, wie ein Publikum im Vordergrund einer
     // Kamera-Perspektive.
+    if(mitKulisse)return; // das Publikum sitzt schon in der Kulisse
     const publikumY=showcasePublikumY();
     ctx.fillStyle="rgba(0,0,0,.85)";
     const kn=22;
@@ -30572,6 +30810,10 @@
     if(!ispyRaumAn){ tonLoopStart("i-spy"); ispyRaumAn=true; }
 
     const art=BB();
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): beide Raeume als
+    // Draufsicht aus der PixelLab-Szene (Garten, Hof, Halle), ohne deren Demo-Truhen. Ersetzt Verlauf,
+    // Dielen, Buecherregale und Lichtinseln; Steg, Fuehrungssaum und Fundorte zeichnet der Motor weiter.
+    if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#241c14"); g.addColorStop(1,"#100c08");
@@ -30610,6 +30852,8 @@
     // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
     // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
     // steht nie mit einem Fundort oder einer Figur in Konflikt.
+    }
+
     const stegX0=W*0.465, stegX1=W*0.535;
     ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
 
@@ -30785,9 +31029,21 @@
     // dieselbe BB()-Quelle, die jede andere Uhr dieser Buehne schon liest (z.B.
     // updateHudBuehne()), rein lesend, kein rr().
     const art=BB();
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): fuer das LIVE
+    // laufende Hantel-Duell der Kopfstreifen der PixelLab-Szenen (Hafen, Oase, Lagerhalle) als
+    // Hintergrund der Tribuene, darunter ihr Boden. Ersetzt Verlauf, Tribuenenflaeche und
+    // Rueckwand; die Zuschauerreihen (wippen mit dem Heben) und die Plattform bleiben.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    } else {
+      // Duell-Zeile und Kilo-Anzeige stehen frei ueber dem Kopfstreifen (Himmel der Oase ist hell)
+      const kopf=ctx.createLinearGradient(0,0,0,130);
+      kopf.addColorStop(0,"rgba(8,6,12,.55)");kopf.addColorStop(1,"rgba(8,6,12,0)");
+      ctx.fillStyle=kopf;ctx.fillRect(0,0,W,130);
+    }
     // PUBLIKUMS-REAKTION. Merge 01.10. (PR #1007 auf main): die frueheren 26 Punkt-
     // Silhouetten sind durch die Tribuene weiter unten ersetzt; die H3-Reaktion unten wirkt
     // seitdem unveraendert auf deren Zuschauerreihen (s. zuschauerReihe()).
@@ -30837,6 +31093,7 @@
     // links/rechts der Plattform stehen. Die Scheinwerfer bei W*0.30/0.70 rahmen die Wand.
     const tribueneH=H*0.34;
     const wandX0=W*0.29, wandX1=W*0.71;
+    if(!mitKulisse){
     ctx.fillStyle="#20242e"; ctx.fillRect(0,0,W,tribueneH);
     ctx.strokeStyle="rgba(255,255,255,.07)"; ctx.lineWidth=1;
     for(let i=1;i<12;i++){ ctx.beginPath(); ctx.moveTo(i*W/12,0); ctx.lineTo(i*W/12,tribueneH); ctx.stroke(); }
@@ -30844,6 +31101,7 @@
     ctx.strokeStyle="rgba(255,255,255,.09)"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(wandX0+0.5,0); ctx.lineTo(wandX0+0.5,tribueneH);
     ctx.moveTo(wandX1-0.5,0); ctx.lineTo(wandX1-0.5,tribueneH); ctx.stroke();
+    }
     const TRIB_FARBEN=["#6b7690","#8a7a63","#6f8878","#8a6b76","#5f7488"];
     const zuschauerReihe=(rowY,n,r,phase)=>{
       for(let i=0;i<n;i++){
@@ -31118,6 +31376,12 @@
   let eiskunstlaufPublikumAn=false;
   function bodenEis(){
     if(!eiskunstlaufPublikumAn){ tonLoopStart("eiskunstlauf"); eiskunstlaufPublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Halle bzw. Waldsee
+    // aus der PixelLab-Szene, das Eis der Szene schon genau im eisRundweg(k) unten. Ersetzt Verlauf,
+    // Lichtkegel, Bodenband und die gemalte Eisflaeche; Bande, Fuehrungssaum, Balken, Kampfgericht,
+    // Startbereich und Kiss-and-Cry zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const bg=ctx.createLinearGradient(0,0,0,H);
     bg.addColorStop(0,"#11151f");bg.addColorStop(1,"#080a10");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
@@ -31133,13 +31397,14 @@
     ctx.fillStyle="#171c26";ctx.fillRect(0,H*0.90,W,H*0.10);
     ctx.strokeStyle="rgba(255,255,255,.08)";ctx.lineWidth=1;
     for(let i=1;i<10;i++){ctx.beginPath();ctx.moveTo(i*W/10,H*0.90);ctx.lineTo(i*W/10,H);ctx.stroke();}
+    }
 
     const F=kuerFlaeche();
     const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};
     // Eisflaeche: derselbe kalte Verlauf wie eisflaeche() (Hockey), eigene Grenzen.
     const eis=ctx.createLinearGradient(0,k.o,0,k.u);
     eis.addColorStop(0,"#dce9f2");eis.addColorStop(0.5,"#eef5fa");eis.addColorStop(1,"#d3e2ee");
-    eisRundweg(k,0);ctx.fillStyle=eis;ctx.fill();
+    if(!mitKulisse){eisRundweg(k,0);ctx.fillStyle=eis;ctx.fill();}
     ctx.lineWidth=6;ctx.strokeStyle="#f2f4f7";eisRundweg(k,0);ctx.stroke();
     // Goldene Bandenkante — der eine Farbakzent, den der Plan ausdruecklich nennt.
     ctx.lineWidth=2;ctx.strokeStyle="rgba(214,172,54,.85)";eisRundweg(k,4);ctx.stroke();
@@ -35951,7 +36216,11 @@
     bg.addColorStop(0,"hsl(275 55% 22%)");
     bg.addColorStop(0.55,"hsl(278 50% 13%)");
     bg.addColorStop(1,"hsl(280 45% 7%)");
+    // KULISSE (Kulissen-Integration 07.11.): liegt der Kerker der PixelLab-Szene darunter, kommt der
+    // violette Verlauf nur durchscheinend darueber -- die Folter-Stimmung bleibt, der Ort wird sichtbar.
+    if(kulisseSichtbar())ctx.globalAlpha=0.45;
     ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;
 
     // B. Vier Druck-Ringe, exakt breaking.tsx:62-67s vier Zonen und Radien.
     const zonen=[[1.0,"GEBROCHEN"],[0.72,"SCHMERZGRENZE"],[0.46,"STONE FACE"],[0.22,"MIND FORTRESS"]];
@@ -36675,12 +36944,21 @@
   // Fingerabdruck in mehreren Tests bit-identisch geprueft wird) auch nur ein Bit zu aendern.
   function kampfwerteVorschau(p,d,slId){
     const engPunkte=slId?slotAufschlag(p,slId,d):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engPunkte+breitPunkte+eigHebung(p,d);
     const eigWert=eigOhneMutator+eigMutator(p,d);
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
     return aufEignung(stats({...p,a:attr},d),eigWert);
+  }
+  // NUR GANZE ZAHLEN ANZEIGEN (Chris, 08.11.: "bitte nur gerade Zahlen zeigen").
+  // aufEignung() skaliert LP/ANG/VER mit einem krummen Faktor; die aufgeklappte Karte
+  // in der Aufstellung zeigte deshalb "LP 89.48130901737728 · ANG 82.36347761826772".
+  // Gerundet wird NUR fuer die Anzeige -- kampfwerteVorschau() und der Kampf rechnen
+  // weiter mit den ungerundeten Werten.
+  const kampfzahl=(x)=>String(Math.round(Number(x)||0));
+  function kampfwerteZeile(s){
+    return "LP "+kampfzahl(s.LP)+" · ANG "+kampfzahl(s.ANG)+" · VER "+kampfzahl(s.VER)+" · TMP "+kampfzahl(s.TMP);
   }
   // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
   // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
@@ -36808,6 +37086,13 @@
           place[n].wechselPaarBonus=e.wechselPaarBonus;
           place[n].wechselPaarGeber=e.wechselPaarGeber;
           place[n].wechselPaarEingespielt=e.wechselPaarEingespielt===true;
+        }
+        // P4 ECHTE FORMKARTE/INTENSITAET (s. breitPunkteVon()): nur uebernommen, wenn `form` eine
+        // endliche Zahl ist — die App setzt das Feld ausschliesslich fuer Disziplinen in
+        // FORMKARTEN_ECHT_DISCIPLINE_IDS. Fehlt es, bleibt `place[n]` exakt wie oben.
+        if(typeof e.form==="number"&&Number.isFinite(e.form)){
+          place[n].form=e.form;
+          if(e.intensitaet==="schonen"||e.intensitaet==="normal"||e.intensitaet==="push")place[n].intensitaet=e.intensitaet;
         }
         order[n]=slotOrd(e.slot);
       }
@@ -37229,9 +37514,10 @@
       // einen Blick, WER da steht, und nicht nur zwei Buchstaben.
       const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
       ico.appendChild(figurKlein(p,40));
-      const fk=formVon(p.n);
-      if(fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent="+"+fk;
-        fm.title="Formkarte des Spieltags: +"+fk+" auf den Disziplinwert";ico.appendChild(fm);}
+      // P4: die GESPIELTE Karte, wo es sie gibt (formEchtVon), sonst wie bisher die Ersatzkarte.
+      const fe=formEchtVon(p.n,disc), fk=fe?fe.form:formVon(p.n);
+      if(fe?fk!==0:fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent=(fk>0?"+":"")+fk;
+        fm.title=(fe?"Gespielte Formkarte: ":"Formkarte des Spieltags: ")+(fk>0?"+":"")+fk+" auf den Disziplinwert";ico.appendChild(fm);}
       if(gesetzt||anderswo)ico.title=anderswo?("steht in "+DISCS[pl.d].label):("steht auf "+(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot));
       r.appendChild(ico);
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
@@ -37373,17 +37659,17 @@
         rm.addEventListener("click",ev=>{ev.stopPropagation();delete place[p.n];renderAll();});
         u.appendChild(rm);
         u.appendChild(el("b",null,p.n));
-        u.appendChild(el("span",null,"LP "+s.LP+" · ANG "+s.ANG+" · VER "+s.VER+" · TMP "+s.TMP));
+        u.appendChild(el("span",null,kampfwerteZeile(s)));
         // DIESELBE LESART WIE IM VORBILD: die Kampfwerte als Prozente, damit man sofort
         // sieht, was sie bewirken, statt eine nackte Zahl zwischen 1 und 99 zu deuten.
         const pz=(x)=>(x>=0?"+":"")+x+" %";
         const wz=el("span","prozente");
         const teile=[
-          ["Leben",Math.round(s.LP*LEBEN_JE_LP)+"",  "Er hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus, bevor er ausscheidet ("+s.LP+" × "+LEBEN_JE_LP+")."],
+          ["Leben",Math.round(s.LP*LEBEN_JE_LP)+"",  "Er hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus, bevor er ausscheidet ("+kampfzahl(s.LP)+" × "+LEBEN_JE_LP+")."],
           ["Angriff",pz(Math.round((s.ANG/50-1)*100)),
-            "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+s.ANG+"."],
+            "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+kampfzahl(s.ANG)+"."],
           ["Minderung",Math.round(s.VER/(s.VER+100)*100)+" %",
-            "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+s.VER+". Genau die Kurve, die auch im Vorbild steht."],
+            "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+kampfzahl(s.VER)+". Genau die Kurve, die auch im Vorbild steht."],
           // KARTEN_SPD statt der alten 40+TMP*1.4-Formel (Fable-Audit, 03.11.: zeigte bei
           // TMP 99 +62 % statt korrekt +21 %) -- dieselbe Formel wie renderProfile()
           // (s. dort) und derselbe cdKuerzung-Wert aus baueEinheit(), hier dupliziert, weil
@@ -38029,6 +38315,22 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  // ANZEIGE-TREUE-FIX A1 (09.11.) + B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs,
+  // 24 Saaten je Disziplin): eigener Akkumulator fuer jedes Chassis, dessen Physik sich
+  // ueber die Dauer eines Spiels per `rr()` summiert -- Bahn (istBahn(disc), A1), Kampf
+  // (istKampf(disc): TDM/Mini-DM/Battlefield, B1-Nachtrag) UND Feldspiel (istFeldspiel(disc):
+  // Hockey, B1-Nachtrag) --, getrennt von `acc`. Alle drei nachgemessen 24/24 Saaten
+  // abweichend vor diesem Fix (Battlefield sogar im SIEGER). `acc` zaehlt weiterhin in
+  // ECHTZEIT-Sechzigsteln (unveraendert, speist tickerSendeT/ticksSeitReset genau wie
+  // vorher); `bahnSimAcc` zaehlt dieselben Echtzeit-Sechzigstel ein zweites Mal, aber loest
+  // einen stepSim()-Aufruf erst aus, wenn `zeitFaktor()/60` davon zusammen sind -- und
+  // dieser Aufruf bekommt dann den FESTEN Takt `1/60`, nicht `(1/60)/zeitFaktor()`. Buehne
+  // bleibt AUSSEN VOR: derselbe B1-Nachtrag bestaetigt fuer Fechten/Gewichtheben (beide
+  // ZEIT_DEHNUNG!=1) 24/24 Saaten UEBEREINSTIMMEND -- rundenbasierte Entscheidungspunkte
+  // (stepBuehne()) sind tick-granularitaets-invariant, anders als die kontinuierliche
+  // Positions-/Kontakt-Simulation in Kampf/Feldspiel (wie bei der Bahn).
+  // s. ausfuehrliche Begruendung am Kommentar in loop() direkt vor seiner Verwendung.
+  let bahnSimAcc=0;
   // SONDEN-MODUS (A0.2, docs/design/deterministischer-sonden-modus-19-09.md): additiver
   // Schalter fuer Screenshot-QA. `sondenAktiv` schaltet jetztMs() (s. dort, unten bei den
   // performance.now()-Lesestellen) von der echten Wanduhr auf eine SIMULATIONSGEBUNDENE Uhr
@@ -38263,7 +38565,7 @@
     // Doppelbuchung, die das Konzeptdokument (Abschnitt 5.2) benennt — und der eng-Weg hob zwei
     // Attribute staerker als die uebrigen, verschob also Einflussanteile gegen die Matrix.
     const engPunkte=(slId?slotAufschlag(p,slId,d,slotDef):0);     // haengt an der Position
-    const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
+    const breitPunkte=breitPunkteVon(p,d);                       // trifft jeden gleich
     // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
     // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
     // Battlefield fiel der Basiswert damit auf 0, und `eigWert` bestand nur aus Slot-,
@@ -38367,6 +38669,29 @@
     const gesetzt=inDisc(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // TDM-GEFECHT (Verdrahtung 11.11., s. Kopfkommentar bei tdmDuellRoster() weiter unten):
+    // das vorab entschiedene Gefecht ersetzt den alten kontinuierlichen Zweikampf-Aufbau
+    // unten vollstaendig fuer TDM -- frueher Return, kein Byte der Reihen-/Slot-Logik darunter
+    // wird fuer diese Disziplin noch erreicht. `tdmDuellRoster()` (statt einer zweiten Kopie
+    // der Rollenauswahl hier) ist dieselbe Funktion, die auch `spieleTdmGefecht()` fuer die
+    // Headless-Buchung ruft -- GARANTIERT dieselben zwei Seiten, "gezeigt = gebucht".
+    if(d==="tdm"){
+      const {mine:mineTdm,gegner:gegnerTdm}=tdmDuellRoster();
+      if(mineTdm.length&&gegnerTdm.length){
+        const alleTdm=[...mineTdm,...gegnerTdm];
+        const g=tdmGefecht([mineTdm,gegnerTdm],seed,n);
+        const seitenZaehlerTdm=[0,0];
+        U=g.kaempfer.map((k,i)=>{
+          const p=alleTdm[i];
+          const idxSeite=seitenZaehlerTdm[k.side]++;
+          const seitenGroesse=k.side===0?mineTdm.length:gegnerTdm.length;
+          return baueEinheit(p,k.side,1,idxSeite,seitenGroesse,i,k.slot,
+            order[p.n]||slotOrd(k.slot),zielOf[p.n],d,SLOTVON[k.slot]);
+        });
+        tdmReplayStarten(g);
+      }
+      return;
+    }
     // BATTLEFIELD: eigene Rollen je Kadergroesse (bfSlotsFuer), sonst unveraendert slotListe.
     const kSlotsHeim=bfSlotsFuer(d,mine.length);
     const slotListeHeim=kSlotsHeim||slotListe;
@@ -38915,6 +39240,10 @@
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n,"ereignis");
     }
+    // TON (Fable-Brainstorm 14.11., Punkt 2): s. TON_KATALOG-Kommentar bei "tdm:{" oben --
+    // jede K.o.-Meldung bekommt ihren Ton, unabhaengig von `big` (eine Ausschaltung ist von
+    // Natur aus selten genug). Reine Praesentation, kein rr()-Aufruf.
+    sfx(disc,"ausschaltung");
   }
 
   // GROSSER TREFFER STATT "HAT UEBERHAUPT EIN LABEL" (Opus-Ingame-Review, 27.09.): vorher war
@@ -38971,6 +39300,11 @@
     // 144). kind nur noch, wenn die Zeile wirklich ein Banner ist -- derselbe Fund und dieselbe
     // Loesung wie beim Tennis-Ticker-Fix (T-N1, 04.10.).
     const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false);
+    // TON (Fable-Brainstorm 14.11., Punkt 2): nur auf `gross` -- bei mehreren Kaempfern mit
+    // hoher Schlagfrequenz waere ein Ton auf JEDEN Treffer ein Dauerrauschen, kein Ereignis
+    // (s. TON_KATALOG-Kommentar bei "tdm:{" oben). `gross` ist hier schon fertig berechnet,
+    // kein zweiter kampfGrossDrosseln()-Verbrauch.
+    if(gross)sfx(disc,"treffer");
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
       gross,undefined,
       gross?"grosserTreffer":undefined,undefined,undefined,"routine");
@@ -39863,6 +40197,9 @@
         // "routine" in feed() fuer JEDEN Geschosstreffer. kind nur noch, wenn die Zeile
         // wirklich ein Banner ist.
         const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false);
+        // TON (Fable-Brainstorm 14.11., Punkt 2): dasselbe `gross`-Gate wie bei nahschlag()
+        // oben, derselbe Grund (Tongewitter bei hoher Schussfrequenz vermeiden).
+        if(gross)sfx(disc,"treffer");
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
           gross,undefined,
@@ -40270,6 +40607,13 @@
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
+    // TDM-GEFECHT (Verdrahtung 11.11.): das Gefecht steht fest, die Arena spielt es nur ab
+    // (tdmReplaySchritt, s. dort) -- dasselbe Abfang-Muster wie Battlefields KP.pod.replay
+    // direkt darunter. `tdmReplay` gibt es nur, wenn build()s TDM-Zweig die Rollenauswahl zu
+    // zwei nichtleeren Seiten aufloesen konnte (s. tdmDuellRoster/tdmReplayStarten) -- sonst
+    // bleibt `U` leer und der alte Zweig unten wird (wirkungslos, weil `U` dann leer ist)
+    // trotzdem erreicht, statt dass hier ein Fehler entsteht.
+    if(tdmReplayAktiv()){ tdmReplaySchritt(dt); return; }
     t+=dt;
     // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
     // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
@@ -42373,6 +42717,10 @@
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
     "hind_mauer","hind_heu","hind_feuer",
+    // Kulissen Batch 15 (Spurt, Rang 3 des Audits): IN-/FINISH-Bogen, aus der HYROX-Rohszene
+    // freigestellt (scripts/baue-kulisse-buehnen.py bogen_requisiten(), kulissen_werkzeug.freistellen),
+    // nicht aus PixelLab bestellt -- die Rohszene fuehrte sie laut Audit ohnehin schon.
+    "spurt_bogen_in","spurt_bogen_finish",
     // Takeshi's Castle: zehn Fallen-Typen + Burg-Kulisse auf vierzehn Stationen, s.
     // BAHN_ART["takeshis-castle"].fallenBild und zeichneFalleTakeshi() weiter unten
     // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
@@ -42382,7 +42730,12 @@
     // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
     // Abschnitt 5): die Untergruende der fuenf Gelaende-Zonen und ihrer Umgebungen.
     "boden_wiese","boden_wald","boden_pfad","boden_kies","boden_schlamm","boden_see",
-    "boden_sumpf","boden_hang","boden_pflaster"];
+    "boden_sumpf","boden_hang","boden_pflaster",
+    // KULISSEN-QS 08.11. (Batch 14, Rang 2 des Audits docs/design/kulissen-qualitaets-audit-08-11.md):
+    // drei neue Requisiten fuer "Rahmen statt Material" an der Kletterwand -- Hallenmatte als
+    // Bodenkachel, Kreidebeutel am Wandfuss, Eiszapfen am Eisfall-Ueberhang. Fehlen-tolerant wie
+    // jede andere Kachel hier (aDa()-Wache), s. bodenWand() unten.
+    "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -42441,11 +42794,17 @@
   }
   // Zeichnet die gewaehlte Kulisse samt Lesbarkeits-Schicht; false = nichts gezeichnet
   // (keine Kulisse fuer diese Disziplin oder Bild noch nicht geladen) -> alter Boden.
-  function kulisseZeichnen(){
+  // versatzY (Kulissen-Integration 07.11., Climbing): die Kulisse ist dann eine senkrecht nahtlose
+  // Kachel und wird um versatzY nach oben verschoben gezeichnet (zwei Kopien), damit eine scrollende
+  // Wand mit der Kamera mitlaeuft. Reine Anzeige.
+  function kulisseZeichnen(versatzY){
     if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
     const im=kulisseBilder[kulisseAktiv.bild];
     if(!im||!im.complete||!im.naturalWidth)return false;
-    ctx.drawImage(im,0,0,W,H);
+    if(Number.isFinite(versatzY)&&versatzY!==0){
+      const y0=-(((versatzY%H)+H)%H);
+      ctx.drawImage(im,0,y0,W,H); ctx.drawImage(im,0,y0+H,W,H);
+    } else ctx.drawImage(im,0,0,W,H);
     // LESBARKEIT: die Kulissen reichen von Schnee (hell) bis Lava (dunkel), die Kaempfer
     // samt Namen und Ringen muessen auf jeder stehen. Eine gleichmaessige Abdunklung nimmt
     // dem Schnee die Blendung — wie stark, rechnet der Generator je Bild aus seiner mittleren
@@ -42459,6 +42818,15 @@
     return true;
   }
 
+  // Liegt gerade eine geladene Kulisse unter dieser Disziplin? Fuer Zeichnungen, die nach dem Boden
+  // noch eine eigene vollflaechige Grundfarbe legen (zeichneBreaking) und sie dann durchscheinend
+  // statt deckend zeichnen muessen. Reine Anzeige-Abfrage.
+  function kulisseSichtbar(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    return !!(im&&im.complete&&im.naturalWidth);
+  }
+
   // Speed-Schach-Buehnenbild: dieselbe Datei-statt-base64-Idee, eigener Ordner
   // (public/sprites/buehne/, quellen.json dort — Fable-Plan 05.09., Teil A.2). Brett
   // und Tisch sind Canvas-Primitiven, nur die Figuren sind ein Blatt. Laedt es nicht,
@@ -42468,6 +42836,16 @@
   const sbBild={};
   for(const n of SB_TEILE){const im=new Image();im.src="/sprites/buehne/"+n+".png";sbBild[n]=im;}
   const sbDa=n=>{const im=sbBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+
+  // HYROX-HALLE (Hallenrunde-PR, Design-Dokument 6.6): dieselbe Datei-statt-base64-Idee wie
+  // SB_TEILE/A_TEILE oben, eigener kleiner Lader statt eines Eintrags in A_TEILE --
+  // `tests/arena-kulissen.test.ts` prueft fuer A_TEILE-Eintraege PNG-Masse, dieses Bild ist
+  // aber ein JPEG (wie die Rohszene selbst, s. baue-hyrox-halle.py). Laedt es nicht (oder
+  // fehlt die Datei, etwa im Headless-Runner), zeichnet bodenHyroxHalle() den Vektor-
+  // Rueckfall (derselbe Rueckfall-Grundsatz wie bei jeder A_TEILE/BK_TEILE-Kachel).
+  const hallenBild={hyrox_halle:new Image()};
+  hallenBild.hyrox_halle.src="/sprites/arena/hyrox_halle.jpg";
+  const hallenDa=()=>{const im=hallenBild.hyrox_halle;return !!im&&im.complete&&im.naturalWidth>0;};
 
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
@@ -42764,6 +43142,43 @@
       // ueberall im Katalog, kein neues Audio-Asset.
       gebrochen: {synth:(vol)=>{ tonSchlag(vol,120,35,0.32); tonRauschen((vol??0.6)*0.5,200,0.35,false); }},
       gibtauf:   {synth:(vol)=>tonSchlag((vol??0.6)*0.75,180,55,0.22)}
+    },
+    // TDM/MINI-DM/BATTLEFIELD (Fable-Brainstorm 14.11., Abschnitt 3 Punkte 1-3): die drei
+    // einzigen Disziplinen, die bislang KEINEN TON_KATALOG-Eintrag hatten (Basketball galt
+    // lange als vierte Luecke, hat aber laengst sein eigenes, datei-basiertes bkSfx()-System
+    // oben -- geprueft, kein Nachbau hier noetig). Alle drei teilen sich nahschlag()/
+    // schrittPfeile()/treffer()/schalteAus() (s. dort) -- "treffer" feuert deshalb nur auf
+    // GROSSE Treffer (dieselbe grosserTreffer()-Schwelle wie der Ticker), sonst waere der
+    // Ton bei mehreren Kaempfern mit schneller Schlagfrequenz ein Dauerrauschen statt eines
+    // Ereignisses. "ausschaltung" feuert auf jedes schalteAus() (K.o./Fall), das ist von
+    // Natur aus seltener. Reine Synth-Primitive, kein neues Audio-Asset.
+    tdm:{
+      treffer:     {synth:(vol)=>tonSchlag(vol,260,90,0.14)},
+      ausschaltung:{synth:(vol)=>{ tonSchlag(vol,220,50,0.24); tonRauschen((vol??0.6)*0.5,500,0.22,false); }},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    // MINI-DM (Punkt 3): die drei Kulissen-Varianten (Grube/Saegewerk/Strom-Kaefig,
+    // battle-mode.kulissen.js) waren bisher nur optisch unterscheidbar. `publikum` liest
+    // `kulisseAktiv.id` (gesetzt von kulisseWaehlen() oben, pro Begegnung deterministisch
+    // aus Saat+Paarung, kein rr()) und waehlt je Variante eine eigene Bandmitte fuer
+    // tonRauschen(): hohe, enge Bandmitte fuer das Saegeblatt-Surren, tiefe fuer das
+    // Strom-Kaefig-Knistern/-Summen, die neutrale TDM-Bandmitte fuer die namenlose
+    // Basis-Grube. Kein sechster Grundbaustein -- dieselbe Komposition wie ueberall im
+    // Katalog, nur die Auswahl ist neu.
+    "mini-dm":{
+      treffer:     {synth:(vol)=>tonSchlag(vol,240,80,0.13)},
+      ausschaltung:{synth:(vol)=>{ tonBuzzer(vol,0.22); tonSchlag((vol??0.6)*0.7,180,45,0.18); }},
+      publikum:    {loop:true, synth:(vol)=>{
+        const variante=(kulisseAktiv&&kulisseAktiv.disc==="mini-dm")?kulisseAktiv.id:"basis";
+        if(variante==="saegewerk")return tonRauschen(vol,3200,0,true);
+        if(variante==="strom-kaefig")return tonRauschen(vol,140,0,true);
+        return tonRauschen(vol,500,0,true);
+      }}
+    },
+    battlefield:{
+      treffer:     {synth:(vol)=>tonSchlag(vol,250,85,0.14)},
+      ausschaltung:{synth:(vol)=>{ tonSchlag(vol,210,45,0.26); tonRauschen((vol??0.6)*0.5,460,0.24,false); }},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,480,0,true)}
     },
     "takeshis-castle":{
       falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
@@ -43423,6 +43838,59 @@
   // reset() setzt takeshiPublikumAn unten explizit zurueck, sonst haelt die Flagge nach
   // dem ersten Reset "schon gestartet" und der Loop kommt im zweiten Takeshi-Kampf nie
   // wieder.
+  // ================= HYROX-HALLENRUNDE, BODEN (Stufe 2, Design-Dokument 7.7) =================
+  // Vorbild `bodenTakeshiRoute()` direkt unten: EINE Weiche in `bodenSpurt()` fuer Boden UND
+  // Laeufer (istHyroxHalle()), Vektor-Rueckfall ohne geladenes Hallenbild (derselbe Grundsatz
+  // wie jede A_TEILE/BK_TEILE-Kachel -- Boden und Laeufer laufen nie auseinander, auch
+  // headless nicht).
+  function bodenHyroxHalle(){
+    const z=cam.zoom;
+    ctx.fillStyle="#15161b"; ctx.fillRect(0,0,W,H);   // Raender bei Zoom<1
+    ctx.save();
+    ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z*HALLE_S,z*HALLE_S);
+    ctx.imageSmoothingEnabled=false;
+    if(hallenDa()){
+      ctx.drawImage(hallenBild.hyrox_halle,0,0,1680,960);
+    } else {
+      // VEKTOR-RUECKFALL: Innenraum dunkel, die ganze Wegtabelle als Strich (die Laufrunde
+      // ist darin der laengste, durchgehende Teil), drei Zonenrechtecke als Matten --
+      // grob, aber Boden und Laeufer laufen auch so nie auseinander (Takeshi-Grundsatz).
+      ctx.fillStyle="#2a2c33"; ctx.fillRect(-40,-40,1760,1040);
+      const P=HYROX_WEG.pts;
+      ctx.strokeStyle="#2b5fa8"; ctx.lineWidth=84; ctx.lineJoin="round"; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(P[0].x,P[0].y); for(let i=1;i<P.length;i++)ctx.lineTo(P[i].x,P[i].y); ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=3; ctx.setLineDash([14,10]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle="#394049";
+      ctx.fillRect(150,520,500,230);    // Technik-Gassen
+      ctx.fillRect(960,655,340,60);     // Kletter-Boxen
+      ctx.fillRect(140,180,500,230);    // Kraft-Rasen
+    }
+    // START-/ZIELLINIE (6.5).
+    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=3; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(1430,800); ctx.lineTo(1430,880); ctx.stroke();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.setLineDash([6,5]);
+    ctx.beginPath(); ctx.moveTo(1560,450); ctx.lineTo(1650,450); ctx.stroke();
+    ctx.setLineDash([]);
+    // STATIONSSPRITES im Quellraum (6.6), Unterkante auf der Fusslinie.
+    const fuss=(img,cx,fy)=>{ if(img&&img.complete&&img.naturalWidth)
+      ctx.drawImage(img,Math.round(cx-img.naturalWidth/2),Math.round(fy-img.naturalHeight)); };
+    if(aDa("hind_huerde"))for(const gy of [548,604,660,716])fuss(aBild.hind_huerde,620,gy);
+    if(aDa("hind_balken"))for(const gy of [548,604,660,716])fuss(aBild.hind_balken,420,gy);
+    if(aDa("hind_wasser_l")&&aDa("hind_wasser_r"))for(const gy of [218,274,330,385]){
+      fuss(aBild.hind_wasser_l,290-16,gy); fuss(aBild.hind_wasser_r,290+16,gy); }
+    if(aDa("hind_mauer"))for(const gy of [218,274,330,385])fuss(aBild.hind_mauer,390,gy);
+    if(aDa("hind_heu"))for(const gy of [218,274,330,385])fuss(aBild.hind_heu,490,gy);
+    if(aDa("hind_wand"))fuss(aBild.hind_wand,1010,700);
+    if(aDa("hind_seil"))fuss(aBild.hind_seil,1260,700);
+    // LIVE-ZEIT AUF DER ANZEIGETAFEL (optional, rein kosmetisch): das eingebrannte Feld
+    // dunkel uebermalen, dann die gestreckte Zuschauzeit in Gelb.
+    ctx.fillStyle="#0c1220"; ctx.fillRect(1432,250,98,30);
+    ctx.fillStyle="#f2d75a"; ctx.font="700 16px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+    ctx.fillText(bahnZeitText(bahnRealSek(rennT)),1481,273);
+    ctx.restore();
+    if(z>1.08){ ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
+      ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+z.toFixed(1)+"×",10,16); }
+  }
   let takeshiPublikumAn=false;
   function bodenTakeshiRoute(){
     if(!takeshiPublikumAn){ tonLoopStart("takeshis-castle"); takeshiPublikumAn=true; }
@@ -43675,6 +44143,10 @@
     // Oval herkommen und jetzt eine andere Bahn-Disziplin zeichnen, ohne dass zwischendurch
     // reset() lief -- s. staffelPublikumAn/bodenSpurtOval() unten.
     if(!istOval()&&staffelPublikumAn){ tonLoopStop(); staffelPublikumAn=false; }
+    // HYROX-HALLENRUNDE (Stufe 2, Design-Dokument 7.7): EINE Weiche fuer Boden UND Laeufer
+    // (istHyroxHalle()), dasselbe Prinzip wie bei Takeshis Route zwei Zeilen unten -- Boden
+    // und Figuren koennen so nie auseinanderlaufen.
+    if(istHyroxHalle())return bodenHyroxHalle();
     // TAKESHI LAEUFT UEBER DIE KARTE, nicht ueber das Bahn-Rechteck. Eine Weiche fuer
     // Boden UND Laeufer (istRoute()), damit beide nie auseinanderlaufen koennen.
     if(istRoute())return bodenTakeshiRoute();
@@ -43711,6 +44183,12 @@
     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
     // Steinwand ploetzlich Wiese, nur weil dieselbe Zeichenfunktion beide bedient.
     const grasHintergrund=BA().baeume!==false;
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): HYROX-Halle der
+    // PixelLab-Szene -- Publikum oben/unten, blauer Laufbahnbelag genau im Bahnband oben..unten.
+    // Ersetzt Rasen, Baeume, Bahnfuellung und Zaun; Bahnlinien, Stationen (aus HUERDEN_N/camX, also
+    // genau wie das Rennen rechnet), Start, Ziel und Beschriftung zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     if(grasHintergrund){
       const rasen=aMust("rasen");
       if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H);
@@ -43730,7 +44208,9 @@
       v.addColorStop(1,"rgba(0,0,0,.35)");
       ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     }
+    }
     const oben=H*0.14, unten=H*0.94;
+    if(!mitKulisse){
     // Baumreihe ueber der Bahn. Vier Nadelbaum-Blaetter im Wechsel; die Wahl haengt am
     // Platz in der Reihe, nicht am Zufall — sonst tanzt der Wald bei jedem Bild. An einer
     // Kletterwand steht kein Wald (BA().baeume===false), da bleibt die Schleife leer.
@@ -43796,6 +44276,7 @@
     // `oben-28` bis `oben+4` und hat die Legendenzeile bei `oben-18` vorher vollstaendig
     // uebermalt — sie stand im Code, war im Bild aber nie zu sehen (nachgemessen am
     // Screenshot, 1240x470: Zaunkachel 32 px hoch bei `oben-z.naturalHeight+4`).
+    }
     if(BA().takeshi&&aDa("burg_mauer")){
       const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
@@ -43814,6 +44295,60 @@
       const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
         +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
       ctx.lineWidth=3; ctx.strokeText(leg,W/2,oben-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,oben-16);
+    }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Stationsumfeld im Belag" +
+    // "Licht"): unter jeder Station ein Bodenmerkmal in Bahnbreite, darueber ein Scheinwerferkegel
+    // -- beides VOR den Bahnlinien/Stationskacheln gezeichnet (Z-Reihenfolge unten unveraendert),
+    // damit die Station sichtbar AUF ihrem eigenen Fleck steht statt auf gleichfoermigem Blau.
+    // Exakt an camX(HUERDEN_N()[i]), also denselben Weltkoordinaten, mit denen stepSpurt rechnet
+    // (HUERDEN_N()/camX() selbst bleiben unangetastet) -- reine Anzeige, liest nur BA()/bodenSaat,
+    // schreibt nichts, kein rr()-Aufruf. Nur bei aktiver Kulisse und nur fuer Spurt selbst: dieselbe
+    // Funktion bedient als Fallback auch Staffel/Climbing/Takeshi-ohne-Route (s. Kommentar an
+    // bodenSpurtGerade() oben), deren Kulisse und Stationstypen etwas ganz anderes sind.
+    if(mitKulisse&&BA().spurt){
+      const stationsBoden={
+        // Audit woertlich: "nasse Pfuetze und Spritzer am Wassergraben". Die Spritzer hell/weiss
+        // statt blau: Wasser-auf-Wasser gibt sonst kaum Kontrast gegen den Bahnbelag.
+        wasser:(x,i)=>{ ctx.fillStyle="rgba(40,95,150,.5)"; ctx.fillRect(x-34,oben,68,unten-oben);
+          for(let k=0;k<16;k++){ const sy=oben+(unten-oben)*bodenSaat(i*97+k), sx=x+(bodenSaat(i*97+k+500)-0.5)*60;
+            ctx.fillStyle="rgba(226,242,250,"+(0.30+bodenSaat(i*97+k+900)*0.30)+")";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.6+bodenSaat(i*97+k+300)*2.6,1.1+bodenSaat(i*97+k+700)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Kiesbett um die Bruchsteinmauer".
+        mauer:(x,i)=>{ for(let k=0;k<28;k++){ const sy=oben+(unten-oben)*bodenSaat(i*131+k), sx=x+(bodenSaat(i*131+k+500)-0.5)*54;
+            const t=bodenSaat(i*131+k+200);
+            ctx.fillStyle="rgba("+Math.round(168+t*40)+","+Math.round(150+t*34)+","+Math.round(120+t*28)+",.78)";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.8+bodenSaat(i*131+k+300)*2.8,1.2+bodenSaat(i*131+k+330)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Mattenstreifen unter Huerden".
+        huerde:(x)=>{ ctx.fillStyle="rgba(122,59,53,.5)"; ctx.fillRect(x-20,oben,40,unten-oben);
+          ctx.fillStyle="rgba(210,100,78,.24)"; ctx.fillRect(x-20,oben,40,3); ctx.fillRect(x-20,unten-3,40,3); },
+        // Saegemehl-Landeflaeche unter dem Balancier-Balken, dieselbe Idee wie die Huerdenmatte.
+        balken:(x,i)=>{ ctx.fillStyle="rgba(214,188,132,.14)"; ctx.fillRect(x-22,oben,44,unten-oben);
+          for(let k=0;k<22;k++){ const sy=oben+(unten-oben)*bodenSaat(i*151+k), sx=x+(bodenSaat(i*151+k+500)-0.5)*40;
+            ctx.fillStyle="rgba(230,206,150,"+(0.30+bodenSaat(i*151+k+700)*0.28)+")"; ctx.fillRect(sx,sy,2.2,2.2); } },
+        // Festgetretener Sandwall vor der Palisadenwand.
+        wand:(x)=>{ const g=ctx.createRadialGradient(x,unten-18,4,x,unten-18,38);
+          g.addColorStop(0,"rgba(104,76,50,.55)"); g.addColorStop(1,"rgba(104,76,50,0)");
+          ctx.fillStyle=g; ctx.fillRect(x-44,oben,88,unten-oben); },
+        // Ausgetretener Erdpfad unter dem Schwingseil.
+        seil:(x)=>{ ctx.fillStyle="rgba(86,66,44,.48)"; ctx.fillRect(x-17,oben,34,unten-oben);
+          ctx.fillStyle="rgba(140,112,76,.26)"; ctx.fillRect(x-6,oben,12,unten-oben); },
+        // Lose Strohhalme um den Strohballen.
+        heu:(x,i)=>{ for(let k=0;k<20;k++){ const sy=oben+(unten-oben)*bodenSaat(i*181+k), sx=x+(bodenSaat(i*181+k+500)-0.5)*48;
+            ctx.strokeStyle="rgba(232,206,112,"+(0.42+bodenSaat(i*181+k+700)*0.3)+")"; ctx.lineWidth=1.3;
+            ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+6+bodenSaat(i*181+k+300)*5,sy-1.5); ctx.stroke(); } },
+      };
+      const bilderSt=BA().hindernisBilder||[];
+      HUERDEN_N().forEach((h,i)=>{
+        const x=camX(h); if(x<-80||x>W+80)return;
+        const fn=stationsBoden[bilderSt[i]]; if(fn)fn(x,i);
+        // Scheinwerferkegel von oben auf jede Station (Audit: "wie Gewichtheben") -- hell/dunkel
+        // Rhythmus entlang der Bahn statt gleichfoermigem Blau. Niedrige Deckkraft (Lehre aus
+        // Batch 12/14): Laeufer, Ringe und Namen bleiben lesbar.
+        const kegel=ctx.createLinearGradient(x,oben-10,x,unten);
+        kegel.addColorStop(0,"rgba(255,244,214,.16)"); kegel.addColorStop(1,"rgba(255,244,214,0)");
+        ctx.fillStyle=kegel; ctx.beginPath();
+        ctx.moveTo(x,oben-10); ctx.lineTo(x-54,unten); ctx.lineTo(x+54,unten); ctx.closePath(); ctx.fill();
+      });
     }
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
@@ -43890,6 +44425,28 @@
       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
       ctx.setLineDash([]);
     }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Boegen an Start und Ziel"): der
+    // IN-Bogen am Startpunkt, der FINISH-Bogen an der Ziellinie, genau an camX(0)/camX(1) -- denselben
+    // Werten, die die Start-/Ziellinie zwei Bloecke darueber schon zeichnet. Ersetzt nichts an Start/
+    // Ziel selbst (die Linien bleiben), gibt dem Band nur sichtbar Anfang und Ende. Beide Sprites aus
+    // der HYROX-Rohszene freigestellt (s. A_TEILE-Kommentar oben).
+    //
+    // NACHBESSERUNG (Chris, 08.11., zum ersten Stand dieses Batches): "komsiche riesige Tore!
+    // Das sieht richtig weird aus" -- auf die VOLLE Bandhoehe skaliert (alle zwoelf Bahnen
+    // uebereinander, ~80 % von H) wirkte der Bogen wie ein Rohr quer durchs Bild, nicht wie ein
+    // Ziel-Bogen. Ein echter Start-/Zielbogen ist ein Landmark am oberen Bandrand, keine
+    // Wand ueber die ganze Bahnbreite -- gedeckelt auf einen Bruchteil der Bandhoehe, anstatt
+    // sie auszufuellen.
+    if(mitKulisse&&BA().spurt){
+      if(aDa("spurt_bogen_in")&&xStart>-220&&xStart<W+220){
+        const im=aBild.spurt_bogen_in, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xStart-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+      if(aDa("spurt_bogen_finish")&&xZiel>-220&&xZiel<W+220){
+        const im=aBild.spurt_bogen_finish, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xZiel-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+    }
     if(BA().takeshi&&aDa("burg_tor")&&xZiel>-60&&xZiel<W+60){
       // DAS BURGTOR am Ziel (Teil B.3) — unter der Kamera wie die Ziellinie selbst, und
       // die Ruestkammer-Deko der Emperor's Guards davor (Pranger, Fussblock, Holzstapel, Fass).
@@ -43916,6 +44473,14 @@
     // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
     // Bilder ueber rennT. Kein Zeitpreis — die Mechanik bekommt kein achtes Ereignis.
     if(BA().feuerZiel&&aDa("hind_feuer")&&xZiel>-40&&xZiel<W+40){
+      // Verbrannter Boden am Feuersprung (Kulissen Batch 15, Audit-Beispiel woertlich uebernommen):
+      // ein russiger Fleck in Bahnbreite hinter der Ziellinie, VOR den Flammen gezeichnet, nur bei
+      // aktiver Kulisse (ohne Kulisse blieb dieser Ausschnitt bit-identisch zum Vorherstand).
+      if(mitKulisse){
+        const g=ctx.createRadialGradient(xZiel-20,(oben+unten)/2,6,xZiel-20,(oben+unten)/2,(unten-oben)*0.6);
+        g.addColorStop(0,"rgba(18,14,12,.5)"); g.addColorStop(1,"rgba(18,14,12,0)");
+        ctx.fillStyle=g; ctx.fillRect(xZiel-80,oben,100,unten-oben);
+      }
       const f=aBild.hind_feuer, fr=Math.floor(rennT*8)%5;
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+16;
@@ -43967,8 +44532,19 @@
   //     um die Zonenmitte) — die Kontur braucht eine monotone Rampe, keinen Buckel je Zone.
   const ZF_HUEGEL_PX=34;
   function bodenZeitfahren(){
+    // KULISSE (Kulissen-Integration Batch 8, 08.11., s. scripts/baue-kulisse-zeitfahren.py): kommt
+    // ueber bodenSpurtGerade() -> kulisseZeichnen(), kein eigener Aufruf noetig. Sie bringt nur das
+    // Panorama der Streckenkarte (Kopfstreifen) und deren Asphalt (Bahnband) mit, NICHT das in die
+    // PixelLab-Szene eingebrannte Demo-Profil -- sichtbar bleibt allein das Profil aus `gelaende`
+    // (Schicht 1 und 2 unten, beide unveraendert). Reine Anzeige.
     bodenSpurtGerade();
     const zonen=BA().gelaende; if(!zonen||!zonen.length)return;
+    // STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11., s. zfStreckenbild unten): liegt eine
+    // Kulisse unter dem Rennen, zeichnet der Motor die Zonen als Strassenbild der Tour (Parolen,
+    // Pfeile, Curbs, Warnschilder, Leitpfosten) und das Panorama als Parallaxe aus den echten
+    // PixelLab-Ebenen. Ohne Kulisse (Headless-Runner, Bild fehlt) bleibt der alte Weg darunter
+    // Wort fuer Wort stehen.
+    if(kulisseSichtbar())return zfStreckenbild(zonen);
     const oben=H*0.14, unten=H*0.94;
     // ---- Schicht 1: Terrain-Toenung + Schraffur, Zone fuer Zone ueber der fertigen Bahn.
     for(const z of zonen){
@@ -44037,6 +44613,189 @@
     for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
     ctx.stroke();
     ctx.restore();
+  }
+
+  // ================== ZEITFAHREN: STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11.) ====
+  // Chris, 10.11., nach einem Screenshot: "was ist das ingame für ein time trial? dachte da sind
+  // schon überall die neuen assets und dass es gut aussieht? aber das ist auch trash wie spurt".
+  // Befund (docs/design/zeitfahren-kulissen-rework-10-11.md): die PixelLab-Streckenkarten liegen
+  // seit der Asset-Runde vollstaendig vor (public/szenen/time-trial/<karte>/assets: far/mid/course/
+  // front, je 4000 px breit), der Motor nutzte davon aber nur einen 58 px hohen, STARREN Ausschnitt
+  // (baue-kulisse-zeitfahren.py) -- und legte ueber den Asphalt die alten, lauten Zonenbaender mit
+  // Schraffur und ▲/▼/S-Glyphen. Was das Bild beherrschte, war also die Fallback-Grafik, nicht die
+  // Kulisse.
+  //
+  // Jetzt, NUR wenn eine Kulisse sichtbar ist (sonst der alte Weg oben, bit-identisch):
+  //  1. PANORAMA ALS PARALLAXE aus den echten Ebenen `far` und `mid` der gewaehlten Karte: beide
+  //     wandern mit der Kamera (0,12 bzw. 0,30 ihrer Fahrt), gespiegelt gekachelt ab x=1000 (links
+  //     davon traegt jede Karte ein Startbild mit harter Kante, s. ZF_PANORAMA_X0 im Builder).
+  //  2. HOEHENPROFIL ALS STRASSE: dieselbe Kontur aus `gelaende` wie oben (ZF_HUEGEL_PX), jetzt als
+  //     Wiesenhuegel mit Asphaltband und Mittelstrich statt brauner Flaeche.
+  //  3. ZONEN ALS STRASSENBILD statt Farbband + Schraffur + Glyphe: Steigung = auf den Asphalt
+  //     gemalte Fan-Parolen wie an jedem Tour-Anstieg (ALLEZ/HOPP/… und die Namen der Fahrer),
+  //     Abfahrt = gemalte Richtungspfeile, Kurve = rot-weisse Curbs an beiden Bahnraendern. Dazu je
+  //     Zonenbeginn ein Warnschild am Strassenrand (Dreieck mit Rampe bzw. Richtungstafel) und
+  //     Leitpfosten entlang der Bahn. Die Toenung bleibt als leise dritte Kodierung (Farbe + Muster
+  //     + Schildform), damit die Zonen auch ohne Farbunterscheidung lesbar sind.
+  // Reine Anzeige: liest `BA().gelaende`, `LAEUFER[].n`, camX/camView -- kein rr(), kein Schreiben
+  // in den Rennzustand. Laden die Ebenen (noch) nicht, bleibt der Kopfstreifen der Kulisse stehen.
+  //
+  // Horizont je Karte: erste Zeile, ab der `mid` dicht wird (dieselbe Regel wie `dicht` in
+  // scripts/baue-kulisse-zeitfahren.py), nachgemessen am 10.11.
+  const ZF_PANO_HORIZONT={standard:199,"bergzeitfahren-alpen":476,"etappe-pass":372,"abfahrt-kamm":373,
+    "etappe-kueste":221,"flachsprint-kueste":215,"etappe-mittelgebirge":199,"huegel-weinberge":202,
+    "etappe-strade-bianche":205,"etappe-vulkan":281,"wueste-hitze":211};
+  const ZF_PANO_X0=1000, ZF_PANO_UNTER=30, ZF_PANO_SKALA=0.24;
+  const ZF_PAROLEN=["ALLEZ","HOPP","VAMOS","FORZA","ALLEZ ALLEZ","GO GO","HOPP HOPP"];
+  const zfEbenenCache={};
+  function zfEbenen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return null;
+    const id=kulisseAktiv.id; if(!(id in ZF_PANO_HORIZONT))return null;
+    let e=zfEbenenCache[id];
+    if(!e){
+      const ordner="/szenen/time-trial/"+(id==="standard"?"demo-assets":id+"/assets")+"/";
+      e=zfEbenenCache[id]={};
+      for(const n of ["far","mid"]){
+        const im=new Image();
+        im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.id===id&&kulisseAktiv.disc===disc)draw(); }catch(_){} };
+        im.src=ordner+n+".png"; e[n]=im;
+      }
+    }
+    const da=im=>!!im&&im.complete&&im.naturalWidth>0;
+    return da(e.far)&&da(e.mid)?e:null;
+  }
+  function zfPanorama(e,panH){
+    const id=kulisseAktiv.id;
+    const unter=Math.min(e.far.naturalHeight,ZF_PANO_HORIZONT[id]+ZF_PANO_UNTER);
+    const hs=Math.min(unter,Math.round(panH/ZF_PANO_SKALA));
+    const sy=unter-hs, sw=e.far.naturalWidth-ZF_PANO_X0, bw=sw*panH/hs;
+    const weg=camView().links*cam.zoom;     // Kamerafahrt in Bildschirm-Pixeln
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,panH);ctx.clip();
+    ctx.imageSmoothingEnabled=false;
+    for(const [im,par] of [[e.far,0.12],[e.mid,0.30]]){
+      const off=((weg*par)%(2*bw)+2*bw)%(2*bw);
+      for(let i=0,x=-off;x<W;i++,x+=bw){
+        if(x+bw<=0)continue;
+        if(i%2){ ctx.save();ctx.translate(x+bw,0);ctx.scale(-1,1);
+          ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,0,0,bw,panH);ctx.restore(); }
+        else ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,x,0,bw,panH);
+      }
+    }
+    // Dieselbe Lesbarkeits-Abdunklung wie kulisseZeichnen() sie ueber die ganze Leinwand legt.
+    ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,panH);
+    ctx.restore();
+  }
+  // Warnschild am Strassenrand, Fuss auf der Bahnoberkante.
+  function zfSchild(x,fuss,art){
+    ctx.save();
+    ctx.fillStyle="#6b6f78";ctx.fillRect(Math.round(x)-1,fuss-24,2,24);
+    const cy=fuss-32;
+    if(art==="kurve"){
+      ctx.fillStyle="#c0392b";ctx.fillRect(x-13,cy-7,26,14);
+      ctx.strokeStyle="#1a1a1a";ctx.lineWidth=1;ctx.strokeRect(x-13+0.5,cy-7+0.5,25,13);
+      ctx.strokeStyle="#f4f1e8";ctx.lineWidth=2.4;ctx.lineJoin="miter";
+      for(const dx of [-7,0,7]){ctx.beginPath();ctx.moveTo(x+dx-3,cy-4);ctx.lineTo(x+dx+2,cy);ctx.lineTo(x+dx-3,cy+4);ctx.stroke();}
+    } else {
+      ctx.beginPath();ctx.moveTo(x,cy-11);ctx.lineTo(x+12,cy+9);ctx.lineTo(x-12,cy+9);ctx.closePath();
+      ctx.fillStyle="#f4f1e8";ctx.fill();ctx.strokeStyle="#c0392b";ctx.lineWidth=3;ctx.lineJoin="round";ctx.stroke();
+      ctx.fillStyle="#1a1a1a";ctx.beginPath();
+      if(art==="steigung"){ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x+7,cy-2);}
+      else {ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x-7,cy-2);}
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+  function zfStreckenbild(zonen){
+    const oben=H*0.14, unten=H*0.94;
+    // ---- 1. Panorama-Parallaxe im Kopfstreifen (ueber dem schmalen Grasrand der Kulisse).
+    const e=zfEbenen();
+    if(e)zfPanorama(e,Math.round(oben)-8);
+    // ---- 3. Zonen als Strassenbild (vor dem Profil, damit Schilder obenauf stehen).
+    const namen=LAEUFER.map(u=>String(u.n||"").split(" ")[0].toUpperCase()).filter(n=>n&&n.length<=10);
+    const worte=ZF_PAROLEN.concat(namen);
+    const bandH=unten-oben;
+    zonen.forEach((z,zi)=>{
+      const x0=camX(z.von), x1=camX(z.bis);
+      if(x1<-40||x0>W+40)return;
+      const steig=z.art==="steigung", ab=z.art==="abfahrt";
+      ctx.save();
+      ctx.beginPath();ctx.rect(x0,oben,Math.max(1,x1-x0),bandH);ctx.clip();
+      ctx.fillStyle=steig?"rgba(196,120,70,.10)":ab?"rgba(90,150,220,.09)":"rgba(242,215,90,.06)";
+      ctx.fillRect(x0,oben,x1-x0,bandH);
+      if(steig){
+        // Gemalte Parolen, an der Strecke verankert (wandern mit der Kamera), drei Reihen versetzt.
+        // Abstand in Bildschirm-Pixeln (eine Parole je ~230 px und Reihe), damit sie sich bei keiner
+        // Zoomstufe ueberlappen; was nicht ganz in die Zone passt, entfaellt statt abgeschnitten.
+        ctx.font="900 21px 'Arial Black',Impact,'Helvetica Neue',Arial,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillStyle="rgba(244,241,232,.27)";
+        const n=Math.max(1,Math.floor((x1-x0)/230)), schritt=(z.bis-z.von)/n;
+        for(let k=0;k<n;k++)for(let r=0;r<3;r++){
+          const p=z.von+schritt*(k+(r%2?0.7:0.3));
+          const wx=camX(p), wy=oben+bandH*(0.2+0.3*r);
+          if(wx<-160||wx>W+160)continue;
+          const wort=worte[(zi*5+k*3+r)%worte.length], hb=ctx.measureText(wort).width/2+4;
+          if(wx-hb<x0||wx+hb>x1)continue;
+          ctx.save();ctx.translate(wx,wy);ctx.rotate(r===1?0.04:-0.04);
+          ctx.fillText(wort,0,0);ctx.restore();
+        }
+        ctx.textBaseline="alphabetic";
+      } else if(ab){
+        // Gemalte Richtungspfeile in Fahrtrichtung.
+        ctx.strokeStyle="rgba(244,241,232,.30)";ctx.lineWidth=4;ctx.lineJoin="miter";ctx.lineCap="butt";
+        const schritt=0.02, n=Math.max(1,Math.ceil((z.bis-z.von)/schritt));
+        for(let k=0;k<n;k++)for(const fy of [0.3,0.7]){
+          const px=camX(z.von+schritt*(k+0.5)), py=oben+bandH*fy;
+          if(px<-30||px>W+30)continue;
+          for(const dx of [-9,0]){ctx.beginPath();ctx.moveTo(px+dx-6,py-14);ctx.lineTo(px+dx+6,py);ctx.lineTo(px+dx-6,py+14);ctx.stroke();}
+        }
+      } else {
+        // Rot-weisse Curbs an beiden Bahnraendern, an der Strecke verankert.
+        const sb=12, start=Math.floor((Math.max(x0,-sb)-x0)/sb);
+        for(let i=start,x=x0+start*sb;x<Math.min(x1,W+sb);i++,x+=sb){
+          ctx.fillStyle=i%2?"rgba(244,241,232,.88)":"rgba(192,57,43,.88)";
+          ctx.fillRect(x,oben,sb,6);ctx.fillRect(x,unten-6,sb,6);
+        }
+      }
+      ctx.restore();
+    });
+    // ---- 2. Hoehenprofil als Strasse ueber einen Wiesenhuegel (Kontur wie im alten Weg).
+    let h=0; const pts=[[0,0]];
+    for(const z of zonen){
+      pts.push([z.von,h]);
+      if(z.art==="steigung")h+=ZF_HUEGEL_PX; else if(z.art==="abfahrt")h=Math.max(0,h-ZF_HUEGEL_PX);
+      pts.push([z.bis,h]);
+    }
+    pts.push([1,h]);
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,oben);ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(camX(pts[0][0]),oben);
+    for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
+    ctx.lineTo(camX(pts[pts.length-1][0]),oben);
+    ctx.closePath();
+    const hg=ctx.createLinearGradient(0,oben,0,oben-ZF_HUEGEL_PX*2.2);
+    hg.addColorStop(0,"rgba(44,78,40,.96)");hg.addColorStop(1,"rgba(92,136,66,.94)");
+    ctx.fillStyle=hg;ctx.fill();
+    const strasse=()=>{ctx.beginPath();ctx.moveTo(camX(pts[0][0]),oben-pts[0][1]-2);
+      for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]-2);};
+    ctx.lineJoin="round";ctx.lineCap="round";
+    strasse();ctx.strokeStyle="#24262b";ctx.lineWidth=7;ctx.stroke();
+    strasse();ctx.strokeStyle="#5b5e66";ctx.lineWidth=5;ctx.stroke();
+    strasse();ctx.strokeStyle="rgba(244,241,232,.75)";ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // ---- Leitpfosten entlang der Bahnoberkante und Warnschilder je Zonenbeginn.
+    const fuss=Math.round(oben);
+    for(let p=0;p<=1.0001;p+=0.025){
+      const x=Math.round(camX(p)); if(x<-4||x>W+4)continue;
+      ctx.fillStyle="#f4f1e8";ctx.fillRect(x-1,fuss-10,3,10);
+      ctx.fillStyle="#1a1a1a";ctx.fillRect(x-1,fuss-8,3,3);
+    }
+    for(const z of zonen){
+      const x=camX(z.von)+10; if(x<-20||x>W+20)continue;
+      zfSchild(x,fuss,z.art);
+    }
   }
 
   // ================== CLIMBING: EINE ECHTE WAND STATT EINER GERAUTEN BAHN (bodenWand, =======
@@ -44109,15 +44868,165 @@
     const von=Math.max(0,Math.min(1,u.vizFallVon));
     return von+(ziel-von)*(t*t);   // ease-in: ein Sturz beschleunigt statt konstant zu fallen
   }
-  function bodenWand(){
-    // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
-    // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
 
+  // ===================== KLETTER-KULISSE "RAHMEN STATT MATERIAL" ======================
+  // ===================== (Kulissen-QS 08.11., Batch 14, Rang 2 des Audits) ============
+  // docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.2, Befund woertlich: "Fels liest
+  // sich als Holzmaserung, Eis als blauer Vorhang, Wand als grauer Beton ... Es gibt kein Oben
+  // und kein Unten: kein Boden mit Matten und Sicherern, kein Himmel oder Hallendach, keine
+  // Wandkante, nichts, das Hoehe vermittelt". Diese PR haengt keine neue Mechanik an: alles hier
+  // liest nur `camY()`/`wandX()`/`BAHNEN_N()`/`kulisseAktiv` (reine Anzeige-Groessen) und schreibt
+  // nirgends in `u.*`/`BA()`/`hindernisse`/`rr()` -- bit-identische Rangtreue vor/nach dieser PR
+  // (node scripts/pruefe-wertung-fingerabdruck.mjs, s. PR-Beschreibung).
+  const KLETTER_PALETTE={
+    wand:{ // Kletterhalle
+      himmelOben:"#14161c", fernAkzent:"rgba(150,165,195,.45)",
+      kante:"#5c6372", kanteHell:"rgba(235,240,255,.22)",
+      bodenA:"#232a3a", bodenB:"#2c3650", bodenLinie:"rgba(255,255,255,.14)",
+      dachA:"#0e1016", dachB:"#1a1e27", lichtband:"rgba(255,244,210,.55)",
+    },
+    fels:{ // Sandsteinschlucht
+      himmelOben:"#e8884a", fernAkzent:"rgba(140,80,40,.5)",
+      kante:"#8a5a30", kanteHell:"rgba(255,224,170,.3)",
+      bodenA:"#6b4a2a", bodenB:"#7e5a34", bodenLinie:"rgba(0,0,0,.18)",
+      dachA:"#d9733e", dachB:"#f6c179", lichtband:"rgba(255,214,150,.4)",
+    },
+    eis:{ // Eisfall
+      himmelOben:"#aee0f6", fernAkzent:"rgba(150,205,235,.5)",
+      kante:"#cdeaf7", kanteHell:"rgba(240,252,255,.4)",
+      bodenA:"#d7e8ef", bodenB:"#c3dbe4", bodenLinie:"rgba(30,70,100,.3)",
+      dachA:"#8fd0ee", dachB:"#eaf8ff", lichtband:"rgba(200,236,255,.4)",
+    },
+  };
+  // Drei Routenfarben wie in der PixelLab-Rohszene (public/szenen/climbing/*.jpg, Routenlabel
+  // "Route 4 - gruen" usw.): orange/gruen/violett, zyklisch ueber die zwoelf Bahnen -- reine
+  // Zeichenaenderung im Griff-Loop unten, s. "ROUTENFARBE STATT GRAU".
+  const KLETTER_ROUTE_FARBEN=[{h:"#e8923c",d:"#a8641f"},{h:"#5cb878",d:"#34804e"},{h:"#9b6bd1",d:"#6a429c"}];
+
+  function bodenWand(){
     const n=BAHNEN_N(), steigung=BA().steigung??0.85;
     const griffe=BA().hindernisse||[];
+    // VARIANTE/PALETTE: `kulisseAktiv.id` ("wand"/"fels"/"eis", aus battle-mode.kulissen.js) ist
+    // auch VOR dem Laden des Fotos gesetzt (kulisseWaehlen() beim reset()) -- dieselbe Variable,
+    // die kulisseZeichnen() unten schon fuer `dunkel` liest. Faellt auf "wand" zurueck, wenn keine
+    // Kulissenliste existiert (Headless-Runner/alte Fassung ohne battle-mode.kulissen.js).
+    const variante=(kulisseAktiv&&kulisseAktiv.disc==="climbing")?kulisseAktiv.id:"wand";
+    const pal=KLETTER_PALETTE[variante]||KLETTER_PALETTE.wand;
+    const kv=camViewV(), versatzY=kv.oben*cam.zoom;
+    const wandX0=wandX(-0.5), wandX1=wandX(n-0.5);
+    // DREI ZONEN IN DER HOEHE (Audit 4.2): camY(0)=Wandfuss, camY(1)=Top-out. camY faellt, wenn
+    // posFrac steigt, also topY<bottomY immer -- Boden liegt UNTER bottomY, Top-out UEBER topY.
+    const topY=camY(1), bottomY=camY(0);
+    const wallY0=Math.max(0,Math.min(H,topY)), wallY1=Math.max(0,Math.min(H,bottomY));
+
+    // ---- Zone 0: FERNE EBENE -- Halle/Schlucht/Eisklippe im Gegenlicht, HALBER Versatz (Audit
+    // 4.2: "ferne Ebene, mit halbem Versatz scrollend = echtes Parallax"). Volle Leinwand, auch
+    // hinter den Boden-/Top-out-Zonen, die gleich darueber gezeichnet werden.
+    {
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,pal.himmelOben); g.addColorStop(1,pal.bodenA);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      const fernV=versatzY*0.5, TILE=H+260;
+      ctx.save(); ctx.globalAlpha=0.55;
+      for(let i=0;i<8;i++){
+        const fy=bodenSaat(i+7000);
+        const y=(((fy*TILE-fernV)%TILE)+TILE)%TILE-40;
+        if(variante==="wand"){                          // Hallen-Dachbinder, waagerecht
+          ctx.strokeStyle=pal.fernAkzent; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+        } else if(variante==="fels"){                   // Schluchtwand-Baender
+          ctx.fillStyle=pal.fernAkzent;
+          ctx.fillRect(0,y,W,10+bodenSaat(i+7050)*14);
+        } else {                                        // Eisklippen-Kanten, schraeg
+          ctx.strokeStyle=pal.fernAkzent; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(0,y+14); ctx.lineTo(W,y-10); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- Zone BODEN (unten, Audit: "Matten, Sicherer, Kreidebeutel, Hallenboden bzw. Geroell
+    // bzw. Gletscherfuss"). Volle Breite -- der Boden liegt unter der ganzen Halle/Schlucht, nicht
+    // nur unter den zwoelf Bahnen. Nur gezeichnet, wenn der Wandfuss ueberhaupt im Bild ist.
+    if(bottomY<H+2){
+      const y0=Math.max(0,bottomY);
+      ctx.save(); ctx.beginPath(); ctx.rect(0,y0,W,H-y0); ctx.clip();
+      if(variante==="wand"){
+        if(aDa("climbing_matte")){ ctx.fillStyle=aMust("climbing_matte"); ctx.fillRect(0,y0,W,H-y0); }
+        else {
+          const kach=48;
+          for(let gx=0;gx<W;gx+=kach)for(let gy=Math.floor(y0/kach)*kach;gy<H;gy+=kach){
+            ctx.fillStyle=((Math.round(gx/kach)+Math.round(gy/kach))%2)?pal.bodenA:pal.bodenB;
+            ctx.fillRect(gx,gy,kach,kach);
+          }
+        }
+        ctx.strokeStyle=pal.bodenLinie; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,y0+3); ctx.lineTo(W,y0+3); ctx.stroke();
+      } else if(variante==="fels"){                     // Geroell/Schotter am Schluchtfuss
+        ctx.fillStyle=pal.bodenA; ctx.fillRect(0,y0,W,H-y0);
+        for(let i=0;i<60;i++){
+          const x=bodenSaat(i+7100)*W, y=y0+bodenSaat(i+7140)*(H-y0), r=2+bodenSaat(i+7180)*4;
+          ctx.fillStyle=bodenSaat(i+7220)<0.5?pal.bodenB:"rgba(0,0,0,.22)";
+          ctx.beginPath(); ctx.ellipse(x,y,r*1.3,r*0.8,0,0,6.283); ctx.fill();
+        }
+      } else {                                          // Gletscherfuss mit Spaltenrissen
+        ctx.fillStyle=pal.bodenA; ctx.fillRect(0,y0,W,H-y0);
+        for(let i=0;i<10;i++){
+          const x0=bodenSaat(i+7300)*W, y1=y0+10+bodenSaat(i+7340)*(H-y0-10);
+          ctx.strokeStyle=pal.bodenLinie; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(x0,y1);
+          ctx.lineTo(x0+(bodenSaat(i+7380)-0.5)*40,y1+10+bodenSaat(i+7420)*18);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- Zone TOP-OUT (oben, Audit: "Hallendach mit Lichtbaendern bzw. Himmel ueber der
+    // Schluchtkante bzw. Gipfel mit Wolken"). Volle Breite, nur wenn sichtbar.
+    if(topY>-2){
+      const y1=Math.max(0,Math.min(H,topY));
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,y1); ctx.clip();
+      const g=ctx.createLinearGradient(0,0,0,y1);
+      g.addColorStop(0,pal.dachA); g.addColorStop(1,pal.dachB);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,y1);
+      if(variante==="wand"){                            // Hallendach mit Lichtbaendern
+        for(let i=0;i<3;i++){ ctx.fillStyle=pal.lichtband; ctx.fillRect(0,y1*(0.25+i*0.28),W,4); }
+      } else if(variante==="fels"){                     // Himmel ueber der Schluchtkante
+        const sun=ctx.createRadialGradient(W*0.78,y1*0.3,4,W*0.78,y1*0.3,W*0.26);
+        sun.addColorStop(0,"rgba(255,235,190,.8)"); sun.addColorStop(1,"rgba(255,235,190,0)");
+        ctx.fillStyle=sun; ctx.fillRect(0,0,W,y1);
+        ctx.fillStyle="rgba(50,28,14,.75)"; ctx.beginPath(); ctx.moveTo(0,y1);
+        for(let i=0;i<=10;i++)ctx.lineTo(i*W/10,y1-6-bodenSaat(i+7500)*16);
+        ctx.lineTo(W,y1); ctx.closePath(); ctx.fill();
+      } else {                                          // Gipfel mit Wolken
+        for(let i=0;i<5;i++){
+          const cx=bodenSaat(i+7600)*W, cy=y1*(0.2+bodenSaat(i+7640)*0.5), r=18+bodenSaat(i+7680)*22;
+          ctx.fillStyle="rgba(255,255,255,.55)";
+          ctx.beginPath(); ctx.ellipse(cx,cy,r,r*0.45,0,0,6.283); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- WAND ALS KOERPER, NICHT ALS TAPETE: Material nur noch zwischen den Routenraendern
+    // (`wandX0..wandX1`), nicht mehr formatfuellend -- bisher fuellten Fotokulisse/Verlauf die
+    // GANZE Leinwand (der Audit-Befund "Fels liest sich als Holzmaserung" u.ae. kam genau daher).
+    // KULISSE (Kulissen-Integration 07.11.): Wandmaterial der PixelLab-Szene (Halle, Fels, Eis)
+    // ohne deren Griffe und Volumen, laeuft mit der Kamera mit. Die Boden-/Top-out-Zonen von oben
+    // ueberdecken gleich wieder, was hier oberhalb/unterhalb der Wandhoehe mitgemalt wird.
+    ctx.save(); ctx.beginPath(); ctx.rect(wandX0,0,wandX1-wandX0,H); ctx.clip();
+    const mitKulisse=kulisseZeichnen(versatzY);
+    if(!mitKulisse){
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
+    if(bottomY<H+2){ const y0=Math.max(0,bottomY);
+      ctx.fillStyle=pal.bodenA; ctx.fillRect(wandX0,y0,wandX1-wandX0,H-y0); }
+    if(topY>-2){ const y1=Math.max(0,Math.min(H,topY));
+      ctx.fillStyle=pal.dachA; ctx.fillRect(wandX0,0,wandX1-wandX0,y1); }
 
     // ================== FERNE FELSKULISSE/PARALLAX ENTFERNT (Chris, 13.10.,
     // docs/design/chris-feedback-breite-runde-13-10.md Abschnitt "Climbing" Punkt 7,
@@ -44148,7 +45057,27 @@
       if(y1<-20||y0>H+20)continue;
       const alpha=steigung*ZW_UEBERHANG_MAX*((i+1)/UEBERHANG_BAENDER);
       ctx.fillStyle="rgba(12,10,9,"+alpha.toFixed(3)+")";
-      ctx.fillRect(0,y0,W,Math.max(1,y1-y0));
+      // KULISSEN-QS 08.11.: auf den Wandstreifen begrenzt (vorher W-breit) -- die Schattierung
+      // gehoert zur Wandoberflaeche, nicht zu den neuen Boden-/Top-out-Zonen daneben.
+      ctx.fillRect(wandX0,y0,wandX1-wandX0,Math.max(1,y1-y0));
+    }
+    // EISZAPFEN AM OBERSTEN UEBERHANG-BAND (Audit 4.2, nur Eisfall: "Eisfall mit blauem
+    // Durchlicht und Eiszapfen am Ueberhang"). Reine Deko ueber die ganze Wandbreite verteilt,
+    // unabhaengig von den zwoelf Routen -- kein `hindernisse`-Bezug.
+    if(variante==="eis"){
+      const topBandY=camY((UEBERHANG_BAENDER-1)/UEBERHANG_BAENDER);
+      if(topBandY>-40&&topBandY<H+40){
+        for(let i=0;i<9;i++){
+          const ex=wandX0+(wandX1-wandX0)*((i+0.5)/9), el=10+bodenSaat(i+9500)*14;
+          if(aDa("climbing_eiszapfen")){
+            const im=aBild.climbing_eiszapfen, s=el/im.naturalHeight;
+            ctx.drawImage(im,Math.round(ex-im.naturalWidth*s/2),Math.round(topBandY-2),im.naturalWidth*s,im.naturalHeight*s);
+          } else {
+            ctx.fillStyle="rgba(200,235,250,.55)";
+            ctx.beginPath(); ctx.moveTo(ex-4,topBandY); ctx.lineTo(ex+4,topBandY); ctx.lineTo(ex,topBandY+el); ctx.closePath(); ctx.fill();
+          }
+        }
+      }
     }
     // Riss-/Kantenlinien, dieselbe Koernung wie vorher (bodenSaat), nur um 90 Grad gedreht --
     // die Wand steht jetzt, sie liegt nicht mehr. SCROLLT JETZT MIT (Climbing-Audit-Fund
@@ -44159,32 +45088,109 @@
     // Griffe/Kletterer selbst) -- die Risse sind Teil der Wandoberflaeche, nicht des
     // Hintergrunds, muessen also mit ihr mitlaufen. TILE_RISS deutlich groesser als H, damit
     // beim Kacheln nicht dieselben 22 Risse im selben Bildausschnitt doppelt auftauchen.
+    if(!mitKulisse){
     ctx.save();
-    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+    // KULISSEN-QS 08.11.: Clip auf den Wandstreifen statt die ganze Leinwand (vorher 0,0,W,H).
+    ctx.beginPath();ctx.rect(wandX0,0,wandX1-wandX0,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
     {
       const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE_RISS=H+240;
       for(let i=0;i<22;i++){
+        // KULISSEN-QS 08.11.: x nur noch ueber den Wandstreifen gestreut (vorher fx*W).
         const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
-        const x0=fx*W, y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
+        const x0=wandX0+fx*(wandX1-wandX0), y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
         const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
         ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
       }
     }
     ctx.restore();
+    }
+
+    // ---- WANDKANTEN links/rechts (Audit 4.2: "Wandkanten links und rechts ... Wand als Koerper,
+    // nicht als Tapete"), nur innerhalb der sichtbaren Wandhoehe -- sonst liefen sie in die neuen
+    // Boden-/Top-out-Zonen hinein, wo sie nichts mehr zu suchen haben.
+    if(wallY1>wallY0){
+      ctx.save(); ctx.beginPath(); ctx.rect(0,wallY0,W,wallY1-wallY0); ctx.clip();
+      for(const [kx,innen] of [[wandX0,1],[wandX1,-1]]){
+        ctx.fillStyle=pal.kante; ctx.fillRect(innen>0?kx:kx-7,wallY0,7,wallY1-wallY0);
+        ctx.fillStyle=pal.kanteHell; ctx.fillRect(innen>0?kx:kx-2,wallY0,2,wallY1-wallY0);
+      }
+      ctx.restore();
+    }
+
+    // ---- LICHT (Audit 4.2: "Hallenscheinwerfer von oben, Felsschlucht mit Sonnenstreifen,
+    // Eisfall mit blauem Durchlicht"). Innerhalb des Wandstreifens, ueber dem Material, unter den
+    // Griffen (Schicht 3 unten zeichnet darueber).
+    if(wallY1>wallY0){
+      ctx.save(); ctx.beginPath(); ctx.rect(wandX0,wallY0,wandX1-wandX0,wallY1-wallY0); ctx.clip();
+      const wallH=wallY1-wallY0;
+      if(variante==="wand"){                            // Hallenscheinwerfer von oben
+        for(const fx of [0.22,0.5,0.78]){
+          const cx=wandX0+(wandX1-wandX0)*fx;
+          const g=ctx.createLinearGradient(cx,wallY0,cx,wallY0+wallH*0.6);
+          g.addColorStop(0,"rgba(255,246,210,.22)"); g.addColorStop(1,"rgba(255,246,210,0)");
+          ctx.fillStyle=g; ctx.beginPath();
+          ctx.moveTo(cx-6,wallY0); ctx.lineTo(cx+6,wallY0);
+          ctx.lineTo(cx+46,wallY0+wallH*0.6); ctx.lineTo(cx-46,wallY0+wallH*0.6);
+          ctx.closePath(); ctx.fill();
+        }
+      } else if(variante==="fels"){                     // Sonnenstreifen diagonal ueber den Fels
+        ctx.strokeStyle="rgba(255,214,150,.22)"; ctx.lineWidth=14;
+        for(let i=0;i<4;i++){
+          const x0=wandX0+(wandX1-wandX0)*(i/3);
+          ctx.beginPath(); ctx.moveTo(x0-40,wallY0); ctx.lineTo(x0+40,wallY1); ctx.stroke();
+        }
+      } else {                                          // blaues Durchlicht von der Seite
+        const g=ctx.createLinearGradient(wandX1,0,wandX0,0);
+        g.addColorStop(0,"rgba(190,230,255,.28)"); g.addColorStop(1,"rgba(190,230,255,0)");
+        ctx.fillStyle=g; ctx.fillRect(wandX0,wallY0,wandX1-wandX0,wallH);
+      }
+      ctx.restore();
+    }
 
     // ---- Schicht 2: zwoelf schwache Spaltentrenner -- bei zwoelf belegten Routen soll die
     // Bahnzugehoerigkeit trotz Kamera-Zoom lesbar bleiben (dasselbe Bild wie Fahrbahnlinien).
+    // KULISSEN-QS 08.11.: y auf die sichtbare Wandhoehe begrenzt (vorher 0..H durchgehend).
     ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;
     for(let i=0;i<=n;i++){
       const x=wandX(i-0.5);
-      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,wallY0);ctx.lineTo(x,wallY1);ctx.stroke();
     }
 
     // ---- Schicht 3: je Route Griffe, Sicherer, Seil und Exen.
     const routeBreite=BA().routeBreite||30;
     for(let bz=0;bz<n;bz++){
       const x=wandX(bz);
+      // VOLUMEN: ein grosses graues Dreieck je Route (Audit 4.2: "Volumen als grosse Dreiecke in
+      // Grau", genau die Form, die public/szenen/climbing/*.jpg schon zeigt). Reiner Vektor,
+      // Position pseudo-zufaellig entlang der Route -- eigene bodenSaat-Indizes (+9000..+9150),
+      // keine Kollision mit den Griff-Indizes (+1200+bz*37, max. ~1620) oder den Kreidespuren
+      // unten (+9300..).
+      { const vf=0.12+bodenSaat(bz+9000)*0.7, vy=camY(vf);
+        if(vy>-60&&vy<H+60){
+          const vx=x+(bodenSaat(bz+9050)-0.5)*routeBreite*1.6, vs=16+bodenSaat(bz+9090)*10;
+          const vr=(bodenSaat(bz+9120)-0.5)*1.4;
+          ctx.save(); ctx.translate(vx,vy); ctx.rotate(vr);
+          ctx.fillStyle="rgba(0,0,0,.22)"; ctx.beginPath();
+          ctx.moveTo(1.5,-vs+1.5); ctx.lineTo(vs*0.9+1.5,vs*0.55+1.5); ctx.lineTo(-vs*0.9+1.5,vs*0.55+1.5);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle="rgba(150,148,142,.55)"; ctx.beginPath();
+          ctx.moveTo(0,-vs); ctx.lineTo(vs*0.9,vs*0.55); ctx.lineTo(-vs*0.9,vs*0.55);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(0,-vs); ctx.lineTo(vs*0.9,vs*0.55); ctx.stroke();
+          ctx.restore();
+        }
+      }
+      // KREIDESPUREN nahe ein paar Griffen (Audit 4.2, letzter Punkt). Eigene Indizes +9300..,
+      // liest nur `griffe`/`camY` -- keine neue Motor-Groesse.
+      ctx.fillStyle="rgba(255,255,255,.14)";
+      for(let k=0;k<4;k++){ const gi=griffe.length?Math.floor(bodenSaat(bz*4+k+9300)*griffe.length):-1;
+        const posFrac=gi>=0?griffe[gi]:null; if(posFrac==null)continue; const gy=camY(posFrac);
+        if(gy<-20||gy>H+20)continue;
+        const gx=x+(bodenSaat(gi+1200+bz*37)-0.5)*2*routeBreite+(bodenSaat(bz*4+k+9340)-0.5)*14;
+        ctx.beginPath(); ctx.ellipse(gx,gy-9,3.2,2,0,0,6.283); ctx.fill();
+      }
       // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x. GRIFFART ALS
       // FORM (Bug 3 / Recherche C3): PR 2 hat fuenf Griffarten mit eigenem Sub-Skill
       // eingefuehrt (`HUERDEN_TYP(i)`), gezeichnet wurden bis hierhin zehn gleiche
@@ -44196,8 +45202,16 @@
         const y=camY(posFrac);
         if(y<-24||y>H+24)return;
         const gx=x+(bodenSaat(i+1200+bz*37)-0.5)*2*routeBreite;
-        const typ=HUERDEN_TYP(i);
-        ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
+        // ROUTENFARBE STATT GRAU, MIT SCHATTEN (Kulissen-QS 08.11., Audit 4.2: "Griffe farbig je
+        // Route ... in der Routenfarbe und mit Schatten statt als graue Punkte"). Reine Zeichen-
+        // aenderung -- `gx`/`y`/`typ`/die Form je Griffart bleiben wort fuer wort unveraendert,
+        // nur `fillStyle` und eine Schatten-Ellipse davor sind neu. `KLETTER_ROUTE_FARBEN[bz%3]`,
+        // NICHT `i%3`: die Farbe gehoert der ROUTE (bz), nicht dem einzelnen Griff -- deckt sich
+        // mit den drei Routenfarben orange/gruen/violett der PixelLab-Rohszene.
+        const typ=HUERDEN_TYP(i), rf=KLETTER_ROUTE_FARBEN[bz%3];
+        ctx.fillStyle="rgba(0,0,0,.38)";
+        ctx.beginPath();ctx.ellipse(gx+1.6,y+2.2,7,4.2,0,0,6.283);ctx.fill();
+        ctx.fillStyle=i%2?rf.h:rf.d;
         if(typ==="TECHNIK"){                          // Leiste: flaches Rechteck
           ctx.fillRect(gx-7,y-1.5,14,3);
         } else if(typ==="WENDIGKEIT"){                // Sloper: halbe Kugel mit Glanz
@@ -44229,6 +45243,20 @@
       ctx.beginPath();ctx.moveTo(x,sy-8);ctx.lineTo(x,sy+7);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
+
+      // KREIDEBEUTEL am Wandfuss (Audit 4.2: "Matten, Sicherer, Kreidebeutel ..."), nur an jeder
+      // dritten Route -- Deko-Requisite, kein Einfluss auf Sicherer-/Seil-Geometrie oben.
+      if(bz%3===0){
+        if(aDa("climbing_kreidebeutel")){
+          const kb=aBild.climbing_kreidebeutel;
+          ctx.drawImage(kb,Math.round(x-9-kb.naturalWidth),Math.round(sy+5-kb.naturalHeight));
+        } else {
+          ctx.fillStyle="#3a3630"; ctx.beginPath();
+          ctx.moveTo(x-13,sy+2); ctx.lineTo(x-7,sy+2); ctx.lineTo(x-6,sy+13); ctx.lineTo(x-15,sy+13);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.4)"; ctx.beginPath(); ctx.ellipse(x-10,sy+1,3,2,0,0,6.283); ctx.fill();
+        }
+      }
 
       // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer. "Geklinkt" heisst
       // BUG 2 (Broadcast-Optik-Recherche 27.09., C2): `u.hoch` (die Hoechstmarke, nach der
@@ -44410,6 +45438,12 @@
   let staffelPublikumAn=false;
   function bodenSpurtOval(){
     if(!staffelPublikumAn){ tonLoopStart("staffel"); staffelPublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Stadion der PixelLab-
+    // Szene, Tartan genau im Bahnring von bahnPfad(), gestreifter Rasen innen. Ersetzt Rasen, Verlauf,
+    // Innenfeld und Bahnfuellung; Linien, Wechselzonen-Marken und Ziel zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+    if(!mitKulisse){
     const rasen=aMust("rasen");
     if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H); }
     else { const g=ctx.createLinearGradient(0,0,0,H);
@@ -44419,7 +45453,6 @@
     v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
     v.addColorStop(1,"rgba(0,0,0,.30)");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
-    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
 
     // ---- 1. INNENFELD, zuerst. Dunkleres, kuehleres Gruen als der Rasen aussen — der
     // Stadioninnenraum liegt im Schatten der Tribuenen. Ohne ihn ginge die Bahn in einer
@@ -44453,6 +45486,7 @@
       ctx.fillRect(x,y,2,2);
     }
     ctx.restore();
+    }
 
     // ---- 3. BAHNLINIEN. Jetzt echte Parallelkurven (gleiche Geradenlaenge, Radius je
     // Spurgrenze) — der Abstand ist ueberall gleich, statt an den Scheiteln auf Null zu
@@ -44466,6 +45500,22 @@
     ctx.beginPath(); bahnPfad(rAussen); ctx.stroke();
     ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=3;
     ctx.beginPath(); bahnPfad(rInnen); ctx.stroke();
+
+    // ---- 3b. BAHNNUMMERN (Kulissen-Audit 08.11., Abschnitt 4.8c, Politur): jede echte Bahn
+    // traegt ihre Nummer, innen=1 bis aussen=OVAL_BAHNEN (World Athletics zaehlt Bahn 1 von
+    // innen). Etwas VOR der Ziellinie (anteil -0.045), damit die Ziffern die Wechselzonen-
+    // Dreiecke aus Schritt 4 und den "ZIEL"-Schriftzug aus Schritt 5 nicht ueberdecken. Reine
+    // Anzeige -- liest nur ovalSpurR()/bahnPunkt(), die die Simulation ohnehin schon fuer die
+    // Wechselzonen benutzt.
+    ctx.save();
+    ctx.font="600 10px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="rgba(255,255,255,.5)";
+    for(let i=0;i<OVAL_BAHNEN;i++){
+      const p=bahnPunkt(-0.045,ovalSpurR(i));
+      ctx.fillText(String(i+1),p.x,p.y);
+    }
+    ctx.restore();
 
     // ---- 4. WECHSELZONEN. Auf einer echten Staffelbahn steht in der Bahnmitte an jeder
     // Zone ein Dreieck (30-m-Zone, World Athletics seit 2018). Bei uns liegen die Zonen an
@@ -44594,6 +45644,31 @@
   // gewichtet sie in deren Richtung. Ob das aufgeht, sagt nicht die Absicht, sondern
   //   node scripts/messe-arena-einfluss.mjs <disziplin> 12
   // ===================================================================================
+  // FORMAT-FUNDAMENT (08.11., docs/design/spurt-format-die-hatz-08-11.md): dasselbe Muster
+  // wie BUEHNE_FLAGS oben (s. dort) — ein Schalter fuer ein ZWEITES Format EINER Disziplin,
+  // der NUR ueber window.__arena.bahnFlags({...}) (Messskripte) oder, fuer den Headless-
+  // Runner, window.__olyBahnFlags VOR dem Laden gesetzt wird. Die echte App setzt beides
+  // nie, deshalb bleibt `spurtFormat` immer "klassisch" und bauSpurt()/stepSpurt() laufen
+  // bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs, GESAMT-Hash
+  // unveraendert). "hatz" baut das Wellen-Ausscheidungsformat (baueHatz(), stepSpurtHatz()
+  // -- beide nahe stepSpurt() unten), "hyrox" das Stationen-Format (baueHyroxStationen(),
+  // stepSpurtHyrox(), s. docs/design/spurt-format-hyrox-stationen-08-11.md). Bewusst NUR
+  // fuer Spurt (einziger heute vorhandener Schluessel) -- ein weiteres Format ergaenzt
+  // hier einen weiteren Wert, keinen weiteren Schalter. Die GROSSE Entscheidung "wie
+  // waehlt das Spiel das Format" (Saisonkalender/Hash/Liga-Einstellung, Hatz-Design-
+  // Dokument Abschnitt 6) ist ausdruecklich NICHT Teil dieses Schalters -- er ist nur der
+  // Mess-/Vorschau-Zugriff, den noch niemand hatte.
+  // `hyroxAnsicht` (Hallenrunde-PR, Design-Dokument 7.1): "bahn"|"halle". Standard "halle"
+  // seit Stufe 2 (die Hallengeometrie existiert jetzt) -- "bahn" bleibt nur fuer Vorher-/
+  // Nachher-Screenshots erreichbar (window.__arena.bahnFlags/window.__olyBahnFlags).
+  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle"};
+  try{
+    const startFlags=window.__olyBahnFlags;
+    if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string")
+      BAHN_FLAGS.spurtFormat=startFlags.spurtFormat;
+    if(startFlags&&typeof startFlags==="object"&&(startFlags.hyroxAnsicht==="bahn"||startFlags.hyroxAnsicht==="halle"))
+      BAHN_FLAGS.hyroxAnsicht=startFlags.hyroxAnsicht;
+  }catch(e){}
   const BAHN_ART={
     spurt:{
       // `spurt:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt
@@ -45025,6 +46100,12 @@
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
         negativ: {label:"Negativ-Split", tempo:0.88, sucht:0, ab:0.55,
                   text:"Erste Hälfte verhalten, zweite Hälfte alles. Verlangt Kopf und Reserve."},
+        // Label "Attacke" bewusst NICHT umbenannt (Gegencheck 10.11.): `spiele()` schreibt das
+        // Plan-Label mit in sein Ergebnis, ein geaenderter Name verschiebt dadurch trotz
+        // identischer Zeiten/Raenge/Punkte den Fingerabdruck-Hash (GESAMT) -- s. Befund im
+        // Nachtrag unten. Um die Pflicht-Regressionsschranke strikt byte-identisch zu halten,
+        // bleibt der Schluessel UND das angezeigte Label "Attacke"; Chris kann das separat
+        // entscheiden, falls ihm der Name noch wichtig ist.
         attacke: {label:"Attacke",       tempo:1.00, sucht:0, ab:0.60,
                   text:"Von Beginn an über der eigenen Schwelle. Geht auf oder geht schief."}
       },
@@ -46007,6 +47088,38 @@
   let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // DIE HATZ (Format-Fundament, s. BAHN_FLAGS/baueHatz/stepSpurtHatz): `bahnHatzAktiv` ist
+  // NUR waehrend eines mit BAHN_FLAGS.spurtFormat==="hatz" gebauten Spurt-Rennens true --
+  // bauSpurt() setzt es bei JEDEM Aufruf neu (s. dort, Ende der Funktion), stepSpurt()/
+  // zeichneSpurt() lesen es nur, um auf die Hatz-Varianten umzuschalten. `HATZ_WELLEN` ist
+  // der vorab (baueHatz(), deterministisch aus derselben Saat) berechnete Wellenplan:
+  // {welle, finale, ende, rausIds, revealed}. `null` ausserhalb der Hatz.
+  let bahnHatzAktiv=false, HATZ_WELLEN=null;
+  // HYROX-STATIONEN (Format 3, 08.11., s. docs/design/spurt-format-hyrox-stationen-08-11.md):
+  // dasselbe Muster wie bahnHatzAktiv/HATZ_WELLEN direkt darueber, nur fuer das dritte
+  // Spurt-Format. `bahnHyroxAktiv` nur waehrend BAHN_FLAGS.spurtFormat==="hyrox" true.
+  // `HYROX_STATIONEN` ist die vorab (baueHyroxStationen(), deterministisch aus derselben
+  // Saat) berechnete Stationsliste fuer die Ueberlagerungs-Zeichnung ({pos, bild, name,
+  // gruppe}, dieselben sieben Positionen wie BA().hindernisse/hindernisBilder/
+  // hindernisNamen) -- die eigentliche ZEITWIRKUNG steht je Laeufer in `u.hyroxZeit`
+  // (s. baueHyroxStationen()). `null` ausserhalb von Hyrox.
+  let bahnHyroxAktiv=false, HYROX_STATIONEN=null;
+  // HALLENRUNDE (Hallenrunde-PR, Design-Dokument Abschnitt 6/7.2): die Wegtabelle der
+  // Hallenrunde (Quellpixel-Koordinaten + Abschnittsliste), gebaut von `baueHyroxWeg()`
+  // (s. dort) -- `null` solange sie nicht existiert (Vorher-Stand/Ansicht "bahn"). Haengt
+  // nicht an W/H/Seed, wird deshalb nur einmal gebaut (wie `HYROX_WEG_BAHN`, s. dort).
+  let HYROX_WEG=null;
+  // NAHKAMERA-ZUSTAND (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md und
+  // der eigene kameraUpdate()-Zweig weiter unten): welche Station die Kamera gerade zeigt und
+  // wann sie das naechste Mal neu entscheidet. Reine Anzeige, von keinem Motor-Wert gelesen --
+  // zurueckgesetzt in baueHyroxStationen() wie jedes andere Hyrox-Feld, deshalb auch hier (nicht
+  // erst in kameraUpdate()), damit ein zweites Rennen nicht den Schnitt-Takt des vorigen erbt.
+  let hyroxCamStationIdx=-1, hyroxCamNaechsterSchnitt=0, hyroxCamGruppe=null;
+  // HALLENRUNDE-NAHKAMERA (Stufe 2, Design-Dokument 8.2): `hyroxCamZiel` ist eines von
+  // "technik"/"kletter"/"kraft"/"strecke" -- das Gegenstueck zu `hyroxCamStationIdx`, nur
+  // fuer die 2-D-Hallenkamera (vier Ziele statt sieben Stationen). `null` ausserhalb der
+  // Halle. Zurueckgesetzt wie jedes andere Hyrox-Feld in baueHyroxStationen().
+  let hyroxCamZiel=null;
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -46357,21 +47470,34 @@
     const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
     routeCache={W,H,src:A.route,pts,cum,len:cum[cum.length-1]}; return routeCache;
   }
-  // s (Bogenlaenge 0..1) -> Weltpunkt, Tangente (tx,ty), Normale (nx,ny).
-  // Binaersuche in der Bogenlaengen-Tabelle, ~8 Schritte bei 265 Stuetzpunkten.
-  function routeXY(s){
-    const R=routeTabelle(); const d=Math.max(0,Math.min(1,s))*R.len;
+  // s (Bogenlaenge 0..1) -> Weltpunkt, Tangente (tx,ty), Normale (nx,ny) -- IN EINER
+  // Stuetzpunkt-/Bogenlaengen-Tabelle `R` ({pts,cum,len}). Herausgeloest aus `routeXY()`
+  // (Hallenrunde-PR, Design-Dokument 7.2), damit die Hallenrunde (`hallenXY()`, s. dort)
+  // dieselbe Bogenlaengen-Suche wiederverwendet statt einer zweiten, potenziell
+  // abweichenden Kopie. Fuer Takeshi bitgleich, denn `routeXY(s)===tabelleXY(routeTabelle(),s)`
+  // ist wortwoertlich derselbe Funktionskoerper. Binaersuche, ~8 Schritte bei 265 Stuetzpunkten.
+  function tabelleXY(R,s){
+    const d=Math.max(0,Math.min(1,s))*R.len;
     let lo=0,hi=R.cum.length-1; while(hi-lo>1){const m=(lo+hi)>>1; if(R.cum[m]<=d)lo=m; else hi=m;}
     const a=R.pts[lo], b=R.pts[hi], seg=(R.cum[hi]-R.cum[lo])||1, t=(d-R.cum[lo])/seg;
     let tx=b.x-a.x, ty=b.y-a.y; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l;
     return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, tx,ty, nx:-ty, ny:tx};
   }
+  function routeXY(s){ return tabelleXY(routeTabelle(),s); }
   // EINE Weiche fuer den ganzen Zeichenpfad. Der Prototyp hatte hier zwei (bodenSpurt
   // wich nur bei geladener Kachel aus, laeuferXY bei jedem `route`-Feld) — fehlte die
   // Kachel, stuenden die Laeufer auf der Route und der Boden zeigte die alte Bahn.
   // bodenTakeshiRoute hat fuer jede Kachel eine Farbfassung (M(name,farbe)) und braucht
   // die Bahn als Rueckfall nicht.
   const istRoute=()=>!!BA().route;
+  // HYROX-HALLE (Hallenrunde-PR, Design-Dokument Abschnitt 7.1): dieselbe Weiche-Idee wie
+  // istRoute()/istWand() -- wahr nur in einem aktiven Hyrox-Rennen MIT gebauter Wegtabelle
+  // (HYROX_WEG, s. baueHyroxWeg()) UND solange die QA-Ansicht nicht ausdruecklich auf die
+  // alte gerade Bahn zurueckgeschaltet ist (BAHN_FLAGS.hyroxAnsicht==="bahn", nur fuer
+  // Vorher-/Nachher-Screenshots). Bleibt in Stufe 1 (dieser Commit) IMMER false, weil
+  // HYROX_WEG erst mit der Hallenrunde gebaut wird -- der Fahrplan laeuft bis dahin auf der
+  // 1-D-Fassung (HYROX_WEG_BAHN, s. baueHyroxStationen()).
+  const istHyroxHalle=()=>bahnHyroxAktiv&&!!HYROX_WEG&&BAHN_FLAGS.hyroxAnsicht!=="bahn";
   let camR={x:W/2,y:H/2};                       // Kameramitte in WELTkoordinaten (nur Route)
   const weltZuSchirm=(wx,wy)=>({x:(wx-camR.x)*cam.zoom+W/2, y:(wy-camR.y)*cam.zoom+H/2});
   // ===================== OVAL DER STAFFEL =====================
@@ -46652,9 +47778,122 @@
     return {x:p.x+vx, y:p.y+vy};
   }
 
+  // ================= S-N5b STATIONSDUELL MIT SIEGER (Chris 10.11.) =================
+  // Chris' Befund, woertlich: "hier steht immer was von duellen, die sieht man aber gar nicht".
+  // Die alte S-N5-Tafel zeigte zwei UNABHAENGIGE Rest-Stationsbalken -- kein Sieger, keine
+  // Auseinandersetzung. Jetzt: stehen ein Heim- und ein Gastlaeufer gleichzeitig an derselben
+  // Station, ist das ein Duell mit Ausgang. SIEGER = wer die Station ZUERST verlaesst. Das ist
+  // kein zweiter Wuerfel, sondern die Station selbst: ihre Dauer haengt am Sub-Skill des
+  // Stationstyps (`hindernisTypen`: HUERDE/STROHBALLEN -> TECHNIK, BALKEN/WASSERGRABEN ->
+  // WENDIGKEIT, PALISADE/SEIL/MAUER -> WUCHT; s. Stationspreis in stepSpurt), plus Ankunftszeit
+  // und Kriechanteil. Gleichstand im selben Schritt: wer tiefer unter 0 gerutscht ist (frueher
+  // im Schritt frei war), dann der hoehere Stations-Sub-Skill, dann Heim.
+  // DESIGN-VORGABE (Chris 10.11.): "Gewonnene duelle koennen fuer die Spieler auch in die PPs mit
+  // beitragen, bringen dem team aber keine zusaetzlichen punkte fuers scoring". Darum:
+  //  - REINE BUCHHALTUNG: liest u.huerde/u.stationIdx/u.pos/u.fertig, schreibt NICHTS am Laeufer
+  //    und ruft kein rr(). Der Zustand liegt in einer WeakMap NEBEN dem Laeufer -- so bleibt
+  //    sogar das Rennprotokoll (rennFertig, serialisiert vom Wertungs-Fingerabdruck)
+  //    zeichengleich, und Rennordnung/Teamstand (`bahnTeamstand()`) koennen es nicht sehen.
+  //  - Die Siege gehen nur in spieleBahn()s Boxscore als `duelle` hinaus; die PP-Gutschrift
+  //    passiert Node-seitig (`computeIndividualBoxscorePpsFromFixtureResults()`), `seiten`
+  //    (die Team-Wertung) bleibt unberuehrt.
+  const STATIONSDUELL=new WeakMap();
+  const STATIONSDUELL_ANZEIGE_S=1.6;   // so lange steht "X GEWINNT DAS DUELL" nach dem Ausgang
+  function stationsDuellZustand(u){
+    let z=STATIONSDUELL.get(u);
+    if(!z){ z={gegner:null,station:-1,seit:0,siege:0,letzter:null}; STATIONSDUELL.set(u,z); }
+    return z;
+  }
+  function stationsDuellGegner(u){ const z=STATIONSDUELL.get(u); return z?z.gegner:null; }
+  function stationsDuellSiege(u){ const z=STATIONSDUELL.get(u); return z?z.siege:0; }
+  function stationsDuellTyp(idx){ const T=BA().hindernisTypen; return T&&idx>=0?T[idx%T.length]:null; }
+  function stationsDuellSkill(u,idx){ const t=stationsDuellTyp(idx); return t?(u[t]||0):0; }
+  // Je Schritt einmal (Anfang von stepSpurt): erst offene Duelle aufloesen, dann neue Paare bilden.
+  function stationsDuellSchritt(){
+    if(!BA().spurt||!spurtSaeule.aktiv||istRoute())return;
+    for(const u of LAEUFER){
+      const z=STATIONSDUELL.get(u);
+      if(!z||!z.gegner||u.seite!==0)continue;
+      const g=z.gegner, zg=stationsDuellZustand(g);
+      const uFrei=!(u.huerde>0)||u.fertig!=null, gFrei=!(g.huerde>0)||g.fertig!=null;
+      if(!uFrei&&!gFrei)continue;
+      let sieger;
+      if(uFrei!==gFrei)sieger=uFrei?u:g;
+      else { const hu=u.huerde||0, hg=g.huerde||0;
+        sieger=hu<hg?u:hg<hu?g:(stationsDuellSkill(g,z.station)>stationsDuellSkill(u,z.station)?g:u); }
+      const verlierer=sieger===u?g:u;
+      stationsDuellZustand(sieger).siege++;
+      const ergebnis={sieger,verlierer,station:z.station,t:rennT};
+      z.letzter=ergebnis; zg.letzter=ergebnis; z.gegner=null; zg.gegner=null;
+      if(!stumm)feedRoutine(sieger.seite,sieger.n+" gewinnt das Duell am "+
+        (((BA().hindernisNamen||[])[z.station])||"Hindernis")+" gegen "+verlierer.n+".");
+    }
+    const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0
+      &&!stationsDuellGegner(o));
+    for(const a of an){
+      if(a.seite!==0||stationsDuellGegner(a))continue;
+      let b=null, best=0.03;
+      for(const o of an){
+        if(o.seite!==1||o.stationIdx!==a.stationIdx||stationsDuellGegner(o))continue;
+        const d=Math.abs(o.pos-a.pos); if(d<best){ b=o; best=d; }
+      }
+      if(!b)continue;
+      const za=stationsDuellZustand(a), zb=stationsDuellZustand(b);
+      za.gegner=b; zb.gegner=a; za.station=zb.station=a.stationIdx; za.seit=zb.seit=rennT;
+    }
+  }
+  // ANZEIGE (nur gelesen von laeuferXY/Sprite/Tafel): wie weit der Zug zum Vorne-Liegenden steht.
+  // Vorne liegt, wer weniger Rest-Stationszeit hat -- also genau der, der zuerst frei sein wird.
+  // Der Zeiger startet in der Mitte und laeuft ueber die Duelldauer bis zum vollen Abstand, so
+  // dass er beim Ausgang beim Sieger steht. Rueckgabe -1..1 aus Sicht des Heimlaeufers (+ = vorn).
+  function stationsDuellZug(a,b){
+    const za=STATIONSDUELL.get(a); if(!za)return 0;
+    const ha=Math.max(0,a.huerde||0), hb=Math.max(0,b.huerde||0);
+    const norm=0.35*Math.max(a.stationDauer||0,b.stationDauer||0,0.2);
+    const lauf=Math.max(0,rennT-za.seit), fortschritt=lauf/(lauf+Math.min(ha,hb)+1e-6);
+    return Math.max(-1,Math.min(1,(hb-ha)/norm))*fortschritt;
+  }
+  // Sprite-Versatz in Laufrichtung: im Duell schiebt sich der Vorne-Liegende sichtbar nach vorn,
+  // der andere wird zurueckgedrueckt (Tauzieh-Muster wie buehneTauziehVersatz); nach dem Ausgang
+  // springt der Sieger kurz nach vorn. Rein kosmetisch, u.pos bleibt der Motor-Wert.
+  function stationsDuellVersatz(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return 0;
+    const z=STATIONSDUELL.get(u); if(!z)return 0;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug;
+      return buehneTauziehVersatz(meins,1,6)+Math.sin(rennT*22+u.seite*Math.PI)*1.2;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; if(da>=0&&da<0.45)return 8*(1-da/0.45); }
+    return 0;
+  }
+  // Stoss-Pose (dieselbe vorhandene Pose wie beim Rempler, `lunge`): im Duell drueckt abwechselnd
+  // jeder, der Vorne-Liegende laenger; beim Ausgang stoesst sich der Sieger kurz ab.
+  function stationsDuellStoss(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return false;
+    const z=STATIONSDUELL.get(u); if(!z)return false;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug, phase=((rennT/0.6)+(u.seite?0.5:0))%1;
+      return phase<0.5+0.3*meins;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; return da>=0&&da<0.3; }
+    return false;
+  }
+
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
+    // HYROX-HALLENRUNDE (Stufe 2, Design-Dokument 7.5): VOR istOval(), wie der Auftrag
+    // verlangt -- eigener Zweig, analog zu istWand()/istRoute() zwei Zeilen unten. Fertige
+    // stehen NICHT auf der Strecke, auf der andere noch Runden laufen, sondern im
+    // Zielpferch (Design-Dokument 6.5) -- das Gegenstueck zum `platz>=0`-Zweig unten.
+    if(istHyroxHalle()){
+      const pIdx=rennFertig.indexOf(u);
+      if(pIdx>=0)return weltZuSchirm((1500-(pIdx%6)*28)*HALLE_S, (425+Math.floor(pIdx/6)*30)*HALLE_S);
+      const z=hyroxZustand(u), r=hallenXY(z.s), q=((u.bahnZ+0.5)/BAHNEN_N()-0.5)*(hyroxBreite(z.s)-14);
+      return weltZuSchirm((r.x+r.nx*q)*HALLE_S, (r.y+r.ny*q)*HALLE_S);
+    }
     if(istOval())return ovalPunkt(u);
     // WAND: Route b haengt fest bei wandX(b), die Hoehe ist camY(u.pos) -- kein platz-Bonus
     // wie auf der geraden Bahn (dort draengen sich Fertige gemeinsam hinter der Ziellinie;
@@ -46672,7 +47911,13 @@
       const L=BA().jokerLaenge||1, p=Math.max(0,Math.min(1,1-u.umwegRest/L));
       return {x:camX(u.pos)+Math.sin(p*Math.PI)*14, y:bahnY(u.bahnZ)+Math.sin(p*Math.PI)*34};
     }
-    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
+    // HYROX-FAHRPLAN AUF DER GERADEN BAHN (Design-Dokument 7.1/7.5): `u.pos` bleibt die
+    // Wertungsgroesse (Abschnitt 9), gezeichnet wird ab dem Fahrplan aus `hyroxZustand(u).s`
+    // -- derselbe 0..1-Bogenlaengen-Anteil, nur stationsgewichtet statt linear in der Zeit.
+    // Fuer jede andere Bahn (Hatz/Klassisch/Staffel/...) ist u.hyroxPlan undefined, also
+    // bitgleich zur alten camX(u.pos)-Formel.
+    const hyroxS=(bahnHyroxAktiv&&u.hyroxPlan)?hyroxZustand(u).s:null;
+    if(!istRoute())return {x:camX(hyroxS!=null?hyroxS:u.pos)+(platz>=0?12+platz*9:0)+stationsDuellVersatz(u), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
     // Spurwechsel weich interpoliert) wird zum Versatz QUER zur Route. Die Spur-Mechanik
@@ -46753,6 +47998,178 @@
       cam.zoom+=(zielZoom-cam.zoom)*t;
       cam.cx+=(zielCx-cam.cx)*t;
       return;
+    }
+    // ================== HYROX-STATIONEN: NAHKAMERA STATT ZWOELF-BAHNEN-UEBERSICHT (Nahkamera-
+    // PR, 08.11., Chris woertlich: "ne ganz andere ... ansicht als das kleine mit den mini
+    // Hindernissen Sondern näher dran wo man die einzelnen Stationen abarbeitet Da wären ja
+    // nicht alle spieler gleichzeitig dabei oder?") ==================
+    //
+    // Der generische Zweig unten (jede andere Spurt-Variante inkl. Klassisch/Hatz) zoomt auf
+    // die Spanne ALLER noch laufenden Bahnen -- bei HYROX-Stationen ist das nach wenigen
+    // Sekunden fast immer das GANZE Feld (sieben Stationen auf 0,14..0,86 der Strecke, zwoelf
+    // Laeufer laufen sie nacheinander ab, s. Design-Dokument), die Kamera zeigt dann dieselbe
+    // breite Zwoelf-Bahnen-Uebersicht mit winzigen Figuren wie vorher -- genau das Bild, das
+    // Chris nicht mehr wollte. EIGENER, climbing-artiger Zweig (wie `istWand()` oben), NICHT der
+    // generische unten geaendert: jede andere Bahn bleibt Zeichen fuer Zeichen unberuehrt.
+    //
+    // ENTSCHEIDUNG 1 -- WESSEN STATION: nicht der Spitzenreiter (der ist nach dem Start fast
+    // immer allein unterwegs, eine reine Einzelkamera liesse das Feld dahinter verschwinden,
+    // genau der Fehler, den die Zeitfahren-Einzelkamera fuer EINEN Laeufer schon kennt -- s.
+    // ZF_NACHBAR_FENSTER-Kommentar oben), sondern die Station mit der MEISTEN gleichzeitigen
+    // Aktivitaet -- das ist die Station, an der gerade am meisten zu sehen ist (ein Pulk, der
+    // sich an einer Huerde oder am Seil staut), genau wie eine echte HYROX-Regie auf den
+    // dichtesten Punkt schneidet statt stur dem Ersten zu folgen.
+    //
+    // JEDER LAEUFER ZAEHLT FUER SEINE NAECHSTE STATION (`hyroxNaechsteStation()`, per Minimal-
+    // abstand, KEIN Schwellwert) statt nur innerhalb eines festen Fensters mitgezaehlt zu
+    // werden -- ein fester Fensteransatz (erster Anlauf dieser PR, per `hyroxKameraProbe()`
+    // nachgemessen und verworfen) konnte bei einem bereits auseinandergezogenen Feld eine
+    // Station mit nur einem einzelnen Nachzuegler waehlen UND, schlimmer, den Ausschnitt dann
+    // bis zum naechsten Schnitt auf eine laengst verlassene, leere Stationsmarke einfrieren,
+    // weil alle anderen Laeufer bereits ausserhalb des Fensters lagen. Die Minimalabstand-
+    // Zuordnung ordnet dagegen IMMER jedem Laeufer genau eine Station zu (die Summe der
+    // Zaehlungen ist immer die volle Feldgroesse), die gewaehlte Station hat also nie weniger
+    // als einen fairen Anteil des Feldes und der Ausschnitt ist nie leer. Bei einem Gleichstand
+    // gewinnt die FRUEHERE Station (kleinerer Index) -- dort steht typischerweise noch die
+    // Verfolgergruppe, waehrend der Spitzenreiter schon einzeln weiterzieht.
+    //
+    // ENTSCHEIDUNG 2 -- SCHNITT-RHYTHMUS: alle HYROX_CAM_SCHNITT_SEK Sekunden neu entscheiden
+    // (Auftrag: "Broadcast-Schnitt-Rhythmus ... alle 3-4s", hier 3,5s als Mittelwert), NICHT
+    // jeden Frame -- sonst würde die Kamera bei zwei Stationen mit gleich viel Aktivitaet
+    // zwischen ihnen flackern. Der UEBERGANG zur neuen Station bleibt trotzdem WEICH: derselbe
+    // zielCx/zielZoom-Anziehungsmechanismus wie ueberall sonst in dieser Funktion (`t=...*dt`),
+    // nur mit einem etwas hoeheren Faktor (2,2 statt der sonst ueblichen 1,8) fuer einen
+    // zuegigeren Schwenk, der sich wie ein Kameraschwenk anfuehlt statt wie ein hartes Schnitt-
+    // Bild zu springen -- genau das vom Auftrag verlangte "nicht ruckartig".
+    //
+    // ENTSCHEIDUNG 3 -- WER NICHT IM BILD IST: zeigt `zeichneHyroxUeberlagerung()`s Rangleiste
+    // (neuer Teil derselben Funktion, s. dort) am rechten Bildrand -- alle zwoelf Laeufer nach
+    // Rang, der Rest des Feldes bleibt damit sichtbar, auch wenn die Kamera nur einen
+    // Stationsausschnitt zeigt. Dasselbe Prinzip wie die Roster-Leiste der Zeitfahren-
+    // Einzelkamera (`#ttroster`, s. `renderZeitfahrenPanel`), hier als Canvas-Zeichnung statt
+    // DOM-Panel, weil die Bahn sonst keine DOM-Overlays fuehrt (anders als Zeitfahren/Staffel).
+    //
+    // Reine Anzeige: liest nur u.pos/u.fertig (die `laeuferXY()`/`stepSpurtHyrox()` ohnehin
+    // schon lesen/schreiben), schreibt nichts in die Simulation, kein rr()-Aufruf. `cam.zoom`/
+    // `cam.cx` bleiben die exakt gleichen zwei Zahlen, die camX()/camView() fuer JEDE Bahn
+    // schon lesen -- laeuferXY()/zeichneBoden() etc. brauchen deshalb KEINE Aenderung, sie
+    // zeichnen einfach in den jetzt engeren Ausschnitt hinein.
+    // ================== HYROX-HALLENRUNDE: 2-D-NAHKAMERA MIT VIER ZIELEN (Stufe 2,
+    // Design-Dokument 8.2) ================== VOR dem 1-D-Stationszweig unten (der bleibt
+    // fuer die Ansicht "bahn" unveraendert stehen und liest dort hyroxZustand(u).s statt
+    // u.pos, s. 7.1/8.4): dieselben drei Entscheidungen (Aktivitaet statt Spitzenreiter,
+    // eingefrorene Gruppe beim Schnitt, weicher Schwenk) bleiben gueltig, nur mit VIER
+    // 2-D-ZIELEN statt sieben 1-D-Stationen -- drei feste Zonenkaesten (technik/kletter/
+    // kraft, s. HYROX_ZONEN) plus "strecke" (kein fester Kasten, das dichteste Laeufer-
+    // fenster auf den Laufabschnitten, s.u.).
+    if(istHyroxHalle()){
+      const laufend=LAEUFER.filter(u=>u.fertig==null);
+      if(laufend.length){
+        const zustand=new Map(); for(const u of laufend)zustand.set(u.id,hyroxZustand(u));
+        if(hyroxCamZiel==null||rennT>=hyroxCamNaechsterSchnitt){
+          // WAHL BEIM SCHNITT: das Ziel mit den meisten Zugehoerigen gewinnt -- die Summe ist
+          // immer die Feldgroesse, der Kasten ist also nie leer. Gleichstand: eine Station vor
+          // der Strecke, unter Stationen die FRUEHERE (dieselbe Minimalabstand-Idee wie beim
+          // 1-D-Zweig).
+          const zaehler={technik:0,kletter:0,kraft:0,strecke:0};
+          for(const u of laufend){ const z=zustand.get(u.id); zaehler[z.art==="lauf"?"strecke":z.gruppe]++; }
+          const reihenfolge=["technik","kletter","kraft","strecke"];
+          let beste=reihenfolge[0], bester=-1;
+          for(const g of reihenfolge)if(zaehler[g]>bester){bester=zaehler[g];beste=g;}
+          hyroxCamZiel=beste;
+          hyroxCamNaechsterSchnitt=rennT+HYROX_HALLE_SCHNITT_SEK;
+          if(beste==="strecke"){
+            // DICHTESTE LAEUFERGRUPPE AUF LAUFABSCHNITTEN: Schiebefenster der Breite 0,05 in
+            // `s` (≈930 Quellpx Strecke) ueber die nach `s` sortierten Laeufer, das Fenster mit
+            // den meisten gewinnt -- diese Laeufer werden eingefroren.
+            const aufStrecke=laufend.filter(u=>zustand.get(u.id).art==="lauf")
+              .sort((a,b)=>zustand.get(a.id).s-zustand.get(b.id).s);
+            let bestVon=0, bestN=1;
+            for(let i=0;i<aufStrecke.length;i++){
+              let j=i; while(j+1<aufStrecke.length&&zustand.get(aufStrecke[j+1].id).s-zustand.get(aufStrecke[i].id).s<=0.05)j++;
+              if(j-i+1>bestN){bestN=j-i+1;bestVon=i;}
+            }
+            hyroxCamGruppe=new Set(aufStrecke.slice(bestVon,bestVon+bestN).map(u=>u.id));
+          } else {
+            // GRUPPE BEIM SCHNITT EINFRIEREN (dasselbe Review-Verfahren wie im 1-D-Zweig
+            // unten): nur Mitglieder, die GERADE im Ausflug dieser Gruppe sind (nicht "lauf").
+            hyroxCamGruppe=new Set(laufend.filter(u=>{const z=zustand.get(u.id);
+              return z.gruppe===beste&&z.art!=="lauf";}).map(u=>u.id));
+          }
+        }
+        // KASTEN ZWISCHEN ZWEI SCHNITTEN.
+        let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9, irgendwer=false;
+        const nimm=(r)=>{x0=Math.min(x0,r.x);y0=Math.min(y0,r.y);x1=Math.max(x1,r.x);y1=Math.max(y1,r.y);irgendwer=true;};
+        if(hyroxCamZiel!=="strecke"){
+          const b=HYROX_ZONEN[hyroxCamZiel]; x0=b.x0;y0=b.y0;x1=b.x1;y1=b.y1; irgendwer=true;
+        }
+        for(const u of laufend){
+          if(!(hyroxCamGruppe&&hyroxCamGruppe.has(u.id)))continue;
+          const z=hyroxZustand(u);
+          // WER DURCH DEN OUT-BOGEN AUF DIE STRECKE GEHT, FAELLT AUS DEM STATIONSKASTEN (8.2):
+          // sonst zoege ein einzelner Davonlaufender den Ausschnitt ueber die halbe Halle.
+          if(hyroxCamZiel!=="strecke"&&z.art==="lauf")continue;
+          if(hyroxCamZiel==="strecke"&&z.art!=="lauf")continue;
+          nimm(hallenXY(z.s));
+        }
+        if(!irgendwer){ x0=0;y0=0;x1=1680;y1=960; }   // Gruppe inzwischen leer: Totale
+        const z0=cam.zoom||1, bw=(x1-x0)*HALLE_S+90/z0, bh=(y1-y0)*HALLE_S+130/z0;
+        const zielZoom=Math.max(HALLE_ZOOM_MIN,Math.min(HALLE_ZOOM_MAX,Math.min(W/bw,H/bh)));
+        const weltB=1680*HALLE_S, weltH=960*HALLE_S, hw=W/2/zielZoom, hh=H/2/zielZoom;
+        const cxWelt=((x0+x1)/2)*HALLE_S, cyWelt=((y0+y1)/2)*HALLE_S;
+        const cx=weltB>2*hw?Math.max(hw,Math.min(weltB-hw,cxWelt)):weltB/2;
+        const cy=weltH>2*hh?Math.max(hh,Math.min(weltH-hh,cyWelt)):weltH/2;
+        const t=Math.min(1,dt*2.2);
+        cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
+        return;
+      }
+      // NIEMAND LAEUFT MEHR: Totale statt in den generischen Zweig unten zu fallen (der
+      // rechnet cam.cx und haette in der Halle keine Wirkung, 8.2).
+      const zielZoom=HALLE_ZOOM_MIN, cx=1680*HALLE_S/2, cy=960*HALLE_S/2, t=Math.min(1,dt*1.8);
+      cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
+      return;
+    }
+    if(bahnHyroxAktiv && HYROX_STATIONEN && HYROX_STATIONEN.length){
+      const laufend=LAEUFER.filter(u=>u.fertig==null);
+      if(laufend.length){
+        if(hyroxCamStationIdx<0||rennT>=hyroxCamNaechsterSchnitt){
+          const zaehler=new Array(HYROX_STATIONEN.length).fill(0);
+          for(const u of laufend)zaehler[hyroxNaechsteStation(u.pos)]++;
+          let beste=0, bester=-1;
+          for(let i=0;i<zaehler.length;i++)if(zaehler[i]>bester){bester=zaehler[i];beste=i;}
+          hyroxCamStationIdx=beste;
+          hyroxCamNaechsterSchnitt=rennT+HYROX_CAM_SCHNITT_SEK;
+          // GRUPPE BEIM SCHNITT EINFRIEREN (Review-Fund waehrend der Bildbeleg-Pruefung dieser
+          // PR, per `hyroxKameraProbe()`/Screenshot nachgemessen): "wem ist diese Station
+          // gerade am naechsten" JEDEN Frame neu auszuwerten liess die Gruppe schon VOR dem
+          // naechsten Schnitt leerlaufen, sobald sich alle ihr zugeordneten Laeufer ueber den
+          // Mittelpunkt zur naechsten Station hinausbewegt hatten -- der Ausschnitt zeigte dann
+          // bis zum naechsten Schnitt nur noch leere Bahn. Jetzt wird die Mitgliedschaft NUR
+          // beim Schnitt selbst bestimmt und bis zum naechsten Schnitt festgehalten (IDs, nicht
+          // Objekte, s. bahnAnzeigeSichern/-Zurueck) -- dieselben Laeufer bleiben fuer das ganze
+          // Zeitfenster im Bild, auch wenn sie dabei ueber die naechste Stationsmarke hinaus-
+          // laufen (genau das Bild, das ein echter Kameraschwenk zeigen wuerde).
+          hyroxCamGruppe=new Set(laufend.filter(u=>hyroxNaechsteStation(u.pos)===beste).map(u=>u.id));
+        }
+        const st=HYROX_STATIONEN[hyroxCamStationIdx];
+        // AUSSCHNITT: die Station selbst plus jeder Laufende aus der beim Schnitt eingefrorenen
+        // Gruppe (s. oben) -- nie leer, weil die gewaehlte Station per Konstruktion mindestens
+        // einen Laeufer in ihre Gruppe bekommen hat.
+        let von=st.pos-0.045, bis=st.pos+0.045;
+        for(const u of laufend)if(hyroxCamGruppe&&hyroxCamGruppe.has(u.id)){von=Math.min(von,u.pos);bis=Math.max(bis,u.pos);}
+        von=Math.max(0,von-0.03); bis=Math.min(1,bis+0.03);
+        const spanne=Math.max(0.10,bis-von);
+        const zielZoom=Math.max(1,Math.min(5.5,1/spanne));
+        const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
+        const t=Math.min(1,dt*2.2);
+        cam.zoom+=(zielZoom-cam.zoom)*t;
+        cam.cx+=(zielCx-cam.cx)*t;
+        return;
+      }
+      // NIEMAND LAEUFT MEHR (letzter Zieleinlauf): kein `return` hier -- die Funktion faellt
+      // durch in den generischen Zweig unten, der bei leerem `aktiv` auf `LAEUFER` zurueckfaellt
+      // und die Kamera wieder auf das volle, jetzt stehende Feld zieht (derselbe Zielbild-
+      // Moment wie bei jeder anderen Bahn).
     }
     // EINZELKAMERA (Zeitfahren-Fokus, Recherche Abschnitt 4.3): zoomt eng auf GENAU einen
     // Laeufer, wie ein Kamerawagen, der neben ihm herfaehrt — statt der Bounding-Box aller
@@ -47007,7 +48424,7 @@
       // haengt, den sie gar nicht hatten.
       const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,d):0;
-      const breitP=formVon(p.n)+stufenWert();
+      const breitP=breitPunkteVon(p,d);
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,d,true),d);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,d,false),d);
       const w=spurtWerte(p,attr);
@@ -47295,6 +48712,22 @@
     // einer unterwegs ist.
     if(art.startAbstand&&LAEUFER.length)
       bahnFokus=[...LAEUFER].sort((a,b)=>(a.startT||0)-(b.startT||0))[0].id;
+    // DIE HATZ (Format-Fundament, 08.11.): NUR fuer Spurt (`art.spurt`) und nur, wenn
+    // explizit angefordert (BAHN_FLAGS.spurtFormat, s. dort) -- ohne das Flag bleibt
+    // `bahnHatzAktiv` false und bauSpurt() endet hier bit-identisch zu vorher. `art.spurt`
+    // statt `d==="spurt"`, dasselbe Gate wie bei spurtSaeuleSetzen() direkt darueber.
+    bahnHatzAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hatz");
+    HATZ_WELLEN=null;
+    if(bahnHatzAktiv)baueHatz();
+    // HYROX-STATIONEN (Format 3, 08.11., s. Hook-Punkt-Liste in
+    // docs/design/spurt-format-die-hatz-08-11.md Abschnitt 7 und
+    // docs/design/spurt-format-hyrox-stationen-08-11.md): derselbe Schalter, derselbe
+    // Hook-Punkt wie bahnHatzAktiv direkt darueber -- NUR fuer Spurt (`art.spurt`), NUR
+    // explizit angefordert. Ohne das Flag bleibt `bahnHyroxAktiv` false und bauSpurt()
+    // endet bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs).
+    bahnHyroxAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hyrox");
+    HYROX_STATIONEN=null;
+    if(bahnHyroxAktiv)baueHyroxStationen();
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -47940,9 +49373,669 @@
     return {seite:fuehrend, delta:Math.max(0,rennT-zeitFuehrendBeiPH), unklar:false};
   }
 
-  function stepSpurt(dt){
+  // ===================================================================================
+  // DIE HATZ — FORMAT 2 FUER SPURT (08.11., docs/design/spurt-format-die-hatz-08-11.md).
+  //
+  // ZEICHENFRAGE AUS DEM ENTWURF, HIER ENTSCHIEDEN: Rundkurs bleibt eine THEMATISCHE
+  // Umdeutung, das Bahn-Chassis bleibt linear. `istOval()` (s. dort, "!!BA().staffel")
+  // zeichnet zwar schon einen Rundkurs, ist aber fest an die Staffel verdrahtet -- genau
+  // ZWEI Bahnen fuer zwei MANNSCHAFTEN (ovalPunkt() liest `OVAL_SPUR0+u.bahnZ`, bahnZ nur
+  // 0/1). Zwoelf EINZELNE Laeufer auf einem echten Rundkurs zu zeigen (eigene Spurzuteilung,
+  // Ueberrunden, Start/Ziel-Geometrie fuer zwoelf statt zwei) ist ein eigenes Zeichenprojekt,
+  // kein Format-Fundament. Der "Rundkurs" bleibt deshalb eine THEMATISCHE Umdeutung: der
+  // Fegearm jagt auf der GERADEN Bahn von hinten nach vorn, "eine Runde" ist eine Welle.
+  //
+  // ABLAUF. Wellen zu je HATZ_WELLEN_DAUER Sim-Sekunden (Entwurf: ~12), dazwischen
+  // HATZ_NEUORDNUNG_DAUER Sekunden Neuordnung (keine Ausdauer-Belohnung ueber Wellen
+  // hinweg -- stamina ist mit 4 das schwaechste Matrixgewicht, s. CLAUDE.md). Jede Welle
+  // bewertet alle noch aktiven Laeufer mit `hatzWelleScore()` und entfernt die beiden mit
+  // der schwaechsten Note -- AUSSER der letzten Welle (<=4 noch aktiv): die bewertet ALLE
+  // Verbliebenen auf einen Schlag, die unteren zwei werden Rang 3/4, die oberen zwei direkt
+  // Rang 1/2 (der "Sprint der verbliebenen zwei um Platz 1" aus dem Entwurf -- eine Welle
+  // entscheidet beides, keine sechste Phase).
+  //
+  // SUB-SKILLS: ausschliesslich das bestehende Spurt-Rezept (BAHN_ART.spurt.rezept, s.
+  // "DIE SIEBEN ROLLEN" am Kopf von BAHN_ART) -- ANTRITT/TECHNIK/WENDIGKEIT/WUCHT/ROBUST/
+  // STEHEN/ENDTEMPO werden NICHT neu gewichtet (die Matrix ist gesperrt, CLAUDE.md), nur
+  // anders KOMBINIERT: ANTRITT in jeder Welle ausser der letzten ("jede Welle ein
+  // Neustart"), ENDTEMPO nur in der letzten. HATZ_W/HATZ_RAUSCHEN sind das einzige freie
+  // Rad dieser Kalibrierung -- Kalibrierweg (Startwerte, Messwerte, Korrekturen) steht in
+  // docs/design/spurt-format-die-hatz-08-11.md.
+  //
+  // `u.fertig` TRAEGT HIER DEN RANG, NICHT EINE ZEIT. MOTOREN["spurt"].wert() (der
+  // generische Bahn-Zweig, unveraendert) sortiert nach `bahnZeit(u)=u.fertig-(u.startT||0)`
+  // aufsteigend und vergibt -(Platz) -- fuer Spurt ist `u.startT` immer 0 (kein
+  // `art.startAbstand`), also bahnZeit(u)===u.fertig. Weil `baueHatz()` JEDEM Laeufer einen
+  // EINDEUTIGEN Rang 1..N zuweist (`u.hatzRang`) und `stepSpurtHatz()` genau diesen Rang
+  // als `u.fertig` eintraegt, reproduziert der bestehende, unveraenderte Zweig exakt die
+  // Ausscheidereihenfolge -- kein eigener wert()-Zweig fuer "hatz" noetig.
+  const HATZ_WELLEN_DAUER=12, HATZ_NEUORDNUNG_DAUER=3;
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-die-hatz-08-11.md).
+  // ZWEI KOMBINATIONS-PROFILE, nicht eines: eine fruehe Welle entscheidet nur 2 von N
+  // Raengen (Gedraenge, viel Chaos/Rauschen passt dazu) -- die letzte Welle entscheidet
+  // Rang 1-4 auf einen Schlag und soll dabei hoeren lassen, WER wirklich besser ist (wenig
+  // Rauschen, mehr ENDTEMPO/STEHEN statt ANTRITT/WUCHT). Kalibrierweg im Design-Dokument.
+  const HATZ_W={haupt:0.36, technik:0.16, wendig:0.06, wucht:0.08, robust:0.20, stehen:0.14};
+  const HATZ_W_FINALE={haupt:0.52, technik:0.10, wendig:0.00, wucht:0.00, robust:0.12, stehen:0.26};
+  // MUTIERBAR NUR UEBER window.__arena.hatzGewichte({...}) (s. dort) -- Objekte statt
+  // simplen `const`s, damit die Kalibrierungs-Schnittstelle sie innerhalb einer Sitzung
+  // aendern kann, ohne die Seite neu zu laden.
+  const HATZ_RAUSCHEN_AKTUELL={nichtFinale:0.25, finale:0.02};
+  // FUENF UNABHAENGIGE WUERFE STATT EINEM (Kalibrierweg, s. Design-Dokument): eine Welle hat
+  // laut Entwurf "zwei Huerden, ein Rempel-Fenster" -- EIN einzelner verrauschter
+  // Gesamt-Score (ein rr()-Wurf) machte das Messergebnis instabil (Pp schwankte zwischen 20
+  // und 37 je nach Laufzahl, s. PR-Beschreibung): bei nur einem Wurf entscheidet eine
+  // einzelne ungluecklich gezogene Zahl ueber die ganze Welle, und WELCHES Attribut davon
+  // profitiert, haengt empfindlich von der genauen Gewichtsmischung ab. Fuenf separat
+  // gewuerfelte Teilereignisse (Antritt/Endtempo, zwei Huerden, Rempel-Fenster, Stehen)
+  // glaetten das genauso, wie die sieben Huerden/hundert Ticks des klassischen Formats es
+  // tun -- derselbe Grund, aus dem CLASSISCH ueberhaupt stabil misst.
+  function hatzWelleScore(u,finale){
+    const W=finale?HATZ_W_FINALE:HATZ_W;
+    const rauschen=finale?HATZ_RAUSCHEN_AKTUELL.finale:HATZ_RAUSCHEN_AKTUELL.nichtFinale;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const haupt=finale?(u.ENDTEMPO||0):(u.ANTRITT||0);
+    // SECHS UNABHAENGIGE WUERFE statt einem gemeinsamen (Kalibrierweg, s. Design-Dokument):
+    // je einer fuer Antritt/Endtempo, die zwei Huerden (Technik/Wendigkeit), den Rempler
+    // (Wucht), das Wegstecken (Robust) und das Stehen -- dieselbe Glaettung, die das
+    // klassische Format ueber Dutzende Ticks/sieben Huerden ohnehin bekommt.
+    return wurf(haupt*W.haupt) + wurf((u.TECHNIK||0)*W.technik) + wurf((u.WENDIGKEIT||0)*W.wendig)
+         + wurf((u.WUCHT||0)*W.wucht) + wurf((u.ROBUST||0)*W.robust) + wurf((u.STEHEN||0)*W.stehen);
+  }
+  function baueHatz(){
+    let aktiv=[...LAEUFER], naechsterRang=aktiv.length, welleIdx=0, letzteBleibt=null, t=0;
+    HATZ_WELLEN=[];
+    while(aktiv.length>2){
+      const finale=aktiv.length<=4;
+      const bewertet=aktiv.map(u=>({u,score:hatzWelleScore(u,finale)})).sort((a,b)=>a.score-b.score);
+      const rausN=finale?(aktiv.length-2):Math.min(2,aktiv.length-2);
+      const raus=bewertet.slice(0,rausN), bleibt=bewertet.slice(rausN);
+      // Innerhalb der Rausgruppe: der schwaechste (Index 0, Note am niedrigsten) bekommt den
+      // schlechtesten noch freien Rang.
+      for(let i=0;i<raus.length;i++)raus[raus.length-1-i].u.hatzRang=naechsterRang--;
+      t+=HATZ_WELLEN_DAUER;
+      HATZ_WELLEN.push({welle:welleIdx, finale, ende:t, rausIds:raus.map(x=>x.u.id), revealed:false});
+      aktiv=bleibt.map(x=>x.u); letzteBleibt=bleibt;
+      if(!finale)t+=HATZ_NEUORDNUNG_DAUER;
+      welleIdx++;
+    }
+    if(!HATZ_WELLEN.length)HATZ_WELLEN.push({welle:0, finale:true, ende:HATZ_WELLEN_DAUER, rausIds:[], revealed:false});
+    // Die letzten (<=2) Laeufer: Reihenfolge aus der zuletzt berechneten Wellen-Note oben
+    // ("letzteBleibt") -- oder, falls das Feld mit <=2 Laeufern startet (sehr kleine
+    // Ersatzaufstellung, Edge-Case), eine letzte eigene Bewertung.
+    const rest=(letzteBleibt?letzteBleibt.filter(x=>aktiv.includes(x.u))
+      :aktiv.map(u=>({u,score:hatzWelleScore(u,true)}))).sort((a,b)=>a.score-b.score);
+    for(let i=0;i<rest.length;i++)rest[rest.length-1-i].u.hatzRang=naechsterRang--;
+    for(const u of LAEUFER)if(u.hatzRang==null)u.hatzRang=naechsterRang--; // Sicherheitsnetz
+  }
+  function hatzAktuelleWelle(){
+    if(!HATZ_WELLEN)return null;
+    return HATZ_WELLEN.find(w=>!w.revealed)||HATZ_WELLEN[HATZ_WELLEN.length-1]||null;
+  }
+  function stepSpurtHatz(dt){
     if(done)return;
     rennT+=dt;
+    const letzte=HATZ_WELLEN[HATZ_WELLEN.length-1];
+    for(const w of HATZ_WELLEN){
+      if(w.revealed||rennT<w.ende)continue;
+      w.revealed=true;
+      for(const id of w.rausIds){
+        const u=LAEUFER.find(x=>x.id===id); if(!u)continue;
+        // `u.fertig`=Rang (s. Kopfkommentar), `u.raus`/`u.stolper` sind reine Anzeige --
+        // dieselbe Dimm-/"liegt"-Behandlung, die Takeshi's Castle/ein Hürdensturz schon
+        // bekommen (s. zeichneSpurt, "AUSGESCHIEDEN"/`down:u.stolper>0`). Niemand faellt
+        // hier generisch nach vorn/hinten um (CLAUDE.md, PixelLab-Tod-Animationen): die
+        // vom Fegearm Erwischten liegen sichtbar auf der Bahn, dieselbe Pose wie ein
+        // Huerdensturz -- nicht die 0815-Umkipp-Variante, die der Abschnitt ausschliesst.
+        u.fertig=u.hatzRang; u.raus=true; u.stolper=Math.max(u.stolper||0,1);
+        rennFertig.push(u);
+      }
+      if(w===letzte){
+        const rest=LAEUFER.filter(x=>x.fertig==null).sort((a,b)=>(a.hatzRang||99)-(b.hatzRang||99));
+        for(const u of rest){ u.fertig=u.hatzRang; rennFertig.push(u); }
+      }
+    }
+    // KOSMETISCHE POSITIONS-ANIMATION (reine Anzeige -- schreibt nur `u.pos`, nie
+    // `u.fertig`/rr()/MOTOREN["spurt"].wert()). Ausgeschiedene bleiben stehen, wo der Arm
+    // sie erwischt hat.
+    const gesamtWellen=HATZ_WELLEN.length;
+    for(const u of LAEUFER){
+      if(u.raus)continue;
+      const w=hatzAktuelleWelle();
+      const localStart=w?w.ende-HATZ_WELLEN_DAUER:0;
+      const frac=w?Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER)):1;
+      const basis=w?(w.welle+frac)/gesamtWellen:1;
+      const jitter=((u.id*53)%37)/37*0.015;
+      u.pos=Math.max(0,Math.min(0.97, basis*0.92+jitter));
+      u.bahn=u.bahnZ;
+    }
+    if(rennT>=letzte.ende+0.05||rennFertig.length>=LAEUFER.length)done=true;
+  }
+  // SWEEP-ARM/BEDROHUNGS-OVERLAY (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset (Auftrag: "zuerst pruefen, ob ein
+  // bestehendes Panzertier wiederverwendbar ist" -- geprueft, s. PR-Beschreibung: kein
+  // passendes vorhanden, "medibull" ist ein Sanitaeter-Maskottchen, kein Bedroher) --
+  // stattdessen derselbe prozedurale Balken, mit dem das Bahn-Chassis auch sonst Zustand
+  // zeichnet (Hot-Seat-Podest, Ziellinie), damit kein Asset-Generierungsprojekt an einem
+  // Format-Fundament haengt.
+  function zeichneHatzUeberlagerung(){
+    const w=hatzAktuelleWelle(); if(!w)return;
+    const localStart=w.ende-HATZ_WELLEN_DAUER;
+    const frac=Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER));
+    // ETWAS HINTER DEM NACHZUEGLER, NIE AUF GLEICHER HOEHE (sonst verschwindet der duenne
+    // Balken optisch unter den Laeufer-Sprites, die ERST NACH diesem Aufruf gezeichnet
+    // werden, s. Kopfkommentar/PR-Beschreibung "Screenshot-Beleg"): der Arm bleibt 0,05
+    // Streckenanteile HINTER der Welle, bis er sie im letzten Fuenftel der Welle einholt.
+    const n=Math.max(1,BAHNEN_N());
+    const y0=bahnY(0)-26, y1=bahnY(n-1)+26;
+    const welleZielPos=Math.min(0.95,((w.welle+1)/Math.max(1,HATZ_WELLEN.length))*0.92);
+    const armPos=Math.max(0,welleZielPos-0.06+frac*0.06);
+    const xPos=camX(armPos);
+    ctx.save();
+    ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
+    ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
+    ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(w.finale?"ENDSPURT":"FEGEARM",xPos,y0-8);
+    ctx.restore();
+  }
+
+  // ===================================================================================
+  // HYROX-STATIONEN (Format 3, 08.11.). Chris' Kritik an Spurt: "lame im Vergleich zu
+  // Time Trial" -- und die Erinnerung, dass die sieben Stationen im Boden (Huerde/
+  // Balken/Palisade/Seil/Wassergraben/Mauer/Strohballen, `BAHN_ART.spurt.hindernisBilder`/
+  // `hindernisNamen`) heute reine Kulisse sind: JEDE von ihnen laeuft ueber denselben
+  // generischen Huerden-Stolper (HUERDEN_TYP(i) aus `hindernisTypen`, unabhaengig vom
+  // gezeigten Bild) -- eine "Wassergraben"-Station bremst mechanisch genauso wie eine
+  // "Huerde", nur mit einem anderen Sprite darunter. Dieses Format macht die STATIONEN
+  // selbst zur Mechanik, mit einer inhaltlich passenden Sub-Skill-Kombination je Gruppe --
+  // Design/Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md.
+  //
+  // RUNDKURS? NEIN -- dieselbe Entscheidung wie bei der Hatz (s. deren Kopfkommentar/
+  // Design-Dokument Abschnitt 2): die Bahn bleibt LINEAR, die sieben Stationen liegen an
+  // denselben Positionen wie heute (BA().hindernisse, 0,14..0,86 Streckenanteile).
+  //
+  // SIEBEN STATIONEN, DREI CHECKS. Sieben unabhaengige rr()-Wuerfe je Laeufer wuerden das
+  // Ergebnis verwaschen (CLAUDE.md, "Mehr Ereignisse helfen fast nie" -- derselbe Befund,
+  // der die Hatz von einem auf fuenf GROB passende Wuerfe je Welle gebracht hat, hier
+  // andersherum: von sieben AUF drei). Gruppiert nach Inhalt, nicht nach Position:
+  //   TECHNIK  (Huerde + Balken)              -- TECHNIK/WENDIGKEIT (bestehendes Rezept)
+  //   KLETTERN (Palisade + Seil)               -- TECHNIK/ROBUST (Grip & Durchhalten)
+  //   KRAFT    (Wassergraben + Mauer + Strohballen) -- WUCHT/STEHEN (Schieben/Tragen/Kaelte aushalten)
+  // Jede Gruppe liest AUSSCHLIESSLICH die sieben bestehenden Spurt-Sub-Skills (s. "DIE
+  // SIEBEN ROLLEN" am Kopf von BAHN_ART, dasselbe Rezept wie Klassisch/Hatz) -- keine neue
+  // Sub-Skill-Formel, nur eine andere KOMBINATION, exakt wie bei der Hatz.
+  //
+  // `u.fertig` TRAEGT HIER EINE ECHTE ZEIT (wie Klassisch/Time-Trial), KEINEN RANG (anders
+  // als die Hatz): `baueHyroxStationen()` berechnet je Laeufer einmal, deterministisch aus
+  // der Renn-Saat, eine Zielzeit `u.hyroxZeit` aus Grundtempo (ANTRITT/ENDTEMPO) minus den
+  // drei Stationschecks. `stepSpurtHyrox()` laesst die Uhr laufen und traegt `u.fertig`
+  // ein, sobald `rennT` die Zielzeit erreicht -- MOTOREN["spurt"].wert() (der generische
+  // Bahn-Zweig, unveraendert) sortiert danach aufsteigend nach `bahnZeit(u)=u.fertig`
+  // (startT ist bei Spurt immer 0) und vergibt -(Platz). Kein eigener wert()-Zweig noetig.
+  const HYROX_MIN_SEK=6;
+  // NAHKAMERA-KONSTANTEN/-HELFER (Nahkamera-PR, 08.11.): hier statt lokal in kameraUpdate()
+  // deklariert, weil zeichneHyroxUeberlagerung() (Rangleiste, s. dort) dieselbe Stations-
+  // zuordnung braucht, um zu markieren, wer gerade im Kamera-Ausschnitt steht -- eine Quelle
+  // statt zweier Kopien, die auseinanderlaufen koennten.
+  const HYROX_CAM_SCHNITT_SEK=3.5;
+  // HALLENRUNDE-NAHKAMERA, EIGENER SCHNITT-TAKT (Stufe 2, Design-Dokument 8.3): Nebenbefund
+  // 2.4 -- `HYROX_CAM_SCHNITT_SEK=3,5` ist Simulationszeit und ergab mit
+  // `ZEIT_DEHNUNG.spurt=11,14` real ~39s statt der beabsichtigten 3-4s. Fuer die neue Halle
+  // gilt deshalb eine EIGENE, kleinere Konstante (0,8 Sim-s ≈ 9s Zuschauzeit) statt die Bahn-
+  // Konstante einfach wiederzuverwenden. Die Bahn-Nahkamera (Ansicht "bahn") bleibt bei ihren
+  // 3,5s -- sie zu aendern ist nicht Teil dieser PR, nur als Befund festgehalten.
+  const HYROX_HALLE_SCHNITT_SEK=0.8;
+  // Naechstgelegene Station zu einer Rennposition, per Minimalabstand (kein Schwellwert) -- s.
+  // ausfuehrliche Begruendung am kameraUpdate()-Hyrox-Zweig (Entscheidung 1): ordnet JEDEN
+  // Laeufer genau einer Station zu, auch wenn er weit von allen entfernt zwischen zwei
+  // Stationen steht.
+  function hyroxNaechsteStation(pos){
+    let bi=0, bd=Infinity;
+    for(let i=0;i<HYROX_STATIONEN.length;i++){
+      const d=Math.abs(pos-HYROX_STATIONEN[i].pos);
+      if(d<bd){bd=d;bi=i;}
+    }
+    return bi;
+  }
+  // BASIS/SKALA MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}) -- Objekte statt
+  // simplen `const`s, dasselbe Muster wie HATZ_RAUSCHEN_AKTUELL (s. dort).
+  const HYROX_BASIS_SEK_AKTUELL={wert:26}, HYROX_SKALA_SEK_AKTUELL={wert:0.165};
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-hyrox-stationen-08-11.md
+  // Abschnitt 5). `pace` ist die Strecke zwischen den Stationen (Antritt/Endtempo-Mix wie
+  // im klassischen Format), die drei Stationsgewichte zusammen tragen die Haelfte des
+  // Scores -- die Stationen sollen wirklich etwas kosten, nicht nur ein kleiner Zuschlag
+  // neben dem Lauftempo sein. MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}).
+  const HYROX_W={pace:0.40, technik:0.20, kletter:0.20, kraft:0.20};
+  const HYROX_RAUSCHEN_AKTUELL={wert:0.18};
+  // DREI UNABHAENGIGE WUERFE statt sieben (Kalibrierweg, s. Design-Dokument) -- je einer
+  // fuer die Strecke und die drei Stationsgruppen, dieselbe Glaettung wie bei der Hatz
+  // (fuenf Wuerfe statt einem je Welle).
+  function hyroxScore(u){
+    const W=HYROX_W, rauschen=HYROX_RAUSCHEN_AKTUELL.wert;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const pace=0.55*(u.ANTRITT||0)+0.45*(u.ENDTEMPO||0);
+    // TECHNIK-STATIONEN (Huerde+Balken): Tritt-Technik und Balance -- dasselbe Paar, das
+    // der klassische Huerdenlauf an jeder Huerde schon nutzt.
+    const technik=0.6*(u.TECHNIK||0)+0.4*(u.WENDIGKEIT||0);
+    // KLETTER-STATIONEN (Palisade+Seil): ueberwiegend ROBUST (Festhalten/Durchhalten unter
+    // Schmerz -- health/torment/will/dex), TECHNIK nur als Nebenweg (wer wenig Grip hat,
+    // kommt ueber geschickte Technik trotzdem rueber, nur langsamer) -- "mehrere Wege zum
+    // Erfolg" (CLAUDE.md).
+    const kletter=0.3*(u.TECHNIK||0)+0.7*(u.ROBUST||0);
+    // KRAFT-STATIONEN (Wassergraben+Mauer+Strohballen): Schieben/Tragen (WUCHT) als
+    // Primaerweg, STEHEN (Kaelte/Erschoepfung aushalten) als zweiter Kanal -- die drei
+    // haertesten Stationen am Streckenende, bewusst zusammengefasst statt dreifach
+    // gewuerfelt.
+    const kraft=0.55*(u.WUCHT||0)+0.45*(u.STEHEN||0);
+    // VIER TEILWERTE ZUSAETZLICH FESTHALTEN (Hallenrunde-PR, Design-Dokument Abschnitt 5.2):
+    // rein kosmetisch fuer hyroxFahrplan() -- die Summe/Reihenfolge der vier wurf()-Aufrufe
+    // bleibt WORT FUER WORT dieselbe Gleitkommarechnung wie vorher (JS wertet
+    // a+b+c+d linksassoziativ und von links nach rechts aus), also bitgleich zu
+    // u.hyroxZeit. KEIN zusaetzlicher rr()-Aufruf.
+    const a=wurf(pace*W.pace), b=wurf(technik*W.technik), c=wurf(kletter*W.kletter), d=wurf(kraft*W.kraft);
+    u.hyroxTeile={lauf:a, technik:b, kletter:c, kraft:d};
+    return a+b+c+d;
+  }
+  // STATIONSLISTE FUER DIE ZEICHNUNG (reine Anzeige -- dieselben sieben Positionen/Bilder/
+  // Namen wie BA().hindernisse/hindernisBilder/hindernisNamen, nur mit ihrer Gruppe
+  // (Technik/Klettern/Kraft) markiert, damit die Ueberlagerung zeigen kann, WELCHER Check
+  // gerade zaehlt). Kein Einfluss auf rr()/wert()/u.hyroxZeit -- die liegen schon fest,
+  // bevor dieses Array gebaut wird.
+  const HYROX_GRUPPE_JE_STATION=["technik","technik","kletter","kletter","kraft","kraft","kraft"];
+  // ================= FAHRPLAN (Hallenrunde-PR, Design-Dokument Abschnitt 5) =================
+  // Zerlegt `u.hyroxZeit` -- bitgleich -- in Lauf-/Roxzone-/Stationsabschnitte, damit die
+  // Figur an einer Station wirklich LANGSAMER vorankommt statt mit konstantem Tempo
+  // durchzugleiten. `u.pos = rennT/z` BLEIBT die Wertungsgroesse (Abschnitt 9) -- gezeichnet
+  // wird ab hier aus `hyroxZustand(u).s`, einer reinen Lesegroesse ohne jeden rr()-Aufruf.
+  //
+  // Anteile je Abschnittsart INNERHALB des Budgets einer Stationsgruppe (5.4): auf der
+  // Hallenrunde teilt sich das Budget in Roxzone/Zwischenweg/Arbeit, auf der GERADEN BAHN
+  // (kein Rox/Zone-Konzept, 7.1) geht das ganze Gruppenbudget in die Arbeitsabschnitte.
+  const HYROX_ANTEIL_ROX=0.30, HYROX_ANTEIL_ZONE=0.10, HYROX_ANTEIL_ARBEIT=0.60;
+  const HYROX_ANTEILE_HALLE={rox:HYROX_ANTEIL_ROX, zone:HYROX_ANTEIL_ZONE, arbeit:HYROX_ANTEIL_ARBEIT};
+  const HYROX_ANTEILE_BAHN={arbeit:1};
+  // Eine Arbeitsbewegung (Schub/Zug/Sprung) je 0,12 Sim-s (~1,3 Zuschau-s bei Dehnung 11,14) --
+  // `hyroxZustand().prog` laeuft damit SCHLEIFEND 0..1 ueber die ganze Stationsdauer, statt
+  // (wie vorher `hyroxProg`) ueber ein einziges 0,4-s-Fenster.
+  const HYROX_ARBEIT_TAKT_SEK=0.12;
+  // 1-D-ABSCHNITTSPLAN AUF DER GERADEN BAHN (7.1): Lauf bis pos_i-0,02, Arbeit pos_i+-0,02,
+  // kein Rox/Zone. Positions-Deltas dienen als "Laenge" -- dimensionslos, nur das
+  // Verhaeltnis zaehlt (dieselbe Rolle wie Quellpixel-Laenge auf der Hallenrunde). Haengt
+  // nur an BA().hindernisse (fest, kein Seed) -- einmal gebaut, wiederverwendet.
+  let HYROX_WEG_BAHN=null;
+  function baueHyroxWegBahn(){
+    const pos=(BA().hindernisse||[]).slice(), HALB=0.02;
+    const abschnitte=[]; let s0=0;
+    pos.forEach((p,i)=>{
+      const a=Math.max(s0,p-HALB), b=Math.min(1,p+HALB);
+      if(a>s0)abschnitte.push({art:"lauf", gruppe:null, station:-1, lauf:0, s0, s1:a, laenge:a-s0});
+      abschnitte.push({art:"arbeit", gruppe:HYROX_GRUPPE_JE_STATION[i%HYROX_GRUPPE_JE_STATION.length],
+        station:i, lauf:0, s0:a, s1:b, laenge:b-a});
+      s0=b;
+    });
+    if(s0<1)abschnitte.push({art:"lauf", gruppe:null, station:-1, lauf:0, s0, s1:1, laenge:1-s0});
+    return {abschnitte};
+  }
+  // Teilt `roh` (die vier normierten Zeitbudgets) auf eine Abschnittsliste auf -- dieselbe
+  // Funktion fuer die Halle (6.3) und die gerade Bahn (oben), nur mit verschiedener
+  // `anteile`-Tabelle. `lauf`-Abschnitte bekommen IMMER das volle Laufbudget, proportional
+  // zur Weglaenge; `rox`/`zone` proportional zur Weglaenge INNERHALB ihrer Gruppe;
+  // `arbeit` zu GLEICHEN Teilen auf die Stationen ihrer Gruppe (2/2/3).
+  function hyroxVerteileZeit(abschnitte, roh, anteile){
+    const sumLen={}, cntArbeit={}; let sumLauf=0;
+    for(const a of abschnitte){
+      if(a.art==="lauf"){ sumLauf+=a.laenge; continue; }
+      const key=a.art+":"+a.gruppe;
+      sumLen[key]=(sumLen[key]||0)+a.laenge;
+      if(a.art==="arbeit")cntArbeit[a.gruppe]=(cntArbeit[a.gruppe]||0)+1;
+    }
+    return abschnitte.map((a)=>{
+      if(a.art==="lauf")return sumLauf>0?roh.lauf*(a.laenge/sumLauf):0;
+      const frac=anteile[a.art]!=null?anteile[a.art]:1;
+      if(a.art==="arbeit")return frac*roh[a.gruppe]/(cntArbeit[a.gruppe]||1);
+      const key=a.art+":"+a.gruppe, sum=sumLen[key]||1;
+      return frac*roh[a.gruppe]*(a.laenge/sum);
+    });
+  }
+  // Baut `u.hyroxPlan` aus den vier in hyroxScore() festgehaltenen Teilwerten -- KEIN
+  // rr()-Aufruf, reine Funktion von bereits feststehenden Werten (Design-Dokument 5.3/9).
+  // `f` normiert exakt auf `u.hyroxZeit`; der letzte Abschnitt bekommt den Rundungsrest
+  // zugeschlagen (5.4), damit `t0[n]===u.hyroxZeit` bitgleich gilt.
+  function hyroxFahrplan(u){
+    const B=HYROX_BASIS_SEK_AKTUELL.wert, k=HYROX_SKALA_SEK_AKTUELL.wert, Wg=HYROX_W, T=u.hyroxTeile;
+    const roh={lauf:Wg.pace*B-k*T.lauf, technik:Wg.technik*B-k*T.technik,
+               kletter:Wg.kletter*B-k*T.kletter, kraft:Wg.kraft*B-k*T.kraft};
+    for(const g in roh)roh[g]=Math.max(0.15*(g==="lauf"?Wg.pace:Wg[g])*B, roh[g]);
+    const f=u.hyroxZeit/(roh.lauf+roh.technik+roh.kletter+roh.kraft);
+    for(const g in roh)roh[g]*=f;
+    const halle=!!HYROX_WEG, weg=halle?HYROX_WEG:HYROX_WEG_BAHN, anteile=halle?HYROX_ANTEILE_HALLE:HYROX_ANTEILE_BAHN;
+    const A=weg.abschnitte, dauer=hyroxVerteileZeit(A,roh,anteile);
+    const n=A.length, t0=new Float64Array(n+1);
+    for(let i=0;i<n;i++)t0[i+1]=t0[i]+Math.max(1e-6,dauer[i]);
+    if(n>0)t0[n]=u.hyroxZeit;
+    return {t0, A};
+  }
+  // Zustand zum Zeitpunkt `rennT`: Bogenlaengen-Anteil `s` (0..1, dieselbe Bedeutung wie
+  // `u.pos`), Abschnittsart/-gruppe/-station, `prog` (0..1 schleifend waehrend der Arbeit).
+  // Reine Lesefunktion, kein rr()-Aufruf, kein Schreibzugriff.
+  function hyroxZustand(u){
+    const P=u.hyroxPlan;
+    if(!P||!P.A.length)return {s:u.pos||0, art:"lauf", gruppe:null, station:-1, lauf:0, prog:0, j:-1};
+    const A=P.A, t=Math.min(rennT, u.hyroxZeit);
+    let lo=0, hi=P.t0.length-1;
+    while(hi-lo>1){ const m=(lo+hi)>>1; if(P.t0[m]<=t)lo=m; else hi=m; }
+    const j=Math.min(lo, A.length-1), seg=A[j];
+    const span=Math.max(1e-9, P.t0[j+1]-P.t0[j]);
+    const frac=Math.max(0,Math.min(1,(t-P.t0[j])/span));
+    const s=seg.s0+(seg.s1-seg.s0)*frac;
+    const prog=seg.art==="arbeit" ? (((t-P.t0[j])/HYROX_ARBEIT_TAKT_SEK)%1) : 0;
+    return {s, art:seg.art, gruppe:seg.gruppe||null, station:seg.station??-1, lauf:seg.lauf||0, prog, j};
+  }
+
+  // ================= HALLENRUNDE (Stufe 2, Design-Dokument Abschnitt 6) =================
+  // Quellraum = Pixel der Szene `public/sprites/arena/hyrox_halle.jpg` (1680x960, Ableitung
+  // aus `public/szenen/spurt/hyrox.jpg`, s. scripts/baue-hyrox-halle.py). Welt = Quellraum *
+  // HALLE_S. Alle Koordinaten in diesem Block sind QUELLPIXEL, bis HALLE_S multipliziert.
+  const HALLE_S=W/1680;
+  const HALLE_ZOOM_MIN=H/(960*HALLE_S), HALLE_ZOOM_MAX=3.2;
+  // Breite quer zur Laufrichtung je Abschnittsart/-gruppe (6.4, Quellpixel).
+  const HYROX_BREITE_ART={lauf:64, rox:30};
+  const HYROX_BREITE_GRUPPE={technik:210, kraft:210, kletter:40};
+  // Baut die 29-Abschnitte-Wegtabelle (6.3) im Quellraum: eine gemeinsame Mittellinie fuer
+  // alle zwoelf Laeufer, analytisch abgetastete Viertelboegen (12 Stuetzpunkte, wie die
+  // Skizzenrechnung), Geraden direkt (keine Subsamplung noetig, s. Design-Dokument 7.2).
+  // Haengt nur an fester Geometrie (kein Seed, keine W/H-Abhaengigkeit, da Quellraum) --
+  // wird deshalb nur einmal gebaut (s. baueHyroxStationen()).
+  function baueHyroxWeg(){
+    const pts=[]; const roh=[]; // roh: {art,gruppe,station,lauf,i0} waehrend des Bauens
+    const push=(x,y)=>{ const p={x,y};
+      if(!pts.length||Math.hypot(p.x-pts[pts.length-1].x,p.y-pts[pts.length-1].y)>1e-6)pts.push(p); };
+    // Viertelbogen um (cx,cy), Radius 110, von Winkel a0 nach a1 (Grad) -- 12 Stuetzpunkte,
+    // wie die Skizzenrechnung des Design-Dokuments.
+    const arc=(cx,cy,a0,a1)=>{ const n=12;
+      for(let k=1;k<=n;k++){ const a=(a0+(a1-a0)*k/n)*Math.PI/180;
+        push(cx+Math.cos(a)*110, cy+Math.sin(a)*110); } };
+    // Eine volle Laufrunde (6.2): von x=1430 unten (OUT) im Uhrzeigersinn (Bildschirm-y
+    // nach unten, also optisch gegen den Uhrzeigersinn, wie die Pfeile der Szene) bis
+    // x=790 unten (IN). Laenge 3711 Quellpixel (nachgemessen, s. Design-Dokument 6.2).
+    const runde=()=>{ push(1495,840); arc(1495,730,90,0); push(1605,210); arc(1495,210,0,-90);
+      push(185,100); arc(185,210,-90,-180); push(75,730); arc(185,730,180,90); push(790,840); };
+    const abschnitte=[];
+    const teil=(art,gruppe,station,lauf,fn)=>{ const i0=pts.length-1; fn();
+      abschnitte.push({art,gruppe,station,lauf,i0,i1:pts.length-1}); };
+    push(1430,840);                                                          // Start
+    teil("lauf",null,-1,1, runde);                                           // 1  Lauf 1
+    teil("rox","technik",-1,0, ()=>{ push(790,770); push(790,700); });       // 2  IN-Bogen
+    teil("rox","technik",-1,0, ()=>{ push(760,632); push(725,632); });       // 3
+    teil("zone","technik",-1,0, ()=>{ push(645,632); });                     // 4
+    teil("arbeit","technik",0,0, ()=>{ push(595,632); });                    // 5  Huerde
+    teil("zone","technik",-1,0, ()=>{ push(460,632); });                     // 6
+    teil("arbeit","technik",1,0, ()=>{ push(380,632); });                    // 7  Balken
+    teil("zone","technik",-1,0, ()=>{ push(205,632); });                     // 8
+    teil("rox","technik",-1,0, ()=>{ push(150,600); push(150,470); push(240,460);
+      push(1500,460); push(1515,520); push(1515,640); push(1430,700); });    // 9
+    teil("rox","technik",-1,0, ()=>{ push(1430,770); push(1430,840); });     // 10 OUT-Bogen
+    teil("lauf",null,-1,2, runde);                                           // 11 Lauf 2
+    teil("rox","kletter",-1,0, ()=>{ push(790,770); push(790,700); push(830,682); }); // 12 IN
+    teil("zone","kletter",-1,0, ()=>{ push(990,682); });                     // 13
+    teil("arbeit","kletter",2,0, ()=>{ push(1030,682); });                   // 14 Palisade
+    teil("zone","kletter",-1,0, ()=>{ push(1230,682); });                    // 15
+    teil("arbeit","kletter",3,0, ()=>{ push(1290,682); });                   // 16 Seil
+    teil("zone","kletter",-1,0, ()=>{ push(1460,682); });                    // 17
+    teil("rox","kletter",-1,0, ()=>{ push(1500,690); push(1430,700);
+      push(1430,770); push(1430,840); });                                    // 18 OUT
+    teil("lauf",null,-1,3, runde);                                           // 19 Lauf 3
+    teil("rox","kraft",-1,0, ()=>{ push(790,770); push(790,700); push(790,460); push(190,460);
+      push(150,420); push(150,300); push(215,300); });                       // 20 IN
+    teil("zone","kraft",-1,0, ()=>{ push(250,300); });                       // 21
+    teil("arbeit","kraft",4,0, ()=>{ push(330,300); });                      // 22 Wassergraben
+    teil("zone","kraft",-1,0, ()=>{ push(360,300); });                       // 23
+    teil("arbeit","kraft",5,0, ()=>{ push(420,300); });                      // 24 Mauer
+    teil("zone","kraft",-1,0, ()=>{ push(450,300); });                       // 25
+    teil("arbeit","kraft",6,0, ()=>{ push(530,300); });                      // 26 Strohballen
+    teil("zone","kraft",-1,0, ()=>{ push(565,300); });                       // 27
+    teil("rox","kraft",-1,0, ()=>{ push(625,300); push(625,445); push(700,460); push(1500,460);
+      push(1515,520); push(1515,640); push(1430,700); push(1430,770); push(1430,840); }); // 28 OUT
+    teil("lauf",null,0,0, ()=>{ push(1495,840); arc(1495,730,90,0); push(1605,450); }); // 29 Schluss
+    const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
+    const len=cum[cum.length-1];
+    for(const a of abschnitte){ a.s0=cum[a.i0]/len; a.s1=cum[a.i1]/len; a.laenge=cum[a.i1]-cum[a.i0]; delete a.i0; delete a.i1; }
+    return {pts, cum, len, abschnitte};
+  }
+  function hallenXY(s){ return tabelleXY(HYROX_WEG,s); }
+  // Abschnittsindex zu einer Bogenlaengen-Position s (0..1) -- eigene, von hyroxZustand()
+  // UNABHAENGIGE Suche (die liest u.hyroxPlan/rennT, hier geht es rein um die GEOMETRIE bei
+  // einem gegebenen s, das auch von einer anderen Figur/einem anderen Zeitpunkt stammen kann).
+  function hyroxAbschnittBeiS(A,s){
+    let lo=0,hi=A.length-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(A[m].s0<=s)lo=m; else hi=m; }
+    return (hi<A.length&&A[hi].s0<=s)?hi:lo;
+  }
+  const hyroxBreiteWert=(a)=>a.art==="lauf"?HYROX_BREITE_ART.lauf:(a.art==="rox"?HYROX_BREITE_ART.rox:(HYROX_BREITE_GRUPPE[a.gruppe]||HYROX_BREITE_ART.lauf));
+  // Breite quer zur Laufrichtung bei Bogenlaengen-Position s, ueber die ersten 60 Quellpixel
+  // des neuen Abschnitts linear zur vorigen Breite uebergeblendet (6.4), damit niemand springt.
+  function hyroxBreite(s){
+    const A=HYROX_WEG.abschnitte, j=hyroxAbschnittBeiS(A,s), a=A[j], w1=hyroxBreiteWert(a);
+    if(j===0)return w1;
+    const distIn=(s-a.s0)*HYROX_WEG.len;
+    if(distIn>=60)return w1;
+    return hyroxBreiteWert(A[j-1])+(w1-hyroxBreiteWert(A[j-1]))*(distIn/60);
+  }
+
+  function baueHyroxStationen(){
+    const art=BA(), pos=art.hindernisse||[], bilder=art.hindernisBilder||[], namen=art.hindernisNamen||[];
+    HYROX_STATIONEN=pos.map((p,i)=>({pos:p, bild:bilder[i]||null, name:namen[i]||("Station "+(i+1)),
+      gruppe:HYROX_GRUPPE_JE_STATION[i%HYROX_GRUPPE_JE_STATION.length]}));
+    // NAHKAMERA NEU AUFSETZEN (Nahkamera-PR, 08.11.): wie jedes andere Hyrox-Feld hier, nicht
+    // erst in kameraUpdate() -- sonst erbt ein zweites Rennen den Schnitt-Zeitpunkt/die Station
+    // des vorigen (s. Kommentar an der Deklaration oben).
+    hyroxCamStationIdx=-1; hyroxCamNaechsterSchnitt=0; hyroxCamGruppe=null;
+    for(const u of LAEUFER){
+      const score=hyroxScore(u);
+      u.hyroxZeit=Math.max(HYROX_MIN_SEK, HYROX_BASIS_SEK_AKTUELL.wert-HYROX_SKALA_SEK_AKTUELL.wert*score);
+      u.hyroxStationIdx=-1;   // kosmetisch: welche Station zuletzt eine Arbeits-Pose ausgeloest hat
+      u.hyroxGruppe=null;     // kosmetisch: TECHNIK/KLETTERN/KRAFT dieser Station, s. stepSpurtHyrox
+    }
+    // HALLENRUNDE (Stufe 2, Design-Dokument 7.3): dieselbe Feststellung wie bei
+    // HYROX_WEG_BAHN -- keine Seed-Abhaengigkeit, also nur einmal gebaut.
+    if(!HYROX_WEG)HYROX_WEG=baueHyroxWeg();
+    // FAHRPLAN JE LAEUFER (s. Block oben): `BA().hindernisse` ist eine feste Konstante (kein
+    // Seed), die 1-D-Wegtabelle wird deshalb nur einmal gebaut. KEIN rr()-Aufruf hier.
+    if(!HYROX_WEG_BAHN)HYROX_WEG_BAHN=baueHyroxWegBahn();
+    for(const u of LAEUFER)u.hyroxPlan=hyroxFahrplan(u);
+    hyroxCamZiel=null;
+    // KAMERA AUF DIE HALLE SETZEN (7.3): `bauSpurt()` setzt `cam={zoom:1,cx:0.5}`, BEVOR
+    // dieser Format-Hook laeuft (s. dortiger Kommentar) -- diese Zeile steht also richtig
+    // dahinter. Totale auf den Start, damit das erste Bild nicht mitten in der Halle zoomt.
+    if(istHyroxHalle()){ const p=hallenXY(0); camR={x:p.x*HALLE_S, y:p.y*HALLE_S}; cam.zoom=1.6; }
+  }
+  function stepSpurtHyrox(dt){
+    if(done)return;
+    rennT+=dt;
+    for(const u of LAEUFER){
+      if(u.stolper>0)u.stolper-=dt;
+      if(u.fertig!=null)continue;
+      const z=u.hyroxZeit||HYROX_BASIS_SEK_AKTUELL.wert;
+      const vorher=u.pos||0;
+      // KOSMETISCHER FORTSCHRITT (reine Anzeige -- schreibt nur `u.pos`/`u.bahn`/`u.stolper`,
+      // nie rr()/wert()/u.hyroxZeit, dasselbe Prinzip wie die Positions-Animation der Hatz).
+      // `u.pos` bleibt EXAKT `rennT/z` -- die Wertungsgroesse (Abschnitt 9 des Design-
+      // Dokuments). Gezeichnet wird seit dem Fahrplan aus `hyroxZustand(u).s`, nicht mehr
+      // hier.
+      u.pos=Math.max(0,Math.min(0.99, rennT/z));
+      u.bahn=u.bahnZ;
+      // ARBEITS-POSE AN JEDER STATION, ALTE FASSUNG (nur Rueckfall ohne Fahrplan, sollte nie
+      // vorkommen -- baueHyroxStationen() setzt u.hyroxPlan immer): beim Ueberschreiten
+      // einer Stationsmarke kurz eine zur Gruppe passende Pose zeigen. Die Stationspositionen
+      // beziehen sich auf `u.pos`, das nach dem Fahrplan nicht mehr die gezeichnete Position
+      // ist -- liefe diese Schleife trotzdem, kaemen Geister-Posen an falscher Stelle
+      // (Design-Dokument 7.4). Die Felder sind rein kosmetisch, keine Wertung liest sie.
+      if(!u.hyroxPlan){
+        for(let i=0;i<HYROX_STATIONEN.length;i++){
+          const st=HYROX_STATIONEN[i];
+          if(vorher<st.pos&&u.pos>=st.pos){ u.stolper=Math.max(u.stolper||0,0.4); u.hyroxStationIdx=i; u.hyroxGruppe=st.gruppe; }
+        }
+      }
+      if(rennT>=z){ u.pos=1; u.fertig=z; rennFertig.push(u); }
+    }
+    if(rennFertig.length>=LAEUFER.length)done=true;
+    // KAMERA-TICK (Nahkamera-PR, 08.11.): `stepSpurt()`s gemeinsamer Nachlauf ruft
+    // `kameraUpdate(dt)` erst NACH der Hatz/Hyrox-Weiche auf (`if(bahnHyroxAktiv){
+    // stepSpurtHyrox(dt); return; }`, s. dort) -- ein Hyrox-Rennen erreichte diesen Aufruf also
+    // nie, `cam` blieb die ganze Zeit auf ihrem Startwert {zoom:1,cx:0.5} stehen (nachgemessen:
+    // derselbe Leerlauf gilt schon fuer die Hatz, s. docs/design/spurt-hyrox-nahkamera-08-11.md
+    // Abschnitt 1 -- dort bewusst NICHT mitbehoben, der Auftrag gilt nur Hyrox). Hier statt dort
+    // behoben, NUR fuer Hyrox: `stepSpurt()`s eigener Aufruf bleibt unangetastet (Klassisch
+    // unveraendert), `stepSpurtHatz()` bekommt keinen eigenen Aufruf (Hatz bleibt exakt wie
+    // heute, auch mit ihrer eigenen Kamera-Luecke -- s. Auftrag: "Klassisch/Hatz bleiben exakt
+    // wie heute"). Reine Anzeige, kein rr()-Aufruf, kein Einfluss auf u.pos/wert()/rho.
+    kameraUpdate(dt);
+  }
+  // STATIONS-UEBERLAGERUNG (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset fuer die Schilder: die sieben Sprites zeichnet
+  // `zeichneBoden()` bereits (Batch 15 Kulissen-Rework); diese Funktion ergaenzt nur ein
+  // kleines Gruppen-Schild ueber jeder Station, damit sichtbar ist, dass TECHNIK/KLETTERN/KRAFT
+  // jetzt echte Checks sind, nicht nur ein Bild.
+  const HYROX_GRUPPEN_LABEL={technik:"TECHNIK", kletter:"KLETTERN", kraft:"KRAFT"};
+  const HYROX_GRUPPEN_FARBE={technik:"rgba(69,176,201,0.85)", kletter:"rgba(242,160,61,0.85)", kraft:"rgba(199,68,68,0.9)"};
+  // VIER KAMERA-/UEBERLAGERUNGS-ZIELE DER HALLE (Stufe 2, Design-Dokument 8.2, Tabelle):
+  // feste Kaesten in Quellpixeln -- dieselben, die kameraUpdate()s Hallenzweig fuer den
+  // Stationsschnitt benutzt (s. dort), hier zusaetzlich fuer die Zonenschilder.
+  const HYROX_ZONEN={
+    technik:{x0:160,y0:505,x1:740,y1:755, label:"TECHNIK · HÜRDE/BALKEN"},
+    kletter:{x0:835,y0:480,x1:1500,y1:705, label:"KLETTERN · PALISADE/SEIL"},
+    kraft:{x0:140,y0:180,x1:630,y1:420, label:"KRAFT · GRABEN/MAUER/BALLEN"},
+  };
+  function zeichneHyroxUeberlagerung(){
+    if(!HYROX_STATIONEN||!HYROX_STATIONEN.length)return;
+    if(istHyroxHalle()){
+      // EIN SCHILD JE ZONE (nicht je Station, 7.8) -- Weltkoordinaten ueber der Zonenmitte,
+      // dieselbe Farbe/derselbe Text wie die alte Bahn-Fassung.
+      //
+      // KOLLISION MIT DER RANGLEISTE VERMEIDEN (Bildbeleg-Pruefung dieser PR): die Rangleiste
+      // steht FEST am rechten Bildrand (zeichneHyroxRangleiste(), x0=W-BREITE-10), waehrend
+      // ein Zonenschild in WELTKOORDINATEN schwimmt -- je nach Kameraausschnitt kann ein
+      // Schild rechnerisch genau dort landen. Ein Schild, dessen Kasten die Rangleiste
+      // ueberlappt, bleibt deshalb ungezeichnet (sie erscheint wieder, sobald die Kamera
+      // weiterzieht); die grosszuegige Flaeche deckt die Rangleiste bei 12 Zeilen sicher ab.
+      const RL_X0=W-186, RL_Y0=36, RL_Y1=270;
+      ctx.save();
+      ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
+      for(const g of ["technik","kletter","kraft"]){
+        const b=HYROX_ZONEN[g], p=weltZuSchirm(((b.x0+b.x1)/2)*HALLE_S, b.y0*HALLE_S);
+        const y=p.y-16;
+        if(p.x+32>=RL_X0&&y-14<RL_Y1&&y+2>RL_Y0)continue;
+        ctx.fillStyle=HYROX_GRUPPEN_FARBE[g];
+        ctx.fillRect(p.x-32,y-14,64,16);
+        ctx.fillStyle="#fff"; ctx.fillText(HYROX_GRUPPEN_LABEL[g], p.x, y-2);
+      }
+      // AB ZOOM 1,6x ZUSAETZLICH DER STATIONSNAME klein ueber jedem Sprite (eine Gasse
+      // genuegt, 7.8) -- liest dieselben Quellpixel-Mitten wie bodenHyroxHalle().
+      if(cam.zoom>=1.6){
+        const namen=[{x:620,y:548,n:"HÜRDE"},{x:420,y:548,n:"BALKEN"},
+          {x:1010,y:700,n:"PALISADE"},{x:1260,y:700,n:"SEIL"},
+          {x:290,y:218,n:"WASSERGRABEN"},{x:390,y:218,n:"MAUER"},{x:490,y:218,n:"STROHBALLEN"}];
+        ctx.font="600 9px sans-serif"; ctx.fillStyle="#e6e0d2";
+        for(const s of namen){ const p=weltZuSchirm(s.x*HALLE_S,(s.y-20)*HALLE_S); ctx.fillText(s.n,p.x,p.y); }
+      }
+      ctx.restore();
+      zeichneHyroxRangleiste();
+      return;
+    }
+    ctx.save();
+    ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
+    for(const st of HYROX_STATIONEN){
+      const x=camX(st.pos), y=bahnY(0)-34;
+      ctx.fillStyle=HYROX_GRUPPEN_FARBE[st.gruppe]||"rgba(120,120,120,0.85)";
+      ctx.fillRect(x-28,y-14,56,16);
+      ctx.fillStyle="#fff";
+      ctx.fillText(HYROX_GRUPPEN_LABEL[st.gruppe]||"", x, y-2);
+    }
+    ctx.restore();
+    zeichneHyroxRangleiste();
+  }
+  // RANGLEISTE (Nahkamera-PR, 08.11., Entscheidung 3 im kameraUpdate()-Kommentar oben): die
+  // Nahkamera zeigt immer nur einen Stationsausschnitt -- ohne diese Leiste wuesste der
+  // Zuschauer nicht mehr, wer insgesamt fuehrt, waehrend neun der zwoelf Laeufer gerade
+  // ausserhalb des Bildes unterwegs sind. Dasselbe Bedarfsmuster wie die Roster-Leiste der
+  // Zeitfahren-Einzelkamera (`#ttroster`/`renderZeitfahrenPanel`, verlinkt vom Auftrag als
+  // bestehendes Muster) -- hier als Canvas-Zeichnung statt DOM-Panel: die Bahn fuehrt fuer
+  // Spurt kein eigenes DOM-Overlay (anders als Zeitfahren/Staffel mit `#ttfokus`/`#bahnHud`),
+  // ein drittes DOM-Panel nur fuer dieses eine Format haette mehr Flaechen angefasst
+  // (battle-mode.html/.css) als diese eine Zeichenfunktion.
+  //
+  // SPOILERFREI SEIT DEM FAHRPLAN (Design-Dokument 7.8, behebt Befund 2.2): `bahnRangliste()`
+  // sortiert Unfertige nach `u.pos` (~1/Zielzeit) -- mit konstantem Tempo durch alle
+  // Stationen stand die Rangfolge damit praktisch ab dem ersten Tick fest, die Leiste zeigte
+  // vom Start an den Endstand. MIT aktivem Fahrplan sortiert diese Funktion selbst: Fertige
+  // nach `u.fertig` aufsteigend (wie bahnRangliste()), Unfertige nach tatsaechlicher
+  // STRECKENPOSITION (`hyroxZustand(u).s` absteigend) -- `bahnRangliste()` selbst bleibt
+  // unangetastet (Wertung/rho/Pp unberuehrt), sie wird hier nur nicht mehr als Anzeigequelle
+  // benutzt. Ohne Fahrplan (Rueckfall) bleibt die alte Quelle.
+  function zeichneHyroxRangleiste(){
+    const hat=!!(LAEUFER[0]&&LAEUFER[0].hyroxPlan);
+    const rang=hat
+      ? [...LAEUFER].sort((a,b)=>{
+          if((a.fertig!=null)!==(b.fertig!=null))return a.fertig!=null?-1:1;
+          if(a.fertig!=null)return a.fertig-b.fertig;
+          return hyroxZustand(b).s-hyroxZustand(a).s;
+        })
+      : bahnRangliste().reihe;
+    if(!rang.length)return;
+    const halle=istHyroxHalle();
+    const st=hyroxCamStationIdx>=0?HYROX_STATIONEN[hyroxCamStationIdx]:null;
+    const ZEILE=15.5, OBEN=58, BREITE=halle?166:142;
+    const x0=W-BREITE-10;
+    ctx.save();
+    ctx.fillStyle="rgba(15,15,20,.62)";
+    ctx.fillRect(x0,OBEN-18,BREITE,18+rang.length*ZEILE+4);
+    ctx.font="bold 10px sans-serif"; ctx.textAlign="left"; ctx.fillStyle="#fff";
+    // KOPFZEILE: welche Zone/Station die Nahkamera gerade zeigt -- sagt dem Zuschauer, WARUM
+    // der Ausschnitt gerade hier ist, bevor er in der Leiste nach dem Gesamtstand sucht.
+    const kopf=halle
+      ? (hyroxCamZiel==="strecke"?"STRECKE":(HYROX_ZONEN[hyroxCamZiel]?.label||"HYROX"))
+      : (st?(st.name.toUpperCase()+" · "+(HYROX_GRUPPEN_LABEL[st.gruppe]||"")):"STATIONEN");
+    ctx.fillText(kopf, x0+6, OBEN-5);
+    ctx.font="10px sans-serif";
+    // STATUSSPALTE (Halle, 7.8, im Stil der echten HYROX-Grafik "Run 3"/"Station 3"):
+    // L1/L2/L3 auf Laufabschnitten, ZIEL auf dem Schlussstueck, TECH/KLET/KRAFT in Roxzone/
+    // Zone/Arbeit der jeweiligen Gruppe, ✓ bei Fertigen -- bei laufenden Runden die einzige
+    // verlaessliche Auskunft darueber, wer wie weit ist (bei echtem HYROX ist das genauso).
+    const statusKurz={technik:"TECH", kletter:"KLET", kraft:"KRAFT"};
+    const statusVon=(u)=>{
+      if(u.fertig!=null)return "✓";
+      if(!halle||!u.hyroxPlan)return "";
+      const z=hyroxZustand(u);
+      if(z.art==="lauf")return z.lauf>=1&&z.lauf<=3?"L"+z.lauf:"ZIEL";
+      return statusKurz[z.gruppe]||"";
+    };
+    rang.forEach((u,i)=>{
+      const y=OBEN+i*ZEILE;
+      // IM BILD: derselbe Fenstertest wie kameraUpdate() fuer die Kamera-Spanne selbst (s.
+      // hyroxCamGruppe-Kommentar dort) -- wer gerade zu sehen ist, bekommt eine helle Zeile,
+      // der Rest bleibt gedimmt lesbar statt zu verschwinden.
+      const imBild=st && u.fertig==null && hyroxCamGruppe && hyroxCamGruppe.has(u.id);
+      if(imBild){ ctx.fillStyle="rgba(255,255,255,.16)"; ctx.fillRect(x0+2,y-11,BREITE-4,ZEILE-1); }
+      ctx.fillStyle=u.fertig!=null?"rgba(140,220,150,.9)":(imBild?"#fff":"rgba(220,220,230,.62)");
+      const platz=(i+1)+". ";
+      const name=u.n.length>(halle?11:14)?u.n.slice(0,(halle?10:13))+"…":u.n;
+      ctx.fillText(platz+name, x0+6, y);
+      ctx.textAlign="right";
+      if(halle)ctx.fillText(statusVon(u), x0+BREITE-7, y);
+      else if(u.fertig!=null)ctx.fillText("✓", x0+BREITE-7, y);
+      ctx.textAlign="left";
+    });
+    ctx.restore();
+  }
+
+  function stepSpurt(dt){
+    if(done)return;
+    if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
+    if(bahnHyroxAktiv){ stepSpurtHyrox(dt); return; }
+    rennT+=dt;
+    // S-N5b: Stationsduelle buchen (reine Buchhaltung neben dem Laeufer, s. stationsDuellSchritt).
+    stationsDuellSchritt();
     // BROADCAST-HUD: Verlaufspuffer je Seite mitschreiben (nur push, s. Deklaration
     // an fortschrittVerlauf oben). Push-only bei echtem Fortschritt haelt den
     // Puffer klein und monoton in `p`, genau was staffelZeitDelta fuer die
@@ -49846,10 +51939,35 @@
         // darunter.
         u.vizHuerdeTon=false; u.vizRissTon=false; u.vizZielTon=false; u.vizHuerde=0;
       }
-      // WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL — derselbe Gedanke wie
-      // stepZeitfahrens Startrampe, hier an `u.huerde>0` statt an `u.startT` gegated.
-      const faehrt=u.fertig==null && !(u.huerde>0);
-      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
+      // BUGFIX (Chris' Meldung, Screenshot "Von vorn"/Nahili-Ke: "sie hat beim rennen
+      // teilweise immer die stand animation noch mit drin"): die Zeile stand bis hierher
+      // als `const faehrt=u.fertig==null && !(u.huerde>0); if(faehrt)u.vizSchritt+=...` —
+      // "WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL, derselbe Gedanke wie
+      // stepZeitfahrens Startrampe". Das stimmte, SOLANGE `u.huerde>0` auch wirklich
+      // `u.v===0` bedeutete. Seit dem "Kriechen"-Paket (spurtSaeule.kriechen, per Default
+      // AN, s. `let spurtSaeule={aktiv:true,...,kriechen:true}` oben und Chris' Freigabe
+      // 04.10.) ist das nicht mehr so: tempoVon() multipliziert waehrend `u.huerde>0` mit
+      // `(u.kriechK||0)` statt mit 0 (Spurt: `kriechAnteil:0.25`, s. BAHN_ART.spurt) — der
+      // Laeufer KRIECHT mit 25% Tempo weiter vorwaerts, steht also nicht mehr wirklich.
+      // Nachgemessen (Playwright, echtes Spurt-Rennen): `u.pos` ruckelt an jeder der sieben
+      // Huerden-Stationen sichtbar weiter (v ~25% statt 0), waehrend `u.vizSchritt` hier
+      // exakt einfriert (gemessen: 20 Frames in Folge exakt derselbe Wert) — die Figur
+      // gleitet die ganze Stationsdauer (`huerdePreis`, hier 1,45s) im eingefrorenen
+      // Gehbild voran: genau die "Stand-Animation mitten im Rennen", die Chris sah, und das
+      // an JEDER der sieben Stationen, nicht nur bei einem echten Sturz (den zeigt ohnehin
+      // schon `u.down` -> "hurt"/"tod", unabhaengig von dieser Zeile).
+      //
+      // FIX: derselbe Lesezugriff wie bei stepParcours/stepClimbing (`u.v`, das tempoVon()
+      // bereits korrekt auf die Kriech-Geschwindigkeit herunterskaliert hat) OHNE die
+      // zusaetzliche `!(u.huerde>0)`-Bremse — ist `u.v` durch das Kriechen klein, aber
+      // nicht 0, laeuft die Schrittphase proportional langsam mit statt stillzustehen; ist
+      // `u.v` (z. B. ohne das Kriechen-Paket, QA-Schalter aus) wirklich 0, bleibt die
+      // Schrittphase trotzdem von selbst stehen (0*dt=0) — bit-identisch zum alten
+      // Verhalten fuer genau den Fall, fuer den es gedacht war. Reine Praesentation: liest
+      // nur `u.v`/`u.fertig`, schreibt ausschliesslich `u.vizSchritt` (dasselbe Feld wie
+      // vorher), kein rr(), keine Ruecklesung durch tempoVon()/MOTOREN.spurt.wert() —
+      // derselbe Vertrag wie der Rest dieser Funktion.
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
       // ---- HUERDEN-TON (TON_KATALOG.spurt.huerde), an der KANTE `u.huerde>0`: feuert nur
       // beim EINTRITT in den Hindernis-Stopp, nicht in jedem Frame, waehrend er anhaelt.
       const huerdeAktiv=u.huerde>0;
@@ -49899,6 +52017,13 @@
   }
   function zeichneSpurt(){
     zeichneBoden();
+    // DIE HATZ (s. BAHN_FLAGS/stepSpurtHatz): nur die zusaetzliche Bedrohungs-Zeichnung,
+    // ohne `bahnHatzAktiv` ist das ein No-Op -- die Figuren selbst zeichnet der Rest dieser
+    // Funktion unveraendert (u.raus/u.pos tragen die Hatz-Information schon, s. dort).
+    if(bahnHatzAktiv)zeichneHatzUeberlagerung();
+    // HYROX-STATIONEN (s. BAHN_FLAGS/stepSpurtHyrox): No-Op ausserhalb des Formats,
+    // dasselbe Muster wie der Hatz-Zweig direkt darueber.
+    if(bahnHyroxAktiv)zeichneHyroxUeberlagerung();
     // TEAM-FEIER STAFFEL (Konzept 3.3): Teamfarben einmal je Frame (Befund B5). Nur Staffel --
     // jede andere Bahn zeichnet ohne Feier-Publikum und bleibt Zeichen fuer Zeichen wie vorher.
     const staffelFeier=!!BA().staffel;
@@ -49907,11 +52032,11 @@
     // den, der weiter oben steht — dieselbe Tiefenstaffelung wie im Feldspiel. Auf der
     // geraden Bahn gibt es nichts zu staffeln (jede Spur hat ihre eigene Zeile), dort
     // bleibt die Reihenfolge unveraendert.
-    const reihe=istRoute()?[...LAEUFER].sort((a,b)=>laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
+    const reihe=(istRoute()||istHyroxHalle())?[...LAEUFER].sort((a,b)=>laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
     // Die Figur waechst mit der Kamera, damit sie auf einer bei 3,4x 190 px breiten Route
     // nicht als 32-px-Sprite verloren geht. Bei Zoom 1 ist sie so gross wie bisher.
     // Name, Plan und Sterne bleiben im Bildschirmraum, skalieren also NICHT mit.
-    const sk0=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
+    const sk0=istHyroxHalle()?Math.min(1.35,0.75+0.15*cam.zoom):(istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1);
     // ETIKETTEN-KOLLISIONSVERMEIDUNG (Broadcast-Audit Runde 2, Punkt 14, 30.09.): dasselbe
     // Muster wie Phase 5 im Kampf (draw()s labelPositionen/labelVersatz, s. dortiger
     // Kommentar) -- hier fuer die Bahn uebernommen, wo es bislang GAR KEINE Kollisions-
@@ -49989,7 +52114,15 @@
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
       // vier Richtungen und braucht dafuer nur vx/vy — hier die Tangente, auf 4 skaliert
       // (die Schwelle |vy|>2 in blickAus verlangt einen Betrag ueber 2).
-      const tg=istRoute()&&u.stolper<=0?routeXY(u.pos):null;
+      // HYROX-FAHRPLAN (Design-Dokument 7.6): `hyroxZ` ist der einmal je Figur gelesene
+      // Fahrplan-Zustand (Bogenlaengen-Anteil `s`, Abschnittsart/-gruppe, Arbeitsfortschritt
+      // `prog`) -- `null` fuer jede andere Bahn (u.hyroxPlan ist dort undefined).
+      const hyroxZ=(bahnHyroxAktiv&&u.hyroxPlan)?hyroxZustand(u):null;
+      // HALLE: Tangente aus hallenXY(z.s), ungeachtet u.stolper -- in der Halle "schaut die
+      // Figur zur Station, die Pose uebernimmt die Bewegung" (Design-Dokument 7.6), die
+      // alte u.stolper<=0-Schwelle der Route gilt hier nicht (u.stolper wird mit aktivem
+      // Fahrplan ohnehin nie mehr gesetzt, s. stepSpurtHyrox()).
+      const tg=(istHyroxHalle()&&hyroxZ)?hallenXY(hyroxZ.s):(istRoute()&&u.stolper<=0?routeXY(u.pos):null);
       // WAND: KLETTERT NACH OBEN STATT NACH RECHTS ZU LAUFEN (Climbing-Neubau PR 1, 24.09.).
       // blickAus() kennt bereits eine "nach oben"-Richtung (vy<0, Rueckenansicht/LPC-Norden,
       // s. dortiger Kommentar) -- genau das Bild eines Kletterers, der der Wand zugewandt
@@ -50031,6 +52164,28 @@
       // zeichneSprite()-Aufruf direkt darunter, damit Band und Laeufer nie auseinanderlaufen.
       const parcRicht=parcTakeshi
         ? blickAus({vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)),vy:tg?tg.ty*4:0,side:u.seite}) : 0;
+      // HYROX-ARBEITSPOSE (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md
+      // Abschnitt 2, ersetzt die erste Fassung "immer dieselbe liegende Stolper-Pose" aus
+      // PR #1368): `u.hyroxGruppe`/`u.stolper` sind rein kosmetische Felder, die ausschliesslich
+      // stepSpurtHyrox() an der Stationsmarke setzt (s. dort) -- diese Zeichnung liest sie nur.
+      // `hyroxProg` laeuft 0..1 ueber genau dasselbe 0,4-s-Fenster, das `u.stolper` schon vorher
+      // fuer die alte Pose mass (keine neue Zeitgroesse). `hyroxLunge` faellt von 0,2 auf 0 (statt
+      // umgekehrt), weil zeichneSprite()/zeichnePixelFigur() `u.lunge` genau so lesen (Ausfall-
+      // schritt-Windup zu -Treffer, s. dortige Formel `(1-u.lunge/0.2)*n`) -- derselbe bestehende
+      // Kanal liefert damit fuer ALLE DREI Gruppen eine vorwaerts laufende Ausfallschritt-/
+      // "angriff"-Pose (Baukasten: ani="slash", s. dortiger `u.lunge>0`-Zweig; PixelLab-Figuren:
+      // "angriff", s. istAngriff in zeichnePixelFigur), OHNE dass diese Funktion selbst zwischen
+      // Baukasten und PixelLab unterscheiden muesste -- "bestehende Animationsart nutzen, bevor
+      // man neu generiert" (Auftrag), hier durch Wiederverwendung des Lunge-Kanals.
+      // FAHRPLAN-PR (Design-Dokument 7.6): mit aktivem Fahrplan (`hyroxZ`) entscheidet
+      // `hyroxZustand(u).art==="arbeit"` ueber die Arbeitspose -- `u.stolper` wird seit dem
+      // Fahrplan von stepSpurtHyrox() nicht mehr gesetzt (die alte Stationsschleife ist
+      // uebersprungen, s. dort), und `prog` laeuft SCHLEIFEND ueber die ganze Stationsdauer
+      // statt ueber ein einzelnes 0,4-s-Fenster. Ohne Fahrplan (sollte nie vorkommen) bleibt
+      // die alte Fassung als Rueckfall.
+      const hyroxAktivPose=hyroxZ?(hyroxZ.art==="arbeit"?hyroxZ.gruppe:null):((bahnHyroxAktiv&&u.stolper>0)?u.hyroxGruppe:null);
+      const hyroxProg=hyroxZ?hyroxZ.prog:(hyroxAktivPose?Math.max(0,Math.min(1,1-(u.stolper||0)/0.4)):0);
+      const hyroxLunge=hyroxAktivPose?Math.max(0.001,(1-hyroxProg)*0.2):0;
       // Sprite-Argumentobjekt in einer Variablen (statt inline wie zuvor), weil das
       // Startnummernband unten DIESELBE Z-Formel braucht, die zeichneSprite() intern fuer
       // GENAU dieses Objekt berechnet (Review-Fund 12.09.: ohne sie driftete das Band 5-10px
@@ -50049,8 +52204,21 @@
         vizAniPhase:u.vizSchritt,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
-        // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben. Max() mit `hyroxLunge`, nicht
+        // Summe: beide sind unabhaengige Ausloeser fuer dieselbe Pose, sollen sich aber nicht
+        // gegenseitig verstaerken, falls sie je zusammenfielen.
+        // S-N5b: dieselbe Pose auch im Stationsduell (stationsDuellStoss, rein kosmetisch).
+        // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3):
+        // `down`/`vizSturz` bleiben ausserhalb von Hyrox wie bisher (laesst zeichnePixelFigur()
+        // beim Abrutschen/Stolpern die treffer- statt die tod-Animation zeigen). INNERHALB von
+        // Hyrox bleiben beide false (DOWN NUR AUSSERHALB VON HYROX, s. Kommentar oben) -- sonst
+        // wuerde u.stolper>0 (hier der Arbeitspose-Zeitgeber, kein echter Sturz) ueber `vizSturz`
+        // denselben istUnten-Zweig ausloesen und die HYROX-Arbeitspose (hyroxGid) nie erreichen.
+        lunge:Math.max((u.lungeVis>0||stationsDuellStoss(u))?0.15:0,hyroxLunge),
+        down:bahnHyroxAktiv?false:(u.stolper>0),
+        vizSturz:bahnHyroxAktiv?false:(u.stolper>0),
+        hyroxPose:hyroxAktivPose, hyroxProg,
+        hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
@@ -50070,13 +52238,27 @@
       // Muster (PR #948, zwei Zeilen darueber) gebaut: eine kleine Sprunghoehe (nach oben
       // verschoben) plus eine minimal gestreckte Silhouette waehrend des Huerdensprungs --
       // "leicht", nicht eine neue Silhouette, wie schon bei zfTilt/zfHaltung.
-      const huerdeAusschlag=BA().spurt?(u.vizHuerde||0):0;
+      // HYROX TECHNIK-STATION (Nahkamera-PR, 08.11.): reiner Zeichen-Zuschlag auf exakt dieselbe
+      // Sprunghoehe/-Streckung wie die bestehende Huerdenflug-Pose direkt darueber -- ein
+      // Sinusbogen ueber `hyroxProg` (0..1, s. Kommentar an der Deklaration oben) statt der
+      // ausklingenden Exponentialkurve von `u.vizHuerde`, weil hier kein echter Huerdenkontakt
+      // dahintersteht, den `stepHuerden()` ausloest, sondern ein rein kosmetisches Zeitfenster.
+      // Fuer Baukasten-Figuren OHNE eigene PixelLab-Animation ist das die sichtbare Differenz
+      // zur KLETTERN-/KRAFT-Pose (beide nutzen stattdessen `u.lunge`/`hyroxKraftHaltung`, s.u.).
+      const hyroxTechnikHop=(hyroxAktivPose==="technik")?Math.sin(Math.PI*hyroxProg):0;
+      const huerdeAusschlag=BA().spurt?Math.max(u.vizHuerde||0,hyroxTechnikHop):0;
       const huerdeHop=huerdeAusschlag*6*sk0;
       const huerdeHaltung=1-huerdeAusschlag*0.06;
+      // HYROX KRAFT-STATION: eine kurze Stauchung (statt Streckung) waehrend des Schiebens/
+      // Tragens -- dieselbe Sinusbogen-Form wie der Technik-Hop oben, nur als Skalierungs-
+      // Multiplikator statt als Versatz, damit die Figur sichtbar in die Knie geht statt zu
+      // hopsen. Nur fuer Baukasten-Figuren sichtbar (PixelLab-Figuren tragen ihre eigene oder
+      // die generische "angriff"-Pose, s. zeichnePixelFigur/HYROX_PIXEL_ART oben).
+      const hyroxKraftHaltung=(hyroxAktivPose==="kraft")?(1-0.16*Math.sin(Math.PI*hyroxProg)):1;
       // feierDy (Team-Feier Staffel, s. `feierFigur` oben): Bildschirm-Pixel VOR der Skalierung,
       // der Fussschatten oben bleibt am Boden -- genau das macht den Sprung lesbar.
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop+feierDy); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
-      ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung*hyroxKraftHaltung); ctx.translate(-x,-(y+16));
       // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
       // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
       // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
@@ -50365,7 +52547,7 @@
       // TT-2: HOT SEAT statt "Platz n" (Abschnitt 2.3) -- "ein Schild 'HOT SEAT' und seine
       // Zeit". `hotSeat` (oben, dieselbe Bedingung wie beim Podest) gilt exklusiv Time-
       // Trial; jede andere Bahn bleibt bei ihrer alten "Platz n"-Zeile.
-      if(u.fertig!=null&&!istRoute()){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
+      if(u.fertig!=null&&!istRoute()&&!istHyroxHalle()){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
         :"Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
         // DEUTSCHES KOMMA (s. Kommentar am Burgpunkte-Etikett oben, dasselbe Muster hier
         // am Zieleinlauf-Etikett).
@@ -50375,32 +52557,91 @@
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
-    // S-N5 STATIONSDUELL-TAFEL (Spurt, Klasse A, nur mit QA-Schalter `spurtSaeule`): stehen
-    // ein Heim- und ein Gastlaeufer gleichzeitig an DERSELBEN Station (innerhalb 0,03
-    // Strecke), zeigt eine kleine Tafel beider Rest-Stationszeiten als Balken — "wer kommt
-    // zuerst los?", der Positionskampf, der sonst unsichtbar im Hindernis passiert. Liest nur
-    // u.huerde/u.stationDauer/u.stationIdx, schreibt nichts.
-    if(BA().spurt && spurtSaeule.aktiv && !istRoute()){
-      const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0);
-      let paar=null;
-      for(const a of an){ if(a.seite!==0)continue;
-        const b=an.find(o=>o.seite===1&&o.stationIdx===a.stationIdx&&Math.abs(o.pos-a.pos)<0.03);
-        if(b){ paar=[a,b]; break; } }
-      if(paar){
-        const sx=camX(BA().hindernisse[paar[0].stationIdx]);
-        const sy=Math.min(bahnY(paar[0].bahnZ),bahnY(paar[1].bahnZ))-58;
-        const name=(BA().hindernisNamen||[])[paar[0].stationIdx]||("STATION "+(paar[0].stationIdx+1));
-        ctx.save(); ctx.globalAlpha=0.92;
-        ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(sx-62,sy-12,124,38);
-        ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
-        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+name,sx,sy-3);
-        paar.forEach((o,k)=>{
-          const rest=Math.max(0,Math.min(1,o.huerde/o.stationDauer)), yy=sy+5+k*11;
-          ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(sx-20,yy,76,6);
-          ctx.fillStyle=o.seite===0?"#f2a03d":"#45b0c9"; ctx.fillRect(sx-20,yy,76*rest,6);
-          ctx.textAlign="right"; ctx.font="600 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
-          ctx.fillStyle="#dfe4ee"; ctx.fillText(o.n.slice(0,9),sx-23,yy+6);
-        });
+    // S-N5b STATIONSDUELL-TAFEL MIT SIEGER (Chris 10.11.: "hier steht immer was von duellen, die
+    // sieht man aber gar nicht"). `spurtSaeule.aktiv` ist der STANDARD (true), die Tafel laeuft
+    // also live. Vorher: zwei unabhaengige Rest-Stationsbalken ohne Ausgang. Jetzt EIN
+    // Tauzieh-Balken (Heim links/orange, Gast rechts/blau), dessen Zeiger sich ueber die
+    // Duelldauer zum Vorne-Liegenden schiebt (stationsDuellZug), dazu der entscheidende Skill der
+    // Station; nach dem Ausgang ein Aufblitzen am Sieger und "NAME GEWINNT DAS DUELL" fuer
+    // STATIONSDUELL_ANZEIGE_S Sekunden. Liest nur, schreibt nichts (s. stationsDuellSchritt).
+    // HALLENRUNDE (Nahkamera/Hallenrunde-PRs): die Tafel haengt an festen 1-D-Stationspositionen
+    // (`BA().hindernisse`/`camX()`) -- in der HYROX-Halle (`istHyroxHalle()`) stehen die Stationen
+    // in eigenen 2-D-Zonen, dieselbe Formel wuerde an der falschen Stelle zeichnen. Deshalb hier
+    // ausgesetzt wie schon die S-N5-Vorgaengertafel (`!istHyroxHalle()`); die Hallenrunde zeigt den
+    // Stationsstand ueber ihre eigene Rangleiste/Ueberlagerung (zeichneHyroxUeberlagerung()).
+    if(BA().spurt && spurtSaeule.aktiv && !istRoute() && !istHyroxHalle()){
+      const SKILLWORT={TECHNIK:"TECHNIK",WENDIGKEIT:"WENDIGKEIT",WUCHT:"WUCHT"};
+      const namen=BA().hindernisNamen||[];
+      const stName=i=>namen[i]||("STATION "+(i+1));
+      const schrift=(g,px)=>g+" "+px+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      const farbe=s=>s===0?"#f2a03d":"#45b0c9";
+      // ORT DER TAFEL: frueher 58 px UEBER der hoeheren der beiden Bahnen -- bei den oberen
+      // Bahnen lag sie damit unter der Anzeigetafel (nachgemessen im Standbild). Jetzt rechts
+      // neben der Station (dort ist die Bahn frei, beide stehen ja an der Station), auf halber
+      // Hoehe zwischen den beiden Duellanten und in die Spielflaeche geklemmt; zwei duenne
+      // Linien in Teamfarbe zeigen, WER gegen wen ringt.
+      const tafelOrt=(st,a,b)=>({
+        sx:Math.max(80,Math.min(W-80,camX(BA().hindernisse[st])+96)),
+        sy:Math.max(72,Math.min(H-40,(bahnY(a.bahnZ)+bahnY(b.bahnZ))/2-8))});
+      const verbinde=(sx,sy,o)=>{ const p=laeuferXY(o);
+        ctx.strokeStyle=farbe(o.seite); ctx.lineWidth=1.2; ctx.globalAlpha=0.55;
+        ctx.beginPath(); ctx.moveTo(p.x+6,p.y-14); ctx.lineTo(sx-70,sy+7); ctx.stroke(); ctx.globalAlpha=0.94; };
+      const belegt=new Set();
+      // 1) laufende Duelle: je Station die erste Paarung
+      for(const a of LAEUFER){
+        const b=a.seite===0?stationsDuellGegner(a):null;
+        if(!b)continue;
+        const st=STATIONSDUELL.get(a).station;
+        if(belegt.has(st))continue; belegt.add(st);
+        const {sx,sy}=tafelOrt(st,a,b);
+        const zug=stationsDuellZug(a,b);            // + = Heim vorn
+        const typ=stationsDuellTyp(st);
+        ctx.save(); ctx.globalAlpha=0.94;
+        verbinde(sx,sy,a); verbinde(sx,sy,b);
+        ctx.fillStyle="rgba(8,10,14,.84)"; ctx.fillRect(sx-70,sy-13,140,40);
+        ctx.textAlign="center"; ctx.font=schrift(700,8);
+        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+stName(st)+(typ?" · "+(SKILLWORT[typ]||typ):""),sx,sy-3);
+        // Tauzieh-Balken: Mitte = offen, Zeiger wandert zum Vorne-Liegenden.
+        const bw=56, by=sy+4;
+        ctx.fillStyle="rgba(242,160,61,.22)"; ctx.fillRect(sx-bw,by,bw,7);
+        ctx.fillStyle="rgba(69,176,201,.22)"; ctx.fillRect(sx,by,bw,7);
+        const zx=sx-buehneTauziehVersatz(zug,1,bw);
+        ctx.fillStyle=zug>=0?farbe(0):farbe(1);
+        ctx.fillRect(Math.min(sx,zx),by,Math.abs(zx-sx),7);
+        ctx.fillStyle="#ffffff"; ctx.fillRect(zx-1.5,by-2,3,11);
+        ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillRect(sx-0.5,by-1,1,9);
+        ctx.font=schrift(600,7.5);
+        ctx.textAlign="left"; ctx.fillStyle=zug>0.05?farbe(0):"#dfe4ee"; ctx.fillText(a.n.slice(0,11),sx-bw,by+18);
+        ctx.textAlign="right"; ctx.fillStyle=zug<-0.05?farbe(1):"#dfe4ee"; ctx.fillText(b.n.slice(0,11),sx+bw,by+18);
+        ctx.restore();
+      }
+      // 2) frisch entschiedene Duelle: Aufblitzen am Sieger + Siegerzeile
+      const gezeigt=new Set();
+      for(const u of LAEUFER){
+        const z=STATIONSDUELL.get(u); const e=z&&z.letzter;
+        if(!e||e.sieger!==u||gezeigt.has(e.station)||belegt.has(e.station))continue;
+        const da=rennT-e.t; if(da<0||da>STATIONSDUELL_ANZEIGE_S)continue;
+        gezeigt.add(e.station);
+        const p=laeuferXY(u), {sx,sy}=tafelOrt(e.station,e.sieger,e.verlierer);
+        const aus=Math.max(0,Math.min(1,(STATIONSDUELL_ANZEIGE_S-da)/0.4));
+        ctx.save();
+        if(da<0.4){
+          const k=da/0.4;
+          ctx.globalAlpha=1-k; ctx.strokeStyle=farbe(u.seite); ctx.lineWidth=3;
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,10+26*k,0,Math.PI*2); ctx.stroke();
+          ctx.fillStyle="rgba(255,255,255,"+(0.55*(1-k)).toFixed(3)+")";
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,9*(1-k)+3,0,Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha=aus;
+        const z1=u.n.toUpperCase()+" GEWINNT DAS DUELL", z2=stName(e.station)+" · gegen "+e.verlierer.n+" · +Duell-PP";
+        ctx.font=schrift(700,9.5); const w1=ctx.measureText(z1).width;
+        ctx.font=schrift(600,7.5); const w2=ctx.measureText(z2).width;
+        const bw=Math.max(w1,w2)/2+8;
+        ctx.fillStyle="rgba(8,10,14,.86)"; ctx.fillRect(sx-bw,sy-13,bw*2,30);
+        ctx.fillStyle=farbe(u.seite); ctx.fillRect(sx-bw,sy-13,3,30);
+        ctx.textAlign="center";
+        ctx.font=schrift(700,9.5); ctx.fillStyle=farbe(u.seite); ctx.fillText(z1,sx,sy);
+        ctx.font=schrift(600,7.5); ctx.fillStyle="#dfe4ee"; ctx.fillText(z2,sx,sy+11);
         ctx.restore();
       }
     }
@@ -50628,8 +52869,13 @@
       // die der Ticker fuer den Fuehrungswechsel schon fuehrt (bahnHotSeatId/
       // bahnFuehrenderId, s. updateHudBahn G-1), hier nur zusaetzlich sichtbar.
       const leaderId=A.startAbstand?bahnHotSeatId:bahnFuehrenderId;
+      // HYROX-FAHRPLAN (Design-Dokument 7.8): mit aktivem Fahrplan sitzen die Laeuferpunkte
+      // bei `hyroxZustand(u).s`, nicht bei `u.pos` -- sonst zeigte das Band (wie die
+      // Rangleiste) vom Start an den Endstand (Abschnitt 2.2). Jede andere Bahn liest
+      // weiterhin `u.pos` unveraendert.
+      const hyroxFahrplanAktiv=bahnHyroxAktiv&&LAEUFER[0]&&LAEUFER[0].hyroxPlan;
       for(const u of LAEUFER){
-        const x=bandX(Math.min(1,Math.max(0,u.pos)));
+        const x=bandX(Math.min(1,Math.max(0,hyroxFahrplanAktiv?hyroxZustand(u).s:u.pos)));
         // AUSGESCHIEDEN BLEIBT ALS GRAUES ✗ AN SEINER STELLE STEHEN (Abschnitt 7: "so sieht
         // man auch im Band, WO das Feld zerlegt wurde") -- exklusiv Takeshi, jede andere
         // Bahn kennt kein `u.raus`.
@@ -51978,6 +54224,65 @@
     if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
   }
 
+  // ANZEIGE-TREUE-FIX A1 (09.11., docs/design/sendedauer-messung-09-11.md Abschnitt 2,
+  // Auftrag "Anzeige-Treue-Fix"). ROOT CAUSE, nachgewiesen fuer Spurt/Takeshi's Castle/
+  // Staffel/Climbing: `stepSim()` rief fuer die Bahn `stepSpurt((1/60)/zeitFaktor())` auf --
+  // JEDES Bild bekam einen KLEINEREN dt (die Physik lief in kleineren Haeppchen), waehrend
+  // der Buchungspfad (bahnLauf()/MOTOREN[bd].lauf()/bahnPodLauf() -- "M.lauf()") IMMER mit
+  // festem `stepSpurt(1/60)` rechnet, unabhaengig von zeitFaktor(). stepSpurt() wuerfelt pro
+  // TICK (nicht pro Sim-Sekunde) an mindestens zwei Stellen mit einer auf `dt` skalierten
+  // Wahrscheinlichkeit -- Bahnwechsel/Windschatten-Wechsel (`rr()<(0.25+...)* dt*3`, s.
+  // dortiger Kommentar "WECHSELPATZER") und Tackle/Rempler (`rr()<willTackeln*dt*...`, nur
+  // Spurt/Takeshi). Ein kleinerer dt bei GLEICHER Sim-Zeit bedeutet MEHR Ticks bis zum Ziel
+  // und damit MEHR rr()-Ziehungen an exakt diesen beiden Stellen als die Buchung macht --
+  // die Zufallsfolge divergiert dadurch schon nach dem ersten Bahnwechsel-Check, selbst bei
+  // identischer Saat (nachgemessen: Spurt/Takeshi 24/24 Saaten weichen ab, s. Dokument).
+  // Time-Trial blieb fast immun, weil `BA().schatten=false`, ALLE Time-Trial-Plaene
+  // `sucht:0` fuehren UND `hindernisse:[]` ist -- `wunsch` im Bahnwechsel-Block bleibt
+  // dadurch STRUKTURELL immer null (kein Windschatten-Ziel, kein `gefallen`-Nachbar, kein
+  // `tackle`), der dt-skalierte rr()-Wurf also toter Code. GENAU DAS macht dieser Fix fuer
+  // ALLE FUENF Bahn-Disziplinen zur Regel, statt es dem Zufall zu ueberlassen: die Physik
+  // laeuft jetzt fuer `istBahn(disc)` IMMER mit dem FESTEN `1/60`-Takt wie die Buchung
+  // (gleich viele, gleich geformte Ticks -> dieselbe rr()-Folge, dieselbe Saat -> dasselbe
+  // Ergebnis), und NUR noch die ZEICHENHAEUFIGKEIT (wie oft dieser Takt in Echtzeit feuert)
+  // wird weiter von zeitFaktor() gestreckt -- Weg (a) aus der Auftragsbeschreibung, nicht
+  // Weg (b) ("am Ende an die Buchung ranziehen"): (a) aendert nichts am GEBUCHTEN Ergebnis
+  // und zeigt waehrend des ganzen Rennens konsistente Zwischenstaende, waehrend (b) einen
+  // ploetzlichen Sprung in der letzten Phase brauchen wuerde, der selbst wie ein Bug wirkt.
+  // Jede andere Bahn-Disziplin-Eigenschaft (Rezept, Matrix, MOTOREN[bd].wert()) bleibt
+  // unangetastet -- s. Fingerabdruck-Beleg in der PR-Beschreibung.
+  //
+  // `tickerSendeT`/`ticksSeitReset` zaehlen WEITERHIN reale Sechzigstelsekunden (eine
+  // Erhoehung je Aufruf dieser Funktion), NICHT stepSim()-Aufrufe -- sonst waere das
+  // Ticker-Zeilenbudget (s. Kommentar an TICKER_ZEILEN_JE_MIN oben, "tickerSendeT waechst um
+  // GENAU 1/60 je stepSim()-Aufruf") fuer die Bahn plötzlich `zeitFaktor()`-mal so langsam
+  // gefuettert, nur weil `stepSim()` jetzt seltener feuert -- ein eigener, hier bewusst
+  // vermiedener Darstellungsfehler. `bahnSimAcc` (s. Deklaration bei `acc` oben) ist der
+  // GETRENNTE Akkumulator, der stattdessen entscheidet, wann die Physik tatsaechlich einen
+  // Schritt macht.
+  function anzeigeSechzigstel(zf){
+    tickerSendeT+=1/60; ticksSeitReset++;
+    // B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs, 24 Saaten je Disziplin):
+    // `istKampf(disc)` UND `istFeldspiel(disc)` ergaenzt -- TDM/Mini-DM/Battlefield (Duell)
+    // UND Hockey haben dieselbe Divergenz wie die Bahn vor A1 (24/24 Saaten abweichend je
+    // Disziplin, bei Battlefield sogar der SIEGER, s. Kommentar an der Deklaration von
+    // `bahnSimAcc` oben). Buehne (Fechten/Gewichtheben, ebenfalls ZEIT_DEHNUNG!=1) bleibt
+    // AUSSEN VOR -- dieselbe Messung ergab dort 24/24 UEBEREINSTIMMEND: `stepBuehne()`
+    // trifft seine Entscheidungen an diskreten Rundengrenzen (Zeit-Schwellenwerte), die
+    // tick-granularitaets-invariant sind, waehrend Kampf/Feldspiel kontinuierliche
+    // Positions-/Kontakt-Simulationen sind wie die Bahn (kleinerer dt -> mehr Ticks bei
+    // gleicher Sim-Zeit -> mehr/andere rr()-Ziehungen entlang des Wegs, selbst ohne einen
+    // explizit dt-skalierten Wurf wie bei stepSpurt() -- die Positionsintegration selbst
+    // (`u.x+=...*dt`) akkumuliert bei anderer Schrittzahl einen anderen Rundungs-/Kontakt-
+    // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
+    if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
+      bahnSimAcc+=1/60;
+      while(bahnSimAcc>=zf/60){ stepSim(1/60); bahnSimAcc-=zf/60; }
+    } else {
+      stepSim((1/60)/zf);
+    }
+  }
+
   let schnelldurchLetztesBild=0;
   function loop(ts){
     // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
@@ -51989,7 +54294,9 @@
     // nur ruckeln, sondern in Sendezeit LANGSAMER laufen -- unter ~20 Bildern/s fehlte jedem Bild
     // Zeit, Tempo 4x wurde gemessen zu ~1,6x (Saisontest-Fund 02.11., s. schnelldurchDomGedrosselt()).
     // 0,2 s holt bis ~5 Bilder/s voll nach und faengt einen Tab-Wechsel weiterhin ab. Die Ticks
-    // selbst bleiben fest (1/60)/zeitFaktor() -- nur ihre Zahl je Bild aendert sich, das Ergebnis nie.
+    // selbst bleiben fest -- (1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix
+    // A1 das FESTE 1/60 der Buchung fuer die Bahn (s. anzeigeSechzigstel() oben) -- nur ihre
+    // Zahl je Bild aendert sich, das Ergebnis nie.
     let dt=Math.min(.2,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
     stingerPruefen();
@@ -51998,8 +54305,11 @@
       acc+=dt*wirksamesTempo();
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
-      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
-      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;ticksSeitReset++;}
+      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest. ANZEIGE-TREUE-
+      // FIX A1 (s. anzeigeSechzigstel() oben): fuer die Bahn feuert stepSim() hier nicht
+      // mehr bei jedem Sechzigstel, sondern erst, wenn `bahnSimAcc` genug Sechzigstel
+      // gesammelt hat -- `zf` bleibt deshalb unveraendert an jeden Aufruf weitergereicht.
+      while(acc>=1/60){anzeigeSechzigstel(zf);acc-=1/60;}
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
@@ -52121,15 +54431,15 @@
       teile.push(["Slot",slotAufschlag(p,sl,dId),
         "Passung zum Profil von "+(slotDef?slotDef.label:sl)+" (+"+(slotDef?slotDef.gross:"?")+" +"+(slotDef?slotDef.klein:"?")+")."]);
     }
-    const fk=formVon(p.n);
-    if(fk)teile.push(["Form",fk,"Formkarte des Spieltags."]);
+    const fe=formEchtVon(p.n,dId), fk=fe?fe.form:formVon(p.n);
+    if(fk)teile.push(["Form",fk,fe?"Gespielte Formkarte (Einsatzliste).":"Formkarte des Spieltags."]);
     if(!istGegner){
       const tr=traitTreffer(p);
       if(tr.netto)teile.push(["Mutator",tr.netto,
         [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"+"+t)].join(", ")+
         " — +"+MUTATOR_REGEL.jeTreffer+" auf jedes Attribut je Treffer"]);
-      const iv=stufenWert();
-      if(iv)teile.push(["Intensität",iv,INTENSITAET[STUFE].label]);
+      const ivStufe=fe?fe.int:STUFE, iv=fe?INTENSITAET[fe.int].wert:stufenWert();
+      if(iv)teile.push(["Intensität",iv,INTENSITAET[ivStufe].label]);
     }
     const summe=teile.reduce((a,[,v])=>a+v,0);
     return {teile,summe};
@@ -54561,6 +56871,351 @@
   // naechsten Mini-DM-Besuch), wird aber nie von traegheitsarm()/prefers-reduced-motion
   // ueberschrieben -- diese Pruefung sitzt in renderMiniDmFfa() selbst.
   let mdffaTempo=1;
+  // ===================================================================================
+  // MINI-DM-FFA AUF DER LEINWAND (Kulissen-Integration, Chris 08.11.: "umbauen"). Bis hierher zeigte
+  // Mini-DM im Vierer-Pod nur DOM-Karten und Tabellen; die Leinwand samt Kulisse war ausgeblendet.
+  // Jetzt laeuft der Kampf als Vier-Ecken-Szene auf einer eigenen Leinwand (#mdffaCv, 1240x470) vor
+  // der Mini-DM-Kulisse (PixelLab, s. kulisseWaehlen): vier Kaempfer, eine Ecke je Team, Schlaege,
+  // Treffer, Zweckbuendnisse, Ring und K.o. Takt fuer Takt so, wie `spieleMiniDmFfaEvent()` sie
+  // GERECHNET hat. Die DOM-Karten darunter bleiben als Punktestand/Boxscore.
+  //
+  // REINE ANZEIGE: Die Buehne liest nur das fertige Ereignis (`runde.takte[].ereignisse/stand/pakt`)
+  // und wird von genau den Stellen in renderMiniDmFfa() angestossen, die auch die DOM-Karten
+  // fortschreiben. Kein rr(), kein Zugriff auf Saat, Formkarten oder Mutatoren; Uhr ist
+  // performance.now(), nicht die Spielzeit `t`. Das Zwei-Seiten-Chassis (build/draw/MOTOREN) bleibt
+  // unberuehrt -- die Begruendung im Kopfkommentar von renderMiniDmFfa() gilt weiter, die Buehne
+  // ist ein eigener, N=4-Zeichner neben ihm statt eines Umbaus darin.
+  // Deklariert HIER, vor reset() (das sie beim Verlassen von Mini-DM abbaut), aus demselben Grund
+  // wie mdffaOffenbarungsTimer oben: reset() laeuft schon beim Start.
+  const mdffaBuehne=(()=>{
+    const BW=1240, BH=470, BMID=BW/2;
+    // Ecke 1 oben, 2 rechts, 3 unten, 4 links (dieselbe Reihenfolge wie ECKEN in renderMiniDmFfa)
+    const ECK=[{x:BMID,y:178,blick:"south"},{x:BW-250,y:292,blick:"west"},{x:BMID,y:402,blick:"north"},{x:250,y:292,blick:"east"}];
+    const MITTE={x:BMID,y:290};
+    const FARBE_HELL=["#F2A03D","#45B0C9","#8FCB5C","#C58CE0"];
+    const FIG_H=86;
+    let cv=null, cx=null, z=null, raf=0;
+    const jetzt=()=>(typeof performance!=="undefined"?performance.now():Date.now())/1000;
+    const tempo=()=>Math.max(1,mdffaTempo||1);
+
+    function leinwand(){
+      if(!cv){ cv=document.getElementById("mdffaCv"); cx=cv?cv.getContext("2d"):null; }
+      return cx;
+    }
+    function laeuft(){
+      return !!(z&&cv&&cv.isConnected&&!cv.closest("[hidden]"));
+    }
+    function anstossen(){
+      if(raf||!laeuft())return;
+      const schritt=()=>{ raf=0; if(!laeuft())return; zeichne(); raf=requestAnimationFrame(schritt); };
+      raf=requestAnimationFrame(schritt);
+    }
+
+    function einlauf(eintraege,ereignis){
+      if(!leinwand())return;
+      const namen=new Set();
+      for(const r of ereignis.runden)for(const t of r.teams)namen.add(t.n);
+      for(const n of namen)pixelFigurLaden(n);
+      z={teams:eintraege.map(e=>e.name), runden:ereignis.runden.length, kaempfer:null,
+        punkte:[0,0,0,0], nachRunde:0, titel:"Vier Ecken, vier Teams — bereit", unterzeile:"Mini-DM · Free-for-All",
+        effekte:[], pakt:null, ringStufe:0, ende:null, sieger:null};
+      anstossen(); zeichne();
+    }
+    function titel(text,unter){ if(!z)return; z.titel=text; z.unterzeile=unter||""; anstossen(); }
+    function runde(r,nr,rolle){
+      if(!z)return;
+      z.kaempfer=[0,1,2,3].map(side=>{
+        const t=r.teams.find(tt=>tt.side===side);
+        return {side, n:t.n, max:t.max, hp:t.max, hpZiel:t.max, raus:false, rausT:null, rausArt:null,
+          angeschlagen:false, lunge:null, treffer:-1e9, reihum:t.gesetzt===false};
+      });
+      z.titel="Runde "+nr+" von "+z.runden; z.unterzeile=rolle; z.pakt=null; z.ringStufe=0; z.effekte=[];
+      anstossen();
+    }
+    function effekt(e){ z.effekte.push(e); }
+    function takt(r,tk){
+      if(!z||!z.kaempfer)return;
+      const t0=jetzt(), dauer=0.24/tempo();
+      const ev=(tk.ereignisse||[]).filter(e=>e.wer!=null||e.ziel!=null||e.typ==="ring");
+      const n=Math.max(1,ev.filter(e=>["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)).length);
+      let i=0;
+      for(const e of tk.ereignisse||[]){
+        const k=z.kaempfer;
+        if(["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)){
+          const ta=t0+dauer*(i++)/n;
+          k[e.wer].lunge={ziel:e.ziel, t:ta, d:Math.min(0.2,dauer*0.9)};
+          if(e.typ==="daneben"||e.typ==="leer")effekt({art:"text", side:e.ziel, t:ta+0.08, text:e.typ==="leer"?"ins Leere":"daneben", farbe:"#d8dde6"});
+          else if(e.typ==="finisher")effekt({art:"text", side:e.ziel, t:ta+0.08, text:"FINISHER", farbe:"#ffd36b", gross:true});
+          else{
+            effekt({art:"hieb", von:e.wer, side:e.ziel, t:ta+0.08, farbe:FARBE_HELL[e.wer], schwach:e.typ==="schwachstelle"});
+            effekt({art:"text", side:e.ziel, t:ta+0.08, text:"−"+Math.round(e.wucht||0)+(e.typ==="schwachstelle"?" Schwachstelle":e.typ==="zange"?" Zange":""), farbe:e.typ==="schwachstelle"?"#ffd36b":"#ff8a80"});
+            k[e.ziel].treffer=ta+0.08;
+          }
+        }else if(e.typ==="position")effekt({art:"text", side:e.wer, t:t0, text:"weicht aus", farbe:"#9fe0ff"});
+        else if(e.typ==="uebersteht")effekt({art:"text", side:e.wer, t:t0+dauer*0.6, text:"hält stand!", farbe:"#b6f0a0"});
+        else if(e.typ==="bruchpunkt")effekt({art:"text", side:e.wer, t:t0+dauer*0.7, text:"angeschlagen", farbe:"#ffb26b"});
+        else if(e.typ==="buendnis")effekt({art:"banner", t:t0, text:"Zweckbündnis gegen "+z.teams[e.gegen]});
+        else if(e.typ==="ring"){ z.ringStufe++; effekt({art:"ring", t:t0}); }
+        else if(e.typ==="ko"||e.typ==="ring-aus")effekt({art:"text", side:e.ziel, t:t0+dauer, text:e.typ==="ko"?"K.O.":"bleibt liegen", farbe:"#ff5a52", gross:true});
+      }
+      z.pakt=tk.pakt||null;
+      for(const s of tk.stand||[]){
+        const k=z.kaempfer[s.side];
+        k.hpZiel=s.stand; k.max=s.max; k.angeschlagen=!!s.angeschlagen;
+        if(s.raus&&!k.raus){
+          k.raus=true; k.rausT=t0+dauer;
+          const tm=r.teams.find(tt=>tt.side===s.side); k.rausArt=tm?tm.rausArt:null;
+        }
+      }
+      anstossen();
+    }
+    function rundenEnde(r){
+      if(!z||!z.kaempfer)return;
+      const sieger=r.teams.find(t=>t.rundenPlatz===1);
+      for(const t of r.teams){
+        const k=z.kaempfer[t.side]; k.hpZiel=t.hp; k.max=t.max;
+        if(t.down&&!k.raus){ k.raus=true; k.rausT=jetzt()-1; k.rausArt=t.rausArt; }
+      }
+      z.pakt=null;
+      if(sieger)effekt({art:"banner", t:jetzt(), text:"Rundensieg: "+sieger.n+" ("+z.teams[sieger.side]+")", lang:true});
+      anstossen();
+    }
+    function punkte(summe,nr){ if(!z)return; z.punkte=summe.slice(); z.nachRunde=nr; anstossen(); }
+    function endstand(ereignis){
+      if(!z)return;
+      const erg=ereignis.teams.slice().sort((a,b)=>a.eventPlatz-b.eventPlatz);
+      z.ende=erg; z.punkte=[0,1,2,3].map(s=>ereignis.teams.find(t=>t.side===s).rundenPunkteSumme);
+      z.titel=z.teams[erg[0].side].toUpperCase()+" GEWINNT"; z.unterzeile="Endstand · Ligapunkte 2-1-0-0";
+      z.pakt=null; z.effekte=[]; z.ringStufe=0;
+      // Zum Endstand stehen alle vier wieder auf (die Platzierung gilt fuer das Team ueber alle Runden,
+      // nicht fuer den Stand am Ende der letzten Runde).
+      if(z.kaempfer)for(const k of z.kaempfer){ k.raus=false; k.rausT=null; k.hp=k.hpZiel=k.max; k.angeschlagen=false; k.lunge=null; }
+      anstossen();
+    }
+    function abbau(){
+      z=null; if(raf){ cancelAnimationFrame(raf); raf=0; }
+      if(leinwand())cx.clearRect(0,0,BW,BH);
+    }
+
+    // ---------------------------------------------------------------- Zeichnen
+    function boden(){
+      const ka=kulisseAktiv&&kulisseAktiv.disc==="mini-dm"?kulisseAktiv:null;
+      const im=ka?kulisseBilder[ka.bild]:null;
+      if(im&&im.complete&&im.naturalWidth){
+        cx.drawImage(im,0,0,BW,BH);
+        cx.fillStyle="rgba(10,10,16,"+Math.min(0.5,(ka.dunkel||0.2)+0.1)+")"; cx.fillRect(0,0,BW,BH);
+      }else{
+        const g=cx.createRadialGradient(BMID,BH/2,40,BMID,BH/2,BW*0.6);
+        g.addColorStop(0,"#5a4a36"); g.addColorStop(1,"#241c14");
+        cx.fillStyle=g; cx.fillRect(0,0,BW,BH);
+      }
+      const v=cx.createRadialGradient(MITTE.x,MITTE.y,80,MITTE.x,MITTE.y,BW*0.6);
+      v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,"rgba(0,0,0,.5)");
+      cx.fillStyle=v; cx.fillRect(0,0,BW,BH);
+      // vier Eckplaetze: farbiger Kreis am Boden je Team
+      ECK.forEach((e,side)=>{
+        cx.save(); cx.translate(e.x,e.y); cx.scale(1,0.42);
+        cx.beginPath(); cx.arc(0,0,58,0,Math.PI*2);
+        cx.fillStyle=FARBE_HELL[side]+"33"; cx.fill();
+        cx.lineWidth=4; cx.strokeStyle=FARBE_HELL[side]+"cc"; cx.stroke();
+        cx.restore();
+      });
+      // Ring: zieht sich mit jeder Stufe zu
+      if(z.ringStufe>0){
+        const r=Math.max(150,420-z.ringStufe*55);
+        cx.save(); cx.translate(MITTE.x,MITTE.y); cx.scale(1,0.55);
+        cx.beginPath(); cx.arc(0,0,r,0,Math.PI*2); cx.setLineDash([14,10]);
+        cx.lineWidth=5; cx.strokeStyle="rgba(255,90,82,.75)"; cx.stroke();
+        cx.restore();
+      }
+    }
+    function position(k,now){
+      const e=ECK[k.side]; let x=e.x, y=e.y;
+      const l=k.lunge;
+      if(l&&now>=l.t&&now<=l.t+l.d*2){
+        const p=(now-l.t)/(l.d*2), hub=Math.sin(p*Math.PI);
+        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y, d=Math.hypot(dx,dy)||1;
+        const weg=Math.min(d*0.38,170)*hub;
+        x+=dx/d*weg; y+=dy/d*weg;
+      }else if(now<k.treffer+0.25&&now>=k.treffer)x+=Math.sin((now-k.treffer)*70)*4;
+      return {x,y};
+    }
+    function figur(k,now,p){
+      const zf=pixelFigurBereit(k.n);
+      const e=ECK[k.side];
+      const unten=k.raus&&now>=k.rausT;
+      if(!zf){
+        cx.save(); cx.translate(p.x,p.y);
+        if(unten)cx.rotate(Math.PI/2*Math.min(1,(now-k.rausT)/0.4));
+        cx.fillStyle=FARBE_HELL[k.side]; cx.beginPath(); cx.ellipse(0,-34,18,34,0,0,Math.PI*2); cx.fill();
+        cx.fillStyle="#111"; cx.font="700 14px system-ui,sans-serif"; cx.textAlign="center";
+        cx.fillText((k.n||"?").slice(0,2).toUpperCase(),0,-30); cx.restore();
+        return;
+      }
+      const fig=zf.fig;
+      const geladen=(b)=>!!(b&&b.im&&b.mass);
+      const grund=pixelGrundBild(zf);
+      const s=Math.max(0.3,Math.min(2.4,Math.min(FIG_H/grund.mass.hoehe,72/Math.max(1,grund.mass.breite))));
+      const male=(b,f,spiegeln,winkel)=>{
+        const m=b.mass;
+        cx.save(); cx.imageSmoothingEnabled=false; cx.translate(p.x,p.y);
+        if(winkel)cx.rotate(winkel);
+        if(spiegeln)cx.scale(-1,1);
+        try{ cx.drawImage(b.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+        cx.restore();
+      };
+      const l=k.lunge, imAngriff=l&&now>=l.t&&now<=l.t+l.d*2&&!unten;
+      const imTreffer=!unten&&!imAngriff&&now>=k.treffer&&now<k.treffer+0.3;
+      const art=unten?"tod":imAngriff?"angriff":imTreffer?"treffer":null;
+      // Blickrichtung: zur Mitte, beim Angriff zum Ziel
+      let blick=e.blick;
+      if(imAngriff){
+        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y;
+        blick=Math.abs(dx)>Math.abs(dy)*1.2?(dx>0?"east":"west"):(dy>0?"south":"north");
+      }
+      if(art&&fig.a[art]){
+        const def=fig.a[art];
+        const wunsch=blick==="west"?"east":blick;
+        const d=def[wunsch]?wunsch:(def.east?"east":def.south?"south":Object.keys(def)[0]);
+        const [stamm,n]=def[d];
+        const b=zf.bilder.get(stamm+"-"+d+".png");
+        if(geladen(b)){
+          let f;
+          if(art==="tod")f=Math.min(n-1,Math.floor((now-k.rausT)/0.9*n));
+          else if(art==="angriff")f=Math.min(n-1,Math.floor((now-l.t)/(l.d*2)*n));
+          else f=Math.min(n-1,Math.floor((now-k.treffer)/0.3*n));
+          male(b,Math.max(0,f),blick==="west"&&d==="east",0);
+          return;
+        }
+      }
+      let b=zf.bilder.get(blick+".png"), sp=false;
+      if(!geladen(b)&&blick==="west"&&geladen(zf.bilder.get("east.png"))){ b=zf.bilder.get("east.png"); sp=true; }
+      if(!geladen(b))b=grund;
+      const winkel=unten?(k.side===1?-1:1)*Math.PI/2*Math.min(1,(now-k.rausT)/0.5):0;
+      male(b,0,sp,winkel);
+    }
+    function schild(k,p){
+      // Oben/unten steht das Schild NEBEN der Figur (sonst laege es unter der Kopfzeile bzw. am
+      // unteren Rand), links/rechts darunter.
+      const e=ECK[k.side], seitlich=k.side===0||k.side===2, w=170;
+      const x0=seitlich?e.x+52:p.x-w/2, y=seitlich?e.y-40:e.y+22;
+      cx.save();
+      cx.fillStyle="rgba(10,12,18,.78)"; cx.fillRect(x0,y,w,34);
+      cx.fillStyle=FARBE_HELL[k.side]; cx.fillRect(x0,y,4,34);
+      cx.font="700 12px system-ui,sans-serif"; cx.textAlign="left"; cx.fillStyle="#eef1f6";
+      const name=(k.n+(k.reihum?" (Reihum)":"")).slice(0,22);
+      cx.fillText(name,x0+10,y+13);
+      cx.font="600 10px system-ui,sans-serif"; cx.fillStyle="#aab3c2";
+      cx.fillText(String(z.teams[k.side]).slice(0,26),x0+10,y+26);
+      // Stand-Balken
+      const q=Math.max(0,Math.min(1,k.hp/Math.max(1,k.max)));
+      cx.fillStyle="#2a2f3c"; cx.fillRect(x0+10,y+29,w-20,3);
+      cx.fillStyle=k.raus?"#6b7280":k.angeschlagen?"#ffb26b":FARBE_HELL[k.side]; cx.fillRect(x0+10,y+29,(w-20)*q,3);
+      cx.restore();
+    }
+    function kopf(){
+      // Titel rechts oben (die Mitte oben gehoert dem Kaempfer in Ecke 1 und seinen Einblendungen)
+      cx.save();
+      cx.textAlign="right";
+      cx.font="800 18px system-ui,sans-serif";
+      const tb=Math.max(220,cx.measureText(z.titel).width+28);
+      cx.fillStyle="rgba(10,12,18,.72)"; cx.fillRect(BW-10-tb,10,tb,46);
+      cx.fillStyle="#eef1f6"; cx.fillText(z.titel,BW-24,32);
+      cx.font="600 12px system-ui,sans-serif"; cx.fillStyle="#aab3c2"; cx.fillText(z.unterzeile||"",BW-24,49);
+      // Punkte-Tafel links oben
+      const reihe=[0,1,2,3].slice().sort((a,b)=>z.punkte[b]-z.punkte[a]||a-b);
+      cx.textAlign="left"; cx.fillStyle="rgba(10,12,18,.72)"; cx.fillRect(10,10,230,22+reihe.length*18);
+      cx.font="700 10px system-ui,sans-serif"; cx.fillStyle="#97a1b3";
+      cx.fillText(z.ende?"ENDSTAND":z.nachRunde?"PUNKTE NACH RUNDE "+z.nachRunde:"PUNKTE",18,25);
+      reihe.forEach((side,i)=>{
+        const y=43+i*18;
+        cx.fillStyle=FARBE_HELL[side]; cx.fillRect(18,y-9,8,8);
+        cx.font="700 12px system-ui,sans-serif"; cx.fillStyle="#eef1f6";
+        cx.fillText(String(z.teams[side]).slice(0,22),32,y);
+        cx.textAlign="right";
+        const erg=z.ende&&z.ende.find(t=>t.side===side);
+        cx.fillText(erg?erg.ligaPunkte+" Liga":String(z.punkte[side]),232,y);
+        cx.textAlign="left";
+      });
+      cx.restore();
+    }
+    function effekteZeichnen(now){
+      z.effekte=z.effekte.filter(e=>now<e.t+(e.lang?2.6:e.art==="banner"?1.6:0.9));
+      const stapel=[0,0,0,0];   // gleichzeitige Texte derselben Ecke uebereinander statt aufeinander
+      for(const e of z.effekte){
+        if(now<e.t)continue;
+        const a=now-e.t;
+        if(e.art==="hieb"){
+          const k=ECK[e.side], q=Math.min(1,a/0.25);
+          cx.save(); cx.globalAlpha=1-q; cx.strokeStyle=e.schwach?"#ffd36b":"#ffffff"; cx.lineWidth=4;
+          cx.beginPath(); cx.moveTo(k.x-26,k.y-FIG_H*0.75); cx.lineTo(k.x+26,k.y-FIG_H*0.25); cx.stroke();
+          cx.beginPath(); cx.arc(k.x,k.y-FIG_H*0.5,10+q*26,0,Math.PI*2); cx.strokeStyle=e.farbe; cx.lineWidth=3; cx.stroke();
+          cx.restore();
+        }else if(e.art==="text"){
+          const k=ECK[e.side], q=Math.min(1,a/0.9);
+          cx.save(); cx.globalAlpha=1-q*q; cx.textAlign="center";
+          cx.font=(e.gross?"900 26px":"800 15px")+" system-ui,sans-serif";
+          cx.lineWidth=4; cx.strokeStyle="rgba(8,10,14,.85)";
+          const y=k.y-FIG_H-6-q*26-(stapel[e.side]++)*19;
+          cx.strokeText(e.text,k.x,y); cx.fillStyle=e.farbe; cx.fillText(e.text,k.x,y);
+          cx.restore();
+        }else if(e.art==="banner"){
+          cx.save(); cx.globalAlpha=Math.min(1,a/0.15)*(1-Math.max(0,a-(e.lang?2.2:1.2))/0.4);
+          cx.textAlign="center"; cx.fillStyle="rgba(10,12,18,.8)"; cx.fillRect(BMID-260,MITTE.y-20,520,34);
+          cx.font="800 15px system-ui,sans-serif"; cx.fillStyle="#ffd36b"; cx.fillText(e.text,BMID,MITTE.y+2);
+          cx.restore();
+        }else if(e.art==="ring"){
+          cx.save(); cx.globalAlpha=Math.max(0,0.35-a*0.5); cx.fillStyle="#ff5a52"; cx.fillRect(0,0,BW,BH); cx.restore();
+        }
+      }
+    }
+    function zeichne(){
+      if(!z||!leinwand())return;
+      const now=jetzt();
+      boden();
+      if(z.kaempfer){
+        // Zweckbuendnis: gestrichelte Linie zwischen den Partnern, Zielmarke auf dem Gejagten
+        if(z.pakt){
+          const a=ECK[z.pakt.a], b=ECK[z.pakt.b], g=ECK[z.pakt.gegen];
+          cx.save(); cx.setLineDash([8,8]); cx.lineWidth=3; cx.strokeStyle="rgba(255,211,107,.8)";
+          cx.beginPath(); cx.moveTo(a.x,a.y-30); cx.lineTo(b.x,b.y-30); cx.stroke();
+          cx.setLineDash([]); cx.strokeStyle="rgba(255,90,82,.9)";
+          cx.beginPath(); cx.arc(g.x,g.y-FIG_H*0.5,FIG_H*0.62,0,Math.PI*2); cx.stroke();
+          cx.restore();
+        }
+        for(const k of z.kaempfer)k.hp+=(k.hpZiel-k.hp)*0.18;
+        const reihe=z.kaempfer.slice().sort((a,b)=>position(a,now).y-position(b,now).y);
+        for(const k of reihe){
+          const p=position(k,now);
+          cx.save(); cx.fillStyle="rgba(0,0,0,.35)"; cx.beginPath(); cx.ellipse(p.x,p.y,26,7,0,0,Math.PI*2); cx.fill(); cx.restore();
+          figur(k,now,p);
+        }
+        for(const k of z.kaempfer)schild(k,ECK[k.side]);
+      }else{
+        // Einlauf: Teamnamen in den Ecken
+        ECK.forEach((e,side)=>{
+          cx.save(); cx.textAlign="center"; cx.font="800 16px system-ui,sans-serif";
+          cx.lineWidth=4; cx.strokeStyle="rgba(8,10,14,.85)";
+          cx.strokeText(z.teams[side],e.x,e.y-20); cx.fillStyle=FARBE_HELL[side]; cx.fillText(z.teams[side],e.x,e.y-20);
+          cx.restore();
+        });
+      }
+      if(z.ende){
+        cx.save(); cx.textAlign="center";
+        z.ende.forEach((t,i)=>{
+          const e=ECK[t.side];
+          cx.font="900 22px system-ui,sans-serif"; cx.lineWidth=5; cx.strokeStyle="rgba(8,10,14,.9)";
+          const y=t.side===0?e.y+44:t.side===2?e.y-FIG_H-14:e.y-FIG_H-24;
+          cx.strokeText("#"+t.eventPlatz,e.x,y); cx.fillStyle=i===0?"#ffd36b":"#eef1f6"; cx.fillText("#"+t.eventPlatz,e.x,y);
+        });
+        cx.restore();
+      }
+      effekteZeichnen(now);
+      kopf();
+    }
+    return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau};
+  })();
+
 
   // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
   // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
@@ -54577,7 +57232,7 @@
   }
 
   function reset(){
-    running=false;done=false;last=0;acc=0;pfeile=[];
+    running=false;done=false;last=0;acc=0;bahnSimAcc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
     // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
     // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
@@ -54777,6 +57432,7 @@
     else{
       if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
       mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
+      mdffaBuehne.abbau();
     }
     // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
     // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
@@ -54898,6 +57554,12 @@
     // Datei. tonLoopStart()/-Stop() sind selbst try/catch-abgesichert (No-Op ohne
     // AudioContext bzw. vor der ersten Nutzergeste).
     if(disc==="breaking"){ if(running)tonLoopStart("breaking"); else tonLoopStop(); }
+    // TON-SCHICHT, TDM/MINI-DM/BATTLEFIELD-PUBLIKUM (Fable-Brainstorm 14.11., Punkte 2/3):
+    // derselbe Play/Pause-Rahmen wie Breaking/Basketball oben. Mini-DMs Loop waehlt die
+    // Bandmitte selbst anhand der gezogenen Kulisse (s. TON_KATALOG["mini-dm"].publikum).
+    if(disc==="tdm"){ if(running)tonLoopStart("tdm"); else tonLoopStop(); }
+    if(disc==="mini-dm"){ if(running)tonLoopStart("mini-dm"); else tonLoopStop(); }
+    if(disc==="battlefield"){ if(running)tonLoopStart("battlefield"); else tonLoopStop(); }
   }
   document.getElementById("play").addEventListener("click",()=>{
     // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
@@ -54987,7 +57649,13 @@
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   mutatorenGrundzustand();
   zieheFormkarten(20260823);
-  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
+  // BOOTSTRAP-AUFRUF VERSCHOBEN (Verdrahtung 11.11., s. Kommentar bei seiner neuen Stelle
+  // ganz am Modulende): `reset()` baut hier synchron die Standarddisziplin ("tdm", s.
+  // `let disc="tdm"` oben) -- seit TDM ueber `tdmGefecht()`/`tdmSchlagwechsel()` laeuft, braucht
+  // dieser Bau Funktionen/Konstanten (mdffaZufall, mdffaMisch, bfPodPlatzierungAus, TDM_GEFECHT
+  // u.a.), die TEXTLICH erst weiter unten im Modul stehen -- an DIESER Stelle waeren sie noch
+  // in ihrer Temporal-Dead-Zone (`let`/`const`, kein `function`). Der Aufruf selbst steht
+  // deshalb jetzt ganz am Ende der Datei, nach jeder Deklaration.
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
   // schreibgeschuetzt zum Nachmessen bereit; das Spiel liest davon nichts.
@@ -55552,7 +58220,7 @@
   function bfffaKaempfer(p,side,slotId,slotDef,idx){
     const d="battlefield";
     const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
@@ -55829,6 +58497,456 @@
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
     return {...g, platzierung:pl, lebend, anteil, teamWert};
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT — SEIT 11.11. DER ECHTE WERTUNGSPFAD (Verdrahtung, s.
+  // lib/battle/arena-headless-runner.ts "ARENA_KAMPF_DISCIPLINE_IDS" und
+  // lib/battle/arena-resolved-disciplines.ts "TDM_GEFECHT_VORLAUF_AKTIV").
+  //
+  // Chris woertlich: „Das was auf dem Feld passiert soll auch das in den Stats sein! Und
+  // das in jeder Disziplin!" TDM lief bis zu dieser Verdrahtung produktiv ueber die
+  // PPS-Duell-Bruecke (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte
+  // Zweikampf (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s.
+  // Kommentar bei ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. Dieser Block entstand
+  // 10.11. als reiner Mess-/Prototyp-Schritt (additiv, an nichts angeschlossen) und ist seit
+  // 11.11. der tatsaechliche Wertungspfad: `spieleTdmGefecht()` (s.u.) ist der Headless-
+  // Einstiegspunkt fuer die Buchung, `build()`s TDM-Zweig (s. dort, tdmReplayStarten) spielt
+  // GENAU DASSELBE Gefecht fuer die Live-Anzeige ab — "gezeigt = gebucht" durch dieselbe
+  // Berechnung auf beiden Seiten, nicht durch einen Tick-Taktabgleich (TDM braucht den
+  // Anzeige-Treue-Fix aus PR #1372/`anzeigeSechzigstel()` deshalb NICHT: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick, ruft `stepSim()`/`anzeigeSechzigstel()` nie).
+  // Nach demselben Vorbild wie bfffaGefecht() (Battlefield-Pod, 02.11., bestand rho
+  // 0,861-0,923 / Pp 4,8-20,2 bei k=2..6). Jede Zeile des urspruenglichen Prototyp-Blocks blieb
+  // additiv: kein bestehender Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen
+  // (slotAufschlag, mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert,
+  // eigHebung, eigMutator, gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus,
+  // normalisiereSaat — alle schon vorher da). Neu durch die Verdrahtung kommen NUR
+  // `spieleTdmGefecht()`, `tdmReplayStarten()`/`tdmReplaySchritt()`/`tdmReplayEreignis()` und die
+  // EINE Zeile in `stepSim()` dazu, die bei aktivem Replay frueh zurueckkehrt (s. dort) — exakt
+  // das Muster, mit dem `KP.pod.replay` dort schon Battlefield abfaengt.
+  // `node scripts/pruefe-wertung-fingerabdruck.mjs` zeigt deshalb ab dieser PR eine Aenderung
+  // NUR in den TDM-Zeilen (s. docs/design/tdm-gefecht-abnahme-10-11.md fuer die Abnahmezahlen).
+  //
+  // ANDERS ALS BATTLEFIELD: TDM ist "reines Deathmatch" (ARENA_ART.tdm-Kommentar sagt das
+  // ausdruecklich, ebenso der Kommentar bei ARENA_DOMINATION oben: "TDM und Mini-DM bleiben
+  // reines Deathmatch"), kein Kontrollpunkt-Gefecht — also kein `orte`, kein Erobern, keine
+  // Rotation. Die Rollen sind ebenfalls FEST (SLOTS_JE_DISC.tdm, sechs Stueck, unabhaengig von
+  // der Kadergroesse k — derselbe feste Pfad, den Mini-DM vor seiner Sechs-Rollen-Erweiterung
+  // hatte), nicht wie Battlefields BATTLEFIELD_SLOTS_JE_K.
+  //
+  // JEDES der neun TDM-Matrixgewichte (BASIS_JE_DISC.tdm, bit-identisch zur gesperrten Matrix
+  // — TDM hat KEINEN Eintrag in spiel-eignung-overrides.ts) bekommt einen eigenen, benannten
+  // Kanal — Budget-Methode, CLAUDE.md:
+  //   health 20         STAND: die Lebenspunkte.
+  //   power 28, torment 2  WUCHT: Schadenshoehe je Treffer (der dominante Kanal, wie die
+  //                      Matrix es vorgibt — Power ist mit Abstand das schwerste Attribut).
+  //   awareness 2        TREFFER: Chance, dass ein Schlag ueberhaupt landet.
+  //   stamina 14         AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst.
+  //   spirit 12          DECKUNG: mindert jeden erlittenen Treffer.
+  //   intelligence 6     SCHWACHSTELLE: Zielwahl trifft den angeschlagensten Gegner statt
+  //                      zufaellig.
+  //   determination 6    LETZTER ATEM: ein toedlicher Treffer laesst einmal stehen.
+  //   charisma 10        BEFEHL: eigener Wucht-Multiplikator — ein Anfuehrer schlaegt mit mehr
+  //                      Nachdruck zu (es gibt in TDM keine Eroberung, auf die Charisma sonst
+  //                      ginge, vgl. Battlefield/`erobern`).
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)`, exakt
+  // wie in bfffaKaempfer()/mdffaKaempfer(). `kappa` fuer die Grundkanaele (Stand, Wucht,
+  // Treffer, Ausdauer), `kappaWege` fuer die taktischen Kanaele (Deckung, Schwachstelle, Atem,
+  // Befehl) — dieselbe Aufteilung wie bei Battlefield.
+  const TDM_GEFECHT_GRUND=Object.freeze({
+    takte:20, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    befehl:{basis:1},
+    wertung:{ko:15, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4},
+    // ANZEIGE-TAKT (Verdrahtung 11.11., s. tdmReplaySchritt() weiter unten): reine
+    // Sekunden-pro-Takt-Vorgabe fuer die Live-Wiedergabe, beeinflusst tdmSchlagwechsel()
+    // selbst NICHT (die rechnet taktlos in diskreten Runden) -- dieselbe Rolle wie
+    // BFFFA.taktSek fuer Battlefields Replay. Additiv: kein bestehender Leser dieses Objekts
+    // (tdmGefechtEinfluss/-Sonde/-Parameter) liest `taktSek`, die schon gemessenen rho-/
+    // Pp-Zahlen bleiben deshalb unberuehrt.
+    taktSek:4
+  });
+  const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
+  let TDM_GEFECHT=tdmGefechtGrund();
+  const TDM_ZWECK={ziel:21, schwachstelle:22, treffer:23, atem:24};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie bfffaKaempfer()/mdffaKaempfer(). `idx`
+  // ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel fuer mdffaZufall).
+  function tdmKaempfer(p,side,slotId,slotDef,idx){
+    const d="tdm";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=breitPunkteVon(p,d);
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=TDM_GEFECHT, R=P.mitte||50, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["power","torment"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      befehl:klemme(P.befehl.basis+weg(H.befehl,["charisma"]),0.2,3),
+      // Laufzustand
+      raus:false, rausTakt:null, atemWeg:false, wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, schwachstellen:0}
+    };
+  }
+
+  // DAS GEFECHT. `kaempfer` sind tdmKaempfer() (Index = idx), `N` die Seitenzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente — dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Jeder Takt: Zielwahl (Schwachstelle via Intelligence, sonst
+  // gleichverteilt unter allen lebenden Gegnern JEDER anderen Seite — bei den zwei Seiten, die
+  // ein echtes TDM-Spiel hat, einfach "der Gegner"), gleichzeitige Schlaege, K.o. mit einmaligem
+  // letzten Atem (Determination), Seiten-Ausscheiden. Rueckgabe wie bfffaGefecht, ohne `orte`.
+  function tdmSchlagwechsel(kaempfer,saat,N){
+    const P=TDM_GEFECHT, Z=TDM_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const lebendeSeiten=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    const schnapp=()=>({k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeSeiten().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ZIELWAHL, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus)continue;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach});
+      }
+      // 2) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit)
+      // mindert, Befehl (Charisma) hebt den eigenen Schlag, Schwachstelle gibt Bonus.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel,schwach}=x;
+        A.st.schlaege++;
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx}); continue; }
+        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, wucht:Math.round(dmg*10)/10});
+      }
+      // 3) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; ereignisse.push({typ:"atem", wer:k.idx}); continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; punkte[bester.side]++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx});
+      }
+      // 4) AUSSCHEIDEN: eine Seite ohne Stehende ist raus.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t; ereignisse.push({typ:"seite-raus", side:s});
+      }
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      takte.push({t, ereignisse, ...schnapp()});
+    }
+    if(ende==="zeit"&&lebendeSeiten().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte — sonst kostete ein schneller Sieg
+    // den Sieger genau die Taktpunkte, die er sich erkaempft hat (dieselbe Regel wie bfffaGefecht).
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // DIE OEFFENTLICHE FUNKTION AUS DER AUFGABE: `tdmGefecht(seiten, saat, jeSeite)`. `seiten` ist
+  // eine Liste von Spielerlisten (ArenaSpieler[], je Seite ein Kader — im echten Spiel immer
+  // zwei, s. Kopfkommentar), `saat` die Kampfsaat, `jeSeite` (optional) die Kadergroesse k
+  // (steuert nur, wie viele der sechs festen Rollen SLOTS_JE_DISC.tdm vergeben werden — ohne
+  // Angabe die Rosterlaenge der ersten Seite). Baut die Kaempfer (liest FORMKARTE/MUTATOREN/
+  // ATTR_HEBUNG wie jede andere Gefecht-Bau-Funktion dieses Motors — dieselben Eingaben liefern
+  // dasselbe Ergebnis) und entscheidet das Gefecht in einem Schritt. Rueckgabe im selben Format
+  // wie bfPodLauf()s "gefecht"-Zweig (ohne die Battlefield-eigenen Felder besitz/erob/amOrt/
+  // wechsel/besucht, die TDM nicht hat), damit Mess-Sonden sie identisch lesen koennen.
+  function tdmGefecht(seiten,saat,jeSeite){
+    const N=seiten.length;
+    if(N<2)throw new Error("tdmGefecht: braucht mindestens zwei Seiten, bekam "+N+".");
+    const k=jeSeite||seiten[0].length||ARENA_ART.tdm.jeSeite;
+    const rollen=slotsVon("tdm").slice(0,Math.max(1,Math.min(6,Math.round(k))));
+    const saatN=normalisiereSaat(saat);
+    let idx=0;
+    const kaempfer=[];
+    seiten.forEach((team,side)=>{
+      team.forEach((p,i)=>{
+        const slotId=rollen[i%rollen.length].id;
+        kaempfer.push(tdmKaempfer(p,side,slotId,SLOTVON[slotId],idx++));
+      });
+    });
+    const g=tdmSchlagwechsel(kaempfer,saatN,N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s&&!x.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s).reduce((a,x)=>a+x.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt,teamWert);
+    const summe=kaempfer.reduce((a,x)=>a+Math.max(0,x.wert),0)||1;
+    return {disziplin:"tdm", saat:saatN, format:"gefecht", ende:g.ende, takte:g.gespielt,
+      teams:Array.from({length:N},(_,s)=>({side:s, punkte:+g.punkte[s].toFixed(1),
+        lebend:pl.lebend[s], rausT:pl.rausT[s], eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s],
+        wertung:+teamWert[s].toFixed(3)})),
+      kaempfer:kaempfer.map(x=>({n:x.n, side:x.side, slot:x.slot, eig:x.eigOhneMutator,
+        wert:+(Math.max(0,x.wert)/summe*100).toFixed(3), roh:+x.wert.toFixed(3), ko:x.st.kos, down:!!x.raus})),
+      gefecht:g};
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie battlefieldPodSonde(): `kader` Liste von Team-Kadern,
+  // `opt.gruppen` Liste von ZWEIERGRUPPEN (Indizes in `kader` — TDM ist zwei Seiten, nicht vier),
+  // `opt.n` Kaempfe je Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k. Gemessen wird `eig` OHNE
+  // Mutator gegen `wert` (Anteil am Gesamtbeitrag) — exakt die Groessen von disziplinProbe().
+  function tdmGefechtSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          FORMKARTE={};
+          mdffaFormkartenFuer(teams,(20260823+versatz+gi*7919+i*104729)>>>0);
+          MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+            :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          const r=tdmGefecht(teams,saat,o.jeSeite);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.takte, ende:r.ende, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"tdm", format:"gefecht", events};
+  }
+
+  // PP-ABNAHME (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon()/
+  // battlefieldPodEinfluss(), aber mit SQUAD/OPP direkt als die zwei TDM-Seiten — TDM braucht,
+  // anders als Battlefields Vier-Team-Pod, keine Zusatzteams, weil es schon im echten Spiel nur
+  // zwei Seiten hat.
+  function tdmGefechtEinfluss(n,plus,saatVersatz,mutatorModus,jeSeite){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(teams,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel((20260823+versatz+i*15485863)>>>0);
+      else if(modus==="aus")MUTATOREN=[];
+      return tdmGefecht(teams,1337+versatz+i*7919,jeSeite);
+    };
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.tdm||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,kk)=>acc+Math.abs((reihen.find(r=>r.attribut===kk)||{anteil:0}).anteil-(W[kk]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"tdm", format:"gefecht", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.tdm.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // MESS-SONDE fuer die Kalibrierung (wie battlefieldPodParameter/miniDmFfaParameter): `neu` wird
+  // tief in den Grundwert TDM_GEFECHT_GRUND gemischt, null/undefined setzt zurueck. Ruft im
+  // Spielbetrieb niemand (TDM ist nicht an diese Funktionen angeschlossen) — nur die Mess-/
+  // Kalibrierskripte dieses Prototyps.
+  function tdmGefechtParameter(neu){
+    const misch=(a,b)=>{ for(const k2 in b){ if(b[k2]&&typeof b[k2]==="object"&&!Array.isArray(b[k2])&&a[k2]&&typeof a[k2]==="object")misch(a[k2],b[k2]); else a[k2]=b[k2]; } return a; };
+    TDM_GEFECHT=neu?misch(tdmGefechtGrund(),JSON.parse(JSON.stringify(neu))):tdmGefechtGrund();
+    return JSON.parse(JSON.stringify(TDM_GEFECHT));
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT-VERDRAHTUNG (11.11.): `spieleTdmGefecht()` ist jetzt der Headless-
+  // Einstiegspunkt fuer die Buchung (s. lib/battle/arena-headless-runner.ts,
+  // "ARENA_KAMPF_DISCIPLINE_IDS"), `tdmReplay*` spielt dasselbe Gefecht fuer die Live-Anzeige
+  // ab (build()s TDM-Zweig, s. dort) -- nach demselben Muster wie Battlefields "DAS REPLAY"
+  // weiter unten, aber ohne Orte/Eroberung/Rotation (TDM ist reines Deathmatch, kein
+  // Kontrollpunkt-Gefecht) und ohne Respawn (tdmSchlagwechsel() kennt keinen, anders als der
+  // alte Echtzeit-Zweikampf -- `schalteAus()`s TDM-Zweig (disc==="tdm", oben) bleibt deshalb
+  // fuer das neue Gefecht ABSICHTLICH ungenutzt: er plant einen Respawn (`downBis`), den es
+  // im neuen Protokoll nicht mehr gibt, und seine Ticker-Zeile ("faellt — zurueck in Xs")
+  // waere hier schlicht falsch. s. tdmReplayKo() unten fuer die eigene, respawnfreie
+  // Buchfuehrung.
+  //
+  // "GEZEIGT = GEBUCHT" ENTSTEHT HIER NICHT UEBER EINEN TICK-TAKTABGLEICH (anders als der
+  // Anzeige-Treue-Fix PR #1372/`anzeigeSechzigstel()` fuer die kontinuierliche Bahn-/Kampf-/
+  // Feldspiel-Physik), SONDERN UEBER DIESELBE BERECHNUNG AUF BEIDEN SEITEN: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick (reines Takt-Protokoll, kein `stepSim()`-Aufruf
+  // in `tdmSchlagwechsel()`), Headless und Live-Anzeige rufen sie mit DERSELBEN Saat und
+  // DENSELBEN zwei Seiten (`tdmDuellRoster()`, EINE Implementierung fuer beide) -- `stepSim()`
+  // tickt fuer TDM danach nur noch den FERTIGEN Ablauf ab (`tdmReplaySchritt`), wuerfelt
+  // nichts mehr. `anzeigeSechzigstel()` braucht deshalb KEINE eigene TDM-Gefecht-Behandlung
+  // (nachgesehen, nicht angenommen): ihr `istKampf(disc)`-Zweig greift nur, solange
+  // `stepSim()` den alten kontinuierlichen Pfad erreicht -- der Replay-Abfang gleich am Kopf
+  // von `stepSim()` (s. dort) kehrt fuer TDM vorher zurueck.
+
+  // DIESELBE ROLLENAUSWAHL WIE build()s TDM-Zweig, hier als eigene Funktion, damit Headless-
+  // Buchung (spieleTdmGefecht) und Live-Anzeige (build()) garantiert dieselben zwei Seiten
+  // sehen — "gezeigt = gebucht" entsteht aus DIESER einen Implementierung, nicht aus zwei
+  // Kopien, die auseinanderlaufen koennten. SQUAD/OPP/place sind globale, aus
+  // `window.__olyArenaKader` gefuellte Singletons (s. "BRUECKE ZUR ECHTEN APP"), deshalb ohne
+  // `disc`-Abhaengigkeit aufrufbar.
+  function tdmDuellRoster(){
+    const d="tdm", n=jeSeiteVon(d);
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    return {mine,gegner,n};
+  }
+
+  // HEADLESS-EINSTIEGSPUNKT, exakt im Format von `spieleFeldspiel()`/`spieleBuehneDuell()`
+  // (s. arena-headless-runner.ts, "ARENA_KAMPF_DISCIPLINE_IDS"): EIN Aufruf, EIN fertiges
+  // Ergebnis, unabhaengig von der aktuell gezeigten `disc`. `seiten`/`boxscore` tragen
+  // dieselben Groessen, die `computeIndividualBoxscorePpsFromFixtureResults()`/
+  // `runBattleModeArenaMatchday()` (battle-mode-arena-team-points.ts) fuer jede andere
+  // resolved Disziplin schon lesen.
+  function spieleTdmGefecht(fd,saat){
+    if(fd!=="tdm")return null;
+    const {mine,gegner,n}=tdmDuellRoster();
+    if(!mine.length||!gegner.length)return null;
+    const g=tdmGefecht([mine,gegner],saat,n);
+    return {disziplin:fd, seiten:[g.teams[0].punkte,g.teams[1].punkte],
+      boxscore:g.kaempfer.map(k=>({name:k.n, wert:k.wert}))};
+  }
+
+  // ANMARSCH (Sekunden): keine "Orte", zu denen gelaufen wird (anders als Battlefields
+  // BF_REPLAY_ANMARSCH=6) -- nur eine kurze Pause, bevor der erste Takt faellt.
+  const TDM_REPLAY_ANMARSCH=3;
+  // `null` ausserhalb TDM oder vor dem ersten `tdmReplayStarten()`-Aufruf.
+  let tdmReplay=null;
+
+  // build()s TDM-Zweig ruft dies NACH dem Bau von U (s. dort) -- `g` ist dasselbe Objekt, das
+  // `tdmGefecht()` zurueckgibt; `g.gefecht.takte` ist das fertige Takt-Protokoll aus
+  // `tdmSchlagwechsel()`. `taktSek` kommt aus `TDM_GEFECHT` (additiv ergaenzt, s.
+  // TDM_GEFECHT_GRUND oben) -- reiner Anzeige-Takt, beeinflusst `tdmGefecht()` selbst nicht.
+  function tdmReplayStarten(g){
+    tdmReplay={g, erledigt:new Set(), ende:TDM_REPLAY_ANMARSCH+g.gefecht.gespielt*TDM_GEFECHT.taktSek};
+  }
+  const tdmReplayAktiv=()=>disc==="tdm"&&!!tdmReplay;
+
+  // EIN KO OHNE RESPAWN (s. Kopfkommentar oben): schlanke eigene Buchfuehrung statt
+  // `schalteAus()`. `still`: nur die Zahlen nachziehen (Endstand-Aufholen beim Replay-Ende),
+  // ohne Ticker-Zeile/Highlight-Drosselung anzufassen.
+  function tdmReplayKo(tg,von,still){
+    tg.st.tode++;
+    if(von){ von.st.ko++; verteileKo(tg,von); }
+    tg.down=true;
+    if(still)return;
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+    // ANDERS ALS schalteAus()s `disc!=="tdm"`-Ausschluss: im neuen, respawnfreien Protokoll
+    // IST "Seite ohne Stehende" ein echter, endgueltiger Zustand (nicht mehr ein Zufallsbild
+    // zwischen zwei Respawns) -- "entscheidend" gilt deshalb hier bewusst auch fuer TDM.
+    const entscheidend=live(tg.side).length===0;
+    const big=kampfGrossDrosseln(ersteAusschaltung||entscheidend, ersteAusschaltung||entscheidend);
+    const kind=kampfKoKind(entscheidend,false,false,ersteAusschaltung);
+    feed(tg.side,tg.n+" fällt.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von?von.n:undefined,"ereignis");
+  }
+
+  // EIN TAKT-EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN — dieselbe Bauart wie
+  // `bfPodReplayEreignis()`, ohne Orte/Eroberung (TDM hat beides nicht). `still`: nur den
+  // Endzustand nachziehen (Zahlen, ohne Spur/Schwebeschrift/Feed-Zeile).
+  function tdmReplayEreignis(e,still){
+    const U_=(i)=>i!=null?U[i]:null;
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const d=e.wucht||0;
+        Z.hp=Math.max(0,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A){A.tgt=Z; if(!still)A.lunge=0.16;} break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02));
+        if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+          feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": { const Z=U_(e.ziel); if(Z&&!Z.down)tdmReplayKo(Z,U_(e.wer),still); break; }
+      default: break;
+    }
+  }
+
+  // DER REPLAY-TAKT. `dt` wie jeder andere `stepSim()`-Aufruf. Bewegung bleibt bewusst
+  // einfach (kein Orte-System wie bei Battlefield): wer noch steht, ruckt beim eigenen
+  // Treffer kurz auf sein Ziel zu (`lunge`, s. tdmReplayEreignis) — dieselbe Anzeige-Geste,
+  // die der alte Echtzeit-Zweikampf fuer Nahkampf-Treffer ohnehin schon nutzt.
+  function tdmReplaySchritt(dt){
+    t+=dt;
+    const R=tdmReplay, g=R.g, D=TDM_GEFECHT.taktSek, takte=g.gefecht.takte, gespielt=g.gefecht.gespielt;
+    const takt=t<TDM_REPLAY_ANMARSCH?0:Math.min(gespielt,1+Math.floor((t-TDM_REPLAY_ANMARSCH)/D));
+    const imTakt=takt>=1?takte[takt-1]:null;
+    const taktStart=TDM_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    for(const u of U)u.lunge=Math.max(0,(u.lunge||0)-dt);
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=takt+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben";
+        const zeitpunkt=istSchlag?0.12+0.66*(((e.wer??0)*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        tdmReplayEreignis(e,false);
+      });
+    }
+    if(t>=R.ende){
+      takte.forEach((tk,ti)=>tk.ereignisse.forEach((e,ei)=>{
+        const schl=(ti+1)+":"+ei;
+        if(!R.erledigt.has(schl)){ R.erledigt.add(schl); tdmReplayEreignis(e,true); }
+      }));
+      finish();
+    }
+    updateHud();
   }
 
   // ===================================================================================
@@ -56164,7 +59282,7 @@
   function mdffaKaempfer(p,side,slotId,slotDef){
     const d="mini-dm";
     const engPunkte=slotId?slotAufschlagMit(p,slotId,d,slotDef):0;
-    const breitPunkte=formVon(p.n)+stufenWert();
+    const breitPunkte=breitPunkteVon(p,d);
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
@@ -56975,11 +60093,13 @@
       if(titelkarte)titelkarte.hidden=true;
       if(rundenbanner)rundenbanner.hidden=true;
       if(endstandKopf)endstandKopf.hidden=true;
+      mdffaBuehne.abbau();
       return;
     }finally{
       FORMKARTE=formVorher;
     }
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
+    mdffaBuehne.einlauf(eintraege,ereignis);
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
     // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
@@ -57128,6 +60248,7 @@
     // als Endzustand nach der Runde beschriftet (.mdffa-hplabel-Text), nicht als Live-
     // Kampfverlauf: die Simulation ist zu diesem Zeitpunkt laengst vollstaendig gelaufen.
     function aktualisiereHpBalken(runde){
+      mdffaBuehne.rundenEnde(runde);
       runde.teams.forEach(t=>{
         const karte=eckKarten[t.side];
         const hpwrap=karte.querySelector(".mdffa-hpwrap");
@@ -57162,6 +60283,7 @@
       while(tickerBox.childNodes.length>60)tickerBox.removeChild(tickerBox.lastChild);
     }
     function setzeKaempfer(runde,rundenNr){
+      mdffaBuehne.runde(runde,rundenNr,mdffaRollenLabel(runde.slotId));
       tickerKopf(runde,rundenNr);
       runde.teams.forEach(t=>{
         const karte=eckKarten[t.side];
@@ -57187,6 +60309,7 @@
       });
     }
     function zeigeTakt(runde,tk){
+      mdffaBuehne.takt(runde,tk);
       const bilanz=mdffaTaktBilanz(tk);
       for(const z of mdffaTaktZeilen(tk,nameIn(runde)))tickerZeile(tk.t,z);
       tk.stand.forEach(s=>{
@@ -57230,6 +60353,7 @@
     }
 
     function aktualisiereEckKarte(side,rundenNr){
+      mdffaBuehne.punkte(laufendeSumme,rundenNr);
       const karte=eckKarten[side];
       karte.classList.remove("mdffa-wartet");
       const punkte=karte.querySelector(".mdffa-punkte");
@@ -57272,6 +60396,7 @@
     // TITELKARTE PRO RUNDE (C2): "Runde X von 4 · <Rolle>", kurz fuer sich allein sichtbar,
     // bevor die Rundentafel/Lebensbalken/der Rundensieger dazukommen.
     function zeigeTitelkarte(rundenNr,rolle){
+      mdffaBuehne.titel("Runde "+rundenNr+" von "+ereignis.runden.length,rolle);
       if(!titelkarte)return;
       titelkarte.textContent="";
       titelkarte.appendChild(el("b",null,"Runde "+rundenNr+" von "+ereignis.runden.length));
@@ -57293,6 +60418,7 @@
     // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
     // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
     function zeigeEndstand(){
+      mdffaBuehne.endstand(ereignis);
       // Mini-DM endet nicht ueber finish(), sondern hier -- dieselbe Ende-Meldung an den Host.
       letzterAngezeigterSieger=null;
       setTimeout(meldeSpielEnde,0);
@@ -57502,10 +60628,30 @@
       staffelWechselAnzeige, staffelVerlauf, staffelBeinMarken, staffelAnkerGezeigt,
       staffelBeinDuellGemeldet, spurtStationBest, spurtFotofinishGezeigt,
       spurtStationStats, cam, camR, bahnWahl, bahnFokus, bahnFokusAuto, ttPanelSig,
-      routeCache, waldCache};
+      routeCache, waldCache,
+      // DIE HATZ (s. BAHN_FLAGS/baueHatz): gehoert hier dazu wie jedes andere Bahn-
+      // Anzeigefeld -- ohne diese zwei Zeilen wuerde ein headless Messlauf MITTEN in einem
+      // sichtbaren Hatz-Rennen (M.sichern()/M.bau()/.../M.zurueck()) das sichtbare Rennen
+      // nach der Messung faelschlich wieder als Hatz (oder umgekehrt) zeigen.
+      bahnHatzAktiv, HATZ_WELLEN,
+      // HYROX-STATIONEN: dieselbe Begruendung wie bei den zwei Zeilen direkt darueber --
+      // ohne sie wuerde ein headless Messlauf ein sichtbares Hyrox-Rennen verwechseln.
+      bahnHyroxAktiv, HYROX_STATIONEN,
+      // NAHKAMERA-ZUSTAND (Nahkamera-PR, 08.11.): gehoert hier dazu wie bahnHyroxAktiv direkt
+      // darueber -- sonst wuerde ein headless Messlauf mitten in einem sichtbaren Hyrox-Rennen
+      // dessen Schnitt-Takt verwerfen.
+      hyroxCamStationIdx, hyroxCamNaechsterSchnitt, hyroxCamGruppe,
+      // HALLENRUNDE (Stufe 2, Design-Dokument 7.9): `hyroxCamZiel` und `HYROX_WEG`
+      // mitnehmen -- dieselbe Begruendung wie bei den Hyrox-Feldern direkt darueber.
+      hyroxCamZiel, HYROX_WEG};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
+    bahnHatzAktiv=!!a.bahnHatzAktiv; HATZ_WELLEN=a.HATZ_WELLEN??null;
+    bahnHyroxAktiv=!!a.bahnHyroxAktiv; HYROX_STATIONEN=a.HYROX_STATIONEN??null;
+    hyroxCamStationIdx=a.hyroxCamStationIdx??-1; hyroxCamNaechsterSchnitt=a.hyroxCamNaechsterSchnitt??0;
+    hyroxCamGruppe=a.hyroxCamGruppe??null;
+    hyroxCamZiel=a.hyroxCamZiel??null; HYROX_WEG=a.HYROX_WEG??HYROX_WEG;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -59063,11 +62209,13 @@
   // fehlten dafuer:
   //
   //  1. EIN QUICK-SIM: schnellDurch() spult das laufende (oder noch nicht gestartete) Spiel bis zum
-  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe Funktion stepSim(), derselbe feste Tick
-  //     (1/60)/zeitFaktor(), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --, nur so
-  //     viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo 1x/2x/4x
-  //     aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel exakt dort,
-  //     wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine zweite Rechnung.
+  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe `anzeigeSechzigstel()` (s. dort), derselbe
+  //     feste Tick ((1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix A1 das feste
+  //     1/60 der Buchung fuer die Bahn), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --,
+  //     nur so viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo
+  //     1x/2x/4x aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel
+  //     exakt dort, wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine
+  //     zweite Rechnung.
   //     Mini-DM hat seine Rundenshow statt Ticks; dort ist Quick-Sim dasselbe wie "Alles zeigen".
   //  2. EINE ENDE-MELDUNG: meldeSpielEnde() schickt `oly-arena:ende` (window-CustomEvent) mit der
   //     Disziplin und dem im Endstand gezeigten Sieger (0 = Heim, 1 = Gast, null = offen/Pod). Der
@@ -59113,11 +62261,14 @@
         // Disziplinwechsel/Reset mitten im Vorspulen: der neue Aufbau gehoert nicht mehr dazu.
         if(disc!==startDisc){ ende({disc:startDisc,done:false,ticks,abgebrochen:true}); return; }
         const bis=wandMs()+120;
+        // ANZEIGE-TREUE-FIX A1: ueber `anzeigeSechzigstel()` statt direktem stepSim()-Aufruf
+        // (s. Kommentar dort, vor loop()) -- fuer die Bahn feuert die Physik dadurch mit dem
+        // FESTEN 1/60-Takt der Buchung, nicht mit (1/60)/zf; Quick-Sim bleibt sonst derselbe
+        // vorgespulte Echtzeit-Lauf wie vorher, nur jetzt mit derselben Zufallsfolge wie die
+        // Buchung fuer jede Bahn-Disziplin.
         while(!done&&ticks<GRENZE&&wandMs()<bis){
-          tickerSendeT+=1/60;
-          stepSim((1/60)/zf);
+          anzeigeSechzigstel(zf);
           stepFloats();
-          ticksSeitReset++;
           ticks++;
           if(istFeldspiel(disc))updateHudFeldspiel();
           else if(istBuehne(disc))updateHudBuehne();
@@ -59146,6 +62297,47 @@
     figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
       ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
+    // AUFKLAERUNGS-NEBEL-SONDE (Bugticket #69, 10.11.: "Seraph-11 zeigt schwarzen Platzhalter
+    // ('?') statt PixelLab-Figur in Battlefield" -- Nachpruefung ergab: kein Verdrahtungsfehler
+    // und keine fehlende PixelLab-Figur (Seraph-11 hat eine vollstaendige, s.
+    // data/generated/figuren-sprites.json), sondern der AUFKLAERUNGS-NEBEL selbst, s. dessen
+    // Kommentar bei NEBEL_SICHT_RADIUS oben: jede gegnerische Figur bleibt in Battlefield
+    // Silhouette mit "?", bis eine eigene Figur ihr nahegekommen ist. Reine Lesesonde, identische
+    // Formel wie dort bei "imNebel" -- kein rr()/wert()/stepSim-Bezug, kein Einfluss auf eine
+    // Messung. Erzwingt wie kulisseProbe() einen frischen draw(), damit nebelSichtBis die
+    // aktuellen Positionen widerspiegelt, auch wenn gerade kein rAF-Frame lief.
+    battlefieldNebelStand:()=>{
+      try{draw();}catch(e){}
+      return U.map(u=>({n:u.n, side:u.side, down:!!u.down, nebelSichtBis:u.nebelSichtBis||0, t,
+        imNebel:disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t)}));
+    },
+    // Dieselbe Sonde, aber DETERMINISTISCH und headless (wie arenaFormationsProbe() oben):
+    // baut Battlefield mit `saat` ueber den aktuell geladenen SQUAD/OPP, laesst stepSimStumm()
+    // +draw() (fuer die Nebel-Buchhaltung) `sekunden` virtuelle Sekunden laufen und meldet je
+    // Figur, ob sie IRGENDWANN ("jeFogged") bzw. am ENDE des Fensters ("amEndeFogged") als
+    // Silhouette galt. Sichert/stellt wie arenaFormationsProbe() den Motorzustand wieder her --
+    // reine Messsonde, kein Einfluss auf eine echte Messung.
+    battlefieldNebelProbe:(saat,sekunden)=>{
+      const M=MOTOREN.battlefield; if(!M)return null;
+      const g=M.sichern();
+      try{
+        if(M.vorher)M.vorher();
+        M.bau(saat);
+        const schritte=Math.max(0,Math.round((sekunden||0)*60));
+        const spuren=new Map();
+        for(let i=0;i<schritte&&!done;i++){
+          stepSimStumm(1/60);
+          try{draw();}catch(e){}
+          for(const u of U){
+            const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+            const eintrag=spuren.get(u.n)||{side:u.side,jeFogged:false,amEndeFogged:false};
+            eintrag.amEndeFogged=imNebel; eintrag.jeFogged=eintrag.jeFogged||imNebel;
+            spuren.set(u.n,eintrag);
+          }
+        }
+        return [...spuren.entries()].map(([n,v])=>({n,...v}));
+      } finally { M.zurueck(g); }
+    },
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
@@ -59155,6 +62347,34 @@
     // Screenshot-Hilfe, kein Leser im Spiel.
     buehneJeSeiteQa:(n)=>{ const a=BUEHNE_ART[disc]; if(!a)return null; const v=Math.max(1,Math.floor(Number(n)||0)); if(v)a.jeSeite=v; reset(); return a.jeSeite; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
+    // ANZEIGE-TREUE-SONDE B1 (10.11., scripts/miss-anzeige-treue-rest.mjs): eigene, additive
+    // Funktion statt einer Erweiterung von spieleDisziplin()/`A.spiele()` -- deren Rueckgabeform
+    // ist Teil des Wertungs-Fingerabdrucks (scripts/pruefe-wertung-fingerabdruck.mjs hasht
+    // `A.spiele(d,s)` fuer alle zwanzig Disziplinen wholesale), ein zusaetzliches Feld dort
+    // haette JEDEN Fingerabdruck-Eintrag veraendert, obwohl an keiner einzigen Wertung etwas
+    // geaendert wird (nachgemessen: GESAMT-Hash aenderte sich, reiner Formfehler, kein Befund --
+    // deshalb dieser separate Einstiegspunkt, der spieleDisziplin() NICHT beruehrt). GENAU
+    // DASSELBE Sichern/Vorher/Bau/Lauf/Zurueck-Muster, nur mit `sieger` statt `protokoll`/
+    // `punkte`: kampfSieger()/fsSieger()/buehneSieger() sind dieselben Funktionen, die auch
+    // finish() beim ECHTEN Spielende synchron liest -- kein neuer Wertungsbegriff. `null` fuer
+    // jede Disziplin ohne Motor oder ohne Zweiseiten-Sieger-Begriff (Bahn hat ihre eigene Sonde,
+    // s. bahnLauf()).
+    anzeigeTreueSonde:(dId,saat)=>{
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat||1337);
+      M.lauf();
+      const ergebnis={disziplin:dId, wert:M.wert(), namen:M.namen(),
+        sieger:istKampf(dId)?kampfSieger():istFeldspiel(dId)?fsSieger():istBuehne(dId)?buehneSieger():null};
+      M.zurueck(g);
+      return ergebnis;
+    },
+    // Liest MOTOREN[disc].wert()/den Sieger-Begriff am AKTUELLEN (z.B. per sondenLauf()
+    // durchlaufenen) Zustand, ohne selbst zu bauen/zu laufen -- das Gegenstueck zu
+    // anzeigeTreueSonde() fuer die ANGEZEIGTE Seite des Vergleichs. Reiner Lese-Durchgriff,
+    // dieselben Sieger-Funktionen wie oben.
+    anzeigeTreueAktuell:()=>(MOTOREN[disc]?{disziplin:disc, wert:MOTOREN[disc].wert(), namen:MOTOREN[disc].namen(),
+      sieger:istKampf(disc)?kampfSieger():istFeldspiel(disc)?fsSieger():istBuehne(disc)?buehneSieger():null}:null),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
@@ -59171,6 +62391,88 @@
           if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
       return {...BUEHNE_FLAGS};
     },
+    // FORMAT-FUNDAMENT SPURT (s. BAHN_FLAGS/baueHatz, 08.11.): dasselbe Muster wie
+    // buehneFlags direkt darueber, nur fuer die Bahn. {spurtFormat:"hatz"} schaltet "Die
+    // Hatz" fuer den naechsten bauSpurt()-Aufruf an dieser Seite ein, {spurtFormat:"klassisch"}
+    // (oder weglassen) ist der unveraenderte Standard. Unbekannte Werte werden ignoriert.
+    // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
+    bahnFlags:(neu)=>{
+      if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"||neu.spurtFormat==="hyrox"))
+        BAHN_FLAGS.spurtFormat=neu.spurtFormat;
+      // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
+      if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
+        BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
+      return {...BAHN_FLAGS};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "DIE HATZ" (nur Messung/QA, s. HATZ_W/HATZ_RAUSCHEN nahe
+    // stepSpurt): erlaubt scripts/messe-spurt-hatz-einfluss.mjs/miss-spurt-hatz-rangtreue.mjs,
+    // die Kombinationsgewichte INNERHALB einer Browser-Sitzung durchzuprobieren, ohne die
+    // Engine jedes Mal neu zu laden. Kein echtes Spiel ruft das auf; die Matrix-Gewichte
+    // selbst (BAHN_ART.spurt.rezept) bleiben unberuehrt.
+    hatzGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HATZ_W))if(Number.isFinite(Number(neu[k])))HATZ_W[k]=Number(neu[k]);
+        if(neu.finale&&typeof neu.finale==="object")
+          for(const k of Object.keys(HATZ_W_FINALE))if(Number.isFinite(Number(neu.finale[k])))HATZ_W_FINALE[k]=Number(neu.finale[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HATZ_RAUSCHEN_AKTUELL.nichtFinale=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.rauschenFinale)))HATZ_RAUSCHEN_AKTUELL.finale=Number(neu.rauschenFinale);
+      }
+      return {...HATZ_W, finale:{...HATZ_W_FINALE}, rauschen:HATZ_RAUSCHEN_AKTUELL.nichtFinale, rauschenFinale:HATZ_RAUSCHEN_AKTUELL.finale};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "HYROX-STATIONEN" (nur Messung/QA, dasselbe Muster wie
+    // hatzGewichte direkt darueber): erlaubt scripts/messe-spurt-hyrox-einfluss.mjs/
+    // miss-spurt-hyrox-rangtreue.mjs, HYROX_W/HYROX_RAUSCHEN_AKTUELL/HYROX_BASIS_SEK/
+    // HYROX_SKALA_SEK innerhalb einer Browser-Sitzung durchzuprobieren. Kein echtes Spiel
+    // ruft das auf; BAHN_ART.spurt.rezept bleibt unberuehrt.
+    hyroxGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HYROX_W))if(Number.isFinite(Number(neu[k])))HYROX_W[k]=Number(neu[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HYROX_RAUSCHEN_AKTUELL.wert=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.basis)))HYROX_BASIS_SEK_AKTUELL.wert=Number(neu.basis);
+        if(Number.isFinite(Number(neu.skala)))HYROX_SKALA_SEK_AKTUELL.wert=Number(neu.skala);
+      }
+      return {...HYROX_W, rauschen:HYROX_RAUSCHEN_AKTUELL.wert, basis:HYROX_BASIS_SEK_AKTUELL.wert, skala:HYROX_SKALA_SEK_AKTUELL.wert};
+    },
+    // NAHKAMERA-SONDE (nur Messung/QA, Nahkamera-PR 08.11.): reiner Lesezugriff auf den
+    // Kamera-Zustand, den kameraUpdate()s eigener Hyrox-Zweig pflegt (s. docs/design/
+    // spurt-hyrox-nahkamera-08-11.md) -- fuer Screenshot-/Bildbeleg-Skripte, die sonst nur aus
+    // Pixeln raten koennten, ob die Kamera wirklich zwischen Stationen wechselt. Kein echtes
+    // Spiel ruft das auf, kein rr()-Aufruf, keine Schreibzugriffe.
+    hyroxKameraProbe:()=>({
+      aktiv:!!bahnHyroxAktiv, halle:istHyroxHalle(), stationIdx:hyroxCamStationIdx,
+      station:(bahnHyroxAktiv&&HYROX_STATIONEN&&hyroxCamStationIdx>=0)?HYROX_STATIONEN[hyroxCamStationIdx].name:null,
+      // HALLENRUNDE (Stufe 2, Design-Dokument 7.9): `ziel` ist eines von "technik"/"kletter"/
+      // "kraft"/"strecke" (oder null ausserhalb der Halle), `camR` die Weltmitte -- fuer den
+      // Bildbeleg dieser PR (Screenshot-/QA-Skripte koennten sonst nur aus dem Bild raten, OB
+      // die Kamera zwischen Zonen schneidet).
+      ziel:hyroxCamZiel, camR:{x:camR.x,y:camR.y},
+      naechsterSchnitt:hyroxCamNaechsterSchnitt, rennT, zoom:cam.zoom, cx:cam.cx,
+      laufend:LAEUFER.filter(u=>u.fertig==null).length, gesamt:LAEUFER.length,
+      // JE LAEUFER: Name/Fortschritt/aktuelle Arbeitspose -- fuer den Posen-Bildbeleg dieser PR
+      // (Screenshot-Skripte koennten sonst nur raten, WANN genau u.stolper>0/u.hyroxGruppe
+      // gesetzt ist, ein 0,4-s-Fenster). Reiner Lesezugriff, nichts hier schreibt. `s`/`art`/
+      // `gruppe` (Halle) ergaenzen dieselbe Groesse wie hyroxFahrplanProbe(), hier zusammen
+      // mit der Kamera-Zugehoerigkeit (`imBild`) an einer Stelle.
+      laeufer:LAEUFER.map(u=>{ const z=(bahnHyroxAktiv&&u.hyroxPlan)?hyroxZustand(u):null;
+        return {n:u.n, pos:u.pos, stolper:u.stolper, hyroxGruppe:u.hyroxGruppe||null, fertig:u.fertig!=null,
+          s:z?z.s:null, art:z?z.art:null, gruppe:z?z.gruppe:null,
+          imBild:!!(hyroxCamGruppe&&hyroxCamGruppe.has(u.id))}; }) }),
+    // FAHRPLAN-SONDE (Hallenrunde-PR, nur Messung/QA, Design-Dokument Abschnitt 11): reiner
+    // Lesezugriff auf `u.hyroxPlan`/`hyroxZustand(u)` fuer tests/spurt-hyrox-fahrplan.test.ts
+    // -- ohne sie koennte ein Test die internen Felder (per Closure gekapselt) ueberhaupt
+    // nicht pruefen. Kein rr()-Aufruf, kein Schreibzugriff, kein echtes Spiel ruft das auf.
+    hyroxFahrplanProbe:()=>({
+      aktiv:!!(bahnHyroxAktiv&&LAEUFER[0]&&LAEUFER[0].hyroxPlan),
+      halle:istHyroxHalle(), rennT,
+      abschnitte:((istHyroxHalle()?HYROX_WEG:HYROX_WEG_BAHN)||{abschnitte:[]}).abschnitte
+        .map(a=>({art:a.art, gruppe:a.gruppe, station:a.station})),
+      laeufer:LAEUFER.map(u=>{
+        const P=u.hyroxPlan, z=P?hyroxZustand(u):null;
+        return {n:u.n, hyroxZeit:u.hyroxZeit, fertig:u.fertig,
+          teile:u.hyroxTeile?{...u.hyroxTeile}:null,
+          t0:P?Array.from(P.t0):null,
+          s:z?z.s:null, art:z?z.art:null, gruppe:z?z.gruppe:null, prog:z?z.prog:null};
+      }) }),
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
     buehneHaltungTest:(neu)=>{
@@ -59750,6 +63052,10 @@
     // scripts/ziehe-hockey-pps-referenz.ts Rollen-Diagnose) — ohne dieses Feld koennte
     // `computeIndividualBoxscorePpsFromFixtureResults()` (lib/resolve/battle-mode-arena-team-
     // points.ts) die beiden Rollen nicht getrennt gegen ihre je eigene Referenz normieren.
+    // P4-MESSSCHALTER: "echt" = Einsatzlisten-Szenario je Seite statt Ersatzkarte (s.
+    // zieheFormSzenarioEcht()), "ersatz" = Spielverhalten. Liefert den vorherigen Modus.
+    formModusMessung:(m)=>{const v=FORM_MESS_MODUS; FORM_MESS_MODUS=m==="echt"?"echt":"ersatz";
+      if(FORM_MESS_MODUS==="ersatz")FORM_MESS=null; return v;},
     spieleFeldspiel:(fd,saat)=>{
       if(typeof FELDSPIEL_ART==="undefined"||!FELDSPIEL_ART[fd])return null;
       const M=MOTOREN[fd]; if(!M)return null;
@@ -59791,6 +63097,15 @@
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
+    // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
+    // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine
+    // Rechenfunktion (auch von den Mess-/Kalibrierskripten direkt genutzt), `spieleTdmGefecht`
+    // ist der Headless-Einstiegspunkt (s. arena-headless-runner.ts).
+    tdmGefecht,
+    tdmGefechtSonde,
+    tdmGefechtEinfluss,
+    tdmGefechtParameter,
+    spieleTdmGefecht,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
@@ -60220,7 +63535,12 @@
       const st=bahnTeamstand();
       const namen=M.namen();
       const punkteVonName=new Map(LAEUFER.map(u=>[u.n, st.punkte?(st.punkte.get(u.id)??0):0]));
-      const boxscore=namen.map(n=>({name:n, wert:punkteVonName.get(n)??0}));
+      // S-N5b: gewonnene Stationsduelle als EIGENES Feld (nur Spurt) -- reine PP-Nebenspur fuer
+      // computeIndividualBoxscorePpsFromFixtureResults(); `wert` und `seiten` bleiben unberuehrt.
+      const duelleVonName=BAHN_ART[bd].spurt?new Map(LAEUFER.map(u=>[u.n, stationsDuellSiege(u)])):null;
+      const boxscore=namen.map(n=>duelleVonName
+        ?({name:n, wert:punkteVonName.get(n)??0, duelle:duelleVonName.get(n)??0})
+        :({name:n, wert:punkteVonName.get(n)??0}));
       const seiten=[st.seiten[0], st.seiten[1]];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
@@ -60358,12 +63678,17 @@
     // (`acc+=dt*speed`) und fuehrt stepSim() aus, sobald 1/60 davon zusammenkommen; wie viele
     // Sechzigstel bis zum Ablauf der Wartezeit zusammenkommen, streut je nach Bildwiederhol-
     // rate und Prozesslast um ein bis zwei Ticks. sondenLauf(ticks) umgeht diese Kopplung
-    // vollstaendig: es ruft stepSim() GENAU `ticks`-mal mit der immer gleichen festen
-    // Tick-Groesse (1/60)/zeitFaktor() auf — derselben Groesse, die loop() auch verwendet, nur
-    // ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Zwei Aufrufe mit demselben
-    // Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit exakt dieselbe
-    // Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig davon, wie lange der
-    // Prozess vorher lief oder wie schnell die Maschine ist.
+    // vollstaendig: es ruft `anzeigeSechzigstel()` (s. dort, Kommentar vor loop()) GENAU
+    // `ticks`-mal auf — ein Aufruf je reale Sechzigstelsekunde, exakt die Rechnung, die auch
+    // loop() macht, nur ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Fuer
+    // jede Nicht-Bahn-Disziplin loest das weiterhin GENAU EINEN stepSim()-Aufruf mit der
+    // festen Tick-Groesse (1/60)/zeitFaktor() je `ticks`-Schritt aus; fuer die Bahn (seit dem
+    // Anzeige-Treue-Fix A1) loest es stepSim(1/60) erst aus, wenn `bahnSimAcc` genug
+    // Sechzigstel gesammelt hat (`zeitFaktor()` Sechzigstel je Tick) — in beiden Faellen
+    // deterministisch an der Tick-Zahl `n`, nicht an Wanduhr/Bildrate. Zwei Aufrufe mit
+    // demselben Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit
+    // exakt dieselbe Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig
+    // davon, wie lange der Prozess vorher lief oder wie schnell die Maschine ist.
     //
     // WAS SONST NOCH AN DER WANDUHR HING (alle drei Fundstellen, s. jetztMs() bei der
     // Deklaration von sondenAktiv oben): die Viertelpause-Overlay-Restsekunden (vpSichtbarBis/
@@ -60389,7 +63714,7 @@
     // Lebensdauer ausschliesslich von der Tick-Zahl abhaengt, nicht von der Bildwiederholrate.
     //
     // Ruehrt weder rr() noch wert()/Boxscore-/Rangtreue-Logik an: stepSim() ist dieselbe
-    // Funktion, die auch loop() aufruft, mit derselben Tick-Groesse (1/60)/zeitFaktor() — kein
+    // Funktion, die auch loop() aufruft, ueber dieselbe `anzeigeSechzigstel()` — kein
     // zweiter Motor, keine Kopie. Nur die AUSSENSTEUERUNG (wie oft, mit welchem dt) ist neu,
     // rein additiv wie renderProbe/figurProbe/bahnVizProbe daneben.
     //
@@ -60408,8 +63733,7 @@
       const zf=zeitFaktor();
       for(let i=0;i<n;i++){
         sondenSimMs+=1000/60;
-        tickerSendeT+=1/60;
-        stepSim((1/60)/zf);
+        anzeigeSechzigstel(zf);
         stepFloats();
         // Dieselbe HUD-Nachfuehrung wie in loop() (s. dort): fuer den Kampf ruft stepSim()
         // updateHud() selbst, Feldspiel/Buehne/Bahn brauchen den Aufruf von aussen.
@@ -60625,6 +63949,39 @@
         fertig:u.fertig!=null, aktiv:!!u.aktiv, raus:!!u.raus,
         vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3)}))
     }),
+    // GEZEIGT = GEBUCHT, FIGUR FUER FIGUR (Chris 11.11.: "KEINE DEMOS mehr! das soll nicht einfach
+    // abgespult werden! das muss sauber simuliert sein durch unsere engine"; Pilot Climbing,
+    // docs/design/bahn-echte-simulation-rollout-11-11.md). Zwei reine Lese-Sonden, kein rr(),
+    // kein Schreibzugriff auf LAEUFER/Saat/Wertung:
+    //   bahnFigurenProbe()   die Bahn, wie sie GERADE gezeichnet wird: je Laeufer Name (= die
+    //                        PixelLab-Figur, pixelFigurLaden(u.n)), Seite, Motor-Fortschritt
+    //                        `pos`, die gezeichnete Stelle laeuferXY() und -- an der Wand -- der
+    //                        gezeichnete Hoehenanteil climbAnzeigeAnteil().
+    //   bahnSpurProbe(bd,s)  der GEBUCHTE Lauf (dieselbe Schleife wie bahnLauf(): M.bau(saat),
+    //                        stepSpurt(1/60) bis done/rennT>=90), aber mit `pos` je Laeufer nach
+    //                        JEDEM Tick mitgeschrieben. Danach M.zurueck() wie bahnLauf().
+    // tests/bahn-climbing-gezeigt-gleich-gebucht.test.ts legt beide nebeneinander.
+    bahnFigurenProbe:()=>{
+      if(!istBahn(disc)||typeof LAEUFER==="undefined")return null;
+      const wand=istWand();
+      return {disc, rennT, wand,
+        laeufer:LAEUFER.map(u=>{ const p=laeuferXY(u);
+          return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, fertig:u.fertig!=null, x:p.x, y:p.y,
+            anzeige:wand?climbAnzeigeAnteil(u):null, sturz:wand?u.vizFallVon!=null:false,
+            figurAngemeldet:pixelFigurenImSpiel.includes(u.n)}; })};
+    },
+    bahnSpurProbe:(bd,saat)=>{
+      if(typeof BAHN_ART==="undefined"||!BAHN_ART[bd])return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+      const spur=[]; let guard=0;
+      stumm=true;
+      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; spur.push(LAEUFER.map(u=>u.pos)); } }
+      finally { stumm=false; }
+      const namen=LAEUFER.map(u=>({id:u.id, n:u.n, seite:u.seite}));
+      M.zurueck(gesichert);
+      return {disziplin:bd, saat:saat||1337, namen, spur};
+    },
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
@@ -61423,5 +64780,18 @@
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>PP_MATRIX_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
+
+  // BOOTSTRAP-AUFRUF (verschoben hierher bei der TDM-Gefecht-Verdrahtung 11.11., urspruenglich
+  // direkt nach `zieheFormkarten(20260823)` weit oben im Modul, s. Kommentar dort): `reset()`
+  // ruft `build()` synchron fuer die Standarddisziplin ("tdm", `let disc="tdm"` oben) auf, und
+  // TDM baut seit dieser PR ueber `tdmGefecht()`/`tdmSchlagwechsel()` -- Funktionen, die ERST
+  // HIER, am Modulende, lexikalisch alle initialisiert sind (mdffaZufall/mdffaMisch,
+  // bfPodPlatzierungAus, TDM_GEFECHT u.a. sind `let`/`const`, keine gehobenen `function`-
+  // Deklarationen). An der alten Stelle waere jeder dieser Bezeichner noch in seiner Temporal-
+  // Dead-Zone gewesen -- nachgemessen beim ersten Playwright-Smoke-Test dieser PR
+  // ("Cannot access 'TDM_GEFECHT'/'mdffaMisch' before initialization"). Reine Verschiebung,
+  // keine inhaltliche Aenderung: `window.__arena` steht jetzt sogar schon VOR diesem Aufruf
+  // (vorher erst danach), jeder bestehende Aufrufer wartet ohnehin erst auf dessen Erscheinen.
+  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
 
 })();

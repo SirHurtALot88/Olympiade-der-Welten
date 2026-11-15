@@ -1,9 +1,14 @@
 import type { ArticleAggregate } from "./viewModel";
+import { conditionFactor, conditionOf, type CardCondition } from "../market/condition";
+import { dynamicMargin, roundToStep99 } from "../pricing/dynamicVk";
+import { applyStaleDiscount, staleDiscountPct } from "../pricing/staleDecay";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import {
   computeHk,
   computePriceCorridor,
   computeMarketTargetRange,
+  marketCapFactor,
+  targetPriceForMargin,
   type MarketTargetRange,
   contributionMarginForPrice,
   fixedCostPerUnit,
@@ -35,19 +40,32 @@ export interface LatestQuote {
 
 /**
  * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
- * (3er-Pack = 3 Karten). 7-Tage-Schnitt (wie Cardcluster), sonst 30-Tage-Schnitt, sonst Trend.
+ * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7, Ø 30 Tage, dem guenstigsten Angebot ("ab", immer, doppelt gewichtet) und, wenn bekannt, deinem letzten EK (Chris, 11.11.:
+ * ein einzelner Wert, vor allem der 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
  * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
  */
-export function marketValueOf(quote: LatestQuote, packQty: number): number | null {
+/** "ab" zaehlt doppelt (Chris, 13.11.): es spiegelt den aktuellen Stand besser als die traegen Schnitte, vor allem bei fallendem Preis. */
+export const FROM_WEIGHT = 2;
+
+export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null, factor = 1): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
-  const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
-  return perCard === null ? null : perCard * Math.max(1, packQty);
+  const pack = Math.max(1, packQty);
+  const cardParts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
+  if (cardParts.length === 0) return null;
+  // Guenstigstes Angebot ("ab", Chris 13.11.): zaehlt IMMER und doppelt, auch wenn es weit unter den Schnitten liegt
+  // (Nummer C1000: Schnitte um 1 €, ab 0,05 €): sonst ist das Bild verzerrt und der Marktwert zu hoch.
+  if (quote.priceFrom != null && quote.priceFrom > 0) for (let i = 0; i < FROM_WEIGHT; i++) cardParts.push(quote.priceFrom);
+  // Je Artikel (Karte x Pack-Menge); der letzte EK steht schon je Artikel und federt Ausreisser ab (Chris, 11.11.).
+  // Zustandsabschlag (EX/GD/LP/PL/Poor) nur auf die Cardmarket-Preise: sie gelten fuer NM, der letzte EK ist ein echter Betrag.
+  const parts = cardParts.map((v) => v * pack * factor);
+  if (lastEk != null && lastEk > 0) parts.push(lastEk);
+  return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
-export function marketRangeOf(quote: LatestQuote, packQty: number): { min: number; max: number; variants: number } | null {
+export function marketRangeOf(quote: LatestQuote, packQty: number, factor = 1): { min: number; max: number; variants: number } | null {
   if (quote.matchQuality !== "mehrdeutig" || quote.priceMin == null || quote.priceMax == null) return null;
   const pack = Math.max(1, packQty);
-  return { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 };
+  return { min: quote.priceMin * pack * factor, max: quote.priceMax * pack * factor, variants: quote.variants ?? 0 };
 }
 
 export interface MarketComparisonRow {
@@ -63,7 +81,7 @@ export interface MarketComparisonRow {
   /** Cardmarket-Werte JE KARTE, wie in der Preisliste. */
   marketFrom: number | null;
   marketTrend: number | null;
-  /** Marktwert des ARTIKELS = 7-Tage-Schnitt (wie Cardcluster; sonst 30-T, sonst Trend) x Pack-Menge. Null wenn mehrdeutig. */
+  /** Marktwert des ARTIKELS = Mittelwert aus Trend, Ø 1, 7, 30 Tage (x Pack-Menge) und letztem EK. Null wenn mehrdeutig. */
   marketValue: number | null;
   /** Mehrdeutig: Spanne des Artikel-Marktwerts (billigste..teuerste Variante, x Pack). */
   marketRange: { min: number; max: number; variants: number } | null;
@@ -74,6 +92,15 @@ export interface MarketComparisonRow {
    */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Dynamischer empfohlener VK (siehe dynamicVk.ts) und seine Begruendung; null ohne Marktwert. Laeuft parallel zur festen Spanne. */
+  dynamicVk: number | null;
+  dynamicNote: string | null;
+  /** Zustand aus dem Titel und Anteil vom NM-Preis, mit dem der Marktwert gerechnet ist (NM = 1). */
+  condition: CardCondition;
+  conditionFactor: number;
+  /** Ladenhüter-Abschlag auf targetMin/targetOpt (0..0,3), 0 = keiner; daysSinceSale = Tage seit dem letzten Verkauf. */
+  staleDiscount: number;
+  daysSinceSale: number | null;
   /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
   capped: boolean;
   /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
@@ -140,8 +167,10 @@ export function buildMarketComparisonRow(
   const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings, { kind, packSize: a.packQty, shop });
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
-  const marketValue = marketValueOf(quote, pack);
-  const marketRange = marketRangeOf(quote, pack);
+  const condition = conditionOf(a.nameRaw);
+  const condFactor = conditionFactor(a.nameRaw);
+  const marketValue = marketValueOf(quote, pack, a.currentEk, condFactor);
+  const marketRange = marketRangeOf(quote, pack, condFactor);
 
   const rangeFor = (marketPerUnit: number): MarketTargetRange =>
     computeMarketTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
@@ -168,6 +197,14 @@ export function buildMarketComparisonRow(
     else if (classifyAgainstRange(ownVk, hi) === "zu_teuer") status = "zu_teuer";
   }
 
+  // Ladenhueter-Abschlag: lange ohne Verkauf (mit Bestand) -> empfohlener VK sinkt, nie unter Kostendeckung (Deckungsbeitrag 0).
+  const daysSinceSale = a.lastSoldAt ? Math.max(0, Math.floor((Date.now() - a.lastSoldAt.getTime()) / 86_400_000)) : null;
+  const staleDiscount = staleDiscountPct(daysSinceSale, a.stock);
+  if (target !== null && staleDiscount > 0) {
+    target = applyStaleDiscount({ min: target.min, opt: target.opt }, staleDiscount, corridor.vkContribution);
+    if (marketValue !== null) status = classifyAgainstRange(ownVk, target);
+  }
+
   // Nachfrage-Beweis (Chris, 14.10.): Ein Preis, zu dem sich der Artikel schon mehrfach verkauft hat,
   // ist nicht "zu teuer", egal was der Marktwert rechnerisch hergibt. Nur "zu teuer" wird so entkraeftet;
   // "zu guenstig" bleibt (dort liegt Geld auf dem Tisch).
@@ -187,6 +224,34 @@ export function buildMarketComparisonRow(
     provenByDemand = true;
   }
 
+  // Dynamischer VK (parallel zur festen Spanne): Zielmarge aus Tempo, Reichweite, Markt und Preisbeweis, dann dieselben Grenzen
+  // wie die feste Spanne (Marktdeckel, Ladenhueter-Abschlag, Nachfrage-Beweis, Mindestpreis, Deckungsbeitrag 0), Preisstufen auf .99.
+  let dynamicVk: number | null = null;
+  let dynamicNote: string | null = null;
+  if (marketValue !== null && marketValue > 0) {
+    const trend7vs30 = quote.priceAvg7 != null && quote.priceAvg30 != null && quote.priceAvg30 > 0 ? quote.priceAvg7 / quote.priceAvg30 - 1 : null;
+    const dyn = dynamicMargin({
+      paceMonth: a.paceMonth ?? null,
+      stock: a.stock,
+      marketValue,
+      trend7vs30,
+      fromVsTrend: quote.priceFrom != null && quote.priceTrend != null && quote.priceTrend > 0 ? quote.priceFrom / quote.priceTrend : null,
+      salesSincePriceChange: a.salesSincePriceChange ?? null,
+      daysSincePriceChange: a.lastPriceChangeAt ? Math.floor((Date.now() - a.lastPriceChangeAt.getTime()) / 86_400_000) : null,
+    });
+    const raw = targetPriceForMargin({ ek: marketValue, kind, packSize: a.packQty, shop }, dyn.margin, costSettings.adFeeRateGood, costSettings);
+    if (raw !== null) {
+      let p = raw;
+      const capFactor = marketCapFactor(marketValue);
+      if (capFactor !== null) p = Math.min(p, capFactor * marketValue);
+      if (staleDiscount > 0 && target) p = Math.min(p, target.opt);
+      if (soldAtVk && (trend7vs30 ?? 0) > -0.15 && ownVk > 0) p = Math.max(p, ownVk);
+      p = Math.max(p, corridor.vkContribution);
+      dynamicVk = roundToStep99(p);
+      dynamicNote = dyn.note;
+    }
+  }
+
   let deltaPercent: number | null = provenByDemand ? 0 : null;
   if (target !== null && ownVk > 0 && !provenByDemand) {
     deltaPercent = ownVk < target.min ? (ownVk - target.min) / target.min : ownVk > target.opt ? (ownVk - target.opt) / target.opt : 0;
@@ -204,7 +269,9 @@ export function buildMarketComparisonRow(
     lastEk !== null && ownVk > 0
       ? contributionMarginForPrice(ownVk, { ek: lastEk, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
       : null;
-  const ekAboveMarket = marketValue !== null && marketValue > 0 && ek > marketValue * 1.5;
+  // Gegen den reinen Cardmarket-Wert pruefen (ohne den eigenen EK), sonst zoege der EK die Messlatte selbst mit hoch.
+  const cardOnlyValue = marketValueOf(quote, pack, null, condFactor);
+  const ekAboveMarket = cardOnlyValue !== null && cardOnlyValue > 0 && ek > cardOnlyValue * 1.5;
 
   const marketEk = quote.priceFrom !== null ? computeMarketEk(quote.priceFrom, a.packQty, hk.buyShipping) : null;
 
@@ -224,6 +291,12 @@ export function buildMarketComparisonRow(
     marketRange,
     targetMin: target ? target.min : null,
     targetOpt: target ? target.opt : null,
+    dynamicVk,
+    dynamicNote,
+    condition,
+    conditionFactor: condFactor,
+    staleDiscount,
+    daysSinceSale,
     capped,
     marginReachable,
     marginAtMarket,

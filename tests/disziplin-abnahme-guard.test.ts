@@ -100,30 +100,59 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     expect(verletzt).toEqual([]);
   });
 
-  it("die Ausnahmeliste ist klein, begruendet und je Kriterium (aktuell nur Hockey, nur rho)", () => {
-    expect([...ARENA_ABNAHME_AUSNAHMEN.keys()]).toEqual(["hockey"]);
+  it("die Ausnahmeliste ist klein, begruendet und je Kriterium (Hockey/Showcase/I-Spy, alle nur rho)", () => {
+    expect([...ARENA_ABNAHME_AUSNAHMEN.keys()]).toEqual(["hockey", "showcase", "i-spy"]);
     expect(ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt).toEqual(["rho"]);
+    expect(ARENA_ABNAHME_AUSNAHMEN.get("showcase")?.deckt).toEqual(["rho"]);
+    expect(ARENA_ABNAHME_AUSNAHMEN.get("i-spy")?.deckt).toEqual(["rho"]);
     for (const ausnahme of ARENA_ABNAHME_AUSNAHMEN.values()) {
       expect(ausnahme.deckt.length).toBeGreaterThan(0);
       expect(ausnahme.begruendung.length).toBeGreaterThan(40);
     }
   });
 
-  it("Hockey ist weiterhin NICHT gewertet -- Pp ist jetzt frisch gemessen (Task #195, 25.10.), verfehlt die Schranke aber auf beiden Saatstroemen (38,5 / 81,5)", () => {
-    // Fruehere Fassung dieses Tests nahm an, eine kuenftige frische Pp-Messung wuerde automatisch
-    // bestehen (`hockey.ppFrisch ? [] : ["pp"]`) -- diese Annahme ist jetzt widerlegt: die Messung
-    // ist frisch UND verletzt die Schranke klar auf beiden unabhaengigen Stroemen. Deshalb hier
-    // gegen das tatsaechliche Ergebnis gepinnt statt gegen die blosse Frische-Flagge.
+  it("Hockey ist jetzt gewertet -- Pp besteht regulaer (richtig gepoolt gemessen), rho bleibt durch Chris' Ausnahme gedeckt (15.11.)", () => {
+    // Vorgaenger-Fassung dieses Tests pinnte Hockey auf "durchgefallen" (38,5 / 81,5) -- das war
+    // selbst ein Messfehler: zwei einzelne, UNGEPOOLTE n=24-Stroeme bei einem fuer Hockey
+    // dokumentierten Rauschboden von 35-40 Pp je Einzelstrom (docs/design/
+    // hockey-pp-messbasis-10-11.md). Richtig gemessen (zwei unabhaengige GEPOOLTE Stroeme, je drei
+    // Roh-Saatstroeme a n=48) besteht Pp klar unter der Schranke. rho bleibt unveraendert unter
+    // 0,80 und wird weiterhin NUR durch Chris' bestehende Ausnahme gedeckt -- deshalb hier gegen
+    // das tatsaechliche Ergebnis gepinnt statt nur gegen die Frische-Flagge.
     const hockey = TABELLE.disziplinen.hockey!;
     expect(hockey.ppFrisch).toBe(true);
     expect(hockey.pp.length).toBeGreaterThanOrEqual(TABELLE.schranken.ppSaatstroemeMindestens);
-    expect(hockey.pp.every((wert) => wert > TABELLE.schranken.ppHoechstens)).toBe(true);
-    expect(verfehlteKriterien(hockey, ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt ?? [])).toEqual(["pp"]);
-    // Hockeys rho (0,64) liegt ohnehin unter der Schranke und wird nur durch die Ausnahme gedeckt --
-    // unabhaengig vom Pp-Ausgang darf Hockey deshalb in keinem Fall in ARENA_RESOLVED_DISCIPLINE_IDS
-    // stehen.
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(false);
+    expect(hockey.pp.every((wert) => wert <= TABELLE.schranken.ppHoechstens)).toBe(true);
+    expect(hockey.rhoFrisch).toBe(true);
+    expect(hockey.rhoJeSpiel).toBeLessThanOrEqual(TABELLE.schranken.rhoJeSpielUeber);
+    // Ohne die Ausnahme wuerde rho allein weiterhin fehlschlagen -- die Ausnahme ist nach wie vor
+    // tragend, nur nicht mehr fuer Pp.
+    expect(verfehlteKriterien(hockey, [])).toEqual(["rho"]);
+    expect(verfehlteKriterien(hockey, ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt ?? [])).toEqual([]);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
   });
+
+  it.each(["showcase", "i-spy"] as const)(
+    "%s ist wieder gewertet -- root-gecaust als Kaderfamilie-Rauschen, rho durch Chris' Ausnahme gedeckt (15.11.)",
+    (id) => {
+      // Kurzzeitig (PR #1481) aus ARENA_RESOLVED_DISCIPLINE_IDS genommen, weil eine frische
+      // Neumessung rho unter 0,80 fand. Ein A/B-Test (derselbe Code, alte vs. aktuelle
+      // Kaderfamilie) zeigte: reines Roster-Rauschen, keine Mechanik- oder Code-Regression --
+      // Chris hat deshalb eine rho-Ausnahme analog Hockey freigegeben (s.
+      // SHOWCASE-I-SPY-AUSNAHME-NACHTRAG in arena-resolved-disciplines.ts). Pp besteht fuer beide
+      // weiterhin regulaer -- deshalb hier gegen das tatsaechliche Ergebnis gepinnt statt nur
+      // gegen die Frische-Flagge.
+      const eintrag = TABELLE.disziplinen[id]!;
+      expect(eintrag.ppFrisch).toBe(true);
+      expect(eintrag.pp.length).toBeGreaterThanOrEqual(TABELLE.schranken.ppSaatstroemeMindestens);
+      expect(eintrag.pp.every((wert) => wert <= TABELLE.schranken.ppHoechstens)).toBe(true);
+      expect(eintrag.rhoFrisch).toBe(true);
+      expect(eintrag.rhoJeSpiel).toBeLessThanOrEqual(TABELLE.schranken.rhoJeSpielUeber);
+      expect(verfehlteKriterien(eintrag, [])).toEqual(["rho"]);
+      expect(verfehlteKriterien(eintrag, ARENA_ABNAHME_AUSNAHMEN.get(id)?.deckt ?? [])).toEqual([]);
+      expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(id)).toBe(true);
+    },
+  );
 
   it("Mini-DM ist NICHT Teil des generischen Chassis-Sets (eigener Pod-Resolve-Pfad, eigener Schalter)", () => {
     // Mini-DM hat seit PR 4/PR 5 des 6-PR-Opus-Plans (21.10.) einen eigenen Pod-Resolve-Pfad

@@ -20,5 +20,7 @@ export function formatEuroCents(value: number): string {
 }
 
 export function formatPercent(value: number): string {
-  return percentFormatter.format(value * 100);
+  const text = percentFormatter.format(value * 100);
+  // "-0" / "−0" soll nicht als negative Null erscheinen
+  return /^[-−]0(,0+)?$/.test(text) ? text.replace(/^[-−]/, "") : text;
 }

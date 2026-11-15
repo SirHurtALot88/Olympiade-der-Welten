@@ -17,12 +17,12 @@ interface Props {
 
 export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; label: string }> = {
   // Zielspanne = 25 % bis 33 % Deckungsbeitrags-Marge (Chris, 13.10.), mindestens 4,99 €.
-  unter_min: { cls: "p-warn", label: "zu günstig" },
-  im_korridor: { cls: "p-good", label: "im Korridor" },
-  ueber_gut: { cls: "p-mkt", label: "zu teuer" },
+  unter_min: { cls: "p-warn", label: "Marge unter 25 %" },
+  im_korridor: { cls: "p-good", label: "Marge 25–33 %" },
+  ueber_gut: { cls: "p-muted-pill", label: "Marge über 33 %" },
   // FIX 1: kein Korridor-Status, sondern Kennzeichnung "wir kennen den EK nicht" --
   // bewusst NICHT gruen/rot, damit hier keine falsche Sicherheit vorgetaeuscht wird.
-  kein_ek: { cls: "p-warn", label: "kein EK" },
+  kein_ek: { cls: "p-muted-pill", label: "EK fehlt" },
 };
 
 type ColId = "artikel" | "velocity" | "umsatz30" | "umsatz90" | "umsatz" | "vk" | "korridor" | "klasse" | "status";

@@ -115,6 +115,50 @@ export const SPONSOR_CURVE_SHAPES: Record<SponsorCurveShape, SponsorCurveShapeDe
 
 export const SPONSOR_CURVE_SHAPE_KEYS = Object.keys(SPONSOR_CURVE_SHAPES) as SponsorCurveShape[];
 
+const kurvenReferenzCache = new Map<string, readonly number[]>();
+
+/**
+ * DIE REFERENZKURVE EINER FORM FUER EINEN RANGRAUM VON `leagueSize` PLAETZEN.
+ *
+ * Die 11 `reference`-Arrays sind auf 32 Plaetze gezeichnet. Bei aktivem Liga-Split rechnet ein
+ * Vertrag liga-lokal 1..16 — Platz r einer 16er-Liga entspricht dem Abschnitt [2r−1, 2r] der
+ * 32er-Kurve (docs/design/liga-split-plan.md Abschnitt 3: „Kurvenformen brauchen 16er-Pendants,
+ * mechanisch ableitbar"). Abgeleitet wird FLAECHENTREU: Platz r bekommt den Mittelwert des Abschnitts
+ * der 32er-Kurve, den er abdeckt (exakt, auch fuer Rangraeume, die 32 nicht glatt teilen — dann
+ * anteilig ueber angeschnittene Sprossen).
+ *
+ * Damit bleiben die zwei Eigenschaften erhalten, auf die sich `sponsorKurvenLeiter` stuetzt:
+ *   - gleiche Flaeche je Form (jede 32er-Form hat dieselbe Summe ⇒ jede abgeleitete auch), und
+ *   - monoton nicht-steigend (ein Mittelwert ueber einen spaeteren Abschnitt einer fallenden Kurve
+ *     ist nie groesser als der ueber einen frueheren).
+ * Die WO-liegt-das-Geld-Aussage der Form bleibt: „titeljaeger" zahlt auch in der 16er-Liga am
+ * Titel, „konsolidierung" bleibt flach.
+ *
+ * Bei `leagueSize = 32` exakt die Original-Referenz (dieselbe Array-Instanz).
+ */
+export function sponsorKurvenReferenz(shape: SponsorCurveShape, leagueSize: number): readonly number[] {
+  const reference = SPONSOR_CURVE_SHAPES[shape].reference;
+  const quelle = reference.length;
+  const ziel = Math.round(leagueSize);
+  if (!Number.isFinite(ziel) || ziel < 1 || ziel === quelle) return reference;
+  const key = `${shape}:${ziel}`;
+  const hit = kurvenReferenzCache.get(key);
+  if (hit) return hit;
+  const breite = quelle / ziel;
+  const kurve = Array.from({ length: ziel }, (_, index) => {
+    const von = index * breite;
+    const bis = (index + 1) * breite;
+    let flaeche = 0;
+    for (let sprosse = Math.floor(von); sprosse < Math.ceil(bis) && sprosse < quelle; sprosse += 1) {
+      const anteil = Math.min(bis, sprosse + 1) - Math.max(von, sprosse);
+      if (anteil > 0) flaeche += anteil * reference[sprosse]!;
+    }
+    return flaeche / breite;
+  });
+  kurvenReferenzCache.set(key, kurve);
+  return kurve;
+}
+
 export type SponsorCurveFamilyDef = { labelDe: string; noteDe: string; order: number };
 
 export const SPONSOR_CURVE_FAMILIES: Record<SponsorCurveFamily, SponsorCurveFamilyDef> = {

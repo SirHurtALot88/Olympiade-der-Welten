@@ -108,7 +108,8 @@ export function buildHarmlosenMiniDmFfaFakeRunner(): typeof runMiniDmFfaPodFixtu
 /**
  * Generischer, harmloser Arena-Fake-Runner (Zweier-Duell-Chassis) -- Gegenstueck zu
  * `buildHarmlosenMiniDmFfaFakeRunner()` oben, fuer dieselbe "IMMER BEIDE Runner faken"-Regel.
- * `discipline2` ist seit dem Fix oben fest auf "hockey" gepinnt (nicht arena-aufgeloest) -- dieser
+ * `discipline2` ist seit dem Fix oben fest auf "football" gepinnt (nicht arena-aufgeloest, s.
+ * Kommentar dort -- bis 15.11. stand hier "hockey") -- dieser
  * Fake wird an einem mit diesem Helfer gebauten Save deshalb im Normalfall gar nicht erst
  * aufgerufen, dient aber als Sicherheitsnetz, falls sich das je aendert, UND als explizite
  * Dokumentation der Regel direkt am Aufrufort.
@@ -396,9 +397,12 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
   }
   // `discipline1` wird auf "mini-dm" erzwungen (wie schon bisher) -- NEU (CI-FIX 25.10., s.
   // ausfuehrlichen Kopfkommentar oben): `discipline2` wird ab jetzt EBENFALLS erzwungen, statt dem
-  // zufaelligen (unseeded) Liga-Draft zu ueberlassen. "hockey" ist dafuer bewusst gewaehlt: WEDER
-  // in `ARENA_RESOLVED_DISCIPLINE_IDS` (also nie echtes Arena-Chromium fuer D2) NOCH "mini-dm"
-  // selbst (also nie ein zweiter Mini-DM-Zweig/kein `expected 64 to be 32`-Resolve-Doppelzaehler).
+  // zufaelligen (unseeded) Liga-Draft zu ueberlassen. "football" ist dafuer bewusst gewaehlt (bis
+  // 15.11. stand hier "hockey" -- Hockey ist seit der Pp-Pool-Korrektur jetzt selbst in
+  // `ARENA_RESOLVED_DISCIPLINE_IDS`, s. lib/battle/arena-resolved-disciplines.ts, und waere hier
+  // also die FALSCHE Wahl geworden): football ist die einzige Disziplin, die WEDER in
+  // `ARENA_RESOLVED_DISCIPLINE_IDS` steht (also nie echtes Arena-Chromium fuer D2) NOCH "mini-dm"
+  // selbst ist (also nie ein zweiter Mini-DM-Zweig/kein `expected 64 to be 32`-Resolve-Doppelzaehler).
   // Macht `andereArenaDisziplinPraesent` unten statisch `false` -- das ist gewollt, nicht nur ein
   // Nebeneffekt: der einzige Aufrufer (`tests/arena-vorlauf-mini-dm-ffa.test.ts`s "Mini-DM ALLEIN
   // ..."-Test) will GENAU diesen Fall pruefen und musste sich bisher bei einem unguenstigen Zufalls-
@@ -416,12 +420,12 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
       occurrenceInSeason: 1 as const,
     },
     discipline2: {
-      disciplineId: "hockey",
-      displayName: "Hockey",
+      disciplineId: "football",
+      displayName: "Football",
       order: bisherigerSpieltag.discipline2?.order ?? 2,
-      playerCount: 5,
-      legacyScorePlayerCount: 5,
-      category: "power" as const,
+      playerCount: 4,
+      legacyScorePlayerCount: 4,
+      category: "social" as const,
       occurrenceInSeason: 1 as const,
     },
   };
