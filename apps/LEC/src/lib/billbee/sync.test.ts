@@ -96,7 +96,7 @@ describe("syncBillbee", () => {
 
     const articles = await db.prisma.article.findMany({ orderBy: { nameRaw: "asc" } });
     const a = articles.find((x) => x.nameRaw === A)!;
-    expect(a).toMatchObject({ stock: 4, currentVk: 6.99, currentEk: 2.5, active: true });
+    expect(a).toMatchObject({ stock: 4, currentVk: 6.99, currentEk: 2.5, active: true, billbeeId: "1" });
     expect(articles.find((x) => x.nameRaw === B)!.active).toBe(false);
     expect(report.deactivated).toBe(1);
 

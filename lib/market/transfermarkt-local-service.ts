@@ -331,7 +331,98 @@ let localMarketContextCacheApproxBytes = 0;
 
 const localMarketContextCache = new Map<string, LocalMarketContextCacheEntry>();
 const localMarketContextKeyCache = new WeakMap<GameState, string>();
-const localNegotiationPreviewCache = new Map<string, ReturnType<typeof buildContractNegotiationPreview>>();
+
+/**
+ * CI-OOM-FUND (15.11., Heap-Snapshot-Diff an `tests/arena-vorlauf-service.test.ts`, NACH dem
+ * Finding-#178-Fix und NACH der Datei-Isolation aus PR #1452 -- die Datei crashte danach immer
+ * noch GANZ ALLEIN): derselbe Fehler wie Finding #178, nur einen Cache weiter. `localNegotiationPreviewCache`
+ * war ein VOELLIG unbegrenztes `Map` -- kein Eintrags-Deckel, kein Byte-Deckel -- UND fehlte
+ * komplett in `invalidateLocalTransfermarktCachesForSave()`. Sein Schluessel
+ * (`negotiationCacheKey` unten) beginnt mit `marketContext.cacheKey` -- demselben mehrstelligen-
+ * MB-grossen Potenzial-/Markt-Signatur-Dump wie bei Finding #178 -- gefolgt von teamId/playerId/
+ * Vertragsparametern. Jede einzelne vom KI-Draft GEPRUEFTE (nicht nur jede GEKAUFTE) Spieler-
+ * Verhandlung erzeugt damit einen EIGENEN, nie verworfenen Eintrag mit demselben riesigen
+ * Schluessel-Praefix. Gemessen an EINEM vollen 32-Team-Ligadraft (Heap-Snapshot nach
+ * `invalidateLocalTransfermarktCachesForSave()` + Vollzyklus-GC): 366 Eintraege, 270 MB NUR an
+ * Schluesselstrings (Werte nicht mitgerechnet) -- und `invalidateLocalTransfermarktCachesForSave()`
+ * liess diese 366 Eintraege unveraendert stehen, weil die Funktion diesen Cache gar nicht kannte.
+ * Vier solcher Baus (vier `it()`-Bloecke bzw. Setup-Versuche in einer Testdatei) haetten damit
+ * schon ueber 1 GB allein in diesem einen, bis dahin unbeachteten Cache gehalten -- genau die
+ * Groessenordnung, die den Default-Heap (~2 GB) sprengte. Gleiche Abwehr wie bei
+ * `localMarketContextCache`: Eintrags-Deckel als Sicherheitsnetz, Byte-Deckel als eigentliche
+ * Grenze, UND Aufnahme in die Save-Aufraeumfunktion.
+ */
+type LocalNegotiationPreviewCacheEntry = {
+  value: ReturnType<typeof buildContractNegotiationPreview>;
+  approxBytes: number;
+};
+
+const DEFAULT_MAX_LOCAL_NEGOTIATION_PREVIEW_CACHE_ENTRIES = 64;
+// Der Wert selbst (eine Verhandlungs-Vorschau FUER EINEN Spieler) ist klein -- der Schluessel
+// traegt praktisch die ganze Groesse (s. Fund oben). Der Byte-Deckel ist deshalb bewusst kleiner
+// als bei `localMarketContextCache` (dort haelt JEDER Eintrag einen vollen Liga-Kontext vor, hier
+// reicht ein Vielfaches weniger, weil ein Save binnen eines Laufs hunderte Verhandlungs-Varianten
+// desselben Spielers pruefen kann, ohne dass das je ueber wenige zehn MB hinauswachsen soll).
+const DEFAULT_MAX_LOCAL_NEGOTIATION_PREVIEW_CACHE_BYTES = 40_000_000;
+
+let maxLocalNegotiationPreviewCacheEntries = DEFAULT_MAX_LOCAL_NEGOTIATION_PREVIEW_CACHE_ENTRIES;
+let maxLocalNegotiationPreviewCacheBytes = DEFAULT_MAX_LOCAL_NEGOTIATION_PREVIEW_CACHE_BYTES;
+let localNegotiationPreviewCacheApproxBytes = 0;
+
+const localNegotiationPreviewCache = new Map<string, LocalNegotiationPreviewCacheEntry>();
+
+function estimateLocalNegotiationPreviewApproxBytes(cacheKey: string): number {
+  // Siehe Fund oben: der Schluessel (der den Markt-Kontext-Signatur-Dump als Praefix traegt) ist
+  // der dominante Anteil -- der Wert selbst ist eine Handvoll Zahlen/Strings fuer EINEN Spieler.
+  return cacheKey.length * 2 + 512;
+}
+
+function evictLocalNegotiationPreviewCacheToLimit() {
+  while (
+    localNegotiationPreviewCache.size > 0 &&
+    (localNegotiationPreviewCache.size > maxLocalNegotiationPreviewCacheEntries ||
+      localNegotiationPreviewCacheApproxBytes > maxLocalNegotiationPreviewCacheBytes)
+  ) {
+    const oldestKey = localNegotiationPreviewCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    const oldestEntry = localNegotiationPreviewCache.get(oldestKey);
+    if (oldestEntry) {
+      localNegotiationPreviewCacheApproxBytes -= oldestEntry.approxBytes;
+    }
+    localNegotiationPreviewCache.delete(oldestKey);
+  }
+  if (localNegotiationPreviewCache.size === 0) {
+    localNegotiationPreviewCacheApproxBytes = 0;
+  }
+}
+
+export function setLocalNegotiationPreviewCacheMaxEntries(maxEntries: number) {
+  maxLocalNegotiationPreviewCacheEntries = Math.max(1, Math.round(maxEntries));
+  evictLocalNegotiationPreviewCacheToLimit();
+}
+
+export function getLocalNegotiationPreviewCacheMaxEntries() {
+  return maxLocalNegotiationPreviewCacheEntries;
+}
+
+export function setLocalNegotiationPreviewCacheMaxBytes(maxBytes: number) {
+  maxLocalNegotiationPreviewCacheBytes = Math.max(1, Math.round(maxBytes));
+  evictLocalNegotiationPreviewCacheToLimit();
+}
+
+export function getLocalNegotiationPreviewCacheMaxBytes() {
+  return maxLocalNegotiationPreviewCacheBytes;
+}
+
+export function localNegotiationPreviewCacheSizeForTests() {
+  return localNegotiationPreviewCache.size;
+}
+
+export function localNegotiationPreviewCacheApproxBytesForTests() {
+  return localNegotiationPreviewCacheApproxBytes;
+}
 
 function estimateLocalMarketContextApproxBytes(cacheKey: string, gameState: GameState): number {
   const keyBytes = cacheKey.length * 2;
@@ -1042,7 +1133,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     lastNegotiatedSalary ?? "-",
     params.saveId ?? marketContext.save.saveId,
   ].join(":");
-  let negotiationPreview = localNegotiationPreviewCache.get(negotiationCacheKey);
+  let negotiationPreview = localNegotiationPreviewCache.get(negotiationCacheKey)?.value;
   if (!negotiationPreview) {
     negotiationPreview = buildContractNegotiationPreview({
       saveId: params.saveId,
@@ -1065,7 +1156,10 @@ function buildLocalTransfermarktBuyPreviewFromContext(
       seasonIdBase: gameState.season.id,
       seasonLabelBase: gameState.season.name,
     });
-    localNegotiationPreviewCache.set(negotiationCacheKey, negotiationPreview);
+    const approxBytes = estimateLocalNegotiationPreviewApproxBytes(negotiationCacheKey);
+    localNegotiationPreviewCache.set(negotiationCacheKey, { value: negotiationPreview, approxBytes });
+    localNegotiationPreviewCacheApproxBytes += approxBytes;
+    evictLocalNegotiationPreviewCacheToLimit();
   }
   const contractSalary = negotiationPreview.offeredSalary ?? salary;
   /**
@@ -2461,6 +2555,18 @@ export function invalidateLocalTransfermarktCachesForSave(saveId: string) {
   }
   if (localMarketContextCache.size === 0) {
     localMarketContextCacheApproxBytes = 0;
+  }
+  // CI-OOM-FUND 15.11. (s. Kommentar an `localNegotiationPreviewCache` oben): fehlte hier bisher
+  // komplett -- derselbe Schluessel-Praefix (`marketContext.cacheKey`, beginnt mit `saveId:`) wie
+  // bei den drei Caches oben, trotzdem ein eigener, bis dahin NIE aufgeraeumter Cache.
+  for (const [key, entry] of [...localNegotiationPreviewCache.entries()]) {
+    if (key.startsWith(prefix) || key.startsWith(saveId)) {
+      localNegotiationPreviewCacheApproxBytes -= entry.approxBytes;
+      localNegotiationPreviewCache.delete(key);
+    }
+  }
+  if (localNegotiationPreviewCache.size === 0) {
+    localNegotiationPreviewCacheApproxBytes = 0;
   }
 }
 

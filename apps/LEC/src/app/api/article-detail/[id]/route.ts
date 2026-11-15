@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     prisma.sale.findMany({ where: { articleId: id }, orderBy: { soldAt: "desc" }, take: 200 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 40 }),
     prisma.priceChange.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 10 }),
-    prisma.article.findUnique({ where: { id }, select: { createdAt: true, stock: true, currentEk: true } }),
+    prisma.article.findUnique({ where: { id }, select: { createdAt: true, stock: true, currentEk: true, billbeeId: true } }),
     prisma.marketPriceHistory.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, priceAvg7: true, priceTrend: true } }),
     prisma.stockLoss.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 50 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, before: true, after: true } }),
@@ -37,6 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     : null;
   const lossCost = losses.reduce((n, l) => n + l.qty * (l.unitEk ?? article?.currentEk ?? 0), 0);
   return NextResponse.json({
+    billbeeId: article?.billbeeId ?? null,
     kennzahlen,
     ekLog: ekLog.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
     losses: losses.map((l) => ({ id: l.id, at: l.at.toISOString(), kind: l.kind, qty: l.qty, unitEk: l.unitEk, note: l.note })),
@@ -49,6 +50,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       source: p.source,
     })),
     sales: sales.map((x) => ({ soldAt: x.soldAt.toISOString(), qty: x.qty, unitPrice: x.unitPrice })),
+    priceHistory: allPrice.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
+    marketHistory: history.map((h) => ({ at: h.at.toISOString(), priceAvg7: h.priceAvg7 })),
     priceLog: priceLog.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
     stockLog: stockLog.map((m) => ({ at: m.at.toISOString(), before: m.before, after: m.after })),
     reports: facts.map((f) => ({
