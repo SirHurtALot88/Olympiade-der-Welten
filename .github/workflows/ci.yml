@@ -523,11 +523,23 @@ jobs:
   #
   # ZUM ANHAKEN: Settings -> Branches -> Regel fuer `main` -> Require status checks to pass ->
   # `persistenz-suiten` dazu. Ohne diesen Klick laeuft der Job zwar, haelt aber nichts auf.
+  #
+  # `timeout-minutes: 40` statt 30 (15.11., CI-TIMEOUT-FUND, s. Kopfkommentar in
+  # `scripts/fahre-persistenz-suiten.ts`): die Isolation der vier SCHWERE_DATEIEN gegen den
+  # Heap-OOM (14.11.) machte diesen Job zu lang fuer sein bisheriges Limit -- Commit badcf9f4f
+  # (Run 43674126454, Job 132690494164) wurde nach 30:13 abgebrochen, waehrend der Batch der
+  # restlichen Dateien noch lief, kein Heap-Crash. Das Skript faehrt die vier Dateien jetzt mit
+  # Konkurrenzgrenze 2 statt streng seriell (spart dort ca. 7-8 Minuten, ohne wieder vier
+  # gleichzeitige Prozesse zu riskieren, s. dortiger Kommentar) -- 40 Minuten ist trotzdem noetig,
+  # weil allein Setup (knapp 3 Min.) plus die isolierte Phase (gemessen ca. 12-13 Min. bei
+  # Konkurrenzgrenze 2) plus der Batch der restlichen rund 200 Dateien (zuletzt gemessen ca.
+  # 16-19 Min., skaliert mit der wachsenden Dateizahl) zusammen nahe an die alten 30 Minuten
+  # heranreichen -- 40 laesst echten CI-Varianz-Puffer, nicht nur die neue Bestzeit.
   persistenz-suiten:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Set CI SQLite path

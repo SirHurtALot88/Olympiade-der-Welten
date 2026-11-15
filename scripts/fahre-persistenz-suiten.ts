@@ -60,10 +60,38 @@
  * isolieren (Laufzeit) oder eine neue schwere Datei NICHT isolieren (genau der Fehler, den sie
  * beheben soll). Wer eine neue `bauFrischenBattleSaveMitVollemFeld()`-Kopie anlegt, trägt sie hier
  * nach UND ruft `invalidateLocalTransfermarktCachesForSave()` darin auf.
+ *
+ * CI-TIMEOUT-FUND (15.11., Anschluss an CI-OOM-FUND oben): die vier SCHWERE_DATEIEN liefen bislang
+ * STRENG SERIELL (vier `execFileSync`-Aufrufe nacheinander) -- das kostete die Isolation nichts
+ * (jede Datei hatte weiterhin ihren eigenen frischen Prozess), aber Zeit. Gemessen auf Commit
+ * badcf9f4f (CI-Run 43674126454, Job 132690494164): 727,83s + 123,39s + 225,39s + 126,20s =
+ * 1202,81s allein fuer diese Phase, danach noch der Batch der restlichen (damals 198) Dateien --
+ * der Job `persistenz-suiten` (`timeout-minutes: 30`) wurde nach 30:13 abgebrochen, bevor der Batch
+ * fertig war. Kein Heap-Crash (der OOM-Fix selbst griff), ein echtes Zeitlimit.
+ *
+ * NICHT auf volle Parallelitaet (alle vier Dateien gleichzeitig) gegangen, GEMESSEN statt vermutet:
+ * vier gleichzeitige `npx vitest run <eine Datei>`-Aufrufe spawnen hier zusammen ACHT geforkte
+ * Worker-Prozesse (zwei je Aufruf) auf vier Kernen UND treiben die Summe aus RSS aller vier
+ * Prozesse nahe an das verfuegbare RAM. Ein lokaler Reproduktionslauf unter dieser Bedingung endete
+ * mit einem echten `oom-kill` von `arena-vorlauf-service.test.ts` (dem schwersten der vier,
+ * `dmesg`: "Memory cgroup out of memory"). Genau DAS wiederherzustellen waere ein Rueckschritt
+ * hinter den Grund, warum diese Dateien ueberhaupt isoliert wurden.
+ *
+ * STATT DESSEN: KONKURRENZ-GRENZE 2, nicht 4. `arena-vorlauf-service.test.ts` ist mit 727,83s von
+ * 1202,81s (61 %) mit Abstand die schwerste Datei -- die uebrigen drei summiert (474,98s) bleiben
+ * DARUNTER. Zwei gleichzeitige Prozesse heben deshalb schon fast den gesamten Zeitgewinn einer
+ * vollen Viererparallelitaet (die Wall-Clock-Zeit der Phase sinkt auf ungefaehr die Laufzeit der
+ * schwersten Datei allein, nicht auf die Summe aller vier), ohne die Spitzenlast auf vier
+ * gleichzeitige Prozesse zu treiben. Lokal nachgemessen (derselbe Vierersatz, KONKURRENZ=2):
+ * 574,0s Wall-Clock statt der seriellen Summe, alle vier Dateien gruen, kein OOM-Kill.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+
+// s. CI-TIMEOUT-FUND oben: 2 gleichzeitige `npx vitest run`-Prozesse heben fast den ganzen
+// Zeitgewinn einer vollen Viererparallelitaet, ohne deren gemessenes OOM-Risiko einzugehen.
+const KONKURRENZGRENZE = 2;
 
 const TEST_ORDNER = join(process.cwd(), "tests");
 const SIGNATUREN = ["lib/persistence/", "createPersistenceService", "OLY_APP_SQLITE_PATH"];
@@ -119,10 +147,70 @@ if (fehlendeSchwereDateien.length > 0) {
 }
 const leichteSuiten = suiten.filter((datei) => !SCHWERE_DATEIEN.includes(datei));
 
-console.log(`Persistenz-Suiten: ${suiten.length} Dateien (${SCHWERE_DATEIEN.length} davon einzeln isoliert, s. CI-OOM-FUND)`);
-for (const schwereDatei of SCHWERE_DATEIEN) {
-  console.log(`Persistenz-Suiten · isoliert: ${schwereDatei}`);
-  execFileSync("npx", ["vitest", "run", schwereDatei], { stdio: "inherit" });
+// Ein eigener `npx vitest run <datei>`-Aufruf je schwerer Datei (ein frischer Prozess, der seinen
+// Speicher beim Beenden freigibt) -- bis zu KONKURRENZGRENZE davon gleichzeitig, s. CI-TIMEOUT-FUND
+// oben fuer die Messung, die diese Zahl statt voller Parallelitaet oder strenger Serialitaet
+// begruendet. `execFileSync` (synchron, blockierend) kann das nicht ausdruecken; `spawn` plus eine
+// kleine Warteschlange schon, ohne die Isolation je zwei Dateien zu nehmen -- sie bleiben weiterhin
+// zwei komplett getrennte Prozesse, nur eben nicht mehr strikt nacheinander gestartet.
+function fahreIsoliert(datei: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    console.log(`Persistenz-Suiten · isoliert gestartet: ${datei}`);
+    const kind = spawn("npx", ["vitest", "run", datei], { stdio: "inherit" });
+    kind.on("error", reject);
+    kind.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`npx vitest run ${datei} endete mit Code ${code}${signal ? ` (Signal ${signal})` : ""}`));
+      }
+    });
+  });
 }
-console.log(`Persistenz-Suiten · Batch: ${leichteSuiten.length} Dateien`);
-execFileSync("npx", ["vitest", "run", ...leichteSuiten], { stdio: "inherit" });
+
+async function fahreSchwereDateienMitKonkurrenzgrenze(dateien: string[], grenze: number): Promise<void> {
+  const warteschlange = [...dateien];
+  const fehler: unknown[] = [];
+
+  async function worker(): Promise<void> {
+    for (;;) {
+      const naechste = warteschlange.shift();
+      if (!naechste) return;
+      try {
+        await fahreIsoliert(naechste);
+      } catch (fehlerFall) {
+        // Nicht sofort abbrechen: die uebrigen bereits laufenden/wartenden Dateien sollen ihr
+        // Ergebnis trotzdem zeigen (dasselbe Verhalten, das ein serieller `execFileSync`-Lauf durch
+        // seinen Nicht-Null-Exit ohnehin erst am Ende des GESAMTEN Skripts hatte).
+        fehler.push(fehlerFall);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(grenze, dateien.length) }, () => worker()));
+
+  if (fehler.length > 0) {
+    for (const einzelFehler of fehler) {
+      console.error(einzelFehler);
+    }
+    throw new Error(`${fehler.length} von ${dateien.length} isolierten Persistenz-Suiten sind fehlgeschlagen.`);
+  }
+}
+
+async function main(): Promise<void> {
+  console.log(
+    `Persistenz-Suiten: ${suiten.length} Dateien (${SCHWERE_DATEIEN.length} davon einzeln isoliert, s. CI-OOM-FUND, hoechstens ${KONKURRENZGRENZE} gleichzeitig, s. CI-TIMEOUT-FUND)`,
+  );
+  await fahreSchwereDateienMitKonkurrenzgrenze(SCHWERE_DATEIEN, KONKURRENZGRENZE);
+  console.log(`Persistenz-Suiten · Batch: ${leichteSuiten.length} Dateien`);
+  execFileSync("npx", ["vitest", "run", ...leichteSuiten], { stdio: "inherit" });
+}
+
+// Kein Top-Level-`await`: `tsx` kompiliert dieses Skript (kein `"type": "module"` in package.json)
+// nach CJS, und esbuild lehnt Top-Level-`await` dort ab ("not supported with the cjs output
+// format") -- lokal beim ersten echten Lauf dieser Fassung aufgefallen, nicht vermutet. Deshalb
+// hier derselbe `main().catch()`-Zuschnitt wie in den uebrigen Skripten dieses Ordners.
+main().catch((fehler) => {
+  console.error(fehler);
+  process.exit(1);
+});
