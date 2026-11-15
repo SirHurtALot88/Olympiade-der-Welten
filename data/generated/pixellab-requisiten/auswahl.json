@@ -65,6 +65,28 @@
   "kandidat": 2,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "bruecke_wackel_heil": {
+  "prompt": "single wooden plank walkway bridging a gap, straight and level, visible wood grain, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   20
+  ],
+  "job": "4c8099c4-8b05-4e5b-8e04-e01d72cb7982",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "bruecke_wackel_kipp": {
+  "prompt": "single wooden plank walkway bridging a gap, tilted steeply to one side as if about to flip over, visible wood grain, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   24
+  ],
+  "job": "918d8afc-2c62-406b-a2ef-8f69e69c03e8",
+  "kandidat": 6,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "burg_mauer": {
   "prompt": "straight section of a solid light grey stone brick castle curtain wall with square battlements along the top, front view, the wall runs across the full width and is cut off at the left and right edges, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -197,6 +219,17 @@
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "falle_fegearm": {
+  "prompt": "a long padded wrecking-ball style sweeper arm mounted on a pivot post, horizontal swinging boom with a thick padded knocker end, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   84,
+   24
+  ],
+  "job": "ef6f84c8-6348-4f9e-b786-f866fb905340",
+  "kandidat": 12,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "falle_spitzen": {
   "prompt": "wooden cheval de frise, crossed sharpened stakes barricade, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -239,6 +272,39 @@
   ],
   "job": "7be4510d-82e8-419e-8cc4-bf9e05d99b12",
   "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_gross": {
+  "prompt": "large deep pit with a jagged crumbling drop edge, pitch black depth with sharpened wooden stakes faintly visible at the bottom, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   80,
+   48
+  ],
+  "job": "dcc54db4-d869-4101-b73b-a24dc00d2ca9",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_klein": {
+  "prompt": "small rectangular pit dug into the ground with a crumbling broken edge, dark shadow at the bottom, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   32
+  ],
+  "job": "8a3a3cb8-ed1c-477a-a192-642cd75ca8fd",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_mittel": {
+  "prompt": "medium rectangular pit with a jagged crumbling drop edge, dark depth with a few loose rocks tumbling in, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   40
+  ],
+  "job": "0ed4396b-078a-4eed-8c72-07d29ad972d8",
+  "kandidat": 2,
   "endpunkt": "/v2/generate-image-v2"
  },
  "helmet_white1": {
@@ -377,6 +443,50 @@
   "kandidat": 10,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "kaefig_ecke_an": {
+  "prompt": "corner post of an electrified fence where the wire mesh turns a right angle, bright blue-white electric arcs crackling along the mesh, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "b3887405-79bf-4edd-a2d2-1ab1c00948db",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_ecke_aus": {
+  "prompt": "corner post of an electrified fence where the wire mesh turns a right angle, dark inactive, no glow, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "a50fff3d-ac7a-4950-92cb-8909e0f87272",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_gerade_an": {
+  "prompt": "straight electrified fence segment between two metal posts, bright blue-white electric arcs crackling along the wire mesh, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "a264046d-0da6-46d8-8398-0e3f6de8aa0e",
+  "kandidat": 2,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_gerade_aus": {
+  "prompt": "straight electrified fence segment between two metal posts, dark inactive wire mesh, no glow, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "2db4d900-3273-4d19-8794-14280711e5f2",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "korb_topdown": {
   "prompt": "basketball hoop seen from directly above: white backboard as a horizontal bar at the top, orange rim ring with white net below it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -443,6 +553,72 @@
    "kandidat": 19,
    "endpunkt": "/v2/generate-image-v2"
   }
+ },
+ "truhe_1_offen": {
+  "prompt": "small plain wooden treasure chest with simple dark metal corner brackets, lid open, a few coins and a torn note visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   34
+  ],
+  "job": "00d0fcb5-cff2-42f6-a185-eb5f9a029a1f",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_1_zu": {
+  "prompt": "small plain wooden treasure chest with simple dark metal corner brackets, no ornamentation, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   30
+  ],
+  "job": "e65064ca-ae31-4300-8a40-cb8db828f445",
+  "kandidat": 10,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_2_offen": {
+  "prompt": "wooden treasure chest with bronze corner fittings and carved trim, lid open, a stack of documents and a few gold coins visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   34,
+   36
+  ],
+  "job": "528c07e7-91b4-4fb2-a802-460ac2c01e20",
+  "kandidat": 10,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_2_zu": {
+  "prompt": "wooden treasure chest with bronze corner fittings, a small lock and carved trim, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   34,
+   32
+  ],
+  "job": "0299f362-1e5a-48bc-8eb7-50f716fc8fb0",
+  "kandidat": 48,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_3_offen": {
+  "prompt": "ornate ironbound treasure chest with gold trim and engraved panels, lid open, a pile of gold coins and gems visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   38,
+   40
+  ],
+  "job": "883d5205-c44f-4c32-ac00-dee212bd7803",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_3_zu": {
+  "prompt": "ornate ironbound treasure chest with gold trim, engraved panels and a heavy lock, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   38,
+   34
+  ],
+  "job": "6a284929-98fd-4063-9864-b9348a230605",
+  "kandidat": 19,
+  "endpunkt": "/v2/generate-image-v2"
  },
  "zaun_holz": {
   "prompt": "short wooden fence segment, two posts and two horizontal rails, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
