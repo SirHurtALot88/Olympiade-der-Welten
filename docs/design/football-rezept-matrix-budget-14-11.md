@@ -16,6 +16,13 @@ unten ist die direkte Antwort darauf und zugleich ein wichtiger NEUER Befund: di
 (ERLAUBT-Tabelle) hat fuer Football weniger Spielraum, als die lineare Sinkhorn-Rechnung nahelegt,
 weil der echte Motor NICHTLINEAR reagiert (s. Abschnitt 3a).
 
+**15.11., "top prio"-Auftrag (Football UND Hockey wirklich an die echte Simulation anschliessen):**
+Runde 4 (Abschnitt 5) probiert zwei weitere, bisher unversuchte Hebel — `FK_LOS_KAPPA` selbst
+(ab jetzt freigegeben) und eine vierte Spaltenseiten-Variante, die das neue Mehrheits-
+Guetekriterium aus Runde 3 explizit einhaelt. **Ergebnis: beide verworfen, rho bleibt im Band
+0,50–0,58** — Football steht am Ende dieses Dokuments weiterhin NICHT in
+`ARENA_RESOLVED_DISCIPLINE_IDS`, s. Abschnitt 6 fuer die Einordnung und die naechsten Optionen.
+
 ## 1. Werkzeug-Befund: zwei strukturelle Bugs, beide behoben
 
 `scripts/baue-feldspiel-rezept.mjs` loest die Budget-Methode bereits per Sinkhorn-Algorithmus —
@@ -189,25 +196,101 @@ erweitern.
   innerhalb der Chris-Vorgabe (volle Zeilensumme je Attribut, s. Guard-Test). Der einzige Hebel,
   der gezogen wurde, ist die Spaltenseite (ERLAUBT-Tabelle), wie ausdruecklich erlaubt.
 
-## 5. Optionen fuer Chris / die naechste Runde
+## 5. Runde 4 (15.11.) — `FK_LOS_KAPPA`-Sweep UND eine vierte Spaltenseiten-Variante, beide verworfen
 
-1. **`FK_LOS_KAPPA` als neuen, separaten Hebel diskutieren** (Abschnitt 4) — koennte rho heben
-   (das ist der dokumentierte Grund, warum TEAMGEIST ueberhaupt die Receiver-Quelle wurde), wirkt
-   aber auf den GESAMTEN Football-Motor (jede Lotterie, nicht nur TEAMGEIST) und braucht eine
-   eigene Korridor-Nachmessung (Completion-Quote/Yards-Attempt/Turnover-Quote) — ein groesserer,
-   eigener Auftrag, keine weitere ERLAUBT-Tabellen-Iteration.
-2. **Weitere, VORSICHTIGERE Spaltenseiten-Iterationen** — nach Runde 3s Befund (Abschnitt 3a)
-   eingeschraenkt auf Varianten, die KEIN Attribut in einer PASSGENAUIGKEIT/PASSSCHUTZ-artigen
-   Zelle von Minderheit zu Mehrheit verschieben. Der verbleibende Spielraum ist damit klein; drei
-   von drei bisher versuchten Varianten haben rho nicht ueber das Kaderrauschen hinaus bewegt.
-3. **rho-Schranke fuer Football gesondert diskutieren** (analog zur bereits bestehenden
-   Stern-/Paartreue-Ausnahme bei anderen Disziplinen, falls 0,55–0,60 als "ehrlicher" Zielwert fuer
-   diese spezielle Disziplin akzeptiert werden kann, nachdem drei unabhaengige Spaltenseiten-
-   Varianten alle im selben engen Band landen) — eine Design-Entscheidung, keine
-   Implementierungsfrage.
-4. **AUSDAUER einen echten mechanischen Kanal geben** (eigener, kleinerer Auftrag, unabhaengig von
+Chris' "top prio"-Auftrag (15.11.) gab fuer diese Runde ausdruecklich auch `FK_LOS_KAPPA` selbst
+frei (bisher nur ERLAUBT-Tabellen-Mandat) — mit dem Ziel, Football wirklich an die Arena-Pipeline
+anzuschliessen, sobald rho > 0,80 UND Pp ≤ 25 in zwei Saatstroemen bestehen. Zwei systematische
+Versuche, beide am realen Motor gemessen (Round-1-Rezept als Ausgangspunkt, `node scripts/
+messe-arena-einfluss.mjs football 48` + `node scripts/miss-alle-disziplinen.mjs 48 football`,
+Kader-Familie "Oly New Game Custom 31.10.2026"):
+
+### 5a. Kappa-Sweep: rho bewegt sich NICHT, Pp wird eher schlechter
+
+`FK_LOS_KAPPA` schrittweise von 3,4 (committeter Wert) auf 3,0 → 2,0 → 1,0 gesenkt, Rezept
+unveraendert (Runde 1):
+
+| kappa | Pp   | rho/Spiel | Spannweite | rho Saison |
+|------:|-----:|----------:|-----------:|-----------:|
+| 3,4 (Basis) | 18,3 | 0,525 | 0,206 | 0,685 |
+| 3,0   | 24,1 | 0,548 | 0,198 | 0,706 |
+| 2,0   | 20,4 | 0,517 | 0,225 | 0,741 |
+| 1,0   | 23,5 | 0,498 | 0,294 | 0,881 |
+
+**rho bleibt in einem engen Band (0,498–0,548), vollstaendig innerhalb der Kaderrauschen-
+Spannweite jeder einzelnen Messung (0,2–0,29) — von Null Bewegung nicht unterscheidbar.** Pp wird
+bei JEDEM getesteten Wert schlechter als bei der committeten 3,4 (24,1/20,4/23,5 gegen 18,3) — 3,4
+bleibt der beste gemessene Wert, deckungsgleich mit dem bereits bestehenden Kappa-Regrid-Kommentar
+im Motor (`battle-mode.engine.js` ~12656), der 3,4 schon fuer das ALTE (override-kalibrierte)
+Rezept als Pp-Optimum gefunden hatte. **Befund: die im Auftrag formulierte Hypothese ("kappa
+senken sollte rho helfen, da es die Mehrheits-Uebergewichtung aus Runde 3 reduziert") traegt fuer
+Runde 1 nicht** — Runde 1 hat anders als Runde 3 gar keine extreme Mehrheit in einer
+mechanisch wichtigen Zelle (TEAMGEIST spirit 53 %, LAUFKRAFT health 54 %, ABWEHR_LAUF health 59 %,
+PASSGENAUIGKEIT/PASSSCHUTZ ohne jede Mehrheit ≤46 %), also gibt es dort auch nichts, was ein
+niedrigeres kappa "entschaerfen" koennte. `FK_LOS_KAPPA` bleibt auf 3,4 (keine Code-Aenderung,
+nichts committet).
+
+### 5b. Spaltenseiten-Variante: `awareness` zusaetzlich in TEAMGEIST
+
+Idee, abgeleitet aus dem Befund, dass `spirit` (Matrixgewicht 25, die groesste Einzelposition der
+Football-Matrix) in TEAMGEIST — mit 51,7 % der mechanischen Gesamtmasse bei weitem der schwerste
+Sub-Skill — zu 53 % dominiert, UND aus der (unabhaengig belegten) Beobachtung im zurueckgebauten
+Override-Verlauf, dass ein `spirit`-Zuschlag in TEAMGEIST rho schon bei kleinen Anteilen senkte
+("schon 8 % spirit: rho 0,788" gegenueber einer Basis um 0,804–0,808, Kommentar-Historie
+`battle-mode.engine.js`). `awareness` (Matrixgewicht 11, bisher nur in PASSGENAUIGKEIT/
+PASSSCHUTZ/ABWEHR_PASS) zusaetzlich in TEAMGEIST zugelassen, um einen Teil von TEAMGEISTs Bedarf
+von `spirit` weg auf ein zweites, grosses Attribut zu verteilen. Linear (Sinkhorn) eine klare
+Verbesserung: Restfehler 11,74 → 7,51 Pp, `spirit` in TEAMGEIST 53 % → 41 %, UND als Nebeneffekt
+verschwindet die bisher unbeachtete 100 %-Alleinherrschaft von `awareness` in der kleinen
+ABWEHR_PASS-Zelle (wird 40/31/29 mit torment/power) — genau das in dieser Runde zusaetzlich
+verlangte Guetekriterium (keine Zelle > 60 % eines Attributs) ist damit fuer ALLE mechanisch
+relevanten Zellen erfuellt (nur die ohnehin mechanisch toten BALLSICHERHEIT/AUSDAUER bleiben bei
+100 % eines einzigen Attributs, weil sie nur je zwei bzw. drei erlaubte Attribute haben und 0 %
+Gesamtmasse tragen — unveraendert gegenueber Runde 1).
+
+**Real am Motor gemessen: Pp 18,3 → 22,0 (schlechter, aber weiterhin unter der 25er-Schranke),
+rho 0,525 → 0,578 (+0,053 — innerhalb der Spannweite dieser Messung selbst, 0,206–0,266, also
+NICHT sicher von Kaderrauschen unterscheidbar).** Ein moeglicher, aber nicht gesicherter kleiner
+rho-Gewinn bei einer klaren Pp-Verschlechterung ist keine Verbesserung gegenueber Runde 1 auf
+beiden Kriterien zugleich — verworfen. `scripts/baue-feldspiel-rezept.mjs`s `ERLAUBT.football`
+und `FELDSPIEL_ART.football.rezept` in `battle-mode.engine.js` stehen wieder auf Runde 1 (CI-Guard
+erneut gruen verifiziert, `git checkout` auf beide Dateien, keine Reste).
+
+### 5c. Einordnung: vier unabhaengige Hebel probiert, keiner bewegt rho ueber 0,58
+
+Mit Runde 4 sind jetzt VIER voneinander unabhaengige Hebel probiert (drei Spaltenseiten-Varianten
+aus Runden 2/3/5b plus ein Motorparameter-Sweep ueber vier Werte in Runde 4a) — alle landen rho
+zwischen 0,498 und 0,578, keiner kommt auch nur in die Naehe der 0,80-Schranke. Das ist ein
+deutlich staerkeres Signal als nach Runde 3 alleine: es sieht nicht nach einer einzelnen falschen
+Design-Entscheidung aus, sondern nach einer STRUKTURELLEN Grenze, die aus der Matrix-Sperrung
+selbst folgt — `spirit` (25 Pp, groesstes Einzelgewicht) MUSS ueberwiegend in TEAMGEIST und/oder
+LAUFKRAFT landen (den beiden einzigen Zellen mit genug mechanischer Masse, um 25 Punkte Budget
+sinnvoll aufzunehmen, ohne eine andere Zelle zu einer unloesbaren Zeilensumme zu zwingen), und
+`spirit` korreliert in diesem Motor nachweislich schwach mit Spielerfolg (s. 5b) — unabhaengig
+davon, WELCHES zweite/dritte Attribut die Zelle begleitet oder wie scharf `fkLos()` zieht. Die alte
+override-kalibrierte Fassung erreichte rho 0,807, indem sie `spirit` komplett ignorierte (0 %
+mechanisches Gewicht) — genau das verbietet die Matrix-Sperrung jetzt.
+
+## 6. Optionen fuer Chris / die naechste Runde
+
+1. **rho-Schranke fuer Football gesondert diskutieren** (analog zur bereits bestehenden
+   Stern-/Paartreue-Ausnahme bei anderen Disziplinen) — nach Runde 4 die naheliegendste Option:
+   VIER unabhaengige Hebel (drei Spaltenseiten-Varianten, ein Kappa-Sweep ueber vier Werte) landen
+   alle im Band 0,50–0,58, keiner naeher an 0,80 als ein anderer. Das liest sich wie eine
+   strukturelle Folge der Matrix-Sperrung (s. 5c), nicht wie ein noch unausprobiertes Rezept.
+2. **Noch vorsichtigere Spaltenseiten-Iterationen** — der Spielraum ist nach Runde 4 noch kleiner
+   als nach Runde 3: VIER von vier bisher versuchten Varianten (inkl. 5b) haben rho nicht ueber das
+   Kaderrauschen hinaus bewegt, und 5b hat dabei zusaetzlich bewiesen, dass selbst eine linear klar
+   bessere, majoritaets-saubere Variante real nur Rauschen bewegt. Ein fuenfter Versuch braucht
+   zuerst eine neue Idee, WARUM er anders ausfallen sollte als die ersten vier — nicht nur eine
+   andere Zellkombination.
+3. **AUSDAUER einen echten mechanischen Kanal geben** (eigener, kleinerer Auftrag, unabhaengig von
    der rho-Frage, würde `stamina`s Pp von 0 auf etwas Reales heben, ohne das aktuelle Rezept
    anzutasten).
+4. **Football bleibt vorerst auf der PPS-Duell-Bruecke** — Runde 4 erreicht das Pflichtziel (rho >
+   0,80 UND Pp ≤ 25, zwei Saatstroeme) nicht; `ARENA_RESOLVED_DISCIPLINE_IDS` bleibt unveraendert,
+   bis entweder Option 1 (rho-Ausnahme) oder eine neue, bisher unversuchte Idee (Option 2) das
+   leistet.
 
 ## Quellen
 
@@ -220,3 +303,12 @@ erweitern.
 - Eigene Messungen (14.11.): `node scripts/messe-arena-einfluss.mjs football 48`,
   `node scripts/miss-alle-disziplinen.mjs 48 football` — frische Kaderfamilie
   (`scripts/ziehe-kader-familie.ts`, Save "Oly New Game Custom 31.10.2026").
+- Eigene Messungen Runde 4 (15.11.), dieselben zwei Befehle, kappa jeweils per `sed`/`git
+  checkout` auf `public/mockups/battle-mode.engine.js` gesetzt und nach jeder Messung wieder
+  zurueckgesetzt (`const FK_LOS_KAPPA=` ~Zeile 12672): 3,4/3,0/2,0/1,0 fuer Abschnitt 5a, Runde-1-
+  Rezept mit `awareness` zusaetzlich in TEAMGEIST fuer Abschnitt 5b (`scripts/baue-feldspiel-
+  rezept.mjs football <sondierung>` mit angepasster `ERLAUBT.football.TEAMGEIST`, dieselbe
+  Sondierung wie Runde 1/3: TEAMGEIST 52,7 %, LAUFKRAFT 24,4 %, ABWEHR_LAUF 8,7 %,
+  PASSGENAUIGKEIT 8,1 %, ABWEHR_PASS 4,9 %, PASSSCHUTZ 1,2 %, BALLSICHERHEIT/AUSDAUER 0 %).
+  Beide Varianten NICHT committet — Code steht nach Runde 4 wieder exakt auf Runde 1 (`git
+  checkout` auf beide Dateien, Guard-Test erneut gruen).
