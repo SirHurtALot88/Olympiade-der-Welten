@@ -1,5 +1,6 @@
 import type { SortimentRow } from "./viewModel";
-import { RARITY_NAMES, rarityKey } from "../market/rarity";
+import { RARITY_NAMES, rarityKey, rarityFromTitle } from "../market/rarity";
+import { buildCardmarketSearchUrl } from "../pricing/marketPrice";
 
 /**
  * Preis-Board (Sortiment, Ansicht "Kompakt"): was ist zu tun, und wie gross ist der Hebel?
@@ -30,7 +31,7 @@ export function boardGap(row: SortimentRow): BoardGap | null {
   return { euro: 0, percent: 0, target: null };
 }
 
-export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "name";
+export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "gewinnMonat" | "kapital" | "reichweite" | "letzterVerkauf" | "ek" | "avgvk" | "name";
 
 export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   abweichung: "Größte Abweichung",
@@ -39,6 +40,12 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   marge: "Marge bei Nachkauf",
   verkaeufe: "Verkäufe (365 T)",
   bestand: "Bestand",
+  gewinnMonat: "Gewinn je Monat",
+  kapital: "Gebundenes Kapital",
+  reichweite: "Reichweite (längste zuerst)",
+  letzterVerkauf: "Letzter Verkauf (jüngster zuerst)",
+  ek: "Ø EK",
+  avgvk: "Ø VK",
   name: "Name",
 };
 
@@ -46,7 +53,7 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
  * "Groesste Abweichung": Artikel mit belastbarem Urteil und Abweichung zuerst, nach |€| absteigend;
  * dann die im Rahmen, zuletzt die ohne Urteil. Bei Gleichstand nach Name — die Reihenfolge ist stabil.
  */
-export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): SortimentRow[] {
+export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey, reverse = false): SortimentRow[] {
   const byName = (a: SortimentRow, b: SortimentRow) => a.nameRaw.localeCompare(b.nameRaw, "de");
   const marketValue = (r: SortimentRow) => r.market?.value ?? r.market?.range?.max ?? -1;
   const rank = (r: SortimentRow): number => {
@@ -74,10 +81,27 @@ export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): Sor
         return (b.windows["365"]?.qty ?? 0) - (a.windows["365"]?.qty ?? 0) || byName(a, b);
       case "bestand":
         return b.stock - a.stock || byName(a, b);
+      case "gewinnMonat":
+        return (b.today?.perMonth ?? -1e9) - (a.today?.perMonth ?? -1e9) || byName(a, b);
+      case "kapital":
+        return (b.today?.capitalBound ?? -1) - (a.today?.capitalBound ?? -1) || byName(a, b);
+      case "reichweite":
+        return (b.stockMonthsCover ?? -1) - (a.stockMonthsCover ?? -1) || byName(a, b);
+      case "letzterVerkauf": {
+        // jüngster zuerst; ohne Verkauf ganz hinten
+        const ta = a.lastSoldAt ? Date.parse(a.lastSoldAt) : -Infinity;
+        const tb = b.lastSoldAt ? Date.parse(b.lastSoldAt) : -Infinity;
+        return tb === ta ? byName(a, b) : tb > ta ? 1 : -1;
+      }
+      case "ek":
+        return b.ek - a.ek || byName(a, b);
+      case "avgvk":
+        return b.avgVkRealized - a.avgVkRealized || byName(a, b);
       case "name":
         return byName(a, b);
     }
   });
+  if (reverse) copy.reverse();
   return copy;
 }
 
@@ -136,22 +160,106 @@ export interface EbayLinks {
   revise: string | null;
   /** Suche im eigenen Shop, wenn die Artikelnummer unbekannt ist. */
   search: string;
+  /** Verkaeufer-Cockpit (Seller Hub), aktive Angebote gefiltert auf die Karte: von dort aus beendet man das Angebot. */
+  manage: string;
 }
 
 const SHOP = "https://www.ebay.de/str/lordenterichcards";
 
-/** Links zu eBay: direkt zum Angebot, sonst Suche im eigenen Shop ueber den Cardmarket-Code (ohne DE/EN). */
+export const isPokemonTitle = (nameRaw: string): boolean => /^\s*(?:\d+\s*x\s+)?pok[eé]mon\b/i.test(nameRaw);
+
+/** Englische Karte: Set-Code mit -EN oder "EN" als eigenes Wort im Titel (ohne DE). */
+function isEnglishCard(row: Pick<SortimentRow, "setCode" | "nameRaw">): boolean {
+  if (row.setCode && /-EN[A-Z]?\d/i.test(row.setCode)) return true;
+  if (/\bDE\b/.test(row.nameRaw) || (row.setCode && /-DE/i.test(row.setCode))) return false;
+  return /\bEN\b/.test(row.nameRaw);
+}
+
+/** Pokemon-Titel: "Pokemon 078/162 Flutter Mane Holo Promo ... NM EN" -> Nummer und Kartenname. */
+export function pokemonParts(nameRaw: string): { number: string | null; name: string } {
+  let t = nameRaw.replace(/^\s*\d+\s*x\s+/i, "").replace(/^\s*pok[eé]mon\s*/i, "");
+  const num = t.match(/\b(\d{1,3}\/\d{1,3})\b/);
+  const rest = t.replace(/\b\d{1,3}(?:\/\d{1,3})?\b/g, " ");
+  const stop = rest.search(/\b(Holo|Reverse|Promo|Rare|NM|LP|MP|HP|EN|DE)\b/i);
+  const name = (stop > 0 ? rest.slice(0, stop) : rest).replace(/\s+/g, " ").trim();
+  return { number: num ? num[1] : null, name };
+}
+
+/** Kartencode aus dem Titel, auch wenn er kein normaler Set-Code ist (SHVI-DESE3, MRD-G090, IOC-SE1). */
+export function titleCode(nameRaw: string): string | null {
+  const m = nameRaw.match(/\b([A-Z0-9]{2,6}-(?:25TH-)?[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?)\b/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Links zu eBay: direkt zum Angebot, sonst Suche im eigenen Shop. Gesucht wird so, wie der Code im
+ * eBay-TITEL steht (also MIT DE: "RA03-DE169"); "RA03-169" findet dort nichts.
+ */
 export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "nameRaw">): EbayLinks {
   const id = row.ebayItemId && /^\d{9,14}$/.test(row.ebayItemId) ? row.ebayItemId : null;
-  const term = row.setCode ? cardmarketCode(row.setCode) : row.nameRaw;
+  let term: string;
+  if (isPokemonTitle(row.nameRaw)) {
+    const p = pokemonParts(row.nameRaw);
+    term = [p.number, p.name].filter(Boolean).join(" ") || row.nameRaw;
+  } else {
+    term = row.setCode || titleCode(row.nameRaw) || cleanTitle(row.nameRaw).name || row.nameRaw;
+  }
   return {
     view: id ? `https://www.ebay.de/itm/${id}` : null,
     revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
     search: `${SHOP}?_nkw=${encodeURIComponent(term)}`,
+    manage: `https://www.ebay.de/sh/lst/active?keyword=${encodeURIComponent(term)}&source=filterbar&action=search`,
   };
+}
+
+/**
+ * Cardmarket-Suche zur Karte: Yu-Gi-Oh mit Cardmarket-Code ohne DE/EN (MAMA-DE047 -> MAMA-047), bei Name/Code-
+ * Konflikt der eindeutige Code zum Namen; Pokemon in der Pokemon-Sektion mit dem Kartennamen. Deutsche Karten
+ * mit Sprachfilter Deutsch, englische mit Englisch; sonst gleiche harten Filter (Verkaeufer DE, ab NM).
+ */
+export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string | null {
+  const language = isEnglishCard(row) ? "EN" : "DE";
+  if (isPokemonTitle(row.nameRaw)) {
+    const p = pokemonParts(row.nameRaw);
+    return buildCardmarketSearchUrl(p.name || row.nameRaw, packQty, { game: "Pokemon", language });
+  }
+  // Sammlungen, Mystery-Packs und Titel mit mehreren Codes sind keine einzelne Karte: kein Link statt einer falschen Suche.
+  const codes = new Set(row.nameRaw.match(/\b[A-Z0-9]{2,6}-(?:25TH-)?[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?\b/g) ?? []);
+  if (codes.size > 1 || /\b(Sammlung|Mystery|Bulk|Konvolut|Lot)\b/i.test(row.nameRaw)) return null;
+  const code = row.codeName?.usedCode || row.setCode || titleCode(row.nameRaw);
+  const term = code ? cardmarketCode(code) : cleanTitle(row.nameRaw).name;
+  return buildCardmarketSearchUrl(term, packQty, { language });
 }
 
 /** Mengen ohne Nachkommastellen, wenn ganz; sonst auf zwei Stellen (krumme Mengen sollen auffallen). */
 export function formatQty(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ",");
+}
+
+/**
+ * Moegliche Doppelte: gleicher Set-Code, gleiche Seltenheit, gleiche Auflage und gleiche Packgroesse, aber verschiedene Namen
+ * (z. B. "Fischborg-Strahlschuetze" und "Fischborg-Strahlschuetze Platinum SecR"). Nur nicht ausgeblendete Artikel.
+ * Liefert je Artikel-ID den Gruppenschluessel; Einzelartikel kommen nicht vor.
+ */
+export function findDuplicateGroups(rows: Pick<SortimentRow, "articleId" | "setCode" | "nameRaw" | "hidden">[]): Map<string, string> {
+  const groups = new Map<string, string[]>();
+  for (const r of rows) {
+    if (r.hidden || !r.setCode) continue;
+    const t = cleanTitle(r.nameRaw);
+    const key = [r.setCode.toUpperCase(), rarityFromTitle(r.nameRaw) ?? "", t.edition ?? "", t.pack].join("|");
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(r.articleId);
+  }
+  const out = new Map<string, string>();
+  for (const [key, ids] of groups) if (ids.length >= 2) for (const id of ids) out.set(id, key);
+  return out;
+}
+
+/**
+ * Preis auf eine ,99-Stufe: bei Erhoehung auf die naechste ,99 darueber oder gleich, bei Senkung auf die naechste ,99 darunter oder gleich
+ * (nie unter 4,99). Nur Anzeige in LEC; der Preis wird bei eBay von Hand geaendert (Chris: Preise enden auf ,99).
+ */
+export function to99(price: number, direction: "up" | "down"): number {
+  const cents = Math.round(price * 100);
+  const k = direction === "up" ? Math.ceil((cents + 1) / 100) : Math.floor((cents + 1) / 100);
+  return Math.max(4.99, (100 * Math.max(1, k) - 1) / 100);
 }

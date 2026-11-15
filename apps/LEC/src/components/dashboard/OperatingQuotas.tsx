@@ -21,7 +21,7 @@ export function OperatingQuotas({ quotas }: Props) {
       />
       <div style={{ marginTop: 12 }}>
         <QuotaRow
-          label="Betriebsausgaben"
+          label="eBay-Gebühren + Versand"
           value={quotas.betriebsausgabenquote}
           target={quotas.targetBetriebsausgabenquote}
         />

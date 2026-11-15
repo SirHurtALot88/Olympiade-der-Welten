@@ -25,9 +25,11 @@ Reine Anzeige-Daten: der Motor liest sie nur beim Zeichnen des Bodens, nie in de
 Welche Variante ein Spiel zeigt, entscheidet der Motor deterministisch aus Saat und Paarung
 (kulisseWaehlen() in battle-mode.engine.js) — ohne rr(), ohne Einfluss auf die Wertung.
 
-Heute gebaut: das Arena-Chassis (bodenArena: TDM, Mini-DM). Andere Chassis (Feldspiel, Buehne,
-Bahn) und Battlefield brauchen eine Kulisse, deren Linien/Stationen/Kontrollpunkte zur
-Motor-Geometrie passen — s. CHASSIS_OFFEN unten und docs/design/arena-kulissen-im-motor-03-11.md.
+Gebaut: das Arena-Chassis (bodenArena: TDM, Mini-DM), Buehnen mit Grundflaeche (Wettessen) und
+Chassis "quelle" (07.11.): eine Kulisse, die ein eigenes Bestellskript schon passend zur
+Motor-Geometrie gebaut hat (Battlefield: scripts/bestelle-kulisse-battlefield.py), wird nur
+uebernommen. Andere Chassis (Feldspiel, Bahn, uebrige Buehnen) brauchen eine Kulisse, deren
+Linien/Stationen zur Motor-Geometrie passen — s. docs/design/arena-kulissen-im-motor-03-11.md.
 
 Neu bauen nach jeder neuen Szenen-Variante:
     python3 scripts/baue-arena-kulissen.py
@@ -66,15 +68,45 @@ CHASSIS = {
     # nimmt Zelte und Publikum (Mitte/oben) und die Buehnenbretter (unten), nicht das
     # WETTESSEN-Schild ganz oben (der Motor hat sein eigenes Schild, s. bodenWettessen()).
     "wettessen": {"art": "buehne", "y_anteil": 1.0, "dunkel_plus": 0.08},
-    # Battlefield: die drei Eroberungspunkte der Szene liegen anders als die des Motors
-    # (ARENA_DOMINATION.orte: senkrechte Reihe bei x=MID, y=85/235/385) — ein Bild mit Turm,
-    # Altar und Brueckenkopf an anderer Stelle wuerde die Kontrollpunkte verfaelschen.
-    "battlefield": {"art": "arena-kontrollpunkte"},
+    # Battlefield: die drei Eroberungspunkte der Szene liegen in anderem Massstab und Ausschnitt
+    # als die des Motors (ARENA_DOMINATION.orte: senkrechte Reihe bei x=MID, y=85/235/385) — ein
+    # Zuschnitt wie bei TDM setzte Turm, Altar und Brueckenkopf neben die Fahnen. Die passende
+    # Kulisse baut scripts/bestelle-kulisse-battlefield.py (Szene auf Ortsabstand skaliert,
+    # Demo-Ringe/-Banner/-Kisten weg, Raender per PixelLab nachgemalt) nach
+    # data/generated/kulissen-quellen/battlefield/<variante>.png; hier wird sie nur uebernommen.
+    "battlefield": {"art": "quelle"},
     # Gewichtheben (Sandsack-Schicht): die Szene ist ein vollstaendiger Stationsplan (Bahnen,
     # Silo, Rampen), der nicht deckungsgleich mit den Reihen des Motors liegt.
-    "gewichtheben": {"art": "buehne-stationsplan"},
+    "gewichtheben": {"art": "quelle"},
+    # Batch 2 (07.11.): Umgebung aus der Szene, Demo-Zutaten weg, Flaeche nach Motor-Geometrie —
+    # gebaut von scripts/baue-kulisse-buehnen.py.
+    "tennis": {"art": "quelle"},
+    "fechten": {"art": "quelle"},
+    "speed-schach": {"art": "quelle"},
+    # Batch 3 (07.11.), ebenfalls aus scripts/baue-kulisse-buehnen.py.
+    "showcase": {"art": "quelle"},
+    "eiskunstlauf": {"art": "quelle"},
+    "breaking": {"art": "quelle"},
+    "i-spy": {"art": "quelle"},
+    # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
+    "basketball": {"art": "quelle"},
+    "football": {"art": "quelle"},
+    # Hockey: das Eis war im Motor immer hell (Linien und Kaempfer sind darauf gebaut) — nur leicht
+    # abdunkeln, sonst wird es grau.
+    "hockey": {"art": "quelle", "dunkel_fest": 0.06},
+    # Batch 6 (07.11.): Bahn-Chassis, Stationen/Linien weiter vom Motor nach den Renn-Werten.
+    "spurt": {"art": "quelle"},
+    "staffel": {"art": "quelle"},
+    # Batch 7 (07.11.): Wandmaterial als senkrecht nahtlose Kachel (Motor scrollt sie mit).
+    "climbing": {"art": "quelle"},
+    # Batch 8 (08.11.): Zeitfahren — Panorama der Streckenkarte im Kopfstreifen, Asphalt im Bahnband,
+    # ohne das eingebrannte Demo-Profil; das Hoehenprofil aus BAHN_ART["time-trial"].gelaende zeichnet
+    # der Motor (bodenZeitfahren). Gebaut von scripts/baue-kulisse-zeitfahren.py.
+    "time-trial": {"art": "quelle"},
 }
-CHASSIS_GEBAUT = {"arena", "buehne"}
+CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
+# Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
+QUELLEN = WURZEL / "data" / "generated" / "kulissen-quellen"
 
 # DAS LAYOUT DER ARENA-SZENEN (TDM, Mini-DM: alle 1280x790, gleicher Grundriss). Spielboden
 # innerhalb der Mauern, und der Ausschnitt, der auf die Leinwand kommt: die volle Bodenbreite
@@ -247,12 +279,23 @@ def main() -> None:
             continue
         eintraege = []
         for v in registry[d_id]["variants"]:
+            if chassis["art"] == "quelle":
+                q = QUELLEN / d_id / f"{v['id']}.png"
+                if not q.exists():
+                    print(f"  {d_id}/{v['id']}: keine Quelle {q.relative_to(WURZEL)}, uebersprungen")
+                    continue
+                fertig, objs = Image.open(q).convert("RGB"), []
+                if fertig.size != (LW, LH):
+                    fertig = fertig.resize((LW, LH), Image.LANCZOS)
+            else:
+                fertig = None
             demo = v.get("demo")
-            bild, objs = lade_szene(SZENEN / demo.lstrip("/")) if demo else (None, [])
-            if bild is None:
-                print(f"  {d_id}/{v['id']}: keine saubere Kulisse in der Szene, uebersprungen")
-                continue
-            fertig = baue_arena(bild, objs) if chassis["art"] == "arena" else baue_buehne(bild, chassis.get("y_anteil", 0.5))
+            if fertig is None:
+                bild, objs = lade_szene(SZENEN / demo.lstrip("/")) if demo else (None, [])
+                if bild is None:
+                    print(f"  {d_id}/{v['id']}: keine saubere Kulisse in der Szene, uebersprungen")
+                    continue
+                fertig = baue_arena(bild, objs) if chassis["art"] == "arena" else baue_buehne(bild, chassis.get("y_anteil", 0.5))
             ziel = ZIEL_BILDER / d_id / f"{v['id']}.jpg"
             ziel.parent.mkdir(parents=True, exist_ok=True)
             fertig.save(ziel, "JPEG", quality=86, optimize=True, progressive=True)
@@ -262,6 +305,8 @@ def main() -> None:
             # Buehnen tragen mehr kleine Schrift direkt auf dem Bild (Zaehler, Namen, Uhr) und
             # bekommen deshalb einen Aufschlag (`dunkel_plus`).
             dunkel = round(min(0.3, max(0.06, (hell - 0.25) * 0.55)) + chassis.get("dunkel_plus", 0), 2)
+            if "dunkel_fest" in chassis:
+                dunkel = chassis["dunkel_fest"]
             eintraege.append({"id": v["id"], "label": v["label"], "bild": f"/sprites/kulissen/{d_id}/{v['id']}.jpg", "dunkel": dunkel})
             print(f"  {d_id}/{v['id']}: {len(objs)} Hindernisse zugemalt -> {ziel.relative_to(WURZEL)} ({ziel.stat().st_size // 1024} KB)")
         if eintraege:

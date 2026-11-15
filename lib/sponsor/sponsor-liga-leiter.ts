@@ -22,16 +22,16 @@
  * Zufallsquelle, keine IO. Einzeln testbar, siehe tests/sponsor-liga-leiter.test.ts.
  */
 import type { SponsorCurveShape } from "@/lib/data/olyDataTypes";
-import { SPONSOR_CURVE_SHAPES } from "@/lib/sponsor/sponsor-curve-shapes";
+import { sponsorKurvenReferenz } from "@/lib/sponsor/sponsor-curve-shapes";
 import { sponsorV3AnchorWeights } from "@/lib/sponsor/sponsor-v3-model";
 import type { LeagueTier } from "@/lib/season/league-split";
 
 /**
- * Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell. Bleibt der
- * DEFAULT fuer alle Funktionen unten (docs/design/liga-split-plan.md, PR 1: reine Parametrisierung,
- * Verhalten bei Default unveraendert). Ein optionaler `leagueSize`-Parameter erlaubt eine kleinere
- * Ligagroesse (z. B. `LEAGUE_SIZE = 16` aus lib/season/league-split.ts), ohne dass ein bestehender
- * Aufruf ohne diesen Parameter sich aendert.
+ * Ligagroesse, ueber die die Leiter laeuft, wenn niemand eine andere nennt — die 32er-Tabelle der
+ * Spielstaende OHNE Liga-Split (Legacy, Manager Mode). Bleibt der DEFAULT fuer alle Funktionen unten.
+ * Bei aktivem Liga-Split uebergibt der Live-Pfad (`buildSponsorV3Terms`, Saisonwechsel-Reroll)
+ * ausdruecklich `leagueSize = LEAGUE_SIZE` (16) aus `sponsorRangraumFuer(gameState)` — die Leiter
+ * deckt dann genau die liga-lokalen Plaetze 1..16 ab.
  */
 const SPONSOR_LIGA_RANKS = 32;
 
@@ -277,8 +277,18 @@ export function sponsorKurvenLeiter(input: {
   salaryFactor: number;
   /** Liga-Split PR4 — siehe `sponsorLigaLeiter`. Weggelassen: Topf-Rabatt und Zonen-Term bleiben aus. */
   leagueTier?: LeagueTier;
+  /**
+   * RANGRAUM DER LEITER — wie viele Sprossen sie hat. Bei aktivem Liga-Split `LEAGUE_SIZE` (16):
+   * Start- und Endrang zaehlen dann liga-lokal 1..16, und die Leiter muss genau diese 16 Plaetze
+   * abdecken. Mit der alten 32er-Leiter landete ein 16er-Team nur auf ihren oberen 16 Sprossen —
+   * Sockel nie am Maximum, Anker ueber unerreichbare Raenge 17..32 gemittelt, Wertungstopf zu klein
+   * verteilt, und die Abstiegszone des Zonen-Terms (Raenge 30..32) nie erreicht.
+   * Ohne Angabe 32 — Legacy-Spielstaende ohne Liga-Split bleiben bit-identisch.
+   */
+  leagueSize?: number;
 }): number[] {
-  const sockel = sponsorSockelFuerStartrang(input.startRank);
+  const leagueSize = input.leagueSize ?? SPONSOR_LIGA_RANKS;
+  const sockel = sponsorSockelFuerStartrang(input.startRank, leagueSize);
   // ZONENFREI: der Zonen-Term wird bewusst NICHT hier eingerechnet, sondern erst ganz unten auf die
   // fertig geshapete Leiter aufgetragen. Ginge er hier in `neutral` ein, würde er zuerst im
   // gewichteten Mittelwert `anspruch` verwaschen (ein kleiner Ausschlag an genau 3 von 32 Rängen) und
@@ -288,10 +298,14 @@ export function sponsorKurvenLeiter(input: {
     startRank: input.startRank,
     salaryFactor: input.salaryFactor,
     leagueTier: input.leagueTier,
+    leagueSize,
   });
-  const gewichte = sponsorV3AnchorWeights(input.startRank);
+  // Anker-Gewichte im SELBEN Rangraum (und mit dessen Sigma, `sponsorV3AnchorSigmaFor`) wie
+  // `buildSponsorV3TermsCore`, das den Anker der fertigen Leiter spaeter einfriert — sonst traefe die
+  // Ankernormierung hier einen anderen Erwartungswert als den, der im Vertrag steht.
+  const gewichte = sponsorV3AnchorWeights(input.startRank, undefined, leagueSize);
   const anspruch = neutral.reduce((sum, value, index) => sum + value * (gewichte[index] ?? 0), 0);
-  const referenz = SPONSOR_CURVE_SHAPES[input.shape].reference;
+  const referenz = sponsorKurvenReferenz(input.shape, leagueSize);
   const referenzAnker = referenz.reduce((sum, value, index) => sum + value * (gewichte[index] ?? 0), 0);
   // Guardrail, kann bei den heutigen Referenzwerten (alle > 30) nicht vorkommen: ohne einen
   // positiven Nenner waere `c` nicht definiert — dann lieber die neutrale Leiter als eine

@@ -17,35 +17,79 @@
  *      saisonweite zaehlen anteilig nach aktiven Spieltagen (aktiv an 8 von 10 = 80 %).
  *
  * Die Bloecke sind dieselben, die die Sponsor-Rangleiter ohnehin zeigt (`SPONSOR_RANK_LADDER_RUNGS`
- * in sponsor-offer-presenter.ts: Top 28 / 24 / 20 / 16 / 12 / 8 / 4 / Meister). Eine zweite Skala
- * daneben waere genau die Sorte Doppelbegriff, an der dieses System schon einmal unuebersichtlich
- * geworden ist.
+ * in sponsor-offer-presenter.ts baut seine Sprossen aus `sponsorRangBloecke` hier). Eine zweite
+ * Skala daneben waere genau die Sorte Doppelbegriff, an der dieses System schon einmal
+ * unuebersichtlich geworden ist.
  */
 import type { GameState, SponsorLeihgabeRecord } from "@/lib/data/olyDataTypes";
+import { LEAGUE_SIZE, TEAM_COUNT_TOTAL, isLeagueSplitActive } from "@/lib/season/league-split";
 
 /**
- * Die Bloecke der Sponsor-Rangleiter, von unten nach oben. Bewusst als eigene Konstante und nicht
- * als Import aus dem Presenter: der Presenter haengt an der Anzeige, diese Datei an der Regel.
- * `tests/sponsor-rangmarke.test.ts` haelt beide auf derselben Liste.
+ * Wie viele Sprossen die Leiter unter „Meister" hat. Die Schrittweite ist `leagueSize / 8`:
+ * bei einer 16er-Liga alle 2 Plaetze eine Stufe (Chris, 10.11.: „dann sollte es für alle 2 plätze
+ * mehr cash geben statt alle 4"), im Legacy-32er-Modus wie bisher alle 4.
  */
-export const RANGMARKEN_BLOECKE = [28, 24, 20, 16, 12, 8, 4, 1] as const;
+const SPONSOR_RANG_STUFEN = 8;
+
+/**
+ * DIE BLOECKE DER SPONSOR-RANGLEITER fuer einen Rangraum von `leagueSize` Plaetzen, von unten nach
+ * oben (weiteste Sprosse zuerst, „Meister" = 1 zuletzt).
+ *
+ *   leagueSize 16 → [14, 12, 10, 8, 6, 4, 2, 1]
+ *   leagueSize 32 → [28, 24, 20, 16, 12, 8, 4, 1]   (bit-identisch zur frueheren festen Liste)
+ *
+ * Der letzte Platz selbst ist keine Sprosse — er ist der garantierte Boden
+ * (`SPONSOR_RANK_FLOOR_AT` im Presenter).
+ */
+export function sponsorRangBloecke(leagueSize: number = LEAGUE_SIZE): number[] {
+  const groesse = Math.max(2, Math.round(Number.isFinite(leagueSize) ? leagueSize : LEAGUE_SIZE));
+  const schritt = Math.max(1, Math.floor(groesse / SPONSOR_RANG_STUFEN));
+  const bloecke: number[] = [];
+  for (let stufe = SPONSOR_RANG_STUFEN - 1; stufe >= 1; stufe -= 1) {
+    const block = stufe * schritt;
+    if (block > 1 && block < groesse && !bloecke.includes(block)) bloecke.push(block);
+  }
+  bloecke.push(1);
+  return bloecke;
+}
+
+/**
+ * DER RANGRAUM, IN DEM DIESER SPIELSTAND ABRECHNET: liga-lokal `LEAGUE_SIZE` (16), sobald der
+ * Liga-Split aktiv ist — Tabellenplatz und damit Sponsor-Endrang zaehlen dann 1..16 —, sonst der
+ * Legacy-32er-Modus (`TEAM_COUNT_TOTAL`) alter Spielstaende ohne Liga-Zuordnung. Ohne Spielstand
+ * gilt die heutige Ligagroesse.
+ */
+export function sponsorRangraumFuer(gameState: Pick<GameState, "seasonState"> | null | undefined): number {
+  if (!gameState?.seasonState) return LEAGUE_SIZE;
+  return isLeagueSplitActive(gameState as GameState) ? LEAGUE_SIZE : TEAM_COUNT_TOTAL;
+}
+
+/**
+ * Die Bloecke bei der heutigen Ligagroesse (`LEAGUE_SIZE`). Abgeleitet, nicht gepflegt:
+ * `tests/sponsor-rangmarke.test.ts` haelt sie auf derselben Liste wie die Presenter-Leiter.
+ */
+export const RANGMARKEN_BLOECKE: readonly number[] = sponsorRangBloecke(LEAGUE_SIZE);
 
 export type RangmarkenHaerte = "mild" | "hart";
 
 /**
  * Der Block, in dem ein Startrang liegt — die ENGSTE Sprosse, die ihn noch enthaelt.
  *
- * Achtung auf die Leserichtung: die Liste steht von der weitesten zur engsten Sprosse (28 → 1),
+ * Achtung auf die Leserichtung: die Liste steht von der weitesten zur engsten Sprosse (14 → 1),
  * also aufsteigend in der GUETE und absteigend in der ZAHL. Gesucht ist die kleinste Zahl, die den
- * Rang noch fasst — deshalb wird von hinten gelesen. Von vorne gelesen bekaeme der Meister „Top 28".
+ * Rang noch fasst — deshalb wird von hinten gelesen. Von vorne gelesen bekaeme der Meister „Top 14".
+ *
+ * `leagueSize` ist der Rangraum des Spielstands (`sponsorRangraumFuer`), Default die heutige
+ * Ligagroesse `LEAGUE_SIZE`.
  */
-export function blockFuerRang(rang: number, leagueSize: number = 32): number {
+export function blockFuerRang(rang: number, leagueSize: number = LEAGUE_SIZE): number {
+  const bloecke = sponsorRangBloecke(leagueSize);
   const geklammert = Math.max(1, Math.min(leagueSize, Math.round(rang)));
-  for (let index = RANGMARKEN_BLOECKE.length - 1; index >= 0; index -= 1) {
-    const block = RANGMARKEN_BLOECKE[index]!;
+  for (let index = bloecke.length - 1; index >= 0; index -= 1) {
+    const block = bloecke[index]!;
     if (geklammert <= block) return block;
   }
-  return RANGMARKEN_BLOECKE[0]!;
+  return bloecke[0]!;
 }
 
 /**
@@ -54,18 +98,20 @@ export function blockFuerRang(rang: number, leagueSize: number = 32): number {
  * `hart` setzt den eigenen Startblock — wer im Block bleibt, behaelt das Gebäude. `mild` setzt
  * einen Block DARUNTER; das ist die Karte, die man auch mit einem mittelmaessigen Jahr haelt.
  *
- * Ein Team aus dem untersten Block bekommt gar keine Marke (Rueckgabe 32): unter „Top 28" gibt es
- * keine Sprosse mehr, und eine Marke, die niemand reissen kann, ist keine — aber sie darf auch
- * nicht dazu fuehren, dass ausgerechnet das schwaechste Team seine Leihe nie nutzen kann.
+ * Ein Team aus dem untersten Block bekommt gar keine Marke (Rueckgabe `leagueSize`, also der letzte
+ * Platz): unter der weitesten Sprosse („Top 14" bei 16 Teams) gibt es keine mehr, und eine Marke,
+ * die niemand reissen kann, ist keine — aber sie darf auch nicht dazu fuehren, dass ausgerechnet das
+ * schwaechste Team seine Leihe nie nutzen kann.
  */
 export function baueRangmarke(input: { startRang: number; haerte: RangmarkenHaerte; leagueSize?: number }): number {
-  const leagueSize = input.leagueSize ?? 32;
+  const leagueSize = input.leagueSize ?? LEAGUE_SIZE;
+  const bloecke = sponsorRangBloecke(leagueSize);
   const block = blockFuerRang(input.startRang, leagueSize);
   if (input.haerte === "hart") return block;
-  const index = RANGMARKEN_BLOECKE.indexOf(block as (typeof RANGMARKEN_BLOECKE)[number]);
+  const index = bloecke.indexOf(block);
   // Ein Block weiter unten heisst: groessere Zahl. Im untersten Block gibt es keinen mehr, dann
   // deckt die Marke die ganze Tabelle ab.
-  return index <= 0 ? leagueSize : RANGMARKEN_BLOECKE[index - 1]!;
+  return index <= 0 ? leagueSize : bloecke[index - 1]!;
 }
 
 /** Haelt dieses Team seine Marke gerade? */

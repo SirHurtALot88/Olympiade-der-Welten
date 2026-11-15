@@ -121,6 +121,7 @@ import {
   beschreibeGebuchtesArenaErgebnis,
   findeEigeneWertungsZeilen,
   grundOhneMotorSpiel,
+  waehleArenaFlaeche,
   zeigtArenaDenGebuchtenSieger,
 } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
 import { isBattleModeSave } from "@/lib/season/game-mode";
@@ -172,7 +173,12 @@ export type DisciplineStageArenaProps = {
    * bleibt die Buehne reine Vorschau (z. B. `dev-arena`).
    */
   onCommitDiscipline?:
-    | ((side: "d1" | "d2", shownPreview: LegacyMatchdayResolvePreview | null) => Promise<unknown>)
+    | ((
+        side: "d1" | "d2",
+        shownPreview: LegacyMatchdayResolvePreview | null,
+        /** `quickSim`: die Disziplin endete per "⏩ Quick-Sim" (s. `commitArenaDiscipline`). */
+        optionen?: { quickSim?: boolean },
+      ) => Promise<unknown>)
     | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
@@ -2555,6 +2561,14 @@ export default function DisciplineStageArena({
   /** Warum die Buchung abgelehnt wurde — je Disziplin. `null`, solange es keinen Grund gibt. */
   const [commitFailureReason, setCommitFailureReason] = useState<Record<string, string | null>>({});
   const commitInFlightRef = useRef<Set<string>>(new Set());
+  /**
+   * QUICK-SIM (27.10., Chris: "wir wollen ja nicht nach dem man auf Quick Sim drueckt 2 Minuten auf
+   * ein Ergebnis warten!"): Disziplinen, die per "⏩ Quick-Sim" endeten. Ihre Buchung geht mit
+   * `quickSim: true` raus -- der Server rechnet den Arena-Vorlauf dann per Node statt Chromium.
+   * Ein Ref, kein State: `onQuickSim` feuert synchron unmittelbar vor `onEnded`, ein State-Update
+   * waere im `onEnded`-Closure noch nicht sichtbar.
+   */
+  const quickSimDisziplinenRef = useRef<Set<string>>(new Set());
   const commitState = commitStateByDiscipline[disciplineId] ?? (activeSideScoredInSave ? "booked" : null);
 
   const commitFinishedDiscipline = useCallback(
@@ -2617,7 +2631,8 @@ export default function DisciplineStageArena({
       // zweites Mal aufloest. Ohne sie rechnete der Commit ueber den Zustand, den er im Moment des
       // Buchens vorfindet; bewegte sich dazwischen etwas an den Aufstellungen, landete im
       // Saisonstand etwas anderes als das, was ueber den Schirm gelaufen war.
-      void onCommitDiscipline(side, preview)
+      const perQuickSim = quickSimDisziplinenRef.current.delete(finishedDisciplineId);
+      void onCommitDiscipline(side, preview, perQuickSim ? { quickSim: true } : undefined)
         .then((ergebnis) => {
           /**
            * „NICHT GEWORFEN" HEISST NICHT „GEBUCHT".
@@ -2678,14 +2693,24 @@ export default function DisciplineStageArena({
    *
    * An der Wertung aendert nichts davon etwas: gebucht wird in jedem Fall der Snapshot.
    */
-  const battleModusArena = mode === "real" && !devMode && isBattleModeSave(gameState);
+  // KEINE DEMOS MEHR (11.11.): das gebuchte Motor-Spiel wird in einem Battle-Save AUCH im
+  // Admin-Testmodus gesucht und gezeigt -- s. `waehleArenaFlaeche()` (arena-spieltag-ansicht.ts).
+  const battleSaveEcht = mode === "real" && isBattleModeSave(gameState);
   const battleArenaSpieltag = useMemo(
     () =>
-      battleModusArena
+      battleSaveEcht
         ? bestimmeArenaSpieltagAnsicht({ gameState, matchdayId, disciplineId, ownTeamId, preview })
         : null,
-    [battleModusArena, gameState, matchdayId, disciplineId, ownTeamId, preview],
+    [battleSaveEcht, gameState, matchdayId, disciplineId, ownTeamId, preview],
   );
+  const arenaFlaeche = waehleArenaFlaeche({
+    istBattleSave: isBattleModeSave(gameState),
+    echteWerte: mode === "real",
+    adminTestmodus: devMode,
+    hatMotorSpiel: battleArenaSpieltag != null,
+  });
+  // true = die alte Buehne (samt Pixel-Arena-Kasten) wird NICHT gezeigt.
+  const battleModusArena = arenaFlaeche !== "buehne";
   const battleWertungsZeilen = useMemo(
     () => (battleModusArena && !battleArenaSpieltag ? findeEigeneWertungsZeilen({ preview, disciplineId, ownTeamId }) : null),
     [battleModusArena, battleArenaSpieltag, preview, disciplineId, ownTeamId],
@@ -3487,8 +3512,12 @@ export default function DisciplineStageArena({
           // Saisonstand; nach D2 wird der Spieltag zusaetzlich abgeschlossen.
           commitFinishedDiscipline(disciplineId);
         }}
+        onQuickSim={() => {
+          quickSimDisziplinenRef.current.add(disciplineId);
+        }}
         onReset={(anlass) => {
           setArenaEnded(false);
+          quickSimDisziplinenRef.current.delete(disciplineId);
           // NUR „↻ Neu" ist ein Nachspielen. Vorher galt auch der Mount als Replay — und weil
           // `disciplineEnded` ein Replay bewusst nicht als abgeschlossen zaehlt, blieb der ganze
           // Endscreen (Top-Spieler, Highlights, Weiter-Block) beim Oeffnen einer bereits

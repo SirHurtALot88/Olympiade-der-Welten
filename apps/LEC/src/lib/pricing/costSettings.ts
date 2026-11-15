@@ -6,7 +6,8 @@
  * Berechnungs-Tests).
  *
  * Betriebszahlen hinter den Defaults (von Chris bestaetigt, nicht raten):
- * - ca. 3.400 verkaufte Stueck/Jahr in 1.980 Verkaufs-Bestellungen (Ø 1,72 Artikel/Bestellung)
+ * - Stand 14.11.2026 laut eBay/Billbee: 2.481 Stueck in 1.658 Bestellungen seit 1.1. (Ø 1,50 Artikel/Bestellung), hochgerechnet ca. 2.850 Stueck
+ *   in ca. 1.900 Bestellungen/Jahr (aeltere Zahl: 3.400 Stueck in 1.980 Bestellungen, Ø 1,72)
  * - ca. 840 Einkaufs-Bestellungen/Jahr (Ø 2-5 Artikel)
  * - Jahresfixkosten laut EUeR (Lexoffice) ca. 4.179 EUR: Abos 2.340 (eBay-Shop 1.140 + Billbee 840 +
  *   Lexoffice 360) + Verpackungslizenzen 50 + Sonstige 1.839 (Telekom 540, AfA 199, Beitraege 141,
@@ -61,6 +62,22 @@ export interface CostSettingsValues {
   adFeeRateSingle: number;
   adFeeRateMin: number;
   adFeeRateGood: number;
+  /**
+   * Neue Kalkulation nach Volumen (Chris, 14.11.2026): Versand, Verpackung und Einkaufs-Versand sind JAHRESkosten, geteilt durch die
+   * echten Stueck der letzten 365 Tage (wie die Fixkosten). false = alte feste Stueckwerte (Rueckfall und Test-Standard).
+   */
+  volumeBasedCosts: boolean;
+  /** Porto Inland je Sendung: Standard (Brief) und Aufschlag-Stufe bei mehr Karten; Ausland bleibt aussen vor (Kaeufer zahlt 6,99 / 9,99). */
+  shippingDomesticLow: number;
+  shippingDomesticHigh: number;
+  /** Anteil der Sendungen zur teureren Stufe (0..1). */
+  shippingHighShare: number;
+  /** Ø Artikel je Verkaufsbestellung; wird beim Laden aus den Billbee-Verkaeufen der letzten 365 Tage ueberschrieben, sobald genug Bestellungen vorliegen. */
+  itemsPerOrder: number;
+  /** Verpackung und Transportmaterial gesamt, EUR pro JAHR (Versandtaschen, Toploader). */
+  packagingYearly: number;
+  /** Einkaufsbestellungen pro Jahr (Lexoffice-Belege hochgerechnet); Porto je Bestellung steht in buyShippingUnderFive. */
+  buyOrdersPerYear: number;
 }
 
 export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
@@ -85,4 +102,18 @@ export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
   adFeeRateSingle: 0.09,
   adFeeRateMin: 0.09,
   adFeeRateGood: 0.1,
+  volumeBasedCosts: false,
+  shippingDomesticLow: 0.95,
+  shippingDomesticHigh: 1.1,
+  shippingHighShare: 0.15,
+  itemsPerOrder: 1.5,
+  packagingYearly: 217,
+  buyOrdersPerYear: 904,
 };
+
+/**
+ * Standard im Betrieb: wie DEFAULT_COST_SETTINGS, aber mit der Kalkulation nach Volumen (Chris, 14.11.2026). Gilt, solange keine
+ * Kostensaetze gespeichert sind, und entspricht den DB-Spaltenwerten der Migration. DEFAULT_COST_SETTINGS bleibt der alte Modus
+ * (feste Stueckwerte), damit die Engine-Tests den Rueckfall weiter pruefen.
+ */
+export const LIVE_COST_SETTINGS: CostSettingsValues = { ...DEFAULT_COST_SETTINGS, volumeBasedCosts: true };

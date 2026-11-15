@@ -68,9 +68,10 @@ describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorla
         scope,
         // CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): IMMER beide Runner-Typen faken, nie
         // nur den fuer diesen Testzweck relevanten -- `discipline2` ist seit dem Helfer-Fix fest auf
-        // "hockey" gepinnt (nicht arena-aufgeloest), der Arena-Fake wird hier also im Normalfall nie
-        // aufgerufen, dient aber als Sicherheitsnetz statt stillschweigend auf echtes Chromium
-        // zurueckzufallen, falls sich das je aendert.
+        // "football" gepinnt (nicht arena-aufgeloest, bis 15.11. stand hier "hockey" -- s. Kommentar
+        // im Helfer), der Arena-Fake wird hier also im Normalfall nie aufgerufen, dient aber als
+        // Sicherheitsnetz statt stillschweigend auf echtes Chromium zurueckzufallen, falls sich das
+        // je aendert.
         { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(k), runArenaFixturesImpl: buildHarmlosenArenaFakeRunner() },
         persistence,
       );
@@ -198,12 +199,12 @@ describe("determineArenaDisciplineContexts · Mini-DM-Praesenz ohne Set-Mitglied
         saveId: "s",
         seasonId: "se",
         matchdayId: "m1",
-        contextMeta: { d1DisciplineId: "mini-dm", d2DisciplineId: "showcase" },
+        contextMeta: { d1DisciplineId: "mini-dm", d2DisciplineId: "fechten" },
       },
     };
     const ergebnis = determineArenaDisciplineContexts([fakeContext] as unknown as Parameters<typeof determineArenaDisciplineContexts>[0]);
     expect(ergebnis.miniDmPresent).toBe(true);
-    expect(ergebnis.arenaDisciplineIds).toContain("showcase");
+    expect(ergebnis.arenaDisciplineIds).toContain("fechten");
     expect(ergebnis.arenaDisciplineIds).not.toContain("mini-dm");
     expect(ergebnis.mutatorTraitsByDisciplineId.has("mini-dm")).toBe(true);
   });

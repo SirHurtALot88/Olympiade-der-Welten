@@ -1,4 +1,5 @@
 import { getPoolHeatClass, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import {
   getPlayerStarTier,
   getPlayerStarTierClassName,
@@ -207,18 +208,27 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
       }),
     ),
   ];
+  // Fable-Audit 14.11. #2: VOR Spieltag 1 steht `playerMvs` nicht auf `null`, sondern auf einer
+  // ehrlichen 0 (s. Kommentar in `player-rating-contract.ts`, "NULL HEISST KEINE QUELLE") — und
+  // mit ihr ein `mvsRank` von #1 für JEDEN Spieler gleichzeitig (alle 0, alle an erster Stelle
+  // einsortiert). Der alte `input.playerMvs == null`-Vergleich griff deshalb nie, und die Karte
+  // zeigte „0,0 · #1" statt der „—", die PPs für denselben Fall schon bekommt. `mvsAlsGuete`
+  // (dieselbe Funktion, die die KI-Lesestellen benutzen) ordnet die 0 bereits richtig ein: als
+  // GÜTE-Signal ist sie keine Aussage, erst > 0 zählt.
+  const mvsGuete = mvsAlsGuete(input.playerMvs);
+  const mvsRankForDisplay = mvsGuete != null ? input.mvsRank : null;
   stats.push(
     stat(
-      rankInline ? "MVS" : formatStatLabel("MVS", input.mvsRank),
-      formatNumber(input.playerMvs, 1),
+      rankInline ? "MVS" : formatStatLabel("MVS", mvsRankForDisplay),
+      mvsGuete != null ? formatNumber(mvsGuete, 1) : "—",
       withMetricTitle(
         // Chris-Regel (S1): bei 0/„—" wird erklärt, nicht versteckt — der leere
         // MVS sagt dazu, WANN er sich füllt (wie der PPs-Titel es schon tat).
-        input.playerMvs == null ? `${ROSTER_METRIC_TITLES.mvs} — noch keine Wertung, füllt sich ab Spieltag 1` : ROSTER_METRIC_TITLES.mvs,
+        mvsGuete == null ? `${ROSTER_METRIC_TITLES.mvs} — noch keine Wertung, füllt sich ab Spieltag 1` : ROSTER_METRIC_TITLES.mvs,
         {
-          rankLabel: rankInline ? formatRankLabel(input.mvsRank) : null,
-          heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
-          ...starTierStatExtra("MVS", input.mvsRank),
+          rankLabel: rankInline ? formatRankLabel(mvsRankForDisplay) : null,
+          ...(mvsGuete != null ? { heatClass: getPoolHeatClass(mvsGuete, input.leagueHeatPools.mvs) } : {}),
+          ...starTierStatExtra("MVS", mvsRankForDisplay),
         },
       ),
     ),

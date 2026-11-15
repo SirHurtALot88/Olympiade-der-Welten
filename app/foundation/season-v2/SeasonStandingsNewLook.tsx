@@ -1155,6 +1155,22 @@ export default function SeasonStandingsNewLook({
   );
 
   /**
+   * Fable-Audit 14.11. #8, nachgemessen statt nur aus dem Dokument übernommen: Live geprüft
+   * (`npm run dev` am Save-Abbild) zeigen vor Spieltag 1 NICHT acht Spalten gleichzeitig "—"
+   * oder "0" — Formkarten/Rest tragen bereits den real zugeteilten Kartenpool (unabhängig vom
+   * Spieltag), Verl. zeigt eine echte, gezählte 0 (noch keine Verletzung). Ehrlich leer sind
+   * nur „dav. Bonus" und die vier Achsen-Spalten (POW/SPE/MEN/SOC) — `row.points == null` ist
+   * dafür bereits das kanonische Signal (s. `formatSeasonAreaValue`). Fünf Spalten × 16 Zeilen
+   * sind trotzdem genug "—", um denselben Hinweis wie die Ewige Tabelle zu rechtfertigen: EIN
+   * Satz vor der Tabelle statt der Platzhalter einzeln zu erklären — keine Spalte entfernt,
+   * keine Sortierbarkeit angefasst.
+   */
+  const seasonStandingsPlaceholdersActive = useMemo(
+    () => standingsRows.length > 0 && standingsRows.every((row) => row.points == null),
+    [standingsRows],
+  );
+
+  /**
    * Liga-Rang je Bereichsspalte (POW/SPE/MEN/SOC) für die Einfärbung der Tabellenzellen.
    * Gerankt wird immer gegen ALLE Teams der Tabelle, nicht gegen die gerade sichtbare
    * Sortierung — die Farbe eines Wertes darf sich nicht ändern, nur weil anders sortiert
@@ -1823,6 +1839,13 @@ export default function SeasonStandingsNewLook({
   function renderDatenMode() {
     return (
       <>
+        {seasonStandingsPlaceholdersActive ? (
+          <NlEmptyState
+            title="Noch keine Saison-Wertung"
+            message="„dav. Bonus“ und die vier Achsen-Spalten (POW/SPE/MEN/SOC) zeigen deshalb „—“ in jeder Zeile — sie füllen sich, sobald Spieltag 1 gewertet ist. Formkarten/Rest (Kartenpool) und Verl. (Verletzungen) sind unabhängig davon schon jetzt echt, ebenso Rang/Team/Punkte/MW/Cash."
+            data-testid="nl-standings-placeholder-banner"
+          />
+        ) : null}
         {/* S5/S3 (Audit Spieltag): `.nl-standings-daten-chartrow` reserviert per
             CSS zwei Spalten (Chart minmax(300px,0.58fr) + Spieler-Raster 1fr) —
             fehlt der Chart (vor Spieltag 1 gibt es noch keine Punkte,

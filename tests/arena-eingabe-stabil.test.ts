@@ -10,6 +10,7 @@ import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve
 import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 import {
   buildHarmlosenMiniDmFfaFakeRunner,
@@ -70,6 +71,10 @@ async function bauFrischenBattleSaveMitVollemFeld() {
       (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !istBahnPodDisziplin(id),
     );
     if (arenaDisciplineIds.length === 0) {
+      // CI-OOM-FUND (14.11., s. tests/arena-vorlauf-parity.test.ts fuer die volle Herleitung):
+      // ohne dieses Aufraeumen bleibt der Markt-Kontext-Cache-Eintrag dieses verworfenen Saves
+      // fuer immer im Prozess stehen.
+      invalidateLocalTransfermarktCachesForSave(saveId);
       continue;
     }
     const batch = applyAiLegacyLineupBatchLocally(
@@ -143,6 +148,7 @@ describe("Arena-Vorlauf-Service · eingabe_instabil bleibt 0 im Normalfall (Opus
         expect(zeile.resolutionSource).toBe("arena");
         expect(zeile.arenaAusfall ?? null).toBeNull();
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. CI-OOM-FUND oben
     },
     420_000,
   );

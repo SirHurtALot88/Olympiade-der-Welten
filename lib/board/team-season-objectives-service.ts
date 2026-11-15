@@ -39,6 +39,7 @@ import {
   resolveLeagueRankTarget,
   statusForLeagueRank,
 } from "@/lib/board/board-objective-league-calibration";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -463,17 +464,56 @@ function getPlayerPeakSummary(gameState: GameState, teamId: string) {
 }
 
 /**
+ * Bei aktivem Liga-Split ist der AKTUELLE Rang eines Teams (`row.rank`, siehe
+ * `team-management-overview.ts`) liga-lokal: 1..LEAGUE_SIZE innerhalb der eigenen Liga, nicht
+ * 1..TEAM_COUNT_TOTAL über beide Ligen. Der ERWARTETE Rang aus der Kaderstärke muss dieselbe Skala
+ * teilen, sonst hat jedes Liga-2-Team automatisch einen erwarteten Rang von 17..32, unterschreitet
+ * seinen ligalokalen Rang 1..16 aber IMMER — unabhängig von echter Leistung (gemessen: pauschal
+ * +12 Confidence/Bonus bei allen 16 Liga-2-Teams, siehe CLAUDE.md).
+ *
+ * Ohne Liga-Split (Legacy-Saves, Manager Mode — `gameState` fehlt, oder `isLeagueSplitActive`
+ * liefert `false`) bleibt die Vergleichsbasis unverändert ALLE Teams in `rowsByTeamId`: diese
+ * Funktion gibt dann exakt `rowsByTeamId` zurück, kein neues Objekt.
+ */
+function resolveLeagueScopedRows(input: {
+  gameState?: GameState | null;
+  teamId: string;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+}): Map<string, TeamManagementSnapshotRow> {
+  if (!input.gameState || !isLeagueSplitActive(input.gameState)) return input.rowsByTeamId;
+  const tier = getLeagueOf(input.gameState, input.teamId);
+  if (!tier) return input.rowsByTeamId;
+  const scoped = new Map<string, TeamManagementSnapshotRow>();
+  for (const [teamId, row] of input.rowsByTeamId) {
+    if (getLeagueOf(input.gameState, teamId) === tier) scoped.set(teamId, row);
+  }
+  // Ein leeres Scoping (z.B. Fixtures/Tests, die rowsByTeamId unabhängig von leagueByTeamId bauen)
+  // darf die Rechnung nicht auf 0 Teams stellen — dann lieber auf die ungescopte Basis zurückfallen.
+  return scoped.size > 0 ? scoped : input.rowsByTeamId;
+}
+
+/**
  * Where a team's squad strength says it "should" finish in the league, independent of the
  * board's ambition. Used as the baseline that #6 (expectation-rank) and #2a (upset-avoidance)
  * measure against.
+ *
+ * `gameState` ist optional: nur damit kann bei aktivem Liga-Split die Vergleichsbasis auf die
+ * eigene Liga verengt werden (siehe `resolveLeagueScopedRows`). Fehlt es, bleibt das Verhalten
+ * unverändert über alle Teams in `rowsByTeamId` — keine Regression für Nicht-Split-Spielstände.
  */
 export function computeTeamExpectation(input: {
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   identity: TeamIdentity | null;
+  gameState?: GameState | null;
 }): { expectedRank: number; strengthPct: number; ambitionMod: number; teamCount: number } {
-  const teamCount = input.rowsByTeamId.size;
-  const ranked = [...input.rowsByTeamId.values()].sort((left, right) => {
+  const scopedRowsByTeamId = resolveLeagueScopedRows({
+    gameState: input.gameState,
+    teamId: input.row.teamId,
+    rowsByTeamId: input.rowsByTeamId,
+  });
+  const teamCount = scopedRowsByTeamId.size;
+  const ranked = [...scopedRowsByTeamId.values()].sort((left, right) => {
     const ppsDiff = (right.ppsTotal ?? 0) - (left.ppsTotal ?? 0);
     if (ppsDiff !== 0) return ppsDiff;
     return (right.marketValueTotal ?? 0) - (left.marketValueTotal ?? 0);
@@ -530,8 +570,18 @@ export function getExpectationRankObjective(input: {
   // und der Confidence-Swing bleiben (rankDelta-basiert) unverändert. Ohne Override (V1, Flag aus)
   // greift weiter das statische identity.ambition-Ziel.
   targetRankOverride?: number | null;
+  // Bei aktivem Liga-Split muss der erwartete Rang (Kaderstärke) ligalokal gebildet werden, damit
+  // er mit `row.rank` (ebenfalls ligalokal) vergleichbar ist — siehe `resolveLeagueScopedRows`.
+  // Optional, damit bestehende Aufrufer/Tests ohne gameState (Legacy/Manager-Mode) unverändert
+  // über alle Teams rechnen.
+  gameState?: GameState | null;
 }): ObjectiveDraft {
-  const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
+  const expectation = computeTeamExpectation({
+    row: input.row,
+    rowsByTeamId: input.rowsByTeamId,
+    identity: input.identity,
+    gameState: input.gameState,
+  });
   const ambition = input.identity?.ambition ?? 5;
   const overachieveGap = Math.max(1, Math.round(1 + ambition / 3));
   const targetRank =
@@ -578,7 +628,12 @@ export function getUpsetAvoidanceObjective(input: {
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   gameState: GameState;
 }): ObjectiveDraft | null {
-  const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
+  const expectation = computeTeamExpectation({
+    row: input.row,
+    rowsByTeamId: input.rowsByTeamId,
+    identity: input.identity,
+    gameState: input.gameState,
+  });
   const ambition = input.identity?.ambition ?? 5;
   if (expectation.strengthPct < 0.4 && ambition < 6) return null;
 
@@ -586,7 +641,7 @@ export function getUpsetAvoidanceObjective(input: {
   for (const row of input.rowsByTeamId.values()) {
     expectedRankByTeamId.set(
       row.teamId,
-      computeTeamExpectation({ row, rowsByTeamId: input.rowsByTeamId, identity: null }).expectedRank,
+      computeTeamExpectation({ row, rowsByTeamId: input.rowsByTeamId, identity: null, gameState: input.gameState }).expectedRank,
     );
   }
   const ownExpectedRank = expectedRankByTeamId.get(input.team.teamId) ?? expectation.expectedRank;
@@ -823,15 +878,25 @@ export function getSportTarget(input: {
  * Board-Objectives V2 — expected league rank from team strength (composite of PPs + market-value
  * rank), the same signal getSportTarget uses internally, extracted for reuse by the calibrated
  * targets. Lower = stronger (1 = strongest team).
+ *
+ * `gameState` optional, wie bei `computeTeamExpectation`: bei aktivem Liga-Split wird die
+ * Vergleichsbasis auf die eigene Liga verengt (siehe `resolveLeagueScopedRows`), sonst bleibt es
+ * unveraendert ueber alle Teams in `rowsByTeamId`.
  */
 function resolveExpectedLeagueRank(input: {
   teamId: string;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  gameState?: GameState | null;
 }) {
-  const ppsRank = getRelativeMetricRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId, metric: "ppsTotal" }).rank;
-  const marketValueRank = getRelativeMetricRank({
+  const scopedRowsByTeamId = resolveLeagueScopedRows({
+    gameState: input.gameState,
     teamId: input.teamId,
     rowsByTeamId: input.rowsByTeamId,
+  });
+  const ppsRank = getRelativeMetricRank({ teamId: input.teamId, rowsByTeamId: scopedRowsByTeamId, metric: "ppsTotal" }).rank;
+  const marketValueRank = getRelativeMetricRank({
+    teamId: input.teamId,
+    rowsByTeamId: scopedRowsByTeamId,
     metric: "marketValueTotal",
   }).rank;
   return Math.round((ppsRank * 2 + marketValueRank) / 3);
@@ -873,15 +938,32 @@ export function resolveBoardDisposition(input: {
  * tier ladder + per-team shortCode special-cases with a strength-relative goal — weak teams get an
  * achievable "hold your ground" target, strong+ambitious teams get a real climb. Organic, no quotas.
  * `ambition01` overrides the identity ambition with the dynamic disposition value when provided.
+ *
+ * `gameState` optional: bei aktivem Liga-Split muss `leagueSize`/`expectedRank` liga-lokal sein,
+ * sonst wird dieser kalibrierte Rang (als `targetRankOverride` nach `getExpectationRankObjective`
+ * durchgereicht) auf die ligalokale Skala (1..LEAGUE_SIZE) hochgeklemmt und zieht den Zielrang
+ * künstlich auf den letzten Platz der eigenen Liga — exakt der Fehler, den der Liga-Split-Fix in
+ * `computeTeamExpectation` sonst wieder einführen würde. Ohne `gameState` (Legacy/Manager-Mode)
+ * bleibt das Verhalten unverändert über alle Teams.
  */
 export function getSportTargetV2(input: {
   identity: TeamIdentity | null;
   teamId: string;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   ambition01?: number;
+  gameState?: GameState | null;
 }) {
-  const leagueSize = Math.max(1, input.rowsByTeamId.size);
-  const expectedRank = clamp(resolveExpectedLeagueRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId }), 1, leagueSize);
+  const scopedRowsByTeamId = resolveLeagueScopedRows({
+    gameState: input.gameState,
+    teamId: input.teamId,
+    rowsByTeamId: input.rowsByTeamId,
+  });
+  const leagueSize = Math.max(1, scopedRowsByTeamId.size);
+  const expectedRank = clamp(
+    resolveExpectedLeagueRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId, gameState: input.gameState }),
+    1,
+    leagueSize,
+  );
   const ambition01 = clamp(input.ambition01 ?? (input.identity?.ambition ?? 5) / 10, 0, 1);
   let maxStretch = BOARD_V2_CALIBRATION.maxStretch;
   if (expectedRank >= BOARD_V2_CALIBRATION.bottomDampFromRank) {
@@ -1941,7 +2023,7 @@ function buildTeamObjectives(input: {
   const storedBoard = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
   const disposition = boardV2 ? resolveBoardDisposition({ identity, previousSeasonBoard }) : null;
   const sportTarget = boardV2
-    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition })
+    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition, gameState })
     : getSportTarget({ team, identity, profile, row, rowsByTeamId });
   // F4: dynamic slate size 3–5 from disposition ambition + last-known perceived pressure.
   const slateSize = disposition
@@ -2007,6 +2089,7 @@ function buildTeamObjectives(input: {
         row,
         rowsByTeamId,
         targetRankOverride: boardV2 ? sportTarget.rank : null,
+        gameState,
       }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
       getTransferSpendCeilingObjective({ team, identity, profile, row, rowsByTeamId }),
