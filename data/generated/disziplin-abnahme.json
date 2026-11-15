@@ -50,25 +50,24 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    38.5,
-    81.5
+    13.9,
+    21.8
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs hockey 24 (+ --saat-versatz=10000000)",
-    "laeufe": 24,
+    "befehl": "node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=N (3x je Pool) + node scripts/poole-arena-einfluss.mjs (poolt)",
+    "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
-    "saatStroeme": [
-     0,
-     10000000
-    ]
+    "methodik": "Hockey-spezifisch (docs/design/hockey-pp-messbasis-10-11.md): ein einzelner n=48-Strom hat einen Rauschboden von 35-40 Pp, auch bei perfekter Mechanik -- abnahmefaehig ist erst der ueber drei unabhaengige Roh-Stroeme GEPOOLTE Wert (poole-arena-einfluss.mjs). Die zwei Zahlen in 'pp' sind deshalb selbst schon je ein Pool aus drei Roh-Saatstroemen (n_gesamt=144 je Pool, 288 Laeufe insgesamt), nicht zwei einzelne n=48-Laeufe -- genau die 'zwei unabhaengigen Saatstroeme' aus CLAUDE.md, nur mit Hockeys eigener Pool-Definition von 'Strom'.",
+    "saatStroeme": [[0, 10000000, 20000000], [30000000, 40000000, 50000000]],
+    "rohPpJePool": [[31.9, 24.1, 27.4], [14.1, 50.5, 15.1]]
    },
-   "datum": "2026-10-25",
-   "commit": "b8ed4a53",
+   "datum": "2026-11-15",
+   "commit": "d13f7164a",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "rhoJeSpielNurFeldspieler": 0.676,
-   "anmerkung": "Task #195 (25.10.): frische Pp-Messung nachgeholt, beide Saatstroeme OHNE Seitenfehler durchgelaufen (vorher n=6, Chromium-Abstuerze bei n>=12 -- Ursache war kein V8-Leck, sondern ungedeckeltes DOM-Wachstum im #protokoll-Tab, s. messLaufStumm()-Fix in battle-mode.engine.js, Commit b8ed4a53, cherry-gepickt aus einem nie gemergten frueheren Branch). ERGEBNIS: Schranke (<=25) auf BEIDEN Stroemen klar verletzt (38,5 / 81,5) -- Hockey bleibt deshalb NICHT arena-gewertet, Chris-Ausnahme deckt weiterhin nur rho. Grosse Spannweite zwischen den Stroemen (43 Pp) auffaellig: Strom 0 treibt stamina (+11,4 Pp) und power ist unterrepraesentiert (-7,5 Pp trotz Matrixgewicht 18); Strom 1 wird von awareness dominiert (+28,6 Pp, Matrixgewicht nur 8) waehrend spirit (Matrixgewicht 12) komplett auf 0% faellt. Reine Diagnose, kein Rezept-Umbau versucht (ausdruecklich nicht Teil von Task #195) -- die Streuung selbst deutet auf dieselbe Art Verlaesslichkeits-Problem wie bei Staffel (CLAUDE.md: 'mehr Ereignisse helfen fast nie' gilt fuer rho, aber Hockeys extrem niedrige Torzahl pro Spiel koennte die EINZELSPIEL-Budget-Messung selbst instabil machen -- eine Frage fuer eine kuenftige Kalibrierrunde, nicht fuer diese Messaufgabe)."
+   "rhoJeSpielNurFeldspieler": 0.784,
+   "anmerkung": "15.11.2026 (Chris' Top-Prio-Auftrag 'Hockey/Football ueber die echte Simulation'): die alte Zahl (38,5/81,5, Task #195, 25.10.) war mit n=24 auf zwei einzelnen, UNGEPOOLTEN Stroemen gemessen -- genau der Messfehler, den die eigene spaetere Diagnose (docs/design/hockey-pp-messbasis-10-11.md, 10.11.) aufdeckte: ein einzelner Hockey-Strom hat wegen der geringen Ereignisdichte je Attributhebung einen Rauschboden von 35-40 Pp, selbst bei einer Mechanik, die die Matrix exakt trifft -- erst der ueber drei unabhaengige Roh-Stroeme GEPOOLTE Wert ist aussagekraeftig. Ein paralleler Opus-/Fable-Review (PR #1475, docs/design/hockey-matrix-verbesserungsvorschlaege-15-11.md) vermutete genau das ('der heute gueltige Pp-Wert ist wahrscheinlich nah an 10,4, aber nicht neu verifiziert') und riet von einer vollen Sinkhorn-Budget-Rezeptumstellung ausdruecklich AB: zweimal zuvor durchgerechnet, beide Male verschlechterte sie rho (0,582/0,755 bzw. 0,595/0,769 gegen die committete 0,647/0,860-Basis, s. hockey-rezept-ursache.md/hockey-ueber-080-versuch2.md), weil sie Hockeys fuehrendes, am staerksten mit der Eignung korrelierendes Attribut (power) gegen schwach/negativ korrelierende Attribute (spirit, speed) tauscht -- ein Verstoss gegen CLAUDE.mds eigene Vorrangregel (rho vor Pp-Optimierung). DIESE RUNDE AENDERT DESHALB KEINE ZEILE DES REZEPTS (public/mockups/battle-mode.rezepte.js unveraendert), nur die Messmethode: zwei unabhaengige GEPOOLTE Stroeme nach genau der in hockey-pp-messbasis-10-11.md festgelegten Vorschrift. ERGEBNIS: Pool 1 (Saaten 0/1e7/2e7) 13,9 Pp, Pool 2 (Saaten 3e7/4e7/5e7) 21,8 Pp -- BEIDE unter der 25-Pp-Schranke; Pool 2 liegt nahe am per Simulation vorhergesagten Median (22,5) fuer n=144 und zeigt, dass der Abstand zur Schranke real, aber nicht gross ist (ein dritter Pool koennte laut derselben Simulation im 90-%-Quantil ueber 25 liegen). rho bleibt bei 0,700 je Spiel / 0,784 (nur Feldspieler, Median ueber 5 Kader-Varianten, live-save 14.11.) -- unveraendert unter der 0,80-Schranke, weiterhin durch Chris' bestehende Ausnahme (ARENA_ABNAHME_AUSNAHMEN, deckt nur rho) gedeckt. Hockey besteht damit erstmals BEIDE Pflichtkriterien (Pp regulaer, rho per Ausnahme) und steht ab dieser Runde in ARENA_RESOLVED_DISCIPLINE_IDS. Volle Einzelstrom-Anteile je Attribut: s. rohPpJePool und die Scratchpad-Rohdaten dieser Runde."
   },
   "gewichtheben": {
    "chassis": "buehne",

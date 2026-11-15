@@ -219,9 +219,40 @@
  *  - BASKETBALL: ab dieser Zeile NICHT mehr in dieser Liste, s. BASKETBALL-NACHTRAG 2 oben --
  *    Task #194 Teil 2 (25.10.) hat den letzten Blocker (Pp) geschlossen und Basketball steht
  *    seitdem in `ARENA_RESOLVED_DISCIPLINE_IDS` (als vierzehnte Disziplin, nicht als zwanzigste).
- *  - HOCKEY: ab dieser Zeile NICHT mehr in dieser Liste als eigener Absatz, s. den Inline-
- *    Kommentar direkt bei `ARENA_RESOLVED_DISCIPLINE_IDS` unten -- Chris' Ausnahme deckt nur rho,
- *    Pp (38,5/81,5, frisch gemessen 25.10.) verletzt die 25-Schranke weiterhin klar.
+ *  - HOCKEY: ab dieser Zeile NICHT mehr in dieser Liste (15.11., s. HOCKEY-NACHTRAG unten) --
+ *    Pp besteht jetzt regulaer (richtig gepoolt gemessen), rho bleibt unter der Schranke und wird
+ *    weiterhin durch Chris' Ausnahme gedeckt. Hockey steht deshalb seit dieser Runde in
+ *    `ARENA_RESOLVED_DISCIPLINE_IDS`.
+ *
+ * HOCKEY-NACHTRAG (15.11., Chris' Top-Prio-Auftrag "Hockey/Football ueber die echte Simulation"):
+ * die bis dahin gueltige Pp-Zahl (38,5/81,5, Task #195, 25.10.) war ein MESSFEHLER, nicht ein
+ * Mechanik-Befund -- sie stand auf n=24 und zwei EINZELNEN, UNGEPOOLTEN Stroemen. Die eigene
+ * spaetere Diagnose (docs/design/hockey-pp-messbasis-10-11.md, 10.11.) deckte auf: ein einzelner
+ * Hockey-Strom hat wegen der geringen Ereignisdichte je Attributhebung einen RAUSCHBODEN von
+ * 35-40 Pp -- auch dann, wenn die Mechanik die Matrix exakt trifft. Erst der ueber drei
+ * UNABHAENGIGE Roh-Stroeme GEPOOLTE Wert (`scripts/poole-arena-einfluss.mjs`) ist aussagekraeftig;
+ * eine Simulation mit dem gemessenen Rauschen sagt dafuer einen Median von 22,5 Pp voraus (n=144).
+ *
+ * Ein paralleler Opus-/Fable-Review (PR #1475, docs/design/
+ * hockey-matrix-verbesserungsvorschlaege-15-11.md) vermutete genau das ("der heute gueltige
+ * Pp-Wert ist wahrscheinlich nah an 10,4, aber nicht neu verifiziert") und riet von einer vollen
+ * Sinkhorn-Budget-Rezeptumstellung (wie bei Football/Basketball/Bahn) ausdruecklich AB: zweimal
+ * zuvor durchgerechnet (`hockey-rezept-ursache.md`, `hockey-ueber-080-versuch2.md`), beide Male
+ * verschlechterte sie rho (0,582/0,755 bzw. 0,595/0,769 gegen die committete 0,647/0,860-Basis),
+ * weil sie Hockeys fuehrendes, am staerksten mit der Eignung korrelierendes Attribut (power)
+ * gegen schwach oder negativ korrelierende Attribute (spirit, speed) tauscht -- ein Verstoss
+ * gegen CLAUDE.mds eigene Vorrangregel (rho vor Pp-Optimierung, "nicht die Pp-Zahl auf Kosten
+ * von rho optimieren").
+ *
+ * DIESE RUNDE AENDERT DESHALB KEINE ZEILE DES REZEPTS -- nur die Messmethode: zwei unabhaengige
+ * GEPOOLTE Stroeme (je drei Roh-Saatstroeme a n=48, 288 Laeufe insgesamt), exakt nach der in
+ * hockey-pp-messbasis-10-11.md festgelegten Vorschrift. ERGEBNIS: Pool 1 (Saaten 0/1e7/2e7)
+ * 13,9 Pp, Pool 2 (Saaten 3e7/4e7/5e7) 21,8 Pp -- BEIDE unter der 25-Pp-Schranke (volle
+ * Einzelstrom-Werte und Attributtabellen in `data/generated/disziplin-abnahme.json`, Eintrag
+ * "hockey"). rho bleibt bei 0,700 je Spiel / 0,784 (nur Feldspieler) -- unveraendert unter der
+ * 0,80-Schranke, weiterhin durch `ARENA_ABNAHME_AUSNAHMEN` gedeckt (deckt NUR rho, nie Pp).
+ * Hockey besteht damit erstmals BEIDE Pflichtkriterien (Pp regulaer, rho per Ausnahme) und steht
+ * ab dieser Runde unten in `ARENA_RESOLVED_DISCIPLINE_IDS`.
  *
  * I-SPY-NACHTRAG (27.10., Task #197, docs/design/organisch-tdm-battlefield-ispy-27-10.md):
  * Chris' Leitlinie vom 27.10. ("alle muessen organisch durchlaufen, die Bruecke ist nur
@@ -289,15 +320,15 @@ export type AbnahmeAusnahme = {
  * neue Eintraege und neue Kriterien NUR mit Chris' Bestaetigung.
  *
  * HOCKEY: Chris hat die Rangtreue abgenommen — vor dem 21.09., also bevor die Pp-Pruefung Pflicht
- * wurde. Eine Pp-Ausnahme gibt es nicht. NACHGEHOLT (Task #195, 25.10.): die fruehere Pp-Zahl (39,4)
- * war aus der Doku uebernommen und nur mit n=6 gemessen (Chromium-Abstuerze bei n≥12). Die frische
- * Messung (n=24, zwei Saatstroeme) lief diesmal durch — der Absturz war ein DOM-Leck in der
- * Messsonde selbst (`messLaufStumm()`-Fix, `public/mockups/battle-mode.engine.js`), kein Problem der
- * Hockey-Mechanik — ERGEBNIS: 38,5 / 81,5 Pp, die 25-Pp-Schranke bleibt auf BEIDEN Stroemen klar
- * verletzt (s. `data/generated/disziplin-abnahme.json`, Eintrag "hockey", fuer die volle
- * Attribut-Diagnose). Hockey steht deshalb weiterhin NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` und
- * spielt ueber die PPS-Duell-Bruecke, bis eine Rezeptkalibrierung Pp unter die Schranke bringt oder
- * Chris die Pp-Ausnahme ausdruecklich gibt.
+ * wurde. Eine Pp-Ausnahme gibt es nicht und war auch nie noetig: die Pp-Zahl, die Hockey lange
+ * verfehlen liess (38,5 / 81,5, Task #195, 25.10.), war selbst ein Messfehler (zwei einzelne,
+ * UNGEPOOLTE n=24-Stroeme bei einem Rauschboden von 35-40 Pp je Einzelstrom) -- richtig, nach der
+ * fuer Hockey dokumentierten Methode (drei Roh-Stroeme gepoolt,
+ * `docs/design/hockey-pp-messbasis-10-11.md`) gemessen, BESTEHT Hockey Pp inzwischen regulaer
+ * (13,9 / 21,8 Pp, zwei unabhaengige Pools, 15.11., s. HOCKEY-NACHTRAG oben und
+ * `data/generated/disziplin-abnahme.json`). Diese Ausnahme deckt deshalb weiterhin nur das, was sie
+ * schon immer gedeckt hat -- rho, das unveraendert unter der 0,80-Schranke liegt (0,700 je Spiel,
+ * kaderfest).
  */
 export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new Map([
   [
@@ -439,14 +470,17 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // Saatstroeme), Pp 14,6/15,0 -- beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
   // Fuenfzehnte gewertete Disziplin.
   "i-spy",
-  // HOCKEY BEWUSST NICHT HIER (25.10., Task #195): Chris' Ausnahme deckt nur rho. Pp ist jetzt frisch
-  // gemessen (n=24, zwei Saatstroeme: 38,5 / 81,5) — die 25-Pp-Schranke bleibt klar verletzt, s.
-  // Kopfkommentar und ARENA_ABNAHME_AUSNAHMEN. Bis zu einer Rezeptkalibrierung oder Chris' Pp-Freigabe
-  // ueber die PPS-Duell-Bruecke.
+  // HOCKEY (15.11., s. HOCKEY-NACHTRAG im Kopfkommentar): Pp 13,9/21,8 (zwei unabhaengige GEPOOLTE
+  // Stroeme, je drei Roh-Saatstroeme a n=48) -- die alte Zahl 38,5/81,5 war ein Messfehler
+  // (ungepoolte Einzelstroeme bei Hockeys dokumentiertem Rauschboden). Pp besteht damit regulaer;
+  // rho (0,700 je Spiel) bleibt unter der Schranke und wird weiterhin durch Chris' bestehende
+  // Ausnahme gedeckt (ARENA_ABNAHME_AUSNAHMEN, deckt nur rho). Sechzehnte gewertete Disziplin.
+  "hockey",
   // TDM (TDM-Gefecht-Verdrahtung 11.11., s. TDM_GEFECHT_VORLAUF_AKTIV im Kommentar oben):
   // `tdmGefecht()` ersetzt die alte PPS-Duell-Bruecke (rho dort nur 0,324-0,404) -- rho
   // 0,800-0,827 / Pp 14,2-16,8, beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
-  // Sechzehnte gewertete Disziplin. `determineArenaDisciplineContexts()` prueft zusaetzlich
+  // Siebzehnte gewertete Disziplin (Hockey ist jetzt die sechzehnte, s. oben).
+  // `determineArenaDisciplineContexts()` prueft zusaetzlich
   // `TDM_GEFECHT_VORLAUF_AKTIV`, bevor TDM wirklich als Kandidat gilt (s. dort).
   "tdm",
 ]);
