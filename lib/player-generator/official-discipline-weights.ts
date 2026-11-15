@@ -199,6 +199,20 @@ export const officialDisciplineWeightTable: Record<
     fechten: 20,
     "i-spy": 8,
   },
+  // TESTWEISE MATRIX-VERSCHIEBUNG (15.11., Football-Matrix-Ausnahme-Versuch, docs/design/
+  // matrix-ausgleichspflicht-15-11.md): football 11 -> 21 (+10), fechten 15 -> 5 (-10) als
+  // Ausgleich. Zeilensumme bleibt 167 (vorher 11+15=26 von 167; nachher 21+5=26 von 167).
+  // Fechten gewaehlt statt eines dritten, eigenen Ausgleichspartners: football UND fechten
+  // tauschen spirit/awareness symmetrisch gegeneinander (s. spirit unten) — football spirit
+  // -10/awareness +10, fechten spirit +10/awareness -10. Das haelt NICHT NUR die Zeilensummen
+  // (beide Attribute je 0 Netto ueber alle 20 Disziplinen), sondern auch die SPALTENSUMME
+  // (=100) von BEIDEN beteiligten Disziplinen exakt bei 100, ohne eine dritte Disziplin
+  // anzufassen. Fechten: awareness ist dort die Nummer 4 von 8 Attributen (hinter torment 25,
+  // dexterity 20, speed 16) — plausible Nebenrolle fuer eine Kuerzung; spirit stand bei 0 und
+  // wird jetzt ein kleiner, plausibler Nebenkanal ("Kampfgeist"/Wettkampf-Spirit im Fechten) —
+  // keine Rezept-/Mechanik-Aenderung an Fechten, nur die Matrixzahl. Fechtens eigene Pp/rho-
+  // Abnahme wurde in dieser Runde NICHT neu nachgemessen (ausserhalb des hier beauftragten
+  // Scopes, s. PR-Bericht).
   awareness: {
     tdm: 2,
     "mini-dm": 0,
@@ -216,9 +230,9 @@ export const officialDisciplineWeightTable: Record<
     breaking: 0,
     wettessen: 0,
     basketball: 14,
-    football: 11,
+    football: 21,
     eiskunstlauf: 14,
-    fechten: 15,
+    fechten: 5,
     "i-spy": 5,
   },
   intelligence: {
@@ -287,6 +301,13 @@ export const officialDisciplineWeightTable: Record<
     fechten: 0,
     "i-spy": 9,
   },
+  // TESTWEISE MATRIX-VERSCHIEBUNG (15.11., Football-Matrix-Ausnahme-Versuch, docs/design/
+  // matrix-ausgleichspflicht-15-11.md): football 25 -> 15 (-10), fechten 0 -> 10 (+10) als
+  // Ausgleich. Zeilensumme bleibt 166 (vorher 25+0=25 von 166; nachher 15+10=25 von 166).
+  // Fechten als EINZIGER Ausgleichspartner (s. awareness oben fuer die volle Begruendung des
+  // symmetrischen Tauschs football<->fechten) — haelt Fechtens eigene Spaltensumme (=100)
+  // exakt, ohne eine dritte Disziplin anzufassen. KEINE Aenderung an Fechtens Rezept/Mechanik,
+  // nur die Matrixzahl.
   spirit: {
     tdm: 12,
     "mini-dm": 0,
@@ -304,9 +325,9 @@ export const officialDisciplineWeightTable: Record<
     breaking: 0,
     wettessen: 0,
     basketball: 22,
-    football: 25,
+    football: 15,
     eiskunstlauf: 16,
-    fechten: 0,
+    fechten: 10,
     "i-spy": 13,
   },
   torment: {

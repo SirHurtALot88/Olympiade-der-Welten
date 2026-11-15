@@ -8014,9 +8014,9 @@
     "breaking": {will:28,torment:22,health:18,power:10,determination:10,stamina:8,dexterity:2,intelligence:2},
     "wettessen": {will:26,health:22,stamina:22,determination:16,intelligence:8,torment:6},
     "basketball": {spirit:22,intelligence:16,awareness:14,charisma:11,speed:10,dexterity:8,power:7,stamina:6,torment:6},
-    "football": {spirit:25,torment:16,health:14,awareness:11,will:10,determination:8,power:6,stamina:6,charisma:4},
+    "football": {awareness:21,torment:16,spirit:15,health:14,will:10,determination:8,power:6,stamina:6,charisma:4},
     "eiskunstlauf": {charisma:28,dexterity:18,spirit:16,awareness:14,speed:10,intelligence:8,determination:6},
-    "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
+    "fechten": {torment:25,dexterity:20,speed:16,power:10,spirit:10,determination:6,awareness:5,health:4,intelligence:4},
     "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
   };
   const SLOTS_JE_DISC={
@@ -8145,12 +8145,12 @@
       {id:"fastbreak",label:"Fast Break",text:"Läuft Punkte über Speed und Dexterity.",gross:"power",klein:"stamina",last:"stamina",mueh:"high",profil:{intelligence:13.6,charisma:13.3,spirit:13.1,speed:11.9,power:11.4,stamina:9.7,torment:9.7,awareness:8.8,dexterity:8.7}}
     ],
     "football":[
-      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{spirit:23.5,health:16.6,torment:15.1,awareness:10.4,will:9.4,power:8,determination:7.6,stamina:5.7,charisma:3.8}},
-      {id:"routeburst",label:"Route Burst",text:"Löst sich über Will und Charisma statt über reines Tempo.",gross:"will",klein:"charisma",last:"stamina",mueh:"medium",profil:{spirit:23.6,torment:15.1,will:13.3,health:13.2,awareness:10.4,determination:7.6,power:5.7,stamina:5.7,charisma:5.3}},
-      {id:"quarterback",label:"Quarterback",text:"Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).",gross:"power",klein:"determination",last:"torment",mueh:"low",profil:{spirit:23.6,torment:15.1,health:13.3,determination:10.6,awareness:10.4,will:9.5,power:8,stamina:5.7,charisma:3.8}},
-      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{spirit:22.6,torment:20.1,awareness:13.6,health:12.7,will:9.1,determination:7.3,power:5.5,stamina:5.5,charisma:3.7}},
-      {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{spirit:23.5,torment:18.6,health:13.2,awareness:10.4,will:9.4,power:8,determination:7.6,stamina:5.7,charisma:3.8}},
-      {id:"kickerpunter",label:"Kicker/Punter",text:"Haelt die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"spirit",klein:"health",last:"torment",mueh:"low",profil:{spirit:33.1,health:15.1,torment:12.1,awareness:10.9,will:9.3,stamina:7.8,determination:7.5,charisma:3.6,power:0.9}}
+      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{awareness:19.7,health:16.6,torment:15.1,spirit:14.1,will:9.4,power:8,determination:7.6,stamina:5.7,charisma:3.8}},
+      {id:"routeburst",label:"Route Burst",text:"Löst sich über Will und Charisma statt über reines Tempo.",gross:"will",klein:"charisma",last:"stamina",mueh:"medium",profil:{awareness:19.8,torment:15.1,spirit:14.2,will:13.4,health:13.2,determination:7.6,power:5.7,stamina:5.7,charisma:5.4}},
+      {id:"quarterback",label:"Quarterback",text:"Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).",gross:"power",klein:"determination",last:"torment",mueh:"low",profil:{awareness:19.8,torment:15.1,spirit:14.2,health:13.2,determination:10.6,will:9.5,power:8,stamina:5.7,charisma:3.8}},
+      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{awareness:23.6,torment:20.1,spirit:13.3,health:12.5,will:8.9,determination:7.2,power:5.4,stamina:5.4,charisma:3.6}},
+      {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{awareness:19.7,torment:18.6,spirit:14.1,health:13.2,will:9.4,power:8,determination:7.5,stamina:5.7,charisma:3.8}},
+      {id:"kickerpunter",label:"Kicker/Punter",text:"Haelt die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"spirit",klein:"health",last:"torment",mueh:"low",profil:{awareness:23.3,spirit:20.1,health:15.3,torment:12,will:9.4,stamina:7.9,determination:7.6,charisma:3.6,power:0.9}}
     ],
     "eiskunstlauf":[
       {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
@@ -8161,12 +8161,12 @@
       {id:"finalpose",label:"Final Pose",text:"Setzt den Abschluss über Spirit und Charisma.",gross:"speed",klein:"determination",last:"dexterity",mueh:"low",profil:{charisma:18.9,speed:17.1,dexterity:17,spirit:14.4,awareness:13.3,determination:10,intelligence:9.2}}
     ],
     "fechten":[
-      {id:"duelist",label:"Duelist",text:"Sauberer Kernslot für direkte Duelle.",gross:"dexterity",klein:"speed",last:"speed",mueh:"medium",profil:{dexterity:25.4,torment:21.4,speed:19.4,awareness:12.9,power:8.6,determination:5.2,health:3.5,intelligence:3.5}},
-      {id:"aggressor",label:"Aggressor",text:"Bringt Druck über Torment und Power.",gross:"torment",klein:"power",last:"awareness",mueh:"high",profil:{torment:30.4,dexterity:17.2,speed:13.8,power:13.4,awareness:12.9,determination:5.2,health:3.5,intelligence:3.5}},
-      {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
-      {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
-      {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
-      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+      {id:"duelist",label:"Duelist",text:"Sauberer Kernslot für direkte Duelle.",gross:"dexterity",klein:"speed",last:"speed",mueh:"medium",profil:{dexterity:25.4,torment:21.4,speed:19.4,power:8.6,spirit:8.6,determination:5.2,awareness:4.4,health:3.5,intelligence:3.5}},
+      {id:"aggressor",label:"Aggressor",text:"Bringt Druck über Torment und Power.",gross:"torment",klein:"power",last:"awareness",mueh:"high",profil:{torment:30.4,dexterity:17.2,speed:13.8,power:13.4,spirit:8.6,determination:5.2,awareness:4.4,health:3.5,intelligence:3.5}},
+      {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:23.9,dexterity:19.1,speed:15.3,power:9.6,spirit:9.6,awareness:7.2,health:5.8,determination:5.8,intelligence:3.9}},
+      {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:22.4,speed:14.3,power:9,spirit:9,awareness:7.2,determination:5.4,health:3.7,intelligence:3.7}},
+      {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,power:9.1,spirit:9.1,intelligence:5.8,determination:5.5,awareness:4.6,health:3.7}},
+      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"spirit",klein:"torment",last:"awareness",mueh:"high",profil:{torment:29.3,spirit:15.1,dexterity:14.8,speed:11.8,power:10.3,determination:8.9,health:3.9,intelligence:3.7,awareness:2.3}}
     ],
     "i-spy":[
       {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
@@ -9748,16 +9748,94 @@
       // 2 Saatstroeme): Mittel 57,05 -> 54,75 — kleiner als in der zurueckgezogenen ersten
       // Fassung (die rho gekostet haette), aber real und sicher. Siehe PR-Dokument fuer die
       // vollen Vorher/Nachher-Zahlen inkl. Pp je Attribut.
+      // REZEPT KOMPLETT NEU GEBAUT — BUDGET-KONSERVIERUNG GEGEN DIE MATRIX (14.11., Chris nach
+      // der Override-Ruecknahme, woertlich: „mach das rezept jetzt komplett über die matrix
+      // [...] Wenn du zb nur 26 power für die diszi zur verfügung hast gehen dann vllt nur 3 in
+      // laufkraft 15 in tackling usw"). ALLES oberhalb dieses Kommentars (die lange
+      // Kalibrierungshistorie seit dem 10.09.) beschreibt das ALTE Rezept, das explizit gegen
+      // den jetzt zurueckgebauten Spiel-Eignungs-Override kalibriert war (power/health/speed/
+      // torment-schwer) — nicht mehr der aktuelle Stand, aber als Nachweis stehen gelassen,
+      // WARUM frueher anders entschieden wurde (insbesondere: awareness bewusst ausgesperrt,
+      // weil es gegen die DAMALIGE, override-basierte Eignung negativ korrelierte).
+      //
+      // VERFAHREN: scripts/sondiere-feldspiel-subskills.mjs football 24 misst das MECHANISCHE
+      // Gewicht jedes Sub-Skills im Motor (orthogonales Rezept, ein Attribut je Sub-Skill);
+      // scripts/baue-feldspiel-rezept.mjs football <sondierung> verteilt alle neun
+      // Football-Matrixattribute (spirit 25, torment 16, health 14, awareness 11, will 10,
+      // determination 8, power 6, stamina 6, charisma 4) per Sinkhorn so auf die acht
+      // fachlichen Sub-Skills, dass JEDE ZEILE (Attribut) exakt ihr volles Matrixgewicht
+      // verteilt UND jede SPALTE (Sub-Skill) die gemessene mechanische Masse trifft — echte
+      // Budget-Konservierung, keine Obergrenze. awareness/charisma sind jetzt ERLAUBT (vorher
+      // komplett ausgesperrt, s. Historie oben und scripts/baue-feldspiel-rezept.mjs' eigener
+      // Kommentar) — die rho-Sorge, die zur Aussperrung fuehrte, wird jetzt ueber die
+      // SPALTENSEITE adressiert (welcher Sub-Skill wie viel mechanisches Gewicht trägt), nicht
+      // durch Aussperren aus der Zeile, s. CLAUDE.md "Die Eignungsmatrix ist gesperrt".
+      //
+      // ITERATION 1 von (siehe PR-Dokument fuer die vollstaendige Rundenzahl und
+      // Vorher/Nachher-Pp/rho): Sondierung gegen das ALTE Rezept (Baseline, Teamgeist 52,7 %
+      // mechanisches Gewicht — bei weitem das groesste), Sinkhorn-Lauf, dann neu sondiert
+      // gegen DIESES Rezept und erneut gebaut, bis die Spaltenmassen sich stabilisieren
+      // (dieselbe Sondieren-Sinkhorn-Resondieren-Schleife wie bei jedem anderen
+      // Feldspiel-Rezept dieses Projekts). speed/dexterity/intelligence tragen kein
+      // Football-Matrixgewicht und stehen deshalb in KEINEM fachlichen Sub-Skill mehr
+      // (LAUFTEMPO bleibt disziplinuebergreifend davon ausgenommen, s. dort).
+      //
+      // GEMESSEN: s. docs/design/football-rezept-matrix-budget-14-11.md fuer die vollen
+      // Pp-/rho-Zahlen jeder Runde und den Vergleich gegen die alte Override-Fassung.
+      // RUNDE 2 VERSUCHT UND VERWORFEN (14.11., Spaltenseite): TEAMGEIST bekam zusaetzlich
+      // "health" erlaubt (football-fachlich: der grosse, zaehe Zielspieler), um seine in Runde 1
+      // gemessene Luecke (Soll 51,7 %, Ist nur 39,9 % mechanische Masse) zu schliessen.
+      // GEMESSEN SCHLECHTER: rho je Spiel 0,525 -> 0,564 (kleine Verbesserung), aber Pp 18,3 ->
+      // 26,3 (durchgefallen, spirit ueberzeichnet jetzt um +9,6 statt +2,4) — health wurde LAUFKRAFT
+      // entzogen, ohne TEAMGEISTs Gesamtmasse zu heben (beide Unterfertigkeiten konkurrieren um
+      // dasselbe, bereits ausgeschoepfte health-Budget). Der kleine rho-Gewinn rechtfertigt nicht,
+      // die Pp-Pflichtschranke zu verletzen — zurueckgerollt auf Runde 1. s. docs/design/
+      // football-rezept-matrix-budget-14-11.md fuer beide Messreihen vollstaendig.
+      //
+      // RUNDE 1 (14.11., frischer Sinkhorn-Lauf, awareness/charisma in scripts/baue-feldspiel-
+      // rezept.mjs' ERLAUBT-Tabelle restauriert): GEMESSEN Pp 18,3 (bestanden, nahe am
+      // angestrebten Optimum <15), rho je Spiel 0,525 / Saison 0,685 (durchgefallen, aber massiv
+      // besser als die 0,270 des blossen Override-Rueckbaus ohne Rezept-Anpassung). Dies ist der
+      // STAND, auf den diese PR sich beschraenkt — das Stopp-Kriterium (rho<0,75 nach zwei
+      // Rezeptrunden) ist erreicht, die naechste Runde braucht Chris' Entscheidung (s. Dokument).
+      // RUNDE 5 — TESTWEISE MATRIX-VERSCHIEBUNG (15.11., Football-Matrix-Ausnahme-Versuch,
+      // docs/design/matrix-ausgleichspflicht-15-11.md): spirit 25->15, awareness 11->21 in
+      // lib/player-generator/official-discipline-weights.ts (Ausgleich: EIN symmetrischer
+      // Tausch mit fechten — fechten spirit 0->10, awareness 15->5 — statt zwei separater
+      // Partner, haelt dadurch auch fechtens eigene Spaltensumme bei 100). ERLAUBT.football
+      // (scripts/baue-feldspiel-rezept.mjs)
+      // UNVERAENDERT gegenueber Runde 1 — nur die Matrix-Zeilenbudgets spirit/awareness
+      // geaendert, dann per Sinkhorn NEU verteilt (budget-konservierend, wie die Budget-
+      // Methode es vorschreibt): node scripts/baue-feldspiel-rezept.mjs football
+      // <Runde-1-Sondierung> (bit-identisch zu Runde 1, docs Abschnitt 2: die Sondierung ist
+      // kompositionsunabhaengig). GROESSTE SINKHORN-ABWEICHUNG 17,88 Pp (Runde 1: 11,74) —
+      // schlechter schon auf dem Papier: ABWEHR_PASS wird zu 100% awareness (vorher), PASS-
+      // GENAUIGKEIT/PASSSCHUTZ je 35% awareness (vorher 9%) — genau das Mehrheits-Muster, das
+      // Runde 3 (s. docs, Abschnitt 3a) am echten Motor ueber die fkLos()-Lotterie auf Pp 40
+      // trieb. ECHT GEMESSEN (node scripts/messe-arena-einfluss.mjs football 48 [+ --saat-
+      // versatz=10000000], node scripts/miss-alle-disziplinen.mjs 48 football):
+      // Pp 18,3->??, rho je Spiel 0,525->?? (Zahlen im PR-Bericht). Bei Verwurf: Runde-1-
+      // Rezept unten wiederherstellen (git checkout), MATRIX.football in baue-feldspiel-
+      // rezept.mjs und lib/player-generator/official-discipline-weights.ts ebenfalls zurueck.
+      // RUNDE-1-REZEPT (zum Vergleich/Rollback):
+      //   PASSGENAUIGKEIT: {will:46,determination:45,awareness:9},
+      //   LAUFKRAFT:       {health:54,power:24,spirit:22},
+      //   PASSSCHUTZ:      {will:46,determination:45,awareness:9},
+      //   ABWEHR_PASS:     {awareness:100},
+      //   ABWEHR_LAUF:     {health:59,power:25,torment:16},
+      //   BALLSICHERHEIT:  {will:100},
+      //   TEAMGEIST:       {spirit:53,torment:37,charisma:10},
+      //   AUSDAUER:        {stamina:100}
       rezept:{
-        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert, UNVERAENDERT
-        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT (Yards/Carry-Korridor daran gefittet)
-        PASSSCHUTZ:      {power:38,health:36,awareness:20,stamina:6}, // stamina NEU (6, sicher), awareness UNVERAENDERT (Erhoehung kaderfest durchgefallen, s. Kommentar oben)
-        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt, UNVERAENDERT
-        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck, UNVERAENDERT
-        BALLSICHERHEIT:  {power:33,health:33,determination:28,will:6}, // will NEU (6, reduziert von urspruenglich erwogenen 15 — s. Kommentar oben), power/health/determination nur leicht gesenkt
-        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788)
-        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (weiterhin KEIN eigener Kanal — stamina/will haben jetzt anderswo einen, s.o.)
-        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
+        PASSGENAUIGKEIT: {awareness:35,determination:34,will:31},
+        LAUFKRAFT:       {health:66,power:28,spirit:6},
+        PASSSCHUTZ:      {awareness:35,determination:34,will:31},
+        ABWEHR_PASS:     {awareness:100},
+        ABWEHR_LAUF:     {health:66,power:28,torment:6},
+        BALLSICHERHEIT:  {will:100},
+        TEAMGEIST:       {torment:46,spirit:42,charisma:12},
+        AUSDAUER:        {stamina:100},
+        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.), kein Matrix-Attribut
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
       // Football-Konzepten. Auf die neuen Sub-Skill-Namen nachgezogen, damit hier keine
