@@ -81,12 +81,18 @@ const D2_ARENA = "gewichtheben";
 const D2_NICHT_ARENA = "football";
 /**
  * ZWEITE Kontroll-Disziplin fuer den "weder D1 noch D2 arena-faehig"-Fall (CI-Fix 24.10., s.
- * Kommentar am Testfall unten) -- bewusst NICHT "mini-dm": Mini-DM hat seit PR 5 des 6-PR-Opus-
- * Plans einen eigenen `miniDmPresent`-Erkennungszweig, der unabhaengig von
- * `ARENA_RESOLVED_DISCIPLINE_IDS` Anwendbarkeit ausloest. Hockey hat das nicht -- Chris' Ausnahme
- * (`ARENA_ABNAHME_AUSNAHMEN`) deckt nur die rho-Schranke, nicht die Mengen-Zugehoerigkeit selbst.
+ * Kommentar am Testfall unten) -- bis 15.11. stand hier "hockey" (bewusst NICHT "mini-dm": Mini-DM
+ * hat seit PR 5 des 6-PR-Opus-Plans einen eigenen `miniDmPresent`-Erkennungszweig, der unabhaengig
+ * von `ARENA_RESOLVED_DISCIPLINE_IDS` Anwendbarkeit ausloest, und "battlefield" hat seit dem
+ * Battlefield-Pod-Vorlauf denselben eigenen `battlefieldPresent`-Zweig). Hockey ist seit der
+ * Pp-Pool-Korrektur (15.11., s. lib/battle/arena-resolved-disciplines.ts) selbst in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` und damit hier die FALSCHE Wahl geworden. Nach football,
+ * battlefield, mini-dm ist football das einzige angeschlossene-oder-nicht Mitglied ohne eigenen
+ * Praesenz-Zweig, das weiterhin ausserhalb `ARENA_RESOLVED_DISCIPLINE_IDS` steht -- D1 und D2
+ * duerfen hier identisch sein, `determineArenaDisciplineContexts()` prueft beide unabhaengig
+ * voneinander rein ueber die Mengen-Zugehoerigkeit der jeweiligen disciplineId.
  */
-const D2_NICHT_ARENA_ZWEITE = "hockey";
+const D2_NICHT_ARENA_ZWEITE = "football";
 
 function buildMinimalBattleModeGameState(input: { d1: string; d2: string }): GameState {
   return {
