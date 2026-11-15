@@ -123,7 +123,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     }
     seenMasters.add(m.row.nameNormalized);
     // Mindest-/Soll-Bestand aus Billbee (auch zuruecksetzen, wenn dort nicht mehr gepflegt)
-    await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { minStock: m.minStock, desiredStock: m.desiredStock } });
+    await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { minStock: m.minStock, desiredStock: m.desiredStock, ...(m.id ? { billbeeId: m.id } : {}) } });
     if (m.minStock !== null) minStockCount++;
     if (!m.ebayItemId) continue;
     const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized, ebayPrice: null }, data: { ebayItemId: m.ebayItemId } });
