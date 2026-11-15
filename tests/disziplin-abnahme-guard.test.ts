@@ -100,9 +100,11 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     expect(verletzt).toEqual([]);
   });
 
-  it("die Ausnahmeliste ist klein, begruendet und je Kriterium (aktuell nur Hockey, nur rho)", () => {
-    expect([...ARENA_ABNAHME_AUSNAHMEN.keys()]).toEqual(["hockey"]);
+  it("die Ausnahmeliste ist klein, begruendet und je Kriterium (Hockey/Showcase/I-Spy, alle nur rho)", () => {
+    expect([...ARENA_ABNAHME_AUSNAHMEN.keys()]).toEqual(["hockey", "showcase", "i-spy"]);
     expect(ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt).toEqual(["rho"]);
+    expect(ARENA_ABNAHME_AUSNAHMEN.get("showcase")?.deckt).toEqual(["rho"]);
+    expect(ARENA_ABNAHME_AUSNAHMEN.get("i-spy")?.deckt).toEqual(["rho"]);
     for (const ausnahme of ARENA_ABNAHME_AUSNAHMEN.values()) {
       expect(ausnahme.deckt.length).toBeGreaterThan(0);
       expect(ausnahme.begruendung.length).toBeGreaterThan(40);
@@ -129,6 +131,28 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     expect(verfehlteKriterien(hockey, ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt ?? [])).toEqual([]);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
   });
+
+  it.each(["showcase", "i-spy"] as const)(
+    "%s ist wieder gewertet -- root-gecaust als Kaderfamilie-Rauschen, rho durch Chris' Ausnahme gedeckt (15.11.)",
+    (id) => {
+      // Kurzzeitig (PR #1481) aus ARENA_RESOLVED_DISCIPLINE_IDS genommen, weil eine frische
+      // Neumessung rho unter 0,80 fand. Ein A/B-Test (derselbe Code, alte vs. aktuelle
+      // Kaderfamilie) zeigte: reines Roster-Rauschen, keine Mechanik- oder Code-Regression --
+      // Chris hat deshalb eine rho-Ausnahme analog Hockey freigegeben (s.
+      // SHOWCASE-I-SPY-AUSNAHME-NACHTRAG in arena-resolved-disciplines.ts). Pp besteht fuer beide
+      // weiterhin regulaer -- deshalb hier gegen das tatsaechliche Ergebnis gepinnt statt nur
+      // gegen die Frische-Flagge.
+      const eintrag = TABELLE.disziplinen[id]!;
+      expect(eintrag.ppFrisch).toBe(true);
+      expect(eintrag.pp.length).toBeGreaterThanOrEqual(TABELLE.schranken.ppSaatstroemeMindestens);
+      expect(eintrag.pp.every((wert) => wert <= TABELLE.schranken.ppHoechstens)).toBe(true);
+      expect(eintrag.rhoFrisch).toBe(true);
+      expect(eintrag.rhoJeSpiel).toBeLessThanOrEqual(TABELLE.schranken.rhoJeSpielUeber);
+      expect(verfehlteKriterien(eintrag, [])).toEqual(["rho"]);
+      expect(verfehlteKriterien(eintrag, ARENA_ABNAHME_AUSNAHMEN.get(id)?.deckt ?? [])).toEqual([]);
+      expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(id)).toBe(true);
+    },
+  );
 
   it("Mini-DM ist NICHT Teil des generischen Chassis-Sets (eigener Pod-Resolve-Pfad, eigener Schalter)", () => {
     // Mini-DM hat seit PR 4/PR 5 des 6-PR-Opus-Plans (21.10.) einen eigenen Pod-Resolve-Pfad
