@@ -154,6 +154,34 @@
  * (0,722/47,3 hier, 0,818/47,3 in frueheren Doku-Stellen, UND die 64,6/61,7 vom selben Tag) sind
  * alle ueberholt.
  *
+ * FOOTBALL-NACHTRAG 2 (15.11., Chris: "bitte keine PPS Bruecken mehr nutzen [...] ich wuerde es
+ * bevorzugen wenn du es auf ueber 0,8 gebalanced bekommst"): der Override-Rueckbau (b5731dd6f,
+ * 14.11.) hat Footballs Eignungsquelle auf die offizielle Matrix zurueckgesetzt, aber das
+ * `rezept:`-Feld in `FELDSPIEL_ART.football` (battle-mode.engine.js) NIE mitgezogen -- es blieb
+ * das alte, gegen den Override gefittete "Rezept C" stehen, in dem `spirit` (Matrixgewicht 25,
+ * das GROESSTE Einzelgewicht) und `charisma` (4) in KEINER Zelle vorkommen. Frisch nachgemessen
+ * (Task #136, 15.11.): rho je Spiel **0,248** (Spannweite 0,809 -- groesser als der Messwert
+ * selbst), Pp **113,2/116,2** -- das Fuenffache der 25er-Schranke. Diese PR behebt den
+ * Verdrahtungsfehler: das am 14.11. bereits fertig entworfene, aber nie gemergte "Runde 1"-Rezept
+ * (`docs/design/football-rezept-matrix-budget-14-11.md`, Branch
+ * `claude/football-rezept-matrix-budget-14-11`, PR #1463) ist jetzt wirklich im `rezept:`-Feld
+ * produktiv -- Pp **18,3** (bestanden, nahe am Optimum <15), rho je Spiel **0,525** / Saison
+ * **0,685** (unabhaengig reproduziert 15.11., bit-identisch zum 14.11.-Wert). Massive Verbesserung
+ * auf BEIDEN Kennzahlen gegenueber dem stehen gelassenen Rezept-Bug, aber rho bleibt WEITERHIN
+ * unter der 0,75er-Mindestschranke und der 0,80er-Zielschranke aus CLAUDE.md. FUENF unabhaengige
+ * weitere Hebel (vier Spaltenseiten-Varianten plus ein `FK_LOS_KAPPA`-Sweep, s. Rezept-Kommentar
+ * in `battle-mode.engine.js` fuer die volle Liste und Zahlen) wurden am 14./15.11. probiert und
+ * verworfen -- alle landen rho im selben Band 0,50-0,58. Befund: `TEAMGEIST` traegt 52,7 % des
+ * GESAMTEN mechanischen Gewichts der Disziplin und ist die einzige Zelle mit genug Masse fuer
+ * `spirit`s 25 Budgetpunkte, aber `spirit` korreliert in diesem Motor nachweislich schwach mit dem
+ * simulierten Spielausgang -- ein struktureller Befund, kein weiter optimierbares Rezeptdetail.
+ * Ein echter Durchbruch braeuchte einen neuen, substanziellen Motor-Kanal fuer `spirit` (eigene
+ * Formelaenderung mit Korridor-Refit, keine Rezeptfrage mehr) -- eine Entscheidung fuer Chris,
+ * s. Rezept-Kommentar. Football bleibt deshalb bewusst NICHT in
+ * `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS`/`ARENA_RESOLVED_DISCIPLINE_IDS` (rho-Schranke verfehlt,
+ * keine Chris-Ausnahme dafuer vergeben -- Chris' Auftrag war ausdruecklich "keine PPS-Bruecken
+ * mehr", nicht "noch eine Ausnahme").
+ *
  * BASKETBALL-NACHTRAG (18.10., PR #1289 "Give-and-Go-Schneiden", Task #123 -- Konsistenz-Audit
  * 25.10.): dieselbe Verschiebung wie bei Football, nur in die andere Richtung. Vorher 0,795 je
  * Spiel (16.10., unter der Schranke), nach PR #1289 **rho 0,810** (n=12 statt der sonst ueblichen
@@ -199,12 +227,13 @@
  *
  * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund (zuletzt nachgezogen 15.11.,
  * Konsistenz-Audit -- volle Zahlen/Quellen je Disziplin in data/generated/disziplin-abnahme.json):
- *  - FOOTBALL: rho 0,248 je Spiel nach dem Matrix-Rueckbau (14.11., Chris' Entscheidung "football
- *    muss zur Matrix zurueckkehren"), Pp 113,2/116,2 -- WEIT ueber der 25-Pp-Schranke (das Fuenf-
- *    fache). Eine vorher an dieser Stelle zitierte Zahl "Pp 18,3" stammte von einem NICHT
- *    gemergten Override-Experiment vor dem Rueckbau und gilt fuer den aktuellen Code-Stand nicht
- *    -- nicht wiederverwenden. Config/Referenz sind fertig, der Eintrag hier fehlt bewusst, bis
- *    eine eigene Pp-Rezeptrunde (Budget-Konservierung) das behebt.
+ *  - FOOTBALL: s. FOOTBALL-NACHTRAG 2 oben (15.11.) fuer die volle Herleitung. Der Rezept-
+ *    Verdrahtungsfehler (spirit/charisma ohne Zelle) ist behoben -- Pp besteht jetzt klar (18,3,
+ *    nahe am Optimum <15), aber rho (0,525 je Spiel) bleibt unter der 0,75er-Mindestschranke, nach
+ *    fuenf unabhaengig probierten und verworfenen weiteren Rezept-/Matrix-Varianten. Config/
+ *    Referenz sind fertig, der Eintrag hier fehlt weiterhin -- nicht wegen Pp (das besteht jetzt),
+ *    sondern wegen rho, und ohne Chris-Ausnahme dafuer (sein Auftrag war "keine PPS-Bruecken mehr",
+ *    nicht "noch eine Ausnahme").
  *  - SHOWCASE und I-SPY: SEIT 15.11. WIEDER NICHT MEHR in dieser Liste, s.
  *    SHOWCASE-I-SPY-REGRESSION-NACHTRAG unten -- eine frische Neumessung (Task #136, PR #1481)
  *    fand beide bei n=48 echt unter der 0,80-Schranke (Showcase 0,781, I-Spy 0,776), bestaetigt,

@@ -498,23 +498,23 @@
    "anmerkung": "NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
   },
   "football": {
-   "rhoJeSpiel": 0.248,
-   "rhoSpannweite": 0.809,
-   "rhoSaison": 0.266,
-   "rhoSaisonSpannweite": 0.902,
+   "rhoJeSpiel": 0.525,
+   "rhoSpannweite": 0.206,
+   "rhoSaison": 0.685,
+   "rhoSaisonSpannweite": 0.280,
    "pp": [
-    113.2,
-    116.2
+    18.3,
+    18.8
    ],
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 football -- Task #136, frische Kaderfamilie 15.11.",
-    "spiele": 24,
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 football -- 15.11., nach dem Rezept-Fix dieser PR",
+    "spiele": 48,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs football 48 (+ --saat-versatz=10000000) -- Task #136",
+    "befehl": "node scripts/messe-arena-einfluss.mjs football 48 (+ --saat-versatz=10000000) -- 15.11., nach dem Rezept-Fix dieser PR",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -524,11 +524,11 @@
     ]
    },
    "datum": "2026-11-15",
-   "quelle": "docs/design/baseline-alle-20-disziplinen-15-11.md; docs/design/stand-aller-disziplinen.md Abschnitt 14 (Historie)",
+   "quelle": "docs/design/football-rezept-produktivschaltung-15-11.md",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "commit": "984da6e18",
-   "anmerkung": "NEU NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch -- erstmals seit der Football-Override-Ruecknahme b5731dd6f, 14.11.). WICHTIG: der Override-Rueckbau aendert beide Zahlen fundamental gegenueber dem alten Stand (0,807/0,902, Pp 121,0/120,1), der noch GEGEN DEN OVERRIDE gemessen worden war -- dieser Eintrag ist deshalb kein normaler Vorher/Nachher-Vergleich derselben Mechanik, sondern der erste gueltige Messpunkt der auf-die-Matrix-zurueckgebauten Mechanik. rho je Spiel 0,248 (Spannweite 0,809 -- GROESSER als der Messwert selbst, das Signal ist im Kaderrauschen nicht mehr von einer zufaelligen Umordnung zu unterscheiden), Saison 0,266. Fuenf unabhaengige Rezept-/Matrix-Anlaeufe seit 14.11. (Runde 1-4 plus eine echte Matrix-Verschiebung spirit<->awareness, alle auf eigenen, nicht gemergten Branches claude/football-rezept-matrix-budget-14-11 und claude/football-matrix-spirit-awareness-15-11) kamen auf rho 0,50-0,58 -- besser als 0,248, aber immer noch klar unter 0,80 -- und wurden alle verworfen, main bleibt auf dem reinen Matrix-Rueckbau. Pp frisch gemessen (zwei Saatstroeme, n=48): 113,2/116,2 -- WEIT ueber der 25-Pp-Schranke, dieselbe strukturelle Ursache wie beim alten Override-Stand (nur drei Kreditvergabe-Achsen im Boxscore fuer zwoelf Matrixattribute, spirit/awareness/will/stamina/charisma bei exakt 0 %, s. stand-aller-disziplinen.md Abschnitt 14.4). WICHTIG FUER DIE PARALLELE ENTSCHEIDUNG (Chris, 15.11., kommuniziert waehrend dieser Messrunde): Football soll analog zu Hockey per rho-Ausnahme live geschaltet werden (Code-Verdrahtung in lib/battle/arena-resolved-disciplines.ts laeuft in einer PARALLELEN Session, bewusst nicht Teil dieser reinen Mess-/Doku-PR). ANDERS ALS BEI HOCKEY BESTEHT PP HIER NICHT: 113,2/116,2 ist nicht in der Naehe der 25-Schranke, sondern das Fuenffache davon -- eine rho-only-Ausnahme (deckt: [\"rho\"], wie bei Hockey) wuerde Football an der Pp-Pflichtpruefung haengen lassen, s. tests/disziplin-abnahme-guard.test.ts. Falls Football trotzdem produktiv gehen soll, braucht es entweder einen eigenen Pp-Hebel (bisher keiner gefunden, s.o.) oder eine ZUSAETZLICHE, von Chris ausdruecklich benannte Pp-Ausnahme -- diese Entscheidung liegt bei der parallelen Session/Chris, nicht bei dieser Messrunde."
+   "commit": "PENDING-DIESE-PR",
+   "anmerkung": "NEU NACHGEMESSEN 15.11., NACH DEM REZEPT-FIX DIESER PR (nicht mehr der Rezept-Verdrahtungsfehler, der die 0,248/113,2-Zahl vom selben Tag erklaerte, s. docs/design/football-rezept-produktivschaltung-15-11.md Abschnitt 1). Der Override-Rueckbau (b5731dd6f, 14.11.) hatte nur die Eignungsquelle auf die Matrix zurueckgesetzt, aber `FELDSPIEL_ART.football.rezept` (battle-mode.engine.js) nie mitgezogen -- `spirit` (Matrixgewicht 25) und `charisma` (4) kamen in KEINER Zelle vor. Diese PR verdrahtet das am 14.11. bereits fertig entworfene, aber nie gemergte 'Runde 1'-Rezept (docs/design/football-rezept-matrix-budget-14-11.md, PR #1463, nie gemergt) endlich produktiv. Ergebnis, unabhaengig frisch reproduziert (n=48/n=24, zwei Saatstroeme fuer Pp): rho je Spiel 0,525 (Spannweite 0,206), Saison 0,685 -- MASSIVE Verbesserung gegenueber 0,248, aber WEITERHIN unter der 0,75er-Mindestschranke (CLAUDE.md) und der 0,80er-Zielschranke. Pp 18,3/18,8 -- BESTANDEN, nahe am angestrebten Optimum <15 (nur `stamina` bleibt bei 0 %, weil `AUSDAUER` seit jeher keinen mechanischen Kanal im Motor hat, kein Rezeptbefund). Beide Kennzahlen verbessern sich gleichzeitig, kein Tradeoff zwischen ihnen. FUENF weitere, unabhaengig probierte Hebel (vier Spaltenseiten-Varianten aus Runden 2-4 plus eine echte Matrix-Verschiebung spirit<->awareness, docs/design/football-matrix-spirit-awareness-tausch-15-11.md) wurden am 14./15.11. versucht und verworfen -- alle landen rho im selben Band 0,50-0,58. Struktureller Befund (s. Design-Doc Abschnitt 5): `TEAMGEIST` traegt 52,7 % des gesamten mechanischen Gewichts und ist die einzige Zelle mit genug Masse fuer `spirit`s 25 Budgetpunkte, aber `spirit` korreliert in diesem Motor nachweislich schwach mit dem simulierten Spielausgang -- ein neuer, substanzieller Motor-Kanal fuer `spirit` (keine Rezeptfrage mehr) waere der naechste Schritt, aber eine Entscheidung fuer Chris. Football bleibt deshalb bewusst NICHT in ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS/ARENA_RESOLVED_DISCIPLINE_IDS -- Chris' Auftrag (15.11.) war ausdruecklich 'keine PPS-Bruecken mehr', nicht 'noch eine Ausnahme', und rho verfehlt weiterhin klar auch nur die 0,75er-Mindestschranke."
   },
   "i-spy": {
    "chassis": "buehne",

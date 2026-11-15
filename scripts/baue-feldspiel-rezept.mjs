@@ -174,7 +174,7 @@ for (const s of subskills) {
     .map((a) => ({ a, v: matrix[a] * p[a][s] }))
     .sort((x, y) => y.v - x.v);
   const summe = roh.reduce((x, y) => x + y.v, 0) || 1;
-  let anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
+  const anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
   // Rundungsrest auf den groessten Posten legen, damit die Zeile exakt 100 ergibt.
   const rest = 100 - anteile.reduce((x, y) => x + y.v, 0);
   if (anteile.length) anteile[0].v += rest;
