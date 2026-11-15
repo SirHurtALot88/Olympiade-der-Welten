@@ -59,7 +59,12 @@ import {
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
+// OLY_SEITE (15.11., additiv): misst einen anderen Motorstand (z. B. eine Mockup-Kopie mit einem
+// Rezeptkandidaten), wie das vierte Positionsargument von messe-arena-einfluss.mjs -- der
+// Arbeitsbaum bleibt dabei unangetastet. Ohne die Variable unveraendert der Arbeitsbaum.
+const SEITE = pathToFileURL(process.env.OLY_SEITE
+  ? path.resolve(process.env.OLY_SEITE)
+  : path.join(WURZEL, "public/mockups/battle-mode.html")).href;
 const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE
   || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";

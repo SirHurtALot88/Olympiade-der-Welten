@@ -17,9 +17,8 @@
 //       determination/stamina/dexterity sind im heute committeten Rezept vertreten, aber
 //       intelligence -- Matrixgewicht 2 -- kommt in KEINER der sieben Unterfertigkeiten vor,
 //       s. BUEHNE_ART.breaking.rezept in public/mockups/battle-mode.engine.js). Genau der
-//       Fall, den dieser Test einfangen soll -- und genau WARUM "breaking" unten (noch) nicht
-//       scharf geschaltet ist: der Test wuerde heute rot laufen, bis Task #133 das Rezept nach
-//       der Budget-Methode neu baut.
+//       Fall, den dieser Test einfangen soll. BEHOBEN 15.11. (Task #133): intelligence sitzt
+//       jetzt in NERVEN, s. Kommentar am Rezept.
 //   (b) ein Attribut OHNE Matrixgewicht taucht trotzdem in einer Unterfertigkeit auf.
 //
 // Dieser Test liest das COMMITTETE Rezept direkt aus public/mockups/battle-mode.engine.js --
@@ -47,15 +46,12 @@
 // allesamt disziplinspezifische Fachrollen -- jede traegt (oder soll tragen) echtes
 // Matrixgewicht, keine ist ein generischer Nicht-Fach-Kanal.
 //
-// FUER ALLE NEUN BUEHNEN-DISZIPLINEN GEDACHT, HEUTE KEINE SCHARF. Die bestehenden Rezepte
-// sind handkalibrierte Ergebnisse von scripts/kalibriere-buehne-rezept.mjs's Grid-Suche
-// (rho-getrieben) bzw. frueherer Pp-Nachziehrunden -- nicht Sinkhorn-Ausgaben, und nicht
-// gegen diese exakte Praesenz/Abwesenheit-Eigenschaft gebaut (s. Fund (a) oben: breaking
-// wuerde heute durchfallen). Der Rollout auf die neun Disziplinen (Task #133) ist ein
-// separater, spaeterer Schritt mit eigener rho/Pp-Abnahme je Disziplin -- pending-Platzhalter
-// unten, damit niemand vergisst, dass sie fehlen, ohne jetzt schon rot zu faerben. Sobald eine
-// Disziplin per scripts/baue-buehne-rezept.mjs neu gebaut und abgenommen ist, wandert sie aus
-// diesem Platzhalter in eine eigene it(...), wie football im Feldspiel-Pendant.
+// FUER ALLE NEUN BUEHNEN-DISZIPLINEN SCHARF (seit 15.11., Task #133). Die bestehenden
+// Rezepte sind handkalibrierte Ergebnisse von scripts/kalibriere-buehne-rezept.mjs's
+// Grid-Suche (rho-getrieben) bzw. frueherer Pp-Nachziehrunden, keine Sinkhorn-Ausgaben -- die
+// Struktur-Eigenschaft erfuellten trotzdem acht von neun schon, breaking wurde nachgezogen.
+// Die NUMERISCHE Budget-Treue jeder Disziplin steht als frische Pp-Messung in
+// data/generated/disziplin-abnahme.json.
 // ===================================================================================
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -126,10 +122,7 @@ function leseBuehneRezept(disziplin: string): Record<string, Record<string, numb
   return rezept;
 }
 
-// Noch von keiner `it(...)` aufgerufen, s. Kopfkommentar: alle neun Disziplinen sind heute
-// `it.skip`. Bleibt hier definiert, damit der Rollout (Task #133) sie disziplinweise einfach
-// aufrufen kann, statt sie dann erst zu schreiben.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// SCHARF FUER ALLE NEUN seit 15.11. (Task #133, s. unten).
 function pruefeBudgetKonservierung(disziplinId: OfficialDisciplineWeightId) {
   const matrix = officialDisciplineWeightMatrix[disziplinId] as Partial<
     Record<PlayerGeneratorAttributeKey, number>
@@ -189,15 +182,15 @@ describe("Budget-Konservierung je Attribut, Buehne (Chris 14.11.: 'das rezept je
     expect(Object.keys(rezept).length).toBeGreaterThan(0);
   });
 
-  // PENDING FUER ALLE NEUN BUEHNEN-DISZIPLINEN (Task #133, noch nicht umgesetzt). `it.skip`
-  // statt Weglassen, damit die Liste als TODO sichtbar bleibt, aber heute niemanden rot
-  // faerbt -- keines dieser neun Rezepte ist bisher nach der Budget-Methode (Sinkhorn,
-  // scripts/baue-buehne-rezept.mjs) gebaut/geprueft worden, und mindestens eines (breaking,
-  // s. Kopfkommentar) wuerde heute nachweislich durchfallen.
-  it.skip("tennis, fechten, gewichtheben, speed-schach, breaking, showcase, wettessen, eiskunstlauf, i-spy: noch nicht auf Budget-Konservierung umgestellt", () => {
-    // Absichtlich leer -- Platzhalter fuer den Rollout (Task #133) auf die neun
-    // Buehnen-Disziplinen. Sobald eine Disziplin umgestellt ist, wandert sie aus diesem
-    // Platzhalter in eine eigene it("<disziplin>: ...", () => pruefeBudgetKonservierung(...)),
-    // wie football in tests/feldspiel-rezept-budget-guard.test.ts.
+  // SCHARF FUER ALLE NEUN BUEHNEN-DISZIPLINEN (15.11., Task #133, Chris: "budget konservierung
+  // sollte eigentlich jetzt fuer alle 20 diszis schon gelten!"). Acht der neun Rezepte erfuellten
+  // die Struktur-Eigenschaft schon (jedes Matrixattribut hat eine Zelle, kein attributfremdes
+  // Attribut) -- ihre numerische Budget-Treue steht als frische Pp-Messung in
+  // data/generated/disziplin-abnahme.json (alle <= 25, Task #136). Der einzige Ausreisser war
+  // breaking (intelligence, Matrixgewicht 2, ohne Zelle); seit dem Rezeptschritt vom 15.11.
+  // (BUEHNE_ART.breaking.rezept, NERVEN) besteht auch breaking. Ab hier faellt jede kuenftige
+  // Rezeptaenderung, die ein Matrixattribut verwaist oder ein fremdes einschleust, in CI auf.
+  it.each(BUEHNEN_DISZIPLINEN)("%s: jedes Matrixattribut hat eine Zelle, kein fremdes Attribut", (disziplinId) => {
+    pruefeBudgetKonservierung(disziplinId);
   });
 });

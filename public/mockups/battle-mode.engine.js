@@ -18716,14 +18716,27 @@
       // mehr zusaetzlich in TECHNIK. Zusammen mit `GAUNTLET_FAMILIE_GEWICHT` 0,5->0,35 (s. dort)
       // und der Wucht-Familie 4->3 Geraete (s. FOLTER_GERAETE oben) die Gegenmessung fuer die
       // PR-Beschreibung.
+      //
+      // BUDGET-KONSERVIERUNG (15.11., Task #133, Chris: "budget konservierung sollte eigentlich
+      // jetzt fuer alle 20 diszis schon gelten!"): bis hierher kam intelligence (Matrixgewicht 2)
+      // in KEINER der sieben Unterfertigkeiten vor -- seine Zeile war unloesbar, es trug faktisch
+      // 0 statt 2 (gefunden von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt sitzt
+      // es mit 6 in NERVEN (der "MIND FORTRESS"-Zone: wer den Schmerz durchschaut, haelt laenger).
+      // Zugleich ein multiplikativer Zeilenschritt gegen die GEMESSENEN Anteile (Mittel beider
+      // Saatstroeme vorher: health 13,1 % gegen 18, determination 13,2 % gegen 10, will 29,5 %
+      // gegen 28, power 11,5 % gegen 10): jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je
+      // Unterfertigkeit wieder auf 100 normiert. Gemessen (messe-arena-einfluss.mjs breaking 48,
+      // Saatversatz 0 / 10 000 000): Pp 14,3/13,9 -> 12,5/10,2, intelligence 0 -> 0,8/1,2 %;
+      // rho je Spiel (miss-alle-disziplinen.mjs 24 breaking) 0,867 -> 0,860, Spannweite 0,169 --
+      // die Bewegung liegt weit innerhalb des Kaderrauschens.
       rezept:{
-        GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
-        SPITZENMOMENT:{power:55,will:45},
-        TECHNIK:      {torment:59,determination:41},
-        PUBLIKUM:     {will:60,torment:40},
-        NERVEN:       {will:50,health:50},
-        AUSDAUER:     {stamina:65,determination:35},
-        WAGNIS:       {power:40,dexterity:60}
+        GRUNDLAGE:    {will:32,torment:19,health:34,stamina:15},
+        SPITZENMOMENT:{power:54,will:46},
+        TECHNIK:      {torment:63,determination:37},
+        PUBLIKUM:     {will:59,torment:41},
+        NERVEN:       {will:42,health:52,intelligence:6},
+        AUSDAUER:     {stamina:69,determination:31},
+        WAGNIS:       {power:41,dexterity:59}
       }
     },
 

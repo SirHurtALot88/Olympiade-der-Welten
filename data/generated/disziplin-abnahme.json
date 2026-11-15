@@ -201,19 +201,19 @@
   },
   "breaking": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.867,
-   "rhoSpannweite": 0.181,
-   "rhoSaison": 0.916,
+   "rhoJeSpiel": 0.86,
+   "rhoSpannweite": 0.169,
+   "rhoSaison": 0.923,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking -- Budget-Konservierung 15.11., Rezept mit intelligence in NERVEN",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    14.3,
-    13.9
+    12.5,
+    10.2
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs breaking (+ --saat-versatz=10000000)",
@@ -226,10 +226,10 @@
     ]
    },
    "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "commit": "fbcdc6fab",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,801 -> 0,867 (n=24, Spannweite 0,181, enger als vorher), Saison 0,944 -> 0,916 -- Bewegung 0,066/0,028, innerhalb der alten Spannweite (0,289), keine Regression. Breaking stand bisher auf der Beobachtungsliste, weil 0,801 GENAU auf der Schranke lag -- der neue Wert liegt deutlich komfortabler (0,067 statt 0,001 Abstand), bleibt aber wegen der weiterhin grossen Spannweite vorsorglich auf der Liste (s. 'beobachtungsliste' oben, Text aktualisiert). Gegenprobe n=48 (im selben Zug wie Climbing/Showcase/I-Spy zur Absicherung gefahren): 0,868, bestaetigt den n=24-Wert fast exakt -- stabil, kein Grenzfall wie bei den anderen drei. Pp nicht neu gemessen, 14,3/13,9 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste."
   },
   "wettessen": {
    "chassis": "buehne",
