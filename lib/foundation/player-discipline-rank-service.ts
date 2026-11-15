@@ -1,13 +1,26 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+/**
+ * Bewusst der LEANE Kern (`player-discipline-rank-core.ts`), nicht `player-detail-drawer.ts`
+ * selbst — siehe dessen Kopfkommentar. Diese Route braucht Raenge/Punkte fuer GENAU einen
+ * Spieler, nicht das komplette Spielerprofil (Scouting/Training/Wirtschaft/Moral/…), das
+ * `buildPlayerDrawerDataFromGameState` sonst IMMER mitbaut. Frueher zog der Import von
+ * `player-detail-drawer.ts` dessen vollen ~20-Subsysteme-Abhaengigkeitsgraphen (385 Module /
+ * 16,45 MB) in diese Route — Ursache eines `next dev`-OOM (dmesg bestaetigt echte >13-GB-Kills
+ * in diesem Container). Der Kern liefert dieselben Funktionen (keine Logikaenderung), nur ohne
+ * den Ballast.
+ */
 import {
   buildDisciplineGlobalRankMaps,
-  buildPlayerDrawerDataFromGameState,
+  buildDisciplineValuesFromPlayer,
+  findLatestArchivedPlayerPerformance,
+  resolveAttributeVisibility,
   resolveRosterEntry,
+  resolveTeam,
   type PlayerDisciplineRankOverride,
-} from "@/lib/foundation/player-detail-drawer";
+} from "@/lib/foundation/player-discipline-rank-core";
 
-export type { PlayerDisciplineRankOverride } from "@/lib/foundation/player-detail-drawer";
+export type { PlayerDisciplineRankOverride } from "@/lib/foundation/player-discipline-rank-core";
 
 /**
  * Saison-/All-Time-Rang je Disziplin für GENAU einen Spieler, gerechnet auf dem
@@ -53,11 +66,13 @@ export function buildPlayerDisciplineRankOverride(input: {
   const activePlayerIds = Array.from(
     new Set((input.gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)),
   );
-  const ledger = getSeasonPointsLedger({ gameState: input.gameState, saveId: input.saveId });
+  // EINE Quelle fuer Ledger UND Saison-Performance (statt zwei getrennten Berechnungen) — dieselbe
+  // Rechenstelle, die `buildPlayerDrawerDataFromGameState` intern auch nutzt.
+  const seasonDerivations = getSeasonDerivations({ gameState: input.gameState, saveId: input.saveId });
   const globalRankMaps = buildDisciplineGlobalRankMaps(
     input.gameState,
     input.gameState.disciplines,
-    ledger,
+    seasonDerivations.ledger,
     rosterEntry ? activePlayerIds : null,
   );
 
@@ -94,19 +109,45 @@ export function buildPlayerDisciplineRankOverride(input: {
    * `buildDisciplineValuesFromPlayer`). Genau so entsteht der Widerspruch, gegen den dieses
    * Override antritt — nur eine Ebene tiefer.
    */
-  const vollstaendigeAnsicht = buildPlayerDrawerDataFromGameState({
-    gameState: input.gameState,
-    playerId: input.playerId,
-    source: "sqlite",
+  /**
+   * DIESELBE BRANCH-LOGIK WIE `buildPlayerDrawerDataFromGameState`, nur ohne dessen restliche
+   * ~20 Teilsysteme aufzurufen: `buildDisciplineValuesFromPlayer` ist exakt dieselbe Funktion,
+   * nur direkt statt ueber den vollen Drawer-Aufbau erreicht. Fuer die "scouted"-Sichtbarkeit
+   * liefert der Drawer hier ohnehin IMMER leere allTimePoints/-Appearances/-Ranks
+   * (`buildScoutedDisciplineValuesFromPlayer` setzt sie hart auf null) — die leeren Maps unten
+   * sind also dasselbe Ergebnis, nur ohne die (nutzlose) Rechnung dafuer.
+   */
+  const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
+  const team = resolveTeam(input.gameState.teams, rosterEntry);
+  const attributeVisibility = resolveAttributeVisibility({
+    teamId: rosterEntry?.teamId ?? team?.teamId ?? null,
+    teamHumanControlled: team ? team.humanControlled !== false : null,
+    manageableTeamIds: null,
+    scoutingLevel: 0,
+    isOnViewingTeamRoster: Boolean(rosterEntry && team?.teamId && rosterEntry.teamId === team.teamId),
   });
+
   const allTimePointsByDisciplineId: Record<string, number> = {};
   const allTimeAppearancesByDisciplineId: Record<string, number> = {};
-  for (const zeile of vollstaendigeAnsicht?.disciplineValues ?? []) {
-    if (zeile.allTimePoints != null) {
-      allTimePointsByDisciplineId[zeile.id] = zeile.allTimePoints;
-    }
-    if (zeile.allTimeAppearances != null) {
-      allTimeAppearancesByDisciplineId[zeile.id] = zeile.allTimeAppearances;
+  if (attributeVisibility === "exact") {
+    const seasonPerformance = seasonDerivations.performanceByPlayerId.get(input.playerId) ?? null;
+    const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, input.playerId);
+    const disciplineValues = buildDisciplineValuesFromPlayer(
+      player,
+      input.gameState.disciplines,
+      seasonPerformance,
+      latestArchivedPerformance,
+      input.gameState,
+      globalRankMaps,
+      null,
+    );
+    for (const zeile of disciplineValues) {
+      if (zeile.allTimePoints != null) {
+        allTimePointsByDisciplineId[zeile.id] = zeile.allTimePoints;
+      }
+      if (zeile.allTimeAppearances != null) {
+        allTimeAppearancesByDisciplineId[zeile.id] = zeile.allTimeAppearances;
+      }
     }
   }
 
