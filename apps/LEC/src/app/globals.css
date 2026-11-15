@@ -720,3 +720,17 @@ a.mover .meta, a.mover .meta span { color: var(--muted); }
 .stand-warn i { background: var(--warn, #e0b341); }
 .stand-crit i { background: var(--crit, #e5604d); }
 .stand-warn, .stand-crit { color: var(--text, inherit); }
+
+/* Aktiv-Zeile im Sortiment */
+.bd-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 8px; }
+.bd-active-l { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+
+/* Preis- und Marktlinie im Drawer */
+.bd-pml { margin: 8px 0 4px; }
+.bd-pml svg { width: 100%; height: auto; display: block; }
+.bd-pml-grid { stroke: var(--line); stroke-width: 1; }
+.bd-pml-ax { fill: var(--faint); font-size: 9px; }
+.bd-pml-vk { stroke: var(--accent, #6aa9ff); stroke-width: 2; }
+.bd-pml-mk { stroke: var(--warn, #e0b341); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.bd-pml-sale { fill: var(--good, #3fb97a); }
+.bd-pml-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good, #3fb97a); margin: 0 3px 0 8px; }

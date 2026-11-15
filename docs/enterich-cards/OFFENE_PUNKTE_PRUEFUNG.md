@@ -117,3 +117,9 @@ Formel: Marge der Bestellung = Σ Positionen (Stückpreis × Menge) − Σ EK �
 - Punkt 9 Alter unbekannt: Rückfall auf Tage seit erster Erfassung (`Article.createdAt`) in `queries.ts`. Unterschätzt alte Ladenhüter, solange die DB jung ist.
 - Punkt 7 verworfen; Punkt 8 Mitkäufe und Land/Versandart verworfen.
 - Offen: 4 Handy (Drawer zuerst), 8 Preis-/Marktlinie, 6 ab 15.12., 10 wartet auf Order-JSON, 1 Filterleiste verkleinert.
+
+## Umsetzungsstand 15.11. (Paket F)
+
+- Punkt 8 Preis-/Marktlinie: umgesetzt (`lib/dashboard/preisLinie.ts`, `PreisMarktLinie.tsx`, im Drawer über den Einzelverkäufen). Zeichnet nur mit Verlauf (zwei Marktpunkte, eine Preisänderung oder zwei Verkäufe).
+- Punkt 1 Filterleiste: nur die „Aktiv“-Zeile mit entfernbaren Chips und „alle zurücksetzen“ gebaut. Das Verschieben von KapitalPanel/Überblick nach Finanzen entfällt: beide rechnen auf Sortiment-Zeilen und gehören dorthin. Die Filtermenüs bleiben, weil die Aufgaben-Reiter sie nicht ersetzen.
+- Handy ausdrücklich nicht gewünscht (Chris, 14.11.).
