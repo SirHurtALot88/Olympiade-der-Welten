@@ -146,11 +146,14 @@ das Sand-Profil halbieren und die anderen Varianten mitziehen, damit Regel 2 hä
 
 ## 4. Offen / nächste Schritte
 
-- **Kein Effekt ohne Bild (Regel 7).** Die Tennis-Kulissen (`court/riviera/dach`) kommen mit
-  `claude/kulissen-integration-0711` und stehen auf `main` noch nicht in `battle-mode.kulissen.js`.
-  Dieser PR sollte deshalb **nach** der Kulissen-Integration gemergt werden. Der Test
-  „Varianten-Reihenfolge stimmt mit battle-mode.kulissen.js überein“ greift, sobald Tennis dort steht.
+- **Kein Effekt ohne Bild (Regel 7).** Erledigt: die Kulissen-Integration (PR #1351) ist auf `main`,
+  `court/riviera/dach` stehen in `battle-mode.kulissen.js`, der Reihenfolge-Test ist grün.
 - Arena-Chip (`tchip`) je Spieler und Anpfiff-Protokollzeile (Konzept 4.2 d) sind noch nicht gebaut.
   Spielplan-Anzeige je Begegnung (4.2 c) ebenfalls nicht.
 - PPS-/Manager-Pfad: es gibt keinen Oberflächenwert, deshalb auch keine Anzeige im Manager-Modus.
 - `data/generated/disziplin-abnahme.json` (tennis) ist auf das Mittel über die Varianten aktualisiert.
+
+**Nachmessung 15.11. (nach Merge von `main`, der Tennis inzwischen auf rho 0,890 gehoben hatte):**
+mit Effekt rho je Spiel 0,885 (Spannweite 0,060), Saison 0,958; Pp 6,2 / 5,5 (ohne Effekt 6,9).
+Fingerabdruck: `--kulissen-effekt=aus` ist bit-identisch zu `main` (GESAMT `480b2210dea2`), mit
+Effekt ändern sich genau die drei Tennis-Einträge (GESAMT `8061eaa12edf`).
