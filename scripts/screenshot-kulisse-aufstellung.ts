@@ -10,7 +10,7 @@
 //
 // AUFRUF: OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0 npx tsx scripts/screenshot-kulisse-aufstellung.ts
 // ===================================================================================
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -103,13 +103,13 @@ async function baueSaveVorTennis() {
   return { saveId, teamId: wahl.teamId, seite };
 }
 
-function startDevServer(): ChildProcessWithoutNullStreams {
+function startDevServer(): ChildProcess {
   const child = spawn("npm", ["run", "dev"], {
     env: { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stdout.on("data", () => undefined);
-  child.stderr.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
+  child.stdout?.on("data", () => undefined);
+  child.stderr?.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
   return child;
 }
 
