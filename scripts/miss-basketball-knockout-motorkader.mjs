@@ -20,7 +20,7 @@
 // zusaetzliche Lesefunktion neben feldspielSubskills(). Die Datei im Repo aendert sich nicht.
 //
 //   node scripts/miss-basketball-knockout-motorkader.mjs [spiele=48] [--saat-versatz=N]
-//        [--pp=SPIELE] [--kreuz=1..4] [--leben=4] [--losen=umlauf] [--wert=marge]
+//        [--pp=SPIELE] [--kreuz=1..4] [--kader=2..6] [--leben=4] [--losen=umlauf] [--wert=marge]
 // ===================================================================================
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
@@ -47,8 +47,18 @@ const familieRoh = JSON.parse(readFileSync(resolve(wurzel, "data/generated/kader
 // Gast von Paarung i+K (K=1..4). So spielen dieselben Teams in Begegnungen, die die Kalibrierung
 // nie gesehen hat.
 const KREUZ = Number(opt("kreuz", 0));
-const familie = KREUZ ? familieRoh.map((v, i) => { const w = familieRoh[(i + KREUZ) % familieRoh.length];
+const familieK = KREUZ ? familieRoh.map((v, i) => { const w = familieRoh[(i + KREUZ) % familieRoh.length];
   return { label: `${v.label.split("-")[0]}-x-${w.label.split("-")[1]}`, heim: v.heim, gast: w.gast }; }) : familieRoh;
+// --kader=K (15.11.): kleinere Kader. Je Seite stehen nur K Spieler (2..6) im Aufgebot, gezogen per
+// fester Saat-Mischung (mulberry32 ueber die Paarung) aus dem vollen Kader — die KI-Slotwahl des
+// Motors sieht dann nur diese K. Die Knockout-Mechanik bleibt unveraendert (auch die Zahl der Leben,
+// sofern nicht --leben gesetzt ist).
+const KADER = Number(opt("kader", 0));
+const mischeFest = (liste, saat) => { let a = saat >>> 0; const r = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a;
+  t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const k = [...liste]; for (let i = k.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [k[i], k[j]] = [k[j], k[i]]; } return k; };
+const familie = KADER ? familieK.map((v, i) => ({ label: `${v.label}-k${KADER}`,
+  heim: mischeFest(v.heim, 4711 + i * 2).slice(0, KADER), gast: mischeFest(v.gast, 4712 + i * 2).slice(0, KADER) })) : familieK;
 const SEITE = pathToFileURL(join(wurzel, "public/mockups/battle-mode.html")).href;
 const KANAELE = ["TEAMGEIST", "ZWEITCHANCE", "LAUFTEMPO", "SCHUSS_NAH", "TECHNIK", "AUFBAU"];
 

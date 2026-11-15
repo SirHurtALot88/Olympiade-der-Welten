@@ -16,6 +16,7 @@ nicht. `battle-mode.engine.js`, `battle-mode.rezepte.js` und die Matrix sind unb
 
 | Frage | Antwort |
 |---|---|
+| **Nachmessung 15.11. (Abschnitt 7)** | Die Kaderfamilie ist seit Task #136 aus einem **anderen Spielstand** gezogen (andere Spieler, andere Kadergrößen), dazu ist der Motor weitergewachsen. Unverändert gemessen: **8 von 8 Läufen über beiden Schranken**, rho **0,814–0,860**, Pp **17,0–19,6**. Damit ist der offene Punkt „zweiter Spielstand" erledigt. **Kleinere Kader** (2–5 je Seite, vier Leben unverändert): rho 0,800–0,855, Pp 14,4–21,1, keine Schranke gerissen; bei 2 je Seite ist rho über vier Spieler nur grob gestuft (0,800 = Quantisierung), die Star-Kennzahl liegt dort bei 75–80 % / 94–98 %. Offen bleibt nur der Motor-Builder. |
 | **Aktueller Stand (Stand 2, Abschnitt 6)** | **Vier Leben**, Neuauslosung je Umlauf, Freiwurf und Druck schwächer gewichtet, Sprungwurf stärker, AUFBAU (Ballhandling auf dem Weg zum Korbleger) als neuer Nebenweg. Mit echten Motor-Kadern sind es **8 von 8 Läufen über beiden Schranken**: rho **0,818–0,846**, Pp **17,7–21,5**, auch auf einem nie zur Kalibrierung genutzten Saatstrom und auf gekreuzten Paarungen. Spielzeit im Median ~6:00 (rein darstellerisch skalierbar). Die Zeilen darunter beschreiben Stand 1 und bleiben als Verlauf stehen. |
 | Welche Teilwerte hat Basketball? | **Zehn**, nicht neun: AUFBAU, ABSCHLUSS, TECHNIK, SCHUSS_NAH, SCHUSS_FERN, ZWEITCHANCE, ABWEHR, TEAMGEIST, AUSDAUER und **LAUFTEMPO** (speed 52, stamina 32, dexterity 16). Dazu kommt der Freiwurf-Kanal im Motor (spirit 48, intelligence 35, dexterity 17). Abschnitt 8 der Machbarkeit irrt hier, Fables Kanalliste stimmt (Abschnitt 1). |
 | Trägt Fables Knockout mit einem Leben? | **Nein.** Die Sonde misst rho je Spiel **0,605 / 0,591**. Das hat zwei Ursachen, die sich getrennt messen lassen. Erstens die Reihenposition: Man wird immer vom selben Nachbarn gejagt, deshalb liegt die Validität nur bei 0,67–0,88. Zweitens gibt es zu wenig Daten: 4,5 Würfe je Werfer, der Erstausgeschiedene hat 1,2. Fables eigenes Risiko bestätigt sich (Abschnitt 3). |
@@ -365,6 +366,97 @@ Star auf Rang 1 / Top 2: 60–65 % / 77–82 %. Spielzeit im Median 557 s Simula
 
 ---
 
+## 7. Nachmessung 15.11.: neue Kaderfamilie, kleinere Kader
+
+**Anlass.** `data/generated/kaderfamilie-live-save.json` ist am 15.11. (Task #136) neu gezogen
+worden, und zwar aus einem **anderen Spielstand** (`new-game-1793476611202-0dwpok` statt
+`new-game-1787123325719-swnjlk`): dieselben fünf Teamnamen, aber andere Spieler und andere
+Kadergrößen (11–14 statt 8–14). Dazu hat `battle-mode.engine.js` seit dem 08.11. um mehrere tausend
+Zeilen zugelegt. Die Kalibrierung aus Abschnitt 6 ist nicht angefasst, die Sim-Konstanten sind
+dieselben. Gemessen wurde nach dem Merge von `main` mit denselben Sonden.
+
+**Saatströme.** Strom k heißt hier `--saat-versatz=k·10000000` (Konvention der Tauziehen-Sonde und
+von `messe-arena-einfluss.mjs`). Welche Versätze am 08.11. hinter „Strom 1–3" standen, ist nicht
+festgehalten; die Ströme sind also neu, nicht dieselben.
+
+### 7.1 Motor-Kader-Sonde, volle Kader (n = 48, Pp mit 48 Spielen je Paarung)
+
+| Lauf | rho je Spiel (08.11.) | rho je Spiel (15.11.) | Pp (08.11.) | Pp (15.11.) | Star Rang 1 / Top 2 (15.11.) |
+|---|---:|---:|---:|---:|---:|
+| Paarungen wie gezogen, Strom 0 | 0,832 | **0,846** | 19,9 | **19,3** | 57 % / 76 % |
+| Strom 1 | 0,818 | **0,846** | 19,0 | **17,3** | 53 % / 71 % |
+| Strom 2 | 0,846 | **0,846** | 18,5 | **18,0** | 60 % / 73 % |
+| Strom 3 | 0,839 | **0,850** | 18,9 | **18,0** | 58 % / 77 % |
+| gekreuzt K=1, Strom 0 | 0,829 | **0,846** | 18,9 | **17,9** | 58 % / 73 % |
+| gekreuzt K=1, Strom 1 | 0,828 | **0,814** | 20,4 | **17,0** | 49 % / 70 % |
+| gekreuzt K=2, Strom 0 | 0,846 | **0,860** | 17,7 | **18,5** | 57 % / 73 % |
+| gekreuzt K=2, Strom 1 | 0,839 | **0,846** | 21,5 | **19,6** | 48 % / 73 % |
+
+Pp-Anteile wie vorher: spirit 26–28 (Matrix 22), awareness 9,6–11,3 (Matrix 14), alle anderen
+innerhalb ±3,5; health, will und determination tragen 0,0.
+
+**Vorab-Sonde** (eigene Mischung, erste sechs je Seite): rho 0,830 / 0,835 (vorher 0,839 / 0,839),
+Pp 11,8 / 12,7 (vorher 13,4 / 13,9).
+
+**Lesart.** Die Zahlen haben sich nicht wesentlich bewegt, eher leicht verbessert. Weil die neue
+Familie aus einem anderen Spielstand stammt, auf dem nie kalibriert wurde, ist das die fehlende
+Kreuzvalidierung aus 6.5: Die Konstanten sind nicht auf die fünf alten Teams überangepasst.
+
+### 7.2 Kleinere Kader (neu: `--kader=K`)
+
+Je Seite kommen nur K Spieler ins Aufgebot, fest gemischt aus dem vollen Kader (mulberry32 je
+Paarung). Die KI-Slotwahl des Motors sieht nur diese K. Mechanik und Konstanten bleiben gleich,
+auch **vier Leben**, wenn nicht anders angegeben. n = 48, Pp mit 48 Spielen.
+
+| Kader je Seite | Leben | rho je Spiel (Strom 0 / 1) | Star Rang 1 / Top 2 | Pp (Strom 0 / 1) |
+|---|---:|---:|---:|---:|
+| 6 (Zufallsauswahl statt KI-Auswahl aus allen) | 4 | 0,852 | 57 % / 77 % | 16,7 |
+| 5 | 4 | 0,855 / 0,855 | 59–66 % / 84–85 % | 14,4 / 18,1 |
+| 4 | 4 | 0,833 / 0,833 | 67–68 % / 83–85 % | 17,4 / 16,8 |
+| 3 | 4 | 0,829 / 0,829 | 65–68 % / 86–87 % | 21,1 / 18,1 |
+| 2 | 4 | 0,800 / 0,800 | 75–76 % / 94–95 % | 19,6 / 17,8 |
+| 4 | 5 | 0,833 | 66 % / 83 % | 19,6 |
+| 3 | 6 | 0,829 | 68 % / 87 % | 19,0 |
+| 2 | 8 | 0,800 | 80 % / 98 % | 22,1 |
+
+**Lesart.**
+- Bis hinunter zu drei je Seite halten beide Schranken mit festen vier Leben. Mehr Leben ändern
+  rho nicht messbar und schieben Pp leicht nach oben; die Annahme aus Abschnitt 5 („die Zahl der
+  Leben muss mitwachsen") bestätigt sich in dieser Messung **nicht**.
+- Bei wenigen Teilnehmern ist der Median von rho grob gestuft: Mit 2·K Werfern kann Spearman nur
+  wenige Werte annehmen. 0,800 bei zwei je Seite (vier Werfer) ist so eine Stufe und kein echtes
+  „knapp unter/auf der Schranke". Für so kleine Felder sagen Star auf Rang 1 (75–80 %) und Star in
+  den ersten zwei (94–98 %) mehr als rho.
+- Das ist keine Formatentscheidung, nur die Messung. Ob Knockout bei sehr kleinen Kadern überhaupt
+  angeboten wird, entscheidet Chris.
+
+Befehle: `node scripts/miss-basketball-knockout-motorkader.mjs 48 --pp=48 [--saat-versatz=N]
+[--kreuz=K] [--kader=K] [--leben=N]`. Laufzeit je Lauf ~3,5 min (vier parallel auf vier Kernen).
+
+### 7.3 Was für ein echtes Format noch fehlt (Aufwandsschätzung)
+
+Mechanisch ist der Prototyp fertig vermessen. Für ein buchbares Format fehlt Implementierungsarbeit,
+die eine eigene Freigabe braucht:
+
+1. **Motor-Builder** (`battle-mode.engine.js`): Knockout-Ablauf aus der Sim in den Motor übernehmen,
+   hinter `FELDSPIEL_FLAGS.basketballFormat` an der `bauFeldspiel()`-Weiche, Spielerwert für
+   `MOTOREN.basketball.wert()`. Isolationsprüfung (Schalter aus = bit-identisch, Muster
+   `scripts/pruefe-sandsack-wegc-isolation.mjs`). Etwa 1–2 Agententage.
+2. **Pflichtabnahme** mit `miss-alle-disziplinen.mjs` und `messe-arena-einfluss.mjs` im echten Motor,
+   eigener Eintrag je Format in `disziplin-abnahme.json`, `pruefe-rangtreue-schranke.mjs` muss mehr
+   als eine Zahl je Disziplin kennen. Etwa 1 Tag.
+3. **Darstellung in der Arena**: die Knockout-Szene (Reihe, Wurf, Abpraller, Ausgeschiedene) als
+   Wiedergabe im Battle-Mode statt im Mockup. Ohne eigene Wurf-Pose (neue PixelLab-Animation ist
+   ohne Chris' Freigabe gesperrt) mit den bestehenden Posen wie im Prototyp. Etwa 2–3 Tage.
+4. **Formatwahl, Kaderbildschirm, Picker, PPS-Referenz, Persistenz** wie in Abschnitt 6 der
+   Machbarkeit. Umfang hängt an Chris' Formatwahl-Entscheidung (fest / Hash / Liga-Schalter), etwa
+   1–3 Tage.
+
+Zusammen grob **5–9 Agententage**, davon ist nur Punkt 1–2 nötig, um die Abnahme im echten Motor zu
+fahren.
+
+---
+
 ## 5. Der Prototyp
 
 Öffnen: `public/mockups/basketball-knockout-prototyp.html` (im Next-Dev-Server unter
@@ -403,7 +495,8 @@ Seitenlinie), `…-seite-08-11.png` (Endstand mit Boxscore und Ticker).
    Validität, die die Auslosung zurückgeholt hat (feste Reihe 0,780). Das braucht Chris'
    Entscheidung.
 5. **Kleinere Kader** (2–6 je Seite). Bei weniger Werfern gibt es weniger Duelle. Die Zahl der
-   Leben muss mitwachsen und je Kadergröße gemessen werden.
+   Leben muss mitwachsen und je Kadergröße gemessen werden. *(15.11.: gemessen, Abschnitt 7.2 —
+   mit festen vier Leben halten beide Schranken bis drei je Seite, mehr Leben bringen nichts.)*
 6. **Mannschaftswertung.** Im Prototyp gelten Rangpunkte (13 − Platz). Teaminterne Knocks sind
    dafür neutral.
 7. **Druckterm** deckeln oder nicht (Abschnitt 3.4).
