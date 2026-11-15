@@ -49,6 +49,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       source: p.source,
     })),
     sales: sales.map((x) => ({ soldAt: x.soldAt.toISOString(), qty: x.qty, unitPrice: x.unitPrice })),
+    priceHistory: allPrice.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
+    marketHistory: history.map((h) => ({ at: h.at.toISOString(), priceAvg7: h.priceAvg7 })),
     priceLog: priceLog.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
     stockLog: stockLog.map((m) => ({ at: m.at.toISOString(), before: m.before, after: m.after })),
     reports: facts.map((f) => ({
