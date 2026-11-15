@@ -153,19 +153,16 @@ describe("ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * I-SPY WAR DRIN, STEHT SEIT 15.11. WIEDER DRAUSSEN (SHOWCASE-I-SPY-REGRESSION-NACHTRAG,
-   * lib/battle/arena-resolved-disciplines.ts): von 27.10. bis 15.11. in `ARENA_RESOLVED_
-   * DISCIPLINE_IDS` (Kalibrierrunde 3, rho 0,817/0,811), eine frische Neumessung (Task #136, PR
-   * #1481) fand rho 0,776 je Spiel bei n=48 -- bestaetigt unter der 0,80-Schranke. `ARENA_
-   * ANGESCHLOSSENE_DISCIPLINE_IDS`/die Chassis-Zugehoerigkeit (Auftritt, nicht Duell) bleiben
-   * unberuehrt -- Engine/Config sind weiterhin vollstaendig, nur die Mengen-Zugehoerigkeit zur
-   * Wertung aendert sich. Der Schutz, den ein spaeterer Wiederanstieg braucht ("es waere ja nur
-   * ein Eintrag" darf die Rangtreue-Achse nicht ueberstimmen), liegt bei
-   * tests/disziplin-abnahme-guard.test.ts.
+   * I-SPY: kurzzeitig draussen, seit der root-gecausten rho-Ausnahme (SHOWCASE-I-SPY-AUSNAHME-
+   * NACHTRAG, lib/battle/arena-resolved-disciplines.ts) wieder drin. Ein A/B-Test (derselbe Code,
+   * alte vs. aktuelle Kaderfamilie) zeigte: der rho-Rueckgang auf 0,776 (n=48) ist reines
+   * Kaderfamilie-Rauschen, keine Mechanik- oder Code-Regression -- Chris hat deshalb eine
+   * rho-Ausnahme analog Hockey freigegeben (`ARENA_ABNAHME_AUSNAHMEN`), Pp besteht weiterhin
+   * regulaer.
    */
-  it("I-Spy ist angeschlossen (Auftritt-Chassis, nicht Duell-Chassis), aber seit der Regression vom 15.11. NICHT mehr gewertet", () => {
+  it("I-Spy ist angeschlossen UND gewertet (Auftritt-Chassis, nicht Duell-Chassis, rho per Ausnahme gedeckt)", () => {
     expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(false);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(true);
     expect(ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has("i-spy")).toBe(true);
     expect(ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has("i-spy")).toBe(false);
   });
