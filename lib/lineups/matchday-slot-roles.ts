@@ -239,16 +239,25 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
   ],
   // FOOTBALL-TEXTE UND -FOKUS FOLGEN DER SPIEL-EIGNUNG (10.09., Fable-Entscheidung E3).
   // Bis hierher standen hier „Spirit und Torment"/„Spirit und Charisma" — geschrieben zur
-  // alten Matrix (spirit 25, torment 16, charisma 4). Footballs Gewichtsquelle ist jetzt der
-  // Spiel-Eignungs-Override (power 22, health 18, speed 14, torment 12, determination 10,
-  // awareness 8, stamina 6, dexterity 4, spirit 3, will 3 — CHARISMA UND INTELLIGENCE
-  // WIEGEN NULL). Ein Fokus auf charisma waere von resolveThemeFocus stillschweigend
-  // weggefiltert worden, und die Texte haetten dem Manager weiter das falsche Attribut
-  // genannt. Die sechs Rollen bleiben dieselben Rollen, nur ueber die Attribute, die
-  // Football heute wirklich bezahlt.
+  // alten Matrix (spirit 25, torment 16, charisma 4). Zwischen dem 10.09. und dem 14.11. war
+  // Footballs Gewichtsquelle der Spiel-Eignungs-Override (power 22, health 18, speed 14,
+  // torment 12, determination 10, awareness 8, stamina 6, dexterity 4, spirit 3, will 3).
+  //
+  // RUECKGAENGIG GEMACHT (14.11., Chris: „football muss zu unserem system mit der matrix
+  // zurückkehren" — docs/design/football-matrix-rueckkehr-14-11.md): der Override ist aus
+  // `spiel-eignung-overrides.ts` entfernt, `getBaseWeightProfile("football")` liefert jetzt
+  // wieder die offizielle Matrix (spirit 25, torment 16, health 14, awareness 11, will 10,
+  // determination 8, power 6, stamina 6, charisma 4 — SPEED UND DEXTERITY WIEGEN JETZT NULL,
+  // genau umgekehrt zum Override oben). "Route Burst" war die einzige Rolle, deren Fokus
+  // (speed/dexterity) dadurch komplett aus der Matrix faellt — resolveThemeFocus() haette ihn
+  // stillschweigend auf die zwei schwersten Matrix-Attribute (spirit/torment, schon durch
+  // "ballhawk" belegt) umgebogen, waehrend der Text weiter "Speed und Dexterity" versprochen
+  // haette. Auf will/charisma umgestellt (die zwei einzigen matrixgewichteten Attribute, die
+  // noch von keiner anderen Football-Rolle belegt sind) — "Willenskraft und Ausstrahlung", ein
+  // Receiver, der sich nicht ueber Tempo, sondern ueber Durchsetzungsvermoegen loest.
   football: [
     roleTheme("linepower", "Line Power", "Gewinnt Kontakt über Power und Health.", ["power", "health"], "stamina", "high", ["tank", "berserker"]),
-    roleTheme("routeburst", "Route Burst", "Schafft Separation über Speed und Dexterity.", ["speed", "dexterity"], "stamina", "medium", ["sprinter"]),
+    roleTheme("routeburst", "Route Burst", "Löst sich über Will und Charisma statt über reines Tempo.", ["will", "charisma"], "stamina", "medium", ["sprinter"]),
     // QUARTERBACK-SLOT (football-kickoff-slot-plan-14-10.md Abschnitt 3.2, Schritt 3 des
     // Plans — Chris 14.10. woertlich: „ja soll nen QB slot geben der auch von der stat
     // verteilung passen soll genauso wie die blocker oder runner"). Umgewidmet statt neu

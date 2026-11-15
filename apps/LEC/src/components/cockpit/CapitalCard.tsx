@@ -37,9 +37,22 @@ export function CapitalCard({ capital, planwerte }: { capital: CapitalFacts; pla
               label="Reichweite"
               value={c.reachMonths === null ? "—" : c.reachMonths.toLocaleString("de-DE", { maximumFractionDigits: 1 })}
               unit={c.reachMonths === null ? undefined : "Monate"}
-              sub="gebundenes Kapital ÷ Wareneinsatz je Monat (365 T)"
+              sub="gebundenes Kapital ÷ Wareneinsatz je Monat (365 T, nur Artikel mit EK)"
+            />
+            <Fact
+              label="GMROI"
+              value={c.gmroi === null ? "—" : c.gmroi.toLocaleString("de-DE", { maximumFractionDigits: 2 })}
+              unit={c.gmroi === null ? undefined : "€ je € Kapital"}
+              sub="DB I (365 T) ÷ gebundenes Kapital, Stichtag heute — nur Artikel mit EK"
             />
           </div>
+        )}
+        {c.stockImported && (
+          <p className="ck-note">
+            Reichweite und GMROI lassen {c.salesWithoutEkArticles.toLocaleString("de-DE")} Artikel mit Verkäufen ohne EK
+            {c.salesWithoutEkRevenueShare === null ? "" : ` (${(c.salesWithoutEkRevenueShare * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} % des Umsatzes)`} und{" "}
+            {c.articlesStockWithoutEk.toLocaleString("de-DE")} Artikel mit Bestand ohne EK ({c.stockUnitsWithoutEk.toLocaleString("de-DE")} Stk) aus. Je mehr EK fehlt, desto besser sehen beide Zahlen aus, als sie sind. Das Kapital ist ein Stichtagswert (heute), der Wareneinsatz ein 365-Tage-Wert. Es gibt keinen belastbaren Vergleichswert für Einzelkarten, deshalb keine Ampel.
+          </p>
         )}
         <div className="ck-tempo" role="img" aria-label="Verkaufstempo gegen Einkaufstempo in Euro je Monat">
           {rows.map((r) => (

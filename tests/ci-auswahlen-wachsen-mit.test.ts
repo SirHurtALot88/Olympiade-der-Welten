@@ -28,6 +28,15 @@ const paket = JSON.parse(readFileSync(join(WURZEL, "package.json"), "utf8")) as 
 /**
  * Die Auswahl eines Skripts ermitteln, OHNE die Tests zu fahren: die Skripte melden ihre
  * Dateizahl auf stdout, bevor sie vitest starten. Wir brechen danach ab.
+ *
+ * `cp.spawn` wird seit 15.11. (CI-TIMEOUT-FUND, Konkurrenzgrenze 2 in
+ * `fahre-persistenz-suiten.ts`) ZUSAETZLICH zu `execFileSync` gemockt: die isolierten
+ * SCHWERE_DATEIEN laufen seitdem ueber `spawn` (asynchron, fuer echte Nebenlaeufigkeit statt
+ * blockierendem `execFileSync`), nicht mehr nur ueber `execFileSync`. Ohne diesen zweiten Mock
+ * fuehrt `require(...)` die vier echten, mehrminuetigen Vitest-Laeufe tatsaechlich aus, bevor der
+ * `node -e`-Prozess zurueckkehrt -- genau das Gegenteil von "ohne die Tests zu fahren" (gemessen:
+ * Timeout statt der erwarteten Millisekunden). Der Fake-Child gibt sofort per `setImmediate` ein
+ * `exit`-Event mit Code 0 zurueck, damit jedes `await` auf ihn sofort aufloest.
  */
 function zaehleAuswahl(skript: string): number {
   const ausgabe = execFileSync(
@@ -38,6 +47,12 @@ function zaehleAuswahl(skript: string): number {
       const cp = require("node:child_process");
       const echt = cp.execFileSync;
       cp.execFileSync = () => Buffer.from("");
+      cp.spawn = () => {
+        const { EventEmitter } = require("node:events");
+        const fakeChild = new EventEmitter();
+        setImmediate(() => fakeChild.emit("exit", 0, null));
+        return fakeChild;
+      };
       require("tsx/cjs");
       require(${JSON.stringify(join(WURZEL, "scripts", skript))});
       `,

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "../pipeline/testDb";
 import { loadActiveCostSettings, loadArticleAggregates, saveCostSettings } from "./queries";
 import { buildSortimentRow } from "./viewModel";
-import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
+import { DEFAULT_COST_SETTINGS, LIVE_COST_SETTINGS } from "../pricing/costSettings";
 
 let db: TestDb;
 
@@ -16,17 +16,17 @@ afterEach(async () => {
 describe("loadActiveCostSettings", () => {
   it("faellt auf die Konzept-Defaults zurueck, wenn noch keine Version gespeichert ist", async () => {
     const settings = await loadActiveCostSettings(db.prisma);
-    expect(settings).toEqual(DEFAULT_COST_SETTINGS);
+    expect(settings).toEqual(LIVE_COST_SETTINGS);
   });
 });
 
 describe("CostSettings-Schema", () => {
-  it("Spalten-Defaults der DB (Migration) stimmen mit DEFAULT_COST_SETTINGS ueberein", async () => {
+  it("Spalten-Defaults der DB (Migration) stimmen mit LIVE_COST_SETTINGS ueberein", async () => {
     // Regression: Defaults in Schema/Migration und TypeScript duerfen nicht auseinanderlaufen
-    // (Fixkosten 1140/840/360/50/1839, Einkaufs-Versand 50 %, Einschreiben 2,35/30/100).
+    // (Fixkosten 1140/840/360/50/1839, Einkaufs-Versand 50 %, Einschreiben 2,35/30/100, Kosten nach Volumen an).
     await db.prisma.costSettings.create({ data: {} });
     const loaded = await loadActiveCostSettings(db.prisma);
-    expect(loaded).toEqual(DEFAULT_COST_SETTINGS);
+    expect(loaded).toEqual(LIVE_COST_SETTINGS);
   });
 
   it("speichert und laedt die neuen Felder (Anteil, Einschreiben, Lizenz, Sonstige)", async () => {
@@ -65,7 +65,9 @@ describe("saveCostSettings", () => {
 });
 
 describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () => {
-  async function seed(extra: { ebayPrice?: number | null; packQty?: number; setCode?: string } = {}) {
+  async function seed(extra: { currentVk?: number | null; ebayPrice?: number | null; packQty?: number; setCode?: string } = {}) {
+    // Handgerechnete Erwartungen gelten fuer die festen Stueckwerte (alter Modus), nicht fuer die Kalkulation nach Volumen.
+    await saveCostSettings(db.prisma, DEFAULT_COST_SETTINGS);
     const article = await db.prisma.article.create({
       data: {
         nameNormalized: "yu-gi-oh! tst-de001 testkarte ultra rare nm 1st",
@@ -73,7 +75,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
         setCode: extra.setCode ?? "TST-DE001",
         packQty: extra.packQty ?? 1,
         active: true,
-        currentVk: 5.99,
+        currentVk: extra.currentVk ?? null,
         ebayPrice: extra.ebayPrice ?? 8,
         ebayPriceAt: new Date("2026-10-13T12:00:00Z"),
       },
@@ -84,7 +86,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
         source: "cardmarket-priceguide",
         matchQuality: "eindeutig",
         priceAvg7: 2,
-        priceTrend: 0.02,
+        priceTrend: 2,
         raw: JSON.stringify({ how: "seltenheit" }),
         fetchedAt: new Date("2026-10-12T00:00:00Z"),
       },
@@ -92,7 +94,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     return article;
   }
 
-  it("Aggregat: eBay-Preis ersetzt den Billbee-Preis, Marktwert ist der 7-Tage-Schnitt (nicht der Trend)", async () => {
+  it("Aggregat: ohne Billbee-VK gilt der eBay-Preis, Marktwert ist der Mittelwert der Cardmarket-Werte", async () => {
     const a = await seed();
     const { aggregates } = await loadArticleAggregates(db.prisma);
     const agg = aggregates.find((x) => x.articleId === a.id)!;
@@ -100,6 +102,14 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(agg.vkSource).toBe("ebay");
     expect(agg.latestMarketTrend).toBeCloseTo(2);
     expect(agg.marketQuote?.how).toBe("seltenheit");
+  });
+
+  it("hat Billbee einen VK, gilt er vor dem (evtl. veralteten) eBay-Preis", async () => {
+    const a = await seed({ currentVk: 5.99 });
+    const { aggregates } = await loadArticleAggregates(db.prisma);
+    const agg = aggregates.find((x) => x.articleId === a.id)!;
+    expect(agg.currentVk).toBe(5.99);
+    expect(agg.vkSource).toBe("billbee");
   });
 
   it("Zeile: VK-Quelle, Marktwert, Zielspanne (handgerechnet 7,32 € bis 8,92 €), Urteil und Marge bei Nachkauf", async () => {
@@ -143,5 +153,42 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(row.market).toBeNull();
     expect(row.priceTrend).toBeNull();
     expect(row.listingVkSource).toBe("billbee");
+  });
+});
+
+describe("Artikel ausblenden und Bestandslog", () => {
+  it("blendet ausgeblendete Artikel standardmaessig aus und liefert sie mit includeHidden", async () => {
+    await db.prisma.article.create({ data: { nameNormalized: "a", nameRaw: "A", isCard: true } });
+    await db.prisma.article.create({ data: { nameNormalized: "b", nameRaw: "B", isCard: true, hidden: true } });
+    const normal = await loadArticleAggregates(db.prisma);
+    expect(normal.aggregates.map((a) => a.nameRaw)).toEqual(["A"]);
+    expect(normal.allAggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]); // Summen sehen auch Ausgeblendete
+    const all = await loadArticleAggregates(db.prisma, { includeHidden: true });
+    expect(all.aggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]);
+    expect(all.aggregates.find((a) => a.nameRaw === "B")?.hidden).toBe(true);
+  });
+
+  it("schreibt Bestandsaenderungen beim Artikelstamm-Import mit, den ersten Stand nicht, und setzt hidden nicht zurueck", async () => {
+    const { persistBillbeeArtikel } = await import("../pipeline/persist");
+    const row = (stock: number) => ({ nameNormalized: "x", nameRaw: "X", setCode: null, packQty: 1, isCard: true, stock, currentVk: 5, currentEk: 2, statusRaw: "" });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    expect(await db.prisma.stockMovement.count()).toBe(0);
+    // erster API-Abgleich = Startbestand: auch eine Aenderung wird noch nicht geschrieben
+    await persistBillbeeArtikel(db.prisma, [row(6)]);
+    expect(await db.prisma.stockMovement.count()).toBe(0);
+    await db.prisma.importBatch.create({ data: { kind: "billbee_artikel", fileName: "Billbee-API", rowCount: 1, matchedCount: 1, unmatchedCount: 0 } });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    expect(await db.prisma.stockMovement.count()).toBe(1);
+    await db.prisma.stockMovement.deleteMany();
+    await db.prisma.article.updateMany({ data: { hidden: true } });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    await persistBillbeeArtikel(db.prisma, [row(3)]);
+    const log = await db.prisma.stockMovement.findMany();
+    expect(log.map((m) => [m.before, m.after])).toEqual([[4, 3]]);
+    expect((await db.prisma.article.findFirst())?.hidden).toBe(true);
+    // VK-Aenderung wird mitgeschrieben, der erste Stand nicht
+    await persistBillbeeArtikel(db.prisma, [{ ...row(3), currentVk: 7.5 }]);
+    const prices = await db.prisma.priceChange.findMany();
+    expect(prices.map((c) => [c.before, c.after])).toEqual([[5, 7.5]]);
   });
 });

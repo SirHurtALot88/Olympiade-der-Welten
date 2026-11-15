@@ -25,9 +25,16 @@ export type HomeV2TopPlayerCard = {
   caRating: number | null;
   poRangeMin: number | null;
   poRangeMax: number | null;
-  /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
-  caStars?: number | string | null;
-  poStars?: number | string | null;
+  /**
+   * CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — 1:1 die Felder der
+   * Kaderzeile (`buildRosterCaPoStarFields`), also dieselben Werte wie auf Kaderprofil/Teams.
+   * `known` ist der echte Fog-of-War-Status der Zeile, kein hartkodiertes `true`.
+   */
+  starsKnown: boolean;
+  caStars: number | null;
+  poStarRange: { min: number; max: number } | null;
+  caScore: number | null;
+  poScoreRange: { min: number; max: number } | null;
   /**
    * Saison-PPs je Achse samt Ligarang — dieselbe Quelle wie die POW/SPE/MEN/SOC-Spalten
    * der Ranks-Seite (`PlayerRatingContractRow.ppPow/…`), hier wird nichts nachgerechnet.

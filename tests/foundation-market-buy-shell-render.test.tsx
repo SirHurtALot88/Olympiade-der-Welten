@@ -125,15 +125,20 @@ describe("Kaufdialog rendert auf der geteilten Hülle", () => {
     expect(html).toContain("+3 %");
   });
 
-  it("kündigt einen NOCH NICHT geltenden Aufschlag getrennt an", () => {
+  it("kündigt einen NOCH NICHT geltenden Aufschlag NICHT an — das Risiko zeigt erst der Klick", () => {
+    // Chris, 10.11.: „die warnung darf doch nicht auftauchen bevor ich verhandle!!! das macht es
+    // ja sonst zu einfach das ist eher wenn ich verhandle und der spieler dadurch beleidigt ist".
+    // Die Vorschau rechnet den drohenden Aufschlag weiter aus (der Klick schreibt ihn fest),
+    // die Oberfläche verrät ihn aber nicht, solange nur getippt wird.
     const html = markup({
       buyPreview: { ...VORSCHAU, defianceSurchargePct: 0, pendingDefianceSurchargePct: 0.03 } as TransfermarktBuyPreview,
     });
-    expect(html).toContain('data-testid="transfer-buy-defiance-pending"');
+    expect(html).not.toContain('data-testid="transfer-buy-defiance-pending"');
     expect(html).not.toContain('data-testid="transfer-buy-defiance-active"');
+    expect(html).not.toContain("nimmt er persönlich");
   });
 
-  it("verschweigt beides, wenn nichts vorgefallen ist", () => {
+  it("verschweigt den Trotz, wenn nichts vorgefallen ist", () => {
     const html = markup({
       buyPreview: { ...VORSCHAU, defianceSurchargePct: 0, pendingDefianceSurchargePct: 0 } as TransfermarktBuyPreview,
     });

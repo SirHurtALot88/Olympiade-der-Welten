@@ -1,11 +1,16 @@
+import { ITEM_ID_RE, buildListedIndex, listedDaysAtLeast, type ListedSample } from "./listedAge";
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
 import { marketValueOf, type LatestQuote } from "./marketComparison";
-import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
+import { weightedMonthlyPace } from "./pace";
+import { orderStats } from "./orderStats";
+import { LIVE_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
 export interface ArticleAggregatesResult {
   aggregates: ArticleAggregate[];
+  /** Alle Artikel, auch manuell ausgeblendete: Grundlage fuer Shop-Summen (Umsatz, Stueck), die nicht schrumpfen duerfen. */
+  allAggregates: ArticleAggregate[];
   costSettings: CostSettingsValues;
 }
 
@@ -19,7 +24,7 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     where: { active: true },
     orderBy: { version: "desc" },
   });
-  if (!active) return DEFAULT_COST_SETTINGS;
+  if (!active) return LIVE_COST_SETTINGS;
   return {
     buyShippingUnderFive: active.buyShippingUnderFive,
     buyShippingFive: active.buyShippingFive,
@@ -42,6 +47,13 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     adFeeRateSingle: active.adFeeRateSingle,
     adFeeRateMin: active.adFeeRateMin,
     adFeeRateGood: active.adFeeRateGood,
+    volumeBasedCosts: active.volumeBasedCosts,
+    shippingDomesticLow: active.shippingDomesticLow,
+    shippingDomesticHigh: active.shippingDomesticHigh,
+    shippingHighShare: active.shippingHighShare,
+    itemsPerOrder: active.itemsPerOrder,
+    packagingYearly: active.packagingYearly,
+    buyOrdersPerYear: active.buyOrdersPerYear,
   };
 }
 
@@ -51,8 +63,11 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
  * eigenstaendigen Seiten (/sortiment, /top-flop, /empfehlungen, …), damit
  * nicht jede Seite ihre eigene Prisma-Query schreibt.
  */
-export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
+export async function loadArticleAggregates(
+  prisma: PrismaClient,
+  opts: { includeHidden?: boolean } = {}
+): Promise<ArticleAggregatesResult> {
+  const [articles, latestMarketPrices, costSettings, itemFacts, lastSales, recentSales, lastPriceChanges, lastEkChanges, lastPurchases, firstSales] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -67,9 +82,39 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       select: { articleId: true, ebayItemId: true },
       orderBy: { reportTo: "desc" },
     }),
+    // Letzter Einzelverkauf je Artikel (Spalte "Letzter Verkauf")
+    prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
+    // Einzelverkaeufe des letzten Jahres fuer das gewichtete Verkaufstempo
+    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true, orderRef: true } }),
+    // Letzte VK-Aenderung je Artikel (Billbee-Abgleich und eBay-Shop-Abruf schreiben sie mit)
+    prisma.priceChange.groupBy({ by: ["articleId"], _max: { at: true } }),
+    // Letzte EK-Aenderung (Billbee-Abgleich) und letzter Einkauf (Einkaufsliste): das Spaetere zeigt, wie aktuell der EK ist
+    prisma.ekChange.groupBy({ by: ["articleId"], _max: { at: true } }),
+    prisma.purchase.groupBy({ by: ["articleId"], _max: { date: true } }),
+    // Erster Einzelverkauf je Artikel: Grundlage fuer das geschaetzte Mindestalter des eBay-Angebots (listedAge.ts)
+    prisma.sale.groupBy({ by: ["articleId"], _min: { soldAt: true } }),
   ]);
+  const lastEkAtByArticle = new Map<string, Date>();
+  for (const c of lastEkChanges) if (c._max.at) lastEkAtByArticle.set(c.articleId, c._max.at);
+  for (const c of lastPurchases) {
+    const d = c._max.date;
+    if (d && (!lastEkAtByArticle.has(c.articleId) || d > lastEkAtByArticle.get(c.articleId)!)) lastEkAtByArticle.set(c.articleId, d);
+  }
+  const lastPriceChangeByArticle = new Map(lastPriceChanges.map((c) => [c.articleId, c._max.at]));
+  const salesByArticle = new Map<string, { soldAt: Date; qty: number }[]>();
+  for (const s of recentSales) (salesByArticle.get(s.articleId) ?? salesByArticle.set(s.articleId, []).get(s.articleId)!).push(s);
+  const nowForPace = new Date();
+  const lastSoldByArticle = new Map(lastSales.map((s) => [s.articleId, s._max.soldAt]));
+  const firstSoldByArticle = new Map(firstSales.map((s) => [s.articleId, s._min.soldAt]));
   const factItemByArticle = new Map<string, string>();
   for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
+  const listedSamples: ListedSample[] = [];
+  for (const a of articles) {
+    const itemId = a.ebayItemId ?? factItemByArticle.get(a.id) ?? null;
+    const first = firstSoldByArticle.get(a.id);
+    if (itemId && ITEM_ID_RE.test(itemId) && first) listedSamples.push({ itemId: Number(itemId), firstSoldAt: first });
+  }
+  const listedIndex = buildListedIndex(listedSamples);
 
   // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
   const latestQuoteByArticle = new Map<string, LatestQuote>();
@@ -136,6 +181,8 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       }
     }
 
+    const billbeeVk = article.currentVk !== null && article.currentVk > 0;
+
     return {
       articleId: article.id,
       nameRaw: article.nameRaw,
@@ -143,23 +190,50 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
-      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
-      currentVk: article.ebayPrice ?? article.currentVk,
-      vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
-      vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
+      hidden: article.hidden,
+      ebayEndedAt: article.ebayEndedAt,
+      cardType: article.cardType,
+      ebayListed: article.ebayPrice !== null,
+      delistMarkedAt: article.delistMarkedAt,
+      lastSoldAt: lastSoldByArticle.get(article.id) ?? null,
+      lastPriceChangeAt: lastPriceChangeByArticle.get(article.id) ?? null,
+      // Verkaeufe seit der letzten Preisaenderung (letzte 12 Monate): Preisbeweis fuer den dynamischen VK
+      salesSincePriceChange: ((): number | null => {
+        const at = lastPriceChangeByArticle.get(article.id);
+        if (!at) return null;
+        return (salesByArticle.get(article.id) ?? []).filter((x) => x.soldAt > at).reduce((n, x) => n + x.qty, 0);
+      })(),
+      lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
+      // Mindestalter: erst aus der eBay-Nummer, sonst Tage seit der ersten Erfassung in LEC (Opus 14.11.). Unterschaetzt
+      // alte Ladenhueter, solange die DB jung ist, erfindet aber kein Alter.
+      listedDays:
+        listedDaysAtLeast(listedIndex, article.ebayItemId ?? factItemByArticle.get(article.id) ?? null, firstSoldByArticle.get(article.id) ?? null) ??
+        Math.max(0, Math.floor((Date.now() - article.createdAt.getTime()) / 86_400_000)),
+      paceMonth: salesByArticle.has(article.id) ? weightedMonthlyPace(salesByArticle.get(article.id)!, nowForPace) : null,
+      minStock: article.minStock,
+      desiredStock: article.desiredStock,
+      reorderSnoozeUntil: article.reorderSnoozeUntil,
+      // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
+      // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
+      currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),
+      vkSource: billbeeVk ? "billbee" : article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
+      vkAt: !billbeeVk && article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
       ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
       codeNameEn: article.codeNameEn,
       codeNameDe: article.codeNameDe,
       codeHint: article.codeHint,
       // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
-      latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
+      latestMarketTrend: quote ? marketValueOf(quote, article.packQty, article.currentEk) : null,
       marketQuote: quote ?? null,
       windows,
     };
   });
 
-  return { aggregates, costSettings };
+  // Artikel je Bestellung aus den echten Billbee-Verkaeufen (365 Tage); ersetzt den Standardwert, sobald genug Bestellungen vorliegen.
+  const measured = orderStats(recentSales.filter((s) => s.soldAt >= new Date(nowForPace.getTime() - 365 * 86_400_000)));
+  const effectiveSettings: CostSettingsValues = measured.itemsPerOrder ? { ...costSettings, itemsPerOrder: measured.itemsPerOrder } : costSettings;
+  return { aggregates: opts.includeHidden ? aggregates : aggregates.filter((a) => !a.hidden), allAggregates: aggregates, costSettings: effectiveSettings };
 }
 
 /**
@@ -201,6 +275,6 @@ export async function listRecentImportBatches(prisma: PrismaClient, limit = 20):
 
 /** Laedt alle Artikel + Fenster-Snapshots aus der DB und baut das Dashboard-View-Model. */
 export async function loadDashboardViewModel(prisma: PrismaClient): Promise<DashboardViewModel> {
-  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
-  return buildDashboardViewModel(aggregates, costSettings);
+  const { aggregates, allAggregates, costSettings } = await loadArticleAggregates(prisma);
+  return buildDashboardViewModel(aggregates, costSettings, allAggregates);
 }

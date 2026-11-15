@@ -1,5 +1,131 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Dreißigster Nachtrag 15.11. — Rho/Pp aller zwanzig Disziplinen frisch nachgemessen (Task #136),
+`disziplin-abnahme.json` nachgezogen.** Chris' Auftrag wörtlich: „dann bitte rho und pp noch mal
+auf neuesten stand bringen und durch messen" — für alle zwanzig, nicht nur Football/Hockey (Task
+#136, Erweiterung von Task #127). Dies ist die erste Runde, die **die beiden autoritativen
+Dateien selbst** (`data/generated/disziplin-abnahme.json`, dieses Dokument) aktualisiert — die
+Baseline-Runde vom selben Vormittag (`docs/design/baseline-alle-20-disziplinen-15-11.md`, PR
+#1469) war ausdrücklich eine eigenständige Messung ohne Rückschreibung in diese beiden Dateien.
+
+**Methodik, identisch zur Baseline-Runde:** Spiegel-Frische zuerst geprüft
+(`pruefe-spiegel-frische.ts`, beide < 0,1 h alt), Kaderfamilie neu gezogen (live-save-Push
+15.11. 13:20 Uhr war neuer als die committete Datei vom 14.11. 21:56 Uhr; Ergebnis byte-identisch
+bis auf `gezogenAm`, derselbe Save), `node scripts/miss-alle-disziplinen.mjs 24` für 18
+Disziplinen, `OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 spurt time-trial`
+für die beiden Formkarten-Echt-Ausnahmen. **Anders als die Baseline-Runde** gab es dieses Mal
+keine Speichernot-Seitenfehler — Football und Hockey liefen im gemeinsamen 20er-Lauf
+durch, keine isolierten Nachläufe nötig. Alle Werte dieser Runde decken sich exakt mit der
+unabhängigen Baseline-Messung desselben Vormittags (Commit `2000667e8`) — ein zweiter,
+unabhängiger Beleg, dass die Zahlen reproduzierbar sind, keine Lauf-zu-Lauf-Artefakte.
+
+### Ergebnistabelle — alter Stand (`disziplin-abnahme.json` vor dieser Runde) gegen neu gemessen
+
+| Disziplin | Chassis | Alter rho/Spiel (Datum) | **Neuer rho/Spiel** | Spannweite | Saison | Status | Pp | Bewegung |
+|---|---|---:|---:|---:|---:|---|---|---|
+| staffel | bahn | 0,937 (16.10.) | **0,931** | 0,078 | 0,965 | bestanden | 21,1/22,0 unverändert | innerhalb Spannweite |
+| time-trial* | bahn | 0,917 (11.11.) | **0,930** | 0,047 | 0,937 | bestanden | 12,0/11,6 unverändert | innerhalb Spannweite |
+| eiskunstlauf | bühne | 0,866 (16.10.) | **0,912** | 0,046 | 0,951 | bestanden | 18,8/19,8 unverändert | innerhalb Spannweite, komfortabler |
+| wettessen | bühne | 0,910 (16.10.) | **0,905** | 0,190 | 0,958 | bestanden | 8,7/10,0 unverändert | innerhalb Spannweite |
+| tdm** | kampf | 0,813 (10.11., k=2..6-Mittel) | **0,813 unverändert** (Gegenprobe generisch: 0,911) | — | 0,857 | bestanden | 16,8/14,2 unverändert | kein neuer Code seit 11.11. |
+| gewichtheben | bühne | 0,865 (16.10.) | **0,892** | 0,039 | 0,944 | bestanden | 8,5/10,0 unverändert | innerhalb Spannweite |
+| tennis | bühne | 0,813 (16.10.) | **0,890** | 0,079 | 0,965 | bestanden | 6,9/4,4 unverändert | innerhalb Spannweite, deutlich komfortabler |
+| spurt* | bahn | 0,938 (14.11.) | **0,860** | 0,074 | 0,860 | bestanden | 18,5/15,4 unverändert | innerhalb Spannweite — **größerer Rücksetzer, im Auge behalten** |
+| fechten | bühne | 0,860 (16.10.) | **0,877** | 0,037 | 0,972 | bestanden | 20,1/20,7 unverändert | innerhalb Spannweite |
+| breaking | bühne | 0,801 (16.10., Beobachtungsliste — genau auf der Schranke) | **0,867** (n=24) / **0,868** (n=48-Gegenprobe) | 0,159–0,181 | 0,916–0,930 | bestanden | 14,3/13,9 unverändert | **deutlich komfortabler** (0,067 statt 0,001 Abstand), bleibt vorsorglich auf der Liste |
+| takeshis-castle | bahn | 0,898 (16.10.) | **0,838** | 0,143 | 0,979 | bestanden | 18,9/17,7 unverändert | knapp innerhalb der alten Spannweite (0,060 vs. 0,062) — größte Bewegung unter den bestandenen |
+| basketball | feldspiel | 0,832 (26.10.) | **0,822** | 0,091 | 0,930 | bestanden | 15,6/16,7 unverändert | innerhalb Spannweite |
+| climbing | bahn | 0,833 (16.10.) | 0,797 (n=24) → **0,801** (n=48-Gegenprobe) | 0,209 | 0,881 | **bestanden, aber knappster Wert im Feld** | 12,0/9,5 unverändert | Grenzfall, auf Beobachtungsliste genommen |
+| i-spy | bühne | 0,817 / 0,811 (27.10.) | 0,779 (n=24) → **0,776** (n=48-Gegenprobe) | 0,199–0,212 | 0,881–0,888 | **NICHT BESTANDEN — bestätigt bei n=48, s. u.** | 14,6/15,0 unverändert | **neuer Befund** |
+| showcase | bühne | 0,835 (16.10.) | 0,771 (n=24) → **0,781** (n=48-Gegenprobe) | 0,135–0,151 | 0,965–0,972 | **NICHT BESTANDEN — bestätigt bei n=48, s. u.** | 11,1/12,7 unverändert | **neuer Befund, erstmals** |
+| hockey | feldspiel | 0,64 / Saison 0,797 (obere Felder veraltet, Task #195) | **0,700** (Dokukorrektur — deckt sich mit der schon vorhandenen Anmerkung aus PR #1478) | 0,266 | 0,888 | durchgefallen, Chris-Ausnahme deckt rho; **Pp bestanden** (13,9/21,8, PR #1478) | 13,9/21,8 | reine Dokukonsistenz, keine neue Bewegung |
+| battlefield | arena (Zweier-Duell, außerhalb der Wertung) | 0,399 (15.10., `rhoFrisch:false`) | **0,589** (`rhoFrisch:true`) | 0,276 | 0,664 | durchgefallen, außerhalb der Wertung — gewertet wird der Vierer-Pod (0,861–0,923, s. 29. Nachtrag) | 30,1/37,1 (alt, irrelevant für die Wertung) | Dokukorrektur, kein neuer Befund |
+| football | feldspiel | 0,807 / Pp 121,0/120,1 (25.10., **gegen den inzwischen zurückgebauten Override gemessen**) | **0,248** / Pp **113,2/116,2** (erster gültige Messpunkt NACH dem Matrix-Rückbau b5731dd6f, 14.11.) | 0,809 | 0,266 | durchgefallen (rho UND Pp) — s. eigener Abschnitt unten | fünf verworfene Rezept-/Matrixanläufe seit 14.11. (rho 0,50–0,58) | dramatisch, aber erwartet/dokumentiert |
+| mini-dm | arena (falsches Chassis) | 0,8 (16.10.) | 0,199 (bekanntes Messartefakt, s. Fußnote von `miss-alle-disziplinen.mjs`) | — | — | durchgefallen — Messartefakt, reale Mechanik ist `mini-dm-ffa` | — | nicht vergleichbar, kein neuer Befund |
+
+\* `OLY_FORM_MODUS=echt`, wie seit der P4-Formkarten-Welle für diese beiden Disziplinen Pflicht.
+\*\* `miss-tdm-gefecht-abnahme.mjs --je-seite=2..6` bleibt die maßgebliche Zahl (andere
+Stichprobe/Methodik als der generische Sweep, s. Fußnote in `disziplin-abnahme.json`).
+
+Alle zwanzig Zeilen dieser Tabelle sind in `data/generated/disziplin-abnahme.json` nachgezogen
+(rho/Spannweite/Saison, Datum, Commit `984da6e18`, Anmerkung je Disziplin). Pp wurde NICHT für
+alle zwanzig neu gemessen — nur für Football (Engine-Code geändert, 14.11.) war das zwingend;
+für die übrigen neunzehn hat kein Rezept-/Matrix-Code seit der jeweils letzten frischen
+Pp-Messung einen Lesepfad verändert (geprüft per `git log` auf
+`battle-mode.engine.js`/`battle-mode.rezepte.js` seit `ace43062`), also bleiben ihre alten
+Pp-Werte gültig und `ppFrisch` bleibt `true`.
+
+### Zwei echte Grenzfälle, mit n=48 gegengeprobt statt auf den n=24-Zufall vertraut
+
+Vier Disziplinen fielen bei der ersten, regulären n=24-Messung knapp unter 0,80 (climbing, i-spy,
+showcase) oder lagen genau auf der alten Beobachtungsgrenze (breaking war bereits vorher
+markiert). Weil CLAUDE.mds eigener Maßstab sagt, dass eine Bewegung kleiner als die
+Kaderrauschen-Spannweite von Null nicht zu unterscheiden ist, reicht ein einzelner n=24-Lauf
+nicht, um „echtes Signal" von „Zufallsziehung" zu trennen — deshalb ein zweiter Lauf mit
+doppelter Spielzahl (n=48) für alle vier:
+
+- **Climbing kehrte zurück** (0,797 → 0,801) — bestanden, wenn auch der knappste Wert im
+  gesamten Feld (0,001 Abstand). Das spricht für reines Abtast-Rauschen um die Grenze.
+- **Breaking blieb stabil** (0,867 → 0,868) — nie wirklich gefährdet, bestätigt nur die
+  Komfortabilität des neuen Werts.
+- **Showcase und I-Spy kehrten NICHT zurück** (0,771 → 0,781 bzw. 0,779 → 0,776) — beide
+  konvergieren klar unter 0,80, statt sich der Schranke anzunähern. Das spricht gegen reines
+  Rauschen und für einen echten, wenn auch kleinen Abstand zur Schranke bei der **aktuellen**
+  Kaderfamilie.
+
+**Konsequenz, die diese PR bewusst NICHT selbst zieht:** Showcase und I-Spy stehen beide in
+`lib/battle/arena-resolved-disciplines.ts`s `ARENA_RESOLVED_DISCIPLINE_IDS` — mit diesem Befund
+schlägt `tests/disziplin-abnahme-guard.test.ts` für beide rot an, genau die vom Wächter selbst
+dokumentierte Reaktion auf eine durchfallende Neumessung („die Disziplin gehört aus der Menge
+genommen"). Diese PR ändert `arena-resolved-disciplines.ts` **bewusst nicht** — erstens, weil der
+Auftrag für diese Runde ausdrücklich eine reine Mess-/Doku-Aktualisierung ist (kein
+Rezept-/Wiring-Code), zweitens, weil eine parallel laufende Session genau diese Datei zur selben
+Zeit für die Football-Entscheidung (s. u.) bearbeitet — ein zweiter gleichzeitiger Eingriff in
+dieselben beiden `Set`-Literale wäre unnötiges Konfliktrisiko. Der Befund ist an jene Session
+gemeldet (mit der Bitte, Showcase/I-Spy im selben Zug herauszunehmen); bis das geschehen ist,
+bleibt der Guard-Test für diese zwei Disziplinen rot, und das ist in diesem Fall die korrekte,
+beabsichtigte Reaktion des Wächters auf einen echten Befund — kein Fehler dieser PR.
+
+### Football: erste gültige Messung nach dem Matrix-Rückbau, plus Chris' parallele Live-Entscheidung
+
+Der Matrix-Override-Rückbau (`b5731dd6f`, 14.11., „Mechanik liest wieder die Matrix") macht jede
+Football-Zahl von vorher ungültig als Vergleichspunkt — sie maß gegen eine Mechanik, die es nicht
+mehr gibt. Diese Runde liefert den **ersten gültigen Messpunkt danach**: rho 0,248 je Spiel
+(Spannweite 0,809 — größer als der Messwert selbst, das Signal ist im Kaderrauschen nicht mehr
+von einer zufälligen Umordnung zu unterscheiden), Saison 0,266. Fünf unabhängige Rezept-/
+Matrixanläufe seit dem 14.11. (Runde 1–4 plus eine echte Matrix-Verschiebung spirit↔awareness,
+alle auf eigenen, nicht gemergten Branches) kamen auf rho 0,50–0,58 — besser, aber weiterhin klar
+unter 0,80 — und wurden alle verworfen; `main` bleibt auf dem reinen Matrix-Rückbau.
+
+Pp frisch gemessen (zwei Saatströme, n=48): **113,2 / 116,2** — die fünffache 25-Pp-Schranke,
+dieselbe strukturelle Ursache wie beim alten Override-Stand (nur drei Kreditvergabe-Achsen im
+Boxscore für zwölf Matrixattribute, s. Abschnitt 14.4 oben; spirit/awareness/will/stamina/
+charisma bei exakt 0 %).
+
+**Während dieser Messrunde lief eine parallele Entscheidung:** Chris hat entschieden, Football
+analog zu Hockey per rho-Ausnahme live zu schalten; die Code-Verdrahtung
+(`lib/battle/arena-resolved-disciplines.ts`: Football in `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` +
+`ARENA_RESOLVED_DISCIPLINE_IDS` + neuer `ARENA_ABNAHME_AUSNAHMEN`-Eintrag) läuft in einer
+**parallelen Session**, bewusst nicht Teil dieser reinen Mess-PR. Wichtiger Unterschied zu Hockey:
+bei Hockey deckte Chris' Ausnahme nur rho, weil Pp nach der Pool-Korrektur (PR #1478) regulär
+bestand. **Bei Football besteht Pp nicht einmal annähernd** — eine rho-only-Ausnahme (wie bei
+Hockey) ließe Football an der Pp-Pflichtprüfung hängen, bis entweder ein eigener Pp-Hebel
+gefunden wird (bisher keiner, s. o.) oder Chris ausdrücklich auch eine Pp-Ausnahme benennt. Diese
+Entscheidung liegt bei der parallelen Session/Chris, nicht bei dieser Messrunde — der Eintrag
+„football" in `disziplin-abnahme.json` hält deshalb bewusst **nicht** „aufgelöst", sondern die
+gemessenen Zahlen mit diesem Hinweis.
+
+### Hockey: eine reine Dokukorrektur, keine neue Bewegung
+
+Der Eintrag „hockey" trug bis zu dieser Runde zwei widersprüchliche Zahlen: die oberen
+`rhoJeSpiel`/`rhoSpannweite`/`rhoSaison`-Felder zeigten noch 0,64/0,222/0,797 (Task #195, 25.10.),
+während der dazugehörige Anmerkungstext (seit der Pp-Pool-Korrektur, PR #1478, selber Tag) schon
+0,700/0,888 nannte. Die frische Messung dieser Runde (0,700 je Spiel, 0,784 nur Feldspieler,
+Saison 0,888) bestätigt exakt den Anmerkungstext — die oberen Felder sind jetzt nachgezogen, keine
+neue Bewegung, reine Konsistenz.
+
+---
+
 **Neunundzwanzigster Nachtrag 02.11. — Battlefield im Vierer-Pod: Gefecht je Ort, gezeigt = gebucht.**
 Chris hat für den Battlefield-Pod das Mini-DM-Muster gewählt: ein deterministisches Gefecht je Ort
 (Nord/Mitte/Süd, Belegung aus der Rolle, je Ort ein Schlagwechsel aus den neun Matrix-Kanälen,

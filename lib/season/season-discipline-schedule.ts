@@ -156,6 +156,14 @@ export const MINI_DM_DISCIPLINE_ID = "mini-dm";
 export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
 
 /**
+ * TDMs Disziplin-ID (TDM-Gefecht-Verdrahtung 11.11.) -- derselbe Zweck wie `MINI_DM_DISCIPLINE_ID`
+ * oben, hier gebraucht, weil der TDM-Gefecht-Notschalter (`istTdmGefechtVorlaufAktiv()`,
+ * arena-vorlauf-service.ts) die generische `ARENA_RESOLVED_DISCIPLINE_IDS`-Mitgliedschaft fuer
+ * GENAU diese eine Disziplin zusaetzlich einschraenkt.
+ */
+export const TDM_DISCIPLINE_ID = "tdm";
+
+/**
  * VIERER-POD-DISZIPLINEN (01.11., Chris' Freigabe "eine 4er-Diszi je Bereich pow/spe/men/soc"):
  * jede Disziplin in dieser Menge wird in einem Battle-Save NICHT als Zweier-Duell gegen den
  * Spielplan-Gegner gewertet, sondern als Vierergruppe ("Pod", `lib/season/mini-dm-pod-schedule.ts`)

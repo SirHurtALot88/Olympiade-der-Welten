@@ -141,6 +141,26 @@ jedes Rezept** — genauso verbindlich wie die rho-über-0,80-Schranke oben, nic
 Zeit ist". Beide Abnahmen gehören zusammen: rho sagt, ob das RICHTIGE Ergebnis am Ende steht, die
 Pp-Abweichung sagt, ob es aus den RICHTIGEN Gründen (den vorgegebenen Attributen) zustande kommt.
 
+Chris am 10.11.: **<15 ist das angestrebte Optimum**, sofern ohne rho-Verlust erreichbar — ≤25 bleibt
+aber die verbindliche Pflichtschranke. Wo ein Rezept zwischen "knapp unter 25" und "unter 15, aber
+rho sinkt" wählen muss, hat die rho-Schranke (>0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
+Kosten von rho optimieren.
+
+**Falls die Matrix doch angepasst werden muss: Ausgleichspflicht über alle 20 Disziplinen.**
+Chris am 15.11., wörtlich: „wenn du die gewichtungen in der matrix anpassen würdest für eine diszi
+müsstest du das bei anderen auch machen damit es unterm strich wieder sauber ist, momentan wird
+jedes attribut über 20 disziplinen fast gleich gewichetet bis auf 1-2 Punkte unterschied. und das
+MUSS so bleiben“ — nachgemessen exakt bestätigt: jedes der zwölf Attribute summiert sich über alle
+20 Disziplinen auf genau 166 oder 167 Punkte. Das ändert nichts an der Sperre oben — die Matrix
+bleibt der Normalfall unangetastet, und das bleibt die endgültige Entscheidung für alle zwanzig
+Disziplinen. Es gilt nur als zusätzliche Nebenbedingung, **falls** Chris für einen bestimmten,
+dokumentierten Einzelfall ausdrücklich eine Ausnahme freigibt: „Wenn du die matrix anpassen musst
+dann nur so dass das in summe weiter aufgeht und vorsichtig sein und vor allem den aktuellen
+ursprungsstand der matrix speichern“ — vor jeder solchen Änderung den aktuellen Stand sichern
+(Muster: `docs/design/matrix-backups/`), jede Erhöhung bei einer Disziplin durch eine Senkung bei
+anderen Disziplinen **desselben Attributs** ausgleichen, und die neue Zeilensumme nachrechnen statt
+schätzen. Volle Herleitung und Tabelle: `docs/design/matrix-ausgleichspflicht-15-11.md`.
+
 **Design-Leitlinie, nicht nur für eine Disziplin: mehrere Wege zum Erfolg.** Chris am 21.09., im
 Kontext der I-Spy-Konzeptrunde (`docs/design/i-spy-schatzsuche-konzept-21-09.md`, Mehrwege-Truhen),
 danach ausdrücklich verallgemeinert: „das ist jetzt auch nur ein Beispiel — auf genau diese Art und
@@ -177,6 +197,33 @@ kippen auf den Rücken statt kurz zu blinken, Batch 1; ein gewöhnlicher Büro-T
 Herzinfarkt-Tod statt Kampf-K.o., Batch 10). Ein reines Vorne-/Hinten-Kippen ist nur dann in
 Ordnung, wenn es wirklich wie ein K.o. wirkt — wirkt es nur wie ein Hinfallen, zählt das als
 Mangel und braucht eine charakterspezifischere Pose, kein 0815-Umkippen.
+
+## PixelLab-Charaktere und -Animationen: keine neuen ohne Freigabe — Requisiten bleiben frei
+
+Chris am 09.11., nachdem ein Agent für ein neues Spurt-Format ungefragt drei neue PixelLab-
+Animationen für eine einzelne Figur bestellt hatte, wörtlich: „moment du darfst nicht einfach
+irgendwelche animationen anlegen!!! die sind sau teuer wenn wir das für [den ganzen
+Figuren-Bestand] machen deswegen haben wir nur die basis animationen bisher! du musst erstmal
+auskommen damit bis ich es dir erlaube!" **Keine neue PixelLab-Animation für eine bestehende
+Figur und keine neue Figur — auch nicht „nur für eine Testfigur" oder „nur probeweise" — ohne
+Chris' ausdrückliche Freigabe für genau diesen Fall.** Grund, von ihm selbst am 10.11. präzisiert:
+eine Animation oder ein neuer Charakter ist teuer in der Summe, weil sie potenziell für den
+gesamten, großen Figuren-Bestand anfällt, nicht nur für eine Figur. Das gilt unabhängig davon,
+wie viel besser eine Mechanik oder eine neue Kamera-Ansicht damit aussähe: der bestehende
+Animationsbestand (Grundposen plus die bereits abgeschlossene „Nord"-Ergänzung) ist das, womit
+jede neue Disziplin, jedes neue Format und jede neue Kameraperspektive auskommen muss, bis er
+selbst grünes Licht für mehr gibt. Ein Agent, der eine fehlende Pose bemerkt, schlägt sie vor
+(mit Umfang-/Kostenschätzung wie seinerzeit bei der Nord-Animation-Kampagne) statt sie selbst zu
+bestellen.
+
+**Ausdrücklich NICHT von dieser Sperre betroffen, Chris am 10.11. wörtlich: „du darfst PixelLab
+Assets generieren, aber keine Charaktere oder Animationen [...] die normalen Assets, die wir
+brauchen, wie eine Schatztruhe oder eine Kiste oder solche Dinge, die darfst du auch so weiterhin
+generieren":** gewöhnliche Requisiten/Objekte (Kisten, Schatztruhen, Gerätschaften, Kulissen-
+Versatzstücke und Ähnliches) bleiben frei bestellbar, wie bisher — der Kostentreiber ist die
+Vervielfachung über den ganzen Figuren-Bestand, die bei einem einzelnen Requisiten-Sprite nicht
+anfällt. Im Zweifel (eine neue Art von Objekt, die einem Charakter sehr nahekommt, z.B. ein
+Maskottchen oder eine Kreatur) lieber einmal nachfragen statt anzunehmen.
 
 ## An die Spielstände kommen
 
@@ -272,6 +319,19 @@ Ohne Schalter gibt es **nur den Bericht**, die App läuft weiter. `--apply` fäh
 `--zurueck` dreht auf die letzte Sicherung zurück. Gekauft wird über denselben Produktionspfad, den
 das Spiel selbst nimmt — keine zweite Kauflogik.
 
+## PRs mergen — Agenten dürfen das jetzt selbst
+
+Chris am 10.11., wörtlich, nachdem ich noch dachte das Mergen bliebe sein Schritt: „ne das ist
+nicht mein schritt, du lässt doch eh CI laufen etc. wenn sachen fertig sind und ready sollst du
+auto mergen!" Das kehrt die bis dahin gelebte Praxis um — Draft-PR erstellen und auf Chris'
+eigenen Merge warten.
+
+**Ab jetzt gilt:** sobald eine PR grün ist (CI durchgelaufen, `mergeable_state: clean`, keine
+offenen Findings/Reviews, die eine Entscheidung brauchen), aus dem Draft-Status nehmen und selbst
+mergen — nicht mehr auf Chris warten. Das löst automatisch `auto-deploy.sh` auf dem Server aus
+(s. unten), der neue Commits auf `main` baut und ausrollt — das ist beabsichtigt, kein Nebeneffekt
+zum Vermeiden.
+
 ## Deploy
 
 `deploy/hetzner/auto-deploy.sh` pollt per Cron `main` und baut bei neuen Commits neu. Er zieht mit
@@ -287,6 +347,28 @@ verschwindet. `deploy/hetzner/git-repo-aufraeumen.sh` raeumt das per `git gc --p
 laeuft seitdem woechentlich (sonntags 04:10) als dritter Cron neben den beiden Push-Crons, s.
 `install-live-save-cron.sh`.
 
+**Dritter Blockierer, gefunden am 14.11.: `/var/lib/containerd`, nicht `/etc/docker/daemon.json`.**
+Docker laeuft hier ueber den **separaten System-Containerd-Dienst** (`/run/containerd/containerd.sock`,
+eigener systemd-Dienst `containerd.service`) — der hat eine **eigene** Datenwurzel, unabhaengig von
+Dockers `data-root`. Alle Schreibvorgaenge beim Layer-Entpacken laufen tatsaechlich unter
+`/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/...` — das stand schon in der allerersten
+"no space left"-Fehlermeldung, wurde aber zunaechst uebersehen, weil `docker info` eine andere
+("Docker Root Dir") zeigt und man die fuer die ganze Wahrheit haelt. Am 14.11. waren es 23 GB, davon
+**13 GB per `docker system prune -af` reclaimbar** (Reste gescheiterter Build-Versuche; Docker spricht
+dafuer mit Containerd, auch wenn dessen Root separat liegt). Pruefen mit:
+```sh
+du -sh /var/lib/containerd
+docker system df
+docker system prune -af
+```
+Es gibt daneben `deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh` (14.11., PR #1435), das
+NUR Dockers eigene Datenwurzel (`/etc/docker/daemon.json`, Images/Volumes/Build-Cache) auf das bislang
+ungenutzte Hetzner-Volume (`/mnt/HC_Volume_106761772`, 20 GB; `/mnt/volume-hel1-1` ist trotz Namens
+**kein** eigenes Mount, sondern ein gewoehnlicher Ordner auf `sda1`) umzieht — das allein reicht nicht,
+weil Containerds Root davon unberuehrt bleibt. Wird `/var/lib/containerd` zum wiederkehrenden Problem,
+muesste als naechstes containerd selbst umgezogen werden (`root`/`state` in `/etc/containerd/config.toml`),
+nicht nochmal nur Dockers `data-root`.
+
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
 Chris am 18.10.: Moosgrab soll nicht jedes Mal die Oly-CI fahren. Ein Push oder PR, der **nur**
@@ -297,3 +379,10 @@ statt Build, Browser-Smokes, voller Suite, Persistenz-Suiten und Rangtreue-Schra
 `scripts/ci-nur-kartenschmiede.sh`; liegt auch nur eine Datei außerhalb (auch die Routen unter
 `app/`), läuft die volle CI. Website und Deploy bleiben unverändert: der Server baut jeden neuen
 `main`-Commit wie bisher.
+
+**LEC-Cockpit (apps/LEC, docs/enterich-cards) hängt an derselben Weiche** (Chris, 11.11.): ein Push, der nur dort etwas ändert, fährt
+statt der Oly-CI nur den Job `lec` (Prisma, Typen, Vitest). Berührt ein Push `apps/LEC`, läuft `lec` immer mit, auch neben der
+Oly-CI. `scripts/ci-beruehrt.sh` sagt, welches Nebenprojekt angefasst wurde.
+
+**Jeder neue CI-Job braucht die Weiche** (`needs: weiche` und `if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}`).
+Sonst läuft er bei jedem Moosgrab-PR mit; `tests/kartenschmiede.test.ts` („CI-Weiche“) wird dann rot.
