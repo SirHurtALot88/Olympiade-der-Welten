@@ -45,6 +45,16 @@
 // Gilt fuer jede Buehnen-Disziplin, die durch den generischen Durchgangs-Rechner laeuft
 // (auch duell/duett). `heben:true` (Gewichtheben) hat einen eigenen Paar-Rechner und wird
 // abgelehnt.
+//
+// BUDGET-KONSERVIERUNG (14.11., Chris' Auftrag "mach das rezept jetzt komplett über die
+// matrix, für alle disziplinen!!", s. CLAUDE.md "Die Eignungsmatrix ist gesperrt"): dieses
+// Skript bleibt dabei UNVERAENDERT das rho-Werkzeug, s. Begruendung oben ("Ein Sinkhorn-
+// Rezept maximiert nur die erste Groesse"). Das Sinkhorn-Transportproblem fuer die Buehne
+// (das Gegenstueck zu scripts/baue-feldspiel-rezept.mjs) steht in
+// scripts/baue-buehne-rezept.mjs + scripts/sondiere-buehne-subskills.mjs -- zwei eigene,
+// parallele Dateien, keine Erweiterung dieser hier. Der Guard-Test dazu:
+// tests/buehne-rezept-budget-guard.test.ts (heute alle neun Disziplinen `it.skip`, Rollout
+// ist CLAUDE.md-Aufgabe #133).
 // ===================================================================================
 import { readFileSync, writeFileSync, mkdtempSync, copyFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
