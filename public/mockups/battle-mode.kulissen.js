@@ -35,13 +35,15 @@ window.__ARENA_KULISSEN={
    "id": "brutal",
    "label": "Gauntlet",
    "bild": "/sprites/kulissen/breaking/brutal.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.04,
+   "rand": 0.35
   },
   {
    "id": "standard",
    "label": "Erste Fassung",
    "bild": "/sprites/kulissen/breaking/standard.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.04,
+   "rand": 0.35
   }
  ],
  "climbing": [
@@ -191,19 +193,22 @@ window.__ARENA_KULISSEN={
    "id": "buehne",
    "label": "Theater",
    "bild": "/sprites/kulissen/showcase/buehne.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.04,
+   "rand": 0.5
   },
   {
    "id": "festival",
    "label": "Freiluft-Festival",
    "bild": "/sprites/kulissen/showcase/festival.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.04,
+   "rand": 0.5
   },
   {
    "id": "zirkus",
    "label": "Zirkuszelt",
    "bild": "/sprites/kulissen/showcase/zirkus.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.04,
+   "rand": 0.5
   }
  ],
  "speed-schach": [

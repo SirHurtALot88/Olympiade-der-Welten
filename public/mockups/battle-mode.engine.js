@@ -18767,14 +18767,27 @@
       // mehr zusaetzlich in TECHNIK. Zusammen mit `GAUNTLET_FAMILIE_GEWICHT` 0,5->0,35 (s. dort)
       // und der Wucht-Familie 4->3 Geraete (s. FOLTER_GERAETE oben) die Gegenmessung fuer die
       // PR-Beschreibung.
+      //
+      // BUDGET-KONSERVIERUNG (15.11., Task #133, Chris: "budget konservierung sollte eigentlich
+      // jetzt fuer alle 20 diszis schon gelten!"): bis hierher kam intelligence (Matrixgewicht 2)
+      // in KEINER der sieben Unterfertigkeiten vor -- seine Zeile war unloesbar, es trug faktisch
+      // 0 statt 2 (gefunden von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt sitzt
+      // es mit 6 in NERVEN (der "MIND FORTRESS"-Zone: wer den Schmerz durchschaut, haelt laenger).
+      // Zugleich ein multiplikativer Zeilenschritt gegen die GEMESSENEN Anteile (Mittel beider
+      // Saatstroeme vorher: health 13,1 % gegen 18, determination 13,2 % gegen 10, will 29,5 %
+      // gegen 28, power 11,5 % gegen 10): jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je
+      // Unterfertigkeit wieder auf 100 normiert. Gemessen (messe-arena-einfluss.mjs breaking 48,
+      // Saatversatz 0 / 10 000 000): Pp 14,3/13,9 -> 12,5/10,2, intelligence 0 -> 0,8/1,2 %;
+      // rho je Spiel (miss-alle-disziplinen.mjs 24 breaking) 0,867 -> 0,860, Spannweite 0,169 --
+      // die Bewegung liegt weit innerhalb des Kaderrauschens.
       rezept:{
-        GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
-        SPITZENMOMENT:{power:55,will:45},
-        TECHNIK:      {torment:59,determination:41},
-        PUBLIKUM:     {will:60,torment:40},
-        NERVEN:       {will:50,health:50},
-        AUSDAUER:     {stamina:65,determination:35},
-        WAGNIS:       {power:40,dexterity:60}
+        GRUNDLAGE:    {will:32,torment:19,health:34,stamina:15},
+        SPITZENMOMENT:{power:54,will:46},
+        TECHNIK:      {torment:63,determination:37},
+        PUBLIKUM:     {will:59,torment:41},
+        NERVEN:       {will:42,health:52,intelligence:6},
+        AUSDAUER:     {stamina:69,determination:31},
+        WAGNIS:       {power:41,dexterity:59}
       }
     },
 
@@ -36283,7 +36296,10 @@
     bg.addColorStop(1,"hsl(280 45% 7%)");
     // KULISSE (Kulissen-Integration 07.11.): liegt der Kerker der PixelLab-Szene darunter, kommt der
     // violette Verlauf nur durchscheinend darueber -- die Folter-Stimmung bleibt, der Ort wird sichtbar.
-    if(kulisseSichtbar())ctx.globalAlpha=0.45;
+    // Batch 12 (08.11., Kulissen-Audit Rang 6): 45 % -> 20 %. Bei 45 % lag ein Schleier ueber der
+    // Szene, Fackeln und Publikum waren nur Schemen; das Licht (Fackelglut, Lichtinsel auf dem Rund)
+    // steckt jetzt in der Kulisse selbst (scripts/baue-kulisse-buehnen.py, breaking_licht()).
+    if(kulisseSichtbar())ctx.globalAlpha=0.2;
     ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
     ctx.globalAlpha=1;
 
@@ -42848,7 +42864,10 @@
     const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))
       ||(typeof gebucht==="string"&&liste.find(k=>k.id===gebucht))
       ||liste[kulisseHash(schluessel)%liste.length];
-    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
+    // rand (Batch 12, 08.11.): Staerke der Rand-Vignette, 1 = wie bisher; Showcase/Breaking 0.5, weil
+    // ihr Licht jetzt im Bild steckt (Prospekt, Kegel, Fackeln) und der Rand sonst Raenge/Fackeln schluckt.
+    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25,
+      rand:Number.isFinite(v.rand)?v.rand:1};
     if(!kulisseBilder[v.bild]){
       const im=new Image();
       // Steht das Spiel noch (Einlauf, vor dem Anpfiff), zeichnet niemand nach — also einmal
@@ -42884,8 +42903,9 @@
     // im alten Sandboden) traegt die Tiefe und lenkt den Blick zur Mitte.
     ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,H);
     const v=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
-    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,.18)");
-    v.addColorStop(1,"rgba(0,0,0,.48)");
+    const rd=kulisseAktiv.rand;
+    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,"+(0.18*rd)+")");
+    v.addColorStop(1,"rgba(0,0,0,"+(0.48*rd)+")");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     return true;
   }
