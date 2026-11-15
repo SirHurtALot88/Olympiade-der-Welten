@@ -16,6 +16,7 @@ import { monthlyBars, salesPattern, type PriceEffect } from "@/lib/dashboard/ken
 /** Detail-Fenster zu einem Artikel: Preise, Verkaeufe, Einkauf, Bestand. Rein lesend. */
 
 interface Detail {
+  billbeeId?: string | null;
   kennzahlen: KennzahlenData | null;
   losses: LossRow[];
   lossCost: number;
@@ -221,6 +222,17 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               <span className="bd-rar" title="Zustand laut Titel">{m?.condition ?? conditionOf(row.nameRaw)}</span>
               {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
               {!row.active && <span className="bd-rar">ausgelaufen</span>}
+              {detail?.billbeeId && (
+                <a
+                  className={`bd-rar bd-billbee${row.ekMissing ? " bd-billbee-ek" : ""}`}
+                  href={`https://app.billbee.io/app_v2/article/edit/${encodeURIComponent(detail.billbeeId)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Artikel in Billbee bearbeiten (Preise, Einkauf, Bestand) – öffnet in neuem Tab"
+                >
+                  {row.ekMissing ? "EK in Billbee eintragen ↗" : "In Billbee öffnen ↗"}
+                </a>
+              )}
             </div>
           </div>
         </header>

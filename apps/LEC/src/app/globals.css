@@ -734,3 +734,8 @@ a.mover .meta, a.mover .meta span { color: var(--muted); }
 .bd-pml-mk { stroke: var(--warn, #e0b341); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .bd-pml-sale { fill: var(--good, #3fb97a); }
 .bd-pml-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good, #3fb97a); margin: 0 3px 0 8px; }
+
+/* Link in die Billbee-Artikelbearbeitung (Drawer) */
+.bd-billbee { text-decoration: none; cursor: pointer; }
+.bd-billbee:hover { text-decoration: underline; }
+.bd-billbee-ek { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
