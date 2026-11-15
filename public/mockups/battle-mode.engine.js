@@ -45806,10 +45806,17 @@
         // das direkt die Geschwindigkeit multipliziert, und das Feld war so weit
         // gespreizt (8,5 s gegen 17,1 s), dass eine gerissene Huerde nie einen Platz
         // gekostet hat. Damit zahlte Technik nichts — und Wucht erst recht nicht.
-        ANTRITT:    {speed:42,power:34,determination:24},
-        ENDTEMPO:   {speed:36,will:30,determination:22,stamina:12},
-        TECHNIK:    {dexterity:52,awareness:30,determination:18},
-        WENDIGKEIT: {dexterity:46,awareness:34,speed:20},
+        // BUDGET-KONSERVIERUNG (15.11., Chris: "budget konservierung sollte eigentlich jetzt
+        // fuer alle 20 diszis schon gelten!"): EIN multiplikativer Zeilenschritt ueber alle
+        // sieben Rollen gegen die gemessenen Anteile (OLY_FORM_MODUS=echt, Mittel beider
+        // Saatstroeme vorher: dexterity 16,0 % gegen Matrix 12, determination 11,4 % gegen 15,
+        // power 7,1 % gegen 10) -- jede Zelle mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert,
+        // Struktur unveraendert. Pp 18,5/15,4 -> 12,9/6,5 (Saatversatz 0 / 10 000 000),
+        // ungesehener Strom 20 000 000: 15,5 -> 9,4; rho je Spiel 0,860 -> 0,876.
+        ANTRITT:    {speed:39,power:36,determination:25},
+        ENDTEMPO:   {speed:36,will:28,determination:25,stamina:11},
+        TECHNIK:    {dexterity:46,awareness:32,determination:22},
+        WENDIGKEIT: {dexterity:41,awareness:36,speed:23},
         // STEHEN NACHGEZOGEN (SP-P1, 26.09., Folgeschritt zur Puste-Bindung oben). Solange
         // die Reserve kaum band, war STEHEN mechanisch fast irrelevant — jetzt entscheidet
         // sie ueber Einbruch und Erholung mit. Mit dem alten Mix (Determination 44/Will 32/
@@ -45821,9 +45828,9 @@
         // ANTRITT/ENDTEMPO/TECHNIK ohnehin die groessten Kanaele der Bahn, "Stehvermoegen"
         // passt inhaltlich mindestens so gut zu Schmerztoleranz (Torment) und Robustheit
         // (Health) wie zu Willen.
-        STEHEN:     {torment:36,health:30,dexterity:20,will:14},
-        WUCHT:      {torment:55,power:42,speed:3},
-        ROBUST:     {health:28,torment:24,will:20,dexterity:18,awareness:10}
+        STEHEN:     {torment:37,health:29,dexterity:19,will:15},
+        WUCHT:      {torment:48,power:49,speed:3},
+        ROBUST:     {health:27,torment:24,will:21,dexterity:17,awareness:11}
       },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Endtempo",TECHNIK:"Technik",WENDIGKEIT:"Wendigkeit",
             STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"},
