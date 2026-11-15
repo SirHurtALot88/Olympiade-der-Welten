@@ -214,7 +214,7 @@ AUFTRAEGE = {
     # Rohszene im selben Massstab/derselben Draufsicht wie die bestehende HYROX-Halle (kurs.png,
     # 1680x960), damit Boegen/Geraetezeile/Bodenmerkmale genauso zuschneidbar bleiben (Muster
     # Batch 15, 0 weitere Generationen fuer die Bausteine).
-    "spurt_outdoor_strand": dict(art="neu", datei="arena/spurt_outdoor_strand.png", gen=(1680, 960), anker="mitte",
+    "spurt_outdoor_strand": dict(art="neu", datei="arena/spurt_outdoor_strand.png", gen=(688, 384), anker="mitte",
         prompt=f"top-down view of a wide outdoor sports track on a beach at dusk, golden sand lanes between painted white lines, beach volleyball nets and a lifeguard tower in the distance, warm orange evening light with long shadows, pixel art game asset, 16-bit RPG style, clean single color dark outline"),
 
     # --- PixelLab-Requisiten Welle 3 (Task #140, 14.11.), NUR falls nach Welle 1+2 noch

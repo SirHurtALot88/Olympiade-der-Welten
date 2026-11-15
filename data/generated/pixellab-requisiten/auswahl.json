@@ -208,6 +208,39 @@
   "kandidat": 5,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "eis_kufenspuren": {
+  "prompt": "tileable pale blue ice rink surface texture with crisscrossing faint ice skate blade scratch marks, subtle cracks, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   64
+  ],
+  "job": "3b31dd3a-66a3-4dec-aaf3-152445e8642e",
+  "kandidat": 9,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "eiskunst_spotlight": {
+  "prompt": "a single soft cold white spotlight beam cone shining downward from above, glowing, transparent falloff at the edges, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   90
+  ],
+  "job": "21ab287f-b75a-4094-89fe-a127ebe82963",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "eiskunst_tannen_bergkette": {
+  "prompt": "wide landscape backdrop of a dense dark pine forest skyline in front of a tall snow-capped mountain range, soft orange and purple evening sky above, side view horizon panorama, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   480,
+   160
+  ],
+  "job": "d9fa24aa-30e5-43b6-b982-e82b7d2d88e2",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "falle_fass": {
   "prompt": "wooden barrel standing upright with iron bands, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -553,6 +586,17 @@
    "kandidat": 19,
    "endpunkt": "/v2/generate-image-v2"
   }
+ },
+ "spurt_outdoor_strand": {
+  "prompt": "top-down view of a wide outdoor sports track on a beach at dusk, golden sand lanes between painted white lines, beach volleyball nets and a lifeguard tower in the distance, warm orange evening light with long shadows, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   688,
+   384
+  ],
+  "job": "5c120403-9505-4951-b8ad-b9311ce9214e",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
  },
  "truhe_1_offen": {
   "prompt": "small plain wooden treasure chest with simple dark metal corner brackets, lid open, a few coins and a torn note visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
