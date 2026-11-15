@@ -106,3 +106,52 @@ export function deriveCostFacts(settings: CostSettingsValues, shop: ShopVolume |
     buyShippingEffectiveFive: settings.buyShippingFive * settings.buyShippingShareFactor,
   };
 }
+
+/** Eine Zeile des Vergleichs "feste Stueckwerte" gegen "nach Volumen". */
+export interface CostModelRow {
+  label: string;
+  oldValue: number;
+  newValue: number;
+}
+export interface CostModelComparison {
+  rows: CostModelRow[];
+  /** Nebenkosten ohne EK (alles ausser dem Einkaufspreis), je Stueck. */
+  oldTotal: number;
+  newTotal: number;
+  /** Empfohlener VK-Mindestpreis fuer das Beispiel (VK-MIN) im alten und neuen Modus. */
+  oldVkMin: number;
+  newVkMin: number;
+}
+
+/**
+ * Vergleicht die zwei Kalkulationsarten fuer ein Beispiel mit dem echten Verkaufsvolumen: alt = feste Stueckwerte, neu = Jahreskosten
+ * geteilt durch die verkauften Stueck (Chris, 14.11.2026). Gleiche Engine-Funktionen wie Dashboard und Sortiment.
+ */
+export function compareCostModels(example: PreviewExample, settings: CostSettingsValues, shop: ShopVolume | null): CostModelComparison {
+  const oldS: CostSettingsValues = { ...settings, volumeBasedCosts: false };
+  const newS: CostSettingsValues = { ...settings, volumeBasedCosts: true };
+  const a = buildCostPreview(example, oldS, shop);
+  const b = buildCostPreview(example, newS, shop);
+  const parts = (pv: CostPreview) => ({
+    buyShipping: pv.hk.buyShipping,
+    shipping: pv.hk.shipping,
+    registeredMail: pv.hk.registeredMail,
+    packaging: pv.hk.packaging,
+    fixedCostShare: pv.hk.fixedCostShare,
+  });
+  const pa = parts(a);
+  const pb = parts(b);
+  return {
+    rows: [
+      { label: "Einkaufs-Versand", oldValue: pa.buyShipping, newValue: pb.buyShipping },
+      { label: "Versand Inland", oldValue: pa.shipping, newValue: pb.shipping },
+      { label: "Einschreiben", oldValue: pa.registeredMail, newValue: pb.registeredMail },
+      { label: "Verpackung", oldValue: pa.packaging, newValue: pb.packaging },
+      { label: "Fixkosten-Anteil", oldValue: pa.fixedCostShare, newValue: pb.fixedCostShare },
+    ],
+    oldTotal: a.hk.total - a.hk.ek,
+    newTotal: b.hk.total - b.hk.ek,
+    oldVkMin: a.corridor.vkMin,
+    newVkMin: b.corridor.vkMin,
+  };
+}

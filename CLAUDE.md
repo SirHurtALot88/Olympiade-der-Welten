@@ -146,6 +146,21 @@ aber die verbindliche Pflichtschranke. Wo ein Rezept zwischen "knapp unter 25" u
 rho sinkt" wählen muss, hat die rho-Schranke (>0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
 Kosten von rho optimieren.
 
+**Falls die Matrix doch angepasst werden muss: Ausgleichspflicht über alle 20 Disziplinen.**
+Chris am 15.11., wörtlich: „wenn du die gewichtungen in der matrix anpassen würdest für eine diszi
+müsstest du das bei anderen auch machen damit es unterm strich wieder sauber ist, momentan wird
+jedes attribut über 20 disziplinen fast gleich gewichetet bis auf 1-2 Punkte unterschied. und das
+MUSS so bleiben“ — nachgemessen exakt bestätigt: jedes der zwölf Attribute summiert sich über alle
+20 Disziplinen auf genau 166 oder 167 Punkte. Das ändert nichts an der Sperre oben — die Matrix
+bleibt der Normalfall unangetastet, und das bleibt die endgültige Entscheidung für alle zwanzig
+Disziplinen. Es gilt nur als zusätzliche Nebenbedingung, **falls** Chris für einen bestimmten,
+dokumentierten Einzelfall ausdrücklich eine Ausnahme freigibt: „Wenn du die matrix anpassen musst
+dann nur so dass das in summe weiter aufgeht und vorsichtig sein und vor allem den aktuellen
+ursprungsstand der matrix speichern“ — vor jeder solchen Änderung den aktuellen Stand sichern
+(Muster: `docs/design/matrix-backups/`), jede Erhöhung bei einer Disziplin durch eine Senkung bei
+anderen Disziplinen **desselben Attributs** ausgleichen, und die neue Zeilensumme nachrechnen statt
+schätzen. Volle Herleitung und Tabelle: `docs/design/matrix-ausgleichspflicht-15-11.md`.
+
 **Design-Leitlinie, nicht nur für eine Disziplin: mehrere Wege zum Erfolg.** Chris am 21.09., im
 Kontext der I-Spy-Konzeptrunde (`docs/design/i-spy-schatzsuche-konzept-21-09.md`, Mehrwege-Truhen),
 danach ausdrücklich verallgemeinert: „das ist jetzt auch nur ein Beispiel — auf genau diese Art und
@@ -331,6 +346,28 @@ Branch auf GitHub klein), der aber lokal sofort zum "dangling object" wird und n
 verschwindet. `deploy/hetzner/git-repo-aufraeumen.sh` raeumt das per `git gc --prune=now` weg und
 laeuft seitdem woechentlich (sonntags 04:10) als dritter Cron neben den beiden Push-Crons, s.
 `install-live-save-cron.sh`.
+
+**Dritter Blockierer, gefunden am 14.11.: `/var/lib/containerd`, nicht `/etc/docker/daemon.json`.**
+Docker laeuft hier ueber den **separaten System-Containerd-Dienst** (`/run/containerd/containerd.sock`,
+eigener systemd-Dienst `containerd.service`) — der hat eine **eigene** Datenwurzel, unabhaengig von
+Dockers `data-root`. Alle Schreibvorgaenge beim Layer-Entpacken laufen tatsaechlich unter
+`/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/...` — das stand schon in der allerersten
+"no space left"-Fehlermeldung, wurde aber zunaechst uebersehen, weil `docker info` eine andere
+("Docker Root Dir") zeigt und man die fuer die ganze Wahrheit haelt. Am 14.11. waren es 23 GB, davon
+**13 GB per `docker system prune -af` reclaimbar** (Reste gescheiterter Build-Versuche; Docker spricht
+dafuer mit Containerd, auch wenn dessen Root separat liegt). Pruefen mit:
+```sh
+du -sh /var/lib/containerd
+docker system df
+docker system prune -af
+```
+Es gibt daneben `deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh` (14.11., PR #1435), das
+NUR Dockers eigene Datenwurzel (`/etc/docker/daemon.json`, Images/Volumes/Build-Cache) auf das bislang
+ungenutzte Hetzner-Volume (`/mnt/HC_Volume_106761772`, 20 GB; `/mnt/volume-hel1-1` ist trotz Namens
+**kein** eigenes Mount, sondern ein gewoehnlicher Ordner auf `sda1`) umzieht — das allein reicht nicht,
+weil Containerds Root davon unberuehrt bleibt. Wird `/var/lib/containerd` zum wiederkehrenden Problem,
+muesste als naechstes containerd selbst umgezogen werden (`root`/`state` in `/etc/containerd/config.toml`),
+nicht nochmal nur Dockers `data-root`.
 
 ## CI-Weiche für Moosgrab / Kartenschmiede
 

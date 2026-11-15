@@ -78,9 +78,13 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(skript).toContain("ST_CX, ST_CY, ST_HL, ST_RA, ST_BA, ST_N, ST_ST = LW / 2, LH * 0.615, 263, 288, 26, 6, 0.57");
     expect(kulissen.spurt?.length ?? 0).toBeGreaterThanOrEqual(1);
     expect(kulissen.staffel?.length ?? 0).toBeGreaterThanOrEqual(1);
-    // Climbing: Wandkachel laeuft mit der Kamera (gleicher Versatz wie die gezeichneten Risse)
+    // Climbing: Wandkachel laeuft mit der Kamera (gleicher Versatz wie die gezeichneten Risse).
+    // Kulissen-QS 08.11. (Batch 14): `versatzY` ist seit der Drei-Zonen-Kulisse eine eigene
+    // Variable (auch fuer die ferne Parallax-Ebene und die Boden-/Top-out-Zonen gebraucht),
+    // bleibt aber wortwoertlich `camViewV().oben*cam.zoom`.
     expect(kulissen.climbing?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(motor).toContain("const mitKulisse=kulisseZeichnen(camViewV().oben*cam.zoom);");
+    expect(motor).toContain("const kv=camViewV(), versatzY=kv.oben*cam.zoom;");
+    expect(motor).toContain("const mitKulisse=kulisseZeichnen(versatzY);");
     // Gewichtheben: Kulisse nur im Hantel-Duell (bodenHeben), der Sandsack-Pfad bleibt aus
     expect(motor).toMatch(/gewichthebenSandsack\s*:\s*0/);
   });

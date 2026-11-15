@@ -79,14 +79,16 @@ describe("buildDashboardViewModel", () => {
     expect(vm.moversGood[0].nameRaw).toBe("Stark");
   });
 
-  it("baut die 'Laeuft schlecht'-Liste aus der schlechtesten Lebenszeit-DB-II-%", () => {
+  it("baut die 'Laeuft schlecht'-Liste nach Euro-Verlust in 90 Tagen, nur mit bekanntem EK", () => {
     const articles: ArticleAggregate[] = [
-      article("Verlust", { windows: { all: agg({ revenue: 100, dbII: -50, qty: 5 }) } }),
-      article("Gewinn", { windows: { all: agg({ revenue: 100, dbII: 30, qty: 5 }) } }),
+      article("Verlust klein", { windows: { "90": agg({ revenue: 100, ek: 110, dbII: -10, qty: 5 }) } }),
+      article("Verlust gross", { windows: { "90": agg({ revenue: 100, ek: 140, dbII: -50, qty: 5 }) } }),
+      article("Gewinn", { windows: { "90": agg({ revenue: 100, ek: 40, dbII: 30, qty: 5 }) } }),
+      article("Ohne EK", { windows: { "90": agg({ revenue: 100, ek: 0, dbII: -100, qty: 5 }) } }),
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
-    expect(vm.moversBad).toHaveLength(1);
-    expect(vm.moversBad[0].nameRaw).toBe("Verlust");
+    expect(vm.moversBad.map((m) => m.nameRaw)).toEqual(["Verlust gross", "Verlust klein"]);
+    expect(vm.moversBad[0].dbIIEuro).toBe(-50);
   });
 
   it("sortiert die Sortiment-Tabelle nach AKTUELLER Velocity, nicht nach Lebenszeit-Umsatz", () => {

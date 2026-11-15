@@ -356,7 +356,7 @@ describe("(f) Arena-Host-Hinweis", () => {
             matchdayId: "md1",
             matchdayIndex: 0,
             discipline1: { disciplineId: "battlefield", displayName: "Battlefield", order: 1, playerCount: 2, category: "social" },
-            discipline2: { disciplineId: "hockey", displayName: "Hockey", order: 2, playerCount: 2, category: "power" },
+            discipline2: { disciplineId: "football", displayName: "Football", order: 2, playerCount: 2, category: "power" },
           },
         ],
         matchdayResults: [],
@@ -367,7 +367,7 @@ describe("(f) Arena-Host-Hinweis", () => {
     const bf = hinweise.find((h) => h.disciplineId === "battlefield")!;
     expect(bf.text).toBe("wird als 4-Team-Gruppe (Pod) gewertet — aus genau dem Gefecht, das die Arena hier zeigt");
     expect(bf.nurVorschau).toBe(false);
-    expect(hinweise.find((h) => h.disciplineId === "hockey")!.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
+    expect(hinweise.find((h) => h.disciplineId === "football")!.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
   });
 
   it("Battlefield: bereits per PPS-Pod gebucht (Gefecht fiel aus) -> sagt das, wieder nur Vorschau", () => {

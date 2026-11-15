@@ -25,7 +25,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
 import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
@@ -92,9 +92,10 @@ const pfad = process.argv[4]
   : resolve(dirname(fileURLToPath(import.meta.url)), "..", "public", "mockups", "battle-mode.html");
 const datei = pathToFileURL(pfad).href;
 
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
-});
+const festerPfad = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const browser = await chromium.launch(
+  existsSync(festerPfad) ? { executablePath: festerPfad } : {},
+);
 const seite = await browser.newPage();
 // KEIN AUDIOCONTEXT IM MESSLAUF (Speicherleck-Fix, 01.10.). einflussVon() laeuft als EIN
 // synchroner evaluate()-Aufruf ueber (1 + 12 x Teilnehmer) x n Spiele. Die Ton-Schicht
@@ -116,6 +117,9 @@ const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(datei, { waitUntil: "networkidle" });
 await seite.waitForFunction(() => window.__arena, null, { timeout: 30000 });
+// P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem
+// Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
+if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
 const schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
 const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 

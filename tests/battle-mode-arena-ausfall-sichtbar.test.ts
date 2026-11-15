@@ -329,16 +329,19 @@ describe.skipIf(UEBERSPRINGEN)(
        * Spieltag 1 war deshalb NICHT garantiert eine arena-aufgeloeste Disziplin.
        *
        * BEWEIS, DASS 4 VERSUCHE GENUEGEN (kein Zufall, keine Wahrscheinlichkeit): von 20
-       * Disziplinen sind NUR 7 nicht arena-aufgeloest (tdm, mini-dm, battlefield, hockey,
-       * basketball, football, i-spy, s. ARENA_RESOLVED_DISCIPLINE_IDS). Jeder Spieltag zieht 2
-       * Disziplinen. Aus 7 Nicht-Arena-Disziplinen lassen sich hoechstens 3 Spieltage bilden, die
-       * BEIDE Disziplinen nicht-arena ziehen (3 Paare = 6 Stueck) -- die siebte, uebrige
-       * Nicht-Arena-Disziplin MUSS mit einer Arena-Disziplin auf einem weiteren Spieltag paaren.
-       * Unter den ersten 4 Spieltagen (8 gezogene Disziplinen) steckt also, egal wie der Shuffle-
-       * Seed faellt, IMMER mindestens eine Arena-Disziplin -- ein Zaehlargument (Schubfach-
-       * prinzip), keine Haeufigkeitsmessung. In Battle Mode (Saison mit `repeat: 2`, zwei
-       * unabhaengige Halbserien-Shuffles von je allen 20 Disziplinen) gilt das Argument fuer die
-       * erste Halbserie, also fuer Spieltag 1 der Saison, identisch.
+       * Disziplinen sind STAND 15.11. NUR 3 nicht arena-aufgeloest (mini-dm, battlefield, football,
+       * s. ARENA_RESOLVED_DISCIPLINE_IDS) -- diese Zahl ist seit mehreren seitherigen
+       * Produktivierungsrunden (Basketball/I-Spy/TDM/Hockey) kleiner als die "7" einer frueheren
+       * Fassung dieses Kommentars, was das Argument unten nur GROSSZUEGIGER macht, nicht knapper.
+       * Jeder Spieltag zieht 2 Disziplinen. Aus 3 Nicht-Arena-Disziplinen laesst sich hoechstens 1
+       * Spieltag bilden, der BEIDE Disziplinen nicht-arena zieht (1 Paar = 2 Stueck) -- die dritte,
+       * uebrige Nicht-Arena-Disziplin MUSS mit einer Arena-Disziplin auf einem weiteren Spieltag
+       * paaren. Unter den ersten 4 Versuchen (mit viel Luft gegenueber den tatsaechlich hoechstens
+       * 2 noetigen) steckt also, egal wie der Shuffle-Seed faellt, IMMER mindestens eine
+       * Arena-Disziplin -- ein Zaehlargument (Schubfachprinzip), keine Haeufigkeitsmessung. In
+       * Battle Mode (Saison mit `repeat: 2`, zwei unabhaengige Halbserien-Shuffles von je allen 20
+       * Disziplinen) gilt das Argument fuer die erste Halbserie, also fuer Spieltag 1 der Saison,
+       * identisch.
        *
        * Findet die Schleife nach 4 Spieltagen trotzdem keine Arena-Zeile, ist NICHT Pech am Werk,
        * sondern entweder der Spielplan-Generator hat sich geaendert (eine neue Disziplin kam dazu/

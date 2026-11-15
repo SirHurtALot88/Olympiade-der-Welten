@@ -114,7 +114,16 @@ function NlScoutPortraitCard({
             <BudgetedMediaImage
               src={src}
               placeholderSrc={previewSrc}
-              alt=""
+              alt={`${entry.playerName} Portrait`}
+              // Fable-Audit 14.11. #6: `getPlayerPortraitBrowserUrl` liefert IMMER eine
+              // konstruierte URL zurück (kein Existenz-Check), also war `previewSrc` nie
+              // falsy und der `getNlScoutInitials`-Zweig unten de facto toter Code. Schlägt
+              // das Bild dann wirklich fehl (404), griff `alt=""` als leerer Fallback-Text
+              // (`OptimizedMediaImage` leitet ihn sonst aus `alt` ab) — ein 100%-gescouteter
+              // Kandidat zeigte dadurch GAR KEIN Icon, nicht einmal Initialen. Jetzt derselbe
+              // `fallbackLabel`, den auch Podium/Historie/Kaderkarten benutzen.
+              fallbackLabel={getNlScoutInitials(entry.playerName)}
+              onErrorClassName="nl-scout-player-portrait-fallback"
               width={64}
               height={64}
               loading="lazy"

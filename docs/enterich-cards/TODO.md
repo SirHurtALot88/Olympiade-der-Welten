@@ -1,4 +1,6 @@
-# LEC: To-do (Stand 13.11.)
+# LEC: To-do (Stand 14.11.)
+
+**Stand 14.11.:** Punkte 1 bis 6 sind umgesetzt (Kapital-Panel auf der Sortiment-Seite, Drawer-Gruppen „Kennzahlen“ und „Schwund & Retouren“, Rechenlogik in `src/lib/dashboard/kennzahlen.ts`). Punkt 7 wartet auf eine Beispielbestellung (siehe unten).
 
 Von Chris am 13.11. zur Umsetzung am 14.11. freigegeben (Budget). Reihenfolge wie unten.
 
@@ -13,7 +15,7 @@ Von Chris am 13.11. zur Umsetzung am 14.11. freigegeben (Budget). Reihenfolge wi
 
 5. **Tage ohne Bestand:** täglicher Bestandsstand je Artikel (`StockMovement` nutzen oder täglichen Schnappschuss anlegen); Tempo nur über Tage mit Bestand rechnen; Grundlage der Nachbestell-Liste.
 6. **Retouren, Reklamationen, Schwund:** eigene Erfassung (beschädigt, verloren, zurück); fließt in die Marge ein.
-7. **Tatsächliche Marge je Bestellung:** echte Versandkosten und eBay-Gebühren aus der Billbee-Bestellung statt Pauschalen.
+7. **Tatsächliche Marge je Bestellung:** echte Versandkosten und eBay-Gebühren aus der Billbee-Bestellung statt Pauschalen. **Offen:** `map.ts` liest aus der Bestellung bisher nur Positionen (Datum, Menge, Preis). Welche Felder Versand und Gebühren tragen, ist nicht belegt; dafür braucht es das JSON einer echten Bestellung (z. B. über „Bestellung prüfen“, ohne Kundendaten).
 
 ## C. Später, braucht Zugang von Chris
 

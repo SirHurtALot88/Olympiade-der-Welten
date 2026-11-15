@@ -65,6 +65,39 @@
   "kandidat": 2,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "breaking_pfahl": {
+  "prompt": "a plain sturdy wooden post dug into the ground, worn rope wrapped around the top for binding, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   28,
+   64
+  ],
+  "job": "3effeb8d-cca2-4e9e-90b7-323ad20bcbf1",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "bruecke_wackel_heil": {
+  "prompt": "single wooden plank walkway bridging a gap, straight and level, visible wood grain, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   20
+  ],
+  "job": "4c8099c4-8b05-4e5b-8e04-e01d72cb7982",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "bruecke_wackel_kipp": {
+  "prompt": "single wooden plank walkway bridging a gap, tilted steeply to one side as if about to flip over, visible wood grain, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   24
+  ],
+  "job": "918d8afc-2c62-406b-a2ef-8f69e69c03e8",
+  "kandidat": 6,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "burg_mauer": {
   "prompt": "straight section of a solid light grey stone brick castle curtain wall with square battlements along the top, front view, the wall runs across the full width and is cut off at the left and right edges, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -95,6 +128,39 @@
    144
   ],
   "job": "d92887ea-a50b-49aa-9729-4fc18ee195da",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "climbing_eiszapfen": {
+  "prompt": "a cluster of hanging translucent light blue ice icicles pointing downward, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   30,
+   42
+  ],
+  "job": "6d645eaf-89f4-4532-b50f-94dce49f7bb8",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "climbing_kreidebeutel": {
+  "prompt": "small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   20,
+   26
+  ],
+  "job": "94397d27-04cd-4c99-9d8f-2840b961352c",
+  "kandidat": 6,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "climbing_matte": {
+  "prompt": "square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   48
+  ],
+  "job": "172b67f2-df39-41f2-983c-8d85bd583bc5",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
@@ -153,6 +219,39 @@
   "kandidat": 5,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "eis_kufenspuren": {
+  "prompt": "tileable pale blue ice rink surface texture with crisscrossing faint ice skate blade scratch marks, subtle cracks, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   64
+  ],
+  "job": "3b31dd3a-66a3-4dec-aaf3-152445e8642e",
+  "kandidat": 9,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "eiskunst_spotlight": {
+  "prompt": "a single soft cold white spotlight beam cone shining downward from above, glowing, transparent falloff at the edges, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   90
+  ],
+  "job": "21ab287f-b75a-4094-89fe-a127ebe82963",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "eiskunst_tannen_bergkette": {
+  "prompt": "wide landscape backdrop of a dense dark pine forest skyline in front of a tall snow-capped mountain range, soft orange and purple evening sky above, side view horizon panorama, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   480,
+   160
+  ],
+  "job": "d9fa24aa-30e5-43b6-b982-e82b7d2d88e2",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "falle_fass": {
   "prompt": "wooden barrel standing upright with iron bands, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -162,6 +261,17 @@
   ],
   "job": "b688352e-9f54-459a-a799-cbd615929762",
   "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "falle_fegearm": {
+  "prompt": "a long padded wrecking-ball style sweeper arm mounted on a pivot post, horizontal swinging boom with a thick padded knocker end, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   84,
+   24
+  ],
+  "job": "ef6f84c8-6348-4f9e-b786-f866fb905340",
+  "kandidat": 12,
   "endpunkt": "/v2/generate-image-v2"
  },
  "falle_spitzen": {
@@ -205,6 +315,61 @@
    16
   ],
   "job": "7be4510d-82e8-419e-8cc4-bf9e05d99b12",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "football_becken": {
+  "prompt": "a rectangular glass-walled water tank lane segment sunk into the ground, pool water visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   32
+  ],
+  "job": "d72965c7-d4b7-41ba-8e14-6818df1ecc22",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_gross": {
+  "prompt": "large deep pit with a jagged crumbling drop edge, pitch black depth with sharpened wooden stakes faintly visible at the bottom, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   80,
+   48
+  ],
+  "job": "dcc54db4-d869-4101-b73b-a24dc00d2ca9",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_klein": {
+  "prompt": "small rectangular pit dug into the ground with a crumbling broken edge, dark shadow at the bottom, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   32
+  ],
+  "job": "8a3a3cb8-ed1c-477a-a192-642cd75ca8fd",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "grube_mittel": {
+  "prompt": "medium rectangular pit with a jagged crumbling drop edge, dark depth with a few loose rocks tumbling in, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   40
+  ],
+  "job": "0ed4396b-078a-4eed-8c72-07d29ad972d8",
+  "kandidat": 2,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hai": {
+  "prompt": "a grey shark swimming just under the water surface, seen from directly above, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   20
+  ],
+  "job": "03d7141f-ff72-4148-9621-0ca7d16e7fb0",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
@@ -344,6 +509,50 @@
   "kandidat": 10,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "kaefig_ecke_an": {
+  "prompt": "corner post of an electrified fence where the wire mesh turns a right angle, bright blue-white electric arcs crackling along the mesh, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "b3887405-79bf-4edd-a2d2-1ab1c00948db",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_ecke_aus": {
+  "prompt": "corner post of an electrified fence where the wire mesh turns a right angle, dark inactive, no glow, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "a50fff3d-ac7a-4950-92cb-8909e0f87272",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_gerade_an": {
+  "prompt": "straight electrified fence segment between two metal posts, bright blue-white electric arcs crackling along the wire mesh, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "a264046d-0da6-46d8-8398-0e3f6de8aa0e",
+  "kandidat": 2,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kaefig_gerade_aus": {
+  "prompt": "straight electrified fence segment between two metal posts, dark inactive wire mesh, no glow, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   32
+  ],
+  "job": "2db4d900-3273-4d19-8794-14280711e5f2",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "korb_topdown": {
   "prompt": "basketball hoop seen from directly above: white backboard as a horizontal bar at the top, orange rim ring with white net below it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -430,6 +639,171 @@
    116
   ],
   "job": "738e1118-b586-4a97-9592-2a9630c91b18",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "spurt_outdoor_strand": {
+  "prompt": "top-down view of a wide outdoor sports track on a beach at dusk, golden sand lanes between painted white lines, beach volleyball nets and a lifeguard tower in the distance, warm orange evening light with long shadows, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   688,
+   384
+  ],
+  "job": "5c120403-9505-4951-b8ad-b9311ce9214e",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "stier": {
+  "prompt": "an angry charging bull with lowered horns, muscular body, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   40,
+   34
+  ],
+  "job": "c8f3f551-3d15-4824-8183-0e57666d0088",
+  "kandidat": 12,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "takeshi_fort_segment": {
+  "prompt": "straight section of a rough wooden palisade fort wall made of lashed logs with a simple fighting platform on top, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   96,
+   64
+  ],
+  "job": "b337e711-d8e1-46d1-b084-ddc42d492a05",
+  "kandidat": 3,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "takeshi_rammbock": {
+  "prompt": "a medieval battering ram, a thick log with an iron tip hanging from a wheeled wooden frame, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   64,
+   32
+  ],
+  "job": "fa4b8054-896d-4836-b981-c930c2ec63ec",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "takeshi_wasserkanone": {
+  "prompt": "a heavy water cannon turret on a wooden tripod stand, front three-quarter view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   40,
+   48
+  ],
+  "job": "c370f915-1ce8-4943-8af7-f97124575efb",
+  "kandidat": 11,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_1_offen": {
+  "prompt": "small plain wooden treasure chest with simple dark metal corner brackets, lid open, a few coins and a torn note visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   34
+  ],
+  "job": "00d0fcb5-cff2-42f6-a185-eb5f9a029a1f",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_1_zu": {
+  "prompt": "small plain wooden treasure chest with simple dark metal corner brackets, no ornamentation, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   30
+  ],
+  "job": "e65064ca-ae31-4300-8a40-cb8db828f445",
+  "kandidat": 10,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_2_offen": {
+  "prompt": "wooden treasure chest with bronze corner fittings and carved trim, lid open, a stack of documents and a few gold coins visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   34,
+   36
+  ],
+  "job": "528c07e7-91b4-4fb2-a802-460ac2c01e20",
+  "kandidat": 10,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_2_zu": {
+  "prompt": "wooden treasure chest with bronze corner fittings, a small lock and carved trim, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   34,
+   32
+  ],
+  "job": "0299f362-1e5a-48bc-8eb7-50f716fc8fb0",
+  "kandidat": 48,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_3_offen": {
+  "prompt": "ornate ironbound treasure chest with gold trim and engraved panels, lid open, a pile of gold coins and gems visible inside, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   38,
+   40
+  ],
+  "job": "883d5205-c44f-4c32-ac00-dee212bd7803",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "truhe_3_zu": {
+  "prompt": "ornate ironbound treasure chest with gold trim, engraved panels and a heavy lock, closed, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   38,
+   34
+  ],
+  "job": "6a284929-98fd-4063-9864-b9348a230605",
+  "kandidat": 19,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "wettessen_kotzeimer": {
+  "prompt": "a plain metal bucket, slightly dented, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   28,
+   32
+  ],
+  "job": "b409e968-1022-442f-8e17-f316e1025734",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "wettessen_teller_krabbler": {
+  "prompt": "a round plate piled with an unappetizing grey lumpy mystery stew with visible bones, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   20
+  ],
+  "job": "cc7b44c9-3f0b-4fda-b389-a31c61c9e8e0",
+  "kandidat": 5,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "wettessen_teller_normal": {
+  "prompt": "a round plate piled with an ordinary hearty meal, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   20
+  ],
+  "job": "69f6e9b8-c983-4453-aba6-122f86e692c6",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "wettessen_teller_schleim": {
+  "prompt": "a round plate filled with a disgusting grey-green slimy gloop, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   20
+  ],
+  "job": "49e33c34-d749-410f-9d61-725f87c0e899",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },

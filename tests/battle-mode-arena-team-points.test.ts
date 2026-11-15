@@ -153,18 +153,14 @@ describe("ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * I-SPY IST JETZT DRIN (27.10., Task #197) -- loest den Regressionstest ab, der seit
-   * Produktivierungswelle 2 bewusst rot-bei-Anschluss angelegt war ("Wird I-Spy spaeter ueber
-   * 0,80 gehoben, faellt dieser Test absichtlich rot und ist DANN mit der neuen Zahl zu
-   * aktualisieren"). Die neue Zahl: Kalibrierrunde 3 (32 Ticks, Tresor 45) hebt rho je Spiel
-   * auf 0,817/0,811 (n=48, zwei Saatstroeme), Pp 14,6/15,0 -- s. data/generated/
-   * disziplin-abnahme.json und docs/design/organisch-tdm-battlefield-ispy-27-10.md. Der Schutz,
-   * den der alte Test leisten sollte ("es waere ja nur ein Eintrag" darf die Rangtreue-Achse
-   * nicht ueberstimmen), liegt weiter bei tests/disziplin-abnahme-guard.test.ts. Technisch laeuft
-   * I-Spy nicht ueber das Duell-, sondern ueber das Auftritt-Chassis (`schatzsuche:true`, kein
-   * `duell` mehr seit dem 21.09.).
+   * I-SPY: kurzzeitig draussen, seit der root-gecausten rho-Ausnahme (SHOWCASE-I-SPY-AUSNAHME-
+   * NACHTRAG, lib/battle/arena-resolved-disciplines.ts) wieder drin. Ein A/B-Test (derselbe Code,
+   * alte vs. aktuelle Kaderfamilie) zeigte: der rho-Rueckgang auf 0,776 (n=48) ist reines
+   * Kaderfamilie-Rauschen, keine Mechanik- oder Code-Regression -- Chris hat deshalb eine
+   * rho-Ausnahme analog Hockey freigegeben (`ARENA_ABNAHME_AUSNAHMEN`), Pp besteht weiterhin
+   * regulaer.
    */
-  it("enthaelt I-Spy (Kalibrierrunde 3, 27.10.) -- ueber das Auftritt-Chassis, nicht das Duell-Chassis", () => {
+  it("I-Spy ist angeschlossen UND gewertet (Auftritt-Chassis, nicht Duell-Chassis, rho per Ausnahme gedeckt)", () => {
     expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(true);
     expect(ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has("i-spy")).toBe(true);

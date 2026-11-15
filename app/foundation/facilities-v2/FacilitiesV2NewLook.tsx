@@ -887,6 +887,182 @@ export default function FacilitiesV2NewLook({
   // Hero-Zähler (#Wave2) für die Portfolio-Cash-Kachel im Header.
   const animatedPortfolioCash = useCountUp(summary.cashCurrent);
 
+  /**
+   * Fable-Audit 14.11. #5: diese beiden Blöcke (Kosten-Kurven + Upgrade/Wartung/Downgrade)
+   * waren vorher IMMER an fester Stelle unter dem gesamten Grid gerendert, die Aktionsleiste
+   * zusätzlich `position: sticky; bottom: …` — beim Scrollen legte sie sich dadurch über die
+   * jeweils unterste sichtbare Kartenreihe und verdeckte deren Inhalt (wirkte wie ein
+   * fehlplatziertes Modal, Screenshot `06-gebaeude-overlay-icons.png`). Jetzt eine einzelne
+   * JSX, die im Karten-Grid DIREKT NACH der ausgewählten Karte eingefügt wird (Inline-Expand:
+   * die Karte "wächst", Nachbarn rutschen eine Zeile tiefer) statt über sie zu schweben. Für
+   * die Listenansicht (keine Karten, kein "daneben") bleibt sie ein normaler Block unter der
+   * Tabelle — ebenfalls ohne `sticky`.
+   */
+  const activeFacilityPanel = activeFacility ? (
+    <>
+      {/* E4: Ausbau-Kurve (einmalige Upgrade-Kosten) und Unterhalts-Kurve
+          (laufende Kosten pro Saison je Stufe) nebeneinander — beide direkt
+          aus dem Facility-Katalog (`getFacilityLevelDefinition`), derselben
+          Quelle wie der Upgrade-Service. */}
+      <NlCard
+        className="nl-facility-curve-card"
+        eyebrow="Kosten-Kurven"
+        title={`${activeFacility.name} · L1→L${FACILITY_MAX_LEVEL}`}
+      >
+        <div className="nl-facility-curve-duo">
+          <figure className="nl-facility-curve-col">
+            <figcaption className="nl-facility-curve-col-head">
+              <span>Ausbau (einmalig)</span>
+              <InfoTip label="Was sind Ausbau-Kosten?" tip={TIP_AUSBAU} />
+            </figcaption>
+            <NlBarChart
+              aria-label={`Upgrade-Kosten je Ausbaustufe für ${activeFacility.name}`}
+              format={(value) => formatTransfermarktCurrency(value)}
+              bars={Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
+                const targetLevel = index + 1;
+                const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
+                return {
+                  label: `L${targetLevel}`,
+                  value: definition?.upgradeCost ?? 0,
+                  tone:
+                    targetLevel <= activeFacility.level
+                      ? "good"
+                      : targetLevel === activeFacility.level + 1
+                        ? "accent"
+                        : "neutral",
+                };
+              })}
+            />
+          </figure>
+          <figure className="nl-facility-curve-col">
+            <figcaption className="nl-facility-curve-col-head">
+              <span>Unterhalt (pro Saison)</span>
+              <InfoTip label="Was ist Unterhalt?" tip={TIP_UNTERHALT} />
+            </figcaption>
+            <NlBarChart
+              aria-label={`Unterhalt pro Saison je Ausbaustufe für ${activeFacility.name}`}
+              format={(value) => formatTransfermarktCurrency(value)}
+              bars={Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
+                const targetLevel = index + 1;
+                const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
+                return {
+                  label: `L${targetLevel}`,
+                  value: definition?.seasonUpkeep ?? 0,
+                  tone:
+                    targetLevel <= activeFacility.level
+                      ? "good"
+                      : targetLevel === activeFacility.level + 1
+                        ? "accent"
+                        : "neutral",
+                };
+              })}
+            />
+            <small className="nl-facility-curve-note nl-tnum">
+              {activeFacility.level > 0
+                ? `Heute −${formatTransfermarktCurrency(activeFacility.currentUpkeep)}/Saison`
+                : "Heute kein Unterhalt (nicht gebaut)"}
+              {activeFacility.upgradeCost != null
+                ? ` · nach Ausbau auf L${activeFacility.nextLevel} −${formatTransfermarktCurrency(activeFacility.nextUpkeep)}/Saison`
+                : " · Max-Level erreicht"}
+            </small>
+          </figure>
+        </div>
+      </NlCard>
+
+      <footer className="nl-facility-action-bar" data-testid="facilities-v2-action-bar">
+        <div className="nl-facility-action-copy">
+          <strong>{activeFacility.name}</strong>
+          <small>
+            {activeFacility.level <= 0 ? "Nicht gebaut" : `Level ${activeFacility.level}`} · Zustand{" "}
+            {formatNlNumber(activeFacility.conditionPct, 0)}% ·{" "}
+            {activeFacility.upgradeCost != null
+              ? `Upgrade ${formatTransfermarktCurrency(activeFacility.upgradeCost)}`
+              : "Max-Level"}{" "}
+            <InfoTip up label="Was bringen Zustand und Wartung?" tip={TIP_WARTUNG} />
+          </small>
+          {activeFacility.upgradeCost != null ? (
+            <div className="nl-facility-action-consequence" aria-label="Konsequenz-Vorschau nach Upgrade">
+              {/* Was das Upgrade konkret BRINGT — Effekt-Delta der nächsten Stufe,
+                  statisch bei Auswahl sichtbar (kein Klick nötig). */}
+              <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
+              <NlDeltaChip
+                value={
+                  effectiveIncomeFor(activeFacility.id, activeFacility.nextIncome, beliebtheit) -
+                  effectiveSeasonIncome(activeFacility, beliebtheit)
+                }
+                format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Einnahmen`}
+                title={
+                  activeFacility.id === "arena_upgrade" && beliebtheit
+                    ? `Effektive Einnahmen-Änderung (Basis × ${formatNlNumber(beliebtheit.value, 2)} Beliebtheit) nach Upgrade auf die nächste Stufe`
+                    : "Einnahmen-Änderung nach Upgrade auf die nächste Stufe"
+                }
+              />
+              <NlDeltaChip
+                value={activeFacility.nextUpkeep - activeFacility.currentUpkeep}
+                format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Unterhalt`}
+                invert
+                title="Unterhalts-Änderung nach Upgrade auf die nächste Stufe"
+              />
+            </div>
+          ) : (
+            /* Max-Level: kein Delta mehr — Effekt trotzdem benennen (graceful). */
+            <div className="nl-facility-action-consequence" aria-label="Effekt bei Max-Level">
+              <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
+            </div>
+          )}
+        </div>
+        <div className="nl-facility-action-buttons">
+          <button
+            type="button"
+            className={primaryAction === "upgrade" ? "primary-button" : "secondary-button inline-button"}
+            data-testid="facilities-upgrade-button"
+            disabled={readOnly || facilityUpgradeBusy || facilityMaintenanceBusy}
+            title={facilityLaneActionReason ?? undefined}
+            onClick={() => openFacilityDialog(activeFacility.id, "upgrade")}
+          >
+            Upgrade
+            {activeFacility.upgradeCost != null ? ` · ${formatTransfermarktCurrency(activeFacility.upgradeCost)}` : ""}
+          </button>
+          <button
+            type="button"
+            className={primaryAction === "maintenance" ? "primary-button" : "secondary-button inline-button"}
+            disabled={
+              readOnly ||
+              facilityUpgradeBusy ||
+              facilityMaintenanceBusy ||
+              activeFacility.level <= 0 ||
+              activeFacility.conditionPct >= 100
+            }
+            title={
+              facilityLaneActionReason ??
+              (primaryAction === "maintenance" ? "Zustand niedrig — Wartung empfohlen." : undefined)
+            }
+            onClick={() => openFacilityDialog(activeFacility.id, "maintenance")}
+          >
+            Wartung
+            {activeFacility.maintenanceCost > 0 ? ` · ${formatTransfermarktCurrency(activeFacility.maintenanceCost)}` : ""}
+          </button>
+          <button
+            type="button"
+            className="secondary-button inline-button"
+            disabled={readOnly || facilityUpgradeBusy || facilityMaintenanceBusy || activeFacility.level <= 0}
+            title={facilityLaneActionReason ?? undefined}
+            onClick={() => openFacilityDialog(activeFacility.id, "downgrade")}
+          >
+            Downgrade
+          </button>
+        </div>
+      </footer>
+    </>
+  ) : null;
+
+  // Inline-Expand (s. o.): das Panel landet im Karten-Grid nur dann direkt neben der Karte,
+  // wenn diese Karte durch den Zustand-Filter aktuell auch sichtbar ist. Ist sie herausgefiltert,
+  // würde das Panel sonst stillschweigend verschwinden — der Fallback unten rendert es dann
+  // normal (nicht sticky) unterhalb des Grids/der Liste weiter.
+  const activeFacilityVisibleInCardsGrid =
+    viewMode === "cards" && activeFacility != null && visibleFacilityRows.some((row) => row.id === activeFacility.id);
+
   return (
     <section
       className={`nl-facility${facilityDialog ? " is-facility-mode" : ""}`}
@@ -1071,10 +1247,10 @@ export default function FacilitiesV2NewLook({
               }}
             />
           ) : (
-            visibleFacilityRows.map((facility) => {
+            visibleFacilityRows.flatMap((facility) => {
             const wearTone = getFacilityCardTone(facility);
             const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
-            return (
+            const card = (
               <button
                 key={facility.id}
                 type="button"
@@ -1139,6 +1315,14 @@ export default function FacilitiesV2NewLook({
                 </div>
               </button>
               );
+            return isSelected && activeFacilityPanel
+              ? [
+                  card,
+                  <div key={`${facility.id}-detail`} className="nl-facility-inline-detail">
+                    {activeFacilityPanel}
+                  </div>,
+                ]
+              : [card];
             })
           )}
         </div>
@@ -1216,163 +1400,11 @@ export default function FacilitiesV2NewLook({
         </div>
       )}
 
-      {activeFacility ? (
-        /* E4: Ausbau-Kurve (einmalige Upgrade-Kosten) und Unterhalts-Kurve
-           (laufende Kosten pro Saison je Stufe) nebeneinander — beide direkt
-           aus dem Facility-Katalog (`getFacilityLevelDefinition`), derselben
-           Quelle wie der Upgrade-Service. */
-        <NlCard
-          className="nl-facility-curve-card"
-          eyebrow="Kosten-Kurven"
-          title={`${activeFacility.name} · L1→L${FACILITY_MAX_LEVEL}`}
-        >
-          <div className="nl-facility-curve-duo">
-            <figure className="nl-facility-curve-col">
-              <figcaption className="nl-facility-curve-col-head">
-                <span>Ausbau (einmalig)</span>
-                <InfoTip label="Was sind Ausbau-Kosten?" tip={TIP_AUSBAU} />
-              </figcaption>
-              <NlBarChart
-                aria-label={`Upgrade-Kosten je Ausbaustufe für ${activeFacility.name}`}
-                format={(value) => formatTransfermarktCurrency(value)}
-                bars={Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
-                  const targetLevel = index + 1;
-                  const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
-                  return {
-                    label: `L${targetLevel}`,
-                    value: definition?.upgradeCost ?? 0,
-                    tone:
-                      targetLevel <= activeFacility.level
-                        ? "good"
-                        : targetLevel === activeFacility.level + 1
-                          ? "accent"
-                          : "neutral",
-                  };
-                })}
-              />
-            </figure>
-            <figure className="nl-facility-curve-col">
-              <figcaption className="nl-facility-curve-col-head">
-                <span>Unterhalt (pro Saison)</span>
-                <InfoTip label="Was ist Unterhalt?" tip={TIP_UNTERHALT} />
-              </figcaption>
-              <NlBarChart
-                aria-label={`Unterhalt pro Saison je Ausbaustufe für ${activeFacility.name}`}
-                format={(value) => formatTransfermarktCurrency(value)}
-                bars={Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
-                  const targetLevel = index + 1;
-                  const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
-                  return {
-                    label: `L${targetLevel}`,
-                    value: definition?.seasonUpkeep ?? 0,
-                    tone:
-                      targetLevel <= activeFacility.level
-                        ? "good"
-                        : targetLevel === activeFacility.level + 1
-                          ? "accent"
-                          : "neutral",
-                  };
-                })}
-              />
-              <small className="nl-facility-curve-note nl-tnum">
-                {activeFacility.level > 0
-                  ? `Heute −${formatTransfermarktCurrency(activeFacility.currentUpkeep)}/Saison`
-                  : "Heute kein Unterhalt (nicht gebaut)"}
-                {activeFacility.upgradeCost != null
-                  ? ` · nach Ausbau auf L${activeFacility.nextLevel} −${formatTransfermarktCurrency(activeFacility.nextUpkeep)}/Saison`
-                  : " · Max-Level erreicht"}
-              </small>
-            </figure>
-          </div>
-        </NlCard>
-      ) : null}
-
-      {activeFacility ? (
-        <footer className="nl-facility-action-bar" data-testid="facilities-v2-action-bar">
-          <div className="nl-facility-action-copy">
-            <strong>{activeFacility.name}</strong>
-            <small>
-              {activeFacility.level <= 0 ? "Nicht gebaut" : `Level ${activeFacility.level}`} · Zustand{" "}
-              {formatNlNumber(activeFacility.conditionPct, 0)}% ·{" "}
-              {activeFacility.upgradeCost != null
-                ? `Upgrade ${formatTransfermarktCurrency(activeFacility.upgradeCost)}`
-                : "Max-Level"}{" "}
-              <InfoTip up label="Was bringen Zustand und Wartung?" tip={TIP_WARTUNG} />
-            </small>
-            {activeFacility.upgradeCost != null ? (
-              <div className="nl-facility-action-consequence" aria-label="Konsequenz-Vorschau nach Upgrade">
-                {/* Was das Upgrade konkret BRINGT — Effekt-Delta der nächsten Stufe,
-                    statisch bei Auswahl sichtbar (kein Klick nötig). */}
-                <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
-                <NlDeltaChip
-                  value={
-                    effectiveIncomeFor(activeFacility.id, activeFacility.nextIncome, beliebtheit) -
-                    effectiveSeasonIncome(activeFacility, beliebtheit)
-                  }
-                  format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Einnahmen`}
-                  title={
-                    activeFacility.id === "arena_upgrade" && beliebtheit
-                      ? `Effektive Einnahmen-Änderung (Basis × ${formatNlNumber(beliebtheit.value, 2)} Beliebtheit) nach Upgrade auf die nächste Stufe`
-                      : "Einnahmen-Änderung nach Upgrade auf die nächste Stufe"
-                  }
-                />
-                <NlDeltaChip
-                  value={activeFacility.nextUpkeep - activeFacility.currentUpkeep}
-                  format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Unterhalt`}
-                  invert
-                  title="Unterhalts-Änderung nach Upgrade auf die nächste Stufe"
-                />
-              </div>
-            ) : (
-              /* Max-Level: kein Delta mehr — Effekt trotzdem benennen (graceful). */
-              <div className="nl-facility-action-consequence" aria-label="Effekt bei Max-Level">
-                <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
-              </div>
-            )}
-          </div>
-          <div className="nl-facility-action-buttons">
-            <button
-              type="button"
-              className={primaryAction === "upgrade" ? "primary-button" : "secondary-button inline-button"}
-              data-testid="facilities-upgrade-button"
-              disabled={readOnly || facilityUpgradeBusy || facilityMaintenanceBusy}
-              title={facilityLaneActionReason ?? undefined}
-              onClick={() => openFacilityDialog(activeFacility.id, "upgrade")}
-            >
-              Upgrade
-              {activeFacility.upgradeCost != null ? ` · ${formatTransfermarktCurrency(activeFacility.upgradeCost)}` : ""}
-            </button>
-            <button
-              type="button"
-              className={primaryAction === "maintenance" ? "primary-button" : "secondary-button inline-button"}
-              disabled={
-                readOnly ||
-                facilityUpgradeBusy ||
-                facilityMaintenanceBusy ||
-                activeFacility.level <= 0 ||
-                activeFacility.conditionPct >= 100
-              }
-              title={
-                facilityLaneActionReason ??
-                (primaryAction === "maintenance" ? "Zustand niedrig — Wartung empfohlen." : undefined)
-              }
-              onClick={() => openFacilityDialog(activeFacility.id, "maintenance")}
-            >
-              Wartung
-              {activeFacility.maintenanceCost > 0 ? ` · ${formatTransfermarktCurrency(activeFacility.maintenanceCost)}` : ""}
-            </button>
-            <button
-              type="button"
-              className="secondary-button inline-button"
-              disabled={readOnly || facilityUpgradeBusy || facilityMaintenanceBusy || activeFacility.level <= 0}
-              title={facilityLaneActionReason ?? undefined}
-              onClick={() => openFacilityDialog(activeFacility.id, "downgrade")}
-            >
-              Downgrade
-            </button>
-          </div>
-        </footer>
-      ) : null}
+      {/* Fallback (s. Kommentar bei `activeFacilityPanel` weiter oben): Listenansicht hat kein
+          "daneben" wie das Karten-Grid, und eine durch den Zustand-Filter versteckte Karte
+          kann das Panel nicht mehr neben sich zeigen — in beiden Fällen rendert es hier normal
+          (nicht sticky) unter dem Grid/der Liste weiter, statt zu verschwinden. */}
+      {!activeFacilityVisibleInCardsGrid ? activeFacilityPanel : null}
 
       {facilityDialog && selectedDialogFacility ? (
         <FacilityDecisionModal

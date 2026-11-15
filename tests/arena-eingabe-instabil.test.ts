@@ -46,6 +46,7 @@ const { stelleArenaVorlaufSicher } = await import("@/lib/battle/arena-vorlauf-se
 const { kickoffArenaMatchdayApply } = await import("@/lib/season/arena-matchday-resolve-service");
 const { ARENA_RESOLVED_DISCIPLINE_IDS } = await import("@/lib/battle/arena-resolved-disciplines");
 const { isViererPodDiscipline } = await import("@/lib/season/season-discipline-schedule");
+const { invalidateLocalTransfermarktCachesForSave } = await import("@/lib/market/transfermarkt-local-service");
 const { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner, buildHarmlosenBahnPodFakeRunner } = await import(
   "@/tests/helpers/mini-dm-ffa-battle-save"
 );
@@ -96,6 +97,10 @@ async function bauFrischenBattleSaveMitVollemFeld() {
       (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
     );
     if (arenaDisciplineIds.length === 0) {
+      // CI-OOM-FUND (14.11., s. tests/arena-vorlauf-parity.test.ts fuer die volle Herleitung):
+      // ohne dieses Aufraeumen bleibt der Markt-Kontext-Cache-Eintrag dieses verworfenen Saves
+      // fuer immer im Prozess stehen.
+      invalidateLocalTransfermarktCachesForSave(saveId);
       continue;
     }
     const batch = applyAiLegacyLineupBatchLocally(
@@ -175,6 +180,7 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
         const ausfall = zeile.arenaAusfall as { grund?: string } | null | undefined;
         expect(ausfall?.grund).toBe("eingabe_instabil");
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. CI-OOM-FUND oben
     },
     420_000, // bis zu 3 Setup-Versuche + bis zu 2 interne Arena-Vorlaeufe, kein echtes Chromium
   );

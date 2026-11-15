@@ -1588,7 +1588,14 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         <NlCard
           className="nl-market-rail-card"
           eyebrow="Kandidaten"
-          title={`${totalVisibleCount} sichtbar`}
+          // Fable-Audit 14.11. #7: solange der Feed noch lädt UND noch kein Kandidat da ist,
+          // zeigte der Titel trotzdem "0 sichtbar" — gleichzeitig mit den Lade-Skeletons
+          // direkt darunter. "0 sichtbar" liest sich wie ein fertig geladenes, leeres
+          // Ergebnis, nicht wie "lädt noch" — derselbe Widerspruch, den die Skeletons selbst
+          // lösen sollen. Genau in diesem einen Fall (busy + noch 0 Kandidaten) zeigt der
+          // Titel "Lädt…" statt der Zahl; sobald der erste Kandidat da ist oder der Feed
+          // fertig und wirklich leer ist, steht wieder die echte Zahl.
+          title={marketBusy && candidates.length === 0 ? "Lädt…" : `${totalVisibleCount} sichtbar`}
           actions={
             <small className="nl-market-rail-meta">
               {/* Waehrend nachgeladen wird, ist die Reihenfolge noch die des Servers und nicht

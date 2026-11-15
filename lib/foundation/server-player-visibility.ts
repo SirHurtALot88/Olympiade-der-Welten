@@ -13,12 +13,18 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
+/**
+ * Bewusst der LEANE Kern (`player-discipline-rank-core.ts`), nicht `player-detail-drawer.ts` —
+ * sonst zoege jede Route, die hier nur Fog-of-War-Sichtbarkeit aufloest (player-sheet,
+ * ratings-slice, player-directory-slice, player-discipline-ranks), dessen vollen
+ * ~20-Subsysteme-Abhaengigkeitsgraphen mit (Ursache eines `next dev`-OOM, siehe dort).
+ */
 import {
   resolveAttributeVisibility,
   resolveRosterEntry,
   resolveTeam,
   type AttributeVisibility,
-} from "@/lib/foundation/player-detail-drawer";
+} from "@/lib/foundation/player-discipline-rank-core";
 
 export type { AttributeVisibility };
 

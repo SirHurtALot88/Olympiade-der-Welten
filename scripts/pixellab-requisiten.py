@@ -125,6 +125,147 @@ AUFTRAEGE = {
         prompt="painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors"),
     "showcase_prospekt_zirkus": dict(art="kulisse", hintergrund=True, gen=(264, 116),
         prompt="deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit"),
+
+    # --- Climbing: Kulissen-QS 08.11. (Rahmen statt Material, Rang 2 des Audits). Drei NEUE
+    # Requisiten (art="neu", wie takeshi_torii/-kirschbaum/-tribuene in Batch 13: kein altes
+    # Format zu treffen, Ziel ist die eigene gen-Box) fuer die Boden-/Wandfuss-Zone, die bodenWand()
+    # jetzt zeichnet (docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.2: "unten der
+    # Boden (Matten, Sicherer, Kreidebeutel, Hallenboden ...)", "Eisfall mit ... Eiszapfen am
+    # Ueberhang"). Front-/Seitenansicht wie hind_huerde/falle_tuer oben, NICHT DRAUF: die Wand ist
+    # eine senkrechte Flaeche von vorn, keine Draufsicht-Karte.
+    "climbing_matte": dict(art="neu", datei="arena/climbing_matte.png", gen=(48, 48),
+        prompt=f"square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, {STIL}"),
+    "climbing_kreidebeutel": dict(art="neu", datei="arena/climbing_kreidebeutel.png", gen=(20, 26),
+        prompt=f"small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, {STIL}"),
+    "climbing_eiszapfen": dict(art="neu", datei="arena/climbing_eiszapfen.png", gen=(30, 42), anker="mitte",
+        prompt=f"a cluster of hanging translucent light blue ice icicles pointing downward, front view, {STIL}"),
+
+    # --- PixelLab-Requisiten Welle 1 (Task #137, 14.11.): neue Takeshi-/Mini-DM-/Gewichtheben-
+    # Requisiten, die kein vorhandenes Format tauschen, deshalb alle art="neu" wie
+    # takeshi_torii/climbing_matte oben. Nur Bestellen+Waehlen in dieser Runde, "einsetzen"
+    # (Motor-Integration, battle-mode.engine.js) ist ein spaeterer, separater Task.
+
+    # 1. Truhen-/Kisten-Familie: drei Verzierungsstufen, je zu und offen/durchsucht als
+    # getrennte Sprites. Nutzen: I-Spy (Notiz/Akte/Tresor-Fundorte), Takeshi als Beute-Station.
+    "truhe_1_zu": dict(art="neu", datei="arena/truhe_1_zu.png", gen=(32, 30),
+        prompt=f"small plain wooden treasure chest with simple dark metal corner brackets, no ornamentation, closed, {DRAUF}, {STIL}"),
+    "truhe_1_offen": dict(art="neu", datei="arena/truhe_1_offen.png", gen=(32, 34),
+        prompt=f"small plain wooden treasure chest with simple dark metal corner brackets, lid open, a few coins and a torn note visible inside, {DRAUF}, {STIL}"),
+    "truhe_2_zu": dict(art="neu", datei="arena/truhe_2_zu.png", gen=(34, 32),
+        prompt=f"wooden treasure chest with bronze corner fittings, a small lock and carved trim, closed, {DRAUF}, {STIL}"),
+    "truhe_2_offen": dict(art="neu", datei="arena/truhe_2_offen.png", gen=(34, 36),
+        prompt=f"wooden treasure chest with bronze corner fittings and carved trim, lid open, a stack of documents and a few gold coins visible inside, {DRAUF}, {STIL}"),
+    "truhe_3_zu": dict(art="neu", datei="arena/truhe_3_zu.png", gen=(38, 34),
+        prompt=f"ornate ironbound treasure chest with gold trim, engraved panels and a heavy lock, closed, {DRAUF}, {STIL}"),
+    "truhe_3_offen": dict(art="neu", datei="arena/truhe_3_offen.png", gen=(38, 40),
+        prompt=f"ornate ironbound treasure chest with gold trim and engraved panels, lid open, a pile of gold coins and gems visible inside, {DRAUF}, {STIL}"),
+
+    # 2. Grube mit Absturzkante: zwei bis drei Groessen/Gefahrstufen. Nutzen: Takeshi, Mini-DM,
+    # Gewichtheben "Die Grube".
+    "grube_klein": dict(art="neu", datei="arena/grube_klein.png", gen=(48, 32), anker="mitte",
+        prompt=f"small rectangular pit dug into the ground with a crumbling broken edge, dark shadow at the bottom, {DRAUF}, {STIL}"),
+    "grube_mittel": dict(art="neu", datei="arena/grube_mittel.png", gen=(64, 40), anker="mitte",
+        prompt=f"medium rectangular pit with a jagged crumbling drop edge, dark depth with a few loose rocks tumbling in, {DRAUF}, {STIL}"),
+    "grube_gross": dict(art="neu", datei="arena/grube_gross.png", gen=(80, 48), anker="mitte",
+        prompt=f"large deep pit with a jagged crumbling drop edge, pitch black depth with sharpened wooden stakes faintly visible at the bottom, {DRAUF}, {STIL}"),
+
+    # 3. Strom-Kaefig/Elektrozaun-Segment: kachelbar (Ecke + Gerade), je Zustand an/aus.
+    # Nutzen: Mini-DM, Takeshi.
+    "kaefig_gerade_aus": dict(art="neu", datei="arena/kaefig_gerade_aus.png", gen=(32, 32), anker="mitte",
+        prompt=f"straight electrified fence segment between two metal posts, dark inactive wire mesh, no glow, {DRAUF}, {STIL}"),
+    "kaefig_gerade_an": dict(art="neu", datei="arena/kaefig_gerade_an.png", gen=(32, 32), anker="mitte",
+        prompt=f"straight electrified fence segment between two metal posts, bright blue-white electric arcs crackling along the wire mesh, {DRAUF}, {STIL}"),
+    "kaefig_ecke_aus": dict(art="neu", datei="arena/kaefig_ecke_aus.png", gen=(32, 32), anker="mitte",
+        prompt=f"corner post of an electrified fence where the wire mesh turns a right angle, dark inactive, no glow, {DRAUF}, {STIL}"),
+    "kaefig_ecke_an": dict(art="neu", datei="arena/kaefig_ecke_an.png", gen=(32, 32), anker="mitte",
+        prompt=f"corner post of an electrified fence where the wire mesh turns a right angle, bright blue-white electric arcs crackling along the mesh, {DRAUF}, {STIL}"),
+
+    # 4. Pendel/Walze/Fegearm: EIN Einzelbild-Requisit (die Bewegung macht der Code, keine
+    # Animation bestellen). Nutzen: Takeshi, Spurt "Die Hatz" (dort heute nur prozedural
+    # gezeichnet, zeichneHatzUeberlagerung() in battle-mode.engine.js).
+    "falle_fegearm": dict(art="neu", datei="arena/falle_fegearm.png", gen=(84, 24),
+        prompt=f"a long padded wrecking-ball style sweeper arm mounted on a pivot post, horizontal swinging boom with a thick padded knocker end, side view, {STIL}"),
+
+    # 5. Wackelbruecke: Planke ueber einer Gefahrenzone, als zwei Einzelbilder (intakt,
+    # kippend). Nutzen: Takeshi, Mini-DM-Fluchtweg.
+    "bruecke_wackel_heil": dict(art="neu", datei="arena/bruecke_wackel_heil.png", gen=(64, 20), anker="mitte",
+        prompt=f"single wooden plank walkway bridging a gap, straight and level, visible wood grain, {DRAUF}, {STIL}"),
+    "bruecke_wackel_kipp": dict(art="neu", datei="arena/bruecke_wackel_kipp.png", gen=(64, 24), anker="mitte",
+        prompt=f"single wooden plank walkway bridging a gap, tilted steeply to one side as if about to flip over, visible wood grain, {DRAUF}, {STIL}"),
+
+    # --- PixelLab-Requisiten Welle 2 (Task #139, 14.11.), Kulissen-Material. Vor dem Bestellen
+    # geprueft (docs/design/kulissen-qualitaets-audit-08-11.md):
+    #   - Punkt 7 (Spurt, Abschnitt 4.3) ist bereits VOLLSTAENDIG umgesetzt (Kulissen Batch 15,
+    #     PR #1364, scripts/baue-kulisse-buehnen.py _sp_*): Boegen, Geraetezeile (Rudergeraete/
+    #     Schlitten), Anzeigetafel und Bodenmerkmale kommen bereits aus der schon bezahlten
+    #     HYROX-Rohszene (data/generated/kulissen-quellen/spurt/kurs.png) bzw. sind reiner
+    #     Vektor -- 0 Generationen verbraucht (s. Commit-Text). Deshalb HIER NICHTS NEU BESTELLT.
+    #   - Punkt 10 (Battlefield Hafen) hat eine wiederverwendbare Rohszene: die Gewichtheben-
+    #     Kulisse "Sandsack-Schicht Hafenkai" (public/szenen/gewichtheben/hafen.html) zeigt
+    #     bereits Frachter, KRAN und Leuchtturm -- Rohquelle data/generated/kulissen-quellen/
+    #     gewichtheben/hafen.png. Deshalb AUCH HIER NICHTS NEU BESTELLT, s. Bericht.
+
+    # 8. Eiskunstlauf Waldsee/Kuer (Audit 4.4): die bestehende Waldsee-Rohszene (kulissen-
+    # quellen/eiskunstlauf/waldsee.png) zeigt Tannen nur als 25px-Linie ohne Bergkette/Himmel --
+    # geprueft per Bildsicht, Audit-Kritik "nicht als Linie" trifft zu, kein Zuschnitt der
+    # bestehenden Szene liefert mehr Hoehe. Fuer die Kür-Halle (kuer.png) gilt dasselbe
+    # Spotlight-/Eis-Problem (Kuer-Halle: kuer.png). Drei neue Requisiten, gemeinsam fuer beide
+    # Varianten nutzbar.
+    "eiskunst_tannen_bergkette": dict(art="neu", datei="arena/eiskunst_tannen_bergkette.png", gen=(480, 160), anker="mitte",
+        prompt=f"wide landscape backdrop of a dense dark pine forest skyline in front of a tall snow-capped mountain range, soft orange and purple evening sky above, side view horizon panorama, {STIL}"),
+    "eiskunst_spotlight": dict(art="neu", datei="arena/eiskunst_spotlight.png", gen=(48, 90),
+        prompt=f"a single soft cold white spotlight beam cone shining downward from above, glowing, transparent falloff at the edges, front view, {STIL}"),
+    "eis_kufenspuren": dict(art="neu", datei="arena/eis_kufenspuren.png", gen=(64, 64), anker="mitte",
+        prompt=f"tileable pale blue ice rink surface texture with crisscrossing faint ice skate blade scratch marks, subtle cracks, {DRAUF}, {STIL}"),
+
+    # 9. Spurt zweite Outdoor-Variante (Stadionvorplatz oder Strand, Abendlicht): komplette
+    # Rohszene im selben Massstab/derselben Draufsicht wie die bestehende HYROX-Halle (kurs.png,
+    # 1680x960), damit Boegen/Geraetezeile/Bodenmerkmale genauso zuschneidbar bleiben (Muster
+    # Batch 15, 0 weitere Generationen fuer die Bausteine).
+    "spurt_outdoor_strand": dict(art="neu", datei="arena/spurt_outdoor_strand.png", gen=(688, 384), anker="mitte",
+        prompt=f"top-down view of a wide outdoor sports track on a beach at dusk, golden sand lanes between painted white lines, beach volleyball nets and a lifeguard tower in the distance, warm orange evening light with long shadows, pixel art game asset, 16-bit RPG style, clean single color dark outline"),
+
+    # --- PixelLab-Requisiten Welle 3 (Task #140, 14.11.), NUR falls nach Welle 1+2 noch
+    # Guthaben uebrig ist. Hai (14) und Stier (14) sind von Chris ausdruecklich als Requisiten
+    # freigegeben (keine neue PixelLab-Figur/-Animation), s. CLAUDE.md-Auftrag.
+
+    # 11. Breaking "Die zwoelf Pfaehle": ein schlichter Bindepfahl -- NICHT der verzierte
+    # deko_pranger (der existiert schon), sondern ein nackter, robuster Holzpfosten zum
+    # Festbinden (CLAUDE.md: Breaking ist Folter/Survival, keine Breakdance-Requisite).
+    "breaking_pfahl": dict(art="neu", datei="arena/breaking_pfahl.png", gen=(28, 64),
+        prompt=f"a plain sturdy wooden post dug into the ground, worn rope wrapped around the top for binding, front view, {STIL}"),
+
+    # 12. Wettessen "Ekelroulette": Kotzeimer + drei Teller-Varianten.
+    "wettessen_kotzeimer": dict(art="neu", datei="arena/wettessen_kotzeimer.png", gen=(28, 32),
+        prompt=f"a plain metal bucket, slightly dented, front view, {STIL}"),
+    "wettessen_teller_normal": dict(art="neu", datei="arena/wettessen_teller_normal.png", gen=(32, 20), anker="mitte",
+        prompt=f"a round plate piled with an ordinary hearty meal, {DRAUF}, {STIL}"),
+    "wettessen_teller_schleim": dict(art="neu", datei="arena/wettessen_teller_schleim.png", gen=(32, 20), anker="mitte",
+        prompt=f"a round plate filled with a disgusting grey-green slimy gloop, {DRAUF}, {STIL}"),
+    # Urspruenglicher Prompt ("cooked crickets and grubs") wurde von der PixelLab-API als
+    # Richtlinienverstoss abgelehnt (HTTP-Antwort: "Generation failed because it is against
+    # policy") -- auf eine insektenfreie Ekel-Variante umgestellt, kein zweiter Versuch mit
+    # Insekten/Kreaturen-Bezug.
+    "wettessen_teller_krabbler": dict(art="neu", datei="arena/wettessen_teller_krabbler.png", gen=(32, 20), anker="mitte",
+        prompt=f"a round plate piled with an unappetizing grey lumpy mystery stew with visible bones, {DRAUF}, {STIL}"),
+
+    # 13. Takeshi "Sturm auf die Burg" / Battlefield "Belagerung": Fort-Segment, Rammbock,
+    # Wasserkanone.
+    "takeshi_fort_segment": dict(art="neu", datei="arena/takeshi_fort_segment.png", gen=(96, 64),
+        prompt=f"straight section of a rough wooden palisade fort wall made of lashed logs with a simple fighting platform on top, front view, {STIL}"),
+    "takeshi_rammbock": dict(art="neu", datei="arena/takeshi_rammbock.png", gen=(64, 32),
+        prompt=f"a medieval battering ram, a thick log with an iron tip hanging from a wheeled wooden frame, side view, {STIL}"),
+    "takeshi_wasserkanone": dict(art="neu", datei="arena/takeshi_wasserkanone.png", gen=(40, 48),
+        prompt=f"a heavy water cannon turret on a wooden tripod stand, front three-quarter view, {STIL}"),
+
+    # 14. Football "Hai-Gasse" (Becken + Hai) und Spurt "Die Hatz" (Stier) -- Chris' ausdruecklich
+    # bestaetigte Requisiten-Ausnahme fuer diese zwei Lebewesen.
+    "football_becken": dict(art="neu", datei="arena/football_becken.png", gen=(64, 32), anker="mitte",
+        prompt=f"a rectangular glass-walled water tank lane segment sunk into the ground, pool water visible inside, {DRAUF}, {STIL}"),
+    "hai": dict(art="neu", datei="arena/hai.png", gen=(48, 20), anker="mitte",
+        prompt=f"a grey shark swimming just under the water surface, seen from directly above, {STIL}"),
+    "stier": dict(art="neu", datei="arena/stier.png", gen=(40, 34),
+        prompt=f"an angry charging bull with lowered horns, muscular body, side view, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -426,8 +567,27 @@ def baue_kulisse(name, a):
     return roh(name) is not None
 
 
+def baue_neu(name, a):
+    """Brandneue Requisiten ohne Vorgaenger-Datei (kein ALTE_BOX-Eintrag noetig, uebernommen aus
+    Batch 13/Takeshi): der Rohkandidat wird auf seine Alpha-Begrenzung beschnitten, in die eigene
+    gen-Box eingepasst und mittig (anker="mitte") oder unten buendig (Default) auf eine neue,
+    transparente Leinwand genau dieser Box gesetzt."""
+    q = roh(name)
+    if q is None:
+        return False
+    bw, bh = a["gen"]
+    inh = einpassen(zuschnitt(q), bw, bh)
+    neu = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    ox = (bw - inh.width) // 2
+    oy = (bh - inh.height) // 2 if a.get("anker") == "mitte" else bh - inh.height
+    neu.alpha_composite(inh, (ox, oy))
+    os.makedirs(os.path.join(SPRITES, os.path.dirname(a["datei"])), exist_ok=True)
+    neu.save(os.path.join(SPRITES, a["datei"]))
+    return True
+
+
 BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach,
-         "kulisse": baue_kulisse}
+         "kulisse": baue_kulisse, "neu": baue_neu}
 
 
 def einsetzen(args):
