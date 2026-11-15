@@ -30,7 +30,11 @@ const SONDIERUNG = process.argv[3];
 const MATRIX = {
   hockey: { power: 18, health: 18, speed: 12, spirit: 12, stamina: 10, torment: 10,
             awareness: 8, determination: 4, dexterity: 4, will: 4 },
-  football: { spirit: 25, torment: 16, health: 14, awareness: 11, will: 10,
+  // TESTWEISE MATRIX-VERSCHIEBUNG (15.11., Football-Matrix-Ausnahme-Versuch): spirit 25 -> 15,
+  // awareness 11 -> 21 (s. lib/player-generator/official-discipline-weights.ts, Kommentare dort).
+  // Nur fuer diese Messrunde geaendert — Runde-1-Werte (spirit:25, awareness:11) bei Verwurf
+  // wiederherstellen.
+  football: { spirit: 15, torment: 16, health: 14, awareness: 21, will: 10,
               determination: 8, power: 6, stamina: 6, charisma: 4 },
 };
 
