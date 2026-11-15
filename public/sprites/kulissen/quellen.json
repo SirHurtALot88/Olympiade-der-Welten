@@ -1,0 +1,84 @@
+{
+ "_hinweis": "Herkunft der Arena-Kulissen. Alle Bilder unter kulissen/ entstehen aus den PixelLab-Szenen der Asset-Runde (public/szenen/<disziplin>/<variante>.html) ueber scripts/baue-kulisse-*.py -> data/generated/kulissen-quellen/ -> scripts/baue-arena-kulissen.py. Hier stehen die Bilder, in die seit Batch 12 (08.11., 'Rahmen statt Material') zusaetzlich eigene PixelLab-Erzeugnisse oder gebackenes Licht eingehen; die fruehere Fassung steht unter 'vorher'. Doku: docs/design/arena-kulissen-im-motor-03-11.md, Abschnitt Batch 12.",
+ "showcase/buehne.jpg": {
+  "paket": "PixelLab",
+  "quelle": "Szene public/szenen/showcase/buehne.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors",
+   "seed": 11,
+   "gen": [264, 116],
+   "job": "278784ac-cecc-412d-b126-098371786044",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_buehne.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (Prospekt in die Demo-LED-Wand, Holzboden, Lichtkegel und Lichtpfuetzen; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Showcase, Variante Theater",
+  "vorher": {
+   "paket": "PixelLab (Szene der Asset-Runde)",
+   "quelle": "public/szenen/showcase/buehne.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+   "befund": "schwarzer Buehnenraum, schwarze Demo-LED-Wand (Kulissen-Audit 08.11., Rang 5)"
+  }
+ },
+ "showcase/zirkus.jpg": {
+  "paket": "PixelLab",
+  "quelle": "Szene public/szenen/showcase/zirkus.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit",
+   "seed": 11,
+   "gen": [264, 116],
+   "job": "738e1118-b586-4a97-9592-2a9630c91b18",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_zirkus.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (graue Randspalten des Rohbilds abgeschnitten, Prospekt in die Demo-LED-Wand, sanfte Lichtkegel)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Showcase, Variante Zirkus",
+  "vorher": {
+   "paket": "PixelLab (Szene der Asset-Runde)",
+   "quelle": "public/szenen/showcase/zirkus.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+   "befund": "schwarzes Loch der Demo-LED-Wand ueber dem Holzboden"
+  }
+ },
+ "showcase/festival.jpg": {
+  "paket": "PixelLab",
+  "quelle": "Szene public/szenen/showcase/festival.html (bg + fg); LED-Wand als Punktmatrix nachgerechnet (prospekt_led(), Farben aus dem Poster der Szene), keine neue Erzeugung",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Showcase, Variante Freiluft-Festival",
+  "vorher": {
+   "paket": "PixelLab (Szene der Asset-Runde)",
+   "quelle": "public/szenen/showcase/festival.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+   "befund": "schwarze Demo-LED-Wand, schwarzer Buehnenboden"
+  }
+ },
+ "breaking/standard.jpg": {
+  "paket": "PixelLab",
+  "quelle": "Szene public/szenen/breaking/standard.html (world); Licht gebacken (breaking_licht(): Schatten angehoben, Fackelglut, Lichtschacht, Lichtinsel auf dem Motor-Druck-Rund), keine neue Erzeugung",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Breaking (Folter-Gauntlet), Variante Erste Fassung",
+  "vorher": {
+   "paket": "PixelLab (Szene der Asset-Runde)",
+   "quelle": "public/szenen/breaking/standard.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
+   "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
+  }
+ },
+ "breaking/brutal.jpg": {
+  "paket": "PixelLab",
+  "quelle": "Szene public/szenen/breaking/brutal.html (world); Licht gebacken wie breaking/standard.jpg, keine neue Erzeugung",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Breaking (Folter-Gauntlet), Variante Gauntlet",
+  "vorher": {
+   "paket": "PixelLab (Szene der Asset-Runde)",
+   "quelle": "public/szenen/breaking/brutal.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
+   "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
+  }
+ }
+}
