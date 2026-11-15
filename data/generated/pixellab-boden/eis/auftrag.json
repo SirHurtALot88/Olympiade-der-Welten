@@ -1,0 +1,10 @@
+{
+ "description": "1). smooth frozen ice surface, pale blue with white cracks and glints 2). slippery light blue ice sheet",
+ "tile_type": "square_topdown",
+ "tile_size": 32,
+ "tile_view": "top-down",
+ "outline_mode": "segmentation",
+ "seed": 21,
+ "tiles_pro_id": "5480cac3-2b47-4966-89a0-4f9fd491aa14",
+ "endpunkt": "/v2/create-tiles-pro"
+}

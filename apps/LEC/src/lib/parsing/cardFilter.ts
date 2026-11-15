@@ -15,3 +15,8 @@ const POKEMON_MARKER = /pok[eéè]mon/i;
 export function isCardArticleName(name: string): boolean {
   return hasSetCode(name) || YUGIOH_MARKER.test(name) || POKEMON_MARKER.test(name);
 }
+
+/** Pokemon-Artikel (Chris, 13.11.: gehoeren nicht ins Yu-Gi-Oh-Sortiment, werden bei jedem Abgleich ausgeblendet). */
+export function isPokemonArticleName(name: string): boolean {
+  return POKEMON_MARKER.test(name) && !YUGIOH_MARKER.test(name);
+}

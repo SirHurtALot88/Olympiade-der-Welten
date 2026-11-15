@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SortimentMarket, SortimentRow } from "./viewModel";
-import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks, formatQty } from "./board";
+import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, cardmarketLink, ebayLinks, formatQty } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
@@ -81,22 +81,86 @@ describe("cardmarketCode", () => {
   });
 });
 
+describe("ebayLinks: Seller Hub", () => {
+  it("sucht die aktiven Angebote nach dem Code, wie er im Titel steht", () => {
+    const l = ebayLinks({ ebayItemId: null, setCode: "RA05-DE081", nameRaw: "x" });
+    expect(l.manage).toBe("https://www.ebay.de/sh/lst/active?keyword=RA05-DE081&source=filterbar&action=search");
+  });
+  it("faellt ohne Code auf den Namen zurueck, URL-kodiert", () => {
+    const l = ebayLinks({ ebayItemId: null, setCode: null, nameRaw: "Lieder der Beherrscher" });
+    expect(new URL(l.manage).searchParams.get("keyword")).toBe("Lieder der Beherrscher");
+  });
+});
+
 describe("ebayLinks", () => {
   it("verlinkt direkt zum Angebot, wenn die Artikelnummer bekannt ist", () => {
     const l = ebayLinks({ ebayItemId: "227444381442", setCode: "OP27-DE010", nameRaw: "x" });
     expect(l.view).toBe("https://www.ebay.de/itm/227444381442");
     expect(l.revise).toBe("https://www.ebay.de/lstng?mode=ReviseItem&itemId=227444381442");
   });
-  it("faellt auf die Shop-Suche mit dem Cardmarket-Code zurueck", () => {
+  it("faellt auf die Shop-Suche mit dem Code aus dem Titel zurueck (MIT DE)", () => {
     const l = ebayLinks({ ebayItemId: null, setCode: "MAMA-DE047", nameRaw: "x" });
     expect(l.view).toBeNull();
     expect(l.revise).toBeNull();
-    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=MAMA-047");
+    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=MAMA-DE047");
   });
   it("ignoriert unplausible Nummern und nutzt ohne Set-Code den Namen", () => {
     const l = ebayLinks({ ebayItemId: "abc", setCode: null, nameRaw: "Karte & Co" });
     expect(l.view).toBeNull();
     expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=Karte%20%26%20Co");
+  });
+});
+
+describe("Links fuer Sonderfaelle (echte Titel)", () => {
+  const e = (nameRaw: string, setCode: string | null = null) => new URL(ebayLinks({ ebayItemId: null, setCode, nameRaw }).search).searchParams.get("_nkw");
+  const c = (nameRaw: string, setCode: string | null = null) => new URL(cardmarketLink({ setCode, nameRaw, codeName: null })!);
+  it("eBay: Sonder-Codes ohne erkannten Set-Code kommen aus dem Titel", () => {
+    expect(e("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed")).toBe("SHVI-DESE3");
+    expect(e("Yu-Gi-Oh! MRD-G090 Schatten Leichenfledderer Rare NM")).toBe("MRD-G090");
+  });
+  it("eBay: Pokemon sucht mit Nummer und Kartenname", () => {
+    expect(e("Pokemon 078/162 Flutter Mane Holo Promo Trick or Trade NM EN")).toBe("078/162 Flutter Mane");
+    expect(e("Pokemon 011/159 Hutsassa ex Holo Rare Reisegefährten NM DE")).toBe("011/159 Hutsassa ex");
+  });
+  it("Cardmarket: Pokemon geht in die Pokemon-Sektion, nicht zu Yu-Gi-Oh", () => {
+    const u = c("Pokemon 080/162 Eisenkrieger Holo Gewalten der Zeit NM DE");
+    expect(u.pathname).toBe("/de/Pokemon/Products/Search");
+    expect(u.searchParams.get("searchString")).toBe("Eisenkrieger");
+    expect(u.searchParams.get("language")).toBe("3");
+  });
+  it("Cardmarket: englische Karten mit Sprachfilter Englisch", () => {
+    expect(c("Yu-Gi-Oh! LC01-EN004 Blue Eyes White Dragon Ultra Rare, NM, EN Limited", "LC01-EN004").searchParams.get("language")).toBe("1");
+    expect(c("Pokemon 078/162 Flutter Mane Holo Promo Trick or Trade NM EN").searchParams.get("language")).toBe("1");
+    expect(c("Yu-Gi-Oh! RA03-DE169 Überlastfusion Platinum SecR NM 1st", "RA03-DE169").searchParams.get("language")).toBe("3");
+  });
+  it("Cardmarket: Sammlungen und Titel mit mehreren Codes bekommen keinen Link", () => {
+    expect(cardmarketLink({ setCode: null, nameRaw: "250 YuGiOh! Karten Sammlung Deutsch 30 Holos", codeName: null })).toBeNull();
+    expect(cardmarketLink({ setCode: "RA01-DE001", nameRaw: "Yu-Gi-Oh! RA01-DE001 und RA01-DE002 Set", codeName: null })).toBeNull();
+  });
+  it("Sonder-Codes mit 25TH behalten das Set-Praefix", () => {
+    expect(e("Yu-Gi-Oh! MRD-25TH-000 Torwächter Secret Rare NM")).toBe("MRD-25TH-000");
+  });
+  it("Cardmarket: Sonder-Code aus dem Titel, wenn kein Set-Code erkannt wurde", () => {
+    expect(c("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed").searchParams.get("searchString")).toBe("SHVI-DESE3");
+  });
+});
+
+describe("cardmarketLink", () => {
+  const cm = (o: object) => cardmarketLink({ setCode: null, nameRaw: "x", codeName: null, ...o } as Parameters<typeof cardmarketLink>[0]);
+  it("sucht mit dem Cardmarket-Code ohne DE/EN, deutsch und ab NM", () => {
+    const url = new URL(cm({ setCode: "CT09-DE023" })!);
+    expect(url.origin + url.pathname).toBe("https://www.cardmarket.com/de/YuGiOh/Products/Search");
+    expect(url.searchParams.get("searchString")).toBe("CT09-023");
+    expect(url.searchParams.get("language")).toBe("3");
+    expect(url.searchParams.get("minCondition")).toBe("2");
+  });
+  it("nimmt bei Name/Code-Konflikt den Code, der zum Namen passt", () => {
+    const url = new URL(cm({ setCode: "AAAA-DE001", codeName: { usedCode: "BBBB-DE002" } })!);
+    expect(url.searchParams.get("searchString")).toBe("BBBB-002");
+  });
+  it("faellt ohne Set-Code auf den Kartennamen zurueck", () => {
+    const url = new URL(cm({ nameRaw: "3x Yu-Gi-Oh! Mystischer Raum-Taifun Ultra Rare NM" })!);
+    expect(url.searchParams.get("searchString")).toContain("Taifun");
   });
 });
 
@@ -111,5 +175,45 @@ describe("Verkaeufe, Bestand, Mengen", () => {
   it("formatQty zeigt ganze Mengen ohne, krumme mit zwei Nachkommastellen", () => {
     expect(formatQty(51)).toBe("51");
     expect(formatQty(2762.67)).toBe("2762,67");
+  });
+});
+
+describe("Sortierung nach letztem Verkauf und Umkehren", () => {
+  const r = (name: string, lastSoldAt: string | null, stock = 1) => ({ nameRaw: name, lastSoldAt, stock, ek: 0, avgVkRealized: 0, windows: {} }) as unknown as SortimentRow;
+  const rows = [r("alt", "2025-01-01T00:00:00Z"), r("nie", null), r("neu", "2026-11-10T00:00:00Z")];
+  it("juengster Verkauf zuerst, ohne Verkauf ganz hinten", () => {
+    expect(sortBoard(rows, "letzterVerkauf").map((x) => x.nameRaw)).toEqual(["neu", "alt", "nie"]);
+  });
+  it("umkehren dreht die Reihenfolge", () => {
+    expect(sortBoard(rows, "letzterVerkauf", true).map((x) => x.nameRaw)).toEqual(["nie", "alt", "neu"]);
+  });
+});
+
+describe("findDuplicateGroups", () => {
+  const r = (articleId: string, nameRaw: string, setCode = "RA03-DE225", hidden = false) => ({ articleId, nameRaw, setCode, hidden });
+  it("findet gleichen Code/Seltenheit/Auflage mit verschiedenem Namen", async () => {
+    const { findDuplicateGroups } = await import("./board");
+    const g = findDuplicateGroups([
+      r("a", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum Secret Rare NM 1st"),
+      r("b", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum SecR NM 1st"),
+      r("c", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Secret Rare NM 1st"),
+      r("d", "Yu-Gi-Oh! RA03-DE226 Anderer Platinum Secret Rare NM 1st", "RA03-DE226"),
+      r("e", "Yu-Gi-Oh! RA03-DE225 Fischborg-Strahlschütze Platinum Secret Rare NM 1st", "RA03-DE225", true),
+    ]);
+    expect([...g.keys()].sort()).toEqual(["a", "b"]);
+  });
+});
+
+import { to99 } from "./board";
+describe("to99", () => {
+  it("erhoeht auf die naechste ,99 darueber oder gleich", () => {
+    expect(to99(29.52, "up")).toBe(29.99);
+    expect(to99(29.99, "up")).toBe(29.99);
+    expect(to99(30.0, "up")).toBe(30.99);
+  });
+  it("senkt auf die naechste ,99 darunter oder gleich, nie unter 4,99", () => {
+    expect(to99(14.54, "down")).toBe(13.99);
+    expect(to99(14.99, "down")).toBe(14.99);
+    expect(to99(3.2, "down")).toBe(4.99);
   });
 });

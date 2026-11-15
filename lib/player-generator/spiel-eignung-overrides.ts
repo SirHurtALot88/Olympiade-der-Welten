@@ -11,18 +11,27 @@
 //   2. die Spiel-Ordnung — die Gewichte, GEGEN DIE das Minispiel kalibriert wurde und
 //      gegen die die Rangtreue-Sonde misst.
 //
-// Bei Football lagen die beiden bei rho 0,427 auseinander (110 Spieler der Kader-Familie,
-// docs/design/football-erfolgskurve-plan-05-09.md 2.3): Ser Camelot faellt von Rang 1 auf
-// 27, Johanna von 2 auf 25. Der Manager sah also eine Zahl und bekam ein Spiel, das andere
-// Spieler belohnt — und die KI kaufte fuer das falsche Spiel ein.
+// Bei Football lagen die beiden zwischen dem 10.09. und dem 14.11. bei rho 0,427 auseinander
+// (110 Spieler der Kader-Familie, docs/design/football-erfolgskurve-plan-05-09.md 2.3): Ser
+// Camelot fiel von Rang 1 auf 27, Johanna von 2 auf 25. Der Manager sah also eine Zahl und
+// bekam ein Spiel, das andere Spieler belohnte — und die KI kaufte fuer das falsche Spiel ein.
 //
-// Der Rueckweg (Minispiel zurueck auf die Matrix) ist gemessen tot: rho 0,053 je Spiel
-// (docs/pm-briefings/opus-plan-football-gameplay-09-10.md 3), weil das drittschwerste
-// Matrix-Attribut (awareness) auf dem echten Kader mit −0,335 gegen die eigene Matrix-
-// Eignung korreliert (docs/design/football-matrix-entscheidung.md). Also zieht die
-// Anzeige-/Kauf-Seite nach — Fable-Entscheidung E3,
-// docs/pm-briefings/fable-entscheidung-e1-e2-e3-basketball-hockey-football-10-09.md
-// Abschnitt 3.
+// FOOTBALL-OVERRIDE AM 14.11. RUECKGAENGIG GEMACHT — Chris, woertlich (im Chat, nicht per PR-
+// Review): „football muss zu unserem system mit der matrix zurückkehren, dann werden die
+// spirit usw stats halt anders in die diszi stats verteilt die genutzt werden [...] so dass du
+// nur diese anzahl an punkten zur verfügung hast und insgesamt 100 vergeben kannst mit der
+// gewichtung". Das ist das 100-Punkte-Budget-System, das die anderen neunzehn Disziplinen
+// laengst fahren (`PP_MATRIX_JE_DISC.football` summiert sich schon seit der Pp-Korrektur vom
+// 25.10. auf genau 100). Football hat damit ab jetzt KEINEN Eintrag mehr in
+// `spielEignungOverrides` — `resolveDisciplineWeightProfile("football")` faellt auf
+// `officialDisciplineWeightMatrix.football` zurueck, exakt wie bei jeder anderen Disziplin ohne
+// Override. Der damals gemessene Rueckweg-Befund (rho 0,053, docs/pm-briefings/opus-plan-
+// football-gameplay-09-10.md 3) galt fuer eine DAMALIGE Mechanik-Fassung vor der Live-Motor-
+// Migration/dem F1-EPA-Umbau/der Rezept-Feinkalibrierung — frisch nachgemessen (14.11.,
+// `docs/design/football-matrix-rueckkehr-14-11.md`) auf dem HEUTIGEN Motor, Chris akzeptiert
+// den resultierenden rho-Wert ausdruecklich, auch wenn er niedriger ausfaellt als mit dem
+// Override: „die spirit usw stats werden halt anders verteilt" ist kein Kalibrierungsfehler,
+// sondern die beabsichtigte Folge der Entscheidung.
 //
 // WARUM ALS OVERRIDE UND NICHT IN DER MATRIX-DATEI
 //
@@ -72,12 +81,16 @@ export type DisciplineWeightProfile = Partial<Record<PlayerGeneratorAttributeKey
 /**
  * Gewichte der Spiel-Eignung je Disziplin, die ihr Minispiel schon bedient.
  *
- * Football: 1:1 uebernommen aus `FELDSPIEL_ART.football.spielEignung`
- * (public/mockups/battle-mode.engine.js, eingefuehrt mit PR #803, gemessen mit PR #884).
- * Summe 100, wie in der Matrix; `charisma` und `intelligence` wiegen hier nichts.
+ * Football stand hier vom 10.09. bis zum 14.11. (power 22/health 18/speed 14/torment 12/
+ * determination 10/awareness 8/stamina 6/dexterity 4/spirit 3/will 3, 1:1 uebernommen aus
+ * `FELDSPIEL_ART.football.spielEignung`, PR #803/#884) — RUECKGAENGIG GEMACHT, s. Kopfkommentar
+ * "FOOTBALL-OVERRIDE AM 14.11. RUECKGAENGIG GEMACHT" oben. Football hat jetzt KEINEN Eintrag
+ * mehr hier und faellt auf die Matrix zurueck wie die anderen achtzehn Disziplinen ohne
+ * Override.
  *
- * Mini-DM (13.10.): die zweite Ausnahme, wieder mit Chris' ausdruecklicher Vorgabe. Chris am
- * 13.10., woertlich: „auch das FFA soll nach den gewichtungen geschehen die vorgegeben sind!
+ * Mini-DM (13.10.): die EINZIGE verbleibende Ausnahme, wieder mit Chris' ausdruecklicher
+ * Vorgabe. Chris am 13.10., woertlich: „auch das FFA soll nach den gewichtungen geschehen die
+ * vorgegeben sind!
  * weil du schreibst eigenes system, nirgendwo soll ein 'EIGENES' system genutzt werden sondern
  * die vorgegebene Verteilung! Intelligenz kann dabei ja auch für schwachstellen genutzt werden
  * oder positionierung, spirit für kurzfristiges zusammenarbeiten mit anderen kontrahenten um
@@ -97,18 +110,6 @@ export type DisciplineWeightProfile = Partial<Record<PlayerGeneratorAttributeKey
  * `scripts/miss-mini-dm-ffa-abnahme.mjs` (Rangtreue und Pp, zwei Saatstroeme).
  */
 export const spielEignungOverrides: Partial<Record<OfficialDisciplineWeightId, Readonly<DisciplineWeightProfile>>> = {
-  football: {
-    power: 22,
-    health: 18,
-    speed: 14,
-    torment: 12,
-    determination: 10,
-    awareness: 8,
-    stamina: 6,
-    dexterity: 4,
-    spirit: 3,
-    will: 3,
-  },
   "mini-dm": {
     torment: 21,
     health: 18,

@@ -131,11 +131,15 @@ describe("buildMarketComparisonRow", () => {
     expect(row.targetMin).toBeCloseTo(6.029, 2);
   });
 
-  it("Marktwert = 7-Tage-Schnitt, sonst 30-Tage-Schnitt, sonst Trend", () => {
+  it("Marktwert = Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage (vorhandene Werte)", () => {
     const v = (q: Partial<LatestQuote>) => buildMarketComparisonRow(article({ currentVk: 8 }), quote(q), DEFAULT_COST_SETTINGS, null).marketValue;
-    expect(v({ priceAvg7: 2, priceAvg30: 3, priceTrend: 4 })).toBe(2);
-    expect(v({ priceAvg30: 3, priceTrend: 4 })).toBe(3);
+    // Magier des Glaubens (Cardmarket, 11.11.): Trend 5,94, Ø 1 5,99, Ø 7 5,90, Ø 30 5,35 -> 5,795
+    expect(v({ priceTrend: 5.94, priceAvg1: 5.99, priceAvg7: 5.9, priceAvg30: 5.35 })).toBeCloseTo(5.795, 3);
+    expect(v({ priceAvg7: 2, priceAvg30: 4 })).toBe(3);
     expect(v({ priceTrend: 4 })).toBe(4);
+    // mit letztem EK (7,00) als weiterer Wert: (5,94 + 5,99 + 5,90 + 5,35 + 7) / 5 = 6,036
+    const withEk = buildMarketComparisonRow(article({ currentVk: 8, currentEk: 7 }), quote({ priceTrend: 5.94, priceAvg1: 5.99, priceAvg7: 5.9, priceAvg30: 5.35 }), DEFAULT_COST_SETTINGS, null).marketValue;
+    expect(withEk).toBeCloseTo(6.036, 3);
   });
 
   it("Marge des heutigen VK bei Nachkauf zum Marktwert (Deckungsbeitrag, vor Fixkosten)", () => {
@@ -216,5 +220,27 @@ describe("buildMarketComparisonRow", () => {
     const a = article();
     const row = buildMarketComparisonRow(a, quote({ fetchedAt: new Date() }), DEFAULT_COST_SETTINGS, null);
     expect(row.stale).toBe(false);
+  });
+});
+
+describe("marketValueOf mit guenstigstem Angebot (ab)", () => {
+  const q = (extra: Record<string, unknown>) => ({ priceFrom: null, priceTrend: 8, priceAvg1: 8, priceAvg7: 8, priceAvg30: 8, available: 5, fetchedAt: new Date(), matchQuality: "eindeutig", ...extra }) as never;
+  it("ab zieht den Marktwert doppelt gewichtet mit herunter, wenn plausibel", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q({ priceFrom: 6 }), 1)).toBeCloseTo((32 + 12) / 6);
+  });
+  it("auch ein sehr billiges Angebot zaehlt (doppelt), sonst ist der Marktwert zu hoch", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q({ priceFrom: 0.5 }), 1)).toBeCloseTo((32 + 1) / 6);
+  });
+});
+
+describe("Zustandsabschlag im Marktwert", () => {
+  const q = { priceFrom: null, priceTrend: 10, priceAvg1: 10, priceAvg7: 10, priceAvg30: 10, available: 5, fetchedAt: new Date(), matchQuality: "eindeutig" } as never;
+  it("rechnet NM-Preise mit dem Zustandsfaktor herunter, den letzten EK nicht", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q, 1, null, 0.5)).toBeCloseTo(5);
+    expect(marketValueOf(q, 1, 4, 0.5)).toBeCloseTo((4 * 5 + 4) / 5);
+    expect(marketValueOf(q, 1)).toBeCloseTo(10);
   });
 });

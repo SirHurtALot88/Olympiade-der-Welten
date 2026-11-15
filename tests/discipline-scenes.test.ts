@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -41,4 +41,37 @@ describe("Pixel-Szenen-Registry", () => {
       }
     });
   }
+
+  // KEINE DEMOS MEHR (11.11.): im Spiel steht nur die saubere Kulisse, nie die Demo-Seite oder ihr
+  // Standbild mit eingebrannten Demo-Figuren. `kulisse` ist entweder eine vorhandene Datei oder
+  // bewusst null -- und null nur dort, wo es die Datei wirklich nicht gibt (OHNE_KULISSE exakt).
+  for (const scene of Object.values(DISCIPLINE_SCENES)) {
+    it(`${scene.disciplineId}: Kulisse je Variante vorhanden bzw. bewusst leer`, () => {
+      for (const v of scene.variants) {
+        const erwartet = path.join(PUBLIC, "sprites", "kulissen", scene.disciplineId, `${v.id}.jpg`);
+        if (v.kulisse) {
+          expect(v.kulisse.startsWith("/sprites/kulissen/"), v.kulisse).toBe(true);
+          expect(existsSync(path.join(PUBLIC, v.kulisse)), v.kulisse).toBe(true);
+        } else {
+          expect(existsSync(erwartet), `${erwartet} existiert -- aus OHNE_KULISSE streichen`).toBe(false);
+        }
+      }
+    });
+  }
+
+  it("Climbing (Pilot) hat fuer jede Variante eine saubere Kulisse", () => {
+    expect(DISCIPLINE_SCENES.climbing!.variants.every((v) => v.kulisse)).toBe(true);
+  });
+
+  it("die Pixel-Arena spielt keine Demo-Seite und zeigt kein Demo-Standbild mehr", () => {
+    const quelle = readFileSync(
+      path.join(process.cwd(), "app", "foundation", "discipline-stage", "DisciplinePixelScene.tsx"),
+      "utf8",
+    );
+    const code = quelle.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/<iframe/);
+    expect(code).not.toMatch(/\.demo\b/);
+    expect(code).not.toMatch(/\.poster\b/);
+    expect(code).not.toMatch(/Demo-Figuren/);
+  });
 });

@@ -2,7 +2,7 @@ import type { GameState, ScoutingWatchlistEntry } from "@/lib/data/olyDataTypes"
 import { refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddManualScoutingWatchEntry,
-  getActiveScoutingWishlistEntries,
+  getScoutingWishlistQueue,
   getScoutingWishlistSlotMessage,
 } from "@/lib/scouting/scouting-wishlist-slots";
 
@@ -84,7 +84,10 @@ export function removeScoutingWatchlistEntry(input: {
 
 export function syncWishlistToScoutingWatchlist(gameState: GameState, teamId: string): GameState {
   const seasonId = gameState.season.id;
-  const activeWishlist = getActiveScoutingWishlistEntries(gameState, teamId);
+  // Gespiegelt werden die aktiv gescouteten UND die fertig gescouteten Einträge (beide waren bis
+  // 11.11. „die obersten X"); nur die wartenden bleiben reine Merkliste.
+  const queue = getScoutingWishlistQueue(gameState, teamId);
+  const activeWishlist = [...queue.active, ...queue.completed];
   const activeWishlistIds = new Set(activeWishlist.map((entry) => entry.playerId));
   const existing = (gameState.seasonState.scoutingWatchlist ?? []).filter(
     (entry) => !(entry.teamId === teamId && entry.seasonId === seasonId && entry.source === "transfer_wishlist_mirror"),

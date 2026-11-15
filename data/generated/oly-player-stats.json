@@ -312229,7 +312229,7 @@
   {
     "id": "player-2984-vip-wal",
     "name": "VIP Wal",
-    "rating": 69.98,
+    "rating": 70.79,
     "className": "Bard",
     "race": "Fish",
     "alignment": "C-G",
@@ -312308,7 +312308,7 @@
       "breaking": 74.6,
       "wettessen": 81.2,
       "basketball": 70.8,
-      "football": 63.3,
+      "football": 79.5,
       "eiskunstlauf": 60.9,
       "fechten": 45.3,
       "i-spy": 77.1
@@ -312330,10 +312330,10 @@
     "referenceClass": null,
     "imageSource": null,
     "bracketLabel": null,
-    "marketValue": 71.82,
-    "displayMarketValue": 71.82,
-    "salaryDemand": 19.72,
-    "displaySalary": 19.72,
+    "marketValue": 73.9,
+    "displayMarketValue": 73.9,
+    "salaryDemand": 20.2,
+    "displaySalary": 20.2,
     "portraitUrl": "/portraits/vip-wal.jpg"
   }
 ]

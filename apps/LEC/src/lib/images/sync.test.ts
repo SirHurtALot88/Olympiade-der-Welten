@@ -38,7 +38,7 @@ function fakeFetch(tiles: string[], failImages = false): typeof fetch {
   }) as typeof fetch;
 }
 
-async function article(name: string, extra: { currentVk?: number } = {}) {
+async function article(name: string, extra: { currentVk?: number; stock?: number } = {}) {
   return db.prisma.article.create({
     data: { nameNormalized: normalizedNameKey(name), nameRaw: name, setCode: null, ...extra },
   });
@@ -47,8 +47,8 @@ async function article(name: string, extra: { currentVk?: number } = {}) {
 const opts = (f: typeof fetch) => ({ imageDir: dir, fetchFn: f, pageDelayMs: 0, skipFallback: true });
 
 describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
-  it("setzt den Angebotspreis, und er hat Vorrang vor dem Billbee-Artikelstamm-Preis", async () => {
-    const a = await article("Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st", { currentVk: 5.99 });
+  it("setzt den Angebotspreis; er gilt als VK, wenn Billbee keinen hat", async () => {
+    const a = await article("Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st");
     const f = fakeFetch([tile("111111111", "Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st", "AAAAAAAAAA", "7,49")]);
     const report = await syncArticleImages(db.prisma, opts(f));
     expect(report.priced).toBe(1);
@@ -75,5 +75,43 @@ describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
     expect((await db.prisma.article.findUnique({ where: { id: stays.id } }))?.ebayPrice).toBeCloseTo(2.99);
     const { aggregates } = await loadArticleAggregates(db.prisma);
     expect(aggregates.find((x) => x.articleId === gone.id)?.currentVk).toBeCloseTo(4.99);
+  });
+
+  it("bei eBay beendet: alle werden einmal ausgeblendet, Wiedereinblenden bleibt", async () => {
+    const stays = await article("Yu-Gi-Oh! TST-DE005 Bleibt NM");
+    const sold = await article("Yu-Gi-Oh! TST-DE006 Ausverkauft NM", { stock: 0 });
+    const stocked = await article("Yu-Gi-Oh! TST-DE007 Mit Bestand NM", { stock: 3 });
+    const never = await article("Yu-Gi-Oh! TST-DE008 Nie gelistet NM", { stock: 0 });
+    const reorder = await article("Yu-Gi-Oh! TST-DE009 Ausverkauft aber gelaufen NM", { stock: 0 });
+    await db.prisma.article.update({ where: { id: reorder.id }, data: { ebayItemId: "888000009" } });
+    await db.prisma.sale.create({ data: { articleId: reorder.id, soldAt: new Date(), qty: 1, unitPrice: 5, source: "test" } });
+    for (const x of [sold, stocked]) await db.prisma.article.update({ where: { id: x.id }, data: { ebayItemId: "999" + x.id.slice(-6).replace(/\D/g, "1") } });
+    const run = () => syncArticleImages(db.prisma, { ...opts(fakeFetch([tile("555555555", "Yu-Gi-Oh! TST-DE005 Bleibt NM", "DDDDDDDDDD", "2,99")])), minListingsForEnded: 1 });
+    const report = await run();
+    expect(report.ended).toBe(3);
+    expect(report.endedHidden).toBe(3);
+    expect((await db.prisma.article.findUnique({ where: { id: reorder.id } }))?.hidden).toBe(true);
+    const get = (id: string) => db.prisma.article.findUnique({ where: { id } });
+    expect((await get(sold.id))?.hidden).toBe(true);
+    expect((await get(stocked.id))?.hidden).toBe(true);
+    expect((await get(stocked.id))?.ebayEndedAt).not.toBeNull();
+    expect((await get(never.id))?.ebayEndedAt).toBeNull();
+    expect((await get(stays.id))?.ebayEndedAt).toBeNull();
+    await db.prisma.article.update({ where: { id: sold.id }, data: { hidden: false } });
+    await run();
+    expect((await get(sold.id))?.hidden).toBe(false);
+  });
+
+  it("eine Aenderung des eBay-Preises wird als Preisaenderung mitgeschrieben", async () => {
+    const a = await article("Yu-Gi-Oh! TST-DE010 Preisaenderung NM");
+    await db.prisma.article.update({ where: { id: a.id }, data: { ebayPrice: 5.99, ebayPriceAt: new Date() } });
+    await syncArticleImages(db.prisma, opts(fakeFetch([tile("666666666", "Yu-Gi-Oh! TST-DE010 Preisaenderung NM", "EEEEEEEEEE", "6,99")])));
+    const log = await db.prisma.priceChange.findMany({ where: { articleId: a.id } });
+    expect(log).toHaveLength(1);
+    expect(log[0].before).toBeCloseTo(5.99);
+    expect(log[0].after).toBeCloseTo(6.99);
+    // gleicher Preis bei erneutem Abruf: keine zweite Zeile
+    await syncArticleImages(db.prisma, opts(fakeFetch([tile("666666666", "Yu-Gi-Oh! TST-DE010 Preisaenderung NM", "EEEEEEEEEE", "6,99")])));
+    expect(await db.prisma.priceChange.count({ where: { articleId: a.id } })).toBe(1);
   });
 });

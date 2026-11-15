@@ -231,7 +231,7 @@ const block = [
   MARKER_AUF,
   "  // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:",
   "  //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)",
-  "  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)",
+  "  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Mini-DM)",
   "  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen, inkl. Mini-DM-FFA-",
   "  //     Rollen je Kadergroesse k=2..6, PR 2 des 6-PR-Plans 21.10.; Battlefield-Rollen",
   "  //     je Kadergroesse k=2..6, eigene Zusammensetzung je k, 27.10.)",

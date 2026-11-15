@@ -13,7 +13,6 @@ import {
   getScoutingWishlistSlotLimit,
   getScoutingWishlistSlotsForLevel,
   isTeamSetupDraftWishlistPhase,
-  trimTransferWishlistToSlotLimit,
 } from "@/lib/scouting/scouting-wishlist-slots";
 
 function createGameState(partial?: {
@@ -180,21 +179,10 @@ describe("scouting wishlist slots", () => {
     expect(getActiveScoutingWishlistEntries(draftState, "M-M")).toHaveLength(15);
   });
 
-  it("allows the 15th wishlist entry in the draft but rejects a 16th", () => {
-    // Ohne die 15er-Grenze ist die Wishlist im Draft unbegrenzt (`limit: null`)
-    // — dieser Test ist rot, solange getScoutingWishlistSlotLimit im Draft
-    // `null` statt 15 zurückgibt.
-    const fourteenEntries = createGameState({
-      seasonId: "season-1",
-      gamePhase: "preseason_management",
-      newGameFlowActive: true,
-      wishlist: Array.from({ length: 14 }, (_, index) => ({
-        playerId: `p-${index}`,
-        createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
-      })),
-    });
-    expect(canAddPlayerToTransferWishlist(fourteenEntries, "M-M", "p-15th").ok).toBe(true);
-
+  it("accepts a 16th wishlist entry in the draft — it waits for one of the 15 active scout slots", () => {
+    // Bis 11.11. lehnte die Wunschliste im Draft den 16. Eintrag ab. Seit dem Scouting-Ausbau
+    // (Chris: „endlos viele Spieler") ist die Liste unbegrenzt; die 15 sind nur noch die aktiven
+    // Plätze, der 16. wartet.
     const fifteenEntries = createGameState({
       seasonId: "season-1",
       gamePhase: "preseason_management",
@@ -204,10 +192,10 @@ describe("scouting wishlist slots", () => {
         createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
       })),
     });
-    const rejected = canAddPlayerToTransferWishlist(fifteenEntries, "M-M", "p-16th");
-    expect(rejected.ok).toBe(false);
-    expect(rejected.limit).toBe(15);
-    // Bereits gesetzte Spieler dürfen trotzdem entfernt/erneut markiert werden.
+    const check = canAddPlayerToTransferWishlist(fifteenEntries, "M-M", "p-16th");
+    expect(check.ok).toBe(true);
+    expect(check.limit).toBe(15);
+    expect(check.waitsForSlot).toBe(true);
     expect(canAddPlayerToTransferWishlist(fifteenEntries, "M-M", "p-0").ok).toBe(true);
   });
 
@@ -251,9 +239,7 @@ describe("scouting wishlist slots", () => {
     expect(getScoutingWishlistSlotLimit(postDraft, "M-M")).toBe(getScoutingWishlistSlotsForLevel(1));
   });
 
-  it("blocks wishlist adds when regular slots are full", () => {
-    // Die Liste wird GENAU bis ans Limit gefuellt, statt eine feste Zahl Namen abzuschreiben — sonst
-    // prueft der Test nach der naechsten Slot-Aenderung nur noch, dass irgendeine Liste zu kurz ist.
+  it("never blocks wishlist adds once the active slots are full — the new entry waits", () => {
     const limit = getScoutingWishlistSlotsForLevel(1);
     const full = createGameState({
       scoutingLevel: 1,
@@ -262,8 +248,10 @@ describe("scouting wishlist slots", () => {
         createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
       })),
     });
-    expect(canAddPlayerToTransferWishlist(full, "M-M").ok).toBe(false);
-    // Ein Spieler, der schon drauf steht, darf immer — er belegt keinen zusaetzlichen Platz.
+    const check = canAddPlayerToTransferWishlist(full, "M-M");
+    expect(check.ok).toBe(true);
+    expect(check.waitsForSlot).toBe(true);
+    expect(check.reason).toBeUndefined();
     expect(canAddPlayerToTransferWishlist(full, "M-M", "p-1").ok).toBe(true);
   });
 
@@ -320,55 +308,5 @@ describe("scouting wishlist slots", () => {
     expect((refreshed.seasonState.scoutIntelByTeamId?.["M-M"] ?? []).map((entry) => entry.playerId)).toEqual(
       Array.from({ length: getScoutingWishlistSlotsForLevel(0) }, (_, index) => `p-${index + 1}`),
     );
-  });
-
-  // Absicherung für die schon vorhandene Kappung beim Übergang vom Draft (15
-  // Slots) auf das Scouting-Niveau — bisher ungetestet, aber bewusst nicht
-  // neu gebaut (Aufgabe: nur absichern).
-  describe("trimTransferWishlistToSlotLimit (Kappung beim Übergang Draft → Scouting)", () => {
-    it("keeps only the highest-priority entries up to the post-draft scouting limit", () => {
-      // Zwei Eintraege mehr als Plaetze, aus den Konstanten abgeleitet — die Kappung soll sichtbar
-      // greifen, ohne dass die Zahl im Test steht.
-      const nachDraftLimit = getScoutingWishlistSlotsForLevel(0);
-      const gameState = createGameState({
-        scoutingLevel: 0,
-        seasonId: "season-1",
-        gamePhase: "season_active", // Draft vorbei, reguläre Scouting-Grenze gilt.
-        wishlist: [
-          ...Array.from({ length: nachDraftLimit + 2 }, (_, index) => ({
-            playerId: `p-${index + 1}`,
-            createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
-            priorityRank: index,
-          })),
-          // Team-fremder Eintrag, muss unabhängig von der Grenze erhalten bleiben.
-          { playerId: "other-1", createdAt: "2026-06-25T23:00:00.000Z", priorityRank: 0, teamId: "L-K" },
-        ],
-      });
-      const trimmed = trimTransferWishlistToSlotLimit(
-        gameState.seasonState.transferWishlist ?? [],
-        gameState,
-        "M-M",
-      );
-      expect(trimmed.filter((entry) => entry.teamId === "M-M").map((entry) => entry.playerId)).toEqual(
-        Array.from({ length: nachDraftLimit }, (_, index) => `p-${index + 1}`),
-      );
-      expect(trimmed.some((entry) => entry.playerId === "other-1")).toBe(true);
-    });
-
-    it("does not trim during the draft, where the wishlist limit is 15, not the scouting level", () => {
-      const draftState = createGameState({
-        scoutingLevel: 0,
-        seasonId: "season-1",
-        gamePhase: "preseason_management",
-        newGameFlowActive: true,
-        wishlist: Array.from({ length: 10 }, (_, index) => ({
-          playerId: `p-${index}`,
-          createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
-          priorityRank: index,
-        })),
-      });
-      const trimmed = trimTransferWishlistToSlotLimit(draftState.seasonState.transferWishlist ?? [], draftState, "M-M");
-      expect(trimmed).toHaveLength(10);
-    });
   });
 });

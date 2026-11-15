@@ -204,6 +204,8 @@ describe("capital", () => {
     expect(c.potentialRevenueVk).toBeCloseTo(100 + 25 + 36);
     expect(c.purchasePerMonth90).toBeCloseTo(100);
     expect(c.reachMonths).not.toBeNull();
+    expect(c.salesWithoutEkRevenueShare === null || c.salesWithoutEkRevenueShare >= 0).toBe(true);
+    expect(c.gmroi === null || Number.isFinite(c.gmroi)).toBe(true);
   });
 });
 
