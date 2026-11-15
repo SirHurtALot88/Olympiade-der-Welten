@@ -291,6 +291,7 @@
      darueber, die fuer genau diese Ansicht ausgeblendet werden. */
   .oly-battle-arena.oly-battle-arena .minidmffa{padding:14px 18px;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .minidmffa .honest{display:block;margin:0 0 12px;max-width:74ch;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .mdffa-buehne{display:block;width:100%;height:auto;aspect-ratio:1240/470;margin:0 0 12px;border-radius:10px;background:#1a1510;image-rendering:pixelated}
   .oly-battle-arena.oly-battle-arena .mdffa-teams{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
   .oly-battle-arena.oly-battle-arena .mdffa-team{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center}
   .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-eck{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}

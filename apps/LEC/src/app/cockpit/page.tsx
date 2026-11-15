@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { loadCockpitViewModel } from "@/lib/cockpit/queries";
+import { loadActiveCostSettings } from "@/lib/dashboard/queries";
 import { parseWindowParam } from "@/lib/cockpit/viewModel";
 import { CockpitPage } from "@/components/cockpit/CockpitPage";
 import "./cockpit.css";
@@ -19,5 +20,6 @@ export default async function Page({ searchParams }: Props) {
   const params = await searchParams;
   const window = parseWindowParam(params.fenster);
   const vm = await loadCockpitViewModel(prisma, window);
-  return <CockpitPage vm={vm} />;
+  const costSettings = await loadActiveCostSettings(prisma);
+  return <CockpitPage vm={vm} costSettings={costSettings} />;
 }

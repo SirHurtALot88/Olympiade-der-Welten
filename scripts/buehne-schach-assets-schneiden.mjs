@@ -11,12 +11,20 @@
 // variante des Blatts, von der Engine ungenutzt) und schach_schwarz.png (dieselbe
 // Zeichnung, Cremefuellung auf Dunkelgrau umgefaerbt).
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 
 const ZIEL = 'public/sprites/buehne';
+
+// Seit 08.11. sind die Figuren PixelLab-Erzeugnisse (scripts/pixellab-requisiten.py, Auftrag
+// "schach"). Ohne --lpc bricht das Skript ab, statt sie mit dem alten Blatt zu ueberschreiben.
+if (!process.argv.includes('--lpc')
+  && JSON.parse(readFileSync(join(ZIEL, 'quellen.json'), 'utf8'))['schach_weiss.png']?.paket === 'PixelLab') {
+  console.log('schach_*.png sind PixelLab (s. quellen.json) — nichts geschnitten. Mit --lpc trotzdem.');
+  process.exit(0);
+}
 const QUELLE_URL = 'https://opengameart.org/sites/default/files/chess_clean.png';
 const BG = [169, 156, 152];
 const TOL = 20;

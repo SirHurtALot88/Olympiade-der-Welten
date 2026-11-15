@@ -14,6 +14,7 @@ import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
+import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 
 /**
@@ -72,6 +73,26 @@ const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
  */
 const CHROMIUM_PFLICHT = process.env.OLY_ARENA_CHROMIUM_PFLICHT === "1";
 const UEBERSPRINGEN = !CHROMIUM_VERFUEGBAR && !CHROMIUM_PFLICHT;
+
+/**
+ * CI-OOM-FUND (14.11., root-caused per Reproduktion unter Speicherdruck -- NICHT per Vermutung):
+ * diese Datei hat `bauFrischenBattleSaveMitVollemFeld()` aus `tests/arena-vorlauf-service.test.ts`
+ * KOPIERT (nicht geteilt), aber den dort am 18.10. gefundenen Fix (`invalidateLocalTransfermarktCachesForSave`
+ * nach jedem verworfenen UND jedem abgeschlossenen Save) nicht mitkopiert. `lib/market/
+ * transfermarkt-local-service.ts`s `localMarketContextCache`/`localFreeAgentBaseCache`/
+ * `localFreeAgentBrowseIndexCache` sammeln dadurch pro Testlauf dieser Datei einen weiteren, nie
+ * entfernten Eintrag ein -- UNABHAENGIG vom eigenen Byte-/Eintrags-Deckel dieser Caches, weil
+ * dieser Deckel auf den PROZESS zielt, nicht auf einzelne Testdateien, und in den CI-Jobs
+ * `full-test-suite`/`persistenz-suiten` mehrere speicherhungrige Testdateien (u. a. `tests/
+ * arena-vorlauf-service.test.ts` selbst) DENSELBEN Worker-Prozess teilen (Vitest bundlet mehrere
+ * Testdateien in denselben geforkten Prozess, sobald mehr Dateien als CPU-Kerne vorhanden sind --
+ * dasselbe Muster, das der Job `arena-chromium-tests` bereits dokumentiert, s. dessen Kommentar).
+ * Lokal reproduziert: `npx vitest run tests/arena-vorlauf-service.test.ts tests/
+ * arena-vorlauf-parity.test.ts tests/battle-mode-arena-ausfall-sichtbar.test.ts tests/
+ * battle-mode-auto-run-invarianten.test.ts --execArgv=--max-old-space-size=900` (900 MB simuliert
+ * den knapperen CI-Worker-Anteil) endet zuverlaessig in "JavaScript heap out of memory", mit genau
+ * den Worker-Abstuerzen, die #-weise in CI auftraten.
+ */
 async function bauFrischenBattleSaveMitVollemFeld() {
   for (let versuch = 1; versuch <= 3; versuch += 1) {
     process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-parity-${Math.random().toString(36).slice(2)}.sqlite`;
@@ -108,6 +129,9 @@ async function bauFrischenBattleSaveMitVollemFeld() {
       (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
     );
     if (arenaDisciplineIds.length === 0) {
+      // Verworfener Versuch -- ohne dieses Aufraeumen bleibt der Markt-Kontext-Cache-Eintrag
+      // dieses Saves fuer immer im Prozess stehen (s. CI-OOM-FUND-Kommentar oben).
+      invalidateLocalTransfermarktCachesForSave(saveId);
       continue;
     }
     const batch = applyAiLegacyLineupBatchLocally(
@@ -210,6 +234,7 @@ describe.skipIf(UEBERSPRINGEN)(
         expect(d.status).toBe("arena");
         expect(d.ausfall).toBeFalsy();
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. CI-OOM-FUND-Kommentar oben
     },
     420_000,
   );
@@ -289,6 +314,7 @@ describe("Arena-Vorlauf-Service · Was-du-siehst-wird-gebucht-Parität, Brücken
         // PARITAET (Bruecken-Pfad): dieselbe gebuchte Zahl wie im vorher gezeigten Snapshot.
         expect(zeile.teamPoints).toBe(gezeigtByTeam.get(zeile.teamId));
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. CI-OOM-FUND-Kommentar oben
     },
     420_000,
   );

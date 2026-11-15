@@ -105,7 +105,33 @@ export type HomeV2RosterTableRow = {
   playerOvr: number | null;
   playerMvs: number | null;
   playerPps: number | null;
+  /**
+   * CA/PO-Sterne der Kaderzeile — kommen fertig aus `buildRosterCaPoStarFields`
+   * (`use-foundation-cross-tab-teams-roster.ts`), DERSELBEN Funktion, die die
+   * Portraitkarten auf Kaderprofil/Teams speist. Die Home-Karten lesen sie hier
+   * durch, statt sie über den Trainings-Forecast ein zweites Mal herzuleiten
+   * (der zeigte andere PO-Sterne als das Kaderprofil, Chris 10.11.).
+   */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
+
+/**
+ * Reicht die CA/PO-Sternfelder einer Kaderzeile unverändert an die Home-Topkarte durch —
+ * keine zweite Herleitung. `known` bleibt der echte Fog-of-War-Status der Zeile.
+ */
+export function pickHomeTopPlayerStarFields(row: HomeV2RosterTableRow) {
+  return {
+    starsKnown: row.known ?? true,
+    caStars: row.caStars ?? null,
+    poStarRange: row.poStarRange ?? null,
+    caScore: row.caScore ?? null,
+    poScoreRange: row.poScoreRange ?? null,
+  };
+}
 
 export type HomeV2PlayerCardRow = HomeV2RosterTableRow & {
   portrait: ReturnType<typeof getPlayerPortraitMediaModel>;

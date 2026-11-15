@@ -1,7 +1,7 @@
 import type { BillbeeImportResult, BillbeeRow } from "../importers/billbee";
 import type { EbayImportResult } from "../importers/ebay";
 import { matchBillbeeToEbay, type AliasMap } from "../matching/engine";
-import { computeHk, computeShopVolume, fixedCostPerUnit, type ItemKind, type ShopVolume } from "../pricing/costEngine";
+import { computeEbayFees, computeHk, computeShopVolume, fixedCostPerUnit, type ItemKind, type ShopVolume } from "../pricing/costEngine";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import type { SaleWindowKey } from "../parsing/date";
 
@@ -193,13 +193,39 @@ export function buildImportPlan(
     ebayFeePerUnitByName.set(pair.billbee.nameNormalized, totalQty > 0 ? totalFees / totalQty : 0);
   }
 
+  // Gebuehren-Rueckfall: Artikel, die in keinem eBay-Report standen, haben keine echte Gebuehr. Statt 0 (DB II
+  // zu hoch) wird der effektive Gebuehrensatz AEHNLICHER Artikel angenommen (gleiches Preisband, aus den
+  // echten Gebuehren), sonst der Gesamtsatz, sonst die Formel aus den Kostensaetzen.
+  const feeFor = (name: string) => ebayFeePerUnitByName.get(name) ?? options.knownFeePerUnit?.get(name) ?? 0;
+  const bandOf = (unitPrice: number) => (unitPrice < 5 ? 0 : unitPrice < 15 ? 1 : unitPrice < 40 ? 2 : 3);
+  const bandFee = [0, 0, 0, 0];
+  const bandRev = [0, 0, 0, 0];
+  for (const result of billbeeResults) {
+    if (result.window !== "365") continue; // ein Fenster, sonst zaehlen ueberlappende Verkaeufe doppelt
+    for (const row of result.rows) {
+      const fee = feeFor(row.nameNormalized);
+      if (!row.isCard || !(fee > 0) || !(row.qty > 0) || !(row.revenue > 0)) continue;
+      const b = bandOf(row.revenue / row.qty);
+      bandFee[b] += fee * row.qty;
+      bandRev[b] += row.revenue;
+    }
+  }
+  const totalRate = bandRev.reduce((a, b) => a + b, 0) > 0 ? bandFee.reduce((a, b) => a + b, 0) / bandRev.reduce((a, b) => a + b, 0) : null;
+  const estimateFee = (unitPrice: number): number => {
+    const b = bandOf(unitPrice);
+    if (bandRev[b] >= 300) return (bandFee[b] / bandRev[b]) * unitPrice; // genug Vergleichsumsatz im Preisband
+    if (totalRate !== null) return totalRate * unitPrice;
+    return computeEbayFees(unitPrice, costSettings.adFeeRateGood, costSettings).total;
+  };
+
   // 3. Fenster-Snapshots inkl. DB I / DB II serverseitig neu berechnen.
   const saleWindows: PlannedSaleWindow[] = [];
   for (const result of billbeeResults) {
     for (const row of result.rows) {
       if (!row.isCard) continue; // Privatverkaeufe fliessen nicht in die Karten-Analytics ein.
 
-      const feePerUnit = ebayFeePerUnitByName.get(row.nameNormalized) ?? options.knownFeePerUnit?.get(row.nameNormalized) ?? 0;
+      const knownFee = feeFor(row.nameNormalized);
+      const feePerUnit = knownFee > 0 ? knownFee : row.qty > 0 && row.revenue > 0 ? estimateFee(row.revenue / row.qty) : 0;
       const ebayFeeTotal = feePerUnit * row.qty;
 
       const kind: ItemKind = row.packQty > 1 ? "pack" : "single";

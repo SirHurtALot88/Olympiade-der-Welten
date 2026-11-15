@@ -2400,7 +2400,16 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
           // konvergieren deutlich unter die Zusage-Schwelle.
           const rho = isStubborn ? 0.01 : W >= WILLING_WILLINGNESS ? 0.03 : 0.02;
           const memoryCounter = lastCounter - g * step;
-          const floor = D * (Math.min(rFull, pride) - rho);
+          // Der Boden misst das Budget gegen das, was er OHNE Gedaechtnis ohnehin nennen wuerde
+          // (`formulaCounter`), nicht allein gegen seinen Zielpunkt. Nachtrag 10.11.: die erste
+          // Runde nennt mit Haerte h < 1 einen Konter UNTER dem Ziel — bei flachen Angeboten
+          // (h ~ 0,8) oft schon unter `D·(Ziel − rho)`. Dann hob der Boden die Erwiderung bis an
+          // sein letztes Wort zurueck, und er kam trotz echtem Schritt keinen Cent entgegen. Das
+          // Minimum laesst das Budget dort, wo die Formel ohnehin nah am Ziel liegt, unveraendert.
+          // NICHT nach einem Lowball (Trotz-Aufschlag gilt): dort bleibt der alte Boden, damit
+          // Lowball + Entgegenkommen nie billiger wird als das ehrliche Direktangebot (9.5, Inv. 6).
+          const targetFloor = D * (Math.min(rFull, pride) - rho);
+          const floor = priorSurcharge > 0 ? targetFloor : Math.min(targetFloor, formulaCounter - D * rho);
           // Er steht zu seinem letzten Wort: sein Gegenangebot steigt innerhalb einer
           // Verhandlung nie. (Die FORDERUNG kann per Trotz steigen — aber nur als Antwort auf
           // einen Lowball, und nach einem Konter loest ein niedrigeres Angebot ohnehin die

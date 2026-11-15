@@ -48,6 +48,19 @@ Heldenpunkte), Werte bleiben. Regeln, Zahlen je Kampf und die Gegnerliste für d
 `docs/design/moosgrab-balancing-und-gegner.md`. Der Balancing-Test in `tests/kartenschmiede.test.ts`
 muss für jede Map grün sein.
 
+### Deckung (Chris, 08.11.)
+
+Gespielt wird mit Deckung, weil beide Seiten Fernkämpfer haben:
+
+- **Wann:** Das Ziel steht in Deckungsgelände, oder die Linie vom Schützen zum Ziel geht durch ein solches Teil.
+- **Wirkung:** Getroffen wird normal, das Ziel bekommt **+1 auf den Verteidigungswurf**. Nicht stapelbar.
+- **Nahkampf:** Deckung zählt nicht.
+- **Ganz verdeckt:** Hinter Gelände, das die Sicht blockiert, sieht man das Ziel nicht und kann nicht schießen.
+- Gilt für Helden und Gegner; „Zielsuchend“ und „Ignoriert Deckung“ heben sie auf.
+
+Steht im Reiter „Spielen“ im Lage-Fenster, in der Gelände-Legende je Teil und in den Geländetexten
+(`ARTEN` in `apps/kartenschmiede/szenarien.js`). Der Kampfsimulator rechnet schon so (`regeln.js`).
+
 ## 3. Bildschirme
 
 ### (a) Map-Vorbereitung

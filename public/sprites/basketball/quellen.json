@@ -1,59 +1,96 @@
 {
-  "_hinweis": "Basketball-Halle: Parkett, Korb, Ball, Zuschauer. Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Alle Quellen sind fuer ein privates, nicht kommerzielles Spiel unproblematisch (CC0 / CC-BY / CC-BY-SA). Beschafft am 24.08. ueber OpenGameArt; Schnitte mit Pillow, Koordinaten unten dokumentiert.",
-  "parkett.png": {
-    "paket": "[LPC] Floors",
-    "blatt": "floors.png (aus lpc-floors.zip)",
-    "schnitt": "x=448 y=1056 64x64, nahtlos kachelbar (geprueft per 3x3-Kachelung)",
-    "urheber": "bluecarrot16 und die in CREDITS-floors.txt des Pakets genannten (u.a. Lanea Zimmerman/Sharm)",
-    "lizenz": "CC-BY-SA 4.0",
-    "url": "https://opengameart.org/content/lpc-floors",
-    "verwendung": "Hallenboden statt des bisherigen gruenen Vektor-Courts; Spielfeldlinien weiter als Vektor-Overlay drueberzeichnen"
+ "_hinweis": "Basketball-Halle: Parkett, Korb, Ball, Zuschauer. Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Alle Quellen sind fuer ein privates, nicht kommerzielles Spiel unproblematisch (CC0 / CC-BY / CC-BY-SA). Beschafft am 24.08. ueber OpenGameArt; Schnitte mit Pillow, Koordinaten unten dokumentiert. — 08.11.: die vom Motor gezeichneten Requisiten (und in arena/ die Takeshi-Bodenkacheln) sind auf PixelLab umgestellt (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py); bei diesen Eintraegen steht die fruehere Quelle unter 'vorher'.",
+ "parkett.png": {
+  "paket": "[LPC] Floors",
+  "blatt": "floors.png (aus lpc-floors.zip)",
+  "schnitt": "x=448 y=1056 64x64, nahtlos kachelbar (geprueft per 3x3-Kachelung)",
+  "urheber": "bluecarrot16 und die in CREDITS-floors.txt des Pakets genannten (u.a. Lanea Zimmerman/Sharm)",
+  "lizenz": "CC-BY-SA 4.0",
+  "url": "https://opengameart.org/content/lpc-floors",
+  "verwendung": "Hallenboden statt des bisherigen gruenen Vektor-Courts; Spielfeldlinien weiter als Vektor-Overlay drueberzeichnen"
+ },
+ "korb_topdown.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "basketball hoop seen from directly above: white backboard as a horizontal bar at the top, orange rim ring with white net below it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    36,
+    28
+   ],
+   "job": "8c1fe8ed-ad2a-4fb1-b20f-b0559952abcf",
+   "kandidat": 0
   },
-  "korb_topdown.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Elements/element (67).png, unveraendert, 64x64",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Korb in Draufsicht: Brett als Querbalken, Ring haengt davor — passt zur Vogelperspektive des Feldes; an beiden Schmalseiten spiegeln"
-  },
-  "korb_seite.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Elements/element (65).png, unveraendert, 64x64",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Korb in Seitenansicht (Ring am Brett) — Alternative, falls die Koerbe wie in der alten Arena-Version seitlich gezeichnet werden"
-  },
-  "korb_front.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Elements/element (66).png, unveraendert, 64x64",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Korb frontal von unten (Ring vor Brett) — dritte Ansichtsvariante"
-  },
-  "ball.png": {
-    "paket": "Basketballs [32x32]",
-    "blatt": "basketballs.png, Schnitt x=0 y=0 32x32 (der klassische orange Ball)",
-    "urheber": "Leozlk",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/basketballs-32x32"
-  },
-  "baelle_varianten.png": {
-    "paket": "Basketballs [32x32]",
-    "blatt": "basketballs.png, unveraendert (6 Baelle, 3x2 Raster zu 32x32)",
-    "urheber": "Leozlk",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/basketballs-32x32"
-  },
-  "zuschauer.png": {
-    "paket": "Welcome to The Arena!",
-    "blatt": "the arenaOGA1.gif (1024x768, 2 Animationsbilder)",
-    "schnitt": "je Bild x=160 y=373 40x66; Bild 0 links, Bild 1 rechts (Blatt ist 80x66). Die 40x66-Kachel wiederholt sich nahtlos horizontal (Periode 40px, per Autokorrelation gemessen) und vertikal (Periode 33px)",
-    "urheber": "Spring Spring",
-    "lizenz": "CC-BY 3.0 / CC-BY 4.0 (auch CC-BY-SA moeglich)",
-    "url": "https://opengameart.org/content/welcome-to-the-arena",
-    "verwendung": "Publikum am Spielfeldrand: Kachel horizontal wiederholen, zwischen den beiden Bildern wechseln (die Menge wippt). Es sind kleine Pixel-Monster-Gesichter — passt zum Kader"
+  "roh": "data/generated/pixellab-requisiten/roh/korb_topdown*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen korb_topdown (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "hinweis": "Ringmittelpunkt pixelgenau auf den des alten Kenney-Korbs gelegt (31,6/13,4), weil der Ballflug auf korbX zielt",
+  "verwendung": "Korb in Draufsicht: Brett als Querbalken, Ring haengt davor — passt zur Vogelperspektive des Feldes; an beiden Schmalseiten spiegeln",
+  "vorher": {
+   "paket": "Sports pack (350+)",
+   "blatt": "PNG/Elements/element (67).png, unveraendert, 64x64",
+   "urheber": "Kenney (kenney.nl)",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/sports-pack-350"
   }
+ },
+ "korb_seite.png": {
+  "paket": "Sports pack (350+)",
+  "blatt": "PNG/Elements/element (65).png, unveraendert, 64x64",
+  "urheber": "Kenney (kenney.nl)",
+  "lizenz": "CC0",
+  "url": "https://opengameart.org/content/sports-pack-350",
+  "verwendung": "Korb in Seitenansicht (Ring am Brett) — Alternative, falls die Koerbe wie in der alten Arena-Version seitlich gezeichnet werden"
+ },
+ "korb_front.png": {
+  "paket": "Sports pack (350+)",
+  "blatt": "PNG/Elements/element (66).png, unveraendert, 64x64",
+  "urheber": "Kenney (kenney.nl)",
+  "lizenz": "CC0",
+  "url": "https://opengameart.org/content/sports-pack-350",
+  "verwendung": "Korb frontal von unten (Ring vor Brett) — dritte Ansichtsvariante"
+ },
+ "ball.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "orange basketball with black seams, round, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    32,
+    32
+   ],
+   "job": "567be1bb-2fe0-4934-8d4d-e447761d2407",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ball*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ball (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "vorher": {
+   "paket": "Basketballs [32x32]",
+   "blatt": "basketballs.png, Schnitt x=0 y=0 32x32 (der klassische orange Ball)",
+   "urheber": "Leozlk",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/basketballs-32x32"
+  }
+ },
+ "baelle_varianten.png": {
+  "paket": "Basketballs [32x32]",
+  "blatt": "basketballs.png, unveraendert (6 Baelle, 3x2 Raster zu 32x32)",
+  "urheber": "Leozlk",
+  "lizenz": "CC0",
+  "url": "https://opengameart.org/content/basketballs-32x32"
+ },
+ "zuschauer.png": {
+  "paket": "Welcome to The Arena!",
+  "blatt": "the arenaOGA1.gif (1024x768, 2 Animationsbilder)",
+  "schnitt": "je Bild x=160 y=373 40x66; Bild 0 links, Bild 1 rechts (Blatt ist 80x66). Die 40x66-Kachel wiederholt sich nahtlos horizontal (Periode 40px, per Autokorrelation gemessen) und vertikal (Periode 33px)",
+  "urheber": "Spring Spring",
+  "lizenz": "CC-BY 3.0 / CC-BY 4.0 (auch CC-BY-SA moeglich)",
+  "url": "https://opengameart.org/content/welcome-to-the-arena",
+  "verwendung": "Publikum am Spielfeldrand: Kachel horizontal wiederholen, zwischen den beiden Bildern wechseln (die Menge wippt). Es sind kleine Pixel-Monster-Gesichter — passt zum Kader"
+ }
 }

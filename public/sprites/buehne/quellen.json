@@ -1,23 +1,151 @@
 {
-  "_hinweis": "Speed-Schach-Buehnenbild: nur die Figuren sind ein Asset, Brett und Tisch sind Canvas-Primitiven (zwei Farben im Schachmuster, s. docs/design/takeshi-schach-optik-gameplay-plan-05-09.md A.2). Beschafft am 06.09. ueber OpenGameArt (CC0), Schnitt mit sharp per scripts/buehne-schach-assets-schneiden.mjs, Koordinaten aus dem Alphakanal gelesen (nicht geschaetzt).",
-  "schach_weiss.png": {
-    "paket": "Chess pieces pixel art (Catacomb Chess)",
-    "blatt": "chess_clean.png, 628x360, Pixel-Umrisse auf grauem Grund (169,156,152)",
-    "schnitt": "sechs Spalten x=246-288/297-339/348-390/401-443/454-496/507-549 (Bauer/Turm/Springer/Laeufer/Dame/Koenig), zwei Zeilen y=15-75/78-140 (zwei Zeichnungsvarianten des Blatts), Hintergrund per Toleranz 20 transparent, je Zelle auf 48x48 unten buendig zentriert -> 288x96. Zeile 0 wird von zeichneSchachBrett() gezeichnet, Zeile 1 ist mitgeschnitten, aber ungenutzt.",
-    "urheber": "woodsmoke",
-    "lizenz": "CC0",
-    "namensnennung": "Vom Einsteller erbeten (obwohl CC0 sie nicht verlangt): \"woodsmoke\", alternativ \"Chess pieces from Catacomb Chess\".",
-    "url": "https://opengameart.org/content/chess-pieces-pixel-art",
-    "verwendung": "Fokus- und Mini-Bretter in BUEHNE_ART[\"speed-schach\"] (zeichneSchach); Rueckfall ohne die Datei: helle/dunkle Kreise, wie jede andere Kachel in bodenSpurt einzeln geprueft"
+ "_hinweis": "Speed-Schach-Buehnenbild: nur die Figuren sind ein Asset, Brett und Tisch sind Canvas-Primitiven (zwei Farben im Schachmuster, s. docs/design/takeshi-schach-optik-gameplay-plan-05-09.md A.2). Beschafft am 06.09. ueber OpenGameArt (CC0), Schnitt mit sharp per scripts/buehne-schach-assets-schneiden.mjs, Koordinaten aus dem Alphakanal gelesen (nicht geschaetzt). — 08.11.: die vom Motor gezeichneten Requisiten (und in arena/ die Takeshi-Bodenkacheln) sind auf PixelLab umgestellt (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py); bei diesen Eintraegen steht die fruehere Quelle unter 'vorher'.",
+ "schach_weiss.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "reihe": {
+    "prompt": "row of six ivory white chess pieces side by side, evenly spaced, from left to right: small round pawn, castle tower rook, horse head knight, bishop with pointed mitre, queen with a spiked crown, tallest king with a cross on top, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+    "seed": 12,
+    "gen": [
+     288,
+     48
+    ],
+    "job": "b41041c6-e430-477e-9a6e-527765e1d8c7",
+    "kandidat": 0,
+    "endpunkt": "/v2/generate-image-v2",
+    "genommen": "Spalten 1-4 (Bauer, Turm, Springer, Laeufer); Dame und Koenig waren oben abgeschnitten",
+    "spalten": [
+     [
+      7,
+      31
+     ],
+     [
+      53,
+      84
+     ],
+     [
+      97,
+      141
+     ],
+     [
+      155,
+      181
+     ]
+    ]
+   },
+   "dame": {
+    "prompt": "single ivory white chess queen piece with a spiked crown on top, standing, front view, pixel art game asset",
+    "seed": 12,
+    "gen": [
+     48,
+     48
+    ],
+    "job": "f13f438d-d098-47db-8f20-4bd271dd3a5a",
+    "style_image": "Ausschnitt x96..288 des Schach-Reihenbilds (Saat 12)",
+    "kandidat": 0,
+    "endpunkt": "/v2/generate-image-v2"
+   },
+   "koenig": {
+    "prompt": "single ivory white chess king piece, tallest piece, crown with a small cross on top, standing, front view, pixel art game asset",
+    "seed": 12,
+    "gen": [
+     48,
+     48
+    ],
+    "job": "d988cbf0-3578-47ea-881b-a7bed50419a5",
+    "style_image": "Ausschnitt x96..288 des Schach-Reihenbilds (Saat 12)",
+    "kandidat": 19,
+    "endpunkt": "/v2/generate-image-v2"
+   }
   },
-  "schach_schwarz.png": {
-    "paket": "Chess pieces pixel art (Catacomb Chess)",
-    "blatt": "dieselbe Quelldatei wie schach_weiss.png, im selben Schnitt-Skript umgefaerbt",
-    "schnitt": "wie schach_weiss.png, danach alle Pixel mit R>150 und G>140 (die Cremefuellung) auf (62,58,54) gesetzt; Umriss/Schattierung bleiben unveraendert",
-    "urheber": "woodsmoke",
-    "lizenz": "CC0",
-    "namensnennung": "Vom Einsteller erbeten (obwohl CC0 sie nicht verlangt): \"woodsmoke\", alternativ \"Chess pieces from Catacomb Chess\".",
-    "url": "https://opengameart.org/content/chess-pieces-pixel-art",
-    "verwendung": "wie schach_weiss.png, fuer die schwarzen Figuren (kein zweiter Download noetig, reine Umfaerbung im Schnitt-Skript)"
+  "roh": "data/generated/pixellab-requisiten/roh/schach*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen schach (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "hinweis": "Bauer/Turm/Springer/Laeufer aus einem Reihenbild, Dame und Koenig einzeln mit Stilvorlage; schwarz = umgefaerbte Zeichnung",
+  "verwendung": "Fokus- und Mini-Bretter in BUEHNE_ART[\"speed-schach\"] (zeichneSchach); Rueckfall ohne die Datei: helle/dunkle Kreise, wie jede andere Kachel in bodenSpurt einzeln geprueft",
+  "vorher": {
+   "paket": "Chess pieces pixel art (Catacomb Chess)",
+   "blatt": "chess_clean.png, 628x360, Pixel-Umrisse auf grauem Grund (169,156,152)",
+   "schnitt": "sechs Spalten x=246-288/297-339/348-390/401-443/454-496/507-549 (Bauer/Turm/Springer/Laeufer/Dame/Koenig), zwei Zeilen y=15-75/78-140 (zwei Zeichnungsvarianten des Blatts), Hintergrund per Toleranz 20 transparent, je Zelle auf 48x48 unten buendig zentriert -> 288x96. Zeile 0 wird von zeichneSchachBrett() gezeichnet, Zeile 1 ist mitgeschnitten, aber ungenutzt.",
+   "urheber": "woodsmoke",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/chess-pieces-pixel-art"
   }
+ },
+ "schach_schwarz.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "reihe": {
+    "prompt": "row of six ivory white chess pieces side by side, evenly spaced, from left to right: small round pawn, castle tower rook, horse head knight, bishop with pointed mitre, queen with a spiked crown, tallest king with a cross on top, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+    "seed": 12,
+    "gen": [
+     288,
+     48
+    ],
+    "job": "b41041c6-e430-477e-9a6e-527765e1d8c7",
+    "kandidat": 0,
+    "endpunkt": "/v2/generate-image-v2",
+    "genommen": "Spalten 1-4 (Bauer, Turm, Springer, Laeufer); Dame und Koenig waren oben abgeschnitten",
+    "spalten": [
+     [
+      7,
+      31
+     ],
+     [
+      53,
+      84
+     ],
+     [
+      97,
+      141
+     ],
+     [
+      155,
+      181
+     ]
+    ]
+   },
+   "dame": {
+    "prompt": "single ivory white chess queen piece with a spiked crown on top, standing, front view, pixel art game asset",
+    "seed": 12,
+    "gen": [
+     48,
+     48
+    ],
+    "job": "f13f438d-d098-47db-8f20-4bd271dd3a5a",
+    "style_image": "Ausschnitt x96..288 des Schach-Reihenbilds (Saat 12)",
+    "kandidat": 0,
+    "endpunkt": "/v2/generate-image-v2"
+   },
+   "koenig": {
+    "prompt": "single ivory white chess king piece, tallest piece, crown with a small cross on top, standing, front view, pixel art game asset",
+    "seed": 12,
+    "gen": [
+     48,
+     48
+    ],
+    "job": "d988cbf0-3578-47ea-881b-a7bed50419a5",
+    "style_image": "Ausschnitt x96..288 des Schach-Reihenbilds (Saat 12)",
+    "kandidat": 19,
+    "endpunkt": "/v2/generate-image-v2"
+   }
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/schach*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen schach (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "hinweis": "Bauer/Turm/Springer/Laeufer aus einem Reihenbild, Dame und Koenig einzeln mit Stilvorlage; schwarz = umgefaerbte Zeichnung",
+  "verwendung": "wie schach_weiss.png, fuer die schwarzen Figuren (kein zweiter Download noetig, reine Umfaerbung im Schnitt-Skript)",
+  "vorher": {
+   "paket": "Chess pieces pixel art (Catacomb Chess)",
+   "blatt": "dieselbe Quelldatei wie schach_weiss.png, im selben Schnitt-Skript umgefaerbt",
+   "schnitt": "wie schach_weiss.png, danach alle Pixel mit R>150 und G>140 (die Cremefuellung) auf (62,58,54) gesetzt; Umriss/Schattierung bleiben unveraendert",
+   "urheber": "woodsmoke",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/chess-pieces-pixel-art"
+  }
+ }
 }

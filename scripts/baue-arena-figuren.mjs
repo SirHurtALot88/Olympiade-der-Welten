@@ -25,7 +25,12 @@ const hier = dirname(fileURLToPath(import.meta.url));
 const wurzel = resolve(hier, "..");
 
 export const ARENA_FIGUREN_ZIEL = resolve(wurzel, "public", "mockups", "battle-mode.figuren.js");
-const ARTEN = ["walk", "angriff", "treffer", "tod"];
+// HYROX-ARBEITSPOSEN (Nahkamera-PR, 08.11.): drei zusaetzliche, OPTIONALE Arten neben den vier
+// Kampf-Grundarten -- nur bei Figuren gesetzt, fuer die eine eigene PixelLab-Animation bestellt
+// wurde (s. docs/design/spurt-hyrox-nahkamera-08-11.md). Fehlt eine Figur in `a`, liest
+// zeichnePixelFigur() im Motor den bestehenden "angriff"-Rueckfall -- bit-identisch zum
+// Verhalten ohne diese drei Zeilen.
+const ARTEN = ["walk", "angriff", "treffer", "tod", "hyroxTechnik", "hyroxKletter", "hyroxKraft"];
 
 /**
  * @param {Record<string, {canvas:number, rotationen:string[], animationen:{name:string,kind:string,frames:number,dirs:string[]}[]}>} index

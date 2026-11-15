@@ -12,8 +12,9 @@
 // Laeuft mit leerer Kulissenliste UND mit der echten: beide Laeufe muessen gleich sein.
 // --kulissen-effekt=aus (Oberflaechen-Effekte 08.11.): schaltet den Kulissen-Effekt fuer die ganze
 // Messung ab (window.__arena.kulissePin("aus")). Damit muss der Gesamt-Hash wieder dem Stand vor
-// dem Effekt entsprechen (22f04e06e285) -- Beleg, dass Staerke 0 bit-identisch ist. Ohne den
-// Schalter aendern sich gewollt genau die Tennis-Eintraege.
+// dem Effekt entsprechen (Lauf auf main ohne Schalter == Lauf auf dem Branch mit
+// --kulissen-effekt=aus) -- Beleg, dass Staerke 0 bit-identisch ist. Ohne den Schalter aendern
+// sich gewollt genau die Tennis-Eintraege.
 import { chromium } from "playwright";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";

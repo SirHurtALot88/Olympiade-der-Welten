@@ -17,9 +17,11 @@ import type { GameState, SponsorOffer, SponsorTermSeasons } from "@/lib/data/oly
 import {
   getSponsorV3Terms,
   rerollSponsorV3TermsForNewSeason,
+  resolveSponsorLeagueTier,
   sponsorV3ExpectedPayout,
   sponsorV3GuaranteedLadder,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 
 /**
  * ABSOLUTE UNTERGRENZE der Sponsor-Oekonomie. Sie ist als Sicherheitsnetz geblieben (Guardrail aus
@@ -171,7 +173,18 @@ export function buildSponsorOfferTermForecast(gameState: GameState, offer: Spons
     // Eine zweite Rechenstelle findet solche Abweichungen nie von selbst; sie treibt nur langsam
     // auseinander. Deshalb ist der Weg jetzt derselbe wie in der Wirklichkeit, und ein kuenftiger
     // Regler an der Leiter kann die Vorschau gar nicht mehr vergessen.
-    const jahresTerms = rerollSponsorV3TermsForNewSeason(terms, { newSalaryFactor: factor, contractYear });
+    //
+    // UND MIT DERSELBEN LIGA UND DEMSELBEN RANGRAUM wie in der Wirklichkeit: ohne `leagueTier` zeigte
+    // die Vorschau einer Split-Karte die Leiter ohne Topf-Faktor (0,6/0,4) und ohne Zonen-Term — schon
+    // fuer Vertragsjahr 1 andere Betraege als die Gewinnstufen-Leiter daneben. Jahr 1 rechnet im
+    // Rangraum der Karte selbst, die Folgejahre im Rangraum des Spielstands, wie der Saisonwechsel
+    // (`advanceSponsorContractsForNewSeason`) sie tatsaechlich baut.
+    const jahresTerms = rerollSponsorV3TermsForNewSeason(terms, {
+      newSalaryFactor: factor,
+      contractYear,
+      leagueTier: resolveSponsorLeagueTier(gameState, offer.teamId),
+      leagueSize: seasonIndex === 0 ? undefined : sponsorRangraumFuer(gameState),
+    });
     const leiter = sponsorV3GuaranteedLadder(jahresTerms);
     const runde = (wert: number) => Math.round(wert * 10) / 10;
 

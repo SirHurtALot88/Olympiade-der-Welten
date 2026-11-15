@@ -7,6 +7,10 @@
 #   3. Git-Repo-Bereinigung woechentlich (git-repo-aufraeumen.sh) — die elternlosen Force-Push-
 #      Commits aus 1./2. haeufen sich sonst lokal als "dangling objects" an (ANLASS 01.09.: 6,8 GB
 #      reine Git-Historie bei nur ~200 MB Arbeitsbaum, s. git-repo-aufraeumen.sh).
+#   4. Docker-Aufraeumen woechentlich (docker-aufraeumen.sh) — ANLASS 14.11.: 23 GB verwaister
+#      Containerd-Reste aus gescheiterten Build-Versuchen, 13 GB davon in Sekunden mit
+#      `docker system prune -af` weg, aber nirgends automatisiert. Nur sichere, bereits von Hand
+#      erprobte Schritte, siehe docker-aufraeumen.sh.
 #
 # Danach ist auf GitHub IMMER dein aktueller Stand UND jede im Spiel gemeldete Sache — ohne dass du
 # je wieder etwas tippst. Claude liest beides von dort (siehe docs/BUGFIXING_AGENT.md).
@@ -36,13 +40,17 @@ BUGS_CRON="7,22,37,52 * * * * cd $REPO_DIR && bash deploy/hetzner/push-bug-repor
 # Sonntagnacht, abseits jeder Stosszeit. `git gc --prune=now` braucht selbst bei mehreren GB nur
 # Sekunden bis wenige Minuten — kein Grund, das haeufiger als woechentlich zu tun.
 GC_CRON="10 4 * * 0 cd $REPO_DIR && bash deploy/hetzner/git-repo-aufraeumen.sh >> /var/log/oly-git-gc.log 2>&1"
+# 10 Minuten versetzt zur Git-Bereinigung — beide sind in Sekunden bis wenigen Minuten fertig,
+# eine Ueberlappung waere ungefaehrlich, aber unnoetig.
+DOCKER_CRON="20 4 * * 0 cd $REPO_DIR && bash deploy/hetzner/docker-aufraeumen.sh >> /var/log/oly-docker-aufraeumen.log 2>&1"
 
 BEFORE="$(crontab -l 2>/dev/null || true)"
 AFTER="$(
-  printf '%s\n' "$BEFORE" | grep -v -e 'push-live-save.sh' -e 'push-bug-reports.sh' -e 'git-repo-aufraeumen.sh' | sed '/^$/d' || true
+  printf '%s\n' "$BEFORE" | grep -v -e 'push-live-save.sh' -e 'push-bug-reports.sh' -e 'git-repo-aufraeumen.sh' -e 'docker-aufraeumen.sh' | sed '/^$/d' || true
   echo "$SAVE_CRON"
   echo "$BUGS_CRON"
   echo "$GC_CRON"
+  echo "$DOCKER_CRON"
 )"
 
 if [ "$BEFORE" = "$AFTER" ]; then
@@ -55,6 +63,7 @@ else
   echo "    Live-Save     → alle 10 Minuten nach GitHub (Branch 'live-save')"
   echo "    Bug-Meldungen → alle 15 Minuten nach GitHub (Branch 'bug-reports')"
   echo "    Git-Bereinigung → sonntags 04:10 (git gc --prune=now)"
+  echo "    Docker-Aufraeumen → sonntags 04:20 (docker system prune -af, apt-get clean, journalctl --vacuum)"
 fi
 
 if [ "$ENSURE_ONLY" = "1" ]; then
@@ -71,3 +80,4 @@ bash "$REPO_DIR/deploy/hetzner/push-bug-reports.sh"
 echo ""
 echo "Und einmal sofort aufraeumen, statt bis Sonntag zu warten ..."
 bash "$REPO_DIR/deploy/hetzner/git-repo-aufraeumen.sh"
+bash "$REPO_DIR/deploy/hetzner/docker-aufraeumen.sh"

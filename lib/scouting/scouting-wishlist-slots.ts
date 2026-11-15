@@ -1,8 +1,17 @@
 import type { GameState, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { isPlayerFullyScouted } from "@/lib/scouting/scouting-reveal-state";
 
 /**
- * WIE VIELE SPIELER OHNE JEDES SCOUTING-BUERO AUF DIE WUNSCHLISTE PASSEN.
+ * WIE VIELE SPIELER OHNE JEDES SCOUTING-BUERO GLEICHZEITIG AKTIV GESCOUTET WERDEN.
+ *
+ * Seit dem Scouting-Ausbau (Chris, 10.11.: „dass dort endlos viele Spieler für ein team gespeichert
+ * werden dürfen, es wird aber weiterhin dann nur die obersten X der liste gescoutet bis die
+ * vollständig gescoutet sind") begrenzt diese Zahl NICHT mehr die Wunschliste selbst — die ist
+ * unbegrenzt —, sondern nur noch die aktive Scouting-Queue: die obersten X noch nicht fertigen
+ * Einträge. Siehe `getScoutingWishlistQueue` und docs/design/scouting-ausbau-konzept-11-11.md.
+ *
+ * Historie der Zahl (damals noch Listen-Grenze):
  *
  * Chris: „erweiter die wunschliste mal um 2 slots". Von 4 auf 6.
  *
@@ -30,8 +39,8 @@ export const SCOUTING_WISHLIST_SLOTS_PER_LEVEL = 4;
 export const SCOUTING_DRAFT_WISHLIST_SLOT_LIMIT = 999;
 
 /**
- * Obergrenze der Wunschliste selbst während der Draft-Phase (Season 1, bis
- * der Einstiegs-Flow abgeschlossen ist). Bug 2026-07-31: Chris meldete eine
+ * Aktive Scouting-Plätze während der Draft-Phase (bis 11.11. die Obergrenze der Wunschliste selbst)
+ * — Season 1, bis der Einstiegs-Flow abgeschlossen ist. Bug 2026-07-31: Chris meldete eine
  * zu kleine Grenze im Draft — tatsächlich war sie `null` (unbegrenzt), aber
  * `isTeamSetupDraftWishlistPhase` erkannte den Draft in seinem Spielstand gar
  * nicht mehr als solchen (siehe dort), sodass schon die reguläre, sehr
@@ -43,9 +52,12 @@ export const DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT = 15;
 
 export type ScoutingWishlistSlotCheck = {
   ok: boolean;
+  /** Aktive Scouting-Plätze (nicht mehr die Listen-Grenze, die Liste ist unbegrenzt). */
   limit: number | null;
   used: number;
   draftSuspended: boolean;
+  /** Aktive Plätze sind alle belegt — ein neuer Eintrag wartet, bis einer frei wird. */
+  waitsForSlot?: boolean;
   reason?: "wishlist_full";
 };
 
@@ -103,6 +115,11 @@ export function getScoutingFacilityLevel(gameState: GameState, teamId: string) {
   return getFacilityLevel(getTeamFacilityState(gameState, teamId), "scouting_office");
 }
 
+/**
+ * Wie viele Wunschlisten-Einträge gleichzeitig AKTIV gescoutet werden (die „obersten X").
+ * Der Name stammt aus der Zeit, als das zugleich die Listen-Grenze war; seit 11.11. ist die
+ * Liste unbegrenzt. `getActiveScoutingSlotLimit` ist der sprechende Alias.
+ */
 export function getScoutingWishlistSlotLimit(gameState: GameState, teamId: string): number {
   if (isTeamSetupDraftWishlistPhase(gameState, teamId)) {
     return DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT;
@@ -121,13 +138,72 @@ export function getTeamTransferWishlistEntries(gameState: GameState, teamId: str
   return (gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.teamId === teamId);
 }
 
+export const getActiveScoutingSlotLimit = getScoutingWishlistSlotLimit;
+
+export type ScoutingWishlistQueueState = "active" | "completed" | "waiting";
+
+export type ScoutingWishlistQueue = {
+  /** Alle Einträge des Teams in Prioritätsreihenfolge (Platz 1 zuerst). */
+  ordered: TransferWishlistEntry[];
+  /** Die obersten X noch nicht voll gescouteten Einträge — nur die bekommen Scouting-Fortschritt. */
+  active: TransferWishlistEntry[];
+  /** Voll gescoutete Einträge — belegen keinen Slot mehr, bleiben aber auf der Liste. */
+  completed: TransferWishlistEntry[];
+  /** Noch nicht fertig, aber unterhalb der aktiven Plätze — warten auf einen freien Slot. */
+  waiting: TransferWishlistEntry[];
+  capacity: number;
+  stateByPlayerId: Map<string, ScoutingWishlistQueueState>;
+};
+
+/**
+ * Reine Aufteilung einer nach Priorität sortierten Liste in aktiv / fertig / wartend.
+ * Fertige Einträge überspringt die Zählung — ihr Platz geht an den nächsten wartenden.
+ */
+export function splitScoutingWishlistQueue(
+  ordered: TransferWishlistEntry[],
+  capacity: number,
+  isComplete: (playerId: string) => boolean,
+): ScoutingWishlistQueue {
+  const active: TransferWishlistEntry[] = [];
+  const completed: TransferWishlistEntry[] = [];
+  const waiting: TransferWishlistEntry[] = [];
+  const stateByPlayerId = new Map<string, ScoutingWishlistQueueState>();
+  const safeCapacity = Math.max(0, capacity);
+  for (const entry of ordered) {
+    if (isComplete(entry.playerId)) {
+      completed.push(entry);
+      stateByPlayerId.set(entry.playerId, "completed");
+    } else if (active.length < safeCapacity) {
+      active.push(entry);
+      stateByPlayerId.set(entry.playerId, "active");
+    } else {
+      waiting.push(entry);
+      stateByPlayerId.set(entry.playerId, "waiting");
+    }
+  }
+  return { ordered, active, completed, waiting, capacity: safeCapacity, stateByPlayerId };
+}
+
+/**
+ * Die Scouting-Queue eines Teams: unbegrenzte Wunschliste, davon die obersten X nicht fertigen
+ * Einträge aktiv (X = `getScoutingWishlistSlotLimit`).
+ */
+export function getScoutingWishlistQueue(gameState: GameState, teamId: string): ScoutingWishlistQueue {
+  return splitScoutingWishlistQueue(
+    sortByPriorityRank(getTeamTransferWishlistEntries(gameState, teamId)),
+    getScoutingWishlistSlotLimit(gameState, teamId),
+    (playerId) => isPlayerFullyScouted(gameState, teamId, playerId),
+  );
+}
+
+/**
+ * Die AKTIV gescouteten Wunschlisten-Einträge (die obersten X noch nicht fertigen).
+ *
+ * Bis 11.11. schnitt das die obersten X ab, egal ob fertig — ein voll gescouteter Spieler auf
+ * Platz 1 hielt seinen Slot dann für immer. Jetzt gibt ein fertiger Eintrag seinen Platz frei.
+ */
 export function getActiveScoutingWishlistEntries(gameState: GameState, teamId: string) {
-  const entries = sortByPriorityRank(getTeamTransferWishlistEntries(gameState, teamId));
-  const limit = getScoutingWishlistSlotLimit(gameState, teamId);
-  // Nur die Anzeige/Aktivierung wird gekappt (slice) — gespeicherte Einträge
-  // oberhalb der Grenze bleiben im Save erhalten, siehe trimTransferWishlistToSlotLimit
-  // für die einzige Stelle, die Einträge tatsächlich entfernt.
-  return entries.slice(0, limit);
+  return getScoutingWishlistQueue(gameState, teamId).active;
 }
 
 /**
@@ -168,6 +244,12 @@ export function reorderTeamTransferWishlist(
   return [...otherEntries, ...reranked];
 }
 
+/**
+ * Darf der Spieler auf die Wunschliste? Seit 11.11. immer — die Liste ist unbegrenzt
+ * (Chris: „endlos viele Spieler"). Die Prüfung bleibt als Schnittstelle bestehen, weil das UI aus
+ * ihr ablesen will, ob ein neuer Eintrag sofort gescoutet wird oder auf einen Slot wartet
+ * (`waitsForSlot`).
+ */
 export function canAddPlayerToTransferWishlist(
   gameState: GameState,
   teamId: string,
@@ -176,18 +258,12 @@ export function canAddPlayerToTransferWishlist(
   const entries = getTeamTransferWishlistEntries(gameState, teamId);
   const used = entries.length;
   const draftSuspended = isTeamSetupDraftWishlistPhase(gameState, teamId);
-  // Seit `getScoutingWishlistSlotLimit` im Draft die feste 15er-Grenze statt
-  // `null` liefert, greift dieselbe Prüfung einheitlich in beiden Phasen —
-  // `draftSuspended` bleibt nur noch als Info fürs UI erhalten (andere
-  // Meldung, siehe getScoutingWishlistSlotMessage).
   const limit = getScoutingWishlistSlotLimit(gameState, teamId);
   if (playerId && entries.some((entry) => entry.playerId === playerId)) {
     return { ok: true, limit, used, draftSuspended };
   }
-  if (used >= limit) {
-    return { ok: false, limit, used, draftSuspended, reason: "wishlist_full" };
-  }
-  return { ok: true, limit, used, draftSuspended };
+  const activeCount = getScoutingWishlistQueue(gameState, teamId).active.length;
+  return { ok: true, limit, used, draftSuspended, waitsForSlot: activeCount >= limit };
 }
 
 export function getScoutingWishlistSlotMessage(check: ScoutingWishlistSlotCheck) {
@@ -195,9 +271,9 @@ export function getScoutingWishlistSlotMessage(check: ScoutingWishlistSlotCheck)
     return null;
   }
   if (check.draftSuspended) {
-    return `Wunschliste im Draft voll (${check.used}/${check.limit} Plätzen). Erst einen Spieler entfernen, um einen neuen zu setzen.`;
+    return `Scouting-Slots im Draft belegt (${check.used}/${check.limit}).`;
   }
-  return `Wishlist voll (${check.used}/${check.limit} Scouting-Slots). Erst einen Spieler entfernen oder Scouting Office upgraden.`;
+  return `Scouting-Slots belegt (${check.used}/${check.limit}). Erst eine Beobachtung entfernen oder Scouting Office upgraden.`;
 }
 
 export function countManualScoutingWatchSlots(gameState: GameState, teamId: string) {
@@ -215,22 +291,13 @@ export function canAddManualScoutingWatchEntry(gameState: GameState, teamId: str
     return { ok: true, limit: null, used: getTeamTransferWishlistEntries(gameState, teamId).length, draftSuspended: true };
   }
   const limit = getScoutingPipelineSlotLimit(gameState, teamId);
-  const wishlistUsed = getTeamTransferWishlistEntries(gameState, teamId).length;
+  // Nur die AKTIVEN Wunschlisten-Plätze belegen die Pipeline — eine lange Merkliste darf manuelle
+  // Beobachtungen nicht aussperren (seit 11.11. ist die Wunschliste unbegrenzt).
+  const wishlistUsed = getScoutingWishlistQueue(gameState, teamId).active.length;
   const manualUsed = countManualScoutingWatchSlots(gameState, teamId);
   const used = wishlistUsed + manualUsed;
   if (used >= limit) {
     return { ok: false, limit, used, draftSuspended: false, reason: "wishlist_full" as const };
   }
   return { ok: true, limit, used, draftSuspended: false };
-}
-
-export function trimTransferWishlistToSlotLimit(entries: TransferWishlistEntry[], gameState: GameState, teamId: string) {
-  const limit = getScoutingWishlistSlotLimit(gameState, teamId);
-  const teamEntries = entries.filter((entry) => entry.teamId === teamId);
-  const otherEntries = entries.filter((entry) => entry.teamId !== teamId);
-  if (limit == null) {
-    return entries;
-  }
-  const keptTeamEntries = sortByPriorityRank(teamEntries).slice(0, limit);
-  return [...otherEntries, ...keptTeamEntries];
 }
