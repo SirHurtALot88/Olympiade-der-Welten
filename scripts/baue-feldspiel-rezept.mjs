@@ -54,31 +54,46 @@ const ERLAUBT = {
     PARADE:      ["awareness", "will", "determination", "health", "dexterity"],
   },
   // FOOTBALL — Kandidaten aus dem Football-Plan (docs/design/football-rollout-plan.md,
-  // Teil D), aber NICHT wortgleich uebernommen: "awareness" faellt ueberall dort heraus,
-  // wo der Plan es als Kandidat nennt (PASSGENAUIGKEIT/PASSSCHUTZ/ABWEHR_PASS). Grund,
-  // GEMESSEN an der echten Kaderfamilie (data/generated/kaderfamilie-live-save.json, 110
-  // Spieler, Spearman-rho je Attribut gegen `p.d.football`, s. docs/design/football-
-  // rezept-kalibrierung.md Abschnitt 4.2 fuer die volle Tabelle und das Skript-Fragment):
-  // awareness korreliert auf diesem Kader NEGATIV mit der Football-Eignung (rho -0,34) —
-  // trotz drittschwerstem
-  // Matrixgewicht (11). health/determination/will/power/charisma/spirit liegen alle
-  // deutlich positiv (0,36 bis 0,54), genau dieselbe Falle wie Hockeys Speed/Spirit
-  // (docs/design/hockey-rezept-ursache.md Abschnitt 2) — nur schon VOR dem ersten
-  // Sinkhorn-Lauf vermieden statt hinterher nachjustiert. "dexterity"/"speed"/
-  // "intelligence" stehen gar nicht erst zur Wahl: keins der drei traegt Matrixgewicht in
-  // BASIS_JE_DISC.football (spirit/torment/health/awareness/will/determination/power/
-  // stamina/charisma), Sinkhorn kann sie ohnehin nicht speisen. LAUFTEMPO fehlt hier
-  // bewusst (wie PARADE torwartspezifisch bei Hockey, nur umgekehrt): es ist keine
-  // fachliche Rolle, sondern das disziplinuebergreifend erwartete Bewegungstempo
-  // (battle-mode.rezepte.js-Konvention 1:1 mit Basketball/Hockey), speed/dexterity
-  // tragen dafuer ohnehin kein Football-Matrixgewicht — bleibt unangetastet.
+  // Teil D).
+  //
+  // AWARENESS WIEDER ZUGELASSEN (14.11., Opus-PM-Praezisierung nach Chris' Matrix-
+  // Ruecknahme-Auftrag). Bis hierher war "awareness" in KEINER Zelle erlaubt — ausdruecklich,
+  // weil es auf der (damaligen) Kaderfamilie negativ mit der Football-Eignung korrelierte
+  // (rho -0,34, docs/design/football-rezept-kalibrierung.md Abschnitt 4.2) und das Projekt
+  // damals noch gegen den Spiel-Eignungs-Override kalibrierte, in dem awareness nur 8 Pp
+  // wog. Genau das ist jetzt der Fehler, den Chris ausdrueckllich benennt: eine ERLAUBT-
+  // Liste, die ein Matrix-Attribut komplett aussperrt, macht seine Zeilensumme unloesbar
+  // (0 statt des vollen Matrixgewichts 11) — Sinkhorn kann ein Attribut nur verteilen,
+  // wenn mindestens eine Zelle es zulaesst. Die rho-Sorge bleibt real (und bleibt zu
+  // beobachten), aber die Antwort darauf ist die SPALTENSEITE (Sondierung/mechanisches
+  // Gewicht der Sub-Skills, Primaer-/Nebenwege), nicht das Aussperren eines Attributs aus
+  // der ZEILE — s. CLAUDE.md "Die Eignungsmatrix ist gesperrt". Zugelassen in den drei
+  // Zellen, die der Football-Plan (Teil D) urspruenglich dafuer vorsah: PASSGENAUIGKEIT
+  // (Feldlesen/Progression), PASSSCHUTZ (Blitz-Erkennung) und ABWEHR_PASS (Coverage-
+  // Antizipation) — football-fachlich die drei Rollen, in denen "awareness" tatsaechlich
+  // die Bedeutung hat, die der Name verspricht. "dexterity"/"speed"/"intelligence" bleiben
+  // zu Recht aussen vor: keins der drei traegt Matrixgewicht in MATRIX.football, Sinkhorn
+  // kann sie ohnehin nicht speisen. LAUFTEMPO fehlt hier bewusst (wie PARADE
+  // torwartspezifisch bei Hockey, nur umgekehrt): es ist keine fachliche Rolle, sondern das
+  // disziplinuebergreifend erwartete Bewegungstempo (battle-mode.rezepte.js-Konvention 1:1
+  // mit Basketball/Hockey), speed/dexterity tragen dafuer ohnehin kein Football-
+  // Matrixgewicht — bleibt unangetastet.
   football: {
-    PASSGENAUIGKEIT: ["determination", "will"],
+    PASSGENAUIGKEIT: ["determination", "will", "awareness"],
     LAUFKRAFT:       ["power", "health", "spirit"],
-    PASSSCHUTZ:      ["health", "determination", "will"],
-    ABWEHR_PASS:     ["torment", "power"],
+    PASSSCHUTZ:      ["health", "determination", "will", "awareness"],
+    ABWEHR_PASS:     ["torment", "power", "awareness"],
     ABWEHR_LAUF:     ["torment", "power", "health"],
     BALLSICHERHEIT:  ["health", "will"],
+    // RUNDE 2 VERSUCHT UND VERWORFEN (14.11., Spaltenseite): TEAMGEIST brauchte laut Sondierung
+    // 51,7 % der mechanischen Gesamtmasse, konnte aus spirit+charisma+torment (Matrixbudget
+    // 25+4+16=45) aber nur 39,9 % tatsaechlich erreichen. "health" zusaetzlich zugelassen
+    // (football-fachlich: der grosse, zaehe Zielspieler) hob diese Luecke NICHT (health ist
+    // bereits anderswo voll ausgeschoepft, verschob nur die Komposition) und kostete Pp
+    // (18,3 -> 26,3, durchgefallen) fuer einen kleinen rho-Gewinn (0,525 -> 0,564) — s.
+    // docs/design/football-rezept-matrix-budget-14-11.md. Zurueckgerollt auf die urspruengliche
+    // Drei-Attribute-Zelle; die naechste Runde braucht eine andere Spaltenseiten-Idee, keine
+    // weitere Verdraengung eines bereits ausgeschoepften Attributs.
     TEAMGEIST:       ["spirit", "charisma", "torment"],
     AUSDAUER:        ["stamina", "health", "will"],
   },
@@ -159,7 +174,7 @@ for (const s of subskills) {
     .map((a) => ({ a, v: matrix[a] * p[a][s] }))
     .sort((x, y) => y.v - x.v);
   const summe = roh.reduce((x, y) => x + y.v, 0) || 1;
-  let anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
+  const anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
   // Rundungsrest auf den groessten Posten legen, damit die Zeile exakt 100 ergibt.
   const rest = 100 - anteile.reduce((x, y) => x + y.v, 0);
   if (anteile.length) anteile[0].v += rest;

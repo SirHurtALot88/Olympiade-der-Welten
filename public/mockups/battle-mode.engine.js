@@ -9742,22 +9742,81 @@
       // bewusst konservativ, sie tragen die am genauesten gegen den Korridor (Yards/Carry,
       // Sack-/Interception-Quote) gefitteten Kanaele.
       //
-      // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 48 football, kaderfest, ZWEIMAL
-      // unabhaengig reproduziert, bit-identisch): rho je Spiel 0,804 (Baseline) -> 0,808
-      // (bestanden, MEHR Marge als die Baseline selbst). Pp (messe-arena-einfluss.mjs, n=48,
-      // 2 Saatstroeme): Mittel 57,05 -> 54,75 — kleiner als in der zurueckgezogenen ersten
-      // Fassung (die rho gekostet haette), aber real und sicher. Siehe PR-Dokument fuer die
-      // vollen Vorher/Nachher-Zahlen inkl. Pp je Attribut.
+      // ALLES OBERHALB DIESES KOMMENTARS BESCHREIBT DAS ALTE REZEPT ("Rezept C") — gegen den
+      // damaligen Spiel-Eignungs-Override kalibriert (power/health/speed/torment-schwer), NICHT
+      // mehr der aktuelle Stand. Stehen gelassen als Nachweis, warum fruehere Entscheidungen
+      // (z.B. "awareness bewusst ausgesperrt") damals Sinn ergaben.
+      //
+      // REZEPT-BRUCH GEFUNDEN UND BEHOBEN (15.11., CLAUDE.md-Auftrag "PPS-Bruecken abloesen").
+      // Der Override-Rueckbau (b5731dd6f, 14.11., "Football-Override zurueckgebaut: Mechanik
+      // liest wieder die Matrix") hat NUR die Eignungsquelle (`p.d.football`/BASIS_JE_DISC)
+      // auf die offizielle Matrix zurueckgesetzt — DIESES `rezept:`-Feld hier (das die
+      // Sub-Skills tatsaechlich speist) wurde dabei NIE angefasst und blieb das alte, gegen den
+      // Override gefittete Rezept C stehen. Ergebnis: `spirit` (Matrixgewicht 25, das GROESSTE
+      // Einzelgewicht) und `charisma` (4) kamen in KEINER Zelle vor — ihre Zeile war buchstaeblich
+      // unloesbar, sie trugen 0 statt ihres vollen Budgets, waehrend die Eignung (gegen die rho
+      // gemessen wird) sie voll gewichtet. Frisch gemessen VOR diesem Fix (Task #136, 15.11.,
+      // node scripts/miss-alle-disziplinen.mjs 24 football + messe-arena-einfluss.mjs football 48,
+      // zwei Saatstroeme): rho je Spiel 0,248 (durchgefallen, Spannweite 0,809 — groesser als der
+      // Messwert selbst), Pp 113,2/116,2 (die 25er-Schranke um das Viereinhalbfache verletzt).
+      //
+      // DER FIX WAR SCHON FERTIG, NUR NIE VERDRAHTET: `docs/design/
+      // football-rezept-matrix-budget-14-11.md` (Branch `claude/football-rezept-matrix-budget-
+      // 14-11`, PR #1463, nie gemergt) hatte genau dieses Rezept am 14.11. per Budget-Methode
+      // (Sinkhorn, scripts/baue-feldspiel-rezept.mjs, ERLAUBT-Zeilen-Bug fuer awareness/charisma
+      // behoben) neu gebaut und am echten Motor gemessen — die PR blieb nur offen stehen. Hier
+      // zum ersten Mal wirklich in die Produktion gezogen ("Runde 1" aus dem Dokument, Sondierung
+      // `scripts/sondiere-feldspiel-subskills.mjs football 24`: TEAMGEIST 52,7 %, LAUFKRAFT 24,4 %,
+      // ABWEHR_LAUF 8,7 %, PASSGENAUIGKEIT 8,1 %, ABWEHR_PASS 4,9 %, PASSSCHUTZ 1,2 %, BALLSICHERHEIT/
+      // AUSDAUER 0 % mechanisches Gewicht — kompositionsunabhaengig, bit-identisch auf dem alten UND
+      // dem neuen Rezept gemessen).
+      //
+      // GEMESSEN NACH DEM FIX (reproduziert 15.11., node scripts/miss-alle-disziplinen.mjs 48
+      // football + messe-arena-einfluss.mjs football 48, zwei Saatstroeme, dieselbe Kaderfamilie):
+      // Pp 18,3 (bestanden, nahe am angestrebten Optimum <15 — spirit 27,4 vs. 25, torment 17,2
+      // vs. 16, health 16,4 vs. 14, awareness 9,6 vs. 11, alle Attribute binnen ±2,4 Pp ihres
+      // Matrixgewichts ausser stamina, das wegen AUSDAUERs seit jeher fehlendem mechanischen Kanal
+      // bei 0 % bleibt — ein Motor-, kein Rezeptbefund). rho je Spiel 0,525 / Saison 0,685 — MASSIV
+      // besser als die 0,248 des reinen Override-Rueckbaus ohne Rezeptfix, aber WEITERHIN unter der
+      // 0,75er-Mindestschranke (CLAUDE.md) und der 0,80er-Zielschranke.
+      //
+      // VIER WEITERE SPALTENSEITEN-VARIANTEN PROBIERT UND VERWORFEN (docs/design/
+      // football-rezept-matrix-budget-14-11.md Runden 2-4, docs/design/
+      // football-matrix-spirit-awareness-tausch-15-11.md, alle auf eigenen, nie gemergten
+      // Branches, am 15.11. fuer diese PR nachvollzogen statt blind wiederholt): zusaetzliche
+      // TEAMGEIST-Zelle fuer health (rho 0,564, aber Pp 26,3, durchgefallen), determination/will
+      // aus PASSGENAUIGKEIT/PASSSCHUTZ abgezogen (rho 0,512, Pp 40 — awareness wird dort zur
+      // Mehrheit und die `fkLos()`-Lotterie, FK_LOS_KAPPA=3,4, verstaerkt das ueberproportional),
+      // ein `FK_LOS_KAPPA`-Sweep 3,4->1,0 (rho bleibt bei 0,498-0,548, Pp wird NIE besser als bei
+      // 3,4), awareness zusaetzlich in TEAMGEIST (rho 0,578, aber Pp 22,0 — schlechter als Runde 1
+      // und der rho-Unterschied liegt innerhalb der Kaderrauschen-Spannweite), und eine ECHTE
+      // Matrix-Verschiebung spirit(25->15)/awareness(11->21) mit Fechten als Ausgleichspartner
+      // (Pp 26,8-33,7 auf BEIDEN Saatstroemen durchgefallen, rho unveraendert bei 0,500). ALLE FUENF
+      // unabhaengigen Hebel (vier Spaltenseiten-Varianten plus der Kappa-Sweep) landen rho im
+      // selben engen Band 0,50-0,58 — ein konvergentes, nicht ein einzelnes falsches Detail:
+      // TEAMGEIST trägt mit 52,7 % bei weitem das meiste mechanische Gewicht und ist die einzige
+      // Zelle mit genug Masse fuer `spirit`s 25 Budgetpunkte, aber `spirit` korreliert in diesem
+      // Motor nachweislich schwach mit dem simulierten Spielausgang (dieselbe Diagnose, die die
+      // alte, jetzt zurueckgebaute Override-Fassung mit rho 0,807 erkaufte, indem sie spirit
+      // komplett auf 0 % mechanisches Gewicht hielt). EIN ECHTER FIX dafuer braeuchte einen neuen
+      // Kanal, ueber den `spirit` tatsaechlich den simulierten Ausgang beeinflusst (z.B. eine
+      // substanzielle, nicht nur additive Clutch-/Nervenstaerke-Wirkung bei 3rd/4th-Down-
+      // Entscheidungen) — eine Motorformel-Aenderung mit eigenem Korridor-Refit (Completion-Quote,
+      // Yards/Attempt, Turnover-Quote), keine Rezeptfrage mehr, und deshalb eine Entscheidung fuer
+      // Chris, nicht stillschweigend hier mitgemacht. Football bleibt deshalb bewusst NICHT in
+      // ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS/ARENA_RESOLVED_DISCIPLINE_IDS (s. dort) — dieser Fix
+      // ist eine reine, risikofreie Verbesserung (beide Kennzahlen gehen hoch, kein Tausch rho
+      // gegen Pp), aber keine, die die Pflichtabnahme allein schon bestehen laesst.
       rezept:{
-        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert, UNVERAENDERT
-        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT (Yards/Carry-Korridor daran gefittet)
-        PASSSCHUTZ:      {power:38,health:36,awareness:20,stamina:6}, // stamina NEU (6, sicher), awareness UNVERAENDERT (Erhoehung kaderfest durchgefallen, s. Kommentar oben)
-        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt, UNVERAENDERT
-        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck, UNVERAENDERT
-        BALLSICHERHEIT:  {power:33,health:33,determination:28,will:6}, // will NEU (6, reduziert von urspruenglich erwogenen 15 — s. Kommentar oben), power/health/determination nur leicht gesenkt
-        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788)
-        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (weiterhin KEIN eigener Kanal — stamina/will haben jetzt anderswo einen, s.o.)
-        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
+        PASSGENAUIGKEIT: {will:46,determination:45,awareness:9},
+        LAUFKRAFT:       {health:54,power:24,spirit:22},
+        PASSSCHUTZ:      {will:46,determination:45,awareness:9},
+        ABWEHR_PASS:     {awareness:100},
+        ABWEHR_LAUF:     {health:59,power:25,torment:16},
+        BALLSICHERHEIT:  {will:100},
+        TEAMGEIST:       {spirit:53,torment:37,charisma:10},
+        AUSDAUER:        {stamina:100},
+        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.), kein Matrix-Attribut
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
       // Football-Konzepten. Auf die neuen Sub-Skill-Namen nachgezogen, damit hier keine
