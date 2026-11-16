@@ -169,19 +169,19 @@
   },
   "eiskunstlauf": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.912,
-   "rhoSpannweite": 0.046,
-   "rhoSaison": 0.951,
+   "rhoJeSpiel": 0.927,
+   "rhoSpannweite": 0.021,
+   "rhoSaison": 0.965,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf -- Budget-Konservierung 15.11., Rezept nach Zeilenschritt",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    18.8,
-    19.8
+    10.6,
+    12.0
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs eiskunstlauf (+ --saat-versatz=10000000)",
@@ -191,29 +191,34 @@
     "saatStroeme": [
      0,
      10000000
-    ]
+    ],
+    "gegenprobe": {
+     "saatVersatz": 20000000,
+     "pp": 11.2,
+     "hinweis": "ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
+    }
    },
    "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "commit": "fbcdc6fab",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,866 -> 0,912 (Spannweite 0,046, deutlich enger), Saison 0,986 -> 0,951 -- Bewegung 0,046/0,035, innerhalb der alten Spannweite, keine Regression, eher komfortabler. Pp nicht neu gemessen, 18,8/19,8 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher dexterity 24,5 % gegen Matrix 18, charisma 23,8 % gegen 28, speed 5,5 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,8/19,8 -> 10,6/12,0, Gegenprobe auf dem ungesehenen Strom 20 000 000: 11,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,912 -> 0,927 (Spannweite 0,021, Saison 0,965) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,866 -> 0,912 (Spannweite 0,046, deutlich enger), Saison 0,986 -> 0,951 -- Bewegung 0,046/0,035, innerhalb der alten Spannweite, keine Regression, eher komfortabler. Pp nicht neu gemessen, 18,8/19,8 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
   },
   "breaking": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.867,
-   "rhoSpannweite": 0.181,
-   "rhoSaison": 0.916,
+   "rhoJeSpiel": 0.86,
+   "rhoSpannweite": 0.169,
+   "rhoSaison": 0.923,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking -- Budget-Konservierung 15.11., Rezept mit intelligence in NERVEN",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    14.3,
-    13.9
+    12.5,
+    10.2
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs breaking (+ --saat-versatz=10000000)",
@@ -226,10 +231,10 @@
     ]
    },
    "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "commit": "fbcdc6fab",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,801 -> 0,867 (n=24, Spannweite 0,181, enger als vorher), Saison 0,944 -> 0,916 -- Bewegung 0,066/0,028, innerhalb der alten Spannweite (0,289), keine Regression. Breaking stand bisher auf der Beobachtungsliste, weil 0,801 GENAU auf der Schranke lag -- der neue Wert liegt deutlich komfortabler (0,067 statt 0,001 Abstand), bleibt aber wegen der weiterhin grossen Spannweite vorsorglich auf der Liste (s. 'beobachtungsliste' oben, Text aktualisiert). Gegenprobe n=48 (im selben Zug wie Climbing/Showcase/I-Spy zur Absicherung gefahren): 0,868, bestaetigt den n=24-Wert fast exakt -- stabil, kein Grenzfall wie bei den anderen drei. Pp nicht neu gemessen, 14,3/13,9 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste."
   },
   "wettessen": {
    "chassis": "buehne",
@@ -297,19 +302,19 @@
   },
   "fechten": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.877,
-   "rhoSpannweite": 0.037,
-   "rhoSaison": 0.972,
+   "rhoJeSpiel": 0.876,
+   "rhoSpannweite": 0.045,
+   "rhoSaison": 0.979,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 fechten -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 fechten -- Budget-Konservierung 15.11., Rezept nach Zeilenschritt",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    20.1,
-    20.7
+    12.7,
+    13.3
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs fechten (+ --saat-versatz=10000000)",
@@ -319,13 +324,18 @@
     "saatStroeme": [
      0,
      10000000
-    ]
+    ],
+    "gegenprobe": {
+     "saatVersatz": 20000000,
+     "pp": 13.2,
+     "hinweis": "ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
+    }
    },
    "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "commit": "fbcdc6fab",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,86 -> 0,877 (Spannweite 0,037, enger), Saison 0,937 -> 0,972 -- Bewegung 0,017, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 20,1/20,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher determination 1,3 % gegen Matrix 6, torment 20,4 % gegen 25, speed 20,2 % gegen 16, health 7,5 % gegen 4). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 20,1/20,7 -> 12,7/13,3, Gegenprobe auf dem ungesehenen Strom 20 000 000: 13,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,877 -> 0,876 (Spannweite 0,045, Saison 0,979) -- gehalten. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,86 -> 0,877 (Spannweite 0,037, enger), Saison 0,937 -> 0,972 -- Bewegung 0,017, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 20,1/20,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
   },
   "staffel": {
    "chassis": "bahn",
@@ -572,46 +582,72 @@
    "anmerkung": "NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,779 -- unter der 0,80-Schranke (vorher 0,817/0,811, bereits damals knapp). Weil die Bewegung (0,038) kleiner als die eigene Spannweite (0,212) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,776** (Spannweite 0,199, Saison 0,888) -- KONVERGIERT NAHE DEM n=24-WERT statt sich der 0,80-Schranke anzunaehern, genau wie Showcase. Das spricht GEGEN reines Abtast-Rauschen und FUER einen echten, wenn auch kleinen Abstand zur Schranke bei der aktuellen Kaderfamilie -- anders als bei Climbing (das bei n=48 auf 0,801 stieg). I-Spy ist in `ARENA_RESOLVED_DISCIPLINE_IDS` gewertet; dieser Befund macht `tests/disziplin-abnahme-guard.test.ts` ROT, bis entweder die Menge nachgezogen wird oder eine neue Messung/Kaderfamilie etwas anderes zeigt -- das ist die vom Waechter selbst dokumentierte Reaktion auf eine durchfallende Neumessung, keine neue Regel. Diese PR aendert arena-resolved-disciplines.ts bewusst NICHT (reine Mess-/Doku-Aktualisierung, Abstimmung mit der parallel laufenden Football-Session noetig). I-Spy stand schon vorher auf der Beobachtungsliste (zweiter Strom nur 0,011 ueber der Schranke) -- bleibt dort, Text s. 'beobachtungsliste' oben. Pp nicht neu gemessen, 14,6/15,0 bleibt gueltig (kein Rezept-Code seit 27.10. angefasst). Historie: Gemessen auf origin/main 14b15d3e plus der Kalibrierrunde 3 dieses PRs (BUEHNE_ART['i-spy'].rundenN 8 -> 32, rundenDauer mitskaliert, ISPY_PUNKTWERT[3] 60 -> 45). Vorher (gleiche Sonden): rho je Spiel 0,749 / 0,710 (zwei Stroeme, n=48), Pp 16,6 / 12,8. Nachher: rho 0,817 / 0,811, 5 von 5 Paarungen auf beiden Stroemen besser; Saison 0,888 / 0,895; Star Rang 1 54,2 % / 52,1 %, erste zwei 84,2 % / 81,7 %, letzter 0 %, Paartreue (>=15) 96,8 % / 96,6 %. Kadergroessen je Seite 2/3/4/5 (n=24): 0,854 / 0,842 / 0,877 / 0,859. Spiegeltest (miss-arena-buehne-spiegel.mjs 480 i-spy) 247:231, Punkte 0,1 % auseinander. Pp-Profil beide Stroeme: intelligence +5,2/+5,0 die groesste Einzelabweichung, kein Matrixattribut bei 0 %. Chassis spieleBuehneAuftritt() (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), PPS-Referenz data/generated/i-spy-pps-referenz.json."
   },
   "battlefield": {
-   "rhoJeSpiel": 0.589,
-   "rhoSpannweite": 0.276,
-   "rhoSaison": 0.664,
-   "pp": [
-    30.1,
-    37.1
-   ],
-   "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 battlefield -- Task #136, frische Kaderfamilie 15.11.",
-    "spiele": 24,
-    "kaderVarianten": 5,
-    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "Median ueber die Kader-Familie; MISST DAS ZWEIER-DUELL AUF DEM ARENA-CHASSIS, NICHT den gewerteten Vierer-Pod (s. Anmerkung)"
+   "format": "4-Team-Pod, Gefecht je Ort (gewertet; bfffaGefecht, BATTLEFIELD_POD_VORLAUF_AKTIV)",
+   "rhoJeSpiel": 0.874,
+   "rhoJeKampfMedianJeK": {
+    "2": [
+     0.89,
+     0.899
+    ],
+    "3": [
+     0.881,
+     0.874
+    ],
+    "4": [
+     0.892,
+     0.876
+    ],
+    "5": [
+     0.917,
+     0.913
+    ],
+    "6": [
+     0.913,
+     0.902
+    ]
    },
-   "datum": "2026-11-15",
-   "quelle": "docs/design/baseline-alle-20-disziplinen-15-11.md; docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7 (der tatsaechlich gewertete Pod)",
-   "rhoFrisch": true,
-   "ppFrisch": false,
-   "commit": "984da6e18",
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): dieser Eintrag misst weiterhin nur das alte Zweier-Duell auf dem generischen Arena-Chassis (rho 0,399 -> 0,589, Spannweite 0,276, Saison 0,664) -- AUSSERHALB DER WERTUNG. Battlefield wird seit dem Vierer-Pod-Umbau (02.11., docs/design/battlefield-pod-ffa-02-11.md) tatsaechlich als Gefecht je Ort gewertet: rho je Kampf 0,861-0,923 fuer k=2..6, Pp 4,8-20,2 (n=48) -- BEIDE Pflichtkriterien dort regulaer bestanden, eigener Messpfad (nicht dieser JSON-Schluessel). Das Zweier-Duell bleibt als Referenz/Kalibrierungsbasis des alten Chassis stehen, zaehlt aber fuer keine Abnahme-Entscheidung mehr. Pp hier nicht neu gemessen (30,1/37,1 ist die alte, nie fuer die Wertung relevante Zahl, ppFrisch bleibt false)."
-  },
-  "tdm": {
-   "chassis": "kampf",
-   "rhoJeSpiel": 0.813,
-   "rhoSpannweite": 0.321,
-   "rhoSaison": 0.857,
+   "rhoSaison": 0.947,
+   "pp": [
+    8.2,
+    7.5
+   ],
+   "ppJeK": {
+    "2": [
+     8.2,
+     7.5
+    ],
+    "3": [
+     5.2,
+     4.6
+    ],
+    "4": [
+     7.7,
+     7.0
+    ],
+    "5": [
+     5.8,
+     5.9
+    ],
+    "6": [
+     6.4,
+     4.3
+    ]
+   },
    "rhoMessung": {
-    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs 24 --je-seite=2..6 --pp --stroeme=0,10000000",
-    "spiele": 24,
+    "befehl": "node scripts/miss-battlefield-pod-ffa-abnahme.mjs 4 --je-seite=2..6 --gruppen=30 --pp=48 --pp-je-seite=2..6",
+    "spiele": 4,
+    "vierergruppen": 30,
     "kaderVarianten": 10,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "k=6 (Standard-Motorfeldgroesse ARENA_ART.tdm.jeSeite), Saatstrom 0; Median ueber k=2..6 beider Stroeme liegt bei 0,800-0,827, s. Anmerkung"
+    "saatStroeme": [
+     0,
+     10000000
+    ],
+    "statistik": "rhoJeSpiel = KLEINSTER Median (rho je Kampf, Gruppenmittel) ueber k=2..6 und beide Saatstroeme (konservativ); rhoSaison ebenso der kleinste Wert; pp = groesste Abweichung ueber k=2..6 je Strom"
    },
-   "pp": [
-    16.8,
-    14.2
-   ],
    "ppMessung": {
-    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=24 --pp-je-seite=6",
-    "laeufe": 24,
+    "befehl": "dieselbe Messung, --pp=48 (window.__arena.battlefieldPodEinfluss = einflussVon als Vier-Team-Kampf)",
+    "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
     "saatStroeme": [
@@ -619,11 +655,77 @@
      10000000
     ]
    },
-   "datum": "2026-11-10",
-   "commit": "9b986f6b7",
+   "duellReferenz": {
+    "hinweis": "Das alte Zweier-Duell auf dem generischen Arena-Chassis (build()/stepSim()) -- AUSSERHALB DER WERTUNG, nur Referenz/Kalibrierungsbasis. Diese Zahlen standen bis 15.11. als Kopfwerte dieses Eintrags und liessen Battlefield faelschlich als durchgefallen erscheinen.",
+    "rhoJeSpiel": 0.589,
+    "rhoSpannweite": 0.276,
+    "rhoSaison": 0.664,
+    "pp": [
+     30.1,
+     37.1
+    ],
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 battlefield (Task #136, 15.11.; Pp aus aelterer Messung, nie fuer die Wertung relevant)"
+   },
+   "datum": "2026-11-15",
+   "commit": "2d4153b4b",
+   "quelle": "docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7; data/generated/battlefield-pod-gefecht-abnahme.json (mit dieser Messung frisch ueberschrieben, 15.11.)",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "TDM-Gefecht-Verdrahtung 11.11.: tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324, Zahl oben war aus docs/design/gesamtstand-audit-13-10.md uebernommen und galt der nie wirklich angeschlossenen Echtzeit-Simulation). Neu gemessen auf main NACH dem Anzeige-Treue-Fix PR #1372 (rho war beim urspruenglichen Prototyp 10.11. noch 0,808-0,829 -- die 0,800-0,827 hier sind der aktuelle, leicht niedrigere main-Stand, weiterhin klar ueber der Schranke). GEGENPROBE 15.11. (Task #136): der generische Alle-Disziplinen-Sweep (node scripts/miss-alle-disziplinen.mjs 24 tdm, Standard-Kaderfamilie statt der k=2..6-Mittelung) misst 0,911 (Spannweite 0,020, Saison 0,958) -- andere Stichprobe/Methodik (s. 'statistik' oben), aber kein Widerspruch: beide Messpfade liegen komfortabel ueber der 0,80-Schranke. Kein Code seit 11.11. an tdmGefecht() geaendert (nur ein Sound-Polish-Commit d1a61aa84, 14.11., ohne Wertungsbezug) -- die massgebliche k=2..6-Zahl (0,813) nicht neu gemessen, bleibt gueltig."
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten'): dieser Eintrag zeigte bis hierher die Zahlen des alten Zweier-Duells (rho 0,589, Pp 30,1/37,1) als Kopfwerte -- ein MESSPFAD-FEHLER wie bei Hockey, kein Mechanikproblem. Gewertet wird Battlefield seit 02.11. ausschliesslich als Vier-Team-Pod (VIERER_POD_DISCIPLINE_IDS, BATTLEFIELD_POD_VORLAUF_AKTIV; steht deshalb nie in ARENA_RESOLVED_DISCIPLINE_IDS). Frisch auf main 2d4153b4b nachgemessen: rho je Kampf 0,874-0,917 bei JEDEM k=2..6 in beiden Saatstroemen (Saison 0,947-0,981, Star unter den ersten zwei 73-93 %, Paare ab 15 Punkten 99,7-100 % richtig), Pp 4,3-8,2 -- BEIDE Pflichtkriterien regulaer bestanden, Pp klar unter dem angestrebten Optimum <15. Kein Rezept angefasst: das Gefecht liest jedes der neun Matrixgewichte als eigenen benannten Kanal mit seinem Gewicht als Staerke (BASIS_JE_DISC.battlefield, Kopfkommentar an BF_FFA_GRUND) -- die Budget-Konservierung ist dort per Bauart erfuellt, kein Sinkhorn-Rezept noetig. Gegenueber der Abnahme vom 02.11. (rho 0,861-0,923, Pp 4,8-20,2) liegt der hoechste Pp-Wert jetzt bei 8,2 statt 20,2 (damals k=2 Strom 0; Rauschen der kleinsten Kadergroesse bei n=48)."
+  },
+  "tdm": {
+   "chassis": "kampf",
+   "rhoJeSpiel": 0.839,
+   "rhoSpannweite": 0.346,
+   "rhoSaison": 0.913,
+   "rhoJeGefechtMedianJeK": {
+    "2": [
+     0.82,
+     0.821
+    ],
+    "3": [
+     0.819,
+     0.801
+    ],
+    "4": [
+     0.818,
+     0.832
+    ],
+    "5": [
+     0.82,
+     0.824
+    ],
+    "6": [
+     0.839,
+     0.828
+    ]
+   },
+   "rhoMessung": {
+    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs 24 --je-seite=2..6 --pp=48 --pp-je-seite=6 --stroeme=0,10000000",
+    "spiele": 24,
+    "kaderVarianten": 10,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "k=6 (Standard-Motorfeldgroesse ARENA_ART.tdm.jeSeite), Saatstrom 0, wie bisher; Median ueber k=2..6 beider Stroeme liegt bei 0,801-0,839 (rhoJeGefechtMedianJeK)"
+   },
+   "pp": [
+    14.6,
+    14.7
+   ],
+   "ppMessung": {
+    "befehl": "dieselbe Messung, --pp=48 --pp-je-seite=6 (Protokollstandard n=48 statt der bisherigen n=24)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-11-15",
+   "commit": "2d4153b4b",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #135, 'Budget-Konformitaet verifizieren'): frisch auf main 2d4153b4b nachgemessen, erstmals Pp mit dem Protokollstandard n=48 statt n=24. rho je Gefecht 0,801-0,839 bei jedem k=2..6 in beiden Saatstroemen (Saison 0,854-0,922) -- ueber der 0,80-Schranke, Kopfwert k=6/Strom 0 0,839 (vorher 0,813). Pp 14,6/14,7 (vorher 16,8/14,2 bei n=24) -- damit unter dem angestrebten Optimum <15 in beiden Stroemen, OHNE Code- oder Rezeptaenderung (die alte Zahl war das hoehere Rauschen von n=24). Budget-Konformitaet per Bauart: tdmGefecht() hat kein Sub-Skill-Rezept, es liest die Matrixgewichte BASIS_JE_DISC.tdm direkt als Kanalstaerken (TDM_GEFECHT, dieselbe Gefecht-Bauweise wie Battlefields BF_FFA_GRUND). Ist-Anteile k=6, Strom 0: power 25,7 (Matrix 28), health 16,2 (20), charisma 14,5 (10), spirit 12,9 (12), stamina 12,9 (14), intelligence 6,5 (6), determination 5,9 (6), awareness 3,4 (2), torment 2,0 (2). Groesste Einzelabweichung charisma +4,5 / health -3,8 -- keine Nachjustierung, weil sie nur ueber die TDM_GEFECHT-Hebel ginge und CLAUDE.md-Vorrang rho > Pp-Optimierung gilt. Vorherige Historie: TDM-Gefecht-Verdrahtung 11.11., tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324)."
   },
   "mini-dm": {
    "format": "4-Team-FFA (gespielt), 4 Rollenrunden je Event",
