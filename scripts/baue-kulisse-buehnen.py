@@ -406,20 +406,138 @@ def rundweg_maske(k: dict, ein: float = 0.0) -> Image.Image:
     return m
 
 
+# "RAHMEN STATT MATERIAL" (Sicht-Audit 16.11., Kulissen-Audit 08.11. Abschnitt 4.4, Rang 4). Bis hierher
+# lag die Tribuene der Szene so, dass ihre UNTERKANTE an der oberen Eiskante sass -- bei o=59 px rutschten
+# Himmel, Berge und Tannen (Waldsee) bzw. das Publikum (Kuer) komplett ueber den Leinwandrand, uebrig blieb
+# eine helle Linie. Das Eis fuellt 83 % der Leinwand; Ort kann die Kulisse nur in den drei Raendern
+# zeigen: oben 59 px (zum Teil unter dem Broadcast-Bug), links/rechts je 108 px, unten 59 px. Jetzt:
+#   fern   - oben das ganze Panorama der Szene (Himmel, Bergkette, Tannenreihe bzw. Hallendach und Raenge)
+#            auf die Leinwandbreite gestaucht, Unterkante an der Eiskante;
+#   mitte  - links/rechts Tannenreihen auf Schnee (Waldsee) bzw. Seitentribuenen (Kuer), in Lagen
+#            gestaffelt, zum Rand hin dunkler;
+#   vorne  - unten eine Tannenreihe als dunkle Silhouette (Waldsee) bzw. die Sponsorenbande der Szene vor
+#            Publikumsruecken (Kuer);
+#   Eis    - Spiegelung des Panoramas an der oberen Eiskante (Waldsee: Abendrot), zu den Raendern hin
+#            kaelter, in der Mitte heller (Kuer: drei Lichtpfuetzen der Hallenscheinwerfer).
+# Eisflaeche, Bande (weiss + Gold), Fuehrungssaum, Kampfgericht, Startbereich und Kiss-and-Cry zeichnet
+# weiter der Motor. Nur Pixel der PixelLab-Szenen, keine neue Bestellung, deterministisch.
+E_PANORAMA = {"waldsee": 150, "kuer": 138}  # Szenenzeilen 0..n: Himmel/Berge/Tannen bzw. Dach/Raenge
+E_KISS = (80, 0, 290, 260)  # Demo-Kiss-&-Cry-Kabine ("BITTE WARTEN") samt Schild, Szenen-px
+E_TANNEN = (0, 104, 2640, 150)  # Waldsee: Tannenreihe vor den Bergen
+E_RAENGE = (0, 40, 2640, 137)  # Kuer: Publikumsraenge
+E_SPONSOR = (490, 194, 2150, 231)  # Kuer: gerade Bandenstrecke mit Sponsorenschildern
+E_PANEL = (1186, 66, 1454, 192)  # Demo-"TECHNISCHES PANEL" samt Richtern J1..J9 (der Motor hat sein Kampfgericht)
+
+
+def _kiss_weg(welt: Image.Image) -> Image.Image:
+    """Demo-Kiss-&-Cry-Kabine durch den gleich breiten Streifen RECHTS daneben ersetzen (links ist kein
+    Platz), weich eingeblendet -- dieselbe Idee wie seitlich_fuellen()."""
+    x0, y0, x1, y1 = E_KISS
+    w, rand = x1 - x0, 6
+    stueck = welt.crop((x1 - rand, y0, x1 + w + rand, y1))
+    kern = Image.new("L", stueck.size, 0)
+    ImageDraw.Draw(kern).rectangle((rand, 0, stueck.width - rand - 1, stueck.height - 1), fill=255)
+    aus = welt.copy()
+    aus.paste(stueck, (x0 - rand, y0), kern.filter(ImageFilter.GaussianBlur(rand / 2)))
+    return aus
+
+
+def _tannen_freistellen(band: Image.Image) -> Image.Image:
+    """Tannen (dunkles Tannengruen + Schnee auf den Zweigen) vor Bergen/Himmel freistellen."""
+    a = np.asarray(band.convert("RGB")).astype(int)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    gruen = (g > r + 6) & (g >= b - 8) & (a.sum(2) < 420)
+    schnee = (np.abs(r - b) < 14) & (np.abs(g - b) < 14) & (a.sum(2) > 600)
+    # Schneereste der Berge, die als Schnee durchrutschen, tragen keine Tannen darunter: nur Pixel, in
+    # deren Spalte weiter unten Tannengruen steht, gehoeren zur Tanne.
+    unten = np.maximum.accumulate(gruen[::-1], axis=0)[::-1]
+    m = Image.fromarray((((gruen | (schnee & unten)) * 255)).astype(np.uint8)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+    aus = band.convert("RGBA")
+    aus.putalpha(m)
+    return aus
+
+
+def _lagen(streifen: Image.Image, breite: int, hoehe: int, lage_h: int, saat: int, dunkel_rand: bool,
+           x_spiegel: bool, luecke: float) -> Image.Image:
+    """Seitenflaeche aus Lagen desselben Streifens (Tannenreihen bzw. Raenge): jede Lage waagerecht
+    zufaellig versetzt, untere Lagen (naeher) leicht groesser. Transparent, wo der Streifen es ist."""
+    import random
+
+    rnd = random.Random(saat)
+    aus = Image.new("RGBA", (breite, hoehe), (0, 0, 0, 0))
+    y = -lage_h // 2
+    while y < hoehe:
+        t = max(0.0, y / hoehe)
+        h = round(lage_h * (0.85 + 0.35 * t))
+        f = h / streifen.height
+        s = streifen.resize((round(streifen.width * f), h), Image.LANCZOS)
+        dx = rnd.randrange(0, max(1, s.width - breite))
+        lage = s.crop((dx, 0, dx + breite, h))
+        aus.alpha_composite(lage, (0, y))
+        y += round(h * luecke)
+    if dunkel_rand:
+        # zum Leinwandrand hin dunkler (Tiefe), zur Eisflaeche hin unveraendert
+        xx = np.linspace(1.0, 0.0, breite) if not x_spiegel else np.linspace(0.0, 1.0, breite)
+        f = (1 - 0.38 * xx ** 1.4)[None, :, None]
+        a = np.asarray(aus).astype(np.float32)
+        a[..., :3] *= f
+        aus = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+    return aus
+
+
 def baue_eiskunstlauf(variante: str) -> Image.Image:
     b = lade_szenenbilder(SZENEN / "eiskunstlauf" / f"{variante}.html")
     welt = b["bg"].copy()
     welt.alpha_composite(b["fg"])
-    welt = welt.convert("RGB")
-    # Boden
+    welt = seitlich_fuellen(_kiss_weg(welt.convert("RGB")), [E_PANEL])
+    waldsee = variante == "waldsee"
+    lo, ro, oo, uo = (round(E_K[s]) for s in ("l", "r", "o", "u"))
+    # Boden (Schnee bzw. dunkler Hallenboden) als Grund ueberall
     b0 = welt.crop(E_BODEN)
     band = b0.resize((LW, max(8, round(b0.height * LW / b0.width * 3))), Image.LANCZOS)
-    lein = streifen_kacheln(band, LW, LH, saat=23)
-    # Tribuene: Unterkante (Bande) an die obere Eiskante des Motors
-    t = welt.crop(E_TRIBUENE)
-    th = round(t.height * LW / t.width)
-    t = t.resize((LW, th), Image.LANCZOS)
-    lein.paste(t, (0, round(E_K["o"]) - th + 2))
+    lein = streifen_kacheln(band, LW, LH, saat=23).convert("RGBA")
+
+    # fern: Panorama, Unterkante an der oberen Eiskante
+    pn = E_PANORAMA[variante]
+    pano = welt.crop((0, 0, welt.width, pn))
+    ph = round(pn * LW / welt.width)
+    pano = pano.resize((LW, ph), Image.LANCZOS)
+    lein.paste(pano, (0, oo + 3 - ph))
+
+    # mitte: Seiten (links/rechts der Eisflaeche), von knapp unter dem Panorama bis zum Boden
+    sb = lo + 8
+    if waldsee:
+        streifen = _tannen_freistellen(welt.crop(E_TANNEN))
+        lage_h, luecke = 40, 1.0  # Schnee zwischen den Reihen
+    else:
+        streifen = welt.crop(E_RAENGE).convert("RGBA")
+        lage_h, luecke = 50, 0.62
+    for seite, x in ((0, 0), (1, LW - sb)):
+        flaeche = _lagen(streifen, sb, LH - oo + 6, lage_h, saat=31 + seite, dunkel_rand=True,
+                         x_spiegel=seite == 1, luecke=luecke)
+        lein.alpha_composite(flaeche, (x, oo - 6))
+
+    # vorne: unter der Eisflaeche
+    unten_y = uo + 4
+    if waldsee:
+        reihe = _tannen_freistellen(welt.crop(E_TANNEN))
+        f = 60 / reihe.height
+        reihe = reihe.resize((round(reihe.width * f), 60), Image.LANCZOS)
+        reihe = reihe.crop((300, 0, 300 + LW, 60))
+        a = np.asarray(reihe).astype(np.float32)
+        a[..., :3] *= 0.55  # Vordergrund-Silhouette im Gegenlicht
+        lein.alpha_composite(Image.fromarray(a.astype(np.uint8), "RGBA"), (0, unten_y + 2))
+    else:
+        bande = welt.crop(E_SPONSOR)
+        bh = round(bande.height * (ro - lo) / bande.width)
+        bande = bande.resize((ro - lo, bh), Image.LANCZOS)
+        lein.paste(bande, (lo, unten_y))
+        rue = welt.crop(E_RAENGE).resize((LW * 2, round(E_RAENGE[3] - E_RAENGE[1]) * 2 * LW // welt.width), Image.LANCZOS)
+        rue = rue.crop((LW // 3, 0, LW // 3 + LW, rue.height))
+        a = np.asarray(rue.convert("RGB")).astype(np.float32) * 0.45  # Publikumsruecken im Dunkel
+        ry = unten_y + bh + 1
+        lein.paste(Image.fromarray(a.astype(np.uint8)).crop((0, 0, LW, max(1, LH - ry))), (0, ry))
+
     # Eis im Rundweg
     eis = welt.crop(E_EIS)
     breite, hoehe = E_K["r"] - E_K["l"], E_K["u"] - E_K["o"]
@@ -429,8 +547,26 @@ def baue_eiskunstlauf(variante: str) -> Image.Image:
     ey = round((E_K["o"] + E_K["u"]) / 2 - eis.height / 2)
     voll = Image.new("RGB", (LW, LH))
     voll.paste(eis, (ex, ey))
+    e = np.asarray(voll).astype(np.float32)
+    yy, xx = np.mgrid[0:LH, 0:LW].astype(np.float32)
+    # Licht: Mitte hell, Raender kalt (statt gleichfoermig grauweiss)
+    d = np.sqrt(((xx - LW / 2) / (breite / 2)) ** 2 + ((yy - LH / 2) / (hoehe / 2)) ** 2)
+    kalt = np.array([168, 198, 228.0])[None, None]
+    w = np.clip((d - 0.45) / 0.6, 0, 1)[..., None] * 0.30
+    e = e * (1 - w) + kalt * w
+    if waldsee:
+        # Spiegelung des Panoramas (Abendrot, Tannen) an der oberen Eiskante, nach unten auslaufend
+        sp = pano.transpose(Image.FLIP_TOP_BOTTOM).filter(ImageFilter.GaussianBlur(2.2))
+        spa = np.zeros_like(e)
+        spa[oo:oo + ph] = np.asarray(sp.convert("RGB")).astype(np.float32)[:min(ph, LH - oo)]
+        t = np.clip(1 - (yy - oo) / (ph * 1.1), 0, 1)[..., None] * (yy >= oo)[..., None] * 0.26
+        e = e * (1 - t) + spa * t
+    else:
+        for cx in (LW * 0.3, LW * 0.5, LW * 0.7):
+            e = licht_rund(e, cx, LH * 0.52, 170, 120, (255, 255, 255), 0.55, haerte=1.6)
+    voll = Image.fromarray(np.clip(e, 0, 255).astype(np.uint8))
     lein.paste(voll, (0, 0), rundweg_maske(E_K))
-    return lein
+    return lein.convert("RGB")
 
 
 # ---------------------------------------------------------------------------------------- Breaking

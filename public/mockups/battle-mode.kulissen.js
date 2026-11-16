@@ -71,13 +71,13 @@ window.__ARENA_KULISSEN={
    "id": "kuer",
    "label": "Kür",
    "bild": "/sprites/kulissen/eiskunstlauf/kuer.jpg",
-   "dunkel": 0.24
+   "dunkel": 0.06
   },
   {
    "id": "waldsee",
    "label": "Waldsee",
    "bild": "/sprites/kulissen/eiskunstlauf/waldsee.jpg",
-   "dunkel": 0.3
+   "dunkel": 0.06
   }
  ],
  "fechten": [
