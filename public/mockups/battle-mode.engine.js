@@ -17347,7 +17347,9 @@
       if(mitteHtml!==bbugLetztMitte){
         bbugLetztMitte=mitteHtml;
         mitteReal.textContent="";
-        while(bbugTmp.firstChild)mitteReal.appendChild(bbugTmp.firstChild);
+        // Schnappschuss statt `while(firstChild)`: im Node-Motor (Leerlauf-Knoten) ist firstChild immer
+        // "da" -> Endlosschleife (CI-Timeout arena-node-runner); im echten DOM gleichwertig.
+        Array.from(bbugTmp.childNodes).forEach(k=>mitteReal.appendChild(k));
       } else bbugTmp.textContent="";
     }
     // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, Bauplan Abschnitt 4): eigenes Band unter
