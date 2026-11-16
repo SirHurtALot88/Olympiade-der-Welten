@@ -164,5 +164,45 @@
    "saisonSpannweite": 0.098,
    "schranke": 0.067
   }
- }
+ },
+ "zusatzmessungen": {
+  "spurt-mischung": {
+   "formModus": "echt",
+   "spielMedian": 0.873,
+   "spielSpannweite": 0.053,
+   "saisonMedian": 0.951,
+   "saisonSpannweite": 0.049,
+   "schranke": 0.05,
+   "formatAnteile": {
+    "hatz": 90,
+    "klassisch": 106,
+    "hyrox": 104
+   }
+  },
+  "spurt-klassisch": {
+   "formModus": "echt",
+   "spielMedian": 0.876,
+   "spielSpannweite": 0.067,
+   "saisonMedian": 0.937,
+   "saisonSpannweite": 0.098,
+   "schranke": 0.05
+  },
+  "spurt-hatz": {
+   "formModus": "echt",
+   "spielMedian": 0.823,
+   "spielSpannweite": 0.053,
+   "saisonMedian": 0.951,
+   "saisonSpannweite": 0.093,
+   "schranke": 0.05
+  },
+  "spurt-hyrox": {
+   "formModus": "echt",
+   "spielMedian": 0.895,
+   "spielSpannweite": 0.077,
+   "saisonMedian": 0.951,
+   "saisonSpannweite": 0.033,
+   "schranke": 0.05
+  }
+ },
+ "zusatzmessungenGemessenAm": "2026-11-16T13:53:06.637Z"
 }

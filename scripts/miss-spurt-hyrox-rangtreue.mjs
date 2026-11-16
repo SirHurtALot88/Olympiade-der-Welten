@@ -15,6 +15,9 @@
 //
 //   node scripts/miss-spurt-hyrox-rangtreue.mjs [spiele]
 //   node scripts/miss-spurt-hyrox-rangtreue.mjs 24
+//   OLY_FORM_MODUS=echt node scripts/miss-spurt-hyrox-rangtreue.mjs 24   (Kartenmodus wie die Abnahmezahlen)
+//
+// Die MISCHUNG, wie das Spiel sie spielt (Format je Saat per Hash), misst scripts/miss-spurt-mischung.mjs.
 //
 // Schranke (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80, angestrebt
 // 0,85 -- EINES Spiels, nicht der Saison.
@@ -44,6 +47,11 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe && window.__arena.bahnFlags, null, { timeout: 30000 });
+  // P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem
+  // Einsatzlisten-Szenario je Seite statt der Ersatzkarte -- dieselbe Kartenmodus-Basis wie
+  // miss-alle-disziplinen.mjs (und damit wie die Abnahmezahlen in disziplin-abnahme.json).
+  // Ohne die Variable unveraendert (Ersatzkarte).
+  if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
 
   if (!kaderFamilie) {
     const gebaut = await baueSynthetischeKaderFamilie(seite);
@@ -67,6 +75,7 @@ try {
 }
 
 console.log(`Spurt "HYROX-Stationen" — Rangtreue, ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten`);
+console.log(`Kartenmodus: ${process.env.OLY_FORM_MODUS || "Ersatzkarte (OLY_FORM_MODUS nicht gesetzt)"}`);
 console.log(`Kader-Quelle: ${kaderQuelle}\n`);
 console.log("Format      Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 for (const [label, z] of [["klassisch", zeileKlassisch], ["hyrox", zeile]]) {
