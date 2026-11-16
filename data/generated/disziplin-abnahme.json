@@ -340,22 +340,22 @@
   },
   "staffel": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.931,
-   "rhoSpannweite": 0.078,
+   "rhoJeSpiel": 0.924,
+   "rhoSpannweite": 0.083,
    "rhoSaison": 0.965,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Task #150, Health-Saeulen-Fix 16.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    21.1,
-    22.0
+    21.6,
+    21.4
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs staffel (+ --saat-versatz=10000000)",
+    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 144 (+ --saat-versatz=10000000)",
     "laeufe": 144,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -364,11 +364,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-16",
+   "commit": "2ca27f52",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,937 -> 0,931 (Spannweite 0,078), Saison 0,958 -> 0,965 -- Bewegung 0,006, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 21,1/22,0 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "TASK #150, SAEULE 'SPEED/HEALTH' (16.11.): Health sass NUR in ROBUST, und ROBUST ist im Duell ein Totkanal (KRAFT_VON-Anteil 0,3, Reserve bodet laut Puste-Kommentar nie; WECHSEL-Patzerchance haengt an verlaesslich*0,0012, aber der Rohausdruck liegt bei den ueblichen Sub-Skill-Werten schon ohne ROBUST unter dem Patzerboden) -- gemessen VORHER 0,0 %/0,0 % gegen Matrix 2, ein echter Totkanal, nicht nur ein kleines Gewicht. FIX: Health wandert aus ROBUST in STEHEN (lebendig: 0,7 in KRAFT_VON UND direkt in der Ermuedung `mued` in tempoVon(), nie an einem Boden). Gemessen NACHHER: Health 2,1 %/2,1 % gegen Matrix 2 -- nahezu exakt getroffen. Pp gesamt 21,1/22,0 -> 21,6/21,4 (Health-Gewinn ca. -2,0 Pp wird durch minimal staerkere Stamina-/Will-Unterzeichnung an anderer Stelle fast genau aufgehoben, derselbe Positiv-Summen-Normierungseffekt wie bei frueheren Takeshi-Rezeptaenderungen) -- WEITERHIN sicher unter der 25-Schranke, aber kein Fortschritt Richtung <15, weil Charisma (-5,8/-6,2) und Speed (bereits UEBER der Matrix, +4,6/+4,8) die groessten verbleibenden Luecken sind und ausserhalb des Task-#150-Rahmens (nur Speed/Health) liegen. rho je Spiel 0,931 -> 0,924 (Spannweite 0,083, vorher 0,078) -- Bewegung 0,007, innerhalb der Spannweite, keine Regression. Speed selbst war VOR dieser Aenderung bereits UEBER der Matrix (28,3-29,0 % gegen 24) und wurde bewusst nicht angefasst, um es nicht noch weiter zu ueberzeichnen. Volle Messmethodik und zwei verworfene Takeshi-Versuche (ENDTEMPO, WENDIGKEIT -- keiner hob Speed verlaesslich, einer verschlechterte einen Strom sogar) im PR-Bericht."
   },
   "takeshis-castle": {
    "chassis": "bahn",
@@ -400,7 +400,7 @@
    "commit": "984da6e18",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,898 -> 0,838 (Spannweite 0,143, deutlich breiter als vorher), Saison 0,986 -> 0,979 -- Bewegung 0,060, knapp innerhalb der alten Spannweite (0,062) -- die groesste Bewegung unter den bereits bestandenen Bahn-/Buehnen-Disziplinen dieser Runde, bei naechster Nachmessung im Auge behalten, aber (noch) kein belegter Regress. Pp nicht neu gemessen, 18,9/17,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,898 -> 0,838 (Spannweite 0,143, deutlich breiter als vorher), Saison 0,986 -> 0,979 -- Bewegung 0,060, knapp innerhalb der alten Spannweite (0,062) -- die groesste Bewegung unter den bereits bestandenen Bahn-/Buehnen-Disziplinen dieser Runde, bei naechster Nachmessung im Auge behalten, aber (noch) kein belegter Regress. Pp nicht neu gemessen, 18,9/17,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst). TASK #150, SAEULE 'SPEED' (16.11., UNTERSUCHT, REZEPT UNVERAENDERT): Speed sitzt nur in ANTRITT und misst 3,8 %/0,0 % gegen Matrix 4 -- ein Strom buchstaeblich null. ZWEI Reparaturversuche verworfen: (a) Speed zusaetzlich in ENDTEMPO -> 0,8 %/0,0 %, ein Strom blieb bei Null; (b) Speed zusaetzlich in WENDIGKEIT (einer von Takeshis fuenf Fallen-lesenden Sub-Skills) -> 2 %/0 %, der zweite Strom blieb WIEDER bei Null und der erste wurde schlechter (Gesamt-Pp 18,9 -> 20,3). Befund: welcher Sub-Skill es traegt, ist nicht die Ursache -- Speed hat schon vorher ein betraechtliches Rezept-Gewicht (28 in ANTRITT) bei winzigem Matrixgewicht (4), dieselbe Zaehler/Nenner-Selbstkuerzung in f=eigW/mean(w) (art.mengeAusEignung), die im alten Staffel-Speed/Spirit-Bug (Task #40) dokumentiert ist. Eine echte Schliessung braeuchte entweder Speed GANZ aus jedem Sub-Skill zu entfernen (dann nur ueber eigW, wie der Health-Fix bei Staffel -- aber ANTRITT/ENDTEMPO brauchen Speed fachlich) oder eine Aenderung an der f-Formel selbst, die alle Bahn-Rezepte beruehrt -- beides ausserhalb des Rahmens dieser Aufgabe. Pp/rho bewusst UNVERAENDERT gelassen (kein Code-Risiko eingegangen fuer einen nicht belegten Gewinn), volle Messreihe im PR-Bericht Task #150."
   },
   "time-trial": {
    "chassis": "bahn",
