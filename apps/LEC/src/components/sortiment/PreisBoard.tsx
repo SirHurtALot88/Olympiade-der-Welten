@@ -3,7 +3,7 @@
 import type { BoardSortKey } from "@/lib/dashboard/board";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { LIFECYCLE_LABEL } from "@/lib/dashboard/lifecycle";
-import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty, to99 } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty, lifetimeAvgVk, to99, vkAbweichung, type VkTrend } from "@/lib/dashboard/board";
 import type { TaskKey } from "@/lib/dashboard/tasks";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
@@ -141,12 +141,15 @@ export function daysSince(iso: string | null | undefined, now = Date.now()): num
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86_400_000));
 }
 
+const DEV_ARROW: Record<VkTrend, string> = { hoch: "▲", hoch_leicht: "↗", gleich: "≈", runter_leicht: "↘", runter: "▼" };
+
 export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVersions, imageSrc, onPreview, onOpen, task = "alle", selected, onToggleSelect, onToggleAll, marked, onMark, busyMark }: Props) {
   const withTask = task !== "alle";
   // In den Aufgaben-Reitern ohne Preisfrage entfaellt der Marktwert, damit die Spalte "Aktion" Platz hat
   const showMarkt = task === "alle" || task === "preis";
   // Eigene Spalte "Letzter Verkauf" nur ohne Aufgaben-Reiter; dort bleibt es unter den Verkaeufen (Platz fuer "Aktion")
   const showLast = !withTask;
+  const showAvg = !withTask;
   const allSelected = withTask && rows.length > 0 && rows.every((r) => selected?.has(r.articleId));
   const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
     <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
@@ -169,11 +172,12 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
             {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage), darunter wann zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
             {showLast && head("letzterVerkauf", "Letzter Verkauf", "r", "Datum des letzten Verkaufs (grün bis 90 Tage, gelb bis 365, rot älter). Nie verkauft: Mindestalter des eBay-Angebots")}
             {head("vk", "Dein VK", "r")}
+            {showAvg && head("avgvk", "Ø VK", "r", "Durchschnittlicher Verkaufspreis je Stück über die ganze Verkaufszeit des Artikels. Darunter: wie weit dein heutiger VK davon abweicht (grün = darüber, rot = darunter)")}
             {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
             {head("abweichung", "Urteil")}
             {showMarkt && head("marktwert", "Marktwert", "r")}
             {head("marge", "Marge", "r", "Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst")}
-            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T), darunter dein durchschnittlicher Verkaufspreis (Ø VK)")}
+            {head("ek", "Ø EK", "r", "Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)")}
             {withTask && <th className="bd-th-act">Aktion</th>}
           </tr>
         </thead>
@@ -282,12 +286,8 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                           <span className="bd-none">—</span>
                         );
                       const color = d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)";
-                      return (
-                        <>
-                          <span style={{ color }}>{new Date(row.lastSoldAt as string).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
-                          <small className="bd-sub90" style={{ display: "block" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</small>
-                        </>
-                      );
+                      const date = new Date(row.lastSoldAt as string).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+                      return <span style={{ color }} title={`Letzter Verkauf am ${date}`}>{d === 0 ? "heute" : d === 1 ? "vor 1 Tag" : `vor ${d} Tagen`}</span>;
                     })()}
                   </td>
                 )}
@@ -334,10 +334,32 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                       </small>
                     );
                   })()}
-                  <small className="bd-pchg" style={{ display: "block", color: "var(--muted)" }} title="Durchschnittlicher Verkaufspreis je Stück (365 T)">
-                    Ø VK {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : "—"}
-                  </small>
+                  {!showAvg && (
+                    <small className="bd-pchg" style={{ display: "block", color: "var(--muted)" }} title="Durchschnittlicher Verkaufspreis je Stück (365 T)">
+                      Ø VK {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : "—"}
+                    </small>
+                  )}
                 </td>
+                {showAvg && (
+                  <td data-label="Ø VK" className="r bd-num bd-c-avg">
+                    {(() => {
+                      const avg = lifetimeAvgVk(row);
+                      if (avg <= 0) return <span className="bd-none">—</span>;
+                      const dev = vkAbweichung(boardVk(row), avg);
+                      return (
+                        <>
+                          {eur(avg)}
+                          {dev && (
+                            <small className={`bd-dev bd-dev-${dev.trend}`} style={{ display: "block" }} title={`Dein heutiger VK liegt ${Math.abs(dev.pct).toLocaleString("de-DE", { maximumFractionDigits: 1 })} % ${dev.pct >= 0 ? "über" : "unter"} dem Durchschnitt aller bisherigen Verkäufe`}>
+                              {DEV_ARROW[dev.trend]} {dev.pct > 0 ? "+" : dev.pct < 0 ? "−" : ""}
+                              {Math.abs(Math.round(dev.pct)).toLocaleString("de-DE")} %
+                            </small>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
                 {withTask && (
                   <td data-label="Aktion" className="bd-c-act" onClick={(e) => e.stopPropagation()}>
                     {(() => {

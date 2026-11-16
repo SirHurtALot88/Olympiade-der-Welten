@@ -729,3 +729,9 @@ a.mover .meta, a.mover .meta span { color: var(--muted); }
 .bd-billbee { text-decoration: none; cursor: pointer; }
 .bd-billbee:hover { text-decoration: underline; }
 .bd-billbee-ek { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+
+/* Ø VK mit Abweichung des heutigen VK */
+.bd-dev { font-weight: 700; white-space: nowrap; }
+.bd-dev-hoch, .bd-dev-hoch_leicht { color: var(--good); }
+.bd-dev-runter, .bd-dev-runter_leicht { color: var(--crit); }
+.bd-dev-gleich { color: var(--muted); }

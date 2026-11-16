@@ -217,3 +217,25 @@ describe("to99", () => {
     expect(to99(3.2, "down")).toBe(4.99);
   });
 });
+
+import { lifetimeAvgVk, vkAbweichung } from "./board";
+
+describe("vkAbweichung", () => {
+  it("Stufen nach Abweichung", () => {
+    expect(vkAbweichung(10, 8)?.trend).toBe("hoch");
+    expect(vkAbweichung(8.8, 8)?.trend).toBe("hoch_leicht");
+    expect(vkAbweichung(8.1, 8)?.trend).toBe("gleich");
+    expect(vkAbweichung(7.5, 8)?.trend).toBe("runter_leicht");
+    expect(vkAbweichung(5, 8)?.trend).toBe("runter");
+  });
+  it("ohne Preis oder Durchschnitt: null", () => {
+    expect(vkAbweichung(0, 8)).toBeNull();
+    expect(vkAbweichung(8, 0)).toBeNull();
+  });
+  it("Lebenszeit-Durchschnitt mit Rueckfall", () => {
+    const w = { qty: 3, avgPrice: 8.4 } as never;
+    expect(lifetimeAvgVk({ windows: { all: w }, avgVkRealized: 9 })).toBe(8.4);
+    expect(lifetimeAvgVk({ windows: {}, avgVkRealized: 9 })).toBe(9);
+    expect(lifetimeAvgVk({ windows: {}, avgVkRealized: 0 })).toBe(0);
+  });
+});
