@@ -45,11 +45,20 @@ function chromiumVerfuegbar(): boolean {
 const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 
 // Am Engine-Stand vor dem N-Bahnen-Umbau gezogen (s. Kopfkommentar).
+// NACHGEZOGEN 16.11. (Task #119): zwei BEWUSSTE Bahn-Mechanik-Aenderungen hatten die Werte
+// verschoben, ohne dass es auffiel -- die Datei laeuft in keinem CI-Job mit Chromium
+// (`full-test-suite` installiert keines, `describe.skipIf` springt still; `arena-chromium-tests`
+// faehrt sie nicht). Per Bisektion ueber alle Motor-/Rezept-/Kaderfamilie-Commits seit 7a77b5ea
+// bestimmt:
+//   spurt   d0b83c4c88b4fa0e -> ec5dc6e942170404 bei 17db4128 (#1376, Spurt-Stationsduell + PP-Bonus)
+//                            -> aaf683d558b12728 bei d3cd7b06 (#1488, Spurt-Budget-Konservierung)
+//   staffel bbb0c028e8447abe -> 78236478f3941cc3 bei b6462832 (#1499, Health von ROBUST nach STEHEN)
+// Takeshi's Castle, Zeitfahren und Climbing sind seit dem Umbau unveraendert.
 const SAATEN: Array<number | string> = [1, 7, 42, 1337, "save:s1:md3:staffel"];
 const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
-  staffel: "bbb0c028e8447abe",
+  staffel: "78236478f3941cc3",
   "takeshis-castle": "5bbb7171f24f2908",
-  spurt: "d0b83c4c88b4fa0e",
+  spurt: "aaf683d558b12728",
   "time-trial": "b167882f39f9bc63",
   climbing: "d538d2c1fb7f6344",
 };
@@ -189,9 +198,16 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
   // Aenderung an Gedraenge, Rezept oder Pod-Einstieg verschiebt sie, dann neu messen
   // (scripts/miss-bahn-pod-abnahme.mjs, rho UND --pp in zwei Saatstroemen) und neu ziehen.
   // Vor der Kalibrierung lauteten sie staffel a35a2321cbb16276, takeshis-castle 6451afa5e888b0d4.
+  // NACHGEZOGEN 16.11. (Task #119, Bisektion wie oben bei den Duell-Werten): nach der Kalibrierung
+  // (02.11.: staffel 8484261a6da5ebb1, takeshis-castle 079498743dacc99c) verschoben bei
+  //   b5731dd6 (#1444, Football-Override-Rueckbau, generierte Arena-Daten neu geschrieben):
+  //            staffel -> 28b0dc7aec07abed, takeshis-castle -> d91070176c0010b4
+  //            (echte Ergebnisverschiebung im Pod, nicht nur Text -- Zielzeiten/Plaetze aendern sich)
+  //   b6462832 (#1499, Staffel-Health nach STEHEN): staffel -> 5aad1c353c0efcab
+  // Die Pod-Pp-Abnahme selbst ist dabei NICHT neu gemessen worden (scripts/miss-bahn-pod-abnahme.mjs).
   const POD_FINGERABDRUECKE_KALIBRIERT: Record<string, string> = {
-    staffel: "8484261a6da5ebb1",
-    "takeshis-castle": "079498743dacc99c",
+    staffel: "5aad1c353c0efcab",
+    "takeshis-castle": "d91070176c0010b4",
   };
   it.each(Object.keys(POD_FINGERABDRUECKE_KALIBRIERT))(
     "Pod %s: spieleBahnPod() liefert den abgenommenen Stand der Pp-Kalibrierung (02.11.)",

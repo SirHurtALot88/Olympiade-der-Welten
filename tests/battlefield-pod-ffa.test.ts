@@ -53,9 +53,16 @@ function chromiumVerfuegbar(): boolean {
 }
 
 // Am Engine-Stand vor dem Pod-Umbau gezogen (s. Kopfkommentar, Teil 1).
+// NACHGEZOGEN 16.11. (Task #119): "disziplinProbe-tdm-mini-dm-battlefield" lautete 8e65ccde7e58eda3
+// und verschob sich BEWUSST bei 24e968ea (#1387, TDM-Gefecht-Verdrahtung: tdmGefecht() ist der echte
+// TDM-Wertungspfad). Je Disziplin nachgemessen (disziplinProbe(d,{n:2}), sha256/16): tdm
+// 576f867d25c62bae -> 777e8a8976c1e65b, mini-dm 9ee349125815ee4e und battlefield c8a5d28b70ec22d4
+// UNVERAENDERT -- der Battlefield-/Mini-DM-Kampf selbst ist also bit-identisch geblieben. Unbemerkt
+// blieb das, weil die Datei in keinem CI-Job mit Chromium laeuft (`full-test-suite` springt per
+// `describe.skipIf` still, `arena-chromium-tests` faehrt sie nicht).
 const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
   "battlefield-domination": "c617dfa4ff542705",
-  "disziplinProbe-tdm-mini-dm-battlefield": "8e65ccde7e58eda3",
+  "disziplinProbe-tdm-mini-dm-battlefield": "23532e19a4d85f68",
 };
 
 type KaderSpieler = { n: string; d: Record<string, number>; a: Record<string, number> };
