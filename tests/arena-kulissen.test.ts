@@ -57,8 +57,12 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     // Eiskunstlauf: das Eis der Kulisse liegt im eisRundweg(k) aus kuerFlaeche()
     expect(motor).toContain("return {cx:W*0.5, cy:H*0.5, ax:W*0.35, ay:H*0.28};");
     expect(motor).toContain("const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};");
-    // I-Spy: die beiden Raeume enden am Steg W*0.465 / W*0.535
-    expect(motor).toContain("const stegX0=W*0.465, stegX1=W*0.535;");
+    // I-Spy (16.11.): EINE Halle ueber die ganze Leinwand, kein Steg mehr -- die Kulisse ist aus
+    // zwei Szenenkopien mit weicher Naht gebaut, die Fundorte verteilt ispyFundortXY() ueber W*0.06..0.94.
+    expect(motor).not.toContain("const stegX0=W*0.465, stegX1=W*0.535;");
+    expect(motor).toContain("return {x:W*0.06+f.x*(W*0.88), y:H*0.27+f.y*(H*0.49)};");
+    expect(skript).not.toContain("IS_STEG");
+    expect(skript).toContain("IS_UEBERGANG = 56");
     // Basketball: das Feld der Kulisse liegt auf W*0.06..W*0.94 x 60..H-60
     expect(motor).toContain("ctx.fillRect(W*0.06,60,W*0.88,H-120);");
     expect(skript).toContain("BB_FELD = (round(LW * 0.06), 60, round(LW * 0.94), LH - 60)");
