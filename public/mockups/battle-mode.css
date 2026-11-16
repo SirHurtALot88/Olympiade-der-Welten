@@ -864,6 +864,16 @@
     text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel th:first-child, .oly-battle-arena.oly-battle-arena .etafel td:first-child{text-align:left}
   .oly-battle-arena.oly-battle-arena .etafel td{padding:3px 2.5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+  /* QA 16.11. (Fix-Paket C): Endstand-Tabellen (Breaking/Staffel/Showcase) -- (1) Zahlen und
+     Kopfzellen brechen nicht mehr um ("108 %" -> "108 / %", "PUNKTE" stiess an den Kartenrand);
+     nur die erste Spalte (Name) darf umbrechen. (2) Die letzte Spalte bekommt Luft zum
+     Kartenrand. (3) Ist die Tabelle breiter als die Karte (Breaking: 15 Spalten), scrollt sie
+     waagerecht IN der Karte (.etafel hat overflow:auto) -- mit sichtbarer, schmaler Leiste statt
+     abgeschnittener Spalten. */
+  .oly-battle-arena.oly-battle-arena .etafel th, .oly-battle-arena.oly-battle-arena .etafel td{white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .etafel td:first-child{white-space:normal;min-width:5.5em}
+  .oly-battle-arena.oly-battle-arena .etafel th:last-child, .oly-battle-arena.oly-battle-arena .etafel td:last-child{padding-right:6px}
+  .oly-battle-arena.oly-battle-arena .etafel{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
   .oly-battle-arena.oly-battle-arena .etafel td.imp{color:var(--warn);font-weight:700}
   .oly-battle-arena.oly-battle-arena .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
   .oly-battle-arena.oly-battle-arena .etafel td.leer{color:var(--faint)}
@@ -1281,15 +1291,18 @@
      Split, am unteren Rand der Leinwand -- acht schmale Spalten, eine je Zug. Noch nicht
      enthuellte Zuege zeigen "·" (Spoiler-Schutz, s. aktualisiereIspyHud()). */
   .oly-battle-arena.oly-battle-arena .ispysplit{position:absolute;left:2.2%;right:2.2%;
-    bottom:2%;display:flex;gap:2px;background:rgba(10,13,18,.8);
-    border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 6px;
+    bottom:1.2%;display:flex;gap:2px;background:rgba(10,13,18,.62);
+    border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 5px;
     pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .ispysplit[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .ispysplit:empty{display:none}
   .oly-battle-arena.oly-battle-arena .ispysplit .isp-col{flex:1;min-width:0;
-    text-align:center;display:flex;flex-direction:column;gap:1px;line-height:1.25}
+    text-align:center;display:flex;flex-direction:column;gap:0;line-height:1.2}
+  /* QA 16.11. (Fix-Paket C): Kopfzeile = Zugnummer links, Differenz rechts (statt zwei Zeilen). */
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-kopf{display:flex;justify-content:space-between;
+    align-items:baseline;gap:2px;padding:0 1px}
   .oly-battle-arena.oly-battle-arena .ispysplit .isp-zug{font-size:7.5px;color:#93a1b3;
-    letter-spacing:.04em}
+    letter-spacing:0}
   .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte{font-size:10px;font-weight:700;
     color:#5c6773}
   .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.l{color:var(--home)}
