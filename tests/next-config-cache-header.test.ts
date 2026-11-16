@@ -6,8 +6,8 @@
  *
  * Die Dateien in public/ sind NICHT per Hash versioniert (Reworks ersetzen Sprites/Szenen unter
  * gleichem Namen). Darum: Bilder nur kurz frisch (1 h + SWR), Motor-/Mockup-Dateien `no-cache`
- * (immer per ETag revalidieren), niemals `immutable`/lange max-age. Kompression macht Caddy
- * (zstd+gzip), deshalb muss Next `compress` abschalten, sonst bleibt Caddys zstd wirkungslos.
+ * (immer per ETag revalidieren), niemals `immutable`/lange max-age.
+ * Next komprimiert selbst; Caddy-`encode` war live groesser (s. next.config.ts).
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -73,22 +73,22 @@ describe("next.config.ts headers()", () => {
     }
   });
 
-  it("Next komprimiert nicht selbst (Caddy übernimmt zstd/gzip)", () => {
-    expect(nextConfig.compress).toBe(false);
+  it("Next komprimiert selbst (Caddy-Kompression lieferte live groessere Antworten)", () => {
+    expect(nextConfig.compress).toBe(true);
   });
 });
 
 describe("deploy/hetzner/Caddyfile", () => {
   const caddyfile = readFileSync(path.join(__dirname, "..", "deploy", "hetzner", "Caddyfile"), "utf8");
 
-  it("Oly-Block komprimiert mit zstd und gzip vor dem reverse_proxy", () => {
+  it("Oly-Block hat kein `encode` (sonst doppelte/groessere Kompression)", () => {
     const block = /\{\$OLY_DOMAIN\}\s*\{([\s\S]*?)\n\}/.exec(caddyfile)?.[1] ?? "";
     const code = block
       .split("\n")
       .filter((l) => !l.trim().startsWith("#"))
       .join("\n");
-    expect(code).toMatch(/^\s*encode zstd gzip\s*$/m);
-    expect(code.indexOf("encode")).toBeLessThan(code.indexOf("reverse_proxy"));
+    expect(code).not.toMatch(/^\s*encode\b/m);
+    expect(code).toMatch(/reverse_proxy oly-app:3000/);
   });
 });
 

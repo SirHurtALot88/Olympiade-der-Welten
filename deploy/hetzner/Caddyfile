@@ -1,8 +1,6 @@
 {$OLY_DOMAIN} {
-	# Kompression sitzt hier, nicht in Next (next.config.ts: compress:false) -- Caddy kann zstd,
-	# Next nur gzip. Standard-Match = nur komprimierbare Typen (text/*, JS, JSON, SVG, Fonts ...);
-	# PNG/MP3 bleiben unangetastet. Brotli ist im Standard-Image `caddy:2` NICHT enthalten.
-	encode zstd gzip
+	# Keine Kompression hier: Next komprimiert selbst (gzip -6). `encode zstd gzip` lieferte live groessere
+	# Antworten (engine.js 14,1/13,9 MB statt 12,5 MB), s. next.config.ts.
 	reverse_proxy oly-app:3000
 }
 
