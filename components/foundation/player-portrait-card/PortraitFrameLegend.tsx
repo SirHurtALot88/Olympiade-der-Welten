@@ -11,7 +11,8 @@ import { PLAYER_STAR_TIERS } from "@/lib/foundation/player-star-tier";
  *  1. Leuchtender Außenrahmen Bronze → Diamant: ligaweiter OVR-Rang (Top 50/25/10/3), siehe
  *     `lib/foundation/player-star-tier.ts`. Gold und Diamant tragen zusätzlich den Glanz.
  *  2. Farbstreifen am linken Rand: Klassengruppe des Spielers (Rot/Grün/Blau/Gelb), Quelle ist
- *     dieselbe Zuordnung wie im CSS (`classVisuals.ts`).
+ *     dieselbe Zuordnung wie im CSS (`classVisuals.ts`). Nur in der Teams-Variante: Home-Karten tragen
+ *     keinen Klassenstreifen.
  *  3. Nur Home: Gold/Silber/Bronze-Rand für Platz 1–3 innerhalb DEINER Top-6 — nicht ligaweit.
  *
  * Nichts davon wird hier berechnet; die Legende liest die bestehenden Tabellen, damit sie nicht
@@ -46,18 +47,23 @@ export default function PortraitFrameLegend({ variant = "teams", className = "" 
           </span>
         ))}
       </span>
-      <span
-        className="nl-frame-legend-group"
-        title="Farbstreifen am linken Kartenrand: Klassengruppe des Spielers."
-      >
-        <span className="nl-frame-legend-label">Streifen links = Klasse</span>
-        {CLASS_COLOR_LEGEND.map((entry) => (
-          <span key={entry.token} className="nl-frame-legend-item" title={entry.classes.join(" · ")}>
-            <i className={`nl-frame-legend-swatch is-stripe is-${entry.token}`} aria-hidden="true" />
-            {entry.classes.join(" / ")}
-          </span>
-        ))}
-      </span>
+      {/* Klassenstreifen: NUR die Teams-Karten tragen ihn (FoundationTeamsNewLook setzt
+          player-card-class-frame-*). Die Home-Top-6-Karten haben keinen — die Legende darf dort nichts
+          versprechen, was nicht zu sehen ist (Opus-Review #1508). */}
+      {variant === "teams" ? (
+        <span
+          className="nl-frame-legend-group"
+          title="Farbstreifen am linken Kartenrand: Klassengruppe des Spielers."
+        >
+          <span className="nl-frame-legend-label">Streifen links = Klasse</span>
+          {CLASS_COLOR_LEGEND.map((entry) => (
+            <span key={entry.token} className="nl-frame-legend-item" title={entry.classes.join(" · ")}>
+              <i className={`nl-frame-legend-swatch is-stripe is-${entry.token}`} aria-hidden="true" />
+              {entry.classes.join(" / ")}
+            </span>
+          ))}
+        </span>
+      ) : null}
       {variant === "home" ? (
         <span
           className="nl-frame-legend-group"

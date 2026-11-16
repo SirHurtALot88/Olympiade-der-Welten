@@ -42,7 +42,11 @@ describe("Kartenrand-Legende", () => {
   });
 
   it("Home ergänzt den positionsbasierten Rand der eigenen Top-6, Teams nicht", () => {
-    expect(renderToStaticMarkup(<PortraitFrameLegend variant="home" />)).toContain("Top-6");
+    const home = renderToStaticMarkup(<PortraitFrameLegend variant="home" />);
+    expect(home).toContain("Top-6");
+    // Home-Karten tragen keinen Klassenstreifen (kein player-card-class-frame-* in HomeV2NewLook) —
+    // die Legende darf dort keinen versprechen.
+    expect(home).not.toContain("is-stripe");
   });
 
   it("hängt an Home (Top-Kader) und an der Teams-Kaderansicht", () => {

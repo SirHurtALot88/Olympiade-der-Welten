@@ -990,22 +990,22 @@ function NlTrainingPlayerRow({
             <span
               className="nl-training-chip is-class-suggest"
               data-testid="training-class-suggestion"
-              aria-label={`Vorschlag: Klasse ${bestClass.label}`}
               title={`Beste Klasse laut Schätzung: ${bestClass.label} (Netto ca. ${formatNlSignedNumber(bestClass.netComparableGain, 1)} SP statt ${formatNlSignedNumber(currentClass?.netComparableGain ?? net, 1)} SP als ${currentTrainingClassLabel}). Details und Auswahl in der aufgeklappten Klassenliste.`}
             >
+              <span className="sr-only">Vorschlag: Klasse </span>
               <NlTrainingGlyph kind="signature" /> {bestClass.label}
             </span>
           ) : (
             <span
               className="nl-training-chip is-neutral is-class-match"
-              aria-label={`${currentTrainingClassLabel} passt bereits`}
               title={
                 bestClass && bestClass.isCurrent
                   ? `${currentTrainingClassLabel} ist laut Schätzung bereits die beste Trainingsklasse für diesen Spieler.`
                   : `Keine Klasse verspricht deutlich mehr als ${currentTrainingClassLabel} (Unterschied unter 0,3 SP) — Wechsel lohnt aktuell nicht.`
               }
             >
-              <NlTrainingGlyph kind="match" /> passt
+              <span className="sr-only">{currentTrainingClassLabel} </span>
+              <NlTrainingGlyph kind="match" /> passt<span className="sr-only"> bereits</span>
             </span>
           )}
         </td>
