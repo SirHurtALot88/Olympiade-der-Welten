@@ -8056,6 +8056,9 @@
     // "aus" = Referenzlauf ohne Oberflaechen-Effekt (der Stand vor dem 08.11.), nur fuer Sonden.
     if(kulisseSondenPin==="aus")return null;
     if(kulisseSondenPin&&P.varianten.includes(kulisseSondenPin))return kulisseSondenPin;
+    // Test-Pin aus der Variantenzeile (nur Test-/Aufstellungsansicht; im Spieltag immer null): gezeigt =
+    // simuliert, sonst saehe man Riviera und bekaeme die Effekte des Hash-Platzes.
+    if(typeof kulisseQaId==="string"&&P.varianten.includes(kulisseQaId))return kulisseQaId;
     const gebucht=echterKader&&echterKader.kulisseByDisciplineId&&echterKader.kulisseByDisciplineId[d];
     if(typeof gebucht==="string"&&P.varianten.includes(gebucht))return gebucht;
     const meta=(echterKader&&echterKader.meta)||{};
@@ -38173,7 +38176,7 @@
       const c=el("button","dchip",d.label);
       c.appendChild(el("em",null,d.size+"v"+d.size));
       c.setAttribute("aria-pressed",id===disc?"true":"false");
-      c.addEventListener("click",()=>{disc=id;sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
+      c.addEventListener("click",()=>{if(id!==disc)kulisseQaId=null;disc=id;sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
       b.appendChild(c);
     }
     renderFormatLeiste(b);
@@ -38202,28 +38205,54 @@
     if(id==="auto"){ BAHN_FLAGS.spurtFormatExplizit=false; BAHN_FLAGS.spurtFormat="klassisch"; }
     else { BAHN_FLAGS.spurtFormat=id; BAHN_FLAGS.spurtFormatExplizit=true; }
   }
-  function renderFormatLeiste(dbar){
-    if(dbar&&dbar.parentNode){ const alt=dbar.parentNode.querySelector(".dformat"); if(alt)alt.remove(); }
-    const liste=FORMATE_JE_DISC[disc];
-    if(!liste||!dbar)return;
+  // VARIANTEN-AUSWAHL JE DISZIPLIN (Chris 16.11.: "nicht nur fuer die eine, dass man sich die alle
+  // angucken kann"): zweite Zeile "Variante" fuer JEDE Disziplin mit mehr als einer Kulisse
+  // (battle-mode.kulissen.js, 17 Disziplinen mit mehreren Kulissen: Time-Trial 11, I-Spy 4, TDM/Tennis/Climbing/... 2-3).
+  // "Automatisch" = Hash-Wahl des Spiels; jedes andere Chip pinnt die Kulisse (kulisseQaId, dieselbe
+  // Schnittstelle wie window.__arena.kulisseQa) und baut das Spiel neu auf, damit auch die
+  // Oberflaechen-Effekte der Variante greifen. Nur Test-/Aufstellungsansicht, keine Wertung.
+  function kulissenVarianten(){
+    const kl=KULISSEN[disc];
+    return (Array.isArray(kl)&&kl.length>1)?kl:null;
+  }
+  function chipZeile(titel,testid,eintraege,aktuellId,beiWahl){
     const zeile=el("div","dbar dformat");
-    zeile.setAttribute("data-testid","format-leiste");
-    zeile.appendChild(el("span","dformat-titel","Format"));
-    const jetzt=formatAuswahlJetzt();
-    for(const f of liste){
+    zeile.setAttribute("data-testid",testid);
+    zeile.appendChild(el("span","dformat-titel",titel));
+    for(const f of eintraege){
       const c=el("button","dchip",f.label);
-      c.appendChild(el("em",null,f.hinweis));
+      if(f.hinweis)c.appendChild(el("em",null,f.hinweis));
       c.setAttribute("data-format",f.id);
-      c.setAttribute("aria-pressed",f.id===jetzt?"true":"false");
+      c.setAttribute("aria-pressed",f.id===aktuellId?"true":"false");
       c.addEventListener("click",()=>{
-        formatSetzen(f.id);sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();
-        // Der Neuaufbau ersetzt die Chips -- Tastaturfokus auf das gewaehlte Format zurueckgeben (Opus-Review #1506).
-        const neu=document.querySelector('[data-testid="format-leiste"] [data-format="'+f.id+'"]');
+        beiWahl(f.id);sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();
+        // Der Neuaufbau ersetzt die Chips -- Tastaturfokus auf die gewaehlte Variante zurueckgeben (Opus-Review #1506).
+        const neu=document.querySelector('[data-testid="'+testid+'"] [data-format="'+f.id+'"]');
         if(neu&&typeof neu.focus==="function")neu.focus();
       });
       zeile.appendChild(c);
     }
-    dbar.parentNode.insertBefore(zeile,dbar.nextSibling);
+    return zeile;
+  }
+  function renderFormatLeiste(dbar){
+    if(!dbar||!dbar.parentNode)return;
+    for(const alt of Array.from(dbar.parentNode.querySelectorAll(".dformat")))alt.remove();
+    let anker=dbar;
+    const formate=FORMATE_JE_DISC[disc];
+    if(formate){
+      const z=chipZeile("Format","format-leiste",formate,formatAuswahlJetzt(),formatSetzen);
+      dbar.parentNode.insertBefore(z,anker.nextSibling); anker=z;
+    }
+    const kl=kulissenVarianten();
+    if(kl){
+      const pin=(kulisseQaId&&kl.find(k=>k.id===kulisseQaId))?kulisseQaId:"auto";
+      const eintraege=[{id:"auto",label:"Automatisch",hinweis:"wie im Spiel (nach Saat)"}]
+        .concat(kl.map(k=>({id:k.id,label:k.label||k.id})));
+      const z=chipZeile("Variante","variante-leiste",eintraege,pin,(id)=>{
+        kulisseQaId=id==="auto"?null:id;
+      });
+      dbar.parentNode.insertBefore(z,anker.nextSibling);
+    }
   }
 
   // ===================================================================================
