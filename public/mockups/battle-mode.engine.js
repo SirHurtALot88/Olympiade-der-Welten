@@ -47057,14 +47057,37 @@
       // ENDTEMPO verliert einen Teil von SPEED/STAMINA an SPIRIT ("Zug haelt die Haltung auch
       // im letzten Drittel"). Matrix bleibt gesperrt (official-discipline-weights.ts) — nur
       // das Rezept wird nachgezogen, s. CLAUDE.md "Die Eignungsmatrix ist gesperrt".
+      // TASK #150, SAEULE "SPEED/HEALTH" (16.11.): Health sass bislang NUR in ROBUST --
+      // und ROBUST ist im DUELL ein totkanal, genau wie im PODREZEPT schon diagnostiziert
+      // (s. Kommentar "WARUM DAS REZEPT UND NICHT DIE MATRIX" am podRezept unten): es
+      // speist nur KRAFT_VON (0,3 Gewicht, und die Reserve bodet laut obigem Puste-
+      // Kommentar ohnehin nie unter 77 %) und `verlaesslich` im WECHSEL-Patzer-Wurf, wo es
+      // mit WECHSEL_ROBUST_K=0,0012 gegen WECHSEL_PATZER_K=0,0020 (TECHNIK) antritt --
+      // bei den ueblichen Sub-Skill-Werten (40-100 nach der "Menge aus Eignung"-Skalierung)
+      // liegt der Rohausdruck schon ohne ROBUST unter dem Patzerboden WECHSEL_PATZER_MIN
+      // (s. Kommentar dort: "bei den ueblichen Werten ... wird der Ausdruck NEGATIV und
+      // faellt auf den Boden"), also kann KEINE ROBUST-Zusammensetzung dort je ankommen.
+      // NACHGEMESSEN (messe-arena-einfluss.mjs staffel 144, zwei Saatstroeme, VOR dieser
+      // Aenderung): Health 0,0 % / 0,0 % gegen Matrix 2 -- ein echter Totkanal, nicht nur
+      // ein kleines Gewicht.
+      //
+      // FIX, EIN SUB-SKILL-TAUSCH, KEINE NEUE MATRIX-ZELLE: Health wandert aus ROBUST in
+      // STEHEN. STEHEN ist nachweislich lebendig -- es geht zu 0,7 in KRAFT_VON UND
+      // DIREKT (nicht ueber die Reserve) in die Ermuedung `mued` in tempoVon()
+      // (`(100-u.STEHEN)*muedGrad*(anteil-0.45)*100`), die ab 45 % Renndistanz JEDEN Tick
+      // jedes Laeufers Tempo skaliert -- anders als ROBUST laeuft dieser Kanal nie gegen
+      // einen Boden. Die drei verbliebenen Zellen in STEHEN weichen proportional (x0,85),
+      // ROBUST verteilt Healths 24 Punkte proportional auf die drei uebrigen (stamina/
+      // will/spirit). Speed bleibt unberuehrt (ANTRITT/ENDTEMPO/WENDIGKEIT/WUCHT,
+      // gemessen bereits UEBER der Matrix: 28,3-29,0 % gegen 24).
       rezept:{
         ANTRITT:    {speed:28,spirit:34,dexterity:20,awareness:18},
         ENDTEMPO:   {speed:26,stamina:32,will:28,spirit:14},
         TECHNIK:    {awareness:38,dexterity:32,charisma:30},
         WENDIGKEIT: {dexterity:46,awareness:40,speed:14},
-        STEHEN:     {stamina:45,will:33,determination:22},
+        STEHEN:     {stamina:42,will:31,determination:21,health:6},
         WUCHT:      {spirit:45,charisma:33,speed:22},
-        ROBUST:     {stamina:30,will:26,health:24,spirit:20}
+        ROBUST:     {stamina:40,will:34,spirit:26}
       },
       // POD-REZEPT (Vier-Team-Rennen, 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5.1;
       // Chris 01.11.: "die stats die vorgegeben sind sind verdammt wichtig, kannst du die
@@ -47377,6 +47400,32 @@
       // WIRKUNG NUR NACH UNTEN: bei voller Puste ist der Faktor exakt 1, die Station also
       // unveraendert. Nur ein leerer Laeufer verliert etwas.
       pusteHindernis:{WUCHT:0.30, ROBUST:0.26, STEHEN:0.20, TECHNIK:0.06, WENDIGKEIT:0.05},
+      // TASK #150, SAEULE "SPEED" (16.11., UNTERSUCHT, NICHT GEAENDERT): Speed sitzt nur in
+      // ANTRITT und misst 3,8 % / 0,0 % gegen Matrix 4 (messe-arena-einfluss.mjs
+      // takeshis-castle 48, zwei Saatstroeme) -- einmal buchstaeblich null. ZWEI
+      // Reparaturversuche, beide WIEDER VERWORFEN, weil sie Speed nicht verlaesslich anheben
+      // und einen Strom sogar verschlechtern:
+      //   (a) Speed zusaetzlich in ENDTEMPO (dem Kanal, der nach der kurzen ANTRITT-Phase,
+      //       tempoVon()s `phase`, den Rest der Strecke traegt) -> 0,8 % / 0,0 %, EIN Strom
+      //       blieb exakt bei Null.
+      //   (b) Speed zusaetzlich in WENDIGKEIT ("Aufstehen", eine von Takeshis fuenf
+      //       Fallen-lesenden Sub-Skills, anders als ANTRITT/ENDTEMPO) -> 2 % / 0 %, der
+      //       zweite Strom blieb WIEDER exakt bei Null, der erste wurde schlechter (Pp 18,9
+      //       -> 20,3).
+      // BEFUND: welcher Sub-Skill es traegt, ist nicht die Ursache. Speed hat (anders als
+      // Health in der Staffel, s. BAHN_ART.staffel) schon vorher ein betraechtliches
+      // Rezept-Gewicht (28 in ANTRITT) bei einem winzigen Matrixgewicht (4) -- dieselbe
+      // Zaehler/Nenner-Selbstkuerzung in `f=eigW/mean(w)` (art.mengeAusEignung, s. Kommentar
+      // dort), die im alten Staffel-Speed/Spirit-Bug (Task #40) dokumentiert ist, nur mit
+      // vertauschten Vorzeichen: ein hohes Rezept-Gewicht gegen ein niedriges Matrixgewicht
+      // daempft sich IM NENNER staerker weg, je mehr Sub-Skills es zusaetzlich besetzt --
+      // genau das Gegenteil von dem, was beide Versuche taten. Eine echte Schliessung
+      // braeuchte entweder Speed GANZ aus jedem Sub-Skill zu entfernen (dann liefe es nur
+      // ueber `eigW`, wie der Health-Fix unten) -- das aber waere eine dritte, noch nicht
+      // gemessene Strukturaenderung, und ANTRITT/ENDTEMPO brauchen Speed fachlich ("Losstuermen"/
+      // "Durchhaltetempo" ohne Tempo-Attribut waere unplausibel) -- oder eine Aenderung an der
+      // f-Formel selbst, die ALLE Bahn-/Takeshi-Rezepte beruehrt und ausserhalb des Rahmens
+      // dieser Aufgabe liegt. Rezept bewusst UNVERAENDERT gelassen, s. Bericht.
       rezept:{
         ANTRITT:    {will:40,determination:32,speed:28},
         ENDTEMPO:   {will:38,determination:33,stamina:29},
