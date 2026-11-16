@@ -41,9 +41,9 @@
 // Rezept-Kommentar selbst -- dieselbe Arbeitsteilung wie bei rho/Pp ueberall sonst im Projekt
 // (CLAUDE.md: Browser-Messungen sind eigene, bewusst NICHT-vitest-gebundene Werkzeuge).
 //
-// FUER ALLE ZWANZIG DISZIPLINEN GEDACHT, HEUTE NUR FUER FOOTBALL SCHARF. Der Opus-PM-Rollout auf
-// die anderen 19 ist eine eigene, noch offene Aufgabe; pending-Platzhalter unten, damit niemand
-// vergisst, dass sie fehlen, ohne jetzt schon rot zu sein.
+// SCHARF FUER FOOTBALL, BASKETBALL, HOCKEY UND DIE FUENF BAHNEN (seit 15./16.11.); die neun
+// Buehnen-Disziplinen prueft tests/buehne-rezept-budget-guard.test.ts, die drei Arena-Formate
+// haben kein Sub-Skill-Rezept (s. Kommentar am Ende der Datei).
 // ===================================================================================
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -70,29 +70,46 @@ function klammerBlock(quelle: string, von: number): string {
   throw new Error(`Klammer nicht geschlossen ab Position ${von}`);
 }
 
+const REZEPTE_PATH = path.resolve(process.cwd(), "public/mockups/battle-mode.rezepte.js");
+
+/** Zeilenkommentare entfernen (ohne `://` in URLs zu treffen) -- sie duerfen Klammern enthalten. */
+function ohneKommentare(quelle: string): string {
+  return quelle.replace(/(^|[^:"'])\/\/[^\n]*/gm, "$1");
+}
+
 /**
- * Liest das inline `rezept:{...}` einer Feldspiel-Disziplin aus dem Motor und gibt
- * {UNTERFERTIGKEIT: {attribut: prozent}} zurueck -- dieselbe Extraktion wie
- * scripts/sondiere-feldspiel-subskills.mjs' Chassis-Eintrags-Zweig (dort wird sie nicht
- * exportiert, deshalb hier dieselbe kleine Logik noch einmal).
+ * Liest das WIRKSAME Rezept einer Disziplin und gibt {UNTERFERTIGKEIT: {attribut: prozent}}
+ * zurueck. Reihenfolge wie im Motor (`rezeptAus()`/`rezepteNachziehen()`): steht die Disziplin in
+ * der Daten-Datei public/mockups/battle-mode.rezepte.js (`window.__ARENA_REZEPTE`, heute
+ * Basketball/Hockey), gilt DIESES Rezept; sonst das inline `rezept:{...}` ihres Chassis-Eintrags
+ * im Motor (Football, die fuenf Bahnen). Disziplin-IDs mit Bindestrich stehen in Anfuehrungs-
+ * zeichen ("time-trial", "takeshis-castle") -- die Suche ist quote-tolerant (15.11.).
  */
 function leseInlineRezept(disziplin: string): Record<string, Record<string, number>> {
-  const engineQuelle = readFileSync(ENGINE_PATH, "utf8");
-  const discRe = new RegExp(`\\n    ${disziplin}:\\{`, "g");
-  let discM: RegExpExecArray | null;
-  let discBlock: string | null = null;
-  while ((discM = discRe.exec(engineQuelle))) {
-    const kandidat = klammerBlock(engineQuelle, discM.index + discM[0].length - 1);
-    if (kandidat.includes("rezept:{")) {
-      discBlock = kandidat;
-      break;
+  let rezeptBlock: string | null = null;
+
+  const rezepteQuelle = ohneKommentare(readFileSync(REZEPTE_PATH, "utf8"));
+  const datenM = new RegExp(`\\n  "?${disziplin}"?:\\s*\\{`).exec(rezepteQuelle);
+  if (datenM) rezeptBlock = klammerBlock(rezepteQuelle, datenM.index + datenM[0].length - 1);
+
+  if (!rezeptBlock) {
+    const engineQuelle = ohneKommentare(readFileSync(ENGINE_PATH, "utf8"));
+    const discRe = new RegExp(`\\n    "?${disziplin}"?:\\{`, "g");
+    let discM: RegExpExecArray | null;
+    let discBlock: string | null = null;
+    while ((discM = discRe.exec(engineQuelle))) {
+      const kandidat = klammerBlock(engineQuelle, discM.index + discM[0].length - 1);
+      if (kandidat.includes("rezept:{")) {
+        discBlock = kandidat;
+        break;
+      }
     }
+    if (!discBlock) {
+      throw new Error(`Kein Chassis-Eintrag mit "rezept:{...}" fuer "${disziplin}" gefunden.`);
+    }
+    const rezeptIdx = discBlock.indexOf("rezept:{");
+    rezeptBlock = klammerBlock(discBlock, rezeptIdx + "rezept:".length);
   }
-  if (!discBlock) {
-    throw new Error(`Kein Chassis-Eintrag mit "rezept:{...}" fuer "${disziplin}" gefunden.`);
-  }
-  const rezeptIdx = discBlock.indexOf("rezept:{");
-  const rezeptBlock = klammerBlock(discBlock, rezeptIdx + "rezept:".length);
 
   const rezept: Record<string, Record<string, number>> = {};
   const subRe = /([A-Z_]+):\s*\{([^{}]*)\}/g;
@@ -161,12 +178,27 @@ describe("Budget-Konservierung je Attribut (Chris 14.11.: 'das rezept jetzt komp
     pruefeBudgetKonservierung("football");
   });
 
-  // PENDING FUER DIE UEBRIGEN 19 DISZIPLINEN (Opus-PM-Rollout, noch nicht umgesetzt). `it.skip`
-  // statt Weglassen, damit die Liste als TODO sichtbar bleibt, aber heute niemanden rot faerbt --
-  // keine dieser neunzehn Rezepte ist bisher nach dieser Methode gebaut/geprueft worden.
-  it.skip("tdm, mini-dm, battlefield, gewichtheben, climbing, staffel, time-trial, spurt, tennis, hockey, showcase, speed-schach, takeshis-castle, breaking, wettessen, basketball, eiskunstlauf, fechten, i-spy: noch nicht auf Budget-Konservierung umgestellt", () => {
-    // Absichtlich leer -- Platzhalter fuer den Opus-PM-Rollout auf die restlichen 19
-    // Disziplinen. Sobald eine Disziplin umgestellt ist, wandert sie aus diesem Platzhalter in
-    // eine eigene `it(...)`, wie football oben.
+  // SCHARF SEIT 15./16.11. (Chris: "budget konservierung sollte eigentlich jetzt fuer alle 20
+  // diszis schon gelten!"): die beiden uebrigen Feldspiel-Disziplinen (Rezept aus
+  // battle-mode.rezepte.js) und die fuenf Bahnen (inline in BAHN_ART, Befund PR #1472: dieselbe
+  // {SUB_SKILL:{attribut:gewicht}}-Form). Alle sieben erfuellten die Struktur-Eigenschaft schon;
+  // ihre numerische Budget-Treue steht als frische Pp-Messung in data/generated/disziplin-abnahme.json.
+  it.each([
+    "basketball",
+    "hockey",
+    "staffel",
+    "takeshis-castle",
+    "time-trial",
+    "spurt",
+    "climbing",
+  ] as const)("%s: jedes Matrix-Attribut kommt vor, kein attributfremdes Attribut kommt vor", (disziplinId) => {
+    pruefeBudgetKonservierung(disziplinId);
   });
+
+  // NICHT HIER, UND WARUM: die neun Buehnen-Disziplinen haben ihren eigenen, ebenfalls scharfen
+  // Guard (tests/buehne-rezept-budget-guard.test.ts). tdm/battlefield/mini-dm werden in ihren
+  // gewerteten Formaten (tdmGefecht, Battlefield-Gefecht je Ort, Mini-DM-FFA) nicht ueber ein
+  // Sub-Skill-Rezept entschieden, sondern lesen jedes Matrixgewicht direkt als benannten Kanal mit
+  // seinem Gewicht als Staerke -- dort gibt es keine Zeile, die verwaisen koennte; ihre
+  // Budget-Treue belegt allein die Pp-Messung (alle drei unter 15, disziplin-abnahme.json).
 });
