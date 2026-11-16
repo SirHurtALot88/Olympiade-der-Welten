@@ -319,7 +319,12 @@ export default function FoundationSidebar({
                   ) : item.icon ? (
                     <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span>
                   ) : null}
-                  <span>{item.label}</span>
+                  <span className="foundation-sidebar-item-label">{item.label}</span>
+                  {item.badge ? (
+                    <span className="foundation-sidebar-item-badge" data-testid={`foundation-nav-badge-${item.id}`}>
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

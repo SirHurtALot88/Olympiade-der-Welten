@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { formatTrainingAttributeLabel } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
@@ -2641,8 +2642,11 @@ export default function PlayerDetailDrawer({
     {
       key: "mvs",
       label: "MVS",
-      value: data.mvs,
-      rank: data.mvsRank,
+      // Fable-UI/UX 14.11. #2, am Spielerprofil nachgezogen (Home/Kaderkarten waren schon dran):
+      // vor der ersten Wertung steht MVS auf einer echten 0 und damit bei JEDEM Spieler auf #1.
+      // `mvsAlsGuete` ordnet die 0 als "noch keine Aussage" ein -> "—" ohne Rang.
+      value: mvsAlsGuete(data.mvs),
+      rank: mvsAlsGuete(data.mvs) != null ? data.mvsRank : null,
       delta: data.mvsDelta,
       deltaSourceLabel: data.mvsDeltaSourceLabel,
       sourceLabel: data.mvsSourceLabel,

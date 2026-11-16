@@ -10,6 +10,11 @@ export type FoundationNavItem = {
   label: string;
   tooltip: string;
   icon?: string;
+  /**
+   * Kleine Kennzeichnung hinter dem Label (z. B. "Test"). Nur Anzeige in der Sidebar — das Label
+   * selbst bleibt unverändert, weil Breadcrumb und Inbox-Zielnamen es als Ansichtsnamen lesen.
+   */
+  badge?: string;
 };
 
 export type FoundationNavGroup = {
@@ -34,7 +39,12 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       {
         id: "battleArena",
         label: "Battle Arena",
-        tooltip: "Entwurf für den Battle Mode: Aufstellung mit Reihen und Befehlen, dazu ein laufender 6-gegen-6-Kampf.",
+        // Fable-UI/UX 14.11., Vorschlag 13: neben der echten "Arena" las sich der Eintrag wie ein
+        // zweiter Kampfbildschirm. Er ist ein Testwerkzeug (Formate/Varianten ausprobieren) und
+        // bleibt deshalb drin — nur kenntlich gemacht.
+        badge: "Test",
+        tooltip:
+          "Testwerkzeug, kein Spieltag: Entwurf für den Battle Mode — Aufstellung mit Reihen und Befehlen, dazu ein laufender 6-gegen-6-Kampf. Liest und schreibt keinen Spielstand. Den echten Spieltag spielst du unter „Arena“.",
         icon: "⚔",
       },
     ],
