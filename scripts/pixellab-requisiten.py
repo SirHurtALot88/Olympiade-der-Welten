@@ -152,6 +152,11 @@ AUFTRAEGE = {
         prompt=f"square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, {STIL}"),
     "climbing_kreidebeutel": dict(art="neu", datei="arena/climbing_kreidebeutel.png", gen=(20, 26),
         prompt=f"small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, {STIL}"),
+    # Sicht-Audit 16.11.: statt der Strichfigur als Sicherer am Wandfuss eine Sicherungsstation OHNE
+    # Person (neue Charaktere sind gesperrt, CLAUDE.md): Seilsack mit aufgeschossenem Seil und einem
+    # Sicherungsgeraet am Bodenanker. Requisite, keine Figur.
+    "climbing_seilsack": dict(art="neu", datei="arena/climbing_seilsack.png", gen=(32, 28),
+        prompt=f"open climbing rope bag lying on the floor with a neatly coiled colorful climbing rope on top and a small metal belay device clipped to a steel floor anchor ring, no people, front view, {STIL}"),
     "climbing_eiszapfen": dict(art="neu", datei="arena/climbing_eiszapfen.png", gen=(30, 42), anker="mitte",
         prompt=f"a cluster of hanging translucent light blue ice icicles pointing downward, front view, {STIL}"),
 

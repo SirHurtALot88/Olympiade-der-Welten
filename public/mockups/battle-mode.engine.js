@@ -43023,7 +43023,10 @@
     // drei neue Requisiten fuer "Rahmen statt Material" an der Kletterwand -- Hallenmatte als
     // Bodenkachel, Kreidebeutel am Wandfuss, Eiszapfen am Eisfall-Ueberhang. Fehlen-tolerant wie
     // jede andere Kachel hier (aDa()-Wache), s. bodenWand() unten.
-    "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen"];
+    "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen",
+    // Sicht-Audit 16.11.: Sicherungsstation (Seilsack + Sicherungsgeraet am Bodenanker) statt der
+    // Strichfigur als Sicherer -- eine Requisite, keine Figur (neue Charaktere sind gesperrt).
+    "climbing_seilsack"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -45711,20 +45714,32 @@
         }
       });
 
-      // SICHERER, eine Strichfigur am Wandfuss (Primitive, kein Asset, Gegencheck 3.6).
+      // SICHERUNGSSTATION am Wandfuss. Bis zum Sicht-Audit 16.11. stand hier eine Strichfigur als
+      // Sicherer (Gegencheck 3.6) -- die einzige gemalte Person neben lauter PixelLab-Figuren, im
+      // Spiel als "Strichmaennchen" sofort sichtbar. Eine echte Sicherer-Figur waere ein neuer
+      // Charakter (gesperrt, CLAUDE.md); stattdessen eine Requisite: Seilsack mit aufgeschossenem Seil
+      // und Sicherungsgeraet am Bodenanker. Fuesse-Linie wie vorher (sy+17), Seil startet am Geraet.
+      // Reine Zeichnung: `sy` und die Seil-/Exen-Geometrie darunter bleiben, wie sie waren.
       const sy=camY(0)+20;
-      ctx.fillStyle="#caa06a";ctx.beginPath();ctx.arc(x,sy-13,5,0,6.283);ctx.fill();
-      ctx.strokeStyle="#5b4636";ctx.lineWidth=3;ctx.lineCap="round";
-      ctx.beginPath();ctx.moveTo(x,sy-8);ctx.lineTo(x,sy+7);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
+      let seilY=sy-3;
+      if(aDa("climbing_seilsack")){
+        const ss=aBild.climbing_seilsack;
+        ctx.drawImage(ss,Math.round(x-ss.naturalWidth/2),Math.round(sy+17-ss.naturalHeight));
+        seilY=sy+17-ss.naturalHeight+6;
+      } else {
+        // Ersatz, solange das Bild laedt: aufgeschossenes Seil als drei Ringe, keine Person.
+        ctx.strokeStyle="#5b6f9a";ctx.lineWidth=2;
+        for(let r=0;r<3;r++){ctx.beginPath();ctx.ellipse(x,sy+12-r*3,9-r,3,0,0,6.283);ctx.stroke();}
+        seilY=sy+4;
+      }
 
       // KREIDEBEUTEL am Wandfuss (Audit 4.2: "Matten, Sicherer, Kreidebeutel ..."), nur an jeder
       // dritten Route -- Deko-Requisite, kein Einfluss auf Sicherer-/Seil-Geometrie oben.
       if(bz%3===0){
         if(aDa("climbing_kreidebeutel")){
           const kb=aBild.climbing_kreidebeutel;
-          ctx.drawImage(kb,Math.round(x-9-kb.naturalWidth),Math.round(sy+5-kb.naturalHeight));
+          // links neben dem Seilsack (16 px halbe Breite), nicht mehr darin
+          ctx.drawImage(kb,Math.round(x-18-kb.naturalWidth),Math.round(sy+17-kb.naturalHeight));
         } else {
           ctx.fillStyle="#3a3630"; ctx.beginPath();
           ctx.moveTo(x-13,sy+2); ctx.lineTo(x-7,sy+2); ctx.lineTo(x-6,sy+13); ctx.lineTo(x-15,sy+13);
@@ -45746,7 +45761,7 @@
       // Sturz-Animation aus Bug 3 (`climbAnzeigeAnteil`) -- sonst wuerde das Seil zur alten
       // Live-Position im selben Frame springen, waehrend die Figur noch sichtbar faellt.
       const live=u?climbAnzeigeAnteil(u):0;
-      const punkte=[{x,y:sy-3}];
+      const punkte=[{x,y:seilY}];
       WAND_EXE_INDIZES.forEach(idx=>{
         const posFrac=griffe[idx]; if(posFrac==null||hoch<posFrac)return;
         punkte.push({x,y:camY(posFrac)});
