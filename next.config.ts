@@ -17,7 +17,8 @@ const nextConfig: NextConfig = {
   // Cache-Policy fuer public/-Dateien. Next liefert sie sonst mit max-age=0 aus -> bei JEDEM Reload
   // eine bedingte Anfrage je Datei (beim Arena-Start ~244 Sprites). Die Dateien sind NICHT per Hash
   // versioniert: Sprites/Szenen werden bei Reworks unter gleichem Namen ersetzt. Deshalb nur kurz
-  // frisch (1 h) + 1 Tag stale-while-revalidate, nie `immutable`/lange max-age. ETag-Revalidierung
+  // frisch (1 h) + 1 Tag stale-while-revalidate, nie `immutable`/lange max-age (einzige Ausnahme:
+  // /mockups/engine-bilder/, inhaltsadressiert, s. unten). ETag-Revalidierung
   // bleibt, ein getauschtes Bild ist spaetestens nach ~1 h (plus ein Reload) sichtbar.
   async headers() {
     const kurzFrisch = "public, max-age=3600, stale-while-revalidate=86400";
@@ -37,6 +38,16 @@ const nextConfig: NextConfig = {
       {
         source: "/mockups/:path*",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      // AUSGELAGERTE ENGINE-BILDER (Task #165, Performance-Paket 3): die einzige Ausnahme vom "nie
+      // immutable" oben. scripts/lagere-engine-bilder-aus.mjs benennt jede Datei nach ihrem Inhalts-
+      // Hash (engine-bilder/<sha256[0..12]>.png) -- ein geaendertes Bild bekommt einen NEUEN Namen
+      // und damit eine neue URL im (no-cache) Motor, eine alte URL aendert ihren Inhalt nie. Darf
+      // deshalb ein Jahr ohne Revalidierung im Cache bleiben. MUSS nach /mockups/:path* stehen: Next
+      // wendet alle passenden Regeln an, bei gleichem Header gewinnt die spaetere.
+      {
+        source: "/mockups/engine-bilder/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
     ];
   },

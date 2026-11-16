@@ -33,6 +33,8 @@ mkdirSync(ziel, { recursive: true });
 const datei = (m) => path.join(ziel, "gewichtheben-sandsack-wegc-parallel-stufe3-" + m + "-06-10.png");
 
 const browser = await chromium.launch({
+  // Engine-Bilder (Task #165) sind Dateien: unter file:// nur mit diesem Schalter pixellesbar.
+  args: ["--allow-file-access-from-files"],
   ...(existsSync(fest) ? { executablePath: fest } : {}),
   args: ["--disable-gpu"],
 });
