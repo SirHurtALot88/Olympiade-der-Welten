@@ -8056,6 +8056,9 @@
     // "aus" = Referenzlauf ohne Oberflaechen-Effekt (der Stand vor dem 08.11.), nur fuer Sonden.
     if(kulisseSondenPin==="aus")return null;
     if(kulisseSondenPin&&P.varianten.includes(kulisseSondenPin))return kulisseSondenPin;
+    // Test-Pin aus der Variantenzeile (nur Test-/Aufstellungsansicht; im Spieltag immer null): gezeigt =
+    // simuliert, sonst saehe man Riviera und bekaeme die Effekte des Hash-Platzes.
+    if(typeof kulisseQaId==="string"&&P.varianten.includes(kulisseQaId))return kulisseQaId;
     const gebucht=echterKader&&echterKader.kulisseByDisciplineId&&echterKader.kulisseByDisciplineId[d];
     if(typeof gebucht==="string"&&P.varianten.includes(gebucht))return gebucht;
     const meta=(echterKader&&echterKader.meta)||{};
@@ -38204,7 +38207,7 @@
   }
   // VARIANTEN-AUSWAHL JE DISZIPLIN (Chris 16.11.: "nicht nur fuer die eine, dass man sich die alle
   // angucken kann"): zweite Zeile "Variante" fuer JEDE Disziplin mit mehr als einer Kulisse
-  // (battle-mode.kulissen.js, 18 Disziplinen: Time-Trial 11, I-Spy 4, TDM/Tennis/Climbing/... 2-3).
+  // (battle-mode.kulissen.js, 17 Disziplinen mit mehreren Kulissen: Time-Trial 11, I-Spy 4, TDM/Tennis/Climbing/... 2-3).
   // "Automatisch" = Hash-Wahl des Spiels; jedes andere Chip pinnt die Kulisse (kulisseQaId, dieselbe
   // Schnittstelle wie window.__arena.kulisseQa) und baut das Spiel neu auf, damit auch die
   // Oberflaechen-Effekte der Variante greifen. Nur Test-/Aufstellungsansicht, keine Wertung.
@@ -38247,7 +38250,6 @@
         .concat(kl.map(k=>({id:k.id,label:k.label||k.id})));
       const z=chipZeile("Variante","variante-leiste",eintraege,pin,(id)=>{
         kulisseQaId=id==="auto"?null:id;
-        try{ kulisseWaehlen(seed); }catch{ /* Anzeige-Wahl, kein Abbruch */ }
       });
       dbar.parentNode.insertBefore(z,anker.nextSibling);
     }
