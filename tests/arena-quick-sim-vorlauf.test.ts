@@ -72,6 +72,31 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const preview = previewNewGameSetup(input);
     const angelegt = applyNewGameSetup({ ...input, confirmToken: preview.confirmToken }, persistence, { ownerId: null });
     const saveId = angelegt.save.saveId;
+    // TIMEOUT-FIX (16.11., `beforeAll`-Hook nach 300 s abgebrochen, Shard 3 auf #1515 -- inhaltlich
+    // unbeteiligter PR): der Aufbau kostet ~110-165 s (fast alles der Liga-Draft fuer 32 Teams). Traf der
+    // zufaellige Spielplan Staffel/Takeshi auf Spieltag 1 (~1 von 8 Saves, s. unten), lief frueher der
+    // GESAMTE Aufbau inklusive Draft ein zweites Mal (> 300 s => sicherer Timeout). Die Pod-/Duell-
+    // Klassifizierung haengt nur an Spielplan und Teamzahl, nicht an Aufstellungen -- sie steht schon
+    // NACH `applyNewGameSetup()` fest (Gegenprobe: gleiches Ergebnis vor und nach dem Draft). Darum VOR dem
+    // Draft pruefen: ein verworfener Save kostet so wenige Sekunden statt eines kompletten Drafts.
+    {
+      const frisch = persistence.getSaveById(saveId)!;
+      const frischSeasonId = frisch.gameState.season.id;
+      const frischMatchdayId = frisch.gameState.matchdayState.matchdayId;
+      const frischSpieltag = (frisch.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === frischMatchdayId);
+      const frischKandidaten = [frischSpieltag?.discipline1?.disciplineId, frischSpieltag?.discipline2?.disciplineId].filter(
+        (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id),
+      );
+      const { arenaDisciplineIds: frischDuell } = teileBahnPodDisziplinenAb(
+        frisch.gameState,
+        { saveId, seasonId: frischSeasonId, matchdayId: frischMatchdayId },
+        frischKandidaten,
+      );
+      if (frischDuell.length === 0) {
+        invalidateLocalTransfermarktCachesForSave(saveId);
+        continue;
+      }
+    }
     await fuehreLigaSetupDraftAus({
       persistence,
       saveId,
@@ -183,7 +208,7 @@ let kopieZaehler = 0;
 beforeAll(async () => {
   const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
   basis = { persistence, saveId: scope.saveId, seasonId: scope.seasonId, matchdayId: scope.matchdayId };
-}, 300_000);
+}, 600_000); // Aufbau ~110-165 s je Aufruf; 300 s liessen unter CI-Last keine Reserve
 
 afterAll(() => {
   if (basis) invalidateLocalTransfermarktCachesForSave(basis.saveId);
