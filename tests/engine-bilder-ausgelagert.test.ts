@@ -5,7 +5,7 @@
  * hat sie nach public/mockups/engine-bilder/<inhaltshash>.png (bzw. auf byte-gleiche Dateien unter
  * public/sprites/) ausgelagert. Dieser Test ist die CI-Stufe von `--pruefen`: keine neuen
  * eingebetteten Bilder in SPRITES/B_SPRITES, jede Referenz existiert und hat noch denselben
- * Inhalt, keine verwaisten Dateien. Rot? -> `node scripts/lagere-engine-bilder-aus.mjs`.
+ * Inhalt, keine verwaisten Dateien. Rot? -> `node scripts/lagere-engine-bilder-aus.mjs`; bei "Inhalt ... hat sich geaendert" (Sprite-Datei unter public/sprites/ neu gerendert) zuerst `--einlagern`, dann erneut ohne Argument auslagern.
  */
 import { readFileSync } from "node:fs";
 
