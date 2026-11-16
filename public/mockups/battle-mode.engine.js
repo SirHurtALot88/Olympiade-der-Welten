@@ -54853,6 +54853,60 @@
   // vermiedener Darstellungsfehler. `bahnSimAcc` (s. Deklaration bei `acc` oben) ist der
   // GETRENNTE Akkumulator, der stattdessen entscheidet, wann die Physik tatsaechlich einen
   // Schritt macht.
+  // ===================================================================================
+  // RENDER-INTERPOLATION FUER DIE BAHN (Spurt-Ruckeln, Chris 16.11.: "das ganze spurt ding laeuft
+  // sehr ruckelig und stotternd ab").
+  //
+  // URSACHE (nachgemessen, scripts/-unabhaengige Probe im Arbeitsbaum): die Physik laeuft in festen
+  // Sechzigsteln (`acc`/`bahnSimAcc`), gezeichnet wird aber pro Bildschirmbild (rAF). Das ergibt
+  // je Bild eine schwankende Zahl Sim-Schritte -- 0/1/2, im Alt-Stand sogar bis 3 -- sobald die
+  // Bildzeit nicht EXAKT 1/60 s ist: auf 60-Hz-Schirmen weil `acc` am Schwellwert klebt (ein
+  // Bild mit 16,66 ms statt 16,67 ms gibt 0 Schritte, das naechste 2), auf 75/120/144-Hz-Schirmen
+  // systematisch (immer 0/1-Muster). Jeder Doppelschritt ist ein Positionssprung, und auf der Spurt-
+  // Bahn mit Kamera 2,8x ist er fuer das Auge 2,8-fach vergroessert (Chris' Screenshot).
+  //
+  // BEHEBUNG: die klassische "Interpolation zwischen den letzten zwei Sim-Staenden" (Gaffer on
+  // Games, "Fix Your Timestep"): VOR jedem echten stepSim()-Aufruf wird der gezeichnete Teilzustand
+  // (rennT, u.pos/u.bahnZ aller Laeufer, Kamera) gemerkt; vor draw() wird er mit dem Rest des
+  // Akkumulators zwischen "vorher" und "jetzt" gemischt und NACH draw() wieder hergestellt. Der
+  // Sim-Zustand selbst wird nie veraendert -- gemischt wird nur WAEHREND draw(), und wieder
+  // zurueckgeschrieben, auch wenn draw() wirft. Ergebnis, Rennlauf, rr()-Ziehungen, Fingerabdruck
+  // bleiben damit bit-identisch; die Anzeige hinkt dem Sim-Stand um hoechstens einen Schritt nach.
+  //
+  // Wo NICHT gemischt wird: Pause/Schnelldurchlauf (f=1), Sprung von rennT (neues Rennen, mehr als
+  // 0,25 s Abstand), Laeufer die im Schritt ins Ziel kamen (Zielpferch-Versatz) oder deren pos um mehr
+  // als 0,06 sprang (Teleport nach Sturz/Sicherung).
+  const viVorher=new Map();
+  let viRennT=null, viZoom=1, viCx=0, viRx=0, viRy=0;
+  function viSchnappschuss(){
+    viVorher.clear();
+    if(!istBahn(disc)){ viRennT=null; return; }
+    viRennT=rennT; viZoom=cam.zoom; viCx=cam.cx; viRx=camR.x; viRy=camR.y;
+    for(const u of LAEUFER)viVorher.set(u,{pos:u.pos,z:u.bahnZ,fertig:u.fertig!=null});
+  }
+  function viMische(zf){
+    if(viRennT==null||!istBahn(disc))return null;
+    const schritt=zf/60, f=Math.max(0,Math.min(1,(bahnSimAcc+acc)/schritt));
+    if(f>=0.999||f<=0)return null;
+    if(!(rennT>=viRennT)||rennT-viRennT>0.25)return null;
+    const cr=camR, c=cam;
+    const gesichert={rennT, zoom:c.zoom, cx:c.cx, rx:cr.x, ry:cr.y, l:[]};
+    const mix=(a,b)=>a+(b-a)*f;
+    rennT=mix(viRennT,rennT); c.zoom=mix(viZoom,c.zoom); c.cx=mix(viCx,c.cx); cr.x=mix(viRx,cr.x); cr.y=mix(viRy,cr.y);
+    for(const u of LAEUFER){
+      const v=viVorher.get(u); if(!v)continue;
+      if(v.fertig!==(u.fertig!=null))continue;
+      if(Math.abs(u.pos-v.pos)>0.06)continue;
+      gesichert.l.push([u,u.pos,u.bahnZ]);
+      u.pos=mix(v.pos,u.pos);
+      if(Math.abs(u.bahnZ-v.z)<1.5)u.bahnZ=mix(v.z,u.bahnZ);
+    }
+    return ()=>{
+      rennT=gesichert.rennT; c.zoom=gesichert.zoom; c.cx=gesichert.cx; cr.x=gesichert.rx; cr.y=gesichert.ry;
+      for(const [u,p,z] of gesichert.l){u.pos=p;u.bahnZ=z;}
+    };
+  }
+
   function anzeigeSechzigstel(zf){
     tickerSendeT+=1/60; ticksSeitReset++;
     // B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs, 24 Saaten je Disziplin):
@@ -54870,7 +54924,7 @@
     // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
     if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
       bahnSimAcc+=1/60;
-      while(bahnSimAcc>=zf/60){ stepSim(1/60); bahnSimAcc-=zf/60; }
+      while(bahnSimAcc>=zf/60){ if(istBahn(disc))viSchnappschuss(); stepSim(1/60); bahnSimAcc-=zf/60; }
     } else {
       stepSim((1/60)/zf);
     }
@@ -54913,7 +54967,9 @@
       if(!done&&!finaleAktiv){ const z=finaleZustandLive(); if(z)finaleSchritt(finaleBedingungAus(z)); }
     }
     tempoAnzeigeAktualisieren();
-    draw();
+    // Render-Interpolation (s. viMische): nur waehrend draw(), Sim-Zustand bleibt unberuehrt.
+    const viRueck=(running&&!schnelldurchAktiv&&!done)?viMische(zeitFaktor()):null;
+    try{ draw(); } finally { if(viRueck)viRueck(); }
     requestAnimationFrame(loop);
   }
 
