@@ -49,6 +49,11 @@ const SAATEN = [1, 7, 42];
 const KULISSEN_EFFEKT = process.argv.slice(2).find((a) => a.startsWith("--kulissen-effekt="))?.split("=")[1] ?? null;
 const KONTAKT_FLAG = process.argv.slice(2).includes("--kontakt-flag");
 const KONTAKT_ZWANG = process.argv.slice(2).find((a) => a.startsWith("--kontakt-zwang="))?.split("=")[1] ?? null;
+if (KONTAKT_ZWANG !== null && !["draufgaenger", "opportunist", "duellant", "schleicher", "beschuetzer", "bollwerk"].includes(KONTAKT_ZWANG)) {
+  // Tippfehler (z. B. "Bollwerk") wuerden sonst lautlos als "Zwang ohne Wirkung" durchlaufen.
+  console.error(`FEHLER: unbekannter --kontakt-zwang=${KONTAKT_ZWANG}`);
+  process.exit(2);
+}
 
 const v = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten;
 const vierKader = [v[0].heim, v[0].gast, v[1].heim, v[1].gast];

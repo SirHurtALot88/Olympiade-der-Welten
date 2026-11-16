@@ -8042,8 +8042,8 @@
   //   - Flag-Geruest: BAHN_ART/FELDSPIEL_ART/ARENA_ART/BUEHNE_ART[d].kontakt, Standard null,
   //     NICHT aufzaehlbar (sonst taucht der Schluessel ueber eine Rohreferenz im Fingerabdruck
   //     auf). Gesetzt nur ueber window.__arena.kontaktFlags({<disziplin>:{...}}) bzw.
-  //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Headless-Laeufe,
-  //     window.__olyKontaktFlags vor dem Laden. Die echte App setzt nichts davon.
+  //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Chromium-Headless-Laeufe,
+  //     window.__olyKontaktFlags vor dem Laden (der Node-Runner reicht sie noch NICHT durch, s. arena-node-motor.mjs). Die echte App setzt nichts davon.
   //     In Schritt 0 hat ein gesetztes Flag KEINE Wirkung auf das Spiel: es schaltet nur die
   //     Schatten-Buchhaltung (Profil je Laeufer, Schatten-Zaehler, Ziehung aus dem eigenen
   //     Strom) ein -- der Nachweis, dass die Schicht im Sim-Pfad laeuft, ohne rr() anzufassen.
@@ -8147,7 +8147,7 @@
     if(pr.revanche)teile.push("sinnt auf Revanche");
     const s=teile.join(", ");
     return "Tendenzen im Zweikampf: "+s.charAt(0).toUpperCase()+s.slice(1)+
-      ". Bisher wirkt davon nur die Grundneigung der Persönlichkeit, als Rempel-Häufigkeit in Spurt und Takeshi's Castle.";
+      ". Das ist die Grundtendenz der Persönlichkeit; sie wirkt bisher nur als Rempel-Häufigkeit in Spurt und Takeshi's Castle, Eigenschaften verschieben sie später.";
   }
   // EIGENER ZUFALLSSTROM (Abschnitt 3.5). mulberry32 statt der rr()-LCG mit Versatz: eine
   // andere Startzahl derselben Vollperioden-LCG laege auf demselben Zyklus wie rr().
@@ -38494,7 +38494,9 @@
           "Entsteht aus "+p.c+" · "+p.r+(p.sub&&p.sub.length?" · "+p.sub.join(", "):"")+
           ((p.tp&&p.tp.length)||(p.tn&&p.tn.length)?" · "+[...(p.tp||[]),...(p.tn||[])].join(", "):"")+
           ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist. "+
-          kontaktTendenzText(kontaktProfil(p,pk)));
+          // Opus-Review #1531: nur die GRUNDtendenz der Persoenlichkeit (ohne Traits) -- das ist heute die einzige Groesse,
+          // die im Spiel wirkt; mit Traits stuende z. B. "nimmt Zweikaempfe mit", obwohl der Spieler real meidet.
+          kontaktTendenzText(kontaktProfil({...p,tp:[],tn:[]},pk)));
         u.appendChild(pl);
 
         const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
