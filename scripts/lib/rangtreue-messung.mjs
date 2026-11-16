@@ -247,6 +247,75 @@ export async function baueSynthetischeKaderFamilie(seite) {
 }
 
 /**
+ * ECHTEN KADER EINHAENGEN (Spurt-Formatwahl, Opus-Review #1502, 16.11.): `spurtFormatWaehlen()` in
+ * battle-mode.engine.js waehlt das Spurt-Format (klassisch/Hatz/HYROX) per Saat-Hash NUR, wenn beim
+ * Laden der Seite ein echter Kader eingehaengt war (`window.__olyArenaKader.heim/gast`, so macht es
+ * der Host) UND niemand das Format ausdruecklich gesetzt hat (`bahnFlags({spurtFormat})`). Alle
+ * kader-losen Messwerkzeuge laufen deshalb immer "klassisch". Wer die MISCHUNG messen will, so wie
+ * das Spiel sie spielt, haengt den Kader mit dieser Funktion VOR `seite.goto()` ein (Init-Skript;
+ * `__olyArenaKader` wird beim Laden einmalig gelesen). `disziplinProbe` mit `kaderFamilie` setzt die
+ * Kader je Variante selbst -- der eingehaengte Kader schaltet nur das Gate der Formatwahl frei und
+ * aendert sonst nichts. Kein `mutatoren`/`aufstellung`, damit die Messung sonst unveraendert bleibt.
+ */
+export async function haengeEchtenKaderEin(seite, kader) {
+  await seite.addInitScript((k) => { window.__olyArenaKader = { heim: k.heim, gast: k.gast }; }, { heim: kader.heim, gast: kader.gast });
+}
+
+/**
+ * SPURT-MISCHUNG (16.11.): oeffnet eine FRISCHE Seite mit eingehaengtem Kader (Formatwahl per
+ * Saat-Hash aktiv) und dem Kartenmodus `formModus` ("echt" = wie die Abnahmezahlen in
+ * data/generated/disziplin-abnahme.json). Frisch, weil `bahnFlags({spurtFormat})` sich nicht
+ * zuruecknehmen laesst (setzt `spurtFormatExplizit`) und der Kader nur beim Laden gelesen wird.
+ * `fehler` sammelt Seitenfehler. Der Aufrufer schliesst den Browser.
+ */
+export async function oeffneSpurtMischungsSeite(browser, seitenUrl, kader, { formModus = "echt", fehler = [] } = {}) {
+  const seite = await browser.newPage();
+  seite.on("pageerror", (e) => fehler.push(String(e)));
+  // Kein AudioContext im Messlauf (Speicherleck-Fix, s. messe-arena-einfluss.mjs).
+  await seite.addInitScript(() => { window.AudioContext = undefined; window.webkitAudioContext = undefined; });
+  await haengeEchtenKaderEin(seite, kader);
+  await seite.goto(seitenUrl, { waitUntil: "networkidle" });
+  await seite.waitForFunction(
+    () => window.__arena && window.__arena.disziplinProbe && window.__arena.einflussVon && window.__arena.spurtFormatProbe && window.__arena.formModusMessung,
+    null, { timeout: 30000 });
+  await seite.evaluate((m) => window.__arena.formModusMessung(m), formModus);
+  return seite;
+}
+
+/**
+ * Anteile der drei Formate, die die Saat-Hash-Wahl ueber die Saaten 1..300 liefert. Weniger als
+ * drei Formate heisst: der Kader ist nicht eingehaengt (oder die Formatwahl wurde ausdruecklich
+ * gesetzt) und die "Mischung" waere in Wahrheit ein Einzelformat.
+ */
+export async function spurtFormatAnteile(seite) {
+  return seite.evaluate(() => {
+    const z = {};
+    for (let s = 1; s <= 300; s++) { const f = window.__arena.spurtFormatProbe(s); z[f] = (z[f] || 0) + 1; }
+    return z;
+  });
+}
+
+/**
+ * Misst Spurt-RHO auf einer Seite aus `oeffneSpurtMischungsSeite`: zuerst die MISCHUNG (Format dem
+ * Hash ueberlassen), danach -- falls `jeFormat` -- klassisch/Hatz/HYROX einzeln mit ausdruecklich
+ * gesetztem Format (ab da ist die Seite fuer die Mischung verbraucht). Rueckgabe je Eintrag die
+ * `disziplinMessen`-Zeile (spielMed, spielSpan, saisonMed, ...) oder `{ fehler }`.
+ */
+export async function messeSpurtMischungRho(seite, { n, kaderFamilie, jeFormat = true, nachMischung = null }) {
+  const aus = { mischung: await disziplinMessen(seite, "spurt", { n, kaderFamilie }), einzelformate: {} };
+  // Haken fuer weitere Messungen an der NOCH UNVERBRAUCHTEN Mischungs-Seite (z. B. Pp, s.
+  // scripts/miss-spurt-mischung.mjs), bevor ein Format ausdruecklich gesetzt wird.
+  if (nachMischung) await nachMischung(seite);
+  if (jeFormat) {
+    for (const fmt of ["klassisch", "hatz", "hyrox"]) {
+      await seite.evaluate((f) => window.__arena.bahnFlags({ spurtFormat: f }), fmt);
+      aus.einzelformate[fmt] = await disziplinMessen(seite, "spurt", { n, kaderFamilie });
+    }
+  }
+  return aus;
+}
+
+/**
  * Feldspieler-only-Zusatz (Fable-Recherche 1.1/3.1): nur ausgefuellt, wenn IRGENDEINER der
  * Spieldurchlaeufe einen als Torwart markierten Teilnehmer enthaelt (heute nur Hockey) —
  * fuer jede andere Disziplin liefert das ein leeres Objekt, und `disziplinMessen` gibt
