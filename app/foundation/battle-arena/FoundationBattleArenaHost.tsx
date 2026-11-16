@@ -78,7 +78,7 @@ let huelleCache: Promise<ArenaHuelle> | null = null;
 
 function ladeArenaHuelle(): Promise<ArenaHuelle> {
   if (!huelleCache) {
-    huelleCache = fetch("/mockups/battle-mode.html", { cache: "force-cache" })
+    huelleCache = fetch("/mockups/battle-mode.html", { cache: "no-cache" })
       .then(async (response) => ({
         html: await response.text(),
         basis: response.url,

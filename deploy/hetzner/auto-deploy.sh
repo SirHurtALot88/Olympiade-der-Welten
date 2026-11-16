@@ -105,6 +105,22 @@ fi
 # geaenderte Caddyfile/Env uebernimmt. Guenstig genug, um das jeden Lauf zu tun.
 compose up -d caddy
 
+# Geaenderte Caddyfile wirklich laden: `up -d` allein tut dafuer NICHTS (die Compose-Konfiguration
+# ist unveraendert, der Container wird nicht neu erzeugt), und die Datei ist als EINZELDATEI
+# gemountet -- `git pull` ersetzt sie durch eine neue Inode, der Container sieht weiter die alte.
+# Ein Neustart des Containers bindet den Pfad neu (Ausfall ~1-2 s, Zertifikate liegen im Volume
+# caddy-data).
+#
+# Bewusst KEIN Blick in den Git-Diff (DATEIEN): bash liest dieses Skript waehrend des Laufs aus der
+# alten Datei weiter, die `git merge --ff-only` oben ersetzt hat -- ein Block, der erst durch diesen
+# Merge ins Skript kommt, liefe im selben Lauf nicht, und beim naechsten Deploy waere die Caddyfile
+# nicht mehr im Diff. Stattdessen: Datei IM Container gegen die auf der Platte vergleichen. Das
+# heilt sich beim naechsten Lauf von selbst (auch nach einem abgebrochenen Deploy).
+if ! compose exec -T caddy cat /etc/caddy/Caddyfile 2>/dev/null | cmp -s - deploy/hetzner/Caddyfile; then
+  log "Caddyfile im Container weicht von der Platte ab -- starte caddy neu ..."
+  compose restart caddy || log "WARNUNG: caddy-Neustart fehlgeschlagen -- Caddyfile ggf. von Hand laden."
+fi
+
 # 3b) Alte, ungenutzte Images wegraeumen (E1, Fund F10: kein Deploy-Skript tat das bisher).
 #
 # Jeder erfolgreiche Build oben hinterlaesst das VORHERIGE Image als "dangling" (ohne Tag,
