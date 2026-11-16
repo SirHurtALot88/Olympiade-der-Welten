@@ -38189,7 +38189,7 @@
   // "Zuschau-Modus"). Reine Auswahl der Darstellung/Variante, kein Eingriff in die Wertungsformel.
   const FORMATE_JE_DISC={
     spurt:[
-      {id:"auto",label:"Automatisch",hinweis:"wie im Spiel (nach Saat)"},
+      {id:"auto",label:"Automatisch",hinweis:"wie im Spiel (nach Saat; ohne echten Kader: Normal)"},
       {id:"klassisch",label:"Normal",hinweis:"Huerdenlauf"},
       {id:"hyrox",label:"HYROX",hinweis:"Stationen in der Halle"},
       {id:"hatz",label:"Die Hatz",hinweis:"Wellen-Ausscheidung"},
@@ -38215,7 +38215,12 @@
       c.appendChild(el("em",null,f.hinweis));
       c.setAttribute("data-format",f.id);
       c.setAttribute("aria-pressed",f.id===jetzt?"true":"false");
-      c.addEventListener("click",()=>{formatSetzen(f.id);sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
+      c.addEventListener("click",()=>{
+        formatSetzen(f.id);sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();
+        // Der Neuaufbau ersetzt die Chips -- Tastaturfokus auf das gewaehlte Format zurueckgeben (Opus-Review #1506).
+        const neu=document.querySelector('[data-testid="format-leiste"] [data-format="'+f.id+'"]');
+        if(neu&&typeof neu.focus==="function")neu.focus();
+      });
       zeile.appendChild(c);
     }
     dbar.parentNode.insertBefore(zeile,dbar.nextSibling);
