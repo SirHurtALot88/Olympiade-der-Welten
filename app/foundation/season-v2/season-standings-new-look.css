@@ -630,6 +630,14 @@
   font-weight: 700;
 }
 
+/* KULISSEN-FUNDAMENT (Baustein 1, 15.11.): reiner Namens-Hinweis neben dem Ergebnis-Chip, eine
+   Spur dezenter als das Ergebnis selbst -- s. lib/battle/arena-kulisse-anzeige.ts. */
+.is-new-look .nl-standings-spieltage-disziplin-kulisse {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+  font-weight: 400;
+}
+
 .is-new-look .nl-standings-spieltage-verhaeltnis {
   font-size: var(--nl-fs-sm);
   min-width: 2.4em;

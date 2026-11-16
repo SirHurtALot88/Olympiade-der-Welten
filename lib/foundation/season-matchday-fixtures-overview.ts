@@ -60,6 +60,7 @@ import { getLeagueOf, type LeagueTier } from "@/lib/season/league-split";
 import { berechneErgebnisNormiert, findeSpieltagsFixtures, outcomeAusPunkten } from "@/lib/resolve/battle-mode-pps-duell";
 import { getSeasonDisciplineScheduleEntry, isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 import { getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { waehleKulisseAnzeige } from "@/lib/battle/arena-kulisse-anzeige";
 
 export type SpieltagsPaarungTeilnehmer = {
   teamId: string;
@@ -119,6 +120,13 @@ export type SpieltagsDuellDisziplin = {
   miniDmPodIdHeim: string | null;
   /** Dieselbe Groesse fuer das GASTTEAM dieser Zeile -- s. `miniDmPodIdHeim`. */
   miniDmPodIdGast: string | null;
+  /**
+   * KULISSEN-FUNDAMENT (Baustein 1, 15.11., `lib/battle/arena-kulisse-anzeige.ts`): die fuer dieses
+   * Duell gebuchte bzw. vom Motor zu waehlende Kulisse, schon VOR dem Spieltag bekannt -- reine
+   * Anzeige, keine Spielwirkung. `null` ohne Save-Kontext (`options.saveId` fehlt), fuer Disziplinen
+   * ohne illustrierte Kulissen und fuer Vierer-Pod-Disziplinen.
+   */
+  kulisse: { id: string; label: string } | null;
 };
 
 /** EIN Mitglied eines Mini-DM-Pods, mit seinem Ergebnis (falls schon gewertet). */
@@ -552,6 +560,18 @@ export function buildSpieltagsUebersicht(
           : null,
         miniDmPodIdGast: isViererPodDiscipline(slot.disciplineId)
           ? podIdByDisciplineAndTeamId.get(podSchluessel(slot.disciplineId, fixture.awayTeamId)) ?? null
+          : null,
+        // KULISSEN-FUNDAMENT (Baustein 1, 15.11.): nur mit Save-Kontext (derselbe Grund wie
+        // `buildMiniDmPodsForSlot()` oben) -- ohne `saveId` kein Hinweis, statt einen Hash mit
+        // leerer saveId zu zeigen, der spaeter (mit saveId) wieder eine andere Kulisse waehlte.
+        kulisse: options?.saveId
+          ? waehleKulisseAnzeige({
+              disciplineId: slot.disciplineId,
+              saveId: options.saveId,
+              seasonId: gameState.season.id,
+              spieltag: matchdayIndex + 1,
+              fixture,
+            })
           : null,
       };
     });
