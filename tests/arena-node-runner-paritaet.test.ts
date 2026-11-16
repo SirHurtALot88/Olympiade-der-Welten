@@ -10,6 +10,7 @@ import {
   ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
   ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS,
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
+  bereiteFixturesVor,
   runArenaFixtures,
   runBahnPodFixtures,
   runBattlefieldPodFixtures,
@@ -22,7 +23,10 @@ import {
   type BattlefieldPodFixtureResult,
   type MiniDmFfaPodFixtureInput,
   type MiniDmFfaPodFixtureResult,
+  waehleArenaChassis,
 } from "@/lib/battle/arena-headless-runner";
+import { ARENA_KULISSEN_PROFILE, waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
+import { ladeMotorSkripte, simuliereDuelle } from "@/lib/battle/arena-node-motor.mjs";
 import {
   pruefeRohesDuellErgebnis,
   pruefeRohesMiniDmErgebnis,
@@ -32,7 +36,7 @@ import {
   runMiniDmFfaPodFixturesNode,
 } from "@/lib/battle/arena-node-runner";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
-import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
+import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { rollMatchdayMutatorTraitsForSide } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
@@ -311,6 +315,58 @@ describe("arena-node-runner · ohne Chromium", () => {
     const fixtures = fixturesFuer("basketball").slice(0, 1);
     await expect(runArenaFixturesNode(kontext!.gameState, fixtures, "basketball", { nodeTimeoutMs: 1 })).rejects.toThrow(/Timeout/);
   }, 120_000);
+
+  // KULISSE (Task #169, 16.11.): der Node-Runner muss die GEBUCHTE Kulisse (`waehleKulisseFuerFixture`)
+  // an den Motor reichen, wie der Chromium-Runner. Fehlt sie (`disziplin` nicht an
+  // `bereiteFixturesVor()` oder `kulisseByDisciplineId` nicht im Auftrag/Worker/Motor), waehlt der
+  // Motor per eigenem Hash eine andere Oberflaeche -- bei Tennis mit Wirkung auf die Wertung. Der
+  // Chromium-Paritaetstest unten faengt das nur MIT Browser; dieser hier laeuft ohne.
+  it("tennis: der Node-Runner spielt auf der gebuchten Kulisse", async () => {
+    const disziplin = "tennis";
+    const varianten = ARENA_KULISSEN_PROFILE[disziplin]!.varianten.map((v) => v.id);
+    expect(varianten.length, "Tennis braucht mindestens zwei Kulissen").toBeGreaterThan(1);
+    const { gameState } = kontext!;
+    const fixtures = fixturesFuer(disziplin);
+    const mutatoren = mutatorenFuer(disziplin);
+
+    const node = await runArenaFixturesNode(gameState, fixtures, disziplin, { mutatoren });
+
+    // Referenz: derselbe Motor direkt, einmal mit der gebuchten, einmal mit einer bewusst anderen Kulisse.
+    const vorbereitet = bereiteFixturesVor(gameState, fixtures);
+    const gebucht = fixtures.map((f) =>
+      waehleKulisseFuerFixture({
+        disziplin,
+        saat: seedZuZahl(f.seed),
+        homeTeamId: f.homeTeamId,
+        awayTeamId: f.awayTeamId,
+        matchdayId: f.matchdayId ?? gameState.matchdayState?.matchdayId ?? "",
+      })!.id,
+    );
+    const skripte = ladeMotorSkripte(path.resolve(process.cwd(), "public", "mockups"));
+    const motorLauf = (kulissen: string[]) =>
+      simuliereDuelle(skripte, {
+        disziplin,
+        chassis: waehleArenaChassis(disziplin),
+        mutatoren,
+        fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed }, i) => ({
+          heim,
+          gast,
+          aufstellung,
+          seed,
+          kulisseByDisciplineId: { [disziplin]: kulissen[i]! },
+        })),
+      }) as Promise<Array<{ seiten: [number, number]; boxscore: Array<{ wert: number }> } | null>>;
+    const mitGebucht = await motorLauf(gebucht);
+    const mitAnderer = await motorLauf(gebucht.map((id) => varianten[(varianten.indexOf(id) + 1) % varianten.length]!));
+
+    const kern = (r: { seiten: [number, number]; boxscore: Array<{ wert: number }> } | null) =>
+      r ? { seiten: [...r.seiten], werte: r.boxscore.map((e) => e.wert) } : null;
+    expect(node.map(kern), "Node-Runner == Motor mit gebuchter Kulisse").toEqual(mitGebucht.map(kern));
+    expect(
+      mitAnderer.some((r, i) => JSON.stringify(kern(r)) !== JSON.stringify(kern(mitGebucht[i]!))),
+      "eine andere Kulisse muss mindestens ein Duell veraendern -- sonst kommt kulisseByDisciplineId in simuliereDuelle()/ladeMotorInstanz() nicht beim Motor an",
+    ).toBe(true);
+  }, 300_000);
 
   it("die Formpruefung lehnt jedes Ergebnis ab, das die Wertung nicht lesen koennte", () => {
     const gut = { disziplin: "tennis", seiten: [2, 1], boxscore: [{ name: "A", wert: 1.5 }] };

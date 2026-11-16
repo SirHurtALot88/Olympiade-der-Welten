@@ -103,7 +103,14 @@ type DuellAuftrag = {
   chassis: ReturnType<typeof waehleArenaChassis>;
   mutatoren: string[];
   buehneFlags?: Record<string, number>;
-  fixtures: Array<{ heim: unknown[]; gast: unknown[]; aufstellung: unknown; seed: number }>;
+  fixtures: Array<{
+    heim: unknown[];
+    gast: unknown[];
+    aufstellung: unknown;
+    seed: number;
+    /** Gebuchte Kulisse je Disziplin, wie im Chromium-Runner (s. `bereiteFixturesVor`). */
+    kulisseByDisciplineId: Record<string, string>;
+  }>;
 };
 
 type MiniDmAuftrag = {
@@ -312,7 +319,11 @@ export async function runArenaFixturesNode(
   options: RunArenaFixturesNodeOptions = {},
 ): Promise<ArenaFixtureResult[]> {
   if (fixtures.length === 0) return [];
-  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides);
+  // `disziplin` MUSS mit: nur damit waehlt `bereiteFixturesVor()` die gebuchte Kulisse
+  // (`kulisseByDisciplineId`), genau wie `runArenaFixtures()`. Ohne sie fiel der Motor auf seinen
+  // eigenen Hash ohne Teams/Spieltag zurueck und spielte Tennis (bisher die einzige Disziplin mit
+  // Kulissen-Profil) oft auf einer anderen Oberflaeche als Chromium (Task #169, 16.11.).
+  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin);
   const chassis = waehleArenaChassis(disziplin);
   const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
   const roh = await fuehreWorkerAus(
@@ -322,7 +333,13 @@ export async function runArenaFixturesNode(
       chassis,
       mutatoren,
       ...(options.buehneFlags ? { buehneFlags: { ...options.buehneFlags } } : {}),
-      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed }) => ({ heim, gast, aufstellung, seed })),
+      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId }) => ({
+        heim,
+        gast,
+        aufstellung,
+        seed,
+        kulisseByDisciplineId,
+      })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),
   );
