@@ -88,7 +88,9 @@ CHASSIS = {
     # (Prospekt, Lichtkegel, Fackelglut). Flaechige Abdunklung hatte genau das ins Dunkel gezogen
     # (Audit 08.11.): Abdunklung fest niedrig, Rand-Vignette des Motors halb (`rand`, s. kulisseZeichnen).
     "showcase": {"art": "quelle", "dunkel_fest": 0.04, "rand": 0.5},
-    "eiskunstlauf": {"art": "quelle"},
+    # Eiskunstlauf (Sicht-Audit 16.11.): das helle Eis bekam aus der Helligkeitsformel die Hoechst-
+    # Abdunklung 0.30 und wurde im Spiel grau -- wie Hockey fest niedrig, das Licht traegt das Bild.
+    "eiskunstlauf": {"art": "quelle", "dunkel_fest": 0.06},
     "breaking": {"art": "quelle", "dunkel_fest": 0.04, "rand": 0.35},
     "i-spy": {"art": "quelle"},
     # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
