@@ -136,6 +136,9 @@
   @media (max-width:1120px){.oly-battle-arena.oly-battle-arena .bl{border-left:0;border-top:1px solid var(--line-soft)}}
 
   .oly-battle-arena.oly-battle-arena .dbar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  /* FORMAT-LEISTE (Spurt: Normal/HYROX/Die Hatz), zweite Chip-Zeile unter der Disziplinwahl */
+  .oly-battle-arena.oly-battle-arena .dformat{align-items:center;margin-top:-4px;padding-left:2px}
+  .oly-battle-arena.oly-battle-arena .dformat-titel{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;font-weight:600;font-style:normal;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-right:4px}
   .oly-battle-arena.oly-battle-arena .dchip{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:15px;font-weight:600;letter-spacing:.03em;
     text-transform:uppercase;padding:6px 12px;border-radius:6px;cursor:pointer;background:var(--surface-2);
     border:1px solid var(--line);color:var(--muted);font-style:normal;
