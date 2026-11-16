@@ -43,7 +43,7 @@ Einzel-Hashes der neuen Zeilen: Hatz 1/7/42 `9f029aa1b41a 6c0dd765489a e550ef44d
 | klassisch | 0,899 | 0,876 |
 | Hatz | 0,837 | 0,823 |
 | HYROX | 0,893 | 0,895 |
-| Mischung | -- | 0,873 (Spannweite 0,053) |
+| Mischung | 0,863 (Spannweite 0,088; Opus-Nachmessung) | 0,873 (Spannweite 0,053) |
 
 Pp der Mischung (echt, n=48): 16,5 / 21,5 (Opus-Review: 18,7 / 19,1).
 

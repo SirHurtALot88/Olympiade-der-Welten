@@ -188,7 +188,9 @@ try {
   }
 
   // SPURT-MISCHUNG (s. Kopfkommentar, dritter Block): eigene Seite mit eingehaengtem Kader.
-  if (basislinie.zusatzmessungen) {
+  if (!basislinie.zusatzmessungen) {
+    console.warn("WARNUNG: Basislinie ohne `zusatzmessungen` -- Spurt-Mischung/Formate werden NICHT geprueft (node scripts/baue-rangtreue-basislinie.mjs neu bauen).");
+  } else try {
     const zusatzSeite = await oeffneSpurtMischungsSeite(browser, SEITE, kaderFamilie[0], { formModus: "echt" });
     spurtAnteile = await spurtFormatAnteile(zusatzSeite);
     // Weniger als drei Formate: das Gate der Formatwahl ist kaputt, die "Mischung" waere ein Einzelformat.
@@ -206,6 +208,11 @@ try {
       if (gefallen || absolutGerissen) rot = true;
       spurtZeilen.push({ d: name, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen, absolutGerissen });
     }
+  } catch (e) {
+    // Ein Fehler im Spurt-Block (Timeout der Seite, Kader-Datei ohne heim/gast) darf den Bericht der
+    // zwanzig Disziplinen nicht verschlucken -- rot + Fehlerzeile statt Abbruch mit Stacktrace.
+    spurtZeilen.push({ d: "spurt-mischung", fehler: String((e && e.message) || e) });
+    rot = true;
   }
 } finally {
   await browser.close();
