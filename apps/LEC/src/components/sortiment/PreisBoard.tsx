@@ -145,6 +145,8 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
   const withTask = task !== "alle";
   // In den Aufgaben-Reitern ohne Preisfrage entfaellt der Marktwert, damit die Spalte "Aktion" Platz hat
   const showMarkt = task === "alle" || task === "preis";
+  // Eigene Spalte "Letzter Verkauf" nur ohne Aufgaben-Reiter; dort bleibt es unter den Verkaeufen (Platz fuer "Aktion")
+  const showLast = !withTask;
   const allSelected = withTask && rows.length > 0 && rows.every((r) => selected?.has(r.articleId));
   const head = (key: BoardSortKey, label: React.ReactNode, cls?: string, title?: string) => (
     <th className={`${cls ?? ""}${onSort ? " bd-th-sort" : ""}`.trim()} title={title} onClick={onSort ? () => onSort(key) : undefined} aria-sort={sortKey === key ? (reversed ? "ascending" : "descending") : undefined}>
@@ -165,6 +167,7 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
             {head("name", "Artikel")}
             {head("bestand", "Bestand", "r", "Lagerbestand in Stück")}
             {head("verkaeufe", "Verkäufe", "r", "Verkaufte Stück in 365 Tagen (darunter 90 Tage), darunter wann zuletzt verkauft (grün bis 90 Tage, gelb bis 365, rot älter)")}
+            {showLast && head("letzterVerkauf", "Letzter Verkauf", "r", "Datum des letzten Verkaufs (grün bis 90 Tage, gelb bis 365, rot älter). Nie verkauft: Mindestalter des eBay-Angebots")}
             {head("vk", "Dein VK", "r")}
             {head("abweichung", "Empfohlener VK", undefined, "Sortiert nach der größten Abweichung deines VK von der Zielspanne")}
             {head("abweichung", "Urteil")}
@@ -249,21 +252,45 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                 <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
                   {formatQty(row.windows["365"]?.qty ?? 0)}
                   <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
+                  {!showLast && (
                   <small className="bd-sub90" style={{ display: "block" }} title="Letzter Verkauf">
+                      {(() => {
+                        const d = daysSince(row.lastSoldAt);
+                        if (d === null)
+                          return row.listedDays != null ? (
+                            <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                              nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
+                            </span>
+                          ) : (
+                            <span className="bd-none">—</span>
+                          );
+                        return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                      })()}
+                    </small>
+                  )}
+                </td>
+                {showLast && (
+                  <td data-label="Letzter Verkauf" className="r bd-num bd-c-last" title="Datum des letzten Verkaufs">
                     {(() => {
                       const d = daysSince(row.lastSoldAt);
                       if (d === null)
                         return row.listedDays != null ? (
-                          <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer: so lange ist er mindestens eingestellt.">
+                          <span className="bd-none" title="Nie verkauft. Mindestalter des eBay-Angebots, geschätzt aus der Artikelnummer.">
                             nie · ≥ {row.listedDays >= 365 ? `${(row.listedDays / 365).toFixed(1).replace(".", ",")} J` : `${row.listedDays} T`} online
                           </span>
                         ) : (
                           <span className="bd-none">—</span>
                         );
-                      return <span style={{ color: d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</span>;
+                      const color = d <= 90 ? "var(--good)" : d <= 365 ? "var(--warn)" : "var(--crit)";
+                      return (
+                        <>
+                          <span style={{ color }}>{new Date(row.lastSoldAt as string).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
+                          <small className="bd-sub90" style={{ display: "block" }}>{d === 0 ? "heute" : `vor ${d} Tagen`}</small>
+                        </>
+                      );
                     })()}
-                  </small>
-                </td>
+                  </td>
+                )}
                 <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "eBay-Shoppreis (Rückfall, wenn Billbee keinen VK hat)" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
