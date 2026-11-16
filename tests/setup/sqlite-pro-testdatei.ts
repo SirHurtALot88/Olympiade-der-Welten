@@ -37,6 +37,28 @@ import { afterAll } from "vitest";
 
 const datenbankDatei = path.join(os.tmpdir(), `oly-test-${process.pid}-${randomUUID()}.sqlite`);
 
+// Alle Datenbankdateien, die `getDatabase()` in DIESER Testdatei geoeffnet hat (s. lib/persistence/sqlite.ts).
+// Je Testdatei neu (setupFiles laeuft einmal pro Datei); Worker sind getrennte Prozesse/Threads, fremde
+// Dateien kommen hier nie hinein.
+const geoeffneteDatenbanken = new Set<string>();
+(globalThis as { __olyTestDatenbanken?: Set<string> }).__olyTestDatenbanken = geoeffneteDatenbanken;
+
+/** Nur Dateien direkt im Temp-Verzeichnis mit Namen `oly-*.sqlite` (nie ein echter Spielstand); Fehler nie weiterwerfen. */
+function loescheTestDb(pfad: string | undefined) {
+  if (!pfad) return;
+  try {
+    if (
+      path.dirname(path.resolve(pfad)) !== path.resolve(os.tmpdir()) ||
+      !/^oly-.+\.sqlite$/.test(path.basename(pfad))
+    ) {
+      return;
+    }
+    for (const endung of ["", "-wal", "-shm"]) fs.rmSync(`${pfad}${endung}`, { force: true });
+  } catch {
+    // z. B. EBUSY/EPERM: ein liegengebliebenes Testfile darf NIE die Umgebungs-Wiederherstellung unten verhindern.
+  }
+}
+
 /**
  * ZWEITES LECK, dieselbe Ursache: Umgebungsvariablen.
  *
@@ -54,6 +76,20 @@ const umgebungVorher = { ...process.env };
 process.env.OLY_APP_SQLITE_PATH = datenbankDatei;
 
 afterAll(() => {
+  // EIGENE DATENBANKEN DER TESTDATEI (16.11.): viele Tests setzen `OLY_APP_SQLITE_PATH` selbst
+  // (`/tmp/oly-arena-...-<zufall>.sqlite`) und raeumten sie nie weg -- gemessen 673 Dateien = 11 GB nach einer
+  // Arbeitssitzung. Zuerst die offene Verbindung schliessen (sonst gibt Linux den Platz erst frei, wenn der GC das
+  // better-sqlite3-Objekt abraeumt), dann alles loeschen, was `getDatabase()` in DIESER Datei geoeffnet hat, plus
+  // den zuletzt per Env gesetzten Pfad. Fehler werden verschluckt (s. loescheTestDb).
+  try {
+    (globalThis as { __olySchliesseTestDatenbank?: () => void }).__olySchliesseTestDatenbank?.();
+  } catch {
+    // schon geschlossen
+  }
+  loescheTestDb(process.env.OLY_APP_SQLITE_PATH);
+  for (const pfad of geoeffneteDatenbanken) loescheTestDb(pfad);
+  geoeffneteDatenbanken.clear();
+
   // Erst die Umgebung zuruecksetzen: hinzugefuegte Schluessel entfernen, veraenderte
   // zuruecksetzen. `delete` UND Zuweisung, weil ein blosses Ueberschreiben neu gesetzte
   // Schluessel stehen liesse.
