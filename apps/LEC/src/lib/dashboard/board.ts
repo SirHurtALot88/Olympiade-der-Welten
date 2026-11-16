@@ -53,6 +53,24 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
  * "Groesste Abweichung": Artikel mit belastbarem Urteil und Abweichung zuerst, nach |€| absteigend;
  * dann die im Rahmen, zuletzt die ohne Urteil. Bei Gleichstand nach Name — die Reihenfolge ist stabil.
  */
+/** Durchschnittlicher VK je Stueck ueber die ganze Verkaufszeit (Lebenszeit-Fenster), Rueckfall auf den Referenz-Ø; 0 = unbekannt. */
+export function lifetimeAvgVk(row: Pick<SortimentRow, "windows" | "avgVkRealized">): number {
+  const all = row.windows.all;
+  if (all && all.qty > 0 && all.avgPrice > 0) return all.avgPrice;
+  return row.avgVkRealized > 0 ? row.avgVkRealized : 0;
+}
+
+export type VkTrend = "hoch" | "hoch_leicht" | "gleich" | "runter_leicht" | "runter";
+
+/** Abweichung des heutigen VK vom Lebenszeit-Ø in Prozent und als Stufe: ab 15 % deutlich, ab 3 % leicht, darunter gleich. */
+export function vkAbweichung(vk: number, avg: number): { pct: number; trend: VkTrend } | null {
+  if (!(vk > 0) || !(avg > 0)) return null;
+  const pct = ((vk - avg) / avg) * 100;
+  const a = Math.abs(pct);
+  const trend: VkTrend = a < 3 ? "gleich" : pct > 0 ? (a >= 15 ? "hoch" : "hoch_leicht") : a >= 15 ? "runter" : "runter_leicht";
+  return { pct, trend };
+}
+
 export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey, reverse = false): SortimentRow[] {
   const byName = (a: SortimentRow, b: SortimentRow) => a.nameRaw.localeCompare(b.nameRaw, "de");
   const marketValue = (r: SortimentRow) => r.market?.value ?? r.market?.range?.max ?? -1;
@@ -96,7 +114,7 @@ export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey, reve
       case "ek":
         return b.ek - a.ek || byName(a, b);
       case "avgvk":
-        return b.avgVkRealized - a.avgVkRealized || byName(a, b);
+        return lifetimeAvgVk(b) - lifetimeAvgVk(a) || byName(a, b);
       case "name":
         return byName(a, b);
     }
