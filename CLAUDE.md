@@ -248,6 +248,23 @@ lokale Store leer ist. Ein Store, in dem schon Spielstände liegen, wird **nie**
 `data/online-saves/manifest.json` (JSON-Exporte auf `main`) ist der ältere, zweite Weg und nur noch
 Rückfall. Er trug über die gesamte Historie nur Smoke- und Audit-Saves, nie einen echten Stand.
 
+## `npm run dev` lokal: Auto-Export abschalten, sonst pusht er auf `main`
+
+Gefunden 16.11. bei einem visuellen Arena-Audit: `npm run dev` startet standardmäßig
+`lib/persistence/online-save-auto-export.ts`, und dieser Mechanismus **committet lokale
+Spielstände und pusht sie auf `main`** — genau das, was der Abschnitt oben als "nichts wird lokal
+gespielt, nichts lokal gespeichert" ausschließt. Bei diesem Fund baute er tatsächlich einen Commit
+("chore(daten): auto-export N Save(s)") und versuchte zu pushen; nur ein fehlgeschlagener Rebase hat
+ihn aufgehalten, und das Skript hat den Commit danach selbst zurückgenommen — verlassen sollte man
+sich darauf nicht.
+
+**Jede Session, die die App lokal mit einem Dev-Server startet** (Browser-Sichtprüfung, Screenshots,
+manuelles Durchklicken), setzt deshalb vorher:
+
+```sh
+OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0 npm run dev
+```
+
 ## An Chris' In-Game-Meldungen kommen
 
 Dieselbe Mechanik, anderer Branch: der Server pusht jede über die Flagge im Spiel abgeschickte
