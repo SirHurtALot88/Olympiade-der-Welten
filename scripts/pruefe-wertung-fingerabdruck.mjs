@@ -28,6 +28,11 @@
 // dem Effekt entsprechen (Lauf auf main ohne Schalter == Lauf auf dem Branch mit
 // --kulissen-effekt=aus) -- Beleg, dass Staerke 0 bit-identisch ist. Ohne den Schalter aendern
 // sich gewollt genau die Tennis-Eintraege.
+// --kontakt-flag (Kontakt-Schritt 0, 16.11., docs/design/kontakt-persoenlichkeit-16-11.md 6.5): setzt
+// fuer ALLE Disziplinen `kontakt:{stufe:0}` (window.__arena.kontaktFlags) und gibt danach die Kontakt-
+// Zaehler eines Spurt- und eines Takeshi-Rennens aus. In Schritt 0 hat das Flag keine Wirkung: GESAMT
+// muss dem Lauf ohne Schalter gleichen. --kontakt-zwang=<typ> zwingt die Kontakt-Schicht auf einen
+// Persoenlichkeitstyp (Kontrafaktik); das bewegt gewollt die Bahnen mit Rempler (Spurt, Takeshi).
 import { chromium } from "playwright";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -42,6 +47,13 @@ const DISZIPLINEN = ["tdm", "mini-dm", "battlefield", "basketball", "football", 
   "climbing", "staffel", "takeshis-castle"];
 const SAATEN = [1, 7, 42];
 const KULISSEN_EFFEKT = process.argv.slice(2).find((a) => a.startsWith("--kulissen-effekt="))?.split("=")[1] ?? null;
+const KONTAKT_FLAG = process.argv.slice(2).includes("--kontakt-flag");
+const KONTAKT_ZWANG = process.argv.slice(2).find((a) => a.startsWith("--kontakt-zwang="))?.split("=")[1] ?? null;
+if (KONTAKT_ZWANG !== null && !["draufgaenger", "opportunist", "duellant", "schleicher", "beschuetzer", "bollwerk"].includes(KONTAKT_ZWANG)) {
+  // Tippfehler (z. B. "Bollwerk") wuerden sonst lautlos als "Zwang ohne Wirkung" durchlaufen.
+  console.error(`FEHLER: unbekannter --kontakt-zwang=${KONTAKT_ZWANG}`);
+  process.exit(2);
+}
 
 const v = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten;
 const vierKader = [v[0].heim, v[0].gast, v[1].heim, v[1].gast];
@@ -61,9 +73,11 @@ try {
   await seite.addInitScript(() => { window.AudioContext = undefined; });
   await seite.goto(SEITE);
   await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
-  const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT }) => {
+  const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_ZWANG }) => {
     const A = window.__arena;
     if (KULISSEN_EFFEKT) A.kulissePin(KULISSEN_EFFEKT);
+    if (KONTAKT_FLAG) A.kontaktFlags(Object.fromEntries(DISZIPLINEN.map((d) => [d, { stufe: 0 }])));
+    if (KONTAKT_ZWANG) A.kontaktPersZwang(KONTAKT_ZWANG);
     const aus = [];
     const probe = (name, f) => { try { aus.push([name, f()]); } catch (e) { aus.push([name, "FEHLER " + String(e)]); } };
     for (const d of DISZIPLINEN) for (const s of SAATEN) probe(`spiele ${d} ${s}`, () => A.spiele(d, s));
@@ -76,10 +90,17 @@ try {
       A.bahnFlags({ spurtFormat: fmt });
       try { return A.spiele("spurt", s); } finally { A.bahnFlags({ spurtFormat: "klassisch" }); }
     });
-    return aus;
-  }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT });
-  for (const [name, wert] of ergebnis) console.log(`${h(wert)}  ${name}`);
-  console.log(`GESAMT ${h(ergebnis)} (${ergebnis.length} Eintraege)`);
+    const kontakt = (KONTAKT_FLAG || KONTAKT_ZWANG) ? {
+      flags: Object.keys(A.kontaktFlags()).length,
+      zwang: A.kontaktPersZwang(),
+      zaehler: ["spurt", "takeshis-castle"].map((d) => { A.spiele(d, 7); return [d, A.kontaktZaehler()]; }),
+    } : null;
+    return { aus, kontakt };
+  }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_ZWANG });
+  for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
+  console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
+  // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
+  if (ergebnis.kontakt) console.log("KONTAKT " + JSON.stringify(ergebnis.kontakt));
 } finally {
   await browser.close();
 }
