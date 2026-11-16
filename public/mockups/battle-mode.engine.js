@@ -38176,6 +38176,49 @@
       c.addEventListener("click",()=>{disc=id;sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
       b.appendChild(c);
     }
+    renderFormatLeiste(b);
+  }
+
+  // FORMAT-AUSWAHL JE DISZIPLIN (Chris 16.11.: "ich klicke an Sport und dann den normalen Modus, den
+  // HYROX-Modus ... als kleine Unterpunkte, damit ich die gezielt sehen und testen kann und nicht auf
+  // einen Seed hoffen muss"). Eine zweite Chip-Zeile unter der Disziplinwahl, nur wenn die gewaehlte
+  // Disziplin mehr als ein Format kennt. "Automatisch" = die Wahl des echten Spiels (Saat-Hash,
+  // spurtFormatWaehlen()); jedes andere Chip setzt das Format AUSDRUECKLICH (BAHN_FLAGS.spurtFormat
+  // + spurtFormatExplizit) und baut das Spiel neu. Wirkt nur in dieser Aufstellungs-/Testansicht --
+  // die Spieltags-Arena zeigt weiter das GEBUCHTE Format (dort gibt es diese Leiste nicht, s.
+  // "Zuschau-Modus"). Reine Auswahl der Darstellung/Variante, kein Eingriff in die Wertungsformel.
+  const FORMATE_JE_DISC={
+    spurt:[
+      {id:"auto",label:"Automatisch",hinweis:"wie im Spiel (nach Saat)"},
+      {id:"klassisch",label:"Normal",hinweis:"Huerdenlauf"},
+      {id:"hyrox",label:"HYROX",hinweis:"Stationen in der Halle"},
+      {id:"hatz",label:"Die Hatz",hinweis:"Wellen-Ausscheidung"},
+    ],
+  };
+  function formatAuswahlJetzt(){
+    return BAHN_FLAGS.spurtFormatExplizit?BAHN_FLAGS.spurtFormat:"auto";
+  }
+  function formatSetzen(id){
+    if(id==="auto"){ BAHN_FLAGS.spurtFormatExplizit=false; BAHN_FLAGS.spurtFormat="klassisch"; }
+    else { BAHN_FLAGS.spurtFormat=id; BAHN_FLAGS.spurtFormatExplizit=true; }
+  }
+  function renderFormatLeiste(dbar){
+    if(dbar&&dbar.parentNode){ const alt=dbar.parentNode.querySelector(".dformat"); if(alt)alt.remove(); }
+    const liste=FORMATE_JE_DISC[disc];
+    if(!liste||!dbar)return;
+    const zeile=el("div","dbar dformat");
+    zeile.setAttribute("data-testid","format-leiste");
+    zeile.appendChild(el("span","dformat-titel","Format"));
+    const jetzt=formatAuswahlJetzt();
+    for(const f of liste){
+      const c=el("button","dchip",f.label);
+      c.appendChild(el("em",null,f.hinweis));
+      c.setAttribute("data-format",f.id);
+      c.setAttribute("aria-pressed",f.id===jetzt?"true":"false");
+      c.addEventListener("click",()=>{formatSetzen(f.id);sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
+      zeile.appendChild(c);
+    }
+    dbar.parentNode.insertBefore(zeile,dbar.nextSibling);
   }
 
   // ===================================================================================
@@ -63483,6 +63526,7 @@
     // FORMATWAHL-SONDE (16.11., s. spurtFormatWaehlen()): welches Spurt-Format haette diese Saat
     // JETZT. Reines Lesen, kein rr(), keine Schreibzugriffe.
     spurtFormatProbe:(saat)=>spurtFormatWaehlen(saat),
+    formatSetzen:(id)=>{ formatSetzen(id); return formatAuswahlJetzt(); },
     hyroxKameraProbe:()=>({
       aktiv:!!bahnHyroxAktiv, halle:istHyroxHalle(), stationIdx:hyroxCamStationIdx,
       station:(bahnHyroxAktiv&&HYROX_STATIONEN&&hyroxCamStationIdx>=0)?HYROX_STATIONEN[hyroxCamStationIdx].name:null,
