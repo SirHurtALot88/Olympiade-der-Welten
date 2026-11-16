@@ -4,6 +4,19 @@
   // synchronen Teil, also vor dem ersten await weiter unten) — Basis fuer die Bildpfade der
   // PixelLab-Figuren, s. PIXEL_FIGUR_BASIS.
   const PIXEL_FIGUR_SKRIPT_SRC=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
+  // FONT-SETTER ENTPRELLT (Performance-Review 16.11.): `ctx.font=` parst bei JEDER Zuweisung die
+  // CSS-Schrift neu, auch bei gleichem Wert -- die heissen Zeichenpfade (Spurt, Takeshi-Route, I-Spy)
+  // setzten 35-110 Mal je Bild dieselben drei, vier Schriften. setzeFont() schreibt nur, wenn der
+  // Kontext die Schrift nicht schon hat. Verglichen wird gegen die vom Browser NORMALISIERTE Form
+  // (einmal je Schriftstring ausgelesen), weil `ctx.font` den Wert nicht unveraendert zurueckgibt.
+  // Greift auch nach save()/restore() richtig, weil immer der echte Kontextwert gelesen wird.
+  const FONT_NORM=new Map();
+  function setzeFont(c,f){
+    const n=FONT_NORM.get(f);
+    if(n!==undefined&&c.font===n)return;
+    c.font=f;
+    if(n===undefined)FONT_NORM.set(f,c.font);
+  }
   // ===================================================================================
   // SPRITES.
   //
@@ -17167,6 +17180,11 @@
   let bbugLetzteFuehrung=null, bbugWechselTimer=null,
     hkTorlichtSeite=null, hkTorlichtBisMs=0, hkTorlichtGesehen=0,
     bbugLetzterScoreTxt=null;
+  // ANZEIGE-CACHE DES SCORE-BUGS (Performance-Review 16.11.): aktualisiereBbug() lief je Bild und
+  // schrieb #bbugL/#bbugR/#bbugMitte jedes Mal neu (innerHTML/Knotenneubau, Layout-Invalidierung).
+  // Jetzt wird der fertige HTML-Text je Zone gemerkt und nur bei Aenderung ins DOM geschrieben --
+  // der Inhalt im DOM ist danach bytegleich zu vorher. reset() setzt die Merker zurueck.
+  let bbugLetztL=null, bbugLetztR=null, bbugLetztMitte=null, bbugTmp=null;
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
@@ -17218,16 +17236,20 @@
     // darunter klein die Minute -- so sieht der Bug aus wie die Skizze des Konzepts, und der
     // Stand steht nirgends doppelt.
     const wett=istBuehne(disc)&&!!BB().wettessen;
-    if(bl)bl.innerHTML=(wett?wettessenBugStandHtml(0):"")+bbugWappenHtml(0)+zeile("tnameL")+pipsHtml(0);
-    if(br)br.innerHTML=(wett?wettessenBugStandHtml(1):"")+bbugWappenHtml(1)+zeile("tnameR")+pipsHtml(1);
+    if(bl){ const h=(wett?wettessenBugStandHtml(0):"")+bbugWappenHtml(0)+zeile("tnameL")+pipsHtml(0); if(h!==bbugLetztL){ bbugLetztL=h; bl.innerHTML=h; } }
+    if(br){ const h=(wett?wettessenBugStandHtml(1):"")+bbugWappenHtml(1)+zeile("tnameR")+pipsHtml(1); if(h!==bbugLetztR){ bbugLetztR=h; br.innerHTML=h; } }
     if(mitte){
+      // Die Mitte wird wie bisher bei jedem Aufruf frisch aufgebaut, aber ABGELOEST vom Dokument in
+      // einem Fragment und nur dann eingehaengt, wenn ihr HTML sich geaendert hat.
+      const mitteReal=mitte;
+      if(!bbugTmp)bbugTmp=document.createElement("div");
+      const mitteBau=document.createDocumentFragment();
       const scoreTxt=wett?"":txt("score"), istFs=istFeldspiel(disc);
       let fuehrend=null;
       if(istFs&&scoreTxt){
         const m=scoreTxt.match(/^(\d+)\s*:\s*(\d+)$/);
         if(m){const a=+m[1],b=+m[2]; fuehrend=a===b?null:(a>b?0:1);}
       }
-      mitte.textContent="";
       if(scoreTxt){
         const scoreEl=document.createElement("b");
         scoreEl.textContent=scoreTxt;
@@ -17240,19 +17262,19 @@
         // `bbugLetzterScoreTxt`); in jedem anderen Tick entsteht derselbe Knoten ohne
         // Klasse, keine Animation spielt erneut.
         if(bbugLetzterScoreTxt!=null&&scoreTxt!==bbugLetzterScoreTxt)scoreEl.classList.add("ziffernroll");
-        mitte.appendChild(scoreEl);
+        mitteBau.appendChild(scoreEl);
       }
       bbugLetzterScoreTxt=scoreTxt||bbugLetzterScoreTxt;
       const clockTxt=txt("clock");
       if(clockTxt){
-        if(scoreTxt)mitte.appendChild(document.createTextNode(" · "));
-        if(wett){ const uhr=document.createElement("b"); uhr.textContent=clockTxt; mitte.appendChild(uhr); }
-        else mitte.appendChild(document.createTextNode(clockTxt));
+        if(scoreTxt)mitteBau.appendChild(document.createTextNode(" · "));
+        if(wett){ const uhr=document.createElement("b"); uhr.textContent=clockTxt; mitteBau.appendChild(uhr); }
+        else mitteBau.appendChild(document.createTextNode(clockTxt));
       }
       if(wett){
         const klein=document.createElement("small");
         klein.textContent=wettessenMinuteText();
-        mitte.appendChild(klein);
+        mitteBau.appendChild(klein);
       }
       if(istFs){
         if(fuehrend!=null&&bbugLetzteFuehrung!=null&&fuehrend!==bbugLetzteFuehrung){
@@ -17275,7 +17297,7 @@
           // Canvas-Ziffernbox, s. dort). `zusatz` besteht sonst nur aus festen Labels und
           // Zahlen, nie aus Spieler-/Team-Text -- unbedenklich fuer innerHTML.
           klein.innerHTML=zusatz;
-          mitte.appendChild(klein);
+          mitteBau.appendChild(klein);
         }
       }
       if(istKampfDisc){
@@ -17295,7 +17317,7 @@
           // (seit S2 zeigt die Kaderleiste dieselbe Zahl wie #score, nicht mehr "Lebende"). "v"
           // statt ":" haelt den Doppelpunkt dem Stand vorbehalten.
           ueb.textContent=nL+" v "+nR;
-          mitte.appendChild(ueb);
+          mitteBau.appendChild(ueb);
         }
         // K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09.,
         // Abschnitt 3/K6, P3, nur Battlefield). Bewusst KLEIN: die Domination entscheidet
@@ -17320,9 +17342,18 @@
           }
           kpz.appendChild(document.createTextNode(
             "KP "+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])));
-          mitte.appendChild(kpz);
+          mitteBau.appendChild(kpz);
         }
       }
+      bbugTmp.textContent=""; bbugTmp.appendChild(mitteBau);
+      const mitteHtml=bbugTmp.innerHTML;
+      if(mitteHtml!==bbugLetztMitte){
+        bbugLetztMitte=mitteHtml;
+        mitteReal.textContent="";
+        // Schnappschuss statt `while(firstChild)`: im Node-Motor (Leerlauf-Knoten) ist firstChild immer
+        // "da" -> Endlosschleife (CI-Timeout arena-node-runner); im echten DOM gleichwertig.
+        Array.from(bbugTmp.childNodes).forEach(k=>mitteReal.appendChild(k));
+      } else bbugTmp.textContent="";
     }
     // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, Bauplan Abschnitt 4): eigenes Band unter
     // dem Bug, reine Lesung von basketballLaufInfo() (die ihrerseits nur fsZuege liest,
@@ -18514,6 +18545,26 @@
       c.strokeStyle="#c6cfdd"; c.lineWidth=1; c.strokeRect(21,-10,12,20);
     }}
   ];
+  // ENTSAETTIGTE VORLAGE JE GERAET (Performance-Review 16.11.): das Geraet wird einmal mit
+  // derselben Anfangs-Alpha (0,26 -- die Geraete setzen ihr globalAlpha teils selbst wieder auf 1,
+  // das bleibt so erhalten) in ein Offscreen-Canvas gezeichnet, dort einmal durch
+  // `grayscale(1)` geschickt und danach nur noch als Bild verwendet. Zweifache Aufloesung, damit
+  // die duennen Linien beim Verkleinern nicht ausbluten. Ohne `ctx.filter`-Unterstuetzung bleibt das
+  // Bild farbig -- wie vorher.
+  const folterGrauCache=[];
+  function folterGeraetGrau(i){
+    let e=folterGrauCache[i]; if(e)return e;
+    const S=2, ox=6, oy=14, w=48, h=28;
+    const roh=document.createElement("canvas"); roh.width=w*S; roh.height=h*S;
+    const g=roh.getContext("2d");
+    g.scale(S,S); g.translate(ox,oy); g.globalAlpha=0.26;
+    FOLTER_GERAETE[i].zeichne(g);
+    const grau=document.createElement("canvas"); grau.width=roh.width; grau.height=roh.height;
+    const g2=grau.getContext("2d");
+    g2.filter="grayscale(1)"; g2.drawImage(roh,0,0); g2.filter="none";
+    e={cv:grau,s:S,ox,oy}; folterGrauCache[i]=e;
+    return e;
+  }
   // Welches Geraet gehoert zu Durchgang `runde` (0-basiert) bei `rundenN` Durchgaengen?
   // Die Leiter wird auf die volle Breite der zehn Geraete gespreizt, damit der letzte
   // Durchgang IMMER beim Vorschlaghammer endet und der erste beim Strick beginnt — bei
@@ -30944,7 +30995,7 @@
   // Takeshis fallenStufe") — wortgleiches Glyphen-Muster wie zeichneTakeshiRoute()s
   // "★".repeat(st), kein Emoji, reiner Text-Glyph wie ueberall sonst im Motor.
   function ispySterne(cx,cy,stufe){
-    ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+    setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
   }
@@ -30966,12 +31017,12 @@
     const wert=ISPY_PUNKTWERT[stufeAnzeige||f.stufe]||ISPY_PUNKTWERT[1];
     ctx.save();
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.font="700 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    setzeFont(ctx,"700 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
     ctx.fillStyle="rgba(232,226,208,.88)";
     ctx.fillText(primaerKuerzel+" · "+wert,cx,cy);
     if(f.neben){
       const nebenKuerzel=ISPY_SKILL_KUERZEL[f.neben]||f.neben;
-      ctx.font="700 5.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,"700 5.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.fillStyle="rgba(190,180,150,.62)";
       ctx.fillText("o. "+nebenKuerzel,cx,cy+7);
     }
@@ -30987,7 +31038,7 @@
   // Kleine Pille mit Zeiger nach unten (Richtung Kopf), Text/Glyph zentriert.
   function ispySprechblase(cx,cy,text,farbe){
     ctx.save();
-    ctx.font="700 7px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    setzeFont(ctx,"700 7px 'RaniraSeason',Georgia,'Times New Roman',serif");
     const tw=ctx.measureText(text).width;
     const w=Math.max(14,tw+7), h=11;
     const bx=cx-w/2, by=cy-h/2;
@@ -31257,7 +31308,7 @@
           // Sternen, bei beiden Tresoren mit der Nebenweg-Zeile darunter.
           ispyFundortBadge(p.x,p.y-37,f,stufeAnzeige);
           if(z&&!z.offen){
-            ctx.font="700 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(255,120,90,.9)";
+            setzeFont(ctx,"700 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="rgba(255,120,90,.9)";
             ctx.textAlign="center"; ctx.textBaseline="alphabetic";
             ctx.fillText("angebrochen",p.x,p.y+21);
           }
@@ -32849,7 +32900,7 @@
           ctx.strokeStyle="rgba(242,215,90,.75)"; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
           ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY); ctx.stroke();
           ctx.setLineDash([]);
-          ctx.font="800 13px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+          setzeFont(ctx,"800 13px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
           ctx.textAlign="center"; ctx.textBaseline="alphabetic";
           ctx.fillText("!",x,y-46);
           ctx.restore();
@@ -32927,7 +32978,7 @@
           } else if(u.vizIspyStufe===3){
             ctx.strokeStyle="rgba(255,90,60,.85)"; ctx.lineWidth=2;
             ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(1,2); ctx.lineTo(-3,4); ctx.lineTo(4,10); ctx.stroke();
-            ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+            setzeFont(ctx,"700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
             ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.fillText("+15%",0,18);
           }
           ctx.restore();
@@ -32935,13 +32986,13 @@
 
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dyN,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          setzeFont(ctx,"400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif");
           ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
           ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
         schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        ctx.font="400 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#8a93a3";
+        setzeFont(ctx,"400 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#8a93a3";
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x+dx,y+dy2+66);
       });
@@ -32952,7 +33003,7 @@
       const p=posMap.get(f._teilnehmer); if(!p)continue;
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
-      ctx.font=(f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,(f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.textAlign="center";
       ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
       ctx.globalAlpha=1;
@@ -36751,10 +36802,18 @@
       ctx.save();
       // Schon benutzt: ausgegraut und schwach. Kommt noch: fast voll sichtbar -- WEIL der Blick
       // nach rechts auf das gehen soll, was noch bevorsteht.
-      ctx.globalAlpha=i<stufe?0.26:0.82;
-      if(i<stufe)ctx.filter="grayscale(1)";
+      // PERFORMANCE (Review 16.11.): das Ausgrauen lief als `ctx.filter="grayscale(1)"` je Bild und
+      // Geraet (Breaking 13,9 -> 48 Bilder/s ohne Filter, Software-Rendering). Jetzt wird jedes
+      // benutzte Geraet EINMAL entsaettigt vorgerendert (folterGeraetGrau) und je Bild nur noch als
+      // Bild gezeichnet. Gleiche Alpha-Staffel, gleiche Lage, gleiches Aussehen.
       ctx.translate(fx-fachB*0.32,fy); ctx.scale(0.95,0.95);
-      FOLTER_GERAETE[i].zeichne(ctx);
+      if(i<stufe){
+        const gg=folterGeraetGrau(i);
+        ctx.drawImage(gg.cv,-gg.ox,-gg.oy,gg.cv.width/gg.s,gg.cv.height/gg.s);
+      } else {
+        ctx.globalAlpha=0.82;
+        FOLTER_GERAETE[i].zeichne(ctx);
+      }
       ctx.restore();
       // B4.2 (Broadcast-Optik-Recherche 27.09., Klasse A): QUAL-ZAHL je Geraet, klein, im
       // Tischbrett selbst -- "die Leiter wird damit zur Zahl, die man vorher sieht" (Doku).
@@ -38746,7 +38805,23 @@
   // eingebettet; der body-Rueckfall haelt den Aufruf am Leben, falls die Klasse einmal
   // fehlt (dann verhaelt es sich exakt wie bisher, es wird also nichts schlechter).
   const FARBWURZEL=cv.closest(".oly-battle-arena")||document.body;
-  const css=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
+  // CACHE (Performance-Review 16.11.): css() rief je Aufruf getComputedStyle (bis ~30x je Bild,
+  // erzwingt Style-Neuberechnung). Die Tokens aendern sich nur mit dem Thema, nicht je Bild:
+  // der Wert wird je Token gemerkt und verworfen, wenn (a) reset() laeuft, (b) sich das
+  // data-theme der Wurzel aendert oder (c) 500 ms vergangen sind (faengt einen Wechsel der
+  // System-Einstellung prefers-color-scheme ab). Ein leerer Wert (Token noch nicht aufloesbar)
+  // wird nicht gemerkt.
+  const cssCache=new Map();
+  let cssCacheThema=null, cssCacheT=0;
+  const cssLesen=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
+  const css=v=>{
+    const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    const thema=FARBWURZEL.getAttribute?FARBWURZEL.getAttribute("data-theme"):null;
+    if(thema!==cssCacheThema||jetzt-cssCacheT>500){ cssCache.clear(); cssCacheThema=thema; cssCacheT=jetzt; }
+    let w=cssCache.get(v);
+    if(w===undefined){ w=cssLesen(v); if(w!=="")cssCache.set(v,w); }
+    return w;
+  };
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
   // EIGENER, UNABHAENGIGER SAATSTROM FUER DEN FOOTBALL-KICKOFF (football-kickoff-slot-plan-
   // 14-10.md Schritt 4, Abschnitt 3.1) — dasselbe Grundprinzip, das dieses Modul bereits an
@@ -44578,14 +44653,14 @@
       const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
       ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);
       ctx.fillStyle="#e8d8a8"; ctx.beginPath(); ctx.moveTo(px-2,py-18); ctx.lineTo(px+12,py-14); ctx.lineTo(px-2,py-9); ctx.closePath(); ctx.fill();
-      ctx.font="700 7px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
+      setzeFont(ctx,"700 7px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
       ctx.fillText("★".repeat(st),px-2,py-20);
       // TK-1: FALLEN-NAMENSSCHILD AM WEGPFAHL (broadcast-optik-bahn-27-09.md Abschnitt 5.3):
       // "ab Zoom 1,5x lesbar". Reine Anzeige -- BA().fallenName ist eine Datenzeile, kein
       // Simulationsfeld; fallenLook(i)/HUERDEN_TYP(i) sind bestehende, reine Lesefunktionen.
       if(cam.zoom>=1.5){
         const name=(BA().fallenName||{})[fallenLook(i)];
-        if(name){ ctx.font="600 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#e6e0d2";
+        if(name){ setzeFont(ctx,"600 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#e6e0d2";
           ctx.fillText(name,px-2,py-28); }
       }
     });
@@ -44656,7 +44731,7 @@
     {
       const nochN=LAEUFER.filter(u=>u.fertig==null).length;
       ctx.fillStyle="rgba(8,10,14,.55)"; ctx.fillRect(W/2-230,H-92,460,34);
-      ctx.font="700 15px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      setzeFont(ctx,"700 15px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
       const nochTxt="noch "+nochN+" im Rennen";
       ctx.strokeText(nochTxt,W/2,H-78); ctx.fillStyle="#f2e9d8"; ctx.fillText(nochTxt,W/2,H-78);
@@ -44685,7 +44760,7 @@
       const st=(BA().fallenStufe||{})[typ]||1;
       const txt="FALLE "+(fi+1)+"/"+(BA().hindernisse||[]).length+" · "+name+
         " · "+"★".repeat(st)+" · "+((BA().lang||{})[typ]||typ);
-      ctx.font="700 15px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+      setzeFont(ctx,"700 15px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
       const tw=ctx.measureText(txt).width;
       ctx.fillStyle="rgba(8,10,14,.72)"; ctx.fillRect(W/2-tw/2-18,H-134,tw+36,26);
       ctx.strokeStyle="rgba(242,215,90,.7)"; ctx.lineWidth=1; ctx.strokeRect(W/2-tw/2-17.5,H-133.5,tw+35,25);
@@ -44693,19 +44768,19 @@
       ctx.fillStyle="#f2e9d8"; ctx.fillText(txt,W/2,H-116);
     }
     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
-    ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.textAlign="center";ctx.textBaseline="middle";setzeFont(ctx,"700 20px 'RaniraSeason',Georgia,'Times New Roman',serif");
     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
     // POD (sichtbares Vier-Team-Rennen): alle N Teamsummen statt "Heim : Gast".
     const bpTxt=bahnPodAnzeigeAktiv()
       ?"Burgpunkte  "+Array.from({length:bahnSeitenN()},(_,s)=>bp(s).toFixed(1).replace(".",",")).join(" · ")
       :"Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
     ctx.strokeText(bpTxt,W/2,H-35); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,H-35);
-    ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.lineWidth=3;
+    setzeFont(ctx,"400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.lineWidth=3;
     const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
       +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
     ctx.strokeText(leg,W/2,H-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,H-16);
     ctx.textBaseline="alphabetic";
-    if(cam.zoom>1.08){ ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
+    if(cam.zoom>1.08){ setzeFont(ctx,"400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="left";
       ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,16); }
   }
 
@@ -53164,6 +53239,52 @@
     const ovx=o.stolper>0?0:((owartet&&!oAnlaufLaeuft)?0:4);
     return ovx!==0?3:(o.seite===0?3:1);
   }
+  // ENTSAETTIGTER SPRITE OHNE ctx.filter (Performance-Review 16.11., Takeshi: Ausgeschiedene).
+  // Zeichnet zeichneSprite() mit derselben Transformation in ein festes Offscreen-Blatt (Fuss des
+  // Sprites an einem festen Ankerpunkt, auf ganze Pixel gerundet -> beim Auflegen keine
+  // Neuberechnung), rechnet dort `grayscale(1) brightness(0.8)` per Pixel (Rec.-709-Gewichte wie
+  // der CSS-Filter, danach *0,8) und legt das Blatt 1:1 auf. Die Alpha-Staffel (dimAlpha) wird mit
+  // ins Blatt gezeichnet, deshalb liegt es mit Alpha 1 auf -- "over" ist assoziativ, das Ergebnis
+  // ist dasselbe wie die Einzelschichten direkt auf der Leinwand. Gibt false zurueck, wenn der
+  // Weg nicht moeglich ist; der Aufrufer nimmt dann den alten Filterweg.
+  const GRAU_B=240, GRAU_H=260, GRAU_AX=120, GRAU_AY=190;
+  let grauBlatt=null, grauCtx=null;
+  function zeichneSpriteGrau(c,arg,x,y){
+    if(typeof c.getTransform!=="function")return false;
+    const M=c.getTransform(), sc=Math.hypot(M.a,M.b);
+    if(!(sc>0.5&&sc<1.5))return false;
+    if(!grauBlatt){
+      grauBlatt=document.createElement("canvas"); grauBlatt.width=GRAU_B; grauBlatt.height=GRAU_H;
+      grauCtx=grauBlatt.getContext("2d",{willReadFrequently:true});
+      if(!grauCtx){ grauBlatt=null; return false; }
+    }
+    const gx=M.a*x+M.c*y+M.e, gy=M.b*x+M.d*y+M.f;
+    const wx=Math.round(gx-GRAU_AX), wy=Math.round(gy-GRAU_AY);
+    const g=grauCtx;
+    g.setTransform(1,0,0,1,0,0); g.globalAlpha=1; g.globalCompositeOperation="source-over";
+    g.clearRect(0,0,GRAU_B,GRAU_H);
+    g.save();
+    try{
+      g.imageSmoothingEnabled=c.imageSmoothingEnabled;
+      g.font=c.font; g.textAlign=c.textAlign; g.textBaseline=c.textBaseline;
+      g.lineWidth=c.lineWidth; g.lineCap=c.lineCap; g.lineJoin=c.lineJoin;
+      g.fillStyle=c.fillStyle; g.strokeStyle=c.strokeStyle; g.globalAlpha=c.globalAlpha;
+      g.setTransform(M.a,M.b,M.c,M.d,M.e-wx,M.f-wy);
+      zeichneSprite(g,arg,x,y);
+    } finally { g.restore(); }
+    g.setTransform(1,0,0,1,0,0);
+    const bild=g.getImageData(0,0,GRAU_B,GRAU_H), d=bild.data;
+    for(let i=0;i<d.length;i+=4){
+      if(d[i+3]===0)continue;
+      const v=((0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])*0.8+0.5)|0;
+      d[i]=v; d[i+1]=v; d[i+2]=v;
+    }
+    g.putImageData(bild,0,0);
+    c.save(); c.setTransform(1,0,0,1,0,0); c.globalAlpha=1; c.imageSmoothingEnabled=false;
+    c.drawImage(grauBlatt,wx,wy);
+    c.restore();
+    return true;
+  }
   function zeichneSpurt(){
     zeichneBoden();
     // DIE HATZ (s. BAHN_FLAGS/stepSpurtHatz): nur die zusaetzliche Bedrohungs-Zeichnung,
@@ -53455,9 +53576,17 @@
       // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
       // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
       // ihre eigene Dimmung ueber `dimAlpha` (oben).
-      if(raus)ctx.filter="grayscale(1) brightness(0.8)";
-      zeichneSprite(ctx,parcSpriteArg,x,y);
-      if(raus)ctx.filter="none";
+      // PERFORMANCE (Review 16.11.): statt `ctx.filter` auf JEDER der vielen Zeichenoperationen des
+      // Sprites wird der Ausgeschiedene in ein kleines Offscreen-Blatt gezeichnet, dort einmal
+      // entsaettigt und als Bild aufgelegt (zeichneSpriteGrau). Rueckfall auf den alten Filter nur,
+      // wenn die Transformation das nicht hergibt (stark gezoomt/ohne getTransform).
+      if(raus){
+        if(!zeichneSpriteGrau(ctx,parcSpriteArg,x,y)){
+          ctx.filter="grayscale(1) brightness(0.8)";
+          zeichneSprite(ctx,parcSpriteArg,x,y);
+          ctx.filter="none";
+        }
+      } else zeichneSprite(ctx,parcSpriteArg,x,y);
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -53676,11 +53805,11 @@
       // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
       // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
       if(u.vizRampe>0&&!zfLabelAus&&!zfBlase){
-        ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+        setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
         ctx.strokeText(txt,x,y-19-bahnLabelDy); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19-bahnLabelDy);
-        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       }
       // TT-1: ZWISCHENZEIT-TAFEL (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Reine
       // Anzeige: `u.vizZzFlash` wird ausschliesslich in updateHudBahn() gesetzt (s. dort),
@@ -53691,14 +53820,14 @@
         const fz=u.vizZzFlash;
         const txt="ZZ"+(fz.ci+1)+" · "+(fz.neueBest?"BESTZEIT":(fz.rang+"."))+
           (fz.delta?(" · "+(fz.neueBest?"−":"+")+fmtDauer(Math.abs(fz.delta))):"");
-        ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+        setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         ctx.strokeText(txt,x,y-19-bahnLabelDy);
         ctx.fillStyle=fz.neueBest?"#f2d75a":"#c0504a"; ctx.fillText(txt,x,y-19-bahnLabelDy);
-        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       }
       ctx.textAlign="center";
-      ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
@@ -53715,13 +53844,13 @@
       // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
       if(u.fertig==null&&!zfLabelAus&&!zfBlase){
         const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
-        ctx.font=(frisch?"700 9px":"400 8px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+        setzeFont(ctx,(frisch?"700 9px":"400 8px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
         const pl=((BA().plaene)[u.plan]||{}).label||"";
         const zus=frisch?" ◂ neu":(u.leer?" · leer":(u.imSchatten?" · Sog":""));
         ctx.strokeText(pl+zus,x,y-40-bahnLabelDy);
         ctx.fillStyle=frisch?ANSAGE_FARBE:(u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9"));
         ctx.fillText(pl+zus,x,y-40-bahnLabelDy);
-        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       }
       // BURGPUNKTE AM LAEUFER (Teil B.6 des Plans): laufend waehrend des Rennens neben
       // der Figur, im Ziel zusammen mit Platz und Zeit — dieselbe Zahl, die jetzt auch
@@ -53733,9 +53862,9 @@
         // Punkt bei jedem Nicht-Ganzzahlwert aber nicht. Das lief laufend neben jeder
         // Figur mit, war deshalb die am haeufigsten sichtbare der sechs Fundstellen.
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"").replace(".",",");
-        ctx.font="600 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
+        setzeFont(ctx,"600 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19-bahnLabelDy); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19-bahnLabelDy);
-        ctx.textAlign="center"; ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.textAlign="center"; setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       }
       // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
       // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
@@ -53743,9 +53872,9 @@
       // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
       // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
       if(raus){
-        ctx.font="600 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
+        setzeFont(ctx,"600 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="left";
         ctx.strokeText("✕ Raus",x+16,y-19-bahnLabelDy); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19-bahnLabelDy);
-        ctx.textAlign="center"; ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.textAlign="center"; setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
       // Finisher waeren zwoelf Zeilen "Platz n · Zeit · ★" uebereinander auf dem Pflaster,
@@ -53836,7 +53965,7 @@
         ctx.save(); ctx.globalAlpha=0.94;
         verbinde(sx,sy,a); verbinde(sx,sy,b);
         ctx.fillStyle="rgba(8,10,14,.84)"; ctx.fillRect(sx-70,sy-13,140,40);
-        ctx.textAlign="center"; ctx.font=schrift(700,8);
+        ctx.textAlign="center"; setzeFont(ctx,schrift(700,8));
         ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+stName(st)+(typ?" · "+(SKILLWORT[typ]||typ):""),sx,sy-3);
         // Tauzieh-Balken: Mitte = offen, Zeiger wandert zum Vorne-Liegenden.
         const bw=56, by=sy+4;
@@ -53847,7 +53976,7 @@
         ctx.fillRect(Math.min(sx,zx),by,Math.abs(zx-sx),7);
         ctx.fillStyle="#ffffff"; ctx.fillRect(zx-1.5,by-2,3,11);
         ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillRect(sx-0.5,by-1,1,9);
-        ctx.font=schrift(600,7.5);
+        setzeFont(ctx,schrift(600,7.5));
         ctx.textAlign="left"; ctx.fillStyle=zug>0.05?farbe(0):"#dfe4ee"; ctx.fillText(a.n.slice(0,11),sx-bw,by+18);
         ctx.textAlign="right"; ctx.fillStyle=zug<-0.05?farbe(1):"#dfe4ee"; ctx.fillText(b.n.slice(0,11),sx+bw,by+18);
         ctx.restore();
@@ -53871,14 +54000,14 @@
         }
         ctx.globalAlpha=aus;
         const z1=u.n.toUpperCase()+" GEWINNT DAS DUELL", z2=stName(e.station)+" · gegen "+e.verlierer.n+" · +Duell-PP";
-        ctx.font=schrift(700,9.5); const w1=ctx.measureText(z1).width;
-        ctx.font=schrift(600,7.5); const w2=ctx.measureText(z2).width;
+        setzeFont(ctx,schrift(700,9.5)); const w1=ctx.measureText(z1).width;
+        setzeFont(ctx,schrift(600,7.5)); const w2=ctx.measureText(z2).width;
         const bw=Math.max(w1,w2)/2+8;
         ctx.fillStyle="rgba(8,10,14,.86)"; ctx.fillRect(sx-bw,sy-13,bw*2,30);
         ctx.fillStyle=farbe(u.seite); ctx.fillRect(sx-bw,sy-13,3,30);
         ctx.textAlign="center";
-        ctx.font=schrift(700,9.5); ctx.fillStyle=farbe(u.seite); ctx.fillText(z1,sx,sy);
-        ctx.font=schrift(600,7.5); ctx.fillStyle="#dfe4ee"; ctx.fillText(z2,sx,sy+11);
+        setzeFont(ctx,schrift(700,9.5)); ctx.fillStyle=farbe(u.seite); ctx.fillText(z1,sx,sy);
+        setzeFont(ctx,schrift(600,7.5)); ctx.fillStyle="#dfe4ee"; ctx.fillText(z2,sx,sy+11);
         ctx.restore();
       }
     }
@@ -53908,14 +54037,14 @@
           :markeWort+" "+(sw.netto<0?"−"+fmtDauer(-sw.netto)+" GEWONNEN":"+"+fmtDauer(sw.netto));
       }
       ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-      ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,"700 11px 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.strokeText(zeile1,swp.x,swp.y-56); ctx.fillStyle=farbe; ctx.fillText(zeile1,swp.x,swp.y-56);
       if(zeile2){
-        ctx.font="600 9px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        setzeFont(ctx,"600 9px 'RaniraSeason',Georgia,'Times New Roman',serif");
         ctx.strokeText(zeile2,swp.x,swp.y-44);
         ctx.fillStyle=(sw.verpatzt||sw.patzer)?"#e0685f":(sw.netto!=null&&sw.netto<0?"#7fd18b":"#8795A9"); ctx.fillText(zeile2,swp.x,swp.y-44);
       }
-      ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
     }
     // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2,
     // uebersetzt ins Zeitfahren"). Auf der Spur des FOKUSSIERTEN Fahrers erscheint eine
@@ -53938,7 +54067,7 @@
           ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx,gy+20); ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx-4,gy-30); ctx.lineTo(gx+4,gy-30); ctx.closePath(); ctx.fill();
-          ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          ctx.textAlign="center"; setzeFont(ctx,"700 8px 'RaniraSeason',Georgia,'Times New Roman',serif");
           ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
           ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
           // In dieselbe Kollisionsvermeidung wie Name/Platz aufgenommen (s. Kommentar an
@@ -53946,7 +54075,7 @@
           // fokussierten Laeufer, genau die Ueberlagerung aus Audit Bild 13 ("GEIST" ueber
           // "eingebrochen"/"fängt sich"). Schwebetexte weichen ihm dadurch aus.
           bahnLabelSchwebeBoxen.push({x:gx,y:gy-33,halbBreite:ctx.measureText("GEIST · "+hs.u.n).width/2+4});
-          ctx.restore(); ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          ctx.restore(); setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
         }
       }
     }
@@ -54017,7 +54146,7 @@
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.ansage?ANSAGE_FARBE:f.crit?css("--crit"):css("--ink");
-      ctx.font=(f.ansage?"800 17px":f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+      setzeFont(ctx,(f.ansage?"800 17px":f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
       // SIE STEHEN NEBEN DEM KOPF, NICHT DARUEBER. Ueber dem Kopf ist die Spalte voll
       // (Name y-30, Plan y-40) — und zwoelf Laeufer liegen bei enger Kamera nur rund
       // 30 px auseinander, ein hoch gesetzter Text landet also im Namen des Laeufers
@@ -54119,8 +54248,8 @@
         // man auch im Band, WO das Feld zerlegt wurde") -- exklusiv Takeshi, jede andere
         // Bahn kennt kein `u.raus`.
         if(A.takeshi&&u.raus){
-          ctx.fillStyle="#8795A9"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
-          ctx.fillText("✕",x,by+3); ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          ctx.fillStyle="#8795A9"; setzeFont(ctx,"700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
+          ctx.fillText("✕",x,by+3); setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
           continue;
         }
         ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
@@ -55586,8 +55715,35 @@
     }
   }
 
+  // INSTANZ BEENDEN (Performance-Review 16.11., Fund "Zombie-Motoren"): der Host (Foundation) baut die
+  // Arena bei jedem Team-/Spieltagswechsel neu auf (`container.innerHTML=...` + neue <script>), die
+  // alte Instanz lief aber unsichtbar weiter -- loop() forderte bedingungslos das naechste Bild an
+  // (60 -> 17 Bilder/s nach fuenf Neuaufbauten, doppelte HUD-Schreibzugriffe, Ton). Zwei Wege zum
+  // Ende: der Host ruft `window.__arena.stopp()` VOR dem Abreissen, und loop() bricht von selbst ab,
+  // sobald sein Canvas nicht mehr im Dokument haengt. Reine Anzeige: beruehrt weder rr() noch
+  // Simulationszustand oder Protokolle. `isConnected===false` statt `!isConnected`, damit eine
+  // DOM-Attrappe ohne die Eigenschaft (Node-Tests) die Schleife nicht stoppt.
+  let instanzGestoppt=false;
+  function stoppeInstanz(){
+    if(instanzGestoppt)return true;
+    instanzGestoppt=true;
+    try{ tonLoopStop(); }catch{}
+    try{ bkLoopStop(); }catch{}
+    try{ if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; } }catch{}
+    try{ if(calloutTimer){ clearTimeout(calloutTimer); calloutTimer=null; } }catch{}
+    try{ if(bbugWechselTimer){ clearTimeout(bbugWechselTimer); bbugWechselTimer=null; } }catch{}
+    try{ if(fechtPeriodenQuietT){ clearTimeout(fechtPeriodenQuietT); fechtPeriodenQuietT=null; } }catch{}
+    try{ if(fechtPeriodenMaxT){ clearTimeout(fechtPeriodenMaxT); fechtPeriodenMaxT=null; } }catch{}
+    try{ if(mdffaOffenbarungsTimer){ clearTimeout(mdffaOffenbarungsTimer); mdffaOffenbarungsTimer=null; } }catch{}
+    try{ const tc=tonCtx; tonCtx=null; tonRauschPuffer=null; if(tc&&tc.state!=="closed")tc.close().catch(()=>{}); }catch{}
+    return true;
+  }
+
   let schnelldurchLetztesBild=0;
   function loop(ts){
+    // Instanz abgeloest (Canvas aus dem Dokument entfernt) oder ausdruecklich gestoppt: kein
+    // weiteres Bild anfordern, Aufraeumen einmalig.
+    if(instanzGestoppt||cv.isConnected===false){ stoppeInstanz(); return; }
     // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
     // ~5 Bilder je Sekunde, damit die Rechnung die Zeit bekommt. Reine Anzeige.
     if(schnelldurchAktiv&&ts-schnelldurchLetztesBild<200){ last=ts; requestAnimationFrame(loop); return; }
@@ -58591,6 +58747,8 @@
     // "Aenderung" vom alten Endstand gelten und sofort rollen, und ein Teamwechsel wuerde
     // weiter das alte Wappen zeigen (bbugWappenHtml() gibt sonst seinen Cache zurueck).
     bbugLetzterScoreTxt=null;
+    bbugLetztL=null; bbugLetztR=null; bbugLetztMitte=null;
+    cssCache.clear();
     bbugWappenCache=[null,null];
     if(calloutTimer){clearTimeout(calloutTimer);calloutTimer=null;}
     const bc=document.getElementById("bbugcallout");
@@ -58852,7 +59010,7 @@
       figurenWarten=setInterval(()=>{
         // Abbruch: Instanz abgeloest, Disziplin gewechselt, oder jemand anderes (Quick-Sim,
         // Sofort-Start) hat das Spiel inzwischen selbst angepfiffen.
-        if(!document.getElementById("cv")||disc!==meinDisc||running||anpfiffErfolgt){ clearInterval(figurenWarten); figurenWarten=null; return; }
+        if(!document.getElementById("cv")||cv.isConnected===false||disc!==meinDisc||running||anpfiffErfolgt){ clearInterval(figurenWarten); figurenWarten=null; return; }
         if(bereit()||wandMs()-start>=FIGUREN_WARTE_MS){ clearInterval(figurenWarten); figurenWarten=null; spielLaeuft(true,true); }
       },60);
       return;
@@ -63631,7 +63789,7 @@
     return schnelldurchVersprechen;
   }
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
+  window.__arena={ stopp:stoppeInstanz, serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
     // SPIELTAGS-ANSICHT (s. schnellDurch()/meldeSpielEnde() direkt darueber).
     schnellDurch,
     // KULISSE (03.11., s. kulisseWaehlen): welche illustrierte Arena gerade gezeichnet wird, und

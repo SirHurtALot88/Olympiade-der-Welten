@@ -124,9 +124,22 @@ type ArenaFenster = {
     setDisc?: (disziplin: string) => void;
     schnellDurch?: () => Promise<unknown>;
     spielEndeStand?: () => { disziplin: string; done: boolean; sieger: 0 | 1 | null };
+    // Beendet die Motor-Instanz (Zeichenschleife, Timer, Ton); idempotent. Der Host ruft sie VOR
+    // jedem Abreissen/Neuaufbau, sonst laeuft die alte Instanz unsichtbar weiter.
+    stopp?: () => boolean;
   };
   __olyArenaKader?: unknown;
 };
+
+// Beendet die aktuell laufende Motor-Instanz (`window.__arena` gehoert immer der neuesten). Aeltere
+// Instanzen stoppen sich selbst, sobald ihr Canvas nicht mehr im Dokument haengt.
+function stoppeLaufendenMotor(): void {
+  try {
+    (window as unknown as ArenaFenster).__arena?.stopp?.();
+  } catch {
+    // Aufraeumen darf den Neuaufbau nie verhindern.
+  }
+}
 
 async function warteAufMotor(fristMs: number): Promise<boolean> {
   const start = Date.now();
@@ -891,6 +904,8 @@ export default function FoundationBattleArenaHost({
       }
 
       huelle.stylesheetHrefs.forEach(sicherstelleStylesheet);
+      // Alte Motor-Instanz beenden, BEVOR ihr DOM verschwindet (sonst Zombie-Schleife, s. `stopp`).
+      stoppeLaufendenMotor();
       container.innerHTML = huelle.markup;
       // Der Foundation-Shell ist permanent dunkel (Velo) — der Entwurf soll seine
       // Flaechen daran ausrichten statt an der OS-Einstellung des Browsers, sonst
@@ -1029,6 +1044,7 @@ export default function FoundationBattleArenaHost({
   // Dependency-Array), nicht bei jedem Team-Wechsel — der raeumt sich selbst auf (s. oben).
   useEffect(() => {
     return () => {
+      stoppeLaufendenMotor();
       if (containerRef.current) containerRef.current.innerHTML = "";
       delete (window as unknown as { __olyArenaKader?: unknown })
         .__olyArenaKader;
