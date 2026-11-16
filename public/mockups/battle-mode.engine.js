@@ -45051,7 +45051,7 @@
   // fehlt, anderes Rennen). Dann laufen camX/laeuferXY/bodenZeitfahren/zeichneSpurt exakt den alten Weg.
   let zfSeiteErlaubt=true;      // QA-Schalter (window.__arena.zfSeite(false)): zeigt wieder die alte Draufsicht
   function zfSeite(){
-    return zfSeiteErlaubt && !!BA().zeitfahren && !!BA().gelaende && kulisseSichtbar();
+    return zfSeiteErlaubt && !!BA().zeitfahren && !!(BA().gelaende && BA().gelaende.length>0) && kulisseSichtbar();
   }
   // Hoehenfeld in Pixeln BEI ZOOM 1 (wird mit cam.zoom skaliert, damit Hoehe und Laenge gleich wachsen und
   // der Neigungswinkel unabhaengig vom Zoom bleibt). Je Steigung +50, je Abfahrt -25: die Strecke
@@ -53134,7 +53134,7 @@
       // Drehpunkt Fuss) und beugt sich, je erschoepfter sie ist (`u.vizErschoepft` 0..1, weich aus der
       // Puste -- liest nur). Beides 0 ausserhalb der Seitenansicht und fuer Wartende/Eingelaufene.
       const zfAufStrecke=zfSeiteAn&&u.fertig==null&&zfWk<0;
-      const zfSeiteWinkel=zfAufStrecke?zfWinkel(u.pos)*0.6:0;
+      const zfSeiteWinkel=zfAufStrecke?zfWinkel(u.pos)*0.25:0;
       const zfErsch=zfAufStrecke?Math.max(0,Math.min(1,u.vizErschoepft||0)):0;
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop+feierDy); if(parcTaumel||zfTilt||zfSeiteWinkel||zfErsch)ctx.rotate(parcTaumel+zfTilt+zfSeiteWinkel+zfErsch*0.12);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung*hyroxKraftHaltung*(1-zfErsch*0.06)); ctx.translate(-x,-(y+16));
