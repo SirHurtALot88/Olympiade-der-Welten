@@ -3231,6 +3231,22 @@ export default function SeasonStandingsNewLook({
       <span key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin-ergebnis" title={titleParts.join(" — ")}>
         <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
         <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
+        {renderSpieltagKulisseBadge(disziplin.kulisse)}
+      </span>
+    );
+  }
+
+  /**
+   * KULISSEN-FUNDAMENT (Baustein 1, 15.11.): die VOR dem Spieltag feststehende Kulisse, reine
+   * Anzeige -- s. `lib/battle/arena-kulisse-anzeige.ts`. Nur der Name, bewusst OHNE
+   * Attribut-Chips oder Tendenz-Pfeile (das ist ein späterer, hier nicht beauftragter Schritt,
+   * s. `docs/design/arenen-mechaniken-konzept-konsolidiert-15-11.md` Abschnitt 5.1).
+   */
+  function renderSpieltagKulisseBadge(kulisse: { id: string; label: string } | null) {
+    if (!kulisse) return null;
+    return (
+      <span className="nl-standings-spieltage-disziplin-kulisse" title={`Kulisse: ${kulisse.label}`}>
+        {kulisse.label}
       </span>
     );
   }

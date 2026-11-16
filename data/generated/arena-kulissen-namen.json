@@ -1,0 +1,256 @@
+{
+ "basketball": [
+  {
+   "id": "parkett",
+   "label": "Parkett"
+  },
+  {
+   "id": "streetcourt",
+   "label": "Street-Court"
+  }
+ ],
+ "battlefield": [
+  {
+   "id": "eroberung",
+   "label": "Eroberung"
+  },
+  {
+   "id": "wuestenruine",
+   "label": "Wüstenruine"
+  }
+ ],
+ "breaking": [
+  {
+   "id": "brutal",
+   "label": "Gauntlet"
+  },
+  {
+   "id": "standard",
+   "label": "Erste Fassung"
+  }
+ ],
+ "climbing": [
+  {
+   "id": "wand",
+   "label": "Kletterhalle"
+  },
+  {
+   "id": "fels",
+   "label": "Sandsteinschlucht"
+  },
+  {
+   "id": "eis",
+   "label": "Eisfall"
+  }
+ ],
+ "eiskunstlauf": [
+  {
+   "id": "kuer",
+   "label": "Kür"
+  },
+  {
+   "id": "waldsee",
+   "label": "Waldsee"
+  }
+ ],
+ "fechten": [
+  {
+   "id": "piste",
+   "label": "Piste"
+  },
+  {
+   "id": "schlosshof",
+   "label": "Schlosshof"
+  }
+ ],
+ "football": [
+  {
+   "id": "feld",
+   "label": "Feld"
+  },
+  {
+   "id": "strand",
+   "label": "Strand"
+  }
+ ],
+ "gewichtheben": [
+  {
+   "id": "sandsack",
+   "label": "Lagerhalle"
+  },
+  {
+   "id": "hafen",
+   "label": "Hafenkai bei Nacht"
+  },
+  {
+   "id": "oase",
+   "label": "Oase"
+  }
+ ],
+ "hockey": [
+  {
+   "id": "eis",
+   "label": "Eisbahn"
+  },
+  {
+   "id": "bergsee",
+   "label": "Bergsee"
+  }
+ ],
+ "i-spy": [
+  {
+   "id": "ruinengarten",
+   "label": "Ruinengarten"
+  },
+  {
+   "id": "aztec",
+   "label": "Aztekentempel"
+  },
+  {
+   "id": "lostplace",
+   "label": "Lost Place"
+  },
+  {
+   "id": "horror",
+   "label": "Horror"
+  }
+ ],
+ "mini-dm": [
+  {
+   "id": "basis",
+   "label": "Grube"
+  },
+  {
+   "id": "saegewerk",
+   "label": "Sägewerk"
+  },
+  {
+   "id": "strom-kaefig",
+   "label": "Strom-Käfig"
+  }
+ ],
+ "showcase": [
+  {
+   "id": "buehne",
+   "label": "Theater"
+  },
+  {
+   "id": "festival",
+   "label": "Freiluft-Festival"
+  },
+  {
+   "id": "zirkus",
+   "label": "Zirkuszelt"
+  }
+ ],
+ "speed-schach": [
+  {
+   "id": "park",
+   "label": "Stadtpark"
+  },
+  {
+   "id": "zug",
+   "label": "Speisewagen"
+  }
+ ],
+ "spurt": [
+  {
+   "id": "kurs",
+   "label": "HYROX-Kurs"
+  }
+ ],
+ "staffel": [
+  {
+   "id": "arena",
+   "label": "Die Runde"
+  }
+ ],
+ "tdm": [
+  {
+   "id": "basis",
+   "label": "Sandarena"
+  },
+  {
+   "id": "lava",
+   "label": "Lava"
+  },
+  {
+   "id": "frost",
+   "label": "Frost"
+  }
+ ],
+ "tennis": [
+  {
+   "id": "court",
+   "label": "Centre Court"
+  },
+  {
+   "id": "riviera",
+   "label": "Sandplatz Riviera"
+  },
+  {
+   "id": "dach",
+   "label": "Hochhausdach"
+  }
+ ],
+ "time-trial": [
+  {
+   "id": "standard",
+   "label": "Standard"
+  },
+  {
+   "id": "bergzeitfahren-alpen",
+   "label": "Bergzeitfahren Alpen"
+  },
+  {
+   "id": "etappe-pass",
+   "label": "Etappe Pass"
+  },
+  {
+   "id": "abfahrt-kamm",
+   "label": "Abfahrt Kamm"
+  },
+  {
+   "id": "etappe-kueste",
+   "label": "Etappe Küste"
+  },
+  {
+   "id": "flachsprint-kueste",
+   "label": "Flachsprint Küste"
+  },
+  {
+   "id": "etappe-mittelgebirge",
+   "label": "Mittelgebirge"
+  },
+  {
+   "id": "huegel-weinberge",
+   "label": "Hügel & Weinberge"
+  },
+  {
+   "id": "etappe-strade-bianche",
+   "label": "Strade Bianche"
+  },
+  {
+   "id": "etappe-vulkan",
+   "label": "Vulkan"
+  },
+  {
+   "id": "wueste-hitze",
+   "label": "Wüste & Hitze"
+  }
+ ],
+ "wettessen": [
+  {
+   "id": "jahrmarkt",
+   "label": "Jahrmarkt"
+  },
+  {
+   "id": "nachtmarkt",
+   "label": "Nachtmarkt"
+  },
+  {
+   "id": "bierzelt",
+   "label": "Festzelt"
+  }
+ ]
+}
