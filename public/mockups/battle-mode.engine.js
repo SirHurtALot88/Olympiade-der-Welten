@@ -4,6 +4,12 @@
   // synchronen Teil, also vor dem ersten await weiter unten) — Basis fuer die Bildpfade der
   // PixelLab-Figuren, s. PIXEL_FIGUR_BASIS.
   const PIXEL_FIGUR_SKRIPT_SRC=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
+  // STOPP-ZUSTAND GANZ OBEN (TDZ: tonKontext()/loop() koennen vor der spaeteren Stopp-Logik laufen) und das
+  // eigene <script>-Element, solange document.currentScript noch greifbar ist: wird es vom Host entfernt
+  // (Remount waehrend die 19,7-MB-Datei noch laedt), erkennt sich die ALTE Instanz daran selbst, auch
+  // wenn sie inzwischen ein neues #cv vorfindet (Opus-Review #1510, SOLLTE 1).
+  let instanzGestoppt=false;
+  const MEIN_SKRIPT=(typeof document!=="undefined"&&document.currentScript)||null;
   // FONT-SETTER ENTPRELLT (Performance-Review 16.11.): `ctx.font=` parst bei JEDER Zuweisung die
   // CSS-Schrift neu, auch bei gleichem Wert -- die heissen Zeichenpfade (Spurt, Takeshi-Route, I-Spy)
   // setzten 35-110 Mal je Bild dieselben drei, vier Schriften. setzeFont() schreibt nur, wenn der
@@ -43415,6 +43421,7 @@
   // mitlaufen lassen.
   let tonCtx=null;
   function tonKontext(){
+    if(instanzGestoppt)return null; // nach stoppeInstanz() keinen neuen AudioContext mehr aufmachen (Opus-Review #1510, SOLLTE 2)
     if(tonCtx)return tonCtx;
     try{ tonCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ tonCtx=null; }
     return tonCtx;
@@ -55723,7 +55730,6 @@
   // sobald sein Canvas nicht mehr im Dokument haengt. Reine Anzeige: beruehrt weder rr() noch
   // Simulationszustand oder Protokolle. `isConnected===false` statt `!isConnected`, damit eine
   // DOM-Attrappe ohne die Eigenschaft (Node-Tests) die Schleife nicht stoppt.
-  let instanzGestoppt=false;
   function stoppeInstanz(){
     if(instanzGestoppt)return true;
     instanzGestoppt=true;
@@ -55743,7 +55749,7 @@
   function loop(ts){
     // Instanz abgeloest (Canvas aus dem Dokument entfernt) oder ausdruecklich gestoppt: kein
     // weiteres Bild anfordern, Aufraeumen einmalig.
-    if(instanzGestoppt||cv.isConnected===false){ stoppeInstanz(); return; }
+    if(instanzGestoppt||cv.isConnected===false||(MEIN_SKRIPT&&MEIN_SKRIPT.isConnected===false)){ stoppeInstanz(); return; }
     // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
     // ~5 Bilder je Sekunde, damit die Rechnung die Zeit bekommt. Reine Anzeige.
     if(schnelldurchAktiv&&ts-schnelldurchLetztesBild<200){ last=ts; requestAnimationFrame(loop); return; }
