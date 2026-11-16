@@ -91,8 +91,17 @@ services:
 
   # Lord Enterich Cards — Shop-Analytics. Eigenstaendige App (apps/LEC), eigene
   # DB, eigener Login. Bewusst getrennt von der Oly, eigene Subdomain (siehe
-  # Caddyfile + KONZEPT §4.2). Baut unabhaengig; ein LEC-Build-Fehler betrifft
-  # den bereits laufenden oly-app-Container nicht.
+  # Caddyfile + KONZEPT §4.2).
+  #
+  # BAUT UNABHAENGIG — aber das stimmt erst seit 16.11. wirklich. Vorher rief
+  # auto-deploy.sh ein einziges "docker compose up -d --build" fuer BEIDE Dienste auf: schlug
+  # lec-apps Build fehl, brach der GESAMTE Befehl ab, bevor ueberhaupt ein Container ersetzt
+  # wurde -- auch oly-app blieb dann unbemerkt auf dem alten Image stehen (konkret zwei Tage
+  # lang, 14.11. bis 16.11., wegen eines abgelaufenen APT-GPG-Schluesselbunds im gecachten
+  # LEC-Basis-Image). "Baut unabhaengig" galt also nur fuer den schon LAUFENDEN Container, nicht
+  # fuers Neubauen. auto-deploy.sh baut und startet oly-app und lec-app seitdem in getrennten
+  # Befehlen (s. dort) -- ein Fehler im einen haelt den anderen nicht mehr auf, und keiner baut
+  # neu, wenn nur der jeweils andere sich geaendert hat.
   lec-app:
     build:
       context: ../../apps/LEC
