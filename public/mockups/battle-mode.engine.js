@@ -48837,7 +48837,13 @@
   // Messwerkzeuge ohne Kader (miss-alle-disziplinen, Fingerabdruck) bleiben dadurch
   // bit-identisch "klassisch"; Spurt-Messskripte setzen das Format ausdruecklich.
   const SPURT_FORMATE=["klassisch","hatz","hyrox"];
+  // FORMAT DES GEZEIGTEN RENNENS FESTHALTEN (Opus-Review #1502): der Alternativ-Rechner rechnet
+  // Spurt ueber Saaten basis+i*7919 -- jede wuerde per Hash ihr eigenes Format waehlen und
+  // klassisch/Hatz/HYROX vermischen. `spurtFormatAktuell` merkt das zuletzt gebaute Format,
+  // `spurtFormatFest` zwingt es waehrend der Zweitlaeufe (nur dort gesetzt, danach null).
+  let spurtFormatAktuell=null, spurtFormatFest=null;
   function spurtFormatWaehlen(saat){
+    if(spurtFormatFest)return spurtFormatFest;
     if(BAHN_FLAGS.spurtFormatExplizit)return BAHN_FLAGS.spurtFormat;
     const echt=echterKader&&Array.isArray(echterKader.heim)&&echterKader.heim.length
       &&Array.isArray(echterKader.gast)&&echterKader.gast.length;
@@ -49315,6 +49321,7 @@
     // `bahnHatzAktiv` false und bauSpurt() endet hier bit-identisch zu vorher. `art.spurt`
     // statt `d==="spurt"`, dasselbe Gate wie bei spurtSaeuleSetzen() direkt darueber.
     const spurtFmt=art.spurt?spurtFormatWaehlen(saat):"klassisch";
+    if(art.spurt)spurtFormatAktuell=spurtFmt;
     bahnHatzAktiv=!!(art.spurt&&spurtFmt==="hatz");
     HATZ_WELLEN=null;
     if(bahnHatzAktiv)baueHatz();
@@ -57019,6 +57026,9 @@
     // dies eine interaktive Anzeige ist, keine Offline-Messung.
     const basis=normalisiereSaat(bahnAktuelleSaat==null?1337:bahnAktuelleSaat)>>>0;
     const SAATEN=[0,1,2].map(i=>(basis+i*7919)>>>0);
+    // Spurt: alle Zweitlaeufe im Format des GEZEIGTEN Rennens (s. spurtFormatFest oben).
+    spurtFormatFest=(BA()&&BA().spurt)?spurtFormatAktuell:null;
+    try{
     for(const h of heim){
       for(const p of plaene){
         if(p===h.plan)continue;
@@ -57034,6 +57044,7 @@
         if(n>0)zeilen.push(h.n+": mit "+label(p)+" hätte "+gewinne+" von "+n+" Saaten gewonnen");
       }
     }
+    } finally { spurtFormatFest=null; }
     return zeilen;
   }
   // GEMEINSAME ANZEIGEFUNKTION FUER ALLE DREI ENDSTAND-OVERLAYS (wie renderHighlights()/
