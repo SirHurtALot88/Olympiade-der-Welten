@@ -105,6 +105,16 @@ fi
 # geaenderte Caddyfile/Env uebernimmt. Guenstig genug, um das jeden Lauf zu tun.
 compose up -d caddy
 
+# Geaenderte Caddyfile wirklich laden: `up -d` allein tut dafuer NICHTS (die Compose-Konfiguration
+# ist unveraendert, der Container wird nicht neu erzeugt), und die Datei ist als EINZELDATEI
+# gemountet -- `git pull` ersetzt sie durch eine neue Inode, der Container sieht weiter die alte.
+# Ein Neustart des Containers bindet den Pfad neu (Ausfall ~1-2 s, Zertifikate liegen im Volume
+# caddy-data). Nur bei tatsaechlicher Aenderung, nicht bei jedem Lauf.
+if grep -q -x 'deploy/hetzner/Caddyfile' <<<"$DATEIEN"; then
+  log "Caddyfile geaendert -- starte caddy neu ..."
+  compose restart caddy || log "WARNUNG: caddy-Neustart fehlgeschlagen -- Caddyfile ggf. von Hand laden."
+fi
+
 # 3b) Alte, ungenutzte Images wegraeumen (E1, Fund F10: kein Deploy-Skript tat das bisher).
 #
 # Jeder erfolgreiche Build oben hinterlaesst das VORHERIGE Image als "dangling" (ohne Tag,
