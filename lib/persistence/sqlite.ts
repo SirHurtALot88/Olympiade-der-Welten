@@ -236,6 +236,7 @@ export function getDatabase() {
   // loescht ihn im afterAll). Ohne das blieb jede selbst gesetzte `/tmp/oly-*.sqlite` liegen -- 11 GB.
   if (process.env.VITEST === "true") {
     (globalThis as { __olyTestDatenbanken?: Set<string> }).__olyTestDatenbanken?.add(datenbankPfad);
+    (globalThis as { __olySchliesseTestDatenbank?: () => void }).__olySchliesseTestDatenbank = closeDatabaseForMaintenance;
   }
   databaseInstance.pragma("journal_mode = WAL");
   databaseInstance.pragma("busy_timeout = 5000");
