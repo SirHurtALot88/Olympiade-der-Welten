@@ -14,6 +14,20 @@ const CLASS_COLOR_BY_NAME: Record<string, "red" | "green" | "blue" | "yellow"> =
   Tactician: "yellow",
 };
 
+/**
+ * Legende zu `CLASS_COLOR_BY_NAME`: welche Klassen den jeweiligen Farbstreifen am linken
+ * Kartenrand tragen. Wird aus der Zuordnung oben abgeleitet, damit die Legende nie von den
+ * Rahmen abweichen kann (`PortraitFrameLegend`).
+ */
+export const CLASS_COLOR_LEGEND: ReadonlyArray<{ token: "red" | "green" | "blue" | "yellow"; classes: string[] }> = (
+  ["red", "green", "blue", "yellow"] as const
+).map((token) => ({
+  token,
+  classes: Object.entries(CLASS_COLOR_BY_NAME)
+    .filter(([, value]) => value === token)
+    .map(([name]) => name),
+}));
+
 const CLASS_ICON_BY_KEY: Record<string, string> = {
   badass: "/class-icons/Badass.png",
   bard: "/class-icons/Bard.png",

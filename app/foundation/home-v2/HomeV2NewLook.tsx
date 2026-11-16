@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { HomeV2ClientProps, HomeV2TodayCard, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
+import PortraitFrameLegend from "@/components/foundation/player-portrait-card/PortraitFrameLegend";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import {
   NlCard,
@@ -699,6 +700,7 @@ export default function HomeV2NewLook({
             sortiert nach OVR
           </span>
         </div>
+        {topPlayers.length > 0 ? <PortraitFrameLegend variant="home" /> : null}
         {topPlayers.length > 0 ? (
           <div className="nl-home-portrait-grid">
             {topPlayers.slice(0, HOME_V2_TOP_PLAYER_COUNT).map((player, index) => (
