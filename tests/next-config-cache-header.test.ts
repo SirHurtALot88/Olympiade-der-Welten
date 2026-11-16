@@ -74,7 +74,7 @@ describe("next.config.ts headers()", () => {
   });
 
   it("Next komprimiert selbst (Caddy-Kompression lieferte live groessere Antworten)", () => {
-    expect(nextConfig.compress).not.toBe(false);
+    expect(nextConfig.compress).toBe(true);
   });
 });
 
