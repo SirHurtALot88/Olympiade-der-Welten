@@ -29,12 +29,14 @@ function verzeichnisse(source: string): string[] {
 }
 
 function cacheControlFuer(rs: Regel[], pfadAnfang: string): string | undefined {
-  for (const r of rs) {
+  // ALLE passenden Regeln sammeln: Next wendet jede an, die spaetere gewinnt -- eine Ueberschneidung
+  // waere also ein stiller Fehler. Genau eine Regel muss treffen.
+  const treffer = rs.filter((r) => {
     const dirs = verzeichnisse(r.source);
-    const trifft = dirs.length ? dirs.includes(pfadAnfang) : r.source === `/${pfadAnfang}/:path*`;
-    if (trifft) return r.headers.find((h) => h.key === "Cache-Control")?.value;
-  }
-  return undefined;
+    return dirs.length ? dirs.includes(pfadAnfang) : r.source === `/${pfadAnfang}/:path*`;
+  });
+  expect(treffer.length, `Regeln fuer /${pfadAnfang}`).toBe(1);
+  return treffer[0].headers.find((h) => h.key === "Cache-Control")?.value;
 }
 
 describe("next.config.ts headers()", () => {
@@ -87,5 +89,31 @@ describe("deploy/hetzner/Caddyfile", () => {
       .join("\n");
     expect(code).toMatch(/^\s*encode zstd gzip\s*$/m);
     expect(code.indexOf("encode")).toBeLessThan(code.indexOf("reverse_proxy"));
+  });
+});
+
+describe("deploy/hetzner/auto-deploy.sh — Caddy-Neustart", () => {
+  const skript = readFileSync(path.join(__dirname, "..", "deploy", "hetzner", "auto-deploy.sh"), "utf8");
+  const code = skript
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("#"))
+    .join("\n");
+
+  it("vergleicht die Caddyfile im Container mit der auf der Platte (kein Git-Diff)", () => {
+    // Der Git-Diff taugt hier nicht: bash liest das Skript nach `git merge --ff-only` weiter aus der
+    // alten Datei, ein erst durch den Merge eingefuehrter Block liefe im selben Lauf nicht mehr an.
+    expect(code).toMatch(/exec -T caddy cat \/etc\/caddy\/Caddyfile[^\n]*cmp -s - deploy\/hetzner\/Caddyfile/);
+    expect(code).toMatch(/restart caddy/);
+    expect(code).not.toMatch(/grep[^\n]*deploy\/hetzner\/Caddyfile[^\n]*DATEIEN/);
+  });
+});
+
+describe("Arena-Hülle beim Host", () => {
+  it("holt battle-mode.html mit no-cache, nicht force-cache", () => {
+    const host = readFileSync(
+      path.join(__dirname, "..", "app", "foundation", "battle-arena", "FoundationBattleArenaHost.tsx"),
+      "utf8",
+    );
+    expect(host).toMatch(/fetch\("\/mockups\/battle-mode\.html", \{ cache: "no-cache" \}\)/);
   });
 });
