@@ -29,7 +29,7 @@ const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const MAX_S = Number(process.argv[2] || 20);
 
-const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}) });
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 const seite = await browser.newPage({ viewport: { width: 1300, height: 700 } });
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));

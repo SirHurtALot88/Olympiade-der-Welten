@@ -24,7 +24,9 @@ import { fileURLToPath } from "node:url";
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ZIEL = process.argv[2];
 const L = 256, DIR = 3;
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const b = await chromium.launch({
+  // Engine-Bilder (Task #165) sind Dateien: unter file:// nur mit diesem Schalter pixellesbar.
+  args: ["--allow-file-access-from-files"], executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
 const p = await b.newPage();
 p.on("pageerror", (e) => console.log("ERR", String(e)));
 await p.goto("file://" + join(REPO, "public/mockups/battle-mode.html"), { waitUntil: "networkidle" });

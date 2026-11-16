@@ -24,6 +24,8 @@ const ZIEL = process.argv[3] || join(REPO, "docs/design");
 mkdirSync(ZIEL, { recursive: true });
 
 const browser = await chromium.launch({
+  // Engine-Bilder (Task #165) sind Dateien: unter file:// nur mit diesem Schalter pixellesbar.
+  args: ["--allow-file-access-from-files"],
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
 });
 const seite = await browser.newPage({ viewport: { width: 1400, height: 900 } });

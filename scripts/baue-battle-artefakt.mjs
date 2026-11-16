@@ -10,6 +10,12 @@
 // schreibt nur die zusammengesetzte Ausgabedatei. Aufruf:
 //   node scripts/baue-battle-artefakt.mjs [ziel-datei]
 // Ohne Argument landet das Ergebnis unter dist/battle-mode-artefakt.html (gitignored).
+//
+// STAND 16.11. (Performance-Paket 3): die Engine-Bilder liegen als Dateien unter
+// public/mockups/engine-bilder/ bzw. public/sprites/ und sind NICHT mehr in die Engine
+// eingebettet -- im Artefakt (inline, ohne Dateien) fehlen die Baukasten-Figuren damit. Wieder
+// einbetten ginge ueber einlagern() aus lagere-engine-bilder-aus.mjs, ergaebe aber ~19,7 MB und
+// damit mehr als die 16-MB-Grenze fuer Artefakte (die Engine war schon vorher zu gross).
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";

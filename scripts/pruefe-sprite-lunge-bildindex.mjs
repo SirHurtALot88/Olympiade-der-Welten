@@ -31,6 +31,8 @@ const LUNGEN = [0, 0.1, 0.19, 0.21, 0.3, 0.5];
 const SCHRANKE = 0.6;
 
 const browser = await chromium.launch({
+  // Engine-Bilder (Task #165) sind Dateien: unter file:// nur mit diesem Schalter pixellesbar.
+  args: ["--allow-file-access-from-files"],
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
 });
 const seite = await browser.newPage();

@@ -61,10 +61,13 @@ Zeilen — und das ist der Kern der Falle unten.
      Kader-/Board-Ikone (`figur()`) und für vier Nahkampfwaffen, die auch die animierte Arena
      zeichnet (`zeichneB()`, `battle-mode.engine.js:2009`).
 
-   Beide werden identisch geladen: `for(const k in B_SPRITES){const im=new Image();im.src=
-   B_SPRITES[k];bBild[k]=im;}` (`battle-mode.engine.js:69`, analog für `SPRITES`). Ein neues
-   Requisiten-/Rassenblatt muss hier als Base64-Data-URI eingetragen sein, sonst existiert es
-   für den Motor nicht.
+   Beide werden identisch geladen: `for(const k in B_SPRITES)bBild[k]=engineBild(B_SPRITES[k]);`
+   (analog für `SPRITES`). Ein neues Requisiten-/Rassenblatt muss hier eingetragen sein, sonst
+   existiert es für den Motor nicht. **Seit Task #165 (16.11.) stehen dort keine data:-URIs mehr,
+   sondern Pfade relativ zur Engine** (`engine-bilder/<inhaltshash>.png` oder
+   `../sprites/…png#<inhaltshash>`): ein neues Blatt darf weiter als Base64-Data-URI eingetragen
+   werden, danach `node scripts/lagere-engine-bilder-aus.mjs` laufen lassen — das lagert es aus.
+   `tests/engine-bilder-ausgelagert.test.ts` (= `--pruefen`) wird sonst rot.
 
 2. **Ein `VOLLBILD`-Eintrag mit Zellraster** (`battle-mode.engine.js:1403-…`) — nur nötig,
    wenn das Motiv eine **fertige Fremdillustration** ist (Golem, Kraken, Drache, Roboter),

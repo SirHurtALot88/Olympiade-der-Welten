@@ -22,7 +22,7 @@ const MARKEN = process.argv.slice(4).map(Number).filter((v) => v > 0);
 const SEKUNDEN = MARKEN.length ? MARKEN : [6, 14, 22, 34, 48];
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 const seite = await browser.newPage({ viewport: { width: 1320, height: 900 } });
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
