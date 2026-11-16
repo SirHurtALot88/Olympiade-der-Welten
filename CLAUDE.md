@@ -395,6 +395,16 @@ Dieses Skript lief noch nicht auf dem echten Server (kein SSH-Zugang fuer Agente
 ersten `--apply` prueft `bash deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh` (ohne
 Argument) den Bericht, und Chris fuehrt es dann selbst aus.
 
+**Dritter Umzug, kleinerer Kaliber (16.11.), Chris: "lass uns das groesste auf jeden fall umziehen
+weil das externe volume kann ich beliebig vergroessern":** `/root/oly-save-sicherungen/` sammelt bei
+jedem Lauf von `docker-datenwurzel-auf-volume-umziehen.sh`, `kader-auffuellen.sh` und
+`pull-repaired-save.sh` eine gezippte komplette Spielstand-Kopie an — UNBEGRENZT, kein Cron raeumt
+dort auf. `deploy/hetzner/save-sicherungen-auf-volume-umziehen.sh` zieht diesen EINEN Ordner aufs
+Volume um und ersetzt ihn an alter Stelle durch einen Symlink — kein Dienst muss dafuer angehalten
+werden (reine Dateiverwaltung), alle drei Skripte oben schreiben unveraendert weiter dorthin. Gleiches
+Berichts-/`--apply`-/`--zurueck`-/`--loesche-altes`-Muster, ebenfalls noch nicht auf dem echten Server
+gelaufen.
+
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
 Chris am 18.10.: Moosgrab soll nicht jedes Mal die Oly-CI fahren. Ein Push oder PR, der **nur**

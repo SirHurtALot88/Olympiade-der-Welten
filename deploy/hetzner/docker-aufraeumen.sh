@@ -64,6 +64,7 @@ if [ -n "$BELEGT_PROZENT" ] && [ "$BELEGT_PROZENT" -ge 85 ]; then
   echo "         Naechste Schritte (Bericht zuerst, dann ggf. --apply):"
   echo "           deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh"
   echo "           deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh"
+  echo "           deploy/hetzner/save-sicherungen-auf-volume-umziehen.sh"
 fi
 
 echo
