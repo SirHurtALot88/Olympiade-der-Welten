@@ -9,12 +9,11 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "tsconfig.next.json",
   },
-  // Kompression macht in Produktion Caddy (`encode zstd gzip`, deploy/hetzner/Caddyfile), nicht Next:
-  // Next kann nur gzip, Caddy zusaetzlich zstd (~12 % kleiner bei battle-mode.engine.js, 11,0 statt
-  // 12,5 MB). Caddy fasst Antworten mit vorhandenem Content-Encoding NICHT an -- Next muss hier also
-  // aus sein, sonst kaeme nie zstd beim Browser an. Lokal (`npm run dev`/`start` ohne Caddy) bleiben
-  // Antworten unkomprimiert, das ist ueber localhost egal.
-  compress: false,
+  // Kompression bleibt bei Next (compress: true = Standard, gzip -6). Ein Versuch mit Caddy
+  // (`encode zstd gzip`, Next aus) lieferte live GROESSERE Antworten: battle-mode.engine.js 14,1 MB (gzip) bzw.
+  // 13,9 MB (zstd) gegenueber 12,5 MB bei Nexts gzip (gemessen 16.11. gegen den Live-Server). Die echte Loesung
+  // fuer die Ladegroesse ist, die base64-Sprites aus der engine.js auszulagern (Task #165, Paket 3).
+  compress: true,
   // Cache-Policy fuer public/-Dateien. Next liefert sie sonst mit max-age=0 aus -> bei JEDEM Reload
   // eine bedingte Anfrage je Datei (beim Arena-Start ~244 Sprites). Die Dateien sind NICHT per Hash
   // versioniert: Sprites/Szenen werden bei Reworks unter gleichem Namen ersetzt. Deshalb nur kurz
