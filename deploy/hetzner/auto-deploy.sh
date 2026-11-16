@@ -43,13 +43,72 @@ export NEXT_PUBLIC_OLY_BUILD_SHA="$(git rev-parse HEAD)"
 export NEXT_PUBLIC_OLY_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 log "Build-Stempel: ${NEXT_PUBLIC_OLY_BUILD_SHA:0:7} @ ${NEXT_PUBLIC_OLY_BUILD_DATE}"
 
-# 3) Neu bauen & starten (Container wird bei Aenderung automatisch ersetzt)
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+# 3) oly-app und lec-app UNABHAENGIG bauen & starten (16.11., Chris-Fund).
+#
+# VORHER: ein einziges "docker compose up -d --build" fuer BEIDE Dienste. Schlug lec-apps Build
+# fehl (konkreter Anlass: Debian-APT-GPG-Fehler im gecachten Basis-Image, s. unten), brach der
+# GESAMTE Befehl ab, BEVOR irgendein Container ersetzt wurde -- auch oly-app blieb dann auf dem
+# alten Image stehen, obwohl der Git-Pull in Schritt 2 laengst erfolgreich war. Der alte Kommentar
+# im Compose-File ("ein LEC-Build-Fehler betrifft den bereits laufenden oly-app-Container nicht")
+# stimmte nur fuer den schon LAUFENDEN Container, nicht fuers NEUBAUEN -- das Gegenteil von dem,
+# was er suggerierte. Dadurch stand der Server real von 14.11. 09:13 bis 16.11. komplett still,
+# ohne dass irgendein Fehler das je offensichtlich gemacht haette (derselbe "schlaegt lautlos fehl"-
+# Charakter wie die Spiegel-Ausfaelle oben).
+#
+# JETZT: separate Build+Start-Befehle je Dienst, genau wie die CI-Weiche
+# (scripts/ci-nur-kartenschmiede.sh/ci-beruehrt.sh) zwischen Oly und den Nebenprojekten
+# unterscheidet -- nur Dateien unter apps/LEC/ bzw. docs/enterich-cards/ zaehlen als
+# LEC-relevant, alles andere als Oly-relevant. Ein fehlgeschlagener lec-app-Build (oder
+# umgekehrt) wird nur noch als WARNUNG geloggt, wirft den Deploy aber NICHT um (derselbe
+# "Fehler hier darf den Deploy nicht umwerfen"-Stil wie bei 'docker image prune' und dem
+# Cron-Install unten). Zusaetzlicher Nebeneffekt: wird nur ein Dienst beruehrt, baut auch nur
+# der neu -- kein verschwendeter LEC-Build bei einer reinen Oly-Aenderung und umgekehrt.
+#
+# '--pull' bei JEDEM Build: behebt den akuten Fund vom 16.11. an der Wurzel. Der GPG-Fehler
+# ("At least one invalid signature was encountered") kam nicht von einem toten Debian-Spiegel,
+# sondern vom lokal gecachten 'node:22-bookworm-slim'-Basis-Image, dessen eingebauter
+# debian-archive-keyring inzwischen zu alt fuer Debians aktuelle Signierschluessel war -- Docker
+# zieht ein FROM-Image nie von selbst neu, auch wenn es laengst veraltet ist. '--pull' erzwingt
+# bei jedem Build einen frischen Zug der Basis-Images, bevor gebaut wird.
+DATEIEN="$(git diff --name-only "$LOCAL" "$REMOTE")"
+LEC_MUSTER='^(apps/LEC/|docs/enterich-cards/)'
+LEC_BERUEHRT=0
+OLY_BERUEHRT=0
+if grep -q -E "$LEC_MUSTER" <<<"$DATEIEN"; then LEC_BERUEHRT=1; fi
+if grep -q -v -E "$LEC_MUSTER" <<<"$DATEIEN"; then OLY_BERUEHRT=1; fi
+
+compose() { docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"; }
+
+if [ "$OLY_BERUEHRT" = "1" ]; then
+  log "Oly-relevante Aenderungen -- baue und starte oly-app neu ..."
+  if compose build --pull oly-app && compose up -d oly-app; then
+    log "oly-app: Deploy fertig."
+  else
+    log "WARNUNG: oly-app-Build/-Start fehlgeschlagen -- lec-app/caddy bleiben davon unberuehrt."
+  fi
+else
+  log "Keine Oly-relevanten Aenderungen -- oly-app wird nicht neu gebaut."
+fi
+
+if [ "$LEC_BERUEHRT" = "1" ]; then
+  log "LEC-relevante Aenderungen -- baue und starte lec-app neu ..."
+  if compose build --pull lec-app && compose up -d lec-app; then
+    log "lec-app: Deploy fertig."
+  else
+    log "WARNUNG: lec-app-Build/-Start fehlgeschlagen -- oly-app bleibt davon unberuehrt."
+  fi
+else
+  log "Keine LEC-relevanten Aenderungen -- lec-app wird nicht neu gebaut."
+fi
+
+# caddy baut nie (festes 'caddy:2'-Image) -- nur sicherstellen, dass es laeuft bzw. eine
+# geaenderte Caddyfile/Env uebernimmt. Guenstig genug, um das jeden Lauf zu tun.
+compose up -d caddy
 
 # 3b) Alte, ungenutzte Images wegraeumen (E1, Fund F10: kein Deploy-Skript tat das bisher).
 #
 # Jeder erfolgreiche Build oben hinterlaesst das VORHERIGE Image als "dangling" (ohne Tag,
-# niemand zeigt mehr drauf), weil `up -d --build` den Container ersetzt, das alte Image aber
+# niemand zeigt mehr drauf), weil `compose up -d` den Container ersetzt, das alte Image aber
 # nicht loescht. Seit Chromium im Image steckt (E1), kostet jedes dieser Images mehrere
 # hundert MB zusaetzlich (Plan Abschnitt 4.2, ~0,6-0,75 GB) -- das summiert sich ueber viele
 # Deploys zur alten "no space left on device"-Falle (CLAUDE.md, 01.09.), nur eine Ebene
