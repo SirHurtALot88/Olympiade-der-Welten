@@ -270,9 +270,9 @@
   },
   "tennis": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.890,
-   "rhoSpannweite": 0.079,
-   "rhoSaison": 0.965,
+   "rhoJeSpiel": 0.885,
+   "rhoSpannweite": 0.060,
+   "rhoSaison": 0.958,
    "rhoMessung": {
     "befehl": "node scripts/miss-alle-disziplinen.mjs 24 tennis -- Task #136, frische Kaderfamilie 15.11.",
     "spiele": 24,
@@ -281,8 +281,8 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    6.9,
-    4.4
+    6.2,
+    5.5
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs tennis (+ --saat-versatz=10000000)",
@@ -295,10 +295,11 @@
     ]
    },
    "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "commit": "2bb12fd0a",
+   "kulissenHinweis": "Mit Oberflaechen-Effekt (Tennis-Pilot, PR #1354), ungepinnt = Hash-Wahl der Variante je Spiel; ohne Effekt (--kulisse=aus) Pp 6,9 auf Strom 0. Je Variante s. docs/design/oberflaechen-effekte-tennis-pilot-08-11.md und scripts/miss-kulisse-abnahme.mjs",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,813 -> 0,890 (Spannweite 0,079, deutlich enger), Saison 0,944 -> 0,965 -- Bewegung 0,077, innerhalb der alten Spannweite (0,199), keine Regression, eher deutlich komfortabler. Pp nicht neu gemessen, 6,9/4,4 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "NACHGEMESSEN 15.11. nach Merge von main in den Tennis-Pilot (Oberflaechen-Effekte, PR #1354): rho 0,890 (main, ohne Effekt) -> 0,885 mit Effekt (Spannweite 0,060), Saison 0,965 -> 0,958 -- Bewegung 0,005, weit innerhalb der Spannweite. Pp 6,2/5,5 auf beiden Stroemen frisch gemessen (ohne Effekt 6,9 auf Strom 0)."
   },
   "fechten": {
    "chassis": "buehne",
