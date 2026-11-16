@@ -4,7 +4,20 @@
 //   - window.__arena.spiele(d, s) fuer alle 20 Disziplinen x 3 Saaten,
 //   - disziplinProbe fuer TDM, Mini-DM, Battlefield,
 //   - spieleArenaDomination (Battlefield),
-//   - spieleBahnPod fuer Staffel und Takeshi, spieleBattlefieldPod (Vier-Team-Pod).
+//   - spieleBahnPod fuer Staffel und Takeshi, spieleBattlefieldPod (Vier-Team-Pod),
+//   - Spurt in den beiden Zusatzformaten "Die Hatz" und "HYROX" (spiele spurt/hatz|hyrox <saat>, 3 Saaten
+//     je Format), mit window.__arena.bahnFlags({spurtFormat}) AUSDRUECKLICH gesetzt und danach wieder
+//     auf "klassisch" zurueck. Grund (16.11., Opus-Review #1502): im echten Spiel waehlt die Saat das
+//     Format (spurtFormatWaehlen()), die kader-losen Messwerkzeuge -- auch dieses -- laufen aber immer
+//     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
+//     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
+//     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
+// GESAMT-STAND (16.11., zweimal gelaufen, identisch): `GESAMT e80babacb68c (75 Eintraege)`. Davor,
+// ohne die sechs Spurt-Zusatzformat-Eintraege: `GESAMT 0057e683fc3f (69 Eintraege)` -- die ersten 69
+// Zeilen sind unveraendert, der alte Wert bleibt also als Praefix-Beleg pruefbar (die ersten 69
+// Zeilen der Ausgabe diffen). Eine Motor-/Rezept-Aenderung, die diesen Wert absichtlich bewegt, nennt
+// den neuen Wert im PR; eine reine Darstellungs-Aenderung darf ihn nicht bewegen. (Kein Test und keine
+// CI-Stufe pinnt den Wert -- er wird per Hand vorher/nachher verglichen, s. unten.)
 // Ausgabe: je Eintrag ein Kurz-Hash und ein Gesamt-Hash. Vorher/nachher vergleichen:
 //   node scripts/pruefe-wertung-fingerabdruck.mjs > vorher.txt   (auf main)
 //   node scripts/pruefe-wertung-fingerabdruck.mjs > nachher.txt  (auf dem Branch)
@@ -58,6 +71,11 @@ try {
     for (const s of SAATEN) probe(`spieleArenaDomination ${s}`, () => A.spieleArenaDomination("battlefield", s, { jeSeite: 4 }));
     for (const bd of ["staffel", "takeshis-castle"]) probe(`spieleBahnPod ${bd}`, () => A.spieleBahnPod(bd, vierKader, "save:s1:md7:" + bd, null, { formSaat: "save:s1:md7:" + bd }));
     probe("spieleBattlefieldPod", () => A.spieleBattlefieldPod(vierTeams, "save:s1:md7:bf"));
+    // Spurt-Zusatzformate (s. Kopfkommentar): Format ausdruecklich setzen, messen, im finally zuruecksetzen.
+    for (const fmt of ["hatz", "hyrox"]) for (const s of SAATEN) probe(`spiele spurt/${fmt} ${s}`, () => {
+      A.bahnFlags({ spurtFormat: fmt });
+      try { return A.spiele("spurt", s); } finally { A.bahnFlags({ spurtFormat: "klassisch" }); }
+    });
     return aus;
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT });
   for (const [name, wert] of ergebnis) console.log(`${h(wert)}  ${name}`);

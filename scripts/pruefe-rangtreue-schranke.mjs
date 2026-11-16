@@ -43,6 +43,15 @@
 // scripts/pruefe-rangtreue-schranke.mjs` (oder `npm run ci:rangtreue-schranke`) ist der richtige
 // Aufruf.
 //
+// DRITTER BLOCK, SPURT-MISCHUNG (16.11., Opus-Review #1502, docs/design/spurt-ci-schutz-16-11.md):
+// seit PR #1502 waehlt das echte Spiel das Spurt-Format per Saat-Hash (klassisch / "Die Hatz" /
+// HYROX), aber alle Messungen oben laufen kader-los und damit immer "klassisch" -- Hatz und HYROX
+// waeren in der CI ungeschuetzt. Der Abschnitt "Spurt-Mischung" misst deshalb (~10 s) mit
+// eingehaengtem Kader und Kartenmodus "echt" die MISCHUNG und jedes der drei Formate einzeln und
+// prueft sie wie die Disziplinen: relativ gegen `zusatzmessungen` der Basislinie UND absolut
+// ueber 0,80. Die Pp-Abweichung der Mischung dauert mit echten Karten gut drei Minuten und bleibt
+// eine manuelle Sonde: node scripts/miss-spurt-mischung.mjs 24 --pp
+//
 // Aufruf (s. .github/workflows/ci-nightly.yml, Job "rangtreue-schranke"):
 //   npm run ci:rangtreue-schranke
 //   (entspricht: node --import tsx scripts/pruefe-rangtreue-schranke.mjs)
@@ -57,7 +66,10 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie } from "./lib/rangtreue-messung.mjs";
+import {
+  disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie,
+  oeffneSpurtMischungsSeite, spurtFormatAnteile, messeSpurtMischungRho,
+} from "./lib/rangtreue-messung.mjs";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "../lib/resolve/battle-mode-arena-team-points";
 
 // Die harte Abnahmeschranke aus CLAUDE.md ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine
@@ -128,6 +140,8 @@ if (geladen) kaderFamilie = geladen.familie;
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
 let rot = false;
 const zeilen = [];
+const spurtZeilen = [];
+let spurtAnteile = null, spurtGateDefekt = false;
 try {
   const seite = await browser.newPage();
   await seite.goto(SEITE, { waitUntil: "networkidle" });
@@ -172,6 +186,27 @@ try {
       arenaResolved, abnahmeOffen, jetztBestanden, absolutGerissen, stufeVorher, stufeJetzt, stufeGefallen,
     });
   }
+
+  // SPURT-MISCHUNG (s. Kopfkommentar, dritter Block): eigene Seite mit eingehaengtem Kader.
+  if (basislinie.zusatzmessungen) {
+    const zusatzSeite = await oeffneSpurtMischungsSeite(browser, SEITE, kaderFamilie[0], { formModus: "echt" });
+    spurtAnteile = await spurtFormatAnteile(zusatzSeite);
+    // Weniger als drei Formate: das Gate der Formatwahl ist kaputt, die "Mischung" waere ein Einzelformat.
+    if (Object.keys(spurtAnteile).length < 3) { spurtGateDefekt = true; rot = true; }
+    const r = await messeSpurtMischungRho(zusatzSeite, { n: basislinie.spiele, kaderFamilie });
+    const spurtAbsolutPflicht = ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt") && !ABNAHME_OFFEN.has("spurt");
+    for (const [name, z] of [["spurt-mischung", r.mischung], ["spurt-klassisch", r.einzelformate.klassisch],
+                             ["spurt-hatz", r.einzelformate.hatz], ["spurt-hyrox", r.einzelformate.hyrox]]) {
+      const basis = basislinie.zusatzmessungen[name];
+      if (!basis) continue;
+      if (z.fehler) { spurtZeilen.push({ d: name, fehler: z.fehler }); rot = true; continue; }
+      const rueckgang = basis.spielMedian - z.spielMed;
+      const gefallen = rueckgang > basis.schranke;
+      const absolutGerissen = spurtAbsolutPflicht && z.spielMed < SCHRANKE_ABSOLUT;
+      if (gefallen || absolutGerissen) rot = true;
+      spurtZeilen.push({ d: name, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen, absolutGerissen });
+    }
+  }
 } finally {
   await browser.close();
 }
@@ -208,6 +243,23 @@ if (absoluteVerstoesse.length) {
   console.log("  ok — keine arena-resolved Disziplin ausserhalb von ABNAHME_OFFEN liegt unter 0,80.");
 }
 
+// SPURT-MISCHUNG (dritter Block): Mischung und drei Einzelformate, Kartenmodus "echt", Kader eingehaengt.
+if (spurtZeilen.length) {
+  console.log("\nSpurt-Mischung (Format je Saat per Hash, Kartenmodus echt, Kader eingehaengt) — die");
+  console.log("Standardmessung oben sieht nur \"klassisch\"; Hatz und HYROX stehen nur hier unter Schutz:");
+  console.log(`  Formatwahl ueber Saaten 1..300: ${JSON.stringify(spurtAnteile)}`
+    + (spurtGateDefekt ? "  GATE DEFEKT: keine Mischung, Kader nicht eingehaengt oder Format fest gesetzt" : ""));
+  console.log("  Eintrag              Basislinie      Jetzt   Aenderung   Schranke   Status");
+  for (const z of spurtZeilen) {
+    if (z.fehler) { console.log("  " + z.d.padEnd(20) + "— " + z.fehler); continue; }
+    const aend = Math.round(-z.rueckgang * 1000) / 1000 + 0;
+    const status = z.gefallen ? "GEFALLEN" : z.absolutGerissen ? "UNTER 0,80" : "ok";
+    console.log("  " + z.d.padEnd(20) + z.basis.toFixed(3).padStart(8) + z.jetzt.toFixed(3).padStart(11)
+      + ((aend > 0 ? "+" : aend < 0 ? "-" : "±") + Math.abs(aend).toFixed(3)).padStart(12)
+      + z.schranke.toFixed(3).padStart(11) + "   " + status);
+  }
+}
+
 // ABNAHME OFFEN: in JEDEM Lauf ausgeben, nicht nur bei Treffern — damit die bekannten Ausnahmen
 // nicht dadurch in Vergessenheit geraten, dass die CI gruen ist.
 console.log("\nAbnahme offen (vom absoluten Waechter ausgenommen, s. ABNAHME_OFFEN in diesem Skript)");
@@ -242,7 +294,8 @@ if (stufenWarnungen.length) {
 if (rot) {
   console.log("\nFEHLGESCHLAGEN: mindestens eine Disziplin ist um mehr als ihre Schranke gefallen,");
   console.log("liefert keine Spiele mehr, oder eine arena-resolved Disziplin ausserhalb von");
-  console.log("ABNAHME_OFFEN liegt unter der absoluten 0,80-Schranke. Basislinie neu ziehen nur, wenn");
+  console.log("ABNAHME_OFFEN liegt unter der absoluten 0,80-Schranke, oder die Spurt-Mischung/ein Spurt-Format");
+  console.log("(Block \"Spurt-Mischung\" oben) ist gefallen. Basislinie neu ziehen nur, wenn");
   console.log("ein relativer Rueckgang gewollt ist: node scripts/baue-rangtreue-basislinie.mjs");
   console.log("(das Neuziehen heilt den absoluten Waechter NICHT — dafuer braucht es einen begruendeten");
   console.log("Eintrag in ABNAHME_OFFEN oder eine Kalibrierung ueber 0,80).");

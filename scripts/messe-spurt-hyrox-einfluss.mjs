@@ -40,6 +40,10 @@ const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(pathToFileURL(pfad).href, { waitUntil: "networkidle" });
 await seite.waitForFunction(() => window.__arena && window.__arena.einflussVon && window.__arena.bahnFlags, null, { timeout: 30000 });
+// P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem Einsatzlisten-
+// Szenario je Seite statt der Ersatzkarte (dieselbe Basis wie messe-arena-einfluss.mjs). Ohne die
+// Variable unveraendert.
+if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
 
 await seite.evaluate(() => window.__arena.bahnFlags({ spurtFormat: "hyrox" }));
 

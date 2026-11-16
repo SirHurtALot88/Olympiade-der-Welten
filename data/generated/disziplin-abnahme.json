@@ -492,6 +492,60 @@
    "ppFrisch": true,
    "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (OLY_FORM_MODUS=echt; jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert, Struktur unveraendert; vorher dexterity 16,0 % gegen Matrix 12, determination 11,4 % gegen 15, power 7,1 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,5/15,4 -> 12,9/6,5, Gegenprobe auf dem ungesehenen Strom 20 000 000: 15,5 -> 9,4 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,860 -> 0,876 (Spannweite 0,067, Saison 0,937) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136, OLY_FORM_MODUS=echt): rho 0,938 -> 0,860 (Spannweite 0,126 -> 0,074, enger), Saison 0,951 -> 0,860 -- Bewegung 0,078, innerhalb der alten Spannweite, keine Regression, aber ein staerkerer Ruecksetzer als bei den meisten anderen Disziplinen dieser Runde -- bei naechster Nachmessung im Auge behalten (deckt sich mit demselben Befund im unabhaengigen Baseline-Lauf vom selben Tag, docs/design/baseline-alle-20-disziplinen-15-11.md). Pp nicht neu gemessen, 18,5/15,4 bleibt gueltig (kein Rezept-Code seit 14.11. angefasst)."
   },
+  "spurt-mischung": {
+   "chassis": "bahn",
+   "format": "Spurt wie das Spiel ihn spielt: Format je Saat per Hash (klassisch/Hatz/HYROX, je ein Drittel), s. spurtFormatWaehlen() in battle-mode.engine.js (PR #1502). ERGAENZT die Zeile 'spurt' (die kader-los nur das klassische Format misst), ueberschreibt sie nicht.",
+   "rhoJeSpiel": 0.873,
+   "rhoSpannweite": 0.053,
+   "rhoSaison": 0.951,
+   "rhoMessung": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-spurt-mischung.mjs 24 --je-format",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie",
+    "einzelformate": {
+     "klassisch": 0.876,
+     "hatz": 0.823,
+     "hyrox": 0.895
+    }
+   },
+   "pp": [
+    16.5,
+    21.5
+   ],
+   "ppMessung": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-spurt-mischung.mjs 24 --pp=48",
+    "laeufe": 48,
+    "saatStroeme": [
+     0,
+     10000000
+    ],
+    "hinweis": "Opus-Review #1502 mass 18,7/19,1 (hoehere Laufzahl); n=48 schwankt um einige Pp. Dauer gut 3 Minuten -- manuelle Sonde, nicht in der CI.",
+    "einzelformatPpErsatzkarte": {
+     "hatz": [
+      22.5,
+      25.1,
+      26.1,
+      25.9,
+      24.1
+     ],
+     "hatzSaatStroeme": [
+      0,
+      10000000,
+      20000000,
+      30000000,
+      40000000
+     ],
+     "hatzBefehl": "node scripts/messe-spurt-hatz-einfluss.mjs 192 <versatz>"
+    }
+   },
+   "datum": "2026-11-16",
+   "commit": "81fedad1",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "NEU 16.11. (Auftrag: Hatz/HYROX in der CI schuetzen, docs/design/spurt-ci-schutz-16-11.md). Die Mischung besteht beide Kriterien mit Abstand (rho 0,873 > 0,85, Pp 16,5/21,5). Das Einzelformat Hatz liegt bei Pp 22,5-26,1 ueber fuenf Saatstroeme (Mittel 24,7, drei von fuenf Stroemen ueber 25) und rho 0,823 (echt) bzw. 0,837 (Ersatzkarte): im Spiel zaehlt die Mischung, ein Drittel der Rennen sind Hatz -- die Entscheidung ueber das Einzelformat steht bei Chris. rho der Mischung und der drei Formate schuetzt die Nacht-CI (zusatzmessungen in rangtreue-basislinie.json)."
+  },
   "climbing": {
    "chassis": "bahn",
    "rhoJeSpiel": 0.801,
