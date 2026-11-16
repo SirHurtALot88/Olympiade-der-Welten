@@ -29901,14 +29901,16 @@
         const goldL=(w.l===besteL&&besteL>0)?" isp-gold":"";
         const goldR=(w.r===besteR&&besteR>0)?" isp-gold":"";
         const deltaKlasse=delta>0?"vorn":delta<0?"hinten":"";
-        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+        // QA 16.11. (Fix-Paket C): Zugnummer und Differenz teilen sich jetzt eine Kopfzeile
+        // (vorher vier Zeilen, ~20 % der Leinwandhoehe samt Figuren darunter) -- drei Zeilen.
+        html+="<div class=\"isp-col\"><span class=\"isp-kopf\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-delta "+deltaKlasse+"\">"+(delta>0?"+":"")+delta+"</span></span>"
           +"<span class=\"isp-punkte l"+goldL+"\">"+w.l+"</span>"
-          +"<span class=\"isp-punkte r"+goldR+"\">"+w.r+"</span>"
-          +"<span class=\"isp-delta "+deltaKlasse+"\">"+(delta>0?"+":"")+delta+"</span></div>";
+          +"<span class=\"isp-punkte r"+goldR+"\">"+w.r+"</span></div>";
       } else {
-        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
-          +"<span class=\"isp-punkte\">·</span><span class=\"isp-punkte\">·</span>"
-          +"<span class=\"isp-delta\">·</span></div>";
+        html+="<div class=\"isp-col\"><span class=\"isp-kopf\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-delta\">·</span></span>"
+          +"<span class=\"isp-punkte\">·</span><span class=\"isp-punkte\">·</span></div>";
       }
     }
     split.innerHTML=html;
@@ -32314,10 +32316,16 @@
     // genau ueber dieser Zeile, "Ballwechsel"/"Aufschlag"/"Siegchance" waren dahinter
     // unleserlich. H*0.16 raeumt dem Bug Platz, ohne die Mannschafts-Leiste direkt darunter
     // zu verschieben.
-    ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
+    // QA 16.11. (Fix-Paket C): Zeile nie hoeher als 11px unter dem mittleren Anzeige-Kasten
+    // (hudMitteUnten, waechst bei mehrzeiligem Kasten) und mit dunkler Kontur -- auf Sand/Tribuene
+    // war das graue Dünnschrift-Etikett sonst kaum zu lesen.
+    const tnInfo="Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
       +(schlagzahl!=null?" · "+schlagzahl+" Schläge":"")
-      +punkteText,W/2,H*0.16);
+      +punkteText;
+    const tnInfoY=Math.max(H*0.16,hudMitteUnten()+11);
+    ctx.save(); ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.75)"; ctx.strokeText(tnInfo,W/2,tnInfoY); ctx.restore();
+    ctx.fillText(tnInfo,W/2,tnInfoY);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
@@ -32344,7 +32352,7 @@
     // Verschoben von H*0.145 auf H*0.185, zusammen mit der Info-Zeile direkt darueber (s.
     // deren Kommentar, Bug-Sichtung 14.10.) -- sonst stuende die Leiste jetzt UeBER der
     // Zeile, die sie erklaert.
-    zeichneMannschaftsLeiste(W/2,H*0.185,Math.min(W-40,bretter*50),leisteBoxen);
+    zeichneMannschaftsLeiste(W/2,tnInfoY+H*0.025,Math.min(W-40,bretter*50),leisteBoxen);
 
     // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
     // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
@@ -34620,9 +34628,15 @@
   const kuerZeilenAnim=new Map();
   function kuerZeilenY(key,zielY){
     let rec=kuerZeilenAnim.get(key);
-    if(!rec){ rec={y:zielY,ziel:zielY,seit:buehneT-1}; kuerZeilenAnim.set(key,rec); return zielY; }
-    if(rec.ziel!==zielY){ rec.von=rec.y; rec.ziel=zielY; rec.seit=buehneT; }
-    const p=Math.max(0,Math.min(1,(buehneT-rec.seit)/0.4));
+    // QA 16.11. (Fix-Paket C): die Uhr war buehneT (Sim-Zeit) -- die steht nach Spielende still
+    // (und springt bei Quick-Sim), die Zeilen blieben mitten im Gleiten haengen: Zeilen
+    // uebereinander, eine Luecke, Rangzahlen durcheinander. Jetzt Wanduhr (jetztMs, in Sonden
+    // simuliert), und nach Spielende rasten alle Zeilen auf ihrem Platz ein.
+    const jetztS=jetztMs()/1000;
+    if(!rec){ rec={y:zielY,ziel:zielY,seit:jetztS-1}; kuerZeilenAnim.set(key,rec); return zielY; }
+    if(done){ rec.y=zielY; rec.ziel=zielY; rec.von=null; return zielY; }
+    if(rec.ziel!==zielY){ rec.von=rec.y; rec.ziel=zielY; rec.seit=jetztS; }
+    const p=Math.max(0,Math.min(1,(jetztS-rec.seit)/0.4));
     rec.y=rec.von!=null?rec.von+(rec.ziel-rec.von)*p:zielY;
     return rec.y;
   }
@@ -36223,14 +36237,22 @@
       // sonst kollidiert der Text mit den Schachuhren direkt darunter (by-38).
       ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=siegGlueh; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.9)";
       const siegTxt=(siegSeite!=null?"SIEG — "+VEREIN[siegSeite].name:"UNENTSCHIEDEN")+" ("+gew(0)+":"+gew(1)+")";
-      ctx.strokeText(siegTxt,W/2,H*0.125); ctx.fillText(siegTxt,W/2,H*0.125);
+      const siegY=H*0.225+8*24+48;   // QA 16.11.: wie die Brett/Zug-Zeile unter dem Tisch (s. dort), nicht hinter dem Anzeige-Kasten
+      ctx.strokeText(siegTxt,W/2,siegY); ctx.fillText(siegTxt,W/2,siegY);
     } else {
       ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
       // S-F2: nur sichtbar, wenn ein ANGEHEFTETES (schachPin) Brett trotz Regie-Meidung im
       // Fokus steht -- die Automatik selbst zeigt ein aufgegebenes Brett ja gar nicht mehr an.
-      ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
+      // QA 16.11. (Fix-Paket C): bei 59px (H*0.125) lag die Zeile hinter dem mittleren
+      // Anzeige-Kasten (Unterkante ~69px), zwischen Kasten und Schachuhren (Oberkante ~68px) ist
+      // aber kein Platz -- die Zeile steht jetzt als Unterschrift unter dem Tisch (zwischen den
+      // Tischbeinen/Mannschaftsleiste und der Miniaturreihe bei H*0.80), mit dunkler Kontur.
+      const schInfo="Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
         +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":"")
-        +(a.vizSchachAufgegeben?"  ·  vorzeitig entschieden":""),W/2,H*0.125);
+        +(a.vizSchachAufgegeben?"  ·  vorzeitig entschieden":"");
+      const schInfoY=H*0.225+8*24+48;
+      ctx.save(); ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.75)"; ctx.strokeText(schInfo,W/2,schInfoY); ctx.restore();
+      ctx.fillText(schInfo,W/2,schInfoY);
     }
 
     // TISCH + BRETT — zwei braune Rechtecke und zwei Beine, wie die Hantel beim Heben:
@@ -44117,6 +44139,12 @@
       ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.32;ctx.lineWidth=2;ctx.setLineDash([5,7]);
       ctx.beginPath();ctx.arc(o.x,o.y,KP.radius,0,6.283);ctx.stroke();
       ctx.setLineDash([]);
+      // QA 16.11. (Fix-Paket C): der Nordpunkt (fy=85/470) hat die Fahnenspitze bei y=o.y-34=51 und
+      // lag damit samt Name unter dem Spiel-Anzeige-Balken (Unterkante ~69-96px je nach KP-Zeile).
+      // Ort, Radius und Simulation bleiben; nur Mast/Fahne/Scheibe/Fortschrittsring/Name werden um
+      // `kpDy` nach unten geschoben (Ring bleibt, Mitte/Sued berechnen 0).
+      const kpDy=Math.max(0,Math.min(60,hudBandUnten()+4-(o.y-34)));
+      ctx.translate(0,kpDy);
       ctx.globalAlpha=.28;ctx.fillStyle=besitzFarbe;
       ctx.beginPath();ctx.ellipse(o.x,o.y+14,26,10,0,0,6.283);ctx.fill();
       ctx.globalAlpha=1;
@@ -44134,7 +44162,7 @@
       ctx.font="bold 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
       const txt=o.name+" — "+(o.besitz!=null?kampfTeamName(o.besitz):"neutral");
-      ctx.strokeText(txt,o.x,o.y+34);ctx.fillText(txt,o.x,o.y+34);
+      ctx.strokeText(txt,o.x,o.y+34+kpDy);ctx.fillText(txt,o.x,o.y+34+kpDy);
     }
   }
 
@@ -45045,7 +45073,11 @@
         // Platz hat, ohne den Namen zu ueberdecken.
         ctx.font=(cam.zoom>=2?"700 8px":"700 10px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
         ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-        ctx.strokeText(stLabel,x,oben-13); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,oben-13);
+        // QA 16.11. (Fix-Paket C): die Zeile lag bei oben-13 (~53px) UNTER dem Spiel-Anzeige-Balken
+        // (Unterkante ~69px) -- Etiketten unter Team-/Uhrkasten waren unlesbar. Jetzt direkt unter
+        // der Balken-Unterkante (hudBandUnten), die Statistikzeile 9px darunter.
+        const stY=Math.max(oben-13,hudBandUnten()+9);
+        ctx.strokeText(stLabel,x,stY); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,stY);
         // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, "der Primaer-/Nebenweg der CLAUDE.md-
         // Leitlinie im Bild"). "✓" ist der TECHNIK-Primaerweg, "⚡" der WUCHT-Nebenweg, "✗"
         // der Sturz -- reiner Lesezugriff auf spurtStationStats, das stepSpurt an den drei
@@ -45055,7 +45087,7 @@
           const stTxt=st.sauber+" ✓ · "+st.durch+" ⚡ · "+st.sturz+" ✗";
           ctx.font=(cam.zoom>=2?"400 7px":"400 8.5px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
           ctx.lineWidth=2.4;
-          ctx.strokeText(stTxt,x,oben-4); ctx.fillStyle="#b7c0cf"; ctx.fillText(stTxt,x,oben-4);
+          ctx.strokeText(stTxt,x,stY+9); ctx.fillStyle="#b7c0cf"; ctx.fillText(stTxt,x,stY+9);
         }
       }
       for(let b=0;b<BAHNEN_N();b++){
@@ -48758,7 +48790,11 @@
   // -Maxima, nie an einer Bildachse) -- camY() ist wortwoertlich camX(), nur mit H statt W
   // und gespiegelt (0 = Wandfuss = UNTEN im Bild, 1 = Top-out = OBEN im Bild, weil Klettern
   // nach oben geht, Bildschirm-Y aber nach unten waechst).
-  const camHoehe=()=>H-170;
+  // QA 16.11. (Fix-Paket C): H-170 setzte das Top-out bei y=80 -- der Fuehrende samt Namensschild
+  // (~25px darueber) verschwand unter dem Spiel-Anzeige-Balken (Unterkante ~69px). 34px weniger
+  // Wandhoehe schieben Top-out nach y=114; Wandfuss (H-90) bleibt. Reine Abbildung auf den
+  // Bildschirm, u.pos (0..1) und Wertung unberuehrt.
+  const camHoehe=()=>H-204;
   function camViewV(){
     const hoehe=camHoehe(), viewH=hoehe/cam.zoom;
     const oben=Math.max(0,Math.min(hoehe-viewH,cam.cx*hoehe-viewH/2));
@@ -50927,7 +50963,9 @@
     ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
     ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
     ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
-    ctx.fillText(w.finale?"ENDSPURT":"FEGEARM",xPos,y0-8);
+    // QA 16.11. (Fix-Paket C): y0-8 (~51px) liegt unter dem Spiel-Anzeige-Balken; unterhalb der
+    // Stationsetiketten (hudBandUnten()+9, Statistikzeile +18) in der naechsten freien Zeile.
+    ctx.fillText(w.finale?"ENDSPURT":"FEGEARM",xPos,Math.max(y0-8,hudBandUnten()+30));
     ctx.restore();
   }
 
@@ -51375,7 +51413,9 @@
     if(!rang.length)return;
     const halle=istHyroxHalle();
     const st=hyroxCamStationIdx>=0?HYROX_STATIONEN[hyroxCamStationIdx]:null;
-    const ZEILE=15.5, OBEN=58, BREITE=halle?166:142;
+    // OBEN war 58 (Kopf bei 40px) -- das lag unter dem Spiel-Anzeige-Balken (Unterkante ~69px) und
+    // verdeckte Kopfzeile und erste Rangzeilen (QA 16.11., Fix-Paket C); jetzt ab der Balken-Unterkante.
+    const ZEILE=15.5, OBEN=Math.max(58,hudBandUnten()+20), BREITE=halle?166:142;
     const x0=W-BREITE-10;
     ctx.save();
     ctx.fillStyle="rgba(15,15,20,.62)";
@@ -53409,6 +53449,34 @@
 
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
+  // OBERES BAND FREIHALTEN (QA 16.11., Fix-Paket C): der Spiel-Anzeige-Balken (#bbug, HTML-Overlay
+  // bei top:8px) liegt immer ueber der Leinwand und ist in CSS-Pixeln fest hoch, die Leinwand aber
+  // skaliert -- seine Unterkante in Leinwand-Pixeln haengt also an der Darstellungsbreite
+  // (~69px bei 938px breiter Leinwand, mehr bei schmalerer). Wer Etiketten/Tafeln oben auf der
+  // Leinwand zeichnet, legt sie UNTER diese Linie. Gemessen wird hoechstens alle 0,5 s (kein
+  // Layout-Zwang je Frame), Rueckfall 75 (= Messwert bei 938px) ohne DOM/Bug. Reine Anzeige:
+  // liest nur Boxmasse, schreibt nichts, kein rr().
+  const hudBandCache={};
+  function hudBoxUnten(id,rueckfall){
+    const e=hudBandCache[id]||(hudBandCache[id]={v:rueckfall,t:-1e9});
+    const jetzt=(typeof performance!=="undefined"&&performance.now)?performance.now():0;
+    if(jetzt-e.t<500)return e.v;
+    e.t=jetzt;
+    try{
+      const el=document.getElementById(id), cv=ctx.canvas;
+      if(el&&!el.hidden&&cv){
+        const r=el.getBoundingClientRect(), c=cv.getBoundingClientRect();
+        if(c.height>0&&r.height>0)e.v=Math.max(rueckfall*0.8,Math.min(H*0.3,Math.ceil((r.bottom-c.top)*(cv.height/c.height))+6));
+      }
+    }catch(err){}
+    return e.v;
+  }
+  // Unterkante des ganzen Balkens (Team-Kaesten links/rechts + Uhr in der Mitte) ...
+  const hudBandUnten=()=>hudBoxUnten("bbug",75);
+  // ... und nur des mittleren Kastens (Stand/Uhr, bei Battlefield mit KP-Zeile hoeher) -- fuer
+  // zentrierte Zeilen, die die Team-Kaesten gar nicht beruehren.
+  const hudMitteUnten=()=>hudBoxUnten("bbugMitte",58);
+
   // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
   // Violett: es darf mit keiner Farbe verwechselbar sein, die auf der Bahn schon etwas
   // bedeutet — Team-Orange/Cyan (Namen), Gruen/Orange/Rot (Reserve), Blau (Sog).
@@ -53535,8 +53603,10 @@
     // Zeichenkonstanten -- aendert nichts an laeuferXY()/wert()/rr(), nur WIE weit ein
     // Etikett vom Kopf weg gezeichnet wird.
     const BAHN_LABEL_KLUSTER_DX=42,BAHN_LABEL_KLUSTER_DY=20,
-      BAHN_LABEL_ZEILENHOEHE=(bahnPodKader||zfSeiteAn)?22:11,        // Seitenansicht: zwoelf Laeufer auf EINER Strasse, ganzer Etikettenblock je Stufe
-      BAHN_LABEL_MAX_VERSATZ=bahnPodKader?7:(zfSeiteAn?4:3);
+      // QA 16.11. (Fix-Paket C): auch das Takeshi-DUELL (zwoelf Laeufer auf der Route, sechs je Seite)
+      // gehoert in die grosse Stufung -- mit 11px/3 Stufen lagen die Zeilen im Startpulk uebereinander.
+      BAHN_LABEL_ZEILENHOEHE=(bahnPodKader||zfSeiteAn||BA().takeshi)?22:11,        // Seitenansicht: zwoelf Laeufer auf EINER Strasse, ganzer Etikettenblock je Stufe
+      BAHN_LABEL_MAX_VERSATZ=(bahnPodKader||BA().takeshi)?7:(zfSeiteAn?4:3);
     const bahnLabelPositionen=[];
     // ZWEITE HAELFTE DESSELBEN MUSTERS (wie labelSchwebeBoxen im Kampf): die tatsaechlich
     // gezeichnete Box der beiden breitesten Zeilen -- Name und die Platz-/Status-Zeile --
@@ -53545,6 +53615,13 @@
     const zfSchnaufListe=[];     // Seitenansicht: Atemwolken werden nach ALLEN Figuren gezeichnet, damit keine Nachbarfigur sie ueberdeckt
     const zfZielListe=[];        // Seitenansicht: Etiketten der Eingelaufenen, nach allen Figuren mit Kollisionsvermeidung gezeichnet (zeichneZfZielEtiketten)
     zfEtik=[];
+    // Vorgemerkte Etikettentexte (s. `ctx.fillText=bahnTextMerkF` in der Laeuferschleife unten).
+    const bahnSpaeteTexte=[], bahnTextOrigF=ctx.fillText, bahnTextOrigS=ctx.strokeText;
+    const bahnTextMerk=(fuell)=>(t,x,y)=>{
+      bahnSpaeteTexte.push({fuell,t,x,y,font:ctx.font,fs:ctx.fillStyle,ss:ctx.strokeStyle,lw:ctx.lineWidth,
+        ga:ctx.globalAlpha,ta:ctx.textAlign,tb:ctx.textBaseline,lj:ctx.lineJoin,fi:ctx.filter});
+    };
+    const bahnTextMerkF=bahnTextMerk(true), bahnTextMerkS=bahnTextMerk(false);
     // FOLGEKAMERA (Rework 16.11.): Startnummer = Platz in der Startreihenfolge, dieselbe Zaehlung wie die Chips der
     // Laeuferwahl (zeitfahrenFokusReihe). Wer nicht der Fokus ist, traegt im Bild nur dieses Namensschild.
     const zfNr=new Map();
@@ -53566,6 +53643,15 @@
         if(Math.abs(x-p.x)<BAHN_LABEL_KLUSTER_DX&&Math.abs(y-p.y)<BAHN_LABEL_KLUSTER_DY)bahnLabelVersatz++;
       }
       bahnLabelVersatz=Math.min(bahnLabelVersatz,BAHN_LABEL_MAX_VERSATZ);
+      // QA 16.11. (Fix-Paket C): STAFFEL-WARTEZONE -- die Wartenden stehen im Abstand von ~25px
+      // uebereinander, ihr dreizeiliger Etikettenblock (Plan/Name/Zahl) ist 21px hoch und die
+      // naechste Figur malt ueber die Zeilen der vorigen. Wer einen Wartenden nahe ueber/unter
+      // sich hat, zeigt nur noch seinen Namen (die Plan-Zeile entfaellt, s. unten); der erste
+      // der Reihe behaelt den vollen Block.
+      let wartePulkNah=0;
+      if(!zfLabelAus&&BA().staffel&&!u.aktiv&&u.fertig==null)for(const p of bahnLabelPositionen){
+        if(Math.abs(x-p.x)<BAHN_LABEL_KLUSTER_DX&&Math.abs(y-p.y)<60)wartePulkNah++;
+      }
       if(!zfLabelAus)bahnLabelPositionen.push({x,y});
       const bahnLabelDy=bahnLabelVersatz*BAHN_LABEL_ZEILENHOEHE;
       // TT-2: HOT SEAT (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Der aktuelle
@@ -53998,6 +54084,12 @@
       // noch wartet, bekommt jetzt einen sichtbaren Countdown ueber dem Kopf, in
       // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
       // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
+      // QA 16.11. (Fix-Paket C): ab hier bis zur Zeile `if(zfBlase)zeichneZfBlase` steht NUR Beschriftung
+      // (Startuhr, Zwischenzeit, Name, Plan, Burgpunkte, Platz). Die Texte werden vorgemerkt und
+      // nach der Laeuferschleife gezeichnet (`bahnSpaeteTexte`) -- sonst malte jeder spaeter
+      // gezeichnete Laeufer (Nachbarbahn, Staffel-Wartereihe, Takeshi-Pulk) seinen Sprite ueber die
+      // Etiketten der frueheren. Position, Schrift, Farbe, Kontur und Deckkraft sind unveraendert.
+      ctx.fillText=bahnTextMerkF; ctx.strokeText=bahnTextMerkS;
       if(u.vizRampe>0&&!zfLabelAus&&!zfBlase){
         setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
@@ -54036,7 +54128,7 @@
       // steht der neue Name ueber dem Kopf. Was dazukommt, ist nur die Aufmerksamkeit:
       // fuer ANSAGE_NACHLEUCHTEN Sekunden steht er fett und in der Ansage-Farbe, damit
       // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
-      if(u.fertig==null&&!zfLabelAus&&!zfBlase){
+      if(u.fertig==null&&!zfLabelAus&&!zfBlase&&!wartePulkNah){
         const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
         setzeFont(ctx,(frisch?"700 9px":"400 8px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
         const pl=((BA().plaene)[u.plan]||{}).label||"";
@@ -54094,8 +54186,19 @@
         const ptY=y-19-bahnLabelDy;
         ctx.strokeText(pt,x,ptY);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,ptY);
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
+      delete ctx.fillText; delete ctx.strokeText;
       if(zfBlase)zeichneZfBlase(u,x,y-(sk0-1)*46,zfNr.get(u.id),bahnLabelSchwebeBoxen);
       else if(zfFremd)zeichneZfNummer(u,x,y-(sk0*0.88-1)*46,zfNr.get(u.id));
+    }
+    if(bahnSpaeteTexte.length){
+      ctx.save();
+      for(const q of bahnSpaeteTexte){
+        ctx.font=q.font; ctx.fillStyle=q.fs; ctx.strokeStyle=q.ss; ctx.lineWidth=q.lw; ctx.globalAlpha=q.ga;
+        ctx.textAlign=q.ta; ctx.textBaseline=q.tb; ctx.lineJoin=q.lj;
+        if(typeof q.fi==="string")ctx.filter=q.fi;
+        (q.fuell?bahnTextOrigF:bahnTextOrigS).call(ctx,q.t,q.x,q.y);
+      }
+      ctx.restore();
     }
     if(zfSeiteAn)zeichneZfZielEtiketten(zfZielListe,bahnLabelSchwebeBoxen);
     // SCHNAUFEN (Seitenansicht, Task #155; Vorlage: das Durchschnaufen in public/szenen/time-trial/
@@ -54654,6 +54757,7 @@
         }
       }
     }
+    const spaeteLabels=[];
     for(const u of U){
       const c=kampfSeitenFarbe(u.side);
       const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
@@ -54713,11 +54817,14 @@
       // sie in `labelSchwebeBoxen` fuer die Schweber-Kollisionspruefung ablegen kann (s.
       // Kommentar an labelSchwebeBoxen oben) — misst dieselbe Zeichenoperation, die ohnehin
       // schon laeuft, keine zweite Text-Vermessung.
+      // QA 16.11. (Fix-Paket C): die Beschriftung wird nur noch GEMESSEN und vorgemerkt, gezeichnet
+      // wird sie nach der Figurenschleife (`spaeteLabels`, s. dort) -- in einer Reihe (TDM-
+      // Aufstellung, ~50px Reihenabstand) malte die naechste Figur sonst ueber den Namen der
+      // vorigen. Text, Position, Kontur und Deckkraft sind unveraendert.
       const schrift=(txt,dy,farbe,groesse)=>{
-        ctx.font="400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
-        ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-        ctx.strokeText(txt,x,y+dy);
-        ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        const fontStr="400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.font=fontStr;ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        if(txt)spaeteLabels.push({txt,x,y:y+dy,farbe,fontStr,alpha:ctx.globalAlpha});
         return ctx.measureText(txt).width/2+LABEL_TEXT_SICHERHEIT;
       };
       // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
@@ -54763,6 +54870,18 @@
         ctx.textAlign="center";ctx.textBaseline="middle";
         ctx.fillText("?",x,y-6);
       }
+    }
+    // BESCHRIFTUNGEN ZULETZT (QA 16.11., Fix-Paket C): Name/Status aller Figuren liegen jetzt ueber
+    // allen Sprites statt unter der naechsten Figur (s. schrift() oben).
+    if(spaeteLabels.length){
+      ctx.save();
+      ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=3;ctx.lineJoin="round";
+      for(const l of spaeteLabels){
+        ctx.globalAlpha=l.alpha;ctx.font=l.fontStr;
+        ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(l.txt,l.x,l.y);
+        ctx.fillStyle=l.farbe;ctx.fillText(l.txt,l.x,l.y);
+      }
+      ctx.restore();
     }
     // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
     // Fokus-Doppeln (s. dort, gleiche Farbe FOKUS_FARBE, gleicher gestrichelter Ring r=27
@@ -54961,6 +55080,16 @@
       if(!r.height)continue;
       unten=unten==null?r.bottom:Math.max(unten,r.bottom);
     }
+    // EISKUNSTLAUF (QA 16.11., Fix-Paket C): unter dem Balken liegt dort die Kuerflaeche mit dem
+    // laufenden Paar -- das Banner ("FUEHRUNGSWECHSEL ...", ~85px hoch) verdeckte es. Das Banner
+    // sitzt hier stattdessen im unteren Eisfeld (unterhalb der Paar-Mitte, oberhalb des
+    // Kampfgerichts bei ~88 %), schmaler, damit es die Zwischenstand-Tafel links nicht beruehrt.
+    if(istEis()){
+      banner.style.maxWidth="min(50%,400px)";
+      banner.style.top=Math.max(0,bezug.clientHeight*0.855-banner.offsetHeight)+"px";
+      return;
+    }
+    banner.style.maxWidth="";
     if(unten==null){ banner.style.top=""; return; }
     const bezugOben=bezug.getBoundingClientRect().top;
     const abstand=8;

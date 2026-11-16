@@ -54847,6 +54847,17 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-table-scroll {
   overflow-x: auto;
+  /* QA 16.11. (Fix-Paket C): `position: relative` macht den Scroll-Container zum Bezugsrahmen
+     des absolut positionierten Screenreader-Textes (.nl-training-table-sr) in der letzten
+     Kopfzelle. Ohne Bezug sass der Text am rechten Tabellenende ausserhalb des Containers,
+     wurde nicht mitgeclippt und dehnte die ganze Seite auf 1523 px bei 1440 px Fenster. */
+  position: relative;
+  max-width: 100%;
+}
+
+.is-new-look .nl-training-table-card {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .is-new-look .nl-training-table {
