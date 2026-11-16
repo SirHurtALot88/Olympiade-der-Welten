@@ -46172,11 +46172,15 @@
   // `hyroxAnsicht` (Hallenrunde-PR, Design-Dokument 7.1): "bahn"|"halle". Standard "halle"
   // seit Stufe 2 (die Hallengeometrie existiert jetzt) -- "bahn" bleibt nur fuer Vorher-/
   // Nachher-Screenshots erreichbar (window.__arena.bahnFlags/window.__olyBahnFlags).
-  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle"};
+  // `spurtFormatExplizit`: true, sobald jemand das Format AUSDRUECKLICH setzt (startFlags/
+  // window.__arena.bahnFlags). Nur ohne ausdruecklichen Wunsch greift im echten Spiel die
+  // Formatwahl per Saat (spurtFormatWaehlen(), 16.11.).
+  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle", spurtFormatExplizit:false};
   try{
     const startFlags=window.__olyBahnFlags;
-    if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string")
-      BAHN_FLAGS.spurtFormat=startFlags.spurtFormat;
+    if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string"){
+      BAHN_FLAGS.spurtFormat=startFlags.spurtFormat; BAHN_FLAGS.spurtFormatExplizit=true;
+    }
     if(startFlags&&typeof startFlags==="object"&&(startFlags.hyroxAnsicht==="bahn"||startFlags.hyroxAnsicht==="halle"))
       BAHN_FLAGS.hyroxAnsicht=startFlags.hyroxAnsicht;
   }catch(e){}
@@ -48820,6 +48824,26 @@
 
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
+  // FORMATWAHL IM ECHTEN SPIEL (16.11., Chris: "das muss in der Battle Arena auch drin sein"):
+  // Die Formate "hatz" und "hyrox" standen seit 08.11. fertig im Motor, wurden aber von keinem
+  // echten Spiel je angeschaltet (Formatwahl "nicht entschieden", s. docs/design/spurt-format-
+  // die-hatz-08-11.md Abschnitt 7). Entscheidung: Option B (deterministischer Hash, wie die
+  // Kulissen) -- ein Drittel klassisch, je ein Drittel Hatz/HYROX, gewaehlt NUR aus der Saat.
+  // Die Saat ist im Vorlauf (Wertung), in der Arena und in der Battle Arena dieselbe
+  // (gezeigt = gebucht), deshalb waehlen alle drei Wege dasselbe Format, ohne ein Flag
+  // durchreichen zu muessen.
+  // GATE: nur wenn ein ECHTER Kader eingehaengt wurde (echterKader.heim/gast, so setzen Host,
+  // Headless-Runner und Node-Motor ihn) UND niemand das Format ausdruecklich gesetzt hat.
+  // Messwerkzeuge ohne Kader (miss-alle-disziplinen, Fingerabdruck) bleiben dadurch
+  // bit-identisch "klassisch"; Spurt-Messskripte setzen das Format ausdruecklich.
+  const SPURT_FORMATE=["klassisch","hatz","hyrox"];
+  function spurtFormatWaehlen(saat){
+    if(BAHN_FLAGS.spurtFormatExplizit)return BAHN_FLAGS.spurtFormat;
+    const echt=echterKader&&Array.isArray(echterKader.heim)&&echterKader.heim.length
+      &&Array.isArray(echterKader.gast)&&echterKader.gast.length;
+    if(!echt)return BAHN_FLAGS.spurtFormat;
+    return SPURT_FORMATE[kulisseHash("spurt-format|"+(saat==null?"":String(saat)))%SPURT_FORMATE.length];
+  }
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
@@ -49290,7 +49314,8 @@
     // explizit angefordert (BAHN_FLAGS.spurtFormat, s. dort) -- ohne das Flag bleibt
     // `bahnHatzAktiv` false und bauSpurt() endet hier bit-identisch zu vorher. `art.spurt`
     // statt `d==="spurt"`, dasselbe Gate wie bei spurtSaeuleSetzen() direkt darueber.
-    bahnHatzAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hatz");
+    const spurtFmt=art.spurt?spurtFormatWaehlen(saat):"klassisch";
+    bahnHatzAktiv=!!(art.spurt&&spurtFmt==="hatz");
     HATZ_WELLEN=null;
     if(bahnHatzAktiv)baueHatz();
     // HYROX-STATIONEN (Format 3, 08.11., s. Hook-Punkt-Liste in
@@ -49299,7 +49324,7 @@
     // Hook-Punkt wie bahnHatzAktiv direkt darueber -- NUR fuer Spurt (`art.spurt`), NUR
     // explizit angefordert. Ohne das Flag bleibt `bahnHyroxAktiv` false und bauSpurt()
     // endet bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs).
-    bahnHyroxAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hyrox");
+    bahnHyroxAktiv=!!(art.spurt&&spurtFmt==="hyrox");
     HYROX_STATIONEN=null;
     if(bahnHyroxAktiv)baueHyroxStationen();
   }
@@ -63019,7 +63044,7 @@
     // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
     bahnFlags:(neu)=>{
       if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"||neu.spurtFormat==="hyrox"))
-        BAHN_FLAGS.spurtFormat=neu.spurtFormat;
+        { BAHN_FLAGS.spurtFormat=neu.spurtFormat; BAHN_FLAGS.spurtFormatExplizit=true; }
       // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
       if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
         BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
@@ -63059,6 +63084,9 @@
     // spurt-hyrox-nahkamera-08-11.md) -- fuer Screenshot-/Bildbeleg-Skripte, die sonst nur aus
     // Pixeln raten koennten, ob die Kamera wirklich zwischen Stationen wechselt. Kein echtes
     // Spiel ruft das auf, kein rr()-Aufruf, keine Schreibzugriffe.
+    // FORMATWAHL-SONDE (16.11., s. spurtFormatWaehlen()): welches Spurt-Format haette diese Saat
+    // JETZT. Reines Lesen, kein rr(), keine Schreibzugriffe.
+    spurtFormatProbe:(saat)=>spurtFormatWaehlen(saat),
     hyroxKameraProbe:()=>({
       aktiv:!!bahnHyroxAktiv, halle:istHyroxHalle(), stationIdx:hyroxCamStationIdx,
       station:(bahnHyroxAktiv&&HYROX_STATIONEN&&hyroxCamStationIdx>=0)?HYROX_STATIONEN[hyroxCamStationIdx].name:null,
