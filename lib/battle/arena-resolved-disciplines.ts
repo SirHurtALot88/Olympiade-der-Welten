@@ -492,6 +492,10 @@ export const MINI_DM_FFA_VORLAUF_AKTIV = true;
  * bestanden, KEINE Ausnahme noetig): rho je Kampf k=2..6 0,861-0,923 (zwei Saatstroeme, kaderfest),
  * Pp 4,8-20,2 (n=48, zwei Stroeme), data/generated/battlefield-pod-gefecht-abnahme.json. Chris'
  * Ausnahme fuer k=2/3 vom 01.11. galt nur dem PPS-Pod und wird fuer den Motor nicht gebraucht.
+ * FRISCH NACHGEMESSEN 15.11. (Budget-Konservierung fuer alle 20): rho je Kampf 0,874-0,917 bei
+ * jedem k=2..6 in beiden Saatstroemen, Pp 4,3-8,2 -- beide Kriterien bestanden, Pp unter dem
+ * Optimum <15. Seither traegt auch `data/generated/disziplin-abnahme.json` (Schluessel
+ * "battlefield") diese Pod-Zahlen als Kopfwerte statt der des ungewerteten Zweier-Duells.
  *
  * `false` (oder `OLY_BATTLEFIELD_POD_VORLAUF=aus` auf dem Server, s. arena-vorlauf-service.ts) faellt
  * sofort auf den PPS-Pod zurueck; bereits fertig gerechnete Snapshots buchen wie bei Mini-DM weiter
@@ -536,6 +540,8 @@ export const BAHN_POD_VORLAUF_AKTIV = true;
  * nachgemessen auf dem main-Stand dieser PR nach dem Anzeige-Treue-Fix PR #1372): rho je
  * Gefecht (Median) 0,800-0,827 bei jeder Kadergroesse k=2..6 und beiden Saatstroemen -- ueber
  * der 0,80-Schranke; Pp-Abweichung 14,2-16,8 (k=6, zwei Stroeme) -- klar unter der 25-Schranke.
+ * FRISCH NACHGEMESSEN 15.11. (Protokollstandard n=48 statt n=24): rho 0,801-0,839, Pp 14,6/14,7
+ * -- unter dem Optimum <15, ohne Code- oder Hebelaenderung.
  * `scripts/miss-tdm-gefecht-abnahme.mjs`, `data/generated/disziplin-abnahme.json` Schluessel
  * "tdm". OHNE jede Kalibrierung (BF_FFA_GRUND-Werte 1:1 uebernommen, wie beim Prototyp 10.11.).
  */
@@ -575,7 +581,8 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "hockey",
   // TDM (TDM-Gefecht-Verdrahtung 11.11., s. TDM_GEFECHT_VORLAUF_AKTIV im Kommentar oben):
   // `tdmGefecht()` ersetzt die alte PPS-Duell-Bruecke (rho dort nur 0,324-0,404) -- rho
-  // 0,800-0,827 / Pp 14,2-16,8, beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
+  // 0,800-0,827 / Pp 14,2-16,8, beide Pflichtkriterien regulaer bestanden, keine Ausnahme
+  // (frisch 15.11., n=48: rho 0,801-0,839, Pp 14,6/14,7).
   // Siebzehnte gewertete Disziplin (Hockey ist die sechzehnte, s. oben).
   // `determineArenaDisciplineContexts()` prueft zusaetzlich
   // `TDM_GEFECHT_VORLAUF_AKTIV`, bevor TDM wirklich als Kandidat gilt (s. dort).

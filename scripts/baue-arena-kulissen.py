@@ -84,9 +84,12 @@ CHASSIS = {
     "fechten": {"art": "quelle"},
     "speed-schach": {"art": "quelle"},
     # Batch 3 (07.11.), ebenfalls aus scripts/baue-kulisse-buehnen.py.
-    "showcase": {"art": "quelle"},
+    # Batch 12 (08.11., "Rahmen statt Material"): Showcase und Breaking tragen ihr Licht jetzt im Bild
+    # (Prospekt, Lichtkegel, Fackelglut). Flaechige Abdunklung hatte genau das ins Dunkel gezogen
+    # (Audit 08.11.): Abdunklung fest niedrig, Rand-Vignette des Motors halb (`rand`, s. kulisseZeichnen).
+    "showcase": {"art": "quelle", "dunkel_fest": 0.04, "rand": 0.5},
     "eiskunstlauf": {"art": "quelle"},
-    "breaking": {"art": "quelle"},
+    "breaking": {"art": "quelle", "dunkel_fest": 0.04, "rand": 0.35},
     "i-spy": {"art": "quelle"},
     # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
     "basketball": {"art": "quelle"},
@@ -307,7 +310,10 @@ def main() -> None:
             dunkel = round(min(0.3, max(0.06, (hell - 0.25) * 0.55)) + chassis.get("dunkel_plus", 0), 2)
             if "dunkel_fest" in chassis:
                 dunkel = chassis["dunkel_fest"]
-            eintraege.append({"id": v["id"], "label": v["label"], "bild": f"/sprites/kulissen/{d_id}/{v['id']}.jpg", "dunkel": dunkel})
+            eintrag = {"id": v["id"], "label": v["label"], "bild": f"/sprites/kulissen/{d_id}/{v['id']}.jpg", "dunkel": dunkel}
+            if "rand" in chassis:
+                eintrag["rand"] = chassis["rand"]
+            eintraege.append(eintrag)
             print(f"  {d_id}/{v['id']}: {len(objs)} Hindernisse zugemalt -> {ziel.relative_to(WURZEL)} ({ziel.stat().st_size // 1024} KB)")
         if eintraege:
             tabelle[d_id] = eintraege

@@ -59,7 +59,12 @@ import {
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
+// OLY_SEITE (15.11., additiv): misst einen anderen Motorstand (z. B. eine Mockup-Kopie mit einem
+// Rezeptkandidaten), wie das vierte Positionsargument von messe-arena-einfluss.mjs -- der
+// Arbeitsbaum bleibt dabei unangetastet. Ohne die Variable unveraendert der Arbeitsbaum.
+const SEITE = pathToFileURL(process.env.OLY_SEITE
+  ? path.resolve(process.env.OLY_SEITE)
+  : path.join(WURZEL, "public/mockups/battle-mode.html")).href;
 const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE
   || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -78,6 +83,11 @@ const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
 // der Standard der Engine ("je-spiel": jedes Spiel zieht seinen eigenen Wurf wie im Spiel).
 const mutatorenArg = roheArgs.find((a) => a.startsWith("--mutatoren="));
 const MUTATOREN = mutatorenArg ? mutatorenArg.split("=")[1] : null;
+// --kulisse=<id>|alle (Oberflaechen-Effekte 08.11., Konzept Abschnitt 7): pinnt die Kulissen-
+// Variante. "alle" misst jede Variante der Disziplin einzeln (eine Zeile je Variante, Label
+// "<disziplin>@<variante>"); Disziplinen ohne Kulissen-Profil laufen dann einmal unveraendert.
+const kulisseArg = roheArgs.find((a) => a.startsWith("--kulisse="));
+const KULISSE = kulisseArg ? kulisseArg.split("=")[1] : null;
 // --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv):
 // schalten die Buehnen-Mechaniken hinter BUEHNE_FLAGS ein, s. scripts/lib/rangtreue-messung.mjs.
 // Ohne sie misst das Skript den Motor wie er im Spiel laeuft (alle Flags aus).
@@ -85,7 +95,7 @@ const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);
 // --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv): Mess-Sonde fuer den Paar-Bonus,
 // s. scripts/lib/rangtreue-messung.mjs. Ohne den Schalter unveraendertes Verhalten.
 const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(roheArgs);
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a));
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -121,12 +131,21 @@ try {
   const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
 
   zeilen = [];
+  const profile = KULISSE ? await seite.evaluate(() => (window.__arena.kulisseProfile ? window.__arena.kulisseProfile() : {})) : {};
   for (const d of alleDisz) {
-    zeilen.push(await disziplinMessen(seite, d, {
-      n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie,
-      ...(JE_SEITE ? { jeSeite: JE_SEITE } : {}),
-      ...(MUTATOREN ? { mutatoren: MUTATOREN } : {}),
-    }));
+    const varianten = !KULISSE ? [null]
+      : KULISSE === "alle" ? (profile[d] ? profile[d].varianten : [null])
+      : [KULISSE];
+    for (const kulisse of varianten) {
+      const z = await disziplinMessen(seite, d, {
+        n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie,
+        ...(JE_SEITE ? { jeSeite: JE_SEITE } : {}),
+        ...(MUTATOREN ? { mutatoren: MUTATOREN } : {}),
+        ...(kulisse ? { kulisse } : {}),
+      });
+      if (kulisse) z.d = `${z.d}@${kulisse}`;
+      zeilen.push(z);
+    }
   }
 } finally {
   await browser.close();
@@ -135,7 +154,7 @@ try {
 const titel = EINZELKADER
   ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
   : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
-console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "")
+console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "") + (KULISSE ? `\nKulisse: ${KULISSE}` : "")
   + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "")
   + (staffelPaarGesetzt ? `\n${staffelPaarSchalterText(staffelPaarGesetzt)}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
