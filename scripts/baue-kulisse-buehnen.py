@@ -62,6 +62,7 @@ T_DEMO_BANDE = [(808, 259, 995, 294), (1108, 258, 1255, 295), (1488, 258, 1636, 
 T_BELAG = (343, 404, 1577, 702)
 # Bandenschilder, die bleiben (OLYMPIADE, DER WELTEN, TENNIS): keine Flickquelle
 T_BANDE_SCHILDER = [(341, 256, 571, 297), (576, 256, 799, 297), (1260, 256, 1483, 297)]
+T_BANDE_OBEN = 254  # erste Szenen-Zeile der Bande (Schilder ab 256, T_DEMO_BANDE ab 258); darueber Publikum
 T_AUSLAUF_DACH = (710, 784)  # Hartplatz: der gruene Auslauf unter dem Platz (ohne Bandenschatten)
 
 
@@ -88,8 +89,14 @@ def baue_tennis(variante: str) -> Image.Image:
 
     lein = np.zeros((LH, LW, 3), np.uint8)
     t0, t1 = T_TRIBUENE
-    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a.
-    band = tribuenen_mischen(welt.crop((0, t0, 1920, t1)).resize((LW, T_BAND_H), Image.LANCZOS), 3, saat=3)
+    # Gemischt statt eines Blocks im Takt, s. tribuenen_mischen()-Kommentar/Audit 4.8a -- aber NUR das
+    # Publikum. Die Bande darunter traegt Schrift (OLYMPIADE, DER WELTEN, TENNIS); mit gemischt hatte
+    # tribuenen_mischen() das rechte Drittel samt Schild gespiegelt, und in allen drei Varianten stand
+    # oben rechts "ƧIИИƎT" (Sicht-Audit 16.11., tennis-z1-spiegelschrift.png). Bande deshalb ungemischt.
+    band = welt.crop((0, t0, 1920, t1)).resize((LW, T_BAND_H), Image.LANCZOS)
+    bande_ab = round((T_BANDE_OBEN - t0) * T_BAND_H / (t1 - t0))
+    publikum = tribuenen_mischen(band.crop((0, 0, LW, bande_ab)), 3, saat=3)
+    band.paste(publikum, (0, 0))
     lein[:T_BAND_H] = np.asarray(band)
 
     # Belag in Szenen-Massstab (1 px Szene ~ 1 px Leinwand), oben an der Bande beginnend, nach unten
