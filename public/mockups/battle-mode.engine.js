@@ -53626,6 +53626,11 @@
     // Laeuferwahl (zeitfahrenFokusReihe). Wer nicht der Fokus ist, traegt im Bild nur dieses Namensschild.
     const zfNr=new Map();
     if(zfSeiteAn)zeitfahrenFokusReihe().forEach((o,i)=>zfNr.set(o.id,i+1));
+    // Opus-Review #1526: try/finally, damit eine Exception in der Etikettenberechnung (burgpunkte, fmtZielzeit ...)
+    // die ueberschriebenen ctx.fillText/strokeText nicht auf dem Kontext stehen laesst (sonst fehlen alle Texte des Bildes).
+    // Annahme beim verzoegerten Zeichnen: Transform, Clip, shadow* und globalCompositeOperation werden NICHT mitgemerkt --
+    // zwischen Vormerken und Zeichnen darf deshalb kein translate/Schatten um die Etiketten gelegt werden.
+    try{
     for(const u of reihe){
       const platz=rennFertig.indexOf(u);
       let {x,y}=laeuferXY(u);
@@ -54190,6 +54195,7 @@
       if(zfBlase)zeichneZfBlase(u,x,y-(sk0-1)*46,zfNr.get(u.id),bahnLabelSchwebeBoxen);
       else if(zfFremd)zeichneZfNummer(u,x,y-(sk0*0.88-1)*46,zfNr.get(u.id));
     }
+    }finally{ delete ctx.fillText; delete ctx.strokeText; }
     if(bahnSpaeteTexte.length){
       ctx.save();
       for(const q of bahnSpaeteTexte){
