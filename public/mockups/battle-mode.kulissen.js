@@ -91,7 +91,7 @@ window.__ARENA_KULISSEN={
    "id": "schlosshof",
    "label": "Schlosshof",
    "bild": "/sprites/kulissen/fechten/schlosshof.jpg",
-   "dunkel": 0.13
+   "dunkel": 0.09
   }
  ],
  "football": [
