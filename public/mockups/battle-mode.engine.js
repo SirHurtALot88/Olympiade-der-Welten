@@ -52554,8 +52554,27 @@
     // (Normalfall) bekommen Versatz 0 und damit exakt dieselbe Position wie vorher. Reine
     // Anzeige: liest nur die schon berechneten Bildschirmpositionen aus laeuferXY(),
     // schreibt nichts in u.pos/u.fertig/rr()/MOTOREN[...].wert() zurueck.
-    const BAHN_LABEL_KLUSTER_DX=42,BAHN_LABEL_KLUSTER_DY=20,BAHN_LABEL_ZEILENHOEHE=11,
-      BAHN_LABEL_MAX_VERSATZ=3;
+    //
+    // POD-NACHBESSERUNG (Visueller Audit 16.11., Task #152): die 11-px-Zeilenhoehe oben war
+    // an EINER Namenszeile bemessen, nicht am ganzen Etikettenblock -- Plan-/Namens-/Punkte-
+    // Zeile liegen aber 10-11 px AUSEINANDER (y-40/-30/-19, s. die drei schrift()-Aufrufe
+    // unten), der Block ist also rund 21 px hoch. Mit nur 11 px Versatz je Stufe rutschte
+    // die PUNKTEZEILE des naechsten Laeufers (y-19-dy) exakt auf die NAMENSZEILE (y-30) des
+    // vorigen -- zwei verschiedene Laeufer-Zeilen UEBEREINANDER statt sauber gestapelt (Beleg:
+    // docs/design/bahn-pod-label-ueberlappung-16-11/takeshi-vorher.png, ein dichter
+    // Pulk aus 24 Laeufern an der ersten Takeshi-Station wird zu einem unlesbaren Textblock).
+    // Im DUELL (`bahnPodKader` null) bleiben beide Konstanten unveraendert (11/3) -- bit-
+    // identisch zum Vorherstand, weil dort nie mehr als eine Handvoll Laeufer kollidieren
+    // (Audit-Beleg war ohnehin "Zehnerpulk", nie real im 1v1). Nur wenn ein Bahn-Pod sichtbar
+    // ist (Staffel/Takeshi's Castle mit vier Teams, bis zu 4xk Laeufer auf derselben Bahn)
+    // wird die Stufenhoehe auf die volle Blockhoehe angehoben (kein Zeilen-Verschnitt mehr)
+    // und die Zahl der Stufen verdoppelt (3 -> 7), weil ein Pod-Pulk routinemaessig groesser
+    // ist als die Zweier-/Dreier-Haeufchen, fuer die der alte Deckel gedacht war. Reine
+    // Zeichenkonstanten -- aendert nichts an laeuferXY()/wert()/rr(), nur WIE weit ein
+    // Etikett vom Kopf weg gezeichnet wird.
+    const BAHN_LABEL_KLUSTER_DX=42,BAHN_LABEL_KLUSTER_DY=20,
+      BAHN_LABEL_ZEILENHOEHE=bahnPodKader?22:11,
+      BAHN_LABEL_MAX_VERSATZ=bahnPodKader?7:3;
     const bahnLabelPositionen=[];
     // ZWEITE HAELFTE DESSELBEN MUSTERS (wie labelSchwebeBoxen im Kampf): die tatsaechlich
     // gezeichnete Box der beiden breitesten Zeilen -- Name und die Platz-/Status-Zeile --
