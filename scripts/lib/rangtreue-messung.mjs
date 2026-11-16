@@ -475,3 +475,56 @@ export function staffelPaarSchalterText(gesetzt) {
   return `Staffel-Paar-Sonde: ${gesetzt.modus}${gesetzt.spiele != null ? ` (${gesetzt.spiele} Spiele)` : ""}`
     + `${gesetzt.stufen ? ` · Stufen ${gesetzt.stufen.join("/")}` : " · Standardstufen 0/0,03/0,06/0,10"}`;
 }
+
+// ===================================================================================
+// KONTAKT-SCHALTER (Kontakt-Schritt 1, 16.11., docs/design/kontakt-persoenlichkeit-16-11.md 6.2/6.5)
+// — gemeinsam fuer miss-alle-disziplinen.mjs, miss-star-paartreue.mjs und messe-arena-einfluss.mjs.
+// Setzt die Kontakt-Flags NUR fuer diesen Messlauf ueber window.__arena.kontaktFlags (dasselbe
+// Geruest wie bahnFlags({kontakt}); kein zweiter Kanal). Ohne Schalter misst jedes Skript den
+// Motor wie im Spiel — byte-identisch zu vorher.
+//
+//   --kontakt=spurt:3                 Stufen 1..3 fuer Spurt ({stufe:3})
+//   --kontakt=spurt:1,3               genau die Stufen 1 und 3 ({nur:[1,3]})
+//   --kontakt-dosis=0.5               Dosis der Stufe-1-Kosten (Konzept 6.4; Standard 1)
+//   --kontakt-json={"spurt":{...}}    beliebiges Flag-Objekt (z. B. {"spurt":{"stufe":3,"foul":false}})
+//   --kontakt-zwang=bollwerk          Kontrafaktik: alle Laeufer auf einen Persoenlichkeitstyp
+// ===================================================================================
+export const IST_KONTAKT_SCHALTER = (a) =>
+  a.startsWith("--kontakt=") || a.startsWith("--kontakt-dosis=") || a.startsWith("--kontakt-json=")
+  || a.startsWith("--kontakt-zwang=");
+
+export function kontaktSchalterAusArgs(args) {
+  const wert = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? null;
+  const kurz = wert("kontakt"), json = wert("kontakt-json"), dosis = wert("kontakt-dosis"), zwang = wert("kontakt-zwang");
+  if (!kurz && !json && !zwang) return null;
+  let flags = null;
+  if (json) flags = JSON.parse(json);
+  else if (kurz) {
+    const [d, stufen] = kurz.split(":");
+    const liste = String(stufen ?? "").split(",").filter((t) => t !== "").map(Number).filter((n) => Number.isFinite(n));
+    if (!d || !liste.length) throw new Error(`--kontakt braucht <disziplin>:<stufe> oder <disziplin>:<a,b>, bekam "${kurz}"`);
+    flags = { [d]: liste.length === 1 ? { stufe: liste[0] } : { nur: liste } };
+  }
+  if (flags && dosis != null) {
+    for (const d of Object.keys(flags)) if (flags[d]) flags[d] = { ...flags[d], dosis: Number(dosis) };
+  }
+  return { flags, zwang };
+}
+
+/** Setzt Flags/Zwang auf einer geladenen Seite. Gibt den gesetzten Stand zurueck (oder null). */
+export async function setzeKontaktSchalter(seite, schalter) {
+  if (!schalter) return null;
+  return seite.evaluate((s) => {
+    const A = window.__arena;
+    if (!A.kontaktFlags) throw new Error("window.__arena.kontaktFlags fehlt — Engine zu alt?");
+    const flags = s.flags ? A.kontaktFlags(s.flags) : A.kontaktFlags();
+    const zwang = s.zwang ? A.kontaktPersZwang(s.zwang) : A.kontaktPersZwang();
+    if (s.zwang && !zwang) throw new Error(`--kontakt-zwang: unbekannter Typ "${s.zwang}"`);
+    return { flags, zwang };
+  }, schalter);
+}
+
+export function kontaktSchalterText(gesetzt) {
+  if (!gesetzt) return "";
+  return `Kontakt-Flags: ${JSON.stringify(gesetzt.flags)}${gesetzt.zwang ? ` · Zwang ${JSON.stringify(gesetzt.zwang)}` : ""}`;
+}
