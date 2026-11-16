@@ -10,8 +10,7 @@ import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { conditionOf } from "@/lib/market/condition";
 import { formatEuroCents, formatPercent } from "@/lib/format";
-import { PreisMarktLinie } from "./PreisMarktLinie";
-import { monthlyBars, salesPattern, type PriceEffect } from "@/lib/dashboard/kennzahlen";
+import { salesPattern, type PriceEffect } from "@/lib/dashboard/kennzahlen";
 
 /** Detail-Fenster zu einem Artikel: Preise, Verkaeufe, Einkauf, Bestand. Rein lesend. */
 
@@ -24,8 +23,6 @@ interface Detail {
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
   priceLog: { at: string; before: number; after: number }[];
-  priceHistory?: { at: string; before: number; after: number }[];
-  marketHistory?: { at: string; priceAvg7: number | null }[];
   stockLog: { at: string; before: number; after: number }[];
   ekLog: { at: string; before: number; after: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
@@ -139,8 +136,6 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const marketDir = mk && mk.avg7 != null && mk.avg30 != null && mk.avg30 > 0 ? (mk.avg7 > mk.avg30 * 1.05 ? { label: "↑ steigt", tone: "good" as Tone } : mk.avg7 < mk.avg30 * 0.95 ? { label: "↓ fällt", tone: "warn" as Tone } : { label: "→ stabil", tone: undefined }) : null;
   const noSale90 = row.stock > 0 && w90 === 0;
   const pattern = salesPattern(sales);
-  const bars = monthlyBars(sales);
-  const maxBar = Math.max(1, ...bars.map((b) => b.qty));
 
   // Lagerbewegungen ohne Verkaeufe: Zugaenge, Einkaeufe, nicht durch Verkaeufe erklaerte Abgaenge (Zuordnung: 3 Tage davor bis 1 Tag danach)
   const consumed = new Map<object, number>();
@@ -376,16 +371,6 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         )}
 
         <Group id="verkaeufe" title="Verkäufe" info={`Tempo der letzten 30 Tage gegen die 60 Tage davor; ab 25 % Unterschied steigt oder fällt es.${lastSaleDays != null ? ` Letzter Verkauf vor ${lastSaleDays} Tagen.` : ""}`} extra={<>{trend && <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span>}{lastSale && <span className={`bd-grp-x${lastSaleDays != null && lastSaleDays > 90 && row.stock > 0 ? " crit" : ""}`}>zuletzt {day(lastSale.soldAt)} · {eur(lastSale.unitPrice)}</span>}</>}>
-          {bars.some((b) => b.qty > 0) && (
-            <svg className="bd-bars" viewBox="0 0 240 44" role="img" aria-label="Verkaufte Stück je Monat, letzte 12 Monate" preserveAspectRatio="none">
-              {bars.map((b, i) => (
-                <g key={b.label}>
-                  <title>{`${b.label}: ${b.qty} Stk`}</title>
-                  <rect x={i * 20 + 2} y={40 - (b.qty / maxBar) * 36} width={16} height={Math.max(b.qty > 0 ? 2 : 0.8, (b.qty / maxBar) * 36)} rx={2} className={b.qty > 0 ? "bd-bar" : "bd-bar0"} />
-                </g>
-              ))}
-            </svg>
-          )}
           <table className="bd-dt-t bd-dt-sales">
             <thead>
               <tr>
@@ -449,7 +434,6 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
           )}
-          {detail && <PreisMarktLinie currentVk={vk ?? null} priceLog={detail.priceHistory ?? []} market={detail.marketHistory ?? []} sales={sales} />}
           {sales.length > 0 && (
             <details className="bd-sub-det">
               <summary title="Verkäufe aus Billbee, neueste zuerst. Farbe: grün bis 90 Tage, gelb bis 365 Tage, rot älter.">Einzelverkäufe ({sales.length})</summary>
