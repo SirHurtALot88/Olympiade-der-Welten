@@ -38270,17 +38270,26 @@
   // "Automatisch" = Hash-Wahl des Spiels; jedes andere Chip pinnt die Kulisse (kulisseQaId, dieselbe
   // Schnittstelle wie window.__arena.kulisseQa) und baut das Spiel neu auf, damit auch die
   // Oberflaechen-Effekte der Variante greifen. Nur Test-/Aufstellungsansicht, keine Wertung.
+  // Tooltip der Variantenchips (Folgerunde 16.11.). Geprueft am Code: KULISSEN_PROFILE hat NUR einen Eintrag (tennis), nur dort
+  // greift kulisseSpielId() in die Eignung (Oberflaechen-Effekt); bei allen anderen Disziplinen steuert die Variante allein
+  // Bild, Palette und Ton (Mini-DM-Publikum, Kletter-Palette, Zeitfahren-Seitenansicht), nie rr() oder Wertung.
+  const VARIANTEN_TIPP="Austragungsort laut Spielplan, keine Spielwirkung au\u00dfer Tennis";
   function kulissenVarianten(){
     const kl=KULISSEN[disc];
     return (Array.isArray(kl)&&kl.length>1)?kl:null;
   }
-  function chipZeile(titel,testid,eintraege,aktuellId,beiWahl){
+  // `tipp` (optional): natives Tooltip fuer Zeilentitel und jedes Chip, Muster "<Label> -- <tipp>". Die Variantenzeile
+  // nutzt es (s. VARIANTEN_TIPP), die Formatzeile nicht.
+  function chipZeile(titel,testid,eintraege,aktuellId,beiWahl,tipp){
     const zeile=el("div","dbar dformat");
     zeile.setAttribute("data-testid",testid);
-    zeile.appendChild(el("span","dformat-titel",titel));
+    const tt=el("span","dformat-titel",titel);
+    if(tipp)tt.title=tipp;
+    zeile.appendChild(tt);
     for(const f of eintraege){
       const c=el("button","dchip",f.label);
       if(f.hinweis)c.appendChild(el("em",null,f.hinweis));
+      if(tipp)c.title=f.label+" \u2014 "+tipp;
       c.setAttribute("data-format",f.id);
       c.setAttribute("aria-pressed",f.id===aktuellId?"true":"false");
       c.addEventListener("click",()=>{
@@ -38309,7 +38318,7 @@
         .concat(kl.map(k=>({id:k.id,label:k.label||k.id})));
       const z=chipZeile("Variante","variante-leiste",eintraege,pin,(id)=>{
         kulisseQaId=id==="auto"?null:id;
-      });
+      },VARIANTEN_TIPP);
       dbar.parentNode.insertBefore(z,anker.nextSibling);
     }
   }
@@ -45202,8 +45211,20 @@
   // RUECKFALL: zfSeite() ist falsch, wenn keine Kulisse unter dem Rennen liegt (Headless-Runner, Bild
   // fehlt, anderes Rennen). Dann laufen camX/laeuferXY/bodenZeitfahren/zeichneSpurt exakt den alten Weg.
   let zfSeiteErlaubt=true;      // QA-Schalter (window.__arena.zfSeite(false)): zeigt wieder die alte Draufsicht
+  // KULISSE UND SEITENANSICHT (Folgerunde 16.11., Z3): zfSeite() haengt an der GEWAEHLTEN Kulisse dieses Spiels
+  // (kulisseAktiv = Disziplin + Karte, gesetzt in kulisseWaehlen() beim reset(), also schon VOR dem Laden des Fotos),
+  // nicht mehr am geladenen Foto. Die Seitenansicht malt ihre Welt selbst (Himmel, Huegel, Strasse, Erde -- Palette je
+  // Karte, ZF_PALETTE; Panorama aus den Ebenen far/mid) und nutzt das Kulissen-JPEG gar nicht. Vorher fiel sie lautlos auf
+  // die alte Draufsicht zurueck, solange das Foto noch lud (dann sprang Kamera und Rand mitten im Rennen um) oder wenn es
+  // nicht ladbar war. Es bleibt bei der Regel von oben: wo KEINE Kulisse gewaehlt ist (Headless-Runner ohne
+  // battle-mode.kulissen.js, andere Disziplin) gilt die alte Draufsicht. Und es gilt die Implikation kulisseSichtbar() =>
+  // zfSeite() (bei geladenem Foto sind beide wahr), die Umkehrung nur waehrend/ohne Foto. Wie bodenWand() (Climbing)
+  // liest sie `kulisseAktiv.id`, ohne dass das Bild da sein muss. Reine Anzeige.
+  function zfKarteGewaehlt(){
+    return !!kulisseAktiv && kulisseAktiv.disc===disc && (kulisseAktiv.id in ZF_PANO_HORIZONT);
+  }
   function zfSeite(){
-    return zfSeiteErlaubt && !!BA().zeitfahren && !!(BA().gelaende && BA().gelaende.length>0) && kulisseSichtbar();
+    return zfSeiteErlaubt && !!BA().zeitfahren && !!(BA().gelaende && BA().gelaende.length>0) && (kulisseSichtbar()||zfKarteGewaehlt());
   }
   // Hoehenfeld in Pixeln BEI ZOOM 1 (wird mit cam.zoom skaliert, damit Hoehe und Laenge gleich wachsen und
   // der Neigungswinkel unabhaengig vom Zoom bleibt). Je Steigung +50, je Abfahrt -25: die Strecke
@@ -45299,6 +45320,59 @@
     return {text:(neg?"−":"+")+bahnZeitText(bahnSpanneAnzeige(Math.abs(L.sek)))+(L.bezug==="Hot Seat"?" zum Hot Seat":" zur Bestzeit")+(L.prozent!=null?" ("+L.prozent+" %)":""),
       farbe:neg?"#7fe0a0":"#ff8d80"};
   }
+  // ZEITFAHREN-ETIKETTEN OHNE UEBERLAGERUNG (Folgerunde 16.11., Z2). Im Zielraum standen Hot-Seat-Etikett, Platz-Etikett des
+  // letzten Einlaufs, die Blase des Fokus und die GEIST-Marke uebereinander oder liefen aus dem Bild. Jetzt melden sie ihre
+  // WIRKLICH gemessenen Rechtecke an (zfEtik, jedes Bild neu) und weichen einander aus: erst nach oben ueber das Hindernis
+  // (bis ZF_ETIK_OBEN, darueber liegt die Kopfzeile), geht das nicht, daneben; horizontal bleibt jedes im Bild. Wer zuerst
+  // anmeldet, behaelt seinen Platz -- die Blase des Fokus (Namens- und Abstandsangabe) steht also immer an ihrer Stelle, dann
+  // Hot Seat, dann der letzte Einlauf, zuletzt die GEIST-Marke. Reine Anzeige: liest und schreibt nur diese Liste.
+  let zfEtik=[];
+  const ZF_ETIK_OBEN=106;       // zeichneZfKopf endet bei y=100
+  function zfEtikPlatz(cx,w,y0,h){
+    const x0=Math.max(4,Math.min(W-4-w,cx-w/2));
+    const r={x0,x1:x0+w,y0,y1:y0+h};
+    const trifft=()=>zfEtik.find(o=>r.x0<o.x1&&r.x1>o.x0&&r.y0<o.y1&&r.y1>o.y0);
+    for(let i=0;i<8;i++){
+      const o=trifft(); if(!o)break;
+      const dy=o.y0-2-r.y1;
+      if(r.y0+dy>=ZF_ETIK_OBEN){ r.y0+=dy; r.y1+=dy; continue; }
+      // oben ist kein Platz mehr: seitlich neben das Hindernis, auf die Seite mit dem kuerzeren Weg
+      const rechts=o.x1+4, links=o.x0-4-w, ok=(nx)=>nx>=4&&nx+w<=W-4;
+      const wahl=(ok(rechts)&&(!ok(links)||Math.abs(rechts-r.x0)<=Math.abs(links-r.x0)))?rechts:(ok(links)?links:null);
+      if(wahl==null)break;
+      r.x0=wahl; r.x1=wahl+w;
+    }
+    zfEtik.push({x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1});
+    return {cx:(r.x0+r.x1)/2,y0:r.y0,dy:r.y0-y0,dx:(r.x0+r.x1)/2-cx};
+  }
+  // Das Etikett der Eingelaufenen (Name + "Platz n · Zeit" bzw. "HOT SEAT · Zeit") nach allen Figuren, damit keine spaetere
+  // Figur es uebermalt. `liste` sammelt der Figurenlauf (Eintrag je Etikett: Figur u, Fuss x/y, Name txt, Zeile pt, hotSeat).
+  function zeichneZfZielEtiketten(liste,boxen){
+    if(!liste.length)return;
+    // das ZIEL-Schild am Tor (s. zfSeitenBild, tor()) ist Hindernis, kein Untergrund: Etiketten stehen davor, nicht darueber
+    const sx=camX(1), yo=zfMitteY(1)-ZF_BAND_OBEN;
+    if(sx>-40&&sx<W+40)zfEtik.push({x0:sx-4,x1:sx+30,y0:yo-78-14,y1:yo-78+2});
+    liste.sort((a,b)=>(b.hotSeat-a.hotSeat)||(b.platz-a.platz));     // Hot Seat zuerst, dann der juengste Einlauf
+    ctx.save(); ctx.textAlign="center";
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+    for(const e of liste){
+      setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif"); const w1=ctx.measureText(e.txt).width;
+      const w2=ctx.measureText(e.pt).width, w=Math.max(w1,w2)+8;
+      const p=zfEtikPlatz(e.x,w,e.y-39,24);
+      // wer ausweichen musste, bekommt eine feine Leitlinie zum Kopf seiner Figur
+      if(Math.abs(p.dy)>8||Math.abs(p.dx)>10){
+        ctx.strokeStyle="rgba(240,235,220,.4)"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(p.cx,p.y0+24); ctx.lineTo(e.x,e.y-17); ctx.stroke();
+        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+      }
+      ctx.strokeText(e.txt,p.cx,p.y0+9); ctx.fillStyle=bahnSeitenFarbe(e.u.seite); ctx.fillText(e.txt,p.cx,p.y0+9);
+      ctx.strokeText(e.pt,p.cx,p.y0+20); ctx.fillStyle=e.hotSeat?"#f2d75a":"#e0c46a"; ctx.fillText(e.pt,p.cx,p.y0+20);
+      boxen.push({x:p.cx,y:p.y0+9,halbBreite:w1/2+4});
+      boxen.push({x:p.cx,y:p.y0+20,halbBreite:w2/2+4});
+    }
+    ctx.restore();
+    setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
+  }
   function zeichneZfBlase(u,x,y,nr,boxen){
     const L=zfLuecke(u), plan=((BA().plaene||{})[u.plan]||{}).label||"";
     const name=u.n.length>15?u.n.slice(0,14)+"…":u.n;
@@ -45322,6 +45396,7 @@
     ctx.font="700 10.5px "+ZF_SCHRIFT; ctx.fillStyle=g.farbe; ctx.fillText(g.text,cx,by+27);
     ctx.restore();
     boxen.push({x:bx+bw/2,y:by+12,halbBreite:bw/2+4});
+    zfEtik.push({x0:bx,x1:bx+bw,y0:by,y1:by+bh+6});
   }
   function zeichneZfNummer(u,x,y,nr){
     if(!nr)return;
@@ -45346,7 +45421,7 @@
     // Flaeche unter dem Profil
     ctx.beginPath(); ctx.moveTo(bx0,yB+2);
     for(let i=0;i<=120;i++)ctx.lineTo(bandX(i/120),profY(i/120));
-    ctx.lineTo(bx1,yB+2); ctx.closePath(); ctx.fillStyle="rgba(120,160,104,.26)"; ctx.fill();
+    ctx.lineTo(bx1,yB+2); ctx.closePath(); ctx.fillStyle=zfPalette().profil; ctx.fill();
     // Ausschnitt, den die Kamera gerade zeigt
     const v=camView(), l=v.links/v.strecke, r=(v.links+v.viewW)/v.strecke;
     if(r-l<0.995){
@@ -45367,8 +45442,8 @@
       ctx.beginPath(); ctx.moveTo(bandX(f0),profY(f0)); ctx.lineTo(bandX(f1),profY(f1)); ctx.stroke();
     }
     // Start und Ziel
-    ctx.font="700 8px "+ZF_SCHRIFT; ctx.fillStyle="#97a1b3"; ctx.textAlign="left"; ctx.fillText("START",bx0-12,yB+11);
-    ctx.textAlign="right"; ctx.fillText("ZIEL",bx1+12,yB+11);
+    ctx.font="700 8px "+ZF_SCHRIFT; ctx.fillStyle="#97a1b3"; ctx.textAlign="left"; ctx.fillText("START",bx0-12,yB+13);
+    ctx.textAlign="right"; ctx.fillText("ZIEL",bx1+12,yB+13);
     ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(bx1,yT+1); ctx.lineTo(bx1,yB+2); ctx.stroke();
     // Laeufer: ein Punkt je Fahrer auf der Linie. Wartende (Rampe) und Eingelaufene zaehlt der Kopf oben.
     zfBandPunkte=[];
@@ -45443,9 +45518,10 @@
     const posAt=sx=>((sx-L)/zm+v.links)/v.strecke;
     const sxAt=pos=>L+(pos*v.strecke-v.links)*zm;
     const mitte=pos=>basis-zfHoehe(pos)*zm;
+    const P=zfPalette();
     // 1. Himmel und Panorama
     const hi=ctx.createLinearGradient(0,0,0,basis);
-    hi.addColorStop(0,"#8fd3f4");hi.addColorStop(1,"#dcefef");
+    hi.addColorStop(0,P.himmel[0]);hi.addColorStop(1,P.himmel[1]);
     ctx.fillStyle=hi;ctx.fillRect(0,0,W,H);
     const e=zfEbenen();
     if(e)zfPanorama(e,basis);
@@ -45468,42 +45544,38 @@
     for(let i=0;i<pts.length;i++){const p=pts[i],y=basis-(basis-p[1])*0.55-46;if(i)ctx.lineTo(p[0],y);else ctx.moveTo(p[0],y);}
     ctx.lineTo(W+8,H+4);ctx.lineTo(-8,H+4);ctx.closePath();
     const fw=ctx.createLinearGradient(0,basis-120,0,basis);
-    fw.addColorStop(0,"#79b25a");fw.addColorStop(1,"#5b9446");
+    fw.addColorStop(0,P.fern[0]);fw.addColorStop(1,P.fern[1]);
     ctx.fillStyle=fw;ctx.fill();
     // Baeume, an der Strecke verankert (alle 0,017 der Strecke, Groesse und Versatz aus dem Index)
     for(let i=Math.floor(posAt(-30)/0.017);;i++){
       const p=i*0.017, sx=sxAt(p); if(sx>W+30)break; if(sx<-30)continue;
       const hsh=((i*2654435761)>>>0)%97, r=5+(hsh%5), yb=basis-(basis-mitte(p))*0.55-46+8+(hsh%7);
-      ctx.fillStyle="#3b2a1c";ctx.fillRect(Math.round(sx)-1,yb-3,2,6);
-      ctx.fillStyle=hsh%3?"#2f6e34":"#3c7d3a";
-      ctx.beginPath();ctx.arc(sx,yb-r-1,r,0,6.283);ctx.fill();
-      ctx.fillStyle="rgba(190,230,150,.35)";
-      ctx.beginPath();ctx.arc(sx-r*0.3,yb-r-1-r*0.3,r*0.5,0,6.283);ctx.fill();
+      zfBaum(P.baum,sx,yb,r,hsh);
     }
     // 4. Grasstreifen hinter der Strasse (oberhalb des Bandes), dann Strasse, Narbe, Erde
-    flaeche(-ZF_BAND_OBEN-14,-ZF_BAND_OBEN+2,"#4f8a3c");
-    linie(-ZF_BAND_OBEN-14,"rgba(160,210,110,.8)",2);
+    flaeche(-ZF_BAND_OBEN-14,-ZF_BAND_OBEN+2,P.gras);
+    linie(-ZF_BAND_OBEN-14,P.grasLicht,2);
     // Erde unter der Strasse (vor dem Band, damit das Band sauber obenauf liegt)
     const erde=ctx.createLinearGradient(0,basis,0,H);
-    erde.addColorStop(0,"#7a5636");erde.addColorStop(1,"#3c2a1c");
+    erde.addColorStop(0,P.erde[0]);erde.addColorStop(1,P.erde[1]);
     flaeche(ZF_BAND_UNTEN+7,null,erde);
     for(const [o,a] of [[18,.40],[40,.34],[66,.30],[96,.26]]){
-      linie(ZF_BAND_UNTEN+7+o,"rgba(26,16,8,"+a+")",2.4);
-      linie(ZF_BAND_UNTEN+7+o+3,"rgba(190,150,100,"+(a*0.45)+")",1);
+      linie(ZF_BAND_UNTEN+7+o,"rgba("+P.erdLinie+","+a+")",2.4);
+      linie(ZF_BAND_UNTEN+7+o+3,"rgba("+P.erdLicht+","+(a*0.45)+")",1);
     }
-    flaeche(ZF_BAND_UNTEN,ZF_BAND_UNTEN+8,"#3f7a35");
-    linie(ZF_BAND_UNTEN+1,"rgba(150,205,100,.7)",1.5);
+    flaeche(ZF_BAND_UNTEN,ZF_BAND_UNTEN+8,P.narbe);
+    linie(ZF_BAND_UNTEN+1,P.narbeLicht,1.5);
     // Strassenband
     ctx.beginPath();
     for(let i=0;i<pts.length;i++){const p=pts[i];if(i)ctx.lineTo(p[0],p[1]-ZF_BAND_OBEN);else ctx.moveTo(p[0],p[1]-ZF_BAND_OBEN);}
     for(let i=pts.length-1;i>=0;i--)ctx.lineTo(pts[i][0],pts[i][1]+ZF_BAND_UNTEN);
     ctx.closePath();
     const as=ctx.createLinearGradient(0,basis-ZF_BAND_OBEN-90,0,basis+ZF_BAND_UNTEN);
-    as.addColorStop(0,"#5b5f68");as.addColorStop(1,"#464952");
+    as.addColorStop(0,P.asphalt[0]);as.addColorStop(1,P.asphalt[1]);
     ctx.fillStyle=as;ctx.fill();
     ctx.lineJoin="round";ctx.lineCap="butt";
-    linie(-ZF_BAND_OBEN+2,"rgba(244,241,232,.9)",1.6);
-    linie(ZF_BAND_UNTEN-2,"rgba(244,241,232,.9)",1.6);
+    linie(-ZF_BAND_OBEN+2,P.rand,1.6);
+    linie(ZF_BAND_UNTEN-2,P.rand,1.6);
     // gestrichelte Mittellinie, an der Strecke verankert (alle 26 px der Strecke ein 14-px-Strich)
     ctx.beginPath();
     for(let i=Math.floor(((-30-L)/zm+v.links)/26);;i++){
@@ -45511,7 +45583,7 @@
       const y0=mitte(wx/v.strecke)+5, y1=mitte((wx+14)/v.strecke)+5;
       ctx.moveTo(sx,y0);ctx.lineTo(sx+14*zm,y1);
     }
-    ctx.strokeStyle="rgba(244,241,232,.75)";ctx.lineWidth=2.2;ctx.stroke();
+    ctx.strokeStyle=P.mitte;ctx.lineWidth=2.2;ctx.stroke();
     // 5. Zonenmarkierungen AUF dem Asphalt (flach, perspektivisch gestaucht)
     const namen=LAEUFER.map(u=>String(u.n||"").split(" ")[0].toUpperCase()).filter(n=>n&&n.length<=10);
     const worte=ZF_PAROLEN.concat(namen);
@@ -45718,6 +45790,119 @@
     "etappe-strade-bianche":205,"etappe-vulkan":281,"wueste-hitze":211};
   const ZF_PANO_X0=1000, ZF_PANO_UNTER=30, ZF_PANO_SKALA=0.24;
   const ZF_PAROLEN=["ALLEZ","HOPP","VAMOS","FORZA","ALLEZ ALLEZ","GO GO","HOPP HOPP"];
+  // PALETTE JE KARTE (Folgerunde 16.11., Z1): die Seitenansicht malte auf JEDER Karte Wiese, Gras und braune Erde -- auch in
+  // Wueste, Kueste oder am Vulkan. Jetzt zieht zfSeitenBild() Himmel (nur sichtbar, solange das Panorama nicht geladen ist),
+  // ferne Huegel, Baumschlag, Grasstreifen, Narbe, Erde und Asphalt aus dieser Tabelle, Schluessel = Kulissen-Id. Die Farben
+  // sind KEINE neuen Bild-Assets, sondern aus den vorhandenen Karten abgelesen: Himmel aus dem Kopf des Kulissenbildes, Boden
+  // aus dessen unterem Rand und der dichten Zeile der Ebene `mid` (Messung 16.11.: Wueste #e99b45/#e4ac5e, Kueste #f7d797/
+  // #b5ad63, Weinberge #dfab45, Strade Bianche #dec06d, Vulkan #291f3c/#5b5259, Alpen #2a5b51). `standard` ist die bisherige
+  // Wiese, Wort fuer Wort -- ohne Eintrag (neue Karte) gilt sie auch. stil: laub | nadel | palme | kaktus | zypresse | reben | kahl.
+  // rand/mitte: Farbe der Randlinien und der Mittelstriche auf dem Band (Strade Bianche: heller Schotter, dort sonst unsichtbar).
+  const ZF_PAL_STANDARD={himmel:["#8fd3f4","#dcefef"],fern:["#79b25a","#5b9446"],
+    baum:{stil:"laub",a:"#2f6e34",b:"#3c7d3a",stamm:"#3b2a1c",licht:"rgba(190,230,150,.35)"},
+    gras:"#4f8a3c",grasLicht:"rgba(160,210,110,.8)",narbe:"#3f7a35",narbeLicht:"rgba(150,205,100,.7)",
+    erde:["#7a5636","#3c2a1c"],erdLinie:"26,16,8",erdLicht:"190,150,100",asphalt:["#5b5f68","#464952"],
+    rand:"rgba(244,241,232,.9)",mitte:"rgba(244,241,232,.75)",profil:"rgba(120,160,104,.26)"};
+  const ZF_PALETTE={
+    "standard":ZF_PAL_STANDARD,
+    "bergzeitfahren-alpen":{himmel:["#54a8e3","#bfdcf2"],fern:["#5d8f6e","#3f7457"],
+      baum:{stil:"nadel",a:"#1f4a3a",b:"#2a5b51",stamm:"#3b2a1c",licht:"rgba(170,215,190,.28)"},
+      gras:"#4a8048",grasLicht:"rgba(150,200,120,.8)",narbe:"#3b6e3c",narbeLicht:"rgba(140,195,110,.7)",
+      erde:["#6d655e","#2e2a28"],erdLinie:"20,18,18",erdLicht:"175,170,165",asphalt:["#585c66","#434650"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(110,150,130,.26)"},
+    "etappe-pass":{himmel:["#96d7fb","#d9ecf6"],fern:["#6b8a6a","#4d6e55"],
+      baum:{stil:"nadel",a:"#22483a",b:"#2a5b51",stamm:"#3b2a1c",licht:"rgba(170,215,190,.28)"},
+      gras:"#5a7f4a",grasLicht:"rgba(170,205,125,.8)",narbe:"#486f3e",narbeLicht:"rgba(150,195,110,.7)",
+      erde:["#7a6c5e","#30291f"],erdLinie:"24,18,12",erdLicht:"185,170,150",asphalt:["#5a5d65","#44474f"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(125,150,120,.26)"},
+    "abfahrt-kamm":{himmel:["#90e1e7","#cfeef0"],fern:["#5a8268","#40665a"],
+      baum:{stil:"nadel",a:"#27493f",b:"#2d4850",stamm:"#3b2a1c",licht:"rgba(170,215,200,.28)"},
+      gras:"#5a8a48",grasLicht:"rgba(165,210,125,.8)",narbe:"#467a3c",narbeLicht:"rgba(150,200,115,.7)",
+      erde:["#6e6b62","#2c2b28"],erdLinie:"20,20,18",erdLicht:"175,172,160",asphalt:["#585c66","#434650"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(115,155,135,.26)"},
+    "etappe-kueste":{himmel:["#4fcffb","#bfeefb"],fern:["#b7bd6a","#9aa856"],
+      baum:{stil:"palme",a:"#2f8a4a",b:"#58b05a",stamm:"#7a5a3a",licht:"rgba(220,245,170,.3)"},
+      gras:"#a3b05a",grasLicht:"rgba(225,232,150,.8)",narbe:"#c8b878",narbeLicht:"rgba(248,232,172,.8)",
+      erde:["#c9a46a","#7a5a34"],erdLinie:"60,40,18",erdLicht:"232,202,142",asphalt:["#62656d","#4a4d55"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(214,190,120,.30)"},
+    "flachsprint-kueste":{himmel:["#b2e8fb","#e2f4f8"],fern:["#a7b872","#8aa35c"],
+      baum:{stil:"palme",a:"#3a8c48",b:"#62b058",stamm:"#7a5a3a",licht:"rgba(220,245,170,.3)"},
+      gras:"#9ab45c",grasLicht:"rgba(220,235,150,.8)",narbe:"#b5b36a",narbeLicht:"rgba(240,230,168,.8)",
+      erde:["#b99a62","#6e5530"],erdLinie:"56,38,16",erdLicht:"225,198,140",asphalt:["#62656d","#4a4d55"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(200,190,120,.28)"},
+    "etappe-mittelgebirge":{himmel:["#cdf8eb","#e8f4ee"],fern:["#7aa862","#5a8a4e"],
+      baum:{stil:"laub",a:"#35693a",b:"#47804a",stamm:"#3b2a1c",licht:"rgba(190,230,150,.35)"},
+      gras:"#5a8c42",grasLicht:"rgba(165,212,115,.8)",narbe:"#477c3a",narbeLicht:"rgba(150,205,105,.7)",
+      erde:["#7a5a3a","#3a2a1c"],erdLinie:"26,16,8",erdLicht:"190,150,100",asphalt:ZF_PAL_STANDARD.asphalt,
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(125,160,105,.26)"},
+    "huegel-weinberge":{himmel:["#abc7e8","#e8eef0"],fern:["#b7b45a","#8f9a44"],
+      baum:{stil:"reben",a:"#6f8a2e",b:"#8aa23c",stamm:"#5a4128",licht:"rgba(225,235,150,.32)"},
+      gras:"#8a9c3e",grasLicht:"rgba(205,222,130,.8)",narbe:"#6f8a34",narbeLicht:"rgba(190,215,115,.7)",
+      erde:["#9a6e3a","#4a3018"],erdLinie:"40,24,8",erdLicht:"215,170,105",asphalt:ZF_PAL_STANDARD.asphalt,
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(190,175,90,.28)"},
+    "etappe-strade-bianche":{himmel:["#abc7e8","#eadfc8"],fern:["#cdb86c","#b3a05a"],
+      baum:{stil:"zypresse",a:"#2c4a2c",b:"#3a5c34",stamm:"#3b2a1c",licht:"rgba(190,215,150,.28)"},
+      gras:"#c4b062",grasLicht:"rgba(242,228,155,.8)",narbe:"#a89654",narbeLicht:"rgba(235,220,150,.75)",
+      erde:["#cdbf9a","#7c6a48"],erdLinie:"70,56,30",erdLicht:"242,232,205",asphalt:["#8d8672","#756e5c"],
+      rand:"rgba(250,246,232,.92)",mitte:"rgba(250,246,232,.7)",profil:"rgba(205,185,110,.30)"},
+    "etappe-vulkan":{himmel:["#7d537a","#c0707a"],fern:["#3b2e3e","#2a2030"],
+      baum:{stil:"kahl",a:"#1c1418",b:"#2a1c20",stamm:"#1c1418",licht:"rgba(230,120,70,.28)"},
+      gras:"#4a4048",grasLicht:"rgba(205,120,90,.7)",narbe:"#3a3036",narbeLicht:"rgba(225,110,70,.6)",
+      erde:["#3a3036","#15101a"],erdLinie:"8,4,10",erdLicht:"150,90,80",asphalt:["#46444c","#33323a"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(200,110,80,.26)"},
+    "wueste-hitze":{himmel:["#f9fdcf","#f1dfb9"],fern:["#e0a85a","#c98a40"],
+      baum:{stil:"kaktus",a:"#4f7a3c",b:"#6a9a4c",stamm:"#3f6230",licht:"rgba(200,235,150,.3)"},
+      gras:"#d9a458",grasLicht:"rgba(250,222,150,.85)",narbe:"#e4b868",narbeLicht:"rgba(255,235,175,.8)",
+      erde:["#c68a4a","#6a4524"],erdLinie:"70,40,16",erdLicht:"242,202,142",asphalt:["#66625c","#4e4b47"],
+      rand:ZF_PAL_STANDARD.rand,mitte:ZF_PAL_STANDARD.mitte,profil:"rgba(230,170,90,.28)"}
+  };
+  const zfPalette=()=>ZF_PALETTE[kulisseAktiv&&kulisseAktiv.disc===disc?kulisseAktiv.id:""]||ZF_PAL_STANDARD;
+  // Ein Baum der Palette, Fuss bei (sx,yb), Groesse r (5..9). Alle Formen sind Canvas-Primitive, kein Bild.
+  function zfBaum(B,sx,yb,r,hsh){
+    const farbe=hsh%3?B.a:B.b;
+    ctx.fillStyle=B.stamm;
+    if(B.stil==="nadel"){
+      ctx.fillRect(Math.round(sx)-1,yb-3,2,5);
+      ctx.fillStyle=farbe;
+      for(const [k,f] of [[0,1],[0.9,0.78],[1.8,0.56]]){
+        ctx.beginPath();ctx.moveTo(sx-r*0.95*f,yb-2-k*r*0.55);ctx.lineTo(sx,yb-2-k*r*0.55-r*1.5);ctx.lineTo(sx+r*0.95*f,yb-2-k*r*0.55);ctx.closePath();ctx.fill();
+      }
+    } else if(B.stil==="palme"){
+      const h=r*2.3;
+      ctx.strokeStyle=B.stamm;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sx,yb+2);ctx.quadraticCurveTo(sx+r*0.45,yb-h*0.5,sx+r*0.2,yb-h);ctx.stroke();
+      ctx.strokeStyle=farbe;ctx.lineWidth=2.4;ctx.lineCap="round";
+      for(const a of [-2.6,-2.05,-1.5,-0.95,-0.4]){
+        ctx.beginPath();ctx.moveTo(sx+r*0.2,yb-h);ctx.quadraticCurveTo(sx+r*0.2+Math.cos(a)*r*0.9,yb-h+Math.sin(a)*r*0.9-r*0.2,sx+r*0.2+Math.cos(a)*r*1.5,yb-h+Math.sin(a)*r*1.1+r*0.6);ctx.stroke();
+      }
+      ctx.lineCap="butt";
+    } else if(B.stil==="kaktus"){
+      const h=r*2.2, w=Math.max(2,r*0.5);
+      ctx.fillStyle=farbe;
+      ctx.fillRect(Math.round(sx-w/2),yb-h,w,h+2);
+      ctx.fillRect(Math.round(sx-w/2-r*0.7),yb-h*0.62,r*0.7,w*0.8);ctx.fillRect(Math.round(sx-w/2-r*0.7),yb-h*0.62-r*0.8,w*0.8,r*0.8+w*0.8);
+      ctx.fillRect(Math.round(sx+w/2),yb-h*0.45,r*0.7,w*0.8);ctx.fillRect(Math.round(sx+w/2+r*0.7-w*0.8),yb-h*0.45-r*0.7,w*0.8,r*0.7+w*0.8);
+      ctx.fillStyle=B.licht;ctx.fillRect(Math.round(sx-w/2),yb-h,Math.max(1,w*0.3),h);
+    } else if(B.stil==="zypresse"){
+      ctx.fillRect(Math.round(sx)-1,yb-2,2,4);
+      ctx.fillStyle=farbe;ctx.beginPath();ctx.ellipse(sx,yb-r*1.5,r*0.42,r*1.7,0,0,6.283);ctx.fill();
+      ctx.fillStyle=B.licht;ctx.beginPath();ctx.ellipse(sx-r*0.14,yb-r*1.7,r*0.14,r*1.1,0,0,6.283);ctx.fill();
+    } else if(B.stil==="reben"){
+      ctx.fillStyle=farbe;
+      for(const dx of [-r*0.9,r*0.9]){ctx.beginPath();ctx.ellipse(sx+dx,yb-r*0.35,r*0.9,r*0.55,0,0,6.283);ctx.fill();}
+      ctx.fillStyle=B.licht;ctx.beginPath();ctx.ellipse(sx-r*0.9,yb-r*0.5,r*0.5,r*0.25,0,0,6.283);ctx.fill();
+    } else if(B.stil==="kahl"){
+      ctx.fillRect(Math.round(sx)-1,yb-r*2.2,2,r*2.2+2);
+      ctx.strokeStyle=B.stamm;ctx.lineWidth=1.6;
+      ctx.beginPath();ctx.moveTo(sx,yb-r*1.5);ctx.lineTo(sx-r*0.9,yb-r*2.3);ctx.moveTo(sx,yb-r*1.1);ctx.lineTo(sx+r*0.8,yb-r*1.8);ctx.stroke();
+      ctx.fillStyle=B.licht;ctx.fillRect(Math.round(sx)-1,yb-1,2,2);                 // Glut am Fuss
+    } else {
+      ctx.fillRect(Math.round(sx)-1,yb-3,2,6);
+      ctx.fillStyle=farbe;
+      ctx.beginPath();ctx.arc(sx,yb-r-1,r,0,6.283);ctx.fill();
+      ctx.fillStyle=B.licht;
+      ctx.beginPath();ctx.arc(sx-r*0.3,yb-r-1-r*0.3,r*0.5,0,6.283);ctx.fill();
+    }
+  }
   const zfEbenenCache={};
   function zfEbenen(){
     if(!kulisseAktiv||kulisseAktiv.disc!==disc)return null;
@@ -53351,6 +53536,8 @@
     // damit Schwebetexte weiter unten ihnen ausweichen, statt sie zu ueberdecken.
     const bahnLabelSchwebeBoxen=[];
     const zfSchnaufListe=[];     // Seitenansicht: Atemwolken werden nach ALLEN Figuren gezeichnet, damit keine Nachbarfigur sie ueberdeckt
+    const zfZielListe=[];        // Seitenansicht: Etiketten der Eingelaufenen, nach allen Figuren mit Kollisionsvermeidung gezeichnet (zeichneZfZielEtiketten)
+    zfEtik=[];
     // FOLGEKAMERA (Rework 16.11.): Startnummer = Platz in der Startreihenfolge, dieselbe Zaehlung wie die Chips der
     // Laeuferwahl (zeitfahrenFokusReihe). Wer nicht der Fokus ist, traegt im Bild nur dieses Namensschild.
     const zfNr=new Map();
@@ -53831,7 +54018,7 @@
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
-      if(!zfLabelAus&&!zfBlase){
+      if(!zfLabelAus&&!zfBlase&&!(zfSeiteAn&&u.fertig!=null)){
       ctx.strokeText(txt,x,nameY);ctx.fillStyle=bahnSeitenFarbe(u.seite);ctx.fillText(txt,x,nameY);
       bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       }
@@ -53889,7 +54076,10 @@
       // TT-2: HOT SEAT statt "Platz n" (Abschnitt 2.3) -- "ein Schild 'HOT SEAT' und seine
       // Zeit". `hotSeat` (oben, dieselbe Bedingung wie beim Podest) gilt exklusiv Time-
       // Trial; jede andere Bahn bleibt bei ihrer alten "Platz n"-Zeile.
-      if(u.fertig!=null&&!istRoute()&&!istHyroxHalle()&&!zfLabelAus){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
+      if(zfSeiteAn&&u.fertig!=null&&!zfLabelAus){
+        // Seitenansicht: nicht hier malen, sondern sammeln (Kollisionsvermeidung im Zielraum, s. zeichneZfZielEtiketten)
+        zfZielListe.push({u,x,y,txt,hotSeat:hotSeat?1:0,platz,pt:hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u)):"Platz "+(platz+1)+" · "+fmtZielzeit(bahnZeit(u))});
+      } else if(u.fertig!=null&&!istRoute()&&!istHyroxHalle()&&!zfLabelAus){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
         :"Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
         // DEUTSCHES KOMMA (s. Kommentar am Burgpunkte-Etikett oben, dasselbe Muster hier
         // am Zieleinlauf-Etikett).
@@ -53900,6 +54090,7 @@
       if(zfBlase)zeichneZfBlase(u,x,y-(sk0-1)*46,zfNr.get(u.id),bahnLabelSchwebeBoxen);
       else if(zfFremd)zeichneZfNummer(u,x,y-(sk0*0.88-1)*46,zfNr.get(u.id));
     }
+    if(zfSeiteAn)zeichneZfZielEtiketten(zfZielListe,bahnLabelSchwebeBoxen);
     // SCHNAUFEN (Seitenansicht, Task #155; Vorlage: das Durchschnaufen in public/szenen/time-trial/
     // standard.html). Echter Rennzustand statt Demo: ab `u.vizErschoepft`>0,3 (weich aus der Puste, s.
     // stepZeitfahren) steigen kleine Atemwolken vom Mund auf, bei `u.leer` (eingebrochen) dazu ein
@@ -54069,12 +54260,15 @@
           ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx-4,gy-30); ctx.lineTo(gx+4,gy-30); ctx.closePath(); ctx.fill();
           ctx.textAlign="center"; setzeFont(ctx,"700 8px 'RaniraSeason',Georgia,'Times New Roman',serif");
           ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
-          ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
+          // Seitenansicht: das Etikett weicht Blase und Zielraum-Etiketten aus (zfEtikPlatz), Marke und Linie bleiben am Ort
+          let gtx=gx, gty=gy-33;
+          if(zfSeiteAn){ const gw=ctx.measureText("GEIST · "+hs.u.n).width+6, q=zfEtikPlatz(gx,gw,gty-9,11); gtx=q.cx; gty=q.y0+9; }
+          ctx.strokeText("GEIST · "+hs.u.n,gtx,gty); ctx.fillText("GEIST · "+hs.u.n,gtx,gty);
           // In dieselbe Kollisionsvermeidung wie Name/Platz aufgenommen (s. Kommentar an
           // bahnLabelSchwebeBoxen oben): der GEIST-Marker liegt haeufig direkt neben dem
           // fokussierten Laeufer, genau die Ueberlagerung aus Audit Bild 13 ("GEIST" ueber
           // "eingebrochen"/"fängt sich"). Schwebetexte weichen ihm dadurch aus.
-          bahnLabelSchwebeBoxen.push({x:gx,y:gy-33,halbBreite:ctx.measureText("GEIST · "+hs.u.n).width/2+4});
+          bahnLabelSchwebeBoxen.push({x:gtx,y:gty,halbBreite:ctx.measureText("GEIST · "+hs.u.n).width/2+4});
           ctx.restore(); setzeFont(ctx,"400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
         }
       }
