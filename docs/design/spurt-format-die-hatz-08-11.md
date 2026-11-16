@@ -259,3 +259,38 @@ Entwurfs (A — fest im Saisonkalender, B — deterministischer Hash wie die Kul
 legt es in der Liga-Einstellung fest) künftig bestimmt, WANN ein Spiel „klassisch" und wann
 „hatz"/„hyrox" läuft. Das bleibt ausdrücklich Chris' Entscheidung. Bis dahin ist „Die Hatz" nur
 über den expliziten Mess-/Vorschau-Schalter erreichbar, nie im echten Spielbetrieb.
+
+
+## 8. Nachtrag 16.11.: Formatwahl entschieden und eingebaut (Option B, Saat-Hash)
+
+Chris am 16.11., nachdem er in Arena und Battle Arena weiter nur den Hürdenlauf sah: Hatz und
+HYROX „sollten da drin sein". Die offene Frage aus Abschnitt 7 ist damit beantwortet:
+**Option B** — deterministischer Hash der Saat, ein Drittel klassisch, je ein Drittel Hatz und
+HYROX (gemessen über 300 Saaten: 106 / 90 / 104). `spurtFormatWaehlen(saat)` in
+`public/mockups/battle-mode.engine.js` sitzt im Hook von `bauSpurt()`.
+
+- **Gleiche Saat, gleiches Format überall.** Vorlauf (Node-Motor/Headless), Arena und Battle Arena
+  rufen `bauSpurt()` mit derselben (gebuchten) Saat auf — gezeigt = gebucht, ohne ein Flag
+  durchreichen zu müssen.
+- **Gate:** nur mit eingehängtem echtem Kader (`echterKader.heim`/`.gast`) und nur, wenn niemand
+  das Format ausdrücklich gesetzt hat (`BAHN_FLAGS.spurtFormatExplizit`). Messwerkzeuge ohne Kader
+  bleiben bit-identisch „klassisch" (Fingerabdruck GESAMT unverändert); die Spurt-Messskripte
+  setzen das Format ausdrücklich und gewinnen immer.
+- **Prüfung:** `node scripts/pruefe-spurt-formatwahl.mjs` (Determinismus, alle drei Formate
+  kommen vor, ohne Kader durchgehend klassisch, explizit gewinnt).
+- **Abnahme (nachgemessen 16.11., Opus-Review #1502 — die Zahlen vom 08.11. gelten nicht mehr
+  unverändert, seit am 15.11. das neue Spurt-Rezept der Budget-Konservierung kam):**
+
+  | Messung | klassisch | Hatz | HYROX | **Mischung wie im Spiel** |
+  |---|---:|---:|---:|---:|
+  | rho je Spiel (24 Spiele, 5 Kader-Varianten) | 0,899 | 0,837 | 0,893 | **0,873** (Saison 0,951) |
+  | Pp-Abweichung (zwei Saatströme) | — | 22,5 / **25,1** | 22,3 (Strom 0) | **18,7 / 19,1** |
+
+  Gewertet wird im Spiel die Mischung, und die besteht beide Pflichtschranken (rho > 0,80,
+  Pp ≤ 25) klar. Offen genannt: Hatz allein liegt auf dem zweiten Saatstrom mit 25,1 um 0,1 Pp
+  über der Schranke — am Rezept ändert das nichts, solange die Mischung zählt. Messweg: Kopien
+  von `miss-alle-disziplinen.mjs`/`messe-arena-einfluss.mjs`, die per `addInitScript` einen
+  echten Kader (`__olyArenaKader`) einhängen.
+- **Übergang:** Ein Spieltag, dessen Spurt VOR diesem Deploy gebucht wurde, lief klassisch; zeigt
+  die Arena ihn jetzt mit der Hash-Wahl, kann das Format vom gebuchten abweichen. Gilt nur einmal
+  für bereits gebuchte Spiele.
