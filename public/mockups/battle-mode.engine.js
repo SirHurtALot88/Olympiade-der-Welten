@@ -45099,12 +45099,187 @@
     }
     // EINGELAUFEN: hinter der Ziellinie auf dem Zielplateau, zwei Reihen, in Reihenfolge des Einlaufs.
     if(platz>=0){
-      return {x:camX(1)+16+Math.floor(platz/3)*22, y:zfMitteY(1)+5-16+((platz%3)-1)*8};
+      return {x:camX(1)+18+Math.floor(platz/3)*30, y:zfMitteY(1)+5-16+((platz%3)-1)*12};
     }
     // AUF DER STRECKE: Fuss auf der Mittellinie plus ein kleiner Tiefenversatz je Spur; auf den ersten
     // Metern gleitet er vom Podest auf die Strasse.
     const a=Math.max(0,Math.min(1,u.pos/0.02)), absatz=ZF_RAMPE_H*(1-a*a*(3-2*a));
     return {x:camX(u.pos), y:zfMitteY(u.pos)+5-16+tief-absatz};
+  }
+
+  // ================== ZEITFAHREN-FOLGEKAMERA (Rework 16.11.) ============================================
+  // Chris, 16.11., zur Seitenansicht: "im Time Trial ... sind trotzdem auch alle Spieler am Start ... Das
+  // braucht man nicht. Wenn im Time Trial die Leute hintereinander starten, dann kann doch die Kamera den
+  // Leuten folgen, die da gestartet sind, und vielleicht auch sonst wieder einen kleinen Ausschnitt zeigen oder
+  // dass man den Spieler auswaehlen kann, den man jetzt sehen moechte. Dass das so wie ein richtiges Zeitfahren
+  // ist und nicht ... dass die alle nebeneinander herlaufen, nur mit verschiedenem Zeitabstand."
+  //
+  // Die Kamera haengt deshalb am Fokus-Laeufer (`bahnFokus`: Auto-Regie in stepSpurt/stepZeitfahren oder Klick
+  // auf einen Chip der Laeuferwahl bzw. einen Punkt im Profilstreifen). Alles Uebrige ist Anzeige DARUEBER:
+  //   - zeichneZfBlase: die Namens-/Abstandsblase des Fokus (Abstand = live gegen den Hot Seat),
+  //   - zeichneZfNummer: wer sonst im Bild steht, traegt nur sein Startnummernschild und ist gedaempft,
+  //   - zeichneZfProfilstreifen: die GANZE Strecke als Hoehenprofil mit einem Punkt je Laeufer unten im Bild,
+  //   - zeichneZfKopf: Rampenuhr ("NAECHSTER ... 11 warten") und Hot Seat oben, statt zwoelf Podest-Reihen.
+  // Reine Anzeige: liest u.pos/u.startT/u.fertig/rennT/bahnFokus/cam, ruft nie rr() und schreibt nichts in den
+  // Rennzustand (Beleg: scripts/pruefe-wertung-fingerabdruck.mjs unveraendert).
+  function zfRundRechteck(x,y,w,h,r){
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r); ctx.lineTo(x+w,y+h-r);
+    ctx.arcTo(x+w,y+h,x+w-r,y+h,r); ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+  }
+  const ZF_SCHRIFT="'RaniraSeason',Georgia,'Times New Roman',serif";
+  // Abstand des Fokus zum Hot Seat (Sim-Sekunden, + = hinten): WIE LANGE BRAUCHTE DER HOT-SEAT-HALTER BIS ZU DIESER
+  // STELLE gegen die eigene Fahrzeit seit dem Start. Dieselbe Stuetzpunktkurve wie der Geisterfahrer
+  // (bahnGeistPosition, hier nur umgekehrt per Halbierung -- die Kurve steigt monoton), also keine zweite
+  // Rechnung neben der der Wertung. Ohne Hot Seat: die letzte Live-Ampel (`u.vizAmpel`, alle 10 % der Strecke)
+  // gegen die Bestzeit im Feld; ohne beides null.
+  function zfLuecke(u){
+    const hs=bahnHotSeat();
+    if(hs&&hs.u!==u&&u.fertig==null&&(u.startT||0)<=rennT){
+      let lo=0, hi=hs.zeit;
+      for(let i=0;i<22;i++){ const m=(lo+hi)/2; if(bahnGeistPosition(hs,m)<u.pos)lo=m; else hi=m; }
+      return {sek:(rennT-(u.startT||0))-(lo+hi)/2, bezug:"Hot Seat"};
+    }
+    if(u.fertig==null&&u.vizAmpel)return {sek:u.vizAmpel.delta, bezug:u.vizAmpel.bezug==="der Hot Seat"?"Hot Seat":"Bestzeit", prozent:u.vizAmpel.prozent};
+    return null;
+  }
+  function zfLueckeText(L){
+    const neg=L.sek<-0.004;
+    return {text:(neg?"−":"+")+bahnZeitText(bahnSpanneAnzeige(Math.abs(L.sek)))+(L.bezug==="Hot Seat"?" zum Hot Seat":" zur Bestzeit")+(L.prozent!=null?" ("+L.prozent+" %)":""),
+      farbe:neg?"#7fe0a0":"#ff8d80"};
+  }
+  function zeichneZfBlase(u,x,y,nr,boxen){
+    const L=zfLuecke(u), plan=((BA().plaene||{})[u.plan]||{}).label||"";
+    const name=u.n.length>15?u.n.slice(0,14)+"…":u.n;
+    const z1=(nr?nr+" · ":"")+name;
+    const g=(u.startT||0)>rennT?{text:"Start in "+bahnZeitText(bahnSpanneAnzeige((u.startT||0)-rennT)),farbe:"#e0c46a"}
+      :(L?zfLueckeText(L):{text:plan||"unterwegs",farbe:"#9aa7bb"});
+    const flash=u.vizZzFlash&&rennT<u.vizZzFlash.bis?13:0;     // die Zwischenzeit-Tafel sitzt ueber dem Kopf: Blase ruecken
+    ctx.save();
+    ctx.textAlign="center";
+    ctx.font="800 11.5px "+ZF_SCHRIFT; const w1=ctx.measureText(z1).width;
+    ctx.font="700 10.5px "+ZF_SCHRIFT; const w2=ctx.measureText(g.text).width;
+    const bw=Math.max(w1,w2)+20, bh=33, bx=Math.max(4,Math.min(W-bw-4,x-bw/2)), by=y-26-flash-bh;
+    ctx.globalAlpha=0.92; ctx.fillStyle="rgba(10,12,18,.9)"; zfRundRechteck(bx,by,bw,bh,5); ctx.fill();
+    ctx.strokeStyle="rgba(240,235,220,.45)"; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillRect(bx+1,by+3,3,bh-6);
+    ctx.beginPath(); ctx.moveTo(x-5,by+bh); ctx.lineTo(x+5,by+bh); ctx.lineTo(x,by+bh+6); ctx.closePath();
+    ctx.fillStyle="rgba(10,12,18,.9)"; ctx.fill();
+    ctx.globalAlpha=1;
+    const cx=bx+bw/2+1;
+    ctx.font="800 11.5px "+ZF_SCHRIFT; ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillText(z1,cx,by+14);
+    ctx.font="700 10.5px "+ZF_SCHRIFT; ctx.fillStyle=g.farbe; ctx.fillText(g.text,cx,by+27);
+    ctx.restore();
+    boxen.push({x:bx+bw/2,y:by+12,halbBreite:bw/2+4});
+  }
+  function zeichneZfNummer(u,x,y,nr){
+    if(!nr)return;
+    ctx.save(); ctx.globalAlpha=0.86; ctx.textAlign="center";
+    ctx.font="800 10px "+ZF_SCHRIFT; const t=String(nr), w=Math.max(16,ctx.measureText(t).width+8);
+    ctx.fillStyle="rgba(10,12,18,.85)"; zfRundRechteck(x-w/2,y-38,w,15,3); ctx.fill();
+    ctx.strokeStyle=bahnSeitenFarbe(u.seite); ctx.lineWidth=1.6; ctx.stroke();
+    ctx.fillStyle="#f2f4f8"; ctx.fillText(t,x,y-27);
+    ctx.restore();
+  }
+  // Klickflaechen des Profilstreifens, jedes Bild neu geschrieben (Muster: schachMiniRects).
+  let zfBandPunkte=[];
+  function zeichneZfProfilstreifen(){
+    const A=BA(), cps=A.zwischenzeiten||[];
+    const bx0=40, bx1=W-40, bw=bx1-bx0, yT=H-66, yB=H-19, hPx=28;
+    let hMax=1; for(let i=0;i<=100;i++)hMax=Math.max(hMax,zfHoehe(i/100));
+    const bandX=f=>bx0+Math.max(0,Math.min(1,f))*bw;
+    const profY=f=>yB-zfHoehe(f)/hMax*hPx;
+    ctx.save();
+    ctx.fillStyle="rgba(8,10,14,.68)"; zfRundRechteck(bx0-20,yT-14,bw+40,yB-yT+31,7); ctx.fill();
+    ctx.strokeStyle="rgba(240,235,220,.22)"; ctx.lineWidth=1; ctx.stroke();
+    // Flaeche unter dem Profil
+    ctx.beginPath(); ctx.moveTo(bx0,yB+2);
+    for(let i=0;i<=120;i++)ctx.lineTo(bandX(i/120),profY(i/120));
+    ctx.lineTo(bx1,yB+2); ctx.closePath(); ctx.fillStyle="rgba(120,160,104,.26)"; ctx.fill();
+    // Ausschnitt, den die Kamera gerade zeigt
+    const v=camView(), l=v.links/v.strecke, r=(v.links+v.viewW)/v.strecke;
+    if(r-l<0.995){
+      ctx.fillStyle="rgba(255,255,255,.09)"; ctx.fillRect(bandX(l),yT-4,bandX(r)-bandX(l),yB-yT+8);
+      ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=1; ctx.strokeRect(bandX(l)+.5,yT-3.5,bandX(r)-bandX(l)-1,yB-yT+7);
+    }
+    // Zwischenzeiten
+    for(let ci=0;ci<cps.length;ci++){
+      const x=bandX(cps[ci]); ctx.strokeStyle="rgba(242,215,90,.8)"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(x,yT+2); ctx.lineTo(x,yB+2); ctx.stroke();
+      ctx.font="800 9px "+ZF_SCHRIFT; ctx.textAlign="center"; ctx.fillStyle="#f2d75a"; ctx.fillText("ZZ"+(ci+1),x,yT+2);
+    }
+    // Profillinie, nach Zonenart gefaerbt (dieselben Farben wie die Baender im Fokus-Panel)
+    ctx.lineWidth=2.4; ctx.lineCap="round";
+    for(let i=0;i<120;i++){
+      const f0=i/120, f1=(i+1)/120, z=gelaendeAn((f0+f1)/2);
+      ctx.strokeStyle=z?(z.art==="steigung"?"#e0956a":z.art==="abfahrt"?"#8fc3f5":"#f2d75a"):"#cfd8c0";
+      ctx.beginPath(); ctx.moveTo(bandX(f0),profY(f0)); ctx.lineTo(bandX(f1),profY(f1)); ctx.stroke();
+    }
+    // Start und Ziel
+    ctx.font="700 8px "+ZF_SCHRIFT; ctx.fillStyle="#97a1b3"; ctx.textAlign="left"; ctx.fillText("START",bx0-12,yB+11);
+    ctx.textAlign="right"; ctx.fillText("ZIEL",bx1+12,yB+11);
+    ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(bx1,yT+1); ctx.lineTo(bx1,yB+2); ctx.stroke();
+    // Laeufer: ein Punkt je Fahrer auf der Linie. Wartende (Rampe) und Eingelaufene zaehlt der Kopf oben.
+    zfBandPunkte=[];
+    const hs=bahnHotSeat(), gesetzt=[];
+    let fokusPkt=null;
+    const reihe=[...LAEUFER].sort((a,b)=>(a.id===bahnFokus)-(b.id===bahnFokus));     // der Fokus zuletzt, also obenauf
+    for(const u of reihe){
+      const fertig=u.fertig!=null, wartet=!fertig&&(u.startT||0)>rennT;
+      if(wartet&&u.id!==bahnFokus)continue;
+      if(fertig&&!(hs&&hs.u===u)&&u.id!==bahnFokus)continue;
+      const f=fertig?1:(wartet?0:u.pos);
+      const x=bandX(f); let y=profY(f);
+      let k=0; for(const g of gesetzt)if(Math.abs(g.x-x)<6&&Math.abs(g.y-y)<6)k++;
+      y-=Math.min(2,k)*5; gesetzt.push({x,y});
+      const fokus=u.id===bahnFokus;
+      ctx.beginPath(); ctx.arc(x,y,fokus?6.5:3.8,0,6.283);
+      ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fill();
+      ctx.strokeStyle=fokus?"#ffffff":(hs&&hs.u===u?"#f2d75a":"rgba(8,10,14,.9)"); ctx.lineWidth=fokus?2:(hs&&hs.u===u?1.6:1); ctx.stroke();
+      if(!fertig||fokus)zfBandPunkte.push({id:u.id,x,y});
+      if(fokus)fokusPkt={x,y,u};
+    }
+    if(fokusPkt){
+      const nr=zeitfahrenFokusReihe().findIndex(o=>o.id===fokusPkt.u.id)+1;
+      const t=nr+" · "+(fokusPkt.u.n.length>15?fokusPkt.u.n.slice(0,14)+"…":fokusPkt.u.n);
+      ctx.font="800 11px "+ZF_SCHRIFT; ctx.textAlign="center";
+      const px=Math.max(bx0+ctx.measureText(t).width/2,Math.min(bx1-ctx.measureText(t).width/2,fokusPkt.x));
+      ctx.lineWidth=3.4; ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.strokeText(t,px,fokusPkt.y-11);
+      ctx.fillStyle="#fff"; ctx.fillText(t,px,fokusPkt.y-11);
+    }
+    ctx.restore();
+  }
+  function zeichneZfKopf(){
+    let nxt=null, rest=0, imZiel=0;
+    for(const u of LAEUFER){
+      if(u.fertig!=null){ imZiel++; continue; }
+      if((u.startT||0)>rennT){ rest++; if(!nxt||(u.startT||0)<(nxt.startT||0))nxt=u; }
+    }
+    ctx.save(); ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    // links: Rampenuhr + Zielzaehler
+    const teile=[];
+    if(nxt)teile.push(["NÄCHSTER","#97a1b3"],[nxt.n.length>13?nxt.n.slice(0,12)+"…":nxt.n,bahnSeitenFarbe(nxt.seite)],
+      [bahnZeitText(bahnSpanneAnzeige(Math.max(0,(nxt.startT||0)-rennT))),"#ff8a7a"],[rest+" warten","#97a1b3"]);
+    else teile.push(["ALLE UNTERWEGS","#97a1b3"]);
+    if(imZiel>0)teile.push(["✓ "+imZiel+"/"+LAEUFER.length+" im Ziel","#7fe0a0"]);
+    // y=76: die Teamkarten und die Anzeigetafel liegen als HTML ueber dem oberen Rand der Leinwand (bis rund y=70).
+    const ky=76;
+    ctx.font="800 11.5px "+ZF_SCHRIFT;
+    let w=16; for(const t of teile)w+=ctx.measureText(t[0]).width+11;
+    ctx.fillStyle="rgba(10,12,18,.84)"; zfRundRechteck(10,ky,w,24,6); ctx.fill();
+    ctx.strokeStyle="rgba(240,235,220,.28)"; ctx.lineWidth=1; ctx.stroke();
+    let x=18; for(const t of teile){ ctx.fillStyle=t[1]; ctx.fillText(t[0],x,ky+16); x+=ctx.measureText(t[0]).width+11; }
+    // rechts: Hot Seat
+    const hs=bahnHotSeat();
+    if(hs){
+      const t1="HOT SEAT", t2=(hs.u.n.length>13?hs.u.n.slice(0,12)+"…":hs.u.n), t3=fmtZielzeit(hs.zeit);
+      const w1=ctx.measureText(t1).width, w2=ctx.measureText(t2).width, w3=ctx.measureText(t3).width, tw=w1+w2+w3+40;
+      ctx.fillStyle="rgba(10,12,18,.84)"; zfRundRechteck(W-10-tw,ky,tw,24,6); ctx.fill();
+      ctx.strokeStyle="rgba(242,215,90,.5)"; ctx.stroke();
+      let rx=W-10-tw+10; ctx.fillStyle="#f2d75a"; ctx.fillText(t1,rx,ky+16);
+      rx+=w1+10; ctx.fillStyle=bahnSeitenFarbe(hs.u.seite); ctx.fillText(t2,rx,ky+16);
+      rx+=w2+10; ctx.fillStyle="#f2f4f8"; ctx.fillText(t3,rx,ky+16);
+    }
+    ctx.restore();
   }
 
   // Die ganze Szene: Himmel + Panorama-Parallaxe, hinter der Strasse eine Wiese mit Baeumen, die Strasse
@@ -45270,23 +45445,8 @@
     ctx.fillStyle="#8a2a24";ctx.fillRect(x0-breite-2,yD-hs+1,breite+2,2);
     ctx.font="800 12px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";
     ctx.fillStyle="#fff";ctx.fillText("START",x0-breite/2-3,yD-hs-1);
-    // Uhr des naechsten Starters (nur solange noch jemand wartet)
-    let nxt=null;
-    for(const u of LAEUFER)if(u.fertig==null&&(u.startT||0)>rennT&&(!nxt||(u.startT||0)<(nxt.startT||0)))nxt=u;
-    if(nxt){
-      const bx=x0+52, by=mitte(0)-ZF_BAND_OBEN-92;
-      ctx.fillStyle="#e8e5da";ctx.fillRect(bx+31,by+40,3,76);
-      ctx.fillStyle="rgba(10,12,18,.92)";ctx.fillRect(bx,by,66,40);
-      ctx.strokeStyle="rgba(240,235,220,.5)";ctx.lineWidth=1;ctx.strokeRect(bx+.5,by+.5,65,39);
-      ctx.textAlign="center";
-      ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#97a1b3";
-      ctx.fillText("NAECHSTER",bx+33,by+9);
-      ctx.font="800 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#ff6a5c";
-      ctx.fillText(bahnZeitText(bahnSpanneAnzeige(Math.max(0,(nxt.startT||0)-rennT))),bx+33,by+23);
-      let rest=0; for(const u of LAEUFER)if(u.fertig==null&&(u.startT||0)>rennT)rest++;
-      if(rest>1){ ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#97a1b3";
-        ctx.fillText(rest+" warten",bx+33,by+35); }
-    }
+    // Die Uhr des naechsten Starters steht NICHT mehr hier im Bild (Rework 16.11.): mit der Folgekamera liegt die
+    // Rampe meist ausserhalb des Ausschnitts, die Anzeige sitzt deshalb fest oben links (zeichneZfKopf).
   }
   function bodenZeitfahren(){
     // SEITENANSICHT (Task #155, s. Kopfkommentar zfSeite): ersetzt den GANZEN Hintergrund.
@@ -48227,7 +48387,7 @@
   // Kulisse), bekommt die Strecke links einen breiteren Rand (Startrampe mit Warteschlange) und rechts
   // einen Zielraum fuer die Eingelaufenen. Jede andere Bahn und jedes Zeitfahren ohne Kulisse
   // (Headless-Runner) bleibt bei 80/90 px, also Zeichen fuer Zeichen wie vorher.
-  const ZF_RAND_L=190, ZF_RAND_R=110;
+  const ZF_RAND_L=190, ZF_RAND_R=140;
   const camRandL=()=>zfSeite()?ZF_RAND_L:80;
   const camStrecke=()=>W-(zfSeite()?ZF_RAND_L+ZF_RAND_R:170);
   function camView(){
@@ -49036,18 +49196,26 @@
         // immer deutlich weiter als die alten 2,2, und er OEFFNET sich zusaetzlich, sobald
         // wirklich jemand in der Naehe ist. Reine Praesentation: kameraUpdate() schreibt
         // nur cam, und cam liest ausser dem Zeichnen niemand.
+        // FOLGEKAMERA (Rework 16.11., Chris: "wenn im Time Trial die Leute hintereinander starten, dann
+        // kann doch die Kamera den Leuten folgen ... nicht dass die alle nebeneinander herlaufen"):
+        // in der Seitenansicht gibt es KEINEN Nachbarkasten mehr -- die Kamera haengt am Fokus-Laeufer
+        // und ein fester Ausschnitt (0,40 der Strecke) laeuft mit ihm; wer sonst noch darin steht, steht
+        // eben darin, wer nicht, ist im Profilstreifen unten (zeichneZfProfilstreifen). Der Fokus liegt
+        // etwas links der Mitte (Blick nach vorn), und wartet er noch auf der Rampe, liegt die Rampe im Bild.
+        const folge=zfSeite();
         let von=u.pos, bis=u.pos;
-        for(const o of LAEUFER){
+        if(folge){ von=u.pos-0.07; bis=u.pos+0.17; }
+        else for(const o of LAEUFER){
           if(o===u||o.fertig!=null)continue;
           if((o.startT||0)>rennT)continue;                 // steht noch auf der Rampe
-          if(Math.abs(o.pos-u.pos)>(zfSeite()?0.22:ZF_NACHBAR_FENSTER))continue;
+          if(Math.abs(o.pos-u.pos)>ZF_NACHBAR_FENSTER)continue;
           von=Math.min(von,o.pos); bis=Math.max(bis,o.pos);
         }
         // SEITENANSICHT (Task #155): die Laeufer sind Figuren auf einer Strasse, nicht Spuren; ein engerer
         // Ausschnitt (38 % statt 56 %, Nachbarfenster 0,22 statt 0,30, Zoom bis 2,3) zeigt die Huegel groesser. Ohne Seitenansicht
         // bleiben beide Zahlen wie vorher.
         const seiteAn=zfSeite();
-        const spanne=Math.max(seiteAn?0.38:ZF_MIN_AUSSCHNITT,(bis-von)+ZF_POLSTER);
+        const spanne=folge?0.40:Math.max(ZF_MIN_AUSSCHNITT,(bis-von)+ZF_POLSTER);
         const zielZoom=Math.max(1,Math.min(seiteAn?2.3:1.8,1/spanne));
         const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
         const t=Math.min(1,dt*1.8);
@@ -52649,6 +52817,9 @@
   // ["time-trial"]=4,38 den Zyklus um denselben Faktor in die Laenge und die Beine
   // schlichen wieder — derselbe Fehler in Gruen, nur eine Etage tiefer.
   const ZF_SCHRITT_PX=46;
+  // PUSTE-RICHTUNG je Laeufer (Anteil von reserveMax je Sekunde, + = laedt auf), nur Anzeige, s. stepZeitfahren 3b.
+  const zfPuste=new WeakMap();
+  const zfPusteTrend=(u)=>{ const z=zfPuste.get(u); return z?z.trend:0; };
   function stepZeitfahren(dt,art){
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
@@ -52691,6 +52862,23 @@
       const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
       const ziel=u.leer?1:Math.max(0,1-anteil/0.35);   // ab einem Drittel Restreserve sichtbar
       u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+      // ---- 3b. PUSTE-TREND (Rework 16.11., Chris: "wenn die Spieler keine Ausdauer mehr haben und dann
+      // langsamer werden oder mal eine Pause machen, dass sich dann auch der Ausdauerbalken wieder
+      // regenerieren kann"). Die SIMULATION erholt sich laengst (BAHN_ART["time-trial"].pusteRegen/
+      // leerRegen/pusteFangen, Gutschrift in stepSpurt; scripts/miss-bahn-puste.mjs: 98 % der Laeufer
+      // fangen sich mindestens einmal) -- der Balken zeigte nur die Hoehe, nie die RICHTUNG, und wer
+      // unter 35 % faellt, taucht in der Seitenansicht kurz auf und verschwindet wieder. Hier nur die
+      // Richtung als weiche Anzeigegroesse (Anteil von reserveMax je Sekunde, + = laedt auf); nichts
+      // davon geht zurueck in u.reserve/u.leer/tempoVon. Liest u.reserve und schreibt NICHT auf den Laeufer, sondern
+      // in eine WeakMap (zfPusteTrend): `rennFertig` ist das Protokoll von spiele() und wird samt allen Feldern des
+      // Laeufers serialisiert -- ein neues viz*-Feld darauf haette den Wertungs-Fingerabdruck verschoben.
+      let pz=zfPuste.get(u);
+      if(!pz){ pz={vor:u.reserve,trend:0}; zfPuste.set(u,pz); }
+      if(dt>0&&u.reserveMax>0){
+        const d=(u.reserve-pz.vor)/u.reserveMax/dt;
+        pz.trend+=(d-pz.trend)*(1-Math.exp(-dt/0.30));
+      }
+      pz.vor=u.reserve;
       // ---- 4. NEIGUNG, s. Kopfkommentar. `gelaendeAn()` ist dieselbe Funktion, die
       // `gelaendeFaktor()` fuer die Physik liest — hier nur zur Positionsbestimmung genutzt,
       // NICHT der Rueckgabewert von `gelaendeFaktor()` selbst (der ist bereits ein Tempo-
@@ -52879,11 +53067,14 @@
     // geraden Bahn gibt es nichts zu staffeln (jede Spur hat ihre eigene Zeile), dort
     // bleibt die Reihenfolge unveraendert.
     const zfSeiteAn=zfSeite();      // Zeitfahren-Seitenansicht (Task #155): eine Strasse, Tiefenstaffelung wie auf der Route
-    const reihe=(istRoute()||istHyroxHalle()||zfSeiteAn)?[...LAEUFER].sort((a,b)=>laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
+    // Seitenansicht: der Fokus-Laeufer (dem die Kamera folgt) wird ZULETZT gezeichnet, steht also nie hinter einem
+    // Nebenmann (Rework 16.11.); unter den uebrigen bleibt die Tiefenstaffelung nach y.
+    const reihe=(istRoute()||istHyroxHalle()||zfSeiteAn)?[...LAEUFER].sort((a,b)=>(zfSeiteAn?((a.id===bahnFokus)-(b.id===bahnFokus)):0)||laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
     // Die Figur waechst mit der Kamera, damit sie auf einer bei 3,4x 190 px breiten Route
     // nicht als 32-px-Sprite verloren geht. Bei Zoom 1 ist sie so gross wie bisher.
     // Name, Plan und Sterne bleiben im Bildschirmraum, skalieren also NICHT mit.
-    const sk0=istHyroxHalle()?Math.min(1.35,0.75+0.15*cam.zoom):(istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1);
+    // Seitenansicht: die Figur waechst ein wenig mit dem Zoom der Folgekamera (Rework 16.11., bei Zoom 2,3 um 1/5).
+    const sk0=istHyroxHalle()?Math.min(1.35,0.75+0.15*cam.zoom):(istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):(zfSeiteAn?Math.min(1.2,0.95+0.11*cam.zoom):1));
     // ETIKETTEN-KOLLISIONSVERMEIDUNG (Broadcast-Audit Runde 2, Punkt 14, 30.09.): dasselbe
     // Muster wie Phase 5 im Kampf (draw()s labelPositionen/labelVersatz, s. dortiger
     // Kommentar) -- hier fuer die Bahn uebernommen, wo es bislang GAR KEINE Kollisions-
@@ -52924,6 +53115,10 @@
     // damit Schwebetexte weiter unten ihnen ausweichen, statt sie zu ueberdecken.
     const bahnLabelSchwebeBoxen=[];
     const zfSchnaufListe=[];     // Seitenansicht: Atemwolken werden nach ALLEN Figuren gezeichnet, damit keine Nachbarfigur sie ueberdeckt
+    // FOLGEKAMERA (Rework 16.11.): Startnummer = Platz in der Startreihenfolge, dieselbe Zaehlung wie die Chips der
+    // Laeuferwahl (zeitfahrenFokusReihe). Wer nicht der Fokus ist, traegt im Bild nur dieses Namensschild.
+    const zfNr=new Map();
+    if(zfSeiteAn)zeitfahrenFokusReihe().forEach((o,i)=>zfNr.set(o.id,i+1));
     for(const u of reihe){
       const platz=rennFertig.indexOf(u);
       let {x,y}=laeuferXY(u);
@@ -52931,8 +53126,11 @@
       // Nur der naechste Starter traegt Etiketten (und von den Eingelaufenen nur die letzten drei plus der Hot Seat), die uebrigen sind schlichte Figuren (die
       // Rampenuhr nennt den Naechsten ohnehin). `zfWk` -1 = steht nicht auf der Rampe.
       const zfWk=(zfSeiteAn&&u.fertig==null&&(u.startT||0)>rennT)?zfWarteIndex(u):-1;
-      if(zfWk>=ZF_RAMPE_SICHT)continue;     // mehr als fuenf Wartende passen nicht aufs Podest, die uebrigen stehen dahinter (Rampenuhr zaehlt sie)
-      const zfLabelAus=zfWk>=1||(zfSeiteAn&&u.fertig!=null&&platz>=0&&platz<rennFertig.length-3&&u.id!==bahnHotSeatId);
+      if(zfWk>=ZF_RAMPE_SICHT&&u.id!==bahnFokus)continue;     // mehr als fuenf Wartende passen nicht aufs Podest, die uebrigen stehen dahinter (Rampenuhr zaehlt sie)
+      const zfFokusU=zfSeiteAn&&u.id===bahnFokus;                          // der Laeufer, dem die Kamera folgt
+      const zfFremd=zfSeiteAn&&!zfFokusU&&u.fertig==null;                  // unterwegs oder auf der Rampe, aber nicht im Fokus: nur Startnummer, gedaempft
+      const zfBlase=zfFokusU&&u.fertig==null;                              // der Fokus traegt die Blase statt Name/Plan (auf der Rampe mit dem Countdown)
+      const zfLabelAus=!zfFokusU&&(zfWk>=1||zfFremd||(zfSeiteAn&&u.fertig!=null&&platz>=0&&platz<rennFertig.length-1&&u.id!==bahnHotSeatId));
       let bahnLabelVersatz=0;
       if(!zfLabelAus)for(const p of bahnLabelPositionen){
         if(Math.abs(x-p.x)<BAHN_LABEL_KLUSTER_DX&&Math.abs(y-p.y)<BAHN_LABEL_KLUSTER_DY)bahnLabelVersatz++;
@@ -52966,7 +53164,7 @@
       // (`u.vizZustand==="ausgeschieden"`, ":30872"), schreibt nichts, aendert nichts an
       // wert()/rr()/rho.
       const raus=!!u.raus;
-      const sk=wartet?sk0*0.88:sk0;
+      const sk=(wartet||zfFremd)?sk0*0.88:sk0;
       // TEAM-FEIER STAFFEL (Konzept 3.3): wer gerade nicht laeuft, ist Publikum (Wartende im
       // Innenfeld, nach dem Ziel die eingelaufene Mannschaft, s. staffelFeierBild()).
       // Huepfer (teamFeierHaltung) + Anfeuern-Welle (staffelAnfeuernDy) gehen als reiner
@@ -52976,7 +53174,7 @@
       // Quelle fuer Zeichnung und Sonde window.__arena.staffelFeierProbe()).
       const feierBild=staffelFeier?staffelFeierBild(u):null;
       const feierDy=feierBild?feierBild.dy:0;
-      const dimAlpha=raus?0.4:(wartet&&!(feierBild&&feierBild.feiert)?0.72:1);
+      const dimAlpha=raus?0.4:(zfFremd?0.82:(wartet&&!(feierBild&&feierBild.feiert)?0.72:1));
       ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
@@ -53206,7 +53404,7 @@
       }
       ctx.restore();
       // SCHNAUFEN (Task #155): Atemwolken sammeln, gezeichnet werden sie nach der Schleife (s. dort).
-      if(zfAufStrecke&&zfErsch>0.3)zfSchnaufListe.push({x,y,u,zfErsch});
+      if(zfAufStrecke&&zfErsch>0.3&&(zfFokusU||u.leer))zfSchnaufListe.push({x,y,u,zfErsch});
       // ================== C6.2: BALANCE-RING (Broadcast-Optik-Recherche 27.09., Klasse A)
       // ==================
       // Konzept 5.3 (Climbing-Neubau, nicht gebaut) und Doku C6.2: "man sieht nicht, dass
@@ -53307,7 +53505,9 @@
       // ab dem `mued`/`leer` in tempoVon spuerbar zubeissen. Reine Zeichenarbeit.
       // SEITENANSICHT: zwoelf Balken uebereinander auf einer Strasse waeren wieder Salat -- dort zeigt nur
       // der Fokussierte, wer eingebrochen ist und wer unter ein Drittel Puste faellt den Balken.
-      if(u.fertig==null&&!zfLabelAus&&(!zfSeiteAn||u.id===bahnFokus||u.leer||u.reserve<0.35*u.reserveMax)){
+      // FOLGEKAMERA (Rework 16.11.): den Balken tragen der Fokus (immer, mit Richtungspfeil und Wort) und wer
+      // eingebrochen ist; die uebrigen im Bild bleiben schlank.
+      if(u.fertig==null&&(zfSeiteAn?(zfWk<0&&(zfFokusU||u.leer)):!zfLabelAus)){
         // FARBEN UNVERAENDERT gruen / orange unter 20 % / rot — dieselbe Sprachregelung,
         // die docs/design/hockey-ausdauer-checks-konzept-13-09.md (Abschnitt 9.6, "Eine
         // Leiste, drei Chassis", Branch claude/hockey-ausdauer-konzept-13-09, noch nicht
@@ -53315,7 +53515,7 @@
         // macht die Leiste nur GROESSER und beschriftet sie im Fokus-Panel; die Skala
         // selbst bleibt bewusst die, auf die sich das Konzept einigt.
         const breit=!!BA().startAbstand;
-        const bw=breit?38:26, bh=breit?5:3, a=Math.max(0,u.reserve/u.reserveMax);
+        const bw=zfBlase?56:(breit?38:26), bh=zfBlase?7:(breit?5:3), a=Math.max(0,u.reserve/u.reserveMax);
         ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,bh);
         ctx.fillStyle=u.leer?"#c0504a":(a<0.2?"#d98b3a":"#5FD08A");
         ctx.fillRect(x-bw/2,y+20,bw*a,bh);
@@ -53326,6 +53526,19 @@
           // die Gegend, in der `mued`/`leer` in tempoVon spuerbar zubeissen.
           ctx.fillStyle="rgba(255,255,255,.45)";
           ctx.fillRect(x-bw/2+bw*0.2,y+20,1,bh);
+        }
+        // RICHTUNG DER PUSTE (Rework 16.11., s. stepZeitfahren 3b): steigt der Balken wieder -- im Windschatten
+        // des eigenen Tempos, bergab, in der Verschnaufpause nach dem Einbruch --, steht es da, statt dass man
+        // es am Balken erraten muss. Der Fokus bekommt es als Wort, ein eingebrochener Nebenmann als Pfeil.
+        if(zfSeiteAn){
+          const tr=zfPusteTrend(u), steigt=tr>0.012, faellt=tr<-0.05;
+          if(zfBlase||steigt){
+            ctx.font="800 10.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+            ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+            const pz=zfBlase?("Puste "+Math.round(a*100)+" %"+(steigt?" ▲ erholt sich":(u.leer?" · schnauft":(faellt?" ▼":"")))):"▲";
+            ctx.strokeText(pz,x,y+bh+33); ctx.fillStyle=steigt?"#7fe0a0":(u.leer?"#e0685f":(a<0.2?"#d98b3a":"#dfe4ee")); ctx.fillText(pz,x,y+bh+33);
+            ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          }
         }
         // TK-3: NERVEN SICHTBAR (broadcast-optik-bahn-27-09.md Abschnitt 5.3, "heute kommt
         // 'ausgeschieden' ohne Vorwarnung"). Eine zweite, schmale Leiste in Lila unter der
@@ -53347,7 +53560,7 @@
       // noch wartet, bekommt jetzt einen sichtbaren Countdown ueber dem Kopf, in
       // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
       // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
-      if(u.vizRampe>0&&!zfLabelAus){
+      if(u.vizRampe>0&&!zfLabelAus&&!zfBlase){
         ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
@@ -53374,7 +53587,7 @@
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
-      if(!zfLabelAus){
+      if(!zfLabelAus&&!zfBlase){
       ctx.strokeText(txt,x,nameY);ctx.fillStyle=bahnSeitenFarbe(u.seite);ctx.fillText(txt,x,nameY);
       bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       }
@@ -53385,7 +53598,7 @@
       // steht der neue Name ueber dem Kopf. Was dazukommt, ist nur die Aufmerksamkeit:
       // fuer ANSAGE_NACHLEUCHTEN Sekunden steht er fett und in der Ansage-Farbe, damit
       // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
-      if(u.fertig==null&&!zfLabelAus){
+      if(u.fertig==null&&!zfLabelAus&&!zfBlase){
         const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
         ctx.font=(frisch?"700 9px":"400 8px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
         const pl=((BA().plaene)[u.plan]||{}).label||"";
@@ -53440,6 +53653,8 @@
         const ptY=y-19-bahnLabelDy;
         ctx.strokeText(pt,x,ptY);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,ptY);
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
+      if(zfBlase)zeichneZfBlase(u,x,y-(sk0-1)*46,zfNr.get(u.id),bahnLabelSchwebeBoxen);
+      else if(zfFremd)zeichneZfNummer(u,x,y-(sk0*0.88-1)*46,zfNr.get(u.id));
     }
     // SCHNAUFEN (Seitenansicht, Task #155; Vorlage: das Durchschnaufen in public/szenen/time-trial/
     // standard.html). Echter Rennzustand statt Demo: ab `u.vizErschoepft`>0,3 (weich aus der Puste, s.
@@ -53735,6 +53950,7 @@
   // schreibt nichts, ruft nie rr().
   function zeichneStreckenband(){
     const A=BA();
+    if(A.startAbstand&&zfSeite()){ zeichneZfProfilstreifen(); zeichneZfKopf(); return; }
     const unten=!!A.startAbstand;                  // Zeitfahren: Band unten, sonst oben
     const rand=26, bx0=rand, bx1=W-rand, by=unten?H-13:13;
     const bandX=(frac)=>bx0+Math.max(0,Math.min(1,frac))*(bx1-bx0);
@@ -56205,8 +56421,11 @@
         // seither als "Pus" statt "Res". Zwei Namen fuer dieselbe Groesse in derselben
         // Disziplin waeren genau die Unklarheit, die Punkt 4 beheben sollte.
         const anteil=u.reserveMax>0?Math.max(0,u.reserve/u.reserveMax):0;
-        const res=el("span",u.leer?"schlecht":anteil<0.2?"knapp":null,
-          " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %"));
+        // RICHTUNG (Rework 16.11., s. stepZeitfahren 3b): laedt der Balken gerade wieder auf, steht es da.
+        const trend=u.fertig==null?zfPusteTrend(u):0, steigt=trend>0.012, faellt=trend<-0.05;
+        const res=el("span",steigt?"gut":u.leer?"schlecht":anteil<0.2?"knapp":null,
+          " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %")+(steigt?" ▲ erholt sich":(faellt?" ▼":"")));
+        res.title="Puste regeneriert sich: im Tempo unter dem Plan, bergab und in der Verschnaufpause nach dem Einbruch";
         standEl.appendChild(res);
       } else standEl.textContent="—";
     }
@@ -56283,6 +56502,22 @@
     if(roster)roster.addEventListener("mousedown",ev=>{
       const c=ev.target.closest?ev.target.closest(".ttchip[data-id]"):null;
       if(c){ ev.preventDefault(); zeitfahrenFokusWaehlen(Number(c.dataset.id)); }
+    });
+    // PROFILSTREIFEN ANKLICKEN (Rework 16.11.): derselbe Weg wie die Chips -- ein Klick auf den Punkt eines
+    // Laeufers im Streifen unten im Bild waehlt ihn zum Fokus (zeitfahrenFokusWaehlen schaltet Auto aus).
+    // zfBandPunkte schreibt zeichneZfProfilstreifen jedes Bild neu; ausserhalb der Seitenansicht ist die Liste leer.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!zfBandPunkte.length||!zfSeite())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width), my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      let best=null, bd=1e9;
+      for(const k of zfBandPunkte){
+        const d=Math.hypot(mx-k.x,(my-k.y)*0.6);
+        if(my>=H-82&&d<bd&&d<=12){ bd=d; best=k; }
+      }
+      if(best)zeitfahrenFokusWaehlen(best.id);
     });
   }
 
@@ -63287,6 +63522,12 @@
     // wird; mit false/true wird sie fuer QA-Vergleiche (alte Draufsicht gegen neue Seitenansicht) aus-/
     // eingeschaltet. Reine Anzeige.
     zfSeite:(an)=>{ if(an!==undefined)zfSeiteErlaubt=!!an; return zfSeite(); },
+    // ZEITFAHREN-FOLGEKAMERA (Rework 16.11.): Lesesonde fuer QA/Screenshots -- wer ist Fokus, wo steht die Kamera,
+    // wie weit sind die Laeufer, wie voll ist ihre Puste und in welche Richtung bewegt sie sich. Schreibt nichts.
+    zfProbe:()=>({rennT, fokus:bahnFokus, auto:bahnFokusAuto, done, zoom:cam.zoom, cx:cam.cx, seite:zfSeite(),
+      punkte:zfBandPunkte.map(k=>({...k})),
+      laeufer:LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,pos:u.pos,startT:u.startT||0,fertig:u.fertig,leer:!!u.leer,
+        reserve:u.reserve,reserveMax:u.reserveMax,trend:zfPusteTrend(u),gefangen:u.gefangen||0,v:u.v}))}),
     // FIGUREN-STAND (03.11., s. spielLaeuft/ANPFIFF ERST MIT FIGUREN): wer im Spiel ist und wessen
     // PixelLab-Bilder noch fehlen; `laeuft` = der erste Tick ist freigegeben. Reine Anzeige-Sonde.
     figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
