@@ -29949,7 +29949,22 @@
     // gerade vorn liegt (laufender Vorteil > 0, Gleichstand zaehlt fuer niemanden). Gleiche Quelle
     // wie die Vorteilszahl auf der Karte jedes Spielers, also kein Spoiler; der Endstand (`done`
     // oben) und jede Wertung bleiben unangetastet.
-    const vorn=(s)=>TEILNEHMER.filter(u=>u.side===s&&laufendVorteil(u)>0).length;
+    // Opus-Review #1521: nach Rubber gruppieren (Tennis-Doppel: zwei Spieler, EIN Rubber, s.
+    // duellBretterGewonnen()), sonst steht live "4 : 2" (6 Spieler), im Endstand aber hoechstens 5.
+    // Gewertet wird der erste je Gruppe; "vorn" bleibt der laufende Vorteil -- bei Fechten/Schach
+    // kann der Endentscheid (gefechtSieg/zeitSieg) davon abweichen, der Live-Stand ist eine
+    // Naeherung und springt beim Umschalten auf `done` ggf. auf den echten Brettentscheid.
+    const vorn=(s)=>{
+      const gesehen=new Set();
+      let n=0;
+      for(const u of TEILNEHMER){
+        if(u.side!==s)continue;
+        const key=u.rubberIdx??u.brett;
+        if(key!=null){ if(gesehen.has(key))continue; gesehen.add(key); }
+        if(laufendVorteil(u)>0)n++;
+      }
+      return n;
+    };
     return vorn(0)+" : "+vorn(1);
   }
   function updateHudBuehne(){
