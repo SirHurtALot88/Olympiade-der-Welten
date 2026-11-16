@@ -30,6 +30,7 @@ import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-p
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type {
   runBattlefieldPodFixtures,
   runMiniDmFfaPodFixtures,
@@ -108,11 +109,12 @@ export function buildHarmlosenMiniDmFfaFakeRunner(): typeof runMiniDmFfaPodFixtu
 /**
  * Generischer, harmloser Arena-Fake-Runner (Zweier-Duell-Chassis) -- Gegenstueck zu
  * `buildHarmlosenMiniDmFfaFakeRunner()` oben, fuer dieselbe "IMMER BEIDE Runner faken"-Regel.
- * `discipline2` ist seit dem Fix oben fest auf "football" gepinnt (nicht arena-aufgeloest, s.
- * Kommentar dort -- bis 15.11. stand hier "hockey") -- dieser
- * Fake wird an einem mit diesem Helfer gebauten Save deshalb im Normalfall gar nicht erst
- * aufgerufen, dient aber als Sicherheitsnetz, falls sich das je aendert, UND als explizite
- * Dokumentation der Regel direkt am Aufrufort.
+ * `discipline2` ist seit dem Fix unten fest auf "football" gepinnt. Bis 15.11. war Football nicht
+ * arena-aufgeloest und dieser Fake deshalb nur Sicherheitsnetz; seit der Football-NFL-Motorrunde
+ * (docs/design/football-opus-review-nfl-15-11.md) steht Football selbst in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`, und dieser Fake bedient jetzt tatsaechlich den D2-Lauf -- genau
+ * dafuer existiert die "IMMER BEIDE Runner faken"-Regel: nie faellt ein Test still auf echtes
+ * Chromium zurueck.
  */
 export function buildHarmlosenArenaFakeRunner(): typeof runArenaFixtures {
   return (async (_gameState, fixtures) =>
@@ -397,17 +399,17 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
   }
   // `discipline1` wird auf "mini-dm" erzwungen (wie schon bisher) -- NEU (CI-FIX 25.10., s.
   // ausfuehrlichen Kopfkommentar oben): `discipline2` wird ab jetzt EBENFALLS erzwungen, statt dem
-  // zufaelligen (unseeded) Liga-Draft zu ueberlassen. "football" ist dafuer bewusst gewaehlt (bis
-  // 15.11. stand hier "hockey" -- Hockey ist seit der Pp-Pool-Korrektur jetzt selbst in
-  // `ARENA_RESOLVED_DISCIPLINE_IDS`, s. lib/battle/arena-resolved-disciplines.ts, und waere hier
-  // also die FALSCHE Wahl geworden): football ist die einzige Disziplin, die WEDER in
-  // `ARENA_RESOLVED_DISCIPLINE_IDS` steht (also nie echtes Arena-Chromium fuer D2) NOCH "mini-dm"
-  // selbst ist (also nie ein zweiter Mini-DM-Zweig/kein `expected 64 to be 32`-Resolve-Doppelzaehler).
-  // Macht `andereArenaDisziplinPraesent` unten statisch `false` -- das ist gewollt, nicht nur ein
-  // Nebeneffekt: der einzige Aufrufer (`tests/arena-vorlauf-mini-dm-ffa.test.ts`s "Mini-DM ALLEIN
-  // ..."-Test) will GENAU diesen Fall pruefen und musste sich bisher bei einem unguenstigen Zufalls-
-  // Draft selbst uebergehen (`return` vor der eigentlichen Pruefung) -- das faellt damit weg.
-  const andereArenaDisziplinPraesent = false;
+  // zufaelligen (unseeded) Liga-Draft zu ueberlassen. "football" (bis 15.11. "hockey"): eine
+  // Disziplin, die NICHT "mini-dm" selbst ist (also nie ein zweiter Mini-DM-Zweig/kein `expected 64
+  // to be 32`-Resolve-Doppelzaehler) und KEIN Vierer-Pod (Battlefield haette einen eigenen,
+  // ungefakten Pod-Lauf). Bis zur Football-NFL-Motorrunde (15.11.) war Football zudem nicht
+  // arena-aufgeloest; seither ist es das, und der D2-Lauf geht ueber den harmlosen Arena-Fake
+  // (`buildHarmlosenArenaFakeRunner()`), den jeder Aufrufer ohnehin mitgibt. Seit es keine echte
+  // Disziplin ausserhalb von `ARENA_RESOLVED_DISCIPLINE_IDS` ohne eigenen Pod-Zweig mehr gibt, wird
+  // `andereArenaDisziplinPraesent` ehrlich aus der Menge berechnet statt statisch `false` gesetzt:
+  // der "Mini-DM ALLEIN"-Test ueberspringt sich dann selbst, und seine eigentliche Behauptung prueft
+  // der direkte `determineArenaDisciplineContexts()`-Test ohne Save.
+  const andereArenaDisziplinPraesent = ARENA_RESOLVED_DISCIPLINE_IDS.has("football");
   const erzwungenerSpieltag = {
     ...bisherigerSpieltag,
     discipline1: {

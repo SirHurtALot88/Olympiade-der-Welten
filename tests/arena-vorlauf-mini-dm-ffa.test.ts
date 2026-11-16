@@ -68,10 +68,9 @@ describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorla
         scope,
         // CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): IMMER beide Runner-Typen faken, nie
         // nur den fuer diesen Testzweck relevanten -- `discipline2` ist seit dem Helfer-Fix fest auf
-        // "football" gepinnt (nicht arena-aufgeloest, bis 15.11. stand hier "hockey" -- s. Kommentar
-        // im Helfer), der Arena-Fake wird hier also im Normalfall nie aufgerufen, dient aber als
-        // Sicherheitsnetz statt stillschweigend auf echtes Chromium zurueckzufallen, falls sich das
-        // je aendert.
+        // "football" gepinnt, und Football ist seit der NFL-Motorrunde (15.11.) selbst arena-
+        // aufgeloest (s. Kommentar im Helfer): der Arena-Fake bedient jetzt den D2-Lauf, statt dass
+        // der Test stillschweigend auf echtes Chromium zurueckfaellt.
         { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(k), runArenaFixturesImpl: buildHarmlosenArenaFakeRunner() },
         persistence,
       );

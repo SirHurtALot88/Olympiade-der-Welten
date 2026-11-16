@@ -329,7 +329,8 @@ describe.skipIf(UEBERSPRINGEN)(
        * Spieltag 1 war deshalb NICHT garantiert eine arena-aufgeloeste Disziplin.
        *
        * BEWEIS, DASS 4 VERSUCHE GENUEGEN (kein Zufall, keine Wahrscheinlichkeit): von 20
-       * Disziplinen sind STAND 15.11. NUR 3 nicht arena-aufgeloest (mini-dm, battlefield, football,
+       * Disziplinen sind STAND 16.11. NUR 2 nicht arena-aufgeloest (mini-dm, battlefield -- football
+       * seit der NFL-Motorrunde 15.11. nicht mehr; die Zaehlung unten mit 3 bleibt als Obergrenze gueltig,
        * s. ARENA_RESOLVED_DISCIPLINE_IDS) -- diese Zahl ist seit mehreren seitherigen
        * Produktivierungsrunden (Basketball/I-Spy/TDM/Hockey) kleiner als die "7" einer frueheren
        * Fassung dieses Kommentars, was das Argument unten nur GROSSZUEGIGER macht, nicht knapper.

@@ -46,17 +46,17 @@ function matchdayResult(id: string, matchdayId: string): MatchdayResultRecord {
   } as unknown as MatchdayResultRecord;
 }
 
-// "football" ist bewusst NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- bis 15.11. stand hier "hockey"
-// (Task #194 Teil 2, 25.10.: Basketball wechselte in diese Menge, Hockey blieb damals wegen der
-// Pp-Schranke draussen), aber Hockey ist seit der Pp-Pool-Korrektur (s.
-// lib/battle/arena-resolved-disciplines.ts) selbst resolved -- football ist jetzt die einzige
-// angeschlossene, aber nicht aufgeloeste Disziplin -- immer Bruecke. "fechten" IST arena-faehig --
-// der zweite Testfall prueft dessen Bruecken-Zeile.
+// Die erste Disziplin ist bewusst KEINE der zwanzig echten: bis 15.11. stand hier "hockey", danach
+// "football" -- beide sind inzwischen selbst in ARENA_RESOLVED_DISCIPLINE_IDS (Hockey seit der
+// Pp-Pool-Korrektur, Football seit der NFL-Motorrunde, docs/design/football-opus-review-nfl-15-11.md).
+// Ausserhalb der Menge stehen danach nur noch Battlefield und Mini-DM, und beide haben einen eigenen
+// Pod-Hinweis -- der PPS-Duell-Zweig ("immer Bruecke") ist nur noch mit einer kuenstlichen Kennung
+// erreichbar. "fechten" IST arena-faehig -- der zweite Testfall prueft dessen Bruecken-Zeile.
 const DISCIPLINE_SCHEDULE = {
   seasonId: "s1",
   matchdayId: "md1",
   matchdayIndex: 0,
-  discipline1: { disciplineId: "football", displayName: "Football", order: 1, playerCount: 2, category: "tactics" },
+  discipline1: { disciplineId: "kontroll-disziplin-ohne-arena", displayName: "Kontrolldisziplin", order: 1, playerCount: 2, category: "tactics" },
   discipline2: { disciplineId: "fechten", displayName: "Fechten", order: 2, playerCount: 2, category: "duell" },
 };
 
@@ -94,10 +94,10 @@ describe("buildArenaHostSpielquelleHinweise", () => {
 
   it("nicht-arena-faehige Disziplin: IMMER ein Hinweis, auch ohne jede Ergebniszeile", () => {
     const hinweise = buildArenaHostSpielquelleHinweise(buildGameState([]), "A");
-    const football = hinweise.find((h) => h.disciplineId === "football")!;
-    expect(football).toBeDefined();
-    expect(football.disciplineName).toBe("Football");
-    expect(football.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
+    const kontrolle = hinweise.find((h) => h.disciplineId === "kontroll-disziplin-ohne-arena")!;
+    expect(kontrolle).toBeDefined();
+    expect(kontrolle.disciplineName).toBe("Kontrolldisziplin");
+    expect(kontrolle.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
     // Fechten (arena-faehig) hat ohne Ergebniszeile KEINEN Hinweis -- nichts wird vermutet.
     expect(hinweise.find((h) => h.disciplineId === "fechten")).toBeUndefined();
   });
