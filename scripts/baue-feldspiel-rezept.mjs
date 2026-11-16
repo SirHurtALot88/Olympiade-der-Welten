@@ -54,32 +54,61 @@ const ERLAUBT = {
     PARADE:      ["awareness", "will", "determination", "health", "dexterity"],
   },
   // FOOTBALL — Kandidaten aus dem Football-Plan (docs/design/football-rollout-plan.md,
-  // Teil D), aber NICHT wortgleich uebernommen: "awareness" faellt ueberall dort heraus,
-  // wo der Plan es als Kandidat nennt (PASSGENAUIGKEIT/PASSSCHUTZ/ABWEHR_PASS). Grund,
-  // GEMESSEN an der echten Kaderfamilie (data/generated/kaderfamilie-live-save.json, 110
-  // Spieler, Spearman-rho je Attribut gegen `p.d.football`, s. docs/design/football-
-  // rezept-kalibrierung.md Abschnitt 4.2 fuer die volle Tabelle und das Skript-Fragment):
-  // awareness korreliert auf diesem Kader NEGATIV mit der Football-Eignung (rho -0,34) —
-  // trotz drittschwerstem
-  // Matrixgewicht (11). health/determination/will/power/charisma/spirit liegen alle
-  // deutlich positiv (0,36 bis 0,54), genau dieselbe Falle wie Hockeys Speed/Spirit
-  // (docs/design/hockey-rezept-ursache.md Abschnitt 2) — nur schon VOR dem ersten
-  // Sinkhorn-Lauf vermieden statt hinterher nachjustiert. "dexterity"/"speed"/
-  // "intelligence" stehen gar nicht erst zur Wahl: keins der drei traegt Matrixgewicht in
-  // BASIS_JE_DISC.football (spirit/torment/health/awareness/will/determination/power/
-  // stamina/charisma), Sinkhorn kann sie ohnehin nicht speisen. LAUFTEMPO fehlt hier
-  // bewusst (wie PARADE torwartspezifisch bei Hockey, nur umgekehrt): es ist keine
-  // fachliche Rolle, sondern das disziplinuebergreifend erwartete Bewegungstempo
-  // (battle-mode.rezepte.js-Konvention 1:1 mit Basketball/Hockey), speed/dexterity
-  // tragen dafuer ohnehin kein Football-Matrixgewicht — bleibt unangetastet.
+  // Teil D).
+  //
+  // AWARENESS WIEDER ZUGELASSEN (14.11., Opus-PM-Praezisierung nach Chris' Matrix-
+  // Ruecknahme-Auftrag). Bis hierher war "awareness" in KEINER Zelle erlaubt — ausdruecklich,
+  // weil es auf der (damaligen) Kaderfamilie negativ mit der Football-Eignung korrelierte
+  // (rho -0,34, docs/design/football-rezept-kalibrierung.md Abschnitt 4.2) und das Projekt
+  // damals noch gegen den Spiel-Eignungs-Override kalibrierte, in dem awareness nur 8 Pp
+  // wog. Genau das ist jetzt der Fehler, den Chris ausdrueckllich benennt: eine ERLAUBT-
+  // Liste, die ein Matrix-Attribut komplett aussperrt, macht seine Zeilensumme unloesbar
+  // (0 statt des vollen Matrixgewichts 11) — Sinkhorn kann ein Attribut nur verteilen,
+  // wenn mindestens eine Zelle es zulaesst. Die rho-Sorge bleibt real (und bleibt zu
+  // beobachten), aber die Antwort darauf ist die SPALTENSEITE (Sondierung/mechanisches
+  // Gewicht der Sub-Skills, Primaer-/Nebenwege), nicht das Aussperren eines Attributs aus
+  // der ZEILE — s. CLAUDE.md "Die Eignungsmatrix ist gesperrt". Zugelassen in den drei
+  // Zellen, die der Football-Plan (Teil D) urspruenglich dafuer vorsah: PASSGENAUIGKEIT
+  // (Feldlesen/Progression), PASSSCHUTZ (Blitz-Erkennung) und ABWEHR_PASS (Coverage-
+  // Antizipation) — football-fachlich die drei Rollen, in denen "awareness" tatsaechlich
+  // die Bedeutung hat, die der Name verspricht. "dexterity"/"speed"/"intelligence" bleiben
+  // zu Recht aussen vor: keins der drei traegt Matrixgewicht in MATRIX.football, Sinkhorn
+  // kann sie ohnehin nicht speisen. LAUFTEMPO fehlt hier bewusst (wie PARADE
+  // torwartspezifisch bei Hockey, nur umgekehrt): es ist keine fachliche Rolle, sondern das
+  // disziplinuebergreifend erwartete Bewegungstempo (battle-mode.rezepte.js-Konvention 1:1
+  // mit Basketball/Hockey), speed/dexterity tragen dafuer ohnehin kein Football-
+  // Matrixgewicht — bleibt unangetastet.
+  // NFL-RUNDE (15.11., docs/design/football-opus-review-nfl-15-11.md): der Motor hat jetzt
+  // Linien-Duelle je Snap (PASSSCHUTZ gegen ABWEHR_PASS/ABWEHR_LAUF), Tackling/Yards nach
+  // Kontakt (LAUFKRAFT gegen ABWEHR_LAUF), Ballsicherheit bei jedem Kontakt plus Faenger-Haende
+  // und Money Downs (TEAMGEIST). Die Zellen folgen dieser neuen Semantik; jedes Matrixattribut
+  // hat mindestens zwei football-fachlich begruendete Zellen (Primaer- und Nebenweg), damit
+  // Sinkhorn kein Attribut in eine einzige Rolle zwingen muss.
+  //   PASSSCHUTZ   = Blocken (Pass- UND Laufblock): Robustheit, Wucht, Wille, Kampfgeist,
+  //                  Schmerzresistenz, Kondition.
+  //   ABWEHR_PASS  = Pass Rush + Deckung: Antizipation (awareness), Kampfgeist, Aggression
+  //                  (torment), Wucht, Entschlossenheit.
+  //   ABWEHR_LAUF  = Tackling/Run Stop: Aggression, Wucht, Robustheit, Kampfgeist, Wille.
+  //   BALLSICHERHEIT = Haende + Ball am Koerper: Wille, Robustheit, Entschlossenheit, Antizipation.
+  //   TEAMGEIST    = Nervenstaerke auf 3./4. Versuch + Chemie als Anspielstation: Kampfgeist,
+  //                  Charisma, Wille, Entschlossenheit.
   football: {
-    PASSGENAUIGKEIT: ["determination", "will"],
-    LAUFKRAFT:       ["power", "health", "spirit"],
-    PASSSCHUTZ:      ["health", "determination", "will"],
-    ABWEHR_PASS:     ["torment", "power"],
-    ABWEHR_LAUF:     ["torment", "power", "health"],
-    BALLSICHERHEIT:  ["health", "will"],
-    TEAMGEIST:       ["spirit", "charisma", "torment"],
+    PASSGENAUIGKEIT: ["determination", "will", "awareness", "charisma"],
+    LAUFKRAFT:       ["power", "health", "spirit", "torment"],
+    PASSSCHUTZ:      ["health", "power", "will", "spirit", "torment", "stamina"],
+    ABWEHR_PASS:     ["awareness", "spirit", "torment", "power", "determination"],
+    ABWEHR_LAUF:     ["torment", "power", "health", "spirit", "will"],
+    BALLSICHERHEIT:  ["will", "health", "determination", "awareness"],
+    // RUNDE 2 VERSUCHT UND VERWORFEN (14.11., Spaltenseite): TEAMGEIST brauchte laut Sondierung
+    // 51,7 % der mechanischen Gesamtmasse, konnte aus spirit+charisma+torment (Matrixbudget
+    // 25+4+16=45) aber nur 39,9 % tatsaechlich erreichen. "health" zusaetzlich zugelassen
+    // (football-fachlich: der grosse, zaehe Zielspieler) hob diese Luecke NICHT (health ist
+    // bereits anderswo voll ausgeschoepft, verschob nur die Komposition) und kostete Pp
+    // (18,3 -> 26,3, durchgefallen) fuer einen kleinen rho-Gewinn (0,525 -> 0,564) — s.
+    // docs/design/football-rezept-matrix-budget-14-11.md. Zurueckgerollt auf die urspruengliche
+    // Drei-Attribute-Zelle; die naechste Runde braucht eine andere Spaltenseiten-Idee, keine
+    // weitere Verdraengung eines bereits ausgeschoepften Attributs.
+    TEAMGEIST:       ["spirit", "charisma", "will", "determination"],
     AUSDAUER:        ["stamina", "health", "will"],
   },
 };
@@ -112,28 +141,80 @@ for (const s of subskills) if (soll[s] < MINDEST) soll[s] = MINDEST;
 const skala = 100 / Object.values(soll).reduce((a, b) => a + b, 0);
 for (const s of subskills) soll[s] *= skala;
 
-// Startbelegung: gleichverteilt ueber die erlaubten Zellen.
+// Startbelegung: gleichverteilt ueber die erlaubten Zellen (`prior` = 1 je erlaubter Zelle).
 const attribute = Object.keys(matrix);
-const p = {};
-for (const a of attribute) {
-  p[a] = {};
-  const ziele = subskills.filter((s) => erlaubt[s].includes(a));
-  for (const s of ziele) p[a][s] = 1 / ziele.length;
-}
 
-// Sinkhorn: abwechselnd Zeilen (Attributbudget = 1) und Spalten (Masse = Soll) normieren.
-for (let runde = 0; runde < 4000; runde++) {
-  for (const s of subskills) {
-    let ist = 0;
-    for (const a of attribute) ist += matrix[a] * (p[a][s] || 0);
-    if (ist <= 0) continue;
-    const f = soll[s] / ist;
-    for (const a of attribute) if (p[a][s] != null) p[a][s] *= f;
-  }
+// Sinkhorn: abwechselnd Zeilen (Attributbudget = 1) und Spalten (Masse = Soll) normieren. Das
+// Ergebnis ist die Diagonalskalierung der Startbelegung `prior` — verschiedene Prioren liefern
+// verschiedene, aber IMMER zeilen- und spaltentreue Loesungen.
+function sinkhorn(prior) {
+  const q = {};
   for (const a of attribute) {
-    const summe = Object.values(p[a]).reduce((x, y) => x + y, 0);
-    if (summe > 0) for (const s in p[a]) p[a][s] /= summe;
+    q[a] = {};
+    for (const s of subskills) if (erlaubt[s].includes(a)) q[a][s] = prior ? prior[a + "|" + s] : 1;
   }
+  for (let runde = 0; runde < 4000; runde++) {
+    for (const s of subskills) {
+      let ist = 0;
+      for (const a of attribute) ist += matrix[a] * (q[a][s] || 0);
+      if (ist <= 0) continue;
+      const f = soll[s] / ist;
+      for (const a of attribute) if (q[a][s] != null) q[a][s] *= f;
+    }
+    for (const a of attribute) {
+      const summe = Object.values(q[a]).reduce((x, y) => x + y, 0);
+      if (summe > 0) for (const s in q[a]) q[a][s] /= summe;
+    }
+  }
+  return q;
+}
+let p = sinkhorn(null);
+
+// --kaderfamilie (NFL-Runde Football, 15.11., docs/design/football-opus-review-nfl-15-11.md
+// Abschnitt 3): UNTER ALLEN zeilen- und spaltentreuen Loesungen die waehlen, deren Sub-Skills
+// je fuer sich am besten mit der Eignung gehen. Reines Sinkhorn ist budget-treu, verteilt ein
+// Attribut aber blind nach Proportion — bei Football landete so ein Sub-Skill bei rho 0,17 zur
+// Eignung, obwohl er die halbe Wertung trug. Gesucht wird ueber die Startbelegung (Prior je
+// Zelle, deterministischer Zufall), bewertet mit der soll-gewichteten mittleren Spearman-
+// Korrelation Sub-Skill/Eignung INNERHALB der je 2x6 Antretenden jeder Paarung der echten
+// Kaderfamilie (data/generated/kaderfamilie-live-save.json, dieselbe Quelle wie die rho-Abnahme).
+// Die Zeilen (Matrix) und Spalten (Sondierung) bleiben dabei exakt erhalten — die Suche
+// verschiebt NUR, welches Attribut in welcher erlaubten Zelle landet.
+if (process.argv.includes("--kaderfamilie")) {
+  const familie = JSON.parse(readFileSync(new URL("../data/generated/kaderfamilie-live-save.json", import.meta.url), "utf8"));
+  const proSeite = 6;
+  const gruppen = familie.varianten.map((v) => [v.heim, v.gast].flatMap((k) =>
+    [...k].sort((x, y) => (y.d[DISZIPLIN] || 0) - (x.d[DISZIPLIN] || 0)).slice(0, proSeite)));
+  const rang = (arr) => { const o = arr.map((v, i) => ({ v, i })).sort((x, y) => y.v - x.v); const r = new Array(arr.length);
+    let k = 0; while (k < o.length) { let j = k; while (j + 1 < o.length && o[j + 1].v === o[k].v) j++;
+      for (let m = k; m <= j; m++) r[o[m].i] = (k + j) / 2 + 1; k = j + 1; } return r; };
+  const rho = (x, y) => { const a = rang(x), b = rang(y), n = x.length, ma = (n + 1) / 2;
+    let sab = 0, sa = 0, sb = 0; for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - ma); sa += (a[i] - ma) ** 2; sb += (b[i] - ma) ** 2; }
+    return sab / Math.sqrt(sa * sb || 1); };
+  const korr = (q, s) => {
+    let t = 0;
+    for (const g of gruppen) t += rho(g.map((pl) => pl.d[DISZIPLIN] || 0),
+      g.map((pl) => attribute.reduce((x, a) => x + (pl.a[a] || 0) * matrix[a] * (q[a][s] || 0), 0)));
+    return t / gruppen.length;
+  };
+  const ziel = (q) => subskills.reduce((x, s) => x + soll[s] * korr(q, s), 0) / 100;
+  let prior = {};
+  for (const a of attribute) for (const s of subskills) if (erlaubt[s].includes(a)) prior[a + "|" + s] = 1;
+  let bester = ziel(p);
+  console.log(`--kaderfamilie: reines Sinkhorn ${bester.toFixed(3)}`);
+  let zustand = 7;
+  const zufall = () => { zustand = (zustand * 1103515245 + 12345) & 0x7fffffff; return zustand / 0x7fffffff; };
+  const schluessel = Object.keys(prior);
+  const RUNDEN = 1500;
+  for (let i = 0; i < RUNDEN; i++) {
+    const neu = { ...prior };
+    for (let k = 0; k < 2; k++) neu[schluessel[Math.floor(zufall() * schluessel.length)]] *= Math.exp((zufall() - 0.5) * 1.5);
+    const q = sinkhorn(neu), z = ziel(q);
+    if (z > bester) { bester = z; prior = neu; p = q; }
+  }
+  console.log(`--kaderfamilie: nach ${RUNDEN} Suchschritten ${bester.toFixed(3)}\n`);
+  for (const s of subskills) console.log(`  rho(${s}, Eignung) = ${korr(p, s).toFixed(2)}`);
+  console.log("");
 }
 
 // Kontrollrechnung
@@ -159,7 +240,7 @@ for (const s of subskills) {
     .map((a) => ({ a, v: matrix[a] * p[a][s] }))
     .sort((x, y) => y.v - x.v);
   const summe = roh.reduce((x, y) => x + y.v, 0) || 1;
-  let anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
+  const anteile = roh.map((r) => ({ a: r.a, v: Math.round((r.v / summe) * 100) })).filter((r) => r.v > 0);
   // Rundungsrest auf den groessten Posten legen, damit die Zeile exakt 100 ergibt.
   const rest = 100 - anteile.reduce((x, y) => x + y.v, 0);
   if (anteile.length) anteile[0].v += rest;
@@ -167,3 +248,20 @@ for (const s of subskills) {
 }
 console.log(zeilen.join(",\n"));
 console.log("  }");
+
+// BUDGET-TABELLE IN MATRIXPUNKTEN (Chris 15.11.: „die tabelle sollst du anpassen dass maximal
+// die punkte aus der matrix vergeben werden"). Das Rezept oben ist je Sub-Skill auf 100 %
+// normiert — dort kann ein Attribut optisch "53" tragen, obwohl die Matrix ihm nur 25 Punkte
+// gibt. Diese Tabelle zeigt dieselbe Loesung in der Schreibweise der Matrix: jede ZEILE
+// verteilt genau die Matrixpunkte des Attributs (nie mehr), jede SPALTE summiert sich auf das
+// gemessene mechanische Gewicht des Sub-Skills.
+console.log("\nBudget-Tabelle in Matrixpunkten (Zeile = Matrixgewicht, Spalte = mechanisches Gewicht)\n");
+const kurz = (s) => s.slice(0, 9);
+console.log("Attribut      " + subskills.map((s) => kurz(s).padStart(10)).join("") + "     Summe  Matrix");
+for (const a of attribute) {
+  const zelle = subskills.map((s) => (p[a][s] ? (matrix[a] * p[a][s]).toFixed(1) : "-").padStart(10));
+  const summe = subskills.reduce((x, s) => x + matrix[a] * (p[a][s] || 0), 0);
+  console.log(a.padEnd(14) + zelle.join("") + summe.toFixed(1).padStart(10) + String(matrix[a]).padStart(8));
+}
+console.log("Spaltensumme  " + subskills.map((s) =>
+  attribute.reduce((x, a) => x + matrix[a] * (p[a][s] || 0), 0).toFixed(1).padStart(10)).join(""));

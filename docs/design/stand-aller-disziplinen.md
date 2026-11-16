@@ -1,5 +1,16 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Einunddreißigster Nachtrag 15./16.11. — Football besteht, produktiv geschaltet (NFL-Motorrunde).**
+Chris: „lass opus das diesmal bitte zu ende bearbeiten". Statt eines sechsten Rezeptversuchs ein
+neuer Motor (Linien-Duelle je Snap, Tackling mit Yards nach Kontakt, Ballsicherheit bei jedem
+Kontakt, Money Downs, Ermüdung) und darauf ein Budget-Rezept. **rho je Spiel 0,854** (n=48, Saison
+0,937; vorher 0,525), **Pp 15,3 / 16,0** (vorher 18,3/18,8) — beide Pflichtkriterien regulär, keine
+Ausnahme. Football steht jetzt in `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` und
+`ARENA_RESOLVED_DISCIPLINE_IDS`; außerhalb der Wertung bleiben nur Battlefield und Mini-DM (eigene
+Pod-Pfade). Die übrigen 19 Disziplinen sind bit-identisch (Fingerabdruck). Volle Herleitung:
+`docs/design/football-opus-review-nfl-15-11.md`. Die Football-Zeile in der Tabelle unten ist damit
+überholt; maßgeblich ist `data/generated/disziplin-abnahme.json`.
+
 **Dreißigster Nachtrag 15.11. — Rho/Pp aller zwanzig Disziplinen frisch nachgemessen (Task #136),
 `disziplin-abnahme.json` nachgezogen.** Chris' Auftrag wörtlich: „dann bitte rho und pp noch mal
 auf neuesten stand bringen und durch messen" — für alle zwanzig, nicht nur Football/Hockey (Task

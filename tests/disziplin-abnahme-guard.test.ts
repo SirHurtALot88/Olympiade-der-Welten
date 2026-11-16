@@ -154,6 +154,21 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     },
   );
 
+  it("Football ist gewertet und besteht BEIDE Kriterien OHNE Ausnahme (NFL-Motorrunde 15.11.)", () => {
+    // Football war bis 15.11. nie gewertet (rho 0,525 nach fuenf verworfenen Rezeptrunden). Die
+    // NFL-Motorrunde (docs/design/football-opus-review-nfl-15-11.md: Linien-Duelle, Tackling,
+    // Ballsicherheit, Money Downs) hebt rho auf 0,854 bei Pp 15,3/16,0 -- regulaer bestanden. Chris
+    // hatte fuer Football eine 0,75er-Mindestschranke erlaubt; sie wird NICHT gebraucht, und dieser
+    // Test haelt fest, dass sich keine stille rho-/Pp-Ausnahme dazwischenschiebt.
+    const football = TABELLE.disziplinen.football!;
+    expect(football.rhoFrisch).toBe(true);
+    expect(football.ppFrisch).toBe(true);
+    expect(verfehlteKriterien(football, [])).toEqual([]);
+    expect(ARENA_ABNAHME_AUSNAHMEN.has("football")).toBe(false);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("football")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("football")).toBe(true);
+  });
+
   it("Mini-DM ist NICHT Teil des generischen Chassis-Sets (eigener Pod-Resolve-Pfad, eigener Schalter)", () => {
     // Mini-DM hat seit PR 4/PR 5 des 6-PR-Opus-Plans (21.10.) einen eigenen Pod-Resolve-Pfad
     // (lib/resolve/mini-dm-pod-resolve.ts, vier Teams statt eines Zweier-Duells, 2-1-0-0 statt

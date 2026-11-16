@@ -77,8 +77,16 @@ function createInMemoryPersistence(gameState: GameState): PersistenceService {
 /** D1 = speed-schach (bis 16.10. basketball, s. disziplin-abnahme.json), D2 = gewichtheben — BEIDE arena-aufgeloest, absichtlich die Weg-B-Konstellation. */
 const D1_ARENA = "speed-schach";
 const D2_ARENA = "gewichtheben";
-/** Kontroll-Fixture (Abschnitt "eine arena-faehige Disziplin bleibt unveraendert"): D2 nicht arena-faehig. */
-const D2_NICHT_ARENA = "football";
+/**
+ * Kontroll-Fixture (Abschnitt "eine arena-faehige Disziplin bleibt unveraendert"): D2 nicht arena-faehig.
+ * Bis 15.11. stand hier "football" -- seit der NFL-Runde (docs/design/football-opus-review-nfl-15-11.md)
+ * ist Football selbst in `ARENA_RESOLVED_DISCIPLINE_IDS`. Von den zwanzig echten Disziplinen stehen
+ * danach nur noch Battlefield und Mini-DM draussen, und BEIDE haben einen eigenen Praesenz-Zweig
+ * (s. Kommentar unten) -- keine echte Disziplin taugt mehr als "nicht arena-faehig ohne Sonderweg".
+ * Der Test prueft ohnehin nur die Mengen-Zugehoerigkeit der disciplineId (der minimale Spielstand
+ * unten deklariert seine Disziplinen selbst), deshalb eine bewusst kuenstliche Kennung.
+ */
+const D2_NICHT_ARENA = "kontroll-disziplin-ohne-arena";
 /**
  * ZWEITE Kontroll-Disziplin fuer den "weder D1 noch D2 arena-faehig"-Fall (CI-Fix 24.10., s.
  * Kommentar am Testfall unten) -- bis 15.11. stand hier "hockey" (bewusst NICHT "mini-dm": Mini-DM
@@ -86,13 +94,13 @@ const D2_NICHT_ARENA = "football";
  * von `ARENA_RESOLVED_DISCIPLINE_IDS` Anwendbarkeit ausloest, und "battlefield" hat seit dem
  * Battlefield-Pod-Vorlauf denselben eigenen `battlefieldPresent`-Zweig). Hockey ist seit der
  * Pp-Pool-Korrektur (15.11., s. lib/battle/arena-resolved-disciplines.ts) selbst in
- * `ARENA_RESOLVED_DISCIPLINE_IDS` und damit hier die FALSCHE Wahl geworden. Nach football,
- * battlefield, mini-dm ist football das einzige angeschlossene-oder-nicht Mitglied ohne eigenen
- * Praesenz-Zweig, das weiterhin ausserhalb `ARENA_RESOLVED_DISCIPLINE_IDS` steht -- D1 und D2
- * duerfen hier identisch sein, `determineArenaDisciplineContexts()` prueft beide unabhaengig
- * voneinander rein ueber die Mengen-Zugehoerigkeit der jeweiligen disciplineId.
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` und damit hier die FALSCHE Wahl geworden; danach stand hier
+ * "football", bis Football selbst am 15.11. (NFL-Runde) aufgenommen wurde. Seither gibt es keine
+ * echte Disziplin mehr ausserhalb der Menge ohne eigenen Praesenz-Zweig -- deshalb eine kuenstliche
+ * Kennung (s. D2_NICHT_ARENA oben). `determineArenaDisciplineContexts()` prueft D1 und D2
+ * unabhaengig voneinander rein ueber die Mengen-Zugehoerigkeit der jeweiligen disciplineId.
  */
-const D2_NICHT_ARENA_ZWEITE = "football";
+const D2_NICHT_ARENA_ZWEITE = "kontroll-disziplin-ohne-arena-2";
 
 function buildMinimalBattleModeGameState(input: { d1: string; d2: string }): GameState {
   return {
