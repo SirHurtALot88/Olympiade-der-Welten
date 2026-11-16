@@ -182,6 +182,21 @@
  * keine Chris-Ausnahme dafuer vergeben -- Chris' Auftrag war ausdruecklich "keine PPS-Bruecken
  * mehr", nicht "noch eine Ausnahme").
  *
+ * FOOTBALL-NACHTRAG 3 (15.11., NFL-RUNDE, docs/design/football-opus-review-nfl-15-11.md -- Chris:
+ * "lass opus das diesmal bitte zu ende bearbeiten [...] dass das abgenommen ist"): der in
+ * NACHTRAG 2 geforderte MOTOR-Kanal ist gebaut. Vier neue Mechaniken in `battle-mode.engine.js`
+ * (FB_NFL, resolveLaufNfl/resolvePassNfl): Linien-Duelle je Snap fuer jeden nicht ballfuehrenden
+ * Spieler (ESPN Pass Block/Pass Rush/Run Stop Win Rate als Vorbild), Tackling mit Yards nach
+ * Kontakt und gebrochenen Tackles, Fumbles bei jedem Kontakt plus Faenger-Haende
+ * (BALLSICHERHEIT: mechanisch 0 % -> 13,6 %), Money Downs (TEAMGEIST: 52,7 % -> 14,5 %), dazu
+ * erstmals ein Live-Kanal fuer AUSDAUER (Ermuedung in der Linie). Rezept per Budget-Methode neu
+ * gebaut (Zeilen = gesperrte Matrix, Spalten = neue Sondierung; Matrix selbst unangetastet).
+ * GEMESSEN: rho je Spiel **0,854** (n=48, Median der Kaderfamilie, Saison 0,937; n=24: 0,874),
+ * Pp **15,3 / 16,0** (n=48, Saatstroeme 0 / 10 000 000). BEIDE Pflichtkriterien regulaer
+ * bestanden -- KEINE Ausnahme noetig, die von Chris erlaubte 0,75er-Mindestschranke wird gar nicht
+ * gebraucht. Die 19 anderen Disziplinen sind bit-identisch (pruefe-wertung-fingerabdruck.mjs:
+ * nur die drei Football-Eintraege aendern sich). Football steht seither in beiden Mengen unten.
+ *
  * BASKETBALL-NACHTRAG (18.10., PR #1289 "Give-and-Go-Schneiden", Task #123 -- Konsistenz-Audit
  * 25.10.): dieselbe Verschiebung wie bei Football, nur in die andere Richtung. Vorher 0,795 je
  * Spiel (16.10., unter der Schranke), nach PR #1289 **rho 0,810** (n=12 statt der sonst ueblichen
@@ -227,13 +242,8 @@
  *
  * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund (zuletzt nachgezogen 15.11.,
  * Konsistenz-Audit -- volle Zahlen/Quellen je Disziplin in data/generated/disziplin-abnahme.json):
- *  - FOOTBALL: s. FOOTBALL-NACHTRAG 2 oben (15.11.) fuer die volle Herleitung. Der Rezept-
- *    Verdrahtungsfehler (spirit/charisma ohne Zelle) ist behoben -- Pp besteht jetzt klar (18,3,
- *    nahe am Optimum <15), aber rho (0,525 je Spiel) bleibt unter der 0,75er-Mindestschranke, nach
- *    fuenf unabhaengig probierten und verworfenen weiteren Rezept-/Matrix-Varianten. Config/
- *    Referenz sind fertig, der Eintrag hier fehlt weiterhin -- nicht wegen Pp (das besteht jetzt),
- *    sondern wegen rho, und ohne Chris-Ausnahme dafuer (sein Auftrag war "keine PPS-Bruecken mehr",
- *    nicht "noch eine Ausnahme").
+ *  - FOOTBALL: SEIT 15.11. NICHT MEHR DRAUSSEN, s. FOOTBALL-NACHTRAG 3 oben (NFL-Runde: rho 0,854
+ *    je Spiel, Pp 15,3/16,0, beide regulaer bestanden).
  *  - SHOWCASE und I-SPY: root-caused (15.11., s. SHOWCASE-I-SPY-AUSNAHME-NACHTRAG unten) --
  *    reines Kaderfamilie-Rauschen (A/B-Test: derselbe Code auf der alten Kaderfamilie liefert
  *    0,839/0,817, auf der aktuellen nur 0,781/0,776), keine Mechanik-Luecke. Beide stehen seitdem
@@ -350,12 +360,10 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   "climbing",
   // I-Spy (27.10., Task #197): Kalibrierrunde 3, s. I-SPY-NACHTRAG im Kommentar oben.
   "i-spy",
-  // Football BEWUSST NICHT HIER: rho bestand zwischenzeitlich NICHT (0,722 seit #934, 15.09.),
-  // besteht seit den Kickoff/QB/Kicker-Slot-Schritten (14.10.) aber WIEDER (0,807) -- der Blocker
-  // ist seither Pp (64,6/61,7, weit ueber 25), nicht mehr rho, s. FOOTBALL-NACHTRAG im Kommentar
-  // oben. Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
-  // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer eigenen
-  // Pp-Rezeptrunde.
+  // FOOTBALL (15.11., NFL-Runde, s. FOOTBALL-NACHTRAG 3 im Kommentar oben): Motor-Ueberarbeitung
+  // (Linien-Duelle, Tackling, Ballsicherheit, Money Downs) plus Budget-Rezept -- rho 0,854 je
+  // Spiel, Pp 15,3/16,0, beide regulaer bestanden. PPS-Referenz gegen den neuen Motor neu gezogen.
+  "football",
   // TDM (TDM-Gefecht-Verdrahtung 11.11.): `tdmGefecht()` ueber das neue Kampf-Chassis
   // (`ARENA_KAMPF_DISCIPLINE_IDS`, arena-headless-runner.ts), s. TDM_GEFECHT_VORLAUF_AKTIV und
   // den Eintrag in ARENA_RESOLVED_DISCIPLINE_IDS unten fuer die Abnahmezahlen.
@@ -572,4 +580,11 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // `determineArenaDisciplineContexts()` prueft zusaetzlich
   // `TDM_GEFECHT_VORLAUF_AKTIV`, bevor TDM wirklich als Kandidat gilt (s. dort).
   "tdm",
+  // FOOTBALL (15.11., NFL-Runde, s. FOOTBALL-NACHTRAG 3 im Kopfkommentar): der in NACHTRAG 2
+  // verlangte Motor-Kanal ist gebaut -- Linien-Duelle je Snap, Tackling/Yards nach Kontakt,
+  // Ballsicherheit bei jedem Kontakt, Money Downs. rho 0,854 je Spiel (n=48, Saison 0,937), Pp
+  // 15,3/16,0 (zwei Saatstroeme) -- beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
+  // Achtzehnte gewertete Disziplin; draussen bleiben nur noch Battlefield und Mini-DM (beide mit
+  // eigenem Pod-Pfad).
+  "football",
 ]);
