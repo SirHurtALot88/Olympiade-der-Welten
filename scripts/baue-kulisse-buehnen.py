@@ -194,7 +194,62 @@ def baue_fechten(variante: str) -> Image.Image:
     b0, b1 = F_BODEN
     band = welt.crop((0, b0, 1280, b1)).resize((LW, round((b1 - b0) * f)), Image.LANCZOS)
     lein.paste(streifen_kacheln(band, LW, LH - F_UNTERKANTE, saat=11), (0, F_UNTERKANTE))
-    return lein
+    return fechten_vordergrund(lein, welt, variante)
+
+
+# "RAHMEN STATT MATERIAL" (Sicht-Audit 16.11., Kulissen-Audit 08.11. Abschnitt 4.7, Rang 7): zwischen der
+# Motor-Bahn (bis y~190) und der Bank der Bahnen 2-6 (zeichneFechten, deckend ab y~366) lagen 45 % des
+# Bildes als leerer Rasen bzw. leerer Hallenboden. Jetzt hat der Raum eine Mitte und einen Vordergrund:
+#   Schlosshof - Hofpflaster der Szene (ihre Steinflaeche links neben der Demo-Bahn) statt Rasen, nach
+#                vorn dunkler; vorne die Rosenhecke der Burgmauer als Vordergrundkante vor der Bank;
+#   Halle      - Lichtinsel der Hallenscheinwerfer unter der Bahn, vorne die ersten Zuschauerreihen
+#                der Szene als dunkle Silhouette (Ruecken zum Betrachter, im Gegenlicht).
+# Die Mitte direkt unter der Bahn bleibt ruhig: dort schreibt der Motor Namen und Trefferverlauf.
+F_PFLASTER = (0, 224, 160, 262)  # Hofpflaster der Szene (Schlosshof), links neben der Demo-Bahn
+F_HECKE = (230, 196, 590, 215)  # Rosenhecke vor der Burgmauer, ohne Laternenpfahl und Tor
+F_PUBLIKUM = (232, 140, 1048, 205)  # Halle: vordere Zuschauerreihen zwischen den Demo-Signalmasten
+F_BANK_OBEN = 366  # Oberkante der deckenden Bank (zeichneFechten), gemessen im Sicht-Audit 16.11.
+
+
+def fechten_vordergrund(lein: Image.Image, welt: Image.Image, variante: str) -> Image.Image:
+    a = np.asarray(lein.convert("RGB")).astype(np.float32)
+    yy = np.mgrid[0:LH, 0:LW][0].astype(np.float32)
+    if variante == "schlosshof":
+        # Bewusst NICHT kacheln_gespiegelt(): dessen Zeilen-/Spaltenangleich glaettet genau die Fugen
+        # weg, und aus Pflaster wurde ein verwaschenes Karomuster. Massstab 1:1 wie die Mauersteine.
+        stueck = welt.crop(F_PFLASTER)
+        flaeche = Image.new("RGB", (LW, LH - F_UNTERKANTE))
+        for j, y in enumerate(range(0, flaeche.height, stueck.height)):
+            for i, x in enumerate(range(0, LW + stueck.width, stueck.width)):
+                flaeche.paste(stueck if i % 2 == 0 else stueck.transpose(Image.FLIP_LEFT_RIGHT),
+                              (x + (stueck.width // 2 if j % 2 else 0) - stueck.width // 2, y))
+        pflaster = np.asarray(flaeche).astype(np.float32)
+        # nach vorn (unten) dunkler: Schatten der Mauer/Hecke, Tiefe
+        t = np.clip((yy[F_UNTERKANTE:] - F_UNTERKANTE) / (F_BANK_OBEN - F_UNTERKANTE), 0, 1)[..., None]
+        a[F_UNTERKANTE:] = pflaster * (1.0 - 0.30 * t)
+        hecke = welt.crop(F_HECKE)
+        hh = 42
+        hecke = hecke.resize((round(hecke.width * hh / hecke.height), hh), Image.NEAREST)
+        reihe = Image.new("RGB", (LW, hh))
+        x, k = 0, 0
+        while x < LW:
+            reihe.paste(hecke if k % 2 == 0 else hecke.transpose(Image.FLIP_LEFT_RIGHT), (x, 0))
+            x += hecke.width
+            k += 1
+        r = np.asarray(reihe).astype(np.float32) * 0.78  # Vordergrund liegt im Schatten
+        a[F_BANK_OBEN - hh + 4:F_BANK_OBEN + 4] = r
+    else:
+        a = licht_rund(a, LW / 2, 205, 560, 70, (190, 225, 255), 0.30, haerte=1.4)
+        # gespiegelt, damit es nicht als Spiegelbild der Raenge oben liest
+        pub = welt.crop(F_PUBLIKUM).transpose(Image.FLIP_LEFT_RIGHT)
+        ph = 70
+        pub = pub.resize((LW, round(pub.height * LW / pub.width)), Image.LANCZOS)
+        pub = pub.crop((0, pub.height - ph, LW, pub.height))
+        p = np.asarray(pub).astype(np.float32)
+        # Silhouette im Gegenlicht (naeher, also groesser als die Raenge oben): dunkel und kalt
+        p = p * 0.24 + np.array([4, 8, 18.0])[None, None]
+        a[F_BANK_OBEN - ph + 4:F_BANK_OBEN + 4] = p
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
 
 
 # ---------------------------------------------------------------------------------------- Speed-Schach
