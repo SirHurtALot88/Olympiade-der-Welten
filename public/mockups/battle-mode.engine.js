@@ -18566,14 +18566,22 @@
       // tennis/fechten) traegt dieses Flag.
       label:"Eiskunstlauf", jeSeite:6, rundenN:12, rundenDauer:0.425, duett:true,
       failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
+      // BUDGET-KONSERVIERUNG (15.11., Task #133, Chris: "budget konservierung sollte eigentlich
+      // jetzt fuer alle 20 diszis schon gelten!"): EIN multiplikativer Zeilenschritt gegen die
+      // GEMESSENEN Anteile -- jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle wieder
+      // auf 100 normiert (Mittel beider Saatstroeme vorher: dexterity 24,5 % gegen Matrix 18,
+      // charisma 23,8 % gegen 28, speed 5,5 % gegen 10). Gemessen (messe-arena-einfluss.mjs
+      // eiskunstlauf 48): Pp 18,8/19,8 -> 10,6/12,0 (Saatversatz 0 / 10 000 000), Gegenprobe auf
+      // dem ungesehenen Strom 20 000 000: 11,2. rho je Spiel (miss-alle-disziplinen.mjs 24
+      // eiskunstlauf) 0,912 -> 0,927, Spannweite 0,021, Saison 0,965.
       rezept:{
-        GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
-        SPITZENMOMENT:{dexterity:45,speed:30,awareness:25},
-        TECHNIK:      {dexterity:40,awareness:35,intelligence:25},
-        PUBLIKUM:     {charisma:70,spirit:30},
-        NERVEN:       {determination:40,awareness:30,intelligence:30},
-        AUSDAUER:     {spirit:40,determination:30,dexterity:30},
-        WAGNIS:       {speed:45,dexterity:30,awareness:25}
+        GRUNDLAGE:    {charisma:54,spirit:30,dexterity:16},
+        SPITZENMOMENT:{dexterity:36,speed:41,awareness:23},
+        TECHNIK:      {dexterity:38,awareness:37,intelligence:25},
+        PUBLIKUM:     {charisma:71,spirit:29},
+        NERVEN:       {determination:42,awareness:30,intelligence:28},
+        AUSDAUER:     {spirit:43,determination:31,dexterity:26},
+        WAGNIS:       {speed:57,dexterity:22,awareness:21}
       }
     },
 
@@ -18716,14 +18724,27 @@
       // mehr zusaetzlich in TECHNIK. Zusammen mit `GAUNTLET_FAMILIE_GEWICHT` 0,5->0,35 (s. dort)
       // und der Wucht-Familie 4->3 Geraete (s. FOLTER_GERAETE oben) die Gegenmessung fuer die
       // PR-Beschreibung.
+      //
+      // BUDGET-KONSERVIERUNG (15.11., Task #133, Chris: "budget konservierung sollte eigentlich
+      // jetzt fuer alle 20 diszis schon gelten!"): bis hierher kam intelligence (Matrixgewicht 2)
+      // in KEINER der sieben Unterfertigkeiten vor -- seine Zeile war unloesbar, es trug faktisch
+      // 0 statt 2 (gefunden von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt sitzt
+      // es mit 6 in NERVEN (der "MIND FORTRESS"-Zone: wer den Schmerz durchschaut, haelt laenger).
+      // Zugleich ein multiplikativer Zeilenschritt gegen die GEMESSENEN Anteile (Mittel beider
+      // Saatstroeme vorher: health 13,1 % gegen 18, determination 13,2 % gegen 10, will 29,5 %
+      // gegen 28, power 11,5 % gegen 10): jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je
+      // Unterfertigkeit wieder auf 100 normiert. Gemessen (messe-arena-einfluss.mjs breaking 48,
+      // Saatversatz 0 / 10 000 000): Pp 14,3/13,9 -> 12,5/10,2, intelligence 0 -> 0,8/1,2 %;
+      // rho je Spiel (miss-alle-disziplinen.mjs 24 breaking) 0,867 -> 0,860, Spannweite 0,169 --
+      // die Bewegung liegt weit innerhalb des Kaderrauschens.
       rezept:{
-        GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
-        SPITZENMOMENT:{power:55,will:45},
-        TECHNIK:      {torment:59,determination:41},
-        PUBLIKUM:     {will:60,torment:40},
-        NERVEN:       {will:50,health:50},
-        AUSDAUER:     {stamina:65,determination:35},
-        WAGNIS:       {power:40,dexterity:60}
+        GRUNDLAGE:    {will:32,torment:19,health:34,stamina:15},
+        SPITZENMOMENT:{power:54,will:46},
+        TECHNIK:      {torment:63,determination:37},
+        PUBLIKUM:     {will:59,torment:41},
+        NERVEN:       {will:42,health:52,intelligence:6},
+        AUSDAUER:     {stamina:69,determination:31},
+        WAGNIS:       {power:41,dexterity:59}
       }
     },
 
@@ -19263,14 +19284,26 @@
       // 16.09.-Kalibrierrunde bereits erschoepfend gegen Alternativen getestet (jede Aenderung
       // dort schlechter als der Status quo, s. GEPRUEFT-UND-VERWORFEN-Kommentar oben), NERVEN
       // traegt bereits eine bewusste Grid-Suchs-Kalibrierung.
+      //
+      // BUDGET-KONSERVIERUNG (15.11., Task #133, Chris: "budget konservierung sollte eigentlich
+      // jetzt fuer alle 20 diszis schon gelten!"): EIN multiplikativer Zeilenschritt ueber ALLE
+      // sieben Rollen gegen die GEMESSENEN Anteile -- jede Zelle eines Attributs mal
+      // (Matrix/Ist)^0,6, je Rolle wieder auf 100 normiert (Mittel beider Saatstroeme vorher:
+      // determination 1,3 % gegen Matrix 6, torment 20,4 % gegen 25, speed 20,2 % gegen 16,
+      // health 7,5 % gegen 4). NERVEN/PUBLIKUM wurden dabei bewusst MITbewegt, entgegen dem
+      // Absatz oben: ihre Struktur (welches Attribut wo) bleibt, nur die Anteile verschieben sich
+      // um 3-11 Punkte -- und rho haelt (Abnahmeregel rho vor Pp). Gemessen (messe-arena-
+      // einfluss.mjs fechten 48): Pp 20,1/20,7 -> 12,7/13,3 (Saatversatz 0 / 10 000 000),
+      // Gegenprobe auf dem ungesehenen Strom 20 000 000: 13,2. rho je Spiel (miss-alle-
+      // disziplinen.mjs 24 fechten) 0,877 -> 0,876, Spannweite 0,045, Saison 0,979.
       rezept:{
-        GRUNDLAGE:    {torment:29,dexterity:23,speed:19,awareness:17,power:12},
-        SPITZENMOMENT:{dexterity:40,speed:35,torment:25},
-        TECHNIK:      {torment:29,dexterity:23,speed:19,awareness:17,power:12},
-        NERVEN:       {awareness:55,determination:20,health:25},
-        PUBLIKUM:     {intelligence:50,health:50},
-        AUSDAUER:     {speed:40,power:35,health:25},
-        WAGNIS:       {speed:45,torment:30,power:25}
+        GRUNDLAGE:    {torment:32,dexterity:23,speed:16,awareness:16,power:13},
+        SPITZENMOMENT:{dexterity:40,speed:31,torment:29},
+        TECHNIK:      {torment:32,dexterity:23,speed:16,awareness:16,power:13},
+        NERVEN:       {awareness:52,determination:31,health:17},
+        PUBLIKUM:     {intelligence:56,health:44},
+        AUSDAUER:     {speed:39,power:42,health:19},
+        WAGNIS:       {speed:39,torment:34,power:27}
       },
       // WERTUNGSTABELLE (F1, Opus-Konzeptreview 26.09.): NUR die "Stand"-Spalte weicht vom
       // WERTUNG_DUELL()-Default ab -- sie muss `gefechtSieg` lesen, nicht `verlauf[rundenN-1]`
