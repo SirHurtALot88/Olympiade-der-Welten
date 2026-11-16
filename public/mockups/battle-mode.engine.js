@@ -54886,25 +54886,35 @@
   }
   function viMische(zf){
     if(viRennT==null||!istBahn(disc))return null;
-    const schritt=zf/60, f=Math.max(0,Math.min(1,(bahnSimAcc+acc)/schritt));
-    if(f>=0.999||f<=0)return null;
+    // OBERGRENZE 1+1/zf STATT 1 (Opus-Review #1503): bahnSimAcc waechst in ganzen Sechzigsteln,
+    // der Schritt feuert erst bei acc>=zf/60 -- (bahnSimAcc+acc)/schritt laeuft deshalb bis zu
+    // 1+1/zf hoch. Bei Kappung auf 1 stand die Figur ein Bild und sprang im naechsten doppelt
+    // (1,7-8 % der Bilder). Mit 1+1/zf rechnet die Mischung hoechstens 1/zf eines Schritts (<1 px)
+    // voraus; die `fertig`-Pruefung unten sichert die Zielankunft weiter ab.
+    const schritt=zf/60, f=Math.max(0,Math.min(1+1/zf,(bahnSimAcc+acc)/schritt));
+    if(f<=0||Math.abs(f-1)<1e-9)return null;
     if(!(rennT>=viRennT)||rennT-viRennT>0.25)return null;
     const cr=camR, c=cam;
     const gesichert={rennT, zoom:c.zoom, cx:c.cx, rx:cr.x, ry:cr.y, l:[]};
     const mix=(a,b)=>a+(b-a)*f;
-    rennT=mix(viRennT,rennT); c.zoom=mix(viZoom,c.zoom); c.cx=mix(viCx,c.cx); cr.x=mix(viRx,cr.x); cr.y=mix(viRy,cr.y);
-    for(const u of LAEUFER){
-      const v=viVorher.get(u); if(!v)continue;
-      if(v.fertig!==(u.fertig!=null))continue;
-      if(Math.abs(u.pos-v.pos)>0.06)continue;
-      gesichert.l.push([u,u.pos,u.bahnZ]);
-      u.pos=mix(v.pos,u.pos);
-      if(Math.abs(u.bahnZ-v.z)<1.5)u.bahnZ=mix(v.z,u.bahnZ);
-    }
-    return ()=>{
+    const rueck=()=>{
       rennT=gesichert.rennT; c.zoom=gesichert.zoom; c.cx=gesichert.cx; cr.x=gesichert.rx; cr.y=gesichert.ry;
       for(const [u,p,z] of gesichert.l){u.pos=p;u.bahnZ=z;}
     };
+    // Wirft das Mischen selbst (Opus-Review #1503: z. B. ein null in LAEUFER), wird der halb
+    // umgeschriebene Stand sofort zurueckgesetzt, statt gemischt stehen zu bleiben.
+    try{
+      rennT=mix(viRennT,rennT); c.zoom=mix(viZoom,c.zoom); c.cx=mix(viCx,c.cx); cr.x=mix(viRx,cr.x); cr.y=mix(viRy,cr.y);
+      for(const u of LAEUFER){
+        const v=viVorher.get(u); if(!v)continue;
+        if(v.fertig!==(u.fertig!=null))continue;
+        if(Math.abs(u.pos-v.pos)>0.06)continue;
+        gesichert.l.push([u,u.pos,u.bahnZ]);
+        u.pos=mix(v.pos,u.pos);
+        if(Math.abs(u.bahnZ-v.z)<1.5)u.bahnZ=mix(v.z,u.bahnZ);
+      }
+    }catch(e){ rueck(); return null; }
+    return rueck;
   }
 
   function anzeigeSechzigstel(zf){
