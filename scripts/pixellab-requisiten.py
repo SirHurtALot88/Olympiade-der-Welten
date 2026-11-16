@@ -126,6 +126,21 @@ AUFTRAEGE = {
     "showcase_prospekt_zirkus": dict(art="kulisse", hintergrund=True, gen=(264, 116),
         prompt="deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit"),
 
+    # --- Takeshi's Castle: Kulissen-QS 08.11. (Rahmen statt Material, Rang 1). Drei NEUE
+    # Requisiten (kein Sprite-Tausch wie oben, art="neu": kein altes Format zu treffen,
+    # Ziel ist die eigene gen-Box) fuer die Draufsicht-Route: ein Torii am Routenanfang,
+    # Kirschbaeume entlang des Wegs, Tribuenenbloecke an zwei, drei Stellen. Alle drei im
+    # selben DRAUF-Stil wie baum_1..4/zaun_holz, damit die Karte EINE Perspektive haelt
+    # (docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.1: "Perspektive
+    # vereinheitlichen" -- gewaehlter Weg: 3/4-Sicht durchhalten, nicht die Fallen-
+    # Piktogramme auf strenge Draufsicht umstellen, s. Batch-13-Notiz).
+    "takeshi_torii": dict(art="neu", datei="arena/takeshi_torii.png", gen=(84, 64),
+        prompt=f"a wooden red japanese torii shrine gate, two upright pillars and a curved crossbeam on top, standalone, {DRAUF}, {STIL}"),
+    "takeshi_kirschbaum": dict(art="neu", datei="arena/takeshi_kirschbaum.png", gen=(40, 58),
+        prompt=f"blooming japanese cherry blossom tree with a round pink and white flower crown, {DRAUF}, {STIL}"),
+    "takeshi_tribuene": dict(art="neu", datei="arena/takeshi_tribuene.png", gen=(72, 46),
+        prompt=f"small wooden spectator grandstand bleacher stand full of tiny cheering fans in colourful clothes, {DRAUF}, {STIL}"),
+
     # --- Climbing: Kulissen-QS 08.11. (Rahmen statt Material, Rang 2 des Audits). Drei NEUE
     # Requisiten (art="neu", wie takeshi_torii/-kirschbaum/-tribuene in Batch 13: kein altes
     # Format zu treffen, Ziel ist die eigene gen-Box) fuer die Boden-/Wandfuss-Zone, die bodenWand()
