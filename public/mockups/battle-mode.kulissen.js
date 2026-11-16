@@ -278,7 +278,7 @@ window.__ARENA_KULISSEN={
    "id": "dach",
    "label": "Hochhausdach",
    "bild": "/sprites/kulissen/tennis/dach.jpg",
-   "dunkel": 0.07
+   "dunkel": 0.06
   }
  ],
  "time-trial": [
