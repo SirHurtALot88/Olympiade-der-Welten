@@ -29643,12 +29643,26 @@
   // x=0,045/0,955 lagen schon VOR dem Split ganz am linken/rechten Bildrand -- nach dem
   // Split ist das automatisch der Aussenrand GENAU der eigenen Haelfte (Heim-Fundorte
   // 4-46 %, Gast-Fundorte 54-96 %, s. ispyFundortXY()), ohne dass diese Funktion selbst
-  // etwas anders rechnen muesste. Keine Aenderung noetig, nur der Beleg dafuer.
+  // etwas anders rechnen muesste. EINE HALLE (16.11.): der Split ist zurueckgenommen; x bleibt
+  // die eigene Aussenwand der Halle, die Hoehe ist auf H*0,24..0,70 gestaucht, damit die
+  // Namensschilder der Wartenden nicht ins Zugtabellen-Band unten ragen.
   function ispyHeimatXY(u){
     const seite=TEILNEHMER.filter(x=>x.side===u.side);
     const i=Math.max(0,seite.indexOf(u));
     const n=Math.max(1,seite.length-1);
-    return {x:u.side===0?W*0.045:W*0.955, y:H*0.20+(H*0.60)*(seite.length>1?i/n:0.5)};
+    return {x:u.side===0?W*0.045:W*0.955, y:H*0.24+(H*0.46)*(seite.length>1?i/n:0.5)};
+  }
+  // ZYKLUS STATT ENTHUELLUNGSTAKT (Darstellungsrunde 16.11., Chris: "sichtbare Wege",
+  // "Verweilen mit Fortschrittsbalken"): stepBuehne() enthuellt EINEN Teilnehmer je
+  // `rundenDauer` (60/384 s), reihum ueber alle Teilnehmer (buehneQueue, s. bauBuehne()). Die
+  // Phasenuhr unten lief bisher gegen `rundenDauer` selbst -- Gehen, Suchen und Ergebnis waren
+  // nach 0,16 s durch, der Lauf dauerte 0,05 s (sah aus wie Teleport), danach stand jeder
+  // ~1,7 s im Ergebnis. Jetzt laeuft die Bilduhr ueber die Zeit bis zur NAECHSTEN eigenen
+  // Enthuellung (rundenDauer x Teilnehmerzahl), mit 8 % Puffer, damit das Ergebnis vor dem
+  // naechsten Lauf noch sichtbar steht. Reine Anzeige: dieselben viz*-Felder wie bisher, kein
+  // rr(), Enthuellungsreihenfolge und u.summe unberuehrt.
+  function ispyVizZyklus(art){
+    return art.rundenDauer*Math.max(1,TEILNEHMER.length)*0.92;
   }
   function stepSchatzsuche(dt,art){
     if(!TEILNEHMER.length)return;
@@ -29672,7 +29686,7 @@
           // SPLIT-SCREEN (I1): `u.side` waehlt die eigene Haelfte -- der Laeufer zielt auf
           // seine EIGENE Truhe im EIGENEN Raum (s. ispyFundortXY()-Kommentar), nie auf die
           // des Gegners.
-          const ziel=ispyFundortXY(vis,u.side);
+          const ziel=ispyStandXY(vis,u.side);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
           // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
@@ -29721,7 +29735,8 @@
     // enthuellter Teilnehmer im SELBEN Frame schon eine (winzige) Fortschrittszahl bekommt
     // statt einen Frame lang bei 0 zu haengen — dieselbe Reihenfolge wie
     // stepFechten()/stepTennis().
-    const T=art.rundenDauer;
+    const T=ispyVizZyklus(art);
+    const klickTakt=ISPY_TON_SCHLOSS_INTERVALL*(art.rundenDauer>0?T/art.rundenDauer:1);
     for(const u of TEILNEHMER){
       u.vizIspyT=(u.vizIspyT||0)+dt;
       const anteil=T>0?Math.min(1,u.vizIspyT/T):1;
@@ -29739,7 +29754,7 @@
           // dasselbe Zaehler-Vergleichsmuster wie TON_KATALOG.climbing.griff/-.zug
           // (u.vizGriffN/u.vizZugN, ":27759"/":27763") -- hier auf u.vizIspyT statt einem
           // Motorzustand, weil "suchen" selbst keinen zaehlbaren Fortschrittswert hat.
-          const klickN=Math.floor((u.vizIspyT-ISPY_VIZ_GEHEN_ANTEIL*T)/ISPY_TON_SCHLOSS_INTERVALL);
+          const klickN=Math.floor((u.vizIspyT-ISPY_VIZ_GEHEN_ANTEIL*T)/klickTakt);
           if(klickN>(u.vizIspySchlossN||0)){ u.vizIspySchlossN=klickN; sfx("i-spy","schloss"); }
         } else {
           u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
@@ -31104,9 +31119,32 @@
   // wie im Recherche-Dokument Abschnitt 4/I1 vorgeschlagen) -- die Luecke bei 46-54 % ist
   // der Trennsteg (s. bodenSchatzsuche()). REIN GEOMETRISCH: `f`/`art.fundorte` selbst
   // bleiben unangetastet, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
-  function ispyFundortXY(f,side){
-    const xBasis=side===1?W*0.54:W*0.04;
-    return {x:xBasis+f.x*(W*0.42), y:H*0.18+f.y*(H*0.66)};
+  //
+  // EINE GROSSE ARENA (Darstellungsrunde 16.11., Chris: "eine grosse Arena statt mehrerer
+  // getrennter Bereiche"; Weg A aus docs/design/fable-kontakt-interaktionen-16-11.md 4.2 und
+  // i-spy-offener-raum-konzept-14-10.md Abschnitt 6, "28e"): der Split-Screen ist zurueckgenommen.
+  // Jeder Fundort steht EINMAL in einer durchgehenden Halle, ueber die volle Breite verteilt, und
+  // wird als DOPPELMOEBEL gezeichnet (links das Fach der Heimseite, rechts das der Gastseite, je in
+  // Teamfarbe, s. bodenSchatzsuche()) -- damit stimmt das Bild weiter mit der Mechanik ueberein:
+  // jede Seite bespielt ihre EIGENE Truhenkopie, zwei Gegner am selben Moebel arbeiten an
+  // verschiedenen Faechern. `side` wird deshalb hier nicht mehr gelesen; wo ein Laeufer steht,
+  // sagt ispyStandXY() (Fach seiner Seite). Mechanik unveraendert: weiterhin zwei getrennte
+  // Truhenkopien je Seite, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
+  // HOEHE: H*0,27..0,76 statt H*0,18..0,84 -- in der einen Halle steht ein Fundort auch in der
+  // Bildmitte, und dort haengt oben der Zug-Kasten des Bugs; unten muessen Namensschild,
+  // Punkte und Zugzaehler (bis Standplatz +66 px) ueber dem Zugtabellen-Band bleiben.
+  function ispyFundortXY(f){
+    return {x:W*0.06+f.x*(W*0.88), y:H*0.27+f.y*(H*0.49)};
+  }
+  // Seitlicher Abstand eines Fachs von der Moebelmitte und Standplatz des Laeufers daneben.
+  const ISPY_FACH_DX=12, ISPY_STAND_DX=31, ISPY_STAND_DY=-6;
+  // STANDPLATZ AM EIGENEN FACH: Heim steht links, Gast rechts neben dem Doppelmoebel. EINE Quelle
+  // fuer stepSchatzsuche() (Laufziel) und zeichneSchatzsuche() (Zielmarke). SCHUBSEN (spaeter, s.
+  // fable-kontakt-interaktionen-16-11.md 4.2 Baustein 4) haengt hier an: ein Rueckstoss waere ein
+  // reiner Zeichenversatz auf diesen Standplatz, kein neues Feld am Laeufer.
+  function ispyStandXY(f,side){
+    const p=ispyFundortXY(f);
+    return {x:p.x+(side===1?1:-1)*ISPY_STAND_DX, y:p.y+ISPY_STAND_DY};
   }
   // WELCHES MOEBELSTUECK AN WELCHEM FUNDORT: die beiden Tuer-Fundorte (`bild:"tuer"`, s.
   // BUEHNE_ART["i-spy"].fundorte-Kommentar "DIE TUER IST BILD") bekommen die Tuer; die
@@ -31125,8 +31163,9 @@
   // STERNE UEBER DEM FUNDORT (Konzept 5.1: "Stufe als Sterne ueber der Truhe (1-3), wie
   // Takeshis fallenStufe") — wortgleiches Glyphen-Muster wie zeichneTakeshiRoute()s
   // "★".repeat(st), kein Emoji, reiner Text-Glyph wie ueberall sonst im Motor.
-  function ispySterne(cx,cy,stufe){
-    setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
+  // `px` (Doppelmoebel, 16.11.): kleinere Schrift, damit zwei Sternreihen nebeneinander passen.
+  function ispySterne(cx,cy,stufe,px){
+    setzeFont(ctx,"700 "+(px||9)+"px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
   }
@@ -31334,20 +31373,18 @@
       ctx.fillStyle=s; ctx.beginPath(); ctx.arc(x,y,W*0.18,0,Math.PI*2); ctx.fill();
     });
 
-    // TRENNSTEG (I1, Split-Screen, Broadcast-Optik-Recherche 27.09., Abschnitt 3/I1):
-    // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
-    // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
-    // steht nie mit einem Fundort oder einer Figur in Konflikt.
     }
 
-    const stegX0=W*0.465, stegX1=W*0.535;
-    ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
-
-    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): "der
-    // Trennsteg zwischen den Raeumen ist der Tauzieh-Balken. Er verschiebt sich zur Seite
-    // des Fuehrenden ... Der Rahmen des fuehrenden Raums leuchtet dezent in Teamfarbe, beim
-    // Fuehrungswechsel kurz voll." Dieselbe Crossfade-Mechanik wie showcaseFuehrung()/
-    // bodenEis() (1,4 s Ueberblendung ab dem Wechsel).
+    // KEIN TRENNSTEG MEHR (Darstellungsrunde 16.11., "eine grosse Arena", s. ispyFundortXY()):
+    // der schwarze Steg bei W*0,465..0,535 und der Raumrahmen der fuehrenden Haelfte sind weg,
+    // die Kulisse ist eine durchgehende Halle (scripts/baue-kulisse-buehnen.py baue_ispy()).
+    //
+    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5), auf die eine
+    // Halle umgestellt: statt den Rahmen einer Raumhaelfte leuchtet jetzt die AUSSENWAND, an der
+    // die fuehrende Seite startet (Heim links, Gast rechts, s. ispyHeimatXY()) -- dezent, beim
+    // Fuehrungswechsel 1,4 s lang voll (dieselbe Ueberblendung wie showcaseFuehrung()/bodenEis()).
+    // Der Tauzieh-Marker sitzt als kurzer Balken oben in der Hallenmitte und wandert mit dem
+    // Vorsprung zur Seite des Fuehrenden. Reine Ablesung von u.summe (ispyFuehrung()).
     const fuehrung=ispyFuehrung();
     if(fuehrung){
       if(ispySaumSide!==fuehrung.side){ ispySaumSide=fuehrung.side; ispySaumSeit=buehneT; }
@@ -31355,97 +31392,116 @@
       const farbe=fuehrung.side===0?css("--home"):css("--away");
       const gesamt=fuehrung.heim+fuehrung.gast;
       const verhaeltnis=gesamt>0?Math.abs(fuehrung.heim-fuehrung.gast)/gesamt:0;
-      // TAUZIEH-MARKER: bleibt INNERHALB von stegX0..stegX1 (70% der halben Stegbreite als
-      // maximaler Ausschlag) -- greift damit nie in die Fundort-Haelften ein, deren
-      // Geometrie (ispyFundortXY()) fuer I1 bereits per Screenshot geprueft ist und hier
-      // nicht angefasst wird.
-      const mitteSteg=(stegX0+stegX1)/2, spanne=(stegX1-stegX0)/2*0.7;
-      const markerX=mitteSteg+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
-      ctx.strokeStyle=farbe; ctx.globalAlpha=0.55+0.45*voll; ctx.lineWidth=2+voll*2;
-      ctx.beginPath(); ctx.moveTo(markerX,0); ctx.lineTo(markerX,H); ctx.stroke();
+      const breite=14+voll*10, x0=fuehrung.side===0?0:W-breite;
+      const wand=ctx.createLinearGradient(fuehrung.side===0?0:W,0,fuehrung.side===0?breite:W-breite,0);
+      wand.addColorStop(0,farbe); wand.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.globalAlpha=0.30+0.45*voll; ctx.fillStyle=wand; ctx.fillRect(x0,0,breite,H);
+      // TAUZIEH-MARKER: Schiene W*0,44..0,56 knapp unter der Rueckwand, Knopf in Teamfarbe.
+      const schieneY=H*0.115, spanne=W*0.06;
+      const markerX=W*0.5+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
+      ctx.globalAlpha=0.55; ctx.fillStyle="rgba(8,6,4,.7)";
+      ctx.fillRect(W*0.5-spanne,schieneY-1.5,spanne*2,3);
+      ctx.globalAlpha=0.7+0.3*voll; ctx.fillStyle=farbe;
+      ctx.beginPath(); ctx.arc(markerX,schieneY,3.5+voll*1.5,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
-      // RAUMRAHMEN: die Haelfte des Fuehrenden bekommt einen duennen Rand in Teamfarbe --
-      // Chris' "ohne Stats sehen, wer fuehrt" (wortgleiches Muster wie der Showcase-
-      // Vorhangsaum/das Eis-Bandenlicht), dezent ausser kurz nach einem Wechsel.
-      const rahmenX0=fuehrung.side===0?4:stegX1+4, rahmenX1=fuehrung.side===0?stegX0-4:W-4;
-      ctx.strokeStyle=farbe; ctx.globalAlpha=0.16+0.34*voll; ctx.lineWidth=2+voll*2;
-      ctx.strokeRect(rahmenX0,4,Math.max(0,rahmenX1-rahmenX0),H-8);
-      ctx.globalAlpha=1;
-    } else {
-      // NEUTRAL, solange niemand gepunktet hat -- dieselbe goldene Mittellinie wie vor I5.
-      ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
     }
 
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
     // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), falls baueSchatzsuche() diesem Spiel schon eine Karte
     // zugewiesen hat — sonst (Sicht-QA vor dem ersten Tick) Fallback auf f.x/f.y selbst.
-    // ART/BILD (Moebelwahl) kommen UNVERAENDERT aus `f`.
     //
-    // JE SEITE EINMAL (I1): vorher EIN gemeinsam gezeichneter Raum fuer beide Teams (I0-
-    // Befund) -- jetzt exakt dieselben zwoelf Moebel zweimal, einmal in JEDER Haelfte
-    // (`ispyFundortXY(vis,seite)`), dieselbe Karte (ISPY_VISUELLES_LAYOUT ist EINMAL je
-    // Spiel gewuerfelt, nicht je Seite) fair fuer beide.
-    //
-    // TRUHENZUSTAND JE RAUM (I1, "der zweite Gewinn"): `ispyRaumZustand(seite)` liest NUR
-    // die fuer DIESE Seite bereits enthuellten `u.runden[]` (Spoiler-Regel wie
-    // ispyTickerZeile()) und liefert je Fundort-Index die zuletzt gesehene Stufe/den
-    // zuletzt gesehenen Ausgang -- `ispySterne()` zeigt diese Stufe statt der Startstufe
-    // aus `f.stufe`, eine erfolgreich geknackte Truhe wird sichtbar gedimmt (statt wie
-    // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
-    // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
-    // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
-    //
-    // JE SEITE IHR EIGENER RAUM (I-1): `ISPY_RAUM_AKTIV[seite]` (von baueSchatzsuche() vor
-    // dem ersten Tick gesetzt) bestimmt, AUS WELCHEM der drei Raeume diese Haelfte ihre
-    // Moebel zeichnet -- das Mehrwege-Moebel/die Stufe/die x/y-Koordinate je Index bleiben
-    // ueber alle drei Raeume gleich (s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART),
-    // nur `f.art` (Schreibtisch/Figur/Aktenschrank, ispyMoebelArt()) kann je Raum wechseln.
-    // Vor dem ersten `baueSchatzsuche()`-Aufruf (Sicht-QA) steht ISPY_RAUM_AKTIV auf
-    // "werkstatt" fuer beide Seiten, s. dessen Deklaration oben.
+    // DOPPELMOEBEL (16.11., s. ispyFundortXY()): jeder Fundort steht EINMAL in der Halle, mit
+    // ZWEI Faechern nebeneinander -- links das der Heimseite, rechts das der Gastseite, je auf
+    // einem Sockel in Teamfarbe. Jedes Fach zeigt den Stand SEINER Seite: `ispyRaumZustand(seite)`
+    // (nur bereits enthuellte u.runden[], Spoiler-Regel wie ispyTickerZeile()) liefert die
+    // zuletzt gesehene Stufe (Sterne ueber dem Fach), den Ausgang (offene Truhe bzw. gedimmtes
+    // Moebel) und die Fehlserie (Glut, I4). `ISPY_RAUM_AKTIV[seite]` bestimmt, aus WELCHEM der
+    // drei Raeume das Fach seine Art nimmt (Archiv/Werkstatt/Salon koennen je Seite verschieden
+    // sein, s. "I-SPY: DREI RAEUME" bei BUEHNE_ART); Stufe und Koordinate je Index sind ueber
+    // alle drei Raeume gleich. Truhen-Faecher (Tresor, Mechanik ohne Tuer) nutzen die
+    // PixelLab-Requisiten truhe_<stufe>_zu/_offen (public/sprites/arena/, schon vorhanden),
+    // die anderen bleiben Primitive.
     if(art.fundorte){
-      [0,1].forEach(seite=>{
-        const zustand=ispyRaumZustand(seite);
-        const raumFundorte=ISPY_RAEUME[ISPY_RAUM_AKTIV[seite]]||art.fundorte;
-        raumFundorte.forEach((f,idx)=>{
-          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
-          const p=ispyFundortXY(vis,seite);
-          const z=zustand.get(idx);
-          const stufeAnzeige=z?z.stufe:f.stufe;
-          // ANGEBROCHENE TRUHEN GLUEHEN NACH (I4, Broadcast-Optik-Recherche 27.09.,
-          // Abschnitt 4/I4): waechst mit `z.fehlserie` (ispyRaumZustand() oben), gedeckelt
-          // wie die Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT: nur zwei Schritte
-          // zaehlen) -- "heiss" im Wortsinn, stimmt mit dem Motor ueberein statt eine
-          // erfundene Naehe vorzuspielen (s. I4-Kommentar bei zeichneLupe). Hinter dem
-          // Moebelstueck gezeichnet, reiner additiver Radial-Schein, keine neue Formel.
+      const raeume=[0,1].map(s=>ISPY_RAEUME[ISPY_RAUM_AKTIV[s]]||art.fundorte);
+      const zustaende=[0,1].map(s=>ispyRaumZustand(s));
+      const teamFarbe=[css("--home"),css("--away")];
+      raeume[0].forEach((f0,idx)=>{
+        const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f0;
+        const p=ispyFundortXY(vis);
+        // gemeinsamer Bodenschatten unter beiden Faechern
+        ctx.fillStyle="rgba(0,0,0,.32)";
+        ctx.beginPath(); ctx.ellipse(p.x,p.y+8,ISPY_FACH_DX+16,6,0,0,Math.PI*2); ctx.fill();
+        const stufen=[0,1].map(s=>{ const z=zustaende[s].get(idx); return z?z.stufe:raeume[s][idx].stufe; });
+        [0,1].forEach(seite=>{
+          const f=raeume[seite][idx]||f0;
+          const z=zustaende[seite].get(idx);
+          const fx=p.x+(seite===0?-1:1)*ISPY_FACH_DX;
+          // ANGEBROCHENE FAECHER GLUEHEN NACH (I4): waechst mit z.fehlserie, gedeckelt wie die
+          // Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT).
           if(z&&!z.offen&&z.fehlserie>0){
-            const stufen=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
-            const glutStaerke=Math.min(z.fehlserie,stufen)/stufen;
-            const glut=ctx.createRadialGradient(p.x,p.y-6,2,p.x,p.y-6,22);
-            glut.addColorStop(0,"rgba(255,110,60,"+(0.10+0.22*glutStaerke).toFixed(2)+")");
+            const stufenN=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
+            const glutStaerke=Math.min(z.fehlserie,stufenN)/stufenN;
+            const glut=ctx.createRadialGradient(fx,p.y-6,2,fx,p.y-6,18);
+            glut.addColorStop(0,"rgba(255,110,60,"+(0.12+0.24*glutStaerke).toFixed(2)+")");
             glut.addColorStop(1,"rgba(255,110,60,0)");
-            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(p.x,p.y-6,22,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(fx,p.y-6,18,0,Math.PI*2); ctx.fill();
           }
-          ctx.save(); ctx.translate(p.x,p.y);
-          ctx.fillStyle="rgba(0,0,0,.30)";
-          ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
-          if(z&&z.offen)ctx.globalAlpha=0.5;
-          (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
+          // SOCKEL IN TEAMFARBE: wem dieses Fach gehoert.
+          ctx.save();
+          ctx.globalAlpha=0.55; ctx.fillStyle=teamFarbe[seite];
+          ctx.beginPath(); ctx.ellipse(fx,p.y+7,11,3.6,0,0,Math.PI*2); ctx.fill();
           ctx.globalAlpha=1;
-          ctx.restore();
-          ispySterne(p.x,p.y-26,stufeAnzeige);
-          // 28c/d (s. ispyFundortBadge()-Kopfkommentar): Skill+Punktwert-Badge ueber den
-          // Sternen, bei beiden Tresoren mit der Nebenweg-Zeile darunter.
-          ispyFundortBadge(p.x,p.y-37,f,stufeAnzeige);
-          if(z&&!z.offen){
-            setzeFont(ctx,"700 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="rgba(255,120,90,.9)";
-            ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-            ctx.fillText("angebrochen",p.x,p.y+21);
+          ctx.translate(fx,p.y); ctx.scale(0.74,0.74);
+          const moebel=ispyMoebelArt(f);
+          const offen=!!(z&&z.offen);
+          if(!ispyZeichneTruheBild(ctx,moebel,stufen[seite],offen)){
+            if(offen)ctx.globalAlpha=0.5;
+            (ISPY_MOEBEL[moebel]||ispyZeichneTruhe)(ctx);
+            ctx.globalAlpha=1;
           }
+          // RISS am angebrochenen Fach (Konzept 5.1), statt der frueheren Textzeile darunter.
+          if(z&&!z.offen){
+            ctx.strokeStyle="rgba(255,120,90,.95)"; ctx.lineWidth=1.6;
+            ctx.beginPath(); ctx.moveTo(-3,-14); ctx.lineTo(1,-8); ctx.lineTo(-2,-5); ctx.lineTo(3,1); ctx.stroke();
+          }
+          ctx.restore();
+          ispySterne(fx,p.y-22,stufen[seite],6.5);
+        });
+        // 28c/d: Skill+Punktwert-Badge ueber dem Doppelmoebel. Gleiche Art auf beiden Seiten
+        // (der Normalfall) -> ein gemeinsames Badge; verschiedene Raeume mit verschiedener Art
+        // an diesem Index -> je Fach ein Kuerzel in Teamfarbe.
+        const f1=raeume[1][idx]||f0;
+        if(f0.art===f1.art&&stufen[0]===stufen[1]) ispyFundortBadge(p.x,p.y-32,f0,stufen[0]);
+        else [0,1].forEach(seite=>{
+          const f=seite===0?f0:f1;
+          const sk=ISPY_RAETSEL_SUBSKILL[f.art];
+          setzeFont(ctx,"700 6px 'RaniraSeason',Georgia,'Times New Roman',serif");
+          ctx.fillStyle=teamFarbe[seite];
+          ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+          ctx.fillText(ISPY_SKILL_KUERZEL[sk]||sk||"?",p.x+(seite===0?-1:1)*(ISPY_FACH_DX+4),p.y-32);
         });
       });
     }
+  }
+  // TRUHEN-REQUISITEN (16.11.): die PixelLab-Truhen truhe_<1|2|3>_<zu|offen> lagen seit der
+  // Requisiten-Runde in public/sprites/arena/ (arenen-mechaniken-konzept-konsolidiert-15-11.md,
+  // Tabelle "Truhe ... I-Spy"), wurden aber nirgends gezeichnet. Hier fuer die beiden
+  // Truhen-Moebel (Tresor "truhe", Mechanik "aktenschrank"); Schreibtisch, Verhoer-Figur und
+  // Tuer bleiben Primitive. QUELLAUSSCHNITT: truhe_2_zu traegt Freistell-Reste (helle
+  // Eckklammern am Rand), truhe_3_offen einen hellen Strich links -- der Ausschnitt laesst sie
+  // weg. Fehlt das Bild (Headless, Ladefehler), false -> der Aufrufer zeichnet das Primitiv.
+  const ISPY_TRUHE_AUSSCHNITT={truhe_2_zu:[3,5,26,25], truhe_3_offen:[4,0,34,40]};
+  function ispyZeichneTruheBild(c,moebel,stufe,offen){
+    if(moebel!=="truhe"&&moebel!=="aktenschrank")return false;
+    const name="truhe_"+Math.max(1,Math.min(3,stufe||1))+"_"+(offen?"offen":"zu");
+    if(!aDa(name))return false;
+    const im=aBild[name];
+    const a=ISPY_TRUHE_AUSSCHNITT[name]||[0,0,im.naturalWidth,im.naturalHeight];
+    const glatt=c.imageSmoothingEnabled; c.imageSmoothingEnabled=false;
+    c.drawImage(im,a[0],a[1],a[2],a[3],-a[2]/2,8-a[3],a[2],a[3]);
+    c.imageSmoothingEnabled=glatt;
+    return true;
   }
   // TRUHENZUSTAND EINER EINZELNEN SEITE (I1, s. bodenSchatzsuche()-Kommentar oben): fuer
   // jeden Fundort-Index der zuletzt (hoechster Zug-Index) enthuellte Zug DIESER Seite, der
@@ -33017,9 +33073,62 @@
   // noch nie gelaufen ist — derselbe "solange vizX==null"-Vertrag wie bei stepKuer/
   // stepShowcase). `true` schaltet den istIspy()-Requisitenblock in zeichneSprite() frei
   // (Lupe an der Hand, nur waehrend u.vizPhase==="suchen").
+  // ANTEIL DES EIGENEN BILDZYKLUS (0..1), aus u.vizIspyT und ispyVizZyklus() -- dieselbe Uhr,
+  // gegen die stepSchatzsuche() die Phasen schaltet. Reine Ablesung.
+  function ispyZyklusAnteil(u,art){
+    const T=ispyVizZyklus(art);
+    return T>0?Math.max(0,Math.min(1,(u.vizIspyT||0)/T)):1;
+  }
+  // FORTSCHRITT DES VERWEILENS (Chris 16.11.: "Verweilen mit Fortschrittsbalken"): 0..1 ueber die
+  // "suchen"-Phase. Der Ausgang steht bei der Enthuellung schon fest (u.vizIspyErfolg) -- ein
+  // Fehlversuch stockt sichtbar kurz vor dem Ziel (Konzept fable-kontakt-interaktionen-16-11.md
+  // 4.2 Baustein 3: "knapp gescheitert: Balken stockt bei 90 %"), ein Erfolg laeuft durch.
+  // Der Starke ist frueher fertig (u.vizIspySuchEnde, Konzept 5.2). Kein rr(), nur Ablesung.
+  function ispyVerweilFortschritt(u,art){
+    const a=ispyZyklusAnteil(u,art);
+    const ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+    const p=Math.max(0,Math.min(1,(a-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,ende-ISPY_VIZ_GEHEN_ANTEIL)));
+    return u.vizIspyErfolg?p:Math.min(p,0.86);
+  }
   function zeichneSchatzsuche(art){
     if(!TEILNEHMER.length)return;
     const posMap=new Map();
+    // SICHTBARE WEGE (Chris 16.11.: "man soll sehen, wohin jeder Spieler laeuft"). Eigener
+    // Durchgang VOR allen Figuren, damit keine Linie ueber einem Kopf liegt. Waehrend "gehen":
+    // gestrichelter Weg vom Laeufer zu seinem Fach (Teamfarbe; gelb, wenn er auf einen
+    // gegnerischen Fund reagiert, Konzept 5.2), dahinter die schon gelaufene Spur blass, am Ziel
+    // ein pulsierender Ring auf dem Boden. Waehrend "suchen"/"ergebnis" bleibt die Spur noch
+    // stehen und blendet aus -- so liest man auch nach der Ankunft, woher jemand kam. Liest nur
+    // vizIspyVon*/vizIspyZiel*/vizX/vizY (stepSchatzsuche()), schreibt nichts.
+    for(const u of TEILNEHMER){
+      if(u.vizIspyVonX==null||u.vizIspyZielX==null||u.vizPhase==null||u.vizPhase==="idle")continue;
+      const c=u.side===0?css("--home"):css("--away");
+      const fuss=17;
+      const x=u.vizX!=null?u.vizX:u.vizIspyVonX, y=u.vizY!=null?u.vizY:u.vizIspyVonY;
+      const a=ispyZyklusAnteil(u,art);
+      ctx.save(); ctx.lineCap="round";
+      if(u.vizPhase==="gehen"){
+        ctx.globalAlpha=0.35; ctx.strokeStyle=c; ctx.lineWidth=2.4;
+        ctx.beginPath(); ctx.moveTo(u.vizIspyVonX,u.vizIspyVonY+fuss); ctx.lineTo(x,y+fuss); ctx.stroke();
+        // dunkle Unterlage, damit der Weg auf hellem Boden (Rasen, Hof) lesbar bleibt
+        ctx.globalAlpha=0.55; ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.moveTo(x,y+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        ctx.globalAlpha=0.95; ctx.strokeStyle=u.vizIspyReaktion?"#f2d75a":c; ctx.lineWidth=2.2;
+        ctx.setLineDash([6,4]); ctx.lineDashOffset=-buehneT*30;
+        ctx.beginPath(); ctx.moveTo(x,y+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        ctx.setLineDash([]);
+        const puls=0.5+0.5*Math.sin(buehneT*9+u.id);
+        ctx.globalAlpha=0.55+0.35*puls; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.ellipse(u.vizIspyZielX,u.vizIspyZielY+fuss,9+2*puls,3.5+0.8*puls,0,0,Math.PI*2); ctx.stroke();
+      } else {
+        const rest=Math.max(0,1-(a-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,1-ISPY_VIZ_GEHEN_ANTEIL)*1.6);
+        if(rest>0){
+          ctx.globalAlpha=0.28*rest; ctx.strokeStyle=c; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(u.vizIspyVonX,u.vizIspyVonY+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
     [0,1].forEach(side=>{
       const g=TEILNEHMER.filter(u=>u.side===side);
       const c=side===0?css("--home"):css("--away");
@@ -33032,11 +33141,9 @@
         // Ausrufezeichen ueber dem Kopf, waehrend der "gehen"-Phase des Ticks, in dem
         // r.reaktion gesetzt war (Vorbild: die Ansage-Linien der Arena, ":12683" ff., hier
         // gestrichelt zum ZIEL statt eines Fokus-Rings um den Laeufer selbst).
+        // Die gestrichelte Linie selbst zeichnet seit 16.11. der Wege-Durchgang oben (gelb).
         if(u.vizPhase==="gehen"&&u.vizIspyReaktion){
           ctx.save();
-          ctx.strokeStyle="rgba(242,215,90,.75)"; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
-          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY); ctx.stroke();
-          ctx.setLineDash([]);
           setzeFont(ctx,"800 13px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
           ctx.textAlign="center"; ctx.textBaseline="alphabetic";
           ctx.fillText("!",x,y-46);
@@ -33121,28 +33228,63 @@
           ctx.restore();
         }
 
+        // VERWEILBALKEN (Chris 16.11.): unter den Fuessen, ueber dem Namen. "suchen": fuellt sich
+        // in Teamfarbe (ein Fehlversuch stockt bei 86 % und flackert), "ergebnis": kurz voll
+        // gold bzw. rot stehen geblieben, dann ausblenden. Nur Ablesung (ispyVerweilFortschritt()).
+        if(u.vizPhase==="suchen"||u.vizPhase==="ergebnis"){
+          const a=ispyZyklusAnteil(u,art), ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+          const sicht=u.vizPhase==="suchen"?1:Math.max(0,1-Math.max(0,(a-ende)/Math.max(0.01,1-ende)-0.35)*1.6);
+          if(sicht>0){
+            const p=ispyVerweilFortschritt(u,art);
+            const bw=28, bh=4, bx=x-bw/2, by=y+27;
+            ctx.save(); ctx.globalAlpha=sicht;
+            ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(bx-1,by-1,bw+2,bh+2);
+            let farbe=c;
+            if(u.vizPhase==="ergebnis")farbe=u.vizIspyErfolg?"#f2d75a":"#e0573f";
+            else if(!u.vizIspyErfolg&&p>=0.86)farbe=(Math.floor(buehneT*14)%2)?c:"#e0573f";
+            ctx.fillStyle=farbe; ctx.fillRect(bx,by,bw*p,bh);
+            ctx.restore();
+          }
+        }
+
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dyN,farbe,groesse)=>{
           setzeFont(ctx,"400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif");
           ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
           ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
         };
+        // PUNKTE ERST NACH DEM VERWEILEN: stepBuehne() bucht r.punkte schon bei der Enthuellung
+        // auf u.summe; das Namensschild zieht sie bis zum Ergebnis wieder ab, sonst verriete die
+        // Zahl den Ausgang, bevor der Balken voll ist. Reine Anzeige.
+        const rAkt=u.aktuell>=0&&u.runden?u.runden[u.aktuell]:null;
+        const offenPkt=(rAkt&&(u.vizPhase==="gehen"||u.vizPhase==="suchen"))?(rAkt.punkte||0):0;
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        schrift(String(u.summe-offenPkt)+" Pkt",56,"#dfe6ef",9);
         setzeFont(ctx,"400 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#8a93a3";
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x+dx,y+dy2+66);
       });
     });
 
-    for(const f of floats){
-      if(f._teilnehmer==null)continue;
-      const p=posMap.get(f._teilnehmer); if(!p)continue;
-      ctx.globalAlpha=Math.max(0,f.life);
-      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
-      setzeFont(ctx,(f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
+    // ERGEBNIS-SCHWEBER ERST AM ENDE DES VERWEILENS (16.11.): der generische Schwebetext aus
+    // stepBuehne() (floats, "+N") entsteht schon bei der Enthuellung, also bevor der Laeufer
+    // ueberhaupt am Fach steht -- mit sichtbarem Weg und Verweilbalken waere er ein Spoiler.
+    // I-Spy zeichnet die floats deshalb nicht mehr, sondern denselben Text "+r.punkte" beim
+    // Eintritt in "ergebnis", steigend und ausblendend ueber diese Phase. Ablesung von
+    // u.runden[u.aktuell] (schon enthuellt), kein neuer Zustand.
+    for(const u of TEILNEHMER){
+      if(u.vizPhase!=="ergebnis")continue;
+      const p=posMap.get(u.id); if(!p)continue;
+      const r=u.aktuell>=0&&u.runden?u.runden[u.aktuell]:null;
+      if(!r||!(r.punkte>0))continue;
+      const ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+      const t=Math.max(0,Math.min(1,(ispyZyklusAnteil(u,art)-ende)/Math.max(0.01,1-ende)));
+      const gross=u.vizIspyStufe===3&&u.vizIspyErfolg;
+      ctx.globalAlpha=Math.max(0,1-t*t);
+      ctx.fillStyle=gross?css("--ok"):css("--ink");
+      setzeFont(ctx,(gross?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.textAlign="center";
-      ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
+      ctx.fillText("+"+r.punkte,p.x,p.y-34-t*20);
       ctx.globalAlpha=1;
     }
   }
@@ -43369,7 +43511,10 @@
     "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen",
     // Sicht-Audit 16.11.: Sicherungsstation (Seilsack + Sicherungsgeraet am Bodenanker) statt der
     // Strichfigur als Sicherer -- eine Requisite, keine Figur (neue Charaktere sind gesperrt).
-    "climbing_seilsack"];
+    "climbing_seilsack",
+    // I-Spy-Darstellung 16.11.: die vorhandenen PixelLab-Truhen (drei Stufen, zu/offen) fuer die
+    // Truhen-Faecher der Doppelmoebel, s. ispyZeichneTruheBild(). Keine neue Bestellung.
+    "truhe_1_zu","truhe_1_offen","truhe_2_zu","truhe_2_offen","truhe_3_zu","truhe_3_offen"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};

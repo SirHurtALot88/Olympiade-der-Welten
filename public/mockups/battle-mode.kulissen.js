@@ -147,7 +147,7 @@ window.__ARENA_KULISSEN={
    "id": "ruinengarten",
    "label": "Ruinengarten",
    "bild": "/sprites/kulissen/i-spy/ruinengarten.jpg",
-   "dunkel": 0.12
+   "dunkel": 0.14
   },
   {
    "id": "aztec",
@@ -159,7 +159,7 @@ window.__ARENA_KULISSEN={
    "id": "lostplace",
    "label": "Lost Place",
    "bild": "/sprites/kulissen/i-spy/lostplace.jpg",
-   "dunkel": 0.12
+   "dunkel": 0.13
   },
   {
    "id": "horror",
