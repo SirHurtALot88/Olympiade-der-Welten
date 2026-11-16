@@ -30035,8 +30035,30 @@
     // ECHTE Endstand (sobald `done`) bleibt unveraendert bei den Brettsiegen.
     if(done)return bretter(0)+" : "+bretter(1);
     const laufendVorteil=(u)=>(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+laufendVorteil(u),0);
-    return summe(0)+" : "+summe(1);
+    // QA 16.11. (Fix-Paket A): die Vorteilssumme je Seite ist bei einem Duell zwangslaeufig
+    // gegenlaeufig ("115 : -115" Fechten, "-342 : 340" Tennis, "-149 : 133" Schach) -- eine
+    // negative Zahl im Spielstand liest niemand als Stand. Angezeigt wird jetzt dieselbe Einheit
+    // wie im Endstand (Bretter), nur LAUFEND: auf wie vielen Brettern/Plaetzen/Bahnen die Seite
+    // gerade vorn liegt (laufender Vorteil > 0, Gleichstand zaehlt fuer niemanden). Gleiche Quelle
+    // wie die Vorteilszahl auf der Karte jedes Spielers, also kein Spoiler; der Endstand (`done`
+    // oben) und jede Wertung bleiben unangetastet.
+    // Opus-Review #1521: nach Rubber gruppieren (Tennis-Doppel: zwei Spieler, EIN Rubber, s.
+    // duellBretterGewonnen()), sonst steht live "4 : 2" (6 Spieler), im Endstand aber hoechstens 5.
+    // Gewertet wird der erste je Gruppe; "vorn" bleibt der laufende Vorteil -- bei Fechten/Schach
+    // kann der Endentscheid (gefechtSieg/zeitSieg) davon abweichen, der Live-Stand ist eine
+    // Naeherung und springt beim Umschalten auf `done` ggf. auf den echten Brettentscheid.
+    const vorn=(s)=>{
+      const gesehen=new Set();
+      let n=0;
+      for(const u of TEILNEHMER){
+        if(u.side!==s)continue;
+        const key=u.rubberIdx??u.brett;
+        if(key!=null){ if(gesehen.has(key))continue; gesehen.add(key); }
+        if(laufendVorteil(u)>0)n++;
+      }
+      return n;
+    };
+    return vorn(0)+" : "+vorn(1);
   }
   function updateHudBuehne(){
     // UHR-ANGLEICHUNG (Broadcast-Audit Runde 2, Punkt 10, 30.09.): bislang stand hier rohes
@@ -30157,6 +30179,11 @@
       // FERTIGEN Esser, die bis Minute 10 immer 0 sind -- der Zuschauer las "niemand am Tisch",
       // waehrend sechs sassen. Alle essen gleichzeitig, also zaehlt, wer sitzt.
       : BB().wettessen
+      ?(s)=>TEILNEHMER.filter(u=>u.side===s).length
+      // DUELL-BUEHNEN (QA 16.11., Fix-Paket A): Tennis/Schach/Fechten spielen alle Bretter PARALLEL
+      // -- "0 an den Brettern/an der Bahn" stand bis kurz vor Schluss, obwohl alle sassen. Wie bei
+      // Wettessen zaehlt, wer am Brett ist.
+      : BB().duell
       ?(s)=>TEILNEHMER.filter(u=>u.side===s).length
       // EISKUNSTLAUF (Task #151): derselbe Bug-Typ wie "0 am Tisch" oben, nur fuer eine
       // ECHT SEQUENZIELLE Buehne statt einer simultanen. `art.rundenN` ist bei Eiskunstlauf
@@ -42475,8 +42502,13 @@
       // fuer die Live-Unterzeile bleiben, s. Kommentar am "rang"-Zweig) -- behebt genau das
       // Audit-Beispiel "0 : 1 NACH ZEITSUMME (7:02,2 MIN GEGEN 5:21,4 MIN)".
       const bannerZusatz=beideVollstaendig?"mit "+fmtDauer(Math.abs(summe[0]-summe[1]))+" Vorsprung":null;
+      // QA 16.11. (Fix-Paket A): `w.punkte` sind Rangpunkte mit Gleichstandsmittelung -- der Endstand
+      // druckte sie roh ("7.750253807106592"). Eine Nachkommastelle mit deutschem Komma, ganze Zahlen
+      // (auch die 1/0 von `seiten`) ohne ",0" -- dasselbe Muster wie `f1` im Takeshi-Zweig unten.
+      // Reine Anzeige; Punkte/Wertung selbst bleiben unveraendert.
+      const fmt=(v)=>typeof v==="number"&&isFinite(v)?v.toFixed(1).replace(/\.0$/,"").replace(".",","):v;
       return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
-        punkte:w.punkte, gewertet:alleFertig, zusatz, bannerZusatz, delta, deltaSeite};
+        punkte:w.punkte, gewertet:alleFertig, zusatz, bannerZusatz, delta, deltaSeite, fmt};
     }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
@@ -42513,6 +42545,11 @@
       return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
         punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
         zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
+        // SIEGERZEIT ZUERST (QA 16.11., Fix-Paket A): "AA gewinnt / 3:12,4 gegen 2:40,9" nannte die
+        // HEIMzeit zuerst, auch wenn der Gast gewann -- gelesen wie "3:12,4 schlaegt 2:40,9". Dieselben
+        // zwei Zielzeiten, nur in Siegerreihenfolge (bei Gleichstand wie `zusatz`); nur die Anzeige am Ziel.
+        zusatzSieger:z[0]!=null&&z[1]!=null
+          ?(z[1]<z[0]?fmtZielzeit(z[1])+" gegen "+fmtZielzeit(z[0]):fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1])):null,
         // BANNERZUSATZ (Punkt 17): derselbe Gedanke wie beim Zeitfahren oben -- EIN
         // Vorsprungswert statt zweier Zielzeiten fuer den Sieger-Banner.
         bannerZusatz:z[0]!=null&&z[1]!=null?"mit "+fmtZielzeit(Math.abs(z[0]-z[1]))+" Vorsprung":null,
@@ -43041,7 +43078,7 @@
             // hier nur final statt interpoliert. Keine zwei Wahrheiten.
             const sieger=stand.seiten[0]>stand.seiten[1]?0:stand.seiten[1]>stand.seiten[0]?1:null;
             deltaEl.innerHTML='<b>'+(sieger==null?"Ziel":(VEREIN[sieger].name+" gewinnt"))+'</b>'
-              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>'+beinZeile;
+              +'<span class="bhsub">'+((sieger!=null&&stand.zusatzSieger)||stand.zusatz||"—")+'</span>'+beinZeile;
             if(sieger!=null)deltaEl.classList.add(sieger===0?"bh-home":"bh-away");
           } else {
             const d=staffelZeitDelta();
@@ -49391,6 +49428,14 @@
   // der hoechstens 30 % der Strecke entfernt ist; ZF_POLSTER laesst dem aeussersten noch
   // Luft fuer Namensschild und Reserve-Balken.
   const ZF_MIN_AUSSCHNITT=0.56, ZF_NACHBAR_FENSTER=0.30, ZF_POLSTER=0.14;
+  // HYROX-KAMERA IN WANDZEIT (QA 16.11., Fix-Paket A): stepSpurtHyrox() feuert im interaktiven Spiel
+  // nur alle zeitFaktor()/60 Wandsekunden mit dem festen dt=1/60 (s. anzeigeSechzigstel); die
+  // Annaeherung `1-exp(-k*dt)` lief dadurch in SIM-Zeit und kroch bei ZEIT_DEHNUNG.spurt=11,14 mit
+  // ~1/11 der gedachten Geschwindigkeit -- ~20 s lang leere Halle, bis die Kamera bei den Laeufern
+  // ankam. Die Zeitkonstante gilt jetzt je WANDsekunde (dt*zeitFaktor()); bei zeitFaktor 1 ist es
+  // dasselbe wie vorher. Exponentiell statt linear, damit der groessere Schritt nicht ueberschiesst.
+  // Reine Anzeige: cam/camR werden von keiner Wertung gelesen.
+  function hyroxKamT(dt,k){ return 1-Math.exp(-k*dt*zeitFaktor()); }
   function kameraUpdate(dt){
     // OVAL: die ganze Bahn liegt immer im Bild (Abschnitt 2.4 des Recherche-
     // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
@@ -49562,13 +49607,13 @@
         const cxWelt=((x0+x1)/2)*HALLE_S, cyWelt=((y0+y1)/2)*HALLE_S;
         const cx=weltB>2*hw?Math.max(hw,Math.min(weltB-hw,cxWelt)):weltB/2;
         const cy=weltH>2*hh?Math.max(hh,Math.min(weltH-hh,cyWelt)):weltH/2;
-        const t=Math.min(1,dt*2.2);
+        const t=hyroxKamT(dt,2.2);
         cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
         return;
       }
       // NIEMAND LAEUFT MEHR: Totale statt in den generischen Zweig unten zu fallen (der
       // rechnet cam.cx und haette in der Halle keine Wirkung, 8.2).
-      const zielZoom=HALLE_ZOOM_MIN, cx=1680*HALLE_S/2, cy=960*HALLE_S/2, t=Math.min(1,dt*1.8);
+      const zielZoom=HALLE_ZOOM_MIN, cx=1680*HALLE_S/2, cy=960*HALLE_S/2, t=hyroxKamT(dt,1.8);
       cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
       return;
     }
@@ -49604,7 +49649,7 @@
         const spanne=Math.max(0.10,bis-von);
         const zielZoom=Math.max(1,Math.min(5.5,1/spanne));
         const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
-        const t=Math.min(1,dt*2.2);
+        const t=hyroxKamT(dt,2.2);
         cam.zoom+=(zielZoom-cam.zoom)*t;
         cam.cx+=(zielCx-cam.cx)*t;
         return;
@@ -55067,6 +55112,10 @@
     if(stumm)return;
     const banner=document.getElementById("bbugcallout");
     if(!banner)return;
+    // QA 16.11. (Fix-Paket A): verzoegerte Callouts (feed(...,verzoegerungMs), z. B. "Ausgeschieden"
+    // +400 ms) feuern im Vorspulen erst NACH dem Aufbau des Endstands und stuenden dann darueber --
+    // bei sichtbarem Endstand gibt es keine Spielbanner mehr (calloutAus() raeumt den davor auf).
+    { const es=document.getElementById("endstand"); if(es&&!es.hidden)return; }
     banner.textContent="";
     if(titel){
       banner.appendChild(el("span","cotitel",titel));
@@ -55089,6 +55138,16 @@
       banner.classList.remove("zu");
       setTimeout(()=>{ if(!banner.classList.contains("zu"))banner.hidden=true; },380);
     },CALLOUT_DAUER_MS);
+  }
+
+  // CALLOUT BEIM ENDSTAND WEG (QA 16.11., Fix-Paket A): der letzte Callout ("AUSGESCHIEDEN ... Cassandra
+  // scheidet aus", Takeshi) blieb ueber dem Endstand stehen, weil sein 2,6-s-Timer nach dem Ende noch
+  // laeuft (bzw. im Vorspulen erst danach feuert). Wird beim Aufbau des Endstands einmal aufgeraeumt --
+  // dieselben drei Handgriffe wie im Reset weiter unten. Reine DOM-Anzeige.
+  function calloutAus(){
+    if(calloutTimer){ clearTimeout(calloutTimer); calloutTimer=null; }
+    const bc=document.getElementById("bbugcallout");
+    if(bc){ bc.hidden=true; bc.classList.remove("zu"); }
   }
 
   // CAPTION-TEMPLATES (Abschnitt 5 derselben Recherche): kurze, alternative Formulierungen
@@ -58062,6 +58121,7 @@
     renderHighlights();
     renderAlternativRechner();
     renderLinescore();
+    calloutAus();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -58364,6 +58424,7 @@
     renderHighlights();
     renderAlternativRechner();
     renderLinescore();
+    calloutAus();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -58481,6 +58542,7 @@
     renderHighlights();
     renderAlternativRechner();
     renderLinescore();
+    calloutAus();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -58567,6 +58629,7 @@
     renderHighlights();
     renderAlternativRechner();
     renderLinescore();
+    calloutAus();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -64057,6 +64120,12 @@
     schnelldurchVersprechen=new Promise((resolve)=>{
       const ende=(ergebnis)=>{
         schnelldurchAktiv=false; schnelldurchVersprechen=null;
+        // QA 16.11. (Fix-Paket A): das Viertel-/Halbzeit-Pausen-Overlay wird nur in updateHudFeldspiel()
+        // per Wandzeit (vpSichtbarBis) ausgeblendet -- dessen letzter Aufruf im Vorspulen liegt aber
+        // oft INNERHALB der 2-3,6 s, und danach laeuft kein Frame mehr: "PAUSE Ende 3. Viertel" blieb
+        // ueber dem Endstand stehen. Reine Anzeige, die Simulation ist hier schon durch.
+        vpSichtbarBis=0;
+        { const vpEl=document.getElementById("viertelpause"); if(vpEl)vpEl.hidden=true; }
         try{ renderKader(); renderWertungTabelle(); }catch(e){}
         if(playBtn){ playBtn.disabled=false; if(!done)playBtn.textContent="Weiter"; }
         draw();
