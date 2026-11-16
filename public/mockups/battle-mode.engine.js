@@ -30147,7 +30147,10 @@
       :"aufgetreten";
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
-      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,auftrittsWort);});
+      // Nur schreiben, wenn sich der Text aendert: dieses Element wurde bei JEDEM Bild neu aufgebaut
+      // (Style-/Layout-Invalidierung je Bild, Fix-Paket B Schach-Ruckler-Pruefung) -- reine Anzeige.
+      const neu=e.dataset.origHtml.replace(/im Kampf/g,auftrittsWort);
+      if(e.innerHTML!==neu)e.innerHTML=neu;});
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
     // S1 (Breaking-Broadcast-Paket, 07.10.): "Punkte" war fuer den Gauntlet falsch -- #score
@@ -56155,7 +56158,114 @@
     viRennT=rennT; viZoom=cam.zoom; viCx=cam.cx; viRx=camR.x; viRy=camR.y;
     for(const u of LAEUFER)viVorher.set(u,{pos:u.pos,z:u.bahnZ,fertig:u.fertig!=null});
   }
+  // ===================================================================================
+  // RENDER-INTERPOLATION FUER KAMPF UND FELDSPIEL (Fix-Paket B / Task #164, 16.11.).
+  //
+  // BEFUND (QA-Durchgang 16.11., Bild-fuer-Bild nachgemessen): Kampf und Feldspiel rechnen ueber
+  // anzeigeSechzigstel() nur jeden zf-ten Takt (Battlefield zf=5: Positionen aendern sich in 80 %
+  // der Bilder NICHT = 12 Hz, Hockey zf=2: 50 % = 30 Hz), die Bahn-Mischung oben galt aber nur fuer
+  // istBahn(). Dasselbe Muster, dieselbe Behebung: VOR jedem Sim-Takt merkt viSchnappschussKF() die
+  // gezeichneten Positionen (Kampf: U[] x/y/lunge, Pfeile; Feldspiel: alle FSTEAM-Spieler x/y/lunge,
+  // Ball/Puck fsBall, Schiedsrichter), viMischeKF() mischt sie vor draw() mit dem Akkumulatorrest
+  // zwischen "vorher" und "jetzt" und stellt sie danach exakt wieder her (try/finally in loop()).
+  // Der Simulationszustand wird nur WAEHREND draw() veraendert -- rr(), Ergebnis, Protokolle und
+  // Fingerabdruck bleiben bit-identisch. Die Anzeige hinkt dem Sim-Stand um hoechstens einen Takt nach.
+  //
+  // Wo NICHT gemischt wird: Pause/Quick-Sim/Spielende, fremde Disziplin oder neu gebauter Zustand
+  // (Verweis-Pruefung auf U bzw. FSTEAM), und jedes Objekt, das in EINEM Takt weiter sprang, als es
+  // laufen kann (Teleport: Anstoss, Wechsel, Respawn, Rueckstoss, Ballwechsel -- VI_*_PX je Takt).
+  // Der Schnappschuss laeuft nur im loop()-Takt (viSchnappAn), nicht im Spieltags-/Quick-Sim-Pfad.
+  let viSchnappAn=false;
+  const viKObj=[], viKW=[], viKPfeil=[];
+  let viKArt=0, viKDisc=null, viKRef=null, viKRef2=null, viKT=0, viKBall=null, viKSchiri=null;
+  // Hoechster Weg je Sim-Takt (1/60 s), den eine Figur/ein Ball real zuruecklegt -- darueber ist es
+  // ein Sprung und wird nicht ueberblendet. Gemessen je Takt (30 s Spielzeit je Disziplin, Perzentile):
+  //   Hockey/Basketball Figuren p99 5,6/6,8 px (Hockey max 98 = ein Sprung), Football p99 4 px, die
+  //   zwoelf/zwanzig Spruenge darueber sind Aufstellungswechsel (130 von 21612 Takten > 14 px);
+  //   Battlefield p99 29 px (Sturm/Rueckstoss), 21 von 4320 Takten > 40 px (max 112);
+  //   Ball/Puck p99 38-53 px (Schuss), darueber Ballwechsel/Anstoss (max 300).
+  // Daraus: Feldspiel-Figuren 18, Kampf-Figuren 45, Ball/Puck 80 px je Takt.
+  const VI_KAMPF_PX=45, VI_FELD_PX=18, VI_BALL_PX=80;
+  function viSchnappschussKF(){
+    const feld=istFeldspiel(disc);
+    viKObj.length=0; viKW.length=0; viKPfeil.length=0; viKBall=null; viKSchiri=null;
+    viKArt=feld?2:1; viKDisc=disc;
+    if(feld){
+      const ft=FSTEAM; viKRef=ft[0]; viKRef2=ft[1];
+      for(const team of ft)for(const u of team){ viKObj.push(u); viKW.push(u.x, u.y, typeof u.lunge==="number"?u.lunge:NaN); }
+      if(fsBall&&fsBall.sichtbar)viKBall={x:fsBall.x,y:fsBall.y,tid:fsBall.traegerId};
+      if(fsSchiri)viKSchiri={o:fsSchiri,x:fsSchiri.x,y:fsSchiri.y};
+    } else {
+      viKRef=U; viKRef2=null; viKT=t;
+      for(const u of U){ viKObj.push(u); viKW.push(u.x, u.y, typeof u.lunge==="number"?u.lunge:NaN); }
+      for(const pf of pfeile)viKPfeil.push(pf, pf.x, pf.y);
+    }
+  }
+  function viMischeKF(zf){
+    const art=istFeldspiel(disc)?2:istKampf(disc)?1:0;
+    if(!art||art!==viKArt||disc!==viKDisc)return null;
+    if(art===2?(FSTEAM[0]!==viKRef||FSTEAM[1]!==viKRef2):(U!==viKRef))return null;
+    const schritt=zf/60, f=Math.max(0,Math.min(1+1/zf,(bahnSimAcc+acc)/schritt));
+    if(f<=0||Math.abs(f-1)<1e-9)return null;
+    const VI_FIGUR_PX=art===1?VI_KAMPF_PX:VI_FELD_PX;
+    const rueck=[]; // [objekt, x, y, lunge|NaN] der ueberschriebenen Werte
+    let tAlt=null;
+    const gemischt=new Set();
+    const mix=(a,b)=>a+(b-a)*f;
+    const stelleWiederHer=()=>{
+      // Rueckwaerts (Opus-Review #1523): steht ein Objekt doppelt in rueck, muss der ERSTE Eintrag (Originalwert) zuletzt gewinnen.
+      for(let i=rueck.length-4;i>=0;i-=4){
+        const o=rueck[i]; o.x=rueck[i+1]; o.y=rueck[i+2];
+        if(rueck[i+3]===rueck[i+3])o.lunge=rueck[i+3];
+      }
+      if(tAlt!==null)t=tAlt;
+    };
+    try{
+      if(art===1){ if(viKT<=t&&t-viKT<0.25){ tAlt=t; t=mix(viKT,t); } }
+      for(let i=0,n=viKObj.length;i<n;i++){
+        const u=viKObj[i], x0=viKW[i*3], y0=viKW[i*3+1], l0=viKW[i*3+2];
+        if(!(Math.abs(u.x-x0)+Math.abs(u.y-y0)<=VI_FIGUR_PX*2))continue;   // NaN/Sprung: nicht mischen
+        if(Math.hypot(u.x-x0,u.y-y0)>VI_FIGUR_PX)continue;
+        rueck.push(u,u.x,u.y,typeof u.lunge==="number"?u.lunge:NaN);
+        gemischt.add(u);
+        u.x=mix(x0,u.x); u.y=mix(y0,u.y);
+        if(l0===l0&&typeof u.lunge==="number")u.lunge=Math.max(0,mix(l0,u.lunge));
+      }
+      if(art===1){
+        // Pfeile: je Takt hoechstens ihre eigene Geschwindigkeit; ein neuer Pfeil hat keinen Vorher-Eintrag.
+        const m=viKPfeil.length?new Map():null; if(m)for(let i=0;i<viKPfeil.length;i+=3)m.set(viKPfeil[i],i);
+        if(m)for(const pf of pfeile){
+          const i=m.get(pf); if(i===undefined)continue;
+          const x0=viKPfeil[i+1], y0=viKPfeil[i+2];
+          if(Math.hypot(pf.x-x0,pf.y-y0)>Math.hypot(pf.vx||0,pf.vy||0)/60*1.5+3)continue;
+          rueck.push(pf,pf.x,pf.y,NaN);
+          pf.x=mix(x0,pf.x); pf.y=mix(y0,pf.y);
+        }
+      } else {
+        const b=viKBall, fb=fsBall;
+        // Getragener Ball (traegerId unveraendert) folgt seinem Traeger und bekommt dessen Sprungschwelle
+        // (+ Dribbelhub), damit er nicht ueberblendet, waehrend der Traeger teleportiert; im Flug gilt VI_BALL_PX.
+        const getragen=b&&fb&&fb.traegerId!=null&&fb.traegerId===b.tid;
+        // Opus-Review #1523: ein getragener Ball wird nur mitgemischt, wenn sein Traeger gemischt wurde --
+        // sonst rastet der Traeger (Sprung 18..34 px) ein, waehrend der Ball noch ueberblendet und hinterherhaengt.
+        let ballFrei=true;
+        if(getragen){
+          const tr=viKObj.find(o=>o.id===fb.traegerId);
+          ballFrei=!!tr&&gemischt.has(tr);
+        }
+        if(ballFrei&&b&&fb&&fb.sichtbar&&Math.hypot(fb.x-b.x,fb.y-b.y)<=(getragen?VI_FELD_PX+16:VI_BALL_PX)){
+          rueck.push(fb,fb.x,fb.y,NaN); fb.x=mix(b.x,fb.x); fb.y=mix(b.y,fb.y);
+        }
+        const s=viKSchiri;
+        if(s&&fsSchiri===s.o&&Math.hypot(fsSchiri.x-s.x,fsSchiri.y-s.y)<=VI_FIGUR_PX){
+          rueck.push(fsSchiri,fsSchiri.x,fsSchiri.y,NaN); fsSchiri.x=mix(s.x,fsSchiri.x); fsSchiri.y=mix(s.y,fsSchiri.y);
+        }
+      }
+    }catch{ stelleWiederHer(); return null; }
+    return stelleWiederHer;
+  }
   function viMische(zf){
+    if(!istBahn(disc))return viMischeKF(zf);
     if(viRennT==null||!istBahn(disc))return null;
     // OBERGRENZE 1+1/zf STATT 1 (Opus-Review #1503): bahnSimAcc waechst in ganzen Sechzigsteln,
     // der Schritt feuert erst bei acc>=zf/60 -- (bahnSimAcc+acc)/schritt laeuft deshalb bis zu
@@ -56205,7 +56315,7 @@
     // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
     if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
       bahnSimAcc+=1/60;
-      while(bahnSimAcc>=zf/60){ if(istBahn(disc))viSchnappschuss(); stepSim(1/60); bahnSimAcc-=zf/60; }
+      while(bahnSimAcc>=zf/60){ if(istBahn(disc))viSchnappschuss(); else if(viSchnappAn){ try{viSchnappschussKF();}catch{viKArt=0;} } else viKArt=0; stepSim(1/60); bahnSimAcc-=zf/60; }
     } else {
       stepSim((1/60)/zf);
     }
@@ -56263,7 +56373,8 @@
       // FIX A1 (s. anzeigeSechzigstel() oben): fuer die Bahn feuert stepSim() hier nicht
       // mehr bei jedem Sechzigstel, sondern erst, wenn `bahnSimAcc` genug Sechzigstel
       // gesammelt hat -- `zf` bleibt deshalb unveraendert an jeden Aufruf weitergereicht.
-      while(acc>=1/60){anzeigeSechzigstel(zf);acc-=1/60;}
+      viSchnappAn=!schnelldurchAktiv;
+      try{ while(acc>=1/60){anzeigeSechzigstel(zf);acc-=1/60;} } finally { viSchnappAn=false; }
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
