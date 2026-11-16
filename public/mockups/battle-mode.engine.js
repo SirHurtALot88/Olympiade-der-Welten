@@ -30005,6 +30005,27 @@
       // waehrend sechs sassen. Alle essen gleichzeitig, also zaehlt, wer sitzt.
       : BB().wettessen
       ?(s)=>TEILNEHMER.filter(u=>u.side===s).length
+      // EISKUNSTLAUF (Task #151): derselbe Bug-Typ wie "0 am Tisch" oben, nur fuer eine
+      // ECHT SEQUENZIELLE Buehne statt einer simultanen. `art.rundenN` ist bei Eiskunstlauf
+      // 12 GRANULARE ELEMENTE (nicht zwei Phasen), und bauBuehne()s `art.duett`-Zweig
+      // enthuellt ein Paar/Solo erst vollstaendig am Stueck (s. dessen "STARTREIHENFOLGE
+      // STATT RUNDEN-SETZLISTE"-Kommentar), bevor das naechste Paar ueberhaupt beginnt --
+      // der generische Massstab unten (`u.aktuell+1>=u.runden.length`, "ALLE eigenen
+      // Durchgaenge enthuellt") verlangt deshalb, dass ein Paar buchstaeblich sein GANZES
+      // Programm (inklusive der sich erst viel spaeter einordnenden Kuer, s.
+      // EISKUNSTLAUF_KURZPROGRAMM_N) fertig gezeigt hat, bevor es als "aufgetreten" zaehlt --
+      // obwohl zu diesem Zeitpunkt oft schon mehrere andere Paare ihr komplettes
+      // Kurzprogramm sichtbar hingelegt haben. "aufgetreten" heisst hier wie im echten
+      // Sport "hat das Eis schon einmal betreten und etwas gezeigt", nicht "hat absolut
+      // nichts mehr vor sich" -- exakt dieselbe Ablesung (`u.aktuell>=0`), die
+      // kuerZwischenstandZeilen() fuer die Zwischenstand-Tafel/das Bandenlicht schon
+      // benutzt ("gelaufen", s. dort), hier nur als Zaehler statt als Flag je Zeile. Reiner
+      // Lesehaken auf ein laengst vorhandenes Feld, keine neue Zahl, keine Wertungsaenderung.
+      // `BB().duett` statt eines eigenen `eiskunstlauf:true`-Felds (das BUEHNE_ART.eiskunstlauf
+      // nicht traegt) -- `duett:true` ist laut dessen eigenem Kommentar ("analog zu heben/duell
+      // oben") exklusiv fuer Eiskunstlauf unter den acht Buehnen-Disziplinen gesetzt.
+      : BB().duett
+      ?(s)=>TEILNEHMER.filter(u=>u.side===s&&(u.aktuell??-1)>=0).length
       :(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
