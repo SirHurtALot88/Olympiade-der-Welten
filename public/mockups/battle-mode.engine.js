@@ -29683,9 +29683,8 @@
           // bodenSchatzsuche() diesem Spiel schon zeichnet. r.fundort bleibt der
           // MECHANISCHE Fundort-Index (ispySeiteTick()), unveraendert.
           const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[r.fundort])||art.fundorte[r.fundort];
-          // SPLIT-SCREEN (I1): `u.side` waehlt die eigene Haelfte -- der Laeufer zielt auf
-          // seine EIGENE Truhe im EIGENEN Raum (s. ispyFundortXY()-Kommentar), nie auf die
-          // des Gegners.
+          // EINE HALLE: `u.side` waehlt das eigene Fach des Doppelmoebels (ispyStandXY) -- der Laeufer zielt auf
+          // seine EIGENE Truhe (s. ispyFundortXY()-Kommentar), nie auf die des Gegners.
           const ziel=ispyStandXY(vis,u.side);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
@@ -31337,7 +31336,7 @@
     const art=BB();
     // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): beide Raeume als
     // Draufsicht aus der PixelLab-Szene (Garten, Hof, Halle), ohne deren Demo-Truhen. Ersetzt Verlauf,
-    // Dielen, Buecherregale und Lichtinseln; Steg, Fuehrungssaum und Fundorte zeichnet der Motor weiter.
+    // Dielen, Buecherregale und Lichtinseln; Fuehrungs-Leuchten, Tauzieh-Marker und Fundorte zeichnet der Motor weiter.
     if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
     const g=ctx.createLinearGradient(0,0,0,H);
@@ -31397,7 +31396,8 @@
       wand.addColorStop(0,farbe); wand.addColorStop(1,"rgba(0,0,0,0)");
       ctx.globalAlpha=0.30+0.45*voll; ctx.fillStyle=wand; ctx.fillRect(x0,0,breite,H);
       // TAUZIEH-MARKER: Schiene W*0,44..0,56 knapp unter der Rueckwand, Knopf in Teamfarbe.
-      const schieneY=H*0.115, spanne=W*0.06;
+      // Opus-Review #1533: unter dem Spiel-Anzeige-Band (hudBandUnten, PR #1526), sonst liegt der Knopf hinter dem Bug.
+      const schieneY=Math.max(H*0.115,hudBandUnten()+8), spanne=W*0.06;
       const markerX=W*0.5+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
       ctx.globalAlpha=0.55; ctx.fillStyle="rgba(8,6,4,.7)";
       ctx.fillRect(W*0.5-spanne,schieneY-1.5,spanne*2,3);
@@ -33253,13 +33253,12 @@
           ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
           ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
         };
-        // PUNKTE ERST NACH DEM VERWEILEN: stepBuehne() bucht r.punkte schon bei der Enthuellung
-        // auf u.summe; das Namensschild zieht sie bis zum Ergebnis wieder ab, sonst verriete die
-        // Zahl den Ausgang, bevor der Balken voll ist. Reine Anzeige.
-        const rAkt=u.aktuell>=0&&u.runden?u.runden[u.aktuell]:null;
-        const offenPkt=(rAkt&&(u.vizPhase==="gehen"||u.vizPhase==="suchen"))?(rAkt.punkte||0):0;
+        // Opus-Review #1533: das Namensschild zeigt wie der Bug-Spielstand und der Ticker den Stand NACH der
+        // Enthuellung (stepBuehne() bucht r.punkte dort auf u.summe). Ein Abziehen bis zum Ergebnis haette Schild
+        // und Teamstand dauerhaft auseinanderlaufen lassen (und nach schnellDurch() falsche Punkte eingefroren);
+        // nur das "+N" ueber dem Kopf kommt erst im Ergebnis.
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe-offenPkt)+" Pkt",56,"#dfe6ef",9);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
         setzeFont(ctx,"400 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#8a93a3";
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x+dx,y+dy2+66);
