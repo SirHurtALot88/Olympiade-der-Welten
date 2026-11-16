@@ -45259,7 +45259,7 @@
     const teile=[];
     if(nxt)teile.push(["NÄCHSTER","#97a1b3"],[nxt.n.length>13?nxt.n.slice(0,12)+"…":nxt.n,bahnSeitenFarbe(nxt.seite)],
       [bahnZeitText(bahnSpanneAnzeige(Math.max(0,(nxt.startT||0)-rennT))),"#ff8a7a"],[rest+" warten","#97a1b3"]);
-    else teile.push(["ALLE UNTERWEGS","#97a1b3"]);
+    else if(imZiel<LAEUFER.length)teile.push(["ALLE UNTERWEGS","#97a1b3"]);
     if(imZiel>0)teile.push(["✓ "+imZiel+"/"+LAEUFER.length+" im Ziel","#7fe0a0"]);
     // y=76: die Teamkarten und die Anzeigetafel liegen als HTML ueber dem oberen Rand der Leinwand (bis rund y=70).
     const ky=76;
@@ -52820,6 +52820,10 @@
   // PUSTE-RICHTUNG je Laeufer (Anteil von reserveMax je Sekunde, + = laedt auf), nur Anzeige, s. stepZeitfahren 3b.
   const zfPuste=new WeakMap();
   const zfPusteTrend=(u)=>{ const z=zfPuste.get(u); return z?z.trend:0; };
+  // PFEILE MIT HYSTERESE (Opus-Review #1505): ▲/▼ springen an der Schwelle sonst im Sekundentakt
+  // an und aus. Ein Pfeil geht erst bei der engeren Schwelle wieder aus als er an ging.
+  const zfPusteSteigt=(u)=>{ const z=zfPuste.get(u); return !!(z&&z.steigt); };
+  const zfPusteFaellt=(u)=>{ const z=zfPuste.get(u); return !!(z&&z.faellt); };
   function stepZeitfahren(dt,art){
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
@@ -52877,6 +52881,8 @@
       if(dt>0&&u.reserveMax>0){
         const d=(u.reserve-pz.vor)/u.reserveMax/dt;
         pz.trend+=(d-pz.trend)*(1-Math.exp(-dt/0.30));
+        pz.steigt=pz.steigt?pz.trend>0.006:pz.trend>0.012;
+        pz.faellt=pz.faellt?pz.trend<-0.02:pz.trend<-0.05;
       }
       pz.vor=u.reserve;
       // ---- 4. NEIGUNG, s. Kopfkommentar. `gelaendeAn()` ist dieselbe Funktion, die
@@ -53531,7 +53537,7 @@
         // des eigenen Tempos, bergab, in der Verschnaufpause nach dem Einbruch --, steht es da, statt dass man
         // es am Balken erraten muss. Der Fokus bekommt es als Wort, ein eingebrochener Nebenmann als Pfeil.
         if(zfSeiteAn){
-          const tr=zfPusteTrend(u), steigt=tr>0.012, faellt=tr<-0.05;
+          const steigt=zfPusteSteigt(u), faellt=zfPusteFaellt(u);
           if(zfBlase||steigt){
             ctx.font="800 10.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
             ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
@@ -56422,7 +56428,7 @@
         // Disziplin waeren genau die Unklarheit, die Punkt 4 beheben sollte.
         const anteil=u.reserveMax>0?Math.max(0,u.reserve/u.reserveMax):0;
         // RICHTUNG (Rework 16.11., s. stepZeitfahren 3b): laedt der Balken gerade wieder auf, steht es da.
-        const trend=u.fertig==null?zfPusteTrend(u):0, steigt=trend>0.012, faellt=trend<-0.05;
+        const fertigU=u.fertig!=null, steigt=!fertigU&&zfPusteSteigt(u), faellt=!fertigU&&zfPusteFaellt(u);
         const res=el("span",steigt?"gut":u.leer?"schlecht":anteil<0.2?"knapp":null,
           " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %")+(steigt?" ▲ erholt sich":(faellt?" ▼":"")));
         res.title="Puste regeneriert sich: im Tempo unter dem Plan, bergab und in der Verschnaufpause nach dem Einbruch";
