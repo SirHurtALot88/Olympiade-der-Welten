@@ -982,7 +982,7 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
 /* Nav label text: ellipsize long labels instead of hard-clipping/overflowing
    the narrow sidebar column (was previously unconstrained, causing labels
    to get chopped off — "abgehackt"). */
-.foundation-sidebar-item > span:last-child {
+.foundation-sidebar-item > .foundation-sidebar-item-label {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -46306,6 +46306,30 @@ button.foundation-team-portrait-card {
   cursor: pointer;
 }
 
+/* Fable-UI/UX 14.11. #3, am Browser nachgemessen: der Tonrand links kam NIE an. Die Team-Theme-Regel
+   `.is-new-look[data-team-theme] .nl-card { border-color: ... }` (Spezifitaet 0,3,0) schlaegt
+   `.is-new-look .nl-inbox-card` (0,2,0) und faerbte den linken Rand bei JEDER Karte in den
+   Team-Akzent — auch bei der kritischen, deren eigene Regel oben denselben Rang hat. Hier mit
+   hoeherer Spezifitaet: Rot = Kritisch, Orange = Heute sinnvoll, gedaempft = Kann warten/Berichte. */
+.is-new-look[data-team-theme] .nl-inbox-card {
+  border-left-color: var(--nl-tone);
+}
+
+.is-new-look[data-team-theme] .nl-inbox-card.nl-tone-warn {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--nl-warn) 9%, transparent), transparent 55%),
+    var(--nl-panel);
+}
+
+.is-new-look[data-team-theme] .nl-inbox-card.nl-tone-neutral {
+  border-left-color: color-mix(in srgb, var(--nl-mut) 70%, var(--nl-line));
+}
+
+.is-new-look[data-team-theme] .nl-inbox-card.is-critical {
+  border-color: color-mix(in srgb, var(--nl-risk) 60%, var(--nl-line));
+  border-left-color: var(--nl-risk);
+}
+
 .is-new-look .nl-inbox-card.is-selected {
   box-shadow: var(--nl-e2), 0 0 0 1px color-mix(in srgb, var(--nl-accent) 55%, transparent);
 }
@@ -55089,6 +55113,15 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
   border-color: var(--nl-line-2);
   background: transparent;
+}
+
+/* Fable-UI/UX 14.11. #4: "Vorschlag" (Stern, Amber) und "passt bereits" (Haken, Gruen) sind zwei
+   Zustaende mit je eigener Farbe und eigenem Glyph — vorher war "passt" grau wie jeder Leerwert.
+   Die Klasse selbst steht im Tooltip und beim Spieler ("trainiert ..."), nicht mehr als Textwand. */
+.is-new-look .nl-training-chip.is-class-match {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-good) 9%, transparent);
 }
 
 .is-new-look .nl-training-row-expand {
@@ -81713,4 +81746,84 @@ span.nl-facility-ampel-chip {
   .scout-verdict-criterion > span:last-child {
     grid-column: 2;
   }
+}
+
+/* --- Legende der Kartenraender (Fable-UI/UX 14.11., Vorschlag 9) ----------
+   Eine Zeile unter den Portraitkarten-Ueberschriften (Home Top-Kader, Teams Kader). Farben kommen
+   aus denselben Tokens/Werten wie die Rahmen selbst (`--nl-gold` & Co. auf :root, Klassenfarben wie
+   `.player-card-class-frame-*`), damit die Legende nicht von den Karten abdriftet. */
+.nl-frame-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  margin: 0 0 var(--nl-s3, 10px);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--nl-mut, rgba(190, 203, 224, 0.78));
+}
+
+.nl-frame-legend-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.nl-frame-legend-label {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--nl-txt, rgba(235, 242, 255, 0.92));
+}
+
+.nl-frame-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.nl-frame-legend-swatch {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nl-frame-legend-swatch.is-ring {
+  border: 2px solid var(--nl-legend-tone);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--nl-legend-tone) 45%, transparent);
+}
+
+.nl-frame-legend-swatch.is-ring.is-bronze { --nl-legend-tone: var(--nl-bronze, #cd7f32); }
+.nl-frame-legend-swatch.is-ring.is-silver { --nl-legend-tone: var(--nl-silver, #c7d0dc); }
+.nl-frame-legend-swatch.is-ring.is-gold { --nl-legend-tone: var(--nl-gold, #f6c750); }
+.nl-frame-legend-swatch.is-ring.is-diamond { --nl-legend-tone: var(--nl-diamond, #7fe6f5); }
+
+.nl-frame-legend-swatch.is-stripe {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left-width: 4px;
+}
+
+.nl-frame-legend-swatch.is-stripe.is-red { border-left-color: rgba(211, 83, 72, 0.9); }
+.nl-frame-legend-swatch.is-stripe.is-green { border-left-color: rgba(109, 176, 105, 0.9); }
+.nl-frame-legend-swatch.is-stripe.is-blue { border-left-color: rgba(91, 145, 218, 0.9); }
+.nl-frame-legend-swatch.is-stripe.is-yellow { border-left-color: rgba(235, 181, 76, 0.92); }
+
+/* Kennzeichnung "Test" hinter einem Nav-Label (Battle Arena, Fable-UI/UX 14.11. #13). */
+.foundation-sidebar-item-badge {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px dashed rgba(255, 196, 64, 0.55);
+  background: rgba(255, 196, 64, 0.1);
+  color: rgba(255, 208, 84, 0.95);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.5;
 }

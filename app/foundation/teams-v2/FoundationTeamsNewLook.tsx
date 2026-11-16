@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import PortraitFrameLegend from "@/components/foundation/player-portrait-card/PortraitFrameLegend";
 import FoundationPlayerPortraitCard, {
   buildAxisPpsFromRating,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
@@ -1216,6 +1217,8 @@ export default function FoundationTeamsNewLook({
       return <p className="nl-teams-empty">Keine Spieler für den aktuellen Filter.</p>;
     }
     return (
+      <>
+      <PortraitFrameLegend variant="teams" />
       <div className="nl-teams-portrait-grid" data-testid="nl-teams-portrait-grid">
         {filteredSelectedRosterTableRows.map((row) => {
           const { entry, player } = row;
@@ -1315,6 +1318,7 @@ export default function FoundationTeamsNewLook({
           );
         })}
       </div>
+      </>
     );
   }
 
