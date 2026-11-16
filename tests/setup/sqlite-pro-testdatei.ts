@@ -37,6 +37,12 @@ import { afterAll } from "vitest";
 
 const datenbankDatei = path.join(os.tmpdir(), `oly-test-${process.pid}-${randomUUID()}.sqlite`);
 
+// Alle Datenbankdateien, die `getDatabase()` in DIESER Testdatei geoeffnet hat (s. lib/persistence/sqlite.ts).
+// Je Testdatei neu (setupFiles laeuft einmal pro Datei); Worker sind getrennte Prozesse/Threads, fremde
+// Dateien kommen hier nie hinein.
+const geoeffneteDatenbanken = new Set<string>();
+(globalThis as { __olyTestDatenbanken?: Set<string> }).__olyTestDatenbanken = geoeffneteDatenbanken;
+
 /**
  * ZWEITES LECK, dieselbe Ursache: Umgebungsvariablen.
  *
@@ -54,6 +60,37 @@ const umgebungVorher = { ...process.env };
 process.env.OLY_APP_SQLITE_PATH = datenbankDatei;
 
 afterAll(() => {
+  // EIGENE DATENBANK DER TESTDATEI (16.11.): viele Tests setzen `OLY_APP_SQLITE_PATH` selbst
+  // (`/tmp/oly-arena-...-<zufall>.sqlite`, 28 Dateien, dazu Helfer) und raeumten sie nie weg. Gemessen:
+  // 673 liegengebliebene Dateien = 11 GB nach einer Arbeitssitzung (je ~97 MB bei den Arena-Vorlauf-
+  // Tests) -- die Platte der Cloud-Umgebung lief voll. Hier nur der Pfad, den DIESE Testdatei zuletzt in
+  // die Variable geschrieben hat, und nur wenn er im Temp-Verzeichnis liegt und `oly-*.sqlite` heisst
+  // (nie ein fremder oder echter Spielstand). Fremde Worker bleiben unberuehrt: jeder Pfad traegt eine
+  // Zufalls-Id, es wird keine Verzeichnissuche gemacht.
+  const eigenerPfad = process.env.OLY_APP_SQLITE_PATH;
+  if (
+    eigenerPfad &&
+    eigenerPfad !== datenbankDatei &&
+    path.dirname(path.resolve(eigenerPfad)) === path.resolve(os.tmpdir()) &&
+    /^oly-.+\.sqlite$/.test(path.basename(eigenerPfad))
+  ) {
+    for (const endung of ["", "-wal", "-shm"]) {
+      fs.rmSync(`${eigenerPfad}${endung}`, { force: true });
+    }
+  }
+
+  // Alles, was diese Testdatei ueber getDatabase() geoeffnet hat (auch mehrere Pfade nacheinander),
+  // sofern es im Temp-Verzeichnis liegt und `oly-*.sqlite` heisst.
+  for (const pfad of geoeffneteDatenbanken) {
+    if (
+      path.dirname(path.resolve(pfad)) === path.resolve(os.tmpdir()) &&
+      /^oly-.+\.sqlite$/.test(path.basename(pfad))
+    ) {
+      for (const endung of ["", "-wal", "-shm"]) fs.rmSync(`${pfad}${endung}`, { force: true });
+    }
+  }
+  geoeffneteDatenbanken.clear();
+
   // Erst die Umgebung zuruecksetzen: hinzugefuegte Schluessel entfernen, veraenderte
   // zuruecksetzen. `delete` UND Zuweisung, weil ein blosses Ueberschreiben neu gesetzte
   // Schluessel stehen liesse.

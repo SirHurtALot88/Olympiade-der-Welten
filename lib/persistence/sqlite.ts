@@ -230,7 +230,13 @@ export function getDatabase() {
   }
 
   ensureDataDirectory();
-  databaseInstance = new Database(resolveDatabasePath());
+  const datenbankPfad = resolveDatabasePath();
+  databaseInstance = new Database(datenbankPfad);
+  // Nur unter Vitest: den Pfad fuer das Aufraeumen der Testdatei merken (tests/setup/sqlite-pro-testdatei.ts
+  // loescht ihn im afterAll). Ohne das blieb jede selbst gesetzte `/tmp/oly-*.sqlite` liegen -- 11 GB.
+  if (process.env.VITEST === "true") {
+    (globalThis as { __olyTestDatenbanken?: Set<string> }).__olyTestDatenbanken?.add(datenbankPfad);
+  }
   databaseInstance.pragma("journal_mode = WAL");
   databaseInstance.pragma("busy_timeout = 5000");
   databaseInstance.pragma("foreign_keys = ON");
