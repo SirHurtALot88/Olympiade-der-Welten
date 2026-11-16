@@ -25,7 +25,7 @@ const namenArg = process.argv.slice(5);
 
 // Startflaggen gegen sporadische Renderer-Abstuerze ("Target crashed") der sehr grossen
 // Seite in der Agenten-Umgebung (05.10.; trat auch mit dem unveraenderten Motor auf).
-const startArgs = ["--disable-gpu", "--js-flags=--max-old-space-size=4096"];
+const startArgs = ["--disable-gpu", "--js-flags=--max-old-space-size=4096", "--allow-file-access-from-files"]; // Engine-Bilder (Task #165) unter file:// pixellesbar
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest, args: startArgs } : { args: startArgs });
 const seite = await browser.newPage({ viewport: { width: 1300, height: 700 } });
 const fehler = [];

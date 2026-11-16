@@ -44,6 +44,8 @@ const NAME = "__Sondentest";
 const lungeFuer = (f) => 0.2 * (1 - (f + 0.5) / N_SHOOT);
 
 const browser = await chromium.launch({
+  // Engine-Bilder (Task #165) sind Dateien: unter file:// nur mit diesem Schalter pixellesbar.
+  args: ["--allow-file-access-from-files"],
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
 });
 const seite = await browser.newPage();

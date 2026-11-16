@@ -391,9 +391,11 @@ beim Docker-Umzug: ohne Argument nur Bericht, `--apply` zieht wirklich um (haelt
 Containerd UND Docker an, nicht nur den Compose-Stack), `--zurueck` dreht zurueck, `--loesche-altes`
 gibt den alten Platz erst frei, wenn der Umzug bestaetigt lief. `state` (Laufzeit-Sockets/PIDs, klein,
 ohnehin unter `/run`) bleibt bewusst unangetastet — nur `root` war je gemessen das Platzproblem.
-Dieses Skript lief noch nicht auf dem echten Server (kein SSH-Zugang fuer Agenten, s. oben) — vor dem
-ersten `--apply` prueft `bash deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh` (ohne
-Argument) den Bericht, und Chris fuehrt es dann selbst aus.
+**Gelaufen am 16.11.:** Chris hat `--apply` und danach `--loesche-altes` selbst ausgefuehrt — die alte
+`/var/lib/containerd` (24 GB) ist weg, danach `sda1` 38 GB gross, 12 GB belegt, **25 GB frei**,
+Healthcheck 200. Dockers und Containerds Datenwurzel liegen damit beide auf dem Volume; `docker system
+df` und `du -sh /var/lib/containerd` zeigen den Platz seither nicht mehr als Problem. Wer trotzdem
+wieder "no space left" sieht, prueft zuerst das Volume (`df -h /mnt/HC_Volume_106761772`), nicht `sda1`.
 
 **Dritter Umzug, kleinerer Kaliber (16.11.), Chris: "lass uns das groesste auf jeden fall umziehen
 weil das externe volume kann ich beliebig vergroessern":** `/root/oly-save-sicherungen/` sammelt bei
@@ -404,6 +406,17 @@ Volume um und ersetzt ihn an alter Stelle durch einen Symlink — kein Dienst mu
 werden (reine Dateiverwaltung), alle drei Skripte oben schreiben unveraendert weiter dorthin. Gleiches
 Berichts-/`--apply`-/`--zurueck`-/`--loesche-altes`-Muster, ebenfalls noch nicht auf dem echten Server
 gelaufen.
+
+## Wertungs-Fingerabdruck der Arena-Engine
+
+`node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
+Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
+16.11.: **GESAMT e80babacb68c (75 Eintraege)**. Eine reine Anzeige-Aenderung an
+`public/mockups/battle-mode.engine.js` (Zeichnen, HUD, Interpolation, Bilder auslagern) darf sie
+NICHT veraendern; weicht sie ab, hat die Aenderung die Wertung beruehrt. Neue Felder an Laeufer-/
+Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer WeakMap bzw. in
+modulweiten Arrays halten (Muster: Render-Interpolation `viSchnappschussKF`). Absichtliche Wertungs-
+aenderung: neue Zahl hier und in `data/generated/` festhalten.
 
 ## CI-Weiche für Moosgrab / Kartenschmiede
 

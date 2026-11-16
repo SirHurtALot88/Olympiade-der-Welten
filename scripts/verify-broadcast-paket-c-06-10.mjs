@@ -46,7 +46,7 @@ const melde = (bedingung, text) => {
   if (!bedingung) alleOk = false;
 };
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 
 async function neueSeite(page, { saat, dunkel } = {}) {
   await page.addInitScript(({ teams, saat }) => {

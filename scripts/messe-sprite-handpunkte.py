@@ -49,9 +49,14 @@ def lade_blatt(key: str) -> Image.Image:
     nur ohne Browser: hier reicht das reine PNG-Blatt, keine zusammengesetzte Figur)."""
     text = ENGINE_DATEI.read_text(encoding="utf-8")
     m = re.search(r'"' + re.escape(key) + r'":\s*"data:image/png;base64,([^"]+)"', text)
+    if m:
+        return Image.open(io.BytesIO(base64.b64decode(m.group(1)))).convert("RGBA")
+    # Seit Task #165 (scripts/lagere-engine-bilder-aus.mjs) steht dort ein Pfad relativ zur
+    # Engine-Datei, z.B. "engine-bilder/<hash>.png" oder "../sprites/...png#<hash>".
+    m = re.search(r'"' + re.escape(key) + r'":\s*"([^"#]+\.png)(?:#[0-9a-f]+)?"', text)
     if not m:
         raise SystemExit(f"Sprite-Key {key!r} nicht in {ENGINE_DATEI} gefunden.")
-    return Image.open(io.BytesIO(base64.b64decode(m.group(1)))).convert("RGBA")
+    return Image.open(ENGINE_DATEI.parent / m.group(1)).convert("RGBA")
 
 
 def zelle(blatt: Image.Image, zeile: int, spalte: int) -> Image.Image:

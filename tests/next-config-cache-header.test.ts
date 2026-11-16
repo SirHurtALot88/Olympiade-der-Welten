@@ -7,6 +7,9 @@
  * Die Dateien in public/ sind NICHT per Hash versioniert (Reworks ersetzen Sprites/Szenen unter
  * gleichem Namen). Darum: Bilder nur kurz frisch (1 h + SWR), Motor-/Mockup-Dateien `no-cache`
  * (immer per ETag revalidieren), niemals `immutable`/lange max-age.
+ * EINZIGE AUSNAHME (Task #165): /mockups/engine-bilder/ — die Dateinamen sind Inhalts-Hashes
+ * (scripts/lagere-engine-bilder-aus.mjs), ein neuer Inhalt bekommt eine neue URL. Nur dort
+ * `immutable` + ein Jahr; die Pruefung unten erlaubt es genau fuer diese eine Quelle.
  * Next komprimiert selbst; Caddy-`encode` war live groesser (s. next.config.ts).
  */
 import { readFileSync } from "node:fs";
@@ -27,6 +30,23 @@ function verzeichnisse(source: string): string[] {
   const m = /^\/:dir\(([^)]+)\)\/:path\*$/.exec(source);
   return m ? m[1].split("|") : [];
 }
+
+/** Wie Next: ALLE Regeln, deren Quelle den konkreten Pfad trifft, in Reihenfolge — die spaetere gewinnt. */
+function wirksamFuer(rs: Regel[], pfad: string): string | undefined {
+  let wert: string | undefined;
+  for (const r of rs) {
+    const muster = r.source
+      .replace(/[.]/g, "\\.")
+      .replace(/:dir\(([^)]+)\)/, "($1)")
+      .replace(/:path\*$/, ".*");
+    if (new RegExp("^" + muster + "$").test(pfad)) {
+      wert = r.headers.find((h) => h.key === "Cache-Control")?.value ?? wert;
+    }
+  }
+  return wert;
+}
+
+const ENGINE_BILDER_QUELLE = "/mockups/engine-bilder/:path*";
 
 function cacheControlFuer(rs: Regel[], pfadAnfang: string): string | undefined {
   // ALLE passenden Regeln sammeln: Next wendet jede an, die spaetere gewinnt -- eine Ueberschneidung
@@ -63,8 +83,17 @@ describe("next.config.ts headers()", () => {
     expect(cacheControlFuer(rs, "mockups")).toBe("no-cache");
   });
 
-  it("keine Regel setzt immutable oder ein max-age über einer Stunde", async () => {
+  it("/mockups/engine-bilder/*: immutable, ein Jahr (inhaltsadressiert) — die Engine selbst bleibt no-cache", async () => {
+    const rs = await regeln();
+    expect(wirksamFuer(rs, "/mockups/engine-bilder/0123456789ab.png")).toBe("public, max-age=31536000, immutable");
+    expect(wirksamFuer(rs, "/mockups/battle-mode.engine.js")).toBe("no-cache");
+    expect(wirksamFuer(rs, "/mockups/battle-mode.html")).toBe("no-cache");
+    expect(wirksamFuer(rs, "/sprites/baukasten/k_walk.png")).toBe("public, max-age=3600, stale-while-revalidate=86400");
+  });
+
+  it("keine andere Regel setzt immutable oder ein max-age über einer Stunde", async () => {
     for (const r of await regeln()) {
+      if (r.source === ENGINE_BILDER_QUELLE) continue;
       for (const h of r.headers) {
         expect(h.value).not.toMatch(/immutable/);
         const ma = /max-age=(\d+)/.exec(h.value);

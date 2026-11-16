@@ -21,7 +21,7 @@ mkdirSync(AUSGABE, { recursive: true });
 
 const DISZIS = ["time-trial", "spurt", "staffel", "takeshis-castle"];
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 let fehlerGesamt = 0;
 try {
   for (const d of DISZIS) {

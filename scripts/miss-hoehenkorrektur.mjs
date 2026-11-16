@@ -26,7 +26,7 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 const seite = await browser.newPage();
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));

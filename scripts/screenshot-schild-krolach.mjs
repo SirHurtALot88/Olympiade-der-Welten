@@ -27,7 +27,7 @@ const JOBS = [
   { name: "Vorrak", kind: "arena", ani: "walk", feldspiel: false, dir: 2, leinwand: 160, file: "vorrak-voidrot-zum-vergleich.png" },
 ];
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 const seite = await browser.newPage({ viewport: { width: 800, height: 600 } });
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));

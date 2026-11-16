@@ -12,7 +12,7 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const wartenMs = Number(process.argv[2] || 3000);
 const out = process.argv[3] || path.join(WURZEL, "tmp-ux-audit/gewichtheben-buehne.png");
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = await chromium.launch({ ...(existsSync(fest) ? { executablePath: fest } : {}), args: ["--allow-file-access-from-files"] }) /* Engine-Bilder (Task #165) unter file:// pixellesbar */;
 const seite = await browser.newPage({ viewport: { width: 1300, height: 700 } });
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
