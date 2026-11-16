@@ -38273,7 +38273,7 @@
   // Tooltip der Variantenchips (Folgerunde 16.11.). Geprueft am Code: KULISSEN_PROFILE hat NUR einen Eintrag (tennis), nur dort
   // greift kulisseSpielId() in die Eignung (Oberflaechen-Effekt); bei allen anderen Disziplinen steuert die Variante allein
   // Bild, Palette und Ton (Mini-DM-Publikum, Kletter-Palette, Zeitfahren-Seitenansicht), nie rr() oder Wertung.
-  const VARIANTEN_TIPP="Austragungsort laut Spielplan, keine Spielwirkung au\u00dfer Tennis";
+  const VARIANTEN_TIPP="Bild, Palette und Ton der Variante (ohne Pin: der Austragungsort laut Spielplan); Spielwirkung hat sie nur bei Tennis";
   function kulissenVarianten(){
     const kl=KULISSEN[disc];
     return (Array.isArray(kl)&&kl.length>1)?kl:null;
@@ -54262,7 +54262,15 @@
           ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
           // Seitenansicht: das Etikett weicht Blase und Zielraum-Etiketten aus (zfEtikPlatz), Marke und Linie bleiben am Ort
           let gtx=gx, gty=gy-33;
-          if(zfSeiteAn){ const gw=ctx.measureText("GEIST · "+hs.u.n).width+6, q=zfEtikPlatz(gx,gw,gty-9,11); gtx=q.cx; gty=q.y0+9; }
+          if(zfSeiteAn){
+            const gw=ctx.measureText("GEIST · "+hs.u.n).width+6, q=zfEtikPlatz(gx,gw,gty-9,11); gtx=q.cx; gty=q.y0+9;
+            // wer ausweichen musste, behaelt eine feine Leitlinie zur Marke (wie bei den Zielraum-Etiketten)
+            if(Math.abs(gtx-gx)>10||Math.abs(gty-(gy-33))>8){
+              ctx.save(); ctx.strokeStyle="rgba(240,235,220,.4)"; ctx.lineWidth=1; ctx.setLineDash([]);
+              ctx.beginPath(); ctx.moveTo(gtx,gty+3); ctx.lineTo(gx,gy-30); ctx.stroke(); ctx.restore();
+              ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
+            }
+          }
           ctx.strokeText("GEIST · "+hs.u.n,gtx,gty); ctx.fillText("GEIST · "+hs.u.n,gtx,gty);
           // In dieselbe Kollisionsvermeidung wie Name/Platz aufgenommen (s. Kommentar an
           // bahnLabelSchwebeBoxen oben): der GEIST-Marker liegt haeufig direkt neben dem
