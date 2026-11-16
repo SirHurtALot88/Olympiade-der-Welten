@@ -8029,6 +8029,189 @@
     beschuetzer:{h:"defensiv",z:"eng",b:"ausgewogen"},
     opportunist:{h:"ausgewogen",z:"locker",b:"opportun"}
   };
+  // ===================================================================================
+  // KONTAKT-REGLER, SCHRITT 0 (16.11., docs/design/kontakt-persoenlichkeit-16-11.md,
+  // Abschnitte 2, 3.5, 6.5, 10). Chris: Schubsen/Wegdraengen/Haengenbleiben sind normale
+  // Aktionen mit Stats, von der Persoenlichkeit getrieben. Schritt 0 baut NUR die Schicht
+  // darunter -- BIT-IDENTISCH zum heutigen Spiel (GESAMT e80babacb68c):
+  //   - kontaktProfil(p): vier Regler 5..95 (Kontaktbereitschaft kb, Haerte ha, Disziplin di,
+  //     Ausweichneigung aw) plus Auswahlschwelle pMin, aus der Persoenlichkeit (leitePers(),
+  //     sechs Typen) und den echten Traits (p.tp/p.tn, Namen aus CANONICAL_*_TRAITS).
+  //     Persoenlichkeit bestimmt die VERTEILUNG, nicht die Bilanz: kein Regler geht in eig,
+  //     ein Rezept oder einen Sub-Skill.
+  //   - Flag-Geruest: BAHN_ART/FELDSPIEL_ART/ARENA_ART/BUEHNE_ART[d].kontakt, Standard null,
+  //     NICHT aufzaehlbar (sonst taucht der Schluessel ueber eine Rohreferenz im Fingerabdruck
+  //     auf). Gesetzt nur ueber window.__arena.kontaktFlags({<disziplin>:{...}}) bzw.
+  //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Chromium-Headless-Laeufe,
+  //     window.__olyKontaktFlags vor dem Laden (der Node-Runner reicht sie noch NICHT durch, s. arena-node-motor.mjs). Die echte App setzt nichts davon.
+  //     In Schritt 0 hat ein gesetztes Flag KEINE Wirkung auf das Spiel: es schaltet nur die
+  //     Schatten-Buchhaltung (Profil je Laeufer, Schatten-Zaehler, Ziehung aus dem eigenen
+  //     Strom) ein -- der Nachweis, dass die Schicht im Sim-Pfad laeuft, ohne rr() anzufassen.
+  //   - Eigener Zufallsstrom kontaktRr(): mulberry32, je bau*()-Aufruf aus der Spiel-Saat
+  //     (eigener Versatz) neu gesaet, zieht NIE aus rr() (Muster kickoffRr, Abschnitt 3.5).
+  //   - Zaehler in einer WeakMap je Einheit (keine Felder an Laeufer/Spieler: neue Felder
+  //     verschieben den Fingerabdruck). Lesbar ueber window.__arena.kontaktZaehler().
+  //   - Kontrafaktik "alle ein Typ" (Abnahme-Kriterium N, Abschnitt 6.3): window.__arena.
+  //     kontaktPersZwang("bollwerk"|{typ,traits}|null). Wirkt NUR auf die Kontakt-Schicht
+  //     (Profil und die Rempel-Haeufigkeit in willTackeln), nicht auf persOf/Kampf/Befehle.
+  //     Standard null; kein echtes Spiel ruft das auf.
+  // NICHT in Schritt 0: keine Kosten, keine neue Wirkung, keine Posen (Stufen 1-4, Abschnitt 6.4).
+  // ===================================================================================
+  // Basis je Persoenlichkeit (Abschnitt 2.2). kb ist Zeichen fuer Zeichen die alte
+  // willTackeln-Tabelle mal 100 (90/100===0.9 usw., in Node nachgeprueft); `beschuetzer` stand
+  // dort nicht und fiel auf `?? 0.5` zurueck -- hier ausdruecklich 50. Der dort gefuehrte Typ
+  // `taktiker` existiert nicht (leitePers() kennt ihn nicht, u.pers ist immer persOf[..] oder
+  // "duellant") und entfaellt ohne Verhaltensaenderung.
+  const KONTAKT_BASIS={
+    draufgaenger:{kb:90,ha:85,di:30,aw:20,neigung:null},
+    opportunist:{kb:70,ha:45,di:40,aw:65,neigung:"angeschlagene"},
+    duellant:{kb:55,ha:60,di:60,aw:40,neigung:"staerkster"},
+    schleicher:{kb:50,ha:35,di:55,aw:90,neigung:"vonHinten"},
+    beschuetzer:{kb:50,ha:55,di:70,aw:30,neigung:"schutz"},
+    bollwerk:{kb:25,ha:60,di:75,aw:15,neigung:"dagegenhalten"}
+  };
+  // pMin (ab welcher geschaetzten Erfolgsaussicht er zulangt) haengt an der vorhandenen
+  // Haltung PERSDEF.h -- dieselbe Stelle, an der spaeter die Strategie-Vorlagen ansetzen
+  // (Abschnitt 7). "offensiv" hat heute keinen Typ; 0,375 ist die Mitte zwischen den Nachbarn.
+  const KONTAKT_PMIN_JE_HALTUNG={defensiv:0.60,vorsichtig:0.55,ausgewogen:0.45,offensiv:0.375,wild:0.30};
+  // Trait-Verschiebungen (Abschnitt 2.3), additiv, je Regler auf +-30 gedeckelt, dann 5..95.
+  // Nur Namen, die es in lib/training/class-progression-config.ts wirklich gibt.
+  const KONTAKT_TRAIT={
+    Fearless:{kb:10,aw:-15}, FiredUp:{kb:10,ha:10,di:-5}, Feisty:{kb:10,di:-15,revanche:true},
+    Vindictive:{ha:5,di:-10,revanche:true}, Cruel:{ha:15,di:-10}, Renegade:{ha:5,di:-20},
+    Cheater:{di:-25}, Gambler:{ha:10,pMin:-0.10}, ColdBlooded:{ha:10,di:10,keineRevanche:true},
+    Egomaniac:{di:-5,keinSchutz:true}, Diva:{kb:-5,aw:10}, Disciplined:{di:25},
+    Fair:{ha:-10,di:20}, Cool:{di:10,aw:10}, Resourceful:{aw:10}, Paranoid:{aw:15},
+    Relaxed:{kb:-10}, Lazy:{kb:-10}, Timid:{kb:-20,aw:20}, FaintHearted:{kb:-15,aw:15},
+    Loyal:{schutz:true}, Caring:{schutz:true}, Altruistic:{schutz:true}, Obsessive:{haftet:true}
+  };
+  const KONTAKT_REGLER=["kb","ha","di","aw"];
+  const kontaktKlemme=(v)=>Math.max(5,Math.min(95,v));
+  const kontaktHat=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  // Kontrafaktik-Zustand (s. Kopfkommentar). null = echte Persoenlichkeiten.
+  let kontaktZwang=null;
+  // Reine Funktion: dasselbe p (und derselbe Zwang) gibt immer dasselbe Profil. persKey
+  // optional (sonst leitePers(p).key); Optionen {traits:false} rechnet nur die Basis.
+  // Ist der Zwang gesetzt, gilt SEIN Typ fuer alle, und Traits nur bei {traits:true}.
+  function kontaktProfil(p,persKey,opt){
+    p=p||{};
+    let key=kontaktZwang?kontaktZwang.typ:(persKey||leitePers(p).key);
+    if(!kontaktHat(KONTAKT_BASIS,key))key="duellant";
+    const mitTraits=kontaktZwang?kontaktZwang.traits:!(opt&&opt.traits===false);
+    const B=KONTAKT_BASIS[key], d={kb:0,ha:0,di:0,aw:0}, warum=[];
+    let pMinD=0, revanche=false, keineRevanche=false, schutz=key==="beschuetzer", keinSchutz=false, haftet=false;
+    if(mitTraits){
+      // Doppelte Eintraege zaehlen einmal; die Summe ist reihenfolgeunabhaengig.
+      const traits=[...new Set([...(p.tp||[]),...(p.tn||[])])];
+      for(const t of traits){
+        if(!kontaktHat(KONTAKT_TRAIT,t))continue;
+        const T=KONTAKT_TRAIT[t];
+        for(const r of KONTAKT_REGLER)if(T[r])d[r]+=T[r];
+        if(T.pMin)pMinD+=T.pMin;
+        if(T.revanche)revanche=true;
+        if(T.keineRevanche)keineRevanche=true;
+        if(T.schutz)schutz=true;
+        if(T.keinSchutz)keinSchutz=true;
+        if(T.haftet)haftet=true;
+        warum.push(t);
+      }
+    }
+    const o={pers:key};
+    for(const r of KONTAKT_REGLER)o[r]=kontaktKlemme(B[r]+Math.max(-30,Math.min(30,d[r])));
+    const h=(PERSDEF[key]||{}).h;
+    o.pMin=+Math.max(0.05,Math.min(0.95,(KONTAKT_PMIN_JE_HALTUNG[h]??0.45)+pMinD)).toFixed(3);
+    o.neigung=B.neigung;
+    o.revanche=revanche&&!keineRevanche;
+    o.schutz=schutz&&!keinSchutz;
+    o.haftet=haftet;
+    o.warum=warum;
+    return o;
+  }
+  // Heutige Rempel-Neigung der Bahn (Spurt/Takeshi, `willTackeln` in stepSpurt): NUR die
+  // Basis-kb der Persoenlichkeit, ohne Traits -- Traits sind Stufe 3. Ohne Zwang ist das
+  // fuer jedes u.pers derselbe Wert wie die alte Tabelle (Rueckfall 0,5 wie `?? 0.5`).
+  function kontaktBereitschaftBahn(u){
+    const key=(kontaktZwang&&kontaktZwang.typ)||u.pers;
+    return kontaktHat(KONTAKT_BASIS,key)?KONTAKT_BASIS[key].kb/100:0.5;
+  }
+  // Tooltip-Text "Tendenzen" (Abschnitt 2.4): Worte statt Zahlen, nur Anzeige.
+  function kontaktTendenzText(pr){
+    const teile=[];
+    teile.push(pr.kb>=70?"sucht den Zweikampf":pr.kb>=45?"nimmt Zweikämpfe mit, wenn sie kommen":"meidet Zweikämpfe");
+    if(pr.pMin<=0.35)teile.push("auch bei schlechter Aussicht");
+    else if(pr.pMin>=0.55)teile.push("nur wenn es sitzt");
+    if(pr.ha>=70)teile.push("geht voll rein");else if(pr.ha<=40)teile.push("bleibt kontrolliert");
+    if(pr.di<=35)teile.push("riskiert Fouls");else if(pr.di>=70)teile.push("bleibt sauber");
+    if(pr.aw>=65)teile.push("weicht als Ziel lieber aus");else if(pr.aw<=30)teile.push("hält als Ziel dagegen");
+    if(pr.schutz)teile.push("springt für Mitspieler ein");
+    if(pr.revanche)teile.push("sinnt auf Revanche");
+    const s=teile.join(", ");
+    return "Tendenzen im Zweikampf: "+s.charAt(0).toUpperCase()+s.slice(1)+
+      ". Das ist die Grundtendenz der Persönlichkeit; sie wirkt bisher nur als Rempel-Häufigkeit in Spurt und Takeshi's Castle, Eigenschaften verschieben sie später.";
+  }
+  // EIGENER ZUFALLSSTROM (Abschnitt 3.5). mulberry32 statt der rr()-LCG mit Versatz: eine
+  // andere Startzahl derselben Vollperioden-LCG laege auf demselben Zyklus wie rr().
+  let kontaktSeed=0x6b6f6e74;
+  const kontaktRr=()=>{
+    kontaktSeed=(kontaktSeed+0x6D2B79F5)>>>0;
+    let z=kontaktSeed;
+    z=Math.imul(z^(z>>>15),z|1);
+    z^=z+Math.imul(z^(z>>>7),z|61);
+    return ((z^(z>>>14))>>>0)/4294967296;
+  };
+  // Aus bauSpurt/bauFeldspiel/bauBuehne/build gerufen, direkt neben `seed=normalisiereSaat(..)`.
+  // Liest die Saat, zieht nichts aus rr().
+  function kontaktStromSaeen(saat){ kontaktSeed=(normalisiereSaat(saat)^0x4b4f4e54)>>>0; }
+  // ZAEHLER je Einheit (Laeufer/Spieler-Objekt des laufenden Spiels). WeakMap statt Feld:
+  // nichts davon wird aufzaehlbar, nichts landet im Ergebnis oder in wert().
+  const kontaktZaehlerMap=new WeakMap();
+  // Spieler-Rohdaten (p mit tp/tn) je Einheit, fuer das Profil bei gesetztem Flag. Derselbe
+  // Uebergabeweg wie u.pers (bauSpurt liest persOf[p.n] aus demselben p), nur ohne Feld.
+  const kontaktSpielerMap=new WeakMap();
+  // Die Laeufer des zuletzt GEBAUTEN Rennens: spieleDisziplin() stellt LAEUFER nach der Messung
+  // zurueck (M.sichern()), die Zaehler sollen aber das gerechnete Rennen zeigen.
+  let kontaktLetzteBahn=[];
+  function kontaktZaehle(einheit,art){
+    if(!einheit||typeof einheit!=="object")return;
+    let z=kontaktZaehlerMap.get(einheit);
+    if(!z){ z={}; kontaktZaehlerMap.set(einheit,z); }
+    z[art]=(z[art]||0)+1;
+  }
+  const kontaktZaehlerVon=(einheit)=>({...(kontaktZaehlerMap.get(einheit)||{})});
+  function kontaktProfilEinheit(einheit){
+    const p=kontaktSpielerMap.get(einheit)||{};
+    return kontaktProfil(p,einheit.pers||persOf[p.n]||null);
+  }
+  // FLAG-GERUEST: `kontakt` je Disziplin, Standard null, nicht aufzaehlbar.
+  function kontaktFlagFeld(tab){
+    for(const d of Object.keys(tab))
+      if(tab[d]&&typeof tab[d]==="object"&&!kontaktHat(tab[d],"kontakt"))
+        Object.defineProperty(tab[d],"kontakt",{value:null,writable:true,enumerable:false,configurable:true});
+  }
+  // Setzt/liest die Flags ueber alle vier Chassis. {spurt:{stufe:0}} schaltet ein, {spurt:null}
+  // aus; unbekannte Disziplinen und Nicht-Objekte werden ignoriert. `nurIn` begrenzt auf eine
+  // Tabelle (bahnFlags/buehneFlags). Ohne Argument nur lesen.
+  function kontaktFlagsSetzen(neu,nurIn){
+    const tabellen=nurIn?[nurIn]:[ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART];
+    if(neu&&typeof neu==="object")
+      for(const d of Object.keys(neu))
+        for(const tab of tabellen){
+          if(!kontaktHat(tab,d))continue;
+          const w=neu[d];
+          if(w===null||w===false)tab[d].kontakt=null;
+          else if(w&&typeof w==="object"&&!Array.isArray(w))tab[d].kontakt=Object.freeze({...w});
+        }
+    const aus={};
+    for(const tab of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])
+      for(const d of Object.keys(tab))if(tab[d]&&tab[d].kontakt)aus[d]={...tab[d].kontakt};
+    return aus;
+  }
+  function kontaktZwangSetzen(neu){
+    if(neu===null||neu===undefined||neu===false||neu==="")kontaktZwang=null;
+    else if(typeof neu==="string"&&kontaktHat(KONTAKT_BASIS,neu))kontaktZwang={typ:neu,traits:false};
+    else if(neu&&typeof neu==="object"&&kontaktHat(KONTAKT_BASIS,neu.typ))kontaktZwang={typ:neu.typ,traits:!!neu.traits};
+    return kontaktZwang?{...kontaktZwang}:null;
+  }
     const clamp=(v)=>Math.max(0,Math.min(100,Math.round(v)));
   // "natürlich" heisst: die Persoenlichkeit entscheidet. Genau der Kniff aus dem Vorbild —
   // man stellt nur ein, was einen wirklich stoert, der Rest bleibt Charakter.
@@ -11253,7 +11436,7 @@
     rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
-    seed=normalisiereSaat(saat);
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat);
     // Eigener Kickoff-Saatstrom, fester Versatz auf denselben Spiel-Seed (s. Kommentar bei
     // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
     kickoffSeed=(normalisiereSaat(saat)+777777)>>>0;
@@ -20690,7 +20873,7 @@
   // Variante des zuletzt gebauten Buehnen-Spiels (null ohne Kulissen-Profil) -- reine Anzeige.
   let buehneKulisseId=null;
   function bauBuehne(saat){
-    seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
     // W-F2 ("Menue des Spieltags", Fable-Ideen Buehne-Auftritt Paket 3 (01.10.), Klasse A):
     // EIN Gericht pro Spiel, aus der ROHEN, NOCH UNVERBRAUCHTEN Saat gehasht -- bewusst
@@ -38451,7 +38634,10 @@
         tipOn(pl,PERS[pk].l+" — Persönlichkeit",
           "Entsteht aus "+p.c+" · "+p.r+(p.sub&&p.sub.length?" · "+p.sub.join(", "):"")+
           ((p.tp&&p.tp.length)||(p.tn&&p.tn.length)?" · "+[...(p.tp||[]),...(p.tn||[])].join(", "):"")+
-          ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist.");
+          ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist. "+
+          // Opus-Review #1531: nur die GRUNDtendenz der Persoenlichkeit (ohne Traits) -- das ist heute die einzige Groesse,
+          // die im Spiel wirkt; mit Traits stuende z. B. "nimmt Zweikaempfe mit", obwohl der Spieler real meidet.
+          kontaktTendenzText(kontaktProfil({...p,tp:[],tn:[]},pk)));
         u.appendChild(pl);
 
         const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
@@ -39382,7 +39568,7 @@
     // SANDSACK_PAR_FILM null, die Zeile tut dann nichts.
     if(istBuehne(disc)){buehneDisc=disc; const erg=bauBuehne(saat); if(SANDSACK_PAR_FILM)sandsackParSzeneBauen(); return erg;}
     if(istBahn(disc)){bahnDisc=disc; bahnAktuelleSaat=saat; return bauSpurt(saat);}
-    seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
     // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
     // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
@@ -48658,6 +48844,16 @@
   for(const tabelle of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])rezepteNachziehen(tabelle);
 
   let bahnDisc="spurt";
+  // KONTAKT-FLAG-GERUEST (Schritt 0, s. KONTAKT_BASIS/kontaktFlagFeld): jetzt stehen alle vier
+  // Art-Tabellen. `kontakt` je Disziplin = null, nicht aufzaehlbar. window.__olyKontaktFlags
+  // (Headless, vor dem Laden) ist derselbe Weg wie __olyBahnFlags/__olyBuehneFlags.
+  for(const tab of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])kontaktFlagFeld(tab);
+  try{
+    const startKontakt=window.__olyKontaktFlags;
+    if(startKontakt&&typeof startKontakt==="object")kontaktFlagsSetzen(startKontakt);
+    const startZwang=window.__olyKontaktPersZwang;
+    if(startZwang)kontaktZwangSetzen(startZwang);
+  }catch{ /* ohne Fenster/Flags: Standard null */ }
   const BA=()=>BAHN_ART[bahnDisc]||BAHN_ART.spurt;
   const istBahn=(d)=>!!BAHN_ART[d];
   const SPURT_KEYS=Object.keys(BAHN_ART.spurt.rezept);
@@ -49956,7 +50152,7 @@
     return SPURT_FORMATE[kulisseHash("spurt-format|"+(saat==null?"":String(saat)))%SPURT_FORMATE.length];
   }
   function bauSpurt(saat){
-    seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); kontaktLetzteBahn=[]; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
     fortschrittVerlauf={};
     for(let s=0;s<bahnSeitenN();s++)fortschrittVerlauf[s]=[];
@@ -50262,6 +50458,7 @@
         // null und werden nie gelesen.
         etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      kontaktSpielerMap.set(L,p); kontaktLetzteBahn.push(L);   // Kontakt-Schicht (Schritt 0): p fuer kontaktProfilEinheit(), ohne Feld am Laeufer
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
       // von Anfang an unterwegs; die uebrigen stehen sichtbar in ihrer Wechselzone, was
@@ -52586,8 +52783,11 @@
 
       // TACKLE. Wer Wucht hat und einen Gegner in Reichweite, kann zulangen — kostet ihn
       // selbst Tempo. Ob er es TUT, haengt an seiner Persoenlichkeit, nicht am Zufall.
-      const willTackeln=({draufgaenger:0.9,duellant:0.55,schleicher:0.5,opportunist:0.7,
-        bollwerk:0.25,taktiker:0.3})[u.pers] ?? 0.5;
+      // KONTAKT-SCHRITT 0 (16.11.): die Tabelle steht jetzt als `kb` in KONTAKT_BASIS (s. dort),
+      // Zahlen identisch (kb/100). Bereinigt: der nie vergebene Typ `taktiker` (0,3) ist raus,
+      // `beschuetzer` steht ausdruecklich auf seinem bisherigen Rueckfall 0,5 -- beides ohne
+      // Verhaltensaenderung, weil u.pers nur Werte aus leitePers() oder "duellant" annimmt.
+      const willTackeln=kontaktBereitschaftBahn(u);
       // Gemessen hat Torment im Spurt 0 % getragen, obwohl die Matrix es mit 14 fuehrt.
       // Ein Teil davon war die Schwelle: bei WUCHT > 45 kamen ueber ein ganzes Rennen rund
       // ein Rempler zustande, und was einmal passiert, entscheidet nichts.
@@ -52626,8 +52826,20 @@
       if(tackleOk && rr()<willTackeln*dt*(TA.tackleRate??1.6)*(bahnKursChaos||1)){
         const opfer=LAEUFER.filter(o=>o!==u&&(TA.tackleAlleSeiten||o.seite!==u.seite)&&o.fertig==null&&!(o.huerde>0)
           && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035);
+        // KONTAKT-ZAEHLER (Schritt 0): WeakMap, kein Feld, kein rr(). Bei gesetztem Flag zusaetzlich
+        // die Schatten-Buchhaltung: Profil-Schwelle pMin gegen die geschaetzte Aussicht (wuerde er
+        // nach Stufe 2 zulangen?) und eine Ziehung aus dem EIGENEN Strom -- ohne jede Wirkung.
+        kontaktZaehle(u,"anlauf");
+        if(!opfer.length)kontaktZaehle(u,"ohneZiel");
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
+          kontaktZaehle(u,"versuch"); kontaktZaehle(o,"angegangen");
+          if(TA.kontakt){
+            const pr=kontaktProfilEinheit(u), aussicht=u.WUCHT/((u.WUCHT+(o.ROBUST||0))||1);
+            kontaktZaehle(u,aussicht>=pr.pMin?"schattenUeberPMin":"schattenUnterPMin");
+            if(kontaktRr()<0.5)kontaktZaehle(u,"schattenStromHalb");
+            kontaktZaehle(u,"schattenStromZug");
+          }
           // Der Rempler kostet den Remplenden weniger, als er den Getroffenen kostet —
           // sonst waere Wucht ein Nachteil, und genau das hat die Messung gezeigt:
           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
@@ -52670,6 +52882,7 @@
               :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
           if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
             o.ausgewichen=(o.ausgewichen||0)+1;
+            kontaktZaehle(o,"ausgewichen"); kontaktZaehle(u,"insLeere");
             // AUSWEICHEN SICHTBAR (dieselbe Quelle wie oben): ein kurzer Ausweich-Ruck neben
             // dem Opfer, derselbe Farbverlauf-Baustein wie beim Windschatten-Sog. Deutet die
             // Seitwaertsbewegung nur an -- u.pos/u.bahnZ selbst aendern sich nicht.
@@ -52680,6 +52893,7 @@
           } else {
             const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
             if(rr()<stark){
+              kontaktZaehle(u,"treffer"); kontaktZaehle(o,"getroffen");
               o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
               // REMPLER-TREFFER SICHTBAR: derselbe Bogenschlag, der im Kampf jeden Treffer
               // markiert (effektFuer/"hieb"). u.lungeVis (s. unten) loest zugleich die
@@ -52712,6 +52926,7 @@
                 remplerBig?"rempler":undefined);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
+              kontaktZaehle(u,"abgeprallt"); kontaktZaehle(o,"gehalten");
               feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
             }
           }
@@ -64674,6 +64889,8 @@
       if(neu&&typeof neu==="object")
         for(const k of Object.keys(BUEHNE_FLAGS))
           if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
+      // KONTAKT (Schritt 0): {kontakt:{eiskunstlauf:{...}|null}} -> BUEHNE_ART[d].kontakt.
+      if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BUEHNE_ART);
       return {...BUEHNE_FLAGS};
     },
     // FORMAT-FUNDAMENT SPURT (s. BAHN_FLAGS/baueHatz, 08.11.): dasselbe Muster wie
@@ -64687,6 +64904,8 @@
       // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
       if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
         BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
+      // KONTAKT (Schritt 0): {kontakt:{spurt:{...}|null}} -> BAHN_ART[d].kontakt, s. kontaktFlags.
+      if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BAHN_ART);
       return {...BAHN_FLAGS};
     },
     // KALIBRIERUNGS-SCHNITTSTELLE "DIE HATZ" (nur Messung/QA, s. HATZ_W/HATZ_RAUSCHEN nahe
@@ -64796,6 +65015,19 @@
           if(Array.isArray(neu[d]))ARENA_ART[d].persHandwerk=neu[d].filter(k=>k==="z"||k==="b");
       return Object.fromEntries(Object.keys(ARENA_ART).map(d=>[d,[...(ARENA_ART[d].persHandwerk||[])]]));
     },
+    // KONTAKT-SCHICHT, SCHRITT 0 (16.11., s. KONTAKT_BASIS): Mess-/QA-Schnittstelle, kein echtes
+    // Spiel ruft das auf. kontaktFlags({spurt:{stufe:0}}) setzt `BAHN_ART.spurt.kontakt` (analog
+    // fuer Feldspiel/Arena/Buehne), {spurt:null} schaltet aus, ohne Argument nur lesen.
+    // kontaktPersZwang("bollwerk"|{typ,traits}|null): Kontrafaktik "alle ein Typ".
+    // kontaktProfil(p, persKey?): das Profil eines Spielers (reine Funktion).
+    // kontaktZaehler(): Zaehler je Laeufer des zuletzt gerechneten Rennens (rein lesend).
+    // kontaktZufallProbe(saat,n): n Ziehungen aus dem eigenen Strom (Determinismus-Beleg).
+    kontaktFlags:(neu)=>kontaktFlagsSetzen(neu),
+    kontaktPersZwang:(...arg)=>arg.length?kontaktZwangSetzen(arg[0]):(kontaktZwang?{...kontaktZwang}:null),
+    kontaktProfil:(p,persKey)=>kontaktProfil(p,persKey),
+    kontaktBasis:()=>JSON.parse(JSON.stringify(KONTAKT_BASIS)),
+    kontaktZaehler:()=>kontaktLetzteBahn.map(u=>({n:u.n, seite:u.seite, pers:u.pers, ...kontaktZaehlerVon(u)})),
+    kontaktZufallProbe:(saat,n)=>{ kontaktStromSaeen(saat); const aus=[]; for(let i=0;i<(n||5);i++)aus.push(kontaktRr()); return aus; },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
     // setzeTaktik oben, docs/design/feldspiel-taktik-karte-fundament-15-10.md): die
