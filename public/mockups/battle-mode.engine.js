@@ -55923,9 +55923,11 @@
     const VI_FIGUR_PX=art===1?VI_KAMPF_PX:VI_FELD_PX;
     const rueck=[]; // [objekt, x, y, lunge|NaN] der ueberschriebenen Werte
     let tAlt=null;
+    const gemischt=new Set();
     const mix=(a,b)=>a+(b-a)*f;
     const stelleWiederHer=()=>{
-      for(let i=0;i<rueck.length;i+=4){
+      // Rueckwaerts (Opus-Review #1523): steht ein Objekt doppelt in rueck, muss der ERSTE Eintrag (Originalwert) zuletzt gewinnen.
+      for(let i=rueck.length-4;i>=0;i-=4){
         const o=rueck[i]; o.x=rueck[i+1]; o.y=rueck[i+2];
         if(rueck[i+3]===rueck[i+3])o.lunge=rueck[i+3];
       }
@@ -55938,6 +55940,7 @@
         if(!(Math.abs(u.x-x0)+Math.abs(u.y-y0)<=VI_FIGUR_PX*2))continue;   // NaN/Sprung: nicht mischen
         if(Math.hypot(u.x-x0,u.y-y0)>VI_FIGUR_PX)continue;
         rueck.push(u,u.x,u.y,typeof u.lunge==="number"?u.lunge:NaN);
+        gemischt.add(u);
         u.x=mix(x0,u.x); u.y=mix(y0,u.y);
         if(l0===l0&&typeof u.lunge==="number")u.lunge=Math.max(0,mix(l0,u.lunge));
       }
@@ -55956,7 +55959,14 @@
         // Getragener Ball (traegerId unveraendert) folgt seinem Traeger und bekommt dessen Sprungschwelle
         // (+ Dribbelhub), damit er nicht ueberblendet, waehrend der Traeger teleportiert; im Flug gilt VI_BALL_PX.
         const getragen=b&&fb&&fb.traegerId!=null&&fb.traegerId===b.tid;
-        if(b&&fb&&fb.sichtbar&&Math.hypot(fb.x-b.x,fb.y-b.y)<=(getragen?VI_FELD_PX+16:VI_BALL_PX)){
+        // Opus-Review #1523: ein getragener Ball wird nur mitgemischt, wenn sein Traeger gemischt wurde --
+        // sonst rastet der Traeger (Sprung 18..34 px) ein, waehrend der Ball noch ueberblendet und hinterherhaengt.
+        let ballFrei=true;
+        if(getragen){
+          const tr=viKObj.find(o=>o.id===fb.traegerId);
+          ballFrei=!!tr&&gemischt.has(tr);
+        }
+        if(ballFrei&&b&&fb&&fb.sichtbar&&Math.hypot(fb.x-b.x,fb.y-b.y)<=(getragen?VI_FELD_PX+16:VI_BALL_PX)){
           rueck.push(fb,fb.x,fb.y,NaN); fb.x=mix(b.x,fb.x); fb.y=mix(b.y,fb.y);
         }
         const s=viKSchiri;
@@ -56018,7 +56028,7 @@
     // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
     if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
       bahnSimAcc+=1/60;
-      while(bahnSimAcc>=zf/60){ if(istBahn(disc))viSchnappschuss(); else if(viSchnappAn)viSchnappschussKF(); stepSim(1/60); bahnSimAcc-=zf/60; }
+      while(bahnSimAcc>=zf/60){ if(istBahn(disc))viSchnappschuss(); else if(viSchnappAn){ try{viSchnappschussKF();}catch{viKArt=0;} } else viKArt=0; stepSim(1/60); bahnSimAcc-=zf/60; }
     } else {
       stepSim((1/60)/zf);
     }
