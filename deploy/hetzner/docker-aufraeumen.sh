@@ -61,8 +61,9 @@ BELEGT_PROZENT="$(df --output=pcent / 2>/dev/null | tail -1 | tr -d ' %')"
 if [ -n "$BELEGT_PROZENT" ] && [ "$BELEGT_PROZENT" -ge 85 ]; then
   echo
   echo "WARNUNG: Root-Platte trotz Aufraeumen bei ${BELEGT_PROZENT}% — das reicht nicht mehr aus."
-  echo "         Naechster Schritt: deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh"
-  echo "         pruefen bzw. containerd selbst (/var/lib/containerd) in den Blick nehmen."
+  echo "         Naechste Schritte (Bericht zuerst, dann ggf. --apply):"
+  echo "           deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh"
+  echo "           deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh"
 fi
 
 echo

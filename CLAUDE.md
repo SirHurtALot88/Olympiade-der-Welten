@@ -382,9 +382,18 @@ Es gibt daneben `deploy/hetzner/docker-datenwurzel-auf-volume-umziehen.sh` (14.1
 NUR Dockers eigene Datenwurzel (`/etc/docker/daemon.json`, Images/Volumes/Build-Cache) auf das bislang
 ungenutzte Hetzner-Volume (`/mnt/HC_Volume_106761772`, 20 GB; `/mnt/volume-hel1-1` ist trotz Namens
 **kein** eigenes Mount, sondern ein gewoehnlicher Ordner auf `sda1`) umzieht — das allein reicht nicht,
-weil Containerds Root davon unberuehrt bleibt. Wird `/var/lib/containerd` zum wiederkehrenden Problem,
-muesste als naechstes containerd selbst umgezogen werden (`root`/`state` in `/etc/containerd/config.toml`),
-nicht nochmal nur Dockers `data-root`.
+weil Containerds Root davon unberuehrt bleibt.
+
+**Der naechste Schritt ist gebaut:** `deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh`
+(16.11.) zieht Containerds eigene `root`-Datenwurzel (die den eigentlichen Platz frisst, s. oben)
+auf dasselbe Volume um, in einen eigenen `containerd`-Unterordner neben Dockers. Gleiches Muster wie
+beim Docker-Umzug: ohne Argument nur Bericht, `--apply` zieht wirklich um (haelt dafuer kurz
+Containerd UND Docker an, nicht nur den Compose-Stack), `--zurueck` dreht zurueck, `--loesche-altes`
+gibt den alten Platz erst frei, wenn der Umzug bestaetigt lief. `state` (Laufzeit-Sockets/PIDs, klein,
+ohnehin unter `/run`) bleibt bewusst unangetastet — nur `root` war je gemessen das Platzproblem.
+Dieses Skript lief noch nicht auf dem echten Server (kein SSH-Zugang fuer Agenten, s. oben) — vor dem
+ersten `--apply` prueft `bash deploy/hetzner/containerd-datenwurzel-auf-volume-umziehen.sh` (ohne
+Argument) den Bericht, und Chris fuehrt es dann selbst aus.
 
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
