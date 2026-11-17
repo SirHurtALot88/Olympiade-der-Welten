@@ -1701,5 +1701,416 @@
     .oly-battle-arena.oly-battle-arena .lvlup{grid-template-columns:repeat(2,1fr)}
   }
 
+  /* LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md). Broadcast-
+     Bildsprache wie Score-Bug und Pod-Tafel: dunkle Glasflaeche, cremeweisser Rand, Teamfarbe als
+     Zeilenstreifen, Hausschrift, Ziffern in Tabellenbreite. Alles CSS, keine PixelLab-Grafik.
+     Inhalt aus liveStandTick() (battle-mode.engine.js). Band: pointer-events:none (blockiert
+     keine Klicks auf die Leinwand); Tafel: klickbar wegen der Messpunkt-Reiter. */
+  .oly-battle-arena.oly-battle-arena .livestand{--ls-glas:rgba(8,10,14,.84);--ls-rand:rgba(244,230,196,.55);
+    --ls-creme:#f4e6c4;--ls-gut:#7be08f;--ls-schlecht:#ff8f7d;--ls-gold:#f2c14e;
+    position:absolute;inset:0;pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;color:#fff}
+  .oly-battle-arena.oly-battle-arena .livestand[hidden],
+  .oly-battle-arena.oly-battle-arena .livestand .ls-tafel[hidden]{display:none}
+  /* Tafel in zwei Teilen (Kopf/Rumpf, getrennt neu geschrieben) -- fuers Layout unsichtbar. */
+  .oly-battle-arena.oly-battle-arena .ls-tafel>.ls-teil{display:contents}
+  /* BAND: mittig unter dem Score-Bug, segmentiert wie eine F1-Timing-Leiste. */
+  .oly-battle-arena.oly-battle-arena .ls-band{position:absolute;top:var(--ls-band-top,47px);left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:0;max-width:calc(100% - 16px);
+    background:linear-gradient(180deg,rgba(22,26,34,.9),var(--ls-glas));border:1px solid var(--ls-rand);
+    border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
+    padding:2px 4px;white-space:nowrap;overflow:hidden;font-size:11.5px;line-height:1.35;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .ls-band:empty{display:none}
+  .oly-battle-arena.oly-battle-arena .ls-feld{display:inline-flex;align-items:baseline;gap:5px;padding:1px 8px;min-width:0}
+  .oly-battle-arena.oly-battle-arena .ls-feld small{font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:#aab4c3}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert{color:var(--ls-creme);font-weight:800;font-size:12.5px}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert.heim{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert.gast{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-feld em{font-style:normal;color:#d5dce6;font-size:10.5px;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .ls-trenner{align-self:stretch;width:1px;margin:2px 0;background:rgba(244,230,196,.28)}
+  /* Siegchance-/Kraefte-Balken: Heimfarbe bis --ls-anteil, Rest Gastfarbe, 50-%-Strich. */
+  .oly-battle-arena.oly-battle-arena .ls-balken{position:relative;display:inline-block;width:92px;height:7px;align-self:center;
+    border-radius:2px;background:var(--away);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+  .oly-battle-arena.oly-battle-arena .ls-balken i{position:absolute;left:0;top:0;bottom:0;width:var(--ls-anteil,50%);
+    background:var(--home);transition:width .4s ease}
+  .oly-battle-arena.oly-battle-arena .ls-balken::after{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:rgba(255,255,255,.75)}
+  /* Basketball-Lauf-Band und Staffel-HUD rutschen unter das Band, solange es steht (sonst laege es
+     auf deren Kopfzeile); den Callout schiebt positioniereCallout() selbst unter das Band.
+     Die Klassen ls-band-an/ls-staffel-an setzt liveStandTick() am .arenaraum (statt :has()). */
+  .oly-battle-arena.oly-battle-arena .arenaraum.ls-band-an .bbuglauf{top:calc(var(--ls-band-top,47px) + 27px)}
+  .oly-battle-arena.oly-battle-arena .arenaraum.ls-staffel-an .bahnhud{top:max(15%,calc(var(--ls-band-top,47px) + 27px))}
+  /* Steht das Band, beginnt die Tafel darunter. */
+  .oly-battle-arena.oly-battle-arena .livestand .ls-band:not(:empty)~.ls-tafel{top:calc(var(--ls-band-top,47px) + 29px);max-height:calc(100% - var(--ls-band-top,47px) - 37px)}
+  /* Staffel: Tafel unten rechts, damit das Staffel-HUD (Aktuell/Naechste) oben frei bleibt. */
+  .oly-battle-arena.oly-battle-arena .livestand[data-typ="staffel"] .ls-band:not(:empty)~.ls-tafel{top:auto;bottom:8px}
+  /* TAFEL: rechts oben unter dem Teamschild. */
+  .oly-battle-arena.oly-battle-arena .ls-tafel{position:absolute;top:56px;right:8px;width:min(300px,calc(100% - 16px));
+    max-height:calc(100% - 64px);overflow:auto;pointer-events:auto;
+    background:var(--ls-glas);border:1px solid var(--ls-rand);border-radius:6px;
+    box-shadow:0 6px 22px rgba(0,0,0,.45);backdrop-filter:blur(3px);font-size:10.5px;line-height:1.25;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .ls-kopf{display:flex;align-items:center;gap:6px;padding:5px 7px 4px 9px;
+    border-bottom:1px solid rgba(244,230,196,.3);background:linear-gradient(90deg,rgba(244,230,196,.12),transparent 70%)}
+  .oly-battle-arena.oly-battle-arena .ls-kopf>b{color:var(--ls-creme);font-size:12px;letter-spacing:.08em;margin-right:auto;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .ls-reiter{display:inline-flex;gap:2px}
+  .oly-battle-arena.oly-battle-arena .ls-tab,.oly-battle-arena.oly-battle-arena .ls-progknopf{all:unset;cursor:pointer;
+    font:700 9px/1 "RaniraSeason",Georgia,serif;letter-spacing:.04em;color:#d9dfe8;padding:3px 4px;border-radius:3px;
+    border:1px solid rgba(244,230,196,.35)}
+  .oly-battle-arena.oly-battle-arena .ls-tab.an{background:var(--ls-creme);color:#16120a;border-color:var(--ls-creme)}
+  .oly-battle-arena.oly-battle-arena .ls-tab.ls-auto{border-style:dashed}
+  .oly-battle-arena.oly-battle-arena .ls-tab:disabled{opacity:.35;cursor:default}
+  .oly-battle-arena.oly-battle-arena .ls-tab:focus-visible,.oly-battle-arena.oly-battle-arena .ls-progknopf:focus-visible{outline:2px solid var(--ls-gold);outline-offset:1px}
+  .oly-battle-arena.oly-battle-arena .ls-grundlage .ls-progknopf{flex:none;padding:1px 4px;font-size:8.5px;color:#aab4c3;border-color:rgba(244,230,196,.25)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle{width:100%;border-collapse:collapse;font:inherit;font-size:inherit;color:inherit}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th{font-size:8.5px;letter-spacing:.1em;color:#97a1b3;font-weight:700;
+    text-align:right;padding:3px 6px 2px;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td{text-align:right;padding:1px 5px;white-space:nowrap;color:#eef2f7}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle .ls-name{text-align:left;max-width:118px;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name{position:relative;padding-left:12px;font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s0::before,
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s1::before{content:"";position:absolute;left:3px;top:3px;bottom:3px;width:4px;border-radius:1px;background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s1::before{background:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th.s0{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th.s1{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle .ls-rang{text-align:center;width:16px;font-weight:800;color:var(--ls-creme)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tbody tr:nth-child(odd){background:rgba(255,255,255,.035)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.eigen{background:rgba(242,193,78,.13);box-shadow:inset 0 0 0 1px rgba(242,193,78,.75)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.dim td{color:#8b95a6}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.dim .ls-rang{color:#6c7586}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.laeuft{background:rgba(244,230,196,.1)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.gut{color:var(--ls-gut);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.schlecht{color:var(--ls-schlecht)}
+  /* Kopplung an die "+4,5 s"-Tafel am Fahrer (u.vizZzFlash): dieselbe Zeile blinkt kurz auf. */
+  @keyframes lsBlink{0%,100%{background:transparent}30%{background:rgba(242,193,78,.42)}}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.blink{animation:lsBlink 1s ease-in-out 2}
+  .oly-battle-arena.oly-battle-arena .ls-unterkopf{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ls-creme);
+    padding:5px 9px 1px;border-top:1px solid rgba(244,230,196,.2);margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .ls-fuss{display:flex;justify-content:space-between;gap:8px;padding:4px 9px;
+    border-top:1px solid rgba(244,230,196,.3);font-size:10.5px;background:rgba(244,230,196,.05)}
+  .oly-battle-arena.oly-battle-arena .ls-fuss .s0{color:var(--home);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-fuss .s1{color:var(--away);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-fuss b{color:var(--ls-creme);text-align:center}
+  .oly-battle-arena.oly-battle-arena .ls-grundlage{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 7px 5px 9px;color:#8f9aab;font-size:9.5px}
+  /* "ohne Prognose": Spalte, Fusszeile und Band-Felder verschwinden fuer Zuschauer, die es spannend moegen. */
+  .oly-battle-arena.oly-battle-arena .livestand.ohne-prognose .ls-prog{visibility:hidden}
+  .oly-battle-arena.oly-battle-arena .livestand.ohne-prognose .ls-band .ls-feld.ls-prog{display:none}
+  /* SCHMALE ARENA (Phone): die Leinwand ist dort nur gut 120 px hoch -- Band und Tafel wandern
+     deshalb UNTER die Leinwand in den Fluss (volle Breite), statt sie zuzudecken. */
+  @container oly-arena (max-width:640px){
+    .oly-battle-arena.oly-battle-arena .livestand{position:static}
+    .oly-battle-arena.oly-battle-arena .ls-band{position:static;transform:none;max-width:none;margin:4px 0 0;
+      flex-wrap:wrap;justify-content:center;white-space:normal;font-size:10px;border-radius:4px}
+    .oly-battle-arena.oly-battle-arena .ls-band .ls-trenner{display:none}
+    .oly-battle-arena.oly-battle-arena .ls-feld{padding:0 5px}
+    .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert{font-size:11px}
+    .oly-battle-arena.oly-battle-arena .ls-balken{width:60px}
+    .oly-battle-arena.oly-battle-arena .ls-tafel,
+    .oly-battle-arena.oly-battle-arena .livestand .ls-band:not(:empty)~.ls-tafel,
+    .oly-battle-arena.oly-battle-arena .livestand[data-typ="staffel"] .ls-band:not(:empty)~.ls-tafel{position:relative;top:auto;right:auto;bottom:auto;
+      width:auto;max-height:none;margin:4px 0 0;font-size:10px;backdrop-filter:none}
+    .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td,.oly-battle-arena.oly-battle-arena .ls-tab-tabelle th{padding-left:4px;padding-right:4px}
+    .oly-battle-arena.oly-battle-arena .arenaraum.ls-band-an .bbuglauf{top:52px}
+    .oly-battle-arena.oly-battle-arena .arenaraum.ls-staffel-an .bahnhud{top:15%}
+  }
   @media (prefers-reduced-motion:reduce){.oly-battle-arena.oly-battle-arena, .oly-battle-arena.oly-battle-arena *{transition:none!important;animation:none!important}}
 
+
+  /* =====================================================================================
+     HUD-SYSTEM (17.11., docs/design/hud-system-17-11.md). Broadcast-HUD als wiederverwendbare
+     Bauteile fuer alle zwanzig Disziplinen; eine Disziplin schaltet es ueber ihr HUD_PROFIL im
+     Motor ein (heute: Basketball). Optik aus dem Basketball-Mockup 17.11.: dunkle Glasflaechen,
+     Haarstriche in Creme, Schraege statt Kasten, Teamfarbe ist Bedeutung (Heim/Gast), Gold nur
+     fuer "ausgewaehlt"/Hauptaktion, Rot nur fuer Warnung.
+     Zwei Schriften mit getrennter Aufgabe: RaniraSeason (Hausschrift, Namen/Schlagworte) und
+     Barlow Condensed (SIL OFL 1.1, public/fonts/barlow-condensed-OFL.txt) fuer alles, was sich
+     aendert -- lokal, kein Google-Fonts-Link zur Laufzeit. Barlow gilt NUR innerhalb der HUD-
+     Bauteile; der Rest der Arena bleibt bei RaniraSeason.
+     Das HUD ist immer dunkel (Sendegrafik), unabhaengig vom hellen/dunklen Seitenthema.
+     ===================================================================================== */
+  @font-face{font-family:"Barlow Condensed";src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+  @font-face{font-family:"Barlow Condensed";src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
+  @font-face{font-family:"Barlow Condensed";src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+  @font-face{font-family:"Barlow Condensed";src:url("../fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");font-weight:800;font-style:normal;font-display:swap}
+  .oly-battle-arena.oly-battle-arena{
+    /* Flaechen */
+    --hud-grund:#06080c;--hud-flaeche:rgba(9,12,18,.90);--hud-flaeche-2:#121824;--hud-flaeche-3:#1a2231;
+    --hud-glas-blur:8px;
+    /* Linien */
+    --hud-linie:rgba(244,230,196,.16);--hud-linie-2:rgba(244,230,196,.34);
+    /* Text in drei Stufen + Akzente */
+    --hud-creme:#f4e6c4;--hud-gold:#f0c35a;--hud-tinte:#eef2f8;--hud-leise:#9aa7ba;--hud-stumm:#66738a;
+    --hud-gut:#62d394;--hud-warn:#ff6058;
+    /* Teamfarben: Heim/Gast. Je Team ueberschreibbar (style="--hud-heim:..."), Standard = Motorwerte */
+    --hud-heim:#F2A03D;--hud-gast:#45B0C9;
+    /* Typografie */
+    --hud-haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+    --hud-zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+    /* Abstaende, Radien, Form */
+    --hud-a1:4px;--hud-a2:8px;--hud-a3:12px;--hud-a4:16px;--hud-r:8px;--hud-r-gross:10px;--hud-schraeg:-14deg;
+  }
+
+  /* --- Uebernahme: was das HUD bei fertigem Profil ersetzt ---------------------------------- */
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys .scoreline,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys .hpbars,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys .kaderleiste,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys #bbug,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys #bbugLauf,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys #bbugcallout,
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys .planzeile{display:none!important}
+  /* SAFE-AREA FUER HOST-ELEMENTE (Chris' Screenshot 17.11.): oben rechts liegen im Spiel das
+     "Angemeldet als ... · Abmelden"-Badge (position:fixed, top:10px) und darunter die Bug-Flagge
+     (top:44px, 26px hoch). Die Seitenspalte mit Ticker/Wertung beginnt deshalb im Einbettungs-
+     Modus erst unterhalb dieser Zone, statt unter dem Badge zu verschwinden. */
+  .oly-battle-arena.oly-battle-arena{--host-safe-oben:78px}
+  @media (min-width:960px){
+    body:has(.oly-auth-status-badge) .oly-battle-arena.oly-battle-arena.im-spiel #p2 .frame>.untenraum,
+    body:has(.oly-bug-report-flag) .oly-battle-arena.oly-battle-arena.im-spiel #p2 .frame>.untenraum{padding-top:var(--host-safe-oben)}
+  }
+  /* Live-Stand-Band: der Bug steht jetzt UEBER der Leinwand, das Band rueckt an die Oberkante. */
+  .oly-battle-arena.oly-battle-arena .arenaHaupt.hud-sys .arenaraum{--ls-band-top:8px!important}
+  .oly-battle-arena.oly-battle-arena .hud-kopf[hidden],.oly-battle-arena.oly-battle-arena .hud-dock[hidden],
+  .oly-battle-arena.oly-battle-arena .hud-karte[hidden],.oly-battle-arena.oly-battle-arena .hud-einblender[hidden],
+  .oly-battle-arena.oly-battle-arena .hud-bedien[hidden]{display:none}
+
+  /* --- gemeinsame Grundlagen ---------------------------------------------------------------- */
+  .oly-battle-arena.oly-battle-arena :is(.hud-kopf,.hud-dock,.hud-karte,.hud-einblender,.hud-bedien){
+    font-family:var(--hud-zahl);font-style:normal;color:var(--hud-tinte);-webkit-font-smoothing:antialiased}
+  .oly-battle-arena.oly-battle-arena :is(.hud-kopf,.hud-dock,.hud-karte,.hud-einblender,.hud-bedien) .t{font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena :is(.hud-dock,.hud-karte,.hud-bedien) button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-transform:none;letter-spacing:inherit;box-shadow:none}
+  .oly-battle-arena.oly-battle-arena :is(.hud-dock,.hud-karte,.hud-bedien) button:focus-visible{outline:2px solid var(--hud-gold);outline-offset:2px;border-radius:4px}
+  .oly-battle-arena.oly-battle-arena .hud-por{flex:none;position:relative;display:inline-grid;place-items:center;width:40px;height:40px;border-radius:7px;
+    background:#1b2230 center/cover no-repeat;border:1px solid var(--hud-linie-2);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .hud-por::before{content:attr(data-k);font:700 15px/1 var(--hud-zahl);color:var(--hud-leise);letter-spacing:.04em;z-index:0}
+  /* Bild liegt als Hintergrund ueber dem Kuerzel; fehlt es, bleibt das Kuerzel sichtbar. */
+  .oly-battle-arena.oly-battle-arena .hud-por::after{content:"";position:absolute;inset:0;background:inherit;z-index:1}
+  /* Tooltips: data-tip, standardmaessig ueber dem Element (Bedienleiste/Karte liegen unten) */
+  .oly-battle-arena.oly-battle-arena :is(.hud-dock,.hud-karte,.hud-bedien,.hud-kopf) [data-tip]{position:relative}
+  .oly-battle-arena.oly-battle-arena :is(.hud-dock,.hud-karte,.hud-bedien,.hud-kopf) [data-tip]:is(:hover,:focus-visible)::after{content:attr(data-tip);position:absolute;z-index:40;left:50%;bottom:calc(100% + 8px);
+    transform:translateX(-50%);width:max-content;max-width:260px;padding:6px 10px;border-radius:6px;background:#000;border:1px solid var(--hud-linie-2);
+    color:var(--hud-tinte);font:500 13.5px/1.3 var(--hud-zahl);letter-spacing:.01em;text-transform:none;text-align:left;white-space:normal;pointer-events:none}
+
+  /* --- Bauteil 1: Kopfleiste / Scorebug ----------------------------------------------------- */
+  .oly-battle-arena.oly-battle-arena .hud-kopf{position:relative;container-type:inline-size;
+    background:linear-gradient(180deg,#0b0e15 0%,#0e121b 100%);border-bottom:1px solid var(--hud-linie);padding:0 0 5px}
+  .oly-battle-arena.oly-battle-arena .hud-sb{display:grid;grid-template-columns:auto minmax(0,1fr) 150px minmax(0,1fr);align-items:stretch;height:66px;padding:0 var(--hud-a3) 0 var(--hud-a4)}
+  .oly-battle-arena.oly-battle-arena .hud-disc{display:flex;flex-direction:column;justify-content:center;padding-right:var(--hud-a3)}
+  .oly-battle-arena.oly-battle-arena .hud-disc b{font:700 italic 17px/1 var(--hud-haus);color:var(--hud-creme);letter-spacing:.03em}
+  .oly-battle-arena.oly-battle-arena .hud-disc small{margin-top:5px;font-size:11.5px;font-weight:600;letter-spacing:.14em;color:var(--hud-leise);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-team{--tf:var(--hud-heim);position:relative;display:flex;align-items:center;gap:10px;min-width:0;padding:0 10px}
+  .oly-battle-arena.oly-battle-arena .hud-team.a{--tf:var(--hud-gast);flex-direction:row-reverse;text-align:right}
+  .oly-battle-arena.oly-battle-arena .hud-team::before{content:"";position:absolute;inset:7px 0;transform:skewX(var(--hud-schraeg));border-radius:4px;z-index:0;
+    background:linear-gradient(90deg,color-mix(in srgb,var(--tf) 30%,transparent),color-mix(in srgb,var(--tf) 6%,transparent) 70%);border-left:5px solid var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-team.a::before{background:linear-gradient(270deg,color-mix(in srgb,var(--tf) 30%,transparent),color-mix(in srgb,var(--tf) 6%,transparent) 70%);border-left:0;border-right:5px solid var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-team>*{position:relative;z-index:1}
+  .oly-battle-arena.oly-battle-arena .hud-wappen{flex:none;width:42px;height:42px;margin-left:6px;border-radius:9px;overflow:hidden;border:1.5px solid var(--tf);background:#111;
+    display:grid;place-items:center;box-shadow:0 0 0 3px rgba(0,0,0,.45)}
+  .oly-battle-arena.oly-battle-arena .hud-team.a .hud-wappen{margin:0 6px 0 0}
+  .oly-battle-arena.oly-battle-arena .hud-wappen img{width:100%;height:100%;object-fit:cover;display:block}
+  .oly-battle-arena.oly-battle-arena .hud-wappen .mono{font:700 12px/1 var(--hud-zahl);font-style:normal;color:var(--hud-creme);letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .hud-tn{flex:1;min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-tn>b{display:block;font:700 italic 19px/1.05 var(--hud-haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+  .oly-battle-arena.oly-battle-arena .hud-tsub{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--hud-leise);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-team.a .hud-tsub{flex-direction:row-reverse}
+  .oly-battle-arena.oly-battle-arena .hud-ball{width:10px;height:10px;border-radius:50%;background:#f37b2c;border:1px solid #401c05;box-shadow:0 0 8px #f37b2c;visibility:hidden}
+  .oly-battle-arena.oly-battle-arena .hud-ball.an{visibility:visible}
+  .oly-battle-arena.oly-battle-arena .hud-chip{display:inline-block;padding:1px 7px 2px;border-radius:3px;font-size:11.5px;font-weight:700;letter-spacing:.08em;line-height:1.35;background:var(--tf);color:#10131a}
+  .oly-battle-arena.oly-battle-arena .hud-chip[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .hud-lauf{animation:hudChipRein .4s ease-out}
+  @keyframes hudChipRein{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+  .oly-battle-arena.oly-battle-arena .hud-stand{flex:none;min-width:62px;text-align:center;font-size:48px;font-weight:700;line-height:1;color:#fff;letter-spacing:-.01em}
+  .oly-battle-arena.oly-battle-arena .hud-stand.fuehrt{color:var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-stand.bump{animation:hudBump .7s ease-out}
+  @keyframes hudBump{0%{transform:scale(1.35);color:var(--hud-gold)}100%{transform:scale(1)}}
+  .oly-battle-arena.oly-battle-arena .hud-mitte{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;align-content:center;column-gap:8px;padding:0 12px;
+    background:#05070b;border-left:1px solid var(--hud-linie);border-right:1px solid var(--hud-linie)}
+  .oly-battle-arena.oly-battle-arena .hud-per{grid-column:1;font-size:12.5px;font-weight:700;letter-spacing:.12em;color:var(--hud-gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-uhr{grid-column:1;font-size:32px;font-weight:700;line-height:.95;color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz{grid-column:2;grid-row:1/3;align-self:center;width:42px;height:42px;border-radius:7px;border:2px solid var(--hud-linie-2);
+    display:grid;place-items:center;font-size:24px;font-weight:700;color:var(--hud-gold);background:#0c0f16}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz.eng{color:#fff;background:var(--hud-warn);border-color:var(--hud-warn)}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz.leer{opacity:.25}
+  /* Bauteil 4: Momentum, Tauzieh-Balken an der Unterkante */
+  .oly-battle-arena.oly-battle-arena .hud-mom{position:relative;height:5px;margin:0 var(--hud-a4);background:rgba(255,255,255,.07)}
+  .oly-battle-arena.oly-battle-arena .hud-mom i{position:absolute;top:0;bottom:0;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .oly-battle-arena.oly-battle-arena .hud-mom::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--hud-creme)}
+  @container (max-width:1000px){
+    .oly-battle-arena.oly-battle-arena .hud-disc{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-sb{grid-template-columns:minmax(0,1fr) 146px minmax(0,1fr);padding:0 var(--hud-a2)}
+  }
+  @container (max-width:560px){
+    .oly-battle-arena.oly-battle-arena .hud-sb{height:54px;grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr);padding:0 4px}
+    .oly-battle-arena.oly-battle-arena .hud-team{gap:5px;padding:0 4px}
+    .oly-battle-arena.oly-battle-arena .hud-team::before{inset:5px 0;border-width:3px}
+    .oly-battle-arena.oly-battle-arena .hud-wappen{width:26px;height:26px;margin:0 0 0 4px;border-radius:6px;box-shadow:none}
+    .oly-battle-arena.oly-battle-arena .hud-team.a .hud-wappen{margin:0 4px 0 0}
+    .oly-battle-arena.oly-battle-arena .hud-tn>b{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-tk{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-tsub{margin-top:3px;gap:4px}
+    .oly-battle-arena.oly-battle-arena .hud-chip{font-size:9.5px;padding:0 4px 1px}
+    .oly-battle-arena.oly-battle-arena .hud-stand{min-width:38px;font-size:32px}
+    .oly-battle-arena.oly-battle-arena .hud-mitte{padding:0 5px;column-gap:4px}
+    .oly-battle-arena.oly-battle-arena .hud-per{font-size:9.5px;letter-spacing:.06em}
+    .oly-battle-arena.oly-battle-arena .hud-uhr{font-size:21px}
+    .oly-battle-arena.oly-battle-arena .hud-zusatz{width:28px;height:28px;font-size:16px;border-radius:5px;border-width:1.5px}
+    .oly-battle-arena.oly-battle-arena .hud-mom{margin:0 4px}
+  }
+
+  /* --- Bauteil 7 + 10: Dock mit Spielerleisten und Spielverlauf ------------------------------ */
+  .oly-battle-arena.oly-battle-arena .hud-dock{container-type:inline-size;display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,.85fr) minmax(0,1fr);gap:var(--hud-a3);
+    padding:var(--hud-a2) var(--hud-a3) var(--hud-a3);background:linear-gradient(180deg,#0e121b,#090c12);border-top:1px solid var(--hud-linie-2)}
+  .oly-battle-arena.oly-battle-arena .hud-dock h3{margin:0 0 6px;height:20px;display:flex;align-items:center;gap:8px;font:600 12px/1 var(--hud-zahl);font-style:normal;letter-spacing:.14em;color:var(--hud-leise);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-strip{--tf:var(--hud-heim);min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-strip.a{--tf:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-strip h3 b{font:700 italic 15px/1 var(--hud-haus);letter-spacing:.02em;color:var(--tf);text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-strip.a h3{flex-direction:row-reverse}
+  .oly-battle-arena.oly-battle-arena .hud-leisten{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .oly-battle-arena.oly-battle-arena .hud-leiste{--tf:var(--hud-heim);position:relative;display:grid;grid-template-columns:40px minmax(0,1fr);grid-template-rows:auto auto;column-gap:7px;row-gap:3px;
+    align-items:center;min-height:54px;padding:5px 7px 5px 5px;text-align:left;border-radius:var(--hud-r);background:var(--hud-flaeche-2);
+    border:1px solid var(--hud-linie);border-left:4px solid var(--tf);transition:background .15s,border-color .15s,transform .1s}
+  .oly-battle-arena.oly-battle-arena .hud-leiste.a{--tf:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-leiste:hover{background:var(--hud-flaeche-3);border-color:var(--hud-linie-2);border-left-color:var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-leiste:active{transform:translateY(1px)}
+  .oly-battle-arena.oly-battle-arena .hud-leiste.sel{background:color-mix(in srgb,var(--hud-gold) 20%,var(--hud-flaeche-2));border-color:var(--hud-gold);border-left-color:var(--hud-gold)}
+  .oly-battle-arena.oly-battle-arena .hud-leiste .hud-por{grid-row:1/3}
+  .oly-battle-arena.oly-battle-arena .hud-lkopf{min-width:0;display:flex;flex-direction:column}
+  .oly-battle-arena.oly-battle-arena .hud-lname{font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;line-height:1.1}
+  .oly-battle-arena.oly-battle-arena .hud-lrolle{font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--hud-leise);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-lwerte{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:8px;min-width:0;font-size:13.5px;color:var(--hud-tinte);white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .hud-w{display:inline-flex;align-items:baseline;gap:3px}
+  .oly-battle-arena.oly-battle-arena .hud-lwerte b{font-size:21px;line-height:1;font-weight:700;color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-lwerte small{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--hud-leise);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-fouls{position:absolute;top:7px;right:7px;display:inline-flex;gap:2px}
+  .oly-battle-arena.oly-battle-arena .hud-leiste .hud-lname{padding-right:34px}
+  .oly-battle-arena.oly-battle-arena .hud-fouls i{width:6px;height:6px;border-radius:1px;background:rgba(255,255,255,.14);transform:skewX(var(--hud-schraeg))}
+  .oly-battle-arena.oly-battle-arena .hud-fouls i.an{background:var(--hud-creme)}
+  .oly-battle-arena.oly-battle-arena .hud-fouls.voll i.an{background:var(--hud-warn)}
+  .oly-battle-arena.oly-battle-arena .hud-lball{position:absolute;left:37px;top:4px;width:10px;height:10px;border-radius:50%;background:#f37b2c;border:1px solid #401c05;box-shadow:0 0 8px #f37b2c;display:none;z-index:2}
+  .oly-battle-arena.oly-battle-arena .hud-leiste.hatball .hud-lball{display:block}
+  .oly-battle-arena.oly-battle-arena .hud-verlauf{min-width:0;display:flex;flex-direction:column}
+  .oly-battle-arena.oly-battle-arena .hud-verlauf h3>span:first-child{flex:1}
+  .oly-battle-arena.oly-battle-arena .hud-filter{display:flex;gap:3px}
+  .oly-battle-arena.oly-battle-arena .hud-filter button{height:20px;padding:0 7px;border-radius:999px;border:1px solid var(--hud-linie);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--hud-leise);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-filter button:hover{border-color:var(--hud-linie-2);color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-filter button[aria-pressed="true"]{background:var(--hud-creme);color:#14110b;border-color:var(--hud-creme)}
+  .oly-battle-arena.oly-battle-arena .hud-vliste{list-style:none;margin:0;padding:0;flex:1;min-height:150px;max-height:186px;overflow-y:auto;border:1px solid var(--hud-linie);border-radius:var(--hud-r);
+    background:rgba(0,0,0,.25);scrollbar-width:thin;scrollbar-color:var(--hud-linie-2) transparent}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li{--tf:var(--hud-stumm);display:grid;grid-template-columns:62px 44px minmax(0,1fr) auto;align-items:center;min-height:30px;padding:0 8px 0 0;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;color:var(--hud-tinte)}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li.h{--tf:var(--hud-heim)} .oly-battle-arena.oly-battle-arena .hud-vliste li.a{--tf:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li.leer{display:block;padding:8px 10px;color:var(--hud-stumm)}
+  .oly-battle-arena.oly-battle-arena .hud-vz{padding-left:8px;border-left:4px solid var(--tf);height:100%;display:flex;align-items:center;color:var(--hud-leise);font-weight:600;font-size:12.5px;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .hud-vart{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tf);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-vtx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-vstand{font-weight:700;color:var(--hud-leise);font-size:13px;padding-left:8px}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li:first-child:not(.leer){background:rgba(255,255,255,.07);font-weight:600}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li:first-child .hud-vtx{color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li.gross .hud-vtx{color:var(--hud-gold)}
+  .oly-battle-arena.oly-battle-arena .hud-vliste li.neu{animation:hudNeu .5s ease-out}
+  @keyframes hudNeu{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  @container (max-width:900px){
+    .oly-battle-arena.oly-battle-arena .hud-dock{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+    .oly-battle-arena.oly-battle-arena .hud-verlauf{grid-column:1/-1;grid-row:2}
+  }
+  @container (max-width:560px){
+    .oly-battle-arena.oly-battle-arena .hud-dock{display:flex;flex-direction:column;gap:6px;padding:6px 6px 8px}
+    .oly-battle-arena.oly-battle-arena .hud-strip h3{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-leisten{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity;scrollbar-width:none}
+    .oly-battle-arena.oly-battle-arena .hud-leiste{flex:none;width:132px;min-height:50px;grid-template-columns:34px minmax(0,1fr);scroll-snap-align:start}
+    .oly-battle-arena.oly-battle-arena .hud-w:not(.kern):nth-child(n+3),.oly-battle-arena.oly-battle-arena .hud-leiste .hud-fouls{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-leiste .hud-lname{padding-right:0}
+    .oly-battle-arena.oly-battle-arena .hud-leiste .hud-por{width:34px;height:34px}
+    .oly-battle-arena.oly-battle-arena .hud-lrolle{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-lwerte b{font-size:18px}
+    .oly-battle-arena.oly-battle-arena .hud-verlauf{order:3}
+    .oly-battle-arena.oly-battle-arena .hud-vliste{max-height:310px;min-height:0}
+    .oly-battle-arena.oly-battle-arena .hud-vliste li{grid-template-columns:54px 40px minmax(0,1fr) auto;font-size:13px;min-height:34px}
+    .oly-battle-arena.oly-battle-arena .hud-vtx{white-space:normal;line-height:1.1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  }
+
+  /* --- Bauteil 8: Spielerkarte (dockt ballfern an) ------------------------------------------ */
+  .oly-battle-arena.oly-battle-arena .hud-karte{--tf:var(--hud-heim);position:absolute;z-index:6;left:12px;bottom:12px;width:min(370px,calc(100% - 24px));
+    background:var(--hud-flaeche);border:1px solid var(--hud-linie-2);border-radius:var(--hud-r-gross);overflow:visible;
+    backdrop-filter:blur(var(--hud-glas-blur));box-shadow:0 18px 40px rgba(0,0,0,.55);animation:hudKarteRein .28s cubic-bezier(.2,.8,.2,1)}
+  .oly-battle-arena.oly-battle-arena .hud-karte.a{--tf:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-karte.rechts{left:auto;right:12px}
+  @keyframes hudKarteRein{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+  .oly-battle-arena.oly-battle-arena .hud-kk{display:flex;gap:10px;align-items:flex-start;padding:10px 10px 8px;border-radius:var(--hud-r-gross) var(--hud-r-gross) 0 0;
+    background:linear-gradient(100deg,color-mix(in srgb,var(--tf) 34%,transparent),transparent 62%);border-bottom:1px solid var(--hud-linie)}
+  .oly-battle-arena.oly-battle-arena .hud-por.gross{width:68px;height:68px;border:2px solid var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-kwer{flex:1;min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-kwer em{font-style:normal;font-size:11.5px;letter-spacing:.12em;color:var(--tf);font-weight:700;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-kwer>b{display:block;font:700 italic 23px/1.05 var(--hud-haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-kplk{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .oly-battle-arena.oly-battle-arena .hud-plk{display:inline-flex;align-items:center;gap:4px;padding:1px 7px 2px;border-radius:4px;border:1px solid var(--hud-linie);font-size:13px;font-weight:600;letter-spacing:.03em;background:rgba(255,255,255,.04)}
+  .oly-battle-arena.oly-battle-arena .hud-plk b{color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-plk.plus{color:var(--hud-gut);border-color:rgba(98,211,148,.4)}
+  .oly-battle-arena.oly-battle-arena .hud-plk.minus{color:var(--hud-warn);border-color:rgba(255,96,88,.4)}
+  .oly-battle-arena.oly-battle-arena .hud-zu{flex:none;width:30px;height:30px;border-radius:6px!important;border:1px solid var(--hud-linie)!important;display:grid;place-items:center;color:var(--hud-leise)!important;font-size:14px}
+  .oly-battle-arena.oly-battle-arena .hud-zu:hover{color:#fff!important;border-color:var(--hud-linie-2)!important}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--hud-linie)}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte div{padding:6px 0 5px;text-align:center;border-right:1px solid rgba(255,255,255,.06);min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte div:nth-child(3),.oly-battle-arena.oly-battle-arena .hud-kwerte div:last-child{border-right:0}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte div:nth-child(n+4){border-top:1px solid rgba(255,255,255,.06)}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte b{display:block;font-size:17px;line-height:1.1;font-weight:700;color:var(--hud-tinte);white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte div.haupt b{font-size:28px;line-height:1;color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte small{font-size:10px;letter-spacing:.1em;color:var(--hud-leise);font-weight:600;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-kwerte div.haupt{grid-column:span 2}
+  .oly-battle-arena.oly-battle-arena .hud-keig{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 12px;font-size:12.5px;color:var(--hud-leise);border-bottom:1px solid var(--hud-linie)}
+  .oly-battle-arena.oly-battle-arena .hud-keig b{color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-kaktion{display:flex;gap:6px;padding:8px 10px}
+  .oly-battle-arena.oly-battle-arena .hud-kplatz{flex:1}
+  .oly-battle-arena.oly-battle-arena .hud-knopf{height:34px;min-width:38px;padding:0 10px!important;border:1px solid var(--hud-linie)!important;border-radius:var(--hud-r)!important;
+    background:var(--hud-flaeche-2)!important;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .hud-knopf:hover{border-color:var(--hud-linie-2)!important;background:var(--hud-flaeche-3)!important}
+  .oly-battle-arena.oly-battle-arena .hud-knopf.breit{flex:1}
+  .oly-battle-arena.oly-battle-arena .hud-knopf.an{background:var(--hud-gold)!important;color:#17120a!important;border-color:var(--hud-gold)!important}
+
+  /* --- Bauteil 11: Highlight-Einblender ----------------------------------------------------- */
+  .oly-battle-arena.oly-battle-arena .hud-einblender{--tf:var(--hud-heim);position:absolute;z-index:7;left:2.5%;top:13%;width:min(640px,78%);pointer-events:none;opacity:0}
+  .oly-battle-arena.oly-battle-arena .hud-einblender.a{--tf:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-einblender.an{animation:hudEinRein 3.4s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes hudEinRein{0%{opacity:0;transform:translateX(-60px) skewX(-8deg)}9%{opacity:1;transform:none}86%{opacity:1;transform:none}100%{opacity:0;transform:translateX(60px)}}
+  .oly-battle-arena.oly-battle-arena .hud-eb{position:relative;display:flex;align-items:center;gap:14px;padding:8px 20px 8px 10px;transform:skewX(-10deg);
+    background:linear-gradient(90deg,#05070b 0%,rgba(5,7,11,.94) 62%,rgba(5,7,11,.72) 100%);border-left:7px solid var(--tf);border-bottom:2px solid var(--tf);box-shadow:0 20px 50px rgba(0,0,0,.6)}
+  .oly-battle-arena.oly-battle-arena .hud-eb>*{transform:skewX(10deg)}
+  .oly-battle-arena.oly-battle-arena .hud-por.eb{width:64px;height:64px;border:2px solid var(--tf)}
+  .oly-battle-arena.oly-battle-arena .hud-ewort{font:700 italic 48px/.92 var(--hud-haus);color:var(--tf);text-shadow:0 3px 0 rgba(0,0,0,.6);letter-spacing:.01em;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .hud-etxt{flex:1;min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-etxt b{display:block;font-size:21px;font-weight:700;color:#fff;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-etxt span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:14.5px;line-height:1.2;color:var(--hud-creme);margin-top:2px;letter-spacing:.03em;overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .hud-eplus{font-size:40px;font-weight:800;color:#fff;line-height:1}
+  /* Ist die Spielerkarte links offen, weicht der Einblender nach rechts aus (und umgekehrt). */
+  .oly-battle-arena.oly-battle-arena .arenaraum:has(.hud-karte:not([hidden]):not(.rechts)) .hud-einblender{left:auto;right:2.5%;width:min(520px,calc(100% - 410px))}
+
+  /* --- Bauteil 16: Bedienleiste mit Tastenkuerzeln ------------------------------------------ */
+  .oly-battle-arena.oly-battle-arena .hud-bedien{position:absolute;z-index:6;right:10px;bottom:10px;display:flex;align-items:center;gap:2px;padding:3px;
+    background:var(--hud-flaeche);border:1px solid var(--hud-linie);border-radius:var(--hud-r-gross);backdrop-filter:blur(6px)}
+  .oly-battle-arena.oly-battle-arena .hud-tb{height:32px;padding:0 9px!important;border-radius:7px!important;display:inline-flex;align-items:center;gap:6px;
+    font-size:13.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase!important;color:var(--hud-tinte);white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .hud-tb:hover{background:rgba(255,255,255,.08)!important}
+  .oly-battle-arena.oly-battle-arena .hud-tb[aria-pressed="true"]{color:var(--hud-creme)}
+  .oly-battle-arena.oly-battle-arena .hud-tb.prim{background:var(--hud-gold)!important;color:#17120a}
+  .oly-battle-arena.oly-battle-arena .hud-tb kbd{font:inherit;font-size:10.5px;opacity:.6;border:1px solid currentColor;border-radius:3px;padding:0 4px;letter-spacing:0}
+  /* Karte offen und rechts angedockt: die Bedienleiste weicht nach links aus. */
+  .oly-battle-arena.oly-battle-arena .hud-karte.rechts:not([hidden])~.hud-bedien{right:auto;left:10px}
+
+  /* --- Phone (< 760 px) ---------------------------------------------------------------------- */
+  @media (max-width:760px){
+    .oly-battle-arena.oly-battle-arena .hud-karte,.oly-battle-arena.oly-battle-arena .hud-karte.rechts{position:fixed;z-index:70;left:0;right:0;bottom:0;width:auto;
+      border-radius:14px 14px 0 0;max-height:80vh;overflow:auto;padding-bottom:env(safe-area-inset-bottom);animation:hudBlatt .28s cubic-bezier(.2,.8,.2,1)}
+    @keyframes hudBlatt{from{transform:translateY(100%)}to{transform:none}}
+    .oly-battle-arena.oly-battle-arena .hud-kwerte div.haupt b{font-size:24px}
+    .oly-battle-arena.oly-battle-arena .hud-einblender{left:6px;right:6px;top:8%;width:auto}
+    .oly-battle-arena.oly-battle-arena .hud-eb{gap:8px;padding:5px 10px 5px 6px;border-left-width:5px}
+    .oly-battle-arena.oly-battle-arena .hud-por.eb{display:none}
+    .oly-battle-arena.oly-battle-arena .hud-ewort{font-size:22px}
+    .oly-battle-arena.oly-battle-arena .hud-etxt b{font-size:14px}
+    .oly-battle-arena.oly-battle-arena .hud-etxt span{font-size:11px}
+    .oly-battle-arena.oly-battle-arena .hud-eplus{font-size:24px}
+    .oly-battle-arena.oly-battle-arena .hud-bedien{position:static;justify-content:flex-start;overflow-x:auto;border-radius:0;border-width:1px 0 0;gap:4px;padding:5px 6px;scrollbar-width:none}
+    .oly-battle-arena.oly-battle-arena .hud-tb{height:40px;font-size:12.5px;border:1px solid var(--hud-linie)!important;background:var(--hud-flaeche-2)!important}
+    .oly-battle-arena.oly-battle-arena .hud-tb kbd{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .oly-battle-arena.oly-battle-arena :is(.hud-kopf,.hud-dock,.hud-karte,.hud-einblender,.hud-bedien),
+    .oly-battle-arena.oly-battle-arena :is(.hud-kopf,.hud-dock,.hud-karte,.hud-einblender,.hud-bedien) *{animation:none!important;transition:none!important}
+    .oly-battle-arena.oly-battle-arena .hud-einblender.an{opacity:1}
+  }

@@ -56929,9 +56929,12 @@
     // Callout ("... übernimmt die Führung.") lag genau darueber. Dritte Bezugskante nach
     // demselben Muster; die tiefste sichtbare Unterkante gewinnt (Math.max). Ein
     // Element ohne Hoehe (per CSS weggeblendet) zaehlt nicht mit.
-    for(const id of ["ispyZugUhr","bahnHud"]){
+    // LIVE-STAND-BAND (Welle 1, 17.11.): vierte Bezugskante, nur solange es UEBER der Leinwand
+    // schwebt (auf schmalen Arenen steht es unter der Leinwand im Fluss, s. battle-mode.css).
+    for(const id of ["ispyZugUhr","bahnHud","lsBand"]){
       const ref=document.getElementById(id);
       if(!ref||ref.hidden)continue;
+      if(id==="lsBand"&&getComputedStyle(ref).position!=="absolute")continue;
       const r=ref.getBoundingClientRect();
       if(!r.height)continue;
       unten=unten==null?r.bottom:Math.max(unten,r.bottom);
@@ -56955,8 +56958,9 @@
   // das Titelwort gross oben (.cotitel, dieselbe Schrift/Grossschreibung wie .esieger), der
   // bisherige Satz rutscht als Caption darunter (.cosatz), die Kommentar-Caption (`em`)
   // bleibt die dritte, kleinste Zeile. Ohne Titel exakt das alte Bild.
-  function callout(txt,caption,titel){
+  function callout(txt,caption,titel,seite,kind){
     if(stumm)return;
+    if(hudCallout(txt,caption,titel,seite,kind))return; // HUD-SYSTEM: Einblender statt Banner
     const banner=document.getElementById("bbugcallout");
     if(!banner)return;
     // QA 16.11. (Fix-Paket A): verzoegerte Callouts (feed(...,verzoegerungMs), z. B. "Ausgeschieden"
@@ -57324,8 +57328,8 @@
       // (renderHighlights()/renderSzeneDesSpiels() lesen den Titel erst beim Endstand nach).
       HIGHLIGHTS.push({side,txt,t:anzeigeT,kind,akteur});
       const titel=highlightTitel(kind);
-      if(verzoegerungMs)setTimeout(()=>callout(txt,caption,titel),verzoegerungMs);
-      else callout(txt,caption,titel);
+      if(verzoegerungMs)setTimeout(()=>callout(txt,caption,titel,side,kind),verzoegerungMs);
+      else callout(txt,caption,titel,side,kind);
       // D3 -- SENDER-STING: ZUSAETZLICH zum vorhandenen Disziplin-Ton (TON_KATALOG[disc],
       // von den Aufrufern dieser Funktion selbst schon vorher per sfx() abgefeuert), 30%
       // leiser als der Standardpegel (Chris' Voreinstellung, Abschnitt 8 Punkt 5: "der
@@ -58041,6 +58045,7 @@
   function stoppeInstanz(){
     if(instanzGestoppt)return true;
     instanzGestoppt=true;
+    try{ document.removeEventListener("keydown",liveStandTaste); }catch{} // LIVE-STAND: abgeloeste Instanz hoert keine Tasten mehr
     try{ tonLoopStop(); }catch{}
     try{ bkLoopStop(); }catch{}
     try{ if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; } }catch{}
@@ -58051,6 +58056,1165 @@
     try{ if(mdffaOffenbarungsTimer){ clearTimeout(mdffaOffenbarungsTimer); mdffaOffenbarungsTimer=null; } }catch{}
     try{ const tc=tonCtx; tonCtx=null; tonRauschPuffer=null; if(tc&&tc.state!=="closed")tc.close().catch(()=>{}); }catch{}
     return true;
+  }
+
+  // ===================================================================================
+  // LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md).
+  //
+  // Chris 17.11. woertlich: "man sieht zwar immer sowas wie +4,5 sek auftauchen aber man hat
+  // keine Gesamtuebersicht wie gerade der Stand realistisch ist" und fuers Zeitfahren: "an den
+  // verschiedenen zeitpunkten ... muessten ja die ranks stehen und auswaehlbar sein ob man
+  // zwischenzeit 1 2 oder finale ausgewaehlt hat".
+  //
+  // EIN Bauteil, zwei Groessen: ein BAND (eine Zeile unter dem Score-Bug, Standard) und eine
+  // TAFEL (Rangliste rechts oben, mit Messpunkt-Reitern), umgeschaltet ueber den Knopf "Stand"
+  // in der Bedienleiste oder die Taste L (Band -> Tafel -> aus), Reiter per 1-4, 0 = Auto.
+  //
+  // REINE ANZEIGE, DREI REGELN:
+  //  1. GEZEIGT = GEBUCHT. Jede Zahl kommt aus derselben Funktion, die auch die Wertung bzw. die
+  //     Kopfzeile liest: bahnRangliste()/bahnTeamstand()/burgwertung()/bahnZeit()/u.zz[] (Bahn),
+  //     fsPunkte/fsPeriodenStand/wertungVon() (Feldspiel), u.hp/u.max (Kampf, dieselbe Summe wie
+  //     die Lebensbalken). Keine zweite Rangrechnung, die abweichen koennte.
+  //  2. SPOILERWAECHTER. Die Prognose liest nur, was schon auf dem Bildschirm stand: gezeigte
+  //     Zwischen-/Zielzeiten, aktuelle Position, aktueller Stand, Uhr. Nie den gebuchten
+  //     Spieltags-Snapshot, nie den HYROX-Fahrplan, kein rr(). Ein Messpunkt-Reiter, den noch
+  //     niemand erreicht hat, ist gesperrt.
+  //  3. KEIN NEUES FELD AM LAEUFER/SPIELER. Zustand nur in Modulvariablen (Wertungs-
+  //     Fingerabdruck, s. CLAUDE.md). Gelesen und gerechnet wird hoechstens viermal je Sekunde
+  //     Wandzeit; das DOM wird nur angefasst, wenn sich die Signatur der Daten aendert.
+  //
+  // Welle 1 deckt die Bahn (Zeitfahren, Spurt klassisch, Climbing, Staffel, Takeshi), die
+  // Feldspiele (Basketball, Hockey, Football) und als Band die Kampf-Disziplinen TDM und
+  // Battlefield ab. HYROX und Hatz behalten ihre eigene Rangleiste (Welle 2), Buehne Welle 3,
+  // Vier-Team-Pods zeigen ihre eigene Pod-Tafel.
+  const LS_MODI=["band","tafel","aus"];
+  const LS_SPEICHER="oly-arena-livestand";
+  let lsModus="band", lsOhnePrognose=false, lsReiter=null, lsLetzterTick=-1e9, lsSigBand="", lsSigTafel="", lsDisc="";
+  let lsLetzteDaten=null, lsInit=false, lsBandTop=-1, lsSigKopf="", lsGewarnt=false;
+  // BLINKEN UEBER DEN NEUBAU HINWEG (Review PR #1560): der Tabellenrumpf wird bis zu 4x/s neu
+  // geschrieben; damit `tr.blink` nicht jedes Mal von vorn beginnt, merkt sich die Anzeige je
+  // Zeile, seit wann sie blinkt, und setzt die Animation mit negativer Verzoegerung fort.
+  const lsBlinkSeit=new Map(), LS_BLINK_MS=2000;
+  // Fehler im Live-Stand duerfen das Spiel nie anhalten -- aber auch nicht still verschwinden:
+  // einmal je Instanz eine Warnung in der Konsole.
+  function lsWarnung(wo,e){ if(lsGewarnt)return; lsGewarnt=true; try{ console.warn("Live-Stand ("+wo+"):",e); }catch{} }
+  try{
+    const g=JSON.parse(localStorage.getItem(LS_SPEICHER)||"null");
+    if(g&&LS_MODI.includes(g.modus))lsModus=g.modus;
+    if(g&&g.ohnePrognose)lsOhnePrognose=true;
+  }catch{}
+  function lsSpeichern(){
+    try{ localStorage.setItem(LS_SPEICHER,JSON.stringify({modus:lsModus,ohnePrognose:lsOhnePrognose})); }catch{}
+  }
+  const lsEsc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const lsKomma=(v,n=1)=>v.toFixed(n).replace(".",",");
+  // Zeit kompakt fuer die Tafel ("41,2" / "1:23,4"), in ZUSCHAUsekunden (bahnSpanneAnzeige).
+  function lsZeit(sim){
+    if(sim==null||!isFinite(sim))return "—";
+    const s=bahnSpanneAnzeige(sim);
+    if(s<60)return lsKomma(s);
+    const m=Math.floor(s/60), r=s-m*60;
+    return m+":"+(r<10?"0":"")+lsKomma(r);
+  }
+  const lsAbstand=(sim)=>sim==null?"":(sim<=0.0005?"Best":"+"+lsKomma(bahnSpanneAnzeige(sim)));
+  const lsKurz=(n,max=13)=>{ n=String(n||""); return n.length>max?n.slice(0,max-1)+"…":n; };
+  const lsVerein=(s)=>((VEREIN[s]&&VEREIN[s].kurz)||(s===0?"Heim":"Gast"));
+  // Normalverteilung, dieselbe erf-Naeherung wie tennisSiegchance().
+  const lsPhi=(z)=>0.5*(1+tennisDruckErf(z/Math.SQRT2));
+  // RANGSPANNE aus Wertintervallen (kleiner = besser): bester Rang, wenn alle anderen, die
+  // nicht SICHER besser sind, schlechter abschneiden; schlechtester umgekehrt. Ein Intervall
+  // (-Inf, +Inf) heisst "noch keine Information" -- der Teilnehmer steht dann bei "offen".
+  function lsRangSpannen(iv){
+    return iv.map((a,i)=>{
+      let besser=0, evtl=0;
+      iv.forEach((b,j)=>{ if(i===j)return; if(b.hi<a.lo)besser++; else if(!(b.lo>a.hi))evtl++; });
+      return {von:1+besser, bis:1+besser+evtl};
+    });
+  }
+  function lsSpanneText(sp,N,fest){
+    if(!sp)return "offen";
+    if(fest||sp.von===sp.bis)return sp.von+".";
+    if(sp.bis-sp.von+1>Math.max(2,N/2))return "offen";
+    return sp.von+".–"+sp.bis+".";
+  }
+  function lsMedian(a){ if(!a.length)return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+  function lsStreuung(a){ if(a.length<2)return null; const m=a.reduce((x,y)=>x+y,0)/a.length; return Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/(a.length-1)); }
+
+  // ---------------- LESEN: BAHN (ohne Staffel) ----------------
+  // Messpunkte: Zeitfahren ZZ1/ZZ2/ZIEL/JETZT (u.zz[] und bahnZeit(), dieselben Felder wie die
+  // Zwischenzeit-Tafel am Fahrer und das Fokus-Panel); die anderen Bahnen nur JETZT.
+  function liveStandBahn(){
+    const art=BA(), N=LAEUFER.length;
+    const tt=art.wertung==="zeit", burg=art.wertung==="burg", climb=!!art.climbing;
+    const cps=art.zwischenzeiten||[];
+    const messpunkte=[];
+    cps.forEach((cp,ci)=>messpunkte.push({id:"zz"+ci,kurz:"ZZ"+(ci+1),erreicht:LAEUFER.filter(u=>u.zz&&u.zz[ci]!=null).length}));
+    if(tt)messpunkte.push({id:"ziel",kurz:"ZIEL",erreicht:LAEUFER.filter(u=>u.fertig!=null).length});
+    messpunkte.push({id:"jetzt",kurz:"JETZT",erreicht:N});
+    // AUTO: der juengste Messpunkt, den mindestens zwei erreicht haben (Konzept 2.5).
+    let auto="jetzt";
+    if(tt){ for(let i=messpunkte.length-2;i>=0;i--){ if(messpunkte[i].erreicht>=2){ auto=messpunkte[i].id; break; } } }
+    let aktiv=lsReiter&&messpunkte.some(m=>m.id===lsReiter&&m.erreicht>0)?lsReiter:auto;
+
+    // INTERVALLE FUER DIE PROGNOSE (kleiner = besser). Fertig: exakt. Unterwegs: Schaetzwert +-
+    // Spanne aus gezeigten Werten. Am Start/auf der Rampe: offen.
+    const fertige=LAEUFER.filter(u=>u.fertig!=null&&!u.raus);
+    const verh=[]; // Zielzeit / Zeit am letzten Messpunkt, nur aus GEZEIGTEN Zielzeiten
+    const schaetz=(u)=>{
+      if(burg){
+        const p=burgwertung(u);
+        if(u.fertig!=null||u.raus)return {lo:-p,hi:-p,e:-p,fest:true};
+        return {lo:-Infinity,hi:Infinity,e:-p};
+      }
+      if(u.fertig!=null&&!u.raus){ const z=bahnZeit(u); return {lo:z,hi:z,e:z,fest:true}; }
+      if(u.raus)return {lo:Infinity,hi:Infinity,e:Infinity,fest:true};
+      const startT=u.startT||0;
+      const pos=climb?(u.hoch??u.pos):u.pos;
+      if(startT>rennT||!(pos>0))return {lo:-Infinity,hi:Infinity,e:Infinity};
+      let e=(rennT-startT)/pos, sd=null;
+      // Zeitfahren: am letzten erreichten Messpunkt mit dem Median-Verhaeltnis der Fertigen.
+      if(tt&&u.zz){
+        for(let ci=cps.length-1;ci>=0;ci--){
+          if(u.zz[ci]==null)continue;
+          const r=fertige.filter(o=>o.zz&&o.zz[ci]>0).map(o=>bahnZeit(o)/o.zz[ci]);
+          if(r.length){
+            const m=lsMedian(r), s=lsStreuung(r);
+            e=Math.max(e*0.5,u.zz[ci]*m);
+            if(s!=null&&r.length>=3)sd=s*u.zz[ci];
+          }
+          break;
+        }
+      }
+      const rest=Math.max(0,1-Math.min(1,pos));
+      // Fallback-Streuung ohne drei Fertige: ein fester Anteil, mit dem Reststueck skaliert
+      // (Konzept 3.3). Kalibrierreihe folgt mit Welle 4 (data/generated/live-stand-kalibrierung.json).
+      if(sd==null)sd=e*(climb?0.2:0.11)*Math.sqrt(Math.max(0.05,rest));
+      const halb=1.2816*sd;
+      return {lo:e-halb,hi:e+halb,e};
+    };
+    const iv=LAEUFER.map(schaetz);
+    const spannen=lsRangSpannen(iv);
+    const ivVon=new Map(), spVon=new Map();
+    LAEUFER.forEach((u,i)=>{ ivVon.set(u.id,iv[i]); spVon.set(u.id,spannen[i]); });
+    const alleFest=iv.every(x=>x.fest);
+
+    // PUNKTE: dieselbe Rangliste und dieselben Punkte wie Kopfzeile, Wertungstabelle, Endstand.
+    const rl=bahnRangliste();
+    const reihe=burg?[...LAEUFER].sort((a,b)=>burgwertung(b)-burgwertung(a)):rl.reihe;
+    const punkte=burg?null:rl.punkte;
+    const fokus=(u)=>!!(u.vizZzFlash&&u.vizZzFlash.bis!=null&&rennT<u.vizZzFlash.bis);
+    const statusVon=(u)=>{
+      if(u.raus)return "raus";
+      if(u.fertig!=null)return "im Ziel";
+      // Ganze Sekunden: "Start 23,9s" machte die Zeitspalte so breit, dass PKT aus der Tafel rutschte.
+      if((u.startT||0)>rennT)return "Start "+Math.ceil(bahnSpanneAnzeige((u.startT||0)-rennT))+"s";
+      return "fährt";
+    };
+    // NOCH AM START (Review PR #1560): wer im Zeitfahren noch nicht losgefahren ist, hat weder
+    // Rang noch Punkte -- "Rang 2/12" mit zehn Fahrern auf der Rampe hiess nichts. Die Raenge
+    // zaehlen nur die Gestarteten; die Punkte bleiben die der Kopfzeile (rl.punkte).
+    const wartet=(u)=>(u.startT||0)>rennT&&u.fertig==null;
+    const rangJetzt=new Map(); { let rz=0; for(const u of reihe)if(!wartet(u))rangJetzt.set(u.id,++rz); }
+    // GLEICHSTAND: am Ende ist die Prognose der gezeigte Rang selbst (sonst zeigten zwei
+    // zeitgleiche Fahrer "1." und "2." als Rang, aber beide "1." als Prognose).
+    const progVon=(u)=>alleFest&&rangJetzt.has(u.id)?rangJetzt.get(u.id)+".":lsSpanneText(spVon.get(u.id),N,alleFest);
+    const pktVon=(u)=>punkte&&!wartet(u)?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"";
+    const zeilen=[];
+    if(aktiv.startsWith("zz")||aktiv==="ziel"){
+      const ci=aktiv==="ziel"?-1:+aktiv.slice(2);
+      const wertVon=(u)=>ci<0?(u.fertig!=null&&!u.raus?bahnZeit(u):null):(u.zz&&u.zz[ci]!=null?u.zz[ci]:null);
+      const mit=LAEUFER.filter(u=>wertVon(u)!=null).sort((a,b)=>wertVon(a)-wertVon(b));
+      const best=mit.length?wertVon(mit[0]):null;
+      mit.forEach((u,i)=>zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:String(i+1),
+        wert:lsZeit(wertVon(u)),abstand:lsAbstand(wertVon(u)-best),gut:i===0,
+        prognose:progVon(u),punkte:"",blink:fokus(u)}));
+      // Wer den Messpunkt noch nicht erreicht hat: gedimmt darunter, in Rennreihenfolge.
+      for(const u of reihe){
+        if(wertVon(u)!=null)continue;
+        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:"–",wert:statusVon(u),abstand:"",
+          prognose:progVon(u),punkte:"",dim:true});
+      }
+    } else {
+      const fBest=fertige.length?Math.min(...fertige.map(bahnZeit)):null;
+      let eBest=Infinity; for(const x of iv)if(isFinite(x.e)&&x.e<eBest)eBest=x.e;
+      reihe.forEach((u,i)=>{
+        const x=ivVon.get(u.id);
+        let wert, abstand="";
+        if(burg){ wert=lsKomma(burgwertung(u)).replace(/,0$/,""); const b0=burgwertung(reihe[0]); abstand=i===0?"Best":"−"+lsKomma(b0-burgwertung(u)).replace(/,0$/,""); }
+        else if(u.raus){ wert="raus"; }
+        else if(u.fertig!=null){ wert=lsZeit(bahnZeit(u)); abstand=lsAbstand(bahnZeit(u)-fBest); }
+        else if((u.startT||0)>rennT||!(u.pos>0)){ wert=statusVon(u); }
+        else if(tt){ wert="≈"+lsZeit(x.e); abstand=isFinite(eBest)?(x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
+        else { const p=climb?(u.hoch??u.pos):u.pos; wert=Math.round(Math.min(1,p)*100)+" %"; abstand=isFinite(eBest)?(i===0||x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
+        const w8=wartet(u);
+        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:w8?"–":String(rangJetzt.get(u.id)),wert,abstand,gut:i===0&&!w8,
+          prognose:progVon(u),punkte:pktVon(u),dim:w8,blink:fokus(u)});
+      });
+    }
+
+    // BAND: bester eigener Teilnehmer in der Rennreihenfolge, Prognose, Team.
+    const ts=bahnTeamstand();
+    let eigenIdx=reihe.findIndex(u=>u.seite===0&&!wartet(u));
+    if(eigenIdx<0)eigenIdx=reihe.findIndex(u=>u.seite===0);
+    const eigen=eigenIdx>=0?reihe[eigenIdx]:null;
+    const band=[];
+    if(eigen){
+      const vorn=reihe[0];
+      let zu="";
+      if(eigenIdx>0){
+        if(burg)zu="−"+lsKomma(burgwertung(vorn)-burgwertung(eigen)).replace(/,0$/,"");
+        else { const a=ivVon.get(eigen.id).e, b=ivVon.get(vorn.id).e; if(isFinite(a)&&isFinite(b))zu=(eigen.fertig!=null&&vorn.fertig!=null?"":"≈")+"+"+lsKomma(bahnSpanneAnzeige(Math.max(0,a-b)))+" s"; }
+      } else zu="vorn";
+      // Dieselbe Regel wie in der Tafel: noch am Start = kein Rang.
+      if(wartet(eigen))band.push({k:"Rang",v:"–/"+N,z:lsKurz(eigen.n,12)+" am Start"});
+      else band.push({k:"Rang",v:rangJetzt.get(eigen.id)+"/"+N,z:lsKurz(eigen.n,12)+(zu?" "+zu:"")});
+      band.push({k:"Prognose",v:progVon(eigen),prog:true});
+    }
+    const fmtSeite=(v)=>ts.fmt?ts.fmt(v):(typeof v==="number"?lsKomma(v).replace(/,0$/,""):String(v));
+    const fuss={links:lsVerein(0),rechts:lsVerein(1),mitte:""};
+    let grundlage="";
+    if(tt){
+      // Team-Zeitsumme: Spanne aus den Einzelintervallen; solange einer auf der Rampe steht: offen.
+      let lo=0, hi=0, offen=false;
+      for(const u of LAEUFER){ const x=ivVon.get(u.id); if(!isFinite(x.lo)||!isFinite(x.hi)){offen=true;break;} if(u.seite===0){lo+=x.lo;hi+=x.hi;} else {lo-=x.hi;hi-=x.lo;} }
+      const wartend=LAEUFER.filter(u=>u.fertig==null&&((u.startT||0)>rennT||!(u.pos>0))).length;
+      let mitte;
+      if(alleFest) mitte=ts.deltaSeite!=null?lsVerein(ts.deltaSeite)+" gewinnt":"Gleichstand";
+      else if(offen) mitte="offen · "+wartend+" am Start";
+      else if(hi<0) mitte=lsVerein(0)+" klar vorn";
+      else if(lo>0) mitte=lsVerein(1)+" klar vorn";
+      else { const m=(lo+hi)/2, h=(hi-lo)/2; mitte=(m<=0?lsVerein(0):lsVerein(1))+" vorn "+lsKomma(bahnSpanneAnzeige(Math.abs(m)))+" s ± "+lsKomma(bahnSpanneAnzeige(h)); }
+      // Die Zeitsumme selbst steht schon gross im Score-Bug -- das Band nennt nur, was daraus wird.
+      band.push({k:"Team",v:mitte,prog:true});
+      fuss.mitte="Prognose "+mitte;
+      grundlage="Prognose aus Zwischenzeiten · "+fertige.length+" von "+N+" im Ziel";
+    } else if(burg){
+      const imRennen=LAEUFER.filter(u=>u.fertig==null&&!u.raus).length;
+      band.push({k:"Burgpunkte",v:fmtSeite(ts.seiten[0])+" : "+fmtSeite(ts.seiten[1]),z:imRennen?"noch "+imRennen+" im Rennen":"alle durch"});
+      fuss.links=lsVerein(0)+" "+fmtSeite(ts.seiten[0]); fuss.rechts=fmtSeite(ts.seiten[1])+" "+lsVerein(1);
+      fuss.mitte=imRennen?"noch "+imRennen+" im Rennen":"Endstand";
+      grundlage="Wert = Burgpunkte (Sterne + Zielbonus) · Prognose, sobald ein Läufer durch ist";
+    } else {
+      // Rangpunkte: erwartete Punkte aus der Spannenmitte, Spanne aus den halben Rangspannen.
+      const erw=[0,0], var2=[0,0]; let offen=false;
+      LAEUFER.forEach(u=>{ const sp=spVon.get(u.id); if(sp.bis-sp.von+1>N/2&&!alleFest)offen=true; erw[u.seite]+=N+1-(sp.von+sp.bis)/2; var2[u.seite]+=Math.pow((sp.bis-sp.von)/2,2); });
+      const pm=Math.round(Math.sqrt(var2[0]+var2[1]));
+      const mitte=alleFest?"Endstand":offen?"offen":(Math.round(erw[0])+" : "+Math.round(erw[1])+(pm?" ± "+pm:""));
+      band.push({k:"Team",v:mitte,prog:true});
+      fuss.links=lsVerein(0)+" "+fmtSeite(ts.seiten[0]); fuss.rechts=fmtSeite(ts.seiten[1])+" "+lsVerein(1);
+      fuss.mitte="Prognose "+mitte;
+      grundlage="Prognose aus Tempo und Strecke · "+fertige.length+" von "+N+" im Ziel";
+    }
+    if(alleFest)grundlage="Endstand · gewertet wie im Ergebnis";
+    const alleImZiel=LAEUFER.every(u=>u.fertig!=null||u.raus);
+    const spalten={wert:aktiv==="jetzt"?(burg?"BURG":tt?"ZEIT":alleImZiel?"ZEIT":climb?"HÖHE":"STRECKE"):messpunkte.find(m=>m.id===aktiv).kurz,
+      punkte:burg||aktiv!=="jetzt"?null:"PKT", name:"Läufer"};
+    // AUTO leuchtet auch, wenn ein erzwungener Reiter (noch) keinen Durchgang hat und deshalb AUTO greift.
+    return {typ:"bahn",titel:"STAND",messpunkte:messpunkte.length>1?messpunkte:null,aktiv,auto:aktiv===auto&&(!lsReiter||lsReiter!==aktiv),spalten,zeilen,fuss,grundlage,band};
+  }
+
+  // ---------------- LESEN: STAFFEL ----------------
+  // Messpunkte sind die Uebergaben: je Abschnitt die Gesamtzeit (Etappe + Wechselbilanz, dieselbe
+  // Zahl wie die Spalte "Gesamt" im Endstand, bahnTeamstand().gesamtVon) beider Teams.
+  function liveStandStaffel(){
+    const ts=bahnTeamstand();
+    const beinN=Math.max(staffelBeineVon(0),staffelBeineVon(1));
+    const gesamt=(u)=>u&&u.etappenZeit!=null?u.etappenZeit-(u.wechselKonto||0):null;
+    const zeilen=[], diffs=[];
+    let kum=0, kumGueltig=true;
+    for(let b=0;b<beinN;b++){
+      const h=LAEUFER.find(o=>o.seite===0&&o.bein===b), g=LAEUFER.find(o=>o.seite===1&&o.bein===b);
+      const gh=gesamt(h), gg=gesamt(g);
+      const st=(u,v)=>v!=null?lsZeit(v):(u&&u.aktiv?"läuft":"–");
+      let delta="", kumTxt="";
+      // GLEICHSTAND (Review PR #1560): unter der Anzeigeschaerfe (0,05 s) weder "−0,0" noch Heim gut.
+      const gleich=(v)=>bahnSpanneAnzeige(Math.abs(v))<0.05;
+      if(gh!=null&&gg!=null){ const d=gh-gg; diffs.push(gleich(d)?0:d); kum+=d; delta=gleich(d)?"±0,0":(d<0?"−":"+")+lsKomma(bahnSpanneAnzeige(Math.abs(d))); }
+      else kumGueltig=false;
+      if(kumGueltig&&gh!=null&&gg!=null)kumTxt=gleich(kum)?"gleichauf":(kum<0?lsVerein(0):lsVerein(1))+" "+lsKomma(bahnSpanneAnzeige(Math.abs(kum)));
+      zeilen.push({id:"b"+b,rang:String(b+1),name:(h?lsKurz(h.n,9):"–")+" / "+(g?lsKurz(g.n,9):"–"),
+        wertL:st(h,gh),wertR:st(g,gg),abstand:delta,gutL:gh!=null&&gg!=null&&!gleich(gh-gg)&&gh<gg,gutR:gh!=null&&gg!=null&&!gleich(gh-gg)&&gg<gh,
+        kum:kumTxt,dim:gh==null&&gg==null&&!(h&&h.aktiv)&&!(g&&g.aktiv),blink:!!((h&&h.aktiv)||(g&&g.aktiv))});
+    }
+    // FUEHRUNG JETZT: dieselbe Quelle wie #bhDelta und die Kopfzeile (staffelZeitDelta()).
+    const fertig=ts.gewertet;
+    const d=staffelZeitDelta();
+    let chance=null, progTxt="offen";
+    // AM ZIEL: Sieger mit Vorsprung (dieselbe Zeile wie der Sieger-Banner, ts.bannerZusatz), Gleichstand ohne Sieger.
+    if(fertig){ chance=ts.seiten[0]>ts.seiten[1]?1:ts.seiten[1]>ts.seiten[0]?0:0.5;
+      progTxt=chance===0.5?"Gleichstand":(chance===1?lsVerein(0):lsVerein(1))+" gewinnt"+(ts.bannerZusatz?" "+ts.bannerZusatz:""); }
+    else if(!d.unklar){
+      const offenBeine=Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit==null).length));
+      const zeiten=LAEUFER.filter(o=>o.etappenZeit!=null).map(o=>o.etappenZeit);
+      let sdBein=lsStreuung(diffs);
+      if(sdBein==null||diffs.length<2)sdBein=zeiten.length?0.12*zeiten.reduce((a,b)=>a+b,0)/zeiten.length:null;
+      if(sdBein!=null&&offenBeine>0){
+        const vor=(d.seite===0?1:-1)*d.delta;
+        chance=lsPhi(vor/(sdBein*Math.sqrt(offenBeine)));
+        progTxt=chance>=0.5?lsVerein(0)+" "+Math.round(chance*100)+" %":lsVerein(1)+" "+Math.round((1-chance)*100)+" %";
+      }
+    }
+    const fuehrungTxt=d.unklar?"—":(d.delta>0?lsVerein(d.seite)+" +"+lsKomma(bahnSpanneAnzeige(d.delta))+" s":"gleichauf");
+    const band=[
+      {k:"Führung",v:fuehrungTxt,z:"Abschnitt "+Math.min(beinN,1+Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit!=null).length)))+"/"+beinN},
+      {k:"Siegchance",chance:chance,prog:true},
+      {k:"Abschnitte",v:diffs.filter(x=>x<0).length+" : "+diffs.filter(x=>x>0).length,z:"gewonnen"}];
+    return {typ:"staffel",titel:"STAFFEL",messpunkte:null,aktiv:"jetzt",auto:true,
+      spalten:{name:"Abschnitt · Läufer"},zeilen,
+      fuss:{links:lsVerein(0),mitte:"Prognose "+progTxt,rechts:lsVerein(1)},
+      grundlage:fertig?"Endstand · gewertet nach Zieleinlauf":"Prognose aus der Führung und der Streuung der gelaufenen Abschnitte",band};
+  }
+
+  // ---------------- LESEN: FELDSPIEL ----------------
+  // Stand fsPunkte (dieselbe Groesse wie #score und spieleFeldspiel), Perioden aus
+  // fsPeriodenStand (Linescore des Endstands), Spieler aus wertungVon(disc) (dieselben Zeilen und
+  // Sortierung wie die Wertungstabelle). Prognose: Rate aus dem bisherigen Spiel, mit dem Spielschnitt
+  // beider Teams gemischt, Streuung als Zaehlprozess (Punkte je Treffer: Hockey 1, Basketball ~2,3,
+  // Football ~6).
+  const LS_PUNKTE_JE_TREFFER={hockey:1,basketball:2.3,football:6};
+  function liveStandFeldspiel(){
+    const L=LIVE(); if(!L)return null;
+    const total=L.perioden*L.periodenDauer;
+    const gespielt=Math.max(0,Math.min(fsT,total)), rest=Math.max(0,total-fsT);
+    const p=[fsPunkte[0],fsPunkte[1]];
+    const anteil=total>0?gespielt/total:0;
+    let chance=null, prog="offen";
+    if(done||rest<=0){ chance=p[0]>p[1]?1:p[1]>p[0]?0:0.5; prog="Endstand "+p[0]+" : "+p[1]; }
+    else if(anteil>=0.08&&gespielt>0&&(p[0]+p[1])/(LS_PUNKTE_JE_TREFFER[feldspielDisc]||2)>=3){
+      // Erst ab drei Treffern im Spiel: vorher gibt es keine Rate, aus der sich etwas ableiten liesse.
+      const gesamtRate=(p[0]+p[1])/gespielt;
+      const rate=[0,1].map(s=>anteil*(p[s]/gespielt)+(1-anteil)*gesamtRate/2);
+      const end=[0,1].map(s=>p[s]+rate[s]*rest);
+      const k=LS_PUNKTE_JE_TREFFER[feldspielDisc]||2;
+      const varDiff=Math.max(1e-6,(rate[0]+rate[1])*rest*k);
+      chance=lsPhi((end[0]-end[1])/Math.sqrt(varDiff));
+      const pm=Math.round(1.2816*Math.sqrt(varDiff/2));
+      prog=Math.round(end[0])+" : "+Math.round(end[1])+(pm?" ± "+pm:"");
+    }
+    const wort=L.periodeWort==="Drittel"?"Drittel":"Viertel";
+    const zeilen=[];
+    let kum=[0,0];
+    for(let i=0;i<L.perioden;i++){
+      const e=fsPeriodenStand.find(x=>x.periode===i+1);
+      const laeuft=!e&&fsLive&&fsLive.viertel===i+1&&!done;
+      const a=e?e.a:laeuft?fsPunkte[0]-kum[0]:null, b=e?e.b:laeuft?fsPunkte[1]-kum[1]:null;
+      if(a!=null){ kum=[kum[0]+a,kum[1]+b]; }
+      zeilen.push({id:"p"+i,rang:wort==="Drittel"?(i+1)+".":"Q"+(i+1),name:laeuft?"läuft":(e?"":"–"),
+        wertL:a==null?"–":String(a),wertR:b==null?"–":String(b),gutL:a!=null&&a>b,gutR:b!=null&&b>a,
+        kum:a==null?"":kum[0]+" : "+kum[1],dim:a==null,blink:laeuft});
+    }
+    // Beste Spieler: dieselbe Tabelle wie rechts, quer ueber beide Teams.
+    let spieler=[], spKopf=[];
+    try{
+      const w=wertungVon(disc);
+      const sp=w.spalten.filter(s=>s.id!=="eig").slice(0,2);
+      const imp=w.spalten.find(s=>s.id==="imp");
+      if(imp&&!sp.includes(imp))sp.push(imp);
+      spKopf=sp.map(s=>s.kopf);
+      spieler=w.zeilen().sort(w.sortierung).slice(0,4).map((z,i)=>({id:"s"+i,rang:String(i+1),seite:z.side,name:z.n,eigen:z.side===0,
+        werte:sp.map(s=>{const v=s.wert(z); return v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v*10)/10).replace(".",","):String(v)));})}));
+    }catch{ spieler=[]; }
+    const band=[
+      {k:"Siegchance",chance,prog:true},
+      {k:"Prognose",v:prog,prog:true},
+      {k:"Gespielt",v:Math.round(anteil*100)+" %",z:chance==null&&!done?"Prognose ab 3 Treffern":""}];
+    return {typ:"feldspiel",titel:"STAND JE "+wort.toUpperCase(),messpunkte:null,aktiv:"jetzt",auto:true,
+      spalten:{name:""},zeilen,spieler,spKopf,
+      fuss:{links:lsVerein(0)+" "+p[0],mitte:"Prognose "+prog,rechts:p[1]+" "+lsVerein(1)},
+      grundlage:done?"Endstand":"Prognose aus der Punkterate dieses Spiels · Spanne ≈ 80 %",band};
+  }
+
+  // ---------------- LESEN: KAMPF (nur Band) ----------------
+  // "Kraefte" = Anteil an den verbleibenden Lebenspunkten -- exakt die Summe hinter den
+  // Lebensbalken (#thpL/#thpR, updateHud()). Prognose erst, wenn ein Viertel aller Lebenspunkte weg ist.
+  function liveStandKampf(){
+    if(!U.length)return null;
+    const hp=[0,0], max=[0,0];
+    for(const u of U){ if(u.side!==0&&u.side!==1)continue; hp[u.side]+=Math.max(0,u.hp||0); max[u.side]+=u.max||0; }
+    const summe=hp[0]+hp[1], gesamtMax=max[0]+max[1];
+    if(!(gesamtMax>0))return null;
+    const anteil=summe>0?hp[0]/summe:0.5;
+    const verbraucht=1-summe/gesamtMax;
+    let prog="offen";
+    if(done)prog="Endstand "+kampfStandText(); // dieselbe Funktion wie #score
+    else if(verbraucht>=0.25){
+      const f=anteil>=0.5?0:1, a=Math.max(anteil,1-anteil);
+      prog=a<0.55?"knapp":lsVerein(f)+(a<0.65?" leicht vorn":" klar vorn");
+    }
+    // BESCHRIFTUNG (Review PR #1560): Kraefte und Lage lesen NUR die Lebenspunkte, nicht den
+    // K.o.-Stand im Score-Bug -- das sagt das Band jetzt selbst, statt neben "3 : 5" ein
+    // unkommentiertes "Heim klar vorn" zu zeigen.
+    const band=[{k:"Kräfte (LP)",chance:anteil,prozent:true},{k:done?"Ergebnis":"Lage nach LP",v:prog,prog:true},
+      {k:"Lebenspunkte",v:Math.round(hp[0])+" : "+Math.round(hp[1])}];
+    return {typ:"kampf",titel:"",band,zeilen:null};
+  }
+
+  function liveStandLesen(){
+    if(istBahn(disc)){
+      if(!LAEUFER.length||bahnPodAnzeigeAktiv())return null;
+      if(bahnHatzAktiv||(LAEUFER[0]&&LAEUFER[0].hyroxPlan))return null; // HYROX/Hatz: eigene Rangleiste (Welle 2)
+      return BA().staffel?liveStandStaffel():liveStandBahn();
+    }
+    if(istFeldspiel(disc))return liveStandFeldspiel();
+    if(istBuehne(disc))return null; // Welle 3
+    if((disc==="tdm"||disc==="battlefield")&&!bfPodAktiv())return liveStandKampf();
+    return null;
+  }
+
+  // ---------------- ZEICHNEN ----------------
+  function lsBandHtml(d){
+    return d.band.map(f=>{
+      let inhalt;
+      if(f.chance!==undefined){
+        if(f.chance==null)inhalt="<b class=\"ls-wert\">offen</b>";
+        else{
+          const l=Math.round(f.chance*100);
+          inhalt="<b class=\"ls-wert heim\">"+l+" %</b><span class=\"ls-balken\" style=\"--ls-anteil:"+l+"%\"><i></i></span><b class=\"ls-wert gast\">"+(100-l)+" %</b>";
+        }
+      } else inhalt="<b class=\"ls-wert\">"+lsEsc(f.v)+"</b>"+(f.z?"<em class=\""+(f.progZ?"ls-prog":"")+"\">"+lsEsc(f.z)+"</em>":"");
+      return "<span class=\"ls-feld"+(f.prog?" ls-prog":"")+"\"><small>"+lsEsc(f.k)+"</small>"+inhalt+"</span>";
+    }).join("<i class=\"ls-trenner\"></i>");
+  }
+  // Struktur des Bands ohne die Prozentwerte: bleibt sie gleich, werden nur Balken und Zahlen
+  // nachgefuehrt (die width-Transition des Balkens greift dann wirklich).
+  const lsBandStruktur=(d)=>JSON.stringify(d.band.map(f=>f.chance===undefined?f:{k:f.k,prog:f.prog,c:f.chance==null?"n":"c"}));
+  function lsBandNachfuehren(band,d){
+    const felder=band.querySelectorAll(".ls-feld");
+    d.band.forEach((f,i)=>{
+      if(f.chance==null||!felder[i])return;
+      const l=Math.round(f.chance*100);
+      const balken=felder[i].querySelector(".ls-balken"), heim=felder[i].querySelector(".ls-wert.heim"), gast=felder[i].querySelector(".ls-wert.gast");
+      if(balken)balken.style.setProperty("--ls-anteil",l+"%");
+      if(heim&&heim.textContent!==l+" %")heim.textContent=l+" %";
+      if(gast&&gast.textContent!==(100-l)+" %")gast.textContent=(100-l)+" %";
+    });
+  }
+  // TAFEL IN ZWEI TEILEN (Review PR #1560): Kopf mit den Reitern nur neu, wenn sich Messpunkte,
+  // aktiver Reiter oder AUTO aendern -- sonst verlor der Reiter-Knopf bei jedem Tick den Fokus.
+  function lsTafelKopfHtml(d){
+    let h="<div class=\"ls-kopf\"><b>"+lsEsc(d.titel)+"</b>";
+    if(d.messpunkte){
+      h+="<span class=\"ls-reiter\" role=\"tablist\">";
+      d.messpunkte.forEach((m,i)=>{
+        const an=m.id===d.aktiv, frei=m.erreicht>0;
+        h+="<button type=\"button\" role=\"tab\" class=\"ls-tab"+(an?" an":"")+"\" data-ls-reiter=\""+m.id+"\" aria-selected=\""+an+"\""+(frei?"":" disabled")+" title=\""+(frei?m.erreicht+" gemessen · Taste "+(i+1):"noch niemand dort")+"\">"+m.kurz+"</button>";
+      });
+      h+="<button type=\"button\" class=\"ls-tab ls-auto"+(d.auto?" an":"")+"\" data-ls-reiter=\"auto\" title=\"automatisch der jüngste Messpunkt · Taste 0\">AUTO</button></span>";
+    }
+    h+="</div>";
+    return h;
+  }
+  function lsTafelRumpfHtml(d){
+    let h="";
+    const jetztMs=performance.now(), blinkt=new Set();
+    const blinkAttr=(z)=>{
+      if(!z.blink)return "";
+      blinkt.add(z.id);
+      if(!lsBlinkSeit.has(z.id))lsBlinkSeit.set(z.id,jetztMs);
+      const seit=jetztMs-lsBlinkSeit.get(z.id);
+      return seit<LS_BLINK_MS?" blink\" style=\"animation-delay:-"+Math.round(seit)+"ms":"";
+    };
+    if(d.typ==="bahn"){
+      h+="<table class=\"ls-tab-tabelle\"><thead><tr><th>#</th><th class=\"ls-name\">"+lsEsc(d.spalten.name)+"</th><th>"+lsEsc(d.spalten.wert)+"</th><th>ABST.</th><th class=\"ls-prog\">PROGN.</th>"+(d.spalten.punkte?"<th title=\"Punkte nach Rang im Spiel (vorläufig)\">PKT</th>":"")+"</tr></thead><tbody>";
+      for(const z of d.zeilen){
+        const vorn=z.gut||z.abstand==="Best"||z.abstand==="vorn";
+        h+="<tr class=\""+(z.eigen?"eigen ":"")+(z.dim?"dim":"")+blinkAttr(z)+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td><td>"+lsEsc(z.wert)+"</td><td class=\""+(vorn?"gut":(z.abstand?"schlecht":""))+"\">"+lsEsc(z.abstand)+"</td><td class=\"ls-prog\">"+lsEsc(z.prognose)+"</td>"+(d.spalten.punkte?"<td>"+lsEsc(z.punkte)+"</td>":"")+"</tr>";
+      }
+      h+="</tbody></table>";
+    } else {
+      // Staffel/Feldspiel: Zwei-Team-Raster (Abschnitt bzw. Periode je Zeile).
+      h+="<table class=\"ls-tab-tabelle ls-duo\"><thead><tr><th>"+(d.typ==="staffel"?"#":"")+"</th><th class=\"ls-name\">"+lsEsc(d.spalten.name)+"</th><th class=\"s0\">"+lsEsc(lsVerein(0))+"</th><th class=\"s1\">"+lsEsc(lsVerein(1))+"</th>"+(d.typ==="staffel"?"<th>Δ</th>":"")+"<th>"+(d.typ==="staffel"?"KUM.":"STAND")+"</th></tr></thead><tbody>";
+      for(const z of d.zeilen){
+        h+="<tr class=\""+(z.dim?"dim ":"")+(z.blink?"laeuft":"")+"\"><td class=\"ls-rang\">"+lsEsc(z.rang)+"</td><td class=\"ls-name\">"+lsEsc(z.name)+"</td><td class=\""+(z.gutL?"gut":"")+"\">"+lsEsc(z.wertL)+"</td><td class=\""+(z.gutR?"gut":"")+"\">"+lsEsc(z.wertR)+"</td>"+(d.typ==="staffel"?"<td>"+lsEsc(z.abstand)+"</td>":"")+"<td>"+lsEsc(z.kum)+"</td></tr>";
+      }
+      h+="</tbody></table>";
+      if(d.spieler&&d.spieler.length){
+        h+="<div class=\"ls-unterkopf\">Beste Spieler</div><table class=\"ls-tab-tabelle\"><thead><tr><th>#</th><th class=\"ls-name\">Spieler</th>"+d.spKopf.map(k=>"<th>"+lsEsc(k)+"</th>").join("")+"</tr></thead><tbody>";
+        for(const z of d.spieler)h+="<tr class=\""+(z.eigen?"eigen":"")+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td>"+z.werte.map(v=>"<td>"+lsEsc(v)+"</td>").join("")+"</tr>";
+        h+="</tbody></table>";
+      }
+    }
+    h+="<div class=\"ls-fuss\"><span class=\"s0\">"+lsEsc(d.fuss.links)+"</span><b class=\"ls-prog\">"+lsEsc(d.fuss.mitte)+"</b><span class=\"s1\">"+lsEsc(d.fuss.rechts)+"</span></div>";
+    h+="<div class=\"ls-grundlage\"><span class=\"ls-prog\">"+lsEsc(d.grundlage||"")+"</span><button type=\"button\" class=\"ls-progknopf\" data-ls-prog=\"1\" aria-pressed=\""+(!lsOhnePrognose)+"\" title=\"Prognose ein-/ausblenden (für alle, die es spannend mögen)\">"+(lsOhnePrognose?"Prognose zeigen":"ohne Prognose")+"</button></div>";
+    for(const id of [...lsBlinkSeit.keys()])if(!blinkt.has(id))lsBlinkSeit.delete(id);
+    return h;
+  }
+  // Schreibt einen Tafelteil neu und gibt einem Knopf darin, der den Fokus hatte, ihn zurueck.
+  function lsTeilSchreiben(teil,html){
+    let wahl=null;
+    const a=document.activeElement;
+    if(a&&teil.contains(a)&&a.dataset){
+      if(a.dataset.lsReiter)wahl="[data-ls-reiter=\""+a.dataset.lsReiter+"\"]";
+      else if(a.dataset.lsProg)wahl="[data-ls-prog]";
+    }
+    teil.innerHTML=html;
+    if(wahl){ const n=teil.querySelector(wahl); if(n&&!n.disabled)try{ n.focus({preventScroll:true}); }catch{} }
+  }
+  // Statt :has() im CSS: der .arenaraum traegt, ob Band bzw. Staffel-Live-Stand gerade stehen.
+  function lsRaumKlassen(root,bandAn,staffel){
+    const raum=root&&root.parentElement; if(!raum||!raum.classList)return;
+    raum.classList.toggle("ls-band-an",!!bandAn);
+    raum.classList.toggle("ls-staffel-an",!!staffel);
+  }
+  function liveStandKnopfText(){
+    const k=document.getElementById("lsKnopf"); if(!k)return;
+    const t="Stand: "+(lsModus==="band"?"Band":lsModus==="tafel"?"Tafel":"aus");
+    if(k.textContent!==t)k.textContent=t;
+    k.setAttribute("aria-pressed",String(lsModus!=="aus"));
+  }
+  function liveStandModusWeiter(){
+    lsModus=LS_MODI[(LS_MODI.indexOf(lsModus)+1)%LS_MODI.length];
+    lsSpeichern(); liveStandKnopfText(); lsLetzterTick=-1e9; liveStandTick(performance.now(),true);
+  }
+  function liveStandReiterSetzen(id){
+    lsReiter=id==="auto"?null:id; lsSigTafel=""; lsLetzterTick=-1e9; liveStandTick(performance.now(),true);
+  }
+  function liveStandInit(){
+    if(lsInit)return; lsInit=true;
+    try{
+      const knopf=document.getElementById("lsKnopf");
+      if(knopf&&knopf.addEventListener)knopf.addEventListener("click",liveStandModusWeiter);
+      const tafel=document.getElementById("lsTafel");
+      if(tafel&&tafel.addEventListener)tafel.addEventListener("click",(ev)=>{
+        const t=ev.target&&ev.target.closest?ev.target.closest("[data-ls-reiter],[data-ls-prog]"):null;
+        if(!t||t.disabled)return;
+        if(t.dataset.lsProg){ lsOhnePrognose=!lsOhnePrognose; lsSpeichern(); lsSigTafel=""; lsSigBand=""; liveStandTick(performance.now(),true); return; }
+        liveStandReiterSetzen(t.dataset.lsReiter);
+      });
+      // TASTE L (+ 1-4, 0). Nur solange die Arena sichtbar ist und nicht in Textfeldern.
+      if(document.addEventListener)document.addEventListener("keydown",liveStandTaste);
+      liveStandKnopfText();
+    }catch{}
+  }
+  function liveStandTaste(ev){
+    if(instanzGestoppt||cv.isConnected===false){ try{document.removeEventListener("keydown",liveStandTaste);}catch{} return; }
+    if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+    if(ev.repeat)return; // gehaltene Taste L wuerde sonst Band/Tafel/aus durchrattern
+    const z=ev.target, tag=z&&z.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(z&&z.isContentEditable))return;
+    const root=document.getElementById("livestand");
+    if(!root||!cv.offsetParent)return; // Arena-Reiter nicht sichtbar
+    if(ev.key==="l"||ev.key==="L"){ ev.preventDefault(); liveStandModusWeiter(); return; }
+    if(lsModus!=="tafel"||root.hidden||!lsLetzteDaten||!lsLetzteDaten.messpunkte)return;
+    if(ev.key==="0"){ liveStandReiterSetzen("auto"); return; }
+    const n=+ev.key;
+    if(n>=1&&n<=lsLetzteDaten.messpunkte.length){ const m=lsLetzteDaten.messpunkte[n-1]; if(m.erreicht>0)liveStandReiterSetzen(m.id); }
+  }
+  // Takt: aus loop() nach draw(). Hoechstens 4x je Sekunde Wandzeit, ausser `sofort`.
+  function liveStandTick(jetzt,sofort){
+    if(!sofort&&jetzt-lsLetzterTick<250)return;
+    lsLetzterTick=jetzt;
+    const root=document.getElementById("livestand");
+    if(!root||!root.querySelector)return;
+    // Quick-Sim und Zustand "aus": nichts lesen, nichts messen, nur ausblenden.
+    if(schnelldurchAktiv||lsModus==="aus"){ if(!root.hidden)root.hidden=true; lsRaumKlassen(root,false,false); lsLetzteDaten=null; liveStandInit(); return; }
+    liveStandInit();
+    if(lsDisc!==disc){ lsDisc=disc; lsReiter=null; lsSigBand=""; lsSigTafel=""; }
+    const bug=document.getElementById("bbug");
+    const sichtbar=lsModus!=="aus"&&!schnelldurchAktiv&&bug&&!bug.hidden&&(running||done);
+    let d=null;
+    if(sichtbar){ try{ d=liveStandLesen(); }catch(e){ d=null; lsWarnung("lesen",e); } }
+    lsLetzteDaten=d;
+    if(!d){ if(!root.hidden)root.hidden=true; lsRaumKlassen(root,false,false); return; }
+    root.hidden=false;
+    root.dataset.typ=d.typ;
+    root.classList.toggle("ohne-prognose",lsOhnePrognose);
+    const band=document.getElementById("lsBand"), tafel=document.getElementById("lsTafel");
+    // BAND-HOEHE folgt dem Score-Bug: dessen Mitte bekommt je Disziplin eine zweite Zeile (Shot-Clock,
+    // Down & Distance, Ueberzahl). Gemessen 4x/s, gesetzt nur bei Aenderung (CSS-Variable am .arenaraum,
+    // die auch Callout und Lauf-Band darunter schiebt).
+    const mitte=document.getElementById("bbugMitte");
+    if(mitte&&root.parentElement&&root.parentElement.style){
+      const top=Math.max(44,Math.round((bug.offsetTop||8)+mitte.offsetTop+mitte.offsetHeight+3));
+      if(top!==lsBandTop){ lsBandTop=top; root.parentElement.style.setProperty("--ls-band-top",top+"px"); }
+    }
+    if(band){
+      const s=lsBandStruktur(d);
+      if(s!==lsSigBand){ lsSigBand=s; band.innerHTML=lsBandHtml(d); }
+      else lsBandNachfuehren(band,d);
+    }
+    lsRaumKlassen(root,!!(band&&d.band&&d.band.length),d.typ==="staffel");
+    if(tafel){
+      // RUHE-MODUS: waehrend Viertelpause und Anpfiff-Countdown klappt die Tafel aufs Band zusammen.
+      const vp=document.getElementById("viertelpause"), af=document.getElementById("anpfiff");
+      const ruhe=(vp&&!vp.hidden)||(af&&!af.hidden);
+      const zeigen=lsModus==="tafel"&&!ruhe&&!!d.zeilen;
+      if(tafel.hidden!==!zeigen)tafel.hidden=!zeigen;
+      if(zeigen){
+        let kopf=tafel.querySelector("[data-ls-teil=kopf]"), rumpf=tafel.querySelector("[data-ls-teil=rumpf]");
+        if(!kopf||!rumpf){
+          tafel.innerHTML="<div class=\"ls-teil\" data-ls-teil=\"kopf\"></div><div class=\"ls-teil\" data-ls-teil=\"rumpf\"></div>";
+          kopf=tafel.querySelector("[data-ls-teil=kopf]"); rumpf=tafel.querySelector("[data-ls-teil=rumpf]"); lsSigKopf=""; lsSigTafel="";
+        }
+        if(lsSigTafel==="")lsSigKopf=""; // Reiter-/Prognosewechsel: beide Teile neu
+        const sk=JSON.stringify([d.titel,d.messpunkte,d.aktiv,d.auto]);
+        if(sk!==lsSigKopf){ lsSigKopf=sk; lsTeilSchreiben(kopf,lsTafelKopfHtml(d)); }
+        const s=JSON.stringify([d.typ,d.spalten,d.zeilen,d.spieler,d.spKopf,d.fuss,d.grundlage,lsOhnePrognose]);
+        if(s!==lsSigTafel){ lsSigTafel=s; lsTeilSchreiben(rumpf,lsTafelRumpfHtml(d)); }
+      }
+    }
+  }
+  function liveStandReset(){
+    lsReiter=null; lsSigBand=""; lsSigTafel=""; lsSigKopf=""; lsLetzteDaten=null; lsLetzterTick=-1e9; lsBlinkSeit.clear();
+    const root=document.getElementById("livestand"); if(root){ root.hidden=true; lsRaumKlassen(root,false,false); }
+  }
+
+  // =====================================================================================
+  // HUD-SYSTEM (17.11., docs/design/hud-system-17-11.md). Ein Broadcast-HUD fuer alle zwanzig
+  // Disziplinen, das eine Disziplin nur KONFIGURIERT statt neu baut: Kopfleiste (Scorebug mit
+  // Wappen, Stand, Uhr, Zusatzfeld, Lauf-Marke, Momentum), Dock (Spielerleisten + Spielverlauf mit
+  // Filter), Spielerkarte, Highlight-Einblender, Bedienleiste mit Tastenkuerzeln. Optik: die
+  // Tokens/Bauteile aus dem Basketball-Mockup (docs/design/basketball-ui-mockup-17-11.md), CSS-Block
+  // "HUD-SYSTEM" in battle-mode.css, Elemente #hudKopf/#hudDock/#hudKarte/#hudEinblender/#hudBedien
+  // in battle-mode.html.
+  //
+  // GEZEIGT = GEBUCHT. Jede Zahl liest eine Quelle, die die Wertung ohnehin fuehrt: Stand = fsPunkte
+  // (dieselbe Zahl wie #score), Spielerwerte = wertungVon(disc).zeilen() (dieselbe Zeile wie die
+  // Wertungstabelle, fsBisher()), Spielverlauf = fsZuege[0..fsZeiger], Lauf = basketballLaufInfo(),
+  // Einblender = die big-Ereignisse aus feed() (derselbe Pfad wie der alte Callout). Nichts hier ruft
+  // rr(), nichts schreibt in Spieler-/Laeuferobjekte; eigener Zustand nur in Modulvariablen (Zeit-
+  // stempel des Verlaufs, gewaehlter Spieler, Filter). Alles hinter der document-Pruefung: der
+  // Node-Motor des Wertungs-Fingerabdrucks laeuft daran vorbei.
+  //
+  // PROFILE. Nur ein Profil mit status:"fertig" schaltet das HUD ein und ersetzt das alte HUD dieser
+  // Disziplin (Kopfzeile .scoreline/.hpbars, #bbug, Lauf-Band, Callout, Kaderleiste). Jedes Skelett
+  // nennt schon die Datenquellen, aus denen sein Roll-out lesen wird; bis dahin behaelt die Disziplin
+  // ihr altes HUD unveraendert. Schalter fuer Vergleichsbilder: window.__arena.hudSystem(false).
+  // -------------------------------------------------------------------------------------
+  const HUD_KOMPONENTEN=["scorebug","momentum","lauf","dock","karte","verlauf","einblender","bedien"];
+  const HUD_SKELETT=(chassis,quellen,extra)=>Object.assign({status:"skelett",chassis,quellen},extra||{});
+  const HUD_PROFIL={
+    basketball:{status:"fertig",chassis:"feldspiel",titel:"Basketball",
+      komponenten:HUD_KOMPONENTEN,
+      ersetzt:["kopfzeile","bbug","lauf-band","callout","kaderleiste"],
+      quellen:{stand:"fsPunkte (= #score, updateHudFeldspiel)",uhr:"feldspielRestzeitAbwaerts()",
+        zusatz:"basketballSchussuhrRest()",ballbesitz:"fsLive.amBall, fsLive.ball.traeger",lauf:"basketballLaufInfo()",
+        momentum:"fsZuege art=treffer im Uhrfenster",spieler:"wertungVon(disc).zeilen() (fsBisher)",
+        verlauf:"fsZuege[0..fsZeiger]",einblender:"feed(big) -> callout()"},
+      // DATEN-ADAPTER: alles, was die Bauteile lesen, als Funktion -- eine neue Disziplin tauscht nur diese.
+      daten:{
+        stand:()=>[fsPunkte[0]||0,fsPunkte[1]||0],
+        uhr:()=>hudUhrFeldspiel(),
+        zusatz:()=>{ const r=basketballSchussuhrRest(); return r==null?null:{txt:fmtSchussuhr(r),eng:r<5}; },
+        ballbesitz:()=>fsLive&&!done?fsLive.amBall:null,
+        ballTraegerId:()=>(!done&&fsLive&&fsLive.ball&&fsLive.ball.traeger)?fsLive.ball.traeger.id:null,
+        lauf:()=>basketballLaufInfo(),
+        fouls:()=>{ const m=new Map(); for(const [id,st] of fsBisher().spieler)m.set(id,st.fouls||0); return m; },
+        einblenderStat:(u)=>{ const st=fsBisher().spieler.get(u.id); return st?st.punkte+" PKT · "+st.feldwuerfeTreffer+"/"+st.feldwuerfe+" FG"+(st.assists?" · "+st.assists+" AST":""):""; }
+      },
+      zusatzTitel:"Schussuhr",
+      kern:"pkt",leiste:["reb","ast"],karte:["pkt","reb","ast","stl","blk","to","fg","fgp","imp"],
+      nullStrich:["fg","fgp","imp"],foulsGrenze:5,momentumFensterUhrSek:60,
+      einblenderSchuetze:["dreier","dunk","spielzug","fuehrungswechsel","undEins"],
+      verlaufArten:{treffer:"korb",foul:"foul",steal:"abwehr",block:"abwehr",turnover:"abwehr"},
+      verlaufFilter:[["alle","Alle"],["korb","Körbe"],["foul","Fouls"],["abwehr","Abwehr"]]},
+    hockey:HUD_SKELETT("feldspiel",{stand:"fsPunkte",uhr:"feldspielRestzeitAbwaerts()",zusatz:"hockeyPPInfo(), hockeySOG()",
+      spieler:"wertungVon(disc) = WERTUNG_HOCKEY",verlauf:"fsZuege (treffer/block/check/strafe/bully)",einblender:"feed(big): tor, torwartRaus"},{kern:"tore"}),
+    football:HUD_SKELETT("feldspiel",{stand:"fsPunkte (+ fsPeriodenStand fuer XP)",uhr:"feldspielRestzeitAbwaerts()",zusatz:"fsLive.football (Down & Distance), fsLive.kickoff",
+      spieler:"wertungVon(disc) = WERTUNG_FOOTBALL",verlauf:"fsZuege (treffer/steal/block)",einblender:"feed(big): touchdown, fieldGoal, sack, interception"}),
+    tdm:HUD_SKELETT("kampf",{stand:"#score (Ausschaltungen, updateHud)",uhr:"#clock",zusatz:"live(0/1) Lebens-Pips, Sudden-Death",
+      spieler:"wertungVon(disc).zeilen() = u.st (Schd/Heil/KO)",verlauf:"feed() kind=ersteAusschaltung/mehrfachkill/trade",einblender:"feed(big)"}),
+    battlefield:HUD_SKELETT("kampf",{stand:"#score + KP (kampfSieger/dominationSieger)",uhr:"#clock",zusatz:"Kontrollpunkte #kpzeile, Pod: zeichneBfPodTafel()",
+      spieler:"wertungVon(disc) = u.st",verlauf:"feed()",einblender:"feed(big): kontrollpunkt"}),
+    "mini-dm":HUD_SKELETT("kampf-ffa",{stand:"spieleMiniDmFfaEvent() (renderMiniDmFfa)",uhr:"Takt der Runde",
+      spieler:"mdffa-Teams",verlauf:"#mdffaTicker",einblender:"Rundenbanner"}),
+    fechten:HUD_SKELETT("buehne-duell",{stand:"buehneDuellStandText() (gefechtSieg)",uhr:"#clock",zusatz:"FIE-Tafel, Trefferlampen",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big)"}),
+    tennis:HUD_SKELETT("buehne-duell",{stand:"buehneDuellStandText()",uhr:"Satz/Spiel",zusatz:"tennisSiegchance()",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big)"}),
+    "speed-schach":HUD_SKELETT("buehne-duell",{stand:"buehneDuellStandText()",uhr:"schachUhrWert()",zusatz:"Vorteilsanzeige",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big)"}),
+    breaking:HUD_SKELETT("buehne-duell",{stand:"buehneDuellStandText()",uhr:"#clock",zusatz:"Kettenleiste, Qual-Skala",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big): ausgeschieden"}),
+    eiskunstlauf:HUD_SKELETT("buehne",{stand:"#score (updateHudBuehne)",uhr:"#clock",zusatz:"zeichneEisStand() Zwischenstand",
+      spieler:"wertungVon(disc) (summe)",verlauf:"feed()",einblender:"feed(big)"}),
+    showcase:HUD_SKELETT("buehne",{stand:"#score",uhr:"#clock",zusatz:"showcaseFuehrung(), Applaus-Meter",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big)"}),
+    gewichtheben:HUD_SKELETT("buehne",{stand:"hebenSichtbareSumme() je Team",uhr:"#clock",zusatz:"Versuchstafel, hebenTeamLage()",
+      spieler:"wertungVon(disc) (kg Zweikampf bisher)",verlauf:"feed()",einblender:"feed(big)"}),
+    wettessen:HUD_SKELETT("buehne",{stand:"wettessenBugStandHtml()",uhr:"#clock + wettessenMinuteText()",zusatz:"zeichneWettessenBand() (auf Kurs fuer N)",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big)"}),
+    "i-spy":HUD_SKELETT("buehne",{stand:"#score (ispyFuehrung())",uhr:"aktualisiereIspyHud() Zug-Uhr",zusatz:"#ispySplit",
+      spieler:"wertungVon(disc)",verlauf:"feed() / ispyTickerZeile()",einblender:"feed(big)"}),
+    staffel:HUD_SKELETT("bahn",{stand:"bahnTeamstand()",uhr:"#clock (rennT)",zusatz:"staffelZeitDelta(), #bahnHud",
+      spieler:"wertungVon(disc) (bahnLeistung)",verlauf:"feed()",einblender:"feed(big): uebergabeVerpatzt"}),
+    "time-trial":HUD_SKELETT("bahn",{stand:"bahnTeamstand(), bahnHochrechnung()",uhr:"#clock",zusatz:"renderZeitfahrenPanel() ZZ1/ZZ2",
+      spieler:"wertungVon(disc) (bahnRangliste)",verlauf:"feed()",einblender:"feed(big): zieleinlauf"}),
+    spurt:HUD_SKELETT("bahn",{stand:"bahnTeamstand()",uhr:"#clock",zusatz:"zeichneHyroxRangleiste() / Fegearm",
+      spieler:"wertungVon(disc) (bahnRangliste)",verlauf:"feed()",einblender:"feed(big): sturz, einbruch"}),
+    climbing:HUD_SKELETT("bahn",{stand:"bahnTeamstand()",uhr:"#clock",zusatz:"Exe-Fortschritt (WAND_EXE_INDIZES)",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big): sturz"}),
+    "takeshis-castle":HUD_SKELETT("bahn",{stand:"bahnTeamstand() (Burgpunkte)",uhr:"#clock",zusatz:"noch N im Rennen (x.raus)",
+      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big): ausgeschieden"})
+  };
+  let hudSysAn=true;            // Schalter window.__arena.hudSystem(an)
+  let hudSysDisc=null, hudSysProfilAktiv=null, hudSysInitDone=false, hudLetzterDockTick=-1e9;
+  let hudZuegeRef=null, hudZuegeGesehen=0;
+  const hudVerlauf=[];          // {i, art, kat, seite, text, uhr, uhrSek, stand, gross}
+  let hudVerlaufFilter="alle", hudVerlaufSig="";
+  let hudKarteId=null, hudKarteSig="";
+  let hudEinblenderTimer=null, hudEinblenderOffen=null, hudEinblenderZaehler=0;
+  let hudKopfSig="", hudDockSig="", hudBedienSig="", hudLetzterStand=[null,null], hudEndeGezeichnet=false;
+  const hudFeldCache=new WeakMap();
+
+  function hudProfil(){
+    const p=HUD_PROFIL[disc];
+    return (hudSysAn&&p&&p.status==="fertig")?p:null;
+  }
+  function hudErsetzt(teil){ const p=hudProfil(); return !!(p&&p.ersetzt.includes(teil)&&document.getElementById("hudKopf")); }
+  function hudSeitenName(s){ return (VEREIN[s]&&VEREIN[s].name)||(s===0?"Heim":"Gast"); }
+  function hudKuerzel(s){ return (VEREIN[s]&&VEREIN[s].kurz)||(s===0?"HEIM":"GAST"); }
+  function hudPortraitHtml(name,klasse){
+    const k=lsEsc(String(name||"?").slice(0,2).toUpperCase());
+    return "<span class=\""+(klasse||"hud-por")+"\" data-k=\""+k+"\" style=\"background-image:url('/portraits/"
+      +lsEsc(kennungVon(String(name||"")))+".jpg')\" aria-hidden=\"true\"></span>";
+  }
+  function hudRolle(u){
+    const sl=u&&u.slotId&&SLOTVON[u.slotId];
+    return sl?sl.label:"";
+  }
+  function hudForm(name){
+    try{ const fe=formEchtVon(name,disc); return fe?fe.form:formVon(name); }catch{ return 0; }
+  }
+  // Wertungszeilen dieser Disziplin (dieselbe Quelle wie die Tabelle "Wertung laufend").
+  function hudZeilen(){
+    try{ const w=wertungVon(disc); return {w,zeilen:w.zeilen()}; }catch{ return {w:null,zeilen:[]}; }
+  }
+  function hudSpalte(w,id){ return w&&w.spalten.find(s=>s.id===id)||null; }
+  // Leere Zelle: die Wertungstabelle zeigt "—" fuer null; im HUD steht fuer Zaehlspalten eine 0
+  // (dieselbe gebuchte Groesse, nur lesbarer), fuer Quoten/Komposita bleibt der Strich.
+  function hudWertText(s,z){
+    if(!s)return "—";
+    const v=s.wert(z);
+    if(v==null){ const p=hudProfil(); return s.fmt||(p&&p.nullStrich&&p.nullStrich.includes(s.id))?"—":"0"; }
+    return s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v*10)/10).replace(".",","):String(v));
+  }
+  function hudFeld(root,key){
+    let m=hudFeldCache.get(root);
+    if(!m){ m=new Map(); hudFeldCache.set(root,m); }
+    let e=m.get(key);
+    if(!e||!e.isConnected){ e=root.querySelector("[data-hf=\""+key+"\"]"); m.set(key,e); }
+    return e;
+  }
+  function hudText(root,key,txt){
+    const e=hudFeld(root,key); if(!e)return;
+    const t=String(txt==null?"":txt);
+    if(e.textContent!==t)e.textContent=t;
+  }
+  function hudKlasse(root,key,klasse,an){ const e=hudFeld(root,key); if(e&&e.classList.contains(klasse)!==!!an)e.classList.toggle(klasse,!!an); }
+
+  // ---------- Verlauf: gebuchte Ereignisse aus fsZuege, mit Uhr-Stempel beim ersten Sehen -------
+  function hudVerlaufText(e){
+    const n=(u)=>u&&u.n?u.n:"?";
+    if(e.art==="treffer"){
+      if(e.freiwurf)return n(e.spieler)+" verwandelt den Freiwurf";
+      const zug=e.zug&&FB().spielzuege&&FB().spielzuege[e.zug];
+      const wie=e.punkte===3?" den Dreier":e.tier==="dunk"?" per Dunk":"";
+      return (zug?zug.label+": ":"")+n(e.spieler)+" trifft"+wie+(e.passgeber?" · Vorlage "+n(e.passgeber):"");
+    }
+    if(e.art==="foul")return n(e.verteidiger)+" foult "+n(e.spieler)+(e.undEins?" · und eins":e.anzahl?" · "+e.anzahl+" Freiwürfe":"");
+    if(e.art==="steal")return n(e.verteidiger)+" klaut "+n(e.spieler)+" den Ball";
+    if(e.art==="block")return n(e.verteidiger)+" blockt "+n(e.spieler);
+    if(e.art==="turnover")return n(e.spieler)+": Ballverlust";
+    return n(e.spieler)+" "+e.art;
+  }
+  // Periode und Restzeit fuer die Kopfleiste: dieselbe Zeichenkette wie #clock (feldspielRestzeitAbwaerts),
+  // nur auf zwei Felder verteilt; vor dem Anpfiff die volle Periodendauer.
+  function hudUhrFeldspiel(){
+    const L=LIVE();
+    const m=(feldspielRestzeitAbwaerts()||"").match(/^(.*?)\s*·\s*(\d+:\d\d|Ende)(?:\s*·\s*(.*))?$/);
+    const per=fsLive&&L?Math.min(fsLive.viertel,L.perioden)+". "+(L.periodeWort==="Drittel"?"DRITTEL":"VIERTEL"):"1. "+(L&&L.periodeWort==="Drittel"?"DRITTEL":"VIERTEL");
+    const voll=L?Math.round(L.periodenDauer*zeitFaktor()):0;
+    return {per:fsLive&&fsLive.viertelpause?per+" · PAUSE":(m&&m[3]?m[3].toUpperCase():per),
+      uhr:m?m[2]:(L?Math.floor(voll/60)+":"+String(voll%60).padStart(2,"0"):"")};
+  }
+  function hudUhrJetzt(){
+    const txt=istFeldspiel(disc)?(feldspielRestzeitAbwaerts()||""):"";
+    const m=txt.match(/^(Q\d+|\d+\. Drittel)\s*·\s*(\d+:\d\d)/);
+    return m?m[1].replace(". Drittel","D")+" "+m[2]:"";
+  }
+  function hudVerlaufNachfuehren(p){
+    if(hudZuegeRef!==fsZuege||fsZeiger<hudZuegeGesehen){
+      hudZuegeRef=fsZuege; hudZuegeGesehen=0; hudVerlauf.length=0; hudVerlaufSig="";
+    }
+    if(hudZuegeGesehen>=fsZeiger)return;
+    // Laufender Stand ueber ALLE bisherigen Treffer (nicht nur die neuen): derselbe Weg wie
+    // fsBisher().team, damit die Stand-Spalte am Ende exakt fsPunkte zeigt.
+    const stand=[0,0];
+    for(let i=0;i<hudZuegeGesehen;i++){ const e=fsZuege[i]; if(e.art==="treffer")stand[e.seite]+=e.punkte; }
+    const uhr=hudUhrJetzt(), uhrSek=fsT*zeitFaktor();
+    for(let i=hudZuegeGesehen;i<fsZeiger;i++){
+      const e=fsZuege[i];
+      if(e.art==="treffer")stand[e.seite]+=e.punkte;
+      const kat=p.verlaufArten[e.art];
+      if(!kat)continue;
+      const gross=(e.art==="treffer"&&!e.freiwurf&&(e.punkte===3||e.tier==="dunk"))||(e.art==="foul"&&!!e.undEins);
+      // Ein Foul gehoert der Seite des Gefoulten (sie bekommt die Freiwuerfe) -- im Verlauf aber in
+      // der Farbe des Foulenden, damit die Zeile zur Leiste mit den Foul-Marken passt.
+      const seite=(e.art==="foul"||e.art==="steal"||e.art==="block")?(e.verteidiger?e.verteidiger.side:e.seite):e.seite;
+      hudVerlauf.push({i,art:e.art,kat,seite,text:hudVerlaufText(e),uhr,uhrSek,
+        punkte:e.art==="treffer"?e.punkte:0,stand:stand[0]+":"+stand[1],gross});
+    }
+    while(hudVerlauf.length>200)hudVerlauf.shift();
+    hudZuegeGesehen=fsZeiger;
+  }
+  // Momentum: Punkte je Seite im Uhrfenster der letzten N Sekunden Spielzeit -- aus denselben
+  // gebuchten Treffern wie der Verlauf.
+  function hudMomentum(p){
+    const jetzt=fsT*zeitFaktor(), fenster=p.momentumFensterUhrSek||60;
+    const pk=[0,0];
+    for(let k=hudVerlauf.length-1;k>=0;k--){
+      const r=hudVerlauf[k];
+      if(jetzt-r.uhrSek>fenster)break;
+      if(r.art==="treffer")pk[r.seite]+=r.punkte;
+    }
+    const sum=pk[0]+pk[1];
+    return {pk,anteil:sum?(pk[0]-pk[1])/sum:0,fenster};
+  }
+
+  // ---------- Kopfleiste (Scorebug) -----------------------------------------------------------
+  function hudKopfSkelett(p){
+    const seite=(s)=>"<div class=\"hud-team "+(s===0?"h":"a")+"\">"
+      +"<span class=\"hud-wappen\">"+bbugWappenHtml(s)+"</span>"
+      +"<span class=\"hud-tn\"><b data-kurz=\""+lsEsc(hudKuerzel(s))+"\">"+lsEsc(hudSeitenName(s))+"</b>"
+      +"<span class=\"hud-tsub\"><i class=\"hud-ball\" data-hf=\"ball"+s+"\" title=\"Ballbesitz\"></i>"
+      +"<span class=\"hud-tk\">"+lsEsc(hudKuerzel(s))+"</span>"
+      +"<span class=\"hud-chip hud-lauf\" data-hf=\"lauf"+s+"\" hidden></span></span></span>"
+      +"<b class=\"hud-stand t\" data-hf=\"stand"+s+"\">0</b></div>";
+    return "<div class=\"hud-sb\">"
+      +"<div class=\"hud-disc\"><b>"+lsEsc(p.titel||disc)+"</b><small data-hf=\"discsub\"></small></div>"
+      +seite(0)
+      +"<div class=\"hud-mitte\"><span class=\"hud-per\" data-hf=\"per\"></span><b class=\"hud-uhr t\" data-hf=\"uhr\"></b>"
+      +"<span class=\"hud-zusatz t\" data-hf=\"zusatz\" title=\""+lsEsc(p.zusatzTitel||"")+"\"></span></div>"
+      +seite(1)
+      +"</div>"
+      +"<div class=\"hud-mom\" data-hf=\"mom\" title=\"Momentum\"><i data-hf=\"momBalken\"></i></div>";
+  }
+  function hudKopfTick(p,kopf){
+    const sig=disc+"|"+hudSeitenName(0)+"|"+hudSeitenName(1)+"|"+bbugWappenHtml(0)+bbugWappenHtml(1);
+    if(sig!==hudKopfSig){ hudKopfSig=sig; kopf.innerHTML=hudKopfSkelett(p); hudLetzterStand=[null,null]; }
+    const d=p.daten, stand=d.stand();
+    for(const s of [0,1]){
+      const v=String(stand[s]||0);
+      hudText(kopf,"stand"+s,v);
+      if(hudLetzterStand[s]!=null&&hudLetzterStand[s]!==v){
+        const e=hudFeld(kopf,"stand"+s);
+        if(e){ e.classList.remove("bump"); void e.offsetWidth; e.classList.add("bump"); }
+      }
+      hudLetzterStand[s]=v;
+    }
+    const fuehrt=stand[0]===stand[1]?null:(stand[0]>stand[1]?0:1);
+    hudKlasse(kopf,"stand0","fuehrt",fuehrt===0); hudKlasse(kopf,"stand1","fuehrt",fuehrt===1);
+    const uhr=d.uhr();
+    hudText(kopf,"per",uhr.per); hudText(kopf,"uhr",uhr.uhr);
+    // Unterzeile: Format aus den GEBAUTEN Kadern (statt der Planzeile, die vor dem Kaderbau "0 gegen 0" las).
+    const n0=istFeldspiel(disc)?FSTEAM[0].length:0, n1=istFeldspiel(disc)?FSTEAM[1].length:0;
+    hudText(kopf,"discsub",(n0&&n1?n0+" gegen "+n1+" · ":"")+(done?"Endstand":running?"live":"bereit"));
+    const zus=d.zusatz?d.zusatz():null;
+    hudText(kopf,"zusatz",zus?zus.txt:"");
+    hudKlasse(kopf,"zusatz","leer",!zus);
+    hudKlasse(kopf,"zusatz","eng",!!(zus&&zus.eng));
+    const ballSeite=d.ballbesitz?d.ballbesitz():null;
+    hudKlasse(kopf,"ball0","an",ballSeite===0); hudKlasse(kopf,"ball1","an",ballSeite===1);
+    const lauf=d.lauf?d.lauf():null;
+    for(const s of [0,1]){
+      const e=hudFeld(kopf,"lauf"+s); if(!e)continue;
+      const an=!!(lauf&&lauf.seite===s);
+      if(e.hidden===an)e.hidden=!an;
+      if(an)hudText(kopf,"lauf"+s,"LAUF "+lauf.punkte+":0");
+    }
+    const mom=hudMomentum(p);
+    const balken=hudFeld(kopf,"momBalken");
+    if(balken){
+      const w=Math.round(Math.abs(mom.anteil)*50);
+      const soll=(mom.anteil>=0?"right:50%;left:auto;":"left:50%;right:auto;")+"width:"+w+"%;background:var(--hud-"+(mom.anteil>=0?"heim":"gast")+")";
+      if(balken.getAttribute("style")!==soll)balken.setAttribute("style",soll);
+    }
+    const momEl=hudFeld(kopf,"mom");
+    if(momEl){
+      const t="Momentum: "+mom.pk[0]+" : "+mom.pk[1]+" Punkte in den letzten "+mom.fenster+" Sekunden Spielzeit";
+      if(momEl.title!==t)momEl.title=t;
+    }
+  }
+
+  // ---------- Dock: Spielerleisten + Spielverlauf ----------------------------------------------
+  function hudDockSkelett(p,w,zeilen){
+    const leiste=(z)=>{
+      const u=z.u||{};
+      return "<button type=\"button\" class=\"hud-leiste "+(z.side===0?"h":"a")+"\" data-hud-spieler=\""+lsEsc(u.id)+"\" "
+        +"data-hf=\"l"+lsEsc(u.id)+"\" aria-label=\""+lsEsc(z.n)+": Spielerkarte öffnen\">"
+        +hudPortraitHtml(z.n)+"<i class=\"hud-lball\" aria-hidden=\"true\"></i>"
+        +"<span class=\"hud-lkopf\"><b class=\"hud-lname\">"+lsEsc(z.n)+"</b><small class=\"hud-lrolle\">"+lsEsc(hudRolle(u))+"</small></span>"
+        +"<span class=\"hud-lwerte\"><span class=\"hud-w kern\"><b class=\"t\" data-hf=\"k"+lsEsc(u.id)+"\">0</b><small>"+lsEsc((hudSpalte(w,p.kern)||{kopf:""}).kopf)+"</small></span>"
+        +p.leiste.map(id=>"<span class=\"hud-w\"><span class=\"t\" data-hf=\""+id+lsEsc(u.id)+"\">0</span><small>"+lsEsc((hudSpalte(w,id)||{kopf:id}).kopf)+"</small></span>").join("")
+        +(p.foulsGrenze?"<span class=\"hud-fouls\" data-hf=\"f"+lsEsc(u.id)+"\" title=\"Persönliche Fouls\">"+"<i></i>".repeat(p.foulsGrenze)+"</span>":"")
+        +"</span></button>";
+    };
+    const block=(s)=>"<section class=\"hud-strip "+(s===0?"h":"a")+"\"><h3><b>"+lsEsc(hudSeitenName(s))+"</b><span>"
+      +(s===0?"Heim":"Gast")+"</span></h3><div class=\"hud-leisten\">"
+      +zeilen.filter(z=>z.side===s).map(leiste).join("")+"</div></section>";
+    return block(0)
+      +"<section class=\"hud-verlauf\"><h3><span>Spielverlauf</span><span class=\"hud-filter\" role=\"group\" aria-label=\"Ereignisfilter\">"
+      +p.verlaufFilter.map(([id,txt])=>"<button type=\"button\" data-hud-filter=\""+id+"\" aria-pressed=\""+(id===hudVerlaufFilter)+"\">"+lsEsc(txt)+"</button>").join("")
+      +"</span></h3><ol class=\"hud-vliste\" data-hf=\"vliste\" aria-live=\"off\"></ol></section>"
+      +block(1);
+  }
+  function hudDockTick(p,dock){
+    const {w,zeilen}=hudZeilen();
+    const sig=disc+"|"+zeilen.map(z=>z.side+":"+(z.u&&z.u.id)+":"+z.n).join(",");
+    if(sig!==hudDockSig){ hudDockSig=sig; dock.innerHTML=hudDockSkelett(p,w,zeilen); hudVerlaufSig=""; }
+    const kern=hudSpalte(w,p.kern), traegerId=p.daten.ballTraegerId?p.daten.ballTraegerId():null;
+    const foulsVon=p.daten.fouls?p.daten.fouls():null;
+    for(const z of zeilen){
+      const id=z.u&&z.u.id; if(id==null)continue;
+      hudText(dock,"k"+id,hudWertText(kern,z));
+      for(const sid of p.leiste)hudText(dock,sid+id,hudWertText(hudSpalte(w,sid),z));
+      const fouls=foulsVon?(foulsVon.get(id)||0):0;
+      const fe=hudFeld(dock,"f"+id);
+      if(fe&&fe.dataset.n!==String(fouls)){
+        fe.dataset.n=String(fouls);
+        Array.from(fe.children).forEach((pip,i)=>pip.classList.toggle("an",i<fouls));
+        fe.classList.toggle("voll",fouls>=(p.foulsGrenze||5));
+        fe.title="Persönliche Fouls: "+fouls;
+      }
+      hudKlasse(dock,"l"+id,"hatball",traegerId!=null&&traegerId===id);
+      hudKlasse(dock,"l"+id,"sel",hudKarteId===id);
+    }
+    // Spielverlauf, neueste Zeile oben.
+    const liste=hudFeld(dock,"vliste");
+    if(liste){
+      const rows=hudVerlauf.filter(r=>hudVerlaufFilter==="alle"||r.kat===hudVerlaufFilter);
+      const letzte=rows.length?rows[rows.length-1].i:-1;
+      const vs=hudVerlaufFilter+"|"+rows.length+"|"+letzte;
+      if(vs!==hudVerlaufSig){
+        const neu=hudVerlaufSig.split("|")[0]===hudVerlaufFilter;
+        hudVerlaufSig=vs;
+        liste.innerHTML=rows.slice(-30).reverse().map((r,k)=>"<li class=\""+(r.seite===0?"h":"a")+(r.gross?" gross":"")
+          +(k===0&&neu?" neu":"")+"\" data-kat=\""+r.kat+"\"><span class=\"hud-vz t\">"+lsEsc(r.uhr)+"</span>"
+          +"<span class=\"hud-vart\">"+lsEsc(r.art==="treffer"?(r.punkte===1?"FW +1":"+"+r.punkte):r.kat==="foul"?"Foul":r.art==="steal"?"Steal":r.art==="block"?"Block":"TO")+"</span>"
+          +"<span class=\"hud-vtx\">"+lsEsc(r.text)+"</span><span class=\"hud-vstand t\">"+(r.art==="treffer"?lsEsc(r.stand):"")+"</span></li>").join("")
+          ||"<li class=\"leer\"><span class=\"hud-vtx\">Noch keine Ereignisse"+(hudVerlaufFilter==="alle"?"":" in diesem Filter")+".</span></li>";
+      }
+    }
+  }
+
+  // ---------- Spielerkarte ---------------------------------------------------------------------
+  function hudKarteOeffnen(id){
+    hudKarteId=(id==null||id===hudKarteId)?null:id; hudKarteSig="";
+    const k=document.getElementById("hudKarte"), p=hudProfil();
+    if(p&&k)hudKarteTick(p,k);
+    const dock=document.getElementById("hudDock");
+    if(p&&dock)hudDockTick(p,dock);
+  }
+  function hudKarteSchritt(r){
+    const {zeilen}=hudZeilen();
+    const ids=zeilen.map(z=>z.u&&z.u.id).filter(x=>x!=null);
+    if(!ids.length)return;
+    const i=ids.indexOf(hudKarteId);
+    hudKarteId=ids[(i<0?0:(i+r+ids.length)%ids.length)]; hudKarteSig="";
+    const k=document.getElementById("hudKarte"), p=hudProfil(); if(p&&k)hudKarteTick(p,k);
+  }
+  function hudKarteTick(p,karte){
+    if(hudKarteId==null){ if(!karte.hidden){ karte.hidden=true; karte.innerHTML=""; } hudKarteSig=""; return; }
+    const {w,zeilen}=hudZeilen();
+    const z=zeilen.find(x=>x.u&&x.u.id===hudKarteId);
+    if(!z){ hudKarteId=null; karte.hidden=true; return; }
+    const u=z.u;
+    const werte=p.karte.map(id=>{ const s=hudSpalte(w,id); return s?[s.kopf,hudWertText(s,z),s.titel||""]:null; }).filter(Boolean);
+    // Eignung = z.eig, exakt die Zahl der Spalte "Eig" (gebaut in bauFeldspiel: Basis + Slot + Form/
+    // Intensitaet). Bewusst KEINE Aufschluesselung aus aufschluesselung(): die liest den Slot aus der
+    // Aufstellung ohne Disziplinpruefung und kann deshalb eine andere Summe zeigen als gebucht ist.
+    const form=hudForm(z.n), eig=z.eig!=null?Math.round(z.eig):null;
+    const fokusMoeglich=z.side===1&&fokusAuswahlMoeglich();
+    const gedoppelt=fokusMoeglich&&effektiverFokus(0)===u.id;
+    const sig=JSON.stringify([hudKarteId,werte,form,eig,fokusMoeglich,gedoppelt]);
+    if(sig===hudKarteSig){ if(karte.hidden)karte.hidden=false; return; }
+    hudKarteSig=sig;
+    karte.className="hud-karte "+(z.side===0?"h":"a");
+    // Die Karte weicht dem Ball aus: sie dockt auf der Haelfte an, auf der gerade nicht angegriffen wird.
+    const angriffRechts=fsLive&&fsLive.amBall!=null?fsLive.amBall===0:true;
+    karte.classList.toggle("rechts",!angriffRechts);
+    karte.innerHTML="<div class=\"hud-kk\">"+hudPortraitHtml(z.n,"hud-por gross")
+      +"<div class=\"hud-kwer\"><em>"+lsEsc(hudSeitenName(z.side))+(hudRolle(u)?" · "+lsEsc(hudRolle(u)):"")+"</em>"
+      +"<b>"+lsEsc(z.n)+"</b><span class=\"hud-kplk\">"
+      +(eig!=null?"<span class=\"hud-plk\" title=\"Eignung für "+lsEsc(p.titel||disc)+" (Basis + Slot + Form + Mutator + Intensität)\">Eignung <b class=\"t\">"+eig+"</b></span>":"")
+      +(form?"<span class=\"hud-plk "+(form>0?"plus":"minus")+"\" title=\"Formkarte des Spieltags\">Form "+(form>0?"+":"")+form+"</span>":"")
+      +"</span></div><button type=\"button\" class=\"hud-zu\" data-hud-aktion=\"zu\" aria-label=\"Spielerkarte schließen\" data-tip=\"Schließen (Esc)\">✕</button></div>"
+      +"<div class=\"hud-kwerte\">"+werte.map(([k,v,t],i)=>"<div class=\""+(i<3?"haupt":"")+"\""+(t?" title=\""+lsEsc(t)+"\"":"")+"><b class=\"t\">"+lsEsc(v)+"</b><small>"+lsEsc(k)+"</small></div>").join("")+"</div>"
+      +"<div class=\"hud-kaktion\"><button type=\"button\" class=\"hud-knopf\" data-hud-aktion=\"vor\" data-tip=\"Voriger Spieler (←)\">◀</button>"
+      +(fokusMoeglich?"<button type=\"button\" class=\"hud-knopf breit"+(gedoppelt?" an":"")+"\" data-hud-aktion=\"doppeln\" aria-pressed=\""+gedoppelt+"\" data-tip=\"Hilfsverteidigung doppelt ihn bevorzugt (wie ein Klick auf ihn im Feld)\">"+(gedoppelt?"Wird gedoppelt":"Doppeln")+"</button>":"<span class=\"hud-kplatz\"></span>")
+      +"<button type=\"button\" class=\"hud-knopf\" data-hud-aktion=\"nach\" data-tip=\"Nächster Spieler (→)\">▶</button></div>";
+    karte.hidden=false;
+  }
+
+  // ---------- Highlight-Einblender (Weg des alten Callouts: feed(big) -> callout) ----------------
+  function hudCallout(txt,caption,titel,seite,kind){
+    const p=hudProfil(); if(!p||!document.getElementById("hudEinblender"))return false;
+    { const es=document.getElementById("endstand"); if(es&&!es.hidden)return true; }
+    const s=seite===1?1:0;
+    hudEinblenderOffen={nr:++hudEinblenderZaehler,seite:s,txt,caption,titel:titel||"",kind:kind||"",abIdx:fsZuege.length,bisMs:jetztMs()+3400,gezeichnet:""};
+    if(hudEinblenderTimer)clearTimeout(hudEinblenderTimer);
+    hudEinblenderTimer=setTimeout(()=>{ const e=document.getElementById("hudEinblender"); if(e){ e.classList.remove("an"); e.hidden=true; } hudEinblenderOffen=null; },3400);
+    hudEinblenderTick(p);
+    return true;
+  }
+  function hudEinblenderTick(p){
+    const e=document.getElementById("hudEinblender"); if(!e)return;
+    const o=hudEinblenderOffen;
+    if(!o){ if(!e.hidden){ e.hidden=true; e.classList.remove("an"); } return; }
+    // Der Schuetze steht erst NACH feed() im Protokoll (logZug folgt dem Text) -- deshalb wird er hier
+    // nachgeschlagen: der erste Treffer dieser Seite ab dem Zeitpunkt des Einblenders, sonst der letzte davor.
+    let wer=null, pkt=0;
+    const mitSchuetze=(p.einblenderSchuetze||[]).includes(o.kind);
+    for(let i=Math.max(0,o.abIdx-3);mitSchuetze&&i<fsZeiger;i++){
+      const z=fsZuege[i];
+      if(z.art==="treffer"&&z.seite===o.seite&&z.spieler){ wer=z.spieler; pkt=z.punkte; if(i>=o.abIdx)break; }
+    }
+    let statZeile="";
+    if(wer&&p.daten.einblenderStat)statZeile=p.daten.einblenderStat(wer)||"";
+    const sig=o.nr+"|"+(wer?wer.id:"")+"|"+statZeile;
+    if(sig===o.gezeichnet)return;
+    const neu=!o.gezeichnet||o.gezeichnet.split("|")[0]!==String(o.nr);
+    o.gezeichnet=sig;
+    e.className="hud-einblender "+(o.seite===0?"h":"a");
+    e.innerHTML="<div class=\"hud-eb\">"+(wer?hudPortraitHtml(wer.n,"hud-por eb"):"")
+      +"<span class=\"hud-ewort\">"+lsEsc(o.titel?o.titel+"!":"")+"</span>"
+      +"<span class=\"hud-etxt\"><b>"+lsEsc(wer?wer.n:hudSeitenName(o.seite))+"</b>"
+      +"<span>"+lsEsc(statZeile||satzOhneTitel(o.txt,o.titel)||o.txt)+"</span></span>"
+      +(pkt&&wer?"<span class=\"hud-eplus t\">+"+pkt+"</span>":"")+"</div>";
+    e.hidden=false;
+    if(neu){ e.classList.remove("an"); void e.offsetWidth; }
+    e.classList.add("an");
+  }
+
+  // ---------- Bedienleiste + Tastatur ----------------------------------------------------------
+  function hudBedienTick(bed){
+    const play=document.getElementById("play"), spd=document.getElementById("spd");
+    const ls=lsModus==="band"?"Band":lsModus==="tafel"?"Tafel":"aus";
+    const sig=(play?play.textContent:"")+"|"+(spd?spd.textContent:"")+"|"+ls+"|"+hudVerlaufFilter;
+    if(sig===hudBedienSig)return;
+    hudBedienSig=sig;
+    bed.innerHTML="<button type=\"button\" class=\"hud-tb prim\" data-hud-aktion=\"play\" data-tip=\"Start / Pause (Leertaste)\">"
+      +lsEsc(play?play.textContent:"Start")+"<kbd>␣</kbd></button>"
+      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"tempo\" data-tip=\"Tempo umschalten (T)\">"+lsEsc(spd?spd.textContent.replace("Tempo ",""):"1×")+"<kbd>T</kbd></button>"
+      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"stand\" aria-pressed=\""+(ls!=="aus")+"\" data-tip=\"Live-Stand: Band → Tafel → aus (L)\">Stand: "+ls+"<kbd>L</kbd></button>"
+      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"karte\" data-tip=\"Spielerkarte öffnen und durchschalten (← →), schließen mit Esc\">Spieler<kbd>←→</kbd></button>"
+      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"filter\" data-tip=\"Spielverlauf-Filter durchschalten (F)\">Filter<kbd>F</kbd></button>";
+  }
+  function hudAktion(a){
+    if(a==="play"){ const b=document.getElementById("play"); if(b)b.click(); }
+    else if(a==="tempo"){ const b=document.getElementById("spd"); if(b)b.click(); }
+    else if(a==="stand")liveStandModusWeiter();
+    else if(a==="karte")hudKarteSchritt(0);
+    else if(a==="vor")hudKarteSchritt(-1);
+    else if(a==="nach")hudKarteSchritt(1);
+    else if(a==="zu")hudKarteOeffnen(null);
+    else if(a==="doppeln"){ if(hudKarteId!=null)fokusUmschalten(hudKarteId); hudKarteSig=""; }
+    else if(a==="filter"){
+      const p=hudProfil(); if(!p)return;
+      const ids=p.verlaufFilter.map(f=>f[0]);
+      hudFilterSetzen(ids[(ids.indexOf(hudVerlaufFilter)+1)%ids.length]);
+    }
+    hudBedienSig=""; hudSysTick(true);
+  }
+  function hudFilterSetzen(id){
+    hudVerlaufFilter=id; hudVerlaufSig=""; hudBedienSig="";
+    const dock=document.getElementById("hudDock");
+    if(dock)dock.querySelectorAll("[data-hud-filter]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.hudFilter===id)));
+  }
+  function hudTaste(ev){
+    if(instanzGestoppt||cv.isConnected===false){ try{document.removeEventListener("keydown",hudTaste);}catch{} return; }
+    if(!hudProfil()||!cv.offsetParent)return;
+    if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+    const z=ev.target, tag=z&&z.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(z&&z.isContentEditable))return;
+    const k=ev.key;
+    if(k===" "){ if(tag==="BUTTON"||ev.repeat)return; ev.preventDefault(); hudAktion("play"); }
+    else if((k==="t"||k==="T")&&!ev.repeat){ ev.preventDefault(); hudAktion("tempo"); }
+    else if((k==="f"||k==="F")&&!ev.repeat){ ev.preventDefault(); hudAktion("filter"); }
+    else if(k==="ArrowLeft"){ ev.preventDefault(); hudKarteSchritt(-1); }
+    else if(k==="ArrowRight"){ ev.preventDefault(); hudKarteSchritt(1); }
+    else if(k==="Escape"&&hudKarteId!=null){ ev.preventDefault(); hudKarteOeffnen(null); }
+  }
+  function hudSysInit(){
+    if(hudSysInitDone)return; hudSysInitDone=true;
+    try{
+      const klick=(ev)=>{
+        const t=ev.target&&ev.target.closest?ev.target.closest("[data-hud-aktion],[data-hud-spieler],[data-hud-filter]"):null;
+        if(!t)return;
+        if(t.dataset.hudFilter){ hudFilterSetzen(t.dataset.hudFilter); hudSysTick(true); return; }
+        if(t.dataset.hudSpieler!=null&&t.dataset.hudSpieler!==""){ hudKarteOeffnen(Number(t.dataset.hudSpieler)); return; }
+        if(t.dataset.hudAktion)hudAktion(t.dataset.hudAktion);
+      };
+      for(const id of ["hudDock","hudKarte","hudBedien"]){ const e=document.getElementById(id); if(e&&e.addEventListener)e.addEventListener("click",klick); }
+      if(document.addEventListener)document.addEventListener("keydown",hudTaste);
+    }catch{}
+  }
+
+  // ---------- Takt: aus loop() neben liveStandTick() (jedes Bild; Dock/Karte hoechstens 4x/s) ---
+  let hudWarnungGemeldet=false;
+  function hudWarnung(e){ if(hudWarnungGemeldet)return; hudWarnungGemeldet=true; try{ console.warn("HUD-System: "+(e&&e.message||e)); }catch{} }
+  function hudSysTick(sofort){
+    if(typeof document==="undefined")return;
+    const kopf=document.getElementById("hudKopf");
+    if(!kopf)return;
+    const haupt=kopf.parentElement;
+    const p=hudProfil();
+    const aktivSig=p?disc:null;
+    if(aktivSig!==hudSysProfilAktiv){
+      hudSysProfilAktiv=aktivSig;
+      if(haupt&&haupt.classList){ haupt.classList.toggle("hud-sys",!!p); if(p)haupt.dataset.hudDisc=disc; else delete haupt.dataset.hudDisc; }
+      hudKopfSig=""; hudDockSig=""; hudBedienSig=""; hudKarteId=null; hudKarteSig=""; hudEinblenderOffen=null;
+      for(const id of ["hudKopf","hudDock","hudKarte","hudEinblender","hudBedien"]){ const e=document.getElementById(id); if(e){ e.hidden=true; if(!p)e.innerHTML=""; } }
+    }
+    hudKpZeileAufraeumen();
+    if(!p)return;
+    hudSysInit();
+    if(hudSysDisc!==disc){ hudSysDisc=disc; hudVerlaufFilter="alle"; }
+    hudVerlaufNachfuehren(p);
+    if(kopf.hidden)kopf.hidden=false;
+    hudKopfTick(p,kopf);
+    const jetzt=jetztMs();
+    const dock=document.getElementById("hudDock"), karte=document.getElementById("hudKarte"), bed=document.getElementById("hudBedien");
+    // Am Spielende genau EINMAL ungedrosselt, damit Leisten/Karte den gebuchten Endstand zeigen.
+    const endeNeu=!!done&&!hudEndeGezeichnet; hudEndeGezeichnet=!!done;
+    if(sofort||endeNeu||jetzt-hudLetzterDockTick>=250){
+      hudLetzterDockTick=jetzt;
+      if(dock){ if(dock.hidden)dock.hidden=false; hudDockTick(p,dock); }
+      if(karte)hudKarteTick(p,karte);
+      if(bed){ if(bed.hidden)bed.hidden=false; hudBedienTick(bed); }
+    }
+    hudEinblenderTick(p);
+  }
+  // KONTROLLPUNKT-ZEILE AUFRAEUMEN (Chris' Screenshot 17.11.): #kpzeile ("Kontrollpunkte"/"Lebende 3 · 3 · 3")
+  // schaltet nur updateHud() (Kampf-Chassis) ein und aus. Nach Battlefield blieb sie deshalb in Basketball
+  // und jeder anderen Nicht-Kampf-Disziplin mit dem alten Battlefield-Wert stehen. Fuer jedes andere Chassis
+  // ist sie bedeutungslos -- hier ausgeblendet, unabhaengig vom HUD-Profil. Reine Anzeige.
+  function hudKpZeileAufraeumen(){
+    if(!(istFeldspiel(disc)||istBuehne(disc)||istBahn(disc)))return;
+    const kz=document.getElementById("kpzeile");
+    if(kz&&kz.style.display!=="none")kz.style.display="none";
+  }
+  // Lesesonde fuer Tests/QA: was die HUD-Bauteile gerade zeigen, und was gebucht ist.
+  function hudProbe(){
+    const p=hudProfil();
+    const {w,zeilen}=hudZeilen();
+    const kopf=document.getElementById("hudKopf"), dock=document.getElementById("hudDock");
+    const txt=(root,key)=>{ const e=root&&root.querySelector("[data-hf=\""+key+"\"]"); return e?e.textContent:null; };
+    return {aktiv:!!p,disc,status:(HUD_PROFIL[disc]||{}).status||null,
+      profile:Object.fromEntries(Object.entries(HUD_PROFIL).map(([k,v])=>[k,v.status])),
+      gebucht:{stand:p?p.daten.stand():[fsPunkte[0],fsPunkte[1]],score:(document.getElementById("score")||{}).textContent||"",
+        spieler:zeilen.map(z=>({id:z.u&&z.u.id,n:z.n,seite:z.side,kern:p?hudWertText(hudSpalte(w,p.kern),z):null,
+          leiste:p?p.leiste.map(id=>hudWertText(hudSpalte(w,id),z)):[],fouls:p&&p.daten.fouls?(p.daten.fouls().get(z.u&&z.u.id)||0):0})),
+        lauf:p&&p.daten.lauf?p.daten.lauf():null,zuege:fsZeiger},
+      gezeigt:{stand:[txt(kopf,"stand0"),txt(kopf,"stand1")],uhr:txt(kopf,"uhr"),zusatz:txt(kopf,"zusatz"),
+        lauf:[0,1].map(s=>{ const e=kopf&&kopf.querySelector("[data-hf=\"lauf"+s+"\"]"); return e&&!e.hidden?e.textContent:null; }),
+        spieler:p&&dock?zeilen.map(z=>({id:z.u&&z.u.id,kern:txt(dock,"k"+(z.u&&z.u.id)),
+          leiste:p.leiste.map(id=>txt(dock,id+(z.u&&z.u.id))),
+          fouls:Number(((dock.querySelector("[data-hf=\"f"+(z.u&&z.u.id)+"\"]")||{}).dataset||{}).n||0)})):[],
+        verlauf:hudVerlauf.map(r=>({i:r.i,art:r.art,kat:r.kat,seite:r.seite,stand:r.stand,text:r.text})),
+        filter:hudVerlaufFilter,karte:hudKarteId,
+        einblender:hudEinblenderOffen?{titel:hudEinblenderOffen.titel,seite:hudEinblenderOffen.seite}:null}};
   }
 
   let schnelldurchLetztesBild=0;
@@ -58097,6 +59261,10 @@
     // Render-Interpolation (s. viMische): nur waehrend draw(), Sim-Zustand bleibt unberuehrt.
     const viRueck=(running&&!schnelldurchAktiv&&!done)?viMische(zeitFaktor()):null;
     try{ draw(); } finally { if(viRueck)viRueck(); }
+    // LIVE-STAND (Welle 1): reine Anzeige, gedrosselt auf 4x/s, s. liveStandTick().
+    try{ liveStandTick(ts); }catch(e){ lsWarnung("tick",e); }
+    // HUD-SYSTEM (17.11.): reine Anzeige, s. HUD_PROFIL/hudSysTick().
+    try{ hudSysTick(); }catch(e){ hudWarnung(e); }
     requestAnimationFrame(loop);
   }
 
@@ -61036,6 +62204,7 @@
 
   function reset(){
     running=false;done=false;last=0;acc=0;bahnSimAcc=0;pfeile=[];
+    liveStandReset(); // LIVE-STAND: Reiter/Signaturen gehoeren zum abgelaufenen Spiel
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
     // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
     // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
@@ -66844,6 +68013,11 @@
     kontaktZaehler:()=>kontaktLetzteMessung.map(u=>({n:u.n, seite:u.seite, pers:u.pers, ...kontaktZaehlerVon(u)})),
     kontaktZufallProbe:(saat,n)=>{ kontaktStromSaeen(saat); const aus=[]; for(let i=0;i<(n||5);i++)aus.push(kontaktRr()); return aus; },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
+    // HUD-SYSTEM (17.11.): Lesesonde (gezeigt gegen gebucht) und Schalter altes/neues HUD fuer
+    // Vergleichsbilder. Reine Anzeige, kein Einfluss auf rr()/Wertung.
+    hudProbe,
+    hudSystem:(an)=>{ if(an!==undefined){ hudSysAn=!!an; hudSysTick(true); } return {an:hudSysAn,aktiv:!!hudProfil()}; },
+    hudKarte:(id)=>{ hudKarteOeffnen(id==null?null:Number(id)); return hudKarteId; },
     // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
     // setzeTaktik oben, docs/design/feldspiel-taktik-karte-fundament-15-10.md): die
     // Sonden-Entsprechung zu Fables Vorschlag "ein Parameter --taktik=<id>:<stufe> fuer
@@ -68642,6 +69816,13 @@
     bahnPlaene:()=>LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,plan:u.plan,
       ab:+u.ab.toFixed(4),pos:+u.pos.toFixed(4),ansagen:u.ansagen||0})),
     setDisc:(d)=>{ disc=d; reset(); },
+    // LIVE-STAND (Welle 1): Sonde und Schalter fuer Tests/Screenshots -- reine Anzeige.
+    // liveStandProbe() liest frisch (dieselbe Funktion wie die Anzeige), liveStand({modus,reiter,ohnePrognose}) schaltet.
+    liveStandProbe:()=>{ let d=null; try{ d=liveStandLesen(); }catch(e){ return {fehler:String(e)}; }
+      return {modus:lsModus,reiter:lsReiter,daten:d?JSON.parse(JSON.stringify(d)):null}; },
+    liveStand:(o)=>{ o=o||{}; if(LS_MODI.includes(o.modus))lsModus=o.modus; if("reiter" in o)lsReiter=o.reiter==="auto"?null:o.reiter;
+      if("ohnePrognose" in o)lsOhnePrognose=!!o.ohnePrognose; lsSigBand=""; lsSigTafel=""; liveStandKnopfText(); liveStandTick(performance.now(),true);
+      return {modus:lsModus,reiter:lsReiter,ohnePrognose:lsOhnePrognose}; },
     // GEWICHTHEBEN: LAMPEN-STATUS, READ-ONLY (Folgefund zu PR #1091, Task #35, 01.10.) —
     // dasselbe Playwright-Abnahme-Muster wie kampfAnsage()/fsFokus()/bahnWahl() daneben: macht
     // von AUSSEN sichtbar, was sonst nur im Motor steckt, damit eine Playwright-Probe den

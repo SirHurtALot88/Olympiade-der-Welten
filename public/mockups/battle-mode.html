@@ -148,6 +148,11 @@
         <div class="sd">Sudden Death 0:50</div>
         <div class="tbar r"><s id="thpR" style="width:100%"></s></div>
       </div>
+      <!-- HUD-SYSTEM (17.11., docs/design/hud-system-17-11.md): Broadcast-Kopfleiste einer Disziplin
+           mit fertigem HUD_PROFIL (heute Basketball). Ersetzt dort .scoreline/.hpbars/#bbug; jede
+           andere Disziplin laesst sie [hidden] und behaelt ihr altes HUD. Inhalt: hudSysTick() im
+           Motor, reine Anzeige der gebuchten Werte. -->
+      <div class="hud-kopf" id="hudKopf" hidden></div>
       <div class="arenaraum">
         <canvas id="cv" width="1240" height="470"></canvas>
         <!-- BROADCAST-BUG. Persistentes HUD-Overlay ueber der Leinwand WAEHREND des
@@ -217,9 +222,24 @@
              nicht enthuellte Zuege zeigen "·" statt einer Zahl (Spoiler-Schutz, s.
              aktualisiereIspyHud()). -->
         <div class="ispysplit hud-in" id="ispySplit" hidden></div>
+        <!-- LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md): ein
+             Bauteil fuer den Stand ueber alle Teilnehmer. Band (eine Zeile unter dem Score-Bug,
+             Standard) und Tafel (Rangliste mit Messpunkt-Reitern rechts oben), umgeschaltet ueber
+             #lsKnopf oder Taste L. Inhalt kommt aus liveStandTick() in der Engine (hoechstens 4x/s,
+             DOM nur bei geaenderter Signatur). Steht VOR .einlauf/.endstand, wird von diesen also
+             zugedeckt, wie die anderen HUDs. Reine Anzeige. -->
+        <div class="livestand" id="livestand" hidden>
+          <div class="ls-band hud-in" id="lsBand" aria-live="off"></div>
+          <div class="ls-tafel hud-in" id="lsTafel" hidden role="region" aria-label="Live-Stand"></div>
+        </div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
+        <!-- HUD-SYSTEM: Einblender, Spielerkarte und Bedienleiste ueber der Leinwand. Vor .einlauf/
+             .endstand, damit diese Vollflaechen sie wie alle anderen HUDs zudecken. -->
+        <div class="hud-einblender" id="hudEinblender" aria-live="polite" hidden></div>
+        <div class="hud-karte" id="hudKarte" role="region" aria-label="Spielerkarte" hidden></div>
+        <div class="hud-bedien" id="hudBedien" role="toolbar" aria-label="Bedienung" hidden></div>
         <div class="einlauf" id="einlauf">
           <div class="ewappen">
             <div class="eteam" id="eteamL"></div>
@@ -295,6 +315,9 @@
           <i class="band"><i class="keil home"></i><i class="schwarz"></i><i class="keil away"></i></i>
         </div>
       </div>
+      <!-- HUD-SYSTEM: Dock unter der Leinwand (Spielerleisten beider Teams, Spielverlauf mit Filter).
+           Ersetzt fuer Disziplinen mit fertigem HUD_PROFIL die Kaderleiste darunter. -->
+      <div class="hud-dock" id="hudDock" hidden></div>
       <!-- KADERLEISTE. Auf einen Blick: wer steht noch, wer ist raus. Beide Seiten,
            getrennt durch den Stand, mit Lebensbalken und durchgestrichenem Namen. -->
       <div class="kaderleiste">
@@ -360,6 +383,7 @@
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>
         <button class="btn g" id="spd">Tempo 1×</button>
+        <button class="btn g" id="lsKnopf" type="button" aria-pressed="true" title="Live-Stand: Band → Tafel → aus (Taste L, Messpunkt 1–4, 0 = Auto)">Stand: Band</button>
         <button class="btn g" id="ton" title="Ton an/aus" aria-pressed="false">🔊 Ton</button>
         <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
           style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">
