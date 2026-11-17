@@ -553,6 +553,17 @@ nahe am toten Knopf.** rho und Pp verschlechtern sie nicht über die Spannweite 
    Ohne Antwort bleibt alles hinter der Flagge.
 2. **Zwei Flaggen-Variablen.** Ist nur `OLY_STRATEGIE_VORLAGEN` gesetzt, bucht der Server mit
    Vorlage, die Arena zeigt aber neutral (gezeigt ≠ gebucht). Beim Scharfschalten beide setzen.
+   Review 17.11. (Opus), ergaenzt: (i) Ist nur die Server-Variable gesetzt, rendert der Server
+   die Einsatzlisten-Zeile "Spielweise", der Browser nicht (Hydrations-Mismatch; React rendert
+   neu, ungefaehrlich, aber unsauber) -- im Client-Pfad deshalb nur `NEXT_PUBLIC_…` lesen oder
+   beide immer gemeinsam setzen. (ii) Ist nur `NEXT_PUBLIC_…` beim Bauen gesetzt, ist die
+   Flagge in Next auch serverseitig an (Einsetzung im Server-Bundle), in tsx-Skripten nicht.
+   (iii) **Keine der beiden Variablen ist heute in `deploy/hetzner/docker-compose.yml`
+   (`environment:`/`build.args`) oder im `Dockerfile` (ARG/ENV) verdrahtet** -- ein Eintrag in
+   `.env` bewirkt nichts. Zum Einschalten muessen Compose und Dockerfile mit angepasst werden.
+   (iv) Der `motorHash` aendert sich mit jedem Engine-PR (auch diesem): zum Deploy laufende
+   Vorlaeufe werden einmal neu gerechnet; "Hash Zeichen fuer Zeichen der alte" in 9.1 gilt nur
+   fuer den Teil `teile`.
 3. **Vorlage im Entwurf nach Abgabe:** geschützt über Sperre des Entwurfs und den Eingabe-Hash; ein
    eigenes Buchungsfeld im Snapshot fehlt noch (9.2).
 4. **Speed-Schach/Staffel (Schritt 2)** nutzen dieselbe Kette; für Disziplinen, deren KI-Vorgabe
