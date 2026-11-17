@@ -57,6 +57,10 @@ const SZENEN_RUNDE2 = [
   { name: "r2-09-spot-up", situation: "spotup", saat: 7, ab: 10 },
   { name: "r2-10-pull-up", situation: "pullup", saat: 42, ab: 10 },
   { name: "r2-11-drive", situation: "drive", saat: 1, ab: 10 },
+  { name: "r2-12-fx-dunk", situation: "fx-dunk", saat: 7, ab: 10 },
+  { name: "r2-13-fx-ringwackeln", situation: "fx-ring", saat: 7, ab: 10 },
+  { name: "r2-14-fx-block", situation: "fx-block", saat: 42, ab: 5 },
+  { name: "r2-15-fx-dreier-spur", situation: "dreier", saat: 42, ab: 10 },
 ];
 const RUNDE2 = process.env.OLY_BB_SZENEN === "runde2" || process.env.OLY_BB_SZENEN === "kamera";
 // OLY_BB_SZENEN=kamera: Bildfolge der Halbfeld-/Folgekamera (Nahzoom auf einen Dreier, danach
