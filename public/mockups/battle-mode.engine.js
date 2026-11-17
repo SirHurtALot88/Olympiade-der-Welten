@@ -9740,8 +9740,11 @@
   // angeschlossen.
   const ARENA_DOMINATION={
     battlefield:{
-      orte:[{name:"Nord",fy:85/470},{name:"Mitte",fy:0.5},{name:"Süd",fy:385/470}],
-      radius:65, kapZeit:5, punkteJeSekunde:2, punkteZumSieg:150,
+      // FUENF ORTE (17.11., s. bfffaGefecht): die fuenf Lichtungen der Battlefield-Kulissen
+      // (eroberung/wuestenruine: Turm, Altar, Sandsackwall auf der Mittellinie, zwei Kreuzungen
+      // links/rechts). Nord/Mitte/Sued liegen unveraendert bei y=85/235/385.
+      orte:[{name:"Nord",fx:0.5,fy:85/470},{name:"West",fx:275/1240,fy:0.5},{name:"Mitte",fx:0.5,fy:0.5},{name:"Ost",fx:965/1240,fy:0.5},{name:"Süd",fx:0.5,fy:385/470}],
+      radius:60, kapZeit:5, punkteJeSekunde:2, punkteZumSieg:150,
       rolle:{
         siegecore:{erobern:1.6},
         fieldcontrol:{erobern:1.3,halten:1.3},
@@ -39908,7 +39911,7 @@
       KP=kf?{radius:kf.radius,kapZeit:kf.kapZeit,
         punkteJeSekunde:kf.punkteJeSekunde,punkteZumSieg:kf.punkteZumSieg,
         rolle:kf.rolle||{},
-        orte:kf.orte.map(o=>({name:o.name,x:MID,y:Math.round(H*o.fy),besitz:null,fortschritt:0,erobertVon:null})),
+        orte:kf.orte.map(o=>({name:o.name,x:Math.round(W*(o.fx??0.5)),y:Math.round(H*o.fy),besitz:null,fortschritt:0,erobertVon:null})),
         punkte:[0,0]}:null;
       // POD (s. bfPodKader): N Seiten statt zwei, je Seite ein Punktekonto und eine
       // Ausscheidezeit (null = noch im Spiel). Nur Battlefield hat Orte (KP), nur dort gibt es Pods.
@@ -61032,6 +61035,50 @@
   // BEWUSST NICHT ANGEFASST: das Zwei-Team-Duell. Es laeuft weiter ueber build()/stepSim(); dieser
   // Block wird nur im Pod (KP.pod) erreicht. Der Echtzeit-Pod bleibt als Kontrolle erreichbar
   // (`spieleBattlefieldPod(..., {echtzeit:true})`), gebucht und gezeigt wird das Gefecht hier.
+  //
+  // ===================================================================================
+  // DOMINATION MIT FUENF ORTEN (17.11.). Chris, woertlich: „battlefield hat auch 0 dynamik. die
+  // area wo die punkte sind muss größer werden ... dass man zwischen den punkten wirklich hin und
+  // her laufen müsste ... die punkte etwas größer ..., sodass man darauf stehen muss um sie
+  // einzunehmen ... farblich markieren für das team was den punkt gerade hält und pro sekunde kommt
+  // ein punkt dazu, wie z.B. bei Overwatch oder Domination ... auch da soll gekämpft, geschubst usw.
+  // werden! teams können sich aufteilen ... oder gemeinsam versuchen wenigstens einen zu erobern.
+  // bitte bau die arenen auch so, dass es 5 Punkte zum Dominieren gibt!"
+  //
+  // BEFUND (Ursache des Stillstands): Die Belegung aus der Rolle (Heimort/Mitte/Fernort, s. die
+  // Fassung vom 02.11.) stellte JEDES Team mit gleich vielen Koepfen an dieselben drei Orte. Damit
+  // war jeder Ort von Takt 1 an von mindestens zwei Teams besetzt, also umkaempft — und an einem
+  // umkaempften Ort bewegt sich nach der kpTick-Regel nichts. Gemessen (k=2..6, 30 Gruppen x 4
+  // Kaempfe x 2 Stroeme): 94-100 % der Kaempfe endeten nach Zeit, die Rotation griff nur, wenn ein
+  // Ort schon gesichert war — was nie geschah. Die Figuren standen fest neben ihrem Ort, und sichtbar
+  // war nur eine Linie je Schlag.
+  //
+  // JETZT:
+  //  1. FUENF ORTE (Nord, West, Mitte, Ost, Sued) ueber das ganze Feld — genau die fuenf Lichtungen
+  //     der Battlefield-Kulissen. Jedes Team (Ecke) hat zwei nahe Orte, die es sich mit je einem
+  //     Nachbarn teilt (West/Ost mit dem Team darunter/darueber, Nord/Sued mit dem Team daneben),
+  //     dazu die Mitte. Die Geometrie ist fuer alle vier Teams spiegelgleich.
+  //  2. LAUFEN KOSTET ZEIT: zwischen zwei Orten liegen 1-3 Takte Weg (BFFFA.lauf), unterwegs zaehlt
+  //     man nirgends und kaempft nicht.
+  //  3. JEDER WAEHLT JEDEN TAKT NEU (bfffaPlane): Besitz, Bedrohung, Bedarf (wie viele Eigene schon
+  //     dort sind/hinlaufen), Kraefteverhaeltnis, Weg, Spielstand — und die PERSOENLICHKEIT
+  //     (leitePers, sechs Typen): Draufgaenger nehmen lieber, Bollwerk/Beschuetzer halten lieber,
+  //     Schleicher/Opportunisten suchen Luecken, wer eng zusammenhaelt (PERSDEF.z), geht dorthin, wo
+  //     schon Eigene sind. Ein Team, das ueberwiegend zusammenhaelt, schickt eine Person mehr als
+  //     noetig (es „blockt"), die anderen verteilen sich. Persoenlichkeit verschiebt die VERTEILUNG,
+  //     nicht die Staerke (kontakt-persoenlichkeit-16-11.md, Leitsatz).
+  //  4. KAMPF NUR AM ORT, hoechstens BFFFA.zugriff Angreifer je Ziel und Takt (mehr kommen an einen
+  //     Koerper nicht heran) — das nimmt der Ueberzahl die Lotterie, laesst ihr aber den Vorteil.
+  //  5. SCHUBSEN (Kontakt-Konzept 16.11.): an einem umkaempften Ort versucht ein Kaempfer statt des
+  //     Schlags manchmal, den Gegner vom Punkt zu draengen. WIE OFT sagt seine Kontaktbereitschaft
+  //     (kontaktProfil().kb), OB es gelingt der Treffer-Kanal (Awareness) — gelingt es, zaehlt der
+  //     Gegner in diesem Takt nicht am Ort (bei Alleinpraesenz laeuft die Eroberung), schlaegt es
+  //     fehl, taumelt der Schubser selbst und zaehlt nicht.
+  //  6. +1 PUNKT JE SEKUNDE UND GEHALTENEM ORT (BFFFA.punkteJeTakt = taktSek), kein Sieglimit; die
+  //     Platzierung geht nach Punkten (bfPodPlatzierungAus). Ein verlassener Ort bleibt im Besitz und
+  //     zahlt weiter, bis ihn jemand nimmt — deshalb lohnt es sich, weiterzuziehen.
+  // Die neun Matrixkanaele unten sind UNVERAENDERT (Stand, Wucht, Treffer, Deckung, Ausdauer,
+  // Schwachstelle, Positionierung, Atem, Befehl).
   const BF_FFA_GRUND=Object.freeze({
     takte:20, taktSek:4, mitte:50, kappa:0.12, kappaWege:0.25, spreizung:3,
     stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
@@ -61040,28 +61087,36 @@
     deckung:{basis:0.1},
     atem:{basis:0.1},
     erobern:{bedarf:2},
-    punkteJeTakt:8, punkteZumSieg:150,
-    rotation:{dauer:2},
-    wertung:{ko:15, erob:12, halten:3, takt:2},
+    punkteJeTakt:4, punkteZumSieg:null,
+    lauf:{pxJeTakt:400},
+    zugriff:2,
+    schub:{rate:0.4, schaden:0.6},
+    wahl:{nehmenFremd:3.0, nehmenNeutral:2.6, verteidigen:3.2, sicher:0.3, satt:0.3, kraftMin:0.5, kraftMax:1.4,
+      luecke:1.2, zusammen:0.35, rolle:0.4, bleibenKampf:0.6, bleiben:0.3, weg:0.9, rauschen:0.25, rueckstand:0.2, eigenerFortschritt:0.4},
+    wertung:{ko:15, erob:12, halten:3, takt:2, teamAnteil:0, druck:0},
     hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, position:1.5, atem:5, erobern:4}
   });
   const bfffaGrund=()=>JSON.parse(JSON.stringify(BF_FFA_GRUND));
   let BFFFA=bfffaGrund();
-  const BFFFA_ZWECK={ziel:11, schwachstelle:12, position:13, positionWahl:14, treffer:15, atem:16};
-  const BF_ORT_NAMEN=["Nord","Mitte","Süd"];
-  // Heim-/Fernort je Seite (Seite 0/1 stehen oben, 2/3 unten — bfPodHome). Bei drei Teams (nur in
-  // Sonden denkbar, die Liga lost immer Vierergruppen) hat Seite 2 den Sueden fuer sich.
-  const bfffaHeimOrt=(side)=>side<2?0:2;
-  const bfffaFernOrt=(side)=>side<2?2:0;
-  const BFFFA_ROLLEN_ORT={moraleanchor:"heim", commander:"heim", siegecore:"mitte", fieldcontrol:"mitte",
-    disruptor:"fern", spotter:"fern"};
-  function bfffaStartOrt(slot,side){
-    const w=BFFFA_ROLLEN_ORT[slot]||"mitte";
-    return w==="heim"?bfffaHeimOrt(side):w==="fern"?bfffaFernOrt(side):1;
-  }
-  // Wer bei einer Rotation als Halter bleibt: die Rolle, die das Halten traegt (ARENA_DOMINATION
-  // .rolle), dann die geringere Kaempfer-Nummer — deterministisch, kein Wurf.
-  const BFFFA_HALTER_RANG={moraleanchor:0, fieldcontrol:1, commander:2, spotter:3, disruptor:4, siegecore:5};
+  const BFFFA_ZWECK={ziel:11, schwachstelle:12, position:13, positionWahl:14, treffer:15, atem:16, reihe:17, schub:18, wahl:19};
+  const BF_ORT_NAMEN=ARENA_DOMINATION.battlefield.orte.map(o=>o.name);
+  // Leinwand 1240x470 (battle-mode.html #cv) — dieselbe Umrechnung wie KP.orte in build().
+  const BF_ORT_XY=ARENA_DOMINATION.battlefield.orte.map(o=>({x:Math.round(1240*(o.fx??0.5)), y:Math.round(470*o.fy)}));
+  // Mitte der vier Ecken aus bfPodHome (Seite 0 oben links, 1 oben rechts, 2 unten links, 3 unten rechts).
+  const BF_START_XY=[{x:255,y:138},{x:985,y:138},{x:255,y:332},{x:985,y:332}];
+  const bfffaWeg=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const bfffaLaufTakte=(von,nach)=>Math.max(1,Math.ceil(bfffaWeg(von,nach)/BFFFA.lauf.pxJeTakt-1e-9));
+  // PERSOENLICHKEIT -> NEIGUNG (nur Verteilung): nehmen/halten gewichten die Lage eines Ortes, luecke
+  // einen fremden Ort ohne Gegner, zusammen die Naehe zu Eigenen. Die Zusammenhalts-Spalte folgt
+  // PERSDEF.z (dicht/eng hoch, eigen niedrig).
+  const BFFFA_PERS_NEIGUNG={
+    draufgaenger:{nehmen:1.35, halten:0.75, luecke:0.9, zusammen:0.8},
+    duellant:{nehmen:1.15, halten:0.95, luecke:0.9, zusammen:1.0},
+    opportunist:{nehmen:1.1, halten:0.85, luecke:1.35, zusammen:0.9},
+    schleicher:{nehmen:1.0, halten:0.85, luecke:1.45, zusammen:0.8},
+    beschuetzer:{nehmen:0.85, halten:1.35, luecke:0.9, zusammen:1.3},
+    bollwerk:{nehmen:0.8, halten:1.45, luecke:0.85, zusammen:1.2}
+  };
 
   // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie baueEinheit() (Slot-Aufschlag mit dem
   // k-Profil `slotDef`, Form/Stufe, Mutator, Messhebel), dieselbe Eignung, die disziplinProbe und
@@ -61085,8 +61140,11 @@
     const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
     const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
     const rolle=kpRolleVonSlot(slotId);
+    const pers=leitePers(p).key;
+    let kb=0.5; try{ kb=kontaktProfil(p,pers).kb/100; }catch(e){}
     return {
       idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      pers, neigung:BFFFA_PERS_NEIGUNG[pers]||BFFFA_PERS_NEIGUNG.duellant, kb,
       stand0, stand:stand0,
       wucht:P.wucht*klemme(1+kanal(H.wucht,["charisma","torment","power"]),0.2,3),
       treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
@@ -61097,18 +61155,20 @@
       atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
       // Eroberung: Rolle (ARENA_DOMINATION.rolle, wie kpRolleVon) mal Befehl (Charisma). Der Befehl
       // traegt auch das HALTEN eines eigenen Ortes: wer dort steht, ordnet ihn je Takt — die
-      // Gutschrift waechst mit seinem Befehl (sonst brachte ein schneller eroberter Ort dieselbe
-      // feste Gutschrift wie ein langsamer, und Charisma laese im Pp fast nur ueber die Eignung).
+      // Gutschrift waechst mit seinem Befehl.
       befehl:klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       erob:rolle.erobern*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       neutral:rolle.neutral*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       halten:rolle.halten*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       stoeren:rolle.stoeren,
-      // Laufzustand
-      ort:bfffaStartOrt(slotId,side), nach:null, ankunft:null, raus:false, rausTakt:null, atemWeg:false,
+      // Laufzustand: `ort` (am Ort, sonst null), unterwegs `nach` mit Abmarsch `ab` (Takt, an dessen
+      // Ende gewaehlt wurde) und `ankunft` (Takt, ab dem er am Ziel zaehlt), `von` der verlassene Ort
+      // (null = Startecke).
+      ort:null, nach:null, von:null, ab:null, ankunft:null, raus:false, rausTakt:null, atemWeg:false,
+      gedraengt:false, taumelt:false,
       wert:0,
       st:{treffer:0, schlaege:0, wucht:0, kos:0, erob:0, halte:0, schwachstellen:0, ausgewichen:0,
-          atem:0, rotationen:0, takteAmOrt:[0,0,0]}
+          atem:0, rotationen:0, schubs:0, geschubst:0, takteAmOrt:BF_ORT_NAMEN.map(()=>0)}
     };
   }
   // kpRolleVon() liest KP.rolle — im Gefecht gibt es kein KP; dieselben Gewichte direkt aus
@@ -61119,40 +61179,122 @@
     return {erobern, neutral:Math.max(1,r.neutral??erobern), halten:Math.max(1,r.halten??1), stoeren:r.stoeren??0};
   }
 
+  // DIE ORTSWAHL EINES TEAMS am Ende von Takt `t` (t=0: Anmarsch). Jeder Stehende, der nicht unterwegs
+  // ist, bewertet alle fuenf Orte; gewaehlt wird nacheinander (Kaempfer-Nummer), jeder sieht, wohin die
+  // Eigenen vor ihm schon gehen. Deterministisch bis auf einen kleinen Wurf je (Kaempfer, Takt), der
+  // Gleichstaende aufloest. Gegner zaehlen dort, wo sie stehen oder bis zum naechsten Takt ankommen.
+  function bfffaPlane(kaempfer,orte,punkte,t,N,wurf,ereignisse){
+    const P=BFFFA, Wp=P.wahl, Z=BFFFA_ZWECK, n=orte.length;
+    const posVon=(k)=>k.ort!=null?BF_ORT_XY[k.ort]:BF_START_XY[k.side%4];
+    const spaet=t>P.takte/2;
+    for(let s=0;s<N;s++){
+      const team=kaempfer.filter(k=>!k.raus&&k.side===s);
+      if(!team.length)continue;
+      const frei=team.filter(k=>k.nach==null);
+      if(!frei.length)continue;
+      // Blockbildung: haelt das Team im Mittel eng zusammen, schickt es eine Person mehr als noetig.
+      const block=team.reduce((a,k)=>a+k.neigung.zusammen,0)/team.length>=1.05?1:0;
+      const E=new Array(n).fill(0);
+      for(const k of kaempfer){
+        if(k.raus||k.side===s)continue;
+        if(k.ort!=null)E[k.ort]++;
+        else if(k.nach!=null&&k.ankunft<=t+2)E[k.nach]++;
+      }
+      // Eigene, die schon festliegen (unterwegs) — die Freien waehlen der Reihe nach dazu.
+      const M=new Array(n).fill(0);
+      for(const k of team)if(k.nach!=null)M[k.nach]++;
+      let besterGegner=-Infinity;
+      for(let x=0;x<N;x++)if(x!==s&&punkte[x]>besterGegner)besterGegner=punkte[x];
+      const hinten=punkte[s]<besterGegner;
+      for(const A of frei){
+        const hier=posVon(A);
+        let best=-Infinity, bestOrt=A.ort;
+        for(let oi=0;oi<n;oi++){
+          const o=orte[oi], nz=A.neigung;
+          const eigen=o.besitz===s, neutral=o.besitz==null;
+          const fremdFortschritt=o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0;
+          const bedroht=eigen&&(E[oi]>0||fremdFortschritt);
+          let v, bedarf;
+          if(eigen){
+            if(bedroht){ v=Wp.verteidigen*nz.halten; bedarf=E[oi]+1; }
+            else { v=Wp.sicher*nz.halten; bedarf=0; }
+          }else{
+            v=(neutral?Wp.nehmenNeutral:Wp.nehmenFremd)*nz.nehmen; bedarf=E[oi]+1;
+            if(o.erobertVon===s&&o.fortschritt>0)v+=Wp.eigenerFortschritt;
+            if(spaet&&hinten)v*=1+Wp.rueckstand;
+          }
+          const m=M[oi];
+          if(m>=bedarf+(bedarf>0?block:0))v*=Wp.satt;
+          if(E[oi]>0){ const r=(m+1)/E[oi]; v*=Math.max(Wp.kraftMin,Math.min(Wp.kraftMax,0.5+0.5*r)); }
+          else if(!eigen)v*=Wp.luecke*nz.luecke;
+          v+=Wp.zusammen*(nz.zusammen-1)*Math.min(m,2);
+          // Rolle: ein kleiner thematischer Zuschlag, nie eine Bindung.
+          const sl=A.slot;
+          if(sl==="siegecore"&&!eigen&&!neutral)v+=Wp.rolle;
+          else if(sl==="spotter"&&neutral&&E[oi]===0)v+=Wp.rolle;
+          else if(sl==="moraleanchor"&&bedroht)v+=Wp.rolle;
+          else if(sl==="disruptor"&&fremdFortschritt)v+=Wp.rolle;
+          else if(sl==="fieldcontrol"&&E[oi]>0)v+=Wp.rolle;
+          else if(sl==="commander"&&m>0&&E[oi]>0)v+=Wp.rolle;
+          if(oi===A.ort)v+=E[oi]>0?Wp.bleibenKampf:Wp.bleiben;
+          else v-=Wp.weg*(t===0?bfffaWeg(hier,BF_ORT_XY[oi])/P.lauf.pxJeTakt:bfffaLaufTakte(hier,BF_ORT_XY[oi]));
+          v+=Wp.rauschen*wurf(A.idx*8+oi,t,Z.wahl);
+          if(v>best+1e-12){ best=v; bestOrt=oi; }
+        }
+        M[bestOrt]++;
+        if(bestOrt===A.ort)continue;
+        A.von=A.ort; A.ort=null; A.nach=bestOrt; A.ab=t;
+        A.ankunft=t===0?1:t+1+bfffaLaufTakte(hier,BF_ORT_XY[bestOrt]);
+        if(t>0){ A.st.rotationen++; if(ereignisse)ereignisse.push({typ:"rotation", wer:A.idx, von:A.von, nach:bestOrt}); }
+      }
+    }
+  }
+
   // DAS GEFECHT. `kaempfer` sind bfffaKaempfer() (Index = idx), `N` die Teamzahl, `saat` die
   // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente: dieselben Eingaben liefern
   // bitgleich dasselbe Gefecht. Rueckgabe: Endstand je Team, Wertung je Kaempfer und das
   // Takt-Protokoll, aus dem die Arena das Gefecht nachspielt (bfPodReplay*).
   function bfffaGefecht(kaempfer,saat,N){
     const P=BFFFA, Z=BFFFA_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
-    const orte=[0,1,2].map(i=>({name:BF_ORT_NAMEN[i], besitz:null, fortschritt:0, erobertVon:null}));
+    const orte=BF_ORT_NAMEN.map(name=>({name, besitz:null, fortschritt:0, erobertVon:null}));
     const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
     const takte=[];
     let gespielt=0, ende="zeit";
-    const steht=(k)=>!k.raus;
     const lebendeTeams=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
-    // Anfangsbild (Takt 0) fuer die Anzeige: wer wohin geht.
+    // ORTSGUTSCHRIFT (Erobern/Halten/Stoeren): ein Teil geht an den, der dort steht, der Rest in den
+    // Topf seines Teams (s. Ende) — wer gerade an einem unbewachten Ort steht, ist Lage, nicht Koennen.
+    const topf=new Array(N).fill(0), lebTakte=new Map();
+    const gutschrift=(k,w)=>{ const ta=P.wertung.teamAnteil||0; k.wert+=w*(1-ta); topf[k.side]+=w*ta; };
     const schnapp=()=>({
-      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach})),
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach, von:k.von,
+        ab:k.ab, ankunft:k.ankunft, gedraengt:k.gedraengt, taumelt:k.taumelt})),
       orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
       punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    // Anmarsch (Takt 0): jeder waehlt seinen ersten Ort, alle kommen zu Takt 1 an.
+    bfffaPlane(kaempfer,orte,punkte,0,N,wurf,null);
     const start=schnapp();
     for(let t=1;t<=P.takte;t++){
-      if(lebendeTeams().size<=1){ ende="allein"; break; }
+      if(lebendeTeams().size===0){ ende="leer"; break; }
       gespielt=t;
       const ereignisse=[];
-      // 1) ANKUNFT der Rotierenden.
+      for(const k of kaempfer){ k.gedraengt=false; k.taumelt=false; }
+      // 1) ANKUNFT.
       for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
-        k.ort=k.nach; k.nach=null; k.ankunft=null;
+        k.ort=k.nach; k.nach=null; k.ankunft=null; k.ab=null;
         ereignisse.push({typ:"ankunft", wer:k.idx, ort:k.ort});
       }
-      // 2) ZIELWAHL je Ort, auf dem Stand vom Taktbeginn.
-      const angriffe=[];
-      for(const A of kaempfer){
-        if(A.raus||A.ort==null)continue;
+      // 2) ZIELWAHL je Ort, auf dem Stand vom Taktbeginn. Hoechstens P.zugriff Angreifer je Ziel;
+      // die Reihenfolge, in der die Angreifer ihr Ziel suchen, wuerfelt jeder Takt neu.
+      const angriffe=[], zugriff=new Map();
+      const reihe=kaempfer.filter(A=>!A.raus&&A.ort!=null)
+        .map(A=>({A,w:wurf(A.idx,t,Z.reihe)})).sort((a,b)=>a.w-b.w||a.A.idx-b.A.idx).map(x=>x.A);
+      for(const A of reihe){
         A.st.takteAmOrt[A.ort]++;
-        const feinde=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
-        if(!feinde.length)continue;
+        const alle=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
+        // DRUCK: wer einen Ort ohne Gegner besetzt, haelt ihn mit seiner Drohung (Wucht x Treffer).
+        if(!alle.length){ if(P.wertung.druck)A.wert+=P.wertung.druck*A.wucht*A.treffer; continue; }
+        const feinde=alle.filter(B=>(zugriff.get(B)||0)<P.zugriff);
+        if(!feinde.length){ ereignisse.push({typ:"wartet", wer:A.idx, ort:A.ort}); continue; }
         let ziel, schwach=false;
         if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
           ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
@@ -61160,7 +61302,10 @@
         }else{
           ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
         }
-        angriffe.push({A,ziel,schwach,aktiv:true});
+        zugriff.set(ziel,(zugriff.get(ziel)||0)+1);
+        const seiten=new Set(kaempfer.filter(B=>!B.raus&&B.ort===A.ort).map(B=>B.side)).size;
+        const schub=seiten>=2&&wurf(A.idx,t,Z.schub)<P.schub.rate*A.kb;
+        angriffe.push({A,ziel,schwach,schub,aktiv:true});
       }
       // 3) POSITIONIERUNG (Intelligence): von zwei oder mehr Angreifern kommt nur einer an.
       for(const Zk of kaempfer){
@@ -61174,18 +61319,25 @@
           ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
         }
       }
-      // 4) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit) mindert.
+      // 4) SCHLAEGE UND SCHUBSER, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung
+      // (Spirit) mindert. Ein Schubser trifft mit dem Treffer-Kanal, macht weniger Schaden und draengt
+      // das Ziel fuer diesen Takt vom Punkt; daneben taumelt der Schubser selbst.
       const schadenJe=new Map();
       const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
       for(const x of angriffe){
         const {A,ziel}=x;
         A.st.schlaege++;
         if(!x.aktiv){ ereignisse.push({typ:"leer", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
-        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
-        const dmg=A.wucht*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung);
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){
+          if(x.schub){ A.taumelt=true; ereignisse.push({typ:"schubs-fehl", wer:A.idx, ziel:ziel.idx, ort:A.ort}); }
+          else ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort});
+          continue;
+        }
+        const dmg=A.wucht*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung)*(x.schub?P.schub.schaden:1);
         ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
         const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
-        ereignisse.push({typ:x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
+        if(x.schub){ ziel.gedraengt=true; A.st.schubs++; ziel.st.geschubst++; }
+        ereignisse.push({typ:x.schub?"schubs":x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
       }
       // 5) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
       // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
@@ -61213,9 +61365,10 @@
         }
         ereignisse.push({typ:"team-raus", side:s});
       }
-      // 7) KONTROLLPUNKTE — dieselbe Regel wie kpTick, je Takt statt je Bild.
+      // 7) KONTROLLPUNKTE — dieselbe Regel wie kpTick, je Takt statt je Bild. Wer gedraengt wurde oder
+      // taumelt, steht in diesem Takt nicht auf dem Punkt.
       orte.forEach((o,oi)=>{
-        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi);
+        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi&&!k.gedraengt&&!k.taumelt);
         const seiten=[...new Set(da.map(k=>k.side))];
         if(seiten.length===1){
           const s=seiten[0], eigene=da;
@@ -61226,17 +61379,18 @@
             const vorher=o.fortschritt;
             o.fortschritt=Math.min(1,o.fortschritt+kraft/P.erobern.bedarf);
             const gewonnen=o.fortschritt-vorher;
-            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; gutschrift(k,a*P.wertung.erob);}
             if(o.fortschritt>=1){
+              const vorBesitz=o.besitz;
               o.besitz=s;o.fortschritt=0;o.erobertVon=null;
-              ereignisse.push({typ:"erobert", side:s, ort:oi});
+              ereignisse.push({typ:"erobert", side:s, ort:oi, von:vorBesitz});
             }
           }else if(o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0){
             const kraft=eigene.reduce((a,k)=>a+k.halten,0);
             const vorher=o.fortschritt;
             o.fortschritt=Math.max(0,o.fortschritt-kraft/P.erobern.bedarf);
             const abgewehrt=vorher-o.fortschritt;
-            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; gutschrift(k,a*P.wertung.erob);}
             if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
           }
         }else if(seiten.length>=2&&o.erobertVon!=null){
@@ -61245,55 +61399,31 @@
           if(st>0){
             const vorher=o.fortschritt;
             o.fortschritt=Math.max(0,o.fortschritt-0.5*st/P.erobern.bedarf);
-            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; gutschrift(k,a*P.wertung.erob);}
             if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
           }
         }
-        // Besitz zahlt; wer am eigenen Ort steht, bekommt den Halteanteil gutgeschrieben.
+        // Besitz zahlt (+1 je Sekunde); wer am eigenen Ort steht, bekommt den Halteanteil gutgeschrieben.
         if(o.besitz!=null){
           punkte[o.besitz]+=P.punkteJeTakt;
           const halter=da.filter(k=>k.side===o.besitz);
-          for(const k of halter){ k.wert+=P.wertung.halten*k.befehl/halter.length; k.st.halte++; }
+          for(const k of halter){ gutschrift(k,P.wertung.halten*k.befehl/halter.length); k.st.halte++; }
         }
       });
-      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
-      // 8) ROTATION: wessen Ort sicher ist (eigener Besitz, kein Gegner, kein fremder Fortschritt),
-      // laesst einen Halter dort und schickt den Rest zum naechsten umkaempften Ort.
-      for(let s=0;s<N;s++){
-        if(rausTakt[s]!=null)continue;
-        for(let oi=0;oi<3;oi++){
-          const o=orte[oi];
-          const eigene=kaempfer.filter(k=>!k.raus&&k.side===s&&k.ort===oi&&k.nach==null);
-          if(eigene.length<2&&o.besitz===s)continue;
-          if(!eigene.length)continue;
-          const feinde=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===oi);
-          if(feinde||o.besitz!==s||(o.erobertVon!=null&&o.fortschritt>0))continue;
-          // Ziel: ein Ort, an dem Gegner stehen oder den ein anderes Team besitzt — die Mitte zuerst,
-          // dann der naehere. Gibt es keinen, bleiben alle.
-          const reihe=[1,oi===0?2:0,oi];
-          let ziel=null;
-          for(const zi of reihe){
-            if(zi===oi)continue;
-            const zo=orte[zi];
-            const dort=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===zi);
-            if(dort||(zo.besitz!=null&&zo.besitz!==s)||zo.besitz==null){ziel=zi;break;}
-          }
-          if(ziel==null)continue;
-          const halter=eigene.slice().sort((a,b)=>(BFFFA_HALTER_RANG[a.slot]??9)-(BFFFA_HALTER_RANG[b.slot]??9)||a.idx-b.idx)[0];
-          for(const k of eigene){
-            if(k===halter)continue;
-            k.nach=ziel; k.ankunft=t+P.rotation.dauer; k.ort=null; k.st.rotationen++;
-            ereignisse.push({typ:"rotation", wer:k.idx, von:oi, nach:ziel});
-          }
-        }
-      }
+      for(const k of kaempfer)if(!k.raus){ k.wert+=P.wertung.takt; lebTakte.set(k,(lebTakte.get(k)||0)+1); }
+      // 8) ORTSWAHL fuer den naechsten Takt (Laufen, Aufteilen, Zusammenziehen, Rueckeroberung).
+      if(t<P.takte)bfffaPlane(kaempfer,orte,punkte,t,N,wurf,ereignisse);
       takte.push({t, ereignisse, ...schnapp()});
-      if(punkte.some(x=>x>=P.punkteZumSieg)){ ende="limit"; break; }
+      if(P.punkteZumSieg!=null&&punkte.some(x=>x>=P.punkteZumSieg)){ ende="limit"; break; }
     }
     if(ende==="zeit"&&lebendeTeams().size<=1)ende="allein";
-    // Wer allein uebrig bleibt, „steht" die restlichen Takte (wie im Schlagwechsel) — sonst kostete
-    // ein schneller Sieg den Sieger genau die Taktpunkte, die er sich erkaempft hat.
-    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    // DER TEAMTOPF: verteilt nach Befehl (Charisma) mal Takten auf den Beinen.
+    for(let s=0;s<N;s++){
+      if(!topf[s])continue;
+      const team=kaempfer.filter(k=>k.side===s);
+      const gew=team.map(k=>k.befehl*(lebTakte.get(k)||0)), sum=gew.reduce((a,b)=>a+b,0)||1;
+      team.forEach((k,i)=>{ k.wert+=topf[s]*gew[i]/sum; });
+    }
     return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte};
   }
 
@@ -61305,7 +61435,10 @@
   // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
   function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
     const nochDa=lebend.filter(x=>x>0).length;
-    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
+    // DOMINATION (17.11.): die Punkte (gehaltene Sekunden) entscheiden zuerst; „letztes Team steht"
+    // ist nur noch der erste Gleichstandsbrecher — wer allein uebrig ist, sammelt bis zum Schluss
+    // ohnehin weiter Punkte (das Gefecht laeuft die volle Zeit).
+    const schl=(s)=>[Math.round(punkte[s]*1000)/1000, nochDa===1&&lebend[s]>0?1:0, lebend[s],
       rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
     const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
     const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
