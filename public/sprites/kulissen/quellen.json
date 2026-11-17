@@ -144,5 +144,131 @@
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-17",
   "verwendung": "I-Spy, Halle ruinengarten"
+ },
+ "tennis/riviera.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty sunny terrace of plain orange-red clay on the mediterranean riviera, a white stone balustrade with terracotta flower pots, dark green cypress trees, small white villas with red roofs and a strip of blue sea along the top edge only, the whole rest is open flat smooth floor of plain orange-red clay with no lines and no markings, a few small potted lemon trees at the far left and right borders, warm sunny colours, even soft light, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "bb4336a1-3205-491a-94dd-f5752dffb3f7",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_riviera.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Tennis, Variante Sandplatz Riviera",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/tennis/riviera.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "tennis/dach.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "50c73c61-cfa8-49c0-8693-fbcbab81cdd7",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_dach.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Tennis, Variante Hochhausdach",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/tennis/dach.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "basketball/streetcourt.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Basketball, Variante Street-Court",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/basketball/streetcourt.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_basketball()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "hockey/bergsee.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "a336f46c-27e2-4b46-893d-aaec77e96453",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_hockey_bergsee.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py hockey && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Hockey, Variante Bergsee",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/hockey/bergsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_hockey()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "football/strand.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "ea5f769a-cafc-47cd-a2a7-ca71b9ecf5d0",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_football_strand.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py football && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Football, Variante Strand",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/football/strand.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_football()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "eiskunstlauf/waldsee.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "82f702b0-6505-4cfc-925a-5b5cfc400104",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_eiskunstlauf_waldsee.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py eiskunstlauf && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Eiskunstlauf, Variante Waldsee",
+  "vorher": {
+   "paket": "prozedural (kein PixelLab)",
+   "quelle": "public/szenen/eiskunstlauf/waldsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_eiskunstlauf()",
+   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
  }
 }
