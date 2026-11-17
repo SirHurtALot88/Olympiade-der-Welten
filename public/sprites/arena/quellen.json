@@ -1207,14 +1207,6 @@
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-08"
  },
- "hyrox_halle.jpg": {
-  "paket": "abgeleitet aus public/szenen/spurt/hyrox.jpg (PixelLab, Asset-Runde 01./02.11.)",
-  "quelle": "public/szenen/spurt/hyrox.jpg",
-  "beschreibung": "Draufsicht-Kulisse der Hallenrunde (Hallenrunde-PR): dieselben sechs Flicken wie scripts/baue-spurt-szene.py (PATCHES/clean_bg(), Demo-Figuren heraus) plus drei weitere, die die uebrigen Schlitten vom Kunstrasen nehmen (dort stehen jetzt die Stationssprites)",
-  "skript": "python3 -I scripts/baue-hyrox-halle.py",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt -- kein neuer PixelLab-Auftrag, reine Bildableitung",
-  "erzeugt": "2026-11-09"
- },
  "climbing_seilsack.png": {
   "paket": "PixelLab",
   "quelle": "api.pixellab.ai /v2/generate-image-v2",
@@ -1355,5 +1347,169 @@
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-17",
   "verwendung": "I-Spy-Nachbesserung 17.11. -- eckige Holztuer im Holzrahmen mit Messinggriff (Tuer-Fundorte), Neubestellung nach Chris' Freigabe (\"3 ja\"): die erste Fassung (Bogentuer im Steinrahmen, Job b6fcc7c1, Kandidat 3) wirkte im Horror-Saal wie ein Grabstein. s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "hyrox_skierg.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "tall standing ski ergometer training machine made of dark iron and old wood, a big round flywheel housing on top and two hanging ropes with wooden handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    32,
+    56
+   ],
+   "job": "a37abe19-15ab-4e70-9c77-7e2e8250ab04",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_skierg.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_skierg (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet SkiErg (Station 3, KLETTERN), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_schlitten_zug.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "heavy wooden pull sled loaded with round stone weight plates, a long thick hemp rope attached at the front and lying stretched out on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    56,
+    32
+   ],
+   "job": "aa8493ce-241f-4555-9355-5e82aa205959",
+   "kandidat": 11,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_schlitten_zug.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_schlitten_zug (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Sled Pull (Station 4, KLETTERN), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_schlitten_schub.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "low heavy push sled with a flat iron base, a stack of round grey stone weight plates on top and two tall upright wooden push posts at the back, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    48,
+    32
+   ],
+   "job": "910c0391-8be1-4b27-9e6d-269f63a3dcdf",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_schlitten_schub.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_schlitten_schub (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Sled Push (Station 5, KRAFT), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_farmers.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "pair of heavy black cast iron kettlebells with thick handles standing side by side on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    32,
+    24
+   ],
+   "job": "3a0297af-0825-40f4-b2ef-e536bcffab39",
+   "kandidat": 26,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_farmers.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_farmers (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Farmers Carry (Station 6, KRAFT), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_sandsack.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "heavy brown burlap sandbag tied with rope lying on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    32,
+    20
+   ],
+   "job": "b973af8d-2716-40a2-9dd8-f3b9ae54afcf",
+   "kandidat": 44,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_sandsack.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_sandsack (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Sandbag Lunges (Station 7, KRAFT), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_burpee.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a rectangular jumping strip on the ground made of packed sand framed by wooden planks with white bone coloured distance marks painted across it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    56,
+    32
+   ],
+   "job": "b2c7f209-050e-47b8-ac55-07eb21a73ffc",
+   "kandidat": 2,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_burpee.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_burpee (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Burpee Broad Jumps (Station 1, TECHNIK), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_wallball.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "wooden wall ball target: a small sturdy wooden board with a round bullseye target painted on it, a heavy leather medicine ball lying at its foot, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    32,
+    40
+   ],
+   "job": "6ca01bf2-fb9b-41fd-ac29-6636f24ba720",
+   "kandidat": 4,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_wallball.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_wallball (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Wall Balls (Station 2, TECHNIK), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+ },
+ "hyrox_arena.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat 792x300 (leerer Dark-Fantasy-Trainingshof fuer HYROX)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty dark fantasy gladiator training yard, open air, weathered dark stone back wall with wooden spectator stands, tattered banners and iron brazier torches along the top edge only, the whole rest is open flat floor of packed dark sand and worn cobblestones with subtle wear, wooden palisade fence segments and a few old weapon racks at the left and right borders, no equipment in the middle, no characters, no text, muted brown grey and ember orange colours, even soft light, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [
+    792,
+    300
+   ],
+   "job": "5e1cd226-9599-4a4b-9450-fcd417ef3bd4",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/hyrox_arena.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py --hyrox-arena (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "HYROX-Arena (Variante B), feste Totale des Spurt-Formats HYROX; Laufrunde, Inseln und Geraete legt der Motor darueber (bodenHyroxHalle()). Ersetzt hyrox_halle.jpg.",
+  "vorher": {
+   "paket": "abgeleitet aus public/szenen/spurt/hyrox.jpg (PixelLab, Asset-Runde 01./02.11.)",
+   "befund": "Chris 17.11.: die lange HYROX-Bahn wirkt neben den neuen Arenen outdated (docs/design/hyrox-optik-konzept-17-11.md)"
+  }
  }
 }

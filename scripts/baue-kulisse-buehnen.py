@@ -1266,9 +1266,31 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "spurt": ["kurs"], "staffel": ["arena"], "climbing": ["wand", "fels", "eis"]}
 
 
+# ---------------------------------------------------------------------------------------- HYROX-Arena
+# Variante B der HYROX-Optik (17.11., docs/design/hyrox-optik-konzept-17-11.md): EINE leere PixelLab-Arena
+# (Dark-Fantasy-Trainingshof, 792x300, roh/hyrox_arena.png) als Breitformat, so wie die I-Spy-Hallen auf die
+# Leinwand gezogen (erst ganzzahlig hoch, dann weich). KEINE Spurt-Disziplin-Kulisse im Sinn von
+# battle-mode.kulissen.js (die Auswahl je Spiel gilt fuer Klassisch/Hatz weiter), sondern die feste Arena des
+# Formats HYROX: der Motor laedt /sprites/arena/hyrox_arena.jpg direkt (bodenHyroxHalle()). Bahn, Inseln und
+# Geraete zeichnet der Motor als Texturebene darueber.
+HYROX_ARENA_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh" / "hyrox_arena.png"
+HYROX_ARENA_ZIEL = WURZEL / "public" / "sprites" / "arena" / "hyrox_arena.jpg"
+
+
+def baue_hyrox_arena() -> Path:
+    roh = Image.open(HYROX_ARENA_ROH).convert("RGB")
+    g = int(LW / roh.width) + 1
+    lein = roh.resize((roh.width * g, roh.height * g), Image.NEAREST).resize((LW, LH), Image.LANCZOS)
+    lein.save(HYROX_ARENA_ZIEL, "JPEG", quality=92, optimize=True)
+    return HYROX_ARENA_ZIEL
+
+
 def main() -> None:
     if "--spurt-requisiten" in sys.argv[1:]:
         spurt_requisiten()
+        return
+    if "--hyrox-arena" in sys.argv[1:]:
+        print(f"hyrox-arena: -> {baue_hyrox_arena().relative_to(WURZEL)}")
         return
     disziplinen = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BAUER)
     for d in disziplinen:

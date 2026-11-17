@@ -520,6 +520,94 @@
   "kandidat": 10,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "hyrox_arena": {
+  "prompt": "top-down view of one single very wide empty dark fantasy gladiator training yard, open air, weathered dark stone back wall with wooden spectator stands, tattered banners and iron brazier torches along the top edge only, the whole rest is open flat floor of packed dark sand and worn cobblestones with subtle wear, wooden palisade fence segments and a few old weapon racks at the left and right borders, no equipment in the middle, no characters, no text, muted brown grey and ember orange colours, even soft light, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "5e1cd226-9599-4a4b-9450-fcd417ef3bd4",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_burpee": {
+  "prompt": "a rectangular jumping strip on the ground made of packed sand framed by wooden planks with white bone coloured distance marks painted across it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   56,
+   32
+  ],
+  "job": "b2c7f209-050e-47b8-ac55-07eb21a73ffc",
+  "kandidat": 2,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_farmers": {
+  "prompt": "pair of heavy black cast iron kettlebells with thick handles standing side by side on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   24
+  ],
+  "job": "3a0297af-0825-40f4-b2ef-e536bcffab39",
+  "kandidat": 26,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_sandsack": {
+  "prompt": "heavy brown burlap sandbag tied with rope lying on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   20
+  ],
+  "job": "b973af8d-2716-40a2-9dd8-f3b9ae54afcf",
+  "kandidat": 44,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_schlitten_schub": {
+  "prompt": "low heavy push sled with a flat iron base, a stack of round grey stone weight plates on top and two tall upright wooden push posts at the back, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   32
+  ],
+  "job": "910c0391-8be1-4b27-9e6d-269f63a3dcdf",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_schlitten_zug": {
+  "prompt": "heavy wooden pull sled loaded with round stone weight plates, a long thick hemp rope attached at the front and lying stretched out on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   56,
+   32
+  ],
+  "job": "aa8493ce-241f-4555-9355-5e82aa205959",
+  "kandidat": 11,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_skierg": {
+  "prompt": "tall standing ski ergometer training machine made of dark iron and old wood, a big round flywheel housing on top and two hanging ropes with wooden handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   56
+  ],
+  "job": "a37abe19-15ab-4e70-9c77-7e2e8250ab04",
+  "kandidat": 3,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_wallball": {
+  "prompt": "wooden wall ball target: a small sturdy wooden board with a round bullseye target painted on it, a heavy leather medicine ball lying at its foot, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   40
+  ],
+  "job": "6ca01bf2-fb9b-41fd-ac29-6636f24ba720",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "ispy_aktenschrank": {
   "prompt": "small grey metal filing cabinet with three closed drawers and handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
