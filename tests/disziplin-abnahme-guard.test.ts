@@ -11,7 +11,7 @@ import {
 /**
  * PFLICHTABNAHME ALS WAECHTER (Projektaufsicht 16.10., docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md).
  *
- * CLAUDE.md: rho je Spiel > 0,75 UND Pp-Abweichung ≤ 25 (zwei Saatstroeme) — „genauso verbindlich"
+ * CLAUDE.md: rho je Spiel >= 0,75 UND Pp-Abweichung ≤ 25 (zwei Saatstroeme) — „genauso verbindlich"
  * fuer jede Disziplin. Die rho-Mindestschranke steht seit 17.11. auf 0,75 (Chris, woertlich: „Rangtreue
  * auf 0,75 als min legen"; vorher 0,80). Ziel bleibt > 0,80, angestrebt 0,85 — rot wird dieser
  * Waechter aber erst unter 0,75. Eine Disziplin, deren Arena-Ergebnis in Battle Mode zaehlt
@@ -44,7 +44,7 @@ const TABELLE = abnahme as unknown as {
  */
 function verfehlteKriterien(eintrag: Eintrag, gedeckt: readonly AbnahmeKriterium[] = []): AbnahmeKriterium[] {
   const { rhoJeSpielUeber, ppHoechstens, ppSaatstroemeMindestens } = TABELLE.schranken;
-  const rhoOk = eintrag.rhoFrisch && eintrag.rhoJeSpiel != null && eintrag.rhoJeSpiel > rhoJeSpielUeber;
+  const rhoOk = eintrag.rhoFrisch && eintrag.rhoJeSpiel != null && eintrag.rhoJeSpiel >= rhoJeSpielUeber;
   const ppOk =
     eintrag.ppFrisch && eintrag.pp.length >= ppSaatstroemeMindestens && eintrag.pp.every((wert) => wert <= ppHoechstens);
   const verfehlt: AbnahmeKriterium[] = [];
@@ -91,7 +91,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     }
   });
 
-  it("jede gewertete Arena-Disziplin besteht rho > 0,75 UND Pp ≤ 25 (frisch) — Ausnahmen decken nur ihr Kriterium", () => {
+  it("jede gewertete Arena-Disziplin besteht rho >= 0,75 UND Pp ≤ 25 (frisch) — Ausnahmen decken nur ihr Kriterium", () => {
     const verletzt: string[] = [];
     for (const id of ARENA_RESOLVED_DISCIPLINE_IDS) {
       const eintrag = TABELLE.disziplinen[id];
