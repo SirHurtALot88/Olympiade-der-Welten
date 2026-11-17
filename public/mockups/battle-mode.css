@@ -1684,5 +1684,114 @@
     .oly-battle-arena.oly-battle-arena .lvlup{grid-template-columns:repeat(2,1fr)}
   }
 
+  /* LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md). Broadcast-
+     Bildsprache wie Score-Bug und Pod-Tafel: dunkle Glasflaeche, cremeweisser Rand, Teamfarbe als
+     Zeilenstreifen, Hausschrift, Ziffern in Tabellenbreite. Alles CSS, keine PixelLab-Grafik.
+     Inhalt aus liveStandTick() (battle-mode.engine.js). Band: pointer-events:none (blockiert
+     keine Klicks auf die Leinwand); Tafel: klickbar wegen der Messpunkt-Reiter. */
+  .oly-battle-arena.oly-battle-arena .livestand{--ls-glas:rgba(8,10,14,.84);--ls-rand:rgba(244,230,196,.55);
+    --ls-creme:#f4e6c4;--ls-gut:#7be08f;--ls-schlecht:#ff8f7d;--ls-gold:#f2c14e;
+    position:absolute;inset:0;pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;color:#fff}
+  .oly-battle-arena.oly-battle-arena .livestand[hidden],
+  .oly-battle-arena.oly-battle-arena .livestand .ls-tafel[hidden]{display:none}
+  /* Tafel in zwei Teilen (Kopf/Rumpf, getrennt neu geschrieben) -- fuers Layout unsichtbar. */
+  .oly-battle-arena.oly-battle-arena .ls-tafel>.ls-teil{display:contents}
+  /* BAND: mittig unter dem Score-Bug, segmentiert wie eine F1-Timing-Leiste. */
+  .oly-battle-arena.oly-battle-arena .ls-band{position:absolute;top:var(--ls-band-top,47px);left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:0;max-width:calc(100% - 16px);
+    background:linear-gradient(180deg,rgba(22,26,34,.9),var(--ls-glas));border:1px solid var(--ls-rand);
+    border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
+    padding:2px 4px;white-space:nowrap;overflow:hidden;font-size:11.5px;line-height:1.35;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .ls-band:empty{display:none}
+  .oly-battle-arena.oly-battle-arena .ls-feld{display:inline-flex;align-items:baseline;gap:5px;padding:1px 8px;min-width:0}
+  .oly-battle-arena.oly-battle-arena .ls-feld small{font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:#aab4c3}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert{color:var(--ls-creme);font-weight:800;font-size:12.5px}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert.heim{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert.gast{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-feld em{font-style:normal;color:#d5dce6;font-size:10.5px;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .ls-trenner{align-self:stretch;width:1px;margin:2px 0;background:rgba(244,230,196,.28)}
+  /* Siegchance-/Kraefte-Balken: Heimfarbe bis --ls-anteil, Rest Gastfarbe, 50-%-Strich. */
+  .oly-battle-arena.oly-battle-arena .ls-balken{position:relative;display:inline-block;width:92px;height:7px;align-self:center;
+    border-radius:2px;background:var(--away);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+  .oly-battle-arena.oly-battle-arena .ls-balken i{position:absolute;left:0;top:0;bottom:0;width:var(--ls-anteil,50%);
+    background:var(--home);transition:width .4s ease}
+  .oly-battle-arena.oly-battle-arena .ls-balken::after{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:rgba(255,255,255,.75)}
+  /* Basketball-Lauf-Band und Staffel-HUD rutschen unter das Band, solange es steht (sonst laege es
+     auf deren Kopfzeile); den Callout schiebt positioniereCallout() selbst unter das Band.
+     Die Klassen ls-band-an/ls-staffel-an setzt liveStandTick() am .arenaraum (statt :has()). */
+  .oly-battle-arena.oly-battle-arena .arenaraum.ls-band-an .bbuglauf{top:calc(var(--ls-band-top,47px) + 27px)}
+  .oly-battle-arena.oly-battle-arena .arenaraum.ls-staffel-an .bahnhud{top:max(15%,calc(var(--ls-band-top,47px) + 27px))}
+  /* Steht das Band, beginnt die Tafel darunter. */
+  .oly-battle-arena.oly-battle-arena .livestand .ls-band:not(:empty)~.ls-tafel{top:calc(var(--ls-band-top,47px) + 29px);max-height:calc(100% - var(--ls-band-top,47px) - 37px)}
+  /* Staffel: Tafel unten rechts, damit das Staffel-HUD (Aktuell/Naechste) oben frei bleibt. */
+  .oly-battle-arena.oly-battle-arena .livestand[data-typ="staffel"] .ls-band:not(:empty)~.ls-tafel{top:auto;bottom:8px}
+  /* TAFEL: rechts oben unter dem Teamschild. */
+  .oly-battle-arena.oly-battle-arena .ls-tafel{position:absolute;top:56px;right:8px;width:min(300px,calc(100% - 16px));
+    max-height:calc(100% - 64px);overflow:auto;pointer-events:auto;
+    background:var(--ls-glas);border:1px solid var(--ls-rand);border-radius:6px;
+    box-shadow:0 6px 22px rgba(0,0,0,.45);backdrop-filter:blur(3px);font-size:10.5px;line-height:1.25;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .ls-kopf{display:flex;align-items:center;gap:6px;padding:5px 7px 4px 9px;
+    border-bottom:1px solid rgba(244,230,196,.3);background:linear-gradient(90deg,rgba(244,230,196,.12),transparent 70%)}
+  .oly-battle-arena.oly-battle-arena .ls-kopf>b{color:var(--ls-creme);font-size:12px;letter-spacing:.08em;margin-right:auto;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .ls-reiter{display:inline-flex;gap:2px}
+  .oly-battle-arena.oly-battle-arena .ls-tab,.oly-battle-arena.oly-battle-arena .ls-progknopf{all:unset;cursor:pointer;
+    font:700 9px/1 "RaniraSeason",Georgia,serif;letter-spacing:.04em;color:#d9dfe8;padding:3px 4px;border-radius:3px;
+    border:1px solid rgba(244,230,196,.35)}
+  .oly-battle-arena.oly-battle-arena .ls-tab.an{background:var(--ls-creme);color:#16120a;border-color:var(--ls-creme)}
+  .oly-battle-arena.oly-battle-arena .ls-tab.ls-auto{border-style:dashed}
+  .oly-battle-arena.oly-battle-arena .ls-tab:disabled{opacity:.35;cursor:default}
+  .oly-battle-arena.oly-battle-arena .ls-tab:focus-visible,.oly-battle-arena.oly-battle-arena .ls-progknopf:focus-visible{outline:2px solid var(--ls-gold);outline-offset:1px}
+  .oly-battle-arena.oly-battle-arena .ls-grundlage .ls-progknopf{flex:none;padding:1px 4px;font-size:8.5px;color:#aab4c3;border-color:rgba(244,230,196,.25)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle{width:100%;border-collapse:collapse;font:inherit;font-size:inherit;color:inherit}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th{font-size:8.5px;letter-spacing:.1em;color:#97a1b3;font-weight:700;
+    text-align:right;padding:3px 6px 2px;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td{text-align:right;padding:1px 5px;white-space:nowrap;color:#eef2f7}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle .ls-name{text-align:left;max-width:118px;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name{position:relative;padding-left:12px;font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s0::before,
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s1::before{content:"";position:absolute;left:3px;top:3px;bottom:3px;width:4px;border-radius:1px;background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.ls-name.s1::before{background:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th.s0{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle th.s1{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle .ls-rang{text-align:center;width:16px;font-weight:800;color:var(--ls-creme)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tbody tr:nth-child(odd){background:rgba(255,255,255,.035)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.eigen{background:rgba(242,193,78,.13);box-shadow:inset 0 0 0 1px rgba(242,193,78,.75)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.dim td{color:#8b95a6}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.dim .ls-rang{color:#6c7586}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.laeuft{background:rgba(244,230,196,.1)}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.gut{color:var(--ls-gut);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td.schlecht{color:var(--ls-schlecht)}
+  /* Kopplung an die "+4,5 s"-Tafel am Fahrer (u.vizZzFlash): dieselbe Zeile blinkt kurz auf. */
+  @keyframes lsBlink{0%,100%{background:transparent}30%{background:rgba(242,193,78,.42)}}
+  .oly-battle-arena.oly-battle-arena .ls-tab-tabelle tr.blink{animation:lsBlink 1s ease-in-out 2}
+  .oly-battle-arena.oly-battle-arena .ls-unterkopf{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ls-creme);
+    padding:5px 9px 1px;border-top:1px solid rgba(244,230,196,.2);margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .ls-fuss{display:flex;justify-content:space-between;gap:8px;padding:4px 9px;
+    border-top:1px solid rgba(244,230,196,.3);font-size:10.5px;background:rgba(244,230,196,.05)}
+  .oly-battle-arena.oly-battle-arena .ls-fuss .s0{color:var(--home);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-fuss .s1{color:var(--away);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ls-fuss b{color:var(--ls-creme);text-align:center}
+  .oly-battle-arena.oly-battle-arena .ls-grundlage{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 7px 5px 9px;color:#8f9aab;font-size:9.5px}
+  /* "ohne Prognose": Spalte, Fusszeile und Band-Felder verschwinden fuer Zuschauer, die es spannend moegen. */
+  .oly-battle-arena.oly-battle-arena .livestand.ohne-prognose .ls-prog{visibility:hidden}
+  .oly-battle-arena.oly-battle-arena .livestand.ohne-prognose .ls-band .ls-feld.ls-prog{display:none}
+  /* SCHMALE ARENA (Phone): die Leinwand ist dort nur gut 120 px hoch -- Band und Tafel wandern
+     deshalb UNTER die Leinwand in den Fluss (volle Breite), statt sie zuzudecken. */
+  @container oly-arena (max-width:640px){
+    .oly-battle-arena.oly-battle-arena .livestand{position:static}
+    .oly-battle-arena.oly-battle-arena .ls-band{position:static;transform:none;max-width:none;margin:4px 0 0;
+      flex-wrap:wrap;justify-content:center;white-space:normal;font-size:10px;border-radius:4px}
+    .oly-battle-arena.oly-battle-arena .ls-band .ls-trenner{display:none}
+    .oly-battle-arena.oly-battle-arena .ls-feld{padding:0 5px}
+    .oly-battle-arena.oly-battle-arena .ls-feld .ls-wert{font-size:11px}
+    .oly-battle-arena.oly-battle-arena .ls-balken{width:60px}
+    .oly-battle-arena.oly-battle-arena .ls-tafel,
+    .oly-battle-arena.oly-battle-arena .livestand .ls-band:not(:empty)~.ls-tafel,
+    .oly-battle-arena.oly-battle-arena .livestand[data-typ="staffel"] .ls-band:not(:empty)~.ls-tafel{position:relative;top:auto;right:auto;bottom:auto;
+      width:auto;max-height:none;margin:4px 0 0;font-size:10px;backdrop-filter:none}
+    .oly-battle-arena.oly-battle-arena .ls-tab-tabelle td,.oly-battle-arena.oly-battle-arena .ls-tab-tabelle th{padding-left:4px;padding-right:4px}
+    .oly-battle-arena.oly-battle-arena .arenaraum.ls-band-an .bbuglauf{top:52px}
+    .oly-battle-arena.oly-battle-arena .arenaraum.ls-staffel-an .bahnhud{top:15%}
+  }
   @media (prefers-reduced-motion:reduce){.oly-battle-arena.oly-battle-arena, .oly-battle-arena.oly-battle-arena *{transition:none!important;animation:none!important}}
 

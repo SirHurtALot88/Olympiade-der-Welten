@@ -217,6 +217,16 @@
              nicht enthuellte Zuege zeigen "·" statt einer Zahl (Spoiler-Schutz, s.
              aktualisiereIspyHud()). -->
         <div class="ispysplit hud-in" id="ispySplit" hidden></div>
+        <!-- LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md): ein
+             Bauteil fuer den Stand ueber alle Teilnehmer. Band (eine Zeile unter dem Score-Bug,
+             Standard) und Tafel (Rangliste mit Messpunkt-Reitern rechts oben), umgeschaltet ueber
+             #lsKnopf oder Taste L. Inhalt kommt aus liveStandTick() in der Engine (hoechstens 4x/s,
+             DOM nur bei geaenderter Signatur). Steht VOR .einlauf/.endstand, wird von diesen also
+             zugedeckt, wie die anderen HUDs. Reine Anzeige. -->
+        <div class="livestand" id="livestand" hidden>
+          <div class="ls-band hud-in" id="lsBand" aria-live="off"></div>
+          <div class="ls-tafel hud-in" id="lsTafel" hidden role="region" aria-label="Live-Stand"></div>
+        </div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
@@ -360,6 +370,7 @@
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>
         <button class="btn g" id="spd">Tempo 1×</button>
+        <button class="btn g" id="lsKnopf" type="button" aria-pressed="true" title="Live-Stand: Band → Tafel → aus (Taste L, Messpunkt 1–4, 0 = Auto)">Stand: Band</button>
         <button class="btn g" id="ton" title="Ton an/aus" aria-pressed="false">🔊 Ton</button>
         <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
           style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">

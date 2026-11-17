@@ -391,12 +391,15 @@ jobs:
       # -- dieselben vier Dateien, die der Schritt "Schwere Dateien" unten auf Shard 1 einzeln faehrt.
       # `--exclude` auf ALLEN vier Matrix-Jobs identisch, damit der Shard-Beweis oben (dieselben
       # Dateifilter in jedem Shard) weiter gilt.
+      # live-stand-welle1.test.ts braucht Chromium (hier keins: stilles skipIf) und laeuft deshalb
+      # im Job `arena-chromium-tests` (Review PR #1560) -- hier ausgeschlossen statt still uebersprungen.
       - run: >-
           npx vitest run --shard=${{ matrix.shard }}/4
           --exclude "**/arena-vorlauf-service.test.ts"
           --exclude "**/arena-vorlauf-parity.test.ts"
           --exclude "**/arena-eingabe-instabil.test.ts"
           --exclude "**/arena-eingabe-stabil.test.ts"
+          --exclude "**/live-stand-welle1.test.ts"
       # NUR auf Shard 1 (nicht auf allen vier), sonst liefe jede dieser Dateien viermal statt
       # einmal. Je ein eigener `npx vitest run`-Aufruf = ein frischer Node-Prozess je Datei, der
       # seinen Speicher beim Beenden garantiert freigibt -- s. Kopfkommentar fuer die Herleitung.
@@ -508,6 +511,13 @@ jobs:
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/mini-dm-ffa-render-formkarten-isolation.test.ts
+      # LIVE-STAND WELLE 1 (Review PR #1560): die Overlay-Pruefung (gezeigt = gebucht, Spoilerwaechter,
+      # laufendes Zeitfahren im DOM) braucht echtes Chromium und lief vorher in keinem Job -- im
+      # Shard-Lauf von `full-test-suite` endete sie im stillen `describe.skipIf`. Eigener Prozess wie oben.
+      - name: "Live-Stand Welle 1 (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/live-stand-welle1.test.ts
 
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #
