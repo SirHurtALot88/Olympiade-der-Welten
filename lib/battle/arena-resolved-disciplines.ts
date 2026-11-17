@@ -515,6 +515,28 @@ export const MINI_DM_FFA_VORLAUF_AKTIV = true;
 export const BATTLEFIELD_POD_VORLAUF_AKTIV = true;
 
 /**
+ * BATTLEFIELD-POD-FORMAT (17.11., docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 3).
+ * Chris am 17.11.: "battlefield hat auch 0 dynamik ... 5 Punkte zum Dominieren ... pro sekunde ein
+ * punkt". `"orte3"` ist das abgenommene Gefecht je Ort (Nord/Mitte/Sued, bit-identisch zum Stand vor
+ * dem 17.11.); `"domination5"` das Fuenf-Punkte-Format mit Respawn, 1 Punkt je Sekunde und gehaltenem
+ * Punkt und Teams, die sich selbst aufteilen (`bfd5Gefecht()` in battle-mode.engine.js).
+ *
+ * EINE Konstante fuer Buchung UND Anzeige: der Liga-Runner (`runBattlefieldPodFixtures`) reicht sie als
+ * `optionen.format`, der Arena-Host als `echterKader.battlefieldPod.format` -- gezeigt = gebucht. Im
+ * Standard wird das Feld gar nicht erst gesetzt (Eingabe-Hash und Ergebnis Zeichen fuer Zeichen wie
+ * vorher). Umschalten ist Chris' Entscheidung nach Sichtung; die Abnahmezahlen stehen im Dokument.
+ */
+export type BattlefieldPodFormat = "orte3" | "domination5";
+export const BATTLEFIELD_POD_FORMAT: BattlefieldPodFormat = "orte3";
+
+/** `optionen`-Zusatz fuer `spieleBattlefieldPod()`: leer im Standard, sonst `{ format }`. */
+export function battlefieldPodFormatOption(
+  format: BattlefieldPodFormat = BATTLEFIELD_POD_FORMAT,
+): { format?: BattlefieldPodFormat } {
+  return format === "orte3" ? {} : { format };
+}
+
+/**
  * BAHN-POD-VORLAUF-SCHALTER (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md
  * Abschnitt 6). Takeshi's Castle und Staffel stehen in `VIERER_POD_DISCIPLINE_IDS` UND hier in
  * `ARENA_RESOLVED_DISCIPLINE_IDS`: an einem Spieltag MIT Pods faehrt der Arena-Vorlauf fuer sie kein

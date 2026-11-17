@@ -7484,18 +7484,24 @@
   // laeuft, bauen beide deshalb hoechstens ~10 Mal je Sekunde neu; Ende (done), Reset und
   // Sonden-Laeufe (pixelgenaue Screenshots) bleiben ungedrosselt. Reine Anzeige: weder
   // renderKader() noch renderWertungTabelle() beruehren rr(), Boxscore oder Wertung.
-  let schnelldurchDomZuletzt=0;
-  let abspielDomZuletzt=0;
-  function schnelldurchDomGedrosselt(){
+  // EINE UHR JE ANZEIGEFLAECHE (17.11.): renderWertungTabelle() und renderKader() teilten sich je EINEN
+  // Zeitstempel. Rief updateHud*() die Wertungstabelle zuerst (Bahn/Pod: immer), setzte sie den Stempel,
+  // und renderKader() direkt danach sah "gerade erst gebaut" -- die Kaderleiste samt Mitte (#kmitte,
+  // im Pod "1. 5,2 P · 2. ...") blieb im laufenden Spiel auf dem Stand vom Anpfiff stehen (gemessen:
+  // 151 Aufrufe, 6 durchgelassen, keine waehrend des Rennens). Jetzt hat jede Flaeche ihren eigenen
+  // Stempel; die Drossel selbst (100 ms Abspielen, 250 ms Vorspulen) bleibt unveraendert. Reine Anzeige.
+  const schnelldurchDomZuletzt={};
+  const abspielDomZuletzt={};
+  function schnelldurchDomGedrosselt(flaeche){
     const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
     if(!schnelldurchAktiv){
       if(!running||done||sondenAktiv)return false;
-      if(jetzt-abspielDomZuletzt<100)return true;
-      abspielDomZuletzt=jetzt;
+      if(jetzt-(abspielDomZuletzt[flaeche]||0)<100)return true;
+      abspielDomZuletzt[flaeche]=jetzt;
       return false;
     }
-    if(jetzt-schnelldurchDomZuletzt<250)return true;
-    schnelldurchDomZuletzt=jetzt;
+    if(jetzt-(schnelldurchDomZuletzt[flaeche]||0)<250)return true;
+    schnelldurchDomZuletzt[flaeche]=jetzt;
     return false;
   }
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
@@ -40184,6 +40190,17 @@
   // rechnet fuer N=2 exakt dieselben Zahlen wie vorher — nachgeprueft per Fingerabdruck
   // (tests/battlefield-pod-ffa.test.ts, Teil 1).
   let bfPodKader=null;
+  // BATTLEFIELD-POD-FORMAT (17.11., s. BF_D5): "orte3" (Standard, bit-identisch) | "domination5".
+  // Hier oben deklariert, weil reset() beim Laden laeuft; die Leser sind Funktionsdeklarationen.
+  let BF_POD_FORMAT="orte3";
+  function bfPodFormatPruefen(f){
+    if(f!=="orte3"&&f!=="domination5")throw new Error("Battlefield-Format unbekannt: "+f+" (erwartet orte3|domination5)");
+    return f;
+  }
+  // Das Format des gerade gebauten Pods (Anzeige/Lauf), sonst das eingestellte.
+  function bfPodFormat(){ return (KP&&KP.pod&&KP.pod.format)||BF_POD_FORMAT; }
+  function bfPodTaktSek(){ return bfPodFormat()==="domination5"?BF_D5.taktSek:BFFFA.taktSek; }
+  function bfPodOrtName(i){ return bfPodFormat()==="domination5"?(BF_D5.orte[i]||{}).name:BF_ORT_NAMEN[i]; }
   let bfPodAnzeigeVorgabe=null, bfPodAnzeigeVereinSnap=null; // Anzeige, s. bfPodAnzeigeKontext()
   const bfPodAktiv=()=>!!(KP&&KP.pod);
   const kampfSeitenN=()=>(KP&&KP.pod)?KP.pod.N:2;
@@ -43052,7 +43069,7 @@
   // etwas umlernen muss.
   let wertungKopfStand="";
   function renderWertungTabelle(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim, s. schnelldurchDomGedrosselt()
+    if(schnelldurchDomGedrosselt("wertung"))return; // Quick-Sim, s. schnelldurchDomGedrosselt()
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
     // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
@@ -44206,7 +44223,7 @@
           // einer Seite bleibt ihr letzter Abschnitt stehen (gesamtfortschritt()==1).
           const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
           const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
-          const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
+          const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||1, rundenN=Math.ceil(beinN/jeRunde);
           const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
           const beinZeile='<small class="bhbein">Abschnitt '+beinNr+'/'+beinN+' · Runde '
             +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
@@ -45404,6 +45421,7 @@
   // Fortschrittsring in der Farbe des Angreifers.
   // DREI ORTE (27.10.): dasselbe Bild je Ort, kleiner (Radius 65 statt 230), mit dem Ortsnamen.
   function zeichneKontrollpunkt(){
+    if(KP.pod&&KP.pod.format==="domination5"){ bfd5ZeichneOrte(); return; }
     for(const o of KP.orte){
       // POD (02.11.): Besitz- und Angreiferfarbe je Seite ueber kampfSeitenFarbe (0/1 wie vorher).
       const besitzFarbe=o.besitz!=null?kampfSeitenFarbe(o.besitz):"rgba(255,255,255,.6)";
@@ -49140,7 +49158,7 @@
       // Nur Anzeige, keine Zeile der Rennmechanik haengt daran.
       wertung:"etappe",
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
-      kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      kraftBasis:60, kraftSpanne:2.4, wendigErholt:0.0040,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -49160,6 +49178,30 @@
       // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
       // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // GANZE RUNDE, PUSTE WIRKT (17.11., Chris woertlich: "jeder laeuft eine ganze runde! Und dort
+      // ist puste anscheinend irrelevant weil alle ihre runde ohne probleme schaffen was unrealistisch
+      // ist weil sie ja alle sprinten!"). Gemessen vorher (scripts/miss-bahn-puste.mjs 24 staffel):
+      // Rest im Ziel 87,2 %, 0,0 % Einbrueche -- der Haushalt band nie. Jetzt ist jedes Bein eine
+      // Runde (Anzeige: OVAL_BEINE_JE_RUNDE=1), und die Puste ist auf eine 400-m-Runde geeicht:
+      //   - `zehrFaktor`: Volllast leert den Vorrat eines mittleren Laeufers kurz vor der Linie.
+      //   - `fadeAb`/`fadeMin`: unter `fadeAb` Rest wird er STETIG langsamer (Laktat, das "Sterben"
+      //     auf den letzten 100 m), bis `fadeMin` bei leerem Tank; `leerTempoBasis` ist der Rest-
+      //     Abschlag im Zustand "eingebrochen" (statt der Bahn-Vorgabe 0,74, die fuer einen Einbruch
+      //     mitten in einem Spurtfeld gedacht ist).
+      //   - `planNachPuste`: die Renneinteilung (Plan) waehlt der Laeufer nach seinem EIGENEN Vorrat
+      //     statt nach dem Slot (K2 hatte den Slot-Bias entfernt, s. `plaene`): reicht die Puste fuer
+      //     Volllast, geht er an; sonst haelt er sich bis zum Angriffspunkt zurueck. Die Rennplan-
+      //     Ansage kann das waehrend des Rennens umwerfen -- das ist die Pacing-Entscheidung.
+      // Kalibrierung und Messung: docs/design/vier-teams-staffel-battlefield-17-11.md, Abschnitt 2.
+      //   - `kraftBasis`/`kraftSpanne` (oben, 230/2,4 -> 60/2,4): der Vorrat haengt jetzt zu einem
+      //     viel groesseren Teil am Stehvermoegen (STEHEN/ROBUST) statt an einem Sockel, den jeder hat.
+      //   - `zehrKoeff`/`zehrExponent` (Bahn-Vorgabe 1,9 / quadratisch -> 4 / hoch 5): die Kosten
+      //     steigen nahe Hoechsttempo steil (anaerob) -- 5 % weniger Tempo spart rund 15 % Puste je
+      //     Meter. Erst damit ist Einteilen ueberhaupt eine Entscheidung (gemessen: bei quadratischen
+      //     Kosten war "Halten" fuer KEINEN Laeufer besser als Volllast).
+      rundePuste:{zehrFaktor:2.0, fadeAb:0.35, fadeMin:0.72, planNachPuste:true, planSchwelle:0.72, kraftMix:0.45,
+        doppelMuedBoden:0.52},
+      leerTempoBasis:0.86, zehrKoeff:4, zehrExponent:5,
       // TEMPO-KANAL NACHGEZOGEN (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, nach O2
       // "Marke und Zug"). O2 selbst war nicht die Ursache: der Sentinel vigilante-armageddon
       // blieb bei JEDER Marke/Zug-Variante unter 0,80 (beste 0,797), weil ANTRITT/ENDTEMPO —
@@ -49255,13 +49297,18 @@
       // durch `planJeSlot`. Alle drei Plaene laufen jetzt mit vollem Tempo; `sucht`/`ab`
       // bleiben unveraendert (Windschatten/Rempler-Verhalten, hier ohnehin ohne Tackle).
       // Gemessen zusammen mit K1: Spannweite 0,212 -> 0,140, Validitaet 0,888 -> 0,944.
+      // GANZE RUNDE (17.11.): die Plaene sind wieder echte Renneinteilungen -- mit bindender Puste
+      // (s. `rundePuste`) ist "volles Tempo" keine Gratisentscheidung mehr. Halten = 95 % bis 55 %
+      // der Runde, dann alles; Angehen = Volllast von der Linie weg (ab 0); Schlussmann = 96 % bis
+      // zur Haelfte. Welcher Laeufer welchen Plan bekommt, entscheidet seit 17.11. seine Puste
+      // (`planNachPuste`), nicht mehr der Slot -- so kehrt der Slot-Bias aus K2 nicht zurueck.
       plaene:{
-        halten:  {label:"Halten",     tempo:1.00, sucht:0.75, ab:0.72,
-                  text:"Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt."},
-        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.60,
-                  text:"Geht seinen Abschnitt von vorn an und legt vor."},
-        schluss: {label:"Schlussmann",tempo:1.00, sucht:0.85, ab:0.55,
-                  text:"Hängt sich an und wirft alles auf das letzte Stück."}
+        halten:  {label:"Halten",     tempo:0.95, sucht:0.75, ab:0.55,
+                  text:"Teilt sich die Runde ein und zieht auf der Zielgeraden an. Kommt nicht leer an."},
+        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.00,
+                  text:"Geht seine Runde von vorn an und legt vor — hält er das durch?"},
+        schluss: {label:"Schlussmann",tempo:0.96, sucht:0.85, ab:0.50,
+                  text:"Läuft kontrolliert an und wirft ab der Gegengeraden alles hinein."}
       },
       planJeSlot:{startrunner:"angehen", tempolink:"halten", batontech:"halten",
                   curverunner:"angehen", chaserunner:"schluss", anchor:"schluss"}
@@ -49694,6 +49741,10 @@
   // zusaetzlich), im Zeitfahren grosszuegiger, weil dort niemand Sog erben kann.
   const KRAFT_VON=(u)=>{
     const a=BA();
+    // GANZE RUNDE (17.11., nur Staffel): `rundePuste.kraftMix` ist der STEHEN-Anteil am Vorrat
+    // (Rest ROBUST). Ohne das Feld (jede andere Bahn) die alte Zeile, Zeichen fuer Zeichen.
+    const mix=a.rundePuste?a.rundePuste.kraftMix:null;
+    if(mix!=null)return Math.round((a.kraftBasis??150) + (u.STEHEN*mix+u.ROBUST*(1-mix))*(a.kraftSpanne??1.8));
     return Math.round((a.kraftBasis??150) + (u.STEHEN*0.7+u.ROBUST*0.3)*(a.kraftSpanne??1.8));
   };
 
@@ -50356,11 +50407,19 @@
   // Chris' Liste. Drei Runden halten rund 36 px/s Bildtempo (vorher 70, bei einer Runde
   // waeren es 12) und legen die Wechsel abwechselnd auf die Ziellinie (Beine 0/2/4) und auf
   // die Gegengerade (Beine 1/3/5) — zwei feste Wechselzonen, wie auf einer echten Bahn.
-  const OVAL_BEINE_JE_RUNDE=2;
-  const OVAL_RUNDEN=()=>Math.max(1,(BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
+  //
+  // UEBERHOLT 17.11. (Chris, woertlich: "bei staffel laufen die spieler auch immer nur eine halbe
+  // runde das ist falsch, sondern jeder laeuft eine ganze runde!"): JEDES BEIN IST JETZT EINE GANZE
+  // RUNDE (4x400-m-Muster), die Uebergabe liegt immer an der Ziellinie. Zweiter Befund dabei: die
+  // Rundenzahl kam aus `BA().jeSeite` (immer 6) statt aus der echten Beinzahl -- bei k=4 (Pod/Liga)
+  // waren die Beine damit 0,75 Runden lang, und die Wartenden standen ueber drei Kurvenpunkte verteilt.
+  // Jetzt zaehlt `u.beineGesamt` (die echte Beinzahl der Seite, s. bauSpurt). Reine Anzeige: u.pos,
+  // die Etappenzeiten und die Wertung lesen nichts davon.
+  const OVAL_BEINE_JE_RUNDE=1;
+  const OVAL_RUNDEN=(u)=>Math.max(1,((u&&u.beineGesamt)||BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
   // Wie weit ist diese Mannschaft auf dem Oval — in Runden, ab der Ziellinie im
   // Uhrzeigersinn. Ganze Zahl = Ziellinie (oben, Mitte der Zielgeraden), x,5 = Gegengerade.
-  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN();
+  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN(u);
   // EIN PUNKT AUF DER STADIONFORM. `anteil` 0..1 ist der Bruchteil EINER Runde ab der
   // Ziellinie (oben Mitte) im Uhrzeigersinn, `r` der Kurvenradius dieser Spur (vor der
   // Stauchung). Bogenlaengen-treu parametrisiert, damit ein Laeufer auf der Geraden und in
@@ -50493,12 +50552,24 @@
       // werden). Kadergroessen sind 2/4/5/6 (s. season-discipline-schedule.ts), und in jeder
       // davon bleibt die groesste Zonengruppe bei drei.
       const rInnenkante=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
-      bahnR=Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
+      // EINE WECHSELZONE (17.11., ganze Runde je Bein): jetzt warten bis zu fuenf je Mannschaft an
+      // derselben Ziellinie. Sie stehen deshalb als kleiner Block je Mannschaft im Innenfeld: zwei
+      // nebeneinander, bis zu drei Reihen (Radius 106/61/16), die Mannschaften nebeneinander (vx unten).
+      const eineZone=OVAL_BEINE_JE_RUNDE===1;
+      bahnR=eineZone
+        ? Math.max(16,rInnenkante-26-Math.floor(Math.min(4,idx)/2)*45)
+        : Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
       // ZWEI WARTEBEREICHE STATT EINEM: ohne einen seitenfesten Horizontal-Schub staenden
       // die beiden Warteschlangen ineinander, denn an einer Wechselzone liegen die Spuren
       // beider Mannschaften senkrecht untereinander. Seite 0 links, Seite 1 rechts von der
       // Zonenmitte: zwei Wechselzonen nebeneinander, wie bei einer echten Staffel.
       vx=(u.seite===0?-1:1)*40;
+      // VIER MANNSCHAFTEN / EINE ZONE (17.11.): je Mannschaft ein eigener Block an der Ziellinie,
+      // mittig verteilt (150 px Abstand, im Duell +-80), darin zwei Laeufer nebeneinander (62 px),
+      // damit sich Figuren und Namensschilder nicht decken.
+      const seitenN=bahnSeitenN();
+      if(eineZone)vx=(seitenN>2?(u.seite-(seitenN-1)/2)*150:(u.seite===0?-1:1)*80)+((Math.min(4,idx)%2)-0.5)*62;
+      else if(seitenN>2)vx=(u.seite-(seitenN-1)/2)*52;
       // ANLAUF (stepStaffel, Ziel 6 M1/M2): der NAECHSTE in der Wartereihe (idx===0) zieht
       // sichtbar Richtung Bahn, sobald sein Vordermann sich der Wechselzone naehert.
       // u.vizAnlauf (0..1) schreibt ausschliesslich stepStaffel; hier wird es nur GELESEN,
@@ -51345,6 +51416,7 @@
         // null und werden nie gelesen.
         etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      if(art.rundePuste)staffelPlanNachPuste(L);
       kontaktSpielerMap.set(L,p); kontaktLetzteBahn.push(L);   // Kontakt-Schicht (Schritt 0): p fuer kontaktProfilEinheit(), ohne Feld am Laeufer
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
@@ -52013,6 +52085,64 @@
     return 1+((BA().bergZehr??1)-1)*z.staerke;
   }
 
+  // =====================================================================================
+  // STAFFEL: GANZE RUNDE, PUSTE WIRKT (17.11., Block 2 der Vier-Teams-Runde,
+  // docs/design/vier-teams-staffel-battlefield-17-11.md). Alles hier haengt an
+  // `BAHN_ART.staffel.rundePuste`; keine andere Bahn fuehrt das Feld und erreicht keine Zeile.
+  //
+  // FADE: unter `fadeAb` Rest-Puste verliert der Laeufer stetig Tempo, bis `fadeMin` bei leerem
+  // Tank -- das "Sterben" auf der Zielgeraden einer 400-m-Runde, kein Schalter von voll auf leer.
+  function staffelRundeFade(u){
+    const P=BA().rundePuste;
+    if(!P||!(u.reserveMax>0))return 1;
+    const f=Math.max(0,Math.min(1,u.reserve/u.reserveMax));
+    if(f>=P.fadeAb)return 1;
+    return P.fadeMin+(1-P.fadeMin)*(f/P.fadeAb);
+  }
+  // TIEFSTER STAND UND EINBRUCH JE LAEUFER -- reine Buchhaltung fuer Sonde/Anzeige, NEBEN dem
+  // Laeufer (WeakMap), damit kein neues Feld am Laeuferobjekt den Rennzustand aufblaeht.
+  const STAFFEL_RUNDE_BUCH=new WeakMap();
+  function staffelRundeBuchen(u){
+    if(!(u.reserveMax>0))return;
+    let b=STAFFEL_RUNDE_BUCH.get(u);
+    if(!b){ b={min:1, eingebrochen:false}; STAFFEL_RUNDE_BUCH.set(u,b); }
+    const f=u.reserve/u.reserveMax;
+    if(f<b.min)b.min=f;
+    if(u.reserve<=0)b.eingebrochen=true;
+  }
+  // RENNEINTEILUNG NACH DER EIGENEN PUSTE (statt nach dem Slot): reicht der Vorrat fuer eine
+  // Volllast-Runde, geht er an ("angehen"); sonst teilt er sich ein ("halten"). Der Slot spielt
+  // keine Rolle mehr (kein Bias je Abschnitt, s. K2 an BAHN_ART.staffel.plaene); "Schlussmann"
+  // bleibt als Ansage-Option. "Reicht" heisst: erwarteter Volllast-Verbrauch der Runde <= Vorrat * planSchwelle. Der
+  // erwartete Verbrauch kommt aus derselben Formel wie stepSpurt (Volllast, ohne Sog), die
+  // erwartete Laufzeit aus Grundtempo und ENDTEMPO -- eine Schaetzung des Laeufers ueber sich
+  // selbst, keine Vorschau auf das Rennen. Die Schaetzung liegt systematisch rund ein Viertel unter
+  // dem echten Verbrauch (Antritt, Kurve, Fade fehlen darin); `planSchwelle` 0,72 ist deshalb
+  // GEMESSEN, nicht hergeleitet: ab Quote ~0,72 war "Halten" fuer die Mehrheit schneller als
+  // Volllast (scripts/miss-staffel-runde-puste.mjs --vergleich, Quintile der Quote).
+  function staffelPlanNachPuste(L){
+    const A=BA(), P=A.rundePuste, plaene=A.plaene;
+    if(!P||!plaene)return;
+    const tempo=A.grundTempo+L.ENDTEMPO*A.tempoSpanne;
+    const beine=L.beineGesamt||A.jeSeite||6;
+    const laufzeit=(W-170)/beine/Math.max(1,tempo);
+    const zehrVoll=(0.55+1*(A.zehrKoeff??1.9))*P.zehrFaktor*10;
+    const quote=zehrVoll*laufzeit/Math.max(1,L.reserveMax);
+    STAFFEL_RUNDE_BUCH.set(L,{min:1, eingebrochen:false, quote});
+    if(!P.planNachPuste)return;
+    const reicht=quote<=(P.planSchwelle??1);
+    const id=reicht?"angehen":"halten";
+    const pl=plaene[id]; if(!pl)return;
+    L.plan=id; L.tempo=pl.tempo; L.sucht=pl.sucht; L.ab=pl.ab; L.label=pl.label; L.text=pl.text;
+  }
+  // QA/Sonde: tiefster Puste-Stand und Einbruch je Laeufer des letzten Rennens.
+  function staffelRundeStand(){
+    return LAEUFER.map(u=>{ const b=STAFFEL_RUNDE_BUCH.get(u)||{min:1,eingebrochen:false};
+      return {n:u.n, seite:u.seite, bein:u.bein, plan:u.plan, reserveMax:u.reserveMax,
+        minPuste:+b.min.toFixed(4), eingebrochen:b.eingebrochen, quote:b.quote==null?null:+b.quote.toFixed(4),
+        etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4)}; });
+  }
+
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
@@ -52036,7 +52166,13 @@
     // beginnt damit dort, wo das erste aufgehoert hat, und nicht frisch bei 0. Ohne Liste (jede
     // voll besetzte Staffel, jede andere Bahn) ist es die alte Zeile.
     const anteil=u.beineFertig?laufAnteil(u)+u.beineFertig:laufAnteil(u);
-    const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
+    // GANZE RUNDE (17.11.): ein Doppellaeufer (unterbesetzte Staffel, ab seinem zweiten Bein) faellt
+    // tiefer als der Boden 0,60 -- eine zweite 400-m-Runde ohne Erholung. Ohne das war ein muede
+    // zweimal laufender Bester nicht langsamer als der schwaechste Frische, und "mit fuenf statt sechs"
+    // gewann wieder oefter (tests/staffel-unterbesetzt-doppellauf.test.ts). Jede andere Bahn und jeder
+    // Laeufer mit einem Bein liest hier 0,60 wie bisher.
+    const muedBoden=(u.beineFertig&&BA().rundePuste)?BA().rundePuste.doppelMuedBoden:0.60;
+    const mued=anteil>0.45?Math.max(muedBoden,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -52074,7 +52210,10 @@
            *gelaendeFaktor(u)*(u.formTag||1)*gespuer
            // STAFFEL "MARKE UND ZUG" (B2): Haltung auf dem Bein. Ohne `u.haltung` (Schalter
            // aus, jede andere Bahn) steht hier exakt *1 — bit-identisch.
-           *(u.haltung?zugFaktor(u):1);
+           *(u.haltung?zugFaktor(u):1)
+           // GANZE RUNDE, PUSTE WIRKT (17.11., nur Staffel, s. BAHN_ART.staffel.rundePuste). Jede
+           // andere Bahn liest hier `undefined` und multipliziert mit exakt 1 -- bit-identisch.
+           *(BA().rundePuste?staffelRundeFade(u):1);
   }
 
   // ===================================================================================
@@ -53154,7 +53293,11 @@
       // die nie geloescht wurde. Chris am 13.09.: "manche laufen aus und muessen kurz
       // regenerieren, manche schaffen den kompletten Spieltag".
       if(u.leer&&BA().leerSchonung)zehr*=BA().leerSchonung;
+      // GANZE RUNDE (17.11., nur Staffel): eine 400-m-Runde kostet mehr als das halbe Bein vorher,
+      // s. BAHN_ART.staffel.rundePuste. Ohne das Feld (jede andere Bahn) steht hier nichts.
+      if(BA().rundePuste)zehr*=BA().rundePuste.zehrFaktor;
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
+      if(BA().rundePuste)staffelRundeBuchen(u);
       // ---- PUSTE LAEDT WIEDER AUF (13.09.).
       //
       // Der Befund, der das noetig macht, steht in docs/design/
@@ -56461,6 +56604,9 @@
       ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.stroke();
       ctx.globalAlpha=u.down?.28:1;
       ctx.imageSmoothingEnabled=false;
+      // TEAMFARBEN-KONTUR (17.11., Chris: "spieler pixelgenau mit Teamfarbe umrahmen"): nur im
+      // Fuenf-Punkte-Pod, reine Zeichnung (s. bfd5Kontur).
+      if(!u.down&&KP&&KP.pod&&KP.pod.format==="domination5")bfd5Kontur(u,x,y,c);
       zeichneSprite(ctx,u,x,y);
       ctx.textAlign="center";ctx.textBaseline="middle";
       if(!u.down){
@@ -59216,7 +59362,7 @@
   }
 
   function renderKader(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
+    if(schnelldurchDomGedrosselt("kader"))return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
@@ -61565,9 +61711,10 @@
       stumm=true;
       bfPodKader=kader;
       try{ M.bau(saat); } finally { bfPodKader=null; }
+      if(KP&&KP.pod)KP.pod.format=BF_POD_FORMAT;
       if(!echtzeit){
         const g=bfffaFuerGebautenPod(kader,saat), pl=g.platzierung;
-        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*BFFFA.taktSek).toFixed(2),
+        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*bfPodTaktSek()).toFixed(2),
           format:"gefecht", ende:g.ende, takte:g.gespielt,
           besitz:g.orte.map(o=>o.besitz),
           teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+g.punkte[s].toFixed(1),
@@ -61575,7 +61722,7 @@
             eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s], wertung:+g.teamWert[s].toFixed(3)})),
           kaempfer:g.kaempfer.map(k=>({n:k.n, side:k.side, slot:k.slot, eig:k.eigOhneMutator,
             wert:g.anteil[k.n]||0, roh:+k.wert.toFixed(3), ko:k.st.kos, down:!!k.raus,
-            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*BFFFA.taktSek,
+            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*bfPodTaktSek(),
             wechsel:k.st.rotationen, besucht:k.st.takteAmOrt.map(x=>x>0?1:0)})),
           gefecht:g};
       }
@@ -61611,7 +61758,9 @@
   // (Anteil am Gesamtbeitrag des Kampfes, jetzt ueber alle 4k Kaempfer).
   function spieleBattlefieldPod(teams,saat,platzJeTeam,optionen){
     const opt=optionen||{};
-    const formVorher=FORMKARTE;
+    const formVorher=FORMKARTE, formatVorher=BF_POD_FORMAT;
+    // FORMAT (17.11.): `optionen.format` ("orte3" | "domination5") gilt nur fuer diesen Lauf.
+    if(opt.format!=null)BF_POD_FORMAT=bfPodFormatPruefen(opt.format);
     try{
       const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
         FORMKARTE={...FORMKARTE};
@@ -61621,8 +61770,10 @@
         boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert,
           ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
       if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
+      // Nur ausserhalb des Standards gemeldet -- im Standard bleibt das Ergebnis Zeichen fuer Zeichen das alte.
+      if(BF_POD_FORMAT!=="orte3")aus.podFormat=BF_POD_FORMAT;
       return aus;
-    } finally { FORMKARTE=formVorher; }
+    } finally { FORMKARTE=formVorher; BF_POD_FORMAT=formatVorher; }
   }
 
   // RANGTREUE-SONDE, dieselbe Bauart wie bahnPodSonde()/miniDmFfaSonde(): `kader` Liste von
@@ -61738,6 +61889,12 @@
       if(pod.k)art.jeSeite=pod.k;
       bfPodKader=kader;
       build(pod.saat);
+      // FORMAT (17.11.): der Host reicht `pod.format` (BATTLEFIELD_POD_FORMAT, dieselbe Konstante wie
+      // die Buchung); ohne Angabe das Standardformat. Fuenf Punkte bekommen hier ihre Leinwand-Orte.
+      if(KP&&KP.pod){
+        KP.pod.format=pod.format!=null?bfPodFormatPruefen(pod.format):BF_POD_FORMAT;
+        if(KP.pod.format==="domination5")bfd5AnzeigeOrte();
+      }
       // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
       // `echtzeit`), mit denselben Formkarten/Aufstellungen — die Arena spielt sie danach ab.
       // `pod.echtzeit` zeigt zum Vergleich den alten freien Echtzeitkampf.
@@ -62065,6 +62222,314 @@
     return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte};
   }
 
+  // ===================================================================================
+  // BATTLEFIELD "DOMINATION MIT FUENF PUNKTEN" (17.11., Block 3 der Vier-Teams-Runde,
+  // docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 3). FORMAT-UMSCHALTER: der
+  // Standard bleibt "orte3" (bfffaGefecht oben, bit-identisch, Wertungs-Fingerabdruck unveraendert);
+  // "domination5" waehlt man ueber BATTLEFIELD_POD_FORMAT (lib/battle/arena-resolved-disciplines.ts,
+  // gilt fuer Buchung UND Anzeige -- gezeigt = gebucht) oder in Messskripten ueber
+  // window.__arena.battlefieldFormat("domination5").
+  //
+  // Chris am 17.11., woertlich: "battlefield hat auch 0 dynamik. die area wo die punkte sind muss
+  // groesser werden ... 5 Punkte zum Dominieren ... punkte farblich markieren ... pro sekunde ein
+  // punkt (wie Overwatch/Domination) ... spieler pixelgenau mit Teamfarbe umrahmen ... Teams koennen
+  // sich aufteilen".
+  //
+  // WAS ANDERS IST als beim Gefecht je Ort (bewusst eigene Funktion daneben, kein Umbau des alten):
+  //  - FUENF ORTE: Nord/Sued zwischen den oberen bzw. unteren Ecken, West/Ost zwischen den linken
+  //    bzw. rechten, die Mitte. Jedes Team hat ZWEI Nachbarorte (die es sich je mit einem Nachbarn
+  //    teilt), die Mitte und zwei ferne Orte -- jede Ecke hat exakt dieselbe Geometrie.
+  //  - 1 PUNKT JE SEKUNDE JE GEHALTENEM ORT (Takt 2 s -> 2 Punkte je Takt und Ort), 45 Takte = 90 s,
+  //    Schluss bei 160 Punkten.
+  //  - RESPAWN statt Ausscheiden: wer faellt, steht nach 3 Takten (6 s) an seiner Ecke wieder auf und
+  //    muss zurueck ins Spiel laufen (Chris' Domination-Vorgabe vom 13.10.: "Respawn kostet kurz Zeit").
+  //  - AUFTEILEN UND WANDERN: jeden Takt plant jedes Team neu. Wer nicht gebunden ist (an einem Ort mit
+  //    Gegnern, beim Erobern, als einziger Halter), sucht sich den lohnendsten Ort: fremde vor neutralen
+  //    vor eigenen bedrohten, minus Weg, minus Eigene, die schon dort sind oder hinlaufen. Teams teilen
+  //    sich dadurch selbst auf, laufen Orte ab und kommen bedrohten Orten zu Hilfe.
+  //  - Kampf, Eroberung und alle neun Matrix-Kanaele sind DIESELBEN wie im Gefecht je Ort
+  //    (bfffaKaempfer, Schlagwechsel je Ort, kpTick-Regel), nur auf 2-s-Takte umgerechnet: Wucht,
+  //    Eroberungsfortschritt und Kampfrichterwertung je Takt mal taktSek/BFFFA.taktSek, die Muedigkeit
+  //    nach Kampfsekunden.
+  const BF_D5_GRUND=Object.freeze({
+    takte:45, taktSek:2, punkteJeSekunde:1, punkteZumSieg:160, respawnTakte:3,
+    // Wucht je 2-s-Takt als Vielfaches der Wucht je 4-s-Takt im Gefecht je Ort. 0,5 waere dieselbe
+    // Wucht je Sekunde; 1v1 dauerte dann ~50 s -- fuer Domination mit Respawn viel zu zaeh. Mit 2,2
+    // faellt ein Kaempfer im 1v1 nach rund 12 s (Sonde: 37 K.o. und 8 Besitzwechsel je Spiel).
+    // `plan.fuehrung`: Orte des Fuehrenden sind lohnender (alle gegen den Ersten, wie in jedem FFA) --
+    // haelt die Spiele offen, ohne den Staerksten zu bestrafen (er gewinnt weiter, s. Abnahme).
+    schaden:2.2,
+    radius:95, replayTempo:170,
+    orte:[{name:"Nord",fx:0.5,fy:0.235},{name:"West",fx:0.2,fy:0.54},{name:"Mitte",fx:0.5,fy:0.54},
+          {name:"Ost",fx:0.8,fy:0.54},{name:"Süd",fx:0.5,fy:0.85}],
+    // Wege in Takten zwischen den Orten (Ring Nord-West-Sued-Ost um die Mitte) und von der Ecke jeder Seite.
+    weg:[[0,1,1,1,2],[1,0,1,2,1],[1,1,0,1,1],[1,2,1,0,1],[2,1,1,1,0]],
+    basisWeg:[[1,1,2,2,3],[1,2,2,1,3],[2,1,2,3,1],[2,3,2,1,1]],
+    plan:{feind:4, neutral:3.2, bedroht:3.6, weg:1.1, schonDa:1.7, uebermacht:0.6, verstaerken:1.2, fuehrung:2}
+  });
+  let BF_D5=JSON.parse(JSON.stringify(BF_D5_GRUND));
+  // (BF_POD_FORMAT und die Format-Leser stehen oben bei bfPodKader -- reset() laeuft beim Laden.)
+
+  function bfd5Gefecht(kaempfer,saat,N){
+    const P=BFFFA, D=BF_D5, Z=BFFFA_ZWECK, r=D.taktSek/P.taktSek;
+    const wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const M=D.orte.length;
+    const orte=D.orte.map(o=>({name:o.name, besitz:null, fortschritt:0, erobertVon:null}));
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    for(const k of kaempfer){ k.ort=null; k.nach=null; k.ankunft=null; k.basis=true; k.respawnTakt=null;
+      k.st.takteAmOrt=new Array(M).fill(0); k.st.respawns=0; }
+    const schnapp=()=>({
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach, basis:!!k.basis})),
+      orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    // PLANUNG je Team: wer frei ist, sucht den lohnendsten Ort (s. Kopfkommentar). Deterministisch,
+    // kein Wurf: Reihenfolge nach Kaempfer-Nummer, Gleichstand nach Ort-Nummer.
+    const planen=(t,ereignisse)=>{
+      for(let s=0;s<N;s++){
+        const team=kaempfer.filter(k=>k.side===s&&!k.raus);
+        const kommt=new Array(M).fill(0);
+        for(const k of team){ if(k.ort!=null)kommt[k.ort]++; else if(k.nach!=null)kommt[k.nach]++; }
+        const feindeAm=(o)=>kaempfer.filter(k=>!k.raus&&k.side!==s&&k.ort===o).length;
+        const frei=[];
+        for(const k of team){
+          if(k.nach!=null)continue;
+          if(k.basis){ frei.push(k); continue; }
+          const o=orte[k.ort];
+          if(feindeAm(k.ort)>0)continue;                       // gebunden: Kampf
+          if(o.besitz!==s)continue;                             // gebunden: Erobern
+          if(o.erobertVon!=null&&o.fortschritt>0)continue;      // gebunden: Abwehr
+          const halter=team.filter(x=>x.ort===k.ort&&x.nach==null)
+            .sort((a,b)=>(BFFFA_HALTER_RANG[a.slot]??9)-(BFFFA_HALTER_RANG[b.slot]??9)||a.idx-b.idx)[0];
+          if(halter===k)continue;                               // einer haelt
+          frei.push(k);
+        }
+        for(const k of frei.sort((a,b)=>a.idx-b.idx)){
+          const von=k.basis?null:k.ort;
+          let best=null, bw=-Infinity;
+          for(let o=0;o<M;o++){
+            const zo=orte[o], fe=feindeAm(o);
+            let w;
+            if(zo.besitz==null)w=D.plan.neutral;
+            else if(zo.besitz!==s)w=D.plan.feind+(D.plan.fuehrung&&punkte[zo.besitz]>=Math.max(...punkte)&&punkte[zo.besitz]>punkte[s]?D.plan.fuehrung:0);
+            else if(fe>0||(zo.erobertVon!=null&&zo.fortschritt>0))w=D.plan.bedroht;
+            else continue;
+            const weg=von==null?D.basisWeg[s%4][o]:D.weg[von][o];
+            const eigene=kommt[o]-(o===von?1:0);
+            // Eigene Kaempfe verstaerken (bis Gleichstand), sonst nicht stapeln; aussichtslose meiden.
+            w+=D.plan.verstaerken*Math.min(eigene,fe);
+            w-=D.plan.weg*weg+D.plan.schonDa*Math.max(0,eigene-fe)+D.plan.uebermacht*Math.max(0,fe-eigene-1);
+            if(w>bw){bw=w;best=o;}
+          }
+          if(best==null||best===von)continue;
+          const weg=von==null?D.basisWeg[s%4][best]:D.weg[von][best];
+          if(von!=null)kommt[von]--;
+          kommt[best]++;
+          k.basis=false; k.ort=null; k.nach=best; k.ankunft=t+weg; k.st.rotationen++;
+          ereignisse.push({typ:"rotation", wer:k.idx, von, nach:best});
+        }
+      }
+    };
+    planen(0,[]);
+    const start=schnapp();
+    for(let t=1;t<=D.takte;t++){
+      gespielt=t;
+      const ereignisse=[];
+      // 0) RESPAWN an der Ecke.
+      for(const k of kaempfer)if(k.raus&&k.respawnTakt!=null&&k.respawnTakt<=t){
+        k.raus=false; k.respawnTakt=null; k.stand=k.stand0; k.atemWeg=false; k.basis=true; k.ort=null; k.nach=null;
+        k.st.respawns++;
+        ereignisse.push({typ:"respawn", wer:k.idx});
+      }
+      // 1) ANKUNFT.
+      for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
+        k.ort=k.nach; k.nach=null; k.ankunft=null;
+        ereignisse.push({typ:"ankunft", wer:k.idx, ort:k.ort});
+      }
+      // 2) ZIELWAHL je Ort (wie bfffaGefecht).
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus||A.ort==null)continue;
+        A.st.takteAmOrt[A.ort]++;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach,aktiv:true});
+      }
+      // 3) POSITIONIERUNG.
+      for(const Zk of kaempfer){
+        if(Zk.raus)continue;
+        const auf=angriffe.filter(x=>x.ziel===Zk);
+        if(auf.length<2)continue;
+        if(wurf(Zk.idx,t,Z.position)<Zk.position){
+          const bleibt=Math.min(auf.length-1,Math.floor(wurf(Zk.idx,t,Z.positionWahl)*auf.length));
+          auf.forEach((x,i)=>{ if(i!==bleibt)x.aktiv=false; });
+          Zk.st.ausgewichen++;
+          ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
+        }
+      }
+      // 4) SCHLAEGE (Wucht je Takt mal r; Muedigkeit nach Kampfsekunden, umgerechnet in 4-s-Takte).
+      const schadenJe=new Map();
+      const t4=t*r;
+      const muede=(k)=>t4>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t4-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel}=x;
+        A.st.schlaege++;
+        if(!x.aktiv){ ereignisse.push({typ:"leer", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        const dmg=A.wucht*D.schaden*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung);
+        // Kampfrichterwertung je Schaden auf die Wucht je Sekunde des Gefechts je Ort umgerechnet
+        // (r/schaden), damit hoehere Toedlichkeit die Gewichte der Wertung nicht verschiebt.
+        ziel.stand-=dmg; A.wert+=dmg*r/D.schaden; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
+      }
+      // 5) WER FAELLT -- mit Respawn statt Ausscheiden.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; k.st.atem++;
+          ereignisse.push({typ:"atem", wer:k.idx, ort:k.ort});
+          continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0; k.respawnTakt=t+D.respawnTakte; k.ort=null; k.nach=null; k.basis=false;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx, ort:null});
+      }
+      // 6) ORTE -- dieselbe kpTick-Regel, Fortschritt je Takt mal r; Besitz zahlt 1 Punkt je Sekunde.
+      orte.forEach((o,oi)=>{
+        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi);
+        const seiten=[...new Set(da.map(k=>k.side))];
+        if(seiten.length===1){
+          const s=seiten[0], eigene=da;
+          if(o.besitz!==s){
+            if(o.erobertVon!==s){o.erobertVon=s;o.fortschritt=0;}
+            const neutral=o.besitz==null;
+            const kraft=eigene.reduce((a,k)=>a+(neutral?k.neutral:k.erob),0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.min(1,o.fortschritt+kraft*r/P.erobern.bedarf);
+            const gewonnen=o.fortschritt-vorher;
+            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt>=1){
+              o.besitz=s;o.fortschritt=0;o.erobertVon=null;
+              ereignisse.push({typ:"erobert", side:s, ort:oi});
+            }
+          }else if(o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0){
+            const kraft=eigene.reduce((a,k)=>a+k.halten,0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-kraft*r/P.erobern.bedarf);
+            const abgewehrt=vorher-o.fortschritt;
+            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }else if(seiten.length>=2&&o.erobertVon!=null){
+          let st=0;
+          for(const k of da)if(k.side!==o.erobertVon)st+=k.stoeren;
+          if(st>0){
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-0.5*st*r/P.erobern.bedarf);
+            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }
+        if(o.besitz!=null){
+          punkte[o.besitz]+=D.punkteJeSekunde*D.taktSek;
+          const halter=da.filter(k=>k.side===o.besitz);
+          for(const k of halter){ k.wert+=P.wertung.halten*r*k.befehl/halter.length; k.st.halte++; }
+        }
+      });
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*r;
+      // 7) PLANUNG fuer den naechsten Takt.
+      planen(t,ereignisse);
+      takte.push({t, ereignisse, ...schnapp()});
+      if(punkte.some(x=>x>=D.punkteZumSieg)){ ende="limit"; break; }
+    }
+    // Mit Respawn scheidet niemand dauerhaft aus: rausTakt bleibt null (Platzierung nach Punkten,
+    // dann Stehende am Ende, dann Kampfrichterwertung).
+    for(const k of kaempfer){ if(k.raus)k.rausTakt=null; }
+    return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte, format:"domination5"};
+  }
+
+  // ANZEIGE: Leinwand-Orte, Ecken, Platz am Ort, Zone und Kontur. Reine Zeichnung.
+  function bfd5AnzeigeOrte(){
+    KP.orte=BF_D5.orte.map(o=>({name:o.name, x:Math.round(W*o.fx), y:Math.round(H*o.fy), besitz:null, fortschritt:0, erobertVon:null}));
+    KP.radius=BF_D5.radius;
+    KP.punkteZumSieg=BF_D5.punkteZumSieg;
+    KP.punkteJeSekunde=BF_D5.punkteJeSekunde;
+  }
+  function bfd5Basis(side){
+    const links=side%2===0, oben=side<2;
+    return {x:links?70:W-70, y:oben?118:H-46};
+  }
+  // Am Ort steht jedes Team in seinem Viertel des Kreises (Richtung seiner Ecke), die Kameraden
+  // auf einem Bogen -- vier Teams an einem Ort stehen so sichtbar getrennt, Figuren decken sich nicht.
+  function bfd5ReplayPlatz(u,ort,stand){
+    const o=KP.orte[ort];
+    const am=U.filter(x=>x.side===u.side&&x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort);
+    const j=Math.max(0,am.indexOf(u)), m=Math.max(1,am.length);
+    const grund=[-2.36,-0.79,2.36,0.79][u.side%4];      // links oben, rechts oben, links unten, rechts unten
+    const w=grund+(j-(m-1)/2)*0.5;
+    const rr=BF_D5.radius*0.62;
+    return {x:o.x+Math.cos(w)*rr*1.35, y:Math.max(60,Math.min(H-24,o.y+Math.sin(w)*rr*0.62))};
+  }
+  function bfd5ZeichneOrte(){
+    for(const o of KP.orte){
+      const besitz=o.besitz!=null?kampfSeitenFarbe(o.besitz):null;
+      const rx=KP.radius*1.35, ry=KP.radius*0.62;
+      ctx.save();
+      // Zone: gefuellt in der Besitzfarbe (neutral: hell), kraeftiger Rand.
+      ctx.globalAlpha=besitz?.26:.12; ctx.fillStyle=besitz||"#ffffff";
+      ctx.beginPath(); ctx.ellipse(o.x,o.y,rx,ry,0,0,6.283); ctx.fill();
+      ctx.globalAlpha=besitz?.95:.55; ctx.strokeStyle=besitz||"rgba(255,255,255,.8)"; ctx.lineWidth=besitz?4:2.5;
+      if(!besitz)ctx.setLineDash([8,8]);
+      ctx.beginPath(); ctx.ellipse(o.x,o.y,rx,ry,0,0,6.283); ctx.stroke(); ctx.setLineDash([]);
+      // Eroberung laeuft: Fortschrittsbogen in der Angreiferfarbe aussen um die Zone.
+      if(o.erobertVon!=null&&o.fortschritt>0){
+        ctx.globalAlpha=1; ctx.strokeStyle=kampfSeitenFarbe(o.erobertVon); ctx.lineWidth=6; ctx.lineCap="round";
+        ctx.beginPath(); ctx.ellipse(o.x,o.y,rx+6,ry+6,0,-Math.PI/2,-Math.PI/2+6.283*o.fortschritt); ctx.stroke();
+      }
+      // Fahne in der Mitte.
+      ctx.globalAlpha=1; ctx.strokeStyle="#3a2f22"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(o.x,o.y+10); ctx.lineTo(o.x,o.y-30); ctx.stroke();
+      ctx.fillStyle=besitz||"rgba(255,255,255,.75)";
+      ctx.beginPath(); ctx.moveTo(o.x,o.y-30); ctx.lineTo(o.x+22,o.y-24); ctx.lineTo(o.x,o.y-18); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.restore();
+      ctx.font="bold 12px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(0,0,0,.75)"; ctx.fillStyle=besitz||"#fff";
+      const txt=o.name+(o.besitz!=null?" · "+kampfTeamName(o.besitz):" · frei");
+      ctx.strokeText(txt,o.x,o.y+ry+12); ctx.fillText(txt,o.x,o.y+ry+12);
+    }
+  }
+  // PIXELGENAUE KONTUR: die Figur einmal auf eine kleine Nebenleinwand, dort in der Teamfarbe
+  // eingefaerbt (source-in) und achtmal um 2 px versetzt UNTER die echte Figur gelegt. Nur Zeichnung.
+  let bfd5KonturLeinwand=null;
+  function bfd5Kontur(u,x,y,farbe){
+    try{
+      if(!bfd5KonturLeinwand){ bfd5KonturLeinwand=document.createElement("canvas"); bfd5KonturLeinwand.width=200; bfd5KonturLeinwand.height=200; }
+      const c=bfd5KonturLeinwand, k=c.getContext("2d");
+      k.setTransform(1,0,0,1,0,0); k.globalAlpha=1; k.globalCompositeOperation="source-over";
+      k.clearRect(0,0,c.width,c.height); k.imageSmoothingEnabled=false;
+      zeichneSprite(k,u,100,120);
+      k.globalCompositeOperation="source-in"; k.fillStyle=farbe; k.fillRect(0,0,c.width,c.height);
+      k.globalCompositeOperation="source-over";
+      const a=ctx.globalAlpha;
+      for(const [dx,dy] of [[-2,0],[2,0],[0,-2],[0,2],[-2,-2],[2,-2],[-2,2],[2,2]])
+        ctx.drawImage(c,x-100+dx,y-120+dy);
+      ctx.globalAlpha=a;
+    }catch(e){}
+  }
+
   // PLATZIERUNG AUS EINEM ENDSTAND — dieselbe Regel wie bfPodPlatzierung() (die liest KP/U und
   // ruft jetzt diese Funktion), damit Gefecht, Replay und Echtzeit-Kontrolle denselben Massstab haben.
   // `zusatz` (optional, nur das Gefecht je Ort): ein fuenfter Schluessel nach dem Ausscheidezeitpunkt —
@@ -62106,10 +62571,13 @@
   function bfffaFuerGebautenPod(kader,saat){
     const N=kader.length;
     const kaempfer=bfffaKaempferAusU(kader);
-    const g=bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
+    // FORMAT-WEICHE (17.11., s. BF_D5): "domination5" rechnet das Fuenf-Punkte-Gefecht, sonst
+    // (Standard "orte3") Zeichen fuer Zeichen das bisherige Gefecht je Ort.
+    const g=bfPodFormat()==="domination5"?bfd5Gefecht(kaempfer,normalisiereSaat(saat),N)
+      :bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
     const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
     const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
-    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek),teamWert);
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*bfPodTaktSek()),teamWert);
     const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
@@ -62582,7 +63050,7 @@
   let bfPodSpuren=[];
   function bfPodReplayStarten(g){
     if(!KP||!KP.pod)return;
-    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*bfPodTaktSek()};
     // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
     KP.pod.zusatz=g.teamWert.slice();
     bfPodSpuren=[];
@@ -62593,6 +63061,7 @@
   // seiner Ecke versetzt, wenn ein zweites Team von derselben Seite dort steht; die Kameraden in
   // einem Raster nach aussen (zwei Reihen), damit sich Figuren und Namen nicht decken.
   function bfPodReplayPlatz(u,ort,stand){
+    if(bfPodFormat()==="domination5")return bfd5ReplayPlatz(u,ort,stand);
     const o=KP.orte[ort];
     const amOrt=(x)=>x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort;
     const am=U.filter(x=>x.side===u.side&&amOrt(x));
@@ -62604,7 +63073,7 @@
     return {x:o.x+sx*(92+spalte*60), y:Math.max(40,Math.min(H-30,y))};
   }
   function bfPodReplaySchritt(dt){
-    const R=KP.pod.replay, g=R.g, D=BFFFA.taktSek;
+    const R=KP.pod.replay, g=R.g, D=bfPodTaktSek();
     // Laufender Takt (0 = Anmarsch) und der Stand, auf den die Figuren gerade zulaufen.
     const takt=t<BF_REPLAY_ANMARSCH?0:Math.min(g.gespielt,1+Math.floor((t-BF_REPLAY_ANMARSCH)/D));
     const standVor=takt<=1?g.start:g.takte[takt-2];
@@ -62617,10 +63086,13 @@
       if(u.down)continue;
       const k=standVor.k[u.bfIdx];
       const ort=k.ort!=null?k.ort:k.nach;
-      if(ort==null)continue;
-      const ziel=bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
-      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=BF_REPLAY_TEMPO*dt;
-      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*BF_REPLAY_TEMPO; u.vy=ddy/weg*BF_REPLAY_TEMPO; }
+      // FUENF PUNKTE (17.11.): wer an der Basis steht (Start, nach dem Respawn), laeuft zu seiner Ecke.
+      const d5=bfPodFormat()==="domination5";
+      if(ort==null&&!(d5&&k.basis))continue;
+      const ziel=ort==null?bfd5Basis(u.side):bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
+      const tempo=d5?BF_D5.replayTempo:BF_REPLAY_TEMPO;
+      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=tempo*dt;
+      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*tempo; u.vy=ddy/weg*tempo; }
       else { u.vx=0; u.vy=0; }
     }
     // 2) DIE SCHLAEGE DIESES TAKTES, jeder zu seinem festen Zeitpunkt im Takt.
@@ -62687,12 +63159,22 @@
       case "ko": {
         const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
         Z.hp=0;
-        if(A&&!still)schalteAus(Z,A);
+        // FUENF PUNKTE (17.11.): mit Respawn ist ein K.o. kein Ausscheiden -- eigene, leise Buchung
+        // statt schalteAus() (dessen Texte "ist ausgeschieden"/"kann nicht mehr weiter" waeren falsch).
+        if(A&&!still&&bfPodFormat()==="domination5"){
+          Z.down=true; Z.st.tode++; A.st.ko++; A.st.koAnteil+=1;
+          feedRoutine(Z.side,Z.n+" fällt gegen "+A.n+" — in "+Math.round(BF_D5.respawnTakte*BF_D5.taktSek)+" s zurück an der Ecke.");
+          schwebe({x:Z.x,y:Z.y-40,txt:"K.o.",life:.9,crit:true});
+        }
+        else if(A&&!still)schalteAus(Z,A);
         else { Z.down=true; Z.st.tode++; if(A){A.st.ko++; A.st.koAnteil+=1;} }
         break;
       }
       case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
-      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+BF_ORT_NAMEN[e.ort]+".",true,undefined,"kontrollpunkt"); break;
+      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+bfPodOrtName(e.ort)+".",true,undefined,"kontrollpunkt"); break;
+      // FUENF PUNKTE (17.11.): Respawn -- er steht an seiner Ecke wieder auf (still: nur Zustand).
+      case "respawn": { const Z=U_(e.wer); if(Z){ Z.down=false; Z.hp=Z.max; const b=bfd5Basis(Z.side); Z.x=b.x; Z.y=b.y;
+        if(!still)schwebe({x:Z.x,y:Z.y-40,txt:"zurück im Spiel",life:.9}); } break; }
       default: break;
     }
   }
@@ -64826,6 +65308,7 @@
     }
   }
   function bahnPodAnzeigeAbbauen(){
+    bahnPodLeisteAus();
     const a=bahnPodAnzeige;
     if(!a)return;
     bahnPodAnzeige=null;
@@ -64869,8 +65352,57 @@
       feed(vorn.side,vorn.name+" übernimmt die Führung im 4-Team-Rennen.",true,undefined,"fuehrungswechsel");
     }
   }
+  // VIER-TEAM-LEISTE IM KOPF (17.11., Chris: "dort sind gerade auch nur 2 teams"): die DOM-Kopfzeile
+  // (#tnameL/#tnameR, #thpL/#thpR) hat nur zwei Plaetze und zeigte im Pod nur Team 0 und 1 mit ihrem
+  // "N im Ziel" und Streckenbalken. Im Pod bleiben diese zwei Plaetze verborgen, statt ihrer steht eine
+  // Leiste mit einem Kaestchen JE TEAM (Teamfarbe, Platz, Name, Stand, "N im Ziel", Streckenbalken,
+  // nach dem Ziel die Ligapunkte 2-1-0-0). Reine Anzeige: liest nur bahnPodLiveStand()/rennFertig/
+  // LAEUFER, schreibt in keinen Simulationszustand; ausserhalb des Pods wird nichts angefasst.
+  const BAHN_POD_LEISTE_VERSTECKT=["tnameL","tnameR"];
+  function bahnPodLeisteAus(){
+    const el=document.getElementById("bahnPodLeiste");
+    if(!el)return;
+    el.remove();
+    for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display=""; }
+    const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="";
+    const sl=document.querySelector(".scoreline"); if(sl)sl.style.gridTemplateColumns="";
+  }
+  function bahnPodLeisteZeigen(st,schnitt){
+    const sl=document.querySelector(".scoreline");
+    if(!sl||!sl.parentNode)return;
+    let el=document.getElementById("bahnPodLeiste");
+    if(!el){
+      el=document.createElement("div"); el.id="bahnPodLeiste"; el.className="bahnpod-leiste";
+      sl.parentNode.insertBefore(el,sl.nextSibling);
+      for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display="none"; }
+      const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="none";
+      sl.style.gridTemplateColumns="1fr";
+    }
+    el.style.gridTemplateColumns="repeat("+st.N+",minmax(0,1fr))";
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
+    const zeilen=st.teams.map(t=>({side:t.side, platz:t.platz, name:t.name, stand:t.anzeige,
+      ziel:imZiel(t.side), pct:Math.max(0,Math.min(100,Math.round(schnitt(t.side)*100))),
+      liga:st.done?t.ligaPunkte:null, sieger:st.done&&t.platz===1}));
+    const schluessel=JSON.stringify(zeilen);
+    if(el.dataset.letzt===schluessel)return;
+    el.dataset.letzt=schluessel;
+    el.textContent="";
+    for(const z of zeilen){
+      const box=document.createElement("div");
+      box.className="bahnpod-team"+(z.sieger?" bp-sieger":"");
+      box.style.setProperty("--bp-c",bahnSeitenFarbe(z.side));
+      const mk=(klasse,text)=>{ const d=document.createElement("div"); d.className=klasse; d.textContent=text; box.appendChild(d); return d; };
+      mk("bp-name",z.platz+". "+z.name);
+      mk("bp-stand",z.stand);
+      const zl=mk("bp-ziel",z.ziel+" im Ziel");
+      if(z.liga!=null){ const l=document.createElement("span"); l.className="bp-liga"; l.textContent="+"+z.liga+" Pkt"; zl.appendChild(l); }
+      const bal=document.createElement("div"); bal.className="bp-balken";
+      const f=document.createElement("s"); f.style.width=z.pct+"%"; bal.appendChild(f); box.appendChild(bal);
+      el.appendChild(box);
+    }
+  }
   // HUD IM POD (aus updateHudBahn): die DOM-Anzeigetafel kennt nur Heim/Gast — sie zeigt hier den
-  // Fuehrenden, die Leinwand-Tafel (zeichneBahnPodTafel) alle vier Teams.
+  // Fuehrenden, die Vier-Team-Leiste darunter und die Leinwand-Tafel (zeichneBahnPodTafel) alle vier.
   function updateHudBahnPod(){
     const st=bahnPodLiveStand(), art=BA();
     const vorn=st.reihe[0];
@@ -64893,6 +65425,7 @@
     };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    bahnPodLeisteZeigen(st,schnitt);
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       feed(vorn?vorn.side:0,(vorn?vorn.name+" gewinnt das 4-Team-Rennen — ":"Rennen beendet — ")
@@ -66275,6 +66808,31 @@
     // Huepfer/die Dimmung benutzt (staffelFeierBild()), plus Zustand fuer die Zuordnung.
     teamFeierStand:()=>teamFeiern.map(f=>({seite:f.seite,stufe:f.stufe,nr:f.nr,seitMs:f.seitMs,
       anker:f.anker?{x:f.anker.x,y:f.anker.y}:null,raunen:!!f.raunen,funken:!!f.funken})),
+    // GANZE RUNDE (17.11.): Kalibrier-/Sondenschnittstelle der Staffel-Puste. `staffelRundePuste(neu)`
+    // setzt Felder von BAHN_ART.staffel.rundePuste fuer diese Sitzung (nur Messskripte),
+    // `staffelRundeLauf(saat)` faehrt ein stummes Duell und liefert je Laeufer tiefsten Stand/Einbruch.
+    staffelRundePuste:(neu)=>{
+      const P=BAHN_ART.staffel.rundePuste;
+      if(P&&neu&&typeof neu==="object")for(const k of Object.keys(neu))if(k in P)P[k]=neu[k];
+      if(neu&&typeof neu==="object"){
+        for(const k of ["kraftBasis","kraftSpanne","leerTempoBasis","zehrKoeff","zehrExponent"])
+          if(Number.isFinite(neu[k]))BAHN_ART.staffel[k]=neu[k];
+        if(neu.plaene&&typeof neu.plaene==="object")for(const [id,w] of Object.entries(neu.plaene))
+          if(BAHN_ART.staffel.plaene[id])Object.assign(BAHN_ART.staffel.plaene[id],w);
+      }
+      const S=BAHN_ART.staffel;
+      return P?{...P, kraftBasis:S.kraftBasis, kraftSpanne:S.kraftSpanne, leerTempoBasis:S.leerTempoBasis,
+        zehrKoeff:S.zehrKoeff, zehrExponent:S.zehrExponent}:null;
+    },
+    staffelRundeLauf:(saat)=>{
+      const M=MOTOREN.staffel, g=M.sichern(); M.vorher(); M.bau(saat||1337);
+      let guard=0; stumm=true;
+      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; } }
+      finally{ stumm=false; }
+      const erg={zeit:+rennT.toFixed(3), laeufer:staffelRundeStand()};
+      M.zurueck(g);
+      return erg;
+    },
     staffelFeierProbe:()=>BA().staffel?LAEUFER.map(u=>({id:u.id,seite:u.seite,bein:u.bein,aktiv:!!u.aktiv,
       fertig:u.fertig!=null,gestolpert:u.gestolpert||0,anteil:ovalAnteil(u),...staffelFeierBild(u)})):null,
     // ===== SENDUNGSRAHMEN-TAKTUNG (D7 / A4+A3 / Endstand-Nachlauf, 07.10.) =====
@@ -66830,6 +67388,19 @@
     },
     // Anzeige ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie echterKader.battlefieldPod;
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
+    // FORMAT-UMSCHALTER (17.11.): "orte3" (Standard, bit-identisch) | "domination5". Gilt fuer
+    // headless Pod-Laeufe ohne eigenes `optionen.format` (Messskripte); gibt das aktive Format zurueck.
+    battlefieldFormat:(f)=>{ if(f!=null)BF_POD_FORMAT=bfPodFormatPruefen(f); return BF_POD_FORMAT; },
+    // Kalibrierung des Fuenf-Punkte-Formats (nur Messskripte): flache Felder und `plan` ueberschreiben,
+    // `null` setzt auf BF_D5_GRUND zurueck.
+    battlefieldD5:(neu)=>{
+      if(neu===null)BF_D5=JSON.parse(JSON.stringify(BF_D5_GRUND));
+      else if(neu&&typeof neu==="object")for(const [k,w] of Object.entries(neu)){
+        if(k==="plan"&&w&&typeof w==="object")Object.assign(BF_D5.plan,w);
+        else if(k in BF_D5&&typeof BF_D5[k]==="number")BF_D5[k]=Number(w);
+      }
+      return JSON.parse(JSON.stringify(BF_D5));
+    },
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei

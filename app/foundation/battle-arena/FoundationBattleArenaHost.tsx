@@ -17,13 +17,12 @@ import {
 import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-strategie-adapter";
 import { buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { resolveArenaHostSeeds } from "@/lib/battle/arena-host-seed";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { ARENA_RESOLVED_DISCIPLINE_IDS, battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 import { baueFixtureIndex, findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaHostSpielquelleHinweise } from "@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis";
 import {
   getMiniDmPodForTeam,
-  getPodForTeam,
   resolveMiniDmFfaPlayerCountForMatchday,
   resolvePodPlayerCountForMatchday,
 } from "@/lib/season/mini-dm-pod-schedule";
@@ -34,6 +33,7 @@ import {
   buildArenaStandingsPanel,
 } from "@/lib/foundation/battle-arena/arena-live-panels";
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
+import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -241,11 +241,19 @@ export default function FoundationBattleArenaHost({
   // wie `miniDmPod` oben: `getPodForTeam(..., "battlefield")` ist dieselbe Funktion, mit der Resolve
   // die Vierergruppe bucht (`getPodsForMatchday`). Gibt es an diesem Spieltag keinen Battlefield-Pod
   // fuer `heimTeamId`, bleibt alles `null` und der Motor zeigt Battlefield wie bisher als Duell.
-  const battlefieldPod = useMemo(() => {
+  //
+  // VORSCHAU (17.11., `findeArenaPodMitVorschau`): steht Battlefield HEUTE nicht an, zeigt der
+  // Entwurfsreiter die Vierergruppe des naechsten Battlefield-Spieltags -- samt dessen Saat, k und
+  // Aufstellung, also genau das Gefecht, das dort gebucht wird. In der Spieltags-Ansicht nur "heute".
+  const battlefieldPodTreffer = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
     if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "battlefield", { saveId });
-  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    return findeArenaPodMitVorschau(gameState, podBezugTeamId, matchdayId, "battlefield", {
+      saveId,
+      nurHeute: spieltag != null,
+    });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId, spieltag]);
+  const battlefieldPod = battlefieldPodTreffer?.pod ?? null;
   const [bfPodTeamId0, bfPodTeamId1, bfPodTeamId2, bfPodTeamId3] =
     battlefieldPod?.teamIds ?? (["", "", "", ""] as const);
 
@@ -255,17 +263,45 @@ export default function FoundationBattleArenaHost({
   // Vierergruppe (`getPodForTeam`, wie die Buchung), dieselbe Saat (`buildBahnPodMatchSeed`, auch
   // Formkarten), dieselbe Aufstellung je Team und dieselbe Kopfzahl k wie der zaehlende Lauf
   // (`runBahnPodFixtures`). Ohne Pod fuer `heimTeamId` bleibt es beim Duell.
-  const bahnPodTakeshi = useMemo(() => {
+  // VORSCHAU (17.11.): wie bei Battlefield -- steht die Disziplin heute nicht an, die Vierergruppe des
+  // naechsten Spieltags, an dem sie als Pod gebucht wird (s. `findeArenaPodMitVorschau`). Genau das war
+  // Chris' Befund "in takeshi ... nur 2 teams": am Live-Stand (Spieltag 1) stand weder Takeshi noch
+  // Staffel an, die Suche nur am aktuellen Spieltag fand keinen Pod, und der Motor zeigte das Duell.
+  const bahnPodTakeshiTreffer = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
     if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "takeshis-castle", { saveId });
-  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
-  const bahnPodStaffel = useMemo(() => {
+    return findeArenaPodMitVorschau(gameState, podBezugTeamId, matchdayId, "takeshis-castle", {
+      saveId,
+      nurHeute: spieltag != null,
+    });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId, spieltag]);
+  const bahnPodStaffelTreffer = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
     if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "staffel", { saveId });
-  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    return findeArenaPodMitVorschau(gameState, podBezugTeamId, matchdayId, "staffel", {
+      saveId,
+      nurHeute: spieltag != null,
+    });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId, spieltag]);
+  const bahnPodTakeshi = bahnPodTakeshiTreffer?.pod ?? null;
+  const bahnPodStaffel = bahnPodStaffelTreffer?.pod ?? null;
   const bahnPodTeamIdsSchluessel = [...(bahnPodTakeshi?.teamIds ?? []), ...(bahnPodStaffel?.teamIds ?? [])].join("|");
+
+  // ENTWURFS-VIERERGRUPPE (17.11.), nur noch LETZTER Rueckfall: findet `findeArenaPodMitVorschau` in
+  // der ganzen Saison keinen Pod (kein Spielplan, Liga nicht durch 4 teilbar), zeigt der Entwurfsreiter
+  // eine Vierergruppe aus Heim, Gast und den naechsten zwei Teams der Liste. Nur Anzeige: nichts davon
+  // wird gebucht, der Hinweistext sagt es. In der Spieltags-Ansicht (`spieltag` gesetzt) gibt es sie
+  // nie -- dort gilt weiter "gezeigt = gebucht".
+  const entwurfsGruppeTeamIds = useMemo<string[] | null>(() => {
+    if (spieltag || teams.length < 4) return null;
+    const ids = [heimTeamId, gastTeamId].filter((id, i, alle) => id && alle.indexOf(id) === i);
+    for (const team of teams) {
+      if (ids.length >= 4) break;
+      if (!ids.includes(team.teamId)) ids.push(team.teamId);
+    }
+    return ids.length === 4 ? ids : null;
+  }, [spieltag, teams, heimTeamId, gastTeamId]);
+  const entwurfsGruppeSchluessel = entwurfsGruppeTeamIds?.join("|") ?? "";
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -300,6 +336,7 @@ export default function FoundationBattleArenaHost({
           bfPodTeamId2,
           bfPodTeamId3,
           ...bahnPodTeamIdsSchluessel.split("|"),
+          ...entwurfsGruppeSchluessel.split("|"),
         ].filter(Boolean),
       ),
     ];
@@ -362,6 +399,7 @@ export default function FoundationBattleArenaHost({
     bfPodTeamId2,
     bfPodTeamId3,
     bahnPodTeamIdsSchluessel,
+    entwurfsGruppeSchluessel,
     activeManagerTeamId,
   ]);
 
@@ -399,11 +437,16 @@ export default function FoundationBattleArenaHost({
   // aus dem Spielplan-Slot, eine reproduzierbare Saat je Pod und die echte Aufstellung je Team.
   // `null`, solange nicht alle vier Kader stehen — dann zeigt der Motor das Duell wie bisher.
   const battlefieldPodNutzlast = useMemo(() => {
-    if (!battlefieldPod) return null;
-    const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+    // Ohne echten Pod im Entwurfsreiter: die Entwurfs-Vierergruppe (s. `entwurfsGruppeTeamIds`).
+    const entwurf = !battlefieldPod && entwurfsGruppeTeamIds != null;
+    const podTeamIds = battlefieldPod?.teamIds ?? entwurfsGruppeTeamIds;
+    if (!podTeamIds) return null;
+    // Saat, k und Aufstellung vom Spieltag, an dem DIESE Gruppe gebucht wird (heute oder Vorschau).
+    const matchdayId = battlefieldPodTreffer?.matchdayId ?? gameState.matchdayState?.matchdayId ?? null;
     const seasonId = gameState.season?.id;
-    if (!matchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
-    const podTeams = battlefieldPod.teamIds.map((teamId) => {
+    if (!seasonId || !saveId || saveId === "loading-save") return null;
+    if (!matchdayId && !entwurf) return null;
+    const podTeams = podTeamIds.map((teamId) => {
       const team = teams.find((t) => t.teamId === teamId);
       return {
         name: team?.name ?? teamId,
@@ -414,20 +457,32 @@ export default function FoundationBattleArenaHost({
     if (!podTeams.every((t) => t.kader.length > 0)) return null;
     return {
       teams: podTeams,
-      k: resolvePodPlayerCountForMatchday(gameState, matchdayId, "battlefield", { saveId }),
-      saat: seedZuZahl(buildBattlefieldPodMatchSeed({ saveId, seasonId, matchdayId, podId: battlefieldPod.id })),
-      aufstellung: battlefieldPod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+      k: matchdayId ? resolvePodPlayerCountForMatchday(gameState, matchdayId, "battlefield", { saveId }) : null,
+      saat: seedZuZahl(
+        buildBattlefieldPodMatchSeed({
+          saveId,
+          seasonId,
+          matchdayId: matchdayId ?? "entwurf",
+          podId: battlefieldPod?.id ?? `entwurf-${podTeamIds.join("-")}`,
+        }),
+      ),
+      aufstellung: podTeamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+      entwurf,
+      vorschau: battlefieldPodTreffer && battlefieldPodTreffer.art !== "heute" ? battlefieldPodTreffer : null,
+      // Format-Umschalter (17.11.): dieselbe Konstante wie die Buchung (BATTLEFIELD_POD_FORMAT); im
+      // Standard "orte3" fehlt das Feld, der Motor zeigt dann das Gefecht je Ort wie bisher.
+      ...battlefieldPodFormatOption(),
     };
-  }, [battlefieldPod, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
 
   // BAHN-POD, Nutzlast fuer den Motor (`echterKader.bahnPodByDisciplineId[bd]`, gelesen von
   // `bahnPodAnzeigeKontext()` in battle-mode.engine.js): je Bahn-Pod-Disziplin dieses Spieltags die
   // vier Kader in Pod-Reihenfolge, k, die Wertungssaat und die Aufstellung je Team. Fehlt ein Kader
   // noch (Bulk-Laden laeuft), bleibt die Disziplin draussen und der Motor zeigt das Duell.
   const bahnPodNutzlast = useMemo(() => {
-    const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+    const heuteMatchdayId = gameState.matchdayState?.matchdayId ?? null;
     const seasonId = gameState.season?.id;
-    if (!matchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
+    if (!heuteMatchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
     const karte: Record<
       string,
       {
@@ -435,14 +490,24 @@ export default function FoundationBattleArenaHost({
         k: number | null;
         saat: number;
         aufstellung: ReturnType<typeof buildArenaAufstellung>[];
+        /** Entwurfs-Vierergruppe statt gebuchtem Pod (nur im Entwurfsreiter, nur Hinweistext). */
+        entwurf: boolean;
+        /** Gebuchter Pod eines anderen Spieltags (Vorschau/Rueckblick), sonst null. */
+        vorschau: { spieltagNummer: number; art: "heute" | "vorschau" | "rueckblick" } | null;
       }
     > = {};
-    for (const [disciplineId, pod] of [
-      ["takeshis-castle", bahnPodTakeshi],
-      ["staffel", bahnPodStaffel],
+    for (const [disciplineId, treffer] of [
+      ["takeshis-castle", bahnPodTakeshiTreffer],
+      ["staffel", bahnPodStaffelTreffer],
     ] as const) {
-      if (!pod) continue;
-      const podTeams = pod.teamIds.map((teamId) => ({
+      const pod = treffer?.pod ?? null;
+      // Saat, k und Aufstellung vom Spieltag, an dem DIESE Gruppe gebucht wird (heute oder Vorschau).
+      const matchdayId = treffer?.matchdayId ?? heuteMatchdayId;
+      // Ohne echten Pod im Entwurfsreiter: die Entwurfs-Vierergruppe (s. `entwurfsGruppeTeamIds`).
+      const entwurf = !pod && entwurfsGruppeTeamIds != null;
+      const podTeamIds = pod?.teamIds ?? entwurfsGruppeTeamIds;
+      if (!podTeamIds) continue;
+      const podTeams = podTeamIds.map((teamId) => ({
         name: teams.find((t) => t.teamId === teamId)?.name ?? teamId,
         kurz: gameState.teams.find((t) => t.teamId === teamId)?.shortCode ?? null,
         kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId),
@@ -451,12 +516,22 @@ export default function FoundationBattleArenaHost({
       karte[disciplineId] = {
         teams: podTeams,
         k: resolvePodPlayerCountForMatchday(gameState, matchdayId, disciplineId, { saveId }),
-        saat: seedZuZahl(buildBahnPodMatchSeed({ saveId, seasonId, matchdayId, disciplineId, podId: pod.id })),
-        aufstellung: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+        saat: seedZuZahl(
+          buildBahnPodMatchSeed({
+            saveId,
+            seasonId,
+            matchdayId,
+            disciplineId,
+            podId: pod?.id ?? `entwurf-${podTeamIds.join("-")}`,
+          }),
+        ),
+        aufstellung: podTeamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+        entwurf,
+        vorschau: treffer && treffer.art !== "heute" ? treffer : null,
       };
     }
     return Object.keys(karte).length > 0 ? karte : null;
-  }, [bahnPodTakeshi, bahnPodStaffel, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [bahnPodTakeshiTreffer, bahnPodStaffelTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
 
   // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
   // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier
@@ -1297,14 +1372,38 @@ export default function FoundationBattleArenaHost({
             unabhängige Gruppierung).
           </p>
         ) : null}
-        {battlefieldPodNutzlast ? (
+        {entwurfsGruppeTeamIds &&
+        (battlefieldPodNutzlast?.entwurf || Object.values(bahnPodNutzlast ?? {}).some((pod) => pod.entwurf)) ? (
+          <p
+            className="muted"
+            data-testid="oly-arena-entwurf-vierergruppe"
+            style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
+          >
+            Takeshi&apos;s Castle, Staffel und Battlefield laufen hier als 4-Team-Format (Punkte 2-1-0-0 nach
+            Platz). Steht die Disziplin am aktuellen Spieltag nicht an, ist es eine Entwurfs-Vierergruppe
+            aus Heim, Gast und zwei weiteren Teams — nur zum Ansehen, nichts davon wird gebucht:{" "}
+            {entwurfsGruppeTeamIds.map((teamId, index) => (
+              <span key={teamId}>
+                {index > 0 ? ", " : ""}
+                <strong>{teams.find((t) => t.teamId === teamId)?.name ?? teamId}</strong>
+              </span>
+            ))}
+            .
+          </p>
+        ) : null}
+        {battlefieldPodNutzlast && !battlefieldPodNutzlast.entwurf ? (
           <p
             className="muted"
             data-testid="oly-arena-battlefield-pod"
             style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
           >
             Battlefield läuft hier als 4-Team-FFA — alle vier Teams der gebuchten Vierergruppe
-            kämpfen gleichzeitig um Nord, Mitte und Süd, und gewertet wird genau dieses Gefecht:{" "}
+            {battlefieldPodNutzlast.vorschau
+              ? ` von Spieltag ${battlefieldPodNutzlast.vorschau.spieltagNummer} (${
+                  battlefieldPodNutzlast.vorschau.art === "vorschau" ? "Vorschau" : "Rückblick"
+                }: Battlefield steht heute nicht an)`
+              : ""}{" "}
+            kämpfen gleichzeitig um die Orte, und gewertet wird genau dieses Gefecht:{" "}
             {battlefieldPodNutzlast.teams.map((team, index) => (
               <span key={team.name + index}>
                 {index > 0 ? ", " : ""}
@@ -1315,15 +1414,21 @@ export default function FoundationBattleArenaHost({
           </p>
         ) : null}
         {bahnPodNutzlast
-          ? Object.entries(bahnPodNutzlast).map(([disciplineId, pod]) => (
+          ? Object.entries(bahnPodNutzlast).filter(([, pod]) => !pod.entwurf).map(([disciplineId, pod]) => (
               <p
                 key={disciplineId}
                 className="muted"
                 data-testid={`oly-arena-bahn-pod-${disciplineId}`}
                 style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
               >
-                {disciplineId === "staffel" ? "Staffel" : "Takeshi's Castle"} läuft hier als 4-Team-Rennen — gezeigt
-                wird die gebuchte Vierergruppe (2-1-0-0 nach Platz):{" "}
+                {disciplineId === "staffel" ? "Staffel" : "Takeshi's Castle"} läuft hier als 4-Team-Rennen —{" "}
+                gezeigt wird die gebuchte Vierergruppe
+                {pod.vorschau
+                  ? ` von Spieltag ${pod.vorschau.spieltagNummer} (${
+                      pod.vorschau.art === "vorschau" ? "Vorschau" : "Rückblick"
+                    }: die Disziplin steht heute nicht an)`
+                  : ""}{" "}
+                (2-1-0-0 nach Platz):{" "}
                 {pod.teams.map((team, index) => (
                   <span key={team.name + index}>
                     {index > 0 ? ", " : ""}

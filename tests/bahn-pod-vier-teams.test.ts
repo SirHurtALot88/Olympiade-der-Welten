@@ -56,10 +56,13 @@ const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 //                               docs/design/kontakt-persoenlichkeit-16-11.md 6.5; Eltern-Stand fa2a52d9 noch aaf683d5...,
 //                               nur diese eine Zeile bewegt sich, die vier anderen Bahnen bleiben gleich)
 //   staffel bbb0c028e8447abe -> 78236478f3941cc3 bei b6462832 (#1499, Health von ROBUST nach STEHEN)
+//   staffel 78236478f3941cc3 -> ffcb5fa8568a8601 am 17.11. (GANZE RUNDE, PUSTE WIRKT: bewusste
+//            Wertungsaenderung, BAHN_ART.staffel.rundePuste, abgenommen: Duell rho 0,957, Pp 13,2/14,0;
+//            docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2)
 // Takeshi's Castle, Zeitfahren und Climbing sind seit dem Umbau unveraendert.
 const SAATEN: Array<number | string> = [1, 7, 42, 1337, "save:s1:md3:staffel"];
 const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
-  staffel: "78236478f3941cc3",
+  staffel: "ffcb5fa8568a8601",
   "takeshis-castle": "5bbb7171f24f2908",
   spurt: "8e96b1dc33ad1b1c",
   "time-trial": "b167882f39f9bc63",
@@ -207,9 +210,11 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
   //            staffel -> 28b0dc7aec07abed, takeshis-castle -> d91070176c0010b4
   //            (echte Ergebnisverschiebung im Pod, nicht nur Text -- Zielzeiten/Plaetze aendern sich)
   //   b6462832 (#1499, Staffel-Health nach STEHEN): staffel -> 5aad1c353c0efcab
+  //   17.11. (GANZE RUNDE, PUSTE WIRKT, s. oben): staffel -> 7533f61ed6de70c0; Pod-Abnahme NEU GEMESSEN
+  //            (k=2/4/6 rho 0,925/0,921/0,953, Pp 19,7/21,1 bei n=48 in zwei Saatstroemen).
   // Die Pod-Pp-Abnahme selbst ist dabei NICHT neu gemessen worden (scripts/miss-bahn-pod-abnahme.mjs).
   const POD_FINGERABDRUECKE_KALIBRIERT: Record<string, string> = {
-    staffel: "5aad1c353c0efcab",
+    staffel: "7533f61ed6de70c0",
     "takeshis-castle": "d91070176c0010b4",
   };
   it.each(Object.keys(POD_FINGERABDRUECKE_KALIBRIERT))(

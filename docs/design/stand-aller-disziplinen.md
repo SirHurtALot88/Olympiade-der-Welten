@@ -25,6 +25,13 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Sechsunddreißigster Nachtrag 17.11. — Staffel: ganze Runde, Puste wirkt; vier Teams in der Arena.**
+Chris am 17.11.: Staffel läuft nur halbe Runden, Puste ist egal, nur 2 Teams in Takeshi/Staffel/Battlefield. Befund und Messung:
+`docs/design/vier-teams-staffel-battlefield-17-11.md`. Staffel Duell rho je Spiel 0,924 → **0,957**, Pp 22,0 / 21,6 → **13,2 / 14,0**;
+Pod rho k=2/4/6 0,926 / 0,921 / 0,954, Pp 19,7 / 21,1. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 8bbc6ea215f6**, bewegt nur die
+vier Staffel-Zeilen. Matrix unangetastet (Rezept über die Budget-Methode, `kraftMix` 0,45). Battlefield Domination mit 5 Punkten ist
+als Umschalter gebaut (`BATTLEFIELD_POD_FORMAT`, Standard `orte3`, bit-identisch).
+
 **Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
 Chris am 17.11.: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern
 länger als 1 Stern, ein Besserer füllt den Balken deutlich schneller. Alles ist jetzt Wertung, nicht
