@@ -17284,6 +17284,10 @@
         } else if(LW&&!(imFastbreak&&fastbreak.seite===u.side)){
           const r=lwBallfuehrer(u,zx,zy,korbX,LW); zx=r.x; zy=r.y; tempoMul*=r.tempo;
         }
+        if(LW&&(fsT<(u.ausbruchBis||0)||(imFastbreak&&fastbreak.seite===u.side))){
+          // Ausbruch/Fast-Break: keine Halbfeld-Absicht (nur Anzeige/Sonde, keine Formel liest es).
+          const z=lwZ(u); if(z.art==="postup"||z.art==="pnr"){ z.art=null; z.postSeit=null; }
+        }
       } else if(fsLive.ball.frei&&(istHockey()
                  ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
                  : JAEGER?JAEGER.has(u):dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
@@ -69612,8 +69616,12 @@
         }
         return false;
       };
-      while(!done&&guard<60000){ stepFeldspiel(1/60); guard++; if(passt())break; }
+      const laengen=[]; // floats-Laenge der letzten 30 Ticks (s. unten)
+      while(!done&&guard<60000){ laengen.push(floats.length); if(laengen.length>30)laengen.shift(); stepFeldspiel(1/60); guard++; if(passt())break; }
       vpSichtbarBis=0; // Viertelpausen-Tafel (Wandzeit) nicht ueber das Standbild legen
+      // Schwebetexte aus dem Vorspulen ("STEAL!", "BLOCK!" laengst vergangener Szenen) nicht ins
+      // Standbild uebernehmen — nur die der letzten halben Sekunde (30 Ticks) bleiben (Runde 2).
+      if(laengen.length)floats.splice(0,Math.min(floats.length,laengen[0]));
       return {gefunden:!done&&guard<60000, t:+fsT.toFixed(2), punkte:[...fsPunkte]};
     },
     // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der

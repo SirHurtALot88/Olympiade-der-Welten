@@ -129,7 +129,9 @@ try {
     await seite.evaluate(() => {
       for (const id of ["einlauf", "bbugcallout", "viertelpause"]) { const e = document.getElementById(id); if (e) e.hidden = true; }
     });
-    await seite.waitForTimeout(500);
+    // Runde 2: die Kamera (KAMERA-MODUL) braucht ~1,5 s Wandzeit, bis sie von der vorigen Szene
+    // herueber geschwenkt ist.
+    await seite.waitForTimeout(RUNDE2 ? 1500 : 500);
     const out = path.join(ziel, `${praefix}-${sz.name}.png`);
     await (await seite.$("#cv")).screenshot({ path: out });
     console.log(`${out}  (${sz.situation}, Saat ${sz.saat}, t=${erg.t}s, Stand ${erg.punkte.join(":")}, gefunden=${erg.gefunden})`);

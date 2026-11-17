@@ -95,3 +95,21 @@ Zahl (9 %) ist die Größe, die den Klumpen trifft.
 - `node scripts/miss-spacing.mjs [disziplin] [spiele] [sekunden] [radius]`, mit
   `OLY_ENGINE_DATEI=<kopie>` für Vorher/Nachher gegen eine eingefrorene Engine-Kopie.
 - `window.__arena.diagSpacing(saaten, bis, dId, r)`: read-only, wie `diagAbstaende`.
+
+## 6. Runde 2 (17.11. abends): Laufwege, Feld-Grenze, Kamera — dieselbe Anschlusslogik
+
+Drei weitere Bausteine nach demselben Muster (Parameterblock in `FELDSPIEL_ART[d]`, ohne Block altes
+Verhalten zeichengleich). Erste Anwendung wieder Basketball, Messungen in
+`docs/design/benchmark-basketball-17-11.md` Abschnitt 7.
+
+| Baustein | Block | Was eine andere Disziplin zum Anschalten braucht |
+|---|---|---|
+| **FELD-GRENZE** `feldGrenze(zx,zy)` | `feld.grenze {laengs:[a,b], querHalb, rand}` | die gezeichneten Grundlinien (Anteil von W) und die halbe Feldbreite in px. Hockey: Bande statt Linie (`RINK()`), Football: Seitenlinien. Abnahme: `diagSpielzuege(n).seitenlinie.ausserhalb` = 0. |
+| **LAUFWEG-MODUL** `lwBallfuehrer`, `lwAngreifer`, `lwVerteidiger`, `lwCrash`, `lwFastbreakLane` | `laufwege {postBlock, postUp, backdoor, deny, pickRoll, ausboxen, crash, fastbreak, rotation, tempo, passArt, wurfAbsicht}` | Jeder Unterblock einzeln: fehlt er (`null`), ist der Baustein aus. Hockey: `deny`+`backdoor` (Pass in den Rücken des Verteidigers), `crash` (Netfront), `fastbreak` (Odd-Man-Rush), `tempo`. Fußball-artige: `deny`, `rotation`, `fastbreak`. Post-up/Pick sind basketballnah, bleiben dort aus. |
+| **KAMERA-MODUL** `feldKameraAnwenden` | `kamera {zoom, korbZug, querZug, daempfung, zoomDaempfung, nahZoom, nahDauer, nahVersatz}` | nichts außer dem Block — liest Ball, Ballbesitz und den laufenden Wurf; `korbXVon` liefert das angegriffene Ziel (Tor/Endzone). |
+| **TEAMFOUL-/BONUS-MODUL** | `fouls {bonusAb, reachIn, einwurfRest}` | basketballspezifisch; Hockey hat Strafzeiten. |
+| **EFFEKT-/TON-MODUL** | — (basketballeigen) | Muster (Ereignis-Warteschlange mit Deckel, Ton erst nach Geste) übertragbar. |
+
+Zustand aller Module liegt in WeakMaps bzw. modulweiten Variablen, nie an den Spielerobjekten
+(Fingerabdruck). Abnahme beim Anschalten wie in Abschnitt 4: `miss-alle-disziplinen.mjs`,
+`messe-arena-einfluss.mjs`, `miss-spacing.mjs`, dazu `diagSpielzuege` für die Häufigkeit der Aktionen.
