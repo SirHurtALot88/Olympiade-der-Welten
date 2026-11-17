@@ -5,10 +5,12 @@ Nach #1521, #1523, #1526, #1527, #1530 und #1533 (Engine-Anzeige, Interpolation,
 Tennis-Kulisse im Node-Runner, I-Spy) wurden Football und Hockey frisch gemessen, bei unverändertem
 Wertungs-Fingerabdruck **GESAMT e80babacb68c**. Ergebnis: **bit-identisch zur Erstmessung** — Football
 rho je Spiel 0,854 (Saison 0,937), Pp 15,3 / 16,0; Hockey rho je Spiel 0,700 (nur Feldspieler 0,784),
-Saison 0,888, Roh-Pp 31,9 / 24,1 in den Strömen 0 und 10000000. Letztere sind **Einzelströme** und
-liegen für Hockey im bekannten Rauschboden (`docs/design/hockey-pp-messbasis-10-11.md`); abnahmefähig
-ist nur der gepoolte Wert **13,9 / 21,8** (unverändert, unter 25). Die anderen vier Hockey-Ströme
-wurden nicht erneut gefahren (je rund 40 Minuten, Saaten deterministisch, Ergebnis vorhersagbar).
+Saison 0,888; Hockey-Pp-Pool 1 vollständig neu gefahren (Ströme 0 / 10000000 / 20000000, je n=48):
+Roh-Pp 31,9 / 24,1 / 27,4, Attributgewinne bit-identisch zu den Rohdaten der Erstmessung, gepoolt
+wieder exakt **13,9**. Einzelströme liegen für Hockey im bekannten Rauschboden
+(`docs/design/hockey-pp-messbasis-10-11.md`); abnahmefähig ist nur der gepoolte Wert **13,9 / 21,8**
+(unter 25). Pool 2 (3e7/4e7/5e7, je rund 40 Minuten) wurde nicht erneut gefahren — Saaten
+deterministisch, Fingerabdruck und Pool 1 bit-identisch, 21,8 ist daher aus der Erstmessung übernommen.
 Hockey bleibt bei rho unter 0,80 mit Chris' Ausnahme (Star-/Paartreue statt nackter Rangkorrelation).
 Keine Rezept- oder Matrixänderung.
 
@@ -65,6 +67,10 @@ unabhängiger Beleg, dass die Zahlen reproduzierbar sind, keine Lauf-zu-Lauf-Art
 | battlefield | arena (Zweier-Duell, außerhalb der Wertung) | 0,399 (15.10., `rhoFrisch:false`) | **0,589** (`rhoFrisch:true`) | 0,276 | 0,664 | durchgefallen, außerhalb der Wertung — gewertet wird der Vierer-Pod (0,861–0,923, s. 29. Nachtrag) | 30,1/37,1 (alt, irrelevant für die Wertung) | Dokukorrektur, kein neuer Befund |
 | football | feldspiel | 0,807 / Pp 121,0/120,1 (25.10., **gegen den inzwischen zurückgebauten Override gemessen**) | **0,248** / Pp **113,2/116,2** (erster gültige Messpunkt NACH dem Matrix-Rückbau b5731dd6f, 14.11.) | 0,809 | 0,266 | durchgefallen (rho UND Pp) — s. eigener Abschnitt unten | fünf verworfene Rezept-/Matrixanläufe seit 14.11. (rho 0,50–0,58) | dramatisch, aber erwartet/dokumentiert |
 | mini-dm | arena (falsches Chassis) | 0,8 (16.10.) | 0,199 (bekanntes Messartefakt, s. Fußnote von `miss-alle-disziplinen.mjs`) | — | — | durchgefallen — Messartefakt, reale Mechanik ist `mini-dm-ffa` | — | nicht vergleichbar, kein neuer Befund |
+
+**Stand 17.11. für die Zeilen football und hockey:** überholt durch den Einunddreißigsten und
+Zweiunddreißigsten Nachtrag oben — football rho 0,854 / Saison 0,937 / Pp 15,3/16,0 (bestanden),
+hockey rho 0,700 (nur Feldspieler 0,784) / Saison 0,888 / Pp-Pool 13,9/21,8 (rho per Ausnahme).
 
 \* `OLY_FORM_MODUS=echt`, wie seit der P4-Formkarten-Welle für diese beiden Disziplinen Pflicht.
 \*\* `miss-tdm-gefecht-abnahme.mjs --je-seite=2..6` bleibt die maßgebliche Zahl (andere
