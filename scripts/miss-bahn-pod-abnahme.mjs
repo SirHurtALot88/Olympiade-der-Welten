@@ -184,15 +184,18 @@ try {
     ausgabe.pp = [];
     for (const versatz of STROEME) {
       const t0 = Date.now();
-      const r = await seite.evaluate(([d, extra, n, v]) => {
+      // Pp bei der ERSTEN --je-seite-Angabe (17.11., Review S1: vorher immer art.jeSeite = 6, auch
+      // wenn die Rangtreue mit --je-seite=4 lief).
+      const ppJe = JE_SEITE.find((x) => x) ?? null;
+      const r = await seite.evaluate(([d, extra, n, v, js]) => {
         const st = window.setTimeout;
         window.setTimeout = () => 0;
         try {
-          return window.__arena.bahnPodEinfluss(d, extra, n, undefined, v);
+          return window.__arena.bahnPodEinfluss(d, extra, n, undefined, v, undefined, js ?? undefined);
         } finally {
           window.setTimeout = st;
         }
-      }, [DISZIPLIN, [KADER[0], KADER[1]], PP_LAEUFE, versatz]);
+      }, [DISZIPLIN, [KADER[0], KADER[1]], PP_LAEUFE, versatz, ppJe]);
       ausgabe.pp.push({ ...r, sekunden: (Date.now() - t0) / 1000 });
     }
   }
@@ -214,7 +217,7 @@ console.log(`\nAusgeschieden/ohne Ziel (Laeufer, %): ${ausgabe.laeufe.map((l) =>
 if (DISZIPLIN === "staffel") console.log(`Teams ohne Zieleinlauf (%): ${ausgabe.laeufe.map((l) => f1(l.teamsOhneZiel)).join("  ")}`);
 console.log("Schranke (CLAUDE.md): rho je Rennen ueber 0,80, angestrebt 0,85.");
 for (const p of ausgabe.pp || []) {
-  console.log(`Pp-Abweichung (Pod, ${p.teams} Teams, ${p.laeufe} Laeufe, Strom ${p.saatVersatz}): ${p.abweichungPp}  [${p.reihen.map((r) => `${r.attribut} ${r.anteil}`).join(", ")}]  (${p.sekunden.toFixed(0)} s)`);
+  console.log(`Pp-Abweichung (Pod, ${p.teams} Teams, k = ${p.jeSeite ?? "art.jeSeite"}, ${p.laeufe} Laeufe, Strom ${p.saatVersatz}): ${p.abweichungPp}  [${p.reihen.map((r) => `${r.attribut} ${r.anteil}`).join(", ")}]  (${p.sekunden.toFixed(0)} s)`);
 }
 if (ausgabe.pp) console.log("Schranke Pp (CLAUDE.md): <= 25 in zwei Saatstroemen.");
 console.log(`Seitenfehler: ${fehler.length ? fehler.join(" | ") : "keine"}`);

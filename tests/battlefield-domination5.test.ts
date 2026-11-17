@@ -144,6 +144,27 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
     expect(fehler).toEqual([]);
   }, LAUF_TIMEOUT_MS);
 
+  // Review D1 (17.11.): mit Respawn ist "einziges stehendes Team" eine Momentaufnahme, kein Sieg-Weg.
+  // Im Fuenf-Punkte-Format entscheiden die Punkte -- mehr Punkte heisst nie schlechterer Platz.
+  // Review N5: Echtzeit-Pod (alter Drei-Orte-Kampf) und "domination5" schliessen sich aus.
+  it("Platzierung nach Punkten (kein 'letztes Team steht'-Vorrang), Echtzeit + domination5 abgelehnt", async () => {
+    const teams = vierTeams();
+    const r = await seite.evaluate((teams) => {
+      const A = (window as unknown as { __arena: Arena }).__arena;
+      const laeufe = [1, 7, 42, 1337, 4711, 9001].map((s) =>
+        A.spieleBattlefieldPod(teams, s, null, { formSaat: s, jeSeite: 3, format: "domination5" }).teams);
+      let fehlerText = "";
+      try { A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, format: "domination5", echtzeit: true }); }
+      catch (e) { fehlerText = String(e); }
+      return { laeufe, fehlerText, danach: A.battlefieldFormat() };
+    }, teams);
+    for (const t of r.laeufe) {
+      for (const a of t) for (const b of t) if (a.punkte > b.punkte) expect(a.eventPlatz).toBeLessThan(b.eventPlatz);
+    }
+    expect(r.fehlerText).toContain("echtzeit");
+    expect(r.danach).toBe("orte3");
+  }, LAUF_TIMEOUT_MS);
+
   it("gezeigt = gebucht: das Replay im Fuenf-Punkte-Format endet exakt im gebuchten Endstand", async () => {
     const teams = vierTeams();
     const r = await seite.evaluate((teams) => {

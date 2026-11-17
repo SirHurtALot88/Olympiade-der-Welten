@@ -8,7 +8,9 @@
 // Verteilung und Renndauer. Optional ein Parametersatz als JSON (setzt rundePuste/kraftBasis/... fuer
 // diese Sitzung ueber window.__arena.staffelRundePuste):
 //
-//   node scripts/miss-staffel-runde-puste.mjs [rennen] ['{"zehrFaktor":2.6,"kraftBasis":230}']
+//   node scripts/miss-staffel-runde-puste.mjs [rennen] ['{"zehrFaktor":2.6,"kraftBasis":230}'] [--je-seite=k]
+//
+// --je-seite=k (17.11., Review S1): k Laeufer = k Beine je Seite (Liga/Pod meist 4). Ohne: Duell, k = 6.
 //
 // Rangtreue/Pp bleiben bei scripts/miss-alle-disziplinen.mjs bzw. scripts/messe-arena-einfluss.mjs.
 import { chromium } from "playwright";
@@ -19,7 +21,8 @@ import path from "node:path";
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
 const RENNEN = Number(process.argv[2] || 24);
-const PARAMETER = process.argv[3] ? JSON.parse(process.argv[3]) : null;
+const PARAMETER = process.argv[3] && !process.argv[3].startsWith("--") ? JSON.parse(process.argv[3]) : null;
+const JE_SEITE = Number((process.argv.find((a) => a.startsWith("--je-seite=")) || "").split("=")[1]) || null;
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
@@ -30,23 +33,24 @@ try {
   await seite.addInitScript(() => { window.AudioContext = undefined; });
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.staffelRundeLauf, null, { timeout: 60000 });
-  const r = await seite.evaluate(({ RENNEN, PARAMETER }) => {
+  const r = await seite.evaluate(({ RENNEN, PARAMETER, JE_SEITE }) => {
     const A = window.__arena;
     const satz = A.staffelRundePuste(PARAMETER || {});
     const alle = [], zeiten = [];
     for (let s = 1; s <= RENNEN; s += 1) {
-      const e = A.staffelRundeLauf(s * 7919);
+      const e = A.staffelRundeLauf(s * 7919, JE_SEITE || undefined);
       zeiten.push(e.zeit);
       alle.push(...e.laeufer);
     }
     return { satz, alle, zeiten };
-  }, { RENNEN, PARAMETER });
+  }, { RENNEN, PARAMETER, JE_SEITE });
   const q = (a, p) => { const b = [...a].sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(p * b.length))]; };
   const mins = r.alle.map((l) => l.minPuste);
   const proz = (x) => (100 * x).toFixed(1).replace(".", ",") + " %";
   const plaene = {};
   for (const l of r.alle) plaene[l.plan] = (plaene[l.plan] || 0) + 1;
   console.log("Parametersatz:", JSON.stringify(r.satz));
+  console.log(`je Seite ${JE_SEITE || "6 (Duell)"}`);
   console.log(`Laeufer ${r.alle.length} in ${RENNEN} Rennen, Renndauer Median ${q(r.zeiten, 0.5).toFixed(2)} s`);
   console.log(`tiefste Puste: Q10 ${proz(q(mins, 0.1))} · Q25 ${proz(q(mins, 0.25))} · Median ${proz(q(mins, 0.5))} · Q75 ${proz(q(mins, 0.75))}`);
   console.log(`eingebrochen (Tank leer): ${proz(r.alle.filter((l) => l.eingebrochen).length / r.alle.length)}`);
@@ -61,7 +65,7 @@ try {
     // Saaten: lohnt sich die Einteilung, und fuer wen? Gruppiert nach Puste-Vorrat (Quartile).
     // Einteilung fuer den Vergleich: EIN_TEMPO/EIN_AB (Umgebung), Standard = Plan "halten".
     const EIN = { tempo: Number(process.env.EIN_TEMPO || 0.95), ab: Number(process.env.EIN_AB || 0.55) };
-    const v = await seite.evaluate(({ RENNEN, PARAMETER, EIN }) => {
+    const v = await seite.evaluate(({ RENNEN, PARAMETER, EIN, JE_SEITE }) => {
       const A = window.__arena;
       const basis = A.staffelRundePuste({});
       const orig = { angehen: null, halten: null };
@@ -69,13 +73,13 @@ try {
         A.staffelRundePuste({ ...(PARAMETER || {}), planNachPuste: false,
           plaene: { halten: planWerte, angehen: planWerte, schluss: planWerte } });
         const aus = [];
-        for (let s = 1; s <= RENNEN; s += 1) aus.push(...A.staffelRundeLauf(s * 7919).laeufer.map((l) => ({ ...l, s })));
+        for (let s = 1; s <= RENNEN; s += 1) aus.push(...A.staffelRundeLauf(s * 7919, JE_SEITE || undefined).laeufer.map((l) => ({ ...l, s })));
         return aus;
       };
       const voll = lauf({ tempo: 1.0, ab: 0.0 });
       const ein = lauf(EIN);
       return { voll, ein, basis, orig };
-    }, { RENNEN, PARAMETER, EIN });
+    }, { RENNEN, PARAMETER, EIN, JE_SEITE });
     const schl = (l) => l.s + "|" + l.seite + "|" + l.n;
     const ein = new Map(v.ein.map((l) => [schl(l), l]));
     const paare = v.voll.map((l) => ({ voll: l, ein: ein.get(schl(l)) })).filter((p) => p.ein && p.voll.etappe && p.ein.etappe);

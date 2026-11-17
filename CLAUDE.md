@@ -467,10 +467,10 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-17.11.: **GESAMT 8bbc6ea215f6 (75 Eintraege)** — absichtlich bewegt von der Staffel „ganze Runde, Puste wirkt“
-(`docs/design/vier-teams-staffel-battlefield-17-11.md` Abschnitt 2); gegenueber dem Vorstand `d09e10bb872c`
-(I-Spy-Knack-Motor V2) haben sich NUR die vier Staffel-Eintraege geaendert (`spiele staffel 1/7/42`,
-`spieleBahnPod staffel`). Davor: `7c9257b4435c` (Kontakt im klassischen Spurt scharf,
+17.11.: **GESAMT 97cccd6017fb (75 Eintraege)** — absichtlich bewegt von der Staffel „ganze Runde, Puste wirkt“
+(`docs/design/vier-teams-staffel-battlefield-17-11.md` Abschnitt 2 und Review-Nachtrag 2.7); gegenueber dem Vorstand
+`d09e10bb872c` (I-Spy-Knack-Motor V2) haben sich NUR die vier Staffel-Eintraege geaendert (`spiele staffel 1/7/42`,
+`spieleBahnPod staffel`; Zwischenstand vor dem Review `8bbc6ea215f6`). Davor: `7c9257b4435c` (Kontakt im klassischen Spurt scharf,
 `--kontakt-aus` -> `e80babacb68c`; I-Spy-Rueckweg `window.__arena.ispyMotor("alt")`). Das Battlefield-
 Domination-Format mit 5 Punkten (`BATTLEFIELD_POD_FORMAT`) ist im Standard AUS und aendert nichts. Eine reine Anzeige-Aenderung an
 `public/mockups/battle-mode.engine.js` (Zeichnen, HUD, Interpolation, Bilder auslagern) darf sie

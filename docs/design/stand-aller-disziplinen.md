@@ -28,9 +28,12 @@ Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nu
 **Sechsunddreißigster Nachtrag 17.11. — Staffel: ganze Runde, Puste wirkt; vier Teams in der Arena.**
 Chris am 17.11.: Staffel läuft nur halbe Runden, Puste ist egal, nur 2 Teams in Takeshi/Staffel/Battlefield. Befund und Messung:
 `docs/design/vier-teams-staffel-battlefield-17-11.md`. Staffel Duell rho je Spiel 0,924 → **0,957**, Pp 22,0 / 21,6 → **13,2 / 14,0**;
-Pod rho k=2/4/6 0,926 / 0,921 / 0,954, Pp 19,7 / 21,1. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 8bbc6ea215f6**, bewegt nur die
-vier Staffel-Zeilen. Matrix unangetastet (Rezept über die Budget-Methode, `kraftMix` 0,45). Battlefield Domination mit 5 Punkten ist
-als Umschalter gebaut (`BATTLEFIELD_POD_FORMAT`, Standard `orte3`, bit-identisch).
+Pod nach dem Review-Nachtrag (Abschnitt 2.7: Puste je Bein statt je Sekunde, Plan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN
+für k < 6 — die Pp-Sonde des Pods hatte vorher immer k = 6 gemessen, bei echtem k = 4 lag schon main bei 34 Pp): rho k=2..6
+0,943 / 0,956 / 0,957 / 0,951 / 0,957, Pp 17,0 / 11,5 / 8,0 / 6,8 / 5,7 (zweiter Strom 16,8 / 11,5 / 9,7 / 6,0 / 7,5).
+Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 8bbc6ea215f6 → 97cccd6017fb**, bewegt nur Staffel-Zeilen (der Review-Schritt nur
+`spieleBahnPod staffel`). Matrix unangetastet (Rezept über die Budget-Methode). Battlefield Domination mit 5 Punkten ist
+als Umschalter gebaut (`BATTLEFIELD_POD_FORMAT`, Standard `orte3`, bit-identisch); Platzierung dort nach Punkten.
 
 **Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
 Chris am 17.11.: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern

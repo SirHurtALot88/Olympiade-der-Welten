@@ -41506,7 +41506,7 @@
     const lebend=Array.from({length:N},(_,s)=>live(s).length);
     // Die Regel selbst steht in bfPodPlatzierungAus() (beim Gefecht je Ort), damit Gefecht,
     // Replay und Echtzeit-Kontrolle denselben Massstab haben.
-    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null);
+    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null,KP.pod.format==="domination5");
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -44225,8 +44225,10 @@
           const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
           const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||1, rundenN=Math.ceil(beinN/jeRunde);
           const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
-          const beinZeile='<small class="bhbein">Abschnitt '+beinNr+'/'+beinN+' · Runde '
-            +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
+          // Bei 1 Bein je Runde (seit 17.11.) waeren Abschnitt und Runde dieselbe Zahl doppelt
+          // ("Abschnitt 3/4 · Runde 3/4", Review N4) -- dann nur "Runde 3/4".
+          const beinZeile='<small class="bhbein">'+(jeRunde===1?'Runde '+beinNr+'/'+beinN
+            :'Abschnitt '+beinNr+'/'+beinN+' · Runde '+Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN)+'</small>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
             // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
@@ -49199,8 +49201,11 @@
       //     steigen nahe Hoechsttempo steil (anaerob) -- 5 % weniger Tempo spart rund 15 % Puste je
       //     Meter. Erst damit ist Einteilen ueberhaupt eine Entscheidung (gemessen: bei quadratischen
       //     Kosten war "Halten" fuer KEINEN Laeufer besser als Volllast).
+      //   - `beineEich` (Review S1, 17.11.): die Beinzahl, auf die das alles geeicht ist (Duell, 6).
+      //     Verbrauch und Erholung laufen mit nb/beineEich, damit ein Bein bei k = 4 (Liga, Pod)
+      //     oder k = 2 nicht 1,5- bzw. dreimal so viel Puste kostet (s. staffelRundeMass).
       rundePuste:{zehrFaktor:2.0, fadeAb:0.35, fadeMin:0.72, planNachPuste:true, planSchwelle:0.72, kraftMix:0.45,
-        doppelMuedBoden:0.52},
+        doppelMuedBoden:0.45, beineEich:6},
       leerTempoBasis:0.86, zehrKoeff:4, zehrExponent:5,
       // TEMPO-KANAL NACHGEZOGEN (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, nach O2
       // "Marke und Zug"). O2 selbst war nicht die Ursache: der Sentinel vigilante-armageddon
@@ -49283,8 +49288,23 @@
       // GEMESSEN (02.11., n = 48, Strom 0 / 10 000 000): Pp 22,8 / 24,9 -> 9,3 / 10,1, rho je
       // Rennen (k = 6, 210 Gruppen) 0,878 / 0,881 -> 0,910 / 0,911, Gruppen unter 0,80 15/12 -> 0.
       // Volle Tabellen und die Kontrollen bei k = 2..5 und n = 96: Dokument Abschnitt 5.
+      //
+      // NACHGEZOGEN 17.11. (Review S1 zu PR #1561): die Pp-Sonde des Pods lief bis dahin IMMER mit k = 6
+      // (art.jeSeite), auch wenn die Rangtreue mit --je-seite=4 gemessen wurde -- bei k < 6 war der Pod
+      // nie abgenommen. Nachgemessen (bahnPodEinfluss mit `jeSeite`, n = 48, Strom 0): main k=4 34,0,
+      // vor diesem Nachzug k=2/4/6 56,2/37,7/19,7 -- Stamina/Will/Determination weit ueber, Dexterity/
+      // Awareness weit unter der Matrix, und das umso mehr, je laenger das Bein (weniger Wechsel, mehr
+      // Abschnittstempo und Stehvermoegen). Budget-Methode, nur im Pod (das Duell liest `rezept`):
+      //   ENDTEMPO "Abschnittstempo" = Speed, Spirit + Dexterity/Awareness (saubere Kurve, Linie halten)
+      //            statt Stamina 32 / Will 28;
+      //   STEHEN   "Stehvermoegen"  = Stamina, Will, Determination, Health + Awareness/Dexterity
+      //            (Renneinteilung lesen, Schritt halten, wenn es weh tut).
+      // GEMESSEN (n = 48, Strom 0 / 10 000 000): Pp k=2 17,0 · k=3 11,5 · k=4 8,0 · k=5 6,8/6,0 ·
+      // k=6 5,7/7,5 (vorher 19,7/21,1). Tabelle und rho: docs/design/vier-teams-staffel-battlefield-17-11.md 2.7.
       podRezept:{
         ANTRITT:    {speed:26,spirit:32,dexterity:14,awareness:16,charisma:12},
+        ENDTEMPO:   {speed:28,stamina:10,will:6,spirit:16,dexterity:20,awareness:20},
+        STEHEN:     {stamina:22,will:10,determination:4,health:6,awareness:30,dexterity:28},
         WUCHT:      {spirit:45,speed:55},
         ROBUST:     {stamina:30,dexterity:26,awareness:24,spirit:20}
       },
@@ -51416,7 +51436,6 @@
         // null und werden nie gelesen.
         etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
-      if(art.rundePuste)staffelPlanNachPuste(L);
       kontaktSpielerMap.set(L,p); kontaktLetzteBahn.push(L);   // Kontakt-Schicht (Schritt 0): p fuer kontaktProfilEinheit(), ohne Feld am Laeufer
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
@@ -51444,6 +51463,12 @@
           L.wechselPaarEingespielt=!!pl.wechselPaarEingespielt;
         }
       }
+      // PLAN NACH PUSTE erst HIER (Review S2, 17.11.): die Selbsteinschaetzung braucht die echte
+      // Beinzahl `L.beineGesamt`, die erst der Staffel-Block oben setzt. Vorher stand der Aufruf
+      // vor diesem Block und las immer `A.jeSeite` (6) -- bei k = 4 lag die Quote um den Faktor 4/6
+      // zu tief. Zwischen alter und neuer Stelle liest nichts den Plan; im Duell (nb = 6) bleibt
+      // alles Zeichen fuer Zeichen gleich.
+      if(art.rundePuste)staffelPlanNachPuste(L);
       // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
       // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
       // liest sich ueberall als 0).
@@ -52120,13 +52145,23 @@
   // dem echten Verbrauch (Antritt, Kurve, Fade fehlen darin); `planSchwelle` 0,72 ist deshalb
   // GEMESSEN, nicht hergeleitet: ab Quote ~0,72 war "Halten" fuer die Mehrheit schneller als
   // Volllast (scripts/miss-staffel-runde-puste.mjs --vergleich, Quintile der Quote).
+  // BEINLAENGE (Review S1): Verbrauch und Erholung der Staffel-Puste sind auf ein Bein von 1/6 der
+  // Strecke geeicht (`beineEich`). Laeuft eine Seite nb Beine, ist jedes Bein 6/nb so lang und
+  // dauert entsprechend laenger; der Faktor nb/6 macht beides zu einer Groesse je Bein (= je Runde),
+  // so dass die Puste-Verteilung bei k = 2/4/6 dieselbe ist. Bei nb = 6 ist er exakt 1.
+  function staffelRundeMass(u){
+    const P=BA().rundePuste, eich=(P&&P.beineEich)||6;
+    return (u.beineGesamt||eich)/eich;
+  }
   function staffelPlanNachPuste(L){
     const A=BA(), P=A.rundePuste, plaene=A.plaene;
     if(!P||!plaene)return;
     const tempo=A.grundTempo+L.ENDTEMPO*A.tempoSpanne;
+    // Echte Beinzahl (Review S2: der Aufruf steht jetzt hinter `L.beineGesamt=nb`). Mit dem
+    // Beinlaengen-Mass ist die Quote damit unabhaengig von nb: laengeres Bein, gleicher Anteil.
     const beine=L.beineGesamt||A.jeSeite||6;
     const laufzeit=(W-170)/beine/Math.max(1,tempo);
-    const zehrVoll=(0.55+1*(A.zehrKoeff??1.9))*P.zehrFaktor*10;
+    const zehrVoll=(0.55+1*(A.zehrKoeff??1.9))*P.zehrFaktor*staffelRundeMass(L)*10;
     const quote=zehrVoll*laufzeit/Math.max(1,L.reserveMax);
     STAFFEL_RUNDE_BUCH.set(L,{min:1, eingebrochen:false, quote});
     if(!P.planNachPuste)return;
@@ -52170,7 +52205,9 @@
     // tiefer als der Boden 0,60 -- eine zweite 400-m-Runde ohne Erholung. Ohne das war ein muede
     // zweimal laufender Bester nicht langsamer als der schwaechste Frische, und "mit fuenf statt sechs"
     // gewann wieder oefter (tests/staffel-unterbesetzt-doppellauf.test.ts). Jede andere Bahn und jeder
-    // Laeufer mit einem Bein liest hier 0,60 wie bisher.
+    // Laeufer mit einem Bein liest hier 0,60 wie bisher. 0,52 -> 0,45 mit dem Pod-Rezept des Review-
+    // Nachtrags (17.11., docs/design/vier-teams-staffel-battlefield-17-11.md 2.7): sonst war "fuenf statt
+    // sechs" im Pod-A/B im Mittel wieder minimal besser platziert (2,42 gegen 2,50).
     const muedBoden=(u.beineFertig&&BA().rundePuste)?BA().rundePuste.doppelMuedBoden:0.60;
     const mued=anteil>0.45?Math.max(muedBoden,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
@@ -53295,7 +53332,12 @@
       if(u.leer&&BA().leerSchonung)zehr*=BA().leerSchonung;
       // GANZE RUNDE (17.11., nur Staffel): eine 400-m-Runde kostet mehr als das halbe Bein vorher,
       // s. BAHN_ART.staffel.rundePuste. Ohne das Feld (jede andere Bahn) steht hier nichts.
-      if(BA().rundePuste)zehr*=BA().rundePuste.zehrFaktor;
+      // BEINLAENGE (Review S1, 17.11.): ein Bein ist 1/nb der Strecke, geeicht war die Puste auf
+      // nb = 6 (`beineEich`). Bei k = 4 ist das Bein 1,5-mal, bei k = 2 dreimal so lang -- ohne
+      // diesen Faktor brachen bei k = 4 88 % und bei k = 2 alle Laeufer ein. `staffelRundeMass(u)`
+      // macht Verbrauch UND Erholung (unten) zu Groessen je Runde statt je Sekunde; im Duell (nb = 6)
+      // ist er genau 1.
+      if(BA().rundePuste)zehr*=BA().rundePuste.zehrFaktor*staffelRundeMass(u);
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(BA().rundePuste)staffelRundeBuchen(u);
       // ---- PUSTE LAEDT WIEDER AUF (13.09.).
@@ -53321,7 +53363,8 @@
         // Station dauert 1/(1-k) laenger, je Station kommt so dieselbe Puste zurueck wie heute.
         const ruhe=u.huerde>0?(u.kriechK?1-u.kriechK:1):(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
         if(ruhe>0)u.reserve=Math.min(u.reserveMax,
-          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
+          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10
+            *(BA().rundePuste?staffelRundeMass(u):1));   // Staffel: je Runde, s. oben (Review S1)
       }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
@@ -61696,6 +61739,11 @@
       throw new Error("spieleBattlefieldPod: braucht 3 oder 4 Teams, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
     if(teams.some(tm=>!bfPodKaderVon(tm).length))
       throw new Error("spieleBattlefieldPod: mindestens ein Team stellt keinen einzigen Kaempfer.");
+    // ECHTZEIT + FUENF PUNKTE (Review N5, 17.11.): der Echtzeit-Pod ist der alte freie Kampf um DREI
+    // Orte (KP.orte aus bau()); "domination5" gibt es nur als Gefecht. Die Kombination hiesse fuenf
+    // Orte in der Anzeige und drei in der Wertung -- deshalb abgelehnt statt still gemischt.
+    if(echtzeit&&BF_POD_FORMAT==="domination5")
+      throw new Error("spieleBattlefieldPod: 'echtzeit' gibt es nur im Standardformat orte3, nicht mit 'domination5'.");
     const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
     const g=M.sichern(); if(M.vorher)M.vorher();
     const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm, jeVorher=art.jeSeite;
@@ -61892,7 +61940,9 @@
       // FORMAT (17.11.): der Host reicht `pod.format` (BATTLEFIELD_POD_FORMAT, dieselbe Konstante wie
       // die Buchung); ohne Angabe das Standardformat. Fuenf Punkte bekommen hier ihre Leinwand-Orte.
       if(KP&&KP.pod){
-        KP.pod.format=pod.format!=null?bfPodFormatPruefen(pod.format):BF_POD_FORMAT;
+        // `pod.echtzeit` (Vergleichsansicht) ist der alte Kampf um drei Orte: dort immer "orte3"
+        // (Review N5), sonst saehe man fuenf Zonen ueber einem Drei-Orte-Kampf.
+        KP.pod.format=pod.echtzeit?"orte3":(pod.format!=null?bfPodFormatPruefen(pod.format):BF_POD_FORMAT);
         if(KP.pod.format==="domination5")bfd5AnzeigeOrte();
       }
       // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
@@ -62286,12 +62336,16 @@
       punkte:punkte.slice(), rausTakt:rausTakt.slice()});
     // PLANUNG je Team: wer frei ist, sucht den lohnendsten Ort (s. Kopfkommentar). Deterministisch,
     // kein Wurf: Reihenfolge nach Kaempfer-Nummer, Gleichstand nach Ort-Nummer.
+    // GLEICHZEITIG (Review D3, 17.11.): alle Teams planen auf dem EINGEFRORENEN Stand vom Taktbeginn
+    // (`ortVorher`). Vorher sah Team 1 schon, wer von Team 0 im selben Takt einen Ort verlassen hatte
+    // (`k.ort=null` beim Losgehen) -- ein Vorteil allein aus der Teamnummer.
     const planen=(t,ereignisse)=>{
+      const ortVorher=new Map(kaempfer.map(k=>[k,k.ort]));
       for(let s=0;s<N;s++){
         const team=kaempfer.filter(k=>k.side===s&&!k.raus);
         const kommt=new Array(M).fill(0);
         for(const k of team){ if(k.ort!=null)kommt[k.ort]++; else if(k.nach!=null)kommt[k.nach]++; }
-        const feindeAm=(o)=>kaempfer.filter(k=>!k.raus&&k.side!==s&&k.ort===o).length;
+        const feindeAm=(o)=>kaempfer.filter(k=>!k.raus&&k.side!==s&&ortVorher.get(k)===o).length;
         const frei=[];
         for(const k of team){
           if(k.nach!=null)continue;
@@ -62375,7 +62429,10 @@
           ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
         }
       }
-      // 4) SCHLAEGE (Wucht je Takt mal r; Muedigkeit nach Kampfsekunden, umgerechnet in 4-s-Takte).
+      // 4) SCHLAEGE (Wucht je Takt mal r). Muedigkeit nach SPIELZEIT, umgerechnet in 4-s-Takte des
+      // Gefechts je Ort (`t4`) -- NICHT nach Kampfsekunden je Kaempfer (Review D2, 17.11.: der alte
+      // Kommentar sagte das Gegenteil). Bewusst so: ein Respawn macht frisch an Haltung (`stand`),
+      // nicht an der Uhr; das ganze Feld wird gemeinsam muede, wie in der Spaetphase eines Matches.
       const schadenJe=new Map();
       const t4=t*r;
       const muede=(k)=>t4>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t4-P.muedeAb+1)*k.ermuedung):1;
@@ -62536,9 +62593,13 @@
   // die Summe der Kampfrichterwertung je Team. Damit bleibt ein exakter Gleichstand auf allen vier
   // Sieg-Wegen (gleiche Punkte, gleich viele Lebende, beide bis zum Ende im Spiel) praktisch aus, und
   // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
-  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
+  // `ohneLetztesTeam` (Review D1, 17.11., nur "domination5"): mit Respawn ist "steht als einziges
+  // Team noch" kein Sieg-Weg, sondern eine Momentaufnahme -- ein Team mit weniger Punkten koennte
+  // sonst gewinnen, nur weil die anderen gerade auf ihren Respawn warten. Dort entscheiden die Punkte.
+  // Ohne den Parameter (Gefecht je Ort, Echtzeit, TDM) Zeichen fuer Zeichen die alte Regel.
+  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz,ohneLetztesTeam){
     const nochDa=lebend.filter(x=>x>0).length;
-    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
+    const schl=(s)=>[!ohneLetztesTeam&&nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
       rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
     const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
     const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
@@ -62577,7 +62638,8 @@
       :bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
     const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
     const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
-    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*bfPodTaktSek()),teamWert);
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*bfPodTaktSek()),teamWert,
+      g.format==="domination5");
     const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
@@ -65510,10 +65572,14 @@
   // Duell-Kader SQUAD/OPP (dieselben zwoelf Messpersonen wie einflussVon) plus `extraTeams` als
   // Seite 2/3. Gehoben und gemessen werden nur die Laeufer von SQUAD/OPP — damit ist die Zahl
   // direkt mit der Duell-Abnahme vergleichbar; die zwei Zusatzteams stellen nur das Feld.
-  function bahnPodEinfluss(bd,extraTeams,n,plus,saatVersatz,mutatorModus){
+  // `jeSeite` (optional, 17.11., Review S1): Laeufer je Team fuer diese Messung (wie bahnPodSonde
+  // `opt.jeSeite`) -- die Liga laeuft meist k = 4. Ohne ihn exakt wie vorher (art.jeSeite, 6).
+  function bahnPodEinfluss(bd,extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite){
     const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
     const teams=[SQUAD,OPP,...(extraTeams||[])];
     const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const artJe=BAHN_ART[bd], jeSeiteVorher=artJe?artJe.jeSeite:null;
+    if(artJe&&Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6)artJe.jeSeite=jeSeite;
     const lauf=(i)=>bahnPodLauf(bd,teams,1337+versatz+i*7919,null,(k)=>{
       FORMKARTE={};
       mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
@@ -65541,8 +65607,10 @@
       abweichung=EINFLUSS_ATTR.reduce((acc,k)=>acc+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
     } finally {
       ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+      if(artJe)artJe.jeSeite=jeSeiteVorher;
     }
     return {disziplin:bd, format:"pod", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      jeSeite:artJe?(Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6?jeSeite:jeSeiteVorher):null,
       saatVersatz:versatz, abweichungPp:Math.round(abweichung*10)/10, reihen};
   }
   // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
@@ -66824,11 +66892,15 @@
       return P?{...P, kraftBasis:S.kraftBasis, kraftSpanne:S.kraftSpanne, leerTempoBasis:S.leerTempoBasis,
         zehrKoeff:S.zehrKoeff, zehrExponent:S.zehrExponent}:null;
     },
-    staffelRundeLauf:(saat)=>{
-      const M=MOTOREN.staffel, g=M.sichern(); M.vorher(); M.bau(saat||1337);
+    // `jeSeite` (optional, 17.11. Review S1): Laeufer/Beine je Seite fuer diesen einen Lauf (2..6) --
+    // die Liga und der Pod laufen meist k = 4; ohne Angabe bleibt es das Duell mit art.jeSeite (6).
+    staffelRundeLauf:(saat,jeSeite)=>{
+      const S=BAHN_ART.staffel, jsAlt=S.jeSeite;
+      if(Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6)S.jeSeite=jeSeite;
+      const M=MOTOREN.staffel, g=M.sichern(); M.vorher();
       let guard=0; stumm=true;
-      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; } }
-      finally{ stumm=false; }
+      try{ M.bau(saat||1337); while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; } }
+      finally{ stumm=false; S.jeSeite=jsAlt; }
       const erg={zeit:+rennT.toFixed(3), laeufer:staffelRundeStand()};
       M.zurueck(g);
       return erg;

@@ -17,9 +17,14 @@ Drei getrennte Blöcke, jeder für sich übernehmbar. Matrix unangetastet, keine
 
 | Block | Inhalt | Wertung | Fingerabdruck |
 |---|---|---|---|
-| 1 | Takeshi/Staffel/Battlefield zeigen in der Battle Arena immer die gebuchte Vierergruppe | unverändert | `e80babacb68c` (unverändert) |
-| 2 | Staffel: ganze Runde je Läufer, Puste wirkt, Einteilung zählt | **geändert (nur Staffel)** | `19d252320d10`, nur 4 Staffel-Einträge anders |
+| 1 | Takeshi/Staffel/Battlefield zeigen in der Battle Arena immer die gebuchte Vierergruppe | unverändert | `d09e10bb872c` (= main, unverändert) |
+| 2 | Staffel: ganze Runde je Läufer, Puste wirkt, Einteilung zählt | **geändert (nur Staffel)** | `d09e10bb872c → 8bbc6ea215f6 → 97cccd6017fb` (Review-Fixes 2.7), nur Staffel-Einträge anders |
 | 3 | Battlefield „Domination mit fünf Punkten“ als Format-Umschalter | Standard unverändert | wie Block 2 (Standard `orte3`) |
+
+**Review-Nachtrag (Abschnitt 2.7, 3.5):** Puste je Bein statt je Sekunde (k = 2/4 brachen vorher fast alle
+ein), Rennplan nach der echten Beinzahl, Pod-Rezept der Staffel für k < 6 nachgezogen (die Pp-Sonde des
+Pods hatte bis dahin immer k = 6 gemessen — bei k = 4 lag schon main bei 34 Pp), Battlefield-
+Fünf-Punkte-Platzierung nach Punkten, Planung auf eingefrorenem Stand.
 
 ---
 
@@ -51,9 +56,15 @@ Entwurfsreiter auf das Zwei-Team-Duell zurück. Genau Chris' Beobachtung.
   denselben Funktionen wie der zählende Lauf. **Gezeigt wird damit die Gruppe, die an jenem Spieltag
   gebucht wird** (solange sich Aufstellung/Kader bis dahin nicht ändern), keine erfundene.
 - In der **Spieltags-Ansicht** (`spieltag` gesetzt) gilt weiter nur „heute“ (`nurHeute`).
-- Die **Entwurfs-Vierergruppe** aus dem abgebrochenen Vorlauf (Heim, Gast, zwei weitere aus der Liste,
-  ausdrücklich „nichts davon wird gebucht“) bleibt nur noch letzter Rückfall, wenn die ganze Saison
-  keinen Pod kennt (kein Spielplan, Liga nicht durch 4 teilbar).
+- Die **Entwurfs-Vierergruppe** (Heim, Gast, zwei weitere aus der Liste, ausdrücklich „nichts davon
+  wird gebucht“) ist in dieser Runde im Host **neu** gebaut (`entwurfsGruppeTeamIds`), nicht aus dem
+  Vorlauf übernommen; sie greift nur als letzter Rückfall, wenn die ganze Saison keinen Pod kennt (kein
+  Spielplan, Liga nicht durch 4 teilbar). **Abweichung von „gezeigt = gebucht“:** in Ligen ohne Pods
+  zeigt der Entwurfsreiter damit vier Teams, gebucht wird dort aber weiter das Duell. Der Hinweistext
+  sagt das; in Ligen mit Pods kommt der Fall nicht vor.
+- **Vorschau ohne Aufstellung (Review N2):** steht für den künftigen Spieltag noch nicht für jedes Team
+  ein Aufstellungsentwurf, zeigt die Arena die Ersatzaufstellung nach Eignung, und der Hinweistext
+  ergänzt „Aufstellung noch offen“ — gebucht wird später, was bis dahin aufgestellt ist.
 - Hinweistext nennt den Spieltag: „… gezeigt wird die gebuchte Vierergruppe von Spieltag 2 (Vorschau:
   die Disziplin steht heute nicht an) …“.
 - **Motor, aus dem Vorlauf übernommen** (reine Anzeige): Vier-Team-Kopfleiste `#bahnPodLeiste` (ein
@@ -69,7 +80,7 @@ Vorschau-Pod ist `toEqual` dem, den `getPodForTeam` für jenen Spieltag liefert)
 
 Bilder: `vier-teams-17-11/takeshi-vier-teams.png`, `vier-teams-17-11/staffel-vier-teams.png`.
 
-Fingerabdruck nach Block 1: **`GESAMT e80babacb68c (75 Einträge)`**, identisch mit main.
+Fingerabdruck nach Block 1: **`GESAMT d09e10bb872c (75 Einträge)`**, identisch mit main.
 
 ---
 
@@ -98,7 +109,7 @@ Fingerabdruck nach Block 1: **`GESAMT e80babacb68c (75 Einträge)`**, identisch 
 | `leerTempoBasis` | 0,74 | **0,86** | Restabschlag im Zustand „eingebrochen“ |
 | Pläne | alle Tempo 1,00 | Angehen 1,00 ab 0 · Halten 0,95 bis 55 % · Schlussmann 0,96 bis 50 % | Einteilung ist eine Entscheidung |
 | Planwahl | nach Slot | **nach eigener Puste** (`planNachPuste`, Schwelle 0,72) | kein Slot-Bias (K2 bleibt eingehalten) |
-| `doppelMuedBoden` | 0,60 | **0,52** (nur Doppelläufer ab Bein 2) | s. 2.5 |
+| `doppelMuedBoden` | 0,60 | **0,52**, seit 2.7 **0,45** (nur Doppelläufer ab Bein 2) | s. 2.5 |
 
 **Pacing ist gemessen eine echte Entscheidung** (`scripts/miss-staffel-runde-puste.mjs 24 --vergleich`,
 jeder Läufer einmal Volllast, einmal eingeteilt, gleiche Saaten): bei quadratischen Kosten war „Halten“
@@ -131,6 +142,10 @@ reicht Stamina/Will/Spirit jetzt so durch, wie die Matrix es sagt. Charisma blei
 | Gruppen < 0,80 | 2 · 2 | 0 · 0 | 1 · 1 | 0 · 0 |
 | Pp (n = 48) | 16,7 / 15,1 | | **19,7 / 21,1** | |
 
+**Korrektur (Review, 17.11.):** die Pp-Zeile oben ist **nicht** bei k = 4 gemessen. `bahnPodEinfluss` kannte
+keine Kopfzahl und lief immer mit `art.jeSeite` = 6, auch wenn die Rangtreue mit `--je-seite=4` lief. Bei
+echtem k = 4 lag der Pod schon auf main bei 34,0 / 37,4 Pp, mit Block 2 bei 41,0 / 41,0. Behoben in 2.7.
+
 Erster Anlauf mit dem alten Vorratsmix (0,7 STEHEN) fiel im Pod auf **27,5 / 26,8 Pp** durch (Stamina,
 Will, Determination zu schwer, Dexterity/Awareness zu leicht — das Pod-Rezept legt Dex/Awareness in
 ROBUST). Budget-Methode: der Vorrat liest jetzt 45 % STEHEN / 55 % ROBUST (`kraftMix`) — Pod 19,7 / 21,1,
@@ -147,13 +162,83 @@ Staffeln erreichen die Zeile nie.
 ### 2.6 Fingerabdruck
 
 ```
-alt  GESAMT e80babacb68c (75 Eintraege)
-neu  GESAMT 19d252320d10 (75 Eintraege)
+alt  GESAMT d09e10bb872c (75 Eintraege)   (main, I-Spy V2)
+neu  GESAMT 8bbc6ea215f6 (75 Eintraege)   (Block 2)
+jetzt GESAMT 97cccd6017fb (75 Eintraege)  (nach dem Review-Nachtrag 2.7)
 ```
 
-Geändert sind **genau vier Einträge**, alle Staffel: `spiele staffel 1/7/42` und `spieleBahnPod staffel`.
-Alle anderen 71 Einträge sind byte-gleich. `tests/bahn-pod-vier-teams.test.ts` hält die neuen
-Staffel-Hashes (Duell `ffcb5fa8568a8601`, Pod `7533f61ed6de70c0`), mit Herkunft im Kommentar.
+Geändert sind gegenüber main **genau vier Einträge**, alle Staffel: `spiele staffel 1/7/42` und
+`spieleBahnPod staffel`. Alle anderen 71 Einträge sind byte-gleich. `tests/bahn-pod-vier-teams.test.ts` hält
+die Staffel-Hashes (Duell `ffcb5fa8568a8601`; Pod k = 6 zuerst `7533f61ed6de70c0`, nach 2.7
+`7f4f59dd46d904e7`; neu Pod k = 4 `f772039c16bffbf3` und k = 2 `206ad2d97031d04b`), mit Herkunft im Kommentar.
+
+### 2.7 Review-Nachtrag (17.11.): Puste je Bein, Plan nach Beinzahl, Pod-Rezept für k < 6
+
+**S1 — Puste nur für k = 6 geeicht.** In der Simulation ist ein Bein `1/nb` der Strecke; „1 Bein = 1 Runde“
+gilt nur in der Anzeige. Bei k = 4 ist jedes Bein 1,5-mal, bei k = 2 dreimal so lang, verbraucht wurde aber je
+Sekunde. Jetzt laufen Verbrauch **und** Erholung mit `staffelRundeMass(u) = nb / beineEich` (`beineEich` 6,
+`BAHN_ART.staffel.rundePuste`): eine Größe je Bein statt je Sekunde. Bei nb = 6 ist der Faktor genau 1 — das
+Duell bleibt bit-identisch.
+
+**S2 — Plan vor der Beinzahl.** `staffelPlanNachPuste(L)` lief vor `L.beineGesamt = nb` und las immer
+`A.jeSeite` (6); in der Liga (k aus dem Spielplan, `art.jeSeite` bleibt 6) lag die Selbsteinschätzung um 4/6
+zu tief. Der Aufruf steht jetzt hinter dem Staffel-Block; mit dem Beinlängen-Maß ist die Quote unabhängig
+von nb, die gemessene Schwelle 0,72 gilt damit für jedes k.
+
+Puste-Haushalt (`scripts/miss-staffel-runde-puste.mjs 24 --je-seite=k`, Duell mit k Läufern je Seite):
+
+| k | vorher: tiefste Puste Median / eingebrochen / Pläne | nachher |
+|---|---|---|
+| 2 | 0,0 % / **100 %** / 96× halten | 18,6 % / 25,0 % / 72 angehen, 24 halten |
+| 4 | 0,0 % / **88,5 %** / 24 angehen, 168 halten | 16,9 % / 16,1 % / 168 angehen, 24 halten |
+| 6 | 5,6 % / 32,3 % / 168 angehen, 120 halten | unverändert (bit-identisch) |
+
+Dass k = 2/4 im Mittel weniger einbrechen als k = 6, ist die Aufstellung, nicht der Haushalt: bei k = 4
+laufen die vier eignungsbesten. Dieselben Läufer (Beine 1–2) haben bei k = 2/4/6 dieselbe Quote (0,685),
+dieselben Pläne und dieselbe Einbruchquote (25,0 %); tiefster Stand Median 18,6 / 16,9 / 15,4 % (der Rest ist
+die Anfahrt, die nach Zeit läuft).
+
+**Pod-Pp bei k < 6.** Mit Kopfzahl in der Pp-Sonde (`bahnPodEinfluss(…, jeSeite)`, Skript nimmt die erste
+`--je-seite`): vorher (nur S1/S2) k = 2/4/6 **56,2 / 37,7 / 19,7** — Stamina, Will, Determination weit über,
+Dexterity/Awareness weit unter der Matrix, je länger das Bein, desto mehr (Abschnittstempo und Stehvermögen
+tragen, Wechsel und Antritt werden seltener). Budget-Methode, nur im Pod (`podRezept`, das Duell liest weiter
+`rezept`), Matrix unangetastet:
+
+| Sub-Skill (Pod) | vorher | nachher |
+|---|---|---|
+| ENDTEMPO „Abschnittstempo“ | speed 26, stamina 32, will 28, spirit 14 | speed 28, stamina 10, will 6, spirit 16, dexterity 20, awareness 20 |
+| STEHEN „Stehvermögen“ | stamina 42, will 31, determination 21, health 6 | stamina 22, will 10, determination 4, health 6, awareness 30, dexterity 28 |
+
+Sechs Varianten gemessen (nur STEHEN, nur ENDTEMPO, beides in zwei Stärken); nur beides zusammen bringt
+k = 2 unter 25.
+
+**Abnahme Pod nachher** (`miss-bahn-pod-abnahme.mjs staffel 6 --je-seite=k --pp=48`, 210 Gruppen, Ströme
+0 / 10 000 000):
+
+| k | rho je Rennen (Median) vorher | **nachher** | Gruppen < 0,80 | Pp vorher | **Pp nachher** |
+|---|---|---|---|---|---|
+| 2 | 0,926 / 0,925 | **0,943 / 0,940** | 0 · 0 | 61,2 / 61,6 | **17,0 / 16,8** |
+| 3 | — | **0,956 / 0,954** | 0 · 0 | — | **11,5 / 11,5** |
+| 4 | 0,921 / 0,922 | **0,957 / 0,956** | 0 · 0 | 40,9 / 41,0 | **8,0 / 9,7** |
+| 5 | — | **0,951 / 0,952** | 0 · 0 | — | **6,8 / 6,0** |
+| 6 | 0,954 / 0,951 | **0,957 / 0,958** | 0 · 0 | 19,7 / 21,1 | **5,7 / 7,5** |
+
+„vorher“ = Branch-Stand vor dem Review (k = 2/4 mit abgeschaltetem Beinlängen-Maß gemessen, k = 6 aus 2.4).
+Main bei k = 4: Pp 34,0 / 37,4. Alle k bestehen jetzt rho (Mindestschranke 0,75, Ziel > 0,80) **und** Pp ≤ 25,
+ab k = 3 auch das Optimum < 15. Star auf Rang 1 bei k = 4: 80 % (vorher 63 %).
+
+**Unterbesetzt (2.5) erneut nachgezogen:** mit dem neuen Pod-Rezept war im Pod-A/B von
+`tests/staffel-unterbesetzt-doppellauf.test.ts` das Team mit fünf Läufern im Mittel minimal besser platziert
+als mit sechs (2,42 gegen 2,50). Der Ermüdungsboden des Doppelläufers ab Bein 2 liegt jetzt bei **0,45**
+(vorher 0,52); Test wieder grün (3/3). Voll besetzte Staffeln erreichen die Zeile nie (Fingerabdruck).
+
+**Duell (k = 6):** unverändert, bit-identisch (Fingerabdruck `spiele staffel 1/7/42` gleich): rho 0,957
+(Spannweite 0,019), Pp 13,2 / 14,0.
+
+**Fingerabdruck:** `GESAMT 8bbc6ea215f6 → 97cccd6017fb (75 Einträge)`; gegenüber dem Branch-Stand bewegt sich
+**nur** `spieleBahnPod staffel` (5599e5d32b9b → 30d941cb1816, Pod-Rezept), gegenüber main (`d09e10bb872c`)
+genau die vier Staffel-Zeilen. Der Fingerabdruck misst den Pod nur bei k = 6; k = 4 und k = 2 hält
+`tests/bahn-pod-vier-teams.test.ts` („Staffel-Pod mit k = …“).
 
 ---
 
@@ -213,6 +298,23 @@ byte-gleich; fünf Orte, 2 Punkte je Takt und Ort, Respawn, Aufteilen, Besitzwec
 Bilder: `vier-teams-17-11/battlefield-domination5.png` (fünf Punkte, Kampfzeit 34 s),
 `vier-teams-17-11/battlefield-orte3-standard.png` (Standardformat zum Vergleich).
 
+### 3.4a Review-Nachtrag (17.11.)
+
+- **D1 Platzierung nach Punkten.** `bfPodPlatzierungAus(…, ohneLetztesTeam)`: im Fünf-Punkte-Format fällt der
+  Schlüssel „einziges stehendes Team“ weg — mit Respawn ist das eine Momentaufnahme, kein Sieg-Weg.
+  Gefecht je Ort, Echtzeit und TDM unverändert (Parameter fehlt dort).
+- **D2 Müdigkeit nach Spielzeit**, nicht nach Kampfsekunden je Kämpfer — der Kommentar sagte das Gegenteil
+  und ist korrigiert; das Verhalten bleibt (ein Respawn macht frisch an Haltung, nicht an der Uhr).
+- **D3 gleichzeitige Planung:** alle Teams planen auf dem eingefrorenen Ortsstand vom Taktbeginn; vorher sah
+  Team 1 schon, wer von Team 0 im selben Takt losgegangen war.
+- **N5:** Echtzeit-Pod + `domination5` wird abgelehnt (Fehler in `spieleBattlefieldPod`); die Anzeige zeigt
+  bei `pod.echtzeit` immer die drei Orte.
+
+Nachgemessen (`miss-battlefield-pod-ffa-abnahme.mjs 4 --gruppen=30 --format=domination5 --je-seite=2..6
+--pp=48 --pp-je-seite=4`): rho je Kampf k = 2 0,866 / 0,875 · k = 3 0,893 / 0,885 · k = 4 **0,909 / 0,910** ·
+k = 5 0,929 / 0,925 · k = 6 0,939 / 0,933; Pp k = 4 **8,2 / 8,3** — praktisch wie 3.3. Kein Kampf endet mehr
+„allein“ (0 %). Standard `orte3` unberührt (Fingerabdruck).
+
 ### 3.4 Empfehlung
 
 Chris soll das Format einmal ansehen; danach `BATTLEFIELD_POD_FORMAT = "domination5"`. **Vor dem
@@ -229,7 +331,9 @@ Standardformat misst.
 - Die Wertungstabelle rechts heißt im Bahn-Pod weiter „Eigenes Team / Gegner“ (links Teams 0/2,
   rechts 1/3).
 - Mini-DM nutzt die Vorschau-Suche noch nicht (gleiches Muster, keine Meldung von Chris).
-- Staffel-Charisma bleibt im Duell bei ~5 % statt 10 (vorher ebenso).
+- Staffel-Charisma bleibt im Duell bei ~5 % statt 10 (vorher ebenso); im Pod bei k = 2 3,3 % (Wechsel selten).
+- Puste-Verteilung im **Pod** selbst ist nicht eigens gemessen (Sonde misst das Duell mit k Läufern je Seite);
+  das Pod-Rezept ändert über STEHEN auch den Vorrat im Pod.
 
 ## 5. Werkzeuge
 

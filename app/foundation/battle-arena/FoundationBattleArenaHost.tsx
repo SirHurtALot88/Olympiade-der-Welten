@@ -151,6 +151,18 @@ async function warteAufMotor(fristMs: number): Promise<boolean> {
   return true;
 }
 
+// VORSCHAU OHNE AUFSTELLUNG (Review N2, 17.11.): zeigt die Arena die Vierergruppe eines KUENFTIGEN
+// Spieltags und hat dort noch nicht jedes Team einen Aufstellungsentwurf (`buildArenaAufstellung`
+// liefert dann `{}`), laeuft das Bild mit der Ersatzaufstellung nach Eignung. Gebucht wird spaeter die
+// Aufstellung, die bis dahin steht -- "gezeigt = gebucht" gilt dann nur unter dieser Annahme, und der
+// Hinweistext sagt es.
+function aufstellungNochOffen(pod: {
+  aufstellung: Record<string, unknown>[];
+  vorschau: { art: "heute" | "vorschau" | "rueckblick" } | null;
+}): boolean {
+  return pod.vorschau?.art === "vorschau" && pod.aufstellung.some((a) => Object.keys(a ?? {}).length === 0);
+}
+
 export default function FoundationBattleArenaHost({
   gameState,
   activeManagerTeamId,
@@ -1401,7 +1413,9 @@ export default function FoundationBattleArenaHost({
             {battlefieldPodNutzlast.vorschau
               ? ` von Spieltag ${battlefieldPodNutzlast.vorschau.spieltagNummer} (${
                   battlefieldPodNutzlast.vorschau.art === "vorschau" ? "Vorschau" : "Rückblick"
-                }: Battlefield steht heute nicht an)`
+                }: Battlefield steht heute nicht an${
+                  aufstellungNochOffen(battlefieldPodNutzlast) ? "; Aufstellung noch offen" : ""
+                })`
               : ""}{" "}
             kämpfen gleichzeitig um die Orte, und gewertet wird genau dieses Gefecht:{" "}
             {battlefieldPodNutzlast.teams.map((team, index) => (
@@ -1426,7 +1440,9 @@ export default function FoundationBattleArenaHost({
                 {pod.vorschau
                   ? ` von Spieltag ${pod.vorschau.spieltagNummer} (${
                       pod.vorschau.art === "vorschau" ? "Vorschau" : "Rückblick"
-                    }: die Disziplin steht heute nicht an)`
+                    }: die Disziplin steht heute nicht an${
+                      aufstellungNochOffen(pod) ? "; Aufstellung noch offen" : ""
+                    })`
                   : ""}{" "}
                 (2-1-0-0 nach Platz):{" "}
                 {pod.teams.map((team, index) => (
