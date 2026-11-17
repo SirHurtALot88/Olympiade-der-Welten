@@ -9,7 +9,7 @@ on:
   # PUSH NACH MAIN HINZUGEFÜGT (04.09., Merge-Hygiene-Runde) — NUR für `rangtreue-schranke` unten,
   # nicht für `full-season-playthrough`: der bleibt über das `if:` am Job selbst weiterhin
   # ausschließlich manuell (Grund s. Kommentar oben, gilt unverändert). `rangtreue-schranke` ist
-  # der einzige Job im gesamten CI, der die 0,80-Rangtreue-Schranke gegen
+  # der einzige Job im gesamten CI, der die Rangtreue-Mindestschranke (0,75 seit 17.11.) gegen
   # `data/generated/rangtreue-basislinie.json` prüft (docs/design/messgrundlage-kaderfest.md), und
   # er lief seit seiner Einführung noch KEIN einziges Mal automatisch — nur auf Zuruf per
   # `workflow_dispatch`. Er ist deterministisch (bit-identische Reproduktion nachgewiesen, s.
@@ -80,7 +80,7 @@ jobs:
   # verlaengern.
   #
   # SEIT 04.09. AUCH AUF `push` NACH `main` (s. `on:`-Block oben), nicht mehr nur manuell. Vorher
-  # war dieser Job — die EINZIGE Pruefung im ganzen CI gegen die 0,80-Rangtreue-Schranke — nur per
+  # war dieser Job — die EINZIGE Pruefung im ganzen CI gegen die Rangtreue-Mindestschranke — nur per
   # `workflow_dispatch` erreichbar und lief seit seiner Einfuehrung nie automatisch; jeder Merge
   # nach `main` konnte die Schranke unbemerkt reissen. `full-season-playthrough` bleibt ueber sein
   # eigenes `if:` unveraendert NUR manuell (der Grund von vorher gilt weiter: der volle

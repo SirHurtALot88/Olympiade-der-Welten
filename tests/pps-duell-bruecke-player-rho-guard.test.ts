@@ -72,6 +72,8 @@ const TABELLE = abnahme as unknown as {
   teilB: Record<string, TeilBZeile[] | { hinweis: string }>;
 };
 
+// Bleibt bewusst bei 0,80 (strenger als die harte Abnahme-Mindestschranke 0,75 seit 17.11.): Regressionswaechter
+// auf den Rueckfallkanal (Seiten-rho bei Feldgroesse 6), kein Abnahmekriterium einer Disziplin.
 const RHO_SCHRANKE = 0.8;
 const PP_SCHRANKE = 25;
 const ROBUSTE_FELDGROESSE = "6";

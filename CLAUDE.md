@@ -50,7 +50,15 @@ diszis merke dir das schon mal für das gesamtprojekt".
 
 Eine Saison enthält je Disziplin nur eine Handvoll Spiele, im Eishockey zwei. Eine
 Rangtreue, die sich erst über zwanzig Spiele einstellt, ist für den Spieler deshalb nicht
-vorhanden. **Die Abnahmezahl ist rho in EINEM Spiel, Ziel über 0,80, angestrebt 0,85.**
+vorhanden. **Die Abnahmezahl ist rho in EINEM Spiel: harte Mindestschranke 0,75, Ziel über 0,80,
+angestrebt 0,85.**
+
+**Mindestschranke 0,75 seit 17.11.** Chris am 17.11., wörtlich: „Rangtreue auf 0,75 als min legen“.
+Bis dahin war 0,80 zugleich Ziel und harte Untergrenze. Seither wird ein Wächter oder Test erst
+unter 0,75 rot (`SCHRANKE_ABSOLUT` in `scripts/pruefe-rangtreue-schranke.mjs`, `schranken` in
+`data/generated/disziplin-abnahme.json`, Konstanten in `scripts/lib/rangtreue-messung.mjs`); eine
+Disziplin zwischen 0,75 und 0,80 besteht, liegt aber unter dem Ziel und bleibt Arbeitsauftrag.
+Über 0,80 bleibt das Ziel, 0,85 das angestrebte Niveau.
 
 Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
 vermutete, und der Unterschied entscheidet, wo man arbeitet.
@@ -137,13 +145,13 @@ Pp-Abnahme"): `scripts/messe-arena-einfluss.mjs` / `einflussVon(dId,n)` misst, w
 Attribut in der fertigen Mechanik tatsächlich trägt, verglichen mit seinem Matrixgewicht. Zielwert
 **Pp-Abweichung ≤ 25** (zwei unabhängige Saatstämme). Was neu ist: das ist ab jetzt kein optionaler
 Politur-Schritt mehr, sondern eine **Pflichtprüfung für jede Disziplin, jede neue Mechanik und
-jedes Rezept** — genauso verbindlich wie die rho-über-0,80-Schranke oben, nicht nur "wenn gerade
+jedes Rezept** — genauso verbindlich wie die rho-Mindestschranke oben, nicht nur "wenn gerade
 Zeit ist". Beide Abnahmen gehören zusammen: rho sagt, ob das RICHTIGE Ergebnis am Ende steht, die
 Pp-Abweichung sagt, ob es aus den RICHTIGEN Gründen (den vorgegebenen Attributen) zustande kommt.
 
 Chris am 10.11.: **<15 ist das angestrebte Optimum**, sofern ohne rho-Verlust erreichbar — ≤25 bleibt
 aber die verbindliche Pflichtschranke. Wo ein Rezept zwischen "knapp unter 25" und "unter 15, aber
-rho sinkt" wählen muss, hat die rho-Schranke (>0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
+rho sinkt" wählen muss, hat rho (Mindestschranke 0,75, Ziel >0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
 Kosten von rho optimieren.
 
 **Falls die Matrix doch angepasst werden muss: Ausgleichspflicht über alle 20 Disziplinen.**
