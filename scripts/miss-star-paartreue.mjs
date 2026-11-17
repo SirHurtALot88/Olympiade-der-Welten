@@ -38,6 +38,7 @@ import {
   auswerten, ohneTorwart, hatTorwart, median, spannweite,
   ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie,
   IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
+  IST_KONTAKT_SCHALTER, kontaktSchalterAusArgs, setzeKontaktSchalter, kontaktSchalterText,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -50,7 +51,8 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 // Mess-Sonde fuer den Paar-Bonus. Ohne den Schalter unveraendertes Verhalten.
 const alleArgs = process.argv.slice(2);
 const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(alleArgs);
-const roheArgs = alleArgs.filter((a) => !IST_STAFFEL_PAAR_SCHALTER(a));
+const KONTAKT_SCHALTER = kontaktSchalterAusArgs(alleArgs);   // --kontakt=..., s. rangtreue-messung.mjs
+const roheArgs = alleArgs.filter((a) => !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a));
 const SPIELE = Number(roheArgs[0] || 24);
 const DISZIPLINEN = roheArgs.slice(1);
 if (!DISZIPLINEN.length) {
@@ -137,6 +139,8 @@ try {
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
   const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
   if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
+  const kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);
+  if (kontaktGesetzt) console.log(kontaktSchalterText(kontaktGesetzt));
 
   let kaderFamilie, kaderQuelle;
   const geladen = ladeKaderFamilieAusDatei(KADERFAMILIE_PFAD);
