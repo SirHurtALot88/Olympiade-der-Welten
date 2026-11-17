@@ -12,6 +12,23 @@
 // ===================================================================================
 import { existsSync, readFileSync } from "node:fs";
 
+// DIE RHO-SCHRANKEN aus CLAUDE.md ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine Saison"),
+// rho kaderfest in EINEM Spiel. Chris am 17.11., woertlich: "Rangtreue auf 0,75 als min legen".
+// Seitdem gibt es drei Stufen statt einer: die harte MINDESTschranke 0,75 (darunter ist eine
+// Disziplin durchgefallen, darunter wird ein Waechter rot), das ZIEL ueber 0,80 und das angestrebte
+// 0,85. Zwischen 0,75 und 0,80 besteht eine Disziplin, liegt aber unter dem Ziel.
+export const RHO_MINDESTSCHRANKE = 0.75;
+export const RHO_ZIEL = 0.80;
+export const RHO_ANGESTREBT = 0.85;
+
+/** Abnahme-Label fuer einen rho-je-Spiel-Wert nach den drei Stufen oben. */
+export function rhoAbnahmeLabel(r) {
+  if (r >= RHO_ANGESTREBT) return "bestanden (>=0,85)";
+  if (r >= RHO_ZIEL) return "bestanden";
+  if (r >= RHO_MINDESTSCHRANKE) return "bestanden (unter Ziel 0,80)";
+  return "durchgefallen (<0,75)";
+}
+
 // Spearman ueber Paare {eig, wert}. Bindungen bekommen den Durchschnittsrang, sonst
 // verzerren gleiche Werte (bei Bahn-Platzierungen keine Seltenheit) das Ergebnis.
 export function rho(paare) {
@@ -59,7 +76,7 @@ export function auswerten(spieleListe) {
 // Gibt `true` zurueck, wenn IRGENDEIN Teilnehmer in der Spieleliste als Torwart markiert
 // ist (Fable-Recherche 1.1/3.1: Hockeys Torwart-Wert ist eine andere Formel als die der
 // Feldspieler und schwankt je Spiel binomial staerker, als der reale Faehigkeitsunterschied
-// zwischen bestem und schlechtestem Torwart ausmacht — die 0,80-Schranke soll ihn deshalb
+// zwischen bestem und schlechtestem Torwart ausmacht — die rho-Schranke soll ihn deshalb
 // NICHT mitordnen). Fuer jede andere Disziplin ist `torwart` nie gesetzt, die Funktion
 // liefert also `false` und die aufrufende Seite laesst die Feldspieler-Spalte einfach weg.
 export function hatTorwart(spieleListe) {

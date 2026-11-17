@@ -57,7 +57,7 @@ import {
   IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
   IST_KONTAKT_SCHALTER, kontaktSchalterAusArgs, setzeKontaktSchalter, kontaktSchalterText,
   IST_STRATEGIE_SCHALTER, strategieSchalterAusArgs, setzeStrategieSchalter, strategieSchalterText,
-  generischeChassisWarnung,
+  generischeChassisWarnung, rhoAbnahmeLabel,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -174,7 +174,7 @@ for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) 
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }
   const warnung = generischeChassisWarnung(z.d);
   if (warnung) chassisWarnungen.push(`${z.d}: ${warnung}`);
-  const ok = z.spielMed >= 0.80 ? "bestanden" : z.spielMed >= 0.70 ? "knapp" : "durchgefallen";
+  const ok = rhoAbnahmeLabel(z.spielMed);
   console.log(z.d.padEnd(20) + (z.chassis || "").padEnd(12)
     + String(z.teilnehmer).padStart(5)
     + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
@@ -194,7 +194,7 @@ for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) 
   // Spiel FELDET den Torwart mit), diese Zeile ist die ehrlichere Frage "belohnt die
   // Feldspieler-Mechanik das Richtige?", s. docs/design/stand-aller-disziplinen.md.
   if (z.spielMedFeld != null) {
-    const okFeld = z.spielMedFeld >= 0.80 ? "bestanden" : z.spielMedFeld >= 0.70 ? "knapp" : "durchgefallen";
+    const okFeld = rhoAbnahmeLabel(z.spielMedFeld);
     console.log("  davon nur Feldspieler".padEnd(32)
       + String(z.teilnehmerFeld).padStart(5)
       + z.spielMedFeld.toFixed(3).padStart(23) + z.spielSpanFeld.toFixed(3).padStart(12)
@@ -202,7 +202,8 @@ for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) 
       + "   " + okFeld);
   }
 }
-console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) ueber 0,80 (CLAUDE.md, gilt fuer alle Disziplinen).");
+console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) mindestens 0,75 (harte Mindestschranke, Chris 17.11.),");
+console.log("Ziel ueber 0,80, angestrebt 0,85 (CLAUDE.md, gilt fuer alle Disziplinen).");
 if (!EINZELKADER) {
   console.log("Spannweite = Kaderrauschen bei UNVERAENDERTER Mechanik — eine Rezeptaenderung, die kleiner");
   console.log("bewegt als die Spannweite einer Disziplin, ist von Null nicht unterscheidbar (s.");

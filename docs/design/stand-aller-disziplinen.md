@@ -1,5 +1,39 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Dreiunddreißigster Nachtrag 17.11. — rho-Mindestschranke von 0,80 auf 0,75 gesenkt.**
+Chris am 17.11., wörtlich: „Rangtreue auf 0,75 als min legen". Die harte Untergrenze für rho je
+Spiel (kaderfest, EIN Spiel), ab der ein Wächter oder Test rot wird, liegt jetzt bei **0,75**. Über
+0,80 bleibt das **Ziel**, 0,85 das angestrebte Niveau; die Pp-Regeln (≤ 25 Pflicht, < 15 Optimum)
+bleiben unverändert, ebenso die G1-Stufen der Scorecard (Punktemethodik, keine Schranke). Nachgezogen
+in `CLAUDE.md`, `scripts/pruefe-rangtreue-schranke.mjs` (`SCHRANKE_ABSOLUT`), `scripts/lib/rangtreue-messung.mjs`
+(`RHO_MINDESTSCHRANKE` / `RHO_ZIEL` / `RHO_ANGESTREBT`, Abnahme-Spalte der Messskripte),
+`data/generated/disziplin-abnahme.json` (`schranken.rhoJeSpielUeber` 0,75) und den beiden Wächtertests.
+Keine Mechanik-, Rezept-, Matrix- oder Engine-Änderung — Wertungs-Fingerabdruck unverändert
+**GESAMT e80babacb68c (75 Einträge)**.
+
+Was sich am Status ändert (Zahlen aus `data/generated/disziplin-abnahme.json`; in Klammern der
+Schranken-Lauf `pruefe-rangtreue-schranke.mjs` vom 17.11., n=24):
+
+| Disziplin | rho je Spiel | vorher (Schranke 0,80) | jetzt (Mindestschranke 0,75) |
+|---|---:|---|---|
+| showcase | 0,781 (0,771) | darunter, gewertet nur über Chris' rho-Ausnahme | **besteht regulär**, unter Ziel; Ausnahme nicht mehr tragend |
+| i-spy | 0,776 (0,779) | darunter, gewertet nur über Chris' rho-Ausnahme | **besteht regulär**, unter Ziel; Ausnahme nicht mehr tragend |
+| climbing | 0,801 (0,797) | im Schranken-Lauf knapp darunter (absoluter Wächter rot) | **besteht** mit 0,047–0,051 Abstand |
+| basketball | 0,822 (0,822) | auf `ABNAHME_OFFEN` im Schranken-Skript | Eintrag entfernt — über Mindestschranke und Ziel |
+
+Breaking (0,860) ist von der Beobachtungsliste genommen; dort bleiben Showcase, I-Spy und Climbing.
+
+**Weiter unter 0,75:** nur **Hockey** (0,700 je Spiel, nur Feldspieler 0,784) — gewertet über Chris'
+Ausnahme (Star-/Paartreue statt nackter Rangkorrelation, deckt nur rho). Außerhalb der Arena-Wertung
+liegen außerdem die Event-rho von **Mini-DM / Mini-DM-FFA** (rhoJeEvent 0,61–0,69, eigener Pod-Pfad,
+Chris' Freigabe 24.10.) und das alte Battlefield-Zweier-Duell (0,589, nur Referenz; der gewertete
+Vier-Team-Pod steht bei 0,874) unter 0,75 — für sie ändert die Senkung nichts. Alle übrigen
+gewerteten Disziplinen lagen schon über 0,80.
+
+**Offen:** Der relative Wächter im Schranken-Skript bleibt unabhängig davon rot — Showcase ist
+gegen die Basislinie vom 02.10. um 0,064 gefallen (Schranke 0,050). Das heilt die Senkung nicht;
+dafür braucht es eine bewusste Entscheidung über das Neuziehen der Basislinie.
+
 **Zweiunddreißigster Nachtrag 17.11. — Football und Hockey nach den Anzeige-/Performance-PRs nachgemessen (Task #136).**
 Nach #1521, #1523, #1526, #1527, #1530 und #1533 (Engine-Anzeige, Interpolation, Bilder-Auslagerung,
 Tennis-Kulisse im Node-Runner, I-Spy) wurden Football und Hockey frisch gemessen, bei unverändertem
