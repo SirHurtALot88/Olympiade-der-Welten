@@ -8043,8 +8043,9 @@
   //     NICHT aufzaehlbar (sonst taucht der Schluessel ueber eine Rohreferenz im Fingerabdruck
   //     auf). Gesetzt nur ueber window.__arena.kontaktFlags({<disziplin>:{...}}) bzw.
   //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Chromium-Headless-Laeufe,
-  //     window.__olyKontaktFlags vor dem Laden (der Node-Runner reicht sie noch NICHT durch, s. arena-node-motor.mjs). Die echte App setzt nichts davon.
-  //     In Schritt 0 hat ein gesetztes Flag KEINE Wirkung auf das Spiel: es schaltet nur die
+  //     window.__olyKontaktFlags vor dem Laden (seit Schritt 1 reicht auch der Node-Runner sie durch: DuellAuftrag.kontaktFlags in arena-node-motor.mjs). Die echte App setzt nichts davon.
+  //     In Schritt 0 hatte ein gesetztes Flag KEINE Wirkung (seit Schritt 1 wirken {stufe:1..3} im
+  //     Spurt klassisch, s. KONTAKT_BAHN/kontaktBahnVersuch; {stufe:0} bleibt wirkungslos): {stufe:0} schaltet nur die
   //     Schatten-Buchhaltung (Profil je Laeufer, Schatten-Zaehler, Ziehung aus dem eigenen
   //     Strom) ein -- der Nachweis, dass die Schicht im Sim-Pfad laeuft, ohne rr() anzufassen.
   //   - Eigener Zufallsstrom kontaktRr(): mulberry32, je bau*()-Aufruf aus der Spiel-Saat
@@ -8170,12 +8171,18 @@
   const kontaktSpielerMap=new WeakMap();
   // Die Laeufer des zuletzt GEBAUTEN Rennens: spieleDisziplin() stellt LAEUFER nach der Messung
   // zurueck (M.sichern()), die Zaehler sollen aber das gerechnete Rennen zeigen.
-  let kontaktLetzteBahn=[];
-  function kontaktZaehle(einheit,art){
+  // SCHRITT 1: kontaktLetzteBahn gehoert seitdem zum Renn-Zustand (MOTOREN[bahn].sichern()/zurueck()
+  // nehmen ihn mit, ebenso kontaktSeed), damit eine Mess-Sonde mitten in einem sichtbaren Rennen
+  // dessen Strom und Laeuferliste nicht stehen laesst. Was die Mess-Schnittstelle kontaktZaehler()
+  // zeigt (das zuletzt GERECHNETE Rennen), steht getrennt in kontaktLetzteMessung -- die wird NICHT
+  // zurueckgestellt.
+  let kontaktLetzteBahn=[], kontaktLetzteMessung=[];
+  // `menge` (Schritt 1): Zeit-Konten ("zeitZugefuegt"/"zeitBezahlt", Sekunden) buchen Bruchteile.
+  function kontaktZaehle(einheit,art,menge){
     if(!einheit||typeof einheit!=="object")return;
     let z=kontaktZaehlerMap.get(einheit);
     if(!z){ z={}; kontaktZaehlerMap.set(einheit,z); }
-    z[art]=(z[art]||0)+1;
+    z[art]=(z[art]||0)+(menge==null?1:menge);
   }
   const kontaktZaehlerVon=(einheit)=>({...(kontaktZaehlerMap.get(einheit)||{})});
   function kontaktProfilEinheit(einheit){
@@ -8211,6 +8218,185 @@
     else if(typeof neu==="string"&&kontaktHat(KONTAKT_BASIS,neu))kontaktZwang={typ:neu,traits:false};
     else if(neu&&typeof neu==="object"&&kontaktHat(KONTAKT_BASIS,neu.typ))kontaktZwang={typ:neu.typ,traits:!!neu.traits};
     return kontaktZwang?{...kontaktZwang}:null;
+  }
+  // ===================================================================================
+  // KONTAKT, SCHRITT 1 -- PILOT SPURT KLASSISCH (16.11., Konzept Abschnitte 3.1-3.4, 4.1, 6.4).
+  // Alles hinter BAHN_ART.spurt.kontakt (Standard null). Ohne Flag oder mit {stufe:0} laeuft der
+  // Rempler-Block in stepSpurt Zeichen fuer Zeichen wie vorher (Fingerabdruck e80babacb68c).
+  // Flag-Form: {stufe:N} schaltet die Stufen 1..N ein; {nur:[1,3]} genau diese Stufen;
+  // {dosis:x} skaliert die Kosten der Stufe 1 (Dosis-Stufen, Abschnitt 6.4; Standard 1);
+  // {schutz:false} nimmt die Schutzregeln heraus (nur Diagnose); {foul:false}/{haenger:false}
+  // nehmen diese beiden Bausteine aus Stufe 3 heraus.
+  //   Stufe 1  KOSTEN DES VERSUCHS. Taeter: Grundpreis T_a0 (u.kraft 0,26 s bei 82 % Tempo, ~0,05 s)
+  //            bei JEDEM Versuch; beim Fehlschlag Mini-Stun (u.stolper 0,45 s bei 35 % Tempo,
+  //            ~0,29 s -- dasselbe Feld wie jedes Stolpern, kein neuer Zustand, ein weicher Deckel,
+  //            kein Stopp), Puste u.reserve -10, Abklingzeit 1,8 -> 2,6 s. Das Opfer zahlt beim
+  //            Treffer wie bisher (0,55+0,9p s Stolpern, Reserve -18).
+  //   Stufe 2  AUSWAHL. pMin aus kontaktProfilEinheit(u): unter der Schwelle laesst er die
+  //            Gelegenheit verstreichen (Abklingzeit wie ein Versuch, damit er nicht jedes Bild neu
+  //            ueberlegt). Das Ziel waehlt nach `aw` (Wurf aus kontaktRr): ausweichen (TECHNIK gegen
+  //            WUCHT, gelungen kostet es ~0,08 s Linie) oder dagegenhalten (ROBUST gegen WUCHT).
+  //   Stufe 3  TRAITS UND HAERTE. kb/pMin/aw/ha/di mit Traits (heute nur Grundtyp); Haertefaktor
+  //            h=0,75+ha/200 multipliziert Treffer-Wirkung UND Fehlschlag-Preis; Foul (Wurf aus
+  //            kontaktRr) mit Zeitstrafe fuer den Taeter und Gutschrift fuer das Opfer; Haenger
+  //            beim ausgeglichenen abgewehrten Duell (|p-0,5|<0,06): beide 0,4 s gebremst.
+  //   Schutzregeln (3.4), an, sobald eine Stufe an ist: (1) nur Zeit/Puste als Waehrung; (2) der
+  //            Ausgang liest Sub-Skills; (3) Schonfrist 3 s nach einem Treffer und hoechstens zwei
+  //            volle Stuerze je Opfer und Rennen, danach halbe Dauer; (4) Ziel nach Naehe, nicht nach
+  //            Platzierung; (5) Foul-Gutschrift (Stufe 3); (6) kein Kontakt auf den letzten 5 %.
+  // ZUFALL: Die bestehenden Wuerfe (Gelegenheit, Duell) bleiben rr() und fallen in genau denselben
+  // Faellen wie ohne Flag -- auch beim Verzicht wird der Duell-Wurf gezogen und verworfen, damit
+  // die Zufallsfolge mit Flag aus deckungsgleich bleibt, bis sich Positionen unterscheiden
+  // (Hockey-Lehre, Abschnitt 3.5). NEUE Wuerfe (Ausweich-Wahl, Foul) ziehen nur aus kontaktRr().
+  // Zustand je Laeufer (Schonfrist, Sturzzahl, Profil) in einer WeakMap: kein neues Feld am Laeufer.
+  // ===================================================================================
+  const KONTAKT_BAHN={
+    grundKraft:0.26,       // T_a0: u.kraft-Dauer (82 % Tempo), wie das alte tackleKosten
+    missStolper:0.45,      // T_miss: u.stolper-Dauer (35 % Tempo)
+    missReserve:10,        // P_miss: Puste
+    missCd:2.6,            // Abklingzeit nach Fehlschlag (Treffer/Versuch: tackleCd 1,8)
+    ausweichStolper:0.12,  // T_aus: gelungenes Ausweichen, ~0,08 s
+    schonfrist:3.0, sturzDeckel:2, sperreAb:0.95,
+    haengerFenster:0.06, haengerKraft:0.4,
+    foulBasis:0.04, foulStolper:0.77,   // Foul: 0,5 s Zeitstrafe = 0,77 s bei 35 % Tempo
+    // Zeitverlust je Sekunde Zustand, nur fuer die Zeit-Konten (Anzeige/Messung, nie Wertung).
+    verlustStolper:0.65, verlustKraft:0.18
+  };
+  const kontaktStufenCache=new WeakMap();
+  // Liest ein Flag-Objekt in die Stufen-Schalter. Ohne Flag oder mit {stufe:0}: aktiv=false.
+  function kontaktStufenVon(flag){
+    if(!flag||typeof flag!=="object")return null;
+    let K=kontaktStufenCache.get(flag);
+    if(K)return K;
+    const nur=Array.isArray(flag.nur)?flag.nur.map(Number):null;
+    const st=Number(flag.stufe)||0;
+    const an=(s)=>nur?nur.includes(s):st>=s;
+    const dosis=Number.isFinite(Number(flag.dosis))?Math.max(0,Number(flag.dosis)):1;
+    K={s1:an(1), s2:an(2), s3:an(3), dosis};
+    K.aktiv=K.s1||K.s2||K.s3;
+    K.schutz=K.aktiv&&flag.schutz!==false;
+    K.foul=K.s3&&flag.foul!==false;
+    K.haenger=K.s3&&flag.haenger!==false;
+    kontaktStufenCache.set(flag,K);
+    return K;
+  }
+  // Zustand je Einheit fuer den laufenden Wettkampf (Schonfrist, Sturzzahl, zwischengespeichertes
+  // Profil). WeakMap wie die Zaehler; neue Laeufer-Objekte je Rennen starten leer.
+  const kontaktZustandMap=new WeakMap();
+  function kontaktZustandVon(einheit){
+    let z=kontaktZustandMap.get(einheit);
+    if(!z){ z={schonBis:-1, stuerze:0, profil:null, profilMitTraits:null}; kontaktZustandMap.set(einheit,z); }
+    return z;
+  }
+  // Profil fuer die Bahn: Stufe 3 mit Traits, sonst nur die Grundtendenz der Persoenlichkeit.
+  // Mit Zwang (Kontrafaktik) entscheidet kontaktProfil() selbst ueber die Traits.
+  function kontaktProfilBahn(u,K){
+    const z=kontaktZustandVon(u), mit=!!(K&&K.s3);
+    if(mit?z.profilMitTraits:z.profil)return mit?z.profilMitTraits:z.profil;
+    const p=kontaktSpielerMap.get(u)||{};
+    const pr=kontaktProfil(p,u.pers||persOf[p.n]||null,mit?undefined:{traits:false});
+    if(mit)z.profilMitTraits=pr; else z.profil=pr;
+    return pr;
+  }
+  // Sind fuer diese Bahn Kontakt-Stufen eingeschaltet? (Takeshi: eigener Pilot, hier immer nein.)
+  function kontaktBahnAktiv(bd){
+    const art=BAHN_ART[bd];
+    if(!art||!art.kontakt||!art.spurt||art.takeshi||art.tackleAusweichen||bahnHatzAktiv||bahnHyroxAktiv)return false;
+    const K=kontaktStufenVon(art.kontakt);
+    return !!(K&&K.aktiv);
+  }
+  // Boxscore-Zeile "Kont"/"±Zeit" (Konzept 5.1) aus den Zaehlern eines Laeufers.
+  function kontaktBoxscore(u){
+    const z=kontaktZaehlerVon(u), r2=(v)=>Math.round((v||0)*100)/100;
+    // versuche: jede Gelegenheit mit Ziel (Zaehler `versuch`, auch ohne Flag gefuehrt) minus Verzicht.
+    return {versuche:(z.versuch||0)-(z.verzichtet||0), treffer:z.treffer||0, verzichtet:z.verzichtet||0,
+      insLeere:(z.abgeprallt||0)+(z.insLeere||0), ministun:z.ministun||0, getroffen:z.getroffen||0,
+      gestanden:z.gehalten||0, ausgewichen:z.ausgewichen||0, haenger:z.haenger||0,
+      fouls:z.foul||0, gefoult:z.gefoult||0,
+      zeitZugefuegt:r2(z.zeitZugefuegt), zeitBezahlt:r2(z.zeitBezahlt)};
+  }
+  // Ein Rempelversuch mit eingeschalteten Stufen (aus stepSpurt, nachdem Gelegenheit und Ziel
+  // feststehen). Gibt nichts zurueck; schreibt nur u/o (stolper, kraft, reserve, tackleCd,
+  // getackelt, tackles, lungeVis -- alles Felder, die der Rempler schon heute setzt) und die Zaehler.
+  function kontaktBahnVersuch(u,o,TA,K){
+    const KB=KONTAKT_BAHN, pr=kontaktProfilBahn(u,K), po=kontaktProfilBahn(o,K);
+    const p=u.WUCHT/((u.WUCHT+(o.ROBUST||0))||1);
+    // STUFE 2: AUSWAHLSCHWELLE. Die geschaetzte Aussicht ist dieselbe Zahl p, die danach
+    // gewuerfelt wuerde -- kein Zusatzwert. Darunter laesst er es bleiben.
+    if(K.s2 && p<pr.pMin){
+      u.tackleCd=TA.tackleCd??1.8;
+      rr();   // Duell-Wurf ziehen und verwerfen: Zufallsfolge bleibt deckungsgleich mit Flag aus
+      kontaktZaehle(u,"verzichtet");
+      return;
+    }
+    kontaktZaehle(u,"versucht");
+    const h=K.s3?0.75+pr.ha/200:1;
+    u.tackleCd=TA.tackleCd??1.8; u.tackles++; u.lungeVis=0.26;
+    // STUFE 1: Grundpreis. Ohne Stufe 1 bleibt es der alte Wert (tackleKosten, Spurt 0).
+    if(K.s1){
+      const g=KB.grundKraft*K.dosis;
+      if(g>0){ u.kraft=Math.max(u.kraft||0,g); kontaktZaehle(u,"zeitBezahlt",g*KB.verlustKraft); }
+    } else u.kraft=TA.tackleKosten??0.26;
+    // STUFE 2: VERTEIDIGER-WAHL (eigener Strom). Ausweichen liest TECHNIK statt ROBUST.
+    const weicht=K.s2 && kontaktRr()<po.aw/100;
+    const pTreffer=weicht?u.WUCHT/((u.WUCHT+(o.TECHNIK||0))||1):p;
+    const r=rr();   // der bestehende Duell-Wurf, nur anders gelesen
+    if(r<pTreffer){
+      // FOUL (Stufe 3): Treffer UND Wurf aus dem eigenen Strom gegen Haerte und fehlende Disziplin.
+      if(K.foul && kontaktRr()<KB.foulBasis*(pr.ha/50)*((100-pr.di)/50)){
+        u.stolper=Math.max(u.stolper||0,KB.foulStolper);
+        kontaktZaehle(u,"foul"); kontaktZaehle(o,"gefoult");
+        kontaktZaehle(u,"zeitBezahlt",KB.foulStolper*KB.verlustStolper);
+        schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"Foul — Zeit gutgeschrieben",life:1,crit:false,_laeufer:o.id});
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Zeitstrafe",life:1,crit:false,_laeufer:u.id});
+        feed(u.seite,u.n+" rempelt "+o.n+" regelwidrig — Zeitstrafe, "+o.n+" bekommt die Zeit gutgeschrieben.");
+        return;
+      }
+      const zo=kontaktZustandVon(o);
+      let st=(0.55+pTreffer*0.9)*h;
+      if(K.schutz && zo.stuerze>=KB.sturzDeckel)st*=0.5;   // Schutzregel 3: Deckel je Opfer
+      o.stolper=st; o.reserve=Math.max(0,o.reserve-18*h); o.getackelt++;
+      zo.stuerze++;
+      if(K.schutz)zo.schonBis=rennT+KB.schonfrist;          // Schutzregel 3: Schonfrist
+      kontaktZaehle(u,"treffer"); kontaktZaehle(o,"getroffen");
+      kontaktZaehle(u,"zeitZugefuegt",st*KB.verlustStolper); kontaktZaehle(o,"zeitBezahlt",st*KB.verlustStolper);
+      { const po2=laeuferXY(o), pu=laeuferXY(u);
+        effekt({typ:"hieb",x:po2.x,y:po2.y,ux:pu.x,uy:pu.y,seite:u.seite,schwer:true,dauer:.42}); }
+      schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true,_laeufer:o.id});
+      feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.",true,undefined,"rempler");
+      return;
+    }
+    // ABGEWEHRT. Haenger (Stufe 3): das ausgeglichene Duell beim Dagegenhalten -- beide gebremst,
+    // kein eigener Wurf. Bremse ueber u.kraft (82 % Tempo), das Feld, das der Rempler schon nutzt.
+    if(K.haenger && !weicht && Math.abs(p-0.5)<KB.haengerFenster){
+      u.kraft=Math.max(u.kraft||0,KB.haengerKraft); o.kraft=Math.max(o.kraft||0,KB.haengerKraft);
+      kontaktZaehle(u,"haenger"); kontaktZaehle(o,"haenger");
+      kontaktZaehle(u,"zeitBezahlt",KB.haengerKraft*KB.verlustKraft); kontaktZaehle(o,"zeitBezahlt",KB.haengerKraft*KB.verlustKraft);
+      schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"verhakt",life:.9,crit:false,_laeufer:o.id});
+      feedRoutine(o.seite,u.n+" und "+o.n+" verhaken sich.");
+      return;
+    }
+    if(weicht){
+      o.stolper=Math.max(o.stolper||0,KB.ausweichStolper);
+      kontaktZaehle(o,"ausgewichen"); kontaktZaehle(u,"insLeere");
+      kontaktZaehle(o,"zeitBezahlt",KB.ausweichStolper*KB.verlustStolper);
+      { const p2=laeuferXY(o); effekt({typ:"spur",x:p2.x-10,y:p2.y,x2:p2.x+16,y2:p2.y-16,seite:o.seite,dauer:.4}); }
+      schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"weicht aus",life:.9,crit:false,_laeufer:o.id});
+    } else {
+      kontaktZaehle(u,"abgeprallt"); kontaktZaehle(o,"gehalten");
+      schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
+    }
+    // STUFE 1: MINI-STUN beim Fehlschlag (weicher Deckel: 35 % Tempo, kein Stopp), Puste, Abklingzeit.
+    if(K.s1 && K.dosis>0){
+      const s=KB.missStolper*h*K.dosis;
+      u.stolper=Math.max(u.stolper||0,s);
+      u.reserve=Math.max(0,u.reserve-KB.missReserve*h*K.dosis);
+      u.tackleCd=Math.max(u.tackleCd,(TA.tackleCd??1.8)+(KB.missCd-(TA.tackleCd??1.8))*K.dosis);
+      kontaktZaehle(u,"ministun"); kontaktZaehle(u,"zeitBezahlt",s*KB.verlustStolper);
+      schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-34,txt:"ins Leere!",life:.9,crit:false,_laeufer:u.id});
+    }
+    feedRoutine(o.seite,weicht?o.n+" sieht "+u.n+" kommen und lässt ihn ins Leere laufen."
+                               :o.n+" steckt den Rempler weg."+(K.s1?" "+u.n+" kommt aus dem Tritt.":""));
   }
     const clamp=(v)=>Math.max(0,Math.min(100,Math.round(v)));
   // "natürlich" heisst: die Persoenlichkeit entscheidet. Genau der Kniff aus dem Vorbild —
@@ -49026,6 +49212,13 @@
         wert:z=>Math.round(z.u.schattenS/Math.max(0.1,z.u.schattenS+z.u.spitzeS)*100),fmt:v=>v+"%"}]:[]),
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
         wert:z=>(z.u.tackles||z.u.getackelt)?z.u.tackles+"/"+z.u.getackelt:null}]:[]),
+      // KONTAKT (Schritt 1, Konzept 5.1): zwei verdichtete Spalten, Details im Titel. Nur bei
+      // eingeschalteten Stufen; reine Anzeige aus den Zaehlern, nie Wertung.
+      ...(kontaktBahnAktiv(bahnDisc)?[
+        {id:"kont",kopf:"Kont",titel:"Kontakt: Versuche / Treffer (dazu: ins Leere, verzichtet, eingesteckt, ausgewichen, verhakt, Fouls)",
+          wert:z=>{const k=kontaktBoxscore(z.u); return (k.versuche||k.getroffen)?k.versuche+"/"+k.treffer:null;}},
+        {id:"kzeit",kopf:"±Zeit",titel:"Zeit durch Kontakt: anderen zugefügt / selbst bezahlt (Schätzung in Sekunden)",
+          wert:z=>{const k=kontaktBoxscore(z.u); return (k.zeitZugefuegt||k.zeitBezahlt)?"+"+k.zeitZugefuegt.toFixed(1)+"/−"+k.zeitBezahlt.toFixed(1):null;}}]:[]),
       {id:"weit", kopf:"Weit", titel:"erreichte Strecke", top:true, wert:z=>Math.round(z.u.pos*100), fmt:v=>v+"%"},
       {id:"res",  kopf:"Pus", titel:"Puste — der disziplineigene Kraftvorrat aus STEHEN und ROBUST, NICHT die Saison-Fatigue. Wer einbricht, wird langsamer und kann sich wieder fangen.", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
         farbe:v=>v==="leer"?"var(--crit)":null},
@@ -50152,7 +50345,7 @@
     return SPURT_FORMATE[kulisseHash("spurt-format|"+(saat==null?"":String(saat)))%SPURT_FORMATE.length];
   }
   function bauSpurt(saat){
-    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); kontaktLetzteBahn=[]; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); kontaktLetzteBahn=[]; kontaktLetzteMessung=kontaktLetzteBahn; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
     fortschrittVerlauf={};
     for(let s=0;s<bahnSeitenN();s++)fortschrittVerlauf[s]=[];
@@ -52787,7 +52980,12 @@
       // Zahlen identisch (kb/100). Bereinigt: der nie vergebene Typ `taktiker` (0,3) ist raus,
       // `beschuetzer` steht ausdruecklich auf seinem bisherigen Rueckfall 0,5 -- beides ohne
       // Verhaltensaenderung, weil u.pers nur Werte aus leitePers() oder "duellant" annimmt.
-      const willTackeln=kontaktBereitschaftBahn(u);
+      // KONTAKT-SCHRITT 1 (Pilot Spurt, s. kontaktBahnVersuch): K ist null ohne Flag, bei {stufe:0}
+      // und in Takeshi (eigener Pilot, Schritt 3) -- dann laeuft alles unten wie vorher. Stufe 3
+      // liest die Kontaktbereitschaft MIT Traits aus dem Profil, sonst die Grundtabelle.
+      const KK=(BA().kontakt&&!BA().takeshi&&!BA().tackleAusweichen)?kontaktStufenVon(BA().kontakt):null;
+      const K=KK&&KK.aktiv?KK:null;
+      const willTackeln=(K&&K.s3)?kontaktProfilBahn(u,K).kb/100:kontaktBereitschaftBahn(u);
       // Gemessen hat Torment im Spurt 0 % getragen, obwohl die Matrix es mit 14 fuehrt.
       // Ein Teil davon war die Schwelle: bei WUCHT > 45 kamen ueber ein ganzes Rennen rund
       // ein Rempler zustande, und was einmal passiert, entscheidet nichts.
@@ -52825,15 +53023,25 @@
       }
       if(tackleOk && rr()<willTackeln*dt*(TA.tackleRate??1.6)*(bahnKursChaos||1)){
         const opfer=LAEUFER.filter(o=>o!==u&&(TA.tackleAlleSeiten||o.seite!==u.seite)&&o.fertig==null&&!(o.huerde>0)
-          && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035);
+          && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035
+          // SCHUTZREGELN 3 und 6 (Kontakt-Schritt 1, nur mit Flag): Opfer in der Schonfrist und
+          // jeder auf den letzten 5 % der Strecke sind kein Ziel. Ohne K steht hier `true`.
+          && (!K||!K.schutz||(kontaktZustandVon(o).schonBis<=rennT
+               && o.pos<KONTAKT_BAHN.sperreAb && u.pos<KONTAKT_BAHN.sperreAb)));
         // KONTAKT-ZAEHLER (Schritt 0): WeakMap, kein Feld, kein rr(). Bei gesetztem Flag zusaetzlich
         // die Schatten-Buchhaltung: Profil-Schwelle pMin gegen die geschaetzte Aussicht (wuerde er
         // nach Stufe 2 zulangen?) und eine Ziehung aus dem EIGENEN Strom -- ohne jede Wirkung.
         kontaktZaehle(u,"anlauf");
         if(!opfer.length)kontaktZaehle(u,"ohneZiel");
         if(opfer.length){
-          const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
+          // SCHUTZREGEL 4 (nur mit K): Ziel nach Naehe, nicht nach Platzierung (bei Gleichstand
+          // die kleinere id, damit die Wahl deterministisch bleibt). Ohne K die alte Sortierung.
+          const o=K&&K.schutz
+            ?opfer.sort((a,b)=>(Math.abs(a.pos-u.pos)-Math.abs(b.pos-u.pos))||(a.id-b.id))[0]
+            :opfer.sort((a,b)=>b.pos-a.pos)[0];
           kontaktZaehle(u,"versuch"); kontaktZaehle(o,"angegangen");
+          if(K){ kontaktBahnVersuch(u,o,TA,K); }
+          else {
           if(TA.kontakt){
             const pr=kontaktProfilEinheit(u), aussicht=u.WUCHT/((u.WUCHT+(o.ROBUST||0))||1);
             kontaktZaehle(u,aussicht>=pr.pMin?"schattenUeberPMin":"schattenUnterPMin");
@@ -52930,6 +53138,7 @@
               feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
             }
           }
+          }   // Ende "else" ohne Kontakt-Stufen (Kontakt-Schritt 1)
         }
       }
 
@@ -60342,8 +60551,8 @@
   //                             ARENA_ART.tdm oben). Bleibt offen fuer eine naechste Runde.
   for(const ad of Object.keys(ARENA_ART)){
     MOTOREN[ad]={
-      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe,KP}),
-      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;KP=a.KP;},
+      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe,KP,kontaktSeed}),
+      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;KP=a.KP;if(a.kontaktSeed!=null)kontaktSeed=a.kontaktSeed;},
       vorher:()=>{disc=ad;},
       bau:(saat)=>{disc=ad; build(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
@@ -63136,9 +63345,13 @@
       // (spieleBahn, spieleBahnPod, Sonden) startet ueber vorher() garantiert ohne Pod-Kader und
       // gibt den sichtbaren ueber zurueck() wieder her. Im Duell sind beide immer null.
       sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern(),
-                    podKader:bahnPodKader, podJeTeam:bahnPodJeTeam}),
+                    podKader:bahnPodKader, podJeTeam:bahnPodJeTeam,
+                    // KONTAKT (Schritt 1): eigener Strom und Laeuferliste des laufenden Rennens.
+                    kontaktSeed, kontaktLetzteBahn}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
                     bahnPodKader=a.podKader??null; bahnPodJeTeam=a.podJeTeam??null;
+                    if(a.kontaktSeed!=null)kontaktSeed=a.kontaktSeed;
+                    if(a.kontaktLetzteBahn)kontaktLetzteBahn=a.kontaktLetzteBahn;
                     rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
                     // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
                     // Rennen: ihre _laeufer-Verweise zeigen auf die Laeufer des Durchgangs,
@@ -63352,7 +63565,11 @@
         // Puste-Erholung immer 0.
         gefangen:u.gefangen||0,
         sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
-        ansagen:u.ansagen||0}))};
+        ansagen:u.ansagen||0,
+        // KONTAKT-BOXSCORE (Schritt 1, Konzept 5.1): NUR mit eingeschalteten Stufen -- ohne Flag
+        // fehlt der Schluessel ganz, das Ergebnis (und der Fingerabdruck) bleibt bit-identisch.
+        // Reine Statistik, geht nie in wert()/bahnRangliste().
+        ...(kontaktBahnAktiv(bd)?{kontakt:kontaktBoxscore(u)}:{})}))};
     M.zurueck(gesichert);
     return erg;
   }
@@ -63370,8 +63587,8 @@
       // SANDSACK_PAR_FILM/_SZENE (Weg C parallel, Stufe 3) aus demselben Grund: eine Mess-Sonde
       // waehrend eines laufenden Live-Spiels (bauBuehne() setzt beide zurueck) loeschte sonst
       // das Bild der Schicht. Bei Flag != 10 immer null.
-      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done, LASTEN_FINALE, SANDSACK_WEGC, SANDSACK_PAR_FILM, SANDSACK_PAR_SZENE}),
-      zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER;
+      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done, LASTEN_FINALE, SANDSACK_WEGC, SANDSACK_PAR_FILM, SANDSACK_PAR_SZENE, kontaktSeed}),
+      zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER; if(a.kontaktSeed!=null)kontaktSeed=a.kontaktSeed;
                     buehneT=a.buehneT; buehneZeiger=a.buehneZeiger; buehneQueue=a.buehneQueue;
                     buehneAkt=a.buehneAkt; done=a.done; LASTEN_FINALE=a.LASTEN_FINALE;
                     SANDSACK_WEGC=a.SANDSACK_WEGC??null;
@@ -63408,8 +63625,8 @@
       // fsLive: nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive), fuer
       // die drei Vorab-Disziplinen bleibt es null — kein Sonderfall im Motor, einfach
       // mitgesichert wie alles andere.
-      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive, fsSchiri}),
-      zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive, fsSchiri, kontaktSeed}),
+      zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM; if(a.kontaktSeed!=null)kontaktSeed=a.kontaktSeed;
                     fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
                     fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive; fsSchiri=a.fsSchiri;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
@@ -65026,7 +65243,7 @@
     kontaktPersZwang:(...arg)=>arg.length?kontaktZwangSetzen(arg[0]):(kontaktZwang?{...kontaktZwang}:null),
     kontaktProfil:(p,persKey)=>kontaktProfil(p,persKey),
     kontaktBasis:()=>JSON.parse(JSON.stringify(KONTAKT_BASIS)),
-    kontaktZaehler:()=>kontaktLetzteBahn.map(u=>({n:u.n, seite:u.seite, pers:u.pers, ...kontaktZaehlerVon(u)})),
+    kontaktZaehler:()=>kontaktLetzteMessung.map(u=>({n:u.n, seite:u.seite, pers:u.pers, ...kontaktZaehlerVon(u)})),
     kontaktZufallProbe:(saat,n)=>{ kontaktStromSaeen(saat); const aus=[]; for(let i=0;i<(n||5);i++)aus.push(kontaktRr()); return aus; },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
@@ -67043,7 +67260,9 @@
           // vorhandenes Feld ausgelesen, veraendert keine Rangtreue.
           const eigVon=(u)=>u.eigOhneMutator!=null?u.eigOhneMutator:u.eig;
           const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:eigVon(u),
-            bein:u.bein??null, etappe:u.etappenZeit??null, startT:u.startT??null}))
+            bein:u.bein??null, etappe:u.etappenZeit??null, startT:u.startT??null,
+            // KONTAKT-DIAGNOSE (Schritt 1, nur Messung, opt.kontaktDiag): Zaehler und Typ je Laeufer.
+            ...(o.kontaktDiag?{kontaktDiag:{pers:u.pers,zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4),...kontaktBoxscore(u)}}:{})}))
             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:eigVon(u),
               // Nur mit Kulissen-Profil gesetzt (sonst fehlen beide Felder, Rueckgabe wie vorher).
               ...(u.kulisseOW!=null?{eigKulisse:u.eigKulisse,kulisse:u.kulisse,kulisseOW:u.kulisseOW}:{})}))
@@ -67092,7 +67311,8 @@
                 kulisseOW:Math.round(u.kulisseOW*100)/100}:{}),
               // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine
               // Zahl (>=0) wenn `o.zielDiag` gesetzt war, deshalb reicht `!=null` als Schalter.
-              ...(u.zugang!=null?{zugang:u.zugang,persTyp:u.persTyp??null,heilerSub:u.heilerSub??null}:{})}))});
+              ...(u.zugang!=null?{zugang:u.zugang,persTyp:u.persTyp??null,heilerSub:u.heilerSub??null}:{}),
+              ...(u.kontaktDiag?{kontakt:u.kontaktDiag}:{})}))});
         }
         return spiele;
       };

@@ -55,6 +55,7 @@ import {
   disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, bootstrapMedianUnsicherheit,
   IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
+  IST_KONTAKT_SCHALTER, kontaktSchalterAusArgs, setzeKontaktSchalter, kontaktSchalterText,
   generischeChassisWarnung,
 } from "./lib/rangtreue-messung.mjs";
 
@@ -95,7 +96,8 @@ const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);
 // --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv): Mess-Sonde fuer den Paar-Bonus,
 // s. scripts/lib/rangtreue-messung.mjs. Ohne den Schalter unveraendertes Verhalten.
 const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(roheArgs);
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a));
+const KONTAKT_SCHALTER = kontaktSchalterAusArgs(roheArgs);   // --kontakt=..., s. rangtreue-messung.mjs
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -110,7 +112,7 @@ if (!EINZELKADER) {
 // Speicher/die Festplatte wegnehmen (selbst beobachtet: ein abgebrochener Lauf ohne diesen
 // Block liess fuenf Chromium-Kindprozesse zurueck).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-let zeilen, fehler = [], schalterGesetzt = null, staffelPaarGesetzt = null;
+let zeilen, fehler = [], schalterGesetzt = null, staffelPaarGesetzt = null, kontaktGesetzt = null;
 try {
   const seite = await browser.newPage();
   seite.on("pageerror", (e) => fehler.push(String(e)));
@@ -121,6 +123,7 @@ try {
   if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
   staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
+  kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);
 
   if (!EINZELKADER && !kaderFamilie) {
     const gebaut = await baueSynthetischeKaderFamilie(seite);
@@ -156,7 +159,8 @@ const titel = EINZELKADER
   : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
 console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "") + (KULISSE ? `\nKulisse: ${KULISSE}` : "")
   + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "")
-  + (staffelPaarGesetzt ? `\n${staffelPaarSchalterText(staffelPaarGesetzt)}` : "") + "\n");
+  + (staffelPaarGesetzt ? `\n${staffelPaarSchalterText(staffelPaarGesetzt)}` : "")
+  + (kontaktGesetzt ? `\n${kontaktSchalterText(kontaktGesetzt)}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 // GENERISCHE-CHASSIS-WARNUNGEN SAMMELN (Task #193, N4): jede Zeile, deren Disziplin in
 // generischeChassisWarnung() steht, bekommt zusaetzlich eine Fussnote nach der Tabelle --
