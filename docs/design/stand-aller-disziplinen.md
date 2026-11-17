@@ -1,5 +1,17 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Zweiunddreißigster Nachtrag 17.11. — Football und Hockey nach den Anzeige-/Performance-PRs nachgemessen (Task #136).**
+Nach #1521, #1523, #1526, #1527, #1530 und #1533 (Engine-Anzeige, Interpolation, Bilder-Auslagerung,
+Tennis-Kulisse im Node-Runner, I-Spy) wurden Football und Hockey frisch gemessen, bei unverändertem
+Wertungs-Fingerabdruck **GESAMT e80babacb68c**. Ergebnis: **bit-identisch zur Erstmessung** — Football
+rho je Spiel 0,854 (Saison 0,937), Pp 15,3 / 16,0; Hockey rho je Spiel 0,700 (nur Feldspieler 0,784),
+Saison 0,888, Roh-Pp 31,9 / 24,1 in den Strömen 0 und 10000000. Letztere sind **Einzelströme** und
+liegen für Hockey im bekannten Rauschboden (`docs/design/hockey-pp-messbasis-10-11.md`); abnahmefähig
+ist nur der gepoolte Wert **13,9 / 21,8** (unverändert, unter 25). Die anderen vier Hockey-Ströme
+wurden nicht erneut gefahren (je rund 40 Minuten, Saaten deterministisch, Ergebnis vorhersagbar).
+Hockey bleibt bei rho unter 0,80 mit Chris' Ausnahme (Star-/Paartreue statt nackter Rangkorrelation).
+Keine Rezept- oder Matrixänderung.
+
 **Einunddreißigster Nachtrag 15./16.11. — Football besteht, produktiv geschaltet (NFL-Motorrunde).**
 Chris: „lass opus das diesmal bitte zu ende bearbeiten". Statt eines sechsten Rezeptversuchs ein
 neuer Motor (Linien-Duelle je Snap, Tackling mit Yards nach Kontakt, Ballsicherheit bei jedem
