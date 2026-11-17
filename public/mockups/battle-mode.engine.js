@@ -8245,7 +8245,7 @@
   //   Stufe 3  TRAITS UND HAERTE. kb/pMin/aw/ha/di mit Traits (heute nur Grundtyp); Haertefaktor
   //            h=0,75+ha/200 multipliziert Treffer-Wirkung UND Fehlschlag-Preis; Foul (Wurf aus
   //            kontaktRr) mit Zeitstrafe fuer den Taeter und Gutschrift fuer das Opfer; Haenger
-  //            beim ausgeglichenen abgewehrten Duell (|p-0,5|<0,06): beide 0,4 s gebremst.
+  //            beim ausgeglichenen abgewehrten Duell (|p-0,5|<0,06): beide 0,4 s auf 60 % gebremst (17.11.).
   //   Schutzregeln (3.4), an, sobald eine Stufe an ist: (1) nur Zeit/Puste als Waehrung; (2) der
   //            Ausgang liest Sub-Skills; (3) Schonfrist 3 s nach einem Treffer und hoechstens zwei
   //            volle Stuerze je Opfer und Rennen, danach halbe Dauer; (4) Ziel nach Naehe, nicht nach
@@ -8263,11 +8263,28 @@
     missCd:2.6,            // Abklingzeit nach Fehlschlag (Treffer/Versuch: tackleCd 1,8)
     ausweichStolper:0.12,  // T_aus: gelungenes Ausweichen, ~0,08 s
     schonfrist:3.0, sturzDeckel:2, sperreAb:0.95,
-    haengerFenster:0.06, haengerKraft:0.4,
+    // Haenger (17.11., Chris: "Und das bremsen machst du auf 60%"): beide 0,4 s auf 60 % Tempo,
+    // Zeitverlust 0,4*(1-0,6)=0,16 s je Laeufer. haengerKraft bleibt die u.kraft-Dauer (Pose,
+    // Puste-Mehrverbrauch wie bisher); das Tempo liest waehrend des Haengers 0,6 statt 0,82.
+    haengerFenster:0.06, haengerKraft:0.4, haengerDauer:0.4, haengerTempo:0.6,
     foulBasis:0.04, foulStolper:0.77,   // Foul: 0,5 s Zeitstrafe = 0,77 s bei 35 % Tempo
     // Zeitverlust je Sekunde Zustand, nur fuer die Zeit-Konten (Anzeige/Messung, nie Wertung).
     verlustStolper:0.65, verlustKraft:0.18
   };
+  // HAENGER-BREMSE (17.11.): bis wann ein Laeufer im Haenger steckt (Rennuhr rennT), in einer
+  // eigenen WeakMap -- kein Feld am Laeufer, nichts im Fingerabdruck. Die Rennuhr wird von
+  // MOTOREN[bahn].sichern()/zurueck() mitgenommen, die Laeufer-Objekte einer Mess-Sonde sind
+  // eigene Objekte: ein sichtbares Rennen behaelt seine Haenger, ohne dass hier etwas zu sichern
+  // ist. `kontaktHaengerJe` ist nur eine Abkuerzung fuer tempoVon (ohne Flag nie true, dann
+  // wird die WeakMap nicht einmal gelesen); sie wird nie zurueckgesetzt, weil eine Mess-Sonde
+  // mitten im sichtbaren Rennen dessen laufende Haenger sonst abschalten wuerde.
+  const kontaktHaengerMap=new WeakMap();
+  let kontaktHaengerJe=false;
+  function kontaktHaengerBremse(u){
+    if(!kontaktHaengerJe)return 0;
+    const bis=kontaktHaengerMap.get(u);
+    return bis!=null&&rennT<bis?KONTAKT_BAHN.haengerTempo:0;
+  }
   const kontaktStufenCache=new WeakMap();
   // Liest ein Flag-Objekt in die Stufen-Schalter. Ohne Flag oder mit {stufe:0}: aktiv=false.
   function kontaktStufenVon(flag){
@@ -8373,11 +8390,17 @@
       return;
     }
     // ABGEWEHRT. Haenger (Stufe 3): das ausgeglichene Duell beim Dagegenhalten -- beide gebremst,
-    // kein eigener Wurf. Bremse ueber u.kraft (82 % Tempo), das Feld, das der Rempler schon nutzt.
+    // kein eigener Wurf. Bremse seit 17.11. auf 60 % fuer 0,4 s (kontaktHaengerBremse in tempoVon,
+    // ersetzt dort die 82 % von u.kraft); u.kraft bleibt fuer Pose und Puste-Mehrverbrauch gesetzt.
     if(K.haenger && !weicht && Math.abs(p-0.5)<KB.haengerFenster){
       u.kraft=Math.max(u.kraft||0,KB.haengerKraft); o.kraft=Math.max(o.kraft||0,KB.haengerKraft);
+      const bis=rennT+KB.haengerDauer;
+      kontaktHaengerJe=true;
+      kontaktHaengerMap.set(u,Math.max(kontaktHaengerMap.get(u)??-1,bis));
+      kontaktHaengerMap.set(o,Math.max(kontaktHaengerMap.get(o)??-1,bis));
+      const verlust=KB.haengerDauer*(1-KB.haengerTempo);
       kontaktZaehle(u,"haenger"); kontaktZaehle(o,"haenger");
-      kontaktZaehle(u,"zeitBezahlt",KB.haengerKraft*KB.verlustKraft); kontaktZaehle(o,"zeitBezahlt",KB.haengerKraft*KB.verlustKraft);
+      kontaktZaehle(u,"zeitBezahlt",verlust); kontaktZaehle(o,"zeitBezahlt",verlust);
       schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"verhakt",life:.9,crit:false,_laeufer:o.id});
       feedRoutine(o.seite,u.n+" und "+o.n+" verhaken sich.");
       return;
@@ -51492,7 +51515,7 @@
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
            // S-N2 (Spurt, QA-Schalter): an der Station kriecht er mit `u.kriechK` statt zu
            // stehen. Ohne Schalter ist kriechK undefined, (undefined||0) also 0 wie vorher.
-           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?(u.kriechK||0):1)
+           *kurvenFaktor(u)*(kontaktHaengerBremse(u)||(u.kraft>0?0.82:1))*(u.huerde>0?(u.kriechK||0):1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.

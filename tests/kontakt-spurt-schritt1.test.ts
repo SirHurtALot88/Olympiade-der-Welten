@@ -208,3 +208,37 @@ describe("Stufe 3: Traits, Haerte, Foul, Haenger", () => {
     expect(summe(s3, "gefoult")).toBe(summe(s3, "fouls"));
   }, 120_000);
 });
+
+describe("Haenger bremst auf 60 % fuer 0,4 s (Chris 17.11.)", () => {
+  // Nur Stufe 3 ohne Foul: ohne Stufe 1 kein Grundpreis/Mini-Stun, ohne Stufe 2 kein Ausweichen.
+  // Mit haenger:false wird derselbe Fall zum einfachen "haelt stand" -- der Unterschied der beiden
+  // Laeufe ist also allein die Haenger-Bremse.
+  it("Zeitbuchung 0,4 * (1 - 0,6) = 0,16 s je Beteiligtem; Beteiligte verlieren im Mittel deutlich mehr als die alten ~0,07 s", () => {
+    const aus = laeufe();
+    const an = mitFlag({ nur: [3], foul: false }, laeufe);
+    const ohne = mitFlag({ nur: [3], foul: false, haenger: false }, laeufe);
+    const haenger = summe(an, "haenger");
+    expect(haenger).toBeGreaterThan(10);
+    const laeuferZahl = an.reduce((s, l) => s + l.laeufer.length, 0);
+    const erwartet = summe(an, "zeitZugefuegt") + haenger * 0.4 * (1 - 0.6);
+    expect(Math.abs(summe(an, "zeitBezahlt") - erwartet)).toBeLessThan(0.006 * laeuferZahl);
+    // Beteiligte gegen dasselbe Rennen ohne Haenger: gemessen ~0,17 s je Beteiligtem (vorher, bei
+    // 82 % ueber u.kraft, ~0,065 s). Die Schranke 0,11 s liegt klar zwischen beiden.
+    let n = 0, langsamer = 0, delta = 0;
+    an.forEach((l, i) => {
+      for (const u of l.laeufer) {
+        if (!u.kontakt || u.kontakt.haenger === 0) continue;
+        const v = ohne[i].laeufer.find((x) => x.n === u.n);
+        if (u.zeit == null || v?.zeit == null) continue;
+        n += 1;
+        delta += u.zeit - v.zeit;
+        if (u.zeit > v.zeit) langsamer += 1;
+      }
+    });
+    expect(n).toBeGreaterThan(10);
+    expect(delta / n).toBeGreaterThan(0.11);
+    expect(langsamer / n).toBeGreaterThan(0.6);
+    // Rueckweg: nach dem Ausschalten wieder dasselbe Rennen wie vorher.
+    expect(JSON.stringify(laeufe())).toBe(JSON.stringify(aus));
+  }, 120_000);
+});
