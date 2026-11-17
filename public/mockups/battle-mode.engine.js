@@ -12149,6 +12149,7 @@
     fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     lwNeuesSpiel(); // LAUFWEG-MODUL: Zustand/Zaehler je Spiel neu (WeakMap-Generation)
     tfNeuesSpiel(); // TEAMFOUL-/BONUS-MODUL
+    bkFxNeuesSpiel(); // EFFEKT-/TON-MODUL
     // ENDSTAND-OVERLAY-WAECHTER (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe
     // Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` (s. dort) -- ohne
     // diese Bremse wuerde updateHudFeldspiel() das #endstand-Overlay bei JEDEM Frame nach
@@ -17104,6 +17105,7 @@
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
         schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:flug.blockKandidat.id});
+        bkFxPush({art:"block",x:(schuetze.x+flug.blockKandidat.x)/2,y:Math.min(schuetze.y,flug.blockKandidat.y)-30}); // EFFEKT-MODUL
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
@@ -17803,6 +17805,9 @@
       if(phase>=1){
         if(bkWurfFlug)bkNachlauf={art:flug.treffer?"netz":"abpraller",t0:bkAnzeigeUhr,
           x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,dunk:flug.tier==="dunk"||flug.art==="alley"};
+        if(bkWurfFlug&&!flug.foul)bkFxPush({art:flug.treffer?"treffer":"ring",x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,
+          dunk:flug.tier==="dunk"||flug.art==="alley",fern:!!flug.fern,brett:!flug.treffer&&flug.tier==="mit",
+          knapp:fsLive.viertel>=4&&Math.abs(fsPunkte[0]-fsPunkte[1])<=4}); // EFFEKT-MODUL, nur Anzeige
         loeseFlugAuf(flug,art); fsLive.ball.flug=null;
       }
     } else if(fsLive.ball.frei){
@@ -19054,6 +19059,17 @@
   // Ring) und wird fuer den rechten gespiegelt. Ist ein PNG geladen, ersetzt es die Primitive
   // seiner Ebene vollstaendig; fehlt es oder laedt es nicht, bleibt die Zeichnung unten.
   function zeichneKorbAnlage(links,ebene){
+    const wk=bkRingWackeln(links); // EFFEKT-MODUL: Ringwackeln (nur Anzeige)
+    if(wk.dx||wk.dy||wk.rot){
+      const kx0=korbXVon(links?1:0);
+      ctx.save(); ctx.translate(wk.dx,wk.dy);
+      ctx.translate(kx0,H/2); ctx.rotate(wk.rot); ctx.translate(-kx0,-H/2);
+      try{ zeichneKorbAnlageRoh(links,ebene); } finally { ctx.restore(); }
+      return;
+    }
+    zeichneKorbAnlageRoh(links,ebene);
+  }
+  function zeichneKorbAnlageRoh(links,ebene){
     const F=BK_FIBA, kx=korbXVon(links?1:0), my=H/2, z=links?1:-1;
     const ry=my-F.ringZ;                       // Bildschirm-y des Ringmittelpunkts
     // PNG-Anlage (Fable 17.11., data/generated/pixellab-requisiten/basketball-17-11/anker.json):
@@ -19742,6 +19758,7 @@
     }
     // Vordere Ebene der Korbanlage NACH dem Ball: der Ball faellt durch den Ring ins Netz.
     if(feldspielDisc==="basketball")for(const links of [true,false])zeichneKorbAnlage(links,"vorne");
+    if(feldspielDisc==="basketball")bkFxZeichne(); // EFFEKT-/TON-MODUL
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
@@ -19832,6 +19849,144 @@
   function zeichneFeldspielMitKamera(){
     ctx.save();
     try{ feldKameraAnwenden(); zeichneFeldspiel(); } finally { ctx.restore(); }
+  }
+
+
+  // ===================================================================================
+  // EFFEKT-/TON-MODUL BASKETBALL (Benchmark Runde 2, 17.11., Bogen-Zeilen 2/8/9). REINE
+  // ANZEIGE: eine kleine Ereignis-Warteschlange (hoechstens BK_FX_MAX Eintraege, in Mess-
+  // laeufen also kein Speicherwachstum), gefuellt an den Stellen, an denen der Ball am Ring
+  // ankommt oder geblockt wird; gelesen nur in zeichneFeldspiel. Kein rr(), keine Felder an
+  // Spielern (Fingerabdruck unberuehrt).
+  //   * Ringwackeln     bei Ringtreffer (Fehlwurf) gedaempfte Schwingung, beim Dunk staerker
+  //                     und mit Neigung (der ganze Korb samt Ring wackelt, PNG oder Primitiv)
+  //   * Dunk            Funkenkranz am Ring, Staubring bei der Landung
+  //   * Dreier          Leuchtspur hinter dem Ball, Goldfunken bei Treffer
+  //   * Block           weisser Stern + Splitter am Blockpunkt
+  //   * Staub/Schweiss  Staubwoelkchen beim Abstoppen (Pull-up) und Absprung (Drive),
+  //                     Schweisstropfen beim Drive
+  //   * Ton             WebAudio-Synthese aus den Bausteinen tonKlick/tonSchlag/tonMetall/
+  //                     tonRauschen (kein Asset): Swish != Ringtreffer != Brett/Block, Dunk-
+  //                     Wumms, Turnschuh-Quietschen, Publikum steigt bei knappem Stand im
+  //                     letzten Viertel an. Erst nach einer Nutzergeste (Autoplay-Regel),
+  //                     abschaltbar: window.__arena.bkSynthTon(false), gemerkt in
+  //                     localStorage "bkSynthTon". Lautstaerke/Stumm ueber bkPegel (gleicher
+  //                     Regler wie alle Basketball-Toene).
+  // ===================================================================================
+  const BK_FX_MAX=24;
+  let bkFx=[], bkFxSpur=[], bkGesteDa=false;
+  let bkSynthAn=(()=>{ try{ return localStorage.getItem("bkSynthTon")!=="0"; }catch(e){ return true; } })();
+  try{
+    if(typeof document!=="undefined"&&document.addEventListener){
+      const geste=()=>{ bkGesteDa=true; };
+      document.addEventListener("pointerdown",geste,{once:true,capture:true});
+      document.addEventListener("keydown",geste,{once:true,capture:true});
+    }
+  }catch(e){}
+  function bkFxPush(e){ if(feldspielDisc!=="basketball")return; e.t0=bkAnzeigeUhr; bkFx.push(e); if(bkFx.length>BK_FX_MAX)bkFx.shift(); }
+  function bkFxNeuesSpiel(){ bkFx=[]; bkFxSpur=[]; }
+  function bkTon(art){
+    if(!bkSynthAn||!bkGesteDa||stumm||(typeof schnelldurchAktiv!=="undefined"&&schnelldurchAktiv))return;
+    try{
+      if(art==="swish"){ tonRauschen(0.22,5200,0.16); tonKlick(0.10,6500,0.05); }
+      else if(art==="ring"){ tonMetall(0.30,1180,0.32); tonSchlag(0.12,420,240,0.10); }
+      else if(art==="brett"){ tonSchlag(0.36,190,70,0.14); tonKlick(0.18,900,0.04); }
+      else if(art==="dunk"){ tonSchlag(0.55,120,45,0.30); tonMetall(0.26,760,0.45); tonRauschen(0.14,900,0.6); }
+      else if(art==="block"){ tonSchlag(0.40,260,90,0.12); tonKlick(0.22,1400,0.05); }
+      else if(art==="quietschen"){ tonSchlag(0.07,2600,3500,0.07); }
+      else if(art==="publikum"){ tonRauschen(0.16,800,1.3); }
+    }catch(e){}
+  }
+  // Ein Ereignis wird beim ersten Zeichnen "gehoert": Ton genau einmal, danach nur Bild.
+  function bkFxTonEinmal(e){
+    if(e.tonGespielt)return; e.tonGespielt=true;
+    if(e.art==="treffer"){ bkTon(e.dunk?"dunk":"swish"); if(e.knapp)bkTon("publikum"); }
+    else if(e.art==="ring")bkTon(e.brett?"brett":"ring");
+    else if(e.art==="block")bkTon("block");
+    else if(e.art==="quietschen")bkTon("quietschen");
+  }
+  // Ring-Auslenkung je Seite (links = Korb bei kleinem x): {dx,dy,rot}
+  function bkRingWackeln(links){
+    let dx=0, dy=0, rot=0;
+    for(const e of bkFx){
+      if(e.links!==links||!(e.art==="ring"||(e.art==="treffer"&&e.dunk)))continue;
+      const t=bkAnzeigeUhr-e.t0; if(t<0||t>0.9)continue;
+      const amp=(e.art==="treffer"?3.6:e.brett?1.2:2.2)*Math.exp(-t*5.5);
+      dy+=Math.sin(t*38)*amp; dx+=Math.sin(t*29+1)*amp*0.35;
+      if(e.art==="treffer")rot+=Math.sin(t*31)*0.035*Math.exp(-t*5);
+    }
+    return {dx,dy,rot};
+  }
+  // Drei-Punkte-Spur: letzte Ballpositionen eines Distanzwurfs (Bildschirm, nach z).
+  function bkFxSpurPflegen(){
+    const fl=fsLive&&fsLive.ball.flug;
+    if(fl&&fl.art==="wurf"&&fl.fern&&fsBall.sichtbar){
+      bkFxSpur.push({x:fsBall.x,y:fsBall.y-(fsBall.z||0)});
+      if(bkFxSpur.length>14)bkFxSpur.shift();
+    } else if(bkFxSpur.length)bkFxSpur.shift();
+  }
+  function bkFxZeichne(){
+    bkFxSpurPflegen();
+    if(bkFxSpur.length>1){
+      ctx.save(); ctx.lineCap="round";
+      for(let i=1;i<bkFxSpur.length;i++){
+        const a=i/bkFxSpur.length;
+        ctx.strokeStyle="rgba(255,196,64,"+(a*0.75)+")"; ctx.lineWidth=1+a*4;
+        ctx.beginPath(); ctx.moveTo(bkFxSpur[i-1].x,bkFxSpur[i-1].y); ctx.lineTo(bkFxSpur[i].x,bkFxSpur[i].y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // Staub/Schweiss aus den Wurf-Absichten (LAUFWEG-MODUL), Ereignis je Wurf einmal.
+    if(typeof laufwegeVon==="function"&&laufwegeVon()){
+      for(const team of FSTEAM)for(const u of team){
+        const z=lwZ(u), tw=bkAnzeigeUhr-z.wurfT;
+        if(z.wurfArt&&tw>=0&&tw<0.5&&z.fxWurfT!==z.wurfT){
+          z.fxWurfT=z.wurfT;
+          if(z.wurfArt==="pullup"||z.wurfArt==="drive"||z.wurfArt==="postup")
+            bkFxPush({art:"staub",x:u.x,y:u.y+19,schweiss:z.wurfArt==="drive",id:u.id});
+          if(z.wurfArt==="pullup")bkFxPush({art:"quietschen"});
+        }
+        if(z.art==="backdoor"&&z.fxCutBis!==z.bis){ z.fxCutBis=z.bis; bkFxPush({art:"staub",x:u.x,y:u.y+19}); bkFxPush({art:"quietschen"}); }
+      }
+    }
+    const F=BK_FIBA;
+    for(const e of bkFx){
+      const t=bkAnzeigeUhr-e.t0; if(t<0)continue;
+      bkFxTonEinmal(e);
+      if(e.art==="treffer"&&(e.dunk||e.fern)&&t<0.7){
+        const kx=e.x, ry=e.y-F.ringZ, n=e.dunk?14:10, r=8+t*(e.dunk?70:50), a=1-t/0.7;
+        ctx.save(); ctx.globalAlpha=a;
+        for(let i=0;i<n;i++){
+          const w=i/n*Math.PI*2+(e.dunk?0:0.2);
+          ctx.strokeStyle=e.dunk?(i%2?"#ffe08a":"#ff8a3a"):"#ffd34a"; ctx.lineWidth=e.dunk?2.4:1.8;
+          ctx.beginPath(); ctx.moveTo(kx+Math.cos(w)*r*0.55,ry+Math.sin(w)*r*0.55*0.7);
+          ctx.lineTo(kx+Math.cos(w)*r,ry+Math.sin(w)*r*0.7); ctx.stroke();
+        }
+        if(e.dunk&&t<0.18){ ctx.globalAlpha=(1-t/0.18)*0.8; ctx.fillStyle="#fff7d6";
+          ctx.beginPath(); ctx.ellipse(kx,ry,F.ringRx*1.6,F.ringRy*1.6,0,0,6.3); ctx.fill(); }
+        ctx.restore();
+        if(e.dunk&&t>0.32&&t<0.9){ // Landung: Staubring unter dem Korb
+          const q=(t-0.32)/0.58;
+          ctx.save(); ctx.globalAlpha=(1-q)*0.45; ctx.strokeStyle="#d8d0c0"; ctx.lineWidth=3*(1-q)+1;
+          ctx.beginPath(); ctx.ellipse(kx+(e.links?18:-18),e.y+14,10+q*30,4+q*10,0,0,6.3); ctx.stroke(); ctx.restore();
+        }
+      } else if(e.art==="block"&&t<0.55){
+        const a=1-t/0.55, r=6+t*40;
+        ctx.save(); ctx.globalAlpha=a; ctx.strokeStyle="#ffffff"; ctx.lineWidth=2.5;
+        for(let i=0;i<8;i++){ const w=i/8*Math.PI*2;
+          ctx.beginPath(); ctx.moveTo(e.x+Math.cos(w)*r*0.35,e.y+Math.sin(w)*r*0.35); ctx.lineTo(e.x+Math.cos(w)*r,e.y+Math.sin(w)*r); ctx.stroke(); }
+        ctx.fillStyle="rgba(255,255,255,"+(a*0.6)+")"; ctx.beginPath(); ctx.arc(e.x,e.y,5*(1-t),0,6.3); ctx.fill();
+        ctx.restore();
+      } else if(e.art==="staub"&&t<0.6){
+        const q=t/0.6;
+        ctx.save(); ctx.globalAlpha=(1-q)*0.5; ctx.fillStyle="#cfc6b4";
+        for(let i=0;i<5;i++){ const w=Math.PI*(0.15+i*0.17);
+          ctx.beginPath(); ctx.arc(e.x+Math.cos(w)*(6+q*16)*(i%2?1:-1),e.y-Math.sin(w)*q*6,2+q*4,0,6.3); ctx.fill(); }
+        if(e.schweiss&&t<0.45){ ctx.globalAlpha=(1-t/0.45)*0.85; ctx.fillStyle="#bfe6ff";
+          for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(e.x+(i-1)*7+(i-1)*t*30,e.y-46-t*20+t*t*120,1.6,0,6.3); ctx.fill(); } }
+        ctx.restore();
+      }
+    }
   }
 
   const BREAKING_BPM=100;
@@ -69337,6 +69492,8 @@
     teamFouls:()=>{ const r=foulRegelVon(); if(!r)return null; tfViertelPruefen();
       return {viertel:tfStand.viertel,fouls:[...tfStand.fouls],bonus:[0,1].map(sd=>tfStand.fouls[sd]>=r.bonusAb),bonusAb:r.bonusAb}; },
     // KAMERA-MODUL: an/aus (Totale), gibt den neuen Zustand zurueck. Reine Anzeige.
+    // EFFEKT-/TON-MODUL: Synth-Ton an/aus (gemerkt), gibt den Zustand zurueck.
+    bkSynthTon:(an)=>{ if(an!=null){ bkSynthAn=!!an; try{ localStorage.setItem("bkSynthTon",bkSynthAn?"1":"0"); }catch(e){} } return bkSynthAn; },
     feldKamera:(an)=>{ if(an!=null)fkAn=!!an; fkZustand=null; return fkAn; },
     diagSpielzuege:(n,dId)=>{
       const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0;
@@ -69412,6 +69569,13 @@
         if(situation==="ausboxen")return !!fl&&fl.art==="wurf"&&fl.t/fl.dauer>=0.85&&FSTEAM[1-fl.schuetze.side].filter(v=>lwZ(v).boxt).length>=4;
         if(situation==="fastbreak")return !!fsLive.fastbreak&&fsT<fsLive.fastbreak.bis&&fsLive.fastbreak.bis-fsT<1.9&&!!fsLive.ball.traeger;
         if(situation==="lob"||situation==="bodenpass")return !!fl&&fl.art==="pass"&&LW_PASS.get(fl)===situation&&fl.t/fl.dauer>=0.45&&fl.t/fl.dauer<=0.6;
+        // Effekt-Momente (EFFEKT-/TON-MODUL): kurz nach dem Ereignis am Ring/Blockpunkt.
+        if(situation==="fx-dunk"||situation==="fx-ring"||situation==="fx-block"){
+          const e=bkFx[bkFx.length-1], tt=e?bkAnzeigeUhr-e.t0:-1;
+          if(situation==="fx-dunk")return !!e&&e.art==="treffer"&&e.dunk&&tt>=0.09;
+          if(situation==="fx-ring")return !!e&&e.art==="ring"&&!e.brett&&tt>=0.04;
+          return !!e&&e.art==="block"&&tt>=0.08;
+        }
         if(situation==="spotup"||situation==="pullup"||situation==="drive"){
           const w=alle().find(u=>lwZ(u).wurfArt===situation&&bkAnzeigeUhr-lwZ(u).wurfT>0.25&&bkAnzeigeUhr-lwZ(u).wurfT<0.32); return !!w; }
         if(situation==="treffer"){
