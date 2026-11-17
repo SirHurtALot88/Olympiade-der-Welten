@@ -1,0 +1,22 @@
+{
+ "prompt": "Sparks from two sword blades clashing, pixel art, plays once, about 0.25 seconds. A bright white-yellow flash at the centre with five to six short golden spark lines radiating outward, shrinking and fading quickly. Colours: white, pale yellow, gold. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "5c1cf85c-22f3-4449-8448-0c79f30b8660",
+ "effect_id": "2a80aac1-658d-4ddf-9af7-7770051be9bb",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "canvas": {
+  "h": 32,
+  "w": 32
+ },
+ "frames": 7,
+ "fps": 28,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 16,
+  "kind": "origin"
+ },
+ "message": "A 32x32 one-shot clash spark that plays for 0.25 seconds (7 frames at 28 fps): a bright white-yellow flash at the centre with six short gold spark lines that spin slightly, shrink and fade out fast. It uses a transparent background with no text. The rays can be shortened or the flash softened if you want it subtler.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=2a80aac1-658d-4ddf-9af7-7770051be9bb"
+}

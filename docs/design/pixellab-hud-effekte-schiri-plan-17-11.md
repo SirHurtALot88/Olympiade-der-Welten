@@ -7,7 +7,8 @@ hatte diese drei Gruppen in Abschnitt 5 ausgeklammert:
 - Linien, Marker, HUD und Effekte sollten Canvas bleiben.
 - `zeichneSchiri()` galt als Figur, und neue Figuren sind gesperrt.
 
-Dieses Dokument ist **nur Analyse und Kostenschätzung**. Es wurde nichts bestellt und kein Code geändert.
+Der Plan selbst (Abschnitte 0 bis 6) ist **Analyse und Kostenschätzung** und wurde vor jeder Bestellung
+geschrieben. Was danach bestellt und eingebaut wurde, steht im **Umsetzungsstand (17.11.)** am Ende des Dokuments.
 
 **Freigabe-Rahmen:** Für den **Schiedsrichter** hat Chris einen neuen Charakter ausdrücklich freigegeben.
 Für alle anderen Figuren und Animationen bleibt die Sperre bestehen (CLAUDE.md, Abschnitt „PixelLab-Charaktere
@@ -331,6 +332,12 @@ ein Pilot zeigen.
 
 ## 6. Offene Fragen an Chris
 
+**Beantwortet am 17.11.:** Chris hat „schiri -> ja / effekte -> ja“ freigegeben. Damit sind der
+Schiri-Ausbau (eine Figur samt Animationen und Gesten, keine weitere Figur) und die H1-Effekte aus
+`/v2/vfx` freigegeben. Frage 2 gilt damit als geklärt: Effekte aus `/v2/vfx` zählen als freie Assets, nicht als
+Figuren-Animationen; die Animationssperre für Figuren bleibt unberührt. Offen bleiben die Fragen 1 (nur die
+Hälfte: Football hat keine Fouls, s. Umsetzungsstand), 3 (pro/lite je Effekt entschieden, s. unten) und 4 bis 6.
+
 1. **Schiri-Umfang:** Reicht S-min (Grundposen + „pfiff", Gehen über den Wipp-Ersatz), oder S-empf. mit
    echtem Laufzyklus? Außerdem: Soll er in Hockey und Football bei Strafen ebenfalls pfeifen? Das wäre reine
    Anzeige.
@@ -344,3 +351,49 @@ ein Pilot zeigen.
    verändern.
 6. **PixelLab-MCP (`vfx_workbench`, laut Doku für Abonnenten kostenlos):** Soll er angebunden werden? Er
    könnte die VFX-Kosten auf 0 senken.
+
+## 7. Umsetzungsstand (17.11.)
+
+Alles reine Anzeige. `node scripts/pruefe-wertung-fingerabdruck.mjs` ergibt nach dem Einbau weiter
+**GESAMT e80babacb68c (75 Einträge)**. Herkunft jedes Assets: `public/sprites/arena/quellen.json` und
+`public/sprites/figuren/__schiri/quellen.json`; Rohdaten und Aufträge: `data/generated/pixellab-vfx/roh/`.
+
+**Schiri (PR #1546 und Folgearbeit):**
+
+| Posten | Gen. (angesetzt) | Stand |
+|---|---:|---|
+| Figur `__schiri`, Basis (create-character-pro) | 10 | eingebaut (#1546) |
+| `pfiff` Süd/Ost | 2 | eingebaut (#1546) |
+| `pfiff` Nord (an dieselbe Gruppe) | 1 | eingebaut, Nord-Pfiff statt Süd-Ersatz |
+| `walk` Süd/Ost/Nord, 16 Bilder | ~3 | eingebaut: der Motor wählt `walk` automatisch, sobald der Stellvertreter sich bewegt |
+
+Pfiff-Geste bei Strafen: **Hockey** ruft `schiriPfeift()` aus `verhaengeStrafe()` (nur Geste und Ring; „STRAFE!“
+und der Pfiff-Ton kommen weiter von dort). **Football** hat im Motor **keine Fouls** (nur Sack, Fumble,
+Interception, Touchdown, Field Goal). Die Geste hängt deshalb am Touchdown und am Field Goal, was der realen
+Torsignal-Geste (Arm hoch) entspricht. Dafür läuft `bewegeSchiri(dt)` jetzt auch im Football-Zweig, sonst wäre `pfiffT`
+nie abgelaufen. Wer echte Football-Strafen will, braucht erst eine Sim-Mechanik dafür, das ist eine Regelfrage.
+
+**Effekte, H1 (alle über `/v2/vfx`, neutral zum Einfärben bestellt, wo Teamfarbe nötig ist):**
+
+| Effekt | Stufe | Gen. angesetzt | Einbau |
+|---|---|---:|---|
+| E1 Hieb-Bogen | pro (+ lite zum Vergleich) | 8 + 1 | eingebaut (#1546) |
+| E7 Feuerwerk | pro | 6 | `teamFeierEffekte()`, 3-fach, Teamfarbe |
+| E7 Konfetti | pro | 6 | am Anker der Feier; jedes dritte Canvas-Flugstück bleibt |
+| E7 Funkenregen (Breaking) | pro | 6 | am Anker, Teamfarbe |
+| E8 Klingen-Funke | lite | 1 | `zeichneFechten()`, 2-fach, Gold |
+| E9 Bodenstaub | lite | 1 | `zeichneBodenstaub()`, Schleife |
+| E10 Eisstaub | lite | 1 | `zeichneEisstaub()`, Schleife, 2-fach |
+| E11 Wasser-/Schlammspritzer | lite | 1 | Takeshi, Zweig „schlamm“ bei Sturz, Schlammton |
+
+Stilprobe: für Klingenfunke, Staub und Spritzer reichte `lite` (1 Gen.), die Bilder lesen sich sauber. Für
+Feuerwerk, Konfetti und Funken war `lite` zu dünn und klumpig; die `pro`-Fassungen laufen. Zur Kostenkontrolle: das
+Konto (Tier 3) wird von mehreren Sitzungen gleichzeitig benutzt (u. a. läuft `baue-arena-kulissen.py`), die Differenz
+zweier Kontostände ist deshalb **kein** Maß für eine einzelne Sitzung; die Zahlen oben sind die beim Auftrag
+angesetzten Kosten (`quoted_generations`).
+
+**Nicht bestellt (bleiben offen):** E6 Pfeil-Projektil und U1 Stern-Icon (zusammen ~26 Gen., statische Requisiten über
+`pixellab-requisiten.py`, nicht über `/v2/vfx`; Pfeile werden heute ohne Bild gezeichnet, der Umbau ist größer als ein
+Tausch) sowie die Welle H2. Außerdem fehlt eine Sichtprüfung des Takeshi-Spritzers (Position im Screenshot nicht
+sicher gefunden) und ein Basketball-Screenshot des Nord-Pfiffs.
+
