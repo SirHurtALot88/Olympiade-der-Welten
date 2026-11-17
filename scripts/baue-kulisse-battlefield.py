@@ -218,6 +218,10 @@ def main() -> None:
     varianten = [a for a in sys.argv[1:] if not a.startswith("--")] or ["eroberung", "wuestenruine"]
     ZIEL.mkdir(parents=True, exist_ok=True)
     for v in varianten:
+        if (WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh" / f"kulisse_battlefield_{v}.png").exists():
+            # Welle A Batch 2 (17.11.): PixelLab-Breitform, gebaut von baue-kulisse-buehnen.py (PL_NUR)
+            print(f"{v}: PixelLab-Breitform vorhanden -> scripts/baue-kulisse-buehnen.py battlefield")
+            continue
         fertig = baue(v)
         ziel = ZIEL / f"{v}.png"
         fertig.save(ziel, optimize=True)

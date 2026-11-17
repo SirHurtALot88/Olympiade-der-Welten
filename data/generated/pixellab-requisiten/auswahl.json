@@ -697,6 +697,39 @@
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "kulisse_battlefield_wuestenruine": {
+  "prompt": "top-down view of one single very wide empty desert battlefield, the whole map is open flat light sand with faint wind ripples and a few small stones and tiny cacti, crumbling ancient sandstone ruin walls and broken columns only along the far left and right borders and the top and bottom edge, nothing in the middle, no paths, no buildings in the middle, no flags, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "e4efc40c-1878-4e8b-a03e-c704ebcfc719",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_climbing_eis": {
+  "prompt": "front view of one single very wide flat sheer blue glacier ice wall, only ice with vertical icicle streaks and faint cracks, evenly lit, no ledges, no snow on top, no sky, no ground, nothing on it, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "0bd0950e-ecdd-4c1e-b875-a5da2f6beeeb",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_climbing_fels": {
+  "prompt": "front view of one single very wide flat sheer orange-brown sandstone cliff face, only rock with horizontal layers and faint cracks, evenly lit, no ledges, no plants, no sky, no ground, nothing on it, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "dd4fc474-16c2-45a8-a6f8-939d9ee2d764",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "kulisse_eiskunstlauf_waldsee": {
   "prompt": "top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
   "seed": 11,
@@ -705,6 +738,17 @@
    300
   ],
   "job": "82f702b0-6505-4cfc-925a-5b5cfc400104",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_fechten_schlosshof": {
+  "prompt": "view of one single very wide empty castle courtyard, a bright blue sky with a few small white clouds at the very top edge, a tall grey stone castle wall with battlements, two square corner towers with blue roofs and coloured banners along the top third only, a thin strip of green hedge with red roses at the foot of the wall, the whole rest below is an open flat smooth floor of plain grey cobblestones with no lines and no markings, nothing in the middle, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "f8052430-7462-454f-8b89-6c2c3b56482f",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
@@ -719,6 +763,28 @@
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "kulisse_gewichtheben_hafen": {
+  "prompt": "view of one single very wide empty harbour quay at night, a strip along the top edge only with the dark sea, a big red cargo ship with stacked colourful containers, a red and white lighthouse, a yellow harbour crane, glowing street lamps and a full moon in a starry sky, the whole rest below is an open flat smooth floor of plain dark blue-grey concrete quay with no lines and no markings, nothing in the middle, no platform, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "83bddbc4-1ffb-47e0-b14a-8475f01cf249",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_gewichtheben_oase": {
+  "prompt": "view of one single very wide empty desert oasis market square, a strip along the top edge only with a blue sky with a bright sun, two sandstone pyramids, palm trees and a row of small market stalls with coloured awnings, the whole rest below is an open flat smooth floor of plain warm sand with faint ripples and no lines and no markings, nothing in the middle, no platform, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "2388377c-5272-46a9-8aa9-c29921930165",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "kulisse_hockey_bergsee": {
   "prompt": "top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art",
   "seed": 11,
@@ -727,6 +793,50 @@
    300
   ],
   "job": "a336f46c-27e2-4b46-893d-aaec77e96453",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_showcase_festival": {
+  "prompt": "front view of one single very wide empty open-air music festival main stage at night, a big dark stage floor platform filling the middle with a row of small footlights along its front edge, tall black loudspeaker stacks on the far left and right, a huge glowing magenta LED wall with light beams behind the stage, starry night sky, a dark crowd area with glow sticks along the bottom edge, nothing on the stage, no people, no instruments, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "496d9038-ef3d-44dd-b8f9-9f02e14c36f0",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_showcase_zirkus": {
+  "prompt": "front view of one single very wide empty circus tent stage, a red velvet curtain with a golden star at the back, red and white striped tent walls, tiers of seats with small cheering spectators on the far left and right, a light sand coloured wooden stage floor filling the middle, red carpet steps with golden lights along the front edge, nothing on the stage, no performer, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "25649129-3422-4c32-b32e-abe9679c293a",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_speed_schach_park": {
+  "prompt": "view of one single very wide empty city park plaza in autumn, a strip along the top edge only with green lawn, orange and yellow autumn trees, a stone fountain with a blue pond, wooden park benches and a black iron fence, the whole rest below is an open flat smooth floor of plain beige gravel path with a few fallen leaves and no lines and no markings, nothing in the middle, no table, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "986af39f-cb41-4484-9088-9d81d1723d93",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_speed_schach_zug": {
+  "prompt": "front view of one single very wide empty luxury train dining car, dark wooden wall with tall windows showing the dark blue night and brass wall lamps along the top, a row of empty tables with green table cloths and white cups along the wall across the upper middle, the whole bottom two thirds is an open flat smooth floor of plain dark red carpet with a faint golden diamond pattern, nothing in the middle, no table in the middle, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "6260b57e-b4d3-4f08-8cb1-4b193d805fbc",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
@@ -749,6 +859,28 @@
    300
   ],
   "job": "bb4336a1-3205-491a-94dd-f5752dffb3f7",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_wettessen_bierzelt": {
+  "prompt": "front view of one single very wide empty bavarian beer tent interior, dark wooden wall panelling with a garland of green leaves hanging along the top edge, long wooden shelves full of beer bottles and mugs across the upper middle, a wooden bar counter below the shelves, the whole bottom half is an open flat floor of plain light wooden planks with nothing on it, warm lamp light, nothing in the middle of the floor, no table, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "ca2e7401-3fe2-4b90-90ef-ab1dbb510064",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_wettessen_nachtmarkt": {
+  "prompt": "front view of one single very wide empty night fairground, dark purple night sky with strings of glowing coloured light bulbs, red and white striped circus tents, a lit ferris wheel and round green trees along the top half, a long low wooden railing with a dim crowd of distant spectators behind it across the middle, the whole bottom third is an open flat floor of plain wooden planks with nothing on it, nothing in the middle of the floor, no table, no characters, no text, 16-bit RPG map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "ead8585b-ee1f-4bec-8dd9-8bb99a5f3bf9",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
