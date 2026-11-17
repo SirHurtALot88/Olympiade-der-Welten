@@ -7484,18 +7484,24 @@
   // laeuft, bauen beide deshalb hoechstens ~10 Mal je Sekunde neu; Ende (done), Reset und
   // Sonden-Laeufe (pixelgenaue Screenshots) bleiben ungedrosselt. Reine Anzeige: weder
   // renderKader() noch renderWertungTabelle() beruehren rr(), Boxscore oder Wertung.
-  let schnelldurchDomZuletzt=0;
-  let abspielDomZuletzt=0;
-  function schnelldurchDomGedrosselt(){
+  // EINE UHR JE ANZEIGEFLAECHE (17.11.): renderWertungTabelle() und renderKader() teilten sich je EINEN
+  // Zeitstempel. Rief updateHud*() die Wertungstabelle zuerst (Bahn/Pod: immer), setzte sie den Stempel,
+  // und renderKader() direkt danach sah "gerade erst gebaut" -- die Kaderleiste samt Mitte (#kmitte,
+  // im Pod "1. 5,2 P · 2. ...") blieb im laufenden Spiel auf dem Stand vom Anpfiff stehen (gemessen:
+  // 151 Aufrufe, 6 durchgelassen, keine waehrend des Rennens). Jetzt hat jede Flaeche ihren eigenen
+  // Stempel; die Drossel selbst (100 ms Abspielen, 250 ms Vorspulen) bleibt unveraendert. Reine Anzeige.
+  const schnelldurchDomZuletzt={};
+  const abspielDomZuletzt={};
+  function schnelldurchDomGedrosselt(flaeche){
     const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
     if(!schnelldurchAktiv){
       if(!running||done||sondenAktiv)return false;
-      if(jetzt-abspielDomZuletzt<100)return true;
-      abspielDomZuletzt=jetzt;
+      if(jetzt-(abspielDomZuletzt[flaeche]||0)<100)return true;
+      abspielDomZuletzt[flaeche]=jetzt;
       return false;
     }
-    if(jetzt-schnelldurchDomZuletzt<250)return true;
-    schnelldurchDomZuletzt=jetzt;
+    if(jetzt-(schnelldurchDomZuletzt[flaeche]||0)<250)return true;
+    schnelldurchDomZuletzt[flaeche]=jetzt;
     return false;
   }
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
@@ -42586,7 +42592,7 @@
   // etwas umlernen muss.
   let wertungKopfStand="";
   function renderWertungTabelle(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim, s. schnelldurchDomGedrosselt()
+    if(schnelldurchDomGedrosselt("wertung"))return; // Quick-Sim, s. schnelldurchDomGedrosselt()
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
     // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
@@ -58448,7 +58454,7 @@
   }
 
   function renderKader(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
+    if(schnelldurchDomGedrosselt("kader"))return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
@@ -64058,6 +64064,7 @@
     }
   }
   function bahnPodAnzeigeAbbauen(){
+    bahnPodLeisteAus();
     const a=bahnPodAnzeige;
     if(!a)return;
     bahnPodAnzeige=null;
@@ -64101,8 +64108,57 @@
       feed(vorn.side,vorn.name+" übernimmt die Führung im 4-Team-Rennen.",true,undefined,"fuehrungswechsel");
     }
   }
+  // VIER-TEAM-LEISTE IM KOPF (17.11., Chris: "dort sind gerade auch nur 2 teams"): die DOM-Kopfzeile
+  // (#tnameL/#tnameR, #thpL/#thpR) hat nur zwei Plaetze und zeigte im Pod nur Team 0 und 1 mit ihrem
+  // "N im Ziel" und Streckenbalken. Im Pod bleiben diese zwei Plaetze verborgen, statt ihrer steht eine
+  // Leiste mit einem Kaestchen JE TEAM (Teamfarbe, Platz, Name, Stand, "N im Ziel", Streckenbalken,
+  // nach dem Ziel die Ligapunkte 2-1-0-0). Reine Anzeige: liest nur bahnPodLiveStand()/rennFertig/
+  // LAEUFER, schreibt in keinen Simulationszustand; ausserhalb des Pods wird nichts angefasst.
+  const BAHN_POD_LEISTE_VERSTECKT=["tnameL","tnameR"];
+  function bahnPodLeisteAus(){
+    const el=document.getElementById("bahnPodLeiste");
+    if(!el)return;
+    el.remove();
+    for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display=""; }
+    const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="";
+    const sl=document.querySelector(".scoreline"); if(sl)sl.style.gridTemplateColumns="";
+  }
+  function bahnPodLeisteZeigen(st,schnitt){
+    const sl=document.querySelector(".scoreline");
+    if(!sl||!sl.parentNode)return;
+    let el=document.getElementById("bahnPodLeiste");
+    if(!el){
+      el=document.createElement("div"); el.id="bahnPodLeiste"; el.className="bahnpod-leiste";
+      sl.parentNode.insertBefore(el,sl.nextSibling);
+      for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display="none"; }
+      const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="none";
+      sl.style.gridTemplateColumns="1fr";
+    }
+    el.style.gridTemplateColumns="repeat("+st.N+",minmax(0,1fr))";
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
+    const zeilen=st.teams.map(t=>({side:t.side, platz:t.platz, name:t.name, stand:t.anzeige,
+      ziel:imZiel(t.side), pct:Math.max(0,Math.min(100,Math.round(schnitt(t.side)*100))),
+      liga:st.done?t.ligaPunkte:null, sieger:st.done&&t.platz===1}));
+    const schluessel=JSON.stringify(zeilen);
+    if(el.dataset.letzt===schluessel)return;
+    el.dataset.letzt=schluessel;
+    el.textContent="";
+    for(const z of zeilen){
+      const box=document.createElement("div");
+      box.className="bahnpod-team"+(z.sieger?" bp-sieger":"");
+      box.style.setProperty("--bp-c",bahnSeitenFarbe(z.side));
+      const mk=(klasse,text)=>{ const d=document.createElement("div"); d.className=klasse; d.textContent=text; box.appendChild(d); return d; };
+      mk("bp-name",z.platz+". "+z.name);
+      mk("bp-stand",z.stand);
+      const zl=mk("bp-ziel",z.ziel+" im Ziel");
+      if(z.liga!=null){ const l=document.createElement("span"); l.className="bp-liga"; l.textContent="+"+z.liga+" Pkt"; zl.appendChild(l); }
+      const bal=document.createElement("div"); bal.className="bp-balken";
+      const f=document.createElement("s"); f.style.width=z.pct+"%"; bal.appendChild(f); box.appendChild(bal);
+      el.appendChild(box);
+    }
+  }
   // HUD IM POD (aus updateHudBahn): die DOM-Anzeigetafel kennt nur Heim/Gast — sie zeigt hier den
-  // Fuehrenden, die Leinwand-Tafel (zeichneBahnPodTafel) alle vier Teams.
+  // Fuehrenden, die Vier-Team-Leiste darunter und die Leinwand-Tafel (zeichneBahnPodTafel) alle vier.
   function updateHudBahnPod(){
     const st=bahnPodLiveStand(), art=BA();
     const vorn=st.reihe[0];
@@ -64125,6 +64181,7 @@
     };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    bahnPodLeisteZeigen(st,schnitt);
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       feed(vorn?vorn.side:0,(vorn?vorn.name+" gewinnt das 4-Team-Rennen — ":"Rennen beendet — ")
