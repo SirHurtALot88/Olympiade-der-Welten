@@ -9892,6 +9892,20 @@
       //   ruecklauf          Angreifer, die beim Wurf NICHT zum Rebound gehen, laufen bis zu
       //                      diesem Anteil Richtung Mittellinie zurueck (Transition-Sicherung)
       spacing:{jaegerJeSeite:2, jaegerRadius:200, mitspielerMin:58, mitspielerStaerke:0.8, ruecklauf:0.35},
+      // TEAMFOULS / BONUS (Runde 2, FIBA-Regel 41): jedes Spielerfoul zaehlt als Teamfoul im
+      // laufenden Viertel. Ab dem 5. Teamfoul (`bonusAb`) gibt jedes Foul ohne Wurf zwei
+      // Freiwuerfe, davor nur Einwurf (Ballbesitz bleibt, Schussuhr auf `einwurfUhr` s gedeckelt).
+      // NEU ist das Foul OHNE Wurf: Reach-in beim missglueckten Steal-Versuch. Chance je Versuch
+      // `reachIn.basis`, gute Verteidiger (ABWEHR) foulen seltener (`reachIn.k` je Punkt).
+      //
+      // GEMESSEN 17.11. (scripts/miss-alle-disziplinen.mjs-Rechnung im Node-Motor, 24 Spiele x 5
+      // Kader): ohne Reach-in 0,865 | Reach-in basis 0,10 (12,5 Fouls/Spiel, Bonus-FW 0,3/Spiel)
+      // 0,841 | basis 0,18 (18 Fouls/Spiel, Bonus-FW 1,3/Spiel) 0,853. Beide unter dem Stand
+      // ohne Foul ohne Wurf (0,865), die erste unter 0,85. Deshalb steht `reachIn` auf null:
+      // gezaehlt und angezeigt werden die Teamfouls (Wurf-Fouls), der Bonus greift, sobald eine
+      // Foulquelle ohne Wurf aktiv ist. Zum Einschalten: reachIn:{basis:0.18, k:0.0020, min:0.03,
+      // max:0.24} — vorher neu messen (rho >= 0,85 Pflicht, docs/design/benchmark-basketball-17-11.md 7.2).
+      fouls:{bonusAb:5, reachIn:null, einwurfRest:0.5},
       // LAUFWEGE MIT ABSICHT (Runde 2, 17.11.) — Parameter des generischen LAUFWEG-MODULS (s. dort).
       // Alle Laengen in Logik-px (1 Logik-px = 1/16,7 m), Tempi als Faktor aufs Lauftempo.
       //   postBlock   Center (Slot 0) steht am Block der Ballseite (laengs vor dem Ring, quer)
@@ -12130,6 +12144,7 @@
     kickoffSeed=(normalisiereSaat(saat)+777777)>>>0;
     fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     lwNeuesSpiel(); // LAUFWEG-MODUL: Zustand/Zaehler je Spiel neu (WeakMap-Generation)
+    tfNeuesSpiel(); // TEAMFOUL-/BONUS-MODUL
     // ENDSTAND-OVERLAY-WAECHTER (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe
     // Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` (s. dort) -- ohne
     // diese Bremse wuerde updateHudFeldspiel() das #endstand-Overlay bei JEDEM Frame nach
@@ -12469,7 +12484,7 @@
       // and-eins) hat keinen eigenen "fehlwurf"-Eintrag (der Pfiff ersetzt ihn komplett,
       // s. loeseFlugAuf) — zaehlt hier trotzdem als FGA, echtem Basketball-Boxscore-Verhalten
       // entsprechend.
-      else if(e.art==="foul"){ s(e.verteidiger).fouls++; if(!e.undEins)s(e.spieler).feldwuerfe++; }
+      else if(e.art==="foul"){ s(e.verteidiger).fouls++; if(!e.undEins&&!e.ohneWurf)s(e.spieler).feldwuerfe++; }
     }
     return {team,spieler};
   }
@@ -16639,12 +16654,75 @@
       // muss deshalb NACH diesem Aufruf kommen, sonst loescht er sein eigenes Fenster.
       naechsterAngriff(decker.side);
       startFastbreak(decker.side);
+    } else if(foulRegelVon()&&!istHockey()){
+      tfReachIn(decker,traeger); // TEAMFOUL-/BONUS-MODUL: Foul ohne Wurf (Reach-in)
     }
   }
 
   // FASTBREAK: nach Steal/Interception/Defensiv-Rebound zaehlt Tempo, nicht nur
   // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
   // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
+
+  // ===================================================================================
+  // TEAMFOUL-/BONUS-MODUL (Benchmark Basketball Runde 2, 17.11., FIBA Regel 41). Parameter
+  // in FELDSPIEL_ART[d].fouls; ohne Block zaehlt nichts mit und es gibt kein Foul ohne Wurf
+  // (Hockey/Football unberuehrt). Zustand modulweit (kein Spielerfeld, Fingerabdruck).
+  //   * tfZaehle(seite)   ein Spielerfoul der Seite -> Teamfoul im laufenden Viertel
+  //   * tfImBonus(seite)  hat die Seite ihr 4. Teamfoul schon begangen -> jedes weitere Foul
+  //                        bringt dem Gegner Freiwuerfe (Bonus ab dem 5. Foul)
+  //   * Reach-in          Foul ohne Wurf beim missglueckten Steal (versucheSteal)
+  // Read-only Sonde: window.__arena.teamFouls() -> {viertel, fouls:[heim,gast], bonus:[..]}.
+  // ===================================================================================
+  let tfStand={viertel:1,fouls:[0,0]}, tfZaehler={reachIn:0,bonusFreiwuerfe:0,einwuerfe:0,wurfFouls:0};
+  const foulRegelVon=()=>{ const a=(typeof FELDSPIEL_ART!=="undefined")&&FELDSPIEL_ART[feldspielDisc]; return a&&a.fouls?a.fouls:null; };
+  function tfNeuesSpiel(){ tfStand={viertel:1,fouls:[0,0]}; tfZaehler={reachIn:0,bonusFreiwuerfe:0,einwuerfe:0,wurfFouls:0}; }
+  function tfViertelPruefen(){ const v=fsLive?fsLive.viertel:1; if(tfStand.viertel!==v)tfStand={viertel:v,fouls:[0,0]}; }
+  function tfImBonus(seite){ const r=foulRegelVon(); if(!r)return false; tfViertelPruefen(); return tfStand.fouls[seite]>=r.bonusAb-1; }
+  function tfZaehle(seite){ if(!foulRegelVon())return; tfViertelPruefen(); tfStand.fouls[seite]++; }
+  // Reach-in beim missglueckten Steal: gibt true zurueck, wenn gepfiffen wurde (Ablauf erledigt).
+  function tfReachIn(decker,traeger){
+    const r=foulRegelVon(); if(!r||!r.reachIn)return false;
+    const c=Math.min(r.reachIn.max,Math.max(r.reachIn.min,r.reachIn.basis-(decker.ABWEHR-50)*r.reachIn.k));
+    if(rr()>=c)return false;
+    const bonus=tfImBonus(decker.side);
+    decker.fouls++; tfZaehle(decker.side); tfZaehler.reachIn++;
+    logZug(decker.side,"foul",{verteidiger:decker,spieler:traeger,anzahl:bonus?2:0,ohneWurf:true});
+    if(bonus){
+      tfZaehler.bonusFreiwuerfe++;
+      feed(traeger.side,decker.n+" greift "+traeger.n+" in den Arm — Teamfoul "+tfStand.fouls[decker.side]+", Bonus: zwei Freiwürfe.",true,undefined,"bonus");
+      starteFreiwuerfe(traeger,2,decker,false);
+    } else {
+      tfZaehler.einwuerfe++;
+      feedRoutine(traeger.side,decker.n+" greift "+traeger.n+" in den Arm — Foul ("+tfStand.fouls[decker.side]+". Teamfoul), Einwurf.");
+      schiriPfeift(traeger,decker);
+      // Einwurf: Ballbesitz bleibt, kurze Unterbrechung; die Schussuhr laeuft nicht voll weiter.
+      const L=LIVE()||{}, uhr=L.schussuhr||SCHUSSUHR_BASKETBALL;
+      fsLive.angriffSeit=Math.min(fsLive.angriffSeit,uhr*r.einwurfRest);
+      traeger.reevBall=Math.max(traeger.reevBall||0,0.5);
+    }
+    return true;
+  }
+
+  // Teamfouls als fuenf Punkte unter der Korbanlage der VERTEIDIGENDEN Seite (am eigenen
+  // Korb), rot ab dem Bonus. Reine Anzeige in Feldkoordinaten (keine HUD-/Scorebug-Aenderung).
+  function tfZeichne(){
+    const r=foulRegelVon(); if(!r||!fsLive)return;
+    tfViertelPruefen();
+    for(const seite of [0,1]){
+      const n=tfStand.fouls[seite], kx=korbXVon(1-seite), links=kx<W/2;
+      const x0=kx+(links?-6:6), y0=H/2+58, bonus=n>=r.bonusAb;
+      ctx.save(); ctx.textAlign="center"; ctx.font="800 9px system-ui,sans-serif";
+      ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(x0-25,y0-10,50,bonus?26:18);
+      ctx.fillStyle=seite===0?css("--home"):css("--away"); ctx.fillText("FOULS",x0,y0-1);
+      for(let i=0;i<r.bonusAb;i++){
+        ctx.beginPath(); ctx.arc(x0-16+i*8,y0+4,3,0,6.3);
+        ctx.fillStyle=i<n?(bonus?"#ff4a3a":"#ffd34a"):"rgba(255,255,255,.25)"; ctx.fill();
+      }
+      if(bonus){ ctx.fillStyle="#ff4a3a"; ctx.fillText("BONUS",x0,y0+13); }
+      ctx.restore();
+    }
+  }
+
   function startFastbreak(seite){
     fsLive.fastbreak={seite, bis:fsT+3, ausbrecher:null};
     if(laufwegeVon())lwZaehle("fastBreaks"); // Sonde diagSpielzuege
@@ -16978,7 +17056,7 @@
       // (Foul und Block schliessen sich gegenseitig aus, s. `foul`-Wuerfel in `wirf`).
       if(flug.foul&&flug.blockKandidat){
         const verteidiger=flug.blockKandidat;
-        verteidiger.fouls++;
+        verteidiger.fouls++; tfZaehle(verteidiger.side); tfZaehler.wurfFouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
         // AND-ONE ist selten und sofort verstaendlich -- immer big (Konzept Abschnitt 4.3,
         // Nachzug 3).
@@ -17001,7 +17079,7 @@
       // Zweier (dunk/nah/mit), 3 fuer einen gefoulten Dreier — die vom Wurftyp geforderte
       // Teilmenge (kein 1-und-1/Bonus-Regelwerk, s. Bericht: bewusst nicht gebaut).
       const verteidiger=flug.blockKandidat;
-      verteidiger.fouls++;
+      verteidiger.fouls++; tfZaehle(verteidiger.side); tfZaehler.wurfFouls++;
       const anzahl=flug.tier==="fern"?3:2;
       logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
       feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
@@ -19483,6 +19561,7 @@
     });
     korbHinten(); // alle Figuren standen hinter dem Korb
     if(feldspielDisc==="basketball")lwZeichneOben(); // LAUFWEG-MODUL: gestellter Block
+    if(feldspielDisc==="basketball")tfZeichne(); // TEAMFOUL-/BONUS-MODUL: Teamfouls am Korb
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
     // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
     // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
@@ -69187,6 +69266,9 @@
     // Pick-and-Roll/-Pop, Post-ups, Fast-Breaks, Deny, Help-Rotation), welche Pass-Arten und
     // Wurf-Absichten gezeigt werden und bei wie vielen Wuerfen ausgeboxt wird. Read-only wie
     // diagSpacing: dieselben Saaten, volle Spiellaenge, Werte als Mittel je Spiel.
+    // TEAMFOUL-/BONUS-MODUL: Stand im laufenden Viertel (read-only, fuer HUD/Scorebug).
+    teamFouls:()=>{ const r=foulRegelVon(); if(!r)return null; tfViertelPruefen();
+      return {viertel:tfStand.viertel,fouls:[...tfStand.fouls],bonus:[0,1].map(sd=>tfStand.fouls[sd]>=r.bonusAb),bonusAb:r.bonusAb}; },
     diagSpielzuege:(n,dId)=>{
       const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0;
       for(let i=0;i<N;i++){
@@ -69203,6 +69285,7 @@
         }
         besitze+=lwBesitzNr;
         for(const k in lwZaehler)summe[k]=(summe[k]||0)+lwZaehler[k];
+        for(const k in tfZaehler)summe["foul_"+k]=(summe["foul_"+k]||0)+tfZaehler[k];
       }
       const je={}; for(const k of Object.keys(summe).sort())je[k]=+(summe[k]/N).toFixed(2);
       return {spiele:N,jeSpiel:je,besitzeJeSpiel:+(besitze/N).toFixed(1),wuerfeJeSpiel:+(wuerfe/N).toFixed(1),
