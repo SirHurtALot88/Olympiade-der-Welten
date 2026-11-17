@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Start – modern (Mockup 17.11.)</title>
+<!--
+  STARTSEITE IM BROADCAST-STIL (Fable, 17.11.). Zweites Mockup zum Plan docs/design/oly-seiten-modern-17-11.md.
+  Gleiche Tokens, gleiche Schiene, gleicher Hero-Kopf wie einsatzliste-modern-17-11.html.
+  ECHT: Teamnamen, Wappen, Spielernamen, Portraits, Klassen, Gesamtwerte. ERFUNDEN: Tabelle, Punkte, Geld, Raenge, Meldungen.
+  Keine externen Skripte, Schriften lokal. URL-Schalter: ?still=1  ?phone=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);font-size:16px;-webkit-font-smoothing:antialiased}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+.demo{height:38px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#0d1016;border-bottom:1px solid #222a38;font-size:14px;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
+.demo a{color:var(--gold);margin-left:auto;font-weight:600}
+body.still .demo{display:none}
+
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);min-height:calc(100vh - 38px);background:var(--grund)}
+body.still .app{min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:40px;height:40px;border-radius:9px;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:10px}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center;font-size:20px;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;right:3px;top:3px;min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.rail .luecke{flex:1}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;z-index:90;left:calc(100% + 8px);top:50%;transform:translateY(-50%);width:max-content;padding:6px 9px;border-radius:6px;background:#020305;border:1px solid var(--linie-2);font:500 13.5px/1.3 var(--zahl);pointer-events:none}
+
+/* Hero */
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:26px;align-items:center;padding:20px 24px 18px;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:-30px;z-index:-2;background:url("../szenen/basketball/parkett.jpg") center 35%/cover;filter:blur(12px) saturate(1.2);opacity:.5}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.95) 0%,rgba(6,8,12,.7) 45%,rgba(6,8,12,.9) 100%),linear-gradient(180deg,transparent 40%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:16px}
+.hk .crest{width:84px;height:84px;border-radius:12px;overflow:hidden;border:2px solid var(--heim);box-shadow:0 8px 22px rgba(0,0,0,.5)}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:2px 0 4px;font:400 40px/1 var(--haus);color:#fff;white-space:nowrap}
+.hk span{font-size:15px;color:var(--leise)}
+.kpis{display:flex;gap:8px;justify-content:center;min-width:0}
+.kpi{min-width:116px;padding:9px 18px 10px 20px;background:rgba(18,24,36,.78);border:1px solid var(--linie);clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%)}
+.kpi strong{display:block;font-size:32px;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap}
+.kpi small{font-size:13px;color:var(--stumm);white-space:nowrap}
+.kpi .fm{display:flex;gap:3px;margin:7px 0 4px}
+.kpi .fm i{width:16px;height:16px;transform:skewX(-14deg);background:var(--gut);border-radius:1px} .kpi .fm i.n{background:var(--warn)} .kpi .fm i.m{background:var(--stumm)}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:34px;padding:0 12px;border-radius:7px;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:15px;white-space:nowrap}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.haupt{height:50px;padding:0 24px;font-size:18px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;background:var(--gold);border-color:var(--gold);color:#17120a;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);border-radius:0}
+.btn.haupt:hover{filter:brightness(1.08)}
+
+/* Raster */
+.raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;padding:14px 16px 20px}
+.pan{grid-column:span 4;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0}
+.pan.b5{grid-column:span 5} .pan.b3{grid-column:span 3} .pan.b7{grid-column:span 7} .pan.b8{grid-column:span 8} .pan.b12{grid-column:span 12}
+.pk{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--linie);min-height:46px}
+.pk h2{margin:0;font:400 19px/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a{font-size:13.5px;font-weight:600;color:var(--gold);white-space:nowrap}
+.pb{padding:12px 14px;flex:1}
+/* Spieltag-Karte */
+.match{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;text-align:center}
+.match img{width:74px;height:74px;border-radius:10px;object-fit:cover;margin:0 auto 6px;border:2px solid var(--heim)}
+.match .g img{border-color:var(--gast)}
+.match b{display:block;font:400 18px/1.1 var(--haus);color:#fff}
+.match small{color:var(--stumm);font-size:13px}
+.match .vs{font:400 30px/1 var(--haus);color:var(--stumm)}
+.wb{position:relative;height:12px;background:var(--gast);transform:skewX(-14deg);overflow:hidden;border-radius:2px;margin:14px 6px 5px}
+.wb i{position:absolute;left:0;top:0;bottom:0;background:var(--heim)}
+.wt{display:flex;justify-content:space-between;font-size:13.5px;color:var(--leise)} .wt b{color:var(--creme)}
+.dz{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.dz a{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:9px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--flaeche-2);border:1px solid var(--linie)}
+.dz a:hover{border-color:var(--gold)}
+.dz .ic{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;font-size:19px;color:var(--gold);background:rgba(0,0,0,.35);border:1px solid var(--linie)}
+.dz b{display:block;font:400 17px/1.1 var(--haus)} .dz small{font-size:12.5px;color:var(--stumm)}
+.pp{display:flex;gap:3px} .pp i{width:10px;height:5px;transform:skewX(-14deg);background:var(--gut);border-radius:1px} .pp i.o{background:rgba(255,255,255,.16)}
+/* Entscheidungen */
+.ent{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;padding:10px 8px;border-radius:7px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;line-height:1.2}
+.ent:hover{background:var(--flaeche-2)}
+.ent .ik{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--warn);color:#fff}
+.ent.w .ik{background:var(--acht);color:#0b0d12} .ent.h .ik{background:var(--flaeche-3);color:var(--leise);border:1px solid var(--linie-2)}
+.ent small{display:block;font-size:13px;color:var(--stumm)} .ent span:last-child{color:var(--gold);font-size:13.5px;font-weight:600;white-space:nowrap}
+/* Tabelle */
+table{width:100%;border-collapse:collapse;font-size:15.5px}
+th{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600;text-align:right;padding:0 8px 6px}
+th:nth-child(2){text-align:left}
+td{padding:0 8px;height:38px;border-top:1px solid rgba(244,230,196,.06);text-align:right;white-space:nowrap}
+td:nth-child(2){text-align:left;width:99%} td:first-child{color:var(--stumm);font-weight:700;width:1%}
+td .tm{display:flex;align-items:center;gap:9px;min-width:0} td .tm img{width:26px;height:26px;border-radius:5px;object-fit:cover}
+tr.wir td{background:linear-gradient(90deg,rgba(242,160,61,.22),rgba(242,160,61,.04));color:#fff;font-weight:600} tr.wir td:first-child{color:var(--heim)}
+td strong{font-size:18px}
+/* Kaderkarten */
+.kk{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.sk{position:relative;border-radius:9px;overflow:hidden;border:1px solid var(--linie-2);background:#111;aspect-ratio:3/4;display:block}
+.sk:hover{border-color:var(--gold)}
+.sk img{width:100%;height:100%;object-fit:cover}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 42%,rgba(4,6,10,.96) 84%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:8px;padding:1px 10px 1px 8px;background:var(--gold);color:#17120a;font-weight:700;font-size:14px;clip-path:polygon(0 0,100% 0,calc(100% - 7px) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:9px;right:9px;bottom:8px}
+.sk b{display:block;font:400 18px/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:12.5px;color:var(--leise)}
+.sk .ov{display:flex;align-items:baseline;gap:8px;margin-top:3px} .sk .ov strong{font-size:24px;line-height:1;color:var(--creme)} .sk .ov span{font-size:13px;font-weight:700}
+/* Disziplin-Raster */
+.dr{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.dk{padding:6px 8px;border-radius:6px;background:var(--flaeche-2);border-left:3px solid var(--stumm)}
+.dk small{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dk strong{font-size:20px;line-height:1.1}
+.dk.a{border-left-color:var(--gut)} .dk.a strong{color:var(--gut)} .dk.c{border-left-color:var(--warn)} .dk.c strong{color:var(--warn)} .dk.h{outline:1px solid var(--gold)}
+/* Geld + Ziele */
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px}
+.zeile strong{font-size:19px}
+.ziel{margin-top:10px;font-size:14.5px;color:var(--leise)}
+.ziel .bn{height:7px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px;transform:skewX(-14deg)} .ziel .bn i{display:block;height:100%;background:var(--gut)} .ziel.w .bn i{background:var(--acht)} .ziel.f .bn i{background:var(--warn)}
+.ziel b{color:var(--tinte);font-weight:600} .ziel span{float:right}
+.ticker{grid-column:span 12;display:flex;align-items:center;gap:22px;padding:9px 14px;border-radius:var(--r);border:1px solid var(--linie);background:#080b11;font-size:15px;color:var(--leise);overflow:hidden;white-space:nowrap}
+.ticker b{color:var(--gold);letter-spacing:.14em;font-size:12px;text-transform:uppercase} .ticker span b{color:var(--tinte);letter-spacing:0;font-size:inherit;text-transform:none}
+
+@media (max-width:1320px){.pan,.pan.b5,.pan.b3,.pan.b7,.pan.b8{grid-column:span 6}.pan.b12{grid-column:span 12}.hk h1{font-size:32px}.kpi{min-width:0;padding:8px 14px}}
+body.phone .app{display:block}
+body.phone .rail{position:fixed;z-index:50;left:0;right:0;bottom:0;top:auto;height:auto;flex-direction:row;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--linie)}
+body.phone .rail .logo,body.phone .rail .luecke,body.phone .rail .x{display:none}
+body.phone .rail a.an::before{left:9px;right:9px;top:-7px;bottom:auto;width:auto;height:3px}
+body.phone [data-tip]:hover::after{display:none}
+body.phone .hero{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px 12px}
+body.phone .hk .crest{width:56px;height:56px} body.phone .hk h1{font-size:25px;white-space:normal}
+body.phone .kpis{justify-content:flex-start;overflow-x:auto;margin:0 -12px;padding:0 12px} body.phone .kpi{flex:none;min-width:0;padding:7px 14px} body.phone .kpi strong{font-size:24px}
+body.phone .cta{align-items:stretch} body.phone .cta .gk{display:none} body.phone .btn.haupt{font-size:16px;height:46px;padding:0 12px}
+body.phone .raster{grid-template-columns:minmax(0,1fr);padding:10px 8px 86px;gap:10px}
+body.phone .pan,body.phone .ticker{grid-column:auto}
+body.phone .kk{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px} body.phone .dr{grid-template-columns:repeat(4,minmax(0,1fr))}
+body.phone .pk .gk{display:none}
+body.phone .match img{width:58px;height:58px} body.phone .dz{grid-template-columns:minmax(0,1fr)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-d-basketball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3.4 3 3.4 9.8 0 12.8M18.4 5.6c-3.4 3-3.4 9.8 0 12.8"/></symbol>
+  <symbol id="i-d-eiskunstlauf" viewBox="0 0 24 24"><path d="M8 3v9l8 3v3H6V3M4 21h15a3 3 0 003-3M9 18v3M15 18v3M8 7h3"/></symbol>
+</defs></svg>
+<div class="demo"><b>Mockup</b><span>Startseite im selben Stil wie die neue Einsatzliste. Zahlen erfunden, Namen, Portraits und Wappen echt.</span><a href="einsatzliste-modern-17-11.html">→ zur Einsatzliste</a></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img src="../team-logos/V-W.jpg" alt=""></div>
+    <a class="an" data-tip="Start" href="#"><svg class="i"><use href="#i-home"/></svg></a>
+    <a data-tip="Inbox · 3 Entscheidungen" href="#"><svg class="i"><use href="#i-post"/></svg><span class="zahl">3</span></a>
+    <a data-tip="Einsatzliste" href="einsatzliste-modern-17-11.html"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a data-tip="Arena" href="#"><svg class="i"><use href="#i-arena"/></svg></a>
+    <a data-tip="Saisonstand" href="#"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a class="x" data-tip="Kader" href="#"><svg class="i"><use href="#i-team"/></svg></a>
+    <a class="x" data-tip="Training" href="#"><svg class="i"><use href="#i-train"/></svg></a>
+    <a class="x" data-tip="Transfermarkt" href="#"><svg class="i"><use href="#i-markt"/></svg></a>
+    <a class="x" data-tip="Scouting" href="#"><svg class="i"><use href="#i-scout"/></svg></a>
+    <span class="luecke"></span>
+    <a class="x" data-tip="Finanzen" href="#"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk"><span class="crest"><img src="../team-logos/V-W.jpg" alt=""></span>
+        <div><em>Saison 1 · Spieltag 7 von 20</em><h1>Vigilante Wranglers</h1><span>Manager Chris · Sponsor Ironworks · Ziel: Top 8</span></div></div>
+      <div class="kpis">
+        <div class="kpi"><span class="gk">Rang</span><strong class="t">9.</strong><small>von 32 · <span class="plus">2 hoch</span></small></div>
+        <div class="kpi"><span class="gk">Saisonpunkte</span><strong class="t">412</strong><small>6 hinter Platz 8</small></div>
+        <div class="kpi"><span class="gk">Kasse</span><strong class="t">3,2 Mio</strong><small>GuV <span class="minus">−0,4 Mio</span></small></div>
+        <div class="kpi"><span class="gk">Form</span><div class="fm"><i></i><i class="n"></i><i></i><i></i><i class="m"></i></div><small>letzte 5 Spieltage</small></div>
+      </div>
+      <div class="cta"><span class="gk">Nächster Schritt · Abgabe bis Sa 20:00</span>
+        <a class="btn haupt" href="einsatzliste-modern-17-11.html?szene=fehler">Einsatzliste abgeben <svg class="i"><use href="#i-r"/></svg></a></div>
+    </header>
+    <div class="raster">
+      <section class="pan b5">
+        <div class="pk"><h2>Spieltag 7</h2><span class="sp"></span><a href="einsatzliste-modern-17-11.html">Zur Einsatzliste ›</a></div>
+        <div class="pb">
+          <div class="match"><div><img src="../team-logos/V-W.jpg" alt=""><b>Vigilante Wranglers</b><small>9. · 412 Pkt</small></div><span class="vs">vs</span><div class="g"><img src="../team-logos/A-A.jpg" alt=""><b>Armageddon Aftermath</b><small>11. · 398 Pkt</small></div></div>
+          <div class="wb"><i style="width:61%"></i></div>
+          <div class="wt"><span>Siegchance <b class="t">61 %</b></span><span>Schätzung, Scouting-Stufe 3 von 5</span></div>
+          <div class="dz">
+            <a href="einsatzliste-modern-17-11.html?szene=fehler"><span class="ic"><svg class="i"><use href="#i-d-basketball"/></svg></span><span><b>Basketball</b><small>Teamspiel · 5 von 6 besetzt</small></span><span class="pp"><i></i><i></i><i></i><i></i><i></i><i class="o"></i></span></a>
+            <a href="einsatzliste-modern-17-11.html?szene=buehne"><span class="ic"><svg class="i"><use href="#i-d-eiskunstlauf"/></svg></span><span><b>Eiskunstlauf</b><small>Bühne · 3 von 3 besetzt</small></span><span class="pp"><i></i><i></i><i></i></span></a>
+          </div>
+        </div>
+      </section>
+      <section class="pan b3">
+        <div class="pk"><h2>Entscheidungen</h2><span class="sp"></span><a href="#">Inbox ›</a></div>
+        <div class="pb" style="padding:6px">
+          <a class="ent" href="einsatzliste-modern-17-11.html?szene=fehler"><span class="ik">!</span><span>Einsatzliste unvollständig<small>1 Platz offen, 1 Verletzter gesetzt</small></span><span>öffnen ›</span></a>
+          <a class="ent w" href="#"><span class="ik">!</span><span>Vertrag Kati läuft aus<small>noch 3 Spieltage</small></span><span>verhandeln ›</span></a>
+          <a class="ent w" href="#"><span class="ik">!</span><span>Krolach erschöpft<small>Last 74 · Ruhetag empfohlen</small></span><span>Training ›</span></a>
+          <a class="ent h" href="#"><span class="ik">i</span><span>Scout-Bericht fertig<small>2 Kandidaten für Speed</small></span><span>lesen ›</span></a>
+        </div>
+      </section>
+      <section class="pan">
+        <div class="pk"><h2>Saisonstand</h2><span class="sp"></span><a href="#">Ganze Tabelle ›</a></div>
+        <div class="pb" style="padding:10px 6px 6px"><table class="t"><thead><tr><th>#</th><th>Team</th><th>ST 6</th><th>Trend</th><th>Pkt</th></tr></thead><tbody id="tab"></tbody></table></div>
+      </section>
+      <section class="pan b8">
+        <div class="pk"><h2>Kader · die besten sechs</h2><span class="sp"></span><a href="#">Ganzer Kader (14) ›</a></div>
+        <div class="pb"><div class="kk" id="kk"></div></div>
+      </section>
+      <section class="pan">
+        <div class="pk"><h2>Kasse und Ziele</h2><span class="sp"></span><a href="#">Finanzen ›</a></div>
+        <div class="pb">
+          <div class="zeile"><span>Kasse</span><strong class="t">3,2 Mio</strong></div>
+          <div class="zeile"><span>Gehälter je Spieltag</span><strong class="t minus">−0,31 Mio</strong></div>
+          <div class="zeile"><span>Prämie letzter Spieltag</span><strong class="t plus">+0,22 Mio</strong></div>
+          <div class="ziel w"><b>Top 8 erreichen</b><span class="t">Rang 9</span><div class="bn"><i style="width:82%"></i></div></div>
+          <div class="ziel"><b>Gehaltsquote halten</b><span class="t">64 % von 70 %</span><div class="bn"><i style="width:91%"></i></div></div>
+          <div class="ziel f"><b>Ein Spieler dreimal Top 20</b><span class="t">1 von 3</span><div class="bn"><i style="width:33%"></i></div></div>
+        </div>
+      </section>
+      <section class="pan b12">
+        <div class="pk"><h2>Disziplinen · unser Rang unter 32</h2><span class="sp"></span><span class="gk">Gold umrandet: an diesem Spieltag</span></div>
+        <div class="pb"><div class="dr" id="dr" style="grid-template-columns:repeat(10,minmax(0,1fr))"></div></div>
+      </section>
+      <div class="ticker"><b>Spieltag 6</b><span><b>Hockey</b> 4 : 3 gegen Cold Steel</span><span><b>Climbing</b> Platz 2 von 4</span><span>Spieler des Tages: <b>Kati</b></span><span>Black Panthers verlieren, Abstand jetzt 6 Punkte</span><span>Transfer: <b>Gearstrike</b> zu Armageddon Aftermath</span></div>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+var T=[["7","B-P","Black Panthers",38,"+1",424],["8","C-S","Cold Steel",31,"−1",418],["9","V-W","Vigilante Wranglers",44,"+2",412],["10","N-W","Natures Wrath",29,"±0",405],["11","A-A","Armageddon Aftermath",35,"+1",398],["12","H-R","Hell Raisers",22,"−3",391]];
+document.getElementById("tab").innerHTML=T.map(function(r){return '<tr class="'+(r[1]==="V-W"?"wir":"")+'"><td>'+r[0]+'.</td><td><span class="tm"><img src="../team-logos/'+r[1]+'.jpg" alt="">'+r[2]+'</span></td><td>'+r[3]+'</td><td class="'+(r[4][0]==="+"?"plus":r[4][0]==="−"?"minus":"null")+'">'+r[4]+'</td><td><strong>'+r[5]+'</strong></td></tr>'}).join("");
+var K=[["Karthogg","karthogg","Hero · Lizard","53,0","−"],["Kati","kati","Bard · Human","53,0","++"],["Aerin","aerin","Bard · Elf","49,9","++"],["Kaylen","kaylen","Templar · Human","47,7","+"],["Lexa","lexa","Sprinter · Human","45,9","+"],["Abe Lincoln","abe-lincoln","Templar · Human","45,9","o"]];
+document.getElementById("kk").innerHTML=K.map(function(p,i){return '<a class="sk" href="#"><img src="../portraits/'+p[1]+'.jpg" alt=""><span class="rg t">'+(i+1)+'</span><span class="un"><b>'+p[0]+'</b><small>'+p[2]+'</small><span class="ov t"><strong>'+p[3]+'</strong><span class="'+(p[4][0]==="+"?"plus":p[4]==="−"?"minus":"null")+'">Form '+p[4]+'</span></span></span></a>'}).join("");
+var D=[["TDM",14],["Mini DM",19],["Battlefield",8],["Gewichtheben",21],["Climbing",6],["Staffel",17],["Time Trial",24],["Spurt",22],["Tennis",12],["Hockey",9],["Showcase",5],["Schach",15],["Takeshi",18],["Breaking",26],["Wettessen",11],["Basketball",7,1],["Football",13],["Eiskunst",4,1],["Fechten",16],["I-Spy",10]];
+document.getElementById("dr").innerHTML=D.map(function(d){return '<div class="dk '+(d[1]<=8?"a":d[1]>=20?"c":"")+(d[2]?" h":"")+'"><small>'+d[0]+'</small><strong class="t">'+d[1]+'.</strong></div>'}).join("");
+(function(){var q=new URLSearchParams(location.search);if(q.get("still"))document.body.classList.add("still");
+  function ph(){document.body.classList.toggle("phone",!!q.get("phone")||innerWidth<760);var dr=document.getElementById("dr");dr.style.gridTemplateColumns=document.body.classList.contains("phone")?"":"repeat(10,minmax(0,1fr))"}ph();addEventListener("resize",ph)})();
+</script>
+</body>
+</html>
