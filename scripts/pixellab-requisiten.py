@@ -318,8 +318,11 @@ AUFTRAEGE = {
         prompt=f"small grey metal filing cabinet with three drawers, the drawers pulled open and files sticking out, front view, {STIL}"),
     "ispy_verhoerstuhl": dict(art="neu", datei="arena/ispy_verhoerstuhl.png", pixelgenau=True, gen=(30, 36),
         prompt=f"empty wooden interrogation chair with leather straps on the armrests under a small hanging lamp, no person, {DRAUF}, {STIL}"),
-    "ispy_tuer": dict(art="neu", datei="arena/ispy_tuer.png", pixelgenau=True, gen=(26, 40),
-        prompt=f"a single heavy old wooden door in a stone frame, closed, with an iron keyhole lock, front view, {STIL}"),
+    # Neubestellung 17.11. (Chris: "3 ja"): die erste Tuer (Bogentuer im Steinrahmen, 26x40) wirkte
+    # im Horror-Saal klein wie ein Grabstein. Jetzt eckig: gerader Sturz, Holzrahmen, deutlicher
+    # Griff; Box 24x32, damit sie nicht an die Sterne ueber dem Fundort stoesst.
+    "ispy_tuer": dict(art="neu", datei="arena/ispy_tuer.png", pixelgenau=True, gen=(24, 32),
+        prompt=f"a single closed rectangular wooden door with a perfectly flat straight top edge, standing in a square brown wooden door frame, vertical wood planks, a large clearly visible shiny brass door handle on the right side, no arch, no rounded top, {DRAUF}, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
