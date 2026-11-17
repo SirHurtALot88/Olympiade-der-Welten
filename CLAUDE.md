@@ -247,6 +247,17 @@ Kosten dort; bestellt wird, was Chris freigibt). Herkunft jedes neuen Assets ste
 gesperrt bleiben neue Charaktere und neue Animationen** (siehe Abschnitt oben) — diese Regel betrifft
 nur Requisiten und Kulissen.
 
+**Zielbild (Chris, 17.11.): ein einheitlicher PixelLab-Stil für ALLE zwanzig Disziplinen.** Wörtlich:
+„Alle Diszis sollen am Ende den gleichen Pixel lab Stil haben und die Assets davon! Das ist das
+Target." Das ist der Zielzustand des Gesamtprojekts, nicht nur eine Regel für Neues: am Ende kommen
+Kulisse, Boden, Requisiten, Effekte und (soweit sichtbar) HUD-Elemente jeder Disziplin aus
+PixelLab und wirken wie aus einer Hand. Wo eine Disziplin optisch noch „alt" aussieht (zuletzt
+Chris am 17.11. über die lange HYROX-Bahn im Vergleich zu den neuen Arenen), ist das ein
+Arbeitsauftrag, kein Geschmacksthema. Die Ersatz-Reihenfolge steht im Audit
+`docs/design/pixellab-nur-neue-assets-audit-17-11.md` (Wellen A/B/C) und im HYROX-Optikkonzept
+`docs/design/hyrox-optik-konzept-17-11.md`. Chris hat am 17.11. zusätzlich HUD, Effekte und den
+Schiedsrichter (als einzige freigegebene neue Figur) ausdrücklich in den PixelLab-Stil einbezogen.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
