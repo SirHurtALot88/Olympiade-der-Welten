@@ -57855,6 +57855,7 @@
   function stoppeInstanz(){
     if(instanzGestoppt)return true;
     instanzGestoppt=true;
+    try{ document.removeEventListener("keydown",liveStandTaste); }catch{} // LIVE-STAND: abgeloeste Instanz hoert keine Tasten mehr
     try{ tonLoopStop(); }catch{}
     try{ bkLoopStop(); }catch{}
     try{ if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; } }catch{}
@@ -57899,7 +57900,14 @@
   const LS_MODI=["band","tafel","aus"];
   const LS_SPEICHER="oly-arena-livestand";
   let lsModus="band", lsOhnePrognose=false, lsReiter=null, lsLetzterTick=-1e9, lsSigBand="", lsSigTafel="", lsDisc="";
-  let lsLetzteDaten=null, lsInit=false, lsBandTop=-1;
+  let lsLetzteDaten=null, lsInit=false, lsBandTop=-1, lsSigKopf="", lsGewarnt=false;
+  // BLINKEN UEBER DEN NEUBAU HINWEG (Review PR #1560): der Tabellenrumpf wird bis zu 4x/s neu
+  // geschrieben; damit `tr.blink` nicht jedes Mal von vorn beginnt, merkt sich die Anzeige je
+  // Zeile, seit wann sie blinkt, und setzt die Animation mit negativer Verzoegerung fort.
+  const lsBlinkSeit=new Map(), LS_BLINK_MS=2000;
+  // Fehler im Live-Stand duerfen das Spiel nie anhalten -- aber auch nicht still verschwinden:
+  // einmal je Instanz eine Warnung in der Konsole.
+  function lsWarnung(wo,e){ if(lsGewarnt)return; lsGewarnt=true; try{ console.warn("Live-Stand ("+wo+"):",e); }catch{} }
   try{
     const g=JSON.parse(localStorage.getItem(LS_SPEICHER)||"null");
     if(g&&LS_MODI.includes(g.modus))lsModus=g.modus;
@@ -58008,9 +58016,19 @@
     const statusVon=(u)=>{
       if(u.raus)return "raus";
       if(u.fertig!=null)return "im Ziel";
-      if((u.startT||0)>rennT)return "Start "+bahnZeitText(bahnSpanneAnzeige((u.startT||0)-rennT)).replace(" s","s");
+      // Ganze Sekunden: "Start 23,9s" machte die Zeitspalte so breit, dass PKT aus der Tafel rutschte.
+      if((u.startT||0)>rennT)return "Start "+Math.ceil(bahnSpanneAnzeige((u.startT||0)-rennT))+"s";
       return "fährt";
     };
+    // NOCH AM START (Review PR #1560): wer im Zeitfahren noch nicht losgefahren ist, hat weder
+    // Rang noch Punkte -- "Rang 2/12" mit zehn Fahrern auf der Rampe hiess nichts. Die Raenge
+    // zaehlen nur die Gestarteten; die Punkte bleiben die der Kopfzeile (rl.punkte).
+    const wartet=(u)=>(u.startT||0)>rennT&&u.fertig==null;
+    const rangJetzt=new Map(); { let rz=0; for(const u of reihe)if(!wartet(u))rangJetzt.set(u.id,++rz); }
+    // GLEICHSTAND: am Ende ist die Prognose der gezeigte Rang selbst (sonst zeigten zwei
+    // zeitgleiche Fahrer "1." und "2." als Rang, aber beide "1." als Prognose).
+    const progVon=(u)=>alleFest&&rangJetzt.has(u.id)?rangJetzt.get(u.id)+".":lsSpanneText(spVon.get(u.id),N,alleFest);
+    const pktVon=(u)=>punkte&&!wartet(u)?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"";
     const zeilen=[];
     if(aktiv.startsWith("zz")||aktiv==="ziel"){
       const ci=aktiv==="ziel"?-1:+aktiv.slice(2);
@@ -58019,12 +58037,12 @@
       const best=mit.length?wertVon(mit[0]):null;
       mit.forEach((u,i)=>zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:String(i+1),
         wert:lsZeit(wertVon(u)),abstand:lsAbstand(wertVon(u)-best),gut:i===0,
-        prognose:lsSpanneText(spVon.get(u.id),N,alleFest),punkte:punkte?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"",blink:fokus(u)}));
+        prognose:progVon(u),punkte:"",blink:fokus(u)}));
       // Wer den Messpunkt noch nicht erreicht hat: gedimmt darunter, in Rennreihenfolge.
       for(const u of reihe){
         if(wertVon(u)!=null)continue;
         zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:"–",wert:statusVon(u),abstand:"",
-          prognose:lsSpanneText(spVon.get(u.id),N,alleFest),punkte:"",dim:true});
+          prognose:progVon(u),punkte:"",dim:true});
       }
     } else {
       const fBest=fertige.length?Math.min(...fertige.map(bahnZeit)):null;
@@ -58038,16 +58056,16 @@
         else if((u.startT||0)>rennT||!(u.pos>0)){ wert=statusVon(u); }
         else if(tt){ wert="≈"+lsZeit(x.e); abstand=isFinite(eBest)?(x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
         else { const p=climb?(u.hoch??u.pos):u.pos; wert=Math.round(Math.min(1,p)*100)+" %"; abstand=isFinite(eBest)?(i===0||x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
-        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:String(i+1),wert,abstand,gut:i===0,
-          prognose:lsSpanneText(spVon.get(u.id),N,alleFest),
-          punkte:punkte?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"",
-          dim:(u.startT||0)>rennT&&u.fertig==null,blink:fokus(u)});
+        const w8=wartet(u);
+        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:w8?"–":String(rangJetzt.get(u.id)),wert,abstand,gut:i===0&&!w8,
+          prognose:progVon(u),punkte:pktVon(u),dim:w8,blink:fokus(u)});
       });
     }
 
     // BAND: bester eigener Teilnehmer in der Rennreihenfolge, Prognose, Team.
     const ts=bahnTeamstand();
-    const eigenIdx=reihe.findIndex(u=>u.seite===0);
+    let eigenIdx=reihe.findIndex(u=>u.seite===0&&!wartet(u));
+    if(eigenIdx<0)eigenIdx=reihe.findIndex(u=>u.seite===0);
     const eigen=eigenIdx>=0?reihe[eigenIdx]:null;
     const band=[];
     if(eigen){
@@ -58057,8 +58075,10 @@
         if(burg)zu="−"+lsKomma(burgwertung(vorn)-burgwertung(eigen)).replace(/,0$/,"");
         else { const a=ivVon.get(eigen.id).e, b=ivVon.get(vorn.id).e; if(isFinite(a)&&isFinite(b))zu=(eigen.fertig!=null&&vorn.fertig!=null?"":"≈")+"+"+lsKomma(bahnSpanneAnzeige(Math.max(0,a-b)))+" s"; }
       } else zu="vorn";
-      band.push({k:"Rang",v:(eigenIdx+1)+"/"+N,z:lsKurz(eigen.n,12)+(zu?" "+zu:"")});
-      band.push({k:"Prognose",v:lsSpanneText(spVon.get(eigen.id),N,alleFest),prog:true});
+      // Dieselbe Regel wie in der Tafel: noch am Start = kein Rang.
+      if(wartet(eigen))band.push({k:"Rang",v:"–/"+N,z:lsKurz(eigen.n,12)+" am Start"});
+      else band.push({k:"Rang",v:rangJetzt.get(eigen.id)+"/"+N,z:lsKurz(eigen.n,12)+(zu?" "+zu:"")});
+      band.push({k:"Prognose",v:progVon(eigen),prog:true});
     }
     const fmtSeite=(v)=>ts.fmt?ts.fmt(v):(typeof v==="number"?lsKomma(v).replace(/,0$/,""):String(v));
     const fuss={links:lsVerein(0),rechts:lsVerein(1),mitte:""};
@@ -58098,8 +58118,9 @@
     if(alleFest)grundlage="Endstand · gewertet wie im Ergebnis";
     const alleImZiel=LAEUFER.every(u=>u.fertig!=null||u.raus);
     const spalten={wert:aktiv==="jetzt"?(burg?"BURG":tt?"ZEIT":alleImZiel?"ZEIT":climb?"HÖHE":"STRECKE"):messpunkte.find(m=>m.id===aktiv).kurz,
-      punkte:burg?null:"PKT", name:"Läufer"};
-    return {typ:"bahn",titel:"STAND",messpunkte:messpunkte.length>1?messpunkte:null,aktiv,auto:!lsReiter,spalten,zeilen,fuss,grundlage,band};
+      punkte:burg||aktiv!=="jetzt"?null:"PKT", name:"Läufer"};
+    // AUTO leuchtet auch, wenn ein erzwungener Reiter (noch) keinen Durchgang hat und deshalb AUTO greift.
+    return {typ:"bahn",titel:"STAND",messpunkte:messpunkte.length>1?messpunkte:null,aktiv,auto:aktiv===auto&&(!lsReiter||lsReiter!==aktiv),spalten,zeilen,fuss,grundlage,band};
   }
 
   // ---------------- LESEN: STAFFEL ----------------
@@ -58116,18 +58137,22 @@
       const gh=gesamt(h), gg=gesamt(g);
       const st=(u,v)=>v!=null?lsZeit(v):(u&&u.aktiv?"läuft":"–");
       let delta="", kumTxt="";
-      if(gh!=null&&gg!=null){ const d=gh-gg; diffs.push(d); kum+=d; delta=(d<=0?"−":"+")+lsKomma(bahnSpanneAnzeige(Math.abs(d))); }
+      // GLEICHSTAND (Review PR #1560): unter der Anzeigeschaerfe (0,05 s) weder "−0,0" noch Heim gut.
+      const gleich=(v)=>bahnSpanneAnzeige(Math.abs(v))<0.05;
+      if(gh!=null&&gg!=null){ const d=gh-gg; diffs.push(gleich(d)?0:d); kum+=d; delta=gleich(d)?"±0,0":(d<0?"−":"+")+lsKomma(bahnSpanneAnzeige(Math.abs(d))); }
       else kumGueltig=false;
-      if(kumGueltig&&gh!=null&&gg!=null)kumTxt=(kum<=0?lsVerein(0):lsVerein(1))+" "+lsKomma(bahnSpanneAnzeige(Math.abs(kum)));
+      if(kumGueltig&&gh!=null&&gg!=null)kumTxt=gleich(kum)?"gleichauf":(kum<0?lsVerein(0):lsVerein(1))+" "+lsKomma(bahnSpanneAnzeige(Math.abs(kum)));
       zeilen.push({id:"b"+b,rang:String(b+1),name:(h?lsKurz(h.n,9):"–")+" / "+(g?lsKurz(g.n,9):"–"),
-        wertL:st(h,gh),wertR:st(g,gg),abstand:delta,gutL:gh!=null&&gg!=null&&gh<=gg,gutR:gh!=null&&gg!=null&&gg<gh,
+        wertL:st(h,gh),wertR:st(g,gg),abstand:delta,gutL:gh!=null&&gg!=null&&!gleich(gh-gg)&&gh<gg,gutR:gh!=null&&gg!=null&&!gleich(gh-gg)&&gg<gh,
         kum:kumTxt,dim:gh==null&&gg==null&&!(h&&h.aktiv)&&!(g&&g.aktiv),blink:!!((h&&h.aktiv)||(g&&g.aktiv))});
     }
     // FUEHRUNG JETZT: dieselbe Quelle wie #bhDelta und die Kopfzeile (staffelZeitDelta()).
     const fertig=ts.gewertet;
     const d=staffelZeitDelta();
     let chance=null, progTxt="offen";
-    if(fertig){ chance=ts.seiten[0]>ts.seiten[1]?1:ts.seiten[1]>ts.seiten[0]?0:0.5; progTxt=(chance===1?lsVerein(0):chance===0?lsVerein(1):"Gleichstand")+" gewinnt"; }
+    // AM ZIEL: Sieger mit Vorsprung (dieselbe Zeile wie der Sieger-Banner, ts.bannerZusatz), Gleichstand ohne Sieger.
+    if(fertig){ chance=ts.seiten[0]>ts.seiten[1]?1:ts.seiten[1]>ts.seiten[0]?0:0.5;
+      progTxt=chance===0.5?"Gleichstand":(chance===1?lsVerein(0):lsVerein(1))+" gewinnt"+(ts.bannerZusatz?" "+ts.bannerZusatz:""); }
     else if(!d.unklar){
       const offenBeine=Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit==null).length));
       const zeiten=LAEUFER.filter(o=>o.etappenZeit!=null).map(o=>o.etappenZeit);
@@ -58143,7 +58168,7 @@
     const band=[
       {k:"Führung",v:fuehrungTxt,z:"Abschnitt "+Math.min(beinN,1+Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit!=null).length)))+"/"+beinN},
       {k:"Siegchance",chance:chance,prog:true},
-      {k:"Abschnitte",v:diffs.filter(x=>x<=0).length+" : "+diffs.filter(x=>x>0).length,z:"gewonnen"}];
+      {k:"Abschnitte",v:diffs.filter(x=>x<0).length+" : "+diffs.filter(x=>x>0).length,z:"gewonnen"}];
     return {typ:"staffel",titel:"STAFFEL",messpunkte:null,aktiv:"jetzt",auto:true,
       spalten:{name:"Abschnitt · Läufer"},zeilen,
       fuss:{links:lsVerein(0),mitte:"Prognose "+progTxt,rechts:lsVerein(1)},
@@ -58221,12 +58246,15 @@
     const anteil=summe>0?hp[0]/summe:0.5;
     const verbraucht=1-summe/gesamtMax;
     let prog="offen";
-    if(done)prog=document.getElementById("score")?.textContent||"Endstand";
+    if(done)prog="Endstand "+kampfStandText(); // dieselbe Funktion wie #score
     else if(verbraucht>=0.25){
       const f=anteil>=0.5?0:1, a=Math.max(anteil,1-anteil);
       prog=a<0.55?"knapp":lsVerein(f)+(a<0.65?" leicht vorn":" klar vorn");
     }
-    const band=[{k:"Kräfte",chance:anteil,prozent:true},{k:"Einschätzung",v:prog,prog:true},
+    // BESCHRIFTUNG (Review PR #1560): Kraefte und Lage lesen NUR die Lebenspunkte, nicht den
+    // K.o.-Stand im Score-Bug -- das sagt das Band jetzt selbst, statt neben "3 : 5" ein
+    // unkommentiertes "Heim klar vorn" zu zeigen.
+    const band=[{k:"Kräfte (LP)",chance:anteil,prozent:true},{k:done?"Ergebnis":"Lage nach LP",v:prog,prog:true},
       {k:"Lebenspunkte",v:Math.round(hp[0])+" : "+Math.round(hp[1])}];
     return {typ:"kampf",titel:"",band,zeilen:null};
   }
@@ -58257,7 +58285,23 @@
       return "<span class=\"ls-feld"+(f.prog?" ls-prog":"")+"\"><small>"+lsEsc(f.k)+"</small>"+inhalt+"</span>";
     }).join("<i class=\"ls-trenner\"></i>");
   }
-  function lsTafelHtml(d){
+  // Struktur des Bands ohne die Prozentwerte: bleibt sie gleich, werden nur Balken und Zahlen
+  // nachgefuehrt (die width-Transition des Balkens greift dann wirklich).
+  const lsBandStruktur=(d)=>JSON.stringify(d.band.map(f=>f.chance===undefined?f:{k:f.k,prog:f.prog,c:f.chance==null?"n":"c"}));
+  function lsBandNachfuehren(band,d){
+    const felder=band.querySelectorAll(".ls-feld");
+    d.band.forEach((f,i)=>{
+      if(f.chance==null||!felder[i])return;
+      const l=Math.round(f.chance*100);
+      const balken=felder[i].querySelector(".ls-balken"), heim=felder[i].querySelector(".ls-wert.heim"), gast=felder[i].querySelector(".ls-wert.gast");
+      if(balken)balken.style.setProperty("--ls-anteil",l+"%");
+      if(heim&&heim.textContent!==l+" %")heim.textContent=l+" %";
+      if(gast&&gast.textContent!==(100-l)+" %")gast.textContent=(100-l)+" %";
+    });
+  }
+  // TAFEL IN ZWEI TEILEN (Review PR #1560): Kopf mit den Reitern nur neu, wenn sich Messpunkte,
+  // aktiver Reiter oder AUTO aendern -- sonst verlor der Reiter-Knopf bei jedem Tick den Fokus.
+  function lsTafelKopfHtml(d){
     let h="<div class=\"ls-kopf\"><b>"+lsEsc(d.titel)+"</b>";
     if(d.messpunkte){
       h+="<span class=\"ls-reiter\" role=\"tablist\">";
@@ -58268,10 +58312,23 @@
       h+="<button type=\"button\" class=\"ls-tab ls-auto"+(d.auto?" an":"")+"\" data-ls-reiter=\"auto\" title=\"automatisch der jüngste Messpunkt · Taste 0\">AUTO</button></span>";
     }
     h+="</div>";
+    return h;
+  }
+  function lsTafelRumpfHtml(d){
+    let h="";
+    const jetztMs=performance.now(), blinkt=new Set();
+    const blinkAttr=(z)=>{
+      if(!z.blink)return "";
+      blinkt.add(z.id);
+      if(!lsBlinkSeit.has(z.id))lsBlinkSeit.set(z.id,jetztMs);
+      const seit=jetztMs-lsBlinkSeit.get(z.id);
+      return seit<LS_BLINK_MS?" blink\" style=\"animation-delay:-"+Math.round(seit)+"ms":"";
+    };
     if(d.typ==="bahn"){
       h+="<table class=\"ls-tab-tabelle\"><thead><tr><th>#</th><th class=\"ls-name\">"+lsEsc(d.spalten.name)+"</th><th>"+lsEsc(d.spalten.wert)+"</th><th>ABST.</th><th class=\"ls-prog\">PROGN.</th>"+(d.spalten.punkte?"<th title=\"Punkte nach Rang im Spiel (vorläufig)\">PKT</th>":"")+"</tr></thead><tbody>";
       for(const z of d.zeilen){
-        h+="<tr class=\""+(z.eigen?"eigen ":"")+(z.dim?"dim ":"")+(z.blink?"blink":"")+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td><td>"+lsEsc(z.wert)+"</td><td class=\""+(z.gut?"gut":(z.abstand?"schlecht":""))+"\">"+lsEsc(z.abstand)+"</td><td class=\"ls-prog\">"+lsEsc(z.prognose)+"</td>"+(d.spalten.punkte?"<td>"+lsEsc(z.punkte)+"</td>":"")+"</tr>";
+        const vorn=z.gut||z.abstand==="Best"||z.abstand==="vorn";
+        h+="<tr class=\""+(z.eigen?"eigen ":"")+(z.dim?"dim":"")+blinkAttr(z)+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td><td>"+lsEsc(z.wert)+"</td><td class=\""+(vorn?"gut":(z.abstand?"schlecht":""))+"\">"+lsEsc(z.abstand)+"</td><td class=\"ls-prog\">"+lsEsc(z.prognose)+"</td>"+(d.spalten.punkte?"<td>"+lsEsc(z.punkte)+"</td>":"")+"</tr>";
       }
       h+="</tbody></table>";
     } else {
@@ -58289,7 +58346,25 @@
     }
     h+="<div class=\"ls-fuss\"><span class=\"s0\">"+lsEsc(d.fuss.links)+"</span><b class=\"ls-prog\">"+lsEsc(d.fuss.mitte)+"</b><span class=\"s1\">"+lsEsc(d.fuss.rechts)+"</span></div>";
     h+="<div class=\"ls-grundlage\"><span class=\"ls-prog\">"+lsEsc(d.grundlage||"")+"</span><button type=\"button\" class=\"ls-progknopf\" data-ls-prog=\"1\" aria-pressed=\""+(!lsOhnePrognose)+"\" title=\"Prognose ein-/ausblenden (für alle, die es spannend mögen)\">"+(lsOhnePrognose?"Prognose zeigen":"ohne Prognose")+"</button></div>";
+    for(const id of [...lsBlinkSeit.keys()])if(!blinkt.has(id))lsBlinkSeit.delete(id);
     return h;
+  }
+  // Schreibt einen Tafelteil neu und gibt einem Knopf darin, der den Fokus hatte, ihn zurueck.
+  function lsTeilSchreiben(teil,html){
+    let wahl=null;
+    const a=document.activeElement;
+    if(a&&teil.contains(a)&&a.dataset){
+      if(a.dataset.lsReiter)wahl="[data-ls-reiter=\""+a.dataset.lsReiter+"\"]";
+      else if(a.dataset.lsProg)wahl="[data-ls-prog]";
+    }
+    teil.innerHTML=html;
+    if(wahl){ const n=teil.querySelector(wahl); if(n&&!n.disabled)try{ n.focus({preventScroll:true}); }catch{} }
+  }
+  // Statt :has() im CSS: der .arenaraum traegt, ob Band bzw. Staffel-Live-Stand gerade stehen.
+  function lsRaumKlassen(root,bandAn,staffel){
+    const raum=root&&root.parentElement; if(!raum||!raum.classList)return;
+    raum.classList.toggle("ls-band-an",!!bandAn);
+    raum.classList.toggle("ls-staffel-an",!!staffel);
   }
   function liveStandKnopfText(){
     const k=document.getElementById("lsKnopf"); if(!k)return;
@@ -58324,6 +58399,7 @@
   function liveStandTaste(ev){
     if(instanzGestoppt||cv.isConnected===false){ try{document.removeEventListener("keydown",liveStandTaste);}catch{} return; }
     if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+    if(ev.repeat)return; // gehaltene Taste L wuerde sonst Band/Tafel/aus durchrattern
     const z=ev.target, tag=z&&z.tagName;
     if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(z&&z.isContentEditable))return;
     const root=document.getElementById("livestand");
@@ -58341,15 +58417,15 @@
     const root=document.getElementById("livestand");
     if(!root||!root.querySelector)return;
     // Quick-Sim und Zustand "aus": nichts lesen, nichts messen, nur ausblenden.
-    if(schnelldurchAktiv||lsModus==="aus"){ if(!root.hidden)root.hidden=true; lsLetzteDaten=null; liveStandInit(); return; }
+    if(schnelldurchAktiv||lsModus==="aus"){ if(!root.hidden)root.hidden=true; lsRaumKlassen(root,false,false); lsLetzteDaten=null; liveStandInit(); return; }
     liveStandInit();
     if(lsDisc!==disc){ lsDisc=disc; lsReiter=null; lsSigBand=""; lsSigTafel=""; }
     const bug=document.getElementById("bbug");
     const sichtbar=lsModus!=="aus"&&!schnelldurchAktiv&&bug&&!bug.hidden&&(running||done);
     let d=null;
-    if(sichtbar){ try{ d=liveStandLesen(); }catch(e){ d=null; } }
+    if(sichtbar){ try{ d=liveStandLesen(); }catch(e){ d=null; lsWarnung("lesen",e); } }
     lsLetzteDaten=d;
-    if(!d){ if(!root.hidden)root.hidden=true; return; }
+    if(!d){ if(!root.hidden)root.hidden=true; lsRaumKlassen(root,false,false); return; }
     root.hidden=false;
     root.dataset.typ=d.typ;
     root.classList.toggle("ohne-prognose",lsOhnePrognose);
@@ -58363,9 +58439,11 @@
       if(top!==lsBandTop){ lsBandTop=top; root.parentElement.style.setProperty("--ls-band-top",top+"px"); }
     }
     if(band){
-      const s=JSON.stringify(d.band);
+      const s=lsBandStruktur(d);
       if(s!==lsSigBand){ lsSigBand=s; band.innerHTML=lsBandHtml(d); }
+      else lsBandNachfuehren(band,d);
     }
+    lsRaumKlassen(root,!!(band&&d.band&&d.band.length),d.typ==="staffel");
     if(tafel){
       // RUHE-MODUS: waehrend Viertelpause und Anpfiff-Countdown klappt die Tafel aufs Band zusammen.
       const vp=document.getElementById("viertelpause"), af=document.getElementById("anpfiff");
@@ -58373,14 +58451,22 @@
       const zeigen=lsModus==="tafel"&&!ruhe&&!!d.zeilen;
       if(tafel.hidden!==!zeigen)tafel.hidden=!zeigen;
       if(zeigen){
-        const s=JSON.stringify([d.titel,d.messpunkte,d.aktiv,d.auto,d.zeilen,d.spieler,d.fuss,d.grundlage,lsOhnePrognose]);
-        if(s!==lsSigTafel){ lsSigTafel=s; tafel.innerHTML=lsTafelHtml(d); }
+        let kopf=tafel.querySelector("[data-ls-teil=kopf]"), rumpf=tafel.querySelector("[data-ls-teil=rumpf]");
+        if(!kopf||!rumpf){
+          tafel.innerHTML="<div class=\"ls-teil\" data-ls-teil=\"kopf\"></div><div class=\"ls-teil\" data-ls-teil=\"rumpf\"></div>";
+          kopf=tafel.querySelector("[data-ls-teil=kopf]"); rumpf=tafel.querySelector("[data-ls-teil=rumpf]"); lsSigKopf=""; lsSigTafel="";
+        }
+        if(lsSigTafel==="")lsSigKopf=""; // Reiter-/Prognosewechsel: beide Teile neu
+        const sk=JSON.stringify([d.titel,d.messpunkte,d.aktiv,d.auto]);
+        if(sk!==lsSigKopf){ lsSigKopf=sk; lsTeilSchreiben(kopf,lsTafelKopfHtml(d)); }
+        const s=JSON.stringify([d.typ,d.spalten,d.zeilen,d.spieler,d.spKopf,d.fuss,d.grundlage,lsOhnePrognose]);
+        if(s!==lsSigTafel){ lsSigTafel=s; lsTeilSchreiben(rumpf,lsTafelRumpfHtml(d)); }
       }
     }
   }
   function liveStandReset(){
-    lsReiter=null; lsSigBand=""; lsSigTafel=""; lsLetzteDaten=null; lsLetzterTick=-1e9;
-    const root=document.getElementById("livestand"); if(root)root.hidden=true;
+    lsReiter=null; lsSigBand=""; lsSigTafel=""; lsSigKopf=""; lsLetzteDaten=null; lsLetzterTick=-1e9; lsBlinkSeit.clear();
+    const root=document.getElementById("livestand"); if(root){ root.hidden=true; lsRaumKlassen(root,false,false); }
   }
 
   let schnelldurchLetztesBild=0;
@@ -58428,7 +58514,7 @@
     const viRueck=(running&&!schnelldurchAktiv&&!done)?viMische(zeitFaktor()):null;
     try{ draw(); } finally { if(viRueck)viRueck(); }
     // LIVE-STAND (Welle 1): reine Anzeige, gedrosselt auf 4x/s, s. liveStandTick().
-    try{ liveStandTick(ts); }catch{}
+    try{ liveStandTick(ts); }catch(e){ lsWarnung("tick",e); }
     requestAnimationFrame(loop);
   }
 

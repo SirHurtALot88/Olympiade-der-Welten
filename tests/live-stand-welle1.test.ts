@@ -9,7 +9,15 @@
  *   3. SPOILERWAECHTER: vor dem ersten Durchgang an einem Messpunkt ist dessen Reiter gesperrt
  *      (erreicht 0) und die Tafel zeigt dort keine Zeit.
  *   4. FELDSPIEL: der Endstand im Band (Siegchance 100/0/50) folgt dem gezeigten Stand (#score).
- *   5. Keine Seitenfehler.
+ *   5. LAUFENDES SPIEL, GERENDERTES DOM (Review PR #1560): im Zeitfahren kurz nach dem Start
+ *      stehen die noch nicht gestarteten Fahrer in `#lsTafel` ohne Rang ("–") und ohne Punkte, die
+ *      Gestarteten tragen die Raenge 1..k, der Reiter-Knopf behaelt ueber mehrere Ticks den Fokus,
+ *      und die Messpunkt-Reiter zeigen keine PKT-Spalte (die Punkte meinen JETZT).
+ *   6. Keine Seitenfehler.
+ *
+ * In der CI laeuft die Datei im Job `arena-chromium-tests` (mit OLY_ARENA_CHROMIUM_PFLICHT=1: fehlt
+ * Chromium dort, ist das ein Fehler statt eines stillen Ueberspringens) und ist aus dem Shard-Lauf
+ * von `full-test-suite` ausgeschlossen.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -39,6 +47,8 @@ type Zeile = { id: string | number; name: string; rang: string; wert: string; ab
 type Daten = {
   typ: string;
   aktiv: string;
+  auto: boolean;
+  spalten: { wert?: string; punkte?: string | null; name: string } | null;
   messpunkte: { id: string; kurz: string; erreicht: number }[] | null;
   zeilen: Zeile[] | null;
   band: { k: string; chance?: number | null; v?: string }[];
@@ -82,6 +92,32 @@ async function endstandTabelle(seite: Page) {
   });
 }
 
+const CHROMIUM_PFLICHT = process.env.OLY_ARENA_CHROMIUM_PFLICHT === "1";
+
+describe("Live-Stand Welle 1: Chromium-Pflicht", () => {
+  it("in der CI (OLY_ARENA_CHROMIUM_PFLICHT=1) ist Chromium da, sonst waere der Test stumm", () => {
+    if (CHROMIUM_PFLICHT) expect(chromiumVerfuegbar()).toBe(true);
+  });
+});
+
+async function tafelDom(seite: Page) {
+  return seite.evaluate(() => {
+    const tafel = document.getElementById("lsTafel");
+    if (!tafel || tafel.hidden) return null;
+    const kopf = Array.from(tafel.querySelectorAll("table.ls-tab-tabelle thead th")).map((x) => (x.textContent || "").trim());
+    const zeilen = Array.from(tafel.querySelectorAll("table.ls-tab-tabelle tbody tr")).map((tr) => ({
+      dim: tr.classList.contains("dim"),
+      td: Array.from(tr.querySelectorAll("td")).map((x) => (x.textContent || "").trim()),
+    }));
+    const reiter = Array.from(tafel.querySelectorAll("[data-ls-reiter]")).map((b) => ({
+      id: (b as HTMLElement).dataset.lsReiter,
+      an: b.classList.contains("an"),
+      gesperrt: (b as HTMLButtonElement).disabled,
+    }));
+    return { kopf, zeilen, reiter };
+  });
+}
+
 describe.skipIf(!chromiumVerfuegbar())("Live-Stand Welle 1 (Arena-Motor, Chromium)", () => {
   let browser: Browser;
   let seite: Page;
@@ -91,6 +127,10 @@ describe.skipIf(!chromiumVerfuegbar())("Live-Stand Welle 1 (Arena-Motor, Chromiu
     browser = await chromium.launch(existsSync(CHROMIUM_PFAD) ? { executablePath: CHROMIUM_PFAD } : {});
     seite = await browser.newPage({ viewport: { width: 1300, height: 900 } });
     seite.on("pageerror", (e) => fehler.push(String(e)));
+    // lsWarnung(): ein geschluckter Fehler im Live-Stand meldet sich einmal als console.warn.
+    seite.on("console", (m) => {
+      if (m.type() === "warning" && m.text().startsWith("Live-Stand")) fehler.push(m.text());
+    });
     await seite.goto(SEITEN_PFAD, { waitUntil: "domcontentloaded", timeout: LAUF_TIMEOUT_MS });
     await seite.waitForFunction(() => window.__arena && window.__arena.liveStandProbe, null, { timeout: 90_000 });
     await seite.click("#t2");
@@ -100,20 +140,69 @@ describe.skipIf(!chromiumVerfuegbar())("Live-Stand Welle 1 (Arena-Motor, Chromiu
     await browser?.close();
   });
 
-  it("Zeitfahren: Reiter ZZ1/ZZ2 gesperrt, bis jemand dort war (Spoilerwaechter)", async () => {
+  it("Zeitfahren laufend: Spoilerwaechter, Fahrer am Start ohne Rang/Punkte, Fokus bleibt (gerendertes DOM)", async () => {
     await neueDisziplin(seite, "time-trial");
+    await seite.evaluate(() => window.__arena.liveStand({ modus: "tafel", reiter: "auto" }));
     await seite.click("#play");
     await seite.waitForFunction(() => (window.__arena.anpfiffStatus as () => { laeuft: boolean; ticks: number })().ticks > 2, null, { timeout: 20_000 });
+    // Warten, bis die Tafel im laufenden Spiel steht (4x/s gezeichnet).
+    await seite.waitForFunction(() => {
+      const t = document.getElementById("lsTafel");
+      return !!t && !t.hidden && t.querySelectorAll("tbody tr").length > 0;
+    }, null, { timeout: 20_000 });
+
     const d = await probe(seite);
     expect(d.typ).toBe("bahn");
     expect(d.messpunkte?.map((m) => m.kurz)).toEqual(["ZZ1", "ZZ2", "ZIEL", "JETZT"]);
-    const zz1 = d.messpunkte!.find((m) => m.id === "zz0")!;
-    if (zz1.erreicht === 0) {
-      // Erzwungener Reiter auf einen Messpunkt ohne Durchgang faellt auf AUTO/JETZT zurueck.
-      const erzwungen = await probe(seite, "zz0");
-      expect(erzwungen.aktiv).not.toBe("zz0");
+    // SPOILERWAECHTER, unbedingt: kurz nach dem Start war noch niemand an ZZ1, ZZ2 oder im Ziel.
+    for (const id of ["zz0", "zz1", "ziel"]) {
+      const m = d.messpunkte!.find((x) => x.id === id)!;
+      expect(m.erreicht, id).toBe(0);
+      // Erzwungener Reiter faellt auf AUTO/JETZT zurueck ...
+      const erzwungen = await probe(seite, id);
+      expect(erzwungen.aktiv, id).toBe("jetzt");
+      expect(erzwungen.auto, id).toBe(true);
+      // ... und die Tafel im DOM zeigt dafuer keine Zeit: Reiter gesperrt, keine Messpunkt-Spalte.
+      const dom = (await tafelDom(seite))!;
+      expect(dom.reiter.find((r) => r.id === id)?.gesperrt, id).toBe(true);
+      expect(dom.reiter.find((r) => r.id === "auto")?.an, id).toBe(true);
+      expect(dom.kopf).not.toContain(d.messpunkte!.find((x) => x.id === id)!.kurz);
     }
     await seite.evaluate(() => window.__arena.liveStand({ reiter: "auto" }));
+
+    // NOCH AM START: Rang "–", keine Punkte; Gestartete haben die Raenge 1..k ohne Luecke.
+    const jetzt = await probe(seite);
+    const wartend = jetzt.zeilen!.filter((z) => z.wert.startsWith("Start "));
+    expect(wartend.length).toBeGreaterThan(0);
+    for (const z of wartend) {
+      expect(z.rang, z.name).toBe("–");
+      expect(z.punkte, z.name).toBe("");
+    }
+    const gestartet = jetzt.zeilen!.filter((z) => z.rang !== "–");
+    gestartet.forEach((z, i) => expect(z.rang).toBe(String(i + 1)));
+    const rang = jetzt.band.find((f) => f.k === "Rang")!;
+    const [r] = String(rang.v).split("/");
+    if (r !== "–") expect(Number(r)).toBeLessThanOrEqual(gestartet.length);
+
+    // Dasselbe im gerenderten DOM: eine Zeile je Fahrer, gedimmte Zeilen mit "–" und leerer PKT-Spalte.
+    const dom = (await tafelDom(seite))!;
+    expect(dom.kopf).toContain("PKT");
+    expect(dom.zeilen.length).toBe(jetzt.zeilen!.length);
+    const pktSpalte = dom.kopf.indexOf("PKT");
+    const domWartend = dom.zeilen.filter((z) => z.td[2]?.startsWith("Start "));
+    expect(domWartend.length).toBe(wartend.length);
+    for (const z of domWartend) {
+      expect(z.dim).toBe(true);
+      expect(z.td[0]).toBe("–");
+      expect(z.td[pktSpalte]).toBe("");
+    }
+
+    // FOKUS: der Reiter-Knopf wird nicht bei jedem Tick neu gebaut.
+    await seite.focus('#lsTafel [data-ls-reiter="auto"]');
+    await seite.waitForTimeout(1300);
+    const fokus = await seite.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset?.lsReiter ?? null);
+    expect(fokus).toBe("auto");
+    await seite.evaluate(() => window.__arena.liveStand({ modus: "band" }));
   }, LAUF_TIMEOUT_MS);
 
   it("Zeitfahren am Ende: Tafel = Endstand (Platz und Punkte je Laeufer), ZZ-Reiter nach u.zz geordnet", async () => {
@@ -133,6 +222,9 @@ describe.skipIf(!chromiumVerfuegbar())("Live-Stand Welle 1 (Arena-Motor, Chromiu
     for (const reiter of ["zz0", "zz1", "ziel"]) {
       const d = await probe(seite, reiter);
       expect(d.aktiv).toBe(reiter);
+      // PKT meint JETZT, nicht die Zwischenzeit: im Messpunkt-Reiter weder Spalte noch Werte.
+      expect(d.spalten?.punkte ?? null).toBeNull();
+      for (const z of d.zeilen!) expect(z.punkte).toBe("");
       const mit = d.zeilen!.filter((z) => z.rang !== "–");
       expect(mit.length).toBeGreaterThan(0);
       expect(mit[0].abstand).toBe("Best");
@@ -147,12 +239,17 @@ describe.skipIf(!chromiumVerfuegbar())("Live-Stand Welle 1 (Arena-Motor, Chromiu
 
   for (const disc of ["spurt", "climbing"]) {
     it(`${disc} am Ende: Tafel = Endstand`, async () => {
+      // Spurt klassisch erzwingen (HYROX/Hatz haben ihre eigene Rangleiste, Welle 2).
+      await seite.evaluate(() => window.__arena.bahnFlags({ spurtFormat: "klassisch" }));
       await neueDisziplin(seite, disc);
       await seite.evaluate(() => window.__arena.schnellDurch());
       await seite.waitForFunction(() => document.getElementById("phase")?.textContent === "beendet", null, { timeout: LAUF_TIMEOUT_MS });
       const jetzt = await probe(seite, "jetzt");
-      if (!jetzt) return; // HYROX/Hatz zeigen ihre eigene Rangleiste (Welle 2)
+      expect(jetzt, `${disc}: Live-Stand fehlt`).not.toBeNull();
+      expect(jetzt.typ).toBe("bahn");
       const end = await endstandTabelle(seite);
+      expect(end.length).toBeGreaterThan(0);
+      expect(jetzt.zeilen!.length).toBe(end.length);
       for (const z of jetzt.zeilen!) {
         const e = end.find((x) => x.name === z.name);
         expect(e, z.name).toBeDefined();
