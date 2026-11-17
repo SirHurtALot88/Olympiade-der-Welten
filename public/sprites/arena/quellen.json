@@ -1521,7 +1521,8 @@
   "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen hyrox_wallball (art=\"neu\", pixelgenau)",
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-17",
-  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Wall Balls (Station 2, TECHNIK), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+  "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Wall Balls (Station 2, TECHNIK), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js.",
+  "verworfen": "Erster Auftrag 40x56 (10 Gen., Job bec1381a-..., Kurzform, volle ID nicht erhalten) verworfen: hoeher als der Bahnabstand von 43 px, die vier Zielbretter verschmolzen zu einer Saeule. Ersatz: dieser Auftrag 32x40 (15 Gen.); zusammen 25 Gen. fuer Wall Balls."
  },
  "hyrox_arena.jpg": {
   "paket": "PixelLab",

@@ -606,7 +606,8 @@
   ],
   "job": "6ca01bf2-fb9b-41fd-ac29-6636f24ba720",
   "kandidat": 4,
-  "endpunkt": "/v2/generate-image-v2"
+  "endpunkt": "/v2/generate-image-v2",
+  "verworfen": "Erster Auftrag 40x56 (10 Gen., Job bec1381a-..., Kurzform, volle ID nicht erhalten) verworfen: hoeher als der Bahnabstand von 43 px, die vier Zielbretter verschmolzen zu einer Saeule. Ersatz: dieser Auftrag 32x40 (15 Gen.); zusammen 25 Gen. fuer Wall Balls."
  },
  "ispy_aktenschrank": {
   "prompt": "small grey metal filing cabinet with three closed drawers and handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",

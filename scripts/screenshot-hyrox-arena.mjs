@@ -5,10 +5,12 @@
 // Aufruf: node scripts/screenshot-hyrox-arena.mjs [ausgabeVerzeichnis] [--zeiten=3,15,40,90] [--tempo=2]
 //   --zeiten  Wandsekunden nach dem Anpfiff, zu denen je ein PNG (1240x470, toDataURL) entsteht.
 //   --tempo   Klicks auf #spd (1x -> 2x -> 4x), um das Rennen zu beschleunigen.
+//   --laeufer=12  setzt je sechs Spieler aus data/generated/kaderfamilie-live-save.json (Variante 0) ein statt des
+//             Demo-Kaders (5 je Seite, also zehn Laeufer): zwoelf Laeufer, zum Pruefen des Rangbands (Review #1550, K2).
 // Reine Anzeige-Sonde, liest nichts in die Simulation zurueck. HTTP statt file:// (absolute Sprite-Pfade).
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, createReadStream, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, createReadStream, statSync, writeFileSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
@@ -21,6 +23,7 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css
 const args = process.argv.slice(2);
 const zeiten = (args.find((a) => a.startsWith("--zeiten="))?.split("=")[1] || "3,15,40,90").split(",").map(Number);
 const tempo = Number(args.find((a) => a.startsWith("--tempo="))?.split("=")[1] || 1);
+const zwoelf = args.includes("--laeufer=12");
 const ordner = args.find((a) => !a.startsWith("--")) || path.join(WURZEL, "tmp-ux-audit", "hyrox-arena");
 mkdirSync(ordner, { recursive: true });
 
@@ -47,6 +50,10 @@ try {
   seite.on("console", (m) => { if (m.type() === "error") fehler.push("console: " + m.text()); });
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+  if (zwoelf) {
+    const v0 = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten[0];
+    await seite.evaluate((k) => window.__arena.kaderSetzen(k), { heim: v0.heim.slice(0, 6), gast: v0.gast.slice(0, 6) });
+  }
   await seite.evaluate(() => { const A = window.__arena; A.bahnFlags({ spurtFormat: "hyrox" }); A.setDisc("spurt"); });
   await seite.click("#t2");
   await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false, figuren: false });
@@ -60,8 +67,8 @@ try {
     const url = await seite.evaluate(() => document.getElementById("cv").toDataURL("image/png"));
     const datei = path.join(ordner, `hyrox-arena-t${String(t).padStart(3, "0")}.png`);
     writeFileSync(datei, Buffer.from(url.split(",")[1], "base64"));
-    const probe = await seite.evaluate(() => (window.__arena.hyroxFahrplanProbe ? window.__arena.hyroxFahrplanProbe().rennT : null));
-    console.log(`Screenshot: ${datei} (rennT ${probe})`);
+    const probe = await seite.evaluate(() => (window.__arena.hyroxFahrplanProbe ? window.__arena.hyroxFahrplanProbe() : null));
+    console.log(`Screenshot: ${datei} (rennT ${probe && probe.rennT}, ${probe && probe.laeufer.length} Laeufer)`);
   }
   console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
 } finally {

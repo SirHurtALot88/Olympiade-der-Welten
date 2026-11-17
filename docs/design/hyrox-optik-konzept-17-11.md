@@ -51,6 +51,17 @@ höher als der Bahnabstand von 43 px, die vier Zielbretter verschmolzen zu einer
 `nachher-b-start.jpg`, `nachher-b-technik.jpg`, `nachher-b-klettern.jpg`, `nachher-b-kraft.jpg`, `nachher-b-ziel.jpg`
 (nachstellen: `node scripts/screenshot-hyrox-arena.mjs <ordner> --zeiten=3,14,28,44,58 --tempo=2`).
 
+**Nachbesserung nach dem Opus-Review zu #1550 (17.11.), alles reine Anzeige:**
+
+| Fund | Änderung |
+|---|---|
+| S1 Läufer zwischen den Geräten | In den Inseln steht jeder Läufer auf der Geräte-Reihe `bahnZ % n` (n = 4/3/4, `hyroxBahnY`); je breiter die Bahn gerade ist (56 Runde → 188 Insel), desto mehr gilt die Reihe, der Übergang bleibt stetig. Nur Zeichenposition in `laeuferXY()`. Die Breitenblende (`hyroxBreite`) beginnt jetzt am ersten Abschnitt der Reihe mit gleicher Breite, nicht an jeder Abschnittsgrenze (die Zonen sind kürzer als die 60-px-Blende, sie sprang). Test: y-Prüfung in `tests/spurt-hyrox-arena.test.ts`. |
+| S2 Tempo | Fahrplan (`HYROX_ZEITWEG`) unverändert, Geometrie an die Zeitanteile angepasst: Inseln rücken in die linke Hälfte (Technik 150–395, Klettern 424–670, Kraft 698–925), rechts bleibt Auslauf; OUT/START-Linie bei x 1100; Geräte so gesetzt, dass die Zonen im Verhältnis ihrer Zeitanteile liegen; Laufrunden 2 und 3 laufen durch den IN-Bogen weiter bis in die untere linke Ecke (die Roxzone beginnt dort). Messung: `node scripts/miss-hyrox-tempo.mjs`. Vorher Kraft-IN 2,57×, Kraft-OUT 0,30× der Rundengeschwindigkeit, Klettern-IN 2,00×, mehrere Zonen 0,26–0,47×; nachher alle Lauf-/Roxzone-/Zonenabschnitte zwischen 0,58× und 1,71×. Die Arbeitsabschnitte (Gerät) stehen bewusst fast (< 0,1×). |
+| S3 Gerätenamen | Im Boden gezeichnet (also unter Figuren und Kopfnamen) auf der freien Kante unter der untersten Reihe, in zwei Zeilen geteilt. |
+| S4 Zielpferch | Matte „ZIELPFERCH“ (x 1022–1112, `HYROX_PFERCH`) rechts neben der Kraft-Insel, weg vom FINISH-Bogen (x 1168) und vom Rückweg aus Kraft (Gasse x 939). |
+| K2 Rangband | Zwölf Läufer geprüft: `nachher-b-12-laeufer.jpg` (`node scripts/screenshot-hyrox-arena.mjs <ordner> --laeufer=12 --zeiten=30 --tempo=2`), alle zwölf Chips passen. |
+| K1 Schrift | Gruppenschild 10 px statt 9 px: das große K von RaniraSeason (nur ein Schnitt) fiel bei 9 px auf Kleinbuchstabenhöhe. |
+
 **Für Variante C** liegt bereit: feste Insel-Kästen (`HYROX_ZONEN`, aus `HYROX_INSELN` abgeleitet), `HYROX_REGIE_AN`,
 `hyroxCamZiel`/Schnitt-Takt und die Läufer-Zustände aus `hyroxZustand()`. Offen für C: ganzzahliger 2×-Schnitt statt
 stufenlosem Zoom, Läufer-Wahl per Klick, Stations-Inset, Wartefelder samt Stau-Anzeige.
@@ -355,8 +366,8 @@ PixelLab-Aufträge C: alles aus B, dazu
   ~230–310. Bei rund 1500 Gen. Guthaben ist beides zusammen knapp. Abschnitt 5.3 schlägt deshalb
   vor, den Spurt-Posten der Welle C (25 Gen.) mit der HYROX-Halle zu verrechnen.
 - **R8 – Alte Ansichten.** `hyroxAnsicht:"halle"` und `"bahn"` sollten eine Runde lang als
-  QA-Schalter bleiben (Vorher-Bilder), danach samt `hyrox_halle.jpg` und
-  `scripts/baue-hyrox-halle.py` entfernt werden.
+  QA-Schalter bleiben (Vorher-Bilder). **Erledigt mit Variante B (#1550):** `hyrox_halle.jpg` und
+  `scripts/baue-hyrox-halle.py` sind entfernt, die Vorher-Bilder liegen als `ist-*.jpg` im Doku-Ordner.
 
 Aufwand im Motor (grobe Schätzung): B etwa 350–450 Zeilen (neue Wegtabelle, `bodenSpurt`-Zweig für
 Texturebene und Inseln, Geräte je Bahn, HUD, Kamerazweig aus), ein Eintrag in `battle-mode.kulissen.js`

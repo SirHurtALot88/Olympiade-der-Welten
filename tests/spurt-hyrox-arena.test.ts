@@ -40,6 +40,9 @@ type ArenaProbe = {
   inselY: number;
   arbeitMitten: { station: number; gruppe: string; x: number; y: number }[];
   regie: boolean;
+  reihen: { station: number; gruppe: string; bahnen: number; y: number[]; reihenY: number[] }[];
+  pferch: { x0: number; x1: number; y0: number; y1: number };
+  ringR: number;
 };
 
 declare global {
@@ -155,6 +158,24 @@ describe.skipIf(!chromiumVerfuegbar())("HYROX-Arena -- Geometrie und feste Total
       expect(g.x).toBeGreaterThan(insel.x0);
       expect(g.x).toBeLessThan(insel.x1);
     }
+  });
+
+  it("in den Inseln stehen alle zwoelf Laeufer auf den Geraete-Reihen (Anzeige-y), keiner dazwischen", () => {
+    expect(probe.reihen.length).toBe(7);
+    for (const r of probe.reihen) {
+      expect(r.y.length).toBe(12);
+      for (const y of r.y) {
+        const abstand = Math.min(...r.reihenY.map((ry) => Math.abs(ry - y)));
+        expect(abstand, `Station ${r.station}, y ${y}`).toBeLessThan(1);
+      }
+      // jede Reihe ist belegt (12 Bahnen auf 4 bzw. 3 Reihen)
+      for (const ry of r.reihenY) expect(r.y.some((y) => Math.abs(y - ry) < 1)).toBe(true);
+    }
+  });
+
+  it("der Zielpferch liegt frei: rechts von der Kraft-Insel und links vom FINISH-Bogen", () => {
+    expect(probe.pferch.x0).toBeGreaterThan(probe.inseln.kraft.x1);
+    expect(probe.pferch.x1).toBeLessThan(probe.ringR - 40);
   });
 
   it("vier / drei / vier Bahnen je Insel (Platz fuer 'belegt' und 'wartet' der spaeteren Stau-Mechanik)", () => {
