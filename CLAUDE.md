@@ -245,6 +245,17 @@ einmal) und laufen unter `flock /tmp/pixellab-bestell.lock` (nur ein Besteller z
 Stilprobe, nur Treffer einbauen; Herkunft in die `quellen.json`. Stand und Töpfe:
 `docs/design/offene-punkte-entscheidungen-17-11.md`.
 
+**REMAKE statt Übertragung — GANZ WICHTIG (Chris, 17.11.):** „wichtig ist dass wir die designs
+wirklich von pixel lab verwenden und nicht einfach die alten hässlichen 1:1 übertragen und
+kopieren sondern REDESIGN als REMAKE/2D HD … sonst sieht so was wie time trial moderner aus und
+spurt bleibt hässlich, das geht nicht". Jede Arena/Kulisse, die auf PixelLab umgestellt wird, wird
+**neu gestaltet** (eigenes Areal, Tiefenstaffelung, Licht, Requisiten im 2D-HD-Look wie I-Spy,
+HYROX-Arena, TDM), nicht der alte Entwurf mit neuem Bildmaterial nachgebaut. **Kein Gefälle**
+zwischen den Disziplinen: vor einer neuen Arena prüfen, ob eine verwandte Disziplin (Zeitfahren
+↔ Spurt ↔ Staffel ↔ Takeshi) sichtbar moderner aussähe, und diese gleich mitziehen. Dazu: mehrere
+verschiedene Arenen/Varianten je Disziplin mit eigenen Assets (z. B. Takeshi), nicht eine Karte mit
+Umfärbung.
+
 ## Nur noch PixelLab-Assets — für alle zwanzig Disziplinen
 
 Chris am 17.11., wörtlich, nachdem die I-Spy-Hallen mit PixelLab neu gebaut worden waren: „Das mit
