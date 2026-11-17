@@ -11732,7 +11732,16 @@
       const dx=(zx-m.x)/s.x, dy=(zy-m.y)/s.y, d=Math.hypot(dx,dy)||0.01;
       if(d<sp.mitspielerMin){ const f=(sp.mitspielerMin-d)/d; px+=dx*f; py+=dy*f; }
     }
-    return {x:zx+px*s.x*sp.mitspielerStaerke, y:zy+py*s.y*sp.mitspielerStaerke};
+    let rx=zx+px*s.x*sp.mitspielerStaerke, ry=zy+py*s.y*sp.mitspielerStaerke;
+    // Basketball: das Ziel bleibt NACH dem Abstand im Spielfeld (Seitenlinien/Grundlinien aus
+    // BK_FIBA, 12 px Rand) — sonst schob der Abstand Ecken-/Fluegelziele ueber die Linie hinaus
+    // bis fast an den Leinwandrand (Review PR #1562).
+    if(feldspielDisc==="basketball"){
+      const halbQ=7.5*BK_FIBA.my-12, halbL=14*BK_FIBA.mx-12;
+      ry=Math.max(H/2-halbQ,Math.min(H/2+halbQ,ry));
+      rx=Math.max(W/2-halbL,Math.min(W/2+halbL,rx));
+    }
+    return {x:rx, y:ry};
   }
   // RUECKLAUF: Laufziel eines Nicht-Jaegers der werfenden Seite Richtung Mittellinie ziehen.
   function spacingRuecklauf(zx){
@@ -11816,6 +11825,7 @@
     rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
+    bkNachlauf=null;
     seed=normalisiereSaat(saat); kontaktStromSaeen(saat);
     // Eigener Kickoff-Saatstrom, fester Versatz auf denselben Spiel-Seed (s. Kommentar bei
     // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
@@ -18621,7 +18631,8 @@
   // Grundlinie, Ausleger, Brett 1,2 m vor der Grundlinie, Ring auf 3,05 m, Netz — in ZWEI
   // Ebenen:
   //   "hinten"  Bodenschatten, Staender, Ausleger, Brett, hintere Ringhaelfte, hintere Netzfaeden
-  //             (in bodenFeldspiel, also VOR Spielern und Ball)
+  //             (in der y-sortierten Spielerschleife von zeichneFeldspiel, via korbHinten: wer
+  //             weiter hinten steht, wird VOR der Anlage gezeichnet, alle anderen danach)
   //   "vorn"    vordere Ringhaelfte und vorderes Netz (am Ende von zeichneFeldspiel, NACH dem
   //             Ball) — dadurch faellt ein Treffer sichtbar DURCH den Ring ins Netz.
   // PNG-TAUSCH (Assets macht der PixelLab-Schwester-Agent): Datei nach
@@ -18720,6 +18731,10 @@
   // null = kein Nachlauf, normale Ballzeichnung. Reine Anzeige.
   function bkNachlaufBall(){
     const n=bkNachlauf; if(!n)return null;
+    // Abpraller: greift jemand den Ball schon waehrend des Nachlaufs, ist er vorbei (kein zweiter
+    // Ball). Beim Treffer (Netz) NICHT: der Einwurf-Ballbesitz folgt sofort und wuerde den
+    // Fall durchs Netz abschneiden.
+    if(n.art==="abpraller"&&fsLive&&fsLive.ball.traeger){ bkNachlauf=null; return null; }
     const t=bkAnzeigeUhr-n.t0, F=BK_FIBA;
     if(n.art==="netz"){
       if(t>0.5){ bkNachlauf=null; return null; }
@@ -45008,8 +45023,9 @@
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
+  // (korb_topdown.png bleibt als Datei liegen, wird aber nicht mehr geladen — die Korbanlage ist ersetzt.)
   // Korbanlage in zwei Ebenen + Schussuhr-Rahmen: Fable 17.11. (docs/design/basketball-assets-17-11.md).
-  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball",
+  const BK_TEILE=["parkett","zuschauer","ball",
     "korb_links_hinten","korb_links_vorne","korb_rechts_hinten","korb_rechts_vorne","schussuhr_rahmen"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
