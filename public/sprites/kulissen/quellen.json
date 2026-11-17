@@ -80,5 +80,69 @@
    "quelle": "public/szenen/breaking/brutal.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
    "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
   }
+ },
+ "i-spy/aztec.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty courtyard of an overgrown aztec jungle temple, carved stone temple wall with dark doorways and hanging vines along the top edge only, the whole rest is open flat floor of mossy stone slabs and short jungle grass with a few small ferns at the left and right borders, warm green and ochre colours, even soft light, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "956a6a8a-fb06-4ebc-bcd2-9f56d38085ef",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_aztec.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy, Halle aztec"
+ },
+ "i-spy/horror.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty haunted crypt hall interior, dark stone back wall with iron-barred alcoves and dim candles along the top edge only, the whole rest is open flat floor of dark grey-teal cobblestones with a few scattered bones and cobwebs at the left and right borders, cold teal and grey moody light, no pillars in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "4fd62eb4-2c2f-4ff6-91b2-54e5d35ce69f",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_horror.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy, Halle horror"
+ },
+ "i-spy/lostplace.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty abandoned factory hall interior, back wall with a row of broken industrial windows along the top edge only, the whole rest is open flat floor of cracked grey-green concrete tiles with moss in the cracks, a few scattered papers and debris at the left and right borders, muted grey and olive colours, no machines in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "afc690f9-8be4-4bfe-8ef4-6fc82e887671",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_lostplace.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy, Halle lostplace"
+ },
+ "i-spy/ruinengarten.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty overgrown ruined garden, crumbling red brick wall with arched openings and ivy along the top edge only, the whole rest is open lawn of lush green grass with a few broken stone flagstone paths, small bushes and fallen column pieces at the left and right borders, bright warm green colours, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "be4d8732-eb9b-4b35-9510-1e259736ca86",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_ruinengarten.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy, Halle ruinengarten"
  }
 }
