@@ -233,6 +233,20 @@ Vervielfachung über den ganzen Figuren-Bestand, die bei einem einzelnen Requisi
 anfällt. Im Zweifel (eine neue Art von Objekt, die einem Charakter sehr nahekommt, z.B. ein
 Maskottchen oder eine Kreatur) lieber einmal nachfragen statt anzunehmen.
 
+## Nur noch PixelLab-Assets — für alle zwanzig Disziplinen
+
+Chris am 17.11., wörtlich, nachdem die I-Spy-Hallen mit PixelLab neu gebaut worden waren: „Das mit
+Pixel lab gilt auch für alle anderen diszis! Wir nutzen keine alten Assets mehr sondern nur noch eie
+aus Pixel lab". **Jedes neue sichtbare Bildasset (Kulisse, Boden, Requisit, Falle, Möbel, Objekt) wird
+mit PixelLab erzeugt — nicht mehr aus OpenGameArt, Kenney oder anderen Paketen, nicht mehr als
+Canvas-Primitive aus Code und nicht mehr aus den alten Szenen-HTMLs unter `public/szenen/`.** Das
+gilt für alle zwanzig Disziplinen, nicht nur für I-Spy. Bestehende Nicht-PixelLab-Assets werden nach
+dem Audit `docs/design/pixellab-nur-neue-assets-audit-17-11.md` in Wellen ersetzt (Reihenfolge und
+Kosten dort; bestellt wird, was Chris freigibt). Herkunft jedes neuen Assets steht in
+`public/sprites/kulissen/quellen.json` bzw. `public/sprites/arena/quellen.json`. **Unverändert
+gesperrt bleiben neue Charaktere und neue Animationen** (siehe Abschnitt oben) — diese Regel betrifft
+nur Requisiten und Kulissen.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
