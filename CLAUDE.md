@@ -507,7 +507,9 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-17.11.: **GESAMT 97c267e8b7c7 (75 Eintraege)** — absichtlich bewegt vom Basketball-Benchmark (FIBA-Feld auf jeder Map,
+17.11. (abends): **GESAMT 004f26374565 (75 Eintraege)** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
+sind reine Anzeige), wieder nur die drei `spiele basketball`-Zeilen bewegt, `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.
+Davor **GESAMT 97c267e8b7c7** — absichtlich bewegt vom Basketball-Benchmark (FIBA-Feld auf jeder Map,
 Spacing-Modul, `docs/design/spacing-modul-17-11.md`, `docs/design/benchmark-basketball-17-11.md`); gegenueber dem Vorstand
 `d09e10bb872c` (I-Spy-Knack-Motor V2; davor `7c9257b4435c` Kontakt im klassischen Spurt scharf, davor `e80babacb68c`)
 haben sich NUR die drei `spiele basketball`-Eintraege geaendert (1/7/42). Eine reine Anzeige-Aenderung an

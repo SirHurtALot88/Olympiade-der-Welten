@@ -25,6 +25,13 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Siebenunddreißigster Nachtrag 17.11. abends — Basketball Runde 2: Laufwege mit Absicht, Kamera, Effekte, Teamfouls.**
+Messung und Prüfbogen: `docs/design/benchmark-basketball-17-11.md` Abschnitt 7. LAUFWEG-MODUL (Backdoor 33, Post-up 58, Pick-and-Roll/-Pop
+12, Fast-Break 47, Help-Rotation 116 je Spiel, Ausboxen bei 97,5 % der Würfe), Feld-Grenze (0 Proben außerhalb, vorher 7 596), Halbfeld-
+Kamera, Effekte/Synth-Ton, Teamfoul-Zähler (Foul ohne Wurf gemessen, 0,841/0,853, aus gelassen). rho je Spiel 0,859 → **0,862**
+(Spannweite 0,136, Saison 0,881), Pp 13,6 / 16,0 → **7,5 / 13,4** (Node-Motor, n=48), gezeigt = gebucht 0 von 846. Fingerabdruck
+**97c267e8b7c7 → 004f26374565**, nur `spiele basketball 1/7/42`. Matrix unangetastet, 0 PixelLab-Generationen.
+
 **Sechsunddreißigster Nachtrag 17.11. — Basketball: Benchmark-Runde (FIBA-Feld, Spacing, echter Korb).**
 Chris am 17.11.: alle laufen als Klumpen, Korb passt nicht, jede Map braucht 3er-Linie, 2er und 3er werfen. Messung:
 `docs/design/benchmark-basketball-17-11.md`. rho je Spiel 0,822 → **0,859** (Spannweite 0,111, Saison 0,909), Pp 15,6 / 16,7 → **13,6 / 16,0**
