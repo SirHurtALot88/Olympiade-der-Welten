@@ -1342,6 +1342,13 @@ export default function EinsatzlisteModern(props: Props) {
           <small>Spieltag erwartet</small>
         </div>
         <button type="button" className="bc-btn bc-nurdesk" disabled={!kannBedienen || !onApplyAssignments} onClick={leeren}>Leeren</button>
+        {abgegeben && arenaReady && onNavigateArena ? null : (
+          // Der Weg in die Arena bleibt sichtbar, auch solange der Knopf noch "Abgeben" heißt:
+          // Wer hier steht, soll wissen, wohin die Abgabe führt (Gameplay-Smoke prüft das).
+          <span className="elm-weg" data-testid="elm-arena-weg">
+            {abgegeben ? "Arena öffnet zum Spieltag" : "Danach: Arena"}
+          </span>
+        )}
         <button
           type="button"
           className={`bc-btn bc-btn--haupt${abgegeben ? " is-ok" : gesperrt ? " is-zu" : ""}`}

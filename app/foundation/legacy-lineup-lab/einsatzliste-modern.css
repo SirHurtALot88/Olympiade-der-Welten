@@ -1004,6 +1004,14 @@ button.elm-pr:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.elm-weg {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+  white-space: nowrap;
+}
+
 .elm-ges {
   text-align: right;
   white-space: nowrap;
