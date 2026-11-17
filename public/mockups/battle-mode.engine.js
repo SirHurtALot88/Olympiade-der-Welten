@@ -34143,7 +34143,23 @@
       // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
       // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
       const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
+      // NUR-PIXELLAB-AUDIT 17.11.: beim Gericht "Pfannkuchen" ist jeder Teller das bezahlte
+      // PixelLab-Bild `wettessen_teller_normal` (32x20, gezeichnet 24x15). Das Bild zeigt einen
+      // Pfannkuchenstapel -- bei Wuerstchen, Wings, Chili oder Austern waere es inhaltlich falsch,
+      // dort bleiben die neutralen Ellipsen, bis ein leerer PixelLab-Teller bestellt ist. Der
+      // Stapel steht RECHTS neben den Fuessen statt darunter: unter den Fuessen verdeckte die Figur
+      // das Gericht, und die dunklen Tellerraender lasen sich wie eine Sprungfeder (Screenshot-
+      // Vergleich, docs/design/pixellab-nur-neue-assets-17-11/). Deckend gezeichnet, damit die
+      // unteren Teller nur als Rand unter dem oberen hervorschauen. Rueckfall: die alten Ellipsen.
+      const tellerBild=(wettessenMenuWahl.n==="Pfannkuchen"&&aDa("wettessen_teller_normal"))?aBild.wettessen_teller_normal:null;
       for(let pl=0;pl<teller;pl++){
+        if(tellerBild){
+          ctx.globalAlpha=gedimmt;
+          ctx.save(); ctx.imageSmoothingEnabled=false;   // Pixel-Look, keine Weichzeichnung beim Verkleinern
+          ctx.drawImage(tellerBild,x+8,y+12-pl*2.2,24,15);
+          ctx.restore();
+          continue;
+        }
         ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
         ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
         ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
@@ -37459,6 +37475,17 @@
       ctx.beginPath();
       ctx.ellipse(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*KY,5+((i*29)%7),3+((i*17)%4),a,0,6.2832);
       ctx.fill();
+    }
+
+    // DER PFAHL IN DER MITTE (Nur-PixelLab-Audit 17.11., 0 Gen.): der bezahlte PixelLab-Bindepfahl
+    // `breaking_pfahl` steht auf dem Folterplatz, der Fuss auf derselben Bodenlinie wie die Fuesse
+    // eines Duellanten in der Mitte (o.y+19). Er wird VOR beiden Raengen gezeichnet: tritt der
+    // Ertragende in die Mitte, steht er vor dem Pfahl, statt von ihm verdeckt zu werden. Reine
+    // Kulisse, kein Zustand. Fehlt das Bild, bleibt die Mitte wie bisher leer.
+    if(aDa("breaking_pfahl")){
+      ctx.save(); ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(aBild.breaking_pfahl,Math.round(cx-14),Math.round(cy+21-64),28,64);
+      ctx.restore();
     }
 
     // ================== C. ZWEI RÄNGE STATT ZWÖLF GLEICHER (13.09.) ==================
@@ -44008,7 +44035,9 @@
   // Herkunft steht; und ein Kachelsatz je Disziplin waere sonst jedes Mal Ballast im
   // HTML. Die Sprite-Blaetter der Kaempfer liegen weiter eingebettet — die brauchen
   // Farbtausch je Pixel und muessen deshalb ohnehin durch die Leinwand.
-  const A_TEILE=["boden_sand","boden_stein","boden_erde","mauer_ziegel","rasen",
+  // 17.11. (Chris: "nur noch PixelLab"): `boden_erde` (LPC) faellt aus der Liste -- die einzige
+  // Verwendung, die Takeshi-Schlammgrube, liest jetzt die PixelLab-Kachel `boden_schlamm`.
+  const A_TEILE=["boden_sand","boden_stein","mauer_ziegel","rasen",
     "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel",
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
@@ -44047,6 +44076,12 @@
     // Fundorte als Requisiten, s. ISPY_MOEBEL_BILD. Fehlen-tolerant (aDa()-Wache), Rueckfall Primitiv.
     "ispy_schreibtisch","ispy_schreibtisch_durchsucht","ispy_aktenschrank","ispy_aktenschrank_offen",
     "ispy_verhoerstuhl","ispy_tuer",
+    // Nur-PixelLab-Audit 17.11. (docs/design/pixellab-nur-neue-assets-audit-17-11.md, 0-Gen.-Schritte):
+    // schon bezahlte, bisher ungenutzte PixelLab-Bilder statt Canvas-Primitiven -- Hatz-Fegearm,
+    // Breaking-Pfahl am Folterplatz, Wettessen-Tellerstapel (Gericht Pfannkuchen). Fehlen-tolerant (aDa()-Wache), Rueckfall
+    // bleibt die alte Primitiv-Zeichnung. Die Ekel-Teller (schleim/krabbler) bleiben fuer das geplante
+    // "Ekelroulette" liegen -- unter den fuenf Gerichten des Tages waeren sie falsch.
+    "falle_fegearm","breaking_pfahl","wettessen_teller_normal",
     // EFFEKT-PILOT 17.11. (Chris: "hud Effekte und schiri auch über Pixel lab"): Hieb-Bogen als
     // PixelLab-VFX (POST /v2/vfx, pro), neutral weiss/grau, 7 Bilder a 56 px als Streifen, zur
     // Laufzeit in Teamfarbe getoent (hiebBildGetoent). Rueckfall: der Canvas-Bogen in zeichneEffekte().
@@ -45203,10 +45238,15 @@
         // im Kulissen-QS-Nachtrag 08.11. systematisch gefunden -- dieselbe Behandlung. Die
         // Blasen bleiben bewusst ausserhalb der Rotation: sie sind kreisrund und saisonal
         // unabhaengig von der Streckenneigung, eine Drehung aendert an ihnen nichts Sichtbares.
-        const er=aMust("boden_erde");
+        // Nur-PixelLab-Audit 17.11.: die Grube liest die PixelLab-Kachel `boden_schlamm` (dieselbe,
+        // die das Seeufer der Route schon traegt) statt der LPC-Erde, die erst per Multiply zu
+        // Schlamm abgedunkelt werden musste. Die Schlammkachel ist schon dunkelbraun-nass, das
+        // Multiply faellt deshalb weg. Rueckfall ohne Kachel: exakt die alte Primitiv-Flaeche.
+        const er=aMust("boden_schlamm");
         ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
         weicheFlaeche(x,y-9,28,15,i,()=>{
-          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30);
+          if(!er){ ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over"; }
         });
         ctx.restore();
         const spritzer=aus==="sturz";
@@ -51780,10 +51820,8 @@
     if(rennT>=letzte.ende+0.05||rennFertig.length>=LAEUFER.length)done=true;
   }
   // SWEEP-ARM/BEDROHUNGS-OVERLAY (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
-  // u.pos/wert()/rho). Kein neues PixelLab-Asset (Auftrag: "zuerst pruefen, ob ein
-  // bestehendes Panzertier wiederverwendbar ist" -- geprueft, s. PR-Beschreibung: kein
-  // passendes vorhanden, "medibull" ist ein Sanitaeter-Maskottchen, kein Bedroher) --
-  // stattdessen derselbe prozedurale Balken, mit dem das Bahn-Chassis auch sonst Zustand
+  // u.pos/wert()/rho). Seit 17.11. zeichnet das bezahlte PixelLab-Bild
+  // `falle_fegearm` den Arm (s. unten); der prozedurale Balken ist nur noch Rueckfall -- derselbe Balken, mit dem das Bahn-Chassis auch sonst Zustand
   // zeichnet (Hot-Seat-Podest, Ziellinie), damit kein Asset-Generierungsprojekt an einem
   // Format-Fundament haengt.
   function zeichneHatzUeberlagerung(){
@@ -51800,10 +51838,34 @@
     const armPos=Math.max(0,welleZielPos-0.06+frac*0.06);
     const xPos=camX(armPos);
     ctx.save();
-    ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
-    ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
-    ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
-    ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    if(aDa("falle_fegearm") && Math.max(1,y1-y0)>=(18+41)){
+      // NUR-PIXELLAB-AUDIT 17.11.: der Arm ist das bezahlte PixelLab-Bild `falle_fegearm` (84x24,
+      // liegend: Drehpfosten links, Warnstreifen-Ausleger, Pralltopf rechts) statt des roten
+      // Balkens. Um 90 Grad gedreht haengt der Pfosten oben ueber Bahn 1, der Topf unten unter der
+      // letzten Bahn; dazwischen wird der Warnstreifen-Abschnitt (x 18..31, zwei Streifenperioden)
+      // gekachelt, damit der Arm jede Bahnzahl ueberspannt, ohne das Pixelraster zu ziehen. Die
+      // Dringlichkeit (Alpha waechst mit frac) bleibt als roter Schein hinter dem Arm.
+      // Doppelte Pixelgroesse (Z=2, ganzzahlig): bei 1x war der Ausleger nur ~8 px breit und las
+      // sich schwaecher als der alte 18-px-Balken.
+      const L=Math.max(1,y1-y0), img=aBild.falle_fegearm, KOPF=18, MUSTER=14, FUSS=41;
+      // Z ganzzahlig: 2 wenn Kopf+Fuss (118 px) in die Bahnhoehe passen, sonst 1 (59 px); darunter
+      // (sehr wenige Bahnen) greift der alte Balken im else-Zweig -- der Arm ragt nie unter die letzte Bahn.
+      const Z=L>=(KOPF+FUSS)*2?2:1;
+      ctx.fillStyle="rgba(200,20,20,"+(0.18+0.42*frac*frac).toFixed(3)+")";
+      ctx.fillRect(xPos-18,y0,36,L);
+      ctx.save(); ctx.translate(Math.round(xPos),Math.round(y0)); ctx.rotate(Math.PI/2);
+      ctx.imageSmoothingEnabled=false;
+      const mitte=Math.max(0,L-(KOPF+FUSS)*Z);
+      ctx.drawImage(img,0,0,KOPF,24,0,-12*Z,KOPF*Z,24*Z);
+      for(let d=0;d<mitte;d+=MUSTER*Z){ const s=Math.min(MUSTER*Z,mitte-d); ctx.drawImage(img,18,0,s/Z,24,KOPF*Z+d,-12*Z,s,24*Z); }
+      ctx.drawImage(img,43,0,FUSS,24,KOPF*Z+mitte,-12*Z,FUSS*Z,24*Z);
+      ctx.restore();
+    } else {
+      ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
+      ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
+      ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
+      ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    }
     ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
     // QA 16.11. (Fix-Paket C): y0-8 (~51px) liegt unter dem Spiel-Anzeige-Balken; unterhalb der
     // Stationsetiketten (hudBandUnten()+9, Statistikzeile +18) in der naechsten freien Zeile.
