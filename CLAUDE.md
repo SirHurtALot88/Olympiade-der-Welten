@@ -304,6 +304,23 @@ Modelle/Animationen später nur für die tatsächlich gepickten Spieler erzeugen
 wird, damit sich die Kosten verteilen. Günstige Kombinationen vorhandener Animationen sind ausdrücklich
 erwünscht; neue Animationen bleiben ohne Einzelfreigabe gesperrt.
 
+## Größere Konzepte: immer zuerst Mockup + Erklärung, im neuen Stil
+
+Chris am 17.11., wörtlich: „mach für das Finanzthema und Sponsoren dann auch erstmal ein Mockup +
+Erklärung — das müssen wir jetzt sauber immer bei größeren Konzepten machen. jetzt hast du nen Style
+gefunden, der modern ist und den ich richtig cool finde! jetzt können wir die ganze App damit über die
+nächsten Wochen hardcore verbessern!!"
+
+- **Ablauf für jedes größere Konzept** (neue Seite, Umbau einer Seite, neues System wie Finanzen,
+  Form/Moral, Sponsoren): (1) klickbares Mockup + kurze Erklärung (Fable als Design-Berater), (2) Chris
+  sagt „bau das“ oder korrigiert, (3) Bau mit Sonnet, (4) Prüfung/Merge durch die Hauptsitzung. Erst
+  bauen, wenn Chris das Mockup gesehen hat.
+- **Der verbindliche Stil** ist der der Mockups vom 17.11.: `public/mockups/basketball-ui-mockup-17-11.html`,
+  `public/mockups/einsatzliste-modern-17-11.html`, `public/mockups/oly-start-modern-17-11.html`, Plan
+  `docs/design/oly-seiten-modern-17-11.md` (Designsystem: Tokens, Barlow-Condensed-Zahlen lokal, Karten,
+  Tabellen, Icon-Schiene, Blatt). Neue Mockups übernehmen dieses System exakt, damit die App aus einem
+  Guss wird. Reine CSS/SVG-Gestaltung; PixelLab nur, wo ein Bild echten Mehrwert hat.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
