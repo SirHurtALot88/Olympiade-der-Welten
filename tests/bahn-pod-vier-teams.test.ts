@@ -52,13 +52,16 @@ const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 // bestimmt:
 //   spurt   d0b83c4c88b4fa0e -> ec5dc6e942170404 bei 17db4128 (#1376, Spurt-Stationsduell + PP-Bonus)
 //                            -> aaf683d558b12728 bei d3cd7b06 (#1488, Spurt-Budget-Konservierung)
+//                            -> 8e96b1dc33ad1b1c am 17.11. (Kontakt scharf: BAHN_ART.spurt.kontakt={stufe:3},
+//                               docs/design/kontakt-persoenlichkeit-16-11.md 6.5; Eltern-Stand fa2a52d9 noch aaf683d5...,
+//                               nur diese eine Zeile bewegt sich, die vier anderen Bahnen bleiben gleich)
 //   staffel bbb0c028e8447abe -> 78236478f3941cc3 bei b6462832 (#1499, Health von ROBUST nach STEHEN)
 // Takeshi's Castle, Zeitfahren und Climbing sind seit dem Umbau unveraendert.
 const SAATEN: Array<number | string> = [1, 7, 42, 1337, "save:s1:md3:staffel"];
 const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
   staffel: "78236478f3941cc3",
   "takeshis-castle": "5bbb7171f24f2908",
-  spurt: "aaf683d558b12728",
+  spurt: "8e96b1dc33ad1b1c",
   "time-trial": "b167882f39f9bc63",
   climbing: "d538d2c1fb7f6344",
 };

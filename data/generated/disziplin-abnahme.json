@@ -194,7 +194,7 @@
     "gegenprobe": {
      "saatVersatz": 20000000,
      "pp": 11.2,
-     "hinweis": "ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
+     "hinweis": "Stand 15.11., VOR dem Scharfschalten des Kontakts (17.11.). Ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
     }
    },
    "datum": "2026-11-15",
@@ -440,22 +440,22 @@
   },
   "spurt": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.876,
-   "rhoSpannweite": 0.067,
-   "rhoSaison": 0.937,
+   "rhoJeSpiel": 0.89,
+   "rhoSpannweite": 0.055,
+   "rhoSaison": 0.93,
    "rhoMessung": {
-    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 spurt -- Budget-Konservierung 15.11., Rezept nach Zeilenschritt",
-    "spiele": 24,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 96 spurt -- Kontakt scharf 17.11. (BAHN_ART.spurt.kontakt={stufe:3}, Engine-Standard, kein Schalter)",
+    "spiele": 96,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.9,
-    6.5
+    8.5,
+    9.9
    ],
    "ppMessung": {
-    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs spurt 48 (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs spurt 48 (+ --saat-versatz=10000000) -- Kontakt scharf 17.11.",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -470,8 +470,46 @@
      "hinweis": "ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet); vorher = altes Rezept auf demselben Strom"
     }
    },
-   "datum": "2026-11-15",
-   "commit": "fbcdc6fab",
+   "datum": "2026-11-17",
+   "commit": "fa2a52d9",
+   "kontakt": {
+    "stand": "scharf seit 17.11.: BAHN_ART.spurt.kontakt={stufe:3} (Stufen 1-3, Dosis 1), nur klassischer Spurt; Hatz/HYROX/Takeshi unberuehrt. Gemessen auf fa2a52d9 mit --kontakt=spurt:3, identisch zum neuen Standard ohne Schalter. docs/design/kontakt-persoenlichkeit-16-11.md 6.5 und Nachtrag 17.11.",
+    "ohneKontakt": {
+     "rhoJeSpiel": 0.887,
+     "rhoSpannweite": 0.069,
+     "rhoSaison": 0.93,
+     "pp": [
+      12.9,
+      6.5
+     ],
+     "starRang1Echt": 78.3,
+     "starTop2Echt": 93.3,
+     "starRang1Ersatz": 81.9,
+     "starTop2Ersatz": 93.3,
+     "paartreue15Echt": 98.9,
+     "paartreue15Ersatz": 98.8,
+     "befehl": "dieselben Befehle mit --kontakt-json={\"spurt\":null} bzw. auf fa2a52d9 ohne Schalter (n=96, OLY_FORM_MODUS=echt; Star/Paartreue miss-star-paartreue.mjs 96 spurt, echt und Ersatzkarte)"
+    },
+    "mitKontakt": {
+     "starRang1Echt": 82.5,
+     "starTop2Echt": 94.4,
+     "starRang1Ersatz": 80.2,
+     "starTop2Ersatz": 94.0,
+     "paartreue15Echt": 99.0,
+     "paartreue15Ersatz": 99.0,
+     "starLetzter": 0,
+     "kontakteJeRennen": {
+      "versuche": 3.65,
+      "treffer": 1.9,
+      "fehlschlaege": 1.13,
+      "verzichtet": 1.55,
+      "haengerBeteiligte": 0.84,
+      "fouls": 0.21
+     }
+    },
+    "neutralitaet": "Kriterium N, Platz-Differenz echter Typ gegen Zwangstyp, Standardfehler je Spieler geclustert (60 Spieler, 96 Saaten): mit Kontakt jeder Typ <= 1 SE (Zwang duellant max |t| 0,99; Zwang bollwerk max 1,15), eps2 Typ 0,051 -> 0,028 (duellant) bzw. 0,050 -> 0,057 (bollwerk)",
+    "fingerabdruck": "GESAMT e80babacb68c -> 7c9257b4435c (75), nur spiele spurt 1/7"
+   },
    "formkarten": {
     "modus": "echt",
     "quelle": "docs/design/formkarten-motor-p4-11-11.md",
@@ -489,13 +527,13 @@
    },
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (OLY_FORM_MODUS=echt; jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert, Struktur unveraendert; vorher dexterity 16,0 % gegen Matrix 12, determination 11,4 % gegen 15, power 7,1 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,5/15,4 -> 12,9/6,5, Gegenprobe auf dem ungesehenen Strom 20 000 000: 15,5 -> 9,4 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,860 -> 0,876 (Spannweite 0,067, Saison 0,937) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136, OLY_FORM_MODUS=echt): rho 0,938 -> 0,860 (Spannweite 0,126 -> 0,074, enger), Saison 0,951 -> 0,860 -- Bewegung 0,078, innerhalb der alten Spannweite, keine Regression, aber ein staerkerer Ruecksetzer als bei den meisten anderen Disziplinen dieser Runde -- bei naechster Nachmessung im Auge behalten (deckt sich mit demselben Befund im unabhaengigen Baseline-Lauf vom selben Tag, docs/design/baseline-alle-20-disziplinen-15-11.md). Pp nicht neu gemessen, 18,5/15,4 bleibt gueltig (kein Rezept-Code seit 14.11. angefasst)."
+   "anmerkung": "KONTAKT SCHARF 17.11. (Chris: 'schubsen tacklen etc bitte auch einbauen, das kann ja die rho noch mal veraendern und sollte drin sein fuers messen'): rho je Spiel 0,887 -> 0,890 (n=96, echt), Saison 0,930 -> 0,930, Pp 12,9/6,5 -> 8,5/9,9, Star Rang 1 echt 78,3 -> 82,5 %, Ersatz 81,9 -> 80,2 %, Paartreue >=15 98,9/98,8 -> 99,0/99,0 %. Vorher: BUDGET-KONSERVIERUNG 15.11. (Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (OLY_FORM_MODUS=echt; jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert, Struktur unveraendert; vorher dexterity 16,0 % gegen Matrix 12, determination 11,4 % gegen 15, power 7,1 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,5/15,4 -> 12,9/6,5, Gegenprobe auf dem ungesehenen Strom 20 000 000: 15,5 -> 9,4 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,860 -> 0,876 (Spannweite 0,067, Saison 0,937) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136, OLY_FORM_MODUS=echt): rho 0,938 -> 0,860 (Spannweite 0,126 -> 0,074, enger), Saison 0,951 -> 0,860 -- Bewegung 0,078, innerhalb der alten Spannweite, keine Regression, aber ein staerkerer Ruecksetzer als bei den meisten anderen Disziplinen dieser Runde -- bei naechster Nachmessung im Auge behalten (deckt sich mit demselben Befund im unabhaengigen Baseline-Lauf vom selben Tag, docs/design/baseline-alle-20-disziplinen-15-11.md). Pp nicht neu gemessen, 18,5/15,4 bleibt gueltig (kein Rezept-Code seit 14.11. angefasst)."
   },
   "spurt-mischung": {
    "chassis": "bahn",
    "format": "Spurt wie das Spiel ihn spielt: Format je Saat per Hash (klassisch/Hatz/HYROX, je ein Drittel), s. spurtFormatWaehlen() in battle-mode.engine.js (PR #1502). ERGAENZT die Zeile 'spurt' (die kader-los nur das klassische Format misst), ueberschreibt sie nicht.",
-   "rhoJeSpiel": 0.873,
-   "rhoSpannweite": 0.053,
+   "rhoJeSpiel": 0.87,
+   "rhoSpannweite": 0.042,
    "rhoSaison": 0.951,
    "rhoMessung": {
     "befehl": "OLY_FORM_MODUS=echt node scripts/miss-spurt-mischung.mjs 24 --je-format",
@@ -504,14 +542,14 @@
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie",
     "einzelformate": {
-     "klassisch": 0.876,
+     "klassisch": 0.894,
      "hatz": 0.823,
      "hyrox": 0.895
     }
    },
    "pp": [
-    16.5,
-    21.5
+    17.7,
+    22
    ],
    "ppMessung": {
     "befehl": "OLY_FORM_MODUS=echt node scripts/miss-spurt-mischung.mjs 24 --pp=48",
@@ -539,11 +577,11 @@
      "hatzBefehl": "node scripts/messe-spurt-hatz-einfluss.mjs 192 <versatz>"
     }
    },
-   "datum": "2026-11-16",
-   "commit": "81fedad1",
+   "datum": "2026-11-17",
+   "commit": "fa2a52d9",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NEU 16.11. (Auftrag: Hatz/HYROX in der CI schuetzen, docs/design/spurt-ci-schutz-16-11.md). Die Mischung besteht beide Kriterien mit Abstand (rho 0,873 > 0,85, Pp 16,5/21,5). Das Einzelformat Hatz liegt bei Pp 22,5-26,1 ueber fuenf Saatstroeme (Mittel 24,7, drei von fuenf Stroemen ueber 25) und rho 0,823 (echt) bzw. 0,837 (Ersatzkarte): im Spiel zaehlt die Mischung, ein Drittel der Rennen sind Hatz -- die Entscheidung ueber das Einzelformat steht bei Chris. rho der Mischung und der drei Formate schuetzt die Nacht-CI (zusatzmessungen in rangtreue-basislinie.json)."
+   "anmerkung": "KONTAKT SCHARF 17.11. (klassischer Spurt, BAHN_ART.spurt.kontakt={stufe:3}): rho Mischung n=24 0,873 -> 0,870 (Spannweite 0,042), klassisch 0,876 -> 0,894 (n=24, Schranken-Lauf), Hatz 0,823 / HYROX 0,895 unveraendert (bit-gleich); Pp Mischung 16,5/21,5 -> 17,7/22,0 (n=48, beide unter 25, Strom 10 000 000 nahe an der Schranke -- beobachten). Bei n=96: Mischung 0,876 -> 0,880. Vorher: NEU 16.11. (Auftrag: Hatz/HYROX in der CI schuetzen, docs/design/spurt-ci-schutz-16-11.md). Die Mischung besteht beide Kriterien mit Abstand (rho 0,873 > 0,85, Pp 16,5/21,5). Das Einzelformat Hatz liegt bei Pp 22,5-26,1 ueber fuenf Saatstroeme (Mittel 24,7, drei von fuenf Stroemen ueber 25) und rho 0,823 (echt) bzw. 0,837 (Ersatzkarte): im Spiel zaehlt die Mischung, ein Drittel der Rennen sind Hatz -- die Entscheidung ueber das Einzelformat steht bei Chris. rho der Mischung und der drei Formate schuetzt die Nacht-CI (zusatzmessungen in rangtreue-basislinie.json)."
   },
   "climbing": {
    "chassis": "bahn",

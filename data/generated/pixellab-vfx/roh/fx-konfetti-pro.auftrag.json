@@ -1,0 +1,23 @@
+{
+ "prompt": "A confetti burst for a pixel art sports game, plays once, about 1.4 seconds. About 30 tiny rectangular paper pieces shoot up and outward from the bottom centre, tumble and flicker between wide and thin as they spin, then drift down and fade. Colours: only white and light grey, so the game can tint them in team colours. Transparent background, crisp pixels, about 96 pixels across, no text.",
+ "artist": "pro",
+ "job": "575d71dd-c833-4dc8-b637-9130570ced8f",
+ "effect_id": "6bfaf81c-7fcb-4d34-98ae-d778fa72282e",
+ "quoted": 6,
+ "generationen_abgerechnet": null,
+ "canvas": {
+  "h": 78,
+  "w": 100
+ },
+ "frames": 28,
+ "fps": 20,
+ "loop": false,
+ "anchor": {
+  "x": 55,
+  "y": 49,
+  "kind": "origin"
+ },
+ "message": "Made a 1.4-second, one-shot burst of 30 tiny tumbling paper rectangles in white and light grey, ready for team-colour tinting. It spreads roughly 96 pixels across on a transparent background, with sliders for piece count, spread, and burst height.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=6bfaf81c-7fcb-4d34-98ae-d778fa72282e",
+ "hinweis": "Kontodifferenz unzuverlaessig (parallele Sitzungen); angesetzt 6"
+}

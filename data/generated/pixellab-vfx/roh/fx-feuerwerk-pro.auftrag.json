@@ -1,0 +1,22 @@
+{
+ "prompt": "A single firework burst for a pixel art sports game, plays once, about 1.2 seconds. A bright white flash, then about 24 spark streaks fly outward in a full circle, droop slightly, and fade with small trailing sparks. Colours: only white to light grey, so the game can tint it in team colours. Transparent background, crisp pixels, about 96 pixels across, centred, no text.",
+ "artist": "pro",
+ "job": "9d8801f2-4a76-4478-aeab-c4e24f251c3a",
+ "effect_id": "9b789031-237d-420a-83ee-08018b9084e9",
+ "quoted": 6,
+ "generationen_abgerechnet": 6.0,
+ "canvas": {
+  "h": 96,
+  "w": 96
+ },
+ "frames": 24,
+ "fps": 20,
+ "loop": false,
+ "anchor": {
+  "x": 48,
+  "y": 48,
+  "kind": "origin"
+ },
+ "message": "Made a 1.2-second, one-shot burst on a transparent 96×96 canvas: a white flash, 24 outward spark streaks, slight droop, and tiny trailing sparks. Only white and light greys are used for team-colour tinting; sliders adjust streak count, droop, and trails.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=9b789031-237d-420a-83ee-08018b9084e9"
+}

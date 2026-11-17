@@ -147,7 +147,7 @@ describe("Arena · PixelLab-Figuren · Angriff-Sperrframes (Backlog #52)", () =>
  * Canvas-Figur.
  */
 describe("Arena · Schiedsrichter als PixelLab-Figur", () => {
-  it("__schiri steht in der Motor-Tabelle unter seinem Slug, mit Grundposen und Pfiff Sued/Ost", () => {
+  it("__schiri steht in der Motor-Tabelle unter seinem Slug, mit Grundposen, Pfiff und Laufzyklus Sued/Ost/Nord", () => {
     const { index, spieler } = leseArenaFigurenEingaben();
     const tabelle = baueArenaFigurenTabelle(index, spieler) as Record<
       string,
@@ -155,7 +155,8 @@ describe("Arena · Schiedsrichter als PixelLab-Figur", () => {
     >;
     expect(tabelle.__schiri?.s).toBe("__schiri");
     expect(new Set(tabelle.__schiri!.r)).toEqual(new Set(["south", "east", "west", "north"]));
-    expect(Object.keys(tabelle.__schiri!.a.pfiff ?? {}).sort()).toEqual(["east", "south"]);
+    expect(Object.keys(tabelle.__schiri!.a.pfiff ?? {}).sort()).toEqual(["east", "north", "south"]);
+    expect(Object.keys(tabelle.__schiri!.a.walk ?? {}).sort()).toEqual(["east", "north", "south"]);
     expect((spieler as { name: string }[]).some((p) => p.name.startsWith("__"))).toBe(false);
   });
 

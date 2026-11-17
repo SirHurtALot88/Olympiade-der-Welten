@@ -1,5 +1,30 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Vierunddreißigster Nachtrag 17.11. — Spurt: Kontakt scharf (Rempeln/Schubsen/Verhaken mit Persönlichkeit).**
+Chris am 17.11., wörtlich: „schubsen tacklen etc bitte auch einbauen, das kann ja die rho noch mal
+verändern und sollte drin sein fürs messen". Der Engine-Standard ist jetzt `BAHN_ART.spurt.kontakt =
+{stufe:3}` (Kontakt-Stufen 1–3, Dosis 1; `docs/design/kontakt-persoenlichkeit-16-11.md` 6.5 und
+Abschnitt 11). Wirkt nur im **klassischen** Spurt; Hatz und HYROX haben keinen Rempler-Block und
+bleiben bit-gleich, Takeshi bleibt ausgenommen. Alle Messwerkzeuge messen den Spurt seither **mit**
+Kontakt; „aus" ist `--kontakt-json={"spurt":null}`.
+
+| Spurt (Kaderfamilie live-save) | ohne Kontakt | Kontakt scharf |
+|---|---:|---:|
+| rho je Spiel, echt, n=96 (Spannweite) | 0,887 (0,069) | **0,890** (0,055) |
+| rho Saison, echt | 0,930 | 0,930 |
+| rho je Spiel, Ersatzkarte, n=96 | 0,883 | 0,887 |
+| Pp, echt, n=48, zwei Ströme | 12,9 / 6,5 | **8,5 / 9,9** |
+| Star auf Rang 1, echt / Ersatz | 78,3 / 81,9 % | 82,5 / 80,2 % |
+| Star in den ersten zwei, echt / Ersatz | 93,3 / 93,3 % | 94,4 / 94,0 % |
+| Paartreue ≥ 15 Punkte, echt / Ersatz | 98,9 / 98,8 % | 99,0 / 99,0 % |
+| Spurt-Mischung je Spiel, n=96 (klassisch / Hatz / HYROX) | 0,876 (0,887 / 0,824 / 0,892) | 0,880 (0,890 / 0,824 / 0,892) |
+| Spurt-Mischung Pp, n=48, zwei Ströme | 16,5 / 21,5 | 17,7 / 22,0 |
+
+Alle Abnahmekriterien bestehen (Einzelheiten, Neutralität der Persönlichkeit und Kontakte je Rennen:
+Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert. Wertungs-
+Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
+`spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
+
 **Dreiunddreißigster Nachtrag 17.11. — rho-Mindestschranke von 0,80 auf 0,75 gesenkt.**
 Chris am 17.11., wörtlich: „Rangtreue auf 0,75 als min legen". Die harte Untergrenze für rho je
 Spiel (kaderfest, EIN Spiel), ab der ein Wächter oder Test rot wird, liegt jetzt bei **0,75**. Über

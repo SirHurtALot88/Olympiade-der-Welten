@@ -1,0 +1,22 @@
+{
+ "prompt": "A spray of ice shavings from a skate blade stopping on ice, pixel art, plays once, about 0.5 seconds. Tiny white and pale blue ice flecks fly sideways and up from the centre, falling and fading. Colours: white, pale ice blue. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "da3e8518-1ccd-469b-8dfe-1a513496fad5",
+ "effect_id": "78eb27f9-7990-4e2f-8dc5-c29a400a598f",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "canvas": {
+  "h": 32,
+  "w": 32
+ },
+ "frames": 8,
+ "fps": 16,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 16,
+  "kind": "origin"
+ },
+ "message": "A 0.5-second, one-shot spray of white and pale-blue ice flecks and short shavings bursting from the centre, flying up and sideways, then falling and fading on a 32×32 transparent canvas. It's tuned to stay inside the frame; the speed, gravity and spread sliders on the page control how far and how high the spray throws.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=78eb27f9-7990-4e2f-8dc5-c29a400a598f"
+}

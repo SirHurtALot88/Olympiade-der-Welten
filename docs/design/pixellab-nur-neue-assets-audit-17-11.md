@@ -85,7 +85,7 @@ Docstring in `baue-szenen-varianten.py`. Job-IDs je Bild gibt es dafür nicht (R
 | Tennis | court | **riviera, dach** | `baue-szenen-varianten-2.py` |
 | Fechten | piste | **schlosshof** | `baue-szenen-schauplaetze.py` |
 | Staffel | arena | — | — |
-| Spurt | kurs ist ein Mischfall, s. u.; hyrox-Halle (`hyrox_halle.jpg` aus `szenen/spurt/hyrox.jpg`) | — | — |
+| Spurt | kurs ist ein Mischfall, s. u.; hyrox-Arena (`hyrox_arena.jpg`, PixelLab, #1550; die alte `hyrox_halle.jpg` aus `szenen/spurt/hyrox.jpg` ist entfernt) | — | — |
 | Takeshi's Castle | keine Kulisse: Route aus PixelLab-Bodenkacheln und -Requisiten | (`szenen/takeshis-castle/eisfestung`, `dschungel` sind prozedural, im Spiel aber nicht gezeigt) | — |
 | Zeitfahren | alle 11 Karten (Parallax-Ebenen der Asset-Runde) | — | — |
 | Climbing | wand | **fels, eis** | `baue-szenen-varianten-2.py` |

@@ -12,7 +12,12 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (16.11., zweimal gelaufen, identisch): `GESAMT e80babacb68c (75 Eintraege)`. Davor,
+// GESAMT-STAND (17.11.): `GESAMT 7c9257b4435c (75 Eintraege)` -- Kontakt im klassischen Spurt SCHARF
+// (BAHN_ART.spurt.kontakt={stufe:3}, docs/design/kontakt-persoenlichkeit-16-11.md 6.5). Gegen den Stand davor
+// bewegen sich NUR `spiele spurt 1` (d22c9e6244c2 -> 870e28b88ab3) und `spiele spurt 7` (3ee976267e5a ->
+// 3732ee6cd899); `spiele spurt 42`, Hatz, HYROX, Takeshi und alle anderen 71 Zeilen sind gleich. Rueckweg:
+// --kontakt-aus (alle Kontakt-Flags null) ergibt wieder `e80babacb68c`.
+// VORHERIGER STAND (16.11., zweimal gelaufen, identisch): `GESAMT e80babacb68c (75 Eintraege)`. Davor,
 // ohne die sechs Spurt-Zusatzformat-Eintraege: `GESAMT 0057e683fc3f (69 Eintraege)` -- die ersten 69
 // Zeilen sind unveraendert, der alte Wert bleibt also als Praefix-Beleg pruefbar (die ersten 69
 // Zeilen der Ausgabe diffen). Eine Motor-/Rezept-Aenderung, die diesen Wert absichtlich bewegt, nennt
@@ -33,6 +38,10 @@
 // Zaehler eines Spurt- und eines Takeshi-Rennens aus. In Schritt 0 hat das Flag keine Wirkung: GESAMT
 // muss dem Lauf ohne Schalter gleichen. --kontakt-zwang=<typ> zwingt die Kontakt-Schicht auf einen
 // Persoenlichkeitstyp (Kontrafaktik); das bewegt gewollt die Bahnen mit Rempler (Spurt, Takeshi).
+// Seit 17.11. ist Spurt klassisch SCHARF (Engine-Standard spurt:{stufe:3}); --kontakt-flag setzt {stufe:0}
+// deshalb nur fuer Disziplinen OHNE gesetztes Flag und laesst Spurt scharf.
+// --kontakt-aus (17.11.): schaltet alle Kontakt-Flags ab (window.__arena.kontaktFlags({<d>:null})) -- der
+// Rueckweg-Beleg: damit muss GESAMT wieder dem Stand vor dem Scharfschalten gleichen (e80babacb68c).
 import { chromium } from "playwright";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -48,6 +57,7 @@ const DISZIPLINEN = ["tdm", "mini-dm", "battlefield", "basketball", "football", 
 const SAATEN = [1, 7, 42];
 const KULISSEN_EFFEKT = process.argv.slice(2).find((a) => a.startsWith("--kulissen-effekt="))?.split("=")[1] ?? null;
 const KONTAKT_FLAG = process.argv.slice(2).includes("--kontakt-flag");
+const KONTAKT_AUS = process.argv.slice(2).includes("--kontakt-aus");
 const KONTAKT_ZWANG = process.argv.slice(2).find((a) => a.startsWith("--kontakt-zwang="))?.split("=")[1] ?? null;
 if (KONTAKT_ZWANG !== null && !["draufgaenger", "opportunist", "duellant", "schleicher", "beschuetzer", "bollwerk"].includes(KONTAKT_ZWANG)) {
   // Tippfehler (z. B. "Bollwerk") wuerden sonst lautlos als "Zwang ohne Wirkung" durchlaufen.
@@ -73,10 +83,14 @@ try {
   await seite.addInitScript(() => { window.AudioContext = undefined; });
   await seite.goto(SEITE);
   await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
-  const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_ZWANG }) => {
+  const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG }) => {
     const A = window.__arena;
     if (KULISSEN_EFFEKT) A.kulissePin(KULISSEN_EFFEKT);
-    if (KONTAKT_FLAG) A.kontaktFlags(Object.fromEntries(DISZIPLINEN.map((d) => [d, { stufe: 0 }])));
+    if (KONTAKT_AUS) A.kontaktFlags(Object.fromEntries(DISZIPLINEN.map((d) => [d, null])));
+    if (KONTAKT_FLAG) {
+      const schonGesetzt = A.kontaktFlags();
+      A.kontaktFlags(Object.fromEntries(DISZIPLINEN.filter((d) => !schonGesetzt[d]).map((d) => [d, { stufe: 0 }])));
+    }
     if (KONTAKT_ZWANG) A.kontaktPersZwang(KONTAKT_ZWANG);
     const aus = [];
     const probe = (name, f) => { try { aus.push([name, f()]); } catch (e) { aus.push([name, "FEHLER " + String(e)]); } };
@@ -96,7 +110,7 @@ try {
       zaehler: ["spurt", "takeshis-castle"].map((d) => { A.spiele(d, 7); return [d, A.kontaktZaehler()]; }),
     } : null;
     return { aus, kontakt };
-  }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_ZWANG });
+  }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
