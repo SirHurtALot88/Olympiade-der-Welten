@@ -8029,6 +8029,189 @@
     beschuetzer:{h:"defensiv",z:"eng",b:"ausgewogen"},
     opportunist:{h:"ausgewogen",z:"locker",b:"opportun"}
   };
+  // ===================================================================================
+  // KONTAKT-REGLER, SCHRITT 0 (16.11., docs/design/kontakt-persoenlichkeit-16-11.md,
+  // Abschnitte 2, 3.5, 6.5, 10). Chris: Schubsen/Wegdraengen/Haengenbleiben sind normale
+  // Aktionen mit Stats, von der Persoenlichkeit getrieben. Schritt 0 baut NUR die Schicht
+  // darunter -- BIT-IDENTISCH zum heutigen Spiel (GESAMT e80babacb68c):
+  //   - kontaktProfil(p): vier Regler 5..95 (Kontaktbereitschaft kb, Haerte ha, Disziplin di,
+  //     Ausweichneigung aw) plus Auswahlschwelle pMin, aus der Persoenlichkeit (leitePers(),
+  //     sechs Typen) und den echten Traits (p.tp/p.tn, Namen aus CANONICAL_*_TRAITS).
+  //     Persoenlichkeit bestimmt die VERTEILUNG, nicht die Bilanz: kein Regler geht in eig,
+  //     ein Rezept oder einen Sub-Skill.
+  //   - Flag-Geruest: BAHN_ART/FELDSPIEL_ART/ARENA_ART/BUEHNE_ART[d].kontakt, Standard null,
+  //     NICHT aufzaehlbar (sonst taucht der Schluessel ueber eine Rohreferenz im Fingerabdruck
+  //     auf). Gesetzt nur ueber window.__arena.kontaktFlags({<disziplin>:{...}}) bzw.
+  //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Chromium-Headless-Laeufe,
+  //     window.__olyKontaktFlags vor dem Laden (der Node-Runner reicht sie noch NICHT durch, s. arena-node-motor.mjs). Die echte App setzt nichts davon.
+  //     In Schritt 0 hat ein gesetztes Flag KEINE Wirkung auf das Spiel: es schaltet nur die
+  //     Schatten-Buchhaltung (Profil je Laeufer, Schatten-Zaehler, Ziehung aus dem eigenen
+  //     Strom) ein -- der Nachweis, dass die Schicht im Sim-Pfad laeuft, ohne rr() anzufassen.
+  //   - Eigener Zufallsstrom kontaktRr(): mulberry32, je bau*()-Aufruf aus der Spiel-Saat
+  //     (eigener Versatz) neu gesaet, zieht NIE aus rr() (Muster kickoffRr, Abschnitt 3.5).
+  //   - Zaehler in einer WeakMap je Einheit (keine Felder an Laeufer/Spieler: neue Felder
+  //     verschieben den Fingerabdruck). Lesbar ueber window.__arena.kontaktZaehler().
+  //   - Kontrafaktik "alle ein Typ" (Abnahme-Kriterium N, Abschnitt 6.3): window.__arena.
+  //     kontaktPersZwang("bollwerk"|{typ,traits}|null). Wirkt NUR auf die Kontakt-Schicht
+  //     (Profil und die Rempel-Haeufigkeit in willTackeln), nicht auf persOf/Kampf/Befehle.
+  //     Standard null; kein echtes Spiel ruft das auf.
+  // NICHT in Schritt 0: keine Kosten, keine neue Wirkung, keine Posen (Stufen 1-4, Abschnitt 6.4).
+  // ===================================================================================
+  // Basis je Persoenlichkeit (Abschnitt 2.2). kb ist Zeichen fuer Zeichen die alte
+  // willTackeln-Tabelle mal 100 (90/100===0.9 usw., in Node nachgeprueft); `beschuetzer` stand
+  // dort nicht und fiel auf `?? 0.5` zurueck -- hier ausdruecklich 50. Der dort gefuehrte Typ
+  // `taktiker` existiert nicht (leitePers() kennt ihn nicht, u.pers ist immer persOf[..] oder
+  // "duellant") und entfaellt ohne Verhaltensaenderung.
+  const KONTAKT_BASIS={
+    draufgaenger:{kb:90,ha:85,di:30,aw:20,neigung:null},
+    opportunist:{kb:70,ha:45,di:40,aw:65,neigung:"angeschlagene"},
+    duellant:{kb:55,ha:60,di:60,aw:40,neigung:"staerkster"},
+    schleicher:{kb:50,ha:35,di:55,aw:90,neigung:"vonHinten"},
+    beschuetzer:{kb:50,ha:55,di:70,aw:30,neigung:"schutz"},
+    bollwerk:{kb:25,ha:60,di:75,aw:15,neigung:"dagegenhalten"}
+  };
+  // pMin (ab welcher geschaetzten Erfolgsaussicht er zulangt) haengt an der vorhandenen
+  // Haltung PERSDEF.h -- dieselbe Stelle, an der spaeter die Strategie-Vorlagen ansetzen
+  // (Abschnitt 7). "offensiv" hat heute keinen Typ; 0,375 ist die Mitte zwischen den Nachbarn.
+  const KONTAKT_PMIN_JE_HALTUNG={defensiv:0.60,vorsichtig:0.55,ausgewogen:0.45,offensiv:0.375,wild:0.30};
+  // Trait-Verschiebungen (Abschnitt 2.3), additiv, je Regler auf +-30 gedeckelt, dann 5..95.
+  // Nur Namen, die es in lib/training/class-progression-config.ts wirklich gibt.
+  const KONTAKT_TRAIT={
+    Fearless:{kb:10,aw:-15}, FiredUp:{kb:10,ha:10,di:-5}, Feisty:{kb:10,di:-15,revanche:true},
+    Vindictive:{ha:5,di:-10,revanche:true}, Cruel:{ha:15,di:-10}, Renegade:{ha:5,di:-20},
+    Cheater:{di:-25}, Gambler:{ha:10,pMin:-0.10}, ColdBlooded:{ha:10,di:10,keineRevanche:true},
+    Egomaniac:{di:-5,keinSchutz:true}, Diva:{kb:-5,aw:10}, Disciplined:{di:25},
+    Fair:{ha:-10,di:20}, Cool:{di:10,aw:10}, Resourceful:{aw:10}, Paranoid:{aw:15},
+    Relaxed:{kb:-10}, Lazy:{kb:-10}, Timid:{kb:-20,aw:20}, FaintHearted:{kb:-15,aw:15},
+    Loyal:{schutz:true}, Caring:{schutz:true}, Altruistic:{schutz:true}, Obsessive:{haftet:true}
+  };
+  const KONTAKT_REGLER=["kb","ha","di","aw"];
+  const kontaktKlemme=(v)=>Math.max(5,Math.min(95,v));
+  const kontaktHat=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  // Kontrafaktik-Zustand (s. Kopfkommentar). null = echte Persoenlichkeiten.
+  let kontaktZwang=null;
+  // Reine Funktion: dasselbe p (und derselbe Zwang) gibt immer dasselbe Profil. persKey
+  // optional (sonst leitePers(p).key); Optionen {traits:false} rechnet nur die Basis.
+  // Ist der Zwang gesetzt, gilt SEIN Typ fuer alle, und Traits nur bei {traits:true}.
+  function kontaktProfil(p,persKey,opt){
+    p=p||{};
+    let key=kontaktZwang?kontaktZwang.typ:(persKey||leitePers(p).key);
+    if(!kontaktHat(KONTAKT_BASIS,key))key="duellant";
+    const mitTraits=kontaktZwang?kontaktZwang.traits:!(opt&&opt.traits===false);
+    const B=KONTAKT_BASIS[key], d={kb:0,ha:0,di:0,aw:0}, warum=[];
+    let pMinD=0, revanche=false, keineRevanche=false, schutz=key==="beschuetzer", keinSchutz=false, haftet=false;
+    if(mitTraits){
+      // Doppelte Eintraege zaehlen einmal; die Summe ist reihenfolgeunabhaengig.
+      const traits=[...new Set([...(p.tp||[]),...(p.tn||[])])];
+      for(const t of traits){
+        if(!kontaktHat(KONTAKT_TRAIT,t))continue;
+        const T=KONTAKT_TRAIT[t];
+        for(const r of KONTAKT_REGLER)if(T[r])d[r]+=T[r];
+        if(T.pMin)pMinD+=T.pMin;
+        if(T.revanche)revanche=true;
+        if(T.keineRevanche)keineRevanche=true;
+        if(T.schutz)schutz=true;
+        if(T.keinSchutz)keinSchutz=true;
+        if(T.haftet)haftet=true;
+        warum.push(t);
+      }
+    }
+    const o={pers:key};
+    for(const r of KONTAKT_REGLER)o[r]=kontaktKlemme(B[r]+Math.max(-30,Math.min(30,d[r])));
+    const h=(PERSDEF[key]||{}).h;
+    o.pMin=+Math.max(0.05,Math.min(0.95,(KONTAKT_PMIN_JE_HALTUNG[h]??0.45)+pMinD)).toFixed(3);
+    o.neigung=B.neigung;
+    o.revanche=revanche&&!keineRevanche;
+    o.schutz=schutz&&!keinSchutz;
+    o.haftet=haftet;
+    o.warum=warum;
+    return o;
+  }
+  // Heutige Rempel-Neigung der Bahn (Spurt/Takeshi, `willTackeln` in stepSpurt): NUR die
+  // Basis-kb der Persoenlichkeit, ohne Traits -- Traits sind Stufe 3. Ohne Zwang ist das
+  // fuer jedes u.pers derselbe Wert wie die alte Tabelle (Rueckfall 0,5 wie `?? 0.5`).
+  function kontaktBereitschaftBahn(u){
+    const key=(kontaktZwang&&kontaktZwang.typ)||u.pers;
+    return kontaktHat(KONTAKT_BASIS,key)?KONTAKT_BASIS[key].kb/100:0.5;
+  }
+  // Tooltip-Text "Tendenzen" (Abschnitt 2.4): Worte statt Zahlen, nur Anzeige.
+  function kontaktTendenzText(pr){
+    const teile=[];
+    teile.push(pr.kb>=70?"sucht den Zweikampf":pr.kb>=45?"nimmt Zweikämpfe mit, wenn sie kommen":"meidet Zweikämpfe");
+    if(pr.pMin<=0.35)teile.push("auch bei schlechter Aussicht");
+    else if(pr.pMin>=0.55)teile.push("nur wenn es sitzt");
+    if(pr.ha>=70)teile.push("geht voll rein");else if(pr.ha<=40)teile.push("bleibt kontrolliert");
+    if(pr.di<=35)teile.push("riskiert Fouls");else if(pr.di>=70)teile.push("bleibt sauber");
+    if(pr.aw>=65)teile.push("weicht als Ziel lieber aus");else if(pr.aw<=30)teile.push("hält als Ziel dagegen");
+    if(pr.schutz)teile.push("springt für Mitspieler ein");
+    if(pr.revanche)teile.push("sinnt auf Revanche");
+    const s=teile.join(", ");
+    return "Tendenzen im Zweikampf: "+s.charAt(0).toUpperCase()+s.slice(1)+
+      ". Das ist die Grundtendenz der Persönlichkeit; sie wirkt bisher nur als Rempel-Häufigkeit in Spurt und Takeshi's Castle, Eigenschaften verschieben sie später.";
+  }
+  // EIGENER ZUFALLSSTROM (Abschnitt 3.5). mulberry32 statt der rr()-LCG mit Versatz: eine
+  // andere Startzahl derselben Vollperioden-LCG laege auf demselben Zyklus wie rr().
+  let kontaktSeed=0x6b6f6e74;
+  const kontaktRr=()=>{
+    kontaktSeed=(kontaktSeed+0x6D2B79F5)>>>0;
+    let z=kontaktSeed;
+    z=Math.imul(z^(z>>>15),z|1);
+    z^=z+Math.imul(z^(z>>>7),z|61);
+    return ((z^(z>>>14))>>>0)/4294967296;
+  };
+  // Aus bauSpurt/bauFeldspiel/bauBuehne/build gerufen, direkt neben `seed=normalisiereSaat(..)`.
+  // Liest die Saat, zieht nichts aus rr().
+  function kontaktStromSaeen(saat){ kontaktSeed=(normalisiereSaat(saat)^0x4b4f4e54)>>>0; }
+  // ZAEHLER je Einheit (Laeufer/Spieler-Objekt des laufenden Spiels). WeakMap statt Feld:
+  // nichts davon wird aufzaehlbar, nichts landet im Ergebnis oder in wert().
+  const kontaktZaehlerMap=new WeakMap();
+  // Spieler-Rohdaten (p mit tp/tn) je Einheit, fuer das Profil bei gesetztem Flag. Derselbe
+  // Uebergabeweg wie u.pers (bauSpurt liest persOf[p.n] aus demselben p), nur ohne Feld.
+  const kontaktSpielerMap=new WeakMap();
+  // Die Laeufer des zuletzt GEBAUTEN Rennens: spieleDisziplin() stellt LAEUFER nach der Messung
+  // zurueck (M.sichern()), die Zaehler sollen aber das gerechnete Rennen zeigen.
+  let kontaktLetzteBahn=[];
+  function kontaktZaehle(einheit,art){
+    if(!einheit||typeof einheit!=="object")return;
+    let z=kontaktZaehlerMap.get(einheit);
+    if(!z){ z={}; kontaktZaehlerMap.set(einheit,z); }
+    z[art]=(z[art]||0)+1;
+  }
+  const kontaktZaehlerVon=(einheit)=>({...(kontaktZaehlerMap.get(einheit)||{})});
+  function kontaktProfilEinheit(einheit){
+    const p=kontaktSpielerMap.get(einheit)||{};
+    return kontaktProfil(p,einheit.pers||persOf[p.n]||null);
+  }
+  // FLAG-GERUEST: `kontakt` je Disziplin, Standard null, nicht aufzaehlbar.
+  function kontaktFlagFeld(tab){
+    for(const d of Object.keys(tab))
+      if(tab[d]&&typeof tab[d]==="object"&&!kontaktHat(tab[d],"kontakt"))
+        Object.defineProperty(tab[d],"kontakt",{value:null,writable:true,enumerable:false,configurable:true});
+  }
+  // Setzt/liest die Flags ueber alle vier Chassis. {spurt:{stufe:0}} schaltet ein, {spurt:null}
+  // aus; unbekannte Disziplinen und Nicht-Objekte werden ignoriert. `nurIn` begrenzt auf eine
+  // Tabelle (bahnFlags/buehneFlags). Ohne Argument nur lesen.
+  function kontaktFlagsSetzen(neu,nurIn){
+    const tabellen=nurIn?[nurIn]:[ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART];
+    if(neu&&typeof neu==="object")
+      for(const d of Object.keys(neu))
+        for(const tab of tabellen){
+          if(!kontaktHat(tab,d))continue;
+          const w=neu[d];
+          if(w===null||w===false)tab[d].kontakt=null;
+          else if(w&&typeof w==="object"&&!Array.isArray(w))tab[d].kontakt=Object.freeze({...w});
+        }
+    const aus={};
+    for(const tab of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])
+      for(const d of Object.keys(tab))if(tab[d]&&tab[d].kontakt)aus[d]={...tab[d].kontakt};
+    return aus;
+  }
+  function kontaktZwangSetzen(neu){
+    if(neu===null||neu===undefined||neu===false||neu==="")kontaktZwang=null;
+    else if(typeof neu==="string"&&kontaktHat(KONTAKT_BASIS,neu))kontaktZwang={typ:neu,traits:false};
+    else if(neu&&typeof neu==="object"&&kontaktHat(KONTAKT_BASIS,neu.typ))kontaktZwang={typ:neu.typ,traits:!!neu.traits};
+    return kontaktZwang?{...kontaktZwang}:null;
+  }
     const clamp=(v)=>Math.max(0,Math.min(100,Math.round(v)));
   // "natürlich" heisst: die Persoenlichkeit entscheidet. Genau der Kniff aus dem Vorbild —
   // man stellt nur ein, was einen wirklich stoert, der Rest bleibt Charakter.
@@ -11253,7 +11436,7 @@
     rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
-    seed=normalisiereSaat(saat);
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat);
     // Eigener Kickoff-Saatstrom, fester Versatz auf denselben Spiel-Seed (s. Kommentar bei
     // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
     kickoffSeed=(normalisiereSaat(saat)+777777)>>>0;
@@ -20690,7 +20873,7 @@
   // Variante des zuletzt gebauten Buehnen-Spiels (null ohne Kulissen-Profil) -- reine Anzeige.
   let buehneKulisseId=null;
   function bauBuehne(saat){
-    seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
     // W-F2 ("Menue des Spieltags", Fable-Ideen Buehne-Auftritt Paket 3 (01.10.), Klasse A):
     // EIN Gericht pro Spiel, aus der ROHEN, NOCH UNVERBRAUCHTEN Saat gehasht -- bewusst
@@ -29643,12 +29826,26 @@
   // x=0,045/0,955 lagen schon VOR dem Split ganz am linken/rechten Bildrand -- nach dem
   // Split ist das automatisch der Aussenrand GENAU der eigenen Haelfte (Heim-Fundorte
   // 4-46 %, Gast-Fundorte 54-96 %, s. ispyFundortXY()), ohne dass diese Funktion selbst
-  // etwas anders rechnen muesste. Keine Aenderung noetig, nur der Beleg dafuer.
+  // etwas anders rechnen muesste. EINE HALLE (16.11.): der Split ist zurueckgenommen; x bleibt
+  // die eigene Aussenwand der Halle, die Hoehe ist auf H*0,24..0,70 gestaucht, damit die
+  // Namensschilder der Wartenden nicht ins Zugtabellen-Band unten ragen.
   function ispyHeimatXY(u){
     const seite=TEILNEHMER.filter(x=>x.side===u.side);
     const i=Math.max(0,seite.indexOf(u));
     const n=Math.max(1,seite.length-1);
-    return {x:u.side===0?W*0.045:W*0.955, y:H*0.20+(H*0.60)*(seite.length>1?i/n:0.5)};
+    return {x:u.side===0?W*0.045:W*0.955, y:H*0.24+(H*0.46)*(seite.length>1?i/n:0.5)};
+  }
+  // ZYKLUS STATT ENTHUELLUNGSTAKT (Darstellungsrunde 16.11., Chris: "sichtbare Wege",
+  // "Verweilen mit Fortschrittsbalken"): stepBuehne() enthuellt EINEN Teilnehmer je
+  // `rundenDauer` (60/384 s), reihum ueber alle Teilnehmer (buehneQueue, s. bauBuehne()). Die
+  // Phasenuhr unten lief bisher gegen `rundenDauer` selbst -- Gehen, Suchen und Ergebnis waren
+  // nach 0,16 s durch, der Lauf dauerte 0,05 s (sah aus wie Teleport), danach stand jeder
+  // ~1,7 s im Ergebnis. Jetzt laeuft die Bilduhr ueber die Zeit bis zur NAECHSTEN eigenen
+  // Enthuellung (rundenDauer x Teilnehmerzahl), mit 8 % Puffer, damit das Ergebnis vor dem
+  // naechsten Lauf noch sichtbar steht. Reine Anzeige: dieselben viz*-Felder wie bisher, kein
+  // rr(), Enthuellungsreihenfolge und u.summe unberuehrt.
+  function ispyVizZyklus(art){
+    return art.rundenDauer*Math.max(1,TEILNEHMER.length)*0.92;
   }
   function stepSchatzsuche(dt,art){
     if(!TEILNEHMER.length)return;
@@ -29669,10 +29866,9 @@
           // bodenSchatzsuche() diesem Spiel schon zeichnet. r.fundort bleibt der
           // MECHANISCHE Fundort-Index (ispySeiteTick()), unveraendert.
           const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[r.fundort])||art.fundorte[r.fundort];
-          // SPLIT-SCREEN (I1): `u.side` waehlt die eigene Haelfte -- der Laeufer zielt auf
-          // seine EIGENE Truhe im EIGENEN Raum (s. ispyFundortXY()-Kommentar), nie auf die
-          // des Gegners.
-          const ziel=ispyFundortXY(vis,u.side);
+          // EINE HALLE: `u.side` waehlt das eigene Fach des Doppelmoebels (ispyStandXY) -- der Laeufer zielt auf
+          // seine EIGENE Truhe (s. ispyFundortXY()-Kommentar), nie auf die des Gegners.
+          const ziel=ispyStandXY(vis,u.side);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
           // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
@@ -29721,7 +29917,8 @@
     // enthuellter Teilnehmer im SELBEN Frame schon eine (winzige) Fortschrittszahl bekommt
     // statt einen Frame lang bei 0 zu haengen — dieselbe Reihenfolge wie
     // stepFechten()/stepTennis().
-    const T=art.rundenDauer;
+    const T=ispyVizZyklus(art);
+    const klickTakt=ISPY_TON_SCHLOSS_INTERVALL*(art.rundenDauer>0?T/art.rundenDauer:1);
     for(const u of TEILNEHMER){
       u.vizIspyT=(u.vizIspyT||0)+dt;
       const anteil=T>0?Math.min(1,u.vizIspyT/T):1;
@@ -29739,7 +29936,7 @@
           // dasselbe Zaehler-Vergleichsmuster wie TON_KATALOG.climbing.griff/-.zug
           // (u.vizGriffN/u.vizZugN, ":27759"/":27763") -- hier auf u.vizIspyT statt einem
           // Motorzustand, weil "suchen" selbst keinen zaehlbaren Fortschrittswert hat.
-          const klickN=Math.floor((u.vizIspyT-ISPY_VIZ_GEHEN_ANTEIL*T)/ISPY_TON_SCHLOSS_INTERVALL);
+          const klickN=Math.floor((u.vizIspyT-ISPY_VIZ_GEHEN_ANTEIL*T)/klickTakt);
           if(klickN>(u.vizIspySchlossN||0)){ u.vizIspySchlossN=klickN; sfx("i-spy","schloss"); }
         } else {
           u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
@@ -31104,9 +31301,32 @@
   // wie im Recherche-Dokument Abschnitt 4/I1 vorgeschlagen) -- die Luecke bei 46-54 % ist
   // der Trennsteg (s. bodenSchatzsuche()). REIN GEOMETRISCH: `f`/`art.fundorte` selbst
   // bleiben unangetastet, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
-  function ispyFundortXY(f,side){
-    const xBasis=side===1?W*0.54:W*0.04;
-    return {x:xBasis+f.x*(W*0.42), y:H*0.18+f.y*(H*0.66)};
+  //
+  // EINE GROSSE ARENA (Darstellungsrunde 16.11., Chris: "eine grosse Arena statt mehrerer
+  // getrennter Bereiche"; Weg A aus docs/design/fable-kontakt-interaktionen-16-11.md 4.2 und
+  // i-spy-offener-raum-konzept-14-10.md Abschnitt 6, "28e"): der Split-Screen ist zurueckgenommen.
+  // Jeder Fundort steht EINMAL in einer durchgehenden Halle, ueber die volle Breite verteilt, und
+  // wird als DOPPELMOEBEL gezeichnet (links das Fach der Heimseite, rechts das der Gastseite, je in
+  // Teamfarbe, s. bodenSchatzsuche()) -- damit stimmt das Bild weiter mit der Mechanik ueberein:
+  // jede Seite bespielt ihre EIGENE Truhenkopie, zwei Gegner am selben Moebel arbeiten an
+  // verschiedenen Faechern. `side` wird deshalb hier nicht mehr gelesen; wo ein Laeufer steht,
+  // sagt ispyStandXY() (Fach seiner Seite). Mechanik unveraendert: weiterhin zwei getrennte
+  // Truhenkopien je Seite, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
+  // HOEHE: H*0,27..0,76 statt H*0,18..0,84 -- in der einen Halle steht ein Fundort auch in der
+  // Bildmitte, und dort haengt oben der Zug-Kasten des Bugs; unten muessen Namensschild,
+  // Punkte und Zugzaehler (bis Standplatz +66 px) ueber dem Zugtabellen-Band bleiben.
+  function ispyFundortXY(f){
+    return {x:W*0.06+f.x*(W*0.88), y:H*0.27+f.y*(H*0.49)};
+  }
+  // Seitlicher Abstand eines Fachs von der Moebelmitte und Standplatz des Laeufers daneben.
+  const ISPY_FACH_DX=12, ISPY_STAND_DX=31, ISPY_STAND_DY=-6;
+  // STANDPLATZ AM EIGENEN FACH: Heim steht links, Gast rechts neben dem Doppelmoebel. EINE Quelle
+  // fuer stepSchatzsuche() (Laufziel) und zeichneSchatzsuche() (Zielmarke). SCHUBSEN (spaeter, s.
+  // fable-kontakt-interaktionen-16-11.md 4.2 Baustein 4) haengt hier an: ein Rueckstoss waere ein
+  // reiner Zeichenversatz auf diesen Standplatz, kein neues Feld am Laeufer.
+  function ispyStandXY(f,side){
+    const p=ispyFundortXY(f);
+    return {x:p.x+(side===1?1:-1)*ISPY_STAND_DX, y:p.y+ISPY_STAND_DY};
   }
   // WELCHES MOEBELSTUECK AN WELCHEM FUNDORT: die beiden Tuer-Fundorte (`bild:"tuer"`, s.
   // BUEHNE_ART["i-spy"].fundorte-Kommentar "DIE TUER IST BILD") bekommen die Tuer; die
@@ -31125,8 +31345,9 @@
   // STERNE UEBER DEM FUNDORT (Konzept 5.1: "Stufe als Sterne ueber der Truhe (1-3), wie
   // Takeshis fallenStufe") — wortgleiches Glyphen-Muster wie zeichneTakeshiRoute()s
   // "★".repeat(st), kein Emoji, reiner Text-Glyph wie ueberall sonst im Motor.
-  function ispySterne(cx,cy,stufe){
-    setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
+  // `px` (Doppelmoebel, 16.11.): kleinere Schrift, damit zwei Sternreihen nebeneinander passen.
+  function ispySterne(cx,cy,stufe,px){
+    setzeFont(ctx,"700 "+(px||9)+"px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
   }
@@ -31298,7 +31519,7 @@
     const art=BB();
     // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): beide Raeume als
     // Draufsicht aus der PixelLab-Szene (Garten, Hof, Halle), ohne deren Demo-Truhen. Ersetzt Verlauf,
-    // Dielen, Buecherregale und Lichtinseln; Steg, Fuehrungssaum und Fundorte zeichnet der Motor weiter.
+    // Dielen, Buecherregale und Lichtinseln; Fuehrungs-Leuchten, Tauzieh-Marker und Fundorte zeichnet der Motor weiter.
     if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
     const g=ctx.createLinearGradient(0,0,0,H);
@@ -31334,20 +31555,18 @@
       ctx.fillStyle=s; ctx.beginPath(); ctx.arc(x,y,W*0.18,0,Math.PI*2); ctx.fill();
     });
 
-    // TRENNSTEG (I1, Split-Screen, Broadcast-Optik-Recherche 27.09., Abschnitt 3/I1):
-    // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
-    // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
-    // steht nie mit einem Fundort oder einer Figur in Konflikt.
     }
 
-    const stegX0=W*0.465, stegX1=W*0.535;
-    ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
-
-    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): "der
-    // Trennsteg zwischen den Raeumen ist der Tauzieh-Balken. Er verschiebt sich zur Seite
-    // des Fuehrenden ... Der Rahmen des fuehrenden Raums leuchtet dezent in Teamfarbe, beim
-    // Fuehrungswechsel kurz voll." Dieselbe Crossfade-Mechanik wie showcaseFuehrung()/
-    // bodenEis() (1,4 s Ueberblendung ab dem Wechsel).
+    // KEIN TRENNSTEG MEHR (Darstellungsrunde 16.11., "eine grosse Arena", s. ispyFundortXY()):
+    // der schwarze Steg bei W*0,465..0,535 und der Raumrahmen der fuehrenden Haelfte sind weg,
+    // die Kulisse ist eine durchgehende Halle (scripts/baue-kulisse-buehnen.py baue_ispy()).
+    //
+    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5), auf die eine
+    // Halle umgestellt: statt den Rahmen einer Raumhaelfte leuchtet jetzt die AUSSENWAND, an der
+    // die fuehrende Seite startet (Heim links, Gast rechts, s. ispyHeimatXY()) -- dezent, beim
+    // Fuehrungswechsel 1,4 s lang voll (dieselbe Ueberblendung wie showcaseFuehrung()/bodenEis()).
+    // Der Tauzieh-Marker sitzt als kurzer Balken oben in der Hallenmitte und wandert mit dem
+    // Vorsprung zur Seite des Fuehrenden. Reine Ablesung von u.summe (ispyFuehrung()).
     const fuehrung=ispyFuehrung();
     if(fuehrung){
       if(ispySaumSide!==fuehrung.side){ ispySaumSide=fuehrung.side; ispySaumSeit=buehneT; }
@@ -31355,97 +31574,117 @@
       const farbe=fuehrung.side===0?css("--home"):css("--away");
       const gesamt=fuehrung.heim+fuehrung.gast;
       const verhaeltnis=gesamt>0?Math.abs(fuehrung.heim-fuehrung.gast)/gesamt:0;
-      // TAUZIEH-MARKER: bleibt INNERHALB von stegX0..stegX1 (70% der halben Stegbreite als
-      // maximaler Ausschlag) -- greift damit nie in die Fundort-Haelften ein, deren
-      // Geometrie (ispyFundortXY()) fuer I1 bereits per Screenshot geprueft ist und hier
-      // nicht angefasst wird.
-      const mitteSteg=(stegX0+stegX1)/2, spanne=(stegX1-stegX0)/2*0.7;
-      const markerX=mitteSteg+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
-      ctx.strokeStyle=farbe; ctx.globalAlpha=0.55+0.45*voll; ctx.lineWidth=2+voll*2;
-      ctx.beginPath(); ctx.moveTo(markerX,0); ctx.lineTo(markerX,H); ctx.stroke();
+      const breite=14+voll*10, x0=fuehrung.side===0?0:W-breite;
+      const wand=ctx.createLinearGradient(fuehrung.side===0?0:W,0,fuehrung.side===0?breite:W-breite,0);
+      wand.addColorStop(0,farbe); wand.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.globalAlpha=0.30+0.45*voll; ctx.fillStyle=wand; ctx.fillRect(x0,0,breite,H);
+      // TAUZIEH-MARKER: Schiene W*0,44..0,56 knapp unter der Rueckwand, Knopf in Teamfarbe.
+      // Opus-Review #1533: unter dem Spiel-Anzeige-Band (hudBandUnten, PR #1526), sonst liegt der Knopf hinter dem Bug.
+      const schieneY=Math.max(H*0.115,hudBandUnten()+8), spanne=W*0.06;
+      const markerX=W*0.5+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
+      ctx.globalAlpha=0.55; ctx.fillStyle="rgba(8,6,4,.7)";
+      ctx.fillRect(W*0.5-spanne,schieneY-1.5,spanne*2,3);
+      ctx.globalAlpha=0.7+0.3*voll; ctx.fillStyle=farbe;
+      ctx.beginPath(); ctx.arc(markerX,schieneY,3.5+voll*1.5,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
-      // RAUMRAHMEN: die Haelfte des Fuehrenden bekommt einen duennen Rand in Teamfarbe --
-      // Chris' "ohne Stats sehen, wer fuehrt" (wortgleiches Muster wie der Showcase-
-      // Vorhangsaum/das Eis-Bandenlicht), dezent ausser kurz nach einem Wechsel.
-      const rahmenX0=fuehrung.side===0?4:stegX1+4, rahmenX1=fuehrung.side===0?stegX0-4:W-4;
-      ctx.strokeStyle=farbe; ctx.globalAlpha=0.16+0.34*voll; ctx.lineWidth=2+voll*2;
-      ctx.strokeRect(rahmenX0,4,Math.max(0,rahmenX1-rahmenX0),H-8);
-      ctx.globalAlpha=1;
-    } else {
-      // NEUTRAL, solange niemand gepunktet hat -- dieselbe goldene Mittellinie wie vor I5.
-      ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
     }
 
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
     // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), falls baueSchatzsuche() diesem Spiel schon eine Karte
     // zugewiesen hat — sonst (Sicht-QA vor dem ersten Tick) Fallback auf f.x/f.y selbst.
-    // ART/BILD (Moebelwahl) kommen UNVERAENDERT aus `f`.
     //
-    // JE SEITE EINMAL (I1): vorher EIN gemeinsam gezeichneter Raum fuer beide Teams (I0-
-    // Befund) -- jetzt exakt dieselben zwoelf Moebel zweimal, einmal in JEDER Haelfte
-    // (`ispyFundortXY(vis,seite)`), dieselbe Karte (ISPY_VISUELLES_LAYOUT ist EINMAL je
-    // Spiel gewuerfelt, nicht je Seite) fair fuer beide.
-    //
-    // TRUHENZUSTAND JE RAUM (I1, "der zweite Gewinn"): `ispyRaumZustand(seite)` liest NUR
-    // die fuer DIESE Seite bereits enthuellten `u.runden[]` (Spoiler-Regel wie
-    // ispyTickerZeile()) und liefert je Fundort-Index die zuletzt gesehene Stufe/den
-    // zuletzt gesehenen Ausgang -- `ispySterne()` zeigt diese Stufe statt der Startstufe
-    // aus `f.stufe`, eine erfolgreich geknackte Truhe wird sichtbar gedimmt (statt wie
-    // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
-    // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
-    // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
-    //
-    // JE SEITE IHR EIGENER RAUM (I-1): `ISPY_RAUM_AKTIV[seite]` (von baueSchatzsuche() vor
-    // dem ersten Tick gesetzt) bestimmt, AUS WELCHEM der drei Raeume diese Haelfte ihre
-    // Moebel zeichnet -- das Mehrwege-Moebel/die Stufe/die x/y-Koordinate je Index bleiben
-    // ueber alle drei Raeume gleich (s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART),
-    // nur `f.art` (Schreibtisch/Figur/Aktenschrank, ispyMoebelArt()) kann je Raum wechseln.
-    // Vor dem ersten `baueSchatzsuche()`-Aufruf (Sicht-QA) steht ISPY_RAUM_AKTIV auf
-    // "werkstatt" fuer beide Seiten, s. dessen Deklaration oben.
+    // DOPPELMOEBEL (16.11., s. ispyFundortXY()): jeder Fundort steht EINMAL in der Halle, mit
+    // ZWEI Faechern nebeneinander -- links das der Heimseite, rechts das der Gastseite, je auf
+    // einem Sockel in Teamfarbe. Jedes Fach zeigt den Stand SEINER Seite: `ispyRaumZustand(seite)`
+    // (nur bereits enthuellte u.runden[], Spoiler-Regel wie ispyTickerZeile()) liefert die
+    // zuletzt gesehene Stufe (Sterne ueber dem Fach), den Ausgang (offene Truhe bzw. gedimmtes
+    // Moebel) und die Fehlserie (Glut, I4). `ISPY_RAUM_AKTIV[seite]` bestimmt, aus WELCHEM der
+    // drei Raeume das Fach seine Art nimmt (Archiv/Werkstatt/Salon koennen je Seite verschieden
+    // sein, s. "I-SPY: DREI RAEUME" bei BUEHNE_ART); Stufe und Koordinate je Index sind ueber
+    // alle drei Raeume gleich. Truhen-Faecher (Tresor, Mechanik ohne Tuer) nutzen die
+    // PixelLab-Requisiten truhe_<stufe>_zu/_offen (public/sprites/arena/, schon vorhanden),
+    // die anderen bleiben Primitive.
     if(art.fundorte){
-      [0,1].forEach(seite=>{
-        const zustand=ispyRaumZustand(seite);
-        const raumFundorte=ISPY_RAEUME[ISPY_RAUM_AKTIV[seite]]||art.fundorte;
-        raumFundorte.forEach((f,idx)=>{
-          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
-          const p=ispyFundortXY(vis,seite);
-          const z=zustand.get(idx);
-          const stufeAnzeige=z?z.stufe:f.stufe;
-          // ANGEBROCHENE TRUHEN GLUEHEN NACH (I4, Broadcast-Optik-Recherche 27.09.,
-          // Abschnitt 4/I4): waechst mit `z.fehlserie` (ispyRaumZustand() oben), gedeckelt
-          // wie die Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT: nur zwei Schritte
-          // zaehlen) -- "heiss" im Wortsinn, stimmt mit dem Motor ueberein statt eine
-          // erfundene Naehe vorzuspielen (s. I4-Kommentar bei zeichneLupe). Hinter dem
-          // Moebelstueck gezeichnet, reiner additiver Radial-Schein, keine neue Formel.
+      const raeume=[0,1].map(s=>ISPY_RAEUME[ISPY_RAUM_AKTIV[s]]||art.fundorte);
+      const zustaende=[0,1].map(s=>ispyRaumZustand(s));
+      const teamFarbe=[css("--home"),css("--away")];
+      raeume[0].forEach((f0,idx)=>{
+        const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f0;
+        const p=ispyFundortXY(vis);
+        // gemeinsamer Bodenschatten unter beiden Faechern
+        ctx.fillStyle="rgba(0,0,0,.32)";
+        ctx.beginPath(); ctx.ellipse(p.x,p.y+8,ISPY_FACH_DX+16,6,0,0,Math.PI*2); ctx.fill();
+        const stufen=[0,1].map(s=>{ const z=zustaende[s].get(idx); return z?z.stufe:raeume[s][idx].stufe; });
+        [0,1].forEach(seite=>{
+          const f=raeume[seite][idx]||f0;
+          const z=zustaende[seite].get(idx);
+          const fx=p.x+(seite===0?-1:1)*ISPY_FACH_DX;
+          // ANGEBROCHENE FAECHER GLUEHEN NACH (I4): waechst mit z.fehlserie, gedeckelt wie die
+          // Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT).
           if(z&&!z.offen&&z.fehlserie>0){
-            const stufen=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
-            const glutStaerke=Math.min(z.fehlserie,stufen)/stufen;
-            const glut=ctx.createRadialGradient(p.x,p.y-6,2,p.x,p.y-6,22);
-            glut.addColorStop(0,"rgba(255,110,60,"+(0.10+0.22*glutStaerke).toFixed(2)+")");
+            const stufenN=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
+            const glutStaerke=Math.min(z.fehlserie,stufenN)/stufenN;
+            const glut=ctx.createRadialGradient(fx,p.y-6,2,fx,p.y-6,18);
+            glut.addColorStop(0,"rgba(255,110,60,"+(0.12+0.24*glutStaerke).toFixed(2)+")");
             glut.addColorStop(1,"rgba(255,110,60,0)");
-            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(p.x,p.y-6,22,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(fx,p.y-6,18,0,Math.PI*2); ctx.fill();
           }
-          ctx.save(); ctx.translate(p.x,p.y);
-          ctx.fillStyle="rgba(0,0,0,.30)";
-          ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
-          if(z&&z.offen)ctx.globalAlpha=0.5;
-          (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
+          // SOCKEL IN TEAMFARBE: wem dieses Fach gehoert.
+          ctx.save();
+          ctx.globalAlpha=0.55; ctx.fillStyle=teamFarbe[seite];
+          ctx.beginPath(); ctx.ellipse(fx,p.y+7,11,3.6,0,0,Math.PI*2); ctx.fill();
           ctx.globalAlpha=1;
-          ctx.restore();
-          ispySterne(p.x,p.y-26,stufeAnzeige);
-          // 28c/d (s. ispyFundortBadge()-Kopfkommentar): Skill+Punktwert-Badge ueber den
-          // Sternen, bei beiden Tresoren mit der Nebenweg-Zeile darunter.
-          ispyFundortBadge(p.x,p.y-37,f,stufeAnzeige);
-          if(z&&!z.offen){
-            setzeFont(ctx,"700 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="rgba(255,120,90,.9)";
-            ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-            ctx.fillText("angebrochen",p.x,p.y+21);
+          ctx.translate(fx,p.y); ctx.scale(0.74,0.74);
+          const moebel=ispyMoebelArt(f);
+          const offen=!!(z&&z.offen);
+          if(!ispyZeichneTruheBild(ctx,moebel,stufen[seite],offen)){
+            if(offen)ctx.globalAlpha=0.5;
+            (ISPY_MOEBEL[moebel]||ispyZeichneTruhe)(ctx);
+            ctx.globalAlpha=1;
           }
+          // RISS am angebrochenen Fach (Konzept 5.1), statt der frueheren Textzeile darunter.
+          if(z&&!z.offen){
+            ctx.strokeStyle="rgba(255,120,90,.95)"; ctx.lineWidth=1.6;
+            ctx.beginPath(); ctx.moveTo(-3,-14); ctx.lineTo(1,-8); ctx.lineTo(-2,-5); ctx.lineTo(3,1); ctx.stroke();
+          }
+          ctx.restore();
+          ispySterne(fx,p.y-22,stufen[seite],6.5);
+        });
+        // 28c/d: Skill+Punktwert-Badge ueber dem Doppelmoebel. Gleiche Art auf beiden Seiten
+        // (der Normalfall) -> ein gemeinsames Badge; verschiedene Raeume mit verschiedener Art
+        // an diesem Index -> je Fach ein Kuerzel in Teamfarbe.
+        const f1=raeume[1][idx]||f0;
+        if(f0.art===f1.art&&stufen[0]===stufen[1]) ispyFundortBadge(p.x,p.y-32,f0,stufen[0]);
+        else [0,1].forEach(seite=>{
+          const f=seite===0?f0:f1;
+          const sk=ISPY_RAETSEL_SUBSKILL[f.art];
+          setzeFont(ctx,"700 6px 'RaniraSeason',Georgia,'Times New Roman',serif");
+          ctx.fillStyle=teamFarbe[seite];
+          ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+          ctx.fillText(ISPY_SKILL_KUERZEL[sk]||sk||"?",p.x+(seite===0?-1:1)*(ISPY_FACH_DX+4),p.y-32);
         });
       });
     }
+  }
+  // TRUHEN-REQUISITEN (16.11.): die PixelLab-Truhen truhe_<1|2|3>_<zu|offen> lagen seit der
+  // Requisiten-Runde in public/sprites/arena/ (arenen-mechaniken-konzept-konsolidiert-15-11.md,
+  // Tabelle "Truhe ... I-Spy"), wurden aber nirgends gezeichnet. Hier fuer die beiden
+  // Truhen-Moebel (Tresor "truhe", Mechanik "aktenschrank"); Schreibtisch, Verhoer-Figur und
+  // Tuer bleiben Primitive. QUELLAUSSCHNITT: truhe_2_zu traegt Freistell-Reste (helle
+  // Eckklammern am Rand), truhe_3_offen einen hellen Strich links -- der Ausschnitt laesst sie
+  // weg. Fehlt das Bild (Headless, Ladefehler), false -> der Aufrufer zeichnet das Primitiv.
+  const ISPY_TRUHE_AUSSCHNITT={truhe_2_zu:[3,5,26,25], truhe_3_offen:[4,0,34,40]};
+  function ispyZeichneTruheBild(c,moebel,stufe,offen){
+    if(moebel!=="truhe"&&moebel!=="aktenschrank")return false;
+    const name="truhe_"+Math.max(1,Math.min(3,stufe||1))+"_"+(offen?"offen":"zu");
+    if(!aDa(name))return false;
+    const im=aBild[name];
+    const a=ISPY_TRUHE_AUSSCHNITT[name]||[0,0,im.naturalWidth,im.naturalHeight];
+    const glatt=c.imageSmoothingEnabled; c.imageSmoothingEnabled=false;
+    c.drawImage(im,a[0],a[1],a[2],a[3],-a[2]/2,8-a[3],a[2],a[3]);
+    c.imageSmoothingEnabled=glatt;
+    return true;
   }
   // TRUHENZUSTAND EINER EINZELNEN SEITE (I1, s. bodenSchatzsuche()-Kommentar oben): fuer
   // jeden Fundort-Index der zuletzt (hoechster Zug-Index) enthuellte Zug DIESER Seite, der
@@ -33017,9 +33256,62 @@
   // noch nie gelaufen ist — derselbe "solange vizX==null"-Vertrag wie bei stepKuer/
   // stepShowcase). `true` schaltet den istIspy()-Requisitenblock in zeichneSprite() frei
   // (Lupe an der Hand, nur waehrend u.vizPhase==="suchen").
+  // ANTEIL DES EIGENEN BILDZYKLUS (0..1), aus u.vizIspyT und ispyVizZyklus() -- dieselbe Uhr,
+  // gegen die stepSchatzsuche() die Phasen schaltet. Reine Ablesung.
+  function ispyZyklusAnteil(u,art){
+    const T=ispyVizZyklus(art);
+    return T>0?Math.max(0,Math.min(1,(u.vizIspyT||0)/T)):1;
+  }
+  // FORTSCHRITT DES VERWEILENS (Chris 16.11.: "Verweilen mit Fortschrittsbalken"): 0..1 ueber die
+  // "suchen"-Phase. Der Ausgang steht bei der Enthuellung schon fest (u.vizIspyErfolg) -- ein
+  // Fehlversuch stockt sichtbar kurz vor dem Ziel (Konzept fable-kontakt-interaktionen-16-11.md
+  // 4.2 Baustein 3: "knapp gescheitert: Balken stockt bei 90 %"), ein Erfolg laeuft durch.
+  // Der Starke ist frueher fertig (u.vizIspySuchEnde, Konzept 5.2). Kein rr(), nur Ablesung.
+  function ispyVerweilFortschritt(u,art){
+    const a=ispyZyklusAnteil(u,art);
+    const ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+    const p=Math.max(0,Math.min(1,(a-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,ende-ISPY_VIZ_GEHEN_ANTEIL)));
+    return u.vizIspyErfolg?p:Math.min(p,0.86);
+  }
   function zeichneSchatzsuche(art){
     if(!TEILNEHMER.length)return;
     const posMap=new Map();
+    // SICHTBARE WEGE (Chris 16.11.: "man soll sehen, wohin jeder Spieler laeuft"). Eigener
+    // Durchgang VOR allen Figuren, damit keine Linie ueber einem Kopf liegt. Waehrend "gehen":
+    // gestrichelter Weg vom Laeufer zu seinem Fach (Teamfarbe; gelb, wenn er auf einen
+    // gegnerischen Fund reagiert, Konzept 5.2), dahinter die schon gelaufene Spur blass, am Ziel
+    // ein pulsierender Ring auf dem Boden. Waehrend "suchen"/"ergebnis" bleibt die Spur noch
+    // stehen und blendet aus -- so liest man auch nach der Ankunft, woher jemand kam. Liest nur
+    // vizIspyVon*/vizIspyZiel*/vizX/vizY (stepSchatzsuche()), schreibt nichts.
+    for(const u of TEILNEHMER){
+      if(u.vizIspyVonX==null||u.vizIspyZielX==null||u.vizPhase==null||u.vizPhase==="idle")continue;
+      const c=u.side===0?css("--home"):css("--away");
+      const fuss=17;
+      const x=u.vizX!=null?u.vizX:u.vizIspyVonX, y=u.vizY!=null?u.vizY:u.vizIspyVonY;
+      const a=ispyZyklusAnteil(u,art);
+      ctx.save(); ctx.lineCap="round";
+      if(u.vizPhase==="gehen"){
+        ctx.globalAlpha=0.35; ctx.strokeStyle=c; ctx.lineWidth=2.4;
+        ctx.beginPath(); ctx.moveTo(u.vizIspyVonX,u.vizIspyVonY+fuss); ctx.lineTo(x,y+fuss); ctx.stroke();
+        // dunkle Unterlage, damit der Weg auf hellem Boden (Rasen, Hof) lesbar bleibt
+        ctx.globalAlpha=0.55; ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.moveTo(x,y+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        ctx.globalAlpha=0.95; ctx.strokeStyle=u.vizIspyReaktion?"#f2d75a":c; ctx.lineWidth=2.2;
+        ctx.setLineDash([6,4]); ctx.lineDashOffset=-buehneT*30;
+        ctx.beginPath(); ctx.moveTo(x,y+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        ctx.setLineDash([]);
+        const puls=0.5+0.5*Math.sin(buehneT*9+u.id);
+        ctx.globalAlpha=0.55+0.35*puls; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.ellipse(u.vizIspyZielX,u.vizIspyZielY+fuss,9+2*puls,3.5+0.8*puls,0,0,Math.PI*2); ctx.stroke();
+      } else {
+        const rest=Math.max(0,1-(a-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,1-ISPY_VIZ_GEHEN_ANTEIL)*1.6);
+        if(rest>0){
+          ctx.globalAlpha=0.28*rest; ctx.strokeStyle=c; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(u.vizIspyVonX,u.vizIspyVonY+fuss); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY+fuss); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
     [0,1].forEach(side=>{
       const g=TEILNEHMER.filter(u=>u.side===side);
       const c=side===0?css("--home"):css("--away");
@@ -33032,11 +33324,9 @@
         // Ausrufezeichen ueber dem Kopf, waehrend der "gehen"-Phase des Ticks, in dem
         // r.reaktion gesetzt war (Vorbild: die Ansage-Linien der Arena, ":12683" ff., hier
         // gestrichelt zum ZIEL statt eines Fokus-Rings um den Laeufer selbst).
+        // Die gestrichelte Linie selbst zeichnet seit 16.11. der Wege-Durchgang oben (gelb).
         if(u.vizPhase==="gehen"&&u.vizIspyReaktion){
           ctx.save();
-          ctx.strokeStyle="rgba(242,215,90,.75)"; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
-          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY); ctx.stroke();
-          ctx.setLineDash([]);
           setzeFont(ctx,"800 13px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#f2d75a";
           ctx.textAlign="center"; ctx.textBaseline="alphabetic";
           ctx.fillText("!",x,y-46);
@@ -33121,12 +33411,35 @@
           ctx.restore();
         }
 
+        // VERWEILBALKEN (Chris 16.11.): unter den Fuessen, ueber dem Namen. "suchen": fuellt sich
+        // in Teamfarbe (ein Fehlversuch stockt bei 86 % und flackert), "ergebnis": kurz voll
+        // gold bzw. rot stehen geblieben, dann ausblenden. Nur Ablesung (ispyVerweilFortschritt()).
+        if(u.vizPhase==="suchen"||u.vizPhase==="ergebnis"){
+          const a=ispyZyklusAnteil(u,art), ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+          const sicht=u.vizPhase==="suchen"?1:Math.max(0,1-Math.max(0,(a-ende)/Math.max(0.01,1-ende)-0.35)*1.6);
+          if(sicht>0){
+            const p=ispyVerweilFortschritt(u,art);
+            const bw=28, bh=4, bx=x-bw/2, by=y+27;
+            ctx.save(); ctx.globalAlpha=sicht;
+            ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(bx-1,by-1,bw+2,bh+2);
+            let farbe=c;
+            if(u.vizPhase==="ergebnis")farbe=u.vizIspyErfolg?"#f2d75a":"#e0573f";
+            else if(!u.vizIspyErfolg&&p>=0.86)farbe=(Math.floor(buehneT*14)%2)?c:"#e0573f";
+            ctx.fillStyle=farbe; ctx.fillRect(bx,by,bw*p,bh);
+            ctx.restore();
+          }
+        }
+
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dyN,farbe,groesse)=>{
           setzeFont(ctx,"400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif");
           ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
           ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
         };
+        // Opus-Review #1533: das Namensschild zeigt wie der Bug-Spielstand und der Ticker den Stand NACH der
+        // Enthuellung (stepBuehne() bucht r.punkte dort auf u.summe). Ein Abziehen bis zum Ergebnis haette Schild
+        // und Teamstand dauerhaft auseinanderlaufen lassen (und nach schnellDurch() falsche Punkte eingefroren);
+        // nur das "+N" ueber dem Kopf kommt erst im Ergebnis.
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
         schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
         setzeFont(ctx,"400 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.fillStyle="#8a93a3";
@@ -33135,14 +33448,25 @@
       });
     });
 
-    for(const f of floats){
-      if(f._teilnehmer==null)continue;
-      const p=posMap.get(f._teilnehmer); if(!p)continue;
-      ctx.globalAlpha=Math.max(0,f.life);
-      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
-      setzeFont(ctx,(f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
+    // ERGEBNIS-SCHWEBER ERST AM ENDE DES VERWEILENS (16.11.): der generische Schwebetext aus
+    // stepBuehne() (floats, "+N") entsteht schon bei der Enthuellung, also bevor der Laeufer
+    // ueberhaupt am Fach steht -- mit sichtbarem Weg und Verweilbalken waere er ein Spoiler.
+    // I-Spy zeichnet die floats deshalb nicht mehr, sondern denselben Text "+r.punkte" beim
+    // Eintritt in "ergebnis", steigend und ausblendend ueber diese Phase. Ablesung von
+    // u.runden[u.aktuell] (schon enthuellt), kein neuer Zustand.
+    for(const u of TEILNEHMER){
+      if(u.vizPhase!=="ergebnis")continue;
+      const p=posMap.get(u.id); if(!p)continue;
+      const r=u.aktuell>=0&&u.runden?u.runden[u.aktuell]:null;
+      if(!r||!(r.punkte>0))continue;
+      const ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+      const t=Math.max(0,Math.min(1,(ispyZyklusAnteil(u,art)-ende)/Math.max(0.01,1-ende)));
+      const gross=u.vizIspyStufe===3&&u.vizIspyErfolg;
+      ctx.globalAlpha=Math.max(0,1-t*t);
+      ctx.fillStyle=gross?css("--ok"):css("--ink");
+      setzeFont(ctx,(gross?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
       ctx.textAlign="center";
-      ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
+      ctx.fillText("+"+r.punkte,p.x,p.y-34-t*20);
       ctx.globalAlpha=1;
     }
   }
@@ -38310,7 +38634,10 @@
         tipOn(pl,PERS[pk].l+" — Persönlichkeit",
           "Entsteht aus "+p.c+" · "+p.r+(p.sub&&p.sub.length?" · "+p.sub.join(", "):"")+
           ((p.tp&&p.tp.length)||(p.tn&&p.tn.length)?" · "+[...(p.tp||[]),...(p.tn||[])].join(", "):"")+
-          ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist.");
+          ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist. "+
+          // Opus-Review #1531: nur die GRUNDtendenz der Persoenlichkeit (ohne Traits) -- das ist heute die einzige Groesse,
+          // die im Spiel wirkt; mit Traits stuende z. B. "nimmt Zweikaempfe mit", obwohl der Spieler real meidet.
+          kontaktTendenzText(kontaktProfil({...p,tp:[],tn:[]},pk)));
         u.appendChild(pl);
 
         const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
@@ -39241,7 +39568,7 @@
     // SANDSACK_PAR_FILM null, die Zeile tut dann nichts.
     if(istBuehne(disc)){buehneDisc=disc; const erg=bauBuehne(saat); if(SANDSACK_PAR_FILM)sandsackParSzeneBauen(); return erg;}
     if(istBahn(disc)){bahnDisc=disc; bahnAktuelleSaat=saat; return bauSpurt(saat);}
-    seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
     // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
     // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
@@ -43369,7 +43696,10 @@
     "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen",
     // Sicht-Audit 16.11.: Sicherungsstation (Seilsack + Sicherungsgeraet am Bodenanker) statt der
     // Strichfigur als Sicherer -- eine Requisite, keine Figur (neue Charaktere sind gesperrt).
-    "climbing_seilsack"];
+    "climbing_seilsack",
+    // I-Spy-Darstellung 16.11.: die vorhandenen PixelLab-Truhen (drei Stufen, zu/offen) fuer die
+    // Truhen-Faecher der Doppelmoebel, s. ispyZeichneTruheBild(). Keine neue Bestellung.
+    "truhe_1_zu","truhe_1_offen","truhe_2_zu","truhe_2_offen","truhe_3_zu","truhe_3_offen"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -48514,6 +48844,16 @@
   for(const tabelle of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])rezepteNachziehen(tabelle);
 
   let bahnDisc="spurt";
+  // KONTAKT-FLAG-GERUEST (Schritt 0, s. KONTAKT_BASIS/kontaktFlagFeld): jetzt stehen alle vier
+  // Art-Tabellen. `kontakt` je Disziplin = null, nicht aufzaehlbar. window.__olyKontaktFlags
+  // (Headless, vor dem Laden) ist derselbe Weg wie __olyBahnFlags/__olyBuehneFlags.
+  for(const tab of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])kontaktFlagFeld(tab);
+  try{
+    const startKontakt=window.__olyKontaktFlags;
+    if(startKontakt&&typeof startKontakt==="object")kontaktFlagsSetzen(startKontakt);
+    const startZwang=window.__olyKontaktPersZwang;
+    if(startZwang)kontaktZwangSetzen(startZwang);
+  }catch{ /* ohne Fenster/Flags: Standard null */ }
   const BA=()=>BAHN_ART[bahnDisc]||BAHN_ART.spurt;
   const istBahn=(d)=>!!BAHN_ART[d];
   const SPURT_KEYS=Object.keys(BAHN_ART.spurt.rezept);
@@ -49812,7 +50152,7 @@
     return SPURT_FORMATE[kulisseHash("spurt-format|"+(saat==null?"":String(saat)))%SPURT_FORMATE.length];
   }
   function bauSpurt(saat){
-    seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    seed=normalisiereSaat(saat); kontaktStromSaeen(saat); kontaktLetzteBahn=[]; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
     fortschrittVerlauf={};
     for(let s=0;s<bahnSeitenN();s++)fortschrittVerlauf[s]=[];
@@ -50118,6 +50458,7 @@
         // null und werden nie gelesen.
         etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      kontaktSpielerMap.set(L,p); kontaktLetzteBahn.push(L);   // Kontakt-Schicht (Schritt 0): p fuer kontaktProfilEinheit(), ohne Feld am Laeufer
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
       // von Anfang an unterwegs; die uebrigen stehen sichtbar in ihrer Wechselzone, was
@@ -52442,8 +52783,11 @@
 
       // TACKLE. Wer Wucht hat und einen Gegner in Reichweite, kann zulangen — kostet ihn
       // selbst Tempo. Ob er es TUT, haengt an seiner Persoenlichkeit, nicht am Zufall.
-      const willTackeln=({draufgaenger:0.9,duellant:0.55,schleicher:0.5,opportunist:0.7,
-        bollwerk:0.25,taktiker:0.3})[u.pers] ?? 0.5;
+      // KONTAKT-SCHRITT 0 (16.11.): die Tabelle steht jetzt als `kb` in KONTAKT_BASIS (s. dort),
+      // Zahlen identisch (kb/100). Bereinigt: der nie vergebene Typ `taktiker` (0,3) ist raus,
+      // `beschuetzer` steht ausdruecklich auf seinem bisherigen Rueckfall 0,5 -- beides ohne
+      // Verhaltensaenderung, weil u.pers nur Werte aus leitePers() oder "duellant" annimmt.
+      const willTackeln=kontaktBereitschaftBahn(u);
       // Gemessen hat Torment im Spurt 0 % getragen, obwohl die Matrix es mit 14 fuehrt.
       // Ein Teil davon war die Schwelle: bei WUCHT > 45 kamen ueber ein ganzes Rennen rund
       // ein Rempler zustande, und was einmal passiert, entscheidet nichts.
@@ -52482,8 +52826,20 @@
       if(tackleOk && rr()<willTackeln*dt*(TA.tackleRate??1.6)*(bahnKursChaos||1)){
         const opfer=LAEUFER.filter(o=>o!==u&&(TA.tackleAlleSeiten||o.seite!==u.seite)&&o.fertig==null&&!(o.huerde>0)
           && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035);
+        // KONTAKT-ZAEHLER (Schritt 0): WeakMap, kein Feld, kein rr(). Bei gesetztem Flag zusaetzlich
+        // die Schatten-Buchhaltung: Profil-Schwelle pMin gegen die geschaetzte Aussicht (wuerde er
+        // nach Stufe 2 zulangen?) und eine Ziehung aus dem EIGENEN Strom -- ohne jede Wirkung.
+        kontaktZaehle(u,"anlauf");
+        if(!opfer.length)kontaktZaehle(u,"ohneZiel");
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
+          kontaktZaehle(u,"versuch"); kontaktZaehle(o,"angegangen");
+          if(TA.kontakt){
+            const pr=kontaktProfilEinheit(u), aussicht=u.WUCHT/((u.WUCHT+(o.ROBUST||0))||1);
+            kontaktZaehle(u,aussicht>=pr.pMin?"schattenUeberPMin":"schattenUnterPMin");
+            if(kontaktRr()<0.5)kontaktZaehle(u,"schattenStromHalb");
+            kontaktZaehle(u,"schattenStromZug");
+          }
           // Der Rempler kostet den Remplenden weniger, als er den Getroffenen kostet —
           // sonst waere Wucht ein Nachteil, und genau das hat die Messung gezeigt:
           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
@@ -52526,6 +52882,7 @@
               :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
           if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
             o.ausgewichen=(o.ausgewichen||0)+1;
+            kontaktZaehle(o,"ausgewichen"); kontaktZaehle(u,"insLeere");
             // AUSWEICHEN SICHTBAR (dieselbe Quelle wie oben): ein kurzer Ausweich-Ruck neben
             // dem Opfer, derselbe Farbverlauf-Baustein wie beim Windschatten-Sog. Deutet die
             // Seitwaertsbewegung nur an -- u.pos/u.bahnZ selbst aendern sich nicht.
@@ -52536,6 +52893,7 @@
           } else {
             const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
             if(rr()<stark){
+              kontaktZaehle(u,"treffer"); kontaktZaehle(o,"getroffen");
               o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
               // REMPLER-TREFFER SICHTBAR: derselbe Bogenschlag, der im Kampf jeden Treffer
               // markiert (effektFuer/"hieb"). u.lungeVis (s. unten) loest zugleich die
@@ -52568,6 +52926,7 @@
                 remplerBig?"rempler":undefined);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
+              kontaktZaehle(u,"abgeprallt"); kontaktZaehle(o,"gehalten");
               feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
             }
           }
@@ -64530,6 +64889,8 @@
       if(neu&&typeof neu==="object")
         for(const k of Object.keys(BUEHNE_FLAGS))
           if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
+      // KONTAKT (Schritt 0): {kontakt:{eiskunstlauf:{...}|null}} -> BUEHNE_ART[d].kontakt.
+      if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BUEHNE_ART);
       return {...BUEHNE_FLAGS};
     },
     // FORMAT-FUNDAMENT SPURT (s. BAHN_FLAGS/baueHatz, 08.11.): dasselbe Muster wie
@@ -64543,6 +64904,8 @@
       // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
       if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
         BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
+      // KONTAKT (Schritt 0): {kontakt:{spurt:{...}|null}} -> BAHN_ART[d].kontakt, s. kontaktFlags.
+      if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BAHN_ART);
       return {...BAHN_FLAGS};
     },
     // KALIBRIERUNGS-SCHNITTSTELLE "DIE HATZ" (nur Messung/QA, s. HATZ_W/HATZ_RAUSCHEN nahe
@@ -64652,6 +65015,19 @@
           if(Array.isArray(neu[d]))ARENA_ART[d].persHandwerk=neu[d].filter(k=>k==="z"||k==="b");
       return Object.fromEntries(Object.keys(ARENA_ART).map(d=>[d,[...(ARENA_ART[d].persHandwerk||[])]]));
     },
+    // KONTAKT-SCHICHT, SCHRITT 0 (16.11., s. KONTAKT_BASIS): Mess-/QA-Schnittstelle, kein echtes
+    // Spiel ruft das auf. kontaktFlags({spurt:{stufe:0}}) setzt `BAHN_ART.spurt.kontakt` (analog
+    // fuer Feldspiel/Arena/Buehne), {spurt:null} schaltet aus, ohne Argument nur lesen.
+    // kontaktPersZwang("bollwerk"|{typ,traits}|null): Kontrafaktik "alle ein Typ".
+    // kontaktProfil(p, persKey?): das Profil eines Spielers (reine Funktion).
+    // kontaktZaehler(): Zaehler je Laeufer des zuletzt gerechneten Rennens (rein lesend).
+    // kontaktZufallProbe(saat,n): n Ziehungen aus dem eigenen Strom (Determinismus-Beleg).
+    kontaktFlags:(neu)=>kontaktFlagsSetzen(neu),
+    kontaktPersZwang:(...arg)=>arg.length?kontaktZwangSetzen(arg[0]):(kontaktZwang?{...kontaktZwang}:null),
+    kontaktProfil:(p,persKey)=>kontaktProfil(p,persKey),
+    kontaktBasis:()=>JSON.parse(JSON.stringify(KONTAKT_BASIS)),
+    kontaktZaehler:()=>kontaktLetzteBahn.map(u=>({n:u.n, seite:u.seite, pers:u.pers, ...kontaktZaehlerVon(u)})),
+    kontaktZufallProbe:(saat,n)=>{ kontaktStromSaeen(saat); const aus=[]; for(let i=0;i<(n||5);i++)aus.push(kontaktRr()); return aus; },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
     // setzeTaktik oben, docs/design/feldspiel-taktik-karte-fundament-15-10.md): die

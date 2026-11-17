@@ -688,24 +688,34 @@ def baue_breaking(variante: str) -> Image.Image:
 
 
 # ---------------------------------------------------------------------------------------- I-Spy
-# Motor (bodenSchatzsuche): zwei Raeume, links 0..W*0.465, rechts W*0.535..W, dazwischen der Steg.
-# Szene (bg 1280x840, Draufsicht): Garten/Hof/Halle mit Rueckwand oben. Jede Raumhaelfte bekommt die
-# Szene deckend; die beiden Demo-Truhen unten (die Fundorte zeichnet der Motor selbst) sind weg.
+# Motor (bodenSchatzsuche): EINE grosse Arena ueber die ganze Leinwand (Darstellungsrunde 16.11., Chris:
+# "eine grosse Arena statt mehrerer getrennter Bereiche"; vorher zwei Raeume links 0..W*0.465 und
+# rechts W*0.535..W mit schwarzem Steg dazwischen). Szene (bg 1280x840, Draufsicht): Garten/Hof/Halle
+# mit Rueckwand oben und Seitenwaenden. Auf Leinwandhoehe skaliert ist sie nur ~716 px breit; die Halle
+# entsteht aus zwei Kopien derselben Szene, links ohne ihre rechte, rechts ohne ihre linke Seitenwand,
+# in der Mitte ueber IS_UEBERGANG Pixel weich ineinander geblendet -- eine durchgehende Rueckwand, ein
+# Boden, nur die beiden Aussenwaende bleiben. Die beiden Demo-Truhen unten (die Fundorte zeichnet der
+# Motor selbst) sind weg. Nur Pixel der vorhandenen PixelLab-Szene, keine Bestellung.
 IS_TRUHEN = [(138, 694, 199, 739), (1081, 694, 1142, 739)]
-IS_STEG = (LW * 0.465, LW * 0.535)
+IS_UEBERGANG = 56
 
 
 def baue_ispy(variante: str) -> Image.Image:
     bg = lade_szenenbilder(SZENEN / "i-spy" / f"{variante}.html")["bg"].convert("RGB")
     bg = flicken(bg, IS_TRUHEN, [], (0, 560, 1280, 800), ring=8, schritt=2)
-    halb = round(IS_STEG[0])
-    f = max(halb / bg.width, LH / bg.height)
-    raum = bg.resize((round(bg.width * f), round(bg.height * f)), Image.LANCZOS)
-    rx = (raum.width - halb) // 2
-    raum = raum.crop((rx, 0, rx + halb, LH))
+    f = LH / bg.height
+    raum = bg.resize((round(bg.width * f), LH), Image.LANCZOS)
+    halb, ueb = LW // 2, IS_UEBERGANG
+    links = raum.crop((0, 0, halb + ueb // 2, LH))
+    rechts = raum.crop((raum.width - halb - ueb // 2, 0, raum.width, LH))
     lein = Image.new("RGB", (LW, LH))
-    lein.paste(raum, (0, 0))
-    lein.paste(raum, (LW - halb, 0))
+    lein.paste(rechts, (LW - rechts.width, 0))
+    # Weiche Naht: die linke Kopie laeuft ueber `ueb` Pixel linear aus.
+    maske = Image.new("L", links.size, 255)
+    rampe = np.clip(np.linspace(1.0, 0.0, ueb), 0, 1)
+    m = np.asarray(maske).copy()
+    m[:, links.width - ueb:] = (rampe * 255).astype(np.uint8)[None, :]
+    lein.paste(links, (0, 0), Image.fromarray(m))
     return lein
 
 
