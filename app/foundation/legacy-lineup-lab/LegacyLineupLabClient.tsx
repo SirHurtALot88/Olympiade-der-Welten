@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
@@ -146,6 +147,12 @@ import {
 const LineupNewLook = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LineupNewLook"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Neuer Look wird geladen…" />,
+});
+// Moderne Einsatzliste (Broadcast-Stil, Welle 1). Nimmt dieselben Props wie `LineupNewLook`;
+// `?einsatzliste=klassisch` bzw. der Knopf in der neuen Ansicht schaltet auf die klassische zurueck.
+const EinsatzlisteModern = dynamic(() => import("@/app/foundation/legacy-lineup-lab/EinsatzlisteModern"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
 });
 const FormBoardPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FormBoardPanel"), {
   ssr: false,
@@ -1032,6 +1039,7 @@ function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: 
 }
 
 export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps) {
+  const [einsatzlisteLook] = useEinsatzlisteLook();
   // "Neuer Look" Flag (additiv): Hook läuft unverändert vor allen anderen Hooks;
   // das eigentliche Gate sitzt NACH allen Hooks/Derivations (siehe vor `const inner`).
   const [params, setParams] = useState(() => defaultParamsFromProps(props));
@@ -5184,6 +5192,63 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     );
   }
 
+  /**
+   * Mehrere Plaetze in EINEM Schritt neu belegen (moderne Einsatzliste: Optimieren, Auffuellen,
+   * Tausch, Spieler aus der anderen Disziplin holen). `updateSelection` taugt dafuer nicht: es
+   * rechnet gegen den `selections`-Stand dieses Renders, ein zweiter Aufruf im selben Tick
+   * ueberschriebe den ersten. Jede Belegung durchlaeuft dieselbe Sperrpruefung wie dort
+   * (verletzt, Captain-Seite, kein Wert in der Disziplin); was durchfaellt, bleibt wie es war.
+   * Ein Spieler steht danach hoechstens einmal (Validator: `duplicate_player_usage`).
+   */
+  function applyLineupAssignments(nextSelections: Record<string, string>, label: string, detail: string) {
+    const geprueft: Record<string, string> = { ...nextSelections };
+    let abgelehnt = 0;
+    for (const slot of slots) {
+      const activePlayerId = geprueft[slot.key] ?? "";
+      if (!activePlayerId || activePlayerId === (selections[slot.key] ?? "")) {
+        continue;
+      }
+      const rosterCard = rosterCardByActivePlayerId.get(activePlayerId) ?? null;
+      const option = getSelectedOptionMeta(activePlayerId);
+      const blockReason = resolveLegacyLineupDragBlockReason({
+        availabilityBlocker: rosterCard?.availabilityBlocker ?? null,
+        selectedSides: [],
+        targetDisciplineSide: slot.disciplineSide,
+        captainSide: captainSideByActivePlayerId.get(activePlayerId) ?? null,
+        hasBaseScore: option?.disciplineScores[slot.disciplineId] != null,
+      });
+      if (blockReason) {
+        geprueft[slot.key] = "";
+        abgelehnt += 1;
+      }
+    }
+    const gesehen = new Set<string>();
+    for (const slot of slots) {
+      const activePlayerId = geprueft[slot.key] ?? "";
+      if (!activePlayerId) {
+        continue;
+      }
+      if (gesehen.has(activePlayerId)) {
+        geprueft[slot.key] = "";
+      } else {
+        gesehen.add(activePlayerId);
+      }
+    }
+    if (JSON.stringify(geprueft) === JSON.stringify(selections)) {
+      setMessage(abgelehnt > 0 ? "Diese Besetzung ist nicht erlaubt." : "Nichts zu aendern.");
+      return;
+    }
+    setPreview(null);
+    setMatchdayScorePreview(null);
+    setVisibleScoreboardSide(null);
+    setDraft(null);
+    rememberLineupUndo(label, detail);
+    setSelections(geprueft);
+    setHoveredCandidate(null);
+    setLineupAssignPulse((count) => count + 1);
+    setMessage(label);
+  }
+
 	  function updateTeamIntensityStage(intensity: MatchdayIntensityStage) {
 	    setPreview(null);
 	    setMatchdayScorePreview(null);
@@ -6300,8 +6365,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         />
       );
     }
+    const LineupView = einsatzlisteLook === "modern" ? EinsatzlisteModern : LineupNewLook;
     return (
-      <LineupNewLook
+      <LineupView
         context={context}
         slots={slots}
         selections={selections}
@@ -6357,6 +6423,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         formatProjectedMetricWindow={formatProjectedMetricWindow}
         onFocusNextOpenSlot={focusNextOpenSlot}
         onAutoFillOpenSlots={handleAutoFillOpenSlots}
+        onApplyAssignments={applyLineupAssignments}
         onSaveDraft={() => void handleSaveDraft()}
         getDisciplineIntensity={getDisciplineIntensity}
         onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
