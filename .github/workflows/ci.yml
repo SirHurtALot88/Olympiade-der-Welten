@@ -365,7 +365,13 @@ jobs:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # ZEITGRENZE 25 -> 35 MINUTEN (17.11., nachgemessen): Shard 1 faehrt zusaetzlich die vier
+    # SCHWERE_DATEIEN einzeln (arena-eingabe-stabil allein 207 s) und lag mit 22-25 Minuten
+    # knapp UNTER dem alten Deckel. Zwei Laeufe am 17.11. (PR #1543: 06:15:31 -> 06:40:45,
+    # PR #1544: 08:24:19 -> 08:49:33) endeten `cancelled` nach genau 25:14 -- im Log war der
+    # letzte Test gerade GRUEN durchgelaufen, abgebrochen wurde nur der Job. Ein Re-Run lief
+    # jeweils gruen durch. Kein Testfehler, sondern ein zu knapper Deckel unter Last.
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
