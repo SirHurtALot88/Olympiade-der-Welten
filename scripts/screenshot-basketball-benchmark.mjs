@@ -58,7 +58,10 @@ const SZENEN_RUNDE2 = [
   { name: "r2-10-pull-up", situation: "pullup", saat: 42, ab: 10 },
   { name: "r2-11-drive", situation: "drive", saat: 1, ab: 10 },
 ];
-const RUNDE2 = process.env.OLY_BB_SZENEN === "runde2";
+const RUNDE2 = process.env.OLY_BB_SZENEN === "runde2" || process.env.OLY_BB_SZENEN === "kamera";
+// OLY_BB_SZENEN=kamera: Bildfolge der Halbfeld-/Folgekamera (Nahzoom auf einen Dreier, danach
+// zurueck in den Halbfeld-Ausschnitt), plus die Totale (feldKamera(false)) als Vergleich.
+const KAMERA = process.env.OLY_BB_SZENEN === "kamera";
 
 function starteServer() {
   return new Promise((resolve) => {
@@ -92,7 +95,26 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("basketball"));
   await seite.click("#t2");
   await seite.waitForTimeout(800);
-  for (const sz of (RUNDE2 ? SZENEN_RUNDE2 : SZENEN)) {
+  if (KAMERA) {
+    const zeige = async (name) => {
+      await seite.evaluate(() => { for (const id of ["einlauf", "bbugcallout", "viertelpause"]) { const e = document.getElementById(id); if (e) e.hidden = true; } });
+      const out = path.join(ziel, `${praefix}-${name}.png`);
+      await (await seite.$("#cv")).screenshot({ path: out });
+      console.log(out);
+    };
+    await seite.evaluate(() => window.__arena.feldKamera(false));
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(42, "dreier", 10));
+    await seite.waitForTimeout(400); await zeige("k0-totale");
+    await seite.evaluate(() => window.__arena.feldKamera(true));
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(7, "aufbau", 20));
+    await seite.waitForTimeout(1500); await zeige("k1-halbfeld");
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(42, "dreier", 10));
+    for (const [ms, n] of [[60, "k2-dreier-0,06s"], [300, "k3-dreier-0,36s"], [500, "k4-dreier-0,86s"], [900, "k5-dreier-1,8s-zurueck"]]) {
+      await seite.waitForTimeout(ms); await zeige(n);
+    }
+    console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
+  }
+  for (const sz of (KAMERA ? [] : RUNDE2 ? SZENEN_RUNDE2 : SZENEN)) {
     const erg = await seite.evaluate(({ saat, situation, ab }) => {
       if (typeof window.__arena.szeneFeldspiel !== "function") return { fehlt: true };
       return window.__arena.szeneFeldspiel(saat, situation, ab);

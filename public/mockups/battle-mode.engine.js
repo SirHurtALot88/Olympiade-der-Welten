@@ -9892,6 +9892,10 @@
       //   ruecklauf          Angreifer, die beim Wurf NICHT zum Rebound gehen, laufen bis zu
       //                      diesem Anteil Richtung Mittellinie zurueck (Transition-Sicherung)
       spacing:{jaegerJeSeite:2, jaegerRadius:200, mitspielerMin:58, mitspielerStaerke:0.8, ruecklauf:0.35},
+      // KAMERA (Runde 2, reine Anzeige, s. KAMERA-MODUL): Halbfeld-Zoom, Zug zum angegriffenen
+      // Korb, Daempfung des Schwenks (1/s), kurzer Nahzoom auf den Ring bei Dunk/Dreier/Alley-Oop.
+      kamera:{zoom:1.32, korbZug:0.38, querZug:0.65, daempfung:3.2, zoomDaempfung:4.0,
+              nahZoom:1.75, nahDauer:1.1, nahVersatz:0.16},
       // TEAMFOULS / BONUS (Runde 2, FIBA-Regel 41): jedes Spielerfoul zaehlt als Teamfoul im
       // laufenden Viertel. Ab dem 5. Teamfoul (`bonusAb`) gibt jedes Foul ohne Wurf zwei
       // Freiwuerfe, davor nur Einwurf (Ballbesitz bleibt, Schussuhr auf `einwurfUhr` s gedeckelt).
@@ -19768,6 +19772,68 @@
   // Zeitbasis ziehen — statt dreier unabhaengig gewaehlter Zahlen, die zufaellig
   // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
   // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
+
+  // ===================================================================================
+  // KAMERA-MODUL — Halbfeld-/Folgekamera fuer die Feldspiele (Benchmark Basketball Runde 2,
+  // 17.11., docs/design/benchmark-basketball-17-11.md Abschnitt 7.3). REINE ANZEIGE: liest den
+  // Ball, den Ballbesitz und den laufenden Wurf, schreibt nichts, das eine Formel liest
+  // (Fingerabdruck unveraendert, gezeigt = gebucht unberuehrt — die Linien liegen weiter genau
+  // dort, wo die Logik misst; die Kamera schiebt und vergroessert nur das ganze Bild).
+  //   * Halbfeld: Bildausschnitt mit `zoom` auf die Angriffshaelfte, Mitte zwischen Ball und
+  //     angegriffenem Korb (`korbZug`), quer weich zur Feldmitte gezogen (`querZug`).
+  //   * Weicher Schwenk: kritisch gedaempfte Annaeherung in Wandzeit (`daempfung` je Sekunde),
+  //     beim Ballbesitzwechsel faehrt das Bild also sichtbar mit statt zu springen.
+  //   * Kurzer Zoom bei Dunk und Dreier: `nahZoom` auf den Ring, `nahDauer` s lang ab Abwurf.
+  //   * Der Ausschnitt bleibt immer innerhalb der Leinwand (kein schwarzer Rand).
+  // Parameter je Disziplin in FELDSPIEL_ART[d].kamera; ohne Block steht die alte Totale.
+  // Abschaltbar: window.__arena.feldKamera(false) (Totale), Vorgabe an.
+  // ===================================================================================
+  let fkAn=true, fkZustand=null, fkLetzteWand=0;
+  const FK_GESEHEN=new WeakSet();
+  const feldKameraVon=()=>{ const a=(typeof FELDSPIEL_ART!=="undefined")&&FELDSPIEL_ART[feldspielDisc]; return a&&a.kamera?a.kamera:null; };
+  function feldKameraZiel(k){
+    const fl=fsLive&&fsLive.ball.flug, tr=fsLive&&fsLive.ball.traeger;
+    const seite=fl&&fl.schuetze?fl.schuetze.side:fl&&fl.passgeber?fl.passgeber.side:tr?tr.side:(fsLive?fsLive.amBall:0);
+    const korbX=korbXVon(seite);
+    const bx=fsBall&&fsBall.sichtbar?fsBall.x:W/2, by=fsBall&&fsBall.sichtbar?fsBall.y:H/2;
+    let z=k.zoom, cx=bx+(korbX-bx)*k.korbZug, cy=by+(H/2-by)*k.querZug;
+    if(!fsLive||fsLive.phase==="viertelpause"||done){ z=1; cx=W/2; cy=H/2; }
+    else if(fsLive.phase==="freiwurf"){ z=k.zoom; cx=korbX+(W/2-korbX)*0.25; cy=H/2; }
+    if(fl&&(fl.art==="wurf"||fl.art==="alley")&&(fl.tier==="dunk"||fl.fern||fl.art==="alley")&&!FK_GESEHEN.has(fl)){
+      FK_GESEHEN.add(fl); fkZustand.nahBis=fkLetzteWand+k.nahDauer; fkZustand.nahX=korbX;
+    }
+    if(fkZustand.nahBis>fkLetzteWand){ z=k.nahZoom; cx=fkZustand.nahX+(W/2-fkZustand.nahX)*k.nahVersatz; cy=H/2-H*0.04; }
+    return {z,cx,cy};
+  }
+  // Einmal je Bild: Zustand weich nachfuehren, dann Transformation setzen. Gibt true zurueck,
+  // wenn transformiert wurde (Aufrufer macht ctx.save/restore).
+  function feldKameraAnwenden(){
+    const k=feldKameraVon();
+    const jetzt=(typeof performance!=="undefined"&&performance.now)?performance.now()/1000:0;
+    const dt=fkLetzteWand?Math.min(0.1,Math.max(0,jetzt-fkLetzteWand)):0; fkLetzteWand=jetzt;
+    if(!k||!fkAn){ fkZustand=null; return false; }
+    if(!fkZustand)fkZustand={z:1,cx:W/2,cy:H/2,nahBis:0,nahX:W/2};
+    const ziel=feldKameraZiel(k);
+    const a=1-Math.exp(-k.daempfung*dt), az=1-Math.exp(-k.zoomDaempfung*dt);
+    fkZustand.z+=(ziel.z-fkZustand.z)*az;
+    fkZustand.cx+=(ziel.cx-fkZustand.cx)*a; fkZustand.cy+=(ziel.cy-fkZustand.cy)*a;
+    const z=Math.max(1,fkZustand.z), hw=W/(2*z), hh=H/(2*z);
+    const cx=Math.max(hw,Math.min(W-hw,fkZustand.cx)), cy=Math.max(hh,Math.min(H-hh,fkZustand.cy));
+    if(z<1.001&&Math.abs(cx-W/2)<0.5&&Math.abs(cy-H/2)<0.5)return false;
+    ctx.translate(W/2,H/2); ctx.scale(z,z); ctx.translate(-cx,-cy);
+    fkZustand.anzeige={z,cx,cy};
+    return true;
+  }
+  // Bildschirm -> Feld (fuer Klicks auf Figuren, s. Fokus-Klick auf der Leinwand).
+  function feldKameraInvers(mx,my){
+    const a=fkZustand&&fkZustand.anzeige; if(!a||!fkAn||!feldKameraVon())return {x:mx,y:my};
+    return {x:(mx-W/2)/a.z+a.cx, y:(my-H/2)/a.z+a.cy};
+  }
+  function zeichneFeldspielMitKamera(){
+    ctx.save();
+    try{ feldKameraAnwenden(); zeichneFeldspiel(); } finally { ctx.restore(); }
+  }
+
   const BREAKING_BPM=100;
   // B5 (Broadcast-Optik-Recherche 27.09.): Dauer des "GEBROCHEN"-Stempels in Buehnenzeit
   // (buehneT-Domaene, also real ablaufend, keine Enthuellungs-Pause, s. zeichneBreaking()).
@@ -57118,7 +57184,7 @@
     ctx.clearRect(0,0,W,H);
     // TEAM-FEIER-WACKELN (Konzept team-publikum-feiermomente 2.5): mitTeamFeierWackeln() ruft
     // die Chassis-Zeichnung ohne laufende grosse Feier unveraendert direkt auf, s. dort.
-    if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspiel);return;}
+    if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspielMitKamera);return;} // KAMERA-MODUL (ohne kamera-Block: Totale)
     if(istBuehne(disc)){mitTeamFeierWackeln(zeichneBuehne);return;}
     if(istBahn(disc)){mitTeamFeierWackeln(zeichneSpurt);return;}
     zeichneBoden();
@@ -59921,8 +59987,9 @@
       if(!fokusAuswahlMoeglich())return;
       const r=leinwand.getBoundingClientRect();
       if(!r.width||!r.height)return;
-      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
-      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      const mx0=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my0=(ev.clientY-r.top)*(leinwand.height/r.height);
+      const mk=feldKameraInvers(mx0,my0), mx=mk.x, my=mk.y; // KAMERA-MODUL: Klick ins Feld zurueckrechnen
       let treffer=null,minD=FOKUS_GREIF_RADIUS;
       for(const g of FSTEAM[1]){
         const d=Math.hypot(g.x-mx,g.y-my);
@@ -69269,6 +69336,8 @@
     // TEAMFOUL-/BONUS-MODUL: Stand im laufenden Viertel (read-only, fuer HUD/Scorebug).
     teamFouls:()=>{ const r=foulRegelVon(); if(!r)return null; tfViertelPruefen();
       return {viertel:tfStand.viertel,fouls:[...tfStand.fouls],bonus:[0,1].map(sd=>tfStand.fouls[sd]>=r.bonusAb),bonusAb:r.bonusAb}; },
+    // KAMERA-MODUL: an/aus (Totale), gibt den neuen Zustand zurueck. Reine Anzeige.
+    feldKamera:(an)=>{ if(an!=null)fkAn=!!an; fkZustand=null; return fkAn; },
     diagSpielzuege:(n,dId)=>{
       const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0;
       for(let i=0;i<N;i++){
@@ -69337,7 +69406,7 @@
         // Runde 2 (LAUFWEG-MODUL): Spielzuege und Wurf-Absichten, je im sichtbarsten Moment.
         const alle=()=>[...FSTEAM[0],...FSTEAM[1]];
         if(situation==="backdoor")return fsLive.phase==="laufend"&&alle().some(u=>{const z=lwZ(u); return z.art==="backdoor"&&z.bis-fsT<0.75;});
-        if(situation==="pick")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&lwZ(fsLive.ball.traeger).art==="pnr"&&alle().some(u=>u.screent&&fsT<u.screent.bis&&fsT>u.screent.bis-0.7);
+        if(situation==="pick")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&lwZ(fsLive.ball.traeger).art==="pnr"&&feldLogikDist(fsLive.ball.traeger,{x:korbXVon(fsLive.ball.traeger.side),y:H/2})<135&&alle().some(u=>u.screent&&fsT<u.screent.bis&&fsT>u.screent.bis-0.7);
         if(situation==="roll")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&alle().some(u=>u.rollBis>fsT&&u.rollBis-fsT<1.1&&u.side===fsLive.ball.traeger.side);
         if(situation==="postup")return !!fsLive.ball.traeger&&lwZ(fsLive.ball.traeger).art==="postup"&&fsT-lwZ(fsLive.ball.traeger).postSeit>0.4;
         if(situation==="ausboxen")return !!fl&&fl.art==="wurf"&&fl.t/fl.dauer>=0.85&&FSTEAM[1-fl.schuetze.side].filter(v=>lwZ(v).boxt).length>=4;
