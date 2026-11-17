@@ -27,7 +27,7 @@
   "jobs": {
    "south": "a6e1349f-b1ce-44db-8b98-89a5e89fd5c0",
    "east": "4c6bb131-79b6-407c-af19-40f38fc59921",
-   "north": "Nachbestellung 17.11. an dieselbe Gruppe (1 Gen. angesetzt)"
+   "north": "77f7dd4e-6a42-4351-a5d2-0266ce5d52ab"
   },
   "generationen": 3,
   "action_description": "quickly raises one arm straight up high above his head with an open hand to signal a foul while putting the whistle to his mouth and blowing it, then holds the arm up",
@@ -35,7 +35,8 @@
    "pfiff-south.png",
    "pfiff-east.png",
    "pfiff-north.png"
-  ]
+  ],
+  "jobs_hinweis": "north: Nachbestellung 17.11. an dieselbe Gruppe (1 Gen. angesetzt); Job-ID aus der Bestellantwort (schiri_jobs.json)"
  },
  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
  "erzeugt": "2026-11-17",
@@ -57,6 +58,12 @@
    "walk-north.png"
   ],
   "erzeugt": "2026-11-17",
-  "freigabe": "Chris 17.11.: eine Schiri-Figur samt Animationen/Gesten ist genehmigt (kein Muster fuer andere Figuren)"
+  "freigabe": "Chris 17.11.: eine Schiri-Figur samt Animationen/Gesten ist genehmigt (kein Muster fuer andere Figuren)",
+  "jobs": {
+   "south": "0919cf97-99ba-4e03-926d-eb526a2eaecc",
+   "east": "0abbe98c-a815-4e98-8190-a5f85d15f62e",
+   "north": "f4ba9a6f-0b51-4f91-b07e-5cffa82a451d"
+  },
+  "jobs_hinweis": "Zuordnung nach Reihenfolge der Bestellantwort (background_job_ids entsprechen directions south, east, north); nicht je Job gegengeprueft"
  }
 }

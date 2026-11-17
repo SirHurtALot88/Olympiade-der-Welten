@@ -15749,8 +15749,8 @@
   // SCHIEDSRICHTER ALS PIXELLAB-FIGUR (17.11., Chris: "hud Effekte und schiri auch über Pixel
   // lab" -- ausdrueckliche Freigabe fuer genau diese eine neue Figur). Index-Schluessel "__schiri"
   // (kein Spieler, s. scripts/baue-arena-figuren.mjs), Grundposen + "pfiff" (Arm hoch, Pfeife)
-  // Sued/Ost; Gehen ueber die Ersatzbewegung aus der Grundpose wie bei den 91 Figuren ohne
-  // Laufzyklus. REIN ZEICHNEND: fsSchiri bleibt {x,y,zielX,zielY,pfiffT} -- Blickrichtung, Tempo
+  // und "walk" (Laufzyklus), jeweils Sued/Ost/Nord, West spiegelt Ost (Stand 17.11. nach dem
+  // Ausbau: Pfiff Nord und Laufzyklus nachbestellt, s. __schiri/quellen.json). REIN ZEICHNEND: fsSchiri bleibt {x,y,zielX,zielY,pfiffT} -- Blickrichtung, Tempo
   // und Pfiff-Fortschritt stehen auf einem modulweiten Stellvertreter-Objekt (neue Felder an
   // fsSchiri verschoeben den Wertungs-Fingerabdruck). Der Anpfiff wartet NICHT auf das Bild
   // (er steht nicht in pixelFigurenImSpiel): bis die Grundpose da ist -- und immer im Node-Motor
@@ -35313,7 +35313,7 @@
     // (die dort lokal ist und nur fuer b.effekt-Requisiten EINES Sprites gebaut wird) —
     // gleiche Bauart wie diese: rein aus buehneT/seed berechnet, kein Array, kein rr().
     // PixelLab-Eisspray (17.11., fx_eisstaub, Schleife 0,5 s); Rueckfall: die fuenf Punkte.
-    if(zeichneFxBild("fx_eisstaub",x,y,(buehneT*2+seed*0.173)%1,null,2))return;
+    if(zeichneFxBild("fx_eisstaub",x,y,(buehneT*2+seed*0.173)%1,null,3))return;
     for(let i=0;i<5;i++){
       const phase=(buehneT*2.6+seed*1.7+i*1.3)%1;
       const a=0.7*(1-phase);
@@ -45211,7 +45211,7 @@
         ctx.restore();
         const spritzer=aus==="sturz";
         ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
-        if(spritzer&&!zeichneFxBild("fx_spritzer",x,y-4,(t*1.3)%1,"#b08d5e",1.5)){ ctx.strokeStyle="rgba(255,255,255,.6)";
+        if(spritzer&&!zeichneFxBild("fx_spritzer",x,y-4,(t*1.45)%1,"#b08d5e",1.5)){ ctx.strokeStyle="rgba(255,255,255,.6)";
           for(let k=0;k<5;k++){const ph=(t*2.4+k*0.31)%1; ctx.beginPath(); ctx.arc(x-24+k*12,y-6-ph*22,2+ph*4,0,6.283); ctx.stroke();} }
         break; }
       case "spitzen": { // Final Fall: spanischer Reiter.
@@ -55499,7 +55499,7 @@
       lx.globalCompositeOperation="destination-in";
       lx.drawImage(im,0,0);
       c=lw;
-    }catch(err){ c=null; }
+    }catch{ c=null; }
     hiebFxCache.set(farbe,c);
     return c;
   }
@@ -55524,18 +55524,31 @@
   // je Farbe einmal getoent und zwischengespeichert; farblose (Klingenfunke, Boden-/Eisstaub)
   // laufen ungetoent. REINE ANZEIGE: liest nur den Fortschritt p (0..1) des Aufrufers; kein
   // Zustand an Spielern/Laeufern, kein rr(). Rueckfall: false -> der Aufrufer zeichnet wie bisher.
+  // Optionale Felder: hell = Tonung heller (Anteil Weiss in der Farbe, 0..1; graue Pixel vorab
+  // aufgehellt statt nur multipliziert -- reines Multiply machte aus Teamorange Erdbraun);
+  // glueh = zusaetzlich additiv ("lighter") gezeichnet, leuchtet auf dunklem Grund;
+  // von/bis/pp = nutzbarer Bildbereich (leere Randbilder der Bestellung ueberspringen) und
+  // Hin-und-her-Lauf statt Sprung, damit ein Endlos-Effekt nicht pulsiert.
   const FX_BILD={
-    fx_feuerwerk:{n:24,w:96,h:96,ax:48,ay:48},
-    fx_funken:{n:24,w:97,h:65,ax:47,ay:43},
-    fx_konfetti:{n:28,w:100,h:78,ax:55,ay:49},
+    fx_feuerwerk:{n:24,w:96,h:96,ax:48,ay:48,hell:0.4,glueh:1},
+    fx_funken:{n:24,w:97,h:65,ax:47,ay:43,hell:0.4,glueh:1},
+    fx_konfetti:{n:28,w:100,h:78,ax:55,ay:49,hell:0.35},
     fx_klingen:{n:7,w:32,h:32,ax:16,ay:16},
-    fx_bodenstaub:{n:8,w:32,h:32,ax:16,ay:17},
-    fx_eisstaub:{n:8,w:32,h:32,ax:16,ay:16},
+    fx_bodenstaub:{n:8,w:32,h:32,ax:16,ay:17,von:1,bis:4,pp:1},
+    fx_eisstaub:{n:8,w:32,h:32,ax:16,ay:16,von:0,bis:6,pp:1},
     fx_spritzer:{n:9,w:64,h:64,ax:32,ay:34}};
   const fxToenCache=new Map();
+  function fxAufhellen(farbe,t){
+    const m=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(farbe||"");
+    if(!m)return farbe;
+    let h=m[1]; if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    const n=parseInt(h,16), k=v=>Math.round(v+(255-v)*t);
+    return "rgb("+k((n>>16)&255)+","+k((n>>8)&255)+","+k(n&255)+")";
+  }
   function fxQuelle(name,farbe){
     if(!aDa(name))return null;
     if(!farbe)return aBild[name];
+    const hell=(FX_BILD[name]&&FX_BILD[name].hell)||0;
     const key=name+"|"+farbe;
     let c=fxToenCache.get(key);
     if(c!==undefined)return c;
@@ -55546,24 +55559,28 @@
       const lx=lw.getContext("2d");
       lx.imageSmoothingEnabled=false;
       lx.drawImage(im,0,0);
+      if(hell){ lx.globalCompositeOperation="lighter"; lx.drawImage(im,0,0); }
       lx.globalCompositeOperation="multiply";
-      lx.fillStyle=farbe; lx.fillRect(0,0,w,h);
+      lx.fillStyle=hell?fxAufhellen(farbe,hell):farbe; lx.fillRect(0,0,w,h);
       lx.globalCompositeOperation="destination-in";
       lx.drawImage(im,0,0);
       c=lw;
-    }catch(err){ c=null; }
+    }catch{ c=null; }
     fxToenCache.set(key,c);
     return c;
   }
   function zeichneFxBild(name,x,y,p,farbe,skala){
     const d=FX_BILD[name];
     if(!d||!isFinite(p)||!isFinite(x)||!isFinite(y))return false;
-    const q=fxQuelle(name,farbe);
-    if(!q)return false;
-    const f=Math.max(0,Math.min(d.n-1,Math.floor(p*d.n))), k=skala||1;
+    const bild=fxQuelle(name,farbe);
+    if(!bild)return false;
+    const von=d.von||0, bis=d.bis==null?d.n-1:d.bis;
+    const q=d.pp?(p<0.5?p*2:(1-p)*2):p;
+    const f=Math.max(von,Math.min(bis,von+Math.floor(q*(bis-von+1)))), k=skala||1;
     ctx.save();
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(q,f*d.w,0,d.w,d.h,Math.round(x-d.ax*k),Math.round(y-d.ay*k),d.w*k,d.h*k);
+    if(d.glueh&&farbe)ctx.globalCompositeOperation="lighter";
+    ctx.drawImage(bild,f*d.w,0,d.w,d.h,Math.round(x-d.ax*k),Math.round(y-d.ay*k),d.w*k,d.h*k);
     ctx.restore();
     return true;
   }

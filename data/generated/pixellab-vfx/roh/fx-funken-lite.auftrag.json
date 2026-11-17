@@ -4,7 +4,8 @@
  "job": "55bd22ff-af2d-4f7b-92f2-f490d1e323b8",
  "effect_id": "208857c7-aebf-4a39-83d5-d78ccd692fdc",
  "quoted": 1,
- "generationen_abgerechnet": 1.264899479199812,
+ "generationen_abgerechnet": null,
+ "hinweis": "Kontodifferenz unzuverlaessig (parallele Sitzungen; gemessen 1.26); angesetzt 1",
  "canvas": {
   "h": 112,
   "w": 96

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bestellt einen Effekt bei PixelLab (POST /v2/vfx) und legt Spritesheet + JSON als Rohdatei ab.
 
-    python3 -I scripts/pixellab-vfx.py <name> <lite|pro> <prompt-datei> [--aenderung <effect_id> <conversation-datei>]
+    python3 -I scripts/pixellab-vfx.py <name> <lite|pro> <prompt-datei>
 
 Ergebnis (17.11., H1-Effekte, docs/design/pixellab-hud-effekte-schiri-plan-17-11.md):
   data/generated/pixellab-vfx/roh/<name>.png   Spritesheet (Raster, wie PixelLab es liefert)

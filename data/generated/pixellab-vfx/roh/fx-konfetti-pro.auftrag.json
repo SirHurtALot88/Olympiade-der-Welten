@@ -4,7 +4,7 @@
  "job": "575d71dd-c833-4dc8-b637-9130570ced8f",
  "effect_id": "6bfaf81c-7fcb-4d34-98ae-d778fa72282e",
  "quoted": 6,
- "generationen_abgerechnet": 31.0,
+ "generationen_abgerechnet": null,
  "canvas": {
   "h": 78,
   "w": 100
@@ -18,5 +18,6 @@
   "kind": "origin"
  },
  "message": "Made a 1.4-second, one-shot burst of 30 tiny tumbling paper rectangles in white and light grey, ready for team-colour tinting. It spreads roughly 96 pixels across on a transparent background, with sliders for piece count, spread, and burst height.",
- "edit_url": "https://pixellab.ai/create-vfx?effect=6bfaf81c-7fcb-4d34-98ae-d778fa72282e"
+ "edit_url": "https://pixellab.ai/create-vfx?effect=6bfaf81c-7fcb-4d34-98ae-d778fa72282e",
+ "hinweis": "Kontodifferenz unzuverlaessig (parallele Sitzungen); angesetzt 6"
 }
