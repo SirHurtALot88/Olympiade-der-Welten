@@ -270,5 +270,57 @@
    "quelle": "public/szenen/eiskunstlauf/waldsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_eiskunstlauf()",
    "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
   }
+ },
+ "takeshis-castle/eisfestung.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, gemalte Arena-Karte 792x300 (Remake, kein Tausch der alten Midoriyama-Karte)",
+  "auftrag": {
+   "prompt": "top-down view game map of a wide frozen dark fantasy valley at dusk, one single wide winding road of trampled snow and grey stone slabs runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the gate of a dark frozen stone fortress with glowing blue windows, the road crosses a frozen lake with cracked ice in the middle of the map, snowy dark pine trees, jagged blue ice crystals, frozen rocks and small burning torches beside the road, cold blue and violet colours with warm torch light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "1c30cdfa-d1cf-4530-8f94-4e9fa337ada4",
+   "usage": {
+    "type": "generations",
+    "generations": 25.0
+   },
+   "guthaben_vorher": 1041.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_takeshis_castle_eisfestung.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py takeshis-castle && python3 -I scripts/baue-arena-kulissen.py (Quelle 1240x470; das Motorbild in doppelter Leinwandgroesse 2480x940 direkt aus dem Rohbild: ganzzahlig NEAREST, dann LANCZOS; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste -- die Motor-Route liegt auf dem gemalten Weg (TAKESHI_ARENEN.eisfestung.route), docs/design/takeshi-arenen-remake-17-11.md",
+  "vorher": {
+   "paket": "keine Motor-Kulisse",
+   "befund": "Takeshi zeichnete die Karte 'Midoriyama' aus Kacheln, Strichen und Ellipsen (bodenTakeshiRoute()); sie bleibt der Rueckfall, wenn das Kartenbild fehlt."
+  }
+ },
+ "takeshis-castle/dschungel.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, gemalte Arena-Karte 792x300 (Remake, kein Tausch der alten Midoriyama-Karte)",
+  "auftrag": {
+   "prompt": "top-down view game map of a wide overgrown dark fantasy jungle ruin, one single wide winding road of mossy stone slabs and brown earth runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the stairs of an ancient stepped stone temple with glowing golden braziers, the road crosses a green swamp river on a broad stone causeway in the middle of the map, dense jungle trees, giant ferns, broken stone idols, vines and small glowing mushrooms beside the road, deep green and teal colours with warm golden light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art",
+   "seed": 11,
+   "gen": [792, 300],
+   "job": "20ed411e-b586-4da5-90c6-2809294e2a6d",
+   "usage": {
+    "type": "generations",
+    "generations": 25.0
+   },
+   "guthaben_vorher": 1016.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_takeshis_castle_dschungel.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py takeshis-castle && python3 -I scripts/baue-arena-kulissen.py (Quelle 1240x470; das Motorbild in doppelter Leinwandgroesse 2480x940 direkt aus dem Rohbild: ganzzahlig NEAREST, dann LANCZOS; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel -- die Motor-Route liegt auf dem gemalten Weg (TAKESHI_ARENEN.dschungel.route), docs/design/takeshi-arenen-remake-17-11.md",
+  "vorher": {
+   "paket": "keine Motor-Kulisse",
+   "befund": "Takeshi zeichnete die Karte 'Midoriyama' aus Kacheln, Strichen und Ellipsen (bodenTakeshiRoute()); sie bleibt der Rueckfall, wenn das Kartenbild fehlt."
+  }
  }
 }

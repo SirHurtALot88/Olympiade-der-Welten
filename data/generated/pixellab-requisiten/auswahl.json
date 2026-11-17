@@ -730,6 +730,38 @@
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "kulisse_takeshis_castle_dschungel": {
+  "prompt": "top-down view game map of a wide overgrown dark fantasy jungle ruin, one single wide winding road of mossy stone slabs and brown earth runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the stairs of an ancient stepped stone temple with glowing golden braziers, the road crosses a green swamp river on a broad stone causeway in the middle of the map, dense jungle trees, giant ferns, broken stone idols, vines and small glowing mushrooms beside the road, deep green and teal colours with warm golden light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "20ed411e-b586-4da5-90c6-2809294e2a6d",
+  "usage": {
+   "type": "generations",
+   "generations": 25.0
+  },
+  "guthaben_vorher": 1016.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_takeshis_castle_eisfestung": {
+  "prompt": "top-down view game map of a wide frozen dark fantasy valley at dusk, one single wide winding road of trampled snow and grey stone slabs runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the gate of a dark frozen stone fortress with glowing blue windows, the road crosses a frozen lake with cracked ice in the middle of the map, snowy dark pine trees, jagged blue ice crystals, frozen rocks and small burning torches beside the road, cold blue and violet colours with warm torch light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "1c30cdfa-d1cf-4530-8f94-4e9fa337ada4",
+  "usage": {
+   "type": "generations",
+   "generations": 25.0
+  },
+  "guthaben_vorher": 1041.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "kulisse_tennis_dach": {
   "prompt": "top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
   "seed": 11,
@@ -916,6 +948,118 @@
   ],
   "job": "c370f915-1ce8-4943-8af7-f97124575efb",
   "kandidat": 11,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_dschungel_ebene": {
+  "prompt": "two separate items side by side with a wide empty gap between them: on the left a very large cluster of dark green tropical palm fronds and fern leaves with hanging vines, filling the left two thirds, on the right one single small glowing golden firefly light orb, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   224,
+   96
+  ],
+  "job": "f28b25a6-d55f-42aa-a9ae-aaecfe2e52f9",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 961.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_dschungel_fallen": {
+  "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   320,
+   64
+  ],
+  "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 981.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_dschungel_fallen2": {
+  "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   320,
+   64
+  ],
+  "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 931.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_eisfestung_ebene": {
+  "prompt": "two separate items side by side with a wide empty gap between them: on the left a very large dark pine tree branch heavily covered with white snow and hanging icicles, filling the left two thirds, on the right one single small soft white snowflake, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   224,
+   96
+  ],
+  "job": "baab6085-10c2-4d51-a7df-bb39300aa929",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 971.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_eisfestung_fallen": {
+  "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   320,
+   64
+  ],
+  "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 991.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_eisfestung_fallen2": {
+  "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   320,
+   64
+  ],
+  "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 941.7351005208002,
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "tk_partikel": {
+  "prompt": "sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   128,
+   32
+  ],
+  "job": "44ba01e7-282c-4537-b043-433d763e4664",
+  "usage": {
+   "type": "generations",
+   "generations": 10.0
+  },
+  "guthaben_vorher": 951.7351005208002,
+  "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
  "truhe_1_offen": {

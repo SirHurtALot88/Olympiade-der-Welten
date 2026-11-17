@@ -1390,5 +1390,655 @@
    "paket": "Canvas-Primitive",
    "stelle": "zeichneEffekte() typ hieb (ctx.arc in Teamfarbe)"
   }
+ },
+ "tk_eisfestung_technik.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 991.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen (Stueck 1 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit TECHNIK, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_wendigkeit.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 991.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen (Stueck 2 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit WENDIGKEIT, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_wucht.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 991.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen (Stueck 3 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit WUCHT, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_stehen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 991.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen (Stueck 4 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit STEHEN, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_robust.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "8b881363-d14d-44a5-a2e1-1b7d0f4e5453",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 991.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen (Stueck 5 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit ROBUST, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_technik_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 941.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen2 (Stueck 1 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit TECHNIK, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_wendigkeit_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 941.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen2 (Stueck 2 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit WENDIGKEIT, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_wucht_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 941.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen2 (Stueck 3 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit WUCHT, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_stehen_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 941.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen2 (Stueck 4 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit STEHEN, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_robust_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "a493c064-8aa4-4401-8197-1ead4c55b0b6",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 941.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_fallen2 (Stueck 5 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Fallen-Requisit ROBUST, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_vordergrund.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "two separate items side by side with a wide empty gap between them: on the left a very large dark pine tree branch heavily covered with white snow and hanging icicles, filling the left two thirds, on the right one single small soft white snowflake, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    224,
+    96
+   ],
+   "job": "baab6085-10c2-4d51-a7df-bb39300aa929",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 971.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_eisfestung_ebene.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_eisfestung_ebene (groesstes Stueck)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Vordergrund-Requisit der Parallax-Ebene -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_technik.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 981.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen (Stueck 1 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit TECHNIK, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_wendigkeit.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 981.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen (Stueck 2 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit WENDIGKEIT, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_wucht.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 981.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen (Stueck 3 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit WUCHT, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_stehen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 981.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen (Stueck 4 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit STEHEN, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_robust.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "86ef9db1-92e2-4f5d-b298-831b2eec370c",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 981.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen (Stueck 5 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit ROBUST, erster Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_technik_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 931.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen2 (Stueck 1 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit TECHNIK, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_wendigkeit_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 931.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen2 (Stueck 2 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit WENDIGKEIT, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_wucht_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 931.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen2 (Stueck 3 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit WUCHT, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_stehen_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 931.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen2 (Stueck 4 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit STEHEN, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_robust_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    320,
+    64
+   ],
+   "job": "e45c98f4-e710-4631-8140-c1f611eda435",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 931.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_fallen2.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_fallen2 (Stueck 5 von 5)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Fallen-Requisit ROBUST, zweiter Durchgang -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_vordergrund.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "two separate items side by side with a wide empty gap between them: on the left a very large cluster of dark green tropical palm fronds and fern leaves with hanging vines, filling the left two thirds, on the right one single small glowing golden firefly light orb, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    224,
+    96
+   ],
+   "job": "f28b25a6-d55f-42aa-a9ae-aaecfe2e52f9",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 961.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_dschungel_ebene.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_dschungel_ebene (groesstes Stueck)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Vordergrund-Requisit der Parallax-Ebene -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_partikel.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    128,
+    32
+   ],
+   "job": "44ba01e7-282c-4537-b043-433d763e4664",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 951.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_partikel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_partikel (Stueck 1 von 4)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Partikel der Parallax-Ebene (Schneeflocke) -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_eisfestung_partikel_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    128,
+    32
+   ],
+   "job": "44ba01e7-282c-4537-b043-433d763e4664",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 951.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_partikel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_partikel (Stueck 2 von 4)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Frostfeste: Partikel der Parallax-Ebene (Schneewehe) -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_partikel.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    128,
+    32
+   ],
+   "job": "44ba01e7-282c-4537-b043-433d763e4664",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 951.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_partikel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_partikel (Stueck 3 von 4)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Partikel der Parallax-Ebene (Gluehwuermchen) -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
+ },
+ "tk_dschungel_partikel_2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2 (ein Reihenbild, an den Leerspalten geteilt)",
+  "auftrag": {
+   "prompt": "sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    128,
+    32
+   ],
+   "job": "44ba01e7-282c-4537-b043-433d763e4664",
+   "usage": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "guthaben_vorher": 951.7351005208002,
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/tk_partikel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen tk_partikel (Stueck 4 von 4)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "Takeshi's Castle, Arena Schlingentempel: Partikel der Parallax-Ebene (treibendes Blatt) -- TAKESHI_ARENEN in battle-mode.engine.js, docs/design/takeshi-arenen-remake-17-11.md"
  }
 }

@@ -26,7 +26,9 @@ def _kopf():
     return h
 
 
-def api(method, path, body=None, timeout=180):
+def api(method, path, body=None, timeout=180, einmal=False):
+    """einmal=True (Bestell-Regel 17.11.: "POST nie wiederholen"): kein Wiederholen bei 429/5xx/
+    Netzfehler -- ein kostenpflichtiger Auftrag darf nie doppelt abgeschickt werden."""
     data = json.dumps(body).encode() if body is not None else None
     t0 = time.time()
     versuch = 0
@@ -38,6 +40,8 @@ def api(method, path, body=None, timeout=180):
                 return json.loads(r.read())
         except urllib.error.HTTPError as e:
             txt = e.read().decode(errors="replace")[:500]
+            if einmal:
+                raise SystemExit(f"HTTP {e.code} {path} (einmal, NICHT wiederholt): {txt}")
             if e.code == 429 and time.time() - t0 < 30 * 60:
                 time.sleep(20)
                 continue
@@ -46,6 +50,8 @@ def api(method, path, body=None, timeout=180):
                 continue
             raise SystemExit(f"HTTP {e.code} {path}: {txt}")
         except (urllib.error.URLError, TimeoutError) as e:
+            if einmal:
+                raise SystemExit(f"Netzfehler {path} (einmal, NICHT wiederholt -- vor einem neuen Versuch /balance und die Job-Liste pruefen): {e}")
             if versuch < 4:
                 time.sleep(5 * versuch)
                 continue

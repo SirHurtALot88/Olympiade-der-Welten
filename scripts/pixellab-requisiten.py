@@ -343,6 +343,42 @@ AUFTRAEGE = {
         prompt="top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art"),
     "kulisse_eiskunstlauf_waldsee": dict(art="kulisse", hintergrund=True, gen=(792, 300),
         prompt="top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
+
+    # --- Takeshi-Arenen-REMAKE (17.11., Chris: "mehrere verschiedene takeshi arenen, mit verschiedenen
+    # assets ... REDESIGN als REMAKE/2D HD"; docs/design/takeshi-arenen-remake-17-11.md). KEIN Tausch der
+    # alten Midoriyama-Karte: je Arena EINE gemalte Karte im Leinwandformat (792x300), auf der der WEG
+    # schon gemalt ist -- die Route des Motors wird danach auf den gemalten Weg gelegt
+    # (TAKESHI_ARENEN[id].route in battle-mode.engine.js), nicht umgekehrt. Start unten links, Ziel-
+    # bauwerk oben rechts (Leserichtung wie bisher); unten Mitte bleibt ruhig (dort liegt das HUD-Band).
+    "kulisse_takeshis_castle_eisfestung": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view game map of a wide frozen dark fantasy valley at dusk, one single wide winding road of trampled snow and grey stone slabs runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the gate of a dark frozen stone fortress with glowing blue windows, the road crosses a frozen lake with cracked ice in the middle of the map, snowy dark pine trees, jagged blue ice crystals, frozen rocks and small burning torches beside the road, cold blue and violet colours with warm torch light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art"),
+    "kulisse_takeshis_castle_dschungel": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view game map of a wide overgrown dark fantasy jungle ruin, one single wide winding road of mossy stone slabs and brown earth runs from the bottom left corner in two big smooth curves across the map to the top right corner, where it ends at the stairs of an ancient stepped stone temple with glowing golden braziers, the road crosses a green swamp river on a broad stone causeway in the middle of the map, dense jungle trees, giant ferns, broken stone idols, vines and small glowing mushrooms beside the road, deep green and teal colours with warm golden light, long soft shadows, no characters, no text, 16-bit RPG top-down map, detailed pixel art"),
+    # Fallen-Requisiten je Arena: EIN Bogen mit fuenf Fallen in einer Reihe (Muster "schach": aus einem
+    # Guss, ein Auftrag statt fuenf), Reihenfolge = die fuenf Fallen-Sub-Skills TECHNIK, WENDIGKEIT,
+    # WUCHT, STEHEN, ROBUST. `einsetzen` schneidet die fuenf Stuecke an den Leerspalten auseinander
+    # nach public/sprites/arena/tk_<arena>_<typ>.png (art="takeshi_bogen").
+    "tk_eisfestung_fallen": dict(art="takeshi_bogen", arena="eisfestung", gen=(320, 64),
+        prompt=f"sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall made of translucent blue ice blocks, three round flat ice floes floating in a dark water hole, a massive cracked wall of frozen ice bricks with an iron-bound gate, a narrow frosted wooden plank bridge with icicles over a dark crevasse, a cluster of sharp upward pointing ice spikes, {DRAUF}, {STIL}"),
+    "tk_dschungel_fallen": dict(art="takeshi_bogen", arena="dschungel", gen=(320, 64),
+        prompt=f"sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a low maze wall of mossy carved stone blocks with glowing green runes, three round mossy stepping stones in a green swamp pool, a heavy carved stone slab door in a vine-covered stone frame, a rickety rope and wooden plank bridge over a dark pit, a row of sharpened bamboo stakes spike trap, {DRAUF}, {STIL}"),
+    # Zweiter Fallen-Bogen je Arena (zweiter Durchgang, Stationen 8-14): dieselbe Reihenfolge der Sub-Skills.
+    "tk_eisfestung_fallen2": dict(art="takeshi_bogen", arena="eisfestung", zweit=True, gen=(320, 64),
+        prompt=f"sprite sheet of exactly five separate dark fantasy ice obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a smooth tilted slab of slippery mirror ice with cracks, two thick frozen tree logs lying side by side covered in frost, a barricade heap of big packed snow boulders, a heavy frozen iron chain hanging between two icy stone posts, a spiked ice mace ball hanging from a wooden gallows frame, {DRAUF}, {STIL}"),
+    "tk_dschungel_fallen2": dict(art="takeshi_bogen", arena="dschungel", zweit=True, gen=(320, 64),
+        prompt=f"sprite sheet of exactly five separate dark fantasy jungle ruin obstacle props side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a square floor of carved stone pressure plates with glowing golden symbols, two thick mossy tree logs lying side by side, a barricade wall of thick thorny vines and roots, a slippery fallen tree trunk bridge over swamp water, a spiked wooden log hanging on vines from a wooden frame, {DRAUF}, {STIL}"),
+    # Parallax-Ebene je Arena: das grosse Vordergrund-Requisit, das beim Heranzoomen von den unteren
+    # Bildecken hereinragt. (Beide Auftraege baten zusaetzlich um ein kleines Partikel im selben Bild --
+    # die Eisfestung lieferte nur die Tanne; die Partikel kommen deshalb aus dem eigenen Bogen tk_partikel.)
+    "tk_eisfestung_ebene": dict(art="takeshi_ebene", arena="eisfestung", gen=(224, 96),
+        prompt=f"two separate items side by side with a wide empty gap between them: on the left a very large dark pine tree branch heavily covered with white snow and hanging icicles, filling the left two thirds, on the right one single small soft white snowflake, {STIL}"),
+    "tk_dschungel_ebene": dict(art="takeshi_ebene", arena="dschungel", gen=(224, 96),
+        prompt=f"two separate items side by side with a wide empty gap between them: on the left a very large cluster of dark green tropical palm fronds and fern leaves with hanging vines, filling the left two thirds, on the right one single small glowing golden firefly light orb, {STIL}"),
+    # Partikel beider Arenen in EINEM Reihenbild (vier Stueck): Schneeflocke und Schneewehe fuer die
+    # Eisfestung, Gluehwuermchen und treibendes Blatt fuer den Dschungel. Der Motor zeichnet sie
+    # vielfach und bewegt (takeshiArenaDavor()).
+    "tk_partikel": dict(art="takeshi_partikel", gen=(128, 32),
+        prompt=f"sprite sheet of exactly four separate tiny particle sprites side by side in one row, evenly spaced with clear empty gaps between them, from left to right: a white six-pointed snowflake, a small soft white snow puff, a small glowing golden firefly light orb, a small green drifting leaf, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -382,18 +418,24 @@ def bestellen(args):
             ref = Image.open(args.referenz).convert("RGBA")
             body["reference_images"] = [{"image": bild_an(ref), "size": {"width": ref.width, "height": ref.height},
                                          "usage_description": "same object, same camera angle and style"}]
-        r = api("POST", "/generate-image-v2", body)
+        # Bestell-Regel 17.11.: Guthaben vorher lesen, POST genau einmal, usage.generations protokollieren.
+        vorher = api("GET", "/balance").get("subscription", {}).get("generations")
+        print(f"{name}: Guthaben vor der Bestellung {vorher}")
+        r = api("POST", "/generate-image-v2", body, einmal=True)
+        print(f"{name}: Job {r.get('background_job_id')} usage={r.get('usage')}")
         j = warte_job(r["background_job_id"])
+        verbrauch = r.get("usage") or j.get("usage") or (j.get("last_response") or {}).get("usage")
         ims = [bild_aus(x) for x in j["last_response"]["images"]]
         d = kand_dir(args, name)
         os.makedirs(d, exist_ok=True)
         for i, im in enumerate(ims):
             im.save(os.path.join(d, f"{i:02d}.png"))
         json.dump({"prompt": prompt, "seed": args.seed, "gen": [w, h], "job": r["background_job_id"],
+                   "usage": verbrauch, "guthaben_vorher": vorher,
                    **({"referenz": os.path.relpath(args.referenz, WURZEL)} if args.referenz else {})},
                   open(os.path.join(d, "auftrag.json"), "w"), indent=1)
         kontaktbogen(ims, os.path.join(d, "bogen.png"))
-        print(f"{name}: {len(ims)} Kandidaten -> {d}/bogen.png")
+        print(f"{name}: {len(ims)} Kandidaten -> {d}/bogen.png, usage={verbrauch}")
 
 
 def kontaktbogen(ims, ziel):
@@ -723,8 +765,82 @@ def baue_neu(name, a):
     return True
 
 
+TAKESHI_TYPEN = ["technik", "wendigkeit", "wucht", "stehen", "robust"]
+
+
+def bogen_teile(q, n):
+    """Ein Reihenbild an seinen Leerspalten in genau n Stuecke teilen (von links nach rechts), jedes
+    auf seine Alpha-Begrenzung beschnitten. Leerspalten unter 3 px gelten als Luecke IM Stueck (ein
+    Eiszapfen neben seinem Block); sind es danach mehr als n Stuecke, werden die jeweils engsten
+    Nachbarn zusammengelegt. None, wenn weniger als n Stuecke im Bild stehen."""
+    q = zuschnitt(q)
+    px = q.load()
+    voll = [any(px[x, y][3] for y in range(q.height)) for x in range(q.width)]
+    laeufe, x = [], 0
+    while x < q.width:
+        if voll[x]:
+            x0 = x
+            while x < q.width and voll[x]:
+                x += 1
+            if laeufe and x0 - laeufe[-1][1] < 3:
+                laeufe[-1][1] = x
+            else:
+                laeufe.append([x0, x])
+        else:
+            x += 1
+    while len(laeufe) > n:
+        k = min(range(len(laeufe) - 1), key=lambda i: laeufe[i + 1][0] - laeufe[i][1])
+        laeufe[k][1] = laeufe[k + 1][1]
+        del laeufe[k + 1]
+    if len(laeufe) < n:
+        return None
+    return [zuschnitt(q.crop((a, 0, b, q.height))) for a, b in laeufe]
+
+
+def baue_takeshi_bogen(name, a):
+    """Fuenf Fallen-Requisiten einer Takeshi-Arena aus EINEM Reihenbild (TECHNIK, WENDIGKEIT, WUCHT,
+    STEHEN, ROBUST) -> arena/tk_<arena>_<typ>.png (zweiter Bogen: ..._<typ>_2.png), pixelgenau."""
+    q = roh(name)
+    if q is None:
+        return False
+    teile = bogen_teile(q, 5)
+    if teile is None:
+        print(f"{name}: keine fuenf Stuecke im Bogen gefunden")
+        return False
+    for typ, teil in zip(TAKESHI_TYPEN, teile):
+        teil.save(os.path.join(SPRITES, f"arena/tk_{a['arena']}_{typ}{'_2' if a.get('zweit') else ''}.png"))
+    return True
+
+
+def baue_takeshi_ebene(name, a):
+    """Vordergrund-Requisit der Parallax-Ebene einer Takeshi-Arena -> arena/tk_<arena>_vordergrund.png."""
+    q = roh(name)
+    if q is None:
+        return False
+    # nur das groesste Stueck (ein mitgeliefertes Kleinteil neben dem Requisit faellt weg)
+    teile = bogen_teile(q, 2) or [zuschnitt(q)]
+    max(teile, key=lambda t: t.width * t.height).save(
+        os.path.join(SPRITES, f"arena/tk_{a['arena']}_vordergrund.png"))
+    return True
+
+
+def baue_takeshi_partikel(name, a):
+    """Vier Partikel in einer Reihe -> arena/tk_eisfestung_partikel(_2).png, arena/tk_dschungel_partikel(_2).png."""
+    q = roh(name)
+    if q is None:
+        return False
+    teile = bogen_teile(q, 4)
+    if teile is None:
+        print(f"{name}: keine vier Stuecke im Bogen gefunden")
+        return False
+    for ziel, teil in zip(["eisfestung_partikel", "eisfestung_partikel_2", "dschungel_partikel", "dschungel_partikel_2"], teile):
+        teil.save(os.path.join(SPRITES, f"arena/tk_{ziel}.png"))
+    return True
+
+
 BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach,
-         "kulisse": baue_kulisse, "neu": baue_neu}
+         "kulisse": baue_kulisse, "neu": baue_neu, "takeshi_bogen": baue_takeshi_bogen,
+         "takeshi_ebene": baue_takeshi_ebene, "takeshi_partikel": baue_takeshi_partikel}
 
 
 def einsetzen(args):

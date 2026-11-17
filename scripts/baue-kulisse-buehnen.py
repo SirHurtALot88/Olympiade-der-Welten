@@ -1249,11 +1249,22 @@ def baue_climbing(variante: str) -> Image.Image:
     return lein
 
 
+def baue_takeshi(variante: str) -> Image.Image:
+    """TAKESHI-ARENEN-REMAKE (17.11., docs/design/takeshi-arenen-remake-17-11.md): es gibt bewusst
+    KEINEN Bau aus der alten Szene -- die Arena ist eine gemalte PixelLab-Karte (roh/
+    kulisse_takeshis_castle_<variante>.png, Auftrag gleichen Namens in
+    scripts/pixellab-requisiten.py), auf deren gemaltem Weg die Motor-Route liegt
+    (TAKESHI_ARENEN in battle-mode.engine.js). Fehlt das Rohbild, gibt es keine Kulisse und der
+    Motor zeichnet die alte Midoriyama-Karte (Rueckfall)."""
+    raise SystemExit(f"takeshis-castle/{variante}: Rohbild roh/kulisse_takeshis_castle_{variante}.png fehlt")
+
+
 BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
          "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy,
          "gewichtheben": baue_gewichtheben, "basketball": baue_basketball,
          "football": baue_football, "hockey": baue_hockey,
-         "spurt": baue_spurt, "staffel": baue_staffel, "climbing": baue_climbing}
+         "spurt": baue_spurt, "staffel": baue_staffel, "climbing": baue_climbing,
+         "takeshis-castle": baue_takeshi}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
@@ -1263,7 +1274,8 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"],
              "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"],
              "football": ["feld", "strand"], "hockey": ["eis", "bergsee"],
-             "spurt": ["kurs"], "staffel": ["arena"], "climbing": ["wand", "fels", "eis"]}
+             "spurt": ["kurs"], "staffel": ["arena"], "climbing": ["wand", "fels", "eis"],
+             "takeshis-castle": ["eisfestung", "dschungel"]}
 
 
 # ---------------------------------------------------------------------------------------- Welle A

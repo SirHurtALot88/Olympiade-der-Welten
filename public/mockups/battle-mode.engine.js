@@ -44009,6 +44009,17 @@
     // entlang des Wegs, Tribuenenbloecke an der Strecke. Alle drei fehlen-tolerant wie jede andere
     // Kachel hier (aDa()-Wache), fallen also nie auf eine leere Flaeche zurueck.
     "takeshi_torii","takeshi_kirschbaum","takeshi_tribuene",
+    // TAKESHI-ARENEN-REMAKE 17.11. (TAKESHI_ARENEN, docs/design/takeshi-arenen-remake-17-11.md): je
+    // Arena zehn Fallen-Requisiten (zwei je Sub-Skill) plus Vordergrund und Partikel der
+    // Parallax-Ebene. Fehlen-tolerant (aDa()-Wache): fehlt eins, zeichnet die alte Fallen-Fassung.
+    "tk_eisfestung_technik","tk_eisfestung_wendigkeit","tk_eisfestung_wucht","tk_eisfestung_stehen",
+    "tk_eisfestung_robust","tk_eisfestung_technik_2","tk_eisfestung_wendigkeit_2","tk_eisfestung_wucht_2",
+    "tk_eisfestung_stehen_2","tk_eisfestung_robust_2",
+    "tk_eisfestung_vordergrund","tk_eisfestung_partikel","tk_eisfestung_partikel_2",
+    "tk_dschungel_technik","tk_dschungel_wendigkeit","tk_dschungel_wucht","tk_dschungel_stehen",
+    "tk_dschungel_robust","tk_dschungel_technik_2","tk_dschungel_wendigkeit_2","tk_dschungel_wucht_2",
+    "tk_dschungel_stehen_2","tk_dschungel_robust_2",
+    "tk_dschungel_vordergrund","tk_dschungel_partikel","tk_dschungel_partikel_2",
     // KULISSEN-QS 08.11. (Batch 14, Rang 2 des Audits docs/design/kulissen-qualitaets-audit-08-11.md):
     // drei neue Requisiten fuer "Rahmen statt Material" an der Kletterwand -- Hallenmatte als
     // Bodenkachel, Kreidebeutel am Wandfuss, Eiszapfen am Eisfall-Ueberhang. Fehlen-tolerant wie
@@ -45269,9 +45280,201 @@
     if(z>1.08){ ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
       ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+z.toFixed(1)+"×",10,16); }
   }
+  // =================== TAKESHI-ARENEN: REMAKE ALS GEMALTE KARTEN (17.11.) ===================
+  // Chris, 17.11.: "wir wollten auch mehrere verschiedene takeshi arenen, mit verschiedenen assets
+  // ... wichtig ist dass wir die designs wirklich von pixel lab verwenden und nicht einfach die
+  // alten haesslichen 1:1 uebertragen ... REDESIGN als REMAKE/2D HD". Konzept, Asset-Liste und
+  // Kosten: docs/design/takeshi-arenen-remake-17-11.md.
+  //
+  // Eine Arena ist EIN gemaltes PixelLab-Kartenbild (public/sprites/kulissen/takeshis-castle/
+  // <id>.jpg, gebaut ueber scripts/pixellab-requisiten.py -> baue-kulisse-buehnen.py ->
+  // baue-arena-kulissen.py), auf dem der Weg schon gemalt ist. Hier steht je Arena nur, was der
+  // Motor dazu wissen muss:
+  //   route      Wegpunkte in Bruchteilen von W/H AUF dem gemalten Weg (am Bild vermessen) --
+  //              ersetzt BAHN_ART["takeshis-castle"].route in routeTabelle(), solange die Karte liegt
+  //   maxZoom    Deckel der Folge-Kamera (s. kameraBahn)
+  //   fallen     je Fallen-Sub-Skill ZWEI eigene Requisiten (erster/zweiter Durchgang, wie fallenBild;
+  //              public/sprites/arena/tk_<id>_<typ>[_2].png) mit eigenem Namen fuer Schild und Lower-Third
+  //   vordergrund/partikel  Parallax-Ebene vor den Laeufern (Requisiten, fehlen-tolerant)
+  //   licht      Farbstimmung der Vignette, `leiste`/`kante` die Farben der HUD-Leiste
+  // Welche Arena ein Spiel zeigt, entscheidet kulisseWaehlen() -- derselbe Saat-Hash wie bei jeder
+  // anderen Kulisse, kein rr(). ALLES HIER IST REINE DARSTELLUNG: kein Feld an Laeuferobjekten,
+  // kein Zugriff aus stepSpurt()/wert(). Spielwirkung je Arena (Rutschigkeit, Fallendichte) ist
+  // im Konzept nur VORGESCHLAGEN, nicht gebaut.
+  const TAKESHI_ARENEN={
+    eisfestung:{ name:"Frostfeste", maxZoom:2.2,
+      route:[[0.076,0.92],[0.139,0.867],[0.189,0.82],[0.227,0.74],[0.235,0.627],[0.21,0.527],[0.162,0.467],
+             [0.135,0.367],[0.152,0.253],[0.208,0.197],[0.278,0.193],[0.335,0.227],[0.379,0.283],[0.423,0.343],
+             [0.465,0.427],[0.505,0.533],[0.537,0.62],[0.574,0.713],[0.631,0.81],[0.707,0.857],[0.783,0.87],
+             [0.846,0.833],[0.884,0.723],[0.879,0.607],[0.848,0.52],[0.817,0.44],[0.816,0.353],[0.838,0.3],
+             [0.869,0.253],[0.888,0.213]],
+      fallen:{TECHNIK:[{bild:"tk_eisfestung_technik",name:"Spiegeleis-Irrgarten"},{bild:"tk_eisfestung_technik_2",name:"Spiegelhang"}],
+              WENDIGKEIT:[{bild:"tk_eisfestung_wendigkeit",name:"Schollensprung"},{bild:"tk_eisfestung_wendigkeit_2",name:"Froststämme"}],
+              WUCHT:[{bild:"tk_eisfestung_wucht",name:"Frostpforte"},{bild:"tk_eisfestung_wucht_2",name:"Schneewall"}],
+              STEHEN:[{bild:"tk_eisfestung_stehen",name:"Eiszapfensteg"},{bild:"tk_eisfestung_stehen_2",name:"Eiskette"}],
+              ROBUST:[{bild:"tk_eisfestung_robust",name:"Dornenfrost"},{bild:"tk_eisfestung_robust_2",name:"Eispendel"}]},
+      vordergrund:"tk_eisfestung_vordergrund", partikel:["tk_eisfestung_partikel","tk_eisfestung_partikel_2"], partikelFall:1,
+      licht:"18,22,58", leiste:"rgba(10,14,34,.78)", kante:"rgba(140,190,255,.55)" },
+    dschungel:{ name:"Schlingentempel", maxZoom:2.2,
+      route:[[0.088,0.9],[0.152,0.853],[0.199,0.76],[0.21,0.627],[0.184,0.507],[0.192,0.407],[0.24,0.36],
+             [0.301,0.38],[0.341,0.473],[0.379,0.56],[0.436,0.6],[0.49,0.553],[0.543,0.453],[0.606,0.387],
+             [0.659,0.387],[0.702,0.447],[0.745,0.5],[0.788,0.473],[0.811,0.373],[0.831,0.287],[0.856,0.207],
+             [0.874,0.153]],
+      fallen:{TECHNIK:[{bild:"tk_dschungel_technik",name:"Runenlabyrinth"},{bild:"tk_dschungel_technik_2",name:"Runenplatten"}],
+              WENDIGKEIT:[{bild:"tk_dschungel_wendigkeit",name:"Sumpfsteine"},{bild:"tk_dschungel_wendigkeit_2",name:"Moosstämme"}],
+              WUCHT:[{bild:"tk_dschungel_wucht",name:"Götzentor"},{bild:"tk_dschungel_wucht_2",name:"Dornenwall"}],
+              STEHEN:[{bild:"tk_dschungel_stehen",name:"Lianenbrücke"},{bild:"tk_dschungel_stehen_2",name:"Rutschstamm"}],
+              ROBUST:[{bild:"tk_dschungel_robust",name:"Bambusfalle"},{bild:"tk_dschungel_robust_2",name:"Stachelpendel"}]},
+      vordergrund:"tk_dschungel_vordergrund", partikel:["tk_dschungel_partikel","tk_dschungel_partikel_2"], partikelFall:0,
+      licht:"6,24,14", leiste:"rgba(8,22,14,.78)", kante:"rgba(240,200,110,.55)" }
+  };
+  // Die aktive Arena dieses Rennens -- nur wenn ihr Kartenbild wirklich GELADEN ist. Boden, Route,
+  // Laeufer und Kamera lesen alle diese eine Weiche, koennen also nie auseinanderlaufen (derselbe
+  // Grundsatz wie istRoute()). null = alte Midoriyama-Karte.
+  function takeshiArena(){
+    if(!BA().takeshi||!BA().route||!kulisseSichtbar())return null;
+    return TAKESHI_ARENEN[kulisseAktiv.id]||null;
+  }
+  // Requisit und Name der Falle i in dieser Arena: Typ aus dem Kurs, Fassung aus dem Durchgang
+  // (Station 1-7 die erste, 8-14 die zweite) -- dieselbe Rechnung wie fallenLook(). Fehlt das Bild
+  // der zweiten Fassung, gilt die erste.
+  function takeshiArenaFalle(arena,i){ const v=arena.fallen[HUERDEN_TYP(i)]; if(!v)return null;
+    const f=v[Math.floor(i/BA().hindernisTypen.length)%v.length]; return aDa(f.bild)?f:v[0]; }
+  function bodenTakeshiArena(arena){
+    const z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
+    const karte=kulisseBilder[kulisseAktiv.bild];
+    ctx.fillStyle="rgb("+arena.licht+")"; ctx.fillRect(0,0,W,H);
+    ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
+    ctx.imageSmoothingEnabled=false;
+    // 1. DIE KARTE: Gelaende, Weg, Licht und Zielbauwerk sind EIN gemaltes Bild.
+    ctx.drawImage(karte,0,0,W,H);
+    // 2. START- UND ZIELLINIE quer ueber den gemalten Weg.
+    ctx.lineCap="butt";
+    for(const [s,strich] of [[0.004,null],[0.985,[6,6]]]){ const r=routeXY(s);
+      ctx.setLineDash(strich||[]); ctx.lineWidth=3;
+      ctx.strokeStyle="rgba(8,10,14,.55)"; ctx.beginPath();
+      ctx.moveTo(r.x-r.nx*breite/2+1,r.y-r.ny*breite/2+2); ctx.lineTo(r.x+r.nx*breite/2+1,r.y+r.ny*breite/2+2); ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.beginPath();
+      ctx.moveTo(r.x-r.nx*breite/2,r.y-r.ny*breite/2); ctx.lineTo(r.x+r.nx*breite/2,r.y+r.ny*breite/2); ctx.stroke(); }
+    ctx.setLineDash([]);
+    // 3. DIE FALLEN: das Requisit dieser Arena je Sub-Skill, quer auf dem Weg, Fuss auf der
+    //    Wegmitte. Reaktion auf den Ausgang (fallenAusgang(), reine Lesefunktion): Durchbruch und
+    //    Sturz ruetteln das Requisit, ein sauberer Durchgang laesst es kurz aufleuchten.
+    //    Fehlt ein Requisit, zeichnet die alte Fallen-Fassung an derselben Stelle (Rueckfall).
+    HUERDEN_N().forEach((h,i)=>{ const r=routeXY(h), f=takeshiArenaFalle(arena,i);
+      if(f&&aDa(f.bild)){ const im=aBild[f.bild], aus=fallenAusgang(i);
+        const sk=Math.min(1.25,(breite+16)/im.naturalWidth), bw=im.naturalWidth*sk, bh=im.naturalHeight*sk;
+        const dx=aus==="durchbruch"?Math.sin(t*30)*2:(aus==="sturz"?Math.sin(t*44)*3:0);
+        const x=Math.round(r.x-bw/2+dx), y=Math.round(r.y+bh*0.42-bh);
+        ctx.globalAlpha=0.3; ctx.fillStyle="#04060c"; ctx.beginPath();
+        ctx.ellipse(r.x+3,r.y+bh*0.36,bw*0.46,bh*0.16,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+        ctx.drawImage(im,x,y,bw,bh);
+        if(aus==="sauber"){ ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=0.35+0.2*Math.sin(t*18);
+          ctx.drawImage(im,x,y,bw,bh); ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over"; }
+      } else zeichneFalleTakeshi(i,r.x,r.y+12,i%3,Math.atan2(r.ty,r.tx));
+      // Sterne (Burgpunkte der Falle) und ab Zoom 1,5 der Name -- wie auf der alten Karte.
+      const st=(BA().fallenStufe||{})[HUERDEN_TYP(i)]||1;
+      setzeFont(ctx,"700 7px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
+      ctx.lineWidth=2.5; ctx.strokeStyle="rgba(6,8,14,.85)"; ctx.lineJoin="round";
+      ctx.strokeText("★".repeat(st),r.x,r.y-30); ctx.fillStyle="#f2d75a"; ctx.fillText("★".repeat(st),r.x,r.y-30);
+      if(cam.zoom>=1.5&&f){ setzeFont(ctx,"600 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif");
+        ctx.strokeText(f.name,r.x,r.y-38); ctx.fillStyle="#f1ecdf"; ctx.fillText(f.name,r.x,r.y-38); }
+    });
+    ctx.restore();
+  }
+  // NACH DEN LAEUFERN (Aufruf am Ende von zeichneSpurt()): Vordergrund-Ebene, Stimmungslicht,
+  // HUD-Leiste. No-Op ohne Arena.
+  function takeshiArenaDavor(){
+    const arena=takeshiArena(); if(!arena)return;
+    const z=cam.zoom, t=rennT;
+    ctx.save();
+    // 1. PARTIKEL (Schneetreiben bzw. Gluehwuermchen): ein Requisit, viele Kopien, saatfest
+    //    verteilt, mit 1,35-facher Kamerabewegung -- sie liegen sichtbar VOR der Karte.
+    { const bilder=arena.partikel.filter(aDa);
+      ctx.imageSmoothingEnabled=true;
+      for(let i=0;i<22&&bilder.length;i++){ const tempo=0.5+bodenSaat(i+3100);
+        const im=aBild[bilder[i%3===2?bilder.length-1:0]], pw=im.naturalWidth, ph=im.naturalHeight;
+        const fall=arena.partikelFall?t*26*tempo:Math.sin(t*0.5*tempo+i)*14;
+        const drift=arena.partikelFall?t*9*tempo:Math.cos(t*0.35*tempo+i*1.7)*22;
+        const wx=bodenSaat(i+3000)*(W+240)-120-camR.x*z*0.35+drift, wy=bodenSaat(i+3050)*(H+160)-80-camR.y*z*0.35+fall;
+        const x=((wx%(W+120))+(W+120))%(W+120)-60, y=((wy%(H+90))+(H+90))%(H+90)-45;
+        const sk=0.4+bodenSaat(i+3200)*0.5;
+        ctx.globalAlpha=arena.partikelFall?0.6:(0.35+0.4*Math.abs(Math.sin(t*1.3*tempo+i)));
+        ctx.drawImage(im,Math.round(x-pw*sk/2),Math.round(y-ph*sk/2),pw*sk,ph*sk); }
+      ctx.globalAlpha=1; }
+    // 2. VORDERGRUND: zwei grosse Requisiten an den unteren Bildecken, die beim Heranzoomen
+    //    wachsen und gegen die Kamera laufen (Tiefenstaffelung der Draufsicht). Im Ueberblick
+    //    (Zoom 1) bleiben sie fast ganz draussen, damit die Karte frei ist.
+    if(aDa(arena.vordergrund)){ const im=aBild[arena.vordergrund];
+      const p=Math.min(1,Math.max(0,(z-1)/1.2)), sk=2.4+1.6*p, vw=im.naturalWidth*sk, vh=im.naturalHeight*sk;
+      const px=(camR.x/W-0.5)*90*p, py=(camR.y/H-0.5)*50*p;
+      ctx.imageSmoothingEnabled=true; ctx.globalAlpha=0.55+0.4*p;
+      ctx.drawImage(im,Math.round(-vw*(0.52-0.2*p)-px),Math.round(H-vh*(0.42+0.3*p)-py),vw,vh);
+      ctx.save(); ctx.translate(W,0); ctx.scale(-1,1);
+      ctx.drawImage(im,Math.round(-vw*(0.52-0.2*p)+px),Math.round(H-vh*(0.34+0.26*p)-py),vw,vh);
+      ctx.restore(); ctx.globalAlpha=1; }
+    // 3. STIMMUNGSLICHT: Vignette in der Farbe der Arena, staerker beim Heranzoomen.
+    { const vg=ctx.createRadialGradient(W/2,H/2,H*0.34,W/2,H/2,H*0.95);
+      vg.addColorStop(0,"rgba("+arena.licht+",0)"); vg.addColorStop(1,"rgba("+arena.licht+","+(0.34+0.2*Math.min(1,(z-1)/1.2))+")");
+      ctx.fillStyle=vg; ctx.fillRect(0,0,W,H); }
+    ctx.restore();
+    takeshiArenaHud(arena);
+  }
+  // HUD DER ARENA: EINE schmale Leiste am unteren Rand statt dreier Baender ueber der Karte. Je
+  // Team (zwei im Duell, vier im Pod) ein Block in Teamfarbe: Burgpunkte und ein Punkt je
+  // Laeufer -- Teamfarbe = im Rennen, gold = im Ziel, grau durchgestrichen = ausgeschieden. Liest
+  // nur u.raus/u.fertig/u.seite und burgwertung(), dieselben Groessen wie das alte Band.
+  function takeshiArenaHud(arena){
+    const n=bahnSeitenN(), y0=H-30, serif="'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.save();
+    ctx.fillStyle=arena.leiste; ctx.fillRect(0,y0,W,30);
+    ctx.fillStyle=arena.kante; ctx.fillRect(0,y0,W,1);
+    ctx.textBaseline="middle"; ctx.lineJoin="round";
+    // links: Arena und Kurs
+    setzeFont(ctx,"700 13px "+serif); ctx.textAlign="left"; ctx.fillStyle="#f2e9d8";
+    ctx.fillText(arena.name,12,y0+11);
+    setzeFont(ctx,"400 9px "+serif); ctx.fillStyle="#b9c0cf";
+    ctx.fillText((bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")+"noch "+LAEUFER.filter(u=>u.fertig==null).length+" im Rennen",12,y0+23);
+    // Mitte: die Teams
+    const x0=210, bw=(W-x0-250)/n;
+    for(let s=0;s<n;s++){ const g=LAEUFER.filter(u=>u.seite===s), bx=x0+s*bw, farbe=bahnSeitenFarbe(s);
+      const pkt=g.reduce((a,u)=>a+burgwertung(u),0).toFixed(1).replace(".",",");
+      ctx.fillStyle=farbe; ctx.fillRect(bx,y0+5,3,20);
+      setzeFont(ctx,"700 15px "+serif); ctx.textAlign="left"; ctx.fillStyle="#f2e9d8";
+      ctx.fillText("★ "+pkt,bx+9,y0+15);
+      const px0=bx+9+ctx.measureText("★ 00,0").width+12;
+      g.forEach((u,k)=>{ const px=px0+k*12, py=y0+15;
+        ctx.beginPath(); ctx.arc(px,py,4,0,6.283);
+        ctx.fillStyle=u.raus?"#4d5361":(u.fertig!=null?"#f2d75a":farbe); ctx.fill();
+        ctx.lineWidth=1; ctx.strokeStyle=u.raus?"#2a2e38":"rgba(255,255,255,.85)"; ctx.stroke();
+        if(u.raus){ ctx.strokeStyle="#c9ced9"; ctx.lineWidth=1.2;
+          ctx.beginPath(); ctx.moveTo(px-3,py-3); ctx.lineTo(px+3,py+3); ctx.stroke(); } }); }
+    // rechts: Legende
+    setzeFont(ctx,"400 9px "+serif); ctx.textAlign="right"; ctx.fillStyle="#b9c0cf";
+    ctx.fillText("★ je Falle 1–3 · Sturz kostet die halbe Falle",W-12,y0+10);
+    ctx.fillText("Ziel bringt Bonus nach Platz · 3 Stürze = raus",W-12,y0+22);
+    // FALLEN-LOWER-THIRD (TK-1), mit dem Fallen-Namen DIESER Arena.
+    if(bahnFalleAnzeige && rennT<bahnFalleAnzeige.bis){
+      const fi=bahnFalleAnzeige.i, typ=HUERDEN_TYP(fi), f=takeshiArenaFalle(arena,fi);
+      const st=(BA().fallenStufe||{})[typ]||1;
+      const txt="FALLE "+(fi+1)+"/"+(BA().hindernisse||[]).length+" · "+(f?f.name:typ).toUpperCase()+
+        " · "+"★".repeat(st)+" · "+((BA().lang||{})[typ]||typ);
+      setzeFont(ctx,"700 14px "+serif); ctx.textAlign="center";
+      const tw=ctx.measureText(txt).width;
+      ctx.fillStyle=arena.leiste; ctx.fillRect(W/2-tw/2-18,y0-34,tw+36,24);
+      ctx.fillStyle=arena.kante; ctx.fillRect(W/2-tw/2-18,y0-34,tw+36,1); ctx.fillRect(W/2-tw/2-18,y0-11,tw+36,1);
+      ctx.fillStyle="#f2e9d8"; ctx.fillText(txt,W/2,y0-21);
+    }
+    if(cam.zoom>1.08){ setzeFont(ctx,"400 9px "+serif); ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+      ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,16); }
+    ctx.restore();
+  }
   let takeshiPublikumAn=false;
   function bodenTakeshiRoute(){
     if(!takeshiPublikumAn){ tonLoopStart("takeshis-castle"); takeshiPublikumAn=true; }
+    // REMAKE-ARENA (17.11.): liegt eine gemalte Arena-Karte vor, zeichnet sie den ganzen Boden --
+    // die alte Midoriyama-Karte unten bleibt der Rueckfall (Bild fehlt/laedt noch/Headless).
+    { const arena=takeshiArena(); if(arena)return bodenTakeshiArena(arena); }
     const R=routeTabelle(), z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
     ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
     const Z=BA().zonen||[{bis:1,boden:"pfad",um:"wiese"}];
@@ -49648,8 +49851,14 @@
   let waldCache=null;
   function routeTabelle(){
     const A=BA(); if(!A.route)return null;
-    if(routeCache&&routeCache.W===W&&routeCache.H===H&&routeCache.src===A.route)return routeCache;
-    const P=A.route.map(([fx,fy])=>({x:fx*W,y:fy*H}));
+    // TAKESHI-ARENEN (Remake 17.11.): liegt eine gemalte Arena-Karte unter dem Rennen, laeuft die
+    // Route auf DEREN gemaltem Weg (TAKESHI_ARENEN[id].route). Reine Darstellung -- `u.pos` laeuft
+    // weiter 0..1, nichts in stepSpurt/wert() liest die Routengeometrie. Ohne Karte (Bild fehlt,
+    // Headless-Runner) bleibt es Zeichen fuer Zeichen bei `A.route`. Der Cache haengt an der
+    // Quelle, wechselt also von selbst, sobald das Kartenbild geladen ist.
+    const arena=takeshiArena(), quelle=arena?arena.route:A.route;
+    if(routeCache&&routeCache.W===W&&routeCache.H===H&&routeCache.src===quelle)return routeCache;
+    const P=quelle.map(([fx,fy])=>({x:fx*W,y:fy*H}));
     const at=(i)=>P[Math.max(0,Math.min(P.length-1,i))];
     const pts=[];
     for(let i=0;i<P.length-1;i++){
@@ -49660,7 +49869,7 @@
     }
     pts.push(P[P.length-1]);
     const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
-    routeCache={W,H,src:A.route,pts,cum,len:cum[cum.length-1]}; return routeCache;
+    routeCache={W,H,src:quelle,pts,cum,len:cum[cum.length-1]}; return routeCache;
   }
   // s (Bogenlaenge 0..1) -> Weltpunkt, Tangente (tx,ty), Normale (nx,ny) -- IN EINER
   // Stuetzpunkt-/Bogenlaengen-Tabelle `R` ({pts,cum,len}). Herausgeloest aus `routeXY()`
@@ -50442,7 +50651,11 @@
       for(const u of quelle)nimm(routeXY(u.pos));
       nimm(routeXY(Math.min(1,maxP+0.10))); nimm(routeXY(Math.max(0,minP-0.04)));
       const z0=cam.zoom||1, bw=(x1-x0)+breite+90/z0, bh=(y1-y0)+breite+130/z0;   // Namen ueber dem Kopf, Balken darunter
-      const zielZoom=Math.max(1,Math.min(3.4,Math.min(W/bw,H/bh)));
+      // TAKESHI-ARENEN (Remake 17.11.): die gemalte Karte hat 1,57 Leinwandpixel je Kartenpixel --
+      // bei 3,4x waere jedes davon ein 5-px-Klotz neben fein gezeichneten Figuren. Die Arena
+      // deckelt deshalb den Zoom (`maxZoom`), was nebenbei mehr Strecke im Bild laesst. Reine Anzeige.
+      const arenaK=takeshiArena(), zoomMax=arenaK?arenaK.maxZoom:3.4;
+      const zielZoom=Math.max(1,Math.min(zoomMax,Math.min(W/bw,H/bh)));
       const hw=W/2/zielZoom, hh=H/2/zielZoom;
       const cx=Math.max(hw,Math.min(W-hw,(x0+x1)/2)), cy=Math.max(hh,Math.min(H-hh,(y0+y1)/2));
       const t=Math.min(1,dt*1.8);               // weich nachziehen, derselbe Faktor wie unten
@@ -55081,6 +55294,9 @@
       ctx.restore();
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
+    // TAKESHI-ARENEN (Remake 17.11.): Vordergrund-Ebene (Parallax) und HUD-Leiste liegen UEBER den
+    // Laeufern -- No-Op ohne gemalte Arena-Karte.
+    takeshiArenaDavor();
     // S-N5b STATIONSDUELL-TAFEL MIT SIEGER (Chris 10.11.: "hier steht immer was von duellen, die
     // sieht man aber gar nicht"). `spurtSaeule.aktiv` ist der STANDARD (true), die Tafel laeuft
     // also live. Vorher: zwei unabhaengige Rest-Stationsbalken ohne Ausgang. Jetzt EIN

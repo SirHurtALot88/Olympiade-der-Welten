@@ -110,10 +110,17 @@ CHASSIS = {
     # ohne das eingebrannte Demo-Profil; das Hoehenprofil aus BAHN_ART["time-trial"].gelaende zeichnet
     # der Motor (bodenZeitfahren). Gebaut von scripts/baue-kulisse-zeitfahren.py.
     "time-trial": {"art": "quelle"},
+    # Takeshi-Arenen-Remake (17.11., docs/design/takeshi-arenen-remake-17-11.md): eine gemalte
+    # PixelLab-Karte je Arena; die Motor-Route liegt auf dem gemalten Weg (TAKESHI_ARENEN im Motor).
+    # Der Motor zeichnet sie selbst in WELT-Koordinaten unter der Folge-Kamera (Zoom bis 2,2x) --
+    # deshalb doppelte Leinwandgroesse direkt aus dem Rohbild (`roh_gross`), sonst waere jedes
+    # Kartenpixel beim Heranzoomen ein weicher Fleck. Licht steckt im Bild: Abdunklung fest 0.
+    "takeshis-castle": {"art": "quelle", "dunkel_fest": 0.0, "roh_gross": 2},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
 QUELLEN = WURZEL / "data" / "generated" / "kulissen-quellen"
+ROH_PIXELLAB = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
 
 # DAS LAYOUT DER ARENA-SZENEN (TDM, Mini-DM: alle 1280x790, gleicher Grundriss). Spielboden
 # innerhalb der Mauern, und der Ausschnitt, der auf die Leinwand kommt: die volle Bodenbreite
@@ -294,6 +301,13 @@ def main() -> None:
                 fertig, objs = Image.open(q).convert("RGB"), []
                 if fertig.size != (LW, LH):
                     fertig = fertig.resize((LW, LH), Image.LANCZOS)
+                roh = ROH_PIXELLAB / f"kulisse_{d_id.replace('-', '_')}_{v['id']}.png"
+                if chassis.get("roh_gross") and roh.exists():
+                    # ganzzahlig NEAREST hoch (Pixelraster bleibt scharf), dann weich auf n-fache Leinwand
+                    n = chassis["roh_gross"]
+                    r = Image.open(roh).convert("RGB")
+                    g = int(LW * n / r.width) + 1
+                    fertig = r.resize((r.width * g, r.height * g), Image.NEAREST).resize((LW * n, LH * n), Image.LANCZOS)
             else:
                 fertig = None
             demo = v.get("demo")
