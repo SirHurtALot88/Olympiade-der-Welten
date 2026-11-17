@@ -1,416 +1,591 @@
 {
- "_hinweis": "Herkunft der Arena-Kulissen. NICHT alle Bilder unter kulissen/ sind PixelLab (Korrektur 17.11., docs/design/pixellab-nur-neue-assets-audit-17-11.md): die Originale der Asset-Runde (public/szenen/<disziplin>/<variante>.html, Commit addeede9) sind PixelLab-Szenen, Job-IDs je Szene gibt es dafuer nicht. 12 der 54 Motor-Kulissen sind dagegen Varianten, deren Umgebung (Himmel, Skyline, Haeuser, Zelte, Baeume, Effekte) scripts/baue-szenen-varianten.py, scripts/baue-szenen-varianten-2.py oder scripts/baue-szenen-schauplaetze.py prozedural mit PIL malen; nur die Spielflaeche ist aus dem PixelLab-Original uebernommen und hoechstens umgefaerbt. Diese Eintraege tragen \"paket\": \"prozedural\" (showcase/zirkus: \"gemischt\") und nennen das Malskript. Weg zur Motor-Kulisse: scripts/baue-kulisse-*.py -> data/generated/kulissen-quellen/ -> scripts/baue-arena-kulissen.py. Bilder, in die seit Batch 12 (08.11., 'Rahmen statt Material') eigene PixelLab-Erzeugnisse oder gebackenes Licht eingehen, fuehren die fruehere Fassung unter 'vorher'. Kulissen ohne Eintrag hier sind unveraenderte Zuschnitte der PixelLab-Originale. Doku: docs/design/arena-kulissen-im-motor-03-11.md, Abschnitt Batch 12.",
- "showcase/buehne.jpg": {
-  "paket": "PixelLab",
-  "quelle": "Szene public/szenen/showcase/buehne.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
-  "auftrag": {
-   "prompt": "painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors",
-   "seed": 11,
-   "gen": [
-    264,
-    116
-   ],
-   "job": "278784ac-cecc-412d-b126-098371786044",
-   "kandidat": 0
+  "_hinweis": "Herkunft der Arena-Kulissen. Die meisten Bilder unter kulissen/ entstehen aus den PixelLab-Szenen der Asset-Runde (public/szenen/<disziplin>/<variante>.html) ueber scripts/baue-kulisse-*.py -> data/generated/kulissen-quellen/ -> scripts/baue-arena-kulissen.py. Hier stehen die Bilder, in die seit Batch 12 (08.11., 'Rahmen statt Material') zusaetzlich eigene PixelLab-Erzeugnisse oder gebackenes Licht eingehen; die fruehere Fassung steht unter 'vorher'. Doku: docs/design/arena-kulissen-im-motor-03-11.md, Abschnitt Batch 12. Welle A (17.11., docs/design/pixellab-nur-neue-assets-audit-17-11.md): die 18 prozedural gemalten Varianten (baue-szenen-varianten*.py, baue-szenen-schauplaetze.py) sind durch eigene PixelLab-Breitformate ersetzt (Batch 1: 6 Bilder, Batch 2: 12 Bilder); jeder Eintrag unten traegt Job-ID, Prompt, Saat und 'vorher'.",
+  "showcase/buehne.jpg": {
+    "paket": "PixelLab",
+    "quelle": "Szene public/szenen/showcase/buehne.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
+    "auftrag": {
+      "prompt": "painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors",
+      "seed": 11,
+      "gen": [
+        264,
+        116
+      ],
+      "job": "278784ac-cecc-412d-b126-098371786044",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_buehne.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (Prospekt in die Demo-LED-Wand, Holzboden, Lichtkegel und Lichtpfuetzen; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-08",
+    "verwendung": "Showcase, Variante Theater",
+    "vorher": {
+      "paket": "PixelLab (Szene der Asset-Runde)",
+      "quelle": "public/szenen/showcase/buehne.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+      "befund": "schwarzer Buehnenraum, schwarze Demo-LED-Wand (Kulissen-Audit 08.11., Rang 5)"
+    }
   },
-  "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_buehne.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (Prospekt in die Demo-LED-Wand, Holzboden, Lichtkegel und Lichtpfuetzen; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-08",
-  "verwendung": "Showcase, Variante Theater",
-  "vorher": {
-   "paket": "PixelLab (Szene der Asset-Runde)",
-   "quelle": "public/szenen/showcase/buehne.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
-   "befund": "schwarzer Buehnenraum, schwarze Demo-LED-Wand (Kulissen-Audit 08.11., Rang 5)"
+  "showcase/zirkus.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide empty circus tent stage, a red velvet curtain with a golden star at the back, red and white striped tent walls, tiers of seats with small cheering spectators on the far left and right, a light sand coloured wooden stage floor filling the middle, red carpet steps with golden lights along the front edge, nothing on the stage, no performer, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "25649129-3422-4c32-b32e-abe9679c293a",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_showcase_zirkus.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Showcase, Variante Zirkuszelt",
+    "vorher": {
+      "paket": "PixelLab",
+      "quelle": "Szene public/szenen/showcase/zirkus.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
+      "auftrag": {
+        "prompt": "deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit",
+        "seed": 11,
+        "gen": [
+          264,
+          116
+        ],
+        "job": "738e1118-b586-4a97-9592-2a9630c91b18",
+        "kandidat": 0
+      },
+      "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_zirkus.png",
+      "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (graue Randspalten des Rohbilds abgeschnitten, Prospekt in die Demo-LED-Wand, sanfte Lichtkegel)",
+      "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+      "erzeugt": "2026-11-08",
+      "verwendung": "Showcase, Variante Zirkus",
+      "vorher": {
+        "paket": "PixelLab (Szene der Asset-Runde)",
+        "quelle": "public/szenen/showcase/zirkus.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+        "befund": "schwarzes Loch der Demo-LED-Wand ueber dem Holzboden"
+      }
+    }
+  },
+  "showcase/festival.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide empty open-air music festival main stage at night, a big dark stage floor platform filling the middle with a row of small footlights along its front edge, tall black loudspeaker stacks on the far left and right, a huge glowing magenta LED wall with light beams behind the stage, starry night sky, a dark crowd area with glow sticks along the bottom edge, nothing on the stage, no people, no instruments, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "496d9038-ef3d-44dd-b8f9-9f02e14c36f0",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_showcase_festival.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Showcase, Variante Freiluft-Festival",
+    "vorher": {
+      "paket": "PixelLab",
+      "quelle": "Szene public/szenen/showcase/festival.html (bg + fg); LED-Wand als Punktmatrix nachgerechnet (prospekt_led(), Farben aus dem Poster der Szene), keine neue Erzeugung",
+      "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py",
+      "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+      "erzeugt": "2026-11-08",
+      "verwendung": "Showcase, Variante Freiluft-Festival",
+      "vorher": {
+        "paket": "PixelLab (Szene der Asset-Runde)",
+        "quelle": "public/szenen/showcase/festival.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
+        "befund": "schwarze Demo-LED-Wand, schwarzer Buehnenboden"
+      }
+    }
+  },
+  "breaking/standard.jpg": {
+    "paket": "PixelLab",
+    "quelle": "Szene public/szenen/breaking/standard.html (world); Licht gebacken (breaking_licht(): Schatten angehoben, Fackelglut, Lichtschacht, Lichtinsel auf dem Motor-Druck-Rund), keine neue Erzeugung",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-08",
+    "verwendung": "Breaking (Folter-Gauntlet), Variante Erste Fassung",
+    "vorher": {
+      "paket": "PixelLab (Szene der Asset-Runde)",
+      "quelle": "public/szenen/breaking/standard.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
+      "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
+    }
+  },
+  "breaking/brutal.jpg": {
+    "paket": "PixelLab",
+    "quelle": "Szene public/szenen/breaking/brutal.html (world); Licht gebacken wie breaking/standard.jpg, keine neue Erzeugung",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-08",
+    "verwendung": "Breaking (Folter-Gauntlet), Variante Gauntlet",
+    "vorher": {
+      "paket": "PixelLab (Szene der Asset-Runde)",
+      "quelle": "public/szenen/breaking/brutal.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
+      "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
+    }
+  },
+  "i-spy/aztec.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty courtyard of an overgrown aztec jungle temple, carved stone temple wall with dark doorways and hanging vines along the top edge only, the whole rest is open flat floor of mossy stone slabs and short jungle grass with a few small ferns at the left and right borders, warm green and ochre colours, even soft light, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "956a6a8a-fb06-4ebc-bcd2-9f56d38085ef",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_aztec.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "I-Spy, Halle aztec"
+  },
+  "i-spy/horror.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty haunted crypt hall interior, dark stone back wall with iron-barred alcoves and dim candles along the top edge only, the whole rest is open flat floor of dark grey-teal cobblestones with a few scattered bones and cobwebs at the left and right borders, cold teal and grey moody light, no pillars in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "4fd62eb4-2c2f-4ff6-91b2-54e5d35ce69f",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_horror.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "I-Spy, Halle horror"
+  },
+  "i-spy/lostplace.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty abandoned factory hall interior, back wall with a row of broken industrial windows along the top edge only, the whole rest is open flat floor of cracked grey-green concrete tiles with moss in the cracks, a few scattered papers and debris at the left and right borders, muted grey and olive colours, no machines in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "afc690f9-8be4-4bfe-8ef4-6fc82e887671",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_lostplace.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "I-Spy, Halle lostplace"
+  },
+  "i-spy/ruinengarten.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty overgrown ruined garden, crumbling red brick wall with arched openings and ivy along the top edge only, the whole rest is open lawn of lush green grass with a few broken stone flagstone paths, small bushes and fallen column pieces at the left and right borders, bright warm green colours, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "be4d8732-eb9b-4b35-9510-1e259736ca86",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_ruinengarten.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "I-Spy, Halle ruinengarten"
+  },
+  "tennis/riviera.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty sunny terrace of plain orange-red clay on the mediterranean riviera, a white stone balustrade with terracotta flower pots, dark green cypress trees, small white villas with red roofs and a strip of blue sea along the top edge only, the whole rest is open flat smooth floor of plain orange-red clay with no lines and no markings, a few small potted lemon trees at the far left and right borders, warm sunny colours, even soft light, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "bb4336a1-3205-491a-94dd-f5752dffb3f7",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_riviera.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Tennis, Variante Sandplatz Riviera",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/tennis/riviera.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "tennis/dach.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "50c73c61-cfa8-49c0-8693-fbcbab81cdd7",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_dach.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Tennis, Variante Hochhausdach",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/tennis/dach.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "basketball/streetcourt.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Basketball, Variante Street-Court",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/basketball/streetcourt.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_basketball()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "hockey/bergsee.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "a336f46c-27e2-4b46-893d-aaec77e96453",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_hockey_bergsee.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py hockey && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Hockey, Variante Bergsee",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/hockey/bergsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_hockey()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "football/strand.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "ea5f769a-cafc-47cd-a2a7-ca71b9ecf5d0",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_football_strand.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py football && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Football, Variante Strand",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/football/strand.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_football()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "eiskunstlauf/waldsee.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "82f702b0-6505-4cfc-925a-5b5cfc400104",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_eiskunstlauf_waldsee.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py eiskunstlauf && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Eiskunstlauf, Variante Waldsee",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/eiskunstlauf/waldsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_eiskunstlauf()",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "battlefield/wuestenruine.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty desert battlefield, the whole map is open flat light sand with faint wind ripples and a few small stones and tiny cacti, crumbling ancient sandstone ruin walls and broken columns only along the far left and right borders and the top and bottom edge, nothing in the middle, no paths, no buildings in the middle, no flags, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "e4efc40c-1878-4e8b-a03e-c704ebcfc719",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_battlefield_wuestenruine.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py battlefield && python3 -I scripts/baue-arena-kulissen.py (PL_NUR: fertige Quelle, ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Battlefield, Variante Wuestenruine",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/battlefield/wuestenruine.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "fechten/schlosshof.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "view of one single very wide empty castle courtyard, a bright blue sky with a few small white clouds at the very top edge, a tall grey stone castle wall with battlements, two square corner towers with blue roofs and coloured banners along the top third only, a thin strip of green hedge with red roses at the foot of the wall, the whole rest below is an open flat smooth floor of plain grey cobblestones with no lines and no markings, nothing in the middle, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "f8052430-7462-454f-8b89-6c2c3b56482f",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_fechten_schlosshof.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py fechten && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Fechten, Variante Schlosshof",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/fechten/schlosshof.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    },
+    "hinweis": "Zweiter Auftrag (Prompt mit blauem Himmel): die erste Fassung (Seed 11, 25 Gen.) zeigte statt eines Himmels die graue Leerfarbe von PixelLab und wurde verworfen."
+  },
+  "gewichtheben/hafen.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "view of one single very wide empty harbour quay at night, a strip along the top edge only with the dark sea, a big red cargo ship with stacked colourful containers, a red and white lighthouse, a yellow harbour crane, glowing street lamps and a full moon in a starry sky, the whole rest below is an open flat smooth floor of plain dark blue-grey concrete quay with no lines and no markings, nothing in the middle, no platform, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "83bddbc4-1ffb-47e0-b14a-8475f01cf249",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_gewichtheben_hafen.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Gewichtheben, Variante Hafenkai bei Nacht",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/gewichtheben/hafen.html aus scripts/baue-szenen-varianten.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "gewichtheben/oase.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "view of one single very wide empty desert oasis market square, a strip along the top edge only with a blue sky with a bright sun, two sandstone pyramids, palm trees and a row of small market stalls with coloured awnings, the whole rest below is an open flat smooth floor of plain warm sand with faint ripples and no lines and no markings, nothing in the middle, no platform, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "2388377c-5272-46a9-8aa9-c29921930165",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_gewichtheben_oase.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Gewichtheben, Variante Oase",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/gewichtheben/oase.html aus scripts/baue-szenen-varianten.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "wettessen/nachtmarkt.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide empty night fairground, dark purple night sky with strings of glowing coloured light bulbs, red and white striped circus tents, a lit ferris wheel and round green trees along the top half, a long low wooden railing with a dim crowd of distant spectators behind it across the middle, the whole bottom third is an open flat floor of plain wooden planks with nothing on it, nothing in the middle of the floor, no table, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "ead8585b-ee1f-4bec-8dd9-8bb99a5f3bf9",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_wettessen_nachtmarkt.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py wettessen && python3 -I scripts/baue-arena-kulissen.py (PL_NUR: fertige Quelle, ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Wettessen, Variante Nachtmarkt",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/wettessen/nachtmarkt.html aus scripts/baue-szenen-varianten.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    },
+    "hinweis": "PixelLab liefert 38 px weisse Randstreifen links und rechts; _weisse_raender_fuellen() ersetzt sie durch gespiegelte Nachbarpixel."
+  },
+  "wettessen/bierzelt.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide empty bavarian beer tent interior, dark wooden wall panelling with a garland of green leaves hanging along the top edge, long wooden shelves full of beer bottles and mugs across the upper middle, a wooden bar counter below the shelves, the whole bottom half is an open flat floor of plain light wooden planks with nothing on it, warm lamp light, nothing in the middle of the floor, no table, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "ca2e7401-3fe2-4b90-90ef-ab1dbb510064",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_wettessen_bierzelt.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py wettessen && python3 -I scripts/baue-arena-kulissen.py (PL_NUR: fertige Quelle, ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Wettessen, Variante Festzelt",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/wettessen/bierzelt.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "climbing/fels.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide flat sheer orange-brown sandstone cliff face, only rock with horizontal layers and faint cracks, evenly lit, no ledges, no plants, no sky, no ground, nothing on it, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "dd4fc474-16c2-45a8-a6f8-939d9ee2d764",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_climbing_fels.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Climbing, Variante Fels (obere Haelfte + gespiegelte Kopie = senkrecht nahtlose Kachel)",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/climbing/fels.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "climbing/eis.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide flat sheer blue glacier ice wall, only ice with vertical icicle streaks and faint cracks, evenly lit, no ledges, no snow on top, no sky, no ground, nothing on it, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "0bd0950e-ecdd-4c1e-b875-a5da2f6beeeb",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_climbing_eis.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Climbing, Variante Eis (obere Haelfte + gespiegelte Kopie = senkrecht nahtlose Kachel)",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/climbing/eis.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "speed-schach/park.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "view of one single very wide empty city park plaza in autumn, a strip along the top edge only with green lawn, orange and yellow autumn trees, a stone fountain with a blue pond, wooden park benches and a black iron fence, the whole rest below is an open flat smooth floor of plain beige gravel path with a few fallen leaves and no lines and no markings, nothing in the middle, no table, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "986af39f-cb41-4484-9088-9d81d1723d93",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_speed_schach_park.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Speed-Schach, Variante Stadtpark",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/speed-schach/park.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    }
+  },
+  "speed-schach/zug.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A Batch 2, ersetzt die prozedural gemalte Variante)",
+    "auftrag": {
+      "prompt": "front view of one single very wide empty luxury train dining car, dark wooden wall with tall windows showing the dark blue night and brass wall lamps along the top, a row of empty tables with green table cloths and white cups along the wall across the upper middle, the whole bottom two thirds is an open flat smooth floor of plain dark red carpet with a faint golden diamond pattern, nothing in the middle, no table in the middle, no characters, no text, 16-bit RPG map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "6260b57e-b4d3-4f08-8cb1-4b193d805fbc",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_speed_schach_zug.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Speed-Schach, Variante Speisewagen",
+    "vorher": {
+      "paket": "prozedural (kein PixelLab)",
+      "quelle": "public/szenen/speed-schach/zug.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt)",
+      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+    },
+    "hinweis": "PixelLab liefert hier einen grauen Letterbox-Streifen (26 px oben, 28 px unten); _weisse_raender_fuellen() in baue-kulisse-buehnen.py schneidet ihn weg und zieht den Inhalt auf die volle Hoehe."
   }
- },
- "showcase/zirkus.jpg": {
-  "paket": "gemischt",
-  "malskript": "scripts/baue-szenen-varianten-2.py showcase (sh_zirkus)",
-  "pixellab_anteil": "Buehnenprospekt (eigener PixelLab-Auftrag, s. 'auftrag') und Buehnenboden aus public/szenen/showcase/buehne.html; Zirkuszelt-Rahmen, Manege und Publikum prozedural",
-  "korrektur": "2026-11-17: stand faelschlich als reines \"paket\": \"PixelLab\" (Nur-PixelLab-Audit)",
-  "quelle": "Szene public/szenen/showcase/zirkus.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
-  "auftrag": {
-   "prompt": "deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit",
-   "seed": 11,
-   "gen": [
-    264,
-    116
-   ],
-   "job": "738e1118-b586-4a97-9592-2a9630c91b18",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/showcase_prospekt_zirkus.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py (graue Randspalten des Rohbilds abgeschnitten, Prospekt in die Demo-LED-Wand, sanfte Lichtkegel)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-08",
-  "verwendung": "Showcase, Variante Zirkus",
-  "vorher": {
-   "paket": "PixelLab (Szene der Asset-Runde)",
-   "quelle": "public/szenen/showcase/zirkus.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
-   "befund": "schwarzes Loch der Demo-LED-Wand ueber dem Holzboden"
-  }
- },
- "showcase/festival.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py showcase (sh_festival)",
-  "pixellab_anteil": "Buehnenboden aus dem PixelLab-Original public/szenen/showcase/buehne.html; Festivalgelaende, Boxentuerme, Publikum und LED-Wand prozedural",
-  "korrektur": "2026-11-17: stand faelschlich als \"paket\": \"PixelLab\" (Nur-PixelLab-Audit)",
-  "quelle": "Szene public/szenen/showcase/festival.html (bg + fg); LED-Wand als Punktmatrix nachgerechnet (prospekt_led(), Farben aus dem Poster der Szene), keine neue Erzeugung",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-08",
-  "verwendung": "Showcase, Variante Freiluft-Festival",
-  "vorher": {
-   "paket": "PixelLab (Szene der Asset-Runde)",
-   "quelle": "public/szenen/showcase/festival.html bg + fg, unveraendert zugeschnitten (Batch 3, 07.11.)",
-   "befund": "schwarze Demo-LED-Wand, schwarzer Buehnenboden"
-  }
- },
- "breaking/standard.jpg": {
-  "paket": "PixelLab",
-  "quelle": "Szene public/szenen/breaking/standard.html (world); Licht gebacken (breaking_licht(): Schatten angehoben, Fackelglut, Lichtschacht, Lichtinsel auf dem Motor-Druck-Rund), keine neue Erzeugung",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-08",
-  "verwendung": "Breaking (Folter-Gauntlet), Variante Erste Fassung",
-  "vorher": {
-   "paket": "PixelLab (Szene der Asset-Runde)",
-   "quelle": "public/szenen/breaking/standard.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
-   "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
-  }
- },
- "breaking/brutal.jpg": {
-  "paket": "PixelLab",
-  "quelle": "Szene public/szenen/breaking/brutal.html (world); Licht gebacken wie breaking/standard.jpg, keine neue Erzeugung",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py breaking && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-08",
-  "verwendung": "Breaking (Folter-Gauntlet), Variante Gauntlet",
-  "vorher": {
-   "paket": "PixelLab (Szene der Asset-Runde)",
-   "quelle": "public/szenen/breaking/brutal.html world, zugeschnitten ohne Licht (Batch 3, 07.11.)",
-   "befund": "dunkelvioletter Schleier, Fackeln und Publikum nur Schemen (Kulissen-Audit 08.11., Rang 6)"
-  }
- },
- "i-spy/aztec.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty courtyard of an overgrown aztec jungle temple, carved stone temple wall with dark doorways and hanging vines along the top edge only, the whole rest is open flat floor of mossy stone slabs and short jungle grass with a few small ferns at the left and right borders, warm green and ochre colours, even soft light, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "956a6a8a-fb06-4ebc-bcd2-9f56d38085ef",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_aztec.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "I-Spy, Halle aztec"
- },
- "i-spy/horror.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty haunted crypt hall interior, dark stone back wall with iron-barred alcoves and dim candles along the top edge only, the whole rest is open flat floor of dark grey-teal cobblestones with a few scattered bones and cobwebs at the left and right borders, cold teal and grey moody light, no pillars in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "4fd62eb4-2c2f-4ff6-91b2-54e5d35ce69f",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_horror.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "I-Spy, Halle horror"
- },
- "i-spy/lostplace.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty abandoned factory hall interior, back wall with a row of broken industrial windows along the top edge only, the whole rest is open flat floor of cracked grey-green concrete tiles with moss in the cracks, a few scattered papers and debris at the left and right borders, muted grey and olive colours, no machines in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "afc690f9-8be4-4bfe-8ef4-6fc82e887671",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_lostplace.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "I-Spy, Halle lostplace"
- },
- "i-spy/ruinengarten.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Halle 792x300 (eine grosse Halle statt zwei Pavillons)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty overgrown ruined garden, crumbling red brick wall with arched openings and ivy along the top edge only, the whole rest is open lawn of lush green grass with a few broken stone flagstone paths, small bushes and fallen column pieces at the left and right borders, bright warm green colours, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "be4d8732-eb9b-4b35-9510-1e259736ca86",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/ispy_halle_ruinengarten.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py i-spy && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "I-Spy, Halle ruinengarten"
- },
- "tennis/riviera.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty sunny terrace of plain orange-red clay on the mediterranean riviera, a white stone balustrade with terracotta flower pots, dark green cypress trees, small white villas with red roofs and a strip of blue sea along the top edge only, the whole rest is open flat smooth floor of plain orange-red clay with no lines and no markings, a few small potted lemon trees at the far left and right borders, warm sunny colours, even soft light, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "bb4336a1-3205-491a-94dd-f5752dffb3f7",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_riviera.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Tennis, Variante Sandplatz Riviera",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/tennis/riviera.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "tennis/dach.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "50c73c61-cfa8-49c0-8693-fbcbab81cdd7",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_tennis_dach.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Tennis, Variante Hochhausdach",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/tennis/dach.html aus scripts/baue-szenen-varianten-2.py (Umgebung mit PIL gemalt), zugeschnitten von baue_tennis()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "basketball/streetcourt.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Basketball, Variante Street-Court",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/basketball/streetcourt.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_basketball()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "hockey/bergsee.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "a336f46c-27e2-4b46-893d-aaec77e96453",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_hockey_bergsee.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py hockey && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Hockey, Variante Bergsee",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/hockey/bergsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_hockey()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "football/strand.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "ea5f769a-cafc-47cd-a2a7-ca71b9ecf5d0",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_football_strand.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py football && python3 -I scripts/baue-arena-kulissen.py (ganzzahlig NEAREST, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Football, Variante Strand",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/football/strand.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_football()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "eiskunstlauf/waldsee.jpg": {
-  "paket": "PixelLab",
-  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
-  "auftrag": {
-   "prompt": "top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
-   "seed": 11,
-   "gen": [
-    792,
-    300
-   ],
-   "job": "82f702b0-6505-4cfc-925a-5b5cfc400104",
-   "kandidat": 0
-  },
-  "roh": "data/generated/pixellab-requisiten/roh/kulisse_eiskunstlauf_waldsee.png",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py eiskunstlauf && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
-  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-  "erzeugt": "2026-11-17",
-  "verwendung": "Eiskunstlauf, Variante Waldsee",
-  "vorher": {
-   "paket": "prozedural (kein PixelLab)",
-   "quelle": "public/szenen/eiskunstlauf/waldsee.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_eiskunstlauf()",
-   "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
-  }
- },
- "battlefield/wuestenruine.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-schauplaetze.py battlefield",
-  "szene": "public/szenen/battlefield/wuestenruine.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/battlefield/eroberung.html, hoechstens umgefaerbt; Umgebung (Wuestenruine mit ausgetrocknetem Wadi) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-battlefield.py wuestenruine && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "fechten/schlosshof.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-schauplaetze.py fechten",
-  "szene": "public/szenen/fechten/schlosshof.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/fechten/piste.html, hoechstens umgefaerbt; Umgebung (Burghof mit Zinnen, Bergfried und Bannern) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py fechten && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "gewichtheben/hafen.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten.py gewichtheben",
-  "szene": "public/szenen/gewichtheben/hafen.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/gewichtheben/sandsack.html, hoechstens umgefaerbt; Umgebung (Hafen) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "gewichtheben/oase.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten.py gewichtheben",
-  "szene": "public/szenen/gewichtheben/oase.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/gewichtheben/sandsack.html, hoechstens umgefaerbt; Umgebung (Oase) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "wettessen/nachtmarkt.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten.py wettessen",
-  "szene": "public/szenen/wettessen/nachtmarkt.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/wettessen/jahrmarkt.html, hoechstens umgefaerbt; Umgebung (Nachtmarkt (Tisch-Ebene umgefaerbt)) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-arena-kulissen.py (Chassis buehne)",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "wettessen/bierzelt.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py wettessen",
-  "szene": "public/szenen/wettessen/bierzelt.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/wettessen/jahrmarkt.html, hoechstens umgefaerbt; Umgebung (Festzelt mit Blaskapelle) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-arena-kulissen.py (Chassis buehne)",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "climbing/fels.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py climbing",
-  "szene": "public/szenen/climbing/fels.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/climbing/wand.html, hoechstens umgefaerbt; Umgebung (Sandsteinwand in der Schlucht) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "climbing/eis.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py climbing",
-  "szene": "public/szenen/climbing/eis.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/climbing/wand.html, hoechstens umgefaerbt; Umgebung (gefrorener Wasserfall am Gletscher) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "speed-schach/park.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py speed-schach",
-  "szene": "public/szenen/speed-schach/park.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/speed-schach/turniersaal.html, hoechstens umgefaerbt; Umgebung (Blitzpartie im Stadtpark) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- },
- "speed-schach/zug.jpg": {
-  "paket": "prozedural",
-  "malskript": "scripts/baue-szenen-varianten-2.py speed-schach",
-  "szene": "public/szenen/speed-schach/zug.html",
-  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/speed-schach/turniersaal.html, hoechstens umgefaerbt; Umgebung (Blitzpartie im Speisewagen) mit PIL gemalt (feste Palette, Bayer-Dithering)",
-  "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py",
-  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
-  "erzeugt": "2026-11-03",
-  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
- }
 }

@@ -271,3 +271,56 @@ Danach die Neubestellungen:
 > oben), Requisiten sind frei bestellbar. Vor einer Neubestellung erst die bezahlten, ungenutzten Bilder in
 > `data/generated/pixellab-requisiten/roh/` prüfen; Stand und Kosten je Disziplin:
 > `docs/design/pixellab-nur-neue-assets-audit-17-11.md`.
+
+## 9. Stand Welle A nach Batch 2 (17.11.)
+
+Chris am 17.11.: „welle 2 ja“. Batch 2 hat die übrigen **12** prozedural gemalten Kulissen durch eigene
+PixelLab-Breitformate (792×300, Saat 11, `/v2/generate-image-v2`) ersetzt. Damit sind alle **18** Varianten aus
+Abschnitt 2 erledigt (Batch 1: 6, Batch 2: 12). Je Bild laut Auftrags-Job **25 Gen.**
+
+| Disziplin / Variante | Roh | Sichtprüfung (Vorher/Nachher unter `docs/design/pixellab-nur-neue-assets-17-11/`) | Gen. |
+|---|---|---|---:|
+| Wettessen Nachtmarkt | `kulisse_wettessen_nachtmarkt` | `welle-a-wettessen-nachtmarkt-*.jpg` | 25 |
+| Wettessen Festzelt (bierzelt) | `kulisse_wettessen_bierzelt` | `welle-a-wettessen-bierzelt-*.jpg` | 25 |
+| Gewichtheben Hafen | `kulisse_gewichtheben_hafen` | `welle-a-gewichtheben-hafen-*.jpg` | 25 |
+| Gewichtheben Oase | `kulisse_gewichtheben_oase` | `welle-a-gewichtheben-oase-*.jpg` | 25 |
+| Fechten Schlosshof | `kulisse_fechten_schlosshof` | `welle-a-fechten-schlosshof-*.jpg` | 25 + 25 (erste Fassung verworfen: graue Leerfarbe statt Himmel) |
+| Showcase Festival | `kulisse_showcase_festival` | `welle-a-showcase-festival-*.jpg` | 25 |
+| Showcase Zirkus | `kulisse_showcase_zirkus` | `welle-a-showcase-zirkus-*.jpg` | 25 |
+| Battlefield Wüstenruine | `kulisse_battlefield_wuestenruine` | `welle-a-battlefield-wuestenruine-*.jpg` | 25 |
+| Speed-Schach Park | `kulisse_speed_schach_park` | `welle-a-speed-schach-park-*.jpg` | 25 |
+| Speed-Schach Zug (Speisewagen) | `kulisse_speed_schach_zug` | `welle-a-speed-schach-zug-*.jpg` | 25 |
+| Climbing Fels | `kulisse_climbing_fels` | `welle-a-climbing-fels-*.jpg` (auch `-nachher-spaet`: Wand mitgescrollt) | 25 |
+| Climbing Eis | `kulisse_climbing_eis` | `welle-a-climbing-eis-*.jpg` | 25 |
+| **Summe Batch 2** | | | **325** (13 Aufträge) |
+
+**Entscheidungen im Bau.**
+
+- **Speed-Schach**: das PixelLab-Original `turniersaal` bleibt unbenutzt (Chris am 17.11.: nicht nutzbar). Statt
+  dessen sind `park` und `zug` neu eingeordnet, also eigene Breitformate, kein Rückgriff auf das Original.
+- **Wettessen**: Chassis bleibt `buehne` (jahrmarkt bleibt der Zuschnitt der Original-Szene). Nur Nachtmarkt und
+  Festzelt kommen als fertige Quelle (`QUELLE_VARIANTEN` in `baue-arena-kulissen.py`, `PL_NUR` in
+  `baue-kulisse-buehnen.py`). Die Wimpelkette und das Schild zeichnet weiter der Motor, deshalb steht keine im Prompt.
+- **Battlefield Wüstenruine**: nur Untergrund und Ruinenrand, keine Wege und keine Bauten in der Mitte. Die drei Orte
+  (x = MID, y = 85/235/385), die Ringe und die Masten zeichnet der Motor, `baue-kulisse-battlefield.py` überspringt die
+  Variante, wenn das Rohbild vorliegt.
+- **Climbing**: die Wand scrollt mit der Kamera, deshalb ist aus dem Breitformat dieselbe senkrecht nahtlose Kachel gebaut
+  wie bisher (obere Hälfte plus gespiegelte Kopie). Beide Bilder sind reine Wandfläche ohne Griffe, Himmel oder Boden.
+  `wand` (Halle) bleibt das PixelLab-Original der Asset-Runde.
+- **Leerfarbe von PixelLab (neu gefunden).** Manche Breitformate haben einen Randstreifen aus reinem Weiß
+  (Nachtmarkt 38 px links/rechts) oder aus dem Neutralgrau (177,176,178) (Zug: 26 px oben, 28 px unten). Weiß wird durch
+  gespiegelte Nachbarpixel ersetzt, graue Letterbox weggeschnitten (`_weisse_raender_fuellen()` in
+  `baue-kulisse-buehnen.py`). **Das behebt einen Fehler aus Batch 1:** `tennis/dach.jpg` trug seit Batch 1 je 20 px weißen
+  Rand links und rechts (im Bild `welle-a-tennis-dach-nachher.jpg` als heller Balken sichtbar). Das Bild ist mit dem
+  Batch-2-Bau neu erzeugt. Alle anderen Batch-1-Bilder haben keinen Randstreifen (nachgemessen, bit-identisch).
+
+**Gesamt Welle A:** Batch 1 (6 Bilder, 150 Gen.) + Batch 2 (13 Aufträge, 325 Gen.) = 475 Gen. Nullkosten-Posten
+(Fegearm, Teller, Pfahl, Takeshi-Schlamm) und Welle B/C sind davon unberührt und weiter offen.
+
+**Football (Strang) — nicht geändert.** Der Auftrag „Football-Strang neu ordnen wie in diesem Dokument beschrieben“ ist
+hier nicht beschrieben: der Audit nennt für Football nur die Kulisse `strand` (Abschnitt 2/3, 25 Gen.), und die ist seit
+Batch 1 erledigt. Es gibt keine Reihenfolge, die neu zu ordnen wäre; `football/feld` bleibt das PixelLab-Original der
+Asset-Runde, `football/strand` die neue Kulisse, Reihenfolge in `battle-mode.kulissen.js` unverändert (feld, strand). Ein
+Umbau auf Verdacht würde den Wertungs-Fingerabdruck nicht verändern, aber auch nichts nachweisbar verbessern. Falls
+Chris etwas Bestimmtes meinte (z. B. `football_becken` verdrahten, Strand als Standard-Kulisse oder Football-Strang im
+Sinne von „Strand-Variante“), braucht der nächste Agent den genauen Satz.
