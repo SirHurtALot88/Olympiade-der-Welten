@@ -78,11 +78,12 @@
   },
   "showcase": {
    "chassis": "buehne",
-   "spielMedian": 0.835,
-   "spielSpannweite": 0.148,
-   "saisonMedian": 0.937,
-   "saisonSpannweite": 0.084,
-   "schranke": 0.05
+   "spielMedian": 0.771,
+   "spielSpannweite": 0.135,
+   "saisonMedian": 0.965,
+   "saisonSpannweite": 0.044,
+   "schranke": 0.05,
+   "nachgezogen": "2026-11-17 von HAND (Chris: Mindestschranke 0,75; Showcase 0,771 besteht; vorher 0,835/0,148/0,937/0,084 vom 02.10.). Messung: node scripts/miss-alle-disziplinen.mjs 24 showcase, Kaderfamilie 15.11. NICHT ueber baue-rangtreue-basislinie.mjs (das ueberschreibt sonst die ganze Datei)"
   },
   "eiskunstlauf": {
    "chassis": "buehne",
