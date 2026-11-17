@@ -71,7 +71,7 @@ export function getFigurSpriteBySlug(slug: string): FigurSprite | null {
 
 export function getFigurSpriteForPlayer(playerId: string | null | undefined): FigurSprite | null {
   if (!playerId) return null;
-  const direct = FIGUREN[playerId.toLowerCase()];
+  const direct = istOffiziellerFigurSlug(playerId.toLowerCase()) ? undefined : FIGUREN[playerId.toLowerCase()];
   if (direct) return { slug: playerId.toLowerCase(), ...direct };
   const slug = slugFromPlayerId(playerId);
   return slug ? getFigurSpriteBySlug(slug) : null;

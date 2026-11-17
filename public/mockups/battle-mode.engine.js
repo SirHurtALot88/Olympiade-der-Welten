@@ -12522,6 +12522,8 @@
     feedEreignis(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
     schwebe({x:0,y:0,txt:"STRAFE!",life:1.2,crit:true,_def:true,_spieler:taeter.id});
     logZug(opfer.side,"strafe",{verteidiger:taeter,spieler:opfer});
+    // Der Schiri zeigt die Strafe an (17.11., reine Anzeige: fsSchiri wird nirgends gelesen, das rr() oder Ergebnisse speist).
+    schiriPfeift(opfer,taeter,{still:true});
     // Beide Seiten neu aufstellen: die bestrafte Seite hat einen Mann weniger (die
     // Unterzahl-Tabelle in zuordneSlots greift dadurch von selbst), die andere einen
     // Gegenspieler weniger zu decken.
@@ -13794,6 +13796,8 @@
       feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true,
         traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined,"touchdown");
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
+      // Der Football-Motor kennt keine Fouls: der Schiri hebt beim Touchdown den Arm (reale Torsignal-Geste).
+      if(traeger)schiriPfeift(traeger,null,{still:true});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
       // F1-MESSPUNKT: der real erzielte Punktwert dieses Zugs (6 oder 7) ist die EP-
       // Entsprechung eines "naechsten Treffers" mit Index 0 -- derselbe Zug, der den
@@ -13841,7 +13845,9 @@
         // Spieler (die Boxscore-Sonde liest e.spieler.id ungeprueft, s.
         // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
         // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
-        logZug(fb.side,"treffer",{spieler:fkLos(off,"PASSGENAUIGKEIT"),punkte:3});
+        const fgSpieler=fkLos(off,"PASSGENAUIGKEIT");
+        logZug(fb.side,"treffer",{spieler:fgSpieler,punkte:3});
+        schiriPfeift(fgSpieler,null,{still:true});
         if(fsFbLog){
           fsFbLog.fgAtt++; fsFbLog.fgMade++;
           // F1-MESSPUNKT: ein Field Goal ist ein realer Punktgewinn wie ein Touchdown (s.
@@ -15707,7 +15713,10 @@
     return {x:b?Math.max(W*0.12,Math.min(W*0.88,b.x)):W/2, y:H-78};
   }
 
-  function schiriPfeift(schuetze,verteidiger){
+  // opt.still (17.11., Hockey-Strafe / Football-Touchdown): nur die Geste und der Ring, kein
+  // "FOUL!"-Schwebetext und kein Basketball-Platzhalterton -- Text und Ton liefert dort schon
+  // der Aufrufer (verhaengeStrafe: "STRAFE!" + hockey-pfiff; Football: "TOUCHDOWN!").
+  function schiriPfeift(schuetze,verteidiger,opt){
     if(!fsSchiri)return;
     const ort=verteidiger||schuetze;
     fsSchiri.pfiffT=PFIFF_DAUER;
@@ -15717,6 +15726,7 @@
     // ballaufprall/buzzer/dribbeln/korb_treffer/publikum_*). buzzer.mp3 ist der einzige
     // kurze, schrille Signalton im Bestand und steht hier leise fuer den Pfiff, bis eine
     // echte pfiff.mp3 im Repo liegt — eine Audiodatei zu erfinden war ausgeschlossen.
+    if(opt&&opt.still)return;
     if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.30);
     schwebe({x:0,y:0,txt:"FOUL!",life:1.2,crit:true,_def:true,_spieler:ort.id});
   }
@@ -15741,8 +15751,8 @@
   // SCHIEDSRICHTER ALS PIXELLAB-FIGUR (17.11., Chris: "hud Effekte und schiri auch über Pixel
   // lab" -- ausdrueckliche Freigabe fuer genau diese eine neue Figur). Index-Schluessel "__schiri"
   // (kein Spieler, s. scripts/baue-arena-figuren.mjs), Grundposen + "pfiff" (Arm hoch, Pfeife)
-  // Sued/Ost; Gehen ueber die Ersatzbewegung aus der Grundpose wie bei den 91 Figuren ohne
-  // Laufzyklus. REIN ZEICHNEND: fsSchiri bleibt {x,y,zielX,zielY,pfiffT} -- Blickrichtung, Tempo
+  // und "walk" (Laufzyklus), jeweils Sued/Ost/Nord, West spiegelt Ost (Stand 17.11. nach dem
+  // Ausbau: Pfiff Nord und Laufzyklus nachbestellt, s. __schiri/quellen.json). REIN ZEICHNEND: fsSchiri bleibt {x,y,zielX,zielY,pfiffT} -- Blickrichtung, Tempo
   // und Pfiff-Fortschritt stehen auf einem modulweiten Stellvertreter-Objekt (neue Felder an
   // fsSchiri verschoeben den Wertungs-Fingerabdruck). Der Anpfiff wartet NICHT auf das Bild
   // (er steht nicht in pixelFigurenImSpiel): bis die Grundpose da ist -- und immer im Node-Motor
@@ -15759,9 +15769,8 @@
       st.vx=dx/d*SCHIRI_TEMPO; st.vy=dy/d*SCHIRI_TEMPO;
       schiriBlick=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:1):(dy>0?2:0);
     } else { st.vx=0; st.vy=0; schiriBlick=2; }
-    // Die Pfiff-Geste selbst gibt es nur Sued/Ost (West = Ost gespiegelt): im Stand und beim
-    // Lauf nach oben schaut er dafuer zum Publikum (Sued).
-    const r0=(pfeift&&schiriBlick===0)?2:schiriBlick;
+    // Die Pfiff-Geste gibt es Sued/Ost/Nord (West = Ost gespiegelt).
+    const r0=schiriBlick;
     st.vizArt=pfeift?"pfiff":null;
     st.vizArtProg=pfeift?Math.min(1,(1-s.pfiffT/PFIFF_DAUER)/0.35):0;
     ctx.save();
@@ -17104,6 +17113,7 @@
     // fuer Football mit — nur der Rest von stepFeldspielLive wird uebersprungen.
     if(istFootball()){
       bewegeSpielerLive(dt);
+      bewegeSchiri(dt); // 17.11.: Pfiff-Geste beim Touchdown/Field Goal braucht den Ablauf von pfiffT (nur Anzeige)
       if(fsLive.phase==="snap")stepSnapPhase(dt);
       // KICKOFF-RETURN (football-kickoff-slot-plan-14-10.md Schritt 4): derselbe Zweig,
       // nur fuer die neue Phase — bleibt innerhalb des bestehenden `if(istFootball())`-
@@ -31078,7 +31088,11 @@
       // und las sich im Screenshot als kleiner Klumpen statt als "Konfetti steigt auf".
       const ausblend=Math.max(0,Math.min(1,(1-alter/S.dauer)/0.30));
       const grav=520;
+      // PixelLab-Burst am Anker (17.11.): Konfetti-Wolke bzw. Funkenfaecher (Breaking), in Teamfarbe;
+      // darunter bleibt jedes dritte Flugstueck des bisherigen Wurfs, damit die Feier nicht duenner wird.
+      const fxKonf=zeichneFxBild(f.funken?"fx_funken":"fx_konfetti",a.x,a.y,alter/(f.funken?1200:1400),c,3);
       for(let i=0;i<S.konfetti;i++){
+        if(fxKonf&&i%3!==0)continue;
         const hh=cypherHash(f.nr*7919+f.seite,i);
         const vx=(hh%321)-160, vy=220+((hh>>>9)%161);
         const x=a.x+vx*tau, y=a.y-vy*tau+0.5*grav*tau*tau;
@@ -31113,6 +31127,8 @@
         const bx=Math.max(W*0.12,Math.min(W*0.88,a.x+((hb%240)-120)));
         const by=H*(feuerwerkAb+((hb>>>8)%19)/100);
         const rMax=150+(hb%60);
+        // PixelLab-Burst (17.11., fx_feuerwerk, 3-fach): ersetzt die 28 Punkte, Rueckfall unten.
+        if(zeichneFxBild("fx_feuerwerk",bx,by,bAlter/1200,c,3))continue;
         ctx.globalAlpha=Math.max(0,1-bAlter/1200);
         ctx.fillStyle=bAlter<120?"#ffffff":c;
         for(let i=0;i<28;i++){
@@ -33494,6 +33510,8 @@
         if(funke>0){
           const leben=funke/FECHT_FUNKE_T;
           const fx=(ax+bx)/2, fy=(ay+by)/2;
+          // PixelLab-Funke (17.11., fx_klingen, 2-fach, 7 Bilder ueber FECHT_FUNKE_T); Rueckfall: Canvas-Funke.
+          if(!zeichneFxBild("fx_klingen",fx,fy,1-leben,null,2)){
           ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
           const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
           grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
@@ -33504,6 +33522,7 @@
             ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
           }
           ctx.restore();
+          }
         }
         // Q1 -- TREFFER-TREPPE unter der Bahn (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
         // die Fechten-Variante der Verlaufskurve, weil seit F1 der Trefferstand das Ergebnis
@@ -34126,7 +34145,23 @@
       // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
       // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
       const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
+      // NUR-PIXELLAB-AUDIT 17.11.: beim Gericht "Pfannkuchen" ist jeder Teller das bezahlte
+      // PixelLab-Bild `wettessen_teller_normal` (32x20, gezeichnet 24x15). Das Bild zeigt einen
+      // Pfannkuchenstapel -- bei Wuerstchen, Wings, Chili oder Austern waere es inhaltlich falsch,
+      // dort bleiben die neutralen Ellipsen, bis ein leerer PixelLab-Teller bestellt ist. Der
+      // Stapel steht RECHTS neben den Fuessen statt darunter: unter den Fuessen verdeckte die Figur
+      // das Gericht, und die dunklen Tellerraender lasen sich wie eine Sprungfeder (Screenshot-
+      // Vergleich, docs/design/pixellab-nur-neue-assets-17-11/). Deckend gezeichnet, damit die
+      // unteren Teller nur als Rand unter dem oberen hervorschauen. Rueckfall: die alten Ellipsen.
+      const tellerBild=(wettessenMenuWahl.n==="Pfannkuchen"&&aDa("wettessen_teller_normal"))?aBild.wettessen_teller_normal:null;
       for(let pl=0;pl<teller;pl++){
+        if(tellerBild){
+          ctx.globalAlpha=gedimmt;
+          ctx.save(); ctx.imageSmoothingEnabled=false;   // Pixel-Look, keine Weichzeichnung beim Verkleinern
+          ctx.drawImage(tellerBild,x+8,y+12-pl*2.2,24,15);
+          ctx.restore();
+          continue;
+        }
         ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
         ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
         ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
@@ -35295,6 +35330,8 @@
     // Eigene, kleine Routine statt der zeichnePartikelEffekt()-Closure aus zeichneSprite()
     // (die dort lokal ist und nur fuer b.effekt-Requisiten EINES Sprites gebaut wird) —
     // gleiche Bauart wie diese: rein aus buehneT/seed berechnet, kein Array, kein rr().
+    // PixelLab-Eisspray (17.11., fx_eisstaub, Schleife 0,5 s); Rueckfall: die fuenf Punkte.
+    if(zeichneFxBild("fx_eisstaub",x,y,(buehneT*2+seed*0.173)%1,null,3))return;
     for(let i=0;i<5;i++){
       const phase=(buehneT*2.6+seed*1.7+i*1.3)%1;
       const a=0.7*(1-phase);
@@ -37328,6 +37365,8 @@
   // lokale Closure INNERHALB zeichneBreaking(); Koerper/Aufrufstelle in zeichneBreaking()
   // unveraendert, nur die Definition ist umgezogen -- bit-identisch fuer Breaking selbst.
   function zeichneBodenstaub(fx,fy,id){
+    // PixelLab-Staubwolke (17.11., fx_bodenstaub, Schleife 0,6 s); Rueckfall: die fuenf Punkte unten.
+    if(zeichneFxBild("fx_bodenstaub",fx,fy,(buehneT/0.6+id*0.37)%1,null,1.25))return;
     ctx.fillStyle="#cbb98a";
     for(let i=0;i<5;i++){
       const ph=buehneT*6+id*1.7+i*1.3;
@@ -37438,6 +37477,17 @@
       ctx.beginPath();
       ctx.ellipse(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*KY,5+((i*29)%7),3+((i*17)%4),a,0,6.2832);
       ctx.fill();
+    }
+
+    // DER PFAHL IN DER MITTE (Nur-PixelLab-Audit 17.11., 0 Gen.): der bezahlte PixelLab-Bindepfahl
+    // `breaking_pfahl` steht auf dem Folterplatz, der Fuss auf derselben Bodenlinie wie die Fuesse
+    // eines Duellanten in der Mitte (o.y+19). Er wird VOR beiden Raengen gezeichnet: tritt der
+    // Ertragende in die Mitte, steht er vor dem Pfahl, statt von ihm verdeckt zu werden. Reine
+    // Kulisse, kein Zustand. Fehlt das Bild, bleibt die Mitte wie bisher leer.
+    if(aDa("breaking_pfahl")){
+      ctx.save(); ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(aBild.breaking_pfahl,Math.round(cx-14),Math.round(cy+21-64),28,64);
+      ctx.restore();
     }
 
     // ================== C. ZWEI RÄNGE STATT ZWÖLF GLEICHER (13.09.) ==================
@@ -43987,7 +44037,9 @@
   // Herkunft steht; und ein Kachelsatz je Disziplin waere sonst jedes Mal Ballast im
   // HTML. Die Sprite-Blaetter der Kaempfer liegen weiter eingebettet — die brauchen
   // Farbtausch je Pixel und muessen deshalb ohnehin durch die Leinwand.
-  const A_TEILE=["boden_sand","boden_stein","boden_erde","mauer_ziegel","rasen",
+  // 17.11. (Chris: "nur noch PixelLab"): `boden_erde` (LPC) faellt aus der Liste -- die einzige
+  // Verwendung, die Takeshi-Schlammgrube, liest jetzt die PixelLab-Kachel `boden_schlamm`.
+  const A_TEILE=["boden_sand","boden_stein","mauer_ziegel","rasen",
     "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel",
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
@@ -44026,10 +44078,20 @@
     // Fundorte als Requisiten, s. ISPY_MOEBEL_BILD. Fehlen-tolerant (aDa()-Wache), Rueckfall Primitiv.
     "ispy_schreibtisch","ispy_schreibtisch_durchsucht","ispy_aktenschrank","ispy_aktenschrank_offen",
     "ispy_verhoerstuhl","ispy_tuer",
+    // HYROX-Arena B 17.11.: die sieben echten Geraete (Rudern entfaellt), PixelLab, s. HYROX_GERAETE.
+    "hyrox_skierg","hyrox_schlitten_schub","hyrox_schlitten_zug","hyrox_burpee","hyrox_wallball","hyrox_farmers","hyrox_sandsack",
+    // Nur-PixelLab-Audit 17.11. (docs/design/pixellab-nur-neue-assets-audit-17-11.md, 0-Gen.-Schritte):
+    // schon bezahlte, bisher ungenutzte PixelLab-Bilder statt Canvas-Primitiven -- Hatz-Fegearm,
+    // Breaking-Pfahl am Folterplatz, Wettessen-Tellerstapel (Gericht Pfannkuchen). Fehlen-tolerant (aDa()-Wache), Rueckfall
+    // bleibt die alte Primitiv-Zeichnung. Die Ekel-Teller (schleim/krabbler) bleiben fuer das geplante
+    // "Ekelroulette" liegen -- unter den fuenf Gerichten des Tages waeren sie falsch.
+    "falle_fegearm","breaking_pfahl","wettessen_teller_normal",
     // EFFEKT-PILOT 17.11. (Chris: "hud Effekte und schiri auch über Pixel lab"): Hieb-Bogen als
     // PixelLab-VFX (POST /v2/vfx, pro), neutral weiss/grau, 7 Bilder a 56 px als Streifen, zur
     // Laufzeit in Teamfarbe getoent (hiebBildGetoent). Rueckfall: der Canvas-Bogen in zeichneEffekte().
-    "fx_hieb"];
+    "fx_hieb",
+    // H1-EFFEKTE 17.11. (Chris: "effekte -> ja"): PixelLab /v2/vfx, waagerechte Streifen, s. FX_BILD.
+    "fx_feuerwerk","fx_konfetti","fx_funken","fx_klingen","fx_bodenstaub","fx_eisstaub","fx_spritzer"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -44145,12 +44207,15 @@
   // HYROX-HALLE (Hallenrunde-PR, Design-Dokument 6.6): dieselbe Datei-statt-base64-Idee wie
   // SB_TEILE/A_TEILE oben, eigener kleiner Lader statt eines Eintrags in A_TEILE --
   // `tests/arena-kulissen.test.ts` prueft fuer A_TEILE-Eintraege PNG-Masse, dieses Bild ist
-  // aber ein JPEG (wie die Rohszene selbst, s. baue-hyrox-halle.py). Laedt es nicht (oder
+  // aber ein JPEG (s. unten, scripts/baue-kulisse-buehnen.py --hyrox-arena). Laedt es nicht (oder
   // fehlt die Datei, etwa im Headless-Runner), zeichnet bodenHyroxHalle() den Vektor-
   // Rueckfall (derselbe Rueckfall-Grundsatz wie bei jeder A_TEILE/BK_TEILE-Kachel).
-  const hallenBild={hyrox_halle:new Image()};
-  hallenBild.hyrox_halle.src="/sprites/arena/hyrox_halle.jpg";
-  const hallenDa=()=>{const im=hallenBild.hyrox_halle;return !!im&&im.complete&&im.naturalWidth>0;};
+  // ARENA B (17.11.): PixelLab-Breitformat 792x300, auf 1240x470 gezogen; vorher hyrox_halle.jpg (1680x960,
+  // aus der alten Szene abgeleitet, entfernt). Name des Feldes bleibt eine Lader-Tabelle, damit ein
+  // spaeteres zweites Motiv nur einen Eintrag braucht.
+  const hallenBild={hyrox_arena:new Image()};
+  hallenBild.hyrox_arena.src="/sprites/arena/hyrox_arena.jpg";
+  const hallenDa=()=>{const im=hallenBild.hyrox_arena;return !!im&&im.complete&&im.naturalWidth>0;};
 
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
@@ -45180,15 +45245,20 @@
         // im Kulissen-QS-Nachtrag 08.11. systematisch gefunden -- dieselbe Behandlung. Die
         // Blasen bleiben bewusst ausserhalb der Rotation: sie sind kreisrund und saisonal
         // unabhaengig von der Streckenneigung, eine Drehung aendert an ihnen nichts Sichtbares.
-        const er=aMust("boden_erde");
+        // Nur-PixelLab-Audit 17.11.: die Grube liest die PixelLab-Kachel `boden_schlamm` (dieselbe,
+        // die das Seeufer der Route schon traegt) statt der LPC-Erde, die erst per Multiply zu
+        // Schlamm abgedunkelt werden musste. Die Schlammkachel ist schon dunkelbraun-nass, das
+        // Multiply faellt deshalb weg. Rueckfall ohne Kachel: exakt die alte Primitiv-Flaeche.
+        const er=aMust("boden_schlamm");
         ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
         weicheFlaeche(x,y-9,28,15,i,()=>{
-          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30);
+          if(!er){ ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over"; }
         });
         ctx.restore();
         const spritzer=aus==="sturz";
         ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
-        if(spritzer){ ctx.strokeStyle="rgba(255,255,255,.6)";
+        if(spritzer&&!zeichneFxBild("fx_spritzer",x,y-4,(t*1.45)%1,"#b08d5e",1.5)){ ctx.strokeStyle="rgba(255,255,255,.6)";
           for(let k=0;k<5;k++){const ph=(t*2.4+k*0.31)%1; ctx.beginPath(); ctx.arc(x-24+k*12,y-6-ph*22,2+ph*4,0,6.283); ctx.stroke();} }
         break; }
       case "spitzen": { // Final Fall: spanischer Reiter.
@@ -45218,58 +45288,106 @@
   // reset() setzt takeshiPublikumAn unten explizit zurueck, sonst haelt die Flagge nach
   // dem ersten Reset "schon gestartet" und der Loop kommt im zweiten Takeshi-Kampf nie
   // wieder.
-  // ================= HYROX-HALLENRUNDE, BODEN (Stufe 2, Design-Dokument 7.7) =================
-  // Vorbild `bodenTakeshiRoute()` direkt unten: EINE Weiche in `bodenSpurt()` fuer Boden UND
-  // Laeufer (istHyroxHalle()), Vektor-Rueckfall ohne geladenes Hallenbild (derselbe Grundsatz
-  // wie jede A_TEILE/BK_TEILE-Kachel -- Boden und Laeufer laufen nie auseinander, auch
-  // headless nicht).
+  // ================= HYROX-ARENA, BODEN (Variante B, 17.11.; Stufe 2 Design-Dokument 7.7) =================
+  // Vorbild `bodenTakeshiRoute()` direkt unten: EINE Weiche in `bodenSpurt()` fuer Boden UND Laeufer
+  // (istHyroxHalle()), Vektor-Rueckfall ohne geladenes Arenabild (derselbe Grundsatz wie jede
+  // A_TEILE/BK_TEILE-Kachel -- Boden und Laeufer laufen nie auseinander, auch headless nicht).
+  //
+  // "RAHMEN STATT MATERIAL" wie I-Spy: das Bild (`hyrox_arena.jpg`, PixelLab) ist ein leerer Trainingshof
+  // OHNE Bahn, Felder und Geraete. Alles Geometrische liegt als Texturebene darueber und stammt aus den
+  // Konstanten HYROX_RING/HYROX_INSELN/HYROX_GERAETE (dieselben, aus denen baueHyroxWeg() die Wegtabelle
+  // baut): Laufrunde als halbtransparenter Belag, gelbe Roxzone-Linie, drei Inseln mit Bahnen, die sieben
+  // Geraete als PixelLab-Requisiten (hyrox_*.png, 1:1 gezeichnet). Reine Anzeige, kein rr().
+  function hyroxRundPfad(x0,y0,x1,y1,r){
+    ctx.moveTo(x0+r,y0); ctx.lineTo(x1-r,y0); ctx.arcTo(x1,y0,x1,y0+r,r); ctx.lineTo(x1,y1-r); ctx.arcTo(x1,y1,x1-r,y1,r);
+    ctx.lineTo(x0+r,y1); ctx.arcTo(x0,y1,x0,y1-r,r); ctx.lineTo(x0,y0+r); ctx.arcTo(x0,y0,x0+r,y0,r); ctx.closePath();
+  }
+  // Mitte der Bahn k von n innerhalb einer Insel (dieselbe Abbildung wie laeuferXY(): q aus bahnZ).
+  const hyroxBahnY=(k,n)=>HYROX_INSEL_Y+((k+0.5)/n-0.5)*(HYROX_BREITE_GRUPPE.technik-14);
+  // Geraetename in ein bis zwei Zeilen: bei zwei Woertern an der Leerstelle geteilt, bei dreien "A B / C".
+  const hyroxNameZeilen=(name)=>{ const w=name.split(" "); if(w.length<2)return [name];
+    const k=w.length>2?w.length-1:1; return [w.slice(0,k).join(" "), w.slice(k).join(" ")]; };
+  // Zielpferch (Matte der Fertigen) in Quellpixeln: zwei Spalten, sechs Reihen, rechts von der Kraft-Insel.
+  const HYROX_PFERCH={x0:1022, x1:1112, y0:196, y1:398, spX:[1086,1052], y:222, dy:31};
   function bodenHyroxHalle(){
     const z=cam.zoom;
     ctx.fillStyle="#15161b"; ctx.fillRect(0,0,W,H);   // Raender bei Zoom<1
     ctx.save();
     ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z*HALLE_S,z*HALLE_S);
     ctx.imageSmoothingEnabled=false;
+    const R=HYROX_RING, bw=R.brt, yI=HYROX_INSEL_Y, hh=HYROX_INSEL_H/2;
     if(hallenDa()){
-      ctx.drawImage(hallenBild.hyrox_halle,0,0,1680,960);
+      ctx.drawImage(hallenBild.hyrox_arena,0,0,HALLE_QW,HALLE_QH);
     } else {
-      // VEKTOR-RUECKFALL: Innenraum dunkel, die ganze Wegtabelle als Strich (die Laufrunde
-      // ist darin der laengste, durchgehende Teil), drei Zonenrechtecke als Matten --
-      // grob, aber Boden und Laeufer laufen auch so nie auseinander (Takeshi-Grundsatz).
-      ctx.fillStyle="#2a2c33"; ctx.fillRect(-40,-40,1760,1040);
-      const P=HYROX_WEG.pts;
-      ctx.strokeStyle="#2b5fa8"; ctx.lineWidth=84; ctx.lineJoin="round"; ctx.lineCap="round";
-      ctx.beginPath(); ctx.moveTo(P[0].x,P[0].y); for(let i=1;i<P.length;i++)ctx.lineTo(P[i].x,P[i].y); ctx.stroke();
-      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=3; ctx.setLineDash([14,10]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle="#394049";
-      ctx.fillRect(150,520,500,230);    // Technik-Gassen
-      ctx.fillRect(960,655,340,60);     // Kletter-Boxen
-      ctx.fillRect(140,180,500,230);    // Kraft-Rasen
+      // VEKTOR-RUECKFALL: dunkler Hof mit Mauerstreifen oben; Ring und Inseln zeichnet der Code darunter.
+      ctx.fillStyle="#2a2620"; ctx.fillRect(-40,-40,HALLE_QW+80,HALLE_QH+80);
+      ctx.fillStyle="#1d1b19"; ctx.fillRect(-40,-40,HALLE_QW+80,170);
     }
-    // START-/ZIELLINIE (6.5).
-    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=3; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(1430,800); ctx.lineTo(1430,880); ctx.stroke();
+    // LAUFRUNDE: Belag als halbtransparente Flaeche (die Fugen des Bildes scheinen durch), Raender als
+    // helle Linien. Gerade/rund wie die Wegtabelle (Mittellinie HYROX_RING, Breite brt).
+    ctx.beginPath();
+    hyroxRundPfad(R.l-bw/2,R.o-bw/2,R.r+bw/2,R.u+bw/2,R.rad+bw/2);
+    hyroxRundPfad(R.l+bw/2,R.o+bw/2,R.r-bw/2,R.u-bw/2,Math.max(2,R.rad-bw/2));
+    ctx.fillStyle="rgba(150,116,70,.34)"; ctx.fill("evenodd");
+    ctx.strokeStyle="rgba(24,16,10,.65)"; ctx.lineWidth=2; ctx.stroke();
+    // Mittellinie der Runde als feine Strichlinie (Bahnrichtung), nur auf den langen Geraden gut lesbar.
+    ctx.beginPath(); hyroxRundPfad(R.l,R.o,R.r,R.u,R.rad);
+    ctx.strokeStyle="rgba(235,222,190,.22)"; ctx.lineWidth=1; ctx.setLineDash([10,12]); ctx.stroke(); ctx.setLineDash([]);
+    // ROXZONE: gelbe Strichlinie an der Innenkante des Rings (Wegweiser zwischen Runde und Inseln).
+    ctx.beginPath(); hyroxRundPfad(R.l+bw/2+2,R.o+bw/2+2,R.r-bw/2-2,R.u-bw/2-2,Math.max(2,R.rad-bw/2-2));
+    ctx.strokeStyle="rgba(235,196,70,.8)"; ctx.lineWidth=2; ctx.setLineDash([9,7]); ctx.stroke(); ctx.setLineDash([]);
+    // DREI INSELN: dunkle Mattenflaeche, Bahnlinien, Rahmen in der Gruppenfarbe.
+    const gFarbe={technik:"rgba(69,176,201,.95)", kletter:"rgba(242,160,61,.95)", kraft:"rgba(199,68,68,.95)"};
+    for(const g of ["technik","kletter","kraft"]){
+      const I=HYROX_INSELN[g], y0=yI-hh, y1=yI+hh;
+      ctx.fillStyle="rgba(14,12,10,.52)"; ctx.fillRect(I.x0,y0,I.x1-I.x0,y1-y0);
+      ctx.strokeStyle="rgba(235,222,190,.2)"; ctx.lineWidth=1; ctx.setLineDash([6,7]);
+      for(let k=1;k<I.bahnen;k++){ const y=Math.round(y0+(y1-y0)*k/I.bahnen)+0.5; ctx.beginPath(); ctx.moveTo(I.x0,y); ctx.lineTo(I.x1,y); ctx.stroke(); }
+      ctx.setLineDash([]);
+      ctx.strokeStyle=gFarbe[g]; ctx.lineWidth=2; ctx.strokeRect(I.x0+1,y0+1,I.x1-I.x0-2,y1-y0-2);
+    }
+    // START/OUT unten, ZIEL rechts (Linien); der IN-Bogen links steht unten bei den Sprites.
+    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(HYROX_X_AUS,R.u-bw/2); ctx.lineTo(HYROX_X_AUS,R.u+bw/2); ctx.stroke();
     ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.setLineDash([6,5]);
-    ctx.beginPath(); ctx.moveTo(1560,450); ctx.lineTo(1650,450); ctx.stroke();
-    ctx.setLineDash([]);
-    // STATIONSSPRITES im Quellraum (6.6), Unterkante auf der Fusslinie.
-    const fuss=(img,cx,fy)=>{ if(img&&img.complete&&img.naturalWidth)
-      ctx.drawImage(img,Math.round(cx-img.naturalWidth/2),Math.round(fy-img.naturalHeight)); };
-    if(aDa("hind_huerde"))for(const gy of [548,604,660,716])fuss(aBild.hind_huerde,620,gy);
-    if(aDa("hind_balken"))for(const gy of [548,604,660,716])fuss(aBild.hind_balken,420,gy);
-    if(aDa("hind_wasser_l")&&aDa("hind_wasser_r"))for(const gy of [218,274,330,385]){
-      fuss(aBild.hind_wasser_l,290-16,gy); fuss(aBild.hind_wasser_r,290+16,gy); }
-    if(aDa("hind_mauer"))for(const gy of [218,274,330,385])fuss(aBild.hind_mauer,390,gy);
-    if(aDa("hind_heu"))for(const gy of [218,274,330,385])fuss(aBild.hind_heu,490,gy);
-    if(aDa("hind_wand"))fuss(aBild.hind_wand,1010,700);
-    if(aDa("hind_seil"))fuss(aBild.hind_seil,1260,700);
-    // LIVE-ZEIT AUF DER ANZEIGETAFEL (optional, rein kosmetisch): das eingebrannte Feld
-    // dunkel uebermalen, dann die gestreckte Zuschauzeit in Gelb.
-    ctx.fillStyle="#0c1220"; ctx.fillRect(1432,250,98,30);
-    ctx.fillStyle="#f2d75a"; ctx.font="700 16px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
-    ctx.fillText(bahnZeitText(bahnRealSek(rennT)),1481,273);
+    ctx.beginPath(); ctx.moveTo(R.r-bw/2,yI); ctx.lineTo(R.r+bw/2,yI); ctx.stroke(); ctx.setLineDash([]);
+    // GERAETE im Quellraum, Unterkante knapp unter der Mitte der Bahn.
+    HYROX_GERAETE.forEach((g)=>{
+      if(!aDa(g.bild))return;
+      const im=aBild[g.bild], n=HYROX_INSELN[g.gruppe].bahnen;
+      for(let k=0;k<n;k++)ctx.drawImage(im,Math.round(g.x-im.naturalWidth/2),Math.round(hyroxBahnY(k,n)+16-im.naturalHeight));
+    });
+    // GERAETENAMEN auf der freien Kante UNTER der untersten Bahn (Opus-Review #1550, S3): im Boden gezeichnet,
+    // also unter allen Figuren und Kopfnamen, und ausserhalb der Reihen, in denen die Laeufer stehen. Zwei
+    // Zeilen (an der Leerstelle geteilt), damit die drei Kraft-Geraete mit ~57 px Abstand nicht ineinander laufen.
+    ctx.save();
+    setzeFont(ctx,"600 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(8,6,4,.85)"; ctx.lineJoin="round"; ctx.fillStyle="#e6e0d2";
+    HYROX_GERAETE.forEach((g)=>{
+      const teile=hyroxNameZeilen(g.name), yB=yI+hh-3-(teile.length-1)*7;
+      teile.forEach((t,i)=>{ ctx.strokeText(t,g.x,yB+i*7); ctx.fillText(t,g.x,yB+i*7); });
+    });
     ctx.restore();
-    if(z>1.08){ ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="left";
-      ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+z.toFixed(1)+"×",10,16); }
+    // ZIELPFERCH (S4): Matte rechts neben der Kraft-Insel, weit weg vom FINISH-Bogen (x 1168) und vom Rueckweg aus Kraft
+    // (Gasse x 939 bis zur Startlinie unten). Die Fertigen stehen darauf (laeuferXY, HYROX_PFERCH).
+    const P=HYROX_PFERCH;
+    ctx.fillStyle="rgba(14,12,10,.52)"; ctx.fillRect(P.x0,P.y0,P.x1-P.x0,P.y1-P.y0);
+    ctx.strokeStyle="rgba(235,196,70,.8)"; ctx.lineWidth=1; ctx.setLineDash([5,4]); ctx.strokeRect(P.x0+0.5,P.y0+0.5,P.x1-P.x0-1,P.y1-P.y0-1); ctx.setLineDash([]);
+    ctx.save(); setzeFont(ctx,"700 8px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(8,6,4,.85)"; ctx.strokeText("ZIELPFERCH",(P.x0+P.x1)/2,P.y1-4);
+    ctx.fillStyle="#f2d75a"; ctx.fillText("ZIELPFERCH",(P.x0+P.x1)/2,P.y1-4); ctx.restore();
+    // IN-Bogen links und FINISH-Bogen rechts: dieselben PixelLab-Sprites wie die Spurt-Bahn, halbe Groesse
+    // (ganzzahlig, scharf), quer ueber der Laufrunde.
+    const bogen=(name,cx,fy)=>{ if(!aDa(name))return; const im=aBild[name], w=im.naturalWidth/2, h=im.naturalHeight/2;
+      ctx.drawImage(im,Math.round(cx-w/2),Math.round(fy-h),w,h); };
+    bogen("spurt_bogen_in",R.l,290+28);
+    bogen("spurt_bogen_finish",R.r,yI+34);
+    // LIVE-ZEIT auf einer kleinen Tafel an der Rueckwand (rechts), rein kosmetisch.
+    ctx.fillStyle="rgba(10,8,6,.82)"; ctx.fillRect(1076,100,100,24);
+    ctx.strokeStyle="rgba(235,196,70,.7)"; ctx.lineWidth=1; ctx.strokeRect(1076.5,100.5,99,23);
+    ctx.fillStyle="#f2d75a"; ctx.font="700 15px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
+    ctx.fillText(bahnZeitText(bahnRealSek(rennT)),1126,118);
+    ctx.restore();
   }
   let takeshiPublikumAn=false;
   function bodenTakeshiRoute(){
@@ -49300,6 +49418,9 @@
   // fuer die 2-D-Hallenkamera (vier Ziele statt sieben Stationen). `null` ausserhalb der
   // Halle. Zurueckgesetzt wie jedes andere Hyrox-Feld in baueHyroxStationen().
   let hyroxCamZiel=null;
+  // ARENA B: Namen am Kopf nur fuer die drei Ersten (Etiketten-Enge in der Totale), gesetzt von
+  // zeichneHyroxRangband() einmal je Bild, gelesen in zeichneSpurt(). Leer ausserhalb der Arena.
+  let hyroxNamenIds=new Set();
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -50094,9 +50215,9 @@
     // Zielpferch (Design-Dokument 6.5) -- das Gegenstueck zum `platz>=0`-Zweig unten.
     if(istHyroxHalle()){
       const pIdx=rennFertig.indexOf(u);
-      if(pIdx>=0)return weltZuSchirm((1500-(pIdx%6)*28)*HALLE_S, (425+Math.floor(pIdx/6)*30)*HALLE_S);
-      const z=hyroxZustand(u), r=hallenXY(z.s), q=((u.bahnZ+0.5)/BAHNEN_N()-0.5)*(hyroxBreite(z.s)-14);
-      return weltZuSchirm((r.x+r.nx*q)*HALLE_S, (r.y+r.ny*q)*HALLE_S);
+      if(pIdx>=0){ const P=HYROX_PFERCH; return weltZuSchirm(P.spX[pIdx%2]*HALLE_S, (P.y+Math.floor(pIdx/2)*P.dy)*HALLE_S); }
+      const z=hyroxZustand(u), p=hyroxAnzeigeXY(z.s,u.bahnZ,z.gruppe);
+      return weltZuSchirm(p.x*HALLE_S, p.y*HALLE_S);
     }
     if(istOval())return ovalPunkt(u);
     // WAND: Route b haengt fest bei wandX(b), die Hoehe ist camY(u.pos) -- kein platz-Bonus
@@ -50277,6 +50398,11 @@
     // kraft, s. HYROX_ZONEN) plus "strecke" (kein fester Kasten, das dichteste Laeufer-
     // fenster auf den Laufabschnitten, s.u.).
     if(istHyroxHalle()){
+      // FESTE TOTALE (Arena B, 17.11.): die ganze Arena ist immer im Bild, die Kamera steht auf der
+      // Leinwandmitte bei Zoom 1 (Quellraum = Leinwand, HALLE_S=1). Der Regie-Zweig darunter (Zielwahl
+      // mit Schnitt, stufenloser Zoom) bleibt unveraendert im Code und wird erst mit HYROX_REGIE_AN
+      // (Variante C, ganzzahliger 2x-Schnitt) wieder gebraucht. Reine Anzeige, kein rr().
+      if(!HYROX_REGIE_AN){ cam.zoom=1; camR.x=W/2; camR.y=H/2; return; }
       const laufend=LAEUFER.filter(u=>u.fertig==null);
       if(laufend.length){
         const zustand=new Map(); for(const u of laufend)zustand.set(u.id,hyroxZustand(u));
@@ -50326,10 +50452,10 @@
           if(hyroxCamZiel==="strecke"&&z.art!=="lauf")continue;
           nimm(hallenXY(z.s));
         }
-        if(!irgendwer){ x0=0;y0=0;x1=1680;y1=960; }   // Gruppe inzwischen leer: Totale
+        if(!irgendwer){ x0=0;y0=0;x1=HALLE_QW;y1=HALLE_QH; }   // Gruppe inzwischen leer: Totale
         const z0=cam.zoom||1, bw=(x1-x0)*HALLE_S+90/z0, bh=(y1-y0)*HALLE_S+130/z0;
         const zielZoom=Math.max(HALLE_ZOOM_MIN,Math.min(HALLE_ZOOM_MAX,Math.min(W/bw,H/bh)));
-        const weltB=1680*HALLE_S, weltH=960*HALLE_S, hw=W/2/zielZoom, hh=H/2/zielZoom;
+        const weltB=HALLE_QW*HALLE_S, weltH=HALLE_QH*HALLE_S, hw=W/2/zielZoom, hh=H/2/zielZoom;
         const cxWelt=((x0+x1)/2)*HALLE_S, cyWelt=((y0+y1)/2)*HALLE_S;
         const cx=weltB>2*hw?Math.max(hw,Math.min(weltB-hw,cxWelt)):weltB/2;
         const cy=weltH>2*hh?Math.max(hh,Math.min(weltH-hh,cyWelt)):weltH/2;
@@ -50339,7 +50465,7 @@
       }
       // NIEMAND LAEUFT MEHR: Totale statt in den generischen Zweig unten zu fallen (der
       // rechnet cam.cx und haette in der Halle keine Wirkung, 8.2).
-      const zielZoom=HALLE_ZOOM_MIN, cx=1680*HALLE_S/2, cy=960*HALLE_S/2, t=hyroxKamT(dt,1.8);
+      const zielZoom=HALLE_ZOOM_MIN, cx=HALLE_QW*HALLE_S/2, cy=HALLE_QH*HALLE_S/2, t=hyroxKamT(dt,1.8);
       cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
       return;
     }
@@ -51767,10 +51893,8 @@
     if(rennT>=letzte.ende+0.05||rennFertig.length>=LAEUFER.length)done=true;
   }
   // SWEEP-ARM/BEDROHUNGS-OVERLAY (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
-  // u.pos/wert()/rho). Kein neues PixelLab-Asset (Auftrag: "zuerst pruefen, ob ein
-  // bestehendes Panzertier wiederverwendbar ist" -- geprueft, s. PR-Beschreibung: kein
-  // passendes vorhanden, "medibull" ist ein Sanitaeter-Maskottchen, kein Bedroher) --
-  // stattdessen derselbe prozedurale Balken, mit dem das Bahn-Chassis auch sonst Zustand
+  // u.pos/wert()/rho). Seit 17.11. zeichnet das bezahlte PixelLab-Bild
+  // `falle_fegearm` den Arm (s. unten); der prozedurale Balken ist nur noch Rueckfall -- derselbe Balken, mit dem das Bahn-Chassis auch sonst Zustand
   // zeichnet (Hot-Seat-Podest, Ziellinie), damit kein Asset-Generierungsprojekt an einem
   // Format-Fundament haengt.
   function zeichneHatzUeberlagerung(){
@@ -51787,10 +51911,34 @@
     const armPos=Math.max(0,welleZielPos-0.06+frac*0.06);
     const xPos=camX(armPos);
     ctx.save();
-    ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
-    ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
-    ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
-    ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    if(aDa("falle_fegearm") && Math.max(1,y1-y0)>=(18+41)){
+      // NUR-PIXELLAB-AUDIT 17.11.: der Arm ist das bezahlte PixelLab-Bild `falle_fegearm` (84x24,
+      // liegend: Drehpfosten links, Warnstreifen-Ausleger, Pralltopf rechts) statt des roten
+      // Balkens. Um 90 Grad gedreht haengt der Pfosten oben ueber Bahn 1, der Topf unten unter der
+      // letzten Bahn; dazwischen wird der Warnstreifen-Abschnitt (x 18..31, zwei Streifenperioden)
+      // gekachelt, damit der Arm jede Bahnzahl ueberspannt, ohne das Pixelraster zu ziehen. Die
+      // Dringlichkeit (Alpha waechst mit frac) bleibt als roter Schein hinter dem Arm.
+      // Doppelte Pixelgroesse (Z=2, ganzzahlig): bei 1x war der Ausleger nur ~8 px breit und las
+      // sich schwaecher als der alte 18-px-Balken.
+      const L=Math.max(1,y1-y0), img=aBild.falle_fegearm, KOPF=18, MUSTER=14, FUSS=41;
+      // Z ganzzahlig: 2 wenn Kopf+Fuss (118 px) in die Bahnhoehe passen, sonst 1 (59 px); darunter
+      // (sehr wenige Bahnen) greift der alte Balken im else-Zweig -- der Arm ragt nie unter die letzte Bahn.
+      const Z=L>=(KOPF+FUSS)*2?2:1;
+      ctx.fillStyle="rgba(200,20,20,"+(0.18+0.42*frac*frac).toFixed(3)+")";
+      ctx.fillRect(xPos-18,y0,36,L);
+      ctx.save(); ctx.translate(Math.round(xPos),Math.round(y0)); ctx.rotate(Math.PI/2);
+      ctx.imageSmoothingEnabled=false;
+      const mitte=Math.max(0,L-(KOPF+FUSS)*Z);
+      ctx.drawImage(img,0,0,KOPF,24,0,-12*Z,KOPF*Z,24*Z);
+      for(let d=0;d<mitte;d+=MUSTER*Z){ const s=Math.min(MUSTER*Z,mitte-d); ctx.drawImage(img,18,0,s/Z,24,KOPF*Z+d,-12*Z,s,24*Z); }
+      ctx.drawImage(img,43,0,FUSS,24,KOPF*Z+mitte,-12*Z,FUSS*Z,24*Z);
+      ctx.restore();
+    } else {
+      ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
+      ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
+      ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
+      ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    }
     ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
     // QA 16.11. (Fix-Paket C): y0-8 (~51px) liegt unter dem Spiel-Anzeige-Balken; unterhalb der
     // Stationsetiketten (hudBandUnten()+9, Statistikzeile +18) in der naechsten freien Zeile.
@@ -51991,77 +52139,150 @@
     return {s, art:seg.art, gruppe:seg.gruppe||null, station:seg.station??-1, lauf:seg.lauf||0, prog, j};
   }
 
-  // ================= HALLENRUNDE (Stufe 2, Design-Dokument Abschnitt 6) =================
-  // Quellraum = Pixel der Szene `public/sprites/arena/hyrox_halle.jpg` (1680x960, Ableitung
-  // aus `public/szenen/spurt/hyrox.jpg`, s. scripts/baue-hyrox-halle.py). Welt = Quellraum *
-  // HALLE_S. Alle Koordinaten in diesem Block sind QUELLPIXEL, bis HALLE_S multipliziert.
-  const HALLE_S=W/1680;
-  const HALLE_ZOOM_MIN=H/(960*HALLE_S), HALLE_ZOOM_MAX=3.2;
-  // Breite quer zur Laufrichtung je Abschnittsart/-gruppe (6.4, Quellpixel).
-  const HYROX_BREITE_ART={lauf:64, rox:30};
-  const HYROX_BREITE_GRUPPE={technik:210, kraft:210, kletter:40};
-  // Baut die 29-Abschnitte-Wegtabelle (6.3) im Quellraum: eine gemeinsame Mittellinie fuer
-  // alle zwoelf Laeufer, analytisch abgetastete Viertelboegen (12 Stuetzpunkte, wie die
-  // Skizzenrechnung), Geraden direkt (keine Subsamplung noetig, s. Design-Dokument 7.2).
-  // Haengt nur an fester Geometrie (kein Seed, keine W/H-Abhaengigkeit, da Quellraum) --
-  // wird deshalb nur einmal gebaut (s. baueHyroxStationen()).
+  // ================= HYROX-ARENA (Variante B, 17.11., docs/design/hyrox-optik-konzept-17-11.md 3.4) =============
+  // Der Quellraum ist jetzt die Leinwand selbst: HALLE_QW x HALLE_QH = 1240 x 470 = das Breitformat der
+  // PixelLab-Arena `public/sprites/arena/hyrox_arena.jpg` (792x300, wie die I-Spy-Hallen auf die Leinwand
+  // gezogen). HALLE_S bleibt als Faktor Quellraum->Welt erhalten (jetzt 1), damit alle Stellen, die in
+  // Quellpixeln rechnen und mit HALLE_S multiplizieren, unveraendert gueltig sind. Die Kamera ist die
+  // FESTE TOTALE (Zoom 1, Mitte der Leinwand); der alte Regie-Zweig (Schnitte auf Zonen, stufenloser Zoom)
+  // bleibt hinter HYROX_REGIE_AN=false im Code stehen und ist der Haken fuer Variante C.
+  const HALLE_QW=1240, HALLE_QH=470;
+  const HALLE_S=W/HALLE_QW;
+  const HALLE_ZOOM_MIN=H/(HALLE_QH*HALLE_S), HALLE_ZOOM_MAX=2;
+  const HYROX_REGIE_AN=false;
+  // Breite quer zur Laufrichtung je Abschnittsart/-gruppe (Quellpixel): Laufrunde 56, Roxzone 30, je Insel
+  // vier (TECHNIK, KRAFT) bzw. drei (KLETTERN) Bahnen in einem 188 px hohen Feld.
+  const HYROX_BREITE_ART={lauf:56, rox:30};
+  const HYROX_BREITE_GRUPPE={technik:188, kraft:188, kletter:188};
+  // Geometrie der Arena (Quellpixel = Leinwandpixel). Ring: Mittellinie der Laufrunde; Inseln: die drei
+  // Stationsfelder in einer Reihe, Mittellinie y=INS_Y; Bahnen je Insel 4/3/4.
+  const HYROX_RING={l:78, r:1168, o:164, u:438, rad:44, brt:56};
+  const HYROX_INSEL_Y=305, HYROX_INSEL_H=200;
+  // INSELN IN DER LINKEN HAELFTE (Opus-Review #1550, S2/S4): die drei Felder sitzen nahe beieinander, rechts davon
+  // bleibt Auslauf. Grund ist das Tempo: der Fahrplan (HYROX_ZEITWEG) gibt je Abschnitt die ZEIT vor, die Geometrie
+  // die Strecke -- Kraft-OUT (Zeitanteil gross) hatte nur ~140 px Weg, Kraft-IN (Zeitanteil klein) ~970 px. Mit
+  // Inseln weiter links wird der IN-Weg zur Kraft-Insel kuerzer und der OUT-Weg zur Startlinie laenger.
+  const HYROX_INSELN={
+    technik:{x0:150, x1:395, bahnen:4},
+    kletter:{x0:424, x1:670, bahnen:3},
+    kraft:{x0:698, x1:925, bahnen:4},
+  };
+  // Mitte der Gassen zwischen den Inseln (Auf-/Abstieg zur Roxzone-Bahn) und Ende der Roxzone-Linie (OUT/START).
+  const HYROX_GASSE=[409, 684, 939];
+  const HYROX_X_AUS=1100;
+  // Die sieben Geraete (Mitte x je Station, die vier/drei Bahnen darunter). Reihenfolge = Stationsnummer.
+  // Echte HYROX-Stationen (Rudern entfaellt: im Figurenbestand gibt es keine Sitzpose). Die x-Werte sind so
+  // gewaehlt, dass die Zonen zwischen den Geraeten im Verhaeltnis der Fahrplan-Zeitanteile liegen (S2).
+  const HYROX_GERAETE=[
+    {x:215, gruppe:"technik", name:"BURPEE BROAD JUMPS", bild:"hyrox_burpee"},
+    {x:306, gruppe:"technik", name:"WALL BALLS",         bild:"hyrox_wallball"},
+    {x:499, gruppe:"kletter", name:"SKIERG",             bild:"hyrox_skierg"},
+    {x:598, gruppe:"kletter", name:"SLED PULL",          bild:"hyrox_schlitten_zug"},
+    {x:757, gruppe:"kraft",   name:"SLED PUSH",          bild:"hyrox_schlitten_schub"},
+    {x:814, gruppe:"kraft",   name:"FARMERS CARRY",      bild:"hyrox_farmers"},
+    {x:871, gruppe:"kraft",   name:"SANDBAG LUNGES",     bild:"hyrox_sandsack"},
+  ];
+  // ZEITPARAMETRISIERUNG DES FAHRPLANS (unveraendert seit der Hallenrunde, 09.11.): je Abschnitt
+  // [s0, s1, laenge] der urspruenglichen 1680x960-Wegtabelle. `hyroxVerteileZeit()` teilt die Zielzeit
+  // nach diesen Laengen auf (Lauf proportional zur Weglaenge, Roxzone/Zone proportional innerhalb ihrer
+  // Gruppe, Arbeit zu gleichen Teilen) -- die ZEITANTEILE des Fahrplans bleiben damit exakt die der
+  // Hallenrunde (Konzept 4/R1: "nur Koordinaten und Zeichnung aendern sich"), und `u.hyroxPlan`, das die
+  // Wertungs-Fingerabdruck-Probe mitliest, bleibt bitgleich. `s` ist also eine ZEITKOORDINATE; die
+  // Zeichenposition ordnet hallenXY() je Abschnitt dem Weg der Arena B zu (gleicher Abschnittsanteil
+  // entlang des NEUEN Wegstuecks). Aendert man diese Tabelle, aendert man das Fahrplan-Timing -- nicht
+  // die Arena-Geometrie (die steht in HYROX_RING/HYROX_INSELN und baueHyroxWeg()).
+  const HYROX_ZEITWEG=[
+    [0,0.20021518861914428,3710.6570446703145], [0.20021518861914428,0.207769140943286,140], [0.207769140943286,0.21366789371819053,109.32361670424825],
+    [0.21366789371819053,0.2179844379034144,80], [0.2179844379034144,0.2206822780191793,50], [0.2206822780191793,0.2279664463317445,134.99999999999955],
+    [0.2279664463317445,0.23228299051696835,80], [0.23228299051696835,0.24172543092214552,175], [0.24172543092214552,0.3404704501501704,1830.0754490787958],
+    [0.3404704501501704,0.34802440247431216,140], [0.34802440247431216,0.5482395910934568,3710.65704467032], [0.5482395910934568,0.5581602735367631,183.86342439892178],
+    [0.5581602735367631,0.5667933619072107,160], [0.5667933619072107,0.5689516339998227,40], [0.5689516339998227,0.5797429944628824,200],
+    [0.5797429944628824,0.5829804026018002,60], [0.5829804026018002,0.5921530589954008,170], [0.5921530589954008,0.6057233477035456,251.5028342273963],
+    [0.6057233477035456,0.8059385363226914,3710.657044670341], [0.8059385363226914,0.8718504686846767,1221.5685424949243], [0.8718504686846767,0.8737389567657122,35],
+    [0.8737389567657122,0.8780555009509361,80], [0.8780555009509361,0.879674205020395,30], [0.879674205020395,0.8829116131593129,60],
+    [0.8829116131593129,0.8845303172287718,30], [0.8845303172287718,0.8888468614139957,80], [0.8888468614139957,0.8907353494950311,35],
+    [0.8907353494950311,0.972068491794487,1507.3751373215819], [0.972068491794487,1,517.6642611675634]
+  ];
+  // Baut die 29-Abschnitte-Wegtabelle im Quellraum (= Leinwandpixel, s. HALLE_QW): eine gemeinsame Mittellinie
+  // fuer alle zwoelf Laeufer, analytisch abgetastete Viertelboegen, Geraden direkt. ABSCHNITTSLISTE (Art,
+  // Gruppe, Station, Reihenfolge) und damit die Zeitanteile je Abschnitt sind exakt die der Hallenrunde
+  // (Hallenrunde-PR 6.3) -- NEU sind nur die KOORDINATEN der Arena B (17.11.): ein Ring aus drei Seiten
+  // und der Roxzone-Bahn unten, darin drei Inseln in einer Reihe, alle Inseln von links nach rechts
+  // durchlaufen. IN-Bogen links an der Laufrunde, OUT/START unten rechts, ZIEL rechts an der Runde.
+  // Haengt nur an fester Geometrie (kein Seed) -- wird deshalb nur einmal gebaut (s. baueHyroxStationen()).
   function baueHyroxWeg(){
-    const pts=[]; const roh=[]; // roh: {art,gruppe,station,lauf,i0} waehrend des Bauens
+    const pts=[]; const abschnitte=[];
     const push=(x,y)=>{ const p={x,y};
       if(!pts.length||Math.hypot(p.x-pts[pts.length-1].x,p.y-pts[pts.length-1].y)>1e-6)pts.push(p); };
-    // Viertelbogen um (cx,cy), Radius 110, von Winkel a0 nach a1 (Grad) -- 12 Stuetzpunkte,
-    // wie die Skizzenrechnung des Design-Dokuments.
-    const arc=(cx,cy,a0,a1)=>{ const n=12;
+    const R=HYROX_RING, rad=R.rad, yI=HYROX_INSEL_Y, yIn=290, xAus=HYROX_X_AUS, G=HYROX_GASSE;
+    const gx=(i)=>HYROX_GERAETE[i].x;
+    // Viertelbogen um (cx,cy) mit Radius `rad`, von Winkel a0 nach a1 (Grad), 8 Stuetzpunkte.
+    const arc=(cx,cy,a0,a1)=>{ const n=8;
       for(let k=1;k<=n;k++){ const a=(a0+(a1-a0)*k/n)*Math.PI/180;
-        push(cx+Math.cos(a)*110, cy+Math.sin(a)*110); } };
-    // Eine volle Laufrunde (6.2): von x=1430 unten (OUT) im Uhrzeigersinn (Bildschirm-y
-    // nach unten, also optisch gegen den Uhrzeigersinn, wie die Pfeile der Szene) bis
-    // x=790 unten (IN). Laenge 3711 Quellpixel (nachgemessen, s. Design-Dokument 6.2).
-    const runde=()=>{ push(1495,840); arc(1495,730,90,0); push(1605,210); arc(1495,210,0,-90);
-      push(185,100); arc(185,210,-90,-180); push(75,730); arc(185,730,180,90); push(790,840); };
-    const abschnitte=[];
+        push(cx+Math.cos(a)*rad, cy+Math.sin(a)*rad); } };
+    // Eine Laufrunde: von OUT/START (xAus, unten) gegen den Uhrzeigersinn um die rechte, obere und linke
+    // Seite bis zum IN-Bogen links (R.l, yIn).
+    const runde=()=>{ push(R.r-rad,R.u); arc(R.r-rad,R.u-rad,90,0); push(R.r,R.o+rad); arc(R.r-rad,R.o+rad,0,-90);
+      push(R.l+rad,R.o); arc(R.l+rad,R.o+rad,-90,-180); push(R.l,yIn); };
+    // Die Laufrunden 2 und 3 laufen durch den IN-Bogen weiter bis in die untere linke Ecke (R.l+rad, R.u): die
+    // Strecke gehoert zur Runde, nicht zur Roxzone. Grund (S2): die Zeitanteile von Kletter-/Kraft-IN sind klein, der
+    // Weg dorthin ist lang -- die Runde nimmt den ersten Teil des Wegs mit (~10 % mehr Weg in 2 von 4 Runden).
+    const ecke=()=>{ push(R.l,R.u-rad); arc(R.l+rad,R.u-rad,180,90); };
+    // Abschnitt anlegen: Weg ab dem letzten Punkt, Index-Grenzen in `seg` (unten).
     const teil=(art,gruppe,station,lauf,fn)=>{ const i0=pts.length-1; fn();
       abschnitte.push({art,gruppe,station,lauf,i0,i1:pts.length-1}); };
-    push(1430,840);                                                          // Start
+    // Weg in der unteren Ringbahn nach rechts bis zur Gasse x (Kletter-/Kraft-Insel) und durch die Gasse hinauf.
+    const unten=(xGasse)=>{ push(xGasse-45,R.u); push(xGasse-14,R.u-12);
+      push(xGasse,R.u-38); push(xGasse,yI+15); push(xGasse+13,yI); };
+    // Weg von der Insel hinunter durch die Gasse hinter ihr und auf der unteren Ringbahn nach rechts.
+    const aus=(xGasse,yUnten,xBis)=>{ push(xGasse,yI+15); push(xGasse,R.u-yUnten); push(xGasse+16,R.u); push(xBis,R.u); };
+    // Arbeitsstrecke eines Geraets: +-hw um die Geraetemitte (Station = Index in HYROX_GERAETE).
+    const HWT=14, HWK=8;
+    push(xAus,R.u);                                                          // Start
     teil("lauf",null,-1,1, runde);                                           // 1  Lauf 1
-    teil("rox","technik",-1,0, ()=>{ push(790,770); push(790,700); });       // 2  IN-Bogen
-    teil("rox","technik",-1,0, ()=>{ push(760,632); push(725,632); });       // 3
-    teil("zone","technik",-1,0, ()=>{ push(645,632); });                     // 4
-    teil("arbeit","technik",0,0, ()=>{ push(595,632); });                    // 5  Huerde
-    teil("zone","technik",-1,0, ()=>{ push(460,632); });                     // 6
-    teil("arbeit","technik",1,0, ()=>{ push(380,632); });                    // 7  Balken
-    teil("zone","technik",-1,0, ()=>{ push(205,632); });                     // 8
-    teil("rox","technik",-1,0, ()=>{ push(150,600); push(150,470); push(240,460);
-      push(1500,460); push(1515,520); push(1515,640); push(1430,700); });    // 9
-    teil("rox","technik",-1,0, ()=>{ push(1430,770); push(1430,840); });     // 10 OUT-Bogen
-    teil("lauf",null,-1,2, runde);                                           // 11 Lauf 2
-    teil("rox","kletter",-1,0, ()=>{ push(790,770); push(790,700); push(830,682); }); // 12 IN
-    teil("zone","kletter",-1,0, ()=>{ push(990,682); });                     // 13
-    teil("arbeit","kletter",2,0, ()=>{ push(1030,682); });                   // 14 Palisade
-    teil("zone","kletter",-1,0, ()=>{ push(1230,682); });                    // 15
-    teil("arbeit","kletter",3,0, ()=>{ push(1290,682); });                   // 16 Seil
-    teil("zone","kletter",-1,0, ()=>{ push(1460,682); });                    // 17
-    teil("rox","kletter",-1,0, ()=>{ push(1500,690); push(1430,700);
-      push(1430,770); push(1430,840); });                                    // 18 OUT
-    teil("lauf",null,-1,3, runde);                                           // 19 Lauf 3
-    teil("rox","kraft",-1,0, ()=>{ push(790,770); push(790,700); push(790,460); push(190,460);
-      push(150,420); push(150,300); push(215,300); });                       // 20 IN
-    teil("zone","kraft",-1,0, ()=>{ push(250,300); });                       // 21
-    teil("arbeit","kraft",4,0, ()=>{ push(330,300); });                      // 22 Wassergraben
-    teil("zone","kraft",-1,0, ()=>{ push(360,300); });                       // 23
-    teil("arbeit","kraft",5,0, ()=>{ push(420,300); });                      // 24 Mauer
-    teil("zone","kraft",-1,0, ()=>{ push(450,300); });                       // 25
-    teil("arbeit","kraft",6,0, ()=>{ push(530,300); });                      // 26 Strohballen
-    teil("zone","kraft",-1,0, ()=>{ push(565,300); });                       // 27
-    teil("rox","kraft",-1,0, ()=>{ push(625,300); push(625,445); push(700,460); push(1500,460);
-      push(1515,520); push(1515,640); push(1430,700); push(1430,770); push(1430,840); }); // 28 OUT
-    teil("lauf",null,0,0, ()=>{ push(1495,840); arc(1495,730,90,0); push(1605,450); }); // 29 Schluss
+    teil("rox","technik",-1,0, ()=>{ push(R.l+8,yIn+13); push(R.l+42,yI); });  // 2  IN-Bogen
+    teil("rox","technik",-1,0, ()=>{ push(165,yI); });                       // 3
+    teil("zone","technik",-1,0, ()=>{ push(gx(0)-HWT,yI); });                // 4
+    teil("arbeit","technik",0,0, ()=>{ push(gx(0)+HWT,yI); });               // 5  Burpee Broad Jumps
+    teil("zone","technik",-1,0, ()=>{ push(gx(1)-HWT,yI); });                // 6
+    teil("arbeit","technik",1,0, ()=>{ push(gx(1)+HWT,yI); });               // 7  Wall Balls
+    teil("zone","technik",-1,0, ()=>{ push(HYROX_INSELN.technik.x1,yI); });  // 8
+    teil("rox","technik",-1,0, ()=>{ aus(G[0],28,xAus-60); });               // 9
+    teil("rox","technik",-1,0, ()=>{ push(xAus,R.u); });                     // 10 OUT-Bogen
+    teil("lauf",null,-1,2, ()=>{ runde(); ecke(); });                        // 11 Lauf 2
+    teil("rox","kletter",-1,0, ()=>{ unten(G[0]); });                        // 12 IN
+    teil("zone","kletter",-1,0, ()=>{ push(gx(2)-HWT,yI); });                // 13
+    teil("arbeit","kletter",2,0, ()=>{ push(gx(2)+HWT,yI); });               // 14 SkiErg
+    teil("zone","kletter",-1,0, ()=>{ push(gx(3)-HWT,yI); });                // 15
+    teil("arbeit","kletter",3,0, ()=>{ push(gx(3)+HWT,yI); });               // 16 Sled Pull
+    teil("zone","kletter",-1,0, ()=>{ push(HYROX_INSELN.kletter.x1,yI); });  // 17
+    teil("rox","kletter",-1,0, ()=>{ aus(G[1],28,xAus-60); push(xAus,R.u); }); // 18 OUT
+    teil("lauf",null,-1,3, ()=>{ runde(); ecke(); });                        // 19 Lauf 3
+    teil("rox","kraft",-1,0, ()=>{ unten(G[1]); });                          // 20 IN
+    teil("zone","kraft",-1,0, ()=>{ push(gx(4)-HWK,yI); });                  // 21
+    teil("arbeit","kraft",4,0, ()=>{ push(gx(4)+HWK,yI); });                 // 22 Sled Push
+    teil("zone","kraft",-1,0, ()=>{ push(gx(5)-HWK,yI); });                  // 23
+    teil("arbeit","kraft",5,0, ()=>{ push(gx(5)+HWK,yI); });                 // 24 Farmers Carry
+    teil("zone","kraft",-1,0, ()=>{ push(gx(6)-HWK,yI); });                  // 25
+    teil("arbeit","kraft",6,0, ()=>{ push(gx(6)+HWK,yI); });                 // 26 Sandbag Lunges
+    teil("zone","kraft",-1,0, ()=>{ push(HYROX_INSELN.kraft.x1,yI); });      // 27
+    teil("rox","kraft",-1,0, ()=>{ aus(G[2],23,xAus); });                    // 28 OUT
+    teil("lauf",null,0,0, ()=>{ push(R.r-rad,R.u); arc(R.r-rad,R.u-rad,90,0); push(R.r,yI); }); // 29 Schluss
     const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
     const len=cum[cum.length-1];
-    for(const a of abschnitte){ a.s0=cum[a.i0]/len; a.s1=cum[a.i1]/len; a.laenge=cum[a.i1]-cum[a.i0]; delete a.i0; delete a.i1; }
-    return {pts, cum, len, abschnitte};
+    // `seg`: Strecke (Weglaenge ab Start) von Anfang und Ende jedes Abschnitts im NEUEN Weg -- bewusst
+    // neben `abschnitte` statt darin, damit die Abschnittsobjekte (Teil von u.hyroxPlan) unveraendert bleiben.
+    const seg=abschnitte.map(a=>({c0:cum[a.i0], c1:cum[a.i1]}));
+    abschnitte.forEach((a,j)=>{ const z=HYROX_ZEITWEG[j]; a.s0=z[0]; a.s1=z[1]; a.laenge=z[2]; delete a.i0; delete a.i1; });
+    return {pts, cum, len, abschnitte, seg};
   }
-  function hallenXY(s){ return tabelleXY(HYROX_WEG,s); }
+  // Zeichenposition zur Zeitkoordinate s: Abschnitt suchen, den Anteil darin auf das neue Wegstueck
+  // abbilden (s. HYROX_ZEITWEG), Punkt und Tangente aus der neuen Wegtabelle.
+  function hallenXY(s){
+    const W_=HYROX_WEG, A=W_.abschnitte, j=hyroxAbschnittBeiS(A,Math.max(0,Math.min(1,s))), a=A[j], g=W_.seg[j];
+    const f=a.s1>a.s0?Math.max(0,Math.min(1,(s-a.s0)/(a.s1-a.s0))):0;
+    return tabelleXY(W_,(g.c0+(g.c1-g.c0)*f)/W_.len);
+  }
   // Abschnittsindex zu einer Bogenlaengen-Position s (0..1) -- eigene, von hyroxZustand()
   // UNABHAENGIGE Suche (die liest u.hyroxPlan/rennT, hier geht es rein um die GEOMETRIE bei
   // einem gegebenen s, das auch von einer anderen Figur/einem anderen Zeitpunkt stammen kann).
@@ -52070,16 +52291,35 @@
     return (hi<A.length&&A[hi].s0<=s)?hi:lo;
   }
   const hyroxBreiteWert=(a)=>a.art==="lauf"?HYROX_BREITE_ART.lauf:(a.art==="rox"?HYROX_BREITE_ART.rox:(HYROX_BREITE_GRUPPE[a.gruppe]||HYROX_BREITE_ART.lauf));
-  // Breite quer zur Laufrichtung bei Bogenlaengen-Position s, ueber die ersten 60 Quellpixel
-  // des neuen Abschnitts linear zur vorigen Breite uebergeblendet (6.4), damit niemand springt.
+  // Breite quer zur Laufrichtung bei Bogenlaengen-Position s, ueber die ersten HYROX_BLENDE (40) Quellpixel
+  // der neuen Breite linear zur vorigen Breite uebergeblendet (6.4), damit niemand springt. Der Uebergang beginnt
+  // am ersten Abschnitt der Reihe mit gleicher Breite (Review #1550): die kurzen Zonen der Arena B (30-70 px) sind
+  // kuerzer als 60 px, die Blende lief vorher an jeder Abschnittsgrenze neu an und sprang dabei.
+  const HYROX_BLENDE=40;
   function hyroxBreite(s){
     const A=HYROX_WEG.abschnitte, j=hyroxAbschnittBeiS(A,s), a=A[j], w1=hyroxBreiteWert(a);
-    if(j===0)return w1;
-    const distIn=(s-a.s0)*HYROX_WEG.len;
-    if(distIn>=60)return w1;
-    return hyroxBreiteWert(A[j-1])+(w1-hyroxBreiteWert(A[j-1]))*(distIn/60);
+    let j0=j; while(j0>0&&hyroxBreiteWert(A[j0-1])===w1)j0--;
+    if(j0===0)return w1;
+    const g=HYROX_WEG.seg[j], f=a.s1>a.s0?Math.max(0,Math.min(1,(s-a.s0)/(a.s1-a.s0))):0;
+    const distIn=g.c0+f*(g.c1-g.c0)-HYROX_WEG.seg[j0].c0;
+    if(distIn>=HYROX_BLENDE)return w1;
+    return hyroxBreiteWert(A[j0-1])+(w1-hyroxBreiteWert(A[j0-1]))*(distIn/HYROX_BLENDE);
   }
 
+  // Zeichenposition (Quellpixel) eines Laeufers mit Bahn `bahnZ` bei Zeitkoordinate `s` im Abschnitt der Gruppe `gruppe`.
+  // IN DEN INSELN AUF DIE GERAETE-REIHEN (Review #1550, S1): die zwoelf Laeufer verteilten sich gleichmaessig ueber die
+  // ganze Inselbreite und standen zwischen den vier/drei Geraete-Reihen. Hier bekommt jeder die Reihe `bahnZ % n`
+  // (n = Reihen der Insel, hyroxBahnY); je breiter die Bahn gerade ist (56 Runde -> 188 Insel), desto mehr gilt die
+  // Reihe, damit der Uebergang an den Bogen stetig bleibt. Nur Zeichenposition, u.pos/hyroxZustand bleiben unberuehrt.
+  function hyroxAnzeigeXY(s,bahnZ,gruppe){
+    const r=hallenXY(s), w=hyroxBreite(s);
+    let q=((bahnZ+0.5)/BAHNEN_N()-0.5)*(w-14);
+    if(gruppe&&HYROX_INSELN[gruppe]){
+      const b=Math.max(0,Math.min(1,(w-HYROX_BREITE_ART.lauf)/(HYROX_BREITE_GRUPPE.technik-HYROX_BREITE_ART.lauf)));
+      if(b>0){ const n=HYROX_INSELN[gruppe].bahnen; q=q*(1-b)+(hyroxBahnY(bahnZ%n,n)-HYROX_INSEL_Y)*b; }
+    }
+    return {x:r.x+r.nx*q, y:r.y+r.ny*q};
+  }
   function baueHyroxStationen(){
     const art=BA(), pos=art.hindernisse||[], bilder=art.hindernisBilder||[], namen=art.hindernisNamen||[];
     HYROX_STATIONEN=pos.map((p,i)=>({pos:p, bild:bilder[i]||null, name:namen[i]||("Station "+(i+1)),
@@ -52105,7 +52345,7 @@
     // KAMERA AUF DIE HALLE SETZEN (7.3): `bauSpurt()` setzt `cam={zoom:1,cx:0.5}`, BEVOR
     // dieser Format-Hook laeuft (s. dortiger Kommentar) -- diese Zeile steht also richtig
     // dahinter. Totale auf den Start, damit das erste Bild nicht mitten in der Halle zoomt.
-    if(istHyroxHalle()){ const p=hallenXY(0); camR={x:p.x*HALLE_S, y:p.y*HALLE_S}; cam.zoom=1.6; }
+    if(istHyroxHalle()){ const p=hallenXY(0); camR=HYROX_REGIE_AN?{x:p.x*HALLE_S, y:p.y*HALLE_S}:{x:W/2, y:H/2}; cam.zoom=HYROX_REGIE_AN?1.6:1; }
   }
   function stepSpurtHyrox(dt){
     if(done)return;
@@ -52159,44 +52399,40 @@
   // VIER KAMERA-/UEBERLAGERUNGS-ZIELE DER HALLE (Stufe 2, Design-Dokument 8.2, Tabelle):
   // feste Kaesten in Quellpixeln -- dieselben, die kameraUpdate()s Hallenzweig fuer den
   // Stationsschnitt benutzt (s. dort), hier zusaetzlich fuer die Zonenschilder.
-  const HYROX_ZONEN={
-    technik:{x0:160,y0:505,x1:740,y1:755, label:"TECHNIK · HÜRDE/BALKEN"},
-    kletter:{x0:835,y0:480,x1:1500,y1:705, label:"KLETTERN · PALISADE/SEIL"},
-    kraft:{x0:140,y0:180,x1:630,y1:420, label:"KRAFT · GRABEN/MAUER/BALLEN"},
-  };
+  const HYROX_ZONEN=(()=>{
+    const label={technik:"TECHNIK · BURPEES/WALL BALLS", kletter:"KLETTERN · SKIERG/SLED PULL", kraft:"KRAFT · SLED PUSH/CARRY/LUNGES"};
+    const o={};
+    for(const g of ["technik","kletter","kraft"]){ const I=HYROX_INSELN[g];
+      o[g]={x0:I.x0, y0:HYROX_INSEL_Y-HYROX_INSEL_H/2, x1:I.x1, y1:HYROX_INSEL_Y+HYROX_INSEL_H/2, label:label[g]}; }
+    return o;
+  })();
+  // ARENA B: Gruppenschilder und Geraetenamen, NACH den Figuren gezeichnet (sonst stehen die Laeufer der
+  // oberen Bahn ueber den Schildern). Aufruf am Ende von zeichneSpurt().
+  function zeichneHyroxArenaSchilder(){
+    // Je Insel ein Gruppenschild ueber dem Rahmen mit der Belegung ("3 am Geraet" =
+    // gerade in einem Arbeitsabschnitt dieser Gruppe, "2 unterwegs" = in Roxzone/Zone dieser Gruppe),
+    // (die Geraetenamen stehen im Boden, s. bodenHyroxHalle). Liest nur hyroxZustand(u) -- kein rr().
+    const am={technik:0,kletter:0,kraft:0}, unterwegs={technik:0,kletter:0,kraft:0};
+    for(const u of LAEUFER){ if(u.fertig!=null||!u.hyroxPlan)continue;
+      const z=hyroxZustand(u); if(!z.gruppe)continue;
+      if(z.art==="arbeit")am[z.gruppe]++; else if(z.art==="rox"||z.art==="zone")unterwegs[z.gruppe]++; }
+    ctx.save();
+    for(const g of ["technik","kletter","kraft"]){
+      const b=HYROX_ZONEN[g], p=weltZuSchirm(b.x0*HALLE_S, b.y0*HALLE_S);
+      const txt=HYROX_GRUPPEN_LABEL[g]+" · "+(am[g]?am[g]+" am Gerät":"frei")+(unterwegs[g]?" · "+unterwegs[g]+" unterwegs":"");
+      // 10 px statt 9 px (Review #1550, K1): RaniraSeason hat nur einen Schnitt, und das grosse K ("KLETTERN",
+      // "KRAFT") faellt bei 9 px auf die Hoehe eines kleinen k zusammen.
+      setzeFont(ctx,"700 10px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="left";
+      const tw=Math.ceil(ctx.measureText(txt).width)+10;
+      ctx.fillStyle="rgba(10,8,6,.86)"; ctx.fillRect(p.x,p.y-16,tw,15);
+      ctx.fillStyle=HYROX_GRUPPEN_FARBE[g]; ctx.fillRect(p.x,p.y-16,3,15);
+      ctx.fillStyle="#f1e9d6"; ctx.fillText(txt,p.x+7,p.y-5);
+    }
+    ctx.restore();
+  }
   function zeichneHyroxUeberlagerung(){
     if(!HYROX_STATIONEN||!HYROX_STATIONEN.length)return;
     if(istHyroxHalle()){
-      // EIN SCHILD JE ZONE (nicht je Station, 7.8) -- Weltkoordinaten ueber der Zonenmitte,
-      // dieselbe Farbe/derselbe Text wie die alte Bahn-Fassung.
-      //
-      // KOLLISION MIT DER RANGLEISTE VERMEIDEN (Bildbeleg-Pruefung dieser PR): die Rangleiste
-      // steht FEST am rechten Bildrand (zeichneHyroxRangleiste(), x0=W-BREITE-10), waehrend
-      // ein Zonenschild in WELTKOORDINATEN schwimmt -- je nach Kameraausschnitt kann ein
-      // Schild rechnerisch genau dort landen. Ein Schild, dessen Kasten die Rangleiste
-      // ueberlappt, bleibt deshalb ungezeichnet (sie erscheint wieder, sobald die Kamera
-      // weiterzieht); die grosszuegige Flaeche deckt die Rangleiste bei 12 Zeilen sicher ab.
-      const RL_X0=W-186, RL_Y0=36, RL_Y1=270;
-      ctx.save();
-      ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
-      for(const g of ["technik","kletter","kraft"]){
-        const b=HYROX_ZONEN[g], p=weltZuSchirm(((b.x0+b.x1)/2)*HALLE_S, b.y0*HALLE_S);
-        const y=p.y-16;
-        if(p.x+32>=RL_X0&&y-14<RL_Y1&&y+2>RL_Y0)continue;
-        ctx.fillStyle=HYROX_GRUPPEN_FARBE[g];
-        ctx.fillRect(p.x-32,y-14,64,16);
-        ctx.fillStyle="#fff"; ctx.fillText(HYROX_GRUPPEN_LABEL[g], p.x, y-2);
-      }
-      // AB ZOOM 1,6x ZUSAETZLICH DER STATIONSNAME klein ueber jedem Sprite (eine Gasse
-      // genuegt, 7.8) -- liest dieselben Quellpixel-Mitten wie bodenHyroxHalle().
-      if(cam.zoom>=1.6){
-        const namen=[{x:620,y:548,n:"HÜRDE"},{x:420,y:548,n:"BALKEN"},
-          {x:1010,y:700,n:"PALISADE"},{x:1260,y:700,n:"SEIL"},
-          {x:290,y:218,n:"WASSERGRABEN"},{x:390,y:218,n:"MAUER"},{x:490,y:218,n:"STROHBALLEN"}];
-        ctx.font="600 9px sans-serif"; ctx.fillStyle="#e6e0d2";
-        for(const s of namen){ const p=weltZuSchirm(s.x*HALLE_S,(s.y-20)*HALLE_S); ctx.fillText(s.n,p.x,p.y); }
-      }
-      ctx.restore();
       zeichneHyroxRangleiste();
       return;
     }
@@ -52230,6 +52466,34 @@
   // STRECKENPOSITION (`hyroxZustand(u).s` absteigend) -- `bahnRangliste()` selbst bleibt
   // unangetastet (Wertung/rho/Pp unberuehrt), sie wird hier nur nicht mehr als Anzeigequelle
   // benutzt. Ohne Fahrplan (Rueckfall) bleibt die alte Quelle.
+  // RANGBAND DER ARENA (Variante B, 17.11.): in der festen Totale sind alle zwoelf immer im Bild, die
+  // Rangleiste liegt deshalb nicht mehr als Kasten ueber den Geraeten, sondern als schmales Band in der
+  // Rueckwand-Zone unter der Anzeige: ein Chip je Laeufer in Rangfolge (Platz, Name, Status). Die drei
+  // Ersten tragen zusaetzlich ihren Namen am Kopf (hyroxNamenIds, gelesen in zeichneSpurt()).
+  function zeichneHyroxRangband(rang){
+    hyroxNamenIds=new Set(rang.slice(0,3).filter(u=>u.fertig==null).map(u=>u.id));
+    const statusKurz={technik:"TECH", kletter:"KLET", kraft:"KRAFT"};
+    const statusVon=(u)=>{
+      if(u.fertig!=null)return {t:"\u2713", f:"#8fdc9a"};
+      if(!u.hyroxPlan)return {t:"", f:"#bbb"};
+      const z=hyroxZustand(u);
+      if(z.art==="lauf")return {t:z.lauf>=1&&z.lauf<=3?"L"+z.lauf:"ZIEL", f:"#e6e0d2"};
+      return {t:statusKurz[z.gruppe]||"", f:z.gruppe==="technik"?"#6fd0e6":(z.gruppe==="kletter"?"#f5b25a":"#ee7b7b")};
+    };
+    const y0=hudBandUnten()+4, n=rang.length, cw=Math.floor((W-16)/n), ch=15;
+    ctx.save();
+    setzeFont(ctx,"600 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textBaseline="alphabetic";
+    ctx.fillStyle="rgba(6,5,4,.35)"; ctx.fillRect(0,y0-2,W,ch+4);
+    rang.forEach((u,i)=>{
+      const x=8+i*cw, st=statusVon(u);
+      ctx.fillStyle="rgba(10,8,6,.74)"; ctx.fillRect(x,y0,cw-2,ch);
+      ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillRect(x,y0,2,ch);
+      const name=u.n.length>9?u.n.slice(0,8)+"\u2026":u.n;
+      ctx.textAlign="left"; ctx.fillStyle=u.fertig!=null?"#bfeac7":"#f1e9d6"; ctx.fillText((i+1)+" "+name,x+5,y0+11);
+      ctx.textAlign="right"; ctx.fillStyle=st.f; ctx.fillText(st.t,x+cw-5,y0+11);
+    });
+    ctx.restore();
+  }
   function zeichneHyroxRangleiste(){
     const hat=!!(LAEUFER[0]&&LAEUFER[0].hyroxPlan);
     const rang=hat
@@ -52241,6 +52505,7 @@
       : bahnRangliste().reihe;
     if(!rang.length)return;
     const halle=istHyroxHalle();
+    if(halle){ zeichneHyroxRangband(rang); return; }
     const st=hyroxCamStationIdx>=0?HYROX_STATIONEN[hyroxCamStationIdx]:null;
     // OBEN war 58 (Kopf bei 40px) -- das lag unter dem Spiel-Anzeige-Balken (Unterkante ~69px) und
     // verdeckte Kopfzeile und erste Rangzeilen (QA 16.11., Fix-Paket C); jetzt ab der Balken-Unterkante.
@@ -54985,7 +55250,7 @@
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
-      if(!zfLabelAus&&!zfBlase&&!(zfSeiteAn&&u.fertig!=null)){
+      if(!zfLabelAus&&!zfBlase&&!(zfSeiteAn&&u.fertig!=null)&&(!istHyroxHalle()||hyroxNamenIds.has(u.id))){
       ctx.strokeText(txt,x,nameY);ctx.fillStyle=bahnSeitenFarbe(u.seite);ctx.fillText(txt,x,nameY);
       bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       }
@@ -54996,7 +55261,7 @@
       // steht der neue Name ueber dem Kopf. Was dazukommt, ist nur die Aufmerksamkeit:
       // fuer ANSAGE_NACHLEUCHTEN Sekunden steht er fett und in der Ansage-Farbe, damit
       // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
-      if(u.fertig==null&&!zfLabelAus&&!zfBlase&&!wartePulkNah){
+      if(u.fertig==null&&!zfLabelAus&&!zfBlase&&!wartePulkNah&&!istHyroxHalle()){
         const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
         setzeFont(ctx,(frisch?"700 9px":"400 8px")+" 'RaniraSeason',Georgia,'Times New Roman',serif");
         const pl=((BA().plaene)[u.plan]||{}).label||"";
@@ -55059,6 +55324,7 @@
       else if(zfFremd)zeichneZfNummer(u,x,y-(sk0*0.88-1)*46,zfNr.get(u.id));
     }
     }finally{ delete ctx.fillText; delete ctx.strokeText; }
+    if(istHyroxHalle())zeichneHyroxArenaSchilder();
     if(bahnSpaeteTexte.length){
       ctx.save();
       for(const q of bahnSpaeteTexte){
@@ -55399,7 +55665,16 @@
     } else {
       // STATIONEN/FALLEN/ZWISCHENZEITEN ALS STRICHE -- dieselbe Streckenliste, die die
       // Bahn selbst schon fuehrt (BA().hindernisse; Time-Trial zusaetzlich seine ZZ).
-      for(const frac of (A.hindernisse||[])){
+      // ARENA B: die Marken sitzen dort, wo die Wegtabelle die sieben Arbeitsabschnitte hat (Bogenlaenge s),
+      // in der Farbe ihrer Gruppe -- sonst liefen Marken (gleichmaessig 0,14..0,86) und Laeuferpunkte (s)
+      // auseinander.
+      const arenaMarken=(bahnHyroxAktiv&&istHyroxHalle()&&HYROX_WEG)?HYROX_WEG.abschnitte.filter(q=>q.art==="arbeit"):null;
+      const gBand={technik:"rgba(69,176,201,.95)", kletter:"rgba(242,160,61,.95)", kraft:"rgba(199,68,68,.95)"};
+      if(arenaMarken){
+        arenaMarken.forEach((q)=>{ const x=bandX((q.s0+q.s1)/2);
+          ctx.strokeStyle=gBand[q.gruppe]||"rgba(255,255,255,.45)"; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(x,by-5); ctx.lineTo(x,by+5); ctx.stroke(); });
+      } else for(const frac of (A.hindernisse||[])){
         const x=bandX(frac);
         ctx.strokeStyle=A.takeshi?"rgba(220,190,120,.65)":"rgba(255,255,255,.45)"; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(x,by-5); ctx.lineTo(x,by+5); ctx.stroke();
@@ -55486,7 +55761,7 @@
       lx.globalCompositeOperation="destination-in";
       lx.drawImage(im,0,0);
       c=lw;
-    }catch(err){ c=null; }
+    }catch{ c=null; }
     hiebFxCache.set(farbe,c);
     return c;
   }
@@ -55502,6 +55777,73 @@
     const dx=r-10*k-kante/2*k, dy=-kante/2*k;
     ctx.drawImage(bild,f*kante,0,kante,kante,dx,dy,kante*k,kante*k);
     if(e.schwer){ ctx.globalAlpha=0.45; ctx.drawImage(aBild.fx_hieb,f*kante,0,kante,kante,dx+4,dy,kante*k,kante*k); }
+    return true;
+  }
+
+  // H1-EFFEKTE ALS PIXELLAB-STREIFEN (17.11., Herkunft: public/sprites/arena/quellen.json, Rohdaten
+  // data/generated/pixellab-vfx/roh/, Streifen aus scripts/baue-fx-streifen.py). n Bilder a w x h,
+  // (ax,ay) = Ankerpunkt im Bild. Neutrale Streifen (Feuerwerk, Konfetti, Funken, Spritzer) werden
+  // je Farbe einmal getoent und zwischengespeichert; farblose (Klingenfunke, Boden-/Eisstaub)
+  // laufen ungetoent. REINE ANZEIGE: liest nur den Fortschritt p (0..1) des Aufrufers; kein
+  // Zustand an Spielern/Laeufern, kein rr(). Rueckfall: false -> der Aufrufer zeichnet wie bisher.
+  // Optionale Felder: hell = Tonung heller (Anteil Weiss in der Farbe, 0..1; graue Pixel vorab
+  // aufgehellt statt nur multipliziert -- reines Multiply machte aus Teamorange Erdbraun);
+  // glueh = zusaetzlich additiv ("lighter") gezeichnet, leuchtet auf dunklem Grund;
+  // von/bis/pp = nutzbarer Bildbereich (leere Randbilder der Bestellung ueberspringen) und
+  // Hin-und-her-Lauf statt Sprung, damit ein Endlos-Effekt nicht pulsiert.
+  const FX_BILD={
+    fx_feuerwerk:{n:24,w:96,h:96,ax:48,ay:48,hell:0.4,glueh:1},
+    fx_funken:{n:24,w:97,h:65,ax:47,ay:43,hell:0.4,glueh:1},
+    fx_konfetti:{n:28,w:100,h:78,ax:55,ay:49,hell:0.35},
+    fx_klingen:{n:7,w:32,h:32,ax:16,ay:16},
+    fx_bodenstaub:{n:8,w:32,h:32,ax:16,ay:17,von:1,bis:4,pp:1},
+    fx_eisstaub:{n:8,w:32,h:32,ax:16,ay:16,von:0,bis:6,pp:1},
+    fx_spritzer:{n:9,w:64,h:64,ax:32,ay:34}};
+  const fxToenCache=new Map();
+  function fxAufhellen(farbe,t){
+    const m=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(farbe||"");
+    if(!m)return farbe;
+    let h=m[1]; if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    const n=parseInt(h,16), k=v=>Math.round(v+(255-v)*t);
+    return "rgb("+k((n>>16)&255)+","+k((n>>8)&255)+","+k(n&255)+")";
+  }
+  function fxQuelle(name,farbe){
+    if(!aDa(name))return null;
+    if(!farbe)return aBild[name];
+    const hell=(FX_BILD[name]&&FX_BILD[name].hell)||0;
+    const key=name+"|"+farbe;
+    let c=fxToenCache.get(key);
+    if(c!==undefined)return c;
+    c=null;
+    try{
+      const im=aBild[name], w=im.naturalWidth, h=im.naturalHeight;
+      const lw=document.createElement("canvas"); lw.width=w; lw.height=h;
+      const lx=lw.getContext("2d");
+      lx.imageSmoothingEnabled=false;
+      lx.drawImage(im,0,0);
+      if(hell){ lx.globalCompositeOperation="lighter"; lx.drawImage(im,0,0); }
+      lx.globalCompositeOperation="multiply";
+      lx.fillStyle=hell?fxAufhellen(farbe,hell):farbe; lx.fillRect(0,0,w,h);
+      lx.globalCompositeOperation="destination-in";
+      lx.drawImage(im,0,0);
+      c=lw;
+    }catch{ c=null; }
+    fxToenCache.set(key,c);
+    return c;
+  }
+  function zeichneFxBild(name,x,y,p,farbe,skala){
+    const d=FX_BILD[name];
+    if(!d||!isFinite(p)||!isFinite(x)||!isFinite(y))return false;
+    const bild=fxQuelle(name,farbe);
+    if(!bild)return false;
+    const von=d.von||0, bis=d.bis==null?d.n-1:d.bis;
+    const q=d.pp?(p<0.5?p*2:(1-p)*2):p;
+    const f=Math.max(von,Math.min(bis,von+Math.floor(q*(bis-von+1)))), k=skala||1;
+    ctx.save();
+    ctx.imageSmoothingEnabled=false;
+    if(d.glueh&&farbe)ctx.globalCompositeOperation="lighter";
+    ctx.drawImage(bild,f*d.w,0,d.w,d.h,Math.round(x-d.ax*k),Math.round(y-d.ay*k),d.w*k,d.h*k);
+    ctx.restore();
     return true;
   }
 
@@ -65394,6 +65736,24 @@
           t0:P?Array.from(P.t0):null,
           s:z?z.s:null, art:z?z.art:null, gruppe:z?z.gruppe:null, prog:z?z.prog:null};
       }) }),
+    // ARENA B (17.11., tests/spurt-hyrox-arena.test.ts): Geometrie der HYROX-Arena zum Nachmessen -- die
+    // Wegpunkte, die sieben Geraete und je Arbeitsabschnitt die Zeichenposition seiner Mitte (hallenXY) samt
+    // Kamerastand. Reiner Lesezugriff, kein rr(), kein Schreibzugriff.
+    hyroxArenaProbe:()=>({
+      halle:istHyroxHalle(), zoom:cam.zoom, camR:{x:camR.x,y:camR.y}, w:W, h:H,
+      pts:HYROX_WEG?HYROX_WEG.pts.map(p=>({x:p.x,y:p.y})):[],
+      geraete:HYROX_GERAETE.map(g=>({...g})), inseln:JSON.parse(JSON.stringify(HYROX_INSELN)), inselY:HYROX_INSEL_Y,
+      arbeitMitten:HYROX_WEG?HYROX_WEG.abschnitte.filter(a=>a.art==="arbeit")
+        .map(a=>({station:a.station, gruppe:a.gruppe, ...hallenXY((a.s0+a.s1)/2)})):[],
+      // Weglaenge je Abschnitt im ARENA-Weg (Pixel) fuer scripts/miss-hyrox-tempo.mjs (Pixel je Sim-Sekunde).
+      segLaenge:HYROX_WEG?HYROX_WEG.seg.map(g=>g.c1-g.c0):[],
+      pferch:{...HYROX_PFERCH}, ringR:HYROX_RING.r,
+      // Anzeige-y der zwoelf Bahnen mitten im Arbeitsabschnitt je Station (S1: stehen sie auf den Geraete-Reihen?).
+      reihen:HYROX_WEG?HYROX_WEG.abschnitte.filter(a=>a.art==="arbeit").map(a=>({station:a.station, gruppe:a.gruppe,
+        bahnen:HYROX_INSELN[a.gruppe].bahnen,
+        y:Array.from({length:BAHNEN_N()},(_,k)=>hyroxAnzeigeXY((a.s0+a.s1)/2,k,a.gruppe).y),
+        reihenY:Array.from({length:HYROX_INSELN[a.gruppe].bahnen},(_,k)=>hyroxBahnY(k,HYROX_INSELN[a.gruppe].bahnen))})):[],
+      regie:HYROX_REGIE_AN }),
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
     buehneHaltungTest:(neu)=>{

@@ -520,6 +520,95 @@
   "kandidat": 10,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "hyrox_arena": {
+  "prompt": "top-down view of one single very wide empty dark fantasy gladiator training yard, open air, weathered dark stone back wall with wooden spectator stands, tattered banners and iron brazier torches along the top edge only, the whole rest is open flat floor of packed dark sand and worn cobblestones with subtle wear, wooden palisade fence segments and a few old weapon racks at the left and right borders, no equipment in the middle, no characters, no text, muted brown grey and ember orange colours, even soft light, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "5e1cd226-9599-4a4b-9450-fcd417ef3bd4",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_burpee": {
+  "prompt": "a rectangular jumping strip on the ground made of packed sand framed by wooden planks with white bone coloured distance marks painted across it, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   56,
+   32
+  ],
+  "job": "b2c7f209-050e-47b8-ac55-07eb21a73ffc",
+  "kandidat": 2,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_farmers": {
+  "prompt": "pair of heavy black cast iron kettlebells with thick handles standing side by side on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   24
+  ],
+  "job": "3a0297af-0825-40f4-b2ef-e536bcffab39",
+  "kandidat": 26,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_sandsack": {
+  "prompt": "heavy brown burlap sandbag tied with rope lying on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   20
+  ],
+  "job": "b973af8d-2716-40a2-9dd8-f3b9ae54afcf",
+  "kandidat": 44,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_schlitten_schub": {
+  "prompt": "low heavy push sled with a flat iron base, a stack of round grey stone weight plates on top and two tall upright wooden push posts at the back, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   32
+  ],
+  "job": "910c0391-8be1-4b27-9e6d-269f63a3dcdf",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_schlitten_zug": {
+  "prompt": "heavy wooden pull sled loaded with round stone weight plates, a long thick hemp rope attached at the front and lying stretched out on the ground, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   56,
+   32
+  ],
+  "job": "aa8493ce-241f-4555-9355-5e82aa205959",
+  "kandidat": 11,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_skierg": {
+  "prompt": "tall standing ski ergometer training machine made of dark iron and old wood, a big round flywheel housing on top and two hanging ropes with wooden handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   56
+  ],
+  "job": "a37abe19-15ab-4e70-9c77-7e2e8250ab04",
+  "kandidat": 3,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "hyrox_wallball": {
+  "prompt": "wooden wall ball target: a small sturdy wooden board with a round bullseye target painted on it, a heavy leather medicine ball lying at its foot, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   32,
+   40
+  ],
+  "job": "6ca01bf2-fb9b-41fd-ac29-6636f24ba720",
+  "kandidat": 4,
+  "endpunkt": "/v2/generate-image-v2",
+  "verworfen": "Erster Auftrag 40x56 (10 Gen., Job bec1381a-..., Kurzform, volle ID nicht erhalten) verworfen: hoeher als der Bahnabstand von 43 px, die vier Zielbretter verschmolzen zu einer Saeule. Ersatz: dieser Auftrag 32x40 (15 Gen.); zusammen 25 Gen. fuer Wall Balls."
+ },
  "ispy_aktenschrank": {
   "prompt": "small grey metal filing cabinet with three closed drawers and handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
@@ -683,6 +772,72 @@
    28
   ],
   "job": "8c1fe8ed-ad2a-4fb1-b20f-b0559952abcf",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_basketball_streetcourt": {
+  "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_eiskunstlauf_waldsee": {
+  "prompt": "top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "82f702b0-6505-4cfc-925a-5b5cfc400104",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_football_strand": {
+  "prompt": "top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "ea5f769a-cafc-47cd-a2a7-ca71b9ecf5d0",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_hockey_bergsee": {
+  "prompt": "top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "a336f46c-27e2-4b46-893d-aaec77e96453",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_tennis_dach": {
+  "prompt": "top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "50c73c61-cfa8-49c0-8693-fbcbab81cdd7",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "kulisse_tennis_riviera": {
+  "prompt": "top-down view of one single very wide empty sunny terrace of plain orange-red clay on the mediterranean riviera, a white stone balustrade with terracotta flower pots, dark green cypress trees, small white villas with red roofs and a strip of blue sea along the top edge only, the whole rest is open flat smooth floor of plain orange-red clay with no lines and no markings, a few small potted lemon trees at the far left and right borders, warm sunny colours, even soft light, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "bb4336a1-3205-491a-94dd-f5752dffb3f7",
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },

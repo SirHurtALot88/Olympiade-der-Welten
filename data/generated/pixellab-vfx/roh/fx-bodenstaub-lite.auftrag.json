@@ -1,0 +1,22 @@
+{
+ "prompt": "A small puff of dust kicked up by a heavy foot stomp on a stage floor, pixel art, plays once, about 0.6 seconds. A low ring of tan-beige dust grains bursts outward and a few particles rise and fade. Colours: sandy beige and light brown-grey. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "21c87c2c-426e-480d-9d6a-be0dc7b5b08a",
+ "effect_id": "a0876615-6679-4478-94a4-53255cf171c8",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "canvas": {
+  "h": 32,
+  "w": 32
+ },
+ "frames": 8,
+ "fps": 13,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 17,
+  "kind": "origin"
+ },
+ "message": "A 32×32 one-shot stage-stomp dust puff, about 0.6 seconds: a low flattened ring of sandy-beige grains bursts outward, a faint brown-grey dust cloud sits at the base, and a few specks drift up and fade. Try the Speed slider on the grain ring for a wider or tighter burst; I pulled the ring in so it stays inside the canvas.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=a0876615-6679-4478-94a4-53255cf171c8"
+}

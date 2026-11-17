@@ -233,6 +233,29 @@ Vervielfachung über den ganzen Figuren-Bestand, die bei einem einzelnen Requisi
 anfällt. Im Zweifel (eine neue Art von Objekt, die einem Charakter sehr nahekommt, z.B. ein
 Maskottchen oder eine Kreatur) lieber einmal nachfragen statt anzunehmen.
 
+**Fable bestellt für Arenen und Effekte selbst (Chris, 17.11.): „fable darf für optik und
+verbesserungen der arenen und effekte von sich aus bestellen! freigabe erteilt".** Gilt für
+Kulissen, Requisiten und VFX (auch kleine UI-Rahmen/Icons als Requisiten) — **nicht** für neue
+Charaktere und Animationen, die bleiben gesperrt. Rahmen, gesetzt am selben Tag: etwa **1000
+Generationen für 10 Tage** (Guthaben 1041,7 am 17.11.), **kein Nachkauf** (Chris: „nachkaufen
+nein"), **Reserve 150 unantastbar**; vor jeder Bestellung Kosten schätzen und `/balance` lesen,
+danach `usage.generations` aus der Job-Antwort protokollieren (die Kontodifferenz taugt nicht,
+solange mehrere bestellen); **Bestellungen werden nie automatisch wiederholt** (ein POST nur
+einmal) und laufen unter `flock /tmp/pixellab-bestell.lock` (nur ein Besteller zugleich); erst
+Stilprobe, nur Treffer einbauen; Herkunft in die `quellen.json`. Stand und Töpfe:
+`docs/design/offene-punkte-entscheidungen-17-11.md`.
+
+**REMAKE statt Übertragung — GANZ WICHTIG (Chris, 17.11.):** „wichtig ist dass wir die designs
+wirklich von pixel lab verwenden und nicht einfach die alten hässlichen 1:1 übertragen und
+kopieren sondern REDESIGN als REMAKE/2D HD … sonst sieht so was wie time trial moderner aus und
+spurt bleibt hässlich, das geht nicht". Jede Arena/Kulisse, die auf PixelLab umgestellt wird, wird
+**neu gestaltet** (eigenes Areal, Tiefenstaffelung, Licht, Requisiten im 2D-HD-Look wie I-Spy,
+HYROX-Arena, TDM), nicht der alte Entwurf mit neuem Bildmaterial nachgebaut. **Kein Gefälle**
+zwischen den Disziplinen: vor einer neuen Arena prüfen, ob eine verwandte Disziplin (Zeitfahren
+↔ Spurt ↔ Staffel ↔ Takeshi) sichtbar moderner aussähe, und diese gleich mitziehen. Dazu: mehrere
+verschiedene Arenen/Varianten je Disziplin mit eigenen Assets (z. B. Takeshi), nicht eine Karte mit
+Umfärbung.
+
 ## Nur noch PixelLab-Assets — für alle zwanzig Disziplinen
 
 Chris am 17.11., wörtlich, nachdem die I-Spy-Hallen mit PixelLab neu gebaut worden waren: „Das mit

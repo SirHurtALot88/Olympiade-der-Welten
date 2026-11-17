@@ -1,0 +1,22 @@
+{
+ "prompt": "A splash of water or mud from a person falling into a puddle, pixel art, plays once, about 0.7 seconds. A crown of droplets and a central column jump up, then droplets fall back down and fade. Colours: only white and light grey, so the game can tint it blue or brown. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "7b01d9cb-5169-43f4-8d3f-bd540dc81a17",
+ "effect_id": "9eb6d377-55ac-41ec-a8e3-e92313c728b7",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "canvas": {
+  "h": 64,
+  "w": 64
+ },
+ "frames": 9,
+ "fps": 13,
+ "loop": false,
+ "anchor": {
+  "x": 32,
+  "y": 34,
+  "kind": "origin"
+ },
+ "message": "A one-shot water splash on a 64×64 transparent canvas, about 0.7 seconds (9 frames at 13 fps): a small flash at the centre, a central column and crown of droplets jumping up, then the droplets fall back and fade while a ripple ring spreads out. It uses only white and light greys, so you can tint it blue or brown in the game. The \"Water splash\" sliders adjust colour, amount and column height if you want it bigger, denser or taller.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=9eb6d377-55ac-41ec-a8e3-e92313c728b7"
+}

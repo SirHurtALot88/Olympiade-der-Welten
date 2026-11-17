@@ -105,7 +105,7 @@ window.__ARENA_KULISSEN={
    "id": "strand",
    "label": "Strand",
    "bild": "/sprites/kulissen/football/strand.jpg",
-   "dunkel": 0.22
+   "dunkel": 0.3
   }
  ],
  "gewichtheben": [
@@ -272,13 +272,13 @@ window.__ARENA_KULISSEN={
    "id": "riviera",
    "label": "Sandplatz Riviera",
    "bild": "/sprites/kulissen/tennis/riviera.jpg",
-   "dunkel": 0.14
+   "dunkel": 0.15
   },
   {
    "id": "dach",
    "label": "Hochhausdach",
    "bild": "/sprites/kulissen/tennis/dach.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.11
   }
  ],
  "time-trial": [

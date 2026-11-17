@@ -1,0 +1,23 @@
+{
+ "prompt": "A shower of sparks for a pixel art sports game, plays once, about 1.2 seconds. Short bright spark streaks shoot upward and outward from the bottom centre in a fan, arc over and fall, fading as they drop. Colours: only white to light grey, so the game can tint them. Transparent background, crisp pixels, about 96 pixels across, no glow halo, no text.",
+ "artist": "lite",
+ "job": "55bd22ff-af2d-4f7b-92f2-f490d1e323b8",
+ "effect_id": "208857c7-aebf-4a39-83d5-d78ccd692fdc",
+ "quoted": 1,
+ "generationen_abgerechnet": null,
+ "hinweis": "Kontodifferenz unzuverlaessig (parallele Sitzungen; gemessen 1.26); angesetzt 1",
+ "canvas": {
+  "h": 112,
+  "w": 96
+ },
+ "frames": 9,
+ "fps": 7,
+ "loop": false,
+ "anchor": {
+  "x": 48,
+  "y": 92,
+  "kind": "origin"
+ },
+ "message": "A one-shot spark shower of about 1.3 seconds on a 96 by 112 transparent canvas: short white-to-grey streaks burst up and out from the bottom centre in a fan, arc over and fall, fading as they drop, with a few small dots among them. There is no glow or halo and no text. Sliders to try: the spark speed and gravity for height and fall, and the spread for fan width.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=208857c7-aebf-4a39-83d5-d78ccd692fdc"
+}

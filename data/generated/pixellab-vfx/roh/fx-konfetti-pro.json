@@ -1,0 +1,755 @@
+{
+ "frames": [
+  {
+   "filename": "fx-konfetti-pro 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 1.png",
+   "frame": {
+    "x": 100,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 2.png",
+   "frame": {
+    "x": 200,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 3.png",
+   "frame": {
+    "x": 300,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 4.png",
+   "frame": {
+    "x": 400,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 5.png",
+   "frame": {
+    "x": 500,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 6.png",
+   "frame": {
+    "x": 0,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 7.png",
+   "frame": {
+    "x": 100,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 8.png",
+   "frame": {
+    "x": 200,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 9.png",
+   "frame": {
+    "x": 300,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 10.png",
+   "frame": {
+    "x": 400,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 11.png",
+   "frame": {
+    "x": 500,
+    "y": 78,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 12.png",
+   "frame": {
+    "x": 0,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 13.png",
+   "frame": {
+    "x": 100,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 14.png",
+   "frame": {
+    "x": 200,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 15.png",
+   "frame": {
+    "x": 300,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 16.png",
+   "frame": {
+    "x": 400,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 17.png",
+   "frame": {
+    "x": 500,
+    "y": 156,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 18.png",
+   "frame": {
+    "x": 0,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 19.png",
+   "frame": {
+    "x": 100,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 20.png",
+   "frame": {
+    "x": 200,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 21.png",
+   "frame": {
+    "x": 300,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 22.png",
+   "frame": {
+    "x": 400,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 23.png",
+   "frame": {
+    "x": 500,
+    "y": 234,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 24.png",
+   "frame": {
+    "x": 0,
+    "y": 312,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 25.png",
+   "frame": {
+    "x": 100,
+    "y": 312,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 26.png",
+   "frame": {
+    "x": 200,
+    "y": 312,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  },
+  {
+   "filename": "fx-konfetti-pro 27.png",
+   "frame": {
+    "x": 300,
+    "y": 312,
+    "w": 100,
+    "h": 78
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 100,
+    "h": 78
+   },
+   "sourceSize": {
+    "w": 100,
+    "h": 78
+   },
+   "pivot": {
+    "x": 0.55,
+    "y": 0.6282051282051282
+   },
+   "duration": 50
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "fx-konfetti-pro.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 600,
+   "h": 390
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 55,
+   "y": 49
+  },
+  "frameTags": [
+   {
+    "name": "fx-konfetti-pro",
+    "from": 0,
+    "to": 27,
+    "direction": "forward"
+   }
+  ]
+ }
+}

@@ -321,8 +321,50 @@ AUFTRAEGE = {
     # Neubestellung 17.11. (Chris: "3 ja"): die erste Tuer (Bogentuer im Steinrahmen, 26x40) wirkte
     # im Horror-Saal klein wie ein Grabstein. Jetzt eckig: gerader Sturz, Holzrahmen, deutlicher
     # Griff; Box 24x32, damit sie nicht an die Sterne ueber dem Fundort stoesst.
+    # --- HYROX-Arena (17.11., Chris: "Dark-Fantasy-Olympiade", echte HYROX-Geraete, eigene Arena) ---
+    # Siehe docs/design/hyrox-optik-konzept-17-11.md 3.4 (Variante B). EINE leere Anlage im
+    # Breitformat der Leinwand: Rueckwand mit Tribuenen oben, sonst freier Boden. Laufrunde, Mattenfelder
+    # und Geraete setzt der Motor bzw. kommen als Requisiten (hyrox_*).
+    "hyrox_arena": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty dark fantasy gladiator training yard, open air, weathered dark stone back wall with wooden spectator stands, tattered banners and iron brazier torches along the top edge only, the whole rest is open flat floor of packed dark sand and worn cobblestones with subtle wear, wooden palisade fence segments and a few old weapon racks at the left and right borders, no equipment in the middle, no characters, no text, muted brown grey and ember orange colours, even soft light, 16-bit RPG top-down map, pixel art"),
+    # HYROX-Geraete (Chris 17.11.: "echte HYROX-Geraete", Dark-Fantasy-Fassung, erkennbar). Je ein Requisit,
+    # ein Blickwinkel, 1:1 auf die Leinwand gezeichnet. Rudern entfaellt (keine Sitzpose im Figurenbestand).
+    "hyrox_skierg": dict(art="neu", datei="arena/hyrox_skierg.png", pixelgenau=True, gen=(32, 56),
+        prompt=f"tall standing ski ergometer training machine made of dark iron and old wood, a big round flywheel housing on top and two hanging ropes with wooden handles, front view, {STIL}"),
+    "hyrox_schlitten_schub": dict(art="neu", datei="arena/hyrox_schlitten_schub.png", pixelgenau=True, gen=(48, 32),
+        prompt=f"low heavy push sled with a flat iron base, a stack of round grey stone weight plates on top and two tall upright wooden push posts at the back, {DRAUF}, {STIL}"),
+    "hyrox_schlitten_zug": dict(art="neu", datei="arena/hyrox_schlitten_zug.png", pixelgenau=True, gen=(56, 32),
+        prompt=f"heavy wooden pull sled loaded with round stone weight plates, a long thick hemp rope attached at the front and lying stretched out on the ground, {DRAUF}, {STIL}"),
+    "hyrox_burpee": dict(art="neu", datei="arena/hyrox_burpee.png", pixelgenau=True, gen=(56, 32),
+        prompt=f"a rectangular jumping strip on the ground made of packed sand framed by wooden planks with white bone coloured distance marks painted across it, top-down view, {STIL}"),
+    "hyrox_wallball": dict(art="neu", datei="arena/hyrox_wallball.png", pixelgenau=True, gen=(32, 40),
+        prompt=f"wooden wall ball target: a small sturdy wooden board with a round bullseye target painted on it, a heavy leather medicine ball lying at its foot, front view, {STIL}"),
+    "hyrox_farmers": dict(art="neu", datei="arena/hyrox_farmers.png", pixelgenau=True, gen=(32, 24),
+        prompt=f"pair of heavy black cast iron kettlebells with thick handles standing side by side on the ground, {DRAUF}, {STIL}"),
+    "hyrox_sandsack": dict(art="neu", datei="arena/hyrox_sandsack.png", pixelgenau=True, gen=(32, 20),
+        prompt=f"heavy brown burlap sandbag tied with rope lying on the ground, {DRAUF}, {STIL}"),
     "ispy_tuer": dict(art="neu", datei="arena/ispy_tuer.png", pixelgenau=True, gen=(24, 32),
         prompt=f"a single closed rectangular wooden door with a perfectly flat straight top edge, standing in a square brown wooden door frame, vertical wood planks, a large clearly visible shiny brass door handle on the right side, no arch, no rounded top, {DRAUF}, {STIL}"),
+
+    # --- Welle A (17.11., Chris: "1 ja fang damit an"; Audit docs/design/pixellab-nur-neue-assets-
+    # audit-17-11.md Abschnitt 4): die prozedural gemalten Motor-Kulissen (baue-szenen-varianten*.py,
+    # baue-szenen-schauplaetze.py) werden PixelLab-Breitformate im I-Spy-Muster (792x300 = Seiten-
+    # verhaeltnis der Leinwand). Linien, Netz, Tore, Bande zeichnet weiter der Motor; das Bild liefert
+    # nur Untergrund und Rand: Deko im obersten Streifen und an den Seitenraendern, Boden frei und
+    # OHNE Markierungen. baue-kulisse-buehnen.py liest roh/kulisse_<disziplin>_<variante>.png, sonst
+    # bleibt der alte Bau als Rueckfall.
+    "kulisse_tennis_riviera": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty sunny terrace of plain orange-red clay on the mediterranean riviera, a white stone balustrade with terracotta flower pots, dark green cypress trees, small white villas with red roofs and a strip of blue sea along the top edge only, the whole rest is open flat smooth floor of plain orange-red clay with no lines and no markings, a few small potted lemon trees at the far left and right borders, warm sunny colours, even soft light, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "kulisse_tennis_dach": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty rooftop sports deck on top of a skyscraper in the evening, a tall chain-link fence with the glowing windows of a dark city skyline behind it along the top edge only, the whole rest is open flat smooth floor of plain blue hard court paint with no lines and no markings, a few small grey air-conditioning units and rooftop vents at the far left and right borders, cool blue and purple colours, bright even floodlight on the floor, nothing in the middle, no net, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "kulisse_basketball_streetcourt": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "kulisse_hockey_bergsee": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty frozen mountain lake, a thin strip of snowy mountain peaks and small snowy pine trees along the top edge only, the whole rest is open flat smooth pale white-blue lake ice with faint scratches and no lines and no markings, only a narrow rim of snow at the far left and right borders, cold bright winter colours, even daylight, nothing in the middle, no goals, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "kulisse_football_strand": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty sandy beach, a thin strip of turquoise sea with small waves, palm trees and striped beach huts along the top edge, a thin row of colourful beach umbrellas and towels along the bottom edge, the whole rest is open flat smooth light golden sand with no lines and no markings, warm sunny colours, even daylight, nothing in the middle, no goal posts, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "kulisse_eiskunstlauf_waldsee": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty frozen forest lake in winter, dense snowy dark green pine forest along the top edge and along the left and right borders and a thin row of pines along the bottom edge, distant snowy mountains above the top tree line, the whole middle is open flat smooth pale blue lake ice with no lines and no markings, cold calm winter colours, even soft light, nothing in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.

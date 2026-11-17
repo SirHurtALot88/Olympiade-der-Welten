@@ -1266,14 +1266,89 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "spurt": ["kurs"], "staffel": ["arena"], "climbing": ["wand", "fels", "eis"]}
 
 
+# ---------------------------------------------------------------------------------------- HYROX-Arena
+# Variante B der HYROX-Optik (17.11., docs/design/hyrox-optik-konzept-17-11.md): EINE leere PixelLab-Arena
+# (Dark-Fantasy-Trainingshof, 792x300, roh/hyrox_arena.png) als Breitformat, so wie die I-Spy-Hallen auf die
+# Leinwand gezogen (erst ganzzahlig hoch, dann weich). KEINE Spurt-Disziplin-Kulisse im Sinn von
+# battle-mode.kulissen.js (die Auswahl je Spiel gilt fuer Klassisch/Hatz weiter), sondern die feste Arena des
+# Formats HYROX: der Motor laedt /sprites/arena/hyrox_arena.jpg direkt (bodenHyroxHalle()). Bahn, Inseln und
+# Geraete zeichnet der Motor als Texturebene darueber.
+HYROX_ARENA_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh" / "hyrox_arena.png"
+HYROX_ARENA_ZIEL = WURZEL / "public" / "sprites" / "arena" / "hyrox_arena.jpg"
+
+
+def baue_hyrox_arena() -> Path:
+    roh = Image.open(HYROX_ARENA_ROH).convert("RGB")
+    g = int(LW / roh.width) + 1
+    lein = roh.resize((roh.width * g, roh.height * g), Image.NEAREST).resize((LW, LH), Image.LANCZOS)
+    lein.save(HYROX_ARENA_ZIEL, "JPEG", quality=92, optimize=True)
+    return HYROX_ARENA_ZIEL
+
+
+# ---------------------------------------------------------------------------------------- Welle A
+# PIXELLAB-BREITFORMATE (17.11., Chris: "nur noch PixelLab-Assets", Welle A des Audits
+# docs/design/pixellab-nur-neue-assets-audit-17-11.md): liegt roh/kulisse_<disziplin>_<variante>.png vor
+# (PixelLab 792x300, Auftrag in scripts/pixellab-requisiten.py), ersetzt es die Variante ganz -- wie die
+# I-Spy-Hallen: ganzzahlig NEAREST hoch, dann LANCZOS auf die Leinwand. Das Bild traegt nur Untergrund
+# und Rand (Deko oben und an den Seiten, Boden frei, ohne Markierungen); Linien, Netz, Tore und Bande
+# zeichnet weiter der Motor. Fehlt das Rohbild, baut BAUER die Variante wie bisher (Rueckfall).
+PL_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
+# RAND AN DIE MOTOR-GEOMETRIE (nur wo noetig): PixelLab trifft die Breite der Randdeko nicht genau. Je
+# Seite (roh-Kante, Leinwand-Kante): der Randstreifen ausserhalb der roh-Kante bleibt im Massstab
+# unverzerrt und wird nur am aeusseren Ende beschnitten, damit seine Innenkante genau auf der
+# Leinwand-Kante liegt; der freie Boden dazwischen wird gestreckt. Fehlt eine Seite, gilt der
+# gleichmaessige Massstab. Basketball: Zaun oben/unten lag sonst 40 px tief im Feld (60..H-60);
+# Tennis-Dach: Zaununterkante sonst unter der fernen Grundlinie (H*0.17); Waldsee: Ufer/Tannen sonst
+# innerhalb der Bande (kuerFlaeche: ~110..1130 x 60..410).
+PL_RAENDER = {
+    ("basketball", "streetcourt"): {"oben": (72, 58), "unten": (239, LH - 58)},
+    ("tennis", "dach"): {"oben": (75, 78)},
+    ("eiskunstlauf", "waldsee"): {"oben": (76, 64), "unten": (262, LH - 58), "links": (97, 112), "rechts": (695, LW - 112)},
+}
+
+
+def _achse(n_lein: int, n_roh: int, s: float, a=None, b=None) -> np.ndarray:
+    """Leinwand-Koordinate (Mitte jedes Pixels) -> roh-Koordinate, stueckweise linear (s. PL_RAENDER)."""
+    c = np.arange(n_lein) + 0.5
+    r = c / s
+    a_roh, a_lein = a if a else (0.0, 0.0)
+    b_roh, b_lein = b if b else (n_roh, n_roh * s)
+    r = np.where(c < a_lein, a_roh - (a_lein - c) / s, r)
+    mitte = (c >= a_lein) & (c < b_lein)
+    r = np.where(mitte, a_roh + (c - a_lein) * (b_roh - a_roh) / (b_lein - a_lein), r)
+    r = np.where(c >= b_lein, b_roh + (c - b_lein) / s, r)
+    return np.clip(r, 0, n_roh - 1e-6)
+
+
+def pixellab_breitform(disziplin: str, variante: str) -> Image.Image | None:
+    roh_pfad = PL_ROH / f"kulisse_{disziplin.replace('-', '_')}_{variante}.png"
+    if not roh_pfad.exists():
+        return None
+    roh = Image.open(roh_pfad).convert("RGB")
+    rd = PL_RAENDER.get((disziplin, variante))
+    if not rd:
+        g = int(LW / roh.width) + 1
+        return roh.resize((roh.width * g, roh.height * g), Image.NEAREST).resize((LW, LH), Image.LANCZOS)
+    # doppelte Leinwand, Pixel des roh-Bildes per naechstem Nachbarn, dann weich auf die Leinwand
+    s = LW / roh.width
+    ys = _achse(LH * 2, roh.height, s * 2, *(None if k not in rd else (rd[k][0], rd[k][1] * 2) for k in ("oben", "unten")))
+    xs = _achse(LW * 2, roh.width, s * 2, *(None if k not in rd else (rd[k][0], rd[k][1] * 2) for k in ("links", "rechts")))
+    a = np.asarray(roh)[ys.astype(int)[:, None], xs.astype(int)[None, :]]
+    return Image.fromarray(a).resize((LW, LH), Image.LANCZOS)
+
+
 def main() -> None:
     if "--spurt-requisiten" in sys.argv[1:]:
         spurt_requisiten()
         return
+    if "--hyrox-arena" in sys.argv[1:]:
+        print(f"hyrox-arena: -> {baue_hyrox_arena().relative_to(WURZEL)}")
+        return
     disziplinen = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BAUER)
     for d in disziplinen:
         for v in VARIANTEN[d]:
-            ziel = speichere_quelle(d, v, BAUER[d](v))
+            bild = pixellab_breitform(d, v)
+            ziel = speichere_quelle(d, v, bild if bild is not None else BAUER[d](v))
             print(f"{d}/{v}: -> {ziel.relative_to(WURZEL)}")
 
 
