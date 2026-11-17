@@ -12520,6 +12520,8 @@
     feedEreignis(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
     schwebe({x:0,y:0,txt:"STRAFE!",life:1.2,crit:true,_def:true,_spieler:taeter.id});
     logZug(opfer.side,"strafe",{verteidiger:taeter,spieler:opfer});
+    // Der Schiri zeigt die Strafe an (17.11., reine Anzeige: fsSchiri wird nirgends gelesen, das rr() oder Ergebnisse speist).
+    schiriPfeift(opfer,taeter,{still:true});
     // Beide Seiten neu aufstellen: die bestrafte Seite hat einen Mann weniger (die
     // Unterzahl-Tabelle in zuordneSlots greift dadurch von selbst), die andere einen
     // Gegenspieler weniger zu decken.
@@ -13792,6 +13794,8 @@
       feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true,
         traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined,"touchdown");
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
+      // Der Football-Motor kennt keine Fouls: der Schiri hebt beim Touchdown den Arm (reale Torsignal-Geste).
+      if(traeger)schiriPfeift(traeger,null,{still:true});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
       // F1-MESSPUNKT: der real erzielte Punktwert dieses Zugs (6 oder 7) ist die EP-
       // Entsprechung eines "naechsten Treffers" mit Index 0 -- derselbe Zug, der den
@@ -13839,7 +13843,9 @@
         // Spieler (die Boxscore-Sonde liest e.spieler.id ungeprueft, s.
         // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
         // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
-        logZug(fb.side,"treffer",{spieler:fkLos(off,"PASSGENAUIGKEIT"),punkte:3});
+        const fgSpieler=fkLos(off,"PASSGENAUIGKEIT");
+        logZug(fb.side,"treffer",{spieler:fgSpieler,punkte:3});
+        schiriPfeift(fgSpieler,null,{still:true});
         if(fsFbLog){
           fsFbLog.fgAtt++; fsFbLog.fgMade++;
           // F1-MESSPUNKT: ein Field Goal ist ein realer Punktgewinn wie ein Touchdown (s.
@@ -15705,7 +15711,10 @@
     return {x:b?Math.max(W*0.12,Math.min(W*0.88,b.x)):W/2, y:H-78};
   }
 
-  function schiriPfeift(schuetze,verteidiger){
+  // opt.still (17.11., Hockey-Strafe / Football-Touchdown): nur die Geste und der Ring, kein
+  // "FOUL!"-Schwebetext und kein Basketball-Platzhalterton -- Text und Ton liefert dort schon
+  // der Aufrufer (verhaengeStrafe: "STRAFE!" + hockey-pfiff; Football: "TOUCHDOWN!").
+  function schiriPfeift(schuetze,verteidiger,opt){
     if(!fsSchiri)return;
     const ort=verteidiger||schuetze;
     fsSchiri.pfiffT=PFIFF_DAUER;
@@ -15715,6 +15724,7 @@
     // ballaufprall/buzzer/dribbeln/korb_treffer/publikum_*). buzzer.mp3 ist der einzige
     // kurze, schrille Signalton im Bestand und steht hier leise fuer den Pfiff, bis eine
     // echte pfiff.mp3 im Repo liegt — eine Audiodatei zu erfinden war ausgeschlossen.
+    if(opt&&opt.still)return;
     if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.30);
     schwebe({x:0,y:0,txt:"FOUL!",life:1.2,crit:true,_def:true,_spieler:ort.id});
   }
@@ -15757,9 +15767,8 @@
       st.vx=dx/d*SCHIRI_TEMPO; st.vy=dy/d*SCHIRI_TEMPO;
       schiriBlick=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:1):(dy>0?2:0);
     } else { st.vx=0; st.vy=0; schiriBlick=2; }
-    // Die Pfiff-Geste selbst gibt es nur Sued/Ost (West = Ost gespiegelt): im Stand und beim
-    // Lauf nach oben schaut er dafuer zum Publikum (Sued).
-    const r0=(pfeift&&schiriBlick===0)?2:schiriBlick;
+    // Die Pfiff-Geste gibt es Sued/Ost/Nord (West = Ost gespiegelt).
+    const r0=schiriBlick;
     st.vizArt=pfeift?"pfiff":null;
     st.vizArtProg=pfeift?Math.min(1,(1-s.pfiffT/PFIFF_DAUER)/0.35):0;
     ctx.save();
@@ -17102,6 +17111,7 @@
     // fuer Football mit — nur der Rest von stepFeldspielLive wird uebersprungen.
     if(istFootball()){
       bewegeSpielerLive(dt);
+      bewegeSchiri(dt); // 17.11.: Pfiff-Geste beim Touchdown/Field Goal braucht den Ablauf von pfiffT (nur Anzeige)
       if(fsLive.phase==="snap")stepSnapPhase(dt);
       // KICKOFF-RETURN (football-kickoff-slot-plan-14-10.md Schritt 4): derselbe Zweig,
       // nur fuer die neue Phase — bleibt innerhalb des bestehenden `if(istFootball())`-
@@ -31076,7 +31086,11 @@
       // und las sich im Screenshot als kleiner Klumpen statt als "Konfetti steigt auf".
       const ausblend=Math.max(0,Math.min(1,(1-alter/S.dauer)/0.30));
       const grav=520;
+      // PixelLab-Burst am Anker (17.11.): Konfetti-Wolke bzw. Funkenfaecher (Breaking), in Teamfarbe;
+      // darunter bleibt jedes dritte Flugstueck des bisherigen Wurfs, damit die Feier nicht duenner wird.
+      const fxKonf=zeichneFxBild(f.funken?"fx_funken":"fx_konfetti",a.x,a.y,alter/(f.funken?1200:1400),c,3);
       for(let i=0;i<S.konfetti;i++){
+        if(fxKonf&&i%3!==0)continue;
         const hh=cypherHash(f.nr*7919+f.seite,i);
         const vx=(hh%321)-160, vy=220+((hh>>>9)%161);
         const x=a.x+vx*tau, y=a.y-vy*tau+0.5*grav*tau*tau;
@@ -31111,6 +31125,8 @@
         const bx=Math.max(W*0.12,Math.min(W*0.88,a.x+((hb%240)-120)));
         const by=H*(feuerwerkAb+((hb>>>8)%19)/100);
         const rMax=150+(hb%60);
+        // PixelLab-Burst (17.11., fx_feuerwerk, 3-fach): ersetzt die 28 Punkte, Rueckfall unten.
+        if(zeichneFxBild("fx_feuerwerk",bx,by,bAlter/1200,c,3))continue;
         ctx.globalAlpha=Math.max(0,1-bAlter/1200);
         ctx.fillStyle=bAlter<120?"#ffffff":c;
         for(let i=0;i<28;i++){
@@ -33492,6 +33508,8 @@
         if(funke>0){
           const leben=funke/FECHT_FUNKE_T;
           const fx=(ax+bx)/2, fy=(ay+by)/2;
+          // PixelLab-Funke (17.11., fx_klingen, 2-fach, 7 Bilder ueber FECHT_FUNKE_T); Rueckfall: Canvas-Funke.
+          if(!zeichneFxBild("fx_klingen",fx,fy,1-leben,null,2)){
           ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
           const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
           grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
@@ -33502,6 +33520,7 @@
             ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
           }
           ctx.restore();
+          }
         }
         // Q1 -- TREFFER-TREPPE unter der Bahn (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
         // die Fechten-Variante der Verlaufskurve, weil seit F1 der Trefferstand das Ergebnis
@@ -35293,6 +35312,8 @@
     // Eigene, kleine Routine statt der zeichnePartikelEffekt()-Closure aus zeichneSprite()
     // (die dort lokal ist und nur fuer b.effekt-Requisiten EINES Sprites gebaut wird) —
     // gleiche Bauart wie diese: rein aus buehneT/seed berechnet, kein Array, kein rr().
+    // PixelLab-Eisspray (17.11., fx_eisstaub, Schleife 0,5 s); Rueckfall: die fuenf Punkte.
+    if(zeichneFxBild("fx_eisstaub",x,y,(buehneT*2+seed*0.173)%1,null,2))return;
     for(let i=0;i<5;i++){
       const phase=(buehneT*2.6+seed*1.7+i*1.3)%1;
       const a=0.7*(1-phase);
@@ -37326,6 +37347,8 @@
   // lokale Closure INNERHALB zeichneBreaking(); Koerper/Aufrufstelle in zeichneBreaking()
   // unveraendert, nur die Definition ist umgezogen -- bit-identisch fuer Breaking selbst.
   function zeichneBodenstaub(fx,fy,id){
+    // PixelLab-Staubwolke (17.11., fx_bodenstaub, Schleife 0,6 s); Rueckfall: die fuenf Punkte unten.
+    if(zeichneFxBild("fx_bodenstaub",fx,fy,(buehneT/0.6+id*0.37)%1,null,1.25))return;
     ctx.fillStyle="#cbb98a";
     for(let i=0;i<5;i++){
       const ph=buehneT*6+id*1.7+i*1.3;
@@ -44027,7 +44050,9 @@
     // EFFEKT-PILOT 17.11. (Chris: "hud Effekte und schiri auch über Pixel lab"): Hieb-Bogen als
     // PixelLab-VFX (POST /v2/vfx, pro), neutral weiss/grau, 7 Bilder a 56 px als Streifen, zur
     // Laufzeit in Teamfarbe getoent (hiebBildGetoent). Rueckfall: der Canvas-Bogen in zeichneEffekte().
-    "fx_hieb"];
+    "fx_hieb",
+    // H1-EFFEKTE 17.11. (Chris: "effekte -> ja"): PixelLab /v2/vfx, waagerechte Streifen, s. FX_BILD.
+    "fx_feuerwerk","fx_konfetti","fx_funken","fx_klingen","fx_bodenstaub","fx_eisstaub","fx_spritzer"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -45186,7 +45211,7 @@
         ctx.restore();
         const spritzer=aus==="sturz";
         ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
-        if(spritzer){ ctx.strokeStyle="rgba(255,255,255,.6)";
+        if(spritzer&&!zeichneFxBild("fx_spritzer",x,y-4,(t*1.3)%1,"#b08d5e",1.5)){ ctx.strokeStyle="rgba(255,255,255,.6)";
           for(let k=0;k<5;k++){const ph=(t*2.4+k*0.31)%1; ctx.beginPath(); ctx.arc(x-24+k*12,y-6-ph*22,2+ph*4,0,6.283); ctx.stroke();} }
         break; }
       case "spitzen": { // Final Fall: spanischer Reiter.
@@ -55490,6 +55515,56 @@
     const dx=r-10*k-kante/2*k, dy=-kante/2*k;
     ctx.drawImage(bild,f*kante,0,kante,kante,dx,dy,kante*k,kante*k);
     if(e.schwer){ ctx.globalAlpha=0.45; ctx.drawImage(aBild.fx_hieb,f*kante,0,kante,kante,dx+4,dy,kante*k,kante*k); }
+    return true;
+  }
+
+  // H1-EFFEKTE ALS PIXELLAB-STREIFEN (17.11., Herkunft: public/sprites/arena/quellen.json, Rohdaten
+  // data/generated/pixellab-vfx/roh/, Streifen aus scripts/baue-fx-streifen.py). n Bilder a w x h,
+  // (ax,ay) = Ankerpunkt im Bild. Neutrale Streifen (Feuerwerk, Konfetti, Funken, Spritzer) werden
+  // je Farbe einmal getoent und zwischengespeichert; farblose (Klingenfunke, Boden-/Eisstaub)
+  // laufen ungetoent. REINE ANZEIGE: liest nur den Fortschritt p (0..1) des Aufrufers; kein
+  // Zustand an Spielern/Laeufern, kein rr(). Rueckfall: false -> der Aufrufer zeichnet wie bisher.
+  const FX_BILD={
+    fx_feuerwerk:{n:24,w:96,h:96,ax:48,ay:48},
+    fx_funken:{n:24,w:97,h:65,ax:47,ay:43},
+    fx_konfetti:{n:28,w:100,h:78,ax:55,ay:49},
+    fx_klingen:{n:7,w:32,h:32,ax:16,ay:16},
+    fx_bodenstaub:{n:8,w:32,h:32,ax:16,ay:17},
+    fx_eisstaub:{n:8,w:32,h:32,ax:16,ay:16},
+    fx_spritzer:{n:9,w:64,h:64,ax:32,ay:34}};
+  const fxToenCache=new Map();
+  function fxQuelle(name,farbe){
+    if(!aDa(name))return null;
+    if(!farbe)return aBild[name];
+    const key=name+"|"+farbe;
+    let c=fxToenCache.get(key);
+    if(c!==undefined)return c;
+    c=null;
+    try{
+      const im=aBild[name], w=im.naturalWidth, h=im.naturalHeight;
+      const lw=document.createElement("canvas"); lw.width=w; lw.height=h;
+      const lx=lw.getContext("2d");
+      lx.imageSmoothingEnabled=false;
+      lx.drawImage(im,0,0);
+      lx.globalCompositeOperation="multiply";
+      lx.fillStyle=farbe; lx.fillRect(0,0,w,h);
+      lx.globalCompositeOperation="destination-in";
+      lx.drawImage(im,0,0);
+      c=lw;
+    }catch(err){ c=null; }
+    fxToenCache.set(key,c);
+    return c;
+  }
+  function zeichneFxBild(name,x,y,p,farbe,skala){
+    const d=FX_BILD[name];
+    if(!d||!isFinite(p)||!isFinite(x)||!isFinite(y))return false;
+    const q=fxQuelle(name,farbe);
+    if(!q)return false;
+    const f=Math.max(0,Math.min(d.n-1,Math.floor(p*d.n))), k=skala||1;
+    ctx.save();
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(q,f*d.w,0,d.w,d.h,Math.round(x-d.ax*k),Math.round(y-d.ay*k),d.w*k,d.h*k);
+    ctx.restore();
     return true;
   }
 

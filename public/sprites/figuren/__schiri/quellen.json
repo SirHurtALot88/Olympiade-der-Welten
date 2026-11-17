@@ -26,16 +26,37 @@
   "animation_group_id": "93d1b991-51d2-445d-b648-1c039b0e92d0",
   "jobs": {
    "south": "a6e1349f-b1ce-44db-8b98-89a5e89fd5c0",
-   "east": "4c6bb131-79b6-407c-af19-40f38fc59921"
+   "east": "4c6bb131-79b6-407c-af19-40f38fc59921",
+   "north": "Nachbestellung 17.11. an dieselbe Gruppe (1 Gen. angesetzt)"
   },
-  "generationen": 2,
+  "generationen": 3,
   "action_description": "quickly raises one arm straight up high above his head with an open hand to signal a foul while putting the whistle to his mouth and blowing it, then holds the arm up",
   "dateien": [
    "pfiff-south.png",
-   "pfiff-east.png"
+   "pfiff-east.png",
+   "pfiff-north.png"
   ]
  },
  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
  "erzeugt": "2026-11-17",
- "vorher": "Canvas-Primitive in zeichneSchiri() (bleibt Rueckfall)"
+ "vorher": "Canvas-Primitive in zeichneSchiri() (bleibt Rueckfall)",
+ "walk": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/characters/animations (mode pixminimax, 16 Bilder + Startbild)",
+  "animation_group_id": "2060368d-393e-4883-a5c5-89a9cf65c362",
+  "richtungen": [
+   "south",
+   "east",
+   "north"
+  ],
+  "generationen_angesetzt": 3,
+  "action_description": "walks forward with a steady stride, arms swinging naturally, then returns to the starting pose",
+  "dateien": [
+   "walk-south.png",
+   "walk-east.png",
+   "walk-north.png"
+  ],
+  "erzeugt": "2026-11-17",
+  "freigabe": "Chris 17.11.: eine Schiri-Figur samt Animationen/Gesten ist genehmigt (kein Muster fuer andere Figuren)"
+ }
 }

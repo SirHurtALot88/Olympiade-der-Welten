@@ -1390,5 +1390,222 @@
    "paket": "Canvas-Primitive",
    "stelle": "zeichneEffekte() typ hieb (ctx.arc in Teamfarbe)"
   }
+ },
+ "fx_feuerwerk.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist pro)",
+  "auftrag": {
+   "prompt": "A single firework burst for a pixel art sports game, plays once, about 1.2 seconds. A bright white flash, then about 24 spark streaks fly outward in a full circle, droop slightly, and fade with small trailing sparks. Colours: only white to light grey, so the game can tint it in team colours. Transparent background, crisp pixels, about 96 pixels across, centred, no text.",
+   "artist": "pro",
+   "job": "9d8801f2-4a76-4478-aeab-c4e24f251c3a",
+   "effect_id": "9b789031-237d-420a-83ee-08018b9084e9",
+   "seed": null,
+   "generationen_angesetzt": 6,
+   "canvas": [
+    96,
+    96
+   ],
+   "bilder": 24,
+   "fps": 20,
+   "anker": [
+    48,
+    48
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-feuerwerk-pro.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneFxBild() in teamFeierEffekte() (battle-mode.engine.js), 3-fach, je Burst des Finales; Rueckfall 28 Canvas-Punkte",
+  "toenung": "neutral weiss/grau, zur Laufzeit in Teamfarbe getoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "28 Punkte je Burst"
+  }
+ },
+ "fx_konfetti.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist pro)",
+  "auftrag": {
+   "prompt": "A confetti burst for a pixel art sports game, plays once, about 1.4 seconds. About 30 tiny rectangular paper pieces shoot up and outward from the bottom centre, tumble and flicker between wide and thin as they spin, then drift down and fade. Colours: only white and light grey, so the game can tint them in team colours. Transparent background, crisp pixels, about 96 pixels across, no text.",
+   "artist": "pro",
+   "job": "575d71dd-c833-4dc8-b637-9130570ced8f",
+   "effect_id": "6bfaf81c-7fcb-4d34-98ae-d778fa72282e",
+   "seed": null,
+   "generationen_angesetzt": 6,
+   "canvas": [
+    100,
+    78
+   ],
+   "bilder": 28,
+   "fps": 20,
+   "anker": [
+    55,
+    49
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-konfetti-pro.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneFxBild() am Anker der Team-Feier (ab mittel), 3-fach; jedes dritte Flugstueck des Canvas-Wurfs bleibt",
+  "toenung": "neutral weiss/grau, zur Laufzeit in Teamfarbe getoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "fillRect-Schnipsel"
+  }
+ },
+ "fx_funken.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist pro)",
+  "auftrag": {
+   "prompt": "A shower of sparks for a pixel art sports game, plays once, about 1.2 seconds. Short bright spark streaks shoot upward and outward from the bottom centre in a fan, arc over and fall, fading as they drop. Colours: only white to light grey, so the game can tint them. Transparent background, crisp pixels, about 96 pixels across, no glow halo, no text.",
+   "artist": "pro",
+   "job": "19ca5312-d55e-4855-b11e-93e11fb40b18",
+   "effect_id": "25ab61e3-2d82-4ac6-bb76-b879c5677a5d",
+   "seed": null,
+   "generationen_angesetzt": 6,
+   "canvas": [
+    97,
+    65
+   ],
+   "bilder": 24,
+   "fps": 20,
+   "anker": [
+    47,
+    43
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-funken-pro.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneFxBild() am Anker der Breaking-Feier (opt.funken), 3-fach",
+  "toenung": "neutral weiss/grau, zur Laufzeit in Teamfarbe getoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "Funkenstriche"
+  }
+ },
+ "fx_klingen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist lite)",
+  "auftrag": {
+   "prompt": "Sparks from two sword blades clashing, pixel art, plays once, about 0.25 seconds. A bright white-yellow flash at the centre with five to six short golden spark lines radiating outward, shrinking and fading quickly. Colours: white, pale yellow, gold. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+   "artist": "lite",
+   "job": "5c1cf85c-22f3-4449-8448-0c79f30b8660",
+   "effect_id": "2a80aac1-658d-4ddf-9af7-7770051be9bb",
+   "seed": null,
+   "generationen_angesetzt": 1,
+   "canvas": [
+    32,
+    32
+   ],
+   "bilder": 7,
+   "fps": 28,
+   "anker": [
+    16,
+    16
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-klingen-lite.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneFxBild() beim Klingenkontakt (zeichneFechten, vizFunkeT), 2-fach; Rueckfall Canvas-Funke",
+  "toenung": "farbig (Gold), ungetoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "Radialverlauf + 5 Striche"
+  }
+ },
+ "fx_bodenstaub.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist lite)",
+  "auftrag": {
+   "prompt": "A small puff of dust kicked up by a heavy foot stomp on a stage floor, pixel art, plays once, about 0.6 seconds. A low ring of tan-beige dust grains bursts outward and a few particles rise and fade. Colours: sandy beige and light brown-grey. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+   "artist": "lite",
+   "job": "21c87c2c-426e-480d-9d6a-be0dc7b5b08a",
+   "effect_id": "a0876615-6679-4478-94a4-53255cf171c8",
+   "seed": null,
+   "generationen_angesetzt": 1,
+   "canvas": [
+    32,
+    32
+   ],
+   "bilder": 8,
+   "fps": 13,
+   "anker": [
+    16,
+    17
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-bodenstaub-lite.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneBodenstaub() (Breaking-Aufbaeumen, Showcase-Stampfer/Landung), Schleife 0,6 s; Rueckfall 5 Punkte",
+  "toenung": "farbig (Beige), ungetoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "5 Punkte"
+  }
+ },
+ "fx_eisstaub.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist lite)",
+  "auftrag": {
+   "prompt": "A spray of ice shavings from a skate blade stopping on ice, pixel art, plays once, about 0.5 seconds. Tiny white and pale blue ice flecks fly sideways and up from the centre, falling and fading. Colours: white, pale ice blue. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+   "artist": "lite",
+   "job": "da3e8518-1ccd-469b-8dfe-1a513496fad5",
+   "effect_id": "78eb27f9-7990-4e2f-8dc5-c29a400a598f",
+   "seed": null,
+   "generationen_angesetzt": 1,
+   "canvas": [
+    32,
+    32
+   ],
+   "bilder": 8,
+   "fps": 16,
+   "anker": [
+    16,
+    16
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-eisstaub-lite.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneEisstaub() (Eiskunstlauf-Landung/Pirouette), Schleife 0,5 s, 2-fach; Rueckfall 5 Punkte",
+  "toenung": "farbig (Weiss/Eisblau), ungetoent",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "5 Punkte"
+  }
+ },
+ "fx_spritzer.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist lite)",
+  "auftrag": {
+   "prompt": "A splash of water or mud from a person falling into a puddle, pixel art, plays once, about 0.7 seconds. A crown of droplets and a central column jump up, then droplets fall back down and fade. Colours: only white and light grey, so the game can tint it blue or brown. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+   "artist": "lite",
+   "job": "7b01d9cb-5169-43f4-8d3f-bd540dc81a17",
+   "effect_id": "9eb6d377-55ac-41ec-a8e3-e92313c728b7",
+   "seed": null,
+   "generationen_angesetzt": 1,
+   "canvas": [
+    64,
+    64
+   ],
+   "bilder": 9,
+   "fps": 13,
+   "anker": [
+    32,
+    34
+   ]
+  },
+  "roh": "data/generated/pixellab-vfx/roh/fx-spritzer-lite.{png,json,auftrag.json} (Raster) -> Streifen via scripts/baue-fx-streifen.py",
+  "einsetzen": "zeichneFxBild() im Takeshi-Fallenzweig 'schlamm' bei Sturz, 1,5-fach, Schlammton; Rueckfall Canvas-Kreise",
+  "toenung": "neutral weiss/grau, zur Laufzeit getoent (Schlamm #b08d5e)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "Kreise"
+  }
  }
 }
