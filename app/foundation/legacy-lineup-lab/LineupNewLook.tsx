@@ -30,6 +30,7 @@ import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import type { LineupKulisseAnzeige } from "@/lib/lineups/lineup-kulisse";
+import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -173,6 +174,13 @@ export type LineupNewLookProps = Pick<
    * Spielplan (`getSpieltagsGegnerFuerTeam`, dieselbe Quelle wie Resolve). Leer/null = nichts zeigen.
    */
   spieltagsGegner?: Array<{ disciplineSide: "d1" | "d2"; displayName: string; art: "pod" | "duell"; gegnerNamen: string[] }> | null;
+  /**
+   * STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., docs/design/strategie-templates-16-11.md 4.1): die
+   * Spielweise je Disziplin-Seite. Nur gesetzt, wenn die Flagge `OLY_STRATEGIE_VORLAGEN` an ist —
+   * fehlen beide Props, gibt es keine Zeile „Spielweise" (Standard). `null` = neutral.
+   */
+  getDisciplineStrategie?: (disciplineSide: "d1" | "d2") => string | null;
+  onUpdateDisciplineStrategie?: (disciplineSide: "d1" | "d2", strategie: string | null) => void;
   /**
    * Letztes Preview-Ergebnis des Clients (derselbe Feed, den die klassische
    * Einsatzliste für ihren Scoreboard-Reveal nutzt). Treibt die Resolve-Show —
@@ -1122,6 +1130,8 @@ export default function LineupNewLook({
   errors,
   rosterShortfall = null,
   spieltagsGegner = null,
+  getDisciplineStrategie,
+  onUpdateDisciplineStrategie,
   resolvePreview,
   formCardControlsBySide,
   onAssignDisciplineFormCard,
@@ -1707,6 +1717,60 @@ export default function LineupNewLook({
               })}
             </div>
           </div>
+
+          {/* STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., Konzept 4.1): zweite Knopfreihe
+              „Spielweise" unter der Kraft-Reihe — nur hinter der Flagge (Props fehlen sonst) und nur
+              für Disziplinen mit Katalogeintrag. Bewusst KEIN Zahlwert und keine Bandbreite (sonst
+              wird es ein Rechenknopf): ein Satz Verhalten, ▲/▼ für Sichtbares und Gegenpreis.
+              „Normal" schreibt kein Feld (neutral = Feld fehlt). */}
+          {(() => {
+            if (!getDisciplineStrategie || !onUpdateDisciplineStrategie) return null;
+            const vorlagen = strategieVorlagenFuer(disciplineId);
+            if (vorlagen.length === 0) return null;
+            const gewaehlt = normalisiereStrategie(disciplineId, getDisciplineStrategie(disciplineSide));
+            const defensiv = vorlagen.find((vorlage) => vorlage.stufe === "defensiv") ?? null;
+            const offensiv = vorlagen.find((vorlage) => vorlage.stufe === "offensiv") ?? null;
+            const knoepfe = [
+              ...(defensiv ? [{ id: defensiv.id, name: defensiv.name }] : []),
+              { id: null as string | null, name: "Normal" },
+              ...(offensiv ? [{ id: offensiv.id, name: offensiv.name }] : []),
+            ];
+            const aktiv = vorlagen.find((vorlage) => vorlage.id === gewaehlt) ?? null;
+            return (
+              <div
+                className="nl-lineup-strategie"
+                data-testid={`nl-lineup-strategie-${disciplineSide}`}
+                style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px" }}
+              >
+                <div
+                  className="nl-lineup-intensity"
+                  role="group"
+                  aria-label={`${disciplineSide.toUpperCase()} Spielweise`}
+                  style={{ alignItems: "center" }}
+                >
+                  <span style={{ fontWeight: 600, color: "var(--nl-mut-2)", marginRight: "4px" }}>Spielweise</span>
+                  {knoepfe.map((knopf) => (
+                    <button
+                      key={`${disciplineSide}-strategie-${knopf.id ?? "neutral"}`}
+                      type="button"
+                      className={gewaehlt === knopf.id ? "is-selected" : ""}
+                      aria-pressed={gewaehlt === knopf.id}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateDisciplineStrategie(disciplineSide, knopf.id)}
+                    >
+                      {knopf.name}
+                    </button>
+                  ))}
+                </div>
+                {aktiv ? (
+                  <div style={{ color: "var(--nl-mut-2)", lineHeight: 1.35 }}>
+                    <span>{aktiv.satz}</span>{" "}
+                    <span className="nl-tnum">{aktiv.wirkung.join("  ")}</span>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {/* Feature 2: kompakter Rivalen-Streifen (eigene Zeile — side-head ist
               flex-wrap). Zeigt Saison-Rang + Rivalitäts-Stärke der nächsten

@@ -3880,6 +3880,29 @@ export type LineupDraftModifierSide = {
   mutatorTrait2?: string | null;
   teamPowerId?: string | null;
   intensity?: "conserve" | "normal" | "push" | null;
+  /**
+   * STRATEGIE-VORLAGE der Mannschaft für diese Disziplin-Seite (docs/design/strategie-templates-16-11.md
+   * Abschnitt 3.1, Katalog `lib/lineups/strategie-vorlagen.ts`). Fehlt das Feld oder ist es `null`,
+   * gilt NEUTRAL — es wird nie ein Eintrag "neutral" geschrieben. Nur Verhalten, keine Stat.
+   * Gelesen nur hinter der Flagge `OLY_STRATEGIE_VORLAGEN` (Standard aus).
+   */
+  strategie?: string | null;
+  /**
+   * ZURUF-PLAN (Konzept 4.2): höchstens zwei vorab gesetzte Wenn-dann-Anweisungen. Im Pilot
+   * Wettessen bewusst NICHT gelesen — Bühnen-Würfe fallen vorab, Bühnen haben keinen Zuruf
+   * (Konzept 4.2); der erste Zuruf-Plan kommt mit Football (Schritt 3). Das Feld steht hier nur,
+   * damit das Datenmodell nicht ein zweites Mal angefasst werden muss.
+   */
+  zurufPlan?: LineupZurufAnweisung[] | null;
+};
+
+/** Feste, kurze Anlass-Liste des Zuruf-Plans (Konzept 4.2). */
+export type LineupZurufAnlass = "rueckstand_haelfte" | "fuehrung_letztes_drittel" | "unterzahl";
+
+export type LineupZurufAnweisung = {
+  wenn: LineupZurufAnlass;
+  /** Kennung einer Strategie-Vorlage derselben Disziplin. */
+  dann: string;
 };
 
 export type LineupDraftModifiers = {

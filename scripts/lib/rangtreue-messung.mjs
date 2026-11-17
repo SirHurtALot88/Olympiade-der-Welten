@@ -528,3 +528,50 @@ export function kontaktSchalterText(gesetzt) {
   if (!gesetzt) return "";
   return `Kontakt-Flags: ${JSON.stringify(gesetzt.flags)}${gesetzt.zwang ? ` · Zwang ${JSON.stringify(gesetzt.zwang)}` : ""}`;
 }
+
+// ===================================================================================
+// STRATEGIE-SCHALTER (Strategie-Vorlagen, Pilot Wettessen 17.11., docs/design/strategie-templates-16-11.md 6.3)
+// — gemeinsam fuer miss-alle-disziplinen.mjs und messe-arena-einfluss.mjs (zweiter Saatstrom dort ueber
+// --saat-versatz=10000000). Setzt die Vorlage NUR fuer diesen Messlauf ueber
+// window.__arena.strategieVorlagen() (Messvorgabe, ueberstimmt den Umschlag). Ohne Schalter misst
+// jedes Skript den Motor wie im Spiel (neutral) — byte-identisch zu vorher.
+//
+//   --strategie=wettessen:reinhauen                beide Seiten dieselbe Vorlage
+//   --strategie=wettessen:reinhauen:kontrolliert   Heim/Gast getrennt ("-" oder "neutral" = neutral)
+//   mehrere Disziplinen mit ";" trennen
+// ===================================================================================
+export const IST_STRATEGIE_SCHALTER = (a) => a.startsWith("--strategie=");
+
+export function strategieSchalterAusArgs(args) {
+  const roh = args.find((a) => a.startsWith("--strategie="))?.slice("--strategie=".length) ?? null;
+  if (!roh) return null;
+  const vorgaben = {};
+  const neutral = (v) => (v == null || v === "" || v === "-" || v === "neutral" ? null : v);
+  for (const teil of roh.split(";").filter(Boolean)) {
+    const [d, a, b] = teil.split(":");
+    if (!d || a == null) throw new Error(`--strategie braucht <disziplin>:<vorlage>[:<vorlage gast>], bekam "${teil}"`);
+    vorgaben[d] = [neutral(a), neutral(b === undefined ? a : b)];
+  }
+  return vorgaben;
+}
+
+/** Setzt die Vorlagen auf einer geladenen Seite; wirft bei unbekannter Kennung. Gibt den Stand zurueck (oder null). */
+export async function setzeStrategieSchalter(seite, vorgaben) {
+  if (!vorgaben) return null;
+  return seite.evaluate((v) => {
+    const A = window.__arena;
+    if (!A.strategieVorlagen) throw new Error("window.__arena.strategieVorlagen fehlt — Engine zu alt?");
+    const { katalog } = A.strategieVorlagen();
+    for (const [d, paar] of Object.entries(v)) {
+      for (const id of paar) {
+        if (id != null && !(katalog[d] && id in katalog[d])) throw new Error(`--strategie: unbekannte Vorlage "${id}" fuer "${d}"`);
+      }
+    }
+    return A.strategieVorlagen(v).gesetzt;
+  }, vorgaben);
+}
+
+export function strategieSchalterText(gesetzt) {
+  if (!gesetzt) return "";
+  return `Strategie-Vorlagen: ${JSON.stringify(gesetzt)}`;
+}

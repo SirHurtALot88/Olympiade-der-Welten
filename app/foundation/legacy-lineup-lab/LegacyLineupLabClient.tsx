@@ -86,6 +86,7 @@ import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-sched
 import { getSpieltagsGegnerFuerTeam } from "@/lib/season/mini-dm-pod-schedule";
 import { buildStaffelPairGamesLookup, STAFFEL_DISCIPLINE_ID } from "@/lib/season/staffel-wechsel-paar-bonus-service";
 import { buildLineupKulisseAnzeige } from "@/lib/lineups/lineup-kulisse";
+import { istStrategieVorlagenAktiv } from "@/lib/lineups/strategie-vorlagen";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
 // verschoben (siehe dortige Kommentare). Diese Komponente behaelt nur noch duenne
@@ -1392,6 +1393,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const getDisciplineIntensity = useCallback(
     (disciplineSide: "d1" | "d2") => modifiers[disciplineSide]?.intensity ?? teamIntensity,
     [modifiers.d1.intensity, modifiers.d2.intensity, teamIntensity],
+  );
+  // STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., lib/lineups/strategie-vorlagen.ts): nur hinter der
+  // Flagge. `null` = neutral = Feld fehlt im Entwurf.
+  const strategieVorlagenAktiv = istStrategieVorlagenAktiv();
+  const getDisciplineStrategie = useCallback(
+    (disciplineSide: "d1" | "d2") => modifiers[disciplineSide]?.strategie ?? null,
+    [modifiers],
   );
   const draftStateKey = useMemo(
     () =>
@@ -5189,6 +5197,21 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	    }));
 	  }
 
+	  // STRATEGIE-VORLAGE je Disziplin-Seite. „Normal" (null) LOESCHT das Feld statt "neutral" zu
+	  // schreiben (Konzept 3.1: neutral = Feld fehlt) -- ein Entwurf ohne Vorlage bleibt Zeichen fuer
+	  // Zeichen der alte. Die Projektion bleibt unberuehrt (eine Vorlage aendert keine Stat).
+	  function updateDisciplineStrategie(disciplineSide: "d1" | "d2", strategie: string | null) {
+	    setDraft(null);
+	    setModifiers((current) => {
+	      const rest = { ...current[disciplineSide] };
+	      delete rest.strategie;
+	      return {
+	        ...current,
+	        [disciplineSide]: strategie ? { ...rest, strategie } : rest,
+	      };
+	    });
+	  }
+
 	  function updateDisciplineIntensityStage(disciplineSide: "d1" | "d2", intensity: MatchdayIntensityStage) {
 	    setPreview(null);
 	    setMatchdayScorePreview(null);
@@ -6337,6 +6360,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onSaveDraft={() => void handleSaveDraft()}
         getDisciplineIntensity={getDisciplineIntensity}
         onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
+        getDisciplineStrategie={strategieVorlagenAktiv ? getDisciplineStrategie : undefined}
+        onUpdateDisciplineStrategie={strategieVorlagenAktiv ? updateDisciplineStrategie : undefined}
         playerFilter={playerFilter}
         onPlayerFilterChange={setPlayerFilter}
         rosterShortfall={lineupRosterShortfall}

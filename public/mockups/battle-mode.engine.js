@@ -20633,6 +20633,37 @@
     return null;
   }
 
+  // ============ STRATEGIE-VORLAGEN JE TEAM (Pilot Wettessen, 17.11.) ============
+  // docs/design/strategie-templates-16-11.md (Abschnitte 1.3, 3.2, 3.3, 6.1, 7 Schritt 1), von Chris am
+  // 17.11. mit den fuenf Empfehlungen aus Abschnitt 8 freigegeben. Eine Vorlage aendert, WAS die
+  // Spieler einer Mannschaft tun, nie WIE GUT: keine Stat, kein Rezept-Gewicht, keine Eignungsmatrix,
+  // keine Erfolgschance ausserhalb der laengst abgenommenen Haltungs-Mechanik.
+  //
+  // NEUTRAL = FELD FEHLT. Ohne Eintrag liest der Motor KEINE neue Stelle ausser dieser einen
+  // Nachschlage-Funktion, zieht KEINEN zusaetzlichen rr()-Wurf und schreibt KEIN neues Feld an
+  // TEILNEHMER/Laeufer (Zuordnung Vorlage <-> Esser in der WeakMap `strategieVorlageKF`, Muster
+  // kontaktZaehlerMap) -- bit-identisch, nachweisbar ueber scripts/pruefe-wertung-fingerabdruck.mjs.
+  //
+  // Quellen, in Prioritaet: (1) Messvorgabe `strategieTest[d]` (nur window.__arena.strategieVorlagen(),
+  // nie im Spiel), (2) der Umschlag `echterKader.strategieByDisciplineId[d]` = [Heim, Gast] (Host und
+  // Vorlauf/Buchung bauen ihn mit DERSELBEN Funktion, lib/foundation/battle-arena/arena-strategie-
+  // adapter.ts, und nur hinter der Flagge OLY_STRATEGIE_VORLAGEN). Nur Kennungen aus STRATEGIE_VORLAGEN[d]
+  // werden angenommen; alles andere ist still neutral (Muster buehneHaltungVon). Der Katalog mit Texten
+  // steht in lib/lineups/strategie-vorlagen.ts; tests/strategie-vorlagen-wettessen.test.ts haelt beide
+  // Kennungslisten deckungsgleich. Wert = Richtung der Verschiebung in Stufen (-1 defensiv, +1 offensiv).
+  const STRATEGIE_VORLAGEN={wettessen:{kontrolliert:-1, reinhauen:1}};
+  let strategieTest={};
+  const strategieVorlageKF=new WeakMap();   // TEILNEHMER -> {vorlage, ki} (nur bei aktiver Vorlage)
+  function strategieVorlageVon(d,seite){
+    const kat=Object.prototype.hasOwnProperty.call(STRATEGIE_VORLAGEN,d)?STRATEGIE_VORLAGEN[d]:null;
+    if(!kat)return null;
+    const quelle=Object.prototype.hasOwnProperty.call(strategieTest,d)?strategieTest[d]
+      :(echterKader&&echterKader.strategieByDisciplineId?echterKader.strategieByDisciplineId[d]:null);
+    if(!Array.isArray(quelle))return null;
+    const v=quelle[seite];
+    return (typeof v==="string"&&Object.prototype.hasOwnProperty.call(kat,v))?v:null;
+  }
+
   // ============ SPEED-SCHACH „DIE UHR WIRD DER DRITTE SPIELER" (Stufe 1 + 2) ============
   // docs/design/speed-schach-nachtkonzept-03-10.md, Abschnitt 3.1-3.3, gebaut 04.10.
   //
@@ -20844,6 +20875,9 @@
           mauerMinute:u.mauerMinute??null, K:Math.round(u.mauerK||0), NERVEN:u.NERVEN,
           AUSDAUER:u.AUSDAUER, summe:u.summe, eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig,
           kurve:u.runden.map(r=>r.punkte)};
+        // Strategie-Vorlage (Pilot 17.11.): nur bei aktiver Vorlage, sonst kein Schluessel.
+        const sv=strategieVorlageKF.get(u);
+        if(sv){ e.vorlage=sv.vorlage; e.kiHaltung=sv.ki; }
         if(evLaeufe>0){
           e.ev={};
           for(const h of WETTESSEN_HALTUNGEN){
@@ -20960,11 +20994,32 @@
   // DER SPIELPFAD: Haltung waehlen (Messvorgabe > Aufstellung > KI) und die Minuten mit rr()
   // rechnen. Bei Flag-Stufe 1 (nur K1) gilt fuer alle "gleichmaessig" — die Haltung ist erst
   // Teil von Stufe 2.
+  // STRATEGIE-VORLAGE (Pilot 17.11., s. STRATEGIE_VORLAGEN oben): die Team-Vorlage verschiebt die
+  // KI-Haltung jedes Essers um EINE Stufe auf der Leiter gleichmaessig -> schlussspurt -> sprint
+  // (Konzept Empfehlung 3: verschieben, nicht alle gleich setzen -- der Draufgaenger bleibt der
+  // Wildeste). "kontrolliert" (-1) Richtung gleichmaessig, "reinhauen" (+1) Richtung sprint, an den
+  // Enden geklemmt. Rangfolge (Konzept 3.2): Messvorgabe > Einzel-Haltung des Spielers > Vorlage des
+  // Teams > KI-Vorgabe. Nur Verhalten: die drei Haltungen sind die seit 04.10. abgenommene
+  // Mechanik (wettessenMauerRunden), dieselbe Zahl rr()-Wuerfe je Minute, kein Sub-Skill aendert sich.
+  const WETTESSEN_VORLAGE_LEITER=["gleichmaessig","schlussspurt","sprint"];
+  function wettessenVorlageHaltung(ki,richtung){
+    const i=WETTESSEN_VORLAGE_LEITER.indexOf(ki);
+    if(i<0)return ki;
+    return WETTESSEN_VORLAGE_LEITER[Math.max(0,Math.min(WETTESSEN_VORLAGE_LEITER.length-1,i+richtung))];
+  }
   function wettessenMauerSetz(L,p,seite,art){
     if(BUEHNE_FLAGS.wettessenMauer>=2){
       const vorgabe=buehneHaltungVon(p,seite,WETTESSEN_HALTUNGEN);
-      L.haltung=vorgabe||wettessenKiHaltung(L);
-      L.haltungQuelle=vorgabe?"vorgabe":"ki";
+      const vorlage=vorgabe?null:strategieVorlageVon("wettessen",seite);
+      if(vorlage){
+        const ki=wettessenKiHaltung(L);
+        L.haltung=wettessenVorlageHaltung(ki,STRATEGIE_VORLAGEN.wettessen[vorlage]);
+        L.haltungQuelle="vorlage";
+        strategieVorlageKF.set(L,{vorlage, ki});
+      } else {
+        L.haltung=vorgabe||wettessenKiHaltung(L);
+        L.haltungQuelle=vorgabe?"vorgabe":"ki";
+      }
     } else {
       L.haltung="gleichmaessig"; L.haltungQuelle="k1";
     }
@@ -65204,6 +65259,20 @@
       if(neu&&typeof neu==="object")
         for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
       return {...buehneHaltungTest};
+    },
+    // STRATEGIE-VORLAGEN (nur Messung/Tests, s. STRATEGIE_VORLAGEN oben): {wettessen:["reinhauen","reinhauen"]}
+    // setzt die Vorlage je Seite fuer diese Disziplin (ueberstimmt den Umschlag), {wettessen:null} hebt
+    // die Vorgabe auf (zurueck zum Umschlag/neutral), "reset" hebt alle auf. Ohne Argument nur lesen.
+    // `katalog` liefert die Kennungen je Disziplin (Abgleich mit lib/lineups/strategie-vorlagen.ts).
+    strategieVorlagen:(neu)=>{
+      if(neu==="reset")strategieTest={};
+      else if(neu&&typeof neu==="object")
+        for(const d of Object.keys(neu)){
+          if(neu[d]==null){ const r={...strategieTest}; delete r[d]; strategieTest=r; }
+          else if(Array.isArray(neu[d]))strategieTest={...strategieTest,[d]:[neu[d][0]??null,neu[d][1]??null]};
+        }
+      return {gesetzt:JSON.parse(JSON.stringify(strategieTest)),
+        katalog:Object.fromEntries(Object.entries(STRATEGIE_VORLAGEN).map(([d,k])=>[d,{...k}]))};
     },
     // RAUMWAHL I-SPY (I-1, s. ispyWaehleRaum()/ISPY_RAUM_MANUELL weiter oben), dasselbe
     // Muster wie buehneHaltungTest direkt darueber: {0:"archiv",1:null} usw.; null/weggelassen

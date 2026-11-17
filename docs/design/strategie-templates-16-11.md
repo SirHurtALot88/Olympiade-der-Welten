@@ -437,6 +437,127 @@ Stelle. Schritt 4 hängt an Welle 3 (Kontakt) und an der Absicherung der Spurt-F
    wahrscheinlich. **Empfehlung: ja** — neutral plus eine bestandene Vorlage ist besser als auf
    die dritte zu warten oder die Schranke zu dehnen.
 
+**Freigabe 17.11.:** Chris hat alle fünf Empfehlungen mit „Ok" angenommen (Zuruf-Plan statt
+Live-Klick im Saisonspiel; vier Disziplinen ausgegraut; um eine Stufe verschieben; Vorlage nicht
+sichtbar, KI-Teams neutral bis zur Abnahme; zwei statt drei Vorlagen erlaubt) und den Pilot
+Wettessen gestartet. Stand des Piloten: Abschnitt 9.
+
+---
+
+## 9. Pilot Wettessen — Umsetzung 17.11. (Flagge aus, nichts scharf)
+
+### 9.1 Was gebaut ist
+
+| Glied der Kette | Fundstelle | Verhalten |
+|---|---|---|
+| Datenmodell | `LineupDraftModifierSide.strategie?` und `.zurufPlan?` (`lib/data/olyDataTypes.ts`) | Feld fehlt = neutral. `zurufPlan` ist nur Typ, wird nirgends gelesen (Bühne hat keinen Zuruf, 4.2; erster Zuruf-Plan mit Football, Schritt 3). |
+| Katalog | `lib/lineups/strategie-vorlagen.ts` | Wettessen: `kontrolliert` (defensiv), `reinhauen` (offensiv). Kennung, Name, ein Satz, ▲/▼. Flagge `istStrategieVorlagenAktiv()`. |
+| Einsatzliste | `LineupNewLook.tsx` (Zeile „Spielweise" unter der Kraft-Reihe), `LegacyLineupLabClient.tsx` | Nur mit Flagge und nur für Disziplinen mit Katalogeintrag (heute nur Wettessen). Kein Zahlwert, keine Bandbreite. „Normal" **löscht** das Feld. |
+| Rohr Entwurf → Arena | `lib/foundation/battle-arena/arena-strategie-adapter.ts` (`buildArenaStrategieBeide`) | EINE Funktion für Vorlauf/Buchung, Eingabe-Hash und Anzeige. Liefert `null` (Feld fehlt im Umschlag) bei Flagge aus, Disziplin ohne Katalog oder beiden Seiten neutral. |
+| Vorlauf/Buchung | `bereiteFixturesVor()` (Chromium und Node, `arena-headless-runner.ts`/`arena-node-runner.ts`/`arena-node-motor.mjs`) | `strategieByDisciplineId = {wettessen: [Heim, Gast]}` im Umschlag, nur per Spread, wenn nicht neutral. |
+| Buchungs-Schutz | `berechneArenaEingabeHash()` (`lib/battle/arena-eingabe-hash.ts`) | Vorlage geht in den Eingabe-Hash; eine nach dem Vorlauf geänderte Vorlage verwirft die Vorberechnung wie jede andere Eingabe. Neutral: Hash Zeichen für Zeichen der alte. |
+| Anzeige | `FoundationBattleArenaHost.tsx` | Dieselbe Funktion, Feld nur per Spread im Umschlag (Signatur unverändert bei neutral) → gezeigt = gebucht. |
+| Motor | `STRATEGIE_VORLAGEN`, `strategieVorlageVon()`, `wettessenVorlageHaltung()` neben `buehneHaltungVon()`/`wettessenMauerSetz()` in `battle-mode.engine.js` | Siehe 9.2. Zuordnung Vorlage↔Esser in der WeakMap `strategieVorlageKF`, kein neues Feld am TEILNEHMER. Messvorgabe `window.__arena.strategieVorlagen()`. |
+| Messschalter | `--strategie=<d>:<heim>[:<gast>]` in `miss-alle-disziplinen.mjs` und `messe-arena-einfluss.mjs` (`scripts/lib/rangtreue-messung.mjs`) | Ohne Schalter byte-identisch. Zweiter Saatstrom über das vorhandene `--saat-versatz=10000000`. |
+| Tests | `tests/strategie-vorlagen-wettessen.test.ts` | Katalog deckungsgleich, neutral/unbekannt/Rückweg identisch, Determinismus, eine Stufe je Esser, Messvorgabe schlägt Vorlage, nur Wettessen betroffen (alle 19 anderen), Umschlag = Messvorgabe (Node-Runner), Adapter hinter der Flagge. |
+
+**Flagge.** `OLY_STRATEGIE_VORLAGEN=1` (Server: Vorlauf, Buchung, Eingabe-Hash) **und**
+`NEXT_PUBLIC_OLY_STRATEGIE_VORLAGEN=1` (beim Bauen: Einsatzliste, Arena-Anzeige). Next.js sieht im
+Browser nur `NEXT_PUBLIC_*`, und die werden beim Bauen eingesetzt; beide stehen auf aus.
+
+### 9.2 Was die Vorlagen konkret tun
+
+Der Motor kennt seit 04.10. drei Haltungen je Esser (`wettessenMauerRunden`, Abschnitt K2), heute
+von der KI-Vorgabe nach NERVEN gewählt (≥ 60 Schlussspurt, < 45 gleichmäßig, sonst Sprint). Die
+Vorlage **verschiebt die KI-Haltung jedes Essers der eigenen Seite um eine Stufe** auf der Leiter
+`gleichmaessig → schlussspurt → sprint`, an den Enden geklemmt (Empfehlung 3):
+
+| Vorlage | KI gleichmäßig | KI Schlussspurt | KI Sprint |
+|---|---|---|---|
+| Kontrolliert (−1) | gleichmäßig | gleichmäßig | Schlussspurt |
+| neutral (Feld fehlt) | gleichmäßig | Schlussspurt | Sprint |
+| Reinhauen (+1) | Schlussspurt | Sprint | Sprint |
+
+Rangfolge (3.2): Messvorgabe `buehneHaltungTest` > Einzel-Haltung `place[n].haltung` > Vorlage des
+Teams > KI. Keine Stat, kein Rezept-Gewicht, keine Matrix; dieselbe Zahl `rr()`-Würfe je Minute
+(genau einer), die Haltungs-Parameter sind die 04.10. abgenommenen.
+
+**Festlegungen, wo das Konzept offen war (jeweils die konservativste Variante):**
+- **Kennungen** `kontrolliert`/`reinhauen` statt „Gleichmäßig"/„Sprint" aus Tabelle 2.4: weil die
+  Vorlage verschiebt statt setzt, hieße ein Esser unter „Sprint" sonst oft Schlussspurt. Die
+  Haltungs-Namen bleiben den Essern vorbehalten.
+- **Leiter-Reihenfolge** gleichmäßig < Schlussspurt < Sprint (Risiko- und Tempoprofil: kein
+  Zusatzrisiko < Risiko spät < Risiko früh und früher voll). Damit liegen Tabelle 2.4s
+  „defensiv = Gleichmäßig" und „offensiv = Sprint" an den Enden.
+- **Keine vierte Vorlage „Schlussspurt"** — sie wäre „alle gleich setzen", gegen Empfehlung 3.
+- **Pods nicht verdrahtet** (Wettessen ist Zweier-Duell; keine Pod-Disziplin hat eine Vorlage).
+- **Kein eigenes Buchungsfeld**: die Vorlage steht im (beim Abgeben gesperrten) Entwurf und im
+  Eingabe-Hash; ein zusätzliches Festschreiben im gebuchten Snapshot kommt mit dem Scharfschalten
+  (wie W3 für Spurt-Formate), solange die Flagge aus ist, gibt es nichts festzuschreiben.
+- **Kein Arena-Chip, keine Anweisungsbilanz im Endstand** im Piloten. Sichtbar ist die Vorlage
+  in der Arena nur über die Haltung der Esser. Bilanz-Zähler gibt es als Diagnose
+  (`disziplinProbe({buehneDiag:true})`: `vorlage`, `kiHaltung` je Esser).
+- **UI nur für Wettessen**; die ausgegrauten Zeilen für die anderen 19 Disziplinen (4.1) kommen,
+  sobald mehr als eine Disziplin eine Vorlage hat — vorher wäre es 19-mal derselbe Hinweis.
+- **KI-Teams** schreiben kein Feld → neutral (Abschnitt 5).
+
+### 9.3 Messung (17.11., Kaderfamilie live-save, Node-Motor bzw. Chromium wie die Skripte)
+
+Fingerabdruck ohne Vorlage: `GESAMT e80babacb68c (75 Eintraege)`, alle Einzel-Hashes gleich.
+
+| Vorlage (beide Seiten) | rho je Spiel, 24 Sp. | rho je Spiel, 48 Sp. | rho Saison | Pp Strom 1 | Pp Strom 2 |
+|---|---:|---:|---:|---:|---:|
+| neutral / Flagge aus | 0,905 | 0,901 | 0,958 | 8,7 | 10,0 |
+| Kontrolliert | 0,894 | 0,907 | 0,958 | 7,9 | 8,6 |
+| Reinhauen | 0,901 | 0,898 | 0,965 | 8,8 | 10,7 |
+
+Gemischt (Heim:Gast, 24 Spiele): Reinhauen:neutral 0,904 · neutral:Reinhauen 0,903 ·
+Kontrolliert:neutral 0,902 · neutral:Kontrolliert 0,890 · Kontrolliert:Reinhauen 0,899 ·
+Reinhauen:Kontrolliert 0,891. Spannweite über die Kaderfamilie überall 0,16–0,19. Alle neun
+Paarungen bestehen > 0,80 mit großem Abstand; Pp bleibt in beiden Strömen weit unter 15. Die
+Abstände zu neutral (höchstens −0,015 bei 24, +0,006/−0,003 bei 48 Spielen) liegen im Rauschen:
+Kontrolliert sah bei 24 Spielen schwächer aus (0,894) und liegt bei 48 vorn (0,907).
+
+**Verhalten (6.2), 1440 Esser, 24 Spiele × 5 Kader:**
+
+| | neutral | Kontrolliert | Reinhauen |
+|---|---:|---:|---:|
+| Haltungen gl./Schl./Spr. | 312 / 787 / 341 | 1099 / 341 / 0 | 0 / 312 / 1128 |
+| Bissanteil Minute 1–3 | 33,5 % | 33,6 % | 34,7 % |
+| Bissanteil Minute 8–10 | 26,7 % | 25,6 % | 25,3 % |
+| Mauer-Minute | 6,72 | 6,81 | 6,37 |
+| Punkte je Esser | 661,9 | 655,5 | 658,2 |
+
+Je Esser gemessen liegen die Verschiebungen bei 0,25–0,4 Standardabweichungen (Reinhauen:
+Bissanteil früh +0,28 SD, Mauer −0,38 SD; Kontrolliert: Bissanteil spät −0,25 SD), also **unter**
+dem 6.2-Kriterium einer halben SD je Esser — die Haltungs-Mechanik selbst ist eine leise.
+
+**Knopf-Test (6.3), nicht bestanden.** Je Spiel und Seite die Vorlage mit der höchsten
+**erwarteten** Seitensumme (40 feste private Ströme, `haltungEV`): neutral 86,7 %, Reinhauen
+10,4 %, Kontrolliert 2,9 % (n = 240). Siegquote gegen einen neutralen Gegner: beide Vorlagen
+kosten in allen Gruppen 1–6 Punkte (Außenseiter wie Favorit). Grund: die KI-Vorgabe wählt die
+Haltung je Esser schon nach dem Sub-Skill, der über die beste Haltung entscheidet (NERVEN,
+kalibriert 04.10.); eine Team-Verschiebung kann diese Einzelwahl im Mittel nur verschlechtern.
+Wettessen hat keinen Gegnerbezug und kaum Streuungsgewinn (Seitendifferenz-SD 536 → 534/540),
+also auch keinen Außenseiter-Hebel. **Die Vorlagen sind damit kein versteckter Stärkeknopf, aber
+nahe am toten Knopf.** rho und Pp verschlechtern sie nicht über die Spannweite hinaus.
+
+### 9.4 Risiken und offene Fragen
+
+1. **Knopf-Test (Frage an Chris):** So gebaut ist „Normal" fast immer richtig. Möglichkeiten:
+   (a) so lassen — die Kette ist bewiesen, Wettessen bleibt der Pilot und die Wahl ist ein
+   ehrlicher Trade ohne Gewinn; (b) die Vorlage verschiebt nicht die Haltung, sondern die
+   KI-Schwellen (NERVEN 60/45) um wenige Punkte — kleinere, gezieltere Wirkung, verliert weniger;
+   (c) Wettessen bekommt eine Entscheidung mit Gegnerbezug (z. B. Haltung nach Zwischenstand der
+   anderen Seite), dann wird die Vorlage situativ — das ist eine eigene Mechanikrunde (Klasse M).
+   Ohne Antwort bleibt alles hinter der Flagge.
+2. **Zwei Flaggen-Variablen.** Ist nur `OLY_STRATEGIE_VORLAGEN` gesetzt, bucht der Server mit
+   Vorlage, die Arena zeigt aber neutral (gezeigt ≠ gebucht). Beim Scharfschalten beide setzen.
+3. **Vorlage im Entwurf nach Abgabe:** geschützt über Sperre des Entwurfs und den Eingabe-Hash; ein
+   eigenes Buchungsfeld im Snapshot fehlt noch (9.2).
+4. **Speed-Schach/Staffel (Schritt 2)** nutzen dieselbe Kette; für Disziplinen, deren KI-Vorgabe
+   ebenso je Spieler optimiert, ist dasselbe Knopf-Ergebnis zu erwarten — vor dem Bau messen.
+
 ---
 
 ## Quellen

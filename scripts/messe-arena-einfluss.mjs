@@ -30,6 +30,7 @@ import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
   kontaktSchalterAusArgs, setzeKontaktSchalter, kontaktSchalterText,
+  strategieSchalterAusArgs, setzeStrategieSchalter, strategieSchalterText,
   generischeChassisWarnung,
 } from "./lib/rangtreue-messung.mjs";
 
@@ -67,6 +68,7 @@ const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
 // --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv), s. scripts/lib/rangtreue-messung.mjs.
 const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(schalter);
 const KONTAKT_SCHALTER = kontaktSchalterAusArgs(schalter);   // --kontakt=..., s. rangtreue-messung.mjs
+const STRATEGIE_SCHALTER = strategieSchalterAusArgs(schalter);   // --strategie=..., s. rangtreue-messung.mjs
 process.argv = [process.argv[0], process.argv[1], ...positionen];
 const disziplin = process.argv[2] || "spurt";
 // WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
@@ -131,6 +133,7 @@ if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formM
 const schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
 const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 const kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);
+const strategieGesetzt = await setzeStrategieSchalter(seite, STRATEGIE_SCHALTER);
 
 const motoren = await seite.evaluate(() => window.__arena.motoren());
 if (!motoren.includes(disziplin)) {
@@ -174,6 +177,7 @@ if (JE_SEITE) console.log(`Kadergroesse: ${JE_SEITE} je Seite (--je-seite)`);
 if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
 if (kontaktGesetzt) console.log(kontaktSchalterText(kontaktGesetzt));
+if (strategieGesetzt) console.log(strategieSchalterText(strategieGesetzt));
 console.log(`Abweichung zur ${e.ziel === "variante" ? "Variantengewichtung" : "Matrix"}: ${e.abweichungPp} Pp\n`);
 console.log(`Attribut          Anteil   ${e.ziel === "variante" ? "  Ziel" : "Matrix"}   Differenz`);
 const matrix = e.zielGewichte || await seite.evaluate((d) => window.__arena.matrix(d), disziplin);
