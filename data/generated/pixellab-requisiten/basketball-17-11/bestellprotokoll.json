@@ -1,0 +1,104 @@
+{
+ "_hinweis": "Bestellprotokoll Basketball-Assets 17.11. (Topf 70 Gen., Reserve 150). Je Auftrag: Kontostand vorher/nachher (GET /balance) und usage.generations aus der Job-Antwort. Massgeblich ist usage; die Kontodifferenz taugt nicht, solange mehrere Agenten bestellen.",
+ "auftraege": [
+  {
+   "name": "bb_korb",
+   "datum": "2026-11-17T13:19:18Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "schaetzung": 10,
+   "gen_vorher": 921.7351005208002,
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "usage_post": null,
+   "gen_usage": 10.0,
+   "usage_job": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "gen_nachher": 911.7351005208002,
+   "kandidaten": 4,
+   "gewaehlt": 3
+  },
+  {
+   "name": "kulisse_basketball_parkett",
+   "datum": "2026-11-17T13:21:30Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "top-down view of one single very wide empty indoor arena court inside a dark fantasy castle hall, a stone grandstand wall with wooden railing, hanging heraldic banners and burning wall torches along the top edge and along the bottom edge, the whole rest is open flat floor of plain warm polished wooden plank parquet with no lines and no markings, only a narrow strip of dark grey stone tiles at the far left and right borders, warm torch light, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [
+    792,
+    300
+   ],
+   "schaetzung": 25,
+   "gen_vorher": 911.7351005208002,
+   "job": "b7170b39-7f9e-41d7-9e0b-379951b2796b",
+   "usage_post": null,
+   "gen_usage": 25.0,
+   "usage_job": {
+    "type": "generations",
+    "generations": 25.0
+   },
+   "gen_nachher": 886.7351005208002,
+   "kandidaten": 1,
+   "gewaehlt": [
+    0
+   ]
+  },
+  {
+   "name": "bb_wappen",
+   "datum": "2026-11-17T13:23:06Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "round painted heraldic crest emblem painted flat on a floor, seen from directly above: a dragon skull with crossed torches inside a ring border, worn faded paint in dark red and gold, perfectly circular, flat decal without shading or perspective, top-down view, dark fantasy medieval arena style, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    96
+   ],
+   "schaetzung": 10,
+   "gen_vorher": 886.7351005208002,
+   "job": "2dab1080-7571-4dac-8a80-7a9e4c7645dd",
+   "usage_post": null,
+   "gen_usage": 10.0,
+   "usage_job": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "gen_nachher": 876.7351005208002,
+   "kandidaten": 4,
+   "gewaehlt": [
+    0,
+    2
+   ]
+  },
+  {
+   "name": "bb_schussuhr",
+   "datum": "2026-11-17T13:25:11Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "small empty rectangular scoreboard sign, wide dark wrought iron frame with rivets and small corner spikes around a plain flat empty dark slate panel, no text, no numbers, no symbols, front view, dark fantasy medieval arena style, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    48,
+    32
+   ],
+   "schaetzung": 10,
+   "gen_vorher": 876.7351005208002,
+   "job": "5f986250-143a-4d37-b875-ccdbdb00c932",
+   "usage_post": null,
+   "gen_usage": 10.0,
+   "usage_job": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "gen_nachher": 866.7351005208002,
+   "kandidaten": 36,
+   "gewaehlt": [
+    20
+   ]
+  }
+ ]
+}

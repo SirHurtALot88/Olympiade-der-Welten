@@ -1283,6 +1283,9 @@ PL_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
 # innerhalb der Bande (kuerFlaeche: ~110..1130 x 60..410).
 PL_RAENDER = {
     ("basketball", "streetcourt"): {"oben": (72, 58), "unten": (239, LH - 58)},
+    # Parkett-Remake 17.11.: Holzboden im Rohbild x 70..721, y 56..253 -> knapp ausserhalb der Feldlinien
+    # (W*0.06..W*0.94 x 60..H-60), damit Mauer/Gelaender nicht im Feld liegen.
+    ("basketball", "parkett"): {"oben": (56, 58), "unten": (253, LH - 58), "links": (70, 72), "rechts": (721, LW - 72)},
     ("tennis", "dach"): {"oben": (75, 78)},
     ("eiskunstlauf", "waldsee"): {"oben": (76, 64), "unten": (262, LH - 58), "links": (97, 112), "rechts": (695, LW - 112)},
 }

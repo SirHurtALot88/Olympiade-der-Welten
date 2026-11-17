@@ -7,7 +7,7 @@ window.__ARENA_KULISSEN={
    "id": "parkett",
    "label": "Parkett",
    "bild": "/sprites/kulissen/basketball/parkett.jpg",
-   "dunkel": 0.18
+   "dunkel": 0.06
   },
   {
    "id": "streetcourt",

@@ -412,5 +412,59 @@
   "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
   "erzeugt": "2026-11-03",
   "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "basketball/parkett.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Basketball-Benchmark 17.11., REMAKE: Burghalle statt der gekachelten Alt-Halle)",
+  "auftrag": {
+   "prompt": "top-down view of one single very wide empty indoor arena court inside a dark fantasy castle hall, a stone grandstand wall with wooden railing, hanging heraldic banners and burning wall torches along the top edge and along the bottom edge, the whole rest is open flat floor of plain warm polished wooden plank parquet with no lines and no markings, only a narrow strip of dark grey stone tiles at the far left and right borders, warm torch light, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [
+    792,
+    300
+   ],
+   "job": "b7170b39-7f9e-41d7-9e0b-379951b2796b",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_parkett.png",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Holzboden per PL_RAENDER knapp ausserhalb der Feldlinien gelegt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 25.0,
+   "konto_vorher": 911.7,
+   "konto_nachher": 886.7
+  },
+  "verwendung": "Basketball, Variante Parkett",
+  "vorher": {
+   "paket": "PixelLab-Szene der Asset-Runde, vom Skript zerlegt und gekachelt",
+   "quelle": "public/szenen/basketball/parkett.html, zugeschnitten von baue_basketball() (Tribuenenstreifen gemischt, Belag ohne Linien gekachelt)",
+   "befund": "flach und gekachelt, kein Raum, kein Licht -- als Benchmark-Halle neu gestaltet (CLAUDE.md, REMAKE statt Uebertragung); der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+  }
+ },
+ "basketball/parkett_linien.png": {
+  "paket": "Skript + PixelLab-Wappen",
+  "quelle": "scripts/baue-basketball-assets.py: Platzmarkierungen (Aussenlinie, Mittellinie, Zone mit Farbfuellung, Freiwurfkreis, Dreierlinie mit Eckstuecken) pixelgenau aus der Motor-Geometrie gerechnet, ohne Kantenglaettung, mit Farbabrieb; das Mittelkreis-Wappen ist PixelLab (sprites/basketball/wappen_parkett.png, Auftrag s. sprites/basketball/quellen.json)",
+  "begruendung": "Die Linien muessen die Geometrie des Motors exakt treffen (DREIER_RADIUS, Zone, korbXVon) -- ein generiertes Bild trifft sie nicht; deshalb rechnet das Skript sie und PixelLab liefert Belag, Wappen und Korb.",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (Schalter --korb-x --dreier-rx --dreier-ry --zone-tiefe --zone-breite, falls der Motor die Geometrie aendert)",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 0,
+   "hinweis": "Wappen-Auftrag (10 Gen.) steht bei sprites/basketball/wappen_*.png"
+  },
+  "verwendung": "Basketball, Variante Parkett: transparentes Boden-Overlay 1240x470, liegt deckungsgleich ueber der Kulisse (nach kulisseZeichnen(), an Stelle der weissen Vektorlinien in bodenFeldspiel()). Noch nicht im Motor verdrahtet, s. docs/design/basketball-assets-17-11.md"
+ },
+ "basketball/streetcourt_linien.png": {
+  "paket": "Skript + PixelLab-Wappen",
+  "quelle": "scripts/baue-basketball-assets.py: Platzmarkierungen (Aussenlinie, Mittellinie, Zone mit Farbfuellung, Freiwurfkreis, Dreierlinie mit Eckstuecken) pixelgenau aus der Motor-Geometrie gerechnet, ohne Kantenglaettung, mit Farbabrieb; das Mittelkreis-Wappen ist PixelLab (sprites/basketball/wappen_streetcourt.png, Auftrag s. sprites/basketball/quellen.json)",
+  "begruendung": "Die Linien muessen die Geometrie des Motors exakt treffen (DREIER_RADIUS, Zone, korbXVon) -- ein generiertes Bild trifft sie nicht; deshalb rechnet das Skript sie und PixelLab liefert Belag, Wappen und Korb.",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (Schalter --korb-x --dreier-rx --dreier-ry --zone-tiefe --zone-breite, falls der Motor die Geometrie aendert)",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 0,
+   "hinweis": "Wappen-Auftrag (10 Gen.) steht bei sprites/basketball/wappen_*.png"
+  },
+  "verwendung": "Basketball, Variante Street-Court: transparentes Boden-Overlay 1240x470, liegt deckungsgleich ueber der Kulisse (nach kulisseZeichnen(), an Stelle der weissen Vektorlinien in bodenFeldspiel()). Noch nicht im Motor verdrahtet, s. docs/design/basketball-assets-17-11.md"
  }
 }

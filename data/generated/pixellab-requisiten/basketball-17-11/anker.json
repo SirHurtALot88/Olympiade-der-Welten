@@ -1,0 +1,118 @@
+{
+ "_hinweis": "Ankerpunkte der Basketball-Assets, gemessen von scripts/baue-basketball-assets.py. Pixel in der jeweiligen Datei, Ursprung oben links. Rechter Korb = linker gespiegelt (x' = 95 - x).",
+ "korb": {
+  "dateien": [
+   "korb_links_hinten.png",
+   "korb_links_vorne.png",
+   "korb_rechts_hinten.png",
+   "korb_rechts_vorne.png"
+  ],
+  "groesse": [
+   96,
+   128
+  ],
+  "links": {
+   "ring_mitte": [
+    68,
+    52
+   ],
+   "boden_unter_ring": [
+    68,
+    111
+   ],
+   "sockel_mitte": [
+    33,
+    111
+   ]
+  },
+  "rechts": {
+   "ring_mitte": [
+    27,
+    52
+   ],
+   "boden_unter_ring": [
+    27,
+    111
+   ],
+   "sockel_mitte": [
+    62,
+    111
+   ]
+  },
+  "ring_aussen_rx_ry": [
+   12,
+   7
+  ],
+  "ring_innen_rx_ry": [
+   8,
+   3
+  ],
+  "ring_hoehe_ueber_boden": 59,
+  "netz_y": [
+   59,
+   75
+  ],
+  "skala_empfohlen": 1.25,
+  "im_motor_bei_skala": {
+   "ring_hoehe_px": 73.8,
+   "ring_aussen_breite_px": 30.0,
+   "ring_innen_breite_px": 20.0,
+   "ball_px": 18,
+   "drawImage_links": "x = korbX - 68*s, y = H/2 - 111*s, w = 96*s, h = 128*s",
+   "drawImage_rechts": "x = korbX - 27*s, y = H/2 - 111*s, w = 96*s, h = 128*s"
+  }
+ },
+ "schussuhr_rahmen": {
+  "groesse": [
+   48,
+   32
+  ],
+  "rahmen_box": [
+   4,
+   2,
+   44,
+   32
+  ],
+  "tafel_innen": [
+   11,
+   9,
+   37,
+   24
+  ],
+  "ziffer_mitte": [
+   24,
+   16
+  ]
+ },
+ "wappen": {
+  "groesse": [
+   96,
+   96
+  ],
+  "mitte": [
+   48,
+   48
+  ],
+  "ring_durchmesser": 82
+ },
+ "boden_overlay": {
+  "groesse": [
+   1240,
+   470
+  ],
+  "geometrie": {
+   "korb_x": 0.076,
+   "dreier_rx": 112.8,
+   "dreier_ry": 112.8,
+   "zone_tiefe": 220.6,
+   "zone_breite": 150.4,
+   "korb_skala": 1.25
+  },
+  "feld": [
+   74.4,
+   60,
+   1165.6,
+   410
+  ]
+ }
+}
