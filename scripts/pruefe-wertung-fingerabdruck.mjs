@@ -12,7 +12,11 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (17.11.): `GESAMT 7c9257b4435c (75 Eintraege)` -- Kontakt im klassischen Spurt SCHARF
+// GESAMT-STAND (17.11., I-Spy-Knack-Motor V2, docs/design/ispy-knacken-ortswahl-schubsen-17-11.md):
+// `GESAMT d09e10bb872c (75 Eintraege)`; gegenueber dem Vorstand (`7c9257b4435c`, Kontakt im klassischen Spurt
+// scharf) bewegen sich NUR die drei Zeilen `spiele i-spy 1|7|42`. Mit window.__arena.ispyMotor("alt") kommt
+// wieder der Vorstand heraus.
+// VORSTAND (17.11., vor I-Spy V2): `GESAMT 7c9257b4435c (75 Eintraege)` -- Kontakt im klassischen Spurt SCHARF
 // (BAHN_ART.spurt.kontakt={stufe:3}, docs/design/kontakt-persoenlichkeit-16-11.md 6.5). Gegen den Stand davor
 // bewegen sich NUR `spiele spurt 1` (d22c9e6244c2 -> 870e28b88ab3) und `spiele spurt 7` (3ee976267e5a ->
 // 3732ee6cd899); `spiele spurt 42`, Hatz, HYROX, Takeshi und alle anderen 71 Zeilen sind gleich. Rueckweg:
