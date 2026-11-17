@@ -9881,7 +9881,11 @@
       // (230 px/s = 5,9 m/s). Gemessen (Node-Motor, 12 Spiele): das echte Feld ist in Logik-
       // Einheiten kuerzer (Wurfreichweite beginnt frueher), FGA steigen schon bei 1,0 von 76 auf
       // 113 je Spiel; 1,55 trieb sie auf 150 (hektisch), 0,8 senkt auf 98, wirkt aber traege.
-      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0},
+      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0,
+            // FELD-GRENZE (Runde 2, Review PR #1562): jedes Laufziel bleibt im gezeichneten Feld —
+            // laengs zwischen den Grundlinien (Anteil von W), quer innerhalb der Seitenlinien
+            // (7,5 m = 175 px um H/2), mit `rand` px Abstand. Ohne `grenze`: keine Begrenzung.
+            grenze:{laengs:[0.06,0.94], querHalb:175, rand:0}},
       // SPACING/POSITIONSTREUE (Chris 17.11.: "spieler brauchen mehr positionstreue und nicht
       // alle nur dem puck/ball hinterher") — Parameter des generischen SPACING-MODULS (s. dort):
       //   jaegerJeSeite      wie viele je Team einem freien Ball nachlaufen (der Rest haelt Zone)
@@ -11739,6 +11743,12 @@
   function feldVersatz(dxL,dyL){
     const s=feldSkala();
     return s?{x:dxL*s.x,y:dyL*s.y}:{x:dxL,y:dyL};
+  }
+  // FELD-GRENZE: Laufziel auf das gezeichnete Feld begrenzen (ohne `feld.grenze`: unveraendert).
+  function feldGrenze(zx,zy){
+    const a=feldArtLive(), g=a&&a.feld&&a.feld.grenze; if(!g)return null;
+    return {x:Math.max(W*g.laengs[0]+g.rand,Math.min(W*g.laengs[1]-g.rand,zx)),
+            y:Math.max(H/2-g.querHalb+g.rand,Math.min(H/2+g.querHalb-g.rand,zy))};
   }
   // Querablage zur Korbachse in Logik-px (fuer die Ecken-Dreier-Regel).
   function feldLogikDy(p){ const s=feldSkala(); return (p.y-H/2)/(s?s.y:1); }
@@ -17537,6 +17547,7 @@
         }
         zx+=sepX*sepR*sepS; zy+=sepY*sepR*sepS;
       }
+      { const g=feldGrenze(zx,zy); if(g){ zx=g.x; zy=g.y; } } // FELD-GRENZE: nie ueber Seiten-/Grundlinie
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
       // (`dribbelFaktor`, ersetzt das alte separate kDribble; im Fastbreak leichter, s.
@@ -69506,12 +69517,17 @@
     bkSynthTon:(an)=>{ if(an!=null){ bkSynthAn=!!an; try{ localStorage.setItem("bkSynthTon",bkSynthAn?"1":"0"); }catch(e){} } return bkSynthAn; },
     feldKamera:(an)=>{ if(an!=null)fkAn=!!an; fkZustand=null; return fkAn; },
     diagSpielzuege:(n,dId)=>{
-      const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0;
+      const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0, proben=0, aussen=0, maxQuer=0;
+      // SEITENLINIEN-PROBE (Review PR #1562): jede Spielerposition je Tick gegen das gezeichnete
+      // Feld (Laengs W*0,06..W*0,94, quer H/2 +- 7,5 m). Abnahme: 0 Proben ausserhalb.
+      const halbQuer=7.5*BK_FIBA.my;
       for(let i=0;i<N;i++){
         feldspielDisc=dId||"basketball"; bauFeldspiel(1337+i*7919);
         let guard=0, flugAkt=null, maxBox=0;
         while(!done&&guard<80000){
           stepFeldspiel(1/60); guard++;
+          for(const t of FSTEAM)for(const u of t){ proben++; const q=Math.abs(u.y-H/2); if(q>maxQuer)maxQuer=q;
+            if(q>halbQuer+0.5||u.x<W*0.06-0.5||u.x>W*0.94+0.5)aussen++; }
           const fl=fsLive&&fsLive.ball.flug;
           if(fl&&(fl.art==="wurf"||fl.art==="alley")){
             if(fl!==flugAkt){ flugAkt=fl; wuerfe++; maxBox=0; }
@@ -69525,7 +69541,8 @@
       }
       const je={}; for(const k of Object.keys(summe).sort())je[k]=+(summe[k]/N).toFixed(2);
       return {spiele:N,jeSpiel:je,besitzeJeSpiel:+(besitze/N).toFixed(1),wuerfeJeSpiel:+(wuerfe/N).toFixed(1),
-        ausboxenAnteilWuerfe:+(mitBoxout/Math.max(1,wuerfe)*100).toFixed(1),boxerJeWurf:+(boxerSumme/Math.max(1,wuerfe)).toFixed(2)};
+        ausboxenAnteilWuerfe:+(mitBoxout/Math.max(1,wuerfe)*100).toFixed(1),boxerJeWurf:+(boxerSumme/Math.max(1,wuerfe)).toFixed(2),
+        seitenlinie:{proben,ausserhalb:aussen,maxQuerPx:+maxQuer.toFixed(1),halbQuerPx:+halbQuer.toFixed(1)}};
     },
     // GEZEIGT = GEBUCHT (Benchmark Basketball 17.11.): prueft fuer jeden Wurf aus n Spielen, ob
     // die gebuchte Stufe (Zweier/Dreier) zur GEZEICHNETEN FIBA-Linie passt — rein geometrisch in
