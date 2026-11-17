@@ -1,0 +1,41 @@
+{
+ "_hinweis": "Schiedsrichter (17.11., Chris: 'hud Effekte und schiri auch über Pixel lab' -- Freigabe fuer genau diese eine neue Figur). Index-Schluessel __schiri (kein Spieler). Neu exportieren: PIXELLAB_API_KEY=... python3 -I scripts/figuren-sprites-export.py --nur __schiri",
+ "figur": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-character-pro (method create_with_style, template custom, view low top-down, 80x80)",
+  "character_id": "5c07c699-b204-44ae-9d01-318447dcf6ec",
+  "job": "06007937-e7ec-4b8b-9fb7-b3f12dbe5941",
+  "seed": 1711,
+  "generationen": 10,
+  "stil_anker": {
+   "style_character_id": "9ae5bd35-1d40-4c22-a9b0-81cf9e8decdb",
+   "figur": "hartmut"
+  },
+  "prompt": "Referee, a sports official of race Human. A fit, average-build adult man with short dark hair, clean-shaven, neutral calm face. He wears a short-sleeved referee shirt with bold vertical black and white stripes (wide, high-contrast stripes clearly visible on chest, back and sleeves), black trousers, black sneakers, a thin black belt. A shiny silver whistle hangs on a black cord around his neck. No hat, no weapon, no armour, no cape. Upright neutral standing pose, arms relaxed at his sides, feet shoulder-width apart. Full body pixel art character.",
+  "tag": "__schiri",
+  "dateien": [
+   "south.png",
+   "east.png",
+   "west.png",
+   "north.png"
+  ]
+ },
+ "pfiff": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/characters/animations (mode pixminimax, 8 Bilder + Startbild)",
+  "animation_group_id": "93d1b991-51d2-445d-b648-1c039b0e92d0",
+  "jobs": {
+   "south": "a6e1349f-b1ce-44db-8b98-89a5e89fd5c0",
+   "east": "4c6bb131-79b6-407c-af19-40f38fc59921"
+  },
+  "generationen": 2,
+  "action_description": "quickly raises one arm straight up high above his head with an open hand to signal a foul while putting the whistle to his mouth and blowing it, then holds the arm up",
+  "dateien": [
+   "pfiff-south.png",
+   "pfiff-east.png"
+  ]
+ },
+ "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+ "erzeugt": "2026-11-17",
+ "vorher": "Canvas-Primitive in zeichneSchiri() (bleibt Rueckfall)"
+}

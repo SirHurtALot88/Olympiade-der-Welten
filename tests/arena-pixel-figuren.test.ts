@@ -138,3 +138,44 @@ describe("Arena · PixelLab-Figuren · Angriff-Sperrframes (Backlog #52)", () =>
     }
   });
 });
+
+/**
+ * SCHIEDSRICHTER ALS PIXELLAB-FIGUR (17.11., Chris: "hud Effekte und schiri auch über Pixel lab").
+ * Der Schiri steht unter dem Nicht-Spieler-Schluessel "__schiri" im Figuren-Index; Kader, Scouting
+ * und Sprite-Galerie sehen ihn nie. Im Motor ist er reine Anzeige: fsSchiri bekommt keine neuen
+ * Felder (Wertungs-Fingerabdruck), der Anpfiff wartet nicht auf sein Bild, und ohne Bild bleibt die
+ * Canvas-Figur.
+ */
+describe("Arena · Schiedsrichter als PixelLab-Figur", () => {
+  it("__schiri steht in der Motor-Tabelle unter seinem Slug, mit Grundposen und Pfiff Sued/Ost", () => {
+    const { index, spieler } = leseArenaFigurenEingaben();
+    const tabelle = baueArenaFigurenTabelle(index, spieler) as Record<
+      string,
+      { s: string; r: string[]; a: Record<string, Record<string, unknown>> }
+    >;
+    expect(tabelle.__schiri?.s).toBe("__schiri");
+    expect(new Set(tabelle.__schiri!.r)).toEqual(new Set(["south", "east", "west", "north"]));
+    expect(Object.keys(tabelle.__schiri!.a.pfiff ?? {}).sort()).toEqual(["east", "south"]);
+    expect((spieler as { name: string }[]).some((p) => p.name.startsWith("__"))).toBe(false);
+  });
+
+  it("Galerie und Spieler-Lookup fuehren den Schiri nicht als Spieler", async () => {
+    const { listFigurSprites, getFigurSpriteBySlug } = await import("../lib/data/figurenSprites");
+    expect(listFigurSprites().some((f) => f.slug.startsWith("__"))).toBe(false);
+    expect(getFigurSpriteBySlug("__schiri")).toBeNull();
+  });
+
+  it("fsSchiri bleibt bei seinen fuenf Feldern; Anzeige ueber Stellvertreter mit Canvas-Rueckfall", () => {
+    expect(MOTOR).toContain("fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};");
+    const start = MOTOR.indexOf("  function zeichneSchiriPixel(s,pfeift){");
+    const ende = MOTOR.indexOf("\n  // Kuerzester Abstand eines Punkts", start);
+    const block = MOTOR.slice(start, ende);
+    expect(start).toBeGreaterThan(-1);
+    // Im ganzen Schiri-Zeichenblock keine Zuweisung an s.<feld> (s = fsSchiri).
+    expect(block).not.toMatch(/\bs\.[A-Za-z_]+\s*(?:[+\-*/]?=)(?!=)/);
+    expect(block).toContain("if(zeichneSchiriPixel(s,pfeift)){");
+    expect(block).toContain("const z=pixelFigurBereit(SCHIRI_FIGUR);\n    if(!z)return false;");
+    // Der Anpfiff wartet nur auf pixelFigurenImSpiel -- der Schiri wird dort nie angemeldet.
+    expect(MOTOR).not.toMatch(/pixelFigurVorladen\([^)]*SCHIRI_FIGUR/);
+  });
+});

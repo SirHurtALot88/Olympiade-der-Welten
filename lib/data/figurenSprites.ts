@@ -64,6 +64,7 @@ function slugFromPlayerId(playerId: string): string | null {
 }
 
 export function getFigurSpriteBySlug(slug: string): FigurSprite | null {
+  if (istOffiziellerFigurSlug(slug)) return null;
   const entry = FIGUREN[slug];
   return entry ? { slug, ...entry } : null;
 }
@@ -76,8 +77,18 @@ export function getFigurSpriteForPlayer(playerId: string | null | undefined): Fi
   return slug ? getFigurSpriteBySlug(slug) : null;
 }
 
+/**
+ * Offizielle (17.11.): Index-Eintraege, die KEIN Spieler sind (Slug mit "__" davor, heute nur der
+ * Schiedsrichter "__schiri"). Sie gehoeren dem Arena-Motor (zeichneSchiri), nicht Kader, Scouting
+ * oder Sprite-Galerie.
+ */
+export function istOffiziellerFigurSlug(slug: string): boolean {
+  return slug.startsWith("__");
+}
+
 export function listFigurSprites(): FigurSprite[] {
   return Object.keys(FIGUREN)
+    .filter((slug) => !istOffiziellerFigurSlug(slug))
     .sort()
     .map((slug) => ({ slug, ...FIGUREN[slug]! }));
 }
