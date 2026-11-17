@@ -86,7 +86,7 @@
 .bc *::after {
   box-sizing: border-box;
 }
-.bc button {
+:where(.bc) button {
   font: inherit;
   color: inherit;
   background: none;
@@ -95,11 +95,11 @@
   cursor: pointer;
   text-align: inherit;
 }
-.bc button:disabled {
+:where(.bc) button:disabled {
   cursor: default;
 }
-.bc input,
-.bc select {
+:where(.bc) input,
+:where(.bc) select {
   font: inherit;
   color: inherit;
 }
@@ -199,6 +199,7 @@
 
 /* ---------- Knöpfe ---------- */
 .bc-btn {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -226,6 +227,7 @@
   font-size: 14px;
 }
 .bc-btn--haupt {
+  flex: none;
   height: 46px;
   padding: 0 20px;
   font-size: 17px;
@@ -610,6 +612,7 @@ button.bc-tbl__zeile:hover:not(:disabled) {
   color: var(--bc-leise);
 }
 .bc-chip {
+  flex: none;
   height: 26px;
   padding: 0 9px;
   border-radius: 999px;

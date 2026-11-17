@@ -38,6 +38,15 @@ export type LineupBoardRosterCard = {
     men: number;
     soc: number;
   } | null;
+  /* Felder, die die Karte zur Laufzeit ohnehin traegt (MatchdayRosterCard) und die die moderne
+     Einsatzliste liest. Nur optional ergaenzt, damit der Vertrag fuer alle bisherigen Aufrufer gleich bleibt. */
+  injuryStatus?: "healthy" | "injured" | "recovering" | null;
+  availabilityBlocker?: string | null;
+  fatigueCount?: number | null;
+  selectedSides?: Array<"d1" | "d2">;
+  traitsPositive?: string[];
+  traitsNegative?: string[];
+  attributeStats?: Record<string, number | boolean | null | undefined> | null;
 };
 
 export type LineupBoardCandidateAxisReasonChip = {
@@ -162,6 +171,10 @@ export type LegacyLineupFocusV2BoardProps = {
         rangeLow?: number | null;
         rangeHigh?: number | null;
         warnings?: string[];
+        baseScore?: number | null;
+        intensityModifier?: number | null;
+        rivalryPressureModifier?: number | null;
+        slotStrainLoad?: "niedrig" | "mittel" | "hoch" | null;
       };
       selectedScore?: number | null;
     }
