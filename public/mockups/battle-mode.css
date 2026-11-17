@@ -1897,6 +1897,7 @@
   .oly-battle-arena.oly-battle-arena .hud-chip{display:inline-block;padding:1px 7px 2px;border-radius:3px;font-size:11.5px;font-weight:700;letter-spacing:.08em;line-height:1.35;background:var(--tf);color:#10131a}
   .oly-battle-arena.oly-battle-arena .hud-chip[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .hud-lauf{animation:hudChipRein .4s ease-out}
+  .oly-battle-arena.oly-battle-arena .hud-stat{background:rgba(255,255,255,.1);color:var(--hud-tinte);font-variant-numeric:tabular-nums}
   @keyframes hudChipRein{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
   .oly-battle-arena.oly-battle-arena .hud-stand{flex:none;min-width:62px;text-align:center;font-size:48px;font-weight:700;line-height:1;color:#fff;letter-spacing:-.01em}
   .oly-battle-arena.oly-battle-arena .hud-stand.fuehrt{color:var(--tf)}
@@ -1910,6 +1911,12 @@
     display:grid;place-items:center;font-size:24px;font-weight:700;color:var(--hud-gold);background:#0c0f16}
   .oly-battle-arena.oly-battle-arena .hud-zusatz.eng{color:#fff;background:var(--hud-warn);border-color:var(--hud-warn)}
   .oly-battle-arena.oly-battle-arena .hud-zusatz.leer{opacity:.25}
+  /* Zusatzfeld als Textzeile (Hockey Power-Play-Uhr, Football Down & Distance): eigene dritte Zeile unter der Uhr. */
+  .oly-battle-arena.oly-battle-arena .hud-sb:has(.hud-zusatz.txt){height:72px}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz.txt{grid-column:1/3;grid-row:3;align-self:center;justify-self:start;display:block;width:auto;max-width:100%;height:auto;margin-top:3px;padding:1px 6px 2px;
+    border:0;border-radius:3px;font-size:12px;line-height:1.25;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--hud-gold);background:#0c0f16}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz.txt.eng{color:#fff;background:var(--hud-warn)}
+  .oly-battle-arena.oly-battle-arena .hud-zusatz.txt.leer{opacity:1;visibility:hidden}
   /* Bauteil 4: Momentum, Tauzieh-Balken an der Unterkante */
   .oly-battle-arena.oly-battle-arena .hud-mom{position:relative;height:5px;margin:0 var(--hud-a4);background:rgba(255,255,255,.07)}
   .oly-battle-arena.oly-battle-arena .hud-mom i{position:absolute;top:0;bottom:0;transition:width .6s cubic-bezier(.2,.8,.2,1)}
@@ -1933,6 +1940,8 @@
     .oly-battle-arena.oly-battle-arena .hud-per{font-size:9.5px;letter-spacing:.06em}
     .oly-battle-arena.oly-battle-arena .hud-uhr{font-size:21px}
     .oly-battle-arena.oly-battle-arena .hud-zusatz{width:28px;height:28px;font-size:16px;border-radius:5px;border-width:1.5px}
+    .oly-battle-arena.oly-battle-arena .hud-sb:has(.hud-zusatz.txt){height:60px}
+    .oly-battle-arena.oly-battle-arena .hud-zusatz.txt{width:auto;height:auto;font-size:9.5px;letter-spacing:.02em;padding:0 4px 1px;margin-top:1px;border-radius:3px}
     .oly-battle-arena.oly-battle-arena .hud-mom{margin:0 4px}
   }
 
@@ -1967,6 +1976,12 @@
   .oly-battle-arena.oly-battle-arena .hud-fouls.voll i.an{background:var(--hud-warn)}
   .oly-battle-arena.oly-battle-arena .hud-lball{position:absolute;left:37px;top:4px;width:10px;height:10px;border-radius:50%;background:#f37b2c;border:1px solid #401c05;box-shadow:0 0 8px #f37b2c;display:none;z-index:2}
   .oly-battle-arena.oly-battle-arena .hud-leiste.hatball .hud-lball{display:block}
+  /* Statusmarke an der Leiste (Hockey: Strafbank mit Restzeit). */
+  .oly-battle-arena.oly-battle-arena .hud-lstatus{position:absolute;top:23px;right:6px;z-index:2;padding:0 5px 1px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.06em;line-height:1.35;
+    background:rgba(255,255,255,.14);color:#fff;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .hud-lstatus.eng{background:var(--hud-warn)}
+  .oly-battle-arena.oly-battle-arena .hud-lstatus[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .hud-leiste.statusan{border-color:var(--hud-warn)}
   .oly-battle-arena.oly-battle-arena .hud-verlauf{min-width:0;display:flex;flex-direction:column}
   .oly-battle-arena.oly-battle-arena .hud-verlauf h3>span:first-child{flex:1}
   .oly-battle-arena.oly-battle-arena .hud-filter{display:flex;gap:3px}
@@ -1975,7 +1990,7 @@
   .oly-battle-arena.oly-battle-arena .hud-filter button[aria-pressed="true"]{background:var(--hud-creme);color:#14110b;border-color:var(--hud-creme)}
   .oly-battle-arena.oly-battle-arena .hud-vliste{list-style:none;margin:0;padding:0;flex:1;min-height:150px;max-height:186px;overflow-y:auto;border:1px solid var(--hud-linie);border-radius:var(--hud-r);
     background:rgba(0,0,0,.25);scrollbar-width:thin;scrollbar-color:var(--hud-linie-2) transparent}
-  .oly-battle-arena.oly-battle-arena .hud-vliste li{--tf:var(--hud-stumm);display:grid;grid-template-columns:62px 44px minmax(0,1fr) auto;align-items:center;min-height:30px;padding:0 8px 0 0;
+  .oly-battle-arena.oly-battle-arena .hud-vliste li{--tf:var(--hud-stumm);display:grid;grid-template-columns:62px 52px minmax(0,1fr) auto;align-items:center;min-height:30px;padding:0 8px 0 0;
     border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;color:var(--hud-tinte)}
   .oly-battle-arena.oly-battle-arena .hud-vliste li.h{--tf:var(--hud-heim)} .oly-battle-arena.oly-battle-arena .hud-vliste li.a{--tf:var(--hud-gast)}
   .oly-battle-arena.oly-battle-arena .hud-vliste li.leer{display:block;padding:8px 10px;color:var(--hud-stumm)}
@@ -2004,7 +2019,7 @@
     .oly-battle-arena.oly-battle-arena .hud-lwerte b{font-size:18px}
     .oly-battle-arena.oly-battle-arena .hud-verlauf{order:3}
     .oly-battle-arena.oly-battle-arena .hud-vliste{max-height:310px;min-height:0}
-    .oly-battle-arena.oly-battle-arena .hud-vliste li{grid-template-columns:54px 40px minmax(0,1fr) auto;font-size:13px;min-height:34px}
+    .oly-battle-arena.oly-battle-arena .hud-vliste li{grid-template-columns:54px 48px minmax(0,1fr) auto;font-size:13px;min-height:34px}
     .oly-battle-arena.oly-battle-arena .hud-vtx{white-space:normal;line-height:1.1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   }
 

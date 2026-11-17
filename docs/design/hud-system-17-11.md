@@ -216,10 +216,45 @@ Je Welle ein PR mit Fingerabdruck vorher/nachher (Soll unverändert), einem Chro
 
 - Fingerabdruck `node scripts/pruefe-wertung-fingerabdruck.mjs`: **GESAMT d09e10bb872c** vorher und nachher.
 - `tests/hud-system-basketball.test.ts` (Chromium, Job `arena-chromium-tests`, im Shard-Lauf ausgeschlossen):
-  Profile (1 fertig, 19 Skelett), Hockey behält das alte HUD, keine Battlefield-KP-Zeile nach dem
+  Profile (3 fertig, 17 Skelett), TDM behält das alte HUD, keine Battlefield-KP-Zeile nach dem
   Wechsel, Host-Safe-Area, Basketball-Komponenten sichtbar und altes
   HUD ausgeblendet, gezeigt = gebucht im laufenden Spiel und am Ende, Klick/Taste/Filter/Tempo, Schalter,
   Phone 390 px ohne Überlauf mit Karte als Blatt, keine Seitenfehler.
+
+## 4a. Stand Welle 1: Hockey und Football (17.11.)
+
+Beide Profile stehen auf `fertig` (`HUD_PROFIL.hockey`, `HUD_PROFIL.football`); das alte HUD dieser zwei
+Disziplinen ist ersetzt, die übrigen 17 Skelette bleiben unverändert. Fingerabdruck vorher und nachher
+**GESAMT d09e10bb872c** (75 Einträge), reine Anzeige. Test: `tests/hud-system-welle1.test.ts` (Job
+`arena-chromium-tests`, im Shard-Lauf ausgeschlossen). Bilder: `docs/design/hud-system-17-11/`.
+
+**Was dafür im Baukasten allgemein wurde** (Basketball verhält sich unverändert): Verlauf-Adapter je Profil
+(`verlauf.text/label/gross/seite/mom`), Momentum aus beliebig gewichteten Ereignissen (`momentumTitel`),
+Rollen-Spalten je Zeile (`rolle(z)`, Hockey-Torwart), im Profil abgeleitete Spalten (`abgeleitet`, Football
+`Yds`), Zusatzfeld als Textzeile (`zusatzText`), Teamfeld-Chip (`daten.teamStat`), Statusmarke an der Leiste
+(`daten.status`, Hockey Strafbank), Statzeile des Einblenders aus gebuchten Spalten (`hudStatZeile`).
+
+| | Hockey | Football |
+|---|---|---|
+| Stand | `fsPunkte` (Tore) | `fsPunkte` (inkl. Extra-Punkte) |
+| Uhr | Drittel + Restzeit | Viertel + Restzeit |
+| Zusatzfeld | Power-Play-Uhr `hockeyPPInfo()`, auf Sendezeit skaliert, „5v3“ | „3rd & 4 · OPP 25“ aus `fsLive.football`, „Kickoff“; ab 3rd Down hervorgehoben |
+| Teamfeld | SOG (`hockeySOG`) | YDS (Pass- + Laufyards) |
+| Leisten | Tore · Ass · Sch; Torwart: Par · Fg% | Yds · Pkt · Tkl (die Einheiten spielen Angriff und Abwehr) |
+| Marke | Strafbank mit Restzeit (`u.strafeBis`) | — |
+| Karte | Tore, Ass, Sch, Sch%, Puck, Blk, Chk, Str, Pus, Imp; Torwart: Par, Fg%, GT, … | Yds, Pkt, Tkl, PassY, LaufY, FangY, Kompl, Sack, Int/Rec, TO, Imp |
+| Verlauf | Tor (mit Vorlagen), Strafe, Parade/Block, Check | TD, FG, Turnover, Sack |
+| Momentum | Schüsse aufs Tor im 60-s-Fenster | Punkte im 70-s-Fenster |
+| Einblender | `tor` (mit Statzeile), `torwartRaus` | `touchdown` (mit Statzeile), `fieldGoal`, `sack`, `interception`, `fumble` |
+
+**Nicht geführt, deshalb weggelassen:** Football-Drives (`fsZuege` kennt keinen Drive), Yards je Touchdown,
+Extra-Punkte als eigene Verlaufszeile (nur `fsPunkte` führt sie; die Stand-Zelle trägt `fsPunkte` und bleibt
+nach einem Schnelldurchlauf bei früheren Touchdowns leer statt eine Zahl ohne Extra-Punkt zu zeigen), ein
+Football-Field-Goal-Schütze (symbolischer Namensträger, deshalb steht dort die Seite), Interception gegen Fumble-Recovery im Verlauf (beide
+sind `steal`, deshalb „Turnover“). Hockey-Momentum zählt Schüsse statt Tore, weil Tore zu selten sind.
+
+**Offen:** Hockey-Strafbank-Zeiten und PP-Uhr zählen in Sendezeit (Sim-Sekunden mal `zeitFaktor()`), die
+alte Kontextzeile zeigte Sim-Sekunden; Pause-Stempel im Verlauf nennen die alte Periode.
 
 ## 5. Was als Nächstes kommt (Basketball)
 
