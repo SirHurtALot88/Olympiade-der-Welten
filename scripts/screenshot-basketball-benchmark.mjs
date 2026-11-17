@@ -6,6 +6,11 @@
 // danach steht der Zustand und der Zeichen-Loop malt genau dieses Bild.
 //
 //   node scripts/screenshot-basketball-benchmark.mjs <zielordner> [praefix] [engine.js]
+//   OLY_BB_SZENEN=runde2 node scripts/screenshot-basketball-benchmark.mjs <zielordner> runde2
+//
+// OLY_BB_SZENEN=runde2 (17.11., Runde 2): fotografiert statt der fuenf Grundsituationen die
+// Spielzuege des LAUFWEG-MODULS (Backdoor, Pick, Roll, Post-up, Ausboxen, Fast-Break, Lob,
+// Bodenpass, Spot-up/Pull-up/Drive). deviceScaleFactor 1 fuer diese Reihe (kleinere Dateien).
 //
 // [engine.js] (optional): eine andere Engine-Datei statt public/mockups/battle-mode.engine.js
 // ausliefern -- fuer Vorher/Nachher aus demselben Skript (z.B. eine Kopie des main-Stands).
@@ -40,6 +45,20 @@ const SZENEN = [
   { name: "4-treffer-im-netz", situation: "treffer", saat: 7, ab: 60 },
   { name: "5-rebound", situation: "rebound", saat: 1, ab: 30 },
 ];
+const SZENEN_RUNDE2 = [
+  { name: "r2-01-backdoor-cut", situation: "backdoor", saat: 7, ab: 15 },
+  { name: "r2-02-pick-gestellt", situation: "pick", saat: 7, ab: 10 },
+  { name: "r2-03-roll-oder-pop", situation: "roll", saat: 42, ab: 10 },
+  { name: "r2-04-post-up", situation: "postup", saat: 1, ab: 10 },
+  { name: "r2-05-ausboxen", situation: "ausboxen", saat: 7, ab: 30 },
+  { name: "r2-06-fast-break-lanes", situation: "fastbreak", saat: 42, ab: 20 },
+  { name: "r2-07-lob-pass", situation: "lob", saat: 7, ab: 10 },
+  { name: "r2-08-bodenpass", situation: "bodenpass", saat: 1, ab: 10 },
+  { name: "r2-09-spot-up", situation: "spotup", saat: 7, ab: 10 },
+  { name: "r2-10-pull-up", situation: "pullup", saat: 42, ab: 10 },
+  { name: "r2-11-drive", situation: "drive", saat: 1, ab: 10 },
+];
+const RUNDE2 = process.env.OLY_BB_SZENEN === "runde2";
 
 function starteServer() {
   return new Promise((resolve) => {
@@ -65,7 +84,7 @@ const server = await starteServer();
 let browser;
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  const seite = await browser.newPage({ viewport: { width: 1300, height: 700 }, deviceScaleFactor: 1.5 });
+  const seite = await browser.newPage({ viewport: { width: 1300, height: 700 }, deviceScaleFactor: RUNDE2 ? 1 : 1.5 });
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
@@ -73,7 +92,7 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("basketball"));
   await seite.click("#t2");
   await seite.waitForTimeout(800);
-  for (const sz of SZENEN) {
+  for (const sz of (RUNDE2 ? SZENEN_RUNDE2 : SZENEN)) {
     const erg = await seite.evaluate(({ saat, situation, ab }) => {
       if (typeof window.__arena.szeneFeldspiel !== "function") return { fehlt: true };
       return window.__arena.szeneFeldspiel(saat, situation, ab);
