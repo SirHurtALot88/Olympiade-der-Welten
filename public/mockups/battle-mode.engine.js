@@ -8155,7 +8155,7 @@
     if(pr.revanche)teile.push("sinnt auf Revanche");
     const s=teile.join(", ");
     return "Tendenzen im Zweikampf: "+s.charAt(0).toUpperCase()+s.slice(1)+
-      ". Das ist die Grundtendenz der Persönlichkeit; sie wirkt bisher nur als Rempel-Häufigkeit in Spurt und Takeshi's Castle, Eigenschaften verschieben sie später.";
+      ". Das ist die Grundtendenz der Persönlichkeit; sie wirkt bisher als Rempel-Häufigkeit in Spurt und Takeshi's Castle und in I-Spy beim Schubsen am Fundort und darin, wie lange jemand an einer angefangenen Truhe festhält.";
   }
   // EIGENER ZUFALLSSTROM (Abschnitt 3.5). mulberry32 statt der rr()-LCG mit Versatz: eine
   // andere Startzahl derselben Vollperioden-LCG laege auf demselben Zyklus wie rr().
@@ -8197,6 +8197,9 @@
     return kontaktProfil(p,einheit.pers||persOf[p.n]||null);
   }
   // FLAG-GERUEST: `kontakt` je Disziplin, Standard null, nicht aufzaehlbar.
+  // AUSNAHME I-SPY (17.11., Knack-Motor V2): dort gilt null als "Standard" = ISPY_KONTAKT_STANDARD
+  // ({stufe:3}, scharf in Produktion); {"i-spy":{stufe:0}} schaltet das Schubsen ab. Das Flag-Feld
+  // selbst bleibt null, kontaktFlags() meldet fuer I-Spy also weiter nichts.
   function kontaktFlagFeld(tab){
     for(const d of Object.keys(tab))
       if(tab[d]&&typeof tab[d]==="object"&&!kontaktHat(tab[d],"kontakt"))
@@ -19822,7 +19825,11 @@
         FINGERFERTIGKEIT: {dexterity:45,speed:35,torment:20},
         NERVEN:           {will:25,awareness:20,determination:25,dexterity:20,speed:10},
         TEAMGEIST:        {spirit:55,charisma:25,awareness:20},
-        AUSDAUER:         {spirit:50,health:30,speed:20}
+        AUSDAUER:         {spirit:50,health:30,speed:20},
+        // DURCHSETZEN (17.11., Knack-Motor V2 + Schubsen, docs/design/ispy-knacken-ortswahl-
+        // schubsen-17-11.md): der Duellwert beim Schubsen am Doppelmoebel (ispyV2Kontakt()).
+        // Nur Attribute mit Matrixgewicht (Budget-Guard); Mischung per Pp-Messung gewaehlt.
+        DURCHSETZEN:      {torment:65,spirit:20,will:15}
       },
       // ZWOELF FUNDORTE (Konzept 2.1, KORRIGIERTES Layout aus dem Gegencheck Abschnitt 3.4/T5
       // — nicht die Drittel-Anzahl-Fassung des ersten Entwurfs): Logik 5 (4x Notiz/Akte + EIN
@@ -26494,6 +26501,9 @@
   // 28c/d) UND ispySprechblase() (Spieler-Ikone, 28a) -- derselbe Text an beiden Stellen,
   // damit ein Zuschauer den Spieler am Fundort erkennt, auf den er zusteuert.
   const ISPY_SKILL_KUERZEL={LOGIK:"LOGIK",MENSCHENKENNTNIS:"MENSCH",FINGERFERTIGKEIT:"FINGER"};
+  // SEIT 17.11. NUR NOCH MOTOR "alt" (window.__arena.ispyMotor("alt")): Knackformel, Fortschritt-
+  // Schritt und Teilpunkte hier gelten fuer den alten Ein-Wurf-je-Tick-Motor. Der Standard ist der
+  // Knack-Motor V2 (Balken, Ortswahl, Schubsen), s. ISPY_V2 weiter unten.
   // KNACKEN-FORMEL (Konzept 1.4): p = clamp(0,08; 0,95; 0,15 + K·0,011 − (Stufe−1)·0,22 +
   // Fortschritt). Bei K=30/60/85 liefert das fuer Stufe 1/2/3 exakt die im Konzept
   // nachgerechnete Tabelle (0,48/0,26/0,08 bzw. 0,95/0,86/0,645 vor Rundung).
@@ -26919,6 +26929,335 @@
     return false;
   }
 
+  // ===================================================================================
+  // I-SPY KNACK-MOTOR V2: KNACKEN ALS BALKEN, ORTSWAHL, SCHUBSEN (17.11.)
+  // Chris 17.11. (woertlich): "schubsen tacklen etc bitte auch einbauen, das kann ja die rho
+  // noch mal veraendern und sollte drin sein fuers messen. Unterlegene Spieler suchen sich dann
+  // lieber einen neuen Ort an dem sie raetseln koennen und 3 Sterne knacken soll laenger dauern
+  // als 1 Stern knacken [...] und ein Spieler der besser ist fuellt den Balken zum Knacken dann
+  // deutlich schneller, wenn es ihm liegt." Volle Herleitung, Ist/Soll und Messwerte:
+  // docs/design/ispy-knacken-ortswahl-schubsen-17-11.md.
+  //
+  // BIS HIER (Motor "alt", ispySeiteTick() unten, weiter ueber window.__arena.ispyMotor("alt")
+  // abrufbar): JEDER Tick war EIN Knackwurf mit Chance p(K,Stufe); der "Verweilbalken" war
+  // reine Anzeige ueber einen Tick, der Spieler waehlte jeden Tick neu (kein Verweilen), und
+  // eine Stufe-3-Truhe dauerte nur ueber die kleinere Chance laenger.
+  //
+  // V2 (Werte kalibriert per Gittersuche, kaderfest n=96, s. Doc Abschnitt 4):
+  //  - AUFWAND je Truhe: ISPY_V2.aufwand[Stufe]*aufwandSkala = 0,6 / 1,08 / 1,8 Tempo-Einheiten
+  //    (1 : 1,8 : 3). Der Balken ist der echte Fortschritt t.fortschritt/Aufwand; er bleibt an
+  //    der Truhe (seitengebunden, wie der alte +15-%-Fortschritt), bis sie geknackt ist.
+  //  - TEMPO je Tick: (K_eff/50)^1,3. K_eff = 60 % Sub-Skill des gewaehlten Wegs (Primaerweg =
+  //    native Raetselart; Nebenweg nur an Tresoren mit `neben`, 65 % Punktwert wie bisher) plus
+  //    40 % allgemeine Raetselkompetenz (LOGIK+MENSCHENKENNTNIS+FINGERFERTIGKEIT+3*SPUERSINN)/6
+  //    -- wer die Spur liest, kommt an jeder Truhe voran --, mal Ermuedung, mal Zufall
+  //    0,85..1,15 (derselbe (rr()+rr())/2-Wurf wie bisher). Primaer-Sub-Skill 80 statt 50 (sonst
+  //    alles 50) fuellt den Balken 1,55-mal so schnell, der eigene Paradeweg gegen den
+  //    schwaechsten (80 gegen 40) 1,7-mal. Ohne Kompetenzanteil gewannen Spezialisten zu viel
+  //    gegen den Eignungsbesten (Star Rang 1 42 % statt 51 %, Top 2 63 % statt 79 %, n=96).
+  //  - UEBERSCHUSS: was nach dem Knacken vom Tempo dieses Ticks uebrig ist, fliesst in die
+  //    nachgefuellte Truhe am selben Ort (hoechstens 90 % von deren Aufwand).
+  //  - PUNKTE: Spur-Punkte proportional zum Fortschritt (70 % des Punktwerts, wie der alte
+  //    Teilpunkte-Sockel), die restlichen 30 % beim Knacken. Ganzzahlig, Rundungsrest je Spieler
+  //    mitgefuehrt (Summe = gerundete exakte Summe).
+  //  - ORTSWAHL: Wert eines Orts = erwartete Punkte je Tick (ispyWert(): Restaufwand durch
+  //    eigenes Tempo, Laufweg 0,35 Tick, Restzeit -- wer einen Tresor bis Spielende nicht mehr
+  //    schafft, rechnet nur noch mit Spur-Punkten). Gewaehlt wird in der bestehenden
+  //    Reihenfolge (NERVEN + Kompetenz): ein staerkerer Teamkollege darf eine angefangene Truhe
+  //    uebernehmen (ihr Balken bleibt), der Unterlegene sucht sich einen anderen Ort. Seinen
+  //    eigenen Ort bewertet jeder mit Haftfaktor 1 + haftMax*(100-aw)/100 aus der
+  //    Persoenlichkeit (Draufgaenger aw 20: +32 %, bleibt trotzig; Opportunist aw 65: +14 %,
+  //    wechselt frueh; Schleicher aw 90: +4 %). Kein neuer rr(). (`inhaber:true` -- Amtsinhaber
+  //    haelt seine Truhe gegen Teamkollegen -- ist gemessen schlechter: rho 0,80 statt 0,85.)
+  //  - SCHUBSEN (ispyV2Kontakt(), Kontakt-Konzept 16.11. Stufen 1-3): stehen sich Heim und Gast
+  //    am selben Doppelmoebel gegenueber, kann der mit der hoeheren Kontaktbereitschaft kb
+  //    schubsen. Duell DURCHSETZEN gegen DURCHSETZEN, Auswahlschwelle pMin, Ausweichen nach
+  //    aw (der Unterlegene weicht eher), Haertefaktor, Foul, Haenger. Waehrung ist NUR Zeit
+  //    (der Fortschritt dieses Ticks), nie Punkte oder schon erarbeiteter Balken; Schonfrist,
+  //    Deckel je Opfer, Sperre in den letzten Ticks. Wer verdraengt wurde, sucht sich im
+  //    naechsten Tick einen anderen Ort. ALLE neuen Wuerfe aus kontaktRr() (eigener Strom);
+  //    rr() zieht je Teilnehmer und Tick genau wie bisher x + (rr()+rr())/2, je Seite und Tick
+  //    den Reaktionswurf.
+  //  - SCHARF in Produktion: ohne gesetztes Flag gilt ISPY_KONTAKT_STANDARD ({stufe:3});
+  //    window.__arena.kontaktFlags({"i-spy":{stufe:0}}) schaltet das Schubsen fuer eine
+  //    gepaarte Messung ab (Messskripte: --kontakt=i-spy:0).
+  // ===================================================================================
+  const ISPY_V2={
+    aufwand:{1:1.0,2:1.8,3:3.0}, aufwandSkala:0.6,
+    tempoRef:50, tempoExp:1.3, tempoMin:0.12, tempoMax:4,
+    zufallBreite:0.3, teilAnteil:0.7, laufVerlust:0.35, haftMax:0.40, inhaber:false, uebertrag:1,
+    tempoMischung:0.4, tempoSpuer:3
+  };
+  const ISPY_KONTAKT={
+    gelegenheit:1.0, trefferVerlust:0.6, grundpreis:0.1, missVerlust:0.5, ausweichVerlust:0.2,
+    haengerFenster:0.06, haengerVerlust:0.3, foulBasis:0.04, foulVerlust:0.8,
+    schonTicks:2, deckel:3, sperreTicks:2, dosis:1
+  };
+  const ISPY_KONTAKT_STANDARD=Object.freeze({stufe:3});
+  let ISPY_MOTOR="v2";
+  // Zustand je Teilnehmer fuer das laufende Spiel (Ort, verdraengt, Schonfrist, Rundungsrest,
+  // Haftfaktor) -- WeakMap statt Feld am Teilnehmer, s. Kontakt-Bauregeln 3.5.
+  const ispyZustandMap=new WeakMap();
+  function ispyZ(u){
+    let z=ispyZustandMap.get(u);
+    if(!z){ z={idx:null,amWerk:false,verdraengt:false,schonBis:-1,treffer:0,rest:0,haft:0}; ispyZustandMap.set(u,z); }
+    return z;
+  }
+  function ispyKontaktStufen(){
+    const f=BUEHNE_ART["i-spy"].kontakt;
+    return kontaktStufenVon(f==null?ISPY_KONTAKT_STANDARD:f);
+  }
+  function ispyTempo(K){
+    return Math.max(ISPY_V2.tempoMin,Math.min(ISPY_V2.tempoMax,
+      Math.pow(Math.max(1,K||0)/ISPY_V2.tempoRef,ISPY_V2.tempoExp)));
+  }
+  function ispyAufwand(stufe){ return (ISPY_V2.aufwand[stufe]||1)*ISPY_V2.aufwandSkala; }
+  // ERWARTETE PUNKTE JE TICK an Truhe t bei Tempo `tempo` (ohne Zufall), Restzeit beachtet.
+  function ispyWert(t,tempo,faktor,istAktuell,restTicks){
+    const E=ispyAufwand(t.stufeAktuell), rest=Math.max(0,E-t.fortschritt);
+    const lauf=istAktuell?0:ISPY_V2.laufVerlust;
+    const PW=ISPY_PUNKTWERT[t.stufeAktuell]*faktor, TA=ISPY_V2.teilAnteil;
+    const tNeed=rest/Math.max(1e-6,tempo)+lauf;
+    if(tNeed<=restTicks)return PW*(TA*rest/E+(1-TA))/Math.max(1,tNeed);
+    return PW*TA*tempo/E*Math.max(0,restTicks-lauf)/Math.max(1,restTicks);
+  }
+  // PRIMAER-/NEBENWEG (Mehrwege-Truhe, 1.6): beide Wege bewertet, der fuer DIESEN Spieler
+  // lohnendere gewinnt. Nebenweg = anderer Sub-Skill, 65 % Punktwert.
+  // ALLGEMEINE KOMPETENZ (Mittel der drei Knack-Sub-Skills, wie im Reihenfolge-Schluessel)
+  // fliesst mit ISPY_V2.tempoMischung in das Tempo jedes Wegs ein: der Weg, der einem liegt,
+  // bleibt klar der schnellste, aber ein Allrounder ist nirgends ein Anfaenger.
+  function ispyKEff(u,skill){
+    const m=ISPY_V2.tempoMischung, ws=ISPY_V2.tempoSpuer;
+    const kompetenz=(u.LOGIK+u.MENSCHENKENNTNIS+u.FINGERFERTIGKEIT+ws*(u.SPUERSINN||0))/(3+ws);
+    return (1-m)*(u[skill]||0)+m*kompetenz;
+  }
+  function ispyWegV2(u,t,ermued,istAktuell,restTicks){
+    const prim=ISPY_RAETSEL_SUBSKILL[t.art];
+    const tp=ispyTempo(ispyKEff(u,prim))*ermued;
+    const a={skill:prim,tempo:tp,faktor:1,neben:false,wert:ispyWert(t,tp,1,istAktuell,restTicks)};
+    if(t.stufeAktuell!==3||!t.neben)return a;
+    const tn=ispyTempo(ispyKEff(u,t.neben))*ermued;
+    const b={skill:t.neben,tempo:tn,faktor:ISPY_NEBENWEG_PUNKTFAKTOR,neben:true,
+      wert:ispyWert(t,tn,ISPY_NEBENWEG_PUNKTFAKTOR,istAktuell,restTicks)};
+    return b.wert>a.wert?b:a;
+  }
+  // REAKTIONSWURF (R-2) -- Zeichen fuer Zeichen die Laeufer-Bestimmung aus ispySeiteTick().
+  function ispyReaktion(teilnehmer,truhen,tick,sichtbareEreignisse,avgTeamgeist){
+    const wurf=rr();
+    const pReaktion=Math.max(0,Math.min(1,ISPY_REAKTION_BASIS+avgTeamgeist*ISPY_REAKTION_TEAMGEIST_K));
+    let laeufer=null, zielIdx=null;
+    if(sichtbareEreignisse.length&&wurf<pReaktion){
+      const ziel=[...sichtbareEreignisse].sort((a,b)=>
+        (ISPY_PUNKTWERT[b.stufe]-ISPY_PUNKTWERT[a.stufe])||(a.idx-b.idx))[0];
+      const truhe=truhen.find(t=>t.idx===ziel.idx&&!t.leer);
+      if(truhe){
+        const primaerSkill=ISPY_RAETSEL_SUBSKILL[truhe.art];
+        const kandidaten=teilnehmer.filter(u=>!u._arbeitetTresor&&u._letzteReaktionTick!==tick-1);
+        if(kandidaten.length){
+          laeufer=[...kandidaten].sort((a,b)=>(b[primaerSkill]-a[primaerSkill])||(a.id-b.id))[0];
+          zielIdx=truhe.idx;
+          laeufer.reaktionen++;
+          laeufer._letzteReaktionTick=tick;
+        }
+      }
+    }
+    return {laeufer,zielIdx};
+  }
+  // PHASE 1 JE SEITE: Reaktion, Sicht, Ortswahl. Zieht rr() in fester Menge (1 je Seite, 3 je
+  // Teilnehmer), unabhaengig von jedem Ausgang. Liefert den Plan dieses Ticks.
+  function ispyV2Waehle(art,teilnehmer,truhen,tick,sichtbareEreignisse,avgTeamgeist){
+    const {laeufer,zielIdx}=ispyReaktion(teilnehmer,truhen,tick,sichtbareEreignisse,avgTeamgeist);
+    const NA=0.3;
+    const schluessel=(u)=>NA*u.NERVEN+(1-NA)*((u.LOGIK+u.MENSCHENKENNTNIS+u.FINGERFERTIGKEIT)/3);
+    const reihenfolge=[...teilnehmer].sort((a,b)=>(schluessel(b)-schluessel(a))||(a.id-b.id));
+    const restTicks=art.rundenN-tick;
+    const belegt=new Map();
+    const truheVon=(idx)=>idx==null?null:(truhen.find(t=>t.idx===idx&&!t.leer)||null);
+    // AMTSINHABER zuerst: wer an einer ANGEFANGENEN, noch nicht geknackten Truhe arbeitet und
+    // nicht verdraengt wurde, haelt sie fuer seine Seite besetzt (Teamkollegen schubsen einander
+    // nicht). Nach dem Knacken ist niemand Inhaber: die nachgefuellte Truhe am selben Ort wird
+    // in der normalen Reihenfolge neu vergeben (er steht nur schon dort, kein Laufweg).
+    const inhaberVon=(z)=>(ISPY_V2.inhaber&&z.amWerk&&!z.verdraengt)?truheVon(z.idx):null;
+    for(const u of teilnehmer){
+      const t=inhaberVon(ispyZ(u));
+      if(t)belegt.set(t.idx,(belegt.get(t.idx)||0)+1);
+    }
+    const plan=[];
+    for(const u of reihenfolge){
+      const z=ispyZ(u);
+      u._arbeitetTresor=false;
+      const istLaeufer=(u===laeufer);
+      const x=rr();
+      const w2=(rr()+rr())/2;
+      const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
+      const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
+      const ermued=Math.max(ISPY_AUSDAUER_BODEN,
+        1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
+      const aktuell=inhaberVon(z);
+      const standort=z.verdraengt?null:z.idx;
+      const verbot=z.verdraengt?z.idx:null;
+      const hinweisBonus=(t)=>(istLaeufer&&t.idx===zielIdx)?ISPY_HINWEIS_BONUS:0;
+      const sichtbarF=(t)=>t===aktuell||t.stufeAktuell===1
+        ||(t.stufeAktuell===2&&x<sieht2+hinweisBonus(t))
+        ||(t.stufeAktuell===3&&x<sieht3+hinweisBonus(t));
+      const frei=(t)=>{
+        const n=(belegt.get(t.idx)||0)-(t===aktuell?1:0);
+        return n<1||(t.idx===zielIdx&&n<2);
+      };
+      const bewertet=truhen.filter(t=>!t.leer&&t.idx!==verbot&&frei(t)&&sichtbarF(t)).map(t=>{
+        const weg=ispyWegV2(u,t,ermued,t.idx===standort,restTicks);
+        return {t,weg,wert:weg.wert*((z.amWerk&&t.idx===standort)?1+z.haft:1),naeher:(u.side===0?t.x:(1-t.x))};
+      }).sort((a,b)=>(b.wert-a.wert)||(a.naeher-b.naeher)||(a.t.idx-b.t.idx));
+      const wahl=bewertet[0]||null;
+      if(aktuell&&(!wahl||wahl.t!==aktuell))belegt.set(aktuell.idx,(belegt.get(aktuell.idx)||1)-1);
+      if(wahl&&wahl.t!==aktuell)belegt.set(wahl.t.idx,(belegt.get(wahl.t.idx)||0)+1);
+      const lauf=!!wahl&&wahl.t.idx!==z.idx;
+      // ORTSWECHSEL im engeren Sinn: eine ANGEFANGENE Truhe verlassen (oder verdraengt worden
+      // sein) -- nach dem Knacken zum naechsten Ort zu gehen ist der Normalfall, kein Wechsel.
+      const wechsel=(lauf&&z.idx!=null&&(z.amWerk||z.verdraengt))?(z.verdraengt?"verdraengt":"aussicht"):null;
+      z.verdraengt=false;
+      if(wahl)z.idx=wahl.t.idx;
+      z.amWerk=!!wahl;
+      plan.push({u,wahl,w2,istLaeufer,zielIdx,lauf,wechsel,mult:1,schubs:null});
+    }
+    return plan;
+  }
+  // PHASE 2: SCHUBSEN AM DOPPELMOEBEL (beide Seiten haben ihre Truhe am selben Index).
+  function ispyV2Kontakt(art,planM,planG,tick){
+    const K=ispyKontaktStufen();
+    if(!K||!K.aktiv)return;
+    if(tick>=art.rundenN-ISPY_KONTAKT.sperreTicks)return;
+    const KK=ISPY_KONTAKT, d=K.dosis*KK.dosis;
+    const erster=(plan)=>{ const m=new Map(); for(const e of plan)if(e.wahl&&!m.has(e.wahl.t.idx))m.set(e.wahl.t.idx,e); return m; };
+    const mM=erster(planM), mG=erster(planG);
+    const orte=[...mM.keys()].filter(i=>mG.has(i)).sort((a,b)=>a-b);
+    for(const idx of orte){
+      const a0=mM.get(idx), b0=mG.get(idx);
+      const pa=kontaktProfilBahn(a0.u,K), pb=kontaktProfilBahn(b0.u,K);
+      // WER DRAENGT: die hoehere Kontaktbereitschaft; Gleichstand: der Ankommende, sonst Los.
+      let A;
+      if(pa.kb!==pb.kb)A=pa.kb>pb.kb?a0:b0;
+      else if(a0.lauf!==b0.lauf)A=a0.lauf?a0:b0;
+      else A=kontaktRr()<0.5?a0:b0;
+      const V=A===a0?b0:a0, pA=A===a0?pa:pb, pV=A===a0?pb:pa;
+      const zV=ispyZ(V.u);
+      if(zV.schonBis>=tick)continue;                         // Schutzregel 3: Schonfrist
+      kontaktZaehle(A.u,"versuch");
+      if(kontaktRr()>=Math.min(1,pA.kb/100*KK.gelegenheit)){ kontaktZaehle(A.u,"verzichtet"); continue; }
+      const DA=A.u.DURCHSETZEN||50, DV=V.u.DURCHSETZEN||50;
+      const p=DA/((DA+DV)||1);
+      if(K.s2&&p<pA.pMin){ kontaktZaehle(A.u,"verzichtet"); continue; }   // Stufe 2: Auswahl
+      kontaktZaehle(A.u,"versucht");
+      const h=K.s3?0.75+pA.ha/200:1;
+      const kosten=(e,anteil)=>{ e.mult*=Math.max(0,1-anteil); };
+      // STUFE 2: DER UNTERLEGENE WEICHT EHER AUS (aw, skaliert mit der Aussicht des Draengers).
+      if(K.s2&&kontaktRr()<Math.min(0.95,pV.aw/100*2*p)){
+        kosten(V,KK.ausweichVerlust*d); kosten(A,KK.grundpreis*d);
+        ispyZ(V.u).verdraengt=true;
+        kontaktZaehle(V.u,"ausgewichen");
+        A.schubs={rolle:"taeter",ausgang:"ausgewichen",gegner:V.u.n};
+        V.schubs={rolle:"opfer",ausgang:"ausgewichen",gegner:A.u.n};
+        continue;
+      }
+      if(kontaktRr()<p){
+        if(K.foul&&kontaktRr()<KK.foulBasis*(pA.ha/50)*((100-pA.di)/50)){
+          kosten(A,KK.foulVerlust*d);
+          kontaktZaehle(A.u,"foul"); kontaktZaehle(V.u,"gefoult");
+          A.schubs={rolle:"taeter",ausgang:"foul",gegner:V.u.n};
+          V.schubs={rolle:"opfer",ausgang:"foul",gegner:A.u.n};
+          continue;
+        }
+        const voll=!(K.schutz&&zV.treffer>=KK.deckel);         // Schutzregel 3: Deckel je Opfer
+        kosten(V,KK.trefferVerlust*h*(voll?1:0.5)*d); kosten(A,KK.grundpreis*d);
+        if(voll)zV.verdraengt=true;
+        zV.treffer++; if(K.schutz)zV.schonBis=tick+KK.schonTicks;
+        kontaktZaehle(A.u,"treffer"); kontaktZaehle(V.u,"getroffen");
+        A.schubs={rolle:"taeter",ausgang:"treffer",gegner:V.u.n};
+        V.schubs={rolle:"opfer",ausgang:"treffer",gegner:A.u.n};
+      } else if(K.haenger&&Math.abs(p-0.5)<KK.haengerFenster){
+        kosten(A,KK.haengerVerlust*d); kosten(V,KK.haengerVerlust*d);
+        kontaktZaehle(A.u,"haenger"); kontaktZaehle(V.u,"haenger");
+        A.schubs={rolle:"taeter",ausgang:"haenger",gegner:V.u.n};
+        V.schubs={rolle:"opfer",ausgang:"haenger",gegner:A.u.n};
+      } else {
+        kosten(A,KK.missVerlust*h*d);                          // Stufe 1: Mini-Stun des Draengers
+        kontaktZaehle(A.u,"abgeprallt"); kontaktZaehle(V.u,"gehalten");
+        A.schubs={rolle:"taeter",ausgang:"abgeprallt",gegner:V.u.n};
+        V.schubs={rolle:"opfer",ausgang:"abgeprallt",gegner:A.u.n};
+      }
+    }
+  }
+  // PHASE 3 JE SEITE: Fortschritt, Punkte, Knacken. Kein rr() (der Zufall kam in Phase 1).
+  function ispyV2Fortschritt(art,plan,truhen){
+    const ereignisse=[];
+    const merke=(t,warErfolg)=>{
+      if(ispySichtbar(t.stufeAktuell,warErfolg))ereignisse.push({idx:t.idx,art:t.art,stufe:t.stufeAktuell});
+    };
+    for(const e of plan){
+      const u=e.u, z=ispyZ(u);
+      const rHinweis=e.istLaeufer||undefined;
+      const rReaktion=(e.istLaeufer&&e.wahl&&e.wahl.t.idx===e.zielIdx)||undefined;
+      if(!e.wahl){ u.runden.push({punkte:0, ereignis:art.failWort, hinweis:rHinweis}); continue; }
+      const t=e.wahl.t, weg=e.wahl.weg, stufe=t.stufeAktuell, E=ispyAufwand(stufe);
+      const basis={art:t.art, stufe, fundort:t.idx, reaktion:rReaktion, hinweis:rHinweis,
+        bleibt:!e.lauf||undefined, neben:weg.neben||undefined, wechsel:e.wechsel||undefined,
+        schubs:e.schubs||undefined};
+      if(t.leer){ u.runden.push({punkte:0, ereignis:art.failWort, ...basis, fv:1, fn:1}); continue; }
+      if(stufe===3)u._arbeitetTresor=true;
+      const zufall=1-ISPY_V2.zufallBreite/2+ISPY_V2.zufallBreite*e.w2;
+      const delta=weg.tempo*zufall*(e.lauf?1-ISPY_V2.laufVerlust:1)*e.mult;
+      const vor=t.fortschritt, eff=Math.max(0,Math.min(delta,E-vor));
+      t.fortschritt=vor+eff;
+      const PW=ISPY_PUNKTWERT[stufe]*weg.faktor;
+      const geknackt=t.fortschritt>=E-1e-9;
+      const roh=PW*ISPY_V2.teilAnteil*eff/E+(geknackt?PW*(1-ISPY_V2.teilAnteil):0);
+      const punkte=Math.round(z.rest+roh)-Math.round(z.rest);
+      z.rest+=roh;
+      const r={punkte, ereignis:geknackt?art.erfolgWort:art.failWort, ...basis,
+        fv:Math.round(vor/E*1000)/1000, fn:Math.round(t.fortschritt/E*1000)/1000};
+      u.runden.push(r);
+      if(geknackt){
+        u.funde[stufe]=(u.funde[stufe]||0)+1; t.leer=true; z.amWerk=false; merke(t,true);
+        // UEBERSCHUSS: was vom Tempo dieses Ticks nach dem Knacken uebrig ist, fliesst in die
+        // naechste Truhe am selben Ort (er steht schon davor) -- sonst verpufft gerade beim
+        // Starken an kleinen Truhen Zeit, und der Balken waere nicht mehr "doppelt so schnell".
+        const rest=(delta-eff)*ISPY_V2.uebertrag;
+        if(rest>1e-9)t.uebertrag={u,z,r,menge:rest};
+      }
+      else merke(t,false);
+    }
+    // NACHFUELLEN wie bisher (art-eigene Folge, eine Runde leer).
+    for(const t of truhen){
+      if(t.leer){
+        const folge=ISPY_NACHFUELL_FOLGE_BY_ART[t.art];
+        t.stufeAktuell=folge[t.folgePos%folge.length];
+        t.folgePos++; t.fortschritt=0; t.leer=false;
+        if(t.uebertrag){
+          const {u,z,r,menge}=t.uebertrag, E2=ispyAufwand(t.stufeAktuell);
+          const mit=Math.min(menge,E2*0.9);
+          t.fortschritt=mit;
+          const roh=ISPY_PUNKTWERT[t.stufeAktuell]*ISPY_V2.teilAnteil*mit/E2;
+          r.punkte+=Math.round(z.rest+roh)-Math.round(z.rest); z.rest+=roh;
+          r.uebertrag=Math.round(mit/E2*1000)/1000;
+          t.uebertrag=null;
+        }
+      }
+    }
+    return ereignisse;
+  }
+  // Startzustand je Teilnehmer (vor Tick 0). Haftfaktor aus der Persoenlichkeit mit Traits.
+  function ispyV2Start(teilnehmer,spieler){
+    for(const u of teilnehmer){
+      const p=spieler.find(q=>q.n===u.n)||{};
+      kontaktSpielerMap.set(u,p);
+      ispyZustandMap.delete(u);
+      kontaktZustandMap.delete(u);
+      const z=ispyZ(u);
+      const pr=kontaktProfil(p,persOf[p.n]||null);
+      z.haft=ISPY_V2.haftMax*(100-pr.aw)/100;
+    }
+  }
+
   // EIN TICK EINER SEITE (Konzept 3.4-Pseudocode, an PR 1s Truhen-Architektur angepasst,
   // s. Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG"). `sichtbareEreignisse` sind die S-c-Funde
   // der ANDEREN Seite aus dem VORHERIGEN Tick (die Verzoegerung ist strukturell, s.o.);
@@ -27147,6 +27486,22 @@
     // `miss-arena-buehne-spiegel.mjs`, s. PR-1-Kommentar-Historie) — das aendert an der
     // Verzoegerung nichts, weil beide Seiten ausschliesslich aus dem VORHERIGEN Tick lesen.
     let sichtbarFuerMine=[], sichtbarFuerGegner=[];
+    // KNACK-MOTOR V2 (17.11., s. Kopfkommentar bei ISPY_V2): Waehlen beider Seiten, dann
+    // Schubsen am Doppelmoebel, dann Fortschritt -- weiterhin aus dem VORHERIGEN Tick reagiert.
+    if(ISPY_MOTOR!=="alt"){
+      ispyV2Start(mineT,mine); ispyV2Start(gegnerT,gegner);
+      for(let tick=0;tick<art.rundenN;tick++){
+        if(ISPY_NACHFUELL_SONDE)ISPY_NACHFUELL_SONDE(tick,mineRaum,gegnerRaum);
+        const planM=ispyV2Waehle(art,mineT,mineRaum,tick,sichtbarFuerMine,mineTeamgeist);
+        const planG=ispyV2Waehle(art,gegnerT,gegnerRaum,tick,sichtbarFuerGegner,gegnerTeamgeist);
+        ispyV2Kontakt(art,planM,planG,tick);
+        const eigeneFuerGegner=ispyV2Fortschritt(art,planM,mineRaum);
+        const eigeneFuerMine=ispyV2Fortschritt(art,planG,gegnerRaum);
+        sichtbarFuerMine=eigeneFuerMine;
+        sichtbarFuerGegner=eigeneFuerGegner;
+      }
+      return;
+    }
     for(let tick=0;tick<art.rundenN;tick++){
       // NACHFUELLFOLGE-SONDE (window.__arena.ispyNachfuellSonde, s.u.): reiner Lesehaken,
       // ruehrt kein rr() und kein Gameplay an — nur wenn ISPY_NACHFUELL_SONDE gesetzt ist
@@ -27199,6 +27554,24 @@
     const stufe=r.stufe||1;
     const erfolg=ereignis===BUEHNE_ART["i-spy"].erfolgWort;
     const hinweisOhneFolge=r.hinweis&&!r.reaktion;
+    // KNACK-MOTOR V2 (17.11.): Balkenstand statt "scheitert", dazu Ortswechsel und Schubser.
+    if(r.fv!=null){
+      const S=r.schubs, g=S&&S.gegner;
+      const schubsText=!S?"":S.rolle==="taeter"
+        ?({treffer:" — schubst "+g+" weg",ausgewichen:" — drängt "+g+" ab",abgeprallt:" — prallt an "+g+" ab",
+          haenger:" — Gerangel mit "+g,foul:" — Foul an "+g+", Zeitstrafe"}[S.ausgang]||"")
+        :({treffer:" — wird von "+g+" weggeschubst und sucht sich einen neuen Ort",
+          ausgewichen:" — weicht "+g+" aus und sucht sich einen neuen Ort",abgeprallt:" — hält gegen "+g+" stand",
+          haenger:" — Gerangel mit "+g,foul:" — "+g+" foult ihn, keine Zeit verloren"}[S.ausgang]||"");
+      const ort=r.wechsel==="verdraengt"?u.n+" weicht aus und "
+        :r.wechsel==="aussicht"?u.n+" sucht sich einen besseren Ort und "
+        :r.reaktion?u.n+" eilt herbei und ":u.n+" ";
+      const pz=(x)=>Math.round(x*100)+" %";
+      if(erfolg)return ort+"knackt "+(ISPY_STUFE_AKK[stufe]||"den Fund")+" ("+artLabel+", Stufe "+stufe+(r.neben?", Nebenweg":"")
+        +") — "+ereignis+"!"+schubsText+" +"+r.punkte;
+      return ort+"arbeitet "+(ISPY_STUFE_AN[stufe]||"am Fund")+" ("+artLabel+", Stufe "+stufe+(r.neben?", Nebenweg":"")
+        +"): "+pz(r.fv)+" → "+pz(r.fn)+schubsText+". +"+r.punkte;
+    }
     if(erfolg){
       const praefix=r.reaktion?u.n+" eilt herbei und untersucht "
         :hinweisOhneFolge?u.n+" hört den Jubel drüben, bleibt aber bei seiner eigenen Aufgabe und untersucht "
@@ -28182,7 +28555,12 @@
         // Bedingung fuer dasselbe `big`-Flag, das feed() ohnehin schon entgegennimmt.
         const vorherSeite=ispyFuehrungMit(u.side===0?-r.punkte:0,u.side===1?-r.punkte:0);
         const nachherSeite=ispyFuehrungMit(0,0);
-        const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
+        // KNACK-MOTOR V2 (17.11.): Spur-Punkte fliessen jetzt jeden Zug, die Fuehrung kippt bei
+        // knappem Stand dadurch staendig -- als grosser Moment zaehlt sie nur noch, wenn ein
+        // geknackter TRESOR sie kippt (r.fv==null: alter Motor, unveraendert). Mit jedem Fund
+        // als Kipp-Moment lag der Ticker bei 31,9 Zeilen/min (Schranke 30).
+        const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite
+          &&(r.fv==null||(r.ereignis===BUEHNE_ART["i-spy"].erfolgWort&&r.stufe===3));
         // I-5 "DIE FALLAKTE" (Task #42, Klasse A): nur bei einem ENTHUELLTEN Fund (nicht bei
         // einem Fehlschlag) vermerkt und an die bestehende Ticker-Zeile angehaengt -- "die
         // sich mit jedem Fund fuellt". Reine Textzierde wie die ACT-Zierde im Showcase-Zweig
@@ -28203,7 +28581,14 @@
         const ispyBig=versuchBig||fuehrungswechsel;
         feed(u.side,ispyTickerZeile(u,r)+fallakteAnhang,ispyBig,undefined,
           ispyBig?(versuchBig?"tresor":"fuehrungswechsel"):undefined,undefined,undefined,
-          r.ereignis===BUEHNE_ART["i-spy"].erfolgWort?undefined:"routine");
+          // KNACK-MOTOR V2 (17.11.): Notizen und Akten werden jetzt fast jeden Zug geknackt (der
+          // Balken laeuft ueber mehrere Zuege, der Ueberschuss traegt weiter) -- sie stehen nur
+          // noch im Protokoll, sonst sprengt der Ticker die 30 Zeilen/min (verify-i-spy-ticker-
+          // paket-07-10.mjs: 34,7/min mit Akten). Tresore, grosse Momente und jeder Schubser-
+          // Treffer bzw. jedes Foul bleiben sichtbar.
+          (r.ereignis===BUEHNE_ART["i-spy"].erfolgWort&&(r.fv==null||(r.stufe||1)>=3))||ispyBig
+            ||(r.schubs&&r.schubs.rolle==="taeter"&&(r.schubs.ausgang==="treffer"||r.schubs.ausgang==="foul"))
+            ?undefined:"routine");
         // AM ENDE DER ENTHUELLUNG (Konzept: "am Ende blendet der Ticker [...] ein"): die
         // generische Enthuellungs-Warteschlange (s. Kopfkommentar bei BUEHNE_ART["i-spy"])
         // hat hier ihren letzten Eintrag ausgegeben -- `buehneZeiger` wurde bereits oben
@@ -30212,6 +30597,19 @@
           // Ereignis reagiert (R-2). zeichneSchatzsuche() liest dieses Feld waehrend der
           // ganzen "gehen"-Phase fuer die gestrichelte Linie + das Ausrufezeichen.
           u.vizIspyReaktion=!!r.reaktion;
+          // KNACK-MOTOR V2 (17.11.): echter Balkenstand vor/nach diesem Zug (r.fv/r.fn, Anteil am
+          // Aufwand der Truhe) fuer ispyVerweilFortschritt(); Schubser als Schwebetext und Stoss.
+          u.vizIspyFv=r.fv!=null?r.fv:null; u.vizIspyFn=r.fn!=null?r.fn:null;
+          u.vizIspyStoss=0;
+          if(r.schubs){
+            const S=r.schubs, opfer=S.rolle==="opfer";
+            const txt=opfer
+              ?({treffer:"weggeschubst!",ausgewichen:"weicht aus",abgeprallt:"hält stand",haenger:"Gerangel",foul:"Foul!"}[S.ausgang])
+              :({treffer:"schubst",ausgewichen:"drängt",abgeprallt:"prallt ab",haenger:"Gerangel",foul:"Foul — Zeitstrafe"}[S.ausgang]);
+            if(opfer&&(S.ausgang==="treffer"||S.ausgang==="ausgewichen"))u.vizIspyStoss=S.ausgang==="treffer"?1:0.5;
+            if(txt&&(opfer||S.ausgang!=="ausgewichen"))
+              schwebe({x:u.vizIspyZielX,y:u.vizIspyZielY-38,txt,life:1.1,crit:S.ausgang==="treffer"&&opfer});
+          }
           u.vizPhase="gehen";
           // ALARM-TON (TON_KATALOG["i-spy"].alarm, Konzept 5.4: "wenn die Reaktion der
           // Gegenseite beginnt"): genau an dieser Kante, dem Moment, in dem PR 2s
@@ -30226,6 +30624,7 @@
           u.vizIspySuchEnde=ISPY_VIZ_SUCHE_SCHWACH_ENDE;
           u.vizIspyErfolg=false; u.vizIspyStufe=0; u.vizIspyReaktion=false;
           u.vizIspySkill=null;
+          u.vizIspyFv=null; u.vizIspyFn=null; u.vizIspyStoss=0;
           u.vizPhase="idle";
         }
         u.vizIspyT=0;
@@ -30252,6 +30651,12 @@
           u.vizY=u.vizIspyVonY+(u.vizIspyZielY-u.vizIspyVonY)*g;
         } else if(anteil<suchEnde){
           u.vizPhase="suchen"; u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
+          // SCHUBSER (Knack-Motor V2): wer weggeschubst wurde, wird kurz vom Fach weggestossen
+          // und kommt zurueck -- reiner Zeichenversatz auf den Standplatz (s. ispyStandXY()).
+          if(u.vizIspyStoss>0){
+            const g=Math.min(1,(anteil-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,suchEnde-ISPY_VIZ_GEHEN_ANTEIL));
+            u.vizX+=(u.side===1?1:-1)*14*u.vizIspyStoss*Math.max(0,1-g*1.6);
+          }
           // SCHLOSS-KLICKS (TON_KATALOG["i-spy"].schloss, Konzept 5.4: "tonKlick leise,
           // wiederholt -- Phase suchen"): zeitgetriebener Zaehler, KEIN rr()-Verbrauch,
           // dasselbe Zaehler-Vergleichsmuster wie TON_KATALOG.climbing.griff/-.zug
@@ -30268,15 +30673,19 @@
             // Kopfschuetteln bei Fehlschlag. Der "+X"-Schweber selbst kommt bereits
             // generisch aus stepBuehne()s schwebe()-Aufruf (unveraendert seit PR 1/2) —
             // hier wird nur die KOeRPERREAKTION ausgeloest.
+            // KNACK-MOTOR V2 (17.11.): ein Zug ohne Knacken ist Fortschritt am Balken, kein
+            // Scheitern -- Kopfschuetteln/Fehl-Ton nur noch, wenn er (fast) nichts geschafft hat.
+            const v2Arbeit=u.vizIspyFv!=null&&!u.vizIspyErfolg;
+            const v2Wenig=v2Arbeit&&(u.vizIspyFn-u.vizIspyFv)<0.15;
             if(u.vizIspyErfolg)u.vizJubelT=ISPY_VIZ_JUBEL_T;
-            else u.vizIspyKopfschuettelT=ISPY_VIZ_KOPFSCHUETTEL_T;
+            else if(!v2Arbeit||v2Wenig)u.vizIspyKopfschuettelT=ISPY_VIZ_KOPFSCHUETTEL_T;
             // ERFOLGS-/FEHL-TON (TON_KATALOG["i-spy"].geknackt/.tresor/.fehl, Konzept 5.4):
             // dieselbe Phasenkante, "tresor" (der krasse Fund) nur bei Stufe 3, sonst
             // "geknackt" fuer Notiz/Akte -- u.vizIspyStufe/-Erfolg kommen unveraendert aus
             // der Erkennungsschleife oben (r.stufe/r.ereignis===art.erfolgWort), kein
             // neuer Zustand.
             if(u.vizIspyErfolg)sfx("i-spy",u.vizIspyStufe===3?"tresor":"geknackt");
-            else sfx("i-spy","fehl");
+            else if(!v2Arbeit||v2Wenig)sfx("i-spy","fehl");
           }
         }
       }
@@ -31948,9 +32357,10 @@
           const fx=p.x+(seite===0?-1:1)*ISPY_FACH_DX;
           // ANGEBROCHENE FAECHER GLUEHEN NACH (I4): waechst mit z.fehlserie, gedeckelt wie die
           // Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT).
-          if(z&&!z.offen&&z.fehlserie>0){
+          // KNACK-MOTOR V2: die Glut folgt dem echten Balkenstand der Truhe (z.fortschritt).
+          if(z&&!z.offen&&(z.fortschritt!=null?z.fortschritt>0:z.fehlserie>0)){
             const stufenN=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
-            const glutStaerke=Math.min(z.fehlserie,stufenN)/stufenN;
+            const glutStaerke=z.fortschritt!=null?Math.min(1,z.fortschritt):Math.min(z.fehlserie,stufenN)/stufenN;
             const glut=ctx.createRadialGradient(fx,p.y-6,2,fx,p.y-6,18);
             glut.addColorStop(0,"rgba(255,110,60,"+(0.12+0.24*glutStaerke).toFixed(2)+")");
             glut.addColorStop(1,"rgba(255,110,60,0)");
@@ -32053,7 +32463,7 @@
         if(!bisher||bisher.ri<ri){
           const offen=r.ereignis===art.erfolgWort;
           const fehlserie=offen?0:((bisher&&!bisher.offen)?bisher.fehlserie+1:1);
-          zustand.set(r.fundort,{ri,stufe:r.stufe,offen,fehlserie});
+          zustand.set(r.fundort,{ri,stufe:r.stufe,offen,fehlserie,fortschritt:offen?0:(r.fn??null)});
         }
       }
     }
@@ -33612,6 +34022,10 @@
     const a=ispyZyklusAnteil(u,art);
     const ende=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
     const p=Math.max(0,Math.min(1,(a-ISPY_VIZ_GEHEN_ANTEIL)/Math.max(0.01,ende-ISPY_VIZ_GEHEN_ANTEIL)));
+    // KNACK-MOTOR V2 (17.11.): der Balken zeigt den ECHTEN Fortschritt an der Truhe, von r.fv
+    // nach r.fn (beim Knacken 1) -- ein Tresor braucht sichtbar mehr Zuege als eine Notiz, und
+    // ein Starker fuellt ihn je Zug weiter.
+    if(u.vizIspyFv!=null&&u.vizIspyFn!=null)return u.vizIspyFv+(u.vizIspyFn-u.vizIspyFv)*p;
     return u.vizIspyErfolg?p:Math.min(p,0.86);
   }
   function zeichneSchatzsuche(art){
@@ -66313,6 +66727,19 @@
     // REIN LESENDE SONDE: welchen Raum jede Seite im zuletzt gebauten Spiel tatsaechlich
     // bekommen hat (KI-Wahl ODER Messvorgabe, s. ISPY_RAUM_AKTIV/baueSchatzsuche()).
     ispyRaumSonde:()=>({...ISPY_RAUM_AKTIV}),
+    // KNACK-MOTOR V2 (17.11., s. ISPY_V2): Mess-/Vergleichsschalter. ispyMotor("alt") rechnet
+    // I-Spy wie bis 17.11. (ein Knackwurf je Tick), ispyMotor("v2") ist der Standard.
+    // ispyParameter({v2:{...},kontakt:{...}}) ueberschreibt Kalibrierwerte fuer eine Messung;
+    // ohne Argument nur lesen. Kein echtes Spiel ruft eins von beiden auf.
+    ispyMotor:(neu)=>{ if(neu==="alt"||neu==="v2")ISPY_MOTOR=neu; return ISPY_MOTOR; },
+    ispyParameter:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        if(neu.v2)for(const k of Object.keys(neu.v2))if(k in ISPY_V2)
+          ISPY_V2[k]=typeof ISPY_V2[k]==="object"?{...ISPY_V2[k],...neu.v2[k]}:neu.v2[k];
+        if(neu.kontakt)for(const k of Object.keys(neu.kontakt))if(k in ISPY_KONTAKT)ISPY_KONTAKT[k]=neu.kontakt[k];
+      }
+      return {v2:JSON.parse(JSON.stringify(ISPY_V2)),kontakt:{...ISPY_KONTAKT}};
+    },
     // PERSOENLICHKEITS-HANDWERK (P1, 07.10., s. persDefVon()): Mess-/QA-Schnittstelle nach dem
     // Muster buehneFlags darueber. {tdm:[], "mini-dm":["z"], ...} setzt `ARENA_ART[d].persHandwerk`
     // je Arena-Disziplin (nur "z"/"b", andere Schluessel und Nicht-Arena-Disziplinen werden
@@ -67346,9 +67773,17 @@
       M.lauf();
       const teiln=TEILNEHMER.map(u=>({n:u.n,side:u.side,summe:u.summe||0,
         funde:{...u.funde}, reaktionen:u.reaktionen||0,
+        // KNACK-MOTOR V2 (17.11.): Eignung, Sub-Skills und Kontakt-Zaehler fuer die Diagnose
+        // (Knackdauer je Stufe/Sub-Skill, Ortswechsel, Schubsen) -- rein lesend.
+        eig:u.eig, skills:{LOGIK:u.LOGIK,MENSCHENKENNTNIS:u.MENSCHENKENNTNIS,FINGERFERTIGKEIT:u.FINGERFERTIGKEIT,
+          SPUERSINN:u.SPUERSINN,NERVEN:u.NERVEN,DURCHSETZEN:u.DURCHSETZEN,AUSDAUER:u.AUSDAUER},
+        kontakt:kontaktZaehlerVon(u), pers:(kontaktProfil(kontaktSpielerMap.get(u)||{},persOf[u.n]||null)||{}).pers||null,
+        haft:Math.round(ispyZ(u).haft*1000)/1000,
         // "runden" nur die additiven Anzeigefelder, keine internen _-Felder.
         runden:u.runden.map(r=>({punkte:r.punkte,ereignis:r.ereignis,art:r.art||null,
-          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion,hinweis:!!r.hinweis}))}));
+          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion,hinweis:!!r.hinweis,
+          fv:r.fv??null,fn:r.fn??null,bleibt:!!r.bleibt,wechsel:r.wechsel||null,neben:!!r.neben,
+          schubs:r.schubs?{...r.schubs}:null}))}));
       M.zurueck(g);
       return {disziplin:"i-spy", teilnehmer:teiln};
     },

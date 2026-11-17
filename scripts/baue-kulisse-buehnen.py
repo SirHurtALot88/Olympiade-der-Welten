@@ -1307,6 +1307,10 @@ PL_RAENDER = {
 }
 
 
+# Varianten, die es NUR als PixelLab-Breitform gibt (kein BAUER-Zweig in diesem Skript).
+PL_NUR = {"wettessen": ["nachtmarkt", "bierzelt"], "battlefield": ["wuestenruine"]}
+
+
 def _achse(n_lein: int, n_roh: int, s: float, a=None, b=None) -> np.ndarray:
     """Leinwand-Koordinate (Mitte jedes Pixels) -> roh-Koordinate, stueckweise linear (s. PL_RAENDER)."""
     c = np.arange(n_lein) + 0.5
@@ -1320,11 +1324,69 @@ def _achse(n_lein: int, n_roh: int, s: float, a=None, b=None) -> np.ndarray:
     return np.clip(r, 0, n_roh - 1e-6)
 
 
+def _weisse_raender_fuellen(roh: Image.Image) -> Image.Image:
+    """PixelLab laesst bei manchen Breitformaten einen Randstreifen aus Leerfarbe stehen: reinweiss
+    (gemessen 17.11.: Tennis-Dach 20 px links und rechts, Wettessen-Nachtmarkt 38 px) oder das
+    einheitliche Neutralgrau (177,176,178) (Speed-Schach-Zug: je ~26 px oben und unten). Er wuerde als
+    heller Balken im Spiel stehen. Zusammenhaengende Randspalten/-zeilen dieser Farbe werden ersetzt:
+    weisse durch die gespiegelten Nachbarpixel (die Geometrie des Bildes bleibt, PL_RAENDER rechnet in
+    roh-Koordinaten), graue Letterbox-Streifen durch Wegschneiden und Aufziehen des Bildinhalts auf die
+    volle Groesse (Leerfarbe ist kein Bildinhalt, eine Spiegelung braeche Lampen und Teppichkante). Graue Flaechen INNERHALB des Bildes (Himmel) bleiben unberuehrt: es zaehlen nur
+    Zeilen/Spalten, die auf ganzer Laenge exakt die Leerfarbe tragen."""
+    a = np.asarray(roh).copy()
+    h, w, _ = a.shape
+    weiss = a.min(axis=2) >= 252
+    grau = (np.abs(a.astype(int) - np.array([177, 176, 178])).max(axis=2) <= 2)
+
+    def zaehle(maske_zeilen: np.ndarray) -> int:
+        return int(len(maske_zeilen)) if maske_zeilen.all() else int(np.argmin(maske_zeilen))
+
+    kanten = {
+        "l": (weiss.mean(axis=0) > 0.9, grau.mean(axis=0) > 0.995),
+        "o": (weiss.mean(axis=1) > 0.9, grau.mean(axis=1) > 0.995),
+    }
+    n = {}
+    art = {}
+    for k, (mw, mg) in kanten.items():
+        for seite, (m_w, m_g) in (("vorn", (mw, mg)), ("hinten", (mw[::-1], mg[::-1]))):
+            nw, ng = zaehle(m_w), zaehle(m_g)
+            n[(k, seite)] = max(nw, ng)
+            art[(k, seite)] = "grau" if ng > nw else "weiss"
+    grenze = {"l": w // 6, "o": h // 5}
+    for (k, seite), v in list(n.items()):
+        if v > grenze[k]:
+            return roh  # kein Randstreifen, sondern ein flaechiges Motiv: unberuehrt lassen
+        if v:
+            n[(k, seite)] = v + 1  # die Kante zu Weiss/Bild ist einen Pixel breit angemischt
+
+    def fuelle(feld, k, seite, v, wie):
+        if not v:
+            return
+        sl = [slice(None), slice(None)]
+        ax = 1 if k == "l" else 0
+        rand = slice(0, v) if seite == "vorn" else slice(feld.shape[ax] - v, None)
+        innen = slice(v, 2 * v) if seite == "vorn" else slice(feld.shape[ax] - 2 * v, feld.shape[ax] - v)
+        ziel = list(sl); ziel[ax] = rand
+        quelle = list(sl); quelle[ax] = innen
+        feld[tuple(ziel)] = np.flip(feld[tuple(quelle)], axis=ax)
+
+    for (k, seite), v in n.items():
+        if art[(k, seite)] == "weiss":
+            fuelle(a, k, seite, v, "weiss")
+    # graue Letterbox: wegschneiden und den Bildinhalt auf die volle Groesse ziehen
+    o, u = (n[("o", "vorn")] if art[("o", "vorn")] == "grau" else 0), (n[("o", "hinten")] if art[("o", "hinten")] == "grau" else 0)
+    li, re_ = (n[("l", "vorn")] if art[("l", "vorn")] == "grau" else 0), (n[("l", "hinten")] if art[("l", "hinten")] == "grau" else 0)
+    bild = Image.fromarray(a)
+    if o or u or li or re_:
+        bild = bild.crop((li, o, w - re_, h - u)).resize((w, h), Image.LANCZOS)
+    return bild
+
+
 def pixellab_breitform(disziplin: str, variante: str) -> Image.Image | None:
     roh_pfad = PL_ROH / f"kulisse_{disziplin.replace('-', '_')}_{variante}.png"
     if not roh_pfad.exists():
         return None
-    roh = Image.open(roh_pfad).convert("RGB")
+    roh = _weisse_raender_fuellen(Image.open(roh_pfad).convert("RGB"))
     rd = PL_RAENDER.get((disziplin, variante))
     if not rd:
         g = int(LW / roh.width) + 1
@@ -1344,12 +1406,30 @@ def main() -> None:
     if "--hyrox-arena" in sys.argv[1:]:
         print(f"hyrox-arena: -> {baue_hyrox_arena().relative_to(WURZEL)}")
         return
-    disziplinen = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BAUER)
+    gewaehlt = [a for a in sys.argv[1:] if not a.startswith("--")]
+    disziplinen = [d for d in gewaehlt if d not in PL_NUR] if gewaehlt else list(BAUER)
     for d in disziplinen:
         for v in VARIANTEN[d]:
             bild = pixellab_breitform(d, v)
+            if bild is not None and d == "climbing":
+                # die Wand scrollt senkrecht mit der Kamera: obere Haelfte + gespiegelte Kopie = nahtlose Kachel
+                halb = bild.crop((0, 0, LW, LH // 2))
+                bild = Image.new("RGB", (LW, LH))
+                bild.paste(halb, (0, 0))
+                bild.paste(halb.transpose(Image.FLIP_TOP_BOTTOM), (0, LH // 2))
             ziel = speichere_quelle(d, v, bild if bild is not None else BAUER[d](v))
             print(f"{d}/{v}: -> {ziel.relative_to(WURZEL)}")
+    # Welle A Batch 2: Disziplinen ohne eigenen BAUER-Zweig hier -- Wettessen (Chassis "buehne" in
+    # baue-arena-kulissen.py) und Battlefield (baue-kulisse-battlefield.py) uebernehmen die
+    # PixelLab-Breitform als fertige Quelle; ohne Rohbild bleibt der alte Bau zustaendig.
+    for d, vs in PL_NUR.items():
+        if gewaehlt and d not in gewaehlt:
+            continue
+        for v in vs:
+            bild = pixellab_breitform(d, v)
+            if bild is not None:
+                ziel = speichere_quelle(d, v, bild)
+                print(f"{d}/{v}: -> {ziel.relative_to(WURZEL)}")
 
 
 if __name__ == "__main__":

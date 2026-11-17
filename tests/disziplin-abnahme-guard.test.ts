@@ -139,7 +139,20 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
   });
 
-  it.each(["showcase", "i-spy"] as const)(
+  it("I-Spy besteht seit dem Knack-Motor V2 (17.11.) beide Kriterien ueber dem Ziel 0,80 -- ohne Ausnahme", () => {
+    // Bis 17.11. stand I-Spy mit Showcase im Block darunter (0,776, unter dem Ziel 0,80). Der
+    // Knack-Motor V2 (Balken je Truhe, Ortswahl, Schubsen am Doppelmoebel; docs/design/
+    // ispy-knacken-ortswahl-schubsen-17-11.md) hebt rho je Spiel auf 0,845 (n=48). Die
+    // rho-Ausnahme in ARENA_ABNAHME_AUSNAHMEN bleibt vorerst stehen, ist aber nicht tragend.
+    const eintrag = TABELLE.disziplinen["i-spy"]!;
+    expect(eintrag.ppFrisch).toBe(true);
+    expect(eintrag.rhoFrisch).toBe(true);
+    expect(eintrag.rhoJeSpiel).toBeGreaterThan(0.8);
+    expect(verfehlteKriterien(eintrag, [])).toEqual([]);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(true);
+  });
+
+  it.each(["showcase"] as const)(
     "%s besteht rho seit der Mindestschranke 0,75 (17.11.) regulaer -- die rho-Ausnahme ist nicht mehr tragend",
     (id) => {
       // Kurzzeitig (PR #1481) aus ARENA_RESOLVED_DISCIPLINE_IDS genommen, weil eine frische

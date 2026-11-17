@@ -27,7 +27,7 @@ window.__ARENA_KULISSEN={
    "id": "wuestenruine",
    "label": "Wüstenruine",
    "bild": "/sprites/kulissen/battlefield/wuestenruine.jpg",
-   "dunkel": 0.24
+   "dunkel": 0.3
   }
  ],
  "breaking": [
@@ -63,7 +63,7 @@ window.__ARENA_KULISSEN={
    "id": "eis",
    "label": "Eisfall",
    "bild": "/sprites/kulissen/climbing/eis.jpg",
-   "dunkel": 0.18
+   "dunkel": 0.17
   }
  ],
  "eiskunstlauf": [
@@ -91,7 +91,7 @@ window.__ARENA_KULISSEN={
    "id": "schlosshof",
    "label": "Schlosshof",
    "bild": "/sprites/kulissen/fechten/schlosshof.jpg",
-   "dunkel": 0.09
+   "dunkel": 0.12
   }
  ],
  "football": [
@@ -125,7 +125,7 @@ window.__ARENA_KULISSEN={
    "id": "oase",
    "label": "Oase",
    "bild": "/sprites/kulissen/gewichtheben/oase.jpg",
-   "dunkel": 0.23
+   "dunkel": 0.22
   }
  ],
  "hockey": [
@@ -216,7 +216,7 @@ window.__ARENA_KULISSEN={
    "id": "park",
    "label": "Stadtpark",
    "bild": "/sprites/kulissen/speed-schach/park.jpg",
-   "dunkel": 0.21
+   "dunkel": 0.22
   },
   {
    "id": "zug",
@@ -278,7 +278,7 @@ window.__ARENA_KULISSEN={
    "id": "dach",
    "label": "Hochhausdach",
    "bild": "/sprites/kulissen/tennis/dach.jpg",
-   "dunkel": 0.11
+   "dunkel": 0.1
   }
  ],
  "time-trial": [
@@ -366,7 +366,7 @@ window.__ARENA_KULISSEN={
    "id": "bierzelt",
    "label": "Festzelt",
    "bild": "/sprites/kulissen/wettessen/bierzelt.jpg",
-   "dunkel": 0.18
+   "dunkel": 0.16
   }
  ]
 };

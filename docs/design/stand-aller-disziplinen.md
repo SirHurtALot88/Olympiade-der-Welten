@@ -25,6 +25,27 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
+Chris am 17.11.: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern
+länger als 1 Stern, ein Besserer füllt den Balken deutlich schneller. Alles ist jetzt Wertung, nicht
+nur Bild. Voller Befund in `docs/design/ispy-knacken-ortswahl-schubsen-17-11.md`.
+
+| Größe | vorher | jetzt |
+|---|---:|---:|
+| rho je Spiel, n=48 (Spannweite) | 0,776 (0,199) | **0,845** (0,088) |
+| rho je Spiel, n=24 | 0,779 | 0,853 |
+| rho Saison, n=48 | 0,888 | 0,923 |
+| Star Rang 1 / Top 2, n=48 | 47,5 / 76,7 % | 51,7 / 78,8 % |
+| Paartreue ≥ 15 Punkte | 94,9 % | 98,6 % |
+| Pp (Strom 0 / 10 000 000) | 14,6 / 15,0 | 16,4 / 14,0 |
+| ohne Schubsen (gepaart, n=48) | — | 0,866 |
+
+I-Spy liegt damit über dem Ziel 0,80 und bleibt vorerst auf der Beobachtungsliste, weil der Motor neu
+ist. Wertungs-Fingerabdruck **GESAMT 7c9257b4435c → d09e10bb872c**; nur die drei `spiele i-spy`-Einträge
+ändern sich, mit `window.__arena.ispyMotor("alt")` kommt wieder `7c9257b4435c` heraus. Die Matrix ist
+unangetastet; das Rezept wurde nur um DURCHSETZEN (torment 65, spirit 20, will 15) für das Schubsen
+ergänzt. Die PPS-Referenz `data/generated/i-spy-pps-referenz.json` ist neu gezogen.
+
 **Dreiunddreißigster Nachtrag 17.11. — rho-Mindestschranke von 0,80 auf 0,75 gesenkt.**
 Chris am 17.11., wörtlich: „Rangtreue auf 0,75 als min legen". Die harte Untergrenze für rho je
 Spiel (kaderfest, EIN Spiel), ab der ein Wächter oder Test rot wird, liegt jetzt bei **0,75**. Über

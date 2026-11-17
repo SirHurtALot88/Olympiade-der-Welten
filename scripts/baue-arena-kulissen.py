@@ -112,6 +112,9 @@ CHASSIS = {
     "time-trial": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
+# Welle A Batch 2 (17.11.): einzelne Varianten einer Disziplin, deren Chassis sonst "buehne" ist (Wettessen:
+# jahrmarkt bleibt der Zuschnitt der Szene), kommen als fertige PixelLab-Breitform aus QUELLEN (s. unten).
+QUELLE_VARIANTEN = {("wettessen", "nachtmarkt"), ("wettessen", "bierzelt")}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
 QUELLEN = WURZEL / "data" / "generated" / "kulissen-quellen"
 
@@ -286,7 +289,7 @@ def main() -> None:
             continue
         eintraege = []
         for v in registry[d_id]["variants"]:
-            if chassis["art"] == "quelle":
+            if chassis["art"] == "quelle" or (d_id, v["id"]) in QUELLE_VARIANTEN:
                 q = QUELLEN / d_id / f"{v['id']}.png"
                 if not q.exists():
                     print(f"  {d_id}/{v['id']}: keine Quelle {q.relative_to(WURZEL)}, uebersprungen")
