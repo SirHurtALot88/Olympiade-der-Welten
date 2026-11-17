@@ -8045,7 +8045,8 @@
   //     sechs Typen) und den echten Traits (p.tp/p.tn, Namen aus CANONICAL_*_TRAITS).
   //     Persoenlichkeit bestimmt die VERTEILUNG, nicht die Bilanz: kein Regler geht in eig,
   //     ein Rezept oder einen Sub-Skill.
-  //   - Flag-Geruest: BAHN_ART/FELDSPIEL_ART/ARENA_ART/BUEHNE_ART[d].kontakt, Standard null,
+  //   - Flag-Geruest: BAHN_ART/FELDSPIEL_ART/ARENA_ART/BUEHNE_ART[d].kontakt, Standard null
+  //     (Ausnahme seit 17.11.: BAHN_ART.spurt.kontakt={stufe:3}, Spurt klassisch scharf),
   //     NICHT aufzaehlbar (sonst taucht der Schluessel ueber eine Rohreferenz im Fingerabdruck
   //     auf). Gesetzt nur ueber window.__arena.kontaktFlags({<disziplin>:{...}}) bzw.
   //     bahnFlags({kontakt:{...}})/buehneFlags({kontakt:{...}}) oder, fuer Chromium-Headless-Laeufe,
@@ -8227,7 +8228,8 @@
   }
   // ===================================================================================
   // KONTAKT, SCHRITT 1 -- PILOT SPURT KLASSISCH (16.11., Konzept Abschnitte 3.1-3.4, 4.1, 6.4).
-  // Alles hinter BAHN_ART.spurt.kontakt (Standard null). Ohne Flag oder mit {stufe:0} laeuft der
+  // Alles hinter BAHN_ART.spurt.kontakt (bis 17.11. Standard null, seither {stufe:3} = SCHARF, s. bei
+  // kontaktFlagFeld weiter unten). Mit {spurt:null} oder {stufe:0} laeuft der
   // Rempler-Block in stepSpurt Zeichen fuer Zeichen wie vorher (Fingerabdruck e80babacb68c).
   // Flag-Form: {stufe:N} schaltet die Stufen 1..N ein; {nur:[1,3]} genau diese Stufen;
   // {dosis:x} skaliert die Kosten der Stufe 1 (Dosis-Stufen, Abschnitt 6.4; Standard 1);
@@ -49294,6 +49296,16 @@
   // Art-Tabellen. `kontakt` je Disziplin = null, nicht aufzaehlbar. window.__olyKontaktFlags
   // (Headless, vor dem Laden) ist derselbe Weg wie __olyBahnFlags/__olyBuehneFlags.
   for(const tab of [ARENA_ART,FELDSPIEL_ART,BUEHNE_ART,BAHN_ART])kontaktFlagFeld(tab);
+  // KONTAKT SCHARF, SPURT KLASSISCH (17.11., Konzept Abschnitt 6.5 Punkt 3; Chris: "schubsen
+  // tacklen etc bitte auch einbauen, das kann ja die rho noch mal verändern und sollte drin sein
+  // fuers messen"): der Standard fuer Spurt ist jetzt {stufe:3} (Stufen 1-3, Dosis 1) statt null.
+  // Damit rempeln, schubsen, verhaken sich die Laeufer im echten Spiel UND in allen Messwerkzeugen
+  // (miss-alle-disziplinen, miss-star-paartreue, messe-arena-einfluss, CI-Schranke, Fingerabdruck)
+  // mit Kostenmodell und Persoenlichkeit. Wirkt NUR im klassischen Spurt: Hatz und HYROX haben eigene
+  // Schritte ohne Rempler-Block (stepSpurtHatz/stepSpurtHyrox), Takeshi bleibt ausgenommen (eigener
+  // Pilot, Schritt 3). Das Feld bleibt nicht aufzaehlbar (kontaktFlagFeld). Rueckweg: {spurt:null}
+  // ueber kontaktFlags()/__olyKontaktFlags bzw. diese Zeile auf null -> GESAMT e80babacb68c.
+  BAHN_ART.spurt.kontakt=Object.freeze({stufe:3});
   try{
     const startKontakt=window.__olyKontaktFlags;
     if(startKontakt&&typeof startKontakt==="object")kontaktFlagsSetzen(startKontakt);

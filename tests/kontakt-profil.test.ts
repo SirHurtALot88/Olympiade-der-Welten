@@ -45,6 +45,7 @@ const familie = JSON.parse(
 
 let kontext: ReturnType<typeof baueMotorKontext>;
 let A: Arena;
+let standardFlags: Record<string, unknown>;
 // Ergebnisse kommen aus dem Kontext-Realm: als JSON in den Test-Realm holen.
 const roh = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 const profil = (p: Spieler, key?: string) => roh(A.kontaktProfil(p, key));
@@ -66,6 +67,10 @@ beforeAll(async () => {
   skripte.engine.runInContext(kontext.fenster);
   for (let i = 0; i < 5000 && !kontext.fenster.__arena; i += 1) await new Promise((r) => setImmediate(r));
   A = kontext.fenster.__arena as Arena;
+  // Seit 17.11. ist Spurt klassisch scharf (Engine-Standard spurt:{stufe:3}, Konzept 6.5 Punkt 3).
+  // Standard festhalten, danach fuer die Schritt-0-Pruefungen unten auf "aus".
+  standardFlags = roh(A.kontaktFlags());
+  A.kontaktFlags({ spurt: null });
 }, 120_000);
 
 afterAll(() => {
@@ -190,7 +195,8 @@ describe("Kontrafaktik 'alle ein Typ'", () => {
 });
 
 describe("Flag-Geruest, eigener Zufallsstrom, Zaehler", () => {
-  it("Standard: kein Flag gesetzt; setzen und loeschen ueber kontaktFlags/bahnFlags", () => {
+  it("Standard: nur Spurt scharf ({stufe:3}, seit 17.11.); setzen und loeschen ueber kontaktFlags/bahnFlags", () => {
+    expect(standardFlags).toEqual({ spurt: { stufe: 3 } });
     expect(roh(A.kontaktFlags())).toEqual({});
     expect(roh(A.kontaktFlags({ spurt: { stufe: 0 }, football: { stufe: 0 }, gibtsnicht: { stufe: 0 } }))).toEqual({
       spurt: { stufe: 0 },

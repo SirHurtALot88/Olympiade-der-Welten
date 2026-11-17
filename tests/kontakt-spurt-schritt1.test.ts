@@ -8,7 +8,8 @@ import { baueMotorKontext, ladeMotorSkripte } from "@/lib/battle/arena-node-moto
 
 /**
  * KONTAKT-SCHRITT 1 (16.11., docs/design/kontakt-persoenlichkeit-16-11.md Abschnitte 3.1-3.4, 4.1, 6.4):
- * Pilot Spurt klassisch, Stufen 1-3 hinter `BAHN_ART.spurt.kontakt`, Standard null.
+ * Pilot Spurt klassisch, Stufen 1-3 hinter `BAHN_ART.spurt.kontakt`. Standard bis 17.11. null, seither
+ * {stufe:3} (scharf, Konzept 6.5 Punkt 3); die Vorher/Nachher-Tests unten setzen "aus" ausdruecklich.
  *  - Flag aus (und {stufe:0}) = identisch; ein- und wieder ausgeschaltet = identisch (Rueckweg).
  *  - Flag an = deterministisch, wirkt nur im klassischen Spurt (nicht Takeshi, Hatz, HYROX).
  *  - Stufe 1: Kosten wie spezifiziert (Grundpreis je Versuch, Mini-Stun je Fehlschlag).
@@ -40,6 +41,8 @@ const familie = JSON.parse(
 const SAATEN = Array.from({ length: 24 }, (_, i) => 101 + i * 37);
 
 let kontext: ReturnType<typeof baueMotorKontext>;
+let standardFlags: Record<string, unknown>;
+let standardLauf: string;
 let A: Arena;
 const roh = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
@@ -78,10 +81,23 @@ beforeAll(async () => {
   A = kontext.fenster.__arena as Arena;
   // Mit Kader waehlt die Saat sonst das Spurt-Format (Hatz/HYROX); die Tests brauchen den klassischen Spurt.
   A.bahnFlags({ spurtFormat: "klassisch" });
+  // SCHARF SEIT 17.11.: der Engine-Standard ist `spurt:{stufe:3}`. Standard und ein Rennen damit
+  // festhalten, danach fuer die Vorher/Nachher-Tests unten ausdruecklich auf "aus" ({spurt:null}).
+  standardFlags = roh(A.kontaktFlags());
+  standardLauf = JSON.stringify(roh(A.bahnLauf("spurt", 7)));
+  A.kontaktFlags({ spurt: null });
 }, 120_000);
 
 afterAll(() => {
   kontext?.aufraeumen();
+});
+
+describe("Standard scharf (17.11., Konzept 6.5 Punkt 3)", () => {
+  it("ohne jeden Schalter steht Spurt auf {stufe:3}, sonst nichts; das Rennen gleicht dem mit ausdruecklich gesetztem {stufe:3}", () => {
+    expect(standardFlags).toEqual({ spurt: { stufe: 3 } });
+    expect(standardLauf).toContain('"kontakt"');
+    expect(mitFlag({ stufe: 3 }, () => JSON.stringify(roh(A.bahnLauf("spurt", 7))))).toBe(standardLauf);
+  }, 120_000);
 });
 
 describe("Flag aus = identisch", () => {
