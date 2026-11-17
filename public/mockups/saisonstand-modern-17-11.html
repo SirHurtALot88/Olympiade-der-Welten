@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Saisonstand – modern (Mockup 17.11.)</title>
+<!--
+  SAISONSTAND IM BROADCAST-STIL (Fable, 17.11.). Drittes Mockup zum Plan docs/design/oly-seiten-modern-17-11.md,
+  Entwurfstext: docs/design/saisonstand-modern-17-11.md.
+  Gleiche Tokens, gleiche Schiene, gleicher Hero-Kopf, gleiche Tafel wie einsatzliste-modern-17-11.html und oly-start-modern-17-11.html.
+  ECHT (Live-Abbild 17.11., Save vom 31.10.): 32 Teams, Wappen, Liga-Zuordnung, Startplaetze, Spielplan (320 Paarungen),
+        Disziplin-Plan (20 Spieltage x 2), Kader, Spielernamen, Portraits, Klassen, Disziplinwerte, Marktwert, Gehalt, Cash.
+        Sponsoren und GuV aus dem Bild fable-uiux-screenshots-14-11/04 (derselbe Save).
+  ERFUNDEN: jedes Ergebnis (der Save steht vor Spieltag 1). Simulation: Kaderstaerke je Disziplin + Rauschen. Daraus Punkte, Bilanz,
+        Verhaeltnis, Form, Verlauf, Matchwinner, Rekorde. Eigene Mannschaft = Vigilante Wranglers wie in den beiden anderen Mockups
+        (im echten Save ist es Nunchuck Ninjas: ?wir=N-N). "Franky" und "Rivale" sind Beispielmarken.
+  Keine externen Skripte, Schriften lokal.
+  URL: ?szene=tabelle|teamkarte|liga1|gesamt|verein|matrix|kader|verlauf|punkte|spieltage|ansetzungen|bestenliste|start|ende
+       &liga=1|2|0  &st=0..20  &team=X-X  &wir=X-X  &still=1  &phone=1  &blatt=kontext
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("einsatzliste-modern-17-11/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche:rgba(9,12,18,.90); --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --p1:#e0637a; --p2:#e89a4c; --p3:#c3cf5e; --p4:#4fc7b2; --p5:#62a0f4; --p6:#ac8af2;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:10px; --r-s:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);font-size:16px;-webkit-font-smoothing:antialiased}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+
+/* ---------- Mockup-Steuerung (gehoert NICHT zum UI) ---------- */
+.demo{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0d1016;border-bottom:1px solid #222a38;font-size:14px;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px;margin-right:4px}
+.demo button{padding:3px 10px;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
+.demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.demo a{color:var(--gold);margin-left:auto;font-weight:600}
+.demo kbd,.kbd{font:inherit;font-size:12px;border:1px solid #333d50;border-radius:4px;padding:0 5px;color:var(--leise)}
+body.still .demo{display:none}
+
+/* ---------- Geruest ---------- */
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);height:calc(100vh - 38px);min-height:760px;background:var(--grund)}
+body.still .app{height:100vh}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:40px;height:40px;border-radius:9px;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:10px}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center;font-size:20px;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;right:3px;top:3px;min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 3px}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+/* Tooltip (ein Muster fuer alles) */
+[data-tip]{position:relative}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;z-index:90;left:50%;top:calc(100% + 7px);transform:translateX(-50%);width:max-content;max-width:280px;white-space:pre-line;
+  padding:6px 9px;border-radius:6px;background:#020305;border:1px solid var(--linie-2);color:var(--tinte);font:500 13.5px/1.3 var(--zahl);letter-spacing:0;text-transform:none;text-align:left;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.6)}
+[data-tip].tr::after{left:calc(100% + 8px);top:50%;transform:translateY(-50%)}
+[data-tip].tl::after{left:auto;right:0;transform:none}
+[data-tip].tll::after{left:0;transform:none}
+[data-tip].to::after{top:auto;bottom:calc(100% + 7px)}
+body.phone [data-tip]::after{display:none}
+
+/* ---------- Hero-Kopf ---------- */
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:22px;padding:14px 20px 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:-30px;z-index:-2;background:url("../szenen/basketball/parkett.jpg") center 40%/cover;filter:blur(14px) saturate(1.15);opacity:.5}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.94) 0%,rgba(6,8,12,.72) 38%,rgba(6,8,12,.62) 62%,rgba(6,8,12,.93) 100%),linear-gradient(180deg,transparent 40%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:14px;padding-bottom:14px}
+.hk .crest{width:62px;height:62px;border-radius:10px;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 34px/1 var(--haus);color:#fff;letter-spacing:.01em}
+.hk .sub{margin-top:5px;font-size:15px;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.mdw{display:inline-flex;align-items:center;gap:2px;margin-bottom:5px}
+.mdw button{width:24px;height:24px;border-radius:5px;border:1px solid var(--linie);display:grid;place-items:center;color:var(--leise)}
+.mdw button:hover{border-color:var(--gold);color:var(--gold)} .mdw button[disabled]{opacity:.3;cursor:default}
+.mdw span{padding:0 8px;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);white-space:nowrap}
+/* Liga-Reiter (derselbe Baustein wie die Disziplin-Reiter der Einsatzliste) */
+.tabs{display:flex;align-items:flex-end;gap:10px;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:340px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 20px 12px 18px;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);color:var(--leise);transition:background .15s}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .ic{width:38px;height:38px;border-radius:8px;overflow:hidden;display:grid;place-items:center;font-size:22px;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme)}
+.dtab .ic img{width:100%;height:100%;object-fit:cover}
+.dtab.an .ic{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab em{display:block;font-style:normal;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 22px/1.1 var(--haus);color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab .erw{text-align:right}
+.dtab .erw strong{display:block;font-size:28px;line-height:1;font-weight:700;color:var(--creme)}
+.dtab .erw span{font-size:12px;color:var(--stumm);letter-spacing:.06em;white-space:nowrap}
+.dtab .mein{position:absolute;right:20px;top:-1px;height:15px;padding:0 6px;background:var(--heim);color:#17120a;font-size:10.5px;font-weight:700;letter-spacing:.1em;border-radius:0 0 3px 3px}
+.hr{display:flex;align-items:center;gap:16px;padding-bottom:14px}
+.frist{text-align:right;white-space:nowrap}
+.frist strong{display:block;font-size:22px;line-height:1.1;font-weight:700;color:var(--creme);max-width:250px;overflow:hidden;text-overflow:ellipsis}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 13px;border-radius:7px;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.klein{height:30px;padding:0 10px;font-size:14px}
+
+/* ---------- Arbeitsflaeche ---------- */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:12px;padding:12px 14px}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--linie);min-height:46px}
+.pk h2{margin:0;font:400 19px/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk h2 i,.sg h3 i{font:700 19px/1 var(--zahl);font-style:normal}
+.pk .sp{flex:1}
+.pk .hin{font-size:13.5px;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktabs{flex:none;display:flex;border-bottom:1px solid var(--linie)}
+.ktabs button{flex:1;height:42px;font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--stumm);border-bottom:3px solid transparent;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;padding:0 10px}
+.ktabs button:hover{color:var(--tinte)} .ktabs button.an{color:var(--gold);border-bottom-color:var(--gold)}
+.kb{flex:1;overflow-y:auto;min-height:0;padding:12px}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:7px;overflow:hidden;flex:none}
+.seg button{text-align:center;height:30px;padding:0 11px;font-weight:600;font-size:14px;color:var(--leise);border-right:1px solid var(--linie);white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--flaeche-2);color:var(--tinte)}
+.seg button[aria-pressed=true]{background:var(--creme);color:#17120a}
+.marke{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#0b0d12;background:var(--pc,var(--leise));flex:none}
+.marke.rot{background:var(--warn);color:#fff} .marke.leer{background:none;border:1px solid var(--linie-2);color:var(--leise)}
+.marke.wir{background:var(--heim)} .marke.fr{background:var(--gast)} .marke.gold{background:var(--gold)} .marke.gut{background:var(--gut)}
+.kf{flex:none;padding:7px 12px;border-top:1px solid var(--linie);font-size:13px;color:var(--stumm);display:flex;gap:14px;align-items:center;white-space:nowrap;overflow:hidden}
+.kf i{display:inline-block;width:4px;height:13px;border-radius:2px;vertical-align:-2px;margin-right:5px}
+.kf .sp{flex:1}
+
+/* ---------- Tabelle (Raster-Zeilen wie die Kaderliste) ---------- */
+.tl{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.th,.tz{display:grid;gap:8px;align-items:center;padding:0 12px 0 0;width:100%}
+.sport .th,.sport .tz{grid-template-columns:50px 34px minmax(170px,1fr) 70px 56px 104px 88px 30px 30px 30px 30px 36px 46px 54px}
+.verein .th,.verein .tz{grid-template-columns:50px minmax(170px,1fr) 52px 66px 88px 76px 92px 88px 84px 54px}
+.th{flex:none;height:28px;border-bottom:1px solid var(--linie);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600;position:sticky;top:0;background:var(--flaeche-1);z-index:5}
+.th button{color:inherit;letter-spacing:inherit;text-transform:inherit;font-weight:inherit;text-align:right;white-space:nowrap}
+.th button.li{text-align:left} .th button.mi{text-align:center}
+.th button.an{color:var(--gold)} .th button:hover{color:var(--tinte)}
+.th button:first-child{padding-left:16px;text-align:left}
+.tz{position:relative;flex:1 1 0;min-height:33px;max-height:42px;border-bottom:1px solid rgba(244,230,196,.06);font-size:16px;text-align:right}
+.tz:hover{background:var(--flaeche-2)}
+.tz::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent}
+.tz.z-titel::before{background:var(--gold)} .tz.z-auf::before{background:var(--gut)} .tz.z-ab::before{background:var(--warn)}
+.tz.g-u{border-bottom:1px dashed var(--zc)} .tz.z-titel{--zc:var(--gold)} .tz.z-auf{--zc:var(--gut)} .tz.g-o{border-top:1px dashed var(--warn);margin-top:-1px}
+.tz.wir{background:linear-gradient(90deg,rgba(242,160,61,.22),rgba(242,160,61,.04));color:#fff}
+.tz.gew{box-shadow:inset 0 0 0 2px var(--gold);background:rgba(240,195,90,.08)}
+.tz .rg{padding-left:16px;text-align:left;font-size:19px;font-weight:700;color:var(--stumm)}
+.tz.z-titel .rg{color:var(--gold)} .tz.z-auf .rg{color:var(--gut)} .tz.z-ab .rg{color:var(--warn)} .tz.wir .rg{color:var(--heim)}
+.tz .tr{font-size:13.5px;font-weight:700;text-align:left;white-space:nowrap}
+.tm{display:flex;align-items:center;gap:9px;min-width:0;text-align:left}
+.tm img{width:26px;height:26px;border-radius:5px;object-fit:cover;flex:none}
+.tm b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tinte)}
+.tz.wir .tm b{color:#fff}
+.tz .bil{color:var(--leise);letter-spacing:.02em}
+.tz .pt strong{font-size:21px;font-weight:700;color:var(--creme)}
+.tz .ar{color:var(--stumm);font-size:15px} .tz .ar.top{color:var(--creme);font-weight:700}
+.tz .ab{color:var(--leise);font-size:15px}
+.tz .nx{display:flex;justify-content:flex-end} .tz .nx img{width:22px;height:22px;border-radius:4px;object-fit:cover;opacity:.9}
+.fm{display:flex;gap:3px;justify-content:flex-end}
+.fm i{width:13px;height:13px;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)} .fm i.o{background:rgba(255,255,255,.1)}
+.tz svg.spk{width:84px;height:22px;display:block;margin-left:auto}
+.lgtr{flex:none;display:flex;align-items:center;gap:10px;height:30px;padding:0 16px;background:var(--flaeche-2);border-bottom:1px solid var(--linie);border-top:1px solid var(--linie)}
+.leerh{flex:none;display:flex;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--linie);font-size:14.5px;color:var(--leise);background:linear-gradient(90deg,rgba(240,195,90,.12),transparent)}
+.leerh b{color:var(--creme);font-weight:600}
+
+/* ---------- Disziplin-Matrix ---------- */
+.mx{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.mh,.mz{display:grid;grid-template-columns:minmax(196px,1fr) repeat(20,minmax(34px,44px)) 54px;gap:2px;align-items:stretch;padding:0 12px 0 0;width:100%}
+.mh{flex:none;position:sticky;top:0;z-index:6;background:var(--flaeche-1)}
+.mh.grp{height:24px;padding-top:6px} .mh.grp span{grid-column:span 5;font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--pc);border-bottom:2px solid var(--pc);text-align:center;margin:0 1px}
+.mh.lab{top:24px;height:30px;border-bottom:1px solid var(--linie)}
+.mh.lab button{font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--leise);text-align:center;border-radius:4px}
+.mh.lab button:hover{color:var(--tinte);background:var(--flaeche-2)} .mh.lab button.an{color:var(--gold)}
+.mh.lab button.heute{box-shadow:inset 0 0 0 1px var(--gold);color:var(--gold)}
+.mh.lab button:first-child{text-align:left;padding-left:16px;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:var(--stumm)}
+.mz{position:relative;flex:1 1 0;min-height:31px;max-height:40px;margin-top:2px}
+.mz::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 2px 2px 0}
+.mz.z-titel::before{background:var(--gold)} .mz.z-auf::before{background:var(--gut)} .mz.z-ab::before{background:var(--warn)}
+.mz .tmz{display:flex;align-items:center;gap:8px;padding-left:14px;min-width:0;overflow:hidden;position:sticky;left:0;background:var(--flaeche-1);z-index:2}
+.mz .tmz span{width:22px;font-weight:700;color:var(--stumm);font-size:15px;flex:none}
+.mz.wir .tmz{background:linear-gradient(90deg,#3a2a14,#191510)} .mz.wir .tmz span{color:var(--heim)}
+.mz.gew .tmz{box-shadow:inset 0 0 0 2px var(--gold)}
+.mz .c{display:grid;place-items:center;border-radius:3px;font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,.05)}
+.mz .c.leer{color:var(--stumm);font-weight:500;background:rgba(255,255,255,.025)}
+.mz .c:hover{outline:2px solid var(--creme);z-index:3}
+.mz .su{display:grid;place-items:center;font-size:18px;font-weight:700;color:var(--creme)}
+.mx.spalte .mz .c:not(.sp-an){opacity:.38}
+.skala{display:inline-flex;align-items:center;gap:3px} .skala i{width:16px;height:12px;border-radius:2px;margin:0}
+
+/* ---------- Saisonverlauf ---------- */
+.vl{flex:1;min-height:320px;position:relative}
+.vl svg{position:absolute;inset:0;width:100%;height:100%}
+.vl text{font-family:var(--zahl);fill:var(--stumm);font-size:12.5px}
+.vl .ln path.s{fill:none;stroke:#5a6679;stroke-width:1.6;opacity:.55;stroke-linejoin:round;stroke-linecap:round}
+.vl .ln path.h{fill:none;stroke:transparent;stroke-width:13;cursor:pointer}
+.vl .ln text{fill:var(--leise);font-size:14.5px;font-weight:500;cursor:pointer}
+.vl .ln:hover path.s{stroke:var(--creme);stroke-width:3;opacity:1} .vl .ln:hover text{fill:#fff}
+.vl .ln.zone path.s{opacity:.8}
+.vl .ln.wir path.s{stroke:var(--heim);stroke-width:3.6;opacity:1} .vl .ln.wir text{fill:var(--heim);font-weight:700}
+.vl .ln.gew path.s{stroke:var(--gast);stroke-width:3.6;opacity:1} .vl .ln.gew text{fill:var(--gast);font-weight:700}
+.vl circle{stroke:var(--flaeche-1);stroke-width:2}
+
+/* ---------- Spieltage ---------- */
+.sg{flex:1;min-height:0;overflow-y:auto;padding:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start}
+.sg.vier{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sg h3{grid-column:1/-1;margin:6px 0 0;font:400 17px/1 var(--haus);color:var(--creme);display:flex;align-items:center;gap:10px}
+.sg h3:first-child{margin-top:0}
+.mc{border-radius:8px;background:var(--flaeche-2);border:1px solid var(--linie);overflow:hidden;min-width:0}
+.mc.wir{border-color:rgba(242,160,61,.7);background:linear-gradient(100deg,rgba(242,160,61,.16),var(--flaeche-2) 60%)}
+.mc.fr{border-color:rgba(69,176,201,.6)}
+.mc .mk{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center;padding:8px 10px}
+.mc .mk button{display:flex;align-items:center;gap:8px;min-width:0}
+.mc .mk button:last-child{flex-direction:row-reverse;text-align:right}
+.mc .mk img{width:34px;height:34px;border-radius:6px;object-fit:cover;flex:none}
+.mc .mk b{display:block;font:400 16px/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc .mk small{font-size:12.5px;color:var(--stumm);white-space:nowrap}
+.mc .mk span.nm{min-width:0}
+.mc .erg{font-size:26px;font-weight:700;color:var(--creme);white-space:nowrap;line-height:1}
+.mc .erg small{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--stumm);text-align:center;font-weight:600}
+.mc .ml{display:grid;grid-template-columns:22px minmax(0,1fr) auto minmax(0,1fr) 22px;gap:8px;align-items:center;height:28px;padding:0 10px;border-top:1px solid rgba(244,230,196,.07);font-size:14.5px}
+.mc .ml .dn{text-align:center;color:var(--leise);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;white-space:nowrap}
+.mc .ml .sa{text-align:right;font-weight:600} .mc .ml .sb{font-weight:600}
+.mc .ml .sa.v,.mc .ml .sb.v{color:var(--stumm);font-weight:500}
+.pkt{width:20px;height:20px;border-radius:4px;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--flaeche-3);color:var(--stumm)}
+.pkt.p2{background:var(--gut);color:#0b0d12} .pkt.p1{background:var(--stumm);color:#0b0d12}
+.mc .wb{margin:0}
+.mc .ml.pf{grid-template-columns:44px minmax(0,1fr) 40px}
+.mc .tag{display:flex;gap:6px;align-items:center;padding:5px 10px;border-top:1px solid rgba(244,230,196,.07);font-size:12.5px;color:var(--leise)}
+.wb{position:relative;height:10px;background:var(--gast);transform:skewX(-14deg);overflow:hidden;border-radius:2px}
+.wb i{position:absolute;left:0;top:0;bottom:0;background:var(--heim)}
+.wb.neutral{background:#3c4658} .wb.neutral i{background:var(--creme)}
+.pod{border-radius:8px;background:var(--flaeche-2);border:1px solid var(--linie);padding:6px 8px;min-width:0}
+.pod .gk{display:block;margin:2px 2px 4px}
+.pod button{display:grid;grid-template-columns:18px 22px minmax(0,1fr) auto 20px;gap:7px;align-items:center;width:100%;height:28px;font-size:14.5px;border-radius:4px;padding:0 2px}
+.pod button:hover{background:var(--flaeche-3)} .pod button.wir{background:rgba(242,160,61,.18)}
+.pod img{width:22px;height:22px;border-radius:4px;object-fit:cover}
+.pod b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .pod em{font-style:normal;color:var(--stumm);font-weight:700} .pod span{color:var(--leise)}
+
+/* ---------- Kontext: Teamkarte, Showdown, Bestenliste ---------- */
+.geg{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center;padding:10px;border-radius:8px;background:linear-gradient(100deg,color-mix(in srgb,var(--pc) 22%,transparent),transparent 70%);border:1px solid var(--linie);border-left:3px solid var(--pc);--pc:var(--gold)}
+.geg img{width:64px;height:64px;border-radius:9px;object-fit:cover}
+.geg b{display:block;font:400 23px/1.05 var(--haus);color:#fff}
+.geg div>span{font-size:13.5px;color:var(--leise);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.rech{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;margin-top:8px;background:var(--linie);border:1px solid var(--linie);border-radius:7px;overflow:hidden}
+.rech div{background:var(--flaeche-1);padding:5px 4px;text-align:center}
+.rech small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm)}
+.rech strong{font-size:18px;font-weight:700}
+.rech .su{background:var(--flaeche-3)} .rech .su strong{color:var(--gold)}
+.ab2{margin-top:14px}
+.ab2>.gk{display:flex;justify-content:space-between;margin-bottom:6px}
+.ab2>.gk em{font-style:normal;color:var(--stumm);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:12.5px}
+.kk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.sk{position:relative;border-radius:7px;overflow:hidden;border:1px solid var(--linie-2);background:#111;aspect-ratio:3/4;display:block}
+.sk:hover{border-color:var(--gold)}
+.sk img{width:100%;height:100%;object-fit:cover}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(4,6,10,.96) 82%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:6px;padding:0 9px 0 6px;background:var(--gold);color:#17120a;font-weight:700;font-size:14px;clip-path:polygon(0 0,100% 0,calc(100% - 6px) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:6px;right:6px;bottom:5px}
+.sk b{display:block;font:400 14.5px/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:11.5px;color:var(--leise);white-space:nowrap}
+.dr{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.dk{padding:4px 6px 5px;border-radius:5px;background:var(--flaeche-2);border-left:3px solid var(--stumm);min-width:0}
+.dk small{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--leise);white-space:nowrap}
+.dk small u{text-decoration:none;color:var(--stumm);letter-spacing:0}
+.dk strong{font-size:19px;line-height:1.05}
+.dk.a{border-left-color:var(--gut)} .dk.a strong{color:var(--gut)} .dk.c{border-left-color:var(--warn)} .dk.c strong{color:var(--warn)} .dk.h{outline:1px solid var(--gold)}
+.duell{display:grid;grid-template-columns:34px 36px 24px minmax(0,1fr) auto 20px;gap:7px;align-items:center;height:32px;font-size:14.5px;border-bottom:1px solid rgba(244,230,196,.06);width:100%}
+.duell:hover{background:var(--flaeche-2)}
+.duell img{width:24px;height:24px;border-radius:4px;object-fit:cover}
+.duell .st{color:var(--stumm);font-size:12.5px} .duell .dn{color:var(--leise);font-size:12px;letter-spacing:.06em;font-weight:600}
+.duell b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .duell strong{font-weight:700;white-space:nowrap}
+.sd{border-radius:8px;border:1px solid var(--linie);background:var(--flaeche-2);margin-bottom:8px;overflow:hidden}
+.sd.wir{border-color:rgba(242,160,61,.7)}
+.sd .kopf{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(244,230,196,.07)}
+.sd .kopf small{color:var(--stumm);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:12.5px}
+.sd .par{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;padding:8px 10px 6px;text-align:center}
+.sd .par button{min-width:0}
+.sd .par img{width:46px;height:46px;border-radius:8px;object-fit:cover;margin:0 auto 4px;border:2px solid var(--heim)}
+.sd .par button:last-child img{border-color:var(--gast)}
+.sd .par b{display:block;font:400 15px/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sd .par small{font-size:12.5px;color:var(--stumm)}
+.sd .par .vs{font:400 22px/1 var(--haus);color:var(--stumm)}
+.sd .pf{display:grid;grid-template-columns:38px minmax(0,1fr) 38px;gap:8px;align-items:center;padding:0 10px 7px;font-size:13px;color:var(--leise)}
+.sd .pf span:last-child{text-align:right}
+.kand{display:grid;grid-template-columns:18px 30px minmax(0,1fr) 22px auto;gap:8px;align-items:center;width:100%;height:44px;padding:0 6px;border-radius:6px;font-size:14.5px}
+.kand:hover{background:var(--flaeche-2)}
+.kand img{width:30px;height:30px;border-radius:5px;object-fit:cover} .kand img.w{width:22px;height:22px}
+.kand b{font:400 15.5px/1.15 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.kand small{color:var(--stumm);font-size:12.5px}
+.kand strong{font-size:18px}
+.kand em{font-style:normal;color:var(--stumm);font-weight:700}
+.rek{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(244,230,196,.06);font-size:14.5px;line-height:1.25}
+.rek small{display:block;color:var(--stumm);font-size:13px} .rek strong{font-size:20px;color:var(--creme)}
+.dkg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.dkg button{display:grid;grid-template-columns:30px 20px minmax(0,1fr) auto;gap:6px;align-items:center;height:28px;padding:0 6px;border-radius:5px;background:var(--flaeche-2);font-size:13.5px}
+.dkg button:hover{background:var(--flaeche-3)}
+.dkg img{width:20px;height:20px;border-radius:4px;object-fit:cover} .dkg span{font-size:11px;letter-spacing:.06em;color:var(--leise);font-weight:600}
+.dkg b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .dkg strong{color:var(--creme)}
+.akt{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.abschl{display:flex;gap:8px;flex-wrap:wrap}
+.abschl button{display:flex;align-items:center;gap:7px;padding:4px 9px 4px 4px;border-radius:7px;background:var(--flaeche-2);border:1px solid var(--linie);font-size:14.5px}
+.abschl img{width:26px;height:26px;border-radius:5px;object-fit:cover}
+#toast{position:fixed;z-index:95;left:50%;bottom:84px;transform:translate(-50%,20px);padding:9px 16px;border-radius:8px;background:#020305;border:1px solid var(--linie-2);font-size:15.5px;font-weight:500;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:90vw}
+#toast.an{opacity:1;transform:translate(-50%,0)}
+.nurphone{display:none!important}
+#schleier{display:none}
+
+/* ---------- schmaler Desktop ---------- */
+@media (max-width:1500px){.sport .th,.sport .tz{grid-template-columns:50px 34px minmax(150px,1fr) 66px 54px 104px 30px 30px 30px 30px 36px 46px 54px}.c-kur{display:none!important}}
+@media (max-width:1320px){.work{grid-template-columns:minmax(0,1fr) 330px}.hk h1{font-size:28px}.frist{display:none}.dtab .ic{display:none}.dtab{grid-template-columns:minmax(0,1fr) auto}
+  .sport .th,.sport .tz{grid-template-columns:50px 34px minmax(140px,1fr) 66px 104px 30px 30px 30px 30px 46px 54px}.c-vh,.c-nx{display:none!important}.sg.vier{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- Phone ---------- */
+body.phone{background:var(--grund)}
+body.phone .app{display:block;height:auto;min-height:100vh;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+body.phone .rail{position:fixed;z-index:50;left:0;right:0;bottom:0;top:auto;height:auto;flex-direction:row;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--linie)}
+body.phone .rail .logo,body.phone .rail .luecke,body.phone .rail .x{display:none}
+body.phone .rail a.an::before{left:9px;right:9px;top:-7px;bottom:auto;width:auto;height:3px}
+body.phone .hero{position:sticky;top:0;z-index:30;grid-template-columns:minmax(0,1fr);gap:8px;padding:8px 10px 0;background:var(--grund)}
+body.phone .hk{padding:0;gap:10px} body.phone .hk .crest{width:40px;height:40px;border-width:1px}
+body.phone .hk>div{display:flex;flex-wrap:wrap;align-items:center;gap:1px 8px;flex:1;min-width:0}
+body.phone .hk h1{font-size:20px;order:-1} body.phone .hk .sub{font-size:13px;margin:0;overflow:hidden;text-overflow:ellipsis;width:100%}
+body.phone .mdw{margin:0 0 0 auto} body.phone .mdw span{padding:0 5px;font-size:11.5px;letter-spacing:.1em} body.phone .mdw .sai{display:none}
+body.phone .hr{display:none}
+body.phone .tabs{gap:4px}
+body.phone .dtab{padding:6px 12px 7px 12px;gap:7px;grid-template-columns:minmax(0,1fr) auto;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+body.phone .dtab .ic{display:none} body.phone .dtab b{font-size:16px} body.phone .dtab em{font-size:10px;letter-spacing:.08em}
+body.phone .dtab .erw strong{font-size:20px} body.phone .dtab .erw span{display:none} body.phone .dtab .mein{display:none} body.phone .dtab.eig em{color:var(--heim)}
+body.phone .work{display:block;padding:8px}
+body.phone .haupt{overflow:visible}
+body.phone .ktabs button{font-size:13px;letter-spacing:.04em;padding:0 4px;height:40px}
+body.phone .pk{flex-wrap:wrap;padding:7px 10px} body.phone .pk h2{font-size:17px} body.phone .pk .hin{display:none}
+body.phone .nurphone{display:inline-flex!important}
+body.phone .xs{display:none!important}
+body.phone .sport .th,body.phone .sport .tz{grid-template-columns:38px minmax(0,1fr) 58px 62px 36px;gap:6px;padding-right:8px}
+body.phone .verein .th,body.phone .verein .tz{grid-template-columns:38px minmax(0,1fr) 66px 60px 40px;gap:6px;padding-right:8px}
+body.phone .tz{flex:none;height:39px;max-height:none;font-size:15px} body.phone .tz .rg{padding-left:11px;font-size:17px} body.phone .th button:first-child{padding-left:11px}
+body.phone .tm{gap:7px} body.phone .tm .marke.xs2{display:none}
+body.phone .fm i{width:10px;height:12px;gap:2px} body.phone .fm i:first-child{display:none}
+body.phone .tl,body.phone .mx,body.phone .sg{overflow-y:visible;flex:none}
+body.phone .mx{overflow-x:auto}
+body.phone .mh,body.phone .mz{grid-template-columns:88px repeat(20,36px) 44px;width:max-content}
+body.phone .mz{flex:none;height:36px;max-height:none} body.phone .mz .tmz b{display:none} body.phone .mz .tmz{padding-left:9px;gap:5px}
+body.phone .mz .tmz::after{content:attr(data-code);font-size:13px;color:var(--leise);font-weight:600}
+body.phone .mh.lab button:first-child{padding-left:9px;position:sticky;left:0;background:var(--flaeche-1)}
+body.phone .vl{height:520px;flex:none}
+body.phone .sg,body.phone .sg.vier{grid-template-columns:minmax(0,1fr);padding:8px}
+body.phone .kf{flex-wrap:wrap;white-space:normal;gap:4px 12px}
+body.phone .kontext{position:fixed;z-index:70;left:0;right:0;bottom:0;height:80vh;border-radius:14px 14px 0 0;border-bottom:0;transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -16px 40px rgba(0,0,0,.6)}
+body.phone:not([data-blatt]) .kontext{visibility:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s .28s}
+body.phone[data-blatt=kontext] .kontext{transform:none}
+body.phone #schleier{display:block;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s}
+body.phone[data-blatt] #schleier{opacity:1;pointer-events:auto}
+body.phone .kontext .ktabs button:last-child{flex:none;width:44px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-krone" viewBox="0 0 24 24"><path d="M3 18h18l1-10-5 4-5-7-5 7-5-4z"/></symbol>
+  <symbol id="i-auf" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-ab" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+  <symbol id="i-welt" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+  <symbol id="i-blitz" viewBox="0 0 24 24"><path d="M13 2L5 14h6l-1 8 9-13h-6z"/></symbol>
+</defs></svg>
+<div class="demo" id="demo"><b>Mockup</b></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img id="raillogo" alt=""></div>
+    <a class="tr" data-tip="Start" href="oly-start-modern-17-11.html"><svg class="i"><use href="#i-home"/></svg></a>
+    <a class="tr" data-tip="Inbox · 3 Entscheidungen" href="#"><svg class="i"><use href="#i-post"/></svg><span class="zahl">3</span></a>
+    <a class="tr" data-tip="Einsatzliste" href="einsatzliste-modern-17-11.html"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a class="tr" data-tip="Arena" href="#"><svg class="i"><use href="#i-arena"/></svg></a>
+    <a class="an tr" data-tip="Saisonstand" href="#"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a class="x tr" data-tip="Kader" href="#"><svg class="i"><use href="#i-team"/></svg></a>
+    <a class="x tr" data-tip="Training" href="#"><svg class="i"><use href="#i-train"/></svg></a>
+    <a class="x tr" data-tip="Transfermarkt" href="#"><svg class="i"><use href="#i-markt"/></svg></a>
+    <a class="x tr" data-tip="Scouting" href="#"><svg class="i"><use href="#i-scout"/></svg></a>
+    <span class="luecke"></span>
+    <a class="x tr" data-tip="Finanzen" href="#"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Liga"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work">
+      <section class="pan haupt" aria-label="Saisonstand">
+        <div class="ktabs" id="vtabs" role="tablist" aria-label="Ansicht"></div>
+        <div class="pk" id="vk"></div>
+        <div id="vb" style="display:contents"></div>
+        <div class="kf" id="vf"></div>
+      </section>
+      <aside class="pan kontext" aria-label="Kontext">
+        <div class="ktabs" id="ctabs"></div>
+        <div class="kb" id="cb"></div>
+      </aside>
+    </div>
+  </main>
+</div>
+<div id="schleier"></div>
+<div id="toast" role="status"></div>
+<script>
+"use strict";
+var DATA={"T":{"A-A":{"n":"Armageddon Aftermath","l":2,"sp":15,"mw":168.5,"geh":57.7,"cash":6.5,"spo":54.7,"guv":-3.0,"k":11,"st":[48.8,51.4,44.7,46.9,48.0,50.8,55.2,49.2,53.6,55.9,57.4,43.5,45.6,43.0,50.5,40.7,41.6,38.0,48.3,40.1],"stars":[2,3,6,1],"ovr":34.6},"B-B":{"n":"Blazing Beasts","l":2,"sp":13,"mw":178.2,"geh":50.5,"cash":6.8,"spo":57.8,"guv":7.3,"k":10,"st":[53.5,61.9,40.6,58.6,49.3,59.8,58.6,49.4,51.5,53.7,37.6,35.0,50.7,31.9,46.5,43.3,47.1,34.6,49.0,41.5],"stars":[9,10,14,17],"ovr":35.3},"B-P":{"n":"Black Panthers","l":1,"sp":11,"mw":266.7,"geh":68.7,"cash":8.3,"spo":69.3,"guv":1.4,"k":9,"st":[57.6,57.4,52.0,64.7,59.8,56.8,60.9,65.7,58.3,63.4,60.7,54.2,58.1,56.1,59.0,50.0,62.5,48.8,56.5,52.1],"stars":[19,21,20,18],"ovr":45.2},"C-C":{"n":"Cash Creators","l":2,"sp":7,"mw":207.5,"geh":61.9,"cash":7.5,"spo":54.2,"guv":-7.7,"k":13,"st":[55.5,51.6,52.5,45.5,49.1,39.6,41.7,37.4,40.0,44.8,60.8,52.8,51.1,46.2,48.7,45.2,48.3,50.6,45.9,45.0],"stars":[29,27,28,35],"ovr":36.7},"C-S":{"n":"Cold Steel","l":1,"sp":3,"mw":309.4,"geh":82.6,"cash":5.6,"spo":112.3,"guv":30.9,"k":11,"st":[60.6,52.1,61.3,61.9,51.3,53.8,54.6,57.2,60.1,60.5,52.5,55.7,55.9,60.4,53.3,61.2,60.0,57.3,64.4,63.2],"stars":[41,43,37,44],"ovr":47.5},"D-L":{"n":"Dire Legion","l":2,"sp":11,"mw":186.9,"geh":49.5,"cash":8.1,"spo":50.4,"guv":-0.6,"k":13,"st":[54.6,47.2,47.4,44.8,48.0,41.3,41.1,34.5,42.9,38.4,52.9,44.3,50.4,42.0,53.4,53.6,46.5,44.0,56.6,45.4],"stars":[49,55,53,47],"ovr":34.2},"D-P":{"n":"Death Peaches","l":2,"sp":2,"mw":231.8,"geh":60.3,"cash":8.2,"spo":89.7,"guv":29.4,"k":12,"st":[42.7,36.1,45.4,36.8,43.2,52.4,58.3,42.0,38.3,48.2,58.4,49.9,57.9,53.0,46.0,51.9,53.0,52.9,64.2,57.3],"stars":[59,57,64,58],"ovr":38.9},"G-G":{"n":"Golden Gladiators","l":1,"sp":4,"mw":304.3,"geh":74.3,"cash":5.7,"spo":135.6,"guv":60.5,"k":14,"st":[53.0,55.0,54.4,53.5,56.8,55.4,52.9,51.9,50.9,49.7,57.0,48.7,62.0,48.9,62.3,61.5,59.3,51.3,62.0,56.4],"stars":[71,70,69,73],"ovr":43.1},"H-R":{"n":"Hell Raisers","l":1,"sp":9,"mw":274.1,"geh":82.5,"cash":10.9,"spo":76.5,"guv":-4.8,"k":12,"st":[56.2,64.7,57.6,56.1,61.8,53.7,52.9,53.9,57.7,61.9,60.6,54.8,52.4,48.4,62.8,49.7,53.0,47.7,52.2,49.0],"stars":[81,86,79,83],"ovr":42.7},"L-K":{"n":"Lost Kingdom","l":2,"sp":5,"mw":219.6,"geh":67.8,"cash":5.4,"spo":73.7,"guv":5.6,"k":13,"st":[48.9,63.0,43.0,44.7,59.4,41.8,55.2,44.8,44.9,60.2,57.1,47.9,55.0,54.5,55.5,51.8,42.2,45.8,52.3,46.2],"stars":[98,95,97,96],"ovr":36.0},"L-R":{"n":"Last Ride","l":1,"sp":5,"mw":294.8,"geh":90.2,"cash":10.2,"spo":94.5,"guv":3.7,"k":11,"st":[51.5,65.2,54.6,54.4,65.1,57.4,58.6,59.5,51.0,65.0,57.5,58.8,58.4,62.7,58.7,56.5,55.0,54.8,51.5,45.8],"stars":[104,105,109,101],"ovr":45.5},"M-M":{"n":"Mayhem Mavericks","l":1,"sp":1,"mw":318.4,"geh":97.9,"cash":6.6,"spo":108.3,"guv":4.2,"k":9,"st":[61.8,61.9,54.9,76.2,60.1,66.6,72.4,75.0,67.6,72.6,60.5,55.6,59.3,62.0,57.8,59.2,69.7,50.8,50.4,47.8],"stars":[111,114,113,115],"ovr":49.5},"M-S":{"n":"Mortal Sin","l":2,"sp":1,"mw":234.1,"geh":61.5,"cash":10.9,"spo":101.6,"guv":42.7,"k":12,"st":[47.3,43.4,41.4,39.9,46.4,49.2,48.0,43.0,46.0,43.3,54.5,51.2,60.0,54.2,55.0,58.7,48.0,56.9,63.3,59.1],"stars":[121,125,128,122],"ovr":38.4},"N-N":{"n":"Nunchuck Ninjas","l":1,"sp":12,"mw":259.8,"geh":65.2,"cash":3.2,"spo":50.7,"guv":-15.4,"k":11,"st":[41.0,39.6,43.6,41.7,41.3,58.4,71.2,52.6,46.1,59.4,62.6,48.0,63.4,55.7,40.1,55.6,47.0,50.3,62.4,55.1],"stars":[134,136,135,141],"ovr":42.3},"N-W":{"n":"Natures Wrath","l":1,"sp":13,"mw":259.8,"geh":70.3,"cash":5.2,"spo":53.1,"guv":-19.3,"k":14,"st":[47.6,56.6,44.5,53.3,57.0,62.4,65.7,46.0,49.2,59.9,50.3,41.0,61.7,40.7,54.1,51.2,49.3,41.4,52.4,42.9],"stars":[143,152,144,151],"ovr":39.7},"P-C":{"n":"Pirate Crew","l":2,"sp":10,"mw":194.7,"geh":47.8,"cash":5.3,"spo":68.5,"guv":20.7,"k":11,"st":[37.9,41.5,36.4,45.7,42.9,59.5,54.3,52.0,52.3,47.7,55.2,43.9,51.8,47.4,47.2,48.7,41.4,39.9,55.8,46.1],"stars":[154,156,155,157],"ovr":37.1},"P-S":{"n":"Project Suicide","l":1,"sp":6,"mw":290.1,"geh":79.4,"cash":9.9,"spo":89.4,"guv":13.7,"k":11,"st":[61.8,58.5,52.2,60.0,63.0,63.3,58.6,53.6,56.0,54.1,56.7,55.4,61.0,58.3,62.6,60.6,62.0,57.1,56.2,57.8],"stars":[163,168,169,165],"ovr":45.2},"R-C":{"n":"Royal Court","l":2,"sp":6,"mw":212.0,"geh":52.2,"cash":8.0,"spo":77.3,"guv":25.1,"k":10,"st":[48.4,40.4,47.0,48.4,44.6,52.3,60.9,45.3,44.2,51.9,58.4,49.3,58.4,47.4,48.2,53.7,55.0,52.2,52.6,50.0],"stars":[173,174,177,179],"ovr":40.3},"R-L":{"n":"Raging Lunatics","l":1,"sp":7,"mw":289.3,"geh":75.9,"cash":5.7,"spo":96.5,"guv":21.8,"k":9,"st":[69.5,62.3,60.6,72.7,63.6,65.3,63.2,59.2,71.7,59.9,59.8,52.7,60.1,45.5,72.1,56.4,61.5,48.5,53.1,48.6],"stars":[182,183,186,187],"ovr":47.6},"R-R":{"n":"Riptide Rivers","l":2,"sp":16,"mw":163.8,"geh":43.8,"cash":6.2,"spo":48.0,"guv":4.2,"k":11,"st":[46.2,49.0,41.5,45.5,42.5,55.6,61.8,44.9,45.4,59.0,44.7,31.2,53.6,35.7,48.5,48.1,38.0,34.9,46.2,36.0],"stars":[196,192,195,197],"ovr":33.9},"S-C":{"n":"Stronghold Crusaders","l":2,"sp":9,"mw":197.9,"geh":60.3,"cash":7.1,"spo":49.3,"guv":-11.0,"k":10,"st":[56.0,63.0,54.4,48.7,67.4,46.0,34.4,46.8,50.1,39.1,34.4,43.3,38.7,39.8,66.4,47.9,52.0,48.7,50.6,52.4],"stars":[200,205,201,199],"ovr":39.1},"S-S":{"n":"Silver Soldiers","l":1,"sp":10,"mw":273.4,"geh":67.9,"cash":6.6,"spo":64.7,"guv":-2.0,"k":12,"st":[65.1,64.3,49.9,56.0,63.2,67.0,58.6,49.4,57.4,46.4,47.8,45.6,61.6,41.5,68.2,56.0,55.5,46.9,57.6,50.0],"stars":[211,209,213,208],"ovr":41.3},"T-C":{"n":"The Chantry","l":2,"sp":8,"mw":203.0,"geh":40.4,"cash":7.0,"spo":65.7,"guv":27.7,"k":12,"st":[41.2,36.0,37.7,41.5,33.9,57.7,47.8,36.0,38.0,40.7,52.9,50.0,62.4,50.2,42.4,59.4,45.2,49.5,59.0,53.2],"stars":[220,218,223,222],"ovr":37.3},"T-G":{"n":"The Giants","l":2,"sp":4,"mw":224.6,"geh":65.4,"cash":5.4,"spo":66.1,"guv":0.7,"k":11,"st":[60.9,70.8,52.3,61.0,68.2,52.2,50.5,54.6,65.0,46.4,42.8,47.5,43.3,35.8,70.2,38.2,50.1,40.6,42.2,40.6],"stars":[228,227,230,232],"ovr":40.4},"T-T":{"n":"Terrible Teachers","l":1,"sp":14,"mw":253.8,"geh":71.5,"cash":6.2,"spo":52.1,"guv":-17.7,"k":14,"st":[49.5,48.1,47.1,48.7,46.1,59.5,62.2,50.3,54.8,58.2,54.1,42.5,65.8,43.2,46.1,61.8,44.1,47.4,56.6,49.6],"stars":[241,238,236,247],"ovr":38.5},"U-A":{"n":"Undercover Agents","l":2,"sp":12,"mw":184.8,"geh":54.6,"cash":5.2,"spo":60.2,"guv":5.7,"k":13,"st":[45.0,48.6,42.2,43.3,45.9,41.6,54.8,46.1,43.9,61.0,63.3,46.1,44.7,45.5,44.8,40.1,33.5,32.1,43.1,36.8],"stars":[252,257,248,251],"ovr":33.6},"V-D":{"n":"Vicious & Delicious","l":1,"sp":16,"mw":244.4,"geh":64.6,"cash":5.6,"spo":39.3,"guv":-23.9,"k":12,"st":[44.5,42.8,40.3,48.0,40.9,56.2,73.2,45.3,46.0,64.0,60.8,45.1,61.0,48.7,46.2,55.9,51.5,48.3,58.6,50.5],"stars":[260,265,262,261],"ovr":39.3},"V-V":{"n":"Vigorous Vikings","l":2,"sp":3,"mw":224.1,"geh":66.5,"cash":10.9,"spo":71.3,"guv":4.8,"k":9,"st":[57.1,56.6,55.0,59.1,51.8,56.1,51.8,55.7,62.3,50.7,48.1,52.2,48.9,47.4,57.9,47.5,53.4,44.9,46.4,46.5],"stars":[274,278,276,277],"ovr":43.4},"V-W":{"n":"Vigilante Wranglers","l":2,"sp":14,"mw":174.6,"geh":46.3,"cash":5.4,"spo":43.3,"guv":-2.5,"k":12,"st":[53.7,45.3,48.6,44.9,49.0,49.4,52.9,43.9,42.1,47.0,41.3,39.6,49.8,40.3,46.1,51.8,48.7,43.8,52.0,48.5],"stars":[285,282,286,284],"ovr":34.9},"W-L":{"n":"Wrecking Legionnaires","l":1,"sp":8,"mw":283.8,"geh":77.0,"cash":6.2,"spo":79.7,"guv":3.9,"k":12,"st":[72.8,63.5,66.8,59.9,58.2,51.2,51.6,52.2,55.5,53.5,40.6,47.0,47.7,42.3,61.0,50.2,63.3,59.3,49.8,55.6],"stars":[288,294,289,296],"ovr":45.1},"W-W":{"n":"Wicked Wizards","l":1,"sp":15,"mw":244.9,"geh":62.3,"cash":10.1,"spo":43.4,"guv":-17.8,"k":12,"st":[57.0,42.3,46.4,42.4,48.2,44.4,38.5,35.1,41.2,30.3,72.5,61.1,63.1,56.5,57.9,53.4,50.8,57.1,55.7,51.1],"stars":[305,304,301,308],"ovr":40.1},"Z-H":{"n":"Zero Heroes","l":1,"sp":2,"mw":314.1,"geh":100.9,"cash":5.9,"spo":98.6,"guv":-10.9,"k":11,"st":[66.9,62.5,56.7,68.0,61.3,62.0,59.0,57.3,62.2,63.6,56.8,49.8,62.5,55.4,65.0,61.8,66.0,64.6,58.0,59.6],"stars":[313,311,309,319],"ovr":46.7}},"P":[["Krag'Zul","krag-zul","Tank","Construct",32.1],["Enoma","enoma","Tank","Construct",35.8],["Chromasyl","chromasyl","Sprinter","Alien",51.2],["Eryndor","eryndor","Hero","Divine",38.4],["Familie Flauschwinge","familie-flauschwinge","Rogue","Animal",17.6],["Zinnik","zinnik","Rogue","Construct",29.0],["Hyperion","hyperion","Overseer","Human",37.2],["Aurora","aurora","Mage","Human",22.9],["Eremal","eremal","Mage","Human",30.5],["Ragnarok","ragnarok","Berserker","Animal",49.2],["Buttercup","buttercup","Berserker","Animal",40.4],["Molten Boar","molten-boar","Charger","Demon",21.3],["Rustfire Golem","rustfire-golem","Tank","Construct",24.1],["Nahli-Ke","nahli-ke","Sprinter","Alien",35.1],["Knoedelsohn","knoedelsohn","Sprinter","Dragon",38.3],["Mictone","mictone","Sprinter","Tauren",30.2],["Venosk","venosk","Charger","Animal",29.2],["Wurzelbert","wurzelbert","Overseer","Construct",36.2],["Treantos","treantos","Warlord","Construct",49.2],["Umbrafond","umbrafond","Berserker","Plant",58.3],["Bloodthorn","bloodthorn","Charger","Elf",51.7],["Verla Compliance","verla-compliance","Mage","Human",51.9],["Swiftfoot","swiftfoot","Sprinter","Human",37.8],["Schattenwind","schattenwind","Sprinter","Demon",37.4],["Eldara","eldara","Mage","Construct",35.1],["Caldor","caldor","Bard","Human",40.0],["Ember Callahan","ember-callahan","Bard","Human",30.8],["Ferramina","ferramina","Warlord","Construct",41.4],["Hammertime","hammertime","Warlord","Construct",39.5],["Tuzer Bitterbelt","tuzer-bitterbelt","Tactician","Dwarf",44.0],["Omniclops","omniclops","Warlord","Construct",26.8],["Dreamsmash","dreamsmash","Mage","Human",35.0],["Timantha","timantha","Overseer","Human",34.9],["Chana","chana","Bard","Tauren",24.2],["Shivers","shivers","Rogue","Alien",34.5],["Prince Ravel","prince-ravel","Mage","Human",37.2],["Tentacle","tentacle","Mage","Animal",26.1],["Sir Sonnenmut","sir-sonnenmut","Templar","Human",50.2],["Ironhoof","ironhoof","Charger","Tauren",39.8],["Thorun","thorun","Hero","Human",41.8],["Bladewarden","bladewarden","Charger","Human",46.0],["Swordfanatic Aseus","swordfanatic-aseus","Badass","Human",54],["Thunderjaw","thunderjaw","Charger","Lizard",36.3],["Afro","afro","Rogue","Human",52.1],["Elaine Marlowe","elaine-marlowe","Bard","Human",49.1],["Swordmaster Yamira","swordmaster-yamira","Rogue","Human",42.7],["Dralinda","dralinda","Bard","Dwarf",43.8],["Hargorin Todbringer","hargorin-todbringer","Warlord","Human",35.0],["Genta","genta","Warlord","Human",34.4],["Ione the Unbreakable","ione-the-unbreakable","Templar","Human",39.4],["Bonecrusher","bonecrusher","Warlord","Human",26.2],["Hollowmonk","hollowmonk","Mage","Human",29.8],["Ked Arat","ked-arat","Tank","Human",25.8],["Serena","serena","Badass","Human",35.9],["Lumen Serene","lumen-serene","Bard","Human",29.6],["Fizzwick","fizzwick","Bard","Human",37.3],["Suzuna","suzuna","Mage","Human",31.9],["Titania","titania","Templar","Dwarf",39.9],["Waxia","waxia","Tactician","Demon",38.5],["Ilirana","ilirana","Bard","Divine",47.4],["Arachna","arachna","Sprinter","Demon",38.1],["Elaris","elaris","Mage","Elf",34.6],["Finca","finca","Mage","Demon",26.8],["Delamare","delamare","Sprinter","Aqua",25.2],["Dorothy","dorothy","Bard","Human",38.5],["Cogfina Skyforge","cogfina-skyforge","Sprinter","Animal",36.3],["Alyssa","alyssa","Rogue","Demon",27.0],["Velza","velza","Bard","Demon",37.6],["Dalinya","dalinya","Bard","Dwarf",30.9],["Guardian Nurukan","guardian-nurukan","Warlord","Elf",47.0],["Concrypto","concrypto","Badass","Divine",48.3],["Reefstrike","reefstrike","Charger","Aqua",48.4],["Grimma","grimma","Templar","Orc",38.1],["Abe Lincoln","abe-lincoln","Templar","Human",45.9],["Zephyra","zephyra","Overseer","Divine",44.7],["Lenrin","lenrin","Bard","Divine",36.0],["Die Liebenden","die-liebenden","Tank","Human",36.0],["Inefinna","inefinna","Mage","Divine",27.3],["Sanctrix","sanctrix","Tactician","Divine",34.4],["Poxnora","poxnora","Tank","Demon",47.1],["Aquatitan","aquatitan","Tank","Demon",35.9],["Lhyor","lhyor","Charger","Demon",53.1],["Toothkrix","toothkrix","Tank","Demon",33.2],["Kebet","kebet","Berserker","Demon",41.4],["Nevermore","nevermore","Mage","Demon",40.0],["Luluria","luluria","Overseer","Demon",34.0],["Molbaal","molbaal","Mage","Demon",49.2],["Rok Kyl","rok-kyl","Rogue","Demon",29.0],["Ruthgal","ruthgal","Rogue","Demon",40.7],["Orichalcos","orichalcos","Mage","Demon",29.5],["Blorgh","blorgh","Tank","Human",34.0],["Kvaltigar","kvaltigar","Tank","Orc",30.2],["Doombringer","doombringer","Tank","Human",27.5],["Venanli","venanli","Berserker","Human",30.4],["Rhazgul Icebound","rhazgul-icebound","Tank","Human",31.2],["Milena Purchase","milena-purchase","Tactician","Human",41.9],["Melody","melody","Bard","Human",36.0],["Lord Amaranth","lord-amaranth","Bard","Human",39.7],["Zhen Mu","zhen-mu","Rogue","Human",44.2],["Knisterl","knisterl","Sprinter","Plant",29.5],["Necromancer","necromancer","Mage","Human",25.5],["Bonethrone","bonethrone","Tank","Construct",46.4],["Armored Wraith","armored-wraith","Tank","Human",42.5],["Bombblitzer","bombblitzer","Charger","Orc",38.5],["Umbra","umbra","Rogue","Human",53.2],["Lady Mournvale","lady-mournvale","Mage","Human",49.8],["Oras Saftblut","oras-saftblut","Sprinter","Human",44.9],["Gralakar","gralakar","Sprinter","Human",41.7],["Nekira","nekira","Rogue","Animal",34.0],["Controller","controller","Mage","Human",46.7],["Amalyth","amalyth","Overseer","Human",33.8],["Jump & Slash","jump-slash","Charger","Animal",69.3],["Kindness","kindness","Berserker","Animal",50.4],["Dawnblade","dawnblade","Warlord","Divine",51.4],["Vurza","vurza","Berserker","Demon",55.9],["Vaal","vaal","Rogue","Alien",50.5],["Raven","raven","Rogue","Animal",35.8],["Abyssal Harvester","abyssal-harvester","Rogue","Aqua",35.6],["A'Kalya","a-kalya","Overseer","Alien",43.9],["Ink","ink","Rogue","Demon",39.1],["Grondak","grondak","Tank","Animal",36.4],["Father Slurpentine","father-slurpentine","Bard","Elf",46],["Matcha","matcha","Tactician","Elf",39.2],["Ash","ash","Templar","Demon",34.3],["Sweet Aggressiva","sweet-aggressiva","Charger","Demon",24.2],["Scar","scar","Mage","Demon",41.9],["Steam Machine","steam-machine","Berserker","Construct",21.2],["Nemenlirea","nemenlirea","Sprinter","Aqua",32.2],["Aralith","aralith","Bard","Elf",39.2],["Hellvoice","hellvoice","Bard","Demon",37.8],["Nunva Skyclaw","nunva-skyclaw","Tactician","Elf",32.8],["Andromeda","andromeda","Bard","Divine",32.1],["Ferdinand Lionfist","ferdinand-lionfist","Warlord","Human",35.2],["Larissa","larissa","Bard","Human",38.5],["Kati","kati","Bard","Human",53.0],["Crimson Shadow","crimson-shadow","Rogue","Human",47.1],["Samsuin","samsuin","Rogue","Human",48.1],["PixiKat","pixikat","Sprinter","Construct",38.9],["Nightwish","nightwish","Rogue","Human",38.5],["Whispra","whispra","Sprinter","Animal",26.6],["Nukka","nukka","Overseer","Construct",33.9],["Duskwhisper","duskwhisper","Mage","Elf",38.9],["Wildfire","wildfire","Tactician","Human",30.7],["Thraxis","thraxis","Berserker","Animal",45.6],["Fungor","fungor","Tank","Plant",42.3],["Murky","murky","Tank","Construct",28.4],["Dark Cloud","dark-cloud","Templar","Human",28.0],["Kyori","kyori","Rogue","Aqua",39.8],["Falcon","falcon","Sprinter","Animal",35.9],["Puschelix","puschelix","Bard","Plant",33.7],["Butterfly","butterfly","Sprinter","Animal",31.6],["Flarewing","flarewing","Sprinter","Dragon",40.2],["Abyssalfin","abyssalfin","Sprinter","Aqua",42.3],["Lys Puppenkopf","lys-puppenkopf","Bard","Construct",37.6],["Thrax","thrax","Charger","Orc",42.9],["Gas","gas","Tank","Alien",40],["Maru","maru","Sprinter","Human",42.6],["Lithael","lithael","Sprinter","Aqua",38.1],["Tulpia","tulpia","Rogue","Elf",31.9],["Myth","myth","Mage","Human",36.3],["Yuko","yuko","Bard","Human",34.7],["Melina","melina","Tactician","Elf",25.2],["Flamira","flamira","Bard","Divine",22.2],["Varric Frankenstein","varric-frankenstein","Tank","Human",56.9],["Drezzan","drezzan","Warlord","Demon",45.3],["Wurggart","wurggart","Tank","Construct",45.5],["Mimic","mimic","Charger","Demon",36.1],["Morblat","morblat","Mage","Human",41.1],["Nefar Safety","nefar-safety","Sprinter","Human",45.9],["Sunny","sunny","Bard","Human",45.7],["Ayame","ayame","Sprinter","Human",33.0],["Kento","kento","Rogue","Human",39.9],["Malarik","malarik","Mage","Human",41.5],["Brannus","brannus","Tactician","Construct",53.2],["Phaerl Torynore","phaerl-torynore","Bard","Elf",46.2],["Kuro","kuro","Rogue","Human",37.1],["Taryn","taryn","Sprinter","Human",40.5],["Ralazar the Balanced","ralazar-the-balanced","Mage","Human",42.1],["Migraya","migraya","Mage","Elf",30.1],["Wurzelbart","wurzelbart","Bard","Dwarf",41.1],["Jihanna","jihanna","Berserker","Elf",31.8],["Haldor","haldor","Tactician","Dwarf",29.8],["Verdant Spike","verdant-spike","Templar","Animal",68.0],["Brujo Oso","brujo-oso","Charger","Animal",57.4],["Cyrven","cyrven","Tank","Plant",40.6],["Haki","haki","Berserker","Animal",44.8],["Monarch Hawk","monarch-hawk","Sprinter","Animal",49.2],["Squawklyn","squawklyn","Rogue","Animal",46.3],["Frayja Accounting","frayja-accounting","Mage","Animal",37.9],["Hisihida","hisihida","Bard","Animal",30.5],["Cyrn","cyrn","Tank","Plant",36.4],["Floodspirit","floodspirit","Tank","Aqua",30.6],["Shadowwing","shadowwing","Charger","Lizard",38.7],["Wu Tang","wu-tang","Tank","Aqua",26.3],["Riptide","riptide","Charger","Aqua",37.1],["Iska","iska","Sprinter","Aqua",37.9],["Vodianoi","vodianoi","Overseer","Aqua",40.1],["Wavepiercer","wavepiercer","Rogue","Aqua",37.4],["Zyrix","zyrix","Overseer","Lizard",23.3],["Chyros","chyros","Warlord","Aqua",40.7],["The Thing","the-thing","Tank","Construct",44.0],["Shield","shield","Tank","Human",41.4],["Riot","riot","Tank","Human",38.4],["Executioner","executioner","Tank","Human",29.7],["Agent 888","agent-888","Templar","Human",39.7],["Brightpaw","brightpaw","Badass","Animal",43.3],["Xochiquibana","xochiquibana","Hero","Divine",35.9],["Quarris","quarris","Warlord","Construct",36.9],["Number 68","number-68","Tank","Construct",40.9],["Donnernaht","donnernaht","Berserker","Construct",47.2],["Grieving Colossus","grieving-colossus","Tank","Construct",30.3],["Wayward","wayward","Tank","Construct",47.7],["Iron Golem","iron-golem","Tank","Construct",33.4],["Claudelio Feelgood","claudelio-feelgood","Bard","Construct",42.9],["Tsubaki Cleaning","tsubaki-cleaning","Tactician","Construct",39.8],["Maansrune","maansrune","Sprinter","Construct",37.6],["Seraph-11","seraph-11","Tactician","Construct",36.9],["Glibbera Onboarding","glibbera-onboarding","Bard","Construct",31.9],["Eiravelle","eiravelle","Berserker","Divine",43.3],["Bone","bone","Tank","Human",20.4],["Liora Somnia","liora-somnia","Bard","Human",46.2],["Remiel","remiel","Rogue","Divine",33.4],["Dr Ironmind","dr-ironmind","Mage","Dwarf",37.8],["Cadrael","cadrael","Berserker","Divine",40.4],["Sonnenherz","sonnenherz","Bard","Divine",30.6],["Whisperveil","whisperveil","Bard","Human",31.8],["Leira","leira","Bard","Human",35.1],["Brontar","brontar","Tank","Construct",46.2],["Gargonth","gargonth","Tank","Alien",48.7],["Kora","kora","Warlord","Tauren",40.1],["Dr Mireya Krov","dr-mireya-krov","Tank","Mutant",44.5],["Teravolt","teravolt","Tank","Demon",25.5],["Szex Scaleshield","szex-scaleshield","Berserker","Lizard",42.4],["Libellus","libellus","Sprinter","Construct",35.8],["Flamehoof","flamehoof","Mage","Tauren",40.2],["Mongrel","mongrel","Sprinter","Demon",24.1],["Stormfang","stormfang","Tank","Construct",39.5],["Maura","maura","Tactician","Orc",38.9],["Leviathan","leviathan","Berserker","Dragon",42.4],["Demonicon","demonicon","Tank","Demon",26.9],["Lurker","lurker","Charger","Animal",30.0],["Wheatley","wheatley","Sprinter","Construct",42.7],["Amoreus","amoreus","Sprinter","Demon",29.7],["Akali","akali","Rogue","Human",38.7],["Yurei","yurei","Rogue","Animal",35.6],["Professor Paranoix","professor-paranoix","Overseer","Human",31.3],["Breeze","breeze","Mage","Human",28],["Issyria","issyria","Bard","Elf",39.0],["Gronkslime","gronkslime","Tank","Construct",35.5],["Leroy the Gunner","leroy-the-gunner","Warlord","Human",21.1],["Kogoro Mori","kogoro-mori","Warlord","Human",24.7],["Vervain","vervain","Rogue","Human",33.8],["Zephyr","zephyr","Rogue","Human",40.5],["Sylith","sylith","Sprinter","Construct",31.6],["Nelchael","nelchael","Tactician","Human",23.0],["Yinen","yinen","Rogue","Human",29.2],["Phantomblade","phantomblade","Rogue","Human",33.2],["Cipher","cipher","Mage","Human",36.6],["Alarm","alarm","Mage","Construct",28.1],["Untaught Scribe","untaught-scribe","Mage","Human",26.5],["Lyselith","lyselith","Hero","Elf",48.4],["Cerenna Garstochter","cerenna-garstochter","Tank","Plant",39.3],["Lumea","lumea","Berserker","Elf",43.6],["Scruffy","scruffy","Berserker","Demon",36.4],["Babuschinka","babuschinka","Tactician","Human",37.2],["Nyrell Winterfang","nyrell-winterfang","Sprinter","Elf",44.0],["Xylaris","xylaris","Overseer","Divine",32.0],["Elara","elara","Rogue","Elf",28.0],["Sweet Dreams","sweet-dreams","Mage","Human",33.6],["Wingless","wingless","Mage","Elf",30.8],["Mindtamer","mindtamer","Mage","Alien",23.5],["Marzipella","marzipella","Bard","Human",28.0],["Leif Eriksson","leif-eriksson","Berserker","Dwarf",41.8],["Wahiru","wahiru","Warlord","Human",35.7],["Gunther","gunther","Berserker","Dwarf",51.8],["Harold","harold","Warlord","Human",34.9],["Brunhilde","brunhilde","Charger","Human",46.9],["Freyla","freyla","Mage","Human",46.9],["Garmel","garmel","Sprinter","Dwarf",47.0],["Sarah","sarah","Overseer","Human",42.2],["Ravager","ravager","Warlord","Construct",27.2],["Greenkraut","greenkraut","Berserker","Construct",28.5],["Elyon","elyon","Templar","Divine",42.5],["Udjnyna","udjnyna","Rogue","Human",33.1],["Enforcer","enforcer","Templar","Human",37.1],["Cherubino","cherubino","Overseer","Divine",44.3],["Drop Dead","drop-dead","Rogue","Human",39.3],["Becky","becky","Rogue","Divine",27.0],["Rubio Stone","rubio-stone","Warlord","Human",54.3],["Hummingbird","hummingbird","Warlord","Construct",46.0],["Roddox Harthelm","roddox-harthelm","Warlord","Orc",34],["Rex","rex","Warlord","Construct",22.8],["Grommok One-Eye","grommok-one-eye","Warlord","Orc",33.4],["Karnath","karnath","Warlord","Aqua",44.0],["Pyro Guardian","pyro-guardian","Warlord","Construct",47.5],["Tartarus","tartarus","Charger","Tauren",42.9],["Tollim KS","tollim-ks","Badass","Animal",45.4],["Agent Wave","agent-wave","Sprinter","Human",41.2],["Towlie","towlie","Tactician","Construct",39.3],["Terratron","terratron","Warlord","Construct",28.3],["Rootheart","rootheart","Tank","Construct",36.9],["Azwraith","azwraith","Templar","Elf",41.5],["Prinz Faelyn","prinz-faelyn","Mage","Elf",38.0],["Prinz Morven","prinz-morven","Mage","Human",37.0],["Shadowsage","shadowsage","Bard","Human",44.9],["Weaver of Time","weaver-of-time","Mage","Divine",47.2],["Hyeliaze","hyeliaze","Mage","Elf",36.1],["Soulstorm","soulstorm","Mage","Elf",29.3],["Nezhet","nezhet","Tactician","Elf",39.0],["Sunken Crown","sunken-crown","Warlord","Aqua",52.6],["Oruk","oruk","Warlord","Orc",39.2],["Skarn","skarn","Charger","Lizard",53.4],["Balphagore","balphagore","Tank","Demon",23.7],["Watcher","watcher","Rogue","Lizard",67.3],["Arlong","arlong","Berserker","Lizard",40.5],["Totemus","totemus","Tank","Construct",40],["Skittermind","skittermind","Rogue","Lizard",31.9],["Starweaver","starweaver","Mage","Elf",31.0],["Nyxor","nyxor","Tactician","Lizard",35.7],["Serilith","serilith","Overseer","Lizard",45.1]],"DIS":[["tdm","TDM","TDM","pow",0],["mini-dm","MIN","Mini DM","pow",1],["gewichtheben","GEW","Gewichtheben","pow",0],["hockey","HOC","Hockey","pow",0],["breaking","BRE","Breaking","pow",0],["staffel","STA","Staffel","spe",1],["time-trial","TIT","Time Trial","spe",0],["spurt","SPU","Spurt","spe",0],["climbing","CLI","Climbing","spe",0],["fechten","FEC","Fechten","spe",0],["speed-schach","SCH","Speed-Schach","men",0],["takeshis-castle","TAK","Takeshi's Castle","men",1],["tennis","TEN","Tennis","men",0],["i-spy","ISP","I-Spy","men",0],["wettessen","WET","Wettessen","men",0],["basketball","BAS","Basketball","soc",0],["football","FOO","Football","soc",0],["battlefield","BAT","Battlefield","soc",1],["eiskunstlauf","EIS","Eiskunstlauf","soc",0],["showcase","SHO","Showcase","soc",0]],"MD":[[8,17],[11,12],[13,4],[9,2],[6,14],[19,16],[18,5],[0,15],[7,1],[10,3],[6,13],[15,18],[8,14],[12,10],[4,2],[1,3],[0,17],[9,16],[11,7],[19,5]],"R":{"1":[{"f":[["T-T","S-S",[0,2,"59,0","65,0",-6.0,209],null],["L-R","G-G",[0,2,"50,4","57,8",-7.4,71],null],["W-W","C-S",[0,2,"46,4","53,8",-7.4,40],null],["V-D","R-L",[0,2,"32,5","64,0",-31.5,182],null],["P-S","M-M",[0,2,"52,4","76,9",-24.4,112],null],["N-N","N-W",[0,2,"41,8","50,1",-8.3,148],null],["B-P","H-R",[0,2,"51,1","60,5",-9.4,81],null],["W-L","Z-H",[0,2,"58,0","67,9",-10.0,314],null]],"p":{"1":[[["G-G","61,2"],["T-T","51,1"],["S-S","46,0"],["L-R","42,0"],70],[["C-S","58,6"],["V-D","55,7"],["R-L","54,9"],["W-W","54,2"],44],[["M-M","55,9"],["P-S","52,2"],["N-N","46,7"],["N-W","38,2"],113],[["Z-H","66,6"],["W-L","53,8"],["B-P","43,7"],["H-R","41,8"],309]]}},{"f":[["G-G","T-T",null,[1,1,"1","1",0,-1]],["C-S","S-S",null,[0,2,"0","2",-11.3,213]],["R-L","L-R",null,[0,2,"0","2",-13.1,107]],["M-M","W-W",null,[2,0,"2","1",2.7,111]],["N-W","V-D",null,[2,0,"2","0",12.7,153]],["H-R","P-S",null,[0,2,"0","2",-19.2,168]],["Z-H","N-N",null,[2,0,"2","0",15.7,319]],["W-L","B-P",null,[0,2,"1","2",-1.0,25]]],"p":{"0":[[["C-S","53,8"],["G-G","51,2"],["S-S","36,6"],["T-T","34,2"],44],[["M-M","64,0"],["W-W","58,8"],["R-L","55,1"],["L-R","51,1"],111],[["H-R","71,0"],["P-S","60,9"],["V-D","47,6"],["N-W","36,7"],86],[["Z-H","64,6"],["B-P","52,4"],["N-N","51,4"],["W-L","45,6"],309]]}},{"f":[["T-T","C-S",[0,2,"48,5","64,7",-16.2,41],[2,0,"51,9","42,8",9.1,239]],["G-G","R-L",[0,2,"46,6","51,1",-4.6,188],[2,0,"53,5","48,0",5.5,69]],["S-S","M-M",[0,2,"43,5","58,2",-14.7,115],[2,0,"61,4","58,4",3.0,208]],["L-R","N-W",[2,0,"49,4","43,5",5.9,104],[2,0,"67,7","51,7",16.0,101]],["W-W","H-R",[2,0,"55,6","54,5",1.2,304],[1,1,"50,1","50,1",0,-1]],["V-D","Z-H",[0,2,"39,9","48,7",-8.7,318],[0,2,"30,7","51,1",-20.3,315]],["P-S","W-L",[2,0,"63,7","43,8",19.9,167],[2,0,"71,0","56,7",14.3,167]],["N-N","B-P",[2,0,"62,3","44,6",17.7,136],[0,2,"44,8","73,4",-28.6,19]]],"p":{}},{"f":[["R-L","T-T",[0,2,"9","15",-8.5,244],[2,0,"62,3","52,0",10.3,182]],["M-M","C-S",[2,0,"15","3",18.8,116],[0,2,"52,1","67,1",-15.0,37]],["N-W","G-G",[2,0,"15","3",15.2,151],[0,2,"44,6","47,6",-3.0,70]],["H-R","S-S",[2,0,"15","9",7.9,88],[2,0,"60,3","56,9",3.4,81]],["Z-H","L-R",[0,2,"9","15",-6.0,104],[2,0,"58,8","55,2",3.6,310]],["W-L","W-W",[2,0,"15","3",15.3,295],[2,0,"65,1","36,4",28.7,288]],["B-P","V-D",[0,2,"4","15",-14.7,262],[2,0,"60,2","34,6",25.6,18]],["N-N","P-S",[1,1,"14","14",0,-1],[0,2,"37,7","62,1",-24.3,165]]],"p":{}},{"f":[["T-T","M-M",[0,2,"56,2","70,1",-13.9,111],[0,2,"58,1","69,5",-11.4,114]],["R-L","N-W",[1,1,"69,1","69,1",0,-1],[2,0,"76,9","49,3",27.5,182]],["C-S","H-R",[2,0,"54,9","44,2",10.7,45],[0,2,"51,3","69,1",-17.7,84]],["G-G","Z-H",[0,2,"61,1","68,5",-7.4,311],[2,0,"60,9","55,9",5.0,69]],["S-S","W-L",[1,1,"57,2","57,2",0,-1],[2,0,"68,8","62,4",6.4,208]],["L-R","B-P",[2,0,"67,0","54,2",12.9,106],[0,2,"58,4","74,6",-16.2,18]],["W-W","N-N",[0,2,"39,2","62,8",-23.6,138],[2,0,"51,1","42,8",8.3,305]],["V-D","P-S",[2,0,"70,4","53,1",17.3,267],[0,2,"45,8","57,7",-11.9,163]]],"p":{}},{"f":[["N-W","T-T",[0,2,"39,5","52,7",-13.2,247],[2,0,"34","25",9.8,144]],["H-R","M-M",[2,0,"61,2","41,7",19.4,86],[0,2,"19","38",-21.6,114]],["Z-H","R-L",[2,0,"69,0","37,9",31.1,319],[2,0,"27","23",4.9,309]],["W-L","C-S",[0,2,"62,7","68,6",-5.9,46],[2,0,"27","24",3.5,298]],["B-P","G-G",[0,2,"61,9","72,8",-10.9,69],[0,2,"24","27",-3.5,76]],["N-N","S-S",[2,0,"52,6","36,8",15.8,141],[2,0,"29","18",11.9,132]],["P-S","L-R",[2,0,"63,9","49,3",14.6,169],[2,0,"22","19",3.4,163]],["V-D","W-W",[0,2,"39,2","50,2",-11.0,302],[1,1,"30","30",0,-1]]],"p":{}},{"f":[["T-T","H-R",[1,1,"44,6","44,6",0,-1],null],["N-W","Z-H",[0,2,"48,3","52,7",-4.3,319],null],["M-M","W-L",[0,2,"46,8","56,5",-9.7,297],null],["R-L","B-P",[0,2,"54,2","65,0",-10.9,26],null],["C-S","N-N",[2,0,"63,2","57,5",5.7,44],null],["G-G","P-S",[2,0,"55,1","52,1",3.0,75],null],["S-S","V-D",[0,2,"58,3","63,8",-5.5,268],null],["L-R","W-W",[1,1,"53,8","53,8",0,-1],null]],"p":{"1":[[["Z-H","69,3"],["N-W","62,2"],["T-T","61,7"],["H-R","47,9"],311],[["M-M","67,9"],["R-L","66,6"],["B-P","58,5"],["W-L","52,3"],111],[["N-N","60,9"],["P-S","57,9"],["C-S","55,3"],["G-G","48,8"],137],[["S-S","74,5"],["V-D","58,0"],["L-R","55,0"],["W-W","40,2"],214]]}},{"f":[["Z-H","T-T",[2,0,"30","25",6.3,309],[0,2,"66","69",-2.0,241]],["W-L","H-R",[2,0,"43","30",15.9,288],[0,2,"58","76",-11.1,85]],["B-P","N-W",[2,0,"27","25",2.5,18],[2,0,"83","78",3.2,25]],["N-N","M-M",[0,2,"21","29",-9.6,112],[0,2,"56","76",-12.7,112]],["P-S","R-L",[0,2,"27","28",-1.2,183],[2,0,"87","55",20.0,168]],["V-D","C-S",[0,2,"24","31",-8.9,39],[0,2,"65","71",-3.9,44]],["W-W","G-G",[2,0,"27","26",1.4,299],[0,2,"57","69",-7.6,74]],["L-R","S-S",[0,2,"31","36",-6.5,207],[0,2,"53","73",-12.5,213]]],"p":{}},{"f":[["T-T","W-L",[0,2,"52,9","57,6",-4.7,294],null],["Z-H","B-P",[2,0,"59,4","55,6",3.8,313],null],["H-R","N-N",[2,0,"62,1","46,9",15.2,81],null],["N-W","P-S",[0,2,"42,4","62,7",-20.3,166],null],["M-M","V-D",[2,0,"77,4","47,1",30.2,111],null],["R-L","W-W",[2,0,"49,1","31,9",17.2,185],null],["C-S","L-R",[2,0,"60,8","55,4",5.3,40],null],["G-G","S-S",[2,0,"55,2","52,4",2.8,69],null]],"p":{"1":[[["Z-H","64,7"],["B-P","59,3"],["W-L","55,2"],["T-T","54,3"],312],[["H-R","65,2"],["P-S","55,0"],["N-W","53,3"],["N-N","42,5"],81],[["M-M","62,1"],["R-L","59,0"],["V-D","43,2"],["W-W","40,7"],112],[["S-S","72,2"],["L-R","58,2"],["G-G","56,9"],["C-S","49,5"],208]]}},{"f":[["B-P","T-T",[2,0,"1,5","0,5",6.3,21],[2,0,"7","4",9.6,20]],["N-N","W-L",[0,2,"0,5","1,5",-5.7,297],[0,2,"5","6",-1.4,295]],["P-S","Z-H",[0,2,"0,5","1,5",-4.4,313],[0,2,"2","5",-12.4,311]],["V-D","H-R",[0,2,"0,5","1,5",-1.3,86],[0,2,"3","7",-13.7,81]],["W-W","N-W",[2,0,"2","0",21.0,307],[0,2,"4","6",-6.0,143]],["L-R","M-M",[0,2,"0,5","1,5",-1.9,118],[0,2,"1","7",-22.1,114]],["S-S","R-L",[2,0,"1,5","0,5",4.2,216],[0,2,"3","7",-13.9,183]],["G-G","C-S",[2,0,"1,5","0,5",2.5,74],[0,2,"3","7",-14.0,37]]],"p":{}},{"f":[["T-T","N-N",[0,2,"62,1","77,5",-15.4,135],[0,2,"46,4","61,6",-15.2,134]],["B-P","P-S",[2,0,"68,2","61,1",7.0,23],[2,0,"50,8","48,4",2.4,20]],["W-L","V-D",[0,2,"44,2","78,7",-34.5,265],[0,2,"34,5","39,1",-4.6,268]],["Z-H","W-W",[2,0,"58,6","33,2",25.3,311],[0,2,"44,2","53,2",-9.0,303]],["H-R","L-R",[0,2,"49,5","58,8",-9.3,106],[0,2,"52,1","71,0",-18.9,105]],["N-W","S-S",[2,0,"63,2","53,7",9.6,151],[2,0,"51,2","42,3",8.9,144]],["M-M","G-G",[2,0,"76,5","48,6",27.9,111],[2,0,"67,6","51,2",16.4,114]],["R-L","C-S",[2,0,"65,1","59,6",5.5,186],[0,2,"54,4","64,8",-10.4,46]]],"p":{}},{"f":[["P-S","T-T",[0,2,"69","84",-9.3,242],[0,2,"50,9","56,2",-5.4,247]],["V-D","N-N",[2,0,"86","74",7.2,268],[0,2,"51,7","53,6",-1.9,134]],["W-W","B-P",[2,0,"94","72",13.7,304],[0,2,"59,2","60,5",-1.2,26]],["L-R","W-L",[2,0,"100","68",19.7,105],[2,0,"56,3","53,5",2.8,105]],["S-S","Z-H",[2,0,"95","73",13.5,213],[0,2,"48,7","62,5",-13.8,317]],["G-G","H-R",[2,0,"73","69",2.2,75],[2,0,"70,0","64,5",5.5,75]],["C-S","N-W",[2,0,"93","80",8.4,43],[2,0,"57,1","43,6",13.5,44]],["R-L","M-M",[2,0,"71","57",9.0,186],[2,0,"50,7","41,7",9.1,186]]],"p":{}},{"f":[["T-T","V-D",[2,0,"55,8","42,2",13.7,236],[0,2,"29,9","39,3",-9.4,264]],["P-S","W-W",[2,0,"67,5","37,1",30.4,165],[2,0,"71,0","66,8",4.2,163]],["N-N","L-R",[0,2,"45,3","57,4",-12.1,103],[0,2,"44,7","64,7",-20.0,102]],["B-P","S-S",[2,0,"61,7","52,2",9.4,19],[2,0,"82,4","68,2",14.3,19]],["W-L","G-G",[0,2,"40,4","50,0",-9.6,71],[2,0,"76,2","56,7",19.5,288]],["Z-H","C-S",[2,0,"59,5","52,7",6.8,311],[2,0,"65,6","45,8",19.9,315]],["H-R","R-L",[0,2,"60,4","74,7",-14.3,183],[0,2,"62,8","77,9",-15.1,182]],["N-W","M-M",[0,2,"63,6","72,3",-8.7,111],[0,2,"52,6","55,4",-2.8,113]]],"p":{}},{"f":[["W-W","T-T",[0,2,"1","2",-4.4,247],[2,0,"1,5","0,5",3.6,305]],["L-R","V-D",[2,0,"2","1",1.7,107],[2,0,"1,5","0,5",3.2,109]],["S-S","P-S",[2,0,"2","0",6.8,213],[1,1,"1","1",0,-1]],["G-G","N-N",[0,2,"1","2",-3.5,134],[2,0,"2","0",9.4,74]],["C-S","B-P",[0,2,"1","2",-2.2,21],[0,2,"0","2",-9.2,24]],["R-L","W-L",[2,0,"2","0",24.7,186],[2,0,"2","0",33.5,189]],["M-M","Z-H",[0,2,"0","2",-8.6,318],[0,2,"0,5","1,5",-4.1,318]],["N-W","H-R",[2,0,"2","0",17.1,150],[0,2,"0,5","1,5",-6.4,89]]],"p":{}},{"f":[["T-T","L-R",[0,2,"48,2","63,8",-15.6,102],[0,2,"39,3","47,2",-7.9,101]],["W-W","S-S",[0,2,"46,5","51,4",-4.9,208],[0,2,"51,8","64,4",-12.6,209]],["V-D","G-G",[0,2,"44,1","53,9",-9.8,73],[0,2,"38,6","58,3",-19.7,69]],["P-S","C-S",[0,2,"50,8","52,8",-2.0,37],[0,2,"48,3","59,0",-10.7,37]],["N-N","R-L",[0,2,"39,6","64,1",-24.5,183],[0,2,"44,9","59,5",-14.6,184]],["B-P","M-M",[0,2,"55,4","61,8",-6.4,114],[0,2,"46,4","63,0",-16.6,111]],["W-L","N-W",[0,2,"51,8","60,9",-9.1,146],[2,0,"72,4","43,1",29.3,288]],["Z-H","H-R",[2,0,"62,9","50,4",12.5,315],[0,2,"42,0","63,0",-21.0,80]]],"p":{}},{"f":[["S-S","T-T",null,[2,0,"4","3",2.7,209]],["G-G","L-R",null,[0,2,"5","7",-6.9,102]],["C-S","W-W",null,[1,1,"4","4",0,-1]],["R-L","V-D",null,[2,0,"8","0",35.0,185]],["M-M","P-S",null,[2,0,"7","1",19.7,111]],["N-W","N-N",null,[2,0,"5","1",14.0,143]],["H-R","B-P",null,[0,2,"2","3",-4.2,18]],["Z-H","W-L",null,[2,0,"6","4",6.7,313]]],"p":{"0":[[["S-S","68,9"],["T-T","66,3"],["L-R","66,0"],["G-G","55,9"],208],[["R-L","59,3"],["V-D","49,1"],["C-S","49,0"],["W-W","46,3"],183],[["M-M","59,6"],["P-S","54,1"],["N-W","53,9"],["N-N","31,3"],113],[["B-P","60,6"],["W-L","57,8"],["Z-H","55,9"],["H-R","55,7"],19]]}},{"f":[["T-T","G-G",[0,2,"31","41",-12.3,70],null],["S-S","C-S",[2,0,"28","24",5.4,207],null],["L-R","R-L",[0,2,"26","41",-18.4,183],null],["W-W","M-M",[0,2,"19","29",-12.1,111],null],["V-D","N-W",[0,2,"26","32",-8.1,144],null],["P-S","H-R",[0,2,"31","34",-3.6,80],null],["N-N","Z-H",[0,2,"18","36",-22.6,309],null],["B-P","W-L",[0,2,"25","34",-11.6,290],null]],"p":{"1":[[["S-S","57,6"],["C-S","56,9"],["G-G","53,3"],["T-T","49,5"],207],[["W-W","58,2"],["L-R","51,3"],["R-L","49,7"],["M-M","47,6"],302],[["N-W","51,0"],["P-S","49,8"],["H-R","44,7"],["V-D","44,7"],153],[["W-L","55,1"],["Z-H","55,0"],["B-P","55,0"],["N-N","47,4"],296]]}},{"f":[["C-S","T-T",[2,0,"15","12",0.8,43],[2,0,"31","8",25.4,37]],["R-L","G-G",[2,0,"15","3",23.3,187],[2,0,"35","26",9.7,190]],["M-M","S-S",[2,0,"15","3",38.2,111],[2,0,"38","23",17.0,114]],["N-W","L-R",[2,0,"15","5",12.8,143],[2,0,"18","16",1.9,144]],["H-R","W-W",[2,0,"15","3",16.9,81],[0,2,"27","30",-3.2,304]],["Z-H","V-D",[0,2,"12","15",-1.6,265],[2,0,"38","13",27.7,309]],["W-L","P-S",[2,0,"15","3",22.9,297],[0,2,"21","29",-8.7,165]],["B-P","N-N",[2,0,"15","13",2.3,20],[1,1,"22","22",0,-1]]],"p":{}},{"f":[["T-T","R-L",null,[0,2,"51,7","59,7",-8.0,183]],["C-S","M-M",null,[0,2,"47,2","68,0",-20.8,111]],["G-G","N-W",null,[2,0,"57,8","41,6",16.2,71]],["S-S","H-R",null,[2,0,"65,2","57,7",7.5,209]],["L-R","Z-H",null,[2,0,"69,2","61,0",8.2,104]],["W-W","W-L",null,[0,2,"27,2","61,0",-33.7,295]],["V-D","B-P",null,[0,2,"42,0","56,7",-14.7,20]],["P-S","N-N",null,[0,2,"62,0","63,2",-1.2,137]]],"p":{"0":[[["R-L","53,2"],["C-S","49,7"],["M-M","42,0"],["T-T","35,9"],186],[["H-R","70,1"],["G-G","46,1"],["S-S","39,3"],["N-W","38,1"],86],[["W-W","72,7"],["Z-H","50,8"],["L-R","47,9"],["W-L","41,2"],305],[["P-S","55,8"],["B-P","44,5"],["V-D","37,9"],["N-N","35,9"],172]]}},{"f":[["M-M","T-T",[1,1,"52,7","52,7",0,-1],null],["N-W","R-L",[0,2,"47,5","53,4",-5.9,182],null],["H-R","C-S",[0,2,"57,6","65,8",-8.2,46],null],["Z-H","G-G",[2,0,"61,5","57,6",3.9,319],null],["W-L","S-S",[0,2,"48,1","52,1",-4.0,217],null],["B-P","L-R",[2,0,"52,3","51,4",0.9,25],null],["N-N","W-W",[0,2,"52,2","60,3",-8.1,302],null],["P-S","V-D",[2,0,"52,5","47,9",4.6,164],null]],"p":{"1":[[["M-M","76,4"],["R-L","70,5"],["T-T","63,9"],["N-W","56,6"],111],[["Z-H","68,5"],["G-G","57,0"],["C-S","56,6"],["H-R","50,8"],314],[["S-S","74,3"],["L-R","63,5"],["B-P","53,0"],["W-L","51,8"],211],[["P-S","66,3"],["V-D","54,5"],["N-N","49,6"],["W-W","38,8"],168]]}}],"2":[{"f":[["D-L","M-S",[0,2,"40,9","55,1",-14.2,123],null],["V-V","A-A",[1,1,"55,3","55,3",0,-1],null],["V-W","B-B",[0,2,"41,0","61,1",-20.1,9],null],["L-K","D-P",[2,0,"44,9","42,1",2.8,90],null],["P-C","U-A",[2,0,"47,9","44,7",3.2,156],null],["T-G","R-C",[2,0,"65,5","41,3",24.2,230],null],["S-C","C-C",[2,0,"50,2","41,4",8.9,202],null],["R-R","T-C",[2,0,"45,1","37,9",7.3,194],null]],"p":{"1":[[["M-S","65,9"],["D-L","44,5"],["V-V","40,7"],["A-A","30,3"],129],[["D-P","57,8"],["L-K","55,7"],["V-W","51,3"],["B-B","38,0"],59],[["R-C","50,7"],["P-C","49,8"],["U-A","28,9"],["T-G","26,5"],174],[["C-C","54,7"],["T-C","48,5"],["S-C","47,0"],["R-R","29,6"],29]]}},{"f":[["A-A","D-L",null,[0,2,"0","2",-11.5,54]],["B-B","M-S",null,[2,0,"2","1",1.6,17]],["D-P","V-V",null,[2,0,"2","0",17.0,65]],["U-A","V-W",null,[0,2,"0","2",-9.6,287]],["R-C","L-K",null,[2,0,"2","0",13.0,181]],["C-C","P-C",null,[2,0,"2","0",16.2,29]],["T-C","T-G",null,[2,0,"2","0",18.4,226]],["R-R","S-C",null,[2,0,"2","1",1.8,195]]],"p":{"0":[[["M-S","52,8"],["A-A","42,9"],["D-L","41,4"],["B-B","40,1"],123],[["D-P","64,4"],["V-V","63,1"],["U-A","39,1"],["V-W","26,4"],59],[["C-C","59,8"],["R-C","56,1"],["L-K","55,5"],["P-C","39,1"],36],[["T-G","45,8"],["S-C","41,5"],["T-C","40,2"],["R-R","38,1"],227]]}},{"f":[["D-L","B-B",[2,0,"48,9","26,5",22.4,55],[2,0,"50,1","43,9",6.2,49]],["A-A","D-P",[0,2,"23,2","41,5",-18.3,67],[2,0,"48,0","42,1",5.9,2]],["M-S","U-A",[0,2,"53,9","56,4",-2.5,257],[2,0,"42,1","35,7",6.4,120]],["V-V","R-C",[0,2,"50,8","55,8",-5.0,177],[2,0,"63,1","40,5",22.6,274]],["V-W","C-C",[2,0,"45,9","38,8",7.1,282],[2,0,"57,9","48,7",9.2,282]],["L-K","T-C",[2,0,"59,8","51,4",8.4,97],[2,0,"48,2","33,5",14.7,94]],["P-C","R-R",[2,0,"54,0","44,7",9.3,159],[2,0,"45,5","36,4",9.1,154]],["T-G","S-C",[0,2,"39,4","46,1",-6.7,205],[0,2,"58,2","63,5",-5.4,203]]],"p":{}},{"f":[["D-P","D-L",[0,2,"10","15",-4.5,55],[2,0,"51,0","44,1",6.9,59]],["U-A","B-B",[2,0,"15","6",10.3,251],[1,1,"45,0","45,0",0,-1]],["R-C","A-A",[0,2,"7","15",-9.1,2],[2,0,"48,5","45,8",2.7,177]],["C-C","M-S",[0,2,"5","15",-12.5,124],[0,2,"52,4","54,9",-2.5,120]],["T-C","V-V",[0,2,"3","15",-18.7,276],[0,2,"33,5","49,5",-16.0,273]],["R-R","V-W",[2,0,"15","3",23.7,197],[0,2,"36,4","53,5",-17.1,282]],["S-C","L-K",[0,2,"3","15",-21.9,93],[2,0,"48,3","40,3",8.0,204]],["T-G","P-C",[0,2,"5","15",-13.0,154],[2,0,"37,6","35,8",1.8,227]]],"p":{}},{"f":[["D-L","U-A",[2,0,"48,3","47,0",1.3,53],[2,0,"46,5","41,4",5.1,51]],["D-P","R-C",[2,0,"56,9","51,1",5.9,60],[0,2,"47,2","50,8",-3.7,173]],["B-B","C-C",[2,0,"49,9","47,8",2.1,15],[2,0,"48,9","47,9",1.0,9]],["A-A","T-C",[2,0,"54,8","52,2",2.6,6],[2,0,"61,5","38,0",23.5,1]],["M-S","R-R",[0,2,"45,5","58,3",-12.8,195],[2,0,"53,6","36,8",16.8,123]],["V-V","S-C",[2,0,"45,4","39,9",5.6,279],[0,2,"61,8","63,4",-1.7,200]],["V-W","T-G",[2,0,"48,1","45,1",3.0,287],[0,2,"37,4","65,0",-27.7,228]],["L-K","P-C",[0,2,"51,3","68,3",-17.0,157],[2,0,"59,3","49,3",10.0,90]]],"p":{}},{"f":[["R-C","D-L",[0,2,"49,5","50,7",-1.2,54],[2,0,"34","33",1.4,179]],["C-C","U-A",[0,2,"38,3","41,9",-3.6,255],[2,0,"23","19",4.1,28]],["T-C","D-P",[0,2,"54,0","59,5",-5.4,59],[2,0,"26","20",6.6,218]],["R-R","B-B",[0,2,"36,4","47,9",-11.5,10],[0,2,"27","34",-8.1,17]],["S-C","A-A",[2,0,"51,4","29,1",22.4,199],[2,0,"33","22",12.8,201]],["T-G","M-S",[0,2,"30,9","58,6",-27.7,131],[1,1,"18","18",0,-1]],["P-C","V-V",[0,2,"55,0","56,2",-1.2,275],[0,2,"18","49",-34.9,274]],["L-K","V-W",[0,2,"26,6","47,4",-20.8,285],[0,2,"17","19",-2.6,284]]],"p":{}},{"f":[["D-L","C-C",[2,0,"48,4","34,1",14.2,53],null],["R-C","T-C",[0,2,"51,7","62,7",-11.0,226],null],["U-A","R-R",[0,2,"34,5","42,8",-8.2,196],null],["D-P","S-C",[2,0,"66,2","48,1",18.2,59],null],["B-B","T-G",[0,2,"43,0","45,3",-2.3,232],null],["A-A","P-C",[0,2,"29,4","54,1",-24.7,158],null],["M-S","L-K",[2,0,"57,6","52,2",5.3,131],null],["V-V","V-W",[0,2,"39,2","54,1",-14.9,286],null]],"p":{"1":[[["T-C","70,1"],["R-C","54,2"],["D-L","39,6"],["C-C","38,4"],218],[["D-P","57,7"],["R-R","53,3"],["S-C","44,2"],["U-A","35,3"],64],[["B-B","66,6"],["P-C","61,5"],["T-G","60,5"],["A-A","54,2"],15],[["V-V","50,9"],["M-S","45,0"],["V-W","44,2"],["L-K","37,5"],278]]}},{"f":[["T-C","D-L",[0,2,"28","40",-14.6,47],[0,2,"63","67",-2.5,55]],["R-R","C-C",[0,2,"24","27",-3.3,27],[0,2,"59","67",-5.1,35]],["S-C","R-C",[2,0,"31","28",4.2,199],[0,2,"59","72",-7.9,174]],["T-G","U-A",[2,0,"33","30",4.4,228],[2,0,"79","66",8.0,232]],["P-C","D-P",[0,2,"25","37",-14.6,59],[1,1,"66","66",0,-1]],["L-K","B-B",[0,2,"26","27",-0.8,10],[2,0,"76","56",12.4,98]],["V-W","A-A",[2,0,"33","29",4.5,281],[2,0,"70","56",8.5,286]],["V-V","M-S",[2,0,"36","26",12.5,272],[0,2,"77","82",-3.4,121]]],"p":{}},{"f":[["D-L","R-R",[0,2,"27,4","36,4",-9.0,194],null],["T-C","S-C",[2,0,"33,7","26,7",7.0,221],null],["C-C","T-G",[0,2,"34,0","46,5",-12.5,227],null],["R-C","P-C",[2,0,"47,0","42,1",4.9,177],null],["U-A","L-K",[2,0,"47,0","42,4",4.5,251],null],["D-P","V-W",[0,2,"37,9","41,3",-3.4,282],null],["B-B","V-V",[2,0,"57,4","55,4",1.9,9],null],["A-A","M-S",[0,2,"47,1","55,6",-8.5,125],null]],"p":{"1":[[["S-C","65,9"],["R-R","54,9"],["D-L","48,9"],["T-C","37,9"],200],[["T-G","57,3"],["P-C","50,7"],["R-C","49,2"],["C-C","45,8"],228],[["L-K","63,6"],["U-A","55,0"],["V-W","49,1"],["D-P","37,1"],90],[["V-V","64,2"],["B-B","56,9"],["A-A","51,4"],["M-S","49,3"],274]]}},{"f":[["S-C","D-L",[0,2,"0","2",-26.7,51],[0,2,"4","5",-4.5,47]],["T-G","R-R",[0,2,"0","2",-12.5,197],[2,0,"5","2",10.2,228]],["P-C","T-C",[0,2,"0,5","1,5",-1.6,222],[0,2,"5","7",-8.2,223]],["L-K","C-C",[2,0,"1,5","0,5",2.1,98],[2,0,"6","5",1.8,91]],["V-W","R-C",[0,2,"0","2",-14.3,178],[2,0,"6","4",7.3,281]],["V-V","U-A",[0,2,"0","2",-14.7,257],[2,0,"5","3",6.7,274]],["M-S","D-P",[0,2,"0","2",-18.2,61],[1,1,"5","5",0,-1]],["A-A","B-B",[2,0,"2","0",9.9,6],[0,2,"5","6",-3.9,10]]],"p":{}},{"f":[["D-L","T-G",[0,2,"33,5","34,8",-1.3,233],[2,0,"41,6","28,6",13.0,56]],["S-C","P-C",[0,2,"43,5","51,9",-8.4,157],[1,1,"41,0","41,0",0,-1]],["R-R","L-K",[2,0,"61,6","60,8",0.8,197],[0,2,"42,9","60,7",-17.8,95]],["T-C","V-W",[2,0,"56,0","48,5",7.5,221],[2,0,"45,5","42,8",2.6,225]],["C-C","V-V",[0,2,"46,8","54,6",-7.9,279],[2,0,"52,0","48,3",3.6,35]],["R-C","M-S",[2,0,"52,1","47,3",4.8,176],[0,2,"42,3","54,5",-12.2,125]],["U-A","A-A",[2,0,"57,9","48,5",9.5,252],[2,0,"51,1","36,0",15.1,259]],["D-P","B-B",[0,2,"56,5","72,3",-15.8,13],[2,0,"58,8","31,9",26.9,59]]],"p":{}},{"f":[["P-C","D-L",[0,2,"77","80",-2.1,54],[0,2,"50,7","68,9",-18.1,53]],["L-K","T-G",[2,0,"92","70",13.9,96],[2,0,"50,0","41,8",8.2,96]],["V-W","S-C",[2,0,"85","79",3.6,285],[2,0,"57,0","55,6",1.4,286]],["V-V","R-R",[0,2,"65","66",-0.8,196],[2,0,"50,1","43,2",6.9,279]],["M-S","T-C",[0,2,"63","70",-4.5,223],[2,0,"67,4","57,8",9.6,131]],["A-A","C-C",[0,2,"78","83",-3.0,35],[0,2,"50,9","58,3",-7.4,35]],["B-B","R-C",[0,2,"68","93",-15.4,174],[0,2,"46,1","53,9",-7.8,174]],["D-P","U-A",[2,0,"92","67",15.9,59],[2,0,"70,0","41,8",28.1,59]]],"p":{}},{"f":[["D-L","L-K",[2,0,"50,1","33,8",16.2,48],[2,0,"52,5","44,1",8.4,49]],["P-C","V-W",[2,0,"56,8","44,3",12.6,156],[0,2,"52,4","55,3",-2.9,282]],["T-G","V-V",[0,2,"58,0","60,2",-2.2,276],[2,0,"64,3","61,0",3.3,230]],["S-C","M-S",[0,2,"52,8","53,7",-0.9,123],[2,0,"74,9","64,5",10.4,202]],["R-R","A-A",[0,2,"43,1","54,3",-11.3,0],[0,2,"45,9","49,3",-3.4,1]],["T-C","B-B",[0,2,"46,4","58,1",-11.7,10],[1,1,"37,4","37,4",0,-1]],["C-C","D-P",[2,0,"36,4","31,9",4.5,27],[1,1,"51,6","51,6",0,-1]],["R-C","U-A",[2,0,"53,8","46,2",7.6,175],[1,1,"45,7","45,7",0,-1]]],"p":{}},{"f":[["V-W","D-L",[0,2,"1","2",-1.7,55],[0,2,"0","2",-25.5,56]],["V-V","L-K",[0,2,"0","2",-21.4,96],[0,2,"0","2",-21.2,97]],["M-S","P-C",[1,1,"1","1",0,-1],[0,2,"0,5","1,5",-1.7,160]],["A-A","T-G",[2,0,"2","0",8.6,6],[2,0,"1,5","0,5",3.8,6]],["B-B","S-C",[2,0,"2","0",8.1,17],[0,2,"0,5","1,5",-6.5,206]],["D-P","R-R",[2,0,"2","0",16.0,64],[2,0,"2","0",28.5,61]],["U-A","T-C",[0,2,"0","2",-33.7,220],[2,0,"1,5","0,5",4.6,257]],["R-C","C-C",[0,2,"1","2",-3.9,32],[1,1,"1","1",0,-1]]],"p":{}},{"f":[["D-L","V-V",[2,0,"49,4","40,2",9.2,49],[0,2,"41,3","59,4",-18.0,273]],["V-W","M-S",[2,0,"45,3","38,8",6.5,282],[2,0,"53,9","40,4",13.5,284]],["L-K","A-A",[2,0,"58,2","42,6",15.6,94],[2,0,"50,8","45,6",5.3,90]],["P-C","B-B",[0,2,"42,9","46,8",-3.8,12],[1,1,"32,1","32,1",0,-1]],["T-G","D-P",[2,0,"79,2","34,1",45.1,227],[2,0,"53,7","50,7",3.0,229]],["S-C","U-A",[2,0,"62,9","41,7",21.1,200],[2,0,"48,3","40,9",7.4,204]],["R-R","R-C",[0,2,"38,9","42,2",-3.3,173],[2,0,"55,6","46,9",8.7,192]],["T-C","C-C",[0,2,"24,3","42,2",-17.9,30],[0,2,"45,9","49,0",-3.1,28]]],"p":{}},{"f":[["M-S","D-L",null,[0,2,"5","8",-11.4,48]],["A-A","V-V",null,[0,2,"5","6",-4.1,276]],["B-B","V-W",null,[2,0,"3","1",7.2,10]],["D-P","L-K",null,[2,0,"7","4",10.9,57]],["U-A","P-C",null,[2,0,"4","3",4.4,248]],["R-C","T-G",null,[0,2,"3","6",-10.3,228]],["C-C","S-C",null,[2,0,"4","3",3.5,30]],["T-C","R-R",null,[0,2,"2","4",-5.9,192]]],"p":{"0":[[["V-V","62,0"],["D-L","58,6"],["M-S","47,9"],["A-A","38,7"],274],[["L-K","69,1"],["B-B","57,9"],["V-W","41,4"],["D-P","39,5"],92],[["T-G","72,7"],["R-C","46,7"],["U-A","44,3"],["P-C","35,0"],231],[["S-C","68,0"],["C-C","48,6"],["T-C","46,0"],["R-R","37,8"],202]]}},{"f":[["D-L","A-A",[2,0,"31","30",1.6,47],null],["M-S","B-B",[0,2,"32","33",-1.4,9],null],["V-V","D-P",[2,0,"38","31",8.7,273],null],["V-W","U-A",[2,0,"30","28",2.6,280],null],["L-K","R-C",[0,2,"35","36",-1.5,173],null],["P-C","C-C",[0,2,"20","33",-16.6,27],null],["T-G","T-C",[2,0,"41","28",16.0,227],null],["S-C","R-R",[2,0,"30","27",3.4,199],null]],"p":{"1":[[["D-L","56,8"],["M-S","55,0"],["B-B","42,8"],["A-A","38,8"],53],[["D-P","64,8"],["V-W","42,1"],["V-V","38,7"],["U-A","28,0"],59],[["C-C","57,4"],["P-C","49,4"],["R-C","47,9"],["L-K","35,8"],28],[["S-C","58,1"],["T-C","52,1"],["T-G","45,1"],["R-R","40,5"],199]]}},{"f":[["B-B","D-L",[2,0,"15","7",10.6,9],[0,2,"14","19",-5.8,47]],["D-P","A-A",[0,2,"3","15",-20.2,2],[2,0,"24","18",6.3,67]],["U-A","M-S",[2,0,"15","3",22.3,251],[0,2,"25","31",-6.3,121]],["R-C","V-V",[2,0,"15","11",3.3,174],[2,0,"22","10",12.9,173]],["C-C","V-W",[0,2,"5","15",-13.6,283],[0,2,"25","41",-17.5,282]],["T-C","L-K",[0,2,"7","15",-9.5,98],[2,0,"30","14",17.4,220]],["R-R","P-C",[2,0,"15","8",8.6,194],[0,2,"25","34",-10.0,155]],["S-C","T-G",[0,2,"3","15",-25.3,233],[1,1,"26","26",0,-1]]],"p":{}},{"f":[["D-L","D-P",null,[0,2,"32,3","42,1",-9.8,60]],["B-B","U-A",null,[2,0,"50,6","47,1",3.5,9]],["A-A","R-C",null,[2,0,"46,9","45,5",1.4,2]],["M-S","C-C",null,[0,2,"39,9","53,7",-13.8,27]],["V-V","T-C",null,[2,0,"51,9","41,9",10.0,276]],["V-W","R-R",null,[2,0,"49,2","30,4",18.9,284]],["L-K","S-C",null,[0,2,"41,6","52,9",-11.3,200]],["P-C","T-G",null,[0,2,"37,3","53,3",-16.1,228]]],"p":{"0":[[["U-A","53,3"],["D-L","47,6"],["D-P","47,1"],["B-B","28,4"],257],[["M-S","59,9"],["R-C","47,1"],["A-A","43,9"],["C-C","41,4"],123],[["V-V","49,5"],["V-W","43,6"],["T-C","41,3"],["R-R","36,7"],278],[["L-K","47,8"],["T-G","47,1"],["S-C","44,6"],["P-C","35,2"],97]]}},{"f":[["U-A","D-L",[0,2,"36,6","40,0",-3.4,55],null],["R-C","D-P",[0,2,"37,5","61,4",-23.9,68],null],["C-C","B-B",[1,1,"39,2","39,2",0,-1],null],["T-C","A-A",[2,0,"54,8","48,2",6.6,218],null],["R-R","M-S",[0,2,"37,8","62,3",-24.5,121],null],["S-C","V-V",[0,2,"46,1","47,7",-1.6,275],null],["T-G","V-W",[0,2,"32,5","57,6",-25.1,285],null],["P-C","L-K",[2,0,"48,5","44,6",3.9,160],null]],"p":{"1":[[["D-P","69,3"],["U-A","43,6"],["R-C","43,3"],["D-L","32,0"],59],[["T-C","67,9"],["B-B","67,1"],["A-A","56,7"],["C-C","29,7"],218],[["R-R","73,4"],["M-S","55,4"],["V-V","51,7"],["S-C","40,8"],197],[["T-G","62,2"],["P-C","52,3"],["V-W","52,0"],["L-K","31,3"],232]]}}]}};
+var T=DATA.T,P=DATA.P,DIS=DATA.DIS,MD=DATA.MD,R=DATA.R,CODES=Object.keys(T);
+var AREA=[["pow","POW","Power","--p1"],["spe","SPE","Speed","--p4"],["men","MEN","Mental","--p5"],["soc","SOC","Social","--p6"]];
+var q=new URLSearchParams(location.search);
+var WIR=T[q.get("wir")]?q.get("wir"):"V-W", FRANKY=WIR==="N-N"?"V-W":"N-N", RIVALE=WIR==="V-W"?"A-A":"B-P";
+var Z={liga:T[WIR].l,n:12,view:"tab",team:null,ctab:"lage",cols:"sport",mat:"pkt",ver:"rang",spt:"erg",sort:"rank",dir:1,spalte:null};
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function logo(c){return "../team-logos/"+c+".jpg"}
+function por(p){return "../portraits/"+P[p][1]+".jpg"}
+function de(x,d){return x.toFixed(d==null?1:d).replace(".",",")}
+function vz(x,d){return (x>0?"+":x<0?"−":"±")+de(Math.abs(x),d)}
+function kl(x){return x>0?"plus":x<0?"minus":"null"}
+function phone(){return document.body.classList.contains("phone")}
+function sag(t){var e=$("#toast");e.textContent=t;e.classList.add("an");clearTimeout(sag.t);sag.t=setTimeout(function(){e.classList.remove("an")},2200)}
+
+/* ---------- Stand nach n Spieltagen (reine Summe der gebuchten Einsaetze, wie summiereSaisonBilanz) ---------- */
+var cache={};
+function ordne(s,l){return CODES.filter(function(c){return T[c].l===l}).sort(function(a,b){return s[b].pts-s[a].pts||s[b].vh-s[a].vh||T[a].sp-T[b].sp})}
+function stand(n){
+  if(cache[n])return cache[n];
+  var s={};CODES.forEach(function(c){s[c]={c:c,pts:0,S:0,U:0,N:0,vh:0,dp:DIS.map(function(){return 0}),dn:DIS.map(function(){return 0}),ein:[],hist:[0],rk:[T[c].sp],pod:[0,0,0,0]}});
+  function add(c,mi,di,p,o){var t=s[c];t.pts+=p;if(p>=2)t.S++;else if(p>=1)t.U++;else t.N++;t.dp[di]+=p;t.dn[di]++;t.vh+=o.d||0;o.mi=mi;o.di=di;o.p=p;t.ein.push(o);if(o.platz)t.pod[o.platz-1]++}
+  for(var mi=0;mi<n;mi++){
+    [1,2].forEach(function(l){var day=R[l][mi];
+      [0,1].forEach(function(side){var di=MD[mi][side];
+        if(day.p[side])day.p[side].forEach(function(pod,pi){for(var k=0;k<4;k++)add(pod[k][0],mi,di,k===0?2:k===1?1:0,{platz:k+1,pi:pi,wert:pod[k][1],pod:pod})});
+        else day.f.forEach(function(row){var r=row[2+side];if(!r)return;
+          add(row[0],mi,di,r[0],{opp:row[1],sa:r[2],sb:r[3],d:r[4],heim:1});add(row[1],mi,di,r[1],{opp:row[0],sa:r[3],sb:r[2],d:-r[4]})})})});
+    [1,2].forEach(function(l){ordne(s,l).forEach(function(c,i){s[c].rk.push(i+1)})});
+    CODES.forEach(function(c){s[c].hist.push(s[c].pts)});
+  }
+  var o={s:s,o:{1:ordne(s,1),2:ordne(s,2)}};
+  [1,2].forEach(function(l){o.o[l].forEach(function(c,i){s[c].rank=i+1;s[c].ges=(l-1)*16+i+1})});
+  return cache[n]=o;
+}
+function zone(c,rank){var l=T[c].l;return l===1?(rank===1?"titel":rank>=14?"ab":""):(rank<=3?"auf":"")}
+function naechster(c,n){if(n>=20)return null;var f=R[T[c].l][n].f;for(var i=0;i<f.length;i++){if(f[i][0]===c)return {opp:f[i][1],heim:1};if(f[i][1]===c)return {opp:f[i][0],heim:0}}return null}
+function papier(a,b,di){return Math.round(100/(1+Math.exp(-(T[a].st[di]-T[b].st[di])/10)))}
+function staerkeRang(c,di){var l=T[c].l,v=T[c].st[di],r=1;CODES.forEach(function(x){if(T[x].l===l&&T[x].st[di]>v)r++});return r}
+function arPts(t,a){var x=0;for(var i=a*5;i<a*5+5;i++)x+=t.dp[i];return x}
+function lagetext(c,S){var t=S.s[c],o=S.o[T[c].l],l=T[c].l;
+  if(Z.n===0)return "Startplatz <b>"+t.rank+".</b> · noch kein Spieltag gewertet";
+  if(l===2){if(t.rank<=3)return "auf <b>Aufstiegsplatz "+t.rank+"</b> · "+(t.pts-S.s[o[3]].pts)+" Pkt vor Platz 4";return "<b>"+(S.s[o[2]].pts-t.pts)+" Pkt</b> hinter Aufstiegsplatz 3"}
+  if(t.rank===1)return "<b>Tabellenführer</b> · "+(t.pts-S.s[o[1]].pts)+" Pkt vor Platz 2";
+  if(t.rank>=14)return "auf <b>Abstiegsplatz "+t.rank+"</b> · "+(S.s[o[12]].pts-t.pts)+" Pkt hinter Platz 13";
+  return "<b>"+(t.pts-S.s[o[13]].pts)+" Pkt</b> vor Abstiegsplatz 14 · "+(S.s[o[0]].pts-t.pts)+" hinter Platz 1"}
+function marken(c,kurz){var m="";if(c===WIR)m+='<span class="marke wir">DU</span>';if(c===FRANKY)m+='<span class="marke fr'+(kurz?" xs2":"")+'" data-tip="Von Franky gesteuert">FRANKY</span>';if(c===RIVALE)m+='<span class="marke leer xs2" data-tip="Dein Rivale">RIVALE</span>';return m}
+function ligen(){return Z.liga?[Z.liga]:[1,2]}
+function ligaName(){return Z.liga?"Liga "+Z.liga:"Gesamt"}
+
+/* ---------- Kopf ---------- */
+function zKopf(){var S=stand(Z.n),t=S.s[WIR];
+  $("#raillogo").src=logo(WIR);
+  $("#hk").innerHTML='<span class="crest"><img src="'+logo(WIR)+'" alt=""></span><div><div class="mdw"><button data-st="-1" aria-label="Spieltag zurück"'+(Z.n<=0?" disabled":"")+'>'+ic("l")+'</button><span><span class="sai">Saison 1 · </span>'+(Z.n===0?"vor Spieltag 1":Z.n===20?"Endstand":"nach Spieltag "+Z.n+" von 20")+'</span><button data-st="1" aria-label="Spieltag vor"'+(Z.n>=20?" disabled":"")+'>'+ic("r")+'</button></div><h1>Saisonstand</h1><div class="sub">'+esc(T[WIR].n)+' · Liga '+T[WIR].l+' · '+lagetext(WIR,S)+'</div></div>';
+  var h="";[1,2,0].forEach(function(l){var an=Z.liga===l;
+    if(l){var f=S.o[l][0];h+='<button class="dtab'+(an?" an":"")+(T[WIR].l===l?" eig":"")+'" role="tab" aria-selected="'+an+'" data-liga="'+l+'">'+(T[WIR].l===l?'<span class="mein">DEINE LIGA</span>':"")+'<span class="ic"><img src="'+logo(f)+'" alt=""></span><span><em>'+(Z.n?"1. "+esc(T[f].n):"16 Teams")+'</em><b>Liga '+l+'</b></span><span class="erw t"><strong>'+(T[WIR].l===l?t.rank+".":Z.n?S.s[f].pts:"–")+'</strong><span>'+(T[WIR].l===l?"dein Rang":"Pkt Platz 1")+'</span></span></button>'}
+    else h+='<button class="dtab'+(an?" an":"")+'" role="tab" aria-selected="'+an+'" data-liga="0"><span class="ic">'+ic("welt")+'</span><span><em>32 Teams</em><b>Gesamt</b></span><span class="erw t"><strong>'+t.ges+'.</strong><span>von 32</span></span></button>'});
+  $("#tabs").innerHTML=h;
+  var nx=naechster(WIR,Z.n);
+  $("#hr").innerHTML=nx?'<div class="frist"><span class="gk">Spieltag '+(Z.n+1)+' · '+DIS[MD[Z.n][0]][2]+' + '+DIS[MD[Z.n][1]][2]+'</span><strong>gegen '+esc(T[nx.opp].n)+'</strong></div><button class="btn" data-view="spt" data-spt="ans">Ansetzungen '+ic("r")+'</button>'
+    :'<div class="frist"><span class="gk">Saison 1 beendet</span><strong>'+(zone(WIR,t.rank)==="auf"?"Aufstieg in Liga 1":zone(WIR,t.rank)==="ab"?"Abstieg in Liga 2":zone(WIR,t.rank)==="titel"?"Meister":"Klasse gehalten")+'</strong></div><button class="btn" data-ctab="lage">Abschluss '+ic("r")+'</button>';
+}
+
+/* ---------- Haupttafel ---------- */
+var VIEWS=[["tab","Tabelle"],["mat","Disziplin-Matrix"],["ver","Saisonverlauf"],["spt","Spieltage"]];
+function seg(name,cur,items){return '<span class="seg" role="group">'+items.map(function(i){return '<button data-'+name+'="'+i[0]+'" aria-pressed="'+(cur===i[0])+'">'+i[1]+'</button>'}).join("")+'</span>'}
+function zHaupt(){
+  $("#vtabs").innerHTML=VIEWS.map(function(v){return '<button role="tab" class="'+(Z.view===v[0]?"an":"")+'" data-view="'+v[0]+'">'+(phone()?v[1].replace("Disziplin-","").replace("Saison",""):v[1])+'</button>'}).join("");
+  ({tab:zTabelle,mat:zMatrix,ver:zVerlauf,spt:zSpieltage})[Z.view]();
+}
+function legende(){var z=[];if(Z.liga!==2)z.push('<span><i style="background:var(--gold)"></i>Titel</span>','<span><i style="background:var(--warn)"></i>Abstieg (3)</span>');if(Z.liga!==1)z.push('<span><i style="background:var(--gut)"></i>Aufstieg (3)</span>');
+  z.push('<span><i style="background:var(--heim)"></i>dein Team</span>');return z.join("")}
+
+/* Tabelle */
+var SP_SPORT=[["rank","#","li"],["trend","±","li xs"],["name","Team","li"],["bil","S-U-N","xs0"],["vh","Verh.","xs c-vh"],["form","Form","mi0"],["kur","Verlauf","xs c-kur"],["a0","POW","xs"],["a1","SPE","xs"],["a2","MEN","xs"],["a3","SOC","xs"],["nx","Nä.","xs c-nx"],["ab","Abst.","xs"],["pts","Pkt",""]];
+var SP_VEREIN=[["rank","#","li"],["name","Team","li"],["k","Kader","xs"],["ovr","Ø Top 8","xs"],["mw","Marktwert",""],["cash","Cash","xs"],["spo","Sponsoren","xs"],["geh","Gehälter","xs"],["guv","GuV",""],["pts","Pkt",""]];
+var TIPS={trend:"Plätze gegenüber dem Spieltag davor",bil:"Siege – Unentschieden – Niederlagen je Disziplin-Einsatz (2 je Spieltag)",vh:"Punkteverhältnis: Summe der Abstände aller Duelle. Erster Tiebreaker nach den Punkten.",form:"Die letzten sechs Einsätze, neuester rechts",kur:"Rang von Spieltag 1 bis heute",a0:"Punkte in den fünf Power-Disziplinen",a1:"Punkte in den fünf Speed-Disziplinen",a2:"Punkte in den fünf Mental-Disziplinen",a3:"Punkte in den fünf Social-Disziplinen",nx:"Nächster Gegner",ab:"Rückstand auf Platz 1 der Liga",ovr:"Mittel der acht besten Spieler",guv:"Gewinn und Verlust der Saison, hochgerechnet"};
+function sortWert(c,S){var t=S.s[c],k=Z.sort;if(k==="rank"||k==="pts"||k==="ab")return t.ges;if(k==="name")return T[c].n;if(k==="trend")return -(Z.n?t.rk[Z.n-1]-t.rk[Z.n]:0);
+  if(k==="vh")return -t.vh;if(k==="bil")return -t.S;if(k==="form")return -t.ein.slice(-6).reduce(function(a,e){return a+e.p},0);if(k[0]==="a"&&k.length===2)return -arPts(t,+k[1]);if(k==="nx"||k==="kur")return t.ges;return -T[c][k]}
+function spark(t,wir){var n=Z.n;if(n<2)return "";var w=84,h=22,pts=[];for(var k=1;k<=n;k++)pts.push((3+(k-1)/(n-1)*(w-8)).toFixed(1)+","+(3+(t.rk[k]-1)/15*(h-6)).toFixed(1));
+  var e=pts[pts.length-1].split(",");return '<svg class="spk" viewBox="0 0 '+w+' '+h+'"><polyline points="'+pts.join(" ")+'" fill="none" stroke="'+(wir?"var(--heim)":"var(--leise)")+'" stroke-width="1.6" stroke-linejoin="round"/><circle cx="'+e[0]+'" cy="'+e[1]+'" r="2.4" fill="'+(wir?"var(--heim)":"var(--creme)")+'"/></svg>'}
+function formHtml(t){var e=t.ein.slice(-6),h="";for(var i=e.length;i<6;i++)h+='<i class="o"></i>';e.forEach(function(x){h+='<i class="'+(x.p>=2?"":x.p>=1?"u":"n")+'"></i>'});return '<span class="fm">'+h+'</span>'}
+function zeile(c,S,sortiert){var t=S.s[c],tt=T[c],z=zone(c,t.rank),lead=S.s[S.o[tt.l][0]],nr=Z.liga?t.rank:t.ges;
+  var cl="tz"+(z?" z-"+z:"")+(c===WIR?" wir":"")+(c===Z.team?" gew":"");
+  if(!sortiert){if((z==="titel")||(z==="auf"&&t.rank===3))cl+=" g-u";if(z==="ab"&&t.rank===14)cl+=" g-o"}
+  var ende=Z.n===20&&z?'<span class="marke '+(z==="ab"?"rot":z==="auf"?"gut":"gold")+' xs2">'+(z==="ab"?"ABSTIEG":z==="auf"?"AUFSTIEG":"MEISTER")+'</span>':"";
+  var team='<span class="tm"><img src="'+logo(c)+'" alt=""><b>'+esc(tt.n)+'</b>'+marken(c,1)+ende+'</span>';
+  var h='<button class="'+cl+'" data-team="'+c+'"><span class="rg t">'+nr+'.</span>';
+  if(Z.cols==="sport"){var d=Z.n?t.rk[Z.n-1]-t.rk[Z.n]:0,best=-1,bv=0;for(var a=0;a<4;a++){var v=arPts(t,a);if(v>bv){bv=v;best=a}}
+    var nx=naechster(c,Z.n);
+    h+='<span class="tr xs '+kl(d)+'">'+(Z.n?(d>0?"▲"+d:d<0?"▼"+(-d):"–"):"")+'</span>'+team+
+      '<span class="bil t">'+(Z.n?t.S+"-"+t.U+"-"+t.N:"–")+'</span><span class="t xs c-vh '+kl(t.vh)+'">'+(Z.n?vz(t.vh):"–")+'</span>'+formHtml(t)+'<span class="xs c-kur">'+spark(t,c===WIR)+'</span>';
+    for(a=0;a<4;a++)h+='<span class="ar t xs'+(a===best?" top":"")+'">'+(Z.n?arPts(t,a):"–")+'</span>';
+    h+='<span class="nx xs c-nx">'+(nx?'<img src="'+logo(nx.opp)+'" alt="'+esc(T[nx.opp].n)+'" title="'+esc(T[nx.opp].n)+'">':"")+'</span><span class="ab t xs">'+(Z.n?(lead.pts-t.pts?"−"+(lead.pts-t.pts):"–"):"–")+'</span>';
+  }else{h+=team+'<span class="t xs">'+tt.k+'</span><span class="t xs">'+de(tt.ovr)+'</span><span class="t">'+de(tt.mw)+' Mio</span><span class="t xs">'+de(tt.cash)+' Mio</span><span class="t xs plus">'+de(tt.spo)+' Mio</span><span class="t xs">'+de(tt.geh)+' Mio</span><span class="t '+kl(tt.guv)+'">'+vz(tt.guv)+' Mio</span>'}
+  return h+'<span class="pt t"><strong>'+(Z.n?t.pts:"–")+'</strong></span></button>'}
+function zTabelle(){var S=stand(Z.n),sp=Z.cols==="sport"?SP_SPORT:SP_VEREIN,sortiert=!(Z.sort==="rank"||Z.sort==="pts");
+  $("#vk").innerHTML='<h2>'+ligaName()+' · Tabelle</h2><span class="hin">'+(Z.n?"Klick auf ein Team öffnet die Teamkarte":"")+'</span><span class="sp"></span>'+seg("cols",Z.cols,[["sport","Sport"],["verein","Verein"]])+'<button class="btn klein nurphone" data-blatt="kontext" data-ctab="lage">'+ic("blitz")+'Showdown</button>';
+  var h='<div class="tl '+Z.cols+'">';
+  if(!Z.n)h+='<div class="leerh">'+ic("info")+'<span><b>Noch kein Spieltag gewertet.</b> Die Reihenfolge ist der Startplatz. Punkte, Bilanz und Form füllen sich ab Spieltag 1.</span></div>';
+  h+='<div class="th">'+sp.map(function(s){var kls=s[2].replace("xs0","").replace("mi0","mi");return '<button class="'+kls+(Z.sort===s[0]?" an":"")+(TIPS[s[0]]?" to":"")+'" data-sort="'+s[0]+'"'+(TIPS[s[0]]?' title="'+esc(TIPS[s[0]])+'"':"")+'>'+s[1]+(Z.sort===s[0]&&sortiert?(Z.dir>0?" ↓":" ↑"):"")+'</button>'}).join("")+'</div>';
+  ligen().forEach(function(l,i){var o=S.o[l].slice();
+    if(sortiert)o.sort(function(a,b){var x=sortWert(a,S),y=sortWert(b,S);return (x<y?-1:x>y?1:0)*Z.dir});
+    if(!Z.liga)h+='<div class="lgtr"><span class="gk" style="color:var(--creme)">Liga '+l+'</span><span class="gk">'+(l===1?"Platz 1 bis 16 · Meister und drei Absteiger":"Platz 17 bis 32 · drei Aufsteiger")+'</span></div>';
+    h+=o.map(function(c){return zeile(c,S,sortiert)}).join("")});
+  $("#vb").innerHTML=h+'</div>';
+  $("#vf").innerHTML=legende()+'<span class="sp"></span><span class="xs">'+(Z.cols==="sport"?"Sieg 2 · Unentschieden 1 · Niederlage 0 Punkte je Disziplin · bei Gleichstand entscheidet das Verhältnis":"Marktwert, Cash, Gehälter aus dem Kader · Sponsoren und GuV hochgerechnet")+'</span>';
+}
+
+/* Disziplin-Matrix */
+function heat(p,m){if(!m)return "";var s=p/m;return s>=1?"rgba(98,211,148,.72)":s>=.75?"rgba(98,211,148,.42)":s>.5?"rgba(98,211,148,.26)":s===.5?"rgba(255,255,255,.11)":s>=.25?"rgba(255,96,88,.30)":"rgba(255,96,88,.58)"}
+function heatRang(r){return "rgba(240,195,90,"+(0.04+Math.pow((16-r)/15,1.6)*.74).toFixed(2)+")"}
+function zMatrix(){var S=stand(Z.n),mat=Z.n?Z.mat:"kader",heute=Z.n<20?MD[Z.n]:[];
+  $("#vk").innerHTML='<h2>'+ligaName()+' · Disziplin-Matrix</h2><span class="hin">'+(mat==="pkt"?"Punkte je Disziplin · Kopf anklicken sortiert":"Rang der Kaderstärke je Disziplin in der Liga")+'</span><span class="sp"></span>'+seg("mat",mat,[["pkt","Punkte"],["kader","Kaderstärke"]]);
+  var h='<div class="mx'+(Z.spalte!=null?" spalte":"")+'"><div class="mh grp"><span style="visibility:hidden;grid-column:auto"></span>'+AREA.map(function(a){return '<span style="--pc:var('+a[3]+')">'+a[2].toUpperCase()+'</span>'}).join("")+'</div>';
+  h+='<div class="mh lab"><button data-spalte="">Team</button>'+DIS.map(function(d,i){return '<button class="to'+(Z.spalte===i?" an":"")+(heute.indexOf(i)>=0?" heute":"")+'" data-spalte="'+i+'" data-tip="'+esc(d[2])+(d[4]?" · Vierer-Pod":" · Duell")+(heute.indexOf(i)>=0?"\nam nächsten Spieltag":"")+'" style="--x:0">'+d[1]+'</button>'}).join("")+'<button data-spalte="">'+(mat==="pkt"?"Σ":"Ø")+'</button></div>';
+  ligen().forEach(function(l){var o=S.o[l].slice();
+    if(Z.spalte!=null)o.sort(function(a,b){return mat==="pkt"?(S.s[b].dp[Z.spalte]-S.s[a].dp[Z.spalte]||T[b].st[Z.spalte]-T[a].st[Z.spalte]):T[b].st[Z.spalte]-T[a].st[Z.spalte]});
+    o.forEach(function(c){var t=S.s[c],z=zone(c,t.rank);
+      h+='<div class="mz'+(z?" z-"+z:"")+(c===WIR?" wir":"")+(c===Z.team?" gew":"")+'"><button class="tmz tm" data-team="'+c+'" data-code="'+c+'"><span class="t">'+(Z.liga?t.rank:t.ges)+'</span><img src="'+logo(c)+'" alt=""><b>'+esc(T[c].n)+'</b></button>';
+      var sum=0;DIS.forEach(function(d,i){var sa=Z.spalte===i?" sp-an":"";
+        if(mat==="pkt"){var m=t.dn[i]*2;if(!m)h+='<span class="c leer'+sa+'">·</span>';else{var er=t.ein.filter(function(e){return e.di===i}).map(function(e){return "ST "+(e.mi+1)+": "+(e.platz?"Platz "+e.platz+" im Vierer-Pod":e.sa+" : "+e.sb+" gegen "+T[e.opp].n)}).join("\n");
+          h+='<span class="c t'+sa+(i>13?" tl":"")+'" style="background:'+heat(t.dp[i],m)+'" data-tip="'+esc(d[2]+": "+t.dp[i]+" von "+m+" Punkten\n"+er)+'">'+t.dp[i]+'</span>'}}
+        else{var r=staerkeRang(c,i);sum+=r;h+='<span class="c t'+sa+(i>13?" tl":"")+'" style="background:'+heatRang(r)+';color:'+(r<=5?"#17120a":"#fff")+'" data-tip="'+esc(d[2]+": Kaderstärke "+de(T[c].st[i])+" (Mittel der vier Besten)\nRang "+r+" in Liga "+l)+'">'+r+'</span>'}});
+      h+='<span class="su t">'+(mat==="pkt"?t.pts:de(sum/20))+'</span></div>'})});
+  $("#vb").innerHTML=h+'</div>';
+  $("#vf").innerHTML=(mat==="pkt"?'<span class="skala"><i style="background:rgba(255,96,88,.58)"></i><i style="background:rgba(255,96,88,.30)"></i><i style="background:rgba(255,255,255,.11)"></i><i style="background:rgba(98,211,148,.42)"></i><i style="background:rgba(98,211,148,.72)"></i></span><span>Anteil der möglichen Punkte: keine · die Hälfte · alle</span><span>· = noch nicht gespielt</span>'
+    :'<span class="skala"><i style="background:'+heatRang(1)+'"></i><i style="background:'+heatRang(5)+'"></i><i style="background:'+heatRang(9)+'"></i><i style="background:'+heatRang(16)+'"></i></span><span>Rang 1 bis 16 der Kaderstärke</span>')+'<span style="color:var(--gold)">▢ am nächsten Spieltag</span><span class="sp"></span><span class="xs">Zelle überfahren zeigt die Ergebnisse</span>';
+}
+
+/* Saisonverlauf */
+function zVerlauf(){var l=Z.liga||T[Z.team||WIR].l;
+  $("#vk").innerHTML='<h2>Liga '+l+' · Saisonverlauf</h2><span class="hin">'+(Z.liga?"":"Gesamt zeigt die Liga des gewählten Teams · ")+'Linie oder Name anklicken wählt das Team</span><span class="sp"></span>'+seg("ver",Z.ver,[["rang","Rang"],["pkt","Punkte"]]);
+  $("#vb").innerHTML='<div class="vl" id="vl"></div>';
+  $("#vf").innerHTML=legende()+'<span><i style="background:var(--gast)"></i>gewähltes Team</span><span class="sp"></span><span class="xs">'+(Z.ver==="rang"?"Rang nach jedem Spieltag · Start = Startplatz":"Punkte nach jedem Spieltag")+'</span>';
+  var el=$("#vl"),W=el.clientWidth,H=el.clientHeight,S=stand(Z.n),o=S.o[l],n=Z.n,breit=W>700;
+  var ml=34,mr=breit?186:62,mt=26,mb=30,xm=Math.max(n,4),maxP=Math.max(8,S.s[o[0]].pts);
+  function X(k){return ml+k/xm*(W-ml-mr)} function Yr(r){return mt+(r-1)/15*(H-mt-mb)} function Yp(p){return mt+(1-p/maxP)*(H-mt-mb)}
+  var g='<svg viewBox="0 0 '+W+' '+H+'">',rh=(H-mt-mb)/15;
+  if(Z.ver==="rang"){
+    if(l===2)g+='<rect x="'+ml+'" y="'+(Yr(1)-rh/2)+'" width="'+(W-ml-mr+18)+'" height="'+rh*3+'" fill="rgba(98,211,148,.09)"/><text x="'+(ml+6)+'" y="'+(Yr(1)-rh/2+13)+'" style="fill:var(--gut);font-size:11px;letter-spacing:.12em">AUFSTIEG</text>';
+    else g+='<rect x="'+ml+'" y="'+(Yr(1)-rh/2)+'" width="'+(W-ml-mr+18)+'" height="'+rh+'" fill="rgba(240,195,90,.12)"/><text x="'+(ml+6)+'" y="'+(Yr(1)-rh/2+13)+'" style="fill:var(--gold);font-size:11px;letter-spacing:.12em">TITEL</text><rect x="'+ml+'" y="'+(Yr(14)-rh/2)+'" width="'+(W-ml-mr+18)+'" height="'+rh*3+'" fill="rgba(255,96,88,.09)"/><text x="'+(ml+6)+'" y="'+(Yr(16)+rh/2-5)+'" style="fill:var(--warn);font-size:11px;letter-spacing:.12em">ABSTIEG</text>';
+    for(var r=1;r<=16;r++)g+='<text x="'+(ml-10)+'" y="'+(Yr(r)+4)+'" text-anchor="end">'+r+'</text><line x1="'+ml+'" x2="'+(W-mr+18)+'" y1="'+Yr(r)+'" y2="'+Yr(r)+'" stroke="rgba(244,230,196,.05)"/>';
+  }else for(var p=0;p<=maxP;p+=5)g+='<text x="'+(ml-10)+'" y="'+(Yp(p)+4)+'" text-anchor="end">'+p+'</text><line x1="'+ml+'" x2="'+(W-mr+18)+'" y1="'+Yp(p)+'" y2="'+Yp(p)+'" stroke="rgba(244,230,196,.07)"/>';
+  for(var k=0;k<=xm;k++)if(breit||k%2===0||k===n)g+='<text x="'+X(k)+'" y="'+(H-9)+'" text-anchor="middle"'+(k===n?' style="fill:var(--gold);font-weight:700"':"")+'>'+(k===0?"Start":k)+'</text>';
+  g+='<line x1="'+X(n)+'" x2="'+X(n)+'" y1="'+(mt-10)+'" y2="'+(H-mb+4)+'" stroke="rgba(240,195,90,.35)" stroke-dasharray="3 4"/>';
+  var ly={},ys=o.map(function(c){return {c:c,y:Z.ver==="rang"?Yr(S.s[c].rk[n]):Yp(S.s[c].pts)}}).sort(function(a,b){return a.y-b.y});
+  if(Z.ver==="pkt"){var step=Math.min(17,(H-mt-mb)/15);for(var i=1;i<ys.length;i++)if(ys[i].y<ys[i-1].y+step)ys[i].y=ys[i-1].y+step;var over=ys[ys.length-1].y-(H-mb+6);if(over>0)for(i=ys.length-1;i>=0;i--){ys[i].y-=over;if(i&&ys[i-1].y+step<=ys[i].y)break}}
+  ys.forEach(function(e){ly[e.c]=e.y});
+  var reihen=o.slice().sort(function(a,b){function w(c){return c===Z.team?3:c===WIR?2:c===FRANKY?1:0}return w(a)-w(b)});
+  reihen.forEach(function(c){var t=S.s[c],pts=[];for(var k=0;k<=n;k++)pts.push(X(k).toFixed(1)+","+(Z.ver==="rang"?Yr(t.rk[k]):Yp(t.hist[k])).toFixed(1));
+    var d="M"+pts.join("L"),stark=c===WIR||c===Z.team,ex=X(n),ey=+pts[pts.length-1].split(",")[1],z=zone(c,t.rank);
+    g+='<g class="ln'+(c===WIR?" wir":"")+(c===Z.team?" gew":"")+(z?" zone":"")+'" data-team="'+c+'"><path class="s" d="'+d+'"/><path class="h" d="'+d+'"/>';
+    if(stark)for(k=0;k<=n;k++){var xy=pts[k].split(",");g+='<circle cx="'+xy[0]+'" cy="'+xy[1]+'" r="3.4" fill="'+(c===Z.team?"var(--gast)":"var(--heim)")+'"/>'}
+    if(Math.abs(ly[c]-ey)>1)g+='<line x1="'+(ex+3)+'" x2="'+(ex+11)+'" y1="'+ey+'" y2="'+ly[c]+'" stroke="#5a6679" stroke-width="1"/>';
+    g+='<image href="'+logo(c)+'" x="'+(ex+13)+'" y="'+(ly[c]-(breit?10:8))+'" width="'+(breit?20:16)+'" height="'+(breit?20:16)+'" preserveAspectRatio="xMidYMid slice"/><text x="'+(ex+(breit?39:33))+'" y="'+(ly[c]+5)+'">'+(breit?esc(T[c].n)+(Z.ver==="pkt"?" · "+t.pts:""):c)+'</text></g>'});
+  if(!n)g+='<text x="'+(ml+60)+'" y="'+(H/2)+'" style="font-size:16px;fill:var(--leise)">Der Verlauf beginnt nach Spieltag 1. Rechts stehen die Startplätze.</text>';
+  el.innerHTML=g+'</svg>';
+}
+
+/* Spieltage */
+function showdown(a,b,S){var x=S.s[a],y=S.s[b],l=T[a].l,lo=Math.min(x.rank,y.rank),hi=Math.max(x.rank,y.rank),tag="";
+  if(!Z.n)tag="";else if(l===1&&hi<=4)tag="Spitzenspiel";else if(l===2&&hi<=5)tag="Aufstiegsduell";else if(l===1&&lo>=11)tag="Abstiegskampf";else if(l===2&&lo>=13)tag="Kellerduell";else if(hi-lo<=1)tag="Tabellennachbarn";else if(x.pts===y.pts)tag="Punktgleich";
+  var w=-Math.abs(x.pts-y.pts)-(hi-lo)*.5+(tag==="Spitzenspiel"||tag==="Aufstiegsduell"||tag==="Abstiegskampf"?5:0)+((a===WIR||b===WIR)?3:0);return {tag:tag,w:w}}
+function tk(c,S,re){var t=S.s[c];return '<button data-team="'+c+'"><img src="'+logo(c)+'" alt=""><span class="nm"><b>'+esc(T[c].n)+'</b><small>'+(Z.n?t.rank+". · "+t.pts+" Pkt":"Startplatz "+t.rank)+'</small></span></button>'}
+function zSpieltage(){var S=stand(Z.n),ans=Z.spt==="ans"||Z.n===0,mi=ans?Z.n:Z.n-1;if(mi>19){ans=false;mi=19}
+  var d=MD[mi],Sv=ans?S:stand(mi);
+  $("#vk").innerHTML='<h2>'+ligaName()+' · Spieltag <i>'+(mi+1)+'</i></h2><span class="hin">'+DIS[d[0]][2]+(DIS[d[0]][4]?" (Vierer-Pods)":"")+' + '+DIS[d[1]][2]+(DIS[d[1]][4]?" (Vierer-Pods)":"")+'</span><span class="sp"></span>'+seg("spt",ans?"ans":"erg",[["erg","Ergebnisse ST "+Math.max(1,Z.n)],["ans","Ansetzungen ST "+Math.min(20,Z.n+1)]]);
+  var h='<div class="sg'+(Z.liga?"":" vier")+'">';
+  ligen().forEach(function(l){var day=R[l][mi];
+    if(!Z.liga)h+='<h3 style="grid-column:'+(l===1?"1/3":"3/5")+';grid-row:1">Liga '+l+'</h3>';
+    var col=Z.liga?"":(l===1?"grid-column:span 1":"");
+    var karten=day.f.map(function(row,fi){var a=row[0],b=row[1],pa=0,pb=0,ls="",sd=showdown(a,b,Sv);
+      [0,1].forEach(function(side){var di=d[side],r=row[2+side],dn='<span class="dn" title="'+esc(DIS[di][2])+'">'+(Z.liga&&!phone()?esc(DIS[di][2]):DIS[di][1])+'</span>';
+        if(ans){var pf=papier(a,b,di);ls+='<div class="ml pf"><span class="dn">'+DIS[di][1]+'</span>'+(DIS[di][4]?'<span style="color:var(--stumm);font-size:13px">Vierer-Pod '+"ABCD"[fi>>1]+' mit '+esc(day.f[fi^1][0])+' und '+esc(day.f[fi^1][1])+'</span><span></span>':'<span class="wb"><i style="width:'+pf+'%"></i></span><span class="t" style="text-align:right;color:var(--leise)">'+pf+' %</span>')+'</div>';return}
+        if(r){pa+=r[0];pb+=r[1];ls+='<div class="ml"><span class="pkt p'+r[0]+'">'+r[0]+'</span><span class="sa t'+(r[0]<r[1]?" v":"")+'">'+r[2]+'</span>'+dn+'<span class="sb t'+(r[1]<r[0]?" v":"")+'">'+r[3]+'</span><span class="pkt p'+r[1]+'">'+r[1]+'</span></div>'}
+        else{var pod=day.p[side][fi>>1],ia=-1,ib=-1;pod.slice(0,4).forEach(function(m,k){if(m[0]===a)ia=k;if(m[0]===b)ib=k});var qa=ia===0?2:ia===1?1:0,qb=ib===0?2:ib===1?1:0;pa+=qa;pb+=qb;
+          ls+='<div class="ml"><span class="pkt p'+qa+'">'+qa+'</span><span class="sa'+(ia>1?" v":"")+'">Platz '+(ia+1)+'</span>'+dn+'<span class="sb'+(ib>1?" v":"")+'">Platz '+(ib+1)+'</span><span class="pkt p'+qb+'">'+qb+'</span></div>'}});
+      var kl2=(a===WIR||b===WIR)?" wir":(a===FRANKY||b===FRANKY)?" fr":"";
+      return {w:sd.w,h:'<div class="mc'+kl2+'"><div class="mk">'+tk(a,Sv)+'<span class="erg t">'+(ans?'<small>'+(sd.tag||"ST "+(mi+1))+'</small>vs':pa+' : '+pb+'<small>PUNKTE</small>')+'</span>'+tk(b,Sv)+'</div>'+ls+'</div>'}});
+    if(Z.liga)h+=karten.map(function(k){return k.h}).join("");
+    else h+='<div style="grid-column:'+(l===1?"1/3":"3/5")+';grid-row:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start">'+karten.map(function(k){return k.h}).join("")+'</div>';
+    if(!ans&&Z.liga)[0,1].forEach(function(side){if(!day.p[side])return;h+='<h3>Vierer-Pods · '+DIS[d[side]][2]+' <span class="gk">Platz 1 = 2 Punkte · Platz 2 = 1 Punkt</span></h3><div style="grid-column:1/-1;display:grid;grid-template-columns:repeat('+(phone()?1:4)+',minmax(0,1fr));gap:10px">'+
+      day.p[side].map(function(pod,pi){return '<div class="pod"><span class="gk">Pod '+"ABCD"[pi]+'</span>'+pod.slice(0,4).map(function(m,k){return '<button data-team="'+m[0]+'" class="'+(m[0]===WIR?"wir":"")+'"><em>'+(k+1)+'.</em><img src="'+logo(m[0])+'" alt=""><b>'+esc(T[m[0]].n)+'</b><span class="t">'+m[1]+'</span><span class="pkt p'+(k===0?2:k===1?1:0)+'">'+(k===0?2:k===1?1:0)+'</span></button>'}).join("")+'</div>'}).join("")+'</div>'})});
+  $("#vb").innerHTML=h+'</div>';
+  $("#vf").innerHTML=ans?'<span>Balken = Papierform aus der Kaderstärke der Disziplin, kein Ergebnis</span><span class="sp"></span><span class="xs">Bernstein = Heim · Türkis = Gast</span>':'<span><span class="pkt p2" style="display:inline-grid;vertical-align:-4px">2</span> Sieg</span><span><span class="pkt p1" style="display:inline-grid;vertical-align:-4px">1</span> Unentschieden</span><span><span class="pkt" style="display:inline-grid;vertical-align:-4px">0</span> Niederlage</span><span class="sp"></span><span class="xs">Zwei Disziplinen je Spieltag, höchstens 4 Punkte</span>';
+}
+
+/* ---------- Kontext ---------- */
+function zKontext(){
+  $("#ctabs").innerHTML=[["team","Teamkarte"],["lage",Z.n>=20?"Abschluss":"Showdown"],["best","Bestenliste"]].map(function(t){return '<button class="'+(Z.ctab===t[0]?"an":"")+'" data-ctab="'+t[0]+'">'+t[1]+'</button>'}).join("")+'<button class="nurphone" data-blatt="" aria-label="Schließen">'+ic("x")+'</button>';
+  $("#cb").innerHTML=({team:kTeam,lage:kLage,best:kBest})[Z.ctab]();$("#cb").scrollTop=0;
+}
+function kTeam(){var c=Z.team||WIR,S=stand(Z.n),t=S.s[c],tt=T[c],z=zone(c,t.rank),nx=naechster(c,Z.n);
+  var h='<div class="geg" style="--pc:var('+(c===WIR?"--heim":"--gold")+')"><img src="'+logo(c)+'" alt=""><div><b>'+esc(tt.n)+'</b><span>Liga '+tt.l+' · '+tt.k+' Spieler · '+de(tt.mw)+' Mio '+marken(c)+(z?'<span class="marke '+(z==="ab"?"rot":z==="auf"?"gut":"gold")+'">'+(z==="ab"?"ABSTIEGSPLATZ":z==="auf"?"AUFSTIEGSPLATZ":"PLATZ 1")+'</span>':"")+'</span></div></div>';
+  h+='<div class="rech t"><div class="su"><small>Rang</small><strong>'+t.rank+'.</strong></div><div><small>Punkte</small><strong>'+(Z.n?t.pts:"–")+'</strong></div><div><small>S-U-N</small><strong>'+(Z.n?t.S+"-"+t.U+"-"+t.N:"–")+'</strong></div><div><small>Verh.</small><strong class="'+kl(t.vh)+'">'+(Z.n?vz(t.vh,0):"–")+'</strong></div><div><small>Trend</small><strong class="'+kl(Z.n?t.rk[Z.n-1]-t.rk[Z.n]:0)+'">'+(Z.n?vz(t.rk[Z.n-1]-t.rk[Z.n],0):"–")+'</strong></div></div>';
+  if(Z.n)h+='<div style="margin-top:8px;font-size:14.5px;color:var(--leise)">'+lagetext(c,S)+'</div>';
+  h+='<div class="ab2"><div class="gk"><span>Die besten vier</span><em>Gesamtwert</em></div><div class="kk">'+tt.stars.map(function(p,i){return '<a class="sk" href="#" data-spieler="'+p+'"><img src="'+por(p)+'" alt="" loading="lazy"><span class="rg t">'+de(P[p][4])+'</span><span class="un"><b>'+esc(P[p][0])+'</b><small>'+esc(P[p][2])+'</small></span></a>'}).join("")+'</div></div>';
+  var heute=Z.n<20?MD[Z.n]:[];
+  h+='<div class="ab2"><div class="gk"><span>Stärken je Disziplin</span><em>Rang der Kaderstärke in Liga '+tt.l+' · Punkte</em></div><div class="dr">'+DIS.map(function(d,i){var r=staerkeRang(c,i);return '<div class="dk '+(r<=4?"a":r>=13?"c":"")+(heute.indexOf(i)>=0?" h":"")+'" title="'+esc(d[2])+': Kaderstärke '+de(tt.st[i])+', '+t.dp[i]+' von '+t.dn[i]*2+' Punkten"><small>'+d[1]+'<u class="t">'+(t.dn[i]?t.dp[i]+"/"+t.dn[i]*2:"")+'</u></small><strong class="t">'+r+'.</strong></div>'}).join("")+'</div></div>';
+  if(Z.n){var e=t.ein.slice(-6).reverse();h+='<div class="ab2"><div class="gk"><span>Letzte Einsätze</span><em>'+t.ein.slice(-6).reduce(function(a,x){return a+x.p},0)+' von 12 Punkten</em></div>'+e.map(function(x){
+    return '<button class="duell"'+(x.opp?' data-team="'+x.opp+'"':"")+'><span class="st t">ST '+(x.mi+1)+'</span><span class="dn">'+DIS[x.di][1]+'</span>'+(x.opp?'<img src="'+logo(x.opp)+'" alt=""><b>'+esc(T[x.opp].n)+'</b><strong class="t">'+x.sa+' : '+x.sb+'</strong>':'<span></span><b style="color:var(--leise)">Vierer-Pod '+"ABCD"[x.pi]+'</b><strong>Platz '+x.platz+'</strong>')+'<span class="pkt p'+x.p+'">'+x.p+'</span></button>'}).join("")+'</div>'}
+  if(nx){h+='<div class="ab2"><div class="gk"><span>Spieltag '+(Z.n+1)+'</span><em>Papierform aus der Kaderstärke</em></div><div class="sd"><div class="par"><button data-team="'+c+'"><img src="'+logo(c)+'" alt=""><b>'+esc(tt.n)+'</b><small>'+t.rank+'. · '+t.pts+' Pkt</small></button><span class="vs">vs</span><button data-team="'+nx.opp+'"><img src="'+logo(nx.opp)+'" alt=""><b>'+esc(T[nx.opp].n)+'</b><small>'+S.s[nx.opp].rank+'. · '+S.s[nx.opp].pts+' Pkt</small></button></div>'+
+    heute.map(function(di){var pf=papier(c,nx.opp,di);return '<div class="pf"><span class="gk">'+DIS[di][1]+'</span>'+(DIS[di][4]?'<span style="font-size:13px">Vierer-Pod</span><span></span>':'<span class="wb"><i style="width:'+pf+'%"></i></span><span class="t">'+pf+' %</span>')+'</div>'}).join("")+'</div></div>'}
+  h+='<div class="akt"><button class="btn klein" data-nix="Teamprofil">Teamprofil '+ic("r")+'</button><button class="btn klein" data-view="ver">Im Verlauf zeigen</button>'+(c!==WIR?'<button class="btn klein" data-team="'+WIR+'">Zurück zu meinem Team</button>':"")+'</div>';
+  return h}
+function kLage(){var S=stand(Z.n),h="";
+  if(Z.n>=20){[1,2].forEach(function(l){var o=S.o[l];function ch(cs){return '<div class="abschl">'+cs.map(function(c){return '<button data-team="'+c+'"><img src="'+logo(c)+'" alt="">'+esc(T[c].n)+'</button>'}).join("")+'</div>'}
+      if(l===1)h+='<div class="ab2" style="margin-top:0"><div class="gk"><span style="color:var(--gold)">Meister Saison 1</span><em>'+S.s[o[0]].pts+' Punkte</em></div>'+ch([o[0]])+'</div><div class="ab2"><div class="gk"><span style="color:var(--warn)">Absteiger in Liga 2</span></div>'+ch(o.slice(13))+'</div>';
+      else h+='<div class="ab2"><div class="gk"><span style="color:var(--gut)">Aufsteiger in Liga 1</span></div>'+ch(o.slice(0,3))+'</div>'});
+    return h+'<div class="ab2" style="font-size:14.5px;color:var(--leise)">Drei Teams tauschen die Liga. Die neue Saison beginnt mit neuen Startplätzen.</div>'}
+  var mi=Z.n,d=MD[mi];
+  h+='<div class="gk" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Spieltag '+(mi+1)+' · '+DIS[d[0]][2]+' + '+DIS[d[1]][2]+'</span></div>';
+  var alle=[];ligen().forEach(function(l){R[l][mi].f.forEach(function(row){var sd=showdown(row[0],row[1],S);alle.push({a:row[0],b:row[1],tag:sd.tag,w:sd.w,l:l})})});
+  alle.sort(function(x,y){function m(z){return z.a===WIR||z.b===WIR?1:0}return m(y)-m(x)||y.w-x.w});
+  alle.slice(0,3).forEach(function(m){var x=S.s[m.a],y=S.s[m.b];
+    h+='<div class="sd'+(m.a===WIR||m.b===WIR?" wir":"")+'"><div class="kopf"><span>'+(m.a===WIR||m.b===WIR?"Dein Spiel"+(m.tag?" · "+m.tag:""):m.tag||"Paarung")+'</span><small>Liga '+m.l+'</small></div><div class="par"><button data-team="'+m.a+'"><img src="'+logo(m.a)+'" alt=""><b>'+esc(T[m.a].n)+'</b><small>'+x.rank+'. · '+x.pts+' Pkt</small></button><span class="vs">vs</span><button data-team="'+m.b+'"><img src="'+logo(m.b)+'" alt=""><b>'+esc(T[m.b].n)+'</b><small>'+y.rank+'. · '+y.pts+' Pkt</small></button></div>'+
+      d.map(function(di){var pf=papier(m.a,m.b,di);return '<div class="pf"><span class="gk">'+DIS[di][1]+'</span>'+(DIS[di][4]?'<span style="font-size:13px">Vierer-Pod, zwei weitere Teams</span><span></span>':'<span class="wb"><i style="width:'+pf+'%"></i></span><span class="t">'+pf+' %</span>')+'</div>'}).join("")+'</div>'});
+  h+='<div class="ab2"><div class="gk"><span>Was auf dem Spiel steht</span></div>';
+  ligen().forEach(function(l){var o=S.o[l];if(!Z.n)return;
+    if(l===1){h+=rek("Titelrennen",esc(T[o[0]].n)+" vor "+esc(T[o[1]].n),(S.s[o[0]].pts-S.s[o[1]].pts)+" Pkt");h+=rek("Abstiegslinie",esc(T[o[12]].n)+" (13.) vor "+esc(T[o[13]].n)+" (14.)",(S.s[o[12]].pts-S.s[o[13]].pts)+" Pkt")}
+    else h+=rek("Aufstiegslinie",esc(T[o[2]].n)+" (3.) vor "+esc(T[o[3]].n)+" (4.)",(S.s[o[2]].pts-S.s[o[3]].pts)+" Pkt")});
+  h+=rek("Noch zu holen",(20-Z.n)+" Spieltage, je 2 Disziplinen",(20-Z.n)*4+" Pkt")+'</div>';
+  return h+'<div class="akt"><button class="btn klein" data-view="spt" data-spt="ans">Alle Ansetzungen '+ic("r")+'</button></div>'}
+function rek(a,b,c){return '<div class="rek"><span>'+a+'<small>'+b+'</small></span><strong class="t">'+c+'</strong></div>'}
+function kBest(){var S=stand(Z.n),ls=ligen(),h="";
+  if(!Z.n)return '<div style="color:var(--leise);font-size:15px;line-height:1.35">Bestenliste, Disziplin-Beste und Rekorde entstehen mit dem ersten gewerteten Spieltag.</div>';
+  var mw={},bestD=null,serie={c:null,n:0},voll={c:null,n:0};
+  for(var mi=0;mi<Z.n;mi++)ls.forEach(function(l){var day=R[l][mi];day.f.forEach(function(row){[0,1].forEach(function(s){var r=row[2+s];if(!r)return;if(r[5]>=0){var w=r[0]>r[1]?row[0]:row[1];(mw[r[5]]=mw[r[5]]||{n:0,c:w}).n++}
+      if(!bestD||Math.abs(r[4])>Math.abs(bestD.r[4]))bestD={r:r,a:row[0],b:row[1],mi:mi,di:MD[mi][s]}})});
+    Object.keys(day.p).forEach(function(s){day.p[s].forEach(function(pod){(mw[pod[4]]=mw[pod[4]]||{n:0,c:pod[0][0]}).n++})})});
+  var top=Object.keys(mw).map(function(p){return {p:+p,n:mw[p].n,c:mw[p].c}}).sort(function(a,b){return b.n-a.n||P[b.p][4]-P[a.p][4]}).slice(0,6);
+  h+='<div class="gk" style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Matchwinner · '+ligaName()+'</span><span style="color:var(--stumm);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:12.5px">bester Spieler eines gewonnenen Einsatzes</span></div>';
+  h+=top.map(function(x,i){return '<button class="kand" data-team="'+x.c+'"><em class="t">'+(i+1)+'</em><img src="'+por(x.p)+'" alt="" loading="lazy"><span style="min-width:0"><b>'+esc(P[x.p][0])+'</b><small>'+esc(P[x.p][2])+' · '+esc(T[x.c].n)+'</small></span><img class="w" src="'+logo(x.c)+'" alt=""><strong class="t">'+x.n+'×</strong></button>'}).join("");
+  h+='<div class="ab2"><div class="gk"><span>Disziplin-Beste</span><em>Team mit den meisten Punkten</em></div><div class="dkg">'+DIS.map(function(d,i){var b=null;CODES.forEach(function(c){if(ls.indexOf(T[c].l)<0||!S.s[c].dn[i])return;if(!b||S.s[c].dp[i]>S.s[b].dp[i]||(S.s[c].dp[i]===S.s[b].dp[i]&&T[c].st[i]>T[b].st[i]))b=c});
+    return b?'<button data-team="'+b+'" title="'+esc(d[2])+'"><span>'+d[1]+'</span><img src="'+logo(b)+'" alt=""><b>'+esc(T[b].n)+'</b><strong class="t">'+S.s[b].dp[i]+'</strong></button>':'<button disabled style="opacity:.4"><span>'+d[1]+'</span><span></span><b>offen</b><span></span></button>'}).join("")+'</div></div>';
+  CODES.forEach(function(c){if(ls.indexOf(T[c].l)<0)return;var run=0,mx=0,v=0,t=S.s[c];t.ein.forEach(function(e){run=e.p>=2?run+1:0;if(run>mx)mx=run});for(var k=1;k<=Z.n;k++)if(t.hist[k]-t.hist[k-1]===4)v++;
+    if(mx>serie.n)serie={c:c,n:mx};if(v>voll.n)voll={c:c,n:v}});
+  h+='<div class="ab2"><div class="gk"><span>Rekorde der Saison</span></div>'+(bestD?rek("Deutlichster Sieg",DIS[bestD.di][2]+", ST "+(bestD.mi+1)+": "+esc(T[bestD.a].n)+" "+bestD.r[2]+" : "+bestD.r[3]+" "+esc(T[bestD.b].n),vz(Math.abs(bestD.r[4]))):"")+
+    rek("Längste Siegesserie",esc(T[serie.c].n)+", Einsätze in Folge",serie.n)+rek("Spieltage mit 4 Punkten",esc(T[voll.c].n),voll.n+"×")+'</div>';
+  return h}
+
+/* ---------- Steuerung ---------- */
+function alles(){zKopf();zHaupt();zKontext();zDemo()}
+function blatt(n){if(n)document.body.dataset.blatt=n;else delete document.body.dataset.blatt}
+var SZENEN={tabelle:{},teamkarte:{team:"D-L",ctab:"team"},liga1:{liga:1},gesamt:{liga:0},verein:{cols:"verein"},matrix:{view:"mat"},kader:{view:"mat",mat:"kader"},verlauf:{view:"ver",team:"D-L",ctab:"team"},punkte:{view:"ver",ver:"pkt"},
+  spieltage:{view:"spt"},ansetzungen:{view:"spt",spt:"ans"},bestenliste:{ctab:"best"},start:{n:0},ende:{n:20}};
+var SZ_NAMEN={tabelle:"Tabelle",teamkarte:"Teamkarte",liga1:"Liga 1",gesamt:"Gesamt",verein:"Verein",matrix:"Matrix",kader:"Kaderstärke",verlauf:"Verlauf",punkte:"Punkteverlauf",spieltage:"Spieltag",ansetzungen:"Ansetzungen",bestenliste:"Bestenliste",start:"Vor Spieltag 1",ende:"Saisonende"};
+var szene="tabelle";
+function setze(n){szene=n;Z={liga:T[WIR].l,n:12,view:"tab",team:null,ctab:"lage",cols:"sport",mat:"pkt",ver:"rang",spt:"erg",sort:"rank",dir:1,spalte:null};var s=SZENEN[n]||{};for(var k in s)Z[k]=s[k];blatt("");alles()}
+function zDemo(){$("#demo").innerHTML='<b>Mockup</b>'+Object.keys(SZENEN).map(function(k){return '<button data-szene="'+k+'" aria-pressed="'+(szene===k)+'">'+SZ_NAMEN[k]+'</button>'}).join("")+'<button data-phone="1" aria-pressed="'+phone()+'">Phone</button><span><span class="kbd">←</span> <span class="kbd">→</span> Spieltag · <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">G</span> Liga · <span class="kbd">T</span> <span class="kbd">M</span> <span class="kbd">V</span> <span class="kbd">S</span> Ansicht</span><a href="oly-start-modern-17-11.html">→ zur Startseite</a>'}
+document.addEventListener("click",function(ev){var t=ev.target,x;
+  if(t.id==="schleier"){blatt("");return}
+  if((x=t.closest("[data-szene]"))){setze(x.dataset.szene);return}
+  if((x=t.closest("[data-phone]"))){document.body.classList.toggle("phone");phoneFest=document.body.classList.contains("phone");alles();return}
+  if((x=t.closest("[data-nix]"))){sag(x.dataset.nix+" öffnet sich in der App. Im Mockup nicht verdrahtet.");return}
+  if((x=t.closest("[data-spieler]"))){ev.preventDefault();sag(P[+x.dataset.spieler][0]+": Spielerkarte öffnet sich in der App.");return}
+  if((x=t.closest("[data-st]"))){Z.n=Math.max(0,Math.min(20,Z.n+ +x.dataset.st));szene="";alles();return}
+  if((x=t.closest("[data-liga]"))){Z.liga=+x.dataset.liga;Z.spalte=null;szene="";alles();return}
+  if((x=t.closest("[data-sort]"))){var k=x.dataset.sort;if(Z.sort===k)Z.dir=-Z.dir;else{Z.sort=k;Z.dir=1}zHaupt();return}
+  if((x=t.closest("[data-spalte]"))){var v=x.dataset.spalte;Z.spalte=v===""||Z.spalte===+v?null:+v;zHaupt();return}
+  var treffer=false;
+  if((x=t.closest("[data-team]"))){var c=x.dataset.team;Z.team=(Z.team===c&&Z.ctab==="team"&&!phone())?null:c;Z.ctab="team";treffer=true;if(phone())blatt("kontext")}
+  if((x=t.closest("[data-view]"))){Z.view=x.dataset.view;treffer=true;if(phone())blatt("")}
+  ["cols","mat","ver","spt","ctab"].forEach(function(k){var y=t.closest("[data-"+k+"]");if(y){Z[k]=y.dataset[k];treffer=true}});
+  if((x=t.closest("[data-blatt]"))){blatt(phone()?x.dataset.blatt:"");treffer=true}
+  if(treffer){szene="";alles()}
+});
+document.addEventListener("keydown",function(ev){if(ev.metaKey||ev.ctrlKey||ev.altKey)return;var k=ev.key.toLowerCase(),ok=true;
+  if(k==="arrowleft")Z.n=Math.max(0,Z.n-1);else if(k==="arrowright")Z.n=Math.min(20,Z.n+1);else if(k==="1")Z.liga=1;else if(k==="2")Z.liga=2;else if(k==="g")Z.liga=0;
+  else if(k==="t")Z.view="tab";else if(k==="m")Z.view="mat";else if(k==="v")Z.view="ver";else if(k==="s")Z.view="spt";
+  else if(k==="escape"){if(document.body.dataset.blatt)blatt("");else Z.team=null}else ok=false;
+  if(ok){szene="";alles()}});
+var phoneFest=!!q.get("phone");
+(function(){if(q.get("still"))document.body.classList.add("still");
+  function ph(){var p=phoneFest||innerWidth<760;if(p!==phone()){document.body.classList.toggle("phone",p)}}
+  ph();setze(SZENEN[q.get("szene")]?q.get("szene"):"tabelle");
+  if(q.get("liga")!=null&&q.get("liga")!=="")Z.liga=+q.get("liga");if(q.get("st")!=null&&q.get("st")!=="")Z.n=Math.max(0,Math.min(20,+q.get("st")));if(T[q.get("team")]){Z.team=q.get("team");Z.ctab="team"}
+  alles();if(q.get("blatt"))blatt(q.get("blatt"));
+  var rt;addEventListener("resize",function(){clearTimeout(rt);rt=setTimeout(function(){ph();alles()},80)});
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){if(Z.view==="ver")zVerlauf()});
+})();
+</script>
+</body>
+</html>
