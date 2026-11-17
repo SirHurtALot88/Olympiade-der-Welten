@@ -8301,7 +8301,7 @@
   // Sind fuer diese Bahn Kontakt-Stufen eingeschaltet? (Takeshi: eigener Pilot, hier immer nein.)
   function kontaktBahnAktiv(bd){
     const art=BAHN_ART[bd];
-    if(!art||!art.kontakt||art.takeshi||art.tackleAusweichen)return false;
+    if(!art||!art.kontakt||!art.spurt||art.takeshi||art.tackleAusweichen||bahnHatzAktiv||bahnHyroxAktiv)return false;
     const K=kontaktStufenVon(art.kontakt);
     return !!(K&&K.aktiv);
   }

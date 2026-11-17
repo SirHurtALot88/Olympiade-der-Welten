@@ -76,6 +76,8 @@ beforeAll(async () => {
   skripte.engine.runInContext(kontext.fenster);
   for (let i = 0; i < 5000 && !kontext.fenster.__arena; i += 1) await new Promise((r) => setImmediate(r));
   A = kontext.fenster.__arena as Arena;
+  // Mit Kader waehlt die Saat sonst das Spurt-Format (Hatz/HYROX); die Tests brauchen den klassischen Spurt.
+  A.bahnFlags({ spurtFormat: "klassisch" });
 }, 120_000);
 
 afterAll(() => {
