@@ -5,6 +5,7 @@ import path from "node:path";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaTeam } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import { buildArenaAufstellung, buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-strategie-adapter";
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
@@ -75,7 +76,17 @@ export function berechneArenaEingabeHash(input: {
     const heim = buildArenaTeam(input.gameState, fixture.homeTeamId);
     const gast = buildArenaTeam(input.gameState, fixture.awayTeamId);
     const aufstellung = buildArenaAufstellungBeide(input.gameState, fixture.homeTeamId, fixture.awayTeamId, input.matchdayId);
-    teile.push(JSON.stringify({ seed, heim, gast, aufstellung }));
+    // STRATEGIE-VORLAGE (Pilot Wettessen, 17.11.): bestimmt das Duell mit, gehoert also in den Hash --
+    // eine nach dem Vorlauf geaenderte Vorlage verwirft die Vorberechnung wie jede andere Eingabe.
+    // Neutral/Flagge aus -> null -> der Teil ist Zeichen fuer Zeichen der alte (Hash unveraendert).
+    const strategie = buildArenaStrategieBeide(
+      input.gameState,
+      fixture.homeTeamId,
+      fixture.awayTeamId,
+      input.matchdayId,
+      [input.disciplineId],
+    );
+    teile.push(JSON.stringify(strategie ? { seed, heim, gast, aufstellung, strategie } : { seed, heim, gast, aufstellung }));
   }
   const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
 

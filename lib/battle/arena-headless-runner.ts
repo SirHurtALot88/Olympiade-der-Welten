@@ -13,6 +13,10 @@ import {
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
 import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
+import {
+  buildArenaStrategieBeide,
+  type ArenaStrategieByDisciplineId,
+} from "@/lib/foundation/battle-arena/arena-strategie-adapter";
 
 /**
  * HEADLESS-RUNNER FUER window.__arena.spieleFeldspiel() (Plan Abschnitt 3.4, PR 6 von 9).
@@ -464,6 +468,12 @@ export type VorbereitetesFixture = {
    * dasselbe Feld, das der Host fuer die Anzeige setzt.
    */
   kulisseByDisciplineId: Record<string, string>;
+  /**
+   * STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., lib/foundation/battle-arena/arena-strategie-adapter.ts):
+   * die Vorlage je Disziplin als [Heim, Gast]. FEHLT, solange die Flagge `OLY_STRATEGIE_VORLAGEN` aus
+   * ist oder beide Seiten neutral sind — dann ist der Umschlag Zeichen fuer Zeichen der alte.
+   */
+  strategieByDisciplineId?: ArenaStrategieByDisciplineId;
 };
 
 /**
@@ -594,6 +604,16 @@ export function bereiteFixturesVor(
           matchdayId: fixture.matchdayId ?? gameState.matchdayState?.matchdayId ?? "",
         })
       : null;
+    // Neutral (Flagge aus, kein Feld) -> null -> das Feld fehlt ganz (s. VorbereitetesFixture).
+    const strategie = disziplin
+      ? buildArenaStrategieBeide(
+          gameState,
+          fixture.homeTeamId,
+          fixture.awayTeamId,
+          gameState.matchdayState?.matchdayId ?? null,
+          [disziplin],
+        )
+      : null;
     return {
       ...fixture,
       seed,
@@ -601,6 +621,7 @@ export function bereiteFixturesVor(
       gast,
       aufstellung,
       kulisseByDisciplineId: kulisse && disziplin ? { [disziplin]: kulisse.id } : {},
+      ...(strategie ? { strategieByDisciplineId: strategie } : {}),
     };
   });
 }
@@ -643,6 +664,7 @@ async function simuliereFixturesImBrowser(payload: {
     seed: number;
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
+    strategieByDisciplineId?: ArenaStrategieByDisciplineId;
   }[];
   disziplin: string;
   /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
@@ -682,6 +704,7 @@ async function simuliereFixturesImBrowser(payload: {
     gast: ArenaSpieler[];
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
+    strategieByDisciplineId?: ArenaStrategieByDisciplineId;
   }) => {
     fenster.__olyArenaKader = {
       heim: kader.heim,
@@ -689,6 +712,8 @@ async function simuliereFixturesImBrowser(payload: {
       aufstellung: kader.aufstellung,
       mutatoren: payload.mutatoren,
       kulisseByDisciplineId: kader.kulisseByDisciplineId,
+      // Nur mit Vorlage gesetzt (Spread), sonst exakt der alte Umschlag.
+      ...(kader.strategieByDisciplineId ? { strategieByDisciplineId: kader.strategieByDisciplineId } : {}),
     };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
@@ -932,18 +957,20 @@ export async function runArenaFixtures(
       aufstellung: vorbereitet[0].aufstellung,
       mutatoren,
       kulisseByDisciplineId: vorbereitet[0].kulisseByDisciplineId,
+      ...(vorbereitet[0].strategieByDisciplineId ? { strategieByDisciplineId: vorbereitet[0].strategieByDisciplineId } : {}),
     });
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const chassis = waehleArenaChassis(disziplin);
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
-      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung, kulisseByDisciplineId }) => ({
+      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung, kulisseByDisciplineId, strategieByDisciplineId }) => ({
         heim,
         gast,
         seed,
         aufstellung,
         kulisseByDisciplineId,
+        ...(strategieByDisciplineId ? { strategieByDisciplineId } : {}),
       })),
       disziplin,
       mutatoren,

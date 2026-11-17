@@ -14,6 +14,7 @@ import {
   buildArenaAufstellung,
   buildArenaAufstellungBeide,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-strategie-adapter";
 import { buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { resolveArenaHostSeeds } from "@/lib/battle/arena-host-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
@@ -587,6 +588,20 @@ export default function FoundationBattleArenaHost({
   // Disziplin -- dieselbe, die der Runner der Wertung mitgibt, damit die Arena genau den Platz
   // zeigt, auf dem gewertet wird. Leer fuer Disziplinen ohne Kulissen-Profil.
   const arenaKulisseByDisciplineId = arenaHostSeed.kulisseByDisciplineId;
+  // STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., lib/foundation/battle-arena/arena-strategie-adapter.ts):
+  // dieselbe Funktion wie Vorlauf/Buchung (`bereiteFixturesVor`), damit gezeigt = gebucht. `null` bei
+  // Flagge aus (Standard) oder neutral -- dann fehlt das Feld im Umschlag ganz (Signatur unveraendert).
+  const arenaStrategieByDisciplineId = useMemo(
+    () =>
+      buildArenaStrategieBeide(
+        gameState,
+        heimTeamId,
+        gastTeamId,
+        gameState.matchdayState?.matchdayId ?? null,
+        arenaDisziplinSlotsThisMatchday,
+      ),
+    [gameState, heimTeamId, gastTeamId, arenaDisziplinSlotsThisMatchday],
+  );
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
   // sonst gibt es nichts, dessen Saat falsch sein koennte.
   const keinGewertetesDuell =
@@ -887,6 +902,8 @@ export default function FoundationBattleArenaHost({
         seedByDisciplineId: arenaSeedByDisciplineId,
         // Gelesen von `kulisseSpielId()`/`kulisseWaehlen()` in battle-mode.engine.js.
         kulisseByDisciplineId: arenaKulisseByDisciplineId,
+        // Gelesen von `strategieVorlageVon()` in battle-mode.engine.js; nur mit Vorlage gesetzt.
+        ...(arenaStrategieByDisciplineId ? { strategieByDisciplineId: arenaStrategieByDisciplineId } : {}),
         // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
         mutatorenByDisciplineId,
         // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
@@ -995,6 +1012,7 @@ export default function FoundationBattleArenaHost({
     gameState,
     arenaSeedByDisciplineId,
     arenaKulisseByDisciplineId,
+    arenaStrategieByDisciplineId,
     mutatorenByDisciplineId,
     miniDmFfaTeams,
     miniDmFfaK,

@@ -110,6 +110,8 @@ type DuellAuftrag = {
     seed: number;
     /** Gebuchte Kulisse je Disziplin, wie im Chromium-Runner (s. `bereiteFixturesVor`). */
     kulisseByDisciplineId: Record<string, string>;
+    /** Strategie-Vorlage je Disziplin [Heim, Gast]; fehlt bei neutral/Flagge aus (s. `bereiteFixturesVor`). */
+    strategieByDisciplineId?: Record<string, [string | null, string | null]>;
   }>;
 };
 
@@ -333,12 +335,13 @@ export async function runArenaFixturesNode(
       chassis,
       mutatoren,
       ...(options.buehneFlags ? { buehneFlags: { ...options.buehneFlags } } : {}),
-      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId }) => ({
+      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId, strategieByDisciplineId }) => ({
         heim,
         gast,
         aufstellung,
         seed,
         kulisseByDisciplineId,
+        ...(strategieByDisciplineId ? { strategieByDisciplineId } : {}),
       })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),
