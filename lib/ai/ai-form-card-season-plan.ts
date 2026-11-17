@@ -1,4 +1,5 @@
 import type { FormCardColor } from "@/lib/data/olyDataTypes";
+import type { FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 
 /**
  * SAISONPLANUNG DER FORMKARTEN (KI)
@@ -72,6 +73,14 @@ export type FormCardSeasonPlanSlot = {
   color: FormCardColor | null;
   /** Kadergröße der Disziplin. `null` = unbekannt (s. `resolvePlanSlotPlayerCount`). */
   playerCount: number | null;
+  /**
+   * FARBREGEL (Prototyp 17.11., formkarten-farbregel.ts, Standard AUS): nur gesetzt, wenn
+   * `buildAiFormCardSeasonPlan` mit `farbregel` aufgerufen wird. Ohne sie bleibt `formCardSlotValue`
+   * die alte Rechnung (Kartenwert x Farbfaktor x Kadergröße) Zeichen für Zeichen.
+   */
+  farbregel?: FormkartenFarbregel;
+  /** Anteil der Kaderspieler je Klassenfarbe (Summe 1), geschätzt aus den Karten des Teams. */
+  farbAnteile?: Partial<Record<FormCardColor, number>>;
 };
 
 export type FormCardSeasonPlanEntry = {
@@ -115,6 +124,14 @@ export function resolvePlanSlotPlayerCount(slot: FormCardSeasonPlanSlot) {
  * muss sie an beiden Stellen geändert werden — dafür steht dieser Hinweis hier.
  */
 export function formCardSlotValue(card: FormCardSeasonPlanCard, slot: FormCardSeasonPlanSlot) {
+  if (slot.farbregel) {
+    // NEUE REGEL: alle Spieler v x alle(passend|fremd), dazu v x traeger je Spieler der Kartenfarbe.
+    // Erwartete Träger = Kadergröße x Farbanteil des Teams (Standard 1/4: vier Farben gleich verteilt).
+    const passend = slot.color != null && card.color === slot.color;
+    const alle = card.value * (passend ? slot.farbregel.allePassend : slot.farbregel.alleFremd);
+    const anteil = slot.farbAnteile?.[card.color] ?? 0.25;
+    return (alle + card.value * slot.farbregel.traeger * anteil) * resolvePlanSlotPlayerCount(slot);
+  }
   const multiplier = slot.color != null && card.color === slot.color ? 2 : 1;
   return card.value * multiplier * resolvePlanSlotPlayerCount(slot);
 }
@@ -289,13 +306,27 @@ function improvePlan(capacities: PlanCapacity[], maxRounds = 4) {
   }
 }
 
+/** Farbanteile des Teams aus seinen Karten (jede Karte gehört einem Spieler, Farbe = Klassenfarbe). */
+export function farbAnteileAusKarten(cards: Array<{ color: FormCardColor }>): Partial<Record<FormCardColor, number>> {
+  const anzahl: Partial<Record<FormCardColor, number>> = {};
+  for (const card of cards) anzahl[card.color] = (anzahl[card.color] ?? 0) + 1;
+  const gesamt = cards.length || 1;
+  const anteile: Partial<Record<FormCardColor, number>> = {};
+  for (const farbe of Object.keys(anzahl) as FormCardColor[]) anteile[farbe] = (anzahl[farbe] ?? 0) / gesamt;
+  return anteile;
+}
+
 export function buildAiFormCardSeasonPlan(input: {
   /** Nur noch UNBENUTZTE Karten — verbrauchte Karten sind keine Planungsmasse mehr. */
   cards: FormCardSeasonPlanCard[];
   /** Alle noch spielbaren Disziplin-Seiten, inklusive der des aktuellen Spieltags. */
   slots: FormCardSeasonPlanSlot[];
+  /** Prototyp 17.11., Standard aus (undefined): bewertet Slots nach der Farbregel, s. `FormCardSeasonPlanSlot.farbregel`. */
+  farbregel?: FormkartenFarbregel;
 }): FormCardSeasonPlan {
-  const capacities = sortSlotsDeterministically(input.slots);
+  const farbAnteile = input.farbregel ? farbAnteileAusKarten(input.cards) : undefined;
+  const slots = input.farbregel ? input.slots.map((slot) => ({ ...slot, farbregel: input.farbregel, farbAnteile })) : input.slots;
+  const capacities = sortSlotsDeterministically(slots);
   const cards = input.cards.filter((card) => Number.isFinite(card.value) && card.value !== 0);
 
   // 1) Minuskarten: größter Betrag zuerst, weil die größte Minuskarte das beste Versteck
