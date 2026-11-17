@@ -1,5 +1,5 @@
 {
- "_hinweis": "Herkunft der Arena-Kulissen. Alle Bilder unter kulissen/ entstehen aus den PixelLab-Szenen der Asset-Runde (public/szenen/<disziplin>/<variante>.html) ueber scripts/baue-kulisse-*.py -> data/generated/kulissen-quellen/ -> scripts/baue-arena-kulissen.py. Hier stehen die Bilder, in die seit Batch 12 (08.11., 'Rahmen statt Material') zusaetzlich eigene PixelLab-Erzeugnisse oder gebackenes Licht eingehen; die fruehere Fassung steht unter 'vorher'. Doku: docs/design/arena-kulissen-im-motor-03-11.md, Abschnitt Batch 12.",
+ "_hinweis": "Herkunft der Arena-Kulissen. NICHT alle Bilder unter kulissen/ sind PixelLab (Korrektur 17.11., docs/design/pixellab-nur-neue-assets-audit-17-11.md): die Originale der Asset-Runde (public/szenen/<disziplin>/<variante>.html, Commit addeede9) sind PixelLab-Szenen, Job-IDs je Szene gibt es dafuer nicht. 18 der 54 Motor-Kulissen sind dagegen Varianten, deren Umgebung (Himmel, Skyline, Haeuser, Zelte, Baeume, Effekte) scripts/baue-szenen-varianten.py, scripts/baue-szenen-varianten-2.py oder scripts/baue-szenen-schauplaetze.py prozedural mit PIL malen; nur die Spielflaeche ist aus dem PixelLab-Original uebernommen und hoechstens umgefaerbt. Diese Eintraege tragen \"paket\": \"prozedural\" (showcase/zirkus: \"gemischt\") und nennen das Malskript. Weg zur Motor-Kulisse: scripts/baue-kulisse-*.py -> data/generated/kulissen-quellen/ -> scripts/baue-arena-kulissen.py. Bilder, in die seit Batch 12 (08.11., 'Rahmen statt Material') eigene PixelLab-Erzeugnisse oder gebackenes Licht eingehen, fuehren die fruehere Fassung unter 'vorher'. Kulissen ohne Eintrag hier sind unveraenderte Zuschnitte der PixelLab-Originale. Doku: docs/design/arena-kulissen-im-motor-03-11.md, Abschnitt Batch 12.",
  "showcase/buehne.jpg": {
   "paket": "PixelLab",
   "quelle": "Szene public/szenen/showcase/buehne.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
@@ -22,7 +22,10 @@
   }
  },
  "showcase/zirkus.jpg": {
-  "paket": "PixelLab",
+  "paket": "gemischt",
+  "malskript": "scripts/baue-szenen-varianten-2.py showcase (sh_zirkus)",
+  "pixellab_anteil": "Buehnenprospekt (eigener PixelLab-Auftrag, s. 'auftrag') und Buehnenboden aus public/szenen/showcase/buehne.html; Zirkuszelt-Rahmen, Manege und Publikum prozedural",
+  "korrektur": "2026-11-17: stand faelschlich als reines \"paket\": \"PixelLab\" (Nur-PixelLab-Audit)",
   "quelle": "Szene public/szenen/showcase/zirkus.html (bg + fg) + Buehnenprospekt api.pixellab.ai /v2/generate-image-v2",
   "auftrag": {
    "prompt": "deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit",
@@ -43,7 +46,10 @@
   }
  },
  "showcase/festival.jpg": {
-  "paket": "PixelLab",
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py showcase (sh_festival)",
+  "pixellab_anteil": "Buehnenboden aus dem PixelLab-Original public/szenen/showcase/buehne.html; Festivalgelaende, Boxentuerme, Publikum und LED-Wand prozedural",
+  "korrektur": "2026-11-17: stand faelschlich als \"paket\": \"PixelLab\" (Nur-PixelLab-Audit)",
   "quelle": "Szene public/szenen/showcase/festival.html (bg + fg); LED-Wand als Punktmatrix nachgerechnet (prospekt_led(), Farben aus dem Poster der Szene), keine neue Erzeugung",
   "bau": "python3 -I scripts/baue-kulisse-buehnen.py showcase && python3 -I scripts/baue-arena-kulissen.py",
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
@@ -144,5 +150,165 @@
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-17",
   "verwendung": "I-Spy, Halle ruinengarten"
+ },
+ "battlefield/wuestenruine.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py battlefield",
+  "szene": "public/szenen/battlefield/wuestenruine.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/battlefield/eroberung.html, hoechstens umgefaerbt; Umgebung (Wuestenruine mit ausgetrocknetem Wadi) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-battlefield.py wuestenruine && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "basketball/streetcourt.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py basketball",
+  "szene": "public/szenen/basketball/streetcourt.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/basketball/parkett.html, hoechstens umgefaerbt; Umgebung (Kaefig-Platz zwischen Backsteinhaeusern) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "hockey/bergsee.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py hockey",
+  "szene": "public/szenen/hockey/bergsee.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/hockey/eis.html, hoechstens umgefaerbt; Umgebung (Freiluft-Eisfeld im verschneiten Gebirge) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py hockey && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "football/strand.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py football",
+  "szene": "public/szenen/football/strand.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/football/feld.html, hoechstens umgefaerbt; Umgebung (Beach-Football an der Kueste) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py football && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "eiskunstlauf/waldsee.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py eiskunstlauf",
+  "szene": "public/szenen/eiskunstlauf/waldsee.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/eiskunstlauf/kuer.html, hoechstens umgefaerbt; Umgebung (zugefrorener Waldsee mit Schneewaellen) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py eiskunstlauf && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "fechten/schlosshof.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-schauplaetze.py fechten",
+  "szene": "public/szenen/fechten/schlosshof.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/fechten/piste.html, hoechstens umgefaerbt; Umgebung (Burghof mit Zinnen, Bergfried und Bannern) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py fechten && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "gewichtheben/hafen.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten.py gewichtheben",
+  "szene": "public/szenen/gewichtheben/hafen.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/gewichtheben/sandsack.html, hoechstens umgefaerbt; Umgebung (Hafen) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "gewichtheben/oase.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten.py gewichtheben",
+  "szene": "public/szenen/gewichtheben/oase.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/gewichtheben/sandsack.html, hoechstens umgefaerbt; Umgebung (Oase) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py gewichtheben && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "wettessen/nachtmarkt.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten.py wettessen",
+  "szene": "public/szenen/wettessen/nachtmarkt.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/wettessen/jahrmarkt.html, hoechstens umgefaerbt; Umgebung (Nachtmarkt (Tisch-Ebene umgefaerbt)) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-arena-kulissen.py (Chassis buehne)",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "wettessen/bierzelt.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py wettessen",
+  "szene": "public/szenen/wettessen/bierzelt.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/wettessen/jahrmarkt.html, hoechstens umgefaerbt; Umgebung (Festzelt mit Blaskapelle) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-arena-kulissen.py (Chassis buehne)",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "tennis/riviera.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py tennis",
+  "szene": "public/szenen/tennis/riviera.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/tennis/court.html, hoechstens umgefaerbt; Umgebung (Sandplatz ueber dem Meer) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "tennis/dach.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py tennis",
+  "szene": "public/szenen/tennis/dach.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/tennis/court.html, hoechstens umgefaerbt; Umgebung (Hartplatz auf dem Hochhausdach) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py tennis && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "climbing/fels.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py climbing",
+  "szene": "public/szenen/climbing/fels.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/climbing/wand.html, hoechstens umgefaerbt; Umgebung (Sandsteinwand in der Schlucht) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "climbing/eis.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py climbing",
+  "szene": "public/szenen/climbing/eis.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/climbing/wand.html, hoechstens umgefaerbt; Umgebung (gefrorener Wasserfall am Gletscher) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py climbing && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "speed-schach/park.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py speed-schach",
+  "szene": "public/szenen/speed-schach/park.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/speed-schach/turniersaal.html, hoechstens umgefaerbt; Umgebung (Blitzpartie im Stadtpark) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
+ },
+ "speed-schach/zug.jpg": {
+  "paket": "prozedural",
+  "malskript": "scripts/baue-szenen-varianten-2.py speed-schach",
+  "szene": "public/szenen/speed-schach/zug.html",
+  "pixellab_anteil": "Spielflaeche aus dem PixelLab-Original public/szenen/speed-schach/turniersaal.html, hoechstens umgefaerbt; Umgebung (Blitzpartie im Speisewagen) mit PIL gemalt (feste Palette, Bayer-Dithering)",
+  "bau": "python3 -I scripts/baue-kulisse-buehnen.py speed-schach && python3 -I scripts/baue-arena-kulissen.py",
+  "lizenz": "eigene prozedurale Erzeugung fuer dieses Projekt; Spielflaeche PixelLab-Abonnement (Tier 3)",
+  "erzeugt": "2026-11-03",
+  "ersatz": "Welle A des Nur-PixelLab-Audits (PixelLab-Breitformat, 25 Gen.), docs/design/pixellab-nur-neue-assets-audit-17-11.md"
  }
 }
