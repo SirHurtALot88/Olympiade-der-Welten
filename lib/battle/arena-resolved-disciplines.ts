@@ -337,6 +337,11 @@
  * 51,7 %. Chassis: `spieleBuehneAuftritt()` (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), eigene
  * PPS-Referenz (data/generated/i-spy-pps-referenz.json). Beobachtungsliste: der Abstand zur
  * Schranke ist auf dem zweiten Strom nur 0,011.
+ *
+ * I-SPY-NACHTRAG 2 (17.11., Knack-Motor V2, docs/design/ispy-knacken-ortswahl-schubsen-17-11.md):
+ * Knacken als Balken je Truhe, Ortswahl mit Persoenlichkeit, Schubsen am Doppelmoebel. rho je Spiel
+ * 0,776 -> 0,845 (n=48), Pp 16,4 / 14,0; PPS-Referenz neu gezogen. Die rho-Ausnahme in
+ * ARENA_ABNAHME_AUSNAHMEN ist damit nicht mehr tragend.
  */
 export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
