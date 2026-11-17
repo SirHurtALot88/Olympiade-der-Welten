@@ -56034,9 +56034,12 @@
     // Callout ("... übernimmt die Führung.") lag genau darueber. Dritte Bezugskante nach
     // demselben Muster; die tiefste sichtbare Unterkante gewinnt (Math.max). Ein
     // Element ohne Hoehe (per CSS weggeblendet) zaehlt nicht mit.
-    for(const id of ["ispyZugUhr","bahnHud"]){
+    // LIVE-STAND-BAND (Welle 1, 17.11.): vierte Bezugskante, nur solange es UEBER der Leinwand
+    // schwebt (auf schmalen Arenen steht es unter der Leinwand im Fluss, s. battle-mode.css).
+    for(const id of ["ispyZugUhr","bahnHud","lsBand"]){
       const ref=document.getElementById(id);
       if(!ref||ref.hidden)continue;
+      if(id==="lsBand"&&getComputedStyle(ref).position!=="absolute")continue;
       const r=ref.getBoundingClientRect();
       if(!r.height)continue;
       unten=unten==null?r.bottom:Math.max(unten,r.bottom);
@@ -57158,6 +57161,522 @@
     return true;
   }
 
+  // ===================================================================================
+  // LIVE-STAND (Welle 1, 17.11., docs/design/live-stand-overlay-konzept-17-11.md).
+  //
+  // Chris 17.11. woertlich: "man sieht zwar immer sowas wie +4,5 sek auftauchen aber man hat
+  // keine Gesamtuebersicht wie gerade der Stand realistisch ist" und fuers Zeitfahren: "an den
+  // verschiedenen zeitpunkten ... muessten ja die ranks stehen und auswaehlbar sein ob man
+  // zwischenzeit 1 2 oder finale ausgewaehlt hat".
+  //
+  // EIN Bauteil, zwei Groessen: ein BAND (eine Zeile unter dem Score-Bug, Standard) und eine
+  // TAFEL (Rangliste rechts oben, mit Messpunkt-Reitern), umgeschaltet ueber den Knopf "Stand"
+  // in der Bedienleiste oder die Taste L (Band -> Tafel -> aus), Reiter per 1-4, 0 = Auto.
+  //
+  // REINE ANZEIGE, DREI REGELN:
+  //  1. GEZEIGT = GEBUCHT. Jede Zahl kommt aus derselben Funktion, die auch die Wertung bzw. die
+  //     Kopfzeile liest: bahnRangliste()/bahnTeamstand()/burgwertung()/bahnZeit()/u.zz[] (Bahn),
+  //     fsPunkte/fsPeriodenStand/wertungVon() (Feldspiel), u.hp/u.max (Kampf, dieselbe Summe wie
+  //     die Lebensbalken). Keine zweite Rangrechnung, die abweichen koennte.
+  //  2. SPOILERWAECHTER. Die Prognose liest nur, was schon auf dem Bildschirm stand: gezeigte
+  //     Zwischen-/Zielzeiten, aktuelle Position, aktueller Stand, Uhr. Nie den gebuchten
+  //     Spieltags-Snapshot, nie den HYROX-Fahrplan, kein rr(). Ein Messpunkt-Reiter, den noch
+  //     niemand erreicht hat, ist gesperrt.
+  //  3. KEIN NEUES FELD AM LAEUFER/SPIELER. Zustand nur in Modulvariablen (Wertungs-
+  //     Fingerabdruck, s. CLAUDE.md). Gelesen und gerechnet wird hoechstens viermal je Sekunde
+  //     Wandzeit; das DOM wird nur angefasst, wenn sich die Signatur der Daten aendert.
+  //
+  // Welle 1 deckt die Bahn (Zeitfahren, Spurt klassisch, Climbing, Staffel, Takeshi), die
+  // Feldspiele (Basketball, Hockey, Football) und als Band die Kampf-Disziplinen TDM und
+  // Battlefield ab. HYROX und Hatz behalten ihre eigene Rangleiste (Welle 2), Buehne Welle 3,
+  // Vier-Team-Pods zeigen ihre eigene Pod-Tafel.
+  const LS_MODI=["band","tafel","aus"];
+  const LS_SPEICHER="oly-arena-livestand";
+  let lsModus="band", lsOhnePrognose=false, lsReiter=null, lsLetzterTick=-1e9, lsSigBand="", lsSigTafel="", lsDisc="";
+  let lsLetzteDaten=null, lsInit=false, lsBandTop=-1;
+  try{
+    const g=JSON.parse(localStorage.getItem(LS_SPEICHER)||"null");
+    if(g&&LS_MODI.includes(g.modus))lsModus=g.modus;
+    if(g&&g.ohnePrognose)lsOhnePrognose=true;
+  }catch{}
+  function lsSpeichern(){
+    try{ localStorage.setItem(LS_SPEICHER,JSON.stringify({modus:lsModus,ohnePrognose:lsOhnePrognose})); }catch{}
+  }
+  const lsEsc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const lsKomma=(v,n=1)=>v.toFixed(n).replace(".",",");
+  // Zeit kompakt fuer die Tafel ("41,2" / "1:23,4"), in ZUSCHAUsekunden (bahnSpanneAnzeige).
+  function lsZeit(sim){
+    if(sim==null||!isFinite(sim))return "—";
+    const s=bahnSpanneAnzeige(sim);
+    if(s<60)return lsKomma(s);
+    const m=Math.floor(s/60), r=s-m*60;
+    return m+":"+(r<10?"0":"")+lsKomma(r);
+  }
+  const lsAbstand=(sim)=>sim==null?"":(sim<=0.0005?"Best":"+"+lsKomma(bahnSpanneAnzeige(sim)));
+  const lsKurz=(n,max=13)=>{ n=String(n||""); return n.length>max?n.slice(0,max-1)+"…":n; };
+  const lsVerein=(s)=>((VEREIN[s]&&VEREIN[s].kurz)||(s===0?"Heim":"Gast"));
+  // Normalverteilung, dieselbe erf-Naeherung wie tennisSiegchance().
+  const lsPhi=(z)=>0.5*(1+tennisDruckErf(z/Math.SQRT2));
+  // RANGSPANNE aus Wertintervallen (kleiner = besser): bester Rang, wenn alle anderen, die
+  // nicht SICHER besser sind, schlechter abschneiden; schlechtester umgekehrt. Ein Intervall
+  // (-Inf, +Inf) heisst "noch keine Information" -- der Teilnehmer steht dann bei "offen".
+  function lsRangSpannen(iv){
+    return iv.map((a,i)=>{
+      let besser=0, evtl=0;
+      iv.forEach((b,j)=>{ if(i===j)return; if(b.hi<a.lo)besser++; else if(!(b.lo>a.hi))evtl++; });
+      return {von:1+besser, bis:1+besser+evtl};
+    });
+  }
+  function lsSpanneText(sp,N,fest){
+    if(!sp)return "offen";
+    if(fest||sp.von===sp.bis)return sp.von+".";
+    if(sp.bis-sp.von+1>Math.max(2,N/2))return "offen";
+    return sp.von+".–"+sp.bis+".";
+  }
+  function lsMedian(a){ if(!a.length)return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+  function lsStreuung(a){ if(a.length<2)return null; const m=a.reduce((x,y)=>x+y,0)/a.length; return Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/(a.length-1)); }
+
+  // ---------------- LESEN: BAHN (ohne Staffel) ----------------
+  // Messpunkte: Zeitfahren ZZ1/ZZ2/ZIEL/JETZT (u.zz[] und bahnZeit(), dieselben Felder wie die
+  // Zwischenzeit-Tafel am Fahrer und das Fokus-Panel); die anderen Bahnen nur JETZT.
+  function liveStandBahn(){
+    const art=BA(), N=LAEUFER.length;
+    const tt=art.wertung==="zeit", burg=art.wertung==="burg", climb=!!art.climbing;
+    const cps=art.zwischenzeiten||[];
+    const messpunkte=[];
+    cps.forEach((cp,ci)=>messpunkte.push({id:"zz"+ci,kurz:"ZZ"+(ci+1),erreicht:LAEUFER.filter(u=>u.zz&&u.zz[ci]!=null).length}));
+    if(tt)messpunkte.push({id:"ziel",kurz:"ZIEL",erreicht:LAEUFER.filter(u=>u.fertig!=null).length});
+    messpunkte.push({id:"jetzt",kurz:"JETZT",erreicht:N});
+    // AUTO: der juengste Messpunkt, den mindestens zwei erreicht haben (Konzept 2.5).
+    let auto="jetzt";
+    if(tt){ for(let i=messpunkte.length-2;i>=0;i--){ if(messpunkte[i].erreicht>=2){ auto=messpunkte[i].id; break; } } }
+    let aktiv=lsReiter&&messpunkte.some(m=>m.id===lsReiter&&m.erreicht>0)?lsReiter:auto;
+
+    // INTERVALLE FUER DIE PROGNOSE (kleiner = besser). Fertig: exakt. Unterwegs: Schaetzwert +-
+    // Spanne aus gezeigten Werten. Am Start/auf der Rampe: offen.
+    const fertige=LAEUFER.filter(u=>u.fertig!=null&&!u.raus);
+    const verh=[]; // Zielzeit / Zeit am letzten Messpunkt, nur aus GEZEIGTEN Zielzeiten
+    const schaetz=(u)=>{
+      if(burg){
+        const p=burgwertung(u);
+        if(u.fertig!=null||u.raus)return {lo:-p,hi:-p,e:-p,fest:true};
+        return {lo:-Infinity,hi:Infinity,e:-p};
+      }
+      if(u.fertig!=null&&!u.raus){ const z=bahnZeit(u); return {lo:z,hi:z,e:z,fest:true}; }
+      if(u.raus)return {lo:Infinity,hi:Infinity,e:Infinity,fest:true};
+      const startT=u.startT||0;
+      const pos=climb?(u.hoch??u.pos):u.pos;
+      if(startT>rennT||!(pos>0))return {lo:-Infinity,hi:Infinity,e:Infinity};
+      let e=(rennT-startT)/pos, sd=null;
+      // Zeitfahren: am letzten erreichten Messpunkt mit dem Median-Verhaeltnis der Fertigen.
+      if(tt&&u.zz){
+        for(let ci=cps.length-1;ci>=0;ci--){
+          if(u.zz[ci]==null)continue;
+          const r=fertige.filter(o=>o.zz&&o.zz[ci]>0).map(o=>bahnZeit(o)/o.zz[ci]);
+          if(r.length){
+            const m=lsMedian(r), s=lsStreuung(r);
+            e=Math.max(e*0.5,u.zz[ci]*m);
+            if(s!=null&&r.length>=3)sd=s*u.zz[ci];
+          }
+          break;
+        }
+      }
+      const rest=Math.max(0,1-Math.min(1,pos));
+      // Fallback-Streuung ohne drei Fertige: ein fester Anteil, mit dem Reststueck skaliert
+      // (Konzept 3.3). Kalibrierreihe folgt mit Welle 4 (data/generated/live-stand-kalibrierung.json).
+      if(sd==null)sd=e*(climb?0.2:0.11)*Math.sqrt(Math.max(0.05,rest));
+      const halb=1.2816*sd;
+      return {lo:e-halb,hi:e+halb,e};
+    };
+    const iv=LAEUFER.map(schaetz);
+    const spannen=lsRangSpannen(iv);
+    const ivVon=new Map(), spVon=new Map();
+    LAEUFER.forEach((u,i)=>{ ivVon.set(u.id,iv[i]); spVon.set(u.id,spannen[i]); });
+    const alleFest=iv.every(x=>x.fest);
+
+    // PUNKTE: dieselbe Rangliste und dieselben Punkte wie Kopfzeile, Wertungstabelle, Endstand.
+    const rl=bahnRangliste();
+    const reihe=burg?[...LAEUFER].sort((a,b)=>burgwertung(b)-burgwertung(a)):rl.reihe;
+    const punkte=burg?null:rl.punkte;
+    const fokus=(u)=>!!(u.vizZzFlash&&u.vizZzFlash.bis!=null&&rennT<u.vizZzFlash.bis);
+    const statusVon=(u)=>{
+      if(u.raus)return "raus";
+      if(u.fertig!=null)return "im Ziel";
+      if((u.startT||0)>rennT)return "Start "+bahnZeitText(bahnSpanneAnzeige((u.startT||0)-rennT)).replace(" s","s");
+      return "fährt";
+    };
+    const zeilen=[];
+    if(aktiv.startsWith("zz")||aktiv==="ziel"){
+      const ci=aktiv==="ziel"?-1:+aktiv.slice(2);
+      const wertVon=(u)=>ci<0?(u.fertig!=null&&!u.raus?bahnZeit(u):null):(u.zz&&u.zz[ci]!=null?u.zz[ci]:null);
+      const mit=LAEUFER.filter(u=>wertVon(u)!=null).sort((a,b)=>wertVon(a)-wertVon(b));
+      const best=mit.length?wertVon(mit[0]):null;
+      mit.forEach((u,i)=>zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:String(i+1),
+        wert:lsZeit(wertVon(u)),abstand:lsAbstand(wertVon(u)-best),gut:i===0,
+        prognose:lsSpanneText(spVon.get(u.id),N,alleFest),punkte:punkte?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"",blink:fokus(u)}));
+      // Wer den Messpunkt noch nicht erreicht hat: gedimmt darunter, in Rennreihenfolge.
+      for(const u of reihe){
+        if(wertVon(u)!=null)continue;
+        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:"–",wert:statusVon(u),abstand:"",
+          prognose:lsSpanneText(spVon.get(u.id),N,alleFest),punkte:"",dim:true});
+      }
+    } else {
+      const fBest=fertige.length?Math.min(...fertige.map(bahnZeit)):null;
+      let eBest=Infinity; for(const x of iv)if(isFinite(x.e)&&x.e<eBest)eBest=x.e;
+      reihe.forEach((u,i)=>{
+        const x=ivVon.get(u.id);
+        let wert, abstand="";
+        if(burg){ wert=lsKomma(burgwertung(u)).replace(/,0$/,""); const b0=burgwertung(reihe[0]); abstand=i===0?"Best":"−"+lsKomma(b0-burgwertung(u)).replace(/,0$/,""); }
+        else if(u.raus){ wert="raus"; }
+        else if(u.fertig!=null){ wert=lsZeit(bahnZeit(u)); abstand=lsAbstand(bahnZeit(u)-fBest); }
+        else if((u.startT||0)>rennT||!(u.pos>0)){ wert=statusVon(u); }
+        else if(tt){ wert="≈"+lsZeit(x.e); abstand=isFinite(eBest)?(x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
+        else { const p=climb?(u.hoch??u.pos):u.pos; wert=Math.round(Math.min(1,p)*100)+" %"; abstand=isFinite(eBest)?(i===0||x.e-eBest<=0.0005?"vorn":"≈"+lsAbstand(x.e-eBest)):""; }
+        zeilen.push({id:u.id,seite:u.seite,name:u.n,eigen:u.seite===0,rang:String(i+1),wert,abstand,gut:i===0,
+          prognose:lsSpanneText(spVon.get(u.id),N,alleFest),
+          punkte:punkte?lsKomma(punkte.get(u.id)).replace(/,0$/,""):"",
+          dim:(u.startT||0)>rennT&&u.fertig==null,blink:fokus(u)});
+      });
+    }
+
+    // BAND: bester eigener Teilnehmer in der Rennreihenfolge, Prognose, Team.
+    const ts=bahnTeamstand();
+    const eigenIdx=reihe.findIndex(u=>u.seite===0);
+    const eigen=eigenIdx>=0?reihe[eigenIdx]:null;
+    const band=[];
+    if(eigen){
+      const vorn=reihe[0];
+      let zu="";
+      if(eigenIdx>0){
+        if(burg)zu="−"+lsKomma(burgwertung(vorn)-burgwertung(eigen)).replace(/,0$/,"");
+        else { const a=ivVon.get(eigen.id).e, b=ivVon.get(vorn.id).e; if(isFinite(a)&&isFinite(b))zu=(eigen.fertig!=null&&vorn.fertig!=null?"":"≈")+"+"+lsKomma(bahnSpanneAnzeige(Math.max(0,a-b)))+" s"; }
+      } else zu="vorn";
+      band.push({k:"Rang",v:(eigenIdx+1)+"/"+N,z:lsKurz(eigen.n,12)+(zu?" "+zu:"")});
+      band.push({k:"Prognose",v:lsSpanneText(spVon.get(eigen.id),N,alleFest),prog:true});
+    }
+    const fmtSeite=(v)=>ts.fmt?ts.fmt(v):(typeof v==="number"?lsKomma(v).replace(/,0$/,""):String(v));
+    const fuss={links:lsVerein(0),rechts:lsVerein(1),mitte:""};
+    let grundlage="";
+    if(tt){
+      // Team-Zeitsumme: Spanne aus den Einzelintervallen; solange einer auf der Rampe steht: offen.
+      let lo=0, hi=0, offen=false;
+      for(const u of LAEUFER){ const x=ivVon.get(u.id); if(!isFinite(x.lo)||!isFinite(x.hi)){offen=true;break;} if(u.seite===0){lo+=x.lo;hi+=x.hi;} else {lo-=x.hi;hi-=x.lo;} }
+      const wartend=LAEUFER.filter(u=>u.fertig==null&&((u.startT||0)>rennT||!(u.pos>0))).length;
+      let mitte;
+      if(alleFest) mitte=ts.deltaSeite!=null?lsVerein(ts.deltaSeite)+" gewinnt":"Gleichstand";
+      else if(offen) mitte="offen · "+wartend+" am Start";
+      else if(hi<0) mitte=lsVerein(0)+" klar vorn";
+      else if(lo>0) mitte=lsVerein(1)+" klar vorn";
+      else { const m=(lo+hi)/2, h=(hi-lo)/2; mitte=(m<=0?lsVerein(0):lsVerein(1))+" vorn "+lsKomma(bahnSpanneAnzeige(Math.abs(m)))+" s ± "+lsKomma(bahnSpanneAnzeige(h)); }
+      // Die Zeitsumme selbst steht schon gross im Score-Bug -- das Band nennt nur, was daraus wird.
+      band.push({k:"Team",v:mitte,prog:true});
+      fuss.mitte="Prognose "+mitte;
+      grundlage="Prognose aus Zwischenzeiten · "+fertige.length+" von "+N+" im Ziel";
+    } else if(burg){
+      const imRennen=LAEUFER.filter(u=>u.fertig==null&&!u.raus).length;
+      band.push({k:"Burgpunkte",v:fmtSeite(ts.seiten[0])+" : "+fmtSeite(ts.seiten[1]),z:imRennen?"noch "+imRennen+" im Rennen":"alle durch"});
+      fuss.links=lsVerein(0)+" "+fmtSeite(ts.seiten[0]); fuss.rechts=fmtSeite(ts.seiten[1])+" "+lsVerein(1);
+      fuss.mitte=imRennen?"noch "+imRennen+" im Rennen":"Endstand";
+      grundlage="Wert = Burgpunkte (Sterne + Zielbonus) · Prognose, sobald ein Läufer durch ist";
+    } else {
+      // Rangpunkte: erwartete Punkte aus der Spannenmitte, Spanne aus den halben Rangspannen.
+      const erw=[0,0], var2=[0,0]; let offen=false;
+      LAEUFER.forEach(u=>{ const sp=spVon.get(u.id); if(sp.bis-sp.von+1>N/2&&!alleFest)offen=true; erw[u.seite]+=N+1-(sp.von+sp.bis)/2; var2[u.seite]+=Math.pow((sp.bis-sp.von)/2,2); });
+      const pm=Math.round(Math.sqrt(var2[0]+var2[1]));
+      const mitte=alleFest?"Endstand":offen?"offen":(Math.round(erw[0])+" : "+Math.round(erw[1])+(pm?" ± "+pm:""));
+      band.push({k:"Team",v:mitte,prog:true});
+      fuss.links=lsVerein(0)+" "+fmtSeite(ts.seiten[0]); fuss.rechts=fmtSeite(ts.seiten[1])+" "+lsVerein(1);
+      fuss.mitte="Prognose "+mitte;
+      grundlage="Prognose aus Tempo und Strecke · "+fertige.length+" von "+N+" im Ziel";
+    }
+    if(alleFest)grundlage="Endstand · gewertet wie im Ergebnis";
+    const alleImZiel=LAEUFER.every(u=>u.fertig!=null||u.raus);
+    const spalten={wert:aktiv==="jetzt"?(burg?"BURG":tt?"ZEIT":alleImZiel?"ZEIT":climb?"HÖHE":"STRECKE"):messpunkte.find(m=>m.id===aktiv).kurz,
+      punkte:burg?null:"PKT", name:"Läufer"};
+    return {typ:"bahn",titel:"STAND",messpunkte:messpunkte.length>1?messpunkte:null,aktiv,auto:!lsReiter,spalten,zeilen,fuss,grundlage,band};
+  }
+
+  // ---------------- LESEN: STAFFEL ----------------
+  // Messpunkte sind die Uebergaben: je Abschnitt die Gesamtzeit (Etappe + Wechselbilanz, dieselbe
+  // Zahl wie die Spalte "Gesamt" im Endstand, bahnTeamstand().gesamtVon) beider Teams.
+  function liveStandStaffel(){
+    const ts=bahnTeamstand();
+    const beinN=Math.max(staffelBeineVon(0),staffelBeineVon(1));
+    const gesamt=(u)=>u&&u.etappenZeit!=null?u.etappenZeit-(u.wechselKonto||0):null;
+    const zeilen=[], diffs=[];
+    let kum=0, kumGueltig=true;
+    for(let b=0;b<beinN;b++){
+      const h=LAEUFER.find(o=>o.seite===0&&o.bein===b), g=LAEUFER.find(o=>o.seite===1&&o.bein===b);
+      const gh=gesamt(h), gg=gesamt(g);
+      const st=(u,v)=>v!=null?lsZeit(v):(u&&u.aktiv?"läuft":"–");
+      let delta="", kumTxt="";
+      if(gh!=null&&gg!=null){ const d=gh-gg; diffs.push(d); kum+=d; delta=(d<=0?"−":"+")+lsKomma(bahnSpanneAnzeige(Math.abs(d))); }
+      else kumGueltig=false;
+      if(kumGueltig&&gh!=null&&gg!=null)kumTxt=(kum<=0?lsVerein(0):lsVerein(1))+" "+lsKomma(bahnSpanneAnzeige(Math.abs(kum)));
+      zeilen.push({id:"b"+b,rang:String(b+1),name:(h?lsKurz(h.n,9):"–")+" / "+(g?lsKurz(g.n,9):"–"),
+        wertL:st(h,gh),wertR:st(g,gg),abstand:delta,gutL:gh!=null&&gg!=null&&gh<=gg,gutR:gh!=null&&gg!=null&&gg<gh,
+        kum:kumTxt,dim:gh==null&&gg==null&&!(h&&h.aktiv)&&!(g&&g.aktiv),blink:!!((h&&h.aktiv)||(g&&g.aktiv))});
+    }
+    // FUEHRUNG JETZT: dieselbe Quelle wie #bhDelta und die Kopfzeile (staffelZeitDelta()).
+    const fertig=ts.gewertet;
+    const d=staffelZeitDelta();
+    let chance=null, progTxt="offen";
+    if(fertig){ chance=ts.seiten[0]>ts.seiten[1]?1:ts.seiten[1]>ts.seiten[0]?0:0.5; progTxt=(chance===1?lsVerein(0):chance===0?lsVerein(1):"Gleichstand")+" gewinnt"; }
+    else if(!d.unklar){
+      const offenBeine=Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit==null).length));
+      const zeiten=LAEUFER.filter(o=>o.etappenZeit!=null).map(o=>o.etappenZeit);
+      let sdBein=lsStreuung(diffs);
+      if(sdBein==null||diffs.length<2)sdBein=zeiten.length?0.12*zeiten.reduce((a,b)=>a+b,0)/zeiten.length:null;
+      if(sdBein!=null&&offenBeine>0){
+        const vor=(d.seite===0?1:-1)*d.delta;
+        chance=lsPhi(vor/(sdBein*Math.sqrt(offenBeine)));
+        progTxt=chance>=0.5?lsVerein(0)+" "+Math.round(chance*100)+" %":lsVerein(1)+" "+Math.round((1-chance)*100)+" %";
+      }
+    }
+    const fuehrungTxt=d.unklar?"—":(d.delta>0?lsVerein(d.seite)+" +"+lsKomma(bahnSpanneAnzeige(d.delta))+" s":"gleichauf");
+    const band=[
+      {k:"Führung",v:fuehrungTxt,z:"Abschnitt "+Math.min(beinN,1+Math.max(...[0,1].map(s=>LAEUFER.filter(o=>o.seite===s&&o.etappenZeit!=null).length)))+"/"+beinN},
+      {k:"Siegchance",chance:chance,prog:true},
+      {k:"Abschnitte",v:diffs.filter(x=>x<=0).length+" : "+diffs.filter(x=>x>0).length,z:"gewonnen"}];
+    return {typ:"staffel",titel:"STAFFEL",messpunkte:null,aktiv:"jetzt",auto:true,
+      spalten:{name:"Abschnitt · Läufer"},zeilen,
+      fuss:{links:lsVerein(0),mitte:"Prognose "+progTxt,rechts:lsVerein(1)},
+      grundlage:fertig?"Endstand · gewertet nach Zieleinlauf":"Prognose aus der Führung und der Streuung der gelaufenen Abschnitte",band};
+  }
+
+  // ---------------- LESEN: FELDSPIEL ----------------
+  // Stand fsPunkte (dieselbe Groesse wie #score und spieleFeldspiel), Perioden aus
+  // fsPeriodenStand (Linescore des Endstands), Spieler aus wertungVon(disc) (dieselben Zeilen und
+  // Sortierung wie die Wertungstabelle). Prognose: Rate aus dem bisherigen Spiel, mit dem Spielschnitt
+  // beider Teams gemischt, Streuung als Zaehlprozess (Punkte je Treffer: Hockey 1, Basketball ~2,3,
+  // Football ~6).
+  const LS_PUNKTE_JE_TREFFER={hockey:1,basketball:2.3,football:6};
+  function liveStandFeldspiel(){
+    const L=LIVE(); if(!L)return null;
+    const total=L.perioden*L.periodenDauer;
+    const gespielt=Math.max(0,Math.min(fsT,total)), rest=Math.max(0,total-fsT);
+    const p=[fsPunkte[0],fsPunkte[1]];
+    const anteil=total>0?gespielt/total:0;
+    let chance=null, prog="offen";
+    if(done||rest<=0){ chance=p[0]>p[1]?1:p[1]>p[0]?0:0.5; prog="Endstand "+p[0]+" : "+p[1]; }
+    else if(anteil>=0.08&&gespielt>0&&(p[0]+p[1])/(LS_PUNKTE_JE_TREFFER[feldspielDisc]||2)>=3){
+      // Erst ab drei Treffern im Spiel: vorher gibt es keine Rate, aus der sich etwas ableiten liesse.
+      const gesamtRate=(p[0]+p[1])/gespielt;
+      const rate=[0,1].map(s=>anteil*(p[s]/gespielt)+(1-anteil)*gesamtRate/2);
+      const end=[0,1].map(s=>p[s]+rate[s]*rest);
+      const k=LS_PUNKTE_JE_TREFFER[feldspielDisc]||2;
+      const varDiff=Math.max(1e-6,(rate[0]+rate[1])*rest*k);
+      chance=lsPhi((end[0]-end[1])/Math.sqrt(varDiff));
+      const pm=Math.round(1.2816*Math.sqrt(varDiff/2));
+      prog=Math.round(end[0])+" : "+Math.round(end[1])+(pm?" ± "+pm:"");
+    }
+    const wort=L.periodeWort==="Drittel"?"Drittel":"Viertel";
+    const zeilen=[];
+    let kum=[0,0];
+    for(let i=0;i<L.perioden;i++){
+      const e=fsPeriodenStand.find(x=>x.periode===i+1);
+      const laeuft=!e&&fsLive&&fsLive.viertel===i+1&&!done;
+      const a=e?e.a:laeuft?fsPunkte[0]-kum[0]:null, b=e?e.b:laeuft?fsPunkte[1]-kum[1]:null;
+      if(a!=null){ kum=[kum[0]+a,kum[1]+b]; }
+      zeilen.push({id:"p"+i,rang:wort==="Drittel"?(i+1)+".":"Q"+(i+1),name:laeuft?"läuft":(e?"":"–"),
+        wertL:a==null?"–":String(a),wertR:b==null?"–":String(b),gutL:a!=null&&a>b,gutR:b!=null&&b>a,
+        kum:a==null?"":kum[0]+" : "+kum[1],dim:a==null,blink:laeuft});
+    }
+    // Beste Spieler: dieselbe Tabelle wie rechts, quer ueber beide Teams.
+    let spieler=[], spKopf=[];
+    try{
+      const w=wertungVon(disc);
+      const sp=w.spalten.filter(s=>s.id!=="eig").slice(0,2);
+      const imp=w.spalten.find(s=>s.id==="imp");
+      if(imp&&!sp.includes(imp))sp.push(imp);
+      spKopf=sp.map(s=>s.kopf);
+      spieler=w.zeilen().sort(w.sortierung).slice(0,4).map((z,i)=>({id:"s"+i,rang:String(i+1),seite:z.side,name:z.n,eigen:z.side===0,
+        werte:sp.map(s=>{const v=s.wert(z); return v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v*10)/10).replace(".",","):String(v)));})}));
+    }catch{ spieler=[]; }
+    const band=[
+      {k:"Siegchance",chance,prog:true},
+      {k:"Prognose",v:prog,prog:true},
+      {k:"Gespielt",v:Math.round(anteil*100)+" %",z:chance==null&&!done?"Prognose ab 3 Treffern":""}];
+    return {typ:"feldspiel",titel:"STAND JE "+wort.toUpperCase(),messpunkte:null,aktiv:"jetzt",auto:true,
+      spalten:{name:""},zeilen,spieler,spKopf,
+      fuss:{links:lsVerein(0)+" "+p[0],mitte:"Prognose "+prog,rechts:p[1]+" "+lsVerein(1)},
+      grundlage:done?"Endstand":"Prognose aus der Punkterate dieses Spiels · Spanne ≈ 80 %",band};
+  }
+
+  // ---------------- LESEN: KAMPF (nur Band) ----------------
+  // "Kraefte" = Anteil an den verbleibenden Lebenspunkten -- exakt die Summe hinter den
+  // Lebensbalken (#thpL/#thpR, updateHud()). Prognose erst, wenn ein Viertel aller Lebenspunkte weg ist.
+  function liveStandKampf(){
+    if(!U.length)return null;
+    const hp=[0,0], max=[0,0];
+    for(const u of U){ if(u.side!==0&&u.side!==1)continue; hp[u.side]+=Math.max(0,u.hp||0); max[u.side]+=u.max||0; }
+    const summe=hp[0]+hp[1], gesamtMax=max[0]+max[1];
+    if(!(gesamtMax>0))return null;
+    const anteil=summe>0?hp[0]/summe:0.5;
+    const verbraucht=1-summe/gesamtMax;
+    let prog="offen";
+    if(done)prog=document.getElementById("score")?.textContent||"Endstand";
+    else if(verbraucht>=0.25){
+      const f=anteil>=0.5?0:1, a=Math.max(anteil,1-anteil);
+      prog=a<0.55?"knapp":lsVerein(f)+(a<0.65?" leicht vorn":" klar vorn");
+    }
+    const band=[{k:"Kräfte",chance:anteil,prozent:true},{k:"Einschätzung",v:prog,prog:true},
+      {k:"Lebenspunkte",v:Math.round(hp[0])+" : "+Math.round(hp[1])}];
+    return {typ:"kampf",titel:"",band,zeilen:null};
+  }
+
+  function liveStandLesen(){
+    if(istBahn(disc)){
+      if(!LAEUFER.length||bahnPodAnzeigeAktiv())return null;
+      if(bahnHatzAktiv||(LAEUFER[0]&&LAEUFER[0].hyroxPlan))return null; // HYROX/Hatz: eigene Rangleiste (Welle 2)
+      return BA().staffel?liveStandStaffel():liveStandBahn();
+    }
+    if(istFeldspiel(disc))return liveStandFeldspiel();
+    if(istBuehne(disc))return null; // Welle 3
+    if((disc==="tdm"||disc==="battlefield")&&!bfPodAktiv())return liveStandKampf();
+    return null;
+  }
+
+  // ---------------- ZEICHNEN ----------------
+  function lsBandHtml(d){
+    return d.band.map(f=>{
+      let inhalt;
+      if(f.chance!==undefined){
+        if(f.chance==null)inhalt="<b class=\"ls-wert\">offen</b>";
+        else{
+          const l=Math.round(f.chance*100);
+          inhalt="<b class=\"ls-wert heim\">"+l+" %</b><span class=\"ls-balken\" style=\"--ls-anteil:"+l+"%\"><i></i></span><b class=\"ls-wert gast\">"+(100-l)+" %</b>";
+        }
+      } else inhalt="<b class=\"ls-wert\">"+lsEsc(f.v)+"</b>"+(f.z?"<em class=\""+(f.progZ?"ls-prog":"")+"\">"+lsEsc(f.z)+"</em>":"");
+      return "<span class=\"ls-feld"+(f.prog?" ls-prog":"")+"\"><small>"+lsEsc(f.k)+"</small>"+inhalt+"</span>";
+    }).join("<i class=\"ls-trenner\"></i>");
+  }
+  function lsTafelHtml(d){
+    let h="<div class=\"ls-kopf\"><b>"+lsEsc(d.titel)+"</b>";
+    if(d.messpunkte){
+      h+="<span class=\"ls-reiter\" role=\"tablist\">";
+      d.messpunkte.forEach((m,i)=>{
+        const an=m.id===d.aktiv, frei=m.erreicht>0;
+        h+="<button type=\"button\" role=\"tab\" class=\"ls-tab"+(an?" an":"")+"\" data-ls-reiter=\""+m.id+"\" aria-selected=\""+an+"\""+(frei?"":" disabled")+" title=\""+(frei?m.erreicht+" gemessen · Taste "+(i+1):"noch niemand dort")+"\">"+m.kurz+"</button>";
+      });
+      h+="<button type=\"button\" class=\"ls-tab ls-auto"+(d.auto?" an":"")+"\" data-ls-reiter=\"auto\" title=\"automatisch der jüngste Messpunkt · Taste 0\">AUTO</button></span>";
+    }
+    h+="</div>";
+    if(d.typ==="bahn"){
+      h+="<table class=\"ls-tab-tabelle\"><thead><tr><th>#</th><th class=\"ls-name\">"+lsEsc(d.spalten.name)+"</th><th>"+lsEsc(d.spalten.wert)+"</th><th>ABST.</th><th class=\"ls-prog\">PROGN.</th>"+(d.spalten.punkte?"<th title=\"Punkte nach Rang im Spiel (vorläufig)\">PKT</th>":"")+"</tr></thead><tbody>";
+      for(const z of d.zeilen){
+        h+="<tr class=\""+(z.eigen?"eigen ":"")+(z.dim?"dim ":"")+(z.blink?"blink":"")+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td><td>"+lsEsc(z.wert)+"</td><td class=\""+(z.gut?"gut":(z.abstand?"schlecht":""))+"\">"+lsEsc(z.abstand)+"</td><td class=\"ls-prog\">"+lsEsc(z.prognose)+"</td>"+(d.spalten.punkte?"<td>"+lsEsc(z.punkte)+"</td>":"")+"</tr>";
+      }
+      h+="</tbody></table>";
+    } else {
+      // Staffel/Feldspiel: Zwei-Team-Raster (Abschnitt bzw. Periode je Zeile).
+      h+="<table class=\"ls-tab-tabelle ls-duo\"><thead><tr><th>"+(d.typ==="staffel"?"#":"")+"</th><th class=\"ls-name\">"+lsEsc(d.spalten.name)+"</th><th class=\"s0\">"+lsEsc(lsVerein(0))+"</th><th class=\"s1\">"+lsEsc(lsVerein(1))+"</th>"+(d.typ==="staffel"?"<th>Δ</th>":"")+"<th>"+(d.typ==="staffel"?"KUM.":"STAND")+"</th></tr></thead><tbody>";
+      for(const z of d.zeilen){
+        h+="<tr class=\""+(z.dim?"dim ":"")+(z.blink?"laeuft":"")+"\"><td class=\"ls-rang\">"+lsEsc(z.rang)+"</td><td class=\"ls-name\">"+lsEsc(z.name)+"</td><td class=\""+(z.gutL?"gut":"")+"\">"+lsEsc(z.wertL)+"</td><td class=\""+(z.gutR?"gut":"")+"\">"+lsEsc(z.wertR)+"</td>"+(d.typ==="staffel"?"<td>"+lsEsc(z.abstand)+"</td>":"")+"<td>"+lsEsc(z.kum)+"</td></tr>";
+      }
+      h+="</tbody></table>";
+      if(d.spieler&&d.spieler.length){
+        h+="<div class=\"ls-unterkopf\">Beste Spieler</div><table class=\"ls-tab-tabelle\"><thead><tr><th>#</th><th class=\"ls-name\">Spieler</th>"+d.spKopf.map(k=>"<th>"+lsEsc(k)+"</th>").join("")+"</tr></thead><tbody>";
+        for(const z of d.spieler)h+="<tr class=\""+(z.eigen?"eigen":"")+"\"><td class=\"ls-rang\">"+z.rang+"</td><td class=\"ls-name s"+z.seite+"\">"+lsEsc(lsKurz(z.name,14))+"</td>"+z.werte.map(v=>"<td>"+lsEsc(v)+"</td>").join("")+"</tr>";
+        h+="</tbody></table>";
+      }
+    }
+    h+="<div class=\"ls-fuss\"><span class=\"s0\">"+lsEsc(d.fuss.links)+"</span><b class=\"ls-prog\">"+lsEsc(d.fuss.mitte)+"</b><span class=\"s1\">"+lsEsc(d.fuss.rechts)+"</span></div>";
+    h+="<div class=\"ls-grundlage\"><span class=\"ls-prog\">"+lsEsc(d.grundlage||"")+"</span><button type=\"button\" class=\"ls-progknopf\" data-ls-prog=\"1\" aria-pressed=\""+(!lsOhnePrognose)+"\" title=\"Prognose ein-/ausblenden (für alle, die es spannend mögen)\">"+(lsOhnePrognose?"Prognose zeigen":"ohne Prognose")+"</button></div>";
+    return h;
+  }
+  function liveStandKnopfText(){
+    const k=document.getElementById("lsKnopf"); if(!k)return;
+    const t="Stand: "+(lsModus==="band"?"Band":lsModus==="tafel"?"Tafel":"aus");
+    if(k.textContent!==t)k.textContent=t;
+    k.setAttribute("aria-pressed",String(lsModus!=="aus"));
+  }
+  function liveStandModusWeiter(){
+    lsModus=LS_MODI[(LS_MODI.indexOf(lsModus)+1)%LS_MODI.length];
+    lsSpeichern(); liveStandKnopfText(); lsLetzterTick=-1e9; liveStandTick(performance.now(),true);
+  }
+  function liveStandReiterSetzen(id){
+    lsReiter=id==="auto"?null:id; lsSigTafel=""; lsLetzterTick=-1e9; liveStandTick(performance.now(),true);
+  }
+  function liveStandInit(){
+    if(lsInit)return; lsInit=true;
+    try{
+      const knopf=document.getElementById("lsKnopf");
+      if(knopf&&knopf.addEventListener)knopf.addEventListener("click",liveStandModusWeiter);
+      const tafel=document.getElementById("lsTafel");
+      if(tafel&&tafel.addEventListener)tafel.addEventListener("click",(ev)=>{
+        const t=ev.target&&ev.target.closest?ev.target.closest("[data-ls-reiter],[data-ls-prog]"):null;
+        if(!t||t.disabled)return;
+        if(t.dataset.lsProg){ lsOhnePrognose=!lsOhnePrognose; lsSpeichern(); lsSigTafel=""; lsSigBand=""; liveStandTick(performance.now(),true); return; }
+        liveStandReiterSetzen(t.dataset.lsReiter);
+      });
+      // TASTE L (+ 1-4, 0). Nur solange die Arena sichtbar ist und nicht in Textfeldern.
+      if(document.addEventListener)document.addEventListener("keydown",liveStandTaste);
+      liveStandKnopfText();
+    }catch{}
+  }
+  function liveStandTaste(ev){
+    if(instanzGestoppt||cv.isConnected===false){ try{document.removeEventListener("keydown",liveStandTaste);}catch{} return; }
+    if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+    const z=ev.target, tag=z&&z.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(z&&z.isContentEditable))return;
+    const root=document.getElementById("livestand");
+    if(!root||!cv.offsetParent)return; // Arena-Reiter nicht sichtbar
+    if(ev.key==="l"||ev.key==="L"){ ev.preventDefault(); liveStandModusWeiter(); return; }
+    if(lsModus!=="tafel"||root.hidden||!lsLetzteDaten||!lsLetzteDaten.messpunkte)return;
+    if(ev.key==="0"){ liveStandReiterSetzen("auto"); return; }
+    const n=+ev.key;
+    if(n>=1&&n<=lsLetzteDaten.messpunkte.length){ const m=lsLetzteDaten.messpunkte[n-1]; if(m.erreicht>0)liveStandReiterSetzen(m.id); }
+  }
+  // Takt: aus loop() nach draw(). Hoechstens 4x je Sekunde Wandzeit, ausser `sofort`.
+  function liveStandTick(jetzt,sofort){
+    if(!sofort&&jetzt-lsLetzterTick<250)return;
+    lsLetzterTick=jetzt;
+    const root=document.getElementById("livestand");
+    if(!root||!root.querySelector)return;
+    // Quick-Sim und Zustand "aus": nichts lesen, nichts messen, nur ausblenden.
+    if(schnelldurchAktiv||lsModus==="aus"){ if(!root.hidden)root.hidden=true; lsLetzteDaten=null; liveStandInit(); return; }
+    liveStandInit();
+    if(lsDisc!==disc){ lsDisc=disc; lsReiter=null; lsSigBand=""; lsSigTafel=""; }
+    const bug=document.getElementById("bbug");
+    const sichtbar=lsModus!=="aus"&&!schnelldurchAktiv&&bug&&!bug.hidden&&(running||done);
+    let d=null;
+    if(sichtbar){ try{ d=liveStandLesen(); }catch(e){ d=null; } }
+    lsLetzteDaten=d;
+    if(!d){ if(!root.hidden)root.hidden=true; return; }
+    root.hidden=false;
+    root.dataset.typ=d.typ;
+    root.classList.toggle("ohne-prognose",lsOhnePrognose);
+    const band=document.getElementById("lsBand"), tafel=document.getElementById("lsTafel");
+    // BAND-HOEHE folgt dem Score-Bug: dessen Mitte bekommt je Disziplin eine zweite Zeile (Shot-Clock,
+    // Down & Distance, Ueberzahl). Gemessen 4x/s, gesetzt nur bei Aenderung (CSS-Variable am .arenaraum,
+    // die auch Callout und Lauf-Band darunter schiebt).
+    const mitte=document.getElementById("bbugMitte");
+    if(mitte&&root.parentElement&&root.parentElement.style){
+      const top=Math.max(44,Math.round((bug.offsetTop||8)+mitte.offsetTop+mitte.offsetHeight+3));
+      if(top!==lsBandTop){ lsBandTop=top; root.parentElement.style.setProperty("--ls-band-top",top+"px"); }
+    }
+    if(band){
+      const s=JSON.stringify(d.band);
+      if(s!==lsSigBand){ lsSigBand=s; band.innerHTML=lsBandHtml(d); }
+    }
+    if(tafel){
+      // RUHE-MODUS: waehrend Viertelpause und Anpfiff-Countdown klappt die Tafel aufs Band zusammen.
+      const vp=document.getElementById("viertelpause"), af=document.getElementById("anpfiff");
+      const ruhe=(vp&&!vp.hidden)||(af&&!af.hidden);
+      const zeigen=lsModus==="tafel"&&!ruhe&&!!d.zeilen;
+      if(tafel.hidden!==!zeigen)tafel.hidden=!zeigen;
+      if(zeigen){
+        const s=JSON.stringify([d.titel,d.messpunkte,d.aktiv,d.auto,d.zeilen,d.spieler,d.fuss,d.grundlage,lsOhnePrognose]);
+        if(s!==lsSigTafel){ lsSigTafel=s; tafel.innerHTML=lsTafelHtml(d); }
+      }
+    }
+  }
+  function liveStandReset(){
+    lsReiter=null; lsSigBand=""; lsSigTafel=""; lsLetzteDaten=null; lsLetzterTick=-1e9;
+    const root=document.getElementById("livestand"); if(root)root.hidden=true;
+  }
+
   let schnelldurchLetztesBild=0;
   function loop(ts){
     // Instanz abgeloest (Canvas aus dem Dokument entfernt) oder ausdruecklich gestoppt: kein
@@ -57202,6 +57721,8 @@
     // Render-Interpolation (s. viMische): nur waehrend draw(), Sim-Zustand bleibt unberuehrt.
     const viRueck=(running&&!schnelldurchAktiv&&!done)?viMische(zeitFaktor()):null;
     try{ draw(); } finally { if(viRueck)viRueck(); }
+    // LIVE-STAND (Welle 1): reine Anzeige, gedrosselt auf 4x/s, s. liveStandTick().
+    try{ liveStandTick(ts); }catch{}
     requestAnimationFrame(loop);
   }
 
@@ -60141,6 +60662,7 @@
 
   function reset(){
     running=false;done=false;last=0;acc=0;bahnSimAcc=0;pfeile=[];
+    liveStandReset(); // LIVE-STAND: Reiter/Signaturen gehoeren zum abgelaufenen Spiel
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
     // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
     // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
@@ -67254,6 +67776,13 @@
     bahnPlaene:()=>LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,plan:u.plan,
       ab:+u.ab.toFixed(4),pos:+u.pos.toFixed(4),ansagen:u.ansagen||0})),
     setDisc:(d)=>{ disc=d; reset(); },
+    // LIVE-STAND (Welle 1): Sonde und Schalter fuer Tests/Screenshots -- reine Anzeige.
+    // liveStandProbe() liest frisch (dieselbe Funktion wie die Anzeige), liveStand({modus,reiter,ohnePrognose}) schaltet.
+    liveStandProbe:()=>{ let d=null; try{ d=liveStandLesen(); }catch(e){ return {fehler:String(e)}; }
+      return {modus:lsModus,reiter:lsReiter,daten:d?JSON.parse(JSON.stringify(d)):null}; },
+    liveStand:(o)=>{ o=o||{}; if(LS_MODI.includes(o.modus))lsModus=o.modus; if("reiter" in o)lsReiter=o.reiter==="auto"?null:o.reiter;
+      if("ohnePrognose" in o)lsOhnePrognose=!!o.ohnePrognose; lsSigBand=""; lsSigTafel=""; liveStandKnopfText(); liveStandTick(performance.now(),true);
+      return {modus:lsModus,reiter:lsReiter,ohnePrognose:lsOhnePrognose}; },
     // GEWICHTHEBEN: LAMPEN-STATUS, READ-ONLY (Folgefund zu PR #1091, Task #35, 01.10.) —
     // dasselbe Playwright-Abnahme-Muster wie kampfAnsage()/fsFokus()/bahnWahl() daneben: macht
     // von AUSSEN sichtbar, was sonst nur im Motor steckt, damit eine Playwright-Probe den
