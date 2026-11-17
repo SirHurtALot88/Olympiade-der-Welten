@@ -87,6 +87,12 @@ ATTACK = ["lunges", "lunge ", "swings", "swing ", "thrusts", "thrust ", "slashes
 DISPLAY = {"walk": "walk", "gehen": "walk", "run": "walk", "attack": "angriff", "angriff": "angriff",
            "hit": "treffer", "hurt": "treffer", "treffer": "treffer", "recoil": "treffer",
            "death": "tod", "die": "tod", "tod": "tod", "ko": "tod", "k.o.": "tod"}
+# OFFIZIELLE (17.11.): Figuren, die KEIN Spieler sind -- heute nur der Schiedsrichter (Chris am 17.11.:
+# "hud Effekte und schiri auch über Pixel lab", ausdrueckliche Freigabe fuer genau diese eine Figur).
+# Slug = PixelLab-Tag, mit "__" davor, damit er nie mit einem Spieler-Slug (player-NNNN-<slug>)
+# zusammenfaellt; lib/data/figurenSprites.ts und die Sprite-Galerie lassen "__"-Slugs aus,
+# scripts/baue-arena-figuren.mjs fuehrt sie unter demselben Schluessel statt unter einem Spielernamen.
+OFFIZIELLE = {"__schiri"}
 # Streifen-Dateien einer Figur: <name>-<richtung>.png (Grundposen heissen nur <richtung>.png).
 STREIFEN = re.compile(r"^[a-z]+\d*-(" + "|".join(ANIM_DIRS) + r")\.png$")
 
@@ -203,12 +209,14 @@ def main():
         m = re.match(r"^player-\d+-(.+)$", pid)
         if m:
             slugs.add(m.group(1))
+    slugs |= OFFIZIELLE
     if args.nur:
         # Spieler ohne Eintrag in der Portrait-Map (Portrait per Override in lib/data/mediaAssets.ts,
         # z. B. player-0154-riley-le-rouge) sind trotzdem gueltig, wenn es die Spieler-ID gibt.
         stats = os.path.join(ROOT, "data", "generated", "oly-player-stats.json")
         if os.path.exists(stats):
             slugs |= set(re.findall(r'"player-\d+-([a-z0-9-]+)"', open(stats).read()))
+        slugs |= OFFIZIELLE
         unbekannt = sorted(set(args.nur) - slugs)
         if unbekannt:
             sys.exit(f"Unbekannte Slugs (nicht in player-portrait-map.json): {unbekannt}")
