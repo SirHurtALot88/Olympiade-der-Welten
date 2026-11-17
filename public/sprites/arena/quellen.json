@@ -1356,6 +1356,41 @@
   "erzeugt": "2026-11-17",
   "verwendung": "I-Spy-Nachbesserung 17.11. -- eckige Holztuer im Holzrahmen mit Messinggriff (Tuer-Fundorte), Neubestellung nach Chris' Freigabe (\"3 ja\"): die erste Fassung (Bogentuer im Steinrahmen, Job b6fcc7c1, Kandidat 3) wirkte im Horror-Saal wie ein Grabstein. s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
  },
+ "fx_hieb.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/vfx (artist pro)",
+  "auftrag": {
+   "prompt": "A single fast melee slash arc for a top-down pixel art brawler, plays once, about 0.35 seconds. One crescent-shaped swoosh: a curved blade trail of about 120 degrees that opens toward the RIGHT side of the canvas (the convex side of the crescent faces right, as if a sword was swung through a target from top to bottom on the right), centred on the canvas. Colours: pure white core fading to light grey edges, no other colours, so the game can tint it in team colours at runtime. Thick bright leading edge, thinning tail, a couple of tiny white sparks at the tips. It sweeps in quickly, then fades out. Transparent background, crisp pixels, about 48 pixels across, no glow halo, no text.",
+   "artist": "pro",
+   "job": "9acf3b75-ac6f-4e83-86a4-7bb952cd7ff1",
+   "effect_id": "0552ff6c-8e54-49a4-bdba-1e05d03c8ce1",
+   "result_id": "47e40109-d1bc-4ad6-b8e9-ab4cac0c5c04",
+   "seed": null,
+   "generationen": 8,
+   "canvas": [
+    56,
+    56
+   ],
+   "bilder": 7,
+   "fps": 20
+  },
+  "roh": "data/generated/pixellab-vfx/roh/hieb-bogen-neutral-pro.{png,json} (3x3-Raster, hier als 7er-Streifen 392x56 umgelegt)",
+  "vergleich": {
+   "artist": "lite",
+   "job": "67eb2357-de76-433b-bdcb-677b491e732b",
+   "effect_id": "2791e9d3-d337-4b98-9e8e-f64e37810048",
+   "generationen": 1,
+   "roh": "data/generated/pixellab-vfx/roh/hieb-bogen-neutral-lite.{png,json}",
+   "verworfen": "duenner, Bogen zerfaellt frueher; pro bei 24-34 px besser lesbar"
+  },
+  "einsetzen": "zeichneEffekte()/zeichneHiebBild() in battle-mode.engine.js, zur Laufzeit in Teamfarbe getoent; Rueckfall Canvas-Bogen",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "vorher": {
+   "paket": "Canvas-Primitive",
+   "stelle": "zeichneEffekte() typ hieb (ctx.arc in Teamfarbe)"
+  }
+ },
  "falle_fegearm.png": {
   "paket": "PixelLab",
   "quelle": "api.pixellab.ai /v2/generate-image-v2",

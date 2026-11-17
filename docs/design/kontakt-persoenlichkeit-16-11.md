@@ -611,6 +611,27 @@ für das **ganze** Kontaktpaket einer Disziplin, nicht je Baustein.
 | 3 | Trait-Verschiebungen, Härte-Faktor, Foul und Gutschrift, Hänger | Feinschliff |
 | 4 | Bedingte Neigungen (Schutz, Revanche, gegen Angeschlagene) | neuer Zielwahl-Kanal, einzeln messen |
 
+**Nachtrag 17.11. — Hänger auf 60 % für 0,4 s umgesetzt (Spurt klassisch, Stufe 3).** Chris am
+17.11., wörtlich: „Und das bremsen machst du auf 60%". Der Pilot (PR #1534) bremste den Hänger nur
+über `u.kraft` (82 % Tempo, ≈ 0,07 s je Beteiligtem) statt wie in Tabelle 3.3 auf 60 %. Jetzt:
+beide Beteiligten 0,4 s auf 60 % Tempo, Zeitverlust 0,4 · (1 − 0,6) = 0,16 s je Läufer, so auch in
+`zeitBezahlt` gebucht. Umsetzung ohne neues Läufer-Feld: Ende des Hängers (Rennuhr) in der WeakMap
+`kontaktHaengerMap`, `tempoVon` liest dort 0,6 statt der 82 % von `u.kraft` (das bleibt für Pose
+und Puste gesetzt). Ohne Flag wird die WeakMap nie beschrieben, Fingerabdruck unverändert
+`GESAMT e80babacb68c (75)`. Ebenfalls von Chris bestätigt und unverändert: im Normalfall gewinnt
+einer das Duell und zahlt kaum etwas (Treffer: Täter nur Grundpreis ≈ 0,05 s; abgewehrt: Blocker
+zahlt nichts, Täter Mini-Stun) — der Hänger bleibt der seltene Ausgleichsfall (|p − 0,5| < 0,06).
+
+| Messung (Spurt, `OLY_FORM_MODUS=echt`, 96 Spiele) | vorher (#1534) | Hänger 60 % |
+|---|---:|---:|
+| rho je Spiel, Flag aus | 0,887 | 0,887 |
+| rho je Spiel, `spurt:3` | 0,890 | 0,890 |
+| rho Saison, aus / `spurt:3` | 0,930 / 0,937 | 0,930 / 0,930 |
+| Pp-Abweichung `spurt:3` (48 Läufe) | 9,8 | 9,7 |
+
+Gegenprobe (24 Saaten, nur Stufe 3 ohne Foul gegen dasselbe Rennen ohne Hänger): Beteiligte
+verlieren im Mittel ≈ 0,17 s (bei 82 % waren es ≈ 0,065 s).
+
 ### 6.5 Flag-Strategie und Fingerabdruck
 
 Aktueller Stand: `GESAMT e80babacb68c (75 Einträge)`. Kein Test pinnt ihn; er wird von Hand
