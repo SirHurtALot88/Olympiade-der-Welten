@@ -419,7 +419,11 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-16.11.: **GESAMT e80babacb68c (75 Eintraege)**. Eine reine Anzeige-Aenderung an
+17.11.: **GESAMT 7c9257b4435c (75 Eintraege)** — seit Kontakt im klassischen Spurt scharf ist
+(`BAHN_ART.spurt.kontakt={stufe:3}`, `docs/design/kontakt-persoenlichkeit-16-11.md` 6.5); davor
+`e80babacb68c`. Bewegt haben sich nur `spiele spurt 1` und `spiele spurt 7`. Rueckweg-Beleg:
+`node scripts/pruefe-wertung-fingerabdruck.mjs --kontakt-aus` muss wieder `e80babacb68c` ergeben.
+Eine reine Anzeige-Aenderung an
 `public/mockups/battle-mode.engine.js` (Zeichnen, HUD, Interpolation, Bilder auslagern) darf sie
 NICHT veraendern; weicht sie ab, hat die Aenderung die Wertung beruehrt. Neue Felder an Laeufer-/
 Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer WeakMap bzw. in

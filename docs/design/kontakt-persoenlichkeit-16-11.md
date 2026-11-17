@@ -635,7 +635,7 @@ verlieren im Mittel ≈ 0,17 s (bei 82 % waren es ≈ 0,065 s).
 ### 6.5 Flag-Strategie und Fingerabdruck
 
 Aktueller Stand: `GESAMT e80babacb68c (75 Einträge)`. Kein Test pinnt ihn; er wird von Hand
-vorher/nachher verglichen.
+vorher/nachher verglichen. **Seit 17.11. (Spurt klassisch scharf): `GESAMT 7c9257b4435c`**, s. Abschnitt 11.3.
 
 1. **Einbau hinter Flag, Standard aus.** `BAHN_ART[d].kontakt` (bzw. `FELDSPIEL_ART`,
    `ARENA_ART`) ist `null`; gesetzt wird nur über `window.__arena.bahnFlags({kontakt:{...}})` /
@@ -771,3 +771,113 @@ eigener PR; scharfgeschaltet wird je Disziplin einzeln (6.5).
 Nach jedem scharfgeschalteten Schritt: `disziplin-abnahme.json` und
 `stand-aller-disziplinen.md` nachziehen, neuen GESAMT-Wert im Kopf von
 `scripts/pruefe-wertung-fingerabdruck.mjs` eintragen.
+
+---
+
+## 11. Nachtrag 17.11. — Spurt klassisch scharf, und die Reihenfolge für den Rest
+
+Chris am 17.11., wörtlich: „schubsen tacklen etc bitte auch einbauen, das kann ja die rho noch mal
+verändern und sollte drin sein fürs messen". Umgesetzt ist **Schritt 1, Scharfschalten** nach 6.5
+Punkt 3: `BAHN_ART.spurt.kontakt = {stufe:3}` (Stufen 1–3, Dosis 1) ist jetzt der Engine-Standard,
+gesetzt direkt nach `kontaktFlagFeld()` (das Feld bleibt nicht aufzählbar). Damit rempeln, schubsen
+und verhaken sich die Läufer im echten Spiel **und** in jedem Messwerkzeug (`miss-alle-disziplinen`,
+`miss-star-paartreue`, `messe-arena-einfluss`, `miss-spurt-mischung`, CI-Schranke, Fingerabdruck),
+ohne Schalter. „Aus" heißt seither `--kontakt-json={"spurt":null}` (Messskripte) bzw.
+`--kontakt-aus` (Fingerabdruck).
+
+**Nur der klassische Spurt bewegt sich.** Hatz und HYROX laufen über `stepSpurtHatz()` /
+`stepSpurtHyrox()` und haben **keinen** Rempler-Block — das Flag kann dort nichts auslösen; Takeshi
+bleibt über `!BA().takeshi && !BA().tackleAusweichen` ausgenommen. Entgegen 6.5 Punkt 3 („plus die
+sechs Hatz-/HYROX-Einträge") bewegen sich deshalb im Fingerabdruck nur zwei Zeilen.
+
+### 11.1 Abnahme vorher/nachher (gleiche Saaten, gleiche Kader, Kaderfamilie live-save)
+
+| Kriterium | Kontakt aus | Kontakt scharf | Schwelle | Urteil |
+|---|---:|---:|---|---|
+| rho je Spiel, echt, n=96 (Spannweite) | 0,887 (0,069) | **0,890** (0,055) | ≥ 0,75, Ziel > 0,80 | besteht |
+| rho Saison, echt | 0,930 | 0,930 | — | gleich |
+| rho je Spiel / Saison, Ersatzkarte, n=96 | 0,883 / 0,916 | 0,887 / 0,923 | ≥ 0,75 | besteht |
+| A: gepaarte Differenz je Kader (echt) | — | +0,026 / −0,010 / +0,012 / −0,003 / ±0,000 | 5 von 5 innerhalb −0,03 | besteht |
+| B: Pp, echt, n=48, Strom 0 / 10 000 000 | 12,9 / 6,5 | **8,5 / 9,9** | ≤ 25, Ziel < 15 | besteht; größtes Plus über Matrix: dexterity +2,2 |
+| C: Star auf Rang 1, echt (Top 2) | 78,3 % (93,3 %) | **82,5 %** (94,4 %) | höchstens −5 Pp | besteht (+4,2) |
+| C: Star auf Rang 1, Ersatz (Top 2) | 81,9 % (93,3 %) | 80,2 % (94,0 %) | höchstens −5 Pp | besteht (−1,7) |
+| Star auf letztem Rang | 0 % | 0 % | 0 % | besteht |
+| D: Paartreue ≥ 15 Punkte, echt / Ersatz | 98,9 / 98,8 % | 99,0 / 99,0 % | höchstens −1 Pp | besteht |
+| N: Neutralität (s. 11.2) | eps² 0,051 | eps² 0,028 | jeder Typ ≤ 1 SE | besteht (geclustert, s. Vorbehalt) |
+| H: Häufigkeit je Rennen (480 Rennen) | — | 3,65 Versuche, 1,90 Treffer, 1,13 Fehlschläge, 1,55 Verzicht, 0,42 Hänger, 0,21 Fouls | Fehlschläge nicht häufiger als Treffer | besteht |
+| Spurt-Mischung, n=96: Mischung / klassisch / Hatz / HYROX | 0,876 / 0,887 / 0,824 / 0,892 | 0,880 / 0,890 / 0,824 / 0,892 | ≥ 0,75 | besteht; Hatz/HYROX bit-gleich |
+| Spurt-Mischung Pp (`--pp=48`, zwei Ströme) | 16,5 / 21,5 (16.11.) | 17,7 / 22,0 | ≤ 25 | besteht; Strom 10 000 000 nahe an der Schranke, beobachten |
+| CI-Schranke (`pruefe-rangtreue-schranke.mjs`): spurt / spurt-klassisch / spurt-mischung | Basis 0,880 / 0,876 / 0,873 | 0,903 / 0,894 / 0,870 | Rückgang ≤ 0,05 | grün, Basislinie unverändert |
+
+Befehle: `OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 96 spurt`,
+`[OLY_FORM_MODUS=echt] node scripts/miss-star-paartreue.mjs 96 spurt` (Formkarten-Modus dort am 17.11.
+ergänzt, vorher maß das Skript nur mit der Ersatzkarte), `OLY_FORM_MODUS=echt node
+scripts/messe-arena-einfluss.mjs spurt 48 [--saat-versatz=10000000]`, `node
+scripts/miss-spurt-mischung.mjs 96 --je-format`. „Aus" wurde auf dem Elternstand `fa2a52d9` ohne
+Schalter gemessen, „scharf" dort mit `--kontakt=spurt:3`; der Lauf auf dem neuen Stand **ohne**
+Schalter liefert Zeichen für Zeichen dieselbe Zeile (0,890 / 0,055 / 0,930 / 0,091).
+
+Nicht eigens gemessen: E (Heim:Gast), K (Kontaktsaldo gegen Eignung), V (Varianzanteil). Für K und
+V fehlt der Sonde die Eignung je Läufer im `bahnLauf()`-Ergebnis; das gehört in Schritt 1b.
+
+### 11.2 Kriterium N, wie gemessen
+
+Kein Werkzeug im Repo misst N; gemessen mit einer Sonde über den Node-Motor (`bahnLauf`, Ersatzkarte,
+5 Kader × 96 Saaten, 60 Spieler): je Läufer Platz und Zeit mit echten Typen gegen dasselbe Rennen, in
+dem `kontaktPersZwang()` alle auf einen Typ zwingt — einmal mit Kontakt aus, einmal scharf.
+Ausgewertet wird der **Platz** (das, was gewertet wird; die Zeit verschiebt sich unter Zwang für das
+ganze Feld), Standardfehler **je Spieler geclustert** (die Persönlichkeit ist eine Eigenschaft des
+Spielers, die 96 Saaten eines Spielers sind nicht unabhängig).
+
+| Zwangstyp | aus: max \|t\|, eps² | scharf: max \|t\|, eps² | scharf − aus: max \|t\| |
+|---|---|---|---|
+| duellant | 2,01 (beschuetzer), 0,051 | **0,99** (opportunist), 0,028 | 1,92 (schleicher, +0,16 Plätze) |
+| bollwerk | 1,35 (schleicher), 0,050 | **1,15** (schleicher), 0,057 | 0,89 |
+
+Mit Kontakt liegt jeder Typ innerhalb von rund einem Standardfehler; ohne Kontakt war die Streuung
+nicht kleiner. Ehrlich dazu: **ungeclustert** (jede Saat als eigene Beobachtung) sind einzelne Typen
+signifikant — mit Kontakt der Beschützer −0,20 Plätze (t −3,5), der Schleicher +0,11 (t +2,8); ohne
+Kontakt das Bollwerk +0,06 (t +2,3). Bei der Zeit gewinnt der wählerische Beschützer gegen Zwang
+„duellant" spürbar (−0,27 s, geclustert t −3,0): wer ihn zum Duellanten macht, lässt ihn bei
+schlechter Aussicht zulangen und zahlt den Mini-Stun. Das ist die in 3.2 beabsichtigte Kostenlogik;
+im Platz kommt davon nichts Messbares an. Weiter beobachten; Stellschraube wäre `pMin` je Typ.
+
+### 11.3 Fingerabdruck und Rückweg
+
+`GESAMT e80babacb68c` → **`GESAMT 7c9257b4435c` (75 Einträge)**. Gegen die Ausgabe von `origin/main`
+(`0c39221f`) unterscheiden sich genau zwei Zeilen: `spiele spurt 1` (`d22c9e6244c2` → `870e28b88ab3`)
+und `spiele spurt 7` (`3ee976267e5a` → `3732ee6cd899`). `spiele spurt 42` (in diesem kaderlosen Rennen
+ändert der Kontakt nichts am Ergebnis), Hatz, HYROX, Takeshi und alle übrigen 71 Zeilen sind gleich.
+Rückweg zweifach belegt: die Engine-Zeile auf `null` gesetzt ergibt wieder exakt `e80babacb68c`,
+ebenso der neue Schalter `--kontakt-aus`. Im Test `tests/bahn-pod-vier-teams.test.ts` (Duell-
+Fingerabdruck, läuft nur mit Chromium) bewegt sich nur `spurt` (`aaf683d558b12728` →
+`8e96b1dc33ad1b1c`); Staffel, Takeshi, Zeitfahren und Climbing bleiben gleich (Elternstand gegen
+neuen Stand gerechnet).
+
+### 11.4 Reihenfolge für „schubsen, tacklen etc." in den übrigen Disziplinen
+
+Stand im Motor am 17.11. (Aufwand wie in Abschnitt 10: S = eine Runde, M = zwei bis drei Runden mit
+Messung, L = mehr). „Gerüst" heißt: `FELDSPIEL_ART`/`ARENA_ART`/`BUEHNE_ART[d].kontakt` existiert
+(Schritt 0), wird aber von keiner Mechanik gelesen. Das Profil `kontaktProfil()` (vier Regler aus
+Persönlichkeit und Traits) steht für **jeden** Spieler bereit; was überall fehlt, ist die Stelle, an
+der eine Mechanik es liest.
+
+| Rang | Disziplin | Kontakt heute im Motor | Persönlichkeit wirkt heute | Was fehlt | Aufwand | rho / Pp heute |
+|---|---|---|---|---|---|---|
+| **1** | **Takeshi** (Schritt 3) | Rempler im Fenster vor der Falle, Ausweichen (TECHNIK-Duell), gemessen 13,3 Versuche je Rennen; **derselbe Codepfad** wie Spurt (`kontaktBahnVersuch`) | ja, `willTackeln` = kb (wie oft) | Gate in `stepSpurt` öffnen (heute `!BA().takeshi && !BA().tackleAusweichen`) und kalibrieren: `tackleAb:30` lässt fast jeden rempeln, `pMin` greift am stärksten; Mini-Stun darf **keine** Nerven kosten (Lehre `tackleNerven`); Ausweichen aus Takeshi mit Stufe 2 zusammenführen | **S–M** | 0,838 / 18,9 · 17,7 |
+| 2 | **Football** (Schritt 2) | Tackle abstrakt in `resolveLaufNfl()`: LAUFKRAFT gegen ABWEHR_LAUF, gebrochener Tackle, Fumble, zweiter Tackler | nein (Tackler per Los nach ABWEHR_LAUF) | Tackle-Stil aus HÄ („voll"/„sicher", gleicher Erwartungswert), KB als zweiter Faktor im Tackler-Los, Läufer-Antwort aus AW, Foul aus DI (15 Yards), Boxscore „verpasste Tackles"; Gerüst `FELDSPIEL_ART.football.kontakt` steht | **M** | 0,854 / 15,3 · 16,0 |
+| 3 | **Hatz / HYROX** (Schritt 1b) | **keiner** — `stepSpurtHatz()` / `stepSpurtHyrox()` haben keinen Rempler-Block (deshalb blieben ihre Fingerabdrücke gleich) | nein | Rempler dort neu verdrahten: Hatz mit Sperre in den letzten Metern **jeder Welle** und Deckel 1 Sturz je Welle (ein Sturz kann ausscheiden lassen); HYROX nur auf Laufstücken, nie an der Station; eigene Sonden `messe-spurt-hatz/-hyrox-einfluss.mjs`. Mehr als „nachmessen", deshalb M statt S–M | **M** | Hatz 0,824 / HYROX 0,892; Mischung Pp 16,5 · 21,5 |
+| 4 | **Battlefield-Pod** (Schritt 4) | Rückstoß `stossen()` mit `knockbackResist`/`stunResist` je Archetyp | Ziel/Haltung (PERS*), nicht der Stoß | „Verdrängen vom Punkt" als Ersatz eines Angriffs (nicht obendrauf, P1-Regel), KB wählt Stoß statt Schlag, HÄ die Weite, Fehlschlag verzögert den nächsten Angriff; Gerüst `ARENA_ART.battlefield.kontakt` steht | **M–L** | Pod 0,874 / 8,2 · 7,5 |
+| 5 | **Basketball** | Ausboxen `REB_BOXOUT=4.0` als Teamkonstante | nein | **wer** ausboxt nach Tendenz (Bollwerk/Beschützer boxen, Schleicher spekulieren), Screens mit Offensivfoul aus DI — zuerst als Statistik, Wirkung erst mit lesender Taktik-Mechanik | **S–M** | 0,822 / 15,6 · 16,7 |
+| 6 | **Hockey** (Checks) | Bodycheck in `versucheSteal()`: ABWEHR gegen AUSDAUER, `HK_STURZ`/`HK_TAUMEL`, Foul-Anteil → Strafe | nein | nur die **Verteilung** der rund zehn Checks je Team nach KB (gleiche Gesamtzahl, eigener Zufallsstrom), verpasster Check als Abklingzeit plus Puste, **nie** als Position (RNG-Kaskade) — Messversuch mit Abbruch bei jeder Verschlechterung | **M** | 0,700 (Ausnahme) / 13,9 · 21,8 |
+| 7 | **TDM** | Rückstoß wie Battlefield | ja (Ziel, Haltung); war schon einmal der größte Fehlordner (P1) | erst Bild über gebuchte Treffer; Wirkung erst nach dem Battlefield-Pod | **S** (Bild) / L (Wirkung) | 0,839 / 14,6 · 14,7 |
+| 8 | **I-Spy** (Schubsen) | **keiner**; nur der Haken in `ispyStandXY()` (Rückstoß als Zeichenversatz) | nein | echtes Schubsen/Warten braucht exklusive Fundorte über Teamgrenzen (Chris' Wunsch, Vorgänger 28b) — ein Umbau der Halle, kein Kontakt-Baustein; vorher als Bild | **L** (Mechanik) / S (Bild) | 0,776 / 14,6 · 15,0 |
+| — | Climbing | Herunterziehen am Kreuzungsgriff, jeder Führende zieht | nein | KB könnte entscheiden, **wer** zieht — rho 0,801 lässt wenig (Frage 3 an Chris) | S | 0,801 / 12,0 · 9,5 |
+| — | Eiskunstlauf (Schritt 5) | keiner | nein | „Kreuzen" setzt „vier Aktive anzeigen" voraus | M–L | 0,927 / 10,6 · 12,0 |
+
+**Empfehlung für die nächste Disziplin: Takeshi.** Gleicher Code, gleiche Stufen, schon heute die
+meisten Rempler im Spiel — der Messgewinn („drin fürs Messen") ist dort am größten und der Bau am
+kleinsten. Danach Football (eigener Motor, Tackle-Logik vorhanden, Puffer) und Hatz/HYROX (der
+Rempler muss erst hinein). Hockey, TDM und I-Spy erst, wenn die ersten drei das Muster bestätigt
+haben. Regeln wie bisher: eine Disziplin je PR, Abnahme vorher/nachher mit denselben Kriterien wie
+11.1, der Fingerabdruck-Diff zeigt nur diese Disziplin.
