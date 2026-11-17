@@ -1,0 +1,907 @@
+/*
+ * BROADCAST-FUNDAMENT (Welle 0, Einsatzliste modern, 17.11.)
+ *
+ * Plan: docs/design/oly-seiten-modern-17-11.md (Teil 3, „Gemeinsames Designsystem"),
+ * Vorlage: public/mockups/einsatzliste-modern-17-11.html.
+ *
+ * Alles hier liegt unter der Wurzelklasse `.bc` und dem Präfix `bc-`: globals.css hat 80 000 Zeilen
+ * mit kurzen Klassennamen (`.btn`, `.chip`, `.slot` …), die der Prototyp ungeschützt benutzt hat.
+ * Ohne Präfix würde sich beides gegenseitig umfärben. Die Tokens sind absichtlich NICHT global:
+ * eine Seite, die das Fundament nutzt, setzt `className="bc"` auf ihre Wurzel.
+ *
+ * Teamfarbe: die Shell setzt `--nl-accent` (lib/foundation/team-shell-theme.ts). `--bc-team` liest
+ * sie, mit Bernstein als Rückfall. Sie färbt Wappenrahmen und Kulisse im Kopf. Die Bedeutungsfarben
+ * (Bernstein = wir, Türkis = Gegner, Gold = gewählt/beste, Rot = Fehler, Gelb = Warnung) bleiben
+ * fest, damit eine Teamfarbe nie „Gegner" oder „Fehler" vortäuscht.
+ *
+ * Schriften: RaniraSeason (global, Namen und Überschriften) und Barlow Condensed (nur Zahlen und
+ * Kleintext, OFL, lokal unter /fonts — kein Google-Link). Entscheidung Chris 17.11.
+ */
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 500;
+  font-style: normal;
+  src: url("/fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 600;
+  font-style: normal;
+  src: url("/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 700;
+  font-style: normal;
+  src: url("/fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");
+  font-display: swap;
+}
+
+.bc {
+  --bc-grund: #06080c;
+  --bc-flaeche: rgba(9, 12, 18, 0.9);
+  --bc-flaeche-1: #0c1017;
+  --bc-flaeche-2: #121824;
+  --bc-flaeche-3: #1a2231;
+  --bc-linie: rgba(244, 230, 196, 0.13);
+  --bc-linie-2: rgba(244, 230, 196, 0.3);
+  --bc-creme: #f4e6c4;
+  --bc-gold: #f0c35a;
+  --bc-tinte: #eef2f8;
+  --bc-leise: #9aa7ba;
+  --bc-stumm: #7a869c;
+  --bc-heim: #f2a03d;
+  --bc-gast: #45b0c9;
+  --bc-gut: #62d394;
+  --bc-warn: #ff6058;
+  --bc-acht: #f3b54a;
+  --bc-team: var(--nl-accent, #f2a03d);
+  /* Sechs Positionsfarben (Slot 1–6). Die Reihenfolge ist die der Einsatzliste: Farbe = Platz. */
+  --bc-p1: #e0637a;
+  --bc-p2: #e89a4c;
+  --bc-p3: #c3cf5e;
+  --bc-p4: #4fc7b2;
+  --bc-p5: #62a0f4;
+  --bc-p6: #ac8af2;
+  --bc-haus: "RaniraSeason", Georgia, "Times New Roman", serif;
+  --bc-zahl: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --bc-r: 10px;
+  --bc-r-s: 6px;
+
+  box-sizing: border-box;
+  color: var(--bc-tinte);
+  font-family: var(--bc-zahl);
+  font-style: normal;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.25;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bc-grund);
+}
+.bc *,
+.bc *::before,
+.bc *::after {
+  box-sizing: border-box;
+}
+.bc button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+.bc button:disabled {
+  cursor: default;
+}
+.bc input,
+.bc select {
+  font: inherit;
+  color: inherit;
+}
+.bc button:focus-visible,
+.bc [tabindex]:focus-visible,
+.bc input:focus-visible,
+.bc select:focus-visible {
+  outline: 2px solid var(--bc-gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.bc img {
+  display: block;
+}
+.bc-t {
+  font-variant-numeric: tabular-nums;
+}
+.bc-haus {
+  font-family: var(--bc-haus);
+  font-style: italic;
+  font-weight: 700;
+}
+.bc-gk {
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+  font-weight: 600;
+}
+.bc-icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.14em;
+  flex: none;
+}
+.bc-plus {
+  color: var(--bc-gut);
+}
+.bc-minus {
+  color: var(--bc-warn);
+}
+.bc-null {
+  color: var(--bc-stumm);
+}
+.bc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- Tooltip: ein Muster für alles (data-bc-tip) ---------- */
+.bc [data-bc-tip] {
+  position: relative;
+}
+.bc [data-bc-tip]:hover::after,
+.bc [data-bc-tip]:focus-visible::after {
+  content: attr(data-bc-tip);
+  position: absolute;
+  z-index: 90;
+  left: 50%;
+  top: calc(100% + 7px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #020305;
+  border: 1px solid var(--bc-linie-2);
+  color: var(--bc-tinte);
+  font: 500 13.5px/1.3 var(--bc-zahl);
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  pointer-events: none;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+.bc [data-bc-tip].bc-tip-oben:hover::after,
+.bc [data-bc-tip].bc-tip-oben:focus-visible::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+}
+.bc [data-bc-tip].bc-tip-links:hover::after,
+.bc [data-bc-tip].bc-tip-links:focus-visible::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* ---------- Knöpfe ---------- */
+.bc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 7px;
+  border: 1px solid var(--bc-linie-2);
+  background: var(--bc-flaeche-2);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.bc-btn:hover:not(:disabled) {
+  background: var(--bc-flaeche-3);
+  border-color: var(--bc-creme);
+}
+.bc-btn:disabled {
+  opacity: 0.4;
+}
+.bc-btn--klein {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.bc-btn--haupt {
+  height: 46px;
+  padding: 0 20px;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: var(--bc-gold);
+  border-color: var(--bc-gold);
+  color: #17120a;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  border-radius: 0;
+}
+.bc-btn--haupt:hover:not(:disabled) {
+  background: var(--bc-gold);
+  border-color: var(--bc-gold);
+  filter: brightness(1.08);
+}
+.bc-btn--haupt:disabled {
+  opacity: 1;
+}
+.bc-btn--haupt.is-zu {
+  background: #2a2f3a;
+  border-color: #2a2f3a;
+  color: var(--bc-leise);
+}
+.bc-btn--haupt.is-zu:disabled {
+  opacity: 0.8;
+}
+.bc-btn--haupt.is-ok {
+  background: var(--bc-gut);
+  border-color: var(--bc-gut);
+}
+@keyframes bc-ruettel {
+  20% {
+    transform: translateX(-5px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+  80% {
+    transform: translateX(-3px);
+  }
+}
+.bc-ruettel {
+  animation: bc-ruettel 0.3s;
+}
+
+/* ---------- Hero-Kopf ---------- */
+.bc-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 22px;
+  padding: 14px 20px 0;
+  border-bottom: 1px solid var(--bc-linie);
+  overflow: hidden;
+  isolation: isolate;
+}
+.bc-hero__kul {
+  position: absolute;
+  inset: -30px;
+  z-index: -2;
+  background-size: cover;
+  background-position: center 40%;
+  filter: blur(14px) saturate(1.15);
+  opacity: 0.5;
+}
+.bc-hero__kul.is-farbe {
+  background: radial-gradient(ellipse at 20% 30%, color-mix(in srgb, var(--bc-team) 55%, transparent), transparent 60%);
+  filter: none;
+  opacity: 0.55;
+}
+.bc-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(6, 8, 12, 0.94) 0%, rgba(6, 8, 12, 0.72) 38%, rgba(6, 8, 12, 0.62) 62%, rgba(6, 8, 12, 0.93) 100%),
+    linear-gradient(180deg, transparent 40%, var(--bc-grund) 100%);
+}
+.bc-hero__kopf {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  min-width: 0;
+}
+.bc-hero__crest {
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--bc-team);
+  background: var(--bc-flaeche-2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+.bc-hero__crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bc-hero__titel {
+  margin: 0;
+  font: italic 700 32px/1 var(--bc-haus);
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+.bc-hero__sub {
+  margin-top: 5px;
+  font-size: 15px;
+  color: var(--bc-leise);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bc-hero__sub b {
+  color: var(--bc-creme);
+  font-weight: 600;
+}
+.bc-hero__dach {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--bc-gold);
+}
+.bc-hero__mitte {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+.bc-hero__rechts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 14px;
+}
+
+/* ---------- Reiter (schräg, wie die Kennzahl-Kacheln im Kopf) ---------- */
+.bc-reiter {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 340px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 20px 12px 18px;
+  background: rgba(18, 24, 36, 0.72);
+  border: 1px solid var(--bc-linie);
+  border-bottom: 0;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  color: var(--bc-leise);
+  text-align: left;
+}
+.bc-reiter:hover {
+  background: rgba(26, 34, 49, 0.9);
+}
+.bc-reiter.is-an {
+  background: linear-gradient(180deg, rgba(240, 195, 90, 0.2), rgba(18, 24, 36, 0.92) 70%);
+  color: var(--bc-tinte);
+}
+.bc-reiter.is-an::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: var(--bc-gold);
+}
+.bc-reiter__ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--bc-linie);
+  color: var(--bc-creme);
+  overflow: hidden;
+}
+.bc-reiter__ic img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.bc-reiter.is-an .bc-reiter__ic {
+  color: var(--bc-gold);
+  border-color: rgba(240, 195, 90, 0.5);
+}
+.bc-reiter__ey {
+  display: block;
+  font-size: 11.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--bc-stumm);
+}
+.bc-reiter__ti {
+  display: block;
+  font: italic 700 21px/1.1 var(--bc-haus);
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bc-reiter__strich {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+.bc-reiter__strich i {
+  width: 14px;
+  height: 5px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  transform: skewX(-14deg);
+}
+.bc-reiter__strich i.is-an {
+  background: var(--bc-gut);
+}
+.bc-reiter__strich i.is-fe {
+  background: var(--bc-warn);
+}
+.bc-reiter__wert {
+  text-align: right;
+}
+.bc-reiter__wert strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--bc-creme);
+}
+.bc-reiter__wert span {
+  font-size: 12px;
+  color: var(--bc-stumm);
+  letter-spacing: 0.06em;
+}
+
+/* ---------- Tafel (Karte mit Kopfzeile) ---------- */
+.bc-pan {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bc-flaeche-1);
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  overflow: hidden;
+}
+.bc-pan__kopf {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--bc-linie);
+  min-height: 46px;
+}
+.bc-pan__titel {
+  margin: 0;
+  font: italic 700 18px/1 var(--bc-haus);
+  color: var(--bc-creme);
+  white-space: nowrap;
+}
+.bc-pan__luecke {
+  flex: 1;
+}
+.bc-pan__mehr {
+  margin-left: auto;
+  color: var(--bc-gold);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.bc-pan__koerper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- Tabelle: Zahlen rechts, feste Ziffernbreite, eigene Zeile hinterlegt ---------- */
+.bc-tbl {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.bc-tbl__kopf,
+.bc-tbl__zeile {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+}
+.bc-tbl__kopf {
+  flex: none;
+  height: 26px;
+  border-bottom: 1px solid var(--bc-linie);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bc-stumm);
+  font-weight: 600;
+}
+.bc-tbl__kopf button {
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.bc-tbl__kopf button.is-an {
+  color: var(--bc-gold);
+}
+.bc-tbl__kopf button:hover {
+  color: var(--bc-tinte);
+}
+.bc-tbl__koerper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.bc-tbl__zeile {
+  width: 100%;
+  min-height: 52px;
+  border-bottom: 1px solid rgba(244, 230, 196, 0.06);
+  position: relative;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+button.bc-tbl__zeile:hover:not(:disabled) {
+  background: var(--bc-flaeche-2);
+}
+.bc-tbl__zeile.is-eigene {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bc-heim) 20%, transparent), transparent);
+}
+.bc-tbl__zeile.is-aus {
+  opacity: 0.5;
+}
+.bc-r {
+  text-align: right;
+}
+
+/* ---------- Marken, Chips, Schalter ---------- */
+.bc-marke {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #0b0d12;
+  background: var(--pc, var(--bc-leise));
+  white-space: nowrap;
+}
+.bc-marke.is-rot {
+  background: var(--bc-warn);
+  color: #fff;
+}
+.bc-marke.is-gelb {
+  background: var(--bc-acht);
+}
+.bc-marke.is-leer {
+  background: none;
+  border: 1px solid var(--bc-linie-2);
+  color: var(--bc-leise);
+}
+.bc-chip {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--bc-linie);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--bc-leise);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+button.bc-chip:hover {
+  border-color: var(--bc-linie-2);
+  color: var(--bc-tinte);
+}
+.bc-chip[aria-pressed="true"] {
+  background: var(--bc-creme);
+  border-color: var(--bc-creme);
+  color: #17120a;
+}
+.bc-chip b {
+  font-weight: 700;
+  opacity: 0.7;
+}
+.bc-seg {
+  display: inline-flex;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.bc-seg button {
+  text-align: center;
+  height: 34px;
+  padding: 0 12px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--bc-leise);
+  border-right: 1px solid var(--bc-linie);
+}
+.bc-seg button:last-child {
+  border-right: 0;
+}
+.bc-seg button:hover:not(:disabled) {
+  background: var(--bc-flaeche-2);
+  color: var(--bc-tinte);
+}
+.bc-seg button[aria-pressed="true"] {
+  background: var(--bc-creme);
+  color: #17120a;
+}
+.bc-seg button[aria-pressed="true"].is-heiss {
+  background: var(--bc-warn);
+  color: #fff;
+}
+.bc-seg button:disabled {
+  opacity: 0.5;
+}
+.bc-last {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.bc-last i {
+  display: block;
+  height: 100%;
+  background: var(--bc-gut);
+}
+.bc-last.is-m i {
+  background: var(--bc-acht);
+}
+.bc-last.is-h i {
+  background: var(--bc-warn);
+}
+.bc-lampe {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bc-gut);
+  box-shadow: 0 0 10px var(--bc-gut);
+  flex: none;
+}
+.bc-lampe.is-fe {
+  background: var(--bc-warn);
+  box-shadow: 0 0 10px var(--bc-warn);
+}
+.bc-lampe.is-wa {
+  background: var(--bc-acht);
+  box-shadow: 0 0 10px var(--bc-acht);
+}
+
+/* ---------- Dock (Abgabeleiste) ---------- */
+.bc-dock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--bc-linie);
+  background: #080b11;
+  min-height: 62px;
+}
+
+/* ---------- Blatt: Tafel, die auf dem Phone von unten hochfährt ---------- */
+.bc-schleier {
+  display: none;
+}
+.bc-ziehgriff {
+  display: none;
+}
+.bc-blatt--modal {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  top: 50%;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(80vh, 760px);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+.bc-blatt--modal:not(.is-offen) {
+  display: none;
+}
+.bc-schleier--modal.is-offen {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.6);
+}
+@media (max-width: 760px) {
+  .bc-blatt {
+    position: fixed;
+    z-index: 70;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: auto;
+    height: 76vh;
+    max-height: none;
+    border-radius: 14px 14px 0 0;
+    border-bottom: 0;
+    transform: translateY(105%);
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.6);
+  }
+  .bc-blatt.is-offen {
+    transform: none;
+  }
+  .bc-blatt--modal:not(.is-offen) {
+    display: flex;
+  }
+  .bc-schleier {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .bc-schleier.is-offen {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .bc-ziehgriff {
+    display: block;
+    width: 44px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bc-linie-2);
+    margin: 7px auto 0;
+    flex: none;
+  }
+  .bc [data-bc-tip]::after {
+    display: none !important;
+  }
+}
+.bc-nurphone {
+  display: none !important;
+}
+@media (max-width: 760px) {
+  .bc-nurphone {
+    display: inline-flex !important;
+  }
+  .bc-nurdesk {
+    display: none !important;
+  }
+}
+
+/*
+ * ICON-SCHIENE (Entscheidung 2): die globale Navigation wird NICHT ersetzt. `FoundationShell` setzt
+ * auf der Einsatzliste `is-bc-rail`; die vorhandene Seitenleiste (mit Team-Wahl, Breitenschalter,
+ * Sortierung per Ziehen) schrumpft dann auf 64 px, zeigt nur ihre Symbole und fährt bei Hover oder
+ * Tastaturfokus als Überlagerung auf die volle Breite aus. Nichts davon geht verloren, es steht
+ * nur nicht mehr im Weg. Phone: eine Symbolreihe oben statt des gestapelten Blocks.
+ */
+.foundation-shell-layout.is-bc-rail {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0;
+}
+.foundation-shell-layout.is-bc-rail .foundation-shell-main {
+  max-width: none;
+  min-width: 0;
+}
+.foundation-shell-layout.is-bc-rail .foundation-sidebar {
+  width: 64px;
+  padding: 10px 8px;
+  gap: 6px;
+  overflow: hidden;
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  background: #080b11;
+  max-height: 100vh;
+  top: 0;
+  height: 100vh;
+  transition: width 0.18s ease;
+}
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:hover,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:focus-within {
+  width: 288px;
+  position: sticky;
+  z-index: 80;
+  overflow: auto;
+  box-shadow: 14px 0 40px rgba(0, 0, 0, 0.55);
+  padding: 14px 16px;
+}
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-brand,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-viewwidth,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-team-picker,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-group-label,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-item-label,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-item-badge,
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-drag-handle {
+  display: none;
+}
+.foundation-shell-layout.is-bc-rail .foundation-sidebar:not(:hover):not(:focus-within) .foundation-sidebar-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+@media (max-width: 760px) {
+  .foundation-shell-layout.is-bc-rail {
+    grid-template-columns: 1fr;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar:hover,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar:focus-within {
+    position: static;
+    width: auto;
+    height: auto;
+    max-height: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 6px 8px;
+    gap: 2px;
+    box-shadow: none;
+    border-width: 0 0 1px 0;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-brand,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-viewwidth,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-team-picker,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-group-label,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-item-label,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-item-badge,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-drag-handle {
+    display: none;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-group,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-items {
+    display: flex;
+    flex-direction: row;
+    gap: 2px;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-item {
+    justify-content: center;
+    padding: 6px 10px;
+    flex: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bc *,
+  .bc-blatt,
+  .bc-schleier,
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar {
+    animation: none !important;
+    transition: none !important;
+  }
+}
