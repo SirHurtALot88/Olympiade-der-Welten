@@ -695,12 +695,25 @@ def baue_breaking(variante: str) -> Image.Image:
 # entsteht aus zwei Kopien derselben Szene, links ohne ihre rechte, rechts ohne ihre linke Seitenwand,
 # in der Mitte ueber IS_UEBERGANG Pixel weich ineinander geblendet -- eine durchgehende Rueckwand, ein
 # Boden, nur die beiden Aussenwaende bleiben. Die beiden Demo-Truhen unten (die Fundorte zeichnet der
-# Motor selbst) sind weg. Nur Pixel der vorhandenen PixelLab-Szene, keine Bestellung.
+# Motor selbst) sind weg. (Rueckfall-Weg, 16.11.: nur Pixel der vorhandenen PixelLab-Szene.)
+#
+# BREITFORMAT-HALLE (17.11., Chris: "wir verwenden nur noch neue PixelLab-Assets"): liegt
+# roh/ispy_halle_<variante>.png vor (PixelLab 792x300 = Seitenverhaeltnis der Leinwand, EINE Halle,
+# Rueckwand nur im obersten Streifen, freie Bodenflaeche fuer die Fundorte; Auftrag in
+# scripts/pixellab-requisiten.py), wird sie direkt auf die Leinwand gezogen -- keine Kopien, keine
+# Naht, keine zwei Pavillons mehr. Die Szenen-Kopie unten bleibt nur der Rueckfall.
 IS_TRUHEN = [(138, 694, 199, 739), (1081, 694, 1142, 739)]
 IS_UEBERGANG = 56
+IS_HALLE_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
 
 
 def baue_ispy(variante: str) -> Image.Image:
+    halle = IS_HALLE_ROH / f"ispy_halle_{variante}.png"
+    if halle.exists():
+        roh = Image.open(halle).convert("RGB")
+        # erst ganzzahlig hoch (Pixelraster bleibt scharf), dann weich auf die Leinwand
+        g = int(LW / roh.width) + 1
+        return roh.resize((roh.width * g, roh.height * g), Image.NEAREST).resize((LW, LH), Image.LANCZOS)
     bg = lade_szenenbilder(SZENEN / "i-spy" / f"{variante}.html")["bg"].convert("RGB")
     bg = flicken(bg, IS_TRUHEN, [], (0, 560, 1280, 800), ring=8, schritt=2)
     f = LH / bg.height

@@ -63,6 +63,12 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(motor).toContain("return {x:W*0.06+f.x*(W*0.88), y:H*0.27+f.y*(H*0.49)};");
     expect(skript).not.toContain("IS_STEG");
     expect(skript).toContain("IS_UEBERGANG = 56");
+    // 17.11.: die Halle kommt aus je einem PixelLab-Breitformatbild (roh/ispy_halle_<variante>.png,
+    // Seitenverhaeltnis der Leinwand); die Szenen-Kopie mit Naht ist nur noch der Rueckfall.
+    expect(skript).toContain('halle = IS_HALLE_ROH / f"ispy_halle_{variante}.png"');
+    for (const v of ["aztec", "horror", "lostplace", "ruinengarten"]) {
+      expect(existsSync(path.join(wurzel, "data/generated/pixellab-requisiten/roh", `ispy_halle_${v}.png`)), v).toBe(true);
+    }
     // Basketball: das Feld der Kulisse liegt auf W*0.06..W*0.94 x 60..H-60
     expect(motor).toContain("ctx.fillRect(W*0.06,60,W*0.88,H-120);");
     expect(skript).toContain("BB_FELD = (round(LW * 0.06), 60, round(LW * 0.94), LH - 60)");

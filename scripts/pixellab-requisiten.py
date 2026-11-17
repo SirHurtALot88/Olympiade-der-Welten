@@ -171,13 +171,15 @@ AUFTRAEGE = {
         prompt=f"small plain wooden treasure chest with simple dark metal corner brackets, no ornamentation, closed, {DRAUF}, {STIL}"),
     "truhe_1_offen": dict(art="neu", datei="arena/truhe_1_offen.png", gen=(32, 34),
         prompt=f"small plain wooden treasure chest with simple dark metal corner brackets, lid open, a few coins and a torn note visible inside, {DRAUF}, {STIL}"),
-    "truhe_2_zu": dict(art="neu", datei="arena/truhe_2_zu.png", gen=(34, 32),
+    # saeubern (Re-Export 17.11.): die Freistellung dieser Bestellung liess helle Rahmenreste stehen
+    # (truhe_2_zu: Eckklammern am Rand, truhe_3_offen: Strich links) -- s. nur_hauptteil().
+    "truhe_2_zu": dict(art="neu", datei="arena/truhe_2_zu.png", gen=(34, 32), saeubern=True,
         prompt=f"wooden treasure chest with bronze corner fittings, a small lock and carved trim, closed, {DRAUF}, {STIL}"),
     "truhe_2_offen": dict(art="neu", datei="arena/truhe_2_offen.png", gen=(34, 36),
         prompt=f"wooden treasure chest with bronze corner fittings and carved trim, lid open, a stack of documents and a few gold coins visible inside, {DRAUF}, {STIL}"),
     "truhe_3_zu": dict(art="neu", datei="arena/truhe_3_zu.png", gen=(38, 34),
         prompt=f"ornate ironbound treasure chest with gold trim, engraved panels and a heavy lock, closed, {DRAUF}, {STIL}"),
-    "truhe_3_offen": dict(art="neu", datei="arena/truhe_3_offen.png", gen=(38, 40),
+    "truhe_3_offen": dict(art="neu", datei="arena/truhe_3_offen.png", gen=(38, 40), saeubern=True,
         prompt=f"ornate ironbound treasure chest with gold trim and engraved panels, lid open, a pile of gold coins and gems visible inside, {DRAUF}, {STIL}"),
 
     # 2. Grube mit Absturzkante: zwei bis drei Groessen/Gefahrstufen. Nutzen: Takeshi, Mini-DM,
@@ -286,6 +288,38 @@ AUFTRAEGE = {
         prompt=f"a grey shark swimming just under the water surface, seen from directly above, {STIL}"),
     "stier": dict(art="neu", datei="arena/stier.png", gen=(40, 34),
         prompt=f"an angry charging bull with lowered horns, muscular body, side view, {STIL}"),
+
+    # --- I-Spy-Nachbesserung (17.11., Chris: "Ja mach mal ... wir verwenden nur noch neue
+    # PixelLab-Assets"). Offene Punkte aus #1533, s. docs/design/ispy-darstellung-16-11/.
+    # (a) Breitformat-Kulisse: EINE Halle im Seitenverhaeltnis der Leinwand (1240x470 = 2,64:1)
+    # statt zweier Szenenkopien mit Naht (zwei Pavillons, Fundorte teils "auf dem Dach").
+    # baue-kulisse-buehnen.py baue_ispy() liest roh/ispy_halle_<variante>.png, sonst Rueckfall.
+    # Bildaufbau passend zum Motor: Rueckwand nur im obersten Streifen (darueber liegt das HUD),
+    # die Fundorte stehen auf H*0,27..0,76 ueber W*0,06..0,94 -- dort freie, ruhige Bodenflaeche.
+    "ispy_halle_aztec": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty courtyard of an overgrown aztec jungle temple, carved stone temple wall with dark doorways and hanging vines along the top edge only, the whole rest is open flat floor of mossy stone slabs and short jungle grass with a few small ferns at the left and right borders, warm green and ochre colours, even soft light, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "ispy_halle_horror": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty haunted crypt hall interior, dark stone back wall with iron-barred alcoves and dim candles along the top edge only, the whole rest is open flat floor of dark grey-teal cobblestones with a few scattered bones and cobwebs at the left and right borders, cold teal and grey moody light, no pillars in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "ispy_halle_lostplace": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty abandoned factory hall interior, back wall with a row of broken industrial windows along the top edge only, the whole rest is open flat floor of cracked grey-green concrete tiles with moss in the cracks, a few scattered papers and debris at the left and right borders, muted grey and olive colours, no machines in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
+    "ispy_halle_ruinengarten": dict(art="kulisse", hintergrund=True, gen=(792, 300),
+        prompt="top-down view of one single very wide empty overgrown ruined garden, crumbling red brick wall with arched openings and ivy along the top edge only, the whole rest is open lawn of lush green grass with a few broken stone flagstone paths, small bushes and fallen column pieces at the left and right borders, bright warm green colours, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art"),
+
+    # (b) Moebel der Fundorte (bisher Primitive in ispyZeichne*): je ein Requisit, fuer Schreibtisch
+    # und Aktenschrank zusaetzlich der durchsuchte Zustand (ersetzt das Abdimmen bei "offen").
+    # KEINE Figur: der Verhoer-Fundort wird ein leerer Verhoerstuhl mit Lampe statt der Mini-Figur.
+    "ispy_schreibtisch": dict(art="neu", datei="arena/ispy_schreibtisch.png", pixelgenau=True, gen=(40, 30),
+        prompt=f"small old wooden writing desk with an open leather diary and an ink pot on top, {DRAUF}, {STIL}"),
+    "ispy_schreibtisch_durchsucht": dict(art="neu", datei="arena/ispy_schreibtisch_durchsucht.png", pixelgenau=True, gen=(40, 30),
+        prompt=f"small old wooden writing desk that has been ransacked, drawers pulled out, papers scattered on top, {DRAUF}, {STIL}"),
+    "ispy_aktenschrank": dict(art="neu", datei="arena/ispy_aktenschrank.png", pixelgenau=True, gen=(28, 36),
+        prompt=f"small grey metal filing cabinet with three closed drawers and handles, front view, {STIL}"),
+    "ispy_aktenschrank_offen": dict(art="neu", datei="arena/ispy_aktenschrank_offen.png", pixelgenau=True, gen=(28, 36),
+        prompt=f"small grey metal filing cabinet with three drawers, the drawers pulled open and files sticking out, front view, {STIL}"),
+    "ispy_verhoerstuhl": dict(art="neu", datei="arena/ispy_verhoerstuhl.png", pixelgenau=True, gen=(30, 36),
+        prompt=f"empty wooden interrogation chair with leather straps on the armrests under a small hanging lamp, no person, {DRAUF}, {STIL}"),
+    "ispy_tuer": dict(art="neu", datei="arena/ispy_tuer.png", pixelgenau=True, gen=(26, 40),
+        prompt=f"a single heavy old wooden door in a stone frame, closed, with an iron keyhole lock, front view, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -312,13 +346,19 @@ def kand_dir(args, name):
 
 
 def bestellen(args):
-    from pixellab_api import api, warte_job, bild_aus
+    from pixellab_api import api, warte_job, bild_aus, bild_an
     for name in args.namen:
         a = AUFTRAEGE[name]
         w, h = a["gen"]
         prompt = args.prompt or a["prompt"]
         body = {"description": prompt, "image_size": {"width": w, "height": h},
                 "no_background": not a.get("hintergrund", False), "seed": args.seed}
+        if args.referenz:
+            # Zustandspaar (zu/durchsucht) in derselben Ansicht: der gewaehlte Rohkandidat des
+            # Partners als Motiv-Referenz (generate-image-v2 reference_images).
+            ref = Image.open(args.referenz).convert("RGBA")
+            body["reference_images"] = [{"image": bild_an(ref), "size": {"width": ref.width, "height": ref.height},
+                                         "usage_description": "same object, same camera angle and style"}]
         r = api("POST", "/generate-image-v2", body)
         j = warte_job(r["background_job_id"])
         ims = [bild_aus(x) for x in j["last_response"]["images"]]
@@ -326,7 +366,8 @@ def bestellen(args):
         os.makedirs(d, exist_ok=True)
         for i, im in enumerate(ims):
             im.save(os.path.join(d, f"{i:02d}.png"))
-        json.dump({"prompt": prompt, "seed": args.seed, "gen": [w, h], "job": r["background_job_id"]},
+        json.dump({"prompt": prompt, "seed": args.seed, "gen": [w, h], "job": r["background_job_id"],
+                   **({"referenz": os.path.relpath(args.referenz, WURZEL)} if args.referenz else {})},
                   open(os.path.join(d, "auftrag.json"), "w"), indent=1)
         kontaktbogen(ims, os.path.join(d, "bogen.png"))
         print(f"{name}: {len(ims)} Kandidaten -> {d}/bogen.png")
@@ -377,6 +418,55 @@ def zuschnitt(im):
             px[x, y] = (r, g, b, 255 if a >= 128 else 0)
     bb = im.getbbox()
     return im.crop(bb) if bb else im
+
+
+def nur_hauptteil(im):
+    """Nur die groesste zusammenhaengende Deckflaeche (8er-Nachbarschaft) behalten. Fuer Kandidaten,
+    deren Freistellung helle Rahmenreste neben dem Objekt stehen liess; das Objekt selbst bleibt
+    pixelgenau an seiner Stelle (Re-Export truhe_2_zu/truhe_3_offen, 17.11., ohne Neubestellung)."""
+    im = im.copy()
+    px = im.load()
+    w, h = im.size
+    # zuerst die fast weissen Reste, die vom Rand her am Objekt kleben (truhe_3_offen: der Strich
+    # links beruehrt die Kontur), vom Bildrand aus wegfluten; Glanzlichter IM Objekt erreicht die
+    # Flut nicht, weil die dunkle Kontur dazwischen liegt.
+    def weiss(x, y):
+        r, g, b, a = px[x, y]
+        return a > 0 and min(r, g, b) >= 235
+    flut = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
+    flut = [p for p in flut if weiss(*p)]
+    while flut:
+        x, y = flut.pop()
+        if not weiss(x, y):
+            continue
+        px[x, y] = (0, 0, 0, 0)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h and weiss(nx, ny):
+                    flut.append((nx, ny))
+    gesehen, teile = set(), []
+    for y0 in range(h):
+        for x0 in range(w):
+            if (x0, y0) in gesehen or px[x0, y0][3] == 0:
+                continue
+            teil, stapel = [], [(x0, y0)]
+            gesehen.add((x0, y0))
+            while stapel:
+                x, y = stapel.pop()
+                teil.append((x, y))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in gesehen and px[nx, ny][3] > 0:
+                            gesehen.add((nx, ny))
+                            stapel.append((nx, ny))
+            teile.append(teil)
+    teile.sort(key=len, reverse=True)
+    for teil in teile[1:]:
+        for x, y in teil:
+            px[x, y] = (0, 0, 0, 0)
+    return im
 
 
 def einpassen(inhalt, bw, bh):
@@ -596,7 +686,11 @@ def baue_neu(name, a):
     if q is None:
         return False
     bw, bh = a["gen"]
-    inh = einpassen(zuschnitt(q), bw, bh)
+    # pixelgenau (I-Spy-Moebel 17.11.): nur zuschneiden, nie um krumme Faktoren ziehen -- der
+    # Motor skaliert beim Zeichnen ohnehin selbst, ein Zwischenschritt verschmiert nur das Raster.
+    inh = zuschnitt(q) if a.get("pixelgenau") else einpassen(zuschnitt(q), bw, bh)
+    if a.get("saeubern"):
+        inh = nur_hauptteil(inh)
     neu = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
     ox = (bw - inh.width) // 2
     oy = (bh - inh.height) // 2 if a.get("anker") == "mitte" else bh - inh.height
@@ -625,6 +719,7 @@ def main():
     ap.add_argument("--seed", type=int, default=11)
     ap.add_argument("--prompt")
     ap.add_argument("--kandidaten")
+    ap.add_argument("--referenz", help="PNG als Motiv-Referenz (reference_images), nur bestellen")
     args = ap.parse_args()
     {"bestellen": bestellen, "waehlen": waehlen, "einsetzen": einsetzen}[args.befehl](args)
 

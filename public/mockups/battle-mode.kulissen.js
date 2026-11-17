@@ -153,19 +153,19 @@ window.__ARENA_KULISSEN={
    "id": "aztec",
    "label": "Aztekentempel",
    "bild": "/sprites/kulissen/i-spy/aztec.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.1
   },
   {
    "id": "lostplace",
    "label": "Lost Place",
    "bild": "/sprites/kulissen/i-spy/lostplace.jpg",
-   "dunkel": 0.13
+   "dunkel": 0.1
   },
   {
    "id": "horror",
    "label": "Horror",
    "bild": "/sprites/kulissen/i-spy/horror.jpg",
-   "dunkel": 0.06
+   "dunkel": 0.1
   }
  ],
  "mini-dm": [
