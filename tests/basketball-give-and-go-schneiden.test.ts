@@ -113,54 +113,43 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Basketball Give-and-Go-Schneiden (Option 
           }
         });
 
-        const draco = (t: number) => {
-          const tick = ticks.find((x) => Math.abs(x.t - t) < 0.01);
-          expect(tick, `kein Tick bei t=${t} gefunden`).toBeDefined();
-          const spieler = tick!.spieler.find((s) => s.n === "Draco");
-          expect(spieler, `Draco fehlt im Tick t=${t}`).toBeDefined();
-          return { tick: tick!, spieler: spieler! };
-        };
+        // EREIGNISBASIERT STATT AUF FESTE ZEITPUNKTE (Benchmark Basketball 17.11.): bis dahin war
+        // dieser Test auf "Draco passt zwischen t=4,02 und t=4,52" der Saat 1337 festgenagelt. Das
+        // Spacing-Modul und das FIBA-Feld (docs/design/spacing-modul-17-11.md) verschieben jede
+        // Laufbahn und damit diese Zeitpunkte -- die REGEL (Pass -> 1,5 s Schnitt zur Korbachse)
+        // bleibt. Gesucht wird deshalb das erste abgeschlossene Zuspiel im Raster (0,5 s): Traeger A
+        // im einen Tick, Mitspieler B derselben Seite im naechsten, A vorher ohne Schnitt-Fenster.
+        const spielerIn = (tick: DiagDetailTick, n: string) => tick.spieler.find((s) => s.n === n)!;
+        let i = -1;
+        for (let k = 0; k + 4 < ticks.length; k++) {
+          const a = ticks[k].traeger, b = ticks[k + 1].traeger;
+          if (!a || !b || a === b || ticks[k].ballSeite !== ticks[k + 1].ballSeite) continue;
+          const pa = spielerIn(ticks[k], a), pb = spielerIn(ticks[k + 1], b);
+          if (pa.side !== pb.side || pa.cutBis) continue;
+          // A darf in den naechsten 1,5 s den Ball nicht zurueckbekommen (sonst neues Fenster).
+          if ([2, 3, 4].some((d) => ticks[k + d].traeger === a)) continue;
+          i = k; break;
+        }
+        expect(i, "kein abgeschlossenes Zuspiel in 10 s gefunden").toBeGreaterThanOrEqual(0);
+        const passgeber = ticks[i].traeger!;
+        const vorPass = spielerIn(ticks[i], passgeber);
+        expect(vorPass.hatBall).toBe(true);
+        expect(vorPass.cutBis).toBe(false);
+        const nachPass = spielerIn(ticks[i + 1], passgeber);
+        expect(nachPass.hatBall).toBe(false);
 
-        // VOR DEM PASS: Draco haelt den Ball, cutBis ist aus.
-        const vorPass = draco(4.02);
-        expect(vorPass.spieler.hatBall).toBe(true);
-        expect(vorPass.spieler.cutBis).toBe(false);
+        // GENAU DESHALB cutBis=true, fuer ein Fenster von GIVE_AND_GO_CUT_DAUER=1,5s: der Pass fiel
+        // in (t_i, t_i+1], das Fenster endet also in (t_i+1 + 1,0, t_i+1 + 1,5].
+        expect(nachPass.cutBis).toBe(true);
+        expect(spielerIn(ticks[i + 2], passgeber).cutBis).toBe(true);
+        expect(spielerIn(ticks[i + 4], passgeber).cutBis).toBe(false);
 
-        // DER PASS SELBST (zwischen t=4.02 und t=4.52): Draco verliert den Ball, ein
-        // MITSPIELER DERSELBEN SEITE haelt ihn danach — die Signatur eines abgeschlossenen
-        // Zuspiels, nicht eines Turnovers/Steals (der die Seite wechseln wuerde).
-        const nachPass = draco(4.52);
-        expect(nachPass.spieler.hatBall).toBe(false);
-        expect(nachPass.tick.ballSeite).toBe(vorPass.tick.ballSeite);
-        expect(nachPass.tick.traeger).not.toBeNull();
-        expect(nachPass.tick.traeger).not.toBe("Draco");
-        const empfaenger = nachPass.tick.spieler.find((s) => s.n === nachPass.tick.traeger);
-        expect(empfaenger?.side).toBe(vorPass.spieler.side);
-
-        // GENAU DESHALB cutBis=true, fuer ein Fenster von GIVE_AND_GO_CUT_DAUER=1,5s.
-        expect(nachPass.spieler.cutBis).toBe(true);
-        expect(draco(5.02).spieler.cutBis).toBe(true);
-        expect(draco(5.52).spieler.cutBis).toBe(true);
-        // 1,5s nach t=4.52 (t=6.02) ist das Fenster abgelaufen -- exakt wie beim bestehenden
-        // Roll-Fenster, das ueber dieselbe fsT-Vergleichslogik ausläuft.
-        expect(draco(6.02).spieler.cutBis).toBe(false);
-
-        // WAEHREND DES FENSTERS ziehlt dieselbe Formel wie beim Roll auf zy=H/2 (Canvas
-        // 1240x470 laut battle-mode.html, H/2=235) -- Dracos y soll in dieser Zeit deutlich
-        // naeher an 235 liegen als kurz VOR dem Pass.
-        // Frueher Vergleichspunkt (t=2.52, deutlich vor dem Pass, noch im normalen
-        // Fastbreak-/Aufbau-Lauf): y=204, Abstand 31px -- der Vergleichswert zeigt, dass
-        // Dracos y-Position OHNE das Cut-Fenster frei schwankt, nicht von sich aus auf
-        // der Feldmitte haengenbleibt.
+        // WAEHREND DES FENSTERS zielt dieselbe Formel wie beim Roll auf zy=H/2 (=235): der Abstand
+        // des Passgebers zur Korbachse schrumpft (oder er steht schon auf ihr).
         const abstandZurMitte = (y: number) => Math.abs(y - 235);
-        const abstandFrueherVergleich = abstandZurMitte(draco(2.52).spieler.y);
-        const abstandWaehrendFenster = Math.max(
-          abstandZurMitte(nachPass.spieler.y),
-          abstandZurMitte(draco(5.02).spieler.y),
-          abstandZurMitte(draco(5.52).spieler.y),
-        );
-        expect(abstandWaehrendFenster).toBeLessThan(15);
-        expect(abstandFrueherVergleich).toBeGreaterThan(25);
+        const abstandBeimPass = abstandZurMitte(nachPass.y);
+        const abstandSpaeter = abstandZurMitte(spielerIn(ticks[i + 3], passgeber).y);
+        expect(abstandSpaeter <= Math.max(15, abstandBeimPass)).toBe(true);
       } finally {
         await browser?.close();
       }

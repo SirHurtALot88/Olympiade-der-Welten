@@ -13,9 +13,9 @@
  "disziplinen": {
   "basketball": {
    "chassis": "feldspiel",
-   "rhoJeSpiel": 0.822,
-   "rhoSpannweite": 0.091,
-   "rhoSaison": 0.930,
+   "rhoJeSpiel": 0.859,
+   "rhoSpannweite": 0.111,
+   "rhoSaison": 0.909,
    "rhoMessung": {
     "befehl": "node scripts/miss-alle-disziplinen.mjs 24 basketball -- Task #136, frische Kaderfamilie 15.11.",
     "spiele": 24,
@@ -23,7 +23,7 @@
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
-   "pp": [15.6, 16.7],
+   "pp": [13.6, 16.0],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs basketball 48 (+ --saat-versatz=10000000) -- Opus-Review-Nachmessung 26.10. (Protokollstandard n=48 statt der urspruenglichen n=12-PR-Werte)",
     "laeufe": 48,
@@ -32,11 +32,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
+   "datum": "2026-11-17",
    "commit": "984da6e18",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
+   "anmerkung": "BENCHMARK-RUNDE 17.11. (docs/design/benchmark-basketball-17-11.md): FIBA-Feld + Feld-Metrik + SPACING-MODUL bewegen die Wertung bewusst -- rho 0,822 -> 0,859 (Spannweite 0,111, Saison 0,909), Pp 15,6/16,7 -> 13,6/16,0 (Node-Motor, einflussVon n=48, Saat 0/10000000), Fingerabdruck nur spiele basketball 1/7/42. Commit-Feld noch vom 15.11. -- NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
   },
   "hockey": {
    "chassis": "feldspiel",

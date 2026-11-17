@@ -25,6 +25,13 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Sechsunddreißigster Nachtrag 17.11. — Basketball: Benchmark-Runde (FIBA-Feld, Spacing, echter Korb).**
+Chris am 17.11.: alle laufen als Klumpen, Korb passt nicht, jede Map braucht 3er-Linie, 2er und 3er werfen. Messung:
+`docs/design/benchmark-basketball-17-11.md`. rho je Spiel 0,822 → **0,859** (Spannweite 0,111, Saison 0,909), Pp 15,6 / 16,7 → **13,6 / 16,0**
+(Node-Motor, n=48), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **9,4 %**, Ballführer mit freier Anspielstation 27 → **50 %**, gezeigt = gebucht
+0 Fehler in 828 Würfen. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 97c267e8b7c7**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix
+unangetastet; PPS-Referenz `data/generated/basketball-pps-referenz.json` neu gezogen (mehr Würfe, Drift-Wächter).
+
 **Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
 Chris am 17.11.: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern
 länger als 1 Stern, ein Besserer füllt den Balken deutlich schneller. Alles ist jetzt Wertung, nicht

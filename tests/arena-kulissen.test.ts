@@ -277,7 +277,9 @@ describe("PixelLab-Requisiten und Takeshi-Bodenkacheln (Batch 10)", () => {
     expect(motor).toContain("ctx.drawImage(m,k*40,8,36,56,");
     expect(motor).toContain("ctx.drawImage(bn,0,0,96,80,");
     expect(motor).toContain("ctx.drawImage(f,fr*32,0,32,32,");
-    expect(motor).toContain("ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56)");
+    // Benchmark Basketball 17.11.: der flache korb_topdown ist durch die stehende Korbanlage in zwei
+    // Ebenen ersetzt (Fable-PNGs, Anker 96x128, Bodenpunkt y=111, s. zeichneKorbAnlage).
+    expect(motor).toContain("ctx.drawImage(bkBild[pngName],kx-ax*sk,my-111*sk,96*sk,128*sk)");
     expect(motor).toContain("ctx.drawImage(sbBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,");
   });
 });

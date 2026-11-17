@@ -9869,6 +9869,29 @@
       // 0,923/0,231 vor UND nach dieser gesamten Aenderung, s. PR-Beschreibung).
       live:{perioden:4, periodenDauer:90, periodenPause:1.0, schussuhr:8,
             periodeWort:"Viertel"},
+      // FELD-MASSSTAB (Benchmark Basketball, 17.11., docs/design/benchmark-basketball-17-11.md):
+      // der Court ist ein echtes FIBA-Feld (28 x 15 m) auf der gezeichneten Flaeche W*0,88 x
+      // (H-120) — 38,97 px/m laengs, 23,33 px/m quer (Schraegsicht, Verkuerzung 0,6). Die
+      // Spiellogik rechnet weiter in ihren alten "Logik-px" (DREIER_RADIUS 112,8, Slots, Wunsch-
+      // distanz ...); `skala` bildet sie auf das echte Feld ab: 112,8 Logik-px = 6,75 m
+      // Dreierlinie = 263 px laengs / 157,5 px quer. Kontakt-Radien (Bedraengnis, Steal, Greifen,
+      // Passlinie) bleiben bewusst Bildschirm-px — sie messen Koerper, nicht Feld.
+      // Rechnung: s. SPACING-MODUL (feldSkala/feldLogikDist/feldVersatz).
+      // `tempo` = Faktor aufs Bildschirm-Lauftempo. 1,0 = Figuren laufen so schnell wie vorher
+      // (230 px/s = 5,9 m/s). Gemessen (Node-Motor, 12 Spiele): das echte Feld ist in Logik-
+      // Einheiten kuerzer (Wurfreichweite beginnt frueher), FGA steigen schon bei 1,0 von 76 auf
+      // 113 je Spiel; 1,55 trieb sie auf 150 (hektisch), 0,8 senkt auf 98, wirkt aber traege.
+      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0},
+      // SPACING/POSITIONSTREUE (Chris 17.11.: "spieler brauchen mehr positionstreue und nicht
+      // alle nur dem puck/ball hinterher") — Parameter des generischen SPACING-MODULS (s. dort):
+      //   jaegerJeSeite      wie viele je Team einem freien Ball nachlaufen (der Rest haelt Zone)
+      //   jaegerRadius       nur wer in diesem Logik-Radius steht, kommt ueberhaupt als Jaeger in
+      //                      Frage (vorher: JEDER binnen LAUF_ZUM_BALL_RADIUS 260 px)
+      //   mitspielerMin      Mindestabstand zwischen Mitspielern im Angriff ohne Ball (Logik-px)
+      //   mitspielerStaerke  wie hart dieser Abstand ins Laufziel geht (0..1)
+      //   ruecklauf          Angreifer, die beim Wurf NICHT zum Rebound gehen, laufen bis zu
+      //                      diesem Anteil Richtung Mittellinie zurueck (Transition-Sicherung)
+      spacing:{jaegerJeSeite:2, jaegerRadius:200, mitspielerMin:58, mitspielerStaerke:0.8, ruecklauf:0.35},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Plan 1.2 Punkt 1,
       // s. rezeptAus() weiter oben). Dort steht es zeichengleich weiter — mitsamt der
       // kompletten Kalibrier-Historie: Chris' Budget-Methode, die zurueckgerechneten
@@ -10971,7 +10994,11 @@
   // ausgerechnete Literalwert, mit Herleitung im Kommentar statt eines zweiten
   // "145-PLATZHALTER"-Raetsels.
   const DREIER_RADIUS=112.8;        // = H*0.24 bei H=470 (cv.height, s. ARENA-Setup) — ab hier ein Dreier
-  const FERN_RADIUS_MAX=170;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
+  // BENCHMARK-RUNDE 17.11.: 170 -> 140. Seit der FIBA-Feldmetrik (SPACING-MODUL) ist ein
+  // Logik-px 1/16,7 m; 170 waren 10,2 m — ein ungezwungener Wurf von fast der Mittellinie. 140 =
+  // 8,4 m ("tiefer Dreier"), die Slots liegen mit 117-130 sicher darunter. Gemessen (Node-Motor,
+  // 12 Spiele): Dreieranteil 46 % statt 67 % bei 170, FGA 113 statt 127 je Spiel.
+  const FERN_RADIUS_MAX=140;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
   // Fluegel-/Eckenslots ab, s. SLOTS: radius bis 150) — jenseits davon wird nur per
   // Schussuhr-Zwang abgeschlossen (entscheideBallaktion, erzwingen-Zweig).
   // WURF_BONUS/GEO_BONUS-Historie: bis zu dieser Runde trug der Distanzunterschied
@@ -11185,7 +11212,11 @@
   // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
   // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
-  function klassifiziereWurfdistanz(zumKorb,erzwingen){
+  // `querL` (optional, Benchmark Basketball 17.11.): Querablage zur Korbachse in Logik-px. Die
+  // gezeichnete FIBA-Dreierlinie laeuft in den Ecken GERADE (6,6 m statt 6,75 m vom Ring, s.
+  // FELDSPIEL_ART.basketball.feld.eckeDreierY) — wer dort hinter der Linie steht, wirft einen
+  // Dreier, auch wenn sein Abstand knapp unter DREIER_RADIUS liegt. Gezeigt = gebucht.
+  function klassifiziereWurfdistanz(zumKorb,erzwingen,querL){
     // EISHOCKEY HAT EIGENE SCHUSSWEITEN, s. HK_RADIUS_* — Basketballs Staffel endet bei
     // 170 px, die blaue Linie liegt bei 295. Ohne diese Weiche gibt jeder Verteidiger,
     // der auf seinem Slot steht, `null` zurueck: kein Schuss, nie, ausser die Schussuhr
@@ -11200,7 +11231,11 @@
     }
     if(zumKorb<DUNK_RADIUS)return "dunk";
     if(zumKorb<KORB_NAH_RADIUS)return "nah";
-    if(zumKorb<DREIER_RADIUS)return "mit";
+    if(zumKorb<DREIER_RADIUS){
+      const fa=feldArtLive();
+      if(querL!=null&&fa&&fa.feld&&fa.feld.eckeDreierY&&Math.abs(querL)>=fa.feld.eckeDreierY)return "fern";
+      return "mit";
+    }
     if(erzwingen||zumKorb<FERN_RADIUS_MAX)return "fern";
     return null; // ausserhalb jeder Reichweite fuer einen ungezwungenen Wurf
   }
@@ -11576,9 +11611,134 @@
   // schon bei 4,5 % sitzt. Alles andere (Schussdistanz, Ballflug, gezeichnete Torlinie)
   // liest diese eine Funktion — getrennte Literale waren beim Basketballkorb schon
   // einmal die Ursache dafuer, dass der Wurf das gezeichnete Ziel verfehlte.
+  // BASKETBALL-KORBLAGE (Benchmark-Runde 17.11., s. FELDSPIEL_ART.basketball.feld): der Ring
+  // bleibt bei W*0,076 / W*0,924 (0,5 m vor der Grundlinie). FIBA saehe 1,575 m vor — die
+  // PixelLab-Korbanlage (public/sprites/basketball/korb_*_hinten/vorne.png, Fable 17.11.) traegt
+  // ihr Brett aber direkt am Mast, 35 px vor dem Sockel: bei 1,575 m stuende der Sockel 40 px im
+  // Spielfeld. Alle LINIEN sind deshalb relativ zum RING FIBA-genau (Freiwurflinie 4,225 m vor
+  // dem Ring, Dreier 6,75 m, No-Charge 1,25 m), nur der Abstand Ring-Grundlinie ist verkuerzt.
+  // Als eigene Zeile, damit eine spaetere Anlage mit langem Ausleger ihn auf 1,575 m setzen kann.
+  const BK_KORB_X_ANTEIL=0.076;
+  // Zeichenmassstab der Korb-PNGs: 1,0 = Ring 59 px ueber dem Boden = 3,05 m bei ~19,5 px/m
+  // Figurenhoehe (eine 1,95-m-Figur ist ~38 px hoch); freie Ringoeffnung 16 px, Ball 12 px.
+  // Fables Vorschlag 1,25 (Ring 74 px, Ball 18 px) wirkt lesbarer, ist aber ~3,8 m hoch.
+  const BK_KORB_SKALA=1.0;
+  // FIBA-MASSE IN PX (Benchmark Basketball 17.11.) — Zeichnung (bodenFeldspiel,
+  // zeichneKorbAnlage, scripts/baue-basketball-assets.py) und Freiwurf-Aufstellung lesen nur
+  // diese Tabelle. Literale fuer die Leinwand 1240x470 (W/H existieren hier noch nicht, TDZ —
+  // dieselbe Begruendung wie bei DREIER_RADIUS): laengs 1240*0,88/28 = 38,971 px/m, quer
+  // 350/15 = 23,333 px/m. Hoehen im Figurenmassstab 19,5 px/m.
+  const BK_FIBA=(()=>{
+    const mx=1240*0.88/28, my=350/15, mz=19.5, ringVonGrund=(BK_KORB_X_ANTEIL-0.06)*1240;
+    return {mx, my, mz, ringVonGrund,
+      zoneTiefe:ringVonGrund+4.225*mx, zoneHalb:2.45*my,
+      kreisRx:1.8*mx, kreisRy:1.8*my,
+      noChargeRx:1.25*mx, noChargeRy:1.25*my,
+      dreierRx:6.75*mx, dreierRy:6.75*my,
+      eckeY:6.6*my, eckeLaengeX:Math.sqrt(6.75*6.75-6.6*6.6)*mx,
+      // Rueckfall-Zeichnung (Primitive, falls die PNGs fehlen): Brett 0,375 m hinter dem Ring.
+      brettVonGrund:ringVonGrund-0.375*mx, brettHalb:0.9*my,
+      ringZ:59*BK_KORB_SKALA, brettUntenZ:56, brettObenZ:77,
+      ringRx:10.5, ringRy:5, netzTiefe:15, ballD:12,
+      staenderHinterGrund:0.65*mx, staenderZ:3.35*mz};
+  })();
+  // ANZEIGE-ZUSTAND DER KORBANLAGE (rein kosmetisch, nie von der Wertung gelesen): was der Ball
+  // NACH dem Wurf sichtbar tut — durchs Netz fallen (Treffer) oder vom Ring abprallen (Fehlwurf).
+  // Eigene Anzeige-Uhr, damit die Animation auch in Freiwurf-/Viertelpausen-Phasen weiterlaeuft,
+  // in denen fsT steht.
+  let bkNachlauf=null, bkAnzeigeUhr=0;
+  // Ballhoehe ueber dem Boden (px) entlang eines Wurfs: aus Handhoehe (26) auf Ringhoehe, mit
+  // Scheitel `scheitel` — so endet jeder Wurf GENAU im gezeichneten Ring, nicht auf dem Boden-
+  // punkt darunter (Chris: "es muss dafuer gesorgt werden dass ein treffer auch im korb landet").
+  const bkBogenZ=(phase,scheitel)=>26+(BK_FIBA.ringZ-26)*phase+Math.sin(phase*Math.PI)*scheitel;
   const korbXVon=(side)=>feldspielDisc==="hockey"
     ?(side===0?W*0.90:W*0.10)
+    :feldspielDisc==="basketball"
+    ?(side===0?W*(1-BK_KORB_X_ANTEIL):W*BK_KORB_X_ANTEIL)
     :(side===0?W*0.924:W*0.076);
+
+  // ===================================================================================
+  // SPACING-MODUL — Positionstreue fuer die Ballsportarten (17.11., Chris: "spieler brauchen
+  // mehr positionstreue und nicht alle nur dem puck/ball hinterher, niemand steht mal separat
+  // und ist frei fuer einen pass etc — da brauchen wir nen generellen fix").
+  // Doku: docs/design/spacing-modul-17-11.md. Erste Anwendung: Basketball. Hockey/Football
+  // schliessen an, indem sie in FELDSPIEL_ART[d] einen `feld`- und/oder `spacing`-Block
+  // eintragen — ohne Block liefern alle Funktionen hier das alte Verhalten (Massstab 1,
+  // keine Jaeger-Auswahl, kein Mitspielerabstand), zeichengleich.
+  //
+  // Vier Bausteine:
+  //   1. FELD-METRIK   feldLogikDist/feldVersatz: die Spiellogik rechnet in "Logik-px", das
+  //                    Feld ist massstabsgetreu gezeichnet; die Skala verbindet beides, damit
+  //                    Dreierlinie, Slots und Wurfdistanz GENAU auf den gezeichneten Linien
+  //                    liegen (gezeigt = gebucht).
+  //   2. JAEGER        spacingJaeger: einem freien Ball laufen je Team nur die `jaegerJeSeite`
+  //                    Naechsten nach; alle anderen bleiben in ihrer Rolle (Slot/Deckung).
+  //   3. MITSPIELER-   spacingMitspielerZiel: ein Laufziel im Angriff ohne Ball haelt
+  //      ABSTAND       `mitspielerMin` Logik-px zu jedem Mitspieler — Anspielstationen entstehen,
+  //                    weil niemand neben dem anderen parkt.
+  //   4. RUECKLAUF     spacingRuecklauf: wer beim Fehlwurf nicht jagt, sichert nach hinten ab.
+  // Heimatpositionen/Rollen je Slot liefern weiter SLOTS/SLOTS_HOCKEY/SLOTS_FOOTBALL
+  // (zuordneSlots) — das Modul legt sie nur in den echten Feldmassstab.
+  // ===================================================================================
+  const feldArtLive=()=>(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[feldspielDisc])||null;
+  const feldSkala=()=>{ const a=feldArtLive(); return a&&a.feld?a.feld.skala:null; };
+  const spacingVon=()=>{ const a=feldArtLive(); return a&&a.spacing?a.spacing:null; };
+  // Abstand in Logik-px (ohne Feld-Block: gewoehnlicher Bildschirmabstand).
+  function feldLogikDist(a,b){
+    const s=feldSkala();
+    return s?Math.hypot((a.x-b.x)/s.x,(a.y-b.y)/s.y):Math.hypot(a.x-b.x,a.y-b.y);
+  }
+  // Versatz in Logik-px -> Bildschirm-px.
+  function feldVersatz(dxL,dyL){
+    const s=feldSkala();
+    return s?{x:dxL*s.x,y:dyL*s.y}:{x:dxL,y:dyL};
+  }
+  // Querablage zur Korbachse in Logik-px (fuer die Ecken-Dreier-Regel).
+  function feldLogikDy(p){ const s=feldSkala(); return (p.y-H/2)/(s?s.y:1); }
+  // Laufgeschwindigkeit im Feldmassstab: ein groesseres, echtes Feld braucht ein hoeheres
+  // Bildschirmtempo, damit Ballbesitze nicht laenger werden (gleiche Zahl Ereignisse je Spiel).
+  const feldTempoSkala=()=>{ const a=feldArtLive(); return a&&a.feld&&a.feld.tempo?a.feld.tempo:1; };
+  // JAEGER: je Team die `jaegerJeSeite` Naechsten zum freien Ball (Logik-Abstand, innerhalb
+  // `jaegerRadius`), Torhueter und Strafbank ausgenommen. null = Modul aus (alte Regel).
+  function spacingJaeger(ball){
+    const sp=spacingVon(); if(!sp||!ball)return null;
+    const menge=new Set();
+    for(const team of FSTEAM){
+      const kand=team.filter(u=>!stehtImTor(u)&&aufDemEis(u))
+        .map(u=>({u,d:feldLogikDist(u,ball)})).filter(e=>e.d<sp.jaegerRadius)
+        .sort((a,b)=>a.d-b.d).slice(0,sp.jaegerJeSeite);
+      for(const e of kand)menge.add(e.u);
+    }
+    // Liegt der Ball ausserhalb jedes Jaeger-Radius, geht wenigstens der Naechste insgesamt
+    // hin — sonst bliebe er liegen.
+    if(!menge.size){
+      let best=null,bd=Infinity;
+      for(const team of FSTEAM)for(const u of team){
+        if(stehtImTor(u)||!aufDemEis(u))continue;
+        const d=feldLogikDist(u,ball); if(d<bd){bd=d;best=u;}
+      }
+      if(best)menge.add(best);
+    }
+    return menge;
+  }
+  // MITSPIELER-ABSTAND: schiebt ein Laufziel (zx,zy) aus dem `mitspielerMin`-Kreis jedes
+  // Mitspielers (aktuelle Position) heraus, in Logik-Koordinaten, dann zurueck in px.
+  function spacingMitspielerZiel(u,zx,zy){
+    const sp=spacingVon(); if(!sp||!sp.mitspielerMin)return {x:zx,y:zy};
+    const s=feldSkala()||{x:1,y:1};
+    let px=0, py=0;
+    for(const m of FSTEAM[u.side]){
+      if(m===u||stehtImTor(m)||!aufDemEis(m))continue;
+      const dx=(zx-m.x)/s.x, dy=(zy-m.y)/s.y, d=Math.hypot(dx,dy)||0.01;
+      if(d<sp.mitspielerMin){ const f=(sp.mitspielerMin-d)/d; px+=dx*f; py+=dy*f; }
+    }
+    return {x:zx+px*s.x*sp.mitspielerStaerke, y:zy+py*s.y*sp.mitspielerStaerke};
+  }
+  // RUECKLAUF: Laufziel eines Nicht-Jaegers der werfenden Seite Richtung Mittellinie ziehen.
+  function spacingRuecklauf(zx){
+    const sp=spacingVon(); if(!sp||!sp.ruecklauf)return zx;
+    return zx+(W/2-zx)*sp.ruecklauf;
+  }
   // HANDPUNKTE FUER DEN GETRAGENEN BALL (Chris, 03.09.: "die Spieler den tragen mit den
   // Animationen"). Reine Uebernahme der Messung aus docs/design/sprite-handpunkte.md
   // (Profil-Laufbilder, Spalten 0-8 = ANIBILDER.walk, Zellen-Pixel mit Fusspunkt bei
@@ -12058,13 +12218,20 @@
   // auf Distanz (Slot 1), je ein Fluegel- und ein Eckenspieler pro Seite (2/3, 4/5) — genau die
   // vier Zonen, die Chris nennt (Ecke/Fluegel/Top of Key/Gegenseite). Kein Slot NAEHER am Korb
   // oder AUSSERHALB des Feldes als vorher — reine Winkelkorrektur, keine neue Mechanik.
+  // BENCHMARK-RUNDE 17.11. (FIBA-Feld, SPACING-MODUL): die beiden ECKEN-Slots liegen jetzt
+  // wirklich in der Ecke — knapp hinter der geraden Dreierlinie (Logik-Quer 113 > 110,3 =
+  // eckeDreierY), 1,7 m vor der Grundlinie. Mit radius 145/seitlich 1,45 lagen sie im echten
+  // Feldmassstab ausserhalb der Seitenlinie (130 Logik-px quer = 182 px > 175 px halbe
+  // Feldbreite) bzw. auf dem Fluegel statt in der Ecke. Top und Fluegel ruecken von 130/150 auf
+  // 125 (7,5 m, ein Schritt hinter der 6,75-m-Linie, wie echtes Spacing) — mit 150 lagen die
+  // Fluegel jenseits des neuen Wurfdeckels FERN_RADIUS_MAX 140 (s. dort). Post unveraendert.
   const SLOTS=[
-    {radius:60,  seitlich:0},
-    {radius:130, seitlich:0},
-    {radius:150, seitlich:1.05},
-    {radius:150, seitlich:-1.05},
-    {radius:145, seitlich:1.45},
-    {radius:145, seitlich:-1.45}
+    {radius:60,  seitlich:0},          // Post (3,6 m vor dem Ring)
+    {radius:125, seitlich:0},          // Top of the Key (7,5 m, knapp hinter der Linie)
+    {radius:125, seitlich:0.95},       // Fluegel (7,5 m)
+    {radius:125, seitlich:-0.95},      // Fluegel
+    {radius:117, seitlich:1.26},       // Ecke (Corner Three)
+    {radius:117, seitlich:-1.26}       // Ecke
   ];
   // EISHOCKEY HAT EINE ANDERE FORMATION, und zwar nicht als Geschmacksfrage: Basketballs
   // Slots reichen bis 150 px vom Korb, weil ein Court so tief ist. Auf der Eisflaeche
@@ -14957,11 +15124,13 @@
     }
     const team=FSTEAM[u.side];
     const korbX=korbXVon(u.side);
-    const zumKorb=dist(u,{x:korbX,y:H/2});
+    // Feld-Metrik (SPACING-MODUL): ohne `feld`-Block identisch zu dist().
+    const zumKorb=feldLogikDist(u,{x:korbX,y:H/2});
+    const querL=feldLogikDy(u);
     // WURFDISTANZ-KLASSIFIZIERUNG (Fable-Fund, Wurfmechanik-Runde): frueher nur ein
     // nah/fern-Bit, geometrisch nicht am gezeichneten Dreier-Bogen ausgerichtet (s.
     // DREIER_RADIUS-Herleitung oben). Jetzt vier echte Stufen.
-    const tier=klassifiziereWurfdistanz(zumKorb,false);
+    const tier=klassifiziereWurfdistanz(zumKorb,false,querL);
     const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
     const deckerAbstand=decker?dist(u,decker):999;
     // DOPPELN (Bedraengnis-Bugfix-Runde, s. Bericht): vorher gab es ausschliesslich
@@ -15014,7 +15183,7 @@
     const kontestFaktor=decker
       ?Math.max(KONTEST_MIN,Math.min(KONTEST_MAX,
         0.7+(KONTEST_PIVOT+decker.ABWEHR
-             -schussSkillFuer(u,tier||klassifiziereWurfdistanz(zumKorb,true)))*KONTEST_K))
+             -schussSkillFuer(u,tier||klassifiziereWurfdistanz(zumKorb,true,querL)))*KONTEST_K))
       :1;
     // BUGFIX (Bedraengnis-Bugfix-Runde, 26.08., s. Bericht): gemessen ueber 400 Spiele/
     // 8.562 Feldwuerfe stieg die Trefferquote MIT sinkendem Deckerabstand (70,8 % offen
@@ -15240,7 +15409,7 @@
       // Verzweiflungswurf jenseits der Dreierlinie traf so oft wie ein Korbleger, fuer
       // einen Punkt mehr. Jetzt klassifiziert nach der ECHTEN Distanz (kann bei einem
       // erzwungenen Wurf aus der Zone durchaus "nah"/"mit" sein, nicht automatisch Dreier).
-      const tierErz=klassifiziereWurfdistanz(zumKorb,true);
+      const tierErz=klassifiziereWurfdistanz(zumKorb,true,querL);
       // Kein Gate/Schwelle in diesem Zweig (erzwingen wirft immer) — kein Auswahl-
       // Kaskadenrisiko, GEO_BONUS+bedraengnisMake koennen hier direkt in die Erfolgsformel,
       // schussSkillFuer wie in technikMake oben.
@@ -15370,7 +15539,7 @@
     // Nur fuer die Wurfmechanik-Abnahme (s. fsZuege()-Debughook): die tatsaechliche
     // Distanz zum Korb IM Abwurfmoment, damit sich die Tier-Klassifizierung nachtraeglich
     // gegen die echte Geometrie pruefen laesst, ohne die Spiellogik selbst zu beeinflussen.
-    const zumKorbBeiWurf=Math.round(dist(schuetze,{x:korbXVon(schuetze.side),y:H/2}));
+    const zumKorbBeiWurf=Math.round(feldLogikDist(schuetze,{x:korbXVon(schuetze.side),y:H/2}));
     // Nur fuer die Fastbreak-Abnahme (Chris' Nachfrage: "produziert ein Tempo-Unterschied
     // WIRKLICH einen Fastbreak-Vorteil, oder trudelt nur die Animation schneller"): Stand
     // des eigenen Deckers IM Abwurfmoment — wie weit weg, ob gerade ein Fastbreak laeuft.
@@ -15567,7 +15736,8 @@
     const links=korbX<W/2;                       // welcher der beiden Koerbe angegriffen wird
     const grundX=links?W*0.06:W*0.94;            // exakt der Wert aus bodenFeldspiel
     const zumFeld=links?1:-1;                    // Richtung von der Grundlinie ins Feld
-    const zonenTiefe=H*0.16, zonenHalb=H*0.08;   // exakt die Werte aus bodenFeldspiel
+    // FIBA-Zone seit 17.11. (bodenFeldspiel/BK_FIBA): Freiwurflinie 4,225 m vor dem Ring, 4,9 m breit.
+    const zonenTiefe=BK_FIBA.zoneTiefe, zonenHalb=BK_FIBA.zoneHalb;
     return {korbX,links,grundX,zumFeld,zonenTiefe,zonenHalb,
       linieX:grundX+zumFeld*zonenTiefe};         // Freiwurflinie = Mittelpunkt des gezeichneten Halbkreises
   }
@@ -15593,10 +15763,12 @@
     // Formation wird also von keiner der beiden Entzerrungen mehr angefasst. Reine
     // Zeichen-/Stellungsfrage: die Freiwurfquote rechnet verbucheFreiwurf() aus
     // Attributen, nicht aus Positionen.
-    const gassen=[{anteil:0.18,abwehr:true},{anteil:0.68,abwehr:false},{anteil:1.18,abwehr:true}];
+    // FIBA-Zone (17.11.): die drei Gassenplaetze je Seite liegen 38 / 57 / 76 % der Zonentiefe vor der
+    // Grundlinie (Anteile der 5,8-m-Zone), knapp ausserhalb der Zonenlinie.
+    const gassen=[{anteil:0.38,abwehr:true},{anteil:0.57,abwehr:false},{anteil:0.76,abwehr:true}];
     for(const g of gassen)for(const vz of [-1,1]){
       const u=(g.abwehr?verteidiger:angreifer).shift();
-      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*geo.zonenHalb};
+      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*(geo.zonenHalb+10)};
     }
     // Rest abwechselnd, damit sich die beiden Teams auch hinten nicht zu einem Klumpen
     // je Farbe sortieren (dieselbe Spacing-Idee wie SLOTS/SEPARATION oben).
@@ -15661,7 +15833,10 @@
     const korb={x:korbXVon(schuetze.side),y:H/2};
     if(fw.stufe==="flug"){
       const phase=Math.min(1,fw.t/FW_FLUG);
-      fsBall={sichtbar:true,
+      fsBall=feldspielDisc==="basketball"
+        ? {sichtbar:true, x:schuetze.x+(korb.x-schuetze.x)*phase, y:schuetze.y+(korb.y-schuetze.y)*phase,
+           z:bkBogenZ(phase,40)}
+        : {sichtbar:true,
         x:schuetze.x+(korb.x-schuetze.x)*phase,
         y:schuetze.y+(korb.y-schuetze.y)*phase-Math.sin(phase*Math.PI)*44};
       if(phase>=1){
@@ -15676,6 +15851,12 @@
       return;
     }
     // `nach`: der Ball faellt am Ring aus, dann geht es weiter bzw. die Phase endet.
+    if(feldspielDisc==="basketball"){
+      // Treffer: durchs Netz senkrecht nach unten. Fehlwurf: vom Ring zur Seite ab.
+      const zf=Math.max(5,BK_FIBA.ringZ-fw.t*(fw.treffer?150:110));
+      const weg=fw.treffer?0:Math.min(1,fw.t/0.4);
+      fsBall={sichtbar:true,x:korb.x+(korb.x<W/2?1:-1)*weg*55,y:korb.y+weg*22,z:zf};
+    } else
     fsBall={sichtbar:true,x:korb.x,y:korb.y+Math.min(26,fw.t*60)};
     if(fw.t<FW_NACH)return;
     if(fw.idx<fw.anzahl){ fw.stufe="anlauf"; fw.t=0; return; }
@@ -16539,8 +16720,13 @@
       // weiter ab (auch physikalisch plausibel). Zwei rr()-Wuerfe, deterministisch.
       const scatterR=10+rr()*(flug.fern?70:flug.tier==="dunk"?15:40); // PLATZHALTER
       const winkel=rr()*Math.PI*2;
-      fsLive.ball.frei={x:flug.nach.x+Math.cos(winkel)*scatterR,
-        y:flug.nach.y+Math.sin(winkel)*scatterR,vonSeite:schuetze.side};
+      // Abpraller im Feldmassstab (SPACING-MODUL; ohne `feld`-Block identisch) — und nie
+      // hinter die Grundlinie: der Ring haengt nur 0,5 m davor (BK_KORB_X_ANTEIL).
+      const vR=feldVersatz(Math.cos(winkel)*scatterR,Math.sin(winkel)*scatterR);
+      let reboundX=flug.nach.x+vR.x;
+      if(feldSkala())reboundX=Math.max(W*0.06+10,Math.min(W*0.94-10,reboundX));
+      fsLive.ball.frei={x:reboundX,
+        y:flug.nach.y+vR.y,vonSeite:schuetze.side};
     }
   }
 
@@ -16583,6 +16769,10 @@
     // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
     const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
+    // SPACING-MODUL (17.11.): wer einem freien Ball nachlaeuft. null = Disziplin ohne
+    // `spacing`-Block -> alte Regel (jeder binnen LAUF_ZUM_BALL_RADIUS bzw. Hockeys eigene).
+    const JAEGER=(!istHockey()&&fsLive.ball&&fsLive.ball.frei)?spacingJaeger(fsLive.ball.frei):null;
+    const FELD_SKALA=feldSkala();
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
     // Radius von 60 wuerde die Zonen-Gassen (Abstand 30px) auseinandertreiben. Richtig
@@ -16652,12 +16842,13 @@
         const anteil=Math.max(0,Math.min(1,(profil+12)/26));
         const wunsch=(istHockey()?HK_WUNSCH_MAX:DREIER_RADIUS+18)*anteil;
         const zumFeldB=u.side===0?-1:1;
-        zy=H/2+(u.id%2?40:-40);
         // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
         // Rechnung wie bei den Slot-Zielen unten); passt sie nicht mehr in die Y-Ablage,
-        // wird direkt der Korb angelaufen.
-        const yAbl=zy-H/2;
-        zx=korbX+zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl));
+        // wird direkt der Korb angelaufen. Gerechnet in Logik-px, dann ueber feldVersatz
+        // ins echte Feld gelegt (SPACING-MODUL; ohne `feld`-Block identisch).
+        const yAbl=u.id%2?40:-40;
+        const vB=feldVersatz(zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl)),yAbl);
+        zx=korbX+vB.x; zy=H/2+vB.y;
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -16682,7 +16873,7 @@
         }
       } else if(fsLive.ball.frei&&(istHockey()
                  ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
-                 : dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
+                 : JAEGER?JAEGER.has(u):dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
         // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
@@ -16717,10 +16908,14 @@
         // (s. Definition oben); die X-Komponente wird so berechnet, dass hypot(x,y) genau
         // diesen Wert trifft.
         const yOff=slot.seitlich*90;
-        let bx=korbX+zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),
-            by=H/2+yOff;
+        const vS=feldVersatz(zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),yOff);
+        let bx=korbX+vS.x, by=H/2+vS.y;
         const traeger=fsLive.ball.traeger;
-        if(traeger&&traeger!==u){
+        if(traeger&&traeger!==u&&FELD_SKALA){
+          // Dieselbe Fahrspur-Regel wie unten, im Feldmassstab (Logik-px).
+          const dx0=(bx-traeger.x)/FELD_SKALA.x, dy0=(by-traeger.y)/FELD_SKALA.y, d0=Math.hypot(dx0,dy0)||1, mindest=110;
+          if(d0<mindest){ bx+=dx0/d0*(mindest-d0)*FELD_SKALA.x; by+=dy0/d0*(mindest-d0)*FELD_SKALA.y; }
+        } else if(traeger&&traeger!==u){
           // Fable-Fund: 80 gab dem Ballfuehrer (fuer den `hatBall` immer Kurs auf den
           // eigenen Korb setzt, s. oben) kaum Vorfahrt vor den eigenen Mitspielern — beim
           // Antritt zum Korb liefen die Slot-Ziele fast unveraendert mit, statt Platz zu
@@ -16743,6 +16938,10 @@
           if(frei.length){ u.slotIdx=frei[Math.floor(rr()*frei.length)]; }
           u.slotSeit=0;
         }
+        // SPACING-MODUL: Rucklauf beim freien Ball (wer nicht jagt, sichert ab) und
+        // Mindestabstand zu den Mitspielern. Ohne `spacing`-Block unveraendert.
+        if(JAEGER&&!JAEGER.has(u))bx=spacingRuecklauf(bx);
+        if(spacingVon()){ const m=spacingMitspielerZiel(u,bx,by); bx=m.x; by=m.y; }
         zx=bx; zy=by;
         if(imFastbreak&&fastbreak.seite===u.side){
           if(fastbreak.ausbrecher===u&&fsT<(u.ausbruchBis||0)){
@@ -16752,7 +16951,7 @@
             // fehlende Teil ("schneller zum anderen Korb kommen"): das Fastbreak-Fenster
             // gab bisher nur Tempo, aber niemandem ein anderes ZIEL — alle liefen ihre
             // Halbfeld-Slots an, nur schneller.
-            zx=korbX; zy=H/2+(u.id%2?26:-26);
+            zx=korbX; zy=H/2+feldVersatz(0,u.id%2?26:-26).y;
             tempoMul=AUSBRUCH_TEMPO_MUL;
           } else if(SPRINTER[u.side].indexOf(u)>=0)tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
         }
@@ -16765,7 +16964,7 @@
           // Angreifer — sie parkte geschlossen im Zielbereich, bevor der Ball ankam.
           // Jetzt kein Bonus mehr: sie ist normal schnell, der Ballfuehrer (1,3×/0,85×
           // Dribbelabzug, s. oben) ist im Fastbreak schneller als sie.
-          zx=eigenerKorbX; zy=H/2+(u.id%2?40:-40);
+          zx=eigenerKorbX; zy=H/2+feldVersatz(0,u.id%2?40:-40).y;
         } else {
           // DOPPELN/HELP-DEFENSE (Bedraengnis-Bugfix-Runde, s. Bericht): vorher gab es
           // ausschliesslich strikte 1:1-Manndeckung — kein Code liess je zwei Verteidiger
@@ -16791,7 +16990,7 @@
             const primaerDecker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger);
             if(primaerDecker&&primaerDecker!==u
                &&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS*(fokus?FOKUS_BEDRAENGT_MUL:1)
-               &&dist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
+               &&feldLogikDist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
               // Chance haengt an der eigenen ABWEHR (koordinierte Hilfe ist Verteidiger-
               // Skill, kein reiner Zufall) — PLATZHALTER-Koeffizienten, s. Bericht fuer die
               // gemessene Doppel-Rate. Der Fokus hebt die Chance UND die Kappe an, macht
@@ -16849,7 +17048,9 @@
             // — er weicht zurueck. `sag` (der Zug Richtung eigenen Korb) gab es schon;
             // gegen einen koerperlich ueberlegenen Angreifer faellt er groesser aus, der
             // Verteidiger steht also weiter vom Ball weg und bedraengt schwaecher.
-            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3)   // PLATZHALTER, gedeckelt
+            // Feldmassstab: der Zug richtet sich nach der Logik-Entfernung zum Korb, der
+            // Versatz selbst bleibt ein Koerperabstand in px (SPACING-MODUL).
+            const sag=Math.min(35,Math.abs(zumEigenenKorb/(FELD_SKALA?FELD_SKALA.x:1))*0.3)   // PLATZHALTER, gedeckelt
               *(1+(u.mismatchWucht||0)*MISMATCH_WUCHT_SAG);
             zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
             // SLOT-BEWEGUNGSCHARAKTERISTIK — VERSUCHT UND WIEDER VERWORFEN (Zusatzauftrag,
@@ -16987,7 +17188,8 @@
       // leerem auf `tempoMin` faellt. Ohne Puste-Rezept gibt pusteFaktor 1 zurueck und die
       // Zeile ist rechnerisch nicht vorhanden.
       if(u.pusteMax>0)tempoMul*=pusteFaktor(u,FB().puste.tempoMin);
-      const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
+      const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1)
+        *(FELD_SKALA?feldTempoSkala():1); // Feldmassstab (SPACING-MODUL), sonst exakt 1 -> unveraendert
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
       // Opus-Review-Fund #12: `u.vx=dx` schrieb die RESTDISTANZ zum Ziel, nicht die
@@ -17004,6 +17206,7 @@
   }
 
   function stepFeldspielLive(dt){
+    bkAnzeigeUhr+=dt; // Anzeige-Uhr der Korbanlage (bkNachlauf), nie von der Wertung gelesen
     // Fable-Playtest (25.08.): nach Spielende stand alles bewegungslos still — der fruehe
     // Return liess bewegeSpielerLive() nie wieder laufen. Anders als die anderen
     // Feldspiel-Disziplinen (die ueber fsLerpPositionen() in feste Formationsslots
@@ -17157,12 +17360,27 @@
     if(flug){
       flug.t+=dt;
       const phase=Math.min(1,flug.t/flug.dauer);
+      // BASKETBALL-WURF IN DER HOEHE (17.11.): Bodenpunkt linear zum Korb, Hoehe `z` ueber
+      // bkBogenZ bis auf Ringhoehe — der Ball endet im Ring der Korbanlage. Reine Anzeige
+      // (fsBall liest die Wertung nicht); alle anderen Fluege unveraendert.
+      const bkWurfFlug=feldspielDisc==="basketball"&&(flug.art==="wurf"||flug.art==="alley");
+      if(bkWurfFlug){
+        const weit=feldLogikDist(flug.von,flug.nach);
+        fsBall={sichtbar:true,
+          x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
+          y:flug.von.y+(flug.nach.y-flug.von.y)*phase,
+          z:bkBogenZ(phase,flug.art==="alley"?70:Math.min(70,18+weit*0.32))};
+      } else
       fsBall={sichtbar:true,
         x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
         y:flug.von.y+(flug.nach.y-flug.von.y)*phase
           -Math.sin(phase*Math.PI)*(istHockey()?0:flug.art==="alley"?90:flug.art==="wurf"?36:0)};
       if(flug.art==="alley"&&phase>0.66)flug.ziel.hop=Math.sin(((phase-0.66)/0.34)*Math.PI)*28;
-      if(phase>=1){ loeseFlugAuf(flug,art); fsLive.ball.flug=null; }
+      if(phase>=1){
+        if(bkWurfFlug)bkNachlauf={art:flug.treffer?"netz":"abpraller",t0:bkAnzeigeUhr,
+          x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,dunk:flug.tier==="dunk"||flug.art==="alley"};
+        loeseFlugAuf(flug,art); fsLive.ball.flug=null;
+      }
     } else if(fsLive.ball.frei){
       const f=fsLive.ball.frei;
       fsBall={sichtbar:true,x:f.x,y:f.y};
@@ -18366,69 +18584,193 @@
     ctx.fillStyle=parkett||"rgba(120,84,46,.18)";
     ctx.fillRect(W*0.06,60,W*0.88,H-120);
     }
-    ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    ctx.strokeRect(W*0.06,60,W*0.88,H-120);
-    ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
-    ctx.beginPath();ctx.arc(W/2,H/2,H*0.09,0,6.3);ctx.stroke();
-    // Alle Radien haengen weiter an H, nicht an W: H (470) ist die Seitenlinien-Tiefe
-    // und bleibt die knappe Achse, auch nachdem die Spielrichtung auf X gedreht ist —
-    // ein an W bemessener Radius wuerde ueber die Seitenlinien hinausschiessen.
-    for(const links of [true,false]){
-      // korbX kommt aus derselben korbXVon()-Referenz wie Ballflug/Distanzklassifizierung
-      // (nicht mehr eigene Literale hier) — sonst laeuft die Zeichnung wieder aus dem
-      // Ruder, sobald korbXVon() an anderer Stelle nachjustiert wird.
-      const grundX=links?W*0.06:W*0.94, korbX=korbXVon(links?1:0);
-      // Zone (die Zahnstocher-Box unterm Korb). Fables Fund (03.09.): die Box haengte
-      // Tiefe UND Breite an H (der kurzen Seitenlinien-Achse) — H*0.16 ~75px, deutlich
-      // kleiner als eine echte NBA-Zone. Die Zone reicht real 19 ft von der Grundlinie
-      // (Feldlaenge 94 ft) und ist 16 ft breit (Feldbreite 50 ft); hier ist W die lange
-      // Achse (Spielfeldlaenge, Spielflaeche W*0.88 breit gemalt, s. fillRect oben) und
-      // H die kurze (Feldbreite) — die TIEFE gehoert deshalb an W, nicht an H.
-      const zoneTiefe=W*0.88*(19/94), zoneBreite=H*(16/50);
-      ctx.strokeRect(links?grundX:grundX-zoneTiefe,H/2-zoneBreite/2,zoneTiefe,zoneBreite);
-      // Freiwurflinie mit Halbkreis — Radius bleibt an H (Feldbreite), nur der Abstand
-      // von der Grundlinie folgt jetzt derselben echten Zonentiefe wie die Box oben.
-      ctx.beginPath();ctx.arc(links?grundX+zoneTiefe:grundX-zoneTiefe,H/2,H*0.09,0,6.3);ctx.stroke();
-      // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
-      ctx.beginPath();
-      ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
-        links?Math.PI/2-0.20:1.5*Math.PI-0.20);
-      ctx.stroke();
-      // Korb: Kenney-Sprite in Draufsicht (Brett quer, Ring davor), an der Grundlinie
-      // gespiegelt/gedreht — Chris' Fund: "die Leute treffen den Korb nicht weil er
-      // nicht existiert". Bild zeigt das Brett OBEN, den Ring darunter (Ring zeigt nach
-      // "unten" im Blatt) — gedreht, damit der Ring ins Feld zeigt statt zur Wand.
-      if(bkDa("korb_topdown")){
-        // Chris' Fund (25.08.): der Wurf traf den Korb optisch gar nicht. Ursache: das
-        // Korb-Sprite hing an `grundX` (der Grundlinie), waehrend der Ballflug bei einem
-        // Wurf IMMER auf `korbX` (=korbXVon(seite), dieselbe X, an der auch Dreierlinie und
-        // Schuss-Distanzklassifizierung haengen) zielt — zwei verschiedene X-Werte fuer
-        // "wo der Korb ist". Jetzt haengt das Sprite an derselben Referenz wie der Ballflug.
-        ctx.save();
-        ctx.translate(korbX,H/2);
-        ctx.rotate(links?-Math.PI/2:Math.PI/2);
-        ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
-        ctx.restore();
-        // Staender zur Grundlinie (Fables Fund, 03.09.: das Sprite haengt frei im Feld,
-        // ohne sichtbare Verbindung zur Wand — real steht die Korbanlage auf einem
-        // Pfosten/Ausleger, der zur Grund-/Aussenlinie zurueckreicht). Reicht bis knapp
-        // an den gezeichneten Ring heran (halbe Sprite-Breite), damit er nicht ueber den
-        // Ring hinaus ins Feld ragt.
-        ctx.strokeStyle="rgba(210,210,215,.6)";ctx.lineWidth=5;
-        ctx.beginPath();
-        ctx.moveTo(grundX,H/2);
-        ctx.lineTo(links?korbX-22:korbX+22,H/2);
-        ctx.stroke();
-      } else {
-        // Rueckfall: Ring plus kurzer Brett-Strich, wie vor der Asset-Runde.
-        ctx.fillStyle="rgba(255,140,60,.9)";
-        ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
-        ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
-        ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
-      }
-      ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    }
+    // FIBA-COURT (Benchmark Basketball 17.11., docs/design/benchmark-basketball-17-11.md). Alle
+    // Linien kommen aus BK_FIBA (echte Meter, 38,97 px/m laengs, 23,33 px/m quer) — vorher hingen
+    // Zone (W-basiert, 220 px tief) und Dreierbogen (H*0,24 = 112,8 px Kreis) an zwei
+    // verschiedenen Massstaeben: der Dreierbogen lag INNERHALB der Zone, war also keine
+    // erkennbare Dreierlinie (Chris: "jede map sollte eine 3er linie haben"). Jetzt: gerade
+    // Eckenlinien 0,9 m vor der Seitenlinie, Bogen 6,75 m um den Ring, Zone bis 4,225 m vor dem Ring x 4,9 m,
+    // Freiwurfkreis, No-Charge-Halbkreis, Mittelkreis — auf JEDER Kulisse, weil der Motor sie
+    // ueber Parkett und Streetcourt gleichermassen zeichnet. Die Spiellogik liest dieselben
+    // Masse (klassifiziereWurfdistanz + feldLogikDist): gezeigt = gebucht.
+    // BODEN-OVERLAY (Fable 17.11., scripts/baue-basketball-assets.py): liegt eine Kulisse
+    // darunter und ist ihr Linien-PNG (<kulisse>_linien.png) geladen, ersetzt es die
+    // Vektorlinien — mit Farbabrieb und Mittelkreis-Wappen, aber derselben Geometrie (das Skript
+    // baut mit den BK_FIBA-Massen, s. dort). Sonst die Vektorlinien als Rueckfall.
+    if(!(mitKulisse&&bkLinienOverlay()))zeichneBasketballLinien();
+    // Die Korbanlage selbst steht NICHT hier im Boden, sondern wird in zeichneFeldspiel nach y
+    // zwischen die Figuren sortiert (Tiefe), s. zeichneKorbAnlage.
     zeichneShotClock();
+  }
+  // Linien-Overlay der aktiven Basketball-Kulisse zeichnen; false = nicht verfuegbar.
+  const bkOverlayBilder={};
+  function bkLinienOverlay(){
+    if(!kulisseAktiv||!kulisseAktiv.bild)return false;
+    const pfad=kulisseAktiv.bild.replace(/\.jpg$/,"_linien.png");
+    if(pfad===kulisseAktiv.bild)return false;
+    let im=bkOverlayBilder[pfad];
+    if(!im){ im=new Image(); im.src=pfad; bkOverlayBilder[pfad]=im; }
+    if(!im.complete||!im.naturalWidth)return false;
+    ctx.drawImage(im,0,0,W,H);
+    return true;
+  }
+  // KORBANLAGE ALS EIGENES ZEICHEN-OBJEKT (Benchmark Basketball 17.11.). Chris: "er [muss] ein
+  // echtes asset [sein] und nicht nur gemalt auf die map". Bis hierher war der Korb ein 56-px-
+  // Sprite flach auf dem Boden (korb_topdown) — der Ball landete 26 px UEBER ihm, weil Baelle
+  // auf Handhoehe gezeichnet werden. Jetzt steht eine Anlage im Raum: Staender hinter der
+  // Grundlinie, Ausleger, Brett 1,2 m vor der Grundlinie, Ring auf 3,05 m, Netz — in ZWEI
+  // Ebenen:
+  //   "hinten"  Bodenschatten, Staender, Ausleger, Brett, hintere Ringhaelfte, hintere Netzfaeden
+  //             (in bodenFeldspiel, also VOR Spielern und Ball)
+  //   "vorn"    vordere Ringhaelfte und vorderes Netz (am Ende von zeichneFeldspiel, NACH dem
+  //             Ball) — dadurch faellt ein Treffer sichtbar DURCH den Ring ins Netz.
+  // PNG-TAUSCH (Assets macht der PixelLab-Schwester-Agent): Datei nach
+  // public/sprites/basketball/ legen und den Namen in BK_KORB_PNG eintragen; Anker ist der
+  // Ringmittelpunkt (ankerX/ankerY im Bild), das Bild zeigt den LINKEN Korb (Brett links vom
+  // Ring) und wird fuer den rechten gespiegelt. Ist ein PNG geladen, ersetzt es die Primitive
+  // seiner Ebene vollstaendig; fehlt es oder laedt es nicht, bleibt die Zeichnung unten.
+  function zeichneKorbAnlage(links,ebene){
+    const F=BK_FIBA, kx=korbXVon(links?1:0), my=H/2, z=links?1:-1;
+    const ry=my-F.ringZ;                       // Bildschirm-y des Ringmittelpunkts
+    // PNG-Anlage (Fable 17.11., data/generated/pixellab-requisiten/basketball-17-11/anker.json):
+    // 96x128, Ringmitte links (68,52) / rechts (27,52), Bodenpunkt unter dem Ring y=111.
+    const pngName="korb_"+(links?"links":"rechts")+"_"+(ebene==="hinten"?"hinten":"vorne");
+    if(bkDa(pngName)){
+      const sk=BK_KORB_SKALA, ax=links?68:27;
+      if(ebene==="hinten"){
+        // Bodenschatten unter dem Ring: der Punkt, den die Wurfdistanz misst.
+        ctx.save();ctx.fillStyle="rgba(0,0,0,.20)";
+        ctx.beginPath();ctx.ellipse(kx,my,F.ringRx,F.ringRy,0,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+      ctx.drawImage(bkBild[pngName],kx-ax*sk,my-111*sk,96*sk,128*sk);
+      if(ebene==="vorne"){ const sw=bkNetzZustand(links); if(sw>0)bkNetzFaeden(kx,ry,sw,false); }
+      return;
+    }
+    const gx=links?W*0.06:W*0.94, bx=gx+z*F.brettVonGrund, sx=gx-z*F.staenderHinterGrund;
+    const netz=bkNetzZustand(links);
+    ctx.save();
+    if(ebene==="hinten"){
+      // Bodenschatten von Ring und Brett: zeigt, WO am Boden der Korb steht (der Punkt, den
+      // klassifiziereWurfdistanz misst).
+      ctx.fillStyle="rgba(0,0,0,.22)";
+      ctx.beginPath();ctx.ellipse(kx,my,F.ringRx,F.ringRy,0,0,Math.PI*2);ctx.fill();
+      ctx.fillRect(Math.min(bx,bx+z*3)-1,my-F.brettHalb,4,F.brettHalb*2);
+      // Staender: Fuss hinter der Grundlinie, Mast, Ausleger zum Brett.
+      ctx.fillStyle="rgba(20,24,32,.55)";
+      ctx.beginPath();ctx.ellipse(sx,my,13,6,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#2b3442";ctx.fillRect(sx-9,my-6,18,8);
+      ctx.strokeStyle="#59677d";ctx.lineWidth=5;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(sx,my);ctx.lineTo(sx,my-F.staenderZ);ctx.lineTo(bx-z*2,my-F.staenderZ);ctx.stroke();
+      ctx.strokeStyle="#3a4556";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(sx,my-F.staenderZ*0.62);ctx.lineTo(bx-z*2,my-F.staenderZ+6);ctx.stroke();
+      // Polster am Mast (Hallen-Standard), Teamfarbe der Seite, die auf diesen Korb wirft.
+      ctx.fillStyle=links?"rgba(58,120,214,.9)":"rgba(214,58,58,.9)";
+      ctx.fillRect(sx-4,my-26,8,22);
+      // Brett: von der Seite gesehen ein schmales, hohes Rechteck (Schraegsicht), weiss mit
+      // rotem Rand; die dem Feld zugewandte Kante traegt das Zielquadrat.
+      const bOben=my-F.brettHalb-F.brettObenZ, bUnten=my+F.brettHalb-F.brettUntenZ;
+      const bL=links?bx-2:bx-5;
+      ctx.fillStyle="rgba(240,244,250,.96)";ctx.fillRect(bL,bOben,7,bUnten-bOben);
+      ctx.strokeStyle="#c0392b";ctx.lineWidth=1.5;ctx.strokeRect(bL+0.5,bOben+0.5,6,bUnten-bOben-1);
+      ctx.fillStyle="#c0392b";
+      ctx.fillRect(links?bL+5:bL,ry-14,2,14);
+      // Halterung Brett -> Ring.
+      ctx.strokeStyle="#9aa3ad";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(bx+z*4,ry+1);ctx.lineTo(kx-z*F.ringRx,ry+1);ctx.stroke();
+      // Netz, hintere Faeden (zwischen hinterer Ringhaelfte und Netzboden).
+      bkNetzFaeden(kx,ry,netz,true);
+      // Hintere Ringhaelfte (oberer Ellipsenbogen = vom Betrachter weg).
+      ctx.strokeStyle="#e8662a";ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,Math.PI,Math.PI*2);ctx.stroke();
+    } else {
+      bkNetzFaeden(kx,ry,netz,false);
+      // Vordere Ringhaelfte, kraeftiger, mit hellem Glanz — liegt UEBER dem Ball.
+      ctx.strokeStyle="#ff7a33";ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,0,Math.PI);ctx.stroke();
+      ctx.strokeStyle="rgba(255,214,170,.7)";ctx.lineWidth=1;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,0.35,1.2);ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Netzbewegung nach einem Treffer: das Netz wird kurz laenger und schmaler ("Swish") —
+  // liest nur den Anzeige-Zustand bkNachlauf.
+  function bkNetzZustand(links){
+    const n=bkNachlauf; if(!n||n.art!=="netz"||n.links!==links)return 0;
+    const t=bkAnzeigeUhr-n.t0; if(t<0||t>0.55)return 0;
+    return Math.sin(Math.min(1,t/0.55)*Math.PI);
+  }
+  function bkNetzFaeden(kx,ry,schwung,hinten){
+    const F=BK_FIBA, tiefe=F.netzTiefe+schwung*7, unten=F.ringRx*0.55*(1-schwung*0.25);
+    ctx.strokeStyle=hinten?"rgba(225,230,238,.45)":"rgba(245,248,252,.85)";ctx.lineWidth=1;
+    const n=7;
+    for(let i=0;i<=n;i++){
+      const w=Math.PI*(i/n);                  // 0..PI = vordere Haelfte, PI..2PI = hintere
+      const a=hinten?w+Math.PI:w;
+      const ox=Math.cos(a)*F.ringRx, oy=Math.sin(a)*F.ringRy;
+      ctx.beginPath();ctx.moveTo(kx+ox,ry+oy);
+      ctx.lineTo(kx+Math.cos(a)*unten,ry+tiefe+Math.sin(a)*F.ringRy*0.5);ctx.stroke();
+    }
+    // Querfaden auf halber Tiefe und unterer Netzrand.
+    for(const anteil of [0.5,1]){
+      const rx=F.ringRx+(unten-F.ringRx)*anteil, yy=ry+tiefe*anteil;
+      ctx.beginPath();ctx.ellipse(kx,yy,rx,F.ringRy*(1-anteil*0.5),0,hinten?Math.PI:0,hinten?Math.PI*2:Math.PI);ctx.stroke();
+    }
+  }
+  // Wo der Ball gerade GEZEICHNET wird, solange bkNachlauf laeuft (Netz bzw. Abpraller).
+  // null = kein Nachlauf, normale Ballzeichnung. Reine Anzeige.
+  function bkNachlaufBall(){
+    const n=bkNachlauf; if(!n)return null;
+    const t=bkAnzeigeUhr-n.t0, F=BK_FIBA;
+    if(n.art==="netz"){
+      if(t>0.5){ bkNachlauf=null; return null; }
+      // 0..0,22 s durch Ring und Netz, danach zu Boden.
+      const z=t<0.22?F.ringZ-(t/0.22)*(F.netzTiefe+6):Math.max(6,F.ringZ-F.netzTiefe-6-(t-0.22)*260);
+      return {x:n.x+(n.links?1:-1)*Math.max(0,t-0.22)*30, y:n.y+Math.max(0,t-0.22)*14, z};
+    }
+    if(t>0.32){ bkNachlauf=null; return null; }
+    const f=fsLive&&fsLive.ball.frei, ziel=f?{x:f.x,y:f.y}:{x:n.x+(n.links?40:-40),y:n.y+20};
+    const p=t/0.32;
+    return {x:n.x+(ziel.x-n.x)*p, y:n.y+(ziel.y-n.y)*p,
+      z:F.ringZ+4+(12-F.ringZ-4)*p+Math.sin(p*Math.PI)*22};
+  }
+  // BASKETBALL-FELDLINIEN (FIBA, s. BK_FIBA). Reine Zeichnung.
+  function zeichneBasketballLinien(){
+    const F=BK_FIBA, gl=W*0.06, gr=W*0.94, oben=60, unten=H-60, my=H/2;
+    ctx.save();
+    // Zonen (Key) leicht in Teamfarbe eingefaerbt, damit sie auf jedem Belag lesbar bleiben.
+    for(const links of [true,false]){
+      const g=links?gl:gr;
+      ctx.fillStyle=links?"rgba(214,58,58,.16)":"rgba(58,120,214,.16)";
+      ctx.fillRect(links?g:g-F.zoneTiefe,my-F.zoneHalb,F.zoneTiefe,F.zoneHalb*2);
+    }
+    ctx.strokeStyle="rgba(255,255,255,.62)";ctx.lineWidth=2;
+    ctx.strokeRect(gl,oben,gr-gl,unten-oben);
+    ctx.beginPath();ctx.moveTo(W/2,oben);ctx.lineTo(W/2,unten);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(W/2,my,F.kreisRx,F.kreisRy,0,0,Math.PI*2);ctx.stroke();
+    for(const links of [true,false]){
+      const g=links?gl:gr, z=links?1:-1, kx=korbXVon(links?1:0);
+      // Zone
+      ctx.strokeRect(links?g:g-F.zoneTiefe,my-F.zoneHalb,F.zoneTiefe,F.zoneHalb*2);
+      // Freiwurfkreis: Feldhaelfte durchgezogen, Zonenhaelfte gestrichelt (wie FIBA).
+      const fx=g+z*F.zoneTiefe;
+      ctx.beginPath();ctx.ellipse(fx,my,F.kreisRx,F.kreisRy,0,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:Math.PI*1.5);ctx.stroke();
+      ctx.save();ctx.setLineDash([6,5]);
+      ctx.beginPath();ctx.ellipse(fx,my,F.kreisRx,F.kreisRy,0,links?Math.PI/2:-Math.PI/2,links?Math.PI*1.5:Math.PI/2);ctx.stroke();
+      ctx.restore();
+      // No-Charge-Halbkreis unter dem Korb.
+      ctx.beginPath();ctx.ellipse(kx,my,F.noChargeRx,F.noChargeRy,0,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:Math.PI*1.5);ctx.stroke();
+      // DREIERLINIE: zwei Geraden in den Ecken + Ellipsenbogen (6,75 m), etwas kraeftiger als
+      // die uebrigen Linien — sie ist die Linie, an der die Wertung haengt.
+      ctx.save();ctx.strokeStyle="rgba(255,255,255,.88)";ctx.lineWidth=2.5;
+      const eckX=kx+z*F.eckeLaengeX, phi=Math.asin(F.eckeY/F.dreierRy);
+      ctx.beginPath();
+      ctx.moveTo(g,my-F.eckeY);ctx.lineTo(eckX,my-F.eckeY);
+      if(links)ctx.ellipse(kx,my,F.dreierRx,F.dreierRy,0,-phi,phi,false);
+      else ctx.ellipse(kx,my,F.dreierRx,F.dreierRy,0,Math.PI+phi,Math.PI-phi,true);
+      ctx.lineTo(g,my+F.eckeY);
+      ctx.stroke();ctx.restore();
+    }
+    ctx.restore();
   }
   // B1 -- SHOT-CLOCK-ZIFFER AM ANGRIFFSKORB (docs/design/broadcast-optik-feldspiel-27-09.md
   // Abschnitt 4, Klasse A, Prio 1): eine kleine Ziffernbox an der Grundlinie neben dem
@@ -18441,14 +18783,26 @@
     const rest=basketballSchussuhrRest();
     if(rest==null||fsLive.amBall==null)return;
     const seite=fsLive.amBall, linksSeite=seite===1;
-    const gx=linksSeite?W*0.06:W*0.94, gy=H/2-58;
+    // Seit 17.11. an der Korbanlage (wie in echten Hallen), nicht mehr frei an der Grundlinie:
+    // mit der PNG-Anlage auf der Mastspitze (Bild-x 34, y 8), sonst ueber dem gezeichneten Brett.
+    // Rahmen: schussuhr_rahmen.png (48x32, Ziffernmitte 24,16), Fable 17.11.
+    const kx=korbXVon(seite), sk=BK_KORB_SKALA;
+    const mitPng=bkDa(linksSeite?"korb_links_hinten":"korb_rechts_hinten");
+    const gx=mitPng?kx+(linksSeite?-34:34)*sk:(linksSeite?W*0.06:W*0.94)+(linksSeite?1:-1)*BK_FIBA.brettVonGrund,
+          gy=mitPng?H/2-(111-8)*sk-17:H/2-BK_FIBA.brettHalb-BK_FIBA.brettObenZ-14;
     const txt=fmtSchussuhr(rest), knapp=rest<5;
     ctx.save();
-    ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
-    ctx.fillRect(gx-19,gy-11,38,22);
-    ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
-    ctx.strokeRect(gx-19,gy-11,38,22);
-    ctx.fillStyle="#fff";ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    if(bkDa("schussuhr_rahmen")){
+      ctx.drawImage(bkBild.schussuhr_rahmen,gx-24,gy-16,48,32);
+      ctx.fillStyle=knapp?"#ff4a4a":"#ffe9a8";
+    } else {
+      ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
+      ctx.fillRect(gx-19,gy-11,38,22);
+      ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
+      ctx.strokeRect(gx-19,gy-11,38,22);
+      ctx.fillStyle="#fff";
+    }
+    ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.fillText(txt,gx,gy+1);
     ctx.restore();
@@ -18622,7 +18976,14 @@
       .concat(FSTEAM[0].map((u,i)=>({u,side:0,i,g:FSTEAM[0]})))
       .concat(FSTEAM[1].map((u,i)=>({u,side:1,i,g:FSTEAM[1]})))
       .sort((a,b)=>(a.u.y+(a.u._zvy||0))-(b.u.y+(b.u._zvy||0)));
+    // KORBANLAGE IN DER TIEFE (Benchmark 17.11.): sie steht auf y = H/2. Wer dahinter steht
+    // (Fusspunkt darueber), wird vor ihr gezeichnet und vom Brett verdeckt; wer davor steht,
+    // danach. Die vordere Ebene (Ring/Netz) kommt erst nach dem Ball, s. unten.
+    let korbGezeichnet=feldspielDisc!=="basketball";
+    const korbHinten=()=>{ if(korbGezeichnet)return; korbGezeichnet=true;
+      for(const links of [true,false])zeichneKorbAnlage(links,"hinten"); };
     zuZeichnen.forEach(({u,side,i,g})=>{
+      if(!korbGezeichnet&&u.y+(u._zvy||0)>=H/2)korbHinten();
       { // Block ohne eigene Bedeutung: er haelt den unveraenderten Rumpf auf seiner alten
         // Einrueckung, damit der Diff dieser Runde die Zeichenlogik nicht komplett neu
         // formatiert (frueher war das die innere `g.forEach(u=>{`-Ebene).
@@ -18776,6 +19137,7 @@
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
       }
     });
+    korbHinten(); // alle Figuren standen hinter dem Korb
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
     // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
     // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
@@ -18923,23 +19285,35 @@
         // Deckkraft folgen dem Dribbel-Takt ueber dieselbe dip-Groesse, die auch die
         // Hoehe treibt (fsBall.y=traeger.y+18+dip, s. BK_DRIBBEL_* oben): am Boden
         // (naehe=1) dunkler/breiter, an der Hand (naehe=0) kaum sichtbar.
-        if(traeger){
+        // HOEHE STATT BODENPUNKT (Benchmark 17.11.): ein Wurf traegt seine Hoehe `fsBall.z`
+        // (bkBogenZ) und endet auf Ringhoehe; nach dem Wurf zeigt bkNachlaufBall() den Ball im
+        // Netz bzw. beim Abprallen. Getragene/gepasste Baelle: Hoehe 26 wie bisher.
+        const nl=bkNachlaufBall();
+        const gx=nl?nl.x:bx, gy=nl?nl.y:by, gz=nl?nl.z:(fsBall.z!=null?fsBall.z:26);
+        if(traeger&&!nl){
           const naehe=Math.max(0,Math.min(1,(fsBall.y-traeger.y-18)/BK_DRIBBEL_AMPLITUDE));
           ctx.fillStyle="rgba(0,0,0,"+(0.12+naehe*0.28)+")";
           ctx.beginPath();
           ctx.ellipse(bx,traeger.y+bvy+19,6+naehe*4,2.5+naehe*1.5,0,0,6.3);
           ctx.fill();
+        } else if(gz>27||nl){
+          // Schatten des fliegenden Balls am Boden — macht die Hoehe lesbar.
+          ctx.fillStyle="rgba(0,0,0,.18)";
+          ctx.beginPath();ctx.ellipse(gx,gy+2,5,2.2,0,0,6.3);ctx.fill();
         }
+        const bd=BK_FIBA.ballD, cy=gy-gz;
         if(bkDa("ball")){
-          ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
+          ctx.drawImage(bkBild.ball,gx-bd/2,cy-bd/2,bd,bd);
         } else {
           ctx.fillStyle="#e8823a";
-          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
+          ctx.beginPath();ctx.arc(gx,cy,bd/2-1,0,6.3);ctx.fill();
           ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+          ctx.beginPath();ctx.arc(gx,cy,bd/2-1,0,6.3);ctx.stroke();
         }
       }
     }
+    // Vordere Ebene der Korbanlage NACH dem Ball: der Ball faellt durch den Ring ins Netz.
+    if(feldspielDisc==="basketball")for(const links of [true,false])zeichneKorbAnlage(links,"vorne");
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
@@ -44634,7 +45008,9 @@
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
-  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball"];
+  // Korbanlage in zwei Ebenen + Schussuhr-Rahmen: Fable 17.11. (docs/design/basketball-assets-17-11.md).
+  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball",
+    "korb_links_hinten","korb_links_vorne","korb_rechts_hinten","korb_rechts_vorne","schussuhr_rahmen"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
   const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -68405,6 +68781,115 @@
         mittlererMin:z.frames?+(z.summeMin/z.frames).toFixed(1):null,
         anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
       return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
+    },
+    // KLUMPEN-MESSUNG (Benchmark Basketball, 17.11., docs/design/spacing-modul-17-11.md):
+    // Chris: "alle laufen immer nur als klumpen gefuehlt rum ... niemand steht mal separat und
+    // ist frei fuer einen pass". Gemessen je Tick der LAUFENDEN Phase (keine Freiwurf-/
+    // Viertelpause), Simulationspositionen, read-only wie diagAbstaende daneben:
+    //   * mitAbstand    mittlerer paarweiser Abstand zwischen Mitspielern (px)
+    //   * naechsterMit  mittlerer Abstand zum naechsten Mitspieler (px)
+    //   * klumpen3      Anteil Ticks, in denen >=3 Spieler (beliebige Teams) in einem Kreis
+    //                   von `r` px um einen von ihnen stehen
+    //   * klumpenMit3   dasselbe nur unter Mitspielern
+    //   * ballNah       mittlere Zahl Spieler (ohne Ballfuehrer) im Umkreis 80 px um den Ball
+    //   * passFrei      Anteil Ticks mit Ballfuehrer, in denen MINDESTENS ein Mitspieler frei
+    //                   anspielbar ist (offenheitFuerPass >= 1: Decker >= 60 px weg und keine
+    //                   Passlinie verstellt), dazu die mittlere Zahl freier Anspielstationen
+    //   * breite        mittlere Standardabweichung der Angreifer-y (Feldbreite-Nutzung, px)
+    diagSpacing:(saaten,bis,dId,r)=>{
+      const R=r||45, n=saaten||6, dauer=bis||120;
+      const acc={ticks:0,mit:0,mitN:0,nn:0,nnN:0,k3:0,km3:0,ballNah:0,ballTicks:0,frei1:0,freiN:0,breite:0};
+      for(let i=0;i<n;i++){
+        feldspielDisc=dId||"basketball"; bauFeldspiel(1337+i*7919);
+        let guard=0;
+        while(!done&&fsT<dauer&&guard<60000){
+          stepFeldspiel(1/60); guard++;
+          if(!fsLive||fsLive.phase!=="laufend")continue;
+          const feld=FSTEAM.map(t=>t.filter(u=>!stehtImTor(u)&&aufDemEis(u)));
+          const alle=[...feld[0],...feld[1]];
+          acc.ticks++;
+          for(const t of feld){
+            for(let a=0;a<t.length;a++){
+              let best=1e9;
+              for(let b=0;b<t.length;b++){ if(a===b)continue; const d=dist(t[a],t[b]); if(b>a){acc.mit+=d;acc.mitN++;} if(d<best)best=d; }
+              if(best<1e9){acc.nn+=best;acc.nnN++;}
+            }
+          }
+          const klumpen=(menge)=>menge.some(u=>menge.filter(v=>v!==u&&dist(u,v)<R).length>=2);
+          if(klumpen(alle))acc.k3++;
+          if(feld.some(t=>klumpen(t)))acc.km3++;
+          const tr=fsLive.ball.traeger;
+          if(tr&&!fsLive.ball.flug){
+            acc.ballTicks++;
+            acc.ballNah+=alle.filter(u=>u!==tr&&dist(u,tr)<80).length;
+            const frei=feld[tr.side].filter(m=>m!==tr&&offenheitFuerPass(tr,m)>=0.999).length;
+            if(frei>0)acc.frei1++; acc.freiN+=frei;
+            const ys=feld[tr.side].map(u=>u.y), my=ys.reduce((s,y)=>s+y,0)/ys.length;
+            acc.breite+=Math.sqrt(ys.reduce((s,y)=>s+(y-my)*(y-my),0)/ys.length);
+          }
+        }
+      }
+      const f=(x,d)=>+x.toFixed(d==null?1:d);
+      return {spiele:n,dauer,r:R,ticks:acc.ticks,
+        mitAbstand:f(acc.mit/Math.max(1,acc.mitN)), naechsterMit:f(acc.nn/Math.max(1,acc.nnN)),
+        klumpen3Prozent:f(acc.k3/Math.max(1,acc.ticks)*100), klumpenMit3Prozent:f(acc.km3/Math.max(1,acc.ticks)*100),
+        ballNah:f(acc.ballNah/Math.max(1,acc.ballTicks),2),
+        passFreiProzent:f(acc.frei1/Math.max(1,acc.ballTicks)*100), freieAnspielstationen:f(acc.freiN/Math.max(1,acc.ballTicks),2),
+        breite:f(acc.breite/Math.max(1,acc.ballTicks))};
+    },
+    // GEZEIGT = GEBUCHT (Benchmark Basketball 17.11.): prueft fuer jeden Wurf aus n Spielen, ob
+    // die gebuchte Stufe (Zweier/Dreier) zur GEZEICHNETEN FIBA-Linie passt — rein geometrisch in
+    // Metern aus BK_FIBA, unabhaengig von der Logik-Metrik — und ob die angezeigte Punktzahl
+    // (fsPunkte, Anzeigetafel) der Summe der gebuchten Spielerpunkte entspricht. Read-only.
+    diagGezeigtGebucht:(n)=>{
+      const F=BK_FIBA; let wuerfe=0, dreier=0, falsch=0, punkteFalsch=0, spiele=0; const faelle=[];
+      for(let i=0;i<(n||6);i++){
+        feldspielDisc="basketball"; bauFeldspiel(4242+i*131); spiele++;
+        let letzterFlug=null, guard=0;
+        while(!done&&guard<60000){
+          stepFeldspiel(1/60); guard++;
+          const fl=fsLive&&fsLive.ball.flug;
+          if(fl&&fl!==letzterFlug&&fl.art==="wurf"&&!fl.zug){
+            letzterFlug=fl; wuerfe++;
+            const dxm=(fl.von.x-korbXVon(fl.schuetze.side))/F.mx, dym=(fl.von.y-H/2)/F.my;
+            const hinterLinie=Math.abs(dym)>=6.6||Math.hypot(dxm,dym)>=6.75;
+            const gebuchtDrei=fl.punkte===3;
+            if(gebuchtDrei)dreier++;
+            if(hinterLinie!==gebuchtDrei){ falsch++; if(faelle.length<8)faelle.push({dxm:+dxm.toFixed(2),dym:+dym.toFixed(2),tier:fl.tier,punkte:fl.punkte}); }
+          }
+        }
+        const summe=[0,1].map(s=>FSTEAM[s].reduce((a,u)=>a+(u.punkte||0),0));
+        if(summe[0]!==fsPunkte[0]||summe[1]!==fsPunkte[1])punkteFalsch++;
+      }
+      return {spiele,wuerfe,dreier,stufeFalsch:falsch,anzeigeUngleichBuchung:punkteFalsch,faelle};
+    },
+    // SZENEN-SONDE FUER SCREENSHOTS (Benchmark Basketball, 17.11.,
+    // scripts/screenshot-basketball-benchmark.mjs): baut ein Feldspiel mit fester Saat und
+    // spult die Simulation (gleiche Schritte wie das Spiel) bis zu einer benannten Situation
+    // vor, dann bleibt der Zustand stehen und der laufende Zeichen-Loop zeigt genau dieses Bild.
+    // Situationen: "aufbau" (Halbfeld-Angriff steht, Ballfuehrer seit >=2,5 s), "wurf" (Wurf
+    // kurz vor dem Ring), "dreier" (dasselbe, nur Dreier), "treffer" (Ball gerade im Netz),
+    // "rebound" (freier Ball nach Fehlwurf). `ab` = fruehester Spielzeitpunkt (s).
+    szeneFeldspiel:(saat,situation,ab,dId)=>{
+      feldspielDisc=dId||"basketball"; bauFeldspiel(saat||1337);
+      const start=ab||0; let guard=0, nachTreffer=null;
+      const passt=()=>{
+        if(!fsLive||fsT<start)return false;
+        const fl=fsLive.ball.flug;
+        if(situation==="aufbau")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&!fl&&fsLive.angriffSeit>=2.5;
+        if(situation==="wurf")return !!fl&&(fl.art==="wurf"||fl.art==="alley")&&fl.t/fl.dauer>=0.8;
+        if(situation==="dreier")return !!fl&&fl.art==="wurf"&&fl.fern&&fl.t/fl.dauer>=0.55;
+        if(situation==="rebound")return !!fsLive.ball.frei&&!!fsLive.reboundKampf&&fsLive.reboundKampf.t>0.2;
+        if(situation==="treffer"){
+          if(nachTreffer!=null)return fsT>=nachTreffer;
+          if(fl&&fl.art==="wurf"&&fl.treffer&&fl.t+1/60>=fl.dauer)nachTreffer=fsT+0.12;
+          return false;
+        }
+        return false;
+      };
+      while(!done&&guard<60000){ stepFeldspiel(1/60); guard++; if(passt())break; }
+      vpSichtbarBis=0; // Viertelpausen-Tafel (Wandzeit) nicht ueber das Standbild legen
+      return {gefunden:!done&&guard<60000, t:+fsT.toFixed(2), punkte:[...fsPunkte]};
     },
     // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der
     // Schnelle jetzt WIRKLICH frueher an, oder sieht es nur so aus?"). Spielt N Spiele
