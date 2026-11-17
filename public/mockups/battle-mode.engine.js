@@ -31788,9 +31788,8 @@
     // Moebel) und die Fehlserie (Glut, I4). `ISPY_RAUM_AKTIV[seite]` bestimmt, aus WELCHEM der
     // drei Raeume das Fach seine Art nimmt (Archiv/Werkstatt/Salon koennen je Seite verschieden
     // sein, s. "I-SPY: DREI RAEUME" bei BUEHNE_ART); Stufe und Koordinate je Index sind ueber
-    // alle drei Raeume gleich. Truhen-Faecher (Tresor, Mechanik ohne Tuer) nutzen die
-    // PixelLab-Requisiten truhe_<stufe>_zu/_offen (public/sprites/arena/, schon vorhanden),
-    // die anderen bleiben Primitive.
+    // alle drei Raeume gleich. Jedes Fach zeigt ein PixelLab-Requisit (ispyZeichneMoebelBild(),
+    // 17.11.); die Primitive bleiben nur der Rueckfall, falls ein Bild fehlt.
     if(art.fundorte){
       const raeume=[0,1].map(s=>ISPY_RAEUME[ISPY_RAUM_AKTIV[s]]||art.fundorte);
       const zustaende=[0,1].map(s=>ispyRaumZustand(s));
@@ -31824,7 +31823,7 @@
           ctx.translate(fx,p.y); ctx.scale(0.74,0.74);
           const moebel=ispyMoebelArt(f);
           const offen=!!(z&&z.offen);
-          if(!ispyZeichneTruheBild(ctx,moebel,stufen[seite],offen)){
+          if(!ispyZeichneMoebelBild(ctx,moebel,stufen[seite],offen)){
             if(offen)ctx.globalAlpha=0.5;
             (ISPY_MOEBEL[moebel]||ispyZeichneTruhe)(ctx);
             ctx.globalAlpha=1;
@@ -31853,23 +31852,35 @@
       });
     }
   }
-  // TRUHEN-REQUISITEN (16.11.): die PixelLab-Truhen truhe_<1|2|3>_<zu|offen> lagen seit der
-  // Requisiten-Runde in public/sprites/arena/ (arenen-mechaniken-konzept-konsolidiert-15-11.md,
-  // Tabelle "Truhe ... I-Spy"), wurden aber nirgends gezeichnet. Hier fuer die beiden
-  // Truhen-Moebel (Tresor "truhe", Mechanik "aktenschrank"); Schreibtisch, Verhoer-Figur und
-  // Tuer bleiben Primitive. QUELLAUSSCHNITT: truhe_2_zu traegt Freistell-Reste (helle
-  // Eckklammern am Rand), truhe_3_offen einen hellen Strich links -- der Ausschnitt laesst sie
-  // weg. Fehlt das Bild (Headless, Ladefehler), false -> der Aufrufer zeichnet das Primitiv.
-  const ISPY_TRUHE_AUSSCHNITT={truhe_2_zu:[3,5,26,25], truhe_3_offen:[4,0,34,40]};
-  function ispyZeichneTruheBild(c,moebel,stufe,offen){
-    if(moebel!=="truhe"&&moebel!=="aktenschrank")return false;
-    const name="truhe_"+Math.max(1,Math.min(3,stufe||1))+"_"+(offen?"offen":"zu");
+  // MOEBEL-REQUISITEN (16.11. Truhen, 17.11. alle Moebel): jedes Fach zeigt ein PixelLab-Requisit
+  // aus public/sprites/arena/ statt eines Primitivs. Truhe (Tresor): truhe_<stufe>_zu/_offen (seit
+  // der Requisiten-Runde vorhanden; truhe_2_zu/truhe_3_offen am 17.11. sauber neu freigestellt, der
+  // fruehere Quellausschnitt ist deshalb entfallen). Schreibtisch und Aktenschrank haben einen
+  // eigenen durchsuchten Zustand; Verhoerstuhl (keine Figur mehr, s. CLAUDE.md "keine neuen
+  // Charaktere") und Tuer werden im Ergebnis wie bisher die Primitive abgedimmt. Auftraege und
+  // Kandidaten: scripts/pixellab-requisiten.py (ispy_*). Fehlt das Bild (Headless, Ladefehler),
+  // false -> der Aufrufer zeichnet das Primitiv. Reine Anzeige, liest nur moebel/stufe/offen.
+  const ISPY_MOEBEL_BILD={
+    schreibtisch:["ispy_schreibtisch","ispy_schreibtisch_durchsucht"],
+    aktenschrank:["ispy_aktenschrank","ispy_aktenschrank_offen"],
+    verhoer:     ["ispy_verhoerstuhl",null],
+    tuer:        ["ispy_tuer",null],
+  };
+  function ispyZeichneMoebelBild(c,moebel,stufe,offen){
+    let name, dimmen=false;
+    if(moebel==="truhe") name="truhe_"+Math.max(1,Math.min(3,stufe||1))+"_"+(offen?"offen":"zu");
+    else {
+      const paar=ISPY_MOEBEL_BILD[moebel];
+      if(!paar)return false;
+      name=(offen&&paar[1])||paar[0];
+      dimmen=offen&&!paar[1];
+    }
     if(!aDa(name))return false;
     const im=aBild[name];
-    const a=ISPY_TRUHE_AUSSCHNITT[name]||[0,0,im.naturalWidth,im.naturalHeight];
     const glatt=c.imageSmoothingEnabled; c.imageSmoothingEnabled=false;
-    c.drawImage(im,a[0],a[1],a[2],a[3],-a[2]/2,8-a[3],a[2],a[3]);
-    c.imageSmoothingEnabled=glatt;
+    const alpha=c.globalAlpha; if(dimmen)c.globalAlpha=alpha*0.5;
+    c.drawImage(im,-im.naturalWidth/2,8-im.naturalHeight);
+    c.globalAlpha=alpha; c.imageSmoothingEnabled=glatt;
     return true;
   }
   // TRUHENZUSTAND EINER EINZELNEN SEITE (I1, s. bodenSchatzsuche()-Kommentar oben): fuer
@@ -43884,8 +43895,12 @@
     // Strichfigur als Sicherer -- eine Requisite, keine Figur (neue Charaktere sind gesperrt).
     "climbing_seilsack",
     // I-Spy-Darstellung 16.11.: die vorhandenen PixelLab-Truhen (drei Stufen, zu/offen) fuer die
-    // Truhen-Faecher der Doppelmoebel, s. ispyZeichneTruheBild(). Keine neue Bestellung.
-    "truhe_1_zu","truhe_1_offen","truhe_2_zu","truhe_2_offen","truhe_3_zu","truhe_3_offen"];
+    // Truhen-Faecher der Doppelmoebel, s. ispyZeichneMoebelBild(). Keine neue Bestellung.
+    "truhe_1_zu","truhe_1_offen","truhe_2_zu","truhe_2_offen","truhe_3_zu","truhe_3_offen",
+    // I-Spy-Nachbesserung 17.11. (Chris: "nur noch neue PixelLab-Assets"): die uebrigen Moebel der
+    // Fundorte als Requisiten, s. ISPY_MOEBEL_BILD. Fehlen-tolerant (aDa()-Wache), Rueckfall Primitiv.
+    "ispy_schreibtisch","ispy_schreibtisch_durchsucht","ispy_aktenschrank","ispy_aktenschrank_offen",
+    "ispy_verhoerstuhl","ispy_tuer"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};

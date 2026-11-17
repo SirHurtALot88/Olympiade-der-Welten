@@ -1234,5 +1234,126 @@
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-16",
   "verwendung": "Climbing, Sicht-Audit 16.11. — Sicherungsstation (Seilsack mit Sicherungsgeraet am Bodenanker) am Wandfuss statt der Strichfigur als Sicherer, s. bodenWand(). Requisite, keine Figur."
+ },
+ "ispy_schreibtisch.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small old wooden writing desk with an open leather diary and an ink pot on top, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    40,
+    30
+   ],
+   "job": "8ba8c0b4-0139-4034-919d-a19ad41adc3f",
+   "kandidat": 44,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_schreibtisch.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_schreibtisch (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- Schreibtisch mit Tagebuch (Logik-Fundort), s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "ispy_schreibtisch_durchsucht.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "the same small old wooden writing desk as in the reference, same 3/4 top-down view, but ransacked: drawers pulled out, loose papers scattered on top and on the floor next to it, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 12,
+   "gen": [
+    40,
+    30
+   ],
+   "job": "819d2fc6-9288-41fd-a429-8282fe3c538c",
+   "referenz": "data/generated/pixellab-requisiten/roh/ispy_schreibtisch.png",
+   "kandidat": 29,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_schreibtisch_durchsucht.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_schreibtisch_durchsucht (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- Schreibtisch, durchsucht (Logik-Fundort im Ergebnis); Nachbestellung mit ispy_schreibtisch als Motiv-Referenz, damit beide Zustaende dieselbe Ansicht haben, s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "ispy_aktenschrank.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small grey metal filing cabinet with three closed drawers and handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    28,
+    36
+   ],
+   "job": "721408ee-f742-48a8-8288-96e646410483",
+   "kandidat": 1,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_aktenschrank.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_aktenschrank (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- Aktenschrank (Mechanik-Fundort ohne Tuer), s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "ispy_aktenschrank_offen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small grey metal filing cabinet with three drawers, the drawers pulled open and files sticking out, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    28,
+    36
+   ],
+   "job": "32850bd7-7a2e-47ec-aa9d-761b96b1a132",
+   "kandidat": 13,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_aktenschrank_offen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_aktenschrank_offen (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- Aktenschrank, aufgezogen (Mechanik-Fundort im Ergebnis), s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "ispy_verhoerstuhl.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "empty wooden interrogation chair with leather straps on the armrests under a small hanging lamp, no person, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    30,
+    36
+   ],
+   "job": "736387b4-b29b-4ab1-9f36-46930ef1dcbe",
+   "kandidat": 12,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_verhoerstuhl.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_verhoerstuhl (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- leerer Verhoerstuhl mit Lampe (Verhoer-Fundort) statt der Mini-Figur -- Requisite, keine Figur, s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+ },
+ "ispy_tuer.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a single heavy old wooden door in a stone frame, closed, with an iron keyhole lock, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    26,
+    40
+   ],
+   "job": "b6fcc7c1-1db7-4a86-8657-aa38745b1d3c",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/ispy_tuer.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_tuer (art=\"neu\", pixelgenau)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- Tuer im Steinrahmen (Tuer-Fundorte), s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
  }
 }

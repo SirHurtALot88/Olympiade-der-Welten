@@ -92,7 +92,9 @@ CHASSIS = {
     # Abdunklung 0.30 und wurde im Spiel grau -- wie Hockey fest niedrig, das Licht traegt das Bild.
     "eiskunstlauf": {"art": "quelle", "dunkel_fest": 0.06},
     "breaking": {"art": "quelle", "dunkel_fest": 0.04, "rand": 0.35},
-    "i-spy": {"art": "quelle"},
+    # I-Spy (17.11., PixelLab-Breitformat-Hallen): der Boden ist jetzt ueberall Spielflaeche, auf der
+    # Fundort-Badges, Namen und Zugzaehler in kleiner Schrift stehen (Aztec: unruhiger Ockerboden).
+    "i-spy": {"art": "quelle", "dunkel_plus": 0.04},
     # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
     "basketball": {"art": "quelle"},
     "football": {"art": "quelle"},

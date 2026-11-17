@@ -520,6 +520,117 @@
   "kandidat": 10,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "ispy_aktenschrank": {
+  "prompt": "small grey metal filing cabinet with three closed drawers and handles, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   28,
+   36
+  ],
+  "job": "721408ee-f742-48a8-8288-96e646410483",
+  "kandidat": 1,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_aktenschrank_offen": {
+  "prompt": "small grey metal filing cabinet with three drawers, the drawers pulled open and files sticking out, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   28,
+   36
+  ],
+  "job": "32850bd7-7a2e-47ec-aa9d-761b96b1a132",
+  "kandidat": 13,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_halle_aztec": {
+  "prompt": "top-down view of one single very wide empty courtyard of an overgrown aztec jungle temple, carved stone temple wall with dark doorways and hanging vines along the top edge only, the whole rest is open flat floor of mossy stone slabs and short jungle grass with a few small ferns at the left and right borders, warm green and ochre colours, even soft light, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "956a6a8a-fb06-4ebc-bcd2-9f56d38085ef",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_halle_horror": {
+  "prompt": "top-down view of one single very wide empty haunted crypt hall interior, dark stone back wall with iron-barred alcoves and dim candles along the top edge only, the whole rest is open flat floor of dark grey-teal cobblestones with a few scattered bones and cobwebs at the left and right borders, cold teal and grey moody light, no pillars in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "4fd62eb4-2c2f-4ff6-91b2-54e5d35ce69f",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_halle_lostplace": {
+  "prompt": "top-down view of one single very wide empty abandoned factory hall interior, back wall with a row of broken industrial windows along the top edge only, the whole rest is open flat floor of cracked grey-green concrete tiles with moss in the cracks, a few scattered papers and debris at the left and right borders, muted grey and olive colours, no machines in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "afc690f9-8be4-4bfe-8ef4-6fc82e887671",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_halle_ruinengarten": {
+  "prompt": "top-down view of one single very wide empty overgrown ruined garden, crumbling red brick wall with arched openings and ivy along the top edge only, the whole rest is open lawn of lush green grass with a few broken stone flagstone paths, small bushes and fallen column pieces at the left and right borders, bright warm green colours, no buildings in the middle, no characters, no text, 16-bit RPG top-down map, pixel art",
+  "seed": 11,
+  "gen": [
+   792,
+   300
+  ],
+  "job": "be4d8732-eb9b-4b35-9510-1e259736ca86",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_schreibtisch": {
+  "prompt": "small old wooden writing desk with an open leather diary and an ink pot on top, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   40,
+   30
+  ],
+  "job": "8ba8c0b4-0139-4034-919d-a19ad41adc3f",
+  "kandidat": 44,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_schreibtisch_durchsucht": {
+  "prompt": "the same small old wooden writing desk as in the reference, same 3/4 top-down view, but ransacked: drawers pulled out, loose papers scattered on top and on the floor next to it, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 12,
+  "gen": [
+   40,
+   30
+  ],
+  "job": "819d2fc6-9288-41fd-a429-8282fe3c538c",
+  "referenz": "data/generated/pixellab-requisiten/roh/ispy_schreibtisch.png",
+  "kandidat": 29,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_tuer": {
+  "prompt": "a single heavy old wooden door in a stone frame, closed, with an iron keyhole lock, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   26,
+   40
+  ],
+  "job": "b6fcc7c1-1db7-4a86-8657-aa38745b1d3c",
+  "kandidat": 3,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "ispy_verhoerstuhl": {
+  "prompt": "empty wooden interrogation chair with leather straps on the armrests under a small hanging lamp, no person, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   30,
+   36
+  ],
+  "job": "736387b4-b29b-4ab1-9f36-46930ef1dcbe",
+  "kandidat": 12,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "kaefig_ecke_an": {
   "prompt": "corner post of an electrified fence where the wire mesh turns a right angle, bright blue-white electric arcs crackling along the mesh, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
