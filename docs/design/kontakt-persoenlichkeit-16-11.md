@@ -645,7 +645,7 @@ vorher/nachher verglichen. **Seit 17.11. (Spurt klassisch scharf): `GESAMT 7c925
    Fingerabdruck auf `main` nicht.
 3. **Scharfschalten ist ein eigener, kleiner PR je Disziplin.** Er setzt nur den Standard in der
    Art-Tabelle. Der `diff` der 75 Zeilen darf **ausschließlich** die Einträge dieser Disziplin
-   zeigen (Spurt: die klassischen Saaten plus die sechs Hatz-/HYROX-Einträge; Takeshi: Einträge
+   zeigen (Spurt: die klassischen Saaten — die Hatz-/HYROX-Einträge bleiben, weil dort kein Rempler läuft, s. Abschnitt 11.3; Takeshi: Einträge
    und Pod). Der PR nennt alten und neuen GESAMT-Wert, und der Kopfkommentar des Skripts wird
    nachgezogen.
 4. **Nie zwei Disziplinen in einem PR scharfschalten.** Sonst lässt sich am Fingerabdruck nicht

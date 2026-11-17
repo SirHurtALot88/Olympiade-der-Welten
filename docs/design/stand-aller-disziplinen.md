@@ -17,7 +17,7 @@ Kontakt; „aus" ist `--kontakt-json={"spurt":null}`.
 | Star auf Rang 1, echt / Ersatz | 78,3 / 81,9 % | 82,5 / 80,2 % |
 | Star in den ersten zwei, echt / Ersatz | 93,3 / 93,3 % | 94,4 / 94,0 % |
 | Paartreue ≥ 15 Punkte, echt / Ersatz | 98,9 / 98,8 % | 99,0 / 99,0 % |
-| Spurt-Mischung je Spiel (klassisch / Hatz / HYROX) | 0,876 (0,887 / 0,824 / 0,892) | 0,880 (0,890 / 0,824 / 0,892) |
+| Spurt-Mischung je Spiel, n=96 (klassisch / Hatz / HYROX) | 0,876 (0,887 / 0,824 / 0,892) | 0,880 (0,890 / 0,824 / 0,892) |
 | Spurt-Mischung Pp, n=48, zwei Ströme | 16,5 / 21,5 | 17,7 / 22,0 |
 
 Alle Abnahmekriterien bestehen (Einzelheiten, Neutralität der Persönlichkeit und Kontakte je Rennen:
