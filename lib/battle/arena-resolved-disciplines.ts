@@ -7,7 +7,8 @@
  *    Kalibrierungen) beschreibt diese Menge.
  *  - `ARENA_RESOLVED_DISCIPLINE_IDS` (ganz unten): die Teilmenge, deren Arena-Ergebnis in einem
  *    Battle-Save TATSAECHLICH zaehlt. Nur wer die Pflichtabnahme aus CLAUDE.md besteht (rho je Spiel
- *    > 0,80 UND Pp-Abweichung ≤ 25 in zwei Saatstroemen, Tabelle data/generated/disziplin-abnahme.json)
+ *    > 0,75 -- Mindestschranke seit 17.11., vorher 0,80 -- UND Pp-Abweichung ≤ 25 in zwei Saatstroemen,
+ *    Tabelle data/generated/disziplin-abnahme.json)
  *    oder fuer das verfehlte Kriterium auf Chris' Ausnahmeliste steht (`ARENA_ABNAHME_AUSNAHMEN`, je Kriterium), darf hier stehen
  *    — `tests/disziplin-abnahme-guard.test.ts` schlaegt sonst fehl. Jede angeschlossene, aber nicht
  *    abgenommene Disziplin laeuft in Battle Mode ueber die PPS-Duell-Bruecke (2/1/0 aus dem
@@ -370,7 +371,7 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   "tdm",
 ]);
 
-/** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,80) und Budget-Methode (Pp ≤ 25). */
+/** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,75 Mindestschranke seit 17.11., Ziel > 0,80) und Budget-Methode (Pp ≤ 25). */
 export type AbnahmeKriterium = "rho" | "pp";
 
 export type AbnahmeAusnahme = {
@@ -393,13 +394,18 @@ export type AbnahmeAusnahme = {
  * (13,9 / 21,8 Pp, zwei unabhaengige Pools, 15.11., s. HOCKEY-NACHTRAG oben und
  * `data/generated/disziplin-abnahme.json`). Diese Ausnahme deckt deshalb weiterhin nur das, was sie
  * schon immer gedeckt hat -- rho, das unveraendert unter der 0,80-Schranke liegt (0,700 je Spiel,
- * kaderfest).
+ * kaderfest) und auch unter der seit 17.11. geltenden Mindestschranke 0,75.
  *
  * SHOWCASE/I-SPY: Chris, 15.11., auf den root-gecausten Befund hin (reines Kaderfamilie-Rauschen,
  * s. SHOWCASE-I-SPY-AUSNAHME-NACHTRAG oben) -- rho-Ausnahme analog Hockey, NICHT weil die Mechanik
  * die Matrix falsch trifft, sondern weil die aktuelle Kaderfamilie zufaellig ein paar enge Paare
  * zieht, die kein Motor ordnen kann. Pp besteht fuer beide regulaer (Showcase 11,1/12,7, I-Spy
  * 14,6/15,0).
+ *
+ * MINDESTSCHRANKE 0,75 (Chris, 17.11.: "Rangtreue auf 0,75 als min legen"): Showcase (0,781) und
+ * I-Spy (0,776) liegen damit ueber der harten Untergrenze und bestehen rho REGULAER -- ihre beiden
+ * Eintraege unten sind seither nicht mehr tragend (tests/disziplin-abnahme-guard.test.ts haelt das
+ * fest), bleiben aber bis zu Chris' Entscheidung stehen. Tragend bleibt nur Hockey (0,700 < 0,75).
  */
 export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new Map([
   [

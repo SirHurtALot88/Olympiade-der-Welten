@@ -18,7 +18,8 @@
 //                 Karten) -- deshalb nur manuell, nicht in der CI (docs/design/spurt-ci-schutz-16-11.md).
 //   --json        eine einzige JSON-Zeile mit den Zahlen auf stdout (fuer Skripte/Nachtlauf).
 //
-// Schranken (CLAUDE.md): rho je Spiel > 0,80 (angestrebt 0,85), Pp <= 25 in beiden Stroemen.
+// Schranken (CLAUDE.md): rho je Spiel mindestens 0,75 (harte Mindestschranke, Chris 17.11.), Ziel
+// > 0,80, angestrebt 0,85; Pp <= 25 in beiden Stroemen.
 // Die rho-Zahlen (Mischung + drei Einzelformate) schuetzt zusaetzlich die Nacht-CI:
 // scripts/pruefe-rangtreue-schranke.mjs, Abschnitt "Spurt-Mischung".
 // ===================================================================================
@@ -28,6 +29,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   ladeKaderFamilieAusDatei, oeffneSpurtMischungsSeite, spurtFormatAnteile, messeSpurtMischungRho,
+  rhoAbnahmeLabel,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -91,7 +93,7 @@ ergebnis.seitenfehler = fehler.length;
 if (JSON_AUS) {
   console.log(JSON.stringify(ergebnis));
 } else {
-  const ok = (r) => (r >= 0.85 ? "bestanden (>=0,85)" : r > 0.80 ? "bestanden" : r >= 0.70 ? "knapp" : "durchgefallen");
+  const ok = rhoAbnahmeLabel;
   console.log(`Spurt-MISCHUNG (Format je Saat per Hash) — ${SPIELE} Spiele je Kader-Variante, ${ergebnis.kaderVarianten} Varianten, Kartenmodus ${FORM_MODUS}`);
   console.log(`Kader-Quelle: ${kaderQuelle}`);
   console.log(`Formatwahl ueber Saaten 1..300: ${JSON.stringify(ergebnis.formatAnteile)}\n`);
@@ -107,6 +109,6 @@ if (JSON_AUS) {
       + ergebnis.pp.map((p) => `${p.abweichungPp} (Versatz ${p.saatVersatz})`).join("  /  ")
       + "   Schranke <= 25, Optimum < 15");
   }
-  console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) ueber 0,80, angestrebt 0,85 (CLAUDE.md).");
+  console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) mindestens 0,75, Ziel ueber 0,80, angestrebt 0,85 (CLAUDE.md).");
   console.log("Seitenfehler: " + (fehler.length ? fehler.slice(0, 3).join(" | ") : "keine"));
 }

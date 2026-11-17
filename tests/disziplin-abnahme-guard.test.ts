@@ -11,8 +11,10 @@ import {
 /**
  * PFLICHTABNAHME ALS WAECHTER (Projektaufsicht 16.10., docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md).
  *
- * CLAUDE.md: rho je Spiel > 0,80 UND Pp-Abweichung ≤ 25 (zwei Saatstroeme) — „genauso verbindlich"
- * fuer jede Disziplin. Eine Disziplin, deren Arena-Ergebnis in Battle Mode zaehlt
+ * CLAUDE.md: rho je Spiel > 0,75 UND Pp-Abweichung ≤ 25 (zwei Saatstroeme) — „genauso verbindlich"
+ * fuer jede Disziplin. Die rho-Mindestschranke steht seit 17.11. auf 0,75 (Chris, woertlich: „Rangtreue
+ * auf 0,75 als min legen"; vorher 0,80). Ziel bleibt > 0,80, angestrebt 0,85 — rot wird dieser
+ * Waechter aber erst unter 0,75. Eine Disziplin, deren Arena-Ergebnis in Battle Mode zaehlt
  * (`ARENA_RESOLVED_DISCIPLINE_IDS`), MUSS laut eingecheckter Tabelle bestehen — ausser sie steht auf
  * Chris' ausdruecklicher Ausnahmeliste. Faellt eine Neumessung durch, wird dieser Test rot, und die
  * Disziplin gehoert aus der Menge genommen: sie zahlt dann ueber die PPS-Duell-Bruecke weiter 2/1/0.
@@ -57,7 +59,7 @@ function besteht(eintrag: Eintrag): boolean {
 
 describe("Disziplin-Abnahmetabelle", () => {
   it("haelt die Schranken aus CLAUDE.md", () => {
-    expect(TABELLE.schranken).toEqual({ rhoJeSpielUeber: 0.8, ppHoechstens: 25, ppSaatstroemeMindestens: 2 });
+    expect(TABELLE.schranken).toEqual({ rhoJeSpielUeber: 0.75, ppHoechstens: 25, ppSaatstroemeMindestens: 2 });
   });
 
   it("fuehrt fuer jede angeschlossene Disziplin rho, Pp, Datum, Commit und Messumfang", () => {
@@ -72,8 +74,13 @@ describe("Disziplin-Abnahmetabelle", () => {
     }
   });
 
-  it("Breaking steht auf der Beobachtungsliste (rho 0,801 genau auf der Schranke)", () => {
-    expect(Object.keys(TABELLE.beobachtungsliste ?? {})).toContain("breaking");
+  it("die Beobachtungsliste fuehrt die Disziplinen nahe der Mindestschranke 0,75 (Showcase, I-Spy, Climbing)", () => {
+    // Bis 17.11. stand hier Breaking (rho 0,801 genau auf der alten 0,80-Schranke, zuletzt 0,860).
+    // Mit der Mindestschranke 0,75 hat Breaking mehr Abstand als jede verbliebene Disziplin und ist
+    // heruntergenommen; die drei knappsten (unter oder genau auf dem Ziel 0,80) bleiben beobachtet.
+    const liste = Object.keys(TABELLE.beobachtungsliste ?? {});
+    expect(liste).toEqual(expect.arrayContaining(["showcase", "i-spy", "climbing"]));
+    for (const id of liste) expect(TABELLE.disziplinen[id], id).toBeDefined();
   });
 });
 
@@ -84,7 +91,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     }
   });
 
-  it("jede gewertete Arena-Disziplin besteht rho > 0,80 UND Pp ≤ 25 (frisch) — Ausnahmen decken nur ihr Kriterium", () => {
+  it("jede gewertete Arena-Disziplin besteht rho > 0,75 UND Pp ≤ 25 (frisch) — Ausnahmen decken nur ihr Kriterium", () => {
     const verletzt: string[] = [];
     for (const id of ARENA_RESOLVED_DISCIPLINE_IDS) {
       const eintrag = TABELLE.disziplinen[id];
@@ -116,8 +123,8 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     // selbst ein Messfehler: zwei einzelne, UNGEPOOLTE n=24-Stroeme bei einem fuer Hockey
     // dokumentierten Rauschboden von 35-40 Pp je Einzelstrom (docs/design/
     // hockey-pp-messbasis-10-11.md). Richtig gemessen (zwei unabhaengige GEPOOLTE Stroeme, je drei
-    // Roh-Saatstroeme a n=48) besteht Pp klar unter der Schranke. rho bleibt unveraendert unter
-    // 0,80 und wird weiterhin NUR durch Chris' bestehende Ausnahme gedeckt -- deshalb hier gegen
+    // Roh-Saatstroeme a n=48) besteht Pp klar unter der Schranke. rho (0,700) bleibt auch unter der
+    // seit 17.11. auf 0,75 gesenkten Mindestschranke und wird weiterhin NUR durch Chris' Ausnahme gedeckt -- deshalb hier gegen
     // das tatsaechliche Ergebnis gepinnt statt nur gegen die Frische-Flagge.
     const hockey = TABELLE.disziplinen.hockey!;
     expect(hockey.ppFrisch).toBe(true);
@@ -133,23 +140,21 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
   });
 
   it.each(["showcase", "i-spy"] as const)(
-    "%s ist wieder gewertet -- root-gecaust als Kaderfamilie-Rauschen, rho durch Chris' Ausnahme gedeckt (15.11.)",
+    "%s besteht rho seit der Mindestschranke 0,75 (17.11.) regulaer -- die rho-Ausnahme ist nicht mehr tragend",
     (id) => {
       // Kurzzeitig (PR #1481) aus ARENA_RESOLVED_DISCIPLINE_IDS genommen, weil eine frische
-      // Neumessung rho unter 0,80 fand. Ein A/B-Test (derselbe Code, alte vs. aktuelle
-      // Kaderfamilie) zeigte: reines Roster-Rauschen, keine Mechanik- oder Code-Regression --
-      // Chris hat deshalb eine rho-Ausnahme analog Hockey freigegeben (s.
-      // SHOWCASE-I-SPY-AUSNAHME-NACHTRAG in arena-resolved-disciplines.ts). Pp besteht fuer beide
-      // weiterhin regulaer -- deshalb hier gegen das tatsaechliche Ergebnis gepinnt statt nur
-      // gegen die Frische-Flagge.
+      // Neumessung rho unter 0,80 fand (Showcase 0,781, I-Spy 0,776, n=48). Ein A/B-Test (derselbe
+      // Code, alte vs. aktuelle Kaderfamilie) zeigte reines Roster-Rauschen -- Chris gab am 15.11.
+      // eine rho-Ausnahme analog Hockey frei. Seit 17.11. liegt die harte Mindestschranke bei 0,75
+      // (Chris: "Rangtreue auf 0,75 als min legen"); beide bestehen damit BEIDE Kriterien ohne
+      // Ausnahme. Der Eintrag in ARENA_ABNAHME_AUSNAHMEN bleibt vorerst stehen, ist aber nicht mehr
+      // tragend. Beide bleiben unter dem Ziel 0,80 (Beobachtungsliste).
       const eintrag = TABELLE.disziplinen[id]!;
       expect(eintrag.ppFrisch).toBe(true);
-      expect(eintrag.pp.length).toBeGreaterThanOrEqual(TABELLE.schranken.ppSaatstroemeMindestens);
-      expect(eintrag.pp.every((wert) => wert <= TABELLE.schranken.ppHoechstens)).toBe(true);
       expect(eintrag.rhoFrisch).toBe(true);
-      expect(eintrag.rhoJeSpiel).toBeLessThanOrEqual(TABELLE.schranken.rhoJeSpielUeber);
-      expect(verfehlteKriterien(eintrag, [])).toEqual(["rho"]);
-      expect(verfehlteKriterien(eintrag, ARENA_ABNAHME_AUSNAHMEN.get(id)?.deckt ?? [])).toEqual([]);
+      expect(eintrag.rhoJeSpiel).toBeGreaterThan(TABELLE.schranken.rhoJeSpielUeber);
+      expect(eintrag.rhoJeSpiel).toBeLessThan(0.8);
+      expect(verfehlteKriterien(eintrag, [])).toEqual([]);
       expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(id)).toBe(true);
     },
   );

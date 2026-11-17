@@ -19,14 +19,14 @@
 //
 // Die MISCHUNG, wie das Spiel sie spielt (Format je Saat per Hash), misst scripts/miss-spurt-mischung.mjs.
 //
-// Schranke (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80, angestrebt
-// 0,85 -- EINES Spiels, nicht der Saison.
+// Schranke (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) mindestens 0,75 (harte
+// Mindestschranke, Chris 17.11.), Ziel > 0,80, angestrebt 0,85 -- EINES Spiels, nicht der Saison.
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie } from "./lib/rangtreue-messung.mjs";
+import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, rhoAbnahmeLabel } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -80,12 +80,12 @@ console.log(`Kader-Quelle: ${kaderQuelle}\n`);
 console.log("Format      Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 for (const [label, z] of [["klassisch", zeileKlassisch], ["hatz", zeile]]) {
   if (z.fehler) { console.log(label.padEnd(12) + "— " + z.fehler); continue; }
-  const ok = z.spielMed >= 0.80 ? "bestanden" : z.spielMed >= 0.70 ? "knapp" : "durchgefallen";
+  const ok = rhoAbnahmeLabel(z.spielMed);
   console.log(label.padEnd(12)
     + String(z.teilnehmer).padStart(5)
     + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
     + z.saisonMed.toFixed(3).padStart(21) + z.saisonSpan.toFixed(3).padStart(12)
     + "   " + ok);
 }
-console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) ueber 0,80, angestrebt 0,85 (CLAUDE.md).");
+console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) mindestens 0,75, Ziel ueber 0,80, angestrebt 0,85 (CLAUDE.md).");
 console.log("Seitenfehler: " + (fehler.length ? fehler.slice(0, 3).join(" | ") : "keine"));
