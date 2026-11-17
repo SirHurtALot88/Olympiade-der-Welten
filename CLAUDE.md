@@ -281,6 +281,46 @@ Arbeitsauftrag, kein Geschmacksthema. Die Ersatz-Reihenfolge steht im Audit
 `docs/design/hyrox-optik-konzept-17-11.md`. Chris hat am 17.11. zusätzlich HUD, Effekte und den
 Schiedsrichter (als einzige freigegebene neue Figur) ausdrücklich in den PixelLab-Stil einbezogen.
 
+## Rollenverteilung der Modelle: Opus führt, Sonnet baut, Fable berät
+
+Chris am 17.11., wörtlich: „du bist nun der Projektmanager und managed das. Für so Design-Fragen gerne
+Fable als teuren externen Berater sehen, für günstiges Building nutzt du Sonnet. und du selber managed
+das, kümmerst dich um Rückfragen etc. solange du das Ziel kennst, kannst du darauf hin arbeiten, kleine
+Fragen selber beantworten, Bugs fixen etc."
+
+- **Hauptsitzung (Opus) = Projektmanagement:** Ziele kennen und darauf hinarbeiten, kleine Fragen selbst
+  entscheiden (Empfehlung umsetzen, Entscheidung dokumentieren), Bugs fixen, Agenten beauftragen und
+  ihre Ergebnisse prüfen (Fingerabdruck, Tests, Review), committen, PRs bis grün führen und mergen. Nur
+  echte Grundsatzfragen gehen an Chris.
+- **Sonnet = Bauen:** Umsetzung nach fertigem Entwurf, Konfiguration, Doku, Tests, Screenshots,
+  mechanische Merges. Standard für Bau-Agenten.
+- **Fable = teurer externer Berater:** Design-/UX-Entwürfe, Mockups, Konzepte, Asset-Bestellungen
+  (Kulissen/Requisiten/VFX). Nicht für das Ausbauen fertiger Entwürfe.
+- **Opus als Agent** nur, wo es das Risiko rechtfertigt: unabhängige Reviews von Wertungsänderungen
+  und heikle Eingriffe in die Arena-Engine.
+
+Priorität laut Chris (17.11.): Assets und HUD/UI zuerst, neue Posen/Animationen später. Seine Idee dazu:
+Modelle/Animationen später nur für die tatsächlich gepickten Spieler erzeugen, wenn wirklich gespielt
+wird, damit sich die Kosten verteilen. Günstige Kombinationen vorhandener Animationen sind ausdrücklich
+erwünscht; neue Animationen bleiben ohne Einzelfreigabe gesperrt.
+
+## Größere Konzepte: immer zuerst Mockup + Erklärung, im neuen Stil
+
+Chris am 17.11., wörtlich: „mach für das Finanzthema und Sponsoren dann auch erstmal ein Mockup +
+Erklärung — das müssen wir jetzt sauber immer bei größeren Konzepten machen. jetzt hast du nen Style
+gefunden, der modern ist und den ich richtig cool finde! jetzt können wir die ganze App damit über die
+nächsten Wochen hardcore verbessern!!"
+
+- **Ablauf für jedes größere Konzept** (neue Seite, Umbau einer Seite, neues System wie Finanzen,
+  Form/Moral, Sponsoren): (1) klickbares Mockup + kurze Erklärung (Fable als Design-Berater), (2) Chris
+  sagt „bau das“ oder korrigiert, (3) Bau mit Sonnet, (4) Prüfung/Merge durch die Hauptsitzung. Erst
+  bauen, wenn Chris das Mockup gesehen hat.
+- **Der verbindliche Stil** ist der der Mockups vom 17.11.: `public/mockups/basketball-ui-mockup-17-11.html`,
+  `public/mockups/einsatzliste-modern-17-11.html`, `public/mockups/oly-start-modern-17-11.html`, Plan
+  `docs/design/oly-seiten-modern-17-11.md` (Designsystem: Tokens, Barlow-Condensed-Zahlen lokal, Karten,
+  Tabellen, Icon-Schiene, Blatt). Neue Mockups übernehmen dieses System exakt, damit die App aus einem
+  Guss wird. Reine CSS/SVG-Gestaltung; PixelLab nur, wo ein Bild echten Mehrwert hat.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
