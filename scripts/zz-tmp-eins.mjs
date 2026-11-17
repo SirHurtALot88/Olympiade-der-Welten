@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
+const SEITE = pathToFileURL(path.join(process.argv[2], "public", "mockups", "battle-mode.html")).href;
+const browser = await chromium.launch({});
+const seite = await browser.newPage();
+seite.on("pageerror", (e) => console.log("ERR", String(e)));
+await seite.addInitScript(() => { window.AudioContext = undefined; });
+await seite.goto(SEITE);
+await seite.waitForFunction(() => window.__arena && window.__arena.tdmBewegungsProbe, null, { timeout: 60000 });
+const r = await seite.evaluate(() => { const t0 = performance.now(); const x = window.__arena.tdmBewegungsProbe(7919); return { ms: performance.now() - t0, x: { ...x, wert: undefined } }; });
+console.log(JSON.stringify(r));
+await browser.close();

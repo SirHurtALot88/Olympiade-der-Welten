@@ -43881,7 +43881,12 @@
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
     // "BEREIT" VOR DEM ANPFIFF (Broadcast-Audit Runde 2, Punkt 12, 30.09.): dieselbe
     // Ergaenzung wie in den anderen drei updateHud*()-Funktionen.
-    document.getElementById("phase").textContent=done?"beendet":!running?"bereit":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
+    // TDM-GEFECHT (17.11.): das vorab entschiedene Gefecht kennt kein Sudden Death — die
+    // Beschriftung zeigte trotzdem "Sudden Death 1:34" (s. Chris' Screenshot). Dort steht jetzt die
+    // Ermuedung (TDM_GEFECHT.muedeAb), die es im Protokoll wirklich gibt. Nur Anzeige.
+    const tdmSdT=tdmReplayAktiv()?TDM_REPLAY_ANMARSCH+(TDM_GEFECHT.muedeAb-1)*TDM_GEFECHT.taktSek:null;
+    document.getElementById("phase").textContent=done?"beendet":!running?"bereit":
+      (tdmSdT!=null?(t>tdmSdT?"Ermüdung":"läuft"):(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft"));
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
@@ -43897,8 +43902,8 @@
     // nach einem Disziplin-Wechsel.
     const sd=document.querySelector(".hpbars .sd");
     if(sd){
-      const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
-      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+      const sdSek=Math.round((tdmSdT!=null?tdmSdT:KAMPF_SUDDEN_DEATH_T)*zeitFaktor());
+      sd.textContent=(tdmSdT!=null?"Ermüdung ab ":"Sudden Death ")+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
     }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
@@ -59773,15 +59778,18 @@
       z.kaempfer=[0,1,2,3].map(side=>{
         const t=r.teams.find(tt=>tt.side===side);
         return {side, n:t.n, max:t.max, hp:t.max, hpZiel:t.max, raus:false, rausT:null, rausArt:null,
-          angeschlagen:false, lunge:null, treffer:-1e9, reihum:t.gesetzt===false};
+          angeschlagen:false, lunge:null, treffer:-1e9, reihum:t.gesetzt===false,
+          // BEWEGUNG (17.11., s. mdffaBewegen): aktuelle Position, Ziel aus dem Protokoll, Ausweichen.
+          x:ECK[side].x, y:ECK[side].y, vx:0, vy:0, ziel:null, ausweichT:-1e9};
       });
+      z.bewT=null;
       z.titel="Runde "+nr+" von "+z.runden; z.unterzeile=rolle; z.pakt=null; z.ringStufe=0; z.effekte=[];
       anstossen();
     }
     function effekt(e){ z.effekte.push(e); }
     function takt(r,tk){
       if(!z||!z.kaempfer)return;
-      const t0=jetzt(), dauer=0.24/tempo();
+      const t0=jetzt(), dauer=0.34/tempo();   // 17.11.: 0,24 -> 0,34 (Takt 250 -> 400 ms)
       const ev=(tk.ereignisse||[]).filter(e=>e.wer!=null||e.ziel!=null||e.typ==="ring");
       const n=Math.max(1,ev.filter(e=>["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)).length);
       let i=0;
@@ -59790,6 +59798,7 @@
         if(["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)){
           const ta=t0+dauer*(i++)/n;
           k[e.wer].lunge={ziel:e.ziel, t:ta, d:Math.min(0.2,dauer*0.9)};
+          if(e.ziel!=null)k[e.wer].ziel=e.ziel;
           if(e.typ==="daneben"||e.typ==="leer")effekt({art:"text", side:e.ziel, t:ta+0.08, text:e.typ==="leer"?"ins Leere":"daneben", farbe:"#d8dde6"});
           else if(e.typ==="finisher")effekt({art:"text", side:e.ziel, t:ta+0.08, text:"FINISHER", farbe:"#ffd36b", gross:true});
           else{
@@ -59797,7 +59806,8 @@
             effekt({art:"text", side:e.ziel, t:ta+0.08, text:"−"+Math.round(e.wucht||0)+(e.typ==="schwachstelle"?" Schwachstelle":e.typ==="zange"?" Zange":""), farbe:e.typ==="schwachstelle"?"#ffd36b":"#ff8a80"});
             k[e.ziel].treffer=ta+0.08;
           }
-        }else if(e.typ==="position")effekt({art:"text", side:e.wer, t:t0, text:"weicht aus", farbe:"#9fe0ff"});
+        }else if(e.typ==="position"){ effekt({art:"text", side:e.wer, t:t0, text:"weicht aus", farbe:"#9fe0ff"});
+          if(e.wer!=null&&k[e.wer])k[e.wer].ausweichT=t0; }
         else if(e.typ==="uebersteht")effekt({art:"text", side:e.wer, t:t0+dauer*0.6, text:"hält stand!", farbe:"#b6f0a0"});
         else if(e.typ==="bruchpunkt")effekt({art:"text", side:e.wer, t:t0+dauer*0.7, text:"angeschlagen", farbe:"#ffb26b"});
         else if(e.typ==="buendnis")effekt({art:"banner", t:t0, text:"Zweckbündnis gegen "+z.teams[e.gegen]});
@@ -59875,17 +59885,73 @@
         cx.restore();
       }
     }
+    // STILLSTAND-FIX (17.11., Chris: "alle Spieler stehen nur auf ihrem Punkt herum, es gibt keinen
+    // echten Kampf — da fehlt Bewegung, Dynamik"): bis hierher stand jede Figur das ganze Spiel auf
+    // ihrem Eckkreis (`ECK`), ein Schlag war ein 0,4-s-Ausfall bis hoechstens 170 px Richtung
+    // gegnerische ECKE und zurueck. Jetzt hat jede Figur eine eigene Position: vor dem ersten Takt
+    // laeuft sie aus ihrer Ecke Richtung Mitte an, danach stellt sie sich in Schlagweite neben das
+    // Ziel, das das Protokoll ihr zuletzt gab (`k.ziel`, aus den Schlag-Ereignissen in takt()),
+    // umkreist es langsam, weicht bei "position"-Ereignissen seitlich aus; zum Endstand gehen alle
+    // zurueck in ihre Ecke. Reine Anzeige wie der ganze Zeichner: liest nur das fertige Protokoll und
+    // die Wanduhr (`jetzt()`), keinen Zufallsstrom, keine Saat — die Wertungsfunktion des Pods sieht nichts.
+    // `an:false` (window.__arena.mdffaBewegung(false)) stellt das alte Standbild fuer Vorher/Nachher her.
+    const BEW={an:true, tempo:300, reichweite:78, anlauf:0.42, kreisen:0.35, ausweichen:46};
+    function zielPunkt(k,now){
+      if(z.ende)return ECK[k.side];
+      const Z=k.ziel!=null?z.kaempfer[k.ziel]:null;
+      if(!Z||Z.raus){
+        // Allein uebrig: der Rundensieger geht in die Mitte (statt auf dem Eckkreis zu warten).
+        if(z.kaempfer.every(o=>o===k||o.raus))return {x:MITTE.x, y:MITTE.y};
+        // Ziel gefallen, aber noch Gegner da: auf den naechsten Stehenden zu (kein Herumstehen).
+        let best=null,bd=Infinity;
+        for(const o of z.kaempfer)if(o!==k&&!o.raus){ const d=Math.hypot(o.x-k.x,o.y-k.y); if(d<bd){bd=d;best=o;} }
+        if(best&&k.ziel!=null){ const dx=(k.x-best.x)/(bd||1), dy=(k.y-best.y)/(bd||1);
+          return {x:best.x+dx*BEW.reichweite, y:best.y+dy*BEW.reichweite*0.7}; }
+        const e=ECK[k.side];
+        return {x:e.x+(MITTE.x-e.x)*BEW.anlauf, y:e.y+(MITTE.y-e.y)*BEW.anlauf};
+      }
+      // Auf der eigenen Seite des Ziels stehen, langsam drum herum kreisen (fester Phasenversatz je Ecke).
+      let dx=k.x-Z.x, dy=k.y-Z.y; const d=Math.hypot(dx,dy)||1; dx/=d; dy/=d;
+      const w=Math.sin(now*0.9+k.side*1.7)*BEW.kreisen, c=Math.cos(w), s=Math.sin(w);
+      let x=Z.x+(dx*c-dy*s)*BEW.reichweite, y=Z.y+(dx*s+dy*c)*BEW.reichweite*0.7;
+      const a=now-k.ausweichT;
+      if(a>=0&&a<0.45){ const h=Math.sin(a/0.45*Math.PI)*BEW.ausweichen; x+=-dy*h; y+=dx*h; }
+      return {x:Math.max(60,Math.min(BW-60,x)), y:Math.max(150,Math.min(BH-20,y))};
+    }
+    function mdffaBewegen(now){
+      if(!z||!z.kaempfer)return;
+      if(!BEW.an){ for(const k of z.kaempfer){ k.x=ECK[k.side].x; k.y=ECK[k.side].y; k.vx=k.vy=0; } z.bewT=now; return; }
+      const dt=z.bewT==null?0:Math.max(0,Math.min(0.1,now-z.bewT)); z.bewT=now;
+      const schritt=BEW.tempo*Math.max(1,tempo())*dt;
+      for(const k of z.kaempfer){
+        if(k.raus&&now>=k.rausT){ k.vx=k.vy=0; continue; }
+        const p=zielPunkt(k,now), dx=p.x-k.x, dy=p.y-k.y, d=Math.hypot(dx,dy);
+        if(d>2){ const f=Math.min(1,schritt/d); k.x+=dx*f; k.y+=dy*f; k.vx=dx/d; k.vy=dy/d; }
+        else { k.vx=k.vy=0; }
+      }
+      // nicht ineinander laufen
+      const L=z.kaempfer;
+      for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){
+        const a=L[i], b=L[j], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+        if(d>=44)continue;
+        const nx=d>1e-6?dx/d:1, ny=d>1e-6?dy/d:0, s=(44-d)/2;
+        if(!(a.raus&&now>=a.rausT)){ a.x-=nx*s; a.y-=ny*s; }
+        if(!(b.raus&&now>=b.rausT)){ b.x+=nx*s; b.y+=ny*s; }
+      }
+    }
     function position(k,now){
-      const e=ECK[k.side]; let x=e.x, y=e.y;
+      let x=k.x, y=k.y;
       const l=k.lunge;
       if(l&&now>=l.t&&now<=l.t+l.d*2){
         const p=(now-l.t)/(l.d*2), hub=Math.sin(p*Math.PI);
-        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y, d=Math.hypot(dx,dy)||1;
-        const weg=Math.min(d*0.38,170)*hub;
+        const zi=(BEW.an&&z.kaempfer[l.ziel])||ECK[l.ziel], dx=zi.x-x, dy=zi.y-y, d=Math.hypot(dx,dy)||1;
+        const weg=(BEW.an?Math.min(d*0.45,60):Math.min(d*0.38,170))*hub;
         x+=dx/d*weg; y+=dy/d*weg;
       }else if(now<k.treffer+0.25&&now>=k.treffer)x+=Math.sin((now-k.treffer)*70)*4;
       return {x,y};
     }
+    // Wo eine Ecke gerade steht (fuer Effekte/Zielmarke): die Figur, sonst der Eckkreis.
+    const platzVon=(side)=>(z&&z.kaempfer&&z.kaempfer[side])?z.kaempfer[side]:ECK[side];
     function figur(k,now,p){
       const zf=pixelFigurBereit(k.n);
       const e=ECK[k.side];
@@ -59912,13 +59978,14 @@
       };
       const l=k.lunge, imAngriff=l&&now>=l.t&&now<=l.t+l.d*2&&!unten;
       const imTreffer=!unten&&!imAngriff&&now>=k.treffer&&now<k.treffer+0.3;
-      const art=unten?"tod":imAngriff?"angriff":imTreffer?"treffer":null;
-      // Blickrichtung: zur Mitte, beim Angriff zum Ziel
+      const laeuft=!unten&&(Math.abs(k.vx||0)+Math.abs(k.vy||0))>0.1;
+      const art=unten?"tod":imAngriff?"angriff":imTreffer?"treffer":laeuft?"walk":null;
+      // Blickrichtung: zur Mitte; beim Angriff/mit Ziel zum Ziel, im Laufen in Laufrichtung (17.11.)
       let blick=e.blick;
-      if(imAngriff){
-        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y;
-        blick=Math.abs(dx)>Math.abs(dy)*1.2?(dx>0?"east":"west"):(dy>0?"south":"north");
-      }
+      const richtung=(dx,dy)=>Math.abs(dx)>Math.abs(dy)*1.2?(dx>0?"east":"west"):(dy>0?"south":"north");
+      const zielK=imAngriff?z.kaempfer[l.ziel]:(k.ziel!=null?z.kaempfer[k.ziel]:null);
+      if(zielK&&!unten)blick=richtung(zielK.x-k.x,zielK.y-k.y);
+      else if(laeuft)blick=richtung(k.vx,k.vy);
       if(art&&fig.a[art]){
         const def=fig.a[art];
         const wunsch=blick==="west"?"east":blick;
@@ -59929,6 +59996,7 @@
           let f;
           if(art==="tod")f=Math.min(n-1,Math.floor((now-k.rausT)/0.9*n));
           else if(art==="angriff")f=Math.min(n-1,Math.floor((now-l.t)/(l.d*2)*n));
+          else if(art==="walk")f=Math.floor(now*9+k.side)%n;
           else f=Math.min(n-1,Math.floor((now-k.treffer)/0.3*n));
           male(b,Math.max(0,f),blick==="west"&&d==="east",0);
           return;
@@ -59992,13 +60060,13 @@
         if(now<e.t)continue;
         const a=now-e.t;
         if(e.art==="hieb"){
-          const k=ECK[e.side], q=Math.min(1,a/0.25);
+          const k=platzVon(e.side), q=Math.min(1,a/0.25);
           cx.save(); cx.globalAlpha=1-q; cx.strokeStyle=e.schwach?"#ffd36b":"#ffffff"; cx.lineWidth=4;
           cx.beginPath(); cx.moveTo(k.x-26,k.y-FIG_H*0.75); cx.lineTo(k.x+26,k.y-FIG_H*0.25); cx.stroke();
           cx.beginPath(); cx.arc(k.x,k.y-FIG_H*0.5,10+q*26,0,Math.PI*2); cx.strokeStyle=e.farbe; cx.lineWidth=3; cx.stroke();
           cx.restore();
         }else if(e.art==="text"){
-          const k=ECK[e.side], q=Math.min(1,a/0.9);
+          const k=platzVon(e.side), q=Math.min(1,a/0.9);
           cx.save(); cx.globalAlpha=1-q*q; cx.textAlign="center";
           cx.font=(e.gross?"900 26px":"800 15px")+" system-ui,sans-serif";
           cx.lineWidth=4; cx.strokeStyle="rgba(8,10,14,.85)";
@@ -60022,7 +60090,7 @@
       if(z.kaempfer){
         // Zweckbuendnis: gestrichelte Linie zwischen den Partnern, Zielmarke auf dem Gejagten
         if(z.pakt){
-          const a=ECK[z.pakt.a], b=ECK[z.pakt.b], g=ECK[z.pakt.gegen];
+          const a=platzVon(z.pakt.a), b=platzVon(z.pakt.b), g=platzVon(z.pakt.gegen);
           cx.save(); cx.setLineDash([8,8]); cx.lineWidth=3; cx.strokeStyle="rgba(255,211,107,.8)";
           cx.beginPath(); cx.moveTo(a.x,a.y-30); cx.lineTo(b.x,b.y-30); cx.stroke();
           cx.setLineDash([]); cx.strokeStyle="rgba(255,90,82,.9)";
@@ -60030,6 +60098,7 @@
           cx.restore();
         }
         for(const k of z.kaempfer)k.hp+=(k.hpZiel-k.hp)*0.18;
+        mdffaBewegen(now);
         const reihe=z.kaempfer.slice().sort((a,b)=>position(a,now).y-position(b,now).y);
         for(const k of reihe){
           const p=position(k,now);
@@ -60059,7 +60128,16 @@
       effekteZeichnen(now);
       kopf();
     }
-    return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau};
+    // Anzeige-Sonde (17.11.): wo die vier Figuren gerade gezeichnet werden, und der Schalter.
+    function stand(){
+      if(!z||!z.kaempfer)return null;
+      const now=jetzt();
+      return z.kaempfer.map(k=>{ const p=position(k,now), l=k.lunge;
+        return {side:k.side, x:Math.round(p.x), y:Math.round(p.y), raus:!!(k.raus&&now>=k.rausT),
+          angriff:!!(l&&now>=l.t&&now<=l.t+l.d*2)}; });
+    }
+    const bewegung=(an)=>{ if(an!=null)BEW.an=!!an; return BEW.an; };
+    return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau, stand, bewegung};
   })();
 
 
@@ -61770,6 +61848,66 @@
   // einfach (kein Orte-System wie bei Battlefield): wer noch steht, ruckt beim eigenen
   // Treffer kurz auf sein Ziel zu (`lunge`, s. tdmReplayEreignis) — dieselbe Anzeige-Geste,
   // die der alte Echtzeit-Zweikampf fuer Nahkampf-Treffer ohnehin schon nutzt.
+  //
+  // STILLSTAND-FIX (17.11., Chris' Screenshot "bei tdm steht sich nur gegenueber und es wird gar
+  // nicht gekaempft"): bis hierher bewegte das Replay KEINE Figur — `baueEinheit()` stellt die
+  // beiden Seiten als zwei senkrechte Reihen links/rechts auf, und dort blieben sie das ganze
+  // Gefecht stehen; Treffer erschienen nur als Schwebezahl plus 0,16 s `lunge` (rund 4 % jedes
+  // 4-s-Taktes). Die Wertung war davon nie betroffen (sie steht vor dem ersten Tick fest, s.
+  // Kopfkommentar), es war ein reiner Anzeigefehler. `tdmReplayBewegen()` laesst jetzt jeden
+  // Stehenden auf das Ziel zulaufen, das das Protokoll ihm fuer den laufenden Takt gibt (im
+  // Anmarsch: das Ziel aus Takt 1), und an dessen Seite in Schlagweite stehen. Liest NUR das fertige
+  // Protokoll und die aktuellen Positionen, kein `rr()`, kein Wurf — Positionen gehen in keine
+  // Wertung ein (`MOTOREN.tdm.wert()` liest `beitragVon(u)`, nicht x/y), der Wertungs-Fingerabdruck
+  // bleibt deshalb unveraendert. `TDM_BEWEGUNG.an=false` (window.__arena.tdmBewegung(false)) stellt
+  // das alte Standbild fuer Vorher/Nachher-Messungen wieder her.
+  // FRONTLINIE STATT KNAEUEL (zweiter Anlauf, gleicher Tag): wer nur seinem Ziel nachlaeuft, zieht
+  // bei wechselnden Zielen alle Figuren zu EINEM Knaeuel in einer Ecke zusammen (Screenshot-Befund).
+  // Deshalb steht jeder an der Frontlinie der Feldmitte (`front` px vor MID auf der eigenen Seite),
+  // in der Hoehe zwischen seinem Ziel (`zug`) und seiner eigenen Startbahn (`heim`) — Duelle
+  // verteilen sich ueber die ganze Feldhoehe, und Gegner stehen sich in Schlagweite gegenueber.
+  const TDM_BEWEGUNG={an:true, tempo:160, reichweite:46, versatz:34, abstand:30, front:26, zug:0.8};
+  // Startbahn je Figur in einer WeakMap statt als neues Feld am Einheitenobjekt (CLAUDE.md,
+  // Wertungs-Fingerabdruck: neue Felder an Spielerobjekten koennen ihn verschieben).
+  const tdmHeimY=new WeakMap();
+  function tdmReplayBewegen(dt,takt){
+    const R=tdmReplay, takte=R.g.gefecht.takte, gespielt=R.g.gefecht.gespielt;
+    if(!gespielt)return;
+    const B=TDM_BEWEGUNG, tk=takte[Math.max(1,Math.min(gespielt,takt))-1];
+    // Ziel je Kaempfer: sein Schlag in diesem Takt (Treffer, Schwachstelle oder daneben).
+    const zielVon=new Map();
+    for(const e of tk.ereignisse)
+      if((e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben")&&!zielVon.has(e.wer))zielVon.set(e.wer,e.ziel);
+    // Wer greift wen an — fuer den Hoehenversatz mehrerer Angreifer am selben Gegner.
+    const angreiferVon=new Map();
+    for(const [wer,ziel] of zielVon){ const l=angreiferVon.get(ziel)||[]; l.push(wer); angreiferVon.set(ziel,l); }
+    for(let i=0;i<U.length;i++){
+      const u=U[i]; if(!u||u.down)continue;
+      const zi=zielVon.get(i), Z=zi!=null?U[zi]:null;
+      if(!Z||Z.down){ u.vx=0; u.vy=0; continue; }
+      u.tgt=Z;
+      const l=angreiferVon.get(zi), j=l.indexOf(i), m=l.length;
+      const sx=u.side===0?-1:1;
+      if(!tdmHeimY.has(u))tdmHeimY.set(u,u.y);
+      const zx=Math.max(40,Math.min(W-40,MID+sx*(B.front+Math.abs(j-(m-1)/2)*B.versatz*0.8)));
+      const zy=Math.max(40,Math.min(H-30,B.zug*Z.y+(1-B.zug)*tdmHeimY.get(u)+(j-(m-1)/2)*B.versatz));
+      const ddx=zx-u.x, ddy=zy-u.y, weg=Math.hypot(ddx,ddy), schritt=B.tempo*dt;
+      if(weg>1.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*B.tempo; u.vy=ddy/weg*B.tempo; }
+      else { u.vx=0; u.vy=0; }
+    }
+    // Kein Ineinanderlaufen: Stehende unter `abstand` Pixeln schieben sich auseinander (feste
+    // Reihenfolge nach Index, deterministisch).
+    for(let i=0;i<U.length;i++){
+      const a=U[i]; if(!a||a.down)continue;
+      for(let k=i+1;k<U.length;k++){
+        const b=U[k]; if(!b||b.down)continue;
+        const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+        if(d>=B.abstand)continue;
+        const nx=d>1e-6?dx/d:0, ny=d>1e-6?dy/d:(i%2?1:-1), s=(B.abstand-d)/2;
+        a.x-=nx*s; a.y-=ny*s; b.x+=nx*s; b.y+=ny*s;
+      }
+    }
+  }
   function tdmReplaySchritt(dt){
     t+=dt;
     const R=tdmReplay, g=R.g, D=TDM_GEFECHT.taktSek, takte=g.gefecht.takte, gespielt=g.gefecht.gespielt;
@@ -61777,6 +61915,7 @@
     const imTakt=takt>=1?takte[takt-1]:null;
     const taktStart=TDM_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
     for(const u of U)u.lunge=Math.max(0,(u.lunge||0)-dt);
+    if(TDM_BEWEGUNG.an&&t<R.ende)tdmReplayBewegen(dt,takt);
     if(imTakt){
       imTakt.ereignisse.forEach((e,ei)=>{
         const schl=takt+":"+ei;
@@ -61796,6 +61935,49 @@
       finish();
     }
     updateHud();
+  }
+
+  // ANZEIGE-SONDE ZUM STILLSTAND (17.11.): spielt das TDM-Replay einer Saat stumm ab und misst,
+  // wie weit die Seiten auseinanderstehen. `getrennt` = keine zwei Gegner naeher als `fern` px
+  // (das "Gegenueberstehen" aus Chris' Screenshot), `kontakt` = mindestens ein Gegnerpaar in
+  // `nah` px. Zeiten in Kampfsekunden (`zeitFaktor` mal = Uhr der Anzeige). `wert` ist
+  // MOTOREN.tdm.wert() — muss mit und ohne Bewegung gleich sein. Zustand wird danach zurueckgelegt.
+  function tdmBewegungsProbe(saat,opt){
+    const o=opt||{}, nah=o.nah||90, fern=o.fern||200, dt=1/60;
+    const M=MOTOREN.tdm, gesichert=M.sichern(), replayAlt=tdmReplay;
+    try{
+      disc="tdm"; build(saat||1337);
+      if(!tdmReplay)return {fehler:"kein Replay"};
+      const R=tdmReplay, start=U.map(u=>({x:u.x,y:u.y}));
+      let n=0,nGetrennt=0,nKontakt=0,lauf=0,laengste=0,weg=0,ySpanne=0;
+      const schlag=[]; const lungeVor=U.map(()=>0);
+      const px=U.map(u=>u.x), py=U.map(u=>u.y);
+      let schritte=0;
+      while(!done&&t<130&&schritte++<9000){
+        stepSimStumm(dt);
+        U.forEach((u,i)=>{
+          weg+=Math.hypot(u.x-px[i],u.y-py[i]); px[i]=u.x; py[i]=u.y;
+          if(u.lunge>lungeVor[i]+0.05&&u.tgt)schlag.push(Math.hypot(u.x-u.tgt.x,u.y-u.tgt.y));
+          lungeVor[i]=u.lunge;
+        });
+        if(t<TDM_REPLAY_ANMARSCH||done)continue;
+        const leb=U.filter(u=>!u.down);
+        let min=Infinity;
+        for(const a of leb)for(const b of leb)if(a.side===0&&b.side===1)min=Math.min(min,Math.hypot(a.x-b.x,a.y-b.y));
+        if(!isFinite(min))continue;
+        n++; ySpanne+=Math.max(...leb.map(u=>u.y))-Math.min(...leb.map(u=>u.y));
+        if(min<=nah)nKontakt++;
+        if(min>fern){ nGetrennt++; lauf+=dt; laengste=Math.max(laengste,lauf); } else lauf=0;
+      }
+      const zf=zeitFaktor();
+      return {saat, W, H, dauer:+R.ende.toFixed(2), dauerUhr:+(R.ende*zf).toFixed(1),
+        getrenntAnteil:+(nGetrennt/Math.max(1,n)).toFixed(3), kontaktAnteil:+(nKontakt/Math.max(1,n)).toFixed(3),
+        laengsteGetrennt:+laengste.toFixed(2), laengsteGetrenntUhr:+(laengste*zf).toFixed(1),
+        wegJeFigur:+(weg/Math.max(1,U.length)).toFixed(1), ySpanneMittel:+(ySpanne/Math.max(1,n)).toFixed(1),
+        schlaege:schlag.length, schlagDistanzMittel:schlag.length?+(schlag.reduce((a,b)=>a+b,0)/schlag.length).toFixed(1):null,
+        schlaegeInReichweite:schlag.length?+(schlag.filter(d=>d<=nah).length/schlag.length).toFixed(3):null,
+        startX:[...new Set(start.map(p=>Math.round(p.x)))], wert:M.wert()};
+    } finally { M.zurueck(gesichert); tdmReplay=replayAlt; }
   }
 
   // ===================================================================================
@@ -63352,11 +63534,17 @@
       if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
       const runde=ereignis.runden[i];
       zeigeTitelkarte(i+1,mdffaRollenLabel(runde.slotId));
+      // ANMARSCH + LANGSAMERER TAKT (Stillstand-Fix 17.11., s. mdffaBewegen): vorher folgte der
+      // Schlagwechsel sofort auf die Titelkarte, 250 ms je Takt — der ganze Kampf einer Runde war
+      // ein ~2-s-Flackern, danach standen die Ueberlebenden ~5 s still auf dem Eckkreis (gemessen,
+      // scripts-Sonde im Bericht). Jetzt: Titelkarte 1,1 s (statt 1,5), 0,9 s Anmarsch aus den Ecken,
+      // 400 ms je Takt. Max-Fall 4x12 Takte ~45 s statt 39 s (Zielband 25-40 s nur im Max-Fall
+      // ueberschritten, Mittel ~4x8 Takte ~38 s). Reine Choreografie, `runde.takte` unberuehrt.
       mdffaOffenbarungsTimer=setTimeout(()=>{
         if(titelkarte)titelkarte.hidden=true;
         setzeKaempfer(runde,i+1);
-        spieleTakte(runde,0,()=>tafelUndSumme(runde,i));
-      },ms(1500));
+        mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,0,()=>tafelUndSumme(runde,i)),ms(MDFFA_ANMARSCH_MS));
+      },ms(1100));
     }
     // DER KAMPF SELBST (13.10.): Takt fuer Takt die Staende, Schadenszahlen und Ticker-Zeilen aus
     // `runde.takte` — dem Protokoll, das baueMiniDmFfaRunde() schon vollstaendig gerechnet hat.
@@ -63368,10 +63556,11 @@
     // beim Einbau der Takt-Anzeige (selbes Datum wie dieser Fix) nicht neu kalibriert hatte. 250ms
     // haelt auch den Maximalfall (4x12 Takte = 48) mit 39,2s knapp im Band; reine Choreografie-
     // Konstante, `runde.takte`/die Simulation selbst sind unberuehrt.
+    const MDFFA_ANMARSCH_MS=900, MDFFA_TAKT_MS=400;
     function spieleTakte(runde,ti,fertig){
       if(ti>=runde.takte.length){ fertig(); return; }
       zeigeTakt(runde,runde.takte[ti]);
-      mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,ti+1,fertig),ms(250));
+      mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,ti+1,fertig),ms(MDFFA_TAKT_MS));
     }
     function tafelUndSumme(runde,i){
       {
@@ -66042,6 +66231,12 @@
     tdmGefechtEinfluss,
     tdmGefechtParameter,
     spieleTdmGefecht,
+    // STILLSTAND-FIX (17.11., s. tdmReplayBewegen): Schalter fuer Vorher/Nachher und eine reine
+    // Anzeige-Sonde. Keiner von beiden beruehrt die Wertung.
+    tdmBewegung:(an)=>{ if(an!=null)TDM_BEWEGUNG.an=!!an; return TDM_BEWEGUNG.an; },
+    tdmBewegungsProbe,
+    mdffaBewegung:(an)=>mdffaBuehne.bewegung(an),
+    mdffaBuehneStand:()=>mdffaBuehne.stand(),
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;

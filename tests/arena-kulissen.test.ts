@@ -136,7 +136,7 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     const start = motor.indexOf("const mdffaBuehne=(()=>{");
     expect(start).toBeGreaterThan(-1);
     expect(start).toBeLessThan(motor.indexOf("  function reset(){"));
-    const ende = motor.indexOf("return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau};", start);
+    const ende = motor.indexOf("return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau, stand, bewegung};", start);
     expect(ende).toBeGreaterThan(start);
     const buehne = motor.slice(start, ende);
     expect(buehne).not.toMatch(/\brr\(/);
