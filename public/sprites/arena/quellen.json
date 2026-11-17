@@ -1340,20 +1340,20 @@
   "paket": "PixelLab",
   "quelle": "api.pixellab.ai /v2/generate-image-v2",
   "auftrag": {
-   "prompt": "a single heavy old wooden door in a stone frame, closed, with an iron keyhole lock, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "prompt": "a single closed rectangular wooden door with a perfectly flat straight top edge, standing in a square brown wooden door frame, vertical wood planks, a large clearly visible shiny brass door handle on the right side, no arch, no rounded top, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
    "seed": 11,
    "gen": [
-    26,
-    40
+    24,
+    32
    ],
-   "job": "b6fcc7c1-1db7-4a86-8657-aa38745b1d3c",
-   "kandidat": 3,
+   "job": "4a5c4ebe-d139-4cf0-b5aa-11314d84df71",
+   "kandidat": 11,
    "endpunkt": "/v2/generate-image-v2"
   },
   "roh": "data/generated/pixellab-requisiten/roh/ispy_tuer.png",
   "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ispy_tuer (art=\"neu\", pixelgenau)",
   "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
   "erzeugt": "2026-11-17",
-  "verwendung": "I-Spy-Nachbesserung 17.11. -- Tuer im Steinrahmen (Tuer-Fundorte), s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
+  "verwendung": "I-Spy-Nachbesserung 17.11. -- eckige Holztuer im Holzrahmen mit Messinggriff (Tuer-Fundorte), Neubestellung nach Chris' Freigabe (\"3 ja\"): die erste Fassung (Bogentuer im Steinrahmen, Job b6fcc7c1, Kandidat 3) wirkte im Horror-Saal wie ein Grabstein. s. ISPY_MOEBEL_BILD/ispyZeichneMoebelBild() in battle-mode.engine.js."
  }
 }
