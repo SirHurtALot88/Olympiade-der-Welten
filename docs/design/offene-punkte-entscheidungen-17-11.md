@@ -524,7 +524,16 @@ Runden in Reihenfolge. In jeder Runde gibt es höchstens **einen** Agenten, der 
 
 ---
 
-## 8. Bleibt bei Chris (drei Fragen, je Ja/Nein)
+## 8. Antworten von Chris (17.11., nach Vorlage dieses Dokuments) — verbindlich
+
+1. **Hockey: Ja.** Hockey gilt mit den festen Ersatzzahlen aus 6.8 (Star auf Rang 1 >= 55 %, Paartreue >= 97 %, Feldspieler-rho >= 0,75) weiter als abgenommen, auch unter rho 0,75 je Spiel.
+2. **HYROX X6 (Live-Zuruf ändert das gebuchte Ergebnis): Ja.** Nach X1–X5 und nur, wenn die Buchung technisch nach dem Zuschauen liegen kann.
+3. **PixelLab nachkaufen: Nein.**
+4. **Budgetrahmen (Chris, wörtlich): „ca 1000 generierungen haben wir noch offen für 10 tage“.** Das Guthaben (1041,7 Gen. am 17.11.) muss also **bis etwa 27.11.** reichen, ohne Auffüllung. Folgen: Die Töpfe aus 4.3 bleiben **Obergrenzen, keine Ziele** (zusammen 825 von 890 verfügbaren); die Reserve von 150 Gen. bleibt unangetastet. Es wird nur bestellt, was ein nächster Schritt sofort einbaut; Reihenfolge nach sichtbarem Gewinn (HYROX-Bögen/Belag, H2, Welle B), Posten ohne Einbau-Agent warten.
+
+Die folgenden drei Fragen sind damit beantwortet; sie stehen unten zur Nachvollziehbarkeit.
+
+## 8a. Ursprüngliche Fragen (beantwortet, s. 8)
 
 1. **Hockey:** Soll Hockey weiter **unter** der Mindestschranke 0,75 (rho 0,700 je Spiel) als
    abgenommen gelten, wenn die festen Ersatzzahlen aus 6.8 halten (Star auf Rang 1 ≥ 55 %,
