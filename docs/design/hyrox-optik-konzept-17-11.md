@@ -9,6 +9,19 @@ die Assets davon! Das ist das Target."
 Screenshots sind am 17.11. aus dem Stand `origin/main` (`0c39221f`) entstanden, die Mockups sind
 Skizzen aus vorhandenen Assets (Platzhalter, kein Endbild).
 
+## Entscheidungen von Chris (17.11., nach Vorlage dieses Konzepts) — verbindlich
+
+1. **Lesart/Umzug:** Spurt klassisch und Hatz müssen NICHT mit umziehen. HYROX bekommt eine **eigene Arena**
+   (darf auch draußen sein, z. B. ein Parcours).
+2. **Geräte:** **echte HYROX-Geräte** (SkiErg, Sled Push/Pull, Farmers Carry, Sandbag Lunges, Wall Balls,
+   Burpee Broad Jumps) — „in den Disziplinen möglichst realistisch". Stationsnamen im HUD folgen den echten Geräten.
+3. **Motiv:** **näher an der Figurenwelt** — Dark-Fantasy-Olympiade bleibt das Setting (also nicht moderne Wettkampfhalle).
+4. **Freigabe:** ~200 Gen. für Variante B (Stilprobe 28 Gen. vorab) und später 40–90 Gen. für C — erteilt.
+5. **Kamera:** Chris überlässt die Wahl dem Konzept („was sieht besser aus?"). Entscheidung: **feste Totale
+   als Grundzustand, Regieschnitte (ganzzahlig 2×) auf Führende/Stau/gewählten Läufer** = Variante C, B zuerst.
+
+---
+
 ## 0. Kurzfassung
 
 - **Ist:** HYROX läuft seit dem 09.11. standardmäßig in der „Hallenrunde" (`hyroxAnsicht:"halle"`):
