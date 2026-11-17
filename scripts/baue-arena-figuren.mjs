@@ -30,7 +30,13 @@ export const ARENA_FIGUREN_ZIEL = resolve(wurzel, "public", "mockups", "battle-m
 // wurde (s. docs/design/spurt-hyrox-nahkamera-08-11.md). Fehlt eine Figur in `a`, liest
 // zeichnePixelFigur() im Motor den bestehenden "angriff"-Rueckfall -- bit-identisch zum
 // Verhalten ohne diese drei Zeilen.
-const ARTEN = ["walk", "angriff", "treffer", "tod", "hyroxTechnik", "hyroxKletter", "hyroxKraft"];
+// "pfiff" (17.11.) gibt es nur beim Schiedsrichter (s. OFFIZIELLE unten).
+const ARTEN = ["walk", "angriff", "treffer", "tod", "hyroxTechnik", "hyroxKletter", "hyroxKraft", "pfiff"];
+// OFFIZIELLE (17.11.): Index-Eintraege, die KEIN Spieler sind (Slug beginnt mit "__", heute nur
+// "__schiri", s. scripts/figuren-sprites-export.py). Sie stehen in der Tabelle unter ihrem Slug
+// statt unter einem Spielernamen -- kein Spielername beginnt mit "__", der Motor holt sie gezielt
+// (zeichneSchiri), Kader/Scouting/Galerie sehen sie nie.
+export const istOffiziellerSlug = (slug) => String(slug).startsWith("__");
 
 /**
  * @param {Record<string, {canvas:number, rotationen:string[], animationen:{name:string,kind:string,frames:number,dirs:string[]}[]}>} index
@@ -39,14 +45,7 @@ const ARTEN = ["walk", "angriff", "treffer", "tod", "hyroxTechnik", "hyroxKlette
  */
 export function baueArenaFigurenTabelle(index, spieler) {
   const tabelle = {};
-  const namen = [...spieler].sort((a, b) => a.id.localeCompare(b.id));
-  for (const p of namen) {
-    const treffer = /^player-\d+-(.+)$/.exec(String(p.id).toLowerCase());
-    const slug = treffer ? treffer[1] : null;
-    if (!slug || !index[slug]) continue;
-    // Doppelte Namen: der erste (nach ID sortiert) gewinnt — heute gibt es keine Kollision
-    // unter den Figuren-Spielern, der Test haelt das fest.
-    if (tabelle[p.name]) continue;
+  const eintrag = (slug) => {
     const e = index[slug];
     const a = {};
     // Je Art UND Richtung die erste Gruppe, die diese Richtung hat: bei Draco etwa hat "walk"
@@ -61,7 +60,20 @@ export function baueArenaFigurenTabelle(index, spieler) {
       }
       if (Object.keys(je).length) a[art] = je;
     }
-    tabelle[p.name] = { s: slug, c: e.canvas, r: [...e.rotationen], a };
+    return { s: slug, c: e.canvas, r: [...e.rotationen], a };
+  };
+  const namen = [...spieler].sort((a, b) => a.id.localeCompare(b.id));
+  for (const p of namen) {
+    const treffer = /^player-\d+-(.+)$/.exec(String(p.id).toLowerCase());
+    const slug = treffer ? treffer[1] : null;
+    if (!slug || !index[slug]) continue;
+    // Doppelte Namen: der erste (nach ID sortiert) gewinnt — heute gibt es keine Kollision
+    // unter den Figuren-Spielern, der Test haelt das fest.
+    if (tabelle[p.name]) continue;
+    tabelle[p.name] = eintrag(slug);
+  }
+  for (const slug of Object.keys(index).sort()) {
+    if (istOffiziellerSlug(slug)) tabelle[slug] = eintrag(slug);
   }
   return tabelle;
 }

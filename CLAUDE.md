@@ -233,6 +233,31 @@ Vervielfachung über den ganzen Figuren-Bestand, die bei einem einzelnen Requisi
 anfällt. Im Zweifel (eine neue Art von Objekt, die einem Charakter sehr nahekommt, z.B. ein
 Maskottchen oder eine Kreatur) lieber einmal nachfragen statt anzunehmen.
 
+## Nur noch PixelLab-Assets — für alle zwanzig Disziplinen
+
+Chris am 17.11., wörtlich, nachdem die I-Spy-Hallen mit PixelLab neu gebaut worden waren: „Das mit
+Pixel lab gilt auch für alle anderen diszis! Wir nutzen keine alten Assets mehr sondern nur noch eie
+aus Pixel lab". **Jedes neue sichtbare Bildasset (Kulisse, Boden, Requisit, Falle, Möbel, Objekt) wird
+mit PixelLab erzeugt — nicht mehr aus OpenGameArt, Kenney oder anderen Paketen, nicht mehr als
+Canvas-Primitive aus Code und nicht mehr aus den alten Szenen-HTMLs unter `public/szenen/`.** Das
+gilt für alle zwanzig Disziplinen, nicht nur für I-Spy. Bestehende Nicht-PixelLab-Assets werden nach
+dem Audit `docs/design/pixellab-nur-neue-assets-audit-17-11.md` in Wellen ersetzt (Reihenfolge und
+Kosten dort; bestellt wird, was Chris freigibt). Herkunft jedes neuen Assets steht in
+`public/sprites/kulissen/quellen.json` bzw. `public/sprites/arena/quellen.json`. **Unverändert
+gesperrt bleiben neue Charaktere und neue Animationen** (siehe Abschnitt oben) — diese Regel betrifft
+nur Requisiten und Kulissen.
+
+**Zielbild (Chris, 17.11.): ein einheitlicher PixelLab-Stil für ALLE zwanzig Disziplinen.** Wörtlich:
+„Alle Diszis sollen am Ende den gleichen Pixel lab Stil haben und die Assets davon! Das ist das
+Target." Das ist der Zielzustand des Gesamtprojekts, nicht nur eine Regel für Neues: am Ende kommen
+Kulisse, Boden, Requisiten, Effekte und (soweit sichtbar) HUD-Elemente jeder Disziplin aus
+PixelLab und wirken wie aus einer Hand. Wo eine Disziplin optisch noch „alt" aussieht (zuletzt
+Chris am 17.11. über die lange HYROX-Bahn im Vergleich zu den neuen Arenen), ist das ein
+Arbeitsauftrag, kein Geschmacksthema. Die Ersatz-Reihenfolge steht im Audit
+`docs/design/pixellab-nur-neue-assets-audit-17-11.md` (Wellen A/B/C) und im HYROX-Optikkonzept
+`docs/design/hyrox-optik-konzept-17-11.md`. Chris hat am 17.11. zusätzlich HUD, Effekte und den
+Schiedsrichter (als einzige freigegebene neue Figur) ausdrücklich in den PixelLab-Stil einbezogen.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch

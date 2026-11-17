@@ -4839,7 +4839,12 @@
     // einer Hyrox-Station ohnehin schon >0, s. zeichneSpurt()).
     const hyroxGid=u.hyroxPose&&HYROX_PIXEL_ART[u.hyroxPose];
     const hyroxEigen=hyroxGid&&fig.a[hyroxGid];
-    const art=istUnten?(istSturz?"treffer":"tod"):hyroxEigen?hyroxGid:istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    // EIGENE ANZEIGE-ART (17.11., Schiedsrichter-Pfiff): `u.vizArt` nennt eine Art, die nur diese
+    // Figur hat (heute "pfiff" beim Stellvertreter in zeichneSchiri), `u.vizArtProg` 0..1 ihren
+    // Fortschritt (letztes Bild wird gehalten). Kein Spieler setzt `vizArt` -- fuer alle anderen
+    // Figuren bleibt die Auswahl unveraendert.
+    const eigenArt=(u.vizArt&&fig.a[u.vizArt])?u.vizArt:null;
+    const art=istUnten?(istSturz?"treffer":"tod"):eigenArt?eigenArt:hyroxEigen?hyroxGid:istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4873,6 +4878,7 @@
           // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
           // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
           if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art===eigenArt)f=Math.max(0,Math.min(n-1,Math.floor((u.vizArtProg||0)*n)));
           else if(art===hyroxGid)f=Math.max(0,Math.min(n-1,Math.floor((u.hyroxProg||0)*n)));
           else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
@@ -15732,6 +15738,40 @@
     if(d>1){ const schritt=Math.min(d,SCHIRI_TEMPO*dt); s.x+=dx/d*schritt; s.y+=dy/d*schritt; }
   }
 
+  // SCHIEDSRICHTER ALS PIXELLAB-FIGUR (17.11., Chris: "hud Effekte und schiri auch über Pixel
+  // lab" -- ausdrueckliche Freigabe fuer genau diese eine neue Figur). Index-Schluessel "__schiri"
+  // (kein Spieler, s. scripts/baue-arena-figuren.mjs), Grundposen + "pfiff" (Arm hoch, Pfeife)
+  // Sued/Ost; Gehen ueber die Ersatzbewegung aus der Grundpose wie bei den 91 Figuren ohne
+  // Laufzyklus. REIN ZEICHNEND: fsSchiri bleibt {x,y,zielX,zielY,pfiffT} -- Blickrichtung, Tempo
+  // und Pfiff-Fortschritt stehen auf einem modulweiten Stellvertreter-Objekt (neue Felder an
+  // fsSchiri verschoeben den Wertungs-Fingerabdruck). Der Anpfiff wartet NICHT auf das Bild
+  // (er steht nicht in pixelFigurenImSpiel): bis die Grundpose da ist -- und immer im Node-Motor
+  // und unter file:// (PIXEL_FIGUR_AKTIV aus) -- zeichnet zeichneSchiri() die Canvas-Figur.
+  const SCHIRI_FIGUR="__schiri", SCHIRI_PIXEL_G=1.04;
+  const schiriStellvertreter={n:SCHIRI_FIGUR,id:0,hp:1,vx:0,vy:0,lunge:0,vizArt:null,vizArtProg:0};
+  let schiriBlick=2; // 0 Nord, 1 West, 2 Sued, 3 Ost (wie r0 in zeichnePixelFigur)
+  function zeichneSchiriPixel(s,pfeift){
+    const z=pixelFigurBereit(SCHIRI_FIGUR);
+    if(!z)return false;
+    const st=schiriStellvertreter;
+    const dx=s.zielX-s.x, dy=s.zielY-s.y, d=Math.hypot(dx,dy);
+    if(d>1){
+      st.vx=dx/d*SCHIRI_TEMPO; st.vy=dy/d*SCHIRI_TEMPO;
+      schiriBlick=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:1):(dy>0?2:0);
+    } else { st.vx=0; st.vy=0; schiriBlick=2; }
+    // Die Pfiff-Geste selbst gibt es nur Sued/Ost (West = Ost gespiegelt): im Stand und beim
+    // Lauf nach oben schaut er dafuer zum Publikum (Sued).
+    const r0=(pfeift&&schiriBlick===0)?2:schiriBlick;
+    st.vizArt=pfeift?"pfiff":null;
+    st.vizArtProg=pfeift?Math.min(1,(1-s.pfiffT/PFIFF_DAUER)/0.35):0;
+    ctx.save();
+    ctx.fillStyle="rgba(0,0,0,.35)";
+    ctx.beginPath();ctx.ellipse(s.x,s.y+18,12,4.5,0,0,6.3);ctx.fill();
+    zeichnePixelFigur(ctx,st,s.x,s.y+18-PIXEL_FUSS*SCHIRI_PIXEL_G,SCHIRI_PIXEL_G,z,r0);
+    ctx.restore();
+    return true;
+  }
+
   function zeichneSchiri(){
     const s=fsSchiri; if(!s)return;
     // Masse an den Spieler-Sprites orientiert (zeichneSprite zeichnet 64px hohe Figuren mit
@@ -15739,6 +15779,7 @@
     // Requisit statt wie eine Person. Dunkle Kontur ueberall, weil Weiss auf hellem Parkett
     // sonst ausbleicht.
     const pfeift=s.pfiffT>0, kH=32, kB=17, oben=s.y+8-kH;
+    if(zeichneSchiriPixel(s,pfeift)){ if(pfeift)zeichneSchiriPfiff(s,s.y-60); return; }
     ctx.save();
     ctx.lineJoin="round"; ctx.lineCap="round";
     ctx.fillStyle="rgba(0,0,0,.35)";
@@ -15756,17 +15797,21 @@
     // Arm hoch = die reale Foul-Anzeige; sonst haengt er am Koerper.
     if(pfeift)ctx.lineTo(s.x+kB/2+7,oben-14); else ctx.lineTo(s.x+kB/2+4,s.y+2);
     ctx.stroke();
-    if(pfeift){
-      const p=1-s.pfiffT/PFIFF_DAUER;
-      ctx.strokeStyle="rgba(255,238,140,"+Math.max(0,0.8-p*0.8).toFixed(3)+")";
-      ctx.lineWidth=2.5;
-      ctx.beginPath();ctx.arc(s.x,s.y-8,15+p*34,0,6.3);ctx.stroke();
-      ctx.font="700 15px 'RaniraSeason',Georgia,'Times New Roman',serif";
-      ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.lineWidth=3.5;ctx.strokeStyle="rgba(8,10,14,.9)";
-      ctx.strokeText("PFIFF!",s.x,oben-24);
-      ctx.fillStyle="#ffe98a";ctx.fillText("PFIFF!",s.x,oben-24);
-    }
+    ctx.restore();
+    if(pfeift)zeichneSchiriPfiff(s,oben-24);
+  }
+  // Pfiff-Ring und "PFIFF!" -- gemeinsam fuer Pixel-Figur und Canvas-Rueckfall (textY: ueber dem Kopf).
+  function zeichneSchiriPfiff(s,textY){
+    const p=1-s.pfiffT/PFIFF_DAUER;
+    ctx.save();
+    ctx.strokeStyle="rgba(255,238,140,"+Math.max(0,0.8-p*0.8).toFixed(3)+")";
+    ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(s.x,s.y-8,15+p*34,0,6.3);ctx.stroke();
+    ctx.font="700 15px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.lineWidth=3.5;ctx.strokeStyle="rgba(8,10,14,.9)";
+    ctx.strokeText("PFIFF!",s.x,textY);
+    ctx.fillStyle="#ffe98a";ctx.fillText("PFIFF!",s.x,textY);
     ctx.restore();
   }
 
@@ -43980,7 +44025,11 @@
     // I-Spy-Nachbesserung 17.11. (Chris: "nur noch neue PixelLab-Assets"): die uebrigen Moebel der
     // Fundorte als Requisiten, s. ISPY_MOEBEL_BILD. Fehlen-tolerant (aDa()-Wache), Rueckfall Primitiv.
     "ispy_schreibtisch","ispy_schreibtisch_durchsucht","ispy_aktenschrank","ispy_aktenschrank_offen",
-    "ispy_verhoerstuhl","ispy_tuer"];
+    "ispy_verhoerstuhl","ispy_tuer",
+    // EFFEKT-PILOT 17.11. (Chris: "hud Effekte und schiri auch über Pixel lab"): Hieb-Bogen als
+    // PixelLab-VFX (POST /v2/vfx, pro), neutral weiss/grau, 7 Bilder a 56 px als Streifen, zur
+    // Laufzeit in Teamfarbe getoent (hiebBildGetoent). Rueckfall: der Canvas-Bogen in zeichneEffekte().
+    "fx_hieb"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -55416,6 +55465,46 @@
       effekt({typ:"hieb",x:z.x,y:z.y,ux:u.x,uy:u.y,seite:u.side,schwer,dauer:schwer?.42:.3});}
   }
 
+  // HIEB-BOGEN ALS PIXELLAB-EFFEKT (17.11., s. "fx_hieb" in A_TEILE). Das Blatt ist neutral
+  // (weiss bis grau, Bogen oeffnet nach rechts = +x, Mitte des 56er-Bilds = Treffpunkt-Achse);
+  // getoent wird einmal je Teamfarbe auf einer Offscreen-Leinwand (multiply, dann auf die Alpha
+  // des Blatts beschnitten) und zwischengespeichert. Nur Anzeige: liest den Effekt, schreibt nichts.
+  const HIEB_FX_BILDER=7, HIEB_FX_KANTE=56, hiebFxCache=new Map();
+  function hiebBildGetoent(farbe){
+    if(!aDa("fx_hieb"))return null;
+    let c=hiebFxCache.get(farbe);
+    if(c!==undefined)return c;
+    c=null;
+    try{
+      const im=aBild.fx_hieb, w=im.naturalWidth, h=im.naturalHeight;
+      const lw=document.createElement("canvas"); lw.width=w; lw.height=h;
+      const lx=lw.getContext("2d");
+      lx.imageSmoothingEnabled=false;
+      lx.drawImage(im,0,0);
+      lx.globalCompositeOperation="multiply";
+      lx.fillStyle="rgb("+farbe+")"; lx.fillRect(0,0,w,h);
+      lx.globalCompositeOperation="destination-in";
+      lx.drawImage(im,0,0);
+      c=lw;
+    }catch(err){ c=null; }
+    hiebFxCache.set(farbe,c);
+    return c;
+  }
+  function zeichneHiebBild(e,farbe,w){
+    const bild=hiebBildGetoent(farbe);
+    if(!bild)return false;
+    const k=e.schwer?1.5:1, r=e.schwer?34:24, n=HIEB_FX_BILDER, kante=HIEB_FX_KANTE;
+    const f=Math.max(0,Math.min(n-1,Math.floor(e.t/e.dauer*n)));
+    ctx.translate(e.x,e.y); ctx.rotate(w);
+    ctx.imageSmoothingEnabled=false;
+    // Bogenmitte liegt im Blatt ~10 px rechts der Bildmitte -> so verschoben, dass der Bogen wie
+    // der Canvas-Bogen im Abstand r hinter dem Getroffenen steht.
+    const dx=r-10*k-kante/2*k, dy=-kante/2*k;
+    ctx.drawImage(bild,f*kante,0,kante,kante,dx,dy,kante*k,kante*k);
+    if(e.schwer){ ctx.globalAlpha=0.45; ctx.drawImage(aBild.fx_hieb,f*kante,0,kante,kante,dx+4,dy,kante*k,kante*k); }
+    return true;
+  }
+
   function zeichneEffekte(dt){
     for(const e of EFFEKTE)e.t+=dt;
     EFFEKTE=EFFEKTE.filter(e=>e.t<e.dauer);
@@ -55423,7 +55512,9 @@
       const a=1-e.t/e.dauer;
       const farbe=e.seite===0?"242,160,61":"69,176,201";
       ctx.save();
-      if(e.typ==="hieb"){
+      if(e.typ==="hieb"&&zeichneHiebBild(e,farbe,Math.atan2(e.y-e.uy,e.x-e.ux))){
+        /* PixelLab-Bogen gezeichnet (s. zeichneHiebBild) */
+      } else if(e.typ==="hieb"){
         const w=Math.atan2(e.y-e.uy,e.x-e.ux);
         const r=(e.schwer?34:24)*(0.6+0.4*(1-a));
         ctx.strokeStyle="rgba("+farbe+","+(a*0.95)+")";

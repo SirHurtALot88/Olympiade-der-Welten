@@ -107,7 +107,10 @@ async function main() {
   for (const f of nochOffen.slice(0, 30)) console.log("  offen:", f);
 
   // 3) Sprite-Figuren ohne Kaderplatz: in ihr Mapping-Team, sonst Team mit Platz.
-  const sprites = Object.keys(JSON.parse(fs.readFileSync("data/generated/figuren-sprites.json", "utf8")));
+  // "__"-Slugs (heute nur "__schiri", 17.11.) sind Offizielle, keine Spieler.
+  const sprites = Object.keys(JSON.parse(fs.readFileSync("data/generated/figuren-sprites.json", "utf8"))).filter(
+    (s) => !s.startsWith("__"),
+  );
   const mapping = (JSON.parse(fs.readFileSync("data/source/player-team-mapping.json", "utf8")) as { rows: Array<{ playerName: string; teamId: string }> }).rows;
   const mappingNachName = new Map(mapping.map((r) => [r.playerName.trim().toLowerCase(), r.teamId]));
   save = persistence.getSaveById(saveId)!;
