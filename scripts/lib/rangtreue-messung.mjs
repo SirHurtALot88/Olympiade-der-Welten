@@ -498,7 +498,7 @@ export function staffelPaarSchalterText(gesetzt) {
 // — gemeinsam fuer miss-alle-disziplinen.mjs, miss-star-paartreue.mjs und messe-arena-einfluss.mjs.
 // Setzt die Kontakt-Flags NUR fuer diesen Messlauf ueber window.__arena.kontaktFlags (dasselbe
 // Geruest wie bahnFlags({kontakt}); kein zweiter Kanal). Ohne Schalter misst jedes Skript den
-// Motor wie im Spiel — byte-identisch zu vorher.
+// Motor wie im Spiel (seit 17.11. mit Kontakt im klassischen Spurt; aus: --kontakt-json={"spurt":null}).
 //
 //   --kontakt=spurt:3                 Stufen 1..3 fuer Spurt ({stufe:3})
 //   --kontakt=spurt:1,3               genau die Stufen 1 und 3 ({nur:[1,3]})

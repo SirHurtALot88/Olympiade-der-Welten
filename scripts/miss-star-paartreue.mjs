@@ -137,6 +137,13 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "domcontentloaded" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  // OLY_FORM_MODUS=echt (wie miss-alle-disziplinen.mjs, P4 docs/design/formkarten-motor-p4-11-11.md):
+  // Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
+  // Ergaenzt 17.11. fuer die Star-Abnahme beim Scharfschalten des Spurt-Kontakts (Ersatz- UND Echtmodus).
+  if (process.env.OLY_FORM_MODUS) {
+    await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
+    console.log(`Formkarten-Modus: ${process.env.OLY_FORM_MODUS}`);
+  }
   const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
   if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
   const kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);
