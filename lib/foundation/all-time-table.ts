@@ -1,7 +1,8 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
-import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
+import { tabellenRegel } from "@/lib/foundation/historie-modern";
+import { buildHistoricalLeagueTierLookup, getLeagueLevel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -60,10 +61,17 @@ export type AllTimeTableRow = {
   seasons: AllTimeSeasonPoint[];
   /** Summe der Liga-Punkte über alle Saisons inkl. laufender Saison. */
   cumulativePoints: number;
-  /** Ø-Rang über archivierte Saisons (aus buildAllTimeTableFromSnapshots). */
+  /**
+   * Ø-Platz über archivierte Saisons, ÜBER BEIDE LIGEN gerechnet (Chris 18.11., Entscheidung 4: Liga 2 zählt ab
+   * Platz 17). Ohne Liga-Trennung der liga-lokale Rang unverändert.
+   */
   avgRank: number | null;
-  /** Bester Rang über archivierte Saisons. */
+  /** Bester Platz über beide Ligen (Liga 2 ab 17). */
   bestRank: number | null;
+  /** Meister Liga 2 — zählt als Aufstieg, nicht als Titel (Entscheidung 3). */
+  titlesLiga2: number;
+  promotions: number;
+  relegations: number;
   /** #1-Finishes über archivierte Saisons. */
   titles: number;
   medals: AllTimeTableMedals;
@@ -324,8 +332,33 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
       top10: aggregate?.top10 ?? 0,
     };
     const titles = medals.gold;
-    const avgRank = aggregate?.avgRank ?? null;
-    const bestRank = aggregate?.bestRank ?? null;
+    // Ø und Bester Platz ueber beide Ligen (Liga 2 ab 17). Ohne bekannte Liga bleibt es beim liga-lokalen Rang.
+    const positionen = seasons
+      .map((season) => toLeagueSpanningPosition(season.rank, season.leagueTier ?? null))
+      .filter(isFiniteNumber);
+    const avgRank =
+      positionen.length > 0
+        ? Math.round((positionen.reduce((sum, value) => sum + value, 0) / positionen.length) * 10) / 10
+        : (aggregate?.avgRank ?? null);
+    const bestRank = positionen.length > 0 ? Math.min(...positionen) : (aggregate?.bestRank ?? null);
+    const titlesLiga2 = seasons.filter(
+      (season) => season.rank === 1 && getLeagueLevel(season.leagueTier) === 2,
+    ).length;
+    let promotions = 0;
+    let relegations = 0;
+    seasons.forEach((season, index) => {
+      const liga = getLeagueLevel(season.leagueTier);
+      if (liga == null) return;
+      const folge = seasons[index + 1] ? getLeagueLevel(seasons[index + 1]!.leagueTier) : null;
+      if (folge != null) {
+        if (folge < liga) promotions += 1;
+        if (folge > liga) relegations += 1;
+        return;
+      }
+      const regel = tabellenRegel(liga, season.rank);
+      if (regel.aufstieg) promotions += 1;
+      if (regel.abstieg) relegations += 1;
+    });
 
     const marketValues = seasons.map((season) => season.marketValue).filter(isFiniteNumber);
     const cashValues = seasons.map((season) => season.cash).filter(isFiniteNumber);
@@ -354,6 +387,9 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
       avgRank,
       bestRank,
       titles,
+      titlesLiga2,
+      promotions,
+      relegations,
       medals,
       mwNow,
       mwPeak,

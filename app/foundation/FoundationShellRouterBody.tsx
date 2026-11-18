@@ -216,6 +216,10 @@ const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-ti
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
 });
+const FoundationSeasonArchiveHost = dynamic(() => import("@/app/foundation/historie/FoundationSeasonArchiveHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Saison-Archiv wird geladen…" />,
+});
 const FoundationMerklisteHost = dynamic(() => import("@/app/foundation/merkliste-v2/FoundationMerklisteHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Merkliste wird geladen…" />,
@@ -393,6 +397,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationRanksHostProps,
   foundationLeagueLeadersHostProps,
   foundationAllTimeTableHostProps,
+  foundationSeasonArchiveHostProps,
   foundationMerklisteHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
@@ -1069,6 +1074,24 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   syncFoundationViewInUrl("playerProfile", id, playerProfileData.playerId);
                 }
               }}
+            />
+          ) : activeView === "seasonArchive" || activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable" ? (
+            // Historie (Mockup 18.11.): drei Reiter im Regieband statt zwei Schienenpunkten unter Markt und Team.
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "archiv", label: "Saison-Archiv" },
+                { id: "transfers", label: "Transfers" },
+                { id: "ewig", label: "Ewige Tabelle" },
+              ]}
+              activeId={activeView === "seasonArchive" ? "archiv" : activeView === "allTimeTable" ? "ewig" : "transfers"}
+              onSelect={(id) =>
+                setFoundationView(
+                  id === "ewig" ? "allTimeTable" : id === "transfers" ? "historyV2" : "seasonArchive",
+                  setActiveView,
+                  { push: true },
+                )
+              }
             />
           ) : activeView === "lineup" || activeView === "lineupV2" ? (
             <FoundationSubNav
@@ -3288,6 +3311,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
+          {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
 
           {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 

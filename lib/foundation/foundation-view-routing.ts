@@ -8,6 +8,7 @@ export const FOUNDATION_VIEW_IDS = [
   "season",
   "seasonV2",
   "historyV2",
+  "seasonArchive",
   "cockpit",
   "inbox",
   "seasonPreview",
@@ -68,6 +69,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "transfermarkt-v2" || view === "transfermarkt" || view === "market") {
     return "marketV2";
+  }
+  if (view === "saison-archiv" || view === "archiv" || view === "historie" || view === "season-archive") {
+    return "seasonArchive";
   }
   if (view === "history-v2" || view === "transferhistorie-v2" || view === "history") {
     return "historyV2";

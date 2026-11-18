@@ -62,7 +62,7 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
       <path d="M16 16l5 5" />
     </>
   ),
-  historyV2: (
+  seasonArchive: (
     <>
       <path d="M4 12a8 8 0 108-8 8 8 0 00-6 2.7" />
       <path d="M4 4v4h4M12 8v4l3 2" />

@@ -66,6 +66,7 @@ export type FoundationView =
   | "season"
   | "seasonV2"
   | "historyV2"
+  | "seasonArchive"
 	  | "cockpit"
 	  | "inbox"
   | "seasonPreview"

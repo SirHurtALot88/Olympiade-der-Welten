@@ -12244,7 +12244,24 @@ export function useFoundationShellRouterBodyScope({
     [activeContextMeta],
   );
 
+  /**
+   * HISTORIE (Mockup 18.11.): ein Schienenpunkt, drei Reiter. Archiv, Transfers und Ewige Tabelle bleiben eigene
+   * Ansichten (`seasonArchive`, `historyV2`, `allTimeTable`); dieser Wechsler setzt zwischen ihnen um und waehlt
+   * dabei optional das Transferfenster.
+   */
+  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig", seasonId?: string) => {
+    if (reiter === "transfers") {
+      if (seasonId) setHistorySeasonFilter(seasonId);
+      setFoundationView("historyV2", setActiveView, { push: true });
+      return;
+    }
+    setFoundationView(reiter === "ewig" ? "allTimeTable" : "seasonArchive", setActiveView, { push: true });
+  };
+  const historieOpenSaisonstand = () => setFoundationView("seasonV2", setActiveView, { push: true });
+
   const foundationHistoryV2HostProps: FoundationHistoryV2ShellHostProps = {
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
     sourceBadgeLabel: historySourceBadgeLabel,
     activeSaveId,
     saveName: activeSaveName,
@@ -12879,10 +12896,22 @@ export function useFoundationShellRouterBodyScope({
   };
 
   const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
+    gameState,
+    ownTeamId: activeManagerTeamId ?? null,
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
     model: allTimeTableModel,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
     onOpenTeam: openTeamProfileById,
+  };
+
+  const foundationSeasonArchiveHostProps = {
+    gameState,
+    ownTeamId: activeManagerTeamId ?? null,
+    onOpenTeam: openTeamProfileById,
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
   };
 
   // Vorsaison-Podium (W1): nur relevant, wenn das PP-Board leer startet — die
@@ -13524,6 +13553,7 @@ export function useFoundationShellRouterBodyScope({
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
     foundationAllTimeTableHostProps,
+    foundationSeasonArchiveHostProps,
     foundationMerklisteHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
