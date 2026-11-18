@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
@@ -151,5 +151,49 @@ export function HistorieBandKpis({ items }: { items: readonly BandKpi[] }) {
         ))}
       </div>
     </FoundationBandSlot>
+  );
+}
+
+const ENTWURF_BREITE_REM = 116;
+const ENTWURF_HOEHE_REM = 67.5;
+
+/**
+ * Seitenwurzel der Historie: fuellt die Flaeche, die die Shell uebrig laesst, und skaliert die Wurzelgroesse mit
+ * (Entwurfsmass 120 x 67,5 rem = 1920 x 1080 bei 16 px, abzueglich 4 rem Schiene) wie die Startseite
+ * (useVolleFlaeche in HomeModern). Nichts scrollt auf Seitenebene; Listen scrollen in ihrer Karte.
+ */
+export function HistorieSeite({ className, testId, children }: { className: string; testId: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const messe = () => {
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        el.style.removeProperty("--hi-u");
+        el.style.removeProperty("--hi-h");
+        return;
+      }
+      const breite = el.parentElement?.clientWidth ?? window.innerWidth;
+      const oben = el.getBoundingClientRect().top;
+      const hoehe = Math.max(480, window.innerHeight - oben - 4);
+      const u = Math.min(34, Math.max(12.5, Math.min(breite / ENTWURF_BREITE_REM, hoehe / ENTWURF_HOEHE_REM)));
+      el.style.setProperty("--hi-u", `${u.toFixed(2)}px`);
+      el.style.setProperty("--hi-h", `${Math.floor(hoehe)}px`);
+      const ueber = document.documentElement.scrollHeight - window.innerHeight;
+      if (ueber > 0) el.style.setProperty("--hi-h", `${Math.max(480, Math.floor(hoehe - ueber))}px`);
+    };
+    messe();
+    const beobachter = new ResizeObserver(messe);
+    if (el.parentElement) beobachter.observe(el.parentElement);
+    window.addEventListener("resize", messe);
+    return () => {
+      beobachter.disconnect();
+      window.removeEventListener("resize", messe);
+    };
+  }, []);
+  return (
+    <div ref={ref} className={`hist ${className}`} data-testid={testId}>
+      {children}
+    </div>
   );
 }

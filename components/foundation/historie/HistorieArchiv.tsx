@@ -17,14 +17,14 @@ import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 import HistorieBlatt from "./HistorieBlatt";
 import HistorieZeitleiste, { baueZeitleistenGlieder, type HistorieLiveSaison } from "./HistorieZeitleiste";
-import { Cv, HistorieBandKpis, Seg, ThZeile, Wappen, ZeilenMarke, fmtC, fmtVz, fmtZahl, positionText } from "./historie-bits";
+import { Cv, HistorieBandKpis, HistorieSeite, Seg, ThZeile, Wappen, ZeilenMarke, fmtC, fmtVz, fmtZahl, positionText } from "./historie-bits";
 
 export type HistorieHostBasis = {
   gameState: GameState;
   ownTeamId: string | null;
   onOpenTeam: (teamId: string) => void;
   /** Wechselt den Reiter der Historie (und waehlt optional eine Saison/ein Fenster). */
-  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string) => void;
+  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => void;
   onOpenSaisonstand: () => void;
 };
 
@@ -227,7 +227,7 @@ export default function HistorieArchiv({ gameState, ownTeamId, onOpenTeam, onWec
 
   if (!saison) {
     return (
-      <div className="hist h-archiv" data-testid="historie-archiv">
+      <HistorieSeite className="h-archiv" testId="historie-archiv">
         {bandKpis}
         <HistorieZeitleiste
           modus="archiv"
@@ -252,7 +252,7 @@ export default function HistorieArchiv({ gameState, ownTeamId, onOpenTeam, onWec
             </div>
           </div>
         </section>
-      </div>
+      </HistorieSeite>
     );
   }
 
@@ -261,7 +261,7 @@ export default function HistorieArchiv({ gameState, ownTeamId, onOpenTeam, onWec
   const klettererListe = [...saison.kletterer, ...saison.absturz];
 
   return (
-    <div className="hist h-archiv" data-testid="historie-archiv">
+    <HistorieSeite className="h-archiv" testId="historie-archiv">
       {bandKpis}
       <HistorieZeitleiste
         modus="archiv"
@@ -381,9 +381,9 @@ export default function HistorieArchiv({ gameState, ownTeamId, onOpenTeam, onWec
         ewigRang={null}
         onSchliessen={() => setBlattTeam(null)}
         onTeamprofil={onOpenTeam}
-        onAlleTransfers={() => onWechsel("transfers")}
+        onAlleTransfers={(teamId) => onWechsel("transfers", undefined, teamId)}
       />
-    </div>
+    </HistorieSeite>
   );
 }
 

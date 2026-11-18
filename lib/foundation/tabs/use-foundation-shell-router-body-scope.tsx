@@ -12249,9 +12249,14 @@ export function useFoundationShellRouterBodyScope({
    * Ansichten (`seasonArchive`, `historyV2`, `allTimeTable`); dieser Wechsler setzt zwischen ihnen um und waehlt
    * dabei optional das Transferfenster.
    */
-  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig", seasonId?: string) => {
+  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => {
     if (reiter === "transfers") {
       if (seasonId) setHistorySeasonFilter(seasonId);
+      // „Alle Transfers" eines Teams: alle Fenster, nur dieses Team.
+      if (teamId) {
+        setHistoryTeamFilter(teamId);
+        setHistorySeasonFilter(HISTORY_ALL_SEASONS_FILTER);
+      }
       setFoundationView("historyV2", setActiveView, { push: true });
       return;
     }

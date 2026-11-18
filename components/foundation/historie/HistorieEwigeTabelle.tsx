@@ -9,7 +9,7 @@ import { getLeagueLevel, toLeagueSpanningPosition } from "@/lib/season/league-hi
 import HistorieBlatt from "./HistorieBlatt";
 import HistorieLinien from "./HistorieLinien";
 import { useHistorieDaten, type HistorieHostBasis } from "./HistorieArchiv";
-import { HistorieBandKpis, Seg, ThZeile, Wappen, fmtC, fmtVz, fmtZahl, positionText } from "./historie-bits";
+import { HistorieBandKpis, HistorieSeite, Seg, ThZeile, Wappen, fmtC, fmtVz, fmtZahl, positionText } from "./historie-bits";
 
 export type HistorieEwigProps = HistorieHostBasis & { model: AllTimeTableModel | null };
 
@@ -224,17 +224,17 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
 
   if (!model || !model.hasArchive) {
     return (
-      <div className="hist h-ewig" data-testid="historie-ewig">
+      <HistorieSeite className="h-ewig" testId="historie-ewig">
         <section className="pan">
           <div className="pk"><h2>Ewige Tabelle</h2></div>
           <div className="pb"><div className="leer"><b>Archiv wird geladen …</b>Die Ewige Tabelle liest alle abgeschlossenen Saisons.</div></div>
         </section>
-      </div>
+      </HistorieSeite>
     );
   }
   if (!model.hasHistory) {
     return (
-      <div className="hist h-ewig" data-testid="historie-ewig">
+      <HistorieSeite className="h-ewig" testId="historie-ewig">
         {bandKpis}
         <section className="pan">
           <div className="pk"><h2>Ewige Tabelle</h2></div>
@@ -245,7 +245,7 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
             </div>
           </div>
         </section>
-      </div>
+      </HistorieSeite>
     );
   }
 
@@ -265,7 +265,7 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
   const labels = (zeilen[0]?.row.seasons ?? []).map((season) => `S${season.seasonId.replace(/\D+/g, "") || "?"}`);
 
   return (
-    <div className="hist h-ewig" data-testid="historie-ewig">
+    <HistorieSeite className="h-ewig" testId="historie-ewig">
       {bandKpis}
       <section className="pan">
         <div className="pk">
@@ -419,8 +419,8 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
         ewigRang={zeilen.find((zeile) => zeile.row.teamId === blattTeam)?.nr ?? null}
         onSchliessen={() => setBlattTeam(null)}
         onTeamprofil={onOpenTeam}
-        onAlleTransfers={() => onWechsel("transfers")}
+        onAlleTransfers={(teamId) => onWechsel("transfers", undefined, teamId)}
       />
-    </div>
+    </HistorieSeite>
   );
 }

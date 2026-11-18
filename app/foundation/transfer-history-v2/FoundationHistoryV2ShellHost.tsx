@@ -47,7 +47,7 @@ export type FoundationHistoryV2ShellHostProps = {
   loadingMore?: boolean;
   onLoadMore: () => void;
   /** Wechselt den Reiter der Historie (Archiv, Transfers, Ewige Tabelle). */
-  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string) => void;
+  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => void;
   onOpenSaisonstand: () => void;
 };
 
@@ -122,7 +122,7 @@ export default function FoundationHistoryV2ShellHost({
   });
 
   return (
-    <>
+    <div id="transfer-history">
       <TransferHistoryV2Client
         sourceBadgeLabel={sourceBadgeLabel}
         saveName={saveName}
@@ -181,6 +181,6 @@ export default function FoundationHistoryV2ShellHost({
         onWechsel={onWechsel}
         onOpenSaisonstand={onOpenSaisonstand}
       />
-    </>
+    </div>
   );
 }

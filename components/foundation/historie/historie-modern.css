@@ -12,8 +12,10 @@
   --haus:var(--bc-haus,"RaniraSeason",Georgia,serif); --zahl:var(--bc-zahl,"Barlow Condensed","Arial Narrow",sans-serif); --r:.625rem;
   --chris:#F2A03D; --franky:#45B0C9; --ramona:#c9a7ff; --ki:#66738a;
   --pow:#e2574c; --spe:#5fc27a; --men:#5aa2e6; --soc:#e8c34a; --l1:#f0c35a; --l2:#45B0C9;
-  font-family:var(--zahl); color:var(--tinte); font-size:1rem;
-  display:grid; gap:.72rem; padding:.8rem 1rem; min-height:0; height:100%; box-sizing:border-box;
+  font-family:var(--zahl); color:var(--tinte);
+  font-size:var(--hi-u,clamp(12.5px,min(calc((100vw - 64px) * .008333),calc(100vh * .014815)),34px));
+  height:var(--hi-h,calc(100vh - 6rem)); overflow:hidden; background:var(--grund); line-height:1.2; -webkit-font-smoothing:antialiased;
+  display:grid; gap:.72rem; padding:.8rem 1rem; min-height:0; box-sizing:border-box;
   grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);
 }
 .hist *{box-sizing:border-box}
