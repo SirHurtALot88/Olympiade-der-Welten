@@ -182,7 +182,37 @@ Umbau des Formats verschiebt nicht den Wert, an dem alle anderen Disziplinen gep
 
 ## 6. Mockup gegen Bau
 
-__BILDER__
+Aufnahme: `flock /tmp/oly-aufnahme.lock node scripts/screenshot-climbing-canyon.mjs` (Arena-Szene der Battle-Mode-
+Seite bei 1920 × 1080, Gerätefaktor 2, echter Kader aus der Kaderfamilie, 6 gegen 6, Saat 1337). Die Szenen sind
+nicht gestellt: das Skript liest die Zeitpunkte aus dem gebuchten Lauf derselben Saat und spult die Wiedergabe
+(`sondenLauf`, derselbe Takt wie das Spiel) dorthin. Mockup-Bilder: `docs/design/climbing-neu-18-11/`.
+
+| Szene | Mockup | Bau |
+|---|---|---|
+| Start | ![](climbing-neu-18-11/01-start.png) | ![](climbing-canyon-bau-18-11/01-start.png) |
+| Seilschaft hilft | ![](climbing-neu-18-11/03-seilschaft-hilft.png) | ![](climbing-canyon-bau-18-11/03-seilschaft-hilft.png) |
+| Rangelei am Band | ![](climbing-neu-18-11/02-rangelei.png) | ![](climbing-canyon-bau-18-11/02-band-rangelei.png) |
+| Zur ersten Glocke (die Regie zeigt gerade den Wegwechsel an der Rastnische) | ![](climbing-neu-18-11/05-topp.png) | ![](climbing-canyon-bau-18-11/05-topp.png) |
+| Am Dach | ![](climbing-neu-18-11/04-ueberhang.png) | ![](climbing-canyon-bau-18-11/04-ueberhang.png) |
+| Endstand (Zeiten je Kletterer, Rangpunkte, „Seilschaft oben“) | — | ![](climbing-canyon-bau-18-11/06-ende.png) |
+
+| Bauteil | Mockup | Bau | Stand |
+|---|---|---|---|
+| Wand | Stilprobe 792 × 300, 2-fach | bestellte Wand 792 × 600, 1-fach (#1632); Wandpixel = Figurenpixel | besser als Mockup |
+| Ebenen E0–E7 | alle acht | Himmel, Panorama, Dunst, Reihe E3 (auch seitlich weitergeführt), Wand, Wandfuß, Requisiten, Vordergrund, Licht, Vignette, Kreide/Staub | gleich |
+| Requisiten | Glocke, Brücke, Leiter, Griffe, Rastplatz | dazu Wegweiser an der Gabel, Startbogen, Kiefer, Griffblätter in Wegfarbe | mehr |
+| Posen | nur vorhandene | nur vorhandene (dieselbe Posenwahl je Kantenart) | gleich |
+| Seil, Seilschaftsseil, Schlagschatten | ja | ja | gleich |
+| Einblender | DOM-Einblender mit Portrait | `callout()` des Arena-HUD („RANGELEI!“, „ZIEHT HOCH!“, „WEG GEWECHSELT“, „ABGERUTSCHT!“, „GLOCKE!“ …) | gleich, ohne Portrait |
+| Kamerawackler beim Rangeln | ja | ja (0,45 s) | gleich |
+| Kopfleiste | Teams, Seilschaften oben, Phase | Arena-HUD (Teams, Uhr, Stand) + im Bild „Seilschaften oben“ und Wartezähler | ohne Phase |
+| Routen-Inset, Weg-Legende | ja | ja | gleich |
+| Dock mit Seilschaft-Kästen, Spielerkarte | ja | nein (Kaderleiste des Arena-HUD) | offen |
+| Kamera | Regie, Totale, Folgen | Regie | offen |
+
+Sichtbare Schwächen: Spieler ohne PixelLab-Satz erscheinen als Rückfallfigur (wie auf jeder Bahn, s. #1617); die
+Einstiegswand ist im Wandbild schmal, bei sechs Wandkletterern je Team stehen die Linien dicht; das Hangeln am Dach
+bleibt die schwächste Pose (wie im Mockup angekündigt).
 
 ## 7. Offene Punkte
 
@@ -202,6 +232,7 @@ __BILDER__
 7. **Rechenzeit** knapp doppelt so hoch wie im Standard (80 statt 42 ms je Rennen); für einen Spieltag unkritisch,
    aber glättbar (die Nachbarsuche je Tick ist quadratisch).
 8. **Rangtreue auf Seilschaftsebene** (R9) nicht gesondert gemessen.
-9. **Chromium-Fingerabdruck** (das Skript ohne `--node`, unter der Aufnahme-Sperre) nicht gelaufen; der Node-Lauf
-   trifft GESAMT von main.
+9. **Chromium-Fingerabdruck** (das Skript ohne `--node`, unter der Aufnahme-Sperre) nicht gelaufen, weil die
+   Sperre stundenlang von anderen Läufen belegt war; der Node-Lauf trifft GESAMT von main (auch nach dem Merge von
+   #1610/#1626/#1631/#1632/#1635).
 10. Eisfall und Kletterhalle (Assets aus #1632 liegen bereit), Abseilen und Flut: später.
