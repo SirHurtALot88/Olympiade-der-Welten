@@ -19,7 +19,6 @@ import {
   TEAM_VOID_VAR_SECONDARY,
 } from "@/lib/foundation/team-shell-theme";
 import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
-import { useViewWidth } from "@/lib/ui/view-width-preference";
 import { groupGameEncyclopediaEntriesByCategory } from "@/lib/ui/game-encyclopedia";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -307,7 +306,6 @@ const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
 };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
-  const [viewWidthMode] = useViewWidth();
   const {
   activeContextMeta,
   activeContextStatusChips,
@@ -845,7 +843,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     (
     <main
       className="app-shell foundation-shell foundation-app is-new-look"
-      data-view-width={viewWidthMode}
+      data-view-width="cinema"
       data-team-theme={teamShellThemeVars ? teamThemeCode ?? undefined : undefined}
       style={teamShellThemeVars ? (teamShellThemeVars as CSSProperties) : undefined}
     >
@@ -1107,6 +1105,22 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         }
         headerActions={
           <>
+            {screenPrimaryAction ? (
+              <button
+                className={`secondary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
+                type="button"
+                aria-label={`Hauptaktion dieser Ansicht: ${screenPrimaryAction.buttonLabel}`}
+                onClick={screenPrimaryAction.onClick}
+                disabled={screenPrimaryAction.disabled}
+                title={
+                  [screenPrimaryAction.title, screenPrimaryAction.detail, screenPrimaryAction.disabledReason]
+                    .filter(Boolean)
+                    .join(" · ") || screenPrimaryAction.buttonLabel
+                }
+              >
+                {screenPrimaryAction.buttonLabel}
+              </button>
+            ) : null}
             <button
               className={`primary-button foundation-global-next-button ${globalNextStatusClass}`}
               data-testid="foundation-global-next-button"
@@ -1684,37 +1698,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           title={readOnlyBannerMessage}
         >
           <span className="transfer-status-pill is-warning">Nur Ansicht</span>
-        </section>
-      ) : null}
-
-      {screenPrimaryAction ? (
-        <section
-          className={joinClassNames(
-            "foundation-screen-action",
-            "is-compact",
-            `is-${screenPrimaryAction.status}`,
-            screenPrimaryAction.disabled && "is-disabled",
-          )}
-          aria-label="Hauptaktion dieser Ansicht"
-        >
-          <div className="foundation-screen-action-cta">
-            {/* Nur EIN Primary pro Ansicht: der Header-"Weiter"-Button ist der
-                globale Akzent; die View-Hauptaktion wird als Secondary abgestuft,
-                damit klar ist, was DER nächste Schritt ist. */}
-            <button
-              className={`secondary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
-              type="button"
-              onClick={screenPrimaryAction.onClick}
-              disabled={screenPrimaryAction.disabled}
-              title={
-                [screenPrimaryAction.title, screenPrimaryAction.detail, screenPrimaryAction.disabledReason]
-                  .filter(Boolean)
-                  .join(" · ") || screenPrimaryAction.buttonLabel
-              }
-            >
-              {screenPrimaryAction.buttonLabel}
-            </button>
-          </div>
         </section>
       ) : null}
 

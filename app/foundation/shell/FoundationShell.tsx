@@ -108,12 +108,15 @@ export default function FoundationShell({
         {/* Die Gliederungs-Spitze des Dokuments. Steht VOR allem anderen im Hauptbereich, damit
             „Zum Hauptinhalt springen" (Ziel `#foundation-main-content`) direkt auf sie faellt. */}
         {viewTitle ? <h1 className="sr-only">{viewTitle}</h1> : null}
-        <FoundationActivityStrip activities={activities} />
+        {/* Kopfzeile (18.11., volle Breite): Brotkrume, Unterreiter, Statuschip, Hauptaktion, Weiter und
+            Suche stehen in EINER schmalen Zeile statt in vier gestapelten Bändern. Läuft eine
+            Aktivität mit Fortschrittsbalken, bricht der Status unter die Zeile um (siehe CSS). */}
         <header className="foundation-shell-header">
           {breadcrumb ? <div className="foundation-shell-breadcrumb-slot">{breadcrumb}</div> : null}
+          {subNav}
+          <FoundationActivityStrip activities={activities} />
           <div className="foundation-shell-header-actions">{headerActions}</div>
         </header>
-        {subNav}
         {/* key={activeView}: der Content-Wrapper wird bei jedem echten
             View-Wechsel neu gemountet, damit die `foundation-view-enter`-
             Animation (Fade + sanftes Aufsteigen) erneut spielt und sich mit

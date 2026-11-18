@@ -17,7 +17,6 @@ import {
   type FoundationSidebarOrderState,
 } from "@/lib/foundation/foundation-sidebar-order";
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
-import { useViewWidth, type ViewWidthMode } from "@/lib/ui/view-width-preference";
 
 // Monochrome line-icons (currentColor) für Views, bei denen ein bildhaftes Icon
 // klarer ist als ein Unicode-Glyph. Fällt auf item.icon (Glyph) zurück, wenn
@@ -71,17 +70,6 @@ type FoundationSidebarProps = {
 // lassen (Mockup: ruhige Leiste, Beschriftung nur auf Wunsch).
 const RAIL_HOVER_DELAY_MS = 140;
 
-const VIEW_WIDTH_SEGMENTS: ReadonlyArray<{
-  mode: ViewWidthMode;
-  label: string;
-  glyph: string;
-  title: string;
-}> = [
-  { mode: "standard", label: "Standard", glyph: "▯", title: "Standardbreite — komfortabel, wie auf einem 15\"-MacBook" },
-  { mode: "wide", label: "Breit", glyph: "▭", title: "Breite Ansicht — mehr Inhalt pro Zeile" },
-  { mode: "cinema", label: "Cinema", glyph: "▬", title: "Cinema — volle Breite, nutzt große 32\"-Monitore aus" },
-];
-
 type SidebarDragState = {
   groupId: keyof FoundationSidebarOrderState;
   itemId: FoundationViewId;
@@ -111,7 +99,6 @@ export default function FoundationSidebar({
   };
   useEffect(() => clearRailTimer, []);
   const railMode = rail ? (rail.pinned ? "pinned" : railHover ? "open" : "compact") : undefined;
-  const [viewWidthMode, setViewWidthMode] = useViewWidth();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
@@ -331,36 +318,6 @@ export default function FoundationSidebar({
             </span>
           )
         ) : null}
-      </div>
-      <div className="foundation-sidebar-viewwidth">
-        <span className="foundation-sidebar-viewwidth-label">Breite</span>
-        <div
-          className="foundation-sidebar-viewwidth-seg"
-          role="radiogroup"
-          aria-label="View-Breite"
-          data-testid="foundation-view-width-switch"
-        >
-          {VIEW_WIDTH_SEGMENTS.map((segment) => {
-            const isActive = viewWidthMode === segment.mode;
-            return (
-              <button
-                key={segment.mode}
-                type="button"
-                role="radio"
-                aria-checked={isActive}
-                className={`foundation-sidebar-viewwidth-option${isActive ? " is-active" : ""}`}
-                data-testid={`foundation-view-width-${segment.mode}`}
-                title={segment.title}
-                onClick={() => setViewWidthMode(segment.mode)}
-              >
-                <span className="foundation-sidebar-viewwidth-glyph" aria-hidden="true">
-                  {segment.glyph}
-                </span>
-                <span className="foundation-sidebar-viewwidth-text">{segment.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
       {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
       {navGroups.map((group) => (
