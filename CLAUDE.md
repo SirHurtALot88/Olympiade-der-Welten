@@ -203,6 +203,26 @@ x2 rechnet, ist ein Fehler. **Gezeigt = gebucht:** `formkartenBuchung` sagt, ob 
 neutral, unzufrieden, verärgert), nicht als Herz und nicht als Emoji. Der Form-Verlauf liegt je Spieler in `playerFormState[].verlauf`
 (Saison-Reset zur Mitte beim Saisonwechsel). Wertungs-Fingerabdruck blieb bei `ce8fcef66028`, weil die Engine nicht angefasst wurde.
 
+## Verletzung heißt: nicht einsetzbar, und 50 % in der Verletzungs-Disziplin (Chris, 18.11.)
+
+Wörtlich: „Verletzt ist nicht nur −10, sondern gar nicht einsetzbar! Und IN der Disziplin, wo er sich verletzt hat, hat
+er nur 50 % seiner Basisleistung bzw. Eignung/Score.“ Ein verletzter Spieler darf für die Dauer der Verletzung weder
+manuell noch von der KI noch von einem Auto-Auffüllweg aufgestellt und nicht gewertet werden. In der Disziplin, in der
+er sich verletzt, zählt nur die Hälfte seiner Basisleistung — gezeigt = gebucht. Anzeigen dürfen eine Verletzung nicht
+als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung-regel-18-11.md`.
+
+## Finanzen und KI-Kaufverhalten: feste Vorgaben (Chris, 18.11.)
+
+- **Rücklage nach Finanzwert, nicht nach Geld.** „Reiche Teams behalten 15–25 %“ meint den **Finanzwert des Teams in der
+  Team-Matrix (1–10)**: hoher Finanzwert behält auch in Saison 1 15–25 % des Budgets als Cash, niedriger 5–10 %.
+- **Der alte Gehaltsdeckel (`OLY_SALARY_CEILING_V2`) bleibt aus** — „da haben die Teams dann nur Mist gekauft“. Kein
+  neuer harter Gehaltsdeckel; die Orientierung am gepickten Sponsor läuft weich (Forecast mit Sponsor, Rücklage, Vorstand).
+- **Der Vorstand verhängt keine Geldstrafen.** Bei ausbleibendem Erfolg gibt er weniger Budget frei: das Team darf bei
+  Transfers nur auf X % seines verfügbaren Budgets zugreifen.
+- **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
+  nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
+- Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
+
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 
 Chris am 13.09., wörtlich: „breaking NICHT breakdance ist sondern ein foltern!!!! […] einer
