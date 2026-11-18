@@ -44,7 +44,7 @@
 .hm-hk .hm-crest{width:5.25rem;height:5.25rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
 .hm-hk .hm-crest img{width:100%;height:100%;object-fit:cover}
 .hm-hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
-.hm-hk h1{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hm-hk .hm-name{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
 .hm-hk span.hm-lage{font-size:.97rem;color:var(--leise)} .hm-hk span.hm-lage b{color:var(--creme);font-weight:600}
 .hm-kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
 .hm-kpi{min-width:7.2rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
@@ -193,7 +193,7 @@ svg.hm-ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
 @media (max-width:760px){
 .hm.bc{font-size:16px;height:auto;display:block;overflow:visible}
 .hm-hero{grid-template-columns:minmax(0,1fr);gap:.75rem;padding:.9rem .75rem}
-.hm-hk .hm-crest{width:3.5rem;height:3.5rem} .hm-hk h1{font-size:1.55rem;white-space:normal}
+.hm-hk .hm-crest{width:3.5rem;height:3.5rem} .hm-hk .hm-name{font-size:1.55rem;white-space:normal}
 .hm-kpis{justify-content:flex-start;overflow-x:auto;margin:0 -.75rem;padding:0 .75rem} .hm-kpi{flex:none;min-width:0;padding:.45rem .9rem} .hm-kpi strong{font-size:1.5rem;height:1.6rem}
 .hm-cta{align-items:stretch} .hm-btn.hm-haupt{height:2.9rem;font-size:1rem;padding:0 .75rem}
 .hm-raster{display:flex;flex-direction:column;padding:.6rem .5rem 5.4rem;gap:.6rem}
@@ -230,7 +230,7 @@ svg.hm-ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
 /* Schmale Fenster (MacBook 1710): Kopf darf schrumpfen statt Kacheln abzuschneiden */
 .hm-hero{grid-template-columns:minmax(0,max-content) minmax(0,1fr) auto}
 .hm-hk{min-width:0;max-width:30rem}
-.hm-hk h1{font-size:2.3rem;overflow:hidden;text-overflow:ellipsis}
+.hm-hk .hm-name{font-size:2.3rem;overflow:hidden;text-overflow:ellipsis}
 .hm-hk .hm-lage{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hm-kpis{gap:.4rem}
 .hm-kpi{min-width:0;padding-left:1rem;padding-right:.95rem;flex:0 1 auto}

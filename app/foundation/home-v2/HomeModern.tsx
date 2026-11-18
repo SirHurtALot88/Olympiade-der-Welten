@@ -103,7 +103,7 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
         </span>
         <div style={{ minWidth: 0 }}>
           <em>{kicker}</em>
-          <h1>{p.teamName}</h1>
+          <h2 className="hm-name">{p.teamName}</h2>
           <span className="hm-lage">
             {eigene && eigene.rang != null ? <b>{eigene.rang}. in {sd?.ligaName}</b> : <b>{sd?.ligaName ?? "Liga"}</b>}
             {lage ? <> · {lage}</> : null}
@@ -222,6 +222,28 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
           ) : null}
         </>
       )}
+      {k.einsatz ? (
+        <div className="hm-st" data-testid="hm-einsatz">
+          <span>
+            Einsatzliste
+            <span className="hm-pp" aria-hidden="true">
+              {Array.from({ length: Math.min(k.einsatz.benoetigt, 12) }, (_, i) => (
+                <i key={i} className={i < k.einsatz!.gesetzt ? "" : "hm-o"} />
+              ))}
+            </span>
+            <em className={`hm-t ${k.einsatz.gesetzt < k.einsatz.benoetigt ? "hm-minus" : "hm-plus"}`}>
+              {k.einsatz.gesetzt} von {k.einsatz.benoetigt}
+            </em>
+          </span>
+          {k.hatFormkartenPool ? (
+            <span>
+              <svg className="hm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg>
+              Formkarte
+              <em className={k.einsatz.formkarten.length ? "hm-plus" : "hm-null"}>{k.einsatz.formkarten.length ? `${k.einsatz.formkarten.join(" + ")} gelegt` : "keine gelegt"}</em>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </button>
   );
 }
@@ -370,19 +392,43 @@ function Tabelle({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten }) {
 
 /* ------------------------------------------------------------------------------------- Entscheidungen */
 
-function Entscheidungen({ p }: { p: HomeV2ClientProps }) {
-  const items: Array<{ id: string; klasse: string; icon: string; titel: string; detail: string; ziel: string }> = p.inboxItems.slice(0, 5).map((i: HomeV2InboxItem) => ({
-    id: i.id,
+function Entscheidungen({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+  type Zeile = { id: string; klasse: string; icon: string; titel: string; detail: string; ziel: string; oeffne: () => void };
+  const abgeleitet: Zeile[] = (sd?.entscheidungen ?? []).map((e) => ({
+    id: e.id,
+    klasse: e.ton === "rot" ? "" : e.ton === "gelb" ? "hm-w" : "hm-h",
+    icon: e.ton === "grau" ? "i" : "!",
+    titel: e.titel,
+    detail: e.detail,
+    ziel: e.zielText,
+    oeffne:
+      e.ziel.art === "einsatzliste"
+        ? p.onOpenLineup
+        : e.ziel.art === "kader"
+          ? p.onOpenTeams
+          : e.ziel.art === "spieler"
+            ? (() => {
+                const id = e.ziel.playerId;
+                return () => p.onOpenPlayer(id);
+              })()
+            : p.onOpenInbox,
+  }));
+  const ausInbox: Zeile[] = p.inboxItems.map((i: HomeV2InboxItem) => ({
+    id: `inbox-${i.id}`,
     klasse: i.severity === "critical" ? "" : i.severity === "warning" ? "hm-w" : "hm-h",
     icon: i.severity === "info" ? "i" : "!",
     titel: i.title,
     detail: i.detail,
     ziel: "öffnen ›",
+    oeffne: p.onOpenInbox,
   }));
+  // Abgeleitete Zeilen zuerst (aus dem echten Zustand), dann die Inbox; Einträge der Inbox, die dasselbe sagen, entfallen.
+  const gesehen = new Set(abgeleitet.map((z) => z.titel.toLowerCase()));
+  const items = [...abgeleitet, ...ausInbox.filter((z) => !gesehen.has(z.titel.toLowerCase()))].slice(0, 5);
   if (items.length < 5) {
     const z = p.boardObjectives[0];
     if (z) {
-      items.push({ id: `board-${z.objectiveId}`, klasse: "hm-h", icon: "i", titel: "Vorstandsziel", detail: z.label, ziel: "lesen ›" });
+      items.push({ id: `board-${z.objectiveId}`, klasse: "hm-h", icon: "i", titel: "Vorstandsziel", detail: z.label, ziel: "lesen ›", oeffne: p.onOpenBoardObjectives ?? p.onOpenInbox });
     }
   }
   return (
@@ -397,7 +443,7 @@ function Entscheidungen({ p }: { p: HomeV2ClientProps }) {
           <p className="hm-leer" style={{ padding: ".8rem .6rem" }}>Nichts offen. Alles erledigt.</p>
         ) : (
           items.map((e) => (
-            <button key={e.id} type="button" className={`hm-ent ${e.klasse}`} onClick={e.id.startsWith("board-") && p.onOpenBoardObjectives ? p.onOpenBoardObjectives : p.onOpenInbox}>
+            <button key={e.id} type="button" className={`hm-ent ${e.klasse}`} onClick={e.oeffne}>
               <span className="hm-ik">{e.icon}</span>
               <span className="hm-tx">{e.titel}<small>{e.detail}</small></span>
               <span className="hm-go">{e.ziel}</span>
@@ -457,7 +503,7 @@ function Kader({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
                 <span className="hm-rg hm-t">{i + 1}</span>
                 <span className="hm-un">
                   <b>{pl.name}</b>
-                  <small>{pl.contractLength != null ? `Vertrag ${pl.contractLength} ${pl.contractLength === 1 ? "Jahr" : "Jahre"}` : " "}</small>
+                  <small>{pl.className || pl.race ? [pl.className, pl.race].filter(Boolean).join(" · ") : pl.contractLength != null ? `Vertrag ${pl.contractLength} ${pl.contractLength === 1 ? "Jahr" : "Jahre"}` : "\u00a0"}</small>
                   <span className="hm-ov hm-t">
                     <strong>{pl.playerOvr != null ? ZAHL.format(pl.playerOvr) : "–"}</strong>
                     {a ? <FormMoralMarke a={a} /> : null}
@@ -554,6 +600,13 @@ function Band({ sd }: { sd: StartseiteDaten }) {
       );
     }
   }
+  if (sd.spielerDesTages) {
+    teile.push(
+      <span key="tag">
+        Spieler des Tages: <b>{sd.spielerDesTages.name}</b> {sd.spielerDesTages.formStufe != null ? <BcFormPfeil stufe={sd.spielerDesTages.formStufe} /> : null}
+      </span>,
+    );
+  }
   if (sd.tabellenfuehrer && sd.eigene) {
     teile.push(
       sd.tabellenfuehrer.name !== sd.eigene.name ? (
@@ -627,7 +680,7 @@ export default function HomeModern(props: HomeV2ClientProps) {
         <div className="hm-raster">
           <SpieltagKarte p={props} sd={sd} />
           <Tabelle p={props} sd={sd} />
-          <Entscheidungen p={props} />
+          <Entscheidungen p={props} sd={sd} />
           <Kader p={props} sd={sd} />
           <Kasse p={props} />
           <Disziplinen sd={sd} />

@@ -1,4 +1,4 @@
-# Startseite neu — Abgleich Mockup | App (18.11.)
+# Startseite neu — Abgleich Mockup | App (18.11., Stand Runde 2)
 
 Chris (18.11.): „startseite neu sieht geil aus! bitte genau so einarbeiten, nicht integrieren sondern die jetzige neu bauen“.
 Vorlage: `public/mockups/oly-start-modern-18-11.html`, Doku `docs/design/oly-start-modern-18-11.md`.
@@ -12,6 +12,20 @@ Der App-Spielstand ist ein Wegwerf-Battle-Save (Liga-Split, Auto-Run), das Team 
 Der Rahmen (Schiene, Kopfzeile) ist der echte App-Rahmen, im Mockup ist er nur angedeutet; die Seite füllt die Fläche, die der Rahmen übrig lässt.
 
 Gemessen (`scripts/screenshot-startseite-neu.ts`-Lauf, Seite scrollt nicht, keine Tafel läuft über): 2560×1440 (Schrift 19,4 px), 1920×1080 (14,1 px), 1710×1112 (14,0 px). Phone 412 breit: einspaltig, Seite scrollt wie im Mockup.
+
+## Runde 2 (neue Lücken geschlossen, Daten lagen im Spielstand)
+
+| Lücke aus Runde 1 | Jetzt | Quelle (nichts doppelt gerechnet) |
+|---|---|---|
+| Einsatzliste je Disziplin | Strichleiste und „x von n" je Disziplin-Karte (Vierergruppe ohne Strichleiste, wie im Mockup) | gespeicherter Entwurf des laufenden Spieltags: `getTeamMatchdayLineupDraft`, `getMatchdayLineupSideRequirements`, `getLineupDraftSideCounts` — dieselben Funktionen wie der Home-Flow (`homeNextMatchdayStatus`); `lib/foundation/startseite-modern-zustand.ts` |
+| Gelegte Formkarte | „Speed +8 gelegt" bzw. „keine gelegt"; ohne Formkarten-Pool (Transfers nicht finalisiert) entfällt die Zeile | `modifiers.d1/d2` des Entwurfs, sonst `formCardPlans`; Pool über `getFormCardFlowStatus` |
+| Entscheidungen aus echtem Zustand | „Einsatzliste unvollständig/leer" (n von m Plätzen), „Pflicht-Minuskarte offen" (Strafe am Saisonende, Spieltage Zeit; rot ab 3 Spieltagen), „Spieler verärgert" (Moral unter 40, Spieltage ohne Einsatz), „Vertrag läuft aus" (Endsaison = laufende Saison); danach die Inbox, doppelte Titel entfallen | `buildFormCardSeasonUsageAudit` (dieselbe Zahl wie die Strafe), `laeuftMitDieserSaisonAus`, `baueFormMoralAnzeige`, Einsatz-Zeilen |
+| Sprungziele | Einsatzliste → Einsatzliste; Spieler → Spielerprofil; mehrere Verträge → Kader; Inbox-Zeilen → Inbox | Props der Startseite |
+| Spieler des Tages | im Meldungsband mit Form-Pfeil: bester des Teams im letzten gewerteten Spieltag (gewonnener Einsatz zuerst, dann Beitrag) | `playerDisciplinePerformances` (`rankInTeam`, `scoreContribution`) |
+| Spieler der Saison, Bestes Heimspiel | in der Saisonbilanz; Heimspiel nur, wo der Spielplan Heim/Auswärts speichert | `baueMatchwinnerListe`, `schedule.homeTeamId` |
+| Kaderkarten Klasse und Volk | „Hero · Lizard" unter dem Namen | `Player.className`, `Player.race` über `HomeV2TopPlayerCard` |
+
+Weiter offen: Kassenkurve, Spieltags-Buchungen, Apron-Abstand (Finanzkonzept), „Scout-Bericht fertig" (kein Inbox-Eintrag), Einsatzliste-Karten nur für den laufenden Spieltag (der Entwurf gehört sonst nicht zur Karte).
 
 ## Drin (wie im Mockup, echte Daten)
 
@@ -46,8 +60,7 @@ Gemessen (`scripts/screenshot-startseite-neu.ts`-Lauf, Seite scrollt nicht, kein
 |---|---|
 | Kassenkurve, Einnahmen/Ausgaben des letzten Spieltags, „Nächste Buchung", Stadion nur im Heimspiel | Keine Buchungen je Spieltag, bis das Finanzkonzept sie liefert; nichts erfunden |
 | Apron-Abstand und Quote | `buildApronProjection` braucht die Projektion über alle 32 Teams; gehört zur Finanzseite, nicht zur Startseite |
-| Einsatzliste „3 von 4" und Formkarte „Speed +2 gelegt" je Disziplin-Karte | Die Besetzung je Disziplin liegt nicht in den Home-Props (nur die Gesamtzahl offener Plätze, sie steht im Hauptknopf); die Zählung müsste aus der Einsatzlisten-Logik gezogen werden (nicht anfassen, parallele Arbeit) |
-| Entscheidungen „Pflicht-Minuskarte offen", „Spieler verärgert", „Scout-Bericht", „Vertrag läuft aus" | Es gibt dafür (noch) keine Inbox-Einträge; die Regeln stehen in `form-moral-17-11.md` |
+| Entscheidung „Scout-Bericht fertig“ | Kein Inbox-Eintrag dafür |
 | „Spieler des Tages" im Band, „Spieler der Saison", „Bestes Heimspiel" in der Bilanz | Keine Datenquelle je Spieltag bzw. nicht abgeleitet; weggelassen |
 | Hover-Ausklappen der Schiene im Mockup-Rahmen | Ist die echte App-Schiene |
 
