@@ -622,5 +622,616 @@
       "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
     },
     "hinweis": "PixelLab liefert hier einen grauen Letterbox-Streifen (26 px oben, 28 px unten); _weisse_raender_fuellen() in baue-kulisse-buehnen.py schneidet ihn weg und zieht den Inhalt auf die volle Hoehe."
+  },
+  "climbing-canyon/wand_oben.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/wand_oben.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "Alpha hart geschnitten; Masse unveraendert 792x300",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Wandebene E4, obere Haelfte (y 0-299): Band an der Unterkante, Engstelle, Spalt/Kamin, Dach mit Lippe, Flanke, Gipfelgrat; Himmel transparent",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1061>",
+      "seed": 32,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 761.735,
+      "gen_nachher": 736.735,
+      "datum": "2026-11-18T20:04:54Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "a7d6a431-9474-4a1f-a305-2d4aa14c2bc4",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-canyon/wand_unten.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/wand_unten.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "unveraendert 792x300, deckend",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Wandebene E4, untere Haelfte (y 300-599): Einstiegswand, Kamin, Wandfuss; deckend",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 906>",
+      "seed": 33,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 711.735,
+      "gen_nachher": 686.735,
+      "datum": "2026-11-18T20:10:14Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "9c65cf8f-adc7-4353-a90b-987f41e7a292",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-canyon/wand.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/wand.png",
+    "groesse": [
+      792,
+      600
+    ],
+    "bearbeitung": "obere Haelfte (y 0-299) ueber unterer Haelfte (y 300-599) zusammengesetzt, Naht = Band; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Wandebene E4 komplett 792x600, Wandpixel = Figurenpixel (1-fach zeichnen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "zusammengesetzt aus eigenen PixelLab-Erzeugnissen",
+    "auftrag": [
+      {
+        "prompt": "<b64 1061>",
+        "seed": 32,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 761.735,
+        "gen_nachher": 736.735,
+        "datum": "2026-11-18T20:04:54Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "a7d6a431-9474-4a1f-a305-2d4aa14c2bc4",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      },
+      {
+        "prompt": "<b64 906>",
+        "seed": 33,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 711.735,
+        "gen_nachher": 686.735,
+        "datum": "2026-11-18T20:10:14Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "9c65cf8f-adc7-4353-a90b-987f41e7a292",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      }
+    ]
+  },
+  "climbing-canyon/reihe_e3.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/reihe_e3.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "aus wand_oben.png: gespiegelt, zu 55 % in Dunstfarbe (150, 110, 170) getoent, Kontrast 0,7; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Ebene E3: zweite Reihe hinter dem Grat (Parallax 0,45)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1061>",
+      "seed": 32,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 761.735,
+      "gen_nachher": 736.735,
+      "datum": "2026-11-18T20:04:54Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "a7d6a431-9474-4a1f-a305-2d4aa14c2bc4",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-eisfall/wand_oben.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/wand_oben.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "dunkelblauer Himmel per Flutfuellung von der Oberkante entfernt (Toleranz 14), Himmelsreste entfernt; Masse unveraendert 792x300",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Wandebene E4, obere Haelfte (y 0-299): Band an der Unterkante, Engstelle, Spalt/Kamin, Dach mit Lippe, Flanke, Gipfelgrat; Himmel transparent",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1220>",
+      "seed": 71,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 672.735,
+      "gen_nachher": 647.735,
+      "datum": "2026-11-18T20:23:57Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "79a651f9-1a98-4d91-a827-93dffa446f60",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-eisfall/wand_unten.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/wand_unten.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "unveraendert 792x300, deckend",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Wandebene E4, untere Haelfte (y 300-599): Einstiegswand, Kamin, Wandfuss; deckend",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 980>",
+      "seed": 72,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 647.735,
+      "gen_nachher": 622.735,
+      "datum": "2026-11-18T20:27:51Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "b67a8d28-186a-437f-aec4-920b499b5572",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-eisfall/wand.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/wand.png",
+    "groesse": [
+      792,
+      600
+    ],
+    "bearbeitung": "obere Haelfte (y 0-299) ueber unterer Haelfte (y 300-599) zusammengesetzt, Naht = Band; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Wandebene E4 komplett 792x600, Wandpixel = Figurenpixel (1-fach zeichnen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "zusammengesetzt aus eigenen PixelLab-Erzeugnissen",
+    "auftrag": [
+      {
+        "prompt": "<b64 1220>",
+        "seed": 71,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 672.735,
+        "gen_nachher": 647.735,
+        "datum": "2026-11-18T20:23:57Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "79a651f9-1a98-4d91-a827-93dffa446f60",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      },
+      {
+        "prompt": "<b64 980>",
+        "seed": 72,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 647.735,
+        "gen_nachher": 622.735,
+        "datum": "2026-11-18T20:27:51Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "b67a8d28-186a-437f-aec4-920b499b5572",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      }
+    ]
+  },
+  "climbing-eisfall/reihe_e3.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/reihe_e3.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "aus wand_oben.png: gespiegelt, zu 55 % in Dunstfarbe (120, 140, 200) getoent, Kontrast 0,7; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Ebene E3: zweite Reihe hinter dem Grat (Parallax 0,45)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1220>",
+      "seed": 71,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 672.735,
+      "gen_nachher": 647.735,
+      "datum": "2026-11-18T20:23:57Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "79a651f9-1a98-4d91-a827-93dffa446f60",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-halle/wand_oben.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/wand_oben.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "dunkler Hintergrund per Flutfuellung von der Oberkante entfernt (Toleranz 10); Masse unveraendert 792x300",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Wandebene E4, obere Haelfte (y 0-299): Band an der Unterkante, Engstelle, Spalt/Kamin, Dach mit Lippe, Flanke, Gipfelgrat; Himmel transparent",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1298>",
+      "seed": 101,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 606.54,
+      "gen_nachher": 581.54,
+      "datum": "2026-11-18T20:40:42Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "2005084a-8063-4409-a672-0e9b3e913055",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-halle/wand_unten.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/wand_unten.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "unveraendert 792x300, deckend",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Wandebene E4, untere Haelfte (y 300-599): Einstiegswand, Kamin, Wandfuss; deckend",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1018>",
+      "seed": 103,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 556.54,
+      "gen_nachher": 531.54,
+      "datum": "2026-11-18T20:49:08Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "3d3b551a-0d5a-4b5d-9e09-2ecbea97c96e",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-halle/wand.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/wand.png",
+    "groesse": [
+      792,
+      600
+    ],
+    "bearbeitung": "obere Haelfte (y 0-299) ueber unterer Haelfte (y 300-599) zusammengesetzt, Naht = Band; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Wandebene E4 komplett 792x600, Wandpixel = Figurenpixel (1-fach zeichnen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "zusammengesetzt aus eigenen PixelLab-Erzeugnissen",
+    "auftrag": [
+      {
+        "prompt": "<b64 1298>",
+        "seed": 101,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 606.54,
+        "gen_nachher": 581.54,
+        "datum": "2026-11-18T20:40:42Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "2005084a-8063-4409-a672-0e9b3e913055",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      },
+      {
+        "prompt": "<b64 1018>",
+        "seed": 103,
+        "endpunkt": "/v2/generate-image-v2",
+        "generationen": 25.0,
+        "gen_vorher": 556.54,
+        "gen_nachher": 531.54,
+        "datum": "2026-11-18T20:49:08Z",
+        "gen": [
+          792,
+          300
+        ],
+        "job": "3d3b551a-0d5a-4b5d-9e09-2ecbea97c96e",
+        "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+      }
+    ]
+  },
+  "climbing-halle/reihe_e3.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/reihe_e3.png",
+    "groesse": [
+      792,
+      300
+    ],
+    "bearbeitung": "aus wand_oben.png: gespiegelt, zu 55 % in Dunstfarbe (40, 45, 80) getoent, Kontrast 0,7; 0 Gen.",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Ebene E3: zweite Reihe hinter dem Grat (Parallax 0,45)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 1298>",
+      "seed": 101,
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "gen_vorher": 606.54,
+      "gen_nachher": 581.54,
+      "datum": "2026-11-18T20:40:42Z",
+      "gen": [
+        792,
+        300
+      ],
+      "job": "2005084a-8063-4409-a672-0e9b3e913055",
+      "stilbild": "ja (siehe docs/design/climbing-assets-18-11.md)"
+    }
+  },
+  "climbing-canyon/panorama.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/panorama.png",
+    "groesse": [
+      400,
+      224
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen, 400x224",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Ebene E1: Fernpanorama (Parallax 0,08, weich ziehen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "wide distant desert canyon landscape at golden hour, layered mesas and rock spires fading into blue haze, big sky with soft clouds, far below a winding river, atmospheric perspective, background for a 2D game, pixel art, 16-bit HD-2D RPG style, no characters, no text",
+      "seed": 23,
+      "gen": [
+        400,
+        224
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/panorama_canyon.png"
+  },
+  "climbing-canyon/vordergrund.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/vordergrund.png",
+    "groesse": [
+      172,
+      203
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen, 172x203",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Ebene E5: Vordergrund-Silhouette (Parallax 1,35, abdunkeln)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "dark orange-brown sandstone rock outcrop in the foreground with a gnarled windswept pine tree growing on top, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 41,
+      "gen": [
+        192,
+        224
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/felsnase.png"
+  },
+  "climbing-canyon/wandfuss.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-canyon/wandfuss.png",
+    "groesse": [
+      400,
+      57
+    ],
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Wandfuss-Streifen vor der Unterkante der Wand",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "wide heap of orange-brown sandstone rubble, scree, broken rocks and boulders with dry grass tufts and a little sand, lying at the foot of a cliff, side view, low and very wide, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 61,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 676.735,
+      "gen_nachher": 675.735,
+      "datum": "2026-11-18T20:21:28Z",
+      "gen": [
+        400,
+        64
+      ]
+    }
+  },
+  "climbing-eisfall/panorama.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/panorama.png",
+    "groesse": [
+      400,
+      224
+    ],
+    "bearbeitung": "unveraendert 400x224",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Ebene E1: Fernpanorama (Parallax 0,08, weich ziehen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "wide distant high alpine glacier landscape in cold morning light, layered snowy mountain peaks and a long glacier tongue fading into pale blue haze, big sky with thin clouds, far below a frozen lake, atmospheric perspective, background for a 2D game, pixel art, 16-bit HD-2D RPG style, no characters, no text",
+      "seed": 81,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 622.735,
+      "gen_nachher": 621.735,
+      "datum": "2026-11-18T20:34:39Z",
+      "gen": [
+        400,
+        224
+      ]
+    }
+  },
+  "climbing-eisfall/vordergrund.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/vordergrund.png",
+    "groesse": [
+      183,
+      182
+    ],
+    "bearbeitung": "blauer Hintergrund per Flutfuellung entfernt, unterer Rand mit Bildfehler (Schriftzug-Artefakt) abgeschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Ebene E5: Vordergrund-Silhouette (Parallax 1,35, abdunkeln)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "dark blue-grey rock outcrop in the foreground covered with thick snow and hanging icicles, a small snow-laden fir tree growing on top, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 82,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 621.735,
+      "gen_nachher": 620.735,
+      "datum": "2026-11-18T20:35:03Z",
+      "gen": [
+        192,
+        224
+      ]
+    }
+  },
+  "climbing-eisfall/wandfuss.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-eisfall/wandfuss.png",
+    "groesse": [
+      400,
+      60
+    ],
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Wandfuss-Streifen vor der Unterkante der Wand",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "wide low heap of snow drifts with scattered blue ice chunks and a few dark rocks at the foot of an ice cliff, side view, low and very wide, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 92,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 611.735,
+      "gen_nachher": 610.735,
+      "datum": "2026-11-18T20:38:26Z",
+      "gen": [
+        400,
+        64
+      ]
+    }
+  },
+  "climbing-halle/panorama.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/panorama.png",
+    "groesse": [
+      400,
+      198
+    ],
+    "bearbeitung": "schwarze Balken oben/unten abgeschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Ebene E1: Fernpanorama (Parallax 0,08, weich ziehen)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "wide interior of a big dim indoor sports arena hall, empty grandstand tiers with rows of seats on both sides, steel roof trusses with rows of glowing spotlights and light beams in haze, colourful blank banners hanging from the ceiling, dark blue and warm amber tones, atmospheric depth, background for a 2D game, pixel art, 16-bit HD-2D RPG style, no characters, no text",
+      "seed": 111,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 530.54,
+      "gen_nachher": 529.54,
+      "datum": "2026-11-18T20:53:01Z",
+      "gen": [
+        400,
+        224
+      ]
+    }
+  },
+  "climbing-halle/vordergrund.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/kulissen/climbing-halle/vordergrund.png",
+    "groesse": [
+      173,
+      196
+    ],
+    "bearbeitung": "grauer Hintergrund per Farbschluessel entfernt (Toleranz 14), beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Ebene E5: Vordergrund-Silhouette (Parallax 1,35, abdunkeln)",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "dark steel lighting truss tower in the foreground with stage spotlights and a loudspeaker stack at its base, cables on the floor, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 112,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 529.54,
+      "gen_nachher": 528.54,
+      "datum": "2026-11-18T20:53:20Z",
+      "gen": [
+        192,
+        224
+      ]
+    }
   }
 }
