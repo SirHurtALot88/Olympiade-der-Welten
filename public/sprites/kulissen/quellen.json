@@ -264,7 +264,7 @@
       "generationen": 25.0
     },
     "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png (Kopie von data/generated/pixellab-requisiten/basketball-18-11/kulisse_basketball_streetcourt_v2/00.png)",
-    "bau": "scripts/baue-kulisse-buehnen.py pixellab_breitform('basketball','streetcourt'), PL_RAENDER oben (62,58) / unten (256, LH-58); JPEG wie scripts/baue-arena-kulissen.py, dunkel 0.06 (hell 0.235)",
+    "bau": "scripts/baue-kulisse-buehnen.py pixellab_breitform('basketball','streetcourt'): PL_RAENDER oben (62,58) / unten (256, LH-58), PL_HELL 1,22 (Abendszene aufgehellt, damit dunkle Figuren lesbar bleiben); JPEG wie scripts/baue-arena-kulissen.py, dunkel 0.06 (hell 0.284)",
     "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
     "erzeugt": "2026-11-18",
     "verwendung": "Basketball, Variante Street-Court (Graffiti-Mauer mit Laternen oben, Maschendrahtzaun mit Strassenlampen unten, rissiger Asphalt mit Lichtkegeln)",
