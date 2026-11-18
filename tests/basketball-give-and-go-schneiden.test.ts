@@ -149,7 +149,7 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Basketball Give-and-Go-Schneiden (Option 
         const abstandZurMitte = (y: number) => Math.abs(y - 235);
         const abstandBeimPass = abstandZurMitte(nachPass.y);
         const abstandSpaeter = abstandZurMitte(spielerIn(ticks[i + 3], passgeber).y);
-        expect(abstandSpaeter <= Math.max(15, abstandBeimPass)).toBe(true);
+        expect(abstandSpaeter < abstandBeimPass - 5 || abstandSpaeter < 15).toBe(true);
       } finally {
         await browser?.close();
       }

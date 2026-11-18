@@ -118,7 +118,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Noch nicht im Motor verdrahtet, Einbau s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
  },
  "korb_links_vorne.png": {
   "paket": "PixelLab",
@@ -145,7 +145,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Noch nicht im Motor verdrahtet, Einbau s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
  },
  "korb_links.png": {
   "paket": "PixelLab",
@@ -172,7 +172,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Noch nicht im Motor verdrahtet, s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
  },
  "korb_rechts_hinten.png": {
   "paket": "PixelLab",
@@ -199,7 +199,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Noch nicht im Motor verdrahtet, Einbau s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
  },
  "korb_rechts_vorne.png": {
   "paket": "PixelLab",
@@ -226,7 +226,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Noch nicht im Motor verdrahtet, Einbau s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
  },
  "korb_rechts.png": {
   "paket": "PixelLab",
@@ -253,7 +253,7 @@
    "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
   },
   "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
-  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Noch nicht im Motor verdrahtet, s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
  },
  "wappen_parkett.png": {
   "paket": "PixelLab",
@@ -333,6 +333,6 @@
    "konto_nachher": 866.7
   },
   "anker": "48x32; Rahmen-Box x 4..43, y 2..31; Schiefertafel innen x 11..36, y 9..23 (26x15); Ziffernmitte (24,16)",
-  "verwendung": "Rahmen fuer die Schussuhr am Korb (zeichneShotClock zeichnet heute eine 38x22-Canvas-Box). Noch nicht im Motor verdrahtet, s. docs/design/basketball-assets-17-11.md"
+  "verwendung": "Rahmen fuer die Schussuhr am Korb (zeichneShotClock zeichnet heute eine 38x22-Canvas-Box). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
  }
 }

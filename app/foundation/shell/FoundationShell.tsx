@@ -7,6 +7,7 @@ import type { FoundationActivityItem } from "@/lib/foundation/foundation-activit
 import FoundationActivityStrip from "@/app/foundation/shell/FoundationActivityStrip";
 import FoundationSidebar from "@/app/foundation/shell/FoundationSidebar";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import "@/components/foundation/broadcast/broadcast.css";
 
 type FoundationShellProps = {
   activeView: FoundationViewId;
@@ -44,6 +45,12 @@ type FoundationShellProps = {
   // Banner + Titel fraßen die halbe Seite). Wiring bleibt bei der Router-Body,
   // hier nur Platzierung.
   teamPicker?: ReactNode;
+  /**
+   * Icon-Schiene (Broadcast-Fundament, `components/foundation/broadcast/broadcast.css`): die
+   * Seitenleiste schrumpft auf 64 px und fährt bei Hover/Fokus aus. Bisher nur für die moderne
+   * Einsatzliste; die globale Navigation bleibt sonst unverändert.
+   */
+  compactRail?: boolean;
 };
 
 function buildSeasonContextLabel(
@@ -76,6 +83,7 @@ export default function FoundationShell({
   activities = [],
   teamPicker,
   viewTitle,
+  compactRail = false,
 }: FoundationShellProps) {
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
@@ -83,7 +91,7 @@ export default function FoundationShell({
       : null;
 
   return (
-    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}`} data-testid="foundation-shell-layout">
+    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}${compactRail ? " is-bc-rail" : ""}`} data-testid="foundation-shell-layout">
       <FoundationSidebar
         activeView={activeView}
         onNavigate={onNavigate}

@@ -35,13 +35,15 @@ Belege und Messungen zu R2 stehen in Abschnitt 7.
 
 **Abnahme-Zeile** (Pflicht, kein Prozentwert, sondern bestanden/nicht bestanden):
 
-| Abnahme | Schranke | main | R1 | **R2** |
-|---|---|---:|---:|---:|
-| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | 0,859 (Spannweite 0,111, Saison 0,909) | **0,862** (Spannweite 0,136, Saison 0,881) |
-| Pp-Abweichung (`messe-arena-einfluss.mjs basketball 48`, zwei Saatstämme) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | 13,6 / 16,0 | **7,5 / 13,4** |
-| Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | 0 von 828 Würfen | **0 von 846 Würfen**, Anzeige = Buchung in 8/8 Spielen |
-| Seitenlinie (`__arena.diagSpielzuege(12).seitenlinie`) | 0 Proben außerhalb | — | 7 596 von 3,3 Mio. | **0 von 3,32 Mio.** |
-| Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | 97c267e8b7c7 | **004f26374565**, nur `spiele basketball 1/7/42` |
+| Abnahme | Schranke | main | R1 | #1562 (R1 + Review-Fix) | R2 (alter main) | **R2 + #1562 (18.11.)** |
+|---|---|---:|---:|---:|---:|---:|
+| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | 0,859 (Spannweite 0,111, Saison 0,909) | 0,867 (0,086 / 0,923) | 0,862 (0,136 / 0,881) | **0,862** (Spannweite 0,136, Saison 0,881) |
+| Pp-Abweichung (`einflussVon("basketball",n)`, Saat 0 / 10 000 000) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | 13,6 / 16,0 | 20,4 / 22,1 (nur n=16) | 7,5 / 13,4 | **7,5 / 13,4** (n=48, Node-Motor) |
+| Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | 0 von 828 Würfen | 0 von 828 | 0 von 846 | **0 von 846**, Anzeige = Buchung in 8/8 Spielen |
+| Seitenlinie (`__arena.diagSpielzuege(12).seitenlinie`) | 0 Proben außerhalb | — | 7 596 von 3,3 Mio. | — | 0 von 3,32 Mio. | **0 von 3,32 Mio.** |
+| Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | 97c267e8b7c7 | 38b176d7185b | 004f26374565 | **ce8fcef66028**, nur `spiele basketball 1/7/42` gegen main mit #1562 `38b176d7185b` |
+
+Abschnitt 4 beschreibt den Stand von #1562 (R1 + Review-Fix), Abschnitt 7 Runde 2, Abschnitt 7.9 die Zusammenführung beider.
 
 ## 2. Was diese Runde gebaut hat
 
@@ -61,7 +63,7 @@ Belege und Messungen zu R2 stehen in Abschnitt 7.
 4. **Ballflug in der Höhe.** Jeder Wurf endet im Ring (`bkBogenZ`). Danach fällt der Ball durchs Netz
    (Treffer) oder prallt zum Rebound-Punkt ab (`bkNachlauf`). Freiwürfe genauso. Alles reine Anzeige
    (`fsBall.z`), die Wertung liest nichts davon.
-5. **Spacing-Modul** (eigene Doku). Klumpen ≥3 Mitspieler 49 % → 9 %, freie Anspielstation 27 % → 50 %.
+5. **Spacing-Modul** (eigene Doku). Klumpen ≥3 Mitspieler 49 % → 8 %, freie Anspielstation 27 % → 52 %.
 6. **Wurfwahl nach Entfernung/Eignung/Freistand.** Das bestehende Wurfprofil (`SCHUSS_FERN − SCHUSS_NAH`
    bestimmt die Wunschdistanz, Bedrängnis die Wahl) bleibt. Neu: ungezwungener Wurf höchstens 8,4 m
    (`FERN_RADIUS_MAX` 170 → 140), Slots im echten Spacing (Top/Flügel 7,5 m, Ecken als echte Corner-Threes).
@@ -71,7 +73,7 @@ Belege und Messungen zu R2 stehen in Abschnitt 7.
 
 1. **Wertung bewusst verändert.** Klumpen lässt sich nicht als reine Anzeige reparieren: die Positionen sind
    Spiellogik (Deckerabstand, Passlinien, Rebound). Bewegt sich nur `basketball` im Fingerabdruck, und rho
-   steigt (0,822 → 0,859). Empfehlung: so übernehmen.
+   steigt (0,822 → 0,867). Empfehlung: so übernehmen.
 2. **Ring 0,5 m statt 1,575 m vor der Grundlinie.** Die PNG-Anlage trägt das Brett direkt am Mast (35 px vor
    dem Sockel). Bei FIBA-Lage stünde der Sockel 40 px im Feld. Alle Linien sind relativ zum *Ring* FIBA-genau,
    nur dieser eine Abstand ist verkürzt. Empfehlung: bei der nächsten Korb-Bestellung einen Ausleger von
@@ -84,30 +86,30 @@ Belege und Messungen zu R2 stehen in Abschnitt 7.
 5. **Kontakt-Konzept (Block/Steal).** `kontakt-persoenlichkeit-16-11.md` setzt Basketball auf Rang 6
    („kleine Dosis, erst wenn 1–5 das Muster bestätigt haben“). Diese Runde baut deshalb keinen neuen
    Kontaktkanal. Block, Steal, Doppeln, Screens und Fouls bleiben, wie sie sind. Der rho-Puffer ist mit
-   0,859 größer geworden (vorher ~0,02 laut Konzept), Platz für den späteren Piloten ist also da.
+   0,867 größer geworden (vorher ~0,02 laut Konzept), Platz für den späteren Piloten ist also da.
 
 ## 4. Messwerte vorher/nachher
 
 | Größe | main | neu | Werkzeug |
 |---|---:|---:|---|
-| rho je Spiel (Median, 5 Kader) | 0,822 | **0,859** | `miss-alle-disziplinen.mjs 24 basketball` |
-| rho Saison | 0,930 | 0,909 | dto. |
+| rho je Spiel (Median, 5 Kader) | 0,822 | **0,867** | `miss-alle-disziplinen.mjs 24 basketball` |
+| rho Saison | 0,930 | 0,923 | dto. |
 | Pp-Abweichung (zwei Saatstämme) | 15,6 / 16,7 (Chromium, 15,6 heute bestätigt) | **13,6 / 16,0** | `einflussVon("basketball",48,…,0 bzw. 10000000)` im Node-Motor (rechnet wie `messe-arena-einfluss.mjs`) |
-| ≥3 Mitspieler im 45-px-Kreis | 49,1 % | **9,4 %** | `miss-spacing.mjs basketball 6 120 45` |
+| ≥3 Mitspieler im 45-px-Kreis | 49,1 % | **7,6 %** | `miss-spacing.mjs basketball 6 120 45` |
 | ≥3 Spieler beliebig im 45-px-Kreis | 92,9 % | **61 %** | dto. |
 | mittlerer Mitspielerabstand | 112 px | **185 px** | dto. |
 | Spieler um den Ballführer (80 px) | 4,7 | **2,4** | dto. |
-| Ballführer hat freie Anspielstation | 27 % | **50 %** | dto. |
+| Ballführer hat freie Anspielstation | 27 % | **52 %** | dto. |
 | Feldwürfe je Spiel (beide Teams) | 75,8 | 103,2 | Node-Motor, 12 Saaten |
 | Dreieranteil / Quote | 44,6 % / 34 % | 47,3 % / 33 % | dto. |
 | Mitteldistanz-Anteil / Quote | 11,9 % / 30 % | 19,4 % / 32 % | dto. |
 | Dunk-Anteil / Quote | 16,4 % / 95 % | 10,7 % / 83 % | dto. |
 | Gezeigt = gebucht | — | 0 / 828 | `__arena.diagGezeigtGebucht(8)` |
 
-**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT e80babacb68c (75 Einträge)`,
-neu **`GESAMT 8e431ffe5d93 (75 Einträge)`**. Der diff betrifft genau drei Zeilen:
-`spiele basketball 1` b37fd82fb384 → 1915afd1ea82, `spiele basketball 7` e04f9806dc23 → 401674e1d307,
-`spiele basketball 42` c52a59d8d024 → 3786e4716c29. Alle 72 übrigen Zeilen sind gleich. Der Node-Vorabgleich
+**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT 97cccd6017fb (75 Einträge)`,
+neu **`GESAMT 38b176d7185b (75 Einträge)`** (nach Review-Fix Seitenlinie und Merge von main inkl. #1564, #1561). Der diff betrifft genau drei Zeilen:
+`spiele basketball 1` b37fd82fb384 → 076bfb746272, `spiele basketball 7` e04f9806dc23 → db37a3d13314,
+`spiele basketball 42` c52a59d8d024 → 0f9d5b90711e. Alle 72 übrigen Zeilen sind gleich. Der Node-Vorabgleich
 (20 Disziplinen × Saaten 1/7/42) zeigt dasselbe: 3 von 60 anders, alle Basketball.
 
 **PPS-Referenz neu gezogen.** Mehr Würfe heißen mehr Roh-Impact je Spieler. Der Drift-Wächter
@@ -297,3 +299,48 @@ Neue read-only Sonden in `window.__arena`: `diagSpielzuege(n)` (Aktionen je Spie
 3. Block-Nutzung häufiger im Halbfeld: den Screen-Ruf selbst erst im Halbfeld zulassen (Wertungsänderung, messen).
 4. Steal-Effekt, Zuschauer-Reaktion, Kamera-Wackeln beim Dunk.
 5. HUD: Teamfouls/Bonus in den Scorebug (`teamFouls()` liefert sie).
+
+### 7.9 Zusammenführung mit #1562 (18.11.): eine Feldbegrenzung
+
+Branch `claude/basketball-runde2-17-11` = Runde 2 (`backup/basketball-runde2-final-17-11`) mit `origin/main` gemergt
+(91aabc6f: #1562 als Squash inkl. Review-Fix und Einsatzliste-Registry ad4c805f, davor HUD #1564, Staffel #1561, #1567), kein Rebase. Beide Stände hielten
+Spieler im Feld, jeder auf seine Art:
+
+- **Feld-Grenze** (Runde 2): `feldGrenze(zx,zy)` am Ende der Zielrechnung in `stepFeldspiel`, für jedes Laufziel,
+  Parameter `FELDSPIEL_ART.basketball.feld.grenze`.
+- **Ziel-Begrenzung** (#1562): Klemme in `spacingMitspielerZiel` (BK_FIBA-Feld, 12 px Rand), nur für das Spacing-Ziel.
+
+Beide zusammen wären doppelt. Gemessen wurde jede allein, am selben gemergten Stand (Kopien der Mockups über
+`OLY_SEITE` bzw. Node-Motor):
+
+| Größe | Feld-Grenze allein | Ziel-Begrenzung allein |
+|---|---:|---:|
+| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`, Median 5 Kader) | **0,862** (Spannweite 0,136) | 0,853 (Spannweite 0,090) |
+| rho Saison | 0,881 | 0,902 |
+| Pp, Saat 0 / 10 000 000, n=16 (gleiche Saaten für beide) | **11,1 / 16,0** | 13,0 / 20,5 |
+| Pp, Saat 0 / 10 000 000, n=48 | **7,5 / 13,4** | nicht gemessen (verworfen) |
+| Proben außerhalb des Feldes (`diagSpielzuege(12).seitenlinie`) | **0 von 3 321 732** (max. quer 175 px) | 4 792 von 3 272 796 (max. quer 185 px) |
+| Klumpen ≥ 3 Mitspieler / freie Anspielstation (`miss-spacing.mjs basketball 6 120 45`) | 12,1 % / 43 % | 10,9 % / 41 % |
+
+**Behalten: die Feld-Grenze.** Sie ist bei rho je Spiel (die Abnahmezahl, +0,009) und bei Pp in beiden Saatstämmen
+besser (n=16: 11,1 / 16,0 gegen 13,0 / 20,5) und hält als
+einzige die Abnahme „0 Proben außerhalb“: die Ziel-Begrenzung wirkt nur auf ein Zwischenziel, Laufweg-, Abstoßungs-
+und Rückzugsziele laufen an ihr vorbei. Die Klemme in `spacingMitspielerZiel` ist entfernt (Kommentar an der Stelle).
+Damit rechnet Basketball wie Runde 2: die drei `spiele basketball`-Zeilen sind dieselben wie im Runde-2-Lauf, nur
+GESAMT ist wegen der Staffel-Zeilen von main ein anderer. Basketball-SLOTS im Motor sind unverändert, `MOTOR_BASKETBALL_SLOTS`
+(`lib/lineups/formation/formation-registry.ts`) braucht deshalb nichts.
+
+Endstand, gegen main mit #1562 `38b176d7185b` (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium, beide Läufe
+am selben Tag auf derselben Maschine):
+**GESAMT ce8fcef66028 (75 Einträge)**. Anders sind genau drei Zeilen:
+
+| Zeile | main | neu |
+|---|---|---|
+| `spiele basketball 1` | 076bfb746272 | 91a13edbaa37 |
+| `spiele basketball 7` | db37a3d13314 | 9cae043e306d |
+| `spiele basketball 42` | 0f9d5b90711e | 8a75782eceaa |
+
+Alle 72 anderen Zeilen sind gleich (gegen den alten main `97cccd6017fb` ebenso nur diese drei Zeilen). Weitere Werte des Endstands: gezeigt = gebucht 0 von 846 Würfen (8/8 Spiele
+Anzeige = Buchung), Pp 7,5 / 13,4 (Node-Motor, `einflussVon("basketball",48,…,0 bzw. 10000000)`), Spacing wie Runde 2
+(Mitspielerabstand 181 px, Klumpen 12,1 %, freie Anspielstation 43 %; #1562 allein: 186 px, 7,6 %, 52 %). Die
+Spacing-Kosten der Laufwege (Deny, Post-up) bleiben ein offener Punkt aus Runde 2, nicht aus der Begrenzung.

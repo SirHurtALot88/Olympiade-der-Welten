@@ -5,6 +5,9 @@ import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import LegacyLineupLabClient from "@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient";
 import type { ComponentProps } from "react";
 
+import { useEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
+import "@/app/foundation/legacy-lineup-lab/einsatzliste-modern.css";
+
 type LegacyLineupLabClientProps = ComponentProps<typeof LegacyLineupLabClient>;
 
 export type FoundationLineupPanelProps = {
@@ -20,13 +23,14 @@ export default function FoundationLineupPanel({
   clientKey,
   client,
 }: FoundationLineupPanelProps) {
+  const [look] = useEinsatzlisteLook();
   if (!active) {
     return null;
   }
 
   return (
     <section
-      className="panel foundation-lineup-panel foundation-lineup-v2-panel"
+      className={`panel foundation-lineup-panel foundation-lineup-v2-panel${look === "modern" ? " foundation-lineup-panel--bc" : ""}`}
       data-testid="foundation-lineup"
       id="foundation-lineup-v2"
     >

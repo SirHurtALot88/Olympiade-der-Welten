@@ -25,6 +25,14 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Achtunddreißigster Nachtrag 18.11. — Basketball: Runde 2 und Review-Fix #1562 zusammengeführt.**
+Branch `claude/basketball-runde2-17-11` (Runde 2 mit main gemergt, der #1562 enthält). Beide Stände begrenzten das Feld je auf eigene Art; behalten ist
+nur die **Feld-Grenze** (`feldGrenze`, jedes Laufziel), die Ziel-Begrenzung in `spacingMitspielerZiel` (#1562) ist entfernt. Gemessen
+am selben Stand: Feld-Grenze allein rho 0,862 (Saison 0,881), 0 von 3,32 Mio. Proben außerhalb; Ziel-Begrenzung allein rho 0,853
+(Saison 0,902), 4 792 von 3,27 Mio. Proben außerhalb (Laufweg-/Abstoßungsziele laufen an ihr vorbei). Endstand: rho je Spiel **0,862**
+(Spannweite 0,136), Pp **7,5 / 13,4** (n=48; Feld-Grenze n=16 11,1 / 16,0 gegen Ziel-Begrenzung 13,0 / 20,5), gezeigt = gebucht 0 von 846. Fingerabdruck **GESAMT 38b176d7185b (main mit #1562) → ce8fcef66028**, nur
+`spiele basketball 1/7/42`. Messung: `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9. Matrix unangetastet, 0 PixelLab-Generationen.
+
 **Siebenunddreißigster Nachtrag 17.11. abends — Basketball Runde 2: Laufwege mit Absicht, Kamera, Effekte, Teamfouls.**
 Messung und Prüfbogen: `docs/design/benchmark-basketball-17-11.md` Abschnitt 7. LAUFWEG-MODUL (Backdoor 33, Post-up 58, Pick-and-Roll/-Pop
 12, Fast-Break 47, Help-Rotation 116 je Spiel, Ausboxen bei 97,5 % der Würfe), Feld-Grenze (0 Proben außerhalb, vorher 7 596), Halbfeld-
@@ -32,12 +40,17 @@ Kamera, Effekte/Synth-Ton, Teamfoul-Zähler (Foul ohne Wurf gemessen, 0,841/0,85
 (Spannweite 0,136, Saison 0,881), Pp 13,6 / 16,0 → **7,5 / 13,4** (Node-Motor, n=48), gezeigt = gebucht 0 von 846. Fingerabdruck
 **97c267e8b7c7 → 004f26374565**, nur `spiele basketball 1/7/42`. Matrix unangetastet, 0 PixelLab-Generationen.
 
-**Sechsunddreißigster Nachtrag 17.11. — Basketball: Benchmark-Runde (FIBA-Feld, Spacing, echter Korb).**
-Chris am 17.11.: alle laufen als Klumpen, Korb passt nicht, jede Map braucht 3er-Linie, 2er und 3er werfen. Messung:
-`docs/design/benchmark-basketball-17-11.md`. rho je Spiel 0,822 → **0,859** (Spannweite 0,111, Saison 0,909), Pp 15,6 / 16,7 → **13,6 / 16,0**
-(Node-Motor, n=48), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **9,4 %**, Ballführer mit freier Anspielstation 27 → **50 %**, gezeigt = gebucht
-0 Fehler in 828 Würfen. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 97c267e8b7c7**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix
-unangetastet; PPS-Referenz `data/generated/basketball-pps-referenz.json` neu gezogen (mehr Würfe, Drift-Wächter).
+**Basketball-Benchmark 17.11./18.11. (#1562, Review-Fix).** FIBA-Feld, Feld-Metrik, Spacing-Modul; Review-Fix: Spacing-Ziele bleiben im Spielfeld (0 von 17.352 Proben ausserhalb der Seitenlinie). rho je Spiel 0,822 → **0,867** (Spannweite 0,086, Saison 0,923), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **7,6 %**, Ballführer mit freier Anspielstation 27 → **52 %**. Wertungs-Fingerabdruck **GESAMT 97cccd6017fb → 38b176d7185b**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix unangetastet; Pp siehe `docs/design/benchmark-basketball-17-11.md`.
+
+**Sechsunddreißigster Nachtrag 17.11. — Staffel: ganze Runde, Puste wirkt; vier Teams in der Arena.**
+Chris am 17.11.: Staffel läuft nur halbe Runden, Puste ist egal, nur 2 Teams in Takeshi/Staffel/Battlefield. Befund und Messung:
+`docs/design/vier-teams-staffel-battlefield-17-11.md`. Staffel Duell rho je Spiel 0,924 → **0,957**, Pp 22,0 / 21,6 → **13,2 / 14,0**;
+Pod nach dem Review-Nachtrag (Abschnitt 2.7: Puste je Bein statt je Sekunde, Plan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN
+für k < 6 — die Pp-Sonde des Pods hatte vorher immer k = 6 gemessen, bei echtem k = 4 lag schon main bei 34 Pp): rho k=2..6
+0,943 / 0,956 / 0,957 / 0,951 / 0,957, Pp 17,0 / 11,5 / 8,0 / 6,8 / 5,7 (zweiter Strom 16,8 / 11,5 / 9,7 / 6,0 / 7,5).
+Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 8bbc6ea215f6 → 97cccd6017fb**, bewegt nur Staffel-Zeilen (der Review-Schritt nur
+`spieleBahnPod staffel`). Matrix unangetastet (Rezept über die Budget-Methode). Battlefield Domination mit 5 Punkten ist
+als Umschalter gebaut (`BATTLEFIELD_POD_FORMAT`, Standard `orte3`, bit-identisch); Platzierung dort nach Punkten.
 
 **Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
 Chris am 17.11.: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern

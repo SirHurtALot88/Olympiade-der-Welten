@@ -338,19 +338,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--vorschau")
     ap.add_argument("--vorher-parkett", help="alte parkett.jpg fuer die Vorher-Montage")
+    # Standardwerte = FIBA-Masse des Motors (BK_FIBA in battle-mode.engine.js, Leinwand 1240x470,
+    # 38,971 px/m laengs, 23,333 px/m quer) — ohne Schalter entsteht dasselbe Bild wie im Spiel.
     ap.add_argument("--korb-x", type=float, default=0.076)        # korbXVon(): W*0.076 / W*0.924
-    ap.add_argument("--dreier-rx", type=float, default=112.8)     # DREIER_RADIUS = H*0.24
-    ap.add_argument("--dreier-ry", type=float, default=112.8)
-    ap.add_argument("--zone-tiefe", type=float, default=round(W * 0.88 * (19 / 94), 1))   # 220.6
-    ap.add_argument("--zone-breite", type=float, default=round(H * (16 / 50), 1))         # 150.4
-    ap.add_argument("--korb-skala", type=float, default=1.25)
-    # FIBA-Geometrie des Motors (Benchmark 17.11., BK_FIBA in battle-mode.engine.js); ohne Schalter
-    # bleibt das alte Bild (Kreise H*0.09, Eckenlinien bei Winkel 0.20, kein No-Charge-Bogen).
-    ap.add_argument("--ecke-y", type=float, default=None)
-    ap.add_argument("--kreis-rx", type=float, default=None)
-    ap.add_argument("--kreis-ry", type=float, default=None)
-    ap.add_argument("--no-charge-rx", type=float, default=None)
-    ap.add_argument("--no-charge-ry", type=float, default=None)
+    ap.add_argument("--dreier-rx", type=float, default=263.06)    # 6,75 m * 38,971
+    ap.add_argument("--dreier-ry", type=float, default=157.50)    # 6,75 m * 23,333
+    ap.add_argument("--zone-tiefe", type=float, default=184.49)   # ringVonGrund + 4,225 m
+    ap.add_argument("--zone-breite", type=float, default=114.33)  # 2 * 2,45 m * 23,333
+    ap.add_argument("--korb-skala", type=float, default=1.0)      # BK_KORB_SKALA
+    ap.add_argument("--ecke-y", type=float, default=154.00)       # BK_FIBA.eckeY (6,6 m)
+    ap.add_argument("--kreis-rx", type=float, default=70.15)      # 1,8 m
+    ap.add_argument("--kreis-ry", type=float, default=42.00)
+    ap.add_argument("--no-charge-rx", type=float, default=48.71)  # 1,25 m
+    ap.add_argument("--no-charge-ry", type=float, default=29.17)
     args = ap.parse_args()
     geo = dict(korb_x=args.korb_x, dreier_rx=args.dreier_rx, dreier_ry=args.dreier_ry,
                zone_tiefe=args.zone_tiefe, zone_breite=args.zone_breite, korb_skala=args.korb_skala,

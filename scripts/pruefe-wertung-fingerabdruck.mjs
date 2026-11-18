@@ -12,8 +12,17 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (17.11., Basketball-Benchmark, docs/design/benchmark-basketball-17-11.md): `GESAMT 97c267e8b7c7
-// (75 Eintraege)`; gegenueber dem Vorstand (`d09e10bb872c`) aendern sich NUR die drei Zeilen `spiele basketball 1|7|42`.
+// GESAMT-STAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md
+// Abschnitt 7.9): `GESAMT ce8fcef66028 (75 Eintraege)`; gegenueber main mit #1562 (`38b176d7185b`) aendern sich NUR die
+// drei Zeilen `spiele basketball 1|7|42`. Zwischenstaende: Runde 2 auf altem main `004f26374565`. Davor:
+// VORSTAND (17.11., Basketball-Benchmark #1562 auf main): `GESAMT 38b176d7185b (75 Eintraege)`; gegenueber `97cccd6017fb`
+// aendern sich NUR die drei Zeilen `spiele basketball 1|7|42`.
+// VORSTAND (17.11., Staffel "ganze Runde, Puste wirkt" plus Review-Nachtrag, bewusste Wertungsaenderung,
+// docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2 und 2.7): `GESAMT 97cccd6017fb (75 Eintraege)`;
+// gegenueber dem Vorstand (`d09e10bb872c`, I-Spy V2) aendern sich genau die vier Staffel-Zeilen (spiele staffel
+// 1/7/42, spieleBahnPod staffel), alle anderen 71 sind byte-gleich. Zwischenstand vor dem Review: `8bbc6ea215f6`
+// (gegen ihn bewegt der Review-Nachtrag nur `spieleBahnPod staffel`, Pod-Rezept). Achtung: der Pod laeuft hier
+// mit k = 6; k = 4/2 haelt tests/bahn-pod-vier-teams.test.ts. Davor:
 // VORSTAND (17.11., I-Spy-Knack-Motor V2, docs/design/ispy-knacken-ortswahl-schubsen-17-11.md):
 // `GESAMT d09e10bb872c (75 Eintraege)`; gegenueber dem Vorstand (`7c9257b4435c`, Kontakt im klassischen Spurt
 // scharf) bewegen sich NUR die drei Zeilen `spiele i-spy 1|7|42`. Mit window.__arena.ispyMotor("alt") kommt

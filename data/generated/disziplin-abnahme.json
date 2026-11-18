@@ -32,11 +32,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-17",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "91aabc6f",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BENCHMARK-RUNDE 2 17.11. abends (docs/design/benchmark-basketball-17-11.md Abschnitt 7): LAUFWEG-MODUL + Feld-Grenze bewegen die Wertung -- rho 0,859 -> 0,862 (Spannweite 0,136, Saison 0,881; Node-Motor wie miss-alle-disziplinen.mjs 24, 5 Kader), Pp 13,6/16,0 -> 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 97c267e8b7c7 -> 004f26374565 nur spiele basketball 1/7/42. Kamera/Effekte/Teamfoul-Anzeige rein kosmetisch. Foul ohne Wurf (Reach-in) gemessen 0,841/0,853 und ausgeschaltet. -- Davor: BENCHMARK-RUNDE 17.11. (docs/design/benchmark-basketball-17-11.md): FIBA-Feld + Feld-Metrik + SPACING-MODUL bewegen die Wertung bewusst -- rho 0,822 -> 0,859 (Spannweite 0,111, Saison 0,909), Pp 15,6/16,7 -> 13,6/16,0 (Node-Motor, einflussVon n=48, Saat 0/10000000), Fingerabdruck nur spiele basketball 1/7/42. Commit-Feld noch vom 15.11. -- NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
+   "anmerkung": "ZUSAMMENFUEHRUNG 18.11. (Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md Abschnitt 7.9): Runde 2 (f49eb82e) auf main mit #1562 (91aabc6f) gemergt, gemessen am Merge-Stand; Commit-Feld = main-Elternteil; von zwei Feldbegrenzungen nur die Feld-Grenze (feldGrenze) behalten, die Ziel-Begrenzung in spacingMitspielerZiel (#1562) entfernt. Gemessen je allein am selben Stand: Feld-Grenze rho 0,862 (Spannweite 0,136, Saison 0,881), Pp n=16 11,1/16,0, 0 von 3,32 Mio. Proben ausserhalb; Ziel-Begrenzung rho 0,853 (Spannweite 0,090, Saison 0,902), Pp n=16 13,0/20,5, 4792 von 3,27 Mio. Proben ausserhalb. Endstand rho 0,862 (miss-alle-disziplinen.mjs 24 basketball, Chromium), Pp 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 38b176d7185b (main) -> ce8fcef66028 nur spiele basketball 1/7/42. -- BENCHMARK-RUNDE 2 17.11. abends (docs/design/benchmark-basketball-17-11.md Abschnitt 7): LAUFWEG-MODUL + Feld-Grenze bewegen die Wertung -- rho 0,859 -> 0,862 (Spannweite 0,136, Saison 0,881; Node-Motor wie miss-alle-disziplinen.mjs 24, 5 Kader), Pp 13,6/16,0 -> 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 97c267e8b7c7 -> 004f26374565 nur spiele basketball 1/7/42. Kamera/Effekte/Teamfoul-Anzeige rein kosmetisch. Foul ohne Wurf (Reach-in) gemessen 0,841/0,853 und ausgeschaltet. -- Davor: REVIEW-FIX #1562 (18.11.): Spacing-Ziel bleibt im Spielfeld (vorher 46/51912 Proben ausserhalb der Seitenlinie, jetzt 0/17352); rho 0,859 -> 0,867 (Spannweite 0,086, Saison 0,923), Fingerabdruck GESAMT 97cccd6017fb -> 38b176d7185b (nur spiele basketball 1/7/42), Pp nach dem Fix nur mit n=16 je Saatstamm nachgemessen (Node-Motor, n=48 braucht >50 min je Stamm): 20,4 / 22,1, beide <=25; die Werte 13,6 / 16,0 im Feld pp sind die n=48-Messung VOR dem Fix. -- Davor: BENCHMARK-RUNDE 17.11. (docs/design/benchmark-basketball-17-11.md): FIBA-Feld + Feld-Metrik + SPACING-MODUL bewegen die Wertung bewusst -- rho 0,822 -> 0,859 (Spannweite 0,111, Saison 0,909), Pp 15,6/16,7 -> 13,6/16,0 (Node-Motor, einflussVon n=48, Saat 0/10000000), Fingerabdruck nur spiele basketball 1/7/42. Commit-Feld noch vom 15.11. -- NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
   },
   "hockey": {
    "chassis": "feldspiel",
@@ -339,23 +339,23 @@
   },
   "staffel": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.924,
-   "rhoSpannweite": 0.083,
-   "rhoSaison": 0.965,
+   "rhoJeSpiel": 0.957,
+   "rhoSpannweite": 0.019,
+   "rhoSaison": 0.986,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Task #150, Health-Saeulen-Fix 16.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Ganze Runde/Puste wirkt, 17.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    21.6,
-    21.4
+    13.2,
+    14.0
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 144 (+ --saat-versatz=10000000)",
-    "laeufe": 144,
+    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 96 (+ --saat-versatz=10000000)",
+    "laeufe": 96,
     "anhebung": 15,
     "mutatoren": "je-lauf",
     "saatStroeme": [
@@ -363,11 +363,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-16",
-   "commit": "2ca27f52",
+   "datum": "2026-11-17",
+   "commit": "9ddacb6e",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "TASK #150, SAEULE 'SPEED/HEALTH' (16.11.): Health sass NUR in ROBUST, und ROBUST ist im Duell ein Totkanal (KRAFT_VON-Anteil 0,3, Reserve bodet laut Puste-Kommentar nie; WECHSEL-Patzerchance haengt an verlaesslich*0,0012, aber der Rohausdruck liegt bei den ueblichen Sub-Skill-Werten schon ohne ROBUST unter dem Patzerboden) -- gemessen VORHER 0,0 %/0,0 % gegen Matrix 2, ein echter Totkanal, nicht nur ein kleines Gewicht. FIX: Health wandert aus ROBUST in STEHEN (lebendig: 0,7 in KRAFT_VON UND direkt in der Ermuedung `mued` in tempoVon(), nie an einem Boden). Gemessen NACHHER: Health 2,1 %/2,1 % gegen Matrix 2 -- nahezu exakt getroffen. Pp gesamt 21,1/22,0 -> 21,6/21,4 (Health-Gewinn ca. -2,0 Pp wird durch minimal staerkere Stamina-/Will-Unterzeichnung an anderer Stelle fast genau aufgehoben, derselbe Positiv-Summen-Normierungseffekt wie bei frueheren Takeshi-Rezeptaenderungen) -- WEITERHIN sicher unter der 25-Schranke, aber kein Fortschritt Richtung <15, weil Charisma (-5,8/-6,2) und Speed (bereits UEBER der Matrix, +4,6/+4,8) die groessten verbleibenden Luecken sind und ausserhalb des Task-#150-Rahmens (nur Speed/Health) liegen. rho je Spiel 0,931 -> 0,924 (Spannweite 0,083, vorher 0,078) -- Bewegung 0,007, innerhalb der Spannweite, keine Regression. Speed selbst war VOR dieser Aenderung bereits UEBER der Matrix (28,3-29,0 % gegen 24) und wurde bewusst nicht angefasst, um es nicht noch weiter zu ueberzeichnen. Volle Messmethodik und zwei verworfene Takeshi-Versuche (ENDTEMPO, WENDIGKEIT -- keiner hob Speed verlaesslich, einer verschlechterte einen Strom sogar) im PR-Bericht."
+   "anmerkung": "GANZE RUNDE, PUSTE WIRKT (17.11., Chris: 'jeder laeuft eine ganze runde! Und dort ist puste anscheinend irrelevant'). Gemessen auf main 9ddacb6e plus Block 2 (docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2): jedes Bein eine Runde, Puste auf eine 400-m-Runde geeicht (BAHN_ART.staffel.rundePuste: kraftBasis 60, kraftMix 0,45, zehrKoeff 4, zehrExponent 5, zehrFaktor 2,0, Fade unter 35 % bis 0,72), Renneinteilung nach eigener Puste statt nach Slot. Duell VORHER rho 0,924 (Spannweite 0,083), Pp 22,0/21,6 (n=96); NACHHER rho 0,957 (0,019), Saison 0,986, Pp 13,2/14,0. REVIEW-NACHTRAG (Abschnitt 2.7): Puste-Verbrauch und -Erholung je Bein statt je Sekunde (staffelRundeMass = nb/6; vorher brachen bei k=4 88 %, bei k=2 100 % ein, jetzt 16 %/25 %), Rennplan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN nachgezogen (nur Pod; die Pp-Sonde des Pods lief vorher immer mit k=6, bei echtem k=4 lag schon main bei 34,0/37,4 Pp). Pod (210 Gruppen, zwei Stroeme, Pp n=48 bei derselben k): rho k=2..6 0,943/0,956/0,957/0,951/0,957, Pp 17,0/16,8 · 11,5/11,5 · 8,0/9,7 · 6,8/6,0 · 5,7/7,5; Duell bit-identisch. Wertungs-Fingerabdruck d09e10bb872c -> 8bbc6ea215f6 (Block 2, vier Staffel-Eintraege) -> 97cccd6017fb (Review, nur spieleBahnPod staffel). Vorheriger Stand (16.11., Task #150): rho 0,924, Pp 21,6/21,4."
   },
   "takeshis-castle": {
    "chassis": "bahn",

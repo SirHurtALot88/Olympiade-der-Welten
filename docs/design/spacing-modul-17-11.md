@@ -113,3 +113,11 @@ Verhalten zeichengleich). Erste Anwendung wieder Basketball, Messungen in
 Zustand aller Module liegt in WeakMaps bzw. modulweiten Variablen, nie an den Spielerobjekten
 (Fingerabdruck). Abnahme beim Anschalten wie in Abschnitt 4: `miss-alle-disziplinen.mjs`,
 `messe-arena-einfluss.mjs`, `miss-spacing.mjs`, dazu `diagSpielzuege` für die Häufigkeit der Aktionen.
+
+**Eine Begrenzung, nicht zwei (18.11.).** Der Review-Fix von #1562 hatte zusätzlich das Spacing-Ziel in
+`spacingMitspielerZiel` auf das Feld geklemmt (12 px Rand). Beim Zusammenführen mit Runde 2 ist nur die
+FELD-GRENZE geblieben: sie wirkt am Ende der Zielrechnung auf jedes Laufziel (auch Laufweg-, Abstoßungs- und
+Rückzugsziele), die Spacing-Klemme nur auf ein Zwischenziel. Gemessen allein: Feld-Grenze 0 von 3,32 Mio.
+Proben außerhalb, rho 0,862; Spacing-Klemme 4 792 von 3,27 Mio. außerhalb, rho 0,853
+(`docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9). Eine andere Disziplin schaltet deshalb
+`feld.grenze` an, keine eigene Klemme im Spacing.

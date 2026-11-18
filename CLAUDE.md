@@ -507,12 +507,17 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-17.11. (abends): **GESAMT 004f26374565 (75 Eintraege)** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
-sind reine Anzeige), wieder nur die drei `spiele basketball`-Zeilen bewegt, `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.
-Davor **GESAMT 97c267e8b7c7** — absichtlich bewegt vom Basketball-Benchmark (FIBA-Feld auf jeder Map,
-Spacing-Modul, `docs/design/spacing-modul-17-11.md`, `docs/design/benchmark-basketball-17-11.md`); gegenueber dem Vorstand
-`d09e10bb872c` (I-Spy-Knack-Motor V2; davor `7c9257b4435c` Kontakt im klassischen Spurt scharf, davor `e80babacb68c`)
-haben sich NUR die drei `spiele basketball`-Eintraege geaendert (1/7/42). Eine reine Anzeige-Aenderung an
+18.11.: **GESAMT ce8fcef66028 (75 Eintraege)** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
+sind reine Anzeige) auf main mit #1562 (`38b176d7185b`); gegenueber diesem main bewegen sich NUR die drei
+`spiele basketball`-Zeilen (1/7/42), `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9. Von den zwei
+Feldbegrenzungen blieb nur die Feld-Grenze (`feldGrenze`); die Ziel-Begrenzung in `spacingMitspielerZiel` aus #1562 ist
+entfallen. Zwischenstaende: main mit #1562 `38b176d7185b` (Basketball-Benchmark R1 + Review-Fix auf dem Staffel-Stand
+`97cccd6017fb`), Runde 2 auf altem main `004f26374565`, R1 `97c267e8b7c7`. Davor absichtlich bewegt von der Staffel „ganze Runde, Puste wirkt“
+(`docs/design/vier-teams-staffel-battlefield-17-11.md` Abschnitt 2 und Review-Nachtrag 2.7); gegenueber dem Vorstand
+`d09e10bb872c` (I-Spy-Knack-Motor V2) haben sich NUR die vier Staffel-Eintraege geaendert (`spiele staffel 1/7/42`,
+`spieleBahnPod staffel`; Zwischenstand vor dem Review `8bbc6ea215f6`). Davor: `7c9257b4435c` (Kontakt im klassischen Spurt scharf,
+`--kontakt-aus` -> `e80babacb68c`; I-Spy-Rueckweg `window.__arena.ispyMotor("alt")`). Das Battlefield-
+Domination-Format mit 5 Punkten (`BATTLEFIELD_POD_FORMAT`) ist im Standard AUS und aendert nichts. Eine reine Anzeige-Aenderung an
 `public/mockups/battle-mode.engine.js` (Zeichnen, HUD, Interpolation, Bilder auslagern) darf sie
 NICHT veraendern; weicht sie ab, hat die Aenderung die Wertung beruehrt. Neue Felder an Laeufer-/
 Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer WeakMap bzw. in
