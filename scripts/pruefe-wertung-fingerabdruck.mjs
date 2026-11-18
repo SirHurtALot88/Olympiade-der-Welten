@@ -12,6 +12,9 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
+//   - Climbing im Format "Canyon" (18.11., docs/design/climbing-canyon-bau-18-11.md): drei Zeilen
+//     `spiele climbing/canyon 1|7|42` mit eigener Summe `CANYON ...` AUSSERHALB von GESAMT (GESAMT bleibt der
+//     Standard-Abgleich). `--node` rechnet alles ueber den Node-Motor statt Chromium.
 // GESAMT-STAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
 // `GESAMT d3a39030a3ef (75 Eintraege)`; gegenueber `ce8fcef66028` aendern sich NUR die drei Zeilen `spiele climbing 1|7|42`.
 // VORSTAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md

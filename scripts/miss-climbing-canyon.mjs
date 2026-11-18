@@ -96,6 +96,11 @@ if (diag && diag.length) {
   }
   const summe = (k) => diag.reduce((a, d) => a + (d.zaehler[k] || 0), 0) / rennen;
   auswertung = {
+    // Mit dem Rest-Zeitraffer von #1617 (Anzeige: nach der ersten Glocke + 4 echte s laeuft der Rest 3x schneller)
+    sendeRafferMed: median(diag.map((d) => { const f = d.erste?.ziel ?? d.zeit; const ab = Math.min(d.zeit, f + 4 / dehnung);
+      return ab * dehnung + (d.zeit - ab) * dehnung / 3; })),
+    sendeRafferMax: Math.max(...diag.map((d) => { const f = d.erste?.ziel ?? d.zeit; const ab = Math.min(d.zeit, f + 4 / dehnung);
+      return ab * dehnung + (d.zeit - ab) * dehnung / 3; })),
     rennen, simZeitMed: median(zeiten), simZeitMax: Math.max(...zeiten), sendeMed: median(zeiten) * dehnung, sendeMax: Math.max(...zeiten) * dehnung,
     hochgerechnet: alle.filter((l) => l.hochgerechnet).length,
     warteAnteil, warteMax: Math.max(...diag.map((d) => d.warteMax)), warteDreiSekMed: median(diag.map((d) => d.warteDreiSek)), warteVierSekMed: median(diag.map((d) => d.warteVierSek)), warteVierSekMax: Math.max(...diag.map((d) => d.warteVierSek)),
@@ -103,7 +108,7 @@ if (diag && diag.length) {
     jeRennen: Object.fromEntries(["rangeln", "abgeblockt", "zieht", "schiebt", "vorstieg", "aussen", "obenrum", "wechsel", "rutsch", "sturz", "wanken", "fehlgriff", "rast"].map((k) => [k, +summe(k).toFixed(2)])),
     nebenweg: alle.filter((l) => l.eigen !== l.wegStart).length / alle.length,
   };
-  console.log(`Sendedauer bei 1x: Median ${auswertung.sendeMed.toFixed(0)} s, max ${auswertung.sendeMax.toFixed(0)} s (Sim ${auswertung.simZeitMed.toFixed(1)} / ${auswertung.simZeitMax.toFixed(1)} s), hochgerechnet ${auswertung.hochgerechnet}`);
+  console.log(`Sendedauer bei 1x: Median ${auswertung.sendeMed.toFixed(0)} s, max ${auswertung.sendeMax.toFixed(0)} s (Sim ${auswertung.simZeitMed.toFixed(1)} / ${auswertung.simZeitMax.toFixed(1)} s), hochgerechnet ${auswertung.hochgerechnet}; mit Rest-Zeitraffer (#1617) Median ${auswertung.sendeRafferMed.toFixed(0)} s, max ${auswertung.sendeRafferMax.toFixed(0)} s`);
   console.log(`Warten: Anteil ${(warteAnteil * 100).toFixed(1)} % der Kletterzeit, max gleichzeitig ${auswertung.warteMax}, >=3 zugleich Median ${auswertung.warteDreiSekMed.toFixed(2)} Sim-s je Rennen, >=4 zugleich Median ${auswertung.warteVierSekMed.toFixed(2)} / max ${auswertung.warteVierSekMax.toFixed(2)} Sim-s, laengste ${auswertung.laengsteMax.toFixed(1)} Welt-s`);
   console.log("Wege (Start): " + Object.entries(jeWeg).map(([w, x]) => `${w} ${(x.anteil * 100).toFixed(0)} % / Zeit bei gleicher Eignung ${x.abweichung == null ? "—" : ((x.abweichung > 0 ? "+" : "") + (x.abweichung * 100).toFixed(1) + " %")}`).join(" · "));
   console.log("Warteorte (Welt-s je Rennen): " + Object.entries(orte).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(" · "));
