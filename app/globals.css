@@ -794,7 +794,7 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
 }
 
 .foundation-shell.app-shell {
-  width: min(1880px, calc(100vw - 24px));
+  width: calc(100vw - 24px);
 }
 
 .foundation-loading-shell {
