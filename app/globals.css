@@ -79149,3 +79149,28 @@ span.nl-facility-ampel-chip {
   font-style: italic;
   font-weight: 700;
 }
+
+/* --- Lesbarkeits-Boden fuer Barlow Condensed (Chris, 18.11.) ------------------------------------------
+   Barlow ist schmaler als die bisherige Schrift; Seiten, die ihre Zahlen mit 9-12 px eintragen, wirkten
+   darin zu klein (Finanzen, Teams). Nur fuer die alten nl-Seiten: Tabellenzellen mindestens 13 px,
+   Tabellenkoepfe 11,5 px, Labels/Fussnoten 11 px. Die neuen Seiten (bc-, ssm-, elm-, hm-) haben eigene Groessen. */
+.foundation-app table[class*="nl-"] td {
+  font-size: max(13px, 1em) !important;
+}
+.foundation-app table[class*="nl-"] th {
+  font-size: max(11.5px, 1em) !important;
+}
+.foundation-app :is(
+    [class*="nl-"][class*="label"],
+    [class*="nl-"][class*="eyebrow"],
+    [class*="nl-"][class*="caption"],
+    [class*="nl-"][class*="-sub"],
+    [class*="nl-"][class*="-code"],
+    [class*="nl-"][class*="-hint"],
+    [class*="nl-"][class*="submeta"],
+    [class*="nl-"] small,
+    [class*="nl-"] em,
+    [class*="nl-"] figcaption
+  ):not(text):not(tspan):not(svg *) {
+  font-size: max(11px, 1em) !important;
+}
