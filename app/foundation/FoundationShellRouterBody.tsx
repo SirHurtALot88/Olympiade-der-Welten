@@ -1039,7 +1039,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                  Statt beide Ebenen zu synchronisieren (Race-Risiko zwischen zwei
                  Zustandsquellen für dieselbe Frage), fällt die tote Ebene weg —
                  "Vereine" im Panel selbst zeigt exakt denselben Manager-Inhalt. */
-          activeView === "playerProfile" ? null : activeView === "lineup" || activeView === "lineupV2" ? (
+          activeView === "playerProfile" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+              activeId={playerProfileTab}
+              onSelect={(id) => {
+                setPlayerProfileTab(id as PlayerProfileTabId);
+                if (playerProfileData) {
+                  syncFoundationViewInUrl("playerProfile", id, playerProfileData.playerId);
+                }
+              }}
+            />
+          ) : activeView === "lineup" || activeView === "lineupV2" ? (
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[

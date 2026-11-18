@@ -87,7 +87,10 @@ describe("foundation v2-only ui contract", () => {
     const kurz = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerKurzprofil.tsx`, "utf8");
     const dienst = await fs.readFile(`${root}/lib/foundation/player-profile-service.ts`, "utf8");
 
-    expect(seite).toContain("PLAYER_PROFILE_TABS");
+    // Die Reiter stehen im Unterreiter-Platz des Regiebands, Name und Zustand im Seiten-Slot.
+    const huelle = await fs.readFile(`${root}/app/foundation/FoundationShellRouterBody.tsx`, "utf8");
+    expect(huelle).toContain("PLAYER_PROFILE_TABS");
+    expect(seite).toContain("FoundationBandSlot");
     expect(dienst.match(/\{ id: "/g)?.length).toBe(6);
     expect(dienst).not.toContain('id: "report"');
     // Der Drawer hat keine Reiter, aber den Knopf „Ganzes Profil öffnen“.

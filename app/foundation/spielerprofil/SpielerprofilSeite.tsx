@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { BcFormPfeil, BcIcon, BcMoralGesicht } from "@/components/foundation/broadcast";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
-import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
+import { type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
 import { formatLeagueTierShortLabel } from "@/lib/season/league-history";
 import { TabDisziplinen } from "./TabDisziplinen";
 import { TabEntwicklung, type TrainingSteuerung } from "./TabEntwicklung";
@@ -76,12 +77,13 @@ export default function SpielerprofilSeite({
   const form = modell.form;
   const moral = form?.moral ?? data.morale?.morale ?? null;
   const liga = formatLeagueTierShortLabel(modell.raenge?.ligaName ?? null);
-  const klassen = useMemo(() => ["bc", "spr"].join(" "), []);
 
   return (
-    <div className={klassen} data-testid="spielerprofil-seite" data-spieler={data.playerId}>
-      <header className={`spr-kopf${modell.verletzung.verletzt ? " is-verletzt" : ""}`}>
-        <div className="spr-kopf__ich">
+    <div className="bc spr" data-testid="spielerprofil-seite" data-spieler={data.playerId}>
+      {/* Regieband des App-Rahmens: Name, Blättern und Zustand stehen im Seiten-Slot, die Reiter im Unterreiter-Platz
+          des Bands (von der Shell gezeichnet). Ohne Band (Tests) bleibt der Slot leer. */}
+      <FoundationBandSlot>
+        <div className={`bc spr-slot${modell.verletzung.verletzt ? " is-verletzt" : ""}`} data-testid="spielerprofil-kopf">
           {onClose ? (
             <button type="button" className="spr-zurueck" onClick={onClose} data-testid="spielerprofil-zurueck">
               <BcIcon name="links" /> Zurück
@@ -112,46 +114,32 @@ export default function SpielerprofilSeite({
               {liga ? ` · ${liga}` : ""} · {[data.className, data.race].filter(Boolean).join(" · ")}
             </div>
           </div>
+          <span className="spr-sp" style={{ flex: 1 }} />
+          <div className="spr-kopf__zustand" data-testid="spielerprofil-zustand">
+            {form?.formVerfuegbar ? (
+              <span className="spr-zst" title={`Form: ${form.formWort}`}>
+                <BcFormPfeil stufe={form.formStufe} />
+                {modell.nebel ? null : <span className="spr-t">{Math.round(form.form ?? 0)}</span>}
+              </span>
+            ) : null}
+            {moral != null ? <BcMoralGesicht wert={moral} mitZahl={!modell.nebel} groesse={22} /> : null}
+            {modell.verletzung.verletzt ? (
+              <span className="spr-marke is-rot" data-testid="spielerprofil-status-verletzt">
+                {modell.verletzung.text}
+              </span>
+            ) : data.teamId ? (
+              <span className="spr-marke is-gruen">{modell.verletzung.genesend ? "genesen" : "einsatzbereit"}</span>
+            ) : (
+              <span className="spr-marke is-grau">vertragslos</span>
+            )}
+            {merken.verfuegbar ? (
+              <button type="button" className="spr-kn" aria-pressed={merken.gemerkt} onClick={merken.umschalten} data-testid="spielerprofil-merken">
+                {merken.gemerkt ? "Gemerkt" : "Merken"}
+              </button>
+            ) : null}
+          </div>
         </div>
-        <nav className="spr-reiter" role="tablist" aria-label="Profil-Bereiche">
-          {PLAYER_PROFILE_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              className={activeTab === tab.id ? "is-an" : undefined}
-              onClick={() => onTabChange(tab.id)}
-              data-testid={`spielerprofil-reiter-${tab.id}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-        <div className="spr-kopf__zustand" data-testid="spielerprofil-zustand">
-          {form?.formVerfuegbar ? (
-            <span className="spr-zst" title={`Form: ${form.formWort}`}>
-              <BcFormPfeil stufe={form.formStufe} />
-              {modell.nebel ? null : <span className="spr-t">{Math.round(form.form ?? 0)}</span>}
-            </span>
-          ) : null}
-          {moral != null ? <BcMoralGesicht wert={moral} mitZahl={!modell.nebel} groesse={22} /> : null}
-          {modell.verletzung.verletzt ? (
-            <span className="spr-marke is-rot" data-testid="spielerprofil-status-verletzt">
-              {modell.verletzung.text}
-            </span>
-          ) : data.teamId ? (
-            <span className="spr-marke is-gruen">{modell.verletzung.genesend ? "genesen" : "einsatzbereit"}</span>
-          ) : (
-            <span className="spr-marke is-grau">vertragslos</span>
-          )}
-          {merken.verfuegbar ? (
-            <button type="button" className="spr-kn" aria-pressed={merken.gemerkt} onClick={merken.umschalten} data-testid="spielerprofil-merken">
-              {merken.gemerkt ? "Gemerkt" : "Merken"}
-            </button>
-          ) : null}
-        </div>
-      </header>
+      </FoundationBandSlot>
       {activeTab === "overview" ? (
         <TabUeberblick
           data={data}
