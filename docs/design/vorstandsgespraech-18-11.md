@@ -6,6 +6,12 @@ Cash, das gesperrt ist, ist eine NOTRÜCKLAGE. Wenn sie benötigt wird, gibt der
 frei, anstatt Kredite zu nehmen. Das Cash soll vor Notlagen schützen und nicht dafür sorgen, dass
 ein Team ausverkaufen muss, weil der Vorstand greedy ist.“
 
+**Stand der Saisonstruktur (Chris, 18.11. abends):** es gibt **ein gemeinsames Transferfenster** in der
+neuen Saison vor Spieltag 1, mit Kaufen und Verkaufen zugleich. **Verkaufserlöse sind sofort zu 100 %
+frei.** Am Saisonende wird nicht mehr verkauft, dort laufen nur Abrechnung und Verlängerungen. In der
+Saison gibt es keinen Handel. Der Draft in Saison 1 ist Kaderaufbau, kein Transfer. Mockup und Text
+sind darauf umgestellt.
+
 Dies ist ein Entwurf: Mockup und Konzept. `app/`, `components/`, `lib/` und der Motor sind nicht
 angefasst. Bei PixelLab ist nichts bestellt (0 Generationen), es gibt keine neue Figur: der Vorstand
 ist das Teamwappen im Kreis, alles andere ist CSS und SVG.
@@ -15,13 +21,13 @@ ist das Teamwappen im Kreis, alles andere ist CSS und SVG.
 | Was | Datei |
 |---|---|
 | Gespräch und Notfall-Antrag, klickbar | `public/mockups/vorstandsgespraech-18-11.html` |
-| Bilder (1600 × 900, einfache Dichte; Phone 390 breit) | `docs/design/vorstandsgespraech-18-11/01` bis `07` |
+| Bilder (1600 × 900, einfache Dichte; Phone 390 breit) | `docs/design/vorstandsgespraech-18-11/01` bis `08` |
 
 Die Seite läuft per Doppelklick ohne Server. Die graue Leiste oben gehört nicht zum UI: sie wechselt
 das Team und springt mit einem Klick zu jedem Ausgang. Dieselben Zustände per Adresse:
 `?team=M-M|C-C|W-W`, `&ansicht=gespraech|notfall`, `&anliegen=stufe|sonder|ruecklage|alles`,
 `&biete=ziel,rueck,deckel,vertrauen`, `&antwort=1` (Antrag gleich stellen), `&annehmen=1`,
-`&not=klein|gross|wunsch`, `&ctab=toepfe|vorstand|regeln`, `&phone=1`, `&still=1`.
+`&not=klein|gross|wunsch`, `&vk=12` (Verkauf im Fenster), `&ctab=toepfe|vorstand|regeln`, `&phone=1`, `&still=1`.
 
 | Bild | Zustand |
 |---|---|
@@ -29,8 +35,9 @@ das Team und springt mit einem Klick zu jedem Ausgang. Dieselben Zustände per A
 | `02-gegenangebot-mm.png` | Antrag gestellt, Vorstand verlangt ein höheres Saisonziel |
 | `03-zustimmung-mm.png` | Mit Saisonziel angeboten: Zustimmung, Protokoll, Töpfe angepasst |
 | `04-ablehnung-cc.png` | Cash Creators wollen die halbe Rücklage für einen Wunsch: Ablehnung mit Begründung, Reiter Vorstand |
-| `05-notfall-gross-mm.png` | Notfall in der Saison: Rücklage zuerst, Rest über den Rahmen, kein Verkauf |
+| `05-notfall-gross-mm.png` | Geldnotlage in der Saison: Rücklage zuerst, Rest über den Rahmen; Notverkauf gibt es dort nicht |
 | `06-sonderbudget-ww.png` | Wicked Wizards, Sonderbudget fürs Gehalt, Reiter Regeln, mit Mockup-Leiste |
+| `08-verkauf-im-fenster-mm.png` | Ein Verkauf im selben Fenster (12 C) ist sofort voll frei und steht schon in den Töpfen |
 | `07-phone-gegenangebot.png` | Phone, Gegenangebot |
 
 ### Was echt ist und was nicht
@@ -61,12 +68,17 @@ Der zweite Teil ist kein Verhandeln: der **Notfall-Antrag**. Dort hat der Vorsta
 
 | Zeitpunkt | Was | Wie oft |
 |---|---|---|
-| Kaufphase der neuen Saison, vor Spieltag 1 (ab Saison 2) | Gespräch: ein Anliegen, höchstens zwei Runden | einmal je Fenster |
-| In der Saison, an jedem Spieltag | Notfall-Antrag | sooft eine Notlage eintritt |
-| Saison 1 | nichts, alles ist frei | — |
+| Transferfenster der neuen Saison, vor Spieltag 1 (ab Saison 2) | Gespräch: ein Anliegen, höchstens zwei Runden | einmal je Fenster |
+| In der Saison, an jedem Spieltag | Notfall-Antrag bei einer Geldnotlage | sooft eine eintritt |
+| Saisonende (Abrechnung, Verlängerungen) | nichts | — |
+| Saison 1 (Draft = Kaderaufbau) | nichts, alles ist frei | — |
 
-Das Gespräch liegt in der Kaufphase, weil dort die Töpfe binden: verkauft ist am Saisonende schon,
-die Erlöse stehen fest, und der Spieler weiß, welcher Kauf am Topf scheitert. Einstieg: Knopf
+Das Gespräch liegt im gemeinsamen Fenster, weil dort die Töpfe binden und Kaufen und Verkaufen
+zusammenfallen. **Was der Spieler im selben Fenster verkauft, ist sofort zu 100 % frei** und erhöht
+den Rahmen ohne Gespräch; im Mockup zeigt das der Schalter „Verkauft in diesem Fenster“ über der
+Topf-Vorschau. Das Gespräch dreht sich also nur um das Geld, das **schon auf dem Konto liegt** und
+nicht freigegeben ist (Vorbehalt und Notrücklage). Der Spieler kann vor oder nach seinen Verkäufen
+fragen; verbraucht ist das Gespräch erst mit einer Vereinbarung oder nach Runde 2. Einstieg: Knopf
 „Mit dem Vorstand sprechen“ im Reiter Budgets der Finanzseite und in der Sperrmeldung des
 Transfermarkts („Ablöse über dem freien Transfertopf“).
 
@@ -76,7 +88,7 @@ Transfermarkts („Ablöse über dem freien Transfertopf“).
 
 | Anliegen | Wirkung | Entspricht heute |
 |---|---|---|
-| **Freigabe anheben** | Eine Stufe mehr (80 → 90 %) für die ganze Saison. Mehr Ablöse, mehr Gehaltsbudget, Verkaufserlöse künftig zur neuen Quote frei | Lockerung (heute nur nach Verkäufen) |
+| **Freigabe anheben** | Eine Stufe mehr (80 → 90 %) für die ganze Saison. Mehr Ablöse, mehr Gehaltsbudget | Lockerung. Deren alte Bedingung (einbehaltener Anteil der Verkaufserlöse) entfällt, weil Erlöse jetzt zu 100 % frei sind; das Gespräch ist der neue Weg zur höheren Stufe |
 | **Sonderbudget** | Einmaliger Betrag aus dem Vorbehalt, wahlweise für Ablösen oder Gehalt. Die Stufe bleibt | Umschichten, nur aus dem Vorbehalt statt aus dem anderen Topf |
 | **Notrücklage anzapfen** | Ein Viertel oder die Hälfte des Ziels, zur Quote frei. Kostet 0,25 Vertrauen je Viertel | Rücklage anzapfen, unverändert |
 | **Alles auf eine Karte** | 100 %, Rücklage frei, 5 % Puffer, Ziel zwei Plätze besser | unverändert, ab Vertrauen 4 |
@@ -89,12 +101,12 @@ ist der große Schritt für die ganze Saison, das Sonderbudget der kleine, gezie
 | Zusage | Was sie bindet |
 |---|---|
 | **Höheres Saisonziel** | Ziel einen Platz besser. Verfehlt: −0,5 Vertrauen. Erreicht: wie jedes erfüllte Ziel |
-| **Rückzahlung aus Verkäufen** | Von den nächsten Verkaufserlösen behält der Vorstand die Hälfte ein, bis der Mehrbetrag zurück ist |
+| **Rückzahlung aus Verkäufen** | Verkauft der Spieler noch in diesem Fenster, geht die Hälfte des Erlöses zurück in den Vorbehalt, bis der Mehrbetrag zurück ist. Eine freiwillige Ausnahme von „Erlöse zu 100 % frei“ (Frage 4) |
 | **Gehaltsdeckel** | Das Gehaltsbudget wächst diese Saison nicht mit (keine höhere Gehaltsquote, kein Umschichten ins Gehalt) |
 | **Vertrauen einsetzen** | Sofort −0,25 Vertrauen, wirksam bei der nächsten Festlegung |
 
 Keine Zusage kostet Geld vom Konto, und keine erzwingt einen Verkauf. Die Rückzahlung greift nur,
-**wenn** der Spieler von sich aus verkauft.
+**wenn** der Spieler von sich aus im Fenster verkauft. Das Mockup rechnet diese Rückführung nicht mit.
 
 ### 3.3 Wie der Vorstand antwortet
 
@@ -175,30 +187,36 @@ Vertrauen ist nicht zu, er ist teurer.
 | Wicked Wizards | 7 | 6,5 | 5,5 | 46 % | 56 C | 25,6 C |
 | Mayhem Mavericks | 6 | 8,5 | 2,5 | 26 % | 62 C | 16,3 C |
 
-Sie wird über die Saison angespart. Im Kauffenster **gesperrt** ist nur, was die erwarteten Einnahmen
+Sie wird über die Saison angespart. Im Transferfenster **gesperrt** ist nur, was die erwarteten Einnahmen
 nicht decken (Mavericks: 16,3 − 6,0 = 10,3 C). Die lineare Zuordnung Sparneigung → Quote ist meine
 Lesart von „10 bis 75 %“; die Messung kann sie ersetzen, ohne dass sich am Gespräch etwas ändert.
 
 ### 5.2 Die feste Reihenfolge
 
-**Notrücklage vor Kredit vor Notverkauf.** Sichtbar im Notfall-Antrag (als Leiter mit Beträgen) und
-dauerhaft im Reiter Regeln.
+**Notrücklage vor Kredit vor Notverkauf.** Dauerhaft sichtbar im Reiter Regeln und als Leiter mit
+Beträgen im Notfall-Antrag.
 
 1. **Notrücklage.** Der Vorstand gibt sie frei: kein Vertrauensverlust, keine Gegenleistung, kein Ermessen.
 2. **Kredit.** Erst der zinsfreie Rahmen, dann ein Kredit, und nur für den Rest.
-3. **Notverkauf.** Nur wenn 1 und 2 zusammen nicht reichen.
+3. **Notverkauf.** Nur im Transferfenster, und nur wenn 1 und 2 zusammen nicht reichen.
 
-Eine **anerkannte Notlage** ist eine von drei Lagen, die das Spiel selbst feststellt (der Spieler
-kann sie nicht behaupten):
+**In der Saison endet die Leiter bei Stufe 2**, weil dort nicht gehandelt wird: ein Notverkauf ist
+gar nicht möglich, und das Mockup zeigt Stufe 3 ausgegraut mit „nur im Fenster“. Was Rücklage und
+Rahmen nicht decken, wird Kredit und im nächsten Fenster abgerechnet.
+
+Eine **anerkannte Notlage in der Saison** ist eine **Geldnotlage**, die das Spiel selbst feststellt
+(der Spieler kann sie nicht behaupten):
 
 * Die Kasse fällt nach der Spieltagsbuchung unter 0.
-* Der Kader fällt unter 8 spielfähige Spieler.
-* Am Kassensturz droht ein Pflichtkredit.
+* Die Gehälter bis zum Saisonende sind nicht gedeckt.
 
-Alles andere ist ein Wunsch. Ein Wunsch in der Saison wird abgelehnt (ohne Vertrauensverlust) und auf
-das nächste Kauffenster verwiesen, wo die Rücklage regulär und mit Vertrauenskosten angezapft werden
-kann. So bleibt der Unterschied spürbar: **in der Not kostet die Rücklage nichts, für einen Wunsch
-kostet sie Vertrauen.**
+„Kader unter 8“ ist **keine** Notlage der Saison, denn kaufen kann man dort nicht. Der Fall gehört
+ins Fenster und ist dort schon geregelt: ein Kauf, der den Kader auf 8 bringt, ist nie gesperrt.
+
+Alles andere ist ein Wunsch (im Mockup: ein Gebäudeausbau). Ein Wunsch in der Saison wird abgelehnt
+(ohne Vertrauensverlust) und auf das nächste Transferfenster verwiesen, wo die Rücklage regulär und
+mit Vertrauenskosten angezapft werden kann. So bleibt der Unterschied spürbar: **in der Not kostet
+die Rücklage nichts, für einen Wunsch kostet sie Vertrauen.**
 
 Nach einer Freigabe wird die Rücklage wieder angespart. Bis sie zur Hälfte steht, gibt es keine
 Lockerung und kein „Alles auf eine Karte“.
@@ -209,13 +227,13 @@ Lockerung und kein „Alles auf eine Karte“.
 * Einen Kauf sperren, der den Kader auf 8 bringt (`VORSTAND_PFLICHT_KADER`).
 * Das Gehaltsbudget unter 75 % kürzen.
 * Eine Notlage ablehnen oder dafür Vertrauen abziehen.
-* Einen Verkauf verlangen, solange Rücklage oder Rahmen reichen.
+* Einen Verkauf verlangen, solange Rücklage oder Kredit reichen.
 
 ## 6. Aufbau der Seite (Stil der Mockups vom 17.11.)
 
 ```
 ┌──┬────────────────────────────────────────────────────────────────────────────────┐
-│  │ Wappen  SAISON 3 · KAUFPHASE     ◢ Budget verhandeln 80 % ◣ ◢ Notfall-Antrag 16,3 ◣   Vertrauen │ Hero-Kopf
+│  │ Wappen  SAISON 3 · FENSTER       ◢ Budget verhandeln 80 % ◣ ◢ Notfall-Antrag 16,3 ◣   Vertrauen │ Hero-Kopf
 │S │ Vorstandsgespräch · Team                                                    [Zur Finanzseite] │
 │c ├────────────────────────────┬─────────────────────────────────┬─────────────────────┤
 │h │ 1 WORUM BITTE ICH          │ Vorstand: Eröffnung              │ Töpfe│Vorstand│Regeln │
@@ -242,7 +260,8 @@ wenn es lang wird.
 | Zusagen im Zustand (`seasonState.vorstandBudget[team].zusagen`) | `VorstandBudgetZustand`, Schreibweg `POST /api/finance/vorstand` |
 | Stufe anheben und Sonderbudget als neue Quellen in `berechneVorstandBudgetStand` | dieselbe Funktion, damit Planer und Sperre eine Zahl behalten |
 | Zusagen als Vorstandsziele (Ziel verfehlt, Rückzahlung offen) | `lib/board/team-season-objectives-service.ts` |
-| Notlage feststellen, Freigabe vor Pflichtkredit | Spieltagsbuchung und Kassensturz |
+| Geldnotlage feststellen, Freigabe vor Pflichtkredit | Spieltagsbuchung und Kassensturz |
+| Verkaufserlöse im Fenster zu 100 % frei (statt zur Quote) | `gesamtBei(q, verk)` in `berechneVorstandBudgetStand`; damit entfällt die Lockerungsschwelle |
 | KI: nutzt dieselben Funktionen, wählt die Zusage nach Charakter | `entscheideKiVorstandMassnahmen` |
 
 Wertung und Arena-Motor bleiben unberührt, der Fingerabdruck ändert sich nicht.
@@ -257,10 +276,11 @@ Wertung und Arena-Motor bleiben unberührt, der Fingerabdruck ändert sich nicht
 3. **Kostet die Notrücklage in einer anerkannten Notlage wirklich gar nichts?** Empfehlung: **ja**,
    kein Vertrauen, keine Zusage; nur die Sperre „keine Lockerung, bis sie halb wieder steht“. Das ist
    der Kern deiner Vorgabe, und jede Strafe darauf würde den Spieler wieder zum Verkauf treiben.
-4. **Drei Notlagen: Kasse unter 0, Kader unter 8, drohender Pflichtkredit. Reicht das?** Empfehlung:
-   **ja**, bewusst eng und vom Spiel festgestellt. Eine vierte („auslaufender Vertrag eines
-   Stammspielers“) wäre ein Wunsch im Notlagen-Kleid.
-5. **Wie oft?** Empfehlung: **ein Gespräch je Kauffenster, ein Anliegen, zwei Runden**; der
+4. **Darf die Zusage „Rückzahlung aus Verkäufen“ die neue Regel „Erlöse zu 100 % frei“ für dieses
+   eine Fenster einschränken?** Empfehlung: **ja, weil freiwillig**. Sie ist die einzige Zusage, die
+   der Kassenwart wirklich schätzt; ohne sie bleibt ihm nur der Gehaltsdeckel. Wer sie nicht will,
+   bietet sie nicht an.
+5. **Wie oft?** Empfehlung: **ein Gespräch je Transferfenster, ein Anliegen, zwei Runden**; der
    Notfall-Antrag jederzeit. Mehr Gespräche machen aus der Stufe eine Formsache.
 6. **Verhandelt die KI auch?** Empfehlung: **ja, mit denselben Funktionen**, aber erst in einem
    zweiten Schritt und mit Messung (Kaderstärke, Kasse, Teams unter 8), weil die KI-Bedingungen in

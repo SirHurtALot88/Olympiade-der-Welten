@@ -9,7 +9,9 @@
   Erklaerung, Regeln und offene Fragen: docs/design/vorstandsgespraech-18-11.md
   Uebersetzt die Hebel aus lib/finance/vorstand-budgetfreigabe.ts (PR #1618) in ein Gespraech:
   Stufe anheben (Lockerung), Sonderbudget (Umschichten/Vorbehalt), Ruecklage anzapfen, Alles auf eine Karte,
-  dazu der Notfall-Antrag in der Saison (Notruecklage vor Kredit vor Notverkauf).
+  dazu der Notfall-Antrag in der Saison (Notruecklage vor Kredit; Notverkauf gibt es nur im Fenster).
+  EIN gemeinsames Transferfenster vor Spieltag 1 (Kaufen und Verkaufen zugleich, Chris 18.11.): Verkaufserloese sind
+  sofort zu 100 % frei. Am Saisonende nur Abrechnung und Verlaengerungen, in der Saison kein Handel.
   Gleiche Tokens, gleiche Schiene, gleicher Hero-Kopf, gleiche Tafel wie finanzen-modern-18-11.html und
   einsatzliste-modern-17-11.html. Kein App-Code, kein PixelLab (0 Generationen), keine neue Figur: alles CSS/SVG.
   ECHT: Teamnamen, Wappen, Finanzwert, Ambition, Start-Vertrauen (data/source/team-identities.json),
@@ -20,7 +22,7 @@
         Der Gehaltspuffer (7 Spieltage) der echten Rechnung fehlt hier, damit der Balken drei Teile hat.
   URL: ?team=M-M|C-C|W-W  &ansicht=gespraech|notfall  &anliegen=stufe|sonder|ruecklage|alles  &betrag=<C>  &viertel=1|2
        &topf=transfer|gehalt  &biete=ziel,rueck,deckel,vertrauen  &antwort=1 (Antrag gleich stellen)  &annehmen=1
-       &not=klein|gross|wunsch  &ctab=toepfe|vorstand|regeln  &phone=1  &still=1  &blatt=kontext
+       &not=klein|gross|wunsch  &vk=<C, Verkaufserloes im Fenster>  &ctab=toepfe|vorstand|regeln  &phone=1  &still=1  &blatt=kontext
 -->
 <style>
 @font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
@@ -444,6 +446,7 @@ const S={
   anl:ANL[P.get("anliegen")]?P.get("anliegen"):"stufe",
   betrag:+P.get("betrag")||0, viertel:P.get("viertel")==="2"?2:1, topf:P.get("topf")==="gehalt"?"gehalt":"transfer",
   biete:new Set((P.get("biete")||"").split(",").filter(k=>OFF[k])),
+  vk:Math.max(0,+P.get("vk")||0),
   phase:"entwurf", runde:1, antwort:null, vertrag:null,
   not:["klein","gross","wunsch"].includes(P.get("not"))?P.get("not"):"klein", notPhase:"entwurf",
   ctab:["toepfe","vorstand","regeln"].includes(P.get("ctab"))?P.get("ctab"):"toepfe"
@@ -484,18 +487,18 @@ function toepfe(id,deal){
     if(deal.anl==="ruecklage"){ang=Math.min(deal.viertel*.25*b.R,gesp);gesp-=ang}
     if(deal.anl==="alles")alles=true;
   }
-  let transfer,vorb,gq,gehaltTopf;
-  if(alles){q=1;gesp=0;transfer=t.kasse*.95;vorb=t.kasse*.05;gq=1;gehaltTopf=t.tragbar}
+  let transfer,vorb,gq,gehaltTopf;const vk=S.vk;   /* Verkaufserloes dieses Fensters: sofort zu 100 % frei */
+  if(alles){q=1;gesp=0;transfer=t.kasse*.95+vk;vorb=t.kasse*.05;gq=1;gehaltTopf=t.tragbar}
   else{
-    transfer=q*(b.verf+ang)+sT;
-    vorb=t.kasse-gesp-transfer-sG;
+    transfer=q*(b.verf+ang)+sT+vk;
+    vorb=t.kasse+vk-gesp-transfer-sG;
     gq=q>=1?1:Math.max(.75,q);
     if(hat("deckel"))gq=b.q>=1?1:Math.max(.75,b.q);
     gehaltTopf=gq*t.tragbar+sG;
   }
   const v=t.v-(deal&&deal.anl==="ruecklage"?.25*deal.viertel:0)-(hat("vertrauen")?.25:0);
   const ziel=Math.max(1,t.ziel-(alles?2:0)-(hat("ziel")?1:0));
-  return {q,gesp,ang,transfer,vorb,sG,gq,gehaltTopf,gehaltFrei:gehaltTopf-t.gehaltIst,v,ziel,alles,kasse:t.kasse};
+  return {q,gesp,ang,transfer,vorb,sG,gq,gehaltTopf,gehaltFrei:gehaltTopf-t.gehaltIst,v,ziel,alles,kasse:t.kasse+vk,vk};
 }
 /* Welche Gegenleistung passt zu welchem Anliegen */
 function frei(deal,k){
@@ -503,7 +506,7 @@ function frei(deal,k){
   if(deal.anl==="sonder"&&deal.topf==="gehalt"&&k==="deckel")return false;
   return true;
 }
-function maxSonder(id){return Math.max(1,Math.floor(toepfe(id,null).vorb))}
+function maxSonder(id){return Math.max(1,Math.floor(toepfe(id,null).vorb))}   /* der Vorbehalt haengt nicht an Verkaeufen */
 function kostenVon(id,deal){
   const b=basis(id);
   if(deal.anl==="sonder")return 4+10*deal.betrag/maxSonder(id);
@@ -551,7 +554,7 @@ function offText(id,d,k){
   const b=basis(id),m=mehrFrei(id,d),t=b.t;
   const x=Math.max(m.tr,m.ang,d.anl==="sonder"?d.betrag:0);
   if(k==="ziel")return "Saisonziel Platz "+t.ziel+" → Platz "+(t.ziel-1)+". Verfehlt: −0,5 Vertrauen.";
-  if(k==="rueck")return "Von den nächsten Verkaufserlösen behält der Vorstand die Hälfte ein, bis "+c(x)+" zurück sind.";
+  if(k==="rueck")return "Verkaufst du in diesem Fenster, geht die Hälfte des Erlöses zurück in den Vorbehalt, bis "+c(x)+" zurück sind.";
   if(k==="deckel")return "Das Gehaltsbudget wächst diese Saison nicht mit ("+c(toepfe(id,null).gehaltTopf)+" bleiben).";
   return "Sofort −0,25 Vertrauen. Wirkt bei der nächsten Festlegung der Stufe.";
 }
@@ -584,9 +587,9 @@ function zeichne(){
     db("Notfall klein",false,"not:klein")+db("Notfall groß",false,"not:gross")+db("Nur ein Wunsch",false,"not:wunsch")+"<i></i>"+
     db("Phone",document.body.classList.contains("phone"),"phone");
   /* Kopf */
-  $("hk").innerHTML='<div class="crest"><img src="../team-logos/'+id+'.jpg" alt=""></div><div><div class="mdw"><span>Saison 3 · '+(S.ans==="notfall"?"Spieltag 11 von 20":"Kaufphase vor Spieltag 1")+'</span></div><h1>Vorstandsgespräch</h1><div class="sub"><b>'+t.name+'</b> · Finanzwert '+f1(t.fin)+' · Ambition '+f1(t.amb)+'</div></div>';
+  $("hk").innerHTML='<div class="crest"><img src="../team-logos/'+id+'.jpg" alt=""></div><div><div class="mdw"><span>Saison 3 · '+(S.ans==="notfall"?"Spieltag 11 von 20":"Transferfenster vor Spieltag 1")+'</span></div><h1>Vorstandsgespräch</h1><div class="sub"><b>'+t.name+'</b> · Finanzwert '+f1(t.fin)+' · Ambition '+f1(t.amb)+'</div></div>';
   $("tabs").innerHTML=
-    '<button class="dtab'+(S.ans==="gespraech"?" an":"")+'" role="tab" data-a="ans:gespraech"><span class="ic">'+ic("i-hand")+'</span><span><em>Kaufphase · einmal je Fenster</em><b>Budget verhandeln</b></span><span class="erw"><strong class="t">'+pz(a.q)+'</strong><span>FREIGABE</span></span></button>'+
+    '<button class="dtab'+(S.ans==="gespraech"?" an":"")+'" role="tab" data-a="ans:gespraech"><span class="ic">'+ic("i-hand")+'</span><span><em>Transferfenster · einmal je Fenster</em><b>Budget verhandeln</b></span><span class="erw"><strong class="t">'+pz(a.q)+'</strong><span>FREIGABE</span></span></button>'+
     '<button class="dtab'+(S.ans==="notfall"?" an":"")+'" role="tab" data-a="ans:notfall"><span class="ic">'+ic("i-schild")+'</span><span><em>In der Saison · jederzeit</em><b>Notfall-Antrag</b></span><span class="erw"><strong class="t">'+f1(b.R)+'</strong><span>RÜCKLAGE C</span></span></button>';
   $("hr").innerHTML='<div class="frist"><span class="gk">Vertrauen</span><strong class="t">'+f1(t.v)+' · Stufe '+b.stufe+'</strong></div><a class="btn" href="finanzen-modern-18-11.html?ansicht=budget">'+ic("i-geld")+' Zur Finanzseite</a>';
   $("haupt").innerHTML=S.ans==="notfall"?notfall(id):gespraech(id);
@@ -625,14 +628,14 @@ function gespraech(id){
   else if(S.anl==="ruecklage")
     stell='<div class="stell"><strong class="t">'+c(toepfe(id,d).ang)+'</strong><span class="seg"><button aria-pressed="'+(S.viertel===1)+'" data-a="viertel:1">ein Viertel</button><button aria-pressed="'+(S.viertel===2)+'" data-a="viertel:2">die Hälfte</button></span><span class="sp"></span><span>von '+c(b.gesp)+' gesperrt · Ziel '+c(b.R)+'</span></div>';
   else if(S.anl==="stufe")
-    stell='<div class="stell"><strong class="t">'+pz(naechste(b.q))+'</strong><span>Ablösen <b class="plus t">'+vz(m.tr)+' C</b> · Gehaltsbudget <b class="'+(m.ge>0.05?"plus":"null")+' t">'+vz(m.ge)+' C</b></span><span class="sp"></span><span>Verkaufserlöse künftig zu '+pz(naechste(b.q))+' frei</span></div>';
+    stell='<div class="stell"><strong class="t">'+pz(naechste(b.q))+'</strong><span>Ablösen <b class="plus t">'+vz(m.tr)+' C</b> · Gehaltsbudget <b class="'+(m.ge>0.05?"plus":"null")+' t">'+vz(m.ge)+' C</b></span><span class="sp"></span><span>Verkaufserlöse sind ohnehin sofort zu 100 % frei</span></div>';
   else
     stell='<div class="stell"><strong class="t">100 %</strong><span>Ablösen <b class="plus t">'+vz(m.tr)+' C</b> · nur 5 % Puffer · Ziel <b>Platz '+toepfe(id,d).ziel+'</b></span><span class="sp"></span><span>Treffer +0,75 · verfehlt −1,0 Vertrauen</span></div>';
   /* 2 Gegenleistungen */
   const offs=REIHE.map(k=>{const ok=frei(d,k),an=S.biete.has(k)&&ok;
     return '<button class="off'+(an?" an":"")+'" data-a="biete:'+k+'"'+(ok?"":" disabled")+' aria-pressed="'+an+'"><span class="hk3">'+ic("i-ok")+'</span><span class="ic">'+ic(OFF[k].ic)+'</span><span><b>'+OFF[k].name+'</b><span>'+(ok?offText(id,d,k):"Passt nicht zu diesem Anliegen.")+'</span></span><span class="gew"><strong class="t">+'+w[k]+'</strong><span class="pkt">'+[1,2,3,4].map(i=>'<i class="'+(w[k]>=i*2?"v":"")+'"></i>').join("")+'</span></span></button>'}).join("");
   /* 3 Gespraech */
-  let chat=blase("vorstand","<p>"+b.C.auf+"</p><p>Dein Stand: Vertrauen <b>"+f1(t.v)+"</b>, Stufe "+b.stufe+". <b>"+pz(b.q)+"</b> sind freigegeben, <b>"+c(a.transfer)+"</b> für Ablösen. <b>"+c(b.gesp)+"</b> liegen als Notrücklage fest.</p>");
+  let chat=blase("vorstand","<p>"+b.C.auf+"</p><p>Dein Stand: Vertrauen <b>"+f1(t.v)+"</b>, Stufe "+b.stufe+". <b>"+pz(b.q)+"</b> sind freigegeben, <b>"+c(a.transfer)+"</b> für Ablösen. <b>"+c(b.gesp)+"</b> liegen als Notrücklage fest."+(S.vk?" Dein Verkauf in diesem Fenster ist schon drin: <b>"+c(S.vk)+"</b>, voll frei.":" Was du in diesem Fenster verkaufst, ist sofort voll frei.")+"</p>");
   if(S.phase==="entwurf"){
     chat+=blase("ich","<p>"+antragSatz(id,d)+"</p>","entw")+waage(r,false);
   }else{
@@ -653,7 +656,7 @@ function gespraech(id){
       chat+=blase("vorstand","<p><b>Vereinbart und im Protokoll.</b> Die Töpfe sind angepasst, die Kaufsperre rechnet ab sofort damit.</p><ul>"+pos.map(x=>'<li class="gut">'+ic("i-ok")+"<span>"+x+"</span></li>").join("")+auf+
         (V.anl==="ruecklage"?'<li class="rot">'+ic("i-herz")+"<span><b>Vertrauen −"+f1(V.viertel*.25)+"</b> · wirkt bei der nächsten Festlegung</span></li>":"")+"</ul>","ok");
     }
-    if(S.phase==="beendet")chat+=blase("vorstand","<p>Dann bleibt es bei <b>"+pz(b.q)+"</b>. Fragen kostet nichts. Das nächste Gespräch gibt es im nächsten Fenster, in einer Notlage sofort.</p>");
+    if(S.phase==="beendet")chat+=blase("vorstand","<p>Dann bleibt es bei <b>"+pz(b.q)+"</b>. Fragen kostet nichts. Das nächste Gespräch gibt es im nächsten Transferfenster, in einer Geldnotlage sofort.</p>");
   }
   /* Dock */
   let dk="",st,kl="";
@@ -685,26 +688,27 @@ function notlage(id){
   const b=basis(id),t=b.t;
   const stand=b.gesp+(b.R-b.gesp)*11/20;                         /* bis Spieltag 11 angespart */
   const L={
-    klein:{name:"Sponsor-Rate fällt aus",txt:"Der Hauptsponsor zahlt die Rate für Spieltag 11 nicht. Die Gehälter sind fällig.",fehl:Math.round(stand*.65),krit:[true,false,false]},
-    gross:{name:"Zwei Stammspieler verletzt",txt:"Der Kader fällt auf 7 spielfähige Spieler. Zwei Ersatzleute müssen sofort her.",fehl:Math.round(stand+8),krit:[true,true,false]},
-    wunsch:{name:"Ein Star ist auf dem Markt",txt:"Ein Topspieler wäre zu haben. Im Transfertopf fehlen 14 C.",fehl:14,krit:[false,false,false]}
+    klein:{name:"Sponsor-Rate fällt aus",txt:"Der Hauptsponsor zahlt die Rate für Spieltag 11 nicht. Nach der Gehaltsbuchung wäre die Kasse im Minus.",fehl:Math.round(stand*.65),krit:[true,false]},
+    gross:{name:"Einnahmen brechen ein",txt:"Niederlagenserie, leere Ränge, dazu ein Schaden an der Arena. Die Gehälter bis zum Saisonende sind nicht mehr gedeckt.",fehl:Math.round(stand+8),krit:[true,true]},
+    wunsch:{name:"Trainingszentrum ausbauen",txt:"Der Ausbau wäre jetzt günstig zu haben. Im Investitionstopf fehlen 14 C.",fehl:14,krit:[false,false]}
   };
   const l=L[S.not],ist=l.krit.some(Boolean);
-  const s1=ist?Math.min(l.fehl,stand):0,s2=ist?Math.min(l.fehl-s1,t.rahmen):0,s3=ist?l.fehl-s1-s2:0;
+  /* In der Saison gibt es keinen Handel: die Leiter endet beim Kredit. Erst der zinsfreie Rahmen, dann ein Kredit. */
+  const s1=ist?Math.min(l.fehl,stand):0,s2=ist?l.fehl-s1:0,s3=0;
   return {b,t,L,l,ist,stand,s1,s2,s3};
 }
 function notfall(id){
   const N=notlage(id),b=N.b,l=N.l,zu=S.notPhase!=="entwurf";
   const lagen=Object.keys(N.L).map(k=>'<button class="anl'+(S.not===k?" an":"")+'" data-a="not:'+k+'"><span><b>'+N.L[k].name+'</b><span>'+N.L[k].txt+'</span><strong class="t">'+c(N.L[k].fehl)+'</strong></span></button>').join("");
-  const kn=["Die Kasse fällt nach der Spieltagsbuchung unter 0","Der Kader fällt unter 8 spielfähige Spieler","Am Kassensturz droht ein Pflichtkredit"];
+  const kn=["Die Kasse fällt nach der Spieltagsbuchung unter 0","Die Gehälter bis zum Saisonende sind nicht gedeckt"];
   const pruef=kn.map((x,i)=>'<div class="'+(l.krit[i]?"ja":"")+'">'+ic(l.krit[i]?"i-ok":"i-x")+'<span>'+x+'</span></div>').join("");
   const st=(nr,kl,name,txt,wert,max,sub)=>'<div class="stufe '+kl+(wert>0.04?"":" aus")+'"><span class="nr">'+nr+'</span><div><b>'+name+'</b><span>'+txt+'</span></div><div class="bt"><strong class="t">'+(wert>0.04?c(wert):"0 C")+'</strong><small>'+sub+'</small></div><div class="fort"><i style="width:'+(max>0?klemm(wert/max*100,0,100):0)+'%"></i></div></div>';
   const leiter='<div class="leiter">'+
     st(1,"s1","Notrücklage","Der Vorstand gibt sie frei. Kein Vertrauensverlust, keine Gegenforderung.",N.s1,N.stand,"von "+c(N.stand))+
-    st(2,"s2","Kredit","Erst der zinsfreie Rahmen, dann ein Kredit. Nur für den Rest.",N.s2,N.t.rahmen,"Rahmen "+c(N.t.rahmen))+
-    st(3,"s3","Notverkauf","Nur wenn Rücklage und Kredit zusammen nicht reichen.",N.s3,l.fehl,N.s3>0.04?"nötig":"nicht nötig")+'</div>';
+    st(2,"s2","Kredit","Erst der zinsfreie Rahmen, dann ein Kredit. Nur für den Rest.",N.s2,Math.max(N.t.rahmen,N.s2),"Rahmen "+c(N.t.rahmen))+
+    st(3,"s3","Notverkauf","In der Saison gibt es keinen Handel. Verkauft wird frühestens im nächsten Transferfenster.",0,l.fehl,"nur im Fenster")+'</div>';
   const auf={antreiber:"Dafür ist die Rücklage da. Nimm sie und bleib im Rennen.",kaufmann:"Genau für diesen Fall liegt das Geld bereit.",kassenwart:"Dafür haben wir gespart. Lieber die Rücklage als ein Kredit."}[b.ch];
-  let chat=blase("vorstand","<p>"+(N.ist?auf:"Erzähl. Aber ich sage gleich: die Notrücklage ist für Notlagen da, nicht für Gelegenheiten.")+"</p>");
+  let chat=blase("vorstand","<p>"+(N.ist?auf:"Erzähl. Aber ich sage gleich: die Notrücklage ist für Geldnotlagen da, nicht für Gelegenheiten.")+"</p>");
   let dock;
   if(!zu){
     chat+=blase("ich","<p><b>Notfall-Antrag:</b> "+l.txt+" Es fehlen <b>"+c(l.fehl)+"</b>.</p>","entw");
@@ -712,24 +716,24 @@ function notfall(id){
   }else{
     chat+=blase("ich","<p><b>Notfall-Antrag:</b> "+l.txt+" Es fehlen <b>"+c(l.fehl)+"</b>.</p>");
     if(N.ist){
-      chat+=blase("vorstand","<p><b>Freigegeben.</b> "+(N.s2>0.04?"Die Rücklage reicht nicht ganz, den Rest decken wir über den Rahmen. Verkaufen musst du niemanden.":"Die Rücklage deckt alles. Kein Kredit, kein Verkauf.")+"</p><ul>"+
+      chat+=blase("vorstand","<p><b>Freigegeben.</b> "+(N.s2>0.04?"Die Rücklage reicht nicht ganz, den Rest decken wir über den Rahmen.":"Die Rücklage deckt alles. Kein Kredit.")+"</p><ul>"+
         '<li class="gut">'+ic("i-schild")+"<span><b>"+c(N.s1)+"</b> aus der Notrücklage, sofort auf dem Konto</span></li>"+
         (N.s2>0.04?"<li>"+ic("i-kredit")+"<span><b>"+c(N.s2)+"</b> aus dem zinsfreien Rahmen</span></li>":"")+
         '<li class="gut">'+ic("i-herz")+"<span>Vertrauen bleibt bei <b>"+f1(N.t.v)+"</b>, Stufe bleibt "+pz(b.q)+"</span></li>"+
         "<li>"+ic("i-rueck")+"<span>Die Rücklage wird ab jetzt wieder angespart. Bis sie zur Hälfte steht, gibt es keine Lockerung.</span></li></ul>","ok");
-      dock=["Freigegeben","Notrücklage "+c(N.s1)+(N.s2>0.04?", Rahmen "+c(N.s2):"")+". Kein Notverkauf.","ok",'<button class="btn" data-a="notneu" data-tip="Nur im Mockup: zurücksetzen">Neu beginnen</button>'];
+      dock=["Freigegeben","Notrücklage "+c(N.s1)+(N.s2>0.04?", Rahmen "+c(N.s2):"")+". Die Stufe bleibt.","ok",'<button class="btn" data-a="notneu" data-tip="Nur im Mockup: zurücksetzen">Neu beginnen</button>'];
     }else{
-      chat+=blase("vorstand","<p>Das ist <b>keine Notlage</b>. Die Kasse ist im Plus, der Kader steht, kein Kredit droht. Die Rücklage bleibt zu.</p><p>Im nächsten Kauffenster kannst du sie regulär anzapfen: bis zur Hälfte, für 0,25 Vertrauen je Viertel. Oder du verkaufst jetzt jemanden, der Erlös wird zu "+pz(b.q)+" frei.</p>","nein");
+      chat+=blase("vorstand","<p>Das ist <b>keine Notlage</b>. Die Kasse ist im Plus, die Gehälter sind gedeckt. Die Rücklage bleibt zu.</p><p>Im nächsten Transferfenster kannst du sie regulär anzapfen: bis zur Hälfte, für 0,25 Vertrauen je Viertel. Oder du verkaufst dort jemanden, der Erlös ist sofort voll frei.</p>","nein");
       dock=["Abgelehnt","Keine anerkannte Notlage. Kein Vertrauensverlust.","nein",'<button class="btn" data-a="notneu" data-tip="Nur im Mockup: zurücksetzen">Neu beginnen</button>'];
     }
   }
-  return '<div class="pk"><h2>Notfall-Antrag</h2><span class="marke leer">SPIELTAG 11 VON 20</span><span class="sp"></span><span class="hin">Die Reihenfolge ist fest: Notrücklage, dann Kredit, dann erst Verkauf.</span></div>'+
+  return '<div class="pk"><h2>Notfall-Antrag</h2><span class="marke leer">SPIELTAG 11 VON 20</span><span class="sp"></span><span class="hin">In der Saison: erst die Notrücklage, dann Kredit. Gehandelt wird nur im Fenster.</span></div>'+
     '<div class="gs"><div class="gl'+(zu?" gesperrt":"")+'">'+
       '<div class="ab"><div class="gk"><span><b>1</b>Was ist passiert</span><em>im Mockup wählbar</em></div><div class="lagen">'+lagen+'</div></div>'+
-      '<div class="ab"><div class="gk"><span><b>2</b>Ist das eine Notlage</span><em>eine der drei reicht</em></div><div class="pruef">'+pruef+'</div></div>'+
+      '<div class="ab"><div class="gk"><span><b>2</b>Ist das eine Notlage</span><em>Geldnotlage · eine der zwei reicht</em></div><div class="pruef">'+pruef+'</div></div>'+
       '<div class="ab"><div class="gk"><span><b>3</b>Wer zahlt die '+c(l.fehl)+'</span><em>von oben nach unten</em></div>'+leiter+'</div>'+
     '</div><div class="gc">'+chat+'</div></div>'+
-    '<div class="dock '+dock[2]+'"><span class="pkt2"></span><div class="st"><b>'+dock[0]+'</b><span>'+dock[1]+'</span></div><div class="sum"><small>Fehlbetrag</small><strong class="t" style="color:var(--warn)">'+c(l.fehl)+'</strong></div><div class="sum"><small>Notverkauf</small><strong class="t">'+(N.s3>0.04?c(N.s3):"keiner")+'</strong></div>'+dock[3]+'</div>';
+    '<div class="dock '+dock[2]+'"><span class="pkt2"></span><div class="st"><b>'+dock[0]+'</b><span>'+dock[1]+'</span></div><div class="sum"><small>Fehlbetrag</small><strong class="t" style="color:var(--warn)">'+c(l.fehl)+'</strong></div><div class="sum"><small>Aus der Rücklage</small><strong class="t" style="color:var(--ruec)">'+c(N.s1)+'</strong></div>'+dock[3]+'</div>';
 }
 
 /* ---------- Kontext ---------- */
@@ -758,7 +762,8 @@ function kontext(id){
     const d=S.phase==="vereinbart"?S.vertrag:S.phase==="beendet"?null:S.phase==="entwurf"?deal():S.antwort.d;
     n=toepfe(id,d);titel=S.phase==="vereinbart"?"Vereinbart":S.phase==="beendet"?"Unverändert":"Wenn der Vorstand zustimmt";
     const z=(name,vo,na,einh,gutHoch)=>{const de=na-vo,kl=Math.abs(de)<0.04?"null":(de>0)===gutHoch?"plus":"minus";return '<div class="vn"><span>'+name+'</span><span class="vo t">'+einh(vo)+'</span><span class="na t">'+einh(na)+'</span><span class="de t '+kl+'">'+(Math.abs(de)<0.04?"·":vz(einh===pz?de*100:de))+'</span></div>'};
-    h='<div class="ab2"><div class="gk"><span>Vorschau der Töpfe</span><em>'+titel+'</em></div>'+kbar("Heute",a,true)+kbar(titel,n,false)+
+    h='<div class="ab2"><div class="gk"><span>Verkauft in diesem Fenster</span><em>im Mockup wählbar</em></div><div class="stell" style="margin:0;min-height:44px"><span class="seg"><button aria-pressed="'+(S.vk===0)+'" data-a="vk:0">nichts</button><button aria-pressed="'+(S.vk===12)+'" data-a="vk:12">ein Spieler · 12 C</button></span><span class="sp"></span><span>Erlös sofort <b class="plus">zu 100 % frei</b></span></div></div>'+
+      '<div class="ab2"><div class="gk"><span>Vorschau der Töpfe</span><em>'+titel+'</em></div>'+kbar("Heute",a,true)+kbar(titel,n,false)+
       '<div class="lg"><span><i style="--pc:var(--frei)"></i>frei für Ablösen</span>'+(n.sG>0?'<span><i style="--pc:var(--gehv)"></i>Gehalt vorgemerkt</span>':"")+'<span><i style="--pc:var(--vorb)"></i>Vorbehalt</span><span><i style="--pc:var(--ruec)"></i>Notrücklage</span></div></div>'+
       '<div class="ab2"><div class="vn kopf"><span>Was sich ändert</span><span>heute</span><span>danach</span><span>Δ</span></div>'+
         z("Freigabe",a.q,n.q,pz,true)+z("Transfertopf frei",a.transfer,n.transfer,f1,true)+z("Gehaltsbudget frei",a.gehaltFrei,n.gehaltFrei,f1,true)+
@@ -778,13 +783,13 @@ function kontext(id){
       '<div class="hinw" style="--pc:'+b.C.farbe+'"><b>Kein Würfel.</b> Die Antwort steht fest, sobald Anliegen und Angebot stehen. Du siehst sie vor dem Antrag als Einschätzung.</div>';
   }else{
     const kl=(nr,k,name,txt)=>'<div class="stufe klein '+k+'"><span class="nr">'+nr+'</span><div><b>'+name+'</b><span>'+txt+'</span></div></div>';
-    h='<div class="ab2"><div class="gk"><span>In der Not gilt diese Reihenfolge</span></div><div class="leiter">'+
+    h='<div class="ab2"><div class="gk"><span>In der Not gilt diese Reihenfolge</span><em>Saison: nur 1 und 2</em></div><div class="leiter">'+
       kl(1,"s1","Notrücklage","Der Vorstand gibt sie frei, ohne Abzug und ohne Verhandlung.")+
       kl(2,"s2","Kredit","Zinsfreier Rahmen, dann Kredit. Nur für den Rest.")+
-      kl(3,"s3","Notverkauf","Erst wenn 1 und 2 nicht reichen.")+'</div></div>'+
+      kl(3,"s3","Notverkauf","Nur im Transferfenster, und erst wenn 1 und 2 nicht reichen. In der Saison gibt es ihn nicht.")+'</div></div>'+
       '<div class="ab2"><div class="gk"><span>Was der Vorstand nie darf</span></div><div class="pruef">'+
-      ["Geld vom Konto nehmen. Gesperrt heißt nur: nicht ausgebbar.","Einen Kauf sperren, der den Kader auf 8 bringt.","Das Gehaltsbudget unter 75 % kürzen.","Eine Notlage ablehnen oder dafür Vertrauen abziehen.","Einen Verkauf verlangen, solange Rücklage oder Rahmen reichen."].map(x=>'<div class="ja">'+ic("i-schild")+'<span>'+x+'</span></div>').join("")+'</div></div>'+
-      '<div class="ab2"><div class="gk"><span>Regeln des Gesprächs</span></div><div class="formel">Ein Gespräch je Kauffenster, ein Anliegen, höchstens zwei Runden.\nFragen kostet nichts. Eine Ablehnung auch nicht.\nNur Zusagen binden: Ziel, Rückzahlung, Deckel, Vertrauen.\nSaison 1: alles ist frei, es gibt nichts zu verhandeln.</div></div>';
+      ["Geld vom Konto nehmen. Gesperrt heißt nur: nicht ausgebbar.","Einen Kauf sperren, der den Kader auf 8 bringt.","Das Gehaltsbudget unter 75 % kürzen.","Eine Notlage ablehnen oder dafür Vertrauen abziehen.","Einen Verkauf verlangen, solange Rücklage oder Kredit reichen."].map(x=>'<div class="ja">'+ic("i-schild")+'<span>'+x+'</span></div>').join("")+'</div></div>'+
+      '<div class="ab2"><div class="gk"><span>Regeln des Gesprächs</span></div><div class="formel">Ein Gespräch je Transferfenster, ein Anliegen, höchstens zwei Runden.\nVerkäufe im selben Fenster sind sofort zu 100 % frei.\nFragen kostet nichts. Eine Ablehnung auch nicht.\nNur Zusagen binden: Ziel, Rückzahlung, Deckel, Vertrauen.\nSaison 1: alles ist frei, es gibt nichts zu verhandeln.</div></div>';
   }
   $("cb").innerHTML=h;
 }
@@ -804,6 +809,7 @@ function aktion(a){
   else if(k==="anl"){S.anl=w;if(w==="sonder")S.betrag=0}
   else if(k==="topf"){S.topf=w}
   else if(k==="viertel"){S.viertel=+w}
+  else if(k==="vk"){S.vk=+w}
   else if(k==="biete"){S.biete.has(w)?S.biete.delete(w):S.biete.add(w)}
   else if(k==="leeren"){S.biete.clear()}
   else if(k==="stellen"){stellen()}
