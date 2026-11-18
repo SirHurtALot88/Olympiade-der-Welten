@@ -2178,6 +2178,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         displayName: slot.displayName,
         art: slot.art,
         gegnerNamen: slot.gegnerTeamIds.map((id) => nameById.get(id) ?? id),
+        gegnerTeamIds: [...slot.gegnerTeamIds],
       }));
     } catch {
       // Ein unvollstaendiger Spielstand (z. B. ohne Saison) soll die Einsatzliste nie umwerfen.
