@@ -198,7 +198,7 @@ if (pool("vorher", "s1_04_nach_abschluss").length > 0) {
         const sponsor = parts.sponsorCash ?? parts.sponsor ?? null;
         const gehalt = parts.salaryTotal ?? parts.gehalt ?? null;
         if (sponsor != null && gehalt > 0) q.push(sponsor / gehalt);
-        guvSumme += guv.ergebnis ?? guv.total ?? guv.saldo ?? 0;
+        guvSumme += guv.guv ?? 0;
         n += 1;
       }
       for (const z of Object.values(ph.snap)) if (z.cash < 0) minus += 1;
