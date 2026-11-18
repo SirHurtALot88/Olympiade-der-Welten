@@ -2838,6 +2838,18 @@ export type DisciplineResultRecord = {
    */
   ergebnisNormiert?: [number, number] | null;
   /**
+   * ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): `"e1"`, wenn `ergebnisNormiert`,
+   * `verhaeltnis` und `miniDmPod.wert` dieser Zeile nach der einheitlichen Skala E1 gerechnet sind
+   * (Saison-Stempel `seasonState.wertungsSkalen.ergebnis`). Fehlt = Skala vom 19.10.
+   */
+  ergebnisSkala?: "e1";
+  /**
+   * PP-SKALA DER ZEILE (18.11., lib/resolve/wertungs-skalen.ts `ppSkalaVersionFuerZeile()`): `"c2"`, wenn
+   * die Spieler-PP dieser Zeile mit C2 gerechnet wurden. Der Ledger rechnet PPS-Duell-Zeilen damit nach
+   * derselben Skala nach, mit der sie gebucht wurden -- auch nach einer Umstellung mitten in der Saison.
+   */
+  ppSkala?: "c2";
+  /**
    * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
    * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
    * Modus bleibt unberuehrt. Seit 01.11. fuer JEDE Vierer-Pod-Disziplin (Mini-DM, Battlefield, s.
@@ -3463,6 +3475,12 @@ export type SeasonSnapshotRecord = {
   sourceStatus?: "mapped" | "partial" | "missing_source";
   finalStandings: SeasonSnapshotTeamRecord[];
   teamSnapshots?: SeasonSnapshotTeamRecord[];
+  /**
+   * WERTUNGSSKALEN DER ARCHIVIERTEN SAISON (18.11., lib/resolve/wertungs-skalen.ts): mit welcher PP- und
+   * Ergebnisskala diese Saison gerechnet wurde. Fehlt = vor dem 18.11. archiviert (alte Skalen).
+   * Saisonuebergreifende Summen (ewige Tabelle, Laufbahn) koennen daran ablesen, ab wann die neue Skala gilt.
+   */
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string } | null;
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
@@ -3750,6 +3768,98 @@ export type LeagueSetupTeamWarning = {
 };
 
 /**
+ * LIGA-DRAFT IM EINZELSCHRITT (Draft-Neubau, 18.11.; docs/design/draft-modern-18-11.md und
+ * docs/design/draft-neubau-kern-18-11.md). Der Zustand liegt im Spielstand (`seasonState.ligaDraft`), damit jeder
+ * Mitspieler denselben Draft sieht und ein Neustart des Servers nichts verliert. Fehlt er, laeuft der Draft nicht
+ * (bzw. lief ueber den alten Hintergrundlauf).
+ */
+export type LigaDraftSitzArt = "ki" | "mensch";
+
+export type LigaDraftTeamStatus =
+  /** Pickt an seinem Platz in der Reihenfolge. */
+  | "aktiv"
+  /** Pickt nicht mehr (KI hoert auf, Kader voll, Mensch „Ich bin fertig“, Draft-Ende). */
+  | "fertig"
+  /** Variante A: aus der Reihenfolge genommen; pickt nach dem Draft ohne Reihenfolge aus dem Rest. */
+  | "nachzug";
+
+export type LigaDraftFertigGrund =
+  | "ki_stop"
+  | "kader_voll"
+  | "max_picks"
+  | "nichts_leistbar"
+  | "kauf_blockiert"
+  | "mensch_fertig"
+  | "draft_ende"
+  /** Der Gastgeber hat den Draft abgebrochen (`/api/draft` Aktion `abbrechen`). */
+  | "abgebrochen";
+
+export type LigaDraftTeamZustand = {
+  teamId: string;
+  art: LigaDraftSitzArt;
+  /** Besitzer des Teams (Mensch) — fuer Anzeige und Rechte; bei KI `null`. */
+  ownerId: string | null;
+  /** Mensch: der eigene GM pickt an seinem Platz (Variante B, oder delegierter Draft). KI: immer `true`. */
+  autoPick: boolean;
+  status: LigaDraftTeamStatus;
+  fertigGrund: LigaDraftFertigGrund | null;
+  /** Gepickte Spieler in diesem Draft. */
+  picks: number;
+  /** Ausgelassene Picks (nur Menschen). */
+  auslassungen: number;
+  /** Planrahmen-Anker: Kader und Kasse zu Draft-Beginn (die KI plant wie der Blocklauf ab diesem Stand). */
+  startKaderIds: string[];
+  startKasse: number;
+  /** Superstar-Lizenz, einmal zu Draft-Beginn vergeben (`null`: Komposition aus). */
+  superstarLizenz: boolean | null;
+};
+
+export type LigaDraftTop3Eintrag = { playerId: string; nutzen: number };
+
+export type LigaDraftEintrag = {
+  /** Laufende Nummer ueber alle Eintraege (1, 2, …). */
+  nr: number;
+  /** Pick-Nummer (nur `art: "pick"`), sonst `null`. */
+  pickNr: number | null;
+  runde: number;
+  /** 1-basierter Platz in der Runde (bei Nachzug `null`). */
+  platz: number | null;
+  teamId: string;
+  art: "pick" | "auslassen" | "aus" | "ueberspringen";
+  playerId: string | null;
+  /** Wer entschieden hat: KI-Team, Mensch, Auto-Pick eines Menschen, Mensch im Nachzug. */
+  quelle: "ki" | "mensch" | "auto" | "nachzug";
+  abloese: number | null;
+  gehalt: number | null;
+  transferId: string | null;
+  /** Was die KI bei diesem Pick sah (Top 3), sonst `null`. */
+  top3: LigaDraftTop3Eintrag[] | null;
+  /** Kurzgrund (z. B. Fertig-Grund oder Ueberspring-Variante). */
+  grund: string | null;
+  zeit: string;
+};
+
+export type LigaDraftZustand = {
+  version: 1;
+  saisonId: string;
+  status: "laeuft" | "nachzug" | "fertig";
+  /** Saat fuer Gleichstaende in der Reihenfolge. */
+  seed: string;
+  regeln: { maxRunden: number; maxPicksJeTeam: number; minKader: number };
+  /** 1-basiert. */
+  runde: number;
+  /** Reihenfolge der laufenden Runde: schwaechstes Team zuerst (beim Rundenstart berechnet). */
+  reihenfolge: string[];
+  /** 0-basierter Index in `reihenfolge`: wer als Naechstes dran ist (fertige Teams werden uebersprungen). */
+  platz: number;
+  teams: Record<string, LigaDraftTeamZustand>;
+  verlauf: LigaDraftEintrag[];
+  erstelltAm: string;
+  aktualisiertAm: string;
+  beendetAm: string | null;
+};
+
+/**
  * Frozen per-player valuation row captured at MD10 season end. Once the season is completed
  * (gamePhase !== "season_active"), OVR/MVS/PPs/MW and the sale-factor bracket rank are read from
  * this snapshot instead of being recomputed pool-relative, so post-season sales/roster changes do
@@ -3815,6 +3925,8 @@ export type SeasonState = {
    * (Manager Mode, Nicht-Basketball-Spieltag, oder noch nie ausgeloest).
    */
   arenaMatchdayResolveStatus?: "in_progress" | "ready" | "failed";
+  /** Liga-Draft im Einzelschritt (Saison 1), s. `LigaDraftZustand`. Fehlt er, laeuft kein solcher Draft. */
+  ligaDraft?: LigaDraftZustand;
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;
@@ -3881,6 +3993,13 @@ export type SeasonState = {
    * die V3-Basis gehoben wurden — und danach rechnen alle noch offenen Vertraege nach V3.
    */
   sponsorSystemVersion?: 1 | 2 | 3;
+  /**
+   * WERTUNGSSKALEN DIESER SAISON (18.11., lib/resolve/wertungs-skalen.ts): welche Spieler-PP-Skala
+   * ("c2" = Zwei-Anker, Deckel 5) und welche Team-Ergebnisskala ("e1" = einheitliche 0-10-Skala) diese
+   * Saison rechnet. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
+   * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
+   */
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
   /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.

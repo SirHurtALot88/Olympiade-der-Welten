@@ -18,7 +18,11 @@ import {
   MARQUEE_TARGET_MW_FLOOR,
   type MarqueeLicenseTeamInput,
 } from "@/lib/ai/organic-squad/marquee-eligibility";
-import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
+import {
+  buildOrganicSquadPlan,
+  type OrganicBuyDecision,
+  type OrganicSquadPlanInput,
+} from "@/lib/ai/organic-squad/draft-builder";
 import { computeTeamSalaryCeiling } from "@/lib/ai/organic-squad/salary-ceiling";
 import {
   ROSTER_MAX,
@@ -374,6 +378,12 @@ export type OrganicDraftPlanInput = {
   };
   /** Optional per-(save, team) seed for the reproducible buy-utility jitter (see draft-builder.ts). */
   draftSeed?: string | null;
+  /**
+   * Liga-Draft im Einzelschritt (lib/draft/liga-draft-ki.ts): die Superstar-Lizenz wird EINMAL zu Draft-Beginn
+   * vergeben und dann festgehalten. Sonst würde sie mit jedem Pick neu ausgewürfelt (die Lizenzrechnung liest Kasse und
+   * Kader ALLER Teams), und ein Team könnte seine Lizenz mitten im Draft verlieren. `undefined` = wie bisher rechnen.
+   */
+  superstarLizenz?: boolean;
 };
 
 export type OrganicDraftPlanResult = {
@@ -455,8 +465,57 @@ function buildOrganicPlanContext(input: {
   };
 }
 
+/**
+ * Der eingefrorene Planrahmen eines Teams: alles, was `buildOrganicSquadPlan` als Eingabe bekommt (Kandidaten als
+ * Sichten, Startkader, Gewichte, Ökonomie, Komposition), plus die Diagnosewerte. `planOrganicDraftForTeam` baut ihn und
+ * lässt die Schleife darauf laufen; der Liga-Draft im Einzelschritt (lib/draft/liga-draft-ki.ts) baut ihn je Pick neu
+ * und macht nur EINEN Schritt (`organicBuyStep`). Eine Quelle für beide Wege.
+ */
+export type OrganicDraftFrame = {
+  planInput: OrganicSquadPlanInput;
+  optTarget: number;
+  /** Die Ruecklage, mit der geplant wird (in Saison 1 halbiert, s. unten). */
+  ruecklage: number;
+  /** Superstar-Lizenz dieses Aufrufs (`null`, wenn die Komposition aus ist). */
+  superstarLizenz: boolean | null;
+  salaryCeilingDebug?: ReturnType<typeof computeTeamSalaryCeiling>;
+  ruecklageDebug?: KiRuecklageErgebnis;
+  vorstandDebug: VorstandBudgetStand;
+  sponsorForecast?: number;
+};
+
+/**
+ * SAISON 1: DRAFT-RUECKLAGE UND GEHALTSPUFFER HALB (Chris, 18.11., zwei Entscheidungen: Finanzkonzept V2 „Draft-
+ * Ruecklage halb“ und Draft-Mockup Frage 9 „auch den Gehaltspuffer halbieren“). Die Ruecklage ist
+ * max(q × Budget, 0,35 × Zielgehalt) — der zweite Term IST der Gehaltspuffer. Der Faktor wirkt auf das Maximum, also auf
+ * beide Terme zugleich: welcher auch bindet, er zählt in Saison 1 nur halb. Ab Saison 2 voll.
+ */
+export const SAISON_EINS_RUECKLAGE_FAKTOR = 0.5;
+
+export function istSaisonEins(gameState: Pick<GameState, "season">): boolean {
+  return /(\d+)\s*$/.exec(gameState.season?.id ?? "")?.[1] === "1";
+}
+
 /** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
 export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDraftPlanResult {
+  const frame = buildOrganicDraftFrame(input);
+  const result = buildOrganicSquadPlan(frame.planInput);
+  return {
+    decisions: result.decisions,
+    finalCash: result.finalCash,
+    finalSalaryTotal: result.finalSalaryTotal,
+    finalRosterSize: result.finalSquad.length,
+    stoppedBelowMin: result.stoppedBelowMin,
+    optTarget: frame.optTarget,
+    salaryCeilingDebug: frame.salaryCeilingDebug,
+    ruecklageDebug: frame.ruecklageDebug,
+    vorstandDebug: frame.vorstandDebug,
+    sponsorForecast: frame.sponsorForecast,
+  };
+}
+
+/** Baut den Planrahmen (Eingabe der Greedy-Schleife) aus dem Spielstand, ohne zu planen. */
+export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDraftFrame {
   const ctx = buildOrganicPlanContext({
     gameState: input.gameState,
     team: input.team,
@@ -491,8 +550,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     });
   }
   // Chris 18.11. (Zwei-Budget-Entscheid): in Saison 1 ist die Draft-Ruecklage um 50 % geringer, ab Saison 2 gilt sie voll.
-  const saisonEins = /(\d+)\s*$/.exec(input.gameState.season?.id ?? "")?.[1] === "1";
-  const ruecklageRoh = (ruecklageDebug?.ruecklage ?? 0) * (saisonEins ? 0.5 : 1);
+  const ruecklageRoh = (ruecklageDebug?.ruecklage ?? 0) * (istSaisonEins(input.gameState) ? SAISON_EINS_RUECKLAGE_FAKTOR : 1);
   // Stufe 3 (hart): der Vorstand gibt nur `nochFrei` zum Ausgeben (Ablosen + Jahresgehaelter) frei; das Geld bleibt auf dem Konto.
   const vorstand = berechneVorstandBudgetStand(input.gameState, input.team.teamId);
   // Ab Saison 2 steckt die Ruecklage schon im Transfertopf des Vorstands (Kasse - Ruecklage - Gehaltspuffer); die KI haelt sie nicht
@@ -527,6 +585,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
   // magic numbers here. Deliberately built AFTER the FILLQ_B opt-trim above so the plan targets the final
   // (possibly trimmed) optTarget, not the pre-trim one.
   let composition: { counts: Record<MarketBracketLane, number>; brackets: ReturnType<typeof buildLeagueMarketBrackets> } | undefined;
+  let superstarLizenz: boolean | null = null;
   if (COMPOSE_ENABLED) {
     const brackets = buildLeagueMarketBrackets(candidates.map((view) => view.marketValue));
     const existingTiers: Record<MarketBracketLane, number> = {
@@ -587,6 +646,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       };
     });
     const licenses = deriveLeagueSuperstarLicenses(leagueInput);
+    superstarLizenz = input.superstarLizenz ?? licenses.has(input.team.teamId);
 
     const counts = deriveCompositionCounts({
       optTarget: planWeights.optTarget,
@@ -595,7 +655,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       brackets,
       premiumAppetite: lanePhilosophy.premiumAppetite,
       premiumCap: lanePhilosophy.premiumCap,
-      superstarCap: licenses.has(input.team.teamId) ? 1 : 0,
+      superstarCap: superstarLizenz ? 1 : 0,
       rosterMin: ROSTER_MIN,
       marqueeTargetMw,
     });
@@ -610,7 +670,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     ? computeTeamSalaryCeiling(input.gameState, input.team.teamId, { teamCash: planCash })
     : undefined;
 
-  const result = buildOrganicSquadPlan({
+  const planInput: OrganicSquadPlanInput = {
     startingSquad,
     candidates,
     identityAxisWeights: ctx.identityAxisWeights,
@@ -639,15 +699,13 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       salaryCap,
     },
     draftSeed: input.draftSeed ?? null,
-  });
+  };
 
   return {
-    decisions: result.decisions,
-    finalCash: result.finalCash,
-    finalSalaryTotal: result.finalSalaryTotal,
-    finalRosterSize: result.finalSquad.length,
-    stoppedBelowMin: result.stoppedBelowMin,
+    planInput,
     optTarget: planWeights.optTarget,
+    ruecklage,
+    superstarLizenz,
     salaryCeilingDebug,
     ruecklageDebug,
     vorstandDebug: vorstand,

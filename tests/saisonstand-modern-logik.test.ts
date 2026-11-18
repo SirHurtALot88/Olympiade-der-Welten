@@ -252,7 +252,7 @@ describe("Runde 2: Form, Bänder, Sparkline, Abstand, Kaderstärke", () => {
 
 describe("Matrix-Hover: Einzeleinsätze", () => {
   const dz = (id: string, name: string, h: number, g: number, norm: [number, number] | null, seiten: [number, number] | null) => ({
-    disciplineId: id, disciplineName: name, gespielt: true, punkteHeim: h, punkteGast: g, ergebnisNormiert: norm, seiten, miniDmPodIdHeim: null, miniDmPodIdGast: null,
+    disciplineId: id, disciplineName: name, gespielt: true, punkteHeim: h, punkteGast: g, ergebnisNormiert: norm, seiten, ergebnisSkala: null, miniDmPodIdHeim: null, miniDmPodIdGast: null,
   });
   it("Duell: Gegner, normierte Zahl aus der Sicht der Seite, Ausgang, Spieltag-Nummer", () => {
     const u = { matchdayIndex: 2, paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [dz("climbing", "Climbing", 2, 0, [8, 4], [70, 15])] }], miniDmPods: [] };

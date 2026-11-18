@@ -99,6 +99,15 @@ describe("Team-Zuordnung mit drei Menschen", () => {
       ramonaTeamIds: [ramona],
     });
     expect(resolveTeamDelegation(settings[ramona]).stufe).toBe("halbautomatik");
+    // Chris, 18.11. abends: „ramona draftet und kauft und verkauft selber alles andere startet mit AI“.
+    expect(resolveTeamDelegation(settings[ramona]).bereiche).toEqual({
+      einsatzliste: "ki",
+      draft: "selbst",
+      transfers: "selbst",
+      training: "ki",
+      gebaeude: "ki",
+      sponsor: "ki",
+    });
     expect(resolveTeamDelegation(settings[chris]).stufe).toBe("voll_selbst");
     expect(resolveTeamDelegation(settings[franky]).stufe).toBe("voll_selbst");
     expect(gameState.scenarioMeta?.humanControlledTeamCount ?? 3).toBe(3);

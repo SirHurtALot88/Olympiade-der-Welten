@@ -9,6 +9,7 @@ import type {
   TeamSeasonObjectiveStatus,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -792,6 +793,8 @@ export function getSportTarget(input: {
    * Liga-Split bleibt alles beim 32er-Raum, bit-identisch zu vorher.
    */
   gameState?: GameState | null;
+  /** PP-SKALA C2 (18.11.): Verhaeltnis C2/alt der Team-Saisonsumme (`ppSkalaUmrechnung().teamSaison`), sonst 1. */
+  ppTeamFaktor?: number;
 }) {
   const rangRaum = rangRaumDesTeams(input.gameState, input.team.teamId);
   const oben = (wert32: number) => rangSchwelleOben(wert32, rangRaum);
@@ -815,7 +818,8 @@ export function getSportTarget(input: {
   const rosterReady = rosterCount >= Math.max(playerMin, Math.floor(playerOpt * 0.9));
   const ppsTotal = input.row.ppsTotal ?? 0;
   const marketValueTotal = input.row.marketValueTotal ?? 0;
-  const strengthReady = ppsTotal >= 95 || marketValueTotal >= Math.max(170, playerOpt * 18);
+  // Die feste Schwelle 95 PP stammt aus der alten PP-Skala; in einer C2-Saison wird sie umgerechnet.
+  const strengthReady = ppsTotal >= 95 * (input.ppTeamFaktor ?? 1) || marketValueTotal >= Math.max(170, playerOpt * 18);
   const ppsRank = getRelativeMetricRank({
     teamId: input.team.teamId,
     rowsByTeamId: staerkeRows,
@@ -2094,7 +2098,7 @@ function buildTeamObjectives(input: {
   const disposition = boardV2 ? resolveBoardDisposition({ identity, previousSeasonBoard }) : null;
   const sportTarget = boardV2
     ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition, gameState })
-    : getSportTarget({ team, identity, profile, row, rowsByTeamId, gameState });
+    : getSportTarget({ team, identity, profile, row, rowsByTeamId, gameState, ppTeamFaktor: ppSkalaUmrechnung(gameState).teamSaison });
   // F4: dynamic slate size 3–5 from disposition ambition + last-known perceived pressure.
   const slateSize = disposition
     ? clamp(

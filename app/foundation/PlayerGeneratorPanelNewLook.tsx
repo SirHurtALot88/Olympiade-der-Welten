@@ -164,7 +164,7 @@ function formatMoneyValue(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
-  return `${formatValue(value, 2)} Mio`;
+  return `${formatValue(value, 2)} C`;
 }
 
 function buildSeed() {

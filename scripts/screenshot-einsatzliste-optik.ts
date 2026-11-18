@@ -31,7 +31,7 @@ const PORT = process.env.SCREENSHOT_PORT ?? "3211";
 const BASE_URL = `http://localhost:${PORT}`;
 const MODUS = process.argv[2] ?? "bau";
 const OUT = path.resolve(process.argv[3] ?? "docs/design/einsatzliste-optik-18-11");
-const TMP = os.tmpdir();
+const TMP = process.env.OPTIK_TMP ?? os.tmpdir();
 const META = path.join(TMP, "optik-meta.json");
 const kopiePfad = (d: string) => path.join(TMP, `optik-${d}.sqlite`);
 const ENDUNGEN = ["", "-wal", "-shm"];
@@ -102,7 +102,9 @@ async function bau() {
 }
 
 function startDevServer(sqlite: string): ChildProcess {
-  const child = spawn("npm", ["run", "dev"], {
+  // OLY_SERVER=start: fertigen Produktions-Build (next build) starten statt Dev-Server (Dev-Cache waechst auf Gigabytes).
+  const [befehl, args]: [string, string[]] = process.env.OLY_SERVER === "start" ? ["npx", ["next", "start", "-p", PORT]] : ["npm", ["run", "dev"]];
+  const child = spawn(befehl, args, {
     env: { ...process.env, OLY_APP_SQLITE_PATH: sqlite, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
     stdio: ["ignore", "pipe", "pipe"], detached: true,
   });
@@ -166,7 +168,16 @@ async function foto() {
             await page.waitForTimeout(900);
           }
           await page.screenshot({ path: path.join(OUT, `${praefix}-${disz}-${w}.png`) });
-          console.log(`[optik] ${disz} ${w}x${h}`);
+          const mass = await page.evaluate(() => ({ scroll: document.scrollingElement?.scrollHeight ?? 0, fenster: window.innerHeight, ueberlappung: (() => {
+            const k = Array.from(document.querySelectorAll<HTMLElement>(".elm-slot")).map((e) => e.getBoundingClientRect());
+            let n = 0;
+            for (let i = 0; i < k.length; i += 1) for (let j = i + 1; j < k.length; j += 1) {
+              const a = k[i]!; const b = k[j]!;
+              if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2) n += 1;
+            }
+            return n;
+          })() }));
+          console.log(`[optik] ${disz} ${w}x${h} scroll=${mass.scroll}/${mass.fenster} kartenUeberlappungen=${mass.ueberlappung}`);
           const tab = page.getByRole("tab", { name: /^Gegner$/ });
           if (await tab.first().isVisible().catch(() => false)) {
             await tab.first().click();

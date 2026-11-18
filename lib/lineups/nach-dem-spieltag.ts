@@ -10,6 +10,7 @@
  * ueberschrieben). Die Moral-Tafel zeigt deshalb den heutigen Wert und den staerksten gespeicherten
  * Grund mit seiner Punktwirkung, nicht "vorher -> nachher".
  */
+import { ergebnisMitSkalaText } from "@/lib/resolve/ergebnis-skala";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -130,7 +131,8 @@ export function baueSpieltagsDisziplinen(
     const name = dName(z.disciplineId);
     const punkte = typeof z.teamPoints === "number" ? z.teamPoints : null;
     if (z.miniDmPod) {
-      return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "pod", ausgang: null, wort: `Platz ${z.miniDmPod.platz}`, detail: "von 4", gegnerName: null, teamPunkte: punkte };
+      // ERGEBNISSKALA (18.11.): der gebuchte 0-10-Wert des Teams in seiner Vierergruppe.
+      return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "pod", ausgang: null, wort: `Platz ${z.miniDmPod.platz}`, detail: z.ergebnisSkala === "e1" && typeof z.miniDmPod.wert === "number" ? `von 4 · Wertung ${z.miniDmPod.wert}` : "von 4", gegnerName: null, teamPunkte: punkte };
     }
     if (z.opponentTeamId) {
       const gegner = zeilen.find((x) => x.teamId === z.opponentTeamId && x.disciplineSide === z.disciplineSide) ?? null;
@@ -139,7 +141,13 @@ export function baueSpieltagsDisziplinen(
       if (punkte != null && gegnerPunkte != null) ausgang = punkte > gegnerPunkte ? "sieg" : punkte < gegnerPunkte ? "niederlage" : "remis";
       else if (z.duellSeiten) ausgang = z.duellSeiten[0] > z.duellSeiten[1] ? "sieg" : z.duellSeiten[0] < z.duellSeiten[1] ? "niederlage" : "remis";
       const wort = ausgang === "sieg" ? "Sieg" : ausgang === "niederlage" ? "Niederlage" : ausgang === "remis" ? "Remis" : "Ergebnis";
-      const stand = z.duellSeiten ? `${fmt(z.duellSeiten[0])} : ${fmt(z.duellSeiten[1])}` : "";
+      // ERGEBNISSKALA (18.11.): native Zahl und gebuchte Skala, "87 : 79 → 7 : 4" (lib/resolve/ergebnis-skala.ts).
+      // Nur bei E1-Zeilen mit Skala; Zeilen der laufenden (alten) Saison zeigen wie vor E1 nur die native Zahl.
+      const stand = z.ergebnisSkala === "e1"
+        ? ergebnisMitSkalaText({ seiten: z.duellSeiten ?? null, skala: z.ergebnisNormiert ?? null })
+        : z.duellSeiten
+          ? `${fmt(z.duellSeiten[0])} : ${fmt(z.duellSeiten[1])}`
+          : "";
       return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "duell", ausgang, wort, detail: stand || `gegen ${teamName(z.opponentTeamId)}`, gegnerName: teamName(z.opponentTeamId), teamPunkte: punkte };
     }
     return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "platz", ausgang: null, wort: `Platz ${z.rank}`, detail: `von ${gleiche.length}`, gegnerName: null, teamPunkte: punkte };

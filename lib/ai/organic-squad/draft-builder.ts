@@ -20,6 +20,7 @@ import {
   type CoreAxis,
   type OrganicDiscipline,
   type OrganicPlayerView,
+  type OrganicTeamState,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { buyUtility, computeCoreAxisPeakQuality, stopUtility } from "@/lib/ai/organic-squad/utility";
@@ -163,29 +164,56 @@ function cheapestSalarySum(pool: OrganicPlayerView[], count: number): number {
     .reduce((sum, p) => sum + Math.max(0, p.salary), 0);
 }
 
-/** Greedy organic squad plan. Deterministic; ties broken by pool order (stable). */
-export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSquadPlanResult {
-  const rosterMax = input.economy.rosterMax ?? ROSTER_MAX;
-  const rosterMin = input.economy.rosterMin ?? ROSTER_MIN;
-  const cashBuffer = input.economy.cashBuffer;
-  const optTarget = input.economy.weights.optTarget;
-  // Floor kept while building from min→opt (see solvencyFloor doc). Defaults to cashBuffer = old behaviour.
-  const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
-  // FINANZKONZEPT V2: Ruecklage auch unter Min (undefined => 0 => bit-gleich zu vorher).
-  const minFillFloor = Math.max(0, input.economy.minFillFloor ?? 0);
-  // ANPASSUNG SALCEIL: undefined ⇒ no salary gating (flag off / caller opted out) ⇒ bit-identical to before.
-  const salaryCeiling = input.economy.salaryCeiling;
+/**
+ * EINZELSCHRITT DES GREEDY-LOOPS (Draft-Neubau, 18.11.).
+ *
+ * Bis hierher lief `buildOrganicSquadPlan` als eine geschlossene Schleife: ein Team plante seinen ganzen Kader am
+ * Stück. Der neue Liga-Draft (docs/design/draft-modern-18-11.md) pickt Pick für Pick über alle Teams; dafür braucht er
+ * genau EINEN Schritt dieser Schleife — mit demselben Zustand, den die Schleife zwischen zwei Käufen mitführt (Kader,
+ * Pool, Kasse, Gehalt, bisherige Ablösen/Gehälter des Plans, gekaufte Stufen). Die Schleife selbst ist jetzt nur noch
+ * „Schritt, Kauf anwenden, wiederholen“ — dieselben Zeilen, nicht eine zweite Kopie. Damit kann der Einzelschritt nicht
+ * anders entscheiden als der Blocklauf, wenn er denselben Zustand sieht.
+ */
+export type OrganicPlanStepState = {
+  squad: OrganicPlayerView[];
+  pool: OrganicPlayerView[];
+  cash: number;
+  salaryTotal: number;
+  /** Summe der Ablösen, die DIESER Plan schon ausgegeben hat (gegen `economy.feeCap`). */
+  spentFee: number;
+  /** Summe der Gehälter, die DIESER Plan schon gebunden hat (gegen `economy.salaryCap`). */
+  spentSalary: number;
+  /** Gekaufte Stufen (nur bei `composition`), sonst `null`. */
+  boughtTiers: Record<MarketBracketLane, number> | null;
+};
 
-  const squad = [...input.startingSquad];
-  const pool = [...input.candidates];
-  const decisions: OrganicBuyDecision[] = [];
-  let cash = input.economy.cash;
-  const feeCap = input.economy.feeCap;
-  const salaryCap = input.economy.salaryCap;
-  let spentFee = 0;
-  let spentSalary = 0;
-  let salaryTotal = input.economy.salaryTotal;
+export type OrganicBuyStepCandidate = {
+  playerId: string;
+  /** Buy-Utility inklusive des Saat-Jitters — dieselbe Zahl, nach der der Schritt sortiert. */
+  utility: number;
+  player: OrganicPlayerView;
+};
 
+export type OrganicBuyStepResult = {
+  /**
+   * `buy`: `best` kaufen. `stop`: das Team hört auf (Stop-Nutzen schlägt den besten Kauf, Kader ≥ Minimum).
+   * `roster_full`: Kader-Maximum erreicht. `nothing_affordable`: kein Kandidat passt in die Kasse.
+   */
+  kind: "buy" | "stop" | "roster_full" | "nothing_affordable";
+  best: OrganicPlayerView | null;
+  bestUtility: number;
+  /** Stop-Nutzen dieses Schritts (nur ab dem Kader-Minimum gerechnet, sonst `null`). */
+  stopUtility: number | null;
+  /**
+   * Die besten Kandidaten dieses Schritts, absteigend (nur mit `topN > 1` gefüllt, sonst nur `best`). `top[0]` ist
+   * immer `best`: gleiche Bewertung, gleiche Reihenfolge bei Gleichstand (Pool-Reihenfolge, stabil sortiert).
+   */
+  top: OrganicBuyStepCandidate[];
+  stoppedBelowMin: boolean;
+};
+
+/** Startzustand eines Plans — exakt das, womit `buildOrganicSquadPlan` seine Schleife beginnt. */
+export function createOrganicPlanStepState(input: OrganicSquadPlanInput): OrganicPlanStepState {
   // ANPASSUNG COMPOSE (flag-gated via input.composition, see OrganicSquadPlanInput doc above). boughtTiers
   // starts at the starting squad's own tier counts and is incremented after every buy below, so the
   // compositionValue term in buyUtility always sees "how much of the plan is filled so far".
@@ -198,166 +226,240 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       boughtTiers[lane] += 1;
     }
   }
+  return {
+    squad: [...input.startingSquad],
+    pool: [...input.candidates],
+    cash: input.economy.cash,
+    salaryTotal: input.economy.salaryTotal,
+    spentFee: 0,
+    spentSalary: 0,
+    boughtTiers,
+  };
+}
 
-  const buildState = () => {
-    const disciplineNeeds = computeDisciplineNeeds(squad, input.identityAxisWeights, input.disciplines);
-    const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);
-    const forecast = projectCashFlow({
-      cash,
-      salaryTotal,
-      expectedPrize: input.economy.expectedPrize,
-      sponsorIncome: input.economy.sponsorIncome,
-      facilityNet: input.economy.facilityNet,
-      netTransfer: input.economy.netTransfer,
-      cashBuffer,
-    });
-    return {
-      cash,
-      cashBuffer,
-      salaryTotal,
-      rosterSize: squad.length,
-      boardRisk: input.economy.boardRisk,
-      forecast,
-      weights: input.economy.weights,
-      disciplineNeeds,
-      needAxisWeights,
-      identityAxisWeights: input.identityAxisWeights,
-      // Self-limiting signal for the flag-gated PEAK front-load: the best on-identity quality already on
-      // the roster. Once this crosses the star line the front-load stops (see peakFrontLoadFactor).
-      coreAxisPeakQuality: computeCoreAxisPeakQuality(squad, input.identityAxisWeights, needAxisWeights),
-      composition:
-        input.composition && boughtTiers
-          ? { counts: input.composition.counts, brackets: input.composition.brackets, boughtTiers }
-          : undefined,
-    };
+function buildStepTeamState(input: OrganicSquadPlanInput, step: OrganicPlanStepState): OrganicTeamState {
+  const cashBuffer = input.economy.cashBuffer;
+  const disciplineNeeds = computeDisciplineNeeds(step.squad, input.identityAxisWeights, input.disciplines);
+  const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);
+  const forecast = projectCashFlow({
+    cash: step.cash,
+    salaryTotal: step.salaryTotal,
+    expectedPrize: input.economy.expectedPrize,
+    sponsorIncome: input.economy.sponsorIncome,
+    facilityNet: input.economy.facilityNet,
+    netTransfer: input.economy.netTransfer,
+    cashBuffer,
+  });
+  return {
+    cash: step.cash,
+    cashBuffer,
+    salaryTotal: step.salaryTotal,
+    rosterSize: step.squad.length,
+    boardRisk: input.economy.boardRisk,
+    forecast,
+    weights: input.economy.weights,
+    disciplineNeeds,
+    needAxisWeights,
+    identityAxisWeights: input.identityAxisWeights,
+    // Self-limiting signal for the flag-gated PEAK front-load: the best on-identity quality already on
+    // the roster. Once this crosses the star line the front-load stops (see peakFrontLoadFactor).
+    coreAxisPeakQuality: computeCoreAxisPeakQuality(step.squad, input.identityAxisWeights, needAxisWeights),
+    composition:
+      input.composition && step.boughtTiers
+        ? { counts: input.composition.counts, brackets: input.composition.brackets, boughtTiers: step.boughtTiers }
+        : undefined,
+  };
+}
+
+/**
+ * EIN Schritt des Greedy-Loops: welcher Kauf (oder Stop) gewinnt beim aktuellen Zustand? Liest den Zustand nur,
+ * ändert ihn nicht — den Kauf wendet `applyOrganicBuyStep` an.
+ */
+export function organicBuyStep(
+  input: OrganicSquadPlanInput,
+  step: OrganicPlanStepState,
+  options?: { topN?: number },
+): OrganicBuyStepResult {
+  const rosterMax = input.economy.rosterMax ?? ROSTER_MAX;
+  const rosterMin = input.economy.rosterMin ?? ROSTER_MIN;
+  const cashBuffer = input.economy.cashBuffer;
+  const optTarget = input.economy.weights.optTarget;
+  // Floor kept while building from min→opt (see solvencyFloor doc). Defaults to cashBuffer = old behaviour.
+  const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
+  // FINANZKONZEPT V2: Ruecklage auch unter Min (undefined => 0 => bit-gleich zu vorher).
+  const minFillFloor = Math.max(0, input.economy.minFillFloor ?? 0);
+  // ANPASSUNG SALCEIL: undefined ⇒ no salary gating (flag off / caller opted out) ⇒ bit-identical to before.
+  const salaryCeiling = input.economy.salaryCeiling;
+  const feeCap = input.economy.feeCap;
+  const salaryCap = input.economy.salaryCap;
+  const topN = Math.max(1, Math.floor(options?.topN ?? 1));
+  const { squad, pool, cash, salaryTotal, spentFee, spentSalary } = step;
+
+  if (squad.length >= rosterMax) {
+    return { kind: "roster_full", best: null, bestUtility: -Infinity, stopUtility: null, top: [], stoppedBelowMin: false };
+  }
+
+  const state = buildStepTeamState(input, step);
+  // Budget pacing for the hard MIN rule: after this buy, keep enough to cheap-fill the remaining
+  // mandatory slots. Reserving the cheapest such prices means a rich club can chase a star AND still
+  // reach min, while nobody blows the whole budget on a few stars and ends below min. Once at/above
+  // min this reserve is 0, so composition past min is fully emergent.
+  const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
+  const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
+  // FINANZKONZEPT V2 (Chris 18.11.): erst die Pflichtplaetze reservieren, nur den Rest nach Wunsch verteilen. Auch unter dem
+  // Minimum muss ein Wunschkauf samt Reserve der fehlenden Plaetze in den Rahmen passen; ueber den Rahmen darf nur der
+  // billigste Pflichtkauf (Auffangnetz weiter unten), der den Topf ueberziehen darf.
+  const reserveSalaryForMin = cheapestSalarySum(pool, remainingToMinAfterBuy);
+  // Three-tier solvency floor. (1) Below the hard ROSTER_MIN: floor 0 — fielding a legal (≥ min) squad
+  // outranks any buffer, so a cash-poor club spends down toward ~0 to reach min (else it stalls below
+  // min and breaks autoprep "teams_under_7"). (2) From min UP TO opt: floor = optFillFloor (a small flat
+  // solvency floor). Here the salary-scaled reserve is SPENDABLE — a club spends it to build its target
+  // squad and refills it from income over later seasons, instead of hoarding it and stalling under opt
+  // (user model: "die Reserve muss auch mal ausgegeben werden, kann später aufgefüllt werden"). (3) At or
+  // above opt: floor = cashBuffer — the full reserve holds again, so cash beyond the target squad is kept
+  // rather than blown on luxury depth. Affordability keeps cash ≥ floor AFTER the buy AND the min-fill.
+  const belowMin = squad.length < rosterMin;
+  const belowOpt = squad.length < optTarget;
+  const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
+  // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
+  // ANPASSUNG SALCEIL: once the roster is at/above the hard minimum, a candidate whose salary would push
+  // the TOTAL wage bill past salaryCeiling is treated as unaffordable-by-salary, same as the cash checks
+  // above — an ADDITIONAL cap, not a replacement (a buy must still separately clear the cash affordability
+  // check). Below rosterMin this is skipped entirely: reaching the hard minimum (survival) always wins
+  // over the ceiling, matching the belowMin-ignores-cashBuffer precedent already established above.
+  const salaryCeilingActive = !belowMin && typeof salaryCeiling === "number" && Number.isFinite(salaryCeiling);
+  let best: OrganicPlayerView | null = null;
+  let bestUtility = -Infinity;
+  // Nur fuer den Einzelschritt-Draft (topN > 1): alle bewerteten Kandidaten des Durchgangs, der `best` liefert.
+  let scored: OrganicBuyStepCandidate[] | null = topN > 1 ? [] : null;
+  const score = (candidate: OrganicPlayerView) => {
+    const jitter =
+      input.draftSeed && ORGANIC_DRAFT_JITTER > 0
+        ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
+        : 0;
+    const utility = buyUtility(candidate, state) + jitter;
+    if (scored) scored.push({ playerId: candidate.playerId, utility, player: candidate });
+    if (utility > bestUtility) {
+      bestUtility = utility;
+      best = candidate;
+    }
   };
 
+  for (const candidate of pool) {
+    if (cash - price(candidate) - reserveForMin < affordFloor) continue;
+    if (feeCap != null && spentFee + price(candidate) + reserveForMin > feeCap + 1e-9) continue;
+    if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
+    if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
+    score(candidate);
+  }
+
+  // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
+  // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
+  if (!best && belowMin && affordFloor > 0 && feeCap == null && salaryCap == null) {
+    if (scored) scored = [];
+    for (const candidate of pool) {
+      if (cash - price(candidate) - reserveForMin < 0) continue;
+      if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
+      score(candidate);
+    }
+  }
+
+  // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
+  // can't reach min in one go must still make PARTIAL progress (6→7 beats staying at 6 and breaking
+  // autoprep). Drop the reserve and buy the single best candidate it can actually pay for (cash ≥ 0).
+  if (!best && belowMin && feeCap == null && salaryCap == null) {
+    if (scored) scored = [];
+    for (const candidate of pool) {
+      if (cash - price(candidate) < 0) continue;
+      score(candidate);
+    }
+  }
+
+  // Auffangnetz (#1618): unter dem Pflichtkader mit Toepfen der billigste bezahlbare Spieler (darf den Topf ueberziehen).
+  if (!best && belowMin && (feeCap != null || salaryCap != null)) {
+    if (scored) scored = [];
+    let billigster: OrganicPlayerView | null = null;
+    for (const candidate of pool) {
+      if (cash - price(candidate) < 0) continue;
+      if (billigster == null || price(candidate) < price(billigster)) billigster = candidate;
+    }
+    if (billigster) score(billigster);
+  }
+
+  const chosen = best as OrganicPlayerView | null;
+  const top: OrganicBuyStepCandidate[] = scored
+    ? [...scored].sort((left, right) => right.utility - left.utility).slice(0, topN)
+    : chosen
+      ? [{ playerId: chosen.playerId, utility: bestUtility, player: chosen }]
+      : [];
+
+  if (!chosen) {
+    // Nothing affordable — the club is out of cash for even the cheapest remaining candidate. Stop the
+    // build here. The preseason buy phase NEVER sells (clean two-phase model: all selling happens at
+    // season end — see runOrganicSellCycle / .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc), so
+    // a club that can't reach min with its available cash simply stops under-filled; that is logged
+    // (stoppedBelowMin), not resolved by shedding a body here.
+    return {
+      kind: "nothing_affordable",
+      best: null,
+      bestUtility,
+      stopUtility: null,
+      top,
+      stoppedBelowMin: squad.length < rosterMin,
+    };
+  }
+
+  // STOP may only win once the roster minimum is met (min is hard; below it we always fill).
+  if (squad.length >= rosterMin) {
+    const stop = stopUtility(state);
+    if (stop >= bestUtility) {
+      return { kind: "stop", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
+    }
+    return { kind: "buy", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
+  }
+  return { kind: "buy", best: chosen, bestUtility, stopUtility: null, top, stoppedBelowMin: false };
+}
+
+/** Wendet einen Kauf auf den Planzustand an — dieselben Fortschreibungen wie bisher im Loop. */
+export function applyOrganicBuyStep(
+  input: OrganicSquadPlanInput,
+  step: OrganicPlanStepState,
+  player: OrganicPlayerView,
+): void {
+  step.squad.push(player);
+  step.cash -= price(player);
+  step.spentFee += price(player);
+  step.spentSalary += Math.max(0, player.salary);
+  step.salaryTotal += Math.max(0, player.salary);
+  const index = step.pool.indexOf(player);
+  if (index >= 0) step.pool.splice(index, 1);
+  if (step.boughtTiers && input.composition) {
+    const lane = classifyCompositionLane(player.marketValue, input.composition.brackets);
+    step.boughtTiers[lane] += 1;
+  }
+}
+
+/** Greedy organic squad plan. Deterministic; ties broken by pool order (stable). */
+export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSquadPlanResult {
+  const step = createOrganicPlanStepState(input);
+  const decisions: OrganicBuyDecision[] = [];
   let stoppedBelowMin = false;
 
-  while (squad.length < rosterMax) {
-    const state = buildState();
-    // Budget pacing for the hard MIN rule: after this buy, keep enough to cheap-fill the remaining
-    // mandatory slots. Reserving the cheapest such prices means a rich club can chase a star AND still
-    // reach min, while nobody blows the whole budget on a few stars and ends below min. Once at/above
-    // min this reserve is 0, so composition past min is fully emergent.
-    const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
-    const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
-    // FINANZKONZEPT V2 (Chris 18.11.): erst die Pflichtplaetze reservieren, nur den Rest nach Wunsch verteilen. Auch unter dem
-    // Minimum muss ein Wunschkauf samt Reserve der fehlenden Plaetze in den Rahmen passen; ueber den Rahmen darf nur der
-    // billigste Pflichtkauf (Auffangnetz weiter unten), der den Topf ueberziehen darf.
-    const reserveSalaryForMin = cheapestSalarySum(pool, remainingToMinAfterBuy);
-    // Three-tier solvency floor. (1) Below the hard ROSTER_MIN: floor 0 — fielding a legal (≥ min) squad
-    // outranks any buffer, so a cash-poor club spends down toward ~0 to reach min (else it stalls below
-    // min and breaks autoprep "teams_under_7"). (2) From min UP TO opt: floor = optFillFloor (a small flat
-    // solvency floor). Here the salary-scaled reserve is SPENDABLE — a club spends it to build its target
-    // squad and refills it from income over later seasons, instead of hoarding it and stalling under opt
-    // (user model: "die Reserve muss auch mal ausgegeben werden, kann später aufgefüllt werden"). (3) At or
-    // above opt: floor = cashBuffer — the full reserve holds again, so cash beyond the target squad is kept
-    // rather than blown on luxury depth. Affordability keeps cash ≥ floor AFTER the buy AND the min-fill.
-    const belowMin = squad.length < rosterMin;
-    const belowOpt = squad.length < optTarget;
-    const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
-    // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
-    // ANPASSUNG SALCEIL: once the roster is at/above the hard minimum, a candidate whose salary would push
-    // the TOTAL wage bill past salaryCeiling is treated as unaffordable-by-salary, same as the cash checks
-    // above — an ADDITIONAL cap, not a replacement (a buy must still separately clear the cash affordability
-    // check). Below rosterMin this is skipped entirely: reaching the hard minimum (survival) always wins
-    // over the ceiling, matching the belowMin-ignores-cashBuffer precedent already established above.
-    const salaryCeilingActive = !belowMin && typeof salaryCeiling === "number" && Number.isFinite(salaryCeiling);
-    let best: OrganicPlayerView | null = null;
-    let bestUtility = -Infinity;
-    for (const candidate of pool) {
-      if (cash - price(candidate) - reserveForMin < affordFloor) continue;
-      if (feeCap != null && spentFee + price(candidate) + reserveForMin > feeCap + 1e-9) continue;
-      if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
-      if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
-      const jitter =
-        input.draftSeed && ORGANIC_DRAFT_JITTER > 0
-          ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
-          : 0;
-      const utility = buyUtility(candidate, state) + jitter;
-      if (utility > bestUtility) {
-        bestUtility = utility;
-        best = candidate;
-      }
-    }
-
-    // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
-    // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
-    if (!best && belowMin && affordFloor > 0 && feeCap == null && salaryCap == null) {
-      for (const candidate of pool) {
-        if (cash - price(candidate) - reserveForMin < 0) continue;
-        if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
-        const jitter =
-          input.draftSeed && ORGANIC_DRAFT_JITTER > 0
-            ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
-            : 0;
-        const utility = buyUtility(candidate, state) + jitter;
-        if (utility > bestUtility) {
-          bestUtility = utility;
-          best = candidate;
-        }
-      }
-    }
-
-    // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
-    // can't reach min in one go must still make PARTIAL progress (6→7 beats staying at 6 and breaking
-    // autoprep). Drop the reserve and buy the single best candidate it can actually pay for (cash ≥ 0).
-    if (!best && belowMin && feeCap == null && salaryCap == null) {
-      for (const candidate of pool) {
-        if (cash - price(candidate) < 0) continue;
-        const jitter =
-          input.draftSeed && ORGANIC_DRAFT_JITTER > 0
-            ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
-            : 0;
-        const utility = buyUtility(candidate, state) + jitter;
-        if (utility > bestUtility) {
-          bestUtility = utility;
-          best = candidate;
-        }
-      }
-    }
-
-    if (!best && belowMin && (feeCap != null || salaryCap != null)) {
-      for (const candidate of pool) {
-        if (cash - price(candidate) < 0) continue;
-        if (best == null || price(candidate) < price(best)) best = candidate;
-      }
-    }
-
-    if (!best) {
-      // Nothing affordable — the club is out of cash for even the cheapest remaining candidate. Stop the
-      // build here. The preseason buy phase NEVER sells (clean two-phase model: all selling happens at
-      // season end — see runOrganicSellCycle / .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc), so
-      // a club that can't reach min with its available cash simply stops under-filled; that is logged
-      // (stoppedBelowMin), not resolved by shedding a body here.
-      if (squad.length < rosterMin) stoppedBelowMin = true;
+  for (;;) {
+    const result = organicBuyStep(input, step);
+    if (result.kind !== "buy" || !result.best) {
+      if (result.kind === "nothing_affordable") stoppedBelowMin = result.stoppedBelowMin;
       break;
     }
-
-    // STOP may only win once the roster minimum is met (min is hard; below it we always fill).
-    if (squad.length >= rosterMin && stopUtility(state) >= bestUtility) {
-      break;
-    }
-
-    squad.push(best);
-    cash -= price(best);
-    spentFee += price(best);
-    spentSalary += Math.max(0, best.salary);
-    salaryTotal += Math.max(0, best.salary);
-    pool.splice(pool.indexOf(best), 1);
-    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
-    if (boughtTiers && input.composition) {
-      const lane = classifyCompositionLane(best.marketValue, input.composition.brackets);
-      boughtTiers[lane] += 1;
-    }
+    applyOrganicBuyStep(input, step, result.best);
+    decisions.push({ playerId: result.best.playerId, step: decisions.length, utility: result.bestUtility });
   }
 
   return {
     decisions,
-    finalSquad: squad,
-    finalCash: cash,
-    finalSalaryTotal: salaryTotal,
+    finalSquad: step.squad,
+    finalCash: step.cash,
+    finalSalaryTotal: step.salaryTotal,
     stoppedBelowMin,
   };
 }

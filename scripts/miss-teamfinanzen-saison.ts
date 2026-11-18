@@ -36,7 +36,12 @@
  * Aufruf (Wegwerf-Datei!):
  *   OLY_APP_SQLITE_PATH=/pfad/wegwerf.sqlite npx tsx scripts/miss-teamfinanzen-saison.ts \
  *     [--mode battle|manager] [--seasons 2] [--out data/generated/lauf.json] [--label A]
- *     [--stop-after draft|vorkauf|kaufphase] [--nur-anlage] [--von-anlage <saveId>]
+ *     [--stop-after draft|vorkauf|kaufphase] [--nur-anlage] [--von-anlage <saveId>] [--draft block|einzelschritt]
+ *
+ * `--draft einzelschritt` (Draft-Neubau, 18.11.): statt des Blocklaufs (`fuehreLigaSetupDraftAus`) laeuft der neue
+ * Liga-Draft Pick fuer Pick (`starteLigaDraft` + `laufeKiZuege`, ein Schreibvorgang je Pick wie ueber die Route).
+ * Paarweiser Vergleich alt gegen neu: docs/design/draft-neubau-kern-18-11.md, Auswertung
+ * `scripts/auswerte-liga-draft-alt-neu.ts`.
  *
  * Das Auswerteskript (Tabellen + Doku) liegt in `scripts/auswerte-teamfinanzen-saison.ts`.
  */
@@ -61,6 +66,7 @@ import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
 import { berechneVorstandBudgetStand, SPERRE_ZAEHLER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
+import { laufeKiZuege, starteLigaDraft } from "@/lib/draft/liga-draft-dienst";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getLeagueOf } from "@/lib/season/league-split";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
@@ -85,6 +91,8 @@ const STOP_AFTER = arg("stop-after", "");
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
 /** Vorhandene (kopierte) Anlage-SQLite weiterverwenden: saveId, ab dem Draft laufen. */
 const VON_ANLAGE = arg("von-anlage", "");
+/** "block" (Standard, alter Hintergrund-Draft) oder "einzelschritt" (neuer Liga-Draft Pick fuer Pick). */
+const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
 
 const t0 = Date.now();
 const log = (msg: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ${msg}`);
@@ -222,6 +230,30 @@ function snap(gs: GameState): Record<string, TeamSnap> {
   return out;
 }
 
+/**
+ * Abdeckung der Disziplinen je Team (Draft-Messung alt gegen neu): wie viele Disziplinen mindestens einen bzw. drei
+ * „solide“ Spieler (Eignung > 60, `SOLIDE_THRESHOLD` der KI) haben, und die schwaechste Top-6-Staerke.
+ */
+function abdeckung(gs: GameState) {
+  const spieler = new Map(gs.players.map((p) => [p.id, p] as const));
+  const disziplinen = (gs.disciplines ?? []).map((d) => d.id);
+  const out: Record<string, { mitEinem: number; mitDrei: number; schwaechsteTop6: number; schwaechsteDisziplin: string | null }> = {};
+  const top6 = kaderStaerke(gs).jeTeamDisziplin;
+  for (const t of gs.teams) {
+    const ids = gs.rosters.filter((r) => r.teamId === t.teamId).map((r) => r.playerId);
+    let mitEinem = 0;
+    let mitDrei = 0;
+    for (const d of disziplinen) {
+      const solide = ids.filter((id) => (spieler.get(id)?.disciplineRatings?.[d] ?? 0) > 60).length;
+      if (solide >= 1) mitEinem += 1;
+      if (solide >= 3) mitDrei += 1;
+    }
+    const werte = Object.entries(top6[t.teamId] ?? {}).sort((a, b) => a[1] - b[1]);
+    out[t.teamId] = { mitEinem, mitDrei, schwaechsteTop6: werte[0]?.[1] ?? 0, schwaechsteDisziplin: werte[0]?.[0] ?? null };
+  }
+  return out;
+}
+
 /** Je Disziplin die Top-6-Eignung aller Teams (fuer Median und unterstes Viertel in der Auswertung). */
 function staerkeDetail(gs: GameState) {
   return kaderStaerke(gs).jeTeamDisziplin;
@@ -333,11 +365,37 @@ async function main() {
   if (!RESUME) {
     phasen["s1_00_nach_anlage"] = { snap: snap(get().gameState) };
     // 1) Pick-Engine / Liga-Draft
-    const dr = await fuehreLigaSetupDraftAus({
-      persistence, saveId, seasonId: seasonId1, callerWritableTeamIds: null, excludeTeamIds: [], logPrefix: "[miss-finanzen]",
-    });
-    log(`Liga-Draft: ${dr.status}`);
+    const draftStart = Date.now();
+    if (DRAFT_ART === "einzelschritt") {
+      starteLigaDraft({ persistence, saveId });
+      let halt = "max_picks";
+      let zuege = 0;
+      while (halt === "max_picks") {
+        const schritt = laufeKiZuege({ persistence, saveId, maxPicks: 1 });
+        zuege += schritt.eintraege.length;
+        halt = schritt.halt;
+      }
+      log(`Liga-Draft (Einzelschritt): ${zuege} Zuege, Halt ${halt}`);
+      run.draftZuege = zuege;
+    } else {
+      const dr = await fuehreLigaSetupDraftAus({
+        persistence, saveId, seasonId: seasonId1, callerWritableTeamIds: null, excludeTeamIds: [], logPrefix: "[miss-finanzen]",
+      });
+      log(`Liga-Draft: ${dr.status}`);
+    }
+    run.draftArt = DRAFT_ART;
+    run.draftLaufzeitMs = Date.now() - draftStart;
+    log(`Draft-Laufzeit ${(Number(run.draftLaufzeitMs) / 1000).toFixed(1)}s`);
     gs = get().gameState;
+    run.draftAbdeckung = abdeckung(gs);
+    run.ligaDraft = gs.seasonState.ligaDraft
+      ? {
+          status: gs.seasonState.ligaDraft.status,
+          runden: gs.seasonState.ligaDraft.runde,
+          teams: Object.fromEntries(Object.values(gs.seasonState.ligaDraft.teams).map((t) => [t.teamId, { picks: t.picks, grund: t.fertigGrund }])),
+          verlauf: gs.seasonState.ligaDraft.verlauf.map((e) => [e.runde, e.platz, e.teamId, e.art, e.playerId, e.abloese]),
+        }
+      : null;
     run.teamCount = gs.teams.length;
     run.ligaAssignment = Object.fromEntries(gs.teams.map((t) => [t.teamId, getLeagueOf(gs, t.teamId)]));
     phasen["s1_01_nach_draft"] = { snap: snap(gs), staerkeDetail: staerkeDetail(gs), transfers: transfers(gs, "*", 0) };
