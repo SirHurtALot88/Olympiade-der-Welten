@@ -304,6 +304,12 @@ export function advancePlayerFormState(
   matchdayId: string,
   /** Nur fuer Nachfuehrung vergangener Spieltage (Skript): Verletzung/Erschoepfung von DAMALS statt dem heutigen Stand. */
   historisch?: { verletzt: Set<string>; erschoepfung: Map<string, number> },
+  /**
+   * REGEL E (Training je Spieltag, Chris 18.11.): Formabzug durch Trainings-Ueberlastung, Spieler-Id ->
+   * Punkte (> 0). Kommt aus `ueberlastungsAbzuegeFuerSpieltag` (lib/training/spieltag-training.ts) und wird
+   * NACH dem normalen Schritt abgezogen und im Verlauf als `u` gezeigt. Fehlt die Map: kein Abzug.
+   */
+  ueberlastung?: ReadonlyMap<string, number> | null,
 ): PlayerFormState[] {
   const seasonId = gameState.season.id;
   const vorhandene = new Map((gameState.playerFormState ?? []).map((zeile) => [zeile.playerId, zeile]));
@@ -334,13 +340,15 @@ export function advancePlayerFormState(
     const verletzt = historisch ? historisch.verletzt.has(roster.playerId) : verf != null && verf.injuryStatus !== "healthy";
     const detail = details.get(roster.playerId);
     const spielte = eingesetzt.has(roster.playerId);
-    const { form, bremse } = advancePlayerFormDetail({
+    const { form: formOhneUeberlastung, bremse } = advancePlayerFormDetail({
       form: alt?.form,
       eingesetzt: spielte,
       residuum: detail?.residuum ?? 0,
       erschoepfung: historisch ? historisch.erschoepfung.get(roster.playerId) ?? 0 : verf?.fatigue ?? spielerFatigue.get(roster.playerId) ?? 0,
       verletzt,
     });
+    const ueberlastungsAbzug = Math.max(0, ueberlastung?.get(roster.playerId) ?? 0);
+    const form = ueberlastungsAbzug > 0 ? round(clamp(formOhneUeberlastung - ueberlastungsAbzug, 0, 100), 1) : formOhneUeberlastung;
     // Verlauf: nur die laufende Saison (beim Saisonwechsel wird er geleert), hoechstens FORM_VERLAUF_MAX Eintraege,
     // KOMPAKT gespeichert (nur gesetzte Felder).
     const neueSaison = !alt || alt.lastSeasonId !== seasonId;
@@ -353,6 +361,7 @@ export function advancePlayerFormState(
       eintrag.d = detail.disziplinId;
     }
     if ((spielte || verletzt) && bremse) eintrag.b = { a: bremse.art === "verletzung" ? "v" : "e", p: bremse.punkte };
+    if (ueberlastungsAbzug > 0) eintrag.u = ueberlastungsAbzug;
     if (bisher.length === 0) eintrag.v = round(clamp(istZahl(alt?.form) ? alt.form : FORM_MORAL_NEUTRAL, 0, 100), 1);
     ergebnis.push({
       playerId: roster.playerId,
@@ -451,5 +460,6 @@ export function entpackeFormVerlauf(zeile: Pick<PlayerFormState, "verlauf" | "la
     erwartungPerz: e.x ?? null,
     disziplinId: e.d ?? null,
     bremse: e.b ? { art: e.b.a === "v" ? ("verletzung" as const) : ("erschoepfung" as const), punkte: e.b.p } : null,
+    ueberlastung: e.u ?? null,
   }));
 }

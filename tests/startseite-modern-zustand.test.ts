@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   baueAbgeleiteteEntscheidungen,
+  inboxEintragIstDoppelt,
   bestesHeimspiel,
   einsatzStatus,
   spielerDerSaison,
@@ -147,5 +148,23 @@ describe("Startseite Runde 2: Spieler des Tages, der Saison, bestes Heimspiel", 
   it("Bestes Heimspiel nur mit gespeicherter Heim/Auswärts-Zuordnung", () => {
     expect(bestesHeimspiel(stand(), "A")).toMatchObject({ spieltag: 1, punkte: 4, moeglich: 4, gegnerId: "B" });
     expect(bestesHeimspiel(stand({ schedule: [] }), "A")).toBeNull();
+  });
+});
+
+describe("Startseite: ein Eintrag je Sache in den Entscheidungen", () => {
+  const abgeleitet = [
+    { id: "einsatzliste", titel: "Einsatzliste leer" },
+    { id: "minuskarte", titel: "2 Pflicht-Minuskarten offen" },
+  ];
+  it("Inbox-Eintrag „Lineup fehlt“ entfällt, wenn „Einsatzliste leer“ schon dasteht", () => {
+    expect(inboxEintragIstDoppelt("Lineup fehlt", abgeleitet)).toBe(true);
+    expect(inboxEintragIstDoppelt("Einsatzliste unvollständig", abgeleitet)).toBe(true);
+  });
+  it("gleicher Titel und Minuskarten-Meldung sind Dubletten, andere Sachen nicht", () => {
+    expect(inboxEintragIstDoppelt("2 Pflicht-Minuskarten offen", abgeleitet)).toBe(true);
+    expect(inboxEintragIstDoppelt("Board-Ziel verfehlt: Ausbeute", abgeleitet)).toBe(false);
+  });
+  it("ohne abgeleitete Einsatzliste bleibt die Inbox-Meldung stehen", () => {
+    expect(inboxEintragIstDoppelt("Lineup fehlt", [{ id: "vertraege", titel: "6 Verträge laufen aus" }])).toBe(false);
   });
 });
