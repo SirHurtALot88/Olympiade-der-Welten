@@ -203,6 +203,68 @@ x2 rechnet, ist ein Fehler. **Gezeigt = gebucht:** `formkartenBuchung` sagt, ob 
 neutral, unzufrieden, verärgert), nicht als Herz und nicht als Emoji. Der Form-Verlauf liegt je Spieler in `playerFormState[].verlauf`
 (Saison-Reset zur Mitte beim Saisonwechsel). Wertungs-Fingerabdruck blieb bei `ce8fcef66028`, weil die Engine nicht angefasst wurde.
 
+## Verletzung heißt: nicht einsetzbar, und 50 % in der Verletzungs-Disziplin (Chris, 18.11.)
+
+Wörtlich: „Verletzt ist nicht nur −10, sondern gar nicht einsetzbar! Und IN der Disziplin, wo er sich verletzt hat, hat
+er nur 50 % seiner Basisleistung bzw. Eignung/Score.“ Ein verletzter Spieler darf für die Dauer der Verletzung weder
+manuell noch von der KI noch von einem Auto-Auffüllweg aufgestellt und nicht gewertet werden. In der Disziplin, in der
+er sich verletzt, zählt nur die Hälfte seiner Basisleistung — gezeigt = gebucht. Anzeigen dürfen eine Verletzung nicht
+als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung-regel-18-11.md`.
+
+## Finanzen und KI-Kaufverhalten: feste Vorgaben (Chris, 18.11.)
+
+- **Rücklage nach Finanzwert, nicht nach Geld.** „Reiche Teams behalten 15–25 %“ meint den **Finanzwert des Teams in der
+  Team-Matrix (1–10)**: hoher Finanzwert behält auch in Saison 1 15–25 % des Budgets als Cash, niedriger 5–10 %.
+- **Der alte Gehaltsdeckel (`OLY_SALARY_CEILING_V2`) bleibt aus** — „da haben die Teams dann nur Mist gekauft“. Kein
+  neuer harter Gehaltsdeckel; die Orientierung am gepickten Sponsor läuft weich (Forecast mit Sponsor, Rücklage, Vorstand).
+- **Der Vorstand verhängt keine Geldstrafen.** Bei ausbleibendem Erfolg gibt er weniger Budget frei: das Team darf bei
+  Transfers nur auf X % seines verfügbaren Budgets zugreifen.
+- **So wirkt die Freigabe (Chris, 18.11., „wie im Football Manager“):** Der Vorstand nimmt nichts weg — das Geld bleibt auf
+  dem Konto, nur X % davon dürfen für Ablösen UND Gehälter (neue Verträge, Gehaltserhöhungen) ausgegeben werden. Die Sperre
+  ist **hart**: ein Kauf oder Vertrag über dem freien Betrag ist nicht möglich (Mensch und KI gleich). **Verkaufserlöse
+  unterliegen derselben Quote** — bei 70 % werden von 20 C Verkauf nur 14 C ausgebbar, der Rest bleibt als gewollter Puffer
+  auf dem Konto. Stufen nach Vertrauen: ab 6 → 100 %, 4–6 → 85 %, 2,5–4 → 70 %, darunter 50 %. Die Rücklage nach Finanzwert
+  bleibt dagegen **weich** (Warnung, Vertrauensverlust).
+- **Zwei Budgets wie im FM (Chris, 18.11.: „optisch und inhaltlich so bauen“):** Transfer-/Investitionstopf und
+  Gehaltstopf, Konzept `docs/design/finanzkonzept-v2-budgets-18-11.md` (Abschnitt 12 = Entscheidungen). Festgelegt:
+  - **Saison 1:** Vorstands-Quote für alle 100 %; die Draft-Rücklage nach Finanzwert ist **halb so hoch** wie üblich (mehr
+    Spielraum beim Draft), voll erst ab Saison 2. Startbudgets und Sponsoren bleiben unverändert.
+  - **Gehaltstopf:** der Vorstand kürzt ihn höchstens auf **75 %** (nie 50 %); frei werdendes Gehalt eines verkauften
+    Spielers fließt zu **100 %** in den Gehaltstopf zurück. Nur der Verkaufserlös unterliegt der Transfer-Quote.
+  - **Gebäude** zahlen aus dem Transfer-/Investitionstopf, kein dritter Topf.
+  - **„Alles auf eine Karte“** (später): beantragt vom Menschen, gewollt von einem Top-Team oder vom Vorstand als Ziel
+    gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet Vertrauen).
+- **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
+  Ergebnis spoilern (Chris, 18.11.).
+- **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
+  verraten (Chris, 18.11.).
+- **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
+  nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
+- Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
+
+## Player Points (PPs): Leistungsmaß, Top-Spieler um 5 je Disziplin (Chris, 18.11.)
+
+Wörtlich: „die PPs sollen weiterhin eine Darstellung der Leistung der Spieler sein, Top-Spieler sollen in einer Diszi um
+die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! bin da offen für changes“. Zielskala: der
+beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
+Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
+
+## Training und Entwicklung: je Spieltag (Chris, 18.11.)
+
+Mockup `public/mockups/training-modern-18-11.html`, Konzept `docs/design/training-modern-18-11.md` (Abschnitt 7a),
+Chris: „bitte setz das 1:1 so um“. **Training wirkt je Spieltag** und wird je Spieltag gebucht und getrackt (nicht am
+Saisonende); die Raten müssen dafür neu gebalanced werden (bisher auf ~10 Spieltage ausgelegt, die Saison hat 20).
+Trainiert wird auf eine **Ziel-Disziplin mit Weg** (Primär-/Nebenweg, Matrix nur gelesen), Fokus jederzeit wechselbar.
+Verletzte trainieren nicht; Überlastung drückt die Form leicht. Kein Alter.
+
+## Neuer Stil überall — Seite für Seite neu konzipieren, nicht mischen (Chris, 18.11.)
+
+Wörtlich: „ich denke wir haben nun einen sehr guten Style gefunden mit den neuen Mockups und genau so möchte ich das auch
+umgesetzt haben, nicht nur integriert — das ist ganz wichtig. Der alte Stil darf dann nicht überall mit dem neuen gemixt
+sein, sondern letztendlich müssen wir step by step die Seiten neu konzeptionieren und aufsetzen inkl. der neuen Mechaniken.“
+Jede Seite wird nach dem Mockup **neu gebaut** (eigene Komponente, eigenes CSS im Mockup-Stil), nicht in die alte Seite
+eingehängt; die alte Fassung fliegt danach raus. Reihenfolge und Stand je Seite: `docs/design/seiten-umbau-fahrplan-18-11.md`.
+
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 
 Chris am 13.09., wörtlich: „breaking NICHT breakdance ist sondern ein foltern!!!! […] einer

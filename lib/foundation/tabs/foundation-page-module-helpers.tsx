@@ -187,6 +187,7 @@ export const foundationSecondaryViews: Array<{ id: FoundationView; label: string
 
 export const foundationInternalViews: Array<{ id: FoundationView; label: string }> = [
   { id: "matchdayResult", label: "Spieltagsergebnis" },
+  { id: "nachDemSpieltag", label: "Nach dem Spieltag" },
   { id: "homeV2", label: "Home v2" },
   { id: "facilitiesOverviewV2", label: "Facilities Overview v2" },
   { id: "scoutingCenterV2", label: "Scouting Hub v2" },
@@ -247,6 +248,8 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
       return "foundation-matchday-arena";
     case "matchdayResult":
       return "foundation-matchday-result";
+    case "nachDemSpieltag":
+      return "foundation-nach-dem-spieltag";
     case "season":
       return "team-table";
     case "seasonV2":
@@ -361,7 +364,7 @@ export function resolveFoundationPanelScrollTarget(input: {
    * DER RUECKFALL MUSS EXISTIEREN, sonst ist er keiner.
    *
    * Hier stand "foundation-home". Ein Element dieses Namens gibt es nicht — die Startseite traegt
-   * `id="foundation-home-v2"` (HomeV2NewLook.tsx:432, FoundationHomeV2Panel.tsx:35). Jeder Sprung
+   * `id="foundation-home-v2"` (HomeModern.tsx, FoundationHomeV2Panel.tsx:35). Jeder Sprung
    * ohne eigene Zuordnung landete damit bei `getElementById(null)` und fiel still aus.
    */
   return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home-v2";

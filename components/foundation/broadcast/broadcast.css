@@ -908,29 +908,6 @@ button.bc-chip:hover {
 .foundation-rail-pin[aria-pressed="true"] svg {
   transform: rotate(0deg);
 }
-.foundation-rail-mini {
-  display: grid;
-  justify-items: center;
-  gap: 1px;
-  width: 100%;
-  padding: 4px 0;
-  border: 1px solid var(--bc-linie-2, rgba(244, 230, 196, 0.3));
-  border-radius: 9px;
-  color: var(--bc-creme, #f4e6c4);
-  font-family: var(--bc-zahl, "Barlow Condensed", Arial, sans-serif);
-  line-height: 1.05;
-}
-.foundation-rail-mini b {
-  font-size: 15px;
-  font-weight: 700;
-}
-.foundation-rail-mini i {
-  font-style: normal;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--bc-leise, #9aa7ba);
-}
-
 /* Die Leiste klebt am Fensterrand (`position: fixed`). Der rechte Rahmen (`.app-shell`) rückt um die
    Leistenbreite nach rechts und nutzt seit 18.11. die GANZE restliche Fensterbreite (kein zentrierter
    Rahmen mit Maximalbreite mehr: auf dem 32"-4K-Monitor bei 2560 px blieben sonst ~300 px je Seite
@@ -1012,9 +989,7 @@ button.bc-chip:hover {
   .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-sidebar-item-label,
   .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-sidebar-item-badge,
   .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-sidebar-drag-handle,
-  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-rail-pin-text,
-  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="open"] .foundation-rail-mini,
-  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="pinned"] .foundation-rail-mini {
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-rail-pin-text {
     display: none;
   }
   .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-rail-head {
@@ -1211,89 +1186,7 @@ button.bc-chip:hover {
   max-width: none;
 }
 
-/* ── Kopfzeile in EINER Reihe (18.11.) ───────────────────────────────────────────────────────────
-   Brotkrume · Unterreiter · Statuschip · Hauptaktion · Weiter · Suche. Läuft eine Aktivität mit
-   Fortschrittsbalken, bricht der Status als eigene Zeile darunter um. */
-.foundation-shell.app-shell .foundation-shell-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px 14px;
-  min-height: 0;
-}
-.foundation-shell.app-shell .foundation-shell-header .foundation-subnav {
-  margin: 0;
-  flex: 0 1 auto;
-}
-.foundation-shell.app-shell .foundation-shell-header .foundation-subnav-item {
-  padding-block: 4px;
-}
-.foundation-shell.app-shell .foundation-shell-header-actions {
-  margin-left: auto;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 6px;
-}
-.foundation-shell.app-shell .foundation-shell-header-actions .primary-button,
-.foundation-shell.app-shell .foundation-shell-header-actions .secondary-button,
-.foundation-shell.app-shell .foundation-shell-header-actions .pill {
-  min-height: 32px;
-  height: 32px;
-  padding-block: 0;
-  padding-inline: 12px;
-  border-radius: 10px;
-  font-size: 0.8rem;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.foundation-shell.app-shell .foundation-shell-header-actions .foundation-screen-action-button {
-  min-width: 0;
-}
-.foundation-shell.app-shell .foundation-shell-header-actions .foundation-global-next-button small {
-  display: none;
-}
-.foundation-shell.app-shell .foundation-shell-header-actions .foundation-global-next-button strong {
-  font-size: 0.8rem;
-}
-
-/* Ruhiger Status ("Bereit / Alle Aktionen abgeschlossen") → schmales Chip in der Zeile. */
-.foundation-shell.app-shell .foundation-shell-header .foundation-activity-strip {
-  flex: 0 1 auto;
-  margin-left: auto;
-  padding: 2px 34px 2px 10px;
-  border-radius: 999px;
-  max-width: 34rem;
-}
-.foundation-shell.app-shell .foundation-shell-header:has(> .foundation-activity-strip) .foundation-shell-header-actions {
-  margin-left: 0;
-}
-.foundation-shell.app-shell .foundation-shell-header .foundation-activity-strip.is-collapsed {
-  padding: 0;
-}
-.foundation-shell.app-shell .foundation-shell-header .foundation-activity-collapse {
-  top: 50%;
-  transform: translateY(-50%);
-  right: 6px;
-}
-.foundation-shell.app-shell .foundation-shell-header .foundation-activity-row-head {
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-/* Läuft etwas (Balken oder Grund-Liste): eigene volle Zeile unter der Kopfzeile. */
-.foundation-shell.app-shell .foundation-shell-header .foundation-activity-strip:has(.foundation-activity-row-bar) {
-  order: 9;
-  flex: 1 1 100%;
-  max-width: none;
-  margin-left: 0;
-  padding: 8px 40px 8px 12px;
-  border-radius: 14px;
-}
-.foundation-shell.app-shell .foundation-shell-header:has(> .foundation-activity-strip:has(.foundation-activity-row-bar)) .foundation-shell-header-actions {
-  margin-left: auto;
-}
+/* (Kopfzeile in EINER Reihe: ersetzt durch das Regieband, siehe rahmen.css) */
 
 /* Leeres Kontextband (nur noch Platzhalter, wenn weder Raum-Chip noch Meldung da ist) belegt keine
    Zeile mehr. Es bleibt 1 px hoch im DOM, weil Smoke-Skripte auf `foundation-context-banner` warten. */

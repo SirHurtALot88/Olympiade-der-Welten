@@ -40,8 +40,21 @@ export function validateLegacyLineupContext(
        * Eine Sperre aus einem VORSPIELTAG bleibt ein Fehler: dort hatte die Aufstellung einen
        * Ausweg, und ein solcher Spieler wuerde gewertet (die Score-Engine kennt keine Sperre).
        */
+      // Nur auf dem bisherigen Platz (der Seite, auf der er sich verletzt hat) — s.
+      // `LegacyLineupValidationOptions.bisherigeEintraege`. Ein neu gesetzter Platz fuer einen heute
+      // Verletzten ist ein Einsatz, und den gibt es nicht (Chris, 18.11.: „gar nicht einsetzbar").
+      const standSoSchonImEntwurf =
+        !options.bisherigeEintraege ||
+        options.bisherigeEintraege.some(
+          (bisher) =>
+            bisher.playerId === entry.playerId &&
+            bisher.disciplineId === entry.disciplineId &&
+            bisher.disciplineSide === entry.disciplineSide,
+        );
       const verletztAnDiesemSpieltag =
-        rosterPlayer.injuredAtMatchdayId != null && rosterPlayer.injuredAtMatchdayId === input.matchdayId;
+        rosterPlayer.injuredAtMatchdayId != null &&
+        rosterPlayer.injuredAtMatchdayId === input.matchdayId &&
+        standSoSchonImEntwurf;
       if (!lineupIsLocked && !verletztAnDiesemSpieltag) {
         // ENTWURF OFFEN: hier hat die Sperre einen Sinn UND einen Ausweg — der Spieler kann nicht
         // antreten, also stellt man jemand anderen auf.

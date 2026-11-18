@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Start – modern (Mockup 18.11.)</title>
+<!--
+  STARTSEITE IM BROADCAST-STIL, FASSUNG 18.11. (Fable). Nachfolger von oly-start-modern-17-11.html.
+  Erklaerung, Datenquellen und Bauanleitung: docs/design/oly-start-modern-18-11.md
+  Neu: Liga-Split + Duell-Wertung (kleine ganze Punkte, S-U-N, Verhaeltnis, Zonen), ehrliche Spieltag-Karte
+  (Kaderstaerke-Vergleich statt "Siegchance"), Form & Moral (Pfeil + Gesicht), Kasse je Spieltag, Disziplin-Rang
+  in der eigenen Liga mit Top-10-Ampel, ausklappende Icon-Schiene, volle Flaeche (alles in rem, Wurzelgroesse waechst mit dem Fenster).
+  ECHT: Teamnamen, Wappen, Spielernamen, Portraits, Klassen, Kulissenbilder (PixelLab, public/sprites/kulissen), Regeln (2/1/0, 2-1-0-0, Zonen).
+  ERFUNDEN: jede Zahl (Punkte, Bilanz, Staerke, Form, Moral, Geld), alle Meldungen.
+  Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  URL: ?z=vor|mitte|ende   ?phone=1   ?still=1 (ohne Mockup-Leiste)   ?nav=auf (Schiene ausgeklappt)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* VOLLE FLAECHE: Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px). Die Wurzelgroesse waechst mit Breite UND Hoehe. */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.9rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* ICON-SCHIENE: kompakt 4 rem, klappt bei Hover als Ueberlagerung aus (wie PR #1576) */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.2rem;padding:.6rem .6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover,body.navauf .rail{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem;flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .grp{height:1.1rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp,body.navauf .rail .grp{opacity:1}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n,body.navauf .rail a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;left:1.7rem;top:.2rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}
+/* HERO mit geteilter Disziplin-Kulisse */
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;padding:1.05rem 1.5rem 1rem;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr}
+.hero .kul i{background-position:center 42%;background-size:cover;filter:saturate(1.1);opacity:.62}
+.hero .kul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.hero .kul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.96) 0%,rgba(6,8,12,.72) 30%,rgba(6,8,12,.5) 55%,rgba(6,8,12,.82) 100%),linear-gradient(180deg,rgba(6,8,12,.2) 30%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:1rem}
+.hk .crest{width:5.25rem;height:5.25rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk span.lage{font-size:.97rem;color:var(--leise)} .hk span.lage b{color:var(--creme);font-weight:600}
+.kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
+.kpi{min-width:7.2rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:flex;align-items:center;gap:.4rem;font-size:2rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap;height:2rem}
+.kpi small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.kpi.zone{border-top:2px solid var(--gut)}
+.fm{display:inline-flex;gap:.18rem}
+.fm i{width:.82rem;height:.82rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)} .fm i.x{background:rgba(255,255,255,.1)}
+.kpi .fm i{width:1rem;height:1rem}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.5rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+.cta small{font-size:.82rem;color:var(--leise)}
+
+/* RASTER: fuellt die Resthoehe, nichts scrollt */
+.raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.12fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+#p-tag{grid-column:1/6;grid-row:1} #p-kad{grid-column:1/6;grid-row:2}
+#p-tab{grid-column:6/10;grid-row:1/3}
+#p-ent{grid-column:10/13;grid-row:1} #p-fin{grid-column:10/13;grid-row:2}
+#p-dis{grid-column:1/13;grid-row:3} .ticker{grid-column:1/13;grid-row:4}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a{font-size:.85rem;font-weight:600;color:var(--gold);white-space:nowrap}
+.pk .marke{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:.12rem .5rem;border-radius:.2rem;background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.pk .marke.g{background:rgba(69,176,201,.14);color:var(--gast);border-color:rgba(69,176,201,.5)}
+.pb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* SPIELTAG-KARTE */
+.match{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:.8rem;flex:none}
+.match .s{display:flex;align-items:center;gap:.7rem;min-width:0} .match .s.g{flex-direction:row-reverse;text-align:right}
+.match img{width:3.4rem;height:3.4rem;border-radius:.55rem;object-fit:cover;border:2px solid var(--heim);flex:none} .match .g img{border-color:var(--gast)}
+.match b{display:block;font:400 1.22rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match small{color:var(--leise);font-size:.85rem;white-space:nowrap}
+.match .vs{font:400 1.5rem/1 var(--haus);color:var(--stumm)}
+.dzs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.7rem;flex:1;min-height:0}
+.dz{position:relative;display:flex;flex-direction:column;gap:.35rem;padding:.6rem .75rem .6rem;border-radius:.55rem;border:1px solid rgba(240,195,90,.55);overflow:hidden;isolation:isolate;min-height:0}
+.dz:hover{border-color:var(--gold)}
+.dz::before{content:"";position:absolute;inset:0;z-index:-2;background:var(--bild) center/cover;opacity:.55}
+.dz::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(8,11,17,.55) 0%,rgba(8,11,17,.9) 46%,rgba(8,11,17,.97) 100%)}
+.dz .kopf{display:flex;align-items:baseline;gap:.5rem}
+.dz .kopf b{font:400 1.35rem/1 var(--haus);color:#fff} .dz .kopf small{font-size:.8rem;color:var(--creme);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz .sp{flex:1}
+.dz .wb{height:clamp(.7rem,1.6vh,1.3rem)}
+.dz .lab{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;color:var(--leise)}
+.dz .lab b{font-size:1.02rem;color:var(--tinte);font-weight:700} .dz .lab b.h{color:var(--heim)} .dz .lab b.g{color:var(--gast)}
+.wb{position:relative;height:.7rem;background:var(--gast);transform:skewX(-14deg);overflow:hidden;border-radius:2px;margin:.1rem .15rem}
+.wb i{position:absolute;left:0;top:0;bottom:0;background:var(--heim);border-right:2px solid #06080c}
+.pf{display:flex;align-items:center;gap:.45rem;font-size:.85rem;color:var(--leise)}
+.pf b{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.08rem .45rem;border-radius:.2rem;border:1px solid currentColor}
+.dz .st{display:flex;flex-direction:column;gap:.18rem;margin-top:.15rem;padding-top:.4rem;border-top:1px solid var(--linie);font-size:.88rem;color:var(--tinte)}
+.dz .st span{display:flex;align-items:center;gap:.45rem;white-space:nowrap;overflow:hidden}
+.dz .st em{font-style:normal;margin-left:auto;font-weight:700}
+.dz.vierer .st{flex-direction:row;gap:1rem;font-size:.82rem} .dz.vierer .st span{flex:1;gap:.3rem} .dz.vierer .pp{display:none}
+.pp{display:inline-flex;gap:.16rem} .pp i{width:.6rem;height:.32rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px} .pp i.o{background:rgba(255,255,255,.18)}
+.pod{display:grid;gap:.1rem;flex:1;align-content:space-evenly;min-height:0}
+.pod div{display:grid;grid-template-columns:1.3rem minmax(0,1fr) 4.2rem 2rem;gap:.4rem;align-items:center;font-size:.85rem;color:var(--leise)}
+.pod img{width:1.3rem;height:1.3rem;border-radius:.2rem;object-fit:cover}
+.pod .bn{height:.42rem;background:rgba(255,255,255,.1);transform:skewX(-14deg)} .pod .bn i{display:block;height:100%;background:var(--gast)}
+.pod .wir{color:#fff;font-weight:600} .pod .wir .bn i{background:var(--heim)} .pod b{text-align:right;color:var(--tinte)}
+.spiel{display:flex;gap:1.2rem;align-items:center;margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--linie);font-size:.88rem;color:var(--leise);flex:none;white-space:nowrap;overflow:hidden}
+.spiel b{color:var(--creme);font-size:1.05rem;font-weight:700;margin-left:.3rem}
+/* Saisonende-Bilanz */
+.bil{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.2rem;align-items:center;flex:1;min-height:0}
+.bil .gross{text-align:center;padding:0 1rem}
+.bil .gross strong{display:block;font:700 5.4rem/1 var(--zahl);color:var(--gut)} .bil .gross span{font:400 1.3rem/1 var(--haus);color:#fff}
+.bil .gross small{display:block;margin-top:.3rem;color:var(--leise);font-size:.88rem}
+
+/* ENTSCHEIDUNGEN */
+.ents{display:flex;flex-direction:column;flex:1;min-height:0;padding:.3rem .4rem}
+.ent{display:grid;grid-template-columns:1.3rem minmax(0,1fr) auto;gap:.6rem;align-items:center;flex:1;min-height:0;max-height:4.6rem;padding:0 .5rem;border-radius:.45rem;border-bottom:1px solid rgba(244,230,196,.06);font-size:.97rem;line-height:1.15}
+.ent:hover{background:var(--flaeche-2)}
+.ent .ik{width:1.25rem;height:1.25rem;border-radius:50%;display:grid;place-items:center;font-size:.75rem;font-weight:700;background:var(--warn);color:#fff}
+.ent.w .ik{background:var(--acht);color:#0b0d12} .ent.h .ik{background:var(--flaeche-3);color:var(--leise);border:1px solid var(--linie-2)} .ent.ok .ik{background:var(--gut);color:#0b0d12}
+.ent span.tx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ent small{display:block;font-size:.82rem;color:var(--leise);overflow:hidden;text-overflow:ellipsis}
+.ent span.go{color:var(--gold);font-size:.85rem;font-weight:600;white-space:nowrap}
+
+/* LIGA-TABELLE: 16 Zeilen teilen sich die Hoehe */
+.tab{display:grid;grid-template-rows:1.7rem repeat(16,minmax(0,1fr));flex:1;min-height:0}
+.tz{display:grid;grid-template-columns:2.1rem 2rem minmax(0,1fr) 4.4rem 3.6rem 5.4rem 2.6rem;gap:.35rem;align-items:center;padding:0 .7rem 0 .55rem;border-top:1px solid rgba(244,230,196,.06);border-left:.2rem solid transparent;font-size:1rem;white-space:nowrap;min-height:0}
+.tz.kopf{border-top:0;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+.tz>*{text-align:right} .tz>:nth-child(1){text-align:left;font-weight:700;color:var(--leise);font-size:1.1rem} .tz>:nth-child(3){text-align:left} .tz>:nth-child(2){text-align:left;font-size:.82rem;font-weight:700}
+.tz .tm{display:flex;align-items:center;gap:.55rem;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tz .tm img{width:1.55rem;height:1.55rem;border-radius:.25rem;object-fit:cover;flex:none}
+.tz .du{font-size:.62rem;font-weight:700;letter-spacing:.08em;padding:.05rem .3rem;border-radius:.15rem;background:var(--heim);color:#17120a}
+.tz .gg{font-size:.62rem;font-weight:700;letter-spacing:.08em;padding:.05rem .3rem;border-radius:.15rem;border:1px solid var(--gast);color:var(--gast)}
+.tz strong{font-size:1.25rem;color:var(--creme)}
+.tz.auf{border-left-color:var(--gut)} .tz.ab{border-left-color:var(--warn)}
+.tz.auf>:nth-child(1){color:var(--gut)} .tz.ab>:nth-child(1){color:var(--warn)}
+.tz.linie-auf{border-bottom:1px dashed rgba(98,211,148,.6)} .tz.linie-ab{border-top:1px dashed rgba(255,96,88,.6)}
+.tz.wir{background:linear-gradient(90deg,rgba(242,160,61,.24),rgba(242,160,61,.05));color:#fff;font-weight:600} .tz.wir>:nth-child(1){color:var(--heim)}
+.tfuss{display:flex;gap:1rem;align-items:center;padding:0 .9rem;height:2rem;border-top:1px solid var(--linie);font-size:.8rem;color:var(--leise);flex:none;white-space:nowrap;overflow:hidden}
+.tfuss i{display:inline-block;width:.25rem;height:.85rem;border-radius:1px;margin-right:.35rem;vertical-align:-.1em} .tfuss .sp{flex:1}
+
+/* KADER MIT FORM & MORAL */
+.tfk{display:flex;align-items:center;gap:1.1rem;font-size:.88rem;color:var(--leise);white-space:nowrap;flex:none;margin-bottom:.6rem;overflow:hidden}
+.tfk .zz{display:inline-flex;align-items:center;gap:.7rem;padding:.25rem .7rem;border-radius:.4rem;background:var(--flaeche-2);border:1px solid var(--linie)}
+.tfk .zz span{display:inline-flex;align-items:baseline;gap:.25rem} .tfk .zz b{font-size:1.05rem;color:var(--tinte)}
+.pfeil{font-weight:700;letter-spacing:-.12em;font-size:.82em;padding-right:.12em}
+.pfeil.s2,.pfeil.s1{color:var(--gut)} .pfeil.s0{color:var(--stumm);letter-spacing:0} .pfeil.s-1,.pfeil.s-2{color:var(--warn)}
+svg.ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
+.kk{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;flex:1;min-height:0}
+.sk{position:relative;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);background:#111;display:block;min-height:0}
+.sk:hover{border-color:var(--gold)}
+.sk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(4,6,10,.97) 80%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:.5rem;padding:.05rem .6rem .05rem .5rem;background:var(--gold);color:#17120a;font-weight:700;font-size:.88rem;clip-path:polygon(0 0,100% 0,calc(100% - .45rem) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:.5rem;right:.5rem;bottom:.45rem}
+.sk b{display:block;font:400 1.1rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:.78rem;color:var(--leise);white-space:nowrap}
+.sk .ov{display:flex;align-items:center;gap:.22rem;margin-top:.2rem;font-size:.88rem} .sk .ov strong{font-size:1.3rem;line-height:1;color:var(--creme);margin-right:auto}
+.sk .ov .mo{display:inline-flex;align-items:center;gap:.12rem;font-weight:700}
+
+/* KASSE */
+.kas{display:flex;align-items:flex-end;gap:.9rem;flex:none}
+.kas strong{font-size:2.3rem;line-height:.95;color:var(--creme)} .kas small{font-size:.85rem;color:var(--leise);padding-bottom:.15rem}
+.kurve{flex:1;min-height:1.6rem;margin:.35rem 0 .1rem;position:relative}
+.kurve svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.kx{display:flex;justify-content:space-between;font-size:.7rem;color:var(--stumm);letter-spacing:.08em;flex:none;margin-bottom:.3rem}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem;flex:none;white-space:nowrap}
+.zeile span{overflow:hidden;text-overflow:ellipsis} .zeile small{color:var(--leise);font-size:.8rem;margin-left:.35rem}
+.zeile strong{font-size:1.1rem}
+.zeile.next small{display:block;margin:0}
+.zeile.next{align-items:center;margin-top:.25rem;padding:.3rem .55rem;border:1px solid var(--linie-2);border-radius:.4rem;background:var(--flaeche-2)}
+.apr{flex:none;margin-top:.45rem;font-size:.85rem;color:var(--leise)}
+.apr .kopfz{display:flex;justify-content:space-between} .apr b{color:var(--tinte)}
+.apr .bn{position:relative;height:.5rem;background:rgba(255,255,255,.08);margin-top:.25rem;transform:skewX(-14deg)}
+.apr .bn i{display:block;height:100%;background:var(--gut)} .apr .bn u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:var(--acht)} .apr .bn u+u{background:var(--warn)}
+
+/* DISZIPLINEN */
+.dr{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.4rem;padding:.55rem .7rem}
+.dk{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:0 .3rem;padding:.3rem .55rem .32rem .6rem;border-radius:.4rem;background:var(--flaeche-2);border-left:.19rem solid var(--stumm);overflow:hidden;isolation:isolate;height:3.15rem}
+.dk::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,var(--flaeche-2) 35%,rgba(18,24,36,.55)),var(--bild,none) center/cover;opacity:1}
+.dk small{grid-column:1/3;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:start}
+.dk strong{font-size:1.4rem;line-height:1;color:var(--tinte)}
+.dk em{font-style:normal;font-size:.76rem;color:var(--leise);white-space:nowrap;text-shadow:0 1px 2px #000}
+.dk.a{border-left-color:var(--gut)} .dk.a strong{color:var(--gut)} .dk.b{border-left-color:var(--acht)} .dk.b strong{color:var(--acht)} .dk.c{border-left-color:var(--warn)} .dk.c strong{color:var(--warn)}
+.dk.h{outline:2px solid var(--gold);outline-offset:-1px;box-shadow:0 0 .8rem rgba(240,195,90,.35)}
+.leg{display:flex;gap:.9rem;font-size:.78rem;color:var(--leise);white-space:nowrap} .leg i{display:inline-block;width:.6rem;height:.6rem;border-radius:1px;margin-right:.3rem}
+.ticker{display:flex;align-items:center;gap:1.4rem;padding:0 .9rem;height:2.2rem;border-radius:var(--r);border:1px solid var(--linie);background:#080b11;font-size:.94rem;color:var(--leise);overflow:hidden;white-space:nowrap}
+.ticker>b{color:var(--gold);letter-spacing:.14em;font-size:.75rem;text-transform:uppercase} .ticker span b{color:var(--tinte)}
+
+/* PHONE: einspaltig, Seite scrollt, Schiene unten */
+body.phone{overflow:auto} html.phone{font-size:16px;height:auto} body.phone{height:auto}
+body.phone .demo{padding-left:.9rem}
+body.phone .app{display:block;height:auto}
+body.phone .railplatz{position:fixed;z-index:50;left:0;right:0;bottom:0}
+body.phone .rail,body.phone .rail:hover{position:static;width:auto;flex-direction:row;justify-content:space-around;padding:.35rem .25rem calc(.35rem + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--linie);box-shadow:none}
+body.phone .rail .logo,body.phone .rail .luecke,body.phone .rail .x,body.phone .rail .grp,body.phone .rail a span.n{display:none}
+body.phone .rail a{width:2.75rem;padding:0;justify-content:center} body.phone .rail .zahl{left:1.5rem}
+body.phone .rail a.an::before{left:.55rem;right:.55rem;top:-.4rem;bottom:auto;width:auto;height:.19rem}
+body.phone main{display:block}
+body.phone .hero{grid-template-columns:minmax(0,1fr);gap:.75rem;padding:.9rem .75rem}
+body.phone .hk .crest{width:3.5rem;height:3.5rem} body.phone .hk h1{font-size:1.55rem;white-space:normal}
+body.phone .kpis{justify-content:flex-start;overflow-x:auto;margin:0 -.75rem;padding:0 .75rem} body.phone .kpi{flex:none;min-width:0;padding:.45rem .9rem} body.phone .kpi strong{font-size:1.5rem;height:1.6rem}
+body.phone .cta{align-items:stretch} body.phone .btn.haupt{height:2.9rem;font-size:1rem;padding:0 .75rem}
+body.phone .raster{display:flex;flex-direction:column;padding:.6rem .5rem 5.4rem;gap:.6rem}
+body.phone #p-tag{order:1} body.phone #p-ent{order:2} body.phone #p-tab{order:3} body.phone #p-kad{order:4} body.phone #p-fin{order:5} body.phone #p-dis{order:6} body.phone .ticker{order:7;overflow-x:auto;flex:none}
+body.phone .pan{overflow:visible} body.phone .pk .weg{display:none}
+body.phone .match{grid-template-columns:minmax(0,1fr);gap:.4rem} body.phone .match .vs{display:none} body.phone .match .s.g{flex-direction:row;text-align:left}
+body.phone .dzs{grid-template-columns:minmax(0,1fr)} body.phone .dz{gap:.5rem} body.phone .spiel{flex-wrap:wrap;gap:.3rem 1rem;white-space:normal}
+body.phone .ent{min-height:3.3rem}
+body.phone .tab{grid-template-rows:1.7rem repeat(16,2.5rem)}
+body.phone .tz{grid-template-columns:1.9rem minmax(0,1fr) 4.2rem 5rem 2.4rem} body.phone .tz>:nth-child(2),body.phone .tz>:nth-child(5){display:none}
+body.phone .tz>:nth-child(3){text-align:left} body.phone .tfuss{flex-wrap:wrap;height:auto;padding:.4rem .9rem;gap:.2rem 1rem}
+body.phone .tfk{flex-wrap:wrap;gap:.4rem .8rem;white-space:normal}
+body.phone .kk{grid-template-columns:repeat(3,minmax(0,1fr))} body.phone .sk{aspect-ratio:3/4}
+body.phone .kurve{height:4.5rem;flex:none}
+body.phone .dr{grid-template-columns:repeat(2,minmax(0,1fr))} body.phone .leg{display:none}
+body.phone .bil{grid-template-columns:minmax(0,1fr)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-spieler" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-bau" viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M3 21h18M9 21v-7h6v7"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-karte" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></symbol>
+</defs></svg>
+<div class="demo"><b>Mockup 18.11.</b><span>Zustand:</span><span id="demoz"></span><span>Zahlen erfunden; Namen, Wappen, Portraits, Kulissen und Regeln echt.</span></div>
+<div class="app">
+  <div class="railplatz"><nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img src="../team-logos/V-W.jpg" alt=""></div>
+    <div class="grp">Spieltag</div>
+    <a class="an" href="#"><svg class="i"><use href="#i-home"/></svg><span class="n">Home</span></a>
+    <a href="#"><svg class="i"><use href="#i-post"/></svg><span class="zahl" id="inboxzahl">3</span><span class="n">Inbox</span></a>
+    <a href="einsatzliste-modern-17-11.html"><svg class="i"><use href="#i-liste"/></svg><span class="n">Einsatzliste</span></a>
+    <a href="#"><svg class="i"><use href="#i-arena"/></svg><span class="n">Arena</span></a>
+    <a href="#"><svg class="i"><use href="#i-tab"/></svg><span class="n">Saisonstand</span></a>
+    <div class="grp">Team</div>
+    <a class="x" href="#"><svg class="i"><use href="#i-team"/></svg><span class="n">Teams</span></a>
+    <a class="x" href="#"><svg class="i"><use href="#i-spieler"/></svg><span class="n">Spieler</span></a>
+    <a class="x" href="#"><svg class="i"><use href="#i-train"/></svg><span class="n">Training</span></a>
+    <a class="x" href="#"><svg class="i"><use href="#i-bau"/></svg><span class="n">Gebäude</span></a>
+    <div class="grp">Markt</div>
+    <a class="x" href="#"><svg class="i"><use href="#i-markt"/></svg><span class="n">Transfermarkt</span></a>
+    <a class="x" href="#"><svg class="i"><use href="#i-scout"/></svg><span class="n">Scouting</span></a>
+    <a class="x" href="#"><svg class="i"><use href="#i-geld"/></svg><span class="n">Finanzen</span></a>
+    <span class="luecke"></span>
+    <a class="x" href="#"><svg class="i"><use href="#i-pin"/></svg><span class="n">Anheften</span></a>
+  </nav></div>
+  <main>
+    <header class="hero" id="hero"></header>
+    <div class="raster">
+      <section class="pan" id="p-tag"></section>
+      <section class="pan" id="p-tab"></section>
+      <section class="pan" id="p-ent"></section>
+      <section class="pan" id="p-kad"></section>
+      <section class="pan" id="p-fin"></section>
+      <section class="pan" id="p-dis"></section>
+      <div class="ticker" id="ticker"></div>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+/* ---------- Helfer ---------- */
+var q=new URLSearchParams(location.search), Z=q.get("z")||"mitte"; if(["vor","mitte","ende"].indexOf(Z)<0)Z="mitte";
+var $=function(id){return document.getElementById(id)};
+function de(x,nk){return x.toFixed(nk==null?1:nk).replace(".",",")}
+function vz(x,nk){return (x>0?"+":x<0?"−":"±")+de(Math.abs(x),nk)}
+function ton(x){return x>0?"plus":x<0?"minus":"null"}
+function logo(c){return '<img src="../team-logos/'+c+'.jpg" alt="">'}
+/* Form-Pfeil wie BcFormPfeil: Stufe -2..+2 */
+function pfeil(s){return '<span class="pfeil s'+s+'" title="Form">'+({"2":"▲▲","1":"▲","0":"–","-1":"▼","-2":"▼▼"})[s]+'</span>'}
+/* Moral-Gesicht wie BcMoralGesicht: Farbe rot→bernstein→gruen (moralFarbe), Mund aus moralMund */
+function moralFarbe(w){var R=[255,96,88],B=[243,181,74],G=[98,211,148],a=w<50?R:B,b=w<50?B:G,t=w<50?w/50:(w-50)/50;return "rgb("+[0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)}).join(",")+")"}
+function gesicht(w){var m=Math.max(-1,Math.min(1,(w-50)/50)),f=moralFarbe(w),y=15+m*-1.2,c=y+m*4.2;
+  return '<svg class="ges" viewBox="0 0 24 24" aria-label="Moral '+w+'"><circle cx="12" cy="12" r="10" fill="'+f+'" fill-opacity=".16" stroke="'+f+'" stroke-width="2"/><circle cx="8.6" cy="9.6" r="1.3" fill="'+f+'"/><circle cx="15.4" cy="9.6" r="1.3" fill="'+f+'"/><path d="M7.6 '+y.toFixed(1)+' Q12 '+c.toFixed(1)+' 16.4 '+y.toFixed(1)+'" fill="none" stroke="'+f+'" stroke-width="2" stroke-linecap="round"/></svg>'}
+function moral(w){return '<span class="mo" style="color:'+moralFarbe(w)+'" title="Moral '+w+'">'+gesicht(w)+'<span class="t">'+w+'</span></span>'}
+function formk(f,n){var s="";for(var i=0;i<(n||5);i++){var c=f[i];s+='<i class="'+(c==="s"?"":c==="u"?"u":c==="n"?"n":"x")+'"></i>'}return '<span class="fm">'+s+'</span>'}
+function kul(d,b){return "../sprites/kulissen/"+d+"/"+b+".jpg"}
+
+/* ---------- Liga 2: 16 Teams. [Code, Name, S,U,N, Verhaeltnis, Form(5 Spieltage: s/u/n), Bewegung] ---------- */
+var LIGA={
+ mitte:[["D-L","Dire Legion",15,1,8,115.1,"snsss",0],["D-P","Death Peaches",14,2,8,132.7,"sunss",1],["M-S","Mortal Sin",13,3,8,62.2,"nusss",-1],["V-W","Vigilante Wranglers",14,0,10,17.1,"snsns",1],
+  ["V-V","Vigorous Vikings",12,2,10,70.0,"nssns",-1],["R-C","Royal Court",12,2,10,-16.8,"nssss",2],["L-K","Lost Kingdom",12,1,11,41.2,"ssnss",2],["B-B","Blazing Beasts",11,2,11,-46.8,"nsssn",-2],
+  ["T-G","The Giants",11,1,12,-29.4,"nssnn",-2],["T-C","The Chantry",10,1,13,-55.9,"ssssn",2],["S-C","Stronghold Crusaders",9,2,13,-36.9,"nnusn",-1],["R-R","Riptide Rivers",9,2,13,-38.3,"sssnn",1],
+  ["P-C","Pirate Crew",7,5,12,-28.9,"nnsun",-2],["C-C","Cash Creators",9,0,15,-42.7,"nnnns",1],["U-A","Undercover Agents",7,2,15,-40.8,"ssnnn",-1],["A-A","Armageddon Aftermath",5,2,17,-101.8,"snnnn",0]],
+ ende:[["D-P","Death Peaches",25,3,12,201.4,"ssuss",1],["D-L","Dire Legion",24,2,14,163.0,"nssns",-1],["V-W","Vigilante Wranglers",22,2,16,48.6,"ssuns",1],["M-S","Mortal Sin",21,3,16,71.9,"nsnus",-1],
+  ["V-V","Vigorous Vikings",21,2,17,88.3,"snssn",0],["L-K","Lost Kingdom",20,3,17,52.0,"sssns",1],["R-C","Royal Court",20,2,18,-22.1,"nsnsn",-1],["T-C","The Chantry",19,2,19,-31.5,"sssus",2],
+  ["B-B","Blazing Beasts",18,3,19,-58.2,"nnsns",-1],["T-G","The Giants",18,2,20,-40.7,"snnsn",-1],["R-R","Riptide Rivers",17,3,20,-36.4,"nsusn",1],["S-C","Stronghold Crusaders",16,4,20,-49.0,"nunsn",-1],
+  ["C-C","Cash Creators",16,1,23,-61.3,"snsnn",1],["P-C","Pirate Crew",13,7,20,-44.8,"unnun",-1],["U-A","Undercover Agents",13,3,24,-77.6,"nnsnn",0],["A-A","Armageddon Aftermath",9,4,27,-164.6,"nnnsn",0]]
+};
+LIGA.vor=LIGA.mitte.slice().sort(function(a,b){return a[1]<b[1]?-1:1}).map(function(r){return [r[0],r[1],0,0,0,0,"",null]});
+var L=LIGA[Z].map(function(r,i){return {c:r[0],n:r[1],s:r[2],u:r[3],v:r[4],verh:r[5],form:r[6],bew:r[7],pkt:r[2]*2+r[3],rang:Z==="vor"?null:i+1}});
+var WIR=L.filter(function(t){return t.c==="V-W"})[0];
+
+/* ---------- Die 20 Disziplinen: [Name, Kulisse(Ordner,Bild)|null, Staerke-Rang in Liga 2, Duellpunkte, moeglich] ---------- */
+var D=[["TDM","tdm","basis",9,1,2],["Mini DM","mini-dm","basis",5,2,2],["Battlefield","battlefield","eroberung",4,1,2],["Gewichtheben","gewichtheben","hafen",13,0,2],["Climbing","climbing","fels",3,2,2],
+ ["Staffel","staffel","arena",10,0,2],["Time Trial","time-trial","abfahrt-kamm",14,0,2],["Spurt","spurt","kurs",12,2,4],["Tennis","tennis","court",6,2,2],["Hockey","hockey","eis",7,4,4],
+ ["Showcase","showcase","buehne",2,4,4],["Speed-Schach","speed-schach","park",8,2,4],["Takeshi",null,null,11,1,2],["Breaking","breaking","standard",15,0,2],["Wettessen","wettessen","bierzelt",9,2,2],
+ ["Basketball","basketball","parkett",4,2,2],["Football","football","feld",7,0,2],["Eiskunstlauf","eiskunstlauf","kuer",1,2,2],["Fechten","fechten","piste",8,0,0],["I-Spy","i-spy","aztec",6,0,0]];
+
+/* ---------- Zustaende ---------- */
+var S={
+ vor:{st:1,kick:"Saison 1 · vor Spieltag 1 von 20 · Liga 2",lage:"Saisonstart · <b>16 Teams</b>, Aufstieg für Platz 1–3, Abstieg ab Platz 14",
+  kul:[["mini-dm","basis"],["tennis","court"]],heute:["Mini DM","Tennis"],
+  cta:["Nächster Schritt","Einsatzliste setzen","10 Plätze offen · 0 von 2 Formkarten gelegt"],
+  gegner:{c:"L-K",n:"Lost Kingdom"},heim:true,
+  dz:[{n:"Mini DM",art:"Vierergruppe · 2-1-0-0 · Kulisse Basis",bild:kul("mini-dm","basis"),pod:[["V-W","Vigilante Wranglers",62.4,5,1],["D-L","Dire Legion",68.9,2],["T-G","The Giants",57.0,9],["C-C","Cash Creators",49.3,14]],wort:["offen","acht"],bes:[0,4],karte:null},
+      {n:"Tennis",art:"Duell · 2 / 1 / 0 · Kulisse Court",bild:kul("tennis","court"),a:58.7,b:55.1,ra:6,rb:8,bes:[0,6],karte:null}],
+  spiel:[["Punkte heute","bis 4"],["Aufstiegslinie","±0 Pkt"],["Noch 20 Spieltage","bis 80 Pkt"]],
+  ent:[["","Einsatzliste leer","Mini DM 0 von 4 · Tennis 0 von 6","setzen ›"],["w","Formkarten: 0 von 2 gelegt","Pflicht-Minuskarte muss bis Spieltag 5 liegen","legen ›"],["w","Kader: 11 Spieler","3 Plätze frei, Transferfenster offen","Markt ›"],["h","Saisonziel vom Vorstand","Platz 6 oder besser in Liga 2","lesen ›"]],
+  tf:[1,3,7,2,1],moral:61,kader:[["Karthogg","karthogg","Hero · Lizard","53,0",0,60],["Kati","kati","Bard · Human","53,0",1,72],["Aerin","aerin","Bard · Elf","49,9",0,66],["Kaylen","kaylen","Templar · Human","47,7",0,58],["Lexa","lexa","Sprinter · Human","45,9",1,63],["Abe Lincoln","abe-lincoln","Templar · Human","45,9",-1,49]],
+  kasse:3.2,verlauf:[3.2],letzter:null,next:["Spieltag 1 · Heimspiel",0.5,[["Sponsoren",3.3],["Stadion",0.6],["Gehälter",-3.4]]],
+  gehalt:67.2,ein:78.0,ticker:["Saisonauftakt",["<b>Liga 2</b> · 16 Teams · 20 Spieltage","je Spieltag <b>2 Disziplinen</b> · Sieg 2, Remis 1, Niederlage 0","Vierergruppen <b>2-1-0-0</b>","Aufstieg Platz <b>1–3</b> · Abstieg Platz <b>14–16</b>"]]},
+ mitte:{st:13,kick:"Saison 1 · vor Spieltag 13 von 20 · Liga 2",lage:"<b>4. in Liga 2</b> · 1 Pkt hinter Aufstiegsplatz 3 · 10 Pkt vor der Abstiegszone",
+  kul:[["climbing","fels"],["wettessen","bierzelt"]],heute:["Climbing","Wettessen"],
+  cta:["Nächster Schritt","Einsatzliste abgeben","1 Platz offen · Pflicht-Minuskarte offen"],
+  gegner:{c:"P-C",n:"Pirate Crew"},heim:true,
+  dz:[{n:"Climbing",art:"Duell · 2 / 1 / 0 · Kulisse Fels",bild:kul("climbing","fels"),a:61.8,b:49.2,ra:3,rb:11,bes:[4,4],karte:"Speed +2 gelegt"},
+      {n:"Wettessen",art:"Duell · 2 / 1 / 0 · Kulisse Bierzelt",bild:kul("wettessen","bierzelt"),a:48.1,b:52.4,ra:9,rb:6,bes:[3,4],karte:null}],
+  spiel:[["Punkte heute","bis 4"],["Zum Aufstieg","−1 Pkt"],["Noch 8 Spieltage","bis 32 Pkt"]],
+  ent:[["","Einsatzliste unvollständig","Wettessen 3 von 4 · 1 Verletzter gesetzt","öffnen ›"],["","Pflicht-Minuskarte offen","Formkarten 1 von 2 gelegt · noch 3 Spieltage Zeit","legen ›"],["w","Abe Lincoln verärgert","Moral 31 · 4 Spieltage ohne Einsatz","ansehen ›"],["w","Vertrag Kati läuft aus","Saisonende · Form ▲▲","verhandeln ›"],["h","Scout-Bericht fertig","2 Kandidaten für Speed","lesen ›"]],
+  tf:[2,4,5,2,1],moral:64,kader:[["Karthogg","karthogg","Hero · Lizard","53,0",-1,44],["Kati","kati","Bard · Human","53,0",2,86],["Aerin","aerin","Bard · Elf","49,9",1,74],["Kaylen","kaylen","Templar · Human","47,7",1,66],["Lexa","lexa","Sprinter · Human","45,9",0,58],["Abe Lincoln","abe-lincoln","Templar · Human","45,9",-2,31]],
+  kasse:3.2,verlauf:[3.2,2.9,3.4,3.1,3.6,2.4,2.7,2.2,2.6,2.3,2.9,2.8,3.2],
+  letzter:[12,false,[["Sponsoren",3.3],["Prämien",0.5],["Gehälter",-3.4]],0.4],
+  next:["Spieltag 13 · Heimspiel",0.5,[["Sponsoren",3.3],["Stadion",0.6],["Gehälter",-3.4]]],
+  gehalt:67.2,ein:78.0,ticker:["Spieltag 12 · 2 von 4 Pkt",["<b>Hockey</b> Sieg 7 : 4 gegen Royal Court · <b class='plus'>+2</b>","<b>Speed-Schach</b> Niederlage 3 : 6 · <b class='null'>0</b>","Spieler des Tages: <b>Kati</b> ▲▲","Mortal Sin verliert beide Duelle, Abstand zur Aufstiegslinie jetzt <b>1 Pkt</b>","Dire Legion bleibt vorn: <b>31 Pkt</b>"]]},
+ ende:{st:20,kick:"Saison 1 · nach Spieltag 20 von 20 · Liga 2",lage:"<b>3. in Liga 2 · Aufstieg in Liga 1</b> · 2 Pkt Polster auf Platz 4",
+  kul:[["eiskunstlauf","kuer"],["showcase","buehne"]],heute:[],
+  cta:["Saison beendet","Saisonabschluss öffnen","Prämien, Verträge, Auf- und Abstieg"],
+  bilanz:{platz:"3.",wort:"Aufstieg",unter:"46 Pkt · 22-2-16 · Verh. +48,6",z:[["Beste Disziplin","Eiskunstlauf · 4 von 4 Pkt"],["Schwächste Disziplin","Breaking · 0 von 4 Pkt"],["Spieler der Saison","Kati · 11-mal bester Wert"],["Bestes Heimspiel","Spieltag 17 · 4 von 4 Pkt gegen Mortal Sin"],["Polster am Ende","+2 Pkt auf Mortal Sin (4.)"]]},
+  ent:[["","Saisonabschluss offen","Prämien und Aufstieg buchen","öffnen ›"],["w","3 Verträge laufen aus","Kati, Lexa, Gram","verhandeln ›"],["w","Liga 1 nächste Saison","Kader #11 von 16 nach heutiger Stärke","Markt ›"],["ok","Saisonziel erreicht","Platz 6 oder besser: Platz 3","Vorstand ›"]],
+  tf:[3,5,4,1,1],moral:78,kader:[["Karthogg","karthogg","Hero · Lizard","53,4",0,62],["Kati","kati","Bard · Human","54,1",2,91],["Aerin","aerin","Bard · Elf","50,6",1,80],["Kaylen","kaylen","Templar · Human","48,0",1,77],["Lexa","lexa","Sprinter · Human","46,8",1,70],["Abe Lincoln","abe-lincoln","Templar · Human","45,9",-1,52]],
+  kasse:5.9,verlauf:[3.2,2.9,3.4,3.1,3.6,2.4,2.7,2.2,2.6,2.3,2.9,2.8,3.2,3.7,3.5,4.0,3.8,4.6,4.4,5.2,5.9],
+  letzter:[20,true,[["Sponsoren",3.3],["Stadion",0.7],["Prämien",0.1],["Gehälter",-3.4]],0.7],
+  next:["Saisonabschluss · Prämie Platz 3",2.4,[["Aufstiegsprämie",2.4]]],
+  gehalt:67.2,ein:80.4,ticker:["Spieltag 20 · 3 von 4 Pkt",["<b>Eiskunstlauf</b> Sieg 8 : 5 gegen Royal Court · <b class='plus'>+2</b>","<b>Showcase</b> Remis 6 : 6 · <b class='acht'>+1</b>","<b>Aufstieg:</b> Death Peaches, Dire Legion, Vigilante Wranglers","<b>Abstieg:</b> Pirate Crew, Undercover Agents, Armageddon Aftermath"]]}
+}[Z];
+
+/* ---------- Mockup-Leiste ---------- */
+$("demoz").innerHTML=[["vor","vor Spieltag 1"],["mitte","mitten in der Saison"],["ende","Saisonende"]].map(function(z){return '<a class="'+(z[0]===Z?"an":"")+'" href="?z='+z[0]+(q.get("phone")?"&phone=1":"")+'">'+z[1]+'</a>'}).join(" ")+' <a href="?z='+Z+(q.get("phone")?"":"&phone=1")+'">'+(q.get("phone")?"Desktop":"Phone")+'</a>';
+$("inboxzahl").textContent=S.ent.filter(function(e){return e[0]!=="h"&&e[0]!=="ok"}).length;
+
+/* ---------- Hero ---------- */
+(function(){
+  var zone=WIR.rang&&WIR.rang<=3, tfN=["▲▲","▲","–","▼","▼▼"], tfMax=S.tf.indexOf(Math.max.apply(null,S.tf));
+  var saldo=S.letzter?S.letzter[3]:null;
+  $("hero").innerHTML='<div class="kul">'+S.kul.map(function(k){return '<i style="background-image:url('+kul(k[0],k[1])+')"></i>'}).join("")+'</div>'+
+   '<div class="hk"><span class="crest">'+logo("V-W")+'</span><div><em>'+S.kick+'</em><h1>Vigilante Wranglers</h1><span class="lage">'+S.lage+'</span></div></div>'+
+   '<div class="kpis">'+
+    '<div class="kpi'+(zone?" zone":"")+'"><span class="gk">Rang</span><strong class="t">'+(WIR.rang?WIR.rang+".":"–")+'</strong><small>in Liga 2'+(WIR.bew?' · <span class="'+ton(WIR.bew)+'">'+(WIR.bew>0?"▲":"▼")+Math.abs(WIR.bew)+'</span>':"")+'</small></div>'+
+    '<div class="kpi"><span class="gk">Punkte</span><strong class="t">'+WIR.pkt+'</strong><small class="t">'+WIR.s+'-'+WIR.u+'-'+WIR.v+' · Verh. <span class="'+ton(WIR.verh)+'">'+vz(WIR.verh)+'</span></small></div>'+
+    '<div class="kpi"><span class="gk">Ergebnisse</span><strong>'+formk(WIR.form)+'</strong><small>'+(WIR.form?"letzte 5 Spieltage":"noch kein Spieltag")+'</small></div>'+
+    '<div class="kpi"><span class="gk">Form · Moral</span><strong>'+pfeil(tfMax<2?1:tfMax>2?-1:0)+'<span style="font-size:.75em;display:inline-flex">'+moral(S.moral)+'</span></strong><small>'+S.tf[0]+'×▲▲ '+S.tf[1]+'×▲ · '+(S.tf[3]+S.tf[4])+' im Tief</small></div>'+
+    '<div class="kpi"><span class="gk">Kasse</span><strong class="t">'+de(S.kasse)+' Mio</strong><small>'+(saldo==null?"noch keine Buchung":'ST '+S.letzter[0]+' <span class="'+ton(saldo)+' t">'+vz(saldo)+' Mio</span>')+'</small></div>'+
+   '</div>'+
+   '<div class="cta"><span class="gk">'+S.cta[0]+'</span><a class="btn haupt" href="einsatzliste-modern-17-11.html">'+S.cta[1]+' <svg class="i"><use href="#i-r"/></svg></a><small>'+S.cta[2]+'</small></div>';
+})();
+
+/* ---------- Spieltag-Karte ---------- */
+function papier(anteil){return anteil>=55?["Vorteil","plus"]:anteil<=45?["Nachteil","minus"]:["offen","acht"]}
+function belegt(b){var s="";for(var i=0;i<b[1];i++)s+='<i class="'+(i<b[0]?"":"o")+'"></i>';return '<span class="pp">'+s+'</span>'}
+(function(){
+  var el=$("p-tag");
+  if(S.bilanz){var b=S.bilanz;
+    el.innerHTML='<div class="pk"><h2>Saisonbilanz</h2><span class="sp"></span><a href="#">Saisonabschluss ›</a></div><div class="pb"><div class="bil"><div class="gross"><strong class="t">'+b.platz+'</strong><span>'+b.wort+'</span><small class="t">'+b.unter+'</small></div><div>'+
+      b.z.map(function(z){return '<div class="zeile" style="padding:.5rem 0"><span>'+z[0]+'</span><strong style="font-size:1rem;font-weight:600">'+z[1]+'</strong></div>'}).join("")+'</div></div></div>';return}
+  var G=L.filter(function(t){return t.c===S.gegner.c})[0];
+  function unter(t){return t.rang?t.rang+". · "+t.pkt+" Pkt · "+t.s+"-"+t.u+"-"+t.v:"Liga 2 · Saisonstart"}
+  el.innerHTML='<div class="pk"><h2>Spieltag '+S.st+'</h2><span class="marke'+(S.heim?"":" g")+'">'+(S.heim?"Heimspiel":"Auswärts")+'</span><span class="sp"></span><a href="einsatzliste-modern-17-11.html">Zur Einsatzliste ›</a></div><div class="pb">'+
+   '<div class="match"><div class="s">'+logo("V-W")+'<div><b>Vigilante Wranglers</b><small class="t">'+unter(WIR)+'</small></div></div><span class="vs">vs</span><div class="s g">'+logo(G.c)+'<div><b>'+G.n+'</b><small class="t">'+unter(G)+'</small></div></div></div>'+
+   '<div class="dzs">'+S.dz.map(function(d){
+      var mitte;
+      if(d.pod){var mx=Math.max.apply(null,d.pod.map(function(p){return p[2]}));
+        mitte='<div class="lab"><span>Kaderstärke der Vierergruppe</span><span class="pf"><b class="'+d.wort[1]+'">'+d.wort[0]+'</b></span><span>Rang in Liga 2</span></div><div class="pod">'+d.pod.map(function(p){return '<div class="'+(p[4]?"wir":"")+'">'+logo(p[0])+'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p[1]+'</span><span class="bn"><i style="width:'+(p[2]/mx*100).toFixed(0)+'%"></i></span><b class="t">#'+p[3]+'</b></div>'}).join("")+'</div>'+
+          '';
+      }else{var an=d.a/(d.a+d.b)*100,w=papier(an);
+        mitte='<div class="lab"><span>Kaderstärke</span><span class="t">Anteil '+de(an,0)+' %</span></div><div class="lab"><b class="h t">#'+d.ra+'</b><span>Rang in Liga 2</span><b class="g t">#'+d.rb+'</b></div><div class="wb"><i style="width:'+an.toFixed(1)+'%"></i></div>'+
+          '<div class="sp"></div><div class="pf"><b class="'+w[1]+'">'+w[0]+'</b><span>Papierform aus der Kaderstärke</span></div>';}
+      return '<a class="dz'+(d.pod?" vierer":"")+'" href="einsatzliste-modern-17-11.html" style="--bild:url('+d.bild+')"><div class="kopf"><b>'+d.n+'</b><small>'+d.art+'</small></div>'+mitte+
+        '<div class="st"><span>Einsatzliste '+belegt(d.bes)+'<em class="t '+(d.bes[0]<d.bes[1]?"minus":"plus")+'">'+d.bes[0]+' von '+d.bes[1]+'</em></span><span><svg class="i"><use href="#i-karte"/></svg>Formkarte<em class="'+(d.karte?"plus":"null")+'">'+(d.karte||"keine gelegt")+'</em></span></div></a>'}).join("")+'</div>'+
+   '<div class="spiel"><span class="gk">Auf dem Spiel</span>'+S.spiel.map(function(s){return '<span>'+s[0]+'<b class="t">'+s[1]+'</b></span>'}).join("")+'</div></div>';
+})();
+
+/* ---------- Liga-Tabelle ---------- */
+(function(){
+  var gegner=S.gegner?S.gegner.c:null;
+  $("p-tab").innerHTML='<div class="pk"><h2>Liga 2 · Tabelle</h2><span class="sp"></span><a href="#">Saisonstand ›</a></div><div class="tab t">'+
+   '<div class="tz kopf"><span>#</span><span>±</span><span>Team</span><span>S-U-N</span><span>Verh.</span><span>Form</span><span>Pkt</span></div>'+
+   L.map(function(t,i){var r=i+1,k="tz"+(t.rang&&r<=3?" auf":"")+(t.rang&&r>=14?" ab":"")+(t.rang&&r===3?" linie-auf":"")+(t.rang&&r===14?" linie-ab":"")+(t.c==="V-W"?" wir":"");
+     return '<a class="'+k+'" href="#"><span>'+(t.rang?t.rang+".":"–")+'</span><span class="'+ton(t.bew||0)+'">'+(t.bew?(t.bew>0?"▲":"▼")+Math.abs(t.bew):"–")+'</span><span class="tm">'+logo(t.c)+'<span style="overflow:hidden;text-overflow:ellipsis">'+t.n+'</span>'+(t.c==="V-W"?'<span class="du">DU</span>':t.c===gegner?'<span class="gg">GEGNER</span>':"")+'</span><span>'+t.s+'-'+t.u+'-'+t.v+'</span><span class="'+ton(t.verh)+'">'+(t.rang?vz(t.verh):"–")+'</span><span>'+formk(t.form)+'</span><strong>'+t.pkt+'</strong></a>'}).join("")+'</div>'+
+   '<div class="tfuss"><span><i style="background:var(--gut)"></i>Aufstieg 1–3</span><span><i style="background:var(--warn)"></i>Abstieg 14–16</span><span class="sp"></span><span class="weg">Sieg 2 · Remis 1 · Niederlage 0 je Disziplin · Gleichstand: Verhältnis</span></div>';
+})();
+
+/* ---------- Entscheidungen ---------- */
+$("p-ent").innerHTML='<div class="pk"><h2>Entscheidungen</h2><span class="sp"></span><a href="#">Inbox ›</a></div><div class="ents">'+S.ent.map(function(e){return '<a class="ent '+e[0]+'" href="#"><span class="ik">'+(e[0]==="h"?"i":e[0]==="ok"?"✓":"!")+'</span><span class="tx">'+e[1]+'<small>'+e[2]+'</small></span><span class="go">'+e[3]+'</span></a>'}).join("")+'</div>';
+
+/* ---------- Kader mit Form & Moral ---------- */
+(function(){
+  var st=[2,1,0,-1,-2];
+  $("p-kad").innerHTML='<div class="pk"><h2>Kader · Form &amp; Moral</h2><span class="sp"></span><a href="#">Ganzer Kader (14) ›</a></div><div class="pb">'+
+   '<div class="tfk"><span class="gk">Team-Form</span><span class="zz">'+S.tf.map(function(n,i){return '<span>'+pfeil(st[i])+'<b class="t">'+n+'</b></span>'}).join("")+'</span><span class="gk">Moral Ø</span><span class="zz" style="gap:.35rem">'+moral(S.moral)+'</span><span class="weg" style="overflow:hidden;text-overflow:ellipsis">Die besten sechs nach Gesamtwert</span></div>'+
+   '<div class="kk">'+S.kader.map(function(p,i){return '<a class="sk" href="#"><img src="../portraits/'+p[1]+'.jpg" alt=""><span class="rg t">'+(i+1)+'</span><span class="un"><b>'+p[0]+'</b><small>'+p[2]+'</small><span class="ov t"><strong>'+p[3]+'</strong>'+pfeil(p[4])+moral(p[5])+'</span></span></a>'}).join("")+'</div></div>';
+})();
+
+/* ---------- Kasse ---------- */
+(function(){
+  var v=S.verlauf,n=20,mn=Math.min.apply(null,v)-.4,mx=Math.max.apply(null,v)+.4,W=200,H=50;
+  function x(i){return i/n*W} function y(w){return H-(w-mn)/(mx-mn)*H}
+  var pts=v.map(function(w,i){return x(i).toFixed(1)+","+y(w).toFixed(1)}).join(" ");
+  var kurve='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><line x1="0" y1="'+H+'" x2="'+W+'" y2="'+H+'" stroke="rgba(244,230,196,.2)" vector-effect="non-scaling-stroke"/>'+
+    (v.length>1?'<polygon points="0,'+H+' '+pts+' '+x(v.length-1).toFixed(1)+','+H+'" fill="rgba(240,195,90,.13)"/><polyline points="'+pts+'" fill="none" stroke="#f0c35a" stroke-width="2" vector-effect="non-scaling-stroke"/>':"")+
+    '<line x1="'+x(v.length-1)+'" y1="0" x2="'+x(v.length-1)+'" y2="'+H+'" stroke="rgba(244,230,196,.35)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/></svg>';
+  var quote=S.gehalt/S.ein*100, a1=72.0, a2=78.0, skala=84;
+  var lz=S.letzter;
+  $("p-fin").innerHTML='<div class="pk"><h2>Kasse</h2><span class="sp"></span><a href="#">Finanzen ›</a></div><div class="pb">'+
+   '<div class="kas"><strong class="t">'+de(S.kasse)+' Mio</strong><small>'+(v.length>1?'seit Saisonstart <span class="'+ton(S.kasse-v[0])+' t">'+vz(S.kasse-v[0])+' Mio</span>':"Startkasse")+'</small></div>'+
+   '<div class="kurve">'+kurve+'</div><div class="kx"><span>ST 1</span><span>ST 10</span><span>ST 20</span></div>'+
+   (lz?'<div class="zeile"><span>Spieltag '+lz[0]+(lz[1]?' <small>Heimspiel</small>':' <small>auswärts, kein Stadion</small>')+'</span><strong class="t '+ton(lz[3])+'">'+vz(lz[3])+' Mio</strong></div>'+
+     '<div class="zeile"><span>Einnahmen <small>'+lz[2].filter(function(p){return p[1]>0}).map(function(p){return p[0]+" "+de(p[1])}).join(" · ")+'</small></span><strong class="t plus">'+vz(lz[2].reduce(function(s,p){return s+(p[1]>0?p[1]:0)},0))+'</strong></div>'+
+     '<div class="zeile"><span>Ausgaben <small>'+lz[2].filter(function(p){return p[1]<0}).map(function(p){return p[0]+" "+de(-p[1])}).join(" · ")+'</small></span><strong class="t minus">'+vz(lz[2].reduce(function(s,p){return s+(p[1]<0?p[1]:0)},0))+'</strong></div>'
+     :'<div class="zeile"><span>Letzter Spieltag</span><strong class="null">noch keine Buchung</strong></div>')+
+   '<div class="zeile next"><span><span class="gk">Nächste Buchung</span> · '+S.next[0]+'<small>'+S.next[2].map(function(p){return p[0]+" "+vz(p[1])}).join(" · ")+'</small></span><strong class="t '+ton(S.next[1])+'">'+vz(S.next[1])+' Mio</strong></div>'+
+   '<div class="apr"><div class="kopfz"><span>Gehälter <b class="t">'+de(S.gehalt)+' Mio</b> · Quote <b class="t">'+de(quote,0)+' %</b></span><span>Apron-Abstand <b class="t plus">'+de(a1-S.gehalt)+' Mio</b></span></div><div class="bn"><i style="width:'+(S.gehalt/skala*100).toFixed(1)+'%"></i><u style="left:'+(a1/skala*100).toFixed(1)+'%" title="Apron-Linie 1"></u><u style="left:'+(a2/skala*100).toFixed(1)+'%" title="Apron-Linie 2"></u></div></div></div>';
+})();
+
+/* ---------- Disziplinen ---------- */
+(function(){
+  $("p-dis").innerHTML='<div class="pk"><h2>Disziplinen · Kaderstärke-Rang in Liga 2</h2><span class="sp"></span><span class="leg"><span><i style="background:var(--gut)"></i>1–3</span><span><i style="background:var(--acht)"></i>4–6</span><span><i style="background:var(--warn)"></i>7–10</span><span><i style="background:var(--stumm)"></i>ab 11</span><span><i style="outline:2px solid var(--gold);background:none"></i>an diesem Spieltag</span><span>klein: Duellpunkte bisher</span></span></div><div class="dr">'+
+   D.map(function(d){var r=d[3],k=r<=3?"a":r<=6?"b":r<=10?"c":"",h=S.heute.indexOf(d[0])>=0,p=Z==="vor"?[0,0]:Z==="ende"?[Math.min(4,d[4]*2||(r<8?2:0)),4]:[d[4],d[5]];
+     if(Z==="ende"&&d[0]==="Eiskunstlauf")p=[4,4]; if(Z==="ende"&&d[0]==="Breaking")p=[0,4];
+     return '<a class="dk '+k+(h?" h":"")+'" href="#"'+(d[1]?' style="--bild:url('+kul(d[1],d[2])+')"':"")+'><small>'+d[0]+'</small><strong class="t">'+r+'.</strong><em class="t">'+(p[1]?p[0]+" / "+p[1]+" Pkt":"noch offen")+'</em></a>'}).join("")+'</div>';
+  $("ticker").innerHTML='<b>'+S.ticker[0]+'</b>'+S.ticker[1].map(function(t){return '<span>'+t+'</span>'}).join("");
+})();
+
+/* ---------- Schalter ---------- */
+(function(){if(q.get("still"))document.body.classList.add("still"); if(q.get("nav")==="auf")document.body.classList.add("navauf");
+  function ph(){var p=!!q.get("phone")||innerWidth<760;document.body.classList.toggle("phone",p);document.documentElement.classList.toggle("phone",p)}ph();addEventListener("resize",ph)})();
+</script>
+</body>
+</html>
