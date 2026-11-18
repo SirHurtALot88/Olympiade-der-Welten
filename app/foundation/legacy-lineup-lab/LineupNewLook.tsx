@@ -154,6 +154,12 @@ export type LineupNewLookProps = Pick<
   | "onNavigateArena"
   | "disciplineTacticPreviewBySide"
 > & {
+  /**
+   * Mehrere Plaetze in einem Schritt neu belegen (nur die moderne Einsatzliste nutzt das; die
+   * klassische ignoriert es). Slot -> activePlayerId, "" = leer. Der Client prueft jede Belegung
+   * mit derselben Sperrlogik wie `updateSelection` und legt einen Undo-Punkt an.
+   */
+  onApplyAssignments?: (nextSelections: Record<string, string>, label: string, detail: string) => void;
   /** Slot, der gerade real zugewiesen wurde (Client-State, ~900ms Lebenszeit). */
   recentlyAssignedSlotKey: string | null;
   /** Undo-Snapshot-Metadaten aus dem Client (null = nichts rückgängig zu machen). */

@@ -119,7 +119,7 @@ function normalizeScoutingLevel(level: number | null | undefined) {
   return clamp(Math.round(level), 0, 5);
 }
 
-function getScoutingUncertainty(level: number | null | undefined) {
+export function getScoutingUncertainty(level: number | null | undefined) {
   const normalizedLevel = normalizeScoutingLevel(level);
   if (normalizedLevel <= 0) return 16;
   if (normalizedLevel >= 5) return 3;
@@ -137,7 +137,7 @@ function getCertainty(level: number | null | undefined): PlayerPotentialCertaint
   return "low";
 }
 
-function getScoutingConfidencePct(level: number | null | undefined) {
+export function getScoutingConfidencePct(level: number | null | undefined) {
   const normalizedLevel = normalizeScoutingLevel(level);
   if (normalizedLevel <= 0) return 20;
   if (normalizedLevel >= 5) return 90;
