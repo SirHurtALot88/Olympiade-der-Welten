@@ -216,6 +216,8 @@ import {
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { shouldAutoOpenSeasonBriefing, type GameFlowView } from "@/lib/foundation/game-flow-controller";
 import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
+import { baueTaktPlan, entscheideLeertaste } from "@/lib/foundation/foundation-takt-plan";
+import { getTaktAblaufOffen, setTaktAblaufOffen } from "@/lib/foundation/takt-ablauf-store";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
@@ -7661,6 +7663,22 @@ export function useFoundationShellRouterBodyScope({
     return () => window.removeEventListener("foundation:open-game-term", onOpenGameTerm);
   }, []);
 
+  // Taktgeber (Regieband): Pflichtschritte mit Haken/Rot/Gelb und die kritischen Punkte, bei denen die
+  // Leertaste NICHT weitergeht (lib/foundation/foundation-takt-plan.ts).
+  const taktPlan = baueTaktPlan({
+    steps: gameFlowState.steps,
+    currentStepId: gameFlowState.currentStepId,
+    formatGrund: formatGameFlowBlocker,
+    sprungZuSchritt: (schritt) => () => navigateToGameFlowStep(schritt.targetView, schritt.teamId, schritt.targetPanel),
+    inbox: activeTeamOpenInboxItems.map((item: GameInboxItem) => ({
+      id: item.itemId,
+      title: item.title,
+      detail: item.description,
+      severity: item.severity,
+      sprung: () => navigateToInboxItem(item),
+    })),
+  });
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space" || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -7685,13 +7703,30 @@ export function useFoundationShellRouterBodyScope({
       // Arena-Entwurf gelten, sonst bleibt genau diese eine Ansicht die Luecke.
       const activeViewHandlesOwnSpace =
         activeView === "lineup" || activeView === "lineupV2" || activeView === "matchdayArena" || activeView === "battleArena";
-      if (isTextTarget || modalOpen || activeViewHandlesOwnSpace || globalNextDisabled) return;
+      const entscheidung = entscheideLeertaste({
+        textZiel: Boolean(isTextTarget),
+        dialogOffen: modalOpen,
+        eigeneLeertaste: activeViewHandlesOwnSpace,
+        deaktiviert: globalNextDisabled,
+        anzahlKritisch: taktPlan.kritisch.length,
+        ablaufOffen: getTaktAblaufOffen(),
+      });
+      if (entscheidung === "ignorieren") return;
       event.preventDefault();
+      if (entscheidung === "ablauf-zeigen") {
+        setTaktAblaufOffen(true);
+        return;
+      }
+      if (entscheidung === "springen") {
+        setTaktAblaufOffen(false);
+        taktPlan.kritisch[0]?.sprung?.();
+        return;
+      }
       void triggerGlobalNext();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-	  }, [activeManagerTeamId, activeView, gameFlowActionStep, globalNextDisabled, primaryInboxItem, triggerGlobalNext]);
+	  }, [activeManagerTeamId, activeView, gameFlowActionStep, globalNextDisabled, primaryInboxItem, taktPlan, triggerGlobalNext]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -13027,6 +13062,7 @@ export function useFoundationShellRouterBodyScope({
     foundationWarningInboxItems,
     freshSeasonStartMessage,
     gameFlowActionStep,
+    taktPlan,
     matchdayAdvanceStep,
     gameModeOwnershipChrisIds,
     gameModeOwnershipLimits,
