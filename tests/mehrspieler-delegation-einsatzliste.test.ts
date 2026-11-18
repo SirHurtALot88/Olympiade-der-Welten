@@ -241,6 +241,48 @@ describe("Mehrspieler-Delegation: Einsatzliste und Formkarten", () => {
     expect(draftOf(persistence.current().gameState, fixture.ramonaTeam)?.entries).toEqual(before.entries);
   });
 
+  it("F3: alle Spieler von Ramona gesetzt, aber keine Formkarte: die KI legt die Karten nach, die Spieler bleiben", () => {
+    const fixture = buildThreeHumanFixture();
+    const persistence = createInMemoryPersistence(fixture.gameState);
+    runBatch(persistence, fixture.gameState);
+    // Ramonas fertiger Entwurf, aber ohne Karten (Mensch hat nur Spieler gesetzt).
+    const state = persistence.current().gameState;
+    const ohneKarten = structuredClone(draftOf(state, fixture.ramonaTeam)!);
+    ohneKarten.modifiers = createDefaultLineupDraftModifiers();
+    state.seasonState.lineupDrafts = (state.seasonState.lineupDrafts ?? []).map((draft) =>
+      draft.teamId === fixture.ramonaTeam ? ohneKarten : draft,
+    );
+    const frisch = createInMemoryPersistence(state);
+    const result = runBatch(frisch, state);
+    expect(result.results.find((entry) => entry.teamId === fixture.ramonaTeam)?.result).toBe("saved");
+    const danach = draftOf(frisch.current().gameState, fixture.ramonaTeam)!;
+    expect(danach.entries).toEqual(ohneKarten.entries);
+    const karten = [danach.modifiers?.d1, danach.modifiers?.d2].flatMap((side) => [side?.primaryFormCardId, side?.secondaryFormCardId]);
+    expect(karten.filter(Boolean).length).toBeGreaterThan(0);
+
+    // Zweiter Lauf: jetzt hat der Entwurf Karten, nichts wird mehr angefasst.
+    const nochmal = runBatch(frisch, frisch.current().gameState);
+    expect(nochmal.results.find((entry) => entry.teamId === fixture.ramonaTeam)?.result).toBe("skipped_existing");
+    expect(draftOf(frisch.current().gameState, fixture.ramonaTeam)?.modifiers).toEqual(danach.modifiers);
+  });
+
+  it("F3: von Ramona gesetzte Formkarten bleiben unberuehrt", () => {
+    const fixture = buildThreeHumanFixture();
+    const persistence = createInMemoryPersistence(fixture.gameState);
+    runBatch(persistence, fixture.gameState);
+    const state = persistence.current().gameState;
+    const eigene = structuredClone(draftOf(state, fixture.ramonaTeam)!);
+    eigene.modifiers = createDefaultLineupDraftModifiers();
+    eigene.modifiers.d1.primaryFormCardId = "karte-von-ramona";
+    state.seasonState.lineupDrafts = (state.seasonState.lineupDrafts ?? []).map((draft) =>
+      draft.teamId === fixture.ramonaTeam ? eigene : draft,
+    );
+    const frisch = createInMemoryPersistence(state);
+    const result = runBatch(frisch, state);
+    expect(result.results.find((entry) => entry.teamId === fixture.ramonaTeam)?.result).toBe("skipped_existing");
+    expect(draftOf(frisch.current().gameState, fixture.ramonaTeam)?.modifiers?.d1.primaryFormCardId).toBe("karte-von-ramona");
+  });
+
   it("ein verletzter Spieler in Ramonas Aufstellung wird ersetzt, die anderen bleiben", () => {
     const fixture = buildThreeHumanFixture();
     const persistence = createInMemoryPersistence(fixture.gameState);
