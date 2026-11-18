@@ -82,7 +82,24 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
   return { teamId, stufe, anteil, vertrauen: wert, grund: "vertrauen" };
 }
 
+/** Ein Topf der Freigabe. Heute traegt `investition` die gemeinsame Freigabe, `gehalt` ist ein leerer Platzhalter. */
+export type VorstandTopf = {
+  gesamt: number;
+  ausgegeben: number;
+  frei: number;
+  gesperrt: number;
+  grund: string;
+};
+
 export type VorstandBudgetStand = {
+  /**
+   * Vorbereitung auf zwei getrennte Toepfe (Chris: Football-Manager-Modell, noch nicht entschieden).
+   * Heute: gemeinsame Freigabe. `investition` = Gesamtzahlen (Abloesen UND Gehaelter zaehlen dagegen),
+   * `gehalt` = leer und nur Platzhalter; `getrennt: false` sagt das ausdruecklich.
+   */
+  getrennt: boolean;
+  investition: VorstandTopf;
+  gehalt: VorstandTopf;
   teamId: string;
   stufe: VorstandStufe;
   anteil: number;
@@ -132,6 +149,12 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
           ? "Budgetfreigabe ist abgeschaltet: das gesamte Budget ist frei."
           : "Kein Vertrauenswert vorhanden: der Vorstand gibt das gesamte Budget frei.";
   return {
+    getrennt: false,
+    investition: { gesamt: r2(freigegebenGesamt), ausgegeben: r2(ausgegeben), frei: r2(nochFrei), gesperrt: r2(gesperrt), grund },
+    gehalt: {
+      gesamt: 0, ausgegeben: 0, frei: 0, gesperrt: 0,
+      grund: "Noch kein eigener Gehaltstopf: Jahresgehaelter neuer Vertraege zaehlen gegen die gemeinsame Freigabe oben.",
+    },
     teamId,
     stufe: freigabe.stufe,
     anteil: freigabe.anteil,

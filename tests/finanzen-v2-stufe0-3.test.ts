@@ -111,6 +111,9 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     expect(st.gesperrt).toBe(30);
     expect(st.grund).toContain("70 %");
     expect(gs.teams[0]!.cash).toBe(100);
+    expect(st.getrennt).toBe(false);
+    expect(st.investition.frei).toBe(st.nochFrei);
+    expect(st.gehalt.gesamt).toBe(0);
   });
 
   it("Kauf ueber der Freigabe ist abgelehnt (Ablose plus Jahresgehalt), darunter erlaubt", () => {
