@@ -928,7 +928,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             )
           ) : null}
         </div>
-      ) : leagueSetupStatus === "failed" ? (
+      ) : leagueSetupStatus === "failed" && !ligaDraftTor.aktiv ? (
+        // Bei laufendem Liga-Draft gibt es keinen „Erneut versuchen“: der Knopf liefe über /api/ai/picks-run und bekäme
+        // 409 `liga_draft_laeuft`. Die Draft-Seite setzt den Draft stattdessen über `ki_hintergrund` fort.
         <div
           className="foundation-persistence-banner transfer-callout is-warning"
           role="alert"
@@ -1184,6 +1186,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       {ligaDraftTor.aktiv ? (
         <LigaDraftSeite
           hostProps={foundationMarketV2ShellHostProps}
+          // Gastgeber = Solo oder eigener Sitz mit Rolle „host“; unbekannte Rolle (Schnappschuss fehlt) zeigt den
+          // Abbrechen-Knopf nicht — die Route lehnt Nicht-Gastgeber ohnehin ab.
+          istGastgeber={!roomContext || findOwnRoomParticipant(roomLiveState, roomContext.participantId)?.role === "host"}
+          setupFehlgeschlagen={leagueSetupStatus === "failed"}
           onTakt={setDraftTakt}
           onWeiter={() => {
             void (async () => {

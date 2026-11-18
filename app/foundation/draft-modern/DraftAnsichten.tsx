@@ -5,7 +5,7 @@
  * (`#s-tafel`, `#s-ende`, Dialog „Überspringen“, Ansicht „Nachzug“). Nur Anzeige: alles aus `/api/draft`.
  */
 import type { DraftKontext } from "./draft-kontext";
-import { betragC, de, sitzKlasse, sitzName } from "./draft-format";
+import { betragC, de, fertigGrundText, sitzKlasse, sitzName } from "./draft-format";
 
 function Wappen({ url, kuerzel }: { url: string | null; kuerzel: string }) {
   // eslint-disable-next-line @next/next/no-img-element
@@ -90,7 +90,7 @@ export function PickTafel({ k }: { k: DraftKontext }) {
             }
             const vorbei = Boolean(e) || r < a.runde || a.status !== "laeuft" || t?.status === "fertig";
             const jetzt = r === a.runde && id === dranId && a.status === "laeuft";
-            return <div key={`${r}|${id}`} className={`ze${sk}${jetzt ? " dran" : vorbei ? " pass" : ""}`} title={e ? (e.art === "auslassen" ? "Pick ausgelassen" : "fertig") : undefined} />;
+            return <div key={`${r}|${id}`} className={`ze${sk}${jetzt ? " dran" : vorbei ? " pass" : ""}`} title={e ? (e.art === "auslassen" ? "Pick ausgelassen" : fertigGrundText(t?.fertigGrund) ?? "fertig") : t?.status === "fertig" ? fertigGrundText(t.fertigGrund) ?? "fertig" : undefined} />;
           }),
         ])}
       </div>
@@ -105,6 +105,7 @@ export function PickTafel({ k }: { k: DraftKontext }) {
 export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => void }) {
   const a = k.ansicht;
   const mein = a.mein;
+  const abgebrochen = a.teams.some((t) => t.fertigGrund === "abgebrochen");
   const picks = a.verlauf.filter((e) => e.art === "pick" && e.playerId);
   const meine = picks.filter((e) => e.teamId === mein?.teamId);
   const teuer = picks.reduce<(typeof picks)[number] | null>((m, e) => (!m || (e.abloese ?? 0) > (m.abloese ?? 0) ? e : m), null);
@@ -121,7 +122,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
   return (
     <div className="en" data-testid="draft-ergebnis">
       <div className="folge ef">
-        <div className="rd"><b>Draft beendet</b><small>{a.teams.length} Teams haben ihren Kader</small></div>
+        <div className="rd"><b>{abgebrochen ? "Draft abgebrochen" : "Draft beendet"}</b><small>{abgebrochen ? "Der Gastgeber hat den Draft vorzeitig beendet" : `${a.teams.length} Teams haben ihren Kader`}</small></div>
         <div className="kz4">
           {kpi("Picks", String(picks.length), `in ${maxRunde} Runden`)}
           {kpi("Teuerster Pick", de(teuer?.abloese ?? 0), `C · ${teuer?.playerId ? a.spieler[teuer.playerId]?.name ?? "" : ""} → ${teuer ? k.teamKuerzel(teuer.teamId) : ""}`)}
@@ -214,6 +215,37 @@ export function SkipDialog({ k, onZu, onWahl }: { k: DraftKontext; onZu: () => v
           <span>{andere.length ? <><b>Mitspieler:</b> {andere.map((t) => sitzName(t.ownerId)).join(" und ")} entscheiden für sich. Wer live bleibt, pickt weiter an seinem Platz.</> : "Du bist der einzige Mensch im Draft."}</span>
           <span className="sp" />
           <button type="button" className="knopf" onClick={onZu}>Zurück zum Draft</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Abbrechen (nur Gastgeber) — Rückfrage in der Seite, kein `confirm()`
+// ---------------------------------------------------------------------------------------------------------------------
+
+export function AbbruchDialog({ k, busy, onZu, onJa }: { k: DraftKontext; busy: boolean; onZu: () => void; onJa: () => void }) {
+  const offen = k.ansicht.teams.filter((t) => t.status !== "fertig");
+  const unterMin = k.ansicht.teams.filter((t) => t.status !== "fertig" && t.kader < k.ansicht.regeln.minKader).length;
+  return (
+    <div className="schleier" onClick={(e) => { if (e.target === e.currentTarget) onZu(); }} data-testid="draft-abbruch-dialog">
+      <div className="dlg skip" role="dialog" aria-label="Draft abbrechen">
+        <div className="dk"><em>Draft · Runde {k.ansicht.runde}</em><h2>Draft abbrechen?</h2><span className="sp" /><button type="button" className="zu" onClick={onZu} aria-label="Schließen">×</button></div>
+        <div className="sk2">
+          <div className="sopt">
+            <p>
+              Der Draft endet jetzt für alle. <b>{offen.length} Teams</b> sind noch nicht fertig und bleiben mit ihrem aktuellen Kader stehen
+              {unterMin ? <>; <b>{unterMin}</b> davon haben noch weniger als {k.ansicht.regeln.minKader} Spieler und bekommen eine Warnung</> : null}.
+              Danach geht es im Spiel weiter; fehlende Spieler holst du am Transfermarkt nach. Das lässt sich nicht zurücknehmen.
+            </p>
+          </div>
+        </div>
+        <div className="skf">
+          <span />
+          <span className="sp" />
+          <button type="button" className="knopf" onClick={onZu} disabled={busy}>Weiter draften</button>
+          <button type="button" className="knopf haupt" onClick={onJa} disabled={busy} data-testid="draft-abbruch-ja">Draft abbrechen</button>
         </div>
       </div>
     </div>

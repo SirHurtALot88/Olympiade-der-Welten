@@ -16,7 +16,7 @@ import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild
 import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format";
 import type { DraftTempo, DraftZeig } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
-import { betragC, de, GRUND_TAG, GRUND_TEXT, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
+import { auslassenSperrGrund, betragC, de, fertigGrundText, fertigSperrGrund, GRUND_TAG, GRUND_TEXT, pickHerkunft, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
 
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
 const DISZIPLINEN = [...officialDisciplineWeightOrder];
@@ -28,6 +28,32 @@ export type DraftAktionen = {
   fertig: () => Promise<boolean>;
   autoPick: (an: boolean, zielTeamId?: string) => Promise<void>;
 };
+
+/**
+ * „Pick auslassen“ und „Ich bin fertig“: gesperrt wird STRIKT nach `darfAuslassen`/`darfFertig` der Sicht (die Route
+ * rechnet beides; die Seite rechnet nichts nach). Der Tooltip sagt, warum ein Knopf gesperrt ist.
+ */
+export function AuslassenFertig({
+  mein,
+  minKader,
+  aktionen,
+}: {
+  mein: NonNullable<DraftKontext["ansicht"]["mein"]>;
+  minKader: number;
+  aktionen: Pick<DraftAktionen, "auslassen" | "fertig">;
+}) {
+  if (mein.art !== "mensch" || mein.status === "fertig") return null;
+  const auslassenGrund = auslassenSperrGrund(mein);
+  const fertigGrund = fertigSperrGrund(mein, minKader);
+  const stil = (an: boolean) => ({ color: an ? "var(--gold)" : "var(--stumm)", fontWeight: 600, opacity: an ? 1 : 0.55, cursor: an ? "pointer" : "not-allowed" });
+  return (
+    <div className="hin" data-testid="draft-auslassen-fertig">
+      <button type="button" disabled={!mein.darfFertig} title={fertigGrund ?? "Nimmt dich aus der Reihenfolge — du pickst nicht mehr."} onClick={() => void aktionen.fertig()} style={stil(mein.darfFertig)} data-testid="draft-fertig">Ich bin fertig</button>
+      {" · "}
+      <button type="button" disabled={!mein.darfAuslassen} title={auslassenGrund ?? "Dieser Pick entfällt, in der nächsten Runde bist du wieder dran."} onClick={() => void aktionen.auslassen()} style={stil(mein.darfAuslassen)} data-testid="draft-auslassen">Pick auslassen</button>
+    </div>
+  );
+}
 
 function Wappen({ url, kuerzel }: { url: string | null; kuerzel: string }) {
   // eslint-disable-next-line @next/next/no-img-element
@@ -79,7 +105,7 @@ export function Kopfleiste({
   const wann = vorbei ? "Fertig" : rest ? "Du pickst" : a.mein?.amZug ? "Du bist dran" : n != null && n > 0 ? `in ${n} Picks` : a.mein ? "nicht in der Reihenfolge" : "";
   const sitze = a.teams.filter((t) => t.art === "mensch");
   const zustand = (t: (typeof sitze)[number]) =>
-    t.teamId === a.mein?.teamId ? "du" : t.status === "nachzug" ? "pickt später" : t.autoPick ? "Auto-Draft" : t.status === "fertig" ? "fertig" : "online";
+    t.teamId === a.mein?.teamId ? "du" : t.status === "nachzug" ? "pickt später" : t.autoPick ? "Auto-Draft" : t.status === "fertig" ? (t.fertigGrund === "abgebrochen" ? "abgebrochen" : "fertig") : "online";
   return (
     <>
       <div className="rd">
@@ -107,7 +133,7 @@ export function Kopfleiste({
               <button
                 type="button"
                 className={klasse}
-                title={`${c.platz}. ${k.teamName(c.teamId)} · Kader ${t?.kader ?? 0}${t?.status === "fertig" ? " · fertig" : ""}`}
+                title={`${c.platz}. ${k.teamName(c.teamId)} · Kader ${t?.kader ?? 0}${t?.status === "fertig" ? ` · ${fertigGrundText(t.fertigGrund) ?? "fertig"}` : ""}`}
                 onClick={() => k.setSchau(k.schau === c.teamId || mensch ? null : c.teamId)}
               >
                 <Wappen url={k.wappen(c.teamId)} kuerzel={k.teamKuerzel(c.teamId)} />
@@ -414,7 +440,7 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
             <span className="nr t">#{e.pickNr}</span>
             <Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} />
             <b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
-            <small>{k.teamKuerzel(e.teamId)}</small>
+            <small>{k.teamKuerzel(e.teamId)}{e.grund === "notkauf_mindestkader" ? " · Notkauf" : ""}</small>
             <em className="t">{de(e.abloese ?? 0)}</em>
           </span>
         );
@@ -509,7 +535,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
               <b className="t" style={{ color: "var(--stumm)" }}>#{e.pickNr}</b>
               <span className="t">{e.quelle === "nachzug" ? "N" : e.runde}</span>
               <span className="lg"><Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} /></span>
-              <span className="nm"><b>{k.teamName(e.teamId)}</b><small>{e.quelle === "mensch" || e.quelle === "nachzug" ? "Mensch" : e.quelle === "auto" ? "Auto-Pick" : "KI"}</small></span>
+              <span className="nm"><b>{k.teamName(e.teamId)}</b><small>{pickHerkunft(e)}</small></span>
               <span />
               <span className="nm"><b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b><small>{e.playerId ? `${kartenInfo(k, e.playerId)?.className ?? ""} · ${kartenInfo(k, e.playerId)?.race ?? ""}` : ""}</small></span>
               <span />
@@ -712,25 +738,15 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             </div>
             {konkurrenz.length ? (
               <div className="hin a"><b>Achtung:</b> {konkurrenz.map((x) => `${k.teamName(x.t.teamId)} (${x.rang}.)`).join(", ")} {konkurrenz.length > 1 ? "haben" : "hat"} ihn in den Top 3 und {konkurrenz.length > 1 ? "picken" : "pickt"} vor dir.</div>
-            ) : mein.darfFertig || mein.darfAuslassen ? (
-              <div className="hin">
-                {mein.darfFertig ? <>Du hast den Pflichtkader. <button type="button" onClick={() => void aktionen.fertig()} style={{ color: "var(--gold)", fontWeight: 600 }} data-testid="draft-fertig">Ich bin fertig</button> nimmt dich aus der Reihenfolge. </> : null}
-                {mein.darfAuslassen ? <button type="button" onClick={() => void aktionen.auslassen()} style={{ color: "var(--gold)", fontWeight: 600 }} data-testid="draft-auslassen">Pick auslassen</button> : null}
-              </div>
             ) : (
               <div className="hin">Kein KI-Team vor dir hat ihn gerade in den Top 3.</div>
             )}
+            <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
           </>
         ) : (
           <>
             <div className="hin">Klick auf einen Spieler im Brett merkt ihn für deinen Pick vor.</div>
-            {mein.darfFertig || mein.darfAuslassen ? (
-              <div className="hin">
-                {mein.darfFertig ? <button type="button" onClick={() => void aktionen.fertig()} style={{ color: "var(--gold)", fontWeight: 600 }} data-testid="draft-fertig">Ich bin fertig</button> : null}
-                {mein.darfFertig && mein.darfAuslassen ? " · " : ""}
-                {mein.darfAuslassen ? <button type="button" onClick={() => void aktionen.auslassen()} style={{ color: "var(--gold)", fontWeight: 600 }} data-testid="draft-auslassen">Pick auslassen</button> : null}
-              </div>
-            ) : null}
+            <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
           </>
         )}
         <h4>Mein Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>{mein.kader} von {a.regeln.minKader} Pflicht · höchstens {a.regeln.maxPicksJeTeam}</span></h4>

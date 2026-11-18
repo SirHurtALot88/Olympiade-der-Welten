@@ -12,8 +12,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { LigaDraftAnsicht, LigaDraftZugAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import type { LigaDraftEintrag } from "@/lib/data/olyDataTypes";
-import { withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import { fehlerText } from "./draft-format";
+import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { fehlerText, istStandKonflikt } from "./draft-format";
+import { baueDraftLeseParameter, baueDraftPostKoerper, DRAFT_MAX_PICKS_JE_SCHRITT } from "./draft-protokoll";
 
 export type DraftTempo = 0 | 1 | 3;
 export type DraftMeldung = { id: number; art: "g" | "w" | ""; titel: string; text: string };
@@ -72,11 +73,11 @@ export function useLigaDraft(input: {
   const lade = useCallback(async () => {
     if (!saveId || saveId === "loading-save") return;
     try {
-      const parameter = new URLSearchParams({ saveId, vorschau: "6", verlauf: "0" });
-      if (teamId) parameter.set("teamId", teamId);
+      const parameter = baueDraftLeseParameter({ saveId, teamId, roomContext: roomRef.current, vorschau: 6, verlauf: 0 });
       const antwort = await fetch(`/api/draft?${parameter.toString()}`, { cache: "no-store" });
       const daten = (await antwort.json()) as { ansicht?: LigaDraftAnsicht | null; hintergrundLaeuft?: boolean; error?: string };
       if (!antwort.ok) return;
+      ansichtRef.current = daten.ansicht ?? null;
       setAnsicht(daten.ansicht ?? null);
       setHintergrund(Boolean(daten.hintergrundLaeuft));
       setGeladen(true);
@@ -91,26 +92,21 @@ export function useLigaDraft(input: {
       busyRef.current = true;
       setBusy(true);
       try {
-        const koerper = withRoomContextBody(
-          {
-            saveId,
-            teamId,
-            aktion,
-            erwarteteNr: ansichtRef.current?.stand,
-            activeManagerTeamId: teamId,
-            ...extra,
-          },
-          roomRef.current,
-        );
+        const koerper = baueDraftPostKoerper({ saveId, teamId, aktion, stand: ansichtRef.current?.stand, roomContext: roomRef.current, extra });
         const antwort = await fetch("/api/draft", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(koerper),
         });
         const daten = (await antwort.json().catch(() => ({}))) as PostAntwort;
-        if (daten.ansicht) setAnsicht(daten.ansicht);
+        if (daten.ansicht) {
+          // Sofort merken: der nächste Aufruf (z. B. `ki_hintergrund` nach `ueberspringen`) braucht den frischen Stand.
+          ansichtRef.current = daten.ansicht;
+          setAnsicht(daten.ansicht);
+        }
         if (!antwort.ok || daten.success === false) {
-          if (daten.error === "draft_stand_veraltet") void lade();
+          // Stand-Konflikt: still neu laden, die Sicht erscheint erneut — keine Fehlermeldung.
+          if (istStandKonflikt(daten.error)) await lade();
           return { ...daten, success: false, error: daten.error ?? "draft_aktion_fehlgeschlagen" };
         }
         return { ...daten, success: true };
@@ -126,7 +122,7 @@ export function useLigaDraft(input: {
 
   // Erstes Laden, danach Nachfragen: wer nicht selbst Zug um Zug treibt, sieht so, was die anderen buchen.
   useEffect(() => {
-    void lade(); // eslint-disable-line react-hooks/set-state-in-effect
+    void lade();
   }, [lade]);
 
   const mein = ansicht?.mein ?? null;
@@ -155,11 +151,11 @@ export function useLigaDraft(input: {
     const warte = vor ? VOR_MS : TAKT_MS[tempo === 3 ? 3 : 1];
     const id = window.setTimeout(async () => {
       const vorher = ansichtRef.current?.amZug ?? null;
-      const maxPicks = vor ? Math.max(1, Math.min(8, naechsterIndex ?? 1)) : 1;
+      const maxPicks = vor ? Math.max(1, Math.min(DRAFT_MAX_PICKS_JE_SCHRITT, naechsterIndex ?? 1)) : 1;
       const antwort = await sende("ki_schritt", { maxPicks });
       if (!antwort.success) {
         setVor(false);
-        if (antwort.error && antwort.error !== "draft_stand_veraltet") meldung("w", "KI-Schritt", fehlerText(antwort.error));
+        if (antwort.error && !istStandKonflikt(antwort.error)) meldung("w", "KI-Schritt", fehlerText(antwort.error));
         return;
       }
       if (antwort.halt === "mensch_am_zug" || antwort.halt === "draft_vorbei") setVor(false);
@@ -186,28 +182,28 @@ export function useLigaDraft(input: {
         if (antwort.success) {
           setZeig(null);
           meldung("g", `${name} gepickt`, "Der Pick ist gebucht.");
-        } else meldung("w", "Pick nicht möglich", fehlerText(antwort.error));
+        } else if (!istStandKonflikt(antwort.error)) meldung("w", "Pick nicht möglich", fehlerText(antwort.error));
         return Boolean(antwort.success);
       },
       auslassen: async () => {
         const antwort = await sende("auslassen");
         if (antwort.success) meldung("", "Pick ausgelassen", "Dein Team ist in dieser Runde übersprungen.");
-        else meldung("w", "Auslassen nicht möglich", fehlerText(antwort.error));
+        else if (!istStandKonflikt(antwort.error)) meldung("w", "Auslassen nicht möglich", fehlerText(antwort.error));
       },
       fertig: async () => {
         const antwort = await sende("fertig");
         if (antwort.success) meldung("g", "Du bist fertig", "Dein Team pickt nicht mehr.");
-        else meldung("w", "Fertig melden nicht möglich", fehlerText(antwort.error));
+        else if (!istStandKonflikt(antwort.error)) meldung("w", "Fertig melden nicht möglich", fehlerText(antwort.error));
         return Boolean(antwort.success);
       },
       autoPick: async (an: boolean, zielTeamId?: string) => {
         const antwort = await sende("auto_pick", { an, ...(zielTeamId ? { zielTeamId } : {}) });
-        if (!antwort.success) meldung("w", "Auto-Pick", fehlerText(antwort.error));
+        if (!antwort.success && !istStandKonflikt(antwort.error)) meldung("w", "Auto-Pick", fehlerText(antwort.error));
       },
       ueberspringen: async (variante: "A" | "B") => {
         const antwort = await sende("ueberspringen", { variante });
         if (!antwort.success) {
-          meldung("w", "Überspringen nicht möglich", fehlerText(antwort.error));
+          if (!istStandKonflikt(antwort.error)) meldung("w", "Überspringen nicht möglich", fehlerText(antwort.error));
           return false;
         }
         if (variante === "A") {
@@ -215,13 +211,22 @@ export function useLigaDraft(input: {
           if (lauf.success) {
             setHintergrund(true);
             meldung("g", "KI pickt fertig", "Danach wählst du ohne Reihenfolge aus dem Rest.");
-          } else meldung("w", "KI-Lauf", fehlerText(lauf.error));
+          } else if (!istStandKonflikt(lauf.error)) meldung("w", "KI-Lauf", fehlerText(lauf.error));
         } else meldung("g", "Auto-Draft", "Dein GM pickt an deinem Platz in der Reihenfolge.");
         return true;
       },
-      kiHintergrund: async () => {
+      kiHintergrund: async (leise = false) => {
         const lauf = await sende("ki_hintergrund");
         if (lauf.success) setHintergrund(true);
+        else if (!leise && !istStandKonflikt(lauf.error)) meldung("w", "KI-Lauf", fehlerText(lauf.error));
+        return Boolean(lauf.success);
+      },
+      /** Nur Gastgeber (die Route prüft es): Draft → fertig, offene Teams „abgebrochen“. Danach zurück ins Spiel. */
+      abbrechen: async () => {
+        const antwort = await sende("abbrechen");
+        if (antwort.success) meldung("", "Draft abgebrochen", "Teams unter 8 Spielern bekommen eine Warnung.");
+        else if (!istStandKonflikt(antwort.error)) meldung("w", "Abbrechen nicht möglich", fehlerText(antwort.error));
+        return Boolean(antwort.success);
       },
     }),
     [sende, meldung],

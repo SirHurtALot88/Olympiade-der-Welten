@@ -23,7 +23,7 @@ import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import { useMarktFeed } from "@/app/foundation/transfermarkt-modern/tm-daten";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
-import { Ergebnis, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
+import { AbbruchDialog, Ergebnis, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { betragC, de } from "./draft-format";
@@ -36,10 +36,16 @@ type Ansicht = "live" | "tafel" | "ende";
 
 export default function LigaDraftSeite({
   hostProps,
+  istGastgeber = false,
+  setupFehlgeschlagen = false,
   onTakt,
   onWeiter,
 }: {
   hostProps: FoundationMarketV2ShellHostProps;
+  /** Solo oder Raum-Gastgeber: nur dann gibt es „Draft abbrechen“ (die Route prüft es ebenfalls). */
+  istGastgeber?: boolean;
+  /** Die Shell steht auf `leagueSetupStatus: "failed"` — der Draft wird über `ki_hintergrund` fortgesetzt. */
+  setupFehlgeschlagen?: boolean;
   onTakt: (t: DraftTaktZustand | null) => void;
   onWeiter: () => void;
 }) {
@@ -73,6 +79,19 @@ export default function LigaDraftSeite({
   const [wahl, setWahl] = useState<string | null>(null);
   const [schau, setSchau] = useState<string | null>(null);
   const [skipOffen, setSkipOffen] = useState(false);
+  const [abbruchOffen, setAbbruchOffen] = useState(false);
+
+  // Liegengebliebener Hintergrundlauf (Reload, Server-Neustart, abgebrochener Lauf → Liga „failed“): niemand treibt die
+  // KI-Züge. Die Shell bietet dafür kein „Erneut versuchen“ (409 `liga_draft_laeuft`), die Seite setzt den Draft selbst
+  // über `ki_hintergrund` fort — einmal je Draft-Stand, leise.
+  const fortsetzGesehen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ansicht || ansicht.status !== "laeuft" || !ansicht.amZug?.automatisch || draft.hintergrund || draft.busy) return;
+    if (!setupFehlgeschlagen && draft.tempo > 0) return; // läuft der Takt selbst (ki_schritt), nichts zu tun
+    if (fortsetzGesehen.current === ansicht.stand) return;
+    fortsetzGesehen.current = ansicht.stand;
+    void aktionen.kiHintergrund(true);
+  }, [ansicht, draft.hintergrund, draft.busy, draft.tempo, setupFehlgeschlagen, aktionen]);
 
   const feed = useMarktFeed({
     saveId: activeSaveId,
@@ -220,6 +239,9 @@ export default function LigaDraftSeite({
               {kpi("Picks", String(ansicht.picks), "gemacht")}
               {mein ? kpi("Kasse frei", de(mein.kasse), "C") : null}
               {mein ? kpi("Mein Kader", String(mein.kader), `/ ${ansicht.regeln.minKader} Pflicht`) : null}
+              {istGastgeber && ansicht.status !== "fertig" ? (
+                <button type="button" className="knopf" onClick={() => setAbbruchOffen(true)} title="Nur der Gastgeber: beendet den Draft für alle" data-testid="draft-abbrechen">Draft abbrechen</button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -256,6 +278,21 @@ export default function LigaDraftSeite({
           onWahl={(v) => {
             setSkipOffen(false);
             void aktionen.ueberspringen(v);
+          }}
+        />
+      ) : null}
+
+      {abbruchOffen && kontext ? (
+        <AbbruchDialog
+          k={kontext}
+          busy={draft.busy}
+          onZu={() => setAbbruchOffen(false)}
+          onJa={() => {
+            void (async () => {
+              const ok = await aktionen.abbrechen();
+              setAbbruchOffen(false);
+              if (ok) onWeiter();
+            })();
           }}
         />
       ) : null}
