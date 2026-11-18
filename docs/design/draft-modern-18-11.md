@@ -251,3 +251,15 @@ abschließen“, Pick-Tafel, Ergebnis.
 Geprüft je Bild: keine Skriptfehler, kein Seitenscroll, keine Tafel läuft über (automatisch gemessen; der Live-Ticker läuft
 absichtlich rechts aus). Nicht geprüft: Firefox und Safari, Tastatur, ein voller Klick-Durchlauf im Browser (die Abläufe
 liefen nur als Trockenlauf der Logik ohne Browser).
+
+---
+
+## Entscheidungen von Chris (18.11. abends) — Mockup freigegeben
+
+1. **Pick-Reihenfolge:** Jede Runde beginnt beim **schwächsten Team** (keine Schlange, kein Los).
+2. **Umfang:** höchstens **16 Runden**, höchstens **14 Picks** je Team; ein Team darf einen Pick **auslassen** (Skip).
+3. **Mitspieler nicht da:** Der Draft wartet; jeder kann für sich Auto-Pick einschalten (Empfehlung angenommen).
+4. **Ramona (halbautomatisch):** pickt im Draft selbst, **wenn sie will — oder danach** im Nachzug.
+5. **Saison 1:** Neben der Draft-Rücklage wird auch der **Gehaltspuffer halbiert** (sonst kommt „mehr Spielraum“ kaum an).
+
+Alle übrigen Fragen: Empfehlungen aus diesem Dokument gelten als angenommen. Bau nach dem Bauplan oben (Draft-Zustand im Spielstand + Einzelschritt, Messlauf mit 32 KI-Teams, Opus-Review der geänderten KI-Kaufreihenfolge).
