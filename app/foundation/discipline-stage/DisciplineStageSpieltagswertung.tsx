@@ -364,7 +364,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
     <section className="swm" data-testid="spieltagswertung" aria-label="Spieltagswertung">
       <div className="in">
         <div className="wkopf2">
-          <h1>Spieltagswertung</h1>
+          <h2>Spieltagswertung</h2>
           <span className="dchip">
             <Icon name={d1Revealed ? "ok" : "schloss"} />
             {d1Name}
