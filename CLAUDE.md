@@ -256,7 +256,9 @@ Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form)
 **Scharf seit 18.11. (Chris: Variante C2, dazu die Ergebnisskala E1 für die Team-Ergebnisse):** Welche Skala gilt,
 steht im Spielstand, nicht im Serverstart: `seasonState.wertungsSkalen = { seasonId, pp: "c2"|"alt", ergebnis:
 "e1"|"alt" }` (`lib/resolve/wertungs-skalen.ts`), gesetzt nur beim Anlegen eines Spiels und beim Saisonwechsel. Neues
-Spiel: C2 + E1 ab Saison 1; bestehender Save: laufende Saison bleibt alt, ab dem nächsten Saisonwechsel neu. Rückweg
+Spiel: C2 + E1 ab Saison 1; bestehender Battle-Save mit höchstens 3 gebuchten Spieltagen: C2 ab dem nächsten Spieltag
+(Lade-Migration `stelleLaufendeSaisonAufC2Um`, Feld `ppAb`; gebuchte Spieltage bleiben, Zeilen tragen `ppSkala: "c2"`),
+sonst ab dem nächsten Saisonwechsel; E1 immer erst zum Saisonwechsel. Rückweg
 `OLY_PP_SKALA=aus` / `OLY_ERGEBNIS_SKALA=aus` (wirkt ab der nächsten Saison), Notbremse `…=aus-sofort`. Jeder
 Rechenweg fragt `ppSkalaModus(gameState)` bzw. `ergebnisSkalaVersionFuer(gameState)`, nie eine Prozess-Variable.
 E1: je Begegnung 0–10 je Seite (Kantersieg 10:0, Median-Sieg 7:4, Remis bleibt Remis), Verhältnis = Abstand, Pods

@@ -120,7 +120,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
   const referenz = resolveBattlefieldPodSpielerPpReferenz(k);
-  const ppSkala = ppSkalaModus(input.gameState);
+  const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
 
   pods.forEach((pod, index) => {
     const ergebnis = ergebnisse[index] ?? null;

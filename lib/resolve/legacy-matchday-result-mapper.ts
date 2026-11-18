@@ -96,6 +96,12 @@ export type DisciplineResultWritePayload = {
    */
   ergebnisSkala?: "e1";
   /**
+   * PP-SKALA DER ZEILE (18.11., lib/resolve/wertungs-skalen.ts `ppSkalaVersionFuerZeile()`): `"c2"`, wenn
+   * die Spieler-PP dieser Zeile mit C2 gerechnet wurden. Der Ledger rechnet PPS-Duell-Zeilen damit nach
+   * derselben Skala nach, mit der sie gebucht wurden -- auch nach einer Umstellung mitten in der Saison.
+   */
+  ppSkala?: "c2";
+  /**
    * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
    * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.).
    */
@@ -289,6 +295,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           // ERGEBNISSKALA E1 (18.11.): nur an Zeilen, die nach E1 gerechnet sind -- aeltere Saisons
           // bekommen keinen neuen Schluessel.
           ...(teamResult.ergebnisSkala ? { ergebnisSkala: teamResult.ergebnisSkala } : {}),
+          ...(teamResult.ppSkala ? { ppSkala: teamResult.ppSkala } : {}),
         };
       }),
   );

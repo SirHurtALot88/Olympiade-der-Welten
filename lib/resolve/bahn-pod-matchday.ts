@@ -124,7 +124,7 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
   });
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);
-  const ppSkala = ppSkalaModus(input.gameState);
+  const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
   const rohdatenByPodId = new Map<string, BahnPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];

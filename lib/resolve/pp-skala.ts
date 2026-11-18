@@ -74,8 +74,8 @@ const ANKER_JE_DISZIPLIN: ReadonlyMap<string, AnkerEintrag> = new Map(
  * "aus" | "an" | "roh" fuer DIESEN Spielstand (Saison-Stempel, s. Kopfkommentar). Ohne Spielstand
  * (reine Rechentests) entscheidet nur der Schalter: "roh"/"aus-sofort" wie dort, sonst "aus".
  */
-export function ppSkalaModus(gameState?: Parameters<typeof ppSkalaVersionFuer>[0]): PpSkalaModus {
-  const version = ppSkalaVersionFuer(gameState);
+export function ppSkalaModus(gameState?: Parameters<typeof ppSkalaVersionFuer>[0], matchdayId?: string | null): PpSkalaModus {
+  const version = ppSkalaVersionFuer(gameState, matchdayId);
   return version === "roh" ? "roh" : version === "c2" ? "an" : "aus";
 }
 

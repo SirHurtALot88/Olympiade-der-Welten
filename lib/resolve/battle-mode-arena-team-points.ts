@@ -1631,7 +1631,7 @@ export async function runBattleModeArenaMatchday(
     alleFixtureErgebnisse,
     fieldSizeGewuerfelt,
     disciplineId,
-    ppSkalaModus(gameState),
+    ppSkalaModus(gameState, matchdayId),
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

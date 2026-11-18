@@ -2754,6 +2754,12 @@ export type DisciplineResultRecord = {
    */
   ergebnisSkala?: "e1";
   /**
+   * PP-SKALA DER ZEILE (18.11., lib/resolve/wertungs-skalen.ts `ppSkalaVersionFuerZeile()`): `"c2"`, wenn
+   * die Spieler-PP dieser Zeile mit C2 gerechnet wurden. Der Ledger rechnet PPS-Duell-Zeilen damit nach
+   * derselben Skala nach, mit der sie gebucht wurden -- auch nach einer Umstellung mitten in der Saison.
+   */
+  ppSkala?: "c2";
+  /**
    * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
    * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
    * Modus bleibt unberuehrt. Seit 01.11. fuer JEDE Vierer-Pod-Disziplin (Mini-DM, Battlefield, s.
@@ -3384,7 +3390,7 @@ export type SeasonSnapshotRecord = {
    * Ergebnisskala diese Saison gerechnet wurde. Fehlt = vor dem 18.11. archiviert (alte Skalen).
    * Saisonuebergreifende Summen (ewige Tabelle, Laufbahn) koennen daran ablesen, ab wann die neue Skala gilt.
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1" } | null;
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string } | null;
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
@@ -3807,7 +3813,7 @@ export type SeasonState = {
    * Saison rechnet. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
    * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1" };
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
   /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.

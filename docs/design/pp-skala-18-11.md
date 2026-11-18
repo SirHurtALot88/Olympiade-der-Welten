@@ -9,7 +9,8 @@ beschreibt einen abschaltbaren Prototyp der empfohlenen Variante (Abschnitte 1�
 
 **Stand 18.11. abends (Abschnitt 8): Chris hat C2 gewählt, C2 ist scharf ab der nächsten Saison.**
 Die Anker sind auf weiteren Saves je Feldgröße nachkalibriert, die Skala hängt am Saison-Stempel
-`seasonState.wertungsSkalen` (neues Spiel: sofort; bestehender Save: ab dem nächsten Saisonwechsel),
+`seasonState.wertungsSkalen` (neues Spiel: sofort; bestehender Save bis Spieltag 3: ab dem nächsten Spieltag, sonst
+ab dem nächsten Saisonwechsel; Abschnitt 8.4),
 Rückweg `OLY_PP_SKALA=aus`. Dazu kommt die Ergebnisskala E1 für die Team-Ergebnisse
 (`docs/design/ergebnisskala-18-11.md`).
 
@@ -495,7 +496,8 @@ für die Notbremse.
 | Fall | Verhalten |
 |---|---|
 | neues Spiel | Saison 1 mit C2 (und E1) |
-| bestehender Save, laufende Saison | kein Stempel → **alt** bis Saisonende; nichts verrutscht, der Ledger rechnet PPS-Duell-Zeilen weiter alt |
+| bestehender Battle-Save, laufende Saison mit höchstens 3 gebuchten Spieltagen | **C2 ab dem nächsten Spieltag** (Abschnitt 8.4); gebuchte Spieltage bleiben alt |
+| bestehender Save, laufende Saison mit mehr als 3 gebuchten Spieltagen | kein Stempel → **alt** bis Saisonende; nichts verrutscht |
 | bestehender Save, nächster Saisonwechsel | neuer Stempel → C2 |
 | `OLY_PP_SKALA=aus` | Rückweg: neue Saisons bekommen „alt“; gestempelte Saisons rechnen weiter wie gestempelt |
 | `OLY_PP_SKALA=aus-sofort` | Notbremse: jeder Stempel wird ignoriert, alles alt (auch mitten in der Saison) |
@@ -607,3 +609,47 @@ Saison ist jeder Faktor 1:
 
 Ein einzelner Spitzeneinsatz bekommt höchstens 5 statt 5,5; ein alter Einzelrekord über 5 (Rekordbuch)
 kann deshalb nur in einer alten Saison stehen, das Rekordbuch rechnet ohnehin je Saison.
+
+### 8.4 Umstellung der laufenden Live-Saison (Nachtrag 18.11. abends)
+
+Chris, nach Spieltag 1 der Live-Saison: „nicht JEDER soll 5,5 bekommen bitte anpassen“. Am Spiegel-Abbild
+(`new-game-1793476611202-0dwpok`, Saison 1, Spieltag 1 gebucht) stehen 16 von 160 PP-Zeilen am alten Deckel
+5,5, die Top 10 der Saison-PP alle bei 5,5. Deshalb nicht erst zum Saisonwechsel:
+
+**Gewählt: Lade-Migration statt Server-Skript.** `stelleLaufendeSaisonAufC2Um()` (lib/resolve/wertungs-skalen.ts)
+läuft beim Laden eines Spielstands in `save-repository.ts`, neben den anderen Lade-Migrationen (Sponsor M1–M3,
+Endsaison-Nachtrag): Battle-Save, laufende Saison ohne Stempel, höchstens 3 gebuchte Spieltage → Stempel
+`{ pp: "c2", ergebnis: "alt", ppAb: <erster ungebuchter Spieltag> }`. Rein und idempotent, persistiert mit dem
+nächsten Schreiben, wirkt nach dem Deploy ohne Handgriff auf dem Server. Gründe:
+
+- Die Umstellung muss **genau dort** greifen, wo jede Rechnung den Spielstand liest; ein Skript, das die SQLite
+  bei laufender App umschreibt, bräuchte Stopp, WAL-Behandlung und Rückweg (Muster `pull-repaired-save.sh`) für
+  eine Ein-Feld-Änderung, und der nächste Lese-Weg sähe den Stempel trotzdem erst nach einem Neuladen.
+- Ein Skript hängt an einem Handgriff von Chris; die Lade-Migration erfasst auch Mehrspieler-Räume und jeden
+  anderen jungen Save gleich.
+- Rückweg ohne Skript: `OLY_PP_SKALA=aus` verhindert die Umstellung (vor dem ersten Schreiben), `aus-sofort`
+  rechnet sofort wieder alt.
+
+**Gezeigt = gebucht bleibt:**
+- Gebuchte Arena-/Pod-Zeilen sind mit ihrem Wert persistiert und werden nicht angefasst.
+- PPS-Duell-Zeilen rechnet der Ledger beim Lesen nach. Jede ab jetzt gebuchte Zeile trägt `ppSkala: "c2"`.
+  Eine Zeile ohne Vermerk in einer mitten in der Saison umgestellten Saison bleibt alt
+  (`ppSkalaVersionFuerZeile`).
+- Wird ein Spieltag vor `ppAb` noch einmal gewertet (forceReplace), rechnet er alt
+  (`ppSkalaModus(gameState, matchdayId)`).
+- Ein schon gelaufener Arena-Vorlauf des nächsten Spieltags ist nach der Umstellung veraltet: Die PP-Skala steht
+  im Eingabe-Hash (`arena-eingabe-hash.ts`, nur bei C2, alte Saves unverändert). Die bestehende
+  Divergenz-Erkennung beim Buchen stößt dann einen neuen Vorlauf an.
+
+**Geprüft an einer Kopie des Spiegels** (`live-save` 17:30, nie auf den Server geschrieben):
+
+| | Wert |
+|---|---|
+| gespeicherter Stempel | keiner |
+| nach dem Laden | `{ seasonId: "season-1", pp: "c2", ergebnis: "alt", ppAb: "matchday-2" }`, `ppSkalaModus` = an |
+| Ledger von Spieltag 1 (160 Zeilen, 64 Arena + 96 Mini-DM-FFA) vor/nach der Umstellung | **0 Zeilen verändert** |
+| PP am Deckel 5,5 (Spieltag 1, bleibt so gebucht) | 16 von 160; Top 10 der Saison alle 5,5 |
+
+Ab Spieltag 2 bekommt der Tagesbeste je Disziplin im Mittel 5,0 (Deckel 5), die Masse 1,1–1,5 (Abschnitt 8.2).
+Die Ergebnisskala E1 bleibt in der laufenden Saison aus, sonst stünden im Tiebreaker „Verh.“ zwei Skalen
+nebeneinander; sie kommt mit dem Saisonwechsel.

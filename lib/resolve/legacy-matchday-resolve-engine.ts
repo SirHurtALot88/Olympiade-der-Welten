@@ -959,7 +959,7 @@ export function buildLegacyMatchdayResolvePreview(
       : null;
     // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
     const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
-    const ppSkalaFuerDieseSaison = ppSkalaModus(base.gameState);
+    const ppSkalaFuerDieseSaison = ppSkalaModus(base.gameState, base.matchdayId);
     const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
     // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
     // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
@@ -1356,6 +1356,12 @@ export function buildLegacyMatchdayResolvePreview(
     // Aendert nur `verhaeltnis`/`ergebnisNormiert`/`miniDmPod.wert`, nie wer gewinnt. Nur in Battle-Saves,
     // deren Saison mit E1 gestempelt ist (lib/resolve/wertungs-skalen.ts) -- aeltere Saisons und der
     // Manager-Modus bleiben byte-identisch.
+    // PP-SKALA DER ZEILE (18.11.): in einer C2-Saison traegt jede Battle-Zeile den Vermerk, damit der
+    // Ledger sie nach derselben Skala nachrechnet, mit der sie gebucht wurde (auch nach einer Umstellung
+    // mitten in der Saison, lib/resolve/wertungs-skalen.ts `stelleLaufendeSaisonAufC2Um()`).
+    if (isBattleModeArenaEligible && ppSkalaFuerDieseSaison === "an") {
+      for (const zeile of teamResultsRanked) zeile.ppSkala = "c2";
+    }
     if (isBattleModeArenaEligible && ergebnisSkalaVersionFuer(base.gameState) === "e1") {
       wendeErgebnisSkalaE1An({
         teamResults: teamResultsRanked,

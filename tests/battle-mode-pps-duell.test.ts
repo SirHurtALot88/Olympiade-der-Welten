@@ -526,6 +526,7 @@ describe("Ergebnisskala E1 + PP-Skala C2 in der Engine (18.11., Saison-Stempel)"
         expect(team.teamPoints).toBe(altZeile.teamPoints);
         expect(team.rank).toBe(altZeile.rank);
         expect(team.ergebnisSkala).toBe("e1");
+        expect(team.ppSkala).toBe("c2");
         expect(team.ergebnisNormiert).toHaveLength(2);
         expect(team.verhaeltnis).toBe(team.ergebnisNormiert![0] - team.ergebnisNormiert![1]);
         expect(Math.sign(team.verhaeltnis!)).toBe(Math.sign(altZeile.verhaeltnis!));
@@ -548,7 +549,10 @@ describe("Ergebnisskala E1 + PP-Skala C2 in der Engine (18.11., Saison-Stempel)"
   it("ohne Stempel (laufende Saison eines bestehenden Saves) keine neuen Schluessel", () => {
     const alt = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
     for (const disziplin of alt.disciplinePreviews) {
-      for (const team of disziplin.teamResults) expect(team.ergebnisSkala).toBeUndefined();
+      for (const team of disziplin.teamResults) {
+        expect(team.ergebnisSkala).toBeUndefined();
+        expect(team.ppSkala).toBeUndefined();
+      }
     }
   });
 });

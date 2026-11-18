@@ -351,7 +351,8 @@ Siehe `docs/design/pp-skala-18-11.md` Abschnitt 8.1 (gleicher Mechanismus):
 | Fall | PP-Skala | Ergebnisskala |
 |---|---|---|
 | neues Spiel ab heute | C2 ab Saison 1 | E1 ab Saison 1 |
-| bestehender Save, laufende Saison | alt bis Saisonende | alt bis Saisonende |
+| bestehender Battle-Save, laufende Saison bis Spieltag 3 | C2 ab dem nächsten Spieltag (PP-Dokument 8.4) | alt bis Saisonende |
+| bestehender Save, laufende Saison später | alt bis Saisonende | alt bis Saisonende |
 | bestehender Save, nächste Saison | C2 | E1 |
 | `OLY_ERGEBNIS_SKALA=aus` | – | neue Saisons alt, gestempelte Saisons rechnen weiter wie gestempelt |
 | `OLY_ERGEBNIS_SKALA=aus-sofort` | – | Notbremse: alle Saisons alt, auch mitten in der Saison |

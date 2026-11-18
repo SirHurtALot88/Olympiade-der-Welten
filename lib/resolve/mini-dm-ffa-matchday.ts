@@ -283,7 +283,7 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     }
     rohdatenByPodId.set(pod.id, uebersetzeMotorErgebnisZuRohdaten(input.gameState, input.matchdayId, pod, k, ergebnis));
     const gesetzteRollenJeTeam = new Map(pod.teamIds.map((teamId) => [teamId, baueGesetzteRollenFuerTeam(input.gameState, teamId, input.matchdayId)] as const));
-    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam, ppSkalaModus(input.gameState))) {
+    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam, ppSkalaModus(input.gameState, input.matchdayId))) {
       playerPpsByPlayerId.set(playerId, pp);
     }
   });

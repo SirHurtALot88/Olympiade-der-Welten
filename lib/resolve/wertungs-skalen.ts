@@ -40,6 +40,12 @@ export type WertungsSkalenStempel = {
   seasonId: string;
   pp: PpSkalaVersion;
   ergebnis: ErgebnisSkalaVersion;
+  /**
+   * Nur bei einer Umstellung MITTEN in der Saison (`stelleLaufendeSaisonAufC2Um()`): der erste Spieltag,
+   * der mit C2 gerechnet wird. Spieler-PP aller frueher gebuchten Zeilen bleiben alt (s.
+   * `ppSkalaModusFuerZeile()`); Zeilen ab diesem Spieltag tragen `ppSkala: "c2"`.
+   */
+  ppAb?: string;
 };
 
 type Schalter = "an" | "aus" | "aus-sofort" | "roh";
@@ -88,7 +94,10 @@ export function stempleWertungsSkalenBeimAnlegen(gameState: GameState): GameStat
   return { ...gameState, seasonState: stempleWertungsSkalen(gameState.seasonState, seasonId) };
 }
 
-type SkalenQuelle = { seasonState?: Pick<SeasonState, "seasonId" | "wertungsSkalen"> | null } | null | undefined;
+type SkalenQuelle =
+  | { seasonState?: Pick<SeasonState, "seasonId" | "wertungsSkalen"> | null; season?: { matchdayIds?: readonly string[] } | null }
+  | null
+  | undefined;
 
 function gueltigerStempel(gameState: SkalenQuelle): WertungsSkalenStempel | null {
   const stempel = gameState?.seasonState?.wertungsSkalen;
@@ -96,12 +105,81 @@ function gueltigerStempel(gameState: SkalenQuelle): WertungsSkalenStempel | null
   return stempel;
 }
 
-/** Welche PP-Skala rechnet DIESE Saison? "roh" nur im Messmodus. */
-export function ppSkalaVersionFuer(gameState: SkalenQuelle): PpSkalaVersion | "roh" {
+/**
+ * Welche PP-Skala rechnet DIESE Saison (bzw. dieser Spieltag)? "roh" nur im Messmodus. Mit `matchdayId`:
+ * ein Spieltag VOR dem Umstellungs-Spieltag (`ppAb`) rechnet alt -- auch wenn er nach der Umstellung noch
+ * einmal neu gewertet wird. Ohne `matchdayId` gilt der Stempel der Saison.
+ */
+export function ppSkalaVersionFuer(gameState: SkalenQuelle, matchdayId?: string | null): PpSkalaVersion | "roh" {
   const schalter = ppSkalaSchalter();
   if (schalter === "roh") return "roh";
   if (schalter === "aus-sofort") return "alt";
-  return gueltigerStempel(gameState)?.pp ?? "alt";
+  const stempel = gueltigerStempel(gameState);
+  if (!stempel) return "alt";
+  if (stempel.pp === "c2" && stempel.ppAb && matchdayId) {
+    const ids = gameState?.season?.matchdayIds ?? [];
+    const ab = ids.indexOf(stempel.ppAb);
+    const hier = ids.indexOf(matchdayId);
+    if (ab >= 0 && hier >= 0 && hier < ab) return "alt";
+  }
+  return stempel.pp;
+}
+
+/**
+ * DIE PP-SKALA EINER GEBUCHTEN ZEILE (fuer den Ledger, der PPS-Duell-Zeilen beim Lesen nachrechnet):
+ * die Zeile selbst sagt, womit sie gebucht wurde (`ppSkala: "c2"`, gesetzt von der Engine). Fehlt der
+ * Vermerk, ist sie alt, sobald die Saison erst mitten drin umgestellt wurde (`ppAb`); bei einer ab
+ * Saisonbeginn gestempelten Saison gilt der Saison-Stempel. Notbremse und Messmodus stehen darueber.
+ * So rechnet eine Umstellung mitten in der Saison keinen schon gebuchten Spieltag um (gezeigt = gebucht).
+ */
+export function ppSkalaVersionFuerZeile(gameState: SkalenQuelle, zeile: { ppSkala?: string | null } | null | undefined): PpSkalaVersion | "roh" {
+  const saison = ppSkalaVersionFuer(gameState);
+  const schalter = ppSkalaSchalter();
+  if (schalter === "roh" || schalter === "aus-sofort") return saison;
+  if (zeile?.ppSkala === "c2") return "c2";
+  if (gueltigerStempel(gameState)?.ppAb) return "alt";
+  return saison;
+}
+
+/** Hoechstens so viele gebuchte Spieltage darf eine laufende Saison haben, um noch umgestellt zu werden. */
+export const PP_UMSTELLUNG_MAX_GEBUCHTE_SPIELTAGE = 3;
+
+/**
+ * UMSTELLUNG EINER LAUFENDEN SAISON AUF C2 AB DEM NAECHSTEN SPIELTAG (Chris 18.11.: "nicht JEDER soll
+ * 5,5 bekommen bitte anpassen", gemessen am Live-Save nach Spieltag 1). Laeuft beim Laden eines
+ * Spielstands (save-repository.ts, neben den anderen Lade-Migrationen), rein und idempotent:
+ *
+ *   - nur Battle-Saves, nur wenn die laufende Saison noch KEINEN gueltigen Stempel hat,
+ *   - nur bis einschliesslich `PP_UMSTELLUNG_MAX_GEBUCHTE_SPIELTAGE` gebuchten Spieltagen,
+ *   - nicht bei `OLY_PP_SKALA=aus` / `aus-sofort` (Rueckweg) oder im Messmodus `roh`.
+ *
+ * Gesetzt wird `{ pp: "c2", ergebnis: "alt", ppAb: <erster ungebuchter Spieltag> }`: die Ergebnisskala
+ * bleibt fuer die laufende Saison alt (sonst stuenden im Tiebreaker "Verh." zwei Skalen nebeneinander),
+ * E1 kommt mit dem Saisonwechsel. Gebuchte Spieltage werden NICHT neu gewertet: Arena-/Pod-PP sind mit
+ * ihrem Wert persistiert, PPS-Duell-Zeilen ohne Vermerk rechnet der Ledger alt (`ppSkalaVersionFuerZeile`).
+ * Ein schon gelaufener Arena-Vorlauf des naechsten Spieltags ist nach der Umstellung veraltet (die
+ * PP-Skala steht im Eingabe-Hash, lib/battle/arena-eingabe-hash.ts) und wird neu gerechnet.
+ */
+export function stelleLaufendeSaisonAufC2Um<T extends Pick<GameState, "seasonState" | "season"> & { scenarioMeta?: { gameMode?: string | null } | null }>(
+  gameState: T,
+): T {
+  const seasonState = gameState.seasonState;
+  const seasonId = seasonState?.seasonId ?? gameState.season?.id;
+  if (!seasonState || !seasonId) return gameState;
+  if (gameState.scenarioMeta?.gameMode !== "battle") return gameState;
+  if (seasonState.wertungsSkalen?.seasonId === seasonId) return gameState;
+  const schalter = ppSkalaSchalter();
+  if (schalter !== "an") return gameState;
+  const gebucht = new Set(
+    (seasonState.matchdayResults ?? []).filter((r) => r.seasonId === seasonId).map((r) => r.matchdayId),
+  );
+  if (gebucht.size > PP_UMSTELLUNG_MAX_GEBUCHTE_SPIELTAGE) return gameState;
+  const naechster = (gameState.season?.matchdayIds ?? []).find((id) => !gebucht.has(id));
+  if (!naechster) return gameState;
+  return {
+    ...gameState,
+    seasonState: { ...seasonState, wertungsSkalen: { seasonId, pp: "c2", ergebnis: "alt", ppAb: naechster } },
+  };
 }
 
 /** Welche Ergebnisskala rechnet DIESE Saison? */

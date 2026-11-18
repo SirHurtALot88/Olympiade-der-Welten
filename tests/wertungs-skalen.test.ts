@@ -7,6 +7,8 @@ import {
   ppSkalaVersionFuer,
   stempleWertungsSkalen,
   stempleWertungsSkalenBeimAnlegen,
+  stelleLaufendeSaisonAufC2Um,
+  ppSkalaVersionFuerZeile,
   wertungsSkalenFuerNeueSaison,
 } from "@/lib/resolve/wertungs-skalen";
 
@@ -76,5 +78,42 @@ describe("Wertungsskalen je Saison", () => {
     expect(stempleWertungsSkalenBeimAnlegen(angelegt)).toBe(angelegt);
     const naechste = stempleWertungsSkalen({ ...angelegt.seasonState, seasonId: "season-2" });
     expect(naechste.wertungsSkalen).toEqual({ seasonId: "season-2", pp: "alt", ergebnis: "e1" });
+  });
+
+  it("Umstellung der laufenden Saison: ab dem naechsten Spieltag C2, gebuchte Zeilen bleiben alt", () => {
+    vi.stubEnv("OLY_PP_SKALA", "");
+    vi.stubEnv("NEXT_PUBLIC_OLY_PP_SKALA", "");
+    const laufend = (gebucht: number, gameMode = "battle") =>
+      ({
+        scenarioMeta: { gameMode },
+        season: { id: "season-1", matchdayIds: ["md-1", "md-2", "md-3", "md-4", "md-5"] },
+        seasonState: {
+          seasonId: "season-1",
+          matchdayResults: Array.from({ length: gebucht }, (_, i) => ({ id: `r${i}`, seasonId: "season-1", matchdayId: `md-${i + 1}` })),
+        },
+      }) as unknown as GameState;
+    const umgestellt = stelleLaufendeSaisonAufC2Um(laufend(1));
+    expect(umgestellt.seasonState.wertungsSkalen).toEqual({ seasonId: "season-1", pp: "c2", ergebnis: "alt", ppAb: "md-2" });
+    // idempotent
+    expect(stelleLaufendeSaisonAufC2Um(umgestellt)).toBe(umgestellt);
+    expect(ppSkalaModus(umgestellt)).toBe("an");
+    // ein Spieltag VOR der Umstellung rechnet alt, auch wenn er noch einmal neu gewertet wird
+    expect(ppSkalaModus(umgestellt, "md-1")).toBe("aus");
+    expect(ppSkalaModus(umgestellt, "md-2")).toBe("an");
+    expect(ppSkalaModus(umgestellt, "md-5")).toBe("an");
+    // gebuchte Zeile ohne Vermerk bleibt alt, neue Zeile mit Vermerk C2
+    expect(ppSkalaVersionFuerZeile(umgestellt, {})).toBe("alt");
+    expect(ppSkalaVersionFuerZeile(umgestellt, { ppSkala: "c2" })).toBe("c2");
+    // eine ab Saisonbeginn gestempelte Saison: Zeile ohne Vermerk folgt dem Stempel
+    const vonAnfang = mitStempel("season-9", { seasonId: "season-9", pp: "c2", ergebnis: "e1" });
+    expect(ppSkalaVersionFuerZeile(vonAnfang, {})).toBe("c2");
+    // Grenzen: mehr als 3 gebuchte Spieltage, Manager-Modus, Rueckweg-Schalter
+    expect(stelleLaufendeSaisonAufC2Um(laufend(3)).seasonState.wertungsSkalen?.ppAb).toBe("md-4");
+    expect(stelleLaufendeSaisonAufC2Um(laufend(4)).seasonState.wertungsSkalen).toBeUndefined();
+    expect(stelleLaufendeSaisonAufC2Um(laufend(1, "manager")).seasonState.wertungsSkalen).toBeUndefined();
+    vi.stubEnv("OLY_PP_SKALA", "aus");
+    expect(stelleLaufendeSaisonAufC2Um(laufend(1)).seasonState.wertungsSkalen).toBeUndefined();
+    vi.stubEnv("OLY_PP_SKALA", "aus-sofort");
+    expect(ppSkalaVersionFuerZeile(umgestellt, { ppSkala: "c2" })).toBe("alt");
   });
 });

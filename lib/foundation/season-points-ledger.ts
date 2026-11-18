@@ -6,7 +6,8 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import { istDuellWertung, ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
-import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert } from "@/lib/resolve/pp-skala";
+import { ppSkalaVersionFuerZeile } from "@/lib/resolve/wertungs-skalen";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -300,7 +301,10 @@ function derivePlayerPointsForDuellGroup(
   // oben vertrauen dem persistierten Wert, der schon skaliert geschrieben wurde -- dort wird hier NICHT
   // ein zweites Mal skaliert. Weil der Stempel nur zum Saisonwechsel wechselt, rechnet dieser Zweig eine
   // laufende Saison nie rueckwirkend um.
-  const ppSkala = ppSkalaModus(gameState);
+  // Je ZEILE (nicht je Saison): nach einer Umstellung mitten in der Saison bleiben frueher gebuchte
+  // Zeilen alt (`ppSkalaVersionFuerZeile`, lib/resolve/wertungs-skalen.ts).
+  const zeilenVersion = ppSkalaVersionFuerZeile(gameState, teamResult);
+  const ppSkala = zeilenVersion === "roh" ? "roh" : zeilenVersion === "c2" ? "an" : "aus";
   const pointsByPerformanceId = new Map(
     performances.map(
       (performance) =>
