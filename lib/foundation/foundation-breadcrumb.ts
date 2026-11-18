@@ -13,6 +13,11 @@ export type FoundationBreadcrumb = {
  * Nav-Konfiguration ab (keine erfundenen Labels). Nur der "Neuer Look" rendert
  * daraus eine Breadcrumb-/Titel-Zeile.
  */
+/** Ansichten, die nicht in der Nav stehen, aber einen Ort im Band brauchen (sonst bleibt die Bandmitte links leer). */
+const ZUSATZ_ANSICHTEN: Partial<Record<FoundationViewId, FoundationBreadcrumb>> = {
+  nachDemSpieltag: { group: "Spieltag", view: "Nach dem Spieltag" },
+};
+
 export function getFoundationBreadcrumb(activeView: FoundationViewId): FoundationBreadcrumb | null {
   for (const group of FOUNDATION_NAV_GROUPS) {
     for (const item of group.items) {
@@ -21,5 +26,5 @@ export function getFoundationBreadcrumb(activeView: FoundationViewId): Foundatio
       }
     }
   }
-  return null;
+  return ZUSATZ_ANSICHTEN[activeView] ?? null;
 }
