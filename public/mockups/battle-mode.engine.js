@@ -58700,6 +58700,13 @@
       +lsEsc(kennungVon(String(name||"")))+".jpg')\" aria-hidden=\"true\"></span>";
   }
   function hudRolle(u){
+    // Hockey: wer WIRKLICH im Tor steht (u.torwart, s. bestimmeTorwaerter: ohne gesetzte Aufstellung gewinnt die
+    // hoechste PARADE, nicht der Torwart-Slot) traegt "Torwart"; ein Feldspieler mit Torwart-Slot (Rundlauf-Slot)
+    // zeigt nicht den Slotnamen, der ihn als Torwart auswiese.
+    if(u&&istHockey()){
+      if(u.torwart)return "Torwart";
+      if(u.slotId&&TORWART_SLOTS.has(u.slotId))return "Feldspieler";
+    }
     const sl=u&&u.slotId&&SLOTVON[u.slotId];
     return sl?sl.label:"";
   }

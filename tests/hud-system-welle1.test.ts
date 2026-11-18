@@ -258,6 +258,19 @@ describe.skipIf(!chromiumVerfuegbar())("HUD-System Welle 1 (Arena-Motor, Chromiu
         const p = await probe(seite);
         pruefeGezeigtGleichGebucht(disc, p);
         expect(p.gezeigt.verlauf.length).toBeGreaterThan(3);
+        // Portraets sind verdrahtet (Hintergrundbild /portraits/<name>.jpg; unter file:// laedt die Datei nicht, das ist Umgebung).
+        expect(await seite.$eval("#hudDock .hud-leiste .hud-por", (e) => getComputedStyle(e).backgroundImage)).toContain("/portraits/");
+        if (disc === "hockey") {
+          // Rollen-Etikett = echte Rolle: genau die zwei Torwart-Zeilen (kernId par) tragen "Torwart", sonst keiner ein Torwart-Slot-Etikett.
+          const rollen = await seite.$$eval("#hudDock .hud-leiste", (l) =>
+            l.map((x) => ({ id: Number((x as HTMLElement).dataset.hudSpieler), rolle: (x.querySelector(".hud-lrolle")?.textContent || "").trim() })),
+          );
+          for (const g of p.gebucht.spieler) {
+            const r = rollen.find((x) => x.id === g.id)!.rolle;
+            if (g.kernId === "par") expect(r, g.n).toBe("Torwart");
+            else expect(r.toLowerCase(), g.n).not.toMatch(/goaltender|torwart/);
+          }
+        }
         if (disc === "hockey") {
           const tw = p.gebucht.spieler.find((x) => x.kernId === "par")!;
           // Torwart-Karte zeigt Paraden vorn.
