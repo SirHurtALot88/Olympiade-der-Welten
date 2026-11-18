@@ -131,14 +131,14 @@ export default function FoundationShell({
 
   // Arena-Vollbild (18.11.): Band und Schiene fahren weg, übrig bleibt ein schmaler Griff. R/Griff holt den
   // Rahmen zurück, Esc verlässt die Arena (zurück zur Seite davor, sonst Start).
-  const istArena = activeView === "matchdayArena";
+  const istArena = activeView === "matchdayArena" || activeView === "battleArena";
   const [arenaRahmen, setArenaRahmen] = useState(false);
   const vorherigeAnsicht = useRef<FoundationViewId | null>(null);
   const letzteAnsicht = useRef<FoundationViewId>(activeView);
   const [wischer, setWischer] = useState<string | null>(null);
   useEffect(() => {
     if (letzteAnsicht.current !== activeView) {
-      if (activeView === "matchdayArena") {
+      if (activeView === "matchdayArena" || activeView === "battleArena") {
         vorherigeAnsicht.current = letzteAnsicht.current;
         setArenaRahmen(false);
         setWischer("Spieltag");
@@ -159,7 +159,7 @@ export default function FoundationShell({
       setBuehneDa(false);
       return undefined;
     }
-    const pruefe = () => setBuehneDa(Boolean(document.querySelector('#foundation-matchday-arena .oly-arena-buehne[data-voll="1"]')));
+    const pruefe = () => setBuehneDa(Boolean(document.querySelector('.oly-arena-buehne[data-voll="1"]')));
     pruefe();
     const beobachter = new MutationObserver(pruefe);
     beobachter.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-voll"] });
@@ -167,7 +167,7 @@ export default function FoundationShell({
   }, [istArena]);
   const arenaVoll = istArena && !arenaRahmen && buehneDa;
   const verlasseArena = useCallback(() => {
-    const ziel = vorherigeAnsicht.current && vorherigeAnsicht.current !== "matchdayArena" ? vorherigeAnsicht.current : "homeV2";
+    const ziel = vorherigeAnsicht.current && vorherigeAnsicht.current !== "matchdayArena" && vorherigeAnsicht.current !== "battleArena" ? vorherigeAnsicht.current : "homeV2";
     onNavigate(ziel);
   }, [onNavigate]);
   useEffect(() => {

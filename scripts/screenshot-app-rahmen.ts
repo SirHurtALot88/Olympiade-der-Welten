@@ -161,7 +161,24 @@ async function main() {
       await ctx.close();
     };
     const nichts = async () => undefined;
+    const oeffneBuehne = async (p: Page) => {
+      const knopf = p.getByRole("button", { name: /Zur Battle Arena|Arena starten/ }).first();
+      if (await knopf.isVisible().catch(() => false)) await knopf.click();
+      await p.locator('.oly-arena-buehne[data-voll="1"]').first().waitFor({ state: "visible", timeout: 120_000 }).catch(() => undefined);
+      await p.waitForTimeout(2500);
+    };
     const aufnehmenMitVerzoegerung = async (ansicht: string, breite: number, hoehe: number, datei: string) => {
+      if (process.env.OLY_SHOT_NUR && !new RegExp(process.env.OLY_SHOT_NUR).test(datei)) return;
+      for (let versuch = 1; versuch <= 3; versuch += 1) {
+        try {
+          await aufnehmenMitVerzoegerungEinmal(ansicht, breite, hoehe, datei);
+          return;
+        } catch (e) {
+          console.log(`[screenshot-rahmen] ${datei} Versuch ${versuch} gescheitert: ${String(e).slice(0, 120)}`);
+        }
+      }
+    };
+    const aufnehmenMitVerzoegerungEinmal = async (ansicht: string, breite: number, hoehe: number, datei: string) => {
       const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe } });
       const page = await ctx.newPage();
       await page.route("**/api/lineups/legacy/ai-batch-apply**", async (route) => { await new Promise((r) => setTimeout(r, 40_000)); await route.abort().catch(() => undefined); });
@@ -172,7 +189,8 @@ async function main() {
       await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 90_000 });
       await dismissSeasonBriefingIfOpen(page, 30_000);
       await page.getByTestId("foundation-regieband").waitFor({ state: "visible", timeout: 150_000 });
-      await page.waitForTimeout(6000);
+      await page.waitForFunction(() => !/WIRD GELADEN/i.test(document.body.innerText), undefined, { timeout: 150_000 }).catch(() => undefined);
+      await page.waitForTimeout(8000);
       await page.screenshot({ path: path.join(OUTPUT_DIR, datei) });
       console.log(`[screenshot-rahmen] ${path.join(OUTPUT_DIR, datei)}`);
       await ctx.close();
@@ -190,10 +208,9 @@ async function main() {
     );
     console.log(`[screenshot-rahmen] Aufstellungen: HTTP ${antwort.status}`);
     for (const [w, h, g] of [[1920, 1080, "1920x1080"], [2560, 1440, "2560x1440"], [1710, 1112, "1710x1112"]] as Array<[number, number, string]>) {
-      await aufnehmen("matchday-arena", w, h, `app-arena-buehne-${g}.png`, nichts);
+      await aufnehmen("matchday-arena", w, h, `app-arena-buehne-${g}.png`, oeffneBuehne);
     }
-    await aufnehmen("matchday-arena", 1920, 1080, "app-arena-buehne-mit-rahmen-1920x1080.png", async (p) => { await p.keyboard.press("r"); });
-    await aufnehmen("matchday-arena", 1920, 1080, "app-takt-zu-1920x1080.png", async (p) => { await p.keyboard.press("r"); });
+    await aufnehmen("matchday-arena", 1920, 1080, "app-arena-buehne-mit-rahmen-1920x1080.png", async (p) => { await oeffneBuehne(p); await p.keyboard.press("r"); });
     await aufnehmen("home", 1920, 1080, "app-start-neu-1920x1080.png", nichts);
     await aufnehmen("lineup", 2560, 1440, "app-einsatzliste-neu-2560x1440.png", nichts);
   } finally {

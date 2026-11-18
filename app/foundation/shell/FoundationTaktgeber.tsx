@@ -135,7 +135,7 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
         <p className="foundation-takt-ablauf-hinweis">
           {kritisch > 0 ? "Rot hält den Spieltag auf: Leertaste noch einmal springt zum ersten roten Punkt." : "Gelb hält nicht auf. Leertaste geht zum nächsten Schritt."}
         </p>
-        <FoundationActivityStrip activities={activities} />
+        {activities.some((a) => a.tone !== "success" && a.tone !== "info") ? <FoundationActivityStrip activities={activities} /> : null}
       </div>
     </div>
   );

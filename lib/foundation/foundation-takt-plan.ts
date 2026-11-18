@@ -49,18 +49,21 @@ export function baueTaktPlan(input: {
   input.steps.forEach((schritt, index) => {
     if (schritt.optional && schritt.status !== "warning" && schritt.status !== "blocked" && index !== aktuellerIndex) return;
     const istJetzt = schritt.stepId === input.currentStepId;
-    const blockiert = schritt.status === "blocked" || (schritt.blockers.length > 0 && schritt.status !== "completed");
+    // Rot (hält auf) gilt nur für den aktuellen und frühere Schritte; spätere sind naturgemäß noch zu.
+    const blockiert =
+      (aktuellerIndex < 0 || index <= aktuellerIndex) &&
+      (schritt.status === "blocked" || (schritt.blockers.length > 0 && schritt.status !== "completed"));
     const status: TaktSchrittStatus =
       schritt.status === "completed"
         ? "erledigt"
         : blockiert
           ? "rot"
-          : schritt.status === "warning" || schritt.optional || schritt.warnings.length > 0
+          : schritt.status === "warning" || schritt.optional || (schritt.warnings.length > 0 && index <= aktuellerIndex)
             ? "gelb"
             : istJetzt
               ? "jetzt"
               : "offen";
-    const gruende = (blockiert ? schritt.blockers : schritt.warnings).map(input.formatGrund).join(" · ");
+    const gruende = (status === "rot" ? schritt.blockers : status === "gelb" ? schritt.warnings : []).map(input.formatGrund).join(" · ");
     const eintrag: TaktSchritt = {
       id: `schritt:${schritt.stepId}`,
       label: schritt.label,
@@ -69,8 +72,7 @@ export function baueTaktPlan(input: {
       sprung: status === "erledigt" ? undefined : input.sprungZuSchritt(schritt),
     };
     schritte.push(eintrag);
-    // Rot zählt nur, wenn es JETZT oder schon vorher dran war — spätere Schritte sind naturgemäß noch zu.
-    if (status === "rot" && (aktuellerIndex < 0 || index <= aktuellerIndex)) kritisch.push(eintrag);
+    if (status === "rot") kritisch.push(eintrag);
   });
 
   for (const item of input.inbox) {

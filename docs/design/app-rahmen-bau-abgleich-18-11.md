@@ -24,6 +24,25 @@ Wertung nicht berührt (reine Rahmen-Änderung).
 | Gold statt Blau | Band, Reiter, Marke, Taktgeber in Gold/Creme (Tokens des Mockups) |
 | rem-Skalierung | Band, Taktgeber, Bauchbinde skalieren mit Fenstergröße (`--fb-u`, Entwurfsmaß 1920×1080) |
 
+## Nachträge (Chris 18.11., nach #1588)
+
+- **Leertaste = weiter, überall.** `lib/foundation/foundation-takt-plan.ts` ist die eine Quelle: `baueTaktPlan` baut aus
+  `buildGameFlowState().steps` und den offenen Inbox-Einträgen die Pflichtschritte (Haken/Rot/Gelb) und die kritischen
+  Punkte; `entscheideLeertaste` entscheidet. Ohne kritische Punkte ruft die Leertaste genau die Taktgeber-Aktion
+  (`triggerGlobalNext`). Bei kritischen Punkten (rote Schritte bis zum aktuellen, kritische Inbox-Einträge wie
+  Einsatzliste unvollständig, Pflicht-Minuskarte, Verletzter aufgestellt, Kasse unter null) geht es NICHT weiter: der
+  Ablauf klappt auf, ein zweiter Druck springt zum ersten kritischen Punkt. Nicht ausgelöst wird in Eingabefeldern,
+  Dialogen, laufenden Aktionen und in Ansichten mit eigener Leertaste (Arena = Pause; die Einsatzliste behält ihre
+  bisherige Ausnahme). Der Zustand „Ablauf offen“ teilen Hook und Taktgeber über `takt-ablauf-store.ts`.
+  Tests: `tests/foundation-takt-plan.test.ts`, `tests/foundation-taktgeber-zustand.test.ts`.
+- **Ablauf-Aufklapper** zeigt die Pflichtschritte mit Haken (grün), Rot (hält auf, „beheben ›“) und Gelb, darunter wie
+  bisher die laufenden Aktivitäten.
+- **Aufgeräumt:** Kopfzeilen-Regeln und `foundation-rail-mini` in `broadcast.css`, Kontext-Portal („S1 · MD“) und
+  alte Brotkrumen-/Kopf-Regeln in `globals.css`, die Saison-Chips der Schiene entfernt (Saison steht im Band).
+  Shell-Vertragstest auf Band-Chip umgezogen.
+- **Arena-Vollbild:** hängt jetzt an `.oly-arena-buehne[data-voll="1"]` der Vollflächen-Bühne (#1578) statt an einer
+  Leinwand-Suche; Seitenmodus der Bühne („⤓ Seite“) und „Vor dem Anpfiff“ behalten Band und Schiene.
+
 ## Angepasst gegenüber dem Mockup
 
 - Der Ablauf zeigt die vorhandene Aktivitätsliste (Preseason, Setup-Aktionen …), nicht die Pflichtschritte mit

@@ -62,7 +62,7 @@ describe("Taktplan: Pflichtschritte und kritische Punkte", () => {
       ],
       "set_lineup",
     );
-    expect(plan.schritte.map((s) => s.status)).toEqual(["erledigt", "rot", "rot", "gelb"]);
+    expect(plan.schritte.map((s) => s.status)).toEqual(["erledigt", "rot", "offen", "gelb"]);
     expect(plan.kritisch.map((s) => s.id)).toEqual(["schritt:set_lineup"]);
     expect(plan.schritte[1].detail).toBe("Grund lineup_incomplete");
     expect(plan.schritte[0].sprung).toBeUndefined();
