@@ -17,7 +17,7 @@ const PORT = process.env.SCREENSHOT_PORT ?? "3216";
 const BASE_URL = `http://localhost:${PORT}`;
 const SQLITE_PATH = process.env.DRAFT_SHOT_SQLITE ?? "/tmp/oly-draft-seite-shot.sqlite";
 const IDS_PATH = `${SQLITE_PATH}.ids.json`;
-const OUT = path.join(process.cwd(), "docs", "design", "draft-seite-18-11");
+const OUT = path.join(process.cwd(), "docs", "design", "draft-seite-bau-18-11");
 const FRANKY = "franky_remote_placeholder";
 
 process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
