@@ -622,5 +622,46 @@
       "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
     },
     "hinweis": "PixelLab liefert hier einen grauen Letterbox-Streifen (26 px oben, 28 px unten); _weisse_raender_fuellen() in baue-kulisse-buehnen.py schneidet ihn weg und zieht den Inhalt auf die volle Hoehe."
+  },
+  "mockup/climbing-neu-18-11/wand_canyon.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2 (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "front view of one single very wide tall orange-brown sandstone cliff wall for a rock climbing game, the cliff fills the image from the left edge to the right edge and stands on a thin strip of sandy ground at the bottom, jagged summit ridge along the top; a long narrow horizontal rock ledge runs across the whole cliff at half height; on the right half a big overhanging rock roof juts out below the summit and casts a deep dark shadow underneath; on the left a deep vertical chimney crack runs from the ground up to the ledge; in the middle a narrow gap splits the upper cliff into two towers; rock bulges and small protruding ledges, lit by warm sunlight from the upper left with strong shadows for depth, no climbing holds, no plants, no characters, no text, 16-bit HD-2D RPG, pixel art",
+      "seed": 31,
+      "gen": [
+        792,
+        300
+      ],
+      "endpunkt": "/v2/generate-image-v2",
+      "generationen": 25.0,
+      "job": "e946ecd5-3b6d-4d61-a9af-333a43fe3fe3"
+    },
+    "datei": "public/mockups/climbing-neu-18-11/wand_canyon.png",
+    "bearbeitung": "Alpha hart geschnitten, auf 255 Farben reduziert, Masse unveraendert 792x300",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Canyon-Wand als Ort (Kamin, Band, Engstelle, Dach mit Lippe, Spalt, Gipfelgrat), Himmel transparent fuer Parallax",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/panorama_canyon.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "wide distant desert canyon landscape at golden hour, layered mesas and rock spires fading into blue haze, big sky with soft clouds, far below a winding river, atmospheric perspective, background for a 2D game, pixel art, 16-bit HD-2D RPG style, no characters, no text",
+      "seed": 23,
+      "gen": [
+        400,
+        224
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/panorama_canyon.png",
+    "bearbeitung": "auf 255 Farben reduziert, Masse unveraendert 400x224",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Fernpanorama hinter der Wand (Ebene E1, Parallax 0,08, weich gezogen)",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
   }
 }
