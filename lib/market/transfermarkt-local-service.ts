@@ -1,3 +1,4 @@
+import { pruefeKaufGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { randomUUID } from "node:crypto";
 
 import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
@@ -11,6 +12,7 @@ import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-l
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
@@ -1449,6 +1451,15 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   ) {
     blockingReasons.push("insufficient_cash");
   }
+  if (team && purchasePrice != null && salary != null) {
+    const vorstand = pruefeKaufGegenVorstandFreigabe(gameState, params.teamId, {
+      fee: purchasePrice,
+      salary,
+      rosterBefore: rosterBefore,
+      playerMin: teamContext?.playerMin ?? null,
+    });
+    if (!vorstand.ok && vorstand.reason) blockingReasons.push(vorstand.reason);
+  }
   if (recentlySoldBySameTeam && !params.allowRecentlySoldRebuyOverride) {
     blockingReasons.push(RECENTLY_SOLD_SAME_PRESEASON_BLOCKER);
   }
@@ -2070,7 +2081,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
 
     if (compactListMode) {
       const player = playersById.get(baseItem.playerId) ?? null;
-      const playerScoutingLevel = getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
+      // Fog of War abschaltbar (scenarioMeta.scoutingNebelAus): dann gilt jeder Spieler als voll gescoutet.
+      const playerScoutingLevel = isScoutingNebelAus(gameState) ? 5 : getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
       const compactFitPlayer = {
         race: baseItem.race,
         alignment: baseItem.alignment,
@@ -2092,10 +2104,26 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             scoutingLevel: playerScoutingLevel,
           })
         : baseItem.topDisciplineScores;
+      const disciplineEstimates = player
+        ? Object.fromEntries(
+            buildScoutedDisciplineTiers({
+              saveId: save.saveId,
+              playerId: player.id,
+              scoutingLevel: playerScoutingLevel,
+              disciplines: Object.entries(player.disciplineRatings ?? {}).map(([disciplineId, score]) => ({
+                disciplineId,
+                disciplineName: disciplinesById.get(disciplineId) ?? disciplineId,
+                score,
+              })),
+              topN: 40,
+            }).map((entry) => [entry.disciplineId, entry.displayedScore] as const),
+          )
+        : undefined;
       return {
         ...baseItem,
         scoutingLevel: playerScoutingLevel,
         topDisciplineScores,
+        disciplineEstimates,
         teamContextAvailable: true,
         teamCash: selectedTeam.cash,
         teamSalary,
@@ -2746,6 +2774,15 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
     }) < purchasePrice
   ) {
     blockingReasons.push("insufficient_cash");
+  }
+  if (team && purchasePrice != null && salary != null) {
+    const vorstand = pruefeKaufGegenVorstandFreigabe(gameState, params.teamId, {
+      fee: purchasePrice,
+      salary,
+      rosterBefore: rosterEntries.length,
+      playerMin: teamIdentity?.playerMin ?? null,
+    });
+    if (!vorstand.ok && vorstand.reason) blockingReasons.push(vorstand.reason);
   }
   if (purchasePriceOverride != null) {
     warnings.push(params.purchasePriceOverrideReason ?? "purchase_price_override_in_effect");

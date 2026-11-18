@@ -14,6 +14,7 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { BcFormPfeil, BcMoralGesicht } from "@/components/foundation/broadcast";
+import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
 import { FormMoralMarke } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 import type { HomeV2ClientProps, HomeV2InboxItem } from "@/app/foundation/home-v2/home-v2-types";
 import {
@@ -25,21 +26,15 @@ import {
   type SpieltagsKarte,
   type StartseiteDaten,
 } from "@/lib/foundation/startseite-modern";
+import { inboxEintragIstDoppelt } from "@/lib/foundation/startseite-modern-zustand";
+import { formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import "./home-modern.css";
 
 const ZAHL = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const de = (x: number, nk = 1) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: nk, maximumFractionDigits: nk }).format(x);
 const vz = (x: number, nk = 1) => `${x > 0 ? "+" : x < 0 ? "−" : "±"}${de(Math.abs(x), nk)}`;
 const ton = (x: number | null | undefined) => (x == null || x === 0 ? "hm-null" : x > 0 ? "hm-plus" : "hm-minus");
-const mio = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? "—" : `${de(x)} Mio`);
-
-function Chevron() {
-  return (
-    <svg className="hm-i" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
+const coins = formatNlCoins;
 
 function Wappen({ url, initials, alt = "" }: { url: string | null; initials: string; alt?: string }) {
   // Wappen sind Bilder mit Initialen-Rückfall: ohne URL oder bei einem Ladefehler ein neutraler Kasten.
@@ -67,7 +62,8 @@ function FormKaestchen({ form, anzahl = 5 }: { form: readonly string[]; anzahl?:
 
 /* ------------------------------------------------------------------------------------- Kopf */
 
-function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+/* Band-Kacheln: Rang, Punkte, Ergebnisse, Form · Moral stehen im Regieband des App-Rahmens (Slot), nicht mehr im Startseiten-Kopf. */
+function BandKacheln({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const eigene = sd?.eigene ?? null;
   const roster = sd ? Object.values(sd.formMoral) : [];
   const mitForm = roster.filter((a) => a.formVerfuegbar);
@@ -79,6 +75,57 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const kopfStufe = mitForm.length === 0 ? null : dominant < 2 ? 1 : dominant > 2 ? -1 : 0;
   const zone = eigene?.zone === "aufstieg" || eigene?.zone === "titel";
   const hatWertung = sd?.hatWertung ?? false;
+  return (
+    <FoundationBandSlot>
+      <div className="hm-bandkpis">
+        <div className={`hm-bk${zone ? " hm-zone" : ""}`}>
+          <span className="hm-gk">Rang</span>
+          <strong className="hm-t">{eigene?.rang != null ? `${eigene.rang}.` : "–"}</strong>
+          <small>
+            in {sd?.ligaName ?? "der Liga"}
+            {eigene?.bewegung ? <> · <span className={ton(eigene.bewegung)}>{eigene.bewegung > 0 ? "▲" : "▼"}{Math.abs(eigene.bewegung)}</span></> : null}
+          </small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Punkte</span>
+          <strong className="hm-t">{hatWertung ? eigene?.punkte ?? p.points ?? 0 : 0}</strong>
+          <small className="hm-t" title="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
+            {eigene?.bilanz ? (
+              <>
+                {sunText(eigene.bilanz)} · {duelleText(eigene.bilanz)}
+                {eigene.verhaeltnis != null ? <> · Verh. <span className={ton(eigene.verhaeltnis)}>{vz(eigene.verhaeltnis)}</span></> : null}
+              </>
+            ) : (
+              "noch kein Duell"
+            )}
+          </small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Ergebnisse</span>
+          <strong>
+            <FormKaestchen form={eigene?.form ?? []} />
+          </strong>
+          <small>{eigene && eigene.form.length > 0 ? `letzte ${eigene.form.length} Spieltage` : "noch kein Spieltag"}</small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Form · Moral</span>
+          <strong>
+            {kopfStufe == null ? <span className="hm-null">–</span> : <BcFormPfeil stufe={kopfStufe} />}
+            {moralSchnitt != null ? (
+              <span style={{ fontSize: ".75em", display: "inline-flex" }}>
+                <BcMoralGesicht wert={moralSchnitt} groesse={22} />
+              </span>
+            ) : null}
+          </strong>
+          <small className="hm-t">{mitForm.length > 0 ? `${zaehler[0]}×▲▲ ${zaehler[1]}×▲ · ${tief} im Tief` : "noch keine Form"}</small>
+        </div>
+      </div>
+    </FoundationBandSlot>
+  );
+}
+
+function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+  const eigene = sd?.eigene ?? null;
   const kicker = [
     p.seasonName,
     sd ? (sd.saisonEnde ? `nach Spieltag ${sd.gesamtSpieltage} von ${sd.gesamtSpieltage}` : `vor Spieltag ${sd.gespielteSpieltage + 1} von ${sd.gesamtSpieltage}`) : p.matchdayLabel,
@@ -110,61 +157,7 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
           </span>
         </div>
       </div>
-      <div className="hm-kpis">
-        <div className={`hm-kpi${zone ? " hm-zone" : ""}`}>
-          <span className="hm-gk">Rang</span>
-          <strong className="hm-t">{eigene?.rang != null ? `${eigene.rang}.` : "–"}</strong>
-          <small>
-            in {sd?.ligaName ?? "der Liga"}
-            {eigene?.bewegung ? <> · <span className={ton(eigene.bewegung)}>{eigene.bewegung > 0 ? "▲" : "▼"}{Math.abs(eigene.bewegung)}</span></> : null}
-          </small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Punkte</span>
-          <strong className="hm-t">{hatWertung ? eigene?.punkte ?? p.points ?? 0 : 0}</strong>
-          <small className="hm-t" title="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
-            {eigene?.bilanz ? (
-              <>
-                {sunText(eigene.bilanz)} · {duelleText(eigene.bilanz)}
-                {eigene.verhaeltnis != null ? <> · Verh. <span className={ton(eigene.verhaeltnis)}>{vz(eigene.verhaeltnis)}</span></> : null}
-              </>
-            ) : (
-              "noch kein Duell"
-            )}
-          </small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Ergebnisse</span>
-          <strong>
-            <FormKaestchen form={eigene?.form ?? []} />
-          </strong>
-          <small>{eigene && eigene.form.length > 0 ? `letzte ${eigene.form.length} Spieltage` : "noch kein Spieltag"}</small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Form · Moral</span>
-          <strong>
-            {kopfStufe == null ? <span className="hm-null">–</span> : <BcFormPfeil stufe={kopfStufe} />}
-            {moralSchnitt != null ? (
-              <span style={{ fontSize: ".75em", display: "inline-flex" }}>
-                <BcMoralGesicht wert={moralSchnitt} groesse={22} />
-              </span>
-            ) : null}
-          </strong>
-          <small className="hm-t">{mitForm.length > 0 ? `${zaehler[0]}×▲▲ ${zaehler[1]}×▲ · ${tief} im Tief` : "noch keine Form"}</small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Kasse</span>
-          <strong className="hm-t">{mio(p.cash)}</strong>
-          <small className="hm-t">Gehälter {mio(p.salaryTotal)}</small>
-        </div>
-      </div>
-      <div className="hm-cta">
-        <span className="hm-gk">{sd?.saisonEnde ? "Saison beendet" : "Nächster Schritt"}</span>
-        <button type="button" className="hm-btn hm-haupt" onClick={p.onContinue} data-testid="hm-weiter">
-          {p.nextStepLabel} <Chevron />
-        </button>
-        <small>{p.nextStepDetail}</small>
-      </div>
+      {p.nextStepDetail ? <small className="hm-hinweis" data-testid="hm-hinweis">{p.nextStepDetail}</small> : null}
     </header>
   );
 }
@@ -207,7 +200,9 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
       ) : (
         <>
           <div className="hm-lab">
-            <span>Kaderstärke</span>
+            <span className="hm-pf" title="Papierform aus der Kaderstärke">
+              Kaderstärke {k.papier ? <b className={`hm-${k.papier.ton}`}>{k.papier.wort}</b> : null}
+            </span>
             <span className="hm-t">{k.anteil != null ? `Anteil ${de(k.anteil, 0)} %` : "–"}</span>
           </div>
           <div className="hm-lab">
@@ -216,12 +211,30 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
             <b className="hm-g hm-t">{k.rangGegner ? `#${k.rangGegner}` : "–"}</b>
           </div>
           <div className="hm-wb"><i style={{ width: `${(k.anteil ?? 50).toFixed(1)}%` }} /></div>
-          <div className="hm-sp" />
-          {k.papier ? (
-            <div className="hm-pf"><b className={`hm-${k.papier.ton}`}>{k.papier.wort}</b><span>Papierform aus der Kaderstärke</span></div>
-          ) : null}
         </>
       )}
+      {k.einsatz ? (
+        <div className="hm-st" data-testid="hm-einsatz">
+          <span>
+            Einsatzliste
+            <span className="hm-pp" aria-hidden="true">
+              {Array.from({ length: Math.min(k.einsatz.benoetigt, 12) }, (_, i) => (
+                <i key={i} className={i < k.einsatz!.gesetzt ? "" : "hm-o"} />
+              ))}
+            </span>
+            <em className={`hm-t ${k.einsatz.gesetzt < k.einsatz.benoetigt ? "hm-minus" : "hm-plus"}`}>
+              {k.einsatz.gesetzt} von {k.einsatz.benoetigt}
+            </em>
+          </span>
+          {k.hatFormkartenPool ? (
+            <span>
+              <svg className="hm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg>
+              Formkarte
+              <em className={k.einsatz.formkarten.length ? "hm-plus" : "hm-null"}>{k.einsatz.formkarten.length ? `${k.einsatz.formkarten.join(" + ")} gelegt` : "keine gelegt"}</em>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </button>
   );
 }
@@ -362,7 +375,7 @@ function Tabelle({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten }) {
           </>
         ) : null}
         <span className="hm-sp" />
-        <span className="hm-weg">S-U-N = Disziplin-Duelle (2 je Spieltag) · Sieg 2 · Remis 1 · Niederlage 0 · Gleichstand: Verhältnis</span>
+        <span className="hm-weg">S-U-N = Duelle · Sieg 2 · Remis 1 · Niederlage 0 · Gleichstand: Verhältnis</span>
       </div>
     </section>
   );
@@ -370,19 +383,42 @@ function Tabelle({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten }) {
 
 /* ------------------------------------------------------------------------------------- Entscheidungen */
 
-function Entscheidungen({ p }: { p: HomeV2ClientProps }) {
-  const items: Array<{ id: string; klasse: string; icon: string; titel: string; detail: string; ziel: string }> = p.inboxItems.slice(0, 5).map((i: HomeV2InboxItem) => ({
-    id: i.id,
+function Entscheidungen({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+  type Zeile = { id: string; klasse: string; icon: string; titel: string; detail: string; ziel: string; oeffne: () => void };
+  const abgeleitet: Zeile[] = (sd?.entscheidungen ?? []).map((e) => ({
+    id: e.id,
+    klasse: e.ton === "rot" ? "" : e.ton === "gelb" ? "hm-w" : "hm-h",
+    icon: e.ton === "grau" ? "i" : "!",
+    titel: e.titel,
+    detail: e.detail,
+    ziel: e.zielText,
+    oeffne:
+      e.ziel.art === "einsatzliste"
+        ? p.onOpenLineup
+        : e.ziel.art === "kader"
+          ? p.onOpenTeams
+          : e.ziel.art === "spieler"
+            ? (() => {
+                const id = e.ziel.playerId;
+                return () => p.onOpenPlayer(id);
+              })()
+            : p.onOpenInbox,
+  }));
+  const ausInbox: Zeile[] = p.inboxItems.map((i: HomeV2InboxItem) => ({
+    id: `inbox-${i.id}`,
     klasse: i.severity === "critical" ? "" : i.severity === "warning" ? "hm-w" : "hm-h",
     icon: i.severity === "info" ? "i" : "!",
     titel: i.title,
     detail: i.detail,
     ziel: "öffnen ›",
+    oeffne: p.onOpenInbox,
   }));
+  // Abgeleitete Zeilen zuerst (aus dem echten Zustand), dann die Inbox; Einträge der Inbox, die dasselbe sagen, entfallen.
+  const items = [...abgeleitet, ...ausInbox.filter((z) => !inboxEintragIstDoppelt(z.titel, abgeleitet))].slice(0, 5);
   if (items.length < 5) {
     const z = p.boardObjectives[0];
     if (z) {
-      items.push({ id: `board-${z.objectiveId}`, klasse: "hm-h", icon: "i", titel: "Vorstandsziel", detail: z.label, ziel: "lesen ›" });
+      items.push({ id: `board-${z.objectiveId}`, klasse: "hm-h", icon: "i", titel: "Vorstandsziel", detail: z.label, ziel: "lesen ›", oeffne: p.onOpenBoardObjectives ?? p.onOpenInbox });
     }
   }
   return (
@@ -397,7 +433,7 @@ function Entscheidungen({ p }: { p: HomeV2ClientProps }) {
           <p className="hm-leer" style={{ padding: ".8rem .6rem" }}>Nichts offen. Alles erledigt.</p>
         ) : (
           items.map((e) => (
-            <button key={e.id} type="button" className={`hm-ent ${e.klasse}`} onClick={e.id.startsWith("board-") && p.onOpenBoardObjectives ? p.onOpenBoardObjectives : p.onOpenInbox}>
+            <button key={e.id} type="button" className={`hm-ent ${e.klasse}`} onClick={e.oeffne}>
               <span className="hm-ik">{e.icon}</span>
               <span className="hm-tx">{e.titel}<small>{e.detail}</small></span>
               <span className="hm-go">{e.ziel}</span>
@@ -457,7 +493,7 @@ function Kader({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
                 <span className="hm-rg hm-t">{i + 1}</span>
                 <span className="hm-un">
                   <b>{pl.name}</b>
-                  <small>{pl.contractLength != null ? `Vertrag ${pl.contractLength} ${pl.contractLength === 1 ? "Jahr" : "Jahre"}` : " "}</small>
+                  <small>{pl.className || pl.race ? [pl.className, pl.race].filter(Boolean).join(" · ") : pl.contractLength != null ? `Vertrag ${pl.contractLength} ${pl.contractLength === 1 ? "Jahr" : "Jahre"}` : "\u00a0"}</small>
                   <span className="hm-ov hm-t">
                     <strong>{pl.playerOvr != null ? ZAHL.format(pl.playerOvr) : "–"}</strong>
                     {a ? <FormMoralMarke a={a} /> : null}
@@ -474,8 +510,11 @@ function Kader({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
 
 /* ------------------------------------------------------------------------------------- Kasse */
 
-function Kasse({ p }: { p: HomeV2ClientProps }) {
+function Kasse({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const kredit = (p.loanInstallment ?? 0) > 0 || (p.outstandingDebt ?? 0) > 0;
+  // Gehalt nach der Regel von Chris: groß je Saison, klein je Spieltag.
+  const spieltage = sd?.gesamtSpieltage && sd.gesamtSpieltage > 0 ? sd.gesamtSpieltage : null;
+  const jeSpieltag = p.salaryTotal != null && spieltage ? p.salaryTotal / spieltage : null;
   return (
     <section className="hm-pan hm-p-fin" data-testid="hm-kasse">
       <div className="hm-pk">
@@ -485,16 +524,20 @@ function Kasse({ p }: { p: HomeV2ClientProps }) {
       </div>
       <div className="hm-pb">
         <div className="hm-kas">
-          <strong className="hm-t">{mio(p.cash)}</strong>
+          <strong className="hm-t">{coins(p.cash)}</strong>
           <small>Kassenstand</small>
         </div>
-        <div className="hm-kurve-leer" data-testid="hm-kurve-leer">
-          Kassenverlauf je Spieltag folgt mit dem neuen Finanzkonzept
+        <div className="hm-sp" />
+        <div className="hm-zeile hm-gross">
+          <span>Gehälter <small>Saison</small></span>
+          <strong className="hm-t">
+            {coins(p.salaryTotal)}
+            {jeSpieltag != null ? <small className="hm-klein">{coins(jeSpieltag)} je Spieltag</small> : null}
+          </strong>
         </div>
-        <div className="hm-zeile"><span>Gehälter <small>Saison</small></span><strong className="hm-t">{mio(p.salaryTotal)}</strong></div>
-        <div className="hm-zeile"><span>Saisonergebnis <small>GuV</small></span><strong className={`hm-t ${ton(p.guv)}`}>{p.guv == null ? "—" : `${vz(p.guv)} Mio`}</strong></div>
+        <div className="hm-zeile"><span>Saisonergebnis <small>GuV</small></span><strong className={`hm-t ${ton(p.guv)}`}>{p.guv == null ? "—" : `${vz(p.guv)} C`}</strong></div>
         {kredit ? (
-          <div className="hm-zeile"><span>Kredit <small>Rate je Saison {mio(p.loanInstallment)}</small></span><strong className="hm-t hm-minus">{mio(p.outstandingDebt)}</strong></div>
+          <div className="hm-zeile"><span>Kredit <small>Rate je Saison {coins(p.loanInstallment)}</small></span><strong className="hm-t hm-minus">{coins(p.outstandingDebt)}</strong></div>
         ) : null}
       </div>
     </section>
@@ -553,6 +596,13 @@ function Band({ sd }: { sd: StartseiteDaten }) {
         </span>,
       );
     }
+  }
+  if (sd.spielerDesTages) {
+    teile.push(
+      <span key="tag">
+        Spieler des Tages: <b>{sd.spielerDesTages.name}</b> {sd.spielerDesTages.formStufe != null ? <BcFormPfeil stufe={sd.spielerDesTages.formStufe} /> : null}
+      </span>,
+    );
   }
   if (sd.tabellenfuehrer && sd.eigene) {
     teile.push(
@@ -623,13 +673,14 @@ export default function HomeModern(props: HomeV2ClientProps) {
   return (
     <div className="hm bc" data-testid="home-modern" ref={wurzel}>
       <Kopf p={props} sd={sd} />
+      <BandKacheln p={props} sd={sd} />
       {sd ? (
         <div className="hm-raster">
           <SpieltagKarte p={props} sd={sd} />
           <Tabelle p={props} sd={sd} />
-          <Entscheidungen p={props} />
+          <Entscheidungen p={props} sd={sd} />
           <Kader p={props} sd={sd} />
-          <Kasse p={props} />
+          <Kasse p={props} sd={sd} />
           <Disziplinen sd={sd} />
           <Band sd={sd} />
         </div>

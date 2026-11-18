@@ -8,6 +8,17 @@ import type { GameState, ScenarioMeta } from "@/lib/data/olyDataTypes";
 export type FoundationSaveModePreset = "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
 export type FoundationSaveMode = "all" | FoundationSaveModePreset;
 
+/**
+ * Mehrspieler-Spielstand, egal in welcher Groesse (1v1, 2v2, 4v4). Gefunden am 18.11.
+ * (Mehrspieler-Pruefung, docs/design/mehrspieler-delegation-18-11.md): zwei Stellen fragten noch
+ * `=== "online_4v4"` ab, obwohl es seit Paket 2 drei Online-Groessen gibt — der Arena-Sprung nach
+ * dem Speichern wartete in 1v1/2v2 deshalb nicht auf den Mitspieler, und ein 1v1/2v2-Spielstand war
+ * nicht vor dem Loeschen durch den Gast geschuetzt.
+ */
+export function isOnlineSaveMode(mode: string | null | undefined): boolean {
+  return mode === "online_1v1" || mode === "online_2v2" || mode === "online_4v4";
+}
+
 type SaveModeInput = {
   name?: string | null;
   scenarioMeta?: ScenarioMeta | null;

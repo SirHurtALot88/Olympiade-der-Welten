@@ -227,6 +227,8 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
         seasonId: "season-1",
         matchdayId,
         deferredPlayerIds: result.deferredPlayerIds,
+        // Reine Belastungs-Simulation: nur die Trainingsschicht, kein Attribut-Zuwachs.
+        mitZuwachs: false,
       });
     }
     rolls += result.injuryEvents.length;

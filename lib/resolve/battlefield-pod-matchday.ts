@@ -16,6 +16,7 @@
  * aufgestellte Spieler, wie bei Mini-DM.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -157,7 +158,13 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
     for (const eintrag of ergebnis.boxscore) {
       if (!eintrag.playerId || !eintrag.teamId) continue;
       if (!gesetztJeTeam.get(eintrag.teamId)?.has(eintrag.name)) continue;
-      playerPpsByPlayerId.set(eintrag.playerId, ppAusBattlefieldPodWertung(eintrag.wertung, referenz));
+      playerPpsByPlayerId.set(
+        eintrag.playerId,
+        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
+        ppSkalaAktiv()
+          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz })
+          : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
+      );
     }
   });
 

@@ -26,9 +26,6 @@ import FoundationPrizeFinanceShellHost, {
 import FoundationMarketV2ShellHost, {
   type FoundationMarketV2ShellHostProps,
 } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
-import FoundationMarketBuyShellHost, {
-  type FoundationMarketBuyShellHostProps,
-} from "@/app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost";
 import FoundationMarketSellShellHost, {
   type FoundationMarketSellShellHostProps,
 } from "@/app/foundation/transfermarkt-v2/FoundationMarketSellShellHost";
@@ -456,26 +453,6 @@ export function FoundationShellRouterMarketSell({ active, hostProps }: Foundatio
   return (
     <FoundationTabActiveHost active={active}>
       <FoundationMarketSellShellHost {...hostProps} />
-    </FoundationTabActiveHost>
-  );
-}
-
-export type FoundationShellRouterMarketBuyProps = {
-  active: boolean;
-  hostProps: FoundationMarketBuyShellHostProps;
-};
-
-/**
- * Incremental Phase 5.3 shell slice: Market buy/offer drilldown with unmount gate.
- */
-export function FoundationShellRouterMarketBuy({ active, hostProps }: FoundationShellRouterMarketBuyProps) {
-  if (!active) {
-    return null;
-  }
-
-  return (
-    <FoundationTabActiveHost active={active}>
-      <FoundationMarketBuyShellHost {...hostProps} />
     </FoundationTabActiveHost>
   );
 }

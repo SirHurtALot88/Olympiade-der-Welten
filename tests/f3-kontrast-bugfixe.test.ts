@@ -41,21 +41,10 @@ describe("1. Leaders-Podium: Name und Wert haben eine explizite Farbe", () => {
   );
 });
 
-describe("2. Spieler-Detail: Trend-Chip und Social-Zelle", () => {
-  it("die Chip-Paarung gewinnt gegen die generische metric-card-span-Regel", () => {
-    // Gleiche Spezifität wie `.foundation-shell .metric-card span`, spätere
-    // Position — die Paarung Text+Grund kommt wieder aus einer Hand.
-    expect(regel(".foundation-shell .metric-card span.player-drawer-potential-trend-chip")).toContain(
-      "color: var(--heat-neutral-text)",
-    );
-    expect(regel(".foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-negative")).toContain(
-      "color: var(--heat-danger-text)",
-    );
-  });
-
+describe("2. Team-Historie: Social-Zelle (der Spieler-Detail-Trend-Chip entfiel mit der alten Schublade, 18.11.)", () => {
   it("Social-Bereichszelle: Gold deckend genug für die dunkle Schrift", () => {
     const rumpf = regel(
-      ".team-drawer-history-table td.team-drawer-history-area.is-social,\n.player-attribute-progress-table td.player-drawer-history-area.is-social",
+      ".team-drawer-history-table td.team-drawer-history-area.is-social",
     );
     expect(rumpf).toContain("rgba(203, 169, 93, 0.85)");
     expect(rumpf).toContain("color: #14120f");

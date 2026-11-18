@@ -304,6 +304,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameRamonaTeamIds = [],
     newGameLeagueOverride,
     newGameMode,
     newGamePresetId,
@@ -514,6 +515,13 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     : !selectedIdentityDraft || !selectedTeamStrategyDraft
       ? "Für dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
       : null;
+
+  // Ramona (dritte Spielerin, 18.11.): direkt aus den gespeicherten Steuerungsfeldern, nicht aus einem
+  // eigenen Zustand — die Zuordnung steht seit dem Anlegen fest und wird hier nur gezeigt.
+  const gespeicherteRamonaTeamIds: string[] = deriveChrisFrankyTeamIdsFromSettings(
+    gameState.teams,
+    buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
+  ).ramonaTeamIds;
 
   /** Draft-Verwerfen: identisch zum alten Panel (Identity/Control/Strategy). */
   function discardDrafts() {
@@ -786,11 +794,17 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             />
             <StatChip
               label="KI-Teams"
-              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+              value={Math.max(
+                0,
+                gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length - newGameRamonaTeamIds.length,
+              )}
               sub="automatisch"
             />
             {newGameFrankyTeamIds.length > 0 ? (
               <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
+            ) : null}
+            {newGameRamonaTeamIds.length > 0 ? (
+              <StatChip label="3. Spielerin" value={`${newGameRamonaTeamIds.length}/4`} tone="warn" sub="Ramona · Halbautomatik" />
             ) : null}
           </StatChipRow>
         </div>
@@ -853,12 +867,13 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             .map((team) => {
               const isChris = newGameChrisTeamIds.includes(team.teamId);
               const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+              const isRamona = newGameRamonaTeamIds.includes(team.teamId);
               const logo = getTeamLogoModel(team, { variant: "thumb" });
-              const selectDisabled = newGameBusy || readMeta.readOnly || isFranky;
+              const selectDisabled = newGameBusy || readMeta.readOnly || isFranky || isRamona;
               return (
                 <article
                   key={`new-game-team-${team.teamId}`}
-                  className={`nl-newgame-club${isChris ? " is-picked" : ""}${isFranky ? " is-franky" : ""}`}
+                  className={`nl-newgame-club${isChris ? " is-picked" : ""}${isFranky || isRamona ? " is-franky" : ""}`}
                 >
                   <button
                     type="button"
@@ -868,7 +883,9 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     title={
                       isFranky
                         ? "Dieses Team ist bereits dem 2. Spieler zugeordnet."
-                        : readMeta.readOnly
+                        : isRamona
+                          ? "Dieses Team ist bereits Ramona zugeordnet."
+                          : readMeta.readOnly
                           ? getReadOnlyActionReason("die Team-Zuordnung")
                           : newGameBusy
                             ? getBusyActionReason("Das New-Game-Setup")
@@ -898,6 +915,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                       <span className="nl-newgame-club-badge">DEIN TEAM ✓</span>
                     ) : isFranky ? (
                       <span className="nl-newgame-club-badge is-franky">2. Spieler</span>
+                    ) : isRamona ? (
+                      <span className="nl-newgame-club-badge is-franky">Ramona</span>
                     ) : null}
                   </button>
                   <button
@@ -925,19 +944,24 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           verwechselt.
         */}
         <details className="nl-teamsettings-details" open>
-          <summary>2. Spieler (lokal, am selben Gerät)</summary>
+          <summary>Mitspieler (Franky, Ramona)</summary>
           <p className="nl-teamsettings-note">
-            Optional: Weise zusätzliche Teams einem zweiten menschlichen Spieler (Franky) zu, der
-            am selben Gerät mitspielt — funktioniert bereits heute, nicht erst "später". Für den
-            Single-Player-Start kannst du diesen Bereich ignorieren — ohne Auswahl bleiben alle übrigen Teams bei
-            der KI. Echtes Online-Multiplayer (eigener Raum-Link) ist ein separates Feature und
-            weiterhin nicht Teil dieses Assistenten.
+            Optional: Weise zusätzliche Teams Franky oder Ramona zu. Beide spielen mit eigenem Login
+            im selben Spielstand mit. Für den Single-Player-Start kannst du diesen Bereich ignorieren —
+            ohne Auswahl bleiben alle übrigen Teams bei der KI. Ramonas Teams starten in der{" "}
+            <strong>Halbautomatik</strong>: die KI stellt auf, pickt im Draft und setzt das Training,
+            Käufe und Verkäufe macht sie selbst. Was sie selbst setzt, überschreibt die KI nicht.
           </p>
           <div className="nl-teamsettings-metric-grid">
             <NlMetric
               label="Franky"
               value={`${newGameFrankyTeamIds.length}/4`}
               sub={newGameFrankyTeamIds.join(" · ") || "kein Team"}
+            />
+            <NlMetric
+              label="Ramona · Halbautomatik"
+              value={`${newGameRamonaTeamIds.length}/4`}
+              sub={newGameRamonaTeamIds.join(" · ") || "kein Team"}
             />
           </div>
           <div className="nl-teamsettings-team-grid">
@@ -947,10 +971,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               .map((team) => {
                 const isChris = newGameChrisTeamIds.includes(team.teamId);
                 const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+                const isRamona = newGameRamonaTeamIds.includes(team.teamId);
                 return (
                   <article
                     key={`new-game-franky-${team.teamId}`}
-                    className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
+                    className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky || isRamona ? " is-owned-franky" : ""}`}
                   >
                     <div className="nl-teamsettings-team-card-main">
                       <strong>{team.shortCode}</strong>
@@ -960,19 +985,41 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                       <button
                         type="button"
                         className={`nl-teamsettings-btn is-small${isFranky ? " is-primary" : ""}`}
-                        disabled={newGameBusy || readMeta.readOnly || isChris}
+                        disabled={newGameBusy || readMeta.readOnly || isChris || isRamona}
                         title={
                           isChris
                             ? "Dieses Team steuerst du bereits selbst."
-                            : readMeta.readOnly
-                              ? getReadOnlyActionReason("die Team-Zuordnung")
-                              : newGameBusy
-                                ? getBusyActionReason("Das New-Game-Setup")
-                                : "Ordnet dieses Team dem 2. Spieler (Franky) zu."
+                            : isRamona
+                              ? "Dieses Team ist bereits Ramona zugeordnet."
+                              : readMeta.readOnly
+                                ? getReadOnlyActionReason("die Team-Zuordnung")
+                                : newGameBusy
+                                  ? getBusyActionReason("Das New-Game-Setup")
+                                  : "Ordnet dieses Team dem 2. Spieler (Franky) zu."
                         }
                         onClick={() => toggleNewGameTeam("franky", team.teamId)}
                       >
                         {isFranky ? "Franky ✓" : "Franky"}
+                      </button>
+                      <button
+                        type="button"
+                        className={`nl-teamsettings-btn is-small${isRamona ? " is-primary" : ""}`}
+                        data-testid={`new-game-ramona-${team.teamId}`}
+                        disabled={newGameBusy || readMeta.readOnly || isChris || isFranky}
+                        title={
+                          isChris
+                            ? "Dieses Team steuerst du bereits selbst."
+                            : isFranky
+                              ? "Dieses Team ist bereits Franky zugeordnet."
+                              : readMeta.readOnly
+                                ? getReadOnlyActionReason("die Team-Zuordnung")
+                                : newGameBusy
+                                  ? getBusyActionReason("Das New-Game-Setup")
+                                  : "Ordnet dieses Team Ramona zu (Halbautomatik)."
+                        }
+                        onClick={() => toggleNewGameTeam("ramona", team.teamId)}
+                      >
+                        {isRamona ? "Ramona ✓" : "Ramona"}
                       </button>
                     </div>
                   </article>
@@ -1052,8 +1099,12 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               />
               <NlMetric
                 label="Ownership"
-                value={`${newGamePreview.counts.chris}+${newGamePreview.counts.franky}+${newGamePreview.counts.ai}`}
-                sub="Chris · Franky · AI"
+                value={
+                  (newGamePreview.counts.ramona ?? 0) > 0
+                    ? `${newGamePreview.counts.chris}+${newGamePreview.counts.franky}+${newGamePreview.counts.ramona}+${newGamePreview.counts.ai}`
+                    : `${newGamePreview.counts.chris}+${newGamePreview.counts.franky}+${newGamePreview.counts.ai}`
+                }
+                sub={(newGamePreview.counts.ramona ?? 0) > 0 ? "Chris · Franky · Ramona · AI" : "Chris · Franky · AI"}
               />
               <NlMetric
                 label="Room"
@@ -2018,6 +2069,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               Franky {currentSaveOwnership.frankyTeamIds.length}/{gameModeOwnershipLimits.frankyMax}
             </span>
           ) : null}
+          {gespeicherteRamonaTeamIds.length > 0 ? (
+            <span className="nl-teamsettings-hint">
+              Ramona {gespeicherteRamonaTeamIds.length}/{gameModeOwnershipLimits.ramonaMax ?? 4}
+            </span>
+          ) : null}
           <span className="nl-teamsettings-hint">AI {aiTeams.length}</span>
           <span className={`nl-teamsettings-hint${readMeta.readOnly ? " is-warn" : ""}`}>Speichern: {readSourceLabel}</span>
         </div>
@@ -2059,13 +2115,21 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 sub={currentSaveOwnership.frankyTeamIds.join(" · ") || "kein Team"}
               />
             ) : null}
+            {gespeicherteRamonaTeamIds.length > 0 ? (
+              <NlMetric
+                label="Ramona · Halbautomatik"
+                value={gespeicherteRamonaTeamIds.length}
+                sub={gespeicherteRamonaTeamIds.join(" · ")}
+              />
+            ) : null}
             <NlMetric
               label="KI"
               value={Math.max(
                 0,
                 gameState.teams.length -
                   currentSaveOwnership.chrisTeamIds.length -
-                  currentSaveOwnership.frankyTeamIds.length,
+                  currentSaveOwnership.frankyTeamIds.length -
+                  gespeicherteRamonaTeamIds.length,
               )}
               sub="automatisch"
             />

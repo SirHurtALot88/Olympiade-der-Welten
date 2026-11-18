@@ -607,11 +607,6 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(marketSellHostText).toContain("use-market-sell-derivations");
-    const marketBuyHostText = await fs.readFile(
-      path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx"),
-      "utf8",
-    );
-    expect(marketBuyHostText).toContain("use-market-buy-derivations");
 
     /**
      * DIE TESTIDS STEHEN NICHT MEHR IN DEN HOSTS. Seit „Kauf und Verkauf auf einer Huelle" (#345)
@@ -627,17 +622,16 @@ describe("foundation performance architecture helpers", () => {
      * und die Huelle macht daraus wirklich ein `data-testid`.
      */
     expect(marketSellHostText).toContain('testId="transfer-sell-page"');
-    expect(marketBuyHostText).toContain('testId="transfer-offer-page"');
     const decisionSurfaceText = await fs.readFile(
       path.join(root, "app/foundation/decision-surface/FoundationDecisionSurface.tsx"),
       "utf8",
     );
     expect(decisionSurfaceText).toContain("data-testid={testId}");
-    const transfermarktV2Text = await fs.readFile(
-      path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
+    const transfermarktModernText = await fs.readFile(
+      path.join(root, "app/foundation/transfermarkt-modern/TransfermarktModern.tsx"),
       "utf8",
     );
-    expect(transfermarktV2Text).toContain("FoundationShellRouterMarketBuy");
+    expect(transfermarktModernText).toContain("VerhandlungsTisch");
     const resultHostShellText = await fs.readFile(
       path.join(root, "app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx"),
       "utf8",
@@ -906,7 +900,11 @@ describe("foundation performance architecture helpers", () => {
     // unveraendertes Verhalten). Er sitzt bewusst im selben `newGame*`-Bausatz wie
     // `newGameChrisTeamIds`/`newGameFrankyTeamIds` direkt daneben, aus dem `runNewGameSetup()`
     // den `/api/new-game`-Payload baut — dieselbe Begruendung wie beim vorigen Zugang hier.
+    // 242 -> 243, wieder bewusst statt heimlich: Ramona als dritte waehlbare Spielerin (Chris,
+    // 18.11., docs/design/mehrspieler-delegation-18-11.md) ergaenzt GENAU EINEN Zustand —
+    // `newGameRamonaTeamIds`, das Gegenstueck zu `newGameFrankyTeamIds` im selben Bausatz, aus dem
+    // `runNewGameSetup()` den Payload baut. Dieselbe Begruendung wie bei den Zugaengen davor.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(242);
+    expect(useStateCallCount).toBeLessThanOrEqual(243);
   });
 });

@@ -13,6 +13,7 @@
  * der Engine), nicht den Spieltag.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -147,7 +148,13 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
     rohdatenByPodId.set(pod.id, uebersetze(pod, input.disciplineId, k, ergebnis));
     for (const eintrag of ergebnis.boxscore) {
       if (!eintrag.playerId) continue;
-      playerPpsByPlayerId.set(eintrag.playerId, ppAusBahnPodWert(eintrag.wert, referenz));
+      playerPpsByPlayerId.set(
+        eintrag.playerId,
+        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
+        ppSkalaAktiv()
+          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz })
+          : ppAusBahnPodWert(eintrag.wert, referenz),
+      );
     }
   });
 

@@ -106,19 +106,15 @@ describe("eine Implementierung, keine Zwillinge", () => {
   it("formatNegotiationSignalLabel ist genau einmal definiert", () => {
     const definitionen = [
       "lib/foundation/tabs/foundation-format-render-helpers.ts",
-      "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx",
-      "lib/foundation/tabs/use-market-buy-derivations.ts",
+      "app/foundation/transfermarkt-modern/VerhandlungsTisch.tsx",
     ]
       .map((pfad) => quelle(pfad))
       .flatMap((inhalt) => inhalt.match(/function formatNegotiationSignalLabel\(/g) ?? []);
     expect(definitionen).toHaveLength(1);
   });
 
-  it("die früheren Duplikat-Stellen importieren die geteilte Funktion", () => {
-    expect(quelle("app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx")).toContain(
-      'import { formatNegotiationSignalLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers"',
-    );
-    expect(quelle("lib/foundation/tabs/use-market-buy-derivations.ts")).toContain(
+  it("der Verhandlungstisch importiert die geteilte Funktion", () => {
+    expect(quelle("app/foundation/transfermarkt-modern/VerhandlungsTisch.tsx")).toContain(
       'import { formatNegotiationSignalLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers"',
     );
   });

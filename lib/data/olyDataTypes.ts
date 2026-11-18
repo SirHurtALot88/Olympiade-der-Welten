@@ -135,6 +135,12 @@ export type ScenarioMeta = {
   // `createRoomCoopSave`s Aufruf in room-store.ts) -- nur die zwei fuer Paket 2 tatsaechlich
   // benoetigten Stellen (hier und lib/persistence/types.ts) wurden ergaenzt.
   saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
+  /**
+   * Fog of War des Transfermarkts (Chris, 18.11.): `true` schaltet den Scouting-Nebel ganz aus, alle Werte erscheinen
+   * exakt und werden danach sortiert (Test und Spielbeginn). Fehlt das Feld, ist der Nebel AN (Standard). Gelesen von
+   * `lib/market/transfermarkt-nebel-einstellung.ts`.
+   */
+  scoutingNebelAus?: boolean;
   newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
   humanControlledTeamCount?: number;
   createdAt: string;
@@ -277,6 +283,8 @@ export type PlayerFormHistoryEntry = {
   disziplinId?: string | null;
   /** Bremse: Erschoepfung (Punkte Abzug am Ziel) oder Verletzung (feste Punkte). */
   bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
+  /** Abzug durch Trainings-Ueberlastung (Regel E), Punkte > 0, sonst null. */
+  ueberlastung?: number | null;
 };
 
 /**
@@ -301,6 +309,39 @@ export type PlayerFormVerlaufEintrag = {
   b?: { a: "e" | "v"; p: number };
   /** Form davor, nur am ersten Eintrag einer Saison (sonst der Wert des Vor-Eintrags). */
   v?: number;
+  /** Abzug durch Trainings-Ueberlastung (Regel E, Punkte > 0), zusaetzlich zur Bremse. */
+  u?: number;
+};
+
+/** Ziel-Disziplin + Weg fuer das Training (Regel A). `weg` 0 = Primaerweg (Hauptattribut), 1/2 = Nebenweg. */
+export type PlayerTrainingsZiel = {
+  disziplinId: string;
+  /** Index in die drei schwersten Matrix-Attribute der Disziplin: dieses bekommt 60 %. */
+  weg: 0 | 1 | 2;
+  gesetztAm?: string;
+};
+
+/**
+ * Gespeicherter Trainings-Eintrag eines Spieltags (KOMPAKT wie der Form-Verlauf). Lesen ueber
+ * `entpackeTrainingsVerlauf` in `lib/training/spieltag-training.ts`.
+ */
+export type TrainingsSpieltagEintrag = {
+  /** Spieltag-Id. */
+  m: string;
+  /** "t" = trainiert und gebucht, "v" = verletzt (kein Zuwachs, keine Trainingslast). */
+  s: "t" | "v";
+  /** Ziel-Disziplin. */
+  d?: string;
+  /** Weg-Index (0 = Primaerweg). */
+  w?: 0 | 1 | 2;
+  /** Quelle des Ziels: "m" vom Manager gesetzt, "k" KI-Vorschlag. */
+  q?: "m" | "k";
+  /** Intensitaet. */
+  i?: "leicht" | "mittel" | "hart";
+  /** Gebuchter Zuwachs je Attribut (nur Werte ungleich 0), nach Decke. */
+  z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
+  l?: number;
 };
 
 export type PlayerFormState = {
@@ -1060,7 +1101,24 @@ export type Player = {
     modeByMatchday: Record<string, "leicht" | "mittel" | "hart">;
     accumulatedTrainingFatigue: number;
     updatedAt: string;
+    /**
+     * TRAINING JE SPIELTAG (Chris, 18.11., `lib/training/spieltag-training.ts`): je abgerechnetem
+     * Spieltag ein Eintrag — was trainiert wurde, welcher Zuwachs GEBUCHT wurde, welche Last. Ein
+     * Spieltag mit Eintrag `s: "t"` ist je Spieltag gebucht und zaehlt am Saisonende NICHT noch
+     * einmal ins Trainingsbudget. Kompakt gespeichert, lesbar ueber `entpackeTrainingsVerlauf`.
+     * Fehlt das Feld (Alt-Stand, Schalter aus), gilt die alte Saisonend-Buchung.
+     */
+    verlauf?: TrainingsSpieltagEintrag[];
+    /** Attribute vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonbilanz). */
+    startAttribute?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+    /** Disziplinwerte vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonend-Delta). */
+    startDisziplinwerte?: Record<string, number>;
   } | null;
+  /**
+   * Ziel-Disziplin + Weg (Regel A, Chris 18.11.). Vom Manager gesetzt; fehlt es, trainiert der Spieler
+   * auf den Vorschlag der KI-Logik (fuer Mensch und KI dieselbe). Wirkt ab dem naechsten Spieltag.
+   */
+  trainingsZiel?: PlayerTrainingsZiel | null;
   cost?: number;
   upkeepBase?: number;
   className: string;
@@ -1260,8 +1318,37 @@ export type TeamControlSettings = {
    * draussen sein.
    */
   lendingBudget?: number | null;
+  /**
+   * DELEGATION JE BEREICH (Chris, 18.11., docs/design/mehrspieler-delegation-18-11.md): welcher
+   * Bereich eines MENSCHLICHEN Teams von der KI erledigt wird. Nur fuer `controlMode: "manual"` von
+   * Belang. Fehlt das Feld, gilt die Voreinstellung des Besitzers (`resolveTeamDelegation` in
+   * lib/foundation/team-delegation.ts): Chris/Franky „voll selbst“ (= Verhalten wie vor dem Feld),
+   * Ramona „Halbautomatik“.
+   */
+  delegation?: TeamDelegation | null;
   notes?: string | null;
   strategyLock?: string | null;
+};
+
+/** Die Bereiche, die ein menschlicher Manager selbst entscheidet oder an die KI abgibt. */
+export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor";
+
+/** Die drei festen Stufen; Einzelschalter in `TeamDelegation.bereiche` gehen ihnen vor. */
+export type DelegationStufe = "voll_selbst" | "halbautomatik" | "voll_ki";
+
+export type DelegationWahl = "selbst" | "ki";
+
+export type TeamDelegation = {
+  stufe: DelegationStufe;
+  /** Einzelschalter je Bereich; ueberschreiben die Stufe. */
+  bereiche?: Partial<Record<DelegationBereich, DelegationWahl>> | null;
+  /**
+   * „Mensch ueberschreibt, KI respektiert das“ fuer das Training: Spieler, deren Trainingsmodus/
+   * -klasse der Mensch selbst gesetzt hat. Die delegierte KI fasst sie nicht an, bis der Mensch
+   * den Spieler zurueck auf KI stellt (`/api/training` mit `zurueckAufKi: true`).
+   */
+  trainingSelbstSpielerIds?: string[] | null;
+  geaendertAm?: string | null;
 };
 
 export type TeamStrategyBias = {

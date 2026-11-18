@@ -118,6 +118,12 @@ export type TransfermarktFreeAgentItem = {
   tormentRating: TransfermarktRatingTier | null;
   attributeStatValues?: TransfermarktAttributeValues | null;
   topDisciplineScores: TransfermarktDisciplineScore[];
+  /**
+   * Sichtbare Schätzung der Eignung in ALLEN Disziplinen (Disziplin-Id → Wert 20..99), gerechnet mit der
+   * Scouting-Stufe des Spielers für das gewählte Team (`buildScoutedDisciplineTiers`, Rauschen schrumpft mit
+   * der Stufe, ab Stufe 5 exakt). Nur der Nebel-Pfad der Markt-Seite liest es (`transfermarkt-sicht.ts`).
+   */
+  disciplineEstimates?: Record<string, number>;
   currentAbilityTier: PlayerProgressionRatingTier | null;
   potentialTier: PlayerProgressionRatingTier | null;
   potentialBand: PlayerPotentialBand;

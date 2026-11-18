@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 
-import type { TransfermarktV2ClientProps } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
+import type { TransfermarktModernProps } from "@/app/foundation/transfermarkt-modern/tm-typen";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 
-const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), {
+const TransfermarktModern = dynamic(() => import("@/app/foundation/transfermarkt-modern/TransfermarktModern"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="marketV2" label="Transfermarkt wird geladen…" />,
 });
@@ -29,7 +29,7 @@ export type FoundationTransfermarktV2PanelProps = {
   selectedTeamLabel: string;
   formatGamePhaseLabel: (phase: string) => string;
   clientKey: string;
-  client: TransfermarktV2ClientProps;
+  client: TransfermarktModernProps;
 };
 
 export default function FoundationTransfermarktV2Panel({
@@ -51,7 +51,7 @@ export default function FoundationTransfermarktV2Panel({
           velo Kopfkarte, die doppelte Legacy-Chrome darüber war redundant.
           Der Transferfenster-Status wird ebenfalls einzig vom Neuer-Look-Client
           (marketWindowNotice) angezeigt. */}
-      <TransfermarktV2Client
+      <TransfermarktModern
         key={clientKey}
         {...client}
         transferWindow={{

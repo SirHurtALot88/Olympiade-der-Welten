@@ -26,6 +26,7 @@
  * schliesslich wirklich gegen diesen Reihum-Kaempfer, das Ergebnis fuer SIE ist nicht erfunden.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runMiniDmFfaPodFixtures,
@@ -184,7 +185,13 @@ function berechnePlayerPpsAusMotorErgebnis(
     if (!eintrag.playerId || !eintrag.teamId) continue;
     const gesetzt = gesetzteRollenJeTeam.get(eintrag.teamId)?.has(eintrag.slotId) ?? false;
     if (!gesetzt) continue; // Reihum-Fallback-Kaempfer bekommt KEINE PP, s. Datei-Kopfkommentar.
-    ppByPlayerId.set(eintrag.playerId, ppAusMiniDmFfaBeitrag(eintrag.beitrag, referenz));
+    ppByPlayerId.set(
+      eintrag.playerId,
+      // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
+      ppSkalaAktiv()
+        ? ppAusKurveSkaliert({ disciplineId: MINI_DM_DISCIPLINE_ID, wert: eintrag.beitrag, referenz })
+        : ppAusMiniDmFfaBeitrag(eintrag.beitrag, referenz),
+    );
   }
   return ppByPlayerId;
 }

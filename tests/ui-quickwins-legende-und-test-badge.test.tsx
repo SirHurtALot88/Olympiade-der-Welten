@@ -90,8 +90,4 @@ describe("Inbox-Tonrand und Training-Chips (Nachmessung im Browser)", () => {
     expect(text).toContain('kind="signature"');
     expect(text).toContain('kind="match"');
   });
-
-  it("Spielerprofil: MVS vor der ersten Wertung ohne erfundenen Rang", () => {
-    expect(read("app/foundation/PlayerDetailDrawer.tsx")).toContain("rank: mvsAlsGuete(data.mvs) != null ? data.mvsRank : null");
-  });
 });

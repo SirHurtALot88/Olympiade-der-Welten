@@ -1605,39 +1605,8 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   background: rgba(239, 68, 68, 0.24);
 }
 
-.player-drawer-profile-card.is-compact {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-}
-
 .player-drawer-role-line {
   margin: 0;
-}
-
-.player-drawer-ca-po-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  gap: 8px 12px;
-}
-
-.player-drawer-ca-po-metric {
-  display: grid;
-  gap: 2px;
-  min-width: 72px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
-.player-drawer-ca-po-metric small {
-  font-size: 0.68rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.58);
 }
 
 .player-drawer-ca-po-label {
@@ -1736,37 +1705,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   background: rgba(211, 83, 72, 0.12);
 }
 
-.player-drawer-header-metrics-band .player-drawer-ca-po-row {
-  display: contents;
-}
-
-.player-drawer-header-metrics-band .player-drawer-ca-po-metric {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 26px;
-  padding: 0 9px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  min-width: 0;
-}
-
-.player-drawer-header-metrics-band .player-drawer-ca-po-metric small {
-  font-size: 0.62rem;
-}
-
-.player-drawer-header-metrics-band .player-drawer-star-rating {
-  font-size: 0.72rem;
-}
-
-.player-drawer-header-metrics-band .player-drawer-star-text.is-compact {
-  font-size: 0.72rem;
-  max-width: 9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .player-drawer-flavor-de {
   margin: 8px 0 0;
   padding: 8px 10px;
@@ -1790,129 +1728,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   height: 100%;
 }
 
-.player-drawer-axis-strip.is-transfer-inline {
-  margin-top: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  align-content: stretch;
-}
-
-.player-drawer-axis-strip.is-transfer-inline.is-compact .player-drawer-axis-chip {
-  min-height: 36px;
-  padding: 4px 6px 4px 0;
-  gap: 0;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-
-.player-drawer-axis-chip-accent {
-  flex: 0 0 4px;
-  align-self: stretch;
-  border-radius: 10px 0 0 10px;
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.player-drawer-axis-chip.is-power .player-drawer-axis-chip-accent {
-  background: rgba(220, 112, 112, 0.92);
-}
-
-.player-drawer-axis-chip.is-speed .player-drawer-axis-chip-accent {
-  background: rgba(126, 211, 141, 0.92);
-}
-
-.player-drawer-axis-chip.is-mental .player-drawer-axis-chip-accent {
-  background: rgba(124, 165, 236, 0.92);
-}
-
-.player-drawer-axis-chip.is-social .player-drawer-axis-chip-accent {
-  background: rgba(229, 178, 93, 0.92);
-}
-
-.player-drawer-axis-chip-hint {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  margin: 0 2px 0 4px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(4, 8, 15, 0.42);
-  color: rgba(226, 235, 249, 0.72);
-  font-size: 0.58rem;
-  font-weight: 900;
-  font-style: italic;
-  line-height: 1;
-  cursor: help;
-}
-
-.player-drawer-axis-chip-inline {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-  padding-right: 6px;
-}
-
-.player-drawer-axis-chip-metric {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  min-width: 0;
-}
-
-.player-drawer-axis-chip-metric.is-pp {
-  justify-content: flex-end;
-}
-
-.player-drawer-axis-chip-metric small {
-  color: rgba(226, 235, 249, 0.62);
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.player-drawer-axis-strip.is-compact .player-drawer-axis-chip strong {
-  font-size: 0.82rem;
-  line-height: 1;
-}
-
-.player-drawer-axis-strip.is-compact .player-drawer-axis-chip-metric em {
-  min-height: 16px;
-  padding: 0 5px;
-  border-radius: 999px;
-  color: rgba(244, 248, 255, 0.88);
-  background: rgba(4, 8, 15, 0.46);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.6rem;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 16px;
-}
-
-.player-drawer-hero-surface .player-drawer-list-grid-wide {
-  margin-top: 8px;
-}
-
-.player-drawer-hero-surface .player-drawer-list-grid-wide .metric-card {
-  padding: 6px 8px;
-  gap: 3px;
-  min-height: 44px;
-}
-
-.player-drawer-hero-surface .player-drawer-list-grid-wide .metric-card strong {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 1rem;
-}
-
 .player-drawer-metric-rank {
   color: rgba(214, 223, 241, 0.72);
   font-size: 0.72rem;
@@ -1920,42 +1735,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   font-weight: 700;
 }
 
-.player-drawer-page .player-drawer-top-grid {
-  grid-template-columns: minmax(200px, 0.72fr) minmax(320px, 1.28fr);
-  gap: 12px;
-}
-
-.player-drawer-page .player-drawer-profile-card.is-compact {
-  min-height: 100%;
-}
-
-.player-drawer-hero-axis-grid {
-  margin-top: 2px;
-}
-
-.player-drawer-axis-source {
-  margin: 0 0 8px;
-  font-size: 0.78rem;
-}
-
-.player-drawer-stats-chart {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-  width: 100%;
-  min-width: 0;
-}
-
-.player-drawer-stats-chart h3 {
-  margin: 0;
-}
-
-.player-drawer-section-block {
-  display: grid;
-  gap: 10px;
-}
-
-.player-profile-shell,
 .team-profile-shell,
 .contract-offer-shell {
   display: grid;
@@ -2013,13 +1792,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   overflow: visible;
 }
 
-.player-drawer.player-drawer-page {
-  width: 100%;
-  max-width: none;
-  max-height: none;
-  overflow: visible;
-}
-
 .foundation-drilldown-page {
   width: 100%;
   min-width: 0;
@@ -2055,27 +1827,15 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
 }
 
 @media (min-width: 1180px) {
-  .player-drawer-page .player-drawer-top-grid {
-    grid-template-columns: minmax(280px, 0.95fr) minmax(320px, 1.35fr);
-  }
+  
 
-  .player-drawer-page .player-drawer-attribute-grid.is-compact {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-  }
+  
 
-  .player-drawer-page .player-drawer-list-grid,
-  .player-drawer-page .player-drawer-list-grid-wide {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  
 
-  .player-drawer-page .player-drawer-development-hero {
-    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
-  }
+  
 
-  .player-drawer-page .player-drawer-transfer-history-shell,
-  .player-drawer-page .player-attribute-progress-table-shell {
-    max-height: 360px;
-  }
+  
 
   .team-profile-body .team-drawer-dashboard-grid {
     grid-template-columns: minmax(260px, 0.85fr) minmax(280px, 1fr) minmax(280px, 1fr);
@@ -2102,9 +1862,7 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
 }
 
 @media (min-width: 1320px) {
-  .player-drawer-page .player-drawer-top-grid {
-    grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.2fr);
-  }
+  
 
   .contract-offer-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -13704,8 +13462,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .foundation-modal-backdrop,
-.season-briefing-backdrop,
-.player-drawer-backdrop {
+.season-briefing-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(3, 7, 13, 0.72);
@@ -13716,25 +13473,12 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   padding: 20px;
 }
 
-.player-drawer-backdrop {
-  z-index: 80;
-}
-
-.player-drawer-backdrop.drawer-layer-front {
-  z-index: 90;
-}
-
-.player-drawer-backdrop.drawer-layer-back {
-  z-index: 80;
-}
-
 .foundation-modal-backdrop,
 .season-briefing-backdrop {
   z-index: 120;
 }
 
-.foundation-modal,
-.player-drawer {
+.foundation-modal {
   width: min(1240px, calc(100vw - 32px));
   max-height: calc(100vh - 40px);
   overflow: auto;
@@ -13784,8 +13528,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   backdrop-filter: blur(18px);
 }
 
-.foundation-modal-body,
-.player-drawer-body {
+.foundation-modal-body {
   display: grid;
   gap: 16px;
   padding: 18px 20px 20px;
@@ -14030,10 +13773,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   }
 }
 
-.player-drawer {
-  max-width: 1120px;
-}
-
 .player-drawer-hero {
   display: flex;
   gap: 22px;
@@ -14139,110 +13878,52 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   flex-basis: 1.75rem;
 }
 
-.player-drawer-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.player-drawer-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-chip.is-positive {
-  color: #c9ffd5;
-  background: rgba(46, 154, 64, 0.18);
-}
-
-.player-drawer-chip.is-negative {
-  color: #ffd2d2;
-  background: rgba(171, 56, 56, 0.18);
-}
-
-.player-drawer-chip.is-subclass {
-  color: #d9e8ff;
-  background: rgba(96, 142, 213, 0.18);
-  border-color: rgba(145, 185, 244, 0.24);
-}
-
-.player-drawer-chip.is-tier-splus,
 .legacy-lineup-slot-attribute-pill.is-tier-splus {
   color: var(--heat-best-text);
   background: var(--heat-best-bg);
   border-color: rgba(230, 240, 255, 0.34);
 }
 
-.player-drawer-chip.is-tier-s,
 .legacy-lineup-slot-attribute-pill.is-tier-s {
   color: var(--heat-elite-text);
   background: var(--heat-elite-bg);
   border-color: rgba(12, 21, 39, 0.2);
 }
 
-.player-drawer-chip.is-tier-a,
 .legacy-lineup-slot-attribute-pill.is-tier-a {
   color: var(--heat-strong-text);
   background: var(--heat-strong-bg);
   border-color: rgba(240, 255, 235, 0.22);
 }
 
-.player-drawer-chip.is-tier-b,
 .legacy-lineup-slot-attribute-pill.is-tier-b {
   color: var(--heat-good-text);
   background: var(--heat-good-bg);
   border-color: rgba(20, 28, 20, 0.18);
 }
 
-.player-drawer-chip.is-tier-c,
 .legacy-lineup-slot-attribute-pill.is-tier-c {
   color: var(--heat-neutral-text);
   background: var(--heat-neutral-bg);
   border-color: rgba(42, 31, 8, 0.18);
 }
 
-.player-drawer-chip.is-tier-d,
 .legacy-lineup-slot-attribute-pill.is-tier-d {
   color: var(--heat-risk-text);
   background: var(--heat-risk-bg);
   border-color: rgba(42, 31, 8, 0.2);
 }
 
-.player-drawer-chip.is-tier-e,
 .legacy-lineup-slot-attribute-pill.is-tier-e {
   color: var(--heat-danger-light-text);
   background: var(--heat-danger-light-bg);
   border-color: rgba(42, 18, 14, 0.2);
 }
 
-.player-drawer-chip.is-tier-f,
 .legacy-lineup-slot-attribute-pill.is-tier-f {
   color: var(--heat-danger-text);
   background: var(--heat-danger-bg);
   border-color: rgba(255, 220, 220, 0.18);
-}
-
-.player-drawer-section {
-  display: grid;
-  gap: 12px;
-}
-
-.player-drawer-section h3 {
-  margin: 0;
-}
-
-.player-drawer-section h4,
-.player-drawer-panel h4 {
-  margin: 0;
 }
 
 .player-drawer-progression-reason-grid {
@@ -14270,99 +13951,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: rgba(220, 229, 244, 0.62);
   font-size: 0.72rem;
   line-height: 1.25;
-}
-
-.player-drawer-tabs {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(27, 34, 47, 0.92), rgba(18, 23, 32, 0.88)),
-    rgba(12, 16, 23, 0.88);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
-}
-
-.player-drawer-tabs a {
-  display: inline-flex;
-  flex: 1 1 112px;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(245, 248, 255, 0.78);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-decoration: none;
-  transition:
-    transform 150ms ease,
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
-}
-
-.player-drawer-tabs a:hover,
-.player-drawer-tabs a:focus-visible {
-  transform: translateY(-1px);
-  border-color: rgba(123, 171, 255, 0.48);
-  background: rgba(91, 145, 218, 0.2);
-  color: #f7fbff;
-}
-
-.player-drawer-dashboard .player-drawer-body {
-  gap: 18px;
-}
-
-.player-drawer-hero-surface {
-  padding: 18px;
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at top left, rgba(76, 123, 201, 0.18), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-top-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
-  gap: 16px;
-  align-items: stretch;
-}
-
-.player-drawer-profile-stack,
-.player-drawer-profile-card {
-  display: grid;
-  gap: 12px;
-}
-
-.player-drawer-profile-card {
-  padding: 16px;
-  min-height: 100%;
-  border-radius: 18px;
-  background: rgba(7, 12, 21, 0.34);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-overline {
-  color: rgba(163, 194, 255, 0.82);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.player-drawer-profile-card h3 {
-  margin: 0;
-  font-size: 1.35rem;
 }
 
 .player-drawer-mini-facts {
@@ -14424,233 +14012,10 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-size: 0.8rem;
 }
 
-.player-drawer-kpi-hero-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.player-drawer-kpi-hero-card {
-  position: relative;
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(10, 15, 25, 0.72), rgba(25, 31, 44, 0.56));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.player-drawer-kpi-hero-card.is-interactive {
-  width: 100%;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    transform 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.player-drawer-kpi-hero-card.is-interactive:hover,
-.player-drawer-kpi-hero-card.is-interactive:focus-visible {
-  border-color: rgba(139, 171, 230, 0.42);
-  transform: translateY(-2px);
-  box-shadow:
-    inset 0 0 0 1px rgba(139, 171, 230, 0.12),
-    0 16px 34px rgba(0, 0, 0, 0.24);
-}
-
-.player-drawer-kpi-link-hint {
-  margin-left: auto;
-  color: rgba(164, 196, 255, 0.82);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.player-drawer-kpi-header,
-.player-drawer-kpi-footer,
-.player-drawer-category-head,
-.player-drawer-category-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: baseline;
-}
-
-.player-drawer-kpi-header span:first-child,
-.player-drawer-category-head span:first-child {
-  color: rgba(244, 247, 255, 0.94);
-  font-size: 0.86rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.player-drawer-kpi-rank,
-.player-drawer-category-head span:last-child,
-.player-drawer-category-meta span {
-  color: rgba(214, 223, 241, 0.7);
-  font-size: 0.8rem;
-}
-
-.player-drawer-kpi-rank {
-  position: absolute;
-  top: -11px;
-  right: 12px;
-  display: inline-flex;
-  align-items: center;
-  min-height: 25px;
-  padding: 0 10px;
-  border-radius: 999px;
-  color: rgba(242, 247, 255, 0.92);
-  background: rgba(10, 15, 25, 0.92);
-  border: 1px solid rgba(139, 171, 230, 0.34);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
-}
-
-.player-drawer-kpi-value {
-  font-size: clamp(1.9rem, 2vw, 2.5rem);
-  line-height: 1;
-}
-
-.player-drawer-kpi-footer {
-  align-items: center;
-}
-
-.player-drawer-kpi-footer small {
-  color: rgba(214, 223, 241, 0.68);
-  font-size: 0.76rem;
-  line-height: 1.35;
-  text-align: right;
-}
-
-.player-drawer-axis-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.player-drawer-axis-chip {
-  display: grid;
-  gap: 9px;
-  min-height: 86px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.player-drawer-axis-chip header > span {
-  color: rgba(244, 247, 255, 0.86);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
-
-.player-drawer-axis-chip-split {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
-}
-
-.player-drawer-axis-chip-split > span,
-.player-drawer-axis-combo-values > span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.player-drawer-axis-chip-split small,
-.player-drawer-axis-combo-values small {
-  color: rgba(226, 235, 249, 0.7);
-  font-size: 0.65rem;
-  font-weight: 800;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.player-drawer-axis-chip strong,
-.player-drawer-axis-combo-values strong {
-  color: #f8fbff;
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
-.player-drawer-axis-chip-split em,
-.player-drawer-axis-combo-values em {
-  justify-self: start;
-  min-height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  color: rgba(244, 248, 255, 0.92);
-  background: rgba(4, 8, 15, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: 0.72rem;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 22px;
-}
-
-.player-drawer-axis-chip.is-power {
-  background: linear-gradient(180deg, rgba(154, 43, 43, 0.28), rgba(83, 21, 21, 0.24));
-  border-color: rgba(220, 112, 112, 0.3);
-}
-
-.player-drawer-axis-chip.is-speed {
-  background: linear-gradient(180deg, rgba(52, 132, 67, 0.28), rgba(22, 76, 36, 0.24));
-  border-color: rgba(126, 211, 141, 0.3);
-}
-
-.player-drawer-axis-chip.is-mental {
-  background: linear-gradient(180deg, rgba(38, 89, 165, 0.28), rgba(18, 49, 99, 0.24));
-  border-color: rgba(124, 165, 236, 0.3);
-}
-
-.player-drawer-axis-chip.is-social {
-  background: linear-gradient(180deg, rgba(180, 125, 36, 0.28), rgba(104, 67, 14, 0.24));
-  border-color: rgba(229, 178, 93, 0.32);
-}
-
-.player-drawer-delta,
-.player-drawer-kpi-missing {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.player-drawer-delta.is-positive {
-  color: #ddffe4;
-  background: rgba(46, 154, 64, 0.24);
-}
-
-.player-drawer-delta.is-negative {
-  color: #ffd6d6;
-  background: rgba(171, 56, 56, 0.24);
-}
-
-.player-drawer-delta.is-neutral,
-.player-drawer-kpi-missing {
-  color: rgba(231, 237, 249, 0.78);
-  background: rgba(255, 255, 255, 0.06);
-}
-
 .player-drawer-kpi-grid,
 .player-drawer-metric-grid,
-.player-drawer-attribute-grid,
 .player-drawer-discipline-grid,
-.player-drawer-axis-grid,
-.player-drawer-list-grid {
+.player-drawer-axis-grid {
   display: grid;
   gap: 10px;
 }
@@ -14667,46 +14032,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.player-drawer-list-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.player-drawer-list-grid-wide {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.player-drawer-attribute-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.player-drawer-attribute-grid.is-compact {
-  grid-template-columns: repeat(12, minmax(52px, 1fr));
-  gap: 6px;
-}
-
-.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card {
-  min-height: 0;
-  padding: 7px 6px;
-  gap: 2px;
-}
-
-.player-drawer-attribute-grid.is-compact .player-drawer-attribute-title {
-  font-size: 0.62rem;
-  letter-spacing: 0.02em;
-  line-height: 1.05;
-}
-
-.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card strong {
-  font-size: 0.88rem;
-  line-height: 1.05;
-}
-
-.player-drawer-attribute-grid.is-compact .player-drawer-affinity-badge {
-  width: 14px;
-  height: 14px;
-  font-size: 0.58rem;
-}
-
 .player-drawer-class-fit-row {
   display: grid;
   gap: 8px;
@@ -14718,21 +14043,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .player-drawer-discipline-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.player-drawer-category-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.player-drawer-category-card {
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .player-drawer-category-button {
@@ -14751,61 +14061,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     0 16px 34px rgba(0, 0, 0, 0.22);
-}
-
-.player-drawer-category-card strong {
-  font-size: 1.7rem;
-  line-height: 1;
-  color: #f7fbff;
-  text-align: left;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.34);
-}
-
-.player-drawer-axis-combo-card:disabled {
-  cursor: default;
-}
-
-.player-drawer-axis-combo-card:disabled:hover {
-  transform: none;
-}
-
-.player-drawer-axis-combo-values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.player-drawer-axis-combo-values strong {
-  font-size: 1.2rem;
-}
-
-.player-drawer-page .player-drawer-category-card {
-  padding: 8px;
-  gap: 5px;
-}
-
-.player-drawer-page .player-drawer-category-card strong {
-  font-size: 1.35rem;
-}
-
-.player-drawer-page .player-drawer-axis-combo-values strong {
-  font-size: 1.05rem;
-}
-
-.player-drawer-category-card.is-power {
-  background: linear-gradient(180deg, rgba(154, 43, 43, 0.28), rgba(83, 21, 21, 0.28));
-}
-
-.player-drawer-category-card.is-speed {
-  background: linear-gradient(180deg, rgba(52, 132, 67, 0.28), rgba(22, 76, 36, 0.28));
-}
-
-.player-drawer-category-card.is-mental {
-  background: linear-gradient(180deg, rgba(38, 89, 165, 0.28), rgba(18, 49, 99, 0.28));
-}
-
-.player-drawer-category-card.is-social {
-  background: linear-gradient(180deg, rgba(180, 125, 36, 0.28), rgba(104, 67, 14, 0.28));
 }
 
 .player-drawer-category-meter {
@@ -14833,455 +14088,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   gap: 10px;
 }
 
-.player-drawer-top-disciplines-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.player-drawer-top-disciplines-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(132px, 152px);
-  gap: 10px;
-  align-items: start;
-}
-
-.player-drawer-season-snapshot {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.player-drawer-season-snapshot-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-}
-
-.player-drawer-season-snapshot-card {
-  display: grid;
-  gap: 4px;
-  padding: 7px 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.player-drawer-season-snapshot-values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.player-drawer-season-snapshot-value {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.player-drawer-season-snapshot-card small {
-  color: rgba(163, 194, 255, 0.72);
-  font-size: 0.62rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.player-drawer-season-snapshot-value strong {
-  color: #f7fbff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.player-drawer-season-snapshot-value em {
-  color: rgba(214, 223, 238, 0.68);
-  font-size: 0.62rem;
-  font-style: normal;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.player-drawer-season-snapshot-card strong {
-  color: #f7fbff;
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.player-drawer-season-snapshot-card em {
-  color: rgba(214, 223, 238, 0.76);
-  font-size: 0.72rem;
-  font-style: normal;
-}
-
-/* Modernisierte "Top-Disziplinen"-Tabelle (ersetzt die frühere plain-graue
-   `team-table`): dunkles Panel im player-drawer-Look, Diszi-Chip mit Area-
-   Tint, Mini-Bar unter dem Stat-Wert, sortierbare Spaltenköpfe (unverändert
-   wiederverwendet aus dem Drag/Sort-State). Zeigt bei eigenen Spielern ALLE
-   Disziplinen (nicht nur Top-5); Scouting-Profile bleiben auf Diszi + grobe
-   Klasse beschränkt (Fog-of-war, siehe `visibleTopDisciplineColumnIds`). */
-.player-drawer-disciplines-table-shell {
-  max-height: 360px;
-  overflow: auto;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.player-drawer-disciplines-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
-}
-
-.player-drawer-disciplines-table th,
-.player-drawer-disciplines-table td {
-  padding: 7px 10px;
-  text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.player-drawer-disciplines-table thead th {
-  position: sticky;
-  top: 0;
-  background: rgba(20, 26, 36, 0.94);
-  color: rgba(214, 223, 241, 0.72);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  z-index: 1;
-}
-
-.player-drawer-disciplines-table tbody tr {
-  transition: background-color 140ms ease;
-}
-
-.player-drawer-disciplines-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-draggable-header {
-  user-select: none;
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-draggable-header.is-dragging {
-  opacity: 0.58;
-  outline: 1px dashed rgba(135, 177, 242, 0.72);
-  outline-offset: -4px;
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-column-header {
-  min-width: max-content;
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-draggable-header:hover .player-drawer-column-header {
-  color: #ffffff;
-}
-
-.player-drawer-disciplines-table tbody td.player-drawer-discipline-name-cell {
-  position: relative;
-  overflow: hidden;
-  box-shadow: inset 4px 0 0 var(--discipline-area-accent, rgba(255, 255, 255, 0.22));
-}
-
-.player-drawer-disc-table-stat {
-  display: grid;
-  gap: 3px;
-  min-width: 64px;
-}
-
-.player-drawer-disc-table-stat-value {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: #f7fbff;
-}
-
-.player-drawer-disc-table-stat-bar {
-  position: relative;
-  height: 4px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-disc-table-stat-bar-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.76));
-}
-
-.player-drawer-season-snapshot-heading {
-  margin: 0 0 2px;
-  color: rgba(163, 194, 255, 0.72);
-  font-size: 0.66rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.player-drawer-discipline-name-cell.is-power,
-.player-drawer-discipline-area-chip.is-power {
-  --discipline-area-accent: #d6574d;
-  --discipline-area-soft: rgba(214, 87, 77, 0.24);
-  --discipline-area-text: #ffd4cf;
-}
-
-.player-drawer-discipline-name-cell.is-speed,
-.player-drawer-discipline-area-chip.is-speed {
-  --discipline-area-accent: #69b864;
-  --discipline-area-soft: rgba(105, 184, 100, 0.24);
-  --discipline-area-text: #d7ffd3;
-}
-
-.player-drawer-discipline-name-cell.is-mental,
-.player-drawer-discipline-area-chip.is-mental {
-  --discipline-area-accent: #6d9df0;
-  --discipline-area-soft: rgba(109, 157, 240, 0.24);
-  --discipline-area-text: #dceaff;
-}
-
-.player-drawer-discipline-name-cell.is-social,
-.player-drawer-discipline-area-chip.is-social {
-  --discipline-area-accent: #e2ba57;
-  --discipline-area-soft: rgba(226, 186, 87, 0.26);
-  --discipline-area-text: #fff0c8;
-}
-
-.player-drawer-discipline-area-chip {
-  padding: 0.14rem 0.46rem 0.14rem 0.16rem;
-  border-radius: 999px;
-  background: var(--discipline-area-soft);
-  border: 1px solid color-mix(in srgb, var(--discipline-area-accent) 62%, transparent);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 6px 14px rgba(0, 0, 0, 0.18);
-}
-
-.player-drawer-discipline-area-chip .discipline-icon-label {
-  color: var(--discipline-area-text);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.38);
-}
-
-.player-drawer-discipline-area-chip .discipline-icon {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 0 0 1px color-mix(in srgb, var(--discipline-area-accent) 72%, transparent),
-    0 0 16px color-mix(in srgb, var(--discipline-area-accent) 42%, transparent);
-}
-
-/* Achsen-KPI-Karte konsolidiert (Space-Saving statt separater "Top-
-   Disziplinen"-Tabelle + Achsen-"Detail"-Tabelle): Top-5-Diszis dieser Achse
-   als kompakte Mini-Bar-Zeilen direkt in der Karte, PPs-All-Time steckt in
-   `.player-drawer-category-meta` (siehe oben). */
-.player-drawer-axis-discipline-list {
-  display: grid;
-  gap: 5px;
-  margin-top: 4px;
-}
-
-.player-drawer-axis-discipline-row {
-  display: grid;
-  gap: 2px;
-}
-
-.player-drawer-axis-discipline-row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 0.72rem;
-}
-
-.player-drawer-axis-discipline-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  overflow: hidden;
-  color: rgba(230, 237, 249, 0.88);
-}
-
-.player-drawer-axis-discipline-label .discipline-icon-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.player-drawer-axis-discipline-count {
-  flex: 0 0 auto;
-  color: rgba(214, 223, 241, 0.62);
-  font-weight: 700;
-}
-
-.player-drawer-axis-discipline-value {
-  flex: 0 0 auto;
-  color: #f7fbff;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Projizierte Auswirkung des Saison-Trainings, als kleine Marke hinter dem Diszi-Wert.
-   Bewusst leiser als der Wert selbst: gebucht ist sie noch nicht. */
-.player-drawer-axis-discipline-forecast {
-  margin-left: 4px;
-  font-size: 0.78em;
-  font-style: normal;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: rgba(214, 223, 241, 0.62);
-}
-
-.player-drawer-axis-discipline-forecast.is-positive {
-  color: #6ee7a8;
-}
-
-.player-drawer-axis-discipline-forecast.is-negative {
-  color: #f98a8a;
-}
-
-/* DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): einklappbares Panel
-   unter der Disziplin-Zeile, Vorbild battle-mode.html#p3 (KAMPFWERTE + LAUFBAHN), aber mit echten
-   gebuchten Zahlen statt Beispielwerten. */
-.player-drawer-axis-discipline-laufbahn-toggle {
-  display: block;
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-}
-
-.player-drawer-axis-discipline-laufbahn-toggle:focus-visible {
-  outline: 2px solid rgba(124, 196, 255, 0.65);
-  outline-offset: 1px;
-  border-radius: 4px;
-}
-
-.player-drawer-axis-discipline-laufbahn-chevron {
-  flex: 0 0 auto;
-  color: rgba(214, 223, 241, 0.55);
-  font-size: 0.7em;
-}
-
-.player-drawer-axis-discipline-laufbahn-panel {
-  display: grid;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(124, 196, 255, 0.06);
-  border: 1px solid rgba(124, 196, 255, 0.18);
-}
-
-.player-drawer-axis-discipline-laufbahn-heading {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: rgba(230, 237, 249, 0.72);
-}
-
-.player-drawer-axis-discipline-laufbahn-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 2px;
-}
-
-.player-drawer-axis-discipline-laufbahn-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.player-drawer-axis-discipline-laufbahn-stat small {
-  font-size: 0.62rem;
-  color: rgba(214, 223, 241, 0.6);
-}
-
-.player-drawer-axis-discipline-laufbahn-stat strong {
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  color: #f7fbff;
-}
-
-.player-drawer-axis-discipline-laufbahn-seasons {
-  display: grid;
-  gap: 3px;
-  margin-top: 4px;
-}
-
-.player-drawer-axis-discipline-laufbahn-season-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.68rem;
-  color: rgba(214, 223, 241, 0.78);
-}
-
-.player-drawer-axis-discipline-laufbahn-season-row.is-active {
-  color: #f7fbff;
-  font-weight: 700;
-}
-
-.player-drawer-axis-discipline-laufbahn-season-label em {
-  font-style: normal;
-  color: #6ee7a8;
-}
-
-.player-drawer-axis-discipline-laufbahn-season-values {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  flex: 0 0 auto;
-}
-
-.player-drawer-discipline-forecast {
-  margin-top: 10px;
-}
-
-.player-drawer-discipline-forecast-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.player-drawer-discipline-forecast-list li {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.player-drawer-discipline-forecast-label {
-  font-weight: 700;
-  color: rgba(214, 223, 241, 0.86);
-}
-
-.player-drawer-discipline-forecast-delta {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: rgba(214, 223, 241, 0.62);
-}
-
-.player-drawer-discipline-forecast-delta.is-positive {
-  color: #6ee7a8;
-}
-
-.player-drawer-discipline-forecast-delta.is-negative {
-  color: #f98a8a;
-}
-
 .player-drawer-axis-discipline-meter {
   position: relative;
   height: 4px;
@@ -15297,55 +14103,10 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.74));
 }
 
-.player-drawer-axis-discipline-empty {
-  font-size: 0.72rem;
-}
-
-/* #106: Liga-Leaders-Link im Kopf der Achsen-Karte (klein, eigenständig). Das
-   frühere Aufklapp-Toggle für ein Diszi-Detail direkt in der Karte wurde
-   entfernt (PO-Feedback) — das volle Detail lebt jetzt ausschließlich in der
-   dedizierten "Top-Disziplinen"-Tabelle weiter unten. */
-.player-drawer-axis-card-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.player-drawer-axis-leaders-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  font-size: 0.72rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
-}
-
-.player-drawer-axis-leaders-btn:hover,
-.player-drawer-axis-leaders-btn:focus-visible {
-  border-color: rgba(139, 171, 230, 0.5);
-  background: rgba(139, 171, 230, 0.16);
-  transform: translateY(-1px);
-}
-
 .player-drawer-two-column-grid {
   display: grid;
   grid-template-columns: 1.08fr 1fr;
   gap: 16px;
-}
-
-.player-drawer-panel {
-  padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .player-drawer-profile-columns {
@@ -15371,13 +14132,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   gap: 16px;
 }
 
-.player-drawer-inline-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
 .player-drawer-callout {
   display: grid;
   gap: 4px;
@@ -15391,75 +14145,11 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   margin: 0;
 }
 
-.player-drawer-injury-banner {
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.player-drawer-injury-banner.is-negative {
-  border-color: rgba(255, 96, 96, 0.35);
-  background: rgba(255, 96, 96, 0.08);
-}
-
-.player-drawer-injury-banner.is-warning {
-  border-color: rgba(255, 196, 72, 0.35);
-  background: rgba(255, 196, 72, 0.08);
-}
-
-.player-drawer-injury-banner strong {
-  font-size: 0.95rem;
-}
-
-.player-drawer-injury-banner span {
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 0.88rem;
-}
-
-.player-drawer-injury-history {
-  margin-top: 18px;
-}
-
-.player-drawer-injury-history h4 {
-  margin: 0 0 10px;
-}
-
-.player-drawer-injury-history-table th,
-.player-drawer-injury-history-table td {
-  white-space: nowrap;
-}
-
 .player-drawer-history-table th,
 .player-drawer-history-table td,
 .player-drawer-breakdown-table th,
 .player-drawer-breakdown-table td {
   white-space: nowrap;
-}
-
-.player-drawer .metric-card {
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer .metric-card strong {
-  font-size: 1rem;
-  line-height: 1.25;
-}
-
-.player-drawer .metric-card small {
-  color: rgba(235, 239, 247, 0.68);
-  font-size: 0.78rem;
-}
-
-.player-drawer .player-drawer-compact-money-card {
-  padding: 10px 12px;
-  gap: 5px;
-  min-height: 84px;
 }
 
 .player-drawer-inline-value {
@@ -15478,331 +14168,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-weight: 800;
   line-height: 1.1;
   white-space: nowrap;
-}
-
-.player-drawer-star-rating {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  vertical-align: middle;
-}
-
-.player-drawer-star-rating.is-empty {
-  color: rgba(235, 239, 247, 0.62);
-}
-
-.player-drawer-star-rating.is-compact {
-  gap: 4px;
-}
-
-.player-drawer-star-text {
-  color: rgba(235, 239, 247, 0.88);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.player-drawer-star-text.is-compact {
-  font-size: 0.74rem;
-}
-
-.player-drawer-star-label {
-  min-width: 2.1ch;
-  color: rgba(235, 239, 247, 0.66);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.player-drawer-stars {
-  display: inline-flex;
-  gap: 1px;
-  line-height: 1;
-  filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
-}
-
-.player-drawer-star {
-  position: relative;
-  display: inline-block;
-  width: 0.86em;
-  color: rgba(111, 91, 48, 0.72);
-  font-size: 0.96rem;
-}
-
-.player-drawer-star-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  overflow: hidden;
-  color: #ffd76a;
-  text-shadow:
-    0 0 3px rgba(255, 245, 181, 0.95),
-    0 0 9px rgba(255, 191, 49, 0.8),
-    0 1px 0 rgba(85, 47, 7, 0.65);
-}
-
-.player-drawer-star-empty {
-  color: rgba(103, 89, 61, 0.58);
-}
-
-.player-drawer-star-rating.is-range .player-drawer-stars {
-  filter: none;
-}
-
-.player-drawer-star.is-inactive .player-drawer-star-empty {
-  color: rgba(103, 89, 61, 0.28);
-}
-
-.player-drawer-star-uncertain {
-  position: absolute;
-  inset: 0 auto 0 0;
-  overflow: hidden;
-  color: #12151c;
-  text-shadow:
-    0 0 1px rgba(255, 255, 255, 0.18),
-    0 1px 0 rgba(0, 0, 0, 0.85);
-}
-
-.player-drawer-star.has-uncertain .player-drawer-star-uncertain {
-  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
-}
-
-.player-drawer-star-stack {
-  display: grid;
-  gap: 5px;
-}
-
-/* Potential & Entwicklung — grafische Potential-vs-Current-Visualisierung,
-   Confidence-Gauge und Entwicklungstrend-Chip. Ton-Klassen nutzen die
-   globalen `--heat-*`-Tokens (immer verfügbar); `.is-new-look` wird lokal
-   auf den Visual-Wrapper gesetzt, damit `--nl-*`/`.nl-tnum` unabhängig vom
-   globalen "Neuer Look"-Flag greifen (gleiches Muster wie `.nl-attr-spark`). */
-.player-drawer-potential-visual-card {
-  display: grid;
-  gap: 10px;
-}
-
-.player-drawer-potential-visual-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 6px 8px;
-}
-
-.player-drawer-potential-visual-head .player-drawer-help-label {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.player-drawer-potential-trend-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  color: var(--heat-neutral-text);
-  background: var(--heat-neutral-bg);
-}
-
-.player-drawer-potential-trend-chip span[aria-hidden="true"] {
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-.player-drawer-potential-trend-chip.is-positive {
-  color: var(--heat-strong-text);
-  background: var(--heat-strong-bg);
-}
-
-.player-drawer-potential-trend-chip.is-warning {
-  color: var(--heat-risk-text);
-  background: var(--heat-risk-bg);
-}
-
-.player-drawer-potential-trend-chip.is-negative {
-  color: var(--heat-danger-text);
-  background: var(--heat-danger-bg);
-}
-
-/* F3 (gemessen 1,3:1): die generische Regel `.foundation-shell .metric-card
-   span` (Weiß 68 %) hat mit ihrer höheren Spezifität die Chip-Paarung
-   übermalt — heller Text auf hellem Gold-Grund. Die Paarungen hier
-   wiederholen die Chip-Farben mit gleicher Spezifität wie die generische
-   Regel, damit Text und Grund wieder aus EINEM Paar kommen. */
-.foundation-shell .metric-card span.player-drawer-potential-trend-chip {
-  color: var(--heat-neutral-text);
-}
-
-.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-positive {
-  color: var(--heat-strong-text);
-}
-
-.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-warning {
-  color: var(--heat-risk-text);
-}
-
-.foundation-shell .metric-card span.player-drawer-potential-trend-chip.is-negative {
-  color: var(--heat-danger-text);
-}
-
-.player-drawer-potential-visual {
-  display: grid;
-  gap: 8px;
-}
-
-.player-drawer-potential-range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.player-drawer-potential-range-value {
-  font-size: 1rem;
-  font-weight: 800;
-  color: rgba(247, 250, 255, 0.95);
-}
-
-.player-drawer-potential-track-wrap {
-  display: grid;
-  gap: 4px;
-}
-
-.player-drawer-potential-track {
-  position: relative;
-  height: 10px;
-  margin-top: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-potential-current-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.34), var(--heat-blue-light));
-}
-
-.player-drawer-potential-band {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  border-radius: 999px;
-  background: rgba(255, 209, 112, 0.3);
-  border: 1px solid rgba(255, 209, 112, 0.68);
-}
-
-.player-drawer-potential-current-marker {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 2px;
-  background: #f7fbff;
-  box-shadow: 0 0 6px rgba(247, 251, 255, 0.7);
-}
-
-.player-drawer-potential-track-labels {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.74rem;
-  color: rgba(220, 229, 244, 0.72);
-}
-
-.player-drawer-potential-gap-label {
-  font-weight: 700;
-  color: rgba(235, 239, 247, 0.92);
-}
-
-.player-drawer-potential-visual-empty {
-  margin: 0;
-  font-size: 0.76rem;
-}
-
-.player-drawer-potential-confidence-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.player-drawer-potential-confidence-label {
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: rgba(220, 229, 244, 0.6);
-}
-
-.player-drawer-potential-confidence-meter {
-  display: inline-flex;
-  gap: 3px;
-}
-
-.player-drawer-potential-confidence-segment {
-  width: 14px;
-  height: 8px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.player-drawer-potential-confidence-meter.is-positive .player-drawer-potential-confidence-segment.is-filled {
-  background: var(--heat-strong-bg);
-}
-
-.player-drawer-potential-confidence-meter.is-neutral .player-drawer-potential-confidence-segment.is-filled,
-.player-drawer-potential-confidence-meter .player-drawer-potential-confidence-segment.is-filled {
-  background: var(--heat-neutral-bg);
-}
-
-.player-drawer-potential-confidence-meter.is-warning .player-drawer-potential-confidence-segment.is-filled {
-  background: var(--heat-risk-bg);
-}
-
-.player-drawer-potential-confidence-meter.is-negative .player-drawer-potential-confidence-segment.is-filled {
-  background: var(--heat-danger-bg);
-}
-
-.player-drawer-potential-confidence-value {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: rgba(235, 239, 247, 0.9);
-}
-
-.player-drawer-potential-scouting-level {
-  margin-left: auto;
-  font-size: 0.72rem;
-  color: rgba(220, 229, 244, 0.6);
-}
-
-.player-drawer-help-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: help;
-}
-
-.player-drawer-help-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  border-radius: 999px;
-  color: rgba(222, 232, 255, 0.9);
-  background: rgba(94, 123, 180, 0.26);
-  border: 1px solid rgba(156, 183, 235, 0.35);
-  font-size: 0.65rem;
-  font-weight: 900;
-  line-height: 1;
 }
 
 .player-drawer-transfer-note {
@@ -15824,225 +14189,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .player-drawer-transfer-note strong {
   color: rgba(245, 248, 255, 0.95);
   font-size: 0.88rem;
-}
-
-.player-drawer-board-trust-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.player-drawer-morale-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.player-drawer-board-trust-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: rgba(148, 163, 184, 0.72);
-}
-
-.player-drawer-morale-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: rgba(148, 163, 184, 0.72);
-}
-
-.player-drawer-board-trust-card.is-happy::before {
-  background: rgba(124, 209, 136, 0.92);
-}
-
-.player-drawer-morale-card.is-excellent::before {
-  background: rgba(92, 205, 145, 0.95);
-}
-
-.player-drawer-morale-card.is-happy::before {
-  background: rgba(124, 209, 136, 0.92);
-}
-
-.player-drawer-board-trust-card.is-neutral::before {
-  background: rgba(226, 184, 86, 0.9);
-}
-
-.player-drawer-morale-card.is-neutral::before {
-  background: rgba(226, 184, 86, 0.9);
-}
-
-.player-drawer-board-trust-card.is-worried::before {
-  background: rgba(232, 148, 91, 0.92);
-}
-
-.player-drawer-morale-card.is-unhappy::before {
-  background: rgba(232, 148, 91, 0.92);
-}
-
-.player-drawer-board-trust-card.is-critical::before {
-  background: rgba(225, 94, 86, 0.95);
-}
-
-.player-drawer-morale-card.is-angry::before {
-  background: rgba(225, 94, 86, 0.95);
-}
-
-.player-drawer-board-trust-reasons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.player-drawer-board-trust-reasons span {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 3px 7px;
-  color: rgba(235, 239, 247, 0.76);
-  background: rgba(255, 255, 255, 0.045);
-  font-size: 0.66rem;
-  line-height: 1;
-}
-
-.player-drawer-attribute-card {
-  min-height: 124px;
-  padding: 12px;
-}
-
-.player-drawer-attribute-card strong {
-  font-size: 1.05rem;
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card strong {
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.player-drawer-attribute-card.is-tier-splus strong,
-.player-drawer-attribute-card.is-tier-s strong {
-  color: var(--heat-elite-text);
-}
-
-.player-drawer-attribute-card.is-tier-a strong,
-.player-drawer-attribute-card.is-tier-b strong {
-  color: var(--heat-strong-text);
-}
-
-.player-drawer-attribute-card.is-tier-c strong,
-.player-drawer-attribute-card.is-tier-d strong {
-  color: var(--heat-good-text);
-}
-
-.player-drawer-attribute-card.is-tier-e strong,
-.player-drawer-attribute-card.is-tier-f strong {
-  color: var(--heat-weak-text);
-}
-
-/* Max-Potenzial pro Attribut (erreichbare Decke). Kleine Sekundärzeile unter dem
-   aktuellen Wert — dezent, akzentuierter Zahlenwert. Fog-of-War-gated über
-   `showExactAttribute` in der TSX (aktuell durch Debug-Sicht immer sichtbar). */
-.player-drawer-attr-ceiling {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  margin-top: 2px;
-  line-height: 1;
-}
-
-.player-drawer-attr-ceiling-label {
-  font-size: 0.58rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--nl-ink);
-  opacity: 0.55;
-}
-
-.player-drawer-attr-ceiling-value {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--nl-accent);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Fog-Unschärfe: der Max ist noch nicht voll aufgedeckt und wird als Range gezeigt —
-   dezent gedämpft + „~"-Präfix, damit klar ist, dass es eine Schätzung ist. */
-.player-drawer-attr-ceiling.is-fogged .player-drawer-attr-ceiling-value {
-  color: var(--nl-ink);
-  opacity: 0.72;
-  font-weight: 600;
-}
-
-.player-drawer-attr-ceiling.is-fogged .player-drawer-attr-ceiling-value::before {
-  content: "~";
-  opacity: 0.7;
-  margin-right: 1px;
-}
-
-.player-drawer-attribute-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 0.72rem;
-}
-
-.player-drawer-attribute-card .player-drawer-chip-row {
-  gap: 6px;
-}
-
-.player-drawer-attribute-card .player-drawer-chip {
-  padding: 5px 8px;
-  font-size: 0.68rem;
-}
-
-.player-drawer-affinity-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 900;
-}
-
-.player-drawer-affinity-badge.is-signature,
-.player-drawer-chip.is-affinity-signature {
-  color: #1f1605;
-  background: linear-gradient(180deg, #ffd872, #b88424);
-  border-color: rgba(255, 217, 116, 0.55);
-  box-shadow: 0 0 14px rgba(244, 194, 77, 0.22);
-}
-
-.player-drawer-affinity-badge.is-weak,
-.player-drawer-chip.is-affinity-weak {
-  color: #ffe6e2;
-  background: linear-gradient(180deg, rgba(171, 49, 43, 0.92), rgba(92, 25, 28, 0.88));
-  border-color: rgba(255, 116, 100, 0.48);
-  box-shadow: 0 0 15px rgba(224, 65, 57, 0.24);
-}
-
-.player-drawer-chip.is-affinity-neutral {
-  color: rgba(235, 239, 247, 0.76);
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.player-drawer-attribute-card.is-affinity-signature {
-  border-color: rgba(255, 216, 116, 0.28);
-  background: linear-gradient(180deg, rgba(132, 93, 26, 0.24), rgba(255, 255, 255, 0.035));
-}
-
-.player-drawer-attribute-card.is-affinity-weak {
-  border-color: rgba(255, 102, 92, 0.28);
-  background: linear-gradient(180deg, rgba(127, 38, 36, 0.22), rgba(255, 255, 255, 0.035));
-}
-
-.player-drawer-delta-line {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.72rem;
-  font-weight: 800;
 }
 
 .player-drawer-development-hero {
@@ -16074,69 +14220,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .player-drawer-affinity-row {
   margin-top: 12px;
-}
-
-.player-drawer-xp-balance-card {
-  grid-column: span 2;
-}
-
-.player-drawer-xp-balance-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.player-drawer-xp-balance-grid span {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.045);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
-}
-
-.player-drawer-xp-balance-grid small {
-  color: rgba(245, 239, 224, 0.58);
-  font-size: 0.68rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.player-drawer-xp-balance-grid strong {
-  font-size: 1.05rem;
-}
-
-.player-drawer-compact-details {
-  margin-top: 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-}
-
-.player-drawer-compact-details summary {
-  cursor: pointer;
-  padding: 12px 14px;
-  color: rgba(245, 239, 224, 0.82);
-  font-family: var(--font-display);
-  font-weight: 900;
-}
-
-.player-drawer-compact-details[open] summary {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-drawer-compact-details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
-}
-
-.player-drawer-compact-details > .player-drawer-chip-row,
-.player-drawer-compact-details > .player-drawer-callout,
-.player-drawer-compact-details > .muted {
-  margin: 0 12px 12px;
 }
 
 .player-drawer-discipline-card {
@@ -17232,23 +15315,19 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   text-align: center;
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-power,
-.player-attribute-progress-table .player-drawer-history-axis.is-power {
+.player-drawer-history-table .player-drawer-history-axis.is-power {
   background: rgba(141, 52, 54, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-speed,
-.player-attribute-progress-table .player-drawer-history-axis.is-speed {
+.player-drawer-history-table .player-drawer-history-axis.is-speed {
   background: rgba(79, 142, 73, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-mental,
-.player-attribute-progress-table .player-drawer-history-axis.is-mental {
+.player-drawer-history-table .player-drawer-history-axis.is-mental {
   background: rgba(36, 79, 159, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-social,
-.player-attribute-progress-table .player-drawer-history-axis.is-social {
+.player-drawer-history-table .player-drawer-history-axis.is-social {
   background: rgba(203, 169, 93, 0.58);
   color: #14120f;
 }
@@ -17275,15 +15354,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   text-transform: uppercase;
 }
 
-.player-drawer-transfer-history-block,
-.player-drawer-training-history-block {
-  margin-top: 18px;
-  display: grid;
-  gap: 10px;
-}
-
-.player-drawer-transfer-history-shell,
-.player-attribute-progress-table-shell {
+.player-drawer-transfer-history-shell {
   max-height: 280px;
   overflow: auto;
   border-radius: 18px;
@@ -17291,8 +15362,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: rgba(5, 8, 14, 0.22);
 }
 
-.player-drawer-transfer-history-table,
-.player-attribute-progress-table {
+.player-drawer-transfer-history-table {
   width: 100%;
   min-width: 0;
   border-collapse: separate;
@@ -17304,9 +15374,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
    `.player-drawer-matchday-training-table` mit. Regeln entfernt statt still durchzufallen. */
 
 .player-drawer-transfer-history-table th,
-.player-drawer-transfer-history-table td,
-.player-attribute-progress-table th,
-.player-attribute-progress-table td {
+.player-drawer-transfer-history-table td {
   padding: 9px 10px;
   white-space: nowrap;
   border-bottom: 1px solid rgba(255, 255, 255, 0.065);
@@ -17314,502 +15382,17 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   text-align: left;
 }
 
-.player-drawer-matchday-training {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.player-drawer-matchday-training-caption {
-  font-size: 0.72rem;
-  line-height: 1.35;
-}
-
-.player-drawer-matchday-training-table {
-  width: 100%;
-  min-width: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.player-drawer-matchday-training-table th,
-.player-drawer-matchday-training-table td {
-  padding: 5px 6px;
-  font-size: 0.68rem;
-  white-space: nowrap;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
-  text-align: left;
-}
-
-.player-drawer-matchday-training-table th.is-attribute-col,
-.player-drawer-matchday-training-table td.is-attribute-col {
-  min-width: 40px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Herkunftszeilen (Training / Leistung / Alterung): Die erste Spalte ist ein <th scope="row">,
-   damit die Zeile auch für Screenreader beschriftet ist. `team-table th` bringt allerdings die
-   Kopfzeilen-Optik mit (Sticky, Versalien, kräftige Farbe) — hier explizit zurückgenommen, sonst
-   sähe jede Datenzeile aus wie ein zweiter Tabellenkopf. */
-.player-drawer-matchday-training-table th.player-drawer-training-origin-label {
-  position: static;
-  top: auto;
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 500;
-  color: var(--nl-mut, #93a3bd);
-  background: transparent;
-  white-space: nowrap;
-}
-
-.player-drawer-matchday-training-table tbody tr[data-row="total"] th.player-drawer-training-origin-label {
-  color: inherit;
-  font-weight: 600;
-}
-
 .player-drawer-matchday-training-cell {
   border-radius: 4px;
   font-weight: 600;
 }
 
-/* Trainingshistorie als Saison-Liste (Wunsch: „das müsste wo die summe steht pro season sein
-   und dann ausklappbar dass man training leistung regression sehen kann"): eine Summenzeile je
-   Saison, die Herkunfts-Zeilen erscheinen erst beim Aufklappen. Der Toggle sitzt IM Zeilenkopf
-   und erbt dessen Typografie — kein Button-Chrome, nur Chevron + Saison + Status-Badge. */
-.player-drawer-training-season-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.player-drawer-training-season-toggle:focus-visible {
-  outline: 2px solid var(--nl-accent-text, #7fb0ff);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.player-drawer-training-season-chevron {
-  color: var(--nl-mut, #93a3bd);
-  font-size: 0.62rem;
-  width: 10px;
-  text-align: center;
-}
-
-.player-drawer-training-season-label {
-  font-weight: 600;
-}
-
-/* Status-Badge: die laufende Saison ist eine PROGNOSE (gestrichelte Kante), abgeschlossene
-   Saisons sind GEBUCHT (durchgezogene Kante) — der Unterschied Hochrechnung/Tatsache bleibt
-   auch ohne Farbe erkennbar. Muted-Ton wie die übrigen Nebentexte der Tabelle. */
-.player-drawer-training-season-badge {
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 1px 7px;
-  border-radius: 999px;
-  color: var(--nl-mut, #93a3bd);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-}
-
-.player-drawer-training-season-badge.is-forecast {
-  border-style: dashed;
-}
-
-.player-drawer-training-season-badge.is-booked {
-  border-style: solid;
-}
-
-/* Potenzial-Drift der Saison (PO vorher→nachher). Steht bewusst in der ZUGEKLAPPTEN Zeile:
-   er erklärt, warum die Folgesaison anders ausfällt, und darf dafür nicht hinter dem Klick
-   liegen. Monospace-Ziffern, damit die Pfeile über die Saisons hinweg untereinander stehen. */
-.player-drawer-training-season-potential {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
-  padding: 1px 6px;
-  border-radius: 999px;
-  color: var(--nl-mut, #93a3bd);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.player-drawer-training-season-potential.is-positive {
-  color: var(--nl-pos, #4ade80);
-  background: rgba(74, 222, 128, 0.12);
-}
-
-.player-drawer-training-season-potential.is-negative {
-  color: var(--nl-neg, #f87171);
-  background: rgba(248, 113, 113, 0.12);
-}
-
-/* Aufgeklappte Herkunfts-Zeilen: eingerückt unter ihrer Saison, damit die Hierarchie
-   (Saison → Posten) auch ohne Rahmen lesbar ist. */
-.player-drawer-training-origin-row th.player-drawer-training-origin-label {
-  padding-left: 27px;
-}
-
-/* Keine erfundenen Zahlen: Saisons ohne mitgeschriebene Herkunft je Attribut sagen es an
-   Ort und Stelle, statt drei Zeilen voller Striche zu zeigen. */
-.player-drawer-matchday-training-table td.player-drawer-training-origin-missing {
-  color: var(--nl-mut, #93a3bd);
-  font-style: italic;
-  text-align: center;
-  vertical-align: middle;
-  white-space: normal;
-}
-
-.player-drawer-matchday-training-table td.player-drawer-training-season-detail {
-  white-space: normal;
-  padding: 8px 10px 12px 27px;
-}
-
-.player-drawer-training-season-detail-note {
-  margin: 0;
-  color: var(--nl-mut, #93a3bd);
-  font-size: 0.68rem;
-  line-height: 1.45;
-  max-width: 72ch;
-}
-
-.player-drawer-training-season-detail .player-drawer-discipline-forecast {
-  margin-top: 8px;
-}
-
-/* Saison-Gruppen optisch trennen: die Summenzeile jeder weiteren Saison bekommt eine etwas
-   kräftigere Oberkante als die normalen Zeilenlinien. */
-.player-drawer-matchday-training-table tbody.player-drawer-training-season-group + tbody.player-drawer-training-season-group tr[data-row="total"] th,
-.player-drawer-matchday-training-table tbody.player-drawer-training-season-group + tbody.player-drawer-training-season-group tr[data-row="total"] td {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-/* Trainingshistorie/Saison-Forecast: Die Legende verspricht "Grün = Zuwachs, Rot = Rückgang",
-   aber die von getDeltaToneClass gesetzten is-positive/is-negative-Klassen hatten in diesen
-   Tabellen KEINE Farbregel (nur spezifische Selektoren wie .player-drawer-delta.is-positive
-   existierten) — alle Deltas blieben einfarbig. Farben aus dem bestehenden Ton-Vokabular
-   (--nl-good/--nl-risk/--nl-mut, wie NlDeltaChip), mit Fallback-Hex für Render-Kontexte
-   ohne .is-new-look-Vorfahren. Helle Töne auf dunklem Grund → Kontrast bleibt erhalten. */
-.player-drawer-matchday-training-table td.is-positive {
-  color: var(--nl-good, #4cc56b);
-}
-.player-drawer-matchday-training-table td.is-negative {
-  color: var(--nl-risk, #e5615a);
-}
-.player-drawer-matchday-training-table td.is-neutral {
-  color: var(--nl-mut, #93a3bd);
-}
-
-/* Sportliche Historie: POW/SPE/MEN/SOC-Spalten tragen die festen Achsfarben des Spiels
-   (nl-tone-pow/… setzt --nl-tone, s. Ton-Klassen unter .is-new-look). Kopf voll im
-   Achston, Werte nur dezent Richtung Achston getönt (color-mix mit heller Tinte),
-   damit die Zahlen auf dem dunklen Grund gut lesbar bleiben — kein dunkel-auf-dunkel. */
-.is-new-look .player-drawer-dashboard th.player-drawer-history-axis-col {
-  color: var(--nl-tone, var(--nl-mut, #93a3bd));
-}
-.is-new-look .player-drawer-dashboard td.player-drawer-history-axis-col {
-  color: color-mix(in srgb, var(--nl-tone, var(--nl-ink, #e8eefc)) 45%, var(--nl-ink, #e8eefc));
-}
-
-.player-training-controls {
-  display: grid;
-  gap: 14px;
-}
-
-.player-training-controls-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.player-training-controls-forecast {
-  margin-top: 0;
-}
-
-.player-attribute-progress-chart {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-}
-
-.player-attribute-progress-pp-blocks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
 @media (min-width: 960px) {
-  .player-attribute-progress-pp-blocks {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.player-attribute-progress-pp-metric-block.is-power {
-  border-color: rgba(211, 83, 72, 0.28);
-  background: rgba(128, 42, 42, 0.16);
-}
-
-.player-attribute-progress-pp-metric-block.is-speed {
-  border-color: rgba(109, 176, 105, 0.28);
-  background: rgba(43, 99, 54, 0.16);
-}
-
-.player-attribute-progress-pp-metric-block.is-mental {
-  border-color: rgba(91, 145, 218, 0.3);
-  background: rgba(43, 78, 142, 0.16);
-}
-
-.player-attribute-progress-pp-metric-block.is-social {
-  border-color: rgba(235, 181, 76, 0.32);
-  background: rgba(126, 87, 28, 0.16);
-}
-
-.player-attribute-progress-pp-metric-block.is-power .player-attribute-progress-pp-metric-head strong {
-  color: #ffb3ac;
-}
-
-.player-attribute-progress-pp-metric-block.is-speed .player-attribute-progress-pp-metric-head strong {
-  color: #b9f6c0;
-}
-
-.player-attribute-progress-pp-metric-block.is-mental .player-attribute-progress-pp-metric-head strong {
-  color: #bdd7ff;
-}
-
-.player-attribute-progress-pp-metric-block.is-social .player-attribute-progress-pp-metric-head strong {
-  color: #ffe1a3;
-}
-
-.player-attribute-progress-delta-chip.player-drawer-history-axis.is-power {
-  border-color: rgba(220, 112, 112, 0.3);
-  background: rgba(154, 43, 43, 0.24);
-}
-
-.player-attribute-progress-delta-chip.player-drawer-history-axis.is-speed {
-  border-color: rgba(126, 211, 141, 0.3);
-  background: rgba(52, 132, 67, 0.24);
-}
-
-.player-attribute-progress-delta-chip.player-drawer-history-axis.is-mental {
-  border-color: rgba(124, 165, 236, 0.3);
-  background: rgba(38, 89, 165, 0.24);
-}
-
-.player-attribute-progress-delta-chip.player-drawer-history-axis.is-social {
-  border-color: rgba(229, 178, 93, 0.32);
-  background: rgba(180, 125, 36, 0.24);
-}
-
-.player-attribute-progress-delta-chip.player-drawer-history-axis.is-neutral {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.player-attribute-progress-pp-metric-block {
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.player-attribute-progress-pp-metric-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.player-attribute-progress-pp-metric-head strong {
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
-}
-
-.player-attribute-progress-pp-metric-head .muted {
-  font-size: 0.66rem;
-}
-
-.player-attribute-progress-pp-metric-svg {
-  width: 100%;
-  height: auto;
-  max-height: 132px;
-  display: block;
-}
-
-.player-attribute-progress-value-label.is-empty {
-  fill: rgba(255, 255, 255, 0.34);
-  font-size: 10px;
-  font-weight: 500;
+  
 }
 
 @media (max-width: 560px) {
-  .player-attribute-progress-pp-blocks {
-    grid-template-columns: 1fr;
-  }
-}
-
-.player-attribute-progress-collapsible {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 8, 14, 0.18);
-  width: 100%;
-  min-width: 0;
-}
-
-.player-attribute-progress-collapsible summary {
-  list-style: none;
-}
-
-.player-attribute-progress-collapsible summary::-webkit-details-marker {
-  display: none;
-}
-
-.player-attribute-progress-collapsible-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.player-attribute-progress-collapsible-summary::after {
-  content: "▸";
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 0.82rem;
-  transition: transform 0.16s ease;
-}
-
-.player-attribute-progress-collapsible[open] .player-attribute-progress-collapsible-summary::after {
-  transform: rotate(90deg);
-}
-
-.player-attribute-progress-collapsible[open] .player-attribute-progress-collapsible-summary {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.player-attribute-progress-collapsible-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.player-attribute-progress-collapsible-copy strong {
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.player-attribute-progress-collapsible-copy .muted {
-  font-size: 0.72rem;
-}
-
-.player-attribute-progress-collapsible-body {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-}
-
-.player-attribute-progress-collapsible.player-attribute-progress-line-chart-shell,
-.player-attribute-progress-collapsible.player-attribute-progress-bar-chart-shell {
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 8, 14, 0.18);
-}
-
-.player-attribute-progress-line-chart-shell,
-.player-attribute-progress-bar-chart-shell {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 8, 14, 0.18);
-  width: 100%;
-  min-width: 0;
-}
-
-.player-attribute-progress-chart-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.player-attribute-progress-range {
-  margin: 0;
-  font-size: 0.78rem;
-}
-
-.player-attribute-progress-summary {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 8, 14, 0.22);
-}
-
-.player-attribute-progress-summary-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.player-attribute-progress-summary-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.player-attribute-progress-delta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 4px 10px;
-  font-size: 0.72rem;
-}
-
-.player-attribute-progress-delta-chip small {
-  opacity: 0.72;
-  font-weight: 700;
-}
-
-.player-attribute-progress-delta-chip strong {
-  font-size: 0.82rem;
-}
-
-.player-attribute-progress-delta-chip.is-positive strong {
-  color: #9ef0ad;
-}
-
-.player-attribute-progress-delta-chip.is-negative strong {
-  color: #ff8f8f;
-}
-
-.player-attribute-progress-delta-chip.is-axis-sum {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
+  
 }
 
 .player-attribute-progress-sparkline-grid {
@@ -17873,30 +15456,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   height: auto;
 }
 
-.player-attribute-progress-y-tick {
-  fill: rgba(255, 255, 255, 0.52);
-  font-size: 10px;
-}
-
-.player-attribute-progress-line-chart-shell.is-focused {
-  border-color: rgba(255, 107, 87, 0.24);
-}
-
-.player-attribute-progress-attribute-line.is-focused-str {
-  stroke-width: 3;
-}
-
-.player-attribute-progress-value-label {
-  fill: rgba(255, 255, 255, 0.92);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.player-attribute-progress-attribute-table td small {
-  margin-left: 4px;
-  font-size: 0.68rem;
-}
-
 .player-attribute-progress-baseline {
   stroke: rgba(255, 255, 255, 0.22);
   stroke-width: 1;
@@ -17918,7 +15477,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-size: 0.86rem;
 }
 
-.player-attribute-progress-line-chart-svg,
 .player-attribute-progress-bar-chart-svg {
   width: 100%;
   height: auto;
@@ -17926,53 +15484,12 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   display: block;
 }
 
-.player-attribute-progress-attribute-line {
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.player-attribute-progress-attribute-dot {
-  stroke-width: 1.5;
-}
-
-.player-attribute-progress-attribute-legend,
 .player-attribute-progress-pp-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
   font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.72);
-}
-
-.player-attribute-progress-attribute-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.player-attribute-progress-attribute-legend-item i {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.player-attribute-progress-bar.is-power {
-  fill: #dc7070;
-}
-
-.player-attribute-progress-bar.is-speed {
-  fill: #7ed38d;
-}
-
-.player-attribute-progress-bar.is-mental {
-  fill: #7ca5ec;
-}
-
-.player-attribute-progress-bar.is-social {
-  fill: #e5b25d;
 }
 
 .player-attribute-progress-pp-legend-item.is-power {
@@ -17991,25 +15508,10 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: #ffe1a3;
 }
 
-.player-attribute-progress-season-label {
-  fill: rgba(255, 255, 255, 0.72);
-  font-size: 10px;
-}
-
-.player-attribute-progress-season-label.is-live {
-  fill: #9ef0ad;
-  font-weight: 700;
-}
-
 .player-attribute-progress-svg,
 .player-attribute-progress-sparkline-svg {
   width: 100%;
   height: auto;
-}
-
-.player-attribute-progress-axis {
-  stroke: rgba(255, 255, 255, 0.16);
-  stroke-width: 1;
 }
 
 .player-attribute-progress-line {
@@ -18061,20 +15563,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .player-attribute-progress-dot {
   stroke-width: 2;
-}
-
-.player-attribute-progress-labels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
-  gap: 6px;
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.72);
-  text-align: center;
-}
-
-.player-attribute-progress-labels .is-live {
-  color: #9ef0ad;
-  font-weight: 700;
 }
 
 .player-drawer-training-history-empty {
@@ -18134,29 +15622,24 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 /* Die PP-Tabelle im Spielerprofil teilt sich die Bereichsfarben mit der Team-Historie:
    dieselben vier Werte, eine Definition. Ohne das Anhaengen der Spieler-Selektoren
    haetten beide Tabellen zwei Farbquellen, die auseinanderdriften koennen. */
-.team-drawer-history-area,
-.player-drawer-history-area {
+.team-drawer-history-area {
   color: #f7f9fc;
   font-weight: 900;
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-power,
-.player-attribute-progress-table td.player-drawer-history-area.is-power {
+.team-drawer-history-table td.team-drawer-history-area.is-power {
   background: rgba(141, 52, 54, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-speed,
-.player-attribute-progress-table td.player-drawer-history-area.is-speed {
+.team-drawer-history-table td.team-drawer-history-area.is-speed {
   background: rgba(79, 142, 73, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-mental,
-.player-attribute-progress-table td.player-drawer-history-area.is-mental {
+.team-drawer-history-table td.team-drawer-history-area.is-mental {
   background: rgba(36, 79, 159, 0.58);
 }
 
-.team-drawer-history-table td.team-drawer-history-area.is-social,
-.player-attribute-progress-table td.player-drawer-history-area.is-social {
+.team-drawer-history-table td.team-drawer-history-area.is-social {
   /* F3 (gemessen 3,76:1): bei 58 % Deckung mischte der dunkle Tabellengrund
      das Gold so weit ab, dass die dunkle Schrift absoff. 85 % Deckung hält
      den Goldton und hebt die Paarung auf > 6:1. */
@@ -18165,30 +15648,10 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .team-drawer-history-table .team-drawer-history-area.is-discipline-child,
-.teams-v2-history-table .teams-v2-area-cell.is-discipline-child,
-.player-attribute-progress-table .player-drawer-history-area.is-discipline-child {
+.teams-v2-history-table .teams-v2-area-cell.is-discipline-child {
   font-size: 0.78rem;
   font-weight: 700;
   opacity: 0.92;
-}
-
-/* Aufklapp-Knopf im Spaltenkopf: erbt Farbe und Gewicht der Kopfzeile, damit er wie
-   Text aussieht und nicht wie ein Formular-Button. */
-.player-attribute-progress-table .player-drawer-history-expand {
-  appearance: none;
-  background: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.player-attribute-progress-table .player-drawer-history-expand:hover,
-.player-attribute-progress-table .player-drawer-history-expand:focus-visible {
-  text-decoration: underline;
 }
 
 .team-drawer-history-expand-header {
@@ -23576,26 +21039,18 @@ button.selected-roster-pps-axis-sortable:focus-visible {
     width: 100%;
   }
 
-  .foundation-modal,
-  .player-drawer {
+  .foundation-modal {
     width: calc(100vw - 20px);
     max-height: calc(100vh - 20px);
   }
 
-  .player-drawer-top-grid,
   .player-drawer-transfer-hero-grid,
-  .player-drawer-kpi-grid,
-  .player-drawer-metric-grid,
-  .player-drawer-attribute-grid,
-  .player-drawer-discipline-grid,
-  .player-drawer-axis-grid,
-  .player-drawer-list-grid,
-  .player-drawer-axis-strip,
-  .player-drawer-category-grid,
-  .player-drawer-discipline-pill-grid,
-  .player-drawer-kpi-hero-grid,
-  .player-drawer-development-hero,
-  .player-drawer-compact-details-grid {
+.player-drawer-kpi-grid,
+.player-drawer-metric-grid,
+.player-drawer-discipline-grid,
+.player-drawer-axis-grid,
+.player-drawer-discipline-pill-grid,
+.player-drawer-development-hero {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -23618,30 +21073,22 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   }
 
   .player-drawer-two-column-grid,
-  .player-drawer-history-grid,
-  .player-drawer-history-card-grid,
-  .player-drawer-list-grid-wide,
-  .player-drawer-discipline-grid-rich,
-  .player-drawer-transfer-hero-grid,
-  .player-drawer-axis-strip.is-transfer-inline {
+.player-drawer-history-grid,
+.player-drawer-history-card-grid,
+.player-drawer-discipline-grid-rich,
+.player-drawer-transfer-hero-grid {
     grid-template-columns: 1fr 1fr;
   }
 
-  .player-drawer-axis-strip.is-transfer-inline.is-compact {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  
 
   .player-drawer-kpi-grid {
     grid-template-columns: 1fr;
   }
 
-  .player-drawer-xp-balance-card {
-    grid-column: span 1;
-  }
+  
 
-  .player-drawer-xp-balance-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  
 
   .season-pp-layout {
     grid-template-columns: 1fr;
@@ -27566,7 +25013,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-size: clamp(1rem, 1.1vw, 1.25rem);
   line-height: 1.15;
 }
-
 
 .legacy-lineup-draft-command-metrics span {
   min-width: 0;
@@ -34806,8 +32252,7 @@ button.market-v2-bucket-card.is-selected {
   gap: 6px;
 }
 
-.training-v2-reality-note,
-.player-training-controls-reality-note {
+.training-v2-reality-note {
   margin: 0;
   padding: 0 16px;
   color: rgba(198, 210, 232, 0.78);
@@ -35272,14 +32717,6 @@ button.market-v2-bucket-card.is-selected {
 .training-v2-facility-impact-strip,
 .training-v2-facility-upgrade-strip {
   margin-top: 8px;
-}
-
-.player-drawer-scouting-disclosure {
-  margin-bottom: 10px;
-}
-
-.player-drawer-attribute-card.is-scouting-locked {
-  opacity: 0.72;
 }
 
 .arena-v2-slot-impact-strip .velo-impact-card {
@@ -45186,19 +42623,6 @@ button.foundation-team-portrait-card {
   transition: width var(--nl-t-fast) var(--nl-ease);
 }
 
-/* Player-Drawer: kompakte NlProgressBar-Instanzen in Tabellen-/Karten-
-   Kontexten — ersetzen die vormals handgerollten `style={{width:%}}`-Balken
-   (Top-Disziplinen-Tabelle, Achsen-Kombikarte, Mini-Diszi-Zeilen). */
-.is-new-look .player-drawer-disc-table-progress,
-.is-new-look .player-drawer-category-progress,
-.is-new-look .player-drawer-axis-discipline-progress {
-  width: 100%;
-}
-.is-new-look .player-drawer-disc-table-progress .nl-progress-track,
-.is-new-look .player-drawer-axis-discipline-progress .nl-progress-track {
-  height: 4px;
-}
-
 /* --- NlGauge ------------------------------------------------------ */
 .is-new-look .nl-gauge {
   position: relative;
@@ -45258,56 +42682,7 @@ button.foundation-team-portrait-card {
   font-size: 13px;
   letter-spacing: 0.01em;
 }
-.is-new-look .player-drawer-fatigue-gauge-wrap {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: var(--nl-s2);
-}
 
-/* Attribut-Grid: Balken-Übersicht (#61) über der Karten-Detailansicht. */
-.is-new-look .player-drawer-attribute-barchart-wrap {
-  padding: var(--nl-s3) var(--nl-s3) 0;
-  margin-bottom: var(--nl-s2);
-  border: 1px solid var(--nl-line);
-  border-radius: var(--nl-r-md);
-  background: var(--nl-panel-2);
-  overflow-x: auto;
-}
-.is-new-look .player-drawer-attribute-barchart {
-  min-width: max-content;
-}
-
-/* --- Player-Drawer Chrome-Retokenisierung -------------------------
-   Die restliche Drawer-Fläche (Panels/Sektionen, `metric-card`,
-   KPI-Hero-Karten, Chips, Header-Metric-Pills, Tab-Leiste) bleibt aus
-   Aufwandsgründen strukturell `player-drawer-*`/`metric-card`-Markup
-   (siehe NlTable/NlProgressBar/NlSubTabs-Konvertierungen oben für die
-   höchstwertigen Einzelstücke), zieht aber innerhalb `.is-new-look`
-   ihre Farben/Radien/Schatten aus den `--nl-*`-Tokens statt den alten
-   festen `rgba(255,255,255,…)`-Werten — dadurch wirkt der Drawer wie
-   ein Teil des neuen Look-Systems statt wie ein Fremdkörper. */
-.is-new-look .player-drawer-dashboard .player-drawer-panel,
-.is-new-look .player-drawer-dashboard .player-drawer-hero-surface {
-  background: var(--nl-panel);
-  border-color: var(--nl-line);
-  border-radius: var(--nl-r-md);
-  box-shadow: var(--nl-e1);
-}
-.is-new-look .player-drawer-dashboard .metric-card {
-  background: var(--nl-panel-2);
-  border: 1px solid var(--nl-line);
-  border-radius: var(--nl-r-sm);
-  box-shadow: none;
-}
-.is-new-look .player-drawer-kpi-hero-card {
-  background: var(--nl-panel-2);
-  border-color: var(--nl-line);
-  border-radius: var(--nl-r-md);
-}
-.is-new-look .player-drawer-kpi-hero-card.is-interactive:hover,
-.is-new-look .player-drawer-kpi-hero-card.is-interactive:focus-visible {
-  border-color: var(--nl-accent);
-}
 .is-new-look .player-drawer-header-metric {
   background: var(--nl-panel-2);
   border-color: var(--nl-line);
@@ -45322,18 +42697,6 @@ button.foundation-team-portrait-card {
 .is-new-look .player-drawer-scout-meta span {
   background: var(--nl-panel-2);
   border-color: var(--nl-line);
-  color: var(--nl-mut);
-}
-.is-new-look .player-drawer-dashboard .table-shell {
-  border-color: var(--nl-line);
-  background: var(--nl-panel);
-}
-.is-new-look .player-drawer-dashboard .team-table th,
-.is-new-look .player-drawer-dashboard .team-table td {
-  border-bottom-color: var(--nl-line);
-}
-.is-new-look .player-drawer-dashboard .team-table thead th {
-  background: var(--nl-panel-2);
   color: var(--nl-mut);
 }
 
@@ -73653,7 +71016,6 @@ span.nl-facility-ampel-chip {
   background-color: #2f2f2f;   /* opaque — matches .foundation-shell .input */
 }
 
-
 /* ============================================================
    WAVE B — P1 show-stopper fixes (merged from scratch)
    ============================================================ */
@@ -73900,7 +71262,6 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-market-window-status.is-closed .nl-market-window-status-badge {
   border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
 }
-
 
 /* ============================================================
    WAVE C — P2 per-tab polish (merged from scratch)
@@ -74173,7 +71534,6 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-result-podium-step.is-rank-1 .nl-result-podium-rank-label {
   color: color-mix(in srgb, #d4a72c 70%, var(--nl-ink));
 }
-
 
 /* ============================================================
    Training-Umbau — Intensität & Klasse direkt in den Prognose-Zeilen wählbar
@@ -74707,7 +72067,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
-
 /* Training-Karten: Spieler-Portrait im Avatar-Kreis (statt nur Initialen) */
 .is-new-look .nl-training-player-avatar {
   overflow: hidden;
@@ -75068,7 +72427,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
-
 .is-new-look .nl-form-strip-delta {
   font-size: var(--nl-fs-xs);
 }
@@ -75116,7 +72474,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
   background: color-mix(in srgb, var(--nl-ink) 8%, transparent);
 }
-
 
 /* ============================================================
    NEUER LOOK — Spieler-Verzeichnis: Vergleich, Query-Chips,
@@ -77477,7 +74834,6 @@ span.nl-facility-ampel-chip {
   background: color-mix(in srgb, var(--nl-accent) 18%, var(--nl-panel-2));
   border-bottom-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
 }
-
 
 .is-new-look .nl-diszis-md-current-tag {
   /* W4-Befund 3 (gemessen 3,40:1 mit rohem Akzent): das Tag sitzt auf dem
@@ -81394,8 +78750,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
   font-size: 12.5px;
 }
-
-
 
 /* Die vormalige eigene VK-Zeile unter den Kader-Portraits (`.nl-teams-portrait-sellvalue*`) ist
    weg: Chris' Nachtrag zog den VK-Preis als Klammerzusatz in die MW-Kachel
