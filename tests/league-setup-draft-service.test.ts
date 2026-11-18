@@ -15,6 +15,14 @@ vi.mock("@/lib/ai/ai-picks-run-service", () => ({
   runAiPicksExecutePreview: (...args: unknown[]) => runAiPicksExecutePreview(...args),
 }));
 
+// Draft-Neubau (18.11.): hinter OLY_LIGA_DRAFT_MODUS=einzelschritt startet der Kickoff den neuen Liga-Draft.
+const starteLigaDraft = vi.fn();
+const laufeKiImHintergrund = vi.fn(async () => ({ halt: "mensch_am_zug", picks: 0 }));
+vi.mock("@/lib/draft/liga-draft-dienst", () => ({
+  starteLigaDraft: (...args: unknown[]) => starteLigaDraft(...args),
+  laufeKiImHintergrund: (...args: unknown[]) => laufeKiImHintergrund(...(args as [])),
+}));
+
 type FakeSave = { saveId: string; gameState: GameState };
 
 function buildTeam(teamId: string): Team {
@@ -61,6 +69,29 @@ async function flushMicrotasks() {
 describe("league-setup-draft-service", () => {
   beforeEach(() => {
     runAiPicksExecutePreview.mockReset();
+  });
+
+  describe("kickoffLeagueSetupDraft mit OLY_LIGA_DRAFT_MODUS=einzelschritt (Draft-Neubau)", () => {
+    it("legt den neuen Draft an (Ausschlussliste = Menschen, die selbst picken), faehrt die KI im Hintergrund, nie den Blocklauf", async () => {
+      const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
+      const persistence = createFakePersistence([{ saveId: "save-e", gameState: buildGameState() }]);
+      process.env.OLY_LIGA_DRAFT_MODUS = "einzelschritt";
+      try {
+        const returned = kickoffLeagueSetupDraft({
+          persistence: persistence as never,
+          saveId: "save-e",
+          excludeTeamIds: ["A-A"],
+          logPrefix: "[test]",
+        });
+        expect(returned?.gameState.seasonState.leagueSetupStatus).toBe("in_progress");
+        await flushMicrotasks();
+        expect(starteLigaDraft).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-e", selbstPickendeTeamIds: ["A-A"] }));
+        expect(laufeKiImHintergrund).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-e" }));
+        expect(runAiPicksExecutePreview).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.OLY_LIGA_DRAFT_MODUS;
+      }
+    });
   });
 
   describe("kickoffLeagueSetupDraft (Teil A: Hintergrund-Kickoff)", () => {

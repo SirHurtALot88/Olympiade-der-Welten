@@ -3,7 +3,6 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
-import { istEinzelschrittDraftAktiv, laufeKiImHintergrund, starteLigaDraft } from "@/lib/draft/liga-draft-dienst";
 
 /**
  * GETEILTER LIGA-SETUP-DRAFT — EIN Ort statt drei Kopien.
@@ -98,8 +97,15 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
   // DRAFT-NEUBAU (18.11., docs/design/draft-neubau-kern-18-11.md): hinter dem Schalter `OLY_LIGA_DRAFT_MODUS=einzelschritt`
   // laeuft der neue Liga-Draft Pick fuer Pick. Der Blocklauf unten bleibt der Standard und der Rueckweg, bis der neue
   // abgenommen ist. Die Ausschlussliste bedeutet in beiden Wegen dasselbe: diese Menschen picken selbst.
-  if (istEinzelschrittDraftAktiv()) {
-    return kickoffEinzelschrittDraft({ persistence, saveId, selbstPickendeTeamIds: [...excludeTeamIds], logPrefix });
+  // (Gleiche Pruefung wie `istEinzelschrittDraftAktiv` in lib/draft/liga-draft-dienst.ts; der Dienst wird erst im Zweig
+  // geladen, damit dieses Modul seinen schlanken Importgraph behaelt.)
+  if (process.env.OLY_LIGA_DRAFT_MODUS === "einzelschritt") {
+    const markiert = persistence.saveSingleplayerState(saveId, {
+      ...current.gameState,
+      seasonState: { ...current.gameState.seasonState, leagueSetupStatus: "in_progress" },
+    });
+    void kickoffEinzelschrittDraft({ persistence, saveId, selbstPickendeTeamIds: [...excludeTeamIds], logPrefix });
+    return markiert;
   }
   const seasonId = input.seasonId ?? current.gameState.season.id;
 
@@ -139,25 +145,23 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
  * Auto-Pick fahren (in einer reinen KI-Liga bis zum Ende). Kehrt sofort zurueck, wie der Blocklauf. Danach treibt die
  * Draft-Seite den Draft ueber `/api/draft` (KI-Schritte im gewaehlten Tempo, Mensch-Picks, Ueberspringen).
  */
-function kickoffEinzelschrittDraft(input: {
+async function kickoffEinzelschrittDraft(input: {
   persistence: PersistenceService;
   saveId: string;
   selbstPickendeTeamIds: string[];
   logPrefix: string;
-}): PersistedSaveGame | null {
+}): Promise<void> {
   const { persistence, saveId, logPrefix } = input;
   try {
+    const { laufeKiImHintergrund, starteLigaDraft } = await import("@/lib/draft/liga-draft-dienst");
     starteLigaDraft({ persistence, saveId, selbstPickendeTeamIds: input.selbstPickendeTeamIds });
+    // Bricht der Lauf ab, bleibt der Draft an seinem letzten gespeicherten Pick stehen und laesst sich ueber
+    // `/api/draft` (Aktion `ki_schritt`/`ki_hintergrund`) fortsetzen; geloggt wird im Dienst.
+    await laufeKiImHintergrund({ persistence, saveId, logPrefix }).catch(() => undefined);
   } catch (error) {
     console.error(`${logPrefix} Liga-Draft (Einzelschritt) konnte nicht angelegt werden:`, error);
     schreibeLigaSetupStatus(persistence, saveId, "failed", null);
-    return persistence.getSaveById(saveId);
   }
-  void laufeKiImHintergrund({ persistence, saveId, logPrefix }).catch(() => {
-    // Schon geloggt; der Draft bleibt an seinem letzten gespeicherten Pick stehen und laesst sich ueber `/api/draft`
-    // (Aktion `ki_schritt`) fortsetzen.
-  });
-  return persistence.getSaveById(saveId);
 }
 
 /**
