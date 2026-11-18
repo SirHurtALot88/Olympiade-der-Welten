@@ -3712,6 +3712,98 @@ export type LeagueSetupTeamWarning = {
 };
 
 /**
+ * LIGA-DRAFT IM EINZELSCHRITT (Draft-Neubau, 18.11.; docs/design/draft-modern-18-11.md und
+ * docs/design/draft-neubau-kern-18-11.md). Der Zustand liegt im Spielstand (`seasonState.ligaDraft`), damit jeder
+ * Mitspieler denselben Draft sieht und ein Neustart des Servers nichts verliert. Fehlt er, laeuft der Draft nicht
+ * (bzw. lief ueber den alten Hintergrundlauf).
+ */
+export type LigaDraftSitzArt = "ki" | "mensch";
+
+export type LigaDraftTeamStatus =
+  /** Pickt an seinem Platz in der Reihenfolge. */
+  | "aktiv"
+  /** Pickt nicht mehr (KI hoert auf, Kader voll, Mensch „Ich bin fertig“, Draft-Ende). */
+  | "fertig"
+  /** Variante A: aus der Reihenfolge genommen; pickt nach dem Draft ohne Reihenfolge aus dem Rest. */
+  | "nachzug";
+
+export type LigaDraftFertigGrund =
+  | "ki_stop"
+  | "kader_voll"
+  | "max_picks"
+  | "nichts_leistbar"
+  | "kauf_blockiert"
+  | "mensch_fertig"
+  | "draft_ende"
+  /** Der Gastgeber hat den Draft abgebrochen (`/api/draft` Aktion `abbrechen`). */
+  | "abgebrochen";
+
+export type LigaDraftTeamZustand = {
+  teamId: string;
+  art: LigaDraftSitzArt;
+  /** Besitzer des Teams (Mensch) — fuer Anzeige und Rechte; bei KI `null`. */
+  ownerId: string | null;
+  /** Mensch: der eigene GM pickt an seinem Platz (Variante B, oder delegierter Draft). KI: immer `true`. */
+  autoPick: boolean;
+  status: LigaDraftTeamStatus;
+  fertigGrund: LigaDraftFertigGrund | null;
+  /** Gepickte Spieler in diesem Draft. */
+  picks: number;
+  /** Ausgelassene Picks (nur Menschen). */
+  auslassungen: number;
+  /** Planrahmen-Anker: Kader und Kasse zu Draft-Beginn (die KI plant wie der Blocklauf ab diesem Stand). */
+  startKaderIds: string[];
+  startKasse: number;
+  /** Superstar-Lizenz, einmal zu Draft-Beginn vergeben (`null`: Komposition aus). */
+  superstarLizenz: boolean | null;
+};
+
+export type LigaDraftTop3Eintrag = { playerId: string; nutzen: number };
+
+export type LigaDraftEintrag = {
+  /** Laufende Nummer ueber alle Eintraege (1, 2, …). */
+  nr: number;
+  /** Pick-Nummer (nur `art: "pick"`), sonst `null`. */
+  pickNr: number | null;
+  runde: number;
+  /** 1-basierter Platz in der Runde (bei Nachzug `null`). */
+  platz: number | null;
+  teamId: string;
+  art: "pick" | "auslassen" | "aus" | "ueberspringen";
+  playerId: string | null;
+  /** Wer entschieden hat: KI-Team, Mensch, Auto-Pick eines Menschen, Mensch im Nachzug. */
+  quelle: "ki" | "mensch" | "auto" | "nachzug";
+  abloese: number | null;
+  gehalt: number | null;
+  transferId: string | null;
+  /** Was die KI bei diesem Pick sah (Top 3), sonst `null`. */
+  top3: LigaDraftTop3Eintrag[] | null;
+  /** Kurzgrund (z. B. Fertig-Grund oder Ueberspring-Variante). */
+  grund: string | null;
+  zeit: string;
+};
+
+export type LigaDraftZustand = {
+  version: 1;
+  saisonId: string;
+  status: "laeuft" | "nachzug" | "fertig";
+  /** Saat fuer Gleichstaende in der Reihenfolge. */
+  seed: string;
+  regeln: { maxRunden: number; maxPicksJeTeam: number; minKader: number };
+  /** 1-basiert. */
+  runde: number;
+  /** Reihenfolge der laufenden Runde: schwaechstes Team zuerst (beim Rundenstart berechnet). */
+  reihenfolge: string[];
+  /** 0-basierter Index in `reihenfolge`: wer als Naechstes dran ist (fertige Teams werden uebersprungen). */
+  platz: number;
+  teams: Record<string, LigaDraftTeamZustand>;
+  verlauf: LigaDraftEintrag[];
+  erstelltAm: string;
+  aktualisiertAm: string;
+  beendetAm: string | null;
+};
+
+/**
  * Frozen per-player valuation row captured at MD10 season end. Once the season is completed
  * (gamePhase !== "season_active"), OVR/MVS/PPs/MW and the sale-factor bracket rank are read from
  * this snapshot instead of being recomputed pool-relative, so post-season sales/roster changes do
@@ -3777,6 +3869,8 @@ export type SeasonState = {
    * (Manager Mode, Nicht-Basketball-Spieltag, oder noch nie ausgeloest).
    */
   arenaMatchdayResolveStatus?: "in_progress" | "ready" | "failed";
+  /** Liga-Draft im Einzelschritt (Saison 1), s. `LigaDraftZustand`. Fehlt er, laeuft kein solcher Draft. */
+  ligaDraft?: LigaDraftZustand;
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;

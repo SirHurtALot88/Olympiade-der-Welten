@@ -10084,6 +10084,17 @@ export function useFoundationShellRouterBodyScope({
     const followingSeasonTrigger =
       !isFirstSeason && getTransferWindowStatus(gameState).isSeasonStartSetup;
     const runKey = `${activeSaveId}:${gameState.season.id}`;
+    /**
+     * LIGA-DRAFT IM EINZELSCHRITT (Review #1619, A1): gibt es fuer diese Saison einen Liga-Draft (nur mit Schalter
+     * `OLY_LIGA_DRAFT_MODUS=einzelschritt` angelegt), wartet der KI-Preseason-Lauf, bis die Liga bereit UND der Draft
+     * fertig ist — vorher lehnt der Server ihn ohnehin ab (`liga_draft_laeuft`), und der Sitzungs-Riegel unten wuerde
+     * den Lauf fuer diese Sitzung verbrauchen. Ohne Liga-Draft (Schalter aus, alter Blocklauf) bleibt alles wie bisher.
+     */
+    const ligaDraftDieserSaison =
+      gameState.seasonState.ligaDraft?.saisonId === gameState.season.id ? gameState.seasonState.ligaDraft : null;
+    const wartetAufLigaDraft =
+      ligaDraftDieserSaison != null &&
+      (gameState.seasonState.leagueSetupStatus !== "ready" || ligaDraftDieserSaison.status !== "fertig");
 
     if (staleOrphanRun) {
       // Verwaisten Lauf: den Session-Guard freigeben, damit der Draft (Bedingungen unten erfüllt) neu startet.
@@ -10100,6 +10111,7 @@ export function useFoundationShellRouterBodyScope({
       aiPreseasonBusy ||
       alreadyHandled ||
       aiPreseasonRunStartedRef.current.has(runKey) ||
+      wartetAufLigaDraft ||
       (!firstSeasonTrigger && !followingSeasonTrigger)
     ) {
       return;
@@ -10341,7 +10353,11 @@ export function useFoundationShellRouterBodyScope({
       // bringen. In dem Moment liegt noch kein einziges Spieltagsergebnis vor. An jedem
       // Saisonende liegen welche vor — dort hat er nichts verloren, das Auffuellen uebernimmt
       // die KI-Preseason.
-      (gameState.seasonState.matchdayResults ?? []).length > 0
+      (gameState.seasonState.matchdayResults ?? []).length > 0 ||
+      // Liga-Draft im Einzelschritt (Review #1619, A1): der ist kein „abgebrochener Erst-Draft“ — Teams im Nachzug oder
+      // unter 8 fuellt er selbst bzw. sie bleiben bewusst so (Ausstieg, Abbruch). Ohne diese Zeile kaufte der Effekt
+      // mit `includeManualTeams` auch Menschen im Nachzug den Kader voll. Schalter aus: kein Liga-Draft, unveraendert.
+      gameState.seasonState.ligaDraft?.saisonId === gameState.season.id
     ) {
       return undefined;
     }

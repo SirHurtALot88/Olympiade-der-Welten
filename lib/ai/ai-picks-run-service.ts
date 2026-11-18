@@ -44,6 +44,7 @@ import {
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { isLongRunContext } from "@/lib/season/long-run-profile";
 import { planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { LigaDraftLaeuftFehler, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
 
@@ -3582,6 +3583,11 @@ export async function runAiPicksExecutePreview(
   const currentGameState = ensureLeagueMarketValueSnapshot(
     resolveStrictLocalSave(persistence, save.saveId).gameState,
   );
+  // LIGA-DRAFT LAEUFT (Review #1619, A1): kein KI-Kaderlauf neben dem Einzelschritt-Draft — gekauft wird dann nur ueber
+  // /api/draft. Schalter aus: `ligaDraftLaeuft` ist immer false, der Blocklauf und alle Laeufe bleiben unveraendert.
+  if (!dryRun && ligaDraftLaeuft(currentGameState)) {
+    throw new LigaDraftLaeuftFehler();
+  }
   const previewRunContext = createLocalTransfermarktRunContext({
     persistence,
     save: { ...save, gameState: currentGameState },
