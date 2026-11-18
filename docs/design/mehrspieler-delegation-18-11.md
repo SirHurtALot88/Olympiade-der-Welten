@@ -49,13 +49,13 @@ blockiert unnötig, **niedrig** = Schönheitsfehler. „Gebaut“ heißt: in die
 | M7 | `lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx:7456` | mittel | `isOnlineGame: activeSaveGameMode === "online_4v4"`: in 1v1/2v2 sprang „Weiter“ in die Arena, bevor der Mitspieler aufgestellt hatte. | **Gebaut:** `isOnlineSaveMode()` (alle drei Größen). |
 | M8 | `app/api/singleplayer-state/route.ts:573` | mittel | Löschsperre nur für `online_4v4`; einen 1v1/2v2-Spielstand durfte auch der Gast löschen. | **Gebaut:** `isOnlineSaveMode()`. |
 | M9 | `lib/ai/ai-training-mode-reevaluation-service.ts:91` | mittel | Training menschlicher Teams nie von der KI. | **Gebaut:** delegiertes Training (Abschnitt 5). |
-| M10 | `lib/room/online-room-model.ts:73` (`resolveFrankyParticipant`), `:120` (`resolveRoomParticipantActiveOwnerId`), `buildOwnershipForPreset`, `lib/socket/server.ts:195` (`setTeamSelection {chrisTeamIds, frankyTeamIds}`), `lib/room/room-store.ts:1285` (`applyRoomTeamSelection`) | hoch | Ein Raum kennt Host plus einen Gast. Ein dritter Teilnehmer bekommt `role: "player"`, keine Teams, und erscheint in der Foundation als Franky (jeder `player` wird zu `FRANKY_OWNER_ID`). | **Offen.** Vorschlag: Sitz-Nummer je Teilnehmer (`seat: 1/2/3`), Besitzer-ID aus dem Login statt aus der Rolle, Team-Auswahl als `Record<ownerId, teamIds[]>`. Bis dahin spielt Ramona über ihren Login im gemeinsamen Spielstand (Koop ohne Raum), das trägt dieser PR. |
+| M10 | `lib/room/online-room-model.ts:73` (`resolveFrankyParticipant`), `:120` (`resolveRoomParticipantActiveOwnerId`), `buildOwnershipForPreset`, `lib/socket/server.ts:195` (`setTeamSelection {chrisTeamIds, frankyTeamIds}`), `lib/room/room-store.ts:1285` (`applyRoomTeamSelection`) | hoch | Ein Raum kennt Host plus einen Gast. Ein dritter Teilnehmer bekommt `role: "player"`, keine Teams, und erscheint in der Foundation als Franky (jeder `player` wird zu `FRANKY_OWNER_ID`). | **Offen, nächster Schritt** (Aufwand Abschnitt 11). Bis dahin spielt Ramona über ihren Login im gemeinsamen Spielstand (Koop ohne Raum), das trägt dieser PR. |
 | M11 | `lib/room/room-flow-controller.ts:226` (`getRequiredParticipants`), `buildRoomFlowState` | hoch | Im Raum muss jeder Mensch jeden Schritt „bereit“ melden, auch „Einsatzliste“ und „Formkarten“, wenn er sie delegiert hat. Ein abwesender Mensch hält den Raum an. | **Offen.** Vorschlag: `buildRoomFlowState` bekommt je Schritt die Teilnehmer, deren Teams den Bereich alle delegiert haben, und zählt sie als erledigt (Schritte `lineup`/`formcards` → `einsatzliste`, `training` → `training`, `buy_players`/`sell_players` → `transfers`, `facilities` → `gebaeude`). |
 | M12 | `lib/season/matchday-auto-run-service.ts:297` (`simulateAiLineupState`) | mittel | Der Trockenlauf (`execute: false`) stellt nur KI-Teams hypothetisch auf; eine delegierte, noch leere Einsatzliste meldet dort `missing_manual_lineup`. Der echte Lauf ist richtig (der Batch füllt vor der Prüfung). | **Offen.** Vorschlag: `buildDelegatedLineupPreview` dort ebenfalls für delegierte Teams aufrufen. |
-| M13 | `app/api/ai/picks-run/route.ts:99-128` | mittel | Kader-KI auf menschliche Teams ist verboten (Chris, 19.08.: „keiner von uns soll seinen kader per KI füllen“). Draft-Delegation braucht eine Ausnahme genau für Teams mit `draft: "ki"`. | **Offen**, Abschnitt 6 und Frage F2. |
+| M13 | `app/api/ai/picks-run/route.ts:99-128` | mittel | Kader-KI auf menschliche Teams ist verboten (Chris, 19.08.: „keiner von uns soll seinen kader per KI füllen“). Draft-Delegation braucht eine Ausnahme genau für Teams mit `draft: "ki"`. | **Teilweise gebaut:** beim Spielstart (`app/api/new-game/route.ts`) pickt der Liga-Draft Teams mit `draft: "ki"` mit (Ramonas Halbautomatik), Chris/Franky bleiben ausgeschlossen. Offen: die Ausnahme in `picks-run` (Nachpicken während der Saison). |
 | M14 | `lib/foundation/tabs/use-foundation-cross-tab-team-control.ts:152` (`localUserManualTeams`) | niedrig | Erkennt „eigene Teams“ über `user_local`/`ownerSlot "user"`/Etikett „Chris“, nicht über den angemeldeten Besitzer. | **Offen.** Vorschlag: `canOwnerManageTeam(settings, effectiveActiveOwnerId)` wie in `canManageTeamId`. |
 | M15 | `lib/foundation/game-inbox-service.ts:313-318` (`getVisibleTeamIds`, Raum-Zweig) | niedrig | Raum-Besitz fest auf `user_chris`/`user_franky` bzw. Etikett „Chris“/„Franky“. Für Ramona greift nur der allgemeine Zweig. | **Offen**, mit M10 zusammen. |
-| M16 | `app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx`, `lib/foundation/tabs/foundation-page-types.ts:2088` | mittel | Die Team-Zuordnung in der Oberfläche hat nur Chris- und Franky-Spalten. Ramona lässt sich heute nur über die API zuordnen. | **Offen**, kommt mit dem Mockup „Mitspieler und Delegation“. |
+| M16 | `app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx`, `lib/foundation/tabs/foundation-page-types.ts:2088` | mittel | Die Team-Zuordnung in der Oberfläche hat nur Chris- und Franky-Spalten. | **Gebaut:** „Neues Spiel starten“ hat Ramona im Klub-Raster und in „Mitspieler (Franky, Ramona)“; „Wer steuert was“ zeigt „Ramona · Halbautomatik“. Bilder: `docs/design/mehrspieler-delegation-18-11/`. Die Delegations-Schalter selbst kommen mit dem Mockup. |
 | M17 | `lib/foundation/team-control-settings.ts:153` (`isChrisOwnedTeamSettings`) | niedrig | Erkennt Chris auch am Etikett „Chris“. Für drei Menschen ungefährlich, weil Ramona vorher erkannt wird. | Gebaut ist die Reihenfolge (Ramona zuerst). |
 
 Geprüft und **mehrspielertauglich** (je Team bzw. je Besitzer getrennt): Merkliste (`MerklisteEintrag.ownerId`),
@@ -163,7 +163,7 @@ Mit „Training je Spieltag“ (Mockup #1592: Ziel-Disziplin, Weg, Intensität) 
 
 | Bereich | Heute | Delegation | Aufwand |
 |---|---|---|---|
-| Draft-Picks | KI-Draft nur für KI-Teams, für Menschen ausdrücklich gesperrt (M13). | Team mit `draft: "ki"`: der KI-Draft pickt mit, nach denselben Regeln (Vorstands-Freigabe, Kaderziel). Picks, die der Mensch schon gemacht hat, bleiben; die KI füllt bis zum Kaderziel. | mittel: Ausnahme in `picks-run`, `includeManualTeams` für delegierte Teams im Draft-Orchestrator. |
+| Draft-Picks | KI-Draft nur für KI-Teams, für Menschen ausdrücklich gesperrt (M13). | Team mit `draft: "ki"`: der KI-Draft pickt mit, nach denselben Regeln (Vorstands-Freigabe, Kaderziel). Picks, die der Mensch schon gemacht hat, bleiben; die KI füllt bis zum Kaderziel. | **Beim Spielstart gebaut** (Liga-Draft pickt delegierte Teams mit). Offen: Nachpicken in der Saison über `picks-run` (klein). |
 | Draft überspringen je Manager | Chris überspringt den Draft, die KI-Teams picken durch. | „Überspringen“ heißt für einen Menschen: seine Teams warten nicht im Draft-Takt. Mit `draft: "selbst"` pickt er danach in Ruhe (Kauffenster bleibt offen, bis er „fertig“ meldet); mit `draft: "ki"` pickt die KI im selben Durchlauf. Der Draft wartet nie auf einen abwesenden Menschen. | mittel |
 | Käufe, Verkäufe, Verträge | KI-Kauf/-Verkauf nur für `controlMode: "ai"`. | Nur bei Voll KI. Dann dieselben KI-Läufe wie für KI-Teams, mit derselben Vorstands-Freigabe (#1594). Halbautomatik: der Mensch entscheidet, die KI tut nichts. | mittel |
 | Gebäude | KI-Ausbau im Vorsaison-Plan nur für KI-Teams. | `gebaeude: "ki"`: derselbe Ausbau-Schritt aus `applyAiManagerPlan`, aus dem Freigabe-Budget. | klein bis mittel |
@@ -204,7 +204,7 @@ Bisher: Chris überspringt den Draft, die KI-Teams picken durch, er pickt danach
 | # | Frage | Empfehlung |
 |---|---|---|
 | F1 | Darf ein Host (Chris) die Delegation von Ramonas Teams ändern? | Nein. Nur der Besitzer des Teams (so ist der Schreibweg gebaut). Der Host ordnet Teams zu, die Delegation gehört dem Manager. |
-| F2 | Chris' Regel vom 19.08. („keiner von uns soll seinen Kader per KI füllen“) gegen Ramonas Draft-Delegation? | Die Regel gilt weiter für alle Teams mit `draft: "selbst"`. Für ein Team mit `draft: "ki"` ist die KI ausdrücklich gewollt. Bitte bestätigen, bevor die Ausnahme in `picks-run` gebaut wird. |
+| F2 | Chris' Regel vom 19.08. („keiner von uns soll seinen Kader per KI füllen“) gegen Ramonas Draft-Delegation? | Die Regel gilt weiter für alle Teams mit `draft: "selbst"`. Für ein Team mit `draft: "ki"` ist die KI ausdrücklich gewollt (Chris, 18.11.: „Ramonas Teams z. B. automatisch picken“). Gebaut für den Draft beim Spielstart; das Nachpicken in `picks-run` folgt. |
 | F3 | Gebäude und Sponsor in der Halbautomatik: KI oder selbst? | KI (so voreingestellt). Beides kostet Geld aus dem Freigabe-Budget, das Ramona nicht überwachen will; ihr Ding sind Käufe und Verkäufe. Einzelschalter erlauben „selbst“. |
 | F4 | Soll die KI Formkarten nachlegen, wenn der Mensch alle Spieler, aber keine Karte gesetzt hat? | Ja, aber erst mit einer Herkunftsmarke je Karte (sonst würde die KI bei jedem Batch neu rechnen und die Arena-Vorschau verwerfen). Bis dahin bleibt es beim heutigen Verhalten. |
 | F5 | Muss ein Mensch mit `draft: "selbst"`, der nie pickt, den Saisonstart blockieren? | Nein. Am Saisonstart füllt die KI bis zum Kaderminimum auf und meldet es in der Inbox. |
@@ -223,3 +223,22 @@ Bisher: Chris überspringt den Draft, die KI-Teams picken durch, er pickt danach
   Schreibschutz je Besitzer, Erhalt von Ramonas Teams bei Chris/Franky-Umstellungen.
 
 Wertung und Arena-Motor sind nicht berührt (Fingerabdruck `ce8fcef66028` unverändert).
+
+## 11. Dritter Sitz im Raum: nächster Schritt mit Aufwand
+
+Chris (18.11.): Ramona als wählbare Person „mit denselben Rechten wie Franky“. Außerhalb eines Raums ist das gebaut
+(Login, Besitzer, Zuordnung beim Spielstart, Delegation). Im Raum nicht. Gemessener Umfang:
+
+| Teil | Stelle | Arbeit |
+|---|---|---|
+| Sitz statt Rolle | `lib/room/online-room-model.ts:73` (`resolveFrankyParticipant`), `:120` (`resolveRoomParticipantActiveOwnerId`) | Jeder Teilnehmer bekommt einen Sitz (`host`/`gast1`/`gast2`) oder trägt die Login-Besitzer-ID; heute wird jeder `player` zu Franky. |
+| Raum-Modi | `PRESET_OWNERSHIP_TABLE`, `buildOwnershipForPreset`, `types/game.ts` (`RoomOwnershipPreset`) | Modi mit drei Menschen (z. B. 1+1+1, 2+2+2) oder eine freie Auswahl je Sitz. |
+| Team-Auswahl | `lib/socket/server.ts:195` (`setTeamSelection {chrisTeamIds, frankyTeamIds}`), `lib/room/room-store.ts:1285` (`applyRoomTeamSelection`), `app/room/[roomCode]/RoomPageClient.tsx` | dritte Liste bzw. `Record<sitz, teamIds[]>`, Lobby-Oberfläche mit drittem Spieler. |
+| Spiegel in den Spielstand | `room-store.ts` (`syncRoomOwnershipToBoundSave`, `startRoom`, `createRoomCoopSave`) | `ramonaTeamIds` an `applyGameModeOwnership`/`createRoomCoopSave` durchreichen (die Funktionen können es seit diesem PR). |
+| Bereit-Pflicht mit Delegation | `lib/room/room-flow-controller.ts:226`, `buildRoomFlowState` (M11) | Teilnehmer, deren Teams den Bereich des Schritts delegiert haben, gelten als bereit. |
+| Tests | `tests/smoke-multiplayer-*`, `tests/server-authoritative-write-guard.test.ts`, Raum-Tests | drei Sitze, Schreibschutz je Sitz, Notausgang bei Abwesenheit. |
+
+**Schätzung:** 1,5 bis 2 Arbeitstage eines Bau-Agenten plus ein Opus-Review des Schreibschutzes. Die Raum-Logik ist an
+rund 15 Stellen auf „Host + ein Gast“ gebaut; ein Teilumbau würde einen dritten Teilnehmer still als Franky behandeln.
+Deshalb ist er in diesem PR bewusst nicht angefangen.
+

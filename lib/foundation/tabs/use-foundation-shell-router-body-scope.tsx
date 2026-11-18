@@ -1070,7 +1070,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameLeagueOverride, setNewGameLeagueOverride, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameRamonaTeamIds, setNewGameRamonaTeamIds, newGameLeagueOverride, setNewGameLeagueOverride, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -6377,6 +6377,7 @@ export function useFoundationShellRouterBodyScope({
     setNewGamePresetId(presetId);
     setNewGameChrisTeamIds(preset.chrisTeamIds);
     setNewGameFrankyTeamIds(preset.frankyTeamIds);
+    setNewGameRamonaTeamIds([]);
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6434,6 +6435,7 @@ export function useFoundationShellRouterBodyScope({
     if (nextTier === "liga2") {
       setNewGameChrisTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
       setNewGameFrankyTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
+      setNewGameRamonaTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
     }
     setNewGamePreview(null);
     setNewGameError(null);
@@ -6451,6 +6453,7 @@ export function useFoundationShellRouterBodyScope({
       const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
       setNewGameChrisTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
       setNewGameFrankyTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+      setNewGameRamonaTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
     }
     setNewGamePreview(null);
     setNewGameError(null);
@@ -6460,19 +6463,24 @@ export function useFoundationShellRouterBodyScope({
   function setNewGameSoloTeam(teamId: string) {
     setNewGameChrisTeamIds([teamId]);
     setNewGameFrankyTeamIds([]);
+    setNewGameRamonaTeamIds([]);
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
   }
 
-  function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
+  function toggleNewGameTeam(owner: "chris" | "franky" | "ramona", teamId: string) {
     // TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert, nicht wählbar. Die Klub-Raster
     // rendern Liga-2-Karten im Battle-Mode-Schritt schon gar nicht als anklickbar; diese Sperre
     // ist die zweite Verteidigungslinie, falls dieser Handler je anders aufgerufen wird. Ein
     // Abwählen (Team ist bereits in der Liste) bleibt immer erlaubt.
     if (newGameMode === "battle") {
       const alreadySelected =
-        owner === "chris" ? newGameChrisTeamIds.includes(teamId) : newGameFrankyTeamIds.includes(teamId);
+        owner === "chris"
+          ? newGameChrisTeamIds.includes(teamId)
+          : owner === "franky"
+            ? newGameFrankyTeamIds.includes(teamId)
+            : newGameRamonaTeamIds.includes(teamId);
       if (!alreadySelected && getNewGameLeagueAssignment()[teamId] === "liga2") {
         return;
       }
@@ -6490,8 +6498,22 @@ export function useFoundationShellRouterBodyScope({
             : current.length >= limits.chrisMax
               ? current
               : [...current.filter((entry) => entry !== teamId), teamId].filter(
-                  (entry) => !newGameFrankyTeamIds.includes(entry),
+                  (entry) => !newGameFrankyTeamIds.includes(entry) && !newGameRamonaTeamIds.includes(entry),
                 ),
+      );
+      return;
+    }
+
+    if (owner === "ramona") {
+      // Ramona (dritte Spielerin, 18.11.): dieselben Rechte und dieselbe Obergrenze wie Franky.
+      setNewGameRamonaTeamIds((current) =>
+        current.includes(teamId)
+          ? current.filter((entry) => entry !== teamId)
+          : current.length >= limits.ramonaMax
+            ? current
+            : [...current.filter((entry) => entry !== teamId), teamId].filter(
+                (entry) => !newGameChrisTeamIds.includes(entry) && !newGameFrankyTeamIds.includes(entry),
+              ),
       );
       return;
     }
@@ -6501,7 +6523,9 @@ export function useFoundationShellRouterBodyScope({
         ? current.filter((entry) => entry !== teamId)
         : current.length >= limits.frankyMax
           ? current
-          : [...current.filter((entry) => entry !== teamId), teamId].filter((entry) => !newGameChrisTeamIds.includes(entry)),
+          : [...current.filter((entry) => entry !== teamId), teamId].filter(
+              (entry) => !newGameChrisTeamIds.includes(entry) && !newGameRamonaTeamIds.includes(entry),
+            ),
     );
   }
 
@@ -6542,6 +6566,8 @@ export function useFoundationShellRouterBodyScope({
           gameMode: newGameMode,
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
+          // Ramona nur mitschicken, wenn sie Teams hat: der Payload bleibt sonst bytegleich.
+          ...(newGameRamonaTeamIds.length > 0 ? { ramonaTeamIds: newGameRamonaTeamIds } : {}),
           // Nur gesetzt, sobald der Nutzer im Liga-Picker mindestens ein Team verschoben hat --
           // sonst bleibt der Payload unveraendert und der Server faellt auf die automatische
           // Budget-Zuteilung zurueck (s. Kommentar an `leagueByTeamId` in
@@ -6580,7 +6606,11 @@ export function useFoundationShellRouterBodyScope({
         // new tab, or the homepage "Solo spielen" link loads exactly this
         // save instead of falling back to the global active save row.
         syncFoundationSaveIdInUrl(newSaveId);
-        const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
+        const firstTeamId =
+          payload.result.preview.chrisTeamIds[0] ??
+          payload.result.preview.frankyTeamIds[0] ??
+          payload.result.preview.ramonaTeamIds?.[0] ??
+          null;
         if (firstTeamId) {
           // Scope the active-team preference to the NEW save id explicitly: the
           // `activeSaveId` in this closure is still the previous save's id, so
@@ -13171,6 +13201,7 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameRamonaTeamIds,
     newGameLeagueOverride,
     newGameMode,
     newGamePresetId,

@@ -23,6 +23,7 @@ import {
 } from "@/lib/foundation/team-control-settings";
 import { resolveTeamDelegation } from "@/lib/foundation/team-delegation";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
+import { buildNewGameStateFromBaseline } from "@/lib/game/new-game-setup-service";
 
 /**
  * RAMONA ALS DRITTE SPIELERIN (Chris, 18.11.): „Eigener Login für Ramona, mit denselben Rechten
@@ -144,6 +145,28 @@ describe("Team-Zuordnung mit drei Menschen", () => {
     expect(next[ramona]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
     expect(next[ramona]?.delegation).toBeUndefined();
     expect(resolveTeamDelegation(next[ramona]).stufe).toBe("voll_selbst");
+  });
+
+  it("Spielstart: Ramona als waehlbare Spielerin, ihre Teams starten in der Halbautomatik", () => {
+    const ohne = buildNewGameStateFromBaseline({ presetId: "custom", chrisTeamIds: ["M-M"], frankyTeamIds: ["D-P"] });
+    const mit = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: ["D-P"],
+      ramonaTeamIds: ["P-S", "M-M"],
+    });
+    // M-M gehoert schon Chris — Chris geht vor, Ramona bekommt nur P-S.
+    expect(mit.preview.ramonaTeamIds).toEqual(["P-S"]);
+    expect(mit.preview.counts.ramona).toBe(1);
+    expect(mit.preview.aiTeamIds).not.toContain("P-S");
+    const settings = mit.gameState.seasonState.teamControlSettings!;
+    expect(settings["P-S"]?.ownerId).toBe(RAMONA_OWNER_ID);
+    expect(settings["P-S"]?.delegation?.stufe).toBe("halbautomatik");
+    expect(settings["M-M"]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
+    // Ohne Ramona bleibt das Bestaetigungs-Token wie bisher.
+    expect(ohne.preview.ramonaTeamIds).toEqual([]);
+    expect(ohne.preview.confirmToken).not.toContain("ramona");
+    expect(mit.preview.confirmToken).toContain("ramona=P-S");
   });
 
   it("ein Spielstand ohne Ramona bleibt bytegleich in den Steuerungsfeldern", () => {
