@@ -126,10 +126,20 @@ async function main() {
   let browser: Browser | null = null;
   try {
     await waitForServer(900_000);
-    browser = await chromium.launch();
-    const GROESSEN: Array<[number, number, string, number]> = [[2560, 1440, "2560x1440", 1], [1920, 1080, "1920x1080", 1], [1710, 1112, "1710x1112", 1]];
+    browser = await chromium.launch({ args: ["--disable-dev-shm-usage", "--disable-gpu"] });
+    const GROESSEN: Array<[number, number, string, number]> = [[1920, 1080, "1920x1080", 1], [2560, 1440, "2560x1440", 1], [1710, 1112, "1710x1112", 1]];
     const aufnehmen = async (ansicht: string, breite: number, hoehe: number, datei: string, vorher: (p: Page) => Promise<void>) => {
-      if (process.env.OLY_SHOT_NUR && !datei.includes(process.env.OLY_SHOT_NUR)) return;
+      if (process.env.OLY_SHOT_NUR && !new RegExp(process.env.OLY_SHOT_NUR).test(datei)) return;
+      for (let versuch = 1; versuch <= 3; versuch += 1) {
+        try {
+          await aufnehmenEinmal(ansicht, breite, hoehe, datei, vorher);
+          return;
+        } catch (e) {
+          console.log(`[screenshot-rahmen] ${datei} Versuch ${versuch} gescheitert: ${String(e).slice(0, 120)}`);
+        }
+      }
+    };
+    const aufnehmenEinmal = async (ansicht: string, breite: number, hoehe: number, datei: string, vorher: (p: Page) => Promise<void>) => {
       const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();
       const url = new URL("/foundation", BASE_URL);
@@ -139,6 +149,7 @@ async function main() {
       await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 90_000 });
       await dismissSeasonBriefingIfOpen(page, 30_000);
       await page.getByTestId("foundation-regieband").or(page.getByTestId("foundation-arena-griff")).first().waitFor({ state: "visible", timeout: 90_000 });
+      await page.waitForFunction(() => !/WIRD GELADEN/i.test(document.body.innerText), undefined, { timeout: 150_000 }).catch(() => undefined);
       await page.waitForTimeout(1500);
       await dismissSeasonBriefingIfOpen(page, 30_000);
       await vorher(page);

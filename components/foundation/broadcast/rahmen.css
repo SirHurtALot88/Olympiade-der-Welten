@@ -595,7 +595,7 @@ button.fb-chip:hover {
 }
 
 /* ── Arena-Vollbild: Band und Schiene fahren weg, übrig bleibt der Griff ────────────────────────── */
-.foundation-shell-layout.is-arena-voll .fb-band {
+.foundation-shell.app-shell .foundation-shell-layout.is-arena-voll .foundation-shell-header.fb-band {
   display: none;
 }
 @media (min-width: 761px) {
