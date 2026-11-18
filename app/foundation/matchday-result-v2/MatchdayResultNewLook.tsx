@@ -17,7 +17,6 @@ import {
   useCountUp,
 } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
-import { FormMeldungen } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 import { baueFormMeldungen } from "@/lib/lineups/form-moral-anzeige";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
@@ -526,7 +525,19 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         }
       >
         {hasResult && !isPartial && formMeldungen.length > 0 ? (
-          <FormMeldungen meldungen={formMeldungen} spieltag={matchdaySummary.matchdayNumber} />
+          // Die Meldungen haben eine eigene Ansicht (18.11.); hier steht nur der Einstieg mit der groessten Bewegung.
+          <div className="nl-result-nds" data-testid="nl-result-nds-einstieg">
+            <span>
+              <strong>Nach dem Spieltag:</strong> {formMeldungen.length} Form-Meldungen
+              {formMeldungen[0] && formMeldungen[0].richtung !== "gleich"
+                ? `, die größte Bewegung bei ${formMeldungen[0].name} (${formMeldungen[0].delta > 0 ? "+" : "−"}${Math.abs(Math.round(formMeldungen[0].delta))})`
+                : ""}
+              .
+            </span>
+            <button className="nl-result-button is-primary" type="button" onClick={() => setFoundationView("nachDemSpieltag", setActiveView)}>
+              Form und Moral ansehen
+            </button>
+          </div>
         ) : null}
         {hasResult && isPartial ? (
           // Der Zwischenstands-Hinweis ist die EINE Aussage, die alle Zahlen dieser
