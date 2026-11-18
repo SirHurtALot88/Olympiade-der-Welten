@@ -391,7 +391,7 @@ jobs:
       # -- dieselben vier Dateien, die der Schritt "Schwere Dateien" unten auf Shard 1 einzeln faehrt.
       # `--exclude` auf ALLEN vier Matrix-Jobs identisch, damit der Shard-Beweis oben (dieselben
       # Dateifilter in jedem Shard) weiter gilt.
-      # live-stand-welle1.test.ts und hud-system-basketball.test.ts brauchen Chromium (hier keins: stilles
+      # live-stand-welle1.test.ts, hud-system-basketball.test.ts und hud-system-welle1.test.ts brauchen Chromium (hier keins: stilles
       # skipIf) und laufen deshalb im Job `arena-chromium-tests` (Review PR #1560) -- hier ausgeschlossen
       # statt still uebersprungen.
       - run: >-
@@ -402,6 +402,7 @@ jobs:
           --exclude "**/arena-eingabe-stabil.test.ts"
           --exclude "**/live-stand-welle1.test.ts"
           --exclude "**/hud-system-basketball.test.ts"
+          --exclude "**/hud-system-welle1.test.ts"
       # NUR auf Shard 1 (nicht auf allen vier), sonst liefe jede dieser Dateien viermal statt
       # einmal. Je ein eigener `npx vitest run`-Aufruf = ein frischer Node-Prozess je Datei, der
       # seinen Speicher beim Beenden garantiert freigibt -- s. Kopfkommentar fuer die Herleitung.
@@ -527,6 +528,11 @@ jobs:
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/hud-system-basketball.test.ts
+      # HUD-SYSTEM WELLE 1 (17.11.): Hockey und Football, gleiche Pruefung, eigener Prozess.
+      - name: "HUD-System Welle 1 Hockey/Football (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/hud-system-welle1.test.ts
 
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #
