@@ -24,6 +24,7 @@ import {
 import { prepareGameStateForPersistence } from "@/lib/foundation/materialize-on-save";
 import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
 import {
+  isOnlineSaveMode,
   matchesFoundationSaveMode,
   normalizeFoundationSaveMode,
   resolveFoundationSaveMode,
@@ -570,7 +571,7 @@ export async function POST(request: Request) {
       }
       const summary = enrichedSaves.find((entry) => entry.saveId === saveId);
       const isVerifiedHost = deleteOwnerId != null && summary?.createdBy != null && deleteOwnerId === summary.createdBy;
-      if (summary?.saveMode === "online_4v4" && !isVerifiedHost) {
+      if (isOnlineSaveMode(summary?.saveMode) && !isVerifiedHost) {
         blockedSaveIds.push({
           saveId,
           reason: "Nur der Host dieses Mehrspieler-Spielstands darf ihn löschen.",

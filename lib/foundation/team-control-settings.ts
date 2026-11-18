@@ -3,10 +3,14 @@ import {
   resolveFoundationSaveMode,
   type FoundationSaveModePreset,
 } from "@/lib/persistence/foundation-save-mode";
+import { RAMONA_OWNER_ID } from "@/lib/foundation/team-delegation";
+
+export { RAMONA_OWNER_ID };
 
 export const DEFAULT_ACTIVE_OWNER_ID = "user_local";
 export const FRANKY_OWNER_ID = "franky_remote_placeholder";
 export const LOCAL_USER_DISPLAY_LABEL = "Chris";
+export const RAMONA_DISPLAY_LABEL = "Ramona";
 export const AI_OWNER_ID = "ai";
 
 export type TeamOwnerType = "local_user" | "local_friend" | "remote_player" | "ai";
@@ -28,7 +32,7 @@ export type TeamControlFilter =
 
 export const DEFAULT_TEAM_OWNERS: Array<Omit<TeamOwner, "controlledTeamIds">> = [
   { ownerId: DEFAULT_ACTIVE_OWNER_ID, label: LOCAL_USER_DISPLAY_LABEL, type: "local_user" },
-  { ownerId: "ramona_local", label: "Ramona", type: "local_friend" },
+  { ownerId: RAMONA_OWNER_ID, label: RAMONA_DISPLAY_LABEL, type: "local_friend" },
   { ownerId: FRANKY_OWNER_ID, label: "Franky", type: "remote_player" },
   { ownerId: AI_OWNER_ID, label: "AI", type: "ai" },
 ];
@@ -164,12 +168,29 @@ export function isFrankyOwnedTeamSettings(settings: TeamControlSettings | null |
   return ownerId === FRANKY_OWNER_ID || settings.displayLabel === "Franky";
 }
 
+/**
+ * Ramona, die dritte Spielerin (Chris, 18.11.). Erkannt NUR ueber die Besitzer-ID — anders als bei
+ * Chris/Franky gibt es keine Altspielstaende mit Etikett-Erkennung, die man mittragen muesste.
+ */
+export function isRamonaOwnedTeamSettings(settings: TeamControlSettings | null | undefined) {
+  if (!settings || settings.controlMode !== "manual") {
+    return false;
+  }
+  return normalizeOwnerIdForMode(settings.controlMode, settings.ownerId) === RAMONA_OWNER_ID;
+}
+
 export function deriveChrisFrankyTeamIdsFromSettings(teams: Team[], settingsMap: Record<string, TeamControlSettings>) {
   const chrisTeamIds: string[] = [];
   const frankyTeamIds: string[] = [];
+  const ramonaTeamIds: string[] = [];
 
   for (const team of teams) {
     const settings = settingsMap[team.teamId];
+    // Ramona zuerst: ein Etikett-Treffer bei Chris (`displayLabel`) darf ihr Team nie verschlucken.
+    if (isRamonaOwnedTeamSettings(settings)) {
+      ramonaTeamIds.push(team.teamId);
+      continue;
+    }
     if (isChrisOwnedTeamSettings(settings)) {
       chrisTeamIds.push(team.teamId);
       continue;
@@ -179,10 +200,20 @@ export function deriveChrisFrankyTeamIdsFromSettings(teams: Team[], settingsMap:
     }
   }
 
-  return { chrisTeamIds, frankyTeamIds };
+  return { chrisTeamIds, frankyTeamIds, ramonaTeamIds };
 }
 
 export function getGameModeOwnershipLimits(saveMode: FoundationSaveModePreset): {
+  chrisMax: number;
+  frankyMax: number;
+  /** Ramona (dritte Spielerin, 18.11.): dieselbe Obergrenze wie Franky, in Solo-Modi keine. */
+  ramonaMax: number;
+} {
+  const ohneRamona = getChrisFrankyOwnershipLimits(saveMode);
+  return { ...ohneRamona, ramonaMax: ohneRamona.frankyMax };
+}
+
+function getChrisFrankyOwnershipLimits(saveMode: FoundationSaveModePreset): {
   chrisMax: number;
   frankyMax: number;
 } {
@@ -214,8 +245,29 @@ export function getGameModeOwnershipLimits(saveMode: FoundationSaveModePreset): 
 
 export function createChrisFrankyTeamControlSetting(
   team: Team,
-  ownership: "chris" | "franky" | "ai",
+  ownership: "chris" | "franky" | "ramona" | "ai",
 ): TeamControlSettings {
+  if (ownership === "ramona") {
+    return {
+      teamId: team.teamId,
+      controlMode: "manual",
+      ownerId: RAMONA_OWNER_ID,
+      ownerSlot: RAMONA_OWNER_ID,
+      displayLabel: RAMONA_DISPLAY_LABEL,
+      aiLineupPreviewEnabled: false,
+      aiLineupApplyEnabled: false,
+      aiLineupAutoApplyEnabled: false,
+      aiTransferPreviewEnabled: false,
+      aiTransferAutoApplyEnabled: false,
+      aiSellPreviewEnabled: false,
+      aiSellAutoApplyEnabled: false,
+      // Chris, 18.11.: „Standard ist Halbautomatik, sobald man sie als Spielerin wählt.“
+      delegation: { stufe: "halbautomatik" },
+      notes: null,
+      strategyLock: null,
+    };
+  }
+
   if (ownership === "chris") {
     return {
       teamId: team.teamId,
@@ -272,32 +324,61 @@ export function createChrisFrankyTeamControlSetting(
   };
 }
 
+/**
+ * `ramonaTeamIds` ist optional: wer es weglaesst (alle Aufrufer von vor dem 18.11.; die
+ * Team-Zuordnung der Oberflaeche kennt nur Chris/Franky), behaelt Ramonas BESTEHENDE Teams —
+ * sonst setzte jede Umstellung zwischen Chris und Franky Ramona stillschweigend auf KI. Explizit an
+ * Chris oder Franky vergebene Teams gehen dabei vor.
+ *
+ * Die Delegation bleibt am Team, solange der Besitzer bleibt. Wechselt er, gilt die Voreinstellung
+ * des neuen (Chris/Franky: keine Delegation = voll selbst, Ramona: Halbautomatik) — Ramonas
+ * Halbautomatik darf nicht an einem Team kleben, das jetzt Chris fuehrt.
+ */
 export function applyChrisFrankyOwnershipToTeamControlSettings(
   teams: Team[],
   chrisTeamIds: string[],
   frankyTeamIds: string[],
   existing?: Record<string, TeamControlSettings> | null,
+  ramonaTeamIds?: string[] | null,
 ) {
   const chrisSet = new Set(chrisTeamIds);
   const frankySet = new Set(frankyTeamIds.filter((teamId) => !chrisSet.has(teamId)));
+  const ramonaQuelle =
+    ramonaTeamIds ??
+    teams.filter((team) => isRamonaOwnedTeamSettings(existing?.[team.teamId])).map((team) => team.teamId);
+  const ramonaSet = new Set(ramonaQuelle.filter((teamId) => !chrisSet.has(teamId) && !frankySet.has(teamId)));
 
   return Object.fromEntries(
     teams.map((team) => {
       const existingSettings = existing?.[team.teamId];
-      const ownership = chrisSet.has(team.teamId) ? "chris" : frankySet.has(team.teamId) ? "franky" : "ai";
+      const ownership = chrisSet.has(team.teamId)
+        ? "chris"
+        : frankySet.has(team.teamId)
+          ? "franky"
+          : ramonaSet.has(team.teamId)
+            ? "ramona"
+            : "ai";
       const nextSettings = createChrisFrankyTeamControlSetting(team, ownership);
-      return [
-        team.teamId,
-        existingSettings
-          ? {
-              ...existingSettings,
-              ...nextSettings,
-              teamId: team.teamId,
-              notes: existingSettings.notes ?? nextSettings.notes,
-              strategyLock: existingSettings.strategyLock ?? nextSettings.strategyLock,
-            }
-          : nextSettings,
-      ];
+      if (!existingSettings) {
+        return [team.teamId, nextSettings];
+      }
+      const besitzerBleibt =
+        existingSettings.controlMode === nextSettings.controlMode &&
+        normalizeOwnerIdForMode(existingSettings.controlMode, existingSettings.ownerId) === nextSettings.ownerId;
+      const delegation = besitzerBleibt
+        ? (existingSettings.delegation ?? nextSettings.delegation)
+        : nextSettings.delegation;
+      const merged: TeamControlSettings = {
+        ...existingSettings,
+        ...nextSettings,
+        teamId: team.teamId,
+        notes: existingSettings.notes ?? nextSettings.notes,
+        strategyLock: existingSettings.strategyLock ?? nextSettings.strategyLock,
+      };
+      // Kein Feld schreiben, wo vorher keins war: bestehende Spielstaende bleiben bytegleich.
+      if (delegation) merged.delegation = delegation;
+      else delete merged.delegation;
+      return [team.teamId, merged];
     }),
   );
 }
@@ -312,6 +393,8 @@ export function applyGameModeOwnership(
     saveMode: FoundationSaveModePreset;
     chrisTeamIds: string[];
     frankyTeamIds: string[];
+    /** Optional (Ramona, 18.11.): fehlt es, bleiben ihre bestehenden Teams bei ihr. */
+    ramonaTeamIds?: string[] | null;
   },
 ): GameState {
   const validTeamIds = new Set(gameState.teams.map((team) => team.teamId));
@@ -319,18 +402,27 @@ export function applyGameModeOwnership(
   const frankyTeamIds = input.frankyTeamIds.filter(
     (teamId) => validTeamIds.has(teamId) && !chrisTeamIds.includes(teamId),
   );
+  const ramonaTeamIds =
+    input.ramonaTeamIds == null
+      ? null
+      : input.ramonaTeamIds.filter(
+          (teamId) => validTeamIds.has(teamId) && !chrisTeamIds.includes(teamId) && !frankyTeamIds.includes(teamId),
+        );
   const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(
     gameState.teams,
     chrisTeamIds,
     frankyTeamIds,
     gameState.seasonState.teamControlSettings,
+    ramonaTeamIds,
   );
   const teams = gameState.teams.map((team) => ({
     ...team,
     humanControlled: teamControlSettings[team.teamId]?.controlMode === "manual",
   }));
   const primaryChrisTeamId = chrisTeamIds[0] ?? null;
-  const humanControlledTeamCount = chrisTeamIds.length + frankyTeamIds.length;
+  const humanControlledTeamCount = Object.values(teamControlSettings).filter(
+    (settings) => settings.controlMode === "manual",
+  ).length;
 
   return {
     ...gameState,
@@ -429,13 +521,14 @@ export function heileFalschAlsMenschMarkierteTeams(gameState: GameState): {
     return { gameState, geheilteTeamIds: [] };
   }
 
-  const { chrisTeamIds, frankyTeamIds } = deriveChrisFrankyTeamIdsFromSettings(teams, settingsMap);
+  const { chrisTeamIds, frankyTeamIds, ramonaTeamIds } = deriveChrisFrankyTeamIdsFromSettings(teams, settingsMap);
   const verdaechtigeIds = new Set(verdaechtig);
   const naechsteChris = chrisTeamIds.filter((teamId) => !verdaechtigeIds.has(teamId));
   const naechsteFranky = frankyTeamIds.filter((teamId) => !verdaechtigeIds.has(teamId));
+  const naechsteRamona = ramonaTeamIds.filter((teamId) => !verdaechtigeIds.has(teamId));
 
   // Der Riegel: lieber die Narbe behalten als einen Spielstand ohne eigenes Team.
-  if (naechsteChris.length + naechsteFranky.length === 0) {
+  if (naechsteChris.length + naechsteFranky.length + naechsteRamona.length === 0) {
     return { gameState, geheilteTeamIds: [] };
   }
 
@@ -444,6 +537,7 @@ export function heileFalschAlsMenschMarkierteTeams(gameState: GameState): {
     naechsteChris,
     naechsteFranky,
     settingsMap,
+    naechsteRamona,
   );
 
   return {

@@ -91,6 +91,7 @@ import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start
 import {
   FOUNDATION_SAVE_MODE_OPTIONS,
   formatFoundationSaveModeLabel,
+  isOnlineSaveMode,
   normalizeFoundationSaveMode,
   resolveFoundationSaveMode,
   type FoundationSaveMode,
@@ -7453,7 +7454,7 @@ export function useFoundationShellRouterBodyScope({
         // Arena, deren Aufstellungen noch unvollstaendig sind — und saehe
         // Ergebnisse, bevor der Mitspieler gesetzt hat. Solo bleibt es beim
         // eigenen Team.
-        isOnlineGame: activeSaveGameMode === "online_4v4",
+        isOnlineGame: isOnlineSaveMode(activeSaveGameMode),
         activeTeamReady: activeManagerMatchdayReady,
         teams: buildMatchdayReadinessTeamsFromState({
           teams: gameState.teams,
