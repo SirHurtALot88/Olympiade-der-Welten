@@ -8,6 +8,7 @@ import {
   waehleArenaFlaeche,
   zeigtArenaDenGebuchtenSieger,
 } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
+import { baueWechselSpielliste, waehleWechselStandard } from "@/lib/foundation/battle-arena/arena-wechsel";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 
 /**
@@ -62,7 +63,7 @@ describe("bestimmeArenaSpieltagAnsicht", () => {
     const pod = { podId: "p1", platz: 2, teamIds: ["EIG", "A", "B", "C"], wert: 0 };
     const mitMotor = preview([zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: { ...pod, quelle: "bahn" }, teamPoints: 1 })], "staffel");
     const e = bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "staffel", ownTeamId: "EIG", preview: mitMotor });
-    expect(e).toMatchObject({ art: "pod", heimTeamId: "EIG", podTeamId: "EIG" });
+    expect(e).toMatchObject({ art: "pod", heimTeamId: "EIG", podTeamId: "EIG", gastTeamId: "A" });
     expect(beschreibeGebuchtesArenaErgebnis(e!, (id) => id).text).toContain("Platz 2 von 4");
     const ohneMotor = preview([zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: pod, teamPoints: 1 })], "staffel");
     expect(bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "staffel", ownTeamId: "EIG", preview: ohneMotor })).toBeNull();
@@ -71,6 +72,44 @@ describe("bestimmeArenaSpieltagAnsicht", () => {
   it("Snapshot eines anderen Spieltags zeigt nichts", () => {
     const p = { ...preview([zeile("EIG", { resolutionSource: "arena", opponentTeamId: "GEG" })]), matchdayId: "matchday-2" };
     expect(bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "spurt", ownTeamId: "EIG", preview: p })).toBeNull();
+  });
+});
+
+describe("Wechsel Disziplin 1 -> Disziplin 2 landet auf dem eigenen Spiel (18.11.)", () => {
+  // D1: Duell gegen GEG (Fixture). D2: Vierergruppe, in der der Fixture-Gegner NICHT sitzt.
+  const pod = { podId: "bf-2", platz: 1, teamIds: ["A", "EIG", "B", "C"], wert: 0, quelle: "ffa" };
+  const d2 = preview([zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: pod, teamPoints: 2 })], "battlefield");
+
+  it("Pod ohne Fixture-Gegner: Gast ist ein Mitglied der gebuchten Gruppe, nicht der D1-Gegner", () => {
+    const e = bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "battlefield", ownTeamId: "EIG", preview: d2 });
+    expect(e?.art).toBe("pod");
+    expect(e?.podTeamIds).toEqual(["A", "EIG", "B", "C"]);
+    expect(e?.podTeamIds).toContain(e!.heimTeamId);
+    expect(e?.podTeamIds).toContain(e!.gastTeamId);
+    expect(e?.gastTeamId).not.toBe("GEG");
+  });
+
+  it("Pod mit Fixture-Gegner in der Gruppe: der bleibt Gast (Vorstellung hebt ihn hervor)", () => {
+    const mit = preview([zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: { ...pod, teamIds: ["EIG", "GEG", "B", "C"] }, teamPoints: 2 })], "battlefield");
+    const e = bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "battlefield", ownTeamId: "EIG", preview: mit });
+    expect(e?.gastTeamId).toBe("GEG");
+  });
+
+  it("Gruppe ohne das eigene Team ist ein fremdes Spiel und wird nie gezeigt", () => {
+    const fremd = preview([zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: { ...pod, teamIds: ["A", "B", "C", "D"] }, teamPoints: 2 })], "battlefield");
+    expect(bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "battlefield", ownTeamId: "EIG", preview: fremd })).toBeNull();
+  });
+
+  it("Spielliste: eigenes Spiel zuerst und als Standard, fremde nur zur Wahl", () => {
+    const p = preview([
+      zeile("X1", { resolutionSource: "mini_dm_pod", miniDmPod: { ...pod, podId: "bf-1", teamIds: ["X1", "X2", "X3", "X4"] } }),
+      zeile("EIG", { resolutionSource: "mini_dm_pod", miniDmPod: pod }),
+      zeile("A", { resolutionSource: "mini_dm_pod", miniDmPod: pod }),
+    ], "battlefield");
+    const liste = baueWechselSpielliste({ preview: p, disciplineId: "battlefield", ownTeamId: "EIG" });
+    expect(liste.map((s) => s.id)).toEqual(["pod:bf-2", "pod:bf-1"]);
+    expect(waehleWechselStandard(liste)?.teamIds).toContain("EIG");
+    expect(liste[1].eigenes).toBe(false);
   });
 });
 

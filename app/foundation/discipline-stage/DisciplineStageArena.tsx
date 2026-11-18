@@ -126,6 +126,11 @@ import {
   waehleArenaFlaeche,
   zeigtArenaDenGebuchtenSieger,
 } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
+import { baueWechselSpielliste, waehleWechselStandard } from "@/lib/foundation/battle-arena/arena-wechsel";
+import { baueRegieSchritte, ordneRegieMitspieler } from "@/lib/foundation/battle-arena/arena-regie";
+import { baueVorraumTeams } from "@/lib/foundation/battle-arena/arena-vorraum";
+import type { ArenaRegie } from "@/app/foundation/battle-arena/ArenaRegieleiste";
+import ArenaWechsel from "@/app/foundation/battle-arena/ArenaWechsel";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
@@ -2783,6 +2788,64 @@ export default function DisciplineStageArena({
     battleArenaSpieltag && gebuchtesBattleErgebnis && battleArenaSieger?.disziplin === disciplineId
       ? zeigtArenaDenGebuchtenSieger(battleArenaSpieltag, gebuchtesBattleErgebnis, battleArenaSieger.sieger)
       : null;
+  // REGIELEISTE (18.11., Mockup arena-spieltag-modern-18-11): Ort, drei Schritte (gebucht, nicht "Arena lief
+  // durch"), Mitspieler im Raum und "Du steuerst". Nur Anzeige-Daten aus dem Save.
+  const arenaRegie = useMemo<ArenaRegie | null>(() => {
+    if (!gameState?.teams) return null;
+    const teamName = (teamId: string | null | undefined) =>
+      gameState.teams.find((team) => team.teamId === teamId)?.name ?? null;
+    const seite = (side: { disciplineId: string | null } | null, fortschritt: { scored: boolean; required: boolean } | undefined) =>
+      side?.disciplineId
+        ? {
+            disciplineId: side.disciplineId,
+            name: matchdayDisciplineOptions.find((option) => option.id === side.disciplineId)?.name ?? null,
+            gewertet: fortschritt?.scored ?? false,
+            geplant: fortschritt?.required ?? true,
+          }
+        : null;
+    const schritte = baueRegieSchritte({
+      d1: seite(matchdaySides.d1, scoringProgress?.d1),
+      d2: seite(matchdaySides.d2, scoringProgress?.d2),
+      aktiveSeite: activeDisciplineSide,
+    });
+    const menschlich = isBattleModeSave(gameState) ? getManualControlTeamIds(gameState) : new Set<string>();
+    const mitspieler = ordneRegieMitspieler(
+      [...menschlich].map((teamId) => ({
+        teamId,
+        teamName: teamName(teamId) ?? teamId,
+        spielerName: resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, teamId))) || null,
+        istEigen: teamId === ownTeamId,
+      })),
+    );
+    const nummer = (gameState.season as { currentMatchday?: number | null } | undefined)?.currentMatchday;
+    return {
+      spieltagText: nummer ? `Spieltag ${nummer}` : "Spieltag",
+      ligaText: null,
+      schritte,
+      mitspieler,
+      eigenesTeamName: teamName(ownTeamId),
+    };
+  }, [gameState, matchdaySides, matchdayDisciplineOptions, scoringProgress, activeDisciplineSide, ownTeamId]);
+  // WECHSEL D1 -> D2: das Spiel des gesteuerten Teams in Disziplin 2 (nie ein fremdes) und die uebrigen
+  // Spiele der Disziplin nur zur Orientierung.
+  const wechselZiel = useMemo(() => {
+    const zweite = matchdaySides.d2?.disciplineId ?? null;
+    if (!zweite || !preview) return null;
+    const liste = baueWechselSpielliste({ preview, disciplineId: zweite, ownTeamId });
+    const eigenes = waehleWechselStandard(liste);
+    return {
+      art: eigenes?.art ?? null,
+      eigenesSpiel: eigenes
+        ? baueVorraumTeams({ gameState, teamIds: eigenes.teamIds, ownTeamId, disciplineId: zweite })
+        : [],
+      andereSpiele: liste
+        .filter((spiel) => !spiel.eigenes)
+        .map((spiel) => ({
+          id: spiel.id,
+          teamNamen: spiel.teamIds.map((id) => gameState.teams.find((team) => team.teamId === id)?.name ?? id),
+        })),
+    };
+  }, [matchdaySides.d2?.disciplineId, preview, ownTeamId, gameState]);
   const beimBattleArenaEnde = useCallback(
     (info: { disziplin: string; sieger: 0 | 1 | null }) => {
       if (info.disziplin !== disciplineId) return;
@@ -3259,6 +3322,20 @@ export default function DisciplineStageArena({
               gastTeamId: battleArenaSpieltag.gastTeamId,
               podTeamId: battleArenaSpieltag.podTeamId,
               disziplinName: model.disciplineName,
+              podTeamIds: battleArenaSpieltag.podTeamIds,
+              regie: arenaRegie,
+              disziplinNr: matchdaySides.d1?.disciplineId === disciplineId ? 1 : matchdaySides.d2?.disciplineId === disciplineId ? 2 : 1,
+              disziplinAnzahl: matchdayDisciplineOptions.length || 1,
+              ausblick:
+                matchdaySides.d2?.disciplineId && matchdaySides.d2.disciplineId !== disciplineId && wechselZiel?.art
+                  ? {
+                      disziplinName:
+                        matchdayDisciplineOptions.find((option) => option.id === matchdaySides.d2?.disciplineId)?.name ??
+                        matchdaySides.d2.displayName,
+                      art: wechselZiel.art,
+                      teams: wechselZiel.eigenesSpiel,
+                    }
+                  : null,
               onEnde: beimBattleArenaEnde,
             }}
           />
@@ -3843,6 +3920,33 @@ export default function DisciplineStageArena({
               // Audit-Punkt 4: derselbe League-weite-Aktion-Gedanke wie an der Disziplin-Auswahl
               // oben — nur wer den Reveal steuert, darf den Spieltag weiterschalten.
               const locked = arenaGuestLocked;
+              const weiter = () => {
+                if (locked) return;
+                setDisciplineId(secondDisciplineId);
+                // Nach oben scrollen: der Knopf sitzt UNTER der Buehne, nach dem
+                // Wechsel stand man also mitten in der Spieltags-Wertung und musste
+                // sich die neue Disziplin erst wieder hochsuchen.
+                scrollArenaIntoView();
+              };
+              // Battle-Save mit Motor-Spiel: der Wechsel-Screen (Mockup Screen 6) -- links D1 gebucht, rechts
+              // das EIGENE Spiel in D2. Sonst der schlichte Knopf wie bisher.
+              if (battleArenaSpieltag && wechselZiel) {
+                return (
+                  <div className={locked ? "nl-arena-phase-controls is-locked" : undefined}>
+                    <ArenaWechsel
+                      d1Name={matchdayDisciplineOptions.find((option) => option.id === disciplineId)?.name ?? "Disziplin 1"}
+                      d1Ergebnis={gebuchtesBattleErgebnis?.text ?? null}
+                      d2Name={secondName}
+                      d2Art={wechselZiel.art}
+                      eigenesSpiel={wechselZiel.eigenesSpiel}
+                      andereSpiele={wechselZiel.andereSpiele}
+                      eigenesTeamName={gameState.teams.find((team) => team.teamId === ownTeamId)?.name ?? null}
+                      gesperrt={locked}
+                      onWeiter={weiter}
+                    />
+                  </div>
+                );
+              }
               return (
                 <div
                   className={locked ? "nl-arena-phase-controls is-locked" : undefined}
@@ -3857,14 +3961,7 @@ export default function DisciplineStageArena({
                     type="button"
                     disabled={locked}
                     title={locked ? "Der Host steuert die gemeinsame Anzeige" : undefined}
-                    onClick={() => {
-                      if (locked) return;
-                      setDisciplineId(secondDisciplineId);
-                      // Nach oben scrollen: der Knopf sitzt UNTER der Buehne, nach dem
-                      // Wechsel stand man also mitten in der Spieltags-Wertung und musste
-                      // sich die neue Disziplin erst wieder hochsuchen.
-                      scrollArenaIntoView();
-                    }}
+                    onClick={weiter}
                     style={{
                       padding: "11px 22px",
                       fontWeight: 800,
