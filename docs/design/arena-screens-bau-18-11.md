@@ -38,7 +38,7 @@ Teamfarben: eigenes Team immer `#F2A03D`, die anderen Türkis/Violett/Rosa (`tea
 
 ## Wertung
 
-Alle Motor-Änderungen sind Anzeige (Endstand-DOM, Text der Tafel vor dem Anpfiff). Fingerabdruck: siehe PR.
+Alle Motor-Änderungen sind Anzeige (Endstand-DOM, Text der Tafel vor dem Anpfiff). Fingerabdruck `node scripts/pruefe-wertung-fingerabdruck.mjs`: GESAMT d3a39030a3ef (75 Eintraege), identisch zum Stand von #1617.
 
 ## Offene Punkte
 
