@@ -11477,6 +11477,11 @@ export function useFoundationShellRouterBodyScope({
     const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
     return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
   }, [gameState]);
+  /** Die Werte hinter diesen Rängen (Top-6-Summe je Disziplin) für den Kaderstärke-Balken der modernen Saisonstand-Ansicht. */
+  const seasonV2TeamStrengthValueByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.scorePack.disciplines] as const));
+  }, [gameState]);
   /**
    * NUR die moderne Saisonstand-Ansicht (18.11.): Zeitreihe je Team aus dem Feld-Rennen-Ledger (Form,
    * Saisonverlauf) und die Matchwinner-Bestenliste. Beides gilt nur fuer die LIVE-Saison — ein Archiv
@@ -13247,6 +13252,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2AreaVerhaeltnisByTeamId,
     seasonV2TeamBilanzByTeamId,
     seasonV2TeamStrengthRankByTeamId,
+    seasonV2TeamStrengthValueByTeamId,
     seasonV2Verlauf,
     seasonV2Matchwinner,
     seasonV2TopPlayers,

@@ -65,8 +65,8 @@ describe("Saisonstand modern: Verträge", () => {
   it("jede Ansicht ist gebaut: Tabelle, Matrix, Verlauf, Spieltage, Bestenliste", () => {
     for (const a of ['"tabelle"', '"matrix"', '"verlauf"', '"spieltage"', '"bestenliste"']) expect(MODERN).toContain(a);
   });
-  it("Spieltage laden lazy: je Spieltag-Wahl, nächster Gegner, nächste Disziplinen, Duell-Matrix (nur bei neuem Bundle)", () => {
-    expect(MODERN.match(/getUebersicht\(/g)?.length).toBe(4);
+  it("Spieltage laden lazy: je Spieltag-Wahl, eine geteilte Übersicht des nächsten Spieltags (Kopf, Matrix, Nä.-Spalte, Showdown), Duell-Matrix (nur bei neuem Bundle)", () => {
+    expect(MODERN.match(/getUebersicht\(/g)?.length).toBe(3);
     // Die Duell-Matrix (Chris 18.11.: Duellpunkte statt PPs) summiert alle gespielten Spieltage —
     // einmal je neuem Spieltage-Bundle, nicht je Render oder Ansichtswechsel.
     expect(MODERN).toMatch(/duellPunkteJeDisziplin\(gespielte\.map\(\(o\) => spieltage\.getUebersicht\(o\.id\)\)\);\n  \}, \[spieltage\]\)/);
@@ -83,5 +83,19 @@ describe("Saisonstand modern: Verträge", () => {
   });
   it("Saisonlänge kommt aus der Spieltags-Liste, nicht aus dem Ledger (sonst Endstand mitten in der Saison)", () => {
     expect(MODERN).toContain("const gesamtSpieltage = Math.max(spieltagListe.length, verlauf ? verlauf.spieltage.length : 0);");
+  });
+  it("Runde 2: Form (6 Plätze), Verlauf-Sparkline, Nä., Abst. und Rang-Bänder sind verdrahtet", () => {
+    expect(MODERN).toContain("formPlaetze(form)");
+    expect(MODERN).toContain('key: "verlauf"');
+    expect(MODERN).toContain('key: "naech"');
+    expect(MODERN).toContain('key: "abst"');
+    expect(MODERN).toMatch(/rangBand\(bereichsRaenge\[id\]\.get\(z\.teamId\)\)/);
+    for (const k of ["gut", "warn", "risk"]) expect(CSS).toContain(`.ssm-band--${k}`);
+    expect(CSS).toContain("skewX(-14deg)");
+  });
+  it("Runde 2: Showdown zeigt Kaderstärke-Verhältnis aus den Stärke-Werten, ehrlich benannt", () => {
+    expect(MODERN).toContain("teamStrengthValueByTeamId?.get(p.homeTeamId)");
+    expect(MODERN).toContain("kaderStaerkeAnteil(wH, wG)");
+    expect(MODERN).toContain("kein Ergebnis und keine Prognose");
   });
 });
