@@ -9,8 +9,11 @@ dem adjusted Budget rechnen und trotzdem die Slots füllen", „keine Notkäufe 
 „Top-20 nicht kaufen ist richtig", „Stars relativ sehen", „der GM kann aus Opt 13 z. B. 12 oder 11 machen", Rücklage-Vorgaben
 (Spreizung nach Persönlichkeit, „Notrücklage, kein greedy Vorstand") und das gemeinsame Transferfenster.
 
-**PM-Entscheidung (18.11.):** Draft bleibt, Kaderplan wird nach unabhängigem Review Standard. Dieser PR liefert Analyse, Prototyp
-(`OLY_KI_KADERPLAN=1`, Standard **aus**) und Messung; S2-Kauf und Star-Teams Stufe 2 sind **nicht** Teil davon (Abschnitt 7).
+**PM-Entscheidung (18.11.):** Draft bleibt, Kaderplan wird nach unabhängigem Review Standard. Dieser PR liefert Analyse, Kaderplan
+und Messung; S2-Kauf und Star-Teams Stufe 2 sind **nicht** Teil davon (Abschnitt 7). **Stand nach dem Opus-Review (Abschnitt 9):** der
+Kaderplan ist im **Saison-1-Setup-Draft Standard AN** (`OLY_KI_KADERPLAN=0` schaltet ab) und ab Saison 2 aus; die Abschnitte 1–8
+beschreiben den Prototyp-Stand davor (`OLY_KI_KADERPLAN=1`). Die alten Läufe r7/r8 tragen im `env`-Feld fälschlich
+`OLY_LIGA_DRAFT_MODUS=einzelschritt`, es lief der Block (Abschnitt 9.2).
 
 **Basis des Branches:** `claude/finanzen-v2-seite-18-11` (#1618, inzwischen mit `main` samt #1619) plus #1628 (Messung S1 ohne Draft,
 Konflikt im Messskript gelöst: `--variante A|C|C2`, `--mischen` und `--draft block|einzelschritt` funktionieren zusammen). Die #1618-
@@ -370,7 +373,7 @@ Kader, gleiche Kasse, 0 Notkäufe). Der „beschränkte Draft-Modus" beschränkt
 
 | Stufe | Inhalt | In diesem PR? | Prüfung |
 |---|---|---|---|
-| 1 | Kaderplan (Reserve bis Opt, Füller nur nach Plan, kein Stopp unter Opt, Wettbewerbs-Reserve, GM-Opt, Protokoll), Notwege 3 und 4 ersetzt | **ja, hinter `OLY_KI_KADERPLAN=1`** | gemessen (Abschnitt 5.3); danach **unabhängiges Opus-Review**, erst dann Schalter auf Standard |
+| 1 | Kaderplan (Reserve bis Opt, Füller nur nach Plan, kein Stopp unter Opt, Wettbewerbs-Reserve, GM-Opt, Protokoll), Notwege 3 und 4 ersetzt | **ja; nach dem Opus-Review im S1-Setup-Draft Standard** (Abschnitt 9) | gemessen (Abschnitt 5.3 und 9.3); Review-Befunde umgesetzt (Abschnitt 9) |
 | 2 | Notwege 1, 2, 5, 7, 8: Legacy-Emergency-Fill löschen, Kader-Fill-Knopf auf den Kaufschritt, delegierte Teams ab S2, Rest-Rückfälle entfernen | nein, Folge-PR nach dem Review | Tests der Notwege umschreiben |
 | 3 | Kauf im gemeinsamen Fenster über den Kaufschritt mit Kaderplan (Stelle 6), Rahmen nach Verkäufen neu, Rücklage S2 nach Sparneigung und angespart, Notrücklage-Reihenfolge | nein — die Session-Datei gehört dem Transferfenster-Agenten; der PM koordiniert | Mehrsaisonlauf S1 → S2: kein Team < 8, Kader nahe Opt, Kasse im Band, Spreizung nach Identität, jedes Team kauft, Zählung Notrücklage/Kredit/Notverkauf |
 | 4 | Star-Teams (bewusste Star-Plätze im Plan, Preis-Term gegen das Star-Budget) | nein — erst Mockup + Erklärung für Chris | Stars relativ je Archetyp (Abschnitt 2.4), Kadergrößen-Spreizung, Stärke je Archetyp |
@@ -385,3 +388,86 @@ Kader, gleiche Kasse, 0 Notkäufe). Der „beschränkte Draft-Modus" beschränkt
   billigsten 12er) und ist trotzdem nicht ganz dicht, weil Teams ihre letzten Plätze in derselben Runde füllen.
 * Fingerabdruck auf diesem Branch `d3a39030a3ef` = aktueller Stand in CLAUDE.md (auf `main` bewegt durch #1617 Climbing, nicht durch
   diesen PR; die Kaufschritt-Änderung berührt die Arena nicht).
+
+---
+
+## 9. Review-Fixes (unabhängiges Opus-Review, 18.11.) — Kaderplan jetzt Standard im S1-Setup-Draft
+
+Chris' Vorgaben, an denen gemessen wird: (1) die KI rechnet mit dem freigegebenen Rahmen und füllt trotzdem ihr Opt, weniger nur als
+bewusste, protokollierte GM-Entscheidung (höchstens −2, nie unter Minimum + 1); (2) keine Notkäufe, kein Minimum-Auffüllen, keine
+Billigst-Auffangnetze; (3) kein Team unter 8; (4) Stars relativ, Top-20 in S1 bewusst nicht kaufen; (5) nach dem Picken liegen die
+meisten Teams bei etwa 50–70 Gehalt.
+
+### 9.1 Befunde und was geändert ist
+
+| Befund | Problem | Änderung | Test |
+|---|---|---|---|
+| **S1** `kaderplanRahmen` | Bei `rest = 0` blieben trotzdem die billigsten `voll` Plätze reserviert. Trug die Kasse sie nicht, bestand kein Kandidat, über dem Minimum folgte `nothing_affordable` — Kader 8 statt 9 ohne Kaderplan. | Zwei Stufen: erst die **Zahl der Plätze** schrittweise bis zum größten tragbaren m senken (m = 0 ist genau die Schranke ohne Kaderplan), dann davon so viele zum Platzpreis wie tragbar. Nie weniger Spieler als ohne Kaderplan. | Beispiel Kader 8 / Opt 12 / Kasse für zwei Plätze → 10 (vorher 8); 120 Zufallsfälle „mit ≥ min(ohne, Opt)" |
+| **S2** Zählung | `traegtNicht` rechnete den aktuellen Kauf mit dem absolut billigsten Spieler (oft ein Füller): `plaetze`/`rahmenPlaetze` bis zu 1 zu hoch, die Füller-Sperre fiel, ein Füller kam unter Opt bei Grund `opt_erreicht`. | Der aktuelle Kauf zählt zum **billigsten Platzpreis** (`billigsterPlatz`, ab 12); trägt nicht einmal der, zählt er nicht als Platzpreis-Platz. Im Protokoll zählt jeder Füller unter Opt bei `opt_erreicht` als Notweg `fueller_rueckfall` (nicht doppelt, wenn der Schritt ihn schon gemeldet hat). | Opt 9, Kasse für Füller, nicht für 13er → `plaetze` 8, Grund „Tiefe vor Qualität"; Protokoll-Test |
+| **S4** Einzelschritt | Scheiterte der Kauf selbst (40 Fehlversuche oder teamweiter Grund), buchte `bucheAusstieg` ohne Protokoll; `bewerteKiPick` setzte es nur bei `kind !== "buy"`. | `bewerteKiPick` liefert das Protokoll immer (mit den Notwegen der bisherigen Picks aus dem Verlauf); der Ausstieg nach gescheitertem Kauf hängt `kaderplan:<grund> kaderplan_notwege:… kauf_gescheitert:<grund>/<Kaufgrund>` an und warnt (`console.warn [kaderplan] AUSSTIEG`). Ein Kader unter 8 ist Notweg `unter_minimum` (Block wie Einzelschritt). Ebenso trägt der Ausstieg am Kader-Maximum das Protokoll. | Integration gegen echten Wegwerf-Spielstand, Kaufweg gemockt (`tests/liga-draft-kaderplan-ausstieg.test.ts`) |
+| **S5** über Opt | Die GM-Senkung wurde über Opt wieder aufgehoben (Stop-Nutzen gegen Kauf wie bisher, keine Füllersperre; gemessen R-L: Opt 10 → 9, Endkader 10 mit Füller 2,84). | Mit Kaderplan über dem Opt **nie ein Füller** unter dem Platzpreis; hat der GM den Opt bewusst gesenkt (`kaderplan.gmOptGesenkt`), **hört das Team am gesenkten Opt auf**. | 20 Fälle mit GM-Senkung: Endkader = Opt; Fall „nur Füller bezahlbar" → Schluss am Opt |
+| **S3** Gehaltstopf | Über dem Minimum prüft der Builder `salaryCap` nur mit der Mindestkader-Reserve; die Gehaltsseite der Plätze bis Opt ist nicht reserviert (nur gedeckelte Saisons, ab S2). | **Nicht gelöst, sondern begrenzt:** `istKaderplanAktiv(gameState)` (draft-adapter.ts) = Schalter **und** Saison 1. Der Builder entscheidet nicht mehr selbst über eine Env-Variable, sondern liest `input.kaderplan` (nur der Adapter setzt es). Ab S2 aus, kommt mit der S2-Umstellung. | Saison 1 an, Saison 2/11 aus, `OLY_KI_KADERPLAN=0` aus |
+| **K2** | `Math.max(1, NaN) = NaN` für `platzWettbewerb`. | `Number.isFinite`-Wächter (auch in der neuen günstigen Reserve). | NaN rechnet wie 1 |
+| **K3** | `notweg` und Verlaufs-`grund` (`notweg:ruecklage_angetastet`) wurden auch ohne Schalter gesetzt. | Nur mit Kaderplan; ohne ist das Ergebnis auch in den Daten gleich zur Basis. | Schritt ohne Kaderplan: kein `notweg` |
+| **K5** | Mit `OLY_DRAFT_FILLQB=1` kürzte die Geld-Senkung bis `ROSTER_MIN`. | Mit Kaderplan nie unter Minimum + 1, und FILLQB + GM zusammen höchstens −2 gegen den Identitäts-Opt (`optEntscheidung.identitaetsOpt` ist jetzt der Opt **vor** FILLQB). FILLQB bleibt Standard aus. | — (gerechnet im Adapter, Konstante `GM_OPT_SENKUNG_MAX`) |
+| **K6** Tests | „Schalter aus bit-gleich" verglich AUS mit AUS; die Füller-Prüfung `>= 12 − 9` war immer wahr; Nachrück-Test mit 400 statt 40 Versuchen. | **Fixture-Kopie** des Builders der Basis #1618 (`tests/fixtures/kaderplan-basis/draft-builder-basis.ts`, Stand `a78c5ada`) und je **300 Zufallsfälle** Block und Einzelschritt (Töpfe, Komposition, Startkader, Gehaltsdeckel, Saat, `rosterMax`, Floors): Pläne, `finalCash`, `finalSalaryTotal`, `stoppedBelowMin`, je Schritt `kind`, `best`, Nutzen, Stop-Nutzen, Top 3 — gleich. Füller echt geprüft (unter Opt bei `opt_erreicht` keiner, über Opt keiner). Nachrücken mit 40: Platz 36 wird gekauft, nach 40 Fehlversuchen `blockiert`, nie die Billig-Liste. | `tests/ki-kaderplan-prototyp.test.ts` (18 Tests) |
+
+Bei der Messung fiel ein weiterer Punkt auf: mit der ehrlicheren Zählung (S2) war die Reserve im **Einzelschritt** zu knapp — 3 Teams
+mit Opt 14 endeten bei 13 (`unter_opt_rahmen_erschoepft`), weil die wenigen Spieler unter 4 längst weg waren, als ihr letzter Platz dran
+war. Die günstigen Plätze rechnen deshalb jetzt wie die Platzpreis-Plätze mit Wettbewerb (jeder T-te Preis, `billigeReserve`); im Block
+(T = 1) ändert sich nichts. Danach 0 Teams unter Opt.
+
+**Schalter:** `OLY_KI_KADERPLAN` ist im Saison-1-Setup-Draft **Standard an**; `OLY_KI_KADERPLAN=0` schaltet ab. Der Builder hat keinen
+eigenen Env-Schalter mehr: ohne `input.kaderplan` ist er bit-gleich zur Basis (K6), mit `input.kaderplan` plant er. Gesetzt wird es nur
+von `buildOrganicDraftFrame` (Blocklauf `planOrganicDraftForTeam`, Einzelschritt `bewerteKiPick`), wenn `istKaderplanAktiv(gameState)`.
+
+### 9.2 Korrektur der alten Läufe r7/r8 (`env`-Feld)
+
+In `r7-v-block1/2.json` und `r8-kp-block1/2.json` steht im `env`-Feld `OLY_LIGA_DRAFT_MODUS=einzelschritt`, obwohl **der Blocklauf
+lief** (`draft: "block"`). Ursache im Messskript: es ruft Block (`fuehreLigaSetupDraftAus`) und Einzelschritt (`starteLigaDraft`) direkt
+auf, der Schalter aus der Shell wirkte also nie, wurde aber mitgeschrieben. Die Zahlen dieser Läufe sind Block-Zahlen. Behoben: das
+Skript setzt `OLY_LIGA_DRAFT_MODUS` jetzt passend zu `--draft` (Block: entfernt), und das Ergebnis trägt zusätzlich `kaderplanAktiv`.
+
+### 9.3 Messung mit Kaderplan im Standard (Block und Einzelschritt, zwei Saaten)
+
+Neue Anlagen `new-game-1795040032554-du3pjj` (Saat 1) und `new-game-1795040053402-9uwlm4` (Saat 2), Schalter **nicht gesetzt**
+(Standard), je Saat Block und Einzelschritt ab derselben SQLite-Kopie (Wegwerf, gelöscht). Rohdaten `data/generated/ki-pick-analyse-18-11/
+r10-std-*.json`, volle Auswertung `auswertung-review-fixes.md`. Gehalt = Summe der Gehaltsforderungen des Kaders nach dem Picken.
+
+| Lauf | Kader Ø (min–max) | unter 8 | unter Opt | Füller < 12 (Teams) | Gehalt Median (min–max) | **in 50–70** | über 70 | unter 50 | Stärke Ø | Notwege |
+|---|---|---:|---:|---|---|---:|---:|---:|---:|---|
+| Review-Vergleich (Block, vorher) | — | — | — | — | — | **20 / 32** | 9 | 3 | — | — |
+| Block, Saat 1 | 11,8 (9–14) | 0 | 0 | 1 (1) | 63,7 (41,5–88,3) | **21** | 9 | 2 | 46,0 | 0 |
+| Block, Saat 2 | 11,8 (9–14) | 0 | 0 | 2 (2) | 65,0 (43,0–87,3) | **18** | 10 | 4 | 46,0 | 1 × `fueller_rueckfall` |
+| Einzelschritt, Saat 1 | 11,8 (9–14) | 0 | 0 | 7 (5) | 65,9 (45,8–86,5) | **20** | 10 | 2 | 45,8 | 0 |
+| Einzelschritt, Saat 2 | 11,8 (9–14) | 0 | 0 | 7 (5) | 65,7 (41,9–86,2) | **19** | 10 | 3 | 45,8 | 0 |
+
+* **Kadergrößen** in allen vier Läufen identisch: 9er 4, 10er 3, 11er 7, 12er 7, 13er 2, 14er 9. Kein Team unter 8, keins unter Opt.
+* **GM-Senkung** (bewusst, protokolliert): 8 Teams, Σ −11 Plätze; alle enden **genau** am gesenkten Opt (R-L 10 → 9, Kader 9; A-A
+  12/13 → 10/11; V-V 11 → 9). Der Fall aus dem Review (R-L Endkader 10 mit Füller) kommt nicht mehr vor.
+* **Gründe:** Block (Simulation, deckt den echten Lauf zu 378/379 Spielern) 32 × `opt_erreicht`; Einzelschritt im Verlauf 19–21 ×
+  `opt_erreicht`, 2–4 × `opt_erreicht_tiefe_vor_qualitaet`, die übrigen 9 Teams (alle mit Opt 14) beenden den Draft über die Pick-Grenze
+  (`max_picks`) ohne Ausstiegszug und damit ohne Verlaufs-Protokoll.
+* **Notwege:** 0 `[kaderplan] NOTWEG`/`AUSSTIEG`-Warnungen in allen Läufen; gezählt 1 × `fueller_rueckfall` (Block Saat 2, A-A: 10. Platz
+  mit 11,45 statt ≥ 12 — der Rahmen trug zu Beginn alle Plätze, am Ende passte kein 12er mehr über die Rücklage). Keine Notkäufe,
+  keine Nachrücker.
+* **Füller:** Block 1–2. Der Füller von P-S (4,63) ist sein **Startspieler** aus dem frischen Stand, kein Kauf (P-S kauft 8, Opt 9) — das
+  ist auch der vom Review gemeldete „9. Spieler". Im Einzelschritt 7 (vorher 10–11), alle bei Teams mit Opt 14 auf den letzten Plätzen
+  (Tiefe vor Qualität, weil die günstigen 12er im Wettbewerb weg sind).
+* **Stars relativ:** 7–8 Teams mit Star nach Markt (Σ 11–13, 3 Superstars bei den drei Lizenz-Teams), 11–14 nach Budget; Top-20 kauft
+  niemand (teuerster gekaufter Spieler 77,7; die Top 20 beginnen bei 81).
+* **Gehalt:** Median 64–66, **18–21 von 32 in 50–70** (Review-Vergleich 20), 9–10 darüber (quer durch die Kadergrößen 9 bis 14, also
+  eher reiche bzw. star-lastige Teams als große Kader), 2–4 darunter (R-R, V-W, je nach Saat A-A, S-C). Vorgabe 5 („die meisten") ist
+  erfüllt, aber nicht enger als im Review gemessen: der Kaderplan verschiebt die Gehaltsverteilung kaum.
+* Kasse über der Rücklage: Median 0–0,1 (Block) bzw. 0,6 (Einzelschritt); Stärke Block 46,0 (vorher mit Prototyp 45,9–46,0),
+  Einzelschritt 45,8 (vorher 45,6–45,7).
+
+Arena-Fingerabdruck unverändert **`d3a39030a3ef`** (75 Einträge).
+
+### 9.4 Offen
+
+* **S3** (Gehaltsseite der Plätze bis Opt im Gehaltstopf) — mit der S2-Umstellung; bis dahin ist der Kaderplan ab Saison 2 aus.
+* Teams, die den Einzelschritt-Draft über die Pick-Grenze beenden (`max_picks`, 9 Teams mit Opt 14), haben kein Verlaufs-Protokoll; ihre
+  Füller auf den letzten Plätzen sind deshalb nicht als Notweg gezählt (Block: dieselben Teams ohne Füller).
+* 9–10 Teams liegen über 70 Gehalt. Soll das Band 50–70 enger werden, braucht es eine Gehaltsseite im Plan (Teil von S3) oder eine
+  Vorgabe an Identität/Rücklage, nicht den Kaderplan.
