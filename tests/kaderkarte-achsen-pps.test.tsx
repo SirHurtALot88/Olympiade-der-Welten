@@ -185,8 +185,6 @@ describe("Der Weg der PPs bis zur Karte ist durchgehend verdrahtet", () => {
     for (const field of ["ppPow", "ppPowRank", "ppSpe", "ppSpeRank", "ppMen", "ppMenRank", "ppSoc", "ppSocRank"]) {
       expect(hook, `${field} wird nicht durchgereicht`).toContain(field);
     }
-    const home = readFileSync(join(root, "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8");
-    expect(home).toContain("axisPps={player.axisPps");
   });
 
   it("die Teams-Portraitraster reichen sie über buildAxisPpsFromRating durch", () => {

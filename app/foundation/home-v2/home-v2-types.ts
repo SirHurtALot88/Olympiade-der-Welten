@@ -1,3 +1,4 @@
+import type { StartseiteDaten } from "@/lib/foundation/startseite-modern";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import type { FoundationPlayerPortraitAxisPps } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
@@ -176,6 +177,8 @@ export type HomeV2ClientProps = {
   inboxOpenCount: number;
   inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
+  /** Daten der modernen Startseite (`baueStartseiteModern`); `null` ohne aktives Team. */
+  startseite?: StartseiteDaten | null;
   boardObjectives: HomeV2BoardObjective[];
   /** S1: Kapitän-Hinweis im Board-Block (optional — ohne Daten bleibt die Zeile weg). */
   captainSummary?: HomeV2CaptainSummary | null;
