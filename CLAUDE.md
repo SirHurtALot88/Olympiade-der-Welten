@@ -240,6 +240,14 @@ die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! b
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
 
+## Training und Entwicklung: je Spieltag (Chris, 18.11.)
+
+Mockup `public/mockups/training-modern-18-11.html`, Konzept `docs/design/training-modern-18-11.md` (Abschnitt 7a),
+Chris: „bitte setz das 1:1 so um“. **Training wirkt je Spieltag** und wird je Spieltag gebucht und getrackt (nicht am
+Saisonende); die Raten müssen dafür neu gebalanced werden (bisher auf ~10 Spieltage ausgelegt, die Saison hat 20).
+Trainiert wird auf eine **Ziel-Disziplin mit Weg** (Primär-/Nebenweg, Matrix nur gelesen), Fokus jederzeit wechselbar.
+Verletzte trainieren nicht; Überlastung drückt die Form leicht. Kein Alter.
+
 ## Neuer Stil überall — Seite für Seite neu konzipieren, nicht mischen (Chris, 18.11.)
 
 Wörtlich: „ich denke wir haben nun einen sehr guten Style gefunden mit den neuen Mockups und genau so möchte ich das auch

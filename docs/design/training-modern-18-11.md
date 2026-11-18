@@ -198,6 +198,23 @@ möglich, aber erst nach deinem OK zum Mockup sinnvoll.
 9. **Sind die Zuwächse spürbar genug?** Zwei bis drei Punkte je Saison im Schwerpunkt. Empfehlung: erst sichtbar machen
    (dieser Bau), dann mit echten Spielständen entscheiden, ob das Budget steigen soll.
 
+## 7a. Entscheidungen von Chris (18.11.)
+
+Chris: „Entwicklung und Training sieht mega geil aus! Bitte setz das 1:1 so um … auch dass man nun Disziplinen targeten
+kann, wo der Spieler sich rein entwickeln soll, ist mega.“
+
+| # | Entscheidung |
+|---:|---|
+| 1 | Ein Bereich „Entwicklung“: **ja**. |
+| 2 | Ziel-Disziplin + Weg statt Trainingsklasse: **ja** (Regel A, mit Messlauf). |
+| 3 | **Training wirkt je Spieltag und wird je Spieltag gebucht und getrackt** — keine vier Blöcke, kein Saisonende-Buchen. Muss neu gebalanced werden: die heutigen Raten waren auf rund 10 Spieltage ausgelegt, die Saison hat 20. |
+| 4 | Verletzte trainieren nicht (Regel B): **ja**. |
+| 5 | Überlastung drückt die Form (Regel E): **ja, aber gering**. |
+| 6 | Alter: **nein**. |
+| 7 | Fokus kann **beliebig gewechselt** werden (keine Sperre je Saison). |
+| 8 | PixelLab-Halle und Gebäude-Sprites (~25 Generationen): **ja**. |
+| 9 | Zuwächse sichtbar machen, dann mit echten Spielständen entscheiden: **ja**. |
+
 ## 8. Grenzen des Mockups
 
 - Die Zuwachs-Zahlen stammen aus einem vereinfachten Modell (Budget × Trainingszentrum × Potenzial-Rest, verteilt
