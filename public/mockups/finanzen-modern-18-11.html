@@ -18,7 +18,9 @@
         (Sponsor 55-77 C, Gehalt 42-67 C, Kasse 20-40 C je Saison und Team), Farben der vier Disziplin-Gruppen.
   ERFUNDEN: jede einzelne Buchung, alle Sponsor-Marken, Stimmungswerte, Ergebnisse, Formeln-Parameter (Elastizitaet, Zins je Spieltag).
         Das Rechenmodell unten ist ein Platzhalter, damit jede gezeigte Zahl aus Posten summiert wird ("gezeigt = gebucht").
-  URL: ?ansicht=kasse|auszug|hebel|slots|angebote|bonus|fans|merch  &szen=normal|eng|dispo  &st=1..20  &tag=1..21 (Auszug, 21 = Saisonende)
+  NEU 18.11. abends: Reiter "Budgets" (Zwei-Budget-Modell des Vorstands, docs/design/finanzkonzept-v2-budgets-18-11.md):
+  ?ansicht=budget &quote=100|85|70|50 &um=<C, + = Transfer ins Gehalt> &vk=<Verkaufserloese im Fenster> &fenster=0|1
+  URL: ?ansicht=kasse|auszug|hebel|budget|slots|angebote|bonus|fans|merch  &szen=normal|eng|dispo  &st=1..20  &tag=1..21 (Auszug, 21 = Saisonende)
        &preis=-20|0|20|40  &kader=0|1|2  &notv=1  &an=pow,spe,soc  &sel=<posten>  &ctab=lage|quelle|liga
        &phone=1  &still=1  &blatt=kontext
 -->
@@ -235,6 +237,22 @@ button.tz:hover{background:var(--flaeche-2)}
 .leiter div.du{background:linear-gradient(90deg,rgba(242,160,61,.26),rgba(242,160,61,.05));color:#fff;box-shadow:inset 3px 0 0 var(--heim)} .leiter div.du b{background:var(--heim)} .leiter div.du strong{color:var(--creme);font-size:17px}
 .leiter div.ziel{box-shadow:inset 0 0 0 1px rgba(98,211,148,.5)}
 
+/* ---------- Budgets: zwei Toepfe ---------- */
+.topf{position:relative;display:flex;height:16px;transform:skewX(-14deg);border-radius:2px;background:rgba(255,255,255,.06)}
+.topf i{height:100%;min-width:0} .topf u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--creme)}
+.topf .aus,.legz .aus{background:var(--stumm)} .topf .frei,.legz .frei{background:var(--gut)} .topf .geh,.legz .geh{background:var(--p1)} .topf .rot{background:var(--warn)}
+.topf .gesp,.legz .gesp{background:repeating-linear-gradient(135deg,rgba(243,181,74,.75) 0 5px,rgba(243,181,74,.25) 5px 10px)}
+.legz{display:flex;gap:12px;font-size:12.5px;color:var(--leise);white-space:nowrap;flex-wrap:wrap}
+.legz i{display:inline-block;width:10px;height:10px;margin-right:5px;transform:skewX(-14deg)}
+.herl{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:6px;background:#06080c;border:1px solid var(--linie)}
+.herl .zl{font-size:14px} .herl .zl strong{font-size:15.5px} .herl .zl small{display:block;color:var(--stumm);font-size:12px;line-height:1.15}
+.herl .zl.sum{border-top:1px solid var(--linie-2);padding-top:3px;color:var(--tinte)} .herl .zl.sum strong{color:var(--gold);font-size:17px}
+.sd .in>.zl small{color:var(--stumm);font-size:12.5px;margin-left:4px}
+.sd .in>.zl .riesig small{font-size:16px;color:var(--leise);margin-left:6px}
+input[type=range].um::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--gut),#3c4658 50%,var(--p1))}
+input[type=range].um::-moz-range-track{background:linear-gradient(90deg,var(--gut),#3c4658 50%,var(--p1))}
+.mreg{padding:6px 8px;border:1px dashed #2b3445;border-radius:6px;background:#0d1016}
+
 /* ---------- Regler ---------- */
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:none;margin:0;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:2px;background:linear-gradient(90deg,var(--gast),#3c4658 50%,var(--heim));transform:skewX(-14deg)}
@@ -421,12 +439,13 @@ var SZEN={normal:{n:"Normal",start:25.4},eng:{n:"Engpass",start:15.6},dispo:{n:"
 var GEHALT=3.4, RAHMEN=14, ZINS=.01, KAP=1.45, MARKE=1.04, STARTRANG=9, SIEGPR=.12, BETRIEB=.3, REISE=.1, FAKTOR=1.0;
 var KADN=["keine","normal","hoch"], KADF=[0,.4,.8];
 var LIGA=[["D-L","Dire Legion",1,8.1,77,71],["M-S","Mortal Sin",3,26.4,82,58],["V-V","Vigorous Vikings",5,31.9,61,66],["R-C","Royal Court",6,22.7,68,63],["L-K","Lost Kingdom",7,35.2,55,69],["T-G","The Giants",9,40.6,49,74],["P-C","Pirate Crew",13,44.8,41,78],["A-A","Armageddon Aftermath",16,38.3,33,81]];
-var ANSICHTEN={kasse:["kasse","Übersicht","Stufe 0 Kontoauszug · Stufe 4 Taktung auf 20 Spieltage"],auszug:["kasse","Spieltags-Abrechnung","Stufe 0 Kontoauszug · neue Posten mit Stufe 4/5"],hebel:["kasse","Hebel","Stufe 7 Kassensturz · Stufe 8 Hebel"],
+var ANSICHTEN={kasse:["kasse","Übersicht","Stufe 0 Kontoauszug · Stufe 4 Taktung auf 20 Spieltage"],auszug:["kasse","Spieltags-Abrechnung","Stufe 0 Kontoauszug · neue Posten mit Stufe 4/5"],hebel:["kasse","Hebel","Stufe 7 Kassensturz · Stufe 8 Hebel"],budget:["kasse","Budgets","Stufe 2a bis 2d Budgets des Vorstands · Stufe 9 Quote nach Vertrauen"],
                slots:["spo","Slots & Ziele","Stufe 4 Raten und Rangbonus · Slots 2/3 sind Vorschlag (Frage 10)"],angebote:["spo","Angebote","Vorschlag (Frage 10), nicht in der Geldmengen-Bilanz"],bonus:["spo","Bonus je Spieltag","Stufe 0 Kontoauszug · Stufe 4 Raten"],fans:["fan","Stimmung & Tickets","Stufe 5 Heimspiel-Einnahmen · Stufe 8 Preisstufen"],merch:["fan","Merch & Stars","Stufe 5 Heimspiel-Einnahmen"]};
 
 var Z={now:Math.min(N,Math.max(1,+q.get("st")||12)),szen:SZEN[q.get("szen")]?q.get("szen"):"normal",ans:ANSICHTEN[q.get("ansicht")]?q.get("ansicht"):"kasse",ctab:q.get("ctab")||"lage",
        preis:+q.get("preis")||0,auto:false,spar:0,dispo:0,bonusWer:0,bonus:0,kader:q.get("kader")===null?1:+q.get("kader"),notv:q.get("notv")==="1",
-       ang:{pow:"offen",spe:"offen",soc:"offen",men:"laeuft"},tag:+q.get("tag")||0,sel:q.get("sel")||"tic"};
+       ang:{pow:"offen",spe:"offen",soc:"offen",men:"laeuft"},tag:+q.get("tag")||0,sel:q.get("sel")||"tic",
+       bq:({"100":1,"85":.85,"70":.7,"50":.5})[q.get("quote")]||.85,um:+q.get("um")||0,vk:q.get("vk")===null?12:+q.get("vk"),fen:q.get("fenster")!=="0"};
 (q.get("an")||"").split(",").forEach(function(f){if(ANG[f]&&f!=="men")Z.ang[f]="an"});
 if(q.get("still"))document.body.classList.add("still");
 var phoneFest=!!q.get("phone");
@@ -557,7 +576,7 @@ function zeichne(halt){
   document.getElementById("hr").innerHTML='<div class="frist"><span class="gk">'+(nx.ende?"Saisonende":"Nächste Buchung · Spieltag "+nx.t+(HEIM[nx.t]?" · Heim":" · Auswärts"))+'</span><strong class="'+vz(nx.netto)+'">'+Cv(nx.netto)+' erwartet</strong></div><button class="btn" data-ans="auszug" data-tag="'+Z.now+'">Abrechnung '+ic("r")+'</button>';
   /* Reiter der Tafel */
   document.getElementById("vtabs").innerHTML=Object.keys(ANSICHTEN).filter(function(a){return ANSICHTEN[a][0]===ber}).map(function(a){var n=ANSICHTEN[a][1];if(phone())n=n.replace("Spieltags-","").replace(" je Spieltag","").replace("Stimmung & ","").replace(" & Ziele","").replace(" & Stars","");return '<button role="tab" class="'+(Z.ans===a?"an":"")+'" data-ans="'+a+'">'+n+'</button>'}).join("");
-  var R={kasse:vKasse,auszug:vAuszug,hebel:vHebel,slots:vSlots,bonus:vSlots,angebote:vAngebote,fans:vFans,merch:vMerch}[Z.ans]();
+  var R={kasse:vKasse,auszug:vAuszug,hebel:vHebel,budget:vBudget,slots:vSlots,bonus:vSlots,angebote:vAngebote,fans:vFans,merch:vMerch}[Z.ans]();
   document.getElementById("vk").innerHTML=R[0]+'<button class="btn klein nurphone" data-blatt="kontext" data-ctab="lage">'+ic("blitz")+'Lage</button>';
   var vb=document.getElementById("vb");
   if(halt&&vb.contains(halt)){var tmp=document.createElement("div");tmp.innerHTML=R[1];flicke(vb,tmp,halt)}else vb.innerHTML=R[1];
@@ -831,6 +850,91 @@ function vHebel(){
     '<span>Kein automatischer Notkredit, kein Auf-Null-Setzen: Minus ist in der Saison erlaubt, der Kredit kommt erst am Kassensturz</span><span class="sp"></span>'];
 }
 
+/* ---------- Budgets: zwei Toepfe des Vorstands (docs/design/finanzkonzept-v2-budgets-18-11.md) ---------- */
+/* Zahlen erfunden (Groessenordnung Liga 2), Formeln und Startwerte wie im Konzept. Jahreswerte, je Spieltag = / 20. */
+var BUD={kasse0:78,kader:162,fw:3.1,sockel:21.6,rangbonus:52.6,tickets:9.6,merch:3.6,praemien:2.4,betrieb:3,reise:1,kaderpr:1,unterhalt:.8,kredit:0,
+         laufend:68,abloesen:31,bau:0,vertrauen:{1:6.4,.85:4.8,.7:3.4,.5:2.1},grenze:{1:.25,.85:.2,.7:.15,.5:.1},puffer:{.85:.1,.7:.2,.5:.3}};
+function budget(){
+  var b=BUD,q=Z.bq,trag=b.sockel+b.rangbonus*FAKTOR+b.tickets+b.merch+b.praemien-b.betrieb-b.reise-b.kaderpr-b.unterhalt-b.kredit;
+  var rq=.05+.2*(b.fw-1)/9,rl=rq*(b.kasse0+b.kader),g0=q*trag,pu=Math.max(0,.35*g0-rl),basis=Math.max(0,b.kasse0-rl-pu),t0=q*basis;
+  var x=q<1?b.puffer[q]*trag:0,schw=q<1?x/(1-q):0,vk=Z.vk,lock=q<1&&vk>=schw-1e-9,qn=lock?(q>=.85?1:q>=.7?.85:.7):q;
+  var ohne=t0+q*vk,mit=lock?Math.min(qn*(basis+vk),ohne+vk,basis+vk-x):ohne,t=Math.max(ohne,mit);
+  var lim=b.grenze[q]*g0,tFreiVor=t-b.abloesen-b.bau,gFreiVor=g0-b.laufend;
+  var umMax=Math.max(0,Math.min(lim,tFreiVor)),umMin=-Math.max(0,Math.min(lim,gFreiVor,.5*(rl+pu)));
+  if(!Z.fen)umMin=0;
+  umMax=Math.floor(umMax*2)/2;umMin=-Math.floor(-umMin*2)/2;
+  var um=kl(Z.um,umMin,umMax);
+  return {q:q,qn:qn,trag:trag,rq:rq,rl:rl,g0:g0,pu:pu,basis:basis,t0:t0,gesp:(basis+vk)-t,x:x,schw:schw,lock:lock,mehr:t-ohne,vk:vk,t:t-um,g:g0+um,um:um,umMin:umMin,umMax:umMax,lim:lim,
+          tFrei:t-um-b.abloesen-b.bau,gFrei:g0+um-b.laufend,boden:rl+pu+x,kasse:b.kasse0+vk-b.abloesen-b.bau};
+}
+function vBudget(){
+  var b=BUD,B=budget(),q=B.q,pzt=Math.round(q*100),v=b.vertrauen[q],ueber=B.gFrei<-.005,tUeber=B.tFrei<-.005;
+  var kopf='<div class="rech gross d4" style="margin:0"><div><small>Freigabe des Vorstands</small><strong class="t'+(q<.6?" minus":"")+'">'+Math.round(B.qn*100)+' %'+(B.lock?' <span style="font-size:15px;color:var(--gut)">gelockert</span>':'')+'</strong></div>'+
+    '<div class="su"><small>Frei für Ablösen und Gebäude</small><strong class="t '+(tUeber?"minus":"")+'">'+C(B.tFrei)+'</strong></div>'+
+    '<div class="su"><small>Frei für Gehalt · je Spieltag</small><strong class="t '+(ueber?"minus":"")+'">'+C(B.gFrei/20)+'</strong></div>'+
+    '<div><small>Kasse nach Käufen und Verkäufen</small><strong class="t">'+C(B.kasse)+'</strong></div></div>';
+  function z(l,w,k,s){return '<div class="zl'+(s?" sum":"")+'"><span>'+l+'</span><strong class="t '+(k||"")+'">'+w+'</strong></div>'}
+  function topf(teile,ges,marke){ges=Math.max(ges,.01);return '<div class="topf">'+teile.map(function(x){return x[0]>0?'<i class="'+x[1]+'" style="width:'+kl(x[0]/ges*100,0,100)+'%"></i>':""}).join("")+(marke!=null?'<u style="left:'+kl(marke/ges*100,0,100)+'%"></u>':"")+'</div>'}
+  var tGes=Math.max(B.basis+B.vk,b.abloesen+b.bau);
+  var tr='<div class="sd farbe" style="--pc:var(--gut)"><div class="kopf">Transfer- und Investitionsbudget<small>Ablösen · Gebäude</small></div><div class="in">'+
+    '<div class="zl"><span class="riesig t" style="font-size:34px">'+zahl(Math.max(0,B.tFrei))+'<small>C frei von '+zahl(B.t)+'</small></span></div>'+
+    topf([[b.abloesen+b.bau,"aus"],[Math.max(0,B.tFrei),"frei"],[B.gesp+Math.max(0,B.um),"gesp"]],tGes)+
+    '<div class="legz"><span><i class="aus"></i>ausgegeben '+zahl(b.abloesen+b.bau)+'</span><span><i class="frei"></i>frei</span><span><i class="gesp"></i>gesperrt '+zahl(B.gesp)+'</span></div>'+
+    '<div class="herl">'+z("Kasse zu Fensterbeginn",C(b.kasse0))+z("− Rücklage-Ziel <small>Finanzwert "+zahl(b.fw)+" → "+zahl(B.rq*100)+" % von "+zahl(b.kasse0+b.kader)+"</small>","−"+zahl(B.rl)+" C")+
+      z("− Gehaltspuffer <small>7 Spieltage Gehalt, soweit die Rücklage sie nicht deckt</small>",(B.pu>.004?"−":"")+zahl(B.pu)+" C")+z("= verfügbar",C(B.basis),"",1)+
+      z("× Freigabe "+pzt+" %",C(B.t0))+z("+ Verkaufserlöse "+zahl(B.vk)+" C × "+pzt+" %","+"+zahl(q*B.vk)+" C","plus")+
+      (B.lock?z("+ Lockerung auf "+Math.round(B.qn*100)+" %","+"+zahl(B.mehr)+" C","plus"):"")+(B.um?z(B.um>0?"− umgeschichtet ins Gehalt":"+ umgeschichtet aus dem Gehalt",Cv(-B.um),vz(-B.um)):"")+
+      z("= Transferbudget",C(B.t),"",1)+'</div></div></div>';
+  var gGes=Math.max(B.trag,b.laufend,B.g);
+  var ge='<div class="sd farbe'+(ueber?" wir":"")+'" style="--pc:var(--p1)"><div class="kopf">Gehaltsbudget<small>alle laufenden Verträge</small></div><div class="in">'+
+    '<div class="zl"><span class="riesig t '+(ueber?"minus":"")+'" style="font-size:34px">'+(ueber?"−":"")+zahl(Math.abs(B.gFrei/20))+'<small>C je Spieltag '+(ueber?"über dem Budget":"frei")+' · Budget '+zahl(B.g/20)+'</small></span></div>'+
+    topf([[Math.min(b.laufend,B.g),"geh"],[Math.max(0,B.gFrei),"frei"],[Math.max(0,b.laufend-B.g),"rot"],[Math.max(0,B.trag-Math.max(B.g,b.laufend)),"gesp"]],gGes,ueber?B.g:null)+
+    '<div class="legz"><span><i class="geh"></i>laufend '+zahl(b.laufend)+' je Saison</span><span><i class="frei"></i>frei</span><span><i class="gesp"></i>nicht freigegeben</span></div>'+
+    '<div class="herl">'+z("Sponsor-Sockel <small>20 Raten</small>",C(b.sockel))+z("+ erwarteter Rangbonus × Saison-Faktor "+FAKTOR.toFixed(2).replace(".",","),"+"+zahl(b.rangbonus*FAKTOR)+" C")+
+      z("+ Tickets, Merch, Siegprämien <small>Plan bei Stimmung 50</small>","+"+zahl(b.tickets+b.merch+b.praemien)+" C")+z("− Fixkosten <small>Betrieb, Reise, Kaderprämie, Unterhalt"+(b.kredit?", Kreditrate":"")+"</small>","−"+zahl(b.betrieb+b.reise+b.kaderpr+b.unterhalt+b.kredit)+" C")+
+      z("= tragbares Gehalt",C(B.trag),"",1)+z("× Freigabe "+pzt+" %",C(B.g0))+(B.um?z(B.um>0?"+ umgeschichtet aus dem Transfer":"− umgeschichtet in den Transfer",Cv(B.um),vz(B.um)):"")+
+      z("= Gehaltsbudget <small>"+zahl(B.g/20)+" C je Spieltag</small>",C(B.g),"",1)+'</div>'+
+    (ueber?'<div class="txt" style="color:var(--acht)">'+ic("acht")+' Über dem Budget: keine neuen Verträge, keine Erhöhung. Kein Zwangsverkauf.</div>':"")+'</div></div>';
+  var stufen=[[1,"ab 6"],[.85,"4 bis 6"],[.7,"2,5 bis 4"],[.5,"unter 2,5"]];
+  var vo='<div class="sd'+(q<.6?" wir":"")+'"><div class="kopf">Vorstand<small>festgelegt zu Beginn des Transferfensters</small></div><div class="in">'+
+    '<div class="zl"><span class="riesig t" style="font-size:34px">'+zahl(v)+'<small>von 10 Vertrauen</small></span><span style="text-align:right">Endrang '+(q>=1?"3 · erwartet 5":q>=.85?"6 · erwartet 5":q>=.7?"11 · erwartet 6":"14 · erwartet 6")+'</span></div>'+
+    '<div class="leiter">'+stufen.map(function(s){return '<div class="'+(s[0]===q?"du":"")+(B.lock&&s[0]===B.qn?" ziel":"")+'"><span>'+s[1]+'</span><b style="width:'+s[0]*100+'%"></b><strong class="t">'+Math.round(s[0]*100)+' %</strong></div>'}).join("")+'</div>'+
+    '<div class="txt">'+(q>=1?"Der Vorstand gibt beide Budgets voll frei.":"Der Vorstand nimmt nichts weg: <b>"+C(B.gesp)+"</b> bleiben auf dem Konto, sind aber nicht ausgebbar."+(q<.6?" Sparauflage: keine Gebäude, kein freiwilliger Kredit.":""))+' Die Sperre ist hart und gilt für jeden Kauf, jeden Vertrag und jedes Gebäude.</div>'+
+    '</div><div class="fuss"><small>Nächste Festlegung: Transferfenster Saison 3</small></div></div>';
+  var umL=B.um>0?zahl(B.um)+" C Transfer → "+zahl(B.um/20)+" C Gehalt je Spieltag":B.um<0?zahl(-B.um/20)+" C Gehalt je Spieltag → "+zahl(-B.um)+" C Transfer":"Nichts umgeschichtet";
+  var kannUm=B.umMax-B.umMin>.01,rmax=Math.max(.5,Math.floor(B.lim*2)/2);
+  var um='<div class="sd"><div class="kopf">Umschichten<small>10 C Transfer ↔ 0,5 C Gehalt je Spieltag</small></div><div class="in">'+
+    '<div class="zl"><span><b>'+umL+'</b></span>'+(B.um?'<button class="btn klein" data-um0="1">Zurücknehmen</button>':'')+'</div>'+
+    '<div><input type="range" class="um" id="um" min="'+(-rmax)+'" max="'+rmax+'" step="0.5" value="'+B.um+'"'+(kannUm?"":" disabled")+' aria-label="Umschichten zwischen Transfer- und Gehaltsbudget"><div class="skl"><span>← mehr Transfer</span><span>0</span><span>mehr Gehalt →</span></div></div>'+
+    z("Grenze des Vorstands <small>Gehaltsbudget ± "+Math.round(b.grenze[q]*100)+" %</small>","± "+zahl(B.lim)+" C")+
+    z("Jetzt möglich",(B.umMin<0?"−"+zahl(-B.umMin):"0")+" bis +"+zahl(B.umMax)+" C")+
+    '<div class="txt">'+(!Z.fen?"In der Saison geht nur Transfer → Gehalt (für Verlängerungen). ":B.umMin===0?"Aus dem Gehalt ist nichts verschiebbar: der Topf ist ausgeschöpft. ":"")+'Gilt für diese Saison; im nächsten Fenster rechnet der Vorstand neu.</div></div></div>';
+  var fehlt=Math.max(0,B.schw-B.vk),nq=q>=.85?100:q>=.7?85:70;
+  var dann=Math.max(0,Math.min(nq/100*(B.basis+B.schw),B.t0+q*B.schw+B.schw,B.basis+B.schw-B.x)-(B.t0+q*B.schw));
+  var lo=q>=1?'<div class="sd aus2"><div class="kopf">Lockerung nach Verkäufen<small>nur unter 100 %</small></div><div class="in"><div class="txt">Du hast die volle Freigabe. Verkaufserlöse sind zu 100 % ausgebbar.</div></div></div>'
+    :'<div class="sd'+(B.lock?" farbe":"")+'" style="--pc:var(--gut)"><div class="kopf">Lockerung nach Verkäufen<small>eine Stufe je Fenster · nur Transfer</small></div><div class="in">'+
+    '<div class="zl"><span><b>'+(B.lock?"Der Vorstand lockert auf "+Math.round(B.qn*100)+" %.":"Verkaufe noch "+C(fehlt)+", dann gibt der Vorstand "+nq+" % frei.")+'</b></span></div>'+
+    '<div class="wb" style="--pc:var('+(B.lock?"--gut":"--acht")+')"><i style="width:'+kl(B.vk/B.schw*100,0,100)+'%"></i></div>'+
+    z("Verkaufserlöse in diesem Fenster <small>"+(100-pzt)+" % davon bleiben als Puffer liegen</small>",C(B.vk)+" von "+zahl(B.schw))+
+    z("Puffer, den der Vorstand sehen will <small>"+Math.round(b.puffer[q]*100)+" % des tragbaren Gehalts</small>",C(B.x))+
+    z((B.lock?"Mehr frei durch die Lockerung":"Mehr frei, sobald die Schwelle erreicht ist")+" <small>nie mehr als verkauft</small>","+"+zahl(B.lock?B.mehr:dann)+" C","plus")+
+    z("Boden: die Kasse bleibt über",C(B.boden))+
+    '<div class="mreg"><span class="gk">Mockup: Verkäufe im Fenster</span><input type="range" class="ein" id="vk" min="0" max="80" step="2" value="'+B.vk+'" aria-label="Verkaufserlöse im Fenster (Mockup)"></div>'+
+    '</div></div>';
+  var ha='<div class="sd"><div class="kopf">Was gegen welchen Topf zählt<small>hart für Mensch und KI</small></div><div class="in">'+
+    '<div class="rek"><span><b>Spieler kaufen</b><small>Ablöse aus dem Transferbudget, Gehalt aus dem Gehaltsbudget. Beides muss passen.</small></span><span class="marke gut">BEIDE</span></div>'+
+    '<div class="rek"><span><b>Vertrag verlängern, Gehalt erhöhen</b><small>nur Gehaltsbudget</small></span><span class="marke" style="--pc:var(--p1)">GEHALT</span></div>'+
+    '<div class="rek"><span><b>Gebäude bauen</b><small>nur Transferbudget; der Unterhalt senkt das nächste Gehaltsbudget</small></span><span class="marke gut">TRANSFER</span></div>'+
+    '<div class="rek"><span><b>Spieler verkaufen</b><small>Erlös × '+pzt+' % ins Transferbudget, sein Gehalt voll zurück ins Gehaltsbudget</small></span><span class="marke gold">ZURÜCK</span></div>'+
+    '<div class="rek"><span><b>Pflichtkader (8 Spieler) bleibt immer auffüllbar</b></span><span class="marke leer">AUSNAHME</span></div>'+
+    '</div></div>';
+  return ['<h2>Zwei Budgets des Vorstands</h2><span class="hin">Das Geld bleibt auf dem Konto. Begrenzt ist, was du ausgeben darfst.</span><span class="sp"></span>'+
+      '<div class="seg" title="Mockup-Steuerung">'+[[1,"100 %"],[.85,"85 %"],[.7,"70 %"],[.5,"50 %"]].map(function(s){return '<button data-bq="'+s[0]+'" aria-pressed="'+(q===s[0])+'">'+s[1]+'</button>'}).join("")+'</div>'+
+      '<div class="seg" title="Mockup-Steuerung"><button data-fen="1" aria-pressed="'+Z.fen+'">Fenster</button><button data-fen="0" aria-pressed="'+!Z.fen+'">Saison</button></div>',
+    '<div class="gr h3"><div class="voll">'+kopf+'</div>'+tr+ge+vo+um+lo+ha+'</div>',
+    '<span>Kein Gehaltsdeckel mehr als eigene Regel: wer mehr Gehalt will, schichtet Transfergeld um</span><span class="sp"></span>'];
+}
+
 /* ---------- Kontext: Lage · Quelle · Liga ---------- */
 function kontext(){
   var tabs=[["lage","Lage"],["quelle","Quelle"],["liga","Liga"]];
@@ -872,7 +976,7 @@ function gruppen(T){var g={},o=[];T.l.forEach(function(x){if(!x.b)return;if(!(x.
 /* ================= Bedienung ================= */
 function hebelNull(){Z.preis=0;Z.auto=false;Z.spar=0;Z.dispo=0;Z.bonus=0;Z.kader=1;Z.notv=false;Z.ang={pow:"offen",spe:"offen",soc:"offen",men:"laeuft"}}
 document.addEventListener("click",function(e){
-  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast]");
+  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast],[data-bq],[data-fen],[data-um0]");
   if(!x)return; var d=x.dataset;
   if(x.tagName==="A"&&x.getAttribute("href")==="#")e.preventDefault();
   if(d.szen){Z.szen=d.szen;hebelNull()}
@@ -894,11 +998,16 @@ document.addEventListener("click",function(e){
   if(d.wer){Z.bonusWer=+d.wer}
   if(d.notv){Z.notv=!Z.notv;toast(Z.notv?"Sterling verkauft · +6,4 C sofort gebucht":"Verkauf zurückgenommen")}
   if(d.toast){toast(d.toast)}
+  if(d.bq){Z.bq=+d.bq;Z.um=0}
+  if(d.fen){Z.fen=d.fen==="1";Z.um=Math.max(0,Z.um)}
+  if(d.um0){Z.um=0;toast("Umschichtung zurückgenommen")}
   zeichne();
 });
 document.addEventListener("input",function(e){
   if(e.target.id==="preis"){Z.preis=+e.target.value;zeichne(e.target)}
   if(e.target.id==="dispo"){Z.dispo=+e.target.value;zeichne(e.target)}
+  if(e.target.id==="um"){Z.um=+e.target.value;zeichne(e.target)}
+  if(e.target.id==="vk"){Z.vk=+e.target.value;zeichne(e.target)}
 });
 document.addEventListener("keydown",function(e){
   if(e.target.tagName==="INPUT")return;
