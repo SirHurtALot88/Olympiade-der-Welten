@@ -365,6 +365,8 @@ body.arena .meld{display:none}
 .demo .dg{display:inline-flex;gap:.3rem;align-items:center}
 .pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
 .pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
 .pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
 .pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
 .ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
@@ -409,7 +411,7 @@ body.arena .meld{display:none}
 
 /* ===================== SCOUTING ===================== */
 :root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a}
-.seite.ue{grid-template-columns:24rem minmax(0,1fr) 33rem;grid-template-rows:minmax(0,1fr)}
+.seite.ue{grid-template-columns:22.5rem minmax(0,1fr) 31.5rem;grid-template-rows:minmax(0,1fr)}
 .seite.rp{grid-template-columns:19rem minmax(0,1fr) 31rem;grid-template-rows:minmax(0,1fr)}
 .nb{display:flex;align-items:center;gap:.6rem;padding:.45rem .8rem;margin-bottom:.6rem;border:1px solid rgba(240,195,90,.55);border-radius:.45rem;background:rgba(240,195,90,.1);font-size:.92rem;color:var(--creme);flex:none}
 .nb svg{font-size:1.2rem;color:var(--gold)}
@@ -421,7 +423,7 @@ body.arena .meld{display:none}
 .lt small{color:var(--stumm);font-size:.82rem;white-space:nowrap}
 .lt.e span{color:var(--tinte)} .lt span{color:var(--leise)}
 /* Wunschliste */
-.wz{display:grid;grid-template-columns:1.4rem 1.5rem 2.5rem minmax(0,1.5fr) 5.6rem minmax(0,1.1fr) 3.4rem 4.6rem 5.4rem 2.9rem 4.6rem 4.2rem;gap:.6rem;align-items:center;min-height:3.5rem;max-height:4.5rem;flex:1;padding:0 .6rem;border-radius:.4rem;font-size:.98rem;border:1px solid transparent}
+.wz{display:grid;grid-template-columns:1.2rem 1.3rem 2.5rem minmax(0,1.45fr) 5.3rem minmax(0,1.1fr) 2.9rem 3.9rem 4.6rem 2.8rem 4.2rem 3.8rem;gap:.55rem;align-items:center;min-height:3.5rem;max-height:4.5rem;flex:1;padding:0 .6rem;border-radius:.4rem;font-size:.98rem;border:1px solid transparent}
 .wz.kopf{min-height:1.9rem;max-height:1.9rem;flex:none;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
 .wz:not(.kopf):nth-child(even){background:rgba(255,255,255,.025)}
 .wz:not(.kopf):hover{border-color:var(--linie-2)}
@@ -430,7 +432,7 @@ body.arena .meld{display:none}
 .wz .r{text-align:right;color:var(--stumm);font-weight:700}
 .wz .zg{display:flex;flex-direction:column;font-size:.8rem;color:var(--stumm);line-height:.9} .wz .zg a:hover{color:var(--gold)}
 .wz .nm b{display:block;font:400 1.1rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .wz .nm small{font-size:.82rem;color:var(--leise);white-space:nowrap}
-.wz .in{display:grid;grid-template-columns:minmax(0,1fr) 2.4rem;gap:.4rem;align-items:center} .wz .in b{text-align:right} .wz .in small{grid-column:1/3;font-size:.76rem;color:var(--leise);margin-top:-.1rem}
+.wz .in{display:grid;grid-template-columns:minmax(0,1fr) 3rem;white-space:nowrap;gap:.4rem;align-items:center} .wz .in b{text-align:right} .wz .in small{grid-column:1/3;font-size:.76rem;color:var(--leise);margin-top:-.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wz .z{text-align:right;font-weight:600} .wz .z small{display:block;font-weight:500;font-size:.76rem;color:var(--stumm)}
 .wz .sp2{color:var(--leise)}
 .st5{display:inline-flex;gap:.12rem} .st5 i{width:.38rem;height:.8rem;transform:skewX(-14deg);background:rgba(255,255,255,.13);border-radius:1px} .st5 i.a{background:var(--gold)}
@@ -462,7 +464,7 @@ body.arena .meld{display:none}
 .akt2{display:flex;gap:.45rem;flex-wrap:wrap;padding:.6rem .9rem;border-top:1px solid var(--linie);flex:none}
 .mini{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.35rem .5rem;border-radius:.4rem;border:1px solid transparent;flex:none}
 .mini:hover{background:var(--flaeche-2)} .mini.an{border-color:var(--gold);background:rgba(240,195,90,.1)}
-.mini b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .mini small{font-size:.8rem;color:var(--leise)}
+.mini>span:not(.ring) b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .mini>span:not(.ring) small{font-size:.8rem;color:var(--leise)}
 .vg{display:grid;grid-template-columns:3rem minmax(0,1fr) 3.2rem 3.6rem;gap:.6rem;align-items:center;padding:.3rem 0;font-size:.95rem;flex:none}
 .vg b{text-align:right;color:var(--tinte)} .vg .dl{text-align:right;font-weight:700}
 .lei{display:grid;grid-template-columns:1.6rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.3rem 0;flex:none;position:relative}
@@ -697,7 +699,7 @@ function zeichneListe(){var kb=W.filter(voll).length;
    W.map(function(p,i){var s=status(p,i),g=gewinn(p,i),im=impact(p);
     return '<a class="wz'+(Z.sel===i?" an":"")+(s[0]==="Wartet"?" wa":"")+'" data-s="sel:'+i+'"><span class="r t">'+(i+1)+'</span><span class="zg"><span data-tu="hoch:'+i+'" title="Nach oben">'+ic("o")+'</span><span data-tu="runter:'+i+'" title="Nach unten">'+ic("u")+'</span></span><img class="ptr" src="'+port(p.n)+'" alt="">'+
      '<span class="nm"><b>'+p.n+(p.neu&&!nebelAus()?' <span class="mk p">neu</span>':'')+'</b><small>'+p.kl+' · '+p.ra+' · '+p.team+'</small></span><span><span class="mk '+s[1]+'">'+(s[0]==="Fokus"?ic("ziel")+" ":"")+s[0]+'</span></span>'+
-     '<span class="in"><span class="bal"><i class="'+(voll(p)?"g":s[0]==="Wartet"?"":"b")+'" style="width:'+(nebelAus()?100:p.intel)+'%'+(s[0]==="Wartet"?";background:var(--stumm)":"")+'"></i>'+(g&&!nebelAus()?'<s style="left:'+p.intel+'%;width:'+Math.min(g,100-p.intel)+'%"></s>':'')+'</span><b class="t">'+(nebelAus()?"—":p.intel+" %")+'</b>'+(nebelAus()?'':'<small>'+(voll(p)?"vollständig":g?"+"+g+" je Spieltag · "+eta(p,i):"wartet auf Slot")+'</small>')+'</span>'+
+     '<span class="in"><span class="bal"><i class="'+(voll(p)?"g":s[0]==="Wartet"?"":"b")+'" style="width:'+(nebelAus()?100:p.intel)+'%'+(s[0]==="Wartet"?";background:var(--stumm)":"")+'"></i>'+(g&&!nebelAus()?'<s style="left:'+p.intel+'%;width:'+Math.min(g,100-p.intel)+'%"></s>':'')+'</span><b class="t">'+(nebelAus()?"—":p.intel+" %")+'</b>'+(nebelAus()?'':'<small>'+(voll(p)?"vollständig":g?"+"+g+" je ST · noch "+eta(p,i):"wartet auf Slot")+'</small>')+'</span>'+
      st5(stufe(p))+'<span class="z t'+(voll(p)?"":" sp2")+'">'+sp(p,p.ca,"ca",1)+'</span><span class="z t'+(voll(p)?"":" sp2")+'">'+sp(p,p.po,"po",1,1.3)+'</span>'+ring(p)+
      '<span class="z t">'+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</span><span class="z t '+(im>.4?"plus":"null")+'">'+(p.intel<20&&!nebelAus()?'<small>Report laden</small>':(voll(p)?"":"≈")+vz(im))+'</span></a>'}).join("")+
    '<p class="hinw" style="flex:none;margin-top:.4rem">Graue Zahlen sind Spannen und werden mit jedem Spieltag enger. Top-6: Veränderung im Schnitt deiner sechs Besten je Achse, wenn du kaufst.</p></div>'}
@@ -709,7 +711,7 @@ function urteil(p){var im=impact(p),best=p.d.map(function(v,i){return [v-TB[i],i
   return (p.intel<20&&!nebelAus()?"Noch zu wenig gesehen für ein Urteil. ":im>.8?"Hebt deine erste Reihe sofort. ":im>.3?"Verstärkung auf einzelnen Achsen. ":"Breite, keine Verstärkung der ersten Reihe. ")+(stufe(p)>=2?"Stärkster Hebel: <b>"+DK[best[1]]+"</b> ("+(voll(p)?"+"+best[0]:"etwa +"+Math.round(best[0]/5)*5)+" gegenüber deinem Besten).":"")}
 function zeichneKurz(){var p=W[Z.sel],i=Z.sel,s=status(p,i);
   $("u-kurz").innerHTML='<div class="kopf3"><i class="bg" style="background-image:url('+port(p.n)+')"></i><img class="ptr g" src="'+port(p.n)+'" alt=""><div><span class="mk '+s[1]+'">'+s[0]+'</span> <span class="mk">'+LEITER[stufe(p)][0]+'</span><h3>'+p.n+'</h3><small>'+p.kl+' · '+p.ra+' · '+p.team+'</small></div>'+ring(p,1)+'</div><div class="pb sc">'+
-   erkenntnis(p)+'<div class="ab"><b>Fähigkeiten</b><span>weißer Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+
+   erkenntnis(p)+'<div class="ab"><b>Fähigkeiten</b><span>oranger Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+
    '<div class="kas3" style="margin-top:.5rem"><div class="ka"><small>CA</small><strong class="t">'+sp(p,p.ca,"ca",1)+'</strong><small>Können heute</small></div><div class="ka"><small>PO-Decke</small><strong class="t">'+sp(p,p.po,"po",1,1.3)+'</strong><small>Potenzial</small></div><div class="ka"><small>Fee</small><strong class="t">'+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</strong><small>Gehalt '+(stufe(p)>=3?sp(p,p.geh,"geh",1,.25)+" C":"unbekannt")+'</small></div></div>'+
    '<div class="ab"><b>Traits</b></div>'+traits(p)+'<div class="ab"><b>Urteil des Scouts</b></div><p class="txt" style="margin:0">'+urteil(p)+'</p>'+
    '<p class="hinw" style="margin-top:.6rem">'+(voll(p)?"Vollständig bekannt. Der Slot ist frei für den nächsten Eintrag.":"Fertig in "+eta(p,i)+(s[0]==="Fokus"?" (Fokus).":s[0]==="Aktiv"?". Als Fokus doppelt so schnell.":". Rückt nach, sobald ein Slot frei wird."))+'</p></div>'+
@@ -718,7 +720,7 @@ function zeichneReport(){var p=W[Z.sel],i=Z.sel,s=status(p,i),st=stufe(p);
   $("r-liste").innerHTML='<div class="pk"><h2>Wunschliste</h2><span class="sp"></span><a data-s="ans:uebersicht">Übersicht ›</a></div><div class="pb sc eng">'+W.map(function(x,j){return '<a class="mini'+(j===Z.sel?" an":"")+'" data-s="sel:'+j+'"><img class="ptr" src="'+port(x.n)+'" alt=""><span><b>'+x.n+'</b><small>'+status(x,j)[0]+' · '+(nebelAus()?"exakt":x.intel+" %")+'</small></span>'+ring(x)+'</a>'}).join("")+'</div>';
   var top=p.d.map(function(v,k){return [v,k]}).sort(function(a,b){return b[0]-a[0]}).slice(0,8);
   $("r-bericht").innerHTML='<div class="kopf3 gr"><i class="bg" style="background-image:url('+port(p.n)+')"></i><img class="ptr g" src="'+port(p.n)+'" alt=""><div><span class="mk '+s[1]+'">'+s[0]+'</span> <span class="mk">Stufe '+st+' · '+LEITER[st][0]+'</span>'+(nebelAus()?' <span class="mk g">Nebel aus (Test)</span>':'')+'<h3>'+p.n+'</h3><small>'+p.kl+' · '+p.ra+' · '+p.team+' · Marktwert '+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</small></div>'+ring(p,1)+'</div><div class="pb sc">'+nebelBand()+erkenntnis(p)+
-   '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1.4rem;flex:none"><div><div class="ab"><b>Fähigkeiten</b><span>weißer Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+'</div>'+
+   '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1.4rem;flex:none"><div><div class="ab"><b>Fähigkeiten</b><span>oranger Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+'</div>'+
    '<div><div class="ab"><b>Können und Potenzial</b></div><div class="kas2"><div class="ka"><small>CA · Können heute</small><strong class="t">'+sp(p,p.ca,"ca",1)+'</strong><small>'+(voll(p)?"exakt":"Spanne ±"+breite(p))+'</small></div><div class="ka"><small>PO-Decke</small><strong class="t">'+sp(p,p.po,"po",1,1.3)+'</strong><small>'+(p.po-p.ca>3.5?"Luft nach oben":"nahe an der Decke")+'</small></div></div>'+
    '<div class="ab"><b>Markt</b></div><div class="kas2"><div class="ka"><small>Marktwert</small><strong class="t">'+(voll(p)?de(p.mw):sp(p,p.mw,"mw",0,.8))+' C</strong><small>'+(p.team==="Free Agent"?"ablösefrei, Handgeld":"Ablöse an "+p.team)+'</small></div><div class="ka"><small>Gehaltsforderung</small><strong class="t">'+(st>=3?sp(p,p.geh,"geh",1,.25)+" C":"?")+'</strong><small>'+(st>=3?"je Saison":"ab Stufe 3 (Vertieft)")+'</small></div></div></div></div>'+
    '<div class="ab"><b>Disziplinen</b><span>'+(st>=2?"die acht stärksten · Zahl daneben: Abstand zu deinem Besten":"ab Stufe 2 (Analysiert)")+'</span></div>'+
@@ -736,7 +738,7 @@ function zeichneReport(){var p=W[Z.sel],i=Z.sel,s=status(p,i),st=stufe(p);
 function zeichne(){var kb=W.filter(voll).length,bel=W.filter(function(p){return !voll(p)}).length;
   RAHMEN.reiter=[["uebersicht","Übersicht",W.filter(function(p){return p.neu}).length&&!nebelAus()?String(W.filter(function(p){return p.neu}).length):""],["report","Scouting Report"]];
   rahmenZeichne(Z);
-  slot([["Office","Stufe "+OFFICE.st,null],["Slots",bel+' <small>/ '+OFFICE.slots+'</small>',null],["Kaufbereit",kb,kb?"var(--gut)":null,kb>0],["Fokus",Z.fok!=null&&W[Z.fok]&&!voll(W[Z.fok])?W[Z.fok].n:"—",null],["Nebel",nebelAus()?"aus":"an",nebelAus()?"var(--gold)":null]]);
+  slot([["Slots",bel+' <small>/ '+OFFICE.slots+'</small>',null],["Kaufbereit",kb,kb?"var(--gut)":null,kb>0],["Fokus",Z.fok!=null&&W[Z.fok]&&!voll(W[Z.fok])?W[Z.fok].n:"—",null],["Nebel",nebelAus()?"aus":"an",nebelAus()?"var(--gold)":null]]);
   takt("Weiter: Einsatzliste","Scouting läuft von selbst · <b>+"+OFFICE.tempo+" Intel</b> beim Spieltagswechsel","");
   if(Z.ans==="report")zeichneReport();else{zeichneOffice();zeichneListe();zeichneKurz()}
   urlSetzen(Z,[["ans","ansicht"],["nebel","nebel"]])}

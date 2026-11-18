@@ -139,7 +139,7 @@ dem Scouting-Stand enger wird. Graue Zahlen sind unsicher, weiße exakt.
   des Spiels. In der Mitte die Wunschliste in Prioritätsreihenfolge mit Status (Fokus, Aktiv, Wartet, Kaufbereit),
   Intel-Balken samt Zuwachs des nächsten Spieltags, Erkenntnisstufe, CA, PO-Decke, Scout-Note im Ring, Fee und Wirkung auf die
   Top 6. Rechts der Kurzbericht zum gewählten Spieler.
-- **Scouting Report**: der ganze Bericht mit Achsen als Spannenbalken (weißer Strich = Schnitt der eigenen Top 6), Können und
+- **Scouting Report**: der ganze Bericht mit Achsen als Spannenbalken (oranger Strich = Schnitt der eigenen Top 6), Können und
   Potenzial, Markt, den acht stärksten Disziplinen mit Abstand zum eigenen Besten, Traits (verdeckte als „?“) und dem Urteil
   des Scouts. Rechts die Einordnung im Kader und die Leiter dieses Spielers mit „in x Spieltagen“.
 - **Nebel aus** (`?nebel=aus`): der Schalter des Spielstands. Alle Werte exakt, ein gelbes Band sagt es, Slots und Tempo

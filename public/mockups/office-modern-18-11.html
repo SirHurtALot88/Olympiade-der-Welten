@@ -367,6 +367,8 @@ body.arena .meld{display:none}
 .demo .dg{display:inline-flex;gap:.3rem;align-items:center}
 .pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
 .pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
 .pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
 .pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
 .ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
@@ -428,10 +430,10 @@ body.arena .meld{display:none}
 .bw{display:grid;grid-template-columns:2.6rem minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.25rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem}
 .bw:first-of-type{border-top:0} .bw small{color:var(--stumm);font-size:.8rem} .bw b{font-size:1.02rem}
 /* Ziele */
-.zi{display:grid;grid-template-columns:3rem minmax(0,1fr) 11.5rem;gap:.3rem 1rem;align-items:center;padding:.8rem 1rem;border:1px solid var(--linie);border-radius:.55rem;background:var(--flaeche-2);flex:1;min-height:0;max-height:9.6rem}
+.zi{display:grid;grid-template-columns:3rem minmax(0,1fr) 11.5rem;gap:.3rem 1rem;align-items:center;padding:.8rem 1rem;border:1px solid var(--linie);border-radius:.55rem;background:var(--flaeche-2);flex:1;min-height:0;max-height:10.6rem}
 .zi+.zi{margin-top:.5rem}
 .zi .zk{grid-row:1/4;width:3rem;height:3rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.5rem;background:var(--flaeche-3);color:var(--leise);align-self:start}
-.zi h3{margin:0;font:400 1.3rem/1.1 var(--haus);color:#fff;display:flex;align-items:center;gap:.6rem;white-space:nowrap}
+.zi h3{margin:0;font:400 1.22rem/1.15 var(--haus);color:#fff;display:flex;align-items:center;gap:.3rem .6rem;flex-wrap:wrap}
 .zi p{margin:0;font-size:.9rem;color:var(--leise);line-height:1.25}
 .zi .re{grid-row:1/4;grid-column:3;text-align:right}
 .zi .re strong{display:block;font-size:2rem;line-height:1;color:var(--creme)} .zi .re strong small{font-size:.95rem;color:var(--leise);font-weight:500}
@@ -481,8 +483,8 @@ body.arena .meld{display:none}
 .stap{display:flex;height:1.3rem;border-radius:2px;overflow:hidden;transform:skewX(-14deg);margin:.5rem .3rem;flex:none}
 .stap i{display:block;height:100%} .stap i:nth-child(1){background:var(--gast)} .stap i:nth-child(2){background:var(--gold)} .stap i:nth-child(3){background:var(--gut)} .stap i:nth-child(4){background:#c9a7ff}
 /* Kabine */
-.kz{display:grid;grid-template-columns:2.6rem minmax(0,1.5fr) minmax(0,1.2fr) 6rem repeat(4,5.2rem) 9.5rem;gap:.7rem;align-items:center;min-height:3.5rem;padding:0 .7rem;border-radius:.4rem;font-size:.98rem;flex:1;max-height:4.4rem}
-.kz.kopf{min-height:2rem;max-height:2rem;flex:none;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
+.kz{display:grid;grid-template-columns:2.6rem minmax(0,1.5fr) minmax(0,1.2fr) 6.2rem repeat(4,6rem) 9.5rem;gap:.7rem;align-items:center;min-height:3.5rem;padding:0 .7rem;border-radius:.4rem;font-size:.98rem;flex:1;max-height:4.4rem}
+.kz.kopf{min-height:2.4rem;max-height:2.4rem;line-height:1.15;flex:none;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
 .kz:not(.kopf):nth-child(odd){background:rgba(255,255,255,.025)}
 .kz.akt{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.03))!important;box-shadow:inset .2rem 0 0 var(--gold)}
 .kz .nm b{display:block;font:400 1.12rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kz .nm small{font-size:.82rem;color:var(--leise)}
@@ -685,7 +687,7 @@ function V(){var d=Z.vor==="druck",damp=Math.min(2,kapitaen()[2]/40);
   return d?{ver:3.4,druck:7.6,damp:damp,rat:"D+",frei:.5,satz:"Der Vorstand ist unruhig. Zwei Ziele wackeln, die Freigabe ist gekürzt."}:{ver:6.2,druck:4.8,damp:damp,rat:"B",frei:.7,satz:"Der Vorstand ist zufrieden. Drei von vier Zielen liegen auf Kurs."}}
 function bogen(w){var a=Math.PI*(1-w/10),x=65+52*Math.cos(a),y=66-52*Math.sin(a),f=w<4?"var(--warn)":w<6?"var(--acht)":"var(--gut)";
   return '<svg viewBox="0 0 130 74"><path d="M13 66 A52 52 0 0 1 117 66" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="9" stroke-linecap="butt"/><path d="M13 66 A52 52 0 0 1 '+x.toFixed(1)+' '+y.toFixed(1)+'" fill="none" stroke="'+f+'" stroke-width="9"/>'+
-   '<path d="M'+(65+41*Math.cos(Math.PI*.6)).toFixed(1)+' '+(66-41*Math.sin(Math.PI*.6)).toFixed(1)+' L'+(65+62*Math.cos(Math.PI*.6)).toFixed(1)+' '+(66-62*Math.sin(Math.PI*.6)).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/><text x="34" y="8" fill="#9aa7ba" font-size="6.5" font-family="Barlow Condensed" font-weight="600">Kürzung unter 4</text>'+
+   '<path d="M'+(65+41*Math.cos(Math.PI*.6)).toFixed(1)+' '+(66-41*Math.sin(Math.PI*.6)).toFixed(1)+' L'+(65+62*Math.cos(Math.PI*.6)).toFixed(1)+' '+(66-62*Math.sin(Math.PI*.6)).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/><text x="22" y="3" fill="#9aa7ba" font-size="6.5" font-family="Barlow Condensed" font-weight="600">Kürzung unter 4</text>'+
    '<text x="13" y="74" fill="#66738a" font-size="7" text-anchor="middle" font-family="Barlow Condensed">0</text><text x="117" y="74" fill="#66738a" font-size="7" text-anchor="middle" font-family="Barlow Condensed">10</text></svg>'}
 function zeichneVorstand(){var v=V(),d=Z.vor==="druck",gef=Math.max(0,v.druck-v.damp),kasse=78,k=kapitaen();
   $("v-mandat").innerHTML='<div class="pk"><h2>Mandat</h2><small>GM-Mandat aus Vertrauen, Druck und Rating</small></div><div class="pb">'+
@@ -747,7 +749,7 @@ function zeichneSponsor(){var s=$("s-sponsor");s.classList.toggle("wahl",Z.sp===
     '<div class="bs kl"><em>Klausel</em><span>Unter Rang 12: Basis −15 %</span><strong class="t null">nicht aktiv</strong></div>'+
     '<div class="bs pe"><em>Perk</em><span>Spotlight ×2</span><strong></strong><small>verdoppelt den Beliebtheits-Schub des Sonderziels, kostet kein Geld</small></div></div></section>'+
    '<section class="pan"><div class="pk"><h2>Auszahlung über die Saison</h2><small>in C je Spieltag</small><span class="sp"></span><a data-s="sp:wahl">Angebote vergleichen ›</a></div><div class="pb">'+
-    '<div class="zeitl">'+Array.apply(null,{length:20}).map(function(_,i){var st=i+1;return '<div class="sa'+(st>HEUTE?" zk":"")+(st===HEUTE?" j":"")+'">'+(st===20?'<i class="z" style="height:62%"></i>':'')+(st===10?'<i class="e" style="height:17%"></i>':'')+'<i style="height:10%"></i><span>'+st+'</span></div>'}).join("")+'</div>'+
+    '<div class="zeitl">'+Array.apply(null,{length:20}).map(function(_,i){var st=i+1;return '<div class="sa'+(st>HEUTE?" zk":"")+(st===HEUTE?" j":"")+'">'+(st===20?'<i class="z" style="height:62%"></i>':'')+(st===10?'<i class="e" style="height:17%"></i>':'')+'<i style="height:15%"></i><span>'+st+'</span></div>'}).join("")+'</div>'+
     '<div class="leg"><span><i></i>Basis-Rate 0,9 C</span><span><i class="e"></i>Aktion (Hockey-Sieg, 1,5 C)</span><span><i class="z"></i>Rangbonus, Tabellen- und Sonderziel am Saisonende (bis 8,0 C)</span></div>'+
     '<div class="ab"><b>Kommerz-Score</b><span>bestimmt, welche Angebote du nächste Saison bekommst</span></div>'+
     '<div style="display:grid;grid-template-columns:9rem minmax(0,1fr);gap:1.2rem;align-items:center;flex:none"><div class="ka" style="text-align:center"><small>Kommerz</small><strong class="t" style="font-size:2.6rem">57</strong><small>Rang 6 in Liga 2</small></div><div>'+
@@ -775,7 +777,7 @@ function zeichne(){var v=V();
   RAHMEN.demo=Z.ans==="vorstand"?[["Ansicht","ans",[["vorstand","Vorstand"],["sponsor","Sponsor"],["kabine","Kabine"]]],["Vorstand","vor",[["ruhig","zufrieden"],["druck","unter Druck"]]]]:
     Z.ans==="sponsor"?[["Ansicht","ans",[["vorstand","Vorstand"],["sponsor","Sponsor"],["kabine","Kabine"]]],["Sponsor","sp",[["laeuft","Vertrag läuft"],["wahl","Angebote wählen (Saisonstart)"]]]]:[["Ansicht","ans",[["vorstand","Vorstand"],["sponsor","Sponsor"],["kabine","Kabine"]]]];
   rahmenZeichne(Z);
-  slot([["Vertrauen",de(v.ver)+' <small>/ 10</small>',v.ver<4?"var(--warn)":null,v.ver>=6],["Druck gefühlt",de(Math.max(0,v.druck-v.damp)),null],["Freigabe",Math.round(v.frei*100)+" %",v.frei<.7?"var(--warn)":null],["Ziele auf Kurs",(Z.vor==="druck"?"2":"3")+' <small>/ 4</small>',null],["Sponsor",'28,5 <small>C</small>',null]]);
+  slot([["Vertrauen",de(v.ver)+' <small>/ 10</small>',v.ver<4?"var(--warn)":null,v.ver>=6],["Druck gefühlt",de(Math.max(0,v.druck-v.damp)),null],["Freigabe",Math.round(v.frei*100)+" %",v.frei<.7?"var(--warn)":null],["Ziele auf Kurs",(Z.vor==="druck"?"2":"3")+' <small>/ 4</small>',null]]);
   takt("Weiter: Einsatzliste","Office hält nicht auf · <b>2 Schritte</b> der Checkliste offen","");
   if(Z.ans==="vorstand")zeichneVorstand();else if(Z.ans==="sponsor")zeichneSponsor();else zeichneKabine();
   urlSetzen(Z,[["ans","ansicht"],["vor","vorstand"],["sp","sponsor"]])}

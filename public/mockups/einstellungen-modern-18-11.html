@@ -366,6 +366,8 @@ body.arena .meld{display:none}
 .demo .dg{display:inline-flex;gap:.3rem;align-items:center}
 .pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
 .pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
 .pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
 .pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
 .ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
@@ -414,7 +416,7 @@ body.arena .meld{display:none}
 .seite.ms{grid-template-columns:repeat(3,minmax(0,1fr)) 27rem;grid-template-rows:minmax(0,1fr)}
 .seite.rg{grid-template-columns:minmax(0,1fr) 37rem;grid-template-rows:minmax(0,1fr)}
 /* Spielstand-Zeile */
-.sv{position:relative;display:grid;grid-template-columns:4.6rem minmax(0,1.6fr) 8rem 7rem minmax(0,1fr) auto;gap:1rem;align-items:center;min-height:5.2rem;padding:.5rem .9rem;border:1px solid var(--linie);border-radius:.55rem;background:var(--flaeche-2);margin-bottom:.45rem;flex:none}
+.sv{position:relative;display:grid;grid-template-columns:5.9rem minmax(0,1.6fr) 8rem 7rem minmax(0,1fr) auto;gap:1rem;align-items:center;min-height:5.2rem;padding:.5rem .9rem;border:1px solid var(--linie);border-radius:.55rem;background:var(--flaeche-2);margin-bottom:.45rem;flex:none}
 .sv:hover{border-color:var(--linie-2)}
 .sv.akt{border-color:var(--gold);background:linear-gradient(90deg,rgba(240,195,90,.14),var(--flaeche-2) 55%)}
 .sv.sel{box-shadow:inset .25rem 0 0 var(--gold)}
@@ -438,7 +440,7 @@ body.arena .meld{display:none}
 .feld::after{content:"";width:1px;height:1.2rem;background:var(--gold);margin-left:.15rem;animation:blink .8s infinite alternate}
 .platz{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.42rem 0;border-top:1px solid rgba(244,230,196,.07);flex:none}
 .platz b{display:block;font-size:1rem;color:var(--tinte)} .platz small{font-size:.84rem;color:var(--leise)}
-.kr{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.45rem;flex:1;min-height:0}
+.kr{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:.45rem;flex:1;min-height:0}
 .kl2{position:relative;border-radius:.5rem;overflow:hidden;border:2px solid var(--linie);background:#111;min-height:0;display:block}
 .kl2 img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55;transition:opacity .15s}
 .kl2:hover img{opacity:.85} .kl2:hover{border-color:var(--linie-2)}
@@ -762,9 +764,9 @@ function zeichneRegeln(){var aus=Z.nebel==="aus";
   else{var r=R.filter(function(x){return x[0]===Z.rg})[0];h='<div class="pk"><h2>'+r[2]+'</h2><span class="sp"></span><span class="mk">'+r[4]+'</span></div><div class="pb"><p class="txt" style="margin:0">'+r[3]+'</p>'+(r[5]==null?'<p class="hinw" style="margin-top:.8rem">'+ic("schloss")+' Fest seit dem Anlegen. Für eine andere Wahl brauchst du ein neues Spiel.</p><a class="kn" data-s="ans:'+(r[0]==="sitze"?"mitspieler":"neu")+'" style="align-self:flex-start;margin-top:.6rem">'+(r[0]==="sitze"?"Mitspieler und Delegation":"Neues Spiel")+' '+ic("r")+'</a>':'')+'</div>'}
   $("g-detail").innerHTML=h}
 function zeichne(){
-  RAHMEN.reiter=[["spielstaende","Spielstände"],["neu","Neues Spiel"],["mitspieler","Mitspieler und Delegation"],["regeln","Spielregeln"]];
+  RAHMEN.reiter=[["spielstaende","Spielstände"],["neu","Neues Spiel"],["mitspieler","Mitspieler"],["regeln","Spielregeln"]];
   rahmenZeichne(Z);
-  slot([["Spielstand","Olympiade Herbst 2026",null],["Modus","Manager",null],["Am Tisch",'3 <small>Menschen</small>',null],["Nebel",Z.nebel==="aus"?"aus":"an",Z.nebel==="aus"?"var(--gold)":null]]);
+  slot([["Spielstand","Olympiade Herbst 2026",null],["Am Tisch",'3 <small>Menschen</small>',null],["Nebel",Z.nebel==="aus"?"aus":"an",Z.nebel==="aus"?"var(--gold)":null]]);
   $("b-slot").querySelector("strong").style.cssText="font:400 1.25rem/1.6rem var(--haus);color:var(--creme)";
   takt("Zurück zum Spiel","Einstellungen halten nicht auf · <b>Franky</b> bestätigt noch","");
   ({spielstaende:zeichneSpielstaende,neu:zeichneNeu,mitspieler:zeichneMitspieler,regeln:zeichneRegeln})[Z.ans]();
