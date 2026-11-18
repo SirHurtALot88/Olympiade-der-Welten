@@ -853,25 +853,18 @@ async function main() {
           const profileButton = page.locator(profileButtonSelector).first();
           await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
           await profileButton.click({ timeout: viewTimeoutMs });
-          const playerProfile = page.getByTestId("foundation-player-profile");
-          await playerProfile.waitFor({ state: "visible", timeout: viewTimeoutMs });
-          await page.waitForFunction(
-            () => {
-              const profile = document.querySelector('[data-testid="foundation-player-profile"]');
-              if (!profile) {
-                return false;
-              }
-              const text = profile.textContent ?? "";
-              return text.includes("OVR") || text.includes("Profil") || text.includes("Scouting");
-            },
-            undefined,
-            { timeout: viewTimeoutMs },
-          );
-          const drawerText = await playerProfile.innerText();
-          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints", "Entwicklung"]), "Spielerprofil zeigt XP/Entwicklung.");
-          assertStep(step, drawerText.includes("OVR"), "Spielerprofil zeigt OVR.");
-          assertStep(step, drawerText.includes("MVS"), "Spielerprofil zeigt MVS.");
-          assertStep(step, drawerText.includes("PPs"), "Spielerprofil zeigt PPs.");
+          // Neuer Ablauf (18.11.): Klick -> Kurzprofil (Drawer) -> "Ganzes Profil öffnen" -> Profilseite.
+          const kurzprofil = page.getByTestId("spielerkurzprofil");
+          await kurzprofil.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const kurzText = await kurzprofil.innerText();
+          assertStep(step, kurzText.trim().length > 20, "Kurzprofil zeigt Inhalt.");
+          await page.getByTestId("spielerkurzprofil-ganzes-profil").click({ timeout: viewTimeoutMs });
+          const profilSeite = page.getByTestId("spielerprofil-seite");
+          await profilSeite.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const drawerText = await profilSeite.innerText();
+          assertStep(step, hasAny(drawerText, ["Überblick", "Disziplinen", "Leistung", "Entwicklung", "Vertrag", "Karriere"]), "Spielerprofil zeigt die Reiter.");
+          assertStep(step, hasAny(drawerText, ["Entwicklung", "XP", "Setpoints"]), "Spielerprofil zeigt Entwicklung.");
+          assertStep(step, (await page.getByTestId("spielerprofil-seite").getAttribute("data-spieler")) !== null, "Profilseite kennt den Spieler.");
           const closeButton = page.getByRole("button", { name: /^Schliessen$/ });
           if (await closeButton.isVisible().catch(() => false)) {
             await closeButton.click();
