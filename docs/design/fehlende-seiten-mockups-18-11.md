@@ -218,3 +218,27 @@ Jede Datei nennt im Kommentar am Anfang, was aus dem Spiel stammt und was erfund
 - Ein Bild ist einen Schritt älter als die Datei: `office-04-sponsor-angebote` zeigt die Marke „Empfohlen“ noch am mittleren
   Angebot, im Mockup steht sie jetzt am ersten (Siemenswerk AG), passend zum Text darunter.
 - Nicht geprüft: Verhalten unter 1700 px Breite und auf dem Handy. Die Mockups sind wie die anderen auf 16:9 ab Full HD ausgelegt.
+
+---
+
+## Entscheidungen von Chris (18.11. abends) — alle vier Mockups freigegeben
+
+**Inbox**
+1. **Nur fürs ausgewählte Team** — kein gemeinsamer Posteingang aller eigenen Teams.
+2. Entscheidungen mit Folgen dürfen **direkt in der Inbox** fallen (mit den drei Zahlen daneben).
+3. **„Franky anstupsen“** kommt (kleine Server-Funktion).
+
+**Office**
+4. **Budgetfreigabe des Vorstands** nach Vertrauen: Standard **90 %**, **100 % ab 7,5**, **80 % unter 5**, **70 % unter 3**, **50 % unter 1,5** — und **messen** (ersetzt die bisherigen Stufen 100/85/70/50 im Finanzkonzept V2).
+5. Ein erfülltes Vorstandsziel bringt **Geld und Vertrauen**.
+- Sponsor wird **Reiter im Office** (Empfehlung angenommen; eigener Navigationspunkt entfällt).
+
+**Scouting**
+6. **Zahlenspannen** statt Buchstaben/Sterne — als Richtung für die ganze App, **mit etwas Streuung**: manche Spieler sind besser, manche schlechter gescoutet. Neu: **KI-Scouting** auswählbar — der Scout sucht selbst passende Fits und scoutet sie automatisch; **Standard, solange die Wunschliste leer ist**.
+
+**Einstellungen / Mehrspieler**
+7. Scouting-Nebel ist **jederzeit umschaltbar** (auch mitten in der Saison).
+8. Chris darf **Ramonas Delegation setzen**, wenn sie nicht da ist.
+9. Der Spieltag **wartet immer** auf alle Menschen (keine Frist, keine KI-Übernahme).
+
+Übrige Fragen: Empfehlungen aus diesem Dokument gelten als angenommen.
