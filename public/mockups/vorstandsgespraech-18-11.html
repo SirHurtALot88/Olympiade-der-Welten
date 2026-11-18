@@ -58,7 +58,7 @@ img{display:block}
 .demo button{padding:3px 10px;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
 .demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
 .demo i{width:1px;height:18px;background:#2b3445;margin:0 4px;flex:none}
-body.still .demo{display:none}
+body.still .demo,body.still #toast{display:none}
 
 /* ---------- Geruest ---------- */
 .app{display:grid;grid-template-columns:64px minmax(0,1fr);height:calc(100vh - 38px);min-height:760px;background:var(--grund)}
@@ -97,7 +97,7 @@ body.phone [data-tip]::after{display:none}
 .mdw{display:inline-flex;align-items:center;gap:2px;margin-bottom:5px}
 .mdw span{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);white-space:nowrap}
 .tabs{display:flex;align-items:flex-end;gap:10px;min-width:0}
-.dtab{position:relative;flex:1 1 0;min-width:0;max-width:340px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 20px 12px 18px;
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:380px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 20px 12px 18px;
   background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);color:var(--leise);transition:background .15s}
 .dtab:hover{background:rgba(26,34,49,.9)}
 .dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
@@ -165,7 +165,7 @@ body.phone [data-tip]::after{display:none}
 .anl.zu{opacity:.55}
 .anl .ic{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;font-size:22px;color:var(--creme);background:rgba(0,0,0,.35);border:1px solid var(--linie)}
 .anl.an .ic{color:var(--gold);border-color:rgba(240,195,90,.5)}
-.anl b{display:block;font:400 18px/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.anl b{display:block;font:400 17px/1.08 var(--haus);color:#fff}
 .anl span{display:block;font-size:13.5px;color:var(--leise);line-height:1.2;margin-top:3px}
 .anl .wirk{position:absolute;right:8px;top:7px;font-size:15px;font-weight:700;color:var(--gut)}
 .stell{margin-top:8px;padding:9px 10px;border-radius:8px;background:#06080c;border:1px solid var(--linie);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14.5px;color:var(--leise);min-height:50px}
@@ -298,6 +298,7 @@ body.phone [data-tip]::after{display:none}
 .pruef div.ja{border-color:rgba(98,211,148,.5);color:var(--tinte)} .pruef div.ja svg{color:var(--gut)}
 .lagen{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .lagen .anl{grid-template-columns:minmax(0,1fr);min-height:86px;align-content:start}
+.lagen .anl b{font-size:16px}
 .lagen .anl strong{display:block;font-size:24px;line-height:1;margin-top:5px;color:var(--warn)}
 
 #toast{position:fixed;z-index:95;left:50%;bottom:84px;transform:translate(-50%,20px);padding:9px 16px;border-radius:8px;background:#020305;border:1px solid var(--linie-2);font-size:15.5px;font-weight:500;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:90vw}
@@ -428,7 +429,7 @@ const CHAR={
 const ANL={
   stufe:{name:"Freigabe anheben",ic:"i-hoch",kosten:14},
   sonder:{name:"Sonderbudget",ic:"i-sack"},
-  ruecklage:{name:"Notrücklage anzapfen",ic:"i-schild"},
+  ruecklage:{name:"Rücklage anzapfen",ic:"i-schild"},
   alles:{name:"Alles auf eine Karte",ic:"i-karte",kosten:20}
 };
 const OFF={
@@ -519,7 +520,7 @@ function kostenVon(id,deal){
 }
 function bewerte(id,deal){
   const b=basis(id),w=b.C.w;
-  const teile=[{n:"Vertrauen "+f1(b.t.v),p:b.K0,f:"var(--heim)"}];
+  const teile=[{n:"Vertrauen "+f1(b.t.v)+" × 2 =",p:b.K0,f:"var(--heim)"}];
   let gewicht=b.K0;
   REIHE.forEach(k=>{if(deal.biete.has(k)&&frei(deal,k)){gewicht+=w[k];teile.push({n:OFF[k].name,p:w[k],f:"var(--gut)"})}});
   const kosten=kostenVon(id,deal);
@@ -576,7 +577,7 @@ function antwortText(id,d,r){
       (r.altBetrag?"<p>Oder ohne weitere Bedingung: <b>"+c(r.altBetrag)+"</b> statt "+c(d.betrag)+".</p>":"");
   }
   const s={antreiber:"Das ist mir bei deinem Stand zu viel auf einmal.",kaufmann:"Das liegt zu weit auseinander, da hilft auch kein Gegenangebot.",kassenwart:d.anl==="ruecklage"?"Die halbe Rücklage für einen Wunsch gebe ich nicht her.":"Das ist mir zu viel Risiko für die Kasse."}[ch];
-  return "<p>"+s+" Dir fehlen <b>"+Math.ceil(-r.score)+" Punkte</b>, und mehr als das hier kannst du mir nicht anbieten.</p>"+
+  return "<p>"+s+" Dir fehlen <b>"+Math.ceil(-r.score)+" Punkte</b>. Das ist mir für ein Gegenangebot zu weit weg.</p>"+
     (d.anl==="ruecklage"?"<p>Ein Viertel ist verhandelbar. Und in einer echten <b>Notlage</b> bekommst du die Rücklage ohne Abzug.</p>":"<p>Bitte um weniger, oder komm mit mehr Vertrauen wieder.</p>");
 }
 
@@ -595,8 +596,8 @@ function zeichne(){
   /* Kopf */
   $("hk").innerHTML='<div class="crest"><img src="../team-logos/'+id+'.jpg" alt=""></div><div><div class="mdw"><span>Saison 3 · '+(S.ans==="notfall"?"Spieltag 11 von 20":inSaison()?"Vor Spieltag 11 von 20":"Transferfenster vor Spieltag 1")+'</span></div><h1>Vorstandsgespräch</h1><div class="sub"><b>'+t.name+'</b> · Finanzwert '+f1(t.fin)+' · Ambition '+f1(t.amb)+'</div></div>';
   $("tabs").innerHTML=
-    '<button class="dtab'+(S.ans==="gespraech"?" an":"")+'" role="tab" data-a="ans:gespraech"><span class="ic">'+ic("i-hand")+'</span><span><em>'+(inSaison()?"In der Saison":"Transferfenster")+' · Gespräch '+(inSaison()?2:1)+' von 2</em><b>Budget verhandeln</b></span><span class="erw"><strong class="t">'+pz(a.q)+'</strong><span>FREIGABE</span></span></button>'+
-    '<button class="dtab'+(S.ans==="notfall"?" an":"")+'" role="tab" data-a="ans:notfall"><span class="ic">'+ic("i-schild")+'</span><span><em>Jederzeit · zählt nicht als Gespräch</em><b>Notfall-Antrag</b></span><span class="erw"><strong class="t">'+f1(b.R)+'</strong><span>RÜCKLAGE C</span></span></button>';
+    '<button class="dtab'+(S.ans==="gespraech"?" an":"")+'" role="tab" data-a="ans:gespraech"><span class="ic">'+ic("i-hand")+'</span><span><em>'+(inSaison()?"Saison":"Fenster")+' · Gespräch '+(inSaison()?2:1)+'/2</em><b>Verhandeln</b></span><span class="erw"><strong class="t">'+pz(a.q)+'</strong><span>FREIGABE</span></span></button>'+
+    '<button class="dtab'+(S.ans==="notfall"?" an":"")+'" role="tab" data-a="ans:notfall"><span class="ic">'+ic("i-schild")+'</span><span><em>Jederzeit · zählt nicht mit</em><b>Notfall-Antrag</b></span><span class="erw"><strong class="t">'+f1(b.R)+'</strong><span>RÜCKLAGE C</span></span></button>';
   $("hr").innerHTML='<div class="frist"><span class="gk">Vertrauen</span><strong class="t">'+f1(t.v)+' · Stufe '+b.stufe+'</strong></div><a class="btn" href="finanzen-modern-18-11.html?ansicht=budget">'+ic("i-geld")+' Zur Finanzseite</a>';
   $("haupt").innerHTML=S.ans==="notfall"?notfall(id):gespraech(id);
   kontext(id);
@@ -649,7 +650,7 @@ function gespraech(id){
     chat+=blase("ich","<p>"+antragSatz(id,A.d)+"</p>")+waage(A.r,true);
     let akt="";
     if(S.phase==="antwort"&&A.r.art==="gegen")akt='<div class="akt"><button class="btn ja klein" data-a="annehmen">'+ic("i-ok")+' Annehmen</button>'+(A.r.altBetrag?'<button class="btn klein" data-a="alt">'+c(A.r.altBetrag)+' nehmen</button>':"")+(S.runde<2?'<button class="btn klein" data-a="nachbessern">Nachbessern · Runde 2</button>':"")+'<button class="btn klein" data-a="zurueck">Zurückziehen</button></div>';
-    if(S.phase==="antwort"&&A.r.art==="nein")akt='<div class="akt">'+(S.runde<2?'<button class="btn klein" data-a="nachbessern">Anderes Anliegen · Runde 2</button>':"")+'<button class="btn klein" data-a="zurueck">Gespräch beenden</button></div>';
+    if(S.phase==="antwort"&&A.r.art==="nein")akt='<div class="akt">'+(S.runde<2?'<button class="btn klein" data-a="nachbessern">Nachbessern · Runde 2</button>':"")+'<button class="btn klein" data-a="zurueck">Gespräch beenden</button></div>';
     chat+=blase("vorstand",antwortText(id,A.d,A.r)+akt,A.r.art);
     if(S.phase==="vereinbart"){
       const V=S.vertrag,n=toepfe(id,V),mv=mehrFrei(id,V);
