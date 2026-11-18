@@ -490,10 +490,13 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       finances: input.identity?.finances,
     });
   }
-  const ruecklage = ruecklageDebug?.ruecklage ?? 0;
+  // Chris 18.11. (Zwei-Budget-Entscheid): in Saison 1 ist die Draft-Ruecklage um 50 % geringer, ab Saison 2 gilt sie voll.
+  const saisonEins = /(\d+)\s*$/.exec(input.gameState.season?.id ?? "")?.[1] === "1";
+  const ruecklage = (ruecklageDebug?.ruecklage ?? 0) * (saisonEins ? 0.5 : 1);
   // Stufe 3 (hart): der Vorstand gibt nur `nochFrei` zum Ausgeben (Ablosen + Jahresgehaelter) frei; das Geld bleibt auf dem Konto.
   const vorstand = berechneVorstandBudgetStand(input.gameState, input.team.teamId);
-  const spendCap = vorstand.anteil < 1 ? vorstand.nochFrei : undefined;
+  const feeCap = vorstand.anteil < 1 ? vorstand.investition.frei : undefined;
+  const salaryCap = vorstand.gehalt.quote < 1 ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
   const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
   const sponsorForecast =
@@ -629,7 +632,8 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
       // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
       minFillFloor: ruecklage > 0 ? ruecklage : undefined,
-      spendCap,
+      feeCap,
+      salaryCap,
     },
     draftSeed: input.draftSeed ?? null,
   });

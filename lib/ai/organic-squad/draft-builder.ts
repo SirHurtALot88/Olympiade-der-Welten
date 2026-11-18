@@ -93,10 +93,12 @@ export type OrganicSquadPlanInput = {
      */
     minFillFloor?: number;
     /**
-     * FINANZKONZEPT V2 Stufe 3: harte Freigabe des Vorstands — hoechstens so viel (Abloese + Jahresgehalt) darf
-     * ueber alle Kaeufe dieses Plans ausgegeben werden. Gilt erst ab dem Kader-Minimum. undefined => keine Grenze.
+     * FINANZKONZEPT V2 Stufe 3: harte Freigabe des Vorstands — hoechstens so viel Abloese darf
+     * ueber alle Kaeufe dieses Plans ausgegeben werden (Investitionstopf). Gilt erst ab dem Kader-Minimum. undefined => keine Grenze.
      */
-    spendCap?: number;
+    feeCap?: number;
+    /** Stufe 3: wie viel ZUSAETZLICHES Jahresgehalt der Gehaltstopf noch zulaesst (undefined => keine Grenze). */
+    salaryCap?: number;
     /**
      * ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2 — see draft-adapter.ts wiring / salary-ceiling.ts
      * computeTeamSalaryCeiling doc). Soft cap on TOTAL salary (existing roster + planned additions),
@@ -169,8 +171,10 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const pool = [...input.candidates];
   const decisions: OrganicBuyDecision[] = [];
   let cash = input.economy.cash;
-  const spendCap = input.economy.spendCap;
-  let spentCost = 0;
+  const feeCap = input.economy.feeCap;
+  const salaryCap = input.economy.salaryCap;
+  let spentFee = 0;
+  let spentSalary = 0;
   let salaryTotal = input.economy.salaryTotal;
 
   // ANPASSUNG COMPOSE (flag-gated via input.composition, see OrganicSquadPlanInput doc above). boughtTiers
@@ -251,7 +255,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     let bestUtility = -Infinity;
     for (const candidate of pool) {
       if (cash - price(candidate) - reserveForMin < affordFloor) continue;
-      if (spendCap != null && !belowMin && spentCost + price(candidate) + Math.max(0, candidate.salary) > spendCap) continue;
+      if (!belowMin && feeCap != null && spentFee + price(candidate) > feeCap) continue;
+      if (!belowMin && salaryCap != null && spentSalary + Math.max(0, candidate.salary) > salaryCap) continue;
       if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       const jitter =
         input.draftSeed && ORGANIC_DRAFT_JITTER > 0
@@ -317,7 +322,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
 
     squad.push(best);
     cash -= price(best);
-    spentCost += price(best) + Math.max(0, best.salary);
+    spentFee += price(best);
+    spentSalary += Math.max(0, best.salary);
     salaryTotal += Math.max(0, best.salary);
     pool.splice(pool.indexOf(best), 1);
     decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });

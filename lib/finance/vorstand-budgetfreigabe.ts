@@ -1,32 +1,38 @@
 /**
  * Finanzkonzept V2, Stufe 3: Der Vorstand gibt Budget frei — er nimmt nichts weg und straft kein Geld.
  *
- * Chris am 18.11. (verbindlich):
- *  - Das Geld bleibt auf dem Konto. Freigegeben sind nur X % zum AUSGEBEN, fuer Abloesen UND Gehaelter
- *    (neue Vertraege); Vorbild Transfer- und Gehaltsbudget im Football Manager.
- *  - Die Sperre ist HART: ein Kauf ueber der Freigabe ist nicht moeglich (Mensch und KI gleich).
- *  - Verkaufserloese unterliegen derselben Quote: bei 70 % werden von 20 C nur 14 C frei, 6 C bleiben als Puffer.
+ * Chris am 18.11. (verbindlich, zuletzt: Zwei-Budget-Modell, Konzept #1591):
+ *  - Das Geld bleibt auf dem Konto. Freigegeben sind nur X % zum AUSGEBEN. Die Sperre ist HART, Mensch und KI gleich.
+ *  - ZWEI TOEPFE: `investition` (Abloesen; Gebaeude sollen aus demselben Topf kommen, noch nicht verdrahtet) mit der
+ *    Vertrauensquote 100/85/70/50 %, und `gehalt` (Jahresgehaelter) mit derselben Quote, aber **nie unter 75 %**.
+ *  - Verkaufserloese (Abloese) unterliegen der Transfer-Quote: bei 70 % werden von 20 C nur 14 C frei. Das beim Verkauf
+ *    frei werdende Gehalt dagegen fliesst zu 100 % ins Gehaltsbudget zurueck (die Gehaltssumme sinkt).
+ *  - Saison 1: Quote 100 % fuer alle (Vertrauensquote erst ab Saison 2).
  *  - Die Ruecklage nach Finanzwert (Stufe 1) bleibt weich; nur die Freigabe ist hart.
  *
  * Vertrauen = `seasonState.boardConfidence[teamId].value` (1 bis 10, Neutral 5; vorhandenes Board-System).
  *
  *   ab 6 -> 100 %   hoch      4 bis unter 6 -> 85 %   mittel
- *   2,5 bis unter 4 -> 70 %   niedrig      darunter -> 50 %   Sparauflage
- *
- * Saison 1 gibt immer 100 % frei (kein Vorjahr, Board neutral, kein Misserfolg, auf den der Vorstand reagieren koennte).
+ *   2,5 bis unter 4 -> 70 %   niedrig      darunter -> 50 %   Sparauflage   (Gehalt: mindestens 75 %)
  *
  * Rechnung ohne neuen Speicher, aus dem Transferverlauf der laufenden Saison:
- *   Anfangskasse   = Kasse + Kaeufe(Ablose) - Verkaufserloese (Netto)            (Stand vor dem ersten Kauf/Verkauf)
- *   freigegeben    = Anteil x (Anfangskasse + Verkaufserloese)                   (Verkaeufe zaehlen mit derselben Quote)
- *   ausgegeben     = Ablosen der Kaeufe + Jahresgehalt der in dieser Saison neu verpflichteten Spieler
- *   noch frei      = max(0, freigegeben - ausgegeben), nie mehr als die Kasse
- *   gesperrt       = Kasse - noch frei  (auf dem Konto, aber nicht ausgebbar)
+ *   Investition:  Anfangskasse = Kasse + Kaeufe - Verkaufserloese;  gesamt = Quote x (Anfangskasse + Verkaufserloese);
+ *                 ausgegeben = Abloesen der Kaeufe;  frei = max(0, gesamt - ausgegeben), hoechstens die Kasse;
+ *                 gesperrt = Kasse - frei (auf dem Konto, nicht ausgebbar).
+ *   Gehalt:       Basis = max(erwarteter Sponsor 0,92 x Anker, Zielgehalt bei Soll-Kader) [Startwert];
+ *                 gesamt = Gehaltsquote x Basis;  ausgegeben = aktuelle Gehaltssumme des Kaders;
+ *                 frei = max(0, gesamt - ausgegeben);  gesperrt = Basis - gesamt.
  *
  * Ausnahme: unter dem Kader-Minimum (8) gilt die Sperre nicht — ein spielfaehiger Kader geht vor.
- * Nicht erfasst: Gehaltserhoehungen bei Verlaengerungen (Vertragsverlaengerung bucht ueber einen anderen Pfad).
+ * Nicht erfasst: Gehaltserhoehungen bei Verlaengerungen, Gebaeudekaeufe (Zwei-Budget-Bau danach) und die UI.
  */
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
+import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
+
+/** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
+export const GEHALTS_QUOTE_UNTERGRENZE = 0.75;
 
 export type VorstandStufe = "hoch" | "mittel" | "niedrig" | "sparauflage";
 
@@ -82,34 +88,31 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
   return { teamId, stufe, anteil, vertrauen: wert, grund: "vertrauen" };
 }
 
-/** Ein Topf der Freigabe. Heute traegt `investition` die gemeinsame Freigabe, `gehalt` ist ein leerer Platzhalter. */
+/** Ein Topf der Freigabe. */
 export type VorstandTopf = {
   gesamt: number;
   ausgegeben: number;
   frei: number;
   gesperrt: number;
+  quote: number;
   grund: string;
 };
 
 export type VorstandBudgetStand = {
-  /**
-   * Vorbereitung auf zwei getrennte Toepfe (Chris: Football-Manager-Modell, noch nicht entschieden).
-   * Heute: gemeinsame Freigabe. `investition` = Gesamtzahlen (Abloesen UND Gehaelter zaehlen dagegen),
-   * `gehalt` = leer und nur Platzhalter; `getrennt: false` sagt das ausdruecklich.
-   */
+  /** Zwei getrennte Toepfe (Zwei-Budget-Modell). */
   getrennt: boolean;
+  /** Transfer-/Investitionstopf (Abloesen). */
   investition: VorstandTopf;
+  /** Gehaltstopf (Jahresgehaelter). */
   gehalt: VorstandTopf;
   teamId: string;
   stufe: VorstandStufe;
+  /** Transfer-Quote (Vertrauensquote). */
   anteil: number;
-  /** Freigegeben gesamt (C): Anteil x (Anfangskasse + Verkaufserloese). */
+  /** Kurzformen des Investitionstopfs (Transfermarkt und Spielerprofil). */
   freigegebenGesamt: number;
-  /** Davon schon ausgegeben (Ablosen + Jahresgehaelter neuer Vertraege). */
   ausgegeben: number;
-  /** Noch frei zum Ausgeben (hoechstens die Kasse). */
   nochFrei: number;
-  /** Auf dem Konto, aber nicht ausgebbar (Kasse minus noch frei). */
   gesperrt: number;
   /** Ein Satz: warum diese Zahlen. */
   grund: string;
@@ -124,20 +127,14 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   const seasonId = gameState.season.id;
   let kaeufe = 0;
   let verkaeufe = 0;
-  let gehaelter = 0;
   for (const e of gameState.transferHistory ?? []) {
     if (e.seasonId !== seasonId) continue;
-    if (e.transferType === "buy" && e.toTeamId === teamId) {
-      kaeufe += e.netCashImpact ?? e.fee;
-      gehaelter += e.salary ?? 0;
-    } else if (e.transferType === "sell" && e.fromTeamId === teamId) {
-      verkaeufe += e.netCashImpact ?? e.fee;
-    }
+    if (e.transferType === "buy" && e.toTeamId === teamId) kaeufe += e.netCashImpact ?? e.fee;
+    else if (e.transferType === "sell" && e.fromTeamId === teamId) verkaeufe += e.netCashImpact ?? e.fee;
   }
   const anfangskasse = cash + kaeufe - verkaeufe;
-  const freigegebenGesamt = freigabe.anteil * (anfangskasse + verkaeufe);
-  const ausgegeben = kaeufe + gehaelter;
-  const nochFrei = Math.max(0, Math.min(cash, freigegebenGesamt - ausgegeben));
+  const transferGesamt = freigabe.anteil * (anfangskasse + verkaeufe);
+  const nochFrei = Math.max(0, Math.min(cash, transferGesamt - kaeufe));
   const gesperrt = Math.max(0, cash - nochFrei);
   const prozent = Math.round(freigabe.anteil * 100);
   const grund =
@@ -148,25 +145,45 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
         : freigabe.grund === "abgeschaltet"
           ? "Budgetfreigabe ist abgeschaltet: das gesamte Budget ist frei."
           : "Kein Vertrauenswert vorhanden: der Vorstand gibt das gesamte Budget frei.";
+
+  // Gehaltstopf: Quote nie unter 75 %. Bei Quote 100 % bleibt alles frei.
+  const gehaltsQuote = freigabe.anteil >= 1 ? 1 : Math.max(GEHALTS_QUOTE_UNTERGRENZE, freigabe.anteil);
+  const gehaltsSumme = gameState.rosters.filter((r) => r.teamId === teamId).reduce((x, r) => x + (r.salary ?? 0), 0);
+  let gehaltsBasis = gehaltsSumme;
+  if (gehaltsQuote < 1) {
+    const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme });
+    gehaltsBasis = Math.max(erwarteterSponsorFuerPlanung(gameState, teamId), zielgehalt);
+  }
+  const gehaltGesamt = gehaltsQuote >= 1 ? Math.max(gehaltsBasis, gehaltsSumme) : gehaltsQuote * gehaltsBasis;
+  const gehaltFrei = Math.max(0, gehaltGesamt - gehaltsSumme);
+  const gehaltGrund =
+    gehaltsQuote >= 1
+      ? "Gehaltsbudget voll freigegeben."
+      : `Gehaltsbudget auf ${Math.round(gehaltsQuote * 100)} % gekuerzt (nie unter 75 %); frei werdendes Gehalt aus Verkaeufen kommt zu 100 % zurueck.`;
+
   return {
-    getrennt: false,
-    investition: { gesamt: r2(freigegebenGesamt), ausgegeben: r2(ausgegeben), frei: r2(nochFrei), gesperrt: r2(gesperrt), grund },
+    getrennt: true,
+    investition: { gesamt: r2(transferGesamt), ausgegeben: r2(kaeufe), frei: r2(nochFrei), gesperrt: r2(gesperrt), quote: freigabe.anteil, grund },
     gehalt: {
-      gesamt: 0, ausgegeben: 0, frei: 0, gesperrt: 0,
-      grund: "Noch kein eigener Gehaltstopf: Jahresgehaelter neuer Vertraege zaehlen gegen die gemeinsame Freigabe oben.",
+      gesamt: r2(gehaltGesamt),
+      ausgegeben: r2(gehaltsSumme),
+      frei: r2(gehaltFrei),
+      gesperrt: r2(Math.max(0, gehaltsBasis - gehaltGesamt)),
+      quote: gehaltsQuote,
+      grund: gehaltGrund,
     },
     teamId,
     stufe: freigabe.stufe,
     anteil: freigabe.anteil,
-    freigegebenGesamt: r2(freigegebenGesamt),
-    ausgegeben: r2(ausgegeben),
+    freigegebenGesamt: r2(transferGesamt),
+    ausgegeben: r2(kaeufe),
     nochFrei: r2(nochFrei),
     gesperrt: r2(gesperrt),
     grund,
   };
 }
 
-/** Harte Pruefung eines Kaufs: Ablose + Jahresgehalt muessen in das noch freie Budget passen. */
+/** Harte Pruefung eines Kaufs: Abloese in den Investitionstopf, Jahresgehalt in den Gehaltstopf. */
 export function pruefeKaufGegenVorstandFreigabe(
   gameState: GameState,
   teamId: string,
@@ -175,7 +192,9 @@ export function pruefeKaufGegenVorstandFreigabe(
   const stand = berechneVorstandBudgetStand(gameState, teamId);
   if (stand.anteil >= 1) return { ok: true, reason: null, stand };
   if (input.rosterBefore < (input.playerMin ?? 8)) return { ok: true, reason: null, stand };
-  const kosten = input.fee + Math.max(0, input.salary);
-  if (kosten <= stand.nochFrei + 1e-9) return { ok: true, reason: null, stand };
-  return { ok: false, reason: "vorstand_budget_nicht_freigegeben", stand };
+  if (input.fee > stand.investition.frei + 1e-9) return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
+  if (stand.gehalt.quote < 1 && Math.max(0, input.salary) > stand.gehalt.frei + 1e-9) {
+    return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
+  }
+  return { ok: true, reason: null, stand };
 }

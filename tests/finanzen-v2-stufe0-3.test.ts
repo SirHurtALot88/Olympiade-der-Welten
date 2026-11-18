@@ -95,6 +95,8 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     return {
       season: { id: "season-2" },
       teams: [{ teamId: "A", cash }],
+      rosters: [],
+      teamIdentities: [],
       transferHistory: history,
       seasonState: { boardConfidence: { A: { teamId: "A", value: vertrauen, pressure: 5, warnings: [] } } },
     } as unknown as GameState;
@@ -111,20 +113,39 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     expect(st.gesperrt).toBe(30);
     expect(st.grund).toContain("70 %");
     expect(gs.teams[0]!.cash).toBe(100);
-    expect(st.getrennt).toBe(false);
+    expect(st.getrennt).toBe(true);
     expect(st.investition.frei).toBe(st.nochFrei);
-    expect(st.gehalt.gesamt).toBe(0);
+    expect(st.gehalt.quote).toBe(0.75);
   });
 
-  it("Kauf ueber der Freigabe ist abgelehnt (Ablose plus Jahresgehalt), darunter erlaubt", () => {
-    const gs = state(100, 3);
-    const ok = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 60, salary: 8, rosterBefore: 10, playerMin: 8 });
-    expect(ok.ok).toBe(true);
-    const nein = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 65, salary: 8, rosterBefore: 10, playerMin: 8 });
-    expect(nein.ok).toBe(false);
-    expect(nein.reason).toBe("vorstand_budget_nicht_freigegeben");
+  it("Kauf ueber der Freigabe ist abgelehnt (Transfertopf und Gehaltstopf), darunter erlaubt", () => {
+    const gs = state(100, 3); // Transfer 70 %, Gehalt max(75 %, 70 %) = 75 % von 41 = 30,75
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 60, salary: 8, rosterBefore: 10, playerMin: 8 }).ok).toBe(true);
+    const teuer = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 71, salary: 8, rosterBefore: 10, playerMin: 8 });
+    expect(teuer.ok).toBe(false);
+    expect(teuer.reason).toBe("vorstand_transferbudget_nicht_freigegeben");
+    const gehalt = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 10, salary: 31, rosterBefore: 10, playerMin: 8 });
+    expect(gehalt.reason).toBe("vorstand_gehaltsbudget_nicht_freigegeben");
     // unter dem Kader-Minimum gilt die Sperre nicht
-    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 90, salary: 8, rosterBefore: 6, playerMin: 8 }).ok).toBe(true);
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 90, salary: 40, rosterBefore: 6, playerMin: 8 }).ok).toBe(true);
+  });
+
+  it("Gehaltsquote nie unter 75 %, auch bei Sparauflage (50 % Transfer)", () => {
+    const st = berechneVorstandBudgetStand(state(100, 1), "A");
+    expect(st.anteil).toBe(0.5);
+    expect(st.gehalt.quote).toBe(0.75);
+    expect(st.investition.quote).toBe(0.5);
+    expect(st.getrennt).toBe(true);
+  });
+
+  it("Verkauf: frei werdendes Gehalt kommt zu 100 % ins Gehaltsbudget zurueck", () => {
+    const mitKader = (gehaelter: number[]) => ({
+      ...state(100, 3),
+      rosters: gehaelter.map((g, i) => ({ teamId: "A", playerId: `p${i}`, salary: g })),
+    }) as unknown as GameState;
+    const vor = berechneVorstandBudgetStand(mitKader([10, 10]), "A").gehalt;
+    const nach = berechneVorstandBudgetStand(mitKader([10]), "A").gehalt;
+    expect(nach.frei - vor.frei).toBeCloseTo(10, 2);
   });
 
   it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben", () => {
@@ -139,12 +160,12 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
   });
 
   it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
-    // Anfangskasse 100, Kauf 40 + Gehalt 5 -> Kasse 60, freigegeben 70, ausgegeben 45, frei 25, gesperrt 35
+    // Anfangskasse 100, Kauf 40 -> Kasse 60, freigegeben 70, ausgegeben 40, frei 30, gesperrt 30
     const st = berechneVorstandBudgetStand(state(60, 3, [buy(40, 5)]), "A");
     expect(st.freigegebenGesamt).toBe(70);
-    expect(st.ausgegeben).toBe(45);
-    expect(st.nochFrei).toBe(25);
-    expect(st.gesperrt).toBe(35);
+    expect(st.ausgegeben).toBe(40);
+    expect(st.nochFrei).toBe(30);
+    expect(st.gesperrt).toBe(30);
   });
 });
 
@@ -226,10 +247,10 @@ describe("Draft-Builder — Ruecklage auch unter dem Kader-Minimum", () => {
     expect(r.finalCash).toBeGreaterThanOrEqual(0);
   });
 
-  it("spendCap begrenzt die Summe aus Abloesen und Gehaeltern ab dem Minimum hart", () => {
+  it("feeCap begrenzt die Summe aus Abloesen und Gehaeltern ab dem Minimum hart", () => {
     const frei = buildOrganicSquadPlan(input({ cash: 400 }));
     const cap = 150;
-    const r = buildOrganicSquadPlan(input({ cash: 400, spendCap: cap }));
+    const r = buildOrganicSquadPlan(input({ cash: 400, feeCap: cap }));
     const kosten = r.finalSquad.reduce((x, p) => x + p.marketValue + p.salary, 0);
     expect(r.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
     // oberhalb des Minimums nie ueber der Freigabe: Kosten der Kaeufe jenseits des Minimums passen hinein
