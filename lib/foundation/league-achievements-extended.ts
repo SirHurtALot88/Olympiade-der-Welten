@@ -241,14 +241,14 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
     label: "Sponsorenliebling",
     description: "Hol dir Sponsoreinnahmen über dem Liga-Median.",
     reached: sponsorReached,
-    detail: sponsorReached && eigenerSponsor != null ? `${runde(eigenerSponsor, 1)} Mio Sponsorgeld` : null,
+    detail: sponsorReached && eigenerSponsor != null ? `${runde(eigenerSponsor, 1)} C Sponsorgeld` : null,
     progressLabel: sponsorReached
       ? null
       : eigenerSponsor == null || sponsorMedian == null
         ? // „Noch keine Sponsordaten" statt gar nichts: ein gesperrter Meilenstein ohne Stand
           // ist nur eine geschlossene Tuer, er sagt dem Spieler nicht, woran es liegt.
           "Noch keine Sponsordaten"
-        : `${runde(eigenerSponsor, 1)} von ${runde(sponsorMedian, 1)} Mio`,
+        : `${runde(eigenerSponsor, 1)} von ${runde(sponsorMedian, 1)} C`,
     targetLabel: sponsorReached ? null : "Ziel: Sponsoreinnahmen über dem Liga-Median",
     tone: "warn",
     playerId: null,
@@ -261,8 +261,8 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
     label: "Schwarze Null",
     description: "Schließe eine Saison mit ausgeglichener oder positiver Bilanz ab.",
     reached: guv != null && guv >= 0,
-    detail: guv != null && guv >= 0 ? `GuV ${runde(guv, 1)} Mio` : null,
-    progressLabel: guv != null && guv < 0 ? `GuV ${runde(guv, 1)} Mio` : guv == null ? "Noch keine Bilanz" : null,
+    detail: guv != null && guv >= 0 ? `GuV ${runde(guv, 1)} C` : null,
+    progressLabel: guv != null && guv < 0 ? `GuV ${runde(guv, 1)} C` : guv == null ? "Noch keine Bilanz" : null,
     targetLabel: guv != null && guv >= 0 ? null : "Ziel: GuV mindestens 0",
     tone: "warn",
     playerId: null,
@@ -289,8 +289,8 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
     label: "Transfer-Gewinner",
     description: "Nimm bei mindestens drei Verkäufen mehr ein, als du ausgibst.",
     reached: transferGewinner,
-    detail: transferGewinner ? `+${saldo} Mio aus ${verkaeufe.length} Verkäufen` : null,
-    progressLabel: transferGewinner ? null : `${verkaeufe.length} von 3 Verkäufen · Saldo ${saldo} Mio`,
+    detail: transferGewinner ? `+${saldo} C aus ${verkaeufe.length} Verkäufen` : null,
+    progressLabel: transferGewinner ? null : `${verkaeufe.length} von 3 Verkäufen · Saldo ${saldo} C`,
     targetLabel: transferGewinner ? null : "Ziel: 3 Verkäufe mit positivem Saldo",
     tone: "warn",
     playerId: null,

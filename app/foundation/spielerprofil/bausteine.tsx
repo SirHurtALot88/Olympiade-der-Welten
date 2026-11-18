@@ -26,9 +26,9 @@ export function zahl(wert: number | null | undefined, stellen = 0): string {
   return wert == null || !Number.isFinite(wert) ? "—" : formatNlNumber(wert, stellen);
 }
 
-/** Geld in Mio mit wählbarer Nachkommastelle (Gehalt je Spieltag braucht zwei). */
+/** Geld in C mit wählbarer Nachkommastelle (Gehalt je Spieltag braucht zwei). */
 export function geld(wert: number | null | undefined, stellen = 1): string {
-  return wert == null || !Number.isFinite(wert) ? "—" : `${formatNlNumber(wert, stellen)} Mio`;
+  return wert == null || !Number.isFinite(wert) ? "—" : `${formatNlNumber(wert, stellen)} C`;
 }
 
 export function achseKlasse(achse: AchseId): string {

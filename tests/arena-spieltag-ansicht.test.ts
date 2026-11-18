@@ -50,6 +50,15 @@ describe("bestimmeArenaSpieltagAnsicht", () => {
     expect(zeigtArenaDenGebuchtenSieger(e!, gebucht, 0)).toBe(false);
   });
 
+  it("Ergebnisskala (18.11.): die Arena-Zeile zeigt native Zahl UND gebuchte Skala", () => {
+    const p = preview([
+      zeile("EIG", { resolutionSource: "arena", opponentTeamId: "GEG", teamPoints: 2, duellSeiten: [87, 79], ergebnisNormiert: [7, 4], ergebnisSkala: "e1" }),
+      zeile("GEG", { resolutionSource: "arena", opponentTeamId: "EIG", teamPoints: 0, duellSeiten: [79, 87], ergebnisNormiert: [4, 7], ergebnisSkala: "e1" }),
+    ]);
+    const e = bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "spurt", ownTeamId: "EIG", preview: p });
+    expect(beschreibeGebuchtesArenaErgebnis(e!, (id) => id).text).toBe("Sieg gegen GEG 87 : 79 → 7 : 4 · 2 Pkt.");
+  });
+
   it("PPS-Duell-Bruecke: kein Motor-Spiel, also keine Arena-Wiedergabe", () => {
     const p = preview([zeile("EIG", { resolutionSource: "pps_duell", opponentTeamId: "GEG", teamPoints: 1 })]);
     expect(bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "spurt", ownTeamId: "EIG", preview: p })).toBeNull();
