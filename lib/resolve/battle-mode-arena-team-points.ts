@@ -121,6 +121,7 @@ import { freemem } from "node:os";
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
@@ -1515,7 +1516,13 @@ export async function runBattleModeArenaMatchday(
     input.matchdayMutatorTraits === undefined
       ? resolveMutatorTraitsFromSchedule({ gameState, saveId, seasonId, matchdayId, disciplineId })
       : [...(input.matchdayMutatorTraits ?? [])];
-  const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren };
+  // VERLETZUNG IM MOTOR (Chris, 18.11., docs/design/verletzung-regel-18-11.md Luecke D/B): der
+  // Verletzungswurf dieses Spieltags faellt VOR dem Motorlauf — derselbe deterministische Wurf, den
+  // Buchung, Vorschau und Arena-Eingabe-Hash (`berechneArenaEingabeHash`) sehen. Heute Verletzte
+  // treten mit 50 % ihrer Eignung an, aus einem Vorspieltag Gesperrte gar nicht.
+  const verletzungsstand =
+    input.runArenaFixturesOptions?.verletzungsstand ?? ermittleArenaVerletzungsstand({ gameState, saveId, seasonId, matchdayId });
+  const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren, verletzungsstand };
 
   // LIGA-STUFEN GLEICHZEITIG, NICHT MEHR NACHEINANDER (Latenz-Fix 18.10., Chris' Top-Prio-Meldung
   // "20 Minuten warten"): der ROOT-CAUSE-Befund dieser Runde (echter Chromium, instrumentiert,

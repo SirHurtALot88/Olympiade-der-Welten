@@ -1,0 +1,25 @@
+{
+ "prompt": "A small puff of white climbing chalk dust when a hand slaps a rock hold, pixel art, plays once, about 0.5 seconds. A soft white-grey cloud bursts out and a few specks drift down and fade. Colours: white, light grey. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "6a1b36bf-83c5-45a9-b5a9-29095d166b23",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "gen_vorher": 675.7351005208002,
+ "gen_nachher": 674.7351005208002,
+ "datum": "2026-11-18T20:21:58Z",
+ "effect_id": "774dde31-e189-4c7e-b6f3-dbced02c1bc6",
+ "canvas": {
+  "h": 32,
+  "w": 32
+ },
+ "frames": 8,
+ "fps": 16,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 16,
+  "kind": "origin"
+ },
+ "message": "A 32x32 one-shot chalk puff over half a second: a soft white-grey cloud bursts out from the centre, thins and fades, while a few small white specks drift down and vanish. Transparent background, crisp pixels, no text. The cloud size and speck spread can be tuned with the sliders if you want it bigger or more scattered.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=774dde31-e189-4c7e-b6f3-dbced02c1bc6"
+}

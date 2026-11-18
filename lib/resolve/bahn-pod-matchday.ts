@@ -21,6 +21,7 @@ import {
   type RunBahnPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildBahnPodMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { getPodsForMatchday, resolvePodPlayerCountForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 import {
   istBahnPodDisziplin,
@@ -121,6 +122,10 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
     mutatoren: input.mutatorTraits ? [...input.mutatorTraits] : undefined,
     k,
     matchdayId: input.matchdayId,
+    // VERLETZUNG IM MOTOR (18.11.), s. `runBattleModeArenaMatchday()`: derselbe Wurf wie Buchung und Hash.
+    verletzungsstand:
+      input.runBahnPodFixturesOptions?.verletzungsstand ??
+      ermittleArenaVerletzungsstand({ gameState: input.gameState, saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId }),
   });
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);

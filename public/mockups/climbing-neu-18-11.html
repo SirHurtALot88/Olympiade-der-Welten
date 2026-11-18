@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Climbing neu – Canyon-Wand (Mockup 18.11.)</title>
+<!--
+  MOCKUP, kein Spielcode. Entwurf fuer den Neubau von Climbing (docs/design/climbing-neu-18-11.md).
+  Die kleine Simulation unten ist eine Schau-Simulation fuer die Regie des Mockups, NICHT der Arena-Motor:
+  keine Matrix, kein Rezept, keine Messung. Figuren: vorhandene PixelLab-Posen (north/south/east,
+  walk-north, walk-east, treffer-north) - keine neue Animation. Wand, Panorama und Requisiten:
+  PixelLab-Stilprobe vom 18.11. (Herkunft in public/sprites/kulissen/quellen.json).
+  URL-Schalter: ?sprites=<Basis-URL zu public/sprites> (Standard ../sprites), ?szene=1..5, ?t=<Sek>,
+  ?kamera=totale, ?ebenen=0, ?routen=1, ?pause=1, ?karte=<Index>
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:800;src:url("../fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --hud-grund:#06080c; --hud-flaeche:rgba(9,12,18,.90); --hud-flaeche-2:#121824; --hud-flaeche-3:#1a2231;
+  --hud-linie:rgba(244,230,196,.16); --hud-linie-2:rgba(244,230,196,.34);
+  --hud-creme:#f4e6c4; --hud-gold:#f0c35a; --hud-tinte:#eef2f8; --hud-leise:#9aa7ba; --hud-stumm:#66738a;
+  --hud-heim:#F2A03D; --hud-gast:#45B0C9; --hud-gut:#62d394; --hud-warn:#ff6058;
+  --weg-kraft:#ff6a55; --weg-technik:#5fa8ff; --weg-ausdauer:#7ddc7a;
+  --hud-haus:"RaniraSeason","Barlow Condensed",sans-serif; --hud-zahl:"Barlow Condensed","Arial Narrow",sans-serif;
+  --hud-r:8px; --hud-schraeg:-14deg;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;overflow:hidden;color:var(--hud-tinte);font-family:var(--hud-zahl)}
+#rahmen{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#06080c}
+canvas#buehne{position:absolute;inset:0;width:1920px;height:1080px;image-rendering:pixelated}
+button{font:inherit;color:inherit;cursor:pointer}
+.glas{background:var(--hud-flaeche);border:1px solid var(--hud-linie);border-radius:var(--hud-r);backdrop-filter:blur(6px)}
+
+/* Kopfleiste (Scorebug) */
+#hudKopf{position:absolute;left:50%;top:18px;transform:translateX(-50%);display:flex;align-items:stretch;height:74px;border-radius:10px;overflow:hidden;
+  background:var(--hud-flaeche);border:1px solid var(--hud-linie-2);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.kopf-team{display:flex;align-items:center;gap:14px;padding:0 20px;min-width:330px;position:relative}
+.kopf-team.gast{flex-direction:row-reverse;text-align:right}
+.kopf-team::before{content:"";position:absolute;top:0;bottom:0;width:6px;background:var(--tf)}
+.kopf-team.heim::before{left:0}.kopf-team.gast::before{right:0}
+.wappen{width:44px;height:44px;border-radius:8px;background:var(--tf);display:grid;place-items:center;font-family:var(--hud-haus);font-size:21px;color:#0b0e14;transform:skewX(var(--hud-schraeg))}
+.wappen span{transform:skewX(14deg)}
+.kopf-name{font-family:var(--hud-haus);font-size:25px;letter-spacing:.5px;color:var(--hud-creme);line-height:1}
+.kopf-sub{font-size:15px;color:var(--hud-leise);font-weight:600;letter-spacing:.6px;text-transform:uppercase;margin-top:4px}
+.kopf-stand{margin-left:auto;font-size:58px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--hud-tinte)}
+.kopf-team.gast .kopf-stand{margin-left:0;margin-right:auto}
+.kopf-team.fuehrt .kopf-stand{color:var(--tf)}
+.kopf-mitte{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 26px;background:#0b0f16;border-left:1px solid var(--hud-linie);border-right:1px solid var(--hud-linie);min-width:250px}
+.kopf-titel{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--hud-gold);text-transform:uppercase}
+.kopf-uhr{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.kopf-phase{font-size:14px;font-weight:700;letter-spacing:1.6px;color:var(--hud-leise);text-transform:uppercase}
+#hudMomentum{position:absolute;left:50%;top:96px;transform:translateX(-50%);width:912px;height:7px;border-radius:4px;background:rgba(9,12,18,.8);overflow:hidden;display:flex}
+#hudMomentum i{display:block;height:100%}
+#momHeim{background:var(--hud-heim)}#momGast{background:var(--hud-gast);margin-left:auto}
+
+/* Routen-Inset */
+#hudInset{position:absolute;left:22px;top:18px;width:372px;padding:10px 12px 10px}
+#hudInset h3,#hudVerlauf h3{margin:0 0 6px;font-size:14px;font-weight:700;letter-spacing:1.8px;color:var(--hud-gold);text-transform:uppercase;display:flex;justify-content:space-between}
+#hudInset h3 em,#hudVerlauf h3 em{font-style:normal;color:var(--hud-stumm);letter-spacing:.6px}#hudVerlauf h3 em.viel{color:var(--hud-warn)}
+#inset{display:block;width:346px;height:150px;border-radius:5px;background:#0b0f16;image-rendering:pixelated;cursor:pointer}
+.wege{display:flex;gap:6px;margin-top:8px}
+.wegchip{flex:1;border-radius:5px;padding:4px 7px;background:var(--hud-flaeche-2);border-left:4px solid var(--wf);font-size:14px;font-weight:700;line-height:1.1}
+.wegchip small{display:block;font-weight:600;color:var(--hud-leise);font-size:12px}
+
+/* Verlauf */
+#hudVerlauf{position:absolute;right:22px;top:18px;width:372px;padding:10px 12px}
+#verlauf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;height:176px;overflow:hidden}
+#verlauf li{display:grid;grid-template-columns:42px 1fr;gap:6px;font-size:15px;font-weight:600;line-height:1.15;padding:3px 6px;border-radius:4px;background:var(--hud-flaeche-2);border-left:3px solid var(--tf,var(--hud-stumm))}
+#verlauf li b{color:var(--hud-leise);font-variant-numeric:tabular-nums;font-weight:700}
+#verlauf li.gross{color:var(--hud-gold)}
+
+/* Einblender */
+#hudEinblender{position:absolute;left:50%;top:150px;transform:translateX(-50%) skewX(var(--hud-schraeg));display:flex;align-items:center;gap:16px;padding:8px 26px 8px 12px;
+  background:linear-gradient(90deg,var(--tf,#f0c35a),rgba(9,12,18,.94) 34%);border-radius:6px;opacity:0;transition:opacity .25s,translate .25s;translate:-40px 0;pointer-events:none}
+#hudEinblender.an{opacity:1;translate:0 0}
+#hudEinblender>*{transform:skewX(14deg)}
+#einbPortrait{width:56px;height:56px;border-radius:6px;background-color:#0b0f16;background-repeat:no-repeat;image-rendering:pixelated;background-size:140px 140px;background-position:-42px -20px}
+#einbWort{font-family:var(--hud-haus);font-size:36px;color:var(--hud-creme);line-height:1;white-space:nowrap}
+#einbZeile{font-size:18px;font-weight:700;color:var(--hud-leise);white-space:nowrap}
+
+/* Dock */
+#hudDock{position:absolute;left:22px;right:22px;bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dock-team{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seil{background:rgba(9,12,18,.72);border:1px solid var(--hud-linie);border-radius:8px;padding:3px 4px 4px;min-width:0}
+.seil.oben{border-color:var(--hud-gold)}
+.seil-kopf{display:flex;gap:8px;align-items:baseline;font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:1px 5px 3px;color:var(--hud-leise);white-space:nowrap}
+.seil-kopf b{color:var(--hud-creme)}.seil-kopf .s-weg{color:var(--wf)}.seil-kopf .s-zeit{margin-left:auto;color:var(--hud-tinte);font-variant-numeric:tabular-nums}
+.seil-paar{display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative}
+.seil-paar::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:3px;margin:-1px 0 0 -7px;background:var(--tf);border-radius:2px;opacity:.9}
+.hud-leiste{position:relative;display:grid;grid-template-columns:40px 1fr;gap:7px;align-items:center;padding:6px 8px 9px 6px;text-align:left;
+  background:var(--hud-flaeche);border:1px solid var(--hud-linie);border-top:3px solid var(--tf);border-radius:6px;min-width:0}
+.hud-leiste:hover{background:var(--hud-flaeche-3)}
+.hud-leiste.aktiv{border-color:var(--hud-gold);box-shadow:0 0 0 1px var(--hud-gold) inset}
+.hud-leiste.top{background:linear-gradient(180deg,rgba(240,195,90,.20),rgba(9,12,18,.92))}
+.portrait{width:40px;height:40px;border-radius:5px;background-color:#0b0f16;background-repeat:no-repeat;image-rendering:pixelated;background-size:100px 100px;background-position:-30px -14px}
+.l-name{font-family:var(--hud-haus);font-size:16px;color:var(--hud-creme);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.05}
+.l-zeile{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--hud-leise);white-space:nowrap}
+.l-weg{display:inline-block;width:16px;height:16px;border-radius:3px;background:var(--wf);color:#0b0e14;font-size:12px;font-weight:800;text-align:center;line-height:16px}
+.l-kern{margin-left:auto;font-size:21px;font-weight:800;color:var(--hud-tinte);font-variant-numeric:tabular-nums;line-height:1}
+.l-puste{position:absolute;left:6px;right:6px;bottom:3px;height:4px;border-radius:2px;background:#0b0f16;overflow:hidden}
+.l-puste i{display:block;height:100%;background:var(--hud-gut);width:100%}
+.l-rang{position:absolute;left:-1px;top:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:0 0 5px 0;background:var(--tf);color:#0b0e14;font-size:13px;font-weight:800;line-height:18px;text-align:center}
+
+/* Bedienleiste */
+#hudBedien{position:absolute;right:22px;bottom:122px;display:flex;gap:6px;padding:6px}
+#hudBedien button,.szenen button{height:34px;padding:0 11px;border-radius:5px;border:1px solid var(--hud-linie);background:var(--hud-flaeche-2);font-size:15px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+#hudBedien button:hover,.szenen button:hover{background:var(--hud-flaeche-3)}
+#hudBedien button.an,.szenen button.an{border-color:var(--hud-gold);color:var(--hud-gold)}
+#hudBedien kbd,.szenen kbd{font:inherit;font-size:12px;color:var(--hud-stumm);margin-left:5px}
+#hudSzenen{position:absolute;left:22px;bottom:122px;display:flex;gap:6px;padding:6px;align-items:center}
+#hudSzenen span{font-size:13px;font-weight:700;letter-spacing:1.6px;color:var(--hud-gold);padding:0 6px;text-transform:uppercase}
+
+/* Spielerkarte */
+#hudKarte{position:absolute;right:22px;top:252px;width:372px;padding:12px 14px;display:none}
+#hudKarte.an{display:block}
+.k-kopf{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center}
+#kPortrait{width:72px;height:72px;border-radius:6px;background-color:#0b0f16;background-repeat:no-repeat;image-rendering:pixelated;background-size:180px 180px;background-position:-54px -26px}
+#kName{font-family:var(--hud-haus);font-size:26px;color:var(--hud-creme);line-height:1}
+#kSub{font-size:15px;font-weight:700;color:var(--hud-leise);letter-spacing:.5px}
+#kZu{width:30px;height:30px;border-radius:5px;border:1px solid var(--hud-linie);background:var(--hud-flaeche-2)}
+.k-werte{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0 8px}
+.k-wert{background:var(--hud-flaeche-2);border-radius:5px;padding:5px 7px}
+.k-wert b{display:block;font-size:26px;font-weight:800;line-height:1}
+.k-wert small{font-size:12px;font-weight:700;color:var(--hud-leise);letter-spacing:1px;text-transform:uppercase}
+.k-wert.haupt{outline:1px solid var(--wf)}
+#kWeg{font-size:15px;font-weight:600;line-height:1.25;color:var(--hud-tinte);border-left:4px solid var(--wf);padding:4px 8px;background:var(--hud-flaeche-2);border-radius:0 5px 5px 0}
+#kSplits{display:flex;gap:6px;margin-top:8px;font-size:14px;font-weight:700;color:var(--hud-leise)}
+#kSplits span{flex:1;background:var(--hud-flaeche-2);border-radius:4px;padding:3px 6px}
+#kSplits b{display:block;color:var(--hud-tinte);font-size:17px;font-variant-numeric:tabular-nums}
+
+#hinweis{position:absolute;left:50%;bottom:172px;transform:translateX(-50%);font-size:14px;font-weight:600;color:var(--hud-leise);letter-spacing:.4px;padding:4px 12px;white-space:nowrap}
+#ende{position:absolute;left:50%;top:330px;transform:translateX(-50%);padding:18px 26px;display:none;min-width:520px}
+#ende.an{display:block}
+#ende h2{margin:0 0 8px;font-family:var(--hud-haus);font-size:30px;color:var(--hud-creme)}
+#ende ol{margin:0;padding:0;list-style:none;columns:2;column-gap:22px;font-size:17px;font-weight:700}
+#ende li{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid var(--hud-linie)}
+#ende li i{font-style:normal;color:var(--hud-stumm);width:22px}
+#ende li b{margin-left:auto;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){#hudEinblender{transition:none}}
+</style>
+</head>
+<body>
+<div id="rahmen">
+  <canvas id="buehne" width="1920" height="1080"></canvas>
+
+  <div id="hudInset" class="glas">
+    <h3>Wand · Routen <em>Klick = Kamera</em></h3>
+    <canvas id="inset" width="346" height="150"></canvas>
+    <div class="wege">
+      <div class="wegchip" style="--wf:var(--weg-kraft)">Kraftweg<small>Dach · Lippe</small></div>
+      <div class="wegchip" style="--wf:var(--weg-technik)">Technikweg<small>Kamin · Seilbrücke</small></div>
+      <div class="wegchip" style="--wf:var(--weg-ausdauer)">Ausdauerweg<small>Flanke · Leiter</small></div>
+    </div>
+    <div class="wege">
+      <div class="wegchip" style="--wf:#f4e6c4">Tempo-Stellen<small>Anlauf · Band · Blöcke · Grat<br>→ Schnelligkeit, Agilität</small></div>
+      <div class="wegchip" style="--wf:#b9773f">Kletter-Stellen<small>Wand · Kamin · Dach · Lippe · Leiter<br>→ Ausdauer + Wegprofil, nicht Tempo</small></div>
+    </div>
+  </div>
+
+  <div id="hudKopf">
+    <div class="kopf-team heim" id="kopfHeim" style="--tf:var(--hud-heim)">
+      <div class="wappen"><span>SF</span></div>
+      <div><div class="kopf-name">Sturmfalken</div><div class="kopf-sub" id="subHeim">Seilschaften oben</div></div>
+      <div class="kopf-stand" id="standHeim">0</div>
+    </div>
+    <div class="kopf-mitte">
+      <div class="kopf-titel">Climbing · Canyon-Wand</div>
+      <div class="kopf-uhr" id="uhr">0:00</div>
+      <div class="kopf-phase" id="phase">Einstieg</div>
+    </div>
+    <div class="kopf-team gast" id="kopfGast" style="--tf:var(--hud-gast)">
+      <div class="wappen"><span>TW</span></div>
+      <div><div class="kopf-name">Tiefseewacht</div><div class="kopf-sub" id="subGast">Seilschaften oben</div></div>
+      <div class="kopf-stand" id="standGast">0</div>
+    </div>
+  </div>
+  <div id="hudMomentum" title="Kletterfortschritt der Teams"><i id="momHeim"></i><i id="momGast"></i></div>
+
+  <div id="hudVerlauf" class="glas"><h3>Verlauf <em id="warte">Warten: 0</em></h3><ul id="verlauf"></ul></div>
+
+  <div id="hudKarte" class="glas">
+    <div class="k-kopf"><div id="kPortrait"></div><div><div id="kName"></div><div id="kSub"></div></div><button id="kZu" title="Schließen (Esc)">×</button></div>
+    <div class="k-werte">
+      <div class="k-wert" data-w="au"><b id="kAu"></b><small>Ausdauer</small></div>
+      <div class="k-wert" data-w="kr"><b id="kKr"></b><small>Kraft</small></div>
+      <div class="k-wert" data-w="te"><b id="kTe"></b><small>Technik</small></div>
+      <div class="k-wert" data-w="ko"><b id="kKo"></b><small>Kopf</small></div>
+      <div class="k-wert" data-w="sn"><b id="kSn"></b><small>Tempo</small></div>
+    </div>
+    <div id="kWeg"></div>
+    <div id="kSplits"><span>Band<b id="kS1">–</b></span><span>Engstelle<b id="kS2">–</b></span><span>Gipfelgrat<b id="kS3">–</b></span><span>Glocke<b id="kS4">–</b></span></div>
+  </div>
+
+  <div id="hudEinblender"><div id="einbPortrait"></div><div><div id="einbWort"></div><div id="einbZeile"></div></div></div>
+
+  <div id="ende" class="glas"><h2>Endstand · Seilschaft zählt, wenn beide geläutet haben</h2><ol id="endListe"></ol></div>
+
+  <div id="hudSzenen" class="glas szenen">
+    <span>Szenen</span>
+    <button data-szene="1">Start<kbd>1</kbd></button>
+    <button data-szene="2">Rangelei am Band<kbd>2</kbd></button>
+    <button data-szene="3">Seilschaft hilft<kbd>3</kbd></button>
+    <button data-szene="4">Überhang<kbd>4</kbd></button>
+    <button data-szene="5">Topp<kbd>5</kbd></button>
+  </div>
+  <div id="hudBedien" class="glas">
+    <button id="bPlay">❚❚ Pause<kbd>␣</kbd></button>
+    <button id="bTempo">Tempo 1×<kbd>T</kbd></button>
+    <button id="bKam">Kamera: Regie<kbd>K</kbd></button>
+    <button id="bRouten">Routen<kbd>R</kbd></button>
+    <button id="bEbenen" class="an">HD-2D-Ebenen<kbd>E</kbd></button>
+    <button id="bNeu">↺ Neu<kbd>N</kbd></button>
+  </div>
+  <div id="hinweis" class="glas">Mockup · Schau-Simulation, nicht der Arena-Motor · Figuren nur mit vorhandenen Posen · 3 Seilschaften je Team · Klick auf eine Spielerleiste: Kamera folgt</div>
+
+  <div id="hudDock"><div class="dock-team" id="dockHeim"></div><div class="dock-team" id="dockGast"></div></div>
+</div>
+
+<script id="sim">
+/* ============================================================================================
+   SCHAU-SIMULATION (rein, ohne DOM): Wege, Puste, Seilschaften, Rangeln, Ausweichen, Proben.
+   Nur fuer das Mockup. Der echte Bau nutzt die acht Sub-Skills und das Rezept des Motors.
+   ============================================================================================ */
+var SIM=(function(){
+  var BAND=352, BODEN=588;
+  // au = Ausdauer (stamina/determination), kr = Kraft (power), te = Technik (dexterity/awareness), ko = Kopf (will),
+  // sn = Schnelligkeit/Agilitaet (speed/dexterity): traegt NUR die Tempo-Stellen (Anlauf, Band, Bloecke, Grat), nicht das Klettern
+  var KADER=[
+    {n:"Akali",s:"akali",t:0,au:74,kr:58,te:88,ko:72,sn:90},
+    {n:"Bana",s:"bana",t:0,au:91,kr:58,te:62,ko:66,sn:60},
+    {n:"Brontar",s:"brontar",t:0,au:74,kr:92,te:46,ko:70,sn:42},
+    {n:"Cassandra",s:"cassandra",t:0,au:82,kr:60,te:86,ko:68,sn:74},
+    {n:"Byrd",s:"byrd",t:0,au:76,kr:80,te:58,ko:60,sn:68},
+    {n:"Ashanti",s:"ashanti",t:0,au:62,kr:50,te:79,ko:83,sn:88},
+    {n:"Ash",s:"ash",t:1,au:72,kr:60,te:85,ko:78,sn:84},
+    {n:"Aurora",s:"aurora",t:1,au:89,kr:48,te:64,ko:70,sn:64},
+    {n:"Corsair",s:"corsair",t:1,au:66,kr:88,te:52,ko:64,sn:74},
+    {n:"Caldor",s:"caldor",t:1,au:60,kr:81,te:57,ko:75,sn:48},
+    {n:"Clara",s:"clara",t:1,au:78,kr:46,te:70,ko:60,sn:70},
+    {n:"Brunhilde",s:"brunhilde",t:1,au:81,kr:62,te:50,ko:68,sn:54}
+  ];
+  // Seilschaften: 6 Kletterer = 3 Zweier, je Seilschaft ein Weg (4 = 2+2, 5 = 3+2)
+  var SEIL=[{t:0,nr:1,weg:"kraft",m:[2,4]},{t:0,nr:2,weg:"technik",m:[0,3]},{t:0,nr:3,weg:"ausdauer",m:[1,5]},
+            {t:1,nr:1,weg:"kraft",m:[8,9]},{t:1,nr:2,weg:"technik",m:[6,10]},{t:1,nr:3,weg:"ausdauer",m:[7,11]}];
+  var WEG_NAME={kraft:"Kraftweg",technik:"Technikweg",ausdauer:"Ausdauerweg"};
+  var AUSWEICH={kraft:"ausdauer",technik:"ausdauer"};
+  var BASIS={boden:60,wand:25,kamin:23,band:44,block:34,dach:31,lippe:28,grat:40,bruecke:26,leiter:36};
+  var KLETTER={wand:1,kamin:1,dach:1,lippe:1,leiter:1};   // Kletter-Stellen: Ausdauer + Wegprofil
+  var MIX={ // Tempo-Stellen tragen sn, Kletter-Stellen nicht
+    boden:{sn:1}, band:{sn:.6,au:.25,ko:.15}, block:{sn:.5,kr:.25,te:.25}, grat:{sn:.6,au:.4}, bruecke:{ko:.5,te:.3,sn:.2},
+    wand:{au:.5,kr:.25,te:.25}, kamin:{te:.7,au:.3}, dach:{kr:.65,au:.35}, lippe:{kr:.8,ko:.2}, leiter:{au:.8,kr:.2}};
+  var ZEHR={boden:0,wand:.030,kamin:.012,band:.011,block:.03,dach:.062,lippe:.058,grat:.008,bruecke:.006,leiter:.030};
+  var RAST=[{x:470,schwelle:.52},{x:1180,schwelle:.50}];
+  var BUCHTEN=[[440,690],[1000,1160],[1220,1480]];
+  var GIPFEL={x:1338,y:14};
+
+  function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function seg(ax,ay,bx,by,typ,o){var s={ax:ax,ay:ay,bx:bx,by:by,typ:typ,len:Math.hypot(bx-ax,by-ay),id:typ==="band"?"band":ax+","+ay+">"+bx+","+by};if(o)for(var k in o)s[k]=o[k];return s;}
+  function wegVon(c){var m=Math.max(c.au-8,c.kr,c.te);return m===c.kr?"kraft":m===c.te?"technik":"ausdauer";}
+  function kopf(c){
+    var P=[];
+    if(c.kamin){P.push(seg(c.sx,BODEN,342,BODEN,"boden"));P.push(seg(342,BODEN,346,BAND,"kamin",{marke:"band"}));P.push(seg(346,BAND,720,BAND,"band"));}
+    else{P.push(seg(c.sx,BODEN,c.sx,BAND,"wand",{crux:.5,marke:"band"}));P.push(seg(c.sx,BAND,720,BAND,"band"));}
+    P.push(seg(720,BAND,762,318,"block",{eng:1}));P.push(seg(762,318,802,BAND,"block",{marke:"eng"}));
+    P.push(seg(802,BAND,915,BAND,"band",{gabel:1}));return P;
+  }
+  function schwanz(weg){
+    var P=[];
+    if(weg==="kraft"){
+      P.push(seg(915,BAND,1180,BAND,"band"));P.push(seg(1180,BAND,1180,228,"wand"));
+      P.push(seg(1180,228,1014,206,"dach"));P.push(seg(1014,206,998,150,"lippe",{probe:"lippe"}));P.push(seg(998,150,1040,84,"lippe"));
+      P.push(seg(1040,84,1075,60,"grat",{marke:"grat"}));
+    }else if(weg==="technik"){
+      P.push(seg(915,BAND,911,205,"kamin"));P.push(seg(911,205,915,104,"kamin"));P.push(seg(915,104,886,52,"wand"));
+      P.push(seg(886,52,1062,58,"bruecke",{probe:"bruecke"}));P.push(seg(1062,58,1075,60,"grat",{marke:"grat"}));
+    }else{
+      P.push(seg(915,BAND,1512,BAND,"band"));P.push(seg(1512,BAND,1516,186,"wand"));P.push(seg(1516,186,1512,64,"leiter"));
+      P.push(seg(1512,64,1420,34,"grat",{marke:"grat"}));P.push(seg(1420,34,GIPFEL.x+10,GIPFEL.y,"grat"));
+    }
+    if(weg!=="ausdauer"){P.push(seg(1075,60,1200,46,"grat"));P.push(seg(1200,46,GIPFEL.x-10,GIPFEL.y,"grat"));}
+    return P;
+  }
+  function vermesse(c){var P=c.pfad;c.gesamt=0;for(var i=0;i<P.length;i++){P[i].vor=c.gesamt;c.gesamt+=P[i].len;if(P[i].typ==="lippe"){var e=P[i-1].typ==="lippe";P[i].lip0=e?P[i-1].len:0;P[i].lipG=e?P[i-1].len+P[i].len:P[i].len+P[i+1].len;}}}
+  function gabelIdx(c){for(var i=0;i<c.pfad.length;i++)if(c.pfad[i].gabel)return i;return 99;}
+  var Z;
+  function neu(){
+    Z={t:0,L:[],S:[],ereignisse:[],fertig:0,seilFertig:0,ende:false,duelle:{},warteJetzt:0,warteMax:0,laengste:0,umgeplant:0};
+    var li=0, ki=0;
+    KADER.forEach(function(k,i){Z.L.push({i:i,n:k.n,s:k.s,t:k.t,au:k.au,kr:k.kr,te:k.te,ko:k.ko,sn:k.sn,eigen:wegVon(k),r:rng(907+i*131)});});
+    SEIL.forEach(function(q,qi){var S={i:qi,t:q.t,nr:q.nr,weg:q.weg,m:q.m.map(function(i){return Z.L[i];}),ziel:0,rang:0,hilfen:0};Z.S.push(S);
+      S.m.forEach(function(c,k){c.seil=S;c.partner=S.m[1-k];c.weg=q.weg;c.kamin=q.weg==="technik";});});
+    // Startplaetze: Seilschaftspartner nebeneinander, Teams abwechselnd
+    [0,3,2,5].forEach(function(qi){Z.S[qi].m.forEach(function(c){c.sx=432+(li++)*30;});});
+    [1,4].forEach(function(qi){Z.S[qi].m.forEach(function(c){c.sx=278+(ki++)*22;});});
+    Z.L.forEach(function(c){c.form=.97+c.r()*.06;c.si=0;c.d=0;c.res=1;c.pause=0;c.zustand="start";c.aussen=null;c.ziel=0;c.rang=0;c.splits={};c.versuche=0;c.x=c.sx;c.y=BODEN;c.wartet=false;c.schritt=0;c.schub=0;c.hilfeCd=0;c.rangel=0;c.warteLauf=0;c.warteSumme=0;
+      c.pfad=kopf(c).concat(schwanz(c.weg));vermesse(c);});
+    return Z;
+  }
+  function attr(c,typ){var m=MIX[typ],a=0;for(var k in m)a+=m[k]*c[k];return a;}
+  function tempo(c,s){var v=BASIS[s.typ]*(.52+.62*attr(c,s.typ)/100)*c.form;if(c.res<.3)v*=.5+1.66*c.res;return v;}
+  function ort(c){var s=c.pfad[Math.min(c.si,c.pfad.length-1)],u=s.len?c.d/s.len:1;c.x=s.ax+(s.bx-s.ax)*u;c.y=s.ay+(s.by-s.ay)*u;}
+  function lage(c){var s=c.pfad[c.si];return s.typ==="band"?c.x:c.d;}
+  function melde(typ,c,text,gross,m){Z.ereignisse.push({t:Z.t,typ:typ,i:c.i,team:c.t,x:c.x,y:c.y,text:text,gross:!!gross,wort:gross||"",m:m?m.i:-1});}
+  function inBucht(x){for(var i=0;i<BUCHTEN.length;i++)if(x>=BUCHTEN[i][0]&&x<=BUCHTEN[i][1])return true;return false;}
+  function anteil(c){if(c.ziel)return 1;var s=c.pfad[c.si];return(s.vor+c.d)/c.gesamt;}
+  function zeit(t){var m=Math.floor(t/60),s=Math.floor(t%60);return m+":"+(s<10?"0":"")+s;}
+  function obenrum(c){ // Wartedeckel: statt an der Engstelle zu stehen, ueber dem Block vorbei (laenger, kostet Puste)
+    c.pfad.splice(c.si+1,3,seg(720,BAND,738,296,"wand"),seg(738,296,808,296,"block"),seg(808,296,828,BAND,"wand",{marke:"eng"}),seg(828,BAND,915,BAND,"band",{gabel:1}));vermesse(c);c.obenrum=1;
+  }
+  function umplanen(c,weg){[c,c.partner].forEach(function(k){var gi=gabelIdx(k);k.pfad=k.pfad.slice(0,gi+1).concat(schwanz(weg));k.weg=weg;vermesse(k);});c.seil.weg=weg;c.seil.umgeplant=1;Z.umgeplant++;}
+
+  function schritt(dt){
+    if(Z.ende)return;
+    Z.t+=dt;
+    if(Z.t<1.6)return; // "Auf die Plaetze"
+    var L=Z.L,wj=0;
+    for(var q=0;q<L.length;q++){
+      var c=L[q];if(c.ziel)continue;
+      if(c.zustand==="start"){c.zustand="los";}
+      if(c.hilfeCd>0)c.hilfeCd-=dt;if(c.schiebt>0)c.schiebt-=dt;
+      if(c.pause>0){c.pause-=dt;if(c.zustand==="rast")c.res=Math.min(1,c.res+dt*.135);
+        if(c.pause<=0){if(c.zustand==="sturz"){c.d=Math.max(0,c.d-34);}if(c.nachRangel){c.aussen=c.nachRangel;c.aussenFrei=1;c.vorstieg=0;c.nachRangel=null;}c.zustand="los";}ort(c);continue;}
+      var s=c.pfad[c.si],v=tempo(c,s),zehr=ZEHR[s.typ],p=c.partner;
+      if(c.schub>0){c.schub-=dt;v*=1.9;zehr*=.5;}
+      if(!p.ziel&&anteil(p)>anteil(c))zehr*=.85; // Nachstieg am Seil des Partners
+      c.wartet=false;
+      // --- Seilschaft: hochziehen (Vorsteiger) und anschieben (Hintermann) ---
+      if(!p.ziel&&c.hilfeCd<=0&&p.pause<=0&&p.schub<=0&&Z.t>5){
+        var ps=p.pfad[p.si],dist=Math.hypot(c.x-p.x,c.y-p.y),cv=anteil(c)>anteil(p);
+        if(cv&&dist>100&&(c.zuege||0)<3&&KLETTER[ps.typ]&&c.res>.22&&s.typ!=="dach"&&s.typ!=="lippe"&&s.typ!=="bruecke"){
+          c.pause=1.4;c.zustand="zieht";c.res=Math.max(.05,c.res-.05);p.schub=1.8;c.hilfeCd=9;c.zuege=(c.zuege||0)+1;c.seil.hilfen++;melde("zieht",c,c.n+" zieht "+p.n+" hoch","ZIEHT HOCH!",p);ort(c);continue;}
+        if(!cv&&dist<34&&ps.id===s.id&&ps.typ!=="grat"&&ps.typ!=="boden"&&tempo(c,ps)>tempo(p,ps)*1.07&&c.res>.4&&!p.aussen&&!c.aussen){
+          c.res=Math.max(.05,c.res-.04);p.schub=1.5;c.schiebt=1.3;c.hilfeCd=6;c.seil.hilfen++;melde("schiebt",c,c.n+" schiebt "+p.n+" an",c.seil.hilfen===1?"ANGESCHOBEN!":"",p);}
+      }
+      // --- Abstand auf geteilten Abschnitten; Ueberholen in den Buchten; sonst Rangeln ---
+      var vorn=null,luecke=1e9;
+      for(var j=0;j<L.length;j++){var o=L[j];if(o===c||o.ziel||o.zustand==="rast"||o.aussen)continue;var os=o.pfad[o.si];if(os.id!==s.id)continue;var g=lage(o)-lage(c);if(g>0&&g<luecke||(g===0&&o.i<c.i&&luecke>0)){luecke=g;vorn=o;}}
+      if(c.aussen){
+        var a=c.aussen;if(s.typ!=="band"||a.ziel||a.pfad[a.si].typ!=="band"||c.x>a.x+28||(!c.aussenFrei&&!inBucht(c.x+6))){c.aussen=null;c.aussenFrei=0;c.vorstieg=0;}
+        else{if(!c.vorstieg)zehr*=2.4;v*=1.04;}
+      }
+      if(s.typ==="grat"||s.typ==="boden")vorn=null; // Tempo-Stellen ohne Stau: am Grat und im Anlauf wird frei ueberholt
+      if(!c.aussen&&vorn&&luecke<27){
+        var vv=vorn.pause>0?0:tempo(vorn,vorn.pfad[vorn.si]),bucht=s.typ==="band"&&inBucht(c.x)&&inBucht(c.x+60),key=Math.min(c.i,vorn.i)+"-"+Math.max(c.i,vorn.i);
+        if(vorn===p&&bucht&&c.res>p.res+.18&&p.pause<=0){c.aussen=p;c.vorstieg=1;melde("vorstieg",c,c.n+" übernimmt den Vorstieg von "+p.n);}
+        else if(vorn!==p&&bucht&&((vorn.t!==c.t&&v>vv*1.10&&c.res>.34)||(vorn.pause>.6&&c.res>.25))){c.aussen=vorn;c.vorstieg=0;melde("ueberholt",c,c.n+" hangelt außen an "+vorn.n+" vorbei",vorn.t!==c.t?"AUSSEN VORBEI!":"",vorn);}
+        else if(s.typ==="band"&&!bucht&&vorn.t!==c.t&&vorn.pause<=0&&!vorn.wartet&&v>vv*1.06&&c.rangel<1&&vorn.rangel<1&&Z.t>9&&!Z.duelle[key]&&c.res>.2){
+          // RANGELN: schieben, festhalten, blocken - Kraftzug und Kopf entscheiden, beide zahlen Puste
+          Z.duelle[key]=1;c.rangel++;vorn.rangel++;c.gegner=vorn;vorn.gegner=c;
+          var pc=.6*c.kr+.4*c.ko+c.r()*16,po=.6*vorn.kr+.4*vorn.ko+vorn.r()*16+4;
+          c.res=Math.max(.05,c.res-.05);vorn.res=Math.max(.05,vorn.res-.05);
+          if(pc>po){vorn.pause=2.0;vorn.zustand="rangelt";vorn.res=Math.max(.05,vorn.res-.03);c.pause=1.0;c.zustand="rangelt";c.nachRangel=vorn;melde("rangel",c,"Rangelei: "+c.n+" schiebt "+vorn.n+" beiseite","RANGELEI!",vorn);}
+          else{c.pause=1.9;c.zustand="rangelt";c.res=Math.max(.05,c.res-.03);vorn.pause=.9;vorn.zustand="rangelt";melde("rangel",vorn,"Rangelei: "+vorn.n+" blockt "+c.n+" ab","ABGEBLOCKT!",c);}
+          ort(c);continue;
+        }else if(s.typ==="band"&&c.warteLauf>.9&&c.res>.15&&vorn!==p){c.aussen=vorn;c.aussenFrei=1;c.vorstieg=0;melde("ueberholt",c,c.n+" wartet nicht – außen an "+vorn.n+" vorbei");}
+        else{v=luecke<22?0:Math.min(v,vv);c.wartet=v===0;}
+      }
+      // Rastpunkte am Band
+      if(s.typ==="band"&&!c.aussen){for(var r=0;r<RAST.length;r++){var R=RAST[r];var sw=(r===1&&c.weg==="kraft")?.86:R.schwelle;if(c.x<R.x&&c.x+v*dt>=R.x&&c.res<sw&&!(c.rasten&&c.rasten[r])){c.rasten=c.rasten||{};c.rasten[r]=1;c.pause=Math.max(1.4,Math.min(2.8,((r===1&&c.weg==="kraft"?.97:.8)-c.res)/.135));c.zustand="rast";melde("rast",c,c.n+" schüttelt am Rastpunkt aus");}}}
+      if(c.pause>0){ort(c);continue;}
+      // Fehlgriff an der Schluesselstelle der Einstiegswand
+      if(s.crux&&!c.cruxDurch&&c.d/s.len>=s.crux){c.cruxDurch=1;var pf=Math.max(.04,Math.min(.5,.50-c.te/210-c.res*.12));if(c.r()<pf){c.pause=1.3;c.zustand="fehlgriff";c.res=Math.max(.05,c.res-.05);melde("fehlgriff",c,"Fehlgriff – "+c.n+" verliert Zeit");ort(c);continue;}}
+      // Dach: leer gepumpt = Sturz ins Seil
+      if(s.typ==="dach"&&c.res<.12&&c.d>20&&!c.gestuerzt){c.gestuerzt=1;c.pause=2.6;c.zustand="sturz";c.res+=.30;melde("sturz",c,c.n+" platzt am Dach – Sturz ins Seil","STURZ INS SEIL");ort(c);continue;}
+      var nd=c.d+v*dt;
+      if(nd>=s.len){
+        var n=c.pfad[c.si+1];
+        if(!n){c.ziel=Z.t;c.rang=++Z.fertig;c.d=s.len;ort(c);c.zustand="ziel";c.splits.glocke=Z.t;melde("ziel",c,"GLOCKE! "+c.n+" toppt als "+c.rang+". ("+zeit(Z.t)+")",c.rang===1?"GLOCKE!":"");
+          if(p.ziel){c.seil.ziel=Z.t;c.seil.rang=++Z.seilFertig;melde("seil",c,"Seilschaft komplett: "+p.n+" + "+c.n+" ("+zeit(Z.t)+")","SEILSCHAFT OBEN!",p);}
+          if(Z.fertig===L.length)Z.ende=true;continue;}
+        var frei=true;
+        if(n.eng&&!s.eng){
+          var schlange=0;
+          for(var j2=0;j2<L.length;j2++){var o2=L[j2];if(o2===c||o2.ziel)continue;if(o2.pfad[o2.si].eng)frei=false;else if(o2.wartet&&o2.pfad[o2.si].bx===720&&o2.x>c.x)schlange++;}
+          if(!frei){c.engWarte=(c.engWarte||0)+dt;
+            if((c.engWarte>.7||schlange>=1)&&c.res>.15){obenrum(c);melde("obenrum",c,c.n+" weicht obenrum aus – kein Warten an der Engstelle");n=c.pfad[c.si+1];frei=true;}}
+        }
+        if(frei&&n.id!==s.id&&!n.eng){
+          for(var j4=0;j4<L.length;j4++){var o4=L[j4];if(o4===c||o4.ziel)continue;var s4=o4.pfad[o4.si];if(s4.id!==n.id)continue;
+            if(n.typ==="band"){if(Math.abs(o4.x-n.ax)<21&&!o4.aussen)frei=false;}else if(n.typ!=="grat"&&o4.d<24)frei=false;}
+        }
+        if(frei&&s.gabel){
+          // Schlange loest sich ueber die Wege auf: ist die Schluesselstelle des eigenen Wegs belegt, weicht die Seilschaft aus
+          var alt=AUSWEICH[c.weg];
+          if(alt&&!c.seil.umgeplant&&Z.umgeplant<1&&p.si<=gabelIdx(p)){var voll=0,steht=0;
+            for(var j5=0;j5<L.length;j5++){var o5=L[j5];if(o5.seil===c.seil||o5.weg!==c.weg||o5.ziel||o5.si<=gabelIdx(o5)||o5.splits.grat)continue;voll++;if(o5.pause>0||o5.wartet)steht++;}
+            if(voll>=1&&steht>=1){var altW=c.weg;umplanen(c,alt);melde("umplan",c,"Seilschaft "+c.n+" / "+p.n+" weicht aus: "+WEG_NAME[alt]+" statt "+WEG_NAME[altW]+" (Schlüsselstelle belegt)","WEG GEWECHSELT");n=c.pfad[c.si+1];}}
+          melde("weg",c,c.n+" nimmt den "+WEG_NAME[c.weg]);
+        }
+        if(frei&&n.probe&&!c["p_"+n.probe]){
+          if(n.probe==="lippe"){var pl=Math.max(.04,Math.min(.62,.74-c.kr/150+(.42-c.res)*.7-c.versuche*.3));if(c.r()<pl){c.versuche++;c.pause=2.2;c.zustand="rutsch";c.res=Math.max(.08,c.res-.05)+.12;melde("rutsch",c,c.n+" rutscht an der Lippe ab – hängt im Seil","ABGERUTSCHT!");c.d=s.len;ort(c);continue;}
+            c.p_lippe=1;melde("lippe",c,c.n+" zieht über die Lippe","ÜBER DIE LIPPE!");}
+          if(n.probe==="bruecke"){c.p_bruecke=1;var pb=Math.max(.05,Math.min(.5,.62-c.ko/140));if(c.r()<pb){c.wackel=1;melde("wackel",c,c.n+" wankt auf der Seilbrücke");}}
+        }
+        if(!frei){c.d=s.len-.01;c.wartet=true;}
+        else{if(s.marke)c.splits[s.marke]=Z.t;c.si++;c.d=Math.min(nd-s.len,n.len*.5);s=n;}
+      }else c.d=nd;
+      if(c.wackel&&s.typ==="bruecke"&&c.d>s.len*.45){c.wackel=0;c.pause=1.5;c.zustand="wackel";}
+      c.res=Math.max(.05,c.res-zehr*(1.5-c.au/100)*dt*(c.wartet?.25:1));
+      if(!c.wartet)c.schritt+=v*dt;
+      if(c.wartet){wj++;c.warteLauf+=dt;c.warteSumme+=dt;if(c.warteLauf>Z.laengste)Z.laengste=c.warteLauf;}else c.warteLauf=0;
+      ort(c);
+    }
+    Z.warteJetzt=wj;if(wj>Z.warteMax)Z.warteMax=wj;
+    if(Z.t>150)Z.ende=true;
+  }
+  function rangliste(){return Z.L.slice().sort(function(a,b){if(a.ziel&&b.ziel)return a.ziel-b.ziel;if(a.ziel)return -1;if(b.ziel)return 1;return anteil(b)-anteil(a);});}
+  return {neu:neu,schritt:schritt,rangliste:rangliste,anteil:anteil,zeit:zeit,tempo:tempo,KADER:KADER,SEIL:SEIL,WEG_NAME:WEG_NAME,GIPFEL:GIPFEL,BAND:BAND,BODEN:BODEN,RAST:RAST,BUCHTEN:BUCHTEN,KLETTER:KLETTER,get Z(){return Z;}};
+})();
+if(typeof module!=="undefined")module.exports=SIM;
+</script>
+
+<script>
+(function(){
+"use strict";
+var Q=new URLSearchParams(location.search);
+var SPR=(Q.get("sprites")||"../sprites").replace(/\/$/,"");
+var ASS="climbing-neu-18-11/";
+var W=1920,H=1080,WW=1584,WH=600;
+var cv=document.getElementById("buehne"),g=cv.getContext("2d");
+var TF=["#F2A03D","#45B0C9"], WF={kraft:"#ff6a55",technik:"#5fa8ff",ausdauer:"#7ddc7a"}, WK={kraft:"K",technik:"T",ausdauer:"A"};
+var $=function(id){return document.getElementById(id);};
+
+/* ---------- Bilder ---------- */
+var B={},offen=0;
+function lade(k,url){offen++;var im=new Image();im.onload=function(){offen--;};im.onerror=function(){offen--;im.fehlt=true;};im.src=url;B[k]=im;return im;}
+["wand_canyon","panorama_canyon","glocke","seilbruecke","strickleiter","griffe","rastplatz","felsnase"].forEach(function(n){lade(n,ASS+n+".png");});
+["climbing_matte","climbing_kreidebeutel","climbing_seilsack"].forEach(function(n){lade(n,SPR+"/arena/"+n+".png");});
+SIM.KADER.forEach(function(k){["north","south","east","walk-north","walk-east","treffer-north"].forEach(function(f){lade(k.s+"/"+f,SPR+"/figuren/"+k.s+"/"+f+".png");});});
+function ok(k){var im=B[k];return im&&im.complete&&!im.fehlt&&im.naturalWidth>0;}
+
+/* ---------- Zustand ---------- */
+var Z=SIM.neu(), zeiten={rangel:{t:15,x:700,y:352},hilfe:{t:19,x:600,y:420},dach:36,ziel:55};
+(function probelauf(){ // Ereigniszeiten fuer die Szenen-Knoepfe
+  var z=SIM.neu();while(!z.ende)SIM.schritt(1/60);
+  var e=z.ereignisse,f=function(t){for(var i=0;i<e.length;i++)if(e[i].typ===t)return e[i].t;return null;};
+  var fe=function(t,ab){for(var i=0;i<e.length;i++)if(e[i].typ===t&&e[i].t>=(ab||0))return{t:e[i].t,x:e[i].x,y:e[i].y};return null;};
+  zeiten.rangel=fe("rangel")||zeiten.rangel;zeiten.hilfe=fe("zieht",33)||fe("zieht")||zeiten.hilfe;zeiten.ziel=f("ziel")||60;
+  var d=null;z=SIM.neu();while(!z.ende&&d===null){SIM.schritt(1/60);z.L.forEach(function(c){if(d===null&&c.pfad[c.si].typ==="dach")d=z.t;});}
+  zeiten.dach=d||36;Z=SIM.neu();
+})();
+var laeuft=Q.get("pause")!=="1",tempo=1,ebenen=Q.get("ebenen")!=="0",routen=Q.get("routen")==="1";
+var kam={x:560,y:440,z:1.7,modus:Q.get("kamera")==="totale"?"totale":"regie",szene:null,szeneBis:0},sel=null;
+var wackelBis=0,uhrzeit=0,ereignisGelesen=0,einbBis=0,teilchen=[],glocke={schwung:0,t:0},wellen=[];
+var staub=[];for(var i=0;i<46;i++)staub.push({x:Math.random()*W,y:Math.random()*H,r:.6+Math.random()*1.8,v:6+Math.random()*14,p:Math.random()*6});
+var voegel=[{x:300,y:210,v:22,p:0},{x:1200,y:150,v:16,p:2},{x:1650,y:260,v:19,p:4}];
+
+function simBis(t){Z=SIM.neu();while(Z.t<t&&!Z.ende)SIM.schritt(1/60);ereignisGelesen=Z.ereignisse.length;teilchen=[];wellen=[];verlaufNeu();$("ende").classList.remove("an");}
+function szene(n){
+  var S={1:{t:0,k:{x:560,y:468,z:1.95},d:9},2:{t:Math.max(0,zeiten.rangel.t-3.0),k:{x:zeiten.rangel.x+20,y:zeiten.rangel.y-30,z:2.0},d:10},3:{t:Math.max(0,zeiten.hilfe.t-2.6),k:{x:zeiten.hilfe.x,y:zeiten.hilfe.y+34,z:2.0},d:9},4:{t:Math.max(0,zeiten.dach-1.2),k:{x:1090,y:205,z:1.95},d:12},5:{t:Math.max(0,zeiten.ziel-3.5),k:{x:1250,y:66,z:1.8},d:12}}[n];
+  if(!S)return;simBis(S.t);kam.modus="regie";kam.szene=S.k;kam.szeneBis=Z.t+S.d;kam.x=S.k.x;kam.y=S.k.y;kam.z=S.k.z;sel=null;karteZu();
+  document.querySelectorAll("[data-szene]").forEach(function(b){b.classList.toggle("an",b.dataset.szene==n);});bedienTick();
+}
+
+/* ---------- Kamera ---------- */
+function kamZiel(){
+  if(kam.modus==="totale")return{x:792,y:292,z:1.2125};
+  if(kam.modus==="folgen"&&sel)return{x:sel.x,y:sel.y-24,z:2.0};
+  if(kam.szene&&Z.t<kam.szeneBis)return kam.szene;
+  var E=Z.ereignisse;for(var i=E.length-1;i>=0&&Z.t-E[i].t<2.8;i--)if(E[i].gross)return{x:E[i].x,y:E[i].y-14,z:2.05};
+  var R=SIM.rangliste().filter(function(c){return !c.ziel;}).slice(0,4);
+  if(!R.length)return{x:1290,y:40,z:1.7};
+  var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;R.forEach(function(c){x0=Math.min(x0,c.x);x1=Math.max(x1,c.x);y0=Math.min(y0,c.y);y1=Math.max(y1,c.y);});
+  var z=Math.max(1.2125,Math.min(1.95,Math.min(1500/(x1-x0+420),620/(y1-y0+230))));
+  return{x:(x0+x1)/2,y:(y0+y1)/2-26,z:z};
+}
+function kamTick(dt){
+  var zl=kamZiel(),k=1-Math.exp(-dt*2.4);kam.x+=(zl.x-kam.x)*k;kam.y+=(zl.y-kam.y)*k;kam.z+=(zl.z-kam.z)*k;
+  var hw=W/2/kam.z,hh=H/2/kam.z;kam.x=Math.max(hw,Math.min(WW-hw,kam.x));kam.y=Math.max(-250+hh,Math.min(772-hh,kam.y));
+}
+function wx(x){return(x-kam.x)*kam.z+W/2;}function wy(y){return(y-kam.y)*kam.z+H/2;}
+
+/* ---------- vorgebackene Ebenen ---------- */
+var back={};
+function backe(){
+  if(back.fertig||!ok("wand_canyon")||!ok("felsnase"))return;
+  var c=document.createElement("canvas");c.width=792;c.height=300;var x=c.getContext("2d");
+  x.drawImage(B.wand_canyon,0,0);x.globalCompositeOperation="source-atop";x.fillStyle="rgba(116,92,150,.72)";x.fillRect(0,0,792,300);back.fern=c;
+  var f=document.createElement("canvas");f.width=B.felsnase.naturalWidth;f.height=B.felsnase.naturalHeight;x=f.getContext("2d");
+  x.drawImage(B.felsnase,0,0);x.globalCompositeOperation="source-atop";x.fillStyle="rgba(24,12,22,.66)";x.fillRect(0,0,f.width,f.height);back.vorn=f;
+  back.fertig=true;
+}
+var schatten=document.createElement("canvas");schatten.width=80;schatten.height=80;var sx=schatten.getContext("2d");
+
+/* ---------- feste Wand-Deko: Griffe je Route ---------- */
+var griffe=[];
+(function(){
+  var r=(function(a){return function(){a=(a*1664525+1013904223)>>>0;return a/4294967296;};})(4711);
+  function linie(ax,ay,bx,by,farbe,n){for(var i=0;i<n;i++){var u=(i+.5)/n;griffe.push({x:ax+(bx-ax)*u+(r()-.5)*16,y:ay+(by-ay)*u+(r()-.5)*10,f:farbe,k:Math.floor(r()*2)});}}
+  for(var l=0;l<8;l++)linie(432+l*30,575,432+l*30,366,[0,2,3,5,6,7,0,3][l],8);
+  linie(722,344,738,300,7,2);linie(742,292,804,292,7,4);
+  linie(1180,340,1180,236,0,4);linie(1170,224,1020,204,0,7);linie(1006,196,1000,150,0,2);linie(1004,140,1040,88,0,3);
+  linie(915,196,888,60,1,5);linie(1512,340,1516,190,3,6);
+})();
+var GRIFF_ZELLE={0:[0,0],1:[1,0],2:[3,0],3:[3,1],5:[2,1],6:[2,0],7:[1,1]};
+
+/* ---------- Zeichnen ---------- */
+function zeichne(dt){
+  backe();g.imageSmoothingEnabled=false;
+  var z=kam.z;
+  // E0 Himmel
+  var hg=g.createLinearGradient(0,0,0,H);
+  if(ebenen){hg.addColorStop(0,"#3f6fb4");hg.addColorStop(.45,"#8fb4d9");hg.addColorStop(.75,"#f1c9a0");hg.addColorStop(1,"#e7a274");}
+  else{hg.addColorStop(0,"#5a8cc8");hg.addColorStop(1,"#5a8cc8");}
+  g.fillStyle=hg;g.fillRect(0,0,W,H);
+  if(ebenen){
+    // E1 Fernpanorama (weich gezogen = Tiefenunschaerfe), Parallax 0,08
+    if(ok("panorama_canyon")){g.imageSmoothingEnabled=true;var pz=5.3+(z-1.2)*.25,pw=400*pz,ph=224*pz;
+      g.drawImage(B.panorama_canyon,W/2-pw/2-(kam.x-792)*.08*z,H*.46-ph/2-(kam.y-290)*.06*z,pw,ph);g.imageSmoothingEnabled=false;}
+    // Voegel
+    g.strokeStyle="rgba(40,30,50,.55)";g.lineWidth=2;voegel.forEach(function(v){v.x+=v.v*dt;if(v.x>W+40)v.x=-40;var f=Math.sin(uhrzeit*5+v.p)*5,y=v.y+Math.sin(uhrzeit*.6+v.p)*14;g.beginPath();g.moveTo(v.x-9,y-f);g.lineTo(v.x,y);g.lineTo(v.x+9,y-f);g.stroke();});
+    // E2 Dunst
+    var dg=g.createLinearGradient(0,H*.35,0,H);dg.addColorStop(0,"rgba(255,214,170,0)");dg.addColorStop(1,"rgba(255,206,160,.55)");g.fillStyle=dg;g.fillRect(0,0,W,H);
+    // E3 zweite Felsreihe (dieselbe Wand, getoent und gespiegelt), Parallax 0,45
+    if(back.fern){var fz=z*.78,fx=W/2-(kam.x-792)*.45*z,fy=H/2+(-84-kam.y)*z;g.save();g.translate(fx,fy);g.scale(-1,1);g.imageSmoothingEnabled=true;g.globalAlpha=.92;g.drawImage(back.fern,-WW*fz/2,0,WW*fz,WH*fz);g.restore();g.globalAlpha=1;g.imageSmoothingEnabled=false;
+      var d2=g.createLinearGradient(0,0,0,H);d2.addColorStop(0,"rgba(255,220,180,.05)");d2.addColorStop(1,"rgba(255,200,150,.28)");g.fillStyle=d2;g.fillRect(0,0,W,H);}
+  }
+  // Welt
+  var wk=uhrzeit<wackelBis?5:0;g.save();g.translate(W/2-kam.x*z+(Math.random()-.5)*wk,H/2-kam.y*z+(Math.random()-.5)*wk);g.scale(z,z);
+  // Boden
+  var bg=g.createLinearGradient(0,596,0,780);bg.addColorStop(0,"#b8672f");bg.addColorStop(.25,"#8f4a24");bg.addColorStop(1,"#3d1c14");g.fillStyle=bg;g.fillRect(-200,596,WW+400,220);
+  if(ok("wand_canyon"))g.drawImage(B.wand_canyon,0,0,WW,WH);
+  // Schlagschatten unter dem Dach etwas vertiefen (Licht von links oben)
+  if(ebenen){var sg=g.createLinearGradient(0,205,0,345);sg.addColorStop(0,"rgba(20,6,22,.34)");sg.addColorStop(1,"rgba(20,6,22,0)");g.fillStyle=sg;g.fillRect(1016,205,470,140);}
+  // Griffe
+  if(ok("griffe"))griffe.forEach(function(h){var c=GRIFF_ZELLE[h.f]||[0,0];g.drawImage(B.griffe,c[0]*32+4,c[1]*32+2,24,28,h.x-5,h.y-6,10,12);});
+  // Requisiten hinter den Figuren
+  if(ok("strickleiter"))g.drawImage(B.strickleiter,1496,62,35,124);
+  if(ok("rastplatz"))g.drawImage(B.rastplatz,438,322,56,40);
+  if(ok("climbing_kreidebeutel"))g.drawImage(B.climbing_kreidebeutel,1196,326,16,21);
+  if(ok("climbing_matte"))for(var m=0;m<9;m++)g.drawImage(B.climbing_matte,404+m*36,584,40,22);
+  if(ok("climbing_seilsack")){g.drawImage(B.climbing_seilsack,306,570,32,28);g.drawImage(B.climbing_seilsack,700,572,32,28);}
+  // Routenlinien + Beschriftung (Schalter R)
+  if(routen)zeichneRouten();
+  // Seile
+  g.lineWidth=1.3;g.lineJoin="round";
+  Z.L.forEach(function(c){g.strokeStyle=c.t?"rgba(110,200,225,.34)":"rgba(250,180,90,.34)";g.beginPath();g.moveTo(c.sx,SIM.BODEN+2);var lx=c.sx,ly=SIM.BODEN;
+    for(var i=0;i<c.si;i++){var s=c.pfad[i];if(s.typ==="boden"){g.moveTo(s.bx,s.by);lx=s.bx;ly=s.by;continue;}var my=(ly+s.by)/2+Math.min(7,Math.abs(s.bx-lx)*.04);g.quadraticCurveTo((lx+s.bx)/2,my,s.bx,s.by-10);lx=s.bx;ly=s.by-10;}
+    var p=sicht(c);g.quadraticCurveTo((lx+p.x)/2,(ly+p.hy)/2+5,p.x,p.hy);g.stroke();});
+  // Seilschaft: das Seil zwischen den Partnern (straff und hell, wenn gezogen oder geschoben wird)
+  Z.S.forEach(function(S){var a=S.m[0],b=S.m[1];if(a.ziel&&b.ziel||Z.t<1.6)return;var pa=sicht(a),pb=sicht(b),hilft=a.zustand==="zieht"||b.zustand==="zieht"||a.schub>0||b.schub>0;
+    var dd=Math.hypot(pa.x-pb.x,pa.hy-pb.hy),hang=hilft?1:Math.max(2,26-dd*.2);
+    g.strokeStyle="rgba(12,8,14,.55)";g.lineWidth=hilft?4:3.2;g.beginPath();g.moveTo(pa.x,pa.hy);g.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy);g.stroke();
+    g.strokeStyle=hilft?"#ffe08a":TF[S.t];g.lineWidth=hilft?2.4:1.8;g.setLineDash(hilft?[]:[5,2]);g.beginPath();g.moveTo(pa.x,pa.hy);g.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy);g.stroke();g.setLineDash([]);});
+  g.lineWidth=1.3;
+  // Seilbruecke (vor den Seilen, Figuren laufen darauf)
+  if(ok("seilbruecke"))g.drawImage(B.seilbruecke,882,34,184,32);
+  // Glocke
+  glocke.schwung*=Math.exp(-dt*1.6);
+  if(ok("glocke")){g.save();g.translate(SIM.GIPFEL.x,SIM.GIPFEL.y-64);g.fillStyle="#3b2216";g.fillRect(-2,6,4,62);g.rotate(Math.sin((uhrzeit-glocke.t)*13)*glocke.schwung*.5);g.drawImage(B.glocke,-23,-6,46,50);g.restore();}
+  wellen=wellen.filter(function(w){w.r+=dt*70;w.a-=dt*.9;if(w.a<=0)return false;g.strokeStyle="rgba(255,225,130,"+w.a+")";g.lineWidth=2;g.beginPath();g.arc(SIM.GIPFEL.x,SIM.GIPFEL.y-40,w.r,0,7);g.stroke();return true;});
+  // Figuren
+  var reihen=Z.L.slice().sort(function(a,b){return a.y-b.y;});
+  reihen.forEach(function(c){zeichneFigur(c);});
+  // Teilchen (Kreide, Staub, Steinchen)
+  teilchen=teilchen.filter(function(p){p.t+=dt;if(p.t>p.l)return false;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.g*dt;var a=1-p.t/p.l;g.fillStyle=p.f.replace("A",(a*p.a).toFixed(2));var r=p.r*(p.wachs?1+p.t*2.4:1);g.fillRect(Math.round(p.x-r/2),Math.round(p.y-r/2),Math.ceil(r),Math.ceil(r));return true;});
+  g.restore();
+  if(ebenen){
+    // E5 Vordergrund-Silhouetten, Parallax 1,35
+    if(back.vorn){g.imageSmoothingEnabled=true;var vz=z*1.25,p=1.35;
+      g.drawImage(back.vorn,W/2+(150-kam.x)*z*p,H/2+(646-kam.y)*z*p-203*vz,172*vz,203*vz);
+      g.save();g.translate(W/2+(1432-kam.x)*z*p,H/2+(668-kam.y)*z*p-203*vz);g.scale(-1,1);g.drawImage(back.vorn,0,0,172*vz,203*vz);g.restore();g.imageSmoothingEnabled=false;}
+    // E6 Licht: Sonnenbahnen von links oben, warme Vignette
+    g.save();g.globalCompositeOperation="lighter";g.translate(-(kam.x-792)*.3,0);
+    [[-120,300,.10],[260,180,.07],[640,240,.06]].forEach(function(s){var lg=g.createLinearGradient(s[0],0,s[0]+900,H);lg.addColorStop(0,"rgba(255,226,170,"+s[2]*1.6+")");lg.addColorStop(1,"rgba(255,200,140,0)");g.fillStyle=lg;g.beginPath();g.moveTo(s[0],-20);g.lineTo(s[0]+s[1],-20);g.lineTo(s[0]+s[1]+1000,H+20);g.lineTo(s[0]+620,H+20);g.closePath();g.fill();});
+    g.restore();
+    // E7 Schwebstaub
+    staub.forEach(function(s){s.x+=s.v*dt;s.y+=Math.sin(uhrzeit+s.p)*4*dt-2*dt;if(s.x>W+10){s.x=-10;s.y=Math.random()*H;}g.fillStyle="rgba(255,236,200,"+(.18+.18*Math.sin(uhrzeit*1.3+s.p))+")";g.fillRect(s.x,s.y,s.r*1.6,s.r*1.6);});
+    var vg=g.createRadialGradient(W/2,H*.48,H*.42,W/2,H*.5,H*1.02);vg.addColorStop(0,"rgba(30,10,20,0)");vg.addColorStop(1,"rgba(22,8,18,.62)");g.fillStyle=vg;g.fillRect(0,0,W,H);
+  }
+  if(routen)zeichneMarken();
+}
+
+/* Wo und wie eine Figur gezeichnet wird - NUR vorhandene Posen, Bewegung aus Ruck, Neigung, Versatz */
+function ruck(d,weite,halt){var n=Math.floor(d/weite),f=d/weite-n;f=f<halt?0:(f-halt)/(1-halt);f=f*f*(3-2*f);return{n:n,v:(n+f)*weite-d,f:f};}
+function sicht(c){
+  var s=c.pfad[Math.min(c.si,c.pfad.length-1)],ux=s.len?(s.bx-s.ax)/s.len:0,uy=s.len?(s.by-s.ay)/s.len:-1;
+  var o={x:c.x,y:c.y,rot:0,bild:"north",fr:-1,spiegel:false,hang:false,dy:0,hy:c.y-24};
+  var w=Math.sin(uhrzeit*9+c.i);
+  if(c.zustand==="ziel"){var k=c.rang-1;o.x=SIM.GIPFEL.x-44-k*24+(k>5?290:0);o.y=k>5?26+(k-6)*3:22+k*6.2;o.bild="south";o.dy=-Math.abs(Math.sin(uhrzeit*6+c.i))*5;o.hy=o.y-24;return o;}
+  if(c.zustand==="start"){o.bild="north";return o;}
+  if(c.zustand==="rutsch"||c.zustand==="sturz"){var fall=Math.min(1,(c.zustand==="sturz"?2.6:2.2)-c.pause);o.bild="treffer-north";o.fr=Math.min(8,Math.floor(fall*10));o.y+=22+Math.min(26,fall*90)+Math.sin(uhrzeit*5)*3;o.x+=Math.sin(uhrzeit*3+c.i)*6;o.rot=Math.sin(uhrzeit*3+c.i)*.25;o.hy=o.y-22;o.haengt=true;return o;}
+  if(c.zustand==="rangelt"){var gx=c.gegner?(c.gegner.x>c.x?1:-1):1,st=Math.sin(uhrzeit*17+c.i);o.bild=st>0?"walk-north":"treffer-north";o.fr=Math.floor(uhrzeit*12)%8;o.x+=gx*(5+st*5);o.rot=gx*(.16+st*.12);o.dy=-Math.abs(st)*3;o.hy=o.y-24;o.marke="RANGELT";o.mf="#ff6058";return o;}
+  if(c.zustand==="zieht"){var zz=Math.sin(uhrzeit*11);o.bild="north";o.dy=zz*2.5;o.rot=zz*.07;o.marke="ZIEHT";o.mf="#ffe08a";o.hy=o.y-24;return o;}
+  if(c.zustand==="fehlgriff"||c.zustand==="abgedraengt"){o.bild="treffer-north";o.fr=Math.floor((uhrzeit*10)%8);o.y+=6;o.x+=w*1.5;o.rot=w*.08;o.hy=o.y-24;return o;}
+  if(c.zustand==="rast"){o.bild="north";o.dy=Math.sin(uhrzeit*3+c.i)*1.2;o.rot=Math.sin(uhrzeit*7+c.i)*.05;o.rast=true;return o;}
+  var r;
+  switch(s.typ){
+    case"boden":case"grat":o.bild="walk-east";o.fr=Math.floor(c.schritt/4);o.spiegel=ux<0;o.dy=-2;o.rot=Math.atan2(uy,Math.abs(ux))*(ux<0?-1:1)*.5;break;
+    case"bruecke":o.bild="walk-east";o.fr=Math.floor(c.schritt/5);var u=c.d/s.len;o.y+=Math.sin(u*Math.PI)*11-6;o.dy=Math.sin(uhrzeit*8+c.i)*1.5;o.rot=c.zustand==="wackel"?Math.sin(uhrzeit*14)*.22:Math.sin(uhrzeit*5+c.i)*.05;if(c.zustand==="wackel")o.x+=Math.sin(uhrzeit*14)*3;break;
+    case"wand":case"leiter":r=ruck(c.d,13,.42);o.x+=ux*r.v+((r.n%2)?3.5:-3.5)*(1-r.f*.5);o.y+=uy*r.v;o.rot=((r.n%2)?1:-1)*(.10-.06*r.f);o.bild="walk-north";o.fr=r.n*4+Math.floor(r.f*3);o.griff=r.f>0&&r.f<.35;break;
+    case"kamin":r=ruck(c.d,11,.38);o.y+=uy*r.v;o.x+=ux*r.v+((r.n%2)?6:-6);o.bild="east";o.spiegel=!!(r.n%2);o.rot=((r.n%2)?-1:1)*.20;break;
+    case"band":r=ruck(c.d,12,.3);o.x+=ux*r.v;o.rot=.06+.05*Math.sin(r.f*Math.PI);o.dy=-Math.sin(r.f*Math.PI)*2;o.bild="walk-north";o.fr=r.n*2;
+      if(c.aussen){o.y+=22;o.hang=true;o.rot=Math.sin(uhrzeit*6+c.i)*.22;o.griff=r.f>0&&r.f<.3;o.hy=o.y-40;return o;}
+      if(c.wartet){o.bild="north";o.rot=0;}break;
+    case"block":r=ruck(c.d,11,.4);o.x+=ux*r.v;o.y+=uy*r.v;o.rot=Math.atan2(uy,ux)*.45+((r.n%2)?.07:-.07);o.bild="walk-north";o.fr=r.n*4;break;
+    case"dach":r=ruck(c.d,15,.45);o.x+=ux*r.v;o.y+=uy*r.v+40;o.hang=true;o.rot=.32*Math.sin(uhrzeit*4.2+c.i)+(r.f>0?-.25*(1-r.f):0);o.bild="north";o.griff=r.f>0&&r.f<.3;o.hy=o.y-40;return o;
+    case"lippe":r=ruck(c.d,10,.5);var ges=(s.lip0+c.d)/s.lipG;
+      o.x+=ux*r.v-10*(1-ges);o.y+=uy*r.v+34*(1-ges);o.rot=-.75*(1-ges)+w*.04*(c.res<.3?2:1);o.bild="walk-north";o.fr=r.n*4;o.griff=r.f>0&&r.f<.3;o.hy=o.y-30;return o;
+  }
+  o.hy=o.y-24+o.dy;return o;
+}
+function zeichneFigur(c){
+  var p=sicht(c),im=B[c.s+"/"+p.bild];if(!ok(c.s+"/"+p.bild)){g.fillStyle=TF[c.t];g.fillRect(p.x-6,p.y-34,12,34);return;}
+  var n=Math.max(1,Math.round(im.naturalWidth/80)),fr=p.fr<0?0:((p.fr%n)+n)%n;
+  // Kreide beim Greifen
+  if(p.griff&&Math.random()<.5)teilchen.push({x:p.x+(Math.random()-.5)*14,y:p.y-(p.hang?44:38),vx:(Math.random()-.5)*10,vy:6+Math.random()*10,g:20,t:0,l:.7,r:2.2,a:.75,f:"rgba(255,250,240,A)",wachs:1});
+  if((c.zustand==="rutsch"||c.zustand==="sturz"||c.zustand==="fehlgriff")&&Math.random()<.4)teilchen.push({x:p.x+(Math.random()-.5)*16,y:p.y-30,vx:(Math.random()-.5)*26,vy:20+Math.random()*30,g:160,t:0,l:.9,r:2.4,a:.95,f:"rgba(120,60,30,A)"});
+  g.save();g.translate(p.x,p.y+p.dy);
+  // Ankerpunkt: Fuesse (stehend/kletternd) oder Haende (haengend)
+  if(p.hang){g.translate(0,-40);g.rotate(p.rot);g.translate(0,40);}else g.rotate(p.rot);
+  if(p.spiegel)g.scale(-1,1);
+  // Schlagschatten auf der Wand: dieselbe Pose als dunkle Flaeche, versetzt -> Figur haengt VOR der Wand
+  sx.clearRect(0,0,80,80);sx.globalCompositeOperation="source-over";sx.drawImage(im,fr*80,0,80,80,0,0,80,80);sx.globalCompositeOperation="source-in";sx.fillStyle="#1a0a12";sx.fillRect(0,0,80,80);
+  g.globalAlpha=.34;g.drawImage(schatten,-40+(p.spiegel?-5:5),-65+7);g.globalAlpha=1;
+  g.drawImage(im,fr*80,0,80,80,-40,-65,80,80);
+  g.restore();
+  // Marke ueber dem Kopf: Teamfarbe, Puste-Bogen, Weg-Buchstabe
+  var mx=p.x,my=p.y+p.dy-(p.hang?4:62)+(p.hang?16:0);if(p.hang)my=p.y+16;
+  g.fillStyle="rgba(9,12,18,.86)";g.beginPath();g.arc(mx,my,7.2,0,7);g.fill();
+  g.strokeStyle=c.res<.3?"#ff6058":TF[c.t];g.lineWidth=2.2;g.beginPath();g.arc(mx,my,6.1,-Math.PI/2,-Math.PI/2+Math.PI*2*c.res);g.stroke();
+  g.fillStyle=WF[c.weg];g.font="800 8px 'Barlow Condensed',sans-serif";g.textAlign="center";g.textBaseline="middle";g.fillText(WK[c.weg],mx,my+.6);
+  if(sel===c){g.strokeStyle="#f0c35a";g.lineWidth=1.4;g.beginPath();g.arc(mx,my,10,0,7);g.stroke();}
+  var mk=p.marke,mf=p.mf;if(p.rast){mk="RAST";mf="#62d394";}else if(!mk&&c.schiebt>0){mk="SCHIEBT";mf="#ffe08a";}else if(!mk&&c.schub>0&&c.zustand==="los"){mk="▲ HILFE";mf="#ffe08a";}else if(!mk&&c.wartet&&c.zustand==="los"&&c.warteLauf>.5){mk="WARTET";mf="#9aa7ba";}
+  if(mk){g.font="800 8px 'Barlow Condensed',sans-serif";var mw=g.measureText(mk).width+8,ly=p.hang?my+11:my-15;g.fillStyle="rgba(9,12,18,.88)";g.fillRect(mx-mw/2,ly-6,mw,11);g.fillStyle=mf;g.fillText(mk,mx,ly+.5);}
+  if(c.schiebt>0){var hx=c.partner.x>c.x?1:-1;g.fillStyle="#ffe08a";for(var q=0;q<2;q++){var ox=mx+hx*(12+q*7+((uhrzeit*20)%7));g.beginPath();g.moveTo(ox,my+26);g.lineTo(ox-hx*5,my+22);g.lineTo(ox-hx*5,my+30);g.fill();}}
+}
+var ROUTEN=[
+  {f:WF.kraft,p:[[915,352],[1180,352],[1180,228],[1014,206],[998,150],[1040,84],[1075,60],[1200,46],[1328,14]]},
+  {f:WF.technik,p:[[342,588],[346,352],[720,352]],d:1},
+  {f:WF.technik,p:[[915,352],[911,205],[915,104],[886,52],[1062,58],[1075,60]]},
+  {f:WF.ausdauer,p:[[915,352],[1512,352],[1516,186],[1512,64],[1420,34],[1348,14]]},
+  {f:"#f4e6c4",p:[[432,352],[720,352],[762,318],[802,352],[915,352]]},
+  {f:"#f0c35a",p:[[720,352],[738,296],[808,296],[828,352]]}];
+function zeichneRouten(){g.lineWidth=3;g.lineCap="round";g.setLineDash([2,7]);ROUTEN.forEach(function(r,i){g.strokeStyle=r.f;g.globalAlpha=.9;g.beginPath();r.p.forEach(function(p,k){var o=(i===3&&k<2)?5:(i===0&&k<2?-5:0);k?g.lineTo(p[0],p[1]-12+o):g.moveTo(p[0],p[1]-12+o);});g.stroke();});g.setLineDash([]);g.globalAlpha=1;
+  SIM.BUCHTEN.forEach(function(b){g.fillStyle="rgba(240,195,90,.22)";g.fillRect(b[0],356,b[1]-b[0],6);});}
+var MARKEN=[[342,470,"KAMIN · Technik-Einstieg"],[560,470,"EINSTIEGSWAND · eigene Linie je Kletterer"],[470,300,"RASTPUNKT"],[560,384,"BAND · Tempo-Stelle, Überholbucht (gold)"],[770,384,"ENGSTELLE · nur einer, davor wird gerangelt"],[770,262,"OBENRUM · Ausweichlinie statt Warten"],[905,150,"KAMIN + SEILBRÜCKE · Technikweg"],[1120,262,"DACH · Kraftweg, hangeln"],[975,118,"LIPPE · Kraftprobe"],[1530,128,"FLANKE + LEITER · Ausdauerweg"],[1338,-78,"GLOCKE · Topp"],[1180,372,"RASTNISCHE"]];
+function zeichneMarken(){g.font="700 15px 'Barlow Condensed',sans-serif";g.textAlign="center";g.textBaseline="middle";MARKEN.forEach(function(m){var x=wx(m[0]),y=wy(m[1]),w=g.measureText(m[2]).width+16;if(x<-100||x>W+100)return;g.fillStyle="rgba(9,12,18,.88)";g.fillRect(x-w/2,y-12,w,24);g.fillStyle="#f0c35a";g.fillRect(x-w/2,y-12,3,24);g.fillStyle="#f4e6c4";g.fillText(m[2],x+1,y+1);});}
+
+/* ---------- Inset ---------- */
+var ic=$("inset"),ig=ic.getContext("2d"),IS=346/WW;
+function insetTick(){
+  ig.imageSmoothingEnabled=true;ig.fillStyle="#6f95c4";ig.fillRect(0,0,346,150);var oy=14;
+  if(ok("wand_canyon"))ig.drawImage(B.wand_canyon,0,oy,346,WH*IS);
+  ig.fillStyle="rgba(9,12,18,.35)";ig.fillRect(0,oy,346,WH*IS);
+  ig.lineWidth=1.6;ROUTEN.forEach(function(r){ig.strokeStyle=r.f;ig.beginPath();r.p.forEach(function(p,k){k?ig.lineTo(p[0]*IS,p[1]*IS+oy-2):ig.moveTo(p[0]*IS,p[1]*IS+oy-2);});ig.stroke();});
+  ig.fillStyle="#f0c35a";ig.fillRect(SIM.GIPFEL.x*IS-2,oy+SIM.GIPFEL.y*IS-9,4,6);
+  Z.L.forEach(function(c){var p=sicht(c);ig.fillStyle="#0b0e14";ig.fillRect(p.x*IS-3.5,p.y*IS+oy-6.5,7,7);ig.fillStyle=TF[c.t];ig.fillRect(p.x*IS-2.5,p.y*IS+oy-5.5,5,5);if(sel===c){ig.strokeStyle="#f0c35a";ig.strokeRect(p.x*IS-5,p.y*IS+oy-8,10,10);}});
+  var hw=W/2/kam.z*IS,hh=H/2/kam.z*IS;ig.strokeStyle="rgba(244,230,196,.95)";ig.lineWidth=1.2;ig.strokeRect(kam.x*IS-hw,Math.max(1,kam.y*IS+oy-hh),hw*2,Math.min(148,hh*2));
+}
+ic.addEventListener("click",function(e){var r=ic.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*346/IS,y=((e.clientY-r.top)/r.height*150-14)/IS;kam.modus="regie";kam.szene={x:x,y:y,z:1.9};kam.szeneBis=Z.t+8;sel=null;bedienTick();});
+
+/* ---------- HUD ---------- */
+var leisten=[];
+function portrait(el,s,gr){el.style.backgroundImage="url('"+SPR+"/figuren/"+s+"/south.png')";}
+var seilEl=[];
+function dockBau(){["dockHeim","dockGast"].forEach(function(id,t){var d=$(id);d.innerHTML="";Z.S.filter(function(S){return S.t===t;}).forEach(function(S){
+  var box=document.createElement("div");box.className="seil";box.style.setProperty("--tf",TF[t]);
+  box.innerHTML='<div class="seil-kopf"><b>Seilschaft '+S.nr+'</b><span class="s-weg"></span><span class="s-hilfe"></span><span class="s-zeit">–</span></div><div class="seil-paar"></div>';d.appendChild(box);
+  seilEl[S.i]={el:box,weg:box.querySelector(".s-weg"),hilfe:box.querySelector(".s-hilfe"),zeit:box.querySelector(".s-zeit")};var d2=box.querySelector(".seil-paar");
+  S.m.forEach(function(c){
+  var b=document.createElement("button");b.className="hud-leiste";b.style.setProperty("--tf",TF[t]);b.style.setProperty("--wf",WF[c.weg]);
+  b.innerHTML='<i class="l-rang">–</i><div class="portrait"></div><div style="min-width:0"><div class="l-name">'+c.n+'</div><div class="l-zeile"><span class="l-weg" title="'+SIM.WEG_NAME[c.weg]+'">'+WK[c.weg]+'</span><span class="l-ort">Start</span><span class="l-kern">0</span></div></div><div class="l-puste" title="Puste (Reserve)"><i></i></div>';
+  portrait(b.querySelector(".portrait"),c.s);b.addEventListener("click",function(){waehle(c.i);});d2.appendChild(b);
+  leisten[c.i]={el:b,rang:b.querySelector(".l-rang"),ort:b.querySelector(".l-ort"),kern:b.querySelector(".l-kern"),puste:b.querySelector(".l-puste i"),weg:b.querySelector(".l-weg")};});});});}
+var ORT={boden:"Anlauf",wand:"Wand",kamin:"Kamin",band:"Band",block:"Engstelle",dach:"Dach",lippe:"Lippe",grat:"Grat",bruecke:"Brücke",leiter:"Leiter"};
+var ZUST={rast:"Rast",rutsch:"Im Seil",sturz:"Im Seil",fehlgriff:"Fehlgriff",abgedraengt:"Abgedrängt",wackel:"Wankt",rangelt:"Rangelt",zieht:"Zieht"};
+function hudTick(){
+  var R=SIM.rangliste(),tops=[0,0],summe=[0,0],beste=[null,null];
+  R.forEach(function(c,k){var l=leisten[c.i];if(!l)return;var a=SIM.anteil(c);summe[c.t]+=a;if(c.ziel)tops[c.t]++;if(!beste[c.t])beste[c.t]=c;
+    l.rang.textContent=k+1;l.kern.textContent=c.ziel?SIM.zeit(c.ziel):Math.round(a*100)+"%";
+    l.ort.textContent=c.ziel?"Topp":(c.pause>0&&ZUST[c.zustand])||(c.aussen?"Außen":c.wartet?"Wartet":ORT[c.pfad[c.si].typ]);
+    l.puste.style.width=Math.round(c.res*100)+"%";l.puste.style.background=c.res<.3?"var(--hud-warn)":c.res<.55?"var(--hud-gold)":"var(--hud-gut)";
+    l.el.classList.toggle("aktiv",sel===c);l.el.classList.toggle("top",!!c.ziel);l.el.style.setProperty("--wf",WF[c.weg]);l.weg.textContent=WK[c.weg];});
+  tops=[0,0];Z.S.forEach(function(S){var q=seilEl[S.i];if(S.ziel)tops[S.t]++;q.el.style.setProperty("--wf",WF[S.weg]);q.el.classList.toggle("oben",!!S.ziel);q.weg.textContent=SIM.WEG_NAME[S.weg];q.hilfe.textContent=S.hilfen?"Hilfen "+S.hilfen:"";q.zeit.textContent=S.ziel?"oben "+SIM.zeit(S.ziel-1.6):"";});
+  var wz=$("warte");wz.textContent="Warten: "+Z.warteJetzt+" · längstes "+Z.laengste.toFixed(1).replace(".",",")+" s";wz.classList.toggle("viel",Z.warteJetzt>=4);
+  $("standHeim").textContent=tops[0];$("standGast").textContent=tops[1];
+  $("kopfHeim").classList.toggle("fuehrt",tops[0]>tops[1]||(tops[0]===tops[1]&&summe[0]>summe[1]));$("kopfGast").classList.toggle("fuehrt",tops[1]>tops[0]||(tops[0]===tops[1]&&summe[1]>summe[0]));
+  [0,1].forEach(function(t){var c=beste[t];$(t?"subGast":"subHeim").textContent="Seilschaften oben · vorn "+c.n+" "+(c.ziel?"Topp "+SIM.zeit(c.ziel):Math.round(SIM.anteil(c)*100)+" %");});
+  var ges=summe[0]+summe[1]||1;$("momHeim").style.width=(summe[0]/ges*100).toFixed(1)+"%";$("momGast").style.width=(summe[1]/ges*100).toFixed(1)+"%";
+  $("uhr").textContent=SIM.zeit(Math.max(0,Z.t-1.6));
+  var f=R.filter(function(c){return !c.ziel;})[0];$("phase").textContent=Z.t<1.6?"Auf die Plätze":Z.ende?"Alle im Ziel":f?({boden:"Einstieg",wand:f.si<2?"Einstiegswand":"Ausstieg",kamin:"Kamin",band:"Quergang am Band",block:"Engstelle",dach:"Überhang · Dach",lippe:"An der Lippe",grat:"Gipfelgrat",bruecke:"Seilbrücke",leiter:"Leiter"})[f.pfad[f.si].typ]:"Topp";
+  // neue Ereignisse
+  var E=Z.ereignisse;for(;ereignisGelesen<E.length;ereignisGelesen++){var e=E[ereignisGelesen];verlaufZeile(e);
+    if(e.gross){var c=Z.L[e.i];$("hudEinblender").style.setProperty("--tf",TF[e.team]);portrait($("einbPortrait"),c.s);$("einbWort").textContent=e.wort;$("einbZeile").textContent=(e.m>=0&&(e.typ==="zieht"||e.typ==="schiebt"||e.typ==="rangel"||e.typ==="seil"||e.typ==="ueberholt")?e.text.replace(/^Rangelei: /,""):c.n+" · "+SIM.WEG_NAME[c.weg])+" · Puste "+Math.round(c.res*100)+" %";$("hudEinblender").classList.add("an");einbBis=performance.now()+2600;}
+    if(e.typ==="ziel"){glocke.schwung=1;glocke.t=uhrzeit;wellen.push({r:8,a:.9},{r:2,a:.6});}
+    if(e.typ==="rangel")wackelBis=uhrzeit+.7;
+    if(e.typ==="rangel"||e.typ==="rutsch"||e.typ==="sturz")for(var k=0;k<14;k++)teilchen.push({x:e.x+(Math.random()-.5)*20,y:e.y-30,vx:(Math.random()-.5)*60,vy:-20+Math.random()*50,g:170,t:0,l:.9,r:2.6,a:.95,f:"rgba(110,54,28,A)"});}
+  if(einbBis&&performance.now()>einbBis){$("hudEinblender").classList.remove("an");einbBis=0;}
+  if(Z.ende&&!$("ende").classList.contains("an")&&Z.t>3){$("endListe").innerHTML=Z.S.slice().sort(function(a,b){return(a.ziel||999)-(b.ziel||999);}).map(function(S,k){return'<li><i>'+(k+1)+'.</i><span style="color:'+TF[S.t]+'">'+S.m[0].n+' + '+S.m[1].n+'</span><b>'+(S.ziel?SIM.zeit(S.ziel-1.6):"–")+'</b></li>';}).join("");$("ende").classList.add("an");}
+  if(sel)karteTick();
+}
+function verlaufZeile(e){var li=document.createElement("li");li.style.setProperty("--tf",TF[e.team]);if(e.gross)li.className="gross";li.innerHTML="<b>"+SIM.zeit(Math.max(0,e.t-1.6))+"</b><span>"+e.text+"</span>";var v=$("verlauf");v.insertBefore(li,v.firstChild);while(v.children.length>7)v.removeChild(v.lastChild);}
+function verlaufNeu(){$("verlauf").innerHTML="";Z.ereignisse.slice(-7).forEach(verlaufZeile);}
+function waehle(i){sel=Z.L[i];kam.modus="folgen";$("hudKarte").classList.add("an");$("hudVerlauf").style.display="";karteTick(true);bedienTick();}
+function karteZu(){$("hudKarte").classList.remove("an");if(kam.modus==="folgen")kam.modus="regie";sel=null;bedienTick();}
+var WEGTEXT={kraft:"Kraftweg: unter dem Dach hangeln, an der Lippe eine Kraftprobe. Kürzer, zehrt aber am meisten Puste.",technik:"Technikweg: im Kamin stemmen (kostet kaum Puste), dann die Seilbrücke – Kopfprobe.",ausdauer:"Ausdauerweg: Band bis zur Flanke, Leiter, Grat. Am längsten, keine Probe."};
+function karteTick(neu){var c=sel;if(!c)return;if(neu){portrait($("kPortrait"),c.s);$("kName").textContent=c.n;$("hudKarte").style.setProperty("--wf",WF[c.weg]);$("kAu").textContent=c.au;$("kKr").textContent=c.kr;$("kTe").textContent=c.te;$("kKo").textContent=c.ko;$("kSn").textContent=c.sn;$("kWeg").textContent=WEGTEXT[c.weg]+(c.eigen!==c.weg?" Für "+c.n+" ein Nebenweg: das eigene Profil wäre der "+SIM.WEG_NAME[c.eigen]+", die Seilschaft geht gemeinsam.":"");
+  document.querySelectorAll(".k-wert").forEach(function(w){w.classList.toggle("haupt",w.dataset.w===({kraft:"kr",technik:"te",ausdauer:"au"})[c.weg]);});}
+  $("kSub").textContent="Seilschaft "+c.seil.nr+" mit "+c.partner.n+" · "+SIM.WEG_NAME[c.weg]+" · Puste "+Math.round(c.res*100)+" %";
+  var s=c.splits,f=function(k){return s[k]?SIM.zeit(s[k]-1.6):"–";};$("kS1").textContent=f("band");$("kS2").textContent=f("eng");$("kS3").textContent=f("grat");$("kS4").textContent=f("glocke");}
+function bedienTick(){$("bPlay").innerHTML=(laeuft?"❚❚ Pause":"▶ Start")+"<kbd>␣</kbd>";$("bTempo").innerHTML="Tempo "+tempo+"×<kbd>T</kbd>";
+  $("bKam").innerHTML="Kamera: "+({regie:"Regie",totale:"Totale",folgen:"Folgt "+(sel?sel.n:"")})[kam.modus]+"<kbd>K</kbd>";$("bKam").classList.toggle("an",kam.modus!=="regie");
+  $("bRouten").classList.toggle("an",routen);$("bEbenen").classList.toggle("an",ebenen);}
+$("bPlay").onclick=function(){laeuft=!laeuft;bedienTick();};
+$("bTempo").onclick=function(){tempo=tempo===1?2:tempo===2?4:1;bedienTick();};
+$("bKam").onclick=function(){kam.modus=kam.modus==="totale"?"regie":"totale";kam.szene=null;if(sel)karteZu();bedienTick();};
+$("bRouten").onclick=function(){routen=!routen;bedienTick();};
+$("bEbenen").onclick=function(){ebenen=!ebenen;bedienTick();};
+$("bNeu").onclick=function(){szene(1);laeuft=true;bedienTick();};
+$("kZu").onclick=karteZu;
+document.querySelectorAll("[data-szene]").forEach(function(b){b.onclick=function(){szene(+b.dataset.szene);laeuft=true;bedienTick();};});
+addEventListener("keydown",function(e){var k=e.key.toLowerCase();
+  if(k===" "){e.preventDefault();$("bPlay").onclick();}else if(k==="t")$("bTempo").onclick();else if(k==="k")$("bKam").onclick();else if(k==="r")$("bRouten").onclick();else if(k==="e")$("bEbenen").onclick();else if(k==="n")$("bNeu").onclick();
+  else if(k>="1"&&k<="5"){szene(+k);laeuft=true;bedienTick();}else if(k==="escape")karteZu();
+  else if(k==="arrowright"||k==="arrowleft"){var i=sel?sel.i:-1;waehle((i+(k==="arrowright"?1:11)+12)%12);}});
+
+/* ---------- Rahmen skalieren, Schleife ---------- */
+function passe(){var s=Math.min(innerWidth/W,innerHeight/H),r=$("rahmen");r.style.transform="scale("+s+")";r.style.left=((innerWidth-W*s)/2)+"px";r.style.top=((innerHeight-H*s)/2)+"px";}
+addEventListener("resize",passe);passe();
+dockBau();
+if(Q.get("szene"))szene(+Q.get("szene"));
+if(Q.get("t")){var k0=kam.szene;simBis(+Q.get("t"));}
+if(Q.get("routen")==="1")routen=true;
+if(Q.get("karte")){waehle(+Q.get("karte"));if(Q.get("kamera")==="regie")kam.modus="regie";}
+if(Q.get("kx")){kam.modus="regie";kam.szene={x:+Q.get("kx"),y:+Q.get("ky"),z:+(Q.get("kz")||1.9)};kam.szeneBis=1e9;kam.x=kam.szene.x;kam.y=kam.szene.y;kam.z=kam.szene.z;}
+bedienTick();
+var letzte=performance.now(),rest=0;
+function bild(jetzt){var dt=Math.min(.05,(jetzt-letzte)/1000);letzte=jetzt;uhrzeit+=dt;
+  if(laeuft){rest+=dt*tempo;while(rest>=1/60){SIM.schritt(1/60);rest-=1/60;}}
+  kamTick(dt);zeichne(dt);insetTick();hudTick();requestAnimationFrame(bild);}
+window.__climbing={SIM:SIM,szene:szene,simBis:simBis,kam:kam,zeiten:zeiten,bereit:function(){return offen===0&&document.fonts.status==="loaded";},pause:function(v){laeuft=!v;bedienTick();}};
+requestAnimationFrame(bild);
+})();
+</script>
+</body>
+</html>
