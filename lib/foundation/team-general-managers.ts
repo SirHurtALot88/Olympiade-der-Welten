@@ -1166,3 +1166,36 @@ export function withNormalizedTeamGeneralManagers(
     },
   };
 }
+
+/**
+ * PROTOTYP KADERPLAN (`OLY_KI_KADERPLAN=1`, docs/design/ki-pick-analyse-18-11.md Abschnitt 5.4): die BEWUSSTE Entscheidung des GM
+ * „weniger Spieler, dafuer staerker". Chris 18.11.: „Der GM kann aus Opt 13 z. B. Opt 12 oder 11 machen … es wird nie nur bis zum
+ * Minimum gepickt." Kompakt-Neigung = Mittel aus Star-Prioritaet und Elite-Kader-Neigung (1..10, neutral 5) ueber neutral:
+ *   >= 4  -> Opt − 2,   >= 2,5 -> Opt − 1,   sonst 0.
+ * Eine ausgepraegte Tiefen-Neigung (>= 7) verhindert die Senkung. Untergrenze: Minimum + 1 (nie bis zum Minimum).
+ * Rein: liest nur die uebergebenen Bias-Werte.
+ */
+export const GM_OPT_SENKUNG_MAX = 2;
+export function gmKaderOptAnpassung(input: {
+  bias: { starPriority?: number; eliteSmallRosterPreference?: number; rosterDepthPreference?: number } | null | undefined;
+  opt: number;
+  rosterMin: number;
+}): { opt: number; delta: number; kompaktNeigung: number; grund: string | null } {
+  const wert = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) ? v : 5);
+  const kompaktNeigung = (wert(input.bias?.starPriority) - 5 + (wert(input.bias?.eliteSmallRosterPreference) - 5)) / 2;
+  const tiefe = wert(input.bias?.rosterDepthPreference);
+  let gewuenscht = kompaktNeigung >= 4 ? GM_OPT_SENKUNG_MAX : kompaktNeigung >= 2.5 ? 1 : 0;
+  if (tiefe >= 7) gewuenscht = 0;
+  const untergrenze = input.rosterMin + 1;
+  const opt = Math.max(Math.min(input.opt, untergrenze), input.opt - gewuenscht);
+  const delta = opt - input.opt;
+  return {
+    opt,
+    delta,
+    kompaktNeigung,
+    grund:
+      delta < 0
+        ? `GM kompakt (Star ${wert(input.bias?.starPriority)}, Elite ${wert(input.bias?.eliteSmallRosterPreference)}): Opt ${input.opt} -> ${opt}, weniger Spieler, dafuer staerker`
+        : null,
+  };
+}

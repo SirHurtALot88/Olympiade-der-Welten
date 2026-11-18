@@ -45,7 +45,7 @@ import {
   setzeAutoPick,
   werIstDran,
 } from "@/lib/draft/liga-draft-modell";
-import { bewerteKiPick, freieSpieler, superstarLizenzZuDraftBeginn } from "@/lib/draft/liga-draft-ki";
+import { bewerteKiPick, freieSpieler, superstarLizenzZuDraftBeginn, type LigaDraftKiBewertung } from "@/lib/draft/liga-draft-ki";
 
 type RunContext = ReturnType<typeof createLocalTransfermarktRunContext>;
 
@@ -350,6 +350,19 @@ export function kaufeMitNachruecken<T>(input: {
   return { ok: false, grund: "erschoepft", letzterKaufgrund, fehlgeschlagen };
 }
 
+/**
+ * PROTOTYP KADERPLAN: den Grund der Kadergroesse an den Ausstieg im Verlauf haengen (Chris: weniger als Opt nur bewusst und
+ * begruendet). `fertigGrund` des Teams bleibt der typisierte Grund; nur der Kurzgrund des Verlaufseintrags bekommt den Zusatz.
+ */
+function mitKaderplanGrund(draft: LigaDraftZustand, kaderplan: LigaDraftKiBewertung["kaderplan"]): LigaDraftZustand {
+  if (!kaderplan || draft.verlauf.length === 0) return draft;
+  const verlauf = [...draft.verlauf];
+  const letzter = verlauf[verlauf.length - 1]!;
+  const gm = kaderplan.optEntscheidung?.grund ? `; ${kaderplan.optEntscheidung.grund}` : "";
+  verlauf[verlauf.length - 1] = { ...letzter, grund: `${letzter.grund ?? ""}; kaderplan:${kaderplan.grund} (${kaderplan.text}${gm})` };
+  return { ...draft, verlauf };
+}
+
 /** Ein automatischer Zug (KI-Team oder Mensch mit Auto-Pick) auf dem Laufkontext. */
 function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZustand["verlauf"][number] | null {
   const draft = draftAusKontext(ctx);
@@ -369,15 +382,18 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
   const bewertung = bewerteKiPick({ gameState, saveId, draft, teamId: zug.teamId, topN: 3 });
   const top3 = bewertung.top.map((eintrag) => ({ playerId: eintrag.playerId, nutzen: eintrag.nutzen }));
   if (bewertung.kind !== "buy") {
-    const naechster = bucheAusstieg({
-      draft,
-      gameState,
-      teamId: zug.teamId,
-      grund: fertigGrundAusKind(bewertung.kind),
-      quelle,
-      top3,
-      jetzt,
-    });
+    const naechster = mitKaderplanGrund(
+      bucheAusstieg({
+        draft,
+        gameState,
+        teamId: zug.teamId,
+        grund: fertigGrundAusKind(bewertung.kind),
+        quelle,
+        top3,
+        jetzt,
+      }),
+      bewertung.kaderplan,
+    );
     setzeDraftImKontext(ctx, naechster);
     return naechster.verlauf[naechster.verlauf.length - 1]!;
   }
@@ -432,7 +448,13 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
       transferId: kauf.ergebnis.transferId!,
       top3,
       grund:
-        kauf.playerId === bewertung.bestPlayerId ? null : kauf.ausNotfall ? "notkauf_mindestkader" : "platz_1_nicht_kaufbar",
+        kauf.playerId === bewertung.bestPlayerId
+          ? bewertung.notweg
+            ? `notweg:${bewertung.notweg}`
+            : null
+          : kauf.ausNotfall
+            ? "notkauf_mindestkader"
+            : "platz_1_nicht_kaufbar",
       jetzt,
     });
     setzeDraftImKontext(ctx, naechster);

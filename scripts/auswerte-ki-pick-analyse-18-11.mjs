@@ -16,6 +16,18 @@ if (dateien.length === 0) {
 }
 const laeufe = dateien.map((d) => JSON.parse(fs.readFileSync(d, "utf8")));
 
+/**
+ * STARS RELATIV (Chris 18.11.: „Zu Beginn ist ein 60er-Spieler ein Superstar, ab 45 eigentlich ein Star"; „wenn ein Spieler
+ * schon alleine 25 % vom Budget beim Kauf kostet … dann ist das wohl ein Star oder sogar Superstar"). Zwei Masse:
+ *  - Markt (Startpool S1): Star ab Marktwert 45, Superstar ab 60. Spaeter relativ zum Pool der Saison: Star ab P87, Superstar
+ *    ab P96 (im S1-Startpool genau 45 bzw. ≈ 60).
+ *  - Budget (Identitaet): Star, wenn die Abloese mindestens 15 % des Startbudgets des Teams kostet, Superstar ab 25 %.
+ */
+const STAR_MW = 45;
+const SUPERSTAR_MW = 60;
+const STAR_BUDGET = 0.15;
+const SUPERSTAR_BUDGET = 0.25;
+
 const r1 = (v) => (v == null || Number.isNaN(v) ? "–" : (Math.round(v * 10) / 10).toString().replace(".", ","));
 const r2 = (v) => (v == null || Number.isNaN(v) ? "–" : (Math.round(v * 100) / 100).toString().replace(".", ","));
 const q = (werte, p) => {
@@ -66,6 +78,15 @@ for (const lauf of laeufe) {
     const sim = lauf.simulation?.jeTeam?.[teamId] ?? null;
     const es = lauf.einzelschritt?.jeTeam?.[teamId] ?? null;
     const stars = (nd.stufen.Superstar ?? 0) + (nd.stufen.Star ?? 0);
+    const werte = nd.spielerWerte ?? [];
+    const budget = Math.max(1, t.startKasse);
+    const gehaltSumme = werte.reduce((a, w) => a + w.gehalt, 0);
+    const starMarkt = werte.filter((w) => w.mw >= STAR_MW).length;
+    const superMarkt = werte.filter((w) => w.mw >= SUPERSTAR_MW).length;
+    const starBudget = werte.filter((w) => w.mw >= STAR_BUDGET * budget).length;
+    const superBudget = werte.filter((w) => w.mw >= SUPERSTAR_BUDGET * budget).length;
+    const top = werte[0] ?? { mw: 0, gehalt: 0 };
+    const kp = sim?.kaderplan ?? t.solo?.kaderplan ?? null;
     const soloStars = (t.solo.bild.stufen.Superstar ?? 0) + (t.solo.bild.stufen.Star ?? 0);
     zeilen.push({
       lauf: `${lauf.label}/${lauf.draft}`,
@@ -118,6 +139,17 @@ for (const lauf of laeufe) {
       esPlatz: es?.platzRunde1 ?? null,
       esNot: es?.notkaeufe ?? 0,
       esNach: es?.nachruecker ?? 0,
+      hatWerte: werte.length > 0,
+      starMarkt,
+      superMarkt,
+      starBudget,
+      superBudget,
+      topAnteilBudget: top.mw / budget,
+      topAnteilGehalt: gehaltSumme > 0 ? top.gehalt / gehaltSumme : 0,
+      identOpt: kp?.optEntscheidung?.identitaetsOpt ?? t.solo.optTarget,
+      gmDelta: kp?.optEntscheidung?.gmDelta ?? 0,
+      simNotwege: sim?.notwege?.length ?? 0,
+      kpGrund: sim?.kaderplan?.grund ?? null,
     });
   }
 }
@@ -165,6 +197,41 @@ p("Stufen gesamt nach dem Draft: " + laufNamen.map((ln) => {
 }).join(" · "));
 p("");
 
+// ---- Stars relativ ----
+if (zeilen.some((x) => x.hatWerte)) {
+  p("## Stars relativ (Markt: Star ≥ 45, Superstar ≥ 60 · Budget: Abloese ≥ 15 % bzw. ≥ 25 % des Startbudgets)");
+  p("");
+  p("| Lauf | Teams mit ≥ 1 Star (Markt) | Stars Σ (Markt) | Superstars Σ (Markt) | Teams mit ≥ 1 Star (Budget) | Stars Σ (Budget) | Superstars Σ (Budget) | teuerster: Anteil am Budget Median | teuerster: Anteil am Kadergehalt Median | GM-Senkung Opt (Teams, Σ Plaetze) | Notwege (Block-Sim.) |");
+  p("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|");
+  for (const ln of [...new Set(zeilen.map((z) => z.lauf))]) {
+    const z = zeilen.filter((x) => x.lauf === ln && x.hatWerte);
+    if (z.length === 0) continue;
+    p(`| ${ln} | ${z.filter((x) => x.starMarkt > 0).length} | ${z.reduce((a, x) => a + x.starMarkt, 0)} | ${z.reduce((a, x) => a + x.superMarkt, 0)} | ${z.filter((x) => x.starBudget > 0).length} | ${z.reduce((a, x) => a + x.starBudget, 0)} | ${z.reduce((a, x) => a + x.superBudget, 0)} | ${r1(100 * median(z.map((x) => x.topAnteilBudget)))} % | ${r1(100 * median(z.map((x) => x.topAnteilGehalt)))} % | ${z.filter((x) => x.gmDelta < 0).length}, ${z.reduce((a, x) => a + x.gmDelta, 0)} | ${z.reduce((a, x) => a + x.simNotwege, 0)} |`);
+  }
+  p("");
+  for (const ln of [...new Set(zeilen.map((z) => z.lauf))]) {
+    const z = zeilen.filter((x) => x.lauf === ln && x.hatWerte);
+    if (z.length === 0) continue;
+    p(`### Stars relativ nach Archetyp — ${ln}`);
+    p("");
+    p("| Archetyp | Teams | Opt Identität → Plan | Kader Ø | Stars Markt Ø | Superstars Markt Ø | Stars Budget Ø | teuerster Anteil Budget Ø |");
+    p("|---|---:|---|---:|---:|---:|---:|---:|");
+    for (const a of [...new Set(z.map((x) => x.archetype))].sort()) {
+      const g = z.filter((x) => x.archetype === a);
+      p(`| ${a} | ${g.length} | ${r1(mittel(g.map((x) => x.identOpt)))} → ${r1(mittel(g.map((x) => x.optTarget)))} | ${r1(mittel(g.map((x) => x.kader)))} | ${r2(mittel(g.map((x) => x.starMarkt)))} | ${r2(mittel(g.map((x) => x.superMarkt)))} | ${r2(mittel(g.map((x) => x.starBudget)))} | ${r1(100 * mittel(g.map((x) => x.topAnteilBudget)))} % |`);
+    }
+    p("");
+    p(`### Je Team relativ — ${ln}`);
+    p("");
+    p("| Team | Archetyp | Opt Identität → Plan | Kader | Stars / Superstars (Markt) | Stars / Superstars (Budget) | teuerster MW | Anteil Budget | Anteil Kadergehalt | Kaderplan |");
+    p("|---|---|---|---:|---|---|---:|---:|---:|---|");
+    for (const x of [...z].sort((a, b) => a.teamId.localeCompare(b.teamId))) {
+      p(`| ${x.teamId} | ${x.archetype} | ${x.identOpt} → ${x.optTarget} | ${x.kader} | ${x.starMarkt} / ${x.superMarkt} | ${x.starBudget} / ${x.superBudget} | ${r1(x.mwMax)} | ${r1(100 * x.topAnteilBudget)} % | ${r1(100 * x.topAnteilGehalt)} % | ${x.kpGrund ?? "–"} |`);
+    }
+    p("");
+  }
+}
+
 // ---- Abbruchgruende ----
 p("## Abbruchgründe");
 p("");
@@ -176,6 +243,12 @@ const zaehle = (werte) => {
 for (const ln of laufNamen) {
   const z = zeilen.filter((x) => x.lauf === ln);
   p(`* ${ln}: Solo-Plan (voller Pool) — ${zaehle(z.map((x) => x.soloAbbruch))}` + (z[0].simAbbruch != null ? `; Block-Simulation — ${zaehle(z.map((x) => x.simAbbruch))}` : "") + (z[0].esGrund != null ? `; Einzelschritt — ${zaehle(z.map((x) => x.esGrund))}, Notkäufe Σ ${z.reduce((a, x) => a + x.esNot, 0)}, Nachrücker Σ ${z.reduce((a, x) => a + x.esNach, 0)}` : ""));
+}
+for (const l of laeufe) {
+  const sim = l.simulation ? Object.values(l.simulation.jeTeam).map((t) => t.kaderplan?.grund).filter(Boolean) : [];
+  if (sim.length > 0) p(`* ${l.label}/${l.draft} Kaderplan-Protokoll (Block-Simulation): ${zaehle(sim)}`);
+  if (l.einzelschritt?.kaderplanGruende && Object.keys(l.einzelschritt.kaderplanGruende).length > 0)
+    p(`* ${l.label}/einzelschritt Kaderplan-Protokoll (Verlauf): ${Object.entries(l.einzelschritt.kaderplanGruende).map(([k, v]) => `${k} ${v}`).join(", ")}`);
 }
 for (const l of laeufe) if (l.einzelschritt) p(`* ${l.label}/einzelschritt Verlauf: ${Object.entries(l.einzelschritt.grundZaehler).map(([k, v]) => `${k} ${v}`).join(", ")}`);
 const treffer = zeilen.filter((x) => x.simTreffer);

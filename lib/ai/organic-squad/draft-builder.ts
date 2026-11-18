@@ -62,6 +62,23 @@ const ORGANIC_DRAFT_JITTER = Number(process.env.OLY_ORGANIC_DRAFT_JITTER ?? 15) 
 export function istKaderplanAktiv(): boolean {
   return process.env.OLY_KI_KADERPLAN === "1";
 }
+/**
+ * Messschalter: Platzpreis aus dem STARTPOOL des Drafts (`OLY_KI_KADERPLAN_STARTPOOL=1`) statt aus dem aktuellen Pool (Standard).
+ * Gemessen 18.11. (Doku 5.2): der Startpool macht Block und Einzelschritt gleich, aber beide mit 56–66 Fuellern, weil die Reserve
+ * mit 12er-Preisen rechnet, die andere Teams laengst gekauft haben — die letzten Plaetze passen dann nur noch mit Fuellern.
+ * Der aktuelle Pool ist die ehrliche (immer hoehere) Rechnung; seit die Fueller-Sperre „immer" gilt und die nicht zum Platzpreis
+ * getragenen Plaetze billig reserviert werden, braucht der Einzelschritt den Startpool nicht mehr.
+ */
+export function istKaderplanStartpoolAktiv(): boolean {
+  return process.env.OLY_KI_KADERPLAN_STARTPOOL === "1";
+}
+/**
+ * Messschalter Fueller-Sperre: `immer` (Standard) = unter Opt zuerst nur Spieler ab Platzpreis, Fueller nur, wenn kein
+ * solcher durch alle Schranken passt; `rahmen` = Sperre nur, solange der Rahmen alle Plaetze bis Opt zum Platzpreis traegt.
+ */
+function fuellerSperreImmer(): boolean {
+  return process.env.OLY_KI_KADERPLAN_FUELLER !== "rahmen";
+}
 /** Platzpreis-Untergrenze der Reserve: Backup-Stufe der Liga (12). Darunter liegen die Fueller (Reserve-Stufe). */
 export const KADERPLAN_PLATZ_MIN_MW = 12;
 
@@ -69,12 +86,18 @@ export const KADERPLAN_PLATZ_MIN_MW = 12;
  * Reserve fuer `count` weitere geplante Plaetze: Summe der billigsten Preise ab `KADERPLAN_PLATZ_MIN_MW` (gibt es zu wenige,
  * zaehlen die billigsten uebrigen). `sortiertePreise` aufsteigend.
  */
-function platzReserve(sortiertePreise: number[], count: number): number {
+function platzReserve(sortiertePreise: number[], count: number, wettbewerb = 1): number {
   if (count <= 0) return 0;
   let sum = 0;
   let n = 0;
+  // Mit Wettbewerb (Einzelschritt: T Teams picken reihum) ist der i-te eigene Platz erst nach i x T fremden Picks dran; im
+  // schlechtesten Fall sind die billigsten davor weg. Deshalb jeder T-te Preis ab Platzpreis statt der n billigsten.
+  const schritt = Math.max(1, Math.floor(wettbewerb));
+  let index = 0;
   for (const p of sortiertePreise) {
     if (p < KADERPLAN_PLATZ_MIN_MW) continue;
+    index += 1;
+    if (index % schritt !== 0) continue;
     sum += p;
     n += 1;
     if (n >= count) return sum;
@@ -154,6 +177,19 @@ export type OrganicSquadPlanInput = {
      * bit-identical to before this field existed (same "undefined ⇒ untouched" contract as `composition`).
      */
     salaryCeiling?: number;
+    /**
+     * PROTOTYP KADERPLAN: Preise (aufsteigend) des Pools zu DRAFT-BEGINN, aus denen der Platzpreis der Reserve gerechnet wird.
+     * Fehlt die Liste, gilt der aktuelle Pool. Im Einzelschritt nehmen sich 32 Teams die billigen 12er-Spieler gleichzeitig weg;
+     * mit dem Restpool stieg der Platzpreis, die Fueller-Sperre fiel und es kamen 54 Fueller statt 1 (Messung 18.11.). Mit dem
+     * Startpool planen Block und Einzelschritt mit derselben Zahl. Ohne Kaderplan ungelesen.
+     */
+    platzPreise?: number[];
+    /**
+     * PROTOTYP KADERPLAN: wie viele Teams im Einzelschritt-Draft noch reihum picken. Die Platz-Reserve rechnet dann mit jedem
+     * T-ten Preis ab Platzpreis (die billigen 12er nehmen sich die anderen zwischen den eigenen Picks weg). Fehlt der Wert
+     * (Blocklauf: ein Team plant gegen einen festen Pool), gilt 1.
+     */
+    platzWettbewerb?: number;
   };
   /**
    * Optional per-(save, team) seed for the reproducible buy-utility jitter (see ORGANIC_DRAFT_JITTER).
@@ -181,6 +217,30 @@ export type OrganicSquadPlanResult = {
   finalSalaryTotal: number;
   /** Set when the loop broke below rosterMin because nothing was affordable (edge to log, not repair). */
   stoppedBelowMin: boolean;
+  /** PROTOTYP KADERPLAN: warum der Kader so gross ist, wie er ist (nur mit `OLY_KI_KADERPLAN=1`). */
+  kaderplan?: KaderplanProtokoll;
+};
+
+/**
+ * PROTOTYP KADERPLAN — Protokoll je Team (Chris 18.11.: „weniger als Opt nur als bewusste, begruendete Entscheidung, nie weil
+ * das Geld aus war"). Gruende:
+ *  - `opt_erreicht`: Zielkader erreicht, der Rahmen trug alle Plaetze zum Platzpreis (ab 12).
+ *  - `opt_erreicht_tiefe_vor_qualitaet`: Zielkader erreicht, aber der Rahmen trug zu Beginn nur `rahmenPlaetze` Plaetze zum
+ *    Platzpreis; das Team hat die restlichen Plaetze bewusst mit billigeren Spielern besetzt (Tiefe vor Qualitaet — die heutige
+ *    Regel fuer alle Identitaeten; „kompakt, dafuer staerker" ist Stufe 2, s. Doku 5.3).
+ *  - `unter_opt_rahmen_erschoepft`: unter dem Zielkader, weil auch der billigste Spieler nicht mehr in Kasse/Topf passte.
+ *    Das darf mit dem Kaderplan praktisch nicht vorkommen und ist deshalb das Warnsignal im Protokoll.
+ */
+export type KaderplanGrund = "opt_erreicht" | "opt_erreicht_tiefe_vor_qualitaet" | "unter_opt_rahmen_erschoepft";
+export type KaderplanProtokoll = {
+  grund: KaderplanGrund;
+  optTarget: number;
+  kader: number;
+  /** Wie viele Plaetze der Rahmen ZU BEGINN zum Platzpreis trug (Kader + Plaetze, die Kasse und Topf decken). */
+  rahmenPlaetze: number;
+  /** Rueckfaelle, die einen Kauf geliefert haben (soll leer sein). */
+  notwege: KaderplanNotweg[];
+  text: string;
 };
 
 function price(player: OrganicPlayerView): number {
@@ -197,6 +257,13 @@ function cheapestPriceSum(pool: OrganicPlayerView[], count: number): number {
   const prices = pool.map(price).sort((left, right) => left - right);
   let sum = 0;
   for (let i = 0; i < count && i < prices.length; i += 1) sum += prices[i];
+  return sum;
+}
+
+/** Summe der `count` ersten Werte einer aufsteigend sortierten Preisliste. */
+function cheapestFromSorted(sortiert: readonly number[], count: number): number {
+  let sum = 0;
+  for (let i = 0; i < count && i < sortiert.length; i += 1) sum += sortiert[i]!;
   return sum;
 }
 
@@ -239,7 +306,17 @@ export type OrganicBuyStepCandidate = {
   player: OrganicPlayerView;
 };
 
+/**
+ * PROTOTYP KADERPLAN: welcher Rueckfall den Kauf dieses Schritts geliefert hat. Mit dem Kaderplan duerfen sie nicht greifen
+ * (gezaehlt in der Messung); ohne Kaderplan sind sie die bisherigen Wege und werden nur mitgeschrieben.
+ */
+export type KaderplanNotweg = "fueller_rueckfall" | "ruecklage_angetastet" | "ohne_mindestreserve" | "topf_ueberzogen";
+
 export type OrganicBuyStepResult = {
+  /** Rueckfall, der den Kauf geliefert hat (s. KaderplanNotweg); `undefined` = regulaerer Kauf nach Plan. */
+  notweg?: KaderplanNotweg;
+  /** PROTOTYP KADERPLAN: die Rahmen-Rechnung dieses Schritts (nur unter Opt mit Schalter). */
+  kaderplan?: KaderplanRahmen;
   /**
    * `buy`: `best` kaufen. `stop`: das Team hört auf (Stop-Nutzen schlägt den besten Kauf, Kader ≥ Minimum).
    * `roster_full`: Kader-Maximum erreicht. `nothing_affordable`: kein Kandidat passt in die Kasse.
@@ -316,6 +393,87 @@ function buildStepTeamState(input: OrganicSquadPlanInput, step: OrganicPlanStepS
   };
 }
 
+export type KaderplanRahmen = {
+  /** Kadergroesse, die der Rahmen nach diesem Kauf zum Platzpreis traegt (Kader + dieser Kauf + reservierte Plaetze). */
+  plaetze: number;
+  /** Reservierter Betrag fuer die restlichen Plaetze. */
+  reserve: number;
+  /** Fueller (< Platzpreis-Untergrenze) gesperrt, weil der Rahmen alle Plaetze bis Opt zum Platzpreis traegt. */
+  fuellerSperre: boolean;
+};
+
+/**
+ * PROTOTYP KADERPLAN: welche Plaetze bis Opt reserviert der naechste Kauf, und sind Fueller gesperrt? Rechnet gegen die Kasse
+ * (minus Untergrenze) UND den Transfertopf des Vorstands (Chris: „mit dem freigegebenen Rahmen rechnen und trotzdem die Slots
+ * fuellen"). Platzpreis aus `economy.platzPreise` (Startpool des Drafts), sonst aus dem aktuellen Pool.
+ */
+export function kaderplanRahmen(input: OrganicSquadPlanInput, step: OrganicPlanStepState): KaderplanRahmen {
+  const rosterMin = input.economy.rosterMin ?? ROSTER_MIN;
+  const optTarget = input.economy.weights.optTarget;
+  const cashBuffer = input.economy.cashBuffer;
+  const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
+  const minFillFloor = Math.max(0, input.economy.minFillFloor ?? 0);
+  const feeCap = input.economy.feeCap;
+  const { squad, pool, cash, spentFee } = step;
+  const belowMin = squad.length < rosterMin;
+  const belowOpt = squad.length < optTarget;
+  const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
+  const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
+  const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
+  const sortiertePreise = input.economy.platzPreise ?? pool.map(price).sort((left, right) => left - right);
+  let billigster = Infinity;
+  for (const candidate of pool) billigster = Math.min(billigster, price(candidate));
+  if (!Number.isFinite(billigster)) billigster = 0;
+  const voll = Math.max(0, optTarget - (squad.length + 1));
+  // Plaetze, die der Rahmen NICHT zum Platzpreis traegt, werden trotzdem reserviert — zum Preis der billigsten Spieler im
+  // aktuellen Pool. So bleibt der Zielkader immer erreichbar (Chris: „trotzdem die Slots fuellen"), und die Fueller-Sperre
+  // kann Spieler ab Platzpreis bevorzugen, ohne die letzten Plaetze leer zu lassen.
+  const aktuellePreise = pool.map(price).sort((left, right) => left - right);
+  const reserveFuer = (n: number) =>
+    Math.max(reserveForMin, platzReserve(sortiertePreise, n, input.economy.platzWettbewerb) + cheapestFromSorted(aktuellePreise, voll - n));
+  const traegtNicht = (n: number) => {
+    const reserve = reserveFuer(n);
+    return cash - billigster - reserve < affordFloor || (feeCap != null && spentFee + billigster + reserve > feeCap + 1e-9);
+  };
+  let rest = voll;
+  while (rest > 0 && traegtNicht(rest)) rest -= 1;
+  const reserve = reserveFuer(rest);
+  // Traegt der Rahmen ALLE geplanten Plaetze zum Platzpreis, gibt es keinen Grund fuer einen Fueller unter dem Platzpreis
+  // (Chris: „keine filler mehr"). Nur ein Team, das sich den Zielkader so nicht leisten kann, darf darunter greifen.
+  // Gegen den billigsten Spieler ab Platzpreis, der JETZT im Pool liegt (nicht gegen die nackte 12): im Einzelschritt sind die
+  // 12,0er spaet laengst vergeben, und eine Sperre gegen einen Preis, den es nicht mehr gibt, verspricht etwas Unmoegliches.
+  const billigsterPlatz = aktuellePreise.find((wert) => wert >= KADERPLAN_PLATZ_MIN_MW) ?? Infinity;
+  const fuellerSperre =
+    rest >= voll &&
+    cash - billigsterPlatz - reserve >= affordFloor &&
+    (feeCap == null || spentFee + billigsterPlatz + reserve <= feeCap + 1e-9);
+  return { plaetze: squad.length + 1 + rest, reserve, fuellerSperre };
+}
+
+/**
+ * PROTOTYP KADERPLAN: Protokoll am Ende eines Plans (Block) bzw. beim Ausstieg (Einzelschritt). `start` ist der Planzustand zu
+ * Beginn (vor dem ersten Kauf), `ende` der Zustand am Schluss.
+ */
+export function kaderplanProtokoll(
+  input: OrganicSquadPlanInput,
+  start: OrganicPlanStepState,
+  ende: Pick<OrganicPlanStepState, "squad">,
+  notwege: KaderplanNotweg[] = [],
+): KaderplanProtokoll {
+  const optTarget = input.economy.weights.optTarget;
+  const kader = ende.squad.length;
+  const rahmenPlaetze = start.squad.length < optTarget ? kaderplanRahmen(input, start).plaetze : start.squad.length;
+  const grund: KaderplanGrund =
+    kader < optTarget ? "unter_opt_rahmen_erschoepft" : rahmenPlaetze >= optTarget ? "opt_erreicht" : "opt_erreicht_tiefe_vor_qualitaet";
+  const text =
+    grund === "opt_erreicht"
+      ? `Zielkader ${optTarget} erreicht, Rahmen trug alle Plaetze ab ${KADERPLAN_PLATZ_MIN_MW}`
+      : grund === "opt_erreicht_tiefe_vor_qualitaet"
+        ? `Zielkader ${optTarget} erreicht; der Rahmen trug zu Beginn nur ${rahmenPlaetze} Plaetze ab ${KADERPLAN_PLATZ_MIN_MW}, der Rest bewusst guenstiger besetzt (Tiefe vor Qualitaet)`
+        : `nur ${kader} von ${optTarget}: Rahmen erschoepft (auch der billigste Spieler passte nicht mehr in Kasse/Topf)`;
+  return { grund, optTarget, kader, rahmenPlaetze, notwege, text };
+}
+
 /**
  * EIN Schritt des Greedy-Loops: welcher Kauf (oder Stop) gewinnt beim aktuellen Zustand? Liest den Zustand nur,
  * ändert ihn nicht — den Kauf wendet `applyOrganicBuyStep` an.
@@ -373,27 +531,10 @@ export function organicBuyStep(
   // check). Below rosterMin this is skipped entirely: reaching the hard minimum (survival) always wins
   // over the ceiling, matching the belowMin-ignores-cashBuffer precedent already established above.
   const salaryCeilingActive = !belowMin && typeof salaryCeiling === "number" && Number.isFinite(salaryCeiling);
-  // PROTOTYP KADERPLAN (s. istKaderplanAktiv): Reserve fuer die restlichen geplanten Plaetze bis Opt. Traegt die Kasse nicht
-  // alle, plant das Team so viele Plaetze, wie sie traegt (nie mehr reservieren als ausgegeben werden kann).
-  let reserveForPlan = reserveForMin;
-  let fuellerSperre = false;
-  if (istKaderplanAktiv() && belowOpt) {
-    const sortiertePreise = pool.map(price).sort((left, right) => left - right);
-    const billigster = sortiertePreise[0] ?? 0;
-    let rest = Math.max(0, optTarget - (squad.length + 1));
-    const traegtNicht = (n: number) => {
-      const reserve = platzReserve(sortiertePreise, n);
-      return cash - billigster - reserve < affordFloor || (feeCap != null && spentFee + billigster + reserve > feeCap + 1e-9);
-    };
-    while (rest > remainingToMinAfterBuy && traegtNicht(rest)) rest -= 1;
-    reserveForPlan = Math.max(reserveForMin, platzReserve(sortiertePreise, rest));
-    // Traegt die Kasse ALLE geplanten Plaetze zum Platzpreis, gibt es keinen Grund fuer einen Fueller unter dem Platzpreis
-    // (Chris: „keine filler mehr"). Nur ein Team, das sich den Zielkader so nicht leisten kann, darf darunter greifen.
-    fuellerSperre =
-      rest >= Math.max(0, optTarget - (squad.length + 1)) &&
-      cash - KADERPLAN_PLATZ_MIN_MW - reserveForPlan >= affordFloor &&
-      (feeCap == null || spentFee + KADERPLAN_PLATZ_MIN_MW + reserveForPlan <= feeCap + 1e-9);
-  }
+  // PROTOTYP KADERPLAN (s. istKaderplanAktiv): Reserve fuer die restlichen geplanten Plaetze bis Opt (s. kaderplanRahmen).
+  const rahmen = istKaderplanAktiv() && belowOpt ? kaderplanRahmen(input, step) : null;
+  const reserveForPlan = rahmen ? Math.max(reserveForMin, rahmen.reserve) : reserveForMin;
+  const fuellerSperre = rahmen?.fuellerSperre ?? false;
   let best: OrganicPlayerView | null = null;
   let bestUtility = -Infinity;
   // Nur fuer den Einzelschritt-Draft (topN > 1): alle bewerteten Kandidaten des Durchgangs, der `best` liefert.
@@ -422,10 +563,16 @@ export function organicBuyStep(
       score(candidate);
     }
   };
-  hauptDurchgang(fuellerSperre);
-  // Die Fueller-Sperre gilt nur, solange ein Spieler ab Platzpreis durch ALLE Schranken passt (auch den Gehaltstopf);
-  // sonst bleibt der Platz nicht leer, sondern wird mit dem bestbewerteten bezahlbaren Spieler besetzt.
-  if (!best && fuellerSperre) hauptDurchgang(false);
+  const sperreAktiv = rahmen ? (fuellerSperreImmer() ? true : fuellerSperre) : false;
+  hauptDurchgang(sperreAktiv);
+  // Plaetze, die der Plan selbst als guenstige Plaetze vorsieht (Rahmen traegt nicht alle zum Platzpreis), duerfen mit dem
+  // bestbewerteten guenstigeren Spieler besetzt werden — das ist Plan, kein Notweg. Sah der Plan ALLE Plaetze zum Platzpreis
+  // vor und passt trotzdem keiner, ist das ein Planfehler: laut protokolliert (`notweg`), in der Messung gezaehlt.
+  let notweg: KaderplanNotweg | undefined;
+  if (!best && sperreAktiv) {
+    hauptDurchgang(false);
+    if (best && rahmen?.fuellerSperre) notweg = "fueller_rueckfall";
+  }
 
   // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
   // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
@@ -436,6 +583,7 @@ export function organicBuyStep(
       if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       score(candidate);
     }
+    if (best) notweg = "ruecklage_angetastet";
   }
 
   // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
@@ -447,6 +595,7 @@ export function organicBuyStep(
       if (cash - price(candidate) < 0) continue;
       score(candidate);
     }
+    if (best) notweg = "ohne_mindestreserve";
   }
 
   // Auffangnetz (#1618): unter dem Pflichtkader mit Toepfen der billigste bezahlbare Spieler (darf den Topf ueberziehen).
@@ -464,6 +613,7 @@ export function organicBuyStep(
           score(candidate);
         }
       }
+      if (best) notweg = "topf_ueberzogen";
     } else {
       let billigster: OrganicPlayerView | null = null;
       for (const candidate of pool) {
@@ -472,6 +622,11 @@ export function organicBuyStep(
       }
       if (billigster) score(billigster);
     }
+  }
+
+  if (notweg && istKaderplanAktiv()) {
+    // Laut: mit dem Kaderplan darf keiner dieser Wege greifen (der Plan reserviert von Anfang an bis Opt).
+    console.warn(`[kaderplan] NOTWEG ${notweg} bei Kader ${squad.length} (Opt ${optTarget}, Kasse ${Math.round(cash * 10) / 10})`);
   }
 
   const chosen = best as OrganicPlayerView | null;
@@ -488,6 +643,8 @@ export function organicBuyStep(
     // a club that can't reach min with its available cash simply stops under-filled; that is logged
     // (stoppedBelowMin), not resolved by shedding a body here.
     return {
+      kaderplan: rahmen ?? undefined,
+      notweg,
       kind: "nothing_affordable",
       best: null,
       bestUtility,
@@ -503,11 +660,11 @@ export function organicBuyStep(
   if (squad.length >= rosterMin && !(istKaderplanAktiv() && belowOpt)) {
     const stop = stopUtility(state);
     if (stop >= bestUtility) {
-      return { kind: "stop", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
+      return { kaderplan: rahmen ?? undefined, notweg, kind: "stop", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
     }
-    return { kind: "buy", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
+    return { kaderplan: rahmen ?? undefined, notweg, kind: "buy", best: chosen, bestUtility, stopUtility: stop, top, stoppedBelowMin: false };
   }
-  return { kind: "buy", best: chosen, bestUtility, stopUtility: null, top, stoppedBelowMin: false };
+  return { kaderplan: rahmen ?? undefined, notweg, kind: "buy", best: chosen, bestUtility, stopUtility: null, top, stoppedBelowMin: false };
 }
 
 /** Wendet einen Kauf auf den Planzustand an — dieselben Fortschreibungen wie bisher im Loop. */
@@ -532,7 +689,9 @@ export function applyOrganicBuyStep(
 /** Greedy organic squad plan. Deterministic; ties broken by pool order (stable). */
 export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSquadPlanResult {
   const step = createOrganicPlanStepState(input);
+  const start = istKaderplanAktiv() ? createOrganicPlanStepState(input) : null;
   const decisions: OrganicBuyDecision[] = [];
+  const notwege: KaderplanNotweg[] = [];
   let stoppedBelowMin = false;
 
   for (;;) {
@@ -542,6 +701,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       break;
     }
     applyOrganicBuyStep(input, step, result.best);
+    if (result.notweg) notwege.push(result.notweg);
     decisions.push({ playerId: result.best.playerId, step: decisions.length, utility: result.bestUtility });
   }
 
@@ -551,5 +711,6 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     finalCash: step.cash,
     finalSalaryTotal: step.salaryTotal,
     stoppedBelowMin,
+    kaderplan: start ? kaderplanProtokoll(input, start, step, notwege) : undefined,
   };
 }

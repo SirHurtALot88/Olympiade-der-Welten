@@ -20,6 +20,8 @@ import {
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import {
   buildOrganicSquadPlan,
+  istKaderplanAktiv,
+  type KaderplanProtokoll,
   type OrganicBuyDecision,
   type OrganicSquadPlanInput,
 } from "@/lib/ai/organic-squad/draft-builder";
@@ -40,7 +42,7 @@ import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/org
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
-import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   istKiRuecklageV2Aktiv,
@@ -384,7 +386,25 @@ export type OrganicDraftPlanInput = {
    * Kader ALLER Teams), und ein Team könnte seine Lizenz mitten im Draft verlieren. `undefined` = wie bisher rechnen.
    */
   superstarLizenz?: boolean;
+  /**
+   * PROTOTYP KADERPLAN (`OLY_KI_KADERPLAN=1`): Preise des Pools zu DRAFT-BEGINN (aufsteigend, s. `kaderplanPlatzPreise`),
+   * damit Block und Einzelschritt mit demselben Platzpreis planen. Fehlt sie, gilt der aktuelle Pool.
+   */
+  platzPreise?: number[];
+  /** PROTOTYP KADERPLAN: Teams, die im Einzelschritt-Draft noch reihum picken (s. `economy.platzWettbewerb`). */
+  platzWettbewerb?: number;
 };
+
+/**
+ * PROTOTYP KADERPLAN: Platzpreis-Liste aus einem Pool (Marktwert > 0, aufsteigend). Aufrufer reichen den Pool zu Beginn des
+ * Drafts bzw. des Kauffensters herein, nicht den Restpool.
+ */
+export function kaderplanPlatzPreise(pool: readonly Player[]): number[] {
+  return pool
+    .map((player) => Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0))
+    .filter((wert) => wert > 0)
+    .sort((left, right) => left - right);
+}
 
 export type OrganicDraftPlanResult = {
   decisions: OrganicBuyDecision[];
@@ -406,6 +426,8 @@ export type OrganicDraftPlanResult = {
   vorstandDebug?: VorstandBudgetStand;
   /** Finanzkonzept V2 Stufe 2: der in den Forecast eingespeiste erwartete Sponsor (C). */
   sponsorForecast?: number;
+  /** PROTOTYP KADERPLAN: Grund der Kadergroesse (nur mit `OLY_KI_KADERPLAN=1`), mit der GM-Entscheidung zum Opt. */
+  kaderplan?: KaderplanProtokoll & { optEntscheidung?: KaderplanOptEntscheidung };
 };
 
 /**
@@ -471,7 +493,11 @@ function buildOrganicPlanContext(input: {
  * lässt die Schleife darauf laufen; der Liga-Draft im Einzelschritt (lib/draft/liga-draft-ki.ts) baut ihn je Pick neu
  * und macht nur EINEN Schritt (`organicBuyStep`). Eine Quelle für beide Wege.
  */
+/** PROTOTYP KADERPLAN: Ziel-Kader aus Identitaet (Blatt + GM-Tiefe) und die bewusste GM-Senkung (s. gmKaderOptAnpassung). */
+export type KaderplanOptEntscheidung = { identitaetsOpt: number; optTarget: number; gmDelta: number; grund: string | null };
+
 export type OrganicDraftFrame = {
+  optEntscheidung?: KaderplanOptEntscheidung;
   planInput: OrganicSquadPlanInput;
   optTarget: number;
   /** Die Ruecklage, mit der geplant wird (in Saison 1 halbiert, s. unten). */
@@ -511,6 +537,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     ruecklageDebug: frame.ruecklageDebug,
     vorstandDebug: frame.vorstandDebug,
     sponsorForecast: frame.sponsorForecast,
+    kaderplan: result.kaderplan ? { ...result.kaderplan, optEntscheidung: frame.optEntscheidung } : undefined,
   };
 }
 
@@ -577,6 +604,18 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     if (trimmedOpt !== ctx.weights.optTarget) {
       planWeights = { ...ctx.weights, optTarget: trimmedOpt };
     }
+  }
+
+  // PROTOTYP KADERPLAN: bewusste GM-Entscheidung „weniger, dafuer staerker" (hoechstens −2, nie unter Minimum + 1), protokolliert.
+  let optEntscheidung: KaderplanOptEntscheidung | undefined;
+  if (istKaderplanAktiv()) {
+    const anpassung = gmKaderOptAnpassung({
+      bias: getTeamGeneralManager(input.gameState, input.team.teamId)?.profile?.bias ?? null,
+      opt: planWeights.optTarget,
+      rosterMin: ROSTER_MIN,
+    });
+    optEntscheidung = { identitaetsOpt: planWeights.optTarget, optTarget: anpassung.opt, gmDelta: anpassung.delta, grund: anpassung.grund };
+    if (anpassung.delta !== 0) planWeights = { ...planWeights, optTarget: anpassung.opt };
   }
 
   // ANPASSUNG COMPOSE (flag-gated): derive an EXPLICIT target role pyramid for this team and hand it to
@@ -697,6 +736,8 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
       minFillFloor: ruecklage > 0 ? ruecklage : undefined,
       feeCap,
       salaryCap,
+      platzPreise: input.platzPreise,
+      platzWettbewerb: input.platzWettbewerb,
     },
     draftSeed: input.draftSeed ?? null,
   };
@@ -706,6 +747,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     optTarget: planWeights.optTarget,
     ruecklage,
     superstarLizenz,
+    optEntscheidung,
     salaryCeilingDebug,
     ruecklageDebug,
     vorstandDebug: vorstand,

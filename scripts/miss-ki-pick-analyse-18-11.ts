@@ -40,8 +40,16 @@ import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setu
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getLeagueOf } from "@/lib/season/league-split";
-import { buildOrganicDraftFrame } from "@/lib/ai/organic-squad/draft-adapter";
-import { applyOrganicBuyStep, createOrganicPlanStepState, organicBuyStep } from "@/lib/ai/organic-squad/draft-builder";
+import { buildOrganicDraftFrame, kaderplanPlatzPreise } from "@/lib/ai/organic-squad/draft-adapter";
+import {
+  applyOrganicBuyStep,
+  createOrganicPlanStepState,
+  istKaderplanAktiv,
+  istKaderplanStartpoolAktiv,
+  kaderplanProtokoll,
+  organicBuyStep,
+  type KaderplanNotweg,
+} from "@/lib/ai/organic-squad/draft-builder";
 import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { buildTeamThemeCompositionRuntimeContext } from "@/lib/ai/team-theme-composition-service";
@@ -82,7 +90,7 @@ type StopArt = "buy" | "stop" | "roster_full" | "nothing_affordable";
  * Greedy-Loop eines Teams rein im Speicher (dieselben drei Schritt-Funktionen wie `buildOrganicSquadPlan`), mit dem
  * Abbruchgrund. `gs` ist der Stand, den das Team bei seinem Zug sieht.
  */
-function planeTeam(gs: GameState, saveId: string, team: Team) {
+function planeTeam(gs: GameState, saveId: string, team: Team, platzPreise?: number[]) {
   const spielerById = new Map(gs.players.map((p) => [p.id, p]));
   const startKader = gs.rosters
     .filter((r) => r.teamId === team.teamId)
@@ -95,9 +103,12 @@ function planeTeam(gs: GameState, saveId: string, team: Team) {
     startingSquad: startKader,
     candidates: freieSpieler(gs),
     draftSeed: `${saveId}:${team.teamId}`,
+    platzPreise,
   });
   const schritt = createOrganicPlanStepState(frame.planInput);
+  const start = createOrganicPlanStepState(frame.planInput);
   const picks: string[] = [];
+  const notwege: KaderplanNotweg[] = [];
   let art: StopArt = "buy";
   let letzterStop: number | null = null;
   let letzterBest: number | null = null;
@@ -107,6 +118,7 @@ function planeTeam(gs: GameState, saveId: string, team: Team) {
     letzterStop = e.stopUtility;
     letzterBest = Number.isFinite(e.bestUtility) ? e.bestUtility : null;
     if (e.kind !== "buy" || !e.best) break;
+    if (e.notweg) notwege.push(e.notweg);
     applyOrganicBuyStep(frame.planInput, schritt, e.best);
     picks.push(e.best.playerId);
   }
@@ -124,6 +136,10 @@ function planeTeam(gs: GameState, saveId: string, team: Team) {
     komposition: frame.planInput.composition?.counts ?? null,
     gewichte: frame.planInput.economy.weights,
     poolGroesse: frame.planInput.candidates.length,
+    kaderplan: istKaderplanAktiv()
+      ? { ...kaderplanProtokoll(frame.planInput, start, schritt, notwege), optEntscheidung: frame.optEntscheidung ?? null }
+      : null,
+    notwege,
   };
 }
 
@@ -197,6 +213,10 @@ function kaderBild(gs: GameState, teamId: string, brackets: ReturnType<typeof bu
   const team = gs.teams.find((t) => t.teamId === teamId)!;
   return {
     kader: kader.length,
+    // Je Spieler Marktwert und Gehalt (absteigend nach Marktwert), fuer die relative Star-Definition der Auswertung.
+    spielerWerte: [...kader]
+      .sort((a, b) => preisVon(b) - preisVon(a))
+      .map((p) => ({ mw: r2(preisVon(p)), gehalt: r2(Math.max(0, p.salaryDemand ?? p.displaySalary ?? 0)) })),
     stufen,
     marktwertSumme: r2(summe),
     top1Anteil: summe > 0 ? r2((mws[0] ?? 0) / summe) : 0,
@@ -257,11 +277,13 @@ async function main() {
     poolWertSumme: r2(kaufbar.reduce((a, b) => a + b, 0)),
   };
   log(`Pool: ${pool.spielerImSpielstand} Spieler, frei ${pool.frei}, kaufbar ${pool.kaufbarMwGroesser0}`);
+  // Wie Block-Lauf und Einzelschritt: Platzpreis aus dem Pool zu Draft-Beginn (nur mit Kaderplan gelesen).
+  const startPreise = istKaderplanAktiv() && istKaderplanStartpoolAktiv() ? kaderplanPlatzPreise(frei0) : undefined;
 
   // ---- Stammdaten + Solo-Plan je Team ----
   const teams: Record<string, Record<string, unknown>> = {};
   for (const team of gs0.teams) {
-    const solo = planeTeam(gs0, saveId, team);
+    const solo = planeTeam(gs0, saveId, team, startPreise);
     const soloStand = kaufeImSpeicher(gs0, team.teamId, solo.picks);
     teams[team.teamId] = {
       ...teamStammdaten(gs0, team),
@@ -283,7 +305,7 @@ async function main() {
     const jeTeam: Record<string, unknown> = {};
     reihenfolge.forEach((teamId, platz) => {
       const team = gsSim.teams.find((t) => t.teamId === teamId)!;
-      const plan = planeTeam(gsSim, saveId, team);
+      const plan = planeTeam(gsSim, saveId, team, startPreise);
       gsSim = kaufeImSpeicher(gsSim, teamId, plan.picks);
       jeTeam[teamId] = { platz: platz + 1, ...plan };
     });
@@ -314,7 +336,15 @@ async function main() {
       const k = `${e.art}:${e.grund ?? "-"}`;
       grundZaehler[k] = (grundZaehler[k] ?? 0) + 1;
     }
+    const kaderplanGruende: Record<string, number> = {};
+    for (const e of d.verlauf) {
+      const treffer = /kaderplan:([a-z_]+)/.exec(e.grund ?? "");
+      if (treffer) kaderplanGruende[treffer[1]!] = (kaderplanGruende[treffer[1]!] ?? 0) + 1;
+      const notweg = /notweg:([a-z_]+)/.exec(e.grund ?? "");
+      if (notweg) kaderplanGruende[`notweg_${notweg[1]!}`] = (kaderplanGruende[`notweg_${notweg[1]!}`] ?? 0) + 1;
+    }
     einzelschritt = {
+      kaderplanGruende,
       zuege,
       halt,
       status: d.status,

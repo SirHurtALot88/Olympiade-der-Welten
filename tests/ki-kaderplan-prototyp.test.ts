@@ -7,10 +7,17 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildOrganicSquadPlan, KADERPLAN_PLATZ_MIN_MW, type OrganicSquadPlanInput } from "@/lib/ai/organic-squad/draft-builder";
+import {
+  buildOrganicSquadPlan,
+  createOrganicPlanStepState,
+  KADERPLAN_PLATZ_MIN_MW,
+  kaderplanRahmen,
+  type OrganicSquadPlanInput,
+} from "@/lib/ai/organic-squad/draft-builder";
 import type { CoreAxis, OrganicDiscipline, OrganicPlayerView } from "@/lib/ai/organic-squad/types";
 import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import { kaufeMitNachruecken, LIGA_DRAFT_KI_TOPN_STUFEN } from "@/lib/draft/liga-draft-dienst";
+import { gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
 
 afterEach(() => {
   delete process.env.OLY_KI_KADERPLAN;
@@ -123,5 +130,70 @@ describe("Kaderplan: kein Billigster-Spieler-Notweg", () => {
     });
     expect(ergebnis.ok && ergebnis.playerId).toBe("r250");
     expect(ergebnis.ok && ergebnis.ausNotfall).toBe(false);
+  });
+});
+
+describe("Kaderplan: Protokoll und Platzpreis aus dem Startpool", () => {
+  it("jeder Plan traegt einen Grund fuer seine Kadergroesse; ohne Schalter keinen", () => {
+    const input = eingabe(11, 260, 13);
+    expect(buildOrganicSquadPlan(input).kaderplan).toBeUndefined();
+    process.env.OLY_KI_KADERPLAN = "1";
+    const plan = buildOrganicSquadPlan(input);
+    expect(plan.kaderplan).toBeDefined();
+    expect(plan.kaderplan!.kader).toBe(plan.finalSquad.length);
+    expect(plan.kaderplan!.optTarget).toBe(input.economy.weights.optTarget);
+    if (plan.finalSquad.length >= plan.kaderplan!.optTarget) {
+      expect(["opt_erreicht", "opt_erreicht_tiefe_vor_qualitaet"]).toContain(plan.kaderplan!.grund);
+    } else {
+      expect(plan.kaderplan!.grund).toBe("unter_opt_rahmen_erschoepft");
+    }
+    expect(plan.kaderplan!.text.length).toBeGreaterThan(10);
+  });
+
+  it("knappes Geld: Zielkader trotzdem erreicht, Protokoll sagt „Tiefe vor Qualitaet\" statt still unter Opt", () => {
+    process.env.OLY_KI_KADERPLAN = "1";
+    const input = eingabe(5, 150, 14);
+    const plan = buildOrganicSquadPlan(input);
+    expect(plan.finalSquad.length).toBeGreaterThanOrEqual(input.economy.weights.optTarget);
+    expect(plan.kaderplan!.grund).toBe("opt_erreicht_tiefe_vor_qualitaet");
+    expect(plan.kaderplan!.rahmenPlaetze).toBeLessThan(input.economy.weights.optTarget);
+  });
+
+  it("Platzpreis aus dem Startpool: billige 12er im Restpool weg, die Reserve bleibt beim Startpreis", () => {
+    process.env.OLY_KI_KADERPLAN = "1";
+    const input = eingabe(9, 240, 12);
+    const start = createOrganicPlanStepState(input);
+    const startPreise = input.candidates.map((p) => p.marketValue).sort((a, b) => a - b);
+    // Restpool ohne alle Spieler zwischen 12 und 20 (die haben andere Teams schon genommen).
+    const restInput = { ...input, candidates: input.candidates.filter((p) => p.marketValue < 12 || p.marketValue > 20) };
+    const rest = createOrganicPlanStepState(restInput);
+    const mitRestpool = kaderplanRahmen(restInput, rest);
+    const mitStartpool = kaderplanRahmen({ ...restInput, economy: { ...restInput.economy, platzPreise: startPreise } }, rest);
+    expect(mitStartpool.reserve).toBeLessThan(mitRestpool.reserve);
+    expect(kaderplanRahmen({ ...input, economy: { ...input.economy, platzPreise: startPreise } }, start).reserve).toBeCloseTo(
+      kaderplanRahmen(input, start).reserve,
+      6,
+    );
+  });
+});
+
+describe("Kaderplan: bewusste GM-Senkung des Opt (weniger, dafuer staerker)", () => {
+  it("hoechstens −2, nie unter Minimum + 1, Tiefen-GM senkt nie, Grund protokolliert", () => {
+    const star = gmKaderOptAnpassung({ bias: { starPriority: 10, eliteSmallRosterPreference: 9, rosterDepthPreference: 3 }, opt: 12, rosterMin: 8 });
+    expect(star.opt).toBe(10);
+    expect(star.grund).toContain("weniger Spieler, dafuer staerker");
+    const knapp = gmKaderOptAnpassung({ bias: { starPriority: 10, eliteSmallRosterPreference: 9 }, opt: 10, rosterMin: 8 });
+    expect(knapp.opt).toBe(9);
+    const mittel = gmKaderOptAnpassung({ bias: { starPriority: 8, eliteSmallRosterPreference: 7 }, opt: 13, rosterMin: 8 });
+    expect(mittel.opt).toBe(12);
+    const tiefe = gmKaderOptAnpassung({ bias: { starPriority: 10, eliteSmallRosterPreference: 10, rosterDepthPreference: 8 }, opt: 14, rosterMin: 8 });
+    expect(tiefe.opt).toBe(14);
+    expect(tiefe.grund).toBeNull();
+    expect(gmKaderOptAnpassung({ bias: null, opt: 12, rosterMin: 8 }).delta).toBe(0);
+    for (let opt = 8; opt <= 14; opt += 1) {
+      const r = gmKaderOptAnpassung({ bias: { starPriority: 10, eliteSmallRosterPreference: 10 }, opt, rosterMin: 8 });
+      expect(r.opt).toBeGreaterThanOrEqual(Math.min(opt, 9));
+      expect(opt - r.opt).toBeLessThanOrEqual(2);
+    }
   });
 });

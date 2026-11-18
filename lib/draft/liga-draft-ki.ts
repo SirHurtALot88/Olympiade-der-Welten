@@ -18,14 +18,24 @@
  * Reihenfolge; Test `liga-draft-kern.test.ts`), aber ohne dessen 0,5–0,8 s je Aufruf.
  */
 import type { GameState, LigaDraftZustand, Player, Team } from "@/lib/data/olyDataTypes";
-import { buildOrganicDraftFrame, toOrganicPlayerView } from "@/lib/ai/organic-squad/draft-adapter";
+import {
+  buildOrganicDraftFrame,
+  kaderplanPlatzPreise,
+  toOrganicPlayerView,
+  type KaderplanOptEntscheidung,
+} from "@/lib/ai/organic-squad/draft-adapter";
 import { computeDisciplineNeeds } from "@/lib/ai/organic-squad/discipline-need";
 import { SOLIDE_THRESHOLD, type OrganicPlayerView } from "@/lib/ai/organic-squad/types";
 import { buildLeagueMarketBrackets, type LeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   applyOrganicBuyStep,
   createOrganicPlanStepState,
+  istKaderplanAktiv,
+  istKaderplanStartpoolAktiv,
+  kaderplanProtokoll,
   organicBuyStep,
+  type KaderplanNotweg,
+  type KaderplanProtokoll,
   type OrganicBuyStepResult,
 } from "@/lib/ai/organic-squad/draft-builder";
 
@@ -62,7 +72,18 @@ export type LigaDraftKiBewertung = {
   /** Die Rücklage, mit der das Team plant (Saison 1: halb), und sein Zielkader. */
   ruecklage: number;
   optTarget: number;
+  /** PROTOTYP KADERPLAN: Grund der Kadergroesse, wenn das Team mit diesem Schritt aussteigt (nur mit Schalter). */
+  kaderplan?: KaderplanProtokoll & { optEntscheidung?: KaderplanOptEntscheidung };
+  /** PROTOTYP KADERPLAN: Rueckfall, der Platz 1 geliefert hat (soll nie vorkommen; im Verlauf als `notweg:` gezaehlt). */
+  notweg?: KaderplanNotweg;
 };
+
+/** PROTOTYP KADERPLAN: Platzpreise aus dem Pool zu DRAFT-BEGINN (alle Spieler ohne Startkader eines Draft-Teams). */
+function platzPreiseZuDraftBeginn(gameState: GameState, draft: LigaDraftZustand): number[] {
+  const startKader = new Set<string>();
+  for (const team of Object.values(draft.teams)) for (const id of team.startKaderIds) startKader.add(id);
+  return kaderplanPlatzPreise((gameState.players ?? []).filter((spieler) => !startKader.has(spieler.id)));
+}
 
 /** Spieler ohne Kader in Spielstand-Reihenfolge (= Feed des Blocklaufs im frischen Saison-1-Stand). */
 export function freieSpieler(gameState: Pick<GameState, "players" | "rosters">): Player[] {
@@ -135,6 +156,11 @@ export function bewerteKiPick(input: {
     candidates: input.freiePool ?? freieSpieler(gameState),
     draftSeed: draftSaatFuerTeam(input.saveId, teamId),
     superstarLizenz: draftTeam.superstarLizenz ?? undefined,
+    platzPreise: istKaderplanAktiv() && istKaderplanStartpoolAktiv() ? platzPreiseZuDraftBeginn(gameState, draft) : undefined,
+    // Wettbewerb um die billigen Plaetze: alle Teams, die noch in der Reihenfolge picken (ohne Nachzug und fertige).
+    platzWettbewerb: istKaderplanAktiv()
+      ? Math.max(1, Object.values(draft.teams).filter((eintrag) => eintrag.status === "aktiv").length)
+      : undefined,
   });
 
   // Bisherige Draft-Picks als Käufe dieses Plans einspielen (gleiche Sicht wie im Rahmen: ohne Theme-Fit, mit Potenzial).
@@ -149,6 +175,10 @@ export function bewerteKiPick(input: {
   schritt.cash = gameState.teams.find((eintrag) => eintrag.teamId === teamId)?.cash ?? schritt.cash;
 
   const ergebnis = organicBuyStep(frame.planInput, schritt, { topN: Math.max(1, input.topN ?? 3) });
+  const kaderplan =
+    istKaderplanAktiv() && ergebnis.kind !== "buy"
+      ? { ...kaderplanProtokoll(frame.planInput, createOrganicPlanStepState(frame.planInput), schritt), optEntscheidung: frame.optEntscheidung }
+      : undefined;
   const offeneDisziplinen = computeDisciplineNeeds(schritt.squad, frame.planInput.identityAxisWeights, frame.planInput.disciplines)
     .filter((bedarf) => bedarf.coveredCount === 0)
     .sort((a, b) => b.needWeight - a.needWeight)
@@ -169,6 +199,8 @@ export function bewerteKiPick(input: {
     stopNutzen: ergebnis.stopUtility == null ? null : Math.round(ergebnis.stopUtility * 100) / 100,
     ruecklage: frame.ruecklage,
     optTarget: frame.optTarget,
+    kaderplan,
+    notweg: ergebnis.kind === "buy" ? ergebnis.notweg : undefined,
   };
 }
 
