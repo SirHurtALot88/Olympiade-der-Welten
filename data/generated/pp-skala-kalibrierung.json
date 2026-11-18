@@ -1,0 +1,197 @@
+{
+  "hinweis": "PP-Skala-Prototyp (docs/design/pp-skala-18-11.md, Variante C2): je Disziplin rTop = Median der ungedeckelten Tagesbesten (-> 5 PP), rMed = Median aller Einsaetze (-> 1,25 PP), beide auf der alten Kurvenskala; faktor = 5/rTop nur zum Vergleich (Variante C). Gemessen mit scripts/miss-pp-skala.ts + scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung. Wirkt nur mit OLY_PP_SKALA=an.",
+  "ziel": 5,
+  "gemessenAm": "2026-11-18",
+  "quellen": [
+    {
+      "saveId": "new-game-1794999566185-ees6r0",
+      "spieltage": 20
+    },
+    {
+      "saveId": "new-game-1795003737169-pwc22d",
+      "spieltage": 20
+    }
+  ],
+  "disziplinen": {
+    "basketball": {
+      "rTop": 8.05,
+      "rMed": 1.3,
+      "faktor": 0.6211,
+      "medianTagesbester": 8.05,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 1
+    },
+    "battlefield": {
+      "rTop": 4.85,
+      "rMed": 1.165,
+      "faktor": 1.0309,
+      "medianTagesbester": 4.85,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "breaking": {
+      "rTop": 3,
+      "rMed": 0.765,
+      "faktor": 1.6667,
+      "medianTagesbester": 3,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "climbing": {
+      "rTop": 5.5,
+      "rMed": 1.15,
+      "faktor": 0.9091,
+      "medianTagesbester": 5.5,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 4
+    },
+    "eiskunstlauf": {
+      "rTop": 3.54,
+      "rMed": 1.03,
+      "faktor": 1.4124,
+      "medianTagesbester": 3.54,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 4
+    },
+    "fechten": {
+      "rTop": 5.76,
+      "rMed": 1.18,
+      "faktor": 0.8681,
+      "medianTagesbester": 5.76,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "football": {
+      "rTop": 4.28,
+      "rMed": 1.44,
+      "faktor": 1.1682,
+      "medianTagesbester": 4.28,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 2
+    },
+    "gewichtheben": {
+      "rTop": 4.47,
+      "rMed": 1.07,
+      "faktor": 1.1186,
+      "medianTagesbester": 4.47,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "hockey": {
+      "rTop": 8.46,
+      "rMed": 1.29,
+      "faktor": 0.591,
+      "medianTagesbester": 8.46,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 3
+    },
+    "i-spy": {
+      "rTop": 5.64,
+      "rMed": 1.315,
+      "faktor": 0.8865,
+      "medianTagesbester": 5.64,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 4
+    },
+    "mini-dm": {
+      "rTop": 5.08,
+      "rMed": 1.21,
+      "faktor": 0.9843,
+      "medianTagesbester": 5.08,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 1
+    },
+    "showcase": {
+      "rTop": 4.48,
+      "rMed": 1.23,
+      "faktor": 1.1161,
+      "medianTagesbester": 4.48,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "speed-schach": {
+      "rTop": 5.39,
+      "rMed": 1.25,
+      "faktor": 0.9276,
+      "medianTagesbester": 5.39,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 1
+    },
+    "spurt": {
+      "rTop": 2.85,
+      "rMed": 1.37,
+      "faktor": 1.7544,
+      "medianTagesbester": 2.85,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "staffel": {
+      "rTop": 5.5,
+      "rMed": 1.63,
+      "faktor": 0.9091,
+      "medianTagesbester": 5.5,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 3
+    },
+    "takeshis-castle": {
+      "rTop": 4.58,
+      "rMed": 0.935,
+      "faktor": 1.0917,
+      "medianTagesbester": 4.58,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "tdm": {
+      "rTop": 6.08,
+      "rMed": 1.28,
+      "faktor": 0.8224,
+      "medianTagesbester": 6.08,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 2
+    },
+    "tennis": {
+      "rTop": 4.06,
+      "rMed": 0.99,
+      "faktor": 1.2315,
+      "medianTagesbester": 4.06,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 0
+    },
+    "time-trial": {
+      "rTop": 5.5,
+      "rMed": 1.3,
+      "faktor": 0.9091,
+      "medianTagesbester": 5.5,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 4
+    },
+    "wettessen": {
+      "rTop": 4.28,
+      "rMed": 1.19,
+      "faktor": 1.1682,
+      "medianTagesbester": 4.28,
+      "zellen": 8,
+      "zellenRoh": 4,
+      "zensiert": 1
+    }
+  }
+}

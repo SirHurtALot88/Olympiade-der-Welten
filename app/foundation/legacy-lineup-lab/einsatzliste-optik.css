@@ -1,0 +1,623 @@
+/*
+ * EINSATZLISTE, OPTIK-RUNDE (18.11.). Soll: public/mockups/einsatzliste-modern-17-11.html und
+ * form-moral-modern-17-11.html. Kommt NACH einsatzliste-modern.css und überschreibt nur Größen und Fläche:
+ * die Arbeitsfläche nutzt die volle Höhe, die Platzkarten wachsen mit dem Feld (Container-Einheiten),
+ * die Karten-Hand ist eine Kachelreihe, der Reiter „Gegner“ hat eigene Bausteine (.gg-*).
+ */
+
+/* ---------- Raster: volle Höhe, Spalten wachsen mit der Breite ---------- */
+.elm .elm-work {
+  flex: none;
+  height: clamp(560px, calc(100vh - 240px), 1280px);
+  grid-template-columns: minmax(300px, clamp(340px, 19vw, 540px)) minmax(0, 1fr) minmax(300px, clamp(330px, 17.5vw, 480px));
+  gap: clamp(12px, 0.8vw, 20px);
+  padding: clamp(12px, 0.8vw, 20px) clamp(14px, 0.9vw, 22px);
+}
+@media (max-width: 1320px) {
+  .elm .elm-work {
+    grid-template-columns: 300px minmax(0, 1fr) 320px;
+  }
+}
+
+/* ---------- Feld: Fläche (PixelLab) unter den Linien ---------- */
+.elm .elm-pitchw {
+  padding: clamp(10px, 0.8vw, 20px) clamp(12px, 0.9vw, 22px);
+}
+.elm .elm-feld__box {
+  container-type: size;
+  min-height: 320px;
+}
+.elm .elm-feld__box.has-bild {
+  background: #0b0f15;
+}
+.elm-feld__bild {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  /* dezent: die Fläche ist Material, die Karten tragen die Seite (Doku einsatzliste-flaechen-18-11.md) */
+  filter: brightness(0.46) saturate(0.85);
+  pointer-events: none;
+}
+.has-bild .elm-feld__svg {
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(6, 9, 14, 0.78) 100%);
+}
+.has-bild .elm-feld__svg rect:not(.tint) {
+  fill-opacity: 0;
+}
+.has-bild .elm-feld__svg circle[fill]:not([fill="none"]) {
+  fill-opacity: 0.35;
+}
+
+/* ---------- Platzkarten: groß, mit Luft ---------- */
+.elm .elm-slot {
+  --sw: var(--w, clamp(172px, 20cqw, 340px));
+  --sh: clamp(88px, 9.4cqw, 190px);
+  --fh: clamp(120px, 13cqw, 300px);
+  --fue: clamp(8px, 0.9cqw, 16px);
+  /* Die Karte (und die Figur darüber) bleibt im Feld, auch bei Plätzen nahe am Rand. */
+  left: clamp(calc(var(--sw) / 2 + 4px), calc(var(--x) * 100%), calc(100% - var(--sw) / 2 - 4px));
+  top: clamp(calc(var(--fh) * 0.82 + var(--sh) / 2), calc(var(--y) * 100%), calc(100% - var(--sh) / 2 - 8px));
+  width: var(--sw);
+  min-width: 150px;
+  grid-template-columns: clamp(48px, 4.6cqw, 88px) minmax(0, 1fr);
+  column-gap: clamp(8px, 0.9cqw, 16px);
+  padding: 0 clamp(7px, 0.8cqw, 14px) clamp(6px, 0.9cqw, 14px) clamp(9px, 1cqw, 16px);
+  border-radius: clamp(8px, 0.8cqw, 12px);
+}
+.elm .elm-slot__ro {
+  height: clamp(24px, 2.3cqw, 36px);
+  font-size: clamp(11.5px, 1cqw, 15px);
+  margin: 0 calc(-1 * clamp(7px, 0.8cqw, 14px)) clamp(5px, 0.7cqw, 11px) -5px;
+}
+.elm .elm-slot__por {
+  width: clamp(48px, 4.6cqw, 88px);
+  height: clamp(48px, 4.6cqw, 88px);
+}
+.elm .elm-slot__nm {
+  font-size: clamp(15px, 1.5cqw, 25px);
+}
+.elm .elm-slot__ze {
+  gap: clamp(6px, 0.6cqw, 10px);
+}
+.elm .elm-slot__ze strong {
+  font-size: clamp(22px, 2.4cqw, 40px);
+}
+.elm .elm-slot__ze .pg {
+  font-size: clamp(13px, 1.1cqw, 18px);
+}
+.elm .elm-slot__tipp {
+  font-size: clamp(13px, 1.1cqw, 17px);
+}
+.elm .elm-hinw,
+.elm .elm-geist {
+  font-size: clamp(12.5px, 1.05cqw, 17px);
+}
+.elm .elm-slot__raute {
+  width: clamp(16px, 1.4cqw, 22px);
+  height: clamp(16px, 1.4cqw, 22px);
+}
+
+/* Formationen mit zwei Karten je Reihe (TDM, Mini-DM, Battlefield): etwas schmalere Karten, damit sie sich nicht überdecken. */
+.elm .elm-feld__box[data-feld="reihen"] .elm-slot,
+.elm .elm-feld__box[data-feld="domination"] .elm-slot {
+  --sw: var(--w, clamp(160px, 14.5cqw, 290px));
+}
+
+/* Bahnen und Leisten mit vielen Plätzen in einer Reihe: schmalere Karten. */
+.elm .elm-feld__box[data-feld="strecke"] .elm-slot,
+.elm .elm-feld__box[data-feld="staffel"] .elm-slot,
+.elm .elm-feld__box[data-feld="tafel"] .elm-slot {
+  --sw: var(--w, clamp(150px, 12.5cqw, 250px));
+}
+
+/* ---------- Taktik-Leiste und Karten-Hand ---------- */
+.elm .elm-tak {
+  padding: clamp(9px, 0.7vw, 16px) clamp(12px, 0.9vw, 22px);
+  gap: 12px clamp(18px, 1.4vw, 36px);
+}
+.elm .elm-tak .bc-seg button,
+.elm .elm-capwahl {
+  font-size: clamp(15px, 0.85vw, 19px);
+}
+.elm-hand {
+  flex: none;
+  padding: 2px clamp(12px, 0.9vw, 22px) clamp(10px, 0.8vw, 18px);
+  border-top: 1px solid var(--bc-linie);
+}
+.elm-hand__kopf {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: clamp(8px, 0.6vw, 14px);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.elm-hand__kopf b {
+  color: var(--bc-gold);
+  font-weight: 700;
+}
+.elm-hand__kopf small {
+  color: var(--bc-stumm);
+  font-size: inherit;
+  letter-spacing: 0.06em;
+}
+.elm-hand__zeile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(12px, 1vw, 28px);
+  align-items: end;
+}
+.elm-hand__karten {
+  display: flex;
+  gap: clamp(8px, 0.6vw, 14px);
+  min-width: 0;
+  overflow-x: auto;
+  padding: 4px 4px 6px;
+}
+.elm-hka {
+  position: relative;
+  flex: 1 1 0;
+  min-width: clamp(56px, 2.9vw, 84px);
+  max-width: clamp(124px, 7.2vw, 190px);
+  height: clamp(86px, 5.8vw, 132px);
+  display: grid;
+  grid-template-rows: 1.3fr 1fr 2.6fr 1.3fr;
+  border-radius: 8px;
+  border: 1px solid var(--bc-linie-2);
+  background: var(--bc-flaeche-2);
+  overflow: hidden;
+  text-align: center;
+  color: inherit;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.elm-hka:hover:not(:disabled) {
+  border-color: var(--bc-creme);
+  transform: translateY(-2px);
+}
+.elm-hka__fa {
+  background: var(--kf);
+  color: #0b0d12;
+  font-size: clamp(11px, 0.62vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: grid;
+  place-items: center;
+}
+.elm-hka__pa {
+  align-self: end;
+  font-size: clamp(10.5px, 0.58vw, 14px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--bc-stumm);
+}
+.elm-hka.is-passt .elm-hka__pa {
+  color: var(--bc-gold);
+}
+.elm-hka strong {
+  align-self: center;
+  font-size: clamp(30px, 2.1vw, 52px);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--bc-creme);
+}
+.elm-hka.is-neg strong {
+  color: var(--bc-warn);
+}
+.elm-hka__vo {
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  font-size: clamp(12px, 0.68vw, 16px);
+  color: var(--bc-leise);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-top: 1px solid var(--bc-linie);
+  background: rgba(0, 0, 0, 0.25);
+}
+.elm-hka.is-gew {
+  border-color: var(--bc-gold);
+  box-shadow: 0 0 0 2px var(--bc-gold), 0 0 18px rgba(240, 195, 90, 0.3);
+  background: linear-gradient(180deg, rgba(240, 195, 90, 0.14), var(--bc-flaeche-2));
+}
+.elm-hka__nr {
+  position: absolute;
+  right: 4px;
+  top: 28%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bc-gold);
+  color: #17120a;
+  font: normal 700 12px/18px var(--bc-zahl, inherit);
+}
+.elm-hka.is-weg {
+  opacity: 0.42;
+}
+.elm-hand__summe {
+  text-align: right;
+  white-space: nowrap;
+  min-width: clamp(110px, 8vw, 200px);
+  padding-bottom: 6px;
+}
+.elm-hand__summe strong {
+  display: block;
+  font-size: clamp(32px, 2.2vw, 54px);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--bc-creme);
+}
+.elm-hand__summe small {
+  display: block;
+  margin-top: 3px;
+  font-size: clamp(12px, 0.68vw, 16px);
+  color: var(--bc-stumm);
+}
+.elm-hand__warn {
+  white-space: normal;
+  max-width: 260px;
+  color: var(--bc-acht, #f3b54a);
+}
+
+/* ---------- breite Schirme: Kader und Kontext atmen mit ---------- */
+@media (min-width: 2200px) {
+  .elm .elm-kader,
+  .elm .elm-kontext {
+    zoom: 1.14;
+  }
+}
+
+/* ---------- Reiter-Leiste des Kontexts: fünf Reiter, eine Zeile ---------- */
+.elm .elm-ktabs button {
+  font-size: clamp(12.5px, 0.68vw, 15.5px);
+  letter-spacing: 0.04em;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+/* ---------- Reiter „Gegner“ ---------- */
+.gg-schnitt {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: 7px;
+  background: var(--bc-flaeche-2);
+  font-size: 13.5px;
+  color: var(--bc-leise);
+}
+.gg-schnitt b {
+  font-size: 17px;
+  color: var(--bc-heim, var(--bc-gold));
+}
+.gg-schnitt b.is-g {
+  color: var(--bc-gast);
+}
+.gg {
+  display: grid;
+  gap: 14px;
+}
+.gg-karte {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: linear-gradient(100deg, rgba(69, 176, 201, 0.22), transparent 75%);
+  border: 1px solid var(--bc-linie);
+  border-left: 3px solid var(--bc-gast);
+}
+.gg-logo {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
+  border: 2px solid #2a3344;
+  display: grid;
+  place-items: center;
+  color: var(--bc-leise);
+  font-size: 14px;
+  flex: none;
+}
+.gg-logo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gg-karte__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.gg-karte__text b {
+  font: italic 700 23px/1.05 var(--bc-haus);
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-karte__text span:last-child {
+  font-size: 14px;
+  color: var(--bc-leise);
+}
+.gg-karte__scout {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+.gg-karte__scout small {
+  font-size: 12.5px;
+  color: var(--bc-stumm);
+}
+.gg-punkte {
+  display: inline-flex;
+  gap: 4px;
+}
+.gg-punkte i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bc-linie-2);
+}
+.gg-punkte i.an {
+  background: var(--bc-gold);
+  border-color: var(--bc-gold);
+}
+.gg-quelle {
+  margin: -4px 0 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13.5px;
+  line-height: 1.3;
+  color: var(--bc-leise);
+}
+.gg-quelle .bc-marke {
+  flex: none;
+}
+.gg-block > .bc-gk {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.gg-duell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(244, 230, 196, 0.07);
+}
+.gg-duell__l,
+.gg-duell__r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gg-duell__r {
+  justify-content: flex-end;
+  text-align: right;
+}
+.gg-duell__l strong,
+.gg-duell__r strong {
+  font-size: 18px;
+  color: var(--bc-creme);
+  flex: none;
+}
+.gg-duell__nm {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.gg-duell__nm b {
+  font: italic 700 15px/1.15 var(--bc-haus);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-duell__nm small {
+  font-size: 12px;
+  color: var(--bc-stumm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-duell__m {
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 5px;
+  padding: 3px 0;
+  background: var(--bc-flaeche-2);
+}
+.gg-por {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+  border: 1.5px solid #2a3344;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--bc-leise);
+  flex: none;
+}
+.gg-por.is-leer {
+  border-style: dashed;
+}
+.gg-por img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gg-grp {
+  display: grid;
+  grid-template-columns: 26px 38px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(244, 230, 196, 0.07);
+}
+.gg-grp.is-wir {
+  background: linear-gradient(100deg, rgba(240, 195, 90, 0.14), transparent 80%);
+  border-radius: 6px;
+}
+.gg-grp .gg-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  border-width: 1.5px;
+  font-size: 11px;
+}
+.gg-grp__n {
+  font-weight: 700;
+  color: var(--bc-stumm);
+  font-size: 16px;
+}
+.gg-grp.is-wir .gg-grp__n {
+  color: var(--bc-heim, var(--bc-gold));
+}
+.gg-grp__nm {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.gg-grp__nm b {
+  font: italic 700 16px/1.15 var(--bc-haus);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-grp__nm small {
+  font-size: 12px;
+  color: var(--bc-stumm);
+}
+.gg-grp__w {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.gg-grp__w strong {
+  font-size: 20px;
+  color: var(--bc-creme);
+}
+.gg-grp__w small {
+  font-size: 12px;
+  color: var(--bc-stumm);
+}
+.gg-fuss {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--bc-stumm);
+}
+
+/* ---------- Phone: wie bisher ---------- */
+@media (max-width: 760px) {
+  .elm .elm-work {
+    display: block;
+    height: auto;
+    min-height: 0;
+    padding: 8px;
+  }
+  .elm .elm-feld__box {
+    min-height: 280px;
+  }
+  .elm .elm-slot {
+    left: calc(var(--x) * 100%);
+    top: calc(var(--y) * 100%);
+    width: var(--w, clamp(150px, 21%, 210px));
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .elm .elm-slot__por {
+    width: 44px;
+    height: 44px;
+  }
+  .elm .elm-slot__nm {
+    font-size: 14.5px;
+  }
+  .elm .elm-slot__ze strong {
+    font-size: 20px;
+  }
+  .elm-hand__zeile {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .elm-hand__summe {
+    text-align: left;
+  }
+  .gg-grp {
+    grid-template-columns: 22px 34px minmax(0, 1fr) auto;
+  }
+  .gg-grp .bc-marke {
+    display: none;
+  }
+}
+
+/* Die Tafel-Hülle (.bc-pan__koerper) ist ein Block: ohne diese Zeilen bekäme das Feld nie die freie Höhe. */
+.elm .elm-feld > .bc-pan__koerper {
+  display: flex;
+  flex-direction: column;
+}
+.elm .elm-feld .elm-pitchw {
+  flex: 1 1 0;
+  min-height: 0;
+}
+@media (max-width: 760px) {
+  .elm .elm-feld > .bc-pan__koerper {
+    display: block;
+  }
+}
+
+/* ---------- Pixel-Figuren auf dem Feld (PixelLab-Grundposen), stehen auf der Platzkarte ---------- */
+.elm-slot__fig {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - var(--fue));
+  height: var(--fh);
+  width: auto;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+  filter: drop-shadow(0 0.4rem 0.3rem rgba(0, 0, 0, 0.5));
+  z-index: 2;
+}
+.elm .elm-geist {
+  overflow: visible;
+}
+.elm-geist__fig {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  height: clamp(60px, 5.8cqw, 128px);
+  width: auto;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+  filter: drop-shadow(0 0.3rem 0.25rem rgba(0, 0, 0, 0.5)) saturate(0.9);
+  opacity: 0.92;
+}
+@media (max-width: 760px) {
+  .elm-slot__fig,
+  .elm-geist__fig {
+    display: none;
+  }
+}

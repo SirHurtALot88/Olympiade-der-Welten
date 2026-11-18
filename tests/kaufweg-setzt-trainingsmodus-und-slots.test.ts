@@ -99,22 +99,22 @@ describe("hnbng4 — der Trainings-Vorgabewert am manuellen Kaufweg", () => {
 });
 
 describe("3tklpq — „Slots offen“ zaehlt bis zum Limit, nicht bis zum KI-Ziel", () => {
-  const client = quelle("app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
+  const client = quelle("app/foundation/transfermarkt-modern/TransfermarktModern.tsx");
 
   it("rechnet die freien Plaetze gegen das Kaderlimit", () => {
     // Geprueft wird die Zusage, nicht die Schreibweise: die Kapazitaet stammt aus `rosterLimit`.
-    expect(client).toContain("const rosterKapazitaet = selectedTeam?.rosterLimit");
-    expect(client).toContain("rosterKapazitaet - marketContext.rosterCount");
+    expect(client).toContain("const kaderLimit = team?.rosterLimit");
+    expect(client).toContain("kaderLimit - kader");
   });
 
   it("nimmt das OPT-Ziel nicht mehr als Kapazitaet", () => {
     // Die alte Zeile ist die Ursache — sie darf nicht zurueckkehren.
-    expect(client).not.toContain("? Math.max(0, Math.round(rosterTarget - marketContext.rosterCount))");
+    expect(client).not.toContain("playerOpt - kader");
   });
 
   it("behaelt das OPT-Ziel als Rueckfall, statt eine 14 zu erfinden", () => {
     // Ein Team ohne `rosterLimit` gibt es real nicht; erfaende man dort eine Zahl, waere sie
     // falsch, sobald das Limit je geaendert wird.
-    expect(client).toContain("selectedTeam?.rosterLimit ?? rosterTarget");
+    expect(client).toContain("team?.rosterLimit ?? feed.teamContext?.playerOpt");
   });
 });

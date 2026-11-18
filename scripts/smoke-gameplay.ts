@@ -384,7 +384,10 @@ async function waitForTransferMarketV2Ready(page: Page, timeoutMs: number) {
         Boolean(marketRoot.querySelector(".market-v2-budget-strip")) ||
         Boolean(marketRoot.querySelector(".market-v2-context-grid")) ||
         Boolean(marketRoot.querySelector('[data-testid="transfer-candidate-card"]')) ||
-        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]'));
+        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]')) ||
+        // Transfermarkt neu (18.11.): Markt-Tabelle mit Zeilen statt Kandidatenkarten.
+        Boolean(marketRoot.querySelector('[data-testid="tm-zeile"]')) ||
+        Boolean(marketRoot.querySelector('[data-testid="tm-markt"]'));
       return hasMarketBody && needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
     },
     TRANSFER_MARKET_READY_NEEDLES,
@@ -771,7 +774,7 @@ async function main() {
         await waitForTransferMarketV2Ready(page, viewTimeoutMs);
         await page.waitForFunction(
           () =>
-            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"]').length > 0 ||
+            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"], [data-testid="tm-zeile"]').length > 0 ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Freie Spieler") ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Free Agents") ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Kandidaten") ||
@@ -782,7 +785,9 @@ async function main() {
         ).catch(() => undefined);
         const buyButtons =
           (await page.getByTestId("transfer-deal-open-button").count()) +
-          (await page.getByTestId("transfer-buy-preview-button").count());
+          (await page.getByTestId("transfer-buy-preview-button").count()) +
+          (await page.getByTestId("tm-zeile").count()) +
+          (await page.getByTestId("tm-draft-platzhalter").count());
         const text = await page.getByTestId("transfer-market").innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, selectedTeam, `Team auswählbar${selectedTeam ? `: ${selectedTeam}` : ""}.`);
         assertStep(
@@ -848,25 +853,20 @@ async function main() {
           const profileButton = page.locator(profileButtonSelector).first();
           await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
           await profileButton.click({ timeout: viewTimeoutMs });
-          const playerProfile = page.getByTestId("foundation-player-profile");
-          await playerProfile.waitFor({ state: "visible", timeout: viewTimeoutMs });
-          await page.waitForFunction(
-            () => {
-              const profile = document.querySelector('[data-testid="foundation-player-profile"]');
-              if (!profile) {
-                return false;
-              }
-              const text = profile.textContent ?? "";
-              return text.includes("OVR") || text.includes("Profil") || text.includes("Scouting");
-            },
-            undefined,
-            { timeout: viewTimeoutMs },
-          );
-          const drawerText = await playerProfile.innerText();
-          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints", "Entwicklung"]), "Spielerprofil zeigt XP/Entwicklung.");
-          assertStep(step, drawerText.includes("OVR"), "Spielerprofil zeigt OVR.");
-          assertStep(step, drawerText.includes("MVS"), "Spielerprofil zeigt MVS.");
-          assertStep(step, drawerText.includes("PPs"), "Spielerprofil zeigt PPs.");
+          // Neuer Ablauf (18.11.): Klick -> Kurzprofil (Drawer) -> "Ganzes Profil öffnen" -> Profilseite.
+          const kurzprofil = page.getByTestId("spielerkurzprofil");
+          await kurzprofil.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const kurzText = await kurzprofil.innerText();
+          assertStep(step, kurzText.trim().length > 20, "Kurzprofil zeigt Inhalt.");
+          await page.getByTestId("spielerkurzprofil-ganzes-profil").click({ timeout: viewTimeoutMs });
+          const profilSeite = page.getByTestId("spielerprofil-seite");
+          await profilSeite.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const drawerText = await profilSeite.innerText();
+          // Die Reiter stehen im Regieband des App-Rahmens, nicht im Seitenelement — daher die ganze Seite lesen.
+          const ganzeSeite = await page.locator("body").innerText();
+          assertStep(step, drawerText.trim().length > 40, "Spielerprofil zeigt Inhalt.");
+          assertStep(step, hasAny(ganzeSeite, ["Überblick", "Disziplinen", "Leistung", "Entwicklung", "Vertrag", "Karriere"]), "Spielerprofil zeigt die Reiter.");
+          assertStep(step, (await page.getByTestId("spielerprofil-seite").getAttribute("data-spieler")) !== null, "Profilseite kennt den Spieler.");
           const closeButton = page.getByRole("button", { name: /^Schliessen$/ });
           if (await closeButton.isVisible().catch(() => false)) {
             await closeButton.click();

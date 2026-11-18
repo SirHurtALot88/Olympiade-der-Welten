@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { buildTeamControlSettingsMap, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { normalizeTeamDelegationInput } from "@/lib/foundation/team-delegation";
+import type { TeamDelegation } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -28,6 +30,12 @@ type TeamControlPatch = {
   aiTransferAutoApplyEnabled?: boolean;
   aiSellPreviewEnabled?: boolean;
   aiSellAutoApplyEnabled?: boolean;
+  /**
+   * Delegation je Bereich (18.11., lib/foundation/team-delegation.ts): `{ stufe, bereiche? }`.
+   * `null` loescht die gespeicherte Delegation (= Voreinstellung des Besitzers). Die Liste der
+   * selbst trainierten Spieler laeuft NICHT hier, sondern ueber `/api/training`.
+   */
+  delegation?: { stufe?: unknown; bereiche?: unknown } | null;
 };
 
 const PATCHABLE_FIELDS = [
@@ -114,16 +122,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "team_control_settings_not_found" }, { status: 404 });
     }
 
-    const safePatch: Partial<TeamControlPatch> = {};
+    const safePatch: Partial<Omit<TeamControlPatch, "delegation">> = {};
     for (const field of PATCHABLE_FIELDS) {
       if (patch[field] !== undefined) {
         (safePatch as Record<string, unknown>)[field] = patch[field];
       }
     }
 
+    let delegationPatch: { delegation?: TeamDelegation | null } = {};
+    if (patch.delegation !== undefined) {
+      if (patch.delegation === null) {
+        delegationPatch = { delegation: null };
+      } else {
+        const normalized = normalizeTeamDelegationInput(patch.delegation, currentSettings.delegation);
+        if (!normalized) {
+          return NextResponse.json({ success: false, error: "invalid_delegation" }, { status: 400 });
+        }
+        delegationPatch = { delegation: normalized };
+      }
+    }
+
     const nextSettings = {
       ...currentSettings,
       ...safePatch,
+      ...delegationPatch,
       teamId,
       controlMode: currentSettings.controlMode,
       ownerId: currentSettings.ownerId,

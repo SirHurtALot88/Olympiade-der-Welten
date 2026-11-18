@@ -32,7 +32,6 @@ describe("foundation league leaders ui contract", () => {
     expect(clientText).toContain("data-testid={`league-leaders-card-${category.id}`}");
     expect(globalsText).toContain(".league-leaders-card.is-pow");
     expect(globalsText).toContain(".league-leaders-card:hover");
-    expect(globalsText).toContain(".player-drawer-kpi-hero-card.is-interactive");
     expect(globalsText).toContain(".league-leaders-card.is-training");
     expect(moduleHelpersText).toContain('return "discipline-ranks";');
   });

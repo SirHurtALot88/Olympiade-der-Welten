@@ -10,6 +10,8 @@ import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 import { setzeTrainingsZiel } from "@/lib/training/spieltag-training";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { isBereichDelegiert, withTrainingSelbstSpieler } from "@/lib/foundation/team-delegation";
 
 const VALID_TRAINING_MODES: PlayerTrainingMode[] = ["leicht", "mittel", "hart"];
 
@@ -24,6 +26,11 @@ type TrainingUpdateBody = {
    * (dann gilt der KI-Vorschlag). Wirkt ab dem naechsten Spieltag.
    */
   trainingsZiel?: { disziplinId: string; weg: number } | null;
+  /**
+   * Delegiertes Training (Halbautomatik, 18.11.): `true` gibt den Spieler an die KI zurueck — sie
+   * setzt ihn beim naechsten Spieltagswechsel wieder selbst. Ohne Modus-/Klassenwechsel erlaubt.
+   */
+  zurueckAufKi?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -57,6 +64,7 @@ export async function POST(request: Request) {
     const trainingClassProvided = Object.prototype.hasOwnProperty.call(body, "trainingClass");
     const trainingClass = body.trainingClass;
     const trainingsZielProvided = Object.prototype.hasOwnProperty.call(body, "trainingsZiel");
+    const zurueckAufKi = body.zurueckAufKi === true;
 
     if (source === "prisma") {
       return NextResponse.json({ success: false, error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
@@ -64,7 +72,7 @@ export async function POST(request: Request) {
     if (!saveId || !teamId || !playerId) {
       return NextResponse.json({ success: false, error: "saveId, teamId and playerId are required." }, { status: 400 });
     }
-    if (trainingMode === undefined && !trainingClassProvided && !trainingsZielProvided) {
+    if (trainingMode === undefined && !trainingClassProvided && !trainingsZielProvided && !zurueckAufKi) {
       return NextResponse.json(
         { success: false, error: "trainingMode, trainingClass or trainingsZiel is required." },
         { status: 400 },
@@ -125,7 +133,29 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+    } else if (zurueckAufKi && player.trainingsZiel) {
+      // Zurueck an die KI heisst auch: das selbst gesetzte Trainingsziel faellt weg, der KI-Vorschlag gilt.
+      zielGameState = setzeTrainingsZiel(save.gameState, playerId, null);
     }
+
+    // „Mensch ueberschreibt, KI respektiert das“ (Chris, 18.11.): ist das Training dieses Teams an
+    // die KI delegiert, merkt sich das Team, dass der Mensch DIESEN Spieler selbst gesetzt hat. Die
+    // Neubewertung je Spieltag (`reevaluateAiTrainingModesForMatchday`) laesst ihn dann in Ruhe, bis
+    // er mit `zurueckAufKi` wieder abgegeben wird. Ohne Delegation bleibt alles wie bisher.
+    const controlSettingsMap = buildTeamControlSettingsMap(save.gameState.teams, save.gameState.seasonState.teamControlSettings);
+    const teamSettings = controlSettingsMap[teamId];
+    const trainingDelegiert = isBereichDelegiert(teamSettings, "training");
+    const menschSetztSelbst = trainingMode !== undefined || trainingClassProvided || trainingsZielProvided;
+    const naechsteTeamControlSettings =
+      teamSettings && trainingDelegiert && (menschSetztSelbst || zurueckAufKi)
+        ? {
+            ...controlSettingsMap,
+            [teamId]: {
+              ...teamSettings,
+              delegation: withTrainingSelbstSpieler(teamSettings, playerId, !zurueckAufKi),
+            },
+          }
+        : null;
 
     const nextGameState: GameState = {
       ...zielGameState,
@@ -139,8 +169,8 @@ export async function POST(request: Request) {
           ...(trainingClassProvided ? { trainingClass } : {}),
         };
       }),
-      seasonState:
-        trainingMode !== undefined
+      seasonState: {
+        ...(trainingMode !== undefined
           ? {
               ...save.gameState.seasonState,
               trainingIntensityConfirmations: {
@@ -153,7 +183,9 @@ export async function POST(request: Request) {
                 },
               },
             }
-          : save.gameState.seasonState,
+          : save.gameState.seasonState),
+        ...(naechsteTeamControlSettings ? { teamControlSettings: naechsteTeamControlSettings } : {}),
+      },
     };
 
     const persisted = persistence.saveSingleplayerState(saveId, nextGameState);
@@ -171,6 +203,7 @@ export async function POST(request: Request) {
       success: true,
       saveVersion: persisted.gameState.saveVersion,
       player: persisted.gameState.players.find((entry) => entry.id === playerId) ?? null,
+      trainingDelegiert,
     });
   } catch (error) {
     const koopKonflikt = koopSchreibkonfliktAntwort(error);

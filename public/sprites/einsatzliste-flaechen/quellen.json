@@ -1,0 +1,715 @@
+{
+ "_hinweis": "Ruhige Draufsicht-Flaechen fuer die Feldflaeche der modernen Einsatzliste, alle 20 Disziplinen (18.11.). Doku: docs/design/einsatzliste-flaechen-18-11.md. Noch NICHT in die App eingebaut.",
+ "_bestellprotokoll": [
+  {
+   "name": "eiskunstlauf",
+   "seed": 11,
+   "generationen": 1.0,
+   "gen_vorher": 866.74,
+   "gen_nachher": 865.74,
+   "datum": "2026-11-18T07:31:13",
+   "gewaehlt": false,
+   "prompt": "flat top-down view of an empty ice skating rink filling the whole image, smooth pale blue-grey ice with very faint skate marks, thin painted center line and one center circle, rounded rink corners with a simple dark blue board around the edge, calm muted colors, low contrast, large empty even surface, minimal, no people, no characters, no audience, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 865.74,
+   "gen_nachher": 864.74,
+   "datum": "2026-11-18T07:33:16",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide horizontal ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, smooth pale blue-grey ice with very faint skate marks, one thin vertical center line and one center circle in the middle, a thin dark blue board only along the outer border of the image with rounded corners, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "battlefield",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 864.74,
+   "gen_nachher": 863.74,
+   "datum": "2026-11-18T07:34:48",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide flat grass battlefield in landscape format, the short muted olive green grass covers the entire image from edge to edge, three faint pale chalk circles marked on the grass in a row left, middle and right, a few small patches of bare trodden earth, a narrow border of darker grass along the outer edge, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "wettessen",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 863.74,
+   "gen_nachher": 862.74,
+   "datum": "2026-11-18T07:36:25",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one wide wooden banquet table top in landscape format, the warm brown wooden planks cover the entire image from edge to edge, long horizontal planks with subtle wood grain, a faint plain linen table runner along the horizontal middle, a thin darker wooden rim along the outer border, completely empty table, no plates, no food, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 13,
+   "generationen": 1.0,
+   "gen_vorher": 862.74,
+   "gen_nachher": 861.74,
+   "datum": "2026-11-18T07:38:01",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide horizontal figure skating ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, evenly lit plain pale blue-grey ice, uniform flat color with a few very faint thin curved skate marks, exactly one thin vertical line in the center and exactly one thin circle in the center, symmetric, a thin dark blue board only along the outer border of the image with rounded corners, no spotlights, no light spots, no dots, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 861.74,
+   "gen_nachher": 860.74,
+   "datum": "2026-11-18T07:59:46",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide horizontal figure skating ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, evenly lit smooth pale blue-grey ice, many faint thin elegant curved skate traces, loops and figure eight traces engraved in the ice, no painted lines, no circles, no dots, no markings, no spotlights, a thin dark blue board with rounded corners only along the outer border of the image, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "battlefield",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 860.74,
+   "gen_nachher": 859.74,
+   "datum": "2026-11-18T08:02:04",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a wild open meadow battleground in landscape format, rough patchy muted olive green grass covers the entire image from the left edge to the right edge, several irregular trodden bare earth trails crossing the meadow, a few small flat grey stones, uneven natural ground, no lines, no chalk markings, no circles, no goals, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "basketball",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 859.74,
+   "gen_nachher": 858.74,
+   "datum": "2026-11-18T08:03:22",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a plain indoor sports hall hardwood floor in landscape format, the light maple wood parquet covers the entire image from the left edge to the right edge, narrow horizontal floorboards with subtle grain, uniform evenly lit surface, no lines, no court markings, no hoops, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "hockey",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 858.74,
+   "gen_nachher": 857.74,
+   "datum": "2026-11-18T08:04:42",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide horizontal ice hockey rink surface in landscape format, the cold white ice covers the entire image from the left edge to the right edge, evenly lit plain white ice with a few faint straight skate scratches, no painted lines, no circles, no markings, a thin dark board with rounded corners only along the outer border of the image, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "football",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 857.74,
+   "gen_nachher": 856.74,
+   "datum": "2026-11-18T08:06:18",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a plain football field lawn in landscape format, the short green grass covers the entire image from the left edge to the right edge, regular vertical mowing stripes in two close shades of muted green, no lines, no markings, no goals, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "tennis",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 856.74,
+   "gen_nachher": 855.74,
+   "datum": "2026-11-18T08:07:39",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a plain flat ground of fine red clay in landscape format, the muted brick red crushed clay covers the entire image from the left edge to the right edge, completely uniform evenly lit surface with only faint long horizontal brush drag marks, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "fechten",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 855.74,
+   "gen_nachher": 854.74,
+   "datum": "2026-11-18T08:09:59",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a dark blue-grey sports hall floor in landscape format that covers the entire image, one long narrow grey metallic fencing strip running horizontally across the middle from the left edge to the right edge, the strip has a thin center line and two short start lines, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "gewichtheben",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 854.74,
+   "gen_nachher": 853.74,
+   "datum": "2026-11-18T08:11:34",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a weightlifting platform floor in landscape format that covers the entire image from the left edge to the right edge, pale wooden planks in the middle, dark rubber mats on the left side and on the right side, thin seams between the parts, the platform is completely empty, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "breaking",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 853.74,
+   "gen_nachher": 852.74,
+   "datum": "2026-11-18T08:12:55",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a bare stained concrete cellar floor in landscape format, the grey concrete covers the entire image from the left edge to the right edge, one small round iron floor drain in the center, a few thin cracks, a few faint dark rust-brown stains, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "climbing",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 852.74,
+   "gen_nachher": 851.74,
+   "datum": "2026-11-18T08:14:11",
+   "gewaehlt": false,
+   "prompt": "flat front view of a grey rock climbing wall in landscape format, the rough grey rock surface covers the entire image from the left edge to the right edge, a few faint cracks and ledges, a few small pale climbing holds scattered sparsely, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "i-spy",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 851.74,
+   "gen_nachher": 850.74,
+   "datum": "2026-11-18T08:15:31",
+   "gewaehlt": true,
+   "prompt": "view from directly above of an ancient temple stone floor in landscape format, large worn sand-grey stone slabs cover the entire image from the left edge to the right edge, thin dark joints between the slabs, one faint carved ornamental circle in the floor, a little moss in a few joints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "mini-dm",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 850.74,
+   "gen_nachher": 849.74,
+   "datum": "2026-11-18T08:17:17",
+   "gewaehlt": false,
+   "prompt": "view from directly above of the trodden sand floor of a small fighting pit in landscape format, the dull ochre packed sand covers the entire image from the left edge to the right edge, one large faint pale chalk circle drawn in the sand, a few scuff marks, a thin darker rim of rough stone along the outer border, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "tdm",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 849.74,
+   "gen_nachher": 848.74,
+   "datum": "2026-11-18T08:18:40",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a concrete yard floor in landscape format, large grey concrete slabs cover the entire image from the left edge to the right edge, thin joints between the slabs, one faint faded blue painted rectangle zone on the left and one faint faded red painted rectangle zone on the right, a few cracks, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "showcase",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 848.74,
+   "gen_nachher": 847.74,
+   "datum": "2026-11-18T08:20:08",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a dark theater stage floor in landscape format, dark brown-black wooden stage boards cover the entire image from the left edge to the right edge, long horizontal boards with subtle grain, one large very faint soft round pool of warm light in the center, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "speed-schach",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 847.74,
+   "gen_nachher": 846.74,
+   "datum": "2026-11-18T08:22:14",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a checkerboard stone pavement in landscape format, large square tiles in two very similar shades of muted grey cover the entire image from the left edge to the right edge in a regular chess pattern, very low contrast between the two shades, thin joints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "spurt",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 846.74,
+   "gen_nachher": 845.74,
+   "datum": "2026-11-18T08:23:40",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a running track surface in landscape format, the muted brick red tartan covers the entire image from the left edge to the right edge, six straight horizontal lanes separated by thin pale lane lines running from the left edge to the right edge, fine grainy rubber texture, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "staffel",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 845.74,
+   "gen_nachher": 844.74,
+   "datum": "2026-11-18T08:25:13",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a running track surface in landscape format, the muted blue-grey tartan covers the entire image from the left edge to the right edge, four straight horizontal lanes separated by thin pale lane lines running from the left edge to the right edge, one short pale relay changeover mark across the lanes, fine grainy rubber texture, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "time-trial",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 844.74,
+   "gen_nachher": 843.74,
+   "datum": "2026-11-18T08:26:29",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a wide asphalt road surface in landscape format, the dark grey asphalt covers the entire image from the left edge to the right edge, one faint dashed pale center line running horizontally through the middle, one thin pale start line across the road on the left, fine grainy asphalt texture, a few faint patches, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "takeshis-castle",
+   "seed": 21,
+   "generationen": 1.0,
+   "gen_vorher": 843.74,
+   "gen_nachher": 842.74,
+   "datum": "2026-11-18T08:27:46",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a muddy obstacle course ground in landscape format, brown wet clay and mud cover the entire image from the left edge to the right edge, two flat wooden plank walkways lying across the mud, one shallow murky puddle, a few footprints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "basketball",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 842.74,
+   "gen_nachher": 841.74,
+   "datum": "2026-11-18T08:29:43",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a plain wooden parquet floor in landscape format, light maple narrow floorboards running horizontally cover the entire image from the left edge to the right edge, subtle wood grain, matte varnish, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "hockey",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 841.74,
+   "gen_nachher": 840.74,
+   "datum": "2026-11-18T08:31:01",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one plain sheet of cold white ice in landscape format, the white ice covers the entire image from the left edge to the right edge, only a few faint thin straight scratches, a thin dark board with rounded corners along the outer border of the image, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "football",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 840.74,
+   "gen_nachher": 839.74,
+   "datum": "2026-11-18T08:33:13",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a striped mown lawn in landscape format, the short grass covers the entire image from the left edge to the right edge, regular broad vertical mowing stripes in two very close shades of muted green, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "fechten",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 839.74,
+   "gen_nachher": 838.74,
+   "datum": "2026-11-18T08:35:24",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a dark blue-grey gym floor in landscape format that covers the entire image, one wide flat band of grey brushed metal plates runs horizontally through the middle from the left edge to the right edge, the band takes one third of the image height, thin seams between the metal plates, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "climbing",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 838.74,
+   "gen_nachher": 837.74,
+   "datum": "2026-11-18T08:36:53",
+   "gewaehlt": false,
+   "prompt": "flat front view of an indoor climbing gym wall in landscape format, large flat grey plywood panels cover the entire image from the left edge to the right edge, thin seams between the panels, a regular grid of tiny bolt holes, a few small climbing holds in muted colors scattered sparsely, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "mini-dm",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 837.74,
+   "gen_nachher": 836.74,
+   "datum": "2026-11-18T08:38:18",
+   "gewaehlt": true,
+   "prompt": "view from directly above of the sand floor of one small fighting pit in landscape format, flat dull ochre packed sand covers the entire image from the left edge to the right edge, one single large faint pale chalk ring in the center, a few faint scuff marks, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "gewichtheben",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 836.74,
+   "gen_nachher": 835.74,
+   "datum": "2026-11-18T08:40:32",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a gym floor of dark rubber mat tiles in landscape format that covers the entire image from the left edge to the right edge, one single large square platform of pale wooden planks in the center, thin seams between the rubber tiles, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "tdm",
+   "seed": 22,
+   "generationen": 1.0,
+   "gen_vorher": 835.74,
+   "gen_nachher": 834.74,
+   "datum": "2026-11-18T08:42:13",
+   "gewaehlt": false,
+   "prompt": "view from directly above of a concrete yard floor in landscape format, large grey concrete slabs cover the entire image from the left edge to the right edge, thin joints between the slabs, the left third of the concrete is tinted with faint faded blue paint, the right third is tinted with faint faded red paint, plain grey in the middle, a few cracks, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "football",
+   "seed": 23,
+   "generationen": 1.0,
+   "gen_vorher": 834.74,
+   "gen_nachher": 833.74,
+   "datum": "2026-11-18T08:44:44",
+   "gewaehlt": true,
+   "prompt": "view from directly above of a mown lawn in landscape format, the short grass covers the entire image from the left edge to the right edge, six very broad vertical mowing bands alternating between two almost identical shades of muted green, soft edges between the bands, fine grass texture, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "climbing",
+   "seed": 23,
+   "generationen": 1.0,
+   "gen_vorher": 833.74,
+   "gen_nachher": 832.74,
+   "datum": "2026-11-18T08:46:04",
+   "gewaehlt": true,
+   "prompt": "flat front view of a bouldering wall in landscape format, flat pale grey wall panels cover the entire image from the left edge to the right edge, about fifteen small rounded climbing holds in muted red, blue, yellow and green scattered loosely across the wall, thin seams between the panels, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 23,
+   "generationen": 1.0,
+   "gen_vorher": 832.74,
+   "gen_nachher": 831.74,
+   "datum": "2026-11-18T08:47:25",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one plain sheet of pale blue-grey ice in landscape format, the ice covers the entire image from the left edge to the right edge, many faint thin elegant curved skate traces, loops and figure eight traces engraved in the ice, a thin dark blue board with rounded corners along the outer border of the image, evenly lit, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  }
+ ],
+ "wettessen.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one wide wooden banquet table top in landscape format, the warm brown wooden planks cover the entire image from edge to edge, long horizontal planks with subtle wood grain, a faint plain linen table runner along the horizontal middle, a thin darker wooden rim along the outer border, completely empty table, no plates, no food, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 12,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche wettessen"
+ },
+ "battlefield.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a wild open meadow battleground in landscape format, rough patchy muted olive green grass covers the entire image from the left edge to the right edge, several irregular trodden bare earth trails crossing the meadow, a few small flat grey stones, uneven natural ground, no lines, no chalk markings, no circles, no goals, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche battlefield"
+ },
+ "tennis.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a plain flat ground of fine red clay in landscape format, the muted brick red crushed clay covers the entire image from the left edge to the right edge, completely uniform evenly lit surface with only faint long horizontal brush drag marks, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche tennis"
+ },
+ "gewichtheben.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a weightlifting platform floor in landscape format that covers the entire image from the left edge to the right edge, pale wooden planks in the middle, dark rubber mats on the left side and on the right side, thin seams between the parts, the platform is completely empty, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche gewichtheben"
+ },
+ "breaking.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a bare stained concrete cellar floor in landscape format, the grey concrete covers the entire image from the left edge to the right edge, one small round iron floor drain in the center, a few thin cracks, a few faint dark rust-brown stains, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche breaking"
+ },
+ "i-spy.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of an ancient temple stone floor in landscape format, large worn sand-grey stone slabs cover the entire image from the left edge to the right edge, thin dark joints between the slabs, one faint carved ornamental circle in the floor, a little moss in a few joints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche i-spy"
+ },
+ "tdm.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a concrete yard floor in landscape format, large grey concrete slabs cover the entire image from the left edge to the right edge, thin joints between the slabs, one faint faded blue painted rectangle zone on the left and one faint faded red painted rectangle zone on the right, a few cracks, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche tdm"
+ },
+ "showcase.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a dark theater stage floor in landscape format, dark brown-black wooden stage boards cover the entire image from the left edge to the right edge, long horizontal boards with subtle grain, one large very faint soft round pool of warm light in the center, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche showcase"
+ },
+ "speed-schach.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a checkerboard stone pavement in landscape format, large square tiles in two very similar shades of muted grey cover the entire image from the left edge to the right edge in a regular chess pattern, very low contrast between the two shades, thin joints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche speed-schach"
+ },
+ "spurt.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a running track surface in landscape format, the muted brick red tartan covers the entire image from the left edge to the right edge, six straight horizontal lanes separated by thin pale lane lines running from the left edge to the right edge, fine grainy rubber texture, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche spurt"
+ },
+ "staffel.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a running track surface in landscape format, the muted blue-grey tartan covers the entire image from the left edge to the right edge, four straight horizontal lanes separated by thin pale lane lines running from the left edge to the right edge, one short pale relay changeover mark across the lanes, fine grainy rubber texture, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche staffel"
+ },
+ "time-trial.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a wide asphalt road surface in landscape format, the dark grey asphalt covers the entire image from the left edge to the right edge, one faint dashed pale center line running horizontally through the middle, one thin pale start line across the road on the left, fine grainy asphalt texture, a few faint patches, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche time-trial"
+ },
+ "takeshis-castle.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a muddy obstacle course ground in landscape format, brown wet clay and mud cover the entire image from the left edge to the right edge, two flat wooden plank walkways lying across the mud, one shallow murky puddle, a few footprints, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 21,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche takeshis-castle"
+ },
+ "basketball.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a plain wooden parquet floor in landscape format, light maple narrow floorboards running horizontally cover the entire image from the left edge to the right edge, subtle wood grain, matte varnish, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 22,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche basketball"
+ },
+ "hockey.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one plain sheet of cold white ice in landscape format, the white ice covers the entire image from the left edge to the right edge, only a few faint thin straight scratches, a thin dark board with rounded corners along the outer border of the image, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 22,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche hockey"
+ },
+ "fechten.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a dark blue-grey gym floor in landscape format that covers the entire image, one wide flat band of grey brushed metal plates runs horizontally through the middle from the left edge to the right edge, the band takes one third of the image height, thin seams between the metal plates, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 22,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche fechten"
+ },
+ "mini-dm.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of the sand floor of one small fighting pit in landscape format, flat dull ochre packed sand covers the entire image from the left edge to the right edge, one single large faint pale chalk ring in the center, a few faint scuff marks, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 22,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche mini-dm"
+ },
+ "football.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of a mown lawn in landscape format, the short grass covers the entire image from the left edge to the right edge, six very broad vertical mowing bands alternating between two almost identical shades of muted green, soft edges between the bands, fine grass texture, completely uniform evenly lit surface, nothing else on it, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 23,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche football"
+ },
+ "climbing.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "flat front view of a bouldering wall in landscape format, flat pale grey wall panels cover the entire image from the left edge to the right edge, about fifteen small rounded climbing holds in muted red, blue, yellow and green scattered loosely across the wall, thin seams between the panels, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 23,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche climbing"
+ },
+ "eiskunstlauf.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one plain sheet of pale blue-grey ice in landscape format, the ice covers the entire image from the left edge to the right edge, many faint thin elegant curved skate traces, loops and figure eight traces engraved in the ice, a thin dark blue board with rounded corners along the outer border of the image, evenly lit, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 23,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche eiskunstlauf"
+ }
+}

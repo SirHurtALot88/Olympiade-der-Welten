@@ -100,8 +100,6 @@
     "app/foundation/transfer-history-v2/TransferHistoryV2NewLook.tsx:826:LOCALE",
     "app/foundation/transfer-history-v2/TransferHistoryV2NewLook.tsx:86:HEX",
     "app/foundation/transfer-history-v2/TransferHistoryV2NewLook.tsx:895:HEX",
-    "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx:28:LOCALE",
-    "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx:45:LOCALE",
     "components/foundation/new-look/NlRadar.tsx:275:HEX",
     "components/foundation/werdegang/WerdegangPanel.tsx:43:LOCALE"
   ]

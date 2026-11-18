@@ -25,7 +25,7 @@ import {
   type SellNoticeWeight,
 } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
 import TransferSellBoardBalance from "@/app/foundation/transfermarkt-v2/TransferSellBoardBalance";
-import { NlMarketBeforeAfterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
+import { NlMarketBeforeAfterRow } from "@/app/foundation/transfermarkt-v2/NlMarketBeforeAfterRow";
 import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
 import type { Team } from "@/lib/data/olyDataTypes";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";

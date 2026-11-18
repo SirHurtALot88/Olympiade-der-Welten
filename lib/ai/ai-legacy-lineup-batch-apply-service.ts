@@ -12,6 +12,8 @@ import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import type { AiLegacyLineupPreview, AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
+import type { StaleAiLineupFinding } from "@/lib/ai/ai-lineup-freshness";
 import {
   calculateFormModifierForSide,
   createDefaultLineupDraftModifiers,
@@ -52,6 +54,11 @@ export type AiBatchApplyTeamResult = {
   teamName: string;
   controlMode: "manual" | "ai" | "passive";
   aiEligible: boolean;
+  /**
+   * Menschliches Team, dessen Einsatzliste an die KI delegiert ist (Halbautomatik/Voll KI,
+   * lib/foundation/team-delegation.ts). Die KI fuellt dann nur Luecken — s. `buildDelegatedLineupPreview`.
+   */
+  lineupDelegated?: boolean;
   previewStatus: AiLegacyLineupPreviewStatus | "validation_failed";
   captainSlotsUsed: number | null;
   captainSlotsRemaining: number | null;
@@ -144,7 +151,13 @@ function resolveLocalScope(input: AiBatchApplyInput, persistence: PersistenceSer
       return save.gameState.teams.map((team) => {
         const settings = settingsMap[team.teamId];
         const controlMode = settings?.controlMode ?? "manual";
-        const aiEligible = controlMode === "ai" && (input.forceAiTeams === true || isAiLineupBatchApplyEnabled(settings));
+        // Delegation (18.11.): ein menschliches Team, dessen Einsatzliste die KI uebernimmt. Ohne
+        // `delegation`-Feld (jeder Spielstand vor dem 18.11., Chris/Franky) ist das `false` und der
+        // `manual`-Zweig unten bleibt unveraendert.
+        const lineupDelegated = controlMode === "manual" && isBereichDelegiert(settings, "einsatzliste");
+        const aiEligible =
+          lineupDelegated ||
+          (controlMode === "ai" && (input.forceAiTeams === true || isAiLineupBatchApplyEnabled(settings)));
 
         return {
           teamId: team.teamId,
@@ -152,6 +165,7 @@ function resolveLocalScope(input: AiBatchApplyInput, persistence: PersistenceSer
           teamName: team.name,
           controlMode,
           aiEligible,
+          lineupDelegated,
         };
       });
     })(),
@@ -1762,6 +1776,187 @@ export function buildAiLegacyLineupPreviewWithModifiers(
   return { preview, modifiers, modifierPlanningMs: planned.ms };
 }
 
+/**
+ * Delegiertes menschliches Team: die Frische-Pruefung darf nur VERLETZTE ersetzen. Wen der Mensch
+ * muede aufgestellt hat, bleibt stehen — das Rotieren ueber die Schonschwelle ist eine
+ * Leistungsentscheidung, und die hat der Mensch getroffen.
+ */
+function filterStaleFindingsForTeam(
+  team: { lineupDelegated?: boolean },
+  findings: StaleAiLineupFinding[],
+): StaleAiLineupFinding[] {
+  return team.lineupDelegated ? findings.filter((finding) => finding.reason === "player_unavailable") : findings;
+}
+
+const HUMAN_SIDE_MODIFIER_KEYS = ["mutatorTrait1", "mutatorTrait2", "strategie", "zurufPlan"] as const;
+
+/**
+ * Fuehrt die Modifier des Menschen mit denen der KI zusammen — der Mensch gewinnt.
+ *
+ * Formkarten und Team-Power werden als GANZES behandelt: hat der Mensch auch nur eine Karte (bzw.
+ * eine Team-Power) gesetzt, bleiben alle Karten (bzw. Powers) seine und die KI legt keine dazu. Eine
+ * Mischung koennte dieselbe Karte zweimal belegen, und die Pflicht-Minuskarte ist eine Entscheidung
+ * ueber die Saison, die nur einer treffen darf. Die Intensitaet zaehlt als gesetzt, sobald sie vom
+ * Standard „normal“ abweicht.
+ */
+export function mergeDelegatedLineupModifiers(
+  human: LineupDraftModifiers | null | undefined,
+  ai: LineupDraftModifiers,
+): LineupDraftModifiers {
+  if (!human) return ai;
+  const sides = ["d1", "d2"] as const;
+  const humanHasFormCards = sides.some((side) => Boolean(human[side]?.primaryFormCardId || human[side]?.secondaryFormCardId));
+  const humanHasTeamPower = sides.some((side) => Boolean(human[side]?.teamPowerId));
+  const merged: LineupDraftModifiers = { d1: { ...ai.d1 }, d2: { ...ai.d2 } };
+  for (const side of sides) {
+    const h = human[side] ?? {};
+    if (humanHasFormCards) {
+      merged[side].primaryFormCardId = h.primaryFormCardId ?? null;
+      merged[side].secondaryFormCardId = h.secondaryFormCardId ?? null;
+    }
+    if (humanHasTeamPower) {
+      merged[side].teamPowerId = h.teamPowerId ?? null;
+    }
+    if (h.intensity && h.intensity !== "normal") {
+      merged[side].intensity = h.intensity;
+    }
+    for (const key of HUMAN_SIDE_MODIFIER_KEYS) {
+      const value = h[key];
+      if (value != null) {
+        (merged[side] as Record<string, unknown>)[key] = value;
+      }
+    }
+  }
+  return merged;
+}
+
+/**
+ * DIE KI FUELLT NUR DIE LUECKEN — Einsatzliste eines menschlichen Teams mit delegierter Einsatzliste.
+ *
+ * Chris, 18.11.: „Setzt der Mensch selbst Spieler, füllt die KI nur den Rest.“ Die Eintraege, die
+ * schon im Entwurf stehen (vom Menschen gesetzt, oder von einem frueheren KI-Lauf, den er stehen
+ * liess), werden GESPERRT: sie bleiben mit Slot, Seite und Kapitaensbinde stehen. Fuer die offenen
+ * Plaetze laeuft dieselbe KI wie fuer jedes KI-Team (`buildAiLegacyLineupPreviewWithModifiers`), nur
+ * auf einem verkleinerten Kontext: ohne die gesperrten Spieler und mit um die gesperrten Plaetze
+ * verringerter Sollstaerke je Seite. Damit gelten dieselben Regeln und dieselbe Qualitaet wie bei
+ * KI-Teams; die Engine selbst bleibt unberuehrt.
+ *
+ * Ohne gesperrte Eintraege (leere Einsatzliste) ist das Ergebnis exakt die KI-Aufstellung.
+ *
+ * `removePlayerIds`: Spieler, die aus der Aufstellung des Menschen fallen muessen (verletzt).
+ */
+export function buildDelegatedLineupPreview(
+  context: LegacyLineupLoadedContext,
+  options: { removePlayerIds?: ReadonlySet<string> } = {},
+): { preview: AiLegacyLineupPreview; modifiers: LineupDraftModifiers; modifierPlanningMs: number; lockedEntryCount: number } {
+  const remove = options.removePlayerIds ?? new Set<string>();
+  const activeRefByPlayerId = new Map(context.activePlayers.map((player) => [player.playerId, player] as const));
+  const activeIds = new Set(activeRefByPlayerId.keys());
+  const sideDisciplines = {
+    d1: context.contextMeta.d1DisciplineId,
+    d2: context.contextMeta.d2DisciplineId,
+  } as const;
+  const capacityOf = (side: "d1" | "d2") => {
+    const disciplineId = sideDisciplines[side];
+    if (!disciplineId) return 0;
+    return (
+      context.disciplineSidePlayerCounts?.[`${disciplineId}::${side}`] ??
+      context.disciplinePlayerCounts[disciplineId] ??
+      0
+    );
+  };
+
+  const locked: LegacyLineupEntryInput[] = [];
+  const lockedPlayerIds = new Set<string>();
+  for (const side of ["d1", "d2"] as const) {
+    const disciplineId = sideDisciplines[side];
+    if (!disciplineId) continue;
+    const capacity = capacityOf(side);
+    let lockedOnSide = 0;
+    const sideEntries = (context.existingDraft?.entries ?? [])
+      .filter((entry) => entry.disciplineSide === side && entry.disciplineId === disciplineId)
+      .sort((left, right) => left.slotIndex - right.slotIndex);
+    for (const entry of sideEntries) {
+      if (lockedOnSide >= capacity) break;
+      if (!entry.playerId || lockedPlayerIds.has(entry.playerId)) continue;
+      if (!activeIds.has(entry.playerId) || remove.has(entry.playerId)) continue;
+      lockedPlayerIds.add(entry.playerId);
+      // `activePlayerId` aus dem aktuellen Kader nachziehen: ein Entwurf aus einer frueheren Saison-
+      // oder Kaderlage kann eine veraltete oder leere Referenz tragen.
+      locked.push({ ...entry, activePlayerId: activeRefByPlayerId.get(entry.playerId)?.id ?? entry.activePlayerId ?? null });
+      lockedOnSide += 1;
+    }
+  }
+
+  const humanModifiers = context.existingDraft?.modifiers ?? null;
+
+  if (locked.length === 0) {
+    const full = buildAiLegacyLineupPreviewWithModifiers(context, "sqlite");
+    return {
+      ...full,
+      modifiers: mergeDelegatedLineupModifiers(humanModifiers, full.modifiers),
+      lockedEntryCount: 0,
+    };
+  }
+
+  const lockedCount = (side: "d1" | "d2") => locked.filter((entry) => entry.disciplineSide === side).length;
+  const reducedSideCounts: Record<string, number> = { ...(context.disciplineSidePlayerCounts ?? {}) };
+  for (const side of ["d1", "d2"] as const) {
+    const disciplineId = sideDisciplines[side];
+    if (!disciplineId) continue;
+    reducedSideCounts[`${disciplineId}::${side}`] = Math.max(0, capacityOf(side) - lockedCount(side));
+  }
+  const reducedContext: LegacyLineupLoadedContext = {
+    ...context,
+    activePlayers: context.activePlayers.filter((player) => !lockedPlayerIds.has(player.playerId)),
+    disciplineSidePlayerCounts: reducedSideCounts,
+  };
+
+  const filled = buildAiLegacyLineupPreviewWithModifiers(reducedContext, "sqlite");
+
+  // Freie Slot-Nummern je Seite in aufsteigender Reihenfolge an die KI-Eintraege vergeben.
+  const merged: LegacyLineupEntryInput[] = [...locked];
+  for (const side of ["d1", "d2"] as const) {
+    const used = new Set(locked.filter((entry) => entry.disciplineSide === side).map((entry) => entry.slotIndex));
+    const humanCaptainOnSide = locked.some((entry) => entry.disciplineSide === side && entry.isCaptain);
+    let nextSlot = 0;
+    const aiSideEntries = filled.preview.entries
+      .filter((entry) => entry.disciplineSide === side)
+      .sort((left, right) => left.slotIndex - right.slotIndex);
+    for (const entry of aiSideEntries) {
+      while (used.has(nextSlot)) nextSlot += 1;
+      used.add(nextSlot);
+      merged.push({
+        ...entry,
+        slotIndex: nextSlot,
+        // Eine Kapitaensbinde je Seite: hat der Mensch sie vergeben, bleibt sie bei ihm.
+        isCaptain: humanCaptainOnSide ? false : Boolean(entry.isCaptain),
+      });
+    }
+  }
+  merged.sort((left, right) =>
+    left.disciplineSide === right.disciplineSide
+      ? left.slotIndex - right.slotIndex
+      : left.disciplineSide.localeCompare(right.disciplineSide),
+  );
+
+  // Formkarten/Intensitaet fuer die GANZE Aufstellung auf dem vollen Kontext — sie haengen an der
+  // Staerke aller Aufgestellten, nicht nur an den von der KI gesetzten.
+  const startedAt = performance.now();
+  const aiModifiers = buildAiLegacyLineupModifiers(context, merged);
+  if (merged.some((entry) => entry.isCaptain)) {
+    applyAiIntensity(context, aiModifiers, merged);
+  }
+  const modifierPlanningMs = filled.modifierPlanningMs + (performance.now() - startedAt);
+
+  return {
+    preview: { ...filled.preview, entries: merged },
+    modifiers: mergeDelegatedLineupModifiers(humanModifiers, aiModifiers),
+    modifierPlanningMs,
+    lockedEntryCount: locked.length,
+  };
+}
+
 /** Ist an diesem Spieltag schon eine Disziplin-Seite gebucht (Teil-Ergebnis nach dem D1-Commit)? */
 function hasBookedMatchdaySide(
   gameState: GameState,
@@ -1786,7 +1981,7 @@ export function applyAiLegacyLineupBatchLocally(
     totalMs: 0,
   };
   const includeWarningTeams = input.includeWarningTeams ?? false;
-  const overwriteExisting = input.overwriteExisting ?? false;
+  const overwriteExistingInput = input.overwriteExisting ?? false;
   const dryRun = input.dryRun ?? true;
 	  const scope = resolveLocalScope(input, persistence);
 	  const save = scope.save;
@@ -1829,7 +2024,9 @@ export function applyAiLegacyLineupBatchLocally(
 	  preparedGameState = repairFrozenAiDraftsWithBlockedPlayers({
 	    gameState: preparedGameState,
 	    scope: { saveId: scope.saveId, seasonId: scope.seasonId, matchdayId: scope.matchdayId },
-	    repairableTeamIds: new Set(scope.teams.filter((team) => team.controlMode !== "manual").map((team) => team.teamId)),
+	    repairableTeamIds: new Set(
+	      scope.teams.filter((team) => team.controlMode !== "manual" || team.lineupDelegated).map((team) => team.teamId),
+	    ),
 	  }).gameState;
 	  if (!dryRun && typeof persistence.saveSingleplayerState === "function") {
 	    persistence.saveSingleplayerState(scope.saveId, preparedGameState);
@@ -1853,6 +2050,9 @@ export function applyAiLegacyLineupBatchLocally(
   });
 
   for (const team of scope.teams) {
+    // Ein delegiertes menschliches Team wird NIE ueberschrieben, auch nicht auf ausdrueckliche
+    // Bitte des Batch-Aufrufers: was der Mensch gesetzt hat, bleibt. Die KI fuellt nur Luecken.
+    const overwriteExisting = team.lineupDelegated ? false : overwriteExistingInput;
     const params: LegacyLineupKeyParams = {
       saveId: scope.saveId,
       seasonId: scope.seasonId,
@@ -1882,7 +2082,7 @@ export function applyAiLegacyLineupBatchLocally(
       } as unknown as LegacyLineupLoadedContext);
       const cheapCanAutoFillIncompleteLineup = !cheapHasCompleteExistingDraft;
 
-      if (team.controlMode === "manual") {
+      if (team.controlMode === "manual" && !team.lineupDelegated) {
         results.push({
           teamId: team.teamId,
           teamCode: team.teamCode,
@@ -1927,7 +2127,7 @@ export function applyAiLegacyLineupBatchLocally(
       }
 
       const cheapStaleFindingCount = cheapHasCompleteExistingDraft
-        ? findStaleAiLineupEntries({
+        ? filterStaleFindingsForTeam(team, findStaleAiLineupEntries({
             entryPlayerIds: (cheapExistingDraft?.entries ?? []).map((entry) => entry.playerId),
             rosterPlayers: batchPrecheck.getFreshnessRosterPlayers(
               team.teamId,
@@ -1937,7 +2137,7 @@ export function applyAiLegacyLineupBatchLocally(
             // vollen Kader — die Schoner-Schwelle braucht die ECHTE Kadergroesse trotzdem, sonst
             // verschaerft sich die Schwelle an einem scheinbar duennen "Kader" aus nur 7 Spielern.
             rosterSize: batchPrecheck.getActiveRosterSize(team.teamId),
-          }).length
+          })).length
         : 0;
 
       if (
@@ -2037,7 +2237,7 @@ export function applyAiLegacyLineupBatchLocally(
     // die er nie gespielt hatte. Die Aufstellung ist die Kernentscheidung des Spielers;
     // fehlt sie, meldet der Resolve-Schritt `missing_manual_lineup` — das ist der richtige
     // Weg, nicht ein stiller KI-Griff in fremde Karten.
-    if (team.controlMode === "manual") {
+    if (team.controlMode === "manual" && !team.lineupDelegated) {
       results.push({
         teamId: team.teamId,
         teamCode: team.teamCode,
@@ -2098,14 +2298,14 @@ export function applyAiLegacyLineupBatchLocally(
     // blockierten die ganze Liga). Passt der Entwurf nicht mehr, faellt er hier NICHT in den
     // Uebersprung, sondern wird unten reguler neu gerechnet.
     const staleDraftFindings = hasCompleteExistingDraft
-      ? findStaleAiLineupEntries({
+      ? filterStaleFindingsForTeam(team, findStaleAiLineupEntries({
           entryPlayerIds: (contextResult.context.existingDraft?.entries ?? []).map((entry) => entry.playerId),
           rosterPlayers: contextResult.context.rosterPlayers ?? [],
           // Dieselbe Korrektur wie im Trainingslast-Dienst: ohne den echten Spieltagsbedarf faellt
           // die Schonschwelle auf einen Notnagel zurueck und laesst duenne Kader tiefer aussehen,
           // als sie sind. Beide Stellen lesen jetzt denselben Wert aus dem Spielplan.
           startingSlots: resolveMatchdayPlayerDemand(preparedGameState, scope.matchdayId) ?? undefined,
-        })
+        }))
       : [];
 
     if (
@@ -2161,10 +2361,20 @@ export function applyAiLegacyLineupBatchLocally(
     }
 
     const previewStartedAt = performance.now();
-    const { preview, modifiers, modifierPlanningMs } = buildAiLegacyLineupPreviewWithModifiers(
-      contextResult.context,
-      "sqlite",
-    );
+    const { preview, modifiers, modifierPlanningMs } = team.lineupDelegated
+      ? buildDelegatedLineupPreview(contextResult.context, {
+          // Nur wer nicht spielen KANN (verletzt), faellt aus der Aufstellung des Menschen. Wen er
+          // muede aufstellt, bleibt — „ein manuell gesetzter Spieler wird nicht überschrieben“.
+          removePlayerIds: new Set(
+            findStaleAiLineupEntries({
+              entryPlayerIds: (contextResult.context.existingDraft?.entries ?? []).map((entry) => entry.playerId),
+              rosterPlayers: contextResult.context.rosterPlayers ?? [],
+            })
+              .filter((finding) => finding.reason === "player_unavailable")
+              .map((finding) => finding.playerId),
+          ),
+        })
+      : buildAiLegacyLineupPreviewWithModifiers(contextResult.context, "sqlite");
     // Der Formkarten-Zug steckt jetzt IN der Vorschau (er geht der Kapitaenswahl voraus). Damit
     // die Aufschluesselung weiter zwei getrennte Groessen zeigt, meldet die Vorschau ihre eigene
     // Modifier-Zeit zurueck und wird hier wieder herausgerechnet.
@@ -2410,6 +2620,11 @@ export function applyAiLegacyLineupBatchLocally(
         result.blockingReasons = Array.from(new Set([...result.blockingReasons, ...batchSave.errors]));
       }
     }
+  }
+
+  const delegatedTeamIds = new Set(scope.teams.filter((team) => team.lineupDelegated).map((team) => team.teamId));
+  for (const result of results) {
+    if (delegatedTeamIds.has(result.teamId)) result.lineupDelegated = true;
   }
 
   const summary: AiBatchApplySummary = {

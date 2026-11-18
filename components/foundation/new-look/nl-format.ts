@@ -15,6 +15,18 @@ export function formatNlMoney(value: number | null | undefined): string {
 }
 
 /**
+ * Einheit C (Chris, 18.11.): derselbe Betrag mit de-DE-Komma und einer Nachkommastelle, Einheit `C` statt `Mio`.
+ * Die Startseite und die Kasse im Regieband nutzen sie; übrige Seiten zeigen bis zur Umstellung noch `formatNlMoney`.
+ */
+export function formatNlCoins(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
+  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(normalized)} C`;
+}
+
+/**
  * Vorzeichenbehaftetes Geldformat ("+4,2 Mio" / "-4,2 Mio" / "0,0 Mio") für Salden-Rechnungen,
  * in denen die Richtung Teil der Aussage ist (Transfersaldo: Käufe negativ, Verkäufe positiv).
  * Gleiche Rundung/Einheit wie `formatNlMoney`, nie "+0,0" oder "-0,0".

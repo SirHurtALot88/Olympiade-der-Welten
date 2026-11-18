@@ -130,6 +130,7 @@ describe("wiring", () => {
     const jump = source.slice(source.indexOf('activeView === "lineup" &&'));
     expect(jump).toContain("canJumpToArenaAfterLineupSave({");
     expect(jump).toContain("buildMatchdayReadinessTeamsFromState({");
-    expect(jump).toContain('isOnlineGame: activeSaveGameMode === "online_4v4"');
+    // Seit 18.11. alle drei Online-Groessen (1v1, 2v2, 4v4), nicht nur 4v4 (docs/design/mehrspieler-delegation-18-11.md, M7).
+    expect(jump).toContain("isOnlineGame: isOnlineSaveMode(activeSaveGameMode)");
   });
 });

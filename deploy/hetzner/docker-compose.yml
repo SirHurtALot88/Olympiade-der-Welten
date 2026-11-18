@@ -48,6 +48,7 @@ services:
       OLY_AUTH_SECRET: ${OLY_AUTH_SECRET:-}
       OLY_USER_CHRIS_PASSWORD: ${OLY_USER_CHRIS_PASSWORD:-}
       OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
+      OLY_USER_RAMONA_PASSWORD: ${OLY_USER_RAMONA_PASSWORD:-}
       # Arena-Vorlauf (Latenz-Fix 18.10., PR #1290): ohne diese Durchreichung erreichte ein Wert in
       # deploy/hetzner/.env den Container NIE (Compose nimmt .env nur zur Interpolation dieser Datei)
       # -- der Notschalter waere nur per Code-Aenderung schaltbar gewesen. Standard jetzt "0" (seriell),

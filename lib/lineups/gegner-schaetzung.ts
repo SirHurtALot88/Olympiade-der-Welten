@@ -48,6 +48,8 @@ export type GegnerSlotSchaetzung = {
   slotIndex: number;
   /** null = auf dieser Stufe nicht erkennbar. */
   spielerName: string | null;
+  /** Nur zum Porträt-Nachschlagen; wie der Name `null`, wenn die Stufe den Spieler nicht verrät. */
+  spielerId?: string | null;
   spanne: { min: number; max: number } | null;
 };
 
@@ -114,10 +116,15 @@ export function schaetzeGegnerAufstellung(input: {
   matchdayId: string;
   /** Disziplin und Slotzahl je Seite — dieselben wie auf der eigenen Seite. */
   seiten: Array<{ seite: GegnerSeite; disciplineId: string; slotCount: number }>;
+  /**
+   * Optional: ein anderes Team als der Duell-Gegner (Vierergruppen: jeder der drei Mitspieler der
+   * Gruppe). Ohne Angabe wie bisher der Spielplan-Gegner dieses Spieltags.
+   */
+  gegnerTeamId?: string;
 }): GegnerSchaetzung {
   const gameState = input.gameState;
   if (!gameState) return { status: "unbekannt", grund: "Spielstand nicht geladen" };
-  const gegnerTeamId = getOpponentOf(gameState, input.eigenesTeamId, input.matchdayId);
+  const gegnerTeamId = input.gegnerTeamId ?? getOpponentOf(gameState, input.eigenesTeamId, input.matchdayId);
   if (!gegnerTeamId) return { status: "unbekannt", grund: "Gegner noch nicht bekannt (kein Spielplan-Eintrag für diesen Spieltag)" };
   const team = gameState.teams.find((entry) => entry.teamId === gegnerTeamId);
   if (!team) return { status: "unbekannt", grund: "Gegner noch nicht bekannt" };
@@ -190,6 +197,7 @@ export function schaetzeGegnerAufstellung(input: {
       slots.push({
         slotIndex,
         spielerName: quelle === "verdeckt" ? null : player.name,
+        spielerId: quelle === "verdeckt" ? null : player.id,
         spanne:
           quelle === "verdeckt"
             ? null

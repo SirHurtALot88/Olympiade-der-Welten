@@ -6,6 +6,7 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import { istDuellWertung, ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
+import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -295,7 +296,18 @@ function derivePlayerPointsForDuellGroup(
   });
   const referenz = resolveSpielerPpReferenz(reference.disciplineId, playerCount);
   const pointsByPerformanceId = new Map(
-    performances.map((performance) => [performance.id, ppAusSpielerScore(performance.finalPlayerScore, referenz)] as const),
+    // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS): dieselbe Rechnung wie in der
+    // Engine, sonst gilt "gezeigt != gebucht". Arena-/Pod-Zeilen oben vertrauen dem persistierten Wert,
+    // der bei AN schon skaliert geschrieben wurde -- dort wird hier NICHT ein zweites Mal skaliert.
+    performances.map(
+      (performance) =>
+        [
+          performance.id,
+          ppSkalaAktiv()
+            ? ppAusKurveSkaliert({ disciplineId: reference.disciplineId, wert: performance.finalPlayerScore, referenz })
+            : ppAusSpielerScore(performance.finalPlayerScore, referenz),
+        ] as const,
+    ),
   );
   // MINI-DM-POD-RESOLVE (19.10.): dieselbe leistungsbasierte Kurve wie `"pps_duell"` -- Chris'
   // "Impact Rating"-Philosophie (Teil A oben) gilt unveraendert, unabhaengig vom Pod-Platz des
