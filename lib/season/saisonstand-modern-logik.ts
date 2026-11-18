@@ -1,0 +1,239 @@
+/**
+ * SAISONSTAND MODERN — die reine Logik hinter der Broadcast-Ansicht (18.11.).
+ *
+ * Vorlage: public/mockups/saisonstand-modern-17-11.html, Entwurf: docs/design/saisonstand-modern-17-11.md.
+ * Nichts hier erfindet Spielwerte: Rang, Punkte, Liga kommen fertig aus den Standings-Zeilen, die
+ * Zeitreihe aus dem Feld-Rennen-Ledger. Neu gerechnet wird nur Anzeige: Zonen, Lagesatz, Abstände,
+ * Form-Kästchen, Ranglinien je Liga, Heatmap-Anteile. React-frei, damit alles ohne Rendering prüfbar ist.
+ */
+import { LEAGUE_SIZE, RELEGATION_COUNT, type LeagueTier } from "@/lib/season/league-split";
+
+/** Titel (Liga 1, Platz 1), Aufstieg (Liga 2, Plätze 1–3), Abstieg (Liga 1, Plätze 14–16). */
+export type SaisonstandZone = "titel" | "aufstieg" | "abstieg";
+
+/** Das Minimum, das die Logik an einer Tabellenzeile liest. */
+export type SaisonstandZeile = {
+  teamId: string;
+  teamName: string;
+  rank: number | null;
+  points: number | null;
+  leagueTier?: LeagueTier | null;
+  isSelected?: boolean;
+};
+
+export function bestimmeZone(tier: LeagueTier | null | undefined, rank: number | null | undefined): SaisonstandZone | null {
+  if (!tier || rank == null || !Number.isFinite(rank)) return null;
+  if (tier === "liga1") {
+    if (rank === 1) return "titel";
+    if (rank > LEAGUE_SIZE - RELEGATION_COUNT) return "abstieg";
+    return null;
+  }
+  return rank <= RELEGATION_COUNT ? "aufstieg" : null;
+}
+
+export const ZONEN_TEXT: Record<SaisonstandZone, string> = {
+  titel: "Meisterschaft",
+  aufstieg: "Aufstieg in Liga 1",
+  abstieg: "Abstieg in Liga 2",
+};
+
+/** Saisonende: aus den Zonen werden die Marken „Meister", „Aufstieg", „Abstieg". */
+export const ZONEN_MARKE_ENDE: Record<SaisonstandZone, string> = {
+  titel: "Meister",
+  aufstieg: "Aufstieg",
+  abstieg: "Abstieg",
+};
+
+export type LigaAnsicht = "liga1" | "liga2" | "gesamt";
+
+export function teileNachLiga<T extends { leagueTier?: LeagueTier | null; rank: number | null }>(
+  zeilen: readonly T[],
+): { liga1: T[]; liga2: T[]; ohne: T[] } {
+  const nachRang = (a: T, b: T) => (a.rank ?? 999) - (b.rank ?? 999);
+  return {
+    liga1: zeilen.filter((z) => z.leagueTier === "liga1").sort(nachRang),
+    liga2: zeilen.filter((z) => z.leagueTier === "liga2").sort(nachRang),
+    ohne: zeilen.filter((z) => !z.leagueTier).sort(nachRang),
+  };
+}
+
+const punkte = (z: Pick<SaisonstandZeile, "points"> | undefined | null) => (z?.points != null && Number.isFinite(z.points) ? z.points : null);
+const pktText = (n: number) => `${Math.abs(n)} ${Math.abs(n) === 1 ? "Pkt" : "Pkt"}`;
+
+/**
+ * Die Lage in einem Satz („1 Pkt hinter Aufstiegsplatz 3"). `liga` ist die nach Rang sortierte
+ * Zeilenliste der Liga des Teams. Ohne Wertung (Saisonstart) gibt es keine Punkte, nur den Startplatz.
+ */
+export function lagesatz(zeile: SaisonstandZeile, liga: readonly SaisonstandZeile[]): string {
+  const eigene = punkte(zeile);
+  if (eigene == null) return zeile.rank != null ? `Startplatz ${zeile.rank}` : "Noch keine Wertung";
+  const tier = zeile.leagueTier ?? null;
+  const rang = zeile.rank;
+  if (!tier || rang == null) return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(eigene)} Punkte`;
+  const beiRang = (r: number) => punkte(liga.find((z) => z.rank === r));
+  if (tier === "liga2") {
+    const grenze = beiRang(RELEGATION_COUNT);
+    if (rang > RELEGATION_COUNT) {
+      return grenze != null ? `${pktText(grenze - eigene)} hinter Aufstiegsplatz ${RELEGATION_COUNT}` : "Außerhalb der Aufstiegsplätze";
+    }
+    const erster = beiRang(RELEGATION_COUNT + 1);
+    return erster != null ? `${pktText(eigene - erster)} vor Platz ${RELEGATION_COUNT + 1}` : "Auf einem Aufstiegsplatz";
+  }
+  const rettung = LEAGUE_SIZE - RELEGATION_COUNT;
+  if (rang > rettung) {
+    const grenze = beiRang(rettung);
+    return grenze != null ? `${pktText(grenze - eigene)} hinter Rettungsplatz ${rettung}` : "In der Abstiegszone";
+  }
+  if (rang === 1) {
+    const zweiter = beiRang(2);
+    return zweiter != null ? `${pktText(eigene - zweiter)} vor Platz 2` : "Tabellenführer";
+  }
+  const abstieg = beiRang(rettung + 1);
+  return abstieg != null ? `${pktText(eigene - abstieg)} vor der Abstiegszone` : `Platz ${rang}`;
+}
+
+export type StehtAufDemSpiel = { id: string; label: string; wert: string; ton: "gut" | "warn" | "leise" };
+
+/**
+ * „Was auf dem Spiel steht": Abstand an Titel-, Aufstiegs- und Abstiegslinie, plus die höchstens noch
+ * erreichbaren Punkte (Basis 2 Einsätze × 2 Punkte je Spieltag; Bonus und Mutator sind darin nicht gerechnet).
+ */
+export function stehtAufDemSpiel(
+  zeile: SaisonstandZeile,
+  liga: readonly SaisonstandZeile[],
+  verbleibendeSpieltage: number | null,
+): StehtAufDemSpiel[] {
+  const eigene = punkte(zeile);
+  const tier = zeile.leagueTier ?? null;
+  const rang = zeile.rank;
+  const aus: StehtAufDemSpiel[] = [];
+  if (eigene == null || !tier || rang == null) return aus;
+  const beiRang = (r: number) => punkte(liga.find((z) => z.rank === r));
+  const vorzeichen = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "±0");
+  if (tier === "liga1") {
+    const erster = beiRang(1);
+    if (erster != null && rang !== 1) aus.push({ id: "titel", label: "Zum Titel", wert: `${vorzeichen(eigene - erster)} Pkt`, ton: "leise" });
+    const rettung = beiRang(LEAGUE_SIZE - RELEGATION_COUNT);
+    const ersterAbsteiger = beiRang(LEAGUE_SIZE - RELEGATION_COUNT + 1);
+    if (rang > LEAGUE_SIZE - RELEGATION_COUNT && rettung != null) aus.push({ id: "rettung", label: "Zur Rettung", wert: `${vorzeichen(eigene - rettung)} Pkt`, ton: "warn" });
+    else if (ersterAbsteiger != null) aus.push({ id: "abstieg", label: "Zur Abstiegszone", wert: `${vorzeichen(eigene - ersterAbsteiger)} Pkt`, ton: "gut" });
+  } else {
+    const grenze = beiRang(RELEGATION_COUNT);
+    const darunter = beiRang(RELEGATION_COUNT + 1);
+    if (rang > RELEGATION_COUNT && grenze != null) aus.push({ id: "aufstieg", label: "Zum Aufstieg", wert: `${vorzeichen(eigene - grenze)} Pkt`, ton: "leise" });
+    else if (darunter != null) aus.push({ id: "polster", label: "Polster auf Platz 4", wert: `${vorzeichen(eigene - darunter)} Pkt`, ton: "gut" });
+  }
+  if (verbleibendeSpieltage != null && verbleibendeSpieltage >= 0) {
+    aus.push({ id: "rest", label: `Noch ${verbleibendeSpieltage} Spieltage`, wert: `bis ${verbleibendeSpieltage * 4} Pkt`, ton: "leise" });
+  }
+  return aus;
+}
+
+/** Zeile des Feld-Rennen-Ledgers, so schmal wie die Ansicht sie braucht. */
+export type VerlaufEintrag = { played: boolean; tagespunkte: number | null; cumulativePoints: number };
+export type SaisonVerlauf = {
+  /** Spieltags-Nummern (1-basiert) in Reihenfolge — ALLE der Saison, gespielt oder nicht. */
+  spieltage: Array<{ nummer: number; played: boolean }>;
+  byTeamId: Record<string, VerlaufEintrag[]>;
+};
+
+/**
+ * Die Form-Schwellen (3–4 / 2 / 0–1) gelten nur für Duell-Wertung, in der ein Spieltag höchstens 4
+ * Punkte bringt. Ältere Saves (Manager Mode, Rangtabelle) tragen als Tagespunkte die PPs-Summe — dort
+ * wäre jede Form „Sieg", also zeigt die Ansicht gar keine.
+ */
+export function istDuellVerlauf(verlauf: SaisonVerlauf | null | undefined): boolean {
+  if (!verlauf) return false;
+  let gesehen = false;
+  for (const eintraege of Object.values(verlauf.byTeamId)) {
+    for (const e of eintraege) {
+      if (!e.played || e.tagespunkte == null) continue;
+      gesehen = true;
+      if (e.tagespunkte > 4) return false;
+    }
+  }
+  return gesehen;
+}
+
+export type FormTon = "s" | "u" | "n";
+
+/**
+ * Form aus den Tagespunkten der letzten gespielten Spieltage: 3–4 Punkte = Sieg (grün),
+ * 2 = Unentschieden (grau), 0–1 = Niederlage (rot). Ältester zuerst. Ein Spieltag trägt zwei Einsätze
+ * zu je 2/1/0 Punkten, daher höchstens 4 — die Schwellen sind Anzeige, keine Wertungsregel.
+ */
+export function formAusVerlauf(eintraege: readonly VerlaufEintrag[] | undefined | null, anzahl = 5): Array<{ ton: FormTon; punkte: number }> {
+  const gespielt = (eintraege ?? []).filter((e) => e.played && e.tagespunkte != null);
+  return gespielt.slice(-anzahl).map((e) => {
+    const p = e.tagespunkte ?? 0;
+    return { ton: p >= 3 ? "s" : p >= 2 ? "u" : "n", punkte: p };
+  });
+}
+
+export type VerlaufsLinie = { teamId: string; raenge: Array<number | null>; punkte: Array<number | null> };
+
+/**
+ * Rang je gespieltem Spieltag, GEZÄHLT INNERHALB DER LIGA des Teams (der Ledger selbst ordnet über
+ * alle 32). Gleichstand an Punkten: der heutige Tabellenrang entscheidet — so endet die Linie genau auf
+ * dem Platz, den die Tabelle zeigt. Der Verhältnis-Tiebreaker je Spieltag ist nicht gespeichert.
+ */
+export function baueVerlaufsLinien(verlauf: SaisonVerlauf, zeilen: readonly SaisonstandZeile[]): { tage: number[]; linien: VerlaufsLinie[] } {
+  const tage = verlauf.spieltage.filter((t) => t.played).map((t) => t.nummer);
+  const gespielteIndizes = verlauf.spieltage.map((t, i) => (t.played ? i : -1)).filter((i) => i >= 0);
+  const linien = new Map<string, VerlaufsLinie>(
+    zeilen.map((z) => [z.teamId, { teamId: z.teamId, raenge: [], punkte: [] }]),
+  );
+  for (const index of gespielteIndizes) {
+    const tiers = new Map<string, SaisonstandZeile[]>();
+    for (const z of zeilen) {
+      const key = z.leagueTier ?? "alle";
+      tiers.set(key, [...(tiers.get(key) ?? []), z]);
+    }
+    for (const gruppe of tiers.values()) {
+      const mitPunkten = gruppe.map((z) => ({ z, p: verlauf.byTeamId[z.teamId]?.[index]?.cumulativePoints ?? null }));
+      mitPunkten.sort((a, b) => (b.p ?? -1) - (a.p ?? -1) || (a.z.rank ?? 999) - (b.z.rank ?? 999));
+      mitPunkten.forEach((eintrag, platz) => {
+        const linie = linien.get(eintrag.z.teamId);
+        if (!linie) return;
+        linie.raenge.push(eintrag.p == null ? null : platz + 1);
+        linie.punkte.push(eintrag.p);
+      });
+    }
+  }
+  return { tage, linien: [...linien.values()] };
+}
+
+/**
+ * Heatmap-Anteil einer Matrix-Zelle: Wert gegen den besten Wert derselben Disziplin (0..1).
+ * Bewusst relativ zur Spalte, nicht gegen ein festes Maximum: wie viele Punkte eine Disziplin bisher
+ * hergegeben hat, hängt davon ab, wie oft sie schon lief.
+ */
+export function matrixAnteil(wert: number | null | undefined, spaltenMaximum: number): number | null {
+  if (wert == null || !Number.isFinite(wert)) return null;
+  if (!(spaltenMaximum > 0)) return 0;
+  return Math.max(0, Math.min(1, wert / spaltenMaximum));
+}
+
+/** Farbe zwischen Rot (nichts), Grau (Hälfte) und Grün (alles) als HSL-Text. */
+export function matrixFarbe(anteil: number | null): string | undefined {
+  if (anteil == null) return undefined;
+  if (anteil >= 0.5) {
+    const t = (anteil - 0.5) / 0.5;
+    return `hsla(${Math.round(150 * t)}, ${Math.round(8 + 48 * t)}%, ${Math.round(24 + 6 * t)}%, 0.9)`;
+  }
+  const t = anteil / 0.5;
+  return `hsla(${Math.round(4 + (0 - 4) * t)}, ${Math.round(58 - 50 * t)}%, ${Math.round(28 - 4 * t)}%, 0.9)`;
+}
+
+/** Rang der Kaderstärke als Goldton (1 = kräftig, 16 = blass). */
+export function staerkeFarbe(rang: number | null | undefined, ligaGroesse = LEAGUE_SIZE): string | undefined {
+  if (rang == null || !Number.isFinite(rang)) return undefined;
+  const t = 1 - (Math.min(Math.max(rang, 1), ligaGroesse) - 1) / Math.max(ligaGroesse - 1, 1);
+  return `rgba(240, 195, 90, ${(0.08 + 0.5 * t * t).toFixed(3)})`;
+}
+
+/** Tooltip-Text für eine Rangbewegung. */
+export function bewegungText(delta: number | null | undefined): { zeichen: "▲" | "▼" | "–"; zahl: number; ton: "plus" | "minus" | "null" } {
+  if (delta == null || !Number.isFinite(delta) || delta === 0) return { zeichen: "–", zahl: 0, ton: "null" };
+  return delta > 0 ? { zeichen: "▲", zahl: delta, ton: "plus" } : { zeichen: "▼", zahl: Math.abs(delta), ton: "minus" };
+}

@@ -3,6 +3,10 @@
 import type { CSSProperties } from "react";
 
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import SeasonStandingsModern from "@/app/foundation/season-v2/SeasonStandingsModern";
+import { setzeSaisonstandLook, useSaisonstandLook } from "@/lib/season/saisonstand-look";
+import type { SaisonVerlauf } from "@/lib/season/saisonstand-modern-logik";
+import type { MatchwinnerEintrag } from "@/lib/season/saisonstand-matchwinner";
 import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
@@ -345,6 +349,14 @@ export type SeasonStandingsV2ClientProps = {
    * Markierung, der Modus funktioniert unverändert.
    */
   currentMatchdayId?: string | null;
+  /**
+   * NUR die moderne Ansicht (18.11.): Zeitreihe je Team aus dem Feld-Rennen-Ledger (Tagespunkte,
+   * kumulative Punkte je Spieltag) — Grundlage von Form-Kästchen und Saisonverlauf. `null`/fehlend
+   * (Archiv-Saison, ältere Host-Version) ⇒ beides fehlt, der Rest der Seite bleibt unverändert.
+   */
+  verlauf?: SaisonVerlauf | null;
+  /** NUR die moderne Ansicht: Bestenliste „Matchwinner" (`saisonstand-matchwinner.ts`), mit Portrait-URL. */
+  matchwinner?: Array<MatchwinnerEintrag & { portraitUrl: string | null }> | null;
 };
 
 const seasonV2TeamTagColorMap: Record<string, { bg: string; border: string; text: string; glow: string }> = {
@@ -414,5 +426,18 @@ export function getSeasonV2TeamTagStyle(teamCode: string | null | undefined): CS
 type SeasonV2ViewMode = "table" | "gms";
 
 export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientProps) {
-  return <SeasonStandingsNewLook {...props} />;
+  const [look] = useSaisonstandLook();
+  if (look === "klassisch") {
+    return (
+      <>
+        <div className="saisonstand-look-schalter" data-testid="saisonstand-look-schalter">
+          <button type="button" className="saisonstand-look-schalter__knopf" onClick={() => setzeSaisonstandLook("modern")}>
+            Zur modernen Ansicht
+          </button>
+        </div>
+        <SeasonStandingsNewLook {...props} />
+      </>
+    );
+  }
+  return <SeasonStandingsModern {...props} onZurKlassik={() => setzeSaisonstandLook("klassisch")} />;
 }
