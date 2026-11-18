@@ -449,3 +449,26 @@ export function bereichsPunkteAusDuellen(
   const zeile = duellMatrix.get(teamId);
   return katalogIds.reduce((summe, id) => summe + (zeile?.get(id)?.punkte ?? 0), 0);
 }
+
+/** Die Disziplin-IDs in der Reihenfolge des Saison-Spielplans (Spieltag für Spieltag, Slot 1 vor Slot 2), jede einmal. */
+export function disziplinReihenfolgeAusSpielplan(
+  eintraege: ReadonlyArray<{ matchdayIndex: number; discipline1: { disciplineId: string } | null; discipline2: { disciplineId: string } | null }>,
+): string[] {
+  const ids: string[] = [];
+  for (const e of [...eintraege].sort((a, b) => a.matchdayIndex - b.matchdayIndex)) {
+    for (const slot of [e.discipline1, e.discipline2]) {
+      if (slot?.disciplineId && !ids.includes(slot.disciplineId)) ids.push(slot.disciplineId);
+    }
+  }
+  return ids;
+}
+
+/** Sortiert Schlüssel nach ihrer Stelle im Spielplan; was dort nicht vorkommt, steht hinten (in der bisherigen Reihenfolge). */
+export function sortiereNachSpielplan<T>(schluessel: readonly T[], katalogId: (k: T) => string, reihenfolge: readonly string[] | null | undefined): T[] {
+  if (!reihenfolge || reihenfolge.length === 0) return [...schluessel];
+  const stelle = (k: T) => {
+    const i = reihenfolge.indexOf(katalogId(k));
+    return i < 0 ? Number.POSITIVE_INFINITY : i;
+  };
+  return schluessel.map((k, i) => ({ k, i })).sort((a, b) => stelle(a.k) - stelle(b.k) || a.i - b.i).map((e) => e.k);
+}

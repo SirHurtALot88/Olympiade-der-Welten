@@ -53,6 +53,7 @@ import {
   type StehtAufDemSpiel,
   teileNachLiga,
   mitLigaRang,
+  sortiereNachSpielplan,
   bereichsPunkteAusDuellen,
   ZONEN_MARKE_ENDE,
   ZONEN_TEXT,
@@ -145,6 +146,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     rivalTeamIds,
     teamBilanzByTeamId,
     teamStrengthRankByTeamId,
+    spielplanDisziplinen,
     teamStrengthValueByTeamId,
     topPlayers,
     disciplineLeaders,
@@ -586,7 +588,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
           <h3 className="bc-gk">Beste Spieler im Kader</h3>
           {kartenKader.map((s) => (
             <button key={s.playerId} type="button" className="ssm-spieler" onClick={() => onOpenPlayer(s.playerId)}>
-              <Portrait name={s.name} />
+              <Portrait name={s.name} url={s.portraitUrl} />
               <span className="ssm-spieler__name">{s.name}</span>
               <span className="ssm-spieler__kl">{s.className ?? ""}</span>
               <strong className="bc-t">{s.ovr != null ? Math.round(s.ovr) : "–"}</strong>
@@ -597,7 +599,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       <section className="ssm-karte__block">
         <h3 className="bc-gk">Disziplinen · Punkte und Kaderstärke</h3>
         <div className="ssm-kacheln">
-          {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.flatMap((g) => g.keys).map((key) => {
+          {sortiereNachSpielplan(SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.flatMap((g) => g.keys), (k) => SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[k], spielplanDisziplinen).map((key) => {
             const punkte = disziplinWert(kartenTeam, key);
             const stark = staerkeInLiga(kartenTeam.teamId, SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]);
             return (

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  disziplinReihenfolgeAusSpielplan,
+  sortiereNachSpielplan,
   mitLigaRang,
   bereichsPunkteAusDuellen,
   baueVerlaufsLinien,
@@ -303,5 +305,22 @@ describe("Saisonstand modern: Liga-Rang und Bereichspunkte (Abnahme 18.11.)", ()
     const m = new Map([["T", new Map([["gewichtheben", { punkte: 2 }], ["hockey", { punkte: 1 }], ["tennis", { punkte: 2 }]])]]);
     expect(bereichsPunkteAusDuellen(m, "T", ["gewichtheben", "hockey", "breaking"])).toBe(3);
     expect(bereichsPunkteAusDuellen(m, "X", ["gewichtheben"])).toBe(0);
+  });
+});
+
+describe("Saisonstand modern: Teamkarte in Spielplan-Reihenfolge", () => {
+  const plan = [
+    { matchdayIndex: 1, discipline1: { disciplineId: "hockey" }, discipline2: { disciplineId: "tennis" } },
+    { matchdayIndex: 0, discipline1: { disciplineId: "gewichtheben" }, discipline2: { disciplineId: "hockey" } },
+  ];
+  it("Spieltag für Spieltag, jede Disziplin einmal", () => {
+    expect(disziplinReihenfolgeAusSpielplan(plan)).toEqual(["gewichtheben", "hockey", "tennis"]);
+  });
+  it("was im Plan fehlt, steht hinten in der bisherigen Reihenfolge", () => {
+    const aus = sortiereNachSpielplan(["tdm", "tennis", "breaking", "gewichtheben"], (k) => k, ["gewichtheben", "hockey", "tennis"]);
+    expect(aus).toEqual(["gewichtheben", "tennis", "tdm", "breaking"]);
+  });
+  it("ohne Plan bleibt die Standardordnung", () => {
+    expect(sortiereNachSpielplan(["b", "a"], (k) => k, null)).toEqual(["b", "a"]);
   });
 });

@@ -1,4 +1,5 @@
 import type { ContractShape, GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
 /**
@@ -37,6 +38,8 @@ export type SaisonstandHoverSpieler = {
   contractShape: ContractShape | null;
   contractLength: number | null;
   ovr: number | null;
+  /** Porträt für die Teamkarte (Kopf der Liste „Beste Spieler im Kader“); ohne Bild zeigt die Ansicht die Initialen. */
+  portraitUrl?: string | null;
 };
 
 export type SaisonstandHoverZeile = {
@@ -148,7 +151,7 @@ export function buildSaisonstandHoverKader(gameState: GameState, teamId: string)
   const spielerNachId = new Map((gameState.players ?? []).map((spieler) => [spieler.id, spieler] as const));
   const eintraege = (gameState.rosters ?? []).filter((eintrag) => eintrag.teamId === teamId);
   return eintraege
-    .map((eintrag: RosterEntry) => {
+    .map((eintrag: RosterEntry): SaisonstandHoverSpieler | null => {
       const spieler: Player | undefined = spielerNachId.get(eintrag.playerId);
       if (!spieler) return null;
       return {
@@ -163,7 +166,11 @@ export function buildSaisonstandHoverKader(gameState: GameState, teamId: string)
         contractShape: eintrag.contractShape ?? null,
         contractLength: endlich(eintrag.contractLength),
         ovr: endlich((spieler as { ovr?: number }).ovr),
-      } satisfies SaisonstandHoverSpieler;
+        portraitUrl: (() => {
+          const modell = getPlayerPortraitMediaModel(spieler);
+          return modell.thumbSrc ?? modell.src ?? null;
+        })(),
+      };
     })
     .filter((eintrag): eintrag is SaisonstandHoverSpieler => eintrag != null);
 }
