@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     // their own squad, so their team ids must never reach `runAiPicksExecutePreview`.
     //
     // DELEGIERTER DRAFT (18.11., docs/design/mehrspieler-delegation-18-11.md): ein menschliches
-    // Team, dessen Draft an die KI delegiert ist (Ramonas Halbautomatik), pickt hier mit der Liga
+    // Team, dessen Draft an die KI delegiert ist (Bereich „draft: ki“, z. B. Voll KI), pickt hier mit der Liga
     // mit — dieselben Regeln wie fuer KI-Teams. Chris' Regel vom 19.08. („keiner von uns soll
     // seinen Kader per KI füllen“) bleibt fuer jedes Team mit `draft: "selbst"` unberuehrt.
     // Frisch aus der Persistenz gelesen; fehlt der Stand (Test-Doubles), gilt jedes Team als „selbst“.
