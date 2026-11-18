@@ -1,8 +1,8 @@
 /**
- * PP-SKALA-PROTOTYP (18.11., docs/design/pp-skala-18-11.md, Variante C2) — STANDARD AUS.
+ * PP-SKALA C2 (18.11., docs/design/pp-skala-18-11.md) -- SCHARF ab der naechsten Saison.
  *
  * Chris 18.11., woertlich: "Die PPs sollen weiterhin eine Darstellung der Leistung der Spieler sein,
- * Top-Spieler sollen in einer Diszi um die 5 PPs bekommen als Maximum."
+ * Top-Spieler sollen in einer Diszi um die 5 PPs bekommen als Maximum." Entscheidung 18.11.: Variante C2.
  *
  * Heute laufen alle Spieler-PP eines Battle-Saves ueber dieselbe Impact-Kurve
  * (`ppsAusArenaImpact()` / `ppAusSpielerScore()`: `MAX * min(1, (s/S_krass)^gamma)`, MAX 5,5), aber
@@ -11,28 +11,25 @@
  * Disziplin deshalb nicht einheitlich bei ~5: Tennis/Spurt um 3,3, Climbing/Time-Trial mit 7-8
  * Spielern gleichauf am Deckel, Hockey ungedeckelt bis ~14; der Median-Einsatz streut 0,6..1,5.
  *
- * DER SCHALTER (Variante C2, "Zwei-Anker-Nachkalibrierung") rechnet dieselbe Kurve OHNE den alten
- * Deckel (`roh = 5,5 * (max(0,s)/S_krass)^gamma`) und legt sie je Disziplin neu auf zwei GEMESSENE Anker
- * (`data/generated/pp-skala-kalibrierung.json`, gezogen mit scripts/miss-pp-skala.ts):
+ * C2 ("Zwei-Anker-Nachkalibrierung") rechnet dieselbe Kurve OHNE den alten Deckel
+ * (`roh = 5,5 * (max(0,s)/S_krass)^gamma`) und legt sie je Disziplin UND Feldgroesse neu auf zwei
+ * GEMESSENE Anker (`data/generated/pp-skala-kalibrierung.json`, gezogen mit scripts/miss-pp-skala.ts):
  *
  *     R_top = Median der ungedeckelten Tagesbesten   -> 5      (Chris: "Top-Spieler um die 5")
- *     R_med = Median aller Einsaetze der Disziplin    -> 1,25   (25 % von 5, wie die alte Kurve)
+ *     R_med = Median aller Einsaetze                  -> 1,25   (25 % von 5, wie die alte Kurve)
  *     PP_neu = min(5, 5 * (roh / R_top)^e),  e = ln(0,25) / ln(R_med / R_top)
  *
- * Das ist exakt die Konstruktion der bestehenden Impact-Kurve (Mitte -> 25 % des Maximums, Spitze ->
- * Maximum), nur mit Ankern, die fuer alle Disziplinen gleich definiert und am selben Motorstand
- * gemessen sind -- statt p50/p99,5 einer je Disziplin zu anderer Zeit gezogenen Einzelwert-Referenz.
  * Weil `roh` selbst ein Potenzgesetz in `s` ist, bleibt auch `PP_neu` eins: streng monoton, Boden 0,
- * Reihenfolge der Spieler unveraendert. Wer heute nur wegen des alten Deckels mit anderen gleichauf
- * bei 5,5 stand, wird wieder unterscheidbar (ausser der Motor liefert selbst gleiche Rohwerte).
+ * Reihenfolge der Spieler unveraendert.
  *
- *   OLY_PP_SKALA=an   neue Skala (Server). Fuer den Browser zusaetzlich NEXT_PUBLIC_OLY_PP_SKALA=an
- *                     beim Build: der Saisonstand rechnet die PPS-Duell-PP im Browser nach.
- *   OLY_PP_SKALA=roh  NUR fuer Messungen (scripts/miss-pp-skala.ts): alte Skala ohne Deckel, Faktor 1 --
- *                     liefert die ungedeckelten Werte, aus denen `R_top`/`R_med` gezogen werden. Nie im Spiel.
- *   alles andere      AUS: kein Aufrufer betritt diesen Pfad, alles bit-identisch zum Stand vorher.
+ * WELCHE SKALA GILT, entscheidet der Spielstand, nicht der Serverstart: `ppSkalaModus(gameState)`
+ * liest den Saison-Stempel `seasonState.wertungsSkalen.pp` (lib/resolve/wertungs-skalen.ts, gesetzt
+ * beim Anlegen und beim Saisonwechsel). "c2" -> "an", fehlend/"alt" -> "aus" (bestehende Saves rechnen
+ * ihre laufende Saison unveraendert zu Ende). Der Messmodus `OLY_PP_SKALA=roh` (alte Skala ohne Deckel,
+ * nur scripts/miss-pp-skala.ts) und die Notbremse `OLY_PP_SKALA=aus-sofort` stehen ueber dem Stempel.
  */
 import kalibrierungJson from "@/data/generated/pp-skala-kalibrierung.json";
+import { gueltigerStempel, istBattleSpielstand, ppSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
 
 /** Neues Maximum je Disziplin-Einsatz (Chris 18.11.: "um die 5 PPs ... als Maximum"). */
 export const PP_SKALA_MAX = 5;
@@ -46,47 +43,61 @@ export type PpSkalaModus = "aus" | "an" | "roh";
 /** Anteil des Maximums fuer den Median-Einsatz (wie `*_PPS_ANTEIL_MITTE` der alten Kurve). */
 export const PP_SKALA_ANTEIL_MITTE = 0.25;
 
+type AnkerRoh = { rTop?: number; rMed?: number };
 type KalibrierungJson = {
   ziel?: number;
-  disziplinen?: Record<string, { rTop?: number; rMed?: number }>;
+  disziplinen?: Record<string, AnkerRoh & { feldgroessen?: Record<string, AnkerRoh & { zellen?: number }> }>;
+  umrechnung?: { einsatz?: number; spielerSaison?: number; teamSaison?: number };
 };
 
 export type PpSkalaAnker = { rTop: number; rMed: number; exponent: number };
 
-const ANKER_JE_DISZIPLIN: ReadonlyMap<string, PpSkalaAnker> = new Map(
-  Object.entries((kalibrierungJson as KalibrierungJson).disziplinen ?? {})
-    .filter(
-      ([, e]) =>
-        typeof e.rTop === "number" && typeof e.rMed === "number" && Number.isFinite(e.rTop) && Number.isFinite(e.rMed) && e.rMed > 0 && e.rTop > e.rMed,
-    )
-    .map(([disziplinId, e]) => [
-      disziplinId,
-      { rTop: e.rTop as number, rMed: e.rMed as number, exponent: Math.log(PP_SKALA_ANTEIL_MITTE) / Math.log((e.rMed as number) / (e.rTop as number)) },
-    ] as const),
+function baueAnker(e: AnkerRoh | undefined): PpSkalaAnker | null {
+  if (!e || typeof e.rTop !== "number" || typeof e.rMed !== "number") return null;
+  if (!Number.isFinite(e.rTop) || !Number.isFinite(e.rMed) || !(e.rMed > 0) || !(e.rTop > e.rMed)) return null;
+  return { rTop: e.rTop, rMed: e.rMed, exponent: Math.log(PP_SKALA_ANTEIL_MITTE) / Math.log(e.rMed / e.rTop) };
+}
+
+type AnkerEintrag = { gesamt: PpSkalaAnker | null; jeFeld: ReadonlyArray<readonly [number, PpSkalaAnker]> };
+
+const ANKER_JE_DISZIPLIN: ReadonlyMap<string, AnkerEintrag> = new Map(
+  Object.entries((kalibrierungJson as KalibrierungJson).disziplinen ?? {}).map(([disziplinId, e]) => {
+    const jeFeld = Object.entries(e.feldgroessen ?? {})
+      .map(([n, f]) => [Number(n), baueAnker(f)] as const)
+      .filter((x): x is readonly [number, PpSkalaAnker] => Number.isFinite(x[0]) && x[1] !== null)
+      .sort((a, b) => a[0] - b[0]);
+    return [disziplinId, { gesamt: baueAnker(e), jeFeld }] as const;
+  }),
 );
 
-function modusAus(wert: string | undefined): PpSkalaModus {
-  const w = (wert ?? "").trim().toLowerCase();
-  if (w === "roh") return "roh";
-  if (w === "an" || w === "1" || w === "true" || w === "ja" || w === "on") return "an";
-  return "aus";
+/**
+ * "aus" | "an" | "roh" fuer DIESEN Spielstand (Saison-Stempel, s. Kopfkommentar). Ohne Spielstand
+ * (reine Rechentests) entscheidet nur der Schalter: "roh"/"aus-sofort" wie dort, sonst "aus".
+ */
+export function ppSkalaModus(gameState?: Parameters<typeof ppSkalaVersionFuer>[0], matchdayId?: string | null): PpSkalaModus {
+  const version = ppSkalaVersionFuer(gameState, matchdayId);
+  return version === "roh" ? "roh" : version === "c2" ? "an" : "aus";
 }
 
-/** Liest den Schalter bei jedem Aufruf neu (Tests/Sonden setzen ihn zur Laufzeit). */
-export function ppSkalaModus(): PpSkalaModus {
-  // NEXT_PUBLIC_ muss als woertlicher Zugriff dastehen, damit Next.js ihn im Browser-Bundle ersetzt.
-  const browser = modusAus(process.env.NEXT_PUBLIC_OLY_PP_SKALA);
-  return browser !== "aus" ? browser : modusAus(process.env.OLY_PP_SKALA);
+export function ppSkalaAktiv(gameState?: Parameters<typeof ppSkalaVersionFuer>[0]): boolean {
+  return ppSkalaModus(gameState) !== "aus";
 }
 
-export function ppSkalaAktiv(): boolean {
-  return ppSkalaModus() !== "aus";
-}
-
-/** Die Anker einer Disziplin (`null`, wenn sie nicht kalibriert ist -- dann nur alter Wert, Deckel 5). */
-export function ppSkalaAnker(disciplineId: string | null | undefined): PpSkalaAnker | null {
+/**
+ * Die Anker einer Disziplin fuer eine Feldgroesse: exakt gezogene Feldgroesse, sonst die
+ * Disziplin-weiten Anker (`null`, wenn die Disziplin gar nicht kalibriert ist -- dann nur alter Wert,
+ * Deckel 5). Bewusst KEIN Sprung auf eine benachbarte Feldgroesse: die Spitze haengt an der Zahl der
+ * Einsaetze je Zelle, die Disziplin-weiten Anker mitteln ueber alle Feldgroessen.
+ */
+export function ppSkalaAnker(disciplineId: string | null | undefined, playerCount?: number | null): PpSkalaAnker | null {
   if (!disciplineId) return null;
-  return ANKER_JE_DISZIPLIN.get(disciplineId) ?? null;
+  const eintrag = ANKER_JE_DISZIPLIN.get(disciplineId);
+  if (!eintrag) return null;
+  if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
+    const exakt = eintrag.jeFeld.find(([n]) => n === Math.round(playerCount));
+    if (exakt) return exakt[1];
+  }
+  return eintrag.gesamt;
 }
 
 function runde2(wert: number): number {
@@ -99,11 +110,16 @@ function runde2(wert: number): number {
  * ohne Deckel). Ein zusaetzlicher, schon auf der alten Skala gerechneter Zuschlag (Spurt-Stationsduelle,
  * hoechstens 0,5) wird danach addiert und faellt unter denselben Deckel.
  */
-export function skaliereUngedeckelt(disciplineId: string, ungedeckelt: number, zuschlag = 0): number {
-  const modus = ppSkalaModus();
+export function skaliereUngedeckelt(
+  disciplineId: string,
+  ungedeckelt: number,
+  zuschlag = 0,
+  optionen: { modus?: PpSkalaModus; playerCount?: number | null } = {},
+): number {
+  const modus = optionen.modus ?? "an";
   const basis = Math.max(0, ungedeckelt);
   if (modus === "roh") return runde2(basis + zuschlag);
-  const anker = ppSkalaAnker(disciplineId);
+  const anker = ppSkalaAnker(disciplineId, optionen.playerCount);
   const neu = anker ? (basis <= 0 ? 0 : PP_SKALA_MAX * Math.pow(basis / anker.rTop, anker.exponent)) : basis;
   return runde2(Math.min(PP_SKALA_MAX, neu + zuschlag));
 }
@@ -120,18 +136,52 @@ export function ppAusKurveSkaliert(input: {
   max?: number;
   anteilMitte?: number;
   zuschlag?: number;
+  /** "an" (Standard) oder "roh" -- vom Aufrufer aus `ppSkalaModus(gameState)`. */
+  modus?: PpSkalaModus;
+  /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
+  playerCount?: number | null;
 }): number {
   const { referenz } = input;
+  const optionen = { modus: input.modus, playerCount: input.playerCount };
   const zuschlag = input.zuschlag ?? 0;
   const max = input.max ?? PP_SKALA_ALT_MAX;
   const anteilMitte = input.anteilMitte ?? PP_SKALA_ALT_ANTEIL_MITTE;
   if (!referenz || typeof input.wert !== "number" || !Number.isFinite(input.wert)) {
-    return skaliereUngedeckelt(input.disciplineId, 0, zuschlag);
+    return skaliereUngedeckelt(input.disciplineId, 0, zuschlag, optionen);
   }
   const { p50, p995 } = referenz;
-  if (!(p995 > 0) || !(p50 > 0) || p50 >= p995) return skaliereUngedeckelt(input.disciplineId, 0, zuschlag);
+  if (!(p995 > 0) || !(p50 > 0) || p50 >= p995) return skaliereUngedeckelt(input.disciplineId, 0, zuschlag, optionen);
   const gamma = Math.log(anteilMitte) / Math.log(p50 / p995);
   const basis = Math.max(0, input.wert) / p995;
   const ungedeckelt = basis <= 0 ? 0 : max * Math.pow(basis, gamma);
-  return skaliereUngedeckelt(input.disciplineId, ungedeckelt, zuschlag);
+  return skaliereUngedeckelt(input.disciplineId, ungedeckelt, zuschlag, optionen);
+}
+
+/**
+ * UMRECHNUNG FUER ABNEHMER MIT ABSOLUTEN PP-SCHWELLEN (docs/design/pp-skala-18-11.md Abschnitt 8.3).
+ * Gemessen an denselben Saves wie die Anker (`werte-pp-skala-aus.mjs`): Verhaeltnis C2 / alt fuer den
+ * mittleren Einsatz, die Spieler-Saisonsumme (Median) und die Team-Saisonsumme. Ein Abnehmer, der eine
+ * feste PP-Zahl als Schwelle oder Multiplikator hat (organische Entwicklung `/30`, Trainings-XP `x 4`,
+ * Vorstands-Sportziel `>= 95`), rechnet seine Zahl in einer C2-Saison mit diesem Faktor um, damit er
+ * sich durch die neue Skala nicht verschiebt. In einer alten Saison sind alle Faktoren 1.
+ */
+export type PpSkalaUmrechnung = { einsatz: number; spielerSaison: number; teamSaison: number };
+
+const KEINE_UMRECHNUNG: PpSkalaUmrechnung = { einsatz: 1, spielerSaison: 1, teamSaison: 1 };
+
+function faktor(wert: number | undefined): number {
+  return typeof wert === "number" && Number.isFinite(wert) && wert > 0.2 && wert < 5 ? wert : 1;
+}
+
+export function ppSkalaUmrechnung(gameState?: Parameters<typeof ppSkalaVersionFuer>[0]): PpSkalaUmrechnung {
+  if (ppSkalaModus(gameState) !== "an") return KEINE_UMRECHNUNG;
+  // Nur Battle-Saves: ein Manager-Save rechnet nie mit C2.
+  if (!istBattleSpielstand(gameState)) return KEINE_UMRECHNUNG;
+  // Gemischte Saison (Umstellung mitten drin, `ppAb`): Faktor 1. Die Faktoren sind auf eine ganze C2-Saison
+  // gemessen; auf eine Saison, in der nur der Rest C2 ist, angewandt, waere die Skalierung falsch
+  // gewichtet. Der Fehler der unskalierten Teilsaison ist klein (die Saison ist ohnehin zu Ende)
+  // und nach dem Saisonwechsel gilt der volle Faktor.
+  if (gueltigerStempel(gameState)?.ppAb) return KEINE_UMRECHNUNG;
+  const u = (kalibrierungJson as KalibrierungJson).umrechnung;
+  return { einsatz: faktor(u?.einsatz), spielerSaison: faktor(u?.spielerSaison), teamSaison: faktor(u?.teamSaison) };
 }

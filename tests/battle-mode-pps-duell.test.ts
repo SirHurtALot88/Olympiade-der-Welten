@@ -498,3 +498,61 @@ describe("Teil B: Sieger-Ordnungs-Garantie von berechneErgebnisNormiert() (Prope
     return resolveNiveauReferenz(quelle, disziplin, n);
   }
 });
+
+describe("Ergebnisskala E1 + PP-Skala C2 in der Engine (18.11., Saison-Stempel)", () => {
+  function gestempelt(): GameState {
+    return {
+      scenarioMeta: { gameMode: "battle" },
+      rosters: [],
+      players: [],
+      teams: [],
+      season: { id: "season-1" },
+      seasonState: {
+        seasonId: "season-1",
+        schedule: FIXTURES,
+        wertungsSkalen: { seasonId: "season-1", pp: "c2", ergebnis: "e1" },
+      },
+    } as unknown as GameState;
+  }
+
+  it("wer gewinnt, bleibt; Verhaeltnis = eigenes minus gegnerisches Ergebnis; Summe je Duell 0; Remis bleibt Remis", () => {
+    const alt = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
+    const neu = buildLegacyMatchdayResolvePreview(vierTeams(gestempelt()));
+    for (const disziplin of neu.disciplinePreviews) {
+      const vorher = alt.disciplinePreviews.find((d) => d.disciplineId === disziplin.disciplineId)!;
+      const zeile = (id: string) => disziplin.teamResults.find((t) => t.teamId === id)!;
+      for (const team of disziplin.teamResults) {
+        const altZeile = vorher.teamResults.find((t) => t.teamId === team.teamId)!;
+        expect(team.teamPoints).toBe(altZeile.teamPoints);
+        expect(team.rank).toBe(altZeile.rank);
+        expect(team.ergebnisSkala).toBe("e1");
+        expect(team.ppSkala).toBe("c2");
+        expect(team.ergebnisNormiert).toHaveLength(2);
+        expect(team.verhaeltnis).toBe(team.ergebnisNormiert![0] - team.ergebnisNormiert![1]);
+        expect(Math.sign(team.verhaeltnis!)).toBe(Math.sign(altZeile.verhaeltnis!));
+        for (const entry of team.entries) expect(entry.pointsAwarded ?? 0).toBeLessThanOrEqual(5);
+      }
+      for (const [h, g] of [
+        ["A", "B"],
+        ["C", "D"],
+      ] as const) {
+        expect((zeile(h).verhaeltnis ?? 0) + (zeile(g).verhaeltnis ?? 0)).toBe(0);
+        expect(zeile(h).ergebnisNormiert).toEqual([zeile(g).ergebnisNormiert![1], zeile(g).ergebnisNormiert![0]]);
+      }
+    }
+    const basketball = neu.disciplinePreviews.find((d) => d.disciplineId === D1)!;
+    const c = basketball.teamResults.find((t) => t.teamId === "C")!;
+    expect(c.verhaeltnis).toBe(0);
+    expect(c.ergebnisNormiert![0]).toBe(c.ergebnisNormiert![1]);
+  });
+
+  it("ohne Stempel (laufende Saison eines bestehenden Saves) keine neuen Schluessel", () => {
+    const alt = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
+    for (const disziplin of alt.disciplinePreviews) {
+      for (const team of disziplin.teamResults) {
+        expect(team.ergebnisSkala).toBeUndefined();
+        expect(team.ppSkala).toBeUndefined();
+      }
+    }
+  });
+});

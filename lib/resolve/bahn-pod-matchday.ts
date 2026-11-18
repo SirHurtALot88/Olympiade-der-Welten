@@ -13,7 +13,7 @@
  * der Engine), nicht den Spieltag.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -124,6 +124,7 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
   });
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);
+  const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
   const rohdatenByPodId = new Map<string, BahnPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
@@ -145,9 +146,9 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
       if (!eintrag.playerId) continue;
       playerPpsByPlayerId.set(
         eintrag.playerId,
-        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
-        ppSkalaAktiv()
-          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz })
+        // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
+        ppSkala !== "aus"
+          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz, modus: ppSkala, playerCount: k })
           : ppAusBahnPodWert(eintrag.wert, referenz),
       );
     }

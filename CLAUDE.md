@@ -255,6 +255,19 @@ die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! b
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
 
+**Scharf seit 18.11. (Chris: Variante C2, dazu die Ergebnisskala E1 für die Team-Ergebnisse):** Welche Skala gilt,
+steht im Spielstand, nicht im Serverstart: `seasonState.wertungsSkalen = { seasonId, pp: "c2"|"alt", ergebnis:
+"e1"|"alt" }` (`lib/resolve/wertungs-skalen.ts`), gesetzt nur beim Anlegen eines Spiels und beim Saisonwechsel. Neues
+Spiel: C2 + E1 ab Saison 1; bestehender Battle-Save mit höchstens 3 gebuchten Spieltagen: C2 ab dem nächsten Spieltag
+(Lade-Migration `stelleLaufendeSaisonAufC2Um`, Feld `ppAb`; gebuchte Spieltage bleiben, Zeilen tragen `ppSkala: "c2"`),
+sonst ab dem nächsten Saisonwechsel; E1 immer erst zum Saisonwechsel. Rückweg
+`OLY_PP_SKALA=aus` / `OLY_ERGEBNIS_SKALA=aus` (wirkt ab der nächsten Saison), Notbremse `…=aus-sofort`. Jeder
+Rechenweg fragt `ppSkalaModus(gameState)` bzw. `ergebnisSkalaVersionFuer(gameState)`, nie eine Prozess-Variable.
+E1: je Begegnung 0–10 je Seite (Kantersieg 10:0, Median-Sieg 7:4, Remis bleibt Remis), Verhältnis = Abstand, Pods
+„eigener Wert minus Mittel der Gegner“; die Arena zeigt „87 : 79 → 7 : 4“. Anker nachkalibrieren:
+`werte-pp-skala-aus.mjs` dann `werte-ergebnisskala-aus.ts` (je `--schreibe-kalibrierung`). Doku:
+`docs/design/pp-skala-18-11.md` Abschnitt 8, `docs/design/ergebnisskala-18-11.md`.
+
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
 Wörtlich: „Wichtig: wenn du neue Dinge baust, IMMER einen Abgleich machen — Screenshot schauen und vergleichen mit dem
