@@ -149,7 +149,7 @@ function vorstandStatistik(gs: GameState) {
   });
   return {
     jeTeam,
-    sperre: { kauf: zaehle("kauf"), gebaeude: zaehle("gebaeude"), verlaengerung: zaehle("verlaengerung") },
+    sperre: { kauf: zaehle("kauf"), kaufGehalt: zaehle("kauf_gehalt"), gebaeude: zaehle("gebaeude"), verlaengerung: zaehle("verlaengerung") },
     alleAufEineKarte: jeTeam.filter((t) => t.alleAufEineKarte).length,
     umgeschichtet: jeTeam.filter((t) => Math.abs(t.umschichtung) > 0.004).length,
     angezapft: jeTeam.filter((t) => t.ruecklageAngezapft > 0.004).length,

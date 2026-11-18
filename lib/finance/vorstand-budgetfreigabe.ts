@@ -108,6 +108,8 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
   return { teamId, stufe, anteil, vertrauen: wert, grund: "vertrauen" };
 }
 
+/** Anteil des Ruecklage-Ziels im ersten Fenster (Saison 2). */
+export const RUECKLAGE_ERSTES_FENSTER = 0.5;
 /** Anteils-Stufen der Transfer-Quote, von streng nach locker. */
 export const QUOTEN_STUFEN = [0.5, 0.7, 0.85, 1] as const;
 /** Lockerungs-Puffer X als Anteil des tragbaren Gehalts je Ausgangsquote (50 / 70 / 85 %). */
@@ -291,7 +293,10 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
     zielgehalt,
   });
   const gedeckelt = istVorstandBudgetfreigabeAktiv() && saisonNr >= 2;
-  const ruecklageZiel = gedeckelt ? ruecklageErg.ruecklage : 0;
+  // Erstes Fenster (Saison 2): nur die halbe Ruecklage. In Saison 1 hat niemand eine gehalten (halbe Draft-Ruecklage, Chris 18.11.),
+  // die volle Ruecklage im Topf wuerde den Kauf im ersten Fenster hart abwuergen (Messung 18.11.: Kaderstaerke -6 %).
+  const uebergang = saisonNr === 2 ? RUECKLAGE_ERSTES_FENSTER : 1;
+  const ruecklageZiel = gedeckelt ? ruecklageErg.ruecklage * uebergang : 0;
   const gehaltspuffer = gedeckelt ? Math.max(0, KI_RUECKLAGE_GEHALTS_FAKTOR * gehaltBudget0 - ruecklageZiel) : 0;
 
   // Transfertopf.
@@ -442,7 +447,12 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
  * Messung (nur mit `OLY_SPERRE_ZAEHLEN=1`, sonst kein Aufwand): wie oft greift die harte Sperre, je Art und Team.
  * Gezaehlt werden ABGELEHNTE PRUEFUNGEN, nicht Kaufversuche: die KI prueft dieselbe Abloese in mehreren Vorschauen.
  */
-export const SPERRE_ZAEHLER: Record<"kauf" | "gebaeude" | "verlaengerung", Record<string, number>> = { kauf: {}, gebaeude: {}, verlaengerung: {} };
+export const SPERRE_ZAEHLER: Record<"kauf" | "kauf_gehalt" | "gebaeude" | "verlaengerung", Record<string, number>> = {
+  kauf: {},
+  kauf_gehalt: {},
+  gebaeude: {},
+  verlaengerung: {},
+};
 
 function zaehleSperre(art: keyof typeof SPERRE_ZAEHLER, teamId: string): void {
   if (process.env.OLY_SPERRE_ZAEHLEN !== "1") return;
@@ -463,7 +473,7 @@ export function pruefeKaufGegenVorstandFreigabe(
     return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
   }
   if (Math.max(0, input.salary) > stand.gehalt.frei + 1e-9) {
-    zaehleSperre("kauf", teamId);
+    zaehleSperre("kauf_gehalt", teamId);
     return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
   }
   return { ok: true, reason: null, stand };

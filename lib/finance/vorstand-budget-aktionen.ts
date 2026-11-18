@@ -219,7 +219,7 @@ export function kiCharakter(gameState: GameState, teamId: string): "vorsichtig" 
  * Die KI entscheidet EINMAL je Fenster und Team, was sie mit den Toepfen tut (Konzept Abschnitt 5, Regeln 3, 7):
  *  - Umschichten in Richtung des Topfes, der zuerst bindet: vorsichtig 0 %, normal 50 %, aggressiv 100 % der Grenze.
  *  - Ruecklage anzapfen: nur aggressive Teams, nur bei Kader unter Soll und Transfertopf als Engpass.
- *  - „Alles auf eine Karte“: selten und begruendet — Top-Team (Erwartungsrang 1 bis 3) mit Ambition >= 8, Vertrauen >= 6
+ *  - „Alles auf eine Karte“: selten und begruendet — Top-Team (Erwartungsrang 1 bis 4) mit Ambition >= 7, Vertrauen >= 5
  *    und aggressiver Doktrin (Risikobereitschaft > 7), oder wenn der Vorstand es fordert. Hoechstens einmal je Saison;
  *    dass es selten bleibt, kommt aus der engen Bedingung (die Messung zaehlt es, `scripts/miss-teamfinanzen-saison.ts`).
  */
@@ -240,7 +240,7 @@ export function entscheideKiVorstandMassnahmen(
   // 1) Alles auf eine Karte: selten und begruendet.
   const erw = schaetzeErwartungsRang(gs, teamId);
   const fordert = vorstandFordertAlleAufEineKarte(gs, teamId);
-  const wille = (charakter === "aggressiv" && ambition >= 8 && (stand.vertrauen ?? 0) >= 6 && erw.rang <= 3 && rosterCount <= sollKader) || fordert;
+  const wille = (charakter === "aggressiv" && ambition >= 7 && (stand.vertrauen ?? 0) >= 5 && erw.rang <= 4 && rosterCount <= sollKader) || fordert;
   if (wille) {
     const r = beantrageAlleAufEineKarte(
       gs,

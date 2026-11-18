@@ -492,9 +492,12 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
   }
   // Chris 18.11. (Zwei-Budget-Entscheid): in Saison 1 ist die Draft-Ruecklage um 50 % geringer, ab Saison 2 gilt sie voll.
   const saisonEins = /(\d+)\s*$/.exec(input.gameState.season?.id ?? "")?.[1] === "1";
-  const ruecklage = (ruecklageDebug?.ruecklage ?? 0) * (saisonEins ? 0.5 : 1);
+  const ruecklageRoh = (ruecklageDebug?.ruecklage ?? 0) * (saisonEins ? 0.5 : 1);
   // Stufe 3 (hart): der Vorstand gibt nur `nochFrei` zum Ausgeben (Ablosen + Jahresgehaelter) frei; das Geld bleibt auf dem Konto.
   const vorstand = berechneVorstandBudgetStand(input.gameState, input.team.teamId);
+  // Ab Saison 2 steckt die Ruecklage schon im Transfertopf des Vorstands (Kasse - Ruecklage - Gehaltspuffer); die KI haelt sie nicht
+  // ein zweites Mal als eigenen Puffer (Messung 18.11.: doppelt gezaehlt kostete -6 % Kaderstaerke).
+  const ruecklage = vorstand.gedeckelt ? 0 : ruecklageRoh;
   const feeCap = vorstand.gedeckelt ? vorstand.investition.frei : undefined;
   const salaryCap = vorstand.gedeckelt ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
