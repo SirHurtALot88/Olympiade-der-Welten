@@ -59766,11 +59766,131 @@
       nullStrich:["fg","fgp","imp"],foulsGrenze:5,momentumFensterUhrSek:60,
       einblenderSchuetze:["dreier","dunk","spielzug","fuehrungswechsel","undEins"],
       verlaufArten:{treffer:"korb",foul:"foul",steal:"abwehr",block:"abwehr",turnover:"abwehr"},
-      verlaufFilter:[["alle","Alle"],["korb","Körbe"],["foul","Fouls"],["abwehr","Abwehr"]]},
-    hockey:HUD_SKELETT("feldspiel",{stand:"fsPunkte",uhr:"feldspielRestzeitAbwaerts()",zusatz:"hockeyPPInfo(), hockeySOG()",
-      spieler:"wertungVon(disc) = WERTUNG_HOCKEY",verlauf:"fsZuege (treffer/block/check/strafe/bully)",einblender:"feed(big): tor, torwartRaus"},{kern:"tore"}),
-    football:HUD_SKELETT("feldspiel",{stand:"fsPunkte (+ fsPeriodenStand fuer XP)",uhr:"feldspielRestzeitAbwaerts()",zusatz:"fsLive.football (Down & Distance), fsLive.kickoff",
-      spieler:"wertungVon(disc) = WERTUNG_FOOTBALL",verlauf:"fsZuege (treffer/steal/block)",einblender:"feed(big): touchdown, fieldGoal, sack, interception"}),
+      verlaufFilter:[["alle","Alle"],["korb","Körbe"],["foul","Fouls"],["abwehr","Abwehr"]],
+      verlauf:{
+        text:(e)=>hudVerlaufTextBasketball(e),
+        label:(e)=>e.art==="treffer"?(e.punkte===1?"FW +1":"+"+e.punkte):e.art==="foul"?"Foul":e.art==="steal"?"Steal":e.art==="block"?"Block":"TO",
+        gross:(e)=>(e.art==="treffer"&&!e.freiwurf&&(e.punkte===3||e.tier==="dunk"))||(e.art==="foul"&&!!e.undEins),
+        // Ein Foul gehoert der Seite des Gefoulten (sie bekommt die Freiwuerfe) -- im Verlauf aber in
+        // der Farbe des Foulenden, damit die Zeile zur Leiste mit den Foul-Marken passt.
+        seite:(e)=>(e.art==="foul"||e.art==="steal"||e.art==="block")?(e.verteidiger?e.verteidiger.side:e.seite):e.seite,
+        mom:(e)=>e.art==="treffer"?{seite:e.seite,gew:e.punkte}:null},
+      momentumTitel:(pk,sek)=>"Momentum: "+pk[0]+" : "+pk[1]+" Punkte in den letzten "+sek+" Sekunden Spielzeit"},
+    // HOCKEY (Welle 1, 17.11.). Chassis wie Basketball: dieselben Bauteile, andere Quellen. Stand = Tore
+    // (fsPunkte), Uhr = Drittel + Restzeit, Zusatzfeld = Power-Play-Uhr (hockeyPPInfo(), auf Sendezeit
+    // skaliert wie die Periodenuhr), Teamfeld = Schuesse aufs Tor (hockeySOG(), aus fsZuege gezaehlt),
+    // Leisten = Tore/Vorlagen/Schuesse (Torwart: Paraden/Gegentore/Fangquote), Strafbank-Marke je Spieler
+    // aus u.strafeBis, Verlauf = Tore/Strafen/Paraden/Blocks/Checks aus fsZuege, Einblender = feed(big) "tor"
+    // und "torwartRaus". Momentum = Schuesse aufs Tor im Fenster (Hockey-Tore sind zu selten fuer ein
+    // Tore-Momentum).
+    hockey:{status:"fertig",chassis:"feldspiel",titel:"Hockey",
+      komponenten:HUD_KOMPONENTEN,
+      ersetzt:["kopfzeile","bbug","lauf-band","callout","kaderleiste"],
+      quellen:{stand:"fsPunkte (= #score)",uhr:"feldspielRestzeitAbwaerts()",zusatz:"hockeyPPInfo() x zeitFaktor()",
+        teamfeld:"hockeySOG(seite)",ballbesitz:"fsLive.amBall, fsLive.ball.traeger",strafbank:"u.strafeBis",
+        momentum:"fsZuege treffer + Torwart-Parade im Uhrfenster",spieler:"wertungVon(disc).zeilen() = WERTUNG_HOCKEY",
+        verlauf:"fsZuege[0..fsZeiger] (treffer/strafe/block/check)",einblender:"feed(big) tor, torwartRaus -> callout()"},
+      daten:{
+        stand:()=>[fsPunkte[0]||0,fsPunkte[1]||0],
+        uhr:()=>hudUhrFeldspiel(),
+        zusatz:()=>{
+          const pp=(!done&&fsLive)?hockeyPPInfo():null; if(!pp)return null;
+          const r=Math.max(0,Math.ceil(pp.rest*zeitFaktor()));
+          return {txt:"PP "+hudKuerzel(pp.seite)+" "+Math.floor(r/60)+":"+String(r%60).padStart(2,"0")+(pp.fuenfDrei?" · 5v3":""),eng:true};
+        },
+        ballbesitz:()=>fsLive&&!done?fsLive.amBall:null,
+        ballTraegerId:()=>(!done&&fsLive&&fsLive.ball&&fsLive.ball.traeger)?fsLive.ball.traeger.id:null,
+        teamStat:(s)=>fsLive?{txt:"SOG "+hockeySOG(s),titel:"Schüsse aufs Tor (Tore plus Paraden des Torwarts)"}:null,
+        status:(u)=>{
+          if(done||!fsLive||!(u.strafeBis>fsT))return null;
+          const r=Math.max(0,Math.ceil((u.strafeBis-fsT)*zeitFaktor()));
+          return {txt:"BANK "+Math.floor(r/60)+":"+String(r%60).padStart(2,"0"),eng:true};
+        },
+        einblenderStat:(u)=>hudStatZeile(u,[["tore",(n)=>n+(n===1?" TOR":" TORE")],["sch",(n)=>n+" SCH"],["ass",(n)=>n+" AST"]])
+      },
+      zusatzTitel:"Überzahl (Power Play)",zusatzText:true,
+      kern:"tore",leiste:["ass","sch"],
+      karte:["tore","ass","sch","schp","puck","blk","chk","str","pus","imp"],
+      // Der Torwart hat keine Tore: seine Leiste und Karte zeigen die Torwart-Spalten der Wertung.
+      rolle:(z)=>z.torwart?{kern:"par",leiste:["fgp"],karte:["par","fgp","gt","puck","pus","tief","imp"]}:null,
+      nullStrich:["schp","fgp","pus","tief","imp"],foulsGrenze:0,momentumFensterUhrSek:60,
+      einblenderSchuetze:["tor"],
+      verlaufArten:{treffer:"tor",strafe:"strafe",block:"abwehr",check:"abwehr"},
+      verlaufFilter:[["alle","Alle"],["tor","Tore"],["strafe","Strafen"],["abwehr","Abwehr"]],
+      verlauf:{
+        text:(e)=>{
+          const n=(u)=>u&&u.n?u.n:"?";
+          if(e.art==="treffer")return n(e.spieler)+" trifft"+(e.passgeber?" · Vorlage "+n(e.passgeber)+(e.zweitpassgeber?" und "+n(e.zweitpassgeber):""):"");
+          if(e.art==="strafe")return n(e.verteidiger)+" auf die Strafbank (2 Min) · foult "+n(e.spieler);
+          if(e.art==="block")return e.verteidiger&&e.verteidiger.torwart?n(e.verteidiger)+" hält den Schuss von "+n(e.spieler):n(e.verteidiger)+" blockt den Schuss von "+n(e.spieler);
+          if(e.art==="check")return n(e.verteidiger)+" checkt "+n(e.spieler);
+          return n(e.spieler)+" "+e.art;
+        },
+        label:(e)=>e.art==="treffer"?"TOR":e.art==="strafe"?"2 MIN":e.art==="block"?(e.verteidiger&&e.verteidiger.torwart?"PARADE":"BLOCK"):"CHECK",
+        gross:(e)=>e.art==="treffer",
+        // Wie beim Foul: die Zeile traegt die Farbe der handelnden Seite (Torwart/Checker/Bestrafter).
+        seite:(e)=>(e.art==="strafe"||e.art==="block"||e.art==="check")?(e.verteidiger?e.verteidiger.side:e.seite):e.seite,
+        mom:(e)=>e.art==="treffer"?{seite:e.seite,gew:1}
+          :(e.art==="block"&&e.verteidiger&&e.verteidiger.torwart&&e.spieler)?{seite:e.spieler.side,gew:1}:null},
+      momentumTitel:(pk,sek)=>"Momentum: Schüsse aufs Tor "+pk[0]+" : "+pk[1]+" in den letzten "+sek+" Sekunden Spielzeit"},
+    // FOOTBALL (Welle 1, 17.11.). Stand = fsPunkte (enthaelt die Extra-Punkte, die fsZuege nicht fuehrt),
+    // Uhr = Viertel + Restzeit, Zusatzfeld = Down & Distance mit Feldposition (fsLive.football) bzw.
+    // "Kickoff", Ballbesitz = Angriffsseite, Teamfeld = Raumgewinn (Pass- plus Laufyards der Einheiten),
+    // Leisten = Yards/Punkte/Tackles (die Einheiten spielen Angriff UND Abwehr, daher keine
+    // Positions-Spalten), Verlauf = Punkte/Turnover/Sacks aus fsZuege, Einblender = feed(big) touchdown,
+    // fieldGoal, sack, interception, fumble. Nicht gefuehrt und deshalb weggelassen: Drive-Liste
+    // (fsZuege kennt keinen Drive), Yards je Touchdown, Extra-Punkte als eigene Verlaufszeile.
+    football:{status:"fertig",chassis:"feldspiel",titel:"Football",
+      komponenten:HUD_KOMPONENTEN,
+      ersetzt:["kopfzeile","bbug","lauf-band","callout","kaderleiste"],
+      quellen:{stand:"fsPunkte (= #score, inkl. Extra-Punkte)",uhr:"feldspielRestzeitAbwaerts()",zusatz:"fsLive.football (down/toGo/spot), fsLive.kickoff",
+        teamfeld:"Summe passYards+laufYards der Einheiten",ballbesitz:"fsLive.football.side",
+        momentum:"fsZuege treffer im Uhrfenster",spieler:"wertungVon(disc).zeilen() = WERTUNG_FOOTBALL (+ abgeleitet: Yds)",
+        verlauf:"fsZuege[0..fsZeiger] (treffer/steal/block), Stand = fsPunkte",einblender:"feed(big) touchdown, fieldGoal, sack, interception, fumble -> callout()"},
+      daten:{
+        stand:()=>[fsPunkte[0]||0,fsPunkte[1]||0],
+        uhr:()=>hudUhrFeldspiel(),
+        zusatz:()=>{
+          if(done||!fsLive)return null;
+          // fsLive.kickoff bleibt nach dem Anstoss als Objekt stehen (wird nie geleert): "gerade Kickoff" heisst phase==="kickoff".
+          if(fsLive.phase==="kickoff")return {txt:"Kickoff",eng:false};
+          const fb=fsLive.football; if(!fb)return null;
+          const ORD=["1st","2nd","3rd","4th"];
+          const feld=fb.spot<=50?"OPP "+fb.spot:"OWN "+(100-fb.spot);
+          return {txt:(ORD[fb.down-1]||fb.down+".")+" & "+fb.toGo+" · "+feld,eng:fb.down>=3};
+        },
+        ballbesitz:()=>(!done&&fsLive&&fsLive.football)?fsLive.football.side:null,
+        ballTraegerId:()=>(!done&&fsLive&&fsLive.ball&&fsLive.ball.traeger)?fsLive.ball.traeger.id:null,
+        teamStat:(s)=>{
+          if(!fsLive)return null;
+          let y=0; for(const u of FSTEAM[s])y+=(u.passYards||0)+(u.laufYards||0);
+          return {txt:"YDS "+y,titel:"Raumgewinn: Pass- plus Laufyards, Sack-Yards abgezogen"};
+        },
+        einblenderStat:(u)=>hudStatZeile(u,[["pkt",(n)=>n+" PKT"],["yds",(n)=>n+" YDS"],["kompl",(n)=>n+" KOMPL"]])
+      },
+      zusatzTitel:"Down & Distance",zusatzText:true,
+      abgeleitet:{yds:{id:"yds",kopf:"Yds",titel:"Yards insgesamt: Pass-, Lauf- und Fangyards des Spielers zusammen (Summe der drei Wertungsspalten)",
+        wert:(z)=>((z.u.passYards||0)+(z.u.laufYards||0)+(z.u.fangYards||0))||null}},
+      kern:"yds",leiste:["pkt","tkl"],
+      karte:["yds","pkt","tkl","passy","laufy","fangy","kompl","sack","intr","to","imp"],
+      nullStrich:["imp"],foulsGrenze:0,momentumFensterUhrSek:70,standExakt:true,
+      einblenderSchuetze:["touchdown"],
+      verlaufArten:{treffer:"punkte",steal:"turnover",block:"sack"},
+      verlaufFilter:[["alle","Alle"],["punkte","Punkte"],["turnover","Turnover"],["sack","Sacks"]],
+      verlauf:{
+        text:(e)=>{
+          const n=(u)=>u&&u.n?u.n:"?";
+          // Das Field Goal hat keinen Kicker-Slot: e.spieler ist nur ein Namenstraeger, gebucht ist es fuer die Seite.
+          if(e.art==="treffer")return e.punkte===3?hudSeitenName(e.seite)+": Field Goal":n(e.spieler)+": Touchdown";
+          if(e.art==="steal")return n(e.verteidiger)+" gewinnt den Ball · Turnover von "+n(e.spieler);
+          if(e.art==="block")return n(e.verteidiger)+" sackt "+n(e.spieler);
+          return n(e.spieler)+" "+e.art;
+        },
+        label:(e)=>e.art==="treffer"?(e.punkte===3?"FG":"TD"):e.art==="steal"?"TO":"SACK",
+        gross:(e)=>e.art==="treffer"&&e.punkte===6,
+        seite:(e)=>(e.art==="steal"||e.art==="block")?(e.verteidiger?e.verteidiger.side:e.seite):e.seite,
+        mom:(e)=>e.art==="treffer"?{seite:e.seite,gew:e.punkte}:null},
+      momentumTitel:(pk,sek)=>"Momentum: "+pk[0]+" : "+pk[1]+" Punkte (Touchdowns, Field Goals) in den letzten "+sek+" Sekunden Spielzeit"},
     tdm:HUD_SKELETT("kampf",{stand:"#score (Ausschaltungen, updateHud)",uhr:"#clock",zusatz:"live(0/1) Lebens-Pips, Sudden-Death",
       spieler:"wertungVon(disc).zeilen() = u.st (Schd/Heil/KO)",verlauf:"feed() kind=ersteAusschaltung/mehrfachkill/trade",einblender:"feed(big)"}),
     battlefield:HUD_SKELETT("kampf",{stand:"#score + KP (kampfSieger/dominationSieger)",uhr:"#clock",zusatz:"Kontrollpunkte #kpzeile, Pod: zeichneBfPodTafel()",
@@ -59829,6 +59949,13 @@
       +lsEsc(kennungVon(String(name||"")))+".jpg')\" aria-hidden=\"true\"></span>";
   }
   function hudRolle(u){
+    // Hockey: wer WIRKLICH im Tor steht (u.torwart, s. bestimmeTorwaerter: ohne gesetzte Aufstellung gewinnt die
+    // hoechste PARADE, nicht der Torwart-Slot) traegt "Torwart"; ein Feldspieler mit Torwart-Slot (Rundlauf-Slot)
+    // zeigt nicht den Slotnamen, der ihn als Torwart auswiese.
+    if(u&&istHockey()){
+      if(u.torwart)return "Torwart";
+      if(u.slotId&&TORWART_SLOTS.has(u.slotId))return "Feldspieler";
+    }
     const sl=u&&u.slotId&&SLOTVON[u.slotId];
     return sl?sl.label:"";
   }
@@ -59839,7 +59966,28 @@
   function hudZeilen(){
     try{ const w=wertungVon(disc); return {w,zeilen:w.zeilen()}; }catch{ return {w:null,zeilen:[]}; }
   }
-  function hudSpalte(w,id){ return w&&w.spalten.find(s=>s.id===id)||null; }
+  // Spalte der Wertung -- oder eine im Profil abgeleitete (Summe aus gebuchten Spalten, z.B. Football "Yds").
+  function hudSpalte(w,id){
+    const p=hudProfil();
+    return (p&&p.abgeleitet&&p.abgeleitet[id])||(w&&w.spalten.find(s=>s.id===id))||null;
+  }
+  // Kern-, Neben- und Kartenwerte je Zeile: Standard aus dem Profil, eine Rolle (Hockey-Torwart) darf sie ersetzen.
+  function hudSpaltenVon(p,z){
+    const r=p.rolle?p.rolle(z):null;
+    return {kern:(r&&r.kern)||p.kern,leiste:(r&&r.leiste)||p.leiste,karte:(r&&r.karte)||p.karte};
+  }
+  // Statzeile des Einblenders aus gebuchten Spalten: [["tore",n=>n+" TOR"],...], Nullwerte ausser dem ersten entfallen.
+  function hudStatZeile(u,teile){
+    const {w,zeilen}=hudZeilen();
+    const z=zeilen.find(x=>x.u&&x.u.id===u.id); if(!z)return "";
+    const out=[];
+    teile.forEach(([id,fmt],i)=>{
+      const sp=hudSpalte(w,id), v=sp?sp.wert(z):null;
+      if(v==null&&i>0)return;
+      out.push(fmt(v==null?0:v));
+    });
+    return out.join(" · ");
+  }
   // Leere Zelle: die Wertungstabelle zeigt "—" fuer null; im HUD steht fuer Zaehlspalten eine 0
   // (dieselbe gebuchte Groesse, nur lesbarer), fuer Quoten/Komposita bleibt der Strich.
   function hudWertText(s,z){
@@ -59863,7 +60011,7 @@
   function hudKlasse(root,key,klasse,an){ const e=hudFeld(root,key); if(e&&e.classList.contains(klasse)!==!!an)e.classList.toggle(klasse,!!an); }
 
   // ---------- Verlauf: gebuchte Ereignisse aus fsZuege, mit Uhr-Stempel beim ersten Sehen -------
-  function hudVerlaufText(e){
+  function hudVerlaufTextBasketball(e){
     const n=(u)=>u&&u.n?u.n:"?";
     if(e.art==="treffer"){
       if(e.freiwurf)return n(e.spieler)+" verwandelt den Freiwurf";
@@ -59890,7 +60038,11 @@
   function hudUhrJetzt(){
     const txt=istFeldspiel(disc)?(feldspielRestzeitAbwaerts()||""):"";
     const m=txt.match(/^(Q\d+|\d+\. Drittel)\s*·\s*(\d+:\d\d)/);
-    return m?m[1].replace(". Drittel","D")+" "+m[2]:"";
+    if(!m)return "";
+    // Waehrend der Pause zeigt die Periodenzahl schon die kommende Periode, die Uhr 0:00: das Ereignis gehoert ans Ende der alten.
+    let per=m[1];
+    if(fsLive&&fsLive.viertelpause)per=per.replace(/\d+/,(n)=>String(Math.max(1,Number(n)-1)));
+    return per.replace(". Drittel","D")+" "+m[2];
   }
   function hudVerlaufNachfuehren(p){
     if(hudZuegeRef!==fsZuege||fsZeiger<hudZuegeGesehen){
@@ -59901,31 +60053,35 @@
     // fsBisher().team, damit die Stand-Spalte am Ende exakt fsPunkte zeigt.
     const stand=[0,0];
     for(let i=0;i<hudZuegeGesehen;i++){ const e=fsZuege[i]; if(e.art==="treffer")stand[e.seite]+=e.punkte; }
-    const uhr=hudUhrJetzt(), uhrSek=fsT*zeitFaktor();
+    const uhr=hudUhrJetzt(), uhrSek=fsT*zeitFaktor(), V=p.verlauf;
+    // Football: die Extra-Punkte stehen in fsPunkte, aber nicht in fsZuege. Dort traegt nur der LETZTE neue
+    // Treffer eines Durchlaufs den gebuchten Stand (fsPunkte); sah das HUD mehrere auf einmal (Schnelldurchlauf),
+    // bleibt die Stand-Zelle der frueheren leer statt eine Zahl ohne Extra-Punkte zu zeigen.
+    let letzterTreffer=-1;
+    if(p.standExakt)for(let i=hudZuegeGesehen;i<fsZeiger;i++)if(fsZuege[i].art==="treffer")letzterTreffer=i;
     for(let i=hudZuegeGesehen;i<fsZeiger;i++){
       const e=fsZuege[i];
       if(e.art==="treffer")stand[e.seite]+=e.punkte;
       const kat=p.verlaufArten[e.art];
       if(!kat)continue;
-      const gross=(e.art==="treffer"&&!e.freiwurf&&(e.punkte===3||e.tier==="dunk"))||(e.art==="foul"&&!!e.undEins);
-      // Ein Foul gehoert der Seite des Gefoulten (sie bekommt die Freiwuerfe) -- im Verlauf aber in
-      // der Farbe des Foulenden, damit die Zeile zur Leiste mit den Foul-Marken passt.
-      const seite=(e.art==="foul"||e.art==="steal"||e.art==="block")?(e.verteidiger?e.verteidiger.side:e.seite):e.seite;
-      hudVerlauf.push({i,art:e.art,kat,seite,text:hudVerlaufText(e),uhr,uhrSek,
-        punkte:e.art==="treffer"?e.punkte:0,stand:stand[0]+":"+stand[1],gross});
+      const m=V.mom?V.mom(e):null;
+      hudVerlauf.push({i,art:e.art,kat,seite:V.seite(e),text:V.text(e),uhr,uhrSek,label:V.label(e),
+        punkte:e.art==="treffer"?e.punkte:0,momSeite:m?m.seite:null,momGew:m?m.gew:0,
+        stand:(p.standExakt&&e.art==="treffer")?(i===letzterTreffer?fsPunkte[0]+":"+fsPunkte[1]:""):stand[0]+":"+stand[1],
+        gross:!!V.gross(e)});
     }
     while(hudVerlauf.length>200)hudVerlauf.shift();
     hudZuegeGesehen=fsZeiger;
   }
-  // Momentum: Punkte je Seite im Uhrfenster der letzten N Sekunden Spielzeit -- aus denselben
-  // gebuchten Treffern wie der Verlauf.
+  // Momentum: Gewicht je Seite im Uhrfenster der letzten N Sekunden Spielzeit -- aus denselben
+  // gebuchten Ereignissen wie der Verlauf (Basketball und Football Punkte, Hockey Schuesse aufs Tor).
   function hudMomentum(p){
     const jetzt=fsT*zeitFaktor(), fenster=p.momentumFensterUhrSek||60;
     const pk=[0,0];
     for(let k=hudVerlauf.length-1;k>=0;k--){
       const r=hudVerlauf[k];
       if(jetzt-r.uhrSek>fenster)break;
-      if(r.art==="treffer")pk[r.seite]+=r.punkte;
+      if(r.momSeite!=null)pk[r.momSeite]+=r.momGew;
     }
     const sum=pk[0]+pk[1];
     return {pk,anteil:sum?(pk[0]-pk[1])/sum:0,fenster};
@@ -59938,13 +60094,14 @@
       +"<span class=\"hud-tn\"><b data-kurz=\""+lsEsc(hudKuerzel(s))+"\">"+lsEsc(hudSeitenName(s))+"</b>"
       +"<span class=\"hud-tsub\"><i class=\"hud-ball\" data-hf=\"ball"+s+"\" title=\"Ballbesitz\"></i>"
       +"<span class=\"hud-tk\">"+lsEsc(hudKuerzel(s))+"</span>"
-      +"<span class=\"hud-chip hud-lauf\" data-hf=\"lauf"+s+"\" hidden></span></span></span>"
+      +"<span class=\"hud-chip hud-lauf\" data-hf=\"lauf"+s+"\" hidden></span>"
+      +"<span class=\"hud-chip hud-stat\" data-hf=\"stat"+s+"\" hidden></span></span></span>"
       +"<b class=\"hud-stand t\" data-hf=\"stand"+s+"\">0</b></div>";
     return "<div class=\"hud-sb\">"
       +"<div class=\"hud-disc\"><b>"+lsEsc(p.titel||disc)+"</b><small data-hf=\"discsub\"></small></div>"
       +seite(0)
       +"<div class=\"hud-mitte\"><span class=\"hud-per\" data-hf=\"per\"></span><b class=\"hud-uhr t\" data-hf=\"uhr\"></b>"
-      +"<span class=\"hud-zusatz t\" data-hf=\"zusatz\" title=\""+lsEsc(p.zusatzTitel||"")+"\"></span></div>"
+      +"<span class=\"hud-zusatz t"+(p.zusatzText?" txt":"")+"\" data-hf=\"zusatz\" title=\""+lsEsc(p.zusatzTitel||"")+"\"></span></div>"
       +seite(1)
       +"</div>"
       +"<div class=\"hud-mom\" data-hf=\"mom\" title=\"Momentum\"><i data-hf=\"momBalken\"></i></div>";
@@ -59980,7 +60137,14 @@
       const e=hudFeld(kopf,"lauf"+s); if(!e)continue;
       const an=!!(lauf&&lauf.seite===s);
       if(e.hidden===an)e.hidden=!an;
-      if(an)hudText(kopf,"lauf"+s,"LAUF "+lauf.punkte+":0");
+      if(an)hudText(kopf,"lauf"+s,lauf.txt||"LAUF "+lauf.punkte+":0");
+    }
+    // Teamfeld (Hockey SOG, Football YDS): eine gebuchte Zahl je Seite neben dem Kuerzel.
+    for(const s of [0,1]){
+      const e=hudFeld(kopf,"stat"+s); if(!e)continue;
+      const st=d.teamStat?d.teamStat(s):null;
+      if(e.hidden===!!st)e.hidden=!st;
+      if(st){ hudText(kopf,"stat"+s,st.txt); if(e.title!==(st.titel||""))e.title=st.titel||""; }
     }
     const mom=hudMomentum(p);
     const balken=hudFeld(kopf,"momBalken");
@@ -59991,7 +60155,7 @@
     }
     const momEl=hudFeld(kopf,"mom");
     if(momEl){
-      const t="Momentum: "+mom.pk[0]+" : "+mom.pk[1]+" Punkte in den letzten "+mom.fenster+" Sekunden Spielzeit";
+      const t=p.momentumTitel(mom.pk,mom.fenster);
       if(momEl.title!==t)momEl.title=t;
     }
   }
@@ -59999,13 +60163,13 @@
   // ---------- Dock: Spielerleisten + Spielverlauf ----------------------------------------------
   function hudDockSkelett(p,w,zeilen){
     const leiste=(z)=>{
-      const u=z.u||{};
+      const u=z.u||{}, sp=hudSpaltenVon(p,z);
       return "<button type=\"button\" class=\"hud-leiste "+(z.side===0?"h":"a")+"\" data-hud-spieler=\""+lsEsc(u.id)+"\" "
         +"data-hf=\"l"+lsEsc(u.id)+"\" aria-label=\""+lsEsc(z.n)+": Spielerkarte öffnen\">"
-        +hudPortraitHtml(z.n)+"<i class=\"hud-lball\" aria-hidden=\"true\"></i>"
+        +hudPortraitHtml(z.n)+"<i class=\"hud-lball\" aria-hidden=\"true\"></i><span class=\"hud-lstatus\" data-hf=\"s"+lsEsc(u.id)+"\" hidden></span>"
         +"<span class=\"hud-lkopf\"><b class=\"hud-lname\">"+lsEsc(z.n)+"</b><small class=\"hud-lrolle\">"+lsEsc(hudRolle(u))+"</small></span>"
-        +"<span class=\"hud-lwerte\"><span class=\"hud-w kern\"><b class=\"t\" data-hf=\"k"+lsEsc(u.id)+"\">0</b><small>"+lsEsc((hudSpalte(w,p.kern)||{kopf:""}).kopf)+"</small></span>"
-        +p.leiste.map(id=>"<span class=\"hud-w\"><span class=\"t\" data-hf=\""+id+lsEsc(u.id)+"\">0</span><small>"+lsEsc((hudSpalte(w,id)||{kopf:id}).kopf)+"</small></span>").join("")
+        +"<span class=\"hud-lwerte\"><span class=\"hud-w kern\"><b class=\"t\" data-hf=\"k"+lsEsc(u.id)+"\">0</b><small>"+lsEsc((hudSpalte(w,sp.kern)||{kopf:""}).kopf)+"</small></span>"
+        +sp.leiste.map(id=>"<span class=\"hud-w\"><span class=\"t\" data-hf=\""+id+lsEsc(u.id)+"\">0</span><small>"+lsEsc((hudSpalte(w,id)||{kopf:id}).kopf)+"</small></span>").join("")
         +(p.foulsGrenze?"<span class=\"hud-fouls\" data-hf=\"f"+lsEsc(u.id)+"\" title=\"Persönliche Fouls\">"+"<i></i>".repeat(p.foulsGrenze)+"</span>":"")
         +"</span></button>";
     };
@@ -60022,12 +60186,22 @@
     const {w,zeilen}=hudZeilen();
     const sig=disc+"|"+zeilen.map(z=>z.side+":"+(z.u&&z.u.id)+":"+z.n).join(",");
     if(sig!==hudDockSig){ hudDockSig=sig; dock.innerHTML=hudDockSkelett(p,w,zeilen); hudVerlaufSig=""; }
-    const kern=hudSpalte(w,p.kern), traegerId=p.daten.ballTraegerId?p.daten.ballTraegerId():null;
+    const traegerId=p.daten.ballTraegerId?p.daten.ballTraegerId():null;
     const foulsVon=p.daten.fouls?p.daten.fouls():null;
     for(const z of zeilen){
       const id=z.u&&z.u.id; if(id==null)continue;
-      hudText(dock,"k"+id,hudWertText(kern,z));
-      for(const sid of p.leiste)hudText(dock,sid+id,hudWertText(hudSpalte(w,sid),z));
+      const sp=hudSpaltenVon(p,z);
+      hudText(dock,"k"+id,hudWertText(hudSpalte(w,sp.kern),z));
+      for(const sid of sp.leiste)hudText(dock,sid+id,hudWertText(hudSpalte(w,sid),z));
+      // Statusmarke (Hockey: Strafbank mit Restzeit): nur aus einem Zustand, den der Motor ohnehin fuehrt.
+      if(p.daten.status){
+        const st=p.daten.status(z.u), se=hudFeld(dock,"s"+id);
+        if(se){
+          if(se.hidden===!!st)se.hidden=!st;
+          if(st){ hudText(dock,"s"+id,st.txt); hudKlasse(dock,"s"+id,"eng",!!st.eng); }
+          hudKlasse(dock,"l"+id,"statusan",!!st);
+        }
+      }
       const fouls=foulsVon?(foulsVon.get(id)||0):0;
       const fe=hudFeld(dock,"f"+id);
       if(fe&&fe.dataset.n!==String(fouls)){
@@ -60050,7 +60224,7 @@
         hudVerlaufSig=vs;
         liste.innerHTML=rows.slice(-30).reverse().map((r,k)=>"<li class=\""+(r.seite===0?"h":"a")+(r.gross?" gross":"")
           +(k===0&&neu?" neu":"")+"\" data-kat=\""+r.kat+"\"><span class=\"hud-vz t\">"+lsEsc(r.uhr)+"</span>"
-          +"<span class=\"hud-vart\">"+lsEsc(r.art==="treffer"?(r.punkte===1?"FW +1":"+"+r.punkte):r.kat==="foul"?"Foul":r.art==="steal"?"Steal":r.art==="block"?"Block":"TO")+"</span>"
+          +"<span class=\"hud-vart\">"+lsEsc(r.label)+"</span>"
           +"<span class=\"hud-vtx\">"+lsEsc(r.text)+"</span><span class=\"hud-vstand t\">"+(r.art==="treffer"?lsEsc(r.stand):"")+"</span></li>").join("")
           ||"<li class=\"leer\"><span class=\"hud-vtx\">Noch keine Ereignisse"+(hudVerlaufFilter==="alle"?"":" in diesem Filter")+".</span></li>";
       }
@@ -60079,7 +60253,7 @@
     const z=zeilen.find(x=>x.u&&x.u.id===hudKarteId);
     if(!z){ hudKarteId=null; karte.hidden=true; return; }
     const u=z.u;
-    const werte=p.karte.map(id=>{ const s=hudSpalte(w,id); return s?[s.kopf,hudWertText(s,z),s.titel||""]:null; }).filter(Boolean);
+    const werte=hudSpaltenVon(p,z).karte.map(id=>{ const s=hudSpalte(w,id); return s?[s.kopf,hudWertText(s,z),s.titel||""]:null; }).filter(Boolean);
     // Eignung = z.eig, exakt die Zahl der Spalte "Eig" (gebaut in bauFeldspiel: Basis + Slot + Form/
     // Intensitaet). Bewusst KEINE Aufschluesselung aus aufschluesselung(): die liest den Slot aus der
     // Aufstellung ohne Disziplinpruefung und kann deshalb eine andere Summe zeigen als gebucht ist.
@@ -60263,15 +60437,20 @@
     return {aktiv:!!p,disc,status:(HUD_PROFIL[disc]||{}).status||null,
       profile:Object.fromEntries(Object.entries(HUD_PROFIL).map(([k,v])=>[k,v.status])),
       gebucht:{stand:p?p.daten.stand():[fsPunkte[0],fsPunkte[1]],score:(document.getElementById("score")||{}).textContent||"",
-        spieler:zeilen.map(z=>({id:z.u&&z.u.id,n:z.n,seite:z.side,kern:p?hudWertText(hudSpalte(w,p.kern),z):null,
-          leiste:p?p.leiste.map(id=>hudWertText(hudSpalte(w,id),z)):[],fouls:p&&p.daten.fouls?(p.daten.fouls().get(z.u&&z.u.id)||0):0})),
+        spieler:zeilen.map(z=>({id:z.u&&z.u.id,n:z.n,seite:z.side,kernId:p?hudSpaltenVon(p,z).kern:null,
+          kern:p?hudWertText(hudSpalte(w,hudSpaltenVon(p,z).kern),z):null,
+          leiste:p?hudSpaltenVon(p,z).leiste.map(id=>hudWertText(hudSpalte(w,id),z)):[],fouls:p&&p.daten.fouls?(p.daten.fouls().get(z.u&&z.u.id)||0):0,
+          roh:p?{passYards:z.u.passYards||0,laufYards:z.u.laufYards||0,fangYards:z.u.fangYards||0,punkte:z.u.punkte||0,assists:z.u.assists||0,
+            feldwuerfe:z.u.feldwuerfe||0,saves:z.u.saves||0,gegentore:z.u.gegentore||0,strafminuten:z.u.strafminuten||0}:null})),
         lauf:p&&p.daten.lauf?p.daten.lauf():null,zuege:fsZeiger},
       gezeigt:{stand:[txt(kopf,"stand0"),txt(kopf,"stand1")],uhr:txt(kopf,"uhr"),zusatz:txt(kopf,"zusatz"),
         lauf:[0,1].map(s=>{ const e=kopf&&kopf.querySelector("[data-hf=\"lauf"+s+"\"]"); return e&&!e.hidden?e.textContent:null; }),
+        stat:[0,1].map(s=>{ const e=kopf&&kopf.querySelector("[data-hf=\"stat"+s+"\"]"); return e&&!e.hidden?e.textContent:null; }),
+        bank:p&&dock?zeilen.map(z=>{ const e=dock.querySelector("[data-hf=\"s"+(z.u&&z.u.id)+"\"]"); return e&&!e.hidden?e.textContent:null; }):[],
         spieler:p&&dock?zeilen.map(z=>({id:z.u&&z.u.id,kern:txt(dock,"k"+(z.u&&z.u.id)),
-          leiste:p.leiste.map(id=>txt(dock,id+(z.u&&z.u.id))),
+          leiste:hudSpaltenVon(p,z).leiste.map(id=>txt(dock,id+(z.u&&z.u.id))),
           fouls:Number(((dock.querySelector("[data-hf=\"f"+(z.u&&z.u.id)+"\"]")||{}).dataset||{}).n||0)})):[],
-        verlauf:hudVerlauf.map(r=>({i:r.i,art:r.art,kat:r.kat,seite:r.seite,stand:r.stand,text:r.text})),
+        verlauf:hudVerlauf.map(r=>({i:r.i,art:r.art,kat:r.kat,seite:r.seite,stand:r.stand,text:r.text,label:r.label})),
         filter:hudVerlaufFilter,karte:hudKarteId,
         einblender:hudEinblenderOffen?{titel:hudEinblenderOffen.titel,seite:hudEinblenderOffen.seite}:null}};
   }

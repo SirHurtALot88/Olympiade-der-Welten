@@ -145,19 +145,19 @@ describe.skipIf(!chromiumVerfuegbar())("HUD-System Basketball (Arena-Motor, Chro
     await browser?.close();
   });
 
-  it("Profile: Basketball fertig, die anderen 19 Disziplinen als Skelett", async () => {
+  it("Profile: Basketball, Hockey und Football fertig (Welle 1), die anderen 17 Disziplinen als Skelett", async () => {
     const p = await seite.evaluate(() => (window.__arena.hudProbe() as Probe).profile);
     expect(p.basketball).toBe("fertig");
     const skelett = Object.entries(p).filter(([, v]) => v === "skelett").map(([k]) => k);
-    expect(skelett.length).toBe(19);
-    for (const d of ["hockey", "football", "tdm", "battlefield", "mini-dm", "fechten", "tennis", "speed-schach", "breaking",
+    expect(skelett.length).toBe(17);
+    for (const d of ["tdm", "battlefield", "mini-dm", "fechten", "tennis", "speed-schach", "breaking",
       "eiskunstlauf", "showcase", "gewichtheben", "wettessen", "i-spy", "staffel", "time-trial", "spurt", "climbing", "takeshis-castle"]) {
       expect(skelett, d).toContain(d);
     }
   });
 
-  it("Hockey (Skelett) behaelt das alte HUD", async () => {
-    await neueDisziplin(seite, "hockey");
+  it("TDM (Skelett) behaelt das alte HUD", async () => {
+    await neueDisziplin(seite, "tdm");
     await seite.waitForTimeout(150);
     expect((await probe(seite)).aktiv).toBe(false);
     expect(await sichtbar(seite, ".scoreline")).toBe(true);
