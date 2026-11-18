@@ -495,8 +495,8 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
   const ruecklage = (ruecklageDebug?.ruecklage ?? 0) * (saisonEins ? 0.5 : 1);
   // Stufe 3 (hart): der Vorstand gibt nur `nochFrei` zum Ausgeben (Ablosen + Jahresgehaelter) frei; das Geld bleibt auf dem Konto.
   const vorstand = berechneVorstandBudgetStand(input.gameState, input.team.teamId);
-  const feeCap = vorstand.anteil < 1 ? vorstand.investition.frei : undefined;
-  const salaryCap = vorstand.gehalt.quote < 1 ? vorstand.gehalt.frei : undefined;
+  const feeCap = vorstand.gedeckelt ? vorstand.investition.frei : undefined;
+  const salaryCap = vorstand.gedeckelt ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
   const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
   const sponsorForecast =

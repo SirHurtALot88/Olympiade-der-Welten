@@ -107,10 +107,13 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
   it("Stand: freigegeben, ausgegeben, noch frei, gesperrt; Kontostand bleibt unveraendert", () => {
     const gs = state(100, 3); // niedrig = 70 %
     const st = berechneVorstandBudgetStand(gs, "A");
-    expect(st.freigegebenGesamt).toBe(70);
+    // Ab Saison 2 geht die Ruecklage nach Finanzwert vor der Quote ab: Topf = 70 % x (Kasse - Ruecklage - Gehaltspuffer).
+    expect(st.gedeckelt).toBe(true);
+    expect(st.freigegebenGesamt).toBeCloseTo(0.7 * st.herleitung.verfuegbar, 1);
+    expect(st.herleitung.ruecklageZiel).toBeGreaterThan(0);
     expect(st.ausgegeben).toBe(0);
-    expect(st.nochFrei).toBe(70);
-    expect(st.gesperrt).toBe(30);
+    expect(st.nochFrei).toBeCloseTo(st.freigegebenGesamt, 2);
+    expect(st.gesperrt).toBeCloseTo(100 - st.nochFrei, 1);
     expect(st.grund).toContain("70 %");
     expect(gs.teams[0]!.cash).toBe(100);
     expect(st.getrennt).toBe(true);
@@ -119,12 +122,13 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
   });
 
   it("Kauf ueber der Freigabe ist abgelehnt (Transfertopf und Gehaltstopf), darunter erlaubt", () => {
-    const gs = state(100, 3); // Transfer 70 %, Gehalt max(75 %, 70 %) = 75 % von 41 = 30,75
-    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 60, salary: 8, rosterBefore: 10, playerMin: 8 }).ok).toBe(true);
-    const teuer = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 71, salary: 8, rosterBefore: 10, playerMin: 8 });
+    const gs = state(100, 3); // Transfer 70 % des Verfuegbaren, Gehalt max(75 %, 70 %) = 75 % der Basis
+    const frei = berechneVorstandBudgetStand(gs, "A");
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: frei.investition.frei - 1, salary: 8, rosterBefore: 10, playerMin: 8 }).ok).toBe(true);
+    const teuer = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: frei.investition.frei + 1, salary: 8, rosterBefore: 10, playerMin: 8 });
     expect(teuer.ok).toBe(false);
     expect(teuer.reason).toBe("vorstand_transferbudget_nicht_freigegeben");
-    const gehalt = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 10, salary: 31, rosterBefore: 10, playerMin: 8 });
+    const gehalt = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 10, salary: frei.gehalt.frei + 1, rosterBefore: 10, playerMin: 8 });
     expect(gehalt.reason).toBe("vorstand_gehaltsbudget_nicht_freigegeben");
     // unter dem Kader-Minimum gilt die Sperre nicht
     expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 90, salary: 40, rosterBefore: 6, playerMin: 8 }).ok).toBe(true);
@@ -149,23 +153,21 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
   });
 
   it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben", () => {
-    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Freigegeben 70 % x (100 + 20) = 84, davon 14 aus dem Verkauf.
-    const gs = state(120, 3, [sell(20)]);
-    const st = berechneVorstandBudgetStand(gs, "A");
-    expect(st.freigegebenGesamt).toBe(84);
-    expect(st.nochFrei).toBe(84);
-    expect(st.gesperrt).toBe(36);
-    // Ohne Verkauf waeren es 70: der Verkauf schaltet genau 14 frei
-    expect(st.nochFrei - 70).toBe(14);
+    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Der Verkauf zaehlt nur zu 70 %: 14 C kommen dazu, 6 C bleiben als Puffer.
+    const ohne = berechneVorstandBudgetStand(state(100, 3), "A");
+    const st = berechneVorstandBudgetStand(state(120, 3, [sell(20)]), "A");
+    expect(st.herleitung.anfangskasse).toBeCloseTo(100, 2);
+    expect(st.nochFrei - ohne.nochFrei).toBeCloseTo(14, 2);
+    expect(st.gesperrt - ohne.gesperrt).toBeCloseTo(6, 2);
   });
 
   it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
-    // Anfangskasse 100, Kauf 40 -> Kasse 60, freigegeben 70, ausgegeben 40, frei 30, gesperrt 30
+    // Anfangskasse 100, Kauf 40 -> Kasse 60: gleicher Topf wie ohne Kauf, davon 40 ausgegeben.
+    const ohne = berechneVorstandBudgetStand(state(100, 3), "A");
     const st = berechneVorstandBudgetStand(state(60, 3, [buy(40, 5)]), "A");
-    expect(st.freigegebenGesamt).toBe(70);
+    expect(st.freigegebenGesamt).toBeCloseTo(ohne.freigegebenGesamt, 2);
     expect(st.ausgegeben).toBe(40);
-    expect(st.nochFrei).toBe(30);
-    expect(st.gesperrt).toBe(30);
+    expect(st.nochFrei).toBeCloseTo(Math.min(60, ohne.freigegebenGesamt - 40), 1);
   });
 });
 

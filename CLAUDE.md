@@ -232,8 +232,15 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   - **Gehaltstopf:** der Vorstand kürzt ihn höchstens auf **75 %** (nie 50 %); frei werdendes Gehalt eines verkauften
     Spielers fließt zu **100 %** in den Gehaltstopf zurück. Nur der Verkaufserlös unterliegt der Transfer-Quote.
   - **Gebäude** zahlen aus dem Transfer-/Investitionstopf, kein dritter Topf.
-  - **„Alles auf eine Karte“** (später): beantragt vom Menschen, gewollt von einem Top-Team oder vom Vorstand als Ziel
-    gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet Vertrauen).
+  - **„Alles auf eine Karte“** (gebaut, Finanzseite 18.11.): beantragt vom Menschen, gewollt von einem Top-Team oder vom
+    Vorstand als Ziel gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet
+    Vertrauen). Regeln und Entscheidungen: `docs/design/finanzen-v2-seite-18-11.md`.
+  - **Die Finanzseite** (`app/foundation/finances/FinanzenModern.tsx`, Mockup `public/mockups/finanzen-modern-18-11.html`) ist neu
+    gebaut, die alte `FoundationFinancesNewLook` samt `.nl-fin-*` ist raus. **Gehälter stehen groß je Saison und klein je
+    Spieltag** (Chris, 18.11.), Einheit C. Gebäude (Bau und Ausbau) zahlen aus dem Investitionstopf, Gehaltserhöhungen bei
+    Verlängerungen aus dem Gehaltstopf, beides hart und für Mensch und KI gleich (`pruefeGebaeudeGegenVorstandFreigabe`,
+    `pruefeVerlaengerungGegenVorstandFreigabe` in `lib/finance/vorstand-budgetfreigabe.ts`). Geschrieben wird nur über
+    `POST /api/finance/vorstand` hinter `authorizeServerRoomWrite`.
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte

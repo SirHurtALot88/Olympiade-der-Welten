@@ -24,11 +24,21 @@
  *                 frei = max(0, gesamt - ausgegeben);  gesperrt = Basis - gesamt.
  *
  * Ausnahme: unter dem Kader-Minimum (8) gilt die Sperre nicht — ein spielfaehiger Kader geht vor.
- * Nicht erfasst: Gehaltserhoehungen bei Verlaengerungen, Gebaeudekaeufe (Zwei-Budget-Bau danach) und die UI.
+ *
+ * AUSBAU (Finanzseite, 18.11.), aus Chris' Zwei-Budget-Entscheid und `docs/design/finanzkonzept-v2-budgets-18-11.md`:
+ *  - GEBAEUDE zahlen aus dem Investitionstopf (Bau und Ausbau), Gehaltserhoehungen bei Verlaengerungen aus dem Gehaltstopf.
+ *    Beides hart, Mensch und KI gleich (`pruefeGebaeudeGegenVorstandFreigabe`, `pruefeVerlaengerungGegenVorstandFreigabe`).
+ *  - Ab Saison 2 gehen die Ruecklage nach Finanzwert und der Gehaltspuffer (7 Spieltage Gehalt, soweit die Ruecklage
+ *    sie nicht deckt) in den Transfertopf ein: q x (Kasse - Ruecklage - Puffer) + q x Verkaufserloese. Saison 1 bleibt
+ *    voll frei (Chris: Quote 100 % fuer alle; die KI haelt ihre halbe Draft-Ruecklage weich selbst). Der Gehaltstopf
+ *    gilt ab Saison 2 auch bei Quote 100 % (Basis = max(erwarteter Sponsor, Zielgehalt)).
+ *  - UMSCHICHTEN, LOCKERUNG nach Verkaeufen, RUECKLAGE ANZAPFEN und ALLES AUF EINE KARTE: Zustand in
+ *    `seasonState.vorstandBudget`, geschrieben ueber `lib/finance/vorstand-budget-aktionen.ts`.
  */
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, VorstandBudgetZustand } from "@/lib/data/olyDataTypes";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
+import { berechneKiRuecklage, KI_RUECKLAGE_GEHALTS_FAKTOR } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
 
 /** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
@@ -80,12 +90,49 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
   if ((saisonNummer(gameState) ?? 1) <= 1) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "saison_1" };
   }
-  const wert = gameState.seasonState.boardConfidence?.[teamId]?.value;
-  if (typeof wert !== "number" || !Number.isFinite(wert)) {
+  const gespeichert = gameState.seasonState.boardConfidence?.[teamId]?.value;
+  if (typeof gespeichert !== "number" || !Number.isFinite(gespeichert)) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "ohne_vertrauenswert" };
   }
+  // Vertrauenskosten des Anzapfens wirken erst bei der naechsten Festlegung (naechste Saison): bis dahin zaehlt der Wert ohne sie.
+  // Steht das Anzapf-Ziel schon im Bestand, ist sein Abzug im gespeicherten Wert enthalten: dann wird er hier zurueckgerechnet.
+  const zustand = gameState.seasonState.vorstandBudget?.[teamId];
+  const kostenImWert =
+    zustand &&
+    zustand.seasonId === gameState.season?.id &&
+    (gameState.seasonState.teamSeasonObjectives ?? []).some(
+      (o) => o.teamId === teamId && o.seasonId === gameState.season?.id && o.objectiveId === "vorstand-ruecklage-angezapft",
+    );
+  const wert = gespeichert + (kostenImWert ? zustand!.vertrauensKosten ?? 0 : 0);
   const { stufe, anteil } = stufeFuerVertrauen(wert);
   return { teamId, stufe, anteil, vertrauen: wert, grund: "vertrauen" };
+}
+
+/** Anteils-Stufen der Transfer-Quote, von streng nach locker. */
+export const QUOTEN_STUFEN = [0.5, 0.7, 0.85, 1] as const;
+/** Lockerungs-Puffer X als Anteil des tragbaren Gehalts je Ausgangsquote (50 / 70 / 85 %). */
+export const LOCKERUNG_PUFFER_ANTEIL: Record<number, number> = { 0.5: 0.3, 0.7: 0.2, 0.85: 0.1 };
+/** Umschicht-Grenze: Anteil des Gehaltstopfs je Ausgangsquote. */
+export const UMSCHICHT_GRENZE_ANTEIL: Record<number, number> = { 1: 0.25, 0.85: 0.2, 0.7: 0.15, 0.5: 0.1 };
+/** „Alles auf eine Karte“: nur dieser Anteil des Budgets bleibt als Puffer auf dem Konto. */
+export const ALLES_PUFFER_ANTEIL = 0.05;
+/** „Ruecklage anzapfen“: hoechstens dieser Anteil des Ruecklage-Ziels. */
+export const ANZAPFEN_MAX_ANTEIL = 0.5;
+/** Vertrauenskosten je angefangenem Viertel des Ruecklage-Ziels. */
+export const ANZAPFEN_VERTRAUEN_JE_VIERTEL = 0.25;
+
+/** Der gespeicherte Zustand dieses Teams in DIESER Saison (sonst leer: der Vorstand rechnet jede Saison neu). */
+export function lesVorstandZustand(gameState: GameState, teamId: string): VorstandBudgetZustand {
+  const z = gameState.seasonState?.vorstandBudget?.[teamId];
+  if (z && z.seasonId === gameState.season?.id) return z;
+  return {
+    seasonId: gameState.season?.id ?? "",
+    umschichtung: 0,
+    ruecklageAngezapft: 0,
+    vertrauensKosten: 0,
+    alleAufEineKarte: null,
+    protokoll: [],
+  };
 }
 
 /** Ein Topf der Freigabe. */
@@ -98,33 +145,113 @@ export type VorstandTopf = {
   grund: string;
 };
 
+export type VorstandHerleitung = {
+  /** Kasse zu Fensterbeginn (Kasse jetzt + Kaeufe + Gebaeude - Verkaufserloese). */
+  anfangskasse: number;
+  ruecklageZiel: number;
+  finanzwert: number;
+  ruecklageQuote: number;
+  /** Gehaltspuffer: 7 Spieltage Gehalt, soweit die Ruecklage sie nicht deckt. */
+  gehaltspuffer: number;
+  /** Kasse - Ruecklage - Puffer (bei „Alles auf eine Karte“ die ganze Kasse). */
+  verfuegbar: number;
+  verkaufserloese: number;
+  angezapft: number;
+  /** Erwarteter Sponsor (0,92 x Anker). */
+  sponsorErwartung: number;
+  /** Gehalt bei Soll-Kader. */
+  zielgehalt: number;
+  /** Basis des Gehaltstopfs = max(Sponsor, Zielgehalt) = „tragbares Gehalt“. */
+  tragbaresGehalt: number;
+  /** Gehaltsbudget vor Umschichten. */
+  gehaltsbudgetVorUmschichten: number;
+};
+
+export type VorstandUmschichten = {
+  /** + = Transfer -> Gehalt (C Jahresgehalt). */
+  aktuell: number;
+  /** Grenze |Umschichtung| (Anteil x Gehaltstopf). */
+  grenze: number;
+  /** Anteil der Grenze am Gehaltstopf (0,25 / 0,2 / 0,15 / 0,1). */
+  grenzeAnteil: number;
+  /** Erlaubter Bereich der Umschichtung: von (negativ) bis (positiv). */
+  moeglichVon: number;
+  moeglichBis: number;
+};
+
+export type VorstandLockerung = {
+  /** Ausgangsquote (vor Lockerung) und die Quote danach. */
+  vonAnteil: number;
+  nachAnteil: number;
+  aktiv: boolean;
+  /** Der Puffer X, den der Vorstand sehen will. */
+  puffer: number;
+  /** Verkaufserloes im Fenster, ab dem der einbehaltene Anteil X erreicht. */
+  schwelle: number;
+  verkaufserloese: number;
+  einbehalten: number;
+  /** Noch zu verkaufen bis zur Schwelle. */
+  fehlt: number;
+  /** Mehrfreigabe (tatsaechlich, wenn aktiv; sonst die, die bei Erreichen der Schwelle kaeme). */
+  mehrFrei: number;
+  /** Boden: die Kasse muss ueber Ruecklage-Ziel + Gehaltspuffer + X bleiben. */
+  boden: number;
+  /** Warum keine Lockerung moeglich ist (null = moeglich). */
+  gesperrtGrund: string | null;
+};
+
 export type VorstandBudgetStand = {
   /** Zwei getrennte Toepfe (Zwei-Budget-Modell). */
   getrennt: boolean;
-  /** Transfer-/Investitionstopf (Abloesen). */
+  /** Greift die harte Sperre? Nein in Saison 1 und bei abgeschalteter Freigabe. */
+  gedeckelt: boolean;
+  /** Transfer-/Investitionstopf (Abloesen und Gebaeude). */
   investition: VorstandTopf;
   /** Gehaltstopf (Jahresgehaelter). */
   gehalt: VorstandTopf;
   teamId: string;
   stufe: VorstandStufe;
-  /** Transfer-Quote (Vertrauensquote). */
+  /** Transfer-Quote (Vertrauensquote, ohne Lockerung). */
   anteil: number;
+  /** Wirksame Transfer-Quote (nach Lockerung bzw. „Alles auf eine Karte“). */
+  wirksamerAnteil: number;
+  /** Vertrauen, mit dem gerechnet wird (gespeichert + noch nicht wirksame Anzapf-Kosten), oder null. */
+  vertrauen: number | null;
   /** Kurzformen des Investitionstopfs (Transfermarkt und Spielerprofil). */
   freigegebenGesamt: number;
   ausgegeben: number;
   nochFrei: number;
   gesperrt: number;
+  /** Davon Gebaeude (in `ausgegeben` enthalten). */
+  gebaeudeAusgegeben: number;
   /** Ein Satz: warum diese Zahlen. */
   grund: string;
+  herleitung: VorstandHerleitung;
+  umschichten: VorstandUmschichten;
+  lockerung: VorstandLockerung;
+  ruecklageAnzapfen: { moeglich: number; bereitsAngezapft: number; vertrauenskosten: number };
+  alleAufEineKarte: { aktiv: boolean; puffer: number; zustand: VorstandBudgetZustand["alleAufEineKarte"] };
+  zustand: VorstandBudgetZustand;
 };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-/** Die Zahlen fuer Transfermarkt und Spielerprofil. Fuer KI und Mensch dieselbe Funktion. */
+function naechsteQuote(q: number): number {
+  for (const stufe of QUOTEN_STUFEN) if (stufe > q + 1e-9) return stufe;
+  return 1;
+}
+
+/** Die Zahlen fuer Finanzseite, Transfermarkt und Spielerprofil. Fuer KI und Mensch dieselbe Funktion. */
 export function berechneVorstandBudgetStand(gameState: GameState, teamId: string): VorstandBudgetStand {
+  const zustand = lesVorstandZustand(gameState, teamId);
   const freigabe = resolveVorstandFreigabe(gameState, teamId);
-  const cash = gameState.teams.find((t) => t.teamId === teamId)?.cash ?? 0;
+  const team = gameState.teams.find((t) => t.teamId === teamId);
+  const cash = team?.cash ?? 0;
   const seasonId = gameState.season.id;
+  const saisonNr = saisonNummer(gameState) ?? 1;
+  const alle = zustand.alleAufEineKarte != null;
+
+  // Kontobewegungen dieser Saison (Ledger, nichts neu gespeichert).
   let kaeufe = 0;
   let verkaeufe = 0;
   for (const e of gameState.transferHistory ?? []) {
@@ -132,55 +259,194 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
     if (e.transferType === "buy" && e.toTeamId === teamId) kaeufe += e.netCashImpact ?? e.fee;
     else if (e.transferType === "sell" && e.fromTeamId === teamId) verkaeufe += e.netCashImpact ?? e.fee;
   }
-  const anfangskasse = cash + kaeufe - verkaeufe;
-  const transferGesamt = freigabe.anteil * (anfangskasse + verkaeufe);
-  const nochFrei = Math.max(0, Math.min(cash, transferGesamt - kaeufe));
-  const gesperrt = Math.max(0, cash - nochFrei);
-  const prozent = Math.round(freigabe.anteil * 100);
-  const grund =
-    freigabe.grund === "vertrauen"
-      ? `Vorstandsvertrauen ${freigabe.vertrauen!.toFixed(1)} (${freigabe.stufe}): ${prozent} % des Budgets sind zum Ausgeben freigegeben, der Rest bleibt als Puffer auf dem Konto.`
-      : freigabe.grund === "saison_1"
-        ? "Saison 1: der Vorstand gibt das gesamte Budget frei."
-        : freigabe.grund === "abgeschaltet"
-          ? "Budgetfreigabe ist abgeschaltet: das gesamte Budget ist frei."
-          : "Kein Vertrauenswert vorhanden: der Vorstand gibt das gesamte Budget frei.";
-
-  // Gehaltstopf: Quote nie unter 75 %. Bei Quote 100 % bleibt alles frei.
-  const gehaltsQuote = freigabe.anteil >= 1 ? 1 : Math.max(GEHALTS_QUOTE_UNTERGRENZE, freigabe.anteil);
-  const gehaltsSumme = gameState.rosters.filter((r) => r.teamId === teamId).reduce((x, r) => x + (r.salary ?? 0), 0);
-  let gehaltsBasis = gehaltsSumme;
-  if (gehaltsQuote < 1) {
-    const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme });
-    gehaltsBasis = Math.max(erwarteterSponsorFuerPlanung(gameState, teamId), zielgehalt);
+  let gebaeude = 0;
+  for (const ev of gameState.seasonState?.facilityEvents ?? []) {
+    if (ev.seasonId === seasonId && ev.teamId === teamId && Number.isFinite(ev.cost)) gebaeude += ev.cost;
   }
-  const gehaltGesamt = gehaltsQuote >= 1 ? Math.max(gehaltsBasis, gehaltsSumme) : gehaltsQuote * gehaltsBasis;
+  const anfangskasse = cash + kaeufe + gebaeude - verkaeufe;
+  const ausgegebenTransfer = kaeufe + gebaeude;
+
+  // Gehaltstopf: Basis = max(erwarteter Sponsor, Zielgehalt bei Soll-Kader) = „tragbares Gehalt“.
+  const gehaltsSumme = gameState.rosters.filter((r) => r.teamId === teamId).reduce((x, r) => x + (r.salary ?? 0), 0);
+  const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme });
+  const sponsor = erwarteterSponsorFuerPlanung(gameState, teamId);
+  const basis = Math.max(sponsor, zielgehalt);
+  const gehaltsQuote = alle || freigabe.anteil >= 1 ? 1 : Math.max(GEHALTS_QUOTE_UNTERGRENZE, freigabe.anteil);
+  const gehaltBudget0 = gehaltsQuote * basis;
+
+  // Ruecklage-Ziel nach Finanzwert (ab Saison 2 voll, Konzept 1) und Gehaltspuffer.
+  const identity = gameState.teamIdentities?.find((i) => i.teamId === teamId);
+  let kaderWert = 0;
+  if (saisonNr >= 2) {
+    const byId = new Map((gameState.players ?? []).map((p) => [p.id, p] as const));
+    for (const r of gameState.rosters) {
+      if (r.teamId !== teamId) continue;
+      const pl = byId.get(r.playerId);
+      kaderWert += Math.max(0, pl?.marketValue ?? pl?.displayMarketValue ?? 0);
+    }
+  }
+  const ruecklageErg = berechneKiRuecklage({
+    finances: identity?.finances,
+    budget: Math.max(0, anfangskasse) + kaderWert,
+    zielgehalt,
+  });
+  const gedeckelt = istVorstandBudgetfreigabeAktiv() && saisonNr >= 2;
+  const ruecklageZiel = gedeckelt ? ruecklageErg.ruecklage : 0;
+  const gehaltspuffer = gedeckelt ? Math.max(0, KI_RUECKLAGE_GEHALTS_FAKTOR * gehaltBudget0 - ruecklageZiel) : 0;
+
+  // Transfertopf.
+  const q0 = freigabe.anteil;
+  const anzapfenMax = ruecklageZiel * ANZAPFEN_MAX_ANTEIL;
+  const angezapft = alle ? 0 : Math.min(Math.max(0, zustand.ruecklageAngezapft), anzapfenMax);
+  const verfuegbar = alle ? Math.max(0, anfangskasse) : Math.max(0, anfangskasse - ruecklageZiel - gehaltspuffer);
+  const gesamtBei = (q: number, verk: number) => q * (verfuegbar + angezapft) + q * verk;
+
+  // Lockerung nach Verkaeufen (Konzept 4): einbehaltener Anteil (1 - q) x Verkaufserloes >= X -> eine Stufe mehr.
+  const puffer = q0 < 1 ? (LOCKERUNG_PUFFER_ANTEIL[q0] ?? 0) * basis : 0;
+  const einbehalten = (1 - q0) * verkaeufe;
+  const schwelle = q0 < 1 && puffer > 0 ? puffer / (1 - q0) : 0;
+  const rosterCount = gameState.rosters.filter((r) => r.teamId === teamId).length;
+  const pflichtkredit = (gameState.seasonState?.loans ?? []).some(
+    (l) => l.borrowerTeamId === teamId && l.status === "active" && l.originatedSeasonId === seasonId,
+  );
+  let lockerungSperre: string | null = null;
+  if (!gedeckelt) lockerungSperre = "Saison 1: alles ist freigegeben.";
+  else if (alle) lockerungSperre = "„Alles auf eine Karte“ ist aktiv.";
+  else if (q0 >= 1) lockerungSperre = "Schon voll freigegeben.";
+  else if (cash < 0) lockerungSperre = "Keine Lockerung bei Kasse im Minus.";
+  else if (pflichtkredit) lockerungSperre = "Keine Lockerung mit laufendem Kredit dieses Fensters.";
+  else if (rosterCount < 8) lockerungSperre = "Der Kader muss über dem Minimum bleiben.";
+  const q1 = naechsteQuote(q0);
+  const lockerungAktiv = lockerungSperre == null && schwelle > 0 && einbehalten + 1e-9 >= puffer;
+  const verkaeufeFuerMehr = lockerungAktiv ? verkaeufe : Math.max(verkaeufe, schwelle);
+  const mehrRoh = gesamtBei(q1, verkaeufeFuerMehr) - gesamtBei(q0, verkaeufeFuerMehr);
+  const mehrFrei = lockerungSperre == null ? Math.max(0, Math.min(mehrRoh, verkaeufeFuerMehr)) : 0;
+  const boden = ruecklageZiel + gehaltspuffer + puffer;
+  const wirksamerAnteil = alle ? 1 : lockerungAktiv ? q1 : q0;
+
+  let transferGesamt: number;
+  if (!gedeckelt) transferGesamt = Math.max(0, anfangskasse + verkaeufe);
+  else if (alle) transferGesamt = Math.max(0, (Math.max(0, anfangskasse) + verkaeufe) * (1 - ALLES_PUFFER_ANTEIL));
+  else transferGesamt = gesamtBei(q0, verkaeufe) + (lockerungAktiv ? mehrFrei : 0);
+
+  // Umschichten (Konzept 3): 1 C Transfer <-> 1 C Jahresgehalt, begrenzt am Gehaltstopf.
+  const grenzeAnteil = alle ? UMSCHICHT_GRENZE_ANTEIL[1]! : (UMSCHICHT_GRENZE_ANTEIL[q0] ?? 0.25);
+  const grenze = gedeckelt ? grenzeAnteil * gehaltBudget0 : 0;
+  const haelfteSicherheit = 0.5 * (ruecklageZiel + gehaltspuffer);
+  const maxHinZuGehalt = grenze;
+  const maxHinZuTransfer = Math.min(grenze, haelfteSicherheit);
+  const umschicht = gedeckelt ? Math.max(-maxHinZuTransfer, Math.min(maxHinZuGehalt, zustand.umschichtung)) : 0;
+  transferGesamt -= umschicht;
+
+  let transferFrei = Math.max(0, Math.min(cash, transferGesamt - ausgegebenTransfer));
+  if (gedeckelt && lockerungAktiv && !alle) transferFrei = Math.min(transferFrei, Math.max(0, cash - boden));
+  if (gedeckelt && alle) {
+    transferFrei = Math.min(transferFrei, Math.max(0, cash - ALLES_PUFFER_ANTEIL * (Math.max(0, anfangskasse) + verkaeufe)));
+  }
+  const gesperrt = Math.max(0, cash - transferFrei);
+  const prozent = Math.round(wirksamerAnteil * 100);
+  const grund = !gedeckelt
+    ? freigabe.grund === "abgeschaltet"
+      ? "Budgetfreigabe ist abgeschaltet: das gesamte Budget ist frei."
+      : "Saison 1: der Vorstand gibt das gesamte Budget frei."
+    : alle
+      ? `Alles auf eine Karte: bis auf ${Math.round(ALLES_PUFFER_ANTEIL * 100)} % Puffer darf alles ausgegeben werden.`
+      : freigabe.grund === "vertrauen"
+        ? `Vorstandsvertrauen ${freigabe.vertrauen!.toFixed(1)} (${freigabe.stufe}): ${prozent} % des Budgets sind zum Ausgeben freigegeben, der Rest bleibt als Puffer auf dem Konto.`
+        : "Kein Vertrauenswert vorhanden: der Vorstand gibt das gesamte Budget frei.";
+
+  // Gehaltstopf.
+  const gehaltGesamt = gedeckelt ? gehaltBudget0 + umschicht : Math.max(basis, gehaltsSumme);
   const gehaltFrei = Math.max(0, gehaltGesamt - gehaltsSumme);
-  const gehaltGrund =
-    gehaltsQuote >= 1
+  const gehaltGrund = !gedeckelt
+    ? "Saison 1: Gehaltsbudget voll freigegeben."
+    : gehaltsQuote >= 1
       ? "Gehaltsbudget voll freigegeben."
-      : `Gehaltsbudget auf ${Math.round(gehaltsQuote * 100)} % gekuerzt (nie unter 75 %); frei werdendes Gehalt aus Verkaeufen kommt zu 100 % zurueck.`;
+      : `Gehaltsbudget auf ${Math.round(gehaltsQuote * 100)} % gekürzt (nie unter 75 %); frei werdendes Gehalt aus Verkäufen kommt zu 100 % zurueck.`;
 
   return {
     getrennt: true,
-    investition: { gesamt: r2(transferGesamt), ausgegeben: r2(kaeufe), frei: r2(nochFrei), gesperrt: r2(gesperrt), quote: freigabe.anteil, grund },
+    gedeckelt,
+    investition: {
+      gesamt: r2(transferGesamt),
+      ausgegeben: r2(ausgegebenTransfer),
+      frei: r2(transferFrei),
+      gesperrt: r2(gesperrt),
+      quote: wirksamerAnteil,
+      grund,
+    },
     gehalt: {
       gesamt: r2(gehaltGesamt),
       ausgegeben: r2(gehaltsSumme),
       frei: r2(gehaltFrei),
-      gesperrt: r2(Math.max(0, gehaltsBasis - gehaltGesamt)),
+      gesperrt: r2(Math.max(0, basis - gehaltBudget0)),
       quote: gehaltsQuote,
       grund: gehaltGrund,
     },
     teamId,
     stufe: freigabe.stufe,
     anteil: freigabe.anteil,
+    wirksamerAnteil,
+    vertrauen: freigabe.vertrauen,
     freigegebenGesamt: r2(transferGesamt),
-    ausgegeben: r2(kaeufe),
-    nochFrei: r2(nochFrei),
+    ausgegeben: r2(ausgegebenTransfer),
+    nochFrei: r2(transferFrei),
     gesperrt: r2(gesperrt),
+    gebaeudeAusgegeben: r2(gebaeude),
     grund,
+    herleitung: {
+      anfangskasse: r2(anfangskasse),
+      ruecklageZiel: r2(ruecklageZiel),
+      finanzwert: ruecklageErg.finanzwert,
+      ruecklageQuote: ruecklageErg.quote,
+      gehaltspuffer: r2(gehaltspuffer),
+      verfuegbar: r2(verfuegbar),
+      verkaufserloese: r2(verkaeufe),
+      angezapft: r2(angezapft),
+      sponsorErwartung: r2(sponsor),
+      zielgehalt: r2(zielgehalt),
+      tragbaresGehalt: r2(basis),
+      gehaltsbudgetVorUmschichten: r2(gehaltBudget0),
+    },
+    umschichten: {
+      aktuell: r2(umschicht),
+      grenze: r2(grenze),
+      grenzeAnteil,
+      moeglichVon: r2(-maxHinZuTransfer),
+      moeglichBis: r2(maxHinZuGehalt),
+    },
+    lockerung: {
+      vonAnteil: q0,
+      nachAnteil: q1,
+      aktiv: lockerungAktiv,
+      puffer: r2(puffer),
+      schwelle: r2(schwelle),
+      verkaufserloese: r2(verkaeufe),
+      einbehalten: r2(einbehalten),
+      fehlt: r2(Math.max(0, schwelle - verkaeufe)),
+      mehrFrei: r2(mehrFrei),
+      boden: r2(boden),
+      gesperrtGrund: lockerungSperre,
+    },
+    ruecklageAnzapfen: {
+      moeglich: r2(Math.max(0, anzapfenMax - angezapft)),
+      bereitsAngezapft: r2(angezapft),
+      vertrauenskosten: r2(zustand.vertrauensKosten),
+    },
+    alleAufEineKarte: { aktiv: alle, puffer: ALLES_PUFFER_ANTEIL, zustand: zustand.alleAufEineKarte },
+    zustand,
   };
+}
+
+/**
+ * Messung (nur mit `OLY_SPERRE_ZAEHLEN=1`, sonst kein Aufwand): wie oft greift die harte Sperre, je Art und Team.
+ * Gezaehlt werden ABGELEHNTE PRUEFUNGEN, nicht Kaufversuche: die KI prueft dieselbe Abloese in mehreren Vorschauen.
+ */
+export const SPERRE_ZAEHLER: Record<"kauf" | "gebaeude" | "verlaengerung", Record<string, number>> = { kauf: {}, gebaeude: {}, verlaengerung: {} };
+
+function zaehleSperre(art: keyof typeof SPERRE_ZAEHLER, teamId: string): void {
+  if (process.env.OLY_SPERRE_ZAEHLEN !== "1") return;
+  SPERRE_ZAEHLER[art][teamId] = (SPERRE_ZAEHLER[art][teamId] ?? 0) + 1;
 }
 
 /** Harte Pruefung eines Kaufs: Abloese in den Investitionstopf, Jahresgehalt in den Gehaltstopf. */
@@ -190,10 +456,55 @@ export function pruefeKaufGegenVorstandFreigabe(
   input: { fee: number; salary: number; rosterBefore: number; playerMin: number | null },
 ): { ok: boolean; reason: string | null; stand: VorstandBudgetStand } {
   const stand = berechneVorstandBudgetStand(gameState, teamId);
-  if (stand.anteil >= 1) return { ok: true, reason: null, stand };
+  if (!stand.gedeckelt) return { ok: true, reason: null, stand };
   if (input.rosterBefore < (input.playerMin ?? 8)) return { ok: true, reason: null, stand };
-  if (input.fee > stand.investition.frei + 1e-9) return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
-  if (stand.gehalt.quote < 1 && Math.max(0, input.salary) > stand.gehalt.frei + 1e-9) {
+  if (input.fee > stand.investition.frei + 1e-9) {
+    zaehleSperre("kauf", teamId);
+    return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
+  }
+  if (Math.max(0, input.salary) > stand.gehalt.frei + 1e-9) {
+    zaehleSperre("kauf", teamId);
+    return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
+  }
+  return { ok: true, reason: null, stand };
+}
+
+/**
+ * Harte Pruefung eines Gebaeudes (Bau oder Ausbau): die Kosten kommen aus dem Investitionstopf, kein dritter Topf.
+ * In der Sparauflage (Stufe 50 %) gibt der Vorstand keine Gebaeude frei, ausser mit „Alles auf eine Karte“.
+ */
+export function pruefeGebaeudeGegenVorstandFreigabe(
+  gameState: GameState,
+  teamId: string,
+  kosten: number,
+): { ok: boolean; reason: string | null; stand: VorstandBudgetStand } {
+  const stand = berechneVorstandBudgetStand(gameState, teamId);
+  if (!stand.gedeckelt || !(kosten > 0)) return { ok: true, reason: null, stand };
+  if (stand.stufe === "sparauflage" && !stand.alleAufEineKarte.aktiv) {
+    zaehleSperre("gebaeude", teamId);
+    return { ok: false, reason: "vorstand_gebaeude_sparauflage", stand };
+  }
+  if (kosten > stand.investition.frei + 1e-9) {
+    zaehleSperre("gebaeude", teamId);
+    return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
+  }
+  return { ok: true, reason: null, stand };
+}
+
+/**
+ * Harte Pruefung einer Gehaltserhoehung bei der Vertragsverlaengerung: nur die Erhoehung zaehlt gegen den freien
+ * Gehaltstopf (das alte Gehalt steht schon in `ausgegeben`). Gleiches oder niedrigeres Gehalt geht immer.
+ */
+export function pruefeVerlaengerungGegenVorstandFreigabe(
+  gameState: GameState,
+  teamId: string,
+  input: { altesGehalt: number; neuesGehalt: number },
+): { ok: boolean; reason: string | null; stand: VorstandBudgetStand } {
+  const erhoehung = input.neuesGehalt - input.altesGehalt;
+  const stand = berechneVorstandBudgetStand(gameState, teamId);
+  if (!stand.gedeckelt || !(erhoehung > 1e-9)) return { ok: true, reason: null, stand };
+  if (erhoehung > stand.gehalt.frei + 1e-9) {
+    zaehleSperre("verlaengerung", teamId);
     return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
   }
   return { ok: true, reason: null, stand };

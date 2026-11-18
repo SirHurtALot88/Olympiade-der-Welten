@@ -2030,6 +2030,53 @@ type TeamObjectiveGeneration = {
   eventAdditions: TeamSeasonObjectiveRecord[];
 };
 
+/**
+ * Finanzkonzept V2: der Ausgang von „Alles auf eine Karte“ und das Anzapfen der Ruecklage als Vorstandsziele.
+ * Keine Geldstrafe (Chris 18.11.), nur Vertrauen: Treffer des eingefrorenen Ziel-Rangs +0,75, Verfehlen -1,0. Das Anzapfen
+ * kostet die beim Anzapfen genannte Vertrauensmenge; sie steht hier als verfehltes Ziel und wirkt in der Abrechnung.
+ */
+function buildVorstandBudgetObjectiveDrafts(input: {
+  gameState: GameState;
+  team: Team;
+  row: TeamManagementSnapshotRow;
+}): ObjectiveDraft[] {
+  const zustand = input.gameState.seasonState.vorstandBudget?.[input.team.teamId];
+  if (!zustand || zustand.seasonId !== input.gameState.season.id) return [];
+  const drafts: ObjectiveDraft[] = [];
+  const karte = zustand.alleAufEineKarte;
+  if (karte) {
+    const rank = input.row.rank ?? null;
+    const geschafft = rank != null && rank <= karte.zielRang;
+    const status: TeamSeasonObjectiveStatus = rank == null ? "open" : geschafft ? "completed" : "failed";
+    drafts.push({
+      objectiveId: "vorstand-alles-auf-eine-karte",
+      category: "finance",
+      label: `Alles auf eine Karte: Top ${karte.zielRang}`,
+      detail: `${karte.grund} Erwartung laut Kader: Rang ${karte.erwartungsRang}. Trifft das Team das Ziel, steigt das Vertrauen; verfehlt es, sinkt es. Keine Geldstrafe.`,
+      actionHint: "Das Geld ist ausgegeben: jetzt muss die Mannschaft liefern.",
+      targetValue: `Top ${karte.zielRang}`,
+      currentValue: rank ?? "offen",
+      status,
+      boardConfidenceDelta: status === "completed" ? 0.75 : status === "failed" ? -1 : 0,
+      source: "vorstand_alles_auf_eine_karte",
+    });
+  }
+  if (zustand.vertrauensKosten > 0) {
+    drafts.push({
+      objectiveId: "vorstand-ruecklage-angezapft",
+      category: "finance",
+      label: "Ruecklage angezapft",
+      detail: `${zustand.ruecklageAngezapft.toFixed(1)} C aus der Ruecklage freigegeben. Der Vorstand merkt es sich: Vertrauen -${zustand.vertrauensKosten.toFixed(2)}.`,
+      targetValue: "Ruecklage halten",
+      currentValue: "angezapft",
+      status: "failed",
+      boardConfidenceDelta: -zustand.vertrauensKosten,
+      source: "vorstand_ruecklage_angezapft",
+    });
+  }
+  return drafts;
+}
+
 function buildTeamObjectives(input: {
   gameState: GameState;
   team: Team;
@@ -2193,7 +2240,11 @@ function buildTeamObjectives(input: {
   // Ereignis-Zugänge: der Sponsor-Spiegel entsteht mit der Unterschrift, die Budget-Kürzung mit dem
   // Vorstandsvertrauen unter 5,0. Nur diese beiden dürfen einem laufenden Bestand noch zuwachsen —
   // alles andere würde den Slate über die Saison aufblähen.
-  const eventDrafts = [...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts];
+  const eventDrafts = [
+    ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []),
+    ...sponsorDrafts,
+    ...buildVorstandBudgetObjectiveDrafts({ gameState, team, row }),
+  ];
 
   return {
     slate: toRecord([...objectiveDrafts, ...eventDrafts]),
