@@ -70,12 +70,19 @@ import { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunn
  * (Formkarten-/Spielplan-Saat je Save) -- gemessen ~11 % der Saves ohne JEDE arena-aufgeloeste
  * Disziplin an Spieltag 1. Ein einzelner Versuch liess den Test deshalb gelegentlich an einer
  * Vorbedingung scheitern, die nichts mit dem eigentlich geprueften Verhalten zu tun hat. Bis zu
- * drei frische Saves werden deshalb versucht (je ~89 % Erfolgswahrscheinlichkeit -> <0,2 %
- * Restausfall bei drei Versuchen), bevor der Test tatsaechlich als "kein passender Save"
+ * MAX_SAVE_VERSUCHE frische Saves werden deshalb versucht, bevor der Test tatsaechlich als "kein
+ * passender Save" fehlschlaegt. NACHTRAG 18.11.: Seit die Vierer-Pod-Disziplinen (Mini-DM,
+ * Battlefield, Staffel, Takeshi) zusaetzlich ausgeschlossen sind (623e6e8c), stimmt die alte
+ * Rechnung "~89 % je Versuch" nicht mehr -- in der CI von PR #1566 (reine HUD-Anzeige) verfehlten
+ * alle drei Versuche. Deshalb 8 Versuche, und die Fehlermeldung nennt jetzt die Disziplinen jedes
+ * verworfenen Versuchs, damit ein erneuter Ausfall sofort zeigt, ob es Pech oder ein Setup-Fehler ist
  * fehlschlaegt.
  */
+const MAX_SAVE_VERSUCHE = 8;
+
 async function bauFrischenBattleSaveMitVollemFeld() {
-  for (let versuch = 1; versuch <= 3; versuch += 1) {
+  const verworfen: string[] = [];
+  for (let versuch = 1; versuch <= MAX_SAVE_VERSUCHE; versuch += 1) {
     process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-service-${Math.random().toString(36).slice(2)}.sqlite`;
     const persistence = createPersistenceService();
     persistence.bootstrapSingleplayerSave();
@@ -118,6 +125,7 @@ async function bauFrischenBattleSaveMitVollemFeld() {
       // Verworfener Versuch -- ohne dieses Aufraeumen bleibt der (mehrere MB grosse) Markt-
       // Kontext-Cache-Eintrag dieses Saves fuer immer im Prozess stehen (s. Kopfkommentar).
       invalidateLocalTransfermarktCachesForSave(saveId);
+      verworfen.push(`${versuch}: ${d1 ?? "?"}/${d2 ?? "?"}`);
       continue; // dieser Save: Spieltag 1 ohne arena-aufgeloeste Disziplin -- neuer Versuch
     }
     // Alle 32 Teams fuer DIESEN (aktiven) Spieltag aufstellen (KI-Batch), damit
@@ -133,7 +141,9 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     // Aufruf-Obergrenzen daraus ab, statt "genau eine" anzunehmen.
     return { persistence, scope, arenaDisciplineId: arenaDisciplineIds[0]!, arenaDisciplineCount: arenaDisciplineIds.length };
   }
-  throw new Error("bauFrischenBattleSaveMitVollemFeld: drei Saves hintereinander ohne arena-aufgeloeste Disziplin an Spieltag 1 -- statistisch extrem unwahrscheinlich, Setup pruefen.");
+  throw new Error(
+    `bauFrischenBattleSaveMitVollemFeld: ${MAX_SAVE_VERSUCHE} Saves hintereinander ohne arena-aufgeloeste Nicht-Pod-Disziplin an Spieltag 1 -- Setup pruefen. Spieltag-1-Disziplinen je Versuch: ${verworfen.join(", ")}`,
+  );
 }
 
 describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () => {
