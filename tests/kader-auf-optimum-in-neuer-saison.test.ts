@@ -28,7 +28,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
@@ -140,6 +140,18 @@ function baueRequest() {
 }
 
 type Lauf = { transferBuysApplied: number; warnings: string[] };
+
+
+// Diese Datei prueft den Marktplan-Weg des Fensters (Stand #1634, `OLY_FENSTER_AUF_OPT=0`). Seit „Fenster auf Opt" (Standard,
+// docs/design/fenster-auf-opt-18-11.md) kaufen Kauf- und Nachrunde ueber den organischen Planer; diesen Weg pruefen
+// tests/preseason-hintergrundlauf-kauffenster.test.ts und tests/fenster-auf-opt.test.ts. Reihenfolge danach (Verletzungs-Topup,
+// Kassensturz, Snapshot) ist in beiden Wegen dieselbe Code-Strecke.
+beforeEach(() => {
+  process.env.OLY_FENSTER_AUF_OPT = "0";
+});
+afterEach(() => {
+  delete process.env.OLY_FENSTER_AUF_OPT;
+});
 
 describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-Lauf", () => {
   beforeEach(() => {
