@@ -35,7 +35,7 @@ Wo es eine Messung gibt, steht sie dabei.
 | Abnahme | Schranke | main | neu |
 |---|---|---:|---:|
 | rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | **0,867** (Spannweite 0,086, Saison 0,923) |
-| Pp-Abweichung (`messe-arena-einfluss.mjs basketball 48`, zwei Saatstämme) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | **13,6 / 16,0** |
+| Pp-Abweichung (`messe-arena-einfluss.mjs basketball 48`, zwei Saatstämme) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | **13,6 / 16,0** (n=48, vor Review-Fix); nach dem Fix n=16: 20,4 / 22,1 (beide ≤ 25, n=48 war in vertretbarer Zeit nicht machbar) |
 | Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | **0 von 828 Würfen**, Anzeigetafel = Spielerpunkte in 8/8 Spielen |
 | Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | nur `spiele basketball 1/7/42` (Abschnitt 4) |
 

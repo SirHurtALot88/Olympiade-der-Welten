@@ -2,7 +2,7 @@
  "disziplin": "basketball",
  "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) je Feldgroesse, gezogen aus echten Liga-Kadern (buildArenaTeam(), s. scripts/ziehe-basketball-pps-referenz.ts) ueber runArenaFixtures() -- NICHT aus dem Demokader des Mockups. Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. Neu ziehen nach jeder Aenderung, die den rohen Boxscore-Impact verschiebt (feldspielWert()-Gewichte, Spieldauer/VIERTEL_*, Basketball-Rezept, Kadergenerierung/Attributniveau der Liga) -- s. docs/design/pps-skalierung-opus.md Abschnitt 8.3. `demoKaderMedianFuerDriftpruefung` je Feldgroesse ist ein SEPARATER Wert, NUR fuer tests/basketball-pps-referenz-drift.test.ts -- gemessen am eingebauten Demokader des Mockups (feldspielProbe), NICHT an echten Liga-Kadern, damit der Drift-Waechter dieselbe Population misst, die er spaeter erneut abfragt (sonst waere jede Abweichung zwischen Demokader und Liga-Feld ein Fehlalarm).",
  "gezogenAm": "2026-11-17T14:52:01.855Z",
- "motorSha1": "d4efce2f2bc27a7455188895794506e6d7363211",
+ "motorSha1": "c1696544f96b71896e08d06e56dea53419381543",
  "repoCommit": "9ddacb6ec30685ca5575b42e56b3956814399d67",
  "quelle": {
   "saveId": "new-game-1793476611202-0dwpok",
