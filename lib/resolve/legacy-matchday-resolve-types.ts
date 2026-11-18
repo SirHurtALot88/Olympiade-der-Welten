@@ -42,6 +42,8 @@ export type PlayerPerformancePreview = {
   /** MUTATOR ORGANISCH (29.09.): Trefferzahl 0/1/2, s. `LegacyScoredEntry.mutatorHits`. */
   mutatorHits?: number | null;
   formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
+  /** Systematischer Form-Anteil ohne Tagesform-Zufall (Grundlage der Form-Fortschreibung). */
+  formSystematisch?: number | null;
   /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
   intensityShare?: number | null;
   /** Der Modifikator SEINER Slot-Rolle (Clutch Shot, Fastbreak und so weiter). */
@@ -270,6 +272,7 @@ export type DisciplineTeamResolvePreview = {
     mutatorPpsBonus?: number | null;
     mutatorHits?: number | null;
     formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
+    formSystematisch?: number | null;
     /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
     intensityShare?: number | null;
     /** Der Modifikator SEINER Slot-Rolle (Clutch Shot, Fastbreak und so weiter). */

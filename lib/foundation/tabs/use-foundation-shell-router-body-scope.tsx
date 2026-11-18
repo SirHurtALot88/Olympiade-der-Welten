@@ -12097,6 +12097,7 @@ export function useFoundationShellRouterBodyScope({
     setActiveView,
     openTeamProfileById,
     triggerGlobalNext,
+    gameState,
   };
 
   const foundationSeasonPreviewHostProps: FoundationSeasonPreviewShellHostProps = {

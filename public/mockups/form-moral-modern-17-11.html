@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Form, Moral, Formkarten – modern (Mockup 17.11.)</title>
+<!--
+  FORM, MORAL UND FORMKARTEN IM BROADCAST-STIL, klickbarer Prototyp (Fable, 17.11.).
+  Erklaerung: docs/design/form-moral-anzeige-17-11.md · Regelwerk: docs/design/form-moral-17-11.md (Branch claude/form-moral-17-11)
+  - Reines HTML/CSS/Inline-JS/SVG, keine externen Skripte, keine Netzwerkzugriffe. Tokens, Bausteine und Schriften sind die der
+    Einsatzliste (public/mockups/einsatzliste-modern-17-11.html bzw. components/foundation/broadcast/broadcast.css).
+  - ECHT: Spielernamen, Portraits, Klassen, Voelker, Attribute, Disziplinwerte, Rollennamen, Wappen, Klassenfarben
+    (CLASS_COLOR_MAP), die Rechenregeln fuer Form, Moralwirkung und Formkarten (aus form-moral-17-11.md nachgebaut).
+  - ERFUNDEN: ALLE ZAHLEN zu Form, Moral, Erschoepfung, Einsaetzen, Erwartung/Leistung, Formkarten-Hand, Spieltagen, Ergebnissen.
+  - URL-Schalter: ?ansicht=liste|profil|nachher  &d=basketball|spurt  &karten=k1,k6  &spieler=Kati  &warum=Kati  &tab=karten|form
+                  &blatt=kader|kontext  &ein=0..n  &still=1  &phone=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche:rgba(9,12,18,.90); --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#7a869c;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --p1:#e0637a; --p2:#e89a4c; --p3:#c3cf5e; --p4:#4fc7b2; --p5:#62a0f4; --p6:#ac8af2;
+  /* Klassen-/Kartenfarben: FORM_HEX aus EinsatzlisteModern.tsx (red, green, blue, yellow) */
+  --k-POW:#ff8b86; --k-SPE:#a8e7aa; --k-MEN:#a9ccff; --k-SOC:#ffd987;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:10px; --r-s:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);font-size:16px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+
+/* ---------- Mockup-Steuerung (gehoert NICHT zum UI) ---------- */
+.demo{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0d1016;border-bottom:1px solid #222a38;font-size:14px;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px;margin-right:4px}
+.demo button{padding:3px 10px;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
+.demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.demo em{font-style:normal;color:var(--acht);margin-left:auto;font-weight:600}
+body.still .demo{display:none}
+
+/* ---------- Geruest ---------- */
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);height:calc(100vh - 38px);min-height:760px;background:var(--grund)}
+body.still .app{height:100vh}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:40px;height:40px;border-radius:9px;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:10px}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail button{position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center;font-size:20px;color:var(--stumm)}
+.rail button:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail button.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail button.an::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;right:3px;top:3px;min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 3px}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+
+/* Tooltip (ein Muster fuer alles) */
+[data-tip]{position:relative}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;z-index:90;left:50%;top:calc(100% + 7px);transform:translateX(-50%);width:max-content;max-width:260px;white-space:normal;
+  padding:6px 9px;border-radius:6px;background:#020305;border:1px solid var(--linie-2);color:var(--tinte);font:500 13.5px/1.3 var(--zahl);letter-spacing:0;text-transform:none;text-align:left;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.6)}
+[data-tip].tr::after{left:calc(100% + 8px);top:50%;transform:translateY(-50%)}
+[data-tip].tl::after{left:auto;right:0;transform:none}
+[data-tip].to::after{top:auto;bottom:calc(100% + 7px)}
+body.phone [data-tip]::after{display:none}
+
+/* ---------- Hero-Kopf ---------- */
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:22px;padding:14px 20px 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:-30px;z-index:-2;background-size:cover;background-position:center 40%;filter:blur(14px) saturate(1.15);opacity:.5}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.94) 0%,rgba(6,8,12,.72) 38%,rgba(6,8,12,.62) 62%,rgba(6,8,12,.93) 100%),linear-gradient(180deg,transparent 40%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:14px;padding-bottom:14px;min-width:0}
+.hk .crest{width:62px;height:62px;flex:none;border-radius:10px;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 34px/1 var(--haus);color:#fff;letter-spacing:.01em;white-space:nowrap}
+.hk .sub{margin-top:5px;font-size:15px;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.mdw{display:inline-flex;align-items:center;gap:2px;margin-bottom:5px}
+.mdw button{width:24px;height:24px;border-radius:5px;border:1px solid var(--linie);display:grid;place-items:center;color:var(--leise)}
+.mdw button:hover{border-color:var(--gold);color:var(--gold)}
+.mdw span{padding:0 8px;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.mdw button+span{padding-left:8px} .mdw span:first-child{padding-left:0}
+.tabs{display:flex;align-items:flex-end;gap:10px;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:340px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 20px 12px 18px;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);color:var(--leise);transition:background .15s}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .ic{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;font-size:22px;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme);overflow:hidden}
+.dtab .ic img{width:100%;height:100%;object-fit:cover}
+.dtab.an .ic{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab em{display:block;font-style:normal;font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 22px/1.1 var(--haus);color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab .erw{text-align:right}
+.dtab .erw strong{display:block;font-size:28px;line-height:1;font-weight:700;color:var(--creme)}
+.dtab .erw span{font-size:12px;color:var(--stumm);letter-spacing:.06em;white-space:nowrap}
+.hr{display:flex;align-items:center;gap:16px;padding-bottom:14px}
+.frist{text-align:right;white-space:nowrap}
+.frist strong{display:block;font-size:26px;line-height:1;font-weight:700;color:var(--creme)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 13px;border-radius:7px;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:15px;letter-spacing:.02em;white-space:nowrap;flex:none}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.haupt{height:46px;padding:0 20px;font-size:17px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;background:var(--gold);border-color:var(--gold);color:#17120a;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);border-radius:0}
+.btn.haupt:hover{filter:brightness(1.08)}
+.btn.klein{height:30px;padding:0 10px;font-size:14px}
+
+/* ---------- Arbeitsflaeche ---------- */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr) 356px;gap:12px;padding:12px 14px}
+.work.zwei{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--linie);min-height:46px}
+.pk h2{margin:0;font:400 19px/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1}
+.pk .hin{font-size:13.5px;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kf{flex:none;padding:7px 12px;border-top:1px solid var(--linie);font-size:13px;color:var(--stumm);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.marke{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#0b0d12;background:var(--pc,var(--leise));flex:none;white-space:nowrap}
+.marke.rot{background:var(--warn);color:#fff} .marke.gelb{background:var(--acht)} .marke.leer{background:none;border:1px solid var(--linie-2);color:var(--leise)}
+
+/* Form-Pfeil (Baustein .form der Einsatzliste) und Moral-Marke (neu, gleiche Tokens) */
+.form{font-size:17px;display:inline-grid;place-items:center} .form.f2,.form.f1{color:var(--gut)} .form.f0{color:var(--stumm)} .form.f-1,.form.f-2{color:var(--warn)}
+.form.kast{width:22px;height:22px;border-radius:5px;background:rgba(255,255,255,.05);border:1px solid var(--linie)}
+.form.kast.f2{background:rgba(98,211,148,.18);border-color:rgba(98,211,148,.55)} .form.kast.f-2{background:rgba(255,96,88,.16);border-color:rgba(255,96,88,.5)}
+.mor{display:inline-flex;align-items:center;gap:3px;font-size:14px;font-weight:700;line-height:1;color:var(--leise)}
+.mor svg{font-size:12px}
+.mor.h{color:var(--gut)} .mor.n{color:var(--warn)}
+.wz{cursor:help;display:inline-flex;align-items:center;gap:5px;border-radius:5px}
+.wz:hover{background:rgba(244,230,196,.08);box-shadow:0 0 0 3px rgba(244,230,196,.08)}
+.last{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.last i{display:block;height:100%;background:var(--gut)} .last.m i{background:var(--acht)} .last.h i{background:var(--warn)}
+.fpkt{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--pc);flex:none}
+
+/* Kader */
+.kh,.kz{display:grid;grid-template-columns:40px minmax(0,1fr) 46px 24px 34px 40px;gap:6px;align-items:center;padding:0 12px}
+.kh{flex:none;height:26px;border-bottom:1px solid var(--linie);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600;text-align:right}
+.kh span:nth-child(2){text-align:left} .kh span:nth-child(4){text-align:center}
+.kl{flex:1;overflow-y:auto;min-height:0}
+.kz{width:100%;height:54px;border-bottom:1px solid rgba(244,230,196,.06);position:relative}
+.kz:hover{background:var(--flaeche-2)}
+.kz.im{background:linear-gradient(90deg,rgba(255,255,255,.03),transparent)}
+.kz.gew{box-shadow:inset 0 0 0 2px var(--gold);background:rgba(240,195,90,.08)}
+.kz.aus{opacity:.5}
+.kz .por{width:40px;height:40px;border-radius:7px;overflow:hidden;border:2px solid #2a3344;background:#111;position:relative}
+.kz .por img{width:100%;height:100%;object-fit:cover}
+.kz .nm{min-width:0}
+.kz .nm b{display:block;font:400 16px/1.15 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz .nm span{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--stumm);white-space:nowrap;overflow:hidden}
+.kz .sw{text-align:right;line-height:1}
+.kz .sw strong{font-size:20px;font-weight:700;color:var(--creme)}
+.kz .sw small{display:block;font-size:12px;font-weight:600;color:var(--stumm)}
+.kz .kw{text-align:right;font-size:16px;font-weight:700}
+.kz .kw.aus{opacity:.45;font-weight:600}
+
+/* Feld */
+.fk{flex:none;display:flex;align-items:center;gap:12px;padding:9px 12px;border-bottom:1px solid var(--linie);min-height:58px}
+.waage{flex:1;min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.waage .z{font-size:30px;font-weight:700;line-height:1;color:var(--heim)} .waage .z.g{color:var(--gast)}
+.waage .z small{display:block;font-size:11px;letter-spacing:.14em;color:var(--stumm);font-weight:600;text-transform:uppercase}
+.waage .z.g small{text-align:right}
+.wb{position:relative;height:12px;background:var(--gast);transform:skewX(-14deg);overflow:hidden;border-radius:2px}
+.wb i{position:absolute;left:0;top:0;bottom:0;background:var(--heim);transition:width .3s}
+.wb u{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.45) 0 3px,transparent 3px 6px)}
+.wt{margin-top:4px;display:flex;justify-content:space-between;font-size:13px;color:var(--leise);gap:8px;white-space:nowrap}
+.wt b{color:var(--creme);font-weight:600}
+.vor{color:var(--gold);font-weight:700}
+.pitchw{flex:1;min-height:0;padding:10px 12px;display:flex}
+.pitch{position:relative;flex:1;min-height:280px;border-radius:8px;overflow:hidden;border:1px solid var(--linie);background:#10151d}
+.pitch>svg{position:absolute;inset:0;width:100%;height:100%}
+.pitch .hinw{position:absolute;left:10px;bottom:8px;font-size:12.5px;color:rgba(238,242,248,.62);max-width:60%;text-shadow:0 1px 2px #000}
+.slot{position:absolute;transform:translate(-50%,-50%);width:22.5%;min-width:160px;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:7px;row-gap:1px;align-items:center;padding:0 7px 6px 9px;border-radius:8px;
+  background:rgba(8,11,16,.9);border:1px solid var(--linie-2);box-shadow:0 6px 16px rgba(0,0,0,.5);--pc:var(--p1);transition:box-shadow .15s,border-color .15s}
+.slot::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:8px 0 0 8px;background:var(--pc)}
+.slot:hover{border-color:var(--creme)}
+.slot.gew{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 0 26px rgba(240,195,90,.35);z-index:3}
+.slot.trg{box-shadow:0 0 0 2px var(--kf),0 0 22px color-mix(in srgb,var(--kf) 40%,transparent)}
+.slot .por{grid-column:1;grid-row:2/4;width:40px;height:40px;border-radius:7px;overflow:hidden;border:2px solid var(--pc);background:#111}
+.slot .por img{width:100%;height:100%;object-fit:cover}
+.slot .in{display:contents}
+.slot .ro{grid-column:1/-1;display:flex;align-items:center;gap:6px;height:24px;margin:0 -7px 5px -5px;padding:0 7px 0 5px;border-bottom:1px solid var(--linie);background:color-mix(in srgb,var(--pc) 16%,transparent);border-radius:0 8px 0 0;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--tinte);font-weight:600;white-space:nowrap;overflow:hidden}
+.slot .ro .fpkt{margin-left:auto}
+.slot .nm{grid-column:2;min-width:0;font:400 15px/1.2 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .ze{grid-column:2;min-width:0;display:flex;align-items:center;gap:5px;line-height:1}
+.slot .ze .wz{gap:4px}
+.slot .ze strong{font-size:20px;font-weight:700;color:var(--creme)}
+.slot .lf{position:absolute;left:8px;top:-11px;padding:0 5px;height:16px;border-radius:3px;background:var(--creme);color:#17120a;font-size:11px;font-weight:700;letter-spacing:.06em}
+/* Karten-Marke am Platz: was dieser Spieler von den gelegten Karten bekommt */
+.kc{position:absolute;right:8px;bottom:-16px;height:21px;display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;font-size:14px;font-weight:700;line-height:21px;color:#0b0d12;box-shadow:0 3px 8px rgba(0,0,0,.6);border:1px solid #0b0d12}
+.kc b{padding:0 6px;background:var(--creme);font-weight:700}
+.kc i{font-style:normal;padding:0 5px;background:var(--kf)}
+.kc u{text-decoration:none;padding:0 5px;background:var(--gut)}
+.kc.neg b{background:var(--warn);color:#fff}
+.kc.vor{outline:1px dashed var(--gold);outline-offset:1px;opacity:.9}
+.typ-track .slot{width:22%}
+.balken{position:absolute;height:14px;transform:translateY(-50%) skewX(-14deg);border-radius:2px;background:linear-gradient(90deg,rgba(242,160,61,.25),var(--heim));transition:width .3s}
+.bz{position:absolute;transform:translate(6px,-50%);font-size:15px;font-weight:700;color:var(--heim);white-space:nowrap}
+.geist{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;padding:3px 8px 3px 3px;border-radius:999px;background:rgba(8,11,16,.72);border:1px dashed rgba(69,176,201,.6);font-size:13px;color:var(--leise);white-space:nowrap}
+.geist img{width:28px;height:28px;border-radius:50%;object-fit:cover;filter:grayscale(.5) brightness(.85)}
+.geist b{color:var(--gast);font-weight:600}
+
+/* Taktik-Leiste mit Formkarten-Hand */
+.tak{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;padding:9px 12px 11px;border-top:1px solid var(--linie);align-items:end}
+.tak .gk{display:flex;gap:8px;margin-bottom:6px;white-space:nowrap}
+.tak .gk b{color:var(--kf);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:7px;overflow:hidden}
+.seg button{text-align:center;height:34px;padding:0 12px;font-weight:600;font-size:15px;color:var(--leise);border-right:1px solid var(--linie)}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--flaeche-2);color:var(--tinte)}
+.seg button[aria-pressed=true]{background:var(--creme);color:#17120a}
+.hand{display:flex;gap:8px;min-width:0;overflow-x:auto;padding:3px 3px 4px}
+.hka{position:relative;flex:1 1 0;min-width:84px;max-width:124px;height:84px;display:grid;grid-template-rows:17px 15px 1fr 18px;border-radius:7px;border:1px solid var(--linie-2);background:var(--flaeche-2);overflow:hidden;text-align:center;transition:transform .12s}
+.hka:hover{border-color:var(--creme);transform:translateY(-2px)}
+.hka .fa{background:var(--kf);color:#0b0d12;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;line-height:17px}
+.hka strong{grid-row:3;font-size:30px;font-weight:700;line-height:1;align-self:center;color:var(--creme)}
+.hka .vo{grid-row:4}
+.hka.neg strong{color:var(--warn)}
+.hka .vo{display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;color:var(--leise);white-space:nowrap;overflow:hidden;border-top:1px solid var(--linie);background:rgba(0,0,0,.25)}
+.hka .vo img{width:14px;height:14px;border-radius:3px;object-fit:cover}
+.hka .pa{grid-row:2;align-self:end;font-size:10.5px;line-height:1;letter-spacing:.08em;font-weight:700;text-transform:uppercase;color:var(--stumm)}
+.hka.passt .pa{color:var(--gold)}
+.hka .nr{position:absolute;right:4px;top:22px;width:17px;height:17px;border-radius:50%;background:var(--gold);color:#17120a;font-size:12px;font-weight:700;line-height:17px;display:none}
+.hka.gew{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 0 18px rgba(240,195,90,.3);background:linear-gradient(180deg,rgba(240,195,90,.14),var(--flaeche-2))}
+.hka.gew .nr{display:block}
+.hka.weg{opacity:.42}
+.hka.weg .pa{color:var(--leise)}
+.ksum{text-align:right;white-space:nowrap;min-width:108px}
+.ksum strong{display:block;font-size:34px;font-weight:700;line-height:1;color:var(--creme)}
+.ksum small{display:block;font-size:12.5px;color:var(--stumm);margin-top:3px}
+
+/* Kontext */
+.ktabs{flex:none;display:flex;border-bottom:1px solid var(--linie)}
+.ktabs button{flex:1;height:42px;font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--stumm);border-bottom:3px solid transparent;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.ktabs button:hover{color:var(--tinte)} .ktabs button.an{color:var(--gold);border-bottom-color:var(--gold)}
+.kb{flex:1;overflow-y:auto;min-height:0;padding:12px}
+.rk{border-radius:8px;padding:11px 12px;background:linear-gradient(100deg,color-mix(in srgb,var(--pc) 26%,transparent),transparent 70%);border:1px solid var(--linie);border-left:3px solid var(--pc)}
+.rk h3{margin:3px 0 4px;font:400 23px/1 var(--haus);color:#fff}
+.rk p{margin:0;font-size:14.5px;line-height:1.3;color:var(--leise)}
+.rk p b{color:var(--creme);font-weight:600}
+.rk+.rk{margin-top:8px}
+.ab{margin-top:12px}
+.ab>.gk{display:flex;justify-content:space-between;margin-bottom:6px}
+.rech{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:8px;background:var(--linie);border:1px solid var(--linie);border-radius:7px;overflow:hidden}
+.rech.d3{grid-template-columns:repeat(3,minmax(0,1fr))} .rech.d5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.rech div{background:var(--flaeche-1);padding:5px 4px;text-align:center;min-width:0}
+.rech small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rech strong{font-size:18px;font-weight:700;white-space:nowrap}
+.rech .su{background:var(--flaeche-3)} .rech .su strong{color:var(--gold)}
+.rech.gross{margin:12px 12px 0;flex:none} .rech.gross div{padding:8px 6px} .rech.gross strong{font-size:26px;line-height:1.1;display:inline-flex;align-items:center;gap:6px} .rech.gross small{font-size:11px}
+/* Wirkungs-Tabelle der Karten */
+.wh,.wr{display:grid;grid-template-columns:4px 26px minmax(0,1fr) 20px 38px 38px 38px 46px;gap:6px;align-items:center}
+.wh{height:24px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;text-align:right;border-bottom:1px solid var(--linie)}
+.wr{position:relative;height:40px;border-bottom:1px solid rgba(244,230,196,.06);font-size:16px;text-align:right;width:100%}
+button.wr:hover{background:var(--flaeche-2)}
+.wr .fb{width:4px;height:24px;border-radius:2px;background:var(--pc)}
+.wr img{width:26px;height:26px;border-radius:5px;object-fit:cover}
+.wr .nm{text-align:left;font:400 15.5px/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr .zf{color:var(--kf);font-weight:700} .wr .zv{color:var(--gut);font-weight:700}
+.wr strong{font-size:19px;color:var(--creme)}
+.wr .st{position:absolute;left:36px;right:0;bottom:2px;height:3px;display:flex;gap:1px;border-radius:2px;overflow:hidden}
+.wr .st i{background:var(--creme);opacity:.75} .wr .st i.f{background:var(--kf);opacity:1} .wr .st i.v{background:var(--gut);opacity:1} .wr .st i.n{background:var(--warn);opacity:1}
+.wr.su{background:var(--flaeche-2);height:44px;border-radius:0 0 7px 7px;border-bottom:0} .wr.su strong{font-size:24px;color:var(--gold)} .wr.su .nm{font:700 13px/1 var(--zahl);letter-spacing:.12em;text-transform:uppercase;color:var(--creme)}
+.rang{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;height:32px;padding:0 6px;border-radius:6px;font-size:15px}
+.rang:hover{background:var(--flaeche-2)}
+.rang.an{background:rgba(240,195,90,.1)}
+.rang .mk{display:inline-flex;align-items:center;gap:5px;font-weight:700;white-space:nowrap;min-width:92px}
+.rang .bn{height:8px;transform:skewX(-14deg);background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.rang .bn i{display:block;height:100%;background:var(--kf)} .rang.neg .bn i{background:var(--warn)}
+.rang strong{font-size:17px;min-width:52px;text-align:right}
+.hinweis{margin-top:10px;display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:9px 10px;border-radius:7px;border:1px solid var(--linie);background:var(--flaeche-2);font-size:14.5px;line-height:1.3;color:var(--leise)}
+.hinweis b{color:var(--creme);font-weight:600}
+.hinweis svg{font-size:18px;color:var(--gold);margin-top:1px}
+.regel{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 1fr;gap:1px;background:var(--linie);border:1px solid var(--linie);border-radius:7px;overflow:hidden;margin-top:8px;font-size:14.5px}
+.regel span{background:var(--flaeche-1);padding:6px 8px;text-align:center;font-weight:700}
+.regel span.l{text-align:left;font-weight:500;color:var(--leise)} .regel span.k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+/* Warum-Block (Kontext, Popover, Profil) */
+.bes{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border-radius:8px;background:var(--flaeche-2);border:1px solid var(--linie)}
+.bes .por{width:64px;height:64px;border-radius:8px;overflow:hidden;border:2px solid var(--pc)}
+.bes .por img{width:100%;height:100%;object-fit:cover}
+.bes b{display:block;font:400 21px/1.05 var(--haus);color:#fff}
+.bes span{font-size:13.5px;color:var(--leise)}
+.ez{display:grid;grid-template-columns:30px minmax(0,1fr) 84px 36px;gap:8px;align-items:center;height:30px;font-size:14.5px;border-bottom:1px solid rgba(244,230,196,.06)}
+.ez .st{font-weight:700;color:var(--stumm);font-size:13px;letter-spacing:.06em}
+.ez .dn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tinte)}
+.ez .dn small{color:var(--stumm);font-size:13px}
+.ez .el{position:relative;height:10px;background:rgba(255,255,255,.07);border-radius:2px}
+.ez .el i{position:absolute;top:0;bottom:0;border-radius:2px;background:var(--gut)} .ez .el.m i{background:var(--warn)}
+.ez .el u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--creme)}
+.ez .df{text-align:right;font-weight:700}
+.ez.leer .dn{color:var(--stumm)}
+.zl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;min-height:26px;font-size:14.5px;color:var(--leise)}
+.zl b{font-weight:700;font-size:16px} .zl span b{font-size:inherit;color:var(--creme);font-weight:600}
+.zl.su{margin-top:6px;padding-top:6px;border-top:1px solid var(--linie);color:var(--tinte)} .zl.su b{font-size:20px;color:var(--gold)}
+/* Ursachen-Balken (Moral) */
+.ur{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) 38px;gap:8px;align-items:center;min-height:30px;font-size:15px;border-bottom:1px solid rgba(244,230,196,.06)}
+.ur .ul{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tinte)}
+.ur .ub{position:relative;height:10px}
+.ur .ub::before{content:"";position:absolute;left:50%;top:-5px;bottom:-5px;width:1px;background:var(--linie-2)}
+.ur .ub i{position:absolute;top:0;bottom:0;border-radius:2px;background:var(--gut)} .ur .ub i.m{background:var(--warn)}
+.ur b{text-align:right;font-weight:700;font-size:16px}
+.ur.su{border-bottom:0;background:var(--flaeche-2);margin:6px -6px 0;padding:0 6px;border-radius:6px;min-height:36px} .ur.su b{font-size:20px;color:var(--gold)} .ur.su .ul{font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--creme)}
+.ur.gr .ul{color:var(--stumm)} .ur.gr b{color:var(--stumm)}
+
+/* Warum-Popover */
+#warum{position:fixed;z-index:96;width:318px;padding:11px 12px 12px;border-radius:9px;background:#05070b;border:1px solid var(--linie-2);box-shadow:0 18px 44px rgba(0,0,0,.7);display:none}
+#warum.an{display:block}
+#warum h4{margin:0;font:400 20px/1 var(--haus);color:#fff;display:flex;align-items:center;gap:8px}
+#warum h4 img{width:30px;height:30px;border-radius:6px;object-fit:cover}
+#warum h4 span{margin-left:auto;font:600 13px var(--zahl);color:var(--gold);white-space:nowrap}
+#warum .gk{display:flex;justify-content:space-between;margin:10px 0 3px}
+#warum .gk b{font-weight:700;letter-spacing:.04em;font-size:13px}
+#warum .zu{position:absolute;right:6px;top:6px;width:26px;height:26px;display:none;place-items:center;color:var(--leise)}
+
+/* ---------- Spielerprofil ---------- */
+.fv{flex:1;min-height:210px;position:relative;margin:14px 16px 0 54px}
+.fv>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.fv .bd{position:absolute;left:0;right:0}
+.fv .bd.o{background:linear-gradient(180deg,rgba(98,211,148,.13),rgba(98,211,148,.03))} .fv .bd.u{background:linear-gradient(0deg,rgba(255,96,88,.13),rgba(255,96,88,.03))}
+.fv .ax{position:absolute;left:-48px;width:42px;transform:translateY(-50%);display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:12.5px;color:var(--stumm)}
+.fv .sp2{position:absolute;top:0;bottom:0;border-radius:5px}
+.fv .sp2.jetzt{background:linear-gradient(180deg,rgba(240,195,90,.12),rgba(240,195,90,.03));border-left:1px solid rgba(240,195,90,.4);border-right:1px solid rgba(240,195,90,.4)}
+.fv .sp2.zuk{background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 6px,transparent 6px 12px)}
+.fv .pt{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--heim);border:2px solid var(--flaeche-1);transform:translate(-50%,-50%)}
+.fv .pt.ohne{background:var(--flaeche-1);border-color:var(--leise)}
+.fv .pt.pro{width:8px;height:8px;background:var(--flaeche-1);border-color:var(--stumm)}
+.fv .wt2{position:absolute;transform:translate(-50%,-165%);font-size:14.5px;font-weight:700;color:var(--creme);white-space:nowrap;text-shadow:0 0 6px var(--flaeche-1),0 0 6px var(--flaeche-1)}
+.fv .lb{position:absolute;right:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--stumm);transform:translateY(-120%)}
+.rs{flex:none;position:relative;height:96px;margin:6px 16px 0 54px;border-top:1px solid var(--linie)}
+.rs::before{content:"";position:absolute;left:0;right:0;top:30px;height:1px;background:var(--linie-2)}
+.rs .ax{position:absolute;left:-52px;top:30px;width:46px;transform:translateY(-50%);font-size:10.5px;line-height:1.1;letter-spacing:.06em;text-transform:uppercase;color:var(--stumm);text-align:right}
+.rs .sb{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;align-items:center}
+.rs .sb i{position:absolute;left:28%;right:28%;border-radius:2px;background:var(--gut);transform:skewX(-10deg)} .rs .sb i.m{background:var(--warn)}
+.rs .sb small{position:absolute;bottom:0;left:-4px;right:-4px;text-align:center;font-size:12px;line-height:1.05;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs .sb small b{display:block;font-size:11px;letter-spacing:.1em;color:var(--leise);font-weight:700}
+.rs .sb.jetzt small b{color:var(--gold)}
+.rs .sb .br{position:absolute;top:2px;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--acht);white-space:nowrap}
+.leg{flex:none;display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 16px 10px 54px;font-size:13px;color:var(--leise)}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--heim);margin-right:5px;vertical-align:-1px}
+.leg i.ohne{background:none;border:2px solid var(--leise)} .leg i.bk{border-radius:2px;background:var(--gut)} .leg i.bm{border-radius:2px;background:var(--warn)}
+.pkb{flex:1;min-height:0;overflow-y:auto;padding:12px}
+.spw{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--linie);flex:none}
+.chip{height:28px;padding:0 9px 0 3px;border-radius:999px;border:1px solid var(--linie);font-size:14px;font-weight:600;color:var(--leise);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex:none}
+.chip img{width:22px;height:22px;border-radius:50%;object-fit:cover}
+.chip:hover{border-color:var(--linie-2);color:var(--tinte)}
+.chip[aria-pressed=true]{background:var(--creme);border-color:var(--creme);color:#17120a}
+.chip[aria-pressed=true] .form{color:#17120a}
+
+/* ---------- Nach dem Spieltag ---------- */
+.mz{display:grid;grid-template-columns:40px minmax(0,150px) 92px 50px minmax(0,1fr);gap:10px;align-items:center;width:100%;min-height:50px;padding:4px 12px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15px}
+.mz:hover{background:var(--flaeche-2)}
+.mz.an{background:rgba(240,195,90,.08);box-shadow:inset 3px 0 0 var(--gold)}
+.mz img{width:40px;height:40px;border-radius:7px;object-fit:cover}
+.mz .nm b{display:block;font:400 16px/1.15 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mz .nm span{font-size:12.5px;color:var(--stumm);white-space:nowrap}
+.mz .ww{display:flex;align-items:center;gap:5px;color:var(--stumm)}
+.mz .dz{font-size:19px;font-weight:700;text-align:right}
+.mz .gr{color:var(--leise);line-height:1.25}
+.mz .gr b{color:var(--creme);font-weight:600}
+.mh{display:grid;grid-template-columns:40px minmax(0,150px) 92px 50px minmax(0,1fr);gap:10px;padding:0 12px;height:26px;align-items:center;border-bottom:1px solid var(--linie);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600;flex:none}
+/* Einblendung (Bauchbinde) */
+.einbl{position:absolute;z-index:40;left:50%;bottom:22px;transform:translateX(-50%);width:min(860px,calc(100% - 40px));display:grid;grid-template-columns:86px minmax(0,1fr) auto;align-items:stretch;background:#05070b;border:1px solid var(--linie-2);box-shadow:0 20px 50px rgba(0,0,0,.75);clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%)}
+.einbl::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--ef)}
+.einbl .por{position:relative;overflow:hidden}
+.einbl .por img{width:100%;height:100%;object-fit:cover}
+.einbl .tx{padding:11px 14px 12px;min-width:0}
+.einbl .tx em{display:flex;align-items:center;gap:8px;font-style:normal;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--ef)}
+.einbl .tx b{display:block;margin:2px 0 3px;font:400 27px/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.einbl .tx p{margin:0;font-size:15.5px;line-height:1.25;color:var(--leise)}
+.einbl .tx p b{display:inline;font:inherit;font-weight:600;color:var(--creme);margin:0}
+.einbl .re{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:6px;padding:8px 30px 8px 12px;border-left:1px solid var(--linie);background:var(--flaeche-1)}
+.einbl .re .pf{display:flex;align-items:center;gap:6px;font-size:26px;color:var(--stumm)}
+.einbl .re .pf .form{font-size:30px}
+.einbl .re .nv{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--stumm)}
+.einbl .re .nv button{width:26px;height:26px;border-radius:5px;border:1px solid var(--linie-2);display:grid;place-items:center;color:var(--tinte)}
+.einbl .re .nv button:hover{border-color:var(--gold);color:var(--gold)}
+.nachher .kl{padding-bottom:128px}
+.erg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+
+/* Dock */
+.dock{flex:none;display:flex;align-items:center;gap:12px;padding:9px 16px;border-top:1px solid var(--linie);background:#080b11;min-height:62px}
+.stat{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.stat .lamp{width:12px;height:12px;border-radius:50%;background:var(--gut);box-shadow:0 0 10px var(--gut);flex:none}
+.stat b{font-size:17px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.stat span{font-size:14.5px;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ges{text-align:right;white-space:nowrap;padding-right:6px}
+.ges strong{font-size:26px;font-weight:700;color:var(--creme);line-height:1}
+.ges small{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+#toast{position:fixed;z-index:95;left:50%;bottom:84px;transform:translate(-50%,20px);padding:9px 16px;border-radius:8px;background:#020305;border:1px solid var(--linie-2);font-size:15.5px;font-weight:500;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:90vw}
+#toast.an{opacity:1;transform:translate(-50%,0)}
+.nurphone{display:none}
+#schleier{display:none}
+.ziehgriff{display:none}
+
+@media (max-width:1380px){.work{grid-template-columns:316px minmax(0,1fr) 344px}.hk h1{font-size:28px}.frist{display:none}}
+
+/* ---------- Phone ---------- */
+body.phone{background:var(--grund)}
+body.phone .app{display:block;height:auto;min-height:100vh;padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+body.phone .rail{display:none}
+body.phone main{display:block}
+body.phone .hero{position:sticky;top:0;z-index:30;grid-template-columns:minmax(0,1fr);gap:8px;padding:8px 10px 0;background:var(--grund)}
+body.phone .hk{padding:0;gap:10px} body.phone .hk .crest{width:40px;height:40px;border-width:1px}
+body.phone .hk>div{display:flex;flex-wrap:wrap;align-items:center;gap:1px 8px;flex:1;min-width:0}
+body.phone .hk h1{font-size:20px;order:-1} body.phone .hk .sub{font-size:13px;margin:0;overflow:hidden;text-overflow:ellipsis;width:100%}
+body.phone .mdw{margin:0 0 0 auto} body.phone .mdw span{padding:0 5px;font-size:11.5px;letter-spacing:.1em} body.phone .mdw .sai{display:none}
+body.phone .hr{display:none}
+body.phone .tabs{gap:4px}
+body.phone .dtab{padding:6px 12px 7px 12px;gap:7px;grid-template-columns:minmax(0,1fr) auto;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+body.phone .dtab .ic{display:none} body.phone .dtab b{font-size:16px} body.phone .dtab em{font-size:10px}
+body.phone .dtab .erw strong{font-size:20px} body.phone .dtab .erw span{display:none}
+body.phone .work,body.phone .work.zwei{display:block;padding:8px}
+body.phone .work.zwei .pan{margin-bottom:8px}
+body.phone .feld{overflow:visible}
+body.phone .fk{padding:8px 10px;gap:8px}
+body.phone .waage .z{font-size:24px} body.phone .wt span:nth-child(2){display:none}
+body.phone .pitchw{padding:8px}
+body.phone .pitch{height:372px;flex:none;width:100%;overflow:visible}
+body.phone .pitch>svg{border-radius:8px}
+body.phone .pitch .hinw,body.phone .geist{display:none}
+body.phone .slot{width:28.5%;min-width:0;grid-template-columns:minmax(0,1fr);padding:0 5px 6px 9px}
+body.phone .slot .por{grid-column:auto;grid-row:auto;width:26px;height:26px;position:absolute;right:4px;top:3px;border-width:1px}
+body.phone .slot .ro{height:32px;font-size:10px;margin-bottom:3px} body.phone .slot .ro .voll,body.phone .slot .ro .fpkt{display:none}
+body.phone .slot .nm,body.phone .slot .ze{grid-column:1}
+body.phone .slot .nm{font-size:13.5px;line-height:1.25} body.phone .slot .ze strong{font-size:18px} body.phone .slot .ze{gap:4px}
+body.phone .slot .mor svg{display:none} body.phone .slot .mor{font-size:13px}
+body.phone .slot .lf{font-size:9.5px;height:14px;top:-8px}
+body.phone .kc{right:4px;font-size:12.5px;height:19px;line-height:19px} body.phone .kc b,body.phone .kc i,body.phone .kc u{padding:0 4px}
+body.phone .typ-track .slot{width:40%}
+body.phone .bz{font-size:13px}
+body.phone .tak{grid-template-columns:minmax(0,1fr);gap:10px;padding:8px 10px 12px}
+body.phone .hka{flex:none;width:92px}
+body.phone .ksum{display:flex;align-items:baseline;justify-content:space-between;text-align:left} body.phone .ksum strong{font-size:26px;order:2} body.phone .ksum small{order:1;margin:0;font-size:13.5px}
+body.phone .ksum .gk{display:none}
+body.phone .kader,body.phone .kontext{position:fixed;z-index:70;left:0;right:0;bottom:0;height:78vh;border-radius:14px 14px 0 0;border-bottom:0;transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -16px 40px rgba(0,0,0,.6)}
+body.phone[data-blatt=kader] .kader,body.phone[data-blatt=kontext] .kontext{transform:none}
+body.phone #schleier{display:block;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s}
+body.phone[data-blatt] #schleier,body.phone.warum-auf #schleier{opacity:1;pointer-events:auto}
+body.phone .nurphone{display:inline-flex}
+body.phone .dock{position:fixed;z-index:50;left:0;right:0;bottom:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));gap:8px;min-height:0}
+body.phone .dock .ges,body.phone .nurdesk,body.phone .stat{display:none}
+body.phone .dock .btn.klein{flex:1}
+body.phone .btn.haupt{height:44px;padding:0 14px;font-size:15px}
+body.phone #toast{bottom:86px;font-size:14px}
+body.phone .ziehgriff{display:block;width:44px;height:4px;border-radius:2px;background:var(--linie-2);margin:7px auto 0;flex:none}
+body.phone #warum{left:0!important;right:0;top:auto!important;bottom:0;width:auto;z-index:80;border-radius:14px 14px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));border-bottom:0}
+body.phone #warum .zu{display:grid}
+body.phone .fv{flex:none;min-height:0;height:210px;margin-right:10px}
+body.phone .pk .hin{display:none}
+body.phone .ptabs{overflow-x:auto}
+body.phone .ptabs .dtab{flex:none;width:136px}
+body.phone .ptabs .dtab em{display:none} body.phone .rs{margin-right:10px} body.phone .leg{padding-right:10px}
+body.phone .rs .sb small{font-size:0} body.phone .rs .sb small b{font-size:10px}
+body.phone .rech.gross strong{font-size:21px} body.phone .rech.gross{margin:10px 10px 0}
+body.phone .pan{overflow:visible} body.phone .pkb,body.phone .kb{overflow:visible}
+body.phone .kader .kl,body.phone .kontext .kb{overflow-y:auto}
+body.phone .kader,body.phone .kontext{overflow:hidden}
+body.phone .mh{display:none}
+body.phone .mz{grid-template-columns:36px minmax(0,1fr) auto 42px;row-gap:2px;padding:7px 10px}
+body.phone .mz img{width:36px;height:36px}
+body.phone .mz .gr{grid-column:1/-1;font-size:14px}
+body.phone .einbl{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom));width:calc(100% - 16px);grid-template-columns:60px minmax(0,1fr);clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+body.phone .einbl .tx{padding:9px 14px 4px 10px} body.phone .einbl .tx b{font-size:20px;white-space:normal} body.phone .einbl .tx p{font-size:14px} body.phone .einbl .tx em{font-size:11px;letter-spacing:.1em}
+body.phone .einbl .re{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;padding:5px 18px 6px 12px;border-left:0;border-top:1px solid var(--linie)}
+body.phone .einbl .re .pf{font-size:18px} body.phone .einbl .re .pf .form{font-size:22px}
+body.phone .nachher{padding-bottom:150px}
+body.phone .erg{grid-template-columns:minmax(0,1fr)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-karte" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8l2 4-2 4-2-4z"/></symbol>
+  <symbol id="i-auf2" viewBox="0 0 24 24"><path d="M6 12l6-6 6 6M6 18l6-6 6 6"/></symbol>
+  <symbol id="i-auf" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-gleich" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-ab" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-ab2" viewBox="0 0 24 24"><path d="M6 6l6 6 6-6M6 12l6 6 6-6"/></symbol>
+  <symbol id="i-herz" viewBox="0 0 24 24"><path d="M12 20s-7-4.6-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.4-7 10-7 10z"/></symbol>
+  <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+  <symbol id="i-d-basketball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3.4 3 3.4 9.8 0 12.8M18.4 5.6c-3.4 3-3.4 9.8 0 12.8"/></symbol>
+  <symbol id="i-d-spurt" viewBox="0 0 24 24"><path d="M13 2L5 14h6l-1 8 9-13h-6z"/></symbol>
+</defs></svg>
+
+<div class="demo" id="demo"><b>Mockup</b>
+  <button data-an="liste">1+2 · Einsatzliste mit Formkarten</button><button data-an="profil">3 · Spielerprofil</button><button data-an="nachher">4 · Nach dem Spieltag</button>
+  <span style="color:var(--stumm)">Karte anklicken = legen · Pfeil oder Herz antippen = warum · Spieler anklicken = Details</span>
+  <em>Alle Zahlen erfunden</em>
+</div>
+
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img src="../team-logos/V-W.jpg" alt="Vigilante Wranglers"></div>
+    <button data-tip="Start" class="tr"><svg class="i"><use href="#i-home"/></svg></button>
+    <button data-tip="Inbox · 3 Entscheidungen" class="tr"><svg class="i"><use href="#i-post"/></svg><span class="zahl">3</span></button>
+    <button data-tip="Einsatzliste" class="tr" data-an="liste" id="rListe"><svg class="i"><use href="#i-liste"/></svg></button>
+    <button data-tip="Arena" class="tr"><svg class="i"><use href="#i-arena"/></svg></button>
+    <button data-tip="Saisonstand · nach dem Spieltag" class="tr" data-an="nachher" id="rNach"><svg class="i"><use href="#i-tab"/></svg></button>
+    <button data-tip="Kader · Spielerprofil" class="tr" data-an="profil" id="rProfil"><svg class="i"><use href="#i-team"/></svg></button>
+    <button data-tip="Training" class="tr"><svg class="i"><use href="#i-train"/></svg></button>
+    <button data-tip="Transfermarkt" class="tr"><svg class="i"><use href="#i-markt"/></svg></button>
+    <button data-tip="Scouting" class="tr"><svg class="i"><use href="#i-scout"/></svg></button>
+    <span class="luecke"></span>
+    <button data-tip="Finanzen" class="tr"><svg class="i"><use href="#i-geld"/></svg></button>
+  </nav>
+  <main id="main"></main>
+</div>
+<div id="schleier"></div>
+<div id="warum" role="dialog" aria-label="Warum diese Form und Moral"></div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+// ---------- ECHT: Stammdaten aus data/generated (wie im Einsatzliste-Mockup) ----------
+var OWN=[{"n":"Lexa","b":"lexa","kl":"Sprinter","ra":"Human","a":[22,39,36,88,53,89,58,67,29,82,48,35],"d":{"basketball":60.2,"spurt":36.6}},{"n":"Bulwark","b":"bulwark","kl":"Templar","ra":"Human","a":[78,85,55,26,13,26,50,57,73,49,48,50],"d":{"basketball":33.9,"spurt":40.2}},{"n":"Kaylen","b":"kaylen","kl":"Templar","ra":"Human","a":[67,60,67,53,44,62,67,58,58,50,40,44],"d":{"basketball":44.6,"spurt":49.7}},{"n":"Aerin","b":"aerin","kl":"Bard","ra":"Elf","a":[39,40,56,54,54,65,54,67,46,63,78,51],"d":{"basketball":65.4,"spurt":43.5}},{"n":"Abe Lincoln","b":"abe-lincoln","kl":"Templar","ra":"Human","a":[63,59,82,52,22,37,65,75,78,44,40,28],"d":{"basketball":40.8,"spurt":43.7}},{"n":"Karthogg","b":"karthogg","kl":"Hero","ra":"Lizard","a":[55,64,56,69,54,50,53,56,65,70,62,50],"d":{"basketball":55.2,"spurt":48}},{"n":"Punisher","b":"punisher","kl":"Warlord","ra":"Human","a":[75,82,59,35,17,33,20,37,41,87,49,66],"d":{"basketball":32.9,"spurt":34.8}},{"n":"Johanna","b":"johanna","kl":"Templar","ra":"Human","a":[56,81,64,51,23,32,22,29,86,44,68,69],"d":{"basketball":30.4,"spurt":44.8}},{"n":"Gram","b":"gram","kl":"Warlord","ra":"Lizard","a":[67,79,73,14,3,5,18,12,33,41,65,58],"d":{"basketball":18.6,"spurt":23}},{"n":"Draco","b":"draco","kl":"Warlord","ra":"Human","a":[81,84,64,37,19,43,6,35,72,89,40,66],"d":{"basketball":27.8,"spurt":44.2}},{"n":"Krolach","b":"krolach","kl":"Templar","ra":"Construct","a":[86,88,82,22,20,3,32,47,94,33,45,64],"d":{"basketball":24.9,"spurt":47.7}},{"n":"Lava Golem","b":"lava-golem","kl":"Warlord","ra":"Construct","a":[98,99,21,29,1,2,1,1,35,94,2,96],"d":{"basketball":11,"spurt":24.2}},{"n":"Nukka","b":"nukka","kl":"Overseer","ra":"Construct","a":[9,26,54,48,68,74,79,83,42,31,33,4],"d":{"basketball":43.2,"spurt":34.1}},{"n":"Kati","b":"kati","kl":"Bard","ra":"Human","a":[13,40,34,53,54,75,68,67,28,81,88,35],"d":{"basketball":75.8,"spurt":29.9}}];
+var OPP=[{"n":"Aida","b":"aida","d":{"basketball":52.8,"spurt":62.8}},{"n":"Mitsuhiko","b":"mitsuhiko","d":{"basketball":49.9,"spurt":43.8}},{"n":"Gearstrike","b":"gearstrike","d":{"basketball":43,"spurt":68.7}},{"n":"Techblade","b":"techblade","d":{"basketball":64.1,"spurt":42.3}},{"n":"Nightowl","b":"nightowl","d":{"basketball":49,"spurt":64.7}},{"n":"Dromon","b":"dromon","d":{"basketball":18.1,"spurt":11.6}}];
+// CLASS_COLOR_MAP aus lib/lineups/legacy-lineup-modifiers.ts: red=Power, green=Speed, blue=Mental, yellow=Social
+var KLFARBE={Berserker:"POW",Warlord:"POW",Tank:"POW",Sprinter:"SPE",Rogue:"SPE",Charger:"SPE",Mage:"MEN",Overseer:"MEN",Templar:"MEN",Bard:"SOC",Hero:"SOC",Badass:"SOC",Tactician:"SOC"};
+var FARBE={POW:{n:"Power",k:"Rot"},SPE:{n:"Speed",k:"Grün"},MEN:{n:"Mental",k:"Blau"},SOC:{n:"Social",k:"Gelb"}};
+var DISZ={
+  basketball:{n:"Basketball",typ:"Teamspiel",farbe:"SOC",feld:"court",kul:"../szenen/basketball/parkett.jpg",krop:1.5,kx:-1,
+    slots:[{c:"FG",l:"Floor General",mj:10,mn:7,st:4,x:57.5,y:50,g:[77,50]},{c:"RP",l:"Rim Pressure",mj:6,mn:4,st:10,x:34.5,y:15,g:[79,15]},{c:"PE",l:"Perimeter",mj:7,mn:5,st:0,x:34.5,y:85,g:[79,85]},
+      {c:"HD",l:"Help Defense",mj:6,mn:10,st:4,x:11.8,y:32,g:[91.5,32]},{c:"CS",l:"Clutch Shot",mj:10,mn:9,st:6,x:11.8,y:68,g:[91.5,68]},{c:"FB",l:"Fast Break",mj:4,mn:5,st:3,x:34.5,y:50,g:[93,50]}]},
+  spurt:{n:"Spurt",typ:"Bahn",farbe:"SPE",feld:"track",kul:"../szenen/spurt/hyrox.jpg",krop:1,
+    slots:[{c:"BS",l:"Block Start",mj:4,mn:2,st:3,x:13,y:14},{c:"AC",l:"Acceleration",mj:4,mn:11,st:1,x:13,y:38},{c:"TS",l:"Top Speed",mj:4,mn:8,st:2,x:13,y:62},{c:"LC",l:"Lane Control",mj:5,mn:6,st:4,x:13,y:86}]}
+};
+var DS=["basketball","spurt"];
+
+// ---------- ERFUNDEN: alles ab hier ----------
+var JETZT=7, SAISON=10, DOSIS=1.0;
+// Einsaetze je Spieltag 1..7: [Disziplin, Erwartung (Perzentil), Leistung (Perzentil), Erschoepfung damals] · null = kein Einsatz · "V" = verletzt
+// Index 6 (Spieltag 7) ist das Ergebnis, das die Ansicht „Nach dem Spieltag“ zeigt; Einsatzliste und Profil stehen VOR Spieltag 7.
+var H={
+ "Lexa":[["Tennis",64,70],["Fechten",58,66],null,["Climbing",70,75],["Speed-Schach",60,69],["Eiskunstlauf",72,81],["Basketball",58,69]],
+ "Bulwark":[["Staffel",40,42],null,["Hockey",48,45],["TDM",52,55],null,["Battlefield",50,49],null],
+ "Kaylen":[["Staffel",55,60],["Fechten",60,70],["Hockey",58,65],null,["Football",56,66],["Battlefield",52,61],["Basketball",44,52]],
+ "Aerin":[["Staffel",55,72],["Wettessen",40,58],["Showcase",70,86],["TDM",50,64],["Football",58,77],["Eiskunstlauf",66,85],["Basketball",64,60]],
+ "Abe Lincoln":[null,["Wettessen",45,44],["Hockey",50,53],["TDM",48,46],["Speed-Schach",66,68],null,["Spurt",46,50]],
+ "Karthogg":[["Tennis",60,64],["Fechten",62,58],["Showcase",64,60],["Climbing",60,49,58],["Football",62,51,60],["Battlefield",58,48,62],["Basketball",54,44,68]],
+ "Punisher":[["Staffel",38,40],null,["Hockey",44,41],["TDM",50,52],null,["Battlefield",48,50],["Spurt",36,33]],
+ "Johanna":[null,["Wettessen",52,60],["Hockey",46,54],null,["Football",40,50],["Battlefield",50,58],["Spurt",46,59]],
+ "Gram":[["Tennis",20,4],null,["Hockey",25,6],null,["Football",22,5],["Battlefield",30,10],null],
+ "Draco":[["Staffel",50,52],["Wettessen",58,60],["Hockey",52,50],["TDM",56,54],"V","V","V"],
+ "Krolach":[["Staffel",48,50],["Wettessen",60,58],["Hockey",50,47,55],["TDM",52,46,64],["Football",44,40,70],["Battlefield",50,44,74],["Spurt",50,47,78]],
+ "Lava Golem":[["Tennis",15,10],null,null,["TDM",40,30],null,["Battlefield",36,28],null],
+ "Nukka":[null,["Fechten",50,52],null,["Climbing",55,54],["Speed-Schach",70,72],null,["Basketball",42,44]],
+ "Kati":[["Tennis",70,78],null,["Showcase",80,90],null,["Football",62,73],["Eiskunstlauf",78,89],["Basketball",72,91]]
+};
+var FAT={"Lexa":22,"Bulwark":10,"Kaylen":35,"Aerin":48,"Abe Lincoln":5,"Karthogg":62,"Punisher":30,"Johanna":18,"Gram":0,"Draco":40,"Krolach":74,"Lava Golem":12,"Nukka":8,"Kati":55};
+var VERL={"Draco":2};
+// Moral-Ursachen (Summe + 50 = Moral). Kategorien aus lib/morale/player-morale-service.ts
+var U={
+ "Kati":[["Teamerfolg · Platz 3","+5"],["Rolle: Stammplatz erfüllt","+5"],["Eigene Leistung · PP-Rang 2","+6"],["Trainings-Wunsch erfüllt","+3"],["Kapitänin Aerin","+2"],["Gehalt unter Marktwert","-3"]],
+ "Aerin":[["Teamerfolg · Platz 3","+5"],["Ist Kapitänin","+6"],["Eigene Leistung · PP-Rang 1","+5"],["Rolle: Stammplatz erfüllt","+4"],["Teamchemie","+2"]],
+ "Lexa":[["Teamerfolg · Platz 3","+5"],["Rolle: Stammplatz erfüllt","+3"],["Eigene Leistung","+3"],["Trait Feisty","-3"]],
+ "Karthogg":[["Teamerfolg · Platz 3","+5"],["Trainingslast zu hoch","-5"],["Eigene Leistung","-4"],["Gehalt unter Marktwert","-2"]],
+ "Gram":[["Teamerfolg · Platz 3","+5"],["Starter versprochen, kaum Einsatz","-12"],["Eigene Leistung","-7"],["Trainings-Wunsch gebrochen","-5"]],
+ "Krolach":[["Teamerfolg · Platz 3","+5"],["Trainingslast zu hoch","-6"],["Rolle: Stammplatz erfüllt","+2"],["Eigene Leistung","-4"]],
+ "Kaylen":[["Teamerfolg · Platz 3","+5"],["Rolle: Stammplatz erfüllt","+4"],["Eigene Leistung","+3"],["Teamchemie","-1"]],
+ "Johanna":[["Teamerfolg · Platz 3","+5"],["Eigene Leistung","+4"],["Rolle: wenig Einsatzzeit","-2"]],
+ "Nukka":[["Teamerfolg · Platz 3","+5"],["Rolle: wenig Einsatzzeit","-3"]],
+ "Bulwark":[["Teamerfolg · Platz 3","+5"],["Rolle: wenig Einsatzzeit","-3"],["Gehalt unter Marktwert","-2"]],
+ "Abe Lincoln":[["Teamerfolg · Platz 3","+5"],["Rolle: wenig Einsatzzeit","-1"]],
+ "Punisher":[["Teamerfolg · Platz 3","+5"],["Trait Mercenary · Gehalt","-6"],["Rolle: wenig Einsatzzeit","-3"]],
+ "Draco":[["Teamerfolg · Platz 3","+5"],["Verletzt, keine Einsatzzeit","-8"],["Trait Egomaniac","-6"]],
+ "Lava Golem":[["Teamerfolg · Platz 3","+5"],["Rolle: kaum Einsatz","-7"],["Eigene Leistung","-5"]]
+};
+// Moral nach Spieltag 7: [Delta, Grund]
+var MN={"Kati":[2,"Sieg in Basketball, starke eigene Leistung"],"Aerin":[1,"Sieg in Basketball"],"Lexa":[1,"Sieg in Basketball"],"Kaylen":[1,"Sieg in Basketball"],"Nukka":[1,"Sieg in Basketball"],"Karthogg":[-2,"Schwache Leistung bei hoher Trainingslast"],
+ "Johanna":[2,"Bester Wranglers-Läufer im Spurt"],"Krolach":[-1,"Trainingslast zu hoch"],"Gram":[-3,"Wieder kein Einsatz trotz Starter-Zusage"],"Lava Golem":[-1,"Wieder kein Einsatz"],"Bulwark":[-1,"Kein Einsatz"],"Punisher":[0,""],"Abe Lincoln":[0,""],"Draco":[0,""]};
+// Formkarten-Hand: jede Karte gehoert einem Spieler, Farbe = Klassenfarbe des Besitzers. Werte wie im Spiel: 2, 4, 8.
+var KARTEN=[{id:"k1",v:8,von:"Kati"},{id:"k2",v:4,von:"Aerin"},{id:"k3",v:4,von:"Kaylen"},{id:"k4",v:8,von:"Lexa"},{id:"k5",v:2,von:"Punisher"},{id:"k6",v:-4,von:"Gram",pflicht:1}];
+var AUF={basketball:["Kati","Lexa","Nukka","Kaylen","Aerin","Karthogg"],spurt:["Punisher","Abe Lincoln","Krolach","Johanna"]};
+
+// ---------- Rechenregeln (aus docs/design/form-moral-17-11.md nachgebaut) ----------
+function kl(v,a,b){return Math.max(a,Math.min(b,v))}
+function bremse(fat){return fat>60?Math.min(15,(fat-60)/40*15):0}
+// Form-Fortschreibung: Ziel = 50 + 50*Residuum/0,22 (geklemmt), Erschoepfung > 60 drueckt bis -15; 30 % Annaeherung je Einsatz; ohne Einsatz 15 % zurueck zur Mitte
+function formVerlauf(name){var f=50,r=[50];H[name].forEach(function(e){if(e&&e!=="V"){var z=kl(50+50*((e[2]-e[1])/100)/.22,0,100)-bremse(e[3]||0);f+=.3*(kl(z,0,100)-f)}else f+=.15*(50-f);r.push(f)});return r}
+function stufeC(f){return kl((f-50)/15,-2,2)}
+function stufe(f){return Math.round(stufeC(f))}
+function formPct(f){return stufeC(f)*DOSIS}
+function moralPct(m){return kl((m-50)/20,-1,1)*2/3*DOSIS}
+var SP=OWN.map(function(p,i){var v=formVerlauf(p.n),m=50;U[p.n].forEach(function(u){m+=parseInt(u[1],10)});
+  return Object.assign({id:i,fv:v,form:v[JETZT-1],formN:v[JETZT],moral:m,moralN:m+MN[p.n][0],fat:FAT[p.n],verl:VERL[p.n]||0,farbe:KLFARBE[p.kl]},p)});
+function sp(n){return SP.filter(function(p){return p.n===n})[0]}
+KARTEN.forEach(function(k){k.g=sp(k.von).farbe});
+// Formkarten-Farbregel NEU: fremde Disziplinfarbe 0,5*v fuer alle, passende 1,0*v; Farbtraeger +0,5*v; Traeger in Form ▲/▲▲: Zusatz +12,5 % je Stufe (nur Pluskarten)
+function karteFuer(k,p,d){var passt=k.g===DISZ[d].farbe,b=(passt?1:.5)*k.v,tr=p.farbe===k.g,z=tr?.5*k.v:0,s=stufe(p.form),h=(k.v>0&&tr&&s>0)?z*.125*s:0;return {b:b,z:z,h:h,s:b+z+h,tr:tr,passt:passt}}
+function kartenFuer(ids,p,d){var r={b:0,z:0,h:0,s:0,tr:false};ids.forEach(function(id){var x=karteFuer(karte(id),p,d);r.b+=x.b;r.z+=x.z;r.h+=x.h;r.s+=x.s;r.tr=r.tr||x.tr});return r}
+function karte(id){return KARTEN.filter(function(k){return k.id===id})[0]}
+function teamKarte(ids,d){var r={b:0,z:0,h:0,s:0};AUF[d].forEach(function(n){var x=kartenFuer(ids,sp(n),d);r.b+=x.b;r.z+=x.z;r.h+=x.h;r.s+=x.s});return r}
+// Platzwert (im Mockup vereinfacht): (Disziplinwert + Rollenpassung) * (1 + Form% + Moral%) - Erschoepfung
+function wert(p,d,i){var s=DISZ[d].slots[i],a=p.a,rolle=((a[s.mj]-50)*.6+(a[s.mn]-50)*.4-(a[s.st]-50)*.25)*.22,g=p.d[d]+rolle;
+  var fo=g*formPct(p.form)/100,mo=g*moralPct(p.moral)/100,fr=p.fat>40?-(p.fat-40)*.12:0;return {g:g,fo:fo,mo:mo,fr:fr,sum:g+fo+mo+fr}}
+function bester(p,d){var b=0,v=-1e9;DISZ[d].slots.forEach(function(_,i){var w=wert(p,d,i).sum;if(w>v){v=w;b=i}});return b}
+
+// ---------- Zustand ----------
+var Z={an:"liste",d:"basketball",kart:{basketball:[],spurt:[]},vor:null,sel:null,tab:"karten",prof:"Kati",ein:0};
+function zahl(v,n){return v.toFixed(n==null?1:n).replace(".",",")}
+function vz(v,n){return (v>0.0001?"+":v<-0.0001?"−":"±")+zahl(Math.abs(v),n)}
+function vzk(v){return vz(v,Math.abs(v-Math.round(v))<.01?0:1)}
+function kls(v){return v>0.0001?"plus":v<-0.0001?"minus":"null"}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
+function por(p){return "../portraits/"+p.b+".jpg"}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+var STN=["eiskalt","kalt","normal","gut drauf","heiß"];
+function fIc(s,kast){return '<span class="form f'+s+(kast?" kast":"")+'">'+ic(s>=2?"auf2":s===1?"auf":s===0?"gleich":s===-1?"ab":"ab2")+'</span>'}
+function mIc(m){return '<span class="mor '+(m>=60?"h":m<40?"n":"")+' t">'+ic("herz")+Math.round(m)+'</span>'}
+function fpkt(g){return '<span class="fpkt" style="--pc:var(--k-'+g+')" title="'+FARBE[g].n+'"></span>'}
+function lastKl(f){return f>=70?"h":f>=40?"m":""}
+function $(s){return document.querySelector(s)}
+function phone(){return document.body.classList.contains("phone")}
+var tT;function sag(t){var e=$("#toast");e.textContent=t;e.classList.add("an");clearTimeout(tT);tT=setTimeout(function(){e.classList.remove("an")},2600)}
+function aktiv(d){var l=Z.kart[d].slice();if(Z.vor&&l.indexOf(Z.vor)<0&&!woKarte(Z.vor))l.push(Z.vor);return l}
+function woKarte(id){var r=null;DS.forEach(function(d){if(Z.kart[d].indexOf(id)>=0)r=d});return r}
+function summe(d,ids){var s=0;AUF[d].forEach(function(n,i){s+=wert(sp(n),d,i).sum});return s+teamKarte(ids||Z.kart[d],d).s}
+var GEG={basketball:384,spurt:158};function gegSumme(d){return GEG[d]}
+
+// ---------- Warum-Bausteine (Kontext, Popover, Profil teilen sie) ----------
+function einsatzZeile(e,st,kurz){
+  if(e==="V")return '<div class="ez leer"><span class="st">ST'+st+'</span><span class="dn">verletzt</span><span></span><span class="df null">–</span></div>';
+  if(!e)return '<div class="ez leer"><span class="st">ST'+st+'</span><span class="dn">kein Einsatz · Rückfall zur Mitte</span><span></span><span class="df null">–</span></div>';
+  var df=e[2]-e[1],lo=Math.min(e[1],e[2]),br=Math.abs(df);
+  return '<div class="ez"><span class="st">ST'+st+'</span><span class="dn">'+e[0]+' <small class="t">'+(kurz?e[1]+' → '+e[2]:'erwartet '+e[1]+' · geleistet '+e[2])+'</small></span>'+
+    '<span class="el'+(df<0?" m":"")+'" title="Strich = Erwartung, Balken = Abstand zur Leistung"><i style="left:'+lo+'%;width:'+br+'%"></i><u style="left:'+e[1]+'%"></u></span><span class="df t '+kls(df)+'">'+vz(df,0)+'</span></div>';
+}
+function letzteEinsaetze(p,bis,n,kurz){var r=[],i=bis-1;for(;i>=0&&r.length<n;i--){var e=H[p.n][i];if(e&&e!=="V")r.push(einsatzZeile(e,i+1,kurz))}return r.join("")||'<div class="ez leer"><span class="st"></span><span class="dn">noch kein Einsatz</span></div>'}
+function warumHTML(p,d,slot){
+  var s=stufe(p.form),fp=formPct(p.form),mp=moralPct(p.moral),br=bremse(p.fat);
+  var top=U[p.n].slice().sort(function(a,b){return Math.abs(parseInt(b[1],10))-Math.abs(parseInt(a[1],10))}).slice(0,3);
+  var h='<div class="gk"><span>Form '+zahl(p.form,0)+' · '+STN[s+2]+'</span><b class="'+kls(fp)+' t">'+vz(fp)+' % Eignung</b></div>'+'<div class="zl" style="min-height:20px;font-size:13px"><span>Letzte drei Einsätze: Erwartung → Leistung</span></div>'+letzteEinsaetze(p,JETZT-1,3,1)+
+    '<div class="zl" style="margin-top:4px"><span>Erschöpfung <b class="t">'+p.fat+'</b>'+(br?" · bremst die Form beim nächsten Einsatz":" · keine Bremse (erst über 60)")+'</span><b class="t '+(br?"minus":"null")+'">'+(br?"−"+zahl(br,0):"0")+'</b></div>'+
+    (p.verl?'<div class="zl"><span>Verletzt · noch '+p.verl+' Spieltage</span><b class="minus">−10</b></div>':"")+
+    '<div class="gk"><span>Moral '+p.moral+'</span><b class="'+kls(mp)+' t">'+vz(mp)+' % Eignung</b></div>'+
+    top.map(function(u){var v=parseInt(u[1],10);return '<div class="zl"><span>'+u[0]+'</span><b class="t '+kls(v)+'">'+vz(v,0)+'</b></div>'}).join("");
+  if(d!=null&&slot!=null){var w=wert(p,d,slot);h+='<div class="zl su"><span>Zusammen auf '+DISZ[d].slots[slot].l+'</span><b class="t">'+vz(w.fo+w.mo)+' Pkt.</b></div>'}
+  else h+='<div class="zl su"><span>Zusammen</span><b class="t">'+vz(fp+mp)+' %</b></div>';
+  return h;
+}
+function zeigeWarum(name,el,fest){
+  var p=sp(name),w=$("#warum"),wo2=null;DS.forEach(function(d){var i=AUF[d].indexOf(name);if(i>=0)wo2=[d,i]});
+  w.innerHTML='<button class="zu" data-wzu="1" aria-label="Schließen">'+ic("x")+'</button><h4><img src="'+por(p)+'" alt="">'+esc(p.n)+'<span>Warum?</span></h4>'+warumHTML(p,wo2?wo2[0]:null,wo2?wo2[1]:null);
+  w.classList.add("an");w.dataset.fest=fest?"1":"";
+  if(phone()){document.body.classList.add("warum-auf");return}
+  var r=el.getBoundingClientRect(),bw=318,bh=w.offsetHeight,x=kl(r.left+r.width/2-bw/2,8,innerWidth-bw-8),y=r.bottom+8;if(y+bh>innerHeight-8)y=Math.max(8,r.top-bh-8);
+  w.style.left=x+"px";w.style.top=y+"px";
+}
+function zuWarum(){var w=$("#warum");w.classList.remove("an");document.body.classList.remove("warum-auf")}
+
+// ---------- Ansicht 1+2: Einsatzliste ----------
+function feldSVG(typ,ph){
+  var L='stroke="rgba(244,230,196,.34)" stroke-width="2" fill="none"';
+  if(typ==="court")return '<svg viewBox="'+(ph?"10 0 506":"0 0 800")+' 500" preserveAspectRatio="none"><defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a1b"/><stop offset="1" stop-color="#241a12"/></linearGradient>'+
+    '<pattern id="dl" width="38" height="500" patternUnits="userSpaceOnUse"><path d="M0 0v500" stroke="rgba(0,0,0,.22)" stroke-width="1"/></pattern></defs>'+
+    '<rect width="800" height="500" fill="url(#hz)"/><rect width="800" height="500" fill="url(#dl)"/><rect x="0" y="0" width="400" height="500" fill="rgba(242,160,61,.05)"/><rect x="400" y="0" width="400" height="500" fill="rgba(69,176,201,.07)"/>'+
+    '<rect x="16" y="16" width="768" height="468" '+L+'/><path d="M400 16v468" '+L+'/><circle cx="400" cy="250" r="62" '+L+'/>'+
+    '<rect x="16" y="170" width="150" height="160" '+L+' fill="rgba(242,160,61,.08)"/><path d="M166 190a60 60 0 010 120" '+L+'/><path d="M16 56h70a212 194 0 010 388H16" '+L+'/><circle cx="46" cy="250" r="9" stroke="#F2A03D" stroke-width="3" fill="none"/><path d="M30 222v56" stroke="#F2A03D" stroke-width="3"/>'+
+    '<rect x="634" y="170" width="150" height="160" '+L+' fill="rgba(69,176,201,.08)"/><path d="M634 190a60 60 0 000 120" '+L+'/><path d="M784 56h-70a212 194 0 000 388h70" '+L+'/><circle cx="754" cy="250" r="9" stroke="#45B0C9" stroke-width="3" fill="none"/><path d="M770 222v56" stroke="#45B0C9" stroke-width="3"/></svg>';
+  return '<svg viewBox="0 0 800 500" preserveAspectRatio="none"><rect width="800" height="500" fill="#0a0f16"/>'+
+    [0,1,2,3].map(function(k){var y=10+k*120;return '<rect x="8" y="'+y+'" width="784" height="112" fill="'+(k%2?"#2a1715":"#321b18")+'"/><path d="M8 '+y+'h784" stroke="rgba(244,230,196,.5)" stroke-width="2"/>'+
+      '<text x="738" y="'+(y+72)+'" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="48" fill="rgba(244,230,196,.16)">'+(k+1)+'</text>'}).join("")+
+    '<path d="M8 490h784" stroke="rgba(244,230,196,.5)" stroke-width="2"/><path d="M212 10v480" stroke="#fff" stroke-width="3"/>'+
+    '<g fill="#eef2f8">'+Array.from({length:24}).map(function(_,r){return '<rect x="'+(772+(r%2)*8)+'" y="'+(10+r*20)+'" width="8" height="20"/>'}).join("")+'</g></svg>';
+}
+function kcHTML(x,vor){if(!x||Math.abs(x.s)<.001)return "";var neg=x.s<0;
+  return '<span class="kc'+(neg?" neg":"")+(vor?" vor":"")+'"><b class="t">'+vzk(x.s)+'</b>'+(!neg&&x.z?'<i class="t" title="davon Farbträger-Zusatz">'+vzk(x.z)+'</i>':"")+(x.h?'<u class="t" title="davon Form-Verstärkung">'+vzk(x.h)+'</u>':"")+'</span>'}
+function listeHTML(){
+  return '<header class="hero"><div class="kul" id="kul"></div><div class="hk"><span class="crest"><img src="../team-logos/V-W.jpg" alt=""></span><div style="min-width:0">'+
+    '<div class="mdw"><button aria-label="Voriger Spieltag">'+ic("l")+'</button><span class="t">Spieltag '+JETZT+'<span class="sai" style="padding:0"> · Saison 1</span></span><button aria-label="Nächster Spieltag">'+ic("r")+'</button></div>'+
+    '<h1>Einsatzliste</h1><div class="sub"><b>Vigilante Wranglers</b> gegen Armageddon Aftermath · Basketball + Spurt</div></div></div>'+
+    '<div class="tabs" id="tabs" role="tablist"></div><div class="hr"><div class="frist" id="tform"></div><div class="frist"><span class="gk">Abgabe bis</span><strong class="t">Sa 20:00</strong></div></div></header>'+
+    '<div class="work"><section class="pan kader" id="kader" aria-label="Kader"><span class="ziehgriff"></span><div class="pk"><h2>Kader</h2><span class="sp"></span><span class="hin">Form · Moral · Karte</span>'+
+    '<button class="btn klein nurphone" data-blatt="" aria-label="Schließen">'+ic("x")+'</button></div><div class="kh" id="kh"></div><div class="kl" id="kl"></div>'+
+    '<div class="kf"><span>'+fpkt("POW")+' Power</span><span>'+fpkt("SPE")+' Speed</span><span>'+fpkt("MEN")+' Mental</span><span>'+fpkt("SOC")+' Social</span></div></section>'+
+    '<section class="pan feld" aria-label="Aufstellung"><div class="fk"><div class="waage" id="waage"></div><span class="seg nurdesk" data-tip="Einsatz: unverändert wie heute"><button aria-pressed="false">Schonen</button><button aria-pressed="true">Normal</button><button aria-pressed="false">Vollgas</button></span></div><div class="pitchw"><div class="pitch" id="pitch"></div></div><div class="tak" id="tak"></div></section>'+
+    '<aside class="pan kontext" id="kontext" aria-label="Kontext"><span class="ziehgriff"></span><div class="ktabs" id="ktabs"></div><div class="kb" id="kb"></div></aside></div>'+
+    '<footer class="dock"><div class="stat" id="stat"></div><button class="btn klein nurphone" data-blatt="kader">'+ic("team")+'Kader</button><button class="btn klein nurphone" data-blatt="kontext" data-tab="karten">'+ic("karte")+'Karten-Wirkung</button>'+
+    '<div class="ges" id="ges"></div><button class="btn haupt" id="bAb">Abgeben</button></footer>';
+}
+function zKopf(){
+  $("#kul").style.backgroundImage='url("'+DISZ[Z.d].kul+'")';
+  $("#tabs").innerHTML=DS.map(function(d,k){var D=DISZ[d];
+    return '<button class="dtab'+(d===Z.d?" an":"")+'" role="tab" aria-selected="'+(d===Z.d)+'" data-d="'+d+'"><span class="ic">'+ic("d-"+d)+'</span><span style="min-width:0"><em>D'+(k+1)+" · "+D.typ+' · <span style="color:var(--k-'+D.farbe+')">'+FARBE[D.farbe].n+'</span></em><b>'+D.n+'</b></span>'+
+      '<span class="erw t"><strong>'+zahl(summe(d),0)+'</strong><span>'+(Z.kart[d].length?"Karten "+vzk(teamKarte(Z.kart[d],d).s):"ohne Karte")+'</span></span></button>'}).join("");
+  var z=[0,0,0,0,0];SP.forEach(function(p){z[stufe(p.form)+2]++});var mm=SP.reduce(function(a,p){return a+p.moral},0)/SP.length;
+  $("#tform").innerHTML='<span class="gk">Team-Form · Moral Ø '+zahl(mm,0)+'</span><strong style="display:flex;gap:9px;justify-content:flex-end;font-size:20px;margin-top:3px">'+[2,1,0,-1,-2].map(function(s){return '<span class="t" style="display:inline-flex;align-items:center;gap:2px">'+fIc(s)+z[s+2]+'</span>'}).join("")+'</strong>';
+}
+function zFeld(){
+  var d=Z.d,D=DISZ[d],ph=phone(),k=ph?D.krop:1,ids=aktiv(d),vor=Z.vor&&Z.kart[d].indexOf(Z.vor)<0;
+  var h=feldSVG(D.feld,ph&&D.feld==="court");
+  if(D.feld==="court"){var ga=OPP.slice().sort(function(a,b){return b.d[d]-a.d[d]});D.slots.forEach(function(s,i){var g=ga[i];h+='<span class="geist" style="left:'+s.g[0]+'%;top:'+s.g[1]+'%"><img src="'+por(g)+'" alt=""><span>'+esc(g.n)+' <b class="t">'+Math.round(g.d[d]+12)+'–'+Math.round(g.d[d]+20)+'</b></span></span>'})}
+  D.slots.forEach(function(s,i){
+    var p=sp(AUF[d][i]),w=wert(p,d,i),x=s.x*k+(ph?(D.kx||0):0),kx=kartenFuer(ids,p,d),kf=ids.length?karte(ids[ids.length-1]).g:null;
+    if(D.feld==="track"){var x0=ph?46:30,br=ph?44:60,tot=w.sum+kx.s;h+='<span class="balken" style="left:'+x0+'%;top:'+s.y+'%;width:'+(br*tot/100)+'%"></span><span class="bz t" style="left:'+(x0+br*tot/100)+'%;top:'+s.y+'%">'+zahl(tot)+'</span>'}
+    h+='<button class="slot'+(Z.sel===p.n?" gew":"")+(kx.tr?" trg":"")+'" style="left:'+(D.feld==="track"&&ph?24:x)+'%;top:'+s.y+'%;--pc:var(--p'+(i+1)+')'+(kf?";--kf:var(--k-"+kf+")":"")+'" data-sp="'+esc(p.n)+'" aria-label="'+s.l+": "+esc(p.n)+'">'+
+      (D.feld==="track"?'<span class="lf">BAHN '+(i+1)+'</span>':"")+
+      '<span class="por"><img src="'+por(p)+'" alt=""></span><span class="in"><span class="ro"><span class="marke">'+s.c+'</span><span class="voll">'+s.l+'</span>'+fpkt(p.farbe)+'</span><span class="nm">'+esc(p.n)+'</span>'+
+      '<span class="ze"><strong class="t">'+zahl(w.sum+kx.s)+'</strong><span class="wz" data-warum="'+esc(p.n)+'">'+fIc(stufe(p.form))+mIc(p.moral)+'</span></span></span>'+kcHTML(kx,vor)+'</button>';
+  });
+  $("#pitch").className="pitch typ-"+D.feld;$("#pitch").innerHTML=h;
+  var s=summe(d,ids),g=gegSumme(d),n=D.slots.length,ant=kl(50+(s-g)/(n*.9),8,92),wk=Math.round(100/(1+Math.exp(-(s-g)/(n*8)))),tk=teamKarte(ids,d);
+  $("#waage").innerHTML='<div class="z t"><small>Wir</small>'+zahl(s,0)+'</div><div><div class="wb"><i style="width:'+ant+'%"></i><u style="left:'+(ant-4)+'%;width:8%"></u></div>'+
+    '<div class="wt"><span>Siegchance <b class="t">'+wk+' %</b></span>'+(ids.length?'<span class="vor t">'+(vor?"Vorschau · ":"")+'Karten '+vzk(tk.s)+'</span>':'<span>noch keine Formkarte gelegt</span>')+'</div></div>'+
+    '<div class="z g t"><small>A-A (geschätzt)</small>'+zahl(g,0)+'</div>';
+  var ks=$("#ksum");if(ks)ks.innerHTML=ksumHTML();
+}
+function ksumHTML(){var d=Z.d,ids=aktiv(d),tk=teamKarte(ids,d);
+  return '<span class="gk" style="justify-content:flex-end">Karten fürs Team</span><strong class="t '+(tk.s<0?"minus":"")+'">'+(ids.length?vzk(tk.s):"–")+'</strong><small class="t">'+(ids.length?'alle '+vzk(tk.b)+' · Farbe '+vzk(tk.z)+' · Form '+vzk(tk.h):Z.kart[d].length+' von 2 gelegt')+'</small>'}
+function zTak(){
+  var d=Z.d,D=DISZ[d];
+  $("#tak").innerHTML='<div style="min-width:0;--kf:var(--k-'+D.farbe+')"><span class="gk"><span>Formkarten · '+Z.kart[d].length+' von 2 gelegt</span><span>Disziplin-Farbe <b>'+FARBE[D.farbe].n+'</b></span></span><div class="hand">'+KARTEN.map(function(k){
+      var wo2=woKarte(k.id),hier=wo2===d,passt=k.g===D.farbe,o=sp(k.von),nr=Z.kart[d].indexOf(k.id)+1;
+      return '<button class="hka'+(hier?" gew":"")+(wo2&&!hier?" weg":"")+(passt?" passt":"")+(k.v<0?" neg":"")+'" data-k="'+k.id+'" style="--kf:var(--k-'+k.g+')" aria-pressed="'+hier+'" aria-label="Formkarte '+FARBE[k.g].n+" "+vzk(k.v)+'">'+
+        '<span class="fa">'+FARBE[k.g].n+'</span><strong class="t">'+vzk(k.v)+'</strong><span class="vo"><img src="'+por(o)+'" alt="">'+(k.pflicht?"Pflicht · "+esc(o.n):esc(o.n))+'</span>'+
+        '<span class="pa">'+(wo2&&!hier?"in "+DISZ[wo2].n:passt?"passt":"fremd ½")+'</span><span class="nr">'+nr+'</span></button>'}).join("")+'</div></div>'+
+    '<div class="ksum" id="ksum">'+ksumHTML()+'</div>';
+}
+function zKader(){
+  var d=Z.d,ids=aktiv(d);
+  $("#kh").innerHTML='<span></span><span>Spieler</span><span data-tip="Wert auf dem besten Platz, inklusive Form, Moral, Erschöpfung">Platz</span><span data-tip="Form: ▲▲ heiß bis ▼▼ eiskalt, aus den letzten etwa drei Einsätzen">Form</span><span data-tip="Moral 0–100, 50 ist neutral" class="tl">Moral</span><span data-tip="Was die gelegten Karten diesem Spieler bringen (nur wer aufgestellt ist, bekommt es)" class="tl">Karte</span>';
+  var l=SP.map(function(p){var wo2=null;DS.forEach(function(x){var i=AUF[x].indexOf(p.n);if(i>=0)wo2=[x,i]});var si=wo2&&wo2[0]===d?wo2[1]:bester(p,d);return {p:p,wo:wo2,si:si,sw:wert(p,d,si).sum}});
+  l.sort(function(a,b){return (a.p.verl?1:0)-(b.p.verl?1:0)||b.sw-a.sw});
+  $("#kl").innerHTML=l.map(function(x){var p=x.p,st="",hier=x.wo&&x.wo[0]===d,kx=kartenFuer(ids,p,d);
+    if(p.verl)st='<span class="marke rot">VERLETZT · '+p.verl+' ST</span>';
+    else if(x.wo)st='<span class="marke" style="--pc:var(--p'+(x.wo[1]+1)+')">D'+(DS.indexOf(x.wo[0])+1)+" "+DISZ[x.wo[0]].slots[x.wo[1]].c+'</span>';
+    else if(p.fat>=70)st='<span class="marke gelb">ERSCHÖPFT</span>';
+    return '<button class="kz'+(x.wo?" im":"")+(p.verl?" aus":"")+(Z.sel===p.n?" gew":"")+'" data-sp="'+esc(p.n)+'">'+
+      '<span class="por"><img src="'+por(p)+'" alt="" loading="lazy"></span><span class="nm"><b>'+esc(p.n)+'</b><span>'+st+fpkt(p.farbe)+'<span>'+p.kl+'</span></span></span>'+
+      '<span class="sw t"><strong>'+zahl(x.sw)+'</strong><small>'+DISZ[d].slots[x.si].c+'</small></span>'+
+      '<span class="wz" data-warum="'+esc(p.n)+'" style="justify-content:center">'+fIc(stufe(p.form),1)+'</span><span class="wz" data-warum="'+esc(p.n)+'" style="justify-content:flex-end">'+mIc(p.moral)+'</span>'+
+      '<span class="kw t '+(ids.length?kls(kx.s):"null")+(hier?"":" aus")+'">'+(ids.length?vzk(kx.s):"–")+'</span></button>'}).join("");
+}
+function zKontext(){
+  var d=Z.d,D=DISZ[d],ids=aktiv(d),h="";
+  $("#ktabs").innerHTML='<button data-tab="karten" class="'+(Z.tab==="karten"?"an":"")+'">'+ic("karte")+'Karten-Wirkung</button><button data-tab="form" class="'+(Z.tab==="form"?"an":"")+'">'+ic("auf")+'Form &amp; Moral</button>';
+  if(Z.tab==="karten"){
+    if(!ids.length){
+      h='<div class="rk" style="--pc:var(--k-'+D.farbe+')"><span class="gk">Formkarten · neue Farbregel</span><h3>Karte wählen</h3><p>Jede Karte hilft <b>allen</b> aufgestellten Spielern. Wer selbst die <b>Farbe der Karte</b> trägt, bekommt die Hälfte obendrauf, in guter Form noch etwas mehr.</p></div>'+
+        '<div class="regel"><span class="k l">Karte +8</span><span class="k">alle</span><span class="k">Farbträger</span><span class="l">fremde Disziplin-Farbe</span><span class="t">+4</span><span class="t">+8</span><span class="l">passende Disziplin-Farbe</span><span class="t">+8</span><span class="t" style="color:var(--gold)">+12</span></div>'+
+        '<div class="ab"><span class="gk"><span>Was bringt welche Karte in '+D.n+'?</span><span>Team</span></span>'+rangHTML(d)+'</div>'+
+        '<div class="hinweis">'+ic("info")+'<span>Über eine Karte fahren zeigt die Vorschau am Feld. <b>Minuskarten</b> müssen in der Saison gelegt werden: dorthin, wo wenige Träger ihrer Farbe stehen.</span></div>';
+    }else{
+      ids.forEach(function(id){var k=karte(id),passt=k.g===D.farbe,b=(passt?1:.5)*k.v,tr=AUF[d].filter(function(n){return sp(n).farbe===k.g}),heiss=tr.filter(function(n){return stufe(sp(n).form)>0});
+        h+='<div class="rk" style="--pc:var(--k-'+k.g+')"><span class="gk">'+(Z.vor===id&&Z.kart[d].indexOf(id)<0?"Vorschau · ":"")+'Karte von '+esc(k.von)+(k.pflicht?" · Pflichtkarte":"")+'</span><h3>'+FARBE[k.g].n+' '+vzk(k.v)+'</h3>'+
+          '<p>'+(ids.length>1?(passt?'<b>Passt</b>':'<b>Fremd</b>')+': alle '+vzk(b)+' · '+(tr.length?tr.length+' '+FARBE[k.g].n+'-Träger je '+vzk(.5*k.v)+' dazu':'kein '+FARBE[k.g].n+'-Träger auf dem Feld'):D.n+' ist <b>'+FARBE[D.farbe].n+'</b>: die Karte '+(passt?'<b>passt</b>, voller Wert':'ist <b>fremd</b>, halber Wert')+' für alle ('+vzk(b)+'). '+(tr.length?'<b>'+tr.length+' '+FARBE[k.g].n+'-Träger</b> auf dem Feld: je '+vzk(.5*k.v)+' dazu.':'Kein '+FARBE[k.g].n+'-Träger auf dem Feld.'))+'</p>'+
+          (ids.length>1?"":'<div class="rech d3"><div><small>alle '+AUF[d].length+'</small><strong class="t">'+vzk(b)+'</strong></div><div><small>'+FARBE[k.g].n+'-Träger</small><strong class="t" style="color:var(--k-'+k.g+')">'+vzk(.5*k.v)+'</strong></div><div><small>in Form ▲ / ▲▲</small><strong class="t '+(k.v>0?"plus":"null")+'">'+(k.v>0?"+12,5 / +25 %":"–")+'</strong></div></div>')+'</div>'});
+      var tk=teamKarte(ids,d),mx=0;AUF[d].forEach(function(n){mx=Math.max(mx,Math.abs(kartenFuer(ids,sp(n),d).s))});
+      h+='<div class="ab" style="--kf:var(--k-'+karte(ids[ids.length-1]).g+')"><div class="wh"><span></span><span></span><span style="text-align:left">Wer bekommt</span><span></span><span>alle</span><span>Farbe</span><span>Form</span><span>gesamt</span></div>'+
+        AUF[d].map(function(n){var p=sp(n),x=kartenFuer(ids,p,d),a=Math.abs(x.s)||1;
+          return '<button class="wr" data-sp="'+esc(n)+'"><span class="fb" style="--pc:var(--k-'+p.farbe+')"></span><img src="'+por(p)+'" alt=""><span class="nm">'+esc(n)+'</span>'+fIc(stufe(p.form))+
+            '<span class="t '+(x.b<0?"minus":"")+'">'+vzk(x.b)+'</span><span class="t '+(x.z?(x.z<0?"minus":"zf"):"null")+'">'+(x.z?vzk(x.z):"–")+'</span><span class="t '+(x.h?"zv":"null")+'">'+(x.h?vzk(x.h):"–")+'</span><strong class="t '+(x.s<0?"minus":"")+'">'+vzk(x.s)+'</strong>'+
+            '<span class="st" style="width:calc('+(mx?Math.abs(x.s)/mx*100:0)+'% - 36px)"><i class="'+(x.b<0?"n":"")+'" style="flex:'+Math.abs(x.b)/a+'"></i>'+(x.z?'<i class="'+(x.z<0?"n":"f")+'" style="flex:'+Math.abs(x.z)/a+'"></i>':"")+(x.h?'<i class="v" style="flex:'+x.h/a+'"></i>':"")+'</span></button>'}).join("")+
+        '<div class="wr su"><span></span><span></span><span class="nm">Team</span><span></span><span class="t">'+vzk(tk.b)+'</span><span class="t">'+vzk(tk.z)+'</span><span class="t">'+vzk(tk.h)+'</span><strong class="t '+(tk.s<0?"minus":"")+'">'+vzk(tk.s)+'</strong></div></div>';
+      h+='<div class="hinweis">'+ic("info")+'<span>'+hinweis(d,ids)+'</span></div>';
+      h+='<div class="ab"><span class="gk"><span>Alle Karten im Vergleich · '+D.n+'</span><span>Team</span></span>'+rangHTML(d)+'</div>';
+    }
+  }else{
+    if(Z.sel){var p=sp(Z.sel),wo2=null;DS.forEach(function(x){var i=AUF[x].indexOf(p.n);if(i>=0)wo2=[x,i]});
+      h='<div class="bes" style="--pc:var(--k-'+p.farbe+')"><span class="por"><img src="'+por(p)+'" alt=""></span><div><b>'+esc(p.n)+'</b><span>'+p.kl+' · '+FARBE[p.farbe].n+(wo2?' · '+DISZ[wo2[0]].slots[wo2[1]].l:" · nicht aufgestellt")+'</span></div><span style="display:flex;gap:8px;align-items:center;font-size:22px">'+fIc(stufe(p.form),1)+mIc(p.moral)+'</span></div>'+
+        '<div class="ab">'+warumHTML(p,wo2?wo2[0]:null,wo2?wo2[1]:null)+'</div><div style="margin-top:12px;display:flex;gap:6px"><button class="btn klein" data-profil="'+esc(p.n)+'">Profil mit Verlauf öffnen '+ic("r")+'</button><button class="btn klein" data-sp="'+esc(p.n)+'">Auswahl aufheben</button></div>';
+    }else{
+      var fo=0,mo=0,fr=0;AUF[d].forEach(function(n,i){var w=wert(sp(n),d,i);fo+=w.fo;mo+=w.mo;fr+=w.fr});
+      h='<div class="rk" style="--pc:var(--heim)"><span class="gk">'+D.n+' · heute</span><h3>Wie die '+(AUF[d].length===6?"Sechs":"Vier")+' drauf sind</h3><p>Form kommt aus den <b>letzten etwa drei Einsätzen</b> (Leistung gegen Erwartung), Moral aus der <b>Lage im Team</b>. Beides verschiebt die Eignung nur leicht.</p>'+
+        '<div class="rech"><div><small>Form</small><strong class="t '+kls(fo)+'">'+vz(fo)+'</strong></div><div><small>Moral</small><strong class="t '+kls(mo)+'">'+vz(mo)+'</strong></div><div><small>Erschöpfung</small><strong class="t '+kls(fr)+'">'+vz(fr)+'</strong></div><div class="su"><small>Punkte</small><strong class="t">'+vz(fo+mo+fr)+'</strong></div></div></div>'+
+        '<div class="ab"><div class="wh" style="grid-template-columns:4px 26px minmax(0,1fr) 20px 44px 44px 50px"><span></span><span></span><span style="text-align:left">Spieler</span><span></span><span>Form</span><span>Moral</span><span>Punkte</span></div>'+
+        AUF[d].map(function(n,i){var p=sp(n),w=wert(p,d,i);return '<button class="wr" style="grid-template-columns:4px 26px minmax(0,1fr) 20px 44px 44px 50px" data-sp="'+esc(n)+'"><span class="fb" style="--pc:var(--p'+(i+1)+')"></span><img src="'+por(p)+'" alt=""><span class="nm">'+esc(n)+'</span>'+fIc(stufe(p.form))+
+          '<span class="t '+kls(formPct(p.form))+'">'+vz(formPct(p.form))+' %</span><span class="t '+kls(moralPct(p.moral))+'">'+vz(moralPct(p.moral))+' %</span><strong class="t '+kls(w.fo+w.mo)+'" style="font-size:17px">'+vz(w.fo+w.mo)+'</strong></button>'}).join("")+'</div>'+
+        '<div class="hinweis">'+ic("info")+'<span>Spieler anklicken zeigt das <b>Warum</b>: letzte drei Einsätze, Erschöpfung, Moral-Ursachen.</span></div>';
+    }
+  }
+  $("#kb").innerHTML=h;
+}
+function rangHTML(d){var l=KARTEN.map(function(k){return {k:k,s:teamKarte([k.id],d).s}}).sort(function(a,b){return b.s-a.s}),mx=Math.max.apply(null,l.map(function(x){return Math.abs(x.s)}));
+  return l.map(function(x){var k=x.k,wo2=woKarte(k.id);return '<button class="rang'+(x.s<0?" neg":"")+(wo2===d?" an":"")+'" data-k="'+k.id+'" style="--kf:var(--k-'+k.g+')"><span class="mk">'+fpkt(k.g)+FARBE[k.g].n+' <span class="t">'+vzk(k.v)+'</span></span><span class="bn"><i style="width:'+Math.abs(x.s)/mx*100+'%"></i></span><strong class="t '+(x.s<0?"minus":"")+'">'+vzk(x.s)+'</strong></button>'}).join("")}
+function hinweis(d,ids){var D=DISZ[d],t=[];ids.forEach(function(id){var k=karte(id),tr=AUF[d].filter(function(n){return sp(n).farbe===k.g}),hs=tr.filter(function(n){return stufe(sp(n).form)>0});
+  if(k.v<0)t.push(tr.length?'<b>Minuskarte:</b> '+tr.length+' '+FARBE[k.g].n+'-Träger zahlen doppelt. In einer Disziplin ohne '+FARBE[k.g].n+'-Spieler wäre sie billiger.':'<b>Gut abgeladen:</b> kein '+FARBE[k.g].n+'-Träger auf dem Feld, die Minuskarte kostet hier nur den Grundabzug.');
+  else if(!tr.length)t.push('<b>'+FARBE[k.g].n+' '+vzk(k.v)+'</b> wirkt hier nur als Grundwert: niemand auf dem Feld trägt die Farbe.');
+  else t.push('<b>'+FARBE[k.g].n+' '+vzk(k.v)+':</b> '+vzk((k.g===D.farbe?1:.5)*k.v)+' für alle, '+vzk(.5*k.v)+' zusätzlich für '+tr.length+' Spieler dieser Farbe'+(hs.length?', davon '+hs.length+' in Form ('+hs.join(", ")+')':'')+'.')});
+  var alt=0;ids.forEach(function(id){var k=karte(id);alt+=(k.g===D.farbe?2:1)*k.v*AUF[d].length});
+  return t.join(" ")+' <span style="color:var(--stumm)">Zum Vergleich alte Regel: '+vzk(alt)+' (alle gleich).</span>'}
+function zDock(){var t=0;DS.forEach(function(d){t+=summe(d)});var n=Z.kart.basketball.length+Z.kart.spurt.length,pf=KARTEN.filter(function(k){return k.pflicht&&!woKarte(k.id)}).length;
+  $("#stat").innerHTML='<span class="lamp"></span><b>Bereit</b><span>'+(n===1?"1 Formkarte":n+" Formkarten")+' gelegt'+(pf?" · 1 Pflicht-Minuskarte noch offen (bis Spieltag 10)":"")+'</span>';
+  $("#ges").innerHTML='<small>Erwartung gesamt</small><strong class="t">'+zahl(t,0)+'</strong>'}
+function zListe(teil){zKopf();zFeld();if(teil!=="vor")zTak();zKader();zKontext();zDock()}
+function legeKarte(id){var d=Z.d,k=karte(id),wo2=woKarte(id);
+  if(wo2===d){Z.kart[d]=Z.kart[d].filter(function(x){return x!==id});sag(FARBE[k.g].n+" "+vzk(k.v)+" zurück auf die Hand.")}
+  else{if(Z.kart[d].length>=2)return sag("Höchstens zwei Formkarten je Disziplin. Erst eine zurücknehmen.");if(wo2){Z.kart[wo2]=Z.kart[wo2].filter(function(x){return x!==id})}Z.kart[d].push(id);
+    sag(FARBE[k.g].n+" "+vzk(k.v)+" in "+DISZ[d].n+" gelegt: Team "+vzk(teamKarte([id],d).s)+".")}
+  Z.vor=null;Z.tab="karten";zListe()}
+
+// ---------- Ansicht 3: Spielerprofil ----------
+function profilHTML(){
+  var p=sp(Z.prof),s=stufe(p.form),fp=formPct(p.form),mp=moralPct(p.moral),br=bremse(p.fat),v=p.fv,h;
+  h='<header class="hero"><div class="kul" style="background-image:url(\''+por(p)+'\');background-position:center 20%"></div><div class="hk"><span class="crest" style="border-color:var(--k-'+p.farbe+')"><img src="'+por(p)+'" alt=""></span><div style="min-width:0">'+
+    '<div class="mdw"><button data-an="liste" aria-label="Zurück zur Einsatzliste">'+ic("l")+'</button><span>Spielerprofil · vor Spieltag '+JETZT+'</span></div><h1>'+esc(p.n)+'</h1><div class="sub"><b>'+p.kl+'</b> · '+p.ra+' · '+fpkt(p.farbe)+' '+FARBE[p.farbe].n+' · Vigilante Wranglers</div></div></div>'+
+    '<div class="tabs ptabs">'+["Kati","Karthogg","Gram","Krolach"].map(function(n){var q=sp(n);return '<button class="dtab'+(n===Z.prof?" an":"")+'" data-profil="'+n+'"><span class="ic"><img src="'+por(q)+'" alt=""></span><span style="min-width:0"><em>Moral '+q.moral+'</em><b>'+esc(n)+'</b></span><span class="erw t"><strong style="display:flex;align-items:center;gap:4px;justify-content:flex-end">'+fIc(stufe(q.form))+zahl(q.form,0)+'</strong><span>Form</span></span></button>'}).join("")+'</div>'+
+    '<div class="hr"><div class="frist"><span class="gk">Wirkung heute</span><strong class="t '+kls(fp+mp)+'">'+vz(fp+mp)+' %</strong></div></div></header>';
+  // Form-Verlauf
+  var n=SAISON,X=function(i){return (i-.5)/n*100},Y=function(f){return 100-f};
+  var pts=[],i;for(i=1;i<JETZT;i++)pts.push([X(i),Y(v[i]),i]);
+  var pro=[],f=p.form;for(i=JETZT;i<=n;i++){f+=.15*(50-f);pro.push([X(i),Y(f)])}
+  var svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none">'+[72.5,57.5,42.5,27.5].map(function(g){return '<path d="M0 '+Y(g)+'H100" stroke="rgba(244,230,196,.16)" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>'}).join("")+
+    '<path d="M0 50H100" stroke="rgba(244,230,196,.34)" stroke-width="1" vector-effect="non-scaling-stroke"/>'+
+    '<path d="M0 50L'+pts.map(function(q){return q[0]+" "+q[1]}).join("L")+'" fill="none" stroke="#F2A03D" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>'+
+    '<path d="M'+pts[pts.length-1][0]+" "+pts[pts.length-1][1]+"L"+pro.map(function(q){return q[0]+" "+q[1]}).join("L")+'" fill="none" stroke="#7a869c" stroke-width="2" stroke-dasharray="4 5" vector-effect="non-scaling-stroke"/></svg>';
+  var sp2="",dots="",rs="";
+  for(i=1;i<=n;i++){var e=H[p.n][i-1],w=100/n,cls=i===JETZT?" jetzt":i>JETZT?" zuk":"";
+    sp2+='<span class="sp2'+cls+'" style="left:'+(i-1)*w+'%;width:'+w+'%"></span>';
+    if(i<JETZT){var ein=e&&e!=="V";dots+='<span class="pt'+(ein?"":" ohne")+'" style="left:'+X(i)+'%;top:'+Y(v[i])+'%"></span>'+(i===JETZT-1?'<span class="wt2 t" style="left:'+X(i)+'%;top:'+Y(v[i])+'%">'+zahl(v[i],0)+'</span>':"");
+      var df=ein?e[2]-e[1]:0,hh=Math.min(26,Math.abs(df)*2.2),b2=ein?bremse(e[3]||0):0;
+      rs+='<span class="sb" style="left:'+(i-1)*w+'%;width:'+w+'%">'+(ein?'<i class="'+(df<0?"m":"")+'" style="'+(df<0?"top:31px":"top:"+(30-hh)+"px")+';height:'+Math.max(2,hh)+'px"></i>':"")+(b2?'<span class="br t">Last −'+zahl(b2,0)+'</span>':"")+
+        '<small><b>ST'+i+'</b>'+(e==="V"?"verletzt":ein?e[0]+" "+vz(df,0):"kein Einsatz")+'</small></span>';
+    }else{dots+='<span class="pt pro" style="left:'+pro[i-JETZT][0]+'%;top:'+pro[i-JETZT][1]+'%"></span>';
+      rs+='<span class="sb'+(i===JETZT?" jetzt":"")+'" style="left:'+(i-1)*w+'%;width:'+w+'%"><small><b>ST'+i+'</b>'+(i===JETZT?"steht an":"")+'</small></span>'}}
+  var ax=[[86,2],[65,1],[50,0],[35,-1],[13.5,-2]].map(function(a){return '<span class="ax" style="top:'+Y(a[0])+'%">'+fIc(a[1])+'</span>'}).join("");
+  h+='<div class="work zwei"><section class="pan"><div class="pk"><h2>Form-Verlauf</h2><span class="sp"></span><span class="hin">Saison 1 · Spieltag 1 bis '+SAISON+' · 50 ist neutral</span></div>'+
+    '<div class="rech gross"><div><small>Form</small><strong class="t">'+fIc(s)+zahl(p.form,0)+'</strong></div><div><small>Stufe</small><strong>'+STN[s+2]+'</strong></div><div><small>Wirkung auf Eignung</small><strong class="t '+kls(fp)+'">'+vz(fp)+' %</strong></div><div><small>Erschöpfung</small><strong class="t '+(br?"minus":"")+'">'+p.fat+(br?' <span style="font-size:14px;font-weight:600">bremst −'+zahl(br,0)+'</span>':"")+'</strong></div></div>'+
+    '<div class="fv"><span class="bd o" style="top:0;height:27.5%"></span><span class="bd u" style="bottom:0;height:27.5%"></span>'+sp2+svg+ax+dots+'<span class="lb" style="top:8px;transform:none">gestrichelt: ohne Einsatz zurück zur Mitte</span></div>'+
+    '<div class="rs"><span class="ax">Leistung gegen Erwartung</span>'+rs+'</div>'+
+    '<div class="leg"><span><i></i>Form nach Einsatz</span><span><i class="ohne"></i>ohne Einsatz</span><span><i class="bk"></i>über Erwartung</span><span><i class="bm"></i>unter Erwartung</span><span style="color:var(--acht)">Last = Erschöpfung über 60 bremst</span></div></section>'+
+    // Moral + Warum
+    '<section class="pan"><div class="pk"><h2>Moral und ihre Ursachen</h2><span class="sp"></span><span class="hin">0 bis 100 · 50 ist neutral</span></div>'+
+    '<div class="rech gross d3"><div><small>Moral</small><strong class="t '+(p.moral>=60?"plus":p.moral<40?"minus":"")+'">'+ic("herz")+p.moral+'</strong></div><div><small>Wirkung auf Eignung</small><strong class="t '+kls(mp)+'">'+vz(mp)+' %</strong></div><div class="su"><small>Form + Moral</small><strong class="t">'+vz(fp+mp)+' %</strong></div></div>'+
+    '<div class="pkb"><div class="ur gr"><span class="ul">Grundwert</span><span></span><b class="t">50</b></div>'+
+    U[p.n].slice().sort(function(a,b){return parseInt(b[1],10)-parseInt(a[1],10)}).map(function(u){var x=parseInt(u[1],10),w=Math.min(50,Math.abs(x)*4);return '<div class="ur"><span class="ul">'+u[0]+'</span><span class="ub"><i class="'+(x<0?"m":"")+'" style="'+(x<0?"right:50%":"left:50%")+';width:'+w+'%"></i></span><b class="t '+kls(x)+'">'+vz(x,0)+'</b></div>'}).join("")+
+    '<div class="ur su"><span class="ul">Moral heute</span><span></span><b class="t">'+p.moral+'</b></div>'+
+    '<div class="ab"><span class="gk"><span>Letzte drei Einsätze · daraus entsteht die Form</span><span>Abstand</span></span>'+letzteEinsaetze(p,JETZT-1,3,phone())+'</div>'+
+    '<div class="hinweis">'+ic("info")+'<span>'+profilSatz(p)+'</span></div>'+
+    '<div class="rk" style="--pc:var(--k-'+p.farbe+');margin-top:10px"><span class="gk">Formkarten · '+FARBE[p.farbe].n+'-Träger</span><p>Von einer <b>'+FARBE[p.farbe].n+'-Karte +8</b> bekommt '+esc(p.n)+' den Grundwert und <b>+4 Farbträger-Zusatz</b>'+(s>0?', in der jetzigen Form noch <b>'+vzk(4*.125*s)+'</b> obendrauf.':'. Die Form-Verstärkung gibt es erst ab ▲.')+'</p></div></div></section></div>';
+  return h;
+}
+function profilSatz(p){var s=stufe(p.form),br=bremse(p.fat),t;
+  if(s>=1)t='<b>'+esc(p.n)+'</b> spielt seit mehreren Einsätzen <b>über Erwartung</b>, deshalb '+STN[s+2]+'. Bleibt der Einsatz aus, fällt die Form je Spieltag um 15 % zur Mitte zurück.';
+  else if(s<=-1)t='<b>'+esc(p.n)+'</b> blieb zuletzt <b>unter Erwartung</b>'+(br?' und ist erschöpft (Bremse −'+zahl(br,0)+')':'')+'. '+(br?'Eine Pause senkt die Erschöpfung und lässt die Form zur Mitte zurückkehren.':'Ohne Einsatz erholt sich die Form langsam zur Mitte.');
+  else t='<b>'+esc(p.n)+'</b> spielt etwa wie erwartet'+(br?', die Erschöpfung ('+p.fat+') drückt aber auf den nächsten Einsatz':'')+'.';
+  return t+' Form wirkt höchstens ±2 %, Moral höchstens ±0,7 %.'}
+
+// ---------- Ansicht 4: Nach dem Spieltag ----------
+function meldung(p){
+  var e=H[p.n][JETZT-1],a=stufe(p.form),b=stufe(p.formN),df=p.formN-p.form,g,kurz;
+  if(e==="V"){g="Verletzt: kein Einsatz, die Form wandert zur Mitte.";kurz="verletzt"}
+  else if(!e){g="Kein Einsatz: die Form fällt um 15 % der Distanz zur Mitte zurück.";kurz="kein Einsatz"}
+  else{var d=e[2]-e[1],br=bremse(e[3]||0);
+    g='<b>'+e[0]+':</b> Leistung <b>'+e[2]+'</b> gegen erwartete <b>'+e[1]+'</b>, '+(d>=5?"klar über Erwartung":d>0?"knapp über Erwartung":d>-5?"knapp unter Erwartung":"klar unter Erwartung")+'.'+(br?' <b style="color:var(--acht)">Erschöpfung '+e[3]+'</b> bremst zusätzlich (−'+zahl(br,0)+').':"")+(a>=1&&df<-2&&d>-10?" Wer heiß ist, muss klar über Erwartung bleiben, sonst kühlt die Form ab.":"");kurz=e[0]+" "+vz(d,0)}
+  var kopf=b>a?"Form gestiegen":b<a?"Form gefallen":df>1?"Form leicht gestiegen":df<-1?"Form leicht gefallen":"Form unverändert";
+  return {p:p,a:a,b:b,df:df,g:g,kopf:kopf,kurz:kurz,titel:b===a?esc(p.n)+" bleibt "+STN[b+2]:esc(p.n)+": von "+STN[a+2]+" auf "+STN[b+2]}
+}
+function nachherHTML(){
+  var l=SP.map(meldung).sort(function(x,y){return Math.abs(y.b-y.a)-Math.abs(x.b-x.a)||(y.b-y.a)-(x.b-x.a)||Math.abs(y.df)-Math.abs(x.df)});
+  var top=l.slice(0,5),m=top[kl(Z.ein,0,top.length-1)],ef=m.df>=0?"var(--gut)":"var(--warn)";
+  var h='<header class="hero"><div class="kul" style="background-image:url(\'../szenen/basketball/parkett.jpg\')"></div><div class="hk"><span class="crest"><img src="../team-logos/V-W.jpg" alt=""></span><div style="min-width:0">'+
+    '<div class="mdw"><span class="t">Spieltag '+JETZT+' · abgeschlossen</span></div><h1>Nach dem Spieltag</h1><div class="sub"><b>Vigilante Wranglers</b> · was der Spieltag mit Form und Moral gemacht hat</div></div></div>'+
+    '<div class="tabs"><div class="dtab an"><span class="ic">'+ic("d-basketball")+'</span><span style="min-width:0"><em>D1 · gegen Armageddon Aftermath</em><b>Basketball</b></span><span class="erw t"><strong class="plus">Sieg</strong><span>412 : 396</span></span></div>'+
+    '<div class="dtab"><span class="ic">'+ic("d-spurt")+'</span><span style="min-width:0"><em>D2 · vier Teams</em><b>Spurt</b></span><span class="erw t"><strong>Platz 3</strong><span>von 4</span></span></div></div><div class="hr"></div></header>'+
+    '<div class="work zwei nachher"><section class="pan"><div class="pk"><h2>Form-Meldungen</h2><span class="sp"></span><span class="hin">vorher → nachher · größte Bewegung zuerst</span></div>'+
+    '<div class="mh"><span></span><span>Spieler</span><span>Form</span><span style="text-align:right">Wert</span><span>Warum</span></div><div class="kl">'+
+    l.map(function(x){var p=x.p;return '<button class="mz'+(x===m?" an":"")+'" data-profil="'+esc(p.n)+'"><img src="'+por(p)+'" alt=""><span class="nm"><b>'+esc(p.n)+'</b><span>'+x.kurz+'</span></span>'+
+      '<span class="ww">'+fIc(x.a,1)+ic("pfeil")+fIc(x.b,1)+'</span><span class="dz t '+kls(Math.round(x.df))+'">'+vz(x.df,0)+'</span><span class="gr">'+x.g+'</span></button>'}).join("")+'</div></section>'+
+    '<section class="pan"><div class="pk"><h2>Moral</h2><span class="sp"></span><span class="hin">nur wer sich bewegt hat</span></div><div class="pkb">'+
+    SP.filter(function(p){return MN[p.n][0]}).sort(function(a,b){return MN[b.n][0]-MN[a.n][0]}).map(function(p){var x=MN[p.n];return '<div class="ur" style="grid-template-columns:28px minmax(0,1fr) auto 38px"><img src="'+por(p)+'" alt="" style="width:28px;height:28px;border-radius:5px;object-fit:cover"><span class="ul">'+esc(p.n)+' <span style="color:var(--stumm);font-size:13.5px">· '+x[1]+'</span></span>'+
+      '<span class="t" style="color:var(--stumm);font-size:14px">'+p.moral+' → '+p.moralN+'</span><b class="t '+kls(x[0])+'">'+vz(x[0],0)+'</b></div>'}).join("")+
+    '<div class="hinweis">'+ic("info")+'<span><b>Was jetzt zu tun ist:</b> Karthogg und Krolach sind erschöpft und rutschen ab, eine Pause hilft doppelt. Gram verliert Moral, weil die Starter-Zusage nicht eingelöst wird.</span></div>'+
+    '<div class="ab erg"><div class="rk" style="--pc:var(--gut)"><span class="gk">Heiß in Spieltag 8</span><h3>Kati, Aerin</h3><p>Beide <b>Social</b>: eine gelbe Formkarte bringt ihnen den Zusatz plus Form-Verstärkung.</p></div>'+
+    '<div class="rk" style="--pc:var(--warn)"><span class="gk">Kalt</span><h3>Gram, Karthogg</h3><p>Karthogg schonen. Gram braucht Einsätze, die er <b>über Erwartung</b> beendet.</p></div></div></div></section></div>'+
+    '<div class="einbl" style="--ef:'+ef+'"><span class="por"><img src="'+por(m.p)+'" alt=""></span><div class="tx"><em>'+m.kopf+' · Spieltag '+JETZT+'</em><b>'+m.titel+'</b><p>'+m.g+'</p></div>'+
+    '<div class="re"><span class="pf">'+fIc(m.a)+ic("pfeil")+fIc(m.b)+'<span class="t '+kls(m.df)+'" style="font-weight:700;font-size:.8em">'+vz(m.df,0)+'</span></span><span class="nv t"><button data-ein="-1" aria-label="Vorige Meldung">'+ic("l")+'</button>'+(kl(Z.ein,0,top.length-1)+1)+' von '+top.length+'<button data-ein="1" aria-label="Nächste Meldung">'+ic("r")+'</button></span></div></div>';
+  return h;
+}
+
+// ---------- Ansichten und Ereignisse ----------
+function zeige(){
+  zuWarum();delete document.body.dataset.blatt;
+  var m=$("#main");
+  if(Z.an==="liste"){m.innerHTML=listeHTML();zListe()}else if(Z.an==="profil")m.innerHTML=profilHTML();else m.innerHTML=nachherHTML();
+  document.querySelectorAll("#demo button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.an===Z.an)});
+  [["rListe","liste"],["rProfil","profil"],["rNach","nachher"]].forEach(function(x){$("#"+x[0]).classList.toggle("an",Z.an===x[1])});
+  scrollTo(0,0);
+}
+function blatt(n){if(n)document.body.dataset.blatt=n;else delete document.body.dataset.blatt}
+document.addEventListener("click",function(ev){
+  var t=ev.target,e;
+  if((e=t.closest("[data-wzu]"))||t.id==="schleier"){zuWarum();blatt("");return}
+  if((e=t.closest("[data-warum]"))){ev.stopPropagation();var w=$("#warum");if(w.classList.contains("an")&&w.dataset.fest&&w.dataset.wer===e.dataset.warum){zuWarum();return}zeigeWarum(e.dataset.warum,e,true);w.dataset.wer=e.dataset.warum;return}
+  if(!t.closest("#warum"))zuWarum();
+  if((e=t.closest("[data-an]"))){Z.an=e.dataset.an;zeige();return}
+  if((e=t.closest("[data-profil]"))){Z.prof=e.dataset.profil;Z.an="profil";zeige();return}
+  if((e=t.closest("[data-ein]"))){Z.ein=(Z.ein+parseInt(e.dataset.ein,10)+5)%5;zeige();return}
+  if((e=t.closest("[data-k]"))){legeKarte(e.dataset.k);return}
+  if((e=t.closest("[data-d]"))){Z.d=e.dataset.d;Z.vor=null;Z.sel=null;zListe();return}
+  if((e=t.closest("[data-blatt]"))){if(e.dataset.tab){Z.tab=e.dataset.tab;zKontext()}blatt(e.dataset.blatt);return}
+  if((e=t.closest("[data-tab]"))){Z.tab=e.dataset.tab;zKontext();return}
+  if((e=t.closest("[data-sp]"))){Z.sel=Z.sel===e.dataset.sp?null:e.dataset.sp;Z.tab=Z.sel?"form":Z.tab;zFeld();zKader();zKontext();if(Z.sel&&phone())blatt("kontext");return}
+  if(t.closest("#bAb")){sag("Im Mockup wird nichts abgegeben.");return}
+});
+document.addEventListener("mouseover",function(ev){if(phone())return;var e=ev.target.closest("[data-warum]"),w=$("#warum");
+  if(e){if(!(w.classList.contains("an")&&w.dataset.fest)){zeigeWarum(e.dataset.warum,e,false)}return}
+  var k=ev.target.closest(".hka");if(k&&Z.an==="liste"&&Z.vor!==k.dataset.k&&!woKarte(k.dataset.k)){Z.vor=k.dataset.k;zListe("vor")}});
+document.addEventListener("mouseout",function(ev){if(phone())return;var e=ev.target.closest("[data-warum]"),w=$("#warum");
+  if(e&&!w.dataset.fest&&!(ev.relatedTarget&&ev.relatedTarget.closest&&ev.relatedTarget.closest("[data-warum]")===e))zuWarum();
+  var k=ev.target.closest(".hka");if(k&&Z.vor&&!(ev.relatedTarget&&ev.relatedTarget.closest&&ev.relatedTarget.closest(".hka")===k)){Z.vor=null;if(Z.an==="liste")zListe("vor")}});
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape"){zuWarum();blatt("")}});
+(function(){
+  var q=new URLSearchParams(location.search);
+  if(q.get("still"))document.body.classList.add("still");
+  function ph(){document.body.classList.toggle("phone",!!q.get("phone")||innerWidth<760)}
+  ph();addEventListener("resize",function(){var v=phone();ph();if(v!==phone())zeige()});
+  if(q.get("ansicht"))Z.an=q.get("ansicht");
+  if(q.get("d"))Z.d=q.get("d");
+  if(q.get("karten"))q.get("karten").split(",").forEach(function(x){var p=x.split("@");if(karte(p[0]))Z.kart[p[1]||Z.d].push(p[0])});
+  if(q.get("spieler")){Z.prof=q.get("spieler");Z.sel=q.get("spieler")}
+  if(q.get("tab"))Z.tab=q.get("tab");else if(Z.sel)Z.tab="form";
+  if(q.get("ein"))Z.ein=parseInt(q.get("ein"),10)||0;
+  zeige();
+  if(q.get("blatt"))blatt(q.get("blatt"));
+  if(q.get("warum")){var el=document.querySelector('.slot [data-warum="'+q.get("warum")+'"]')||document.querySelector('[data-warum="'+q.get("warum")+'"]');if(el){zeigeWarum(q.get("warum"),el,true);$("#warum").dataset.wer=q.get("warum")}}
+})();
+</script>
+</body>
+</html>

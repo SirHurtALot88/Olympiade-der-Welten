@@ -38,7 +38,7 @@ const MODIFIERS = {
 };
 
 function sharesFor(side: "d1" | "d2", playerCount: number) {
-  const result = calculateFormModifierForSide({
+  const result = calculateFormModifierForSide({ farbregel: null, // alte Regel festgehalten (Vorzeichen-Test), die neue: form-moral-bau.test.ts
     modifiers: MODIFIERS,
     disciplineSide: side,
     // Farbe der Disziplin == Farbe der Karte → der x2-Fall, den der Spieler hatte.
@@ -170,7 +170,7 @@ describe("Formkarten — der Plan ist massgeblich, nicht der Entwurf", () => {
       formCardPlans: [plan("d1", "card-plus"), plan("d2", "card-minus-fremd")],
       ...scope,
     });
-    const result = calculateFormModifierForSide({
+    const result = calculateFormModifierForSide({ farbregel: null, // alte Regel festgehalten (Vorzeichen-Test), die neue: form-moral-bau.test.ts
       modifiers: effective, disciplineSide: "d1", disciplineColor: "blue", playerCount: 6, formCards: CARDS,
     });
     expect(result.formPerPlayer).toBe(16);
@@ -182,7 +182,7 @@ describe("Formkarten — der Plan ist massgeblich, nicht der Entwurf", () => {
   });
 
   it("ohne den Fix haette der Entwurf gewonnen — die Gegenprobe", () => {
-    const result = calculateFormModifierForSide({
+    const result = calculateFormModifierForSide({ farbregel: null, // alte Regel festgehalten (Vorzeichen-Test), die neue: form-moral-bau.test.ts
       modifiers: STALE_DRAFT, disciplineSide: "d1", disciplineColor: "blue", playerCount: 6, formCards: CARDS,
     });
     // -4 POW auf einer blauen Disziplin: keine Farbgleichheit, also kein x2 → -4 je Spieler.

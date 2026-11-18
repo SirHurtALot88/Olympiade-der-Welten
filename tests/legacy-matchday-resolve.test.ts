@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
+import { formkartenSummeFuerSpieler } from "@/lib/lineups/formkarten-farbregel";
+import { getFormCardColorForDisciplineCategory, getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Discipline, GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -550,8 +553,22 @@ describe("legacy matchday resolve preview", () => {
     // Form ist jetzt PRO SPIELER (flacher Kartenwert + ±4-Jitter). Nominal = 12
     // (= 6/Spieler × 2 Spieler); die tatsächliche Team-Form-Summe wackelt bewusst
     // im Band nominal ± 4×Spieleranzahl. Der Rest (Mutator, Ranks, Team-PP) fix.
-    expect(alphaTeam?.formModifier).toBeGreaterThanOrEqual(12 - 8);
-    expect(alphaTeam?.formModifier).toBeLessThanOrEqual(12 + 8);
+    // NEUE FARBREGEL (Standard seit 18.11.): der nominale Wert kommt aus formkartenZerlegungFuerSpieler
+    // (alle + Farbtraeger-Zusatz je Spieler), nicht mehr aus "x2 fuer alle". Tagesform +-4 je Spieler bleibt.
+    const farbe = getFormCardColorForDisciplineCategory(alpha.matchdayContract?.discipline1?.category);
+    const nominalJe = [0, 1].map((i) => {
+      const id = `A-A-d1-${i}`;
+      const klasse = alpha.rosterPlayers.find((p) => p.id === id)?.className;
+      return formkartenSummeFuerSpieler({
+        karten: [{ wert: 4, farbe: "red" }, { wert: 2, farbe: "blue" }],
+        disziplinFarbe: farbe,
+        spielerFarbe: klasse ? getPlayerClassColor({ className: klasse } as never) : null,
+      });
+    });
+    const nominalNeu = nominalJe[0]! + nominalJe[1]!;
+    expect(nominalNeu).toBeGreaterThan(0);
+    expect(alphaTeam?.formModifier).toBeGreaterThanOrEqual(nominalNeu - 8);
+    expect(alphaTeam?.formModifier).toBeLessThanOrEqual(nominalNeu + 8);
     expect(alphaTeam?.mutatorModifier).toBe(12);
     // finalPreviewScore = Basis (64 inkl. Nominalform 12) − Nominalform + tatsächliche Form
     // + deterministischer Pro-Spieler-Intensitäts-Jitter (commit e04fb06, "normal" default,
@@ -571,12 +588,54 @@ describe("legacy matchday resolve preview", () => {
     // der Trefferzahl skalieren, sind es 2 x 0,3 = 0,6. Siehe tests/mutator-fairness.test.ts.
     expect(alphaPlayer?.mutatorBonus).toBe(12);
     expect(alphaPlayer?.mutatorPpsBonus).toBe(0.6);
+    // Grundlage der Form-Fortschreibung (Review-Befund 4): der systematische Form-Anteil (flacher Kartenwert, ohne Tagesform).
+    expect(alphaPlayer?.formSystematisch).toBeCloseTo(nominalJe[0]!, 1);
     // finalPlayerScore enthält jetzt den Pro-Spieler-Form-Anteil (war 32 OHNE Form,
     // jetzt 32 + Formanteil ≈ 6 ± 4).
-    expect(alphaPlayer?.finalPlayerScore).toBeGreaterThan(32);
-    expect(alphaPlayer?.finalPlayerScore).toBeLessThanOrEqual(32 + 10);
+    // Neue Regel: 32 + eigener Kartenwert (nominalJe[0]) +- Tagesform 4, dazu der konstante Intensitaets-Offset (~ -0,8).
+    expect(alphaPlayer?.finalPlayerScore).toBeGreaterThanOrEqual(32 + nominalJe[0]! - 4 - 1.5);
+    expect(alphaPlayer?.finalPlayerScore).toBeLessThanOrEqual(32 + nominalJe[0]! + 4 + 1.5);
     // Reconciliation bleibt exakt: Σ verteilte Spieler-PP == Team-PP.
     expect(alphaEntryPoints).toBe(alphaTeam?.teamPoints);
+  });
+
+  describe("Vorschau = Resolve (Farbregel, Review-Befund 3/E2E)", () => {
+    function alphaMitKarten(regeln?: { formMoral: boolean; dosisPct: number; farbregel: "neu" | "schmal" | "alt" }) {
+      const alpha = createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [20, 20], d2Scores: [10], fatigueByPlayerId: {}, fatigueSourceStatus: "mapped" });
+      alpha.formCards = [
+        { id: "form-1", playerId: "A-A-d1-0", playerName: "x", color: "red", value: 4, isUsed: false, usedByLineupId: null },
+        { id: "form-2", playerId: "A-A-d1-1", playerName: "y", color: "blue", value: 2, isUsed: false, usedByLineupId: null },
+      ];
+      if (alpha.existingDraft) {
+        alpha.existingDraft.modifiers.d1.primaryFormCardId = "form-1";
+        alpha.existingDraft.modifiers.d1.secondaryFormCardId = "form-2";
+      }
+      if (regeln) alpha.formMoralRegeln = regeln;
+      return alpha;
+    }
+
+    it.each([
+      ["neu", { formMoral: true, dosisPct: 1, farbregel: "neu" as const }],
+      ["alt", { formMoral: true, dosisPct: 1, farbregel: "alt" as const }],
+    ])("lokale Vorschau und Resolve buchen dieselbe Karten-Summe (Regel %s)", (_name, regeln) => {
+      const alpha = alphaMitKarten(regeln);
+      const lokal = calculateLocalLegacyLineupPreviewFromContext(alpha);
+      const resolve = buildLegacyMatchdayResolvePreview([alpha]);
+      const d1Lokal = lokal.disciplineSideScores.find((e) => e.disciplineSide === "d1");
+      const d1Resolve = resolve.disciplinePreviews.find((d) => d.disciplineId === "mini-dm")?.teamResults.find((t) => t.teamId === "A-A");
+      expect(d1Lokal?.formModifier).toBeDefined();
+      // Nominale Karten-Summe vor dem Tagesform-Zufall: Vorschau und Resolve rechnen dieselbe Funktion.
+      expect(d1Resolve?.formModifier).toBeCloseTo(d1Lokal!.formModifier!, 1);
+    });
+
+    it("alte Regel: nominal 12 (x2 bei Farbgleichheit), neue Regel weicht davon ab (nicht dieselbe Rechnung)", () => {
+      const alt = buildLegacyMatchdayResolvePreview([alphaMitKarten({ formMoral: true, dosisPct: 1, farbregel: "alt" })]);
+      const neu = buildLegacyMatchdayResolvePreview([alphaMitKarten({ formMoral: true, dosisPct: 1, farbregel: "neu" })]);
+      const f = (p: typeof alt) => p.disciplinePreviews.find((d) => d.disciplineId === "mini-dm")?.teamResults[0]?.formModifier ?? 0;
+      expect(f(alt)).toBeGreaterThanOrEqual(12 - 8);
+      expect(f(alt)).toBeLessThanOrEqual(12 + 8);
+      expect(f(neu)).not.toBe(f(alt));
+    });
   });
 
   it("assigns team-entry pointsAwarded to the correct player when slot order != score order", () => {

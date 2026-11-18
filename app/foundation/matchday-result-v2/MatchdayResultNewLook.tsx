@@ -17,6 +17,8 @@ import {
   useCountUp,
 } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
+import { FormMeldungen } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
+import { baueFormMeldungen } from "@/lib/lineups/form-moral-anzeige";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
   MatchdaySummaryHighlight,
@@ -149,9 +151,23 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
     setActiveView,
     openTeamProfileById,
     triggerGlobalNext,
+    gameState,
   } = props;
 
   const [mode, setMode] = useState<NlResultMode>("board");
+  // Form-Meldungen (18.11.): nur fuer das eigene Team und nur fuer einen Spieltag mit Verlaufseintrag.
+  const formMeldungen = useMemo(
+    () =>
+      activeManagerTeamId
+        ? baueFormMeldungen(
+            gameState,
+            activeManagerTeamId,
+            matchdaySummary.matchdayId,
+            (id) => gameState?.disciplines.find((d) => d.id === id)?.name ?? null,
+          )
+        : [],
+    [gameState, activeManagerTeamId, matchdaySummary.matchdayId],
+  );
   const [sortKey, setSortKey] = useState<NlResultSortKey | null>(null);
   const [sortDir, setSortDir] = useState<NlResultSortDir>("asc");
   // Tagessieger-Reveal (D3): kurzer, überspringbarer Moment über dem Detail.
@@ -509,6 +525,9 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </div>
         }
       >
+        {hasResult && !isPartial && formMeldungen.length > 0 ? (
+          <FormMeldungen meldungen={formMeldungen} spieltag={matchdaySummary.matchdayNumber} />
+        ) : null}
         {hasResult && isPartial ? (
           // Der Zwischenstands-Hinweis ist die EINE Aussage, die alle Zahlen dieser
           // Seite einordnet — dieselbe Erzählung wie „Spieltag 4 · läuft" im

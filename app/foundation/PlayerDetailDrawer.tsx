@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
+import { BcMoralGesicht } from "@/components/foundation/broadcast/BcMoralGesicht";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { formatTrainingAttributeLabel } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
@@ -3107,7 +3108,7 @@ export default function PlayerDetailDrawer({
                 <article className={`metric-card player-drawer-morale-card is-${data.morale.visibleMood}`}>
                   <span>Moral</span>
                   <strong>
-                    {data.morale.smiley} {formatValue(data.morale.morale, 0)}
+                    <BcMoralGesicht wert={data.morale.morale} groesse={20} />
                   </strong>
                   <small>
                     {data.morale.moodLabel} · {formatMoraleContractIntent(data.morale.contractIntent)}

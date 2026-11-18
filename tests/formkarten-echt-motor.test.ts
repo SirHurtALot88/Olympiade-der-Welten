@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FORMKARTEN_ECHT_DISCIPLINE_IDS } from "@/lib/battle/formkarten-echt-disziplinen";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -30,10 +30,11 @@ import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufst
 function spielstand(opts: {
   disciplineId: string;
   category: string;
+  klassen?: Record<string, string>;
   modifiers?: Record<string, unknown>;
   plans?: unknown[];
 }) {
-  const spieler = ["a", "b"].map((id) => ({ id, name: `Name ${id}` }));
+  const spieler = ["a", "b"].map((id) => ({ id, name: `Name ${id}`, className: opts.klassen?.[id] }));
   return {
     players: spieler,
     rosters: spieler.map((s) => ({ id: `roster-${s.id}`, teamId: "t1", playerId: s.id })),
@@ -67,7 +68,17 @@ function spielstand(opts: {
   } as unknown as GameState;
 }
 
-describe("P4: echte Formkarte im Aufstellungs-Rohr", () => {
+// Die Zahlen unten sind die der ALTEN Regel (x2 bei Farbgleichheit, gleich fuer alle). Seit 18.11. gilt
+// standardmaessig die neue Farbregel; hier wird die alte per Schalter festgehalten (Abschalt-Pfad).
+// Die neue Regel prueft der Block darunter.
+describe("P4: echte Formkarte im Aufstellungs-Rohr (alte Regel, OLY_FORMKARTEN_FARBREGEL=alt)", () => {
+  beforeEach(() => {
+    process.env.OLY_FORMKARTEN_FARBREGEL = "alt";
+  });
+  afterEach(() => {
+    delete process.env.OLY_FORMKARTEN_FARBREGEL;
+  });
+
   it("Pilot time-trial ist freigeschaltet", () => {
     expect(FORMKARTEN_ECHT_DISCIPLINE_IDS.has("time-trial")).toBe(true);
   });
@@ -149,6 +160,25 @@ describe("P4: echte Formkarte im Aufstellungs-Rohr", () => {
     for (const eintrag of Object.values(a)) {
       expect(Object.keys(eintrag).sort()).toEqual(["d", "slot"]);
     }
+  });
+});
+
+describe("P4: neue Farbregel im Aufstellungs-Rohr (Standard seit 18.11.)", () => {
+  it("time-trial: Kartenwert je SPIELER, gleich wie calculateFormModifierForSide (alle + Farbtraeger)", () => {
+    // a = Sprinter (gruen), b = Bard (gelb); Disziplin speed = gruen. Karte a: gruen +4 (passend), Karte b: gelb +2 (fremd).
+    const a = buildArenaAufstellung(
+      spielstand({
+        disciplineId: "time-trial",
+        category: "speed",
+        klassen: { a: "Sprinter", b: "Bard" },
+        modifiers: { d1: { primaryFormCardId: "fc-a-pos", secondaryFormCardId: "fc-b-pos" } },
+      }),
+      "t1",
+      "md-1",
+    );
+    // a: gruen 4 x1,0 + Traeger 4 x0,5 = 6; gelb 2 x0,5 = 1  -> 7.  b: gruen 4 (alle) ; gelb 2 x0,5 + Traeger 2 x0,5 = 2 -> 6.
+    expect(a["Name a"]).toMatchObject({ form: 7 });
+    expect(a["Name b"]).toMatchObject({ form: 6 });
   });
 });
 
