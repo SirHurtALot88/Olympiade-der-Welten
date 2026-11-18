@@ -17,6 +17,8 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { rangRaumDesTeams, rangSchwelleOben, rangSchwelleUnten } from "@/lib/season/rang-schwelle";
 
 export type DoctrineSeasonTeamReviewRow = {
   teamId: string;
@@ -251,7 +253,7 @@ function seasonStrategyFor(gameState: GameState, teamId: string): AiSeasonStrate
   } else if (cash < 0 || salaryPressure > 1.25) {
     strategy = "cash_recovery";
     reason = "Cash-/Salary-Druck erzwingt kontrollierte Erholung.";
-  } else if ((identityRow?.ambition ?? 5) >= 8 || (profile?.bias.starPriority ?? 5) >= 8 || (rank != null && rank <= 5)) {
+  } else if ((identityRow?.ambition ?? 5) >= 8 || (profile?.bias.starPriority ?? 5) >= 8 || (rank != null && rank <= rangSchwelleOben(5, rangRaumDesTeams(gameState, teamId)))) {
     strategy = "win_now_push";
     reason = "Ambition/Star-Bias oder Topplatzierung verlangt Win-now-Verhalten.";
   } else if ((identityRow?.finances ?? 5) >= 8 || (profile?.bias.valuePriority ?? 5) >= 8) {
@@ -283,8 +285,15 @@ function deriveTacticalMode(gameState: GameState, teamId: string): AiTacticalMod
   if (injured >= 2) return "injury_crisis";
   if (highFatigue >= 4) return "fatigue_crisis";
   if (cash < 0) return "salary_freeze";
-  if (rank != null && rank <= 5) return "protect_lead";
-  if (rank != null && rank >= Math.max(24, gameState.teams.length - 5)) return "chase_top10";
+  // Rang zaehlt pro Liga (1..16 mit Liga-Split): die 32er-Schwellen anteilig umrechnen. Die untere
+  // Schwelle war `max(24, teams.length - 5)` = 27 bei 32 Teams; ohne Liga-Split bleibt exakt diese
+  // Formel, mit Split gilt 27 anteilig (16 Teams: Rang >= 14).
+  const rangRaum = rangRaumDesTeams(gameState, teamId);
+  if (rank != null && rank <= rangSchwelleOben(5, rangRaum)) return "protect_lead";
+  const jagdSchwelle = isLeagueSplitActive(gameState)
+    ? rangSchwelleUnten(27, rangRaum)
+    : Math.max(24, gameState.teams.length - 5);
+  if (rank != null && rank >= jagdSchwelle) return "chase_top10";
   return "standard";
 }
 
@@ -599,8 +608,8 @@ export function buildDoctrineSeasonReview(gameState: GameState) {
       teamName: teamRow.name,
       rank: standing?.rank ?? null,
       points: standing?.points ?? null,
-      goalAchieved: standing?.rank != null ? standing.rank <= Math.ceil(gameState.teams.length / 2) : false,
-      boardSatisfaction: standing?.rank != null && standing.rank <= 8 ? "high" : standing?.rank != null && standing.rank <= 20 ? "medium" : "low",
+      goalAchieved: standing?.rank != null ? standing.rank <= (isLeagueSplitActive(gameState) ? Math.ceil(rangRaumDesTeams(gameState, teamRow.teamId) / 2) : Math.ceil(gameState.teams.length / 2)) : false,
+      boardSatisfaction: standing?.rank != null && standing.rank <= rangSchwelleOben(8, rangRaumDesTeams(gameState, teamRow.teamId)) ? "high" : standing?.rank != null && standing.rank <= rangSchwelleOben(20, rangRaumDesTeams(gameState, teamRow.teamId)) ? "medium" : "low",
       cash: teamRow.cash,
       salaryPressure: salaryPressure > 1 ? "high" : salaryPressure > 0.5 ? "medium" : "low",
       rosterStrength: Number(rosterStrength.toFixed(2)),
@@ -608,7 +617,7 @@ export function buildDoctrineSeasonReview(gameState: GameState) {
       bestDisciplines: topDisciplines(players, "best"),
       worstDisciplines: topDisciplines(players, "worst"),
       injuryFatigueBurden: fatigueBurden >= 65 ? "high" : fatigueBurden >= 35 ? "medium" : "low",
-      strategySuccess: standing?.rank != null && standing.rank <= 12 ? "high" : "medium",
+      strategySuccess: standing?.rank != null && standing.rank <= rangSchwelleOben(12, rangRaumDesTeams(gameState, teamRow.teamId)) ? "high" : "medium",
       doctrineAdherence: identityGuard?.doctrineFit ?? "green",
       nextSeasonRecommendation: strategyState[teamRow.teamId]?.seasonStrategy ?? "balanced_growth",
     };
