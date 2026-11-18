@@ -242,3 +242,36 @@ Chris (18.11.): Ramona als wählbare Person „mit denselben Rechten wie Franky�
 rund 15 Stellen auf „Host + ein Gast“ gebaut; ein Teilumbau würde einen dritten Teilnehmer still als Franky behandeln.
 Deshalb ist er in diesem PR bewusst nicht angefangen.
 
+
+## 12. Abgleich aus der echten App (Regel #1602)
+
+Aufgenommen mit `scripts/screenshot-mehrspieler-zuordnung.ts` (Produktions-Build, `npm start`, Login an, unter
+`flock /tmp/oly-aufnahme.lock`, `.next` danach gelöscht), 1920×1080, Spielstand „custom“ mit Chris M-M, Franky D-P,
+Ramona P-S und G-G:
+
+| Bild | Was es zeigt |
+|---|---|
+| `mehrspieler-delegation-18-11/app-01-login-1920x1080.png` | Login mit Chris, Franky, Ramona (Ramona gewählt) |
+| `mehrspieler-delegation-18-11/app-02-neues-spiel-klubs-1920x1080.png` | „Neues Spiel starten“: Klub-Raster, Ramona-Teams mit Marke „Ramona“, Kopf-Chip „3. Spielerin · Ramona · Halbautomatik“ |
+| `mehrspieler-delegation-18-11/app-03-mitspieler-1920x1080.png` | „Mitspieler (Franky, Ramona)“: je Team die Knöpfe Franky und Ramona |
+| `mehrspieler-delegation-18-11/app-04-wer-steuert-was-1920x1080.png` | Team-Einstellungen, KI-Verhalten: „Wer steuert was“ mit „Ramona · Halbautomatik“ |
+
+Ein Mockup für diese Ansichten gibt es nicht. Chris hat die Oberfläche der Delegations-Einstellungen als späteres Mockup
+angekündigt; gebaut wurde nur die Wählbarkeit Ramonas im vorhandenen Stil der Seite. Abgleich gegen die Vorgabe
+(„Ramona überall wählbar, wo Chris und Franky zur Auswahl stehen“):
+
+| Stelle | Stand |
+|---|---|
+| Login-Seite | **drin** |
+| Personenwahl beim Spielstart (Klub-Raster, Mitspieler-Abschnitt, Kopf-Chips, Vorschau „Chris · Franky · Ramona · AI“) | **drin** |
+| Spielmodus & Team-Zuordnung des laufenden Spielstands | **angepasst:** dort wird seit dem 20.08. nichts mehr umgestellt (nur Anzeige „Wer steuert was“); Ramona steht in der Anzeige. Umstellen geht per API (`/api/team-settings/ownership` mit `ramonaTeamIds`). |
+| Besitzer-Auswahl je Team | **fehlt, gibt es nicht:** die Oberfläche hat keine Besitzer-Auswahl je Team mehr (Besitz wird beim Anlegen festgelegt). |
+| Wechsel der aktiven Person | **angepasst:** die aktive Person kommt aus dem Login (`resolveInitialFoundationActiveOwnerId`), es gibt keinen Umschalter. Mit Ramonas Login ist sie die aktive Person. |
+| Delegation standardmäßig Halbautomatik | **drin** (beim Zuordnen gespeichert, sonst Voreinstellung des Besitzers) |
+| Dritter Sitz im Raum | **fehlt (nächster Schritt):** Abschnitt 11 |
+
+Befund aus der Aufnahme: der Spielstand mit vier menschlichen Teams zeigt in den Team-Einstellungen „Modus Solo 4 Teams“,
+obwohl der Dienst ihn als „custom“ anlegt. In den Solo-Modi ist die Obergrenze für Franky und Ramona 0; die Anzeige
+blendete Franky deshalb aus. Behoben ist die Anzeige (Franky und Ramona erscheinen, sobald sie Teams haben, ohne
+„/0“). Offen: welcher Ladeweg den deklarierten Modus „custom“ durch die Zählung ersetzt. Sonst lehnt die
+Zuordnungs-Route nachträgliche Ramona-/Franky-Teams in so einem Spielstand mit `too_many_human_teams_for_mode` ab.
