@@ -439,7 +439,8 @@ import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-seaso
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
-import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { PLAYER_PROFILE_TABS, normalisierePlayerProfileTab, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { oeffneSpielerKurzprofil } from "@/lib/foundation/spieler-kurzprofil-store";
 
 import { useFoundationPageState } from "@/lib/foundation/tabs/use-foundation-page-state";
 import { useFoundationPersistenceActions } from "@/lib/foundation/tabs/use-foundation-persistence-actions";
@@ -815,12 +816,7 @@ import {
 } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 
 
-const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
 const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
-  ssr: false,
-  loading: () => null,
-});
-const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
   ssr: false,
   loading: () => null,
 });
@@ -3122,8 +3118,12 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Alle Listen öffnen das Kurzprofil (Drawer), nicht mehr die ganze Seite (Chris 18.11., Punkt 2). „Ganzes Profil öffnen“ im
+   * Drawer führt über `openPlayerProfileById` auf die Seite. Der Drawer selbst steht in `SpielerKurzprofilHost`.
+   */
   async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
-    await openPlayerProfileById(playerId, activePlayerId, { push: true });
+    oeffneSpielerKurzprofil({ playerId, activePlayerId });
   }
 
   function navigateHomeTab(tab: "overview" | "office") {
@@ -3287,7 +3287,7 @@ export function useFoundationShellRouterBodyScope({
       }
       setPlayerProfileLoading(true);
       void openPlayerProfileById(state.playerId, null, {
-        tab: (state.tab as PlayerProfileTabId | null) ?? "overview",
+        tab: normalisierePlayerProfileTab(state.tab),
       });
     } else if (state.view === "playerProfile") {
       playerProfileHydrationSequenceRef.current += 1;
@@ -5103,9 +5103,9 @@ export function useFoundationShellRouterBodyScope({
     if (requestedView === "playerProfile" && requestedPlayerId) {
       pendingPlayerProfileHydrationRef.current = {
         playerId: requestedPlayerId,
-        tab: (requestedTab as PlayerProfileTabId | null) ?? "overview",
+        tab: normalisierePlayerProfileTab(requestedTab),
       };
-      setPlayerProfileTab((requestedTab as PlayerProfileTabId | null) ?? "overview");
+      setPlayerProfileTab(normalisierePlayerProfileTab(requestedTab));
       setPlayerProfileLoading(true);
       setActiveView("playerProfile");
     } else if (requestedView) {
@@ -5210,7 +5210,7 @@ export function useFoundationShellRouterBodyScope({
     const pending = pendingPlayerProfileHydrationRef.current;
     const urlState = parseFoundationUrlStateFromLocation();
     const playerId = pending?.playerId ?? urlState.playerId;
-    const tab = pending?.tab ?? (urlState.tab as PlayerProfileTabId | null) ?? playerProfileTab;
+    const tab = pending?.tab ?? (urlState.tab ? normalisierePlayerProfileTab(urlState.tab) : playerProfileTab);
 
     if (!playerId) {
       return;
@@ -13530,7 +13530,6 @@ export {
   PROGRESSION_CLASS_ORDER,
   PlayerGeneratorPanel,
   PlayerPortrait,
-  PlayerProfileClient,
   RaceIcon,
   SEASON_TRANSITION_STATIC_STEPS,
   SPECIALIST_WING_VARIANTS,

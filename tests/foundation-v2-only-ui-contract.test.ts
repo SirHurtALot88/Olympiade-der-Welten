@@ -24,7 +24,7 @@ describe("foundation v2-only ui contract", () => {
 
   it("uses shell subnav for home and season without duplicate player profile tabs", async () => {
     const foundationText = await readFoundationOrchestratorSource(root);
-    const playerProfileText = await fs.readFile(`${root}/app/foundation/player-profile/PlayerProfileClient.tsx`, "utf8");
+    const playerProfileText = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerprofilSeite.tsx`, "utf8");
     const homeText = await fs.readFile(`${root}/app/foundation/home-v2/HomeV2Client.tsx`, "utf8");
     const routingText = await fs.readFile(`${root}/lib/foundation/foundation-view-routing.ts`, "utf8");
 
@@ -82,14 +82,17 @@ describe("foundation v2-only ui contract", () => {
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
 
-  it("uses player profile page variant with full drawer content", async () => {
-    const playerProfileText = await fs.readFile(`${root}/app/foundation/player-profile/PlayerProfileClient.tsx`, "utf8");
-    const drawerText = await fs.readFile(`${root}/app/foundation/PlayerDetailDrawer.tsx`, "utf8");
+  it("trennt Spielerprofil (Seite mit sechs Reitern) und Kurzprofil (Drawer ohne Reiter) in zwei Bauteile", async () => {
+    const seite = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerprofilSeite.tsx`, "utf8");
+    const kurz = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerKurzprofil.tsx`, "utf8");
+    const dienst = await fs.readFile(`${root}/lib/foundation/player-profile-service.ts`, "utf8");
 
-    expect(playerProfileText).toContain('variant="page"');
-    expect(playerProfileText).toContain("PlayerDetailDrawer");
-    expect(drawerText).toContain('variant?: "drawer" | "page"');
-    expect(drawerText).toContain("player-drawer-page");
+    expect(seite).toContain("PLAYER_PROFILE_TABS");
+    expect(dienst.match(/\{ id: "/g)?.length).toBe(6);
+    expect(dienst).not.toContain('id: "report"');
+    // Der Drawer hat keine Reiter, aber den Knopf „Ganzes Profil öffnen“.
+    expect(kurz).not.toContain("PLAYER_PROFILE_TABS");
+    expect(kurz).toContain("Ganzes Profil öffnen");
   });
 
   it("exposes shell subnav for lineup, scouting, and training compact", async () => {

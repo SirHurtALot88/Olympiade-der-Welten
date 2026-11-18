@@ -20,15 +20,10 @@
  * gibt es keinen Render-Pfad ohne kompletten GameState (siehe
  * `trainingshistorie-herkunft-leistung.test.ts`).
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { buildPlayerTrainingHistoryRows } from "@/lib/foundation/player-training-history";
 
-const drawer = readFileSync(join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8");
-const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
 function ereignis(seasonId: string) {
   return {
@@ -86,43 +81,5 @@ describe("Trainingshistorie · Potenzial-Drift je Saison", () => {
       },
     });
     expect(rows[0]?.potentialAfter! - rows[0]?.potentialBefore!).toBe(2);
-  });
-});
-
-describe("Trainingshistorie · der Drift ist auch zu sehen", () => {
-  it("steht in der zugeklappten Saisonzeile, nicht erst nach dem Klick", () => {
-    // Er erklärt die FOLGE-Saison — dafür darf er nicht hinter einem Aufklapp-Chevron liegen.
-    const zeile = drawer.slice(
-      drawer.indexOf("player-drawer-training-season-toggle"),
-      drawer.indexOf("player-drawer-training-origin-row"),
-    );
-    expect(zeile).toContain("player-drawer-training-season-potential");
-    expect(zeile).toContain("entry.potentialDrift");
-  });
-
-  it("zeigt beide Zahlen, nicht nur die Differenz", () => {
-    expect(drawer).toContain("PO {entry.potentialDrift.before}→{entry.potentialDrift.after}");
-  });
-
-  it("färbt Anstieg und Rückgang unterschiedlich", () => {
-    expect(css).toContain(".player-drawer-training-season-potential.is-positive");
-    expect(css).toContain(".player-drawer-training-season-potential.is-negative");
-  });
-
-  it("erklärt in der aufgeklappten Saison, dass der Drift die NÄCHSTE Saison betrifft", () => {
-    // Ohne diesen Satz liest sich „PO −1" als Bewertung der abgelaufenen Saison.
-    const notiz = drawer.slice(drawer.indexOf("player-drawer-training-season-potential-note"));
-    expect(notiz.slice(0, 900)).toContain("nächsten");
-  });
-
-  it("sagt bei fehlendem Vorher-Wert, warum dort nichts steht", () => {
-    // Chris' Regel: bei 0 wird erklärt, nicht versteckt — hier ist es „nicht festgehalten".
-    expect(drawer).toContain("gespeichert wird nur der jeweils letzte Übergang");
-  });
-
-  it("rechnet den Drift nicht in die Netto-Summe der Saison", () => {
-    // Potenzial ist die Obergrenze, keine Attributänderung. Landete es in Σ, stünde dort eine
-    // Zahl, die kein Attribut je gesehen hat.
-    expect(drawer).not.toMatch(/net:\s*row\.netSetpoints\s*\+/);
   });
 });

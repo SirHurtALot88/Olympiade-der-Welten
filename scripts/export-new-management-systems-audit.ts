@@ -694,7 +694,7 @@ function auditUiMarkers(repoRoot: string, issues: AuditIssue[]) {
       markers: ["General Manager", "Board Confidence", "Board & Führung", "Team Captain", "team-drawer-objective-grid"],
     },
     {
-      file: "app/foundation/PlayerDetailDrawer.tsx",
+      file: "app/foundation/spielerprofil/TabVertrag.tsx",
       markers: ["Forderungen", "demands"],
     },
     {

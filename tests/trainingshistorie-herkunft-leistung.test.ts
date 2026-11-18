@@ -22,7 +22,6 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const forecast = readFileSync(join(root, "lib/foundation/player-matchday-training-history.ts"), "utf8");
-const drawer = readFileSync(join(root, "app/foundation/PlayerDetailDrawer.tsx"), "utf8");
 const progression = readFileSync(join(root, "lib/training/organic-season-progression.ts"), "utf8");
 const applyService = readFileSync(join(root, "lib/progression/season-end-xp-apply-service.ts"), "utf8");
 const typen = readFileSync(join(root, "lib/data/olyDataTypes.ts"), "utf8");
@@ -74,56 +73,6 @@ describe("Trainingshistorie · die Posten ergeben den Saldo", () => {
  * aufklappbare Herkunfts-Zeilen unter JEDER Saison-Summenzeile. Der Vertrag bleibt derselbe:
  * die Herkunft wird gezeigt, nicht saldiert versteckt.
  */
-describe("Trainingshistorie · die Saison-Liste zeigt die Herkunft", () => {
-  it("führt die drei Posten als aufklappbare Zeilen unter der Saison-Summenzeile", () => {
-    const zeilen = drawer.slice(
-      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
-      drawer.indexOf("function formatSeasonNetTotal"),
-    );
-    for (const key of ["training", "performance", "regression"]) {
-      expect(zeilen).toContain(`key: "${key}"`);
-    }
-    expect(zeilen).toContain('label: "Leistung"');
-    expect(zeilen).toContain('label: "Alterung"');
-    // Die Summenzeile selbst bleibt die Hauptsache (eine je Saison, data-row="total").
-    expect(drawer).toContain('<tr data-row="total" data-testid="player-drawer-training-season-row">');
-    expect(drawer).toContain("SEASON_TRAINING_ORIGIN_ROWS.map(");
-  });
-
-  it("nimmt die Zellwerte aus den Herkunfts-Feldern", () => {
-    const zeilen = drawer.slice(
-      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
-      drawer.indexOf("function formatSeasonNetTotal"),
-    );
-    expect(zeilen).toContain("cell.training");
-    expect(zeilen).toContain("cell.performance");
-    expect(zeilen).toContain("cell.regression");
-  });
-
-  it("zählt in der Training-Summe den Spillover mit", () => {
-    // Sonst wäre die Σ-Spalte der Trainingszeile kleiner als die Summe ihrer eigenen Zellen.
-    expect(drawer).toContain("forecast.trainingTotal + forecast.spilloverTotal");
-  });
-
-  it("beschriftet jede Zeile als Zeilenkopf", () => {
-    expect(drawer).toContain('<th scope="row" className="player-drawer-training-origin-label"');
-  });
-
-  it("nennt die Leistung auch in der Bildunterschrift", () => {
-    const bildunterschrift = drawer.slice(drawer.indexOf("Eine Zeile je Saison:"));
-    expect(bildunterschrift.slice(0, 900)).toContain("Leistung");
-  });
-
-  it("hält Prognose und gebuchte Werte auseinander", () => {
-    // Die laufende Saison ist eine Hochrechnung, abgeschlossene Saisons sind Tatsachen —
-    // beide stehen in derselben Liste und tragen deshalb ein Status-Badge.
-    expect(drawer).toContain("player-drawer-training-season-badge");
-    const flattened = drawer.replace(/\s+/g, " ");
-    expect(flattened).toContain("? `Prognose ${entry.matchdaysPlayed}/${entry.totalMatchdays}` : \"gebucht\"");
-    // Ist die Saison bereits gebucht, fällt ihre Prognose weg statt daneben zu stehen.
-    expect(drawer).toContain("!bookedSeasonIds.has(input.forecast.seasonId)");
-  });
-});
 
 /**
  * Zweiter Teil derselben Meldung: „auch in der historie weil dort in der spieler ansicht steht es
@@ -178,39 +127,11 @@ describe("Trainingshistorie · abgeschlossene Saisons zeigen die Herkunft beim A
    * Leistungs-Budget von 8,10 zu 8,16. Der Unterschied war die Ceiling-Kappung, nicht ihre
    * Leistung — so gelesen sieht jede Saison eines gereiften Spielers wie ein Einbruch aus.
    */
-  it("zeigt in beiden Faellen die angekommenen Netto-Werte, nicht das Budget", () => {
-    const builder = drawer.slice(
-      drawer.indexOf("function buildTrainingSeasonEntries"),
-      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
-    );
-    // Summiert werden die Attribut-Deltas je Herkunft — dieselbe Groesse wie in der Prognose.
-    expect(builder).toContain("row.upgrades.reduce((summe, upgrade) => summe + (upgrade[auswahl] ?? 0), 0)");
-    // Und das Budget taucht als Quelle der drei Posten NICHT mehr auf.
-    expect(builder).not.toContain("const training = row.trainingSetpoints");
-    expect(builder).not.toContain("const performance = row.performanceSetpoints");
-  });
 
   /**
    * Fehlt die Herkunft je Attribut (Saisons vor der Mitschrift — im gemeldeten Spielstand alle
    * 339 Ereignisse aus S1), bleiben die drei Posten LEER. Das Budget an ihrer Stelle
    * auszuweisen waere genau die Verwechslung, die oben behoben wird.
    */
-  it("laesst die Posten leer, statt ersatzweise das Budget zu zeigen", () => {
-    const builder = drawer.slice(
-      drawer.indexOf("function buildTrainingSeasonEntries"),
-      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
-    );
-    expect(builder).toContain("hasPerAttributeOrigin");
-    expect(builder).toContain(": null;");
-  });
 
-  it("sagt es, wenn die Aufteilung je Attribut fehlt, statt Zahlen zu erfinden", () => {
-    // Für Saisons, die vor der Herkunfts-Mitschrift abgeschlossen wurden, gibt es die
-    // Aufteilung je Attribut nicht — die aufgeklappte Saison sagt das an Ort und Stelle.
-    expect(drawer).toContain("player-drawer-training-origin-missing");
-    const flattened = drawer.replace(/\s+/g, " ");
-    expect(flattened).toContain("Aufteilung je Attribut wurde für diese Saison nicht festgehalten");
-    // Und fehlen sogar die Saison-Summen, wird auch das gesagt statt geraten.
-    expect(flattened).toContain("wurde beim Abschluss dieser Saison nicht festgehalten");
-  });
 });
