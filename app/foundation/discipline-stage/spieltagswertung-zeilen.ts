@@ -31,7 +31,7 @@ import type { MatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modif
 
 export type WertungsSeite = "d1" | "d2";
 export type WertungsLiga = "liga1" | "liga2";
-export type WertungsFilter = "liga2" | "liga1" | "alle" | "gruppe" | "mensch";
+export type WertungsFilter = "beide" | "liga2" | "liga1" | "alle" | "gruppe" | "mensch";
 export type WertungsSortierung = "ges" | "pkt" | "form" | "cap" | "mut" | "sai" | "d1" | "d2";
 
 /** Eine Disziplin-Seite eines Teams, so wie Tabelle und Blatt sie brauchen. */
@@ -60,8 +60,10 @@ export type WertungsZeile = {
   /** Name des Menschen, der das Team steuert, sonst `null` (KI). */
   mensch: string | null;
   liga: WertungsLiga | null;
-  /** Rang nur dieses Spieltags nach Gesamt. */
+  /** Rang nur dieses Spieltags nach Gesamt, über alle Teams (nur noch Grundlage, angezeigt wird `ligaRang`). */
   tagesRang: number | null;
+  /** Rang dieses Spieltags nach Gesamt INNERHALB der eigenen Liga (1..16). Ohne Ligatrennung = `tagesRang`. */
+  ligaRang: number | null;
   d1: WertungsSeitenWerte;
   d2: WertungsSeitenWerte;
   punkte: number;
@@ -178,6 +180,7 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
       mensch: eingabe.humanLabelByTeam?.get(s.teamId) ?? null,
       liga: eingabe.leagueByTeam?.get(s.teamId) ?? null,
       tagesRang: null,
+      ligaRang: null,
       d1,
       d2,
       punkte,
@@ -209,8 +212,17 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
   applySeasonRankColumn(rankInput);
   const nachById = new Map(rankInput.map((r) => [r.teamId, r.projectedRank]));
   const etwasGewertet = eingabe.d1Revealed || eingabe.d2Revealed;
+  // Rang je Liga: dieselbe Funktion, nur über die Teams EINER Liga (Teams ohne Zuordnung bilden eine eigene Gruppe).
+  const ligaRaenge = new Map<string, number>();
+  if (hatLigaTrennung(zeilen)) {
+    for (const liga of ["liga1", "liga2", null] as const) {
+      const r = resolveMatchdayRanks(zeilen.filter((z) => z.liga === liga).map((z) => ({ teamId: z.teamId, total: z.gesamt })));
+      r.forEach((rang, id) => ligaRaenge.set(id, rang));
+    }
+  }
   for (const z of zeilen) {
     z.tagesRang = etwasGewertet ? ranks.get(z.teamId) ?? null : null;
+    z.ligaRang = etwasGewertet ? (ligaRaenge.size > 0 ? ligaRaenge.get(z.teamId) : ranks.get(z.teamId)) ?? null : null;
     z.nachRang = nachById.get(z.teamId) ?? null;
     z.bewegung = z.vorRang != null && z.nachRang != null ? z.vorRang - z.nachRang : null;
   }
@@ -261,6 +273,8 @@ export function filtereWertungsZeilen(
   ownTeamId: string | null,
 ): WertungsZeile[] {
   switch (filter) {
+    case "beide":
+      return zeilen;
     case "liga1":
       return zeilen.filter((z) => z.liga === "liga1");
     case "liga2":
@@ -276,11 +290,42 @@ export function filtereWertungsZeilen(
   }
 }
 
-/** Start-Filter: die eigene Liga, wenn es eine Ligatrennung gibt, sonst alle. */
-export function startFilter(zeilen: WertungsZeile[], ownTeamId: string | null): WertungsFilter {
-  if (!hatLigaTrennung(zeilen)) return "alle";
-  const liga = zeilen.find((z) => z.teamId === ownTeamId)?.liga;
-  return liga === "liga1" ? "liga1" : liga === "liga2" ? "liga2" : "alle";
+/** Start-Filter: beide Ligen getrennt nebeneinander, wenn es eine Ligatrennung gibt, sonst alle. */
+export function startFilter(zeilen: WertungsZeile[]): WertungsFilter {
+  return hatLigaTrennung(zeilen) ? "beide" : "alle";
+}
+
+export type WertungsLigaBlock = {
+  liga: WertungsLiga | null;
+  titel: string;
+  /** Die Liga des eigenen Teams. */
+  istEigene: boolean;
+  zeilen: WertungsZeile[];
+};
+
+/**
+ * Teilt die Zeilen in je einen Block pro Liga (Namen wie im Saisonstand: „Liga 1“, „Liga 2“, „Ohne Liga-Zuordnung“).
+ * Die Liga des eigenen Teams steht zuerst, sonst Liga 1 vor Liga 2; ein Block ohne Teams entfällt. Die Zeilen
+ * eines Blocks sind nach `schluessel` sortiert, die Ränge (`ligaRang`) zählen je Liga von 1.
+ */
+export function gruppiereNachLiga(
+  zeilen: WertungsZeile[],
+  ownTeamId: string | null,
+  schluessel: WertungsSortierung = "ges",
+): WertungsLigaBlock[] {
+  const eigene = zeilen.find((z) => z.teamId === ownTeamId)?.liga ?? null;
+  const reihenfolge: Array<WertungsLiga | null> = eigene === "liga2" ? ["liga2", "liga1", null] : ["liga1", "liga2", null];
+  return reihenfolge
+    .map((liga) => ({
+      liga,
+      titel: liga === "liga1" ? "Liga 1" : liga === "liga2" ? "Liga 2" : "Ohne Liga-Zuordnung",
+      istEigene: liga != null && liga === eigene,
+      zeilen: sortiereWertungsZeilen(
+        zeilen.filter((z) => z.liga === liga),
+        schluessel,
+      ),
+    }))
+    .filter((b) => b.zeilen.length > 0);
 }
 
 /** Ergebnis einer Seite in einem Satz (Blatt rechts), z. B. „Sieg 78 : 71 gegen Natures Wrath". */

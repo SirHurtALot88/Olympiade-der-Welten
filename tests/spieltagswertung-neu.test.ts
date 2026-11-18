@@ -7,6 +7,7 @@ import {
   baueWertungsZeilen,
   beschreibeWertungsErgebnis,
   filtereWertungsZeilen,
+  gruppiereNachLiga,
   startFilter,
   wertungsMarke,
   type WertungsEingabe,
@@ -163,12 +164,13 @@ describe("Spieltagswertung neu: Filter und Worte", () => {
     expect(filtereWertungsZeilen(zeilen, "liga2", "a").map((z) => z.teamId).sort()).toEqual(["a", "b"]);
     expect(filtereWertungsZeilen(zeilen, "gruppe", "a").map((z) => z.teamId).sort()).toEqual(["a", "b"]);
     expect(filtereWertungsZeilen(zeilen, "mensch", "a").map((z) => z.teamId)).toEqual(["a"]);
-    expect(startFilter(zeilen, "a")).toBe("liga2");
+    expect(filtereWertungsZeilen(zeilen, "beide", "a")).toHaveLength(3);
+    expect(startFilter(zeilen)).toBe("beide");
   });
 
   it("startet ohne Ligatrennung mit allen Teams", () => {
     const zeilen = baueWertungsZeilen(eingabe({ leagueByTeam: null }));
-    expect(startFilter(zeilen, "a")).toBe("alle");
+    expect(startFilter(zeilen)).toBe("alle");
   });
 
   it("beschreibt Duell und Gruppe in Worten", () => {
@@ -181,6 +183,31 @@ describe("Spieltagswertung neu: Filter und Worte", () => {
   });
 });
 
+describe("Spieltagswertung neu: Ligen getrennt", () => {
+  it("zählt den Rang je Liga von 1 und teilt gleiche Gesamtwerte", () => {
+    const zeilen = baueWertungsZeilen(eingabe());
+    const rang = (id: string) => zeilen.find((z) => z.teamId === id)!.ligaRang;
+    expect(rang("e")).toBe(1);
+    expect([rang("a"), rang("b")].sort()).toEqual([1, 2]);
+  });
+
+  it("gruppiert: eigene Liga zuerst, jedes Team genau in seiner Liga, Rang je Block 1..n", () => {
+    const zeilen = baueWertungsZeilen(eingabe());
+    const bloecke = gruppiereNachLiga(zeilen, "a");
+    expect(bloecke.map((b) => b.titel)).toEqual(["Liga 2", "Liga 1"]);
+    expect(bloecke[0].istEigene).toBe(true);
+    for (const b of bloecke) {
+      expect(b.zeilen.every((z) => z.liga === b.liga)).toBe(true);
+      expect(b.zeilen.map((z) => z.ligaRang)).toEqual(b.zeilen.map((_, i) => i + 1));
+    }
+    expect(bloecke.flatMap((b) => b.zeilen.map((z) => z.teamId)).sort()).toEqual(["a", "b", "e"]);
+  });
+
+  it("zeigt ohne Ligatrennung keine Blöcke, sondern Alle", () => {
+    expect(startFilter(baueWertungsZeilen(eingabe({ leagueByTeam: null })))).toBe("alle");
+  });
+});
+
 describe("Spieltagswertung neu: Anzeige", () => {
   function render(over: Partial<WertungsEingabe> = {}) {
     return renderToString(React.createElement(DisciplineStageSpieltagswertung as never, eingabe(over) as never));
@@ -189,10 +216,35 @@ describe("Spieltagswertung neu: Anzeige", () => {
   it("zeigt eine Zeile je Team und Form/Captain in eigener Spaltengruppe", () => {
     const html = render();
     expect(html).toContain('data-testid="spieltagswertung-zeile-a"');
-    expect(html).toContain("Wirkung im Score · keine Punkte");
     expect(html).toContain("Du");
-    // Liga 2 ist der Start-Filter: Team E (Liga 1) steht nicht in der Tabelle.
-    expect(html).not.toContain('data-testid="spieltagswertung-zeile-e"');
+    // Start ist „Beide Ligen“: zwei Blöcke, keine gemeinsame Liste.
+    expect(html).toContain('data-testid="spieltagswertung-liga-liga1"');
+    expect(html).toContain('data-testid="spieltagswertung-liga-liga2"');
+    expect(html).not.toContain('data-testid="spieltagswertung-tabelle"');
+  });
+
+  it("zeigt ohne Ligatrennung die volle Tabelle mit Form/Captain in eigener Spaltengruppe", () => {
+    const html = render({ leagueByTeam: null });
+    expect(html).toContain('data-testid="spieltagswertung-tabelle"');
+    expect(html).toContain("Wirkung im Score · keine Punkte");
+    expect(html).not.toContain("spieltagswertung-ligen");
+  });
+
+  it("steckt jedes Team nur im Block seiner Liga, die eigene Liga steht zuerst", () => {
+    const html = render();
+    const liga2 = html.slice(html.indexOf('spieltagswertung-liga-liga2'));
+    const liga1Start = html.indexOf('spieltagswertung-liga-liga1');
+    const liga2Start = html.indexOf('spieltagswertung-liga-liga2');
+    expect(liga2Start).toBeLessThan(liga1Start);
+    const block2 = html.slice(liga2Start, liga1Start);
+    const block1 = html.slice(liga1Start);
+    expect(block2).toContain("spieltagswertung-zeile-a");
+    expect(block2).toContain("spieltagswertung-zeile-b");
+    expect(block2).not.toContain("spieltagswertung-zeile-e");
+    expect(block1).toContain("spieltagswertung-zeile-e");
+    expect(block1).not.toContain("spieltagswertung-zeile-a");
+    expect(liga2).toContain("Deine Liga");
+    expect(html).toContain("<h2>Spieltagswertung</h2>");
   });
 
   it("verschließt Gesamt und Rang nach dem Spieltag, solange Disziplin 2 fehlt", () => {
