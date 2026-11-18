@@ -27,6 +27,8 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
 import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
+import { bestimmeAusfallSpielerFuerSpieltag } from "@/lib/training/spieltag-training";
+import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import {
@@ -961,6 +963,12 @@ export class LegacyMatchdayResultApplyService {
     // ein Re-Apply denselben Stand erzeugt (kein F + 2*Load). `existingResult` wurde aus dem
     // ORIGINAL-Save (vor dem Einfügen von `nextMatchdayResult`) ermittelt.
     const isMatchdayReplay = Boolean(existingResult);
+    // Regel B (Training je Spieltag): wer an diesem Spieltag verletzt ausfaellt, trainiert nicht. Auf dem
+    // Stand VOR der Verletzungsbuchung gefragt — danach steht der letzte Sperr-Spieltag schon auf
+    // "recovering" und der Spieler saehe gesund aus.
+    const ausfallSpielerIds = isTrainingJeSpieltagAktiv()
+      ? bestimmeAusfallSpielerFuerSpieltag(nextGameStateMitBeleg, params.matchdayId)
+      : null;
     const injuryRollMap = buildMatchdayInjuryRollMap({
       gameState: nextGameStateMitBeleg,
       saveId: params.saveId,
@@ -992,6 +1000,7 @@ export class LegacyMatchdayResultApplyService {
       // seine `player.fatigue` steht noch auf dem Vor-Spieltags-Wert, nicht auf reiner
       // Match-Fatigue. Sonst schlaegt die Trainingsschicht bei ihm zweimal auf.
       deferredPlayerIds: injuryResult.deferredPlayerIds,
+      ausfallSpielerIds,
     });
 
     // STAFFEL O7 "EINGESPIELTE PAARE" (11.10., lib/season/staffel-wechsel-paar-bonus-service.ts):

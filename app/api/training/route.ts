@@ -9,6 +9,7 @@ import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { setzeTrainingsZiel } from "@/lib/training/spieltag-training";
 
 const VALID_TRAINING_MODES: PlayerTrainingMode[] = ["leicht", "mittel", "hart"];
 
@@ -18,6 +19,11 @@ type TrainingUpdateBody = {
   playerId?: string;
   trainingMode?: PlayerTrainingMode;
   trainingClass?: string | null;
+  /**
+   * Ziel-Disziplin + Weg (Regel A, Training je Spieltag): `{ disziplinId, weg }` setzt, `null` loescht
+   * (dann gilt der KI-Vorschlag). Wirkt ab dem naechsten Spieltag.
+   */
+  trainingsZiel?: { disziplinId: string; weg: number } | null;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -50,6 +56,7 @@ export async function POST(request: Request) {
     const trainingMode = body.trainingMode;
     const trainingClassProvided = Object.prototype.hasOwnProperty.call(body, "trainingClass");
     const trainingClass = body.trainingClass;
+    const trainingsZielProvided = Object.prototype.hasOwnProperty.call(body, "trainingsZiel");
 
     if (source === "prisma") {
       return NextResponse.json({ success: false, error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
@@ -57,8 +64,11 @@ export async function POST(request: Request) {
     if (!saveId || !teamId || !playerId) {
       return NextResponse.json({ success: false, error: "saveId, teamId and playerId are required." }, { status: 400 });
     }
-    if (trainingMode === undefined && !trainingClassProvided) {
-      return NextResponse.json({ success: false, error: "trainingMode or trainingClass is required." }, { status: 400 });
+    if (trainingMode === undefined && !trainingClassProvided && !trainingsZielProvided) {
+      return NextResponse.json(
+        { success: false, error: "trainingMode, trainingClass or trainingsZiel is required." },
+        { status: 400 },
+      );
     }
     if (trainingMode !== undefined && !VALID_TRAINING_MODES.includes(trainingMode)) {
       return NextResponse.json({ success: false, error: "invalid_training_mode" }, { status: 400 });
@@ -104,9 +114,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: writeAuth.reason }, { status: writeAuth.status });
     }
 
+    // Ziel zuerst pruefen (wirft bei unbekannter Disziplin / ungueltigem Weg -> 400).
+    let zielGameState: GameState = save.gameState;
+    if (trainingsZielProvided) {
+      try {
+        zielGameState = setzeTrainingsZiel(save.gameState, playerId, body.trainingsZiel ?? null);
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: error instanceof Error ? error.message : "invalid_trainings_ziel" },
+          { status: 400 },
+        );
+      }
+    }
+
     const nextGameState: GameState = {
-      ...save.gameState,
-      players: save.gameState.players.map((entry) => {
+      ...zielGameState,
+      players: zielGameState.players.map((entry) => {
         if (entry.id !== playerId) {
           return entry;
         }

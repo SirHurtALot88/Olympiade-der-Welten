@@ -63,7 +63,8 @@ describe("Trainingshistorie · die Posten ergeben den Saldo", () => {
   });
 
   it("die Alterung ist der einzige negative Posten", () => {
-    expect(progression).toMatch(/const regression =\s*-\(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE/);
+    // nurTraining (Zuwachs je Spieltag) rechnet ganz ohne Abbau; sonst bleibt die Alterung der einzige negative Posten.
+    expect(progression).toMatch(/const regression = nurTraining\s*\?\s*0\s*:\s*-\(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE/);
   });
 });
 

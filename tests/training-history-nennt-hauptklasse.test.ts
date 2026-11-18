@@ -27,8 +27,10 @@ const DRAWER = readFileSync(join(process.cwd(), "app/foundation/PlayerDetailDraw
 
 describe("Trainings-Historie: hauptsaechlich trainierte Klasse", () => {
   it("der Split ist fest 70/30 — darauf beruht die ganze Aussage", () => {
-    expect(PROGRESSION).toContain("const primaryShare = secondaryTrainingClass ? 0.7 : 1;");
-    expect(PROGRESSION).toContain("const secondaryShare = secondaryTrainingClass ? 0.3 : 0;");
+    // Seit Training je Spieltag (18.11.) gilt der Klassen-Split nur ohne Regel-A-Profil (Ziel-Disziplin);
+    // mit Profil gibt es keine Zweitklasse, die Saisonend-Buchung nach Klasse bleibt aber 70/30.
+    expect(PROGRESSION).toContain("const primaryShare = secondaryTrainingClass && !profileOverride ? 0.7 : 1;");
+    expect(PROGRESSION).toContain("const secondaryShare = secondaryTrainingClass && !profileOverride ? 0.3 : 0;");
   });
 
   it("ohne Nebenklasse traegt die Hauptklasse alles — dann waere „70 %\" irrefuehrend", () => {
