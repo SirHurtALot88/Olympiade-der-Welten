@@ -9,7 +9,7 @@
 .elm .elm-work {
   flex: none;
   /* Band (~108px) + Hero (~120px) + Dock (~70px) liegen ausserhalb: die Arbeitsflaeche fuellt den Rest, ohne Seitenscroll. */
-  height: clamp(560px, calc(100vh - 330px), 1500px);
+  height: clamp(560px, calc(100vh - 314px), 1500px);
   grid-template-columns: minmax(300px, clamp(430px, 22.5vw, 620px)) minmax(0, 1fr) minmax(300px, clamp(330px, 17.5vw, 480px));
   gap: clamp(12px, 0.8vw, 20px);
   padding: clamp(12px, 0.8vw, 20px) clamp(14px, 0.9vw, 22px);
@@ -56,7 +56,7 @@
 .elm .elm-slot {
   --sw: var(--w, clamp(172px, 20cqw, 340px));
   --sh: clamp(88px, 9.4cqw, 190px);
-  --fh: clamp(120px, 13cqw, 300px);
+  --fh: clamp(80px, min(13cqw, 20cqh), 300px);
   --fue: clamp(8px, 0.9cqw, 16px);
   /* Die Karte (und die Figur darüber) bleibt im Feld, auch bei Plätzen nahe am Rand. */
   left: clamp(calc(var(--sw) / 2 + 4px), calc(var(--x) * 100%), calc(100% - var(--sw) / 2 - 4px));
@@ -762,4 +762,9 @@
   background: var(--kf);
   color: #0b0d12;
   box-shadow: 0 0 0 2px var(--bc-gold);
+}
+
+/* Karten schrumpfen bei engem Feld (Faktor --z aus der Entzerrung), Position bleibt die Mitte der Karte */
+.elm .elm-slot {
+  transform: translate(-50%, -50%) scale(var(--z, 1));
 }

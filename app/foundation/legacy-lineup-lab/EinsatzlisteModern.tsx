@@ -698,21 +698,27 @@ export default function EinsatzlisteModern(props: Props) {
     if (karten.length < 2) return;
     const W = box.clientWidth;
     const H = box.clientHeight;
+    // Naturgroesse messen (ohne Verkleinerung), dann je Versuch mit Faktor z rechnen.
+    karten.forEach((k) => k.style.setProperty("--z", "1"));
     const w = Math.max(...karten.map((k) => k.offsetWidth));
     const h = Math.max(...karten.map((k) => k.offsetHeight));
+    if (!W || !H || !w || !h) return;
     const links = box.dataset.links === "1";
-    const loese = (mitFigur: boolean) => {
-      const hatFigur = karten.some((k) => k.querySelector(".elm-slot__fig"));
-      const figH = mitFigur && hatFigur ? Math.max(120, Math.min(300, 0.13 * W)) : 0; // wie --fh in einsatzliste-optik.css
+    const hatFigur = karten.some((k) => k.querySelector(".elm-slot__fig"));
+    const figNatur = hatFigur ? Math.max(80, Math.min(300, Math.min(0.13 * W, 0.2 * H))) : 0; // wie --fh in einsatzliste-optik.css
+    const versuch = (mitFigur: boolean, z: number) => {
+      const cw = w * z;
+      const ch = h * z;
+      const figH = mitFigur ? figNatur * z : 0;
       const luecke = 6;
-      const rh = h + figH * 0.3; // Figur darf die Nachbarkarte etwas streifen, nicht verdecken
-      const kopf = figH * 0.82 + h / 2;
-      const maxX = links ? Math.max(w / 2 + 4, W * 0.5 - w / 2 - 4) : W - w / 2 - 4;
+      const rh = ch + figH * 0.55; // die Figur steht auf der Karte und gehört zu ihrem Platz: Nachbarkarten bleiben frei davon
+      const kopf = figH * 0.82 + ch / 2;
+      const maxX = links ? Math.max(cw / 2 + 4, W * 0.5 - cw / 2 - 4) : W - cw / 2 - 4;
       const klemme = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, hi < lo ? lo : v));
       const pos = karten.map((k) => ({ x: Number(k.dataset.bx) * W, y: Number(k.dataset.by) * H }));
       const begrenze = () => pos.forEach((q) => {
-        q.x = klemme(q.x, w / 2 + 4, maxX);
-        q.y = klemme(q.y, kopf, H - h / 2 - 8);
+        q.x = klemme(q.x, cw / 2 + 4, maxX);
+        q.y = klemme(q.y, kopf, H - ch / 2 - 8);
       });
       begrenze();
       let rest = false;
@@ -722,7 +728,7 @@ export default function EinsatzlisteModern(props: Props) {
           for (let j = i + 1; j < pos.length; j += 1) {
             const dx = pos[j]!.x - pos[i]!.x;
             const dy = pos[j]!.y - pos[i]!.y;
-            const ox = w + luecke - Math.abs(dx);
+            const ox = cw + luecke - Math.abs(dx);
             const oy = rh + luecke - Math.abs(dy);
             if (ox <= 0.5 || oy <= 0.5) continue;
             bewegt = true;
@@ -739,17 +745,22 @@ export default function EinsatzlisteModern(props: Props) {
         rest = bewegt;
         if (!bewegt) break;
       }
-      return { pos, rest };
+      return { pos, rest, mitFigur, z };
     };
-    let ergebnis = loese(true);
-    // Reicht der Platz auch dann nicht, stehen die Karten ohne Figuren (die Figur gehört zur Karte, nicht umgekehrt).
-    const ohneFigur = ergebnis.rest;
-    if (ohneFigur) ergebnis = loese(false);
-    box.dataset.eng = ohneFigur ? "1" : "0";
-    const pos = ergebnis.pos;
+    // Erst mit Figuren in voller Größe; reicht der Platz nicht, ohne Figuren, dann Karten schrittweise kleiner.
+    const reihe: Array<[boolean, number]> = [[true, 1], [false, 1], [false, 0.86], [false, 0.74], [false, 0.64]];
+    let ergebnis = versuch(reihe[0]![0], reihe[0]![1]);
+    for (const [fig, z] of reihe.slice(1)) {
+      if (!ergebnis.rest) break;
+      ergebnis = versuch(fig, z);
+    }
+    box.dataset.eng = ergebnis.mitFigur ? "0" : "1";
+    box.dataset.z = String(ergebnis.z);
     karten.forEach((k, i) => {
-      k.style.setProperty("--x", String(pos[i]!.x / W));
-      k.style.setProperty("--y", String(pos[i]!.y / H));
+      // Pixelposition direkt setzen (schlägt die CSS-Begrenzung der Basisregel, die von der ungekleinerten Karte ausgeht).
+      k.style.left = `${ergebnis.pos[i]!.x}px`;
+      k.style.top = `${ergebnis.pos[i]!.y}px`;
+      k.style.setProperty("--z", String(ergebnis.z));
     });
   }, []);
   useEffect(() => {
@@ -1494,11 +1505,11 @@ export default function EinsatzlisteModern(props: Props) {
                 ? slotsJeSeite[seite].map((slot) => {
                     const platz = form.plaetze.find((p) => p.slotIndex === slot.slotIndex);
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
-                    if (!platz?.gegner || !g?.spielerName) return null;
+                    if (!platz?.gegner || !g || (!g.spielerName && !geteiltFeld)) return null;
                     return (
                       <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
                         <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
-                        <b>{g.spielerName}</b>
+                        <b>{g.spielerName ?? "Gegner ?"}</b>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}
                       </div>
                     );
