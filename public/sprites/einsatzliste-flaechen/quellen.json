@@ -1,0 +1,109 @@
+{
+ "_hinweis": "Ruhige Draufsicht-Flaechen fuer die Feldflaeche der modernen Einsatzliste (Stilprobe 18.11., drei Disziplinen). Doku: docs/design/einsatzliste-flaechen-18-11.md. Noch NICHT in die App eingebaut.",
+ "_bestellprotokoll": [
+  {
+   "name": "eiskunstlauf",
+   "seed": 11,
+   "generationen": 1.0,
+   "gen_vorher": 866.74,
+   "gen_nachher": 865.74,
+   "datum": "2026-11-18T07:31:13",
+   "gewaehlt": false,
+   "prompt": "flat top-down view of an empty ice skating rink filling the whole image, smooth pale blue-grey ice with very faint skate marks, thin painted center line and one center circle, rounded rink corners with a simple dark blue board around the edge, calm muted colors, low contrast, large empty even surface, minimal, no people, no characters, no audience, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 865.74,
+   "gen_nachher": 864.74,
+   "datum": "2026-11-18T07:33:16",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one wide horizontal ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, smooth pale blue-grey ice with very faint skate marks, one thin vertical center line and one center circle in the middle, a thin dark blue board only along the outer border of the image with rounded corners, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "battlefield",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 864.74,
+   "gen_nachher": 863.74,
+   "datum": "2026-11-18T07:34:48",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one wide flat grass battlefield in landscape format, the short muted olive green grass covers the entire image from edge to edge, three faint pale chalk circles marked on the grass in a row left, middle and right, a few small patches of bare trodden earth, a narrow border of darker grass along the outer edge, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "wettessen",
+   "seed": 12,
+   "generationen": 1.0,
+   "gen_vorher": 863.74,
+   "gen_nachher": 862.74,
+   "datum": "2026-11-18T07:36:25",
+   "gewaehlt": true,
+   "prompt": "view from directly above of one wide wooden banquet table top in landscape format, the warm brown wooden planks cover the entire image from edge to edge, long horizontal planks with subtle wood grain, a faint plain linen table runner along the horizontal middle, a thin darker wooden rim along the outer border, completely empty table, no plates, no food, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  },
+  {
+   "name": "eiskunstlauf",
+   "seed": 13,
+   "generationen": 1.0,
+   "gen_vorher": 862.74,
+   "gen_nachher": 861.74,
+   "datum": "2026-11-18T07:38:01",
+   "gewaehlt": false,
+   "prompt": "view from directly above of one wide horizontal figure skating ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, evenly lit plain pale blue-grey ice, uniform flat color with a few very faint thin curved skate marks, exactly one thin vertical line in the center and exactly one thin circle in the center, symmetric, a thin dark blue board only along the outer border of the image with rounded corners, no spotlights, no light spots, no dots, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art"
+  }
+ ],
+ "eiskunstlauf.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one wide horizontal ice rink in landscape format, the ice surface covers the entire image from the left edge to the right edge, smooth pale blue-grey ice with very faint skate marks, one thin vertical center line and one center circle in the middle, a thin dark blue board only along the outer border of the image with rounded corners, nothing outside the rink, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 12,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche eiskunstlauf (Stilprobe)"
+ },
+ "battlefield.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one wide flat grass battlefield in landscape format, the short muted olive green grass covers the entire image from edge to edge, three faint pale chalk circles marked on the grass in a row left, middle and right, a few small patches of bare trodden earth, a narrow border of darker grass along the outer edge, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 12,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche battlefield (Stilprobe)"
+ },
+ "wettessen.jpg": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/create-image-pixen, 672x384, view 'high top-down', outline 'lineless', detail 'low detail', no_background false",
+  "auftrag": {
+   "prompt": "view from directly above of one wide wooden banquet table top in landscape format, the warm brown wooden planks cover the entire image from edge to edge, long horizontal planks with subtle wood grain, a faint plain linen table runner along the horizontal middle, a thin darker wooden rim along the outer border, completely empty table, no plates, no food, calm muted colors, low contrast, large empty even surface, minimal detail, no people, no characters, no audience, no furniture, no text, no logos, pixel art",
+   "modell": "pixen",
+   "seed": 12,
+   "gen": [
+    672,
+    384
+   ]
+  },
+  "generationen": 1.0,
+  "bau": "Rohbild 2x NEAREST auf 1344x768, JPEG Qualitaet 80",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Einsatzliste modern, Feldflaeche wettessen (Stilprobe)"
+ }
+}
