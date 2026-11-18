@@ -16,6 +16,7 @@ export const FOUNDATION_VIEW_IDS = [
   "matchdayArena",
   "disciplineStage",
   "matchdayResult",
+  "nachDemSpieltag",
   "teams",
   "training",
   "trainingCompact",
@@ -55,6 +56,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "matchday-arena" || view === "matchday-arena-v2") {
     return "matchdayArena";
+  }
+  if (view === "nach-dem-spieltag" || view === "nachdemspieltag") {
+    return "nachDemSpieltag";
   }
   if (view === "season-v2" || view === "season") {
     return "seasonV2";

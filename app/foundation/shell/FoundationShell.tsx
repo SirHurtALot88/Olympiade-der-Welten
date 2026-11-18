@@ -1,14 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FoundationNavAttentionMap } from "@/lib/foundation/foundation-nav-attention";
 import type { FoundationActivityItem } from "@/lib/foundation/foundation-activity-types";
-import FoundationActivityStrip from "@/app/foundation/shell/FoundationActivityStrip";
+import { FoundationBandSlotProvider, FoundationBandSlotTarget } from "@/app/foundation/shell/foundation-band-slot";
+import FoundationMeldungen, { type FoundationMeldung } from "@/app/foundation/shell/FoundationMeldungen";
 import FoundationSidebar from "@/app/foundation/shell/FoundationSidebar";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import FoundationTaktgeber, { type FoundationTaktgeberProps } from "@/app/foundation/shell/FoundationTaktgeber";
 import { useNavRailPinned } from "@/lib/ui/nav-rail-preference";
 import "@/components/foundation/broadcast/broadcast.css";
+import "@/components/foundation/broadcast/rahmen.css";
 
 type FoundationShellProps = {
   activeView: FoundationViewId;
@@ -53,7 +56,30 @@ type FoundationShellProps = {
    * her. „Beschriftung immer zeigen“ (pro Browser gespeichert) hält sie dauerhaft ausgeklappt.
    */
   compactRail?: boolean;
+  /**
+   * Taktgeber im Regieband (18.11.): Status und „Weiter“ in EINEM Baustein. Ersetzt den früheren
+   * Statuschip + Weiter-Knopf; die Aktivitätsliste steht im Ablauf-Aufklapper des Taktgebers.
+   */
+  takt?: Omit<FoundationTaktgeberProps, "activities">;
+  /** Nur-Ansicht-Hinweis (Text = Erklärung) als kleine Marke im Band statt als eigenes Band. */
+  nurAnsicht?: string | null;
+  /** Suche öffnen (Lupe im Band). */
+  onSearch?: () => void;
+  /** Kasse des aktiven Teams, fertig formatiert („3,2 Mio“). */
+  kasseLabel?: string | null;
+  /** Spielplan öffnen (Klick auf den Saison-Chip). */
+  onOpenSeason?: () => void;
+  /** Wappen des aktiven Teams (Schienenkopf). */
+  teamCrest?: ReactNode;
+  teamName?: string | null;
+  /** Office öffnen (Punkt unten in der Schiene). */
+  onOpenOffice?: () => void;
+  /** Meldungen für die Bauchbinde unten rechts; in der Arena zurückgehalten. */
+  meldungen?: FoundationMeldung[];
+  onOpenMeldungen?: () => void;
 };
+
+const SAISON_SPIELTAGE = 20;
 
 function buildSeasonContextLabel(
   seasonLabel: string,
@@ -86,6 +112,16 @@ export default function FoundationShell({
   teamPicker,
   viewTitle,
   compactRail = true,
+  takt,
+  nurAnsicht,
+  onSearch,
+  kasseLabel,
+  onOpenSeason,
+  teamCrest,
+  teamName,
+  onOpenOffice,
+  meldungen = [],
+  onOpenMeldungen,
 }: FoundationShellProps) {
   const [railPinned, setRailPinned] = useNavRailPinned();
   const seasonContextLabel =
@@ -93,39 +129,165 @@ export default function FoundationShell({
       ? buildSeasonContextLabel(seasonLabel, matchdayDisplayLabel, currentMatchday)
       : null;
 
+  // Arena-Vollbild (18.11.): Band und Schiene fahren weg, übrig bleibt ein schmaler Griff. R/Griff holt den
+  // Rahmen zurück, Esc verlässt die Arena (zurück zur Seite davor, sonst Start).
+  const istArena = activeView === "matchdayArena" || activeView === "battleArena";
+  const [arenaRahmen, setArenaRahmen] = useState(false);
+  const vorherigeAnsicht = useRef<FoundationViewId | null>(null);
+  const letzteAnsicht = useRef<FoundationViewId>(activeView);
+  const [wischer, setWischer] = useState<string | null>(null);
+  useEffect(() => {
+    if (letzteAnsicht.current !== activeView) {
+      if (activeView === "matchdayArena" || activeView === "battleArena") {
+        vorherigeAnsicht.current = letzteAnsicht.current;
+        setArenaRahmen(false);
+        setWischer("Spieltag");
+        const timer = setTimeout(() => setWischer(null), 700);
+        letzteAnsicht.current = activeView;
+        return () => clearTimeout(timer);
+      }
+      letzteAnsicht.current = activeView;
+    }
+    return undefined;
+  }, [activeView]);
+  // Vollbild nur, wenn die Bühne wirklich als Vollfläche liegt (`ArenaVollflaecheBuehne`, #1578:
+  // `.oly-arena-buehne[data-voll="1"]`). „Vor dem Anpfiff“ und der Seitenmodus der Bühne behalten
+  // Band und Schiene, sonst käme man nirgends mehr hin.
+  const [buehneDa, setBuehneDa] = useState(false);
+  useEffect(() => {
+    if (!istArena) {
+      setBuehneDa(false);
+      return undefined;
+    }
+    const pruefe = () => setBuehneDa(Boolean(document.querySelector('.oly-arena-buehne[data-voll="1"]')));
+    pruefe();
+    const beobachter = new MutationObserver(pruefe);
+    beobachter.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-voll"] });
+    return () => beobachter.disconnect();
+  }, [istArena]);
+  const arenaVoll = istArena && !arenaRahmen && buehneDa;
+  const verlasseArena = useCallback(() => {
+    const ziel = vorherigeAnsicht.current && vorherigeAnsicht.current !== "matchdayArena" && vorherigeAnsicht.current !== "battleArena" ? vorherigeAnsicht.current : "homeV2";
+    onNavigate(ziel);
+  }, [onNavigate]);
+  useEffect(() => {
+    if (!istArena || (!arenaVoll && !arenaRahmen)) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      const el = event.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (event.key === "r" || event.key === "R") {
+        setArenaRahmen((offen) => !offen);
+      } else if (event.key === "Escape") {
+        if (arenaRahmen) setArenaRahmen(false);
+        else verlasseArena();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [istArena, arenaVoll, arenaRahmen, verlasseArena]);
+
+  const spieltag = typeof currentMatchday === "number" && Number.isFinite(currentMatchday) ? currentMatchday : null;
+  const saisonNr = seasonLabel?.match(/Season (\d+)/i)?.[1] ?? null;
+
   return (
-    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}${compactRail ? " is-bc-rail" : ""}${compactRail && railPinned ? " is-rail-pinned" : ""}`} data-testid="foundation-shell-layout">
+    <FoundationBandSlotProvider>
+    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}${compactRail ? " is-bc-rail" : ""}${compactRail && railPinned ? " is-rail-pinned" : ""}${arenaVoll ? " is-arena-voll" : ""}${istArena && arenaRahmen ? " is-arena-rahmen" : ""}`} data-testid="foundation-shell-layout">
       <FoundationSidebar
         activeView={activeView}
         onNavigate={onNavigate}
         onPrefetchView={onPrefetchView}
         attentionByViewId={attentionByViewId}
-        seasonContextLabel={seasonContextLabel}
         teamPicker={teamPicker}
+        teamCrest={teamCrest}
+        teamName={teamName}
+        onOpenOffice={onOpenOffice}
         rail={compactRail ? { pinned: railPinned, onPinnedChange: setRailPinned } : undefined}
       />
+      {istArena && arenaVoll ? (
+        <button
+          type="button"
+          className="fb-griff"
+          data-testid="foundation-arena-griff"
+          onClick={() => setArenaRahmen(true)}
+          title="Rahmen einblenden (R) · Arena verlassen (Esc)"
+          aria-label="Rahmen einblenden"
+        >
+          <span aria-hidden="true" />
+        </button>
+      ) : null}
+      {wischer ? (
+        <div className="fb-wisch" aria-hidden="true">
+          <strong>{wischer}</strong>
+        </div>
+      ) : null}
+      <FoundationMeldungen meldungen={meldungen} zurueckhalten={istArena} onOpen={onOpenMeldungen} />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         {/* Die Gliederungs-Spitze des Dokuments. Steht VOR allem anderen im Hauptbereich, damit
             „Zum Hauptinhalt springen" (Ziel `#foundation-main-content`) direkt auf sie faellt. */}
         {viewTitle ? <h1 className="sr-only">{viewTitle}</h1> : null}
-        {/* Kopfzeile (18.11., volle Breite): Brotkrume, Unterreiter, Statuschip, Hauptaktion, Weiter und
-            Suche stehen in EINER schmalen Zeile statt in vier gestapelten Bändern. Läuft eine
-            Aktivität mit Fortschrittsbalken, bricht der Status unter die Zeile um (siehe CSS). */}
-        <header className="foundation-shell-header">
-          {breadcrumb ? <div className="foundation-shell-breadcrumb-slot">{breadcrumb}</div> : null}
-          {subNav}
-          <FoundationActivityStrip activities={activities} />
-          <div className="foundation-shell-header-actions">{headerActions}</div>
+        {/* Regieband (18.11., App-Rahmen modern): EIN Band statt Rahmenzeile + Seitenkopf + Reiterzeile.
+            Plätze: Ort (Brotkrume/Titel) · Unterreiter · Seiten-Slot · Saison · Kasse · Suche · Hauptaktion ·
+            Taktgeber. Seiten füllen den Slot über `FoundationBandSlot`. */}
+        <header className="foundation-shell-header fb-band" data-testid="foundation-regieband">
+          <div key={activeView} className="foundation-shell-breadcrumb-slot fb-ort">{breadcrumb}</div>
+          {subNav ? <div className="fb-reiter">{subNav}</div> : null}
+          <FoundationBandSlotTarget />
+          <div className="foundation-shell-header-actions fb-rechts">
+            {nurAnsicht ? (
+              <span className="fb-hinweis" data-testid="foundation-band-nur-ansicht" title={nurAnsicht} role="status">
+                Nur Ansicht
+              </span>
+            ) : null}
+            {seasonContextLabel ? (
+              <button
+                type="button"
+                className="fb-chip fb-saison"
+                data-testid="foundation-band-saison"
+                title={`${seasonContextLabel} — zum Spielplan`}
+                onClick={onOpenSeason}
+              >
+                <small>Saison {saisonNr ?? ""}{spieltag != null ? <> · Spieltag <b>{spieltag}</b> / {SAISON_SPIELTAGE}</> : null}</small>
+                <span className="fb-striche" aria-hidden="true">
+                  {Array.from({ length: SAISON_SPIELTAGE }, (_, index) => (
+                    <i key={index} className={spieltag != null && index + 1 < spieltag ? "is-gespielt" : spieltag === index + 1 ? "is-jetzt" : ""} />
+                  ))}
+                </span>
+              </button>
+            ) : null}
+            {kasseLabel ? (
+              <span className="fb-chip fb-kasse" data-testid="foundation-band-kasse" title="Kasse des aktiven Teams">
+                <small>Kasse</small>
+                <b>{kasseLabel}</b>
+              </span>
+            ) : null}
+            {onSearch ? (
+              <button
+                className="fb-icon foundation-tab foundation-tab-search"
+                type="button"
+                title="Suche öffnen"
+                aria-label="Suchen"
+                onClick={onSearch}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M16 16l4.5 4.5" />
+                </svg>
+              </button>
+            ) : null}
+            {headerActions}
+            {takt ? <FoundationTaktgeber {...takt} activities={activities} /> : null}
+          </div>
         </header>
-        {/* key={activeView}: der Content-Wrapper wird bei jedem echten
-            View-Wechsel neu gemountet, damit die `foundation-view-enter`-
-            Animation (Fade + sanftes Aufsteigen) erneut spielt und sich mit
-            dem panelinternen `.nl-reveal`-Stagger überlagert. Reduced-Motion
-            schaltet das per CSS ab. */}
+        {/* key={activeView}: der Content-Wrapper wird bei jedem echten View-Wechsel neu gemountet, damit der
+            gestaffelte Einstieg (`foundation-view-enter`, Kinder steigen nacheinander auf) erneut spielt.
+            Reduced-Motion schaltet das per CSS ab. */}
         <div key={activeView} className="foundation-shell-content foundation-view-enter">
           {children}
         </div>
       </div>
     </div>
+    </FoundationBandSlotProvider>
   );
 }

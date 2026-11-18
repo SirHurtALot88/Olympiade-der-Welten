@@ -276,6 +276,8 @@ export type LegacyLineupFocusV2BoardProps = {
   /** Draft saved + no blockers + all slots filled — enables gated Arena CTA. */
   arenaReady?: boolean;
   onNavigateArena?: () => void;
+  /** Einstieg in die Ansicht "Nach dem Spieltag" (18.11.); fehlt er, bleibt der Knopf weg. */
+  onOpenNachDemSpieltag?: () => void;
   /** Per-side projected totals at Schonen/Normal/Push for tactic preview cards. */
   disciplineTacticPreviewBySide?: Record<
     "d1" | "d2",
