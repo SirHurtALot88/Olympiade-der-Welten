@@ -320,6 +320,39 @@ nächsten Wochen hardcore verbessern!!"
   `docs/design/oly-seiten-modern-17-11.md` (Designsystem: Tokens, Barlow-Condensed-Zahlen lokal, Karten,
   Tabellen, Icon-Schiene, Blatt). Neue Mockups übernehmen dieses System exakt, damit die App aus einem
   Guss wird. Reine CSS/SVG-Gestaltung; PixelLab nur, wo ein Bild echten Mehrwert hat.
+- **Nach dem Bau immer mit dem Mockup abgleichen** (Chris, 18.11.: „wichtig, dass die ganzen coolen
+  Features und Optik, die man vorher sieht, dann auch im Spiel wiederfindet“). Pflicht zum Abschluss
+  jedes Baus nach Mockup: je Ansicht ein Bildpaar „Mockup | App“ nebeneinander unter `docs/design/…`
+  und eine Liste jedes sichtbaren Mockup-Features als **drin / angepasst (warum) / fehlt (warum)**.
+  Was im Mockup erfunden war (z. B. Siegchancen ohne Datenquelle), wird ehrlich ersetzt, nicht
+  stillschweigend weggelassen.
+
+## Zielbildschirme: 15"-MacBook M4 und 32"-4K-Monitor
+
+Chris, 18.11., wörtlich: „Bitte alle Layouts, Spiele etc. auf 16:9 optimiert, 15" MacBook und
+Hauptscreen ist 32" OLED, bitte merken.“ Nachgeschärft: „MacBook M4 hat 'ne bessere Auflösung […]
+und Rechner ist 4K-Monitor!“ Jede Seite, jede Arena und jedes HUD wird für diese zwei Geräte gebaut
+und geprüft:
+
+| Gerät | Viewport zum Prüfen (CSS-px) | Pixeldichte |
+|---|---|---|
+| MacBook Air 15" M4 (2880×1864 nativ, Standard-Skalierung) | 1710×1112 (16:10) | 2 |
+| 32" 4K-Monitor (3840×2160) | 2560×1440 (150 %) und 1920×1080 (200 %) | 1,5 bzw. 2 |
+
+**Hauptziel ist der 4K-Monitor in 16:9** (Chris, 18.11.: „hauptsächlich auf den 4K-Monitor
+aussteuern, dass alles drauf passt — wäre doof, wenn du auf 16:10 skalierst und nur am MacBook die
+Breite aufgeht, es sonst aber nicht passt“). Erst muss alles bei **2560×1440** (und 1920×1080) ohne
+Scrollen und ohne leere Ränder passen, dann wird **1710×1112** (MacBook, 16:10) geprüft; 3840×2160
+(100 %) und Phone (412 breit) sind Nebenproben.
+
+**Jeder Screen nutzt so viel vom Bildschirm wie möglich** (Chris, 18.11.: „bau alle Screens so,
+dass sie möglichst viel vom Bildschirm nutzen, und vor allem die Battle Arena … die braucht ja
+wirklich jeden cm Breite und Höhe“). Keine zentrierte Schmalspalte mit leeren Rändern, keine
+festen Pixelbreiten für Hauptinhalte; die Arena füllt Breite und Höhe des Fensters (abzüglich der
+Icon-Schiene), HUD und Steuerelemente liegen darüber oder am Rand, nicht darüber/darunter im Fluss. Auf dem MacBook darf nichts gequetscht,
+abgeschnitten oder unnötig scrollend sein; auf dem 4K-Monitor darf nichts verloren wirken (keine
+leeren Riesenränder, Schrift und Tafeln wachsen mit). Wird die genaue Skalierung eines Geräts
+bekannt, hier eintragen.
 
 ## An die Spielstände kommen
 
