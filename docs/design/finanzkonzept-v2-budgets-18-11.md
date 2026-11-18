@@ -401,6 +401,22 @@ Rücklagen- und Sponsor-Regel, nur als sichtbare Töpfe. Stufe 5 (Eichung der Au
 
 ---
 
+## 12. Entscheidungen von Chris (18.11.)
+
+Chris: „Budget-Modell kannst du optisch und inhaltlich so bauen, finde ich stark.“ Abweichend von oder ergänzend zu den
+Empfehlungen oben gilt:
+
+| Punkt | Entscheidung |
+|---|---|
+| Variante A/B (Startbudget/Sponsor +15 %) | **A: Budgets bleiben so.** Stattdessen ist in **Saison 1 die Draft-Rücklage 50 % geringer** als üblich, voll erst ab Saison 2. |
+| 1 Quote in Saison 1 | **100 %** für alle Teams. |
+| 2 Quote auf das Gehaltsbudget | **Höchstens auf 75 % kürzen**, nie auf 50 % („50 wäre zu krass“). Gehalt eines verkauften Spielers fließt **zu 100 %** in den Gehaltstopf zurück. |
+| 3 Rücklage anzapfen | **Ja.** Dazu neu: **„Alles auf eine Karte“** — der Mensch kann es beim Vorstand beantragen, Top-Teams wollen es, oder der Vorstand fordert es als Ziel; dann darf bis auf **5 % Puffer** alles ausgegeben werden. |
+| 4 Übergang laufender Spielstände | **Entfällt**, laufende Spielstände sind gerade irrelevant. |
+| 5/7 Gebäude | **Aus dem Transfer-/Investitionstopf.** |
+| 6 Lockerung 10/20/30 % | **Ja.** |
+| Umschichten ±25 % am Gehaltstopf, Geldstrafe streichen | Wie empfohlen. |
+
 ## 11. Annahmen, Grenzen, Bilder
 
 * **Hochrechnung, keine Messung.** Wie im Hauptdokument: Gehalt proportional zur Ausgabe, Endrang bleibt der gemessene.
