@@ -324,18 +324,19 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
     const cumulativePoints = seasons.reduce((sum, season) => sum + (season.points ?? 0), 0);
 
     const aggregate = allTimeAggregateByTeamId.get(team.teamId) ?? null;
-    const medals: AllTimeTableMedals = {
-      gold: aggregate?.gold ?? 0,
-      silver: aggregate?.silver ?? 0,
-      bronze: aggregate?.bronze ?? 0,
-      top5: aggregate?.top5 ?? 0,
-      top10: aggregate?.top10 ?? 0,
-    };
-    const titles = medals.gold;
-    // Ø und Bester Platz ueber beide Ligen (Liga 2 ab 17). Ohne bekannte Liga bleibt es beim liga-lokalen Rang.
+    // Plaetze ueber BEIDE Ligen (Liga 2 ab 17; ohne bekannte Liga der liga-lokale Rang). Daraus kommen die Medaillen
+    // UND Ø/Bester Platz: Platz 1 der Liga 2 ist „Meister Liga 2" und zaehlt als Aufstieg, nicht als Titel (Chris 18.11.).
     const positionen = seasons
       .map((season) => toLeagueSpanningPosition(season.rank, season.leagueTier ?? null))
       .filter(isFiniteNumber);
+    const medals: AllTimeTableMedals = {
+      gold: positionen.filter((wert) => wert === 1).length,
+      silver: positionen.filter((wert) => wert === 2).length,
+      bronze: positionen.filter((wert) => wert === 3).length,
+      top5: positionen.filter((wert) => wert <= 5).length,
+      top10: positionen.filter((wert) => wert <= 10).length,
+    };
+    const titles = medals.gold;
     const avgRank =
       positionen.length > 0
         ? Math.round((positionen.reduce((sum, value) => sum + value, 0) / positionen.length) * 10) / 10

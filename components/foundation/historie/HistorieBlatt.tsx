@@ -17,7 +17,7 @@ export type HistorieBlattDeal = {
 
 type Props = {
   verlauf: HistorieTeamVerlauf | null;
-  /** Leere Saison-Labels (S1, S2 …) in derselben Reihenfolge wie `verlauf.saisons`. */
+  /** Platz in der Ewigen Tabelle, falls bekannt. */
   ewigRang: number | null;
   menschLabel?: string | null;
   deals?: readonly HistorieBlattDeal[];

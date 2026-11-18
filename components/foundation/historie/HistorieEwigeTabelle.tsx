@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { AllTimeTableModel, AllTimeTableRow } from "@/lib/foundation/all-time-table";
-import { baueTeamVerlauf, rekordmeister, type HistorieSaison } from "@/lib/foundation/historie-modern";
+import { baueTeamVerlauf, type HistorieSaison } from "@/lib/foundation/historie-modern";
 import { getLeagueLevel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 
 import HistorieBlatt from "./HistorieBlatt";
@@ -206,7 +206,6 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
   }, [zeilen, ligaFilter, aktiveSpalte]);
 
   const verlauf = useMemo(() => (blattTeam ? baueTeamVerlauf(saisons, blattTeam) : null), [saisons, blattTeam]);
-  const rekord = useMemo(() => rekordmeister(saisons), [saisons]);
   const eigene = zeilen.find((zeile) => zeile.row.teamId === ownTeamId) ?? null;
   const meisteTitel = [...zeilen].sort((a, b) => b.gold - a.gold)[0] ?? null;
   const groesstesMw = [...zeilen].sort((a, b) => (b.mww ?? -Infinity) - (a.mww ?? -Infinity))[0] ?? null;
@@ -264,7 +263,6 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
     })
     .filter((serie): serie is NonNullable<typeof serie> => serie != null);
   const labels = (zeilen[0]?.row.seasons ?? []).map((season) => `S${season.seasonId.replace(/\D+/g, "") || "?"}`);
-  const wechsel = saisons.slice(0, -1).length > 0 ? saisons : saisons;
 
   return (
     <div className="hist h-ewig" data-testid="historie-ewig">
@@ -390,7 +388,7 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
             <small>wer die Liga gewechselt hat</small>
           </div>
           <div className="pb" style={{ paddingTop: ".2rem", paddingBottom: ".2rem" }}>
-            {wechsel.map((saison, index) => (
+            {saisons.map((saison, index) => (
               <div key={saison.seasonId} className="gz">
                 <b>
                   S{saison.nummer} → S{(saison.nummer ?? index + 1) + 1}
@@ -423,7 +421,6 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
         onTeamprofil={onOpenTeam}
         onAlleTransfers={() => onWechsel("transfers")}
       />
-      {rekord ? null : null}
     </div>
   );
 }

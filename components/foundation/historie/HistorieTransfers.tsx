@@ -19,7 +19,7 @@ import {
 import { useHistorieDaten, type HistorieHostBasis } from "./HistorieArchiv";
 import HistorieBlatt, { type HistorieBlattDeal } from "./HistorieBlatt";
 import HistorieZeitleiste, { ZEITLEISTE_ALLE, baueZeitleistenGlieder } from "./HistorieZeitleiste";
-import { Cv, HistorieBandKpis, Seg, ThZeile, Wappen, fmtC, fmtVz, fmtZahl } from "./historie-bits";
+import { Cv, HistorieBandKpis, Seg, ThZeile, Wappen, fmtC, fmtVz } from "./historie-bits";
 
 export type HistorieTransfersProps = TransferHistoryV2ClientProps & {
   gameState: GameState;
