@@ -137,6 +137,8 @@ body.still .buehne{--kopf:0rem}
 .auf .c{font-size:.7rem;font-weight:700;padding:.1rem .35rem;border-radius:.2rem;background:var(--gold);color:#17120a;letter-spacing:.06em}
 .auf .w{font-size:1.15rem;font-weight:700;color:var(--creme);min-width:2.6rem;text-align:right}
 .pips{display:inline-flex;gap:.16rem} .pips i{width:.55rem;height:.34rem;transform:skewX(-14deg);background:var(--tf);border-radius:1px} .pips i.o{background:rgba(255,255,255,.16)}
+.vduo .auf div{grid-template-columns:4.2rem minmax(0,1fr) auto auto;gap:1rem;padding:.3rem .9rem .3rem .3rem;max-height:5rem;flex:1}
+.vduo .auf img{width:4.2rem;height:4.2rem} .vduo .auf b{font-size:1.5rem} .vduo .auf small{font-size:.95rem} .vduo .auf .w{font-size:1.5rem} .vduo .pips i{width:.9rem;height:.5rem}
 .kart{display:flex;gap:.4rem;margin-top:.7rem;padding-top:.65rem;border-top:1px solid var(--linie);font-size:.88rem;color:var(--leise);flex-wrap:wrap}
 .kart span{display:flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border:1px solid var(--linie);border-radius:.3rem;white-space:nowrap} .kart span b{color:var(--creme);font-weight:600}
 .vs{display:grid;place-items:center;font:400 3rem/1 var(--haus);color:var(--gold);text-shadow:0 .3rem 1rem #000}
@@ -163,7 +165,7 @@ body.still .buehne{--kopf:0rem}
 .tafel .m small{display:block;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .tafel .m strong{font-size:2rem;color:var(--creme)}
 /* Vierer-Tafel: vier gleich breite Felder, eigenes Feld mit Goldkante */
-.t4{left:50%;top:.8rem;transform:translateX(-50%);display:grid;grid-template-columns:repeat(2,13.5rem) 9.5rem repeat(2,13.5rem);gap:.25rem;filter:drop-shadow(0 .6rem 1.2rem rgba(0,0,0,.6))}
+.t4{left:50%;top:.8rem;transform:translateX(-50%);display:grid;grid-template-columns:repeat(2,16.5rem) 9.5rem repeat(2,16.5rem);gap:.25rem;filter:drop-shadow(0 .6rem 1.2rem rgba(0,0,0,.6))}
 .t4 .s{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.55rem;align-items:center;padding:.45rem .7rem;background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 82%,#000),color-mix(in srgb,var(--tf) 34%,#06080c));border-bottom:.22rem solid var(--tf)}
 .t4 .s.e{outline:2px solid var(--gold);outline-offset:-2px}
 .t4 .s img{width:2.5rem;height:2.5rem;border-radius:.35rem;object-fit:cover;border:2px solid rgba(255,255,255,.7)}
@@ -186,7 +188,7 @@ body.still .buehne{--kopf:0rem}
 .ul div{padding:.13rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .ul b{color:var(--tinte)} .ul .gk{color:var(--gold)}
 .ur{right:.9rem;bottom:.9rem;display:flex;gap:.4rem}
 .dock{left:50%;bottom:.9rem;transform:translateX(-50%);display:flex;gap:.3rem}
-.dock .lei{width:8.6rem;display:grid;grid-template-columns:2.2rem minmax(0,1fr);gap:.4rem;align-items:center;padding:.3rem .45rem;background:var(--glas);border:1px solid var(--linie);border-bottom:.2rem solid var(--tf);border-radius:.4rem}
+.dock .lei{width:7.7rem;display:grid;grid-template-columns:2.2rem minmax(0,1fr);gap:.4rem;align-items:center;padding:.3rem .45rem;background:var(--glas);border:1px solid var(--linie);border-bottom:.2rem solid var(--tf);border-radius:.4rem}
 .dock img{width:2.2rem;height:2.2rem;border-radius:.3rem;object-fit:cover}
 .dock b{display:block;font-size:.88rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1} .dock small{font-size:.78rem;color:var(--leise);white-space:nowrap} .dock small strong{color:var(--creme);font-size:.95rem}
 .dock .tr{width:.6rem}
@@ -208,6 +210,7 @@ body.still .buehne{--kopf:0rem}
 .geb{text-align:right} .geb strong{display:block;font-size:2.6rem;line-height:1;color:var(--gut)} .geb small{font-size:.82rem;color:var(--leise);display:flex;gap:.35rem;align-items:center;justify-content:flex-end} .geb small svg{color:var(--gut)}
 .sds{display:grid;grid-template-columns:7rem minmax(0,1fr);gap:.9rem;padding:.8rem .9rem;align-items:center}
 .sds img{width:7rem;height:7rem;border-radius:.6rem;object-fit:cover;border:2px solid var(--gold)}
+.sds.kl img{width:4.6rem;height:4.6rem}
 .sds b{display:block;font:400 1.7rem/1 var(--haus);color:#fff} .sds small{font-size:.86rem;color:var(--leise)}
 .sds .w{display:flex;gap:.9rem;margin-top:.5rem} .sds .w span{font-size:.76rem;color:var(--leise);letter-spacing:.06em;text-transform:uppercase} .sds .w strong{display:block;font-size:1.6rem;line-height:1;color:var(--creme)} .sds .w span.pp strong{color:var(--gold)}
 .szene{position:relative;flex:1;min-height:6rem;margin:.7rem;border-radius:.5rem;overflow:hidden;background:var(--bild) center/cover;image-rendering:pixelated;border:1px solid var(--linie-2);display:flex;align-items:flex-end}
@@ -226,6 +229,7 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .bx th:first-child,.bx td:first-child{text-align:left;padding-left:.9rem} .bx th:last-child,.bx td:last-child{padding-right:.9rem}
 .bx td{text-align:right;padding:.24rem .45rem;border-bottom:1px solid rgba(244,230,196,.06);white-space:nowrap}
 .bx td.sp{display:flex;align-items:center;gap:.55rem} .bx td.sp img{width:1.8rem;height:1.8rem;border-radius:.25rem;object-fit:cover;border-left:.2rem solid var(--tf)} .bx td.sp b{font-weight:600;color:#fff} .bx td.sp small{color:var(--leise);font-size:.8rem}
+.bx.eng td{padding-top:.12rem;padding-bottom:.12rem} .bx.eng td.sp img{width:1.5rem;height:1.5rem}
 .bx tr.e td{background:rgba(240,195,90,.07)}
 .bx td.pp,.bx th.pp{color:var(--gold)} .bx td.pp{font-weight:700;font-size:1.1rem}
 .bx tr.sum td{border-top:1px solid var(--linie-2);border-bottom:0;color:var(--creme);font-weight:700}
@@ -281,14 +285,14 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .wkopf2 h1{margin:0;font:400 2.2rem/1 var(--haus);color:#fff;white-space:nowrap} .wkopf2 .sp{flex:1}
 .dchip{display:flex;align-items:center;gap:.45rem;height:2.2rem;padding:0 .8rem;border:1px solid var(--linie-2);border-radius:.4rem;font-size:.92rem;color:var(--creme);white-space:nowrap} .dchip svg{color:var(--gut)} .dchip small{color:var(--leise)}
 .filt{display:flex;gap:.25rem} .filt a{height:2.2rem;display:flex;align-items:center;padding:0 .8rem;border:1px solid var(--linie);border-radius:.4rem;font-size:.92rem;color:var(--leise);white-space:nowrap} .filt a.an{background:var(--gold);border-color:var(--gold);color:#17120a;font-weight:700}
-.tab{--sp:2.5rem minmax(0,1fr) 9.6rem 9.6rem 3.6rem 4.4rem 4.6rem 4.2rem 4.4rem 6.6rem}
+.tab{--sp:2.5rem minmax(0,1fr) 9.6rem 9.6rem 3.6rem 4.4rem 4.6rem 4.2rem 4.4rem 8rem}
 .tab .grp,.tab .hd,.tab .zr{display:grid;grid-template-columns:var(--sp);gap:.5rem;align-items:center;padding:0 .8rem}
 .tab .grp{height:1.5rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--stumm);flex:none}
 .tab .grp span{border-bottom:1px solid var(--linie-2);padding-bottom:.1rem;text-align:center;white-space:nowrap;overflow:hidden}
 .tab .hd{height:2rem;border-bottom:1px solid var(--linie);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--leise);font-weight:600;flex:none}
 .tab .hd a{white-space:nowrap} .tab .hd a.an{color:var(--gold)} .tab .hd .re{text-align:right} .tab .hd .mi{text-align:center}
 .tab .body{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
-.tab .zr{flex:1 0 2.35rem;border-bottom:1px solid rgba(244,230,196,.06);cursor:pointer;font-size:1rem;border-left:.2rem solid transparent}
+.tab .zr{flex:1 0 2.35rem;max-height:3.6rem;border-bottom:1px solid rgba(244,230,196,.06);cursor:pointer;font-size:1rem;border-left:.2rem solid transparent}
 .tab .zr:hover{background:var(--flaeche-2)} .tab .zr.sel{background:var(--flaeche-3)}
 .tab .zr.e{border-left-color:var(--gold);background:rgba(240,195,90,.09)} .tab .zr.e.sel{background:rgba(240,195,90,.17)}
 .tab .rg{font-size:1.15rem;font-weight:700;color:var(--creme)}
@@ -301,13 +305,13 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .tab .ges{text-align:right;font-size:1.3rem;font-weight:700;color:#fff}
 .tab .sr{display:flex;align-items:center;justify-content:flex-end;gap:.3rem;font-size:.95rem;white-space:nowrap} .tab .sr b{font-size:1.1rem;color:var(--creme)} .tab .sr i{font-style:normal;color:var(--stumm)}
 .bw{display:inline-block;min-width:2.1rem;text-align:center;font-size:.8rem;font-weight:700;padding:.05rem .25rem;border-radius:.2rem} .bw.auf{background:rgba(98,211,148,.18);color:var(--gut)} .bw.ab{background:rgba(255,96,88,.16);color:var(--warn)} .bw.gl{color:var(--stumm)}
-.tfuss{padding:.4rem .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none} .tfuss b{color:var(--leise);font-weight:600}
+.tfuss{padding:.4rem .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--stumm);line-height:1.35;flex:none} .tfuss b{color:var(--leise);font-weight:600}
 .det .dk{display:grid;grid-template-columns:3.6rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .9rem;border-bottom:1px solid var(--linie);flex:none}
 .det .dk img{width:3.6rem;height:3.6rem;border-radius:.5rem;object-fit:cover;border:2px solid var(--gold)}
 .det .dk b{display:block;font:400 1.45rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .det .dk strong{display:block;text-align:right;font-size:2.2rem;line-height:1;color:#fff} .det .dk small{font-size:.78rem;color:var(--leise)}
 .det .bl{display:flex;flex-direction:column;padding:.55rem .9rem .5rem;border-bottom:1px solid var(--linie);flex:1;min-height:0}
-.det .bh{display:flex;align-items:center;gap:.5rem} .det .bh b{font:400 1.15rem/1 var(--haus);color:var(--creme)} .det .bh small{font-size:.84rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .det .bh strong{margin-left:auto;font-size:1.3rem;color:var(--gut);white-space:nowrap} .det .bh strong.o{color:var(--stumm)}
+.det .bh{display:flex;align-items:center;gap:.5rem} .det .bh b{font:400 1.15rem/1 var(--haus);color:var(--creme)} .det .bh small{flex:1;min-width:0;font-size:.84rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .det .bh strong{font-size:1.3rem;color:var(--gut);white-space:nowrap} .det .bh strong.o{color:var(--stumm)}
 .kette{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem;margin:.45rem 0 .4rem}
 .kette div{padding:.3rem .5rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.35rem}
 .kette small{display:block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kette b{font-size:1.15rem;line-height:1.15} .kette i{font-style:normal;font-size:.8rem;color:var(--leise);margin-left:.3rem}
@@ -539,10 +543,10 @@ function scErg4(){
     <div class="geb"><strong class="t">+2 Pkt</strong><small>${ico("ok")}gebucht · Spieltag ${ST}</small></div></div>
    <section class="pan" style="grid-column:1/6"><div class="pk"><h2>Rangfolge der Vierergruppe</h2><span class="sp"></span><small>Kontrollpunkte · Liga-Punkte 2-1-0-0</small></div>
      <div class="rf">${GRUPPE.map(function(c,i){var t=TEAM[c],D=t.d2;return `<div class="z${c===ICH?" e":""}" style="--tf:${GF[c]}"><u>${i+1}.</u>${logo(c)}<div style="min-width:0"><b>${t.n}</b><span style="display:flex;gap:.3rem;margin-top:.15rem">${c===ICH?'<span class="du">Dein Team</span>':mg(c)}</span><div class="bal"><i style="width:${D.eig/max*100}%"></i></div></div><strong class="t">${D.eig}<small>Punkte</small></strong><em class="t${D.pkt?"":" n"}">${D.pkt?"+"+D.pkt:"0"}<small>Liga-Pkt</small></em></div>`}).join("")}</div>
-     <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--linie);flex:none"><div style="border-right:1px solid var(--linie)"><div class="gk" style="padding:.5rem .9rem 0;color:var(--gold)">Spieler des Spiels</div><div class="sds" style="grid-template-columns:4.6rem minmax(0,1fr);padding:.5rem .9rem .7rem">${por(top.s.s,"")}<div><small>${TEAM[top.c].n} · ${top.s.ro}</small><b style="font-size:1.35rem">${top.s.n}</b><div class="w"><span><strong class="t">${stat[top.s.s+top.c][0]}</strong>K</span><span><strong class="t">${stat[top.s.s+top.c][6]}</strong>SCH</span><span class="pp"><strong class="t">${de(top.s.pp)}</strong>PP</span></div></div></div></div>
+     <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--linie);flex:none"><div style="border-right:1px solid var(--linie)"><div class="gk" style="padding:.5rem .9rem 0;color:var(--gold)">Spieler des Spiels</div><div class="sds kl" style="grid-template-columns:4.6rem minmax(0,1fr);padding:.5rem .9rem .7rem">${por(top.s.s,"")}<div><small>${TEAM[top.c].n} · ${top.s.ro}</small><b style="font-size:1.35rem">${top.s.n}</b><div class="w"><span><strong class="t">${stat[top.s.s+top.c][0]}</strong>K</span><span><strong class="t">${stat[top.s.s+top.c][6]}</strong>SCH</span><span class="pp"><strong class="t">${de(top.s.pp)}</strong>PP</span></div></div></div></div>
        <div style="display:flex;flex-direction:column"><div class="gk" style="padding:.5rem .9rem 0;color:var(--gold)">Szene des Spiels · 0:36</div><div class="szene" style="--bild:${kul("battlefield","eroberung")};margin:.5rem .7rem .7rem"><div><span><b>Punkt C fällt</b><small>${WIR.d2.sp[0].n} hält drei Angreifer auf.</small></span><a title="Szene ansehen">${ico("play")}</a></div></div></div></div></section>
    <section class="pan" style="grid-column:6/13"><div class="pk"><h2>Statistik und PP je Spieler</h2><div class="reiter"><a class="${Z.tab==="alle"?"an":""}" data-tab="alle">Alle 16 nach PP</a>${GRUPPE.map(function(c){return `<a class="${Z.tab===c?"an":""}" data-tab="${c}">${logo(c)}${c}</a>`}).join("")}</div><span class="sp"></span><small>◆ Mutator-Bonus</small></div>
-     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:${Z.tab==="alle"?"space-evenly":"flex-start"}"><table class="bx" style="${Z.tab==="alle"?"":"font-size:1.1rem"}"><thead><tr><th>Spieler</th><th>K</th><th>T</th><th>B</th><th>CC</th><th>H</th><th>S</th><th>SCH</th><th>ERL</th><th>FF</th><th>IMP</th><th class="pp">PP</th></tr></thead><tbody>
+     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:${Z.tab==="alle"?"space-evenly":"flex-start"}"><table class="bx${Z.tab==="alle"?" eng":""}" style="${Z.tab==="alle"?"":"font-size:1.1rem"}"><thead><tr><th>Spieler</th><th>K</th><th>T</th><th>B</th><th>CC</th><th>H</th><th>S</th><th>SCH</th><th>ERL</th><th>FF</th><th>IMP</th><th class="pp">PP</th></tr></thead><tbody>
       ${zeig.map(function(x){var v=stat[x.s.s+x.c];return `<tr class="${x.c===ICH?"e":""}"><td class="sp" style="--tf:${GF[x.c]}">${por(x.s.s,"")}<b>${x.s.n}</b><small>${x.c} · ${x.s.ro}</small></td>${v.map(function(w){return '<td class="t">'+w+'</td>'}).join("")}<td class="pp t">${de(x.s.pp)}${x.s.mut?' <span class="mut">◆ +0,3</span>':""}</td></tr>`}).join("")}</tbody></table></div>
      <div class="leg"><b>K</b> Kills · <b>T</b> Tode · <b>B</b> Beihilfen · <b>CC</b> Kontrolleffekte · <b>H</b> Heilung · <b>S</b> Schild · <b>SCH</b> Schaden · <b>ERL</b> erlitten · <b>FF</b> Eigenbeschuss · <b>IMP</b> Impact · <b>PP</b> gebuchte Player Points</div>
      <div class="chips" style="border-top:1px solid var(--linie)"><span style="--tf:${GF[ICH]}"><u class="t">0:12</u>Punkt A an ${WIR.n}</span><span style="--tf:${GF["P-S"]}"><u class="t">0:24</u>Doppel-Kill ${TEAM["P-S"].d2.sp[0].n}</span><span style="--tf:${GF[ICH]}"><u class="t">0:36</u>Punkt C fällt</span><span style="--tf:${GF["M-M"]}"><u class="t">0:51</u>${TEAM["M-M"].d2.sp[0].n} holt B zurück</span><span style="--tf:${GF[ICH]}"><u class="t">1:07</u>Punktelimit</span></div></section>
