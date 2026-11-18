@@ -9,8 +9,9 @@ ein Team ausverkaufen muss, weil der Vorstand greedy ist.“
 **Stand der Saisonstruktur (Chris, 18.11. abends):** es gibt **ein gemeinsames Transferfenster** in der
 neuen Saison vor Spieltag 1, mit Kaufen und Verkaufen zugleich. **Verkaufserlöse sind sofort zu 100 %
 frei.** Am Saisonende wird nicht mehr verkauft, dort laufen nur Abrechnung und Verlängerungen. In der
-Saison gibt es keinen Handel. Der Draft in Saison 1 ist Kaderaufbau, kein Transfer. Mockup und Text
-sind darauf umgestellt.
+Saison gibt es keinen Handel. Der Draft in Saison 1 ist Kaderaufbau, kein Transfer. Dazu: **höchstens
+zwei Gespräche je Saison**, das zweite auch während der Saison; der Notfall-Antrag zählt nicht mit.
+Mockup und Text sind darauf umgestellt.
 
 Dies ist ein Entwurf: Mockup und Konzept. `app/`, `components/`, `lib/` und der Motor sind nicht
 angefasst. Bei PixelLab ist nichts bestellt (0 Generationen), es gibt keine neue Figur: der Vorstand
@@ -21,13 +22,13 @@ ist das Teamwappen im Kreis, alles andere ist CSS und SVG.
 | Was | Datei |
 |---|---|
 | Gespräch und Notfall-Antrag, klickbar | `public/mockups/vorstandsgespraech-18-11.html` |
-| Bilder (1600 × 900, einfache Dichte; Phone 390 breit) | `docs/design/vorstandsgespraech-18-11/01` bis `08` |
+| Bilder (1600 × 900, einfache Dichte; Phone 390 breit) | `docs/design/vorstandsgespraech-18-11/01` bis `09` |
 
 Die Seite läuft per Doppelklick ohne Server. Die graue Leiste oben gehört nicht zum UI: sie wechselt
 das Team und springt mit einem Klick zu jedem Ausgang. Dieselben Zustände per Adresse:
 `?team=M-M|C-C|W-W`, `&ansicht=gespraech|notfall`, `&anliegen=stufe|sonder|ruecklage|alles`,
 `&biete=ziel,rueck,deckel,vertrauen`, `&antwort=1` (Antrag gleich stellen), `&annehmen=1`,
-`&not=klein|gross|wunsch`, `&vk=12` (Verkauf im Fenster), `&ctab=toepfe|vorstand|regeln`, `&phone=1`, `&still=1`.
+`&not=klein|gross|wunsch`, `&vk=12` (Verkauf im Fenster), `&zeit=saison` (zweites Gespräch vor Spieltag 11), `&ctab=toepfe|vorstand|regeln`, `&phone=1`, `&still=1`.
 
 | Bild | Zustand |
 |---|---|
@@ -38,6 +39,7 @@ das Team und springt mit einem Klick zu jedem Ausgang. Dieselben Zustände per A
 | `05-notfall-gross-mm.png` | Geldnotlage in der Saison: Rücklage zuerst, Rest über den Rahmen; Notverkauf gibt es dort nicht |
 | `06-sonderbudget-ww.png` | Wicked Wizards, Sonderbudget fürs Gehalt, Reiter Regeln, mit Mockup-Leiste |
 | `08-verkauf-im-fenster-mm.png` | Ein Verkauf im selben Fenster (12 C) ist sofort voll frei und steht schon in den Töpfen |
+| `09-zweites-gespraech-mm.png` | Gespräch 2 von 2 vor Spieltag 11: Sonderbudget für Gebäude, Rückzahlung und „Alles auf eine Karte“ sind dort gesperrt |
 | `07-phone-gegenangebot.png` | Phone, Gegenangebot |
 
 ### Was echt ist und was nicht
@@ -68,17 +70,43 @@ Der zweite Teil ist kein Verhandeln: der **Notfall-Antrag**. Dort hat der Vorsta
 
 | Zeitpunkt | Was | Wie oft |
 |---|---|---|
-| Transferfenster der neuen Saison, vor Spieltag 1 (ab Saison 2) | Gespräch: ein Anliegen, höchstens zwei Runden | einmal je Fenster |
-| In der Saison, an jedem Spieltag | Notfall-Antrag bei einer Geldnotlage | sooft eine eintritt |
+| Transferfenster der neuen Saison, vor Spieltag 1 (ab Saison 2) | Gespräch: ein Anliegen, höchstens zwei Runden | **zusammen höchstens zwei Gespräche je Saison**, frei verteilt |
+| In der Saison, vor jedem Spieltag (Beispiel: vor Spieltag 11) | Gespräch, mit eingeschränkten Anliegen (2.1) | (dieselben zwei) |
+| In der Saison, an jedem Spieltag | Notfall-Antrag bei einer Geldnotlage | sooft eine eintritt, **zählt nicht mit** |
 | Saisonende (Abrechnung, Verlängerungen) | nichts | — |
 | Saison 1 (Draft = Kaderaufbau) | nichts, alles ist frei | — |
+
+Der Kopf des Gesprächs zeigt den Zähler **„Gespräche diese Saison 1/2“**. Ein Gespräch ist verbraucht,
+sobald ein Antrag gestellt ist, gleich wie er ausgeht; Vertrauen kostet das nie. Weil die Einschätzung
+schon vor dem Antrag sichtbar ist, verschenkt niemand ein Gespräch aus Versehen.
+
+### 2.1 Wofür das zweite Gespräch in der Saison (Vorschlag)
+
+In der Saison wird nicht gehandelt. Mehr Freigabe wirkt dort auf zwei Dinge:
+
+* **Gebäude.** Bau und Ausbau zahlen aus dem Investitionstopf. Wer zur Saisonmitte Geld übrig hat,
+  holt sich die Freigabe für den Ausbau, statt bis zum nächsten Fenster zu warten.
+* **Gehaltsbudget für die Verlängerungen am Saisonende.** Eine Gehaltserhöhung bei der Verlängerung
+  zählt gegen den freien Gehaltstopf. Das zweite Gespräch ist der Moment, das vorzubereiten, bevor
+  der Leistungsträger am Saisonende zu teuer für den Topf ist.
+
+| | Im Fenster | In der Saison |
+|---|---|---|
+| Freigabe anheben | ja | ja, gilt bis zur nächsten Festlegung |
+| Sonderbudget | Ablösen oder Gehalt | Gebäude oder Gehalt |
+| Notrücklage anzapfen | ja | ja (ein Wunsch, kostet Vertrauen; die Notlage läuft über den Notfall-Antrag) |
+| Alles auf eine Karte | ja, ab Vertrauen 4 | **nein**, nur im Fenster (wie bisher) |
+| Zusage „Rückzahlung aus Verkäufen“ | ja | **nein**, es wird nicht verkauft |
+
+Dem Kassenwart bleibt in der Saison damit vor allem der Gehaltsdeckel; er ist dort bewusst der
+härtere Gesprächspartner. Wer beide Gespräche schon im Fenster führt, hat in der Saison keines mehr.
 
 Das Gespräch liegt im gemeinsamen Fenster, weil dort die Töpfe binden und Kaufen und Verkaufen
 zusammenfallen. **Was der Spieler im selben Fenster verkauft, ist sofort zu 100 % frei** und erhöht
 den Rahmen ohne Gespräch; im Mockup zeigt das der Schalter „Verkauft in diesem Fenster“ über der
 Topf-Vorschau. Das Gespräch dreht sich also nur um das Geld, das **schon auf dem Konto liegt** und
 nicht freigegeben ist (Vorbehalt und Notrücklage). Der Spieler kann vor oder nach seinen Verkäufen
-fragen; verbraucht ist das Gespräch erst mit einer Vereinbarung oder nach Runde 2. Einstieg: Knopf
+fragen. Einstieg: Knopf
 „Mit dem Vorstand sprechen“ im Reiter Budgets der Finanzseite und in der Sperrmeldung des
 Transfermarkts („Ablöse über dem freien Transfertopf“).
 
@@ -133,8 +161,9 @@ Feste Regeln, die immer ablehnen: Freigabe schon 100 %, „Alles auf eine Karte�
 Rücklage im Fenster gar nicht gesperrt. Aus PR #1618 bleiben: keine Lockerung bei Kasse im Minus,
 bei Kredit dieses Fensters und unter Kader 8.
 
-Der Spieler sieht die Antwort **vor** dem Antrag als „Einschätzung“ (reicht / fehlt 8). Fragen kostet
-nichts, eine Ablehnung auch nicht. Nur Zusagen binden.
+Der Spieler sieht die Antwort **vor** dem Antrag als „Einschätzung“ (reicht / fehlt 8). Ein Antrag
+kostet kein Vertrauen, auch eine Ablehnung nicht; er verbraucht aber eines der zwei Gespräche. Nur
+Zusagen binden.
 
 ### 3.4 Vorschau der Töpfe
 
@@ -266,22 +295,29 @@ wenn es lang wird.
 
 Wertung und Arena-Motor bleiben unberührt, der Fingerabdruck ändert sich nicht.
 
-## 8. Offene Fragen an Chris
+## 8. Entscheidungen und offene Fragen
 
-1. **Feste Antwort oder Würfel?** Empfehlung: **fest**, mit sichtbarer Einschätzung vor dem Antrag.
-   Ein Würfel lädt zum Neuladen ein, und „gezeigt = gerechnet“ ist die Linie der Finanzseite.
-2. **Ersetzt das Gespräch die vier Knöpfe der Finanzseite oder kommt es dazu?** Empfehlung:
-   **ersetzen**. Umschichten bleibt als Schieber ohne Gespräch (es kostet den Vorstand nichts), alles
-   andere läuft über das Gespräch, sonst gibt es zwei Wege zum selben Geld.
-3. **Kostet die Notrücklage in einer anerkannten Notlage wirklich gar nichts?** Empfehlung: **ja**,
-   kein Vertrauen, keine Zusage; nur die Sperre „keine Lockerung, bis sie halb wieder steht“. Das ist
-   der Kern deiner Vorgabe, und jede Strafe darauf würde den Spieler wieder zum Verkauf treiben.
-4. **Darf die Zusage „Rückzahlung aus Verkäufen“ die neue Regel „Erlöse zu 100 % frei“ für dieses
-   eine Fenster einschränken?** Empfehlung: **ja, weil freiwillig**. Sie ist die einzige Zusage, die
-   der Kassenwart wirklich schätzt; ohne sie bleibt ihm nur der Gehaltsdeckel. Wer sie nicht will,
-   bietet sie nicht an.
-5. **Wie oft?** Empfehlung: **ein Gespräch je Transferfenster, ein Anliegen, zwei Runden**; der
-   Notfall-Antrag jederzeit. Mehr Gespräche machen aus der Stufe eine Formsache.
-6. **Verhandelt die KI auch?** Empfehlung: **ja, mit denselben Funktionen**, aber erst in einem
-   zweiten Schritt und mit Messung (Kaderstärke, Kasse, Teams unter 8), weil die KI-Bedingungen in
-   der Messung von #1618 bisher bei keinem der 32 Teams griffen.
+**Entschieden (Chris, 18.11.):** höchstens zwei Gespräche je Saison, das zweite auch in der Saison,
+der Notfall-Antrag zählt nicht mit. Ein gemeinsames Transferfenster, Verkaufserlöse zu 100 % frei.
+
+**Gilt vorerst als Empfehlung, solange Chris nicht widerspricht:**
+
+1. **Feste Antwort statt Würfel**, mit sichtbarer Einschätzung vor dem Antrag. Ein Würfel lädt zum
+   Neuladen ein, und „gezeigt = gerechnet“ ist die Linie der Finanzseite.
+2. **Das Gespräch ersetzt die Knöpfe der Finanzseite**; Umschichten bleibt als Schieber ohne Gespräch
+   (es kostet den Vorstand nichts). Sonst gäbe es zwei Wege zum selben Geld.
+3. **Die Notrücklage kostet in einer anerkannten Notlage nichts**: kein Vertrauen, keine Zusage; nur
+   die Sperre „keine Lockerung, bis sie halb wieder steht“.
+4. **Die Zusage „Rückzahlung aus Verkäufen“ ist freiwillig** und darf für ihr Fenster die Regel
+   „Erlöse zu 100 % frei“ einschränken. Wer sie nicht will, bietet sie nicht an.
+5. **Die KI verhandelt erst in einem zweiten Schritt**, mit denselben Funktionen und mit Messung
+   (Kaderstärke, Kasse, Teams unter 8).
+
+**Neu offen (durch die Zwei-Gespräche-Regel):**
+
+6. **Verbraucht schon ein abgelehnter oder zurückgezogener Antrag ein Gespräch?** Empfehlung: **ja**,
+   jeder gestellte Antrag zählt. Sonst wären es bei geschicktem Zurückziehen beliebig viele, und die
+   Einschätzung vor dem Antrag schützt vor dem Fehlgriff.
+7. **Darf das zweite Gespräch vor jedem Spieltag stattfinden oder nur zur Saisonmitte (vor Spieltag
+   11)?** Empfehlung: **vor jedem Spieltag**, der Spieler wählt den Moment; die Saisonmitte ist nur
+   das Beispiel im Mockup.
