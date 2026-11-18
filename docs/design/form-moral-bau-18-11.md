@@ -163,10 +163,19 @@ Angeglichen an `public/mockups/form-moral-modern-17-11.html` (Branch `origin/cla
 Abweichung vom Mockup, bewusst: Das Mockup hat eine „Hand“ mit Antippen-Legen; die App behält die bestehenden Kartenwahl-Menüs (Plan wird gespeichert) und
 ergänzt Kacheln und Vergleich darüber. Bankspieler zeigen keine Karten-Wirkung („würde bekommen“ wäre nicht gebucht).
 
-**Screenshots:** Die Mockup-Bilder liegen auf dem Mockup-Branch (`docs/design/form-moral-anzeige-17-11/01…17-*.png`), die App-Bilder (`app-01…07`) in diesem Ordner.
-Die App-Bilder dieses Standes (mit den neuen Bausteinen) konnten nicht neu aufgenommen werden: die Platte der Umgebung war voll (< 1 GB frei, Dev-Server plus Spielstand-Kopie
-würden fremde Läufe gefährden). Die vorhandenen `app-*.png` stammen vom Stand davor (Kader-Spalte „Form · Moral“ zusammen, Karten-Wirkung im Reiter „Form & Moral“).
-Neu aufnehmen: Dev-Server mit `OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, Kopie des Abbilds, `scripts/form-am-save-abbild-nachfuehren.ts`, dann Playwright.
+**Screenshots (18.11., nachgeholt):** `docs/design/form-moral-anzeige-17-11/app-<nr>-<name>-<viewport>.png`, Nr. 01 Einsatzliste (Form/Moral/Karten-Leiste), 02 Karten-Wirkung, 03 Form & Moral,
+04 Profil-Blatt, 05 nach dem Spieltag (Bauchbinde, Meldungen); Viewports 2560 (Hauptziel), 1920, 1710 (DSF 2) und phone (390, DSF 2; ohne 04). Bildpaare Mockup | App:
+`abgleich-01-einsatzliste.png`, `abgleich-02-karten-wirkung.png`, `abgleich-03-profil.png`, `abgleich-04-nach-dem-spieltag.png`, `abgleich-05-phone-karten-wirkung.png`.
+Die Mockup-Bilder liegen auf dem Mockup-Branch; die alten Bilder vom Stand davor sind ersetzt.
+
+**Bei der Prüfung gefunden und behoben:**
+- Kader-Tabelle: mit den neuen Spalten Form/Moral/Karte schrumpfte die Namensspalte auf 0 (nur Portraits sichtbar). Spalten schmaler, Kader-Spalte bis 448 px.
+- Platzkarten auf dem Phone (390): Moral-Zahl, Karten-Marke und Risiko liefen aus der Karte; Zeile umbricht jetzt, Karten-Marke entfällt auf dem Phone (steht im Blatt Karten-Wirkung).
+- Ab 2200 px blieben die Tabellen der Karten-Wirkung bei 12,5 px (eigene Schriftgröße überstimmte den Container); jetzt 15 px.
+- Kein horizontaler Überlauf auf allen vier Viewports (scrollWidth = clientWidth).
+
+**Offen, nicht aus diesem Umbau:** Bei 2560 sitzt der App-Rahmen (Seitenleiste plus Inhalt) nur rund 1880 px breit und links; der Rest bleibt leer. Das ist die Foundation-Shell
+(Breitenschalter standard/wide/cinema), nicht die Einsatzliste. Bei 1710 sind die mittleren Platzkarten knapp (Namen werden gekürzt). Die Leiste zeigt nur gelegte Karten, nicht die ganze Hand wie das Mockup.
 
 ### Abgleich Mockup | App je Feature
 
@@ -179,6 +188,7 @@ Neu aufnehmen: Dev-Server mit `OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, 
 | Moral als Herz | angepasst: Gesicht in Farbe (Chris) |
 | Formkarten-Leiste mit Kacheln und „Karten fürs Team“ | drin (angepasst: über den bestehenden Kartenwahl-Menüs statt Hand mit Antippen-Legen) |
 | Hover-Vorschau der Karte vor dem Legen | fehlt |
+| Ganze Hand als Kacheln (auch nicht gelegte Karten) | fehlt (Vergleich im Reiter zeigt sie als Tabelle) |
 | Karten in der Hand abgedunkelt („in Spurt“), Legen per Klick | fehlt (Menüs bleiben) |
 | Reiter Karten-Wirkung + Form & Moral | drin |
 | Tabelle „Wer bekommt“ (alle/Farbe/Form/gesamt) | drin |
@@ -188,8 +198,5 @@ Neu aufnehmen: Dev-Server mit `OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, 
 | Bauchbinde nach dem Spieltag + Meldungen | drin |
 | Phone-Blätter | drin |
 
-**Zielgeräte (Chris, korrigiert 18.11.):** MacBook Air 15" M4 = Viewport 1710×1112 (16:10, DSF 2), Hauptrechner 32" 4K = 2560×1440 (Nebenprobe 1920×1080).
-Es gibt Regeln für unter 1500 px (kleinere Kacheln und Zähler) und ab 2200 px (größere Schrift in den Form-Bausteinen). **Aufnahmen bei 1710×1112, 2560×1440 und 1920×1080 stehen aus:**
-die Platte der Umgebung war wiederholt voll (zuletzt < 700 MB frei), ein Dev-Server plus Spielstand-Kopie hätte fremde Läufe gefährdet. Vorhanden sind nur die Aufnahmen
-bei 1600×900 und Phone 390×844 vom Stand davor. Vor dem Merge nachholen: Dev-Server (`OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, eigener Port), Kopie des Abbilds,
-`scripts/form-am-save-abbild-nachfuehren.ts --save new-game-1787123325719-swnjlk`, dann die drei Viewports mit Playwright.
+**Zielgeräte (Chris, 18.11.):** MacBook Air 15" M4 = 1710×1112 (DSF 2), Hauptrechner 32" 4K = 2560×1440, Nebenprobe 1920×1080. Geprüft, siehe Screenshots oben; die CSS-Regeln unter 1500 px
+und ab 2200 px greifen (ab 2200 px nun auch die Tabellen).

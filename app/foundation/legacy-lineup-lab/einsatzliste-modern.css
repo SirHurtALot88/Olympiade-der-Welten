@@ -16,7 +16,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 376px) minmax(0, 1fr) minmax(300px, 356px);
+  grid-template-columns: minmax(300px, 448px) minmax(0, 1fr) minmax(300px, 356px);
   gap: 12px;
   padding: 12px 14px;
   height: min(760px, calc(100vh - 250px));

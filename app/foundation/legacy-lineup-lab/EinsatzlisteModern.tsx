@@ -769,7 +769,7 @@ export default function EinsatzlisteModern(props: Props) {
   const spalten: BcTableColumn<KaderZeile>[] = [
     {
       key: "por",
-      breite: "40px",
+      breite: "36px",
       render: (z) => <Por klasse="elm-kz__por" url={z.karte.portraitUrl} name={z.karte.name} />,
     },
     {
@@ -796,7 +796,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "disz",
       kopf: "Eignung",
-      breite: "52px",
+      breite: "42px",
       rechts: true,
       onKopf: () => setSortKey("disz"),
       aktiv: sortKey === "disz",
@@ -805,7 +805,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "platz",
       kopf: "Platzwert",
-      breite: "64px",
+      breite: "54px",
       rechts: true,
       onKopf: () => setSortKey("platz"),
       aktiv: sortKey === "platz",
@@ -819,7 +819,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "form",
       kopf: "Form",
-      breite: "34px",
+      breite: "28px",
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.formVerfuegbar ? (
@@ -832,7 +832,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "moral",
       kopf: "Moral",
-      breite: "52px",
+      breite: "46px",
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.moral != null ? (
@@ -845,7 +845,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "karte",
       kopf: "Karte",
-      breite: "44px",
+      breite: "40px",
       rechts: true,
       render: (z) => {
         // Nur Aufgestellte bekommen die Karte (gezeigt = gebucht): Bankspieler zeigen keinen Wert.
@@ -859,7 +859,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "last",
       kopf: "Last",
-      breite: "46px",
+      breite: "38px",
       rechts: true,
       onKopf: () => setSortKey("last"),
       aktiv: sortKey === "last",

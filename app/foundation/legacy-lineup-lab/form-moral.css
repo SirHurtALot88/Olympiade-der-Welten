@@ -71,3 +71,6 @@
 .fm-vergleich__zeile.is-gelegt { background: rgba(240, 195, 90, 0.08); }
 @media (max-width: 1500px) { .fm-kachel { min-width: 76px; padding: 5px 7px; } .fm-kopf__zeile { gap: 7px; font-size: 14px; } .fm-vergleich__zeile { grid-template-columns: 28px minmax(0, 1fr) auto 48px; } }
 @media (min-width: 2200px) { .fm-warum, .fm-karten, .fm-uebersicht, .fm-leiste { font-size: 15px; } .fm-leiste__team b { font-size: 28px; } .fm-kachel { min-width: 120px; font-size: 14px; } .fm-kachel b { font-size: 24px; } .fm-kopf__zeile { font-size: 18px; } }
+@media (min-width: 2200px) { .fm-tabelle, .fm-regel { font-size: 15px; } .fm-karten { font-size: 15px; } .fm-vergleich__zeile { font-size: 15px; } .fm-meldungen, .fm-profil { font-size: 15px; } }
+.elm-slot__ze { flex-wrap: wrap; row-gap: 2px; min-width: 0; }
+@media (max-width: 760px) { .elm-slot__ze .fm-kmarke { display: none; } .elm-slot__ze .fm-marke { gap: 3px; font-size: 12px; } }
