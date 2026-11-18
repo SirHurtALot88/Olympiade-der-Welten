@@ -385,29 +385,7 @@ function BudgetsAnsicht({
   const anzapfWert = anzapf ?? s.ruecklageAnzapfen.bereitsAngezapft;
   const anzapfMax = s.ruecklageAnzapfen.bereitsAngezapft + s.ruecklageAnzapfen.moeglich;
   return (
-    <div className="fin-gr" style={{ gridTemplateRows: "auto auto minmax(0, 1fr) auto" }} data-testid="fin-budgets">
-      <div className="fin-rech is-gross is-voll" style={{ "--n": 4, margin: 0 } as CSSProperties}>
-        <div>
-          <small>Freigabe des Vorstands</small>
-          <strong className={`bc-t ${s.wirksamerAnteil < 0.6 ? "bc-minus" : ""}`}>
-            {s.gedeckelt ? `${pzt} %` : "100 %"}
-            {lo.aktiv ? <span style={{ fontSize: 15, color: "var(--bc-gut)" }}> gelockert</span> : null}
-          </strong>
-        </div>
-        <div className="is-su">
-          <small>Frei für Ablösen und Gebäude</small>
-          <strong className={`bc-t ${tUeber ? "bc-minus" : ""}`}>{C(s.investition.frei)}</strong>
-        </div>
-        <div className="is-su">
-          <small>Frei für Gehalt · je Saison</small>
-          <strong className={`bc-t ${gUeber ? "bc-minus" : ""}`}>{C(s.gehalt.frei)}</strong>
-        </div>
-        <div>
-          <small>Kasse jetzt</small>
-          <strong className="bc-t">{C(m.kasse)}</strong>
-        </div>
-      </div>
-
+    <div className="fin-gr" style={{ gridTemplateRows: "auto minmax(0, 1fr) auto" }} data-testid="fin-budgets">
       <div className="fin-sd is-farbe" style={{ "--pc": "var(--bc-gut)" } as CSSProperties}>
         <div className="fin-kopf">
           Transfer- und Investitionsbudget<small>Ablösen · Gebäude</small>
@@ -481,6 +459,12 @@ function BudgetsAnsicht({
             ) : null}
             <Zeile l="= Transferbudget" w={C(s.investition.gesamt)} sum />
           </div>
+          {s.kaderpflicht.text ? (
+            <div className="fin-txt is-acht" data-testid="fin-kaderpflicht">
+              {s.kaderpflicht.text}
+              {s.kaderpflicht.zuschlagGehalt > 0.004 ? ` · Gehalt +${zahl(s.kaderpflicht.zuschlagGehalt)} C` : ""}
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -800,6 +800,12 @@ button.fin-tz:hover {
 .fin-herl .fin-zl.is-sum strong {
   color: var(--bc-gold);
 }
+ /* In der App-Schale fehlen gegen das Mockup rund 110 px Hoehe: auf Bildschirmen unter 1200 px Hoehe entfallen die Unterzeilen der Herleitung (die Zahlen bleiben). */
+@media (max-height: 1199px) {
+  .fin-herl .fin-zl small {
+    display: none;
+  }
+}
 .fin-leiter {
   display: flex;
   flex-direction: column;

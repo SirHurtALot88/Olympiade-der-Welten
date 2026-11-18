@@ -10,6 +10,7 @@ import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { berechneKiRuecklage, ruecklagenQuote } from "@/lib/finance/ki-ruecklage";
 import {
+  kaderpflichtZuschlag,
   kaufRahmen,
   pruefeKaufGegenVorstandFreigabe,
   VORSTAND_PFLICHT_KADER,
@@ -147,5 +148,74 @@ describe("Draft-Builder mit Rahmen: jeder geplante Kauf besteht die Sperre (Eige
         kader += 1;
       }
     }
+  });
+});
+
+describe("Kaderpflicht-Freigabe (Chris 18.11.): Geld da, nicht freigegeben, Kader unter Minimum oder Opt", () => {
+  function team(kader: number, cash: number, opts: { playerMin?: number; playerOpt?: number; vertrauen?: number } = {}): GameState {
+    const rosters = Array.from({ length: kader }, (_, i) => ({ id: `r${i}`, teamId: "A", playerId: `pA${i}`, salary: 4 }));
+    const players: Array<{ id: string; marketValue: number; salaryDemand?: number }> = rosters.map((r) => ({ id: r.playerId, marketValue: 15 }));
+    for (let i = 0; i < 20; i += 1) players.push({ id: `fa${i}`, marketValue: 20, salaryDemand: 5 });
+    return {
+      season: { id: "season-2", currentMatchday: 1, matchdayIds: [], totalMatchdays: 20 },
+      gamePhase: "season_active",
+      matchdayState: { status: "open" },
+      teams: [{ teamId: "A", name: "A", cash }],
+      teamIdentities: [{ teamId: "A", finances: 10, ambition: 5, playerMin: opts.playerMin ?? 9, playerOpt: opts.playerOpt ?? 11 }],
+      rosters,
+      players,
+      transferHistory: [],
+      seasonState: { boardConfidence: { A: { teamId: "A", value: opts.vertrauen ?? 8, pressure: 5, warnings: [] } }, facilityEvents: [] },
+    } as unknown as GameState;
+  }
+
+  it("6 Spieler, 87 C Kasse, hoher Finanzwert: der Rahmen reicht fuer mindestens 4 sinnvolle Kaeufe (Platzpreis 20 C, Gehalt 5 C)", () => {
+    const gs = team(6, 87, { playerMin: 10, playerOpt: 12 });
+    const rahmen = kaufRahmen(gs, "A");
+    expect(rahmen.stand.kaderpflicht.platzAbloese).toBe(20);
+    let fee = 0;
+    let sal = 0;
+    for (let k = 0; k < 4; k += 1) {
+      const g = rahmen.grenzeFuer(6 + k, fee, sal);
+      expect(20).toBeLessThanOrEqual(g.fee + 1e-9);
+      expect(5).toBeLessThanOrEqual(g.salary + 1e-9);
+      fee += 20;
+      sal += 5;
+    }
+    expect(rahmen.stand.kaderpflicht.text).toContain("Kaderpflicht: Vorstand gibt");
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 20, salary: 5, rosterBefore: 6, playerMin: 10 }).ok).toBe(true);
+  });
+
+  it("Team bei Opt: keine Wirkung", () => {
+    const rahmen = kaufRahmen(team(11, 87), "A");
+    expect(rahmen.stand.kaderpflicht.aktiv).toBe(false);
+    expect(rahmen.stand.kaderpflicht.text).toBeNull();
+    expect(rahmen.stand.kaderpflicht.zuschlagAbloese).toBe(0);
+  });
+
+  it("Kasse reicht nicht: die Freigabe ist nie groesser als die Kasse (kein Notkauf, erst die bestehende Kredit-Leiter)", () => {
+    const rahmen = kaufRahmen(team(6, 30), "A");
+    expect(rahmen.stand.investition.frei).toBeLessThanOrEqual(30 + 1e-9);
+    expect(rahmen.grenzeFuer(6, 0, 0).fee).toBeLessThanOrEqual(30 + 1e-9);
+  });
+
+  it("zwischen Minimum und Opt wirkt sie nur mit Geld ueber der Notruecklage; unter dem Minimum aus der ganzen Kasse", () => {
+    const basis = { kaderMin: 9, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15 };
+    // Kader 9 (= Minimum), Opt 12: 3 Plaetze x 20 = 60, aber nur Kasse ueber der Notruecklage zaehlt
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 87 }).abloese).toBe(60);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 30 }).abloese).toBe(15);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 12 }).abloese).toBe(0);
+    // Kader 6 (unter dem Minimum): 3 x 20 = 60 aus der GANZEN Kasse, auch unter der Notruecklage
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 6, cash: 87 }).abloese).toBe(60);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 6, cash: 12 }).abloese).toBe(12);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 12, cash: 87 })).toEqual({ abloese: 0, gehalt: 0 });
+  });
+
+  it("Saison 1: keine Wirkung (alles frei)", () => {
+    const gs = team(6, 87);
+    gs.season = { ...gs.season, id: "season-1" };
+    const rahmen = kaufRahmen(gs, "A");
+    expect(rahmen.gedeckelt).toBe(false);
+    expect(rahmen.stand.kaderpflicht.aktiv).toBe(false);
   });
 });

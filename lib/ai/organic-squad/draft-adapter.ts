@@ -48,7 +48,7 @@ import {
   type KiRuecklageErgebnis,
 } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
-import { berechneVorstandBudgetStand, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { berechneVorstandBudgetStand, kaufRahmen, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
@@ -556,6 +556,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   // Ab Saison 2 steckt die Ruecklage schon im Transfertopf des Vorstands (Kasse - Ruecklage - Gehaltspuffer); die KI haelt sie nicht
   // ein zweites Mal als eigenen Puffer (Messung 18.11.: doppelt gezaehlt kostete -6 % Kaderstaerke).
   const ruecklage = vorstand.gedeckelt ? 0 : ruecklageRoh;
+  const kaufRahmenFuerPlan = kaufRahmen(input.gameState, input.team.teamId);
   const feeCap = vorstand.gedeckelt ? vorstand.investition.frei : undefined;
   const salaryCap = vorstand.gedeckelt ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
@@ -697,6 +698,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
       minFillFloor: ruecklage > 0 ? ruecklage : undefined,
       feeCap,
       salaryCap,
+      kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
     },
     draftSeed: input.draftSeed ?? null,
   };

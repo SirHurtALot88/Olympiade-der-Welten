@@ -724,10 +724,10 @@ function buildFinalBuyGate(input: {
     const buffer = getTeamCashBuffer(input.gameState, input.team.teamId, coverageFallback);
     const duplicateClaim = input.claimedPlayerIds.has(candidate.playerId);
     const reserve = pflichtReserve(rosterAfter, candidate.playerId);
+    const grenze = vorstandRahmen.grenzeFuer(rosterBase + picked.length, vorstandAbloese, vorstandGehalt);
     const rahmenBlocked =
       vorstandRahmen.gedeckelt &&
-      (vorstandAbloese + (price ?? 0) + reserve.fee > vorstandRahmen.abloeseFrei + 1e-9 ||
-        vorstandGehalt + (candidate.salary ?? 0) + reserve.salary > vorstandRahmen.gehaltFrei + 1e-9);
+      ((price ?? 0) + reserve.fee > grenze.fee + 1e-9 || (candidate.salary ?? 0) + reserve.salary > grenze.salary + 1e-9);
     const cashBlocked = cashAfter == null || cashAfter < buffer;
     const reasons = [
       rahmenBlocked ? "vorstand_rahmen_ueberschritten" : null,

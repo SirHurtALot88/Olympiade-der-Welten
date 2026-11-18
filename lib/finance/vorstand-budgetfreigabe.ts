@@ -43,6 +43,8 @@ import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
 
 /** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
 export const GEHALTS_QUOTE_UNTERGRENZE = 0.75;
+/** Pflichtkader: Kaeufe bis zu diesem Kader sind NIE gesperrt (Chris 18.11.: keine Finanzregel darf ein Team unter 8 halten). */
+export const VORSTAND_PFLICHT_KADER = 8;
 
 export type VorstandStufe = "hoch" | "standard" | "niedrig" | "knapp" | "sparauflage";
 
@@ -234,15 +236,90 @@ export type VorstandBudgetStand = {
   umschichten: VorstandUmschichten;
   lockerung: VorstandLockerung;
   ruecklageAnzapfen: { moeglich: number; bereitsAngezapft: number; vertrauenskosten: number };
+  /** Kaderpflicht-Freigabe (Chris 18.11.): der Rahmen ist nie kleiner als die Kosten bis zum Minimum und, soweit Geld ueber der Notruecklage da ist, bis zum Opt. */
+  kaderpflicht: KaderpflichtStand;
   alleAufEineKarte: { aktiv: boolean; puffer: number; zustand: VorstandBudgetZustand["alleAufEineKarte"] };
   zustand: VorstandBudgetZustand;
 };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
+const zahlText = (v: number) => (Math.round(v * 10) / 10).toString().replace(".", ",");
 
 function naechsteQuote(q: number): number {
   for (const stufe of QUOTEN_STUFEN) if (stufe > q + 1e-9) return stufe;
   return 1;
+}
+
+export type KaderpflichtStand = {
+  aktiv: boolean;
+  kaderIst: number;
+  kaderMin: number;
+  kaderOpt: number;
+  /** Platzpreis (Ablose / Jahresgehalt) eines sinnvollen Spielers aus dem Markt. */
+  platzAbloese: number;
+  platzGehalt: number;
+  /** Was der Vorstand ZUSAETZLICH zum Rahmen nach Quote freigibt (C Ablose, C Jahresgehalt). */
+  zuschlagAbloese: number;
+  zuschlagGehalt: number;
+  /** Rahmen ohne Kaderpflicht (nach Quote und Toepfen). */
+  basisFreiAbloese: number;
+  basisFreiGehalt: number;
+  /** Notruecklage: das Ruecklage-Ziel; darueber wirkt die Annaeherung an Opt. */
+  notruecklage: number;
+  text: string | null;
+};
+
+/** Platzpreis eines sinnvollen Spielers: Median des freien Marktes (Marktwert und Gehaltsforderung). Wird je Spielerliste einmal gerechnet. */
+const PLATZPREIS_CACHE = new WeakMap<object, { fee: number; salary: number; rosterSize: number }>();
+export function platzPreisAusMarkt(gameState: GameState): { fee: number; salary: number } {
+  const players = gameState.players ?? [];
+  const cached = PLATZPREIS_CACHE.get(players);
+  if (cached && cached.rosterSize === gameState.rosters.length) return { fee: cached.fee, salary: cached.salary };
+  const vergeben = new Set(gameState.rosters.map((r) => r.playerId));
+  const fees: number[] = [];
+  const salaries: number[] = [];
+  for (const pl of players) {
+    if (vergeben.has(pl.id)) continue;
+    const mv = pl.marketValue ?? pl.displayMarketValue ?? 0;
+    if (!(mv > 0)) continue;
+    fees.push(mv);
+    salaries.push(pl.salaryDemand ?? pl.displaySalary ?? 0);
+  }
+  const median = (a: number[]) => (a.length === 0 ? 0 : [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]!);
+  const ergebnis = { fee: median(fees), salary: median(salaries), rosterSize: gameState.rosters.length };
+  PLATZPREIS_CACHE.set(players, ergebnis);
+  return { fee: ergebnis.fee, salary: ergebnis.salary };
+}
+
+/**
+ * Reine Funktion der Kaderpflicht-Freigabe, damit Planer und Sperre dieselbe Zahl rechnen (kaufRahmen.grenzeFuer).
+ * Unter dem Minimum: Kosten der fehlenden Plaetze, gedeckt aus der GANZEN Kasse (inkl. Notruecklage, ohne Vertrauensverlust).
+ * Zwischen Minimum und Opt: Plaetze bis Opt zum Platzpreis, soweit Kasse ueber der Notruecklage da ist.
+ */
+export function kaderpflichtZuschlag(input: {
+  kaderIst: number;
+  kaderMin: number;
+  kaderOpt: number;
+  platzAbloese: number;
+  platzGehalt: number;
+  cash: number;
+  notruecklage: number;
+}): { abloese: number; gehalt: number } {
+  const fehltMin = Math.max(0, input.kaderMin - input.kaderIst);
+  const fehltOpt = Math.max(0, input.kaderOpt - input.kaderIst);
+  if (fehltMin > 0) {
+    return {
+      abloese: Math.max(0, Math.min(Math.max(0, input.cash), fehltMin * input.platzAbloese)),
+      gehalt: fehltMin * input.platzGehalt,
+    };
+  }
+  if (fehltOpt > 0) {
+    return {
+      abloese: Math.max(0, Math.min(fehltOpt * input.platzAbloese, input.cash - input.notruecklage)),
+      gehalt: fehltOpt * input.platzGehalt,
+    };
+  }
+  return { abloese: 0, gehalt: 0 };
 }
 
 /** Die Zahlen fuer Finanzseite, Transfermarkt und Spielerprofil. Fuer KI und Mensch dieselbe Funktion. */
@@ -365,16 +442,50 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
 
   // Gehaltstopf.
   const gehaltGesamt = gedeckelt ? gehaltBudget0 + umschicht : Math.max(basis, gehaltsSumme);
-  const gehaltFrei = Math.max(0, gehaltGesamt - gehaltsSumme);
+  let gehaltFrei = Math.max(0, gehaltGesamt - gehaltsSumme);
   const gehaltGrund = !gedeckelt
     ? "Saison 1: Gehaltsbudget voll freigegeben."
     : gehaltsQuote >= 1
       ? "Gehaltsbudget voll freigegeben."
       : `Gehaltsbudget auf ${Math.round(gehaltsQuote * 100)} % gekürzt (nie unter 75 %); frei werdendes Gehalt aus Verkäufen kommt zu 100 % zurueck.`;
 
+  // Kaderpflicht-Freigabe (Chris 18.11.): Geld da, aber nicht freigegeben, waehrend das Team das Minimum nicht erreicht oder sich dem Opt
+  // nicht naehern kann, ist ein Notfall: der Rahmen ist dann nie kleiner als die Kosten dieser Plaetze (Platzpreis, Ablose UND Gehalt).
+  const kaderIst = gameState.rosters.filter((r) => r.teamId === teamId).length;
+  const kaderMin = Math.max(VORSTAND_PFLICHT_KADER, identity?.playerMin ?? 0);
+  const kaderOpt = Math.max(kaderMin, identity?.playerOpt ?? kaderMin);
+  const platz = gedeckelt ? platzPreisAusMarkt(gameState) : { fee: 0, salary: 0 };
+  const zuschlag = gedeckelt
+    ? kaderpflichtZuschlag({ kaderIst, kaderMin, kaderOpt, platzAbloese: platz.fee, platzGehalt: platz.salary, cash, notruecklage: ruecklageErg.ruecklage })
+    : { abloese: 0, gehalt: 0 };
+  const basisFreiAbloese = transferFrei;
+  const basisFreiGehalt = gehaltFrei;
+  const kpAbloese = Math.max(0, zuschlag.abloese - basisFreiAbloese);
+  const kpGehalt = Math.max(0, zuschlag.gehalt - basisFreiGehalt);
+  if (kpAbloese > 0.004) transferFrei = Math.min(cash, transferFrei + kpAbloese);
+  if (kpGehalt > 0.004) gehaltFrei += kpGehalt;
+  const kaderpflichtAktiv = kpAbloese > 0.004 || kpGehalt > 0.004;
+  const kaderpflichtText = kaderpflichtAktiv
+    ? `Kaderpflicht: Vorstand gibt ${zahlText(kpAbloese)} C frei (Kader ${kaderIst}/${kaderIst < kaderMin ? kaderMin : kaderOpt})`
+    : null;
+
   return {
     getrennt: true,
     gedeckelt,
+    kaderpflicht: {
+      aktiv: kaderpflichtAktiv,
+      kaderIst,
+      kaderMin,
+      kaderOpt,
+      platzAbloese: r2(platz.fee),
+      platzGehalt: r2(platz.salary),
+      zuschlagAbloese: r2(kpAbloese),
+      zuschlagGehalt: r2(kpGehalt),
+      basisFreiAbloese: r2(basisFreiAbloese),
+      basisFreiGehalt: r2(basisFreiGehalt),
+      notruecklage: r2(ruecklageErg.ruecklage),
+      text: kaderpflichtText,
+    },
     investition: {
       gesamt: r2(transferGesamt),
       ausgegeben: r2(ausgegebenTransfer),
@@ -462,15 +573,19 @@ function zaehleSperre(art: keyof typeof SPERRE_ZAEHLER, teamId: string): void {
   SPERRE_ZAEHLER[art][teamId] = (SPERRE_ZAEHLER[art][teamId] ?? 0) + 1;
 }
 
-/** Pflichtkader: Kaeufe bis zu diesem Kader sind NIE gesperrt (Chris 18.11.: keine Finanzregel darf ein Team unter 8 halten). */
-export const VORSTAND_PFLICHT_KADER = 8;
 
 export type KaufRahmen = {
   gedeckelt: boolean;
-  /** Was der Investitionstopf noch fuer Abloesen frei hat (Infinity, wenn nicht gedeckelt). */
+  /** Was der Investitionstopf noch fuer Abloesen frei hat, inkl. Kaderpflicht-Freigabe (Infinity, wenn nicht gedeckelt). */
   abloeseFrei: number;
-  /** Was der Gehaltstopf noch fuer Jahresgehaelter frei hat (Infinity, wenn nicht gedeckelt). */
+  /** Was der Gehaltstopf noch fuer Jahresgehaelter frei hat, inkl. Kaderpflicht-Freigabe (Infinity, wenn nicht gedeckelt). */
   gehaltFrei: number;
+  /**
+   * Die Grenze fuer den NAECHSTEN Kauf, wenn schon `spentFee` / `spentSalary` ausgegeben wurden und der Kader `rosterBefore` hat:
+   * der Rahmen nach Quote (abzueglich Ausgaben) oder die Kaderpflicht-Freigabe fuer die dann fehlenden Plaetze, was groesser ist.
+   * Planer rechnen damit laufend; die Sperre im Kaufweg rechnet mit demselben Ergebnis auf dem echten Stand.
+   */
+  grenzeFuer: (rosterBefore: number, spentFee: number, spentSalary: number) => { fee: number; salary: number };
   stand: VorstandBudgetStand;
 };
 
@@ -480,8 +595,32 @@ export type KaufRahmen = {
  */
 export function kaufRahmen(gameState: GameState, teamId: string): KaufRahmen {
   const stand = berechneVorstandBudgetStand(gameState, teamId);
-  if (!stand.gedeckelt) return { gedeckelt: false, abloeseFrei: Infinity, gehaltFrei: Infinity, stand };
-  return { gedeckelt: true, abloeseFrei: stand.investition.frei, gehaltFrei: stand.gehalt.frei, stand };
+  if (!stand.gedeckelt) {
+    return { gedeckelt: false, abloeseFrei: Infinity, gehaltFrei: Infinity, grenzeFuer: () => ({ fee: Infinity, salary: Infinity }), stand };
+  }
+  const kp = stand.kaderpflicht;
+  const cash = gameState.teams.find((t) => t.teamId === teamId)?.cash ?? 0;
+  return {
+    gedeckelt: true,
+    abloeseFrei: stand.investition.frei,
+    gehaltFrei: stand.gehalt.frei,
+    grenzeFuer: (rosterBefore, spentFee, spentSalary) => {
+      const z = kaderpflichtZuschlag({
+        kaderIst: rosterBefore,
+        kaderMin: kp.kaderMin,
+        kaderOpt: kp.kaderOpt,
+        platzAbloese: kp.platzAbloese,
+        platzGehalt: kp.platzGehalt,
+        cash: cash - spentFee,
+        notruecklage: kp.notruecklage,
+      });
+      return {
+        fee: Math.max(kp.basisFreiAbloese - spentFee, z.abloese),
+        salary: Math.max(kp.basisFreiGehalt - spentSalary, z.gehalt),
+      };
+    },
+    stand,
+  };
 }
 
 /**
@@ -497,11 +636,12 @@ export function pruefeKaufGegenVorstandFreigabe(
   const stand = rahmen.stand;
   if (!rahmen.gedeckelt) return { ok: true, reason: null, stand };
   if (input.rosterBefore < VORSTAND_PFLICHT_KADER) return { ok: true, reason: null, stand };
-  if (input.fee > rahmen.abloeseFrei + 1e-9) {
+  const grenze = rahmen.grenzeFuer(input.rosterBefore, 0, 0);
+  if (input.fee > Math.max(rahmen.abloeseFrei, grenze.fee) + 1e-9) {
     zaehleSperre("kauf", teamId);
     return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
   }
-  if (Math.max(0, input.salary) > rahmen.gehaltFrei + 1e-9) {
+  if (Math.max(0, input.salary) > Math.max(rahmen.gehaltFrei, grenze.salary) + 1e-9) {
     zaehleSperre("kauf_gehalt", teamId);
     return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
   }
