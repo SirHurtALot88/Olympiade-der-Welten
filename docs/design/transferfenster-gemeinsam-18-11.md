@@ -207,6 +207,11 @@ Die Rücklagen-Meldung des Legacy-Plans (Kandidaten nach Wertung statt nach Lüc
 `ai-transfermarkt-preview-service.ts` `empfehlungsAnzahl = Math.max(3, kaderLuecke + 2)`, Rangfolge nach Score) ist der
 eigentliche Grund für M-M; der Overlay-Fix umgeht ihn, die Auswahl selbst bleibt Planer-Sache.
 
+**Nachtrag (Fenster auf Opt, `docs/design/fenster-auf-opt-18-11.md`):** Chris hat die Grenze „Verkauf nur bis zum Minimum“
+zurückgenommen („man darf alle Spieler verkaufen, auch unter Minimum. Die KI soll danach ja einfach auf Optimum füllen!“).
+Seitdem verkauft die Verkaufsrunde frei, und Kauf- und Nachrunde laufen über den organischen Planer mit Kaderplan statt über
+den Marktplan; `OLY_FENSTER_AUF_OPT=0` stellt den Stand dieses Abschnitts her.
+
 ## 7. Offene Punkte
 
 1. **„Notrücklage“** gibt es im Spielstand nicht als eigenes Konto; die Rücklage nach Finanzwert liegt in der Kasse. Der

@@ -466,7 +466,7 @@ Arena-Fingerabdruck unverändert **`d3a39030a3ef`** (75 Einträge).
 
 ### 9.4 Offen
 
-* **S3** (Gehaltsseite der Plätze bis Opt im Gehaltstopf) — mit der S2-Umstellung; bis dahin ist der Kaderplan ab Saison 2 aus.
+* **S3** (Gehaltsseite der Plätze bis Opt im Gehaltstopf) — **gelöst** mit „Fenster auf Opt“ (`docs/design/fenster-auf-opt-18-11.md`): `kaderplanRahmen` reserviert Ablöse und Gehalt gegen `kaufRahmen().grenzeFuer`; der Kaderplan ist im Fenster ab Saison 2 an (`OLY_FENSTER_AUF_OPT=0` = nur Saison 1).
 * Teams, die den Einzelschritt-Draft über die Pick-Grenze beenden (`max_picks`, 9 Teams mit Opt 14), haben kein Verlaufs-Protokoll; ihre
   Füller auf den letzten Plätzen sind deshalb nicht als Notweg gezählt (Block: dieselben Teams ohne Füller).
 * 9–10 Teams liegen über 70 Gehalt. Soll das Band 50–70 enger werden, braucht es eine Gehaltsseite im Plan (Teil von S3) oder eine
