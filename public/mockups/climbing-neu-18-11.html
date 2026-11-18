@@ -439,7 +439,7 @@ var Z=SIM.neu(), zeiten={rangel:{t:15,x:700,y:352},hilfe:{t:19,x:600,y:420},dach
   var z=SIM.neu();while(!z.ende)SIM.schritt(1/60);
   var e=z.ereignisse,f=function(t){for(var i=0;i<e.length;i++)if(e[i].typ===t)return e[i].t;return null;};
   var fe=function(t,ab){for(var i=0;i<e.length;i++)if(e[i].typ===t&&e[i].t>=(ab||0))return{t:e[i].t,x:e[i].x,y:e[i].y};return null;};
-  zeiten.rangel=fe("rangel")||zeiten.rangel;zeiten.hilfe=fe("zieht",40)||fe("zieht")||zeiten.hilfe;zeiten.ziel=f("ziel")||60;
+  zeiten.rangel=fe("rangel")||zeiten.rangel;zeiten.hilfe=fe("zieht",33)||fe("zieht")||zeiten.hilfe;zeiten.ziel=f("ziel")||60;
   var d=null;z=SIM.neu();while(!z.ende&&d===null){SIM.schritt(1/60);z.L.forEach(function(c){if(d===null&&c.pfad[c.si].typ==="dach")d=z.t;});}
   zeiten.dach=d||36;Z=SIM.neu();
 })();
