@@ -14,8 +14,8 @@
  */
 import type { GameState, LigaDraftEintrag, LigaDraftZustand } from "@/lib/data/olyDataTypes";
 import { bewerteKiPick, freieSpieler, type LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
-import { kaderStaerkeFuerReihenfolge, naechsteZuege, werIstDran } from "@/lib/draft/liga-draft-modell";
-import { pflichtReserve } from "@/lib/draft/liga-draft-dienst";
+import { darfAuslassen, kaderStaerkeFuerReihenfolge, naechsteZuege, werIstDran } from "@/lib/draft/liga-draft-modell";
+import { nichtsLeistbar, pflichtReserve } from "@/lib/draft/liga-draft-dienst";
 
 export type LigaDraftSpielerKarte = {
   playerId: string;
@@ -83,7 +83,10 @@ export type LigaDraftAnsicht = {
   verlauf: Array<Omit<LigaDraftEintrag, "top3"> & { top3: string[] | null }>;
   /** Karten fuer alle Spieler, die in `naechste`/`verlauf`/`mein` vorkommen. */
   spieler: Record<string, LigaDraftSpielerKarte>;
-  /** Sicht des Betrachter-Teams (falls angegeben und im Draft). */
+  /**
+   * Sicht des Betrachter-Teams (falls angegeben und im Draft). PRIVAT: die Route setzt `betrachterTeamId` nur fuer ein
+   * Team, fuer das der Aufrufer das Schreibrecht `draft_pick` hat — sonst `null`.
+   */
   mein: null | {
     teamId: string;
     art: "ki" | "mensch";
@@ -92,7 +95,9 @@ export type LigaDraftAnsicht = {
     amZug: boolean;
     /** Darf jetzt picken (am Zug ohne Auto-Pick, oder im Nachzug nach dem geordneten Teil). */
     darfPicken: boolean;
+    /** Am Zug ohne Auto-Pick UND die restlichen Runden reichen nach dem Auslassen noch bis zum Mindestkader. */
     darfAuslassen: boolean;
+    /** Ab dem Mindestkader, darunter nur wenn nichts mehr leistbar ist. */
     darfFertig: boolean;
     darfUeberspringen: boolean;
     kader: number;
@@ -232,6 +237,8 @@ export function baueLigaDraftAnsicht(input: {
         : [];
     vorschlag.forEach(karte);
     const index = folge.findIndex((zug) => zug.teamId === teamId);
+    const mensch = betrachter.art === "mensch";
+    const leer = mensch && betrachter.status !== "fertig" && nichtsLeistbar(gameState, teamId);
     mein = {
       teamId,
       art: betrachter.art,
@@ -239,8 +246,10 @@ export function baueLigaDraftAnsicht(input: {
       autoPick: betrachter.autoPick,
       amZug,
       darfPicken: betrachter.art === "mensch" && ((amZug && !betrachter.autoPick) || imNachzugOffen),
-      darfAuslassen: betrachter.art === "mensch" && amZug && !betrachter.autoPick,
-      darfFertig: betrachter.art === "mensch" && betrachter.status !== "fertig" && kader >= draft.regeln.minKader,
+      // Auslassen nur, solange die restlichen Runden noch bis zum Mindestkader reichen (oder nichts leistbar ist).
+      darfAuslassen: mensch && amZug && !betrachter.autoPick && darfAuslassen(draft, kader, leer),
+      // „Ich bin fertig“ ab dem Mindestkader — darunter nur, wenn nichts mehr leistbar ist.
+      darfFertig: mensch && betrachter.status !== "fertig" && (kader >= draft.regeln.minKader || leer),
       darfUeberspringen: betrachter.art === "mensch" && betrachter.status === "aktiv" && draft.status === "laeuft",
       kader,
       kasse: Math.round(kasse * 100) / 100,

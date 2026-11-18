@@ -280,15 +280,21 @@ export function bucheDraftPick(input: {
   return normalisiereZug({ ...naechster, platz: draft.platz + 1 }, input.gameState, jetzt);
 }
 
-/** Der Mensch am Zug laesst diesen Pick aus. */
+/**
+ * Der Mensch am Zug laesst diesen Pick aus — nur solange `darfAuslassen` gilt (Kader aus `gameState.rosters`;
+ * `nichtsLeistbar` rechnet der Dienst, der die freien Spieler kennt). Sonst Fehler `auslassen_unter_mindestkader`.
+ */
 export function bucheAuslassen(input: {
   draft: LigaDraftZustand;
   gameState: Pick<GameState, "rosters" | "players" | "disciplines" | "teams">;
   teamId: string;
+  nichtsLeistbar?: boolean;
   jetzt: string;
 }): LigaDraftZustand {
   const { draft, jetzt } = input;
   const team = draft.teams[input.teamId]!;
+  const kader = (input.gameState.rosters ?? []).filter((eintrag) => eintrag.teamId === input.teamId).length;
+  if (!darfAuslassen(draft, kader, input.nichtsLeistbar)) throw new Error("auslassen_unter_mindestkader");
   const eintrag = neuerEintrag(
     draft,
     {
@@ -392,8 +398,74 @@ export function setzeAutoPick(draft: LigaDraftZustand, teamId: string, an: boole
   return { ...mitTeam(draft, teamId, { autoPick: an }), aktualisiertAm: jetzt };
 }
 
-/** Sperrt der laufende Draft den freien Markt? (Waehrend der geordneten Phase kauft niemand am Draft vorbei.) */
-export function ligaDraftSperrtMarktkauf(gameState: Pick<GameState, "seasonState" | "season">): boolean {
+/**
+ * Darf ein Mensch diesen Pick auslassen? Auslassen ist je Pick erlaubt, aber nicht bis unter den Mindestkader: nach dem
+ * Auslassen muessen die restlichen Runden noch reichen, um auf `minKader` zu kommen (ein Pick je Runde). Ausnahme: es
+ * ist nichts mehr leistbar — dann kann das Team ohnehin nicht weiter auffuellen. (Review #1619, A5: kein Draft-Ende mit
+ * 0 Spielern durch wiederholtes Auslassen.)
+ */
+export function darfAuslassen(draft: Pick<LigaDraftZustand, "runde" | "regeln">, kader: number, nichtsLeistbar = false): boolean {
+  const fehlend = draft.regeln.minKader - kader;
+  if (fehlend <= 0 || nichtsLeistbar) return true;
+  const restRunden = draft.regeln.maxRunden - draft.runde;
+  return restRunden >= fehlend;
+}
+
+/**
+ * Bricht den Draft ab (Gastgeber): alle noch aktiven oder im Nachzug stehenden Teams sind fertig (`abgebrochen`), der
+ * Draft ist `fertig` und sperrt damit nichts mehr.
+ */
+export function bricheLigaDraftAb(draft: LigaDraftZustand, jetzt: string): LigaDraftZustand {
+  if (draft.status === "fertig") return draft;
+  const teams: Record<string, LigaDraftTeamZustand> = {};
+  for (const [teamId, team] of Object.entries(draft.teams)) {
+    teams[teamId] = team.status === "fertig" ? team : { ...team, status: "fertig", fertigGrund: "abgebrochen" };
+  }
+  return { ...draft, teams, status: "fertig", platz: draft.reihenfolge.length, aktualisiertAm: jetzt, beendetAm: jetzt };
+}
+
+/**
+ * Schalter: `OLY_LIGA_DRAFT_MODUS=einzelschritt` startet beim Anlegen einer Liga den neuen Draft statt des alten. Steht
+ * hier (und nicht nur im Dienst), damit die Sperren unten ihn ohne den schweren Importgraph des Dienstes lesen.
+ */
+export function istEinzelschrittDraftAktiv(): boolean {
+  return process.env.OLY_LIGA_DRAFT_MODUS === "einzelschritt";
+}
+
+/** Der Draft-Zustand der laufenden Saison, falls es einen gibt (egal welcher Status). */
+export function ligaDraftDieserSaison(gameState: Pick<GameState, "seasonState" | "season">): LigaDraftZustand | null {
   const draft = gameState.seasonState?.ligaDraft;
-  return Boolean(draft && draft.saisonId === gameState.season.id && draft.status === "laeuft");
+  return draft && draft.saisonId === gameState.season?.id ? draft : null;
+}
+
+/**
+ * „LIGA-DRAFT LAEUFT“ — die eine Frage, an der alle KI-Kaufwege neben dem Draft haengen (Review #1619, A1):
+ * Preseason-Lauf (`fuehreKiPreseasonLaufAus`), KI-Kaderlauf (`runAiPicksExecutePreview`, `/api/ai/picks-run`) und
+ * Auto-Auffuellen (`/api/ai/roster-fill`). Laeuft = Schalter an UND ein Draft dieser Saison, der noch nicht `fertig` ist
+ * (geordnete Phase ODER Nachzug — im Nachzug picken Menschen noch aus dem Rest, da kauft keine KI dazwischen).
+ * Schalter aus: immer `false` — ein liegengebliebener Draft sperrt dann nichts (A2).
+ */
+export function ligaDraftLaeuft(gameState: Pick<GameState, "seasonState" | "season">): boolean {
+  if (!istEinzelschrittDraftAktiv()) return false;
+  const draft = ligaDraftDieserSaison(gameState);
+  return Boolean(draft && draft.status !== "fertig");
+}
+
+/** Ein KI-Kaufweg wurde abgelehnt, weil der Liga-Draft laeuft (`ligaDraftLaeuft`). Routen antworten 409 `liga_draft_laeuft`. */
+export class LigaDraftLaeuftFehler extends Error {
+  readonly code = "liga_draft_laeuft";
+  readonly httpStatus = 409;
+  constructor() {
+    super("liga_draft_laeuft");
+    this.name = "LigaDraftLaeuftFehler";
+  }
+}
+
+/**
+ * Sperrt der laufende Draft den freien Markt fuer Menschen? Nur in der geordneten Phase (im Nachzug kauft ein fertiges
+ * Team wieder normal ein) und nur mit Schalter an — Schalter aus: ein liegengebliebener Draft sperrt den Markt nicht.
+ */
+export function ligaDraftSperrtMarktkauf(gameState: Pick<GameState, "seasonState" | "season">): boolean {
+  if (!istEinzelschrittDraftAktiv()) return false;
+  return ligaDraftDieserSaison(gameState)?.status === "laeuft";
 }

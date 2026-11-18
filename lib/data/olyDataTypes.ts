@@ -3734,7 +3734,9 @@ export type LigaDraftFertigGrund =
   | "nichts_leistbar"
   | "kauf_blockiert"
   | "mensch_fertig"
-  | "draft_ende";
+  | "draft_ende"
+  /** Der Gastgeber hat den Draft abgebrochen (`/api/draft` Aktion `abbrechen`). */
+  | "abgebrochen";
 
 export type LigaDraftTeamZustand = {
   teamId: string;

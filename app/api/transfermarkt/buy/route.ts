@@ -116,7 +116,8 @@ export async function POST(request: Request) {
     }
 
     // Liga-Draft im Einzelschritt (docs/design/draft-neubau-kern-18-11.md): waehrend der geordneten Phase kauft niemand
-    // am Draft vorbei — sonst haette ein Mensch die Reihenfolge umgangen. Gepickt wird dann ueber /api/draft.
+    // am Draft vorbei — sonst haette ein Mensch die Reihenfolge umgangen. Gepickt wird dann ueber /api/draft. Nur mit
+    // Schalter an (`ligaDraftSperrtMarktkauf` fragt ihn selbst): ein liegengebliebener Draft sperrt sonst nichts.
     if (!dryRun && ligaDraftSperrtMarktkauf(save.gameState)) {
       return NextResponse.json(
         {

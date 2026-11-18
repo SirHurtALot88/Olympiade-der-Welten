@@ -14,6 +14,8 @@ import {
   bucheAusstieg,
   bucheDraftPick,
   bucheUeberspringen,
+  bricheLigaDraftAb,
+  darfAuslassen,
   erzeugeLigaDraft,
   naechsteZuege,
   setzeAutoPick,
@@ -141,13 +143,59 @@ describe("Regeln: Runden, Picks, Auslassen, Aussteigen", () => {
     expect(draft.status).toBe("fertig");
   });
 
-  it("nach Runde 16 endet der Draft auch fuer Teams unter 14 Picks", () => {
-    const gs = stand([{ teamId: "M", cash: 0 }]);
+  it("nach Runde 16 endet der Draft auch fuer Teams unter 14 Picks (mit Mindestkader darf ein Team jede Runde auslassen)", () => {
+    // Review #1619, A5: das geht nur, weil M schon 8 Spieler hat. Ohne Kader darf es nicht bis zum Ende auslassen (s. u.).
+    const gs = stand([{ teamId: "M", cash: 0 }], { M: [50, 50, 50, 50, 50, 50, 50, 50] });
     let draft = erzeugeLigaDraft({ gameState: gs, teams: [sitz("M", "mensch")], seed: "s", jetzt: JETZT });
     for (let i = 0; i < 16; i += 1) draft = bucheAuslassen({ draft, gameState: gs, teamId: "M", jetzt: JETZT });
     expect(draft.status).toBe("fertig");
     expect(draft.teams.M!.fertigGrund).toBe("draft_ende");
     expect(draft.verlauf.filter((e) => e.art === "auslassen")).toHaveLength(16);
+  });
+
+  it("A5: kein Draft-Ende mit 0 Spielern durch Auslassen — auslassen nur, solange die Runden bis 8 noch reichen", () => {
+    const gs = stand([{ teamId: "M", cash: 0 }]);
+    let draft = erzeugeLigaDraft({ gameState: gs, teams: [sitz("M", "mensch")], seed: "s", jetzt: JETZT });
+    // Runde 1–8: nach dem Auslassen bleiben 15 … 8 Runden fuer 8 Pflichtplaetze.
+    for (let i = 0; i < 8; i += 1) {
+      expect(darfAuslassen(draft, 0)).toBe(true);
+      draft = bucheAuslassen({ draft, gameState: gs, teamId: "M", jetzt: JETZT });
+    }
+    expect(draft.runde).toBe(9);
+    // Runde 9: nur noch 7 Runden danach — Auslassen abgelehnt, der Draft wartet auf einen Pick.
+    expect(darfAuslassen(draft, 0)).toBe(false);
+    expect(() => bucheAuslassen({ draft, gameState: gs, teamId: "M", jetzt: JETZT })).toThrow("auslassen_unter_mindestkader");
+    expect(draft.status).toBe("laeuft");
+    // Ausnahme: nichts mehr leistbar.
+    expect(darfAuslassen(draft, 0, true)).toBe(true);
+    // Mit Spielern im Kader verschiebt sich die Grenze: 3 Spieler -> 5 fehlen, Runde 9 laesst 7 Runden -> erlaubt.
+    expect(darfAuslassen(draft, 3)).toBe(true);
+    // Wer dann pickt, kommt in Runde 9–16 genau auf 8.
+    let kader = 0;
+    while (draft.status === "laeuft") {
+      draft = pick(draft, gs, "M");
+      kader += 1;
+    }
+    expect(kader).toBe(8);
+  });
+
+  it("A2: Abbrechen schliesst den Draft, offene Teams (aktiv/Nachzug) sind `abgebrochen`, fertige bleiben", () => {
+    const gs = stand([
+      { teamId: "A", cash: 1 },
+      { teamId: "B", cash: 2 },
+      { teamId: "M", cash: 3 },
+    ]);
+    let draft = erzeugeLigaDraft({ gameState: gs, teams: [sitz("A"), sitz("B"), sitz("M", "mensch")], seed: "s", jetzt: JETZT });
+    draft = bucheAusstieg({ draft, gameState: gs, teamId: "A", grund: "ki_stop", quelle: "ki", jetzt: JETZT });
+    draft = bucheUeberspringen({ draft, gameState: gs, teamId: "M", variante: "A", jetzt: JETZT });
+    const ab = bricheLigaDraftAb(draft, JETZT);
+    expect(ab.status).toBe("fertig");
+    expect(ab.beendetAm).toBe(JETZT);
+    expect(ab.teams.A!.fertigGrund).toBe("ki_stop");
+    expect(ab.teams.B).toMatchObject({ status: "fertig", fertigGrund: "abgebrochen" });
+    expect(ab.teams.M).toMatchObject({ status: "fertig", fertigGrund: "abgebrochen" });
+    expect(werIstDran(ab)).toBeNull();
+    expect(bricheLigaDraftAb(ab, "spaeter")).toBe(ab);
   });
 
   it("ein Ausstieg am Zug gibt den Platz weiter; fertige Teams werden uebersprungen", () => {

@@ -34,6 +34,7 @@
  */
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
+import { ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 import type { GameState, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -525,6 +526,21 @@ export async function runAutoRosterFillForMatchdaySetup(
       saveName: save.name ?? null,
       requestedSeasonId: input.seasonId ?? null,
     });
+  }
+  // LIGA-DRAFT LAEUFT (Review #1619, A1): kein Auto-Auffuellen neben dem Einzelschritt-Draft. Schalter aus: nie.
+  if (!dryRun && ligaDraftLaeuft(save.gameState)) {
+    return {
+      ...baueGesperrtesErgebnis({
+        saveId: save.saveId,
+        seasonId,
+        dryRun,
+        teamCount: save.gameState.teams.length,
+        saveName: save.name ?? null,
+        requestedSeasonId: input.seasonId ?? null,
+      }),
+      warnings: ["liga_draft_laeuft: gekauft wird waehrend des Liga-Drafts nur ueber /api/draft"],
+      blockingReasons: ["liga_draft_laeuft"],
+    };
   }
 
 

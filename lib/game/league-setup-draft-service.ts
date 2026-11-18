@@ -155,11 +155,14 @@ async function kickoffEinzelschrittDraft(input: {
   try {
     const { laufeKiImHintergrund, starteLigaDraft } = await import("@/lib/draft/liga-draft-dienst");
     starteLigaDraft({ persistence, saveId, selbstPickendeTeamIds: input.selbstPickendeTeamIds });
-    // Bricht der Lauf ab, bleibt der Draft an seinem letzten gespeicherten Pick stehen und laesst sich ueber
-    // `/api/draft` (Aktion `ki_schritt`/`ki_hintergrund`) fortsetzen; geloggt wird im Dienst.
-    await laufeKiImHintergrund({ persistence, saveId, logPrefix }).catch(() => undefined);
+    // Bricht der KI-Lauf ab, bleibt der Draft an seinem letzten gespeicherten Pick stehen. Der Fehler wird NICHT
+    // verschluckt (Review #1619, A2): die Liga steht dann auf "failed" — die Shell zeigt ihr Fehlerschild mit
+    // „Erneut versuchen“, und `starteLigaDraft` setzt beim erneuten Anstoss den vorhandenen Draft fort statt ihn neu
+    // anzulegen. Fortsetzen geht auch ueber `/api/draft` (`ki_schritt`/`ki_hintergrund`); jeder weitere Draft-Schreibvorgang
+    // setzt den Status wieder auf "in_progress".
+    await laufeKiImHintergrund({ persistence, saveId, logPrefix });
   } catch (error) {
-    console.error(`${logPrefix} Liga-Draft (Einzelschritt) konnte nicht angelegt werden:`, error);
+    console.error(`${logPrefix} Liga-Draft (Einzelschritt) angehalten:`, error);
     schreibeLigaSetupStatus(persistence, saveId, "failed", null);
   }
 }

@@ -92,6 +92,23 @@ describe("league-setup-draft-service", () => {
         delete process.env.OLY_LIGA_DRAFT_MODUS;
       }
     });
+
+    it("Review #1619 A2: bricht der KI-Hintergrundlauf ab, steht die Liga auf `failed` (Fehler nicht verschluckt)", async () => {
+      const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
+      const persistence = createFakePersistence([{ saveId: "save-f", gameState: buildGameState() }]);
+      laufeKiImHintergrund.mockRejectedValueOnce(new Error("koop_schreibkonflikt"));
+      const fehlerLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      process.env.OLY_LIGA_DRAFT_MODUS = "einzelschritt";
+      try {
+        kickoffLeagueSetupDraft({ persistence: persistence as never, saveId: "save-f", excludeTeamIds: [], logPrefix: "[test]" });
+        await flushMicrotasks();
+        expect(persistence.saves.get("save-f")!.gameState.seasonState.leagueSetupStatus).toBe("failed");
+        expect(fehlerLog).toHaveBeenCalled();
+      } finally {
+        delete process.env.OLY_LIGA_DRAFT_MODUS;
+        fehlerLog.mockRestore();
+      }
+    });
   });
 
   describe("kickoffLeagueSetupDraft (Teil A: Hintergrund-Kickoff)", () => {
