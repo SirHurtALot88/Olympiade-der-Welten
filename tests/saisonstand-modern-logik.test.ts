@@ -8,6 +8,8 @@ import {
   istDuellVerlauf,
   lagesatz,
   matrixAnteil,
+  anteilStufe,
+  duellPunkteJeDisziplin,
   matrixStufe,
   rangStufe,
   stehtAufDemSpiel,
@@ -139,5 +141,30 @@ describe("Saisonstand modern: Matchwinner", () => {
     expect(matrixStufe(2.5, spalte)).toBe(0);
     expect(matrixStufe(null, spalte)).toBeNull();
     expect(matrixStufe(5, [5, 5, 5])).toBe(4);
+  });
+
+  it("Matrix im Duell-Save: ganzzahlige Duellpunkte je Disziplin, keine PPs", () => {
+    const d = (disciplineId: string, h: number | null, g: number | null) => ({ disciplineId, gespielt: h != null, punkteHeim: h, punkteGast: g });
+    const u1 = {
+      paarungen: [
+        { homeTeamId: "A", awayTeamId: "B", disziplinen: [d("climbing", 2, 0), d("wettessen", 1, 1)] },
+      ],
+      miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [{ teamId: "A", teamPoints: 2 }, { teamId: "B", teamPoints: 0 }, { teamId: "C", teamPoints: null }] }],
+    };
+    const u2 = { paarungen: [{ homeTeamId: "B", awayTeamId: "A", disziplinen: [d("climbing", 2, 0), d("tdm", null, null)] }], miniDmPods: [] };
+    const m = duellPunkteJeDisziplin([u1, u2, null] as never);
+    expect(m.get("A")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
+    expect(m.get("B")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
+    expect(m.get("A")?.get("wettessen")).toEqual({ punkte: 1, moeglich: 2 });
+    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
+    expect(m.get("A")?.has("tdm")).toBe(false);
+    expect(m.has("C")).toBe(false);
+    for (const jeD of m.values()) for (const z of jeD.values()) expect(Number.isInteger(z.punkte)).toBe(true);
+    expect(anteilStufe({ punkte: 0, moeglich: 2 })).toBe(0);
+    expect(anteilStufe({ punkte: 1, moeglich: 4 })).toBe(1);
+    expect(anteilStufe({ punkte: 1, moeglich: 2 })).toBe(2);
+    expect(anteilStufe({ punkte: 3, moeglich: 4 })).toBe(3);
+    expect(anteilStufe({ punkte: 4, moeglich: 4 })).toBe(4);
+    expect(anteilStufe(null)).toBeNull();
   });
 });

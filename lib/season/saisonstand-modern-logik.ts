@@ -7,6 +7,7 @@
  * Form-Kästchen, Ranglinien je Liga, Heatmap-Anteile. React-frei, damit alles ohne Rendering prüfbar ist.
  */
 import { LEAGUE_SIZE, RELEGATION_COUNT, type LeagueTier } from "@/lib/season/league-split";
+import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
 
 /** Titel (Liga 1, Platz 1), Aufstieg (Liga 2, Plätze 1–3), Abstieg (Liga 1, Plätze 14–16). */
 export type SaisonstandZone = "titel" | "aufstieg" | "abstieg";
@@ -241,4 +242,55 @@ export function rangStufe(platz: number | null | undefined, n: number): number |
   if (n === 1) return 2;
   const anteil = (Math.min(Math.max(platz, 1), n) - 1) / (n - 1);
   return Math.max(0, Math.min(4, 4 - Math.floor(anteil * 5 - 1e-9)));
+}
+
+/** Duellpunkte eines Teams in einer Disziplin: geholt und möglich (2 je gespieltem Einsatz). */
+export type DuellZelle = { punkte: number; moeglich: number };
+
+/**
+ * Duellpunkte je Team und Disziplin (Katalog-Id) über alle gespielten Spieltage — die Zahl, die in
+ * die Tabelle eingeht (2 Sieg / 1 Unentschieden / 0 Niederlage, Vierergruppe 2-1-0-0). Chris 18.11.:
+ * „warum sind da noch Nachkommastellen? Man bekommt pro Sieg doch 2 Punkte, unentschieden 1."
+ * Die Leistungspunkte der Spieler (PPs, mit Komma) gehören nicht in diese Matrix.
+ */
+export function duellPunkteJeDisziplin(
+  uebersichten: ReadonlyArray<Pick<SpieltagsUebersicht, "paarungen" | "miniDmPods"> | null | undefined>,
+): Map<string, Map<string, DuellZelle>> {
+  const ergebnis = new Map<string, Map<string, DuellZelle>>();
+  const buche = (teamId: string, disciplineId: string, punkte: number) => {
+    let jeDisziplin = ergebnis.get(teamId);
+    if (!jeDisziplin) ergebnis.set(teamId, (jeDisziplin = new Map()));
+    const zelle = jeDisziplin.get(disciplineId) ?? { punkte: 0, moeglich: 0 };
+    zelle.punkte += punkte;
+    zelle.moeglich += 2;
+    jeDisziplin.set(disciplineId, zelle);
+  };
+  for (const u of uebersichten) {
+    if (!u) continue;
+    for (const p of u.paarungen) {
+      for (const d of p.disziplinen) {
+        if (!d.gespielt || d.punkteHeim == null || d.punkteGast == null) continue;
+        buche(p.homeTeamId, d.disciplineId, d.punkteHeim);
+        buche(p.awayTeamId, d.disciplineId, d.punkteGast);
+      }
+    }
+    for (const pod of u.miniDmPods ?? []) {
+      for (const m of pod.mitglieder) {
+        if (m.teamPoints == null) continue;
+        buche(m.teamId, pod.disciplineId, m.teamPoints);
+      }
+    }
+  }
+  return ergebnis;
+}
+
+/** Stufe 0–4 nach Anteil der möglichen Duellpunkte: keine · weniger als die Hälfte · Hälfte · mehr · alle. */
+export function anteilStufe(zelle: DuellZelle | null | undefined): number | null {
+  if (!zelle || !(zelle.moeglich > 0)) return null;
+  const a = zelle.punkte / zelle.moeglich;
+  if (a <= 0) return 0;
+  if (a >= 1) return 4;
+  if (a < 0.5) return 1;
+  if (a > 0.5) return 3;
+  return 2;
 }

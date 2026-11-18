@@ -133,6 +133,10 @@
 .ssm-matrix-legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px 4px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-stumm); }
 .ssm-matrix-legende span { margin-right: 4px; }
 .ssm-matrix-legende i { font-style: normal; padding: 2px 8px; border-radius: 4px; color: var(--bc-creme); }
+.ssm-matrix-legende__naechst { font-style: normal; padding: 1px 7px; border: 1.5px solid var(--bc-gold); border-radius: 4px; color: var(--bc-gold); margin-left: 8px; }
+.ssm-matrix-legende__leer { margin-left: 8px; text-transform: none; letter-spacing: 0.02em; }
+.ssm-matrix thead th.ssm-matrix__diszi.is-naechster { box-shadow: inset 0 0 0 1.5px var(--bc-gold); border-radius: 4px; }
+.ssm-matrix thead th.ssm-matrix__diszi.is-naechster button { color: var(--bc-gold); }
 
 /* Verlauf */
 .ssm-verlauf-wrap { padding: 12px; overflow: auto; }

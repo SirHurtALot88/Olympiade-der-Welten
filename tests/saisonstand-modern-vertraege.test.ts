@@ -65,8 +65,11 @@ describe("Saisonstand modern: Verträge", () => {
   it("jede Ansicht ist gebaut: Tabelle, Matrix, Verlauf, Spieltage, Bestenliste", () => {
     for (const a of ['"tabelle"', '"matrix"', '"verlauf"', '"spieltage"', '"bestenliste"']) expect(MODERN).toContain(a);
   });
-  it("Spieltage laden lazy: genau ein getUebersicht je Spieltag-Wahl plus eines für den nächsten Gegner", () => {
-    expect(MODERN.match(/getUebersicht\(/g)?.length).toBe(2);
+  it("Spieltage laden lazy: je Spieltag-Wahl, nächster Gegner, nächste Disziplinen, Duell-Matrix (nur bei neuem Bundle)", () => {
+    expect(MODERN.match(/getUebersicht\(/g)?.length).toBe(4);
+    // Die Duell-Matrix (Chris 18.11.: Duellpunkte statt PPs) summiert alle gespielten Spieltage —
+    // einmal je neuem Spieltage-Bundle, nicht je Render oder Ansichtswechsel.
+    expect(MODERN).toMatch(/duellPunkteJeDisziplin\(gespielte\.map\(\(o\) => spieltage\.getUebersicht\(o\.id\)\)\);\n  \}, \[spieltage\]\)/);
   });
   it("Klassisch bleibt erreichbar, modern ist Standard", () => {
     expect(CLIENT).toContain('look === "klassisch"');
