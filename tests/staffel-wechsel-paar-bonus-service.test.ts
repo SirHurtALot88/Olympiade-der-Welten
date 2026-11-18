@@ -276,10 +276,14 @@ describe("Staffel O7 — Rohr zur Arena (buildArenaAufstellung)", () => {
   it("ein Spielstand OHNE das Feld (jeder Stand vor O7) liefert exakt die alte Aufstellung", () => {
     const ohne = buildArenaAufstellung(gameState({ drafts: [naechste], ohneFeld: true }), "A-A", md(5));
     const leer = buildArenaAufstellung(gameState({ drafts: [naechste], paare: [] }), "A-A", md(5));
+    // Seit 18.11. liest Staffel die gespielte Formkarte (FORMKARTEN_ECHT_DISCIPLINE_IDS): ohne Karte steht
+    // `form: 0, intensitaet: "normal"` an jedem Eintrag (die echte Wahl "keine Karte" statt der Ersatzkarte,
+    // docs/design/formkarten-alle-disziplinen-18-11.md). Ohne Paar-Geschichte kommen KEINE Paar-Felder dazu.
+    const ohneKarte = { form: 0, intensitaet: "normal" };
     expect(ohne).toStrictEqual({
-      "Name p1": { d: "staffel", slot: "startrunner" },
-      "Name p2": { d: "staffel", slot: "tempolink" },
-      "Name p3": { d: "staffel", slot: "batontech" },
+      "Name p1": { d: "staffel", slot: "startrunner", ...ohneKarte },
+      "Name p2": { d: "staffel", slot: "tempolink", ...ohneKarte },
+      "Name p3": { d: "staffel", slot: "batontech", ...ohneKarte },
     });
     expect(leer).toStrictEqual(ohne);
   });
@@ -288,10 +292,11 @@ describe("Staffel O7 — Rohr zur Arena (buildArenaAufstellung)", () => {
     let gs = gameState({ drafts: [] });
     for (const n of [1, 2, 3]) gs = spiele(gs, { matchdayId: md(n), aufstellungen: { "A-A": ["p1", "p2", "p4"] } });
     gs = { ...gs, seasonState: { ...gs.seasonState, lineupDrafts: [naechste] } } as GameState;
+    const ohneKarte = { form: 0, intensitaet: "normal" };
     expect(buildArenaAufstellung(gs, "A-A", md(5))).toStrictEqual({
-      "Name p1": { d: "staffel", slot: "startrunner" },
-      "Name p2": { d: "staffel", slot: "tempolink", wechselPaarBonus: 0.1, wechselPaarGeber: "Name p1", wechselPaarEingespielt: true },
-      "Name p3": { d: "staffel", slot: "batontech" },
+      "Name p1": { d: "staffel", slot: "startrunner", ...ohneKarte },
+      "Name p2": { d: "staffel", slot: "tempolink", ...ohneKarte, wechselPaarBonus: 0.1, wechselPaarGeber: "Name p1", wechselPaarEingespielt: true },
+      "Name p3": { d: "staffel", slot: "batontech", ...ohneKarte },
     });
   });
 });
