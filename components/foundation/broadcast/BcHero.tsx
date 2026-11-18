@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import "./broadcast.css";
+import { BcHeroKulisse } from "./BcHeroKulisse";
 
 /**
  * HERO-KOPF: Wappen, Dachzeile, Titel, Untertitel links; Reiter oder Kennzahl-Kacheln in der Mitte;
@@ -30,11 +31,7 @@ export function BcHero({
 }) {
   return (
     <header className={`bc-hero${className ? ` ${className}` : ""}`}>
-      {kulisseUrl ? (
-        <div className="bc-hero__kul" style={{ backgroundImage: `url("${kulisseUrl}")` }} aria-hidden="true" />
-      ) : (
-        <div className="bc-hero__kul is-farbe" aria-hidden="true" />
-      )}
+      <BcHeroKulisse url={kulisseUrl} />
       <div className="bc-hero__kopf">
         <div className="bc-hero__crest">
           {/* eslint-disable-next-line @next/next/no-img-element */}
