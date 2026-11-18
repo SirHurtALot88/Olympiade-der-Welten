@@ -20,7 +20,7 @@ import {
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import {
   buildOrganicSquadPlan,
-  istKaderplanAktiv,
+  istKaderplanSchalterAn,
   type KaderplanProtokoll,
   type OrganicBuyDecision,
   type OrganicSquadPlanInput,
@@ -42,7 +42,7 @@ import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/org
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
-import { getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
+import { GM_OPT_SENKUNG_MAX, getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   istKiRuecklageV2Aktiv,
@@ -387,16 +387,16 @@ export type OrganicDraftPlanInput = {
    */
   superstarLizenz?: boolean;
   /**
-   * PROTOTYP KADERPLAN (`OLY_KI_KADERPLAN=1`): Preise des Pools zu DRAFT-BEGINN (aufsteigend, s. `kaderplanPlatzPreise`),
+   * KADERPLAN (s. `istKaderplanAktiv`): Preise des Pools zu DRAFT-BEGINN (aufsteigend, s. `kaderplanPlatzPreise`),
    * damit Block und Einzelschritt mit demselben Platzpreis planen. Fehlt sie, gilt der aktuelle Pool.
    */
   platzPreise?: number[];
-  /** PROTOTYP KADERPLAN: Teams, die im Einzelschritt-Draft noch reihum picken (s. `economy.platzWettbewerb`). */
+  /** KADERPLAN: Teams, die im Einzelschritt-Draft noch reihum picken (s. `economy.platzWettbewerb`). */
   platzWettbewerb?: number;
 };
 
 /**
- * PROTOTYP KADERPLAN: Platzpreis-Liste aus einem Pool (Marktwert > 0, aufsteigend). Aufrufer reichen den Pool zu Beginn des
+ * KADERPLAN: Platzpreis-Liste aus einem Pool (Marktwert > 0, aufsteigend). Aufrufer reichen den Pool zu Beginn des
  * Drafts bzw. des Kauffensters herein, nicht den Restpool.
  */
 export function kaderplanPlatzPreise(pool: readonly Player[]): number[] {
@@ -426,7 +426,7 @@ export type OrganicDraftPlanResult = {
   vorstandDebug?: VorstandBudgetStand;
   /** Finanzkonzept V2 Stufe 2: der in den Forecast eingespeiste erwartete Sponsor (C). */
   sponsorForecast?: number;
-  /** PROTOTYP KADERPLAN: Grund der Kadergroesse (nur mit `OLY_KI_KADERPLAN=1`), mit der GM-Entscheidung zum Opt. */
+  /** KADERPLAN: Grund der Kadergroesse (nur mit Kaderplan, s. `istKaderplanAktiv`), mit der GM-Entscheidung zum Opt. */
   kaderplan?: KaderplanProtokoll & { optEntscheidung?: KaderplanOptEntscheidung };
 };
 
@@ -493,7 +493,7 @@ function buildOrganicPlanContext(input: {
  * lässt die Schleife darauf laufen; der Liga-Draft im Einzelschritt (lib/draft/liga-draft-ki.ts) baut ihn je Pick neu
  * und macht nur EINEN Schritt (`organicBuyStep`). Eine Quelle für beide Wege.
  */
-/** PROTOTYP KADERPLAN: Ziel-Kader aus Identitaet (Blatt + GM-Tiefe) und die bewusste GM-Senkung (s. gmKaderOptAnpassung). */
+/** KADERPLAN: Ziel-Kader aus Identitaet (Blatt + GM-Tiefe) und die bewusste GM-Senkung (s. gmKaderOptAnpassung). */
 export type KaderplanOptEntscheidung = { identitaetsOpt: number; optTarget: number; gmDelta: number; grund: string | null };
 
 export type OrganicDraftFrame = {
@@ -520,6 +520,16 @@ export const SAISON_EINS_RUECKLAGE_FAKTOR = 0.5;
 
 export function istSaisonEins(gameState: Pick<GameState, "season">): boolean {
   return /(\d+)\s*$/.exec(gameState.season?.id ?? "")?.[1] === "1";
+}
+
+/**
+ * KADERPLAN (docs/design/ki-pick-analyse-18-11.md): im Saison-1-Setup-Draft Standard AN (`OLY_KI_KADERPLAN=0` schaltet ab), ab
+ * Saison 2 AUS. Grund fuer die Begrenzung (Review S3): ueber dem Minimum prueft der Builder den Gehaltstopf (`salaryCap`, erst ab
+ * Saison 2 gesetzt) nur mit der Mindestkader-Reserve; die Gehaltsseite der Plaetze bis Opt ist noch nicht reserviert. Das kommt
+ * mit der S2-Umstellung; bis dahin plant der Kaderplan nur, wo es keinen Gehaltstopf gibt.
+ */
+export function istKaderplanAktiv(gameState: Pick<GameState, "season">): boolean {
+  return istKaderplanSchalterAn() && istSaisonEins(gameState);
 }
 
 /** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
@@ -596,26 +606,35 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   // trim optTarget by up to 2 (never below ROSTER_MIN) so per-slot budget rises and Depth becomes
   // affordable — fewer, better bodies instead of a Reserve tail. Rich clubs get strain 0 (untouched).
   let planWeights = ctx.weights;
+  const kaderplan = istKaderplanAktiv(input.gameState);
   if (FILLQ_B_ENABLED) {
     const slotsToFill = Math.max(1, ctx.weights.optTarget - startingSquad.length);
     const budgetPerSlot = (planCash - ORGANIC_CASH_BUFFER) / slotsToFill;
     const strain = Math.min(1, Math.max(0, 1 - budgetPerSlot / DEPTH_REF_COST));
-    const trimmedOpt = Math.max(ROSTER_MIN, ctx.weights.optTarget - Math.round(2 * strain));
+    // Review K5: mit Kaderplan nie unter Minimum + 1 (Chris: „es wird nie nur bis zum Minimum gepickt"); ohne wie bisher.
+    const untergrenze = kaderplan ? Math.min(ctx.weights.optTarget, ROSTER_MIN + 1) : ROSTER_MIN;
+    const trimmedOpt = Math.max(untergrenze, ctx.weights.optTarget - Math.round(2 * strain));
     if (trimmedOpt !== ctx.weights.optTarget) {
       planWeights = { ...ctx.weights, optTarget: trimmedOpt };
     }
   }
 
-  // PROTOTYP KADERPLAN: bewusste GM-Entscheidung „weniger, dafuer staerker" (hoechstens −2, nie unter Minimum + 1), protokolliert.
+  // KADERPLAN: bewusste GM-Entscheidung „weniger, dafuer staerker" (hoechstens −2, nie unter Minimum + 1), protokolliert.
+  // Mit der (standardmaessig abgeschalteten) Geld-Senkung FILLQB davor gilt die Grenze fuer BEIDE zusammen: hoechstens −2 gegen
+  // den Identitaets-Opt, nie unter Minimum + 1 (Review K5).
   let optEntscheidung: KaderplanOptEntscheidung | undefined;
-  if (istKaderplanAktiv()) {
+  let gmOptGesenkt = false;
+  if (kaderplan) {
     const anpassung = gmKaderOptAnpassung({
       bias: getTeamGeneralManager(input.gameState, input.team.teamId)?.profile?.bias ?? null,
       opt: planWeights.optTarget,
       rosterMin: ROSTER_MIN,
     });
-    optEntscheidung = { identitaetsOpt: planWeights.optTarget, optTarget: anpassung.opt, gmDelta: anpassung.delta, grund: anpassung.grund };
-    if (anpassung.delta !== 0) planWeights = { ...planWeights, optTarget: anpassung.opt };
+    const identitaetsOpt = ctx.weights.optTarget;
+    const opt = Math.max(anpassung.opt, identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
+    gmOptGesenkt = anpassung.delta < 0 && opt < identitaetsOpt;
+    optEntscheidung = { identitaetsOpt, optTarget: opt, gmDelta: opt - identitaetsOpt, grund: anpassung.grund };
+    if (opt !== planWeights.optTarget) planWeights = { ...planWeights, optTarget: opt };
   }
 
   // ANPASSUNG COMPOSE (flag-gated): derive an EXPLICIT target role pyramid for this team and hand it to
@@ -740,6 +759,8 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
       platzWettbewerb: input.platzWettbewerb,
     },
     draftSeed: input.draftSeed ?? null,
+    // Nur gesetzt, wenn der Kaderplan laeuft (sonst fehlt das Feld: Builder bit-gleich zum Stand davor).
+    ...(kaderplan ? { kaderplan: { gmOptGesenkt } } : {}),
   };
 
   return {

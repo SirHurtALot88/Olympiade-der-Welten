@@ -14,7 +14,7 @@
  *
  * Der alte Hintergrund-Draft bleibt der Standard (`OLY_LIGA_DRAFT_MODUS` nicht gesetzt), bis der neue abgenommen ist.
  */
-import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-builder";
+import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
 import type {
   GameState,
   LeagueSetupTeamWarning,
@@ -351,15 +351,21 @@ export function kaufeMitNachruecken<T>(input: {
 }
 
 /**
- * PROTOTYP KADERPLAN: den Grund der Kadergroesse an den Ausstieg im Verlauf haengen (Chris: weniger als Opt nur bewusst und
- * begruendet). `fertigGrund` des Teams bleibt der typisierte Grund; nur der Kurzgrund des Verlaufseintrags bekommt den Zusatz.
+ * KADERPLAN: den Grund der Kadergroesse an den Ausstieg im Verlauf haengen (Chris: weniger als Opt nur bewusst und begruendet).
+ * `fertigGrund` des Teams bleibt der typisierte Grund; nur der Kurzgrund des Verlaufseintrags bekommt den Zusatz, mit den
+ * Notwegen des Protokolls (`kaderplan_notwege:a,b`, z. B. `unter_minimum`) und einem Zusatz des Aufrufers (`kauf_gescheitert:…`).
  */
-function mitKaderplanGrund(draft: LigaDraftZustand, kaderplan: LigaDraftKiBewertung["kaderplan"]): LigaDraftZustand {
+function mitKaderplanGrund(draft: LigaDraftZustand, kaderplan: LigaDraftKiBewertung["kaderplan"], zusatz?: string): LigaDraftZustand {
   if (!kaderplan || draft.verlauf.length === 0) return draft;
   const verlauf = [...draft.verlauf];
   const letzter = verlauf[verlauf.length - 1]!;
   const gm = kaderplan.optEntscheidung?.grund ? `; ${kaderplan.optEntscheidung.grund}` : "";
-  verlauf[verlauf.length - 1] = { ...letzter, grund: `${letzter.grund ?? ""}; kaderplan:${kaderplan.grund} (${kaderplan.text}${gm})` };
+  const notwege = kaderplan.notwege.length > 0 ? ` kaderplan_notwege:${kaderplan.notwege.join(",")}` : "";
+  const extra = zusatz ? ` ${zusatz}` : "";
+  verlauf[verlauf.length - 1] = {
+    ...letzter,
+    grund: `${letzter.grund ?? ""}; kaderplan:${kaderplan.grund}${notwege}${extra} (${kaderplan.text}${gm})`,
+  };
   return { ...draft, verlauf };
 }
 
@@ -403,9 +409,9 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
   const kasse = gameState.teams.find((eintrag) => eintrag.teamId === zug.teamId)?.cash ?? 0;
   const unterMinimum = kaderGroesse(gameState, zug.teamId) < draft.regeln.minKader;
   const spielerById = new Map(gameState.players.map((spieler) => [spieler.id, spieler]));
-  // PROTOTYP KADERPLAN (OLY_KI_KADERPLAN=1, docs/design/ki-pick-analyse-18-11.md): kein Notweg „billigster Spieler".
+  // KADERPLAN (Standard im Saison-1-Draft, docs/design/ki-pick-analyse-18-11.md): kein Notweg „billigster Spieler".
   // Scheitert ein Kauf, geht es in der Rangliste der KI weiter — bis ueber den ganzen Pool —, nie nach Preis sortiert.
-  const kaderplan = istKaderplanAktiv();
+  const kaderplan = istKaderplanAktiv(gameState);
   const kauf = kaufeMitNachruecken({
     topNStufen: kaderplan ? [...LIGA_DRAFT_KI_TOPN_STUFEN, Number.MAX_SAFE_INTEGER] : undefined,
     rangliste: (topN) =>
@@ -460,15 +466,27 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
     setzeDraftImKontext(ctx, naechster);
     return naechster.verlauf[naechster.verlauf.length - 1]!;
   }
-  const naechster = bucheAusstieg({
-    draft,
-    gameState,
-    teamId: zug.teamId,
-    grund: kauf.grund === "erschoepft" ? "nichts_leistbar" : "kauf_blockiert",
-    quelle,
-    top3,
-    jetzt,
-  });
+  // Review S4: auch dieser Ausstieg (Kauf gescheitert: 40 Fehlversuche oder ein teamweiter Grund) bekommt das Protokoll, und laut.
+  const zusatz = `kauf_gescheitert:${kauf.grund}${kauf.letzterKaufgrund ? `/${kauf.letzterKaufgrund}` : ""}`;
+  const naechster = mitKaderplanGrund(
+    bucheAusstieg({
+      draft,
+      gameState,
+      teamId: zug.teamId,
+      grund: kauf.grund === "erschoepft" ? "nichts_leistbar" : "kauf_blockiert",
+      quelle,
+      top3,
+      jetzt,
+    }),
+    bewertung.kaderplan,
+    zusatz,
+  );
+  if (bewertung.kaderplan) {
+    console.warn(
+      `[kaderplan] AUSSTIEG ${zug.teamId} nach gescheitertem Kauf (${zusatz}) bei Kader ${kaderGroesse(gameState, zug.teamId)} ` +
+        `(Opt ${bewertung.kaderplan.optTarget}, Notwege ${bewertung.kaderplan.notwege.join(",") || "keine"})`,
+    );
+  }
   setzeDraftImKontext(ctx, naechster);
   return naechster.verlauf[naechster.verlauf.length - 1]!;
 }

@@ -40,11 +40,10 @@ import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setu
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getLeagueOf } from "@/lib/season/league-split";
-import { buildOrganicDraftFrame, kaderplanPlatzPreise } from "@/lib/ai/organic-squad/draft-adapter";
+import { buildOrganicDraftFrame, istKaderplanAktiv, kaderplanPlatzPreise } from "@/lib/ai/organic-squad/draft-adapter";
 import {
   applyOrganicBuyStep,
   createOrganicPlanStepState,
-  istKaderplanAktiv,
   istKaderplanStartpoolAktiv,
   kaderplanProtokoll,
   organicBuyStep,
@@ -65,6 +64,11 @@ const VON_ANLAGE = arg("von-anlage", "");
 const DRAFT = arg("draft", "block") as "block" | "einzelschritt" | "keiner";
 const OUT = arg("out", "");
 const LABEL = arg("label", "");
+// Review 18.11.: die alten Laeufe r7/r8 trugen im `env`-Feld `OLY_LIGA_DRAFT_MODUS=einzelschritt`, obwohl der Block lief — das
+// Skript ruft Block (`fuehreLigaSetupDraftAus`) und Einzelschritt (`starteLigaDraft`) direkt auf, der Schalter aus der Shell
+// wirkte also nie, wurde aber mitgeschrieben. Jetzt setzt das Skript ihn passend zum gewaehlten Lauf; das `env`-Feld stimmt.
+if (DRAFT === "einzelschritt") process.env.OLY_LIGA_DRAFT_MODUS = "einzelschritt";
+else delete process.env.OLY_LIGA_DRAFT_MODUS;
 
 const t0 = Date.now();
 const log = (msg: string) => console.error(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ${msg}`);
@@ -136,7 +140,7 @@ function planeTeam(gs: GameState, saveId: string, team: Team, platzPreise?: numb
     komposition: frame.planInput.composition?.counts ?? null,
     gewichte: frame.planInput.economy.weights,
     poolGroesse: frame.planInput.candidates.length,
-    kaderplan: istKaderplanAktiv()
+    kaderplan: istKaderplanAktiv(gs)
       ? { ...kaderplanProtokoll(frame.planInput, start, schritt, notwege), optEntscheidung: frame.optEntscheidung ?? null }
       : null,
     notwege,
@@ -278,7 +282,7 @@ async function main() {
   };
   log(`Pool: ${pool.spielerImSpielstand} Spieler, frei ${pool.frei}, kaufbar ${pool.kaufbarMwGroesser0}`);
   // Wie Block-Lauf und Einzelschritt: Platzpreis aus dem Pool zu Draft-Beginn (nur mit Kaderplan gelesen).
-  const startPreise = istKaderplanAktiv() && istKaderplanStartpoolAktiv() ? kaderplanPlatzPreise(frei0) : undefined;
+  const startPreise = istKaderplanAktiv(gs0) && istKaderplanStartpoolAktiv() ? kaderplanPlatzPreise(frei0) : undefined;
 
   // ---- Stammdaten + Solo-Plan je Team ----
   const teams: Record<string, Record<string, unknown>> = {};
@@ -342,6 +346,10 @@ async function main() {
       if (treffer) kaderplanGruende[treffer[1]!] = (kaderplanGruende[treffer[1]!] ?? 0) + 1;
       const notweg = /notweg:([a-z_]+)/.exec(e.grund ?? "");
       if (notweg) kaderplanGruende[`notweg_${notweg[1]!}`] = (kaderplanGruende[`notweg_${notweg[1]!}`] ?? 0) + 1;
+      // Notwege des Protokolls am Ausstieg (je Team einmal, z. B. `unter_minimum`) und gescheiterte Kaeufe (Review S4).
+      const protokollWege = /kaderplan_notwege:([a-z_,]+)/.exec(e.grund ?? "");
+      for (const weg of protokollWege?.[1]?.split(",") ?? []) kaderplanGruende[`protokoll_${weg}`] = (kaderplanGruende[`protokoll_${weg}`] ?? 0) + 1;
+      if (/kauf_gescheitert:/.test(e.grund ?? "")) kaderplanGruende.kauf_gescheitert = (kaderplanGruende.kauf_gescheitert ?? 0) + 1;
     }
     einzelschritt = {
       kaderplanGruende,
@@ -390,6 +398,7 @@ async function main() {
     einzelschritt,
     teams,
     env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("OLY_"))),
+    kaderplanAktiv: istKaderplanAktiv(gs0),
   };
   if (OUT) fs.writeFileSync(OUT, JSON.stringify(ergebnis, null, 1));
   log(`fertig (${(draftMs / 1000).toFixed(0)} s Draft)`);

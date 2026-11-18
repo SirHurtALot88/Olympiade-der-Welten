@@ -1168,7 +1168,7 @@ export function withNormalizedTeamGeneralManagers(
 }
 
 /**
- * PROTOTYP KADERPLAN (`OLY_KI_KADERPLAN=1`, docs/design/ki-pick-analyse-18-11.md Abschnitt 5.4): die BEWUSSTE Entscheidung des GM
+ * KADERPLAN (Standard im Saison-1-Draft, docs/design/ki-pick-analyse-18-11.md Abschnitt 5.4): die BEWUSSTE Entscheidung des GM
  * „weniger Spieler, dafuer staerker". Chris 18.11.: „Der GM kann aus Opt 13 z. B. Opt 12 oder 11 machen … es wird nie nur bis zum
  * Minimum gepickt." Kompakt-Neigung = Mittel aus Star-Prioritaet und Elite-Kader-Neigung (1..10, neutral 5) ueber neutral:
  *   >= 4  -> Opt − 2,   >= 2,5 -> Opt − 1,   sonst 0.

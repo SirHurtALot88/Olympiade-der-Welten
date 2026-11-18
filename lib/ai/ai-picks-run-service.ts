@@ -43,8 +43,8 @@ import {
 } from "@/lib/ai/market-pick-engine/execute-live-pick";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { isLongRunContext } from "@/lib/season/long-run-profile";
-import { kaderplanPlatzPreise, planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
-import { istKaderplanAktiv, istKaderplanStartpoolAktiv } from "@/lib/ai/organic-squad/draft-builder";
+import { istKaderplanAktiv, kaderplanPlatzPreise, planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { istKaderplanStartpoolAktiv } from "@/lib/ai/organic-squad/draft-builder";
 import { LigaDraftLaeuftFehler, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
@@ -2983,7 +2983,7 @@ function runOrganicTeamDraftExecute(input: {
   teamWarnings: string[];
   teamBlockingReasons: string[];
   deferFlush?: boolean;
-  /** PROTOTYP KADERPLAN: Platzpreise aus dem Pool zu Beginn des Laufs (s. `kaderplanPlatzPreise`). */
+  /** KADERPLAN: Platzpreise aus dem Pool zu Beginn des Laufs (s. `kaderplanPlatzPreise`). */
   kaderplanPlatzPreise?: number[];
 }) {
   const {
@@ -3051,7 +3051,7 @@ function runOrganicTeamDraftExecute(input: {
     platzPreise: input.kaderplanPlatzPreise,
   });
   teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
-  // PROTOTYP KADERPLAN: Grund der Kadergroesse je Team ins Protokoll (Chris: weniger als Opt nur bewusst und begruendet).
+  // KADERPLAN: Grund der Kadergroesse je Team ins Protokoll (Chris: weniger als Opt nur bewusst und begruendet).
   if (plan.kaderplan) {
     teamWarnings.push(
       `kaderplan:${plan.kaderplan.grund}:opt=${plan.kaderplan.optTarget}:kader=${plan.kaderplan.kader}:rahmen=${plan.kaderplan.rahmenPlaetze}` +
@@ -3836,10 +3836,11 @@ export async function runAiPicksExecutePreview(
     ? createLocalTransfermarktRunContext({ save: resolveStrictLocalSave(persistence, save.saveId), persistence })
     : null;
 
-  // PROTOTYP KADERPLAN: Platzpreis aus dem Pool zu Beginn des Laufs, fuer alle Teams gleich (wie der Einzelschritt-Draft).
-  const kaderplanStartPreise = istKaderplanAktiv() && istKaderplanStartpoolAktiv()
+  // KADERPLAN: Platzpreis aus dem Pool zu Beginn des Laufs, fuer alle Teams gleich (wie der Einzelschritt-Draft).
+  const kaderplanStartPreise = istKaderplanStartpoolAktiv()
     ? (() => {
         const startState = (sharedRunContext?.save ?? resolveStrictLocalSave(persistence, save.saveId)).gameState;
+        if (!istKaderplanAktiv(startState)) return undefined;
         const vergeben = new Set(startState.rosters.map((entry) => entry.playerId));
         return kaderplanPlatzPreise(startState.players.filter((player) => !vergeben.has(player.id)));
       })()
