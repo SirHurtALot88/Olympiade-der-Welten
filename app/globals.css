@@ -53,6 +53,42 @@
   font-weight: 700;
   font-display: swap;
 }
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("/fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("/fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("/fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+/* Schriften der App (Chris, 18.11.): RaniraSeason fuer Ueberschriften und Namen, Barlow Condensed
+   fuer Fliesstext, Zahlen und Labels. Beide lokal unter /fonts, kein CDN. Dieselben Stapel wie in den
+   Mockups (--haus / --zahl). Alles Weitere haengt an diesen zwei Tokens (auch --nl-sans / --nl-display). */
+:root {
+  --schrift-haus: "RaniraSeason", Georgia, "Times New Roman", serif;
+  --schrift-zahl: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}
 
 * {
   box-sizing: border-box;
@@ -70,9 +106,9 @@ body {
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 30%),
     linear-gradient(180deg, #f8f3eb 0%, var(--bg) 100%);
   color: var(--ink);
-  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
-  font-style: italic;
-  font-weight: 700;
+  font-family: var(--schrift-zahl);
+  font-style: normal;
+  font-weight: 500;
 }
 
 /* Velo (Neuer Look) ist der permanente Look. Der dunkle Shell fuellt nicht
@@ -98,9 +134,9 @@ body:has(.foundation-app.is-new-look) {
 
 .foundation-app,
 .foundation-app .foundation-shell {
-  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
-  font-style: italic;
-  font-weight: 700;
+  font-family: var(--schrift-zahl);
+  font-style: normal;
+  font-weight: 500;
 }
 
 .foundation-drilldown-page {
@@ -155,7 +191,7 @@ body:has(.foundation-app.is-new-look) {
 }
 
 .foundation-shell-content {
-  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+  font-family: var(--schrift-zahl);
 }
 
 .foundation-drilldown-page .eyebrow {
@@ -7711,7 +7747,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .season-standings-table th,
 .season-standings-table td {
   padding: 1px 4px;
-  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+  font-family: var(--schrift-zahl);
   border-right: 1px solid rgba(255, 255, 255, 0.055);
 }
 
@@ -13025,7 +13061,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .season-pp-table th,
 .season-pp-table td {
-  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+  font-family: var(--schrift-zahl);
   padding: 4px 8px;
   font-size: 0.82rem;
 }
@@ -41530,7 +41566,7 @@ button.foundation-team-portrait-card {
   --wg-gold: #e3b34c;
   --wg-silver: #b9c0cc;
   --wg-bronze: #c78a5a;
-  --wg-serif: Georgia, "Times New Roman", serif;
+  --wg-serif: var(--schrift-haus);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -42043,8 +42079,8 @@ button.foundation-team-portrait-card {
   --nl-s5: 24px;
   --nl-s6: 32px;
   /* Typografie & Motion */
-  --nl-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --nl-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --nl-sans: var(--schrift-zahl);
+  --nl-display: var(--schrift-haus);
   --nl-t-fast: 120ms;
   --nl-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
   /* Font-Size-Skala (Design-System-Grundlage): fasst vormals verstreute,
@@ -79104,4 +79140,12 @@ span.nl-facility-ampel-chip {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 1.5;
+}
+
+/* --- Schriftregel (Chris, 18.11.): Ueberschriften und Namen in RaniraSeason, alles andere Barlow ---- */
+.foundation-app :is(h1, h2, h3, h4),
+.foundation-app :is([class*="player-name"], [class*="team-name"], [class$="-name"], [class*="-name-"]):not(small):not(span.sr-only) {
+  font-family: var(--schrift-haus);
+  font-style: italic;
+  font-weight: 700;
 }
