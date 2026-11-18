@@ -1,0 +1,25 @@
+{
+ "prompt": "Small rockfall, pixel art, plays once, about 0.8 seconds. Five orange-brown sandstone pebbles and chips break loose at the top and tumble straight down with a little dust trail, fading at the bottom. Colours: orange-brown, dark brown, beige dust. Transparent background, crisp pixels, about 32 pixels wide and 64 tall, no text.",
+ "artist": "lite",
+ "job": "670d4c97-ed13-4b18-be86-1941baa29591",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "gen_vorher": 674.7351005208002,
+ "gen_nachher": 673.7351005208002,
+ "datum": "2026-11-18T20:22:18Z",
+ "effect_id": "6081b72c-4f15-4a3b-8cd0-cc4903fe3b58",
+ "canvas": {
+  "h": 64,
+  "w": 32
+ },
+ "frames": 10,
+ "fps": 12,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 32,
+  "kind": "origin"
+ },
+ "message": "A 32x64 one-shot rockfall, about 0.8 seconds: orange-brown pebbles and beige chips break loose near the top, tumble down with a dust trail, and fade out at the bottom, with a small dust puff where they land. Try the Speed slider or the rock count to change the pace and density.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=6081b72c-4f15-4a3b-8cd0-cc4903fe3b58"
+}

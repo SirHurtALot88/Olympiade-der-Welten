@@ -1,0 +1,25 @@
+{
+ "prompt": "A ringing bell signal, pixel art, plays once, about 0.7 seconds. Three golden curved sound-wave arcs expand outward to both sides from the centre with a few bright sparkles, then fade. Colours: gold, warm yellow, white. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "fcfee3ef-3f17-4b72-8212-883c8d2496f3",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "gen_vorher": 673.7351005208002,
+ "gen_nachher": 672.7351005208002,
+ "datum": "2026-11-18T20:22:51Z",
+ "effect_id": "6f0c7029-1156-4464-a7bc-a59dc58fd49d",
+ "canvas": {
+  "h": 64,
+  "w": 64
+ },
+ "frames": 10,
+ "fps": 14,
+ "loop": false,
+ "anchor": {
+  "x": 32,
+  "y": 32,
+  "kind": "origin"
+ },
+ "message": "A one-shot bell ring of about 0.7 s on a 64×64 transparent canvas: a small gold flash at the centre, then three gold-to-white arcs expand out to both sides and fade, with white sparkles twinkling around them. Colours are gold, warm yellow and white. I haven't added sliders, so the arc timing and sparkle count are set in the recipe.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=6f0c7029-1156-4464-a7bc-a59dc58fd49d"
+}
