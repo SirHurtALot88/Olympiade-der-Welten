@@ -43,6 +43,7 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
+import { getLeagueOf } from "@/lib/season/league-split";
 import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
 import { ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
@@ -74,10 +75,12 @@ const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-
 // Panel ohnehin sofort erscheinen soll — im Cache-Treffer-Fall bekäme der Spieler einen
 // echten Ladeframe direkt unter der Bühne zu sehen, den es vorher nicht gab. Das wäre ein
 // sichtbarer Rückschritt, deshalb bleibt dieser Import unverändert.
-import DisciplineStageMatchdayPanel, {
-  type MatchdayPanelPlayerRow,
-  type MatchdayPanelStandingRow,
-  type MatchdayPanelTeamResult,
+import DisciplineStageSpieltagswertung from "@/app/foundation/discipline-stage/DisciplineStageSpieltagswertung";
+import type {
+  MatchdayPanelPlayerRow,
+  MatchdayPanelSideResult,
+  MatchdayPanelStandingRow,
+  MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
 import { buildStandingsMatchdayRankPair } from "@/lib/foundation/season-standings-matchday-rank-delta";
@@ -1191,6 +1194,8 @@ export default function DisciplineStageArena({
             // eingesetzten Spieler und die Raenge waeren falsch (Top 50 der Liga, nicht
             // Top 50 dieses Spieltags).
             ovrRank: ratingByPlayerId.get(e.playerId)?.ovrRank ?? null,
+            portraitUrl: portraitById.get(e.playerId) ?? null,
+            isCaptain: e.isCaptain === true,
           });
         }
         playersByTeam.set(tr.teamId, cur);
@@ -1274,6 +1279,40 @@ export default function DisciplineStageArena({
       }
       return map;
     };
+    /**
+     * ERGEBNIS IN WORTEN je Team und Seite (Spieltagswertung neu, 18.11.) — nur Felder, die die Preview
+     * schon liefert: Gruppe aus `miniDmPod` (Platz, Gruppenwert, die vier Teams), Duell aus
+     * `duellSeiten` + `opponentTeamId`. Keine eigene Rechnung; fehlt beides, bleibt der Eintrag leer.
+     */
+    const ergebnisForSide = (
+      discipline: { disciplineId: string; displayName: string } | null,
+    ): Map<string, MatchdayPanelSideResult> => {
+      const map = new Map<string, MatchdayPanelSideResult>();
+      if (!discipline) return map;
+      const dp = (preview.disciplinePreviews ?? []).find((entry) => entry.disciplineId === discipline.disciplineId);
+      if (!dp) return map;
+      for (const tr of dp.teamResults ?? []) {
+        if (tr.miniDmPod) {
+          map.set(tr.teamId, {
+            art: "gruppe",
+            platz: tr.miniDmPod.platz,
+            wert: tr.miniDmPod.teamWert ?? tr.miniDmPod.wert ?? null,
+            podId: tr.miniDmPod.podId,
+            teamIds: [...tr.miniDmPod.teamIds],
+          });
+        } else if (tr.duellSeiten) {
+          map.set(tr.teamId, {
+            art: "duell",
+            eigen: tr.duellSeiten[0],
+            gegner: tr.duellSeiten[1],
+            gegnerTeamId: tr.opponentTeamId ?? null,
+          });
+        }
+      }
+      return map;
+    };
+    const d1ErgebnisByTeam = ergebnisForSide(d1);
+    const d2ErgebnisByTeam = ergebnisForSide(d2);
     const d1ArenaAusfallByTeam = arenaAusfallGrundForSide(d1);
     const d2ArenaAusfallByTeam = arenaAusfallGrundForSide(d2);
     const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
@@ -1311,6 +1350,8 @@ export default function DisciplineStageArena({
         missingLineup: r.missingLineup,
         d1ArenaAusfallGrund: d1ArenaAusfallByTeam.get(r.teamId) ?? null,
         d2ArenaAusfallGrund: d2ArenaAusfallByTeam.get(r.teamId) ?? null,
+        d1Ergebnis: d1ErgebnisByTeam.get(r.teamId) ?? null,
+        d2Ergebnis: d2ErgebnisByTeam.get(r.teamId) ?? null,
       };
     });
     // Captain-/Formkarten-Einsatz je Team — 1:1 aus derselben Preview, damit die
@@ -1321,7 +1362,27 @@ export default function DisciplineStageArena({
       d2DisciplineId: d2?.disciplineId ?? null,
     });
     return { d1, d2, standings, mutatorByTeam, modifierBaseByTeam, playersByTeam, modifiersByTeam, teamResults };
-  }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
+  }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId, portraitById]);
+
+  /**
+   * Liga und Besitzer je Team für die Filter der Spieltagswertung (Ligen, „Menschen") und die Marke „Du" bzw.
+   * den Namen des Menschen. Quelle sind `seasonState.leagueByTeamId` und `teamControlSettings` — dieselben
+   * wie bei der Arena-Teamauswahl; auf einem halbfertigen Spielstand ohne `seasonState` bleibt beides leer.
+   */
+  const wertungsTeamInfo = useMemo(() => {
+    const leagueByTeam = new Map<string, "liga1" | "liga2">();
+    const humanLabelByTeam = new Map<string, string>();
+    if (!gameState?.seasonState) return { leagueByTeam, humanLabelByTeam };
+    for (const team of gameState.teams ?? []) {
+      const tier = getLeagueOf(gameState, team.teamId);
+      if (tier) leagueByTeam.set(team.teamId, tier);
+    }
+    for (const teamId of getManualControlTeamIds(gameState)) {
+      const label = resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, teamId)));
+      humanLabelByTeam.set(teamId, label ?? "Mensch");
+    }
+    return { leagueByTeam, humanLabelByTeam };
+  }, [gameState]);
 
   /**
    * Buchungszustand des Spieltags aus dem SAVE (nicht aus Session-State): welche
@@ -3601,7 +3662,7 @@ export default function DisciplineStageArena({
           siehe Definition bei endedDisciplineIds). */}
       {mode === "real" && preview && matchdayPanel && (panelD1Revealed || panelD2Revealed) ? (
         <div style={{ marginTop: 14 }}>
-          <DisciplineStageMatchdayPanel
+          <DisciplineStageSpieltagswertung
             teamResults={matchdayPanel.teamResults}
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
@@ -3617,6 +3678,8 @@ export default function DisciplineStageArena({
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
             injuryMarksByTeam={matchdayInjuryMarks}
+            leagueByTeam={wertungsTeamInfo.leagueByTeam}
+            humanLabelByTeam={wertungsTeamInfo.humanLabelByTeam}
           />
         </div>
       ) : mode === "real" ? (
