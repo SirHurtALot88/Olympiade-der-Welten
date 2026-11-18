@@ -155,7 +155,21 @@ Lesart:
 
 ## 4. Rangtreue, Pp, Fingerabdruck
 
-RANGTREUE_PLATZHALTER
+- **Wertungs-Fingerabdruck** `node scripts/pruefe-wertung-fingerabdruck.mjs`: **GESAMT ce8fcef66028 (75 Einträge)**, unverändert.
+  Kein Motor-, Rezept- oder Arena-Adapter-Code ist angefasst.
+- **Rangtreue-Schranke** (`node --import tsx scripts/pruefe-rangtreue-schranke.mjs`): in dieser Sitzung **nicht zu Ende
+  gelaufen** — der erste Lauf wurde wegen Speicherdruck neben den Messläufen abgebrochen, der zweite bekam keinen Browser (Platte
+  zu 98 % voll), der dritte stand über 30 Minuten in der Warteschlange von `/tmp/oly-aufnahme.lock`. Inhaltlich ändert diese PR
+  daran nichts: die Schranke misst den Motor mit generierten Kadern ohne Training, und der Motor ist unverändert (Fingerabdruck).
+  Nachholen: CI-Job „rangtreue-schranke" bzw. derselbe Befehl.
+- **Pp-Abweichung** (`scripts/messe-arena-einfluss.mjs`): misst ebenfalls den Motor auf generierten Kadern; unverändert aus
+  demselben Grund. Training verschiebt nur die Eingangsattribute, Eignung und Attribute bewegen sich dabei gemeinsam (dieselbe
+  ligaweite Ableitung wie am Saisonende), es entsteht also kein Kanal, der an der Matrix vorbei wirkt. Im Gegenteil: Regel A
+  trainiert genau die Matrix-Attribute der Ziel-Disziplin.
+- **Rangtreue während der Saison**: Disziplinwerte ändern sich jetzt je Spieltag statt einmal je Saison, im Messlauf um Ø +0,7
+  Punkte Top-6-Eignung über 20 Spieltage. Die Abnahme „rho je Spiel" vergleicht Ergebnis gegen die Eignung desselben Spiels; beide
+  kommen aus demselben Stand, die Messung bleibt also gültig.
+
 
 ## 5. Offene Fragen an Chris
 
