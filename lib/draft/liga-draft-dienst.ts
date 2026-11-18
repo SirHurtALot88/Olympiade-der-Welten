@@ -14,6 +14,7 @@
  *
  * Der alte Hintergrund-Draft bleibt der Standard (`OLY_LIGA_DRAFT_MODUS` nicht gesetzt), bis der neue abgenommen ist.
  */
+import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-builder";
 import type {
   GameState,
   LeagueSetupTeamWarning,
@@ -386,13 +387,17 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
   const kasse = gameState.teams.find((eintrag) => eintrag.teamId === zug.teamId)?.cash ?? 0;
   const unterMinimum = kaderGroesse(gameState, zug.teamId) < draft.regeln.minKader;
   const spielerById = new Map(gameState.players.map((spieler) => [spieler.id, spieler]));
+  // PROTOTYP KADERPLAN (OLY_KI_KADERPLAN=1, docs/design/ki-pick-analyse-18-11.md): kein Notweg „billigster Spieler".
+  // Scheitert ein Kauf, geht es in der Rangliste der KI weiter — bis ueber den ganzen Pool —, nie nach Preis sortiert.
+  const kaderplan = istKaderplanAktiv();
   const kauf = kaufeMitNachruecken({
+    topNStufen: kaderplan ? [...LIGA_DRAFT_KI_TOPN_STUFEN, Number.MAX_SAFE_INTEGER] : undefined,
     rangliste: (topN) =>
       topN <= bewertung.top.length || bewertung.top.length < 3
         ? bewertung.top.slice(0, topN).map((eintrag) => eintrag.playerId)
         : bewerteKiPick({ gameState, saveId, draft, teamId: zug.teamId, topN }).top.map((eintrag) => eintrag.playerId),
     notfall: () =>
-      unterMinimum
+      unterMinimum && !kaderplan
         ? freieSpieler(gameState)
             .filter((spieler) => preisVon(spieler) > 0 && preisVon(spieler) <= kasse)
             .sort((a, b) => preisVon(a) - preisVon(b))

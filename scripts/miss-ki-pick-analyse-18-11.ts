@@ -40,7 +40,7 @@ import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setu
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getLeagueOf } from "@/lib/season/league-split";
-import { buildOrganicDraftFrame, toOrganicPlayerView } from "@/lib/ai/organic-squad/draft-adapter";
+import { buildOrganicDraftFrame } from "@/lib/ai/organic-squad/draft-adapter";
 import { applyOrganicBuyStep, createOrganicPlanStepState, organicBuyStep } from "@/lib/ai/organic-squad/draft-builder";
 import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";

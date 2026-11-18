@@ -227,6 +227,30 @@ for (const ln of laufNamen) {
   p("");
 }
 
+// ---- Plan gegen Ist (Chris: „wenn C-C 14 picks plant, sollte es am Ende nicht 8 haben") ----
+for (const ln of laufNamen) {
+  const z = zeilen
+    .filter((x) => x.lauf === ln)
+    .map((x) => ({
+      ...x,
+      luecke: x.optTarget - x.kader,
+      budgetJePlatz: (x.startKasse - x.ruecklage) / Math.max(1, x.optTarget),
+      preisJeSpieler: x.mwSumme / Math.max(1, x.kader),
+    }))
+    .sort((a, b) => b.luecke - a.luecke || a.teamId.localeCompare(b.teamId));
+  const zeigen = z.filter((x, i) => i < 6 || x.teamId === "C-C" || x.teamId === "D-P");
+  p(`## Plan gegen Ist — ${ln} (größte Lücken, dazu C-C und D-P)`);
+  p("");
+  p("| Team | Archetyp | geplant (Opt) | gekauft | Lücke | Abbruch | Budget je geplantem Platz | Ø Preis je gekauftem Spieler | Kasse über Rücklage |");
+  p("|---|---|---:|---:|---:|---|---:|---:|---:|");
+  for (const x of zeigen) {
+    p(`| ${x.teamId} | ${x.archetype} | ${x.optTarget} | ${x.kader} | ${x.luecke} | ${x.simAbbruch ?? x.esGrund ?? x.soloAbbruch} | ${r1(x.budgetJePlatz)} | ${r1(x.preisJeSpieler)} | ${r1(x.kasseUeber)} |`);
+  }
+  p("");
+  p(`Lücke Σ ${z.reduce((a, x) => a + Math.max(0, x.luecke), 0)} Plätze bei ${z.filter((x) => x.luecke > 0).length} Teams; Ø Preis je Spieler über Budget je Platz bei ${z.filter((x) => x.preisJeSpieler > x.budgetJePlatz).length} von ${z.length} Teams.`);
+  p("");
+}
+
 // ---- Je Team ----
 for (const ln of laufNamen) {
   const z = zeilen.filter((x) => x.lauf === ln).sort((a, b) => (a.simPlatz ?? a.esPlatz ?? 0) - (b.simPlatz ?? b.esPlatz ?? 0));
