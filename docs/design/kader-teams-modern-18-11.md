@@ -314,6 +314,24 @@ Mockup-Elements als drin / angepasst / fehlt, Seite scrollt nicht, keine Tafel l
 
 ---
 
+## 7a. Entscheidungen von Chris (18.11.)
+
+| # | Entscheidung |
+|---:|---|
+| 1 | Nebel **so wie im Mockup**. Dazu neu: eine **Einstellung, den Fog of War ganz auszuschalten** (vor allem am Anfang, für Testzwecke). |
+| 2 | **Marktwert ist für alle Spieler einsehbar** (exakt, keine Stufe). |
+| 3 | Kaderstärke fremder Teams: Rang exakt, **Wert als grobe Stufe** (z. B. „75–85“), **exakt nur bei vollem Scouting**. |
+| 4 | Rang gegen die **eigene Liga**, **klein daneben der Rang unter allen 32 Teams**. |
+| 5 | Drei Scouting-Stufen (unbekannt / beobachtet / gescoutet): **ja**. |
+| 6 | Spielplan: **jede Disziplin kommt 2× je Saison vor**, bleibt so. |
+| 7 | Teamprofil wird Reiter **„Klub“**: ok. |
+| 8 | Verträge: Heimat **Team › Verträge**, Transfermarkt nutzt denselben Baustein: ok. |
+| 9 | Merkliste als Reiter der Spieler-Liste: ok. |
+| 10 | PP-Rang **je Liga**; die **All-Time-Werte** werden ebenfalls **für L1 und L2** angezeigt. |
+| 11 | Figuren für Spieler ohne Pixel-Figur: **nur auf Freigabe**, aktuell kein Budget dafür. |
+| 12 | Aus der alten Spieler-Liste bleibt **nur das Streudiagramm** (als eigener Reiter/Ansicht); Radar, Podium, Ridgeline, Spalten-Menü, gespeicherte Ansichten, CSV entfallen. |
+| 13 | Wege-Schwellen beim Bau **an echten Kadern nachmessen**. |
+
 ## 8. Bedienung des Mockups
 
 Graue Leiste oben (gehört nicht zum UI): Ansicht, Team (eigenes, The Giants als Rivale, The Chantry), Freigabe des Vorstands. Mit
