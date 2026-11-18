@@ -11,11 +11,9 @@ import type { PlayerHistoryDisciplineValues } from "@/lib/season/season-discipli
 import type { DisciplineHighlightCandidate, LegacyMatchdayResolvePreview, ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
 import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 
-// T-075 (Performance): PlayerDetailDrawer ist 3617 Zeilen und chart-schwer —
-// per next/dynamic laden statt statisch. Verhalten identisch: PlayerDetailDrawer
-// rendert `null`, solange `data` fehlt (hier der Regelfall bis zum ersten
-// Player-Klick), daher ist ein `null`-Ladefallback äquivalent.
-const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), {
+// Kurzprofil (Drawer) des neuen Spielerprofils, per next/dynamic geladen: der Resolve-Lab-Test braucht ihn erst beim ersten
+// Spieler-Klick. Ohne Shell-Kontext bleiben Ränge und PP-Reihe leer, Verlängern/Verkaufen sind hier gesperrt.
+const SpielerKurzprofil = dynamic(() => import("@/app/foundation/spielerprofil/SpielerKurzprofil"), {
   ssr: false,
   loading: () => null,
 });
@@ -954,7 +952,14 @@ export default function LegacyResolveLabClient({
           </div>
         </section>
 
-        <PlayerDetailDrawer data={playerDrawerData} onClose={() => setPlayerDrawerData(null)} />
+        {playerDrawerData ? (
+          <SpielerKurzprofil
+            data={playerDrawerData}
+            onClose={() => setPlayerDrawerData(null)}
+            onOpenFull={() => setPlayerDrawerData(null)}
+            aktionen={{ darfHandeln: false, grundGesperrt: "Im Resolve-Lab nicht verfügbar." }}
+          />
+        ) : null}
       </div>
     </main>
   );

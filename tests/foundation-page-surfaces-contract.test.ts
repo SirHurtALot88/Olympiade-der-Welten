@@ -13,9 +13,11 @@ describe("foundation page surfaces contract", () => {
 
     expect(foundationText).toContain("openPlayerProfileById");
     expect(foundationText).toContain("openTeamProfileById");
-    expect(foundationText).toContain("<PlayerProfileClient");
+    expect(foundationText).toContain("<SpielerprofilSeite");
     expect(foundationText).toContain("<TeamProfileClient");
     expect(foundationText).not.toMatch(/<PlayerDetailDrawer[\s/>]/);
+    // Listen öffnen das Kurzprofil (Drawer) als eigene Komponente, nicht die alte globale Schublade.
+    expect(foundationText).toContain("<SpielerKurzprofilHost")
     expect(foundationText).not.toMatch(/<TeamDetailDrawer[\s/>]/);
     expect(routingText).toContain('"playerProfile"');
     expect(routingText).toContain('"teamProfile"');
@@ -44,7 +46,7 @@ describe("drawer-to-page layout contract", () => {
   it("uses full-width page styles for converted drawer surfaces", async () => {
     const cssText = await fs.readFile(`${root}/app/globals.css`, "utf8");
 
-    expect(cssText).toContain(".player-drawer.player-drawer-page");
+    // Die Spielerseite trägt ihre Maße jetzt im eigenen `spielerprofil.css` (`.spr`), nicht mehr als `.player-drawer-page`.
     expect(cssText).toContain("max-width: none");
     expect(cssText).toContain(".foundation-player-profile-panel.panel");
     expect(cssText).toContain(".foundation-team-profile-panel.panel");

@@ -1,24 +1,12 @@
 /**
- * SPIELERPROFIL — ANZEIGE-VERTRAG.
+ * SPIELERPROFIL NEU (18.11.) — ANZEIGE-VERTRAG.
  *
- * WARUM DIESE DATEI NEU GESCHRIEBEN WURDE (Entscheidung von Chris: „umschreiben"): sie bestand aus
- * EINEM `it` mit rund 90 Zusicherungen über zehn Dateien. Vitest bricht ein `it` bei der ersten
- * fehlgeschlagenen Zusicherung ab — die Datei scheiterte an Zeile 63, und die 83 Zusicherungen
- * DANACH wurden seitdem nie ausgeführt. Ein Vertrag, der nur bis zur ersten Lücke gilt, ist kein
- * Vertrag. Derselbe Bauplan hatte in `foundation-performance-architecture.test.ts` schon einmal drei
- * veraltete Zusicherungen hintereinander versteckt.
+ * Das Spielerprofil ist neu gebaut (`app/foundation/spielerprofil/`, Mockup `spielerprofil-modern-18-11.html`). Diese Datei
+ * hielt vorher die ~4300 Zeilen der alten `PlayerDetailDrawer` fest (CA/PO-Sterne, Achsengitter, Trainingshistorie als
+ * Diagramm, Klassen-Vorschau, Report-Reiter). Die Gruppen „Laden und Rechtelage“ und „Zwischenspeicher“ gelten unverändert
+ * weiter, weil sie die Verdrahtung in der Shell prüfen, nicht die Oberfläche; der Rest ist auf die neuen Bauteile umgezogen.
  *
- * Jetzt eine Gruppe je Oberfläche und ein `it` je zusammenhängender Aussage. Fällt eine, laufen die
- * anderen weiter und der Bericht nennt alle Lücken auf einmal.
- *
- * DIE ZUSICHERUNG, DIE ROT WAR — und was aus ihr wurde: geprüft wurde, dass
- * `getCachedPlayerProfileData` im Shell-Scope verdrahtet ist. Ist es nicht, und zwar nirgends in
- * `app/` oder `lib/`. Von `lib/foundation/player-profile-session-cache.ts` ist nur die
- * BUSTING-Seite (`invalidatePlayerProfileSessionCache`) angeschlossen — der Code leert also einen
- * Zwischenspeicher, den niemand füllt und niemand liest. Das ist ein echter Befund und keine
- * Testdrift; die Zusicherung ist deshalb nicht gelöscht, sondern DREHT SICH UM und hält den
- * gegenwärtigen Zustand fest, bis entschieden ist, ob der Zwischenspeicher zurückkommt oder ganz
- * verschwindet. So kann der Zustand nicht unbemerkt bleiben und nicht unbemerkt kippen.
+ * Eine Gruppe je Oberfläche und ein `it` je zusammenhängender Aussage: fällt eine, laufen die anderen weiter.
  */
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -29,19 +17,24 @@ import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from ".
 
 const lies = (relativerPfad: string) => fs.readFile(path.join(process.cwd(), relativerPfad), "utf8");
 
-const PROFILE = await lies("app/foundation/player-profile/PlayerProfileClient.tsx");
-const DRAWER = await lies("app/foundation/PlayerDetailDrawer.tsx");
+const SEITE = await lies("app/foundation/spielerprofil/SpielerprofilSeite.tsx");
+const KURZ = await lies("app/foundation/spielerprofil/SpielerKurzprofil.tsx");
+const HOST = await lies("app/foundation/spielerprofil/SpielerKurzprofilHost.tsx");
+const T_UEBERBLICK = await lies("app/foundation/spielerprofil/TabUeberblick.tsx");
+const T_DISZI = await lies("app/foundation/spielerprofil/TabDisziplinen.tsx");
+const T_LEISTUNG = await lies("app/foundation/spielerprofil/TabLeistung.tsx");
+const T_ENTW = await lies("app/foundation/spielerprofil/TabEntwicklung.tsx");
+const T_VERTRAG = await lies("app/foundation/spielerprofil/TabVertrag.tsx");
+const T_KARRIERE = await lies("app/foundation/spielerprofil/TabKarriere.tsx");
+const BAUSTEINE = await lies("app/foundation/spielerprofil/bausteine.tsx");
+const CSS = await lies("app/foundation/spielerprofil/spielerprofil.css");
 const SERVICE = await lies("lib/foundation/player-profile-service.ts");
-const PREVIEW = await lies("lib/foundation/projected-class-preview.ts");
-const TRAINING_CONTROLS = await lies("app/foundation/player-profile/PlayerTrainingControls.tsx");
-const TRAINING_SHARED = await lies("app/foundation/training-facilities-v2/training-view-shared.tsx");
-const CHART = await lies("app/foundation/player-profile/PlayerAttributeProgressChart.tsx");
-const CAREER_HEADER = await lies("app/foundation/player-profile/PlayerCareerStoryHeader.tsx");
-const DRAWER_DATA = await lies("lib/foundation/player-detail-drawer.ts");
+const MODELL = await lies("lib/foundation/spielerprofil-modell.ts");
 const SCOPE_ONLY = await lies("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 const PERSISTENCE_ACTIONS = await lies("lib/foundation/tabs/use-foundation-persistence-actions.ts");
 const ORCHESTRATOR = await readFoundationOrchestratorSource();
 const SURFACE = await readFoundationSurfaceSource();
+const ALLE_TABS = [T_UEBERBLICK, T_DISZI, T_LEISTUNG, T_ENTW, T_VERTRAG, T_KARRIERE].join("\n");
 
 /**
  * Der Zwischenspeicher zog beim Performance-Schnitt aus dem Shell-Scope in den Persistenz-Hook um.
@@ -50,24 +43,113 @@ const SURFACE = await readFoundationSurfaceSource();
  */
 const SCOPE = `${SCOPE_ONLY}\n${PERSISTENCE_ACTIONS}`;
 
-describe("Spielerprofil-Seite", () => {
-  it("ist die volle Seite und benutzt denselben Inhalt wie die Schublade", () => {
-    expect(PROFILE).toContain("PlayerDetailDrawer");
-    expect(SURFACE).toContain("PlayerProfileClient");
+describe("Spielerprofil-Seite (neu)", () => {
+  it("ist ein eigenes Bauteil mit eigenem CSS im Mockup-Stil und hängt in der Shell", () => {
+    expect(SURFACE).toContain("SpielerprofilSeite");
+    expect(SEITE).toContain('import "./spielerprofil.css"');
+    expect(CSS).toContain(".spr-kopf");
+    // Nichts von der alten Schublade lebt in den neuen Dateien weiter.
+    for (const quelle of [SEITE, KURZ, ALLE_TABS]) {
+      expect(quelle).not.toMatch(/PlayerDetailDrawer(?!Data)/);
+      expect(quelle).not.toMatch(/player-drawer-/);
+    }
   });
 
-  it("führt von hier aus weiter — Liga-Bestenliste und Team", () => {
-    expect(PROFILE).toContain("onOpenLeagueLeaders");
-    expect(PROFILE).toContain("onOpenTeam");
+  it("hat sechs Reiter, und der Reiter „Report“ (Scouting) ist entfallen", () => {
+    expect(SERVICE).toContain('"overview" | "disciplines" | "performance" | "development" | "contract" | "career"');
+    expect(SERVICE).not.toContain('id: "report"');
+    expect(SERVICE).toContain("normalisierePlayerProfileTab");
+    for (const marke of ["TabUeberblick", "TabDisziplinen", "TabLeistung", "TabEntwicklung", "TabVertrag", "TabKarriere"]) {
+      expect(SEITE).toContain(marke);
+    }
+  });
+
+  it("führt von hier aus weiter — Team und Blättern im Kader", () => {
+    expect(SEITE).toContain("onOpenTeam");
+    expect(SEITE).toContain("onNavigatePlayer");
     expect(ORCHESTRATOR).toContain("onOpenLeagueLeaders");
-    expect(ORCHESTRATOR).toContain("league-leaders-${categoryId}");
   });
 
-  it("hat adressierbare Reiter und die Trainingssteuerung", () => {
-    expect(PROFILE).toContain("PLAYER_PROFILE_TAB_ANCHORS");
-    expect(PROFILE).toContain("trainingRow");
-    expect(PROFILE).toContain("onSetTrainingMode");
-    expect(ORCHESTRATOR).toContain("playerProfileTrainingRow");
+  it("zeigt KEINE Kaderrolle als Wort (Chris 18.11., Punkt 3)", () => {
+    for (const wort of ["Stammspieler", "Rollenspieler", "Ergänzungsspieler"]) {
+      expect(ALLE_TABS + SEITE + KURZ + MODELL).not.toContain(wort);
+    }
+  });
+
+  it("zeigt Verletzt als „verletzt · nicht einsetzbar · noch N Spieltage“ in Kopf, Karte und Drawer, nicht als Formabzug", () => {
+    expect(MODELL).toContain("verletzt · nicht einsetzbar");
+    expect(SEITE).toContain("modell.verletzung.text");
+    expect(KURZ).toContain("modell.verletzung.text");
+    expect(T_UEBERBLICK).toContain("spielerprofil-einsatz-verletzt");
+    expect(T_LEISTUNG).toContain("× 50 %");
+  });
+
+  it("Disziplinen: Eignung, Rang in der Liga UND Rang unter allen aktiven Spielern, Kaderstärke über die besten 6", () => {
+    expect(T_DISZI).toContain("Liga <b>#");
+    expect(T_DISZI).toContain("Alle <b>#");
+    expect(T_DISZI).toContain("Die besten 6 des Kaders");
+    expect(MODELL).toContain("slice(0, 6)");
+    expect(T_LEISTUNG + T_UEBERBLICK).toContain("ppGesamtLigaRang");
+  });
+
+  it("PP-Skala: Ziellinie bei 5 nur als Markierung, die Werte sind die gebuchten", () => {
+    expect(MODELL).toContain("export const PP_ZIELLINIE = 5");
+    expect(BAUSTEINE).toContain("spr-ppc__ziel");
+    expect(MODELL).toContain("buildSeasonPointsLedger");
+    expect(MODELL).not.toContain("Math.random");
+  });
+
+  it("Vertrag: Gehalt je Spieltag und je Saison, Vorstand-Freigabe mit Platz statt erfundener Quote", () => {
+    expect(T_VERTRAG).toContain("spielerprofil-gehalt-spieltag");
+    expect(T_VERTRAG).toContain("je Saison");
+    expect(T_VERTRAG).toContain("spielerprofil-freigabe");
+    expect(T_VERTRAG).toContain("Verlängerung, Gehaltserhöhung und Verkauf");
+    expect(T_UEBERBLICK).toContain("spielerprofil-freigabe-platz");
+  });
+
+  it("Scouting-Nebel: fremde Spieler zeigen grobe Bereiche, Ränge nur als Einordnung", () => {
+    expect(MODELL).toContain("export function hatNebel");
+    for (const quelle of [T_UEBERBLICK, T_DISZI, T_ENTW]) {
+      expect(quelle).toContain("nebel");
+    }
+    expect(T_DISZI).toContain("grobBereich");
+    expect(T_DISZI).toContain("grobeRangStufe");
+    expect(KURZ).toContain("grobBereich");
+  });
+
+  it("Marktwert bleibt auch bei fremden, ungescouteten Spielern exakt (Chris 18.11.), Gehalt und Kaufpreis bleiben verdeckt", async () => {
+    const daten = await lies("lib/foundation/player-detail-drawer.ts");
+    const maske = daten.slice(daten.indexOf("function maskEconomyForVisibility"), daten.indexOf("function maskEconomyForVisibility") + 900);
+    expect(maske).not.toContain("marketValue: null");
+    expect(maske).toContain("salary: null");
+    expect(maske).toContain("purchasePrice: null");
+  });
+
+  it("Figur groß auf der Kulisse der besten Disziplin, vier Posen anklickbar, Porträt groß ohne Figur", () => {
+    expect(BAUSTEINE).toContain("spielerprofil-posen");
+    for (const pose of ["Stand", "Lauf", "Angriff", "Treffer"]) {
+      expect(BAUSTEINE).toContain(`label: "${pose}"`);
+    }
+    expect(BAUSTEINE).toContain("spielerprofil-portrait-ersatz");
+    expect(BAUSTEINE).toContain("einsatzlisteKulisseBild");
+    // Keine neue Animation, keine Tod-Pose (CLAUDE.md: PixelLab-Charaktere und -Animationen nur mit Freigabe).
+    expect(BAUSTEINE).not.toContain('label: "K.o."');
+  });
+});
+
+describe("Kurzprofil (Drawer ohne Reiter)", () => {
+  it("ist ein eigenes Bauteil, alle Listen öffnen es, „Ganzes Profil öffnen“ führt auf die Seite", () => {
+    expect(SCOPE_ONLY).toContain("oeffneSpielerKurzprofil({ playerId, activePlayerId })");
+    expect(SURFACE).toContain("<SpielerKurzprofilHost");
+    expect(KURZ).toContain("Ganzes Profil öffnen");
+    expect(HOST).toContain("openPlayerProfileById");
+  });
+
+  it("zeigt alle 20 Disziplinen als Kacheln mit Eignung und Liga-Rang, Statuszeile und Form/Moral", () => {
+    expect(KURZ).toContain("spielerkurzprofil-disziplinen");
+    expect(KURZ).toContain("spielerkurzprofil-status");
+    expect(KURZ).toContain("BcMoralGesicht");
+    expect(KURZ).toContain("Liga #");
   });
 });
 
@@ -117,164 +199,5 @@ describe("Spielerprofil-Zwischenspeicher (offener Befund)", () => {
     );
     expect(oeffnen).toContain("await import(\"@/lib/foundation/build-hydrated-player-drawer-data\")");
     expect(oeffnen).not.toContain("getCachedPlayerProfileData");
-  });
-});
-
-describe("Kopfbereich der Schublade", () => {
-  it("CA/PO-Sterne, Achsengitter und anklickbare Kennzahlenkarten", () => {
-    expect(DRAWER).toContain("PlayerCaPoStarStack");
-    expect(DRAWER).toContain('data-testid="player-drawer-ca-po-row"');
-    expect(DRAWER).toContain("player-drawer-hero-axis-grid");
-    expect(DRAWER).toContain("player-drawer-kpi-hero-card is-interactive");
-  });
-
-  /**
-   * NACHGEZOGEN, NICHT GESTRICHEN: der Kopf hiess frueher „Kennzahlenband"
-   * (`player-drawer-header-metrics-band` / `player-drawer-header-scout-compact`). Beides gibt es
-   * nicht mehr — an seiner Stelle steht `PlayerCareerStoryHeader` mit eigenen Marken. Das ist ein
-   * bewusster Umbau, also zieht die Zusicherung auf die heutigen Marken um.
-   */
-  it("die Karriere-Erzählung hat den alten Kennzahlen-Kopf abgelöst", () => {
-    expect(DRAWER).toContain("PlayerCareerStoryHeader");
-    expect(DRAWER).not.toContain("player-drawer-header-metrics-band");
-    expect(CAREER_HEADER).toContain('data-testid="player-career-story"');
-    expect(CAREER_HEADER).toContain('data-testid="career-story-peak"');
-    expect(CAREER_HEADER).toContain('data-testid="career-story-trend"');
-    expect(CAREER_HEADER).toContain('data-testid="career-story-longevity"');
-    expect(CAREER_HEADER).toContain('data-testid="career-story-jump"');
-    // Ohne Datenlage sagt der Kopf das, statt leer zu bleiben.
-    expect(CAREER_HEADER).toContain('data-testid="player-career-story-empty"');
-  });
-
-  it("das Achsengitter hat eine kompakte Variante mit Hinweis-Chips", () => {
-    expect(DRAWER).toContain("showFullAxisGrid");
-    expect(DRAWER).toContain("showCompactAxisStrip");
-    expect(DRAWER).toContain('data-testid="player-drawer-axis-strip"');
-    expect(DRAWER).toContain("player-drawer-axis-chip-hint");
-    expect(DRAWER).toContain("player-drawer-axis-chip-accent");
-  });
-
-  it("Kennzahlen sind anklickbar und sagen das auch", () => {
-    expect(DRAWER).toContain("onOpenLeagueLeaders");
-    expect(DRAWER).toContain("onOpenTeam");
-    expect(DRAWER).toContain("table-link-button");
-    expect(DRAWER).toContain("player-drawer-kpi-link-hint");
-  });
-
-});
-
-/**
- * ZWEI WEITERE OFFENE BEFUNDE, die dieser Umbau freigelegt hat — beide lagen HINTER der roten
- * Zwischenspeicher-Zusicherung und wurden deshalb seit deren Bruch nie mehr ausgeführt. Auch sie
- * stehen hier als gedrehte Zusicherung, nicht als Löschung.
- */
-describe("Spielerprofil: was die Daten liefern, aber niemand anzeigt (offene Befunde)", () => {
-  it("der deutsche Flavor-Text wird berechnet, aber nirgends gerendert", () => {
-    // Die Datenschicht führt ihn vollständig: eigener Katalog (`player-flavor-catalog.ts`), Feld im
-    // Typ, zwei Befüllstellen in `player-detail-drawer.ts`. In der Ansicht kommt er nicht an —
-    // weder in der Schublade noch im Karriere-Kopf.
-    expect(DRAWER_DATA).toContain("flavorDe: string | null;");
-    expect(DRAWER).not.toContain("flavorDe");
-    expect(CAREER_HEADER).not.toContain("flavorDe");
-  });
-
-  it("das Spielerprofil zeigt kein Bild", () => {
-    // `BudgetedMediaImage` (das budgetierte Bild, das Tabelle und Teamseite benutzen) kommt im
-    // Profil nicht vor, `FoundationPlayerPortraitCard` auch nicht. Frueher stand hier die
-    // Zusicherung, die Schublade nutze `BudgetedMediaImage` — sie war die zweite von vier
-    // Zusicherungen, die hinter der roten versteckt lagen.
-    expect(DRAWER).not.toContain("BudgetedMediaImage");
-    expect(DRAWER).not.toContain("FoundationPlayerPortraitCard");
-  });
-});
-
-describe("Inhalt der Schublade", () => {
-  it("Potential, Trainingsroute und Spielraum", () => {
-    expect(DRAWER).toContain("Achsen-Potential");
-    expect(DRAWER).toContain("data.potentialOverallDelta");
-    expect(DRAWER).toContain("data.trainingRouteImpact");
-    expect(DRAWER).toContain("headroomLabel");
-    expect(DRAWER).toContain("player-drawer-potential");
-  });
-
-  it("Disziplinen-Achsenliste mit Werten", () => {
-    expect(DRAWER).toContain("player-drawer-axis-discipline-list");
-    expect(DRAWER).toContain("formatValue(row.pow, 1)");
-    expect(DRAWER).toContain("player-drawer-top-disciplines-layout");
-  });
-
-  it("Transferhistorie samt Ablöse-Erklärung", () => {
-    expect(DRAWER).toContain("data.transferHistory");
-    expect(DRAWER).toContain("PlayerDrawerTransferHistoryTable");
-    expect(DRAWER).toContain("PlayerDrawerHistoryTable");
-    expect(DRAWER).toContain("PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP");
-  });
-
-  it("Trainingshistorie und Verlaufsdiagramm", () => {
-    expect(DRAWER).toContain("PlayerAttributeProgressChart");
-    expect(DRAWER).toContain("player-drawer-stats-chart");
-    expect(DRAWER).toContain("player-drawer-season-snapshot");
-    expect(DRAWER).toContain("player-drawer-training-history");
-    expect(DRAWER).toContain("Trainingshistorie");
-    expect(DRAWER).toContain("trainingHistoryRows");
-  });
-
-  it("Verletzungen: Banner, Historie und Zusammenfassung", () => {
-    expect(DRAWER).toContain("player-drawer-injury-banner");
-    expect(DRAWER).toContain("player-drawer-injury-history");
-    expect(DRAWER).toContain("Verletzungshistorie");
-    expect(DRAWER).toContain("player-drawer-injury-summary");
-    expect(DRAWER).toContain("injuriesCount");
-    expect(DRAWER).toContain("matchdaysMissed");
-  });
-
-  it("die abgelöste XP-Oberfläche ist wirklich weg", () => {
-    expect(DRAWER).not.toContain("Legacy XP-Vorschau");
-    expect(DRAWER).not.toContain("<h3>Klassen-Training</h3>");
-    expect(DRAWER).not.toContain("Spendbare XP");
-  });
-});
-
-describe("Trainingssteuerung", () => {
-  it("Intensitätsschiene und Vorschau-Gitter statt der alten Fokus-Marken", () => {
-    expect(TRAINING_CONTROLS).toContain("VeloIntensityRail");
-    expect(TRAINING_CONTROLS).toContain("TrainingAttributeForecastGrid");
-    expect(TRAINING_CONTROLS).not.toContain("VeloAttributeFocusTags");
-    expect(TRAINING_CONTROLS).toContain("buildStatForecastTooltip");
-  });
-
-  it("das Vorschau-Gitter ist geteilt und sortiert nach Klassenprofil", () => {
-    expect(TRAINING_SHARED).toContain("export function TrainingAttributeForecastGrid");
-    expect(TRAINING_SHARED).toContain("sortTrainingAttributeForecastByClassProfile");
-    expect(TRAINING_SHARED).toContain("training-v2-ceiling-mark");
-  });
-
-  it("die Schublade bindet die Steuerung ein", () => {
-    expect(DRAWER).toContain("PlayerTrainingControls");
-    expect(DRAWER).toContain("player-drawer-training-controls");
-    expect(SERVICE).toContain("player-drawer-training-controls");
-  });
-});
-
-describe("Verlaufsdiagramm", () => {
-  it("Diagramm, Zusammenfassung und Attributtabelle sind adressierbar", () => {
-    expect(CHART).toContain('data-testid="player-attribute-progress-chart"');
-    expect(CHART).toContain('data-testid="player-attribute-progress-summary"');
-    expect(CHART).toContain('data-testid="player-attribute-progress-str-line"');
-    expect(CHART).toContain('data-testid="player-attribute-progress-pp-metric-pow"');
-    expect(CHART).toContain('data-testid="player-attribute-progress-attribute-table"');
-  });
-
-  it("Beschriftungen und Zeilen kommen aus einer Quelle", () => {
-    expect(CHART).toContain("PLAYER_ATTRIBUTE_CHART_LABELS");
-    expect(CHART).toContain("attributeHistoryRows");
-  });
-});
-
-describe("Klassen-Vorschau", () => {
-  it("baut die Vorschau und empfiehlt gegebenenfalls die Umschulung", () => {
-    expect(PREVIEW).toContain("buildProjectedClassPreview");
-    expect(PREVIEW).toContain("reclassRecommended");
-    expect(SERVICE).toContain("Stats");
   });
 });
