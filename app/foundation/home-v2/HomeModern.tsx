@@ -207,7 +207,9 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
       ) : (
         <>
           <div className="hm-lab">
-            <span>Kaderstärke</span>
+            <span className="hm-pf" title="Papierform aus der Kaderstärke">
+              Kaderstärke {k.papier ? <b className={`hm-${k.papier.ton}`}>{k.papier.wort}</b> : null}
+            </span>
             <span className="hm-t">{k.anteil != null ? `Anteil ${de(k.anteil, 0)} %` : "–"}</span>
           </div>
           <div className="hm-lab">
@@ -216,10 +218,6 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
             <b className="hm-g hm-t">{k.rangGegner ? `#${k.rangGegner}` : "–"}</b>
           </div>
           <div className="hm-wb"><i style={{ width: `${(k.anteil ?? 50).toFixed(1)}%` }} /></div>
-          <div className="hm-sp" />
-          {k.papier ? (
-            <div className="hm-pf"><b className={`hm-${k.papier.ton}`}>{k.papier.wort}</b><span>Papierform aus der Kaderstärke</span></div>
-          ) : null}
         </>
       )}
       {k.einsatz ? (

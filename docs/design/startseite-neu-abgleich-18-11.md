@@ -13,6 +13,8 @@ Der Rahmen (Schiene, Kopfzeile) ist der echte App-Rahmen, im Mockup ist er nur a
 
 Gemessen (`scripts/screenshot-startseite-neu.ts`-Lauf, Seite scrollt nicht, keine Tafel läuft über): 2560×1440 (Schrift 19,4 px), 1920×1080 (14,1 px), 1710×1112 (14,0 px). Phone 412 breit: einspaltig, Seite scrollt wie im Mockup.
 
+**Bilder:** Die `abgleich-*`/`app-*`-Aufnahmen stammen noch aus Runde 1 (ohne Einsatzliste-Zeile, ohne abgeleitete Entscheidungen, ohne Spieler des Tages). Neuaufnahme für Runde 2 steht aus: der Wegwerf-Save ließ sich auf dem ausgelasteten Rechner (Last über 20, Platte fast voll) nicht fertig spielen. Aufruf: `npx tsx scripts/screenshot-startseite-neu.ts 6 mitte` bzw. `20 ende`.
+
 ## Runde 2 (neue Lücken geschlossen, Daten lagen im Spielstand)
 
 | Lücke aus Runde 1 | Jetzt | Quelle (nichts doppelt gerechnet) |
@@ -25,7 +27,7 @@ Gemessen (`scripts/screenshot-startseite-neu.ts`-Lauf, Seite scrollt nicht, kein
 | Spieler der Saison, Bestes Heimspiel | in der Saisonbilanz; Heimspiel nur, wo der Spielplan Heim/Auswärts speichert | `baueMatchwinnerListe`, `schedule.homeTeamId` |
 | Kaderkarten Klasse und Volk | „Hero · Lizard" unter dem Namen | `Player.className`, `Player.race` über `HomeV2TopPlayerCard` |
 
-Weiter offen: Kassenkurve, Spieltags-Buchungen, Apron-Abstand (Finanzkonzept), „Scout-Bericht fertig" (kein Inbox-Eintrag), Einsatzliste-Karten nur für den laufenden Spieltag (der Entwurf gehört sonst nicht zur Karte).
+Weiter offen: Kopf-Kacheln und Hauptknopf ins Band des neuen App-Rahmens (wartet auf #1588; der doppelte Knopf „Einsatzliste setzen“ fällt dann weg), Kassenkurve, Spieltags-Buchungen, Apron-Abstand (Finanzkonzept), „Scout-Bericht fertig" (kein Inbox-Eintrag), Einsatzliste-Karten nur für den laufenden Spieltag (der Entwurf gehört sonst nicht zur Karte).
 
 ## Drin (wie im Mockup, echte Daten)
 
