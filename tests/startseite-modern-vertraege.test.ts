@@ -62,10 +62,13 @@ describe("Startseite modern: Regieband des App-Rahmens", () => {
 });
 
 describe("Startseite modern: Entscheidungen des PM", () => {
-  it("Kasse: keine erfundene Kurve — der Platz bleibt als klar leere Fläche", () => {
-    expect(MARKUP).toContain('data-testid="hm-kurve-leer"');
-    expect(MARKUP).toContain("Kassenverlauf je Spieltag folgt mit dem neuen Finanzkonzept");
+  it("Kasse: keine erfundene Kurve und kein Platzhaltertext; Betrag in Einheit C, Gehalt groß je Saison und klein je Spieltag", () => {
+    expect(MARKUP).not.toContain("kurve-leer");
+    expect(MARKUP).not.toContain("folgt mit dem neuen Finanzkonzept");
     expect(MARKUP).not.toContain("<polyline");
+    expect(MARKUP).toContain("formatNlCoins");
+    expect(MARKUP).not.toContain(" Mio");
+    expect(MARKUP).toContain("je Spieltag");
   });
 
   it("S-U-N wird als Disziplin-Duelle beschriftet, nirgends als „Spiele“", () => {

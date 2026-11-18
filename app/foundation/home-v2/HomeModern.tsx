@@ -26,13 +26,14 @@ import {
   type SpieltagsKarte,
   type StartseiteDaten,
 } from "@/lib/foundation/startseite-modern";
+import { formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import "./home-modern.css";
 
 const ZAHL = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const de = (x: number, nk = 1) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: nk, maximumFractionDigits: nk }).format(x);
 const vz = (x: number, nk = 1) => `${x > 0 ? "+" : x < 0 ? "−" : "±"}${de(Math.abs(x), nk)}`;
 const ton = (x: number | null | undefined) => (x == null || x === 0 ? "hm-null" : x > 0 ? "hm-plus" : "hm-minus");
-const mio = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? "—" : `${de(x)} Mio`);
+const coins = formatNlCoins;
 
 function Wappen({ url, initials, alt = "" }: { url: string | null; initials: string; alt?: string }) {
   // Wappen sind Bilder mit Initialen-Rückfall: ohne URL oder bei einem Ladefehler ein neutraler Kasten.
@@ -373,7 +374,7 @@ function Tabelle({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten }) {
           </>
         ) : null}
         <span className="hm-sp" />
-        <span className="hm-weg">S-U-N = Disziplin-Duelle (2 je Spieltag) · Sieg 2 · Remis 1 · Niederlage 0 · Gleichstand: Verhältnis</span>
+        <span className="hm-weg">S-U-N = Duelle · Sieg 2 · Remis 1 · Niederlage 0 · Gleichstand: Verhältnis</span>
       </div>
     </section>
   );
@@ -509,8 +510,11 @@ function Kader({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
 
 /* ------------------------------------------------------------------------------------- Kasse */
 
-function Kasse({ p }: { p: HomeV2ClientProps }) {
+function Kasse({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const kredit = (p.loanInstallment ?? 0) > 0 || (p.outstandingDebt ?? 0) > 0;
+  // Gehalt nach der Regel von Chris: groß je Saison, klein je Spieltag.
+  const spieltage = sd?.gesamtSpieltage && sd.gesamtSpieltage > 0 ? sd.gesamtSpieltage : null;
+  const jeSpieltag = p.salaryTotal != null && spieltage ? p.salaryTotal / spieltage : null;
   return (
     <section className="hm-pan hm-p-fin" data-testid="hm-kasse">
       <div className="hm-pk">
@@ -520,16 +524,20 @@ function Kasse({ p }: { p: HomeV2ClientProps }) {
       </div>
       <div className="hm-pb">
         <div className="hm-kas">
-          <strong className="hm-t">{mio(p.cash)}</strong>
+          <strong className="hm-t">{coins(p.cash)}</strong>
           <small>Kassenstand</small>
         </div>
-        <div className="hm-kurve-leer" data-testid="hm-kurve-leer">
-          Kassenverlauf je Spieltag folgt mit dem neuen Finanzkonzept
+        <div className="hm-sp" />
+        <div className="hm-zeile hm-gross">
+          <span>Gehälter <small>Saison</small></span>
+          <strong className="hm-t">
+            {coins(p.salaryTotal)}
+            {jeSpieltag != null ? <small className="hm-klein">{coins(jeSpieltag)} je Spieltag</small> : null}
+          </strong>
         </div>
-        <div className="hm-zeile"><span>Gehälter <small>Saison</small></span><strong className="hm-t">{mio(p.salaryTotal)}</strong></div>
-        <div className="hm-zeile"><span>Saisonergebnis <small>GuV</small></span><strong className={`hm-t ${ton(p.guv)}`}>{p.guv == null ? "—" : `${vz(p.guv)} Mio`}</strong></div>
+        <div className="hm-zeile"><span>Saisonergebnis <small>GuV</small></span><strong className={`hm-t ${ton(p.guv)}`}>{p.guv == null ? "—" : `${vz(p.guv)} C`}</strong></div>
         {kredit ? (
-          <div className="hm-zeile"><span>Kredit <small>Rate je Saison {mio(p.loanInstallment)}</small></span><strong className="hm-t hm-minus">{mio(p.outstandingDebt)}</strong></div>
+          <div className="hm-zeile"><span>Kredit <small>Rate je Saison {coins(p.loanInstallment)}</small></span><strong className="hm-t hm-minus">{coins(p.outstandingDebt)}</strong></div>
         ) : null}
       </div>
     </section>
@@ -672,7 +680,7 @@ export default function HomeModern(props: HomeV2ClientProps) {
           <Tabelle p={props} sd={sd} />
           <Entscheidungen p={props} sd={sd} />
           <Kader p={props} sd={sd} />
-          <Kasse p={props} />
+          <Kasse p={props} sd={sd} />
           <Disziplinen sd={sd} />
           <Band sd={sd} />
         </div>

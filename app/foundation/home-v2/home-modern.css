@@ -273,3 +273,12 @@ svg.hm-ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
 .hm-bandkpis .hm-pfeil{font-weight:700}
 .hm-hero .hm-hinweis{grid-column:3;justify-self:end;align-self:end;font-size:.9rem;color:var(--leise);text-align:right;max-width:26rem}
 @media (max-width:1100px){.hm-bk small{display:none}}
+
+/* Kasse ohne Platzhalter: Betrag, Gehalt groß je Saison / klein je Spieltag */
+.hm-zeile.hm-gross{padding:.5rem 0}
+.hm-zeile.hm-gross strong{font-size:1.5rem;display:flex;flex-direction:column;align-items:flex-end;line-height:1.05}
+.hm-zeile.hm-gross strong .hm-klein{font-size:.8rem;font-weight:500;color:var(--leise);margin:0}
+/* Liga-Tabelle: Pkt-Spalte und Legende nie am Kartenrand abschneiden */
+.hm-tz{padding-right:1.1rem}
+.hm-tfuss{padding-right:1.1rem}
+.hm-tfuss .hm-weg{min-width:0;overflow:hidden;text-overflow:ellipsis}

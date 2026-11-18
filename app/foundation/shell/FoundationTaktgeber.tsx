@@ -106,29 +106,48 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
       <div className={`foundation-takt-ablauf${ablauf ? " is-offen" : ""}`} data-testid="foundation-takt-ablauf">
         <strong className="foundation-takt-ablauf-titel">Ablauf</strong>
         {plan.schritte.length > 0 ? (
-          <ol className="foundation-takt-schritte" data-testid="foundation-takt-schritte">
-            {plan.schritte.map((schritt) => (
-              <li key={schritt.id} className={`foundation-takt-schritt is-${schritt.status}`}>
-                <span className="foundation-takt-haken" aria-hidden="true">{SCHRITT_ZEICHEN[schritt.status]}</span>
-                <span className="foundation-takt-schritt-text">
-                  <b>{schritt.label}</b>
-                  {schritt.detail ? <small>{schritt.detail}</small> : null}
-                </span>
-                {schritt.sprung ? (
-                  <button
-                    type="button"
-                    className="foundation-takt-sprung"
-                    onClick={() => {
-                      setAblauf(false);
-                      schritt.sprung?.();
-                    }}
-                  >
-                    {schritt.status === "rot" ? "beheben ›" : "öffnen ›"}
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ol>
+          <>
+            {/* Erledigtes kostet keine Zeilen: eine Zeile „n Schritte erledigt“, aufklappbar. So passt der Ablauf in den Bildschirm. */}
+            {plan.schritte.filter((x) => x.status === "erledigt").length > 0 ? (
+              <details className="foundation-takt-erledigt" data-testid="foundation-takt-erledigt">
+                <summary>
+                  <span className="foundation-takt-haken" aria-hidden="true">{SCHRITT_ZEICHEN.erledigt}</span>
+                  {plan.schritte.filter((x) => x.status === "erledigt").length} Schritte erledigt
+                </summary>
+                <ol className="foundation-takt-schritte">
+                  {plan.schritte.filter((x) => x.status === "erledigt").map((schritt) => (
+                    <li key={schritt.id} className="foundation-takt-schritt is-erledigt">
+                      <span className="foundation-takt-haken" aria-hidden="true">{SCHRITT_ZEICHEN[schritt.status]}</span>
+                      <span className="foundation-takt-schritt-text"><b>{schritt.label}</b></span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            ) : null}
+            <ol className="foundation-takt-schritte" data-testid="foundation-takt-schritte">
+              {plan.schritte.filter((x) => x.status !== "erledigt").map((schritt) => (
+                <li key={schritt.id} className={`foundation-takt-schritt is-${schritt.status}`}>
+                  <span className="foundation-takt-haken" aria-hidden="true">{SCHRITT_ZEICHEN[schritt.status]}</span>
+                  <span className="foundation-takt-schritt-text">
+                    <b>{schritt.label}</b>
+                    {schritt.detail ? <small>{schritt.detail}</small> : null}
+                  </span>
+                  {schritt.sprung ? (
+                    <button
+                      type="button"
+                      className="foundation-takt-sprung"
+                      onClick={() => {
+                        setAblauf(false);
+                        schritt.sprung?.();
+                      }}
+                    >
+                      {schritt.status === "rot" ? "beheben ›" : "öffnen ›"}
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </>
         ) : (
           <p className="foundation-takt-ablauf-leer">{title ?? "Keine laufenden Aktionen."}</p>
         )}
