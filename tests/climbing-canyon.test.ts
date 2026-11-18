@@ -28,7 +28,7 @@ type CanyonMessung = {
   laeufer: CanyonLaeufer[];
 };
 type Spur = { namen: { id: number; n: string; seite: number }[]; spur: number[][] };
-type Figur = { id: number; n: string; seite: number; pos: number; x: number; y: number; sichtX: number; sichtY: number; zustand: string };
+type Figur = { id: number; n: string; seite: number; pos: number; x: number; y: number; bildX: number; bildY: number; sichtX: number; sichtY: number; zustand: string };
 type Arena = {
   bahnFlags: (neu?: unknown) => Record<string, unknown>;
   canyonParameter: (neu?: unknown) => Record<string, unknown>;
@@ -124,8 +124,13 @@ describe("Climbing-Canyon: gezeigt = gebucht", () => {
             const zeile = gebucht.spur[Math.min(tick, gebucht.spur.length) - 1]!;
             for (const l of p!.laeufer) {
               expect(l.pos, `${l.n} @ Tick ${tick}`).toBe(zeile[idx.get(l.id)!]);
-              // Die Zeichnung geht vom gebuchten Ort aus; Abweichung nur durch Ruck/Pendeln/Haengen (< 60 Welt-px)
-              if (l.zustand !== "ziel") expect(Math.hypot(l.sichtX - l.x, l.sichtY - l.y)).toBeLessThan(60);
+              // Die Zeichnung geht vom gebuchten Ort aus (ueber die Ankertabelle ins Wandbild abgebildet);
+              // Abweichung nur durch Ruck/Pendeln/Haengen (< 60 Wandpixel). Das Bild liegt auf der Wand (792 x 600).
+              if (l.zustand !== "ziel") expect(Math.hypot(l.sichtX - l.bildX, l.sichtY - l.bildY)).toBeLessThan(60);
+              expect(l.bildX).toBeGreaterThanOrEqual(90);
+              expect(l.bildX).toBeLessThanOrEqual(792);
+              expect(l.bildY).toBeGreaterThanOrEqual(0);
+              expect(l.bildY).toBeLessThanOrEqual(600);
               verglichen += 1;
             }
           }

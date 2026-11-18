@@ -706,7 +706,7 @@ aenderung: neue Zahl hier und in `data/generated/` festhalten.
 
 **Climbing-Format „Canyon“ (18.11., Schalter `climbingFormat`, im Spiel AUS):** das Skript gibt danach drei eigene
 Zeilen `spiele climbing/canyon 1/7/42` und eine eigene Summe `CANYON …` aus — **nicht in GESAMT**, GESAMT bleibt der
-Abgleich des Standards. Canyon-Stand: `CANYON __CANYONHASH__`. `node scripts/pruefe-wertung-fingerabdruck.mjs --node`
+Abgleich des Standards. Canyon-Stand: `CANYON a3ffa010b879` (Saaten 1/7/42). `node scripts/pruefe-wertung-fingerabdruck.mjs --node`
 rechnet denselben Abgleich ueber den Node-Motor (ohne Chromium, ohne Aufnahme-Sperre). Details:
 `docs/design/climbing-canyon-bau-18-11.md`.
 

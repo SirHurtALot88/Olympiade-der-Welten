@@ -57023,44 +57023,78 @@
   // =====================================================================================
   // CLIMBING-CANYON: ZEICHNEN (reine Anzeige, Bau 18.11.). Portiert aus dem freigegebenen Mockup
   // public/mockups/climbing-neu-18-11.html (Ebenen E0-E7, Posen aus Ruck/Neigung/Versatz, Seil,
-  // Schlagschatten, Marken). Liest nur CANYON/LAEUFER und schreibt nichts, was die Wertung liest;
-  // Kamera, Teilchen und Glockenschwung liegen in `canyonAnzeige` (modulweit, nur Anzeige).
-  // KEINE NEUEN ANIMATIONEN: verwendet werden nur north/south/east(west gespiegelt), walk-north,
-  // walk-east und treffer-north der vorhandenen PixelLab-Figuren (Chris 18.11., Antwort 4).
+  // Schlagschatten, Marken), gezeichnet auf der bestellten Wand (PR #1632, docs/design/climbing-assets-18-11.md):
+  // 792 x 600 Wandpixel, 1-fach, Band = Naht bei y 300.
+  //
+  // MOTOR-WELT UND BILD SIND GETRENNT: der Motor rechnet auf dem Routengraphen des Mockups (1584 x 600,
+  // kalibriert und gemessen), die Zeichnung legt jeden Knoten dieses Graphen auf einen ANKER im Wandbild
+  // (`CANYON_ANKER`) und interpoliert dazwischen mit dem gebuchten Fortschritt auf der Kante. So bleibt die
+  // Messung unberuehrt, und Eisfall/Halle brauchen spaeter nur eine eigene Ankertabelle (Kamin dort in der
+  // Mitte). Gezeigt = gebucht: die Basis jeder Figur ist der gebuchte Ort, nur ueber die Ankertabelle
+  // abgebildet; Ruck, Pendeln und Haengen sind Anzeige darueber.
+  //
+  // KEINE NEUEN ANIMATIONEN: nur north/south/east(west gespiegelt), walk-north, walk-east und treffer-north
+  // der vorhandenen PixelLab-Figuren (Chris 18.11., Antwort 4).
   // =====================================================================================
-  const CANYON_BILD_NAMEN=["wand_canyon","panorama_canyon","glocke","seilbruecke","strickleiter","griffe","rastplatz","felsnase"];
+  const CANYON_BILD={B:792, H:600, BAND:298, FUSS:598};
+  // Band (Motor-y 352) und Boden (Motor-y 588): waagerechte Abbildung Motor-x -> Bild-x, stueckweise linear.
+  const CANYON_BAND_X=[[200,100],[346,168],[405,192],[705,290],[720,298],[802,388],[915,440],[1180,620],[1512,765],[1600,790]];
+  // alle uebrigen Knoten des Graphen (Motor "x,y" -> Bild [x,y]); auf etwa +-5 px am Wandbild gemessen
+  const CANYON_ANKER={
+    "762,318":[338,236],                                          // Engstelle: ueber die Bloecke
+    "738,296":[302,178], "808,296":[372,178],                     // obenrum: Absatz ueber den Bloecken
+    "1180,228":[620,204], "1014,206":[504,192],                   // Kraftweg: Nische hoch, unter dem Dach hangeln
+    "998,150":[474,128], "1040,84":[502,66], "1075,60":[530,30],  // Lippe um die Dachkante, auf den Grat
+    "1200,46":[586,20], "1328,14":[628,16], "1348,14":[652,16],   // Gipfelgrat zur Glocke
+    "911,205":[401,196], "915,104":[399,96], "886,52":[384,56],   // Technikweg: Spalt zwischen den Tuermen
+    "1062,58":[516,52],                                           // Seilbruecke
+    "1516,186":[771,206], "1512,64":[770,72], "1420,34":[724,24]  // Ausdauerweg: Flanke, Leiter, Grat
+  };
+  const canyonBandX=(x)=>{
+    const T=CANYON_BAND_X;
+    if(x<=T[0][0])return T[0][1];
+    for(let i=1;i<T.length;i++)if(x<=T[i][0]){ const [a,pa]=T[i-1],[b,pb]=T[i]; return pa+(pb-pa)*(x-a)/(b-a); }
+    return T[T.length-1][1];
+  };
+  function canyonBildPunkt(x,y){
+    if(y===CANYON_WELT.BAND)return [canyonBandX(x),CANYON_BILD.BAND];
+    if(y===CANYON_WELT.BODEN)return [canyonBandX(x),CANYON_BILD.FUSS];
+    const a=CANYON_ANKER[Math.round(x)+","+Math.round(y)];
+    return a||[x/2,y*0.5];
+  }
+  const canyonBildCache=new WeakMap();   // Kante -> [Bildanfang, Bildende] (nur Anzeige, kein Feld an der Kante)
+  // gebuchter Ort einer Figur im Wandbild + Richtung der Kante (Bildpixel)
+  function canyonBildOrt(K){
+    const s=K.pfad[Math.min(K.si,K.pfad.length-1)], f=s.len?Math.max(0,Math.min(1,K.d/s.len)):1;
+    let ab=canyonBildCache.get(s);
+    if(!ab){ ab=[canyonBildPunkt(s.ax,s.ay),canyonBildPunkt(s.bx,s.by)]; canyonBildCache.set(s,ab); }
+    const [a,b]=ab, dx=b[0]-a[0], dy=b[1]-a[1], l=Math.hypot(dx,dy)||1;
+    return {x:a[0]+dx*f, y:a[1]+dy*f, ux:dx/l, uy:dy/l, s, f};
+  }
+  const CANYON_KULISSE=["wand","reihe_e3","panorama","vordergrund","wandfuss"];
+  const CANYON_REQUISITEN=["canyon_glocke","canyon_seilbruecke","canyon_strickleiter","canyon_rastpodest_schraeg","canyon_wegweiser",
+    "canyon_startbogen","canyon_kiefer","canyon_griffe_rot","canyon_griffe_blau","canyon_griffe_gelb",
+    "fx-climbing-kreide-lite","fx-climbing-steinschlag-lite","fx-climbing-glocke-lite"];
   const canyonBild={};
   let canyonBilderGeladen=false;
   function canyonBilderLaden(){
     if(canyonBilderGeladen||typeof Image==="undefined")return;
     canyonBilderGeladen=true;
-    let basis="/sprites/kulissen/climbing-canyon/";
-    try{ basis=new URL("../sprites/kulissen/climbing-canyon/",ENGINE_BILD_BASIS).href; }catch(e){}
-    for(const n of CANYON_BILD_NAMEN){ const im=new Image(); im.src=basis+n+".png"; canyonBild[n]=im; }
+    let k="/sprites/kulissen/climbing-canyon/", r="/sprites/arena/climbing/";
+    try{ k=new URL("../sprites/kulissen/climbing-canyon/",ENGINE_BILD_BASIS).href; r=new URL("../sprites/arena/climbing/",ENGINE_BILD_BASIS).href; }catch(e){}
+    for(const n of CANYON_KULISSE){ const im=new Image(); im.src=k+n+".png"; canyonBild[n]=im; }
+    for(const n of CANYON_REQUISITEN){ const im=new Image(); im.src=r+n+".png"; canyonBild[n]=im; }
   }
   const canyonDa=(n)=>{ const im=canyonBild[n]; return !!im&&im.complete&&im.naturalWidth>0; };
   const CANYON_WEG_FARBE={kraft:"#ff6a55", technik:"#5fa8ff", ausdauer:"#7ddc7a"};
   const CANYON_WEG_KUERZEL={kraft:"K", technik:"T", ausdauer:"A"};
-  const CANYON_GRIFF_ZELLE={0:[0,0],1:[1,0],2:[3,0],3:[3,1],5:[2,1],6:[2,0],7:[1,1]};
-  const CANYON_GRIFFE=(()=>{
-    const g=[]; let a=4711;
-    const r=()=>{ a=(Math.imul(a,1664525)+1013904223)>>>0; return a/4294967296; };
-    const linie=(ax,ay,bx,by,f,n)=>{ for(let i=0;i<n;i++){ const q=(i+.5)/n; g.push({x:ax+(bx-ax)*q+(r()-.5)*16,y:ay+(by-ay)*q+(r()-.5)*10,f}); } };
-    for(let l=0;l<11;l++)linie(405+l*30,575,405+l*30,366,[0,2,3,5,6,7,0,3,2,5,6][l],8);
-    linie(722,344,738,300,7,2); linie(742,292,804,292,7,4);
-    linie(1180,340,1180,236,0,4); linie(1170,224,1020,204,0,7); linie(1006,196,1000,150,0,2); linie(1004,140,1040,88,0,3);
-    linie(915,196,888,60,1,5); linie(1512,340,1516,190,3,6);
-    return g;
-  })();
-  const CANYON_ROUTEN=[
-    {weg:"kraft",p:[[915,352],[1180,352],[1180,228],[1014,206],[998,150],[1040,84],[1075,60],[1200,46],[1328,14]]},
-    {weg:"technik",p:[[342,588],[346,352],[720,352]]},
-    {weg:"technik",p:[[915,352],[911,205],[915,104],[886,52],[1062,58],[1075,60]]},
-    {weg:"ausdauer",p:[[915,352],[1512,352],[1516,186],[1512,64],[1420,34],[1348,14]]}];
-  let canyonAnzeige=null;   // {kam, teilchen, glocke, gelesen, wackelBis, letzteUz, fuer}
+  const CANYON_WEG_GRIFFE={kraft:"canyon_griffe_rot", technik:"canyon_griffe_blau", ausdauer:"canyon_griffe_gelb"};
+  // VFX lite (PR #1632): Zellgroesse und Bildzahl je Blatt
+  const CANYON_FX={kreide:["fx-climbing-kreide-lite",32,32,8], stein:["fx-climbing-steinschlag-lite",32,64,10], glocke:["fx-climbing-glocke-lite",64,64,10]};
+  let canyonAnzeige=null;   // {kam, teilchen, fx, glocke, gelesen, wackelBis, letzteUz, fuer}
   function canyonAnzeigeFuer(){
     if(!canyonAnzeige||canyonAnzeige.fuer!==CANYON)
-      canyonAnzeige={fuer:CANYON, kam:{x:560,y:430,z:1.0}, teilchen:[], glocke:{schwung:0,t:0}, gelesen:0, wackelBis:-1, letzteUz:null, wellen:[]};
+      canyonAnzeige={fuer:CANYON, kam:{x:260,y:420,z:1.2}, teilchen:[], fx:[], glocke:{schwung:0,t:0}, gelesen:0, wackelBis:-1, letzteUz:null, letzteUzRoh:null, wellen:[]};
     return canyonAnzeige;
   }
   function canyonRuck(d,weite,halt){
@@ -57068,68 +57102,69 @@
     f=f<halt?0:(f-halt)/(1-halt); f=f*f*(3-2*f);
     return {n, v:(n+f)*weite-d, f};
   }
-  // Wo und wie eine Figur gezeichnet wird -- die Basisposition ist IMMER der gebuchte Ort (K.x, K.y);
-  // Ruck, Versatz, Neigung und Pendeln sind Anzeige um diesen Punkt (gezeigt = gebucht).
+  // Ziel-Aufstellung auf dem Grat: Reihenfolge der Glocke, links und rechts der Glocke
+  const CANYON_GLOCKE=[640,16];
   function canyonSicht(K,uz){
-    const s=K.pfad[Math.min(K.si,K.pfad.length-1)], ux=s.len?(s.bx-s.ax)/s.len:0, uy=s.len?(s.by-s.ay)/s.len:-1;
-    const o={x:K.x,y:K.y,rot:0,bild:"north",fr:-1,spiegel:false,hang:false,dy:0,hy:K.y-24,marke:null,mf:null};
+    const B=canyonBildOrt(K), s=B.s, ux=B.ux, uy=B.uy;
+    // Weglaenge in Bildpixeln fuer den Ruck-Takt (der Motor zaehlt in Mockup-Pixeln)
+    const ab=canyonBildCache.get(s), bildD=K.d*(Math.hypot(ab[1][0]-ab[0][0],ab[1][1]-ab[0][1])/Math.max(1,s.len));
+    const o={x:B.x,y:B.y,bx:B.x,by:B.y,rot:0,bild:"north",fr:-1,spiegel:false,hang:false,dy:0,hy:B.y-24,marke:null,mf:null};
     const id=K.u.id, w=Math.sin(uz*9+id);
     if(K.zustand==="ziel"){
-      const k=(K.rang||1)-1, G=CANYON_WELT.GIPFEL;
-      o.x=G.x-44-(k%8)*24+(k>=8?290:0); o.y=k>=8?26+(k-8)*3:22+(k%8)*6.2; o.bild="south";
-      o.dy=-Math.abs(Math.sin(uz*6+id))*5; o.hy=o.y-24; return o;
+      const k=(K.rang||1)-1, seite=k%2?1:-1, platz=Math.floor(k/2)+1;
+      o.x=CANYON_GLOCKE[0]+seite*(18+platz*17); o.y=CANYON_GLOCKE[1]+(seite<0?Math.min(14,platz*2.5):Math.min(10,platz*1.5));
+      o.bild="south"; o.dy=-Math.abs(Math.sin(uz*6+id))*4; o.hy=o.y-24; return o;
     }
     if(K.zustand==="rutsch"||K.zustand==="sturz"){
       const lang=K.zustand==="sturz"?CANYON_P.sturzPause:CANYON_P.lippePause;
       const fall=Math.max(0,Math.min(1,(lang-K.pause)/Math.max(.1,lang)*1.6));
-      o.bild="treffer-north"; o.fr=Math.min(8,Math.floor(fall*10)); o.y+=22+Math.min(26,fall*90)+Math.sin(uz*5)*3;
-      o.x+=Math.sin(uz*3+id)*6; o.rot=Math.sin(uz*3+id)*.25; o.hy=o.y-22; return o;
+      o.bild="treffer-north"; o.fr=Math.min(8,Math.floor(fall*10)); o.y+=18+Math.min(22,fall*80)+Math.sin(uz*5)*3;
+      o.x+=Math.sin(uz*3+id)*5; o.rot=Math.sin(uz*3+id)*.25; o.hy=o.y-22; return o;
     }
     if(K.zustand==="rangelt"){
-      const gx=K.gegner?(K.gegner.x>K.x?1:-1):1, st=Math.sin(uz*17+id);
-      o.bild=st>0?"walk-north":"treffer-north"; o.fr=Math.floor(uz*12)%8; o.x+=gx*(5+st*5); o.rot=gx*(.16+st*.12);
+      const gegner=K.gegner?canyonBildOrt(K.gegner):null, gx=gegner?(gegner.x>B.x?1:-1):1, st=Math.sin(uz*17+id);
+      o.bild=st>0?"walk-north":"treffer-north"; o.fr=Math.floor(uz*12)%8; o.x+=gx*(4+st*4); o.rot=gx*(.16+st*.12);
       o.dy=-Math.abs(st)*3; o.hy=o.y-24; o.marke="RANGELT"; o.mf="#ff6058"; return o;
     }
     if(K.zustand==="zieht"){ const zz=Math.sin(uz*11); o.bild="north"; o.dy=zz*2.5; o.rot=zz*.07; o.marke="ZIEHT"; o.mf="#ffe08a"; return o; }
     if(K.zustand==="fehlgriff"){ o.bild="treffer-north"; o.fr=Math.floor((uz*10)%8); o.y+=6; o.x+=w*1.5; o.rot=w*.08; o.hy=o.y-24; return o; }
     if(K.zustand==="rast"){ o.bild="north"; o.dy=Math.sin(uz*3+id)*1.2; o.rot=Math.sin(uz*7+id)*.05; o.marke="RAST"; o.mf="#62d394"; return o; }
-    if(K.zustand==="umplan"){ o.bild="east"; o.spiegel=Math.sin(uz*4+id)>0; o.marke="WEG?"; o.mf="#f0c35a"; return o; }
+    if(K.zustand==="umplan"){ o.bild="east"; o.spiegel=Math.sin(uz*4+id)>0; o.marke="WEG GEWECHSELT"; o.mf="#f0c35a"; return o; }
     let r;
     switch(s.typ){
       case "boden": case "grat":
-        o.bild="walk-east"; o.fr=Math.floor(K.schritt/4); o.spiegel=ux<0; o.dy=-2;
+        o.bild="walk-east"; o.fr=Math.floor(K.schritt/4); o.spiegel=ux<0; o.dy=-1;
         o.rot=Math.atan2(uy,Math.abs(ux))*(ux<0?-1:1)*.5; break;
       case "bruecke": {
-        o.bild="walk-east"; o.fr=Math.floor(K.schritt/5); const q=K.d/s.len;
-        o.y+=Math.sin(q*Math.PI)*11-6; o.dy=Math.sin(uz*8+id)*1.5;
+        o.bild="walk-east"; o.fr=Math.floor(K.schritt/5);
+        o.y+=Math.sin(B.f*Math.PI)*8-2; o.dy=Math.sin(uz*8+id)*1.5;
         o.rot=K.zustand==="wackel"?Math.sin(uz*14)*.22:Math.sin(uz*5+id)*.05;
         if(K.zustand==="wackel"){ o.x+=Math.sin(uz*14)*3; o.marke="WANKT"; o.mf="#ff9f43"; }
         break; }
       case "wand": case "leiter":
-        r=canyonRuck(K.d,13,.42); o.x+=ux*r.v+((r.n%2)?3.5:-3.5)*(1-r.f*.5); o.y+=uy*r.v;
+        r=canyonRuck(bildD,12,.42); o.x+=ux*r.v+((r.n%2)?3:-3)*(1-r.f*.5); o.y+=uy*r.v;
         o.rot=((r.n%2)?1:-1)*(.10-.06*r.f); o.bild="walk-north"; o.fr=r.n*4+Math.floor(r.f*3); o.griff=r.f>0&&r.f<.35; break;
       case "kamin":
-        r=canyonRuck(K.d,11,.38); o.y+=uy*r.v; o.x+=ux*r.v+((r.n%2)?6:-6); o.bild="east"; o.spiegel=!!(r.n%2); o.rot=((r.n%2)?-1:1)*.20; break;
+        r=canyonRuck(bildD,10,.38); o.y+=uy*r.v; o.x+=ux*r.v+((r.n%2)?5:-5); o.bild="east"; o.spiegel=!!(r.n%2); o.rot=((r.n%2)?-1:1)*.20; break;
       case "band":
-        r=canyonRuck(K.d,12,.3); o.x+=ux*r.v; o.rot=.06+.05*Math.sin(r.f*Math.PI); o.dy=-Math.sin(r.f*Math.PI)*2; o.bild="walk-north"; o.fr=r.n*2;
-        if(K.aussen){ o.y+=22; o.hang=true; o.rot=Math.sin(uz*6+id)*.22; o.griff=r.f>0&&r.f<.3; o.hy=o.y-40; return o; }
+        r=canyonRuck(bildD,8,.3); o.x+=ux*r.v; o.rot=.06+.05*Math.sin(r.f*Math.PI); o.dy=-Math.sin(r.f*Math.PI)*2; o.bild="walk-north"; o.fr=r.n*2;
+        if(K.aussen){ o.y+=20; o.hang=true; o.rot=Math.sin(uz*6+id)*.22; o.griff=r.f>0&&r.f<.3; o.hy=o.y-40; o.marke="AUSSEN"; o.mf="#f0c35a"; return o; }
         if(K.wartet){ o.bild="north"; o.rot=0; if(K.warteLauf>.5){ o.marke="WARTET"; o.mf="#9aa7ba"; } }
         break;
       case "block":
-        r=canyonRuck(K.d,11,.4); o.x+=ux*r.v; o.y+=uy*r.v; o.rot=Math.atan2(uy,ux)*.45+((r.n%2)?.07:-.07); o.bild="walk-north"; o.fr=r.n*4; break;
+        r=canyonRuck(bildD,9,.4); o.x+=ux*r.v; o.y+=uy*r.v; o.rot=Math.atan2(uy,ux)*.45+((r.n%2)?.07:-.07); o.bild="walk-north"; o.fr=r.n*4; break;
       case "dach":
-        r=canyonRuck(K.d,15,.45); o.x+=ux*r.v; o.y+=uy*r.v+40; o.hang=true;
+        r=canyonRuck(bildD,13,.45); o.x+=ux*r.v; o.y+=uy*r.v+40; o.hang=true;
         o.rot=.32*Math.sin(uz*4.2+id)+(r.f>0?-.25*(1-r.f):0); o.bild="north"; o.griff=r.f>0&&r.f<.3; o.hy=o.y-40; return o;
       case "lippe": {
-        r=canyonRuck(K.d,10,.5); const ges=Math.max(0,Math.min(1,((s.lip0||0)+K.d)/Math.max(1,s.lipG||s.len)));
-        o.x+=ux*r.v-10*(1-ges); o.y+=uy*r.v+34*(1-ges); o.rot=-.75*(1-ges)+w*.04*(K.res<.3?2:1);
+        r=canyonRuck(bildD,9,.5); const ges=Math.max(0,Math.min(1,((s.lip0||0)+K.d)/Math.max(1,s.lipG||s.len)));
+        o.x+=ux*r.v-8*(1-ges); o.y+=uy*r.v+26*(1-ges); o.rot=-.75*(1-ges)+w*.04*(K.res<.3?2:1);
         o.bild="walk-north"; o.fr=r.n*4; o.griff=r.f>0&&r.f<.3; o.hy=o.y-30; return o; }
     }
     if(!o.marke&&K.schiebt>0){ o.marke="SCHIEBT"; o.mf="#ffe08a"; }
     else if(!o.marke&&K.schub>0){ o.marke="▲ HILFE"; o.mf="#ffe08a"; }
     o.hy=o.y-24+o.dy; return o;
   }
-  // Pose einer PixelLab-Figur als {e, n}: Bild-Eintrag und Bildzahl. Nur vorhandene Posen.
   function canyonPoseBild(z,bild){
     const fig=z.fig;
     if(bild.indexOf("-")>0){
@@ -57141,87 +57176,99 @@
     return (e&&e.im&&e.mass)?{e,n:1}:null;
   }
   let canyonSchattenLw=null;
+  const CANYON_FIGUR_HOCH=46;   // Figurenhoehe in Wandpixeln (Wand 1-fach, s. PR #1632)
   function canyonFigur(K,p,A,uz){
-    const u=K.u, z=pixelFigurBereit(u.n), HOCH=46;
+    const u=K.u, z=pixelFigurBereit(u.n);
     ctx.save();
     ctx.translate(p.x,p.y+p.dy);
     if(p.hang){ ctx.translate(0,-40); ctx.rotate(p.rot); ctx.translate(0,40); } else ctx.rotate(p.rot);
     if(p.spiegel)ctx.scale(-1,1);
     const pb=z?canyonPoseBild(z,p.bild):null;
     if(pb){
-      const grund=pixelGrundBild(z), m=pb.e.mass, s=HOCH/Math.max(1,(grund&&grund.mass?grund.mass.hoehe:m.hoehe));
+      const grund=pixelGrundBild(z), m=pb.e.mass, s=CANYON_FIGUR_HOCH/Math.max(1,(grund&&grund.mass?grund.mass.hoehe:m.hoehe));
       const f=pb.n>1?(((p.fr<0?0:p.fr)%pb.n)+pb.n)%pb.n:0;
-      // Schlagschatten der eigenen Pose auf der Wand (Figur haengt VOR der Wand, Mockup 2.2)
+      // Schlagschatten der eigenen Pose auf der Wand (Mockup 2.2: die Figur haengt VOR der Wand)
       try{
         if(!canyonSchattenLw){ canyonSchattenLw=document.createElement("canvas"); canyonSchattenLw.width=160; canyonSchattenLw.height=160; }
         const sl=canyonSchattenLw, sx=sl.getContext("2d");
         sx.clearRect(0,0,160,160); sx.globalCompositeOperation="source-over"; sx.imageSmoothingEnabled=false;
         sx.drawImage(pb.e.im,f*m.fw,0,m.fw,m.fh,0,0,m.fw,m.fh);
         sx.globalCompositeOperation="source-in"; sx.fillStyle="#1a0a12"; sx.fillRect(0,0,160,160);
-        ctx.globalAlpha=.34; ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(sl,0,0,m.fw,m.fh,-m.mitteX*s+(p.spiegel?-5:5),-m.unten*s+7,m.fw*s,m.fh*s);
+        ctx.globalAlpha=.32; ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(sl,0,0,m.fw,m.fh,-m.mitteX*s+(p.spiegel?-4:4),-m.unten*s+6,m.fw*s,m.fh*s);
         ctx.globalAlpha=1;
       }catch(e){ ctx.globalAlpha=1; }
       ctx.imageSmoothingEnabled=false;
       try{ ctx.drawImage(pb.e.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(e){}
     } else {
       // Spieler ohne PixelLab-Satz: dieselbe Rueckfallfigur wie auf jeder Bahn
-      try{ ctx.scale(.78,.78); zeichneSprite(ctx,{n:u.n,id:u.id,vx:0,vy:-4,side:u.seite,hp:1,max:1},0,-22); }catch(e){}
+      try{ ctx.scale(.62,.62); zeichneSprite(ctx,{n:u.n,id:u.id,vx:0,vy:-4,side:u.seite,hp:1,max:1},0,-24); }catch(e){}
     }
     ctx.restore();
-    // Kreide beim Greifen, Steinchen beim Abrutschen (nur Anzeige)
-    if(p.griff&&Math.random()<.4)A.teilchen.push({x:p.x+(Math.random()-.5)*14,y:p.y-(p.hang?44:38),vx:(Math.random()-.5)*10,vy:6+Math.random()*10,g:20,t:0,l:.7,r:2.2,a:.75,f:"255,250,240",wachs:1});
-    if((K.zustand==="rutsch"||K.zustand==="sturz"||K.zustand==="fehlgriff")&&Math.random()<.4)
-      A.teilchen.push({x:p.x+(Math.random()-.5)*16,y:p.y-30,vx:(Math.random()-.5)*26,vy:20+Math.random()*30,g:160,t:0,l:.9,r:2.4,a:.95,f:"120,60,30"});
+    if(p.griff&&Math.random()<.06)A.fx.push({art:"kreide",x:p.x+(Math.random()-.5)*8,y:p.y-(p.hang?40:36),t:0});
+    if(p.griff&&Math.random()<.3)A.teilchen.push({x:p.x+(Math.random()-.5)*12,y:p.y-(p.hang?42:36),vx:(Math.random()-.5)*8,vy:5+Math.random()*8,g:16,t:0,l:.6,r:1.6,a:.7,f:"255,250,240",wachs:1});
     // Marke ueber dem Kopf: Teamfarbe, Puste-Bogen, Weg-Buchstabe, Zustand
-    const mx=p.x, my=p.hang?p.y+16:p.y+p.dy-58;
-    ctx.fillStyle="rgba(9,12,18,.86)"; ctx.beginPath(); ctx.arc(mx,my,7.2,0,7); ctx.fill();
-    ctx.strokeStyle=K.res<.3?"#ff6058":bahnSeitenFarbe(u.seite); ctx.lineWidth=2.2;
-    ctx.beginPath(); ctx.arc(mx,my,6.1,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(1,K.res))); ctx.stroke();
-    ctx.fillStyle=CANYON_WEG_FARBE[K.weg]; setzeFont(ctx,"800 8px 'Barlow Condensed',sans-serif");
-    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(CANYON_WEG_KUERZEL[K.weg],mx,my+.6);
-    if(A.kam.z>0.95||p.marke){
+    const mx=p.x, my=p.hang?p.y+14:p.y+p.dy-54;
+    ctx.fillStyle="rgba(9,12,18,.86)"; ctx.beginPath(); ctx.arc(mx,my,6.2,0,7); ctx.fill();
+    ctx.strokeStyle=K.res<.3?"#ff6058":bahnSeitenFarbe(u.seite); ctx.lineWidth=1.9;
+    ctx.beginPath(); ctx.arc(mx,my,5.2,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(1,K.res))); ctx.stroke();
+    ctx.fillStyle=CANYON_WEG_FARBE[K.weg]; setzeFont(ctx,"800 7px 'Barlow Condensed',sans-serif");
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(CANYON_WEG_KUERZEL[K.weg],mx,my+.5);
+    if(A.kam.z>1.05||p.marke){
       const name=u.n.length>11?u.n.slice(0,10)+"…":u.n;
-      setzeFont(ctx,"700 7.5px 'Barlow Condensed',sans-serif");
-      const txt=p.marke?p.marke+" · "+name:name, mw=ctx.measureText(txt).width+8, ly=p.hang?my+11:my-14;
-      ctx.fillStyle="rgba(9,12,18,.82)"; ctx.fillRect(mx-mw/2,ly-5.5,mw,10);
-      ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillRect(mx-mw/2,ly-5.5,2,10);
+      setzeFont(ctx,"700 6.5px 'Barlow Condensed',sans-serif");
+      const txt=p.marke?p.marke+" · "+name:name, mw=ctx.measureText(txt).width+7, ly=p.hang?my+10:my-12;
+      ctx.fillStyle="rgba(9,12,18,.82)"; ctx.fillRect(mx-mw/2,ly-5,mw,9);
+      ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillRect(mx-mw/2,ly-5,2,9);
       ctx.fillStyle=p.marke?p.mf:"#f4e6c4"; ctx.fillText(txt,mx+1,ly);
     }
     if(K.schiebt>0&&K.partner.length){
-      const pk=CANYON.K.get(K.partner[0].id), hx=pk&&pk.x>K.x?1:-1;
+      const pk=CANYON.K.get(K.partner[0].id), hx=pk&&canyonBildOrt(pk).x>p.x?1:-1;
       ctx.fillStyle="#ffe08a";
-      for(let q=0;q<2;q++){ const ox=mx+hx*(12+q*7+((uz*20)%7)); ctx.beginPath(); ctx.moveTo(ox,my+26); ctx.lineTo(ox-hx*5,my+22); ctx.lineTo(ox-hx*5,my+30); ctx.fill(); }
+      for(let q=0;q<2;q++){ const ox=mx+hx*(10+q*6+((uz*20)%6)); ctx.beginPath(); ctx.moveTo(ox,my+24); ctx.lineTo(ox-hx*4,my+20); ctx.lineTo(ox-hx*4,my+28); ctx.fill(); }
     }
   }
+  const canyonTotaleZ=()=>H/(CANYON_BILD.H+150);
   function canyonKamZiel(A){
-    const {B}=CANYON_WELT, totaleZ=W/B;
     const E=CANYON.ereignisse;
-    for(let i=E.length-1;i>=0&&rennT-E[i].t<1.6;i--)if(E[i].gross&&E[i].typ!=="ziel"&&E[i].typ!=="seil")return {x:E[i].x,y:E[i].y-14,z:1.3};
+    for(let i=E.length-1;i>=0&&rennT-E[i].t<1.6;i--)if(E[i].gross&&E[i].typ!=="ziel"&&E[i].typ!=="seil"){
+      const K=CANYON.K.get(E[i].id); const p=K?canyonBildOrt(K):{x:E[i].x/2,y:E[i].y/2};
+      return {x:p.x,y:p.y-22,z:1.75};
+    }
     const offen=LAEUFER.map(u=>CANYON.K.get(u.id)).filter(K=>K&&K.ziel==null).sort((a,b)=>canyonAnteil(b)-canyonAnteil(a)).slice(0,4);
-    if(!offen.length)return {x:1250,y:60,z:1.2};
+    if(!offen.length)return {x:CANYON_GLOCKE[0],y:CANYON_GLOCKE[1]+30,z:1.6};
     let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-    for(const K of offen){ x0=Math.min(x0,K.x); x1=Math.max(x1,K.x); y0=Math.min(y0,K.y); y1=Math.max(y1,K.y); }
-    const zz=Math.max(totaleZ,Math.min(1.25,Math.min(W/(x1-x0+380),H/(y1-y0+190))));
-    return {x:(x0+x1)/2,y:(y0+y1)/2-26,z:zz};
+    for(const K of offen){ const p=canyonBildOrt(K); x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); }
+    const zz=Math.max(canyonTotaleZ(),Math.min(1.7,Math.min(W/(x1-x0+300),H/(y1-y0+150))));
+    return {x:(x0+x1)/2,y:(y0+y1)/2-24,z:zz};
+  }
+  function canyonFxZeichnen(A,dt){
+    A.fx=A.fx.filter(e=>{
+      const [n,cw,ch,nb]=CANYON_FX[e.art]; e.t+=dt;
+      const fr=Math.floor(e.t*14); if(fr>=nb)return false;
+      if(!canyonDa(n))return true;
+      const im=canyonBild[n], sp=Math.max(1,Math.floor(im.naturalWidth/cw));
+      ctx.drawImage(im,(fr%sp)*cw,Math.floor(fr/sp)*ch,cw,ch,e.x-cw/2,e.y-ch/2,cw,ch);
+      return true; });
   }
   function zeichneCanyon(){
     if(!CANYON){ zeichneSpurt(); return; }
     canyonBilderLaden();
-    const A=canyonAnzeigeFuer(), {B,H:WH,BAND,BODEN,GIPFEL}=CANYON_WELT;
+    const A=canyonAnzeigeFuer(), WB=CANYON_BILD.B, WH=CANYON_BILD.H, BAND=CANYON_BILD.BAND, FUSS=CANYON_BILD.FUSS;
     const uz=rennT*zeitFaktor();
     const dt=A.letzteUz==null?0:Math.max(0,Math.min(.1,uz-A.letzteUz)); A.letzteUz=uz;
-    // Kamera (Regie: folgt den vorderen vier, haelt grosse Momente kurz)
     const roh=A.letzteUzRoh==null?1e9:uz-A.letzteUzRoh; A.letzteUzRoh=uz;
+    // Kamera (Regie: folgt den vorderen vier, haelt grosse Momente kurz; nach einem Sprung sofort dort)
     const ziel=canyonKamZiel(A), k=roh>1.5||roh<0?1:(roh>0?1-Math.exp(-roh*2.4):(rennT<=0?1:0));
     A.kam.x+=(ziel.x-A.kam.x)*k; A.kam.y+=(ziel.y-A.kam.y)*k; A.kam.z+=(ziel.z-A.kam.z)*k;
     const hw=W/2/A.kam.z, hh=H/2/A.kam.z;
-    A.kam.x=Math.max(hw,Math.min(B-hw,A.kam.x)); A.kam.y=Math.max(-250+hh,Math.min(780-hh,A.kam.y));
-    // neue Ereignisse: Glocke, Kamerawackler beim Rangeln, Staub
+    A.kam.x=hw*2>=WB+260?WB/2:Math.max(hw-130,Math.min(WB+130-hw,A.kam.x));
+    A.kam.y=Math.max(-90+hh,Math.min(660-hh,A.kam.y));
     while(A.gelesen<CANYON.ereignisse.length){
-      const e=CANYON.ereignisse[A.gelesen++];
-      if(e.typ==="rangel"){ A.wackelBis=uz+0.45; for(let i=0;i<12;i++)A.teilchen.push({x:e.x+(Math.random()-.5)*20,y:e.y-6,vx:(Math.random()-.5)*50,vy:-10-Math.random()*20,g:60,t:0,l:.8,r:3,a:.6,f:"190,140,90",wachs:1}); }
-      if(e.typ==="ziel"){ A.glocke.schwung=1; A.glocke.t=uz; A.wellen.push({r:8,a:.9}); }
+      const e=CANYON.ereignisse[A.gelesen++], K=CANYON.K.get(e.id), p=K?canyonBildOrt(K):{x:e.x/2,y:e.y/2};
+      if(e.typ==="rangel"){ A.wackelBis=uz+0.45; for(let i=0;i<12;i++)A.teilchen.push({x:p.x+(Math.random()-.5)*16,y:p.y-4,vx:(Math.random()-.5)*40,vy:-8-Math.random()*16,g:50,t:0,l:.8,r:2.4,a:.6,f:"190,140,90",wachs:1}); }
+      if(e.typ==="rutsch"||e.typ==="sturz"||e.typ==="fehlgriff")A.fx.push({art:"stein",x:p.x,y:p.y+10,t:0});
+      if(e.typ==="ziel"){ A.glocke.schwung=1; A.glocke.t=uz; A.wellen.push({r:8,a:.9}); A.fx.push({art:"glocke",x:CANYON_GLOCKE[0],y:CANYON_GLOCKE[1]-26,t:0}); }
     }
     const z=A.kam.z;
     ctx.save();
@@ -57230,121 +57277,131 @@
     const hg=ctx.createLinearGradient(0,0,0,H);
     hg.addColorStop(0,"#3f6fb4"); hg.addColorStop(.45,"#8fb4d9"); hg.addColorStop(.75,"#f1c9a0"); hg.addColorStop(1,"#e7a274");
     ctx.fillStyle=hg; ctx.fillRect(0,0,W,H);
-    // E1 Fernpanorama, Parallax 0,08
-    if(canyonDa("panorama_canyon")){
-      ctx.imageSmoothingEnabled=true; const pz=3.4+(z-.78)*.2, pw=400*pz, ph=224*pz;
-      ctx.drawImage(canyonBild.panorama_canyon,W/2-pw/2-(A.kam.x-792)*.08*z,H*.46-ph/2-(A.kam.y-290)*.06*z,pw,ph);
+    // E1 Fernpanorama ueber die ganze Breite, weich gezogen, Parallax 0,08
+    if(canyonDa("panorama")){
+      ctx.imageSmoothingEnabled=true; const pw=Math.max(W*1.2,400*z*2.2), ph=pw*224/400;
+      ctx.drawImage(canyonBild.panorama,W/2-pw/2-(A.kam.x-WB/2)*.08*z,H*.42-ph/2-(A.kam.y-300)*.06*z,pw,ph);
       ctx.imageSmoothingEnabled=false;
     }
-    // E2 Dunst
-    const dg=ctx.createLinearGradient(0,H*.35,0,H); dg.addColorStop(0,"rgba(255,214,170,0)"); dg.addColorStop(1,"rgba(255,206,160,.55)");
+    const dg=ctx.createLinearGradient(0,H*.35,0,H); dg.addColorStop(0,"rgba(255,214,170,0)"); dg.addColorStop(1,"rgba(255,206,160,.5)");
     ctx.fillStyle=dg; ctx.fillRect(0,0,W,H);
-    // E3 zweite Felsreihe: dieselbe Wand gespiegelt und violett getoent, Parallax 0,45
-    if(canyonDa("wand_canyon")){
-      if(!A.fern){ try{ const c=document.createElement("canvas"); c.width=792; c.height=300; const x=c.getContext("2d");
-        x.drawImage(canyonBild.wand_canyon,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="rgba(116,92,150,.72)"; x.fillRect(0,0,792,300); A.fern=c; }catch(e){ A.fern=null; } }
-      if(A.fern){ const fz=z*.78, fx=W/2-(A.kam.x-792)*.45*z, fy=H/2+(-84-A.kam.y)*z;
-        ctx.save(); ctx.translate(fx,fy); ctx.scale(-1,1); ctx.imageSmoothingEnabled=true; ctx.globalAlpha=.92;
-        ctx.drawImage(A.fern,-B*fz/2,0,B*fz,WH*fz); ctx.restore(); ctx.globalAlpha=1; ctx.imageSmoothingEnabled=false; }
+    // E3 zweite Felsreihe (reihe_e3, 792 x 300), Parallax 0,45, links und rechts weitergefuehrt
+    if(canyonDa("reihe_e3")){
+      const fz=z*.8, fx=W/2-(A.kam.x-WB/2)*.45*z, fy=H/2+(-60-A.kam.y)*z*.9;
+      ctx.imageSmoothingEnabled=true; ctx.globalAlpha=.9;
+      for(const i of [-1,0,1]){ ctx.save(); ctx.translate(fx+i*WB*fz,fy); if(i!==0)ctx.scale(-1,1); ctx.drawImage(canyonBild.reihe_e3,-WB*fz/2,0,WB*fz,300*fz); ctx.restore(); }
+      ctx.globalAlpha=1; ctx.imageSmoothingEnabled=false;
     }
-    // Welt
-    const wk=uz<A.wackelBis?4:0;
+    // Welt (Wandpixel)
+    const wk=uz<A.wackelBis?3:0;
     ctx.save();
     ctx.translate(W/2-A.kam.x*z+Math.sin(uz*61)*wk,H/2-A.kam.y*z+Math.cos(uz*53)*wk); ctx.scale(z,z);
-    const bg=ctx.createLinearGradient(0,596,0,780); bg.addColorStop(0,"#b8672f"); bg.addColorStop(.25,"#8f4a24"); bg.addColorStop(1,"#3d1c14");
-    ctx.fillStyle=bg; ctx.fillRect(-300,596,B+600,260);
-    if(canyonDa("wand_canyon"))ctx.drawImage(canyonBild.wand_canyon,0,0,B,WH);
-    else { ctx.fillStyle="#a8643a"; ctx.fillRect(0,40,B,WH-40); }
-    const sg=ctx.createLinearGradient(0,205,0,345); sg.addColorStop(0,"rgba(20,6,22,.34)"); sg.addColorStop(1,"rgba(20,6,22,0)");
-    ctx.fillStyle=sg; ctx.fillRect(1016,205,470,140);
-    if(canyonDa("griffe"))for(const h of CANYON_GRIFFE){ const c=CANYON_GRIFF_ZELLE[h.f]||[0,0]; ctx.drawImage(canyonBild.griffe,c[0]*32+4,c[1]*32+2,24,28,h.x-5,h.y-6,10,12); }
-    if(canyonDa("strickleiter"))ctx.drawImage(canyonBild.strickleiter,1496,62,35,124);
-    if(canyonDa("rastplatz"))ctx.drawImage(canyonBild.rastplatz,438,322,56,40);
-    if(aDa("climbing_kreidebeutel"))ctx.drawImage(aBild.climbing_kreidebeutel,1196,326,16,21);
-    if(aDa("climbing_matte"))for(let m=0;m<11;m++)ctx.drawImage(aBild.climbing_matte,380+m*36,584,40,22);
-    if(aDa("climbing_seilsack")){ ctx.drawImage(aBild.climbing_seilsack,306,570,32,28); ctx.drawImage(aBild.climbing_seilsack,736,572,32,28); }
-    // Routen dezent (die drei Wege in ihrer Farbe), Ueberholbuchten gold
-    ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.setLineDash([2,8]); ctx.globalAlpha=.55;
-    for(const r of CANYON_ROUTEN){ ctx.strokeStyle=CANYON_WEG_FARBE[r.weg]; ctx.beginPath(); r.p.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]-12):ctx.moveTo(q[0],q[1]-12)); ctx.stroke(); }
-    ctx.setLineDash([]); ctx.globalAlpha=1;
-    for(const b of CANYON_P.buchten){ ctx.fillStyle="rgba(240,195,90,.22)"; ctx.fillRect(b[0],BAND+4,b[1]-b[0],5); }
+    const bg=ctx.createLinearGradient(0,FUSS-4,0,FUSS+160); bg.addColorStop(0,"#b8672f"); bg.addColorStop(.25,"#8f4a24"); bg.addColorStop(1,"#3d1c14");
+    ctx.fillStyle=bg; ctx.fillRect(-900,FUSS-2,WB+1800,300);
+    if(canyonDa("wand"))ctx.drawImage(canyonBild.wand,0,0,WB,WH);
+    else { ctx.fillStyle="#a8643a"; ctx.fillRect(0,20,WB,WH-20); }
+    if(canyonDa("wandfuss")){ ctx.drawImage(canyonBild.wandfuss,150,FUSS-50,400,57); ctx.drawImage(canyonBild.wandfuss,420,FUSS-44,400,57); }
+    // Griffe: je Kletterer-Linie in der Farbe seines Weges (Einstiegswand), dazu Kraft-, Technik- und Ausdauerweg
+    const griffLinie=(ax,ay,bx,by,n,blatt,saat)=>{ if(!canyonDa(blatt))return; let a=saat;
+      for(let i=0;i<n;i++){ a=(Math.imul(a,1664525)+1013904223)>>>0; const q=(i+.5)/n, c=a%8;
+        ctx.drawImage(canyonBild[blatt],(c%4)*32,Math.floor(c/4)*32,32,32,ax+(bx-ax)*q-6+((a>>>8)%7)-3,ay+(by-ay)*q-6,12,12); } };
     const alle=LAEUFER.map(u=>CANYON.K.get(u.id)).filter(Boolean);
+    for(const K of alle)if(!K.kamin)griffLinie(canyonBandX(K.sx),FUSS-14,canyonBandX(K.sx),BAND+10,6,CANYON_WEG_GRIFFE[K.wegStart],K.u.id*977+13);
+    griffLinie(620,290,620,212,3,"canyon_griffe_rot",5); griffLinie(612,198,512,190,5,"canyon_griffe_rot",7);
+    griffLinie(484,170,500,80,4,"canyon_griffe_rot",9); griffLinie(770,290,770,212,3,"canyon_griffe_gelb",11);
+    griffLinie(302,290,304,186,4,"canyon_griffe_blau",3);
+    // Requisiten hinter den Figuren
+    if(canyonDa("canyon_kiefer"))ctx.drawImage(canyonBild.canyon_kiefer,8,BAND-73,48,75);
+    if(canyonDa("canyon_rastpodest_schraeg")){ const rx=canyonBandX(470); ctx.drawImage(canyonBild.canyon_rastpodest_schraeg,rx-30,BAND-40,60,43); }
+    if(canyonDa("canyon_wegweiser"))ctx.drawImage(canyonBild.canyon_wegweiser,410,BAND-34,84,36);
+    if(canyonDa("canyon_strickleiter"))ctx.drawImage(canyonBild.canyon_strickleiter,753,64,35,120);
+    if(canyonDa("canyon_startbogen"))ctx.drawImage(canyonBild.canyon_startbogen,canyonBandX(555)-63,FUSS-80,126,80);
+    if(aDa("climbing_kreidebeutel"))ctx.drawImage(aBild.climbing_kreidebeutel,636,BAND-21,16,21);
+    if(aDa("climbing_seilsack")){ ctx.drawImage(aBild.climbing_seilsack,120,FUSS-26,30,26); ctx.drawImage(aBild.climbing_seilsack,330,FUSS-26,30,26); }
+    // Routen dezent in ihrer Farbe, Ueberholbuchten gold
+    ctx.lineWidth=1.6; ctx.lineCap="round"; ctx.setLineDash([2,6]); ctx.globalAlpha=.5;
+    const wegLinie=(farbe,pkt)=>{ ctx.strokeStyle=farbe; ctx.beginPath(); pkt.forEach((q,i)=>{ const b=canyonBildPunkt(q[0],q[1]); i?ctx.lineTo(b[0],b[1]-10):ctx.moveTo(b[0],b[1]-10); }); ctx.stroke(); };
+    wegLinie(CANYON_WEG_FARBE.kraft,[[915,352],[1180,352],[1180,228],[1014,206],[998,150],[1040,84],[1075,60],[1200,46],[1328,14]]);
+    wegLinie(CANYON_WEG_FARBE.technik,[[915,352],[911,205],[915,104],[886,52],[1062,58],[1075,60]]);
+    wegLinie(CANYON_WEG_FARBE.ausdauer,[[915,352],[1512,352],[1516,186],[1512,64],[1420,34],[1348,14]]);
+    wegLinie("#f0c35a",[[720,352],[738,296],[808,296],[828,352]]);
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+    for(const b of CANYON_P.buchten){ const x0=canyonBandX(b[0]), x1=canyonBandX(b[1]); ctx.fillStyle="rgba(240,195,90,.25)"; ctx.fillRect(x0,BAND+2,x1-x0,3); }
     const sichten=new Map(alle.map(K=>[K,canyonSicht(K,uz)]));
-    // Seile: vom Wandfuss ueber jeden passierten Punkt bis zur Huefte (zeichnet nebenbei den Weg nach)
-    ctx.lineWidth=1.3; ctx.lineJoin="round";
+    // Seile: vom Wandfuss ueber jeden passierten Knoten bis zur Huefte (zeichnet den Weg nach)
+    ctx.lineWidth=1; ctx.lineJoin="round";
     for(const K of alle){
       const p=sichten.get(K);
-      ctx.strokeStyle=K.u.seite===0?"rgba(250,180,90,.34)":(K.u.seite===1?"rgba(110,200,225,.34)":"rgba(200,200,200,.3)");
-      ctx.beginPath(); ctx.moveTo(K.sx,BODEN+2); let lx=K.sx, ly=BODEN;
-      for(let i=0;i<Math.min(K.si,K.pfad.length);i++){ const s=K.pfad[i];
-        if(s.typ==="boden"){ ctx.moveTo(s.bx,s.by); lx=s.bx; ly=s.by; continue; }
-        ctx.quadraticCurveTo((lx+s.bx)/2,(ly+s.by)/2+Math.min(7,Math.abs(s.bx-lx)*.04),s.bx,s.by-10); lx=s.bx; ly=s.by-10; }
-      ctx.quadraticCurveTo((lx+p.x)/2,(ly+p.hy)/2+5,p.x,p.hy); ctx.stroke();
+      ctx.strokeStyle=K.u.seite===0?"rgba(250,180,90,.38)":(K.u.seite===1?"rgba(110,200,225,.38)":"rgba(200,200,200,.32)");
+      ctx.beginPath(); let [lx,ly]=canyonBildPunkt(K.sx,CANYON_WELT.BODEN); ctx.moveTo(lx,ly+2);
+      for(let i=0;i<Math.min(K.si,K.pfad.length);i++){ const s=K.pfad[i], b=canyonBildPunkt(s.bx,s.by);
+        if(s.typ==="boden"){ ctx.moveTo(b[0],b[1]); lx=b[0]; ly=b[1]; continue; }
+        ctx.quadraticCurveTo((lx+b[0])/2,(ly+b[1])/2+Math.min(6,Math.abs(b[0]-lx)*.04),b[0],b[1]-9); lx=b[0]; ly=b[1]-9; }
+      ctx.quadraticCurveTo((lx+p.x)/2,(ly+p.hy)/2+4,p.x,p.hy); ctx.stroke();
     }
-    // Seilschaft: Seil zwischen benachbarten Partnern, straff und hell, wenn gezogen/geschoben wird
+    // Seilschaft: Seil zwischen benachbarten Partnern, straff und hell beim Ziehen/Schieben
     for(const S of CANYON.S)for(let i=0;i+1<S.m.length;i++){
       const a=CANYON.K.get(S.m[i].id), b=CANYON.K.get(S.m[i+1].id);
       if(!a||!b||(a.ziel!=null&&b.ziel!=null))continue;
       const pa=sichten.get(a), pb=sichten.get(b), hilft=a.zustand==="zieht"||b.zustand==="zieht"||a.schub>0||b.schub>0;
-      const dd=Math.hypot(pa.x-pb.x,pa.hy-pb.hy), hang=hilft?1:Math.max(2,26-dd*.2);
-      ctx.strokeStyle="rgba(12,8,14,.55)"; ctx.lineWidth=hilft?4:3.2;
+      const dd=Math.hypot(pa.x-pb.x,pa.hy-pb.hy), hang=hilft?1:Math.max(2,20-dd*.2);
+      ctx.strokeStyle="rgba(12,8,14,.55)"; ctx.lineWidth=hilft?3:2.4;
       ctx.beginPath(); ctx.moveTo(pa.x,pa.hy); ctx.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy); ctx.stroke();
-      ctx.strokeStyle=hilft?"#ffe08a":bahnSeitenFarbe(S.seite); ctx.lineWidth=hilft?2.4:1.8; ctx.setLineDash(hilft?[]:[5,2]);
+      ctx.strokeStyle=hilft?"#ffe08a":bahnSeitenFarbe(S.seite); ctx.lineWidth=hilft?1.8:1.3; ctx.setLineDash(hilft?[]:[4,2]);
       ctx.beginPath(); ctx.moveTo(pa.x,pa.hy); ctx.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy); ctx.stroke(); ctx.setLineDash([]);
     }
-    if(canyonDa("seilbruecke"))ctx.drawImage(canyonBild.seilbruecke,882,34,184,32);
+    if(canyonDa("canyon_seilbruecke"))ctx.drawImage(canyonBild.canyon_seilbruecke,374,40,150,26);
     // Glocke
     A.glocke.schwung*=Math.exp(-dt*1.6);
-    ctx.save(); ctx.translate(GIPFEL.x,GIPFEL.y-64); ctx.fillStyle="#3b2216"; ctx.fillRect(-2,6,4,62);
+    ctx.save(); ctx.translate(CANYON_GLOCKE[0],CANYON_GLOCKE[1]-58); ctx.fillStyle="#3b2216"; ctx.fillRect(-2,6,4,56);
     ctx.rotate(Math.sin((uz-A.glocke.t)*13)*A.glocke.schwung*.5);
-    if(canyonDa("glocke"))ctx.drawImage(canyonBild.glocke,-23,-6,46,50); else { ctx.fillStyle="#d8a640"; ctx.beginPath(); ctx.arc(0,18,14,Math.PI,0); ctx.fill(); }
+    if(canyonDa("canyon_glocke"))ctx.drawImage(canyonBild.canyon_glocke,-17,-4,34,37); else { ctx.fillStyle="#d8a640"; ctx.beginPath(); ctx.arc(0,14,11,Math.PI,0); ctx.fill(); }
     ctx.restore();
-    A.wellen=A.wellen.filter(w=>{ w.r+=dt*70; w.a-=dt*.9; if(w.a<=0)return false;
-      ctx.strokeStyle="rgba(255,225,130,"+w.a+")"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(GIPFEL.x,GIPFEL.y-40,w.r,0,7); ctx.stroke(); return true; });
-    // Figuren (von oben nach unten, damit Untere vorne stehen)
+    A.wellen=A.wellen.filter(w=>{ w.r+=dt*60; w.a-=dt*.9; if(w.a<=0)return false;
+      ctx.strokeStyle="rgba(255,225,130,"+w.a+")"; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(CANYON_GLOCKE[0],CANYON_GLOCKE[1]-40,w.r,0,7); ctx.stroke(); return true; });
+    // Figuren (von oben nach unten)
     for(const K of [...alle].sort((a,b)=>sichten.get(a).y-sichten.get(b).y))canyonFigur(K,sichten.get(K),A,uz);
+    canyonFxZeichnen(A,dt);
     A.teilchen=A.teilchen.filter(q=>{ q.t+=dt; if(q.t>q.l)return false; q.x+=q.vx*dt; q.y+=q.vy*dt; q.vy+=q.g*dt;
-      const al=(1-q.t/q.l)*q.a, r=q.r*(q.wachs?1+q.t*2.4:1); ctx.fillStyle="rgba("+q.f+","+al.toFixed(2)+")";
+      const al=(1-q.t/q.l)*q.a, r=q.r*(q.wachs?1+q.t*2:1); ctx.fillStyle="rgba("+q.f+","+al.toFixed(2)+")";
       ctx.fillRect(Math.round(q.x-r/2),Math.round(q.y-r/2),Math.ceil(r),Math.ceil(r)); return true; });
     ctx.restore();
-    // E5 Vordergrund-Felsnase (Parallax 1,35), E6 Licht, Vignette
-    if(canyonDa("felsnase")){
-      if(!A.vorn){ try{ const im=canyonBild.felsnase, c=document.createElement("canvas"); c.width=im.naturalWidth; c.height=im.naturalHeight; const x=c.getContext("2d");
-        x.drawImage(im,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="rgba(24,12,22,.66)"; x.fillRect(0,0,c.width,c.height); A.vorn=c; }catch(e){ A.vorn=null; } }
-      if(A.vorn){ ctx.imageSmoothingEnabled=true; const vz=z*1.25, pp=1.35;
-        ctx.drawImage(A.vorn,W/2+(150-A.kam.x)*z*pp,H/2+(646-A.kam.y)*z*pp-203*vz,172*vz,203*vz);
-        ctx.save(); ctx.translate(W/2+(1432-A.kam.x)*z*pp,H/2+(668-A.kam.y)*z*pp-203*vz); ctx.scale(-1,1); ctx.drawImage(A.vorn,0,0,172*vz,203*vz); ctx.restore();
+    // E5 Vordergrund (abgedunkelt, Parallax 1,3), E6 Licht, Vignette
+    if(canyonDa("vordergrund")){
+      if(!A.vorn){ try{ const im=canyonBild.vordergrund, c=document.createElement("canvas"); c.width=im.naturalWidth; c.height=im.naturalHeight; const x=c.getContext("2d");
+        x.drawImage(im,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="rgba(24,12,22,.62)"; x.fillRect(0,0,c.width,c.height); A.vorn=c; }catch(e){ A.vorn=null; } }
+      if(A.vorn){ ctx.imageSmoothingEnabled=true; const vz=z*1.15, pp=1.3, vw=A.vorn.width*vz, vh=A.vorn.height*vz;
+        ctx.drawImage(A.vorn,W/2+(-40-A.kam.x)*z*pp,H/2+(FUSS+40-A.kam.y)*z*pp-vh,vw,vh);
+        ctx.save(); ctx.translate(W/2+(WB+40-A.kam.x)*z*pp,H/2+(FUSS+50-A.kam.y)*z*pp-vh); ctx.scale(-1,1); ctx.drawImage(A.vorn,0,0,vw,vh); ctx.restore();
         ctx.imageSmoothingEnabled=false; }
     }
-    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.translate(-(A.kam.x-792)*.2,0);
+    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.translate(-(A.kam.x-WB/2)*.2*z,0);
     for(const s of [[-80,200,.10],[170,120,.07],[420,160,.06]]){
       const lg=ctx.createLinearGradient(s[0],0,s[0]+600,H); lg.addColorStop(0,"rgba(255,226,170,"+s[2]*1.6+")"); lg.addColorStop(1,"rgba(255,200,140,0)");
       ctx.fillStyle=lg; ctx.beginPath(); ctx.moveTo(s[0],-20); ctx.lineTo(s[0]+s[1],-20); ctx.lineTo(s[0]+s[1]+650,H+20); ctx.lineTo(s[0]+400,H+20); ctx.closePath(); ctx.fill();
     }
     ctx.restore();
-    const vg=ctx.createRadialGradient(W/2,H*.48,H*.42,W/2,H*.5,H*1.1); vg.addColorStop(0,"rgba(30,10,20,0)"); vg.addColorStop(1,"rgba(22,8,18,.55)");
+    const vg=ctx.createRadialGradient(W/2,H*.48,H*.42,W/2,H*.5,H*1.1); vg.addColorStop(0,"rgba(30,10,20,0)"); vg.addColorStop(1,"rgba(22,8,18,.5)");
     ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
     zeichneCanyonHud(A,alle,sichten);
     ctx.restore();
   }
-  // HUD im Bild (Stil HUD-System 17.11.: dunkle Glasflaechen, Barlow-Zahlen, Teamfarbe als Bedeutung):
-  // Kopf mit "Seilschaften oben" und Wartezaehler, Weg-Legende links, Routen-Inset rechts unten.
+  // HUD im Bild (Stil HUD-System 17.11.): Kopf mit "Seilschaften oben" und Wartezaehler, Weg-Legende links,
+  // Routen-Inset rechts unten. Kopfleiste, Uhr, Verlauf und Einblender liefert das Arena-HUD wie bei jeder Bahn.
   function zeichneCanyonHud(A,alle,sichten){
     const ob=Math.max(8,hudBandUnten()+6);
     ctx.save(); ctx.textBaseline="middle";
-    // Weg-Legende
     const lx=10, ly=ob;
-    ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(lx,ly,142,74);
+    ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(lx,ly,150,74);
     setzeFont(ctx,"700 9px 'Barlow Condensed',sans-serif"); ctx.textAlign="left";
-    [["kraft","Kraftweg · Dach + Lippe"],["technik","Technikweg · Kamin + Brücke"],["ausdauer","Ausdauerweg · Flanke + Leiter"]].forEach(([w,t],i)=>{
+    [["kraft","Kraftweg · Dach + Lippe"],["technik","Technikweg · Spalt + Brücke"],["ausdauer","Ausdauerweg · Flanke + Leiter"]].forEach(([w,t],i)=>{
       ctx.fillStyle=CANYON_WEG_FARBE[w]; ctx.fillRect(lx+7,ly+8+i*13,10,4); ctx.fillStyle="#f4e6c4"; ctx.fillText(t,lx+22,ly+10+i*13); });
     ctx.fillStyle="#9fb3c8"; setzeFont(ctx,"600 8px 'Barlow Condensed',sans-serif");
     ctx.fillText("Tempo-Stellen: Anlauf, Band, Blöcke, Grat",lx+7,ly+52);
     ctx.fillText("Kletter-Stellen: Ausdauer + Wegprofil",lx+7,ly+63);
-    // Kopf: Seilschaften oben je Team, Wartezaehler
     const seiten=[...new Set(CANYON.S.map(S=>S.seite))].sort((a,b)=>a-b);
     const txt=seiten.map(s=>CANYON.S.filter(S=>S.seite===s&&S.ziel!=null).length+"/"+CANYON.S.filter(S=>S.seite===s).length);
-    const kw=150+seiten.length*34, kx=W/2-kw/2;
+    const kw=170+seiten.length*34, kx=W/2-kw/2;
     ctx.fillStyle="rgba(9,12,18,.8)"; ctx.fillRect(kx,ob,kw,22);
     setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle="#9fb3c8"; ctx.textAlign="left";
     ctx.fillText("SEILSCHAFTEN OBEN",kx+8,ob+11);
@@ -57353,24 +57410,31 @@
     const lang=alle.reduce((m,K)=>Math.max(m,K.wartet?K.warteLauf:0),0);
     setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle=CANYON.warteJetzt>=3?"#ff9f43":"#9fb3c8"; ctx.textAlign="right";
     ctx.fillText("WARTEN "+CANYON.warteJetzt+(lang>0?" · "+(lang/CANYON_P.tempo*zeitFaktor()).toFixed(1)+" s":""),kx+kw-8,ob+11);
-    // Routen-Inset
-    const iw=180, ih=iw*CANYON_WELT.H/CANYON_WELT.B, ix=W-iw-10, iy=H-ih-12, is=iw/CANYON_WELT.B;
+    // Routen-Inset: ganze Wand, drei Wege, Punkt je Kletterer, Bildausschnitt
+    const ih=120, iw=ih*CANYON_BILD.B/CANYON_BILD.H, ix=W-iw-10, iy=H-ih-12, is=ih/CANYON_BILD.H;
     ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(ix-4,iy-4,iw+8,ih+8);
+    ctx.fillStyle="#6f95c4"; ctx.fillRect(ix,iy,iw,ih);
     ctx.imageSmoothingEnabled=true;
-    if(canyonDa("wand_canyon"))ctx.drawImage(canyonBild.wand_canyon,ix,iy,iw,ih);
+    if(canyonDa("wand"))ctx.drawImage(canyonBild.wand,ix,iy,iw,ih);
     ctx.fillStyle="rgba(9,12,18,.3)"; ctx.fillRect(ix,iy,iw,ih);
-    ctx.lineWidth=1.4;
-    for(const r of CANYON_ROUTEN){ ctx.strokeStyle=CANYON_WEG_FARBE[r.weg]; ctx.beginPath(); r.p.forEach((q,i)=>i?ctx.lineTo(ix+q[0]*is,iy+q[1]*is-1):ctx.moveTo(ix+q[0]*is,iy+q[1]*is-1)); ctx.stroke(); }
-    for(const K of alle){ const p=sichten.get(K); ctx.fillStyle="#0b0e14"; ctx.fillRect(ix+p.x*is-3,iy+p.y*is-5,6,6); ctx.fillStyle=bahnSeitenFarbe(K.u.seite); ctx.fillRect(ix+p.x*is-2,iy+p.y*is-4,4,4); }
+    ctx.lineWidth=1.2;
+    const inset=(farbe,pkt)=>{ ctx.strokeStyle=farbe; ctx.beginPath(); pkt.forEach((q,i)=>{ const b=canyonBildPunkt(q[0],q[1]); i?ctx.lineTo(ix+b[0]*is,iy+b[1]*is):ctx.moveTo(ix+b[0]*is,iy+b[1]*is); }); ctx.stroke(); };
+    inset(CANYON_WEG_FARBE.kraft,[[915,352],[1180,352],[1180,228],[1014,206],[998,150],[1040,84],[1075,60],[1200,46],[1328,14]]);
+    inset(CANYON_WEG_FARBE.technik,[[915,352],[911,205],[915,104],[886,52],[1062,58],[1075,60]]);
+    inset(CANYON_WEG_FARBE.ausdauer,[[915,352],[1512,352],[1516,186],[1512,64],[1420,34],[1348,14]]);
+    for(const K of alle){ const p=sichten.get(K); ctx.fillStyle="#0b0e14"; ctx.fillRect(ix+p.x*is-2.5,iy+p.y*is-5,5,5); ctx.fillStyle=bahnSeitenFarbe(K.u.seite); ctx.fillRect(ix+p.x*is-1.5,iy+p.y*is-4,3,3); }
     const hw=W/2/A.kam.z*is, hh=H/2/A.kam.z*is;
-    ctx.strokeStyle="rgba(244,230,196,.95)"; ctx.lineWidth=1; ctx.strokeRect(ix+A.kam.x*is-hw,Math.max(iy,iy+A.kam.y*is-hh),hw*2,Math.min(ih,hh*2));
+    ctx.strokeStyle="rgba(244,230,196,.95)"; ctx.lineWidth=1;
+    const rx0=Math.max(ix,ix+A.kam.x*is-hw), rx1=Math.min(ix+iw,ix+A.kam.x*is+hw), ry0=Math.max(iy,iy+A.kam.y*is-hh), ry1=Math.min(iy+ih,iy+A.kam.y*is+hh);
+    if(rx1>rx0&&ry1>ry0)ctx.strokeRect(rx0,ry0,rx1-rx0,ry1-ry0);
     ctx.restore();
   }
   // Bildschirmort einer Figur fuer Schwebetexte/Einblender (laeuferXY im Canyon-Format)
   function canyonSchirmXY(u){
     const K=CANYON&&CANYON.K.get(u.id), A=canyonAnzeige&&canyonAnzeige.fuer===CANYON?canyonAnzeige:null;
     if(!K||!A)return {x:W/2,y:H/2};
-    return {x:(K.x-A.kam.x)*A.kam.z+W/2, y:(K.y-24-A.kam.y)*A.kam.z+H/2};
+    const p=canyonBildOrt(K);
+    return {x:(p.x-A.kam.x)*A.kam.z+W/2, y:(p.y-30-A.kam.y)*A.kam.z+H/2};
   }
 
   function zeichneSpurt(){
@@ -70198,11 +70262,13 @@
       const m=bahnCanyonAktiv&&canyonLetzteMessung?canyonLetzteMessung.erste:null;
       M.zurueck(g); return m;
     },
-    // Was gezeichnet wird: je Kletterer der gebuchte Ort (Welt), die Sicht-Basis und der Fortschritt.
+    // Was gezeichnet wird: je Kletterer der gebuchte Ort (Motor-Welt), derselbe Ort im Wandbild (Ankertabelle),
+    // die gezeichnete Position (mit Ruck/Pendeln) und der Fortschritt.
     canyonFigurenProbe:()=>{
       if(!bahnCanyonAktiv||!CANYON)return null;
       return {rennT, laeufer:LAEUFER.map(u=>{ const K=CANYON.K.get(u.id), p=canyonSicht(K,0);
-        return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, x:K.x, y:K.y, zustand:K.zustand, weg:K.weg,
+        const b=canyonBildOrt(K);
+        return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, x:K.x, y:K.y, bildX:b.x, bildY:b.y, zustand:K.zustand, weg:K.weg,
           figurAngemeldet:Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,u.n), sichtX:p.x, sichtY:p.y}; })};
     },
     bahnFlags:(neu)=>{
