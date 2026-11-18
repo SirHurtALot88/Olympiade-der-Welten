@@ -56,10 +56,13 @@ const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 //                               docs/design/kontakt-persoenlichkeit-16-11.md 6.5; Eltern-Stand fa2a52d9 noch aaf683d5...,
 //                               nur diese eine Zeile bewegt sich, die vier anderen Bahnen bleiben gleich)
 //   staffel bbb0c028e8447abe -> 78236478f3941cc3 bei b6462832 (#1499, Health von ROBUST nach STEHEN)
+//   staffel 78236478f3941cc3 -> ffcb5fa8568a8601 am 17.11. (GANZE RUNDE, PUSTE WIRKT: bewusste
+//            Wertungsaenderung, BAHN_ART.staffel.rundePuste, abgenommen: Duell rho 0,957, Pp 13,2/14,0;
+//            docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2)
 // Takeshi's Castle, Zeitfahren und Climbing sind seit dem Umbau unveraendert.
 const SAATEN: Array<number | string> = [1, 7, 42, 1337, "save:s1:md3:staffel"];
 const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
-  staffel: "78236478f3941cc3",
+  staffel: "ffcb5fa8568a8601",
   "takeshis-castle": "5bbb7171f24f2908",
   spurt: "8e96b1dc33ad1b1c",
   "time-trial": "b167882f39f9bc63",
@@ -207,9 +210,19 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
   //            staffel -> 28b0dc7aec07abed, takeshis-castle -> d91070176c0010b4
   //            (echte Ergebnisverschiebung im Pod, nicht nur Text -- Zielzeiten/Plaetze aendern sich)
   //   b6462832 (#1499, Staffel-Health nach STEHEN): staffel -> 5aad1c353c0efcab
-  // Die Pod-Pp-Abnahme selbst ist dabei NICHT neu gemessen worden (scripts/miss-bahn-pod-abnahme.mjs).
+  //   17.11. (GANZE RUNDE, PUSTE WIRKT, s. oben): staffel -> 7533f61ed6de70c0. Pod-Abnahme dazu neu
+  //            gemessen (scripts/miss-bahn-pod-abnahme.mjs staffel 6 --je-seite=k --pp=48): rho je Rennen
+  //            (Median, Strom 0) k=2/4/6 0,926/0,921/0,954, Pp 19,7/21,1 -- die Pp-Sonde lief dabei
+  //            allerdings immer mit k = 6 (art.jeSeite), auch bei --je-seite=4.
+  //   17.11. Review S1/S2 (Puste je Bein statt je Sekunde, Plan nach echter Beinzahl): bei k = 6 fuer sich
+  //            bit-identisch (nb = 6, Faktor genau 1). Danach Pod-Rezept nachgezogen (ENDTEMPO/STEHEN, nur
+  //            Pod, BAHN_ART.staffel.podRezept): staffel -> 7f4f59dd46d904e7. Pod-Abnahme NEU GEMESSEN, jetzt
+  //            mit Pp bei derselben k wie die Rangtreue (miss-bahn-pod-abnahme.mjs --je-seite=k --pp=48):
+  //            rho k=2..6 0,943/0,956/0,957/s. Doku, Pp k=2..6 17,0/11,5/8,0/6,8/5,7 (Strom 0),
+  //            docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2.7. k = 4 und k = 2 haelt der
+  //            Test unten.
   const POD_FINGERABDRUECKE_KALIBRIERT: Record<string, string> = {
-    staffel: "5aad1c353c0efcab",
+    staffel: "7f4f59dd46d904e7",
     "takeshis-castle": "d91070176c0010b4",
   };
   it.each(Object.keys(POD_FINGERABDRUECKE_KALIBRIERT))(
@@ -225,6 +238,28 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
         { bd, teams },
       );
       expect(fingerabdruck(laeufe)).toBe(POD_FINGERABDRUECKE_KALIBRIERT[bd]);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  // STAFFEL-POD BEI k = 4 UND k = 2 (Review S1/S2, 17.11.): die Liga laeuft meist mit vier oder zwei
+  // Laeufern je Team (`optionen.k`, Kopfzahl des Spielplan-Slots). Die Puste war bis dahin nur fuer k = 6
+  // geeicht (Verbrauch je Sekunde, Beine bei k = 4 1,5-mal so lang: 88 % Einbrueche) -- seitdem
+  // je Bein (`staffelRundeMass`), dazu das nachgezogene Pod-Rezept. Vorher (Branch-Stand 8bbc6ea215f6):
+  // k4 8d4675f066ceba72, k2 0f649b7d0ff8c749; nur Beinlaenge: k4 5e5f9e469e531f3b, k2 e7434b777cdcfb4e.
+  const STAFFEL_POD_K: Record<number, string> = { 4: "f772039c16bffbf3", 2: "206ad2d97031d04b" };
+  it.each([4, 2])(
+    "Staffel-Pod mit k = %i Laeufern je Team: abgenommener Stand nach der Beinlaengen-Normierung",
+    async (k) => {
+      const teams = vierTeams();
+      const laeufe = await seite.evaluate(
+        ({ teams, k }) =>
+          ["save:s1:md7:staffel", "save:s1:md8:staffel", 11].map((saat) =>
+            window.__arena.spieleBahnPod("staffel", teams, saat, null, { formSaat: saat, k }),
+          ),
+        { teams, k },
+      );
+      expect(fingerabdruck(laeufe)).toBe(STAFFEL_POD_K[k]);
     },
     LAUF_TIMEOUT_MS,
   );

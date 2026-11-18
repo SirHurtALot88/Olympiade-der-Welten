@@ -7484,18 +7484,24 @@
   // laeuft, bauen beide deshalb hoechstens ~10 Mal je Sekunde neu; Ende (done), Reset und
   // Sonden-Laeufe (pixelgenaue Screenshots) bleiben ungedrosselt. Reine Anzeige: weder
   // renderKader() noch renderWertungTabelle() beruehren rr(), Boxscore oder Wertung.
-  let schnelldurchDomZuletzt=0;
-  let abspielDomZuletzt=0;
-  function schnelldurchDomGedrosselt(){
+  // EINE UHR JE ANZEIGEFLAECHE (17.11.): renderWertungTabelle() und renderKader() teilten sich je EINEN
+  // Zeitstempel. Rief updateHud*() die Wertungstabelle zuerst (Bahn/Pod: immer), setzte sie den Stempel,
+  // und renderKader() direkt danach sah "gerade erst gebaut" -- die Kaderleiste samt Mitte (#kmitte,
+  // im Pod "1. 5,2 P · 2. ...") blieb im laufenden Spiel auf dem Stand vom Anpfiff stehen (gemessen:
+  // 151 Aufrufe, 6 durchgelassen, keine waehrend des Rennens). Jetzt hat jede Flaeche ihren eigenen
+  // Stempel; die Drossel selbst (100 ms Abspielen, 250 ms Vorspulen) bleibt unveraendert. Reine Anzeige.
+  const schnelldurchDomZuletzt={};
+  const abspielDomZuletzt={};
+  function schnelldurchDomGedrosselt(flaeche){
     const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
     if(!schnelldurchAktiv){
       if(!running||done||sondenAktiv)return false;
-      if(jetzt-abspielDomZuletzt<100)return true;
-      abspielDomZuletzt=jetzt;
+      if(jetzt-(abspielDomZuletzt[flaeche]||0)<100)return true;
+      abspielDomZuletzt[flaeche]=jetzt;
       return false;
     }
-    if(jetzt-schnelldurchDomZuletzt<250)return true;
-    schnelldurchDomZuletzt=jetzt;
+    if(jetzt-(schnelldurchDomZuletzt[flaeche]||0)<250)return true;
+    schnelldurchDomZuletzt[flaeche]=jetzt;
     return false;
   }
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
@@ -9869,6 +9875,29 @@
       // 0,923/0,231 vor UND nach dieser gesamten Aenderung, s. PR-Beschreibung).
       live:{perioden:4, periodenDauer:90, periodenPause:1.0, schussuhr:8,
             periodeWort:"Viertel"},
+      // FELD-MASSSTAB (Benchmark Basketball, 17.11., docs/design/benchmark-basketball-17-11.md):
+      // der Court ist ein echtes FIBA-Feld (28 x 15 m) auf der gezeichneten Flaeche W*0,88 x
+      // (H-120) — 38,97 px/m laengs, 23,33 px/m quer (Schraegsicht, Verkuerzung 0,6). Die
+      // Spiellogik rechnet weiter in ihren alten "Logik-px" (DREIER_RADIUS 112,8, Slots, Wunsch-
+      // distanz ...); `skala` bildet sie auf das echte Feld ab: 112,8 Logik-px = 6,75 m
+      // Dreierlinie = 263 px laengs / 157,5 px quer. Kontakt-Radien (Bedraengnis, Steal, Greifen,
+      // Passlinie) bleiben bewusst Bildschirm-px — sie messen Koerper, nicht Feld.
+      // Rechnung: s. SPACING-MODUL (feldSkala/feldLogikDist/feldVersatz).
+      // `tempo` = Faktor aufs Bildschirm-Lauftempo. 1,0 = Figuren laufen so schnell wie vorher
+      // (230 px/s = 5,9 m/s). Gemessen (Node-Motor, 12 Spiele): das echte Feld ist in Logik-
+      // Einheiten kuerzer (Wurfreichweite beginnt frueher), FGA steigen schon bei 1,0 von 76 auf
+      // 113 je Spiel; 1,55 trieb sie auf 150 (hektisch), 0,8 senkt auf 98, wirkt aber traege.
+      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0},
+      // SPACING/POSITIONSTREUE (Chris 17.11.: "spieler brauchen mehr positionstreue und nicht
+      // alle nur dem puck/ball hinterher") — Parameter des generischen SPACING-MODULS (s. dort):
+      //   jaegerJeSeite      wie viele je Team einem freien Ball nachlaufen (der Rest haelt Zone)
+      //   jaegerRadius       nur wer in diesem Logik-Radius steht, kommt ueberhaupt als Jaeger in
+      //                      Frage (vorher: JEDER binnen LAUF_ZUM_BALL_RADIUS 260 px)
+      //   mitspielerMin      Mindestabstand zwischen Mitspielern im Angriff ohne Ball (Logik-px)
+      //   mitspielerStaerke  wie hart dieser Abstand ins Laufziel geht (0..1)
+      //   ruecklauf          Angreifer, die beim Wurf NICHT zum Rebound gehen, laufen bis zu
+      //                      diesem Anteil Richtung Mittellinie zurueck (Transition-Sicherung)
+      spacing:{jaegerJeSeite:2, jaegerRadius:200, mitspielerMin:58, mitspielerStaerke:0.8, ruecklauf:0.35},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Plan 1.2 Punkt 1,
       // s. rezeptAus() weiter oben). Dort steht es zeichengleich weiter — mitsamt der
       // kompletten Kalibrier-Historie: Chris' Budget-Methode, die zurueckgerechneten
@@ -10971,7 +11000,11 @@
   // ausgerechnete Literalwert, mit Herleitung im Kommentar statt eines zweiten
   // "145-PLATZHALTER"-Raetsels.
   const DREIER_RADIUS=112.8;        // = H*0.24 bei H=470 (cv.height, s. ARENA-Setup) — ab hier ein Dreier
-  const FERN_RADIUS_MAX=170;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
+  // BENCHMARK-RUNDE 17.11.: 170 -> 140. Seit der FIBA-Feldmetrik (SPACING-MODUL) ist ein
+  // Logik-px 1/16,7 m; 170 waren 10,2 m — ein ungezwungener Wurf von fast der Mittellinie. 140 =
+  // 8,4 m ("tiefer Dreier"), die Slots liegen mit 117-130 sicher darunter. Gemessen (Node-Motor,
+  // 12 Spiele): Dreieranteil 46 % statt 67 % bei 170, FGA 113 statt 127 je Spiel.
+  const FERN_RADIUS_MAX=140;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
   // Fluegel-/Eckenslots ab, s. SLOTS: radius bis 150) — jenseits davon wird nur per
   // Schussuhr-Zwang abgeschlossen (entscheideBallaktion, erzwingen-Zweig).
   // WURF_BONUS/GEO_BONUS-Historie: bis zu dieser Runde trug der Distanzunterschied
@@ -11185,7 +11218,11 @@
   // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
   // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
-  function klassifiziereWurfdistanz(zumKorb,erzwingen){
+  // `querL` (optional, Benchmark Basketball 17.11.): Querablage zur Korbachse in Logik-px. Die
+  // gezeichnete FIBA-Dreierlinie laeuft in den Ecken GERADE (6,6 m statt 6,75 m vom Ring, s.
+  // FELDSPIEL_ART.basketball.feld.eckeDreierY) — wer dort hinter der Linie steht, wirft einen
+  // Dreier, auch wenn sein Abstand knapp unter DREIER_RADIUS liegt. Gezeigt = gebucht.
+  function klassifiziereWurfdistanz(zumKorb,erzwingen,querL){
     // EISHOCKEY HAT EIGENE SCHUSSWEITEN, s. HK_RADIUS_* — Basketballs Staffel endet bei
     // 170 px, die blaue Linie liegt bei 295. Ohne diese Weiche gibt jeder Verteidiger,
     // der auf seinem Slot steht, `null` zurueck: kein Schuss, nie, ausser die Schussuhr
@@ -11200,7 +11237,11 @@
     }
     if(zumKorb<DUNK_RADIUS)return "dunk";
     if(zumKorb<KORB_NAH_RADIUS)return "nah";
-    if(zumKorb<DREIER_RADIUS)return "mit";
+    if(zumKorb<DREIER_RADIUS){
+      const fa=feldArtLive();
+      if(querL!=null&&fa&&fa.feld&&fa.feld.eckeDreierY&&Math.abs(querL)>=fa.feld.eckeDreierY)return "fern";
+      return "mit";
+    }
     if(erzwingen||zumKorb<FERN_RADIUS_MAX)return "fern";
     return null; // ausserhalb jeder Reichweite fuer einen ungezwungenen Wurf
   }
@@ -11576,9 +11617,143 @@
   // schon bei 4,5 % sitzt. Alles andere (Schussdistanz, Ballflug, gezeichnete Torlinie)
   // liest diese eine Funktion — getrennte Literale waren beim Basketballkorb schon
   // einmal die Ursache dafuer, dass der Wurf das gezeichnete Ziel verfehlte.
+  // BASKETBALL-KORBLAGE (Benchmark-Runde 17.11., s. FELDSPIEL_ART.basketball.feld): der Ring
+  // bleibt bei W*0,076 / W*0,924 (0,5 m vor der Grundlinie). FIBA saehe 1,575 m vor — die
+  // PixelLab-Korbanlage (public/sprites/basketball/korb_*_hinten/vorne.png, Fable 17.11.) traegt
+  // ihr Brett aber direkt am Mast, 35 px vor dem Sockel: bei 1,575 m stuende der Sockel 40 px im
+  // Spielfeld. Alle LINIEN sind deshalb relativ zum RING FIBA-genau (Freiwurflinie 4,225 m vor
+  // dem Ring, Dreier 6,75 m, No-Charge 1,25 m), nur der Abstand Ring-Grundlinie ist verkuerzt.
+  // Als eigene Zeile, damit eine spaetere Anlage mit langem Ausleger ihn auf 1,575 m setzen kann.
+  const BK_KORB_X_ANTEIL=0.076;
+  // Zeichenmassstab der Korb-PNGs: 1,0 = Ring 59 px ueber dem Boden = 3,05 m bei ~19,5 px/m
+  // Figurenhoehe (eine 1,95-m-Figur ist ~38 px hoch); freie Ringoeffnung 16 px, Ball 12 px.
+  // Fables Vorschlag 1,25 (Ring 74 px, Ball 18 px) wirkt lesbarer, ist aber ~3,8 m hoch.
+  const BK_KORB_SKALA=1.0;
+  // FIBA-MASSE IN PX (Benchmark Basketball 17.11.) — Zeichnung (bodenFeldspiel,
+  // zeichneKorbAnlage, scripts/baue-basketball-assets.py) und Freiwurf-Aufstellung lesen nur
+  // diese Tabelle. Literale fuer die Leinwand 1240x470 (W/H existieren hier noch nicht, TDZ —
+  // dieselbe Begruendung wie bei DREIER_RADIUS): laengs 1240*0,88/28 = 38,971 px/m, quer
+  // 350/15 = 23,333 px/m. Hoehen im Figurenmassstab 19,5 px/m.
+  const BK_FIBA=(()=>{
+    const mx=1240*0.88/28, my=350/15, mz=19.5, ringVonGrund=(BK_KORB_X_ANTEIL-0.06)*1240;
+    return {mx, my, mz, ringVonGrund,
+      zoneTiefe:ringVonGrund+4.225*mx, zoneHalb:2.45*my,
+      kreisRx:1.8*mx, kreisRy:1.8*my,
+      noChargeRx:1.25*mx, noChargeRy:1.25*my,
+      dreierRx:6.75*mx, dreierRy:6.75*my,
+      eckeY:6.6*my, eckeLaengeX:Math.sqrt(6.75*6.75-6.6*6.6)*mx,
+      // Rueckfall-Zeichnung (Primitive, falls die PNGs fehlen): Brett 0,375 m hinter dem Ring.
+      brettVonGrund:ringVonGrund-0.375*mx, brettHalb:0.9*my,
+      ringZ:59*BK_KORB_SKALA, brettUntenZ:56, brettObenZ:77,
+      ringRx:10.5, ringRy:5, netzTiefe:15, ballD:12,
+      staenderHinterGrund:0.65*mx, staenderZ:3.35*mz};
+  })();
+  // ANZEIGE-ZUSTAND DER KORBANLAGE (rein kosmetisch, nie von der Wertung gelesen): was der Ball
+  // NACH dem Wurf sichtbar tut — durchs Netz fallen (Treffer) oder vom Ring abprallen (Fehlwurf).
+  // Eigene Anzeige-Uhr, damit die Animation auch in Freiwurf-/Viertelpausen-Phasen weiterlaeuft,
+  // in denen fsT steht.
+  let bkNachlauf=null, bkAnzeigeUhr=0;
+  // Ballhoehe ueber dem Boden (px) entlang eines Wurfs: aus Handhoehe (26) auf Ringhoehe, mit
+  // Scheitel `scheitel` — so endet jeder Wurf GENAU im gezeichneten Ring, nicht auf dem Boden-
+  // punkt darunter (Chris: "es muss dafuer gesorgt werden dass ein treffer auch im korb landet").
+  const bkBogenZ=(phase,scheitel)=>26+(BK_FIBA.ringZ-26)*phase+Math.sin(phase*Math.PI)*scheitel;
   const korbXVon=(side)=>feldspielDisc==="hockey"
     ?(side===0?W*0.90:W*0.10)
+    :feldspielDisc==="basketball"
+    ?(side===0?W*(1-BK_KORB_X_ANTEIL):W*BK_KORB_X_ANTEIL)
     :(side===0?W*0.924:W*0.076);
+
+  // ===================================================================================
+  // SPACING-MODUL — Positionstreue fuer die Ballsportarten (17.11., Chris: "spieler brauchen
+  // mehr positionstreue und nicht alle nur dem puck/ball hinterher, niemand steht mal separat
+  // und ist frei fuer einen pass etc — da brauchen wir nen generellen fix").
+  // Doku: docs/design/spacing-modul-17-11.md. Erste Anwendung: Basketball. Hockey/Football
+  // schliessen an, indem sie in FELDSPIEL_ART[d] einen `feld`- und/oder `spacing`-Block
+  // eintragen — ohne Block liefern alle Funktionen hier das alte Verhalten (Massstab 1,
+  // keine Jaeger-Auswahl, kein Mitspielerabstand), zeichengleich.
+  //
+  // Vier Bausteine:
+  //   1. FELD-METRIK   feldLogikDist/feldVersatz: die Spiellogik rechnet in "Logik-px", das
+  //                    Feld ist massstabsgetreu gezeichnet; die Skala verbindet beides, damit
+  //                    Dreierlinie, Slots und Wurfdistanz GENAU auf den gezeichneten Linien
+  //                    liegen (gezeigt = gebucht).
+  //   2. JAEGER        spacingJaeger: einem freien Ball laufen je Team nur die `jaegerJeSeite`
+  //                    Naechsten nach; alle anderen bleiben in ihrer Rolle (Slot/Deckung).
+  //   3. MITSPIELER-   spacingMitspielerZiel: ein Laufziel im Angriff ohne Ball haelt
+  //      ABSTAND       `mitspielerMin` Logik-px zu jedem Mitspieler — Anspielstationen entstehen,
+  //                    weil niemand neben dem anderen parkt.
+  //   4. RUECKLAUF     spacingRuecklauf: wer beim Fehlwurf nicht jagt, sichert nach hinten ab.
+  // Heimatpositionen/Rollen je Slot liefern weiter SLOTS/SLOTS_HOCKEY/SLOTS_FOOTBALL
+  // (zuordneSlots) — das Modul legt sie nur in den echten Feldmassstab.
+  // ===================================================================================
+  const feldArtLive=()=>(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[feldspielDisc])||null;
+  const feldSkala=()=>{ const a=feldArtLive(); return a&&a.feld?a.feld.skala:null; };
+  const spacingVon=()=>{ const a=feldArtLive(); return a&&a.spacing?a.spacing:null; };
+  // Abstand in Logik-px (ohne Feld-Block: gewoehnlicher Bildschirmabstand).
+  function feldLogikDist(a,b){
+    const s=feldSkala();
+    return s?Math.hypot((a.x-b.x)/s.x,(a.y-b.y)/s.y):Math.hypot(a.x-b.x,a.y-b.y);
+  }
+  // Versatz in Logik-px -> Bildschirm-px.
+  function feldVersatz(dxL,dyL){
+    const s=feldSkala();
+    return s?{x:dxL*s.x,y:dyL*s.y}:{x:dxL,y:dyL};
+  }
+  // Querablage zur Korbachse in Logik-px (fuer die Ecken-Dreier-Regel).
+  function feldLogikDy(p){ const s=feldSkala(); return (p.y-H/2)/(s?s.y:1); }
+  // Laufgeschwindigkeit im Feldmassstab: ein groesseres, echtes Feld braucht ein hoeheres
+  // Bildschirmtempo, damit Ballbesitze nicht laenger werden (gleiche Zahl Ereignisse je Spiel).
+  const feldTempoSkala=()=>{ const a=feldArtLive(); return a&&a.feld&&a.feld.tempo?a.feld.tempo:1; };
+  // JAEGER: je Team die `jaegerJeSeite` Naechsten zum freien Ball (Logik-Abstand, innerhalb
+  // `jaegerRadius`), Torhueter und Strafbank ausgenommen. null = Modul aus (alte Regel).
+  function spacingJaeger(ball){
+    const sp=spacingVon(); if(!sp||!ball)return null;
+    const menge=new Set();
+    for(const team of FSTEAM){
+      const kand=team.filter(u=>!stehtImTor(u)&&aufDemEis(u))
+        .map(u=>({u,d:feldLogikDist(u,ball)})).filter(e=>e.d<sp.jaegerRadius)
+        .sort((a,b)=>a.d-b.d).slice(0,sp.jaegerJeSeite);
+      for(const e of kand)menge.add(e.u);
+    }
+    // Liegt der Ball ausserhalb jedes Jaeger-Radius, geht wenigstens der Naechste insgesamt
+    // hin — sonst bliebe er liegen.
+    if(!menge.size){
+      let best=null,bd=Infinity;
+      for(const team of FSTEAM)for(const u of team){
+        if(stehtImTor(u)||!aufDemEis(u))continue;
+        const d=feldLogikDist(u,ball); if(d<bd){bd=d;best=u;}
+      }
+      if(best)menge.add(best);
+    }
+    return menge;
+  }
+  // MITSPIELER-ABSTAND: schiebt ein Laufziel (zx,zy) aus dem `mitspielerMin`-Kreis jedes
+  // Mitspielers (aktuelle Position) heraus, in Logik-Koordinaten, dann zurueck in px.
+  function spacingMitspielerZiel(u,zx,zy){
+    const sp=spacingVon(); if(!sp||!sp.mitspielerMin)return {x:zx,y:zy};
+    const s=feldSkala()||{x:1,y:1};
+    let px=0, py=0;
+    for(const m of FSTEAM[u.side]){
+      if(m===u||stehtImTor(m)||!aufDemEis(m))continue;
+      const dx=(zx-m.x)/s.x, dy=(zy-m.y)/s.y, d=Math.hypot(dx,dy)||0.01;
+      if(d<sp.mitspielerMin){ const f=(sp.mitspielerMin-d)/d; px+=dx*f; py+=dy*f; }
+    }
+    let rx=zx+px*s.x*sp.mitspielerStaerke, ry=zy+py*s.y*sp.mitspielerStaerke;
+    // Basketball: das Ziel bleibt NACH dem Abstand im Spielfeld (Seitenlinien/Grundlinien aus
+    // BK_FIBA, 12 px Rand) — sonst schob der Abstand Ecken-/Fluegelziele ueber die Linie hinaus
+    // bis fast an den Leinwandrand (Review PR #1562).
+    if(feldspielDisc==="basketball"){
+      const halbQ=7.5*BK_FIBA.my-12, halbL=14*BK_FIBA.mx-12;
+      ry=Math.max(H/2-halbQ,Math.min(H/2+halbQ,ry));
+      rx=Math.max(W/2-halbL,Math.min(W/2+halbL,rx));
+    }
+    return {x:rx, y:ry};
+  }
+  // RUECKLAUF: Laufziel eines Nicht-Jaegers der werfenden Seite Richtung Mittellinie ziehen.
+  function spacingRuecklauf(zx){
+    const sp=spacingVon(); if(!sp||!sp.ruecklauf)return zx;
+    return zx+(W/2-zx)*sp.ruecklauf;
+  }
   // HANDPUNKTE FUER DEN GETRAGENEN BALL (Chris, 03.09.: "die Spieler den tragen mit den
   // Animationen"). Reine Uebernahme der Messung aus docs/design/sprite-handpunkte.md
   // (Profil-Laufbilder, Spalten 0-8 = ANIBILDER.walk, Zellen-Pixel mit Fusspunkt bei
@@ -11656,6 +11831,7 @@
     rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
+    bkNachlauf=null;
     seed=normalisiereSaat(saat); kontaktStromSaeen(saat);
     // Eigener Kickoff-Saatstrom, fester Versatz auf denselben Spiel-Seed (s. Kommentar bei
     // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
@@ -12058,13 +12234,20 @@
   // auf Distanz (Slot 1), je ein Fluegel- und ein Eckenspieler pro Seite (2/3, 4/5) — genau die
   // vier Zonen, die Chris nennt (Ecke/Fluegel/Top of Key/Gegenseite). Kein Slot NAEHER am Korb
   // oder AUSSERHALB des Feldes als vorher — reine Winkelkorrektur, keine neue Mechanik.
+  // BENCHMARK-RUNDE 17.11. (FIBA-Feld, SPACING-MODUL): die beiden ECKEN-Slots liegen jetzt
+  // wirklich in der Ecke — knapp hinter der geraden Dreierlinie (Logik-Quer 113 > 110,3 =
+  // eckeDreierY), 1,7 m vor der Grundlinie. Mit radius 145/seitlich 1,45 lagen sie im echten
+  // Feldmassstab ausserhalb der Seitenlinie (130 Logik-px quer = 182 px > 175 px halbe
+  // Feldbreite) bzw. auf dem Fluegel statt in der Ecke. Top und Fluegel ruecken von 130/150 auf
+  // 125 (7,5 m, ein Schritt hinter der 6,75-m-Linie, wie echtes Spacing) — mit 150 lagen die
+  // Fluegel jenseits des neuen Wurfdeckels FERN_RADIUS_MAX 140 (s. dort). Post unveraendert.
   const SLOTS=[
-    {radius:60,  seitlich:0},
-    {radius:130, seitlich:0},
-    {radius:150, seitlich:1.05},
-    {radius:150, seitlich:-1.05},
-    {radius:145, seitlich:1.45},
-    {radius:145, seitlich:-1.45}
+    {radius:60,  seitlich:0},          // Post (3,6 m vor dem Ring)
+    {radius:125, seitlich:0},          // Top of the Key (7,5 m, knapp hinter der Linie)
+    {radius:125, seitlich:0.95},       // Fluegel (7,5 m)
+    {radius:125, seitlich:-0.95},      // Fluegel
+    {radius:117, seitlich:1.26},       // Ecke (Corner Three)
+    {radius:117, seitlich:-1.26}       // Ecke
   ];
   // EISHOCKEY HAT EINE ANDERE FORMATION, und zwar nicht als Geschmacksfrage: Basketballs
   // Slots reichen bis 150 px vom Korb, weil ein Court so tief ist. Auf der Eisflaeche
@@ -14957,11 +15140,13 @@
     }
     const team=FSTEAM[u.side];
     const korbX=korbXVon(u.side);
-    const zumKorb=dist(u,{x:korbX,y:H/2});
+    // Feld-Metrik (SPACING-MODUL): ohne `feld`-Block identisch zu dist().
+    const zumKorb=feldLogikDist(u,{x:korbX,y:H/2});
+    const querL=feldLogikDy(u);
     // WURFDISTANZ-KLASSIFIZIERUNG (Fable-Fund, Wurfmechanik-Runde): frueher nur ein
     // nah/fern-Bit, geometrisch nicht am gezeichneten Dreier-Bogen ausgerichtet (s.
     // DREIER_RADIUS-Herleitung oben). Jetzt vier echte Stufen.
-    const tier=klassifiziereWurfdistanz(zumKorb,false);
+    const tier=klassifiziereWurfdistanz(zumKorb,false,querL);
     const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
     const deckerAbstand=decker?dist(u,decker):999;
     // DOPPELN (Bedraengnis-Bugfix-Runde, s. Bericht): vorher gab es ausschliesslich
@@ -15014,7 +15199,7 @@
     const kontestFaktor=decker
       ?Math.max(KONTEST_MIN,Math.min(KONTEST_MAX,
         0.7+(KONTEST_PIVOT+decker.ABWEHR
-             -schussSkillFuer(u,tier||klassifiziereWurfdistanz(zumKorb,true)))*KONTEST_K))
+             -schussSkillFuer(u,tier||klassifiziereWurfdistanz(zumKorb,true,querL)))*KONTEST_K))
       :1;
     // BUGFIX (Bedraengnis-Bugfix-Runde, 26.08., s. Bericht): gemessen ueber 400 Spiele/
     // 8.562 Feldwuerfe stieg die Trefferquote MIT sinkendem Deckerabstand (70,8 % offen
@@ -15240,7 +15425,7 @@
       // Verzweiflungswurf jenseits der Dreierlinie traf so oft wie ein Korbleger, fuer
       // einen Punkt mehr. Jetzt klassifiziert nach der ECHTEN Distanz (kann bei einem
       // erzwungenen Wurf aus der Zone durchaus "nah"/"mit" sein, nicht automatisch Dreier).
-      const tierErz=klassifiziereWurfdistanz(zumKorb,true);
+      const tierErz=klassifiziereWurfdistanz(zumKorb,true,querL);
       // Kein Gate/Schwelle in diesem Zweig (erzwingen wirft immer) — kein Auswahl-
       // Kaskadenrisiko, GEO_BONUS+bedraengnisMake koennen hier direkt in die Erfolgsformel,
       // schussSkillFuer wie in technikMake oben.
@@ -15370,7 +15555,7 @@
     // Nur fuer die Wurfmechanik-Abnahme (s. fsZuege()-Debughook): die tatsaechliche
     // Distanz zum Korb IM Abwurfmoment, damit sich die Tier-Klassifizierung nachtraeglich
     // gegen die echte Geometrie pruefen laesst, ohne die Spiellogik selbst zu beeinflussen.
-    const zumKorbBeiWurf=Math.round(dist(schuetze,{x:korbXVon(schuetze.side),y:H/2}));
+    const zumKorbBeiWurf=Math.round(feldLogikDist(schuetze,{x:korbXVon(schuetze.side),y:H/2}));
     // Nur fuer die Fastbreak-Abnahme (Chris' Nachfrage: "produziert ein Tempo-Unterschied
     // WIRKLICH einen Fastbreak-Vorteil, oder trudelt nur die Animation schneller"): Stand
     // des eigenen Deckers IM Abwurfmoment — wie weit weg, ob gerade ein Fastbreak laeuft.
@@ -15567,7 +15752,8 @@
     const links=korbX<W/2;                       // welcher der beiden Koerbe angegriffen wird
     const grundX=links?W*0.06:W*0.94;            // exakt der Wert aus bodenFeldspiel
     const zumFeld=links?1:-1;                    // Richtung von der Grundlinie ins Feld
-    const zonenTiefe=H*0.16, zonenHalb=H*0.08;   // exakt die Werte aus bodenFeldspiel
+    // FIBA-Zone seit 17.11. (bodenFeldspiel/BK_FIBA): Freiwurflinie 4,225 m vor dem Ring, 4,9 m breit.
+    const zonenTiefe=BK_FIBA.zoneTiefe, zonenHalb=BK_FIBA.zoneHalb;
     return {korbX,links,grundX,zumFeld,zonenTiefe,zonenHalb,
       linieX:grundX+zumFeld*zonenTiefe};         // Freiwurflinie = Mittelpunkt des gezeichneten Halbkreises
   }
@@ -15593,10 +15779,12 @@
     // Formation wird also von keiner der beiden Entzerrungen mehr angefasst. Reine
     // Zeichen-/Stellungsfrage: die Freiwurfquote rechnet verbucheFreiwurf() aus
     // Attributen, nicht aus Positionen.
-    const gassen=[{anteil:0.18,abwehr:true},{anteil:0.68,abwehr:false},{anteil:1.18,abwehr:true}];
+    // FIBA-Zone (17.11.): die drei Gassenplaetze je Seite liegen 38 / 57 / 76 % der Zonentiefe vor der
+    // Grundlinie (Anteile der 5,8-m-Zone), knapp ausserhalb der Zonenlinie.
+    const gassen=[{anteil:0.38,abwehr:true},{anteil:0.57,abwehr:false},{anteil:0.76,abwehr:true}];
     for(const g of gassen)for(const vz of [-1,1]){
       const u=(g.abwehr?verteidiger:angreifer).shift();
-      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*geo.zonenHalb};
+      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*(geo.zonenHalb+10)};
     }
     // Rest abwechselnd, damit sich die beiden Teams auch hinten nicht zu einem Klumpen
     // je Farbe sortieren (dieselbe Spacing-Idee wie SLOTS/SEPARATION oben).
@@ -15661,7 +15849,10 @@
     const korb={x:korbXVon(schuetze.side),y:H/2};
     if(fw.stufe==="flug"){
       const phase=Math.min(1,fw.t/FW_FLUG);
-      fsBall={sichtbar:true,
+      fsBall=feldspielDisc==="basketball"
+        ? {sichtbar:true, x:schuetze.x+(korb.x-schuetze.x)*phase, y:schuetze.y+(korb.y-schuetze.y)*phase,
+           z:bkBogenZ(phase,40)}
+        : {sichtbar:true,
         x:schuetze.x+(korb.x-schuetze.x)*phase,
         y:schuetze.y+(korb.y-schuetze.y)*phase-Math.sin(phase*Math.PI)*44};
       if(phase>=1){
@@ -15676,6 +15867,12 @@
       return;
     }
     // `nach`: der Ball faellt am Ring aus, dann geht es weiter bzw. die Phase endet.
+    if(feldspielDisc==="basketball"){
+      // Treffer: durchs Netz senkrecht nach unten. Fehlwurf: vom Ring zur Seite ab.
+      const zf=Math.max(5,BK_FIBA.ringZ-fw.t*(fw.treffer?150:110));
+      const weg=fw.treffer?0:Math.min(1,fw.t/0.4);
+      fsBall={sichtbar:true,x:korb.x+(korb.x<W/2?1:-1)*weg*55,y:korb.y+weg*22,z:zf};
+    } else
     fsBall={sichtbar:true,x:korb.x,y:korb.y+Math.min(26,fw.t*60)};
     if(fw.t<FW_NACH)return;
     if(fw.idx<fw.anzahl){ fw.stufe="anlauf"; fw.t=0; return; }
@@ -16539,8 +16736,13 @@
       // weiter ab (auch physikalisch plausibel). Zwei rr()-Wuerfe, deterministisch.
       const scatterR=10+rr()*(flug.fern?70:flug.tier==="dunk"?15:40); // PLATZHALTER
       const winkel=rr()*Math.PI*2;
-      fsLive.ball.frei={x:flug.nach.x+Math.cos(winkel)*scatterR,
-        y:flug.nach.y+Math.sin(winkel)*scatterR,vonSeite:schuetze.side};
+      // Abpraller im Feldmassstab (SPACING-MODUL; ohne `feld`-Block identisch) — und nie
+      // hinter die Grundlinie: der Ring haengt nur 0,5 m davor (BK_KORB_X_ANTEIL).
+      const vR=feldVersatz(Math.cos(winkel)*scatterR,Math.sin(winkel)*scatterR);
+      let reboundX=flug.nach.x+vR.x;
+      if(feldSkala())reboundX=Math.max(W*0.06+10,Math.min(W*0.94-10,reboundX));
+      fsLive.ball.frei={x:reboundX,
+        y:flug.nach.y+vR.y,vonSeite:schuetze.side};
     }
   }
 
@@ -16583,6 +16785,10 @@
     // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
     const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
+    // SPACING-MODUL (17.11.): wer einem freien Ball nachlaeuft. null = Disziplin ohne
+    // `spacing`-Block -> alte Regel (jeder binnen LAUF_ZUM_BALL_RADIUS bzw. Hockeys eigene).
+    const JAEGER=(!istHockey()&&fsLive.ball&&fsLive.ball.frei)?spacingJaeger(fsLive.ball.frei):null;
+    const FELD_SKALA=feldSkala();
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
     // Radius von 60 wuerde die Zonen-Gassen (Abstand 30px) auseinandertreiben. Richtig
@@ -16652,12 +16858,13 @@
         const anteil=Math.max(0,Math.min(1,(profil+12)/26));
         const wunsch=(istHockey()?HK_WUNSCH_MAX:DREIER_RADIUS+18)*anteil;
         const zumFeldB=u.side===0?-1:1;
-        zy=H/2+(u.id%2?40:-40);
         // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
         // Rechnung wie bei den Slot-Zielen unten); passt sie nicht mehr in die Y-Ablage,
-        // wird direkt der Korb angelaufen.
-        const yAbl=zy-H/2;
-        zx=korbX+zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl));
+        // wird direkt der Korb angelaufen. Gerechnet in Logik-px, dann ueber feldVersatz
+        // ins echte Feld gelegt (SPACING-MODUL; ohne `feld`-Block identisch).
+        const yAbl=u.id%2?40:-40;
+        const vB=feldVersatz(zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl)),yAbl);
+        zx=korbX+vB.x; zy=H/2+vB.y;
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -16682,7 +16889,7 @@
         }
       } else if(fsLive.ball.frei&&(istHockey()
                  ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
-                 : dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
+                 : JAEGER?JAEGER.has(u):dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
         // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
@@ -16717,10 +16924,14 @@
         // (s. Definition oben); die X-Komponente wird so berechnet, dass hypot(x,y) genau
         // diesen Wert trifft.
         const yOff=slot.seitlich*90;
-        let bx=korbX+zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),
-            by=H/2+yOff;
+        const vS=feldVersatz(zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),yOff);
+        let bx=korbX+vS.x, by=H/2+vS.y;
         const traeger=fsLive.ball.traeger;
-        if(traeger&&traeger!==u){
+        if(traeger&&traeger!==u&&FELD_SKALA){
+          // Dieselbe Fahrspur-Regel wie unten, im Feldmassstab (Logik-px).
+          const dx0=(bx-traeger.x)/FELD_SKALA.x, dy0=(by-traeger.y)/FELD_SKALA.y, d0=Math.hypot(dx0,dy0)||1, mindest=110;
+          if(d0<mindest){ bx+=dx0/d0*(mindest-d0)*FELD_SKALA.x; by+=dy0/d0*(mindest-d0)*FELD_SKALA.y; }
+        } else if(traeger&&traeger!==u){
           // Fable-Fund: 80 gab dem Ballfuehrer (fuer den `hatBall` immer Kurs auf den
           // eigenen Korb setzt, s. oben) kaum Vorfahrt vor den eigenen Mitspielern — beim
           // Antritt zum Korb liefen die Slot-Ziele fast unveraendert mit, statt Platz zu
@@ -16743,6 +16954,10 @@
           if(frei.length){ u.slotIdx=frei[Math.floor(rr()*frei.length)]; }
           u.slotSeit=0;
         }
+        // SPACING-MODUL: Rucklauf beim freien Ball (wer nicht jagt, sichert ab) und
+        // Mindestabstand zu den Mitspielern. Ohne `spacing`-Block unveraendert.
+        if(JAEGER&&!JAEGER.has(u))bx=spacingRuecklauf(bx);
+        if(spacingVon()){ const m=spacingMitspielerZiel(u,bx,by); bx=m.x; by=m.y; }
         zx=bx; zy=by;
         if(imFastbreak&&fastbreak.seite===u.side){
           if(fastbreak.ausbrecher===u&&fsT<(u.ausbruchBis||0)){
@@ -16752,7 +16967,7 @@
             // fehlende Teil ("schneller zum anderen Korb kommen"): das Fastbreak-Fenster
             // gab bisher nur Tempo, aber niemandem ein anderes ZIEL — alle liefen ihre
             // Halbfeld-Slots an, nur schneller.
-            zx=korbX; zy=H/2+(u.id%2?26:-26);
+            zx=korbX; zy=H/2+feldVersatz(0,u.id%2?26:-26).y;
             tempoMul=AUSBRUCH_TEMPO_MUL;
           } else if(SPRINTER[u.side].indexOf(u)>=0)tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
         }
@@ -16765,7 +16980,7 @@
           // Angreifer — sie parkte geschlossen im Zielbereich, bevor der Ball ankam.
           // Jetzt kein Bonus mehr: sie ist normal schnell, der Ballfuehrer (1,3×/0,85×
           // Dribbelabzug, s. oben) ist im Fastbreak schneller als sie.
-          zx=eigenerKorbX; zy=H/2+(u.id%2?40:-40);
+          zx=eigenerKorbX; zy=H/2+feldVersatz(0,u.id%2?40:-40).y;
         } else {
           // DOPPELN/HELP-DEFENSE (Bedraengnis-Bugfix-Runde, s. Bericht): vorher gab es
           // ausschliesslich strikte 1:1-Manndeckung — kein Code liess je zwei Verteidiger
@@ -16791,7 +17006,7 @@
             const primaerDecker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger);
             if(primaerDecker&&primaerDecker!==u
                &&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS*(fokus?FOKUS_BEDRAENGT_MUL:1)
-               &&dist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
+               &&feldLogikDist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
               // Chance haengt an der eigenen ABWEHR (koordinierte Hilfe ist Verteidiger-
               // Skill, kein reiner Zufall) — PLATZHALTER-Koeffizienten, s. Bericht fuer die
               // gemessene Doppel-Rate. Der Fokus hebt die Chance UND die Kappe an, macht
@@ -16849,7 +17064,9 @@
             // — er weicht zurueck. `sag` (der Zug Richtung eigenen Korb) gab es schon;
             // gegen einen koerperlich ueberlegenen Angreifer faellt er groesser aus, der
             // Verteidiger steht also weiter vom Ball weg und bedraengt schwaecher.
-            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3)   // PLATZHALTER, gedeckelt
+            // Feldmassstab: der Zug richtet sich nach der Logik-Entfernung zum Korb, der
+            // Versatz selbst bleibt ein Koerperabstand in px (SPACING-MODUL).
+            const sag=Math.min(35,Math.abs(zumEigenenKorb/(FELD_SKALA?FELD_SKALA.x:1))*0.3)   // PLATZHALTER, gedeckelt
               *(1+(u.mismatchWucht||0)*MISMATCH_WUCHT_SAG);
             zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
             // SLOT-BEWEGUNGSCHARAKTERISTIK — VERSUCHT UND WIEDER VERWORFEN (Zusatzauftrag,
@@ -16987,7 +17204,8 @@
       // leerem auf `tempoMin` faellt. Ohne Puste-Rezept gibt pusteFaktor 1 zurueck und die
       // Zeile ist rechnerisch nicht vorhanden.
       if(u.pusteMax>0)tempoMul*=pusteFaktor(u,FB().puste.tempoMin);
-      const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
+      const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1)
+        *(FELD_SKALA?feldTempoSkala():1); // Feldmassstab (SPACING-MODUL), sonst exakt 1 -> unveraendert
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
       // Opus-Review-Fund #12: `u.vx=dx` schrieb die RESTDISTANZ zum Ziel, nicht die
@@ -17004,6 +17222,7 @@
   }
 
   function stepFeldspielLive(dt){
+    bkAnzeigeUhr+=dt; // Anzeige-Uhr der Korbanlage (bkNachlauf), nie von der Wertung gelesen
     // Fable-Playtest (25.08.): nach Spielende stand alles bewegungslos still — der fruehe
     // Return liess bewegeSpielerLive() nie wieder laufen. Anders als die anderen
     // Feldspiel-Disziplinen (die ueber fsLerpPositionen() in feste Formationsslots
@@ -17157,12 +17376,27 @@
     if(flug){
       flug.t+=dt;
       const phase=Math.min(1,flug.t/flug.dauer);
+      // BASKETBALL-WURF IN DER HOEHE (17.11.): Bodenpunkt linear zum Korb, Hoehe `z` ueber
+      // bkBogenZ bis auf Ringhoehe — der Ball endet im Ring der Korbanlage. Reine Anzeige
+      // (fsBall liest die Wertung nicht); alle anderen Fluege unveraendert.
+      const bkWurfFlug=feldspielDisc==="basketball"&&(flug.art==="wurf"||flug.art==="alley");
+      if(bkWurfFlug){
+        const weit=feldLogikDist(flug.von,flug.nach);
+        fsBall={sichtbar:true,
+          x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
+          y:flug.von.y+(flug.nach.y-flug.von.y)*phase,
+          z:bkBogenZ(phase,flug.art==="alley"?70:Math.min(70,18+weit*0.32))};
+      } else
       fsBall={sichtbar:true,
         x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
         y:flug.von.y+(flug.nach.y-flug.von.y)*phase
           -Math.sin(phase*Math.PI)*(istHockey()?0:flug.art==="alley"?90:flug.art==="wurf"?36:0)};
       if(flug.art==="alley"&&phase>0.66)flug.ziel.hop=Math.sin(((phase-0.66)/0.34)*Math.PI)*28;
-      if(phase>=1){ loeseFlugAuf(flug,art); fsLive.ball.flug=null; }
+      if(phase>=1){
+        if(bkWurfFlug)bkNachlauf={art:flug.treffer?"netz":"abpraller",t0:bkAnzeigeUhr,
+          x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,dunk:flug.tier==="dunk"||flug.art==="alley"};
+        loeseFlugAuf(flug,art); fsLive.ball.flug=null;
+      }
     } else if(fsLive.ball.frei){
       const f=fsLive.ball.frei;
       fsBall={sichtbar:true,x:f.x,y:f.y};
@@ -18366,69 +18600,198 @@
     ctx.fillStyle=parkett||"rgba(120,84,46,.18)";
     ctx.fillRect(W*0.06,60,W*0.88,H-120);
     }
-    ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    ctx.strokeRect(W*0.06,60,W*0.88,H-120);
-    ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
-    ctx.beginPath();ctx.arc(W/2,H/2,H*0.09,0,6.3);ctx.stroke();
-    // Alle Radien haengen weiter an H, nicht an W: H (470) ist die Seitenlinien-Tiefe
-    // und bleibt die knappe Achse, auch nachdem die Spielrichtung auf X gedreht ist —
-    // ein an W bemessener Radius wuerde ueber die Seitenlinien hinausschiessen.
-    for(const links of [true,false]){
-      // korbX kommt aus derselben korbXVon()-Referenz wie Ballflug/Distanzklassifizierung
-      // (nicht mehr eigene Literale hier) — sonst laeuft die Zeichnung wieder aus dem
-      // Ruder, sobald korbXVon() an anderer Stelle nachjustiert wird.
-      const grundX=links?W*0.06:W*0.94, korbX=korbXVon(links?1:0);
-      // Zone (die Zahnstocher-Box unterm Korb). Fables Fund (03.09.): die Box haengte
-      // Tiefe UND Breite an H (der kurzen Seitenlinien-Achse) — H*0.16 ~75px, deutlich
-      // kleiner als eine echte NBA-Zone. Die Zone reicht real 19 ft von der Grundlinie
-      // (Feldlaenge 94 ft) und ist 16 ft breit (Feldbreite 50 ft); hier ist W die lange
-      // Achse (Spielfeldlaenge, Spielflaeche W*0.88 breit gemalt, s. fillRect oben) und
-      // H die kurze (Feldbreite) — die TIEFE gehoert deshalb an W, nicht an H.
-      const zoneTiefe=W*0.88*(19/94), zoneBreite=H*(16/50);
-      ctx.strokeRect(links?grundX:grundX-zoneTiefe,H/2-zoneBreite/2,zoneTiefe,zoneBreite);
-      // Freiwurflinie mit Halbkreis — Radius bleibt an H (Feldbreite), nur der Abstand
-      // von der Grundlinie folgt jetzt derselben echten Zonentiefe wie die Box oben.
-      ctx.beginPath();ctx.arc(links?grundX+zoneTiefe:grundX-zoneTiefe,H/2,H*0.09,0,6.3);ctx.stroke();
-      // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
-      ctx.beginPath();
-      ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
-        links?Math.PI/2-0.20:1.5*Math.PI-0.20);
-      ctx.stroke();
-      // Korb: Kenney-Sprite in Draufsicht (Brett quer, Ring davor), an der Grundlinie
-      // gespiegelt/gedreht — Chris' Fund: "die Leute treffen den Korb nicht weil er
-      // nicht existiert". Bild zeigt das Brett OBEN, den Ring darunter (Ring zeigt nach
-      // "unten" im Blatt) — gedreht, damit der Ring ins Feld zeigt statt zur Wand.
-      if(bkDa("korb_topdown")){
-        // Chris' Fund (25.08.): der Wurf traf den Korb optisch gar nicht. Ursache: das
-        // Korb-Sprite hing an `grundX` (der Grundlinie), waehrend der Ballflug bei einem
-        // Wurf IMMER auf `korbX` (=korbXVon(seite), dieselbe X, an der auch Dreierlinie und
-        // Schuss-Distanzklassifizierung haengen) zielt — zwei verschiedene X-Werte fuer
-        // "wo der Korb ist". Jetzt haengt das Sprite an derselben Referenz wie der Ballflug.
-        ctx.save();
-        ctx.translate(korbX,H/2);
-        ctx.rotate(links?-Math.PI/2:Math.PI/2);
-        ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
-        ctx.restore();
-        // Staender zur Grundlinie (Fables Fund, 03.09.: das Sprite haengt frei im Feld,
-        // ohne sichtbare Verbindung zur Wand — real steht die Korbanlage auf einem
-        // Pfosten/Ausleger, der zur Grund-/Aussenlinie zurueckreicht). Reicht bis knapp
-        // an den gezeichneten Ring heran (halbe Sprite-Breite), damit er nicht ueber den
-        // Ring hinaus ins Feld ragt.
-        ctx.strokeStyle="rgba(210,210,215,.6)";ctx.lineWidth=5;
-        ctx.beginPath();
-        ctx.moveTo(grundX,H/2);
-        ctx.lineTo(links?korbX-22:korbX+22,H/2);
-        ctx.stroke();
-      } else {
-        // Rueckfall: Ring plus kurzer Brett-Strich, wie vor der Asset-Runde.
-        ctx.fillStyle="rgba(255,140,60,.9)";
-        ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
-        ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
-        ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
-      }
-      ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    }
+    // FIBA-COURT (Benchmark Basketball 17.11., docs/design/benchmark-basketball-17-11.md). Alle
+    // Linien kommen aus BK_FIBA (echte Meter, 38,97 px/m laengs, 23,33 px/m quer) — vorher hingen
+    // Zone (W-basiert, 220 px tief) und Dreierbogen (H*0,24 = 112,8 px Kreis) an zwei
+    // verschiedenen Massstaeben: der Dreierbogen lag INNERHALB der Zone, war also keine
+    // erkennbare Dreierlinie (Chris: "jede map sollte eine 3er linie haben"). Jetzt: gerade
+    // Eckenlinien 0,9 m vor der Seitenlinie, Bogen 6,75 m um den Ring, Zone bis 4,225 m vor dem Ring x 4,9 m,
+    // Freiwurfkreis, No-Charge-Halbkreis, Mittelkreis — auf JEDER Kulisse, weil der Motor sie
+    // ueber Parkett und Streetcourt gleichermassen zeichnet. Die Spiellogik liest dieselben
+    // Masse (klassifiziereWurfdistanz + feldLogikDist): gezeigt = gebucht.
+    // BODEN-OVERLAY (Fable 17.11., scripts/baue-basketball-assets.py): liegt eine Kulisse
+    // darunter und ist ihr Linien-PNG (<kulisse>_linien.png) geladen, ersetzt es die
+    // Vektorlinien — mit Farbabrieb und Mittelkreis-Wappen, aber derselben Geometrie (das Skript
+    // baut mit den BK_FIBA-Massen, s. dort). Sonst die Vektorlinien als Rueckfall.
+    if(!(mitKulisse&&bkLinienOverlay()))zeichneBasketballLinien();
+    // Die Korbanlage selbst steht NICHT hier im Boden, sondern wird in zeichneFeldspiel nach y
+    // zwischen die Figuren sortiert (Tiefe), s. zeichneKorbAnlage.
     zeichneShotClock();
+  }
+  // Linien-Overlay der aktiven Basketball-Kulisse zeichnen; false = nicht verfuegbar.
+  const bkOverlayBilder={};
+  function bkLinienOverlay(){
+    if(!kulisseAktiv||!kulisseAktiv.bild)return false;
+    const pfad=kulisseAktiv.bild.replace(/\.jpg$/,"_linien.png");
+    if(pfad===kulisseAktiv.bild)return false;
+    let im=bkOverlayBilder[pfad];
+    if(!im){ im=new Image(); im.src=pfad; bkOverlayBilder[pfad]=im; }
+    if(!im.complete||!im.naturalWidth)return false;
+    ctx.drawImage(im,0,0,W,H);
+    return true;
+  }
+  // KORBANLAGE ALS EIGENES ZEICHEN-OBJEKT (Benchmark Basketball 17.11.). Chris: "er [muss] ein
+  // echtes asset [sein] und nicht nur gemalt auf die map". Bis hierher war der Korb ein 56-px-
+  // Sprite flach auf dem Boden (korb_topdown) — der Ball landete 26 px UEBER ihm, weil Baelle
+  // auf Handhoehe gezeichnet werden. Jetzt steht eine Anlage im Raum: Staender hinter der
+  // Grundlinie, Ausleger, Brett 1,2 m vor der Grundlinie, Ring auf 3,05 m, Netz — in ZWEI
+  // Ebenen:
+  //   "hinten"  Bodenschatten, Staender, Ausleger, Brett, hintere Ringhaelfte, hintere Netzfaeden
+  //             (in der y-sortierten Spielerschleife von zeichneFeldspiel, via korbHinten: wer
+  //             weiter hinten steht, wird VOR der Anlage gezeichnet, alle anderen danach)
+  //   "vorn"    vordere Ringhaelfte und vorderes Netz (am Ende von zeichneFeldspiel, NACH dem
+  //             Ball) — dadurch faellt ein Treffer sichtbar DURCH den Ring ins Netz.
+  // PNG-TAUSCH (Assets macht der PixelLab-Schwester-Agent): Datei nach
+  // public/sprites/basketball/ legen und den Namen in BK_KORB_PNG eintragen; Anker ist der
+  // Ringmittelpunkt (ankerX/ankerY im Bild), das Bild zeigt den LINKEN Korb (Brett links vom
+  // Ring) und wird fuer den rechten gespiegelt. Ist ein PNG geladen, ersetzt es die Primitive
+  // seiner Ebene vollstaendig; fehlt es oder laedt es nicht, bleibt die Zeichnung unten.
+  function zeichneKorbAnlage(links,ebene){
+    const F=BK_FIBA, kx=korbXVon(links?1:0), my=H/2, z=links?1:-1;
+    const ry=my-F.ringZ;                       // Bildschirm-y des Ringmittelpunkts
+    // PNG-Anlage (Fable 17.11., data/generated/pixellab-requisiten/basketball-17-11/anker.json):
+    // 96x128, Ringmitte links (68,52) / rechts (27,52), Bodenpunkt unter dem Ring y=111.
+    const pngName="korb_"+(links?"links":"rechts")+"_"+(ebene==="hinten"?"hinten":"vorne");
+    if(bkDa(pngName)){
+      const sk=BK_KORB_SKALA, ax=links?68:27;
+      if(ebene==="hinten"){
+        // Bodenschatten unter dem Ring: der Punkt, den die Wurfdistanz misst.
+        ctx.save();ctx.fillStyle="rgba(0,0,0,.20)";
+        ctx.beginPath();ctx.ellipse(kx,my,F.ringRx,F.ringRy,0,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+      ctx.drawImage(bkBild[pngName],kx-ax*sk,my-111*sk,96*sk,128*sk);
+      if(ebene==="vorne"){ const sw=bkNetzZustand(links); if(sw>0)bkNetzFaeden(kx,ry,sw,false); }
+      return;
+    }
+    const gx=links?W*0.06:W*0.94, bx=gx+z*F.brettVonGrund, sx=gx-z*F.staenderHinterGrund;
+    const netz=bkNetzZustand(links);
+    ctx.save();
+    if(ebene==="hinten"){
+      // Bodenschatten von Ring und Brett: zeigt, WO am Boden der Korb steht (der Punkt, den
+      // klassifiziereWurfdistanz misst).
+      ctx.fillStyle="rgba(0,0,0,.22)";
+      ctx.beginPath();ctx.ellipse(kx,my,F.ringRx,F.ringRy,0,0,Math.PI*2);ctx.fill();
+      ctx.fillRect(Math.min(bx,bx+z*3)-1,my-F.brettHalb,4,F.brettHalb*2);
+      // Staender: Fuss hinter der Grundlinie, Mast, Ausleger zum Brett.
+      ctx.fillStyle="rgba(20,24,32,.55)";
+      ctx.beginPath();ctx.ellipse(sx,my,13,6,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#2b3442";ctx.fillRect(sx-9,my-6,18,8);
+      ctx.strokeStyle="#59677d";ctx.lineWidth=5;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(sx,my);ctx.lineTo(sx,my-F.staenderZ);ctx.lineTo(bx-z*2,my-F.staenderZ);ctx.stroke();
+      ctx.strokeStyle="#3a4556";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(sx,my-F.staenderZ*0.62);ctx.lineTo(bx-z*2,my-F.staenderZ+6);ctx.stroke();
+      // Polster am Mast (Hallen-Standard), Teamfarbe der Seite, die auf diesen Korb wirft.
+      ctx.fillStyle=links?"rgba(58,120,214,.9)":"rgba(214,58,58,.9)";
+      ctx.fillRect(sx-4,my-26,8,22);
+      // Brett: von der Seite gesehen ein schmales, hohes Rechteck (Schraegsicht), weiss mit
+      // rotem Rand; die dem Feld zugewandte Kante traegt das Zielquadrat.
+      const bOben=my-F.brettHalb-F.brettObenZ, bUnten=my+F.brettHalb-F.brettUntenZ;
+      const bL=links?bx-2:bx-5;
+      ctx.fillStyle="rgba(240,244,250,.96)";ctx.fillRect(bL,bOben,7,bUnten-bOben);
+      ctx.strokeStyle="#c0392b";ctx.lineWidth=1.5;ctx.strokeRect(bL+0.5,bOben+0.5,6,bUnten-bOben-1);
+      ctx.fillStyle="#c0392b";
+      ctx.fillRect(links?bL+5:bL,ry-14,2,14);
+      // Halterung Brett -> Ring.
+      ctx.strokeStyle="#9aa3ad";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(bx+z*4,ry+1);ctx.lineTo(kx-z*F.ringRx,ry+1);ctx.stroke();
+      // Netz, hintere Faeden (zwischen hinterer Ringhaelfte und Netzboden).
+      bkNetzFaeden(kx,ry,netz,true);
+      // Hintere Ringhaelfte (oberer Ellipsenbogen = vom Betrachter weg).
+      ctx.strokeStyle="#e8662a";ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,Math.PI,Math.PI*2);ctx.stroke();
+    } else {
+      bkNetzFaeden(kx,ry,netz,false);
+      // Vordere Ringhaelfte, kraeftiger, mit hellem Glanz — liegt UEBER dem Ball.
+      ctx.strokeStyle="#ff7a33";ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,0,Math.PI);ctx.stroke();
+      ctx.strokeStyle="rgba(255,214,170,.7)";ctx.lineWidth=1;
+      ctx.beginPath();ctx.ellipse(kx,ry,F.ringRx,F.ringRy,0,0.35,1.2);ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Netzbewegung nach einem Treffer: das Netz wird kurz laenger und schmaler ("Swish") —
+  // liest nur den Anzeige-Zustand bkNachlauf.
+  function bkNetzZustand(links){
+    const n=bkNachlauf; if(!n||n.art!=="netz"||n.links!==links)return 0;
+    const t=bkAnzeigeUhr-n.t0; if(t<0||t>0.55)return 0;
+    return Math.sin(Math.min(1,t/0.55)*Math.PI);
+  }
+  function bkNetzFaeden(kx,ry,schwung,hinten){
+    const F=BK_FIBA, tiefe=F.netzTiefe+schwung*7, unten=F.ringRx*0.55*(1-schwung*0.25);
+    ctx.strokeStyle=hinten?"rgba(225,230,238,.45)":"rgba(245,248,252,.85)";ctx.lineWidth=1;
+    const n=7;
+    for(let i=0;i<=n;i++){
+      const w=Math.PI*(i/n);                  // 0..PI = vordere Haelfte, PI..2PI = hintere
+      const a=hinten?w+Math.PI:w;
+      const ox=Math.cos(a)*F.ringRx, oy=Math.sin(a)*F.ringRy;
+      ctx.beginPath();ctx.moveTo(kx+ox,ry+oy);
+      ctx.lineTo(kx+Math.cos(a)*unten,ry+tiefe+Math.sin(a)*F.ringRy*0.5);ctx.stroke();
+    }
+    // Querfaden auf halber Tiefe und unterer Netzrand.
+    for(const anteil of [0.5,1]){
+      const rx=F.ringRx+(unten-F.ringRx)*anteil, yy=ry+tiefe*anteil;
+      ctx.beginPath();ctx.ellipse(kx,yy,rx,F.ringRy*(1-anteil*0.5),0,hinten?Math.PI:0,hinten?Math.PI*2:Math.PI);ctx.stroke();
+    }
+  }
+  // Wo der Ball gerade GEZEICHNET wird, solange bkNachlauf laeuft (Netz bzw. Abpraller).
+  // null = kein Nachlauf, normale Ballzeichnung. Reine Anzeige.
+  function bkNachlaufBall(){
+    const n=bkNachlauf; if(!n)return null;
+    // Abpraller: greift jemand den Ball schon waehrend des Nachlaufs, ist er vorbei (kein zweiter
+    // Ball). Beim Treffer (Netz) NICHT: der Einwurf-Ballbesitz folgt sofort und wuerde den
+    // Fall durchs Netz abschneiden.
+    if(n.art==="abpraller"&&fsLive&&fsLive.ball.traeger){ bkNachlauf=null; return null; }
+    const t=bkAnzeigeUhr-n.t0, F=BK_FIBA;
+    if(n.art==="netz"){
+      if(t>0.5){ bkNachlauf=null; return null; }
+      // 0..0,22 s durch Ring und Netz, danach zu Boden.
+      const z=t<0.22?F.ringZ-(t/0.22)*(F.netzTiefe+6):Math.max(6,F.ringZ-F.netzTiefe-6-(t-0.22)*260);
+      return {x:n.x+(n.links?1:-1)*Math.max(0,t-0.22)*30, y:n.y+Math.max(0,t-0.22)*14, z};
+    }
+    if(t>0.32){ bkNachlauf=null; return null; }
+    const f=fsLive&&fsLive.ball.frei, ziel=f?{x:f.x,y:f.y}:{x:n.x+(n.links?40:-40),y:n.y+20};
+    const p=t/0.32;
+    return {x:n.x+(ziel.x-n.x)*p, y:n.y+(ziel.y-n.y)*p,
+      z:F.ringZ+4+(12-F.ringZ-4)*p+Math.sin(p*Math.PI)*22};
+  }
+  // BASKETBALL-FELDLINIEN (FIBA, s. BK_FIBA). Reine Zeichnung.
+  function zeichneBasketballLinien(){
+    const F=BK_FIBA, gl=W*0.06, gr=W*0.94, oben=60, unten=H-60, my=H/2;
+    ctx.save();
+    // Zonen (Key) leicht in Teamfarbe eingefaerbt, damit sie auf jedem Belag lesbar bleiben.
+    for(const links of [true,false]){
+      const g=links?gl:gr;
+      ctx.fillStyle=links?"rgba(214,58,58,.16)":"rgba(58,120,214,.16)";
+      ctx.fillRect(links?g:g-F.zoneTiefe,my-F.zoneHalb,F.zoneTiefe,F.zoneHalb*2);
+    }
+    ctx.strokeStyle="rgba(255,255,255,.62)";ctx.lineWidth=2;
+    ctx.strokeRect(gl,oben,gr-gl,unten-oben);
+    ctx.beginPath();ctx.moveTo(W/2,oben);ctx.lineTo(W/2,unten);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(W/2,my,F.kreisRx,F.kreisRy,0,0,Math.PI*2);ctx.stroke();
+    for(const links of [true,false]){
+      const g=links?gl:gr, z=links?1:-1, kx=korbXVon(links?1:0);
+      // Zone
+      ctx.strokeRect(links?g:g-F.zoneTiefe,my-F.zoneHalb,F.zoneTiefe,F.zoneHalb*2);
+      // Freiwurfkreis: Feldhaelfte durchgezogen, Zonenhaelfte gestrichelt (wie FIBA).
+      const fx=g+z*F.zoneTiefe;
+      ctx.beginPath();ctx.ellipse(fx,my,F.kreisRx,F.kreisRy,0,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:Math.PI*1.5);ctx.stroke();
+      ctx.save();ctx.setLineDash([6,5]);
+      ctx.beginPath();ctx.ellipse(fx,my,F.kreisRx,F.kreisRy,0,links?Math.PI/2:-Math.PI/2,links?Math.PI*1.5:Math.PI/2);ctx.stroke();
+      ctx.restore();
+      // No-Charge-Halbkreis unter dem Korb.
+      ctx.beginPath();ctx.ellipse(kx,my,F.noChargeRx,F.noChargeRy,0,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:Math.PI*1.5);ctx.stroke();
+      // DREIERLINIE: zwei Geraden in den Ecken + Ellipsenbogen (6,75 m), etwas kraeftiger als
+      // die uebrigen Linien — sie ist die Linie, an der die Wertung haengt.
+      ctx.save();ctx.strokeStyle="rgba(255,255,255,.88)";ctx.lineWidth=2.5;
+      const eckX=kx+z*F.eckeLaengeX, phi=Math.asin(F.eckeY/F.dreierRy);
+      ctx.beginPath();
+      ctx.moveTo(g,my-F.eckeY);ctx.lineTo(eckX,my-F.eckeY);
+      if(links)ctx.ellipse(kx,my,F.dreierRx,F.dreierRy,0,-phi,phi,false);
+      else ctx.ellipse(kx,my,F.dreierRx,F.dreierRy,0,Math.PI+phi,Math.PI-phi,true);
+      ctx.lineTo(g,my+F.eckeY);
+      ctx.stroke();ctx.restore();
+    }
+    ctx.restore();
   }
   // B1 -- SHOT-CLOCK-ZIFFER AM ANGRIFFSKORB (docs/design/broadcast-optik-feldspiel-27-09.md
   // Abschnitt 4, Klasse A, Prio 1): eine kleine Ziffernbox an der Grundlinie neben dem
@@ -18441,14 +18804,26 @@
     const rest=basketballSchussuhrRest();
     if(rest==null||fsLive.amBall==null)return;
     const seite=fsLive.amBall, linksSeite=seite===1;
-    const gx=linksSeite?W*0.06:W*0.94, gy=H/2-58;
+    // Seit 17.11. an der Korbanlage (wie in echten Hallen), nicht mehr frei an der Grundlinie:
+    // mit der PNG-Anlage auf der Mastspitze (Bild-x 34, y 8), sonst ueber dem gezeichneten Brett.
+    // Rahmen: schussuhr_rahmen.png (48x32, Ziffernmitte 24,16), Fable 17.11.
+    const kx=korbXVon(seite), sk=BK_KORB_SKALA;
+    const mitPng=bkDa(linksSeite?"korb_links_hinten":"korb_rechts_hinten");
+    const gx=mitPng?kx+(linksSeite?-34:34)*sk:(linksSeite?W*0.06:W*0.94)+(linksSeite?1:-1)*BK_FIBA.brettVonGrund,
+          gy=mitPng?H/2-(111-8)*sk-17:H/2-BK_FIBA.brettHalb-BK_FIBA.brettObenZ-14;
     const txt=fmtSchussuhr(rest), knapp=rest<5;
     ctx.save();
-    ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
-    ctx.fillRect(gx-19,gy-11,38,22);
-    ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
-    ctx.strokeRect(gx-19,gy-11,38,22);
-    ctx.fillStyle="#fff";ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    if(bkDa("schussuhr_rahmen")){
+      ctx.drawImage(bkBild.schussuhr_rahmen,gx-24,gy-16,48,32);
+      ctx.fillStyle=knapp?"#ff4a4a":"#ffe9a8";
+    } else {
+      ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
+      ctx.fillRect(gx-19,gy-11,38,22);
+      ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
+      ctx.strokeRect(gx-19,gy-11,38,22);
+      ctx.fillStyle="#fff";
+    }
+    ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.fillText(txt,gx,gy+1);
     ctx.restore();
@@ -18622,7 +18997,14 @@
       .concat(FSTEAM[0].map((u,i)=>({u,side:0,i,g:FSTEAM[0]})))
       .concat(FSTEAM[1].map((u,i)=>({u,side:1,i,g:FSTEAM[1]})))
       .sort((a,b)=>(a.u.y+(a.u._zvy||0))-(b.u.y+(b.u._zvy||0)));
+    // KORBANLAGE IN DER TIEFE (Benchmark 17.11.): sie steht auf y = H/2. Wer dahinter steht
+    // (Fusspunkt darueber), wird vor ihr gezeichnet und vom Brett verdeckt; wer davor steht,
+    // danach. Die vordere Ebene (Ring/Netz) kommt erst nach dem Ball, s. unten.
+    let korbGezeichnet=feldspielDisc!=="basketball";
+    const korbHinten=()=>{ if(korbGezeichnet)return; korbGezeichnet=true;
+      for(const links of [true,false])zeichneKorbAnlage(links,"hinten"); };
     zuZeichnen.forEach(({u,side,i,g})=>{
+      if(!korbGezeichnet&&u.y+(u._zvy||0)>=H/2)korbHinten();
       { // Block ohne eigene Bedeutung: er haelt den unveraenderten Rumpf auf seiner alten
         // Einrueckung, damit der Diff dieser Runde die Zeichenlogik nicht komplett neu
         // formatiert (frueher war das die innere `g.forEach(u=>{`-Ebene).
@@ -18776,6 +19158,7 @@
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
       }
     });
+    korbHinten(); // alle Figuren standen hinter dem Korb
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
     // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
     // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
@@ -18923,23 +19306,35 @@
         // Deckkraft folgen dem Dribbel-Takt ueber dieselbe dip-Groesse, die auch die
         // Hoehe treibt (fsBall.y=traeger.y+18+dip, s. BK_DRIBBEL_* oben): am Boden
         // (naehe=1) dunkler/breiter, an der Hand (naehe=0) kaum sichtbar.
-        if(traeger){
+        // HOEHE STATT BODENPUNKT (Benchmark 17.11.): ein Wurf traegt seine Hoehe `fsBall.z`
+        // (bkBogenZ) und endet auf Ringhoehe; nach dem Wurf zeigt bkNachlaufBall() den Ball im
+        // Netz bzw. beim Abprallen. Getragene/gepasste Baelle: Hoehe 26 wie bisher.
+        const nl=bkNachlaufBall();
+        const gx=nl?nl.x:bx, gy=nl?nl.y:by, gz=nl?nl.z:(fsBall.z!=null?fsBall.z:26);
+        if(traeger&&!nl){
           const naehe=Math.max(0,Math.min(1,(fsBall.y-traeger.y-18)/BK_DRIBBEL_AMPLITUDE));
           ctx.fillStyle="rgba(0,0,0,"+(0.12+naehe*0.28)+")";
           ctx.beginPath();
           ctx.ellipse(bx,traeger.y+bvy+19,6+naehe*4,2.5+naehe*1.5,0,0,6.3);
           ctx.fill();
+        } else if(gz>27||nl){
+          // Schatten des fliegenden Balls am Boden — macht die Hoehe lesbar.
+          ctx.fillStyle="rgba(0,0,0,.18)";
+          ctx.beginPath();ctx.ellipse(gx,gy+2,5,2.2,0,0,6.3);ctx.fill();
         }
+        const bd=BK_FIBA.ballD, cy=gy-gz;
         if(bkDa("ball")){
-          ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
+          ctx.drawImage(bkBild.ball,gx-bd/2,cy-bd/2,bd,bd);
         } else {
           ctx.fillStyle="#e8823a";
-          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
+          ctx.beginPath();ctx.arc(gx,cy,bd/2-1,0,6.3);ctx.fill();
           ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+          ctx.beginPath();ctx.arc(gx,cy,bd/2-1,0,6.3);ctx.stroke();
         }
       }
     }
+    // Vordere Ebene der Korbanlage NACH dem Ball: der Ball faellt durch den Ring ins Netz.
+    if(feldspielDisc==="basketball")for(const links of [true,false])zeichneKorbAnlage(links,"vorne");
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
@@ -40184,6 +40579,17 @@
   // rechnet fuer N=2 exakt dieselben Zahlen wie vorher — nachgeprueft per Fingerabdruck
   // (tests/battlefield-pod-ffa.test.ts, Teil 1).
   let bfPodKader=null;
+  // BATTLEFIELD-POD-FORMAT (17.11., s. BF_D5): "orte3" (Standard, bit-identisch) | "domination5".
+  // Hier oben deklariert, weil reset() beim Laden laeuft; die Leser sind Funktionsdeklarationen.
+  let BF_POD_FORMAT="orte3";
+  function bfPodFormatPruefen(f){
+    if(f!=="orte3"&&f!=="domination5")throw new Error("Battlefield-Format unbekannt: "+f+" (erwartet orte3|domination5)");
+    return f;
+  }
+  // Das Format des gerade gebauten Pods (Anzeige/Lauf), sonst das eingestellte.
+  function bfPodFormat(){ return (KP&&KP.pod&&KP.pod.format)||BF_POD_FORMAT; }
+  function bfPodTaktSek(){ return bfPodFormat()==="domination5"?BF_D5.taktSek:BFFFA.taktSek; }
+  function bfPodOrtName(i){ return bfPodFormat()==="domination5"?(BF_D5.orte[i]||{}).name:BF_ORT_NAMEN[i]; }
   let bfPodAnzeigeVorgabe=null, bfPodAnzeigeVereinSnap=null; // Anzeige, s. bfPodAnzeigeKontext()
   const bfPodAktiv=()=>!!(KP&&KP.pod);
   const kampfSeitenN=()=>(KP&&KP.pod)?KP.pod.N:2;
@@ -41489,7 +41895,7 @@
     const lebend=Array.from({length:N},(_,s)=>live(s).length);
     // Die Regel selbst steht in bfPodPlatzierungAus() (beim Gefecht je Ort), damit Gefecht,
     // Replay und Echtzeit-Kontrolle denselben Massstab haben.
-    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null);
+    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null,KP.pod.format==="domination5");
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -43052,7 +43458,7 @@
   // etwas umlernen muss.
   let wertungKopfStand="";
   function renderWertungTabelle(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim, s. schnelldurchDomGedrosselt()
+    if(schnelldurchDomGedrosselt("wertung"))return; // Quick-Sim, s. schnelldurchDomGedrosselt()
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
     // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
@@ -44206,10 +44612,12 @@
           // einer Seite bleibt ihr letzter Abschnitt stehen (gesamtfortschritt()==1).
           const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
           const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
-          const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
+          const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||1, rundenN=Math.ceil(beinN/jeRunde);
           const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
-          const beinZeile='<small class="bhbein">Abschnitt '+beinNr+'/'+beinN+' · Runde '
-            +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
+          // Bei 1 Bein je Runde (seit 17.11.) waeren Abschnitt und Runde dieselbe Zahl doppelt
+          // ("Abschnitt 3/4 · Runde 3/4", Review N4) -- dann nur "Runde 3/4".
+          const beinZeile='<small class="bhbein">'+(jeRunde===1?'Runde '+beinNr+'/'+beinN
+            :'Abschnitt '+beinNr+'/'+beinN+' · Runde '+Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN)+'</small>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
             // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
@@ -44634,7 +45042,10 @@
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
-  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball"];
+  // (korb_topdown.png bleibt als Datei liegen, wird aber nicht mehr geladen — die Korbanlage ist ersetzt.)
+  // Korbanlage in zwei Ebenen + Schussuhr-Rahmen: Fable 17.11. (docs/design/basketball-assets-17-11.md).
+  const BK_TEILE=["parkett","zuschauer","ball",
+    "korb_links_hinten","korb_links_vorne","korb_rechts_hinten","korb_rechts_vorne","schussuhr_rahmen"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
   const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -45404,6 +45815,7 @@
   // Fortschrittsring in der Farbe des Angreifers.
   // DREI ORTE (27.10.): dasselbe Bild je Ort, kleiner (Radius 65 statt 230), mit dem Ortsnamen.
   function zeichneKontrollpunkt(){
+    if(KP.pod&&KP.pod.format==="domination5"){ bfd5ZeichneOrte(); return; }
     for(const o of KP.orte){
       // POD (02.11.): Besitz- und Angreiferfarbe je Seite ueber kampfSeitenFarbe (0/1 wie vorher).
       const besitzFarbe=o.besitz!=null?kampfSeitenFarbe(o.besitz):"rgba(255,255,255,.6)";
@@ -49140,7 +49552,7 @@
       // Nur Anzeige, keine Zeile der Rennmechanik haengt daran.
       wertung:"etappe",
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
-      kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      kraftBasis:60, kraftSpanne:2.4, wendigErholt:0.0040,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -49160,6 +49572,33 @@
       // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
       // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // GANZE RUNDE, PUSTE WIRKT (17.11., Chris woertlich: "jeder laeuft eine ganze runde! Und dort
+      // ist puste anscheinend irrelevant weil alle ihre runde ohne probleme schaffen was unrealistisch
+      // ist weil sie ja alle sprinten!"). Gemessen vorher (scripts/miss-bahn-puste.mjs 24 staffel):
+      // Rest im Ziel 87,2 %, 0,0 % Einbrueche -- der Haushalt band nie. Jetzt ist jedes Bein eine
+      // Runde (Anzeige: OVAL_BEINE_JE_RUNDE=1), und die Puste ist auf eine 400-m-Runde geeicht:
+      //   - `zehrFaktor`: Volllast leert den Vorrat eines mittleren Laeufers kurz vor der Linie.
+      //   - `fadeAb`/`fadeMin`: unter `fadeAb` Rest wird er STETIG langsamer (Laktat, das "Sterben"
+      //     auf den letzten 100 m), bis `fadeMin` bei leerem Tank; `leerTempoBasis` ist der Rest-
+      //     Abschlag im Zustand "eingebrochen" (statt der Bahn-Vorgabe 0,74, die fuer einen Einbruch
+      //     mitten in einem Spurtfeld gedacht ist).
+      //   - `planNachPuste`: die Renneinteilung (Plan) waehlt der Laeufer nach seinem EIGENEN Vorrat
+      //     statt nach dem Slot (K2 hatte den Slot-Bias entfernt, s. `plaene`): reicht die Puste fuer
+      //     Volllast, geht er an; sonst haelt er sich bis zum Angriffspunkt zurueck. Die Rennplan-
+      //     Ansage kann das waehrend des Rennens umwerfen -- das ist die Pacing-Entscheidung.
+      // Kalibrierung und Messung: docs/design/vier-teams-staffel-battlefield-17-11.md, Abschnitt 2.
+      //   - `kraftBasis`/`kraftSpanne` (oben, 230/2,4 -> 60/2,4): der Vorrat haengt jetzt zu einem
+      //     viel groesseren Teil am Stehvermoegen (STEHEN/ROBUST) statt an einem Sockel, den jeder hat.
+      //   - `zehrKoeff`/`zehrExponent` (Bahn-Vorgabe 1,9 / quadratisch -> 4 / hoch 5): die Kosten
+      //     steigen nahe Hoechsttempo steil (anaerob) -- 5 % weniger Tempo spart rund 15 % Puste je
+      //     Meter. Erst damit ist Einteilen ueberhaupt eine Entscheidung (gemessen: bei quadratischen
+      //     Kosten war "Halten" fuer KEINEN Laeufer besser als Volllast).
+      //   - `beineEich` (Review S1, 17.11.): die Beinzahl, auf die das alles geeicht ist (Duell, 6).
+      //     Verbrauch und Erholung laufen mit nb/beineEich, damit ein Bein bei k = 4 (Liga, Pod)
+      //     oder k = 2 nicht 1,5- bzw. dreimal so viel Puste kostet (s. staffelRundeMass).
+      rundePuste:{zehrFaktor:2.0, fadeAb:0.35, fadeMin:0.72, planNachPuste:true, planSchwelle:0.72, kraftMix:0.45,
+        doppelMuedBoden:0.45, beineEich:6},
+      leerTempoBasis:0.86, zehrKoeff:4, zehrExponent:5,
       // TEMPO-KANAL NACHGEZOGEN (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, nach O2
       // "Marke und Zug"). O2 selbst war nicht die Ursache: der Sentinel vigilante-armageddon
       // blieb bei JEDER Marke/Zug-Variante unter 0,80 (beste 0,797), weil ANTRITT/ENDTEMPO —
@@ -49241,8 +49680,23 @@
       // GEMESSEN (02.11., n = 48, Strom 0 / 10 000 000): Pp 22,8 / 24,9 -> 9,3 / 10,1, rho je
       // Rennen (k = 6, 210 Gruppen) 0,878 / 0,881 -> 0,910 / 0,911, Gruppen unter 0,80 15/12 -> 0.
       // Volle Tabellen und die Kontrollen bei k = 2..5 und n = 96: Dokument Abschnitt 5.
+      //
+      // NACHGEZOGEN 17.11. (Review S1 zu PR #1561): die Pp-Sonde des Pods lief bis dahin IMMER mit k = 6
+      // (art.jeSeite), auch wenn die Rangtreue mit --je-seite=4 gemessen wurde -- bei k < 6 war der Pod
+      // nie abgenommen. Nachgemessen (bahnPodEinfluss mit `jeSeite`, n = 48, Strom 0): main k=4 34,0,
+      // vor diesem Nachzug k=2/4/6 56,2/37,7/19,7 -- Stamina/Will/Determination weit ueber, Dexterity/
+      // Awareness weit unter der Matrix, und das umso mehr, je laenger das Bein (weniger Wechsel, mehr
+      // Abschnittstempo und Stehvermoegen). Budget-Methode, nur im Pod (das Duell liest `rezept`):
+      //   ENDTEMPO "Abschnittstempo" = Speed, Spirit + Dexterity/Awareness (saubere Kurve, Linie halten)
+      //            statt Stamina 32 / Will 28;
+      //   STEHEN   "Stehvermoegen"  = Stamina, Will, Determination, Health + Awareness/Dexterity
+      //            (Renneinteilung lesen, Schritt halten, wenn es weh tut).
+      // GEMESSEN (n = 48, Strom 0 / 10 000 000): Pp k=2 17,0 · k=3 11,5 · k=4 8,0 · k=5 6,8/6,0 ·
+      // k=6 5,7/7,5 (vorher 19,7/21,1). Tabelle und rho: docs/design/vier-teams-staffel-battlefield-17-11.md 2.7.
       podRezept:{
         ANTRITT:    {speed:26,spirit:32,dexterity:14,awareness:16,charisma:12},
+        ENDTEMPO:   {speed:28,stamina:10,will:6,spirit:16,dexterity:20,awareness:20},
+        STEHEN:     {stamina:22,will:10,determination:4,health:6,awareness:30,dexterity:28},
         WUCHT:      {spirit:45,speed:55},
         ROBUST:     {stamina:30,dexterity:26,awareness:24,spirit:20}
       },
@@ -49255,13 +49709,18 @@
       // durch `planJeSlot`. Alle drei Plaene laufen jetzt mit vollem Tempo; `sucht`/`ab`
       // bleiben unveraendert (Windschatten/Rempler-Verhalten, hier ohnehin ohne Tackle).
       // Gemessen zusammen mit K1: Spannweite 0,212 -> 0,140, Validitaet 0,888 -> 0,944.
+      // GANZE RUNDE (17.11.): die Plaene sind wieder echte Renneinteilungen -- mit bindender Puste
+      // (s. `rundePuste`) ist "volles Tempo" keine Gratisentscheidung mehr. Halten = 95 % bis 55 %
+      // der Runde, dann alles; Angehen = Volllast von der Linie weg (ab 0); Schlussmann = 96 % bis
+      // zur Haelfte. Welcher Laeufer welchen Plan bekommt, entscheidet seit 17.11. seine Puste
+      // (`planNachPuste`), nicht mehr der Slot -- so kehrt der Slot-Bias aus K2 nicht zurueck.
       plaene:{
-        halten:  {label:"Halten",     tempo:1.00, sucht:0.75, ab:0.72,
-                  text:"Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt."},
-        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.60,
-                  text:"Geht seinen Abschnitt von vorn an und legt vor."},
-        schluss: {label:"Schlussmann",tempo:1.00, sucht:0.85, ab:0.55,
-                  text:"Hängt sich an und wirft alles auf das letzte Stück."}
+        halten:  {label:"Halten",     tempo:0.95, sucht:0.75, ab:0.55,
+                  text:"Teilt sich die Runde ein und zieht auf der Zielgeraden an. Kommt nicht leer an."},
+        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.00,
+                  text:"Geht seine Runde von vorn an und legt vor — hält er das durch?"},
+        schluss: {label:"Schlussmann",tempo:0.96, sucht:0.85, ab:0.50,
+                  text:"Läuft kontrolliert an und wirft ab der Gegengeraden alles hinein."}
       },
       planJeSlot:{startrunner:"angehen", tempolink:"halten", batontech:"halten",
                   curverunner:"angehen", chaserunner:"schluss", anchor:"schluss"}
@@ -49694,6 +50153,10 @@
   // zusaetzlich), im Zeitfahren grosszuegiger, weil dort niemand Sog erben kann.
   const KRAFT_VON=(u)=>{
     const a=BA();
+    // GANZE RUNDE (17.11., nur Staffel): `rundePuste.kraftMix` ist der STEHEN-Anteil am Vorrat
+    // (Rest ROBUST). Ohne das Feld (jede andere Bahn) die alte Zeile, Zeichen fuer Zeichen.
+    const mix=a.rundePuste?a.rundePuste.kraftMix:null;
+    if(mix!=null)return Math.round((a.kraftBasis??150) + (u.STEHEN*mix+u.ROBUST*(1-mix))*(a.kraftSpanne??1.8));
     return Math.round((a.kraftBasis??150) + (u.STEHEN*0.7+u.ROBUST*0.3)*(a.kraftSpanne??1.8));
   };
 
@@ -50356,11 +50819,19 @@
   // Chris' Liste. Drei Runden halten rund 36 px/s Bildtempo (vorher 70, bei einer Runde
   // waeren es 12) und legen die Wechsel abwechselnd auf die Ziellinie (Beine 0/2/4) und auf
   // die Gegengerade (Beine 1/3/5) — zwei feste Wechselzonen, wie auf einer echten Bahn.
-  const OVAL_BEINE_JE_RUNDE=2;
-  const OVAL_RUNDEN=()=>Math.max(1,(BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
+  //
+  // UEBERHOLT 17.11. (Chris, woertlich: "bei staffel laufen die spieler auch immer nur eine halbe
+  // runde das ist falsch, sondern jeder laeuft eine ganze runde!"): JEDES BEIN IST JETZT EINE GANZE
+  // RUNDE (4x400-m-Muster), die Uebergabe liegt immer an der Ziellinie. Zweiter Befund dabei: die
+  // Rundenzahl kam aus `BA().jeSeite` (immer 6) statt aus der echten Beinzahl -- bei k=4 (Pod/Liga)
+  // waren die Beine damit 0,75 Runden lang, und die Wartenden standen ueber drei Kurvenpunkte verteilt.
+  // Jetzt zaehlt `u.beineGesamt` (die echte Beinzahl der Seite, s. bauSpurt). Reine Anzeige: u.pos,
+  // die Etappenzeiten und die Wertung lesen nichts davon.
+  const OVAL_BEINE_JE_RUNDE=1;
+  const OVAL_RUNDEN=(u)=>Math.max(1,((u&&u.beineGesamt)||BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
   // Wie weit ist diese Mannschaft auf dem Oval — in Runden, ab der Ziellinie im
   // Uhrzeigersinn. Ganze Zahl = Ziellinie (oben, Mitte der Zielgeraden), x,5 = Gegengerade.
-  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN();
+  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN(u);
   // EIN PUNKT AUF DER STADIONFORM. `anteil` 0..1 ist der Bruchteil EINER Runde ab der
   // Ziellinie (oben Mitte) im Uhrzeigersinn, `r` der Kurvenradius dieser Spur (vor der
   // Stauchung). Bogenlaengen-treu parametrisiert, damit ein Laeufer auf der Geraden und in
@@ -50493,12 +50964,24 @@
       // werden). Kadergroessen sind 2/4/5/6 (s. season-discipline-schedule.ts), und in jeder
       // davon bleibt die groesste Zonengruppe bei drei.
       const rInnenkante=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
-      bahnR=Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
+      // EINE WECHSELZONE (17.11., ganze Runde je Bein): jetzt warten bis zu fuenf je Mannschaft an
+      // derselben Ziellinie. Sie stehen deshalb als kleiner Block je Mannschaft im Innenfeld: zwei
+      // nebeneinander, bis zu drei Reihen (Radius 106/61/16), die Mannschaften nebeneinander (vx unten).
+      const eineZone=OVAL_BEINE_JE_RUNDE===1;
+      bahnR=eineZone
+        ? Math.max(16,rInnenkante-26-Math.floor(Math.min(4,idx)/2)*45)
+        : Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
       // ZWEI WARTEBEREICHE STATT EINEM: ohne einen seitenfesten Horizontal-Schub staenden
       // die beiden Warteschlangen ineinander, denn an einer Wechselzone liegen die Spuren
       // beider Mannschaften senkrecht untereinander. Seite 0 links, Seite 1 rechts von der
       // Zonenmitte: zwei Wechselzonen nebeneinander, wie bei einer echten Staffel.
       vx=(u.seite===0?-1:1)*40;
+      // VIER MANNSCHAFTEN / EINE ZONE (17.11.): je Mannschaft ein eigener Block an der Ziellinie,
+      // mittig verteilt (150 px Abstand, im Duell +-80), darin zwei Laeufer nebeneinander (62 px),
+      // damit sich Figuren und Namensschilder nicht decken.
+      const seitenN=bahnSeitenN();
+      if(eineZone)vx=(seitenN>2?(u.seite-(seitenN-1)/2)*150:(u.seite===0?-1:1)*80)+((Math.min(4,idx)%2)-0.5)*62;
+      else if(seitenN>2)vx=(u.seite-(seitenN-1)/2)*52;
       // ANLAUF (stepStaffel, Ziel 6 M1/M2): der NAECHSTE in der Wartereihe (idx===0) zieht
       // sichtbar Richtung Bahn, sobald sein Vordermann sich der Wechselzone naehert.
       // u.vizAnlauf (0..1) schreibt ausschliesslich stepStaffel; hier wird es nur GELESEN,
@@ -51372,6 +51855,12 @@
           L.wechselPaarEingespielt=!!pl.wechselPaarEingespielt;
         }
       }
+      // PLAN NACH PUSTE erst HIER (Review S2, 17.11.): die Selbsteinschaetzung braucht die echte
+      // Beinzahl `L.beineGesamt`, die erst der Staffel-Block oben setzt. Vorher stand der Aufruf
+      // vor diesem Block und las immer `A.jeSeite` (6) -- bei k = 4 lag die Quote um den Faktor 4/6
+      // zu tief. Zwischen alter und neuer Stelle liest nichts den Plan; im Duell (nb = 6) bleibt
+      // alles Zeichen fuer Zeichen gleich.
+      if(art.rundePuste)staffelPlanNachPuste(L);
       // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
       // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
       // liest sich ueberall als 0).
@@ -52013,6 +52502,74 @@
     return 1+((BA().bergZehr??1)-1)*z.staerke;
   }
 
+  // =====================================================================================
+  // STAFFEL: GANZE RUNDE, PUSTE WIRKT (17.11., Block 2 der Vier-Teams-Runde,
+  // docs/design/vier-teams-staffel-battlefield-17-11.md). Alles hier haengt an
+  // `BAHN_ART.staffel.rundePuste`; keine andere Bahn fuehrt das Feld und erreicht keine Zeile.
+  //
+  // FADE: unter `fadeAb` Rest-Puste verliert der Laeufer stetig Tempo, bis `fadeMin` bei leerem
+  // Tank -- das "Sterben" auf der Zielgeraden einer 400-m-Runde, kein Schalter von voll auf leer.
+  function staffelRundeFade(u){
+    const P=BA().rundePuste;
+    if(!P||!(u.reserveMax>0))return 1;
+    const f=Math.max(0,Math.min(1,u.reserve/u.reserveMax));
+    if(f>=P.fadeAb)return 1;
+    return P.fadeMin+(1-P.fadeMin)*(f/P.fadeAb);
+  }
+  // TIEFSTER STAND UND EINBRUCH JE LAEUFER -- reine Buchhaltung fuer Sonde/Anzeige, NEBEN dem
+  // Laeufer (WeakMap), damit kein neues Feld am Laeuferobjekt den Rennzustand aufblaeht.
+  const STAFFEL_RUNDE_BUCH=new WeakMap();
+  function staffelRundeBuchen(u){
+    if(!(u.reserveMax>0))return;
+    let b=STAFFEL_RUNDE_BUCH.get(u);
+    if(!b){ b={min:1, eingebrochen:false}; STAFFEL_RUNDE_BUCH.set(u,b); }
+    const f=u.reserve/u.reserveMax;
+    if(f<b.min)b.min=f;
+    if(u.reserve<=0)b.eingebrochen=true;
+  }
+  // RENNEINTEILUNG NACH DER EIGENEN PUSTE (statt nach dem Slot): reicht der Vorrat fuer eine
+  // Volllast-Runde, geht er an ("angehen"); sonst teilt er sich ein ("halten"). Der Slot spielt
+  // keine Rolle mehr (kein Bias je Abschnitt, s. K2 an BAHN_ART.staffel.plaene); "Schlussmann"
+  // bleibt als Ansage-Option. "Reicht" heisst: erwarteter Volllast-Verbrauch der Runde <= Vorrat * planSchwelle. Der
+  // erwartete Verbrauch kommt aus derselben Formel wie stepSpurt (Volllast, ohne Sog), die
+  // erwartete Laufzeit aus Grundtempo und ENDTEMPO -- eine Schaetzung des Laeufers ueber sich
+  // selbst, keine Vorschau auf das Rennen. Die Schaetzung liegt systematisch rund ein Viertel unter
+  // dem echten Verbrauch (Antritt, Kurve, Fade fehlen darin); `planSchwelle` 0,72 ist deshalb
+  // GEMESSEN, nicht hergeleitet: ab Quote ~0,72 war "Halten" fuer die Mehrheit schneller als
+  // Volllast (scripts/miss-staffel-runde-puste.mjs --vergleich, Quintile der Quote).
+  // BEINLAENGE (Review S1): Verbrauch und Erholung der Staffel-Puste sind auf ein Bein von 1/6 der
+  // Strecke geeicht (`beineEich`). Laeuft eine Seite nb Beine, ist jedes Bein 6/nb so lang und
+  // dauert entsprechend laenger; der Faktor nb/6 macht beides zu einer Groesse je Bein (= je Runde),
+  // so dass die Puste-Verteilung bei k = 2/4/6 dieselbe ist. Bei nb = 6 ist er exakt 1.
+  function staffelRundeMass(u){
+    const P=BA().rundePuste, eich=(P&&P.beineEich)||6;
+    return (u.beineGesamt||eich)/eich;
+  }
+  function staffelPlanNachPuste(L){
+    const A=BA(), P=A.rundePuste, plaene=A.plaene;
+    if(!P||!plaene)return;
+    const tempo=A.grundTempo+L.ENDTEMPO*A.tempoSpanne;
+    // Echte Beinzahl (Review S2: der Aufruf steht jetzt hinter `L.beineGesamt=nb`). Mit dem
+    // Beinlaengen-Mass ist die Quote damit unabhaengig von nb: laengeres Bein, gleicher Anteil.
+    const beine=L.beineGesamt||A.jeSeite||6;
+    const laufzeit=(W-170)/beine/Math.max(1,tempo);
+    const zehrVoll=(0.55+1*(A.zehrKoeff??1.9))*P.zehrFaktor*staffelRundeMass(L)*10;
+    const quote=zehrVoll*laufzeit/Math.max(1,L.reserveMax);
+    STAFFEL_RUNDE_BUCH.set(L,{min:1, eingebrochen:false, quote});
+    if(!P.planNachPuste)return;
+    const reicht=quote<=(P.planSchwelle??1);
+    const id=reicht?"angehen":"halten";
+    const pl=plaene[id]; if(!pl)return;
+    L.plan=id; L.tempo=pl.tempo; L.sucht=pl.sucht; L.ab=pl.ab; L.label=pl.label; L.text=pl.text;
+  }
+  // QA/Sonde: tiefster Puste-Stand und Einbruch je Laeufer des letzten Rennens.
+  function staffelRundeStand(){
+    return LAEUFER.map(u=>{ const b=STAFFEL_RUNDE_BUCH.get(u)||{min:1,eingebrochen:false};
+      return {n:u.n, seite:u.seite, bein:u.bein, plan:u.plan, reserveMax:u.reserveMax,
+        minPuste:+b.min.toFixed(4), eingebrochen:b.eingebrochen, quote:b.quote==null?null:+b.quote.toFixed(4),
+        etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4)}; });
+  }
+
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
@@ -52036,7 +52593,15 @@
     // beginnt damit dort, wo das erste aufgehoert hat, und nicht frisch bei 0. Ohne Liste (jede
     // voll besetzte Staffel, jede andere Bahn) ist es die alte Zeile.
     const anteil=u.beineFertig?laufAnteil(u)+u.beineFertig:laufAnteil(u);
-    const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
+    // GANZE RUNDE (17.11.): ein Doppellaeufer (unterbesetzte Staffel, ab seinem zweiten Bein) faellt
+    // tiefer als der Boden 0,60 -- eine zweite 400-m-Runde ohne Erholung. Ohne das war ein muede
+    // zweimal laufender Bester nicht langsamer als der schwaechste Frische, und "mit fuenf statt sechs"
+    // gewann wieder oefter (tests/staffel-unterbesetzt-doppellauf.test.ts). Jede andere Bahn und jeder
+    // Laeufer mit einem Bein liest hier 0,60 wie bisher. 0,52 -> 0,45 mit dem Pod-Rezept des Review-
+    // Nachtrags (17.11., docs/design/vier-teams-staffel-battlefield-17-11.md 2.7): sonst war "fuenf statt
+    // sechs" im Pod-A/B im Mittel wieder minimal besser platziert (2,42 gegen 2,50).
+    const muedBoden=(u.beineFertig&&BA().rundePuste)?BA().rundePuste.doppelMuedBoden:0.60;
+    const mued=anteil>0.45?Math.max(muedBoden,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -52074,7 +52639,10 @@
            *gelaendeFaktor(u)*(u.formTag||1)*gespuer
            // STAFFEL "MARKE UND ZUG" (B2): Haltung auf dem Bein. Ohne `u.haltung` (Schalter
            // aus, jede andere Bahn) steht hier exakt *1 — bit-identisch.
-           *(u.haltung?zugFaktor(u):1);
+           *(u.haltung?zugFaktor(u):1)
+           // GANZE RUNDE, PUSTE WIRKT (17.11., nur Staffel, s. BAHN_ART.staffel.rundePuste). Jede
+           // andere Bahn liest hier `undefined` und multipliziert mit exakt 1 -- bit-identisch.
+           *(BA().rundePuste?staffelRundeFade(u):1);
   }
 
   // ===================================================================================
@@ -53154,7 +53722,16 @@
       // die nie geloescht wurde. Chris am 13.09.: "manche laufen aus und muessen kurz
       // regenerieren, manche schaffen den kompletten Spieltag".
       if(u.leer&&BA().leerSchonung)zehr*=BA().leerSchonung;
+      // GANZE RUNDE (17.11., nur Staffel): eine 400-m-Runde kostet mehr als das halbe Bein vorher,
+      // s. BAHN_ART.staffel.rundePuste. Ohne das Feld (jede andere Bahn) steht hier nichts.
+      // BEINLAENGE (Review S1, 17.11.): ein Bein ist 1/nb der Strecke, geeicht war die Puste auf
+      // nb = 6 (`beineEich`). Bei k = 4 ist das Bein 1,5-mal, bei k = 2 dreimal so lang -- ohne
+      // diesen Faktor brachen bei k = 4 88 % und bei k = 2 alle Laeufer ein. `staffelRundeMass(u)`
+      // macht Verbrauch UND Erholung (unten) zu Groessen je Runde statt je Sekunde; im Duell (nb = 6)
+      // ist er genau 1.
+      if(BA().rundePuste)zehr*=BA().rundePuste.zehrFaktor*staffelRundeMass(u);
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
+      if(BA().rundePuste)staffelRundeBuchen(u);
       // ---- PUSTE LAEDT WIEDER AUF (13.09.).
       //
       // Der Befund, der das noetig macht, steht in docs/design/
@@ -53178,7 +53755,8 @@
         // Station dauert 1/(1-k) laenger, je Station kommt so dieselbe Puste zurueck wie heute.
         const ruhe=u.huerde>0?(u.kriechK?1-u.kriechK:1):(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
         if(ruhe>0)u.reserve=Math.min(u.reserveMax,
-          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
+          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10
+            *(BA().rundePuste?staffelRundeMass(u):1));   // Staffel: je Runde, s. oben (Review S1)
       }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
@@ -56461,6 +57039,9 @@
       ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.stroke();
       ctx.globalAlpha=u.down?.28:1;
       ctx.imageSmoothingEnabled=false;
+      // TEAMFARBEN-KONTUR (17.11., Chris: "spieler pixelgenau mit Teamfarbe umrahmen"): nur im
+      // Fuenf-Punkte-Pod, reine Zeichnung (s. bfd5Kontur).
+      if(!u.down&&KP&&KP.pod&&KP.pod.format==="domination5")bfd5Kontur(u,x,y,c);
       zeichneSprite(ctx,u,x,y);
       ctx.textAlign="center";ctx.textBaseline="middle";
       if(!u.down){
@@ -60563,7 +61144,7 @@
   }
 
   function renderKader(){
-    if(schnelldurchDomGedrosselt())return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
+    if(schnelldurchDomGedrosselt("kader"))return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
@@ -62898,6 +63479,11 @@
       throw new Error("spieleBattlefieldPod: braucht 3 oder 4 Teams, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
     if(teams.some(tm=>!bfPodKaderVon(tm).length))
       throw new Error("spieleBattlefieldPod: mindestens ein Team stellt keinen einzigen Kaempfer.");
+    // ECHTZEIT + FUENF PUNKTE (Review N5, 17.11.): der Echtzeit-Pod ist der alte freie Kampf um DREI
+    // Orte (KP.orte aus bau()); "domination5" gibt es nur als Gefecht. Die Kombination hiesse fuenf
+    // Orte in der Anzeige und drei in der Wertung -- deshalb abgelehnt statt still gemischt.
+    if(echtzeit&&BF_POD_FORMAT==="domination5")
+      throw new Error("spieleBattlefieldPod: 'echtzeit' gibt es nur im Standardformat orte3, nicht mit 'domination5'.");
     const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
     const g=M.sichern(); if(M.vorher)M.vorher();
     const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm, jeVorher=art.jeSeite;
@@ -62913,9 +63499,10 @@
       stumm=true;
       bfPodKader=kader;
       try{ M.bau(saat); } finally { bfPodKader=null; }
+      if(KP&&KP.pod)KP.pod.format=BF_POD_FORMAT;
       if(!echtzeit){
         const g=bfffaFuerGebautenPod(kader,saat), pl=g.platzierung;
-        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*BFFFA.taktSek).toFixed(2),
+        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*bfPodTaktSek()).toFixed(2),
           format:"gefecht", ende:g.ende, takte:g.gespielt,
           besitz:g.orte.map(o=>o.besitz),
           teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+g.punkte[s].toFixed(1),
@@ -62923,7 +63510,7 @@
             eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s], wertung:+g.teamWert[s].toFixed(3)})),
           kaempfer:g.kaempfer.map(k=>({n:k.n, side:k.side, slot:k.slot, eig:k.eigOhneMutator,
             wert:g.anteil[k.n]||0, roh:+k.wert.toFixed(3), ko:k.st.kos, down:!!k.raus,
-            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*BFFFA.taktSek,
+            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*bfPodTaktSek(),
             wechsel:k.st.rotationen, besucht:k.st.takteAmOrt.map(x=>x>0?1:0)})),
           gefecht:g};
       }
@@ -62959,7 +63546,9 @@
   // (Anteil am Gesamtbeitrag des Kampfes, jetzt ueber alle 4k Kaempfer).
   function spieleBattlefieldPod(teams,saat,platzJeTeam,optionen){
     const opt=optionen||{};
-    const formVorher=FORMKARTE;
+    const formVorher=FORMKARTE, formatVorher=BF_POD_FORMAT;
+    // FORMAT (17.11.): `optionen.format` ("orte3" | "domination5") gilt nur fuer diesen Lauf.
+    if(opt.format!=null)BF_POD_FORMAT=bfPodFormatPruefen(opt.format);
     try{
       const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
         FORMKARTE={...FORMKARTE};
@@ -62969,8 +63558,10 @@
         boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert,
           ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
       if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
+      // Nur ausserhalb des Standards gemeldet -- im Standard bleibt das Ergebnis Zeichen fuer Zeichen das alte.
+      if(BF_POD_FORMAT!=="orte3")aus.podFormat=BF_POD_FORMAT;
       return aus;
-    } finally { FORMKARTE=formVorher; }
+    } finally { FORMKARTE=formVorher; BF_POD_FORMAT=formatVorher; }
   }
 
   // RANGTREUE-SONDE, dieselbe Bauart wie bahnPodSonde()/miniDmFfaSonde(): `kader` Liste von
@@ -63086,6 +63677,14 @@
       if(pod.k)art.jeSeite=pod.k;
       bfPodKader=kader;
       build(pod.saat);
+      // FORMAT (17.11.): der Host reicht `pod.format` (BATTLEFIELD_POD_FORMAT, dieselbe Konstante wie
+      // die Buchung); ohne Angabe das Standardformat. Fuenf Punkte bekommen hier ihre Leinwand-Orte.
+      if(KP&&KP.pod){
+        // `pod.echtzeit` (Vergleichsansicht) ist der alte Kampf um drei Orte: dort immer "orte3"
+        // (Review N5), sonst saehe man fuenf Zonen ueber einem Drei-Orte-Kampf.
+        KP.pod.format=pod.echtzeit?"orte3":(pod.format!=null?bfPodFormatPruefen(pod.format):BF_POD_FORMAT);
+        if(KP.pod.format==="domination5")bfd5AnzeigeOrte();
+      }
       // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
       // `echtzeit`), mit denselben Formkarten/Aufstellungen — die Arena spielt sie danach ab.
       // `pod.echtzeit` zeigt zum Vergleich den alten freien Echtzeitkampf.
@@ -63413,15 +64012,334 @@
     return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte};
   }
 
+  // ===================================================================================
+  // BATTLEFIELD "DOMINATION MIT FUENF PUNKTEN" (17.11., Block 3 der Vier-Teams-Runde,
+  // docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 3). FORMAT-UMSCHALTER: der
+  // Standard bleibt "orte3" (bfffaGefecht oben, bit-identisch, Wertungs-Fingerabdruck unveraendert);
+  // "domination5" waehlt man ueber BATTLEFIELD_POD_FORMAT (lib/battle/arena-resolved-disciplines.ts,
+  // gilt fuer Buchung UND Anzeige -- gezeigt = gebucht) oder in Messskripten ueber
+  // window.__arena.battlefieldFormat("domination5").
+  //
+  // Chris am 17.11., woertlich: "battlefield hat auch 0 dynamik. die area wo die punkte sind muss
+  // groesser werden ... 5 Punkte zum Dominieren ... punkte farblich markieren ... pro sekunde ein
+  // punkt (wie Overwatch/Domination) ... spieler pixelgenau mit Teamfarbe umrahmen ... Teams koennen
+  // sich aufteilen".
+  //
+  // WAS ANDERS IST als beim Gefecht je Ort (bewusst eigene Funktion daneben, kein Umbau des alten):
+  //  - FUENF ORTE: Nord/Sued zwischen den oberen bzw. unteren Ecken, West/Ost zwischen den linken
+  //    bzw. rechten, die Mitte. Jedes Team hat ZWEI Nachbarorte (die es sich je mit einem Nachbarn
+  //    teilt), die Mitte und zwei ferne Orte -- jede Ecke hat exakt dieselbe Geometrie.
+  //  - 1 PUNKT JE SEKUNDE JE GEHALTENEM ORT (Takt 2 s -> 2 Punkte je Takt und Ort), 45 Takte = 90 s,
+  //    Schluss bei 160 Punkten.
+  //  - RESPAWN statt Ausscheiden: wer faellt, steht nach 3 Takten (6 s) an seiner Ecke wieder auf und
+  //    muss zurueck ins Spiel laufen (Chris' Domination-Vorgabe vom 13.10.: "Respawn kostet kurz Zeit").
+  //  - AUFTEILEN UND WANDERN: jeden Takt plant jedes Team neu. Wer nicht gebunden ist (an einem Ort mit
+  //    Gegnern, beim Erobern, als einziger Halter), sucht sich den lohnendsten Ort: fremde vor neutralen
+  //    vor eigenen bedrohten, minus Weg, minus Eigene, die schon dort sind oder hinlaufen. Teams teilen
+  //    sich dadurch selbst auf, laufen Orte ab und kommen bedrohten Orten zu Hilfe.
+  //  - Kampf, Eroberung und alle neun Matrix-Kanaele sind DIESELBEN wie im Gefecht je Ort
+  //    (bfffaKaempfer, Schlagwechsel je Ort, kpTick-Regel), nur auf 2-s-Takte umgerechnet: Wucht,
+  //    Eroberungsfortschritt und Kampfrichterwertung je Takt mal taktSek/BFFFA.taktSek, die Muedigkeit
+  //    nach Kampfsekunden.
+  const BF_D5_GRUND=Object.freeze({
+    takte:45, taktSek:2, punkteJeSekunde:1, punkteZumSieg:160, respawnTakte:3,
+    // Wucht je 2-s-Takt als Vielfaches der Wucht je 4-s-Takt im Gefecht je Ort. 0,5 waere dieselbe
+    // Wucht je Sekunde; 1v1 dauerte dann ~50 s -- fuer Domination mit Respawn viel zu zaeh. Mit 2,2
+    // faellt ein Kaempfer im 1v1 nach rund 12 s (Sonde: 37 K.o. und 8 Besitzwechsel je Spiel).
+    // `plan.fuehrung`: Orte des Fuehrenden sind lohnender (alle gegen den Ersten, wie in jedem FFA) --
+    // haelt die Spiele offen, ohne den Staerksten zu bestrafen (er gewinnt weiter, s. Abnahme).
+    schaden:2.2,
+    radius:95, replayTempo:170,
+    orte:[{name:"Nord",fx:0.5,fy:0.235},{name:"West",fx:0.2,fy:0.54},{name:"Mitte",fx:0.5,fy:0.54},
+          {name:"Ost",fx:0.8,fy:0.54},{name:"Süd",fx:0.5,fy:0.85}],
+    // Wege in Takten zwischen den Orten (Ring Nord-West-Sued-Ost um die Mitte) und von der Ecke jeder Seite.
+    weg:[[0,1,1,1,2],[1,0,1,2,1],[1,1,0,1,1],[1,2,1,0,1],[2,1,1,1,0]],
+    basisWeg:[[1,1,2,2,3],[1,2,2,1,3],[2,1,2,3,1],[2,3,2,1,1]],
+    plan:{feind:4, neutral:3.2, bedroht:3.6, weg:1.1, schonDa:1.7, uebermacht:0.6, verstaerken:1.2, fuehrung:2}
+  });
+  let BF_D5=JSON.parse(JSON.stringify(BF_D5_GRUND));
+  // (BF_POD_FORMAT und die Format-Leser stehen oben bei bfPodKader -- reset() laeuft beim Laden.)
+
+  function bfd5Gefecht(kaempfer,saat,N){
+    const P=BFFFA, D=BF_D5, Z=BFFFA_ZWECK, r=D.taktSek/P.taktSek;
+    const wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const M=D.orte.length;
+    const orte=D.orte.map(o=>({name:o.name, besitz:null, fortschritt:0, erobertVon:null}));
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    for(const k of kaempfer){ k.ort=null; k.nach=null; k.ankunft=null; k.basis=true; k.respawnTakt=null;
+      k.st.takteAmOrt=new Array(M).fill(0); k.st.respawns=0; }
+    const schnapp=()=>({
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach, basis:!!k.basis})),
+      orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    // PLANUNG je Team: wer frei ist, sucht den lohnendsten Ort (s. Kopfkommentar). Deterministisch,
+    // kein Wurf: Reihenfolge nach Kaempfer-Nummer, Gleichstand nach Ort-Nummer.
+    // GLEICHZEITIG (Review D3, 17.11.): alle Teams planen auf dem EINGEFRORENEN Stand vom Taktbeginn
+    // (`ortVorher`). Vorher sah Team 1 schon, wer von Team 0 im selben Takt einen Ort verlassen hatte
+    // (`k.ort=null` beim Losgehen) -- ein Vorteil allein aus der Teamnummer.
+    const planen=(t,ereignisse)=>{
+      const ortVorher=new Map(kaempfer.map(k=>[k,k.ort]));
+      for(let s=0;s<N;s++){
+        const team=kaempfer.filter(k=>k.side===s&&!k.raus);
+        const kommt=new Array(M).fill(0);
+        for(const k of team){ if(k.ort!=null)kommt[k.ort]++; else if(k.nach!=null)kommt[k.nach]++; }
+        const feindeAm=(o)=>kaempfer.filter(k=>!k.raus&&k.side!==s&&ortVorher.get(k)===o).length;
+        const frei=[];
+        for(const k of team){
+          if(k.nach!=null)continue;
+          if(k.basis){ frei.push(k); continue; }
+          const o=orte[k.ort];
+          if(feindeAm(k.ort)>0)continue;                       // gebunden: Kampf
+          if(o.besitz!==s)continue;                             // gebunden: Erobern
+          if(o.erobertVon!=null&&o.fortschritt>0)continue;      // gebunden: Abwehr
+          const halter=team.filter(x=>x.ort===k.ort&&x.nach==null)
+            .sort((a,b)=>(BFFFA_HALTER_RANG[a.slot]??9)-(BFFFA_HALTER_RANG[b.slot]??9)||a.idx-b.idx)[0];
+          if(halter===k)continue;                               // einer haelt
+          frei.push(k);
+        }
+        for(const k of frei.sort((a,b)=>a.idx-b.idx)){
+          const von=k.basis?null:k.ort;
+          let best=null, bw=-Infinity;
+          for(let o=0;o<M;o++){
+            const zo=orte[o], fe=feindeAm(o);
+            let w;
+            if(zo.besitz==null)w=D.plan.neutral;
+            else if(zo.besitz!==s)w=D.plan.feind+(D.plan.fuehrung&&punkte[zo.besitz]>=Math.max(...punkte)&&punkte[zo.besitz]>punkte[s]?D.plan.fuehrung:0);
+            else if(fe>0||(zo.erobertVon!=null&&zo.fortschritt>0))w=D.plan.bedroht;
+            else continue;
+            const weg=von==null?D.basisWeg[s%4][o]:D.weg[von][o];
+            const eigene=kommt[o]-(o===von?1:0);
+            // Eigene Kaempfe verstaerken (bis Gleichstand), sonst nicht stapeln; aussichtslose meiden.
+            w+=D.plan.verstaerken*Math.min(eigene,fe);
+            w-=D.plan.weg*weg+D.plan.schonDa*Math.max(0,eigene-fe)+D.plan.uebermacht*Math.max(0,fe-eigene-1);
+            if(w>bw){bw=w;best=o;}
+          }
+          if(best==null||best===von)continue;
+          const weg=von==null?D.basisWeg[s%4][best]:D.weg[von][best];
+          if(von!=null)kommt[von]--;
+          kommt[best]++;
+          k.basis=false; k.ort=null; k.nach=best; k.ankunft=t+weg; k.st.rotationen++;
+          ereignisse.push({typ:"rotation", wer:k.idx, von, nach:best});
+        }
+      }
+    };
+    planen(0,[]);
+    const start=schnapp();
+    for(let t=1;t<=D.takte;t++){
+      gespielt=t;
+      const ereignisse=[];
+      // 0) RESPAWN an der Ecke.
+      for(const k of kaempfer)if(k.raus&&k.respawnTakt!=null&&k.respawnTakt<=t){
+        k.raus=false; k.respawnTakt=null; k.stand=k.stand0; k.atemWeg=false; k.basis=true; k.ort=null; k.nach=null;
+        k.st.respawns++;
+        ereignisse.push({typ:"respawn", wer:k.idx});
+      }
+      // 1) ANKUNFT.
+      for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
+        k.ort=k.nach; k.nach=null; k.ankunft=null;
+        ereignisse.push({typ:"ankunft", wer:k.idx, ort:k.ort});
+      }
+      // 2) ZIELWAHL je Ort (wie bfffaGefecht).
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus||A.ort==null)continue;
+        A.st.takteAmOrt[A.ort]++;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach,aktiv:true});
+      }
+      // 3) POSITIONIERUNG.
+      for(const Zk of kaempfer){
+        if(Zk.raus)continue;
+        const auf=angriffe.filter(x=>x.ziel===Zk);
+        if(auf.length<2)continue;
+        if(wurf(Zk.idx,t,Z.position)<Zk.position){
+          const bleibt=Math.min(auf.length-1,Math.floor(wurf(Zk.idx,t,Z.positionWahl)*auf.length));
+          auf.forEach((x,i)=>{ if(i!==bleibt)x.aktiv=false; });
+          Zk.st.ausgewichen++;
+          ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
+        }
+      }
+      // 4) SCHLAEGE (Wucht je Takt mal r). Muedigkeit nach SPIELZEIT, umgerechnet in 4-s-Takte des
+      // Gefechts je Ort (`t4`) -- NICHT nach Kampfsekunden je Kaempfer (Review D2, 17.11.: der alte
+      // Kommentar sagte das Gegenteil). Bewusst so: ein Respawn macht frisch an Haltung (`stand`),
+      // nicht an der Uhr; das ganze Feld wird gemeinsam muede, wie in der Spaetphase eines Matches.
+      const schadenJe=new Map();
+      const t4=t*r;
+      const muede=(k)=>t4>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t4-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel}=x;
+        A.st.schlaege++;
+        if(!x.aktiv){ ereignisse.push({typ:"leer", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        const dmg=A.wucht*D.schaden*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung);
+        // Kampfrichterwertung je Schaden auf die Wucht je Sekunde des Gefechts je Ort umgerechnet
+        // (r/schaden), damit hoehere Toedlichkeit die Gewichte der Wertung nicht verschiebt.
+        ziel.stand-=dmg; A.wert+=dmg*r/D.schaden; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
+      }
+      // 5) WER FAELLT -- mit Respawn statt Ausscheiden.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; k.st.atem++;
+          ereignisse.push({typ:"atem", wer:k.idx, ort:k.ort});
+          continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0; k.respawnTakt=t+D.respawnTakte; k.ort=null; k.nach=null; k.basis=false;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx, ort:null});
+      }
+      // 6) ORTE -- dieselbe kpTick-Regel, Fortschritt je Takt mal r; Besitz zahlt 1 Punkt je Sekunde.
+      orte.forEach((o,oi)=>{
+        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi);
+        const seiten=[...new Set(da.map(k=>k.side))];
+        if(seiten.length===1){
+          const s=seiten[0], eigene=da;
+          if(o.besitz!==s){
+            if(o.erobertVon!==s){o.erobertVon=s;o.fortschritt=0;}
+            const neutral=o.besitz==null;
+            const kraft=eigene.reduce((a,k)=>a+(neutral?k.neutral:k.erob),0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.min(1,o.fortschritt+kraft*r/P.erobern.bedarf);
+            const gewonnen=o.fortschritt-vorher;
+            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt>=1){
+              o.besitz=s;o.fortschritt=0;o.erobertVon=null;
+              ereignisse.push({typ:"erobert", side:s, ort:oi});
+            }
+          }else if(o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0){
+            const kraft=eigene.reduce((a,k)=>a+k.halten,0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-kraft*r/P.erobern.bedarf);
+            const abgewehrt=vorher-o.fortschritt;
+            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }else if(seiten.length>=2&&o.erobertVon!=null){
+          let st=0;
+          for(const k of da)if(k.side!==o.erobertVon)st+=k.stoeren;
+          if(st>0){
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-0.5*st*r/P.erobern.bedarf);
+            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }
+        if(o.besitz!=null){
+          punkte[o.besitz]+=D.punkteJeSekunde*D.taktSek;
+          const halter=da.filter(k=>k.side===o.besitz);
+          for(const k of halter){ k.wert+=P.wertung.halten*r*k.befehl/halter.length; k.st.halte++; }
+        }
+      });
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*r;
+      // 7) PLANUNG fuer den naechsten Takt.
+      planen(t,ereignisse);
+      takte.push({t, ereignisse, ...schnapp()});
+      if(punkte.some(x=>x>=D.punkteZumSieg)){ ende="limit"; break; }
+    }
+    // Mit Respawn scheidet niemand dauerhaft aus: rausTakt bleibt null (Platzierung nach Punkten,
+    // dann Stehende am Ende, dann Kampfrichterwertung).
+    for(const k of kaempfer){ if(k.raus)k.rausTakt=null; }
+    return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte, format:"domination5"};
+  }
+
+  // ANZEIGE: Leinwand-Orte, Ecken, Platz am Ort, Zone und Kontur. Reine Zeichnung.
+  function bfd5AnzeigeOrte(){
+    KP.orte=BF_D5.orte.map(o=>({name:o.name, x:Math.round(W*o.fx), y:Math.round(H*o.fy), besitz:null, fortschritt:0, erobertVon:null}));
+    KP.radius=BF_D5.radius;
+    KP.punkteZumSieg=BF_D5.punkteZumSieg;
+    KP.punkteJeSekunde=BF_D5.punkteJeSekunde;
+  }
+  function bfd5Basis(side){
+    const links=side%2===0, oben=side<2;
+    return {x:links?70:W-70, y:oben?118:H-46};
+  }
+  // Am Ort steht jedes Team in seinem Viertel des Kreises (Richtung seiner Ecke), die Kameraden
+  // auf einem Bogen -- vier Teams an einem Ort stehen so sichtbar getrennt, Figuren decken sich nicht.
+  function bfd5ReplayPlatz(u,ort,stand){
+    const o=KP.orte[ort];
+    const am=U.filter(x=>x.side===u.side&&x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort);
+    const j=Math.max(0,am.indexOf(u)), m=Math.max(1,am.length);
+    const grund=[-2.36,-0.79,2.36,0.79][u.side%4];      // links oben, rechts oben, links unten, rechts unten
+    const w=grund+(j-(m-1)/2)*0.5;
+    const rr=BF_D5.radius*0.62;
+    return {x:o.x+Math.cos(w)*rr*1.35, y:Math.max(60,Math.min(H-24,o.y+Math.sin(w)*rr*0.62))};
+  }
+  function bfd5ZeichneOrte(){
+    for(const o of KP.orte){
+      const besitz=o.besitz!=null?kampfSeitenFarbe(o.besitz):null;
+      const rx=KP.radius*1.35, ry=KP.radius*0.62;
+      ctx.save();
+      // Zone: gefuellt in der Besitzfarbe (neutral: hell), kraeftiger Rand.
+      ctx.globalAlpha=besitz?.26:.12; ctx.fillStyle=besitz||"#ffffff";
+      ctx.beginPath(); ctx.ellipse(o.x,o.y,rx,ry,0,0,6.283); ctx.fill();
+      ctx.globalAlpha=besitz?.95:.55; ctx.strokeStyle=besitz||"rgba(255,255,255,.8)"; ctx.lineWidth=besitz?4:2.5;
+      if(!besitz)ctx.setLineDash([8,8]);
+      ctx.beginPath(); ctx.ellipse(o.x,o.y,rx,ry,0,0,6.283); ctx.stroke(); ctx.setLineDash([]);
+      // Eroberung laeuft: Fortschrittsbogen in der Angreiferfarbe aussen um die Zone.
+      if(o.erobertVon!=null&&o.fortschritt>0){
+        ctx.globalAlpha=1; ctx.strokeStyle=kampfSeitenFarbe(o.erobertVon); ctx.lineWidth=6; ctx.lineCap="round";
+        ctx.beginPath(); ctx.ellipse(o.x,o.y,rx+6,ry+6,0,-Math.PI/2,-Math.PI/2+6.283*o.fortschritt); ctx.stroke();
+      }
+      // Fahne in der Mitte.
+      ctx.globalAlpha=1; ctx.strokeStyle="#3a2f22"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(o.x,o.y+10); ctx.lineTo(o.x,o.y-30); ctx.stroke();
+      ctx.fillStyle=besitz||"rgba(255,255,255,.75)";
+      ctx.beginPath(); ctx.moveTo(o.x,o.y-30); ctx.lineTo(o.x+22,o.y-24); ctx.lineTo(o.x,o.y-18); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.restore();
+      ctx.font="bold 12px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(0,0,0,.75)"; ctx.fillStyle=besitz||"#fff";
+      const txt=o.name+(o.besitz!=null?" · "+kampfTeamName(o.besitz):" · frei");
+      ctx.strokeText(txt,o.x,o.y+ry+12); ctx.fillText(txt,o.x,o.y+ry+12);
+    }
+  }
+  // PIXELGENAUE KONTUR: die Figur einmal auf eine kleine Nebenleinwand, dort in der Teamfarbe
+  // eingefaerbt (source-in) und achtmal um 2 px versetzt UNTER die echte Figur gelegt. Nur Zeichnung.
+  let bfd5KonturLeinwand=null;
+  function bfd5Kontur(u,x,y,farbe){
+    try{
+      if(!bfd5KonturLeinwand){ bfd5KonturLeinwand=document.createElement("canvas"); bfd5KonturLeinwand.width=200; bfd5KonturLeinwand.height=200; }
+      const c=bfd5KonturLeinwand, k=c.getContext("2d");
+      k.setTransform(1,0,0,1,0,0); k.globalAlpha=1; k.globalCompositeOperation="source-over";
+      k.clearRect(0,0,c.width,c.height); k.imageSmoothingEnabled=false;
+      zeichneSprite(k,u,100,120);
+      k.globalCompositeOperation="source-in"; k.fillStyle=farbe; k.fillRect(0,0,c.width,c.height);
+      k.globalCompositeOperation="source-over";
+      const a=ctx.globalAlpha;
+      for(const [dx,dy] of [[-2,0],[2,0],[0,-2],[0,2],[-2,-2],[2,-2],[-2,2],[2,2]])
+        ctx.drawImage(c,x-100+dx,y-120+dy);
+      ctx.globalAlpha=a;
+    }catch(e){}
+  }
+
   // PLATZIERUNG AUS EINEM ENDSTAND — dieselbe Regel wie bfPodPlatzierung() (die liest KP/U und
   // ruft jetzt diese Funktion), damit Gefecht, Replay und Echtzeit-Kontrolle denselben Massstab haben.
   // `zusatz` (optional, nur das Gefecht je Ort): ein fuenfter Schluessel nach dem Ausscheidezeitpunkt —
   // die Summe der Kampfrichterwertung je Team. Damit bleibt ein exakter Gleichstand auf allen vier
   // Sieg-Wegen (gleiche Punkte, gleich viele Lebende, beide bis zum Ende im Spiel) praktisch aus, und
   // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
-  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
+  // `ohneLetztesTeam` (Review D1, 17.11., nur "domination5"): mit Respawn ist "steht als einziges
+  // Team noch" kein Sieg-Weg, sondern eine Momentaufnahme -- ein Team mit weniger Punkten koennte
+  // sonst gewinnen, nur weil die anderen gerade auf ihren Respawn warten. Dort entscheiden die Punkte.
+  // Ohne den Parameter (Gefecht je Ort, Echtzeit, TDM) Zeichen fuer Zeichen die alte Regel.
+  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz,ohneLetztesTeam){
     const nochDa=lebend.filter(x=>x>0).length;
-    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
+    const schl=(s)=>[!ohneLetztesTeam&&nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
       rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
     const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
     const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
@@ -63454,10 +64372,14 @@
   function bfffaFuerGebautenPod(kader,saat){
     const N=kader.length;
     const kaempfer=bfffaKaempferAusU(kader);
-    const g=bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
+    // FORMAT-WEICHE (17.11., s. BF_D5): "domination5" rechnet das Fuenf-Punkte-Gefecht, sonst
+    // (Standard "orte3") Zeichen fuer Zeichen das bisherige Gefecht je Ort.
+    const g=bfPodFormat()==="domination5"?bfd5Gefecht(kaempfer,normalisiereSaat(saat),N)
+      :bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
     const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
     const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
-    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek),teamWert);
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*bfPodTaktSek()),teamWert,
+      g.format==="domination5");
     const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
@@ -63930,7 +64852,7 @@
   let bfPodSpuren=[];
   function bfPodReplayStarten(g){
     if(!KP||!KP.pod)return;
-    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*bfPodTaktSek()};
     // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
     KP.pod.zusatz=g.teamWert.slice();
     bfPodSpuren=[];
@@ -63941,6 +64863,7 @@
   // seiner Ecke versetzt, wenn ein zweites Team von derselben Seite dort steht; die Kameraden in
   // einem Raster nach aussen (zwei Reihen), damit sich Figuren und Namen nicht decken.
   function bfPodReplayPlatz(u,ort,stand){
+    if(bfPodFormat()==="domination5")return bfd5ReplayPlatz(u,ort,stand);
     const o=KP.orte[ort];
     const amOrt=(x)=>x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort;
     const am=U.filter(x=>x.side===u.side&&amOrt(x));
@@ -63952,7 +64875,7 @@
     return {x:o.x+sx*(92+spalte*60), y:Math.max(40,Math.min(H-30,y))};
   }
   function bfPodReplaySchritt(dt){
-    const R=KP.pod.replay, g=R.g, D=BFFFA.taktSek;
+    const R=KP.pod.replay, g=R.g, D=bfPodTaktSek();
     // Laufender Takt (0 = Anmarsch) und der Stand, auf den die Figuren gerade zulaufen.
     const takt=t<BF_REPLAY_ANMARSCH?0:Math.min(g.gespielt,1+Math.floor((t-BF_REPLAY_ANMARSCH)/D));
     const standVor=takt<=1?g.start:g.takte[takt-2];
@@ -63965,10 +64888,13 @@
       if(u.down)continue;
       const k=standVor.k[u.bfIdx];
       const ort=k.ort!=null?k.ort:k.nach;
-      if(ort==null)continue;
-      const ziel=bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
-      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=BF_REPLAY_TEMPO*dt;
-      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*BF_REPLAY_TEMPO; u.vy=ddy/weg*BF_REPLAY_TEMPO; }
+      // FUENF PUNKTE (17.11.): wer an der Basis steht (Start, nach dem Respawn), laeuft zu seiner Ecke.
+      const d5=bfPodFormat()==="domination5";
+      if(ort==null&&!(d5&&k.basis))continue;
+      const ziel=ort==null?bfd5Basis(u.side):bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
+      const tempo=d5?BF_D5.replayTempo:BF_REPLAY_TEMPO;
+      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=tempo*dt;
+      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*tempo; u.vy=ddy/weg*tempo; }
       else { u.vx=0; u.vy=0; }
     }
     // 2) DIE SCHLAEGE DIESES TAKTES, jeder zu seinem festen Zeitpunkt im Takt.
@@ -64035,12 +64961,22 @@
       case "ko": {
         const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
         Z.hp=0;
-        if(A&&!still)schalteAus(Z,A);
+        // FUENF PUNKTE (17.11.): mit Respawn ist ein K.o. kein Ausscheiden -- eigene, leise Buchung
+        // statt schalteAus() (dessen Texte "ist ausgeschieden"/"kann nicht mehr weiter" waeren falsch).
+        if(A&&!still&&bfPodFormat()==="domination5"){
+          Z.down=true; Z.st.tode++; A.st.ko++; A.st.koAnteil+=1;
+          feedRoutine(Z.side,Z.n+" fällt gegen "+A.n+" — in "+Math.round(BF_D5.respawnTakte*BF_D5.taktSek)+" s zurück an der Ecke.");
+          schwebe({x:Z.x,y:Z.y-40,txt:"K.o.",life:.9,crit:true});
+        }
+        else if(A&&!still)schalteAus(Z,A);
         else { Z.down=true; Z.st.tode++; if(A){A.st.ko++; A.st.koAnteil+=1;} }
         break;
       }
       case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
-      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+BF_ORT_NAMEN[e.ort]+".",true,undefined,"kontrollpunkt"); break;
+      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+bfPodOrtName(e.ort)+".",true,undefined,"kontrollpunkt"); break;
+      // FUENF PUNKTE (17.11.): Respawn -- er steht an seiner Ecke wieder auf (still: nur Zustand).
+      case "respawn": { const Z=U_(e.wer); if(Z){ Z.down=false; Z.hp=Z.max; const b=bfd5Basis(Z.side); Z.x=b.x; Z.y=b.y;
+        if(!still)schwebe({x:Z.x,y:Z.y-40,txt:"zurück im Spiel",life:.9}); } break; }
       default: break;
     }
   }
@@ -66174,6 +67110,7 @@
     }
   }
   function bahnPodAnzeigeAbbauen(){
+    bahnPodLeisteAus();
     const a=bahnPodAnzeige;
     if(!a)return;
     bahnPodAnzeige=null;
@@ -66217,8 +67154,57 @@
       feed(vorn.side,vorn.name+" übernimmt die Führung im 4-Team-Rennen.",true,undefined,"fuehrungswechsel");
     }
   }
+  // VIER-TEAM-LEISTE IM KOPF (17.11., Chris: "dort sind gerade auch nur 2 teams"): die DOM-Kopfzeile
+  // (#tnameL/#tnameR, #thpL/#thpR) hat nur zwei Plaetze und zeigte im Pod nur Team 0 und 1 mit ihrem
+  // "N im Ziel" und Streckenbalken. Im Pod bleiben diese zwei Plaetze verborgen, statt ihrer steht eine
+  // Leiste mit einem Kaestchen JE TEAM (Teamfarbe, Platz, Name, Stand, "N im Ziel", Streckenbalken,
+  // nach dem Ziel die Ligapunkte 2-1-0-0). Reine Anzeige: liest nur bahnPodLiveStand()/rennFertig/
+  // LAEUFER, schreibt in keinen Simulationszustand; ausserhalb des Pods wird nichts angefasst.
+  const BAHN_POD_LEISTE_VERSTECKT=["tnameL","tnameR"];
+  function bahnPodLeisteAus(){
+    const el=document.getElementById("bahnPodLeiste");
+    if(!el)return;
+    el.remove();
+    for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display=""; }
+    const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="";
+    const sl=document.querySelector(".scoreline"); if(sl)sl.style.gridTemplateColumns="";
+  }
+  function bahnPodLeisteZeigen(st,schnitt){
+    const sl=document.querySelector(".scoreline");
+    if(!sl||!sl.parentNode)return;
+    let el=document.getElementById("bahnPodLeiste");
+    if(!el){
+      el=document.createElement("div"); el.id="bahnPodLeiste"; el.className="bahnpod-leiste";
+      sl.parentNode.insertBefore(el,sl.nextSibling);
+      for(const id of BAHN_POD_LEISTE_VERSTECKT){ const e=document.getElementById(id); if(e)e.style.display="none"; }
+      const hp=document.querySelector(".hpbars"); if(hp)hp.style.display="none";
+      sl.style.gridTemplateColumns="1fr";
+    }
+    el.style.gridTemplateColumns="repeat("+st.N+",minmax(0,1fr))";
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
+    const zeilen=st.teams.map(t=>({side:t.side, platz:t.platz, name:t.name, stand:t.anzeige,
+      ziel:imZiel(t.side), pct:Math.max(0,Math.min(100,Math.round(schnitt(t.side)*100))),
+      liga:st.done?t.ligaPunkte:null, sieger:st.done&&t.platz===1}));
+    const schluessel=JSON.stringify(zeilen);
+    if(el.dataset.letzt===schluessel)return;
+    el.dataset.letzt=schluessel;
+    el.textContent="";
+    for(const z of zeilen){
+      const box=document.createElement("div");
+      box.className="bahnpod-team"+(z.sieger?" bp-sieger":"");
+      box.style.setProperty("--bp-c",bahnSeitenFarbe(z.side));
+      const mk=(klasse,text)=>{ const d=document.createElement("div"); d.className=klasse; d.textContent=text; box.appendChild(d); return d; };
+      mk("bp-name",z.platz+". "+z.name);
+      mk("bp-stand",z.stand);
+      const zl=mk("bp-ziel",z.ziel+" im Ziel");
+      if(z.liga!=null){ const l=document.createElement("span"); l.className="bp-liga"; l.textContent="+"+z.liga+" Pkt"; zl.appendChild(l); }
+      const bal=document.createElement("div"); bal.className="bp-balken";
+      const f=document.createElement("s"); f.style.width=z.pct+"%"; bal.appendChild(f); box.appendChild(bal);
+      el.appendChild(box);
+    }
+  }
   // HUD IM POD (aus updateHudBahn): die DOM-Anzeigetafel kennt nur Heim/Gast — sie zeigt hier den
-  // Fuehrenden, die Leinwand-Tafel (zeichneBahnPodTafel) alle vier Teams.
+  // Fuehrenden, die Vier-Team-Leiste darunter und die Leinwand-Tafel (zeichneBahnPodTafel) alle vier.
   function updateHudBahnPod(){
     const st=bahnPodLiveStand(), art=BA();
     const vorn=st.reihe[0];
@@ -66241,6 +67227,7 @@
     };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    bahnPodLeisteZeigen(st,schnitt);
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       feed(vorn?vorn.side:0,(vorn?vorn.name+" gewinnt das 4-Team-Rennen — ":"Rennen beendet — ")
@@ -66325,10 +67312,14 @@
   // Duell-Kader SQUAD/OPP (dieselben zwoelf Messpersonen wie einflussVon) plus `extraTeams` als
   // Seite 2/3. Gehoben und gemessen werden nur die Laeufer von SQUAD/OPP — damit ist die Zahl
   // direkt mit der Duell-Abnahme vergleichbar; die zwei Zusatzteams stellen nur das Feld.
-  function bahnPodEinfluss(bd,extraTeams,n,plus,saatVersatz,mutatorModus){
+  // `jeSeite` (optional, 17.11., Review S1): Laeufer je Team fuer diese Messung (wie bahnPodSonde
+  // `opt.jeSeite`) -- die Liga laeuft meist k = 4. Ohne ihn exakt wie vorher (art.jeSeite, 6).
+  function bahnPodEinfluss(bd,extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite){
     const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
     const teams=[SQUAD,OPP,...(extraTeams||[])];
     const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const artJe=BAHN_ART[bd], jeSeiteVorher=artJe?artJe.jeSeite:null;
+    if(artJe&&Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6)artJe.jeSeite=jeSeite;
     const lauf=(i)=>bahnPodLauf(bd,teams,1337+versatz+i*7919,null,(k)=>{
       FORMKARTE={};
       mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
@@ -66356,8 +67347,10 @@
       abweichung=EINFLUSS_ATTR.reduce((acc,k)=>acc+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
     } finally {
       ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+      if(artJe)artJe.jeSeite=jeSeiteVorher;
     }
     return {disziplin:bd, format:"pod", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      jeSeite:artJe?(Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6?jeSeite:jeSeiteVorher):null,
       saatVersatz:versatz, abweichungPp:Math.round(abweichung*10)/10, reihen};
   }
   // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
@@ -67628,6 +68621,35 @@
     // Huepfer/die Dimmung benutzt (staffelFeierBild()), plus Zustand fuer die Zuordnung.
     teamFeierStand:()=>teamFeiern.map(f=>({seite:f.seite,stufe:f.stufe,nr:f.nr,seitMs:f.seitMs,
       anker:f.anker?{x:f.anker.x,y:f.anker.y}:null,raunen:!!f.raunen,funken:!!f.funken})),
+    // GANZE RUNDE (17.11.): Kalibrier-/Sondenschnittstelle der Staffel-Puste. `staffelRundePuste(neu)`
+    // setzt Felder von BAHN_ART.staffel.rundePuste fuer diese Sitzung (nur Messskripte),
+    // `staffelRundeLauf(saat)` faehrt ein stummes Duell und liefert je Laeufer tiefsten Stand/Einbruch.
+    staffelRundePuste:(neu)=>{
+      const P=BAHN_ART.staffel.rundePuste;
+      if(P&&neu&&typeof neu==="object")for(const k of Object.keys(neu))if(k in P)P[k]=neu[k];
+      if(neu&&typeof neu==="object"){
+        for(const k of ["kraftBasis","kraftSpanne","leerTempoBasis","zehrKoeff","zehrExponent"])
+          if(Number.isFinite(neu[k]))BAHN_ART.staffel[k]=neu[k];
+        if(neu.plaene&&typeof neu.plaene==="object")for(const [id,w] of Object.entries(neu.plaene))
+          if(BAHN_ART.staffel.plaene[id])Object.assign(BAHN_ART.staffel.plaene[id],w);
+      }
+      const S=BAHN_ART.staffel;
+      return P?{...P, kraftBasis:S.kraftBasis, kraftSpanne:S.kraftSpanne, leerTempoBasis:S.leerTempoBasis,
+        zehrKoeff:S.zehrKoeff, zehrExponent:S.zehrExponent}:null;
+    },
+    // `jeSeite` (optional, 17.11. Review S1): Laeufer/Beine je Seite fuer diesen einen Lauf (2..6) --
+    // die Liga und der Pod laufen meist k = 4; ohne Angabe bleibt es das Duell mit art.jeSeite (6).
+    staffelRundeLauf:(saat,jeSeite)=>{
+      const S=BAHN_ART.staffel, jsAlt=S.jeSeite;
+      if(Number.isInteger(jeSeite)&&jeSeite>=1&&jeSeite<=6)S.jeSeite=jeSeite;
+      const M=MOTOREN.staffel, g=M.sichern(); M.vorher();
+      let guard=0; stumm=true;
+      try{ M.bau(saat||1337); while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; } }
+      finally{ stumm=false; S.jeSeite=jsAlt; }
+      const erg={zeit:+rennT.toFixed(3), laeufer:staffelRundeStand()};
+      M.zurueck(g);
+      return erg;
+    },
     staffelFeierProbe:()=>BA().staffel?LAEUFER.map(u=>({id:u.id,seite:u.seite,bein:u.bein,aktiv:!!u.aktiv,
       fertig:u.fertig!=null,gestolpert:u.gestolpert||0,anteil:ovalAnteil(u),...staffelFeierBild(u)})):null,
     // ===== SENDUNGSRAHMEN-TAKTUNG (D7 / A4+A3 / Endstand-Nachlauf, 07.10.) =====
@@ -68183,6 +69205,19 @@
     },
     // Anzeige ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie echterKader.battlefieldPod;
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
+    // FORMAT-UMSCHALTER (17.11.): "orte3" (Standard, bit-identisch) | "domination5". Gilt fuer
+    // headless Pod-Laeufe ohne eigenes `optionen.format` (Messskripte); gibt das aktive Format zurueck.
+    battlefieldFormat:(f)=>{ if(f!=null)BF_POD_FORMAT=bfPodFormatPruefen(f); return BF_POD_FORMAT; },
+    // Kalibrierung des Fuenf-Punkte-Formats (nur Messskripte): flache Felder und `plan` ueberschreiben,
+    // `null` setzt auf BF_D5_GRUND zurueck.
+    battlefieldD5:(neu)=>{
+      if(neu===null)BF_D5=JSON.parse(JSON.stringify(BF_D5_GRUND));
+      else if(neu&&typeof neu==="object")for(const [k,w] of Object.entries(neu)){
+        if(k==="plan"&&w&&typeof w==="object")Object.assign(BF_D5.plan,w);
+        else if(k in BF_D5&&typeof BF_D5[k]==="number")BF_D5[k]=Number(w);
+      }
+      return JSON.parse(JSON.stringify(BF_D5));
+    },
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
@@ -69150,6 +70185,115 @@
         mittlererMin:z.frames?+(z.summeMin/z.frames).toFixed(1):null,
         anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
       return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
+    },
+    // KLUMPEN-MESSUNG (Benchmark Basketball, 17.11., docs/design/spacing-modul-17-11.md):
+    // Chris: "alle laufen immer nur als klumpen gefuehlt rum ... niemand steht mal separat und
+    // ist frei fuer einen pass". Gemessen je Tick der LAUFENDEN Phase (keine Freiwurf-/
+    // Viertelpause), Simulationspositionen, read-only wie diagAbstaende daneben:
+    //   * mitAbstand    mittlerer paarweiser Abstand zwischen Mitspielern (px)
+    //   * naechsterMit  mittlerer Abstand zum naechsten Mitspieler (px)
+    //   * klumpen3      Anteil Ticks, in denen >=3 Spieler (beliebige Teams) in einem Kreis
+    //                   von `r` px um einen von ihnen stehen
+    //   * klumpenMit3   dasselbe nur unter Mitspielern
+    //   * ballNah       mittlere Zahl Spieler (ohne Ballfuehrer) im Umkreis 80 px um den Ball
+    //   * passFrei      Anteil Ticks mit Ballfuehrer, in denen MINDESTENS ein Mitspieler frei
+    //                   anspielbar ist (offenheitFuerPass >= 1: Decker >= 60 px weg und keine
+    //                   Passlinie verstellt), dazu die mittlere Zahl freier Anspielstationen
+    //   * breite        mittlere Standardabweichung der Angreifer-y (Feldbreite-Nutzung, px)
+    diagSpacing:(saaten,bis,dId,r)=>{
+      const R=r||45, n=saaten||6, dauer=bis||120;
+      const acc={ticks:0,mit:0,mitN:0,nn:0,nnN:0,k3:0,km3:0,ballNah:0,ballTicks:0,frei1:0,freiN:0,breite:0};
+      for(let i=0;i<n;i++){
+        feldspielDisc=dId||"basketball"; bauFeldspiel(1337+i*7919);
+        let guard=0;
+        while(!done&&fsT<dauer&&guard<60000){
+          stepFeldspiel(1/60); guard++;
+          if(!fsLive||fsLive.phase!=="laufend")continue;
+          const feld=FSTEAM.map(t=>t.filter(u=>!stehtImTor(u)&&aufDemEis(u)));
+          const alle=[...feld[0],...feld[1]];
+          acc.ticks++;
+          for(const t of feld){
+            for(let a=0;a<t.length;a++){
+              let best=1e9;
+              for(let b=0;b<t.length;b++){ if(a===b)continue; const d=dist(t[a],t[b]); if(b>a){acc.mit+=d;acc.mitN++;} if(d<best)best=d; }
+              if(best<1e9){acc.nn+=best;acc.nnN++;}
+            }
+          }
+          const klumpen=(menge)=>menge.some(u=>menge.filter(v=>v!==u&&dist(u,v)<R).length>=2);
+          if(klumpen(alle))acc.k3++;
+          if(feld.some(t=>klumpen(t)))acc.km3++;
+          const tr=fsLive.ball.traeger;
+          if(tr&&!fsLive.ball.flug){
+            acc.ballTicks++;
+            acc.ballNah+=alle.filter(u=>u!==tr&&dist(u,tr)<80).length;
+            const frei=feld[tr.side].filter(m=>m!==tr&&offenheitFuerPass(tr,m)>=0.999).length;
+            if(frei>0)acc.frei1++; acc.freiN+=frei;
+            const ys=feld[tr.side].map(u=>u.y), my=ys.reduce((s,y)=>s+y,0)/ys.length;
+            acc.breite+=Math.sqrt(ys.reduce((s,y)=>s+(y-my)*(y-my),0)/ys.length);
+          }
+        }
+      }
+      const f=(x,d)=>+x.toFixed(d==null?1:d);
+      return {spiele:n,dauer,r:R,ticks:acc.ticks,
+        mitAbstand:f(acc.mit/Math.max(1,acc.mitN)), naechsterMit:f(acc.nn/Math.max(1,acc.nnN)),
+        klumpen3Prozent:f(acc.k3/Math.max(1,acc.ticks)*100), klumpenMit3Prozent:f(acc.km3/Math.max(1,acc.ticks)*100),
+        ballNah:f(acc.ballNah/Math.max(1,acc.ballTicks),2),
+        passFreiProzent:f(acc.frei1/Math.max(1,acc.ballTicks)*100), freieAnspielstationen:f(acc.freiN/Math.max(1,acc.ballTicks),2),
+        breite:f(acc.breite/Math.max(1,acc.ballTicks))};
+    },
+    // GEZEIGT = GEBUCHT (Benchmark Basketball 17.11.): prueft fuer jeden Wurf aus n Spielen, ob
+    // die gebuchte Stufe (Zweier/Dreier) zur GEZEICHNETEN FIBA-Linie passt — rein geometrisch in
+    // Metern aus BK_FIBA, unabhaengig von der Logik-Metrik — und ob die angezeigte Punktzahl
+    // (fsPunkte, Anzeigetafel) der Summe der gebuchten Spielerpunkte entspricht. Read-only.
+    diagGezeigtGebucht:(n)=>{
+      const F=BK_FIBA; let wuerfe=0, dreier=0, falsch=0, punkteFalsch=0, spiele=0; const faelle=[];
+      for(let i=0;i<(n||6);i++){
+        feldspielDisc="basketball"; bauFeldspiel(4242+i*131); spiele++;
+        let letzterFlug=null, guard=0;
+        while(!done&&guard<60000){
+          stepFeldspiel(1/60); guard++;
+          const fl=fsLive&&fsLive.ball.flug;
+          if(fl&&fl!==letzterFlug&&fl.art==="wurf"&&!fl.zug){
+            letzterFlug=fl; wuerfe++;
+            const dxm=(fl.von.x-korbXVon(fl.schuetze.side))/F.mx, dym=(fl.von.y-H/2)/F.my;
+            const hinterLinie=Math.abs(dym)>=6.6||Math.hypot(dxm,dym)>=6.75;
+            const gebuchtDrei=fl.punkte===3;
+            if(gebuchtDrei)dreier++;
+            if(hinterLinie!==gebuchtDrei){ falsch++; if(faelle.length<8)faelle.push({dxm:+dxm.toFixed(2),dym:+dym.toFixed(2),tier:fl.tier,punkte:fl.punkte}); }
+          }
+        }
+        const summe=[0,1].map(s=>FSTEAM[s].reduce((a,u)=>a+(u.punkte||0),0));
+        if(summe[0]!==fsPunkte[0]||summe[1]!==fsPunkte[1])punkteFalsch++;
+      }
+      return {spiele,wuerfe,dreier,stufeFalsch:falsch,anzeigeUngleichBuchung:punkteFalsch,faelle};
+    },
+    // SZENEN-SONDE FUER SCREENSHOTS (Benchmark Basketball, 17.11.,
+    // scripts/screenshot-basketball-benchmark.mjs): baut ein Feldspiel mit fester Saat und
+    // spult die Simulation (gleiche Schritte wie das Spiel) bis zu einer benannten Situation
+    // vor, dann bleibt der Zustand stehen und der laufende Zeichen-Loop zeigt genau dieses Bild.
+    // Situationen: "aufbau" (Halbfeld-Angriff steht, Ballfuehrer seit >=2,5 s), "wurf" (Wurf
+    // kurz vor dem Ring), "dreier" (dasselbe, nur Dreier), "treffer" (Ball gerade im Netz),
+    // "rebound" (freier Ball nach Fehlwurf). `ab` = fruehester Spielzeitpunkt (s).
+    szeneFeldspiel:(saat,situation,ab,dId)=>{
+      feldspielDisc=dId||"basketball"; bauFeldspiel(saat||1337);
+      const start=ab||0; let guard=0, nachTreffer=null;
+      const passt=()=>{
+        if(!fsLive||fsT<start)return false;
+        const fl=fsLive.ball.flug;
+        if(situation==="aufbau")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&!fl&&fsLive.angriffSeit>=2.5;
+        if(situation==="wurf")return !!fl&&(fl.art==="wurf"||fl.art==="alley")&&fl.t/fl.dauer>=0.8;
+        if(situation==="dreier")return !!fl&&fl.art==="wurf"&&fl.fern&&fl.t/fl.dauer>=0.55;
+        if(situation==="rebound")return !!fsLive.ball.frei&&!!fsLive.reboundKampf&&fsLive.reboundKampf.t>0.2;
+        if(situation==="treffer"){
+          if(nachTreffer!=null)return fsT>=nachTreffer;
+          if(fl&&fl.art==="wurf"&&fl.treffer&&fl.t+1/60>=fl.dauer)nachTreffer=fsT+0.12;
+          return false;
+        }
+        return false;
+      };
+      while(!done&&guard<60000){ stepFeldspiel(1/60); guard++; if(passt())break; }
+      vpSichtbarBis=0; // Viertelpausen-Tafel (Wandzeit) nicht ueber das Standbild legen
+      return {gefunden:!done&&guard<60000, t:+fsT.toFixed(2), punkte:[...fsPunkte]};
     },
     // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der
     // Schnelle jetzt WIRKLICH frueher an, oder sieht es nur so aus?"). Spielt N Spiele

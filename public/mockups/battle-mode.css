@@ -289,6 +289,23 @@
   .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;max-width:100%;
     height:auto;aspect-ratio:1240/470;background:var(--pitch)}
 
+  /* BAHN-POD-KOPFLEISTE (17.11., Takeshi's Castle/Staffel mit drei oder vier Teams): ein Kaestchen JE
+     TEAM statt der zwei Plaetze #tnameL/#tnameR (s. bahnPodLeisteZeigen() in battle-mode.engine.js). */
+  .oly-battle-arena.oly-battle-arena .bahnpod-leiste{display:grid;gap:8px;padding:2px 18px 10px}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team{min-width:0;background:var(--surface);border:1px solid var(--line);
+    border-left:4px solid var(--bp-c,var(--line));border-radius:8px;padding:6px 9px}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team.bp-sieger{border-color:var(--bp-c,var(--warn));box-shadow:0 0 0 1px var(--bp-c,var(--warn)) inset}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-name{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:13px;font-weight:600;
+    letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--bp-c,var(--ink))}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-stand{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:17px;font-weight:600;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-ziel{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-liga{margin-left:8px;color:var(--warn);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-balken{height:4px;margin-top:5px;background:var(--line-soft);border-radius:2px;overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .bahnpod-team .bp-balken s{display:block;height:100%;background:var(--bp-c,var(--ink));text-decoration:none}
+  @media (max-width:640px){
+    .oly-battle-arena.oly-battle-arena .bahnpod-leiste{grid-template-columns:repeat(2,minmax(0,1fr)) !important;padding:2px 10px 8px}
+  }
+
   /* MINI-DM 4-TEAM-FFA-Ergebnisansicht (Bugfix 22.09., s. battle-mode.html/-engine.js) —
      vier Teams nebeneinander statt der Zwei-Seiten-.scoreline/.hpbars/.kaderleiste
      darueber, die fuer genau diese Ansicht ausgeblendet werden. */

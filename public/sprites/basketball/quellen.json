@@ -1,5 +1,5 @@
 {
- "_hinweis": "Basketball-Halle: Parkett, Korb, Ball, Zuschauer. Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Alle Quellen sind fuer ein privates, nicht kommerzielles Spiel unproblematisch (CC0 / CC-BY / CC-BY-SA). Beschafft am 24.08. ueber OpenGameArt; Schnitte mit Pillow, Koordinaten unten dokumentiert. — 08.11.: die vom Motor gezeichneten Requisiten (und in arena/ die Takeshi-Bodenkacheln) sind auf PixelLab umgestellt (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py); bei diesen Eintraegen steht die fruehere Quelle unter 'vorher'.",
+ "_hinweis": "Basketball-Halle: Parkett, Korb, Ball, Zuschauer. Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Alle Quellen sind fuer ein privates, nicht kommerzielles Spiel unproblematisch (CC0 / CC-BY / CC-BY-SA). Beschafft am 24.08. ueber OpenGameArt; Schnitte mit Pillow, Koordinaten unten dokumentiert. — 08.11.: die vom Motor gezeichneten Requisiten (und in arena/ die Takeshi-Bodenkacheln) sind auf PixelLab umgestellt (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py); bei diesen Eintraegen steht die fruehere Quelle unter 'vorher'. — 17.11. (Basketball als Benchmark-Disziplin): neuer Korb in zwei Ebenen (korb_links_*/korb_rechts_*), Mittelkreis-Wappen und Schussuhr-Rahmen aus PixelLab, Bestellprotokoll data/generated/pixellab-requisiten/basketball-17-11/bestellprotokoll.json, Einbau docs/design/basketball-assets-17-11.md. korb_topdown.png bleibt bis zur Verdrahtung der Rueckfall.",
  "parkett.png": {
   "paket": "[LPC] Floors",
   "blatt": "floors.png (aus lpc-floors.zip)",
@@ -92,5 +92,247 @@
   "lizenz": "CC-BY 3.0 / CC-BY 4.0 (auch CC-BY-SA moeglich)",
   "url": "https://opengameart.org/content/welcome-to-the-arena",
   "verwendung": "Publikum am Spielfeldrand: Kachel horizontal wiederholen, zwischen den beiden Bildern wechseln (die Menge wippt). Es sind kleine Pixel-Monster-Gesichter — passt zum Kader"
+ },
+ "korb_links_hinten.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
+ },
+ "korb_links_vorne.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
+ },
+ "korb_links.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (68,52), Bodenpunkt unter dem Ring (68,111), Sockelmitte (33,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: linkser Korb, beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
+ },
+ "korb_rechts_hinten.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), HINTERE Ebene -- Sockel, Mast, Brett, hinterer Ringbogen, abgedunkelte Netz-Rueckseite. Vor dem Ball zeichnen. Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
+ },
+ "korb_rechts_vorne.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), VORDERE Ebene -- vorderer Ringbogen und Netz-Vorderseite. Nach dem Ball zeichnen (Ball laeuft durch den Ring). Im Motor verdrahtet (zeichneKorbAnlage in battle-mode.engine.js), s. docs/design/basketball-assets-17-11.md"
+ },
+ "korb_rechts.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a tall basketball hoop on a stand, side view seen slightly from above, the hoop faces to the right: a heavy dark wrought iron pole on a carved stone base at the left, a rectangular weathered wooden backboard with iron bands and rivets seen at an angle, a round red-orange iron rim ring sticking out to the right of the backboard seen as an open ellipse, a white rope net hanging down from the rim, dark fantasy medieval arena style, 3/4 top-down view as in a classic top-down RPG, whole object visible, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    128
+   ],
+   "job": "43bc9a7a-0846-4e53-b617-3bb9fc54714b",
+   "kandidat": 3,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_korb.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 921.7,
+   "konto_nachher": 911.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer alle sechs korb_links*/korb_rechts*-Dateien"
+  },
+  "anker": "Anker (px in der 96x128-Datei): Ringmitte (27,52), Bodenpunkt unter dem Ring (27,111), Sockelmitte (62,111); Ring aussen 24x14, Oeffnung 16x7; Ringhoehe ueber dem Boden 59 px",
+  "verwendung": "Basketball-Benchmark 17.11.: rechtser Korb (Spiegelung des linken Korbs), beide Ebenen in einem Bild (fuer Stellen ohne Ball-Durchlauf, z. B. Vorschau). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
+ },
+ "wappen_parkett.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "round painted heraldic crest emblem painted flat on a floor, seen from directly above: a dragon skull with crossed torches inside a ring border, worn faded paint in dark red and gold, perfectly circular, flat decal without shading or perspective, top-down view, dark fantasy medieval arena style, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    96
+   ],
+   "job": "2dab1080-7571-4dac-8a80-7a9e4c7645dd",
+   "kandidat": 2,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_wappen.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz), unveraendert uebernommen",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 886.7,
+   "konto_nachher": 876.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer beide Wappen: Kandidat 2 Parkett, Kandidat 0 Street-Court"
+  },
+  "anker": "96x96, Mitte (48,48), Ringdurchmesser 82 px (Mittelkreis des Motors: 2*H*0.09 = 84,6 px)",
+  "verwendung": "Mittelkreis-Wappen der Variante Parkett; ist bereits in kulissen/basketball/<variante>_linien.png eingerechnet, liegt hier zusaetzlich einzeln (z. B. fuer eine Sprungball-Einblendung). s. docs/design/basketball-assets-17-11.md"
+ },
+ "wappen_streetcourt.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "round painted heraldic crest emblem painted flat on a floor, seen from directly above: a dragon skull with crossed torches inside a ring border, worn faded paint in dark red and gold, perfectly circular, flat decal without shading or perspective, top-down view, dark fantasy medieval arena style, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    96,
+    96
+   ],
+   "job": "2dab1080-7571-4dac-8a80-7a9e4c7645dd",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_wappen_street.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz), unveraendert uebernommen",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 886.7,
+   "konto_nachher": 876.7,
+   "hinweis": "ein Auftrag (10 Gen.) fuer beide Wappen: Kandidat 2 Parkett, Kandidat 0 Street-Court"
+  },
+  "anker": "96x96, Mitte (48,48), Ringdurchmesser 82 px (Mittelkreis des Motors: 2*H*0.09 = 84,6 px)",
+  "verwendung": "Mittelkreis-Wappen der Variante Street-Court; ist bereits in kulissen/basketball/<variante>_linien.png eingerechnet, liegt hier zusaetzlich einzeln (z. B. fuer eine Sprungball-Einblendung). s. docs/design/basketball-assets-17-11.md"
+ },
+ "schussuhr_rahmen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small empty rectangular scoreboard sign, wide dark wrought iron frame with rivets and small corner spikes around a plain flat empty dark slate panel, no text, no numbers, no symbols, front view, dark fantasy medieval arena style, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    48,
+    32
+   ],
+   "job": "5f986250-143a-4d37-b875-ccdbdb00c932",
+   "kandidat": 20,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/bb_schussuhr.png",
+  "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz), unveraendert uebernommen",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-17",
+  "kosten": {
+   "generationen": 10.0,
+   "konto_vorher": 876.7,
+   "konto_nachher": 866.7
+  },
+  "anker": "48x32; Rahmen-Box x 4..43, y 2..31; Schiefertafel innen x 11..36, y 9..23 (26x15); Ziffernmitte (24,16)",
+  "verwendung": "Rahmen fuer die Schussuhr am Korb (zeichneShotClock zeichnet heute eine 38x22-Canvas-Box). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
  }
 }

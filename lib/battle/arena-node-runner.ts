@@ -29,6 +29,7 @@ import {
   type RunBattlefieldPodFixturesOptions,
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
+import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 /**
@@ -450,7 +451,7 @@ export async function runBattlefieldPodFixturesNode(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
       })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),

@@ -273,6 +273,41 @@
       "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
     }
   },
+  "basketball/parkett.jpg": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Basketball-Benchmark 17.11., ersetzt die alte parkett.jpg)",
+    "auftrag": {
+      "prompt": "top-down view of one single very wide empty indoor arena court inside a dark fantasy castle hall, a stone grandstand wall with wooden railing, hanging heraldic banners and burning wall torches along the top edge and along the bottom edge, the whole rest is open flat floor of plain warm polished wooden plank parquet with no lines and no markings, only a narrow strip of dark grey stone tiles at the far left and right borders, warm torch light, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "seed": 11,
+      "gen": [
+        792,
+        300
+      ],
+      "job": "b7170b39-7f9e-41d7-9e0b-379951b2796b",
+      "kandidat": 0
+    },
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_parkett.png",
+    "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (deterministisch, ohne Netz; Bestellprotokoll: data/generated/pixellab-requisiten/basketball-17-11/bestellprotokoll.json)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Basketball, Variante Parkett-Halle"
+  },
+  "basketball/parkett_linien.png": {
+    "paket": "prozedural (kein PixelLab)",
+    "quelle": "scripts/baue-basketball-assets.py: transparentes Boden-Overlay 1240x470 mit den FIBA-Linien des Motors (BK_FIBA, Schalter --korb-x/--zone-tiefe/--dreier-rx/--ecke-y/--kreis-rx/--no-charge-rx ...; Standardwerte = FIBA) und dem Mittelkreis-Wappen",
+    "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+    "lizenz": "eigene Erzeugung fuer dieses Projekt (Wappen: PixelLab-Job bb_wappen, s. public/sprites/basketball/quellen.json)",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Basketball, Variante Parkett: Linien-Overlay ueber dem Boden, s. docs/design/basketball-assets-17-11.md"
+  },
+  "basketball/streetcourt_linien.png": {
+    "paket": "prozedural (kein PixelLab)",
+    "quelle": "scripts/baue-basketball-assets.py: transparentes Boden-Overlay 1240x470 mit den FIBA-Linien des Motors (BK_FIBA, Schalter --korb-x/--zone-tiefe/--dreier-rx/--ecke-y/--kreis-rx/--no-charge-rx ...; Standardwerte = FIBA) und dem Mittelkreis-Wappen",
+    "bau": "python3 -I scripts/baue-basketball-assets.py (deterministisch, ohne Netz)",
+    "lizenz": "eigene Erzeugung fuer dieses Projekt (Wappen: PixelLab-Job bb_wappen, s. public/sprites/basketball/quellen.json)",
+    "erzeugt": "2026-11-17",
+    "verwendung": "Basketball, Variante Street-Court: Linien-Overlay ueber dem Boden, s. docs/design/basketball-assets-17-11.md"
+  },
   "hockey/bergsee.jpg": {
     "paket": "PixelLab",
     "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
