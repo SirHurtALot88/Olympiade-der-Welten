@@ -212,5 +212,9 @@ Jede Datei nennt im Kommentar am Anfang, was aus dem Spiel stammt und was erfund
 
 - Alle vier Dateien laufen ohne JavaScript-Fehler; ein Trockenlauf klickt jede Aktion einmal durch (Inbox 48, Office 19,
   Scouting 36, Einstellungen 103 Aktionen) und findet kein `undefined` oder `NaN` im erzeugten HTML.
-- Sichtprüfung der Bilder bei 1920×1080 und 2560×1440: siehe Abschnitt 5.
+- Alle 18 Ansichten sind bei 1920×1080 und 2560×1440 aufgenommen (36 Bilder), ohne JavaScript-Fehler und ohne überlaufende
+  Karten. Elf davon wurden einzeln angesehen (zehn bei 1920×1080, eine bei 2560×1440); nachgebessert wurden abgeschnittene
+  Kartentitel, die Spaltenbreiten der Wunschliste, die Zahl im Ring der Kurzliste und die Beschriftung des Vertrauensbogens.
+- Ein Bild ist einen Schritt älter als die Datei: `office-04-sponsor-angebote` zeigt die Marke „Empfohlen“ noch am mittleren
+  Angebot, im Mockup steht sie jetzt am ersten (Siemenswerk AG), passend zum Text darunter.
 - Nicht geprüft: Verhalten unter 1700 px Breite und auf dem Handy. Die Mockups sind wie die anderen auf 16:9 ab Full HD ausgelegt.

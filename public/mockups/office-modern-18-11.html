@@ -677,7 +677,7 @@ function klicks(z,zeichne,TU){document.addEventListener("click",function(ev){
 })}
 window.addEventListener("resize",function(){var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px"});
 
-var Z={ans:["vorstand","sponsor","kabine"].indexOf(q.get("ansicht"))>=0?q.get("ansicht"):"vorstand",vor:q.get("vorstand")==="druck"?"druck":"ruhig",sp:q.get("sponsor")==="wahl"?"wahl":"laeuft",kap:"Johanna",wahl:1};
+var Z={ans:["vorstand","sponsor","kabine"].indexOf(q.get("ansicht"))>=0?q.get("ansicht"):"vorstand",vor:q.get("vorstand")==="druck"?"druck":"ruhig",sp:q.get("sponsor")==="wahl"?"wahl":"laeuft",kap:"Johanna",wahl:0};
 /* Kader (echte Spieler der Wranglers), Leadership/Stil/Moral erfunden */
 var K=[["Johanna","Templar",58,"enforcer",71,0],["Karthogg","Hero",71,"leader",66,0],["Kati","Bard",64,"inspirer",86,1],["Krolach","Templar",52,"operator",62,0],["Kaylen","Templar",47,"enforcer",49,0],["Aerin","Bard",41,"wildcard",38,0],["Lexa","Sprinter",36,"inspirer",55,0],["Xelara","Bard",44,"operator",68,0]];
 var STIL={leader:"Anführer",inspirer:"Mitreißer",enforcer:"Antreiber",operator:"Organisator",wildcard:"Wildcard"};
