@@ -8,6 +8,8 @@ import {
   istDuellVerlauf,
   lagesatz,
   matrixAnteil,
+  matrixStufe,
+  rangStufe,
   stehtAufDemSpiel,
   teileNachLiga,
   type SaisonstandZeile,
@@ -125,5 +127,17 @@ describe("Saisonstand modern: Matchwinner", () => {
   });
   it("leer ohne gewertete Spieltage", () => {
     expect(baueMatchwinnerListe(stand, "andere")).toEqual([]);
+  });
+
+  it("Matrix-Stufen: fünf klar getrennte Stufen nach Platz in der Spalte", () => {
+    const stufen = Array.from({ length: 16 }, (_, i) => rangStufe(i + 1, 16));
+    expect(stufen).toEqual([4, 4, 4, 4, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0]);
+    expect(rangStufe(null, 16)).toBeNull();
+    expect(rangStufe(1, 1)).toBe(2);
+    const spalte = [16.7, 18.9, 8.9, 7.7, 3.7, 2.5, 14.9, 18.3, 10.8, 2.9, 4.4, null];
+    expect(matrixStufe(18.9, spalte)).toBe(4);
+    expect(matrixStufe(2.5, spalte)).toBe(0);
+    expect(matrixStufe(null, spalte)).toBeNull();
+    expect(matrixStufe(5, [5, 5, 5])).toBe(4);
   });
 });

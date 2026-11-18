@@ -92,15 +92,47 @@
 
 /* Matrix */
 .ssm-matrix-wrap { overflow: auto; }
-.ssm-matrix { border-collapse: separate; border-spacing: 2px; width: 100%; font-size: 14px; }
+/* Matrix (18.11. nachgeschärft): Bereiche durch Lücke + Achsenfarbe getrennt, Werte in fünf klaren Stufen. */
+.ssm-matrix {
+  --ssm-pow: var(--nl-pow, #ff6b6b);
+  --ssm-spe: var(--nl-spe, #57d08a);
+  --ssm-men: var(--nl-men, #5b9bff);
+  --ssm-soc: var(--nl-soc, #e6b455);
+  border-collapse: separate; border-spacing: 2px; width: 100%; font-size: 14px;
+}
 .ssm-matrix th, .ssm-matrix td { text-align: center; padding: 4px 3px; font-weight: 600; }
 .ssm-matrix thead th { color: var(--bc-stumm); font-size: 11.5px; letter-spacing: 0.08em; position: sticky; top: 0; background: var(--bc-flaeche-1); z-index: 2; }
-.ssm-matrix__bereich { color: var(--bc-gold) !important; border-bottom: 1px solid var(--bc-linie); }
+.ssm-matrix thead tr:nth-child(2) th { top: 30px; }
 .ssm-matrix__team { text-align: left !important; position: sticky; left: 0; background: var(--bc-flaeche-1); z-index: 3; min-width: 52px; }
 .ssm-matrix__team button { display: flex; align-items: center; gap: 6px; text-align: left; }
-.ssm-matrix tbody td { border-radius: 4px; min-width: 32px; }
 .ssm-matrix tr.is-eigene .ssm-matrix__team { box-shadow: inset 3px 0 0 var(--bc-heim); }
-.ssm-matrix thead button.is-an { color: var(--bc-gold); }
+.ssm-matrix tr.is-eigene td.ssm-zelle { box-shadow: inset 0 2px 0 var(--bc-heim), inset 0 -2px 0 var(--bc-heim); }
+.ssm-matrix .ssm-matrix__luecke { width: 12px; min-width: 12px; padding: 0; background: transparent; }
+
+.ssm-bereich-pow { --ssm-achse: var(--ssm-pow); }
+.ssm-bereich-spe { --ssm-achse: var(--ssm-spe); }
+.ssm-bereich-men { --ssm-achse: var(--ssm-men); }
+.ssm-bereich-soc { --ssm-achse: var(--ssm-soc); }
+.ssm-matrix thead th.ssm-matrix__bereich {
+  color: var(--ssm-achse); font-size: 13px; letter-spacing: 0.18em; padding: 5px 3px 4px;
+  background: color-mix(in srgb, var(--ssm-achse) 16%, var(--bc-flaeche-1));
+  border-bottom: 3px solid var(--ssm-achse); border-radius: 4px 4px 0 0;
+}
+.ssm-matrix thead th.ssm-matrix__diszi { border-bottom: 1px solid color-mix(in srgb, var(--ssm-achse) 55%, transparent); }
+.ssm-matrix thead th.ssm-matrix__diszi button { color: color-mix(in srgb, var(--ssm-achse) 55%, var(--bc-stumm)); }
+.ssm-matrix thead button.is-an { color: var(--bc-gold) !important; }
+
+.ssm-matrix tbody td.ssm-zelle { border-radius: 4px; min-width: 34px; color: var(--bc-creme); }
+.ssm-stufe-4 { background: #1f8a4c; color: #f2fff6 !important; font-weight: 800 !important; }
+.ssm-stufe-3 { background: #2c5a3c; }
+.ssm-stufe-2 { background: rgba(244, 230, 196, 0.07); color: var(--bc-leise) !important; }
+.ssm-stufe-1 { background: #5a2c2a; }
+.ssm-stufe-0 { background: #9a2f2a; color: #fff1ee !important; }
+.ssm-matrix__summe { color: var(--bc-gold); font-size: 15px; }
+
+.ssm-matrix-legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px 4px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-stumm); }
+.ssm-matrix-legende span { margin-right: 4px; }
+.ssm-matrix-legende i { font-style: normal; padding: 2px 8px; border-radius: 4px; color: var(--bc-creme); }
 
 /* Verlauf */
 .ssm-verlauf-wrap { padding: 12px; overflow: auto; }

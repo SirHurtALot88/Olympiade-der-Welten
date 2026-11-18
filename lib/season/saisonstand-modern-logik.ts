@@ -214,26 +214,31 @@ export function matrixAnteil(wert: number | null | undefined, spaltenMaximum: nu
   return Math.max(0, Math.min(1, wert / spaltenMaximum));
 }
 
-/** Farbe zwischen Rot (nichts), Grau (Hälfte) und Grün (alles) als HSL-Text. */
-export function matrixFarbe(anteil: number | null): string | undefined {
-  if (anteil == null) return undefined;
-  if (anteil >= 0.5) {
-    const t = (anteil - 0.5) / 0.5;
-    return `hsla(${Math.round(150 * t)}, ${Math.round(8 + 48 * t)}%, ${Math.round(24 + 6 * t)}%, 0.9)`;
-  }
-  const t = anteil / 0.5;
-  return `hsla(${Math.round(4 + (0 - 4) * t)}, ${Math.round(58 - 50 * t)}%, ${Math.round(28 - 4 * t)}%, 0.9)`;
-}
-
-/** Rang der Kaderstärke als Goldton (1 = kräftig, 16 = blass). */
-export function staerkeFarbe(rang: number | null | undefined, ligaGroesse = LEAGUE_SIZE): string | undefined {
-  if (rang == null || !Number.isFinite(rang)) return undefined;
-  const t = 1 - (Math.min(Math.max(rang, 1), ligaGroesse) - 1) / Math.max(ligaGroesse - 1, 1);
-  return `rgba(240, 195, 90, ${(0.08 + 0.5 * t * t).toFixed(3)})`;
-}
-
 /** Tooltip-Text für eine Rangbewegung. */
 export function bewegungText(delta: number | null | undefined): { zeichen: "▲" | "▼" | "–"; zahl: number; ton: "plus" | "minus" | "null" } {
   if (delta == null || !Number.isFinite(delta) || delta === 0) return { zeichen: "–", zahl: 0, ton: "null" };
   return delta > 0 ? { zeichen: "▲", zahl: delta, ton: "plus" } : { zeichen: "▼", zahl: Math.abs(delta), ton: "minus" };
+}
+
+/**
+ * Fünf klar getrennte Stufen je Disziplin-Spalte (Chris 18.11.: „Punkte in der Matrix besser
+ * voneinander abheben"). Stufe nach Platz in der Spalte, nicht nach Anteil am Besten: ein
+ * Anteils-Verlauf landet bei 16 Teams fast immer im matschigen Mittelfeld.
+ * 4 = Spitze (oberstes Fünftel), 3 = gut, 2 = Mitte, 1 = schwach, 0 = Schluss. Gleiche Werte
+ * teilen sich die bessere Stufe. null = kein Wert.
+ */
+export function matrixStufe(wert: number | null | undefined, spaltenWerte: ReadonlyArray<number | null | undefined>): number | null {
+  if (wert == null || !Number.isFinite(wert)) return null;
+  const gueltig = spaltenWerte.filter((w): w is number => w != null && Number.isFinite(w));
+  if (gueltig.length <= 1) return 2;
+  const besser = gueltig.filter((w) => w > wert).length;
+  return rangStufe(besser + 1, gueltig.length);
+}
+
+/** Stufe 0–4 aus einem Platz (1 = bester) unter n Teilnehmern. */
+export function rangStufe(platz: number | null | undefined, n: number): number | null {
+  if (platz == null || !Number.isFinite(platz) || n <= 0) return null;
+  if (n === 1) return 2;
+  const anteil = (Math.min(Math.max(platz, 1), n) - 1) / (n - 1);
+  return Math.max(0, Math.min(4, 4 - Math.floor(anteil * 5 - 1e-9)));
 }
