@@ -7,7 +7,7 @@ import { normalizeTeamDelegationInput } from "@/lib/foundation/team-delegation";
 import type { TeamDelegation } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
-import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { authorizeServerRoomWrite, authorizeTeamDelegationHostFallback } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
     // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
     const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
-    const writeAuth = authorizeServerRoomWrite({
+    const writeContext = {
       roomCode: body.roomCode,
       participantId: body.participantId,
       seatToken: body.seatToken,
@@ -108,7 +108,12 @@ export async function POST(request: Request) {
       activeManagerTeamId: body.activeManagerTeamId,
       activeOwnerId,
       controlMode: body.controlMode,
-    });
+    } as const;
+    let writeAuth = authorizeServerRoomWrite(writeContext);
+    // Delegation aendern: Besitzer des Teams oder Host (Chris, 18.11., F1) — sonst niemand.
+    if (patch.delegation !== undefined) {
+      writeAuth = authorizeTeamDelegationHostFallback(writeContext, writeAuth);
+    }
     if (!writeAuth.allowed) {
       return NextResponse.json({ success: false, error: writeAuth.reason }, { status: writeAuth.status });
     }

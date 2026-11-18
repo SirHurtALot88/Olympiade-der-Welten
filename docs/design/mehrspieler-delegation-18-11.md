@@ -52,7 +52,7 @@ blockiert unnötig, **niedrig** = Schönheitsfehler. „Gebaut“ heißt: in die
 | M10 | `lib/room/online-room-model.ts:73` (`resolveFrankyParticipant`), `:120` (`resolveRoomParticipantActiveOwnerId`), `buildOwnershipForPreset`, `lib/socket/server.ts:195` (`setTeamSelection {chrisTeamIds, frankyTeamIds}`), `lib/room/room-store.ts:1285` (`applyRoomTeamSelection`) | hoch | Ein Raum kennt Host plus einen Gast. Ein dritter Teilnehmer bekommt `role: "player"`, keine Teams, und erscheint in der Foundation als Franky (jeder `player` wird zu `FRANKY_OWNER_ID`). | **Offen, nächster Schritt** (Aufwand Abschnitt 11). Bis dahin spielt Ramona über ihren Login im gemeinsamen Spielstand (Koop ohne Raum), das trägt dieser PR. |
 | M11 | `lib/room/room-flow-controller.ts:226` (`getRequiredParticipants`), `buildRoomFlowState` | hoch | Im Raum muss jeder Mensch jeden Schritt „bereit“ melden, auch „Einsatzliste“ und „Formkarten“, wenn er sie delegiert hat. Ein abwesender Mensch hält den Raum an. | **Offen.** Vorschlag: `buildRoomFlowState` bekommt je Schritt die Teilnehmer, deren Teams den Bereich alle delegiert haben, und zählt sie als erledigt (Schritte `lineup`/`formcards` → `einsatzliste`, `training` → `training`, `buy_players`/`sell_players` → `transfers`, `facilities` → `gebaeude`). |
 | M12 | `lib/season/matchday-auto-run-service.ts:297` (`simulateAiLineupState`) | mittel | Der Trockenlauf (`execute: false`) stellt nur KI-Teams hypothetisch auf; eine delegierte, noch leere Einsatzliste meldet dort `missing_manual_lineup`. Der echte Lauf ist richtig (der Batch füllt vor der Prüfung). | **Offen.** Vorschlag: `buildDelegatedLineupPreview` dort ebenfalls für delegierte Teams aufrufen. |
-| M13 | `app/api/ai/picks-run/route.ts:99-128` | mittel | Kader-KI auf menschliche Teams ist verboten (Chris, 19.08.: „keiner von uns soll seinen kader per KI füllen“). Draft-Delegation braucht eine Ausnahme genau für Teams mit `draft: "ki"`. | **Teilweise gebaut:** beim Spielstart (`app/api/new-game/route.ts`) pickt der Liga-Draft Teams mit `draft: "ki"` mit (Ramonas Halbautomatik), Chris/Franky bleiben ausgeschlossen. Offen: die Ausnahme in `picks-run` (Nachpicken während der Saison). |
+| M13 | `app/api/ai/picks-run/route.ts:99-128` | entfällt | Kader-KI auf menschliche Teams ist verboten (Chris, 19.08.). Die geplante Ausnahme „KI pickt in der Saison für den delegierten Draft nach“ ist **gestrichen** (Chris, 18.11.: „in der season gibt es keine käufe oder verkäufe“): gekauft wird nur im Fenster vor dem ersten Spieltag der Saison, verkauft nur zum Saisonende (`lib/market/transfer-window-policy.ts`, `TRANSFER_BUY_PHASES` ist leer). | **Erledigt durch Entscheidung:** nichts zu bauen. Beim Spielstart pickt der Liga-Draft Teams mit `draft: "ki"` mit (`app/api/new-game/route.ts`). |
 | M14 | `lib/foundation/tabs/use-foundation-cross-tab-team-control.ts:152` (`localUserManualTeams`) | niedrig | Erkennt „eigene Teams“ über `user_local`/`ownerSlot "user"`/Etikett „Chris“, nicht über den angemeldeten Besitzer. | **Offen.** Vorschlag: `canOwnerManageTeam(settings, effectiveActiveOwnerId)` wie in `canManageTeamId`. |
 | M15 | `lib/foundation/game-inbox-service.ts:313-318` (`getVisibleTeamIds`, Raum-Zweig) | niedrig | Raum-Besitz fest auf `user_chris`/`user_franky` bzw. Etikett „Chris“/„Franky“. Für Ramona greift nur der allgemeine Zweig. | **Offen**, mit M10 zusammen. |
 | M16 | `app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx`, `lib/foundation/tabs/foundation-page-types.ts:2088` | mittel | Die Team-Zuordnung in der Oberfläche hat nur Chris- und Franky-Spalten. | **Gebaut:** „Neues Spiel starten“ hat Ramona im Klub-Raster und in „Mitspieler (Franky, Ramona)“; „Wer steuert was“ zeigt „Ramona · Halbautomatik“. Bilder: `docs/design/mehrspieler-delegation-18-11/`. Die Delegations-Schalter selbst kommen mit dem Mockup. |
@@ -100,7 +100,7 @@ Die drei Stufen (`DELEGATION_STUFEN` in `lib/foundation/team-delegation.ts`):
 | Bereich | Voll selbst | Halbautomatik | Voll KI |
 |---|---|---|---|
 | Einsatzliste und Formkarten | selbst | **KI**, Mensch überschreibt | KI |
-| Draft-Picks | selbst | **selbst** (Chris, 18.11. abends) | KI |
+| Draft-Picks | KI-Draft nur für KI-Teams, für Menschen ausdrücklich gesperrt (M13). | Team mit `draft: "ki"`: der KI-Draft pickt mit, nach denselben Regeln (Vorstands-Freigabe, Kaderziel). Picks, die der Mensch schon gemacht hat, bleiben; die KI füllt bis zum Kaderziel. | **Beim Spielstart gebaut** (Liga-Draft pickt delegierte Teams mit). Ein Nachpicken in der Saison entfällt: es gibt dort keine Käufe (Chris, 18.11.). |
 | Käufe, Verkäufe, Verträge | selbst | **selbst** | KI |
 | Training und Entwicklung | selbst | **KI**, Mensch überschreibt | KI |
 | Gebäude | selbst | KI (Empfehlung, F3) | KI |
@@ -111,7 +111,7 @@ man Ramona ein Team zu, wird die Halbautomatik am Team gespeichert. Wechselt ein
 Delegation weg.
 
 Lesen: `resolveTeamDelegation(settings)` und `isBereichDelegiert(settings, bereich)`. Schreiben:
-`POST /api/team-settings/control` mit `control.delegation = { stufe, bereiche? }` (je Team, Schreibschutz wie jede
+`POST /api/team-settings/control` mit `control.delegation = { stufe, bereiche? }` (je Team, Schreibrecht: nur der Besitzer des Teams und der Host (F1, 18.11.), sonst wie jede
 Team-Einstellung; `null` setzt auf die Voreinstellung zurück).
 
 **Warum am Team und nicht am Manager:** jede Mechanik fragt ohnehin je Team (Batch, Training, Inbox), und ein Manager
@@ -141,8 +141,8 @@ Was ein delegiertes Team nicht mehr blockiert: Bereitschaft (`evaluateMatchdayHu
 Online-Spiel, Inbox (`lineup_missing`, `lineup_not_submitted`, `formcards_open`, `formcards_negative_open` werden
 Hinweise), damit der Taktgeber und die Leertaste.
 
-Bekannte Grenze: stellt der Mensch alle Spieler selbst, aber keine Formkarten, legt die KI keine nach (der Entwurf
-gilt als vollständig). Frage F4.
+Formkarten bei vollständig gesetzten Spielern (F3, Chris, 18.11.: „AI pickt formkarten für ramona ja“): hat der Mensch alle Spieler, aber keine Formkarte gesetzt, gilt der Entwurf für die KI als **nicht fertig** (`delegatedDraftLacksFormCards`). Sie legt die Karten nach, Spieler und Slots bleiben. Hat der Mensch auch nur eine Karte gesetzt, bleibt alles seins. Sobald Karten stehen, ist der Entwurf vollständig und wird nicht mehr angefasst (keine Neuberechnung bei jedem Batch). Nach Spieltagsstart bleibt er eingefroren.
+
 
 ## 5. Training (gebaut, Stand main)
 
@@ -197,20 +197,21 @@ Bisher: Chris überspringt den Draft, die KI-Teams picken durch, er pickt danach
   Kauffenster offen ist.
 - Ramona (Halbautomatik) draftet selbst (Chris, 18.11. abends: „ramona draftet und kauft und verkauft selber alles
   andere startet mit AI“). Stellt sie den Bereich Draft auf KI, pickt die KI ihre Teams im selben Durchlauf wie die KI-Teams.
-- Ist Ramona `draft: "selbst"` und überspringt, bleiben ihre Teams bis zu ihrem nächsten Besuch auf dem Mindestkader;
-  der Saisonstart prüft das Kaderminimum und lässt die KI notfalls bis zum Minimum auffüllen (Frage F5).
+- Ist Ramona `draft: "selbst"` und pickt nicht selbst, wird **sinnvoll gepickt, als wäre das Team richtig KI-gesteuert** (Chris, 18.11., F4/F5: „nicht über so einen NOTFALL weg fahren! niemals“): derselbe organische Aufbau mit Team-Identität, Budget und Zusammensetzung, kein Auffüllen auf das Minimum. Der Stand der Umsetzung je Stelle steht in Abschnitt 12.
 
-## 9. Offene Fragen mit Empfehlung
+## 9. Entscheidungen zu F1–F5 (Chris, 18.11.)
 
-| # | Frage | Empfehlung |
-|---|---|---|
-| F1 | Darf ein Host (Chris) die Delegation von Ramonas Teams ändern? | Nein. Nur der Besitzer des Teams (so ist der Schreibweg gebaut). Der Host ordnet Teams zu, die Delegation gehört dem Manager. |
-| F2 | Chris' Regel vom 19.08. („keiner von uns soll seinen Kader per KI füllen“) gegen Ramonas Draft-Delegation? | Die Regel gilt weiter für alle Teams mit `draft: "selbst"`. Für ein Team mit `draft: "ki"` ist die KI ausdrücklich gewollt (Chris, 18.11.: „Ramonas Teams z. B. automatisch picken“). Gebaut für den Draft beim Spielstart; das Nachpicken in `picks-run` folgt. |
-| F3 | Gebäude und Sponsor in der Halbautomatik: KI oder selbst? | KI (so voreingestellt). Beides kostet Geld aus dem Freigabe-Budget, das Ramona nicht überwachen will; ihr Ding sind Käufe und Verkäufe. Einzelschalter erlauben „selbst“. |
-| F4 | Soll die KI Formkarten nachlegen, wenn der Mensch alle Spieler, aber keine Karte gesetzt hat? | Ja, aber erst mit einer Herkunftsmarke je Karte (sonst würde die KI bei jedem Batch neu rechnen und die Arena-Vorschau verwerfen). Bis dahin bleibt es beim heutigen Verhalten. |
-| F5 | Muss ein Mensch mit `draft: "selbst"`, der nie pickt, den Saisonstart blockieren? | Nein. Am Saisonstart füllt die KI bis zum Kaderminimum auf und meldet es in der Inbox. |
-| F6 | Ein dritter Sitz im Raum (M10/M11) — jetzt bauen? | Erst wenn Ramona wirklich im Raum mitspielen will. Der Login-Weg (Koop im gemeinsamen Spielstand) reicht für „Ramonas Teams laufen nebenher“. |
-| F7 | Weitere Spieler später? | Login und Delegation sind generisch. Für die Team-Zuordnung wäre der nächste Schritt `Record<ownerId, teamIds[]>` statt drei Listen; das lohnt ab dem vierten Menschen. |
+Die frühere Fragenliste ist beantwortet. Wörtlich und mit Folge:
+
+| # | Frage | Chris, 18.11. | Folge |
+|---|---|---|---|
+| F1 | Wer darf die Delegation eines Teams ändern? | „owner und host“ | Nur der **Besitzer** des Teams und der **Host** des Raums bzw. Spielstands, sonst niemand. Serverseitig in `POST /api/team-settings/control` (`authorizeTeamDelegationWrite` in `lib/room/server-authoritative-write-guard.ts`): im Raum Sitz-Token (Besitzer-Sitz oder `role: "host"`), ohne Raum die Sitzung (Besitzer-ID, Standard-Owner Chris oder Urheber des Spielstands). Test: `tests/mehrspieler-delegation-schreibrecht.test.ts` (Besitzer ja, Host ja, anderer Spieler nein, mit und ohne Raum). |
+| F2 | Braucht der delegierte Draft in der Saison ein Nachpicken (M13, `picks-run`)? | „in der season gibt es keine käufe oder verkäufe“ | **Nein, M13 entfällt.** Kauf ist nur im Fenster vor dem ersten Spieltag (`isEarlySeasonTransferSetup`), Verkauf nur zum Saisonende; `TRANSFER_BUY_PHASES` ist leer. Es gibt keinen Weg, mitten in der Saison für ein menschliches oder delegiertes Team zu kaufen (nachgeprüft, `lib/market/transfer-window-policy.ts`, `transfermarkt-local-service.ts`). |
+| F3 | Soll die KI Formkarten nachlegen, wenn der Mensch alle Spieler, aber keine Karte gesetzt hat? | „AI pickt formkarten für ramona ja“ | **Gebaut** (Abschnitt 4). Test in `tests/mehrspieler-delegation-einsatzliste.test.ts` (Karten werden nachgelegt, gesetzte Karten bleiben, zweiter Lauf ändert nichts). Die „Herkunftsmarke“ ist nicht nötig: ein Entwurf mit Karten gilt als vollständig. |
+| F4/F5 | Füllt die KI ein Team, das nicht selbst pickt, bis zum Kadermindestkader? | „nein das minimum wird nicht gefüllt, sondern wenn ein spieler nicht selber pickt soll SINNVOLL gepickt werden als wäre das team richtig AI gesteuert, das soll nicht über so einen NOTFALL weg fahren! niemals“ | Kein Mindestkader-Auffüllen für Menschen. Ein Team, das nicht selbst pickt, bekommt den **vollen organischen KI-Aufbau** wie ein echtes KI-Team. Bestandsaufnahme und Stand: Abschnitt 12. Die frühere Empfehlung „Saisonstart füllt bis zum Minimum“ ist verworfen. |
+
+Offen bleiben F6 (dritter Sitz im Raum, Abschnitt 11) und F7 (weitere Spieler später) wie bisher: erst wenn Ramona wirklich im Raum mitspielen will bzw. ab dem vierten Menschen.
+
 
 ## 10. Tests
 
@@ -220,6 +221,7 @@ Bisher: Chris überspringt den Draft, die KI-Teams picken durch, er pickt danach
   keine Ramona-Teams.
 - `tests/mehrspieler-delegation-training.test.ts`: ohne Delegation unverändert, Halbautomatik bewertet wie KI, selbst
   gesetzte Spieler bleiben, Einzelschalter „Training selbst“.
+- `tests/mehrspieler-delegation-schreibrecht.test.ts`: Delegation aendern nur Besitzer und Host (F1), mit und ohne Raum.
 - `tests/auth-ramona-login.test.ts`: Login, Passwort-Variable, Sitzung, Deploy-Dateien, Zuordnung mit drei Menschen,
   Schreibschutz je Besitzer, Erhalt von Ramonas Teams bei Chris/Franky-Umstellungen.
 
@@ -243,3 +245,21 @@ Chris (18.11.): Ramona als wählbare Person „mit denselben Rechten wie Franky�
 rund 15 Stellen auf „Host + ein Gast“ gebaut; ein Teilumbau würde einen dritten Teilnehmer still als Franky behandeln.
 Deshalb ist er in diesem PR bewusst nicht angefangen.
 
+## 12. Mindestkader-Auffüllen für Menschen: Bestandsaufnahme (F4/F5, 18.11.)
+
+Anforderung: ein menschliches Team, das nicht selbst pickt, bekommt denselben vollen KI-Aufbau wie ein echtes KI-Team
+(organischer Aufbau mit Team-Identität, Budget, Zusammensetzung), keinen Notweg auf das Minimum.
+
+| Stelle | Was dort läuft | Stand |
+|---|---|---|
+| Spielstart, `app/api/new-game/route.ts:121` + `lib/game/league-setup-draft-service.ts:225` | Teams mit `draft: "ki"` laufen im Liga-Draft über `runAiPicksExecutePreview` mit (`includeManualTeams`), organisch. | Bereits der volle KI-Weg. Nichts zu ändern. |
+| Cockpit-Selbstheilung, `lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx:10320-10395` | Bei mindestens vier Teams unter Minimum (abgebrochener Erst-Draft) läuft `/api/ai/picks-run` mit `includeManualTeams`, auch für Menschen. | Voller organischer Weg, kein Fill. Gelassen. Nachteil: erfasst auch menschliche Teams mit `draft: "selbst"`, die noch selbst picken wollen (Chris-Regel 19.08.); bei Bedarf auf „nicht selbst pickend“ eingrenzen. |
+| Wiederholung „Liga-Setup fehlgeschlagen“, `use-foundation-shell-router-body-scope.tsx:10434` | Wie oben, `/api/ai/picks-run`. | Voller organischer Weg. Gelassen. |
+| Cockpit-Handgriff „Kader-Fill“, `lib/foundation/tabs/cockpit-handlers.ts:125` -> `app/api/ai/roster-fill/route.ts` -> `lib/ai/auto-roster-fill-service.ts:486` | Der alte Füll-Lauf ohne Qualitätsterm (`scoreRosterFillCandidate`), nur Saison 1, kauft auch für die eigenen Teams des Aufrufers (Test `tests/auto-roster-fill-service.test.ts:511` erwartet das ausdrücklich). | **Nicht geändert** (Bestandstest, ausdrücklicher Admin-Handgriff, ab Saison 2 gesperrt). Empfehlung: menschliche Teams dort ausnehmen oder den Handgriff auf `picks-run` umhängen. |
+| Notfüllung im Pick-Kern, `lib/ai/ai-picks-run-service.ts:4473-4500` (`runSeason1ExecuteEmergencyMinFill`, Modus `season1_optimum_execute`) | Nach dem organischen Lauf füllt ein Notweg bis zum Minimum auf, für jedes Team im Lauf (KI wie delegiert). | **Nicht geändert** (Pick-Kern, parallele Analyse auf `claude/ki-pick-analyse-18-11`). |
+| Notkauf im neuen Draft-Kern, `lib/draft/liga-draft-dienst.ts:430` (`notkauf_mindestkader`, Branch `claude/draft-neubau-kern-18-11`, noch nicht auf main) | Kauf mit `ausNotfall` bis zum Mindestkader. | **Nicht geändert**, nur gelistet. |
+| Vorsaison-Markt ab Saison 2, `lib/ai/ai-preseason-background-service.ts:107-117` (`getAiTeamIds`) und `lib/ai/ai-transfer-window-session-service.ts:672-688` (`manualTeamIds`) | Nur Teams mit `controlMode: "ai"`. Menschliche Teams, auch mit `draft: "ki"`, bekommen ab Saison 2 weder Kauf noch Mindestkader-Rettung. | **Lücke, nicht geändert:** „Voll KI“ im Draft wirkt nur beim Spielstart. Ein Eingriff berührt den Pick-Kern und `protectManualPlayerTeams`; gehört in die Pick-Analyse. |
+| Admin-Simulation, `lib/admin/season-simulation-runner.ts:1104` (Mindestkader-Refill) | Nur Testläufe der Simulation, nicht im Spiel. | Ohne Belang. |
+
+Ein „Saisonstart prüft das Kaderminimum und füllt notfalls auf“ (frühere Empfehlung zu F5) wurde nie gebaut und
+entfällt.
