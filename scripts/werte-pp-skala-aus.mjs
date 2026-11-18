@@ -25,6 +25,7 @@ if (dateien.length === 0) {
 }
 
 const PP_SKALA_ZIEL = 5;
+const MIN_ZELLEN_JE_FELD = 2;
 
 const zeilen = [];
 const quellen = [];
@@ -80,6 +81,19 @@ for (const z of zeilen) {
   zellen.get(k).zeilen.push(z);
 }
 
+// FELDGROESSE je Zelle: die haeufigste Zahl an Einsaetzen je Team-Seite (= Spieler je Team in dieser
+// Disziplin an diesem Spieltag; ein unterbesetztes Team zaehlt nicht dagegen).
+for (const zelle of zellen.values()) {
+  const jeSeite = new Map();
+  for (const z of zelle.zeilen) {
+    const k = `${z.team}|${z.seite}`;
+    jeSeite.set(k, (jeSeite.get(k) ?? 0) + 1);
+  }
+  const haeufigkeit = new Map();
+  for (const n of jeSeite.values()) haeufigkeit.set(n, (haeufigkeit.get(n) ?? 0) + 1);
+  zelle.feld = [...haeufigkeit].sort((x, y) => y[1] - x[1] || y[0] - x[0])[0]?.[0] ?? null;
+}
+
 const jeDisziplin = new Map();
 for (const zelle of zellen.values()) {
   if (!jeDisziplin.has(zelle.d)) jeDisziplin.set(zelle.d, []);
@@ -132,7 +146,23 @@ for (const [d, liste] of [...jeDisziplin].sort((a, b) => a[0].localeCompare(b[0]
   const alleEinsaetze = liste.flatMap((zelle) => zelle.zeilen.map((z) => z.pp)).sort((a, b) => a - b);
   const rMed = q(alleEinsaetze, 0.5);
   const kalibMax = Number.isFinite(unterer) ? unterer : 5.5;
+  // ANKER JE FELDGROESSE (18.11., Scharfschaltung): dieselbe Regel je (Disziplin, Feldgroesse), sobald
+  // mindestens MIN_ZELLEN_JE_FELD ungedeckelte (roh-)Zellen dieser Feldgroesse vorliegen. Sonst gilt fuer
+  // diese Feldgroesse der Disziplin-weite Anker (lib/resolve/pp-skala.ts, `ppSkalaAnker()`).
+  const feldgroessen = {};
+  const felder = [...new Set(liste.map((zelle) => zelle.feld).filter((n) => n != null))].sort((x, y) => x - y);
+  for (const n of felder) {
+    const zellenN = liste.filter((zelle) => zelle.feld === n);
+    const rohN = zellenN.filter((zelle) => zelle.roh).map((zelle) => Math.max(...zelle.zeilen.map((z) => z.pp))).sort((x, y) => x - y);
+    if (rohN.length < MIN_ZELLEN_JE_FELD) continue;
+    const rTopN = rohN[Math.floor((rohN.length - 1) / 2)];
+    const einsaetzeN = zellenN.flatMap((zelle) => zelle.zeilen.map((z) => z.pp)).sort((x, y) => x - y);
+    const rMedN = q(einsaetzeN, 0.5);
+    if (!(rTopN > rMedN) || !(rMedN > 0)) continue;
+    feldgroessen[String(n)] = { rTop: Number(rTopN.toFixed(4)), rMed: Number(rMedN.toFixed(4)), zellen: rohN.length };
+  }
   kalibrierung[d] = {
+    ...(Object.keys(feldgroessen).length > 0 ? { feldgroessen } : {}),
     rTop: Number(kalibMax.toFixed(4)),
     rMed: Number(rMed.toFixed(4)),
     faktor: Number((PP_SKALA_ZIEL / kalibMax).toFixed(4)),
@@ -165,15 +195,16 @@ console.log(
 if (festeKalibrierung) {
   const fest = JSON.parse(readFileSync(festeKalibrierung, "utf8")).disziplinen ?? {};
   for (const [d, e] of Object.entries(fest)) {
-    kalibrierung[d] = { ...(kalibrierung[d] ?? {}), rTop: e.rTop, rMed: e.rMed, faktor: e.faktor, medianTagesbester: e.medianTagesbester };
+    kalibrierung[d] = { ...(kalibrierung[d] ?? {}), rTop: e.rTop, rMed: e.rMed, faktor: e.faktor, medianTagesbester: e.medianTagesbester, feldgroessen: e.feldgroessen };
   }
   console.log(`\n(Anker fest aus ${festeKalibrierung}, nicht aus diesen Abzuegen gezogen)`);
 }
 
 // C2: Zwei-Anker-Nachkalibrierung (der Prototyp) auf dem UNGEDECKELTEN alten Wert.
 const C2_ANTEIL_MITTE = 0.25;
-function c2(d, roh) {
-  const { rTop, rMed } = kalibrierung[d];
+function c2(d, roh, feld = null) {
+  const jeFeld = feld != null ? kalibrierung[d].feldgroessen?.[String(feld)] : null;
+  const { rTop, rMed } = jeFeld ?? kalibrierung[d];
   if (!(rMed > 0) || !(rTop > rMed)) return Math.round(Math.min(PP_SKALA_ZIEL, Math.max(0, roh)) * 100) / 100;
   const e = Math.log(C2_ANTEIL_MITTE) / Math.log(rMed / rTop);
   const neu = roh <= 0 ? 0 : PP_SKALA_ZIEL * Math.pow(roh / rTop, e);
@@ -227,7 +258,7 @@ variante("B: Tagesanker (5 x PP / Tagesbester)", (zelle) => {
 variante("C: Faktor je Disziplin, Deckel 5", (zelle) =>
   zelle.zeilen.map((z) => Math.round(Math.min(PP_SKALA_ZIEL, z.pp * kalibrierung[z.d].faktor) * 100) / 100),
 );
-variante("C2: Zwei-Anker (Prototyp), Deckel 5", (zelle) => zelle.zeilen.map((z) => c2(z.d, z.pp)));
+variante("C2: Zwei-Anker je Feldgroesse, Deckel 5", (zelle) => zelle.zeilen.map((z) => c2(z.d, z.pp, zelle.feld)));
 variante("D: Rangtabelle (5 fuer Rang 1, linear bis 0)", (zelle) => {
   const n = zelle.zeilen.length;
   const r = raenge(zelle.zeilen.map((z) => z.pp));
@@ -275,7 +306,7 @@ if (rohZellen.length > 0) {
       neuDeckel.push(neu.filter((x) => x >= PP_SKALA_ZIEL).length);
       altMed.push(q([...alt].sort((a, b) => a - b), 0.5));
       neuMed.push(q([...neu].sort((a, b) => a - b), 0.5));
-      const zwei = roh.map((x) => c2(d, x)).sort((a, b) => b - a);
+      const zwei = roh.map((x) => c2(d, x, zelle.feld)).sort((a, b) => b - a);
       c2Max.push(zwei[0]);
       c2Deckel.push(zwei.filter((x) => x >= PP_SKALA_ZIEL).length);
       c2Top3.push((zwei[0] + (zwei[1] ?? zwei[0]) + (zwei[2] ?? zwei[0])) / 3);
@@ -288,6 +319,52 @@ if (rohZellen.length > 0) {
   }
 }
 
+// ---- ABNEHMER MIT ABSOLUTEN SCHWELLEN (Abschnitt 8.3): Verhaeltnis C2 / alt, nur auf roh-Zellen ----
+// alt = min(5,5; roh) (die heutige Kurve), neu = C2 mit den Ankern je Feldgroesse. Ein Faktor je Groesse:
+// mittlerer Einsatz (organische Entwicklung `/30`), Median der Spieler-Saisonsummen (Trainings-XP `x 4`),
+// Median der Team-Saisonsummen (Vorstands-Sportziel `>= 95`).
+const umrechnung = (() => {
+  const rohZ = [...zellen.values()].filter((zelle) => zelle.roh);
+  if (rohZ.length === 0) return null;
+  let altSumme = 0;
+  let neuSumme = 0;
+  let n = 0;
+  const spieler = new Map();
+  const teams = new Map();
+  for (const zelle of rohZ) {
+    for (const z of zelle.zeilen) {
+      const alt = Math.min(5.5, z.pp);
+      const neu = c2(z.d, z.pp, zelle.feld);
+      altSumme += alt;
+      neuSumme += neu;
+      n += 1;
+      const ks = `${zelle.lauf}|${z.spieler}`;
+      const s0 = spieler.get(ks) ?? [0, 0];
+      spieler.set(ks, [s0[0] + alt, s0[1] + neu]);
+      const kt = `${zelle.lauf}|${z.team}`;
+      const t0 = teams.get(kt) ?? [0, 0];
+      teams.set(kt, [t0[0] + alt, t0[1] + neu]);
+    }
+  }
+  const median = (werte) => q([...werte].sort((a, b) => a - b), 0.5);
+  const sp = [...spieler.values()];
+  const tm = [...teams.values()];
+  const top = [...sp].sort((a, b) => b[0] - a[0]).slice(0, Math.max(1, Math.round(sp.length * 0.1)));
+  const ergebnis = {
+    einsatz: Number((neuSumme / altSumme).toFixed(4)),
+    spielerSaison: Number((median(sp.map((x) => x[1])) / median(sp.map((x) => x[0]))).toFixed(4)),
+    teamSaison: Number((median(tm.map((x) => x[1])) / median(tm.map((x) => x[0]))).toFixed(4)),
+  };
+  console.log("\n## Umrechnung fuer Abnehmer mit absoluten PP-Schwellen (C2 / alt, roh-Zellen)\n");
+  console.log("| Groesse | alt | C2 | Faktor |");
+  console.log("|---|---:|---:|---:|");
+  console.log(`| mittlerer Einsatz (${n}) | ${f3(altSumme / n)} | ${f3(neuSumme / n)} | ${f3(ergebnis.einsatz)} |`);
+  console.log(`| Spieler-Saisonsumme, Median (${sp.length}) | ${f2(median(sp.map((x) => x[0])))} | ${f2(median(sp.map((x) => x[1])))} | ${f3(ergebnis.spielerSaison)} |`);
+  console.log(`| Spieler-Saisonsumme, oberste 10 % (Mittel) | ${f2(top.reduce((a, x) => a + x[0], 0) / top.length)} | ${f2(top.reduce((a, x) => a + x[1], 0) / top.length)} | ${f3(top.reduce((a, x) => a + x[1], 0) / top.reduce((a, x) => a + x[0], 0))} |`);
+  console.log(`| Team-Saisonsumme, Median (${tm.length}) | ${f2(median(tm.map((x) => x[0])))} | ${f2(median(tm.map((x) => x[1])))} | ${f3(ergebnis.teamSaison)} |`);
+  return ergebnis;
+})();
+
 if (schreibe) {
   const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
   writeFileSync(
@@ -295,10 +372,11 @@ if (schreibe) {
     JSON.stringify(
       {
         hinweis:
-          "PP-Skala-Prototyp (docs/design/pp-skala-18-11.md, Variante C2): je Disziplin rTop = Median der ungedeckelten Tagesbesten (-> 5 PP), rMed = Median aller Einsaetze (-> 1,25 PP), beide auf der alten Kurvenskala; faktor = 5/rTop nur zum Vergleich (Variante C). Gemessen mit scripts/miss-pp-skala.ts + scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung. Wirkt nur mit OLY_PP_SKALA=an.",
+          "PP-Skala C2 (docs/design/pp-skala-18-11.md): je Disziplin rTop = Median der ungedeckelten Tagesbesten (-> 5 PP), rMed = Median aller Einsaetze (-> 1,25 PP), beide auf der alten Kurvenskala; feldgroessen = dieselben Anker je Feldgroesse (ab 2 roh-Zellen), sonst gilt der Disziplin-weite Anker; faktor = 5/rTop nur zum Vergleich (Variante C). Gemessen mit scripts/miss-pp-skala.ts + scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung. Wirkt in jeder Saison mit Stempel wertungsSkalen.pp = c2.",
         ziel: PP_SKALA_ZIEL,
         gemessenAm: new Date().toISOString().slice(0, 10),
         quellen: quellen.map((x) => ({ saveId: x.saveId, spieltage: x.gespielt })),
+        ...(umrechnung ? { umrechnung } : {}),
         disziplinen: Object.fromEntries(Object.entries(kalibrierung).sort((a, b) => a[0].localeCompare(b[0]))),
       },
       null,

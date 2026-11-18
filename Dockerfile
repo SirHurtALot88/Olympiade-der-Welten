@@ -26,6 +26,13 @@ ARG NEXT_PUBLIC_OLY_BUILD_DATE=""
 ENV NEXT_PUBLIC_OLY_BUILD_SHA=$NEXT_PUBLIC_OLY_BUILD_SHA
 ENV NEXT_PUBLIC_OLY_BUILD_DATE=$NEXT_PUBLIC_OLY_BUILD_DATE
 
+# Wertungsskalen-Schalter fuer den Browser (lib/resolve/wertungs-skalen.ts), s. docker-compose.yml.
+# Leer = Standard (neue Skala), das Verhalten aendert sich nur bei einem gesetzten Wert.
+ARG NEXT_PUBLIC_OLY_PP_SKALA=""
+ARG NEXT_PUBLIC_OLY_ERGEBNIS_SKALA=""
+ENV NEXT_PUBLIC_OLY_PP_SKALA=$NEXT_PUBLIC_OLY_PP_SKALA
+ENV NEXT_PUBLIC_OLY_ERGEBNIS_SKALA=$NEXT_PUBLIC_OLY_ERGEBNIS_SKALA
+
 COPY . .
 RUN npm run db:generate
 RUN npm run build

@@ -12,6 +12,7 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import {
   LEAGUE_SIZE,
   buildInitialLeagueAssignment,
@@ -646,7 +647,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // (apron-settlement-service.ts) — dieselbe Regel wie bei jedem Saisonuebergang. Bis dahin rechnen
   // Anzeige und KI-Kaufbremse mit der live abgeleiteten, als nicht-eingefroren markierten Linie.
   const baseGameStateWithSponsorSystem: GameState = withSeededSeasonEconomyFactorsForNewGame(
-    stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers),
+    // WERTUNGSSKALEN (18.11., lib/resolve/wertungs-skalen.ts): ein neues Spiel rechnet ab Saison 1 mit
+    // der PP-Skala C2 und der Ergebnisskala E1 (Rueckweg: OLY_PP_SKALA=aus / OLY_ERGEBNIS_SKALA=aus).
+    stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
     input.saveId,
   );
 

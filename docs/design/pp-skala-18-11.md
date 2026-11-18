@@ -5,8 +5,14 @@ Spieler sein, Top-Spieler sollen in einer Diszi um die 5 PPs bekommen als Maximu
 dass du das gebalanced bekommst! Bin da offen für Changes.“
 
 Dieses Dokument misst den Ist-Stand, kartiert alle Abnehmer der PP, bewertet vier Varianten und
-beschreibt einen abschaltbaren Prototyp der empfohlenen Variante (`OLY_PP_SKALA`, Standard AUS).
-**Die Wertung im Spiel ist unverändert**, solange der Schalter nicht gesetzt ist.
+beschreibt einen abschaltbaren Prototyp der empfohlenen Variante (Abschnitte 1–7, erster Teil).
+
+**Stand 18.11. abends (Abschnitt 8): Chris hat C2 gewählt, C2 ist scharf ab der nächsten Saison.**
+Die Anker sind auf weiteren Saves je Feldgröße nachkalibriert, die Skala hängt am Saison-Stempel
+`seasonState.wertungsSkalen` (neues Spiel: sofort; bestehender Save bis Spieltag 3: ab dem nächsten Spieltag, sonst
+ab dem nächsten Saisonwechsel; Abschnitt 8.4),
+Rückweg `OLY_PP_SKALA=aus`. Dazu kommt die Ergebnisskala E1 für die Team-Ergebnisse
+(`docs/design/ergebnisskala-18-11.md`).
 
 ---
 
@@ -469,3 +475,220 @@ nicht (dafür Abschnitt 5.2).
 - **Messbetrieb**: zwei Läufe wurden auf dem gemeinsam genutzten Rechner vom Speicher-Killer beendet
   (Exit 137). Ein Lauf wurde fortgesetzt, der andere verworfen. Bei Wiederholung `OLY_ARENA_TIER_PARALLEL=0`
   setzen und nur einen Lauf zugleich fahren.
+
+---
+
+## 8. Scharfschaltung (18.11., zweiter Teil)
+
+Chris, 18.11.: Variante C2. Auftrag: Anker auf weiteren Saves (Feldgröße), Standard AN, Umschalten
+zum Saisonwechsel, alle Abnehmer prüfen.
+
+### 8.1 Saison-Stempel statt Serverschalter
+
+`lib/resolve/wertungs-skalen.ts`: `seasonState.wertungsSkalen = { seasonId, pp: "c2" | "alt", ergebnis:
+"e1" | "alt" }`. Gesetzt **genau zweimal**: beim Anlegen eines Spiels (`new-game-setup-service.ts`) und
+beim Saisonwechsel (`preseason-workflow-service.ts`, neuer Saisonstand). Jeder Rechenweg fragt den
+Stempel des Spielstands, den er gerade rechnet (`ppSkalaModus(gameState)`), Mehrspieler-tauglich, ohne
+Prozesszustand. Damit ist auch das Browser/Server-Risiko aus 5.1 weg: der Saisonstand rechnet
+PPS-Duell-Zeilen im Browser mit demselben Stempel nach, `NEXT_PUBLIC_OLY_PP_SKALA` braucht es nur noch
+für die Notbremse.
+
+| Fall | Verhalten |
+|---|---|
+| neues Spiel | Saison 1 mit C2 (und E1) |
+| bestehender Battle-Save, laufende Saison mit höchstens 3 gebuchten Spieltagen | **C2 ab dem nächsten Spieltag** (Abschnitt 8.4); gebuchte Spieltage bleiben alt |
+| bestehender Save, laufende Saison mit mehr als 3 gebuchten Spieltagen | kein Stempel → **alt** bis Saisonende; nichts verrutscht |
+| bestehender Save, nächster Saisonwechsel | neuer Stempel → C2 |
+| `OLY_PP_SKALA=aus` | Rückweg: neue Saisons bekommen „alt“; gestempelte Saisons rechnen weiter wie gestempelt |
+| `OLY_PP_SKALA=aus-sofort` | Notbremse: jeder Stempel wird ignoriert, alles alt (auch mitten in der Saison) |
+| `OLY_PP_SKALA=roh` | Messmodus der Sonde, nie im Spiel |
+| Archiv | `SeasonSnapshotRecord.wertungsSkalen` trägt den Stempel jeder archivierten Saison |
+
+Gebuchte Arena-/Pod-Zeilen behalten ihren Wert; eine alte Saison wird nie umgerechnet.
+
+### 8.2 Anker je Feldgröße
+
+Sonde wie in Abschnitt 2 (`scripts/miss-pp-skala.ts`, Modus `roh`), drei weitere frische Battle-Saves
+(32 KI-Teams von Anfang an, je 20 Spieltage, Arena über den Node-Motor `quick-sim`), zusammen mit den
+beiden Saves aus Abschnitt 2: **5 Saves, 24.958 PP-Zeilen, 400 Zellen**, davon 320 ungedeckelt (`roh`).
+Die Feldgröße einer Zelle ist die häufigste Spielerzahl je Team-Seite. Anker je (Disziplin,
+Feldgröße) ab 2 roh-Zellen, sonst die Disziplin-weiten Anker (`ppSkalaAnker()`); ein Sprung auf eine
+benachbarte Feldgröße wäre schlechter, weil die Spitze mit der Zahl der Einsätze je Zelle wächst.
+Gezogen mit `node scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung <abzüge>`.
+
+| Disziplin | R_top / R_med (Disziplin-weit) | je Feldgröße: R_top / R_med (Zellen) |
+|---|---|---|
+| basketball | 6,67 / 1,43 | 2: 5,12 / 1,29 (2); 3: 5,1 / 1,61 (6); 4: 8,05 / 1,34 (2); 5: 7,47 / 1,23 (2); 6: 7,23 / 1,37 (4) |
+| battlefield | 5,23 / 1 | 2: 4,47 / 1,06 (4); 3: 5,72 / 0,52 (4); 4: 5,17 / 1 (4); 5: 5,02 / 1,2 (4) |
+| breaking | 3,55 / 0,79 | 2: 2,32 / 0,56 (6); 4: 3,45 / 0,73 (4); 5: 3 / 0,91 (2); 6: 3,97 / 0,95 (4) |
+| climbing | 5,5 / 1,15 | 2: 5,5 / 1,53 (2); 3: 5,5 / 1,43 (2); 4: 5,5 / 1,04 (4); 5: 5,5 / 1,1 (4); 6: 5,5 / 1,15 (4) |
+| eiskunstlauf | 5,88 / 1,06 | 2: 5,37 / 0,91 (6); 3: 5,74 / 0,95 (4); 4: 3,99 / 0,57 (2); 6: 7,34 / 1,44 (4) |
+| fechten | 4,93 / 0,99 | 2: 3 / 0,53 (2); 3: 4,1 / 1,1 (2); 4: 5,47 / 1,59 (4); 5: 4 / 0,84 (4); 6: 5,05 / 0,99 (4) |
+| football | 5,44 / 1,43 | 2: 5,02 / 1,61 (4); 3: 3,58 / 1,32 (2); 4: 5,44 / 1,3 (4); 5: 5,15 / 1,4 (4); 6: 7,07 / 1,5 (2) |
+| gewichtheben | 4,47 / 1,07 | 2: 3,26 / 0,4 (4); 3: 4,2 / 0,69 (6); 5: 3,47 / 0,94 (2); 6: 5,15 / 1,41 (4) |
+| hockey | 6,84 / 1,34 | 2: 6,33 / 1,12 (2); 3: 3,76 / 1,27 (2); 4: 10,47 / 1,32 (2); 5: 6,84 / 1,38 (8); 6: 5,19 / 1,49 (2) |
+| i-spy | 5,47 / 1,3 | 2: 5,02 / 1,23 (4); 4: 5,71 / 1,41 (6); 5: 5,31 / 1,24 (6) |
+| mini-dm | 5,31 / 1,12 | 2: 4,99 / 1,13 (4); 3: 4,46 / 1,2 (2); 4: 5,36 / 1,12 (6); 6: 5,43 / 1,11 (4) |
+| showcase | 4,77 / 1,18 | 4: 4,48 / 1,04 (4); 5: 4,4 / 1,2 (6); 6: 4,77 / 1,23 (6) |
+| speed-schach | 5,12 / 1,17 | 2: 4,61 / 1,08 (2); 3: 3,88 / 1,13 (2); 4: 5,29 / 1,39 (2); 5: 5,16 / 1,11 (4); 6: 5,12 / 1,18 (6) |
+| spurt | 3,15 / 1,37 | 2: 2,46 / 1,38 (4); 3: 3,15 / 1,34 (6); 4: 3,92 / 1,38 (2); 5: 5 / 1,38 (2); 6: 5,8 / 1,55 (2) |
+| staffel | 5,5 / 1,49 | 2: 5,5 / 1,41 (6); 4: 5,5 / 1,38 (2); 5: 5,5 / 1,72 (2); 6: 5,5 / 1,26 (6) |
+| takeshis-castle | 4,77 / 1,01 | 2: 4,74 / 0,97 (2); 3: 4,35 / 0,95 (4); 4: 4,58 / 0,83 (4); 5: 5,06 / 1,13 (4); 6: 5,41 / 1,19 (2) |
+| tdm | 6,32 / 1,28 | 3: 7,22 / 1,13 (6); 4: 5,61 / 1,21 (4); 5: 5,26 / 1,43 (4); 6: 6 / 1,47 (2) |
+| tennis | 4,27 / 0,84 | 2: 4,06 / 1,25 (2); 3: 4,27 / 0,67 (8); 4: 3,32 / 0,76 (2); 6: 3,95 / 1,05 (4) |
+| time-trial | 5,5 / 1,32 | 2: 5,5 / 1,41 (2); 3: 5,5 / 1,32 (6); 4: 5,5 / 1,26 (4); 5: 5,5 / 1,45 (4) |
+| wettessen | 4,28 / 1,32 | 2: 3,52 / 1,18 (6); 3: 4,28 / 1,35 (2); 4: 3,54 / 1,25 (2); 5: 6,49 / 1,85 (2); 6: 4,96 / 1,16 (4) |
+
+Warum je Feldgröße: Spurt hatte mit nur Disziplin-weiten Ankern (R_top 3,15, gezogen fast nur aus
+Feldgröße 2–3) an den Spieltagen mit Feldgröße 4/5 16 bis 24 Spieler gleichzeitig am Deckel 5. Mit den
+Ankern je Feldgröße sind es 1 bis 3.
+
+C2 exakt auf den 320 roh-Zellen (alt = `min(5,5; roh)`):
+
+| Disziplin | Zellen | Tagesbester alt | alt am Deckel je Zelle | Median-Einsatz alt | C: Tagesbester | C: Median-Einsatz | C2: Tagesbester (Median, Spanne) | C2 am Deckel je Zelle | C2: Top-3-Mittel | C2: Median-Einsatz |
+|---|---:|---:|---|---:|---:|---:|---|---|---:|---:|
+| basketball | 16 | 5,50 | 2,3,3,2,0,0,1,0,0,0,3,5,1,3,1,0 | 1,35 | 5,00 | 1,02 | 5,00 (4,69..5,00) | 1,1,1,1,1,0,1,1,0,1,1,0,1,1,1,1 | 4,32 | 1,25 |
+| battlefield | 16 | 5,24 | 0,0,1,0,0,0,0,1,2,0,1,1,1,0,0,0 | 0,88 | 5,00 | 0,84 | 5,00 (3,61..5,00) | 1,0,1,0,0,1,0,1,2,1,1,1,2,1,1,2 | 4,65 | 1,17 |
+| breaking | 16 | 3,63 | 0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0 | 0,74 | 5,00 | 1,04 | 5,00 (2,81..5,00) | 1,3,2,0,1,1,3,2,1,1,1,0,1,0,1,0 | 4,34 | 1,29 |
+| climbing | 16 | 5,50 | 3,5,8,8,8,8,3,7,6,6,7,6,8,8,8,8 | 1,28 | 5,00 | 1,17 | 5,00 (5,00..5,00) | 3,5,8,8,8,8,3,7,6,6,7,6,8,8,8,8 | 5,00 | 1,25 |
+| eiskunstlauf | 16 | 5,50 | 0,0,0,2,1,2,3,2,0,1,1,0,1,1,1,3 | 0,97 | 5,00 | 0,82 | 5,00 (2,71..5,00) | 0,0,0,2,1,2,1,0,1,1,2,1,1,1,1,1 | 4,57 | 1,18 |
+| fechten | 16 | 4,99 | 4,2,0,1,0,0,0,0,0,0,0,0,0,0,0,0 | 0,91 | 5,00 | 0,92 | 5,00 (3,80..5,00) | 4,2,1,1,2,0,0,1,1,2,2,0,1,1,2,1 | 4,66 | 1,23 |
+| football | 16 | 5,45 | 0,0,3,4,1,0,0,0,1,2,0,0,1,0,0,1 | 1,39 | 5,00 | 1,28 | 5,00 (3,94..5,00) | 1,2,1,1,2,0,1,0,1,2,3,1,1,0,1,1 | 4,67 | 1,26 |
+| gewichtheben | 16 | 4,54 | 0,0,1,1,1,0,0,0,0,1,0,0,0,0,0,0 | 0,95 | 5,00 | 1,06 | 5,00 (3,66..5,00) | 1,2,2,2,1,0,1,0,1,1,0,1,0,2,1,9 | 4,54 | 1,51 |
+| hockey | 16 | 5,50 | 4,9,1,5,2,3,3,2,1,3,0,2,0,0,2,0 | 1,37 | 5,00 | 1,00 | 5,00 (3,63..5,00) | 1,1,1,2,1,0,1,1,1,3,1,8,0,0,2,1 | 4,53 | 1,25 |
+| i-spy | 16 | 5,47 | 1,1,0,1,1,1,0,0,0,1,0,0,2,0,0,0 | 1,23 | 5,00 | 1,13 | 5,00 (3,68..5,00) | 1,1,1,1,1,1,1,1,0,1,1,0,2,0,0,0 | 4,18 | 1,21 |
+| mini-dm | 16 | 5,33 | 0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,1 | 1,00 | 5,00 | 0,95 | 5,00 (4,46..5,00) | 1,3,2,0,0,1,2,1,0,0,1,1,1,1,1,1 | 4,74 | 1,15 |
+| showcase | 16 | 4,95 | 1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0 | 1,19 | 5,00 | 1,25 | 5,00 (4,41..5,00) | 1,0,1,1,3,1,2,0,1,0,1,1,2,0,0,1 | 4,30 | 1,23 |
+| speed-schach | 16 | 5,14 | 0,0,0,1,0,0,2,0,0,0,0,0,0,0,1,1 | 1,10 | 5,00 | 1,08 | 5,00 (4,20..5,00) | 1,1,1,1,1,1,2,0,2,0,1,0,3,1,3,1 | 4,65 | 1,09 |
+| spurt | 16 | 3,20 | 0,0,0,0,0,1,0,0,0,0,0,0,7,6,0,0 | 1,33 | 5,00 | 2,11 | 5,00 (4,25..5,00) | 0,1,1,3,1,1,2,2,2,1,2,1,2,1,1,1 | 4,80 | 1,20 |
+| staffel | 16 | 5,50 | 4,4,3,1,4,4,0,0,4,2,4,4,4,4,1,1 | 1,38 | 5,00 | 1,25 | 5,00 (4,59..5,00) | 4,4,3,1,4,4,0,0,4,2,4,4,4,4,1,1 | 5,00 | 1,25 |
+| takeshis-castle | 16 | 4,91 | 0,1,0,0,2,0,0,3,0,0,0,0,0,0,0,0 | 0,82 | 5,00 | 0,86 | 5,00 (4,17..5,00) | 1,1,2,0,5,1,1,4,1,0,1,0,2,1,1,2 | 4,64 | 1,15 |
+| tdm | 16 | 5,50 | 1,2,2,2,4,3,2,1,3,3,0,0,0,1,2,4 | 1,20 | 5,00 | 0,95 | 5,00 (4,37..5,00) | 1,1,2,2,2,1,2,2,0,0,1,0,0,1,1,1 | 4,64 | 1,17 |
+| tennis | 16 | 4,30 | 1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0 | 0,80 | 5,00 | 0,93 | 5,00 (4,35..5,00) | 3,1,2,0,1,2,1,1,1,0,3,1,4,0,1,0 | 4,49 | 1,19 |
+| time-trial | 16 | 5,50 | 8,8,7,8,7,7,8,8,8,8,6,5,7,7,8,8 | 1,42 | 5,00 | 1,29 | 5,00 (5,00..5,00) | 8,8,7,8,7,7,8,8,8,8,6,5,7,7,8,8 | 5,00 | 1,32 |
+| wettessen | 16 | 4,33 | 0,0,1,0,7,2,0,0,0,0,1,0,0,0,0,0 | 1,27 | 5,00 | 1,48 | 5,00 (3,66..5,00) | 1,1,2,0,2,1,1,0,1,1,1,1,1,0,5,1 | 4,44 | 1,34 |
+
+Der Tagesbeste liegt im Median in **jeder** Disziplin bei 5,00, der Median-Einsatz bei 1,09 bis 1,51
+(alt 0,74 bis 1,42). Bleibende Ausnahmen: Climbing, Zeitfahren und Staffel stehen weiter mit 3 bis 8
+Duellsiegern gleichauf am Deckel (Motor-Befund, Abschnitt 2.2), und in je einer Zelle von Gewichtheben
+und Hockey stehen 8–9 Spieler bei 5 (Feldgröße mit nur 2 Zellen geankert). Spannweite der Tagesbesten
+alt (gedeckelt) 3,20 (Spurt) bis 5,50.
+
+Rangtreue/Pp: unverändert Motor-Größen; Fingerabdruck **GESAMT ce8fcef66028 (75 Einträge)** auch auf
+diesem Stand. C2 ist je Zelle streng monoton (Test `tests/pp-skala.test.ts`).
+
+### 8.3 Abnehmer
+
+Gemessenes Verhältnis C2 / alt auf denselben roh-Zellen:
+
+| Größe | alt | C2 | Faktor |
+|---|---:|---:|---:|
+| mittlerer Einsatz (19983) | 1,536 | 1,574 | 1,025 |
+| Spieler-Saisonsumme, Median (1461) | 21,19 | 21,75 | 1,026 |
+| Spieler-Saisonsumme, oberste 10 % (Mittel) | 40,51 | 40,31 | 0,995 |
+| Team-Saisonsumme, Median (128) | 240,68 | 247,25 | 1,027 |
+
+Die Skala verschiebt die Mitte also um rund +2,5 %, die Spitze (oberste 10 % der Spieler-Saisonsummen)
+gar nicht. Wo ein Abnehmer eine **feste** PP-Zahl nutzt, rechnet er in einer C2-Saison mit diesem Faktor
+um (`ppSkalaUmrechnung(gameState)`, Werte in `pp-skala-kalibrierung.json` → `umrechnung`), in einer alten
+Saison ist jeder Faktor 1:
+
+| Abnehmer | Datei | absolute Größe | Umgang |
+|---|---|---|---|
+| Trainings-XP (PPS-Bonus) | `lib/training/player-progression-forecast.ts` (`pps × 4`, Deckel 35 / 35 % MVS-XP) | Saisonsumme | Saisonsumme ÷ `spielerSaison` (1,026), Deckel unverändert |
+| Organische Entwicklung | `lib/training/organic-season-progression.ts` (`scoreContribution / 30`) | PP je Einsatz | Bezug 30 × `einsatz` (1,025) |
+| Vorstand, Sportziel (alter Pfad, V2 ist Standard) | `lib/board/team-season-objectives-service.ts` (`ppsTotal >= 95`) | Team-Saisonsumme | Schwelle 95 × `teamSaison` (1,027) |
+| Saison-MVP, Awards | `lib/foundation/league-season-awards.ts` | Median-Schwelle, Maximum | relativ, keine Änderung |
+| Spieler des Tages / PP-Gewinner | `lib/season/matchday-mvp-scoring-service.ts` | Sortierung über d1+d2 | relativ, gewollt fairer zwischen Disziplinen |
+| PP-Saisonrang der KI (Verkauf, Ersatz, Verträge, Moral) | `ai-sell-decision-engine.ts`, `ai-transfer-replacement-memory.ts`, `contract-renewal-service.ts`, `player-morale-service.ts` | Rang der Summe | Rang, keine Schwelle in PP; Ränge verschieben sich gewollt zwischen Disziplinen |
+| MVS / Marktwert-Rang | `player-rating-contract.ts` | Rang je Disziplin | keine Änderung |
+| Rekordbuch | `league-record-book.ts` | Bestwerte der laufenden Saison | nur innerhalb einer Saison, also einer Skala |
+| Hall of Fame, ewige Tabelle, Laufbahn | `league-records-hall-of-fame.ts`, `eternal-player-table.ts`, `player-league-career-stats.ts` | Summen über Saisons | bleiben vergleichbar (Mitte +2,5 %, Spitze ±0); das Archiv trägt den Stempel (`SeasonSnapshotRecord.wertungsSkalen`) |
+| Arena-HUD, Live-Bühne, Spieltagsbericht | `DisciplineStageNativeArena.tsx`, `player-points-total.ts` | Anzeige `pointsAwarded` | zeigt die gebuchte Zahl, gezeigt = gebucht |
+| Tabelle, Form, Moral, Board, Sponsoren | – | keine PP bzw. Ränge nach Score | unberührt |
+
+Ein einzelner Spitzeneinsatz bekommt höchstens 5 statt 5,5; ein alter Einzelrekord über 5 (Rekordbuch)
+kann deshalb nur in einer alten Saison stehen, das Rekordbuch rechnet ohnehin je Saison.
+
+### 8.4 Umstellung der laufenden Live-Saison (Nachtrag 18.11. abends)
+
+Chris, nach Spieltag 1 der Live-Saison: „nicht JEDER soll 5,5 bekommen bitte anpassen“. Am Spiegel-Abbild
+(`new-game-1793476611202-0dwpok`, Saison 1, Spieltag 1 gebucht) stehen 16 von 160 PP-Zeilen am alten Deckel
+5,5, die Top 10 der Saison-PP alle bei 5,5. Deshalb nicht erst zum Saisonwechsel:
+
+**Gewählt: Lade-Migration statt Server-Skript.** `stelleLaufendeSaisonAufC2Um()` (lib/resolve/wertungs-skalen.ts)
+läuft beim Laden eines Spielstands in `save-repository.ts`, neben den anderen Lade-Migrationen (Sponsor M1–M3,
+Endsaison-Nachtrag): Battle-Save, laufende Saison ohne Stempel, höchstens 3 gebuchte Spieltage → Stempel
+`{ pp: "c2", ergebnis: "alt", ppAb: <erster ungebuchter Spieltag> }`. Rein und idempotent, persistiert mit dem
+nächsten Schreiben, wirkt nach dem Deploy ohne Handgriff auf dem Server. Gründe:
+
+- Die Umstellung muss **genau dort** greifen, wo jede Rechnung den Spielstand liest; ein Skript, das die SQLite
+  bei laufender App umschreibt, bräuchte Stopp, WAL-Behandlung und Rückweg (Muster `pull-repaired-save.sh`) für
+  eine Ein-Feld-Änderung, und der nächste Lese-Weg sähe den Stempel trotzdem erst nach einem Neuladen.
+- Ein Skript hängt an einem Handgriff von Chris; die Lade-Migration erfasst auch Mehrspieler-Räume und jeden
+  anderen jungen Save gleich.
+- Rückweg ohne Skript: `OLY_PP_SKALA=aus` verhindert die Umstellung (vor dem ersten Schreiben), `aus-sofort`
+  rechnet sofort wieder alt. **Das funktioniert seit dem Review-Nachtrag (Abschnitt 8.5) wirklich:** bis dahin
+  reichte `docker-compose.yml` weder `OLY_PP_SKALA` / `OLY_ERGEBNIS_SKALA` an den Container noch
+  `NEXT_PUBLIC_OLY_PP_SKALA` als Build-Argument durch -- ein Wert in `deploy/hetzner/.env` kam nie an.
+
+**Gezeigt = gebucht bleibt:**
+- Gebuchte Arena-/Pod-Zeilen sind mit ihrem Wert persistiert und werden nicht angefasst.
+- PPS-Duell-Zeilen rechnet der Ledger beim Lesen nach. Jede ab jetzt gebuchte Zeile trägt `ppSkala: "c2"`.
+  Eine Zeile ohne Vermerk in einer mitten in der Saison umgestellten Saison bleibt alt
+  (`ppSkalaVersionFuerZeile`).
+- Wird ein Spieltag vor `ppAb` noch einmal gewertet (forceReplace), rechnet er alt
+  (`ppSkalaModus(gameState, matchdayId)`).
+- Ein schon gelaufener Arena-Vorlauf des nächsten Spieltags ist nach der Umstellung veraltet: Die PP-Skala steht
+  im Eingabe-Hash (`arena-eingabe-hash.ts`, nur bei C2, alte Saves unverändert). Die bestehende
+  Divergenz-Erkennung beim Buchen stößt dann einen neuen Vorlauf an.
+
+**Geprüft an einer Kopie des Spiegels** (`live-save` 17:30, nie auf den Server geschrieben):
+
+| | Wert |
+|---|---|
+| gespeicherter Stempel | keiner |
+| nach dem Laden | `{ seasonId: "season-1", pp: "c2", ergebnis: "alt", ppAb: "matchday-2" }`, `ppSkalaModus` = an |
+| Ledger von Spieltag 1 (160 Zeilen, 64 Arena + 96 Mini-DM-FFA) vor/nach der Umstellung | **0 Zeilen verändert** |
+| PP am Deckel 5,5 (Spieltag 1, bleibt so gebucht) | 16 von 160; Top 10 der Saison alle 5,5 |
+
+Ab Spieltag 2 bekommt der Tagesbeste je Disziplin im Mittel 5,0 (Deckel 5), die Masse 1,1–1,5 (Abschnitt 8.2).
+Die Ergebnisskala E1 bleibt in der laufenden Saison aus, sonst stünden im Tiebreaker „Verh.“ zwei Skalen
+nebeneinander; sie kommt mit dem Saisonwechsel.
+
+### 8.5 Review-Nachträge (18.11.)
+
+**Schalter erreichen jetzt den Container (M1).** `deploy/hetzner/docker-compose.yml` reicht `OLY_PP_SKALA` und
+`OLY_ERGEBNIS_SKALA` an den Container durch und als Build-Argument `NEXT_PUBLIC_OLY_PP_SKALA` /
+`NEXT_PUBLIC_OLY_ERGEBNIS_SKALA` an den Browser-Build (Dockerfile `ARG`/`ENV`); ohne eigenen `NEXT_PUBLIC_`-Wert
+gilt der Server-Wert, damit Server und Browser nie auseinanderlaufen. Leer = Standard (neue Skala), nichts
+ändert sich, solange nichts gesetzt ist. So schaltet Chris auf dem Server um (Zeile in `deploy/hetzner/.env`
+eintragen, dann neu bauen, ein bloßer Neustart reicht nicht, weil der Browser-Wert beim Build eingebacken wird):
+
+```sh
+ssh root@135.181.102.2
+cd Olympiade-der-Welten/deploy/hetzner
+nano .env
+docker compose up -d --build
+```
+
+In `.env`: `OLY_PP_SKALA=aus` (neue Saisons alt, gestempelte rechnen weiter wie gestempelt) oder
+`OLY_PP_SKALA=aus-sofort` (Notbremse, jeder Stempel ignoriert), analog `OLY_ERGEBNIS_SKALA`. Zurück zum
+Standard: Wert leeren und wieder neu bauen.
+
+**Nur Battle-Saves (N1).** Stempel und C2-Umrechnungsfaktoren (`ppSkalaUmrechnung`) gibt es nur für Battle-Saves:
+`stempleWertungsSkalenBeimAnlegen` und der Saisonwechsel (`wertungsSkalenFuerSpielmodus`) setzen für einen
+Manager-Save keinen Stempel (ein alter wird beim Saisonwechsel entfernt), `ppSkalaUmrechnung` ist dort 1. In einer
+gemischten Saison (Stempel mit `ppAb`) ist die Umrechnung ebenfalls 1: die Faktoren sind auf eine ganze C2-Saison
+gemessen und würden auf eine nur teilweise C2-Saison falsch gewichtet; der kleine Fehler endet mit dem
+Saisonwechsel.
+
+**Nicht auflösbares `ppAb` (N2).** Fehlt die Spieltagsliste oder ist die ID unbekannt, rechnet der Spieltag alt statt
+mit dem Stempel.
+
+**E1 nur mit C2 (N3).** Die Anker der Ergebnisskala sind auf C2-Spieler-PP gezogen; die Engine wendet E1 nur an,
+wenn die Zeile mit C2 gerechnet wird.
+
+**Anzeige der laufenden Saison (Info).** "Nach dem Spieltag", die Arena-Paarungsliste und die gebuchte
+Arena-Zeile zeigen die 0-10-Skala und den Pod-Wert nur bei Zeilen mit `ergebnisSkala: "e1"`; eine Zeile der
+laufenden (alten) Saison zeigt exakt wie vor diesem PR.

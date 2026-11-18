@@ -657,11 +657,11 @@ function LoanOfferFilterPanel({
               disabled={maxAmount <= 0}
               onChange={(event) => onAmountInputChange(event.target.value)}
               onBlur={onAmountBlur}
-              aria-label="Kreditsumme (genauer Betrag, Mio.)"
+              aria-label="Kreditsumme (genauer Betrag, C)"
               data-testid="nl-credits-principal-input"
               style={{ color: maxAmount > 0 ? amountToneColor : undefined }}
             />
-            <span className="nl-credits-amount-unit">Mio.</span>
+            <span className="nl-credits-amount-unit">C</span>
           </div>
           {maxAmount > 0 ? (
             <span

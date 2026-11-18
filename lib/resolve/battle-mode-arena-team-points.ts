@@ -121,6 +121,7 @@ import { freemem } from "node:os";
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
@@ -187,7 +188,7 @@ import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
 // vom 10.11. -- derselbe rohe Boxscore-Wert, den die Liga ab jetzt tatsaechlich bucht
 // (g.kaempfer[].wert aus tdmGefecht()), nicht mehr ein Mass der alten PPS-Duell-Bruecke.
 import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -1262,6 +1263,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   fixtureResults: readonly ArenaFixtureResult[],
   playerCount: number | null,
   disciplineId: string = "basketball",
+  /** PP-Skala dieser Saison (`ppSkalaModus(gameState)`, lib/resolve/pp-skala.ts); "aus" = Kurve bis 5,5. */
+  ppSkala: PpSkalaModus = "aus",
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
@@ -1274,9 +1277,9 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {
       if (eintrag.playerId === null) continue;
-      if (ppSkalaAktiv()) {
-        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS): dieselbe Kurve ohne alten
-        // Deckel, Faktor je Disziplin, neuer Deckel 5. Bei AUS wird dieser Zweig nie betreten.
+      if (ppSkala !== "aus") {
+        // PP-SKALA C2 (docs/design/pp-skala-18-11.md): dieselbe Kurve ohne alten Deckel, Zwei-Anker je
+        // Disziplin und Feldgroesse, neuer Deckel 5. Bei "aus" (alte Saison) wird dieser Zweig nie betreten.
         const referenz = eintrag.torwart
           ? (torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz)
           : feldReferenz;
@@ -1289,6 +1292,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
             max: konfig.max,
             anteilMitte: konfig.anteilMitte,
             zuschlag: eintrag.torwart ? 0 : ppsAusStationsduellen(disciplineId, eintrag.duelle),
+            modus: ppSkala,
+            playerCount,
           }),
         );
         continue;
@@ -1511,7 +1516,13 @@ export async function runBattleModeArenaMatchday(
     input.matchdayMutatorTraits === undefined
       ? resolveMutatorTraitsFromSchedule({ gameState, saveId, seasonId, matchdayId, disciplineId })
       : [...(input.matchdayMutatorTraits ?? [])];
-  const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren };
+  // VERLETZUNG IM MOTOR (Chris, 18.11., docs/design/verletzung-regel-18-11.md Luecke D/B): der
+  // Verletzungswurf dieses Spieltags faellt VOR dem Motorlauf — derselbe deterministische Wurf, den
+  // Buchung, Vorschau und Arena-Eingabe-Hash (`berechneArenaEingabeHash`) sehen. Heute Verletzte
+  // treten mit 50 % ihrer Eignung an, aus einem Vorspieltag Gesperrte gar nicht.
+  const verletzungsstand =
+    input.runArenaFixturesOptions?.verletzungsstand ?? ermittleArenaVerletzungsstand({ gameState, saveId, seasonId, matchdayId });
+  const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren, verletzungsstand };
 
   // LIGA-STUFEN GLEICHZEITIG, NICHT MEHR NACHEINANDER (Latenz-Fix 18.10., Chris' Top-Prio-Meldung
   // "20 Minuten warten"): der ROOT-CAUSE-Befund dieser Runde (echter Chromium, instrumentiert,
@@ -1627,6 +1638,7 @@ export async function runBattleModeArenaMatchday(
     alleFixtureErgebnisse,
     fieldSizeGewuerfelt,
     disciplineId,
+    ppSkalaModus(gameState, matchdayId),
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

@@ -11,11 +11,12 @@ import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractR
 import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
 import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
 const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
+import { abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
 import {
   buildTeamShellThemeVars,
   buildTeamVoidVars,
@@ -702,6 +703,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
+  // Abgabe der Einsatzliste als Hauptaktion des Taktgebers (statt zweitem Knopf im Dock der Einsatzliste).
+  const einsatzlisteAbgabe = useSyncExternalStore(abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe, () => null);
   const newLookBreadcrumbData = getFoundationBreadcrumb(activeView as FoundationViewId);
   // Regieband (18.11.): goldene Kopfzeile (Gruppe, bei Teamseiten das Team) über dem Seitentitel.
   const newLookBreadcrumb = newLookBreadcrumbData ? (
@@ -1003,7 +1006,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
-        takt={ligaDraftTor.aktiv && draftTakt ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick } : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
+        takt={
+          ligaDraftTor.aktiv && draftTakt
+            ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick }
+            : einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
+              ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan }
+              : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
+        }
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
