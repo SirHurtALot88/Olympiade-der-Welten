@@ -131,3 +131,5 @@
 .swm .det .dsp b small { color: var(--gold); font-weight: 700; }
 .swm .det .bh strong svg { color: var(--stumm); }
 .swm .tab .dz svg { color: var(--stumm); }
+.swm .tab .grp { height: calc(2.1 * var(--u)); align-items: end; }
+.swm .tab .grp span { white-space: normal; line-height: 1.1; letter-spacing: 0.1em; }
