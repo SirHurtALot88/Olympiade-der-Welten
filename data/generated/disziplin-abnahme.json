@@ -339,23 +339,23 @@
   },
   "staffel": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.924,
-   "rhoSpannweite": 0.083,
-   "rhoSaison": 0.965,
+   "rhoJeSpiel": 0.957,
+   "rhoSpannweite": 0.019,
+   "rhoSaison": 0.986,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Task #150, Health-Saeulen-Fix 16.11.",
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Ganze Runde/Puste wirkt, 17.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    21.6,
-    21.4
+    13.2,
+    14.0
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 144 (+ --saat-versatz=10000000)",
-    "laeufe": 144,
+    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 96 (+ --saat-versatz=10000000)",
+    "laeufe": 96,
     "anhebung": 15,
     "mutatoren": "je-lauf",
     "saatStroeme": [
@@ -363,11 +363,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-16",
-   "commit": "2ca27f52",
+   "datum": "2026-11-17",
+   "commit": "9ddacb6e",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "TASK #150, SAEULE 'SPEED/HEALTH' (16.11.): Health sass NUR in ROBUST, und ROBUST ist im Duell ein Totkanal (KRAFT_VON-Anteil 0,3, Reserve bodet laut Puste-Kommentar nie; WECHSEL-Patzerchance haengt an verlaesslich*0,0012, aber der Rohausdruck liegt bei den ueblichen Sub-Skill-Werten schon ohne ROBUST unter dem Patzerboden) -- gemessen VORHER 0,0 %/0,0 % gegen Matrix 2, ein echter Totkanal, nicht nur ein kleines Gewicht. FIX: Health wandert aus ROBUST in STEHEN (lebendig: 0,7 in KRAFT_VON UND direkt in der Ermuedung `mued` in tempoVon(), nie an einem Boden). Gemessen NACHHER: Health 2,1 %/2,1 % gegen Matrix 2 -- nahezu exakt getroffen. Pp gesamt 21,1/22,0 -> 21,6/21,4 (Health-Gewinn ca. -2,0 Pp wird durch minimal staerkere Stamina-/Will-Unterzeichnung an anderer Stelle fast genau aufgehoben, derselbe Positiv-Summen-Normierungseffekt wie bei frueheren Takeshi-Rezeptaenderungen) -- WEITERHIN sicher unter der 25-Schranke, aber kein Fortschritt Richtung <15, weil Charisma (-5,8/-6,2) und Speed (bereits UEBER der Matrix, +4,6/+4,8) die groessten verbleibenden Luecken sind und ausserhalb des Task-#150-Rahmens (nur Speed/Health) liegen. rho je Spiel 0,931 -> 0,924 (Spannweite 0,083, vorher 0,078) -- Bewegung 0,007, innerhalb der Spannweite, keine Regression. Speed selbst war VOR dieser Aenderung bereits UEBER der Matrix (28,3-29,0 % gegen 24) und wurde bewusst nicht angefasst, um es nicht noch weiter zu ueberzeichnen. Volle Messmethodik und zwei verworfene Takeshi-Versuche (ENDTEMPO, WENDIGKEIT -- keiner hob Speed verlaesslich, einer verschlechterte einen Strom sogar) im PR-Bericht."
+   "anmerkung": "GANZE RUNDE, PUSTE WIRKT (17.11., Chris: 'jeder laeuft eine ganze runde! Und dort ist puste anscheinend irrelevant'). Gemessen auf main 9ddacb6e plus Block 2 (docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2): jedes Bein eine Runde, Puste auf eine 400-m-Runde geeicht (BAHN_ART.staffel.rundePuste: kraftBasis 60, kraftMix 0,45, zehrKoeff 4, zehrExponent 5, zehrFaktor 2,0, Fade unter 35 % bis 0,72), Renneinteilung nach eigener Puste statt nach Slot. Duell VORHER rho 0,924 (Spannweite 0,083), Pp 22,0/21,6 (n=96); NACHHER rho 0,957 (0,019), Saison 0,986, Pp 13,2/14,0. REVIEW-NACHTRAG (Abschnitt 2.7): Puste-Verbrauch und -Erholung je Bein statt je Sekunde (staffelRundeMass = nb/6; vorher brachen bei k=4 88 %, bei k=2 100 % ein, jetzt 16 %/25 %), Rennplan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN nachgezogen (nur Pod; die Pp-Sonde des Pods lief vorher immer mit k=6, bei echtem k=4 lag schon main bei 34,0/37,4 Pp). Pod (210 Gruppen, zwei Stroeme, Pp n=48 bei derselben k): rho k=2..6 0,943/0,956/0,957/0,951/0,957, Pp 17,0/16,8 · 11,5/11,5 · 8,0/9,7 · 6,8/6,0 · 5,7/7,5; Duell bit-identisch. Wertungs-Fingerabdruck d09e10bb872c -> 8bbc6ea215f6 (Block 2, vier Staffel-Eintraege) -> 97cccd6017fb (Review, nur spieleBahnPod staffel). Vorheriger Stand (16.11., Task #150): rho 0,924, Pp 21,6/21,4."
   },
   "takeshis-castle": {
    "chassis": "bahn",
