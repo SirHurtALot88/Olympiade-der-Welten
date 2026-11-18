@@ -55,7 +55,7 @@ import {
   type UrsachenZeile,
 } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 import { baueFormMoralAnzeige, moralUrsachen, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
-import { berechneKartenWirkung } from "@/lib/lineups/formkarten-wirkung";
+import { berechneKartenWirkung, wertungsPfad } from "@/lib/lineups/formkarten-wirkung";
 import "./einsatzliste-modern.css";
 
 type Props = LineupNewLookProps;
@@ -552,9 +552,11 @@ export default function EinsatzlisteModern(props: Props) {
   const gs = context?.gameState ?? null;
   const formMoralVon = useMemo(() => {
     const karte = new Map<string, FormMoralAnzeige>();
-    for (const [aid, k] of rosterCardByActivePlayerId) karte.set(aid, baueFormMoralAnzeige(gs, k.id));
+    const dis = (seite === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2) ?? null;
+    const pfad = wertungsPfad(gs, dis?.disciplineId);
+    for (const [aid, k] of rosterCardByActivePlayerId) karte.set(aid, baueFormMoralAnzeige(gs, k.id, { pfad, regeln: context?.formMoralRegeln }));
     return karte;
-  }, [gs, rosterCardByActivePlayerId]);
+  }, [gs, rosterCardByActivePlayerId, seite, context?.matchdayContract, context?.formMoralRegeln]);
   const fmVon = (aid: string | null | undefined) => (aid ? formMoralVon.get(aid) ?? null : null);
   const disziplinNameVon = (id: string) => (gs?.disciplines ?? []).find((d) => d.id === id)?.name ?? id;
   const ursachenVon = (aid: string): UrsachenZeile[] => {
@@ -588,6 +590,7 @@ export default function EinsatzlisteModern(props: Props) {
         secondaryCardId: steuerung.secondarySelectedId,
         playerIds: spielerIds,
         rosterPlayers: context.rosterPlayers,
+        regeln: context.formMoralRegeln,
       });
     }
     return ergebnis;
@@ -1345,7 +1348,7 @@ export default function EinsatzlisteModern(props: Props) {
                 {kartenWirkungJeSeite[seite] && kartenWirkungJeSeite[seite]!.karten.length > 0 ? (
                   <small data-testid="elm-karten-live">
                     {kartenWirkungJeSeite[seite]!.buchung.gebucht
-                      ? `Karten fürs Team: ${vz(kartenWirkungJeSeite[seite]!.teamSumme)} (Details im Reiter „Form & Moral“)`
+                      ? `Karten fürs Team: ${vz(kartenWirkungJeSeite[seite]!.teamSumme)} (+ Tagesform ±4 je Spieler; Details im Reiter „Form & Moral“)`
                       : kartenWirkungJeSeite[seite]!.buchung.grund}
                   </small>
                 ) : null}

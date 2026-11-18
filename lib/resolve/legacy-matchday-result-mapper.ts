@@ -117,6 +117,7 @@ export type PlayerDisciplinePerformanceWritePayload = {
   slotIndex: number;
   baseValue: number;
   finalPlayerScore: number;
+  formSystematisch?: number | null;
   mutatorScoreBonus: number | null;
   mutatorPpsBonus: number | null;
   /** MUTATOR ORGANISCH (29.09.): Trefferzahl 0/1/2, s. `PlayerDisciplinePerformanceRecord.mutatorHits`. */
@@ -303,6 +304,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
         slotIndex: player.slotIndex,
         baseValue: player.baseValue,
         finalPlayerScore: player.finalPlayerScore,
+        ...(player.formSystematisch != null ? { formSystematisch: player.formSystematisch } : {}),
         mutatorScoreBonus: player.mutatorBonus ?? null,
         mutatorPpsBonus: player.mutatorPpsBonus ?? null,
         mutatorHits: player.mutatorHits ?? null,

@@ -1,4 +1,5 @@
 import { listBookedMatchdaySides, repairFrozenAiDraftsWithBlockedPlayers } from "@/lib/ai/ai-frozen-draft-blocked-repair";
+import { kartenEffekt } from "@/lib/lineups/formkarten-wirkung";
 import {
   buildAiFormCardSeasonPlan,
   getPlannedCardIdsForSlot,
@@ -380,9 +381,16 @@ export function resolveFormCardSidePlayerCount(input: {
   return Math.max(1, contractPlayerCount ?? FORM_CARD_FALLBACK_SLOT_PLAYER_COUNT);
 }
 
-function formCardDeploymentValue(card: LegacyFormCardOption, color: FormCardColor | null, playerCount: number) {
-  const multiplier = color != null && card.color === color ? 2 : 1;
-  return card.value * multiplier * Math.max(1, playerCount);
+function formCardDeploymentValue(
+  card: LegacyFormCardOption,
+  color: FormCardColor | null,
+  playerCount: number,
+  farbAnteile?: Partial<Record<FormCardColor, number>>,
+) {
+  // Eine Wahrheit (Review-Befund 9): alte Regel x2, neue Regel alle + Farbtraeger-Zusatz (erwarteter Traegeranteil 1/4,
+  // wie `formCardSlotValue`), beides aus `kartenEffekt`.
+  const e = kartenEffekt(card, color);
+  return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25)) * Math.max(1, playerCount);
 }
 
 // Team-Charakter statt Einheits-KI (Vorbild: Doktrinen in team-powers): mentale Teams
@@ -439,7 +447,7 @@ function selectPositiveFormCardForSlot(input: {
   // ungeduldige erst bei deutlichem. (patience 0.85..1.2 → Faktor 1.35..1.0)
   const reserveFactor = Math.max(1, 2.2 - input.patience);
   const scored = candidates.map((card) => {
-    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount);
+    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount, input.plan.farbAnteile);
     // Der ANSPRUCH der Karte auf ihren Planplatz, abgezinst auf heute. Drei Fälle fallen daraus
     // ohne Sonderbehandlung heraus (s. getPlannedClaimValue): Plan will sie hier → Anspruch ==
     // Jetzt-Wert, sie fällt. Plan will sie heute NEBENAN → Anspruch ist der dortige, bessere Wert,
@@ -972,8 +980,10 @@ function takeCheapestNegativeFormCard(input: {
   usedIds: Set<string>;
   color: FormCardColor | null;
 }) {
-  const damage = (card: LegacyFormCardOption) =>
-    Math.abs(card.value) * (input.color != null && card.color === input.color ? 2 : 1);
+  const damage = (card: LegacyFormCardOption) => {
+    const e = kartenEffekt(card, input.color);
+    return Math.abs(e.alle + e.traegerZusatz * 0.25);
+  };
   const picked =
     input.cards
       .filter((card) => !input.usedIds.has(card.id))

@@ -98,6 +98,8 @@ export type FormBoardPanelProps = {
   ) => string;
   formatFormCardValueLabel: (value: number) => string;
   formatFormCardColorLabel: (color: LegacyFormCardOption["color"]) => string;
+  /** Neue Farbregel aktiv (alle + Farbträger) statt x2. */
+  farbregelNeu?: boolean;
   formatFormCardOptionLabel: (card: LegacyFormCardOption, disciplineColor: LegacyFormCardOption["color"] | null) => string;
   formatNullableScore: (value: number | null) => string;
   resolveTeamDisciplineRank: (
@@ -157,6 +159,7 @@ export default function FormBoardPanel({
   formatFormCardValueLabel,
   formatFormCardColorLabel,
   formatFormCardOptionLabel,
+  farbregelNeu = false,
   formatNullableScore,
   resolveTeamDisciplineRank,
   getFormCardColorForCategory,
@@ -352,7 +355,7 @@ export default function FormBoardPanel({
         <span className={draft ? "is-ready" : "is-warning"}>Gespeichert {draft ? "✓" : "⚠"}</span>
       </div>
       <p className="legacy-lineup-form-board-hint">
-        Beide Slots sind optional. F1 ± · F2 nur positiv. Farbmatch (Karte = Disziplin-Bereich) verdoppelt den Kartenwert.
+        Beide Slots sind optional. F1 ± · F2 nur positiv. {farbregelNeu ? "Farbmatch (Karte = Disziplin-Bereich): voller Wert für alle, dazu ein Zusatz für Spieler dieser Klassenfarbe." : "Farbmatch (Karte = Disziplin-Bereich) verdoppelt den Kartenwert."}
         Negative bis Saisonende abwerfen — offene Negative kosten Strafpunkte.
       </p>
       {/*
@@ -389,7 +392,7 @@ export default function FormBoardPanel({
               <span
                 key={`form-resource-color-${color}`}
                 className={`legacy-lineup-form-card-chip legacy-lineup-form-resource-color is-${color}${freeCardCountByColor[color] === 0 ? " is-depleted" : ""}`}
-                title={`Freie ${formatFormCardColorLabel(color)}-Karten — zählen in ${formatFormCardColorLabel(color)}-Disziplinen doppelt (x2).`}
+                title={`Freie ${formatFormCardColorLabel(color)}-Karten — ${farbregelNeu ? `zählen in ${formatFormCardColorLabel(color)}-Disziplinen voll für alle, dazu ein Zusatz für Spieler dieser Farbe.` : `zählen in ${formatFormCardColorLabel(color)}-Disziplinen doppelt (x2).`}`}
               >
                 <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
                 {formatFormCardColorLabel(color)} {freeCardCountByColor[color]}
@@ -531,7 +534,7 @@ export default function FormBoardPanel({
             <p className="legacy-lineup-form-resource-note">
               Zelle wählen, dann eine Karte anklicken oder hineinziehen — sie ersetzt die
               Basiswerte dieses Spieltag-Slots durch ihren Bonus/Malus und wird aus dem
-              Formkarten-Budget oben verbraucht (bei Farbmatch zur Disziplin doppelt, x2).
+              Formkarten-Budget oben verbraucht{farbregelNeu ? " (bei Farbmatch zur Disziplin voll für alle plus Farbträger-Zusatz)" : " (bei Farbmatch zur Disziplin doppelt, x2)"}.
             </p>
           </div>
           {activeFormPickCell ? (
@@ -592,7 +595,7 @@ export default function FormBoardPanel({
                 >
                   <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
                   {formatFormCardColorLabel(card.color)} {formatFormCardValueLabel(card.value)}
-                  {activeCellColor === card.color ? " · x2" : ""}
+                  {activeCellColor === card.color ? (farbregelNeu ? " · passt" : " · x2") : ""}
                 </button>
               );
             })}
@@ -662,10 +665,10 @@ export default function FormBoardPanel({
                             {disciplineColor ? (
                               <span
                                 className={`legacy-lineup-form-card-chip legacy-lineup-form-board-match-chip is-${disciplineColor}`}
-                                title={`Farbmatch: ${formatFormCardColorLabel(disciplineColor)}-Karten zählen in dieser Disziplin doppelt · ${matchingFreeCount} passende Karte(n) frei.`}
+                                title={`Farbmatch: ${formatFormCardColorLabel(disciplineColor)}-Karten ${farbregelNeu ? "zählen in dieser Disziplin voll für alle, dazu Zusatz für die Klassenfarbe" : "zählen in dieser Disziplin doppelt"} · ${matchingFreeCount} passende Karte(n) frei.`}
                               >
                                 <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
-                                x2 {formatFormCardColorLabel(disciplineColor)} · {matchingFreeCount} frei
+                                {farbregelNeu ? "passt" : "x2"} {formatFormCardColorLabel(disciplineColor)} · {matchingFreeCount} frei
                               </span>
                             ) : null}
                             {hasPlannedCards ? (

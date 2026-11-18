@@ -285,7 +285,13 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     const moraleAdjustedScore =
       injuryAdjustedScore == null || moraleMultiplier == null
         ? injuryAdjustedScore
-        : roundPreviewScore(injuryAdjustedScore * moraleMultiplier * (formWirkung?.multiplier ?? 1));
+        : roundPreviewScore(injuryAdjustedScore * moraleMultiplier);
+    // Spieler-Form (18.11.) als EIGENER Schritt hinter der Moral: `moraleModifier` bleibt reine Moral
+    // (Review-Befund 7), der Form-Anteil steht in `formMultiplierPunkte`.
+    const formAdjustedScore =
+      moraleAdjustedScore == null || !formWirkung ? moraleAdjustedScore : roundPreviewScore(moraleAdjustedScore * formWirkung.multiplier);
+    const formMultiplierPunkte =
+      moraleAdjustedScore == null || formAdjustedScore == null ? 0 : roundPreviewScore(formAdjustedScore - moraleAdjustedScore);
     const moraleModifier =
       fatigueAdjustedScore == null || moraleAdjustedScore == null
         ? null
@@ -327,7 +333,9 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       mutatorBonus: 0,
       mutatorPpsBonus: 0,
       formShare: 0,
-      finalContribution: moraleAdjustedScore,
+      formMultiplierPunkte,
+      formSystematisch: formMultiplierPunkte,
+      finalContribution: formAdjustedScore,
       sourceStatus,
       warnings,
     };
@@ -398,6 +406,9 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     scoredEntries.forEach((entry, index) => {
       const share = shares[index] ?? 0;
       if (entry.finalContribution != null) {
+        // Systematischer Anteil (ohne Tagesform-Zufall): Kartenwert dieses Spielers + Form-Multiplikator.
+        const flat = input.formByPlayerId?.[entry.playerId]?.summe ?? formPerPlayer ?? 0;
+        entry.formSystematisch = roundPreviewScore((entry.formMultiplierPunkte ?? 0) + (Number.isFinite(flat) ? flat : 0));
         entry.formShare = share;
         entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + share);
         entry.score = entry.finalContribution;

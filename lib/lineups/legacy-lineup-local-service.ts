@@ -1,3 +1,4 @@
+import { resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -926,6 +927,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         teamId: params.teamId,
         lineupId: existingDraftLineupId,
       }),
+      formMoralRegeln: resolveFormMoralRegeln(),
       formCardPlans: (normalizedGameState.seasonState.formCardPlans ?? []).filter(
         (plan) => plan.seasonId === params.seasonId && plan.teamId === params.teamId,
       ),

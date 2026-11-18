@@ -98,6 +98,8 @@ export type FormCardSeasonPlan = {
   unplacedCardIds: string[];
   /** Summe aller `expectedFormModifier` — die Kennzahl, die der Plan maximiert. */
   expectedTotalFormModifier: number;
+  /** Farbanteile der Karten (nur bei Farbregel): der Einsatz-Wert der KI nimmt denselben erwarteten Traegeranteil wie der Plan. */
+  farbAnteile?: Partial<Record<FormCardColor, number>>;
 };
 
 /**
@@ -415,6 +417,7 @@ export function buildAiFormCardSeasonPlan(input: {
     entryByCardId,
     unplacedCardIds: [...unplacedCardIds].sort((left, right) => left.localeCompare(right)),
     expectedTotalFormModifier,
+    ...(farbAnteile ? { farbAnteile } : {}),
   };
 }
 

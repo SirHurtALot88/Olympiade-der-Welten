@@ -28,12 +28,15 @@ export function FormMoralMarke({ a, nurMoral = false }: { a: FormMoralAnzeige; n
   return (
     <span className="fm-marke">
       {a.formVerfuegbar && !nurMoral ? (
-        <BcFormPfeil stufe={a.formStufe} titel={`Form ${a.form != null ? Math.round(a.form) : "–"}: ${a.formWort} (${vz(a.formPct)} % Eignung)`} />
+        <BcFormPfeil stufe={a.formStufe} titel={`Form ${a.form != null ? Math.round(a.form) : "–"}: ${a.formWort} (${vz(a.formPct)} ${einheit(a)})`} />
       ) : null}
-      {a.moral != null ? <BcMoralGesicht wert={a.moral} groesse={16} titel={`Moral ${Math.round(a.moral)}: ${a.moralWort} (${vz(a.moralPct)} % Eignung)`} /> : null}
+      {a.moral != null ? <BcMoralGesicht wert={a.moral} groesse={16} titel={`Moral ${Math.round(a.moral)}: ${a.moralWort} (${vz(a.moralPct)} ${einheit(a)})`} /> : null}
     </span>
   );
 }
+
+/** Was die Prozentzahl meint: Legacy-Wertung bucht auf den Spielerwert, die Arena auf die Eignung. */
+const einheit = (a: FormMoralAnzeige) => (a.pfad === "legacy" ? "% Spielerwert" : "% Eignung");
 
 export type UrsachenZeile = { id: string; label: string; delta: number };
 
@@ -58,7 +61,7 @@ export function WarumBlock({
             <b className="t">
               <BcFormPfeil stufe={a.formStufe} /> {a.form != null ? Math.round(a.form) : "–"} · {a.formWort}
             </b>
-            <span className={`t ${a.formPct > 0 ? "bc-plus" : a.formPct < 0 ? "bc-minus" : ""}`}>{vz(a.formPct)} % Eignung</span>
+            <span className={`t ${a.formPct > 0 ? "bc-plus" : a.formPct < 0 ? "bc-minus" : ""}`}>{vz(a.formPct)} {einheit(a)}</span>
           </>
         ) : (
           <span className="fm-leise">Noch keine Form gespeichert — sie entsteht nach dem ersten Spieltag.</span>
@@ -111,7 +114,7 @@ export function WarumBlock({
             <b className="t">
               <BcMoralGesicht wert={a.moral} /> · {a.moralWort}
             </b>
-            <span className={`t ${a.moralPct > 0 ? "bc-plus" : a.moralPct < 0 ? "bc-minus" : ""}`}>{vz(a.moralPct)} % Eignung</span>
+            <span className={`t ${a.moralPct > 0 ? "bc-plus" : a.moralPct < 0 ? "bc-minus" : ""}`}>{vz(a.moralPct)} {einheit(a)}</span>
           </>
         ) : (
           <span className="fm-leise">noch nicht bewertet</span>
@@ -128,9 +131,9 @@ export function WarumBlock({
       ) : null}
       <div className="fm-summe">
         <span>Zusammen</span>
-        <b className={`t ${a.gesamtPct > 0 ? "bc-plus" : a.gesamtPct < 0 ? "bc-minus" : ""}`}>{vz(a.gesamtPct)} % auf die Eignung</b>
+        <b className={`t ${a.gesamtPct > 0 ? "bc-plus" : a.gesamtPct < 0 ? "bc-minus" : ""}`}>{vz(a.gesamtPct)} % {a.pfad === "legacy" ? "auf den Spielerwert" : "auf die Eignung"}</b>
       </div>
-      <p className="fm-leise fm-hinweis">Form und Moral verschieben die Eignung nur leicht — {ZAHL.format(2)} % bei „heiß“ sind keine Gamechanger.</p>
+      <p className="fm-leise fm-hinweis">Form verschiebt den Wert nur leicht — {ZAHL.format(2)} % bei „heiß“ sind keine Gamechanger.{a.pfad === "legacy" ? " Die Moral wirkt in dieser Wertung stärker (bis +8 % / −10 %)." : ""}</p>
       {onProfil ? (
         <button type="button" className="bc-btn bc-btn--klein" onClick={onProfil}>
           Form-Verlauf im Profil
@@ -181,6 +184,65 @@ export function FormMoralUebersicht({
   );
 }
 
+/** Kopf-Baustein „Team-Form · Moral Ø“: fuenf Zaehler plus Moral-Schnitt (Mockup, Hero rechts). */
+export function TeamFormKopf({ anzeigen }: { anzeigen: FormMoralAnzeige[] }) {
+  const mitForm = anzeigen.filter((a) => a.formVerfuegbar);
+  const mitMoral = anzeigen.filter((a) => a.moral != null);
+  if (mitForm.length === 0 && mitMoral.length === 0) return null;
+  const schnitt = mitMoral.length ? mitMoral.reduce((x, a) => x + (a.moral ?? 0), 0) / mitMoral.length : null;
+  return (
+    <div className="fm-kopf" data-testid="fm-kopf">
+      <span className="fm-gk">Team-Form{schnitt != null ? " · Moral Ø" : ""}</span>
+      <span className="fm-kopf__zeile">
+        {[2, 1, 0, -1, -2].map((s) => (
+          <span key={s} className="t">
+            <BcFormPfeil stufe={s} /> {mitForm.filter((a) => a.formStufe === s).length}
+          </span>
+        ))}
+        {schnitt != null ? <BcMoralGesicht wert={schnitt} groesse={18} /> : null}
+      </span>
+    </div>
+  );
+}
+
+/** Formkarten-Leiste: gelegte Karten als Kacheln (passt / fremd halber Wert) und „Karten fürs Team“ mit alle · Farbe · Form. */
+export function KartenLeiste({ w }: { w: KartenWirkung }) {
+  const summe = (f: (z: KartenWirkung["spieler"][number]["zerlegung"]) => number) => w.spieler.reduce((x, s) => x + f(s.zerlegung), 0);
+  const alle = summe((z) => z.alle);
+  const farbe = summe((z) => z.traeger);
+  const form = summe((z) => z.form);
+  return (
+    <div className="fm-leiste" data-testid="fm-leiste">
+      <div className="fm-leiste__kopf">
+        <span className="fm-gk">Formkarten · {w.karten.length} gelegt</span>
+        <small className="fm-leise">{w.buchung.gebucht ? "zählt in dieser Wertung" : "zählt hier noch nicht"}</small>
+      </div>
+      <div className="fm-leiste__kacheln">
+        {w.karten.length === 0 ? <span className="fm-leise">Keine Karte gelegt.</span> : null}
+        {w.karten.map((k) => (
+          <span key={k.id} className="fm-kachel" style={{ borderColor: FORM_HEX[k.farbe] }}>
+            <b className="t" style={{ color: FORM_HEX[k.farbe] }}>{vz(k.wert, 0)}</b>
+            <span>{FARB_NAME[k.farbe] ?? k.farbe}</span>
+            <small className="fm-leise">{k.spielerName}</small>
+            <small className={k.passt ? "bc-plus" : "fm-leise"}>{k.passt ? "passt" : "fremd ½"}</small>
+          </span>
+        ))}
+      </div>
+      {w.buchung.gebucht ? (
+        <div className="fm-leiste__team" data-testid="fm-leiste-team">
+          <span className="fm-gk">Karten fürs Team</span>
+          <b className="t">{vz(w.teamSumme)}</b>
+          <small className="fm-leise">
+            alle {vz(alle)} · Farbe {vz(farbe)} · Form {vz(form)} (+ Tagesform ±{w.tagesformSpanne} je Spieler)
+          </small>
+        </div>
+      ) : (
+        <p className="fm-warn">{w.buchung.grund}</p>
+      )}
+    </div>
+  );
+}
+
 /** Dreiteilige Karten-Marke am Platz: alle / Farbe / Form. */
 export function KartenMarke({ alle, traeger, form, farbe }: { alle: number; traeger: number; form: number; farbe: string | null }) {
   const summe = alle + traeger + form;
@@ -225,9 +287,25 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
           {w.buchung.grund}
         </p>
       ) : null}
+      <p className="fm-leise" data-testid="fm-tagesform">
+        Dazu kommt je Spieler die <b>Tagesform ±{w.tagesformSpanne}</b> (Zufall, je Spieltag neu). Bei Kartenwerten unter {w.tagesformSpanne} (mit ~) kann das Vorzeichen kippen.
+      </p>
+      {w.vergleich.length > 0 ? (
+        <div className="fm-vergleich" data-testid="fm-vergleich">
+          <span className="fm-gk">Alle Karten im Vergleich</span>
+          {w.vergleich.slice(0, 8).map((v) => (
+            <div key={v.id} className={`fm-vergleich__zeile${v.gewaehlt ? " is-gelegt" : ""}`}>
+              <b className="t" style={{ color: FORM_HEX[v.farbe] }}>{vz(v.wert, 0)}</b>
+              <span>{FARB_NAME[v.farbe] ?? v.farbe} · {v.spielerName}</span>
+              <small className={v.passt ? "bc-plus" : "fm-leise"}>{v.passt ? "passt" : "fremd ½"}</small>
+              <b className="t">{vz(v.teamSumme)}</b>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <table className="fm-tabelle">
         <thead>
-          <tr><th>Wer bekommt</th><th>alle</th><th>Farbe</th><th>Form</th><th>gesamt</th></tr>
+          <tr><th>Wer bekommt</th><th>alle</th><th>Farbe</th><th>Form</th><th>Karte</th></tr>
         </thead>
         <tbody>
           {w.spieler.map((s) => (
@@ -236,12 +314,12 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
               <td className="t">{vz(s.zerlegung.alle)}</td>
               <td className="t">{s.zerlegung.traeger ? vz(s.zerlegung.traeger) : "–"}</td>
               <td className="t">{s.zerlegung.form ? vz(s.zerlegung.form) : "–"}</td>
-              <td className="t"><b>{vz(s.zerlegung.summe)}</b></td>
+              <td className="t"><b>{s.vorzeichenOffen ? "~" : ""}{vz(s.zerlegung.summe)}</b></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr><td colSpan={4}>Team</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
+          <tr><td colSpan={4}>Team (Karten)</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
         </tfoot>
       </table>
     </div>

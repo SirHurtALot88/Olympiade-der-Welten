@@ -274,6 +274,30 @@ export type PlayerFormHistoryEntry = {
   bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
 };
 
+/**
+ * Gespeicherter Verlaufs-Eintrag (KOMPAKT, Review-Befund 6: lange Schluessel und Nullfelder blaehten den
+ * Spielstand um ~670 KB nach zehn Spieltagen). Lesen ueber `entpackeFormVerlauf` (liefert
+ * `PlayerFormHistoryEntry`). Felder ohne Wert fehlen ganz.
+ */
+export type PlayerFormVerlaufEintrag = {
+  /** Spieltag-Id. */
+  m: string;
+  /** Form danach (0..100). */
+  f: number;
+  /** 1 = eingesetzt (fehlt = kein Einsatz). */
+  e?: 1;
+  /** Leistungs-Perzentil 0..100. */
+  l?: number;
+  /** Erwartungs-Perzentil 0..100. */
+  x?: number;
+  /** Disziplin des Perzentils. */
+  d?: string;
+  /** Bremse: a = "e" Erschoepfung / "v" Verletzung, p = Punkte. */
+  b?: { a: "e" | "v"; p: number };
+  /** Form davor, nur am ersten Eintrag einer Saison (sonst der Wert des Vor-Eintrags). */
+  v?: number;
+};
+
 export type PlayerFormState = {
   playerId: string;
   teamId: string;
@@ -285,7 +309,7 @@ export type PlayerFormState = {
    * Verlauf der laufenden Saison (neueste zuletzt, hoechstens `FORM_VERLAUF_MAX`). Additiv und optional:
    * Staende ohne das Feld laden unveraendert, die Kurve beginnt dann beim naechsten Spieltag.
    */
-  verlauf?: PlayerFormHistoryEntry[];
+  verlauf?: PlayerFormVerlaufEintrag[];
 };
 
 export type PlayerRelationshipEventRecord = {
@@ -2744,6 +2768,8 @@ export type PlayerDisciplinePerformanceRecord = {
   slotIndex: number;
   baseValue: number;
   finalPlayerScore: number;
+  /** Systematischer Form-Anteil in `finalPlayerScore` (s. `formSystematisch` der Score-Engine); fehlt bei aelteren Zeilen. */
+  formSystematisch?: number | null;
   mutatorScoreBonus?: number | null;
   mutatorPpsBonus?: number | null;
   /**

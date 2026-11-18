@@ -1,3 +1,4 @@
+import { farbregelAusRegeln } from "@/lib/morale/form-moral-regeln";
 import { buildFormWirkungMap } from "@/lib/morale/form-moral-modifikator";
 import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
 import { countSelectedAvailablePlayers, isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
@@ -213,6 +214,7 @@ function applyTeamPowerDebuffs(teamResults: DisciplineTeamResolvePreview[]) {
       entries: team.entries.map((entry) => ({
         ...entry,
         finalPlayerScore: entry.finalPlayerScore == null ? entry.finalPlayerScore : roundScore(entry.finalPlayerScore * factor),
+        formSystematisch: entry.formSystematisch == null ? entry.formSystematisch : roundScore(entry.formSystematisch * factor),
       })),
       warnings: [...team.warnings, ...debuff.labels.map((label) => `team_power_debuff:${label}`)],
     };
@@ -530,7 +532,7 @@ export function buildLegacyMatchdayResolvePreview(
             fatigueByPlayerId: context.fatigueByPlayerId ?? null,
             injuryByPlayerId: context.injuryByPlayerId ?? null,
             moraleByPlayerId,
-            formWirkungByPlayerId: buildFormWirkungMap(context.gameState, Array.from(resolvePlayerIds)),
+            formWirkungByPlayerId: buildFormWirkungMap(context.gameState, Array.from(resolvePlayerIds), context.formMoralRegeln),
             fatigueSourceStatus: context.fatigueSourceStatus ?? "missing_source",
             injurySourceStatus: context.injurySourceStatus ?? "not_applied",
             intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity,
@@ -556,7 +558,9 @@ export function buildLegacyMatchdayResolvePreview(
               playerIds: sideEntries.map((entry) => entry.playerId),
               rosterPlayers: context.rosterPlayers,
               gameState: context.gameState,
+              formMoral: context.formMoralRegeln?.formMoral,
             }),
+            farbregel: farbregelAusRegeln(context.formMoralRegeln),
           });
           // MUTATOR ORGANISCH IM BATTLE-MODUS (29.09., lib/battle/battle-mutator-organisch.ts):
           // simuliert die Arena-Engine das Ergebnis DIESES Teams in DIESER Disziplin (Battle-Save
@@ -802,6 +806,7 @@ export function buildLegacyMatchdayResolvePreview(
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
           mutatorHits: entry.mutatorHits ?? null,
           formShare: entry.formShare ?? null,
+          formSystematisch: entry.formSystematisch ?? null,
           intensityShare: entry.intensityShare ?? null,
           slotRoleShare: entry.slotRoleShare ?? null,
           teamEffectShare: entry.teamEffectShare ?? null,
@@ -1269,6 +1274,7 @@ export function buildLegacyMatchdayResolvePreview(
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
         mutatorHits: entry.mutatorHits ?? null,
         formShare: entry.formShare ?? null,
+        formSystematisch: entry.formSystematisch == null ? null : scalePlayerScore(entry.formSystematisch),
         intensityShare: entry.intensityShare ?? null,
         slotRoleShare: entry.slotRoleShare ?? null,
         teamEffectShare: entry.teamEffectShare ?? null,

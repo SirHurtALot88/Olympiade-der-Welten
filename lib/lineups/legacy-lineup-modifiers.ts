@@ -828,10 +828,12 @@ export function buildFormkartenPlayers(input: {
   playerIds: string[];
   rosterPlayers?: Array<{ id: string; className?: string | null }> | null;
   gameState?: GameState | null;
+  /** Regelstand aus dem Lineup-Kontext (schlaegt die Umgebungsvariable). */
+  formMoral?: boolean;
 }): Array<{ playerId: string; className: string | null; formStufe: number }> {
   const klasse = new Map((input.rosterPlayers ?? []).map((p) => [p.id, p.className ?? null]));
   const spielerKlasse = input.gameState ? new Map(input.gameState.players.map((p) => [p.id, p.className])) : null;
-  const stufen = isFormMoralEnabled() && input.gameState
+  const stufen = (input.formMoral ?? isFormMoralEnabled()) && input.gameState
     ? new Map((input.gameState.playerFormState ?? []).map((z) => [z.playerId, formToStufe(z.form)]))
     : null;
   return input.playerIds.map((playerId) => ({

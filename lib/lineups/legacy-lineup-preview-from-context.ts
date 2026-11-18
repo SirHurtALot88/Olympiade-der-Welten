@@ -1,3 +1,4 @@
+import { farbregelAusRegeln } from "@/lib/morale/form-moral-regeln";
 import { buildFormWirkungMap } from "@/lib/morale/form-moral-modifikator";
 import {
   buildFormkartenPlayers,
@@ -157,7 +158,9 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         playerIds: sideEntries.map((entry) => entry.playerId),
         rosterPlayers: context.rosterPlayers,
         gameState: resolvedGameState,
+        formMoral: context.formMoralRegeln?.formMoral,
       }),
+      farbregel: farbregelAusRegeln(context.formMoralRegeln),
     });
     const mutatorResult = calculateMutatorModifierForSide({
       modifiers: previewModifiers,
@@ -240,7 +243,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
           null,
         fatigueByPlayerId: fatigueMap,
         moraleByPlayerId,
-        formWirkungByPlayerId: buildFormWirkungMap(resolvedGameState, Array.from(previewPlayerIds)),
+        formWirkungByPlayerId: buildFormWirkungMap(resolvedGameState, Array.from(previewPlayerIds), context.formMoralRegeln),
         fatigueSourceStatus: fatigueMap ? "mapped" : "missing_source",
         intensity: previewModifiers[disciplineSide].intensity,
         slotRoleModifier,

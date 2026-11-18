@@ -122,3 +122,27 @@ Spielstand keine `playerFormState` hat, die Karten-Zahlen der Einsatzliste folge
 - Formdynamik: ein ▲▲-Spieler, der nur „auf Erwartung“ spielt, fällt um bis zu 8 Punkte (Ziel ist die Mitte). Das ist konzeptgemäß,
   wirkt im Bericht hart; der Bericht erklärt es mit „Die Form nähert sich der Mitte.“
 - Kopplung Server-/Browser-Schalter, Legacy-Moral auf Arena-Skala (Frage 3), Nachmessung der Farbregel über alle 20 Disziplinen.
+
+## Review-Nachträge (18.11., Opus-Review zu PR #1571)
+
+1. **Moral gezeigt = gebucht.** Die Anzeige kennt zwei Pfade (`wertungsPfad`): Legacy-Wertung (Manager-Modus und PPS-Disziplinen im Battle-Modus) zeigt den
+   Moralanteil aus `buildPlayerMoralePerformanceMap` (+8 %/−10 %, „% Spielerwert“), die Arena (Battle, arena-aufgelöst) den aus `buildFormMoralMultipliers`
+   („% Eignung“, höchstens ±⅔ Dosis). Die Legacy-Skala selbst bleibt unverändert. Test: Anzeige-Prozent == gebuchter Multiplikator je Pfad.
+2. **Formkarten-Dropdown und Formboard** (`LegacyLineupLabClient`, `FormBoardPanel`) zeigen „x2“ nur noch bei der alten Regel; die neue zeigt
+   „passt: +8 alle, +4 Farbe“ aus `kartenEffekt` (= `kartenZerlegungFuerSpieler`).
+3. **Regelstand serverseitig.** `LegacyLineupLoadedContext.formMoralRegeln` ({formMoral, dosisPct, farbregel}) wird vom Server gesetzt
+   (`lib/morale/form-moral-regeln.ts`); Anzeige, lokale Vorschau und Resolve lesen ihn statt `process.env`.
+4. **Keine Selbstverstärkung der Form.** Die Score-Engine liefert je Spieler `formSystematisch` (Form-Multiplikator + flacher Kartenwert, ohne
+   Tagesform-Zufall), das auf `playerDisciplinePerformances` gespeichert wird; die Fortschreibung vergleicht `finalPlayerScore − formSystematisch` mit
+   der Erwartung. Verteilung der nachgeführten Form am Abbild (10 Spieltage, 328 Spieler mit Einsatz, damalige Verletzung/Erschöpfung aus `injuryEvents`):
+   min 11,4 / p10 33,1 / Median 50,7 / p90 67,2 / max 83,9, Mittel 50,5; Stufen ▲▲ 2,7 %, ▲ 29,0 %, – 41,2 %, ▼ 22,6 %, ▼▼ 4,6 %.
+   Einschränkung: das Abbild stammt aus der Zeit vor der Form, seine Leistungszeilen enthalten noch keinen Form-Anteil — der Effekt der Korrektur selbst
+   lässt sich erst an einer Saison mit aktiver Form messen.
+5. **Nachführ-Skript** nimmt Verletzung und Erschöpfung von damals aus `injuryEvents` (statt des heutigen Stands).
+6. **Größe.** Kompakter Verlauf (`m`, `f`, `e`, `l`, `x`, `d`, `b`, `v` nur am ersten Eintrag, keine Nullfelder, Saison in der Zeile):
+   251 KB statt 669 KB nach zehn Spieltagen. `entpackeFormVerlauf` liefert die lesbare Form.
+7. **Form als eigener Schritt** in der Score-Engine (`formMultiplierPunkte`), `moraleModifier` bleibt reine Moral.
+8. **Tagesform in der Karten-Anzeige** ausgewiesen („Tagesform ±4“), Zeilen mit |Kartenwert| < 4 tragen ein „~“ (Vorzeichen kann kippen).
+9. **KI** (`formCardDeploymentValue`, `takeCheapestNegativeFormCard`) rechnet über `kartenEffekt`.
+CI-Fall `legacy-matchday-resolve` (Form-Summe 0,2 statt ≥ 4): gewollte neue Regel (Karte rot +4 / blau +2 in einer anderen Disziplinfarbe zählt nur halb bzw. voll
+ohne Farbträger); Test leitet den Sollwert jetzt aus `formkartenSummeFuerSpieler` ab, ein Zweitfall pinnt die alte Regel, dazu „Vorschau = Resolve“ je Regel.

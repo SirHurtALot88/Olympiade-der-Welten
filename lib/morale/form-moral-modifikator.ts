@@ -27,7 +27,7 @@
  * Intensität (Aufstellungs-/Kader-Adapter). Die Engine bleibt unangetastet; der Wertungs-
  * Fingerabdruck verschiebt sich nicht, solange der Schalter aus ist.
  */
-import type { GameState, PlayerFormHistoryEntry, PlayerFormState, PlayerMoraleState } from "@/lib/data/olyDataTypes";
+import type { GameState, PlayerFormHistoryEntry, PlayerFormState, PlayerFormVerlaufEintrag, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 
 /** Neutralpunkt beider Skalen (0..100): Form und Moral liegen im Mittel bei 50. */
 export const FORM_MORAL_NEUTRAL = 50;
@@ -246,7 +246,7 @@ export type MatchdayLeistungDetail = {
 };
 
 export function buildMatchdayLeistungDetails(
-  performances: Array<{ playerId: string; disciplineId: string; baseValue: number; finalPlayerScore: number }>,
+  performances: Array<{ playerId: string; disciplineId: string; baseValue: number; finalPlayerScore: number; formSystematisch?: number | null }>,
 ): Map<string, MatchdayLeistungDetail> {
   const jeDisziplin = new Map<string, typeof performances>();
   for (const zeile of performances) {
@@ -258,7 +258,12 @@ export function buildMatchdayLeistungDetails(
   for (const [disziplinId, zeilen] of jeDisziplin) {
     if (zeilen.length < 3) continue;
     const erwartung = perzentile(zeilen.map((z) => (istZahl(z.baseValue) ? z.baseValue : 0)));
-    const leistung = perzentile(zeilen.map((z) => (istZahl(z.finalPlayerScore) ? z.finalPlayerScore : 0)));
+    // Review-Befund 4 (Selbstverstaerkung): die Leistung wird OHNE den systematischen Form-Anteil
+    // (Form-Multiplikator + flacher Kartenwert inkl. Farbtraeger/Form-Hebel) verglichen; der Tagesform-
+    // Zufall (+-4) bleibt drin — er ist das, was die Form messen soll. Aeltere Zeilen: finalPlayerScore.
+    const leistung = perzentile(
+      zeilen.map((z) => (istZahl(z.finalPlayerScore) ? z.finalPlayerScore - (istZahl(z.formSystematisch) ? z.formSystematisch : 0) : 0)),
+    );
     zeilen.forEach((zeile, index) => {
       const eintrag = summen.get(zeile.playerId) ?? { summe: 0, anzahl: 0, best: null };
       const abstand = leistung[index] - erwartung[index];
@@ -294,7 +299,12 @@ export function buildMatchdayResiduals(
  * denselben Spieltag auf, bleibt die zweite Fassung stehen (`lastMatchdayId`), die Form wird nicht
  * doppelt gezogen. Reine Funktion über den Spielstand; liefert die neue Liste.
  */
-export function advancePlayerFormState(gameState: GameState, matchdayId: string): PlayerFormState[] {
+export function advancePlayerFormState(
+  gameState: GameState,
+  matchdayId: string,
+  /** Nur fuer Nachfuehrung vergangener Spieltage (Skript): Verletzung/Erschoepfung von DAMALS statt dem heutigen Stand. */
+  historisch?: { verletzt: Set<string>; erschoepfung: Map<string, number> },
+): PlayerFormState[] {
   const seasonId = gameState.season.id;
   const vorhandene = new Map((gameState.playerFormState ?? []).map((zeile) => [zeile.playerId, zeile]));
   const ergebnisse = gameState.seasonState.matchdayResults ?? [];
@@ -305,6 +315,7 @@ export function advancePlayerFormState(gameState: GameState, matchdayId: string)
     ergebnisIds.has(p.matchdayResultId),
   );
   const details = buildMatchdayLeistungDetails(leistungen);
+
   const eingesetzt = new Set(leistungen.map((p) => p.playerId));
   const verfuegbarkeit = new Map((gameState.seasonState.playerAvailabilityState ?? []).map((v) => [v.playerId, v]));
   const spielerFatigue = new Map(gameState.players.map((p) => [p.id, p.fatigue]));
@@ -320,29 +331,29 @@ export function advancePlayerFormState(gameState: GameState, matchdayId: string)
       continue;
     }
     const verf = verfuegbarkeit.get(roster.playerId);
-    const verletzt = verf != null && verf.injuryStatus !== "healthy";
+    const verletzt = historisch ? historisch.verletzt.has(roster.playerId) : verf != null && verf.injuryStatus !== "healthy";
     const detail = details.get(roster.playerId);
     const spielte = eingesetzt.has(roster.playerId);
     const { form, bremse } = advancePlayerFormDetail({
       form: alt?.form,
       eingesetzt: spielte,
       residuum: detail?.residuum ?? 0,
-      erschoepfung: verf?.fatigue ?? spielerFatigue.get(roster.playerId) ?? 0,
+      erschoepfung: historisch ? historisch.erschoepfung.get(roster.playerId) ?? 0 : verf?.fatigue ?? spielerFatigue.get(roster.playerId) ?? 0,
       verletzt,
     });
-    // Verlauf: nur die laufende Saison, hoechstens FORM_VERLAUF_MAX Eintraege.
-    const bisher = (alt?.verlauf ?? []).filter((v) => v.seasonId === seasonId);
-    const eintrag: PlayerFormHistoryEntry = {
-      seasonId,
-      matchdayId,
-      form,
-      vorher: round(clamp(istZahl(alt?.form) ? alt.form : FORM_MORAL_NEUTRAL, 0, 100), 1),
-      eingesetzt: spielte,
-      leistungPerz: spielte && detail ? detail.leistungPerz : null,
-      erwartungPerz: spielte && detail ? detail.erwartungPerz : null,
-      disziplinId: spielte && detail ? detail.disziplinId : null,
-      bremse: spielte || verletzt ? bremse : null,
-    };
+    // Verlauf: nur die laufende Saison (beim Saisonwechsel wird er geleert), hoechstens FORM_VERLAUF_MAX Eintraege,
+    // KOMPAKT gespeichert (nur gesetzte Felder).
+    const neueSaison = !alt || alt.lastSeasonId !== seasonId;
+    const bisher = neueSaison ? [] : (alt?.verlauf ?? []);
+    const eintrag: PlayerFormVerlaufEintrag = { m: matchdayId, f: form };
+    if (spielte) eintrag.e = 1;
+    if (spielte && detail) {
+      eintrag.l = detail.leistungPerz;
+      eintrag.x = detail.erwartungPerz;
+      eintrag.d = detail.disziplinId;
+    }
+    if ((spielte || verletzt) && bremse) eintrag.b = { a: bremse.art === "verletzung" ? "v" : "e", p: bremse.punkte };
+    if (bisher.length === 0) eintrag.v = round(clamp(istZahl(alt?.form) ? alt.form : FORM_MORAL_NEUTRAL, 0, 100), 1);
     ergebnis.push({
       playerId: roster.playerId,
       teamId: roster.teamId,
@@ -409,9 +420,12 @@ export function scaleArenaPlayerByMultiplier<
 export function buildFormWirkungMap(
   gameState: GameState | null | undefined,
   playerIds: string[],
-  dosisPct: number = resolveFormMoralDosisPct(),
+  regeln?: { formMoral: boolean; dosisPct: number } | null,
 ): Record<string, { multiplier: number; modifierPct: number }> | null {
-  if (!gameState || !isFormMoralEnabled()) return null;
+  // `regeln` (aus dem Lineup-Kontext, Review-Befund 3) schlaegt die Umgebungsvariablen.
+  const aktiv = regeln ? regeln.formMoral : isFormMoralEnabled();
+  const dosisPct = regeln ? regeln.dosisPct : resolveFormMoralDosisPct();
+  if (!gameState || !aktiv) return null;
   const form = new Map((gameState.playerFormState ?? []).map((z) => [z.playerId, z.form]));
   const ergebnis: Record<string, { multiplier: number; modifierPct: number }> = {};
   for (const id of playerIds) {
@@ -422,4 +436,20 @@ export function buildFormWirkungMap(
     ergebnis[id] = { multiplier: round(1 + signal.formPct / 100, 5), modifierPct: signal.formPct };
   }
   return Object.keys(ergebnis).length > 0 ? ergebnis : null;
+}
+
+/** Kompakten Verlauf in die lesbare Form bringen (vorher aus dem Vor-Eintrag, Saison aus der Zeile). */
+export function entpackeFormVerlauf(zeile: Pick<PlayerFormState, "verlauf" | "lastSeasonId"> | null | undefined): PlayerFormHistoryEntry[] {
+  const liste = zeile?.verlauf ?? [];
+  return liste.map((e, i) => ({
+    seasonId: zeile!.lastSeasonId,
+    matchdayId: e.m,
+    form: e.f,
+    vorher: i > 0 ? liste[i - 1].f : e.v ?? FORM_MORAL_NEUTRAL,
+    eingesetzt: e.e === 1,
+    leistungPerz: e.l ?? null,
+    erwartungPerz: e.x ?? null,
+    disziplinId: e.d ?? null,
+    bremse: e.b ? { art: e.b.a === "v" ? ("verletzung" as const) : ("erschoepfung" as const), punkte: e.b.p } : null,
+  }));
 }

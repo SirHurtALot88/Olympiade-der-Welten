@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const legacyMoral = vi.hoisted(() => ({ map: null as null | Record<string, { morale: number; modifierPct: number; multiplier: number }> }));
+vi.mock("@/lib/morale/player-morale-performance", async (orig) => {
+  const echt = (await orig()) as Record<string, unknown>;
+  return { ...echt, buildPlayerMoralePerformanceMap: () => legacyMoral.map };
+});
 import type { GameState, PlayerFormState } from "@/lib/data/olyDataTypes";
 import {
   FARBREGEL_PM,
@@ -16,6 +22,8 @@ import { baueFormMeldungen, baueFormMoralAnzeige, formBegruendung } from "@/lib/
 import {
   FORM_VERLAUF_MAX,
   advancePlayerFormDetail,
+  buildFormMoralMultipliers,
+  entpackeFormVerlauf,
   advancePlayerFormState,
   buildFormWirkungMap,
   buildMatchdayLeistungDetails,
@@ -181,19 +189,21 @@ describe("Form-Verlauf", () => {
     const liste = advancePlayerFormState(mini(), "md1");
     const p1 = liste.find((z) => z.playerId === "p1")!;
     expect(p1.verlauf).toHaveLength(1);
-    expect(p1.verlauf![0]).toMatchObject({ seasonId: "s1", matchdayId: "md1", eingesetzt: true, disziplinId: "tennis", vorher: 50 });
-    expect(p1.verlauf![0].leistungPerz).toBeGreaterThan(p1.verlauf![0].erwartungPerz!);
+    const v0 = entpackeFormVerlauf(p1)[0];
+    expect(v0).toMatchObject({ seasonId: "s1", matchdayId: "md1", eingesetzt: true, disziplinId: "tennis", vorher: 50 });
+    expect(v0.leistungPerz).toBeGreaterThan(v0.erwartungPerz!);
     expect(p1.form).toBeGreaterThan(50);
     const p4 = liste.find((z) => z.playerId === "p4")!;
-    expect(p4.verlauf![0].bremse?.art).toBe("erschoepfung");
-    expect(p4.verlauf![0].bremse!.punkte).toBeGreaterThan(0);
+    expect(entpackeFormVerlauf(p4)[0].bremse?.art).toBe("erschoepfung");
+    expect(entpackeFormVerlauf(p4)[0].bremse!.punkte).toBeGreaterThan(0);
   });
 
   it("Spieler ohne Einsatz: Eintrag mit eingesetzt=false, kein Perzentil", () => {
     const gs = mini();
     gs.rosters.push({ id: "r-p5", playerId: "p5", teamId: "t1" } as never);
     const p5 = advancePlayerFormState(gs, "md1").find((z) => z.playerId === "p5")!;
-    expect(p5.verlauf![0]).toMatchObject({ eingesetzt: false, leistungPerz: null, bremse: null });
+    expect(entpackeFormVerlauf(p5)[0]).toMatchObject({ eingesetzt: false, leistungPerz: null, bremse: null });
+    expect(p5.verlauf![0]).toEqual({ m: "md1", f: p5.form, v: 50 });
   });
 
   it("idempotent je Spieltag und hängt an einen vorhandenen Verlauf an; alte Stände ohne Feld laden", () => {
@@ -204,24 +214,23 @@ describe("Form-Verlauf", () => {
     const alt: PlayerFormState[] = [{ playerId: "p1", teamId: "t1", form: 60, lastSeasonId: "s1", lastMatchdayId: "md0", appearances: 2 }];
     const neu = advancePlayerFormState({ ...gs, playerFormState: alt }, "md1").find((z) => z.playerId === "p1")!;
     expect(neu.verlauf).toHaveLength(1);
-    expect(neu.verlauf![0].vorher).toBe(60);
+    expect(entpackeFormVerlauf(neu)[0].vorher).toBe(60);
     expect(neu.appearances).toBe(3);
   });
 
   it("Verlauf ist auf FORM_VERLAUF_MAX begrenzt und enthält nur die laufende Saison", () => {
     let gs = mini();
-    const viele = Array.from({ length: FORM_VERLAUF_MAX + 5 }, (_, i) => ({
-      seasonId: i < 3 ? "s0" : "s1", matchdayId: `m${i}`, form: 50, vorher: 50, eingesetzt: false,
-    }));
+    const viele = Array.from({ length: FORM_VERLAUF_MAX + 5 }, (_, i) => ({ m: `m${i}`, f: 50 }));
     gs = { ...gs, playerFormState: [{ playerId: "p1", teamId: "t1", form: 50, lastSeasonId: "s1", lastMatchdayId: "mx", appearances: 0, verlauf: viele }] };
     const p1 = advancePlayerFormState(gs, "md1").find((z) => z.playerId === "p1")!;
     expect(p1.verlauf!.length).toBe(FORM_VERLAUF_MAX);
-    expect(p1.verlauf!.every((v) => v.seasonId === "s1")).toBe(true);
+    // Saison-Zuordnung steckt in der Zeile (lastSeasonId), nicht je Eintrag.
+    expect(entpackeFormVerlauf(p1).every((v) => v.seasonId === "s1")).toBe(true);
   });
 
   it("Saisonwechsel: Form zur Mitte, Verlauf leer, Einsatzzähler bleibt", () => {
     const reset = resetPlayerFormForNewSeason([
-      { playerId: "p1", teamId: "t1", form: 85, lastSeasonId: "s1", lastMatchdayId: "m9", appearances: 7, verlauf: [{ seasonId: "s1", matchdayId: "m9", form: 85, vorher: 80, eingesetzt: true }] },
+      { playerId: "p1", teamId: "t1", form: 85, lastSeasonId: "s1", lastMatchdayId: "m9", appearances: 7, verlauf: [{ m: "m9", f: 85, e: 1 }] },
     ])!;
     expect(reset[0]).toMatchObject({ form: 50, verlauf: [], appearances: 7 });
     expect(resetPlayerFormForNewSeason(undefined)).toBeUndefined();
@@ -285,5 +294,110 @@ describe("Moral als Gesicht: Stufen und Farbe folgen dem Wert", () => {
     expect(moralMund(50)).toBe(0);
     expect(moralMund(100)).toBe(1);
     expect(moralMund(70)).toBeGreaterThan(moralMund(40));
+  });
+});
+
+describe("Review-Befunde 18.11.", () => {
+  beforeEach(() => {
+    legacyMoral.map = null;
+  });
+
+  it("Befund 1: Anzeige-Prozent == gebuchter Multiplikator, je Pfad", () => {
+    const gs = mini();
+    const mitForm = { ...gs, playerFormState: advancePlayerFormState(gs, "md1") } as GameState;
+    // Legacy: gebucht wird calculatePlayerMoralePerformanceSignal (+8 %/-10 %) aus buildPlayerMoralePerformanceMap.
+    legacyMoral.map = { p1: { morale: 75, modifierPct: 4, multiplier: 1.04 } };
+    const legacy = baueFormMoralAnzeige(mitForm, "p1", { pfad: "legacy" });
+    expect(legacy.moralPct).toBe(4);
+    const formGebucht = buildFormWirkungMap(mitForm, ["p1"])!.p1;
+    expect(legacy.formPct).toBeCloseTo(formGebucht.modifierPct, 5);
+    expect(legacy.gesamtPct).toBeCloseTo((formGebucht.multiplier * 1.04 - 1) * 100, 2);
+    // Arena: gebucht wird der Multiplikator aus buildFormMoralMultipliers (calculateFormMoralSignal).
+    const arena = baueFormMoralAnzeige(mitForm, "p1", { pfad: "arena" });
+    const gebucht = buildFormMoralMultipliers(mitForm, "t1").get("p1")!;
+    expect(arena.gesamtPct).toBeCloseTo(gebucht.modifierPct, 3);
+    expect(arena.moralPct).toBeCloseTo(gebucht.moralePct, 3);
+    // Die beiden Pfade zeigen verschiedene Moral-Prozente (Moral 75: ~+4 % gegen ~+0,4 %).
+    expect(Math.abs(legacy.moralPct)).toBeGreaterThan(Math.abs(arena.moralPct));
+  });
+
+  it("Befund 3: Regelstand aus dem Kontext schlägt Umgebung und Standard", () => {
+    const gs = mini();
+    const mitForm = { ...gs, playerFormState: advancePlayerFormState(gs, "md1") } as GameState;
+    expect(baueFormMoralAnzeige(mitForm, "p1", { regeln: { formMoral: false, dosisPct: 1, farbregel: "alt" } }).formVerfuegbar).toBe(false);
+    const eins = baueFormMoralAnzeige(mitForm, "p1", { regeln: { formMoral: true, dosisPct: 1, farbregel: "neu" } }).formPct;
+    const zwei = baueFormMoralAnzeige(mitForm, "p1", { regeln: { formMoral: true, dosisPct: 2, farbregel: "neu" } }).formPct;
+    expect(zwei).toBeCloseTo(2 * eins, 3);
+    expect(buildFormWirkungMap(mitForm, ["p1"], { formMoral: false, dosisPct: 1 })).toBeNull();
+    const w = (farbregel: "neu" | "alt") =>
+      berechneKartenWirkung({
+        side: "d1",
+        disciplineId: "basketball",
+        disciplineCategory: "social",
+        formCards: KARTEN,
+        primaryCardId: "k1",
+        secondaryCardId: null,
+        playerIds: ["a"],
+        rosterPlayers: [{ id: "a", name: "A", className: "Bard" }] as never,
+        regeln: { formMoral: true, dosisPct: 1, farbregel },
+      });
+    expect(w("alt").regelNeu).toBe(false);
+    expect(w("alt").teamSumme).toBe(16);
+    expect(w("neu").regelNeu).toBe(true);
+    expect(w("neu").teamSumme).toBe(12);
+  });
+
+  it("Befund 4: die Form-Fortschreibung vergleicht ohne den systematischen Form-Anteil (keine Selbstverstärkung)", () => {
+    const zeilen = [
+      { playerId: "heiss", disciplineId: "d", baseValue: 50, finalPlayerScore: 60, formSystematisch: 20 },
+      { playerId: "mitte", disciplineId: "d", baseValue: 40, finalPlayerScore: 45, formSystematisch: 0 },
+      { playerId: "kalt", disciplineId: "d", baseValue: 30, finalPlayerScore: 35, formSystematisch: 0 },
+    ];
+    const ohne = buildMatchdayLeistungDetails(zeilen.map((z) => ({ playerId: z.playerId, disciplineId: z.disciplineId, baseValue: z.baseValue, finalPlayerScore: z.finalPlayerScore })));
+    const mit = buildMatchdayLeistungDetails(zeilen);
+    expect(ohne.get("heiss")!.leistungPerz).toBe(100);
+    // Ohne die 20 systematischen Punkte (40) liegt er hinter "mitte" (45).
+    expect(mit.get("heiss")!.leistungPerz).toBeLessThan(100);
+    expect(mit.get("heiss")!.residuum).toBeLessThan(ohne.get("heiss")!.residuum);
+  });
+
+  it("Befund 6: der Verlauf ist kompakt (nur gesetzte Felder, kurze Schlüssel) und round-trippt", () => {
+    const gs = mini();
+    const liste = advancePlayerFormState(gs, "md1");
+    const p2 = liste.find((z) => z.playerId === "p2")!;
+    expect(Object.keys(p2.verlauf![0]).sort()).toEqual(["d", "e", "f", "l", "m", "v", "x"]);
+    expect(JSON.stringify(p2.verlauf).length).toBeLessThan(120);
+    const zweiter = advancePlayerFormState({ ...gs, playerFormState: liste } as GameState, "md2");
+    const p2b = zweiter.find((z) => z.playerId === "p2")!;
+    expect(p2b.verlauf).toHaveLength(2);
+    expect(p2b.verlauf![1].v).toBeUndefined();
+    expect(entpackeFormVerlauf(p2b)[1].vorher).toBe(p2b.verlauf![0].f);
+  });
+
+  it("Befund 8: Karten-Anzeige weist die Tagesform ±4 aus und markiert kippende Vorzeichen", () => {
+    const w = berechneKartenWirkung({
+      side: "d1",
+      disciplineId: "basketball",
+      disciplineCategory: "social",
+      formCards: KARTEN,
+      primaryCardId: "k2",
+      secondaryCardId: null,
+      playerIds: ["a", "c"],
+      rosterPlayers: [{ id: "a", name: "A", className: "Bard" }, { id: "c", name: "C", className: "Tank" }] as never,
+      regeln: { formMoral: true, dosisPct: 1, farbregel: "neu" },
+    });
+    expect(w.tagesformSpanne).toBe(4);
+    const nach = Object.fromEntries(w.spieler.map((s) => [s.playerId, s]));
+    expect(nach.a.zerlegung.summe).toBe(-2);
+    expect(nach.a.vorzeichenOffen).toBe(true);
+    expect(nach.c.zerlegung.summe).toBe(-4);
+    expect(nach.c.vorzeichenOffen).toBe(false);
+    // Und es stimmt: bei Kartenwert -2 kippt das Vorzeichen für manche Seeds (die Wertung addiert +-4 Tagesform).
+    const anteile = distributePerPlayerFormShares({
+      formPerPlayer: -2,
+      seeds: Array.from({ length: 40 }, (_, i) => `p-${i}|d|m`),
+      flatBySeedIndex: Array(40).fill(-2),
+    });
+    expect(anteile.some((x) => x > 0) && anteile.some((x) => x < 0)).toBe(true);
   });
 });
