@@ -1,0 +1,25 @@
+{
+ "prompt": "A finish buzzer flash, pixel art, plays once, about 0.6 seconds. A red button lights up with a bright red-white flash, two red light rings expand outward and a few white sparks fly off, then fade. Colours: red, white, a little yellow. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+ "artist": "lite",
+ "job": "53ecf281-ed1b-4d4c-9202-f015b61f807f",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.0,
+ "gen_vorher": 515.5396546146003,
+ "gen_nachher": 514.5396546146003,
+ "datum": "2026-11-18T20:58:48Z",
+ "effect_id": "4370068d-ce77-482e-8fe7-95285528d284",
+ "canvas": {
+  "h": 64,
+  "w": 64
+ },
+ "frames": 8,
+ "fps": 12,
+ "loop": false,
+ "anchor": {
+  "x": 32,
+  "y": 32,
+  "kind": "origin"
+ },
+ "message": "A 64px one-shot button flash, about 0.6 seconds: the small red button flares white-hot, two red rings expand outward, and white and yellow sparks fly off and fade. The rings and sparks are the main things to tweak: try the Speed of the sparks or the ring sizes if you want it bigger or tighter.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=4370068d-ce77-482e-8fe7-95285528d284"
+}
