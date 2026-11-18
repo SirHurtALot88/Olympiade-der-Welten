@@ -238,6 +238,10 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
   verraten (Chris, 18.11.).
+  Regeln (Chris, 18.11., Kader-&-Teams-Mockup #1595 Abschnitt 7a): feste Stufen (unbekannt 10er, beobachtet 5er, gescoutet
+  exakt), nie „~Zahl“ um den wahren Wert; Sortieren nach Stufe, Gleichstand nach Name. **Marktwert ist immer exakt
+  sichtbar.** Kaderstärke fremder Teams als grobe Stufe, exakt nur bei vollem Scouting. **Eine Einstellung schaltet den Fog
+  of War ganz aus** (Testzwecke, Spielbeginn). Ränge gegen die eigene Liga, klein daneben gegen alle 32.
 - **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
