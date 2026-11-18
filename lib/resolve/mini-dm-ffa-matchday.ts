@@ -35,6 +35,7 @@ import {
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import {
   getMiniDmPodsForMatchday,
   resolveMiniDmFfaPlayerCountForMatchday,
@@ -249,6 +250,10 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     ...input.runMiniDmFfaPodFixturesOptions,
     mutatoren: input.mutatorTraits ? [...input.mutatorTraits] : undefined,
     k,
+    // VERLETZUNG IM MOTOR (18.11.), s. `runBattleModeArenaMatchday()`: derselbe Wurf wie Buchung und Hash.
+    verletzungsstand:
+      input.runMiniDmFfaPodFixturesOptions?.verletzungsstand ??
+      ermittleArenaVerletzungsstand({ gameState: input.gameState, saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId }),
     // AUFSTELLUNG ECHT (PR A, Default -- hier nicht ueberschrieben): der Motor braucht die reale
     // Aufstellung als `platzJeTeam`, DAMIT die Reihum-Auswahl ueberhaupt die richtigen Spieler
     // uebrig laesst/ausschliesst. Die Teilnahme-Pruefung DIESER Datei (s. Kopfkommentar) ist davon

@@ -12,6 +12,7 @@ import {
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import type { ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
 import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
 import {
@@ -420,6 +421,14 @@ export type RunArenaFixturesOptions = {
    * durchreichen, sonst faellt fast der ganze Kader fremder Teams aus `buildArenaTeam()` raus.
    */
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  /**
+   * VERLETZUNG IM MOTOR (Chris, 18.11., docs/design/verletzung-regel-18-11.md Luecke D/B):
+   * `ermittleArenaVerletzungsstand()` des Spieltags, durchgereicht an `buildArenaTeam()`. Heute
+   * Verletzte treten mit 50 % ihrer Eignung an, aus einem Vorspieltag Gesperrte gar nicht. Gesetzt
+   * vom Spieltags-Aufrufer (battle-mode-arena-team-points.ts bzw. *-pod-matchday.ts), der Saat und
+   * Spieltag kennt; ohne Feld (Messwerkzeuge, Tests) der Kader wie bisher.
+   */
+  verletzungsstand?: ArenaVerletzungsstand | null;
   /** Override fuer Tests/andere Umgebungen; Default ist der feste Server-Pfad. */
   chromiumExecutablePath?: string;
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
@@ -578,10 +587,11 @@ export function bereiteFixturesVor(
   fixtures: ArenaFixtureInput[],
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>,
   disziplin?: string,
+  verletzungsstand?: ArenaVerletzungsstand | null,
 ): VorbereitetesFixture[] {
   return fixtures.map((fixture) => {
-    const heim = buildArenaTeam(gameState, fixture.homeTeamId, attributeSheetOverrides);
-    const gast = buildArenaTeam(gameState, fixture.awayTeamId, attributeSheetOverrides);
+    const heim = buildArenaTeam(gameState, fixture.homeTeamId, attributeSheetOverrides, verletzungsstand);
+    const gast = buildArenaTeam(gameState, fixture.awayTeamId, attributeSheetOverrides, verletzungsstand);
     // Die Aufstellung des Spieltags wird hier mit vorbereitet, aus demselben Grund wie die
     // Kader: server-seitig, VOR dem Browser-Start. Ohne Entwurf bleibt sie leer.
     const aufstellung = buildArenaAufstellungBeide(
@@ -881,7 +891,7 @@ export async function runArenaFixtures(
 ): Promise<ArenaFixtureResult[]> {
   if (fixtures.length === 0) return [];
 
-  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin);
+  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin, options.verletzungsstand);
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
@@ -1088,6 +1098,8 @@ export type RoherMiniDmFfaEventErgebnis = {
 
 export type RunMiniDmFfaPodFixturesOptions = {
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  /** s. `RunArenaFixturesOptions.verletzungsstand`. */
+  verletzungsstand?: ArenaVerletzungsstand | null;
   chromiumExecutablePath?: string;
   seitenTimeoutMs?: number;
   /** Der Spieltagswurf (20.10., PR A) — s. Kopfkommentar oben, `RunArenaFixturesOptions.mutatoren`
@@ -1185,7 +1197,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
 export function bereiteMiniDmPodsVor(
   gameState: GameState,
   pods: MiniDmFfaPodFixtureInput[],
-  options: Pick<RunMiniDmFfaPodFixturesOptions, "attributeSheetOverrides" | "aufstellungBeachten" | "matchdayId"> = {},
+  options: Pick<RunMiniDmFfaPodFixturesOptions, "attributeSheetOverrides" | "aufstellungBeachten" | "matchdayId" | "verletzungsstand"> = {},
 ) {
   // AUFSTELLUNG (20.10., PR A) — je Team EIN `place` (buildArenaAufstellung(), kein Merge noetig,
   // s. Kopfkommentar). `aufstellungBeachten: false` haelt bewusst beim alten Verhalten (leere
@@ -1198,7 +1210,7 @@ export function bereiteMiniDmPodsVor(
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
-    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides, options.verletzungsstand)),
     platzJeTeam: aufstellungBeachten
       ? pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId))
       : pod.teamIds.map(() => ({}) as ArenaAufstellung),
@@ -1405,6 +1417,8 @@ export type BahnPodFixtureResult = {
 
 export type RunBahnPodFixturesOptions = {
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  /** s. `RunArenaFixturesOptions.verletzungsstand`. */
+  verletzungsstand?: ArenaVerletzungsstand | null;
   chromiumExecutablePath?: string;
   seitenTimeoutMs?: number;
   /** Der Spieltagswurf dieser Disziplin (wie `RunArenaFixturesOptions.mutatoren`). Ohne: kein Mutator. */
@@ -1457,13 +1471,13 @@ async function simuliereBahnPodsImBrowser(payload: {
 export function bereiteBahnPodsVor(
   gameState: GameState,
   pods: BahnPodFixtureInput[],
-  options: Pick<RunBahnPodFixturesOptions, "attributeSheetOverrides" | "matchdayId"> = {},
+  options: Pick<RunBahnPodFixturesOptions, "attributeSheetOverrides" | "matchdayId" | "verletzungsstand"> = {},
 ) {
   const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
-    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides, options.verletzungsstand)),
     platzJeTeam: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
   }));
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
@@ -1637,6 +1651,8 @@ export type RoherBattlefieldPodErgebnis = {
 
 export type RunBattlefieldPodFixturesOptions = {
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  /** s. `RunArenaFixturesOptions.verletzungsstand`. */
+  verletzungsstand?: ArenaVerletzungsstand | null;
   chromiumExecutablePath?: string;
   seitenTimeoutMs?: number;
   /** Der Spieltagswurf fuer Battlefield (`resolveMatchdayMutatorTraitsForDiscipline`), fuer alle Pods gleich. */
@@ -1678,13 +1694,13 @@ async function simuliereBattlefieldPodsImBrowser(payload: {
 export function bereiteBattlefieldPodsVor(
   gameState: GameState,
   pods: BattlefieldPodFixtureInput[],
-  options: Pick<RunBattlefieldPodFixturesOptions, "attributeSheetOverrides" | "matchdayId"> = {},
+  options: Pick<RunBattlefieldPodFixturesOptions, "attributeSheetOverrides" | "matchdayId" | "verletzungsstand"> = {},
 ) {
   const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
-    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides, options.verletzungsstand)),
     platzJeTeam: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
   }));
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));

@@ -1137,6 +1137,122 @@ export function attachMatchdayInjuryPerformanceToContexts(
   }
 }
 
+/**
+ * VERLETZUNG IM MOTOR (Chris, 18.11., woertlich: „Verletzt ist nicht nur −10, sondern gar nicht
+ * einsetzbar! Und IN der Disziplin, wo er sich verletzt hat, hat er nur 50 % seiner Basisleistung
+ * bzw. Eignung/Score."; docs/design/verletzung-regel-18-11.md, Luecke D und B).
+ *
+ * Was eine Arena-Disziplin ueber die Verletzungen dieses Spieltags wissen muss, BEVOR der Motor
+ * laeuft. Beide Mengen sind `teamId::playerId`:
+ *
+ *   - `heuteVerletzt`: der Verletzungswurf dieses Spieltags trifft ihn. Er tritt mit
+ *     INJURY_PERFORMANCE_MULTIPLIER seiner Eignung und Attribute an (`buildArenaTeam`).
+ *   - `gesperrt`: die Sperre stammt aus einem VORSPIELTAG (`istVerletzungsgesperrtAusVorspieltag`,
+ *     legacy-score-engine.ts). Er tritt gar nicht an (`buildArenaTeam` laesst ihn weg,
+ *     `buildArenaAufstellung` gibt ihm keinen Platz).
+ *
+ * DERSELBE WURF WIE BEI DER BUCHUNG. `heuteVerletzt` kommt aus `buildMatchdayInjuryRollMap`, derselben
+ * deterministischen Funktion, die Vorschau, Arena-Kickoff, Auto-Run und Buchung an die Kontexte heften.
+ * Vorlauf, Buehne (FoundationBattleArenaHost) und Buchung rechnen ihn deshalb aus demselben Stand
+ * gleich. Zwei Absicherungen dafuer, dass die Zahl ueber einen D1-Teil-Commit hinweg stehen bleibt:
+ *
+ *   1. Liegt fuer den Spieltag schon ein Ergebnis, rechnet die Roll-Map mit `isMatchdayReplay`
+ *      (Vor-Spieltags-Ausdauer), genau wie die Buchung selbst (`legacy-matchday-result-apply-service`).
+ *   2. Hat ein Spieler fuer diesen Spieltag schon ein gebuchtes `injuryEvent` (seine Seite ist
+ *      gebucht), zaehlt dessen Ergebnis. Neu gewuerfelt wird nur, wer noch nicht gebucht ist.
+ *
+ * Ohne Verletzung und ohne Sperre sind beide Mengen leer, und `buildArenaTeam`/`buildArenaAufstellung`
+ * liefern Zeichen fuer Zeichen dasselbe wie vorher. Der Arena-Eingabe-Hash bleibt dann gleich.
+ */
+export type ArenaVerletzungsstand = {
+  heuteVerletzt: ReadonlySet<MatchdayInjuryRollKey>;
+  gesperrt: ReadonlySet<MatchdayInjuryRollKey>;
+};
+
+const LEERER_ARENA_VERLETZUNGSSTAND: ArenaVerletzungsstand = { heuteVerletzt: new Set(), gesperrt: new Set() };
+
+function stelleVerletzungsstatusVorDemSpieltagHer(
+  entries: PlayerAvailabilityStateRecord[],
+  matchdayId: string,
+): PlayerAvailabilityStateRecord[] {
+  // Dieselbe Bedingung wie Pass 1 in `restorePreMatchdayAvailability`: der abschliessende Commit von
+  // Spieltag N stellt eine Sperre, die bis N lief, auf "recovering". Fuer N selbst war er gesperrt.
+  // Vor diesem Commit gibt es den Zustand nicht, die Ruecknahme ist also immer gefahrlos.
+  return entries.map((entry) =>
+    entry.injuryStatus === "recovering" &&
+    entry.injuryUntilMatchday === matchdayId &&
+    entry.injuredAtMatchdayId &&
+    entry.injuredAtMatchdayId !== matchdayId
+      ? { ...entry, injuryStatus: "injured" as const }
+      : entry,
+  );
+}
+
+/**
+ * `teamId::playerId` aller Spieler, die an `matchdayId` wegen einer Verletzung aus einem VORSPIELTAG
+ * gesperrt sind. Wer sich AN diesem Spieltag verletzt, gehoert nicht dazu (er ist gelaufen). Stabil
+ * ueber D1-Teil-Commit und Abschluss-Commit (s. `stelleVerletzungsstatusVorDemSpieltagHer`). Liest nur
+ * `playerAvailabilityState`; ohne eingetragene Verletzung ist die Menge leer und nichts wird gerechnet.
+ */
+export function ermittleVerletzungsgesperrteAmSpieltag(
+  gameState: GameState,
+  matchdayId: string | null | undefined,
+): Set<MatchdayInjuryRollKey> {
+  const gesperrt = new Set<MatchdayInjuryRollKey>();
+  const eintraege = gameState.seasonState?.playerAvailabilityState ?? [];
+  if (!matchdayId || !gameState.season?.matchdayIds) return gesperrt;
+  const kandidaten = eintraege.filter(
+    (entry) =>
+      (entry.injuryStatus === "injured" || entry.injuryStatus === "recovering") &&
+      entry.injuredAtMatchdayId != null &&
+      entry.injuredAtMatchdayId !== matchdayId,
+  );
+  if (kandidaten.length === 0) return gesperrt;
+  const hergestellt: GameState = {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      playerAvailabilityState: stelleVerletzungsstatusVorDemSpieltagHer(eintraege, matchdayId),
+    },
+  };
+  for (const entry of kandidaten) {
+    const view = getPlayerAvailabilityView(hergestellt, entry.playerId, entry.teamId, matchdayId, { matchdayBookkeeping: true });
+    if (view.isUnavailable) gesperrt.add(buildMatchdayUseKey(entry.teamId, entry.playerId));
+  }
+  return gesperrt;
+}
+
+export function ermittleArenaVerletzungsstand(input: {
+  gameState: GameState;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string | null | undefined;
+}): ArenaVerletzungsstand {
+  const { gameState, saveId, seasonId, matchdayId } = input;
+  if (!matchdayId || !gameState.season?.matchdayIds || !gameState.seasonState) return LEERER_ARENA_VERLETZUNGSSTAND;
+  const gesperrt = ermittleVerletzungsgesperrteAmSpieltag(gameState, matchdayId);
+  const hatEntwurf = (gameState.seasonState.lineupDrafts ?? []).some(
+    (draft) => draft.seasonId === seasonId && draft.matchdayId === matchdayId && draft.entries.length > 0,
+  );
+  const heuteVerletzt = new Set<MatchdayInjuryRollKey>();
+  if (hatEntwurf) {
+    const isMatchdayReplay = (gameState.seasonState.matchdayResults ?? []).some(
+      (result) => result.saveId === saveId && result.seasonId === seasonId && result.matchdayId === matchdayId,
+    );
+    const gebuchteWuerfe = new Map<MatchdayInjuryRollKey, InjuryEventRecord["result"]>();
+    for (const event of gameState.seasonState.injuryEvents ?? []) {
+      if (event.seasonId !== seasonId || event.matchdayId !== matchdayId) continue;
+      gebuchteWuerfe.set(buildMatchdayUseKey(event.teamId, event.playerId), event.result);
+    }
+    const rollMap = buildMatchdayInjuryRollMap({ gameState, saveId, seasonId, matchdayId, isMatchdayReplay });
+    for (const [key, roll] of rollMap.entries()) {
+      if ((gebuchteWuerfe.get(key) ?? roll.result) === "injured") heuteVerletzt.add(key);
+    }
+  }
+  if (heuteVerletzt.size === 0 && gesperrt.size === 0) return LEERER_ARENA_VERLETZUNGSSTAND;
+  return { heuteVerletzt, gesperrt };
+}
+
 function buildInjuryEventId(input: {
   saveId: string;
   seasonId: string;
