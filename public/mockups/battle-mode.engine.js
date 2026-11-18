@@ -42713,6 +42713,9 @@
   // Abschnitt 3.2). Dasselbe Prinzip wie buehneDuellStandText() beim Buehnen-Duell (Review-Fund
   // PR #1083): EINE Funktion, zwei Aufrufer, kann nie mehr auseinanderlaufen.
   function kampfStandText(){
+    // KEIN SPOILER VOR DEM ANPFIFF (18.11., Mockup arena-spieltag-modern-18-11): der Vorlauf hat das Ergebnis
+    // schon gerechnet, die Tafel zeigt bis zum Start "–" statt einer 0 oder Prognose. Nur Anzeige-Text.
+    if(!running&&!done&&!(t>0))return bfPodAktiv()?KP.punkte.map(()=>"–").join(" · "):"– : –";
     // POD (02.11.): Kontrollpunkt-Punkte aller N Teams in Seitenreihenfolge ("120 · 80 · 40 · 10").
     if(bfPodAktiv())return KP.punkte.map(p=>Math.round(p)).join(" · ");
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
@@ -62601,6 +62604,116 @@
     if(verborgen>0)box.appendChild(el("div","ehmehr","+"+verborgen+" weitere Momente dieses Spiels"));
   }
 
+  // EINE ZEILE DES ENDSTAND-BOXSCORES (18.11. aus renderEndstand herausgeloest, damit die Vierergruppe sie
+  // in EINER Tabelle wiederverwenden kann). Reine Anzeige: liest nur u.st.*/impactVon, aendert nichts.
+  function endstandZeile(u,imp,mvpUnit){
+    // DURCHSTREICH-BUG (Punkt 28): `u.down` ist bei TDM ein TRANSIENTER Respawn-Status
+    // (s. TDM_RESPAWN_SEK/reviveUnit oben) -- ein Kaempfer, der im Moment des Abpfiffs
+    // gerade am Boden lag, respawnt nie mehr (die Simulation steht), bleibt also fuer
+    // immer "down", obwohl er ueber das GANZE Spiel z.B. zehn Ausschaltungen sammelte.
+    // Das Endstand-Overlay zeigt die ECHTEN, finalen Boxscore-Werte (imp/u.st.*, s.
+    // unten) — die Durchstreichung darf dem nicht widersprechen. Ausserhalb TDM (kein
+    // Respawn) bleibt `u.down` dagegen ein ECHTES, permanentes Ausscheiden.
+    const tr=el("tr",(disc!=="tdm"&&u.down)?"tot":null);
+    const nameZelle=el("td",null,u.n);
+    if(mvpUnit&&u===mvpUnit.u)nameZelle.insertBefore(mvpStern("Spieler des Spiels — "+imp+" Impact"),nameZelle.firstChild);
+    tr.appendChild(nameZelle);
+    for(const [lab,f] of ESPALTEN){
+      const v=u.st[f];
+      // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
+      // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
+      if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
+      const z=el("td",null,String(Math.round(v||0)));
+      const gf=GEGENFELD[f];
+      if(gf&&v){
+        const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
+          .filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]);
+        if(liste.length){
+          z.tabIndex=0; z.classList.add("hovbar");
+          // Heilung geht an Teamkollegen, nicht gegen den Gegner — "an wen" statt
+          // "gegen wen" haelt den Titel bei den eigenen Zahlen sprachlich richtig.
+          tipOn(z,lab+" von "+u.n+" — "+(f==="heal"?"an wen":"gegen wen"),
+            liste.map(([n,x])=>n+": "+Math.round(x*10)/10).join("\n"));
+        }
+      }
+      tr.appendChild(z);
+    }
+    // Impact aufgeschluesselt, wie es das Vorbild im Tooltip zeigt.
+    const iz=el("td","imp",String(imp));
+    iz.tabIndex=0;
+    tipOn(iz,"Impact "+imp+" — woraus er besteht",impZerlegung(u).join("\n"));
+    tr.appendChild(iz);
+    return tr;
+  }
+  // ENDSTAND DER VIERERGRUPPE (18.11.). Liest bfPodPlatzierung() (Platz, Liga-Punkte, Kontrollpunkte) und die
+  // Boxscore-Werte der Kaempfer; aendert an Wertung, Saat und Simulation nichts.
+  function endstandPodAus(){
+    const rang=document.getElementById("epodrang");
+    if(rang)rang.hidden=true;
+    const r=document.getElementById("etafelR");
+    if(r)r.hidden=false;
+  }
+  function renderEndstandPod(mvpUnit){
+    const pl=bfPodPlatzierung();
+    const N=kampfSeitenN();
+    let eigen=null;
+    try{const k=bfPodAnzeigeKontext();eigen=k&&Number.isInteger(k.eigeneSeite)&&k.eigeneSeite>=0&&k.eigeneSeite<N?k.eigeneSeite:null;}catch(e){eigen=null;}
+    const zahl=(x)=>String(Math.round(x*10)/10).replace(".",",");
+    // Banner: Platz des gesteuerten Teams statt "SIEGER 0·88·112·0".
+    if(eigen!=null)document.getElementById("esieger").textContent="Platz "+pl.platz[eigen]+" von "+N+" · "+kampfTeamName(eigen);
+    // Rangfolge 1-4 gross, eigenes Team goldumrandet.
+    const eltern=document.getElementById("etafelL").parentNode;
+    let rang=document.getElementById("epodrang");
+    if(!rang){rang=el("div","epodrang");rang.id="epodrang";eltern.parentNode.insertBefore(rang,eltern);}
+    rang.hidden=false;rang.textContent="";
+    for(const s of pl.reihenfolge){
+      const zeile=el("div","epodzeile"+(s===eigen?" eigen":""));
+      zeile.style.setProperty("--tf",s===eigen?"#F2A03D":kampfSeitenFarbe(s));
+      zeile.appendChild(el("b","epodplatz",String(pl.platz[s])));
+      const name=el("span","epodname",kampfTeamName(s));
+      if(s===eigen)name.appendChild(el("em","epoddu","Dein Team"));
+      zeile.appendChild(name);
+      zeile.appendChild(el("span","epodkp",zahl(pl.punkte[s])+" Kontrollpunkte"));
+      zeile.appendChild(el("span","epodliga","+"+zahl(pl.ligaPunkte[s])+" Pkt"));
+      rang.appendChild(zeile);
+    }
+    // EINE Tabelle mit Reitern: Alle (nach Impact) oder je Team.
+    const L=document.getElementById("etafelL"),R=document.getElementById("etafelR");
+    R.hidden=true;L.textContent="";
+    const reiter=el("div","epodtabs");
+    const box=el("div");
+    const alle=U.map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
+    const zeichne=(seite)=>{
+      box.textContent="";
+      const t=el("table"),kopf=el("tr");
+      kopf.appendChild(el("th",null,"Kämpfer"));
+      kopf.appendChild(el("th",null,"Team"));
+      for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
+      kopf.appendChild(el("th",null,"IMP"));
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      for(const {u,imp} of alle){
+        if(seite!=null&&u.side!==seite)continue;
+        const tr=endstandZeile(u,imp,mvpUnit);
+        const tz=el("td",null,kampfTeamName(u.side));
+        tz.style.color=u.side===eigen?"#F2A03D":kampfSeitenFarbe(u.side);
+        tr.insertBefore(tz,tr.children[1]);
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb);box.textContent="";box.appendChild(t);
+      for(const b of reiter.children)b.classList.toggle("an",b.dataset.seite===String(seite==null?"alle":seite));
+    };
+    const knopf=(text,seite)=>{
+      const b=el("button",null,text);b.type="button";b.dataset.seite=String(seite==null?"alle":seite);
+      b.addEventListener("click",()=>zeichne(seite));reiter.appendChild(b);
+    };
+    knopf("Alle "+U.length+" nach Impact",null);
+    const ordnung=eigen!=null?[eigen,...pl.reihenfolge.filter(x=>x!==eigen)]:pl.reihenfolge;
+    for(const s of ordnung)knopf(kampfTeamName(s),s);
+    L.appendChild(reiter);L.appendChild(box);
+    zeichne(null);
+  }
+
   function renderEndstand(){
     // BATTLEFIELD-DOMINATION: derselbe Sieger wie in finish()/feed() — sonst zeigte das
     // Overlay nach einem Punktelimit-Sieg weiter den ueberlebenszahl-basierten Sieger, der
@@ -62640,62 +62753,34 @@
     // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, nach demselben Impact-Wert,
     // der die Zeilen gleich darunter je Seite ohnehin schon sortiert -- kein neuer Wert.
     const mvpUnit=U.length?U.map(u=>({u,imp:impactVon(u)})).reduce((a,b)=>b.imp>a.imp?b:a):null;
-    // POD (02.11.): links die Teams 0 und 2, rechts 1 und 3 — dieselbe Seite wie auf dem Feld.
-    const tafelSeiten=bfPodAktiv()?[[0,2],[1,3]].map(g=>g.filter(s=>s<kampfSeitenN())):[[0],[1]];
-    for(const seite of [0,1]){
-      const box=document.getElementById(seite===0?"etafelL":"etafelR");
-      box.textContent="";
-      for(const teamSeite of tafelSeiten[seite]){
-      const h5=el("h5",null,bfPodAktiv()?bfPodPlatzierung().platz[teamSeite]+". "+kampfTeamName(teamSeite):VEREIN[teamSeite].name);
-      if(bfPodAktiv())h5.style.color=kampfSeitenFarbe(teamSeite);
-      box.appendChild(h5);
-      const t=el("table"), kopf=el("tr");
-      kopf.appendChild(el("th",null,"Kämpfer"));
-      for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
-      kopf.appendChild(el("th",null,"IMP"));
-      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
-      const tb=el("tbody");
-      const reihen=U.filter(u=>u.side===teamSeite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
-      for(const {u,imp} of reihen){
-        // DURCHSTREICH-BUG (Punkt 28): `u.down` ist bei TDM ein TRANSIENTER Respawn-Status
-        // (s. TDM_RESPAWN_SEK/reviveUnit oben) -- ein Kaempfer, der im Moment des Abpfiffs
-        // gerade am Boden lag, respawnt nie mehr (die Simulation steht), bleibt also fuer
-        // immer "down", obwohl er ueber das GANZE Spiel z.B. zehn Ausschaltungen sammelte.
-        // Das Endstand-Overlay zeigt die ECHTEN, finalen Boxscore-Werte (imp/u.st.*, s.
-        // unten) — die Durchstreichung darf dem nicht widersprechen. Ausserhalb TDM (kein
-        // Respawn) bleibt `u.down` dagegen ein ECHTES, permanentes Ausscheiden.
-        const tr=el("tr",(disc!=="tdm"&&u.down)?"tot":null);
-        const nameZelle=el("td",null,u.n);
-        if(mvpUnit&&u===mvpUnit.u)nameZelle.insertBefore(mvpStern("Spieler des Spiels — "+imp+" Impact"),nameZelle.firstChild);
-        tr.appendChild(nameZelle);
-        for(const [lab,f] of ESPALTEN){
-          const v=u.st[f];
-          // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
-          // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
-          if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
-          const z=el("td",null,String(Math.round(v||0)));
-          const gf=GEGENFELD[f];
-          if(gf&&v){
-            const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
-              .filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]);
-            if(liste.length){
-              z.tabIndex=0; z.classList.add("hovbar");
-              // Heilung geht an Teamkollegen, nicht gegen den Gegner — "an wen" statt
-              // "gegen wen" haelt den Titel bei den eigenen Zahlen sprachlich richtig.
-              tipOn(z,lab+" von "+u.n+" — "+(f==="heal"?"an wen":"gegen wen"),
-                liste.map(([n,x])=>n+": "+Math.round(x*10)/10).join("\n"));
-            }
-          }
-          tr.appendChild(z);
+    // VIERERGRUPPE (18.11., Mockup arena-spieltag-modern-18-11 Screen 4b): Rangfolge 1-4 mit Liga-Punkten und
+    // EINE Statistik-Tabelle mit Reitern statt vier Tabellen in Gruppen-Reihenfolge. Reine Anzeige.
+    if(bfPodAktiv()){
+      renderEndstandPod(mvpUnit);
+    } else {
+      endstandPodAus();
+      // POD (02.11.): links die Teams 0 und 2, rechts 1 und 3 — dieselbe Seite wie auf dem Feld.
+      const tafelSeiten=bfPodAktiv()?[[0,2],[1,3]].map(g=>g.filter(s=>s<kampfSeitenN())):[[0],[1]];
+      for(const seite of [0,1]){
+        const box=document.getElementById(seite===0?"etafelL":"etafelR");
+        box.textContent="";
+        for(const teamSeite of tafelSeiten[seite]){
+        const h5=el("h5",null,bfPodAktiv()?bfPodPlatzierung().platz[teamSeite]+". "+kampfTeamName(teamSeite):VEREIN[teamSeite].name);
+        if(bfPodAktiv())h5.style.color=kampfSeitenFarbe(teamSeite);
+        box.appendChild(h5);
+        const t=el("table"), kopf=el("tr");
+        kopf.appendChild(el("th",null,"Kämpfer"));
+        for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
+        kopf.appendChild(el("th",null,"IMP"));
+        const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+        const tb=el("tbody");
+        const reihen=U.filter(u=>u.side===teamSeite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
+        for(const {u,imp} of reihen){
+          const tr=endstandZeile(u,imp,mvpUnit);
+          tb.appendChild(tr);
         }
-        // Impact aufgeschluesselt, wie es das Vorbild im Tooltip zeigt.
-        const iz=el("td","imp",String(imp));
-        iz.tabIndex=0;
-        tipOn(iz,"Impact "+imp+" — woraus er besteht",impZerlegung(u).join("\n"));
-        tr.appendChild(iz);
-        tb.appendChild(tr);
-      }
-      t.appendChild(tb); box.appendChild(t);
+        t.appendChild(tb); box.appendChild(t);
+        }
       }
     }
     renderSzeneDesSpiels();
@@ -62899,6 +62984,7 @@
   }
 
   function renderEndstandBahn(){
+    endstandPodAus();
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
     // SIEGER-BANNER (Punkt 17): nur EIN gemeinsamer Bauplan (s. siegerBannerText()), wenn
@@ -63084,6 +63170,7 @@
     return "Punkte";
   }
   function renderEndstandBuehne(){
+    endstandPodAus();
     const sieger=buehneSieger(), stand=buehneStand();
     document.getElementById("esieger").textContent=
       siegerBannerText(sieger,stand.text,buehneEinheitLabel(BB()));
@@ -63171,6 +63258,7 @@
   // dieselben Disziplin-Flags, die der Rest der Feldspiel-Logik ohnehin schon liest.
   function fsEinheitLabel(){ return istHockey()?"Tore":"Punkte"; }
   function renderEndstandFeldspiel(){
+    endstandPodAus();
     const sieger=fsSieger(), stand=fsStand();
     document.getElementById("esieger").textContent=
       siegerBannerText(sieger,stand.text,fsEinheitLabel());
