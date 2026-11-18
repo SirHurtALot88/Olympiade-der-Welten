@@ -41077,6 +41077,83 @@
   }
 
   /* ================= ARENA ================= */
+  // SCHARFE LEINWAND (Arena-Vollbild, Chris 18.11.: "die Battle Arena braucht jeden cm Breite und
+  // Hoehe", Hauptziel 4K-Monitor). Die Leinwand waechst per CSS auf die ganze Buehne (bis ~2500 CSS-px
+  // breit bei devicePixelRatio 1,5-2) -- mit dem festen 1240x470-Bildpuffer waere das ein 3-faches
+  // Hochskalieren, Schrift und Figuren matschig. Diese Funktion gibt der Leinwand einen Bildpuffer in
+  // ihrer echten Geraetepixel-Groesse und laesst den Motor trotzdem in seinen LOGISCHEN Koordinaten
+  // zeichnen:
+  //  - `leinwand.width/height` lesen weiter 1240/470 (Getter auf der Instanz) -- W/H, jede Klick-/
+  //    Hover-Umrechnung `(ev.clientX-r.left)*(leinwand.width/r.width)` und hudBoxUnten() bleiben
+  //    damit unveraendert richtig.
+  //  - setTransform/resetTransform/getTransform des Kontexts rechnen die Puffer-Skalierung (kx,ky)
+  //    unsichtbar mit ein: "Identitaet" heisst weiter "logische Identitaet".
+  //  - shadowBlur wirkt laut Canvas-Spezifikation in Geraetepixeln -- mitskaliert, damit Gluehen
+  //    gleich breit bleibt.
+  // Reine Anzeige: weder Simulation noch Wertung lesen etwas davon (Fingerabdruck unveraendert, s.
+  // CLAUDE.md). Unter Faktor 1 wird nie verkleinert -- bei devicePixelRatio 1 und einer Leinwand bis
+  // 1240 CSS-px bleibt alles exakt wie vorher. Deckel: Faktor 3 und ~5,2 Megapixel. Ohne Canvas-API
+  // (Node-Stub) tut sie nichts.
+  function leinwandScharf(leinwand,kontext){
+    const nichts={pruefe(){ return false; }};
+    if(!leinwand||!kontext||typeof window==="undefined"||typeof HTMLCanvasElement==="undefined"
+      ||typeof CanvasRenderingContext2D==="undefined"||!(kontext instanceof CanvasRenderingContext2D))return nichts;
+    const LW=leinwand.width, LH=leinwand.height;
+    const dW=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,"width");
+    const dH=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,"height");
+    const kp=CanvasRenderingContext2D.prototype;
+    const setT=kp.setTransform, getT=kp.getTransform;
+    if(!(LW>0&&LH>0)||!dW||!dW.get||!dW.set||!dH||!dH.get||!dH.set||typeof setT!=="function")return nichts;
+    const MAX_K=3, MAX_PX=LW*LH*9;
+    let kx=1, ky=1, schmutzig=true;
+    try{
+      Object.defineProperty(leinwand,"width",{configurable:true,get:()=>LW,set:()=>{}});
+      Object.defineProperty(leinwand,"height",{configurable:true,get:()=>LH,set:()=>{}});
+    }catch(e){ return nichts; }
+    kontext.setTransform=function(a,b,c,d,e,f){
+      if(a!==null&&typeof a==="object"){
+        const m=a; a=m.a??m.m11??1; b=m.b??m.m12??0; c=m.c??m.m21??0; d=m.d??m.m22??1; e=m.e??m.m41??0; f=m.f??m.m42??0;
+      }
+      return setT.call(this,a*kx,b*ky,c*kx,d*ky,e*kx,f*ky);
+    };
+    kontext.resetTransform=function(){ return setT.call(this,kx,0,0,ky,0,0); };
+    if(typeof getT==="function"&&typeof DOMMatrix!=="undefined"){
+      kontext.getTransform=function(){
+        const m=getT.call(this);
+        return new DOMMatrix([m.a/kx,m.b/ky,m.c/kx,m.d/ky,m.e/kx,m.f/ky]);
+      };
+    }
+    const sb=Object.getOwnPropertyDescriptor(kp,"shadowBlur");
+    if(sb&&sb.get&&sb.set){
+      try{
+        Object.defineProperty(kontext,"shadowBlur",{configurable:true,
+          get(){ return sb.get.call(this)/kx; }, set(v){ sb.set.call(this,v*kx); }});
+      }catch(e){}
+    }
+    try{
+      if(typeof ResizeObserver!=="undefined")new ResizeObserver(()=>{ schmutzig=true; }).observe(leinwand);
+      window.addEventListener("resize",()=>{ schmutzig=true; });
+    }catch(e){}
+    // Vor jedem Bild aufgerufen (loop()): nur nach einer Groessen-/Zoom-Aenderung misst sie, und nur
+    // wenn sich die Puffergroesse wirklich aendert, setzt sie sie neu (das leert die Leinwand und den
+    // Kontextzustand -- das naechste draw() zeichnet ohnehin alles neu und setzt seinen Zustand selbst).
+    function pruefe(){
+      if(!schmutzig)return false;
+      schmutzig=false;
+      const r=leinwand.getBoundingClientRect();
+      if(!(r.width>0&&r.height>0))return false;
+      const dpr=Math.max(1,Number(window.devicePixelRatio)||1);
+      let k=Math.min(MAX_K,Math.max(1,r.width*dpr/LW));
+      if(LW*LH*k*k>MAX_PX)k=Math.sqrt(MAX_PX/(LW*LH));
+      const bw=Math.round(LW*k), bh=Math.round(LH*k);
+      if(bw===dW.get.call(leinwand)&&bh===dH.get.call(leinwand))return false;
+      dW.set.call(leinwand,bw); dH.set.call(leinwand,bh);
+      kx=bw/LW; ky=bh/LH;
+      setT.call(kontext,kx,0,0,ky,0,0);
+      return true;
+    }
+    return {pruefe, faktor:()=>kx};
+  }
   // Schutz gegen eine ueberholte Instanz: bei sehr schnell aufeinanderfolgenden Team-
   // Wechseln (der Host haengt bei jedem Wechsel eine frische Skript-Instanz ein, s.
   // FoundationBattleArenaHost.tsx) kann dieses Skript ausgefuehrt werden, NACHDEM sein
@@ -41089,6 +41166,9 @@
   if(!cv)return;
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
+  // SCHARFE LEINWAND (Arena-Vollbild, 18.11., s. leinwandScharf()): ab hier darf die Zeichenflaeche
+  // groesser als 1240x470 sein -- W/H und alle Koordinaten bleiben logisch.
+  const cvScharf=leinwandScharf(cv,ctx);
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
   // ANZEIGE-TREUE-FIX A1 (09.11.) + B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs,
   // 24 Saaten je Disziplin): eigener Akkumulator fuer jedes Chassis, dessen Physik sich
@@ -60506,6 +60586,8 @@
     tempoAnzeigeAktualisieren();
     // Render-Interpolation (s. viMische): nur waehrend draw(), Sim-Zustand bleibt unberuehrt.
     const viRueck=(running&&!schnelldurchAktiv&&!done)?viMische(zeitFaktor()):null;
+    // Bildpuffer an die angezeigte Groesse anpassen (s. leinwandScharf()) -- nur nach Groessenaenderung.
+    try{ cvScharf.pruefe(); }catch(e){}
     try{ draw(); } finally { if(viRueck)viRueck(); }
     // LIVE-STAND (Welle 1): reine Anzeige, gedrosselt auf 4x/s, s. liveStandTick().
     try{ liveStandTick(ts); }catch(e){ lsWarnung("tick",e); }
@@ -63112,12 +63194,12 @@
     const MITTE={x:BMID,y:290};
     const FARBE_HELL=["#F2A03D","#45B0C9","#8FCB5C","#C58CE0"];
     const FIG_H=86;
-    let cv=null, cx=null, z=null, raf=0;
+    let cv=null, cx=null, z=null, raf=0, scharf=null;
     const jetzt=()=>(typeof performance!=="undefined"?performance.now():Date.now())/1000;
     const tempo=()=>Math.max(1,mdffaTempo||1);
 
     function leinwand(){
-      if(!cv){ cv=document.getElementById("mdffaCv"); cx=cv?cv.getContext("2d"):null; }
+      if(!cv){ cv=document.getElementById("mdffaCv"); cx=cv?cv.getContext("2d"):null; scharf=cx?leinwandScharf(cv,cx):null; }
       return cx;
     }
     function laeuft(){
@@ -63125,7 +63207,7 @@
     }
     function anstossen(){
       if(raf||!laeuft())return;
-      const schritt=()=>{ raf=0; if(!laeuft())return; zeichne(); raf=requestAnimationFrame(schritt); };
+      const schritt=()=>{ raf=0; if(!laeuft())return; try{ if(scharf)scharf.pruefe(); }catch(e){} zeichne(); raf=requestAnimationFrame(schritt); };
       raf=requestAnimationFrame(schritt);
     }
 
