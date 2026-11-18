@@ -49508,12 +49508,16 @@
   // `spurtFormatExplizit`: true, sobald jemand das Format AUSDRUECKLICH setzt (startFlags/
   // window.__arena.bahnFlags). Nur ohne ausdruecklichen Wunsch greift im echten Spiel die
   // Formatwahl per Saat (spurtFormatWaehlen(), 16.11.).
-  // `climbingFormat` (Climbing-Canyon-Bau 18.11., docs/design/climbing-canyon-bau-18-11.md): "standard"
-  // (Vorgabe, bit-identisch zum Stand davor) oder "canyon" (die neue Wand mit drei Wegen, Engstelle,
-  // Rangeln und Seilschaften, s. baueCanyon()/stepClimbingCanyon()). Gesetzt NUR ueber
-  // window.__arena.bahnFlags({climbingFormat}) oder window.__olyBahnFlags vor dem Laden -- das echte
-  // Spiel setzt beides nicht, der Schalter ist dort AUS, bis Chris nach der Messung entscheidet.
-  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle", spurtFormatExplizit:false, climbingFormat:"standard"};
+  // `climbingFormat` (Climbing-Canyon-Bau 18.11., docs/design/climbing-canyon-bau-18-11.md): "canyon"
+  // (die neue Wand mit drei Wegen, Engstelle, Rangeln und Seilschaften, s. baueCanyon()/
+  // stepClimbingCanyon()) oder "standard" (die alte Wand bis 18.11.). LIVE SEIT 18.11. (Chris: "Ja, Canyon
+  // soll live gehen", docs/design/climbing-canyon-live-18-11.md): Vorgabe ist "canyon". Das echte Spiel
+  // reicht das gebuchte Format des Spieltags im Kader-Umschlag herein (`formatByDisciplineId.climbing`,
+  // gesetzt von Host, Chromium- und Node-Runner aus demselben Saison-Stempel, lib/resolve/climbing-format.ts)
+  // -- ein schon gewerteter Spieltag mit dem alten Format bleibt so auch in der Wiedergabe "standard".
+  // `climbingFormatExplizit`: true, sobald jemand das Format AUSDRUECKLICH setzt (startFlags/bahnFlags);
+  // dann gilt es vor dem Umschlag (Messskripte, Fingerabdruck, Format-Chips der Testansicht).
+  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle", spurtFormatExplizit:false, climbingFormat:"canyon", climbingFormatExplizit:false};
   try{
     const startFlags=window.__olyBahnFlags;
     if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string"){
@@ -49522,7 +49526,7 @@
     if(startFlags&&typeof startFlags==="object"&&(startFlags.hyroxAnsicht==="bahn"||startFlags.hyroxAnsicht==="halle"))
       BAHN_FLAGS.hyroxAnsicht=startFlags.hyroxAnsicht;
     if(startFlags&&typeof startFlags==="object"&&(startFlags.climbingFormat==="standard"||startFlags.climbingFormat==="canyon"))
-      BAHN_FLAGS.climbingFormat=startFlags.climbingFormat;
+      { BAHN_FLAGS.climbingFormat=startFlags.climbingFormat; BAHN_FLAGS.climbingFormatExplizit=true; }
   }catch(e){}
   const BAHN_ART={
     spurt:{
@@ -52337,6 +52341,14 @@
     if(!echt)return BAHN_FLAGS.spurtFormat;
     return SPURT_FORMATE[kulisseHash("spurt-format|"+(saat==null?"":String(saat)))%SPURT_FORMATE.length];
   }
+  // CLIMBING-FORMAT DES GEBUCHTEN SPIELTAGS (live 18.11.): ausdruecklich gesetzt (bahnFlags/__olyBahnFlags)
+  // vor dem Kader-Umschlag (`formatByDisciplineId.climbing`, aus dem Saison-Stempel), sonst die Vorgabe
+  // "canyon". Host, Chromium-Runner und Node-Motor reichen denselben Umschlag herein: gezeigt = gebucht.
+  function climbingFormatWaehlen(){
+    if(BAHN_FLAGS.climbingFormatExplizit)return BAHN_FLAGS.climbingFormat;
+    const f=echterKader&&echterKader.formatByDisciplineId&&echterKader.formatByDisciplineId.climbing;
+    return (f==="standard"||f==="canyon")?f:BAHN_FLAGS.climbingFormat;
+  }
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); kontaktStromSaeen(saat); kontaktLetzteBahn=[]; kontaktLetzteMessung=kontaktLetzteBahn; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
@@ -52828,9 +52840,10 @@
     bahnHyroxAktiv=!!(art.spurt&&spurtFmt==="hyrox");
     HYROX_STATIONEN=null;
     if(bahnHyroxAktiv)baueHyroxStationen();
-    // CLIMBING-FORMAT "CANYON": nur Climbing, nur mit gesetztem Schalter. Ohne ihn bleibt
-    // `bahnCanyonAktiv` false und bauSpurt() endet hier bit-identisch zu vorher.
-    bahnCanyonAktiv=!!(art.climbing&&BAHN_FLAGS.climbingFormat==="canyon");
+    // CLIMBING-FORMAT "CANYON" (live seit 18.11.): nur Climbing; welches Format, sagt climbingFormatWaehlen().
+    // Im Format "standard" bleibt `bahnCanyonAktiv` false und bauSpurt() endet hier bit-identisch zum Stand vor
+    // dem Canyon-Bau (Fingerabdruck-Zeilen `spiele climbing/standard`).
+    bahnCanyonAktiv=!!(art.climbing&&climbingFormatWaehlen()==="canyon");
     CANYON=null;
     if(bahnCanyonAktiv)baueCanyon();
   }
@@ -70277,9 +70290,12 @@
       // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
       if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
         BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
-      // CLIMBING-FORMAT (Canyon-Bau 18.11.): {climbingFormat:"canyon"|"standard"}.
+      // CLIMBING-FORMAT (Canyon-Bau 18.11.): {climbingFormat:"canyon"|"standard"} setzt es ausdruecklich,
+      // {climbingFormat:null} gibt die Wahl an den Kader-Umschlag bzw. die Vorgabe "canyon" zurueck.
       if(neu&&typeof neu==="object"&&(neu.climbingFormat==="standard"||neu.climbingFormat==="canyon"))
-        BAHN_FLAGS.climbingFormat=neu.climbingFormat;
+        { BAHN_FLAGS.climbingFormat=neu.climbingFormat; BAHN_FLAGS.climbingFormatExplizit=true; }
+      if(neu&&typeof neu==="object"&&neu.climbingFormat===null)
+        { BAHN_FLAGS.climbingFormat="canyon"; BAHN_FLAGS.climbingFormatExplizit=false; }
       // KONTAKT (Schritt 0): {kontakt:{spurt:{...}|null}} -> BAHN_ART[d].kontakt, s. kontaktFlags.
       if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BAHN_ART);
       return {...BAHN_FLAGS};

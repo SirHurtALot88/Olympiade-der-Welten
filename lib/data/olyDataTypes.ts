@@ -3961,6 +3961,11 @@ export type SeasonState = {
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
   /**
+   * CLIMBING-FORMAT DIESER SAISON (Canyon live, 18.11., lib/resolve/climbing-format.ts): Wechselliste
+   * "standard"/"canyon" je Spieltag, gesetzt beim Laden. Gebuchte Spieltage behalten ihr Format.
+   */
+  climbingFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "standard" | "canyon" }> } | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *
