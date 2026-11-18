@@ -102,7 +102,9 @@ async function bau() {
 }
 
 function startDevServer(sqlite: string): ChildProcess {
-  const child = spawn("npm", ["run", "dev"], {
+  // OLY_SERVER=start: fertigen Produktions-Build (next build) starten statt Dev-Server (Dev-Cache waechst auf Gigabytes).
+  const [befehl, args]: [string, string[]] = process.env.OLY_SERVER === "start" ? ["npx", ["next", "start", "-p", PORT]] : ["npm", ["run", "dev"]];
+  const child = spawn(befehl, args, {
     env: { ...process.env, OLY_APP_SQLITE_PATH: sqlite, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
     stdio: ["ignore", "pipe", "pipe"], detached: true,
   });

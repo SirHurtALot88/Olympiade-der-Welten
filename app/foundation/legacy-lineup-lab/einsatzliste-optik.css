@@ -8,7 +8,8 @@
 /* ---------- Raster: volle Höhe, Spalten wachsen mit der Breite ---------- */
 .elm .elm-work {
   flex: none;
-  height: clamp(560px, calc(100vh - 240px), 1280px);
+  /* Band (~108px) + Hero (~120px) + Dock (~70px) liegen ausserhalb: die Arbeitsflaeche fuellt den Rest, ohne Seitenscroll. */
+  height: clamp(560px, calc(100vh - 330px), 1500px);
   grid-template-columns: minmax(300px, clamp(340px, 19vw, 540px)) minmax(0, 1fr) minmax(300px, clamp(330px, 17.5vw, 480px));
   gap: clamp(12px, 0.8vw, 20px);
   padding: clamp(12px, 0.8vw, 20px) clamp(14px, 0.9vw, 22px);
@@ -620,4 +621,90 @@
   .elm-geist__fig {
     display: none;
   }
+}
+
+/* ---------- Rollen-Chips in der Kaderliste: lesbarer Text auf der Slot-Farbe (18.11.) ---------- */
+.elm .elm-kz__nm .bc-marke {
+  flex: none;
+  height: 17px;
+  padding: 0 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0b0d12;
+  text-shadow: none;
+}
+.elm .elm-kz__nm .bc-marke.is-rot {
+  color: #fff;
+}
+
+/* ---------- Unterer Block: Taktik links, Karten-Hand rechts, eine Zeile (kein leerer Streifen unter dem Feld) ---------- */
+.elm .elm-unten {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.55fr) minmax(0, 1.45fr);
+  border-top: 1px solid var(--bc-linie);
+  align-items: stretch;
+}
+.elm .elm-unten .elm-tak {
+  border-top: 0;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  border-right: 1px solid var(--bc-linie);
+}
+.elm .elm-unten .elm-tak .bc-gk {
+  margin-bottom: 3px;
+}
+.elm .elm-unten .elm-hand {
+  border-top: 0;
+  align-self: center;
+}
+@media (max-width: 1500px) {
+  .elm .elm-unten {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .elm .elm-unten .elm-tak {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+  }
+  .elm .elm-unten .elm-hand {
+    border-top: 1px solid var(--bc-linie);
+  }
+}
+
+/* ---------- Disziplin-Karte im Kopf: „Unser Rang“, groß Liga, klein alle (18.11.) ---------- */
+.elm-rang {
+  display: block;
+}
+.elm-rang__ko {
+  display: block;
+}
+.elm-rang__za {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin-top: 1px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.elm-rang__za b {
+  font-size: 17px;
+  line-height: 1.05;
+  color: var(--bc-gold);
+}
+.elm-rang__za span {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--bc-creme);
+}
+.elm-rang__za small {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--bc-stumm);
+}
+.elm-rang__za small.elm-rang__ab {
+  color: var(--bc-acht, #f3b54a);
 }

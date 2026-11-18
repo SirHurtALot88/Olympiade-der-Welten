@@ -38,6 +38,8 @@ import {
   type Seite,
 } from "@/lib/lineups/einsatzliste-modern-logik";
 import { setzeEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
+import { berechneDisziRang, type DisziRang } from "@/lib/lineups/einsatzliste-diszi-rang";
+import { setEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
 import { formationFuerSeite, type GelegteFormation } from "@/lib/lineups/formation";
 import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/gegner-schaetzung";
 import { uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
@@ -113,6 +115,26 @@ function FeldFigur({ spielerId, blick, klasse }: { spielerId: string | null | un
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img className={klasse} src={figurPoseUrl(sprite, blick)} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFehler(true)} data-testid="elm-figur" />
+  );
+}
+
+/** Kopf-Zeile der Disziplin-Karte: „UNSER RANG · KADERSTÄRKE“, groß der Ligarang, klein der Rang unter allen. */
+function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang | null; fallback: number | null }) {
+  const quelle = rang?.quelle === "saison" ? "Saison" : "Kaderstärke";
+  if (!rang) return <span className="elm-rang">{seite.toUpperCase()} · Rang {fallback ?? "–"}</span>;
+  const haupt = rang.liga ?? rang.gesamt;
+  const hauptText = rang.liga != null ? `Liga ${rang.ligaName?.slice(-1) ?? ""}` : "alle Teams";
+  const titel = `Unser Rang in dieser Disziplin (${quelle === "Saison" ? "Saisonwertung nach Teampunkten" : "nach Kaderstärke: Summe der sechs besten Eignungen, noch keine Wertung"}): ${rang.liga != null ? `${rang.liga}. in ${rang.ligaName}, ` : ""}${rang.gesamt}. von ${rang.gesamtVon} Teams${rang.abstandVordermann != null ? `. ${rang.abstandVordermann} Punkte bis zum Vordermann` : ""}.`;
+  return (
+    <span className="elm-rang" title={titel}>
+      <span className="elm-rang__ko">{seite.toUpperCase()} · Unser Rang · {quelle}</span>
+      <span className="elm-rang__za">
+        <b className="bc-t">{haupt}.</b>
+        <span>{hauptText}</span>
+        {rang.liga != null ? <small className="bc-t">{rang.gesamt}. von {rang.gesamtVon}</small> : null}
+        {rang.abstandVordermann != null ? <small className="elm-rang__ab bc-t">−{rang.abstandVordermann} Pkt. zum Vordermann</small> : null}
+      </span>
+    </span>
   );
 }
 
@@ -569,9 +591,30 @@ export default function EinsatzlisteModern(props: Props) {
     onSaveDraft();
   };
 
+  // Hauptaktion im Taktgeber (Regieband): dieselbe Abgabe, nur an EINER Stelle als Knopf.
+  const abgabeLabel = isReadOnly ? "Nur ansehen" : abgegeben ? (arenaReady && onNavigateArena ? "Zur Arena" : "Abgegeben") : gesperrt ? "Abgabe gesperrt" : "Abgeben";
+  const abgabeRef = useRef(abgabeKlick);
+  abgabeRef.current = abgabeKlick;
+  useEffect(() => {
+    setEinsatzlisteAbgabe({
+      label: abgabeLabel,
+      title: lineupSaveCta.detail,
+      statusClass: abgegeben ? "is-ready" : gesperrt ? "is-blocked" : warnAnzahl > 0 ? "is-warning" : "is-ready",
+      onClick: () => {
+        if (!isReadOnly && !isBusy) abgabeRef.current();
+      },
+    });
+  }, [abgabeLabel, lineupSaveCta.detail, abgegeben, gesperrt, warnAnzahl, isReadOnly, isBusy]);
+  useEffect(() => () => setEinsatzlisteAbgabe(null), []);
+
   /* ---------------- Rendern ---------------- */
   /* ---------------- Form + Moral (18.11.) ---------------- */
   const gs = context?.gameState ?? null;
+  // Rang des EIGENEN Teams je Disziplin (Kopf): vor der Wertung Kaderstärke, danach Saisonrang; Liga groß, alle klein.
+  const diszIdD1 = disziplin("d1")?.disciplineId ?? null;
+  const diszRangD1 = useMemo<DisziRang | null>(() => (gs && context?.team.id && diszIdD1 ? berechneDisziRang(gs, context.team.id, diszIdD1) : null), [gs, context?.team.id, diszIdD1]);
+  const diszIdD2 = disziplin("d2")?.disciplineId ?? null;
+  const diszRangD2 = useMemo<DisziRang | null>(() => (gs && context?.team.id && diszIdD2 ? berechneDisziRang(gs, context.team.id, diszIdD2) : null), [gs, context?.team.id, diszIdD2]);
   const formMoralVon = useMemo(() => {
     const karte = new Map<string, FormMoralAnzeige>();
     const dis = (seite === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2) ?? null;
@@ -1146,7 +1189,7 @@ export default function EinsatzlisteModern(props: Props) {
               key={s}
               aktiv={seite === s}
               onClick={() => waehleSeite(s)}
-              eyebrow={`${s.toUpperCase()} · Rang ${(s === "d1" ? d1Rank : d2Rank) ?? "–"}`}
+              eyebrow={<RangEyebrow seite={s} rang={s === "d1" ? diszRangD1 : diszRangD2} fallback={(s === "d1" ? d1Rank : d2Rank) ?? null} />}
               titel={d.displayName}
               symbol={ikon ? <img src={ikon} alt="" /> : d.displayName.slice(0, 2)}
               strich={liste.map((slot) => {
@@ -1338,6 +1381,7 @@ export default function EinsatzlisteModern(props: Props) {
             </div>
           </div>
 
+          <div className="elm-unten">
           <div className="elm-tak" data-testid="elm-taktik">
             <div>
               <span className="bc-gk">Einsatz · {dSeite?.displayName}</span>
@@ -1437,6 +1481,7 @@ export default function EinsatzlisteModern(props: Props) {
               onWahl={(art, id) => onAssignDisciplineFormCard?.(seite, art, id, formSteuerung.disciplineId)}
             />
           ) : null}
+          </div>
         </BcPanel>
 
         {/* ------------ Kontext ------------ */}
@@ -1493,17 +1538,6 @@ export default function EinsatzlisteModern(props: Props) {
             {abgegeben ? "Arena öffnet zum Spieltag" : "Danach: Arena"}
           </span>
         )}
-        <button
-          type="button"
-          className={`bc-btn bc-btn--haupt${abgegeben ? " is-ok" : gesperrt ? " is-zu" : ""}`}
-          data-testid="nl-lineup-save"
-          aria-disabled={isReadOnly || isBusy || (abgegeben && !(arenaReady && onNavigateArena))}
-          disabled={isReadOnly || isBusy}
-          title={lineupSaveCta.detail}
-          onClick={abgabeKlick}
-        >
-          {isReadOnly ? "Nur ansehen" : abgegeben ? (arenaReady && onNavigateArena ? "Zur Arena" : "Abgegeben") : gesperrt ? "Abgabe gesperrt" : "Abgeben"}
-        </button>
       </div>
 
       <BcSheet modal offen={steuerungOffen} onSchliessen={() => setSteuerungOffen(false)} titel="Team & Spieltag" data-testid="elm-steuerung">
