@@ -2064,14 +2064,16 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <span className="nl-teamsettings-hint">
             Chris {currentSaveOwnership.chrisTeamIds.length}/{gameModeOwnershipLimits.chrisMax}
           </span>
-          {gameModeOwnershipLimits.frankyMax > 0 ? (
+          {gameModeOwnershipLimits.frankyMax > 0 || currentSaveOwnership.frankyTeamIds.length > 0 ? (
             <span className="nl-teamsettings-hint">
-              Franky {currentSaveOwnership.frankyTeamIds.length}/{gameModeOwnershipLimits.frankyMax}
+              Franky {currentSaveOwnership.frankyTeamIds.length}
+              {gameModeOwnershipLimits.frankyMax > 0 ? `/${gameModeOwnershipLimits.frankyMax}` : ""}
             </span>
           ) : null}
           {gespeicherteRamonaTeamIds.length > 0 ? (
             <span className="nl-teamsettings-hint">
-              Ramona {gespeicherteRamonaTeamIds.length}/{gameModeOwnershipLimits.ramonaMax ?? 4}
+              Ramona {gespeicherteRamonaTeamIds.length}
+              {(gameModeOwnershipLimits.ramonaMax ?? 0) > 0 ? `/${gameModeOwnershipLimits.ramonaMax}` : ""}
             </span>
           ) : null}
           <span className="nl-teamsettings-hint">AI {aiTeams.length}</span>
@@ -2108,7 +2110,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               value={currentSaveOwnership.chrisTeamIds.length}
               sub={currentSaveOwnership.chrisTeamIds.join(" · ") || "kein Team"}
             />
-            {gameModeOwnershipLimits.frankyMax > 0 ? (
+            {gameModeOwnershipLimits.frankyMax > 0 || currentSaveOwnership.frankyTeamIds.length > 0 ? (
               <NlMetric
                 label="Franky"
                 value={currentSaveOwnership.frankyTeamIds.length}

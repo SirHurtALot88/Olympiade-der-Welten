@@ -139,6 +139,11 @@ body.still .buehne{--kopf:0rem}
 .pips{display:inline-flex;gap:.16rem} .pips i{width:.55rem;height:.34rem;transform:skewX(-14deg);background:var(--tf);border-radius:1px} .pips i.o{background:rgba(255,255,255,.16)}
 .vduo .auf div{grid-template-columns:4.2rem minmax(0,1fr) auto auto;gap:1rem;padding:.3rem .9rem .3rem .3rem;max-height:5rem;flex:1}
 .vduo .auf img{width:4.2rem;height:4.2rem} .vduo .auf b{font-size:1.5rem} .vduo .auf small{font-size:.95rem} .vduo .auf .w{font-size:1.5rem} .vduo .pips i{width:.9rem;height:.5rem}
+.vvier .auf{justify-content:flex-start;gap:.45rem}
+.vvier .auf div{grid-template-columns:3.6rem minmax(0,1fr) auto auto;flex:1;max-height:4.6rem}
+.vvier .auf img{width:3.6rem;height:3.6rem} .vvier .auf b{font-size:1.25rem}
+.figz{display:flex;justify-content:space-around;align-items:flex-end;margin-top:.6rem;padding:0 .4rem;border-bottom:.3rem solid var(--tf);background:linear-gradient(180deg,transparent,rgba(255,255,255,.05))}
+.figz img{width:23%;max-width:7rem;height:auto;min-width:0;image-rendering:pixelated}
 .kart{display:flex;gap:.4rem;margin-top:.7rem;padding-top:.65rem;border-top:1px solid var(--linie);font-size:.88rem;color:var(--leise);flex-wrap:wrap}
 .kart span{display:flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border:1px solid var(--linie);border-radius:.3rem;white-space:nowrap} .kart span b{color:var(--creme);font-weight:600}
 .vs{display:grid;place-items:center;font:400 3rem/1 var(--haus);color:var(--gold);text-shadow:0 .3rem 1rem #000}
@@ -165,7 +170,7 @@ body.still .buehne{--kopf:0rem}
 .tafel .m small{display:block;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .tafel .m strong{font-size:2rem;color:var(--creme)}
 /* Vierer-Tafel: vier gleich breite Felder, eigenes Feld mit Goldkante */
-.t4{left:50%;top:.8rem;transform:translateX(-50%);display:grid;grid-template-columns:repeat(2,16.5rem) 9.5rem repeat(2,16.5rem);gap:.25rem;filter:drop-shadow(0 .6rem 1.2rem rgba(0,0,0,.6))}
+.t4{left:50%;top:.8rem;transform:translateX(-50%);display:grid;grid-template-columns:repeat(2,18rem) 9.5rem repeat(2,18rem);gap:.25rem;filter:drop-shadow(0 .6rem 1.2rem rgba(0,0,0,.6))}
 .t4 .s{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.55rem;align-items:center;padding:.45rem .7rem;background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 82%,#000),color-mix(in srgb,var(--tf) 34%,#06080c));border-bottom:.22rem solid var(--tf)}
 .t4 .s.e{outline:2px solid var(--gold);outline-offset:-2px}
 .t4 .s img{width:2.5rem;height:2.5rem;border-radius:.35rem;object-fit:cover;border:2px solid rgba(255,255,255,.7)}
@@ -177,7 +182,7 @@ body.still .buehne{--kopf:0rem}
 .t4 .m small{display:block;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700} .t4 .m strong{font-size:1.9rem;line-height:1.1;color:var(--creme)}
 .kp{left:50%;top:5.6rem;transform:translateX(-50%);display:flex;gap:.4rem;padding:.3rem .6rem;background:var(--glas);border:1px solid var(--linie);border-radius:.5rem;align-items:center;font-size:.82rem;color:var(--leise);white-space:nowrap}
 .kp u{text-decoration:none;display:grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;font-weight:700;color:#fff;background:var(--tf);border:2px solid rgba(255,255,255,.5)} .kp u.frei{background:transparent;color:var(--leise);border-style:dashed}
-.turm{left:.9rem;top:5.4rem;width:17.5rem;background:var(--glas);border:1px solid var(--linie);border-radius:.5rem;overflow:hidden}
+.turm{left:.9rem;top:5.4rem;width:20.5rem;background:var(--glas);border:1px solid var(--linie);border-radius:.5rem;overflow:hidden}
 .turm .gk{padding:.5rem .7rem .35rem;color:var(--gold);display:flex;justify-content:space-between}
 .turm div.z{display:grid;grid-template-columns:1.5rem 1.7rem minmax(0,1fr) 2.6rem 3.4rem;gap:.45rem;align-items:center;padding:.3rem .7rem;border-top:1px solid var(--linie);font-size:.95rem}
 .turm .z.e{background:rgba(240,195,90,.14)}
@@ -215,6 +220,7 @@ body.still .buehne{--kopf:0rem}
 .sds .w{display:flex;gap:.9rem;margin-top:.5rem} .sds .w span{font-size:.76rem;color:var(--leise);letter-spacing:.06em;text-transform:uppercase} .sds .w strong{display:block;font-size:1.6rem;line-height:1;color:var(--creme)} .sds .w span.pp strong{color:var(--gold)}
 .szene{position:relative;flex:1;min-height:6rem;margin:.7rem;border-radius:.5rem;overflow:hidden;background:var(--bild) center/cover;image-rendering:pixelated;border:1px solid var(--linie-2);display:flex;align-items:flex-end}
 .szene::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(6,8,12,.92))}
+.szene img{position:absolute;height:36%;bottom:34%;image-rendering:pixelated;filter:drop-shadow(0 .4rem .3rem rgba(0,0,0,.5))}
 .szene div{position:relative;padding:.6rem .8rem;width:100%;display:flex;align-items:flex-end;gap:.7rem}
 .szene b{display:block;font:400 1.15rem/1.1 var(--haus);color:#fff} .szene small{font-size:.84rem;color:var(--creme)}
 .szene a{margin-left:auto;display:grid;place-items:center;width:2.6rem;height:2.6rem;border-radius:50%;background:var(--gold);color:#17120a;font-size:1.2rem;flex:none}
@@ -244,7 +250,7 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .fussz{grid-column:1/13;display:flex;align-items:center;gap:.8rem} .fussz .sp{flex:1} .fussz .hin{font-size:.92rem;color:var(--leise)}
 /* Rangfolge 1-4 */
 .rf{display:flex;flex-direction:column;gap:.35rem;padding:.6rem .7rem;flex:1;min-height:0;justify-content:space-evenly}
-.rf .z{display:grid;grid-template-columns:2.8rem 3.2rem minmax(0,1fr) 5rem 4.6rem;gap:.75rem;align-items:center;padding:.45rem .8rem .45rem .5rem;background:var(--flaeche-2);border:1px solid var(--linie);border-left:.3rem solid var(--tf);border-radius:.45rem}
+.rf .z{flex:1;max-height:6.6rem;display:grid;grid-template-columns:2.8rem 3.2rem minmax(0,1fr) 5rem 4.6rem;gap:.75rem;align-items:center;padding:.45rem .8rem .45rem .5rem;background:var(--flaeche-2);border:1px solid var(--linie);border-left:.3rem solid var(--tf);border-radius:.45rem}
 .rf .z.e{border-color:var(--gold);border-left-color:var(--tf);background:rgba(240,195,90,.1)}
 .rf u{text-decoration:none;font:400 2.4rem/1 var(--haus);color:var(--creme);text-align:center} .rf .z:nth-child(n+3) u{color:var(--stumm)}
 .rf img{width:3.2rem;height:3.2rem;border-radius:.45rem;object-fit:cover}
@@ -269,6 +275,7 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .g4 div{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;padding:.6rem .3rem;background:var(--flaeche-2);border:1px solid var(--linie);border-top:.25rem solid var(--tf);border-radius:.5rem;text-align:center}
 .g4 div.e{border-color:var(--gold);border-top-color:var(--tf);background:rgba(240,195,90,.1)}
 .g4 img{width:4.6rem;height:4.6rem;border-radius:.6rem;object-fit:cover} .g4 b{font:400 1.05rem/1.1 var(--haus);color:#fff} .g4 small{font-size:.8rem;color:var(--leise)}
+.g4 .lg4{display:grid;grid-template-columns:repeat(2,3.4rem);gap:.3rem;margin-top:.6rem} .g4 .lg4 img{width:3.4rem;height:3.4rem;border-radius:.35rem}
 .spiele{grid-row:2/3;grid-column:2}
 .spiele .zl3{display:grid;grid-template-columns:1.3rem minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.6rem .9rem;border-bottom:1px solid var(--linie)}
 .spiele .zl3.an{background:rgba(240,195,90,.1)}
@@ -285,7 +292,7 @@ table.bx{width:100%;border-collapse:collapse;font-size:.98rem}
 .wkopf2 h1{margin:0;font:400 2.2rem/1 var(--haus);color:#fff;white-space:nowrap} .wkopf2 .sp{flex:1}
 .dchip{display:flex;align-items:center;gap:.45rem;height:2.2rem;padding:0 .8rem;border:1px solid var(--linie-2);border-radius:.4rem;font-size:.92rem;color:var(--creme);white-space:nowrap} .dchip svg{color:var(--gut)} .dchip small{color:var(--leise)}
 .filt{display:flex;gap:.25rem} .filt a{height:2.2rem;display:flex;align-items:center;padding:0 .8rem;border:1px solid var(--linie);border-radius:.4rem;font-size:.92rem;color:var(--leise);white-space:nowrap} .filt a.an{background:var(--gold);border-color:var(--gold);color:#17120a;font-weight:700}
-.tab{--sp:2.5rem minmax(0,1fr) 9.6rem 9.6rem 3.6rem 4.4rem 4.6rem 4.2rem 4.4rem 8rem}
+.tab{--sp:2.5rem minmax(0,1fr) 9.6rem 9.6rem 3.6rem 4.4rem 4.6rem 4.9rem 4.9rem 8rem}
 .tab .grp,.tab .hd,.tab .zr{display:grid;grid-template-columns:var(--sp);gap:.5rem;align-items:center;padding:0 .8rem}
 .tab .grp{height:1.5rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--stumm);flex:none}
 .tab .grp span{border-bottom:1px solid var(--linie-2);padding-bottom:.1rem;text-align:center;white-space:nowrap;overflow:hidden}
@@ -403,7 +410,7 @@ baueLiga(L2,"l2");baueLiga(L1,"l1");
 /* Feste Werte fuer das eigene Team: dieselben Zahlen in Ergebnis-Screens UND Wertung (gezeigt = gebucht) */
 (function(){var n=TEAM["N-N"];n.vorP=2;
   Object.assign(n.d1,{form:2,formLab:"R+2",cap:1.4,mut:0,basis:61.2});[4.8,3.6,3.1,2.4,1.9].forEach(function(p,i){n.d1.sp[i].pp=p});
-  Object.assign(n.d2,{form:-2,formLab:"B−2",cap:null,mut:.3,basis:58.7});[4.6,3.9,3.0,2.2].forEach(function(p,i){n.d2.sp[i].pp=p});n.d2.sp[1].mut=.3;
+  Object.assign(n.d2,{form:-1,formLab:"B−1",cap:null,mut:.3,basis:58.7});[4.6,3.9,3.0,2.2].forEach(function(p,i){n.d2.sp[i].pp=p});n.d2.sp[1].mut=.3;
   TEAM["N-W"].vorP=2;TEAM["P-S"].vorP=3;TEAM["M-M"].vorP=1;})();
 Object.keys(TEAM).forEach(function(c){var t=TEAM[c];["d1","d2"].forEach(function(d){if(t[d].mut&&!t[d].sp.some(function(s){return s.mut}))t[d].sp[Math.floor(R()*t[d].sp.length)].mut=.3});
   t.pkt=t.d1.pkt+t.d2.pkt;t.mut=t.d1.mut+t.d2.mut;t.ges=t.pkt+t.mut;t.nachP=t.vorP+t.ges;
@@ -449,7 +456,7 @@ function vkarte(c,d,farbe,eig,diszi){
   var t=TEAM[c],D=t[d],k=eig?`<span>Formkarte <b>${D.formLab||"keine"}</b>${D.form!=null?` <b class="${ton(D.form)}">${vz(D.form)}</b>`:""}</span><span>Captain <b>${D.cap!=null?D.sp[0].n:"nicht gesetzt"}</b></span>`:`<span>${ico("schloss")}Formkarte <b>verdeckt bis Anpfiff</b></span><span>Captain <b>${D.cap!=null?D.sp[0].n:"–"}</b></span>`;
   return `<article class="vt${eig?" eig":""}" style="--tf:${farbe}"><div class="kopf">${logo(c)}<div style="min-width:0"><div class="zl">${eig?'<span class="du">Dein Team</span>':""}${mg(c)}</div><h2>${t.n}</h2></div></div>
    <div class="kz"><div><small>Saison</small><b class="t">${t.vorR}.<i> von 16</i></b></div><div><small>${diszi}-Stärke</small><b class="t">#${1+(c.charCodeAt(0)*7+c.charCodeAt(2))%14}<i> Liga 2</i></b></div><div><small>${eig?"Eignung Schnitt":"Kader (beste 6)"}</small><b class="t">${eig?de(D.basis):"≈ "+Math.round(D.basis)}</b></div></div>
-   ${aufst(t,d,eig)}<div class="kart">${k}</div></article>`;
+   ${aufst(t,d,eig)}${d==="d2"?`<div class="figz">${D.sp.map(function(x){return `<img src="../sprites/figuren/${x.s}/south.png" alt="" onerror="this.style.visibility='hidden'">`}).join("")}</div>`:""}<div class="kart">${k}</div></article>`;
 }
 function scVor2(){
   return `<section class="sc vor"><div class="bild" style="--bild:${kul("basketball","parkett")}"></div>${reg(0,0)}
@@ -489,7 +496,7 @@ function scLive2(){
 function scLive4(){
   var L=Z.lauf,stand={"N-N":64,"P-S":51,"M-M":33,"N-W":19};
   var g=L?GRUPPE:[ICH].concat(WIR.d2.gruppe.filter(function(c){return c!==ICH}));
-  var ecke={};ecke[g[0]]=[[14,56],[21,72],[10,82],[27,58]];ecke[g[1]]=[[86,56],[79,72],[90,82],[73,58]];ecke[g[2]]=[[40,90],[47,84],[34,80],[52,92]];ecke[g[3]]=[[60,52],[66,62],[54,60],[70,50]];
+  var ord=[ICH].concat(WIR.d2.gruppe.filter(function(c){return c!==ICH})),ecke={};ecke[ord[0]]=[[14,56],[21,72],[10,82],[27,58]];ecke[ord[3]]=[[86,56],[79,72],[90,82],[73,58]];ecke[ord[2]]=[[40,90],[47,84],[34,80],[52,92]];ecke[ord[1]]=[[60,52],[66,62],[54,60],[70,50]];
   function feld(c,i){return `<div class="s${c===ICH?" e":""}" style="--tf:${GF[c]}">${c===ICH?'<span class="du">Dein Team</span>':""}${logo(c)}<div style="min-width:0"><small>${L?(i+1)+". Platz":TEAM[c].mgr||"KI"}</small><b>${TEAM[c].n}</b></div><strong class="t">${L?stand[c]:"–"}</strong></div>`}
   return `<section class="sc live hell"><div class="bild" style="--bild:${kul("battlefield","eroberung")}"></div>${reg(1,1)}
   <div class="feld">${g.map(function(c){return TEAM[c].d2.sp.map(function(s,i){return fig(s.s,ecke[c][i][0],ecke[c][i][1],GF[c],ecke[c][i][0]<50?"east":"west",c===ICH,88-i*13)}).join("")}).join("")}
@@ -520,11 +527,11 @@ function scErg2(){
    <section class="pan" style="grid-column:1/5"><div class="pk"><h2>Spieler des Spiels</h2><span class="sp"></span><small>höchster PP-Wert</small></div>
      <div class="sds">${por(s.s,"")}<div><small>${WIR.n} · ${s.ro}${a.cap!=null?" · Captain":""}</small><b>${s.n}</b><div class="w"><span><strong class="t">${pk[0]}</strong>PKT</span><span><strong class="t">7</strong>AST</span><span><strong class="t">3</strong>STL</span><span class="pp"><strong class="t">${de(s.pp)}</strong>PP</span></div></div></div>
      <div class="pk" style="border-top:1px solid var(--linie)"><h2>Szene des Spiels</h2><span class="sp"></span><small>3. Viertel · 6:31</small></div>
-     <div class="szene" style="--bild:${kul("basketball","parkett")}"><div><span><b>Dreier zum 54 : 49</b><small>${s.n} trifft nach Steal von ${a.sp[2].n}. Danach lag ${WIR.n} nie mehr hinten.</small></span><a title="Szene ansehen">${ico("play")}</a></div></div></section>
+     <div class="szene" style="--bild:${kul("basketball","parkett")}"><img src="../sprites/figuren/${a.sp[2].s}/east.png" alt="" style="left:16%"><img src="../sprites/figuren/${s.s}/angriff-east.png" alt="" style="left:40%" onerror="this.src='../sprites/figuren/${s.s}/east.png'"><img src="../sprites/figuren/${b.sp[0].s}/west.png" alt="" style="left:64%"><div><span><b>Dreier zum 54 : 49</b><small>${s.n} trifft nach Steal von ${a.sp[2].n}. Danach lag ${WIR.n} nie mehr hinten.</small></span><a title="Szene ansehen">${ico("play")}</a></div></div></section>
    <section class="pan" style="grid-column:5/10"><div class="pk"><h2>Statistik und PP je Spieler</h2><span class="sp"></span><small>PP = gebuchte Player Points · ◆ Mutator-Bonus</small></div>
      <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly">${boxBB(WIR,"var(--heim)",true)}${boxBB(GEG,"var(--gast)",false)}</div></section>
    <section class="pan" style="grid-column:10/13"><div class="pk"><h2>Höhepunkte</h2></div>
-     <div class="hoh"><div><u class="t">Q1 4:02</u><em>Dunk</em><span>${a.sp[4].n} zum 14 : 9</span></div><div><u class="t">Q2 1:15</u><em>Lauf</em><span>${GEG.n} 9 : 0</span></div><div><u class="t">Q3 6:31</u><em class="g">Dreier</em><span>${s.n} · 54 : 49</span></div><div><u class="t">Q3 2:40</u><em>Block</em><span>${a.sp[3].n} gegen ${b.sp[0].n}</span></div><div><u class="t">Q4 0:48</u><em class="g">Und-eins</em><span>${a.sp[1].n} · 76 : 69</span></div></div>
+     <div class="hoh"><div><u class="t">V1 4:02</u><em>Dunk</em><span>${a.sp[4].n} zum 14 : 9</span></div><div><u class="t">V2 1:15</u><em>Lauf</em><span>${GEG.n} 9 : 0</span></div><div><u class="t">V3 6:31</u><em class="g">Dreier</em><span>${s.n} · 54 : 49</span></div><div><u class="t">V3 2:40</u><em>Block</em><span>${a.sp[3].n} gegen ${b.sp[0].n}</span></div><div><u class="t">V4 0:48</u><em class="g">Und-eins</em><span>${a.sp[1].n} · 76 : 69</span></div></div>
      <div class="pk" style="border-top:1px solid var(--linie)"><h2>Was das heißt</h2></div>
      <div class="heisst"><div>Punkte heute<b class="t">2 von 4</b></div><div>Disziplin 2 · Battlefield<b>${ico("schloss")} offen</b></div><div>Saison-Rang nach dem Spieltag<b>${ico("schloss")} nach D2</b></div></div></section>
    <div class="fussz"><span class="hin">Die Spieltagswertung deckt Disziplin 2 erst auf, wenn sie gespielt ist.</span><span class="sp"></span><a class="btn neben" data-geh="wertung">Spieltagswertung</a><a class="btn haupt" data-geh="wechsel">Weiter zu Disziplin 2 · Battlefield ${ico("r")}</a></div>
@@ -546,7 +553,7 @@ function scErg4(){
      <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--linie);flex:none"><div style="border-right:1px solid var(--linie)"><div class="gk" style="padding:.5rem .9rem 0;color:var(--gold)">Spieler des Spiels</div><div class="sds kl" style="grid-template-columns:4.6rem minmax(0,1fr);padding:.5rem .9rem .7rem">${por(top.s.s,"")}<div><small>${TEAM[top.c].n} · ${top.s.ro}</small><b style="font-size:1.35rem">${top.s.n}</b><div class="w"><span><strong class="t">${stat[top.s.s+top.c][0]}</strong>K</span><span><strong class="t">${stat[top.s.s+top.c][6]}</strong>SCH</span><span class="pp"><strong class="t">${de(top.s.pp)}</strong>PP</span></div></div></div></div>
        <div style="display:flex;flex-direction:column"><div class="gk" style="padding:.5rem .9rem 0;color:var(--gold)">Szene des Spiels · 0:36</div><div class="szene" style="--bild:${kul("battlefield","eroberung")};margin:.5rem .7rem .7rem"><div><span><b>Punkt C fällt</b><small>${WIR.d2.sp[0].n} hält drei Angreifer auf.</small></span><a title="Szene ansehen">${ico("play")}</a></div></div></div></div></section>
    <section class="pan" style="grid-column:6/13"><div class="pk"><h2>Statistik und PP je Spieler</h2><div class="reiter"><a class="${Z.tab==="alle"?"an":""}" data-tab="alle">Alle 16 nach PP</a>${GRUPPE.map(function(c){return `<a class="${Z.tab===c?"an":""}" data-tab="${c}">${logo(c)}${c}</a>`}).join("")}</div><span class="sp"></span><small>◆ Mutator-Bonus</small></div>
-     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:${Z.tab==="alle"?"space-evenly":"flex-start"}"><table class="bx${Z.tab==="alle"?" eng":""}" style="${Z.tab==="alle"?"":"font-size:1.1rem"}"><thead><tr><th>Spieler</th><th>K</th><th>T</th><th>B</th><th>CC</th><th>H</th><th>S</th><th>SCH</th><th>ERL</th><th>FF</th><th>IMP</th><th class="pp">PP</th></tr></thead><tbody>
+     <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start"><table class="bx" style="${Z.tab==="alle"?"":"font-size:1.15rem"}"><thead><tr><th>Spieler</th><th>K</th><th>T</th><th>B</th><th>CC</th><th>H</th><th>S</th><th>SCH</th><th>ERL</th><th>FF</th><th>IMP</th><th class="pp">PP</th></tr></thead><tbody>
       ${zeig.map(function(x){var v=stat[x.s.s+x.c];return `<tr class="${x.c===ICH?"e":""}"><td class="sp" style="--tf:${GF[x.c]}">${por(x.s.s,"")}<b>${x.s.n}</b><small>${x.c} · ${x.s.ro}</small></td>${v.map(function(w){return '<td class="t">'+w+'</td>'}).join("")}<td class="pp t">${de(x.s.pp)}${x.s.mut?' <span class="mut">◆ +0,3</span>':""}</td></tr>`}).join("")}</tbody></table></div>
      <div class="leg"><b>K</b> Kills · <b>T</b> Tode · <b>B</b> Beihilfen · <b>CC</b> Kontrolleffekte · <b>H</b> Heilung · <b>S</b> Schild · <b>SCH</b> Schaden · <b>ERL</b> erlitten · <b>FF</b> Eigenbeschuss · <b>IMP</b> Impact · <b>PP</b> gebuchte Player Points</div>
      <div class="chips" style="border-top:1px solid var(--linie)"><span style="--tf:${GF[ICH]}"><u class="t">0:12</u>Punkt A an ${WIR.n}</span><span style="--tf:${GF["P-S"]}"><u class="t">0:24</u>Doppel-Kill ${TEAM["P-S"].d2.sp[0].n}</span><span style="--tf:${GF[ICH]}"><u class="t">0:36</u>Punkt C fällt</span><span style="--tf:${GF["M-M"]}"><u class="t">0:51</u>${TEAM["M-M"].d2.sp[0].n} holt B zurück</span><span style="--tf:${GF[ICH]}"><u class="t">1:07</u>Punktelimit</span></div></section>
@@ -561,11 +568,11 @@ function scWechsel(){
   <div class="in">${Z.fremd?`<div class="fremd">${ico("auge")}<span>Du schaust gerade <b>Gruppe 2</b> an. Das ist <b>nicht dein Spiel</b>, deine Wertung läuft unverändert weiter.</span><span class="sp"></span><a class="btn haupt" data-tu="fremd" style="height:2.3rem;font-size:.95rem">${ico("haus")}Zurück zu meinem Spiel</a></div>`:`<div class="wkopf"><em>Wechsel zu Disziplin 2 von 2 · du bleibst bei deinem Team</em><h1>Weiter mit ${WIR.n}</h1></div>`}
    <div class="wduo"><div class="wk"><div class="gebucht">${ico("ok")}Disziplin 1 gebucht</div><h2>Basketball</h2>
       <div class="erg1"><img src="../team-logos/${ICH}.jpg" alt="" style="--tf:var(--heim)"><strong class="t">${WIR.d1.eig}</strong><i>:</i><strong class="t" style="color:var(--stumm)">${GEG.d1.eig}</strong><img src="../team-logos/${GEG.c}.jpg" alt="" style="--tf:var(--gast)"></div>
-      <div class="zl2"><span>Ergebnis</span><b class="plus">Sieg · +2 Pkt</b></div><div class="zl2"><span>Spieler des Spiels</span><b>${WIR.d1.sp[0].n} · ${de(WIR.d1.sp[0].pp)} PP</b></div><div class="zl2"><span>Gegner</span><b>${GEG.n}</b></div><span style="flex:1"></span>
+      <div class="zl2"><span>Ergebnis</span><b class="plus">Sieg · +2 Pkt</b></div><div class="zl2"><span>Spieler des Spiels</span><b>${WIR.d1.sp[0].n} · ${de(WIR.d1.sp[0].pp)} PP</b></div><div class="zl2"><span>Gegner</span><b>${GEG.n}</b></div><div class="gk" style="margin:.9rem 0 .2rem;color:var(--gold)">PP deiner Spieler · gebucht</div><div class="dsp" style="justify-content:flex-start;gap:.5rem">${WIR.d1.sp.map(function(x){return `<div>${por(x.s,"")}<b>${x.n}<small>${x.ro}</small></b><span></span><span class="ppb t">${de(x.pp)}</span></div>`}).join("")}</div><span style="flex:1"></span>
       <a class="hk2" data-geh="erg2" style="align-self:flex-start">${ico("l")}Ergebnis noch einmal</a></div>
     <div class="wpf">${ico("r")}<small>gleiches Team<br>neues Spiel</small></div>
     <div class="wk neu"><div class="gk" style="color:var(--gold)">Disziplin 2 von 2 · deine Vierergruppe</div><h2>Battlefield</h2>
-      <div class="g4">${[ICH].concat(g.filter(function(c){return c!==ICH})).map(function(c){return `<div class="${c===ICH?"e":""}" style="--tf:${GF[c]}">${logo(c)}<b>${TEAM[c].n}</b>${c===ICH?'<span class="du">Dein Team</span>':mg(c)}<small>Saison ${TEAM[c].vorR}.</small></div>`}).join("")}</div>
+      <div class="g4">${[ICH].concat(g.filter(function(c){return c!==ICH})).map(function(c){return `<div class="${c===ICH?"e":""}" style="--tf:${GF[c]}">${logo(c)}<b>${TEAM[c].n}</b>${c===ICH?'<span class="du">Dein Team</span>':mg(c)}<small>Saison ${TEAM[c].vorR}.</small><span class="lg4">${TEAM[c].d2.sp.map(function(x){return por(x.s,"")}).join("")}</span></div>`}).join("")}</div>
       <div class="zl2" style="margin-top:.8rem"><span>Wertung</span><b>Platz 1: 2 Pkt · Platz 2: 1 Pkt · Platz 3 und 4: 0</b></div></div></div>
    <section class="pan spiele"><div class="pk"><h2>Spiele in Battlefield</h2><span class="sp"></span><small>Liga 2 · 4 Gruppen</small></div>
      ${pods.map(function(p,i){var mein=p.indexOf(ICH)>=0,an=Z.fremd?i===1:mein;return `<div class="zl3${an?" an":""}"><u></u><div><b>Gruppe ${i+1}${mein?' <span class="du">Dein Spiel</span>':""}</b><div class="lg">${p.map(function(c){return logo(c,c===ICH?"e":"")}).join("")}</div></div>${mein?(Z.fremd?'<a class="an2" data-tu="fremd">zurück ›</a>':'<small>Standard</small>'):(an?'<small>wird angesehen</small>':'<a class="an2" data-tu="fremd">nur ansehen ›</a>')}</div>`}).join("")}
@@ -599,8 +606,8 @@ function scWertung(){
   return `<section class="sc wer"><div class="bild" style="--bild:${kul("battlefield","eroberung")}"></div>${reg(2,2)}
   <div class="in"><div class="wkopf2"><h1>Spieltagswertung</h1><span class="dchip">${ico("ok")}Basketball <small>Duell · 2 / 1 / 0</small></span><span class="dchip">${ico("ok")}Battlefield <small>Vierergruppe · 2-1-0-0</small></span><span class="sp"></span>
      <div class="filt">${lig.map(function(l){return `<a class="${Z.liga===l[0]?"an":""}" data-liga="${l[0]}">${l[1]}</a>`}).join("")}</div><a class="btn haupt" data-geh="laden" style="height:2.4rem;font-size:.95rem">Weiter · Nach dem Spieltag ${ico("r")}</a></div>
-   <section class="pan tab"><div class="grp"><span style="grid-column:1/3;border:0"></span><span style="grid-column:3/8">Ergebnis · Punkte für die Tabelle</span><span style="grid-column:8/10">Wirkung im Score · keine Punkte</span><span>Saison-Rang</span></div>
-     <div class="hd">${kopf("ges","#")}${kopf("ges","Team")}${kopf("d1","Basketball")}${kopf("d2","Battlefield")}${kopf("pkt","Punkte","re")}${kopf("mut","◆ Mutator","re")}${kopf("ges","Gesamt","re")}${kopf("form","Form","re")}${kopf("cap","Captain","re")}${kopf("sai","vor → nach","re")}</div>
+   <section class="pan tab"><div class="grp"><span style="grid-column:1/3;border:0"></span><span style="grid-column:3/8">Ergebnis · Punkte für die Tabelle</span><span style="grid-column:8/10">Score · keine Punkte</span><span>Saison-Rang</span></div>
+     <div class="hd">${kopf("ges","#")}<span>Team</span>${kopf("d1","Basketball")}${kopf("d2","Battlefield")}${kopf("pkt","Punkte","re")}${kopf("mut","◆ Mutator","re")}${kopf("ges","Gesamt","re")}${kopf("form","Form","re")}${kopf("cap","Captain","re")}${kopf("sai","vor → nach","re")}</div>
      <div class="body">${zeilen.map(function(c){var t=TEAM[c],bw=t.vorR-t.nachR;
        return `<div class="zr${c===ICH?" e":""}${c===Z.team?" sel":""}" data-team="${c}"><span class="rg t">${tagR[c]}</span><span class="tm">${logo(c)}<b>${t.n}</b>${c===ICH?'<span class="du">Du</span>':t.mgr?mg(c):""}</span><span class="dz">${dzelle(t.d1)}</span><span class="dz">${dzelle(t.d2)}</span><span class="re t">${t.pkt}</span><span class="re t" style="color:${t.mut?"var(--drei)":"var(--stumm)"}">${t.mut?"+"+de(t.mut):"–"}</span><span class="ges t">${de(t.ges)}</span><span class="re t ${t.hatForm?ton(t.form):"null"}">${t.hatForm?vz(t.form):"–"}</span><span class="re t ${t.hatCap?"plus":"null"}">${t.hatCap?vz(t.cap):"–"}</span><span class="sr t">${Z.liga==="alle"||Z.liga==="mensch"?'<i>'+(t.liga==="l1"?"L1":"L2")+'</i>':""}<i>${t.vorR}.</i>→<b>${t.nachR}.</b><span class="bw ${bw>0?"auf":bw<0?"ab":"gl"}">${bw>0?"▲"+bw:bw<0?"▼"+(-bw):"="}</span></span></div>`}).join("")}</div>
      <div class="tfuss"><b>#</b> Rang nur dieses Spieltags nach Gesamt · <b>S / N</b> Sieg, Niederlage · <b>1.–4.</b> Platz in der Vierergruppe · <b>Gesamt</b> = Punkte + Mutator · <b>Form / Captain</b> haben die Aufstellung stärker oder schwächer gemacht, sie zählen nicht zusätzlich</div></section>

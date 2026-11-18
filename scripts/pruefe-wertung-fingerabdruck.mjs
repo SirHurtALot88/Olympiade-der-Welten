@@ -12,7 +12,9 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md
+// GESAMT-STAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
+// `GESAMT d3a39030a3ef (75 Eintraege)`; gegenueber `ce8fcef66028` aendern sich NUR die drei Zeilen `spiele climbing 1|7|42`.
+// VORSTAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md
 // Abschnitt 7.9): `GESAMT ce8fcef66028 (75 Eintraege)`; gegenueber main mit #1562 (`38b176d7185b`) aendern sich NUR die
 // drei Zeilen `spiele basketball 1|7|42`. Zwischenstaende: Runde 2 auf altem main `004f26374565`. Davor:
 // VORSTAND (17.11., Basketball-Benchmark #1562 auf main): `GESAMT 38b176d7185b (75 Eintraege)`; gegenueber `97cccd6017fb`

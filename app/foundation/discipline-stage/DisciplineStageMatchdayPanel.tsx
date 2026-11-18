@@ -43,7 +43,7 @@ import {
  * types.ts) fuer den Badge-Titel unten -- bewusst lokal statt importiert: die Gruende sind ein
  * kleines, stabiles Enum, und diese Datei ist reines Lese-UI ohne Engine-Import.
  */
-function beschreibeArenaAusfallGrund(grund: string): string {
+export function beschreibeArenaAusfallGrund(grund: string): string {
   switch (grund) {
     case "chromium_start":
       return "Arena-Browser konnte nicht gestartet werden";
@@ -66,6 +66,16 @@ function beschreibeArenaAusfallGrund(grund: string): string {
   }
 }
 
+/**
+ * Ergebnis einer Disziplin-Seite in Worten (Spieltagswertung neu, 18.11.) — 1:1 aus der Resolve-Preview:
+ *  - `duell`: `duellSeiten` ([eigen, Gegner]) und `opponentTeamId` der Duell-Zeile,
+ *  - `gruppe`: `miniDmPod` (Platz 1–4, Gruppenwert, Pod-Id, die vier Teams der Gruppe).
+ * `null`/fehlend: die Preview liefert für diese Seite weder das eine noch das andere (reine Rangtabelle).
+ */
+export type MatchdayPanelSideResult =
+  | { art: "duell"; eigen: number; gegner: number; gegnerTeamId: string | null }
+  | { art: "gruppe"; platz: number; wert: number | null; podId: string; teamIds: string[] };
+
 export type MatchdayPanelTeamResult = {
   teamId: string;
   d1DisciplineId: string | null;
@@ -84,6 +94,9 @@ export type MatchdayPanelTeamResult = {
    */
   d1ArenaAusfallGrund?: string | null;
   d2ArenaAusfallGrund?: string | null;
+  /** Ergebnis in Worten je Seite (nur die neue Spieltagswertung liest es). */
+  d1Ergebnis?: MatchdayPanelSideResult | null;
+  d2Ergebnis?: MatchdayPanelSideResult | null;
 };
 
 export type MatchdayPanelStandingRow = {
@@ -130,6 +143,10 @@ export type MatchdayPanelPlayerRow = {
    * ohne Rang — die bleiben rahmenlos, statt auf "Bronze" zu fallen.
    */
   ovrRank?: number | null;
+  /** Portrait-URL (nur die neue Spieltagswertung liest sie). */
+  portraitUrl?: string | null;
+  /** Dieser Spieler war in der Disziplin Captain (`entry.isCaptain` der Preview). */
+  isCaptain?: boolean;
 };
 
 export type DisciplineStageMatchdayPanelProps = {

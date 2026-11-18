@@ -518,7 +518,7 @@ export default function ContractRenewalNegotiationModal({
           <section className="nl-negotiation-panel" aria-label="Angebot">
             <h3 className="nl-negotiation-panel-title">Dein Angebot</h3>
             <label className="nl-negotiation-field">
-              <span>Gehalt p.a. (Mio)</span>
+              <span>Gehalt p.a. (C)</span>
               <div className="nl-negotiation-salary-row">
                 <input
                   className="nl-negotiation-salary-input"

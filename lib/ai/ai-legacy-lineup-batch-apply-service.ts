@@ -1788,6 +1788,23 @@ function filterStaleFindingsForTeam(
   return team.lineupDelegated ? findings.filter((finding) => finding.reason === "player_unavailable") : findings;
 }
 
+/**
+ * F3 (Chris, 18.11., „AI pickt formkarten für ramona ja"): hat der Mensch in der Halbautomatik alle
+ * Spieler gesetzt, aber noch keine Formkarte, ist sein Entwurf fuer die KI NICHT fertig — sie legt
+ * die Karten nach. Gesetzte Karten (auch nur eine) bleiben unberuehrt (`mergeDelegatedLineupModifiers`).
+ * Nur vor dem Spieltagsstart: danach ist der Entwurf eingefroren (`shouldSkipExistingAiDraft`).
+ */
+function delegatedDraftLacksFormCards(
+  team: { lineupDelegated?: boolean },
+  draft: { modifiers?: LineupDraftModifiers | null } | null | undefined,
+): boolean {
+  if (!team.lineupDelegated) return false;
+  const modifiers = draft?.modifiers;
+  return !(["d1", "d2"] as const).some(
+    (side) => Boolean(modifiers?.[side]?.primaryFormCardId || modifiers?.[side]?.secondaryFormCardId),
+  );
+}
+
 const HUMAN_SIDE_MODIFIER_KEYS = ["mutatorTrait1", "mutatorTrait2", "strategie", "zurufPlan"] as const;
 
 /**
@@ -2142,7 +2159,8 @@ export function applyAiLegacyLineupBatchLocally(
 
       if (
         shouldSkipExistingAiDraft({
-          hasCompleteExistingDraft: cheapHasCompleteExistingDraft,
+          hasCompleteExistingDraft:
+            cheapHasCompleteExistingDraft && !delegatedDraftLacksFormCards(team, cheapExistingDraft),
           overwriteExisting,
           staleFindingCount: cheapStaleFindingCount,
           matchdayAlreadyStarted,
@@ -2310,7 +2328,7 @@ export function applyAiLegacyLineupBatchLocally(
 
     if (
       shouldSkipExistingAiDraft({
-        hasCompleteExistingDraft,
+        hasCompleteExistingDraft: hasCompleteExistingDraft && !delegatedDraftLacksFormCards(team, contextResult.context.existingDraft),
         overwriteExisting,
         staleFindingCount: staleDraftFindings.length,
         matchdayAlreadyStarted,
@@ -2492,7 +2510,7 @@ export function applyAiLegacyLineupBatchLocally(
     // gespeichert: der Fehler bliebe bestehen, nur teurer.
     if (
       shouldSkipExistingAiDraft({
-        hasCompleteExistingDraft,
+        hasCompleteExistingDraft: hasCompleteExistingDraft && !delegatedDraftLacksFormCards(team, contextResult.context.existingDraft),
         overwriteExisting,
         staleFindingCount: staleDraftFindings.length,
         matchdayAlreadyStarted,

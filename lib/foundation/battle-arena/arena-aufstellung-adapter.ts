@@ -1,6 +1,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { hasSlotCountSpecificRoles, resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { ermittleVerletzungsgesperrteAmSpieltag } from "@/lib/fatigue/fatigue-injury-service";
 import { nutztEchteFormkarten } from "@/lib/battle/formkarten-echt-disziplinen";
 import {
   buildFormkartenPlayers,
@@ -203,10 +204,20 @@ export function buildArenaAufstellung(
     return wert;
   };
 
+  // LUECKE B (Verletzung, Chris 18.11., docs/design/verletzung-regel-18-11.md): wer aus einem
+  // VORSPIELTAG verletzungsgesperrt ist, aber in einem gesperrten Entwurf (oder per Override) noch auf
+  // dem Zettel steht, bekommt keinen Platz — der Motor laesst ihn nicht antreten, sein Slot bleibt leer
+  // (Unterzahl bzw. die Ersatzregel des Motors, wie bei jedem fehlenden Eintrag). Die Wertung zaehlt ihn
+  // ohnehin nicht (`istVerletzungsgesperrtAusVorspieltag`). Ohne eingetragene Verletzung ist die Menge
+  // leer und die Aufstellung Zeichen fuer Zeichen die alte. Wer sich AN diesem Spieltag verletzt hat,
+  // ist nicht gesperrt: er ist gelaufen und behaelt seinen Platz.
+  const gesperrt = ermittleVerletzungsgesperrteAmSpieltag(gameState, matchdayId);
+
   for (const eintrag of entwurf.entries) {
     const spielerId = eintrag.activePlayerId
       ? spielerZuKaderzeile.get(eintrag.activePlayerId) ?? eintrag.playerId
       : eintrag.playerId;
+    if (gesperrt.size > 0 && gesperrt.has(`${teamId}::${spielerId}`)) continue;
     const name = nameVon.get(spielerId);
     if (!name) continue;
 

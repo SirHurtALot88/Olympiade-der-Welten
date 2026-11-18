@@ -13,7 +13,20 @@ import { describe, expect, it } from "vitest";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import {
+  applyFatigueAndInjuryAfterMatchday,
+  buildInjuryPerformanceMapForTeam,
+  buildMatchdayInjuryRollMap,
+  ermittleArenaVerletzungsstand,
+  getPlayerAvailabilityView,
+  rollInjuryRisk,
+} from "@/lib/fatigue/fatigue-injury-service";
+import { buildArenaTeam } from "@/lib/foundation/battle-arena/arena-kader-adapter";
+import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { berechneArenaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import { bereiteFixturesVor, type RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
+import { runBattleModeArenaMatchday } from "@/lib/resolve/battle-mode-arena-team-points";
+import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 import { buildDisciplineStageTeamsFromPreview } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
@@ -205,11 +218,12 @@ describe("Regel 1 — ein Verletzter ist nicht einsetzbar", () => {
     });
     const ergebnis = saveLocalLegacyLineupDraft({ ...scope, teamId: draft.teamId }, umgesetzt, draft.modifiers, persistence);
     expect(ergebnis.ok).toBe(false);
-    expect((ergebnis.errors ?? []).some((error) => error.includes("player_injured_unavailable"))).toBe(true);
+    const fehler: string[] = "errors" in ergebnis ? (ergebnis.errors ?? []) : [];
+    expect(fehler.some((error) => error.includes("player_injured_unavailable"))).toBe(true);
 
     // Gegenprobe: bleibt er auf seinem D1-Platz stehen (dort hat er gespielt), ist der Entwurf gueltig.
     const unveraendert = saveLocalLegacyLineupDraft({ ...scope, teamId: draft.teamId }, draft.entries, draft.modifiers, persistence);
-    expect(unveraendert.errors ?? []).not.toContainEqual(expect.stringContaining("player_injured_unavailable"));
+    expect("errors" in unveraendert ? (unveraendert.errors ?? []) : []).not.toContainEqual(expect.stringContaining("player_injured_unavailable"));
   }, 180_000);
 
   it("Pruefung: Sperre aus einem Vorspieltag ist im offenen Entwurf ein Fehler, ein heute Verletzter nur auf seinem alten Platz erlaubt", () => {
@@ -271,8 +285,8 @@ describe("Regel 1 — ein Verletzter ist nicht einsetzbar", () => {
       disciplineSide: "d2",
       matchdayId: "md-2",
       entries: [
-        { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 0, playerId: "gesperrt" },
-        { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 1, playerId: "fit" },
+        { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 0, playerId: "gesperrt", activePlayerId: "r-gesperrt" },
+        { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 1, playerId: "fit", activePlayerId: "r-fit" },
       ],
       disciplineScores: [
         { playerId: "gesperrt", disciplineId: "tdm", score: 90 },
@@ -303,7 +317,7 @@ describe("Regel 2 — in der Disziplin, in der er sich verletzt, zaehlt nur 50 %
       disciplineId: "tdm",
       disciplineSide: "d1",
       matchdayId: "md-1",
-      entries: [{ disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p" }],
+      entries: [{ disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p", activePlayerId: "r-p" }],
       disciplineScores: [{ playerId: "p", disciplineId: "tdm", score: 80 }],
       requiredPlayers: 1,
       fatigueByPlayerId: { p: { count: 60, multiplier: fatigueMultiplier } },
@@ -388,7 +402,11 @@ function arenaKontext(teamId: string, d1Scores: number[], gameState: GameState, 
   } as unknown as LegacyLineupLoadedContext;
 }
 
-describe("Regel 2/3 in der Arena — halbe Boxscore-PP, und gezeigt = gebucht", () => {
+// Seit Luecke D (Wurf VOR dem Motorlauf, s. Block „Luecke D“ unten) traegt der Motor die Verletzung
+// selbst: der Verletzte tritt mit 50 % seiner Eignung an, sein Boxscore und das Teamergebnis kommen
+// schon so aus dem Lauf. Die Resolve-Engine reicht die Boxscore-PP deshalb UNVERAENDERT durch (vorher
+// halbierte `arenaPpsFuer` sie nachtraeglich, weil der Motor nichts wusste — jetzt waere das doppelt).
+describe("Regel 2/3 in der Arena — Boxscore-PP aus dem Motor, und gezeigt = gebucht", () => {
   const gameState = { scenarioMeta: { gameMode: "battle" }, rosters: [], players: [], teams: [], seasonState: {} } as unknown as GameState;
   const VERLETZT = "A-A-d1-0";
   const arenaOptionen = {
@@ -411,17 +429,15 @@ describe("Regel 2/3 in der Arena — halbe Boxscore-PP, und gezeigt = gebucht", 
   );
   const basketball = mitVerletzung.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball")!;
 
-  it("der Verletzte bekommt die Haelfte seiner Arena-PP, seine Mitspieler und das Teamergebnis bleiben unberuehrt", () => {
+  it("die Arena-PP des Verletzten kommen unveraendert aus dem Motor (kein zweiter Abzug), Mitspieler und Teamergebnis ebenso", () => {
     const alpha = basketball.teamResults.find((team) => team.teamId === "A-A")!;
-    expect(alpha.entries.find((entry) => entry.playerId === VERLETZT)!.pointsAwarded).toBe(
-      Math.round(4.3 * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100,
-    );
+    expect(alpha.entries.find((entry) => entry.playerId === VERLETZT)!.pointsAwarded).toBe(4.3);
     expect(alpha.entries.find((entry) => entry.playerId === "A-A-d1-1")!.pointsAwarded).toBe(2.2);
     expect(alpha.teamPoints).toBe(ARENA_TEAM_POINTS.win);
   });
 
   it("Buehne, Vorschau-Zeile und gebuchte Zeile tragen dieselbe Zahl", () => {
-    const erwartet = Math.round(4.3 * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100;
+    const erwartet = 4.3;
     // Live-Buehne (Team-Zeile der Vorschau)
     const buehne = basketball.teamResults.find((team) => team.teamId === "A-A")!.entries.find((entry) => entry.playerId === VERLETZT)!;
     // Spielerzeile der Vorschau (das, was gebucht wird)
@@ -445,5 +461,295 @@ describe("Regel 2/3 in der Arena — halbe Boxscore-PP, und gezeigt = gebucht", 
     expect(zeile.injuryAdjustedValue).toBe(50 * INJURY_PERFORMANCE_MULTIPLIER);
     expect(stage.mods.find((mod) => mod.injury)?.amt).toBeCloseTo(50 * (1 - INJURY_PERFORMANCE_MULTIPLIER), 1);
     expect(gebucht.finalPlayerScore).toBe(zeile.finalPlayerScore);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Luecke D: der Wurf faellt VOR dem Motorlauf, der Verletzte tritt mit 50 % seiner Eignung an
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Erzwingt eine Verletzung im ECHTEN Wurf: ein aufgestellter D1-Spieler, dessen deterministischer
+ * Wurf bei Ausdauer 100 (Risiko 33 %) trifft, bekommt diese Ausdauer. Alle anderen bleiben frisch
+ * (Risiko 0). Nichts am Wurf selbst wird umgangen.
+ */
+function erzwingeVerletzungImWurf(gameState: GameState, scope: { saveId: string; seasonId: string; matchdayId: string }) {
+  const fixtures = findeSpieltagsFixtures(gameState, scope.matchdayId);
+  const mitFixture = new Set(fixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
+  for (const draft of gameState.seasonState.lineupDrafts ?? []) {
+    if (draft.matchdayId !== scope.matchdayId || !mitFixture.has(draft.teamId)) continue;
+    for (const slot of draft.entries) {
+      if (slot.disciplineSide !== "d1") continue;
+      if (rollInjuryRisk({ ...scope, playerId: slot.playerId, fatigueBefore: 100 }).result !== "injured") continue;
+      gameState.seasonState.playerAvailabilityState = [
+        ...(gameState.seasonState.playerAvailabilityState ?? []).filter(
+          (entry) => !(entry.playerId === slot.playerId && entry.teamId === draft.teamId),
+        ),
+        { playerId: slot.playerId, teamId: draft.teamId, fatigue: 100, injuryStatus: "healthy" },
+      ];
+      return { teamId: draft.teamId, playerId: slot.playerId, disciplineId: slot.disciplineId };
+    }
+  }
+  throw new Error("Kein D1-Spieler, dessen Wurf bei Ausdauer 100 trifft — der Test liefe ins Leere.");
+}
+
+describe("Luecke D — der Wurf faellt vor dem Motorlauf, der Verletzte tritt mit 50 % seiner Eignung an", () => {
+  const { persistence, scope } = baueStand();
+  const ohneVerletzung = structuredClone(persistence.getSaveById(SAVE_ID)!.gameState);
+  const gameState = structuredClone(ohneVerletzung);
+  const verletzt = erzwingeVerletzungImWurf(gameState, scope);
+  const key = `${verletzt.teamId}::${verletzt.playerId}`;
+  const stand = ermittleArenaVerletzungsstand({ gameState, ...scope });
+
+  it("derselbe Wurf wie bei der Buchung: Motor-Stand und Kontext-Verletzung (PPS, Buehne, Ledger) nennen denselben Spieler", () => {
+    const rollMap = buildMatchdayInjuryRollMap({ gameState, ...scope });
+    const gebuchtVerletzt = [...rollMap.entries()].filter(([, roll]) => roll.result === "injured").map(([k]) => k);
+    expect(gebuchtVerletzt).toEqual([key]);
+    expect([...stand.heuteVerletzt]).toEqual([key]);
+    expect(stand.gesperrt.size).toBe(0);
+    // Genau diese Map heften Vorschau, Arena-Kickoff, Auto-Run und Buchung an die Kontexte.
+    expect(buildInjuryPerformanceMapForTeam(verletzt.teamId, rollMap)?.[verletzt.playerId]).toEqual({
+      injuredThisMatchday: true,
+      multiplier: INJURY_PERFORMANCE_MULTIPLIER,
+    });
+  });
+
+  it("Motor-Eingabe: der Verletzte mit 50 % von Eignung und Attributen, Mitspieler und Reihenfolge unberuehrt", () => {
+    const vorher = buildArenaTeam(gameState, verletzt.teamId);
+    const nachher = buildArenaTeam(gameState, verletzt.teamId, undefined, stand);
+    expect(nachher.map((spieler) => spieler.id)).toEqual(vorher.map((spieler) => spieler.id));
+    expect(nachher.map((spieler) => spieler.id)).toContain(verletzt.playerId);
+    for (const [index, spieler] of nachher.entries()) {
+      const alt = vorher[index]!;
+      if (spieler.id !== verletzt.playerId) {
+        expect(spieler).toEqual(alt);
+        continue;
+      }
+      for (const [k, wert] of Object.entries(alt.a)) {
+        expect(spieler.a[k as keyof typeof spieler.a]).toBe(Math.round(wert * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100);
+      }
+      for (const [k, wert] of Object.entries(alt.d)) {
+        expect(spieler.d[k]).toBe(Math.round(Math.min(100, Math.max(0, wert * INJURY_PERFORMANCE_MULTIPLIER)) * 100) / 100);
+      }
+    }
+    // Die anderen Teams sehen nichts davon.
+    const anderesTeam = gameState.teams.find((team) => team.teamId !== verletzt.teamId)!.teamId;
+    expect(buildArenaTeam(gameState, anderesTeam, undefined, stand)).toEqual(buildArenaTeam(gameState, anderesTeam));
+  });
+
+  it("ohne Verletzung ist der Stand leer und die Motor-Eingabe Zeichen fuer Zeichen die alte", () => {
+    const leer = ermittleArenaVerletzungsstand({ gameState: ohneVerletzung, ...scope });
+    expect(leer.heuteVerletzt.size).toBe(0);
+    expect(leer.gesperrt.size).toBe(0);
+    for (const team of ohneVerletzung.teams) {
+      expect(buildArenaTeam(ohneVerletzung, team.teamId, undefined, leer)).toEqual(buildArenaTeam(ohneVerletzung, team.teamId));
+    }
+  });
+
+  it("Vorlauf-Cache: der Arena-Eingabe-Hash sieht die Verletzung (neu gerechnet), bleibt sonst stabil", () => {
+    const hash = (state: GameState) =>
+      berechneArenaEingabeHash({ gameState: state, ...scope, disciplineId: verletzt.disciplineId, mutatoren: [] });
+    expect(hash(gameState)).toBe(hash(structuredClone(gameState)));
+    expect(hash(gameState)).not.toBe(hash(ohneVerletzung));
+  });
+
+  it("Vorlauf und Hash fuettern den Motor mit derselben Eingabe (Runner bekommt den Stand vom Spieltags-Aufrufer)", async () => {
+    let gesehen: RunArenaFixturesOptions | null = null;
+    const vorbereitet: ReturnType<typeof bereiteFixturesVor> = [];
+    // Der frische Seed-Spielplan traegt keine Liga-Stufe; der Arena-Spieltag laeuft je Stufe.
+    const mitLiga = structuredClone(gameState);
+    mitLiga.seasonState.schedule = (mitLiga.seasonState.schedule ?? []).map((fixture) =>
+      fixture.matchdayId === scope.matchdayId ? { ...fixture, leagueTier: "liga1" as const } : fixture,
+    );
+    await runBattleModeArenaMatchday({
+      gameState: mitLiga,
+      ...scope,
+      disciplineId: verletzt.disciplineId,
+      matchdayMutatorTraits: [],
+      tierParallel: false,
+      runArenaFixturesImpl: async (state, fixtures, disziplin, options) => {
+        gesehen = options ?? null;
+        vorbereitet.push(...bereiteFixturesVor(state, fixtures, options?.attributeSheetOverrides, disziplin, options?.verletzungsstand));
+        return [];
+      },
+    });
+    expect(gesehen).not.toBeNull();
+    expect([...(gesehen!.verletzungsstand?.heuteVerletzt ?? [])]).toEqual([key]);
+    const duell = vorbereitet.find((fixture) => fixture.homeTeamId === verletzt.teamId || fixture.awayTeamId === verletzt.teamId)!;
+    expect(duell, "Das Team des Verletzten muss an diesem Spieltag ein Duell haben").toBeTruthy();
+    const kader = duell.homeTeamId === verletzt.teamId ? duell.heim : duell.gast;
+    // Dieselbe Funktion, mit der `berechneArenaEingabeHash` den Kader in den Fingerabdruck nimmt.
+    expect(kader).toEqual(buildArenaTeam(gameState, verletzt.teamId, undefined, stand));
+    const imMotor = kader.find((spieler) => spieler.id === verletzt.playerId)!;
+    const gesund = buildArenaTeam(ohneVerletzung, verletzt.teamId).find((spieler) => spieler.id === verletzt.playerId)!;
+    expect(imMotor.a.power).toBe(Math.round(gesund.a.power * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100);
+  });
+
+  it("stabil ueber den D1-Teil-Commit: der gebuchte Wurf zaehlt, die offene Seite wird gleich gewuerfelt", () => {
+    const nachD1 = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      ...scope,
+      matchdayResultId: `result-${scope.matchdayId}`,
+      timestamp: "2026-11-18T00:00:00.000Z",
+      commitThroughSide: "d1",
+    }).gameState;
+    nachD1.seasonState.matchdayResults = [
+      ...(nachD1.seasonState.matchdayResults ?? []),
+      { id: `result-${scope.matchdayId}`, saveId: SAVE_ID, seasonId: scope.seasonId, matchdayId: scope.matchdayId } as never,
+    ];
+    // Der D1-Commit hat ihn wirklich als verletzt eingetragen.
+    expect(nachD1.seasonState.playerAvailabilityState?.find((entry) => entry.playerId === verletzt.playerId)?.injuryStatus).toBe("injured");
+    const danach = ermittleArenaVerletzungsstand({ gameState: nachD1, ...scope });
+    expect([...danach.heuteVerletzt]).toEqual([key]);
+    expect(danach.gesperrt.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Luecke B: ein Gesperrter im gesperrten Entwurf tritt in der Arena nicht an
+// ---------------------------------------------------------------------------------------------
+
+function arenaSpieler(id: string, wert: number) {
+  return {
+    id,
+    name: id,
+    className: "Runner",
+    race: "Human",
+    subclasses: [],
+    traitsPositive: [],
+    traitsNegative: [],
+    marketValue: 10,
+    salary: 2,
+    fatigue: 20,
+    attributes: {},
+    disciplineRatings: { tdm: wert, spurt: wert },
+    attributeSheetStats: {
+      power: wert,
+      health: wert,
+      stamina: wert,
+      intelligence: wert,
+      awareness: wert,
+      determination: wert,
+      speed: wert,
+      dexterity: wert,
+      charisma: wert,
+      will: wert,
+      spirit: wert,
+      torment: wert,
+    },
+  };
+}
+
+/** md-2: `gesperrt` hat sich an md-1 verletzt (Sperre bis md-2) und steht im gesperrten Entwurf auf D2. */
+function gesperrterStand(status: "injured" | "recovering" = "injured"): GameState {
+  const teamId = "A-A";
+  const ids = ["d1-laeufer", "heute-verletzt", "gesperrt", "d2-partner", "bank"];
+  return {
+    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 2, matchdayIds: ["md-1", "md-2", "md-3"] },
+    seasonState: {
+      seasonId: "season-1",
+      schedule: [],
+      standings: {},
+      lineupDrafts: [
+        {
+          lineupId: "lineup-1",
+          saveId: "save-1",
+          seasonId: "season-1",
+          matchdayId: "md-2",
+          teamId,
+          status: "submitted",
+          entries: [
+            { disciplineId: "spurt", disciplineSide: "d1", slotIndex: 0, playerId: "d1-laeufer", activePlayerId: "roster-d1-laeufer" },
+            { disciplineId: "spurt", disciplineSide: "d1", slotIndex: 1, playerId: "heute-verletzt", activePlayerId: "roster-heute-verletzt" },
+            { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 0, playerId: "gesperrt", activePlayerId: "roster-gesperrt" },
+            { disciplineId: "tdm", disciplineSide: "d2", slotIndex: 1, playerId: "d2-partner", activePlayerId: "roster-d2-partner" },
+          ],
+          createdAt: "2026-11-18T00:00:00.000Z",
+          updatedAt: "2026-11-18T00:00:00.000Z",
+        },
+      ],
+      matchdayResults: [],
+      disciplineResults: [],
+      playerDisciplinePerformances: [],
+      disciplineHighlights: [],
+      resultAuditLogs: [],
+      playerAvailabilityState: ids.map((playerId) =>
+        playerId === "gesperrt"
+          ? {
+              playerId,
+              teamId,
+              fatigue: 60,
+              injuryStatus: status,
+              injuredAtSeasonId: "season-1",
+              injuredAtMatchdayId: "md-1",
+              injuryUntilMatchday: "md-2",
+            }
+          : playerId === "heute-verletzt"
+            ? {
+                playerId,
+                teamId,
+                fatigue: 62,
+                injuryStatus: "injured" as const,
+                injuredAtSeasonId: "season-1",
+                injuredAtMatchdayId: "md-2",
+                injuryUntilMatchday: "md-3",
+              }
+            : { playerId, teamId, fatigue: 10, injuryStatus: "healthy" as const },
+      ),
+    },
+    matchdayState: { matchdayId: "md-2", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+    teams: [{ teamId, shortCode: teamId, name: teamId, budget: 100, cash: 100, identityId: "id", humanControlled: false, rosterLimit: 12 }],
+    teamIdentities: [],
+    players: ids.map((id, index) => arenaSpieler(id, 90 - index * 5)),
+    disciplines: [],
+    rosters: ids.map((playerId) => ({ id: `roster-${playerId}`, teamId, playerId, role: "core", joinedSeasonId: "season-1" })),
+    contracts: [],
+    transferListings: [],
+    transferHistory: [],
+    logs: [],
+  } as unknown as GameState;
+}
+
+describe("Luecke B — ein Gesperrter im gesperrten Entwurf tritt in der Arena nicht an", () => {
+  const scope = { saveId: "save-1", seasonId: "season-1", matchdayId: "md-2" };
+
+  it("kein Platz in der Aufstellung, kein Platz im Kader — der Slot bleibt leer, die Mitspieler stehen", () => {
+    const gameState = gesperrterStand();
+    const aufstellung = buildArenaAufstellung(gameState, "A-A", "md-2");
+    expect(aufstellung.gesperrt).toBeUndefined();
+    expect(aufstellung["d2-partner"]?.d).toBe("tdm");
+    expect(aufstellung["d1-laeufer"]?.d).toBe("spurt");
+    // Wer sich AN diesem Spieltag verletzt hat, ist gelaufen und behaelt seinen Platz.
+    expect(aufstellung["heute-verletzt"]?.d).toBe("spurt");
+
+    const stand = ermittleArenaVerletzungsstand({ gameState, ...scope });
+    expect([...stand.gesperrt]).toEqual(["A-A::gesperrt"]);
+    const kader = buildArenaTeam(gameState, "A-A", undefined, stand);
+    expect(kader.map((spieler) => spieler.id)).not.toContain("gesperrt");
+    expect(kader.map((spieler) => spieler.id)).toEqual(
+      buildArenaTeam(gameState, "A-A")
+        .map((spieler) => spieler.id)
+        .filter((id) => id !== "gesperrt"),
+    );
+  });
+
+  it("bleibt auch nach dem Abschluss-Commit gesperrt (recovering bis md-2) — Buehne und Buchung sehen dasselbe", () => {
+    const gameState = gesperrterStand("recovering");
+    expect(buildArenaAufstellung(gameState, "A-A", "md-2").gesperrt).toBeUndefined();
+    expect([...ermittleArenaVerletzungsstand({ gameState, ...scope }).gesperrt]).toEqual(["A-A::gesperrt"]);
+    // Am Folgespieltag ist die Sperre vorbei.
+    // Am Folgespieltag ist seine Sperre vorbei — gesperrt ist dann nur, wer sich an md-2 verletzt hat.
+    expect([...ermittleArenaVerletzungsstand({ gameState, ...scope, matchdayId: "md-3" }).gesperrt]).toEqual(["A-A::heute-verletzt"]);
+  });
+
+  it("ohne Sperre steht er wie bisher in Aufstellung und Kader (Arena-Eingabe unveraendert)", () => {
+    const ohneSperre = gesperrterStand();
+    ohneSperre.seasonState.playerAvailabilityState = ohneSperre.seasonState.playerAvailabilityState!.map((entry) =>
+      entry.playerId === "gesperrt" ? { playerId: entry.playerId, teamId: entry.teamId, fatigue: 10, injuryStatus: "healthy" as const } : entry,
+    );
+    expect(buildArenaAufstellung(ohneSperre, "A-A", "md-2").gesperrt?.d).toBe("tdm");
+    const stand = ermittleArenaVerletzungsstand({ gameState: ohneSperre, ...scope });
+    expect(stand.gesperrt.size).toBe(0);
+    expect(buildArenaTeam(ohneSperre, "A-A", undefined, stand).map((spieler) => spieler.id)).toContain("gesperrt");
   });
 });

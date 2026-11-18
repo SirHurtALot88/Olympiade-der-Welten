@@ -63,7 +63,7 @@ function istZahl(wert: number | null | undefined): wert is number {
 }
 
 function formatMio(wert: number): string {
-  return `${Math.abs(wert).toFixed(1).replace(".", ",")} Mio`;
+  return `${Math.abs(wert).toFixed(1).replace(".", ",")} C`;
 }
 
 /**

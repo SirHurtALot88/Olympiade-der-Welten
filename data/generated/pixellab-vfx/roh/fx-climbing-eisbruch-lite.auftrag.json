@@ -1,0 +1,25 @@
+{
+ "prompt": "An icicle breaking off, pixel art, plays once, about 0.8 seconds. A pale blue icicle snaps at the top, falls straight down and shatters at the bottom into small ice shards and a puff of white frost. Colours: pale blue, white, light cyan. Transparent background, crisp pixels, about 32 pixels wide and 64 tall, no text.",
+ "artist": "lite",
+ "job": "3c782cc9-7ff0-4220-8cad-32ed97c04bd0",
+ "quoted": 1,
+ "generationen_abgerechnet": 1.195,
+ "gen_vorher": 607.7351005208002,
+ "gen_nachher": 606.5396546146003,
+ "datum": "2026-11-18T20:39:40Z",
+ "effect_id": "a12df4fa-4972-431e-89b3-4fe51f932921",
+ "canvas": {
+  "h": 64,
+  "w": 32
+ },
+ "frames": 9,
+ "fps": 11,
+ "loop": false,
+ "anchor": {
+  "x": 16,
+  "y": 32,
+  "kind": "origin"
+ },
+ "message": "A pale blue icicle (about 32x64 canvas, 9 frames at 11 fps, plays once in about 0.8 s) sits at the top, snaps loose, and falls straight down. On impact it bursts into small white and cyan ice shards and a puff of frost. The shards and frost are kept inside the canvas. Next, you could try the shard speed or the frost size if you want a bigger or smaller burst.",
+ "edit_url": "https://pixellab.ai/create-vfx?effect=a12df4fa-4972-431e-89b3-4fe51f932921"
+}

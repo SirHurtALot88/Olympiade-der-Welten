@@ -26,7 +26,7 @@
  * schliesslich wirklich gegen diesen Reihum-Kaempfer, das Ergebnis fuer SIE ist nicht erfunden.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runMiniDmFfaPodFixtures,
@@ -35,6 +35,7 @@ import {
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import {
   getMiniDmPodsForMatchday,
   resolveMiniDmFfaPlayerCountForMatchday,
@@ -177,6 +178,7 @@ function berechnePlayerPpsAusMotorErgebnis(
   k: number,
   ergebnis: MiniDmFfaPodFixtureResult,
   gesetzteRollenJeTeam: ReadonlyMap<string, Set<string>>,
+  ppSkala: PpSkalaModus,
 ): Map<string, number> {
   const referenz = resolveMiniDmFfaSpielerPpReferenz(k);
   const ppByPlayerId = new Map<string, number>();
@@ -186,9 +188,9 @@ function berechnePlayerPpsAusMotorErgebnis(
     if (!gesetzt) continue; // Reihum-Fallback-Kaempfer bekommt KEINE PP, s. Datei-Kopfkommentar.
     ppByPlayerId.set(
       eintrag.playerId,
-      // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
-      ppSkalaAktiv()
-        ? ppAusKurveSkaliert({ disciplineId: MINI_DM_DISCIPLINE_ID, wert: eintrag.beitrag, referenz })
+      // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
+      ppSkala !== "aus"
+        ? ppAusKurveSkaliert({ disciplineId: MINI_DM_DISCIPLINE_ID, wert: eintrag.beitrag, referenz, modus: ppSkala, playerCount: k })
         : ppAusMiniDmFfaBeitrag(eintrag.beitrag, referenz),
     );
   }
@@ -248,6 +250,10 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     ...input.runMiniDmFfaPodFixturesOptions,
     mutatoren: input.mutatorTraits ? [...input.mutatorTraits] : undefined,
     k,
+    // VERLETZUNG IM MOTOR (18.11.), s. `runBattleModeArenaMatchday()`: derselbe Wurf wie Buchung und Hash.
+    verletzungsstand:
+      input.runMiniDmFfaPodFixturesOptions?.verletzungsstand ??
+      ermittleArenaVerletzungsstand({ gameState: input.gameState, saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId }),
     // AUFSTELLUNG ECHT (PR A, Default -- hier nicht ueberschrieben): der Motor braucht die reale
     // Aufstellung als `platzJeTeam`, DAMIT die Reihum-Auswahl ueberhaupt die richtigen Spieler
     // uebrig laesst/ausschliesst. Die Teilnahme-Pruefung DIESER Datei (s. Kopfkommentar) ist davon
@@ -282,7 +288,7 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     }
     rohdatenByPodId.set(pod.id, uebersetzeMotorErgebnisZuRohdaten(input.gameState, input.matchdayId, pod, k, ergebnis));
     const gesetzteRollenJeTeam = new Map(pod.teamIds.map((teamId) => [teamId, baueGesetzteRollenFuerTeam(input.gameState, teamId, input.matchdayId)] as const));
-    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam)) {
+    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam, ppSkalaModus(input.gameState, input.matchdayId))) {
       playerPpsByPlayerId.set(playerId, pp);
     }
   });

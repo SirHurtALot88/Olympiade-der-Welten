@@ -7131,6 +7131,38 @@
     // unuebersehbare Merkmal" aus dem Bildbefund, nicht nur ein Farbtupfer auf dem Koerper).
     if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
     if(b.geist)ctx.globalAlpha=1;
+    // GESICHTSMARKE FUER SPIELER OHNE EIGENE FIGUR (18.11., s. ohneEigeneFigur()).
+    if(b===BAU_STD&&!u.down&&ohneEigeneFigur(u.n))zeichneGesichtsMarke(ctx,u,x,y-58*Z,Z);
+  }
+  // SPIELER OHNE EIGENE FIGUR (Chris' Live-Befund 18.11., Spieltag 1: "Crimson Shadow, Fungor und
+  // Nukka klettern als dieselbe generische glatzkoepfige Figur, nur Abyssalfin echt"). URSACHE: kein
+  // Ladefehler und keine fehlende Pose -- diese Spieler HABEN keinen PixelLab-Satz. Der Figuren-Index
+  // (data/generated/figuren-sprites.json -> battle-mode.figuren.js) fuehrt 361 Spieler von 2984; wer
+  // fehlt, faellt auf BAU_STD, und seit die alten LPC-Baukasten-Eintraege am 30.10. abgeschaltet
+  // wurden, sieht jeder davon gleich aus. Neue Figuren bestellen ist gesperrt (CLAUDE.md, PixelLab).
+  // Mit dem, was da ist, wird der Platzhalter wenigstens unterscheidbar: ueber dem Kopf steht das
+  // PORTRAET des Spielers als runde Marke (dasselbe Bild, das die Kaderleiste/Spielerkamera schon
+  // zeigen, `battlePortraitBild`), und die Kaderleiste zeigt fuer ihn nur noch das Portraet statt
+  // eines zweiten, nichtssagenden Platzhalters. Nur ueber HTTP (PIXEL_FIGUR_AKTIV): unter file://
+  // (Messlaeufe, renderProbe) bleibt jedes Bild unveraendert. Reine Anzeige, liest nur u.n/u.down.
+  function ohneEigeneFigur(name){
+    return !!name&&PIXEL_FIGUR_AKTIV&&!BAU[name]&&!Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,name);
+  }
+  function zeichneGesichtsMarke(ctx,u,x,yMitte,Z){
+    const e=battlePortraitBild(u);
+    if(!e.geladen||e.fehler)return;
+    const r=Math.max(5.5,8*Z);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x,yMitte,r,0,Math.PI*2); ctx.closePath();
+    ctx.fillStyle="rgba(8,10,14,.85)"; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(e.im,x-r,yMitte-r,2*r,2*r);
+    ctx.restore();
+    ctx.lineWidth=Math.max(1,1.3*Z);
+    ctx.strokeStyle="rgba(242,233,216,.9)";
+    ctx.stroke();
+    ctx.restore();
   }
 
   // SKILLS — Struktur aus Eslabong uebernommen, Zahlen bleiben unsere.
@@ -44593,6 +44625,15 @@
         zeitSpanne=Math.max(...fertigeZeiten)-zeitBest;
       }
     }
+    // KEIN STAND VOR DEM START (Chris' Live-Befund 18.11., Spieltag 1, D1 Climbing: vor dem
+    // Anpfiff stand oben "7 · 3" und unten in der Kaderleiste "7:3"). Vor dem ersten Tick hat
+    // noch niemand einen Meter gezeigt, alle stehen gleich -- die Sortierung oben ist dann
+    // nur die stabile LAEUFER-Reihenfolge (Heim zuerst bzw. Bahnfolge), und die Rangpunkte
+    // N..1 darauf sahen aus wie ein Ergebnis. Vor dem Start bekommt deshalb jeder 0 Punkte,
+    // beide Seiten stehen 0 : 0; HUD, Kaderleiste (#kmitte) und Kacheln lesen alle diese
+    // Funktion. Reine Anzeige: sobald `rennT>0` ist (erster Sim-Tick) gilt die alte Zeile
+    // unveraendert -- am Rennende, wo wert()/Sonde/Endstand lesen, also bit-identisch.
+    const vorStart=!done&&!(rennT>0);
     reihe.forEach((u,i)=>{
       const rangP=N-i;
       let p=rangP;
@@ -44600,9 +44641,10 @@
         const marginP=N-(bahnZeit(u)-zeitBest)/zeitSpanne*(N-1);
         p=(1-marginAnteil)*rangP+marginAnteil*marginP;
       }
+      if(vorStart)p=0;
       punkte.set(u.id,p); seiten[u.seite]+=p;
     });
-    return {reihe,punkte,seiten};
+    return {reihe,punkte,seiten,vorStart};
   }
   let bahnEndeGemeldet=false;
   // FUEHRUNGSWECHSEL (Broadcast-Praesentation Runde 2, Vorschlag 1, 22.09./26.09.): das
@@ -44719,6 +44761,7 @@
       // Banner GENAU EINEN sprechenden Zusatz bekommt, ohne die Live-Anzeige zu beruehren.
       const diff=Math.round(Math.abs(w.seiten[0]-w.seiten[1])*10)/10;
       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true,
+        vorStart:!!w.vorStart,
         bannerZusatz:diff>0?"mit "+diff+" Punkten Vorsprung":null};
     }
     // TIME-TRIAL (22.09.): ZWEI Groessen, GENAU WIE BEI DER STAFFEL bewusst nicht eine
@@ -45260,7 +45303,7 @@
     const rangSpiel=stand.gewertet&&BA().wertung==="rang"&&LAEUFER.length>0;
     document.getElementById("klsuffix").textContent=
       stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
-      +(stand.gewertet&&!done?" · vorläufig":"");
+      +(stand.vorStart?" · vor dem Start":stand.gewertet&&!done?" · vorläufig":"");
     // DEUTSCHES KOMMA AUCH HIER (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `stand.seiten`
     // sind bei Takeshi (Burgpunkte) Dezimalwerte — ohne `stand.fmt` haette der rohe
     // Zahlenwert per String-Verkettung einen Punkt gezeigt ("40.1 : 22.7"), waehrend
@@ -49191,7 +49234,17 @@
       const boxW=104, boxH=36, bx=W-14-boxW, by=H-14-boxH;
       ctx.save();
       ctx.textAlign="center";ctx.textBaseline="alphabetic";
-      if(zl){
+      // OHNE ZEITLIMIT (18.11.): statt einer Restzeit, die es nicht mehr gibt, zaehlt die Box, wie
+      // viele schon oben sind -- dieselbe Stelle, dieselbe Kastenform.
+      if(!zl){
+        const oben=LAEUFER.filter(u=>u.fertig!=null&&!u.raus).length, alle=LAEUFER.length;
+        ctx.fillStyle="rgba(17,24,35,.82)"; ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle="rgba(255,255,255,.4)"; ctx.lineWidth=1.4; ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 8.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(255,255,255,.78)";
+        ctx.fillText("OBEN",bx+boxW/2,by+12);
+        ctx.font="800 19px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#fff";
+        ctx.fillText(oben+" / "+alle,bx+boxW/2,by+31);
+      } else if(zl){
         const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
         const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
         const knapp=restEcht<=10;
@@ -50073,7 +50126,11 @@
       // beschlossenen Eichregel (Gegencheck 3.5), keine neue Zeit-/Rundenregel -- die Dauer
       // einer Climbing-Runde/eines Spieltags aendert sich dadurch nicht, nur WANN innerhalb
       // des Rennens die Uhr fuer einen einzelnen Kletterer ablaeuft.
-      zeitlimit:10.6,
+      // ZEITLIMIT ENTFERNT (18.11., Chris: "Ende bitte erst wenn ALLE im Ziel sind"): das Lead-Limit
+      // von 10,6 Sim-s (Eichung oben) beendete das Rennen, waehrend im Mittel 64 % der Kletterer noch
+      // in der Wand hingen -- sie bekamen keine Zeit, nur einen Platz nach Hoehe. Jetzt klettert jeder
+      // bis oben (Sicherheitsdeckel und Hochrechnung s. Rennende in stepSpurt()). Messung vorher/
+      // nachher: docs/design/arena-start-ende-figuren-18-11.md.
       // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11): `rastUnter` ist das vierte Feld im
       // `planWechsel()`-Vertrag (s. dort) — an einer Henkel-Exe wird zusaetzlich gerastet,
       // wenn die Reserve darunter faellt. `rastZeit` ist die zusaetzliche Stoppzeit, in der
@@ -55591,12 +55648,38 @@
     }
     kameraUpdate(dt);
     bahnBewegung(dt);
-    // ZEITLIMIT (Gegencheck 3.5, nur Climbing setzt `BA().zeitlimit`): das Rennen endet wie
-    // ein Lead-Versuch, sobald die Uhr abgelaeuft ist, auch wenn noch nicht alle oben sind
-    // -- Nicht-Angekommene bleiben `fertig==null` und werden nach Hoehe geordnet
-    // (bahnRangliste()/wert(), s. dort). Jede andere Bahn liest hier `undefined>=rennT`,
-    // also `false`, und bleibt beim alten 60-Sekunden-Deckel.
-    if(rennFertig.length>=LAEUFER.length||rennT>60||(BA().zeitlimit&&rennT>=BA().zeitlimit))done=true;
+    // ENDE ERST, WENN ALLE IM ZIEL SIND (Chris, 18.11., Live-Befund Spieltag 1, D1 Climbing,
+    // woertlich: "Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit
+    // PPs geratet werden koennen"). Bis hierher endete Climbing nach dem Lead-Zeitlimit
+    // (`zeitlimit:10.6` Sim-s, Gegencheck 3.5): gemessen 64 % der Kletterer ohne Zeit (Node-Sonde,
+    // 5 Kader x 6 Saaten), im Live-Beispiel Nukka mit "—" auf Platz 4. Jetzt laeuft jede Bahn,
+    // bis jeder Teilnehmer im Ziel (oder bei Takeshi ausgeschieden) ist -- ohne Limit kommen alle
+    // Kletterer an (Median letzter Zieleinlauf 18 Sim-s, Maximum 49 Sim-s ueber 60 Rennen).
+    //
+    // SICHERHEITSDECKEL statt Endloslauf: `BAHN_DECKEL_SEK` (der alte 60-Sekunden-Deckel, den keine
+    // Bahn ausser Climbing je erreichte). Wer dann noch unterwegs ist, bekommt eine aus seinem
+    // Fortschritt HOCHGERECHNETE Zielzeit (`bahnZeitHochrechnen`), damit jeder eine Zeit, einen
+    // Platz und damit PPs hat; die Reihenfolge entspricht der alten Ordnung nach Strecke/Hoehe.
+    // Die Staffel wird als Team gewertet und bleibt unberuehrt (dort setzt nur der Schlusslaeufer
+    // die Zeit aller sechs).
+    if(rennFertig.length>=LAEUFER.length||rennT>BAHN_DECKEL_SEK){
+      if(!BA().staffel)for(const u of LAEUFER)if(u.fertig==null)bahnZeitHochrechnen(u);
+      done=true;
+    }
+  }
+  // Sicherheitsdeckel jeder Bahn in Sim-Sekunden (s. Kommentar am Rennende in stepSpurt()).
+  const BAHN_DECKEL_SEK=60;
+  // HOCHGERECHNETE ZIELZEIT beim Sicherheitsdeckel: dieselbe Projektion wie bahnHochrechnung()
+  // (eigene Laufzeit / Fortschritt), bei Climbing auf der Hoechstmarke `u.hoch` (die zaehlt, s.
+  // bahnRangliste()). Ein Laeufer ohne jeden Fortschritt wird auf das Zwanzigfache gedeckelt statt
+  // durch null geteilt. Kommt in `rennFertig` wie ein echter Zieleinlauf. Bewusst KEIN neues Feld am
+  // Laeufer (s. CLAUDE.md, Fingerabdruck): geschaetzt ist eine Zeit genau dann, wenn das Rennen am
+  // Deckel endete und der Laeufer bis dahin nicht im Ziel war.
+  function bahnZeitHochrechnen(u){
+    const p=Math.max(0.05,Math.min(1,BA().climbing?(u.hoch??u.pos):u.pos)||0);
+    const eigen=Math.max(0,rennT-(u.startT||0));
+    u.fertig=(u.startT||0)+eigen/p;
+    rennFertig.push(u);
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT FUER DIE BAHN (PR 0.3, Opus-Plan Zehn-Disziplinen 09-10,
@@ -58793,7 +58876,27 @@
   // "bleibt aktiv bis done" (Chris 07.10.): mit dem Schlusspfiff endet die Drosselung, die
   // Tempo-Taste zeigt wieder das Wunschtempo (der Riegel selbst faellt erst mit reset()).
   const finaleDrosseltJetzt=()=>finaleAktiv&&!done&&!finaleAbgewaehlt&&finaleEchtzeitAn&&speed>1;
-  const wirksamesTempo=()=>finaleDrosseltJetzt()?1:speed;
+  // REST IM ZEITRAFFER (18.11., zu Chris' "Ende erst, wenn ALLE im Ziel sind"): ohne das Lead-Limit
+  // haengt Climbing nach dem Sieger noch bis zum letzten Kletterer -- im Median 18 statt 10,6 Sim-s,
+  // im Extrem 49 (Faktor 4,38 in Zuschauzeit). Damit die Sendung nicht ewig wird, laeuft der Rest
+  // BAHN_RESTRAFFER-fach schneller, sobald der erste oben ist und man BAHN_RESTRAFFER_NACH_SEK echte
+  // Sekunden lang seinen Moment gesehen hat. Reine Wiedergabe: mehr 1/60-Ticks je Bild, dieselbe
+  // Rechnung (wie die Tempo-Taste), am Ergebnis aendert sich nichts. Nur Climbing (die einzige Bahn,
+  // deren Dauer sich durch "alle im Ziel" verlaengert hat).
+  const BAHN_RESTRAFFER=3, BAHN_RESTRAFFER_NACH_SEK=4;
+  let bahnRafferGemeldetFuer=null;
+  function bahnRestRaffer(){
+    if(done||!istBahn(disc)||!BA().climbing)return 1;
+    let erstes=null;
+    for(const u of LAEUFER)if(u.fertig!=null&&!u.raus&&(erstes==null||u.fertig<erstes))erstes=u.fertig;
+    if(erstes==null||(rennT-erstes)*zeitFaktor()<BAHN_RESTRAFFER_NACH_SEK)return 1;
+    if(bahnRafferGemeldetFuer!==LAEUFER){
+      bahnRafferGemeldetFuer=LAEUFER;
+      try{ callout("REST IM ZEITRAFFER · "+BAHN_RESTRAFFER+"×"); }catch(e){}
+    }
+    return BAHN_RESTRAFFER;
+  }
+  const wirksamesTempo=()=>finaleDrosseltJetzt()?1:speed*bahnRestRaffer();
   function tempoAnzeigeAktualisieren(){
     const b=document.getElementById("spd"); if(!b)return;
     const drosselt=finaleDrosseltJetzt();
@@ -60878,13 +60981,36 @@
     return frag;
   }
 
+  // WELCHE ZWEI SEITEN DIE VORSTELLUNG ZEIGT (Chris' Live-Befund 18.11., Spieltag 1, D2 Battlefield:
+  // "Obwohl ich N-N steuere, geht er auf ein anderes Spiel, wenn ich zu Diszi 2 wechsle"). Die
+  // Vorstellung hat zwei Plaetze (L/R) und las immer Seite 0 und 1 -- im Vier-Team-Pod sind das die
+  // ersten beiden Teams der GRUPPE (Pod-Reihenfolge der Buchung), nicht das gesteuerte Team. Der Host
+  // reicht im Pod `eigeneSeite` (Index des gesteuerten Teams in der Gruppe) und `gegnerSeite` (sein
+  // Spieltagsgegner, falls in derselben Gruppe) mit; die Vorstellung zeigt dann diese beiden. Reine
+  // Anzeige: Seitennummern, Pod-Reihenfolge, Saat und Aufstellung des Laufs bleiben unberuehrt.
+  // Ohne Pod oder ohne Angabe bleibt es bei [0,1] wie bisher.
+  function einlaufSeiten(){
+    let roh=null;
+    try{
+      if(istKampf(disc)&&bfPodAktiv())roh=bfPodAnzeigeKontext();
+      else if(istBahn(disc)&&bahnPodAnzeigeAktiv())roh=bahnPodAnzeigeKontext();
+    }catch(e){ roh=null; }
+    if(!roh)return [0,1];
+    const N=roh.teams.length;
+    const gueltig=(s)=>Number.isInteger(s)&&s>=0&&s<N;
+    const eigen=gueltig(roh.eigeneSeite)?roh.eigeneSeite:0;
+    const gegner=gueltig(roh.gegnerSeite)&&roh.gegnerSeite!==eigen?roh.gegnerSeite:(eigen===0?1:0);
+    return [eigen,gegner];
+  }
   function renderEinlauf(){
+    const seitenZuordnung=einlaufSeiten();
     // Erster Durchlauf ueber beide Seiten: Basis+Anpassung je Spieler EINMAL berechnen
     // (nicht pro Zeile neu, s.u.) und den Anpassungs-Pool fuer die Faerbung sammeln —
     // braucht beide Teams, bevor die erste Zeile gezeichnet wird.
     const aufschluesselungenJeSeite=[[],[]];
     const deltaPool=[];
-    for(const seite of [0,1]){
+    for(const platzL of [0,1]){
+      const seite=seitenZuordnung[platzL];
       const feldRoh=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite)
         :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite)
         :istFeldspiel(disc)?FSTEAM[seite]
@@ -60892,7 +61018,7 @@
       for(const u of feldRoh){
         const p=seite===0?SQUAD.find(x=>x.n===u.n):OPP.find(x=>x.n===u.n);
         const auf=p?aufschluesselung(p,disc,seite===1):{teile:[["Basis",u.eig,""]],summe:u.eig};
-        aufschluesselungenJeSeite[seite].push(auf);
+        aufschluesselungenJeSeite[platzL].push(auf);
         deltaPool.push(auf.summe-auf.teile[0][1]);
       }
     }
@@ -60906,9 +61032,10 @@
       for(const sk of Object.keys(BASKETBALL_SKILL_LABEL))
         basketballSkillPool[sk]=alle.map(x=>x[sk]).filter(Number.isFinite);
     }
-    for(const seite of [0,1]){
-      const v=VEREIN[seite];
-      const k=document.getElementById(seite===0?"eteamL":"eteamR");
+    for(const platzL of [0,1]){
+      const seite=seitenZuordnung[platzL];
+      const v=VEREIN[seite]||VEREIN[platzL];
+      const k=document.getElementById(platzL===0?"eteamL":"eteamR");
       k.textContent="";
       k.appendChild(wappen(v));
       const txt=el("div");
@@ -60933,7 +61060,7 @@
 
       // Die Aufstellung kommt aus DENSELBEN Einheiten, die gleich kaempfen — nicht aus
       // einer zweiten Liste, die auseinanderlaufen koennte.
-      const liste=document.getElementById(seite===0?"elisteL":"elisteR");
+      const liste=document.getElementById(platzL===0?"elisteL":"elisteR");
       liste.textContent="";
       const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
         :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
@@ -60961,7 +61088,7 @@
         // (Slot/Form/Mutator/Intensitaet zusammen) in Klammern, z.B. "71 (+8,5)". Die
         // Anpassung ist gefaerbt (heatBand, s.o.) — rot=verschlechtert den Spieler fuer
         // diesen Slot spuerbar, blau=hebt ihn deutlich, dieselbe Skala wie im echten Spiel.
-        const auf=aufschluesselungenJeSeite[seite][i];
+        const auf=aufschluesselungenJeSeite[platzL][i];
         const basis=auf.teile[0][1], deltaWert=auf.summe-basis;
         const w=el("span","ewert");
         w.appendChild(document.createTextNode(basis.toFixed(1)+" "));
@@ -62035,7 +62162,9 @@
         // genau wie kaderFigur() daneben.
         const kopf=el("div","kkkopf");
         kopf.appendChild(kaderPortraet(u.n));
-        kopf.appendChild(kaderFigur(u.n));
+        // Ohne eigene PixelLab-Figur (s. ohneEigeneFigur()) waere die Figur daneben nur der
+        // gleiche Platzhalter wie bei jedem anderen solchen Spieler -- dann steht das Portraet allein.
+        if(!ohneEigeneFigur(u.n))kopf.appendChild(kaderFigur(u.n));
         kopf.appendChild(el("b",null,u.n));
         // Was die Leiste frueher trug, steht jetzt als Zahl neben dem Namen — der
         // Streckenanteil auf der Bahn, der Punktestand im Feldspiel/auf der Buehne. Eine
@@ -70007,6 +70136,8 @@
       return JSON.parse(JSON.stringify(BF_D5));
     },
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
+    // Welche zwei Seiten die Vorstellung gerade zeigt (einlaufSeiten(), 18.11.) -- nur gelesen.
+    einlaufSeitenProbe:()=>einlaufSeiten(),
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
     // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine

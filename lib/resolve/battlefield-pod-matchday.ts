@@ -16,7 +16,7 @@
  * aufgestellte Spieler, wie bei Mini-DM.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -25,6 +25,7 @@ import {
   type RunBattlefieldPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildBattlefieldPodMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { getPodsForMatchday, resolvePodPlayerCountForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 import { BATTLEFIELD_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import {
@@ -114,12 +115,17 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
     mutatoren: input.mutatorTraits ? [...input.mutatorTraits] : undefined,
     k,
     matchdayId: input.matchdayId,
+    // VERLETZUNG IM MOTOR (18.11.), s. `runBattleModeArenaMatchday()`: derselbe Wurf wie Buchung und Hash.
+    verletzungsstand:
+      input.runBattlefieldPodFixturesOptions?.verletzungsstand ??
+      ermittleArenaVerletzungsstand({ gameState: input.gameState, saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId }),
   });
 
   const rohdatenByPodId = new Map<string, BattlefieldPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
   const referenz = resolveBattlefieldPodSpielerPpReferenz(k);
+  const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
 
   pods.forEach((pod, index) => {
     const ergebnis = ergebnisse[index] ?? null;
@@ -155,9 +161,9 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
       if (!gesetztJeTeam.get(eintrag.teamId)?.has(eintrag.name)) continue;
       playerPpsByPlayerId.set(
         eintrag.playerId,
-        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
-        ppSkalaAktiv()
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz })
+        // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
+        ppSkala !== "aus"
+          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }
