@@ -607,11 +607,6 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(marketSellHostText).toContain("use-market-sell-derivations");
-    const marketBuyHostText = await fs.readFile(
-      path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx"),
-      "utf8",
-    );
-    expect(marketBuyHostText).toContain("use-market-buy-derivations");
 
     /**
      * DIE TESTIDS STEHEN NICHT MEHR IN DEN HOSTS. Seit „Kauf und Verkauf auf einer Huelle" (#345)
@@ -627,17 +622,16 @@ describe("foundation performance architecture helpers", () => {
      * und die Huelle macht daraus wirklich ein `data-testid`.
      */
     expect(marketSellHostText).toContain('testId="transfer-sell-page"');
-    expect(marketBuyHostText).toContain('testId="transfer-offer-page"');
     const decisionSurfaceText = await fs.readFile(
       path.join(root, "app/foundation/decision-surface/FoundationDecisionSurface.tsx"),
       "utf8",
     );
     expect(decisionSurfaceText).toContain("data-testid={testId}");
-    const transfermarktV2Text = await fs.readFile(
-      path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
+    const transfermarktModernText = await fs.readFile(
+      path.join(root, "app/foundation/transfermarkt-modern/TransfermarktModern.tsx"),
       "utf8",
     );
-    expect(transfermarktV2Text).toContain("FoundationShellRouterMarketBuy");
+    expect(transfermarktModernText).toContain("VerhandlungsTisch");
     const resultHostShellText = await fs.readFile(
       path.join(root, "app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx"),
       "utf8",

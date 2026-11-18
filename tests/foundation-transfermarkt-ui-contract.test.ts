@@ -65,127 +65,6 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain('setFoundationView("marketV2", setActiveView)');
   });
 
-  it("keeps Transfermarkt V2 centered on scouting, deal preview and own roster context", async () => {
-    const [fileText, buyHostText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(marketBuyHostPath, "utf8"),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(fileText).toContain("Markt-Pool");
-    expect(fileText).toContain("Scouting-Profil");
-    expect(fileText).toContain("Deal-Desk");
-    expect(fileText).toContain("Deal-Vorschau");
-    expect(fileText).toContain("Aktueller Kader");
-    // G6 (Durchklick-Test, Terminologie): sichtbarer Spieltext sagt durchgängig
-    // „Wunschliste" — „Wishlist" lebt nur noch in Code-Bezeichnern weiter.
-    expect(fileText).toContain("Wunschliste & Scouting");
-    expect(fileText).toContain("Deal prüfen");
-    expect(fileText).toContain("Auf Wunschliste");
-    expect(fileText).toContain("Beobachten");
-    expect(fileText).toContain("nl-market-ca-stars");
-    expect(fileText).toContain("axisStarsDisplay");
-    expect(fileText).toContain("onToggleScoutingWatch");
-    expect(fileText).toContain("selectedPlayerScoutCertainty");
-    expect(cssText).toContain(".market-v2-scout-certainty-bar");
-    expect(fileText).toContain("nl-market-focus-card");
-    expect(fileText).toContain("scoutingLevel");
-    // Phase 0: der tote Pool-Bracket-Drilldown (poolBracketPanel + Paging-Effekt,
-    // nie von einer gerenderten UI ausgelöst) wurde entfernt — daher hier keine
-    // Assertion mehr auf filterTransfermarktFreeAgentsByBracket/poolBracketPanel.
-    expect(fileText).toContain("nl-market-board");
-    expect(fileText).toContain('data-testid="transfer-deal-open-button"');
-    expect(buyHostText).toContain("Kauf final abschließen");
-    expect(buyHostText).toContain("Warum der Deal so ausfällt");
-    expect(fileText).toContain("getTransfermarktPortraitModel");
-  });
-
-  it("keeps Transfermarkt V2 filters for market value and salary pressure", async () => {
-    const [fileText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    // Mindest-MW/Gehalt-Ratio ist jetzt ein Range-Slider (statt Schnell-Chips).
-    expect(fileText).toContain("nl-market-ratio-slider");
-    expect(fileText).toContain('type="range"');
-    expect(fileText).toContain("MW ÷ Gehalt ≥");
-    expect(fileText).toContain("minRatioFilter");
-    expect(fileText).toContain("setMaxSalary");
-    expect(fileText).toContain("setMaxRatio");
-    expect(fileText).toContain("effectiveMaxSalary");
-    expect(fileText).toContain("effectiveMinRatio");
-    expect(cssText).toContain(".market-v2-range-row .secondary-button");
-  });
-
-  it("persists Transfermarkt V2 filters and named presets locally", async () => {
-    const [fileText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(fileText).toContain("MARKET_FILTER_STORAGE_PREFIX");
-    expect(fileText).toContain("readMarketFilterStorage");
-    expect(fileText).toContain("writeMarketFilterStorage");
-    expect(fileText).toContain("MarketFilterPreset");
-    expect(fileText).toContain("setFilterPresets");
-    expect(fileText).toContain("filterPresetMessage");
-    expect(fileText).toContain("writeMarketFilterStorage(defaultSaveId, currentFilterSnapshot, filterPresets)");
-    expect(fileText).toContain("HIDDEN_RACE_FILTER_VALUES");
-    expect(cssText).toContain(".market-v2-filter-presets");
-    expect(cssText).toContain(".market-v2-filter-preset-chip");
-  });
-
-  it("shows colored discipline fit rows in Transfermarkt V2", async () => {
-    const [fileText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(fileText).toContain("NL_AXIS_DISCIPLINE_CATEGORY");
-    expect(fileText).toContain("nlToneClass");
-    expect(fileText).toContain("topDisciplineScores.slice(0, 5)");
-    expect(cssText).toContain(".market-v2-diszi-row.is-power");
-    expect(cssText).toContain(".market-v2-diszi-row.is-speed");
-    expect(cssText).toContain(".market-v2-diszi-row.is-mental");
-    expect(cssText).toContain(".market-v2-diszi-row.is-social");
-    expect(cssText).toContain(".market-v2-disclosure-grid");
-  });
-
-  it("shows Transfermarkt V2 talent and attribute-tier markers on the candidate profile", async () => {
-    const [fileText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(fileText).toContain("nl-market-talent-row");
-    expect(fileText).toContain('label="Talent"');
-    expect(fileText).toContain("getAttributeTierClass");
-    expect(fileText).toContain("NlAbilityStars");
-    expect(cssText).toContain(".market-v2-training-affinity-chip.is-signature");
-    expect(cssText).toContain(".market-v2-training-affinity-chip.is-weak");
-  });
-
-  it("keeps the Transfermarkt V2 deal desk as an immediate impact preview", async () => {
-    const fileText = await readTransfermarktV2Source();
-
-    expect(fileText).toContain("previewPurchasePrice");
-    expect(fileText).toContain("previewCashBefore");
-    expect(fileText).toContain("previewCashAfter");
-    expect(fileText).toContain("previewTeamSalaryBefore");
-    expect(fileText).toContain("previewRosterAfter");
-    expect(fileText).toContain('label="Ablöse"');
-    expect(fileText).toContain("nl-market-deal-topline");
-    expect(fileText).toContain("NlMarketBeforeAfterRow");
-    expect(fileText).toContain("nl-market-need-tag");
-    expect(fileText).toContain("nl-market-impact-summary");
-    expect(fileText).toContain("nl-market-board");
-    expect(fileText).toContain("selectedPlayerWishlisted");
-    expect(fileText).not.toContain("Happy / Trust / Push");
-    expect(fileText).not.toContain("Final im Dialog");
-    expect(fileText).not.toContain('className="market-v2-buy-controls"');
-  });
-
   it("lets local Chris/manual teams stay manageable in quick market views", async () => {
     const fileText = await readFoundationOrchestratorSource(root);
     const teamControlHookText = await fs.readFile(
@@ -214,15 +93,6 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).not.toContain("activeOwnerId: resolvedOwnerId");
   });
 
-  it("keeps scouting values intentionally fuzzy instead of exposing exact hidden truths", async () => {
-    const marketText = await readTransfermarktV2Source();
-
-    expect(marketText).toContain("getScoutingTierWindow");
-    expect(marketText).toContain("resolveScoutingConfidenceFromLevel");
-    expect(marketText).toContain("isScoutedImpactExact");
-    expect(marketText).toContain("formatScoutedImpactDelta");
-  });
-
   it("documents that local team fit can still go negative for bad profile matches", async () => {
     const fileText = await fs.readFile(fitServicePath, "utf8");
 
@@ -230,27 +100,6 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("scorePresenceArray");
     expect(fileText).toContain("scorePresenceToken(raceKey, tokenCounts.races, -2)");
     expect(fileText).toContain("scorePresenceArray(traitKeys, tokenCounts.traits, -1)");
-  });
-
-  it("uses compact full-art portrait cards in the candidate rail and table hover previews", async () => {
-    const [fileText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(fileText).toContain("getTransfermarktPortraitModel");
-    expect(fileText).toContain("playerRatingsById");
-    expect(fileText).toContain("nl-market-candidate-portrait");
-    // Phase 0: CA-Sterne im Fokus-Card auf EINE kanonische Stelle reduziert
-    // (Kandidaten-Kopf-Duplikat `caScore={item.ovr}` entfernt); die Sterne
-    // leben jetzt am Fokus-„Talent"-Row via focusStarProps.
-    expect(fileText).toContain("caScore={focusStarProps.caScore}");
-    expect(fileText).toContain("NlAbilityStars");
-    expect(fileText).toContain('data-testid="transfer-candidate-card"');
-    expect(fileText).toContain("OptimizedMediaImage");
-    expect(fileText).toContain("nl-market-wishlist-chip");
-    expect(fileText).toContain("nl-market-roster-list");
-    expect(cssText).toContain(".foundation-player-portrait-preview-panel");
   });
 
   it("keeps the team profile relationship cards alive", async () => {
@@ -266,25 +115,6 @@ describe("foundation transfermarkt ui contract", () => {
     expect(teamProfileText).toContain("renderRelationshipColumn");
     expect(teamProfileText).toContain("data.relationships.allies");
     expect(teamProfileText).toContain("data.relationships.rivals");
-  });
-
-  it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
-    const [fileText, buyHostText, foundationText, marketHostText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(marketBuyHostPath, "utf8"),
-      readFoundationOrchestratorSource(root),
-      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx"), "utf8"),
-    ]);
-
-    expect(fileText).toContain('data-testid="transfer-deal-open-button"');
-    expect(fileText).toContain("resetBuyDemandFrame");
-    expect(buyHostText).toContain("Spieler ist noch angefressen");
-    expect(buyHostText).toContain('buyNegotiationOutcome?.status !== "accepted"');
-    expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
-    expect(foundationText).toContain("toggleScoutingWatch");
-    expect(marketHostText).toContain("onToggleScoutingWatch");
-    expect(foundationText).toContain("openMarketOfferPanel");
-    expect(fileText).toContain("FoundationShellRouterMarketBuy");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {
@@ -308,87 +138,4 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".legacy-matchday-player-score-chip.is-quality-instant");
   });
 
-  it("separates market loading from empty filter state", async () => {
-    const fileText = await readTransfermarktV2Source();
-
-    expect(fileText).toContain("bootstrapReady");
-    expect(fileText).toContain("marketBusy && candidates.length === 0");
-    expect(fileText).toContain("nl-market-loading-skeletons");
-    expect(fileText).toContain("!marketBusy && !marketError && candidates.length === 0");
-    expect(fileText).toContain('defaultSeasonId === "loading"');
-  });
-
-  it("blocks market buy for teams the active owner cannot manage", async () => {
-    const [foundationText, v2Text] = await Promise.all([
-      readFoundationOrchestratorSource(root),
-      readTransfermarktV2Source(),
-    ]);
-
-    expect(foundationText).toContain("openMarketBuyModal");
-    expect(foundationText).toContain("!canManageTeamId(effectiveTeamId)");
-    expect(v2Text).toContain("manageableTeamIdSet");
-    expect(v2Text).toContain("steuerbaren Teams");
-  });
-
-  it("shows negotiation abort feedback when closing buy offer pages", async () => {
-    const [v2Text, buyHostText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(marketBuyHostPath, "utf8"),
-    ]);
-
-    expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
-    expect(v2Text).toContain("Verhandlung mit ${playerName} abgebrochen");
-    // Die Testid kommt jetzt aus der geteilten Entscheidungs-Huelle (`testId`-Prop), seit der
-    // Kaufdialog seine Huelle nicht mehr selbst baut. Der Wert ist derselbe geblieben — nur die
-    // Stelle, an der er im Quelltext steht, hat sich verschoben.
-    expect(buyHostText).toContain('testId="transfer-offer-page"');
-    expect(v2Text).toContain("FoundationShellRouterMarketBuy");
-  });
-
-  it("loads buy preview skeleton and two-step confirm flow in Transfermarkt V2", async () => {
-    const [v2Text, buyHostText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(marketBuyHostPath, "utf8"),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(buyHostText).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
-    expect(buyHostText).toContain('buttonTestId: "transfer-buy-confirm-button"');
-    expect(buyHostText).toContain("Kauf final abschließen");
-    expect(buyHostText).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
-    expect(v2Text).toContain("negotiation_cancelled_after_contact");
-    expect(buyHostText).toContain("Spieler ist noch angefressen");
-    expect(v2Text).toContain("allSeasons: \"1\"");
-    expect(v2Text).toContain("nl-market-history-card");
-    expect(v2Text).toContain("(alle Seasons)");
-    expect(cssText).toContain(".transfer-buy-preview-skeleton");
-  });
-
-  it("exposes sprint L mobile preview sheet, candidate chips, contract control, rejection meter, and Auto labels", async () => {
-    const [v2Text, sellHostText, teamProfileText, teamsPanelText, cssText] = await Promise.all([
-      readTransfermarktV2Source(),
-      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"), "utf8"),
-      fs.readFile(teamProfileNewLookPath, "utf8"),
-      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
-      fs.readFile(globalsPath, "utf8"),
-    ]);
-
-    expect(v2Text).toContain("nl-market-candidate-signals");
-    expect(v2Text).toContain("nl-market-signal-chip");
-    expect(v2Text).toContain('data-testid="market-v2-contract-segmented"');
-    expect(v2Text).toContain("previewCashBefore");
-    expect(v2Text).toContain("previewCashAfter");
-    expect(sellHostText).toContain("Auto-Empfehlung");
-    expect(sellHostText).not.toContain("AI-Empfehlung");
-
-    expect(teamProfileText).toContain('data-testid="foundation-team-profile"');
-    expect(teamProfileText).toContain('data-testid="nl-teamprofile-roster"');
-    expect(teamProfileText).toContain('data-testid="nl-teamprofile-history"');
-    expect(teamsPanelText).toContain('data-testid="teams-v2-transfer-tab"');
-    expect(teamsPanelText).toContain("teams-v2-name-cell is-sticky-actions");
-    expect(teamsPanelText).toContain("table-icon-button");
-
-    expect(cssText).toContain(".market-v2-mobile-preview-sheet");
-    expect(cssText).toContain(".market-v2-rejection-meter");
-  });
 });

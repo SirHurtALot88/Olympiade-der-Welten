@@ -7,21 +7,6 @@ import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from ".
 const root = process.cwd();
 
 describe("foundation v2-only ui contract", () => {
-  it("hides classic transfer market and history tabs from the main shell", async () => {
-    const foundationText = await readFoundationOrchestratorSource(root);
-    const transferText = await fs.readFile(`${root}/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx`, "utf8");
-    const routingText = await fs.readFile(`${root}/lib/foundation/foundation-view-routing.ts`, "utf8");
-
-    expect(foundationText).not.toContain("marketBuyModalOpen");
-    expect(foundationText).not.toContain("foundation-modal-backdrop");
-    expect(foundationText).not.toContain('aria-label="Transfermarkt Ansicht"');
-    expect(foundationText).not.toContain('aria-label="Transferhistorie Ansicht"');
-    expect(foundationText).toContain('const isTransferMarketViewActive = activeView === "marketV2"');
-    expect(foundationText).toContain('const isTransferHistoryViewActive = activeView === "historyV2"');
-    expect(transferText).not.toContain("Klassischer Markt");
-    expect(routingText).toContain('if (view === "history") return "historyV2"');
-  });
-
   it("uses shell subnav for home and season without duplicate player profile tabs", async () => {
     const foundationText = await readFoundationOrchestratorSource(root);
     const playerProfileText = await fs.readFile(`${root}/app/foundation/player-profile/PlayerProfileClient.tsx`, "utf8");

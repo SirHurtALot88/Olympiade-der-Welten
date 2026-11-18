@@ -2092,10 +2092,26 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             scoutingLevel: playerScoutingLevel,
           })
         : baseItem.topDisciplineScores;
+      const disciplineEstimates = player
+        ? Object.fromEntries(
+            buildScoutedDisciplineTiers({
+              saveId: save.saveId,
+              playerId: player.id,
+              scoutingLevel: playerScoutingLevel,
+              disciplines: Object.entries(player.disciplineRatings ?? {}).map(([disciplineId, score]) => ({
+                disciplineId,
+                disciplineName: disciplinesById.get(disciplineId) ?? disciplineId,
+                score,
+              })),
+              topN: 40,
+            }).map((entry) => [entry.disciplineId, entry.displayedScore] as const),
+          )
+        : undefined;
       return {
         ...baseItem,
         scoutingLevel: playerScoutingLevel,
         topDisciplineScores,
+        disciplineEstimates,
         teamContextAvailable: true,
         teamCash: selectedTeam.cash,
         teamSalary,
