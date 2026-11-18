@@ -87,12 +87,45 @@ async function main() {
   if (!SAVE) throw new Error("--save fehlt");
   if (!process.env.OLY_APP_SQLITE_PATH) throw new Error("OLY_APP_SQLITE_PATH (Kopie!) setzen");
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
-  const ansichten = [
-    { name: "transfermarkt-fenster", url: ansicht("marketV2") },
-    { name: "saisonrueckblick-inbox", url: ansicht("inboxV2") },
-    { name: "saisonstand", url: ansicht("seasonV2") },
+  type Ansicht = { name: string; url: string; danach?: (page: Page) => Promise<void> };
+  const ansichten: Ansicht[] = [
+    {
+      name: "transfermarkt-fenster",
+      url: ansicht("marketV2"),
+      danach: async (page) => {
+        await page.getByText("Transfermarkt wird geladen", { exact: false }).waitFor({ state: "detached", timeout: 600_000 }).catch(() => undefined);
+        await page.waitForTimeout(4000);
+      },
+    },
+    {
+      // Der Saisonrueckblick steht in der Chronik der Inbox („Berichte & Momente“).
+      name: "saisonrueckblick-inbox",
+      url: ansicht("inboxV2"),
+      danach: async (page) => {
+        await page.getByRole("button", { name: /^Chronik/ }).first().click().catch(() => undefined);
+        await page.waitForTimeout(3000);
+      },
+    },
+    {
+      // Spalte „Transfers“ steht in der Vereins-Ansicht.
+      name: "saisonstand",
+      url: ansicht("seasonV2"),
+      danach: async (page) => {
+        await page.getByRole("button", { name: /^Verein$/ }).first().click().catch(() => undefined);
+        await page.waitForTimeout(3000);
+      },
+    },
     { name: "finanzen", url: ansicht("finances") },
     { name: "transferhistorie", url: ansicht("historyV2") },
+    {
+      // Saison 1: Kaderaufbau statt Transferbilanz.
+      name: "transferhistorie-s1",
+      url: ansicht("historyV2"),
+      danach: async (page) => {
+        await page.locator("select").first().selectOption({ label: "Season 1" }).catch(() => undefined);
+        await page.waitForTimeout(6000);
+      },
+    },
   ].filter((a) => !NUR || NUR.split(",").includes(a.name));
   const server = startServer();
   let browser: Browser | null = null;
@@ -107,6 +140,7 @@ async function main() {
         await page.waitForLoadState("networkidle", { timeout: 300_000 }).catch(() => undefined);
         await page.waitForTimeout(6000);
         await schliesseBriefing(page);
+        if (a.danach) await a.danach(page);
         await page.waitForTimeout(1500);
         const datei = path.join(OUTPUT_DIR, `${PRAEFIX}-${a.name}-${groesse.breite}.png`);
         await page.screenshot({ path: datei });

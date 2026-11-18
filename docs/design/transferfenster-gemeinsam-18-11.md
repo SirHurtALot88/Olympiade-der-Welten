@@ -175,3 +175,16 @@ Wertungs-Fingerabdruck: `GESAMT ce8fcef66028 (75 Eintraege)`, unverändert.
 3. **Nachrunde und Kasse** (Abschnitt 6): Planer-Entscheidung, nicht Fenster-Entscheidung.
 4. Der Room-Flow springt nach dem Saisonwechsel zu „Verkäufe entscheiden“; „Käufe entscheiden“ bleibt ein eigener Schritt
    danach. Ein gemeinsamer Raum-Schritt „Transfers“ wäre möglich, ist aber eine UI-Frage.
+
+## 8. Aufnahmen
+
+Echte App (Dev-Server, Auto-Export aus) auf einer Kopie des „nachher“-Messstands, Saison 2 vor Spieltag 1, M-M als eigenes
+Team; `scripts/screenshot-transferfenster-gemeinsam.ts`, Ordner `docs/design/transferfenster-gemeinsam-18-11/`, je 1920 und 2560:
+
+* `neu-transfermarkt-fenster-*`: Kopfzeile „Kauf offen · Verkauf offen“, Knopf „Erst verkaufen“ neben „Verhandeln“.
+* `neu-saisonstand-*` (Ansicht „Verein“): Spalte „Transfers“ = Transferbilanz S2 aus dem gemeinsamen Fenster, verteilt um null.
+* `neu-transferhistorie-*`: Top-Verkäufe und Top-Käufe des Fensters, beide unter Season 2.
+
+Nicht aufgenommen: der Saisonrückblick (Inbox-Chronik) und die Historie mit Filter Saison 1 — die Klickfolge im Skript traf die
+Bedienelemente nicht. Ihr Inhalt ist durch `tests/transferfenster-gemeinsam.test.ts` (Zeugnis-Zeile, Kaderaufbau-Umrechnung)
+abgedeckt; die Aufnahme bleibt offen.
