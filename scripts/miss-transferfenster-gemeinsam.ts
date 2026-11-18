@@ -27,6 +27,10 @@ import { loadEnvConfig } from "@next/env";
 loadEnvConfig(process.cwd());
 
 import { fuehreKiPreseasonLaufAus } from "@/lib/ai/ai-preseason-background-service";
+import { getTeamOptTarget } from "@/lib/ai/ai-market-plan-convergence-service";
+import { berechneVorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { GM_OPT_SENKUNG_MAX, getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
+import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
@@ -65,13 +69,15 @@ function kader(gs: GameState): Record<string, number> {
 
 /** Bewegungen, die NACH `vorher` dazukamen (Menge der IDs — die Historie ist nicht nach Zeit geordnet). */
 function bewegungen(gs: GameState, vorher: Set<string>) {
-  const je: Record<string, { kaeufe: number; kaufSumme: number; verkaeufe: number; verkaufSumme: number }> = {};
-  const z = (teamId: string) => (je[teamId] ??= { kaeufe: 0, kaufSumme: 0, verkaeufe: 0, verkaufSumme: 0 });
+  const je: Record<string, { kaeufe: number; kaufSumme: number; verkaeufe: number; verkaufSumme: number; fueller: number }> = {};
+  const z = (teamId: string) => (je[teamId] ??= { kaeufe: 0, kaufSumme: 0, verkaeufe: 0, verkaufSumme: 0, fueller: 0 });
   for (const e of gs.transferHistory) {
     if (vorher.has(e.id)) continue;
     if (e.transferType === "buy" && e.toTeamId) {
       z(e.toTeamId).kaeufe += 1;
       z(e.toTeamId).kaufSumme = r2(z(e.toTeamId).kaufSumme + e.fee);
+      // Fenster auf Opt: Fueller = Kauf unter dem Platzpreis 12 (KADERPLAN_PLATZ_MIN_MW).
+      if (e.fee < 12) z(e.toTeamId).fueller += 1;
     } else if (e.transferType === "sell" && e.fromTeamId) {
       z(e.fromTeamId).verkaeufe += 1;
       z(e.fromTeamId).verkaufSumme = r2(z(e.fromTeamId).verkaufSumme + (e.netCashImpact ?? e.fee));
@@ -121,6 +127,13 @@ async function main() {
   const sid2 = nachWechsel.season.id;
   const kasseFensterStart = Object.fromEntries(nachWechsel.teams.map((t) => [t.teamId, r2(t.cash)]));
   const kaderFensterStart = kader(nachWechsel);
+  // Opt (Planer-Ziel) und GM-Opt (bewusste Senkung um hoechstens 2, nie unter Minimum + 1), zum Fensterbeginn.
+  const optJeTeam: Record<string, { opt: number; gmOpt: number }> = {};
+  for (const t of nachWechsel.teams) {
+    const opt = getTeamOptTarget(nachWechsel, t.teamId);
+    const anp = gmKaderOptAnpassung({ bias: getTeamGeneralManager(nachWechsel, t.teamId)?.profile?.bias ?? null, opt, rosterMin: 8 });
+    optJeTeam[t.teamId] = { opt, gmOpt: Math.max(anp.opt, opt - GM_OPT_SENKUNG_MAX, Math.min(opt, 9)) };
+  }
   const histVorFenster = new Set(nachWechsel.transferHistory.map((e) => e.id));
   const kredite0 = new Set((nachWechsel.seasonState.loans ?? []).map((k) => k.loanId));
 
@@ -140,10 +153,26 @@ async function main() {
   const bilanzS1 = buildStandingsTransferBalanceByTeamId(ende, sid1);
   const bilanzS2 = buildStandingsTransferBalanceByTeamId(ende, sid2);
 
+  const laufWarn = lauf.body.run?.warnings ?? [];
   const teams = ende.teams.map((t) => {
     const se = saisonendeBewegungen[t.teamId];
     const fe = fensterBewegungen[t.teamId];
+    const kaderplanZeilen = laufWarn.filter((w) => w.startsWith(`kaderplan:${t.teamId}:`));
+    const letzteZeile = kaderplanZeilen[kaderplanZeilen.length - 1] ?? "";
+    const notwege = kaderplanZeilen
+      .map((w) => /:notwege=(.*)$/.exec(w)?.[1] ?? "0")
+      .filter((n) => n !== "0")
+      .flatMap((n) => n.split(","));
+    const stand = berechneVorstandBudgetStand(ende, t.teamId);
     return {
+      opt: optJeTeam[t.teamId]?.opt ?? null,
+      gmOpt: optJeTeam[t.teamId]?.gmOpt ?? null,
+      kaderplanGrund: letzteZeile.split(":")[2] ?? null,
+      notwege,
+      fensterFueller: fe?.fueller ?? 0,
+      gehaltSumme: r2(ende.rosters.filter((r) => r.teamId === t.teamId).reduce((sum, r) => sum + (r.salary ?? 0), 0)),
+      notruecklage: stand.kaderpflicht?.notruecklage ?? null,
+      notverkaeufe: laufWarn.filter((w) => w.startsWith(`ai_notverkauf:${t.teamId}:`)).length,
       teamId: t.teamId,
       kasseSaisonende: kasseSaisonende[t.teamId],
       kasseFensterStart: kasseFensterStart[t.teamId],
@@ -167,9 +196,35 @@ async function main() {
 
   const summe = (f: (x: (typeof teams)[number]) => number) => r2(teams.reduce((s, x) => s + f(x), 0));
   const bilanzS2Werte = teams.map((x) => x.transferbilanzS2).filter((v): v is number => typeof v === "number");
+  const gehaelter = teams.map((x) => x.gehaltSumme);
   const zusammenfassung = {
     label: LABEL,
     gemeinsam: istTransferfensterGemeinsam(),
+    fensterAufOpt: istFensterAufOpt(),
+    // FENSTER AUF OPT: Kadergroesse gegen Opt und GM-Opt (Ziel: 0 unter GM-Opt, kein Team bei 8–9, ausser sein GM-Opt liegt dort).
+    unterOpt: teams.filter((x) => x.opt != null && x.kaderEnde < x.opt).length,
+    unterGmOpt: teams
+      .filter((x) => x.gmOpt != null && x.kaderEnde < x.gmOpt)
+      .map((x) => `${x.teamId}:${x.kaderEnde}/${x.gmOpt} (Opt ${x.opt}, Start ${x.kaderFensterStart}, V ${x.fensterVerkaeufe}, K ${x.fensterKaeufe}, Kasse ${x.kasseEnde}, ${x.kaderplanGrund ?? "-"})`),
+    bei8oder9OhneGrund: teams
+      .filter((x) => (x.kaderEnde === 8 || x.kaderEnde === 9) && (x.gmOpt ?? 99) > x.kaderEnde)
+      .map((x) => `${x.teamId}:${x.kaderEnde}/${x.gmOpt}`),
+    kaderVerteilung: Object.fromEntries(
+      [...new Set(teams.map((x) => x.kaderEnde))].sort((a, b) => a - b).map((k) => [k, teams.filter((x) => x.kaderEnde === k).length]),
+    ),
+    fensterFueller: summe((x) => x.fensterFueller),
+    notwegZaehler: teams.reduce((n, x) => n + x.notwege.length, 0),
+    notwegeArten: teams.flatMap((x) => x.notwege).reduce<Record<string, number>>((m, n) => ({ ...m, [n]: (m[n] ?? 0) + 1 }), {}),
+    notverkaeufe: summe((x) => x.notverkaeufe),
+    kasseUnterNotruecklage: teams.filter((x) => x.notruecklage != null && x.kasseEnde < x.notruecklage).length,
+    gehaltSumme: {
+      min: quantil(gehaelter, 0),
+      q25: quantil(gehaelter, 0.25),
+      median: quantil(gehaelter, 0.5),
+      q75: quantil(gehaelter, 0.75),
+      max: quantil(gehaelter, 1),
+      in50bis70: gehaelter.filter((g) => g >= 50 && g <= 70).length,
+    },
     saveId: SAVE,
     saisonendeVerkaeufe: summe((x) => x.saisonendeVerkaeufe),
     saisonendeVerkaufSumme: summe((x) => x.saisonendeVerkaufSumme),
@@ -202,7 +257,7 @@ async function main() {
     negativeKassen: teams.filter((x) => x.kasseEnde < -0.01).length,
     neueKredite: neueKredite.length,
     notkredite: summe((x) => x.notkredit),
-    laufWarnungen: (lauf.body.run?.warnings ?? []).filter((w) => /fenster|kassensturz|notkredit|notverkauf/.test(w)).slice(0, 20),
+    laufWarnungen: laufWarn.filter((w) => /fenster|kassensturz|notkredit|notverkauf/.test(w)).slice(0, 20),
     laufzeitSekunden: Math.round((Date.now() - t0) / 1000),
   };
   console.log(JSON.stringify(zusammenfassung, null, 2));
