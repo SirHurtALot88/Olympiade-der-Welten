@@ -201,11 +201,11 @@ export const MOTOR_BASKETBALL_ROLLE_SLOT: Readonly<Record<string, number>> = {
 /** `SLOTS` (Basketball, Engine Z. ~11259): Abstand zum Korb (px) und Seitenfaktor (×90 px). */
 export const MOTOR_BASKETBALL_SLOTS: ReadonlyArray<{ radius: number; seitlich: number }> = [
   { radius: 60, seitlich: 0 },
-  { radius: 130, seitlich: 0 },
-  { radius: 150, seitlich: 1.05 },
-  { radius: 150, seitlich: -1.05 },
-  { radius: 145, seitlich: 1.45 },
-  { radius: 145, seitlich: -1.45 },
+  { radius: 125, seitlich: 0 },
+  { radius: 125, seitlich: 0.95 },
+  { radius: 125, seitlich: -0.95 },
+  { radius: 117, seitlich: 1.26 },
+  { radius: 117, seitlich: -1.26 },
 ];
 
 /** `SLOTS_HOCKEY` (Engine Z. ~11282): Netfront, Half-Wall l/r, Point l/r, hoher Slot. */
@@ -253,9 +253,9 @@ export const MOTOR_RENNPLAENE: Readonly<Record<string, { plaene: Readonly<Record
   },
   staffel: {
     plaene: {
-      halten: { label: "Halten", tempo: 1.0, text: "Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt." },
-      angehen: { label: "Angehen", tempo: 1.0, text: "Geht seinen Abschnitt von vorn an und legt vor." },
-      schluss: { label: "Schlussmann", tempo: 1.0, text: "Hängt sich an und wirft alles auf das letzte Stück." },
+      halten: { label: "Halten", tempo: 0.95, text: "Teilt sich die Runde ein und zieht auf der Zielgeraden an. Kommt nicht leer an." },
+      angehen: { label: "Angehen", tempo: 1.0, text: "Geht seine Runde von vorn an und legt vor — hält er das durch?" },
+      schluss: { label: "Schlussmann", tempo: 0.96, text: "Läuft kontrolliert an und wirft ab der Gegengeraden alles hinein." },
     },
     planJeSlot: { startrunner: "angehen", tempolink: "halten", batontech: "halten", curverunner: "angehen", chaserunner: "schluss", anchor: "schluss" },
   },
