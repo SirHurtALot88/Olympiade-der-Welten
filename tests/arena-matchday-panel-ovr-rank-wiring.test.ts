@@ -20,7 +20,7 @@ describe("Arena: OVR-Rang für die Spieltags-Wertung", () => {
     // `ratingByPlayerId` gibt es in der Bühne längst (Hover-Vorschau, Top-Spieler).
     expect(ARENA).toContain("ovrRank: ratingByPlayerId.get(e.playerId)?.ovrRank ?? null,");
     // Und die Zeile muss neu berechnet werden, wenn sich die Map ändert.
-    expect(ARENA).toContain("}, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);");
+    expect(ARENA).toContain("}, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId, portraitById]);");
   });
 
   it("baut die Rating-Map OHNE playerIds-Filter", () => {

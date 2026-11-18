@@ -116,6 +116,35 @@ Der alte Boden 0,35 x Gehalt (14 / 21 / 28) liegt **immer** darüber (q höchste
 
 **Kasse nach dem S2-Fenster:** 19,9 % des Startbudgets bei Soll 14 % (1,5 x Soll, vorher 1,14 x, alter Stand dieses PR 1,9 x). Gründe, mit Zahlen: (a) bei 7 von 32 Teams ist der **Gehaltstopf** der Engpass (frei unter 5 C), (b) einzelne Teams bleiben bei Kader 8 bis 9 stehen, obwohl noch rund 30 C Transferrahmen frei sind (z. B. C-C, D-P): der Markt-Plan plant dort selbst keinen weiteren Kauf (sein eigener Bedarfs-Stopp, nicht die Sperre), (c) der Standard-Anteil von 90 % lässt 10 % gewollt auf dem Konto. Eine weitere Absenkung gehört in den Planer-Stopp (Bedarf bis Opt), nicht in die Töpfe.
 
+## 4d. Kaderpflicht-Freigabe (Chris, 18.11. abends)
+
+Chris: „Wenn Geld da ist, aber nicht freigegeben, müsste der Vorstand das Geld freigeben, weil das ja schon ein Notfall ist, wenn man nicht das Minimum erreicht und sich nicht dem Optimum nähern kann.“ Gebaut in `kaufRahmen` / `berechneVorstandBudgetStand` (`lib/finance/vorstand-budgetfreigabe.ts`), für Mensch und KI gleich:
+
+1. **Unter dem Minimum** (Identitäts-Minimum, mindestens 8): der Rahmen ist nie kleiner als Platzpreis × fehlende Plätze, Ablöse UND Gehalt. Gedeckt aus der **ganzen Kasse** (auch unter der Notrücklage), ohne Vertrauensverlust.
+2. **Zwischen Minimum und Opt:** der Rahmen deckt mindestens die Plätze bis Opt zum Platzpreis, **soweit Kasse über der Notrücklage** da ist. Die Quote (50 bis 100 %) wirkt erst auf das Geld darüber hinaus.
+3. **Platzpreis** = Median des freien Marktes (Marktwert und Gehaltsforderung eines sinnvollen Spielers, nicht der billigste Füller). Sobald der Kaderplan #1629 auf main ist, kann er die Platzpreise hineinreichen (`platzPreisAusMarkt` ist die eine Stelle).
+4. **Eine Zahl für Planer und Sperre:** `kaufRahmen().grenzeFuer(kaderVorKauf, bereitsAusgegebeneAbloese, bereitsAusgegebenesGehalt)`; der organische Planer (`economy.kaufGrenze`), der Markt-Plan und die Sperre rechnen mit derselben reinen Funktion `kaderpflichtZuschlag`.
+5. **Sichtbarkeit (gezeigt = gebucht):** die Zeile „Kaderpflicht: Vorstand gibt X C frei (Kader 6/10)“ steht in der Transfer-Karte der Budgets (`data-testid="fin-kaderpflicht"`) und ist Teil von `TransferFreigabe.kaderpflicht` für den Transfermarkt (`tm-kaderpflicht`). Der Betrag steckt schon im freien Rahmen des Stands.
+6. **Kasse reicht wirklich nicht:** die Freigabe ist nie größer als die Kasse; dann greift die bestehende Leiter (Kredit), kein Notkauf.
+
+Messung (derselbe Aufbau wie 4b, eine Saat): **Teams unter 8: 0**, Käufe 75 (vorher 69), Kader Median 10, **Kaderstärke Median 44,50 (+0,5 % gegen „vorher“ 44,30)**, negative Kassen 0, Kasse nach dem S2-Fenster 16,0 % des Startbudgets bei Soll 14,0 % (**1,04 x Soll**, vorher 1,14 x; 20 von 32 Teams im Band 0,5 bis 1,5 x Soll). Tests: `tests/ki-planung-toepfe.test.ts` (Team mit 6 Spielern und 87 C Kasse: Rahmen für 4 Käufe zum Platzpreis; Team bei Opt: keine Wirkung; Kasse reicht nicht: Freigabe höchstens die Kasse; Saison 1: keine Wirkung).
+
+## 4c. Mockup vs. Bau (Abgleich der Aufnahmen aus der echten App)
+
+Bilder: `docs/design/finanzen-v2-seite-18-11/` (Bau: `normal-<reiter>-<breite>.png`, Mockup: `mockup-kasse|auszug|budget-1920.png`). Das Mockup ist eine eigenständige Seite ohne App-Schale; in der App fehlen dem Reiterbereich deshalb rund 110 px Höhe (Kopfzeile der Schale). Der Spielstand der Aufnahmen steht vor Spieltag 1 der Saison 2, deshalb ist der Kontoauszug leer und der Kassenverlauf flach (das Spiel bucht Spieltag-Posten nur für Transfers, siehe Abschnitt 3); das Mockup zeigt erfundene Spieltags-Posten.
+
+| Reiter | Mockup | Bau | Abweichung / Begründung |
+|---|---|---|---|
+| Kopf | Wappen, Titel, drei Kennzahl-Reiter (Kasse, Sponsoren, Fans und Arena), „nächste Buchung“ | Wappen, Titel, drei Kennzahl-Reiter (Kasse, Budgets, Sponsor), „Saisonende erwartet“ | Fans/Arena gibt es in der Finanzseite nicht (eigene Seiten); an ihrer Stelle die Budgets, weil dort die Freigabe des Vorstands lebt. |
+| Reiter | Übersicht, Spieltags-Abrechnung, Hebel, Budgets | Übersicht, Kontoauszug, Budgets, Sponsor, GuV, Apron | „Hebel“ entfällt (Konzept: Umschichten, Lockerung und Sonderwege stehen in Budgets); Sponsor, GuV und Apron kamen aus der alten Seite dazu. |
+| Übersicht | Kassenverlauf mit Reserve-Linie, Posten-Balken je Spieltag, Einnahmen-Mix | Kassenverlauf mit Stationen, Balken nur für Saisonabrechnung, fünf Kennzahlen | Keine Spieltags-Posten im Spiel (nur Transfers werden je Spieltag gebucht); Reserve-Linie und Einnahmen-Mix sind nicht umgesetzt. |
+| Kontoauszug | Posten, Herkunft, Quelle der Zahl, Betrag, Kontostand je Spieltag, Spieltag-Auswahl | Wann, Art, Posten, Betrag; Saisonende-Erwartung als Kopfzeile | Nur Zeilen aus vorhandenen Ledgern (Transfers, Sponsor, Apron, Vorstandsziele); „Herkunft“ und „Quelle“ nur, wo das Ledger sie hat. Leer vor dem ersten Spieltag. |
+| Budgets | Kennzahl-Streifen, zwei Töpfe mit Herleitung, Vorstand-Leiter, Umschichten, Lockerung, „Was gegen welchen Topf zählt“ | Zwei Töpfe mit Herleitung, Vorstand-Leiter, Umschichten, Lockerung, Sonderwege (Rücklage anzapfen, Alles auf eine Karte), Regel-Streifen | Kennzahl-Streifen entfällt (die Zahlen stehen in den Kopf-Reitern und in den Karten); Unterzeilen der Herleitung entfallen unter 1200 px Höhe. Sonderwege sind neu gegenüber dem Mockup (Chris, 18.11.). |
+| Kontext-Panel | Lage, Quelle, Liga; „zinsfreier Rahmen“, „nächste Buchung“ | Lage, Quelle, Liga; Gehälter, Saisonende, Prognose | Kein zinsfreier Rahmen im Spiel; die Gehälter stehen groß je Saison und klein je Spieltag (Chris, 18.11.). |
+| Sponsor / GuV / Apron | nicht im Mockup | eigene Reiter aus der alten Seite | Gehaltsfaktor-Chip im Reiter GuV (Ton nach Nutzen, Tooltip). |
+
+Korrekturschleife: Seitenhöhe (Schale wächst mit der Breite) und Budgets-Höhe nachgezogen; die Mess-Aufnahme meldet pro Reiter und Breite, ob die Seite scrollt und welche Karten innen scrollen.
+
 ## 5. Offene Punkte für Chris
 
 1. Soll im ersten Fenster (Saison 2) nur die halbe Rücklage zählen (Übergang)? Ohne diese Entscheidung wären die Töpfe im ersten Fenster noch enger.

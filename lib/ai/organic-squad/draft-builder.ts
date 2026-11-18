@@ -184,6 +184,11 @@ export type OrganicSquadPlanInput = {
     /** Stufe 3: wie viel ZUSAETZLICHES Jahresgehalt der Gehaltstopf noch zulaesst (undefined => keine Grenze). */
     salaryCap?: number;
     /**
+     * Kaderpflicht-Freigabe (Chris 18.11.): die laufende Grenze fuer den naechsten Kauf aus `kaufRahmen().grenzeFuer` — dieselbe
+     * Funktion wie die Sperre. Gesetzt, ersetzt sie `feeCap`/`salaryCap` (Rahmen nach Quote ODER Kosten der fehlenden Plaetze).
+     */
+    kaufGrenze?: (rosterBefore: number, spentFee: number, spentSalary: number) => { fee: number; salary: number };
+    /**
      * ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2 — see draft-adapter.ts wiring / salary-ceiling.ts
      * computeTeamSalaryCeiling doc). Soft cap on TOTAL salary (existing roster + planned additions),
      * anchored on expected sponsor income and team value rather than the volatile cash snapshot. Enforced
@@ -563,6 +568,7 @@ export function organicBuyStep(
   const salaryCeiling = input.economy.salaryCeiling;
   const feeCap = input.economy.feeCap;
   const salaryCap = input.economy.salaryCap;
+  const kaufGrenze = input.economy.kaufGrenze;
   const topN = Math.max(1, Math.floor(options?.topN ?? 1));
   const { squad, pool, cash, salaryTotal, spentFee, spentSalary } = step;
 
@@ -591,6 +597,7 @@ export function organicBuyStep(
   // rather than blown on luxury depth. Affordability keeps cash ≥ floor AFTER the buy AND the min-fill.
   const belowMin = squad.length < rosterMin;
   const belowOpt = squad.length < optTarget;
+  const grenze = kaufGrenze ? kaufGrenze(squad.length, spentFee, spentSalary) : null;
   const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
   // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
   // ANPASSUNG SALCEIL: once the roster is at/above the hard minimum, a candidate whose salary would push
@@ -626,8 +633,15 @@ export function organicBuyStep(
       if (cash - price(candidate) - reserveForPlan < affordFloor) continue;
       if (mitFuellerSperre && price(candidate) < KADERPLAN_PLATZ_MIN_MW) continue;
       // Mit Kaderplan plant der Topf dieselben Plaetze wie die Kasse (Chris: gegen den echten Rahmen planen, nicht gegen die Kasse).
-      if (feeCap != null && spentFee + price(candidate) + (kaderplan ? reserveForPlan : reserveForMin) > feeCap + 1e-9) continue;
-      if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
+      const feeReserve = kaderplan ? reserveForPlan : reserveForMin;
+      if (grenze) {
+        // Kaderpflicht-Freigabe (#1618): die laufende Grenze ist schon „ab jetzt" (abzueglich des bisher Ausgegebenen).
+        if (price(candidate) + feeReserve > grenze.fee + 1e-9) continue;
+        if (Math.max(0, candidate.salary) + reserveSalaryForMin > grenze.salary + 1e-9) continue;
+      } else {
+        if (feeCap != null && spentFee + price(candidate) + feeReserve > feeCap + 1e-9) continue;
+        if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
+      }
       if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       score(candidate);
     }
@@ -647,7 +661,7 @@ export function organicBuyStep(
 
   // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
   // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
-  if (!best && belowMin && affordFloor > 0 && feeCap == null && salaryCap == null) {
+  if (!best && belowMin && affordFloor > 0 && feeCap == null && salaryCap == null && !grenze) {
     if (scored) scored = [];
     for (const candidate of pool) {
       if (cash - price(candidate) - reserveForMin < 0) continue;
@@ -660,7 +674,7 @@ export function organicBuyStep(
   // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
   // can't reach min in one go must still make PARTIAL progress (6→7 beats staying at 6 and breaking
   // autoprep). Drop the reserve and buy the single best candidate it can actually pay for (cash ≥ 0).
-  if (!best && belowMin && feeCap == null && salaryCap == null) {
+  if (!best && belowMin && feeCap == null && salaryCap == null && !grenze) {
     if (scored) scored = [];
     for (const candidate of pool) {
       if (cash - price(candidate) < 0) continue;
@@ -670,7 +684,7 @@ export function organicBuyStep(
   }
 
   // Auffangnetz (#1618): unter dem Pflichtkader mit Toepfen der billigste bezahlbare Spieler (darf den Topf ueberziehen).
-  if (!best && belowMin && (feeCap != null || salaryCap != null)) {
+  if (!best && belowMin && (feeCap != null || salaryCap != null || grenze)) {
     if (scored) scored = [];
     if (kaderplan) {
       // Kein Notweg: dieselbe Bewertung ueber den ganzen Pool, nur die Topf-Schranke ist gelockert (Kasse bleibt hart).
