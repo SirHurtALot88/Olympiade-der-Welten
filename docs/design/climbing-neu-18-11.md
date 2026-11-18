@@ -5,6 +5,17 @@ jeden Fall rotz langweilig — man geht einfach nur hoch und nix passiert, keine
 brauchen wir hier auch wieder echte Assets, eine Wand, an der horizontal und vertikal geklettert wird, wo
 man über Dinge klettern muss etc.“
 
+**Zweite Runde, Chris am 18.11. nach den ersten Bildern**, wörtlich: „ja sowas wie bei climbing jetzt finde ich
+sehr gut! dass es auch unterschiedliche wege gibt“ — und dazu: „jetzt muss nur noch gerangelt werden was
+manchen leuten helfen könnte, kostet ggf. auch ausdauer · schnelligkeit und agilität hilft natürlich schneller
+beim ziel zu sein aber heißt nicht zwangsweise dass man dann schneller klettert · wichtig ist dass das warten
+nicht zu lange dauert, oder dass 8 spieler einfach nur warten, das wird dann irgendwann langweilig oder
+gammlig · oder man lässt die teams wenn wir 4 oder 6 spieler haben in 2er teams starten oder bei 5 dann ein
+3er und ein 2er team? so könnte man das als team game machen, so dass sich 2 oder 3 leute gegenseitig helfen
+können, falls einer zu langsam ist kann der mate ihn anschieben oder hoch ziehen etc bitte ins mockup
+einbauen“. Diese vier Punkte sind eingebaut und stehen in **Abschnitt 3** (Rangeln 3.1, Tempo gegen Klettern
+3.3, Warten 3.4, Seilschaften 3.5).
+
 Dieses Dokument ist **Mockup + Erklärung** nach der Mockup-zuerst-Regel. **Im Spiel ist nichts gebaut, am
 Motor nichts geändert, nichts gemessen.** Alle Aussagen zu rho und Pp sind Risiken und Erwartungen, keine
 Messwerte. Die Zahlen im Mockup (Zeiten, Puste, Proben) stammen aus einer kleinen Schau-Simulation, die nur
@@ -25,10 +36,18 @@ die Regie des Mockups füttert; sie ist nicht der Arena-Motor und kennt weder Ma
 2. **Die Route ist ein S, kein Strich.** Einstiegswand senkrecht, dann ein langer Quergang nach rechts, dann
    teilt sich der Weg dreifach und läuft am Gipfelgrat wieder zusammen. Es wird senkrecht, waagerecht,
    hängend und über Hindernisse geklettert.
-3. **Interaktion entsteht aus Geometrie.** Alle zwölf müssen über dasselbe Band und durch dieselbe
-   Engstelle. Dort gibt es Stau, den Kreuzungsgriff (Freigabe 14.10.), Überholen „außen an der Bandkante“ und
-   Rastpunkte. Das Rennen entscheidet sich sichtbar an drei Stellen: Engstelle, Schlüsselstelle des
-   gewählten Wegs, Gipfelgrat.
+3. **Interaktion entsteht aus Geometrie.** Alle zwölf müssen über dasselbe Band und zur selben Engstelle.
+   Dort wird **gerangelt** (schieben, blocken; Kraft und Kopf entscheiden, beide zahlen Puste), in den Buchten
+   außen an der Bandkante überholt und an Rastpunkten ausgeschüttelt.
+3a. **Niemand steht lange.** Wer an der Engstelle warten müsste, klettert „obenrum“; wer am Band hinter
+   jemandem hängt, geht nach einer knappen Sekunde außen vorbei; ist die Schlüsselstelle des eigenen Wegs
+   belegt, wechselt die Seilschaft den Weg. Im gezeigten Lauf warten nie mehr als vier zugleich, drei oder
+   mehr zusammen nur 1,3 Sekunden lang, und niemand länger als 2,8 Sekunden am Stück.
+3b. **Seilschaften.** Sechs Kletterer starten als drei Zweier-Seilschaften (vier als 2+2, fünf als 3+2), jede
+   auf einem Weg. Partner hängen am selben Seil und helfen sich: **hochziehen**, **anschieben**, **Vorstieg
+   übernehmen**. Helfen kostet den Helfer Puste und Zeit. Eine Seilschaft ist oben, wenn beide geläutet haben.
+3c. **Schnell ist nicht gleich kletterstark.** Schnelligkeit und Agilität tragen nur die Tempo-Stellen
+   (Anlauf, Band, Blöcke, Grat), nicht die Kletter-Stellen (Wand, Kamin, Dach, Lippe, Leiter).
 4. **Drei Wege für drei Profile**, alle mit Ausdauer als Grundlast: Kraftweg (Dach und Lippe), Technikweg
    (Kamin und Seilbrücke), Ausdauerweg (Flanke und Leiter).
 5. **Keine neue Animation.** Klettern, Stemmen, Hangeln und Abrutschen entstehen aus den vorhandenen Posen
@@ -56,16 +75,17 @@ vom 18.11. fügt zwei Dinge hinzu, die das Konzept vom 17.11. noch nicht gelöst
 
 ### 2.1 Die Wand
 
-![Totale mit eingeblendeten Routen](climbing-neu-18-11/05-totale-routen.png)
+![Totale mit eingeblendeten Routen](climbing-neu-18-11/06-totale-routen.png)
 
 | Stelle | Was man sieht | Was dort passiert |
 |---|---|---|
 | Wandfuß | Matten, Seilsäcke, Vordergrund-Fels mit Kiefer | Start, je Kletterer eine eigene Linie |
-| Einstiegswand | sieben farbige Grifflinien, senkrecht | Aufstieg, Schlüsselstelle auf halber Höhe (Fehlgriff kostet Zeit) |
+| Einstiegswand | acht farbige Grifflinien, senkrecht | Aufstieg, Schlüsselstelle auf halber Höhe (Fehlgriff kostet Zeit) |
 | Kamin (links) | dunkler Spalt vom Boden bis zum Band | Technik-Einstieg: stemmen, kostet kaum Puste, aber nur hintereinander |
 | Rastpunkt | Podest mit Kreideeimer am Band | wer unter der Schwelle ist, schüttelt aus (Zeit gegen Puste) |
 | Band | waagerechtes Felsband über die ganze Wandbreite | Quergang, hintereinander; Überholen nur in den Buchten, hängend an der Bandkante |
-| Engstelle | Felsblöcke auf dem Band | Überklettern, immer nur einer; davor der **Kreuzungsgriff** |
+| Engstelle | Felsblöcke auf dem Band | Überklettern, immer nur einer; davor wird **gerangelt** |
+| Obenrum | Grifflinie über den Blöcken | Ausweichlinie: länger und teurer, dafür ohne Warten |
 | Gabelung | hinter der Engstelle | die drei Wege trennen sich |
 | Dach und Lippe | großer Überhang mit tiefem Schatten | Kraftweg: unter dem Dach hangeln, an der Lippe eine Kraftprobe |
 | Spalt und Seilbrücke | Kamin zwischen zwei Türmen, oben die Brücke | Technikweg: stemmen, dann Kopfprobe auf der Brücke |
@@ -93,7 +113,7 @@ vom 18.11. fügt zwei Dinge hinzu, die das Konzept vom 17.11. noch nicht gelöst
 
 Zum Vergleich dieselbe Totale ohne die Ebenen:
 
-![Totale ohne HD-2D-Ebenen](climbing-neu-18-11/06-totale-ohne-ebenen.png)
+![Totale ohne HD-2D-Ebenen](climbing-neu-18-11/07-totale-ohne-ebenen.png)
 
 Jede Figur wirft ihre eigene Pose als dunkle, versetzte Fläche auf die Wand. Das ist der billigste Trick im
 Mockup und der wirksamste: die Figur hängt damit **vor** der Wand statt auf einem Bild zu stehen.
@@ -114,30 +134,120 @@ Mockup und der wirksamste: die Figur hängt damit **vor** der Wand statt auf ein
 
 ## 3. Interaktion: wo sich das Rennen entscheidet
 
-### 3.1 Die Engstelle und der Kreuzungsgriff
+### 3.1 Rangeln am Band und vor der Engstelle
 
-![Quergang-Duell an der Engstelle](climbing-neu-18-11/02-quergang-duell.png)
+![Rangelei am Band](climbing-neu-18-11/02-rangelei.png)
 
-Über die Felsblöcke auf dem Band kommt immer nur einer. Wer ankommt, während ein Gegner direkt hinter ihm
-ist, muss den Griff verteidigen: **Kreuzungsgriff**, einmal je Kletterer, entschieden aus Kraftzug und Kopf
-(dieselben zwei Kanäle wie in der Freigabe vom 14.10.). Der Verlierer wird abgedrängt und verliert Zeit und
-etwas Puste; ein Sturz, ein Rang oder eine Höhe wird dadurch nicht direkt verändert. Wer hinter einem
-Wartenden steht, wartet mit („WARTET“ über dem Kopf). Für den Zuschauer ist das die Szene, die heute fehlt:
-ein Pulk, der sich an einer Stelle staut, und zwei, die um den Vortritt ringen.
+Auf dem Band läuft man hintereinander. Kommt ein Gegner schneller von hinten und es ist keine Überholbucht
+da, wird **gerangelt**: der Hintere versucht, den Vorderen beiseitezuschieben, der Vordere hält dagegen und
+blockt. Das ist die Weiterführung des Kreuzungsgriffs vom 14.10., jetzt als eigene, sichtbare Szene.
+
+| | Regel im Mockup | Im Bau |
+|---|---|---|
+| Auslöser | Gegner direkt dahinter, schneller, außerhalb einer Bucht | wie Kontakt im klassischen Spurt, nur auf dem Band |
+| Entscheidung | 60 % Kraft, 40 % Kopf, kleiner Würfel; der Vordere hat einen kleinen Bonus | Kraftzug (WUCHT) gegen Kopf (GLEICHGEWICHT), wie am 14.10. freigegeben |
+| Kosten | **beide** zahlen Puste; der Verlierer zusätzlich und steht rund zwei Sekunden | wirkt nur über Reserve/Balance und Zeit, `zugDeckel` bleibt |
+| Gewinn | gewinnt der Hintere, zieht er sofort außen vorbei; gewinnt der Vordere, hat er Ruhe | – |
+| Grenze | höchstens **einmal je Kletterer** | Pflicht, sonst wird aus dem Rennen eine Prügelei |
+| Bild | beide ruckeln gegeneinander (vorhandene Posen im Wechsel, Versatz zum Gegner), Marke „RANGELT“, Staub, kurzer Kamerawackler, Einblender „RANGELEI!“ oder „ABGEBLOCKT!“, Zeile im Verlauf | `hudCallout()`, Ereignisliste |
+
+**Wem das hilft:** kräftigen, willensstarken Figuren, die im Klettern selbst nicht die schnellsten sind. Ein
+Brontar kommt am Band nicht vorbei, weil er schneller wäre, sondern weil er sich durchsetzt. Es kostet aber
+Puste, und die fehlt ihm später am Dach. Wer klug ist, rangelt nicht vor seiner Schlüsselstelle.
 
 ### 3.2 Überholen am Band
 
-Auf dem Band läuft man hintereinander. In den **Überholbuchten** (im Mockup mit `R` als goldene Streifen
-sichtbar) darf der Schnellere außen vorbei: er hängt sich an die Bandkante und hangelt unter dem Vordermann
-durch. Das kostet gut die doppelte Puste und ist deshalb eine Entscheidung, kein Automatismus. Wer am
-Rastpunkt ausschüttelt, wird dort regelmäßig überholt.
+In den **Überholbuchten** (im Mockup mit `R` als goldene Streifen sichtbar) geht es ohne Rangelei: der
+Schnellere hängt sich an die Bandkante und hangelt unter dem Vordermann durch. Das kostet gut die doppelte
+Puste. Wer am Rastpunkt ausschüttelt, steht nicht im Weg.
 
-![Außen vorbei, Spielerkarte offen](climbing-neu-18-11/07-aussen-vorbei-karte.png)
+### 3.3 Schnell ist nicht gleich kletterstark
 
-### 3.3 Drei Wege (Primär- und Nebenweg)
+Chris: „schnelligkeit und agilität hilft natürlich schneller beim ziel zu sein aber heißt nicht zwangsweise
+dass man dann schneller klettert“. Die Wand hat deshalb zwei Sorten Abschnitte, und die Legende im Mockup
+(links oben, unter den drei Wegen) sagt das dauerhaft:
 
-Chris' Leitlinie vom 21.09. („mehrere Wege zum Erfolg“) wird hier zur Geometrie. Hinter der Engstelle wählt
-jeder Kletterer den Weg, der zu seinem Profil passt:
+| Sorte | Abschnitte | Was dort Tempo macht | Sub-Skills (vorhanden) | Matrix-Attribute |
+|---|---|---|---|---|
+| **Tempo-Stellen** | Anlauf, Band, Felsblöcke, Gipfelgrat | Schnelligkeit und Agilität | Zug (ANTRITT), Umsetzen (WENDIGKEIT), Ausdauertempo | speed 12, dexterity 12, dazu stamina |
+| **Kletter-Stellen** | Einstiegswand, Kamin, Dach, Lippe, Leiter | Ausdauer plus das Wegprofil (Kraft oder Technik); **Tempo zählt hier nicht** | Kraftausdauer, Griff, Kraftzug, Zähigkeit, Kopf | stamina 26, determination 16, health 10, power 8, awareness 8, will 8 |
+
+Im Mockup hat jede Figur dafür einen fünften Wert „Tempo“ auf der Spielerkarte. Man sieht den Effekt im
+Lauf: Akali und Ashanti (Tempo 90 und 88) sind am Band und am Grat die Schnellsten und holen dort auf, an
+Wand und Leiter aber nicht; Brontar (Tempo 42) verliert am Band und ist am Dach der Stärkste. Am Grat und
+im Anlauf gibt es keinen Stau, dort wird frei überholt: das ist der Ort, an dem Schnelligkeit ein Rennen
+noch dreht. Nebenbei löst das ein Risiko der ersten Fassung: speed und dexterity hatten vorher keine eigene
+Stelle auf der Wand.
+
+### 3.4 Warten bleibt kurz
+
+Chris: „wichtig ist dass das warten nicht zu lange dauert, oder dass 8 spieler einfach nur warten“. Fünf
+Regeln sorgen dafür, dass Warten nie das Hauptbild wird:
+
+| # | Regel | Was man sieht |
+|---|---|---|
+| W1 | **Obenrum.** Ist die Engstelle besetzt und es steht schon jemand davor oder man stünde länger als 0,7 s, klettert man über den Blöcken vorbei (länger, kostet Puste) | zweite Grifflinie über der Engstelle, Verlauf „weicht obenrum aus“ |
+| W2 | **Wartedeckel am Band.** Wer 0,9 s hinter jemandem hängt, geht außen vorbei, auch außerhalb einer Bucht (mit dem Puste-Preis des Überholens) | „wartet nicht – außen vorbei“ |
+| W3 | **Rastende und Helfende blockieren nicht.** Wer ausschüttelt, steht neben der Linie | – |
+| W4 | **Die Schlange verteilt sich auf drei Wege**, und eine Seilschaft **wechselt den Weg**, wenn die Schlüsselstelle des eigenen belegt ist und dort jemand steht | Einblender „WEG GEWECHSELT“, Wegfarbe der Seilschaft im Dock wechselt |
+| W5 | **Tempo-Stellen ohne Stau.** Im Anlauf und am Gipfelgrat wird frei überholt | Schlussspurt |
+
+![Obenrum statt Warten an der Engstelle](climbing-neu-18-11/08-obenrum-kein-warten.png)
+
+Der Verlauf-Kasten zeigt die Kontrolle live: „Warten: 1 · längstes 2,8 s“. Zahlen aus dem gezeigten Lauf
+(Schau-Simulation, kein Messwert des Motors):
+
+| Größe | Wert |
+|---|---:|
+| meiste gleichzeitig Wartende | 4 |
+| Zeit, in der drei oder mehr zugleich warten | 1,3 s von 62 s |
+| längste Wartezeit eines Kletterers am Stück | 2,8 s |
+| Wartezeit je Kletterer im Mittel | 2,5 s (rund 4 % der Laufzeit) |
+| Ausweichen obenrum | 5-mal |
+| Wegwechsel einer Seilschaft | 1-mal |
+
+Für den Bau wird daraus eine **Abnahmegröße**: Wartezeit-Anteil unter 5 %, nie mehr als vier gleichzeitig.
+
+### 3.5 Seilschaften: aus dem Rennen wird ein Teamspiel
+
+![Seilschaft: der Vorsteiger zieht den Partner hoch](climbing-neu-18-11/03-seilschaft-hilft.png)
+
+**Aufteilung** (meine Empfehlung je Kadergröße):
+
+| Kletterer je Team | Aufteilung | Begründung |
+|---:|---|---|
+| 4 | 2 + 2 | zwei Paare, zwei Wege |
+| 5 | 3 + 2 | wie von Chris vorgeschlagen; der Dreier nimmt den Ausdauerweg (keine Probe, die eine Dreierkette aufhält), im Dreier hilft nur, wer direkt nebeneinander am Seil hängt |
+| 6 | **2 + 2 + 2** | drei Seilschaften sind genau drei Wege: die Schlange verteilt sich von selbst, und die Beziehung bleibt klar (einer hilft einem). Bei 3 + 3 hinge jeder am Langsamsten von dreien, zwei Wege wären überfüllt und einer leer |
+
+Jede Seilschaft geht **einen gemeinsamen Weg**. Das erzeugt nebenbei den Nebenweg aus Chris' Leitlinie:
+Ashanti (Technikprofil) geht mit Bana den Ausdauerweg, kommt dort schlechter zurecht und wird gezogen.
+
+![Spielerkarte: Nebenweg in der Seilschaft](climbing-neu-18-11/09-karte-nebenweg.png)
+
+**Helfen**, drei Handlungen:
+
+| Hilfe | Wann | Wirkung | Preis für den Helfer | Bild (nur vorhandene Posen) |
+|---|---|---|---|---|
+| **Hochziehen** | Vorsteiger ist voraus, Partner hängt an einer Kletter-Stelle zurück | Partner klettert knapp zwei Sekunden fast doppelt so schnell und zehrt halb | steht 1,4 s, zahlt Puste; höchstens dreimal je Kletterer | Vorsteiger ruckt am Seil (Nord-Standbild mit Ruck), Seil wird straff und hell, Marke „ZIEHT“, beim Partner „▲ HILFE“, Einblender „ZIEHT HOCH!“ |
+| **Anschieben** | Hintermann direkt hinter dem langsameren Partner auf demselben Abschnitt | Partner bekommt Schub | zahlt Puste, bleibt selbst dahinter | Marke „SCHIEBT“, kleine Schubpfeile, straffes Seil, Verlauf „X schiebt Y an“ |
+| **Vorstieg übernehmen** | in einer Bucht, wenn der Hintere deutlich mehr Puste hat | Führungswechsel ohne den Puste-Preis des Überholens; der Nachsteiger zehrt 15 % weniger | keiner | Partner tauschen die Plätze, Verlauf „X übernimmt den Vorstieg“ |
+
+Dazu das **Seil zwischen den Partnern** als dickes, gestricheltes Seil in Teamfarbe und im Dock die
+Seilschaft als Kasten: Nummer, Weg, Zahl der Hilfen, „oben“ mit Zeit.
+
+**Wertung.** Im Mockup zählt die Kopfleiste „Seilschaften oben“; eine Seilschaft ist oben, wenn **beide**
+geläutet haben. Jeder Kletterer behält seine eigene Glockenzeit (für Rangliste und Abnahme). Welche der
+beiden Zahlen die Teampunkte gibt, ist Frage 8.
+
+**Was das ablöst.** Zwei frühere Festlegungen kehrt Chris' Wunsch um: „kein Helfer-Bonus für Teamkollegen“
+(Gegencheck 24.09.) und „Seilschaft zurückstellen“ (Konzept 17.11., F4). Beide waren mit der Rangtreue je
+Spieler begründet; das Risiko besteht weiter und steht in Abschnitt 7 (R9).
+
+### 3.6 Drei Wege (Primär- und Nebenweg)
+
+Chris' Leitlinie vom 21.09. („mehrere Wege zum Erfolg“) wird hier zur Geometrie. Hinter der Engstelle nimmt
+jede Seilschaft ihren Weg:
 
 | Weg | Strecke | Schlüsselstelle | Sub-Skills (vorhanden) | Attribute laut Rezept | Preis |
 |---|---|---|---|---|---|
@@ -145,36 +255,37 @@ jeder Kletterer den Weg, der zu seinem Profil passt:
 | **Kraftweg** | Rastnische, Wand im Schatten, unter dem Dach hangeln, über die Lippe | Kraftprobe an der Lippe; leer gepumpt am Dach = Sturz ins Seil | Kraftzug, Kraftausdauer, Zug | power, stamina, determination | am kürzesten, zehrt am meisten; Abrutschen kostet Zeit |
 | **Technikweg** | Kamin zwischen den Türmen, Felsturm, Seilbrücke | Kopfprobe auf der Brücke (wer wankt, steht) | Griff, Umsetzen, Kopf | dexterity, awareness, will | mittellang, langsam, schont die Puste |
 
-Dazu der kleine Bruder am Wandfuß: Technik-Profile nehmen statt der Einstiegswand den **Kamin**.
+Dazu der kleine Bruder am Wandfuß: Technik-Seilschaften nehmen statt der Einstiegswand den **Kamin**.
 
-![Überhang: Hangeln am Dach, Lippe, Seilbrücke](climbing-neu-18-11/03-ueberhang.png)
+![Überhang: Hangeln am Dach, Lippe, Seilbrücke](climbing-neu-18-11/04-ueberhang.png)
+
+![Abgerutscht an der Lippe](climbing-neu-18-11/10-lippe-abgerutscht.png)
 
 Die Regel dahinter, damit die Matrix durchkommt: **jeder Weg ist zuerst eine Ausdauerprüfung.** Die Puste
 (Reserve des Motors) läuft auf allen Wegen mit und macht langsam, wenn sie leer ist. Der Weg entscheidet nur,
-*welcher zweite Kanal* an der Schlüsselstelle mitredet. Im Mockup sieht man das am Endstand: vorn liegen die
-beiden Ausdauerstärksten, dahinter mischen sich Kraft- und Technikweg.
+*welcher zweite Kanal* an der Schlüsselstelle mitredet. Im Mockup sieht man das am Endstand: die beiden
+Ausdauer-Seilschaften sind zuerst oben, dahinter kommen die anderen vier innerhalb von gut drei Sekunden.
 
-### 3.4 Was sonst gebucht wird
+### 3.7 Was sonst gebucht wird
 
-- **Rastpunkte** (Podest am Band, Nische unter dem Dach): stehen und ausschütteln, Zeit gegen Puste.
-  Kraftkletterer laden vor dem Dach fast voll auf, sonst reicht es nicht bis über die Lippe.
+- **Rastpunkte** (Podest am Band, Nische unter dem Dach): ausschütteln, Zeit gegen Puste. Kraftkletterer
+  laden vor dem Dach fast voll auf, sonst reicht es nicht bis über die Lippe.
 - **Abrutschen an der Lippe:** Kraftprobe misslingt, die Figur fällt ins Seil, pendelt, zweiter Versuch mit
   besserer Chance.
 - **Sturz ins Seil am Dach:** nur bei leerer Puste, höchstens einmal je Kletterer.
-- **Fehlgriff** an der Schlüsselstelle der Einstiegswand.
-- **Wanken auf der Seilbrücke.**
+- **Fehlgriff** an der Schlüsselstelle der Einstiegswand, **Wanken** auf der Seilbrücke.
 
 Für alles gilt die Regel aus dem Kontaktkonzept: **gezeigt = gebucht.** Jede dieser Szenen ist ein
-Motor-Ereignis mit Folge für die Zeit, keine Deko.
+Motor-Ereignis mit Folge für Zeit oder Puste, keine Deko.
 
-### 3.5 Topp
+### 3.8 Topp
 
-![Topp: Glocke am Gipfelgrat](climbing-neu-18-11/04-topp.png)
+![Topp: Glocke am Gipfelgrat](climbing-neu-18-11/05-topp.png)
 
-Die drei Wege laufen am Grat zusammen. Wer die Glocke läutet, ist im Ziel; sie schwingt, es gibt einen
-Einblender, und die Figur dreht sich zur Kamera und jubelt (Süd-Standbild mit Hüpfer). Wertung wie heute:
-Tops nach Zeit, darunter die Höchstmarke; mit dieser Wand heißt die Höchstmarke „Anteil der Route“ oder
-benannt „bis Engstelle“, „bis Lippe“.
+Die drei Wege laufen am Grat zusammen; dort zählt Tempo. Wer die Glocke läutet, ist im Ziel; sie schwingt,
+und die Figur dreht sich zur Kamera und jubelt (Süd-Standbild mit Hüpfer). Läutet der zweite Partner,
+kommt der Einblender „SEILSCHAFT OBEN!“. Unter dem Zeitlimit gilt wie heute die Höchstmarke, mit dieser
+Wand als „Anteil der Route“ oder benannt („bis Engstelle“, „bis Lippe“).
 
 ## 4. Klettern nur mit vorhandenen Posen
 
@@ -192,6 +303,9 @@ Verwendet werden ausschließlich `north`, `south`, `east` (gespiegelt als West),
 | Lippe | `walk-north` | beginnt 43 Grad nach hinten gekippt unter der Kante und richtet sich mit jedem Zug auf; zittert bei leerer Puste |
 | Abrutschen, Sturz | `treffer-north` | fällt bis zu 48 px, hängt im straffen Seil, pendelt, Steinchen |
 | Rast | `north` | leichtes Wippen, Marke „RAST“ |
+| Rangeln | `walk-north` und `treffer-north` im schnellen Wechsel | beide Figuren stoßen im Takt gegeneinander (5–10 px Versatz zum Gegner, Neigung), Staub, Kamerawackler |
+| Hochziehen | `north` | Ruck auf und ab im Seiltakt, Seil straff und hell; der Gezogene klettert in schnellen Rucken |
+| Anschieben | Kletterpose des Abschnitts | Schubpfeile zum Partner, Seil straff |
 | Brücke, Grat | `walk-east` | Brücke: folgt dem Durchhang, wankt bei misslungener Probe |
 | Topp | `south` | dreht sich zur Kamera, hüpft |
 
@@ -214,15 +328,15 @@ für Namen, die eine Schräge, Teamfarbe als Bedeutung).
 
 | Bauteil | Im Mockup | Datenquelle im Bau |
 |---|---|---|
-| Kopfleiste | Teams, **Tops** groß, „Beste: Name · Anteil“, Uhr, Phase („Quergang am Band“, „An der Lippe“) | `bahnTeamstand()`, Phase aus dem Abschnitt des Führenden |
+| Kopfleiste | Teams, **Seilschaften oben** groß, „vorn Name Anteil“, Uhr, Phase („Quergang am Band“, „An der Lippe“) | `bahnTeamstand()`, Phase aus dem Abschnitt des Führenden |
 | Momentum | Kletterfortschritt beider Teams als Tauzieh-Balken | Summe der Routenanteile |
 | Routen-Inset | ganze Wand als Miniatur, drei Wege farbig, Punkt je Kletterer, Rahmen des Bildausschnitts; Klick setzt die Kamera | Routengraph und Positionen |
-| Weg-Legende | Kraftweg, Technikweg, Ausdauerweg mit Farbe | fest |
-| Verlauf | neueste Zeile oben, große Ereignisse in Gold | Ereignisliste des Motors |
-| Einblender | „DUELL AM GRIFF“, „AUSSEN VORBEI!“, „ÜBER DIE LIPPE!“, „ABGERUTSCHT!“, „GLOCKE!“ mit Portrait, Weg und Puste | `hudCallout()` |
-| Dock | zwölf Spielerleisten: Rang, Portrait, Name, Weg-Buchstabe, Ort („Band“, „Wartet“, „Im Seil“), Anteil oder Zielzeit, Puste-Balken | `wertungVon(disc).zeilen()` plus Reserve |
-| Spielerkarte | vier Profilwerte, der Weg in einem Satz, Zwischenzeiten Band, Engstelle, Grat, Glocke | vorhandene Karte, neue Spalten |
-| Bedienleiste | Start/Pause, Tempo, Kamera, Routen, Ebenen, Neu; Szenen-Knöpfe 1–4 | `hudBedienTick()` |
+| Weg-Legende | Kraftweg, Technikweg, Ausdauerweg mit Farbe; darunter **Tempo-Stellen** gegen **Kletter-Stellen** | fest |
+| Verlauf | neueste Zeile oben, große Ereignisse in Gold; im Kopf der **Wartezähler** („Warten: 1 · längstes 2,8 s“) | Ereignisliste des Motors |
+| Einblender | „RANGELEI!“, „ABGEBLOCKT!“, „ZIEHT HOCH!“, „ANGESCHOBEN!“, „WEG GEWECHSELT“, „AUSSEN VORBEI!“, „ÜBER DIE LIPPE!“, „ABGERUTSCHT!“, „GLOCKE!“, „SEILSCHAFT OBEN!“ mit Portrait, Satz und Puste | `hudCallout()` |
+| Dock | je Team drei **Seilschaft-Kästen** (Nummer, Weg, Hilfen, „oben“ mit Zeit), darin zwei Spielerleisten: Rang, Portrait, Name, Weg-Buchstabe, Ort („Band“, „Rangelt“, „Zieht“, „Im Seil“), Anteil oder Zielzeit, Puste-Balken | `wertungVon(disc).zeilen()` plus Reserve |
+| Spielerkarte | fünf Profilwerte (mit Tempo), Seilschaftspartner, der Weg in einem Satz samt Nebenweg-Hinweis, Zwischenzeiten Band, Engstelle, Grat, Glocke | vorhandene Karte, neue Spalten |
+| Bedienleiste | Start/Pause, Tempo, Kamera, Routen, Ebenen, Neu; Szenen-Knöpfe 1–5 | `hudBedienTick()` |
 
 **Kamera.** Drei Modi: *Regie* (folgt den vorderen vier, zoomt auf gebuchte große Ereignisse und hält sie
 kurz), *Totale* (die ganze Wand steht als Körper in der Landschaft), *Folgen* (Klick auf eine Leiste oder
@@ -254,11 +368,14 @@ CANYON_WAND = {
 | Puste | die vorhandene Reserve; Zehrung je Kantenart statt eines einzigen `steigung` | Reserve, Rennpläne |
 | Wegwahl | fest vor dem Start aus dem Sub-Skill-Profil (nicht aus Rohattributen), sichtbar in der Aufstellung; kein Würfel | Rennplan-Wahl |
 | Abstand | auf geteilten Kanten Mindestabstand; Engstelle exklusiv | Kontakt im klassischen Spurt (Stand `7c9257b4435c`) |
-| Kreuzungsgriff | wie am 14.10. freigegeben (Kraftzug gegen Kopf, wirkt nur über Balance/Zeit), jetzt **an der Engstelle verortet** statt an zwei abstrakten Griffen; einmal je Kletterer, `zugDeckel` bleibt | `climbing-kontakt-konzept-14-10.md` |
+| Rangeln | der Kreuzungsgriff vom 14.10. (Kraftzug gegen Kopf, wirkt nur über Reserve/Balance und Zeit), jetzt **überall am Band außerhalb der Buchten** statt an zwei abstrakten Griffen; einmal je Kletterer, beide zahlen Reserve, `zugDeckel` bleibt | `climbing-kontakt-konzept-14-10.md` |
 | Überholen | in Buchten, Zehrung ×2,4, Bedingung: Tempovorteil und Reserve über Schwelle | neu, klein |
-| Wartedeckel | wer länger als etwa 1,5 Sim-Sekunden an der Engstelle steht, darf „obenrum“ (über dem Block, kostet Puste) | neu; begrenzt den Zufall der Ankunftsreihenfolge |
+| Wartedeckel | Engstelle: „obenrum“ ab 0,7 s oder wenn schon einer wartet; Band: außen vorbei ab 0,9 s; Rastende blockieren nicht; Anlauf und Grat ohne Abstandsregel | neu; begrenzt den Zufall der Ankunftsreihenfolge |
+| Wegwechsel | beim Erreichen der Gabelung: ist die Schlüsselstelle des eigenen Wegs von einer anderen Seilschaft belegt und steht dort jemand, wechselt die Seilschaft auf den Ausdauerweg | neu |
+| Tempo- und Kletter-Stellen | zwei Gewichtsvektoren je Kantenart: Tempo-Stellen überwiegend Zug, Umsetzen, Ausdauertempo; Kletter-Stellen ohne diese Kanäle | `rezept` |
+| Seilschaft | Paare (bei fünf ein Dreier) aus der Aufstellung, gemeinsamer Weg; Hilfen als Ereignisse: Hochziehen (Helfer pausiert, zahlt Reserve, Partner bekommt Tempo-Schub), Anschieben, Vorstieg übernehmen; Deckel je Kletterer | Staffel-Übergabe als Muster für gekoppelte Läufer |
 | Proben | Lippe (Kraftzug, Reserve), Brücke (Kopf); Verlust gedeckelt (Ziel: höchstens 4 % der Laufzeit je Ereignis) | Fehlgriff, Abrutschen bis zur letzten Exe |
-| Ende und Wertung | unverändert: Tops nach Zeit, darunter Höchstmarke; Zeitlimit so, dass 40–55 % toppen (wie heute) | `rang` |
+| Ende und Wertung | je Kletterer unverändert: Tops nach Zeit, darunter Höchstmarke; Zeitlimit so, dass 40–55 % toppen (wie heute). Zusätzlich Seilschaftszeit (zweite Glocke) für die Teamwertung, siehe Frage 8 | `rang` |
 | Zeichnen | Position aus dem Graphen statt aus der Spur; Posenwahl nach Kantenart (Abschnitt 4) | `bodenWand()`, `kulisseZeichnen()` |
 
 **Wertungsneutralität.** Format hinter dem Schalter; alle neuen Zustände nur bei aktivem Format und nicht
@@ -274,20 +391,35 @@ Format darf darunter nicht fallen: Mindestschranke 0,75, Ziel über 0,80, Pp ≤
 
 | # | Risiko | Wirkt auf | Gegenmittel |
 |---|---|---|---|
-| R1 | **Kopplung an andere.** An Engstelle und Band hängt die eigene Zeit davon ab, wer vor einem ist. Das ist die gewünschte Interaktion und zugleich Rauschen je Spieler | rho | Wartedeckel („obenrum“), Überholbuchten, Kreuzungsgriff nur einmal je Kletterer und attributgebunden; Wartezeit als Anteil der Laufzeit messen (Ziel unter 5 %) |
+| R1 | **Kopplung an andere.** An Engstelle und Band hängt die eigene Zeit davon ab, wer vor einem ist. Das ist die gewünschte Interaktion und zugleich Rauschen je Spieler | rho | Wartedeckel („obenrum“), Überholbuchten, Rangeln nur einmal je Kletterer und attributgebunden; Wartezeit als Anteil der Laufzeit messen (Ziel unter 5 %) |
 | R2 | **Wege ungleich schnell.** Ist ein Weg systematisch schneller, ordnet das Ergebnis nach Weg statt nach Eignung | rho, Pp | Kalibrierregel: mittlere Zeit je Weg bei gleicher Eignung innerhalb ±2 %; je Weg einzeln messen |
 | R3 | **Kraft und Technik bekommen über die Wegwahl mehr Gewicht als in der Matrix** (power 8, dexterity 12, awareness 8, will 8 gegen stamina 26, determination 16) | Pp | jede Kante trägt überwiegend Ausdauer-Kanäle; die Schlüsselstelle bestimmt nur einen kleinen Zeitanteil (Richtwert 15–20 %); Wegwahl aus Sub-Skills, die bereits matrixgewichtet sind |
 | R4 | **Binäre Ereignisse** (Abrutschen, Sturz ins Seil) sind wenige, teure Zufälle | rho | Wahrscheinlichkeit an Kanal und Reserve gebunden, Verlust gedeckelt, zweiter Versuch mit Bonus, Sturz höchstens einmal |
-| R5 | **speed (12) und health (10)** haben im Entwurf keine eigene sichtbare Stelle | Pp | speed über Zug und Ausdauertempo auf Band und Grat, health über Zähigkeit bei Rast-Erholung und Abrutsch-Folgen; mit `einflussVon` prüfen |
+| R5 | **Tempo-Stellen zu stark oder zu schwach.** speed und dexterity (je 12) tragen jetzt Band, Blöcke und Grat. Sind diese Abschnitte zu lang, überholt Tempo die Ausdauer (26); sind sie zu kurz, verschwindet es | Pp | Zeitanteil der Tempo-Stellen auf das Matrixverhältnis kalibrieren (Richtwert ein Viertel bis ein Drittel der Laufzeit); health über Zähigkeit bei Rast-Erholung; mit `einflussVon` prüfen |
 | R6 | **Weniger Tops oder zu viele Tops.** Die Wand ist länger als die heutige | rho (Gleichstände) | Zeitlimit und Weglängen auf 40–55 % Tops kalibrieren; darunter stetige Höchstmarke (Routenanteil) |
 | R7 | **Kamin-Stau am Start** benachteiligt Technik-Profile systematisch | Pp (dexterity) | Kamin-Einstieg nur als Wahl, wenn die Sollzeit gleich ist; sonst im Bau streichen (rein optisch behalten) |
 | R8 | **Rastentscheidungen** als fester Plan können Ausdauerstarke bremsen | rho | Rast nur unter Schwelle; Schwelle aus dem Rennplan |
+| R9 | **Helfen verwischt die Eignung.** Der Schwächere wird gezogen und kommt besser an, als er ist; der Stärkere verliert Zeit. Das drückt die Rangtreue je Spieler, genau der Grund für die Absagen vom 24.09. und 17.11. Größtes Risiko des Entwurfs | **rho** | Hilfen gedeckelt (drei Züge je Kletterer, Schub kurz); Erwartung: Zeitverschiebung je Hilfe unter 2 % der Laufzeit. Seilschaften aus ähnlicher Eignung bilden. Abnahme zusätzlich auf Seilschaftsebene messen (mittlere Eignung gegen Seilschaftszeit). Reicht das nicht: Hilfe nur als Aufholen bis zur Seillänge, nie darüber hinaus |
+| R10 | **Rangeln gibt power und will mehr Gewicht** als ihre je 8 Matrixpunkte | Pp | einmal je Kletterer, Verlust des Verlierers gedeckelt (rund 2 s), beide zahlen Reserve, also zahlt am Ende stamina mit |
+| R11 | **Gemeinsamer Weg der Seilschaft** schickt einzelne Figuren auf einen Nebenweg, der nicht zu ihnen passt | rho | gewollt (Nebenweg ist schlechter gestellt), aber begrenzen: Paarung in der Aufstellung sichtbar und änderbar; Automatik paart gleiche Wegprofile zuerst |
+| R12 | **Wegwechsel und Obenrum** sind Entscheidungen aus der Lage, nicht aus der Eignung | rho | beide kosten nur wenig (Erwartung unter 3 % der Laufzeit) und ersetzen eine Wartezeit, die sonst ebenso zufällig wäre |
 
 **Messplan** (wie am 17.11., 4.2): Fingerabdruck vor und nach; Standard-Gegenprobe 0,801;
 `miss-alle-disziplinen.mjs` mit Format-Parameter, n=48 in zwei Saatstämmen; Saisonwert daneben;
 `messe-arena-einfluss.mjs` und zweiter Saatstamm für Pp; Star auf Rang 1 und Paartreue ab 15 Punkten.
-Formatspezifisch zusätzlich: Wartezeit-Anteil (R1), mittlere Zeit je Weg (R2), Zeitanteil der
-Schlüsselstellen (R3), Anteil der Wege (keiner über 50 %).
+Formatspezifisch zusätzlich: Wartezeit-Anteil und Höchstzahl gleichzeitig Wartender (R1, Abschnitt 3.4),
+mittlere Zeit je Weg (R2), Zeitanteil der Schlüsselstellen (R3) und der Tempo-Stellen (R5), Anteil der Wege
+(keiner über 50 %), **rho mit und ohne Hilfen** und rho auf Seilschaftsebene (R9), Pp für power und will mit
+und ohne Rangeln (R10).
+
+**Welche Matrix-Attribute tragen die neuen Bausteine** (Erwartung; die Matrix selbst bleibt unangetastet):
+
+| Baustein | Kanal | Attribute | Kostet |
+|---|---|---|---|
+| Rangeln | Kraftzug, Kopf | power, will, determination | Reserve beider (stamina) |
+| Hochziehen, Anschieben | Kraftzug und Kraftausdauer des Helfers | power, stamina, will | Reserve und Zeit des Helfers (stamina) |
+| Tempo-Stellen | Zug, Umsetzen, Ausdauertempo | speed, dexterity, awareness | wenig Reserve |
+| Kletter-Stellen | Kraftausdauer, Griff, Kraftzug, Zähigkeit, Kopf | stamina, determination, health, power, dexterity | Reserve |
 
 ## 8. Stilprobe PixelLab (18.11.)
 
@@ -382,20 +514,31 @@ untere Canyon-Hälfte als Probe der Naht, nur bei Treffer weiter. Die bereits ge
 4. **Reicht das Klettern mit den vorhandenen Posen (bitte das Mockup in Bewegung ansehen, vor allem das
    Dach)?** Empfehlung: **damit bauen.** Falls das Hangeln nicht reicht, wäre *eine* Animation „Klettern
    Nord“ der Vorschlag, zuerst nur als Kostenprobe an einer Figur und nur mit deiner Einzelfreigabe.
-5. **Kreuzungsgriff an der Engstelle so deutlich (abdrängen, Einblender „DUELL AM GRIFF“)?** Die Freigabe
-   vom 14.10. deckt die Mechanik; neu ist nur der feste Ort und die Sichtbarkeit. Empfehlung: **Ja.**
+5. **Rangeln so deutlich (schieben, blocken, Einblender „RANGELEI!“, Kamerawackler)?** Die Freigabe vom
+   14.10. deckt die Mechanik (Kraftzug gegen Kopf, wirkt nur über Reserve und Zeit); neu sind der Ort (ganzes
+   Band außerhalb der Buchten) und die Sichtbarkeit. Empfehlung: **Ja.**
 6. **Budget: Stufe 1 (Canyon, Deckel 90 Gen.) jetzt, Eisfall und Halle danach?** Empfehlung: **Ja**, Stufe
    2 und 3 erst, wenn die Canyon-Wand im Spiel steht und gemessen ist.
 7. **Abseilen und Flut (17.11.) auf dieser Wand als zweiter Schritt?** Empfehlung: **Ja, danach**; beide
    passen auf die Geometrie, brauchen aber je eine eigene Messung.
+8. **Was gibt die Teampunkte: die Glockenzeiten der einzelnen Kletterer oder die Zeit der Seilschaft (zweite
+   Glocke)?** Empfehlung: **die Seilschaft für die Teamwertung, die eigene Glocke für die Spielerwertung**
+   (Statistik, Rangliste, Abnahme). So lohnt sich Helfen fürs Team, und der Einzelne bleibt messbar.
+9. **Wer stellt die Seilschaften zusammen?** Empfehlung: **Automatik mit Vorschlag** (gleiche Wegprofile
+   zusammen, je Seilschaft ein Zugpferd), in der Aufstellung sichtbar und von Hand änderbar. Bei sechs
+   Kletterern 2+2+2, bei fünf 3+2, bei vier 2+2.
+10. **Rangeln nur einmal je Kletterer und nur gegen Gegner?** Empfehlung: **Ja.** Mehr wirkt schnell wie
+    Takeshi statt Klettern (das war die Sorge im Gegencheck vom 24.09.) und hebt power und will über ihr
+    Matrixgewicht.
 
 ## 11. Bauplan
 
 | Schritt | Inhalt | Wer | Wertung berührt | Gen. |
 |---|---|---|---|---:|
 | 0 | Chris sieht das Mockup und beantwortet die Fragen | Chris | – | 0 |
-| 1 | Routengraph und Format-Schalter im Motor, noch mit alter Zeichnung; Fingerabdruck-Einträge `climbing/canyon` | Sonnet nach diesem Entwurf, Opus-Review (Eingriff in die Arena-Engine) | nur neues Format | 0 |
-| 2 | Messrunde 1: rho, Pp, Wartezeit-Anteil, Zeit je Weg; Kalibrierung der Weglängen und Proben | Mess-Agent | nur neues Format | 0 |
+| 1 | Routengraph und Format-Schalter im Motor, noch mit alter Zeichnung; Tempo- und Kletter-Stellen, Wartedeckel, Obenrum; Fingerabdruck-Einträge `climbing/canyon` | Sonnet nach diesem Entwurf, Opus-Review (Eingriff in die Arena-Engine) | nur neues Format | 0 |
+| 1b | Rangeln am Band, danach Seilschaften mit den drei Hilfen, jeweils hinter eigenem Schalter, damit die Messung sie einzeln zu- und abschalten kann | Sonnet, Opus-Review | nur neues Format | 0 |
+| 2 | Messrunde 1: rho, Pp, Wartezeit-Anteil, Zeit je Weg; **rho mit und ohne Hilfen**, Pp mit und ohne Rangeln; Kalibrierung der Weglängen, Proben und Deckel | Mess-Agent | nur neues Format | 0 |
 | 3 | Bestellung Stufe 1 (untere Wandhälfte zuerst als Nahtprobe) | Fable | nein | ≤ 90 |
 | 4 | Ebenen-Renderer, Wand, Requisiten, Posenwahl nach Kantenart, Schlagschatten, Seil | Sonnet | nein (Fingerabdruck gleich) | 0 |
 | 5 | HUD-Profil `HUD_PROFIL.climbing` auf „fertig“: Kopf, Inset, Dock mit Puste, Einblender, Karte | Sonnet | nein | 0 |
@@ -410,7 +553,7 @@ unabhängig und betreffen den Standard.
 
 | Taste / Klick | Wirkung |
 |---|---|
-| `1` `2` `3` `4` | Szenen: Start, Quergang-Duell, Überhang, Topp (springt an die Stelle im Lauf, Kamera hält kurz) |
+| `1` `2` `3` `4` `5` | Szenen: Start, Rangelei am Band, Seilschaft hilft, Überhang, Topp (springt an die Stelle im Lauf, Kamera hält kurz) |
 | Leertaste | Start / Pause |
 | `T` | Tempo 1×, 2×, 4× |
 | `K` | Kamera Regie ↔ Totale |
@@ -421,7 +564,7 @@ unabhängig und betreffen den Standard.
 | Klick ins Routen-Inset | Kamera an diese Stelle |
 
 Der Lauf ist fest (eine Saat), damit die Szenen-Knöpfe immer dieselben Momente zeigen. Zwei Teams zu je
-sechs: vier Kraft-, fünf Technik-, drei Ausdauerprofile. Sprites werden aus `../sprites/` geladen; für
+sechs in je drei Seilschaften (Kraftweg, Technikweg, Ausdauerweg). Sprites werden aus `../sprites/` geladen; für
 Aufnahmen aus dem schlanken Arbeitsverzeichnis gibt es `?sprites=<Basis-URL>`.
 
 ## 13. Quellen
