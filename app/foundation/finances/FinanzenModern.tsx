@@ -846,6 +846,42 @@ function SponsorAnsicht({ m, gameState }: { m: FinanzSeiteModell; gameState: Gam
   );
 }
 
+// --- Gehaltsfaktor (Saison-Oekonomie) ---------------------------------------
+// Ton nach Nutzen fuer den Spieler, nicht nach Vorzeichen: ein STEIGENDER Faktor skaliert die Einnahmenseite der Liga
+// (Sponsor-Topf ~ Liga-Gehaltssumme x Faktor, Preis-/Meilensteinleitern), nicht die Gehaelter. Steigt -> gut, faellt -> Risiko.
+function salaryFactorDirectionTone(direction: SalaryFactorOutlook["direction"]): "good" | "risk" | "neutral" {
+  if (direction === "up") return "good";
+  if (direction === "down") return "risk";
+  return "neutral";
+}
+
+/** Untertitel: ehrlich nur dann eine Richtung, wenn die naechste Saison vorliegt. */
+function buildSalaryFactorSub(outlook: SalaryFactorOutlook): string | undefined {
+  if (outlook.nextFactor == null || outlook.direction == null) return undefined;
+  const arrow = outlook.direction === "up" ? "▲" : outlook.direction === "down" ? "▼" : "±";
+  const word = outlook.direction === "up" ? "steigt" : outlook.direction === "down" ? "fällt" : "stabil";
+  return `${arrow} ${word} → ${zahl(outlook.nextFactor)}× nächste Saison`;
+}
+
+const SALARY_FACTOR_TOOLTIP =
+  "Liga-Ökonomiefaktor der laufenden Season (engl. „Salary Factor“, derselbe Wert wie im Season-Briefing): " +
+  "skaliert die Einnahmenseite — der Sponsor-Topf der Liga entspricht ungefähr Liga-Gehaltssumme × Faktor, " +
+  "Meilenstein-/Preisleitern skalieren mit. Über 1,0 fließt mehr Geld in die Liga als Gehälter kosten (gute " +
+  "Zeiten), unter 1,0 weniger (sparen!). Die nächste Season ist bereits ausgewürfelt — der Pfeil zeigt, wohin " +
+  "sich die Ökonomie entwickelt.";
+
+function FaktorChip({ label, value, tone, sub, title }: { label: string; value: string; tone: "good" | "risk" | "neutral"; sub?: string; title: string }) {
+  return (
+    <div className="fin-hinweis fin-faktor" title={title} data-testid="fin-gehaltsfaktor" data-ton={tone}>
+      <b>{label}</b>
+      <span className={tone === "good" ? "bc-plus" : tone === "risk" ? "bc-minus" : undefined}>
+        {value}
+        {sub ? ` · ${sub}` : ""}
+      </span>
+    </div>
+  );
+}
+
 function GuvAnsicht({ m, salaryFactorOutlook }: { m: FinanzSeiteModell; salaryFactorOutlook: SalaryFactorOutlook }) {
   const f = m.finanzen;
   if (!f) return <div className="fin-leer"><b>Finanzen werden geladen.</b></div>;
@@ -901,13 +937,15 @@ function GuvAnsicht({ m, salaryFactorOutlook }: { m: FinanzSeiteModell; salaryFa
           </span>
         </div>
       ) : null}
-      <div className="fin-hinweis">
-        <b>Gehaltsfaktor</b>
-        <span>
-          Saison {salaryFactorOutlook.currentFactor == null ? "–" : zahl(salaryFactorOutlook.currentFactor)}×
-          {salaryFactorOutlook.nextFactor != null ? ` · nächste Saison ${zahl(salaryFactorOutlook.nextFactor)}×` : ""}
-        </span>
-      </div>
+      {salaryFactorOutlook.currentFactor != null ? (
+        <FaktorChip
+          label="Gehaltsfaktor"
+          value={`${zahl(salaryFactorOutlook.currentFactor)}×`}
+          tone={salaryFactorDirectionTone(salaryFactorOutlook.direction)}
+          sub={buildSalaryFactorSub(salaryFactorOutlook)}
+          title={SALARY_FACTOR_TOOLTIP}
+        />
+      ) : null}
     </div>
   );
 }

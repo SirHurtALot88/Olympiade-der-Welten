@@ -376,3 +376,37 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
     warnings,
   };
 }
+
+/**
+ * Delegation eines Teams aendern (Chris, 18.11., F1 „owner und host"): NUR der Besitzer des Teams
+ * und der Host des Raums bzw. Spielstands. Niemand sonst.
+ *
+ * Der Aufrufer fragt zuerst als Besitzer (`authorizeServerRoomWrite`, Aktion `team_control_update`).
+ * Lehnt der Guard mit 403 ab, ruft er diese Funktion mit dem Ergebnis auf: sie prueft, ob der
+ * Schreiber der Host ist. Im Raum ist das der Sitz mit `role === "host"`; ausserhalb eines Raums
+ * der Standard-Owner (Chris, `DEFAULT_ACTIVE_OWNER_ID`) oder der Urheber des Spielstands. Die
+ * Raum-Pruefungen (Sitz-Token, Raumbindung, Bestaetigung) laufen dabei unveraendert ueber
+ * `authorizeServerRoomWrite` mit der host-level Aktion `team_ownership_update`.
+ */
+export function authorizeTeamDelegationHostFallback(
+  input: ServerRoomWriteContext,
+  asOwner: ServerRoomWriteAuthorization,
+): ServerRoomWriteAuthorization {
+  if (asOwner.allowed || asOwner.status !== 403) {
+    return asOwner;
+  }
+  const asHost = authorizeServerRoomWrite({ ...input, action: "team_ownership_update" });
+  if (!asHost.allowed) {
+    return asOwner;
+  }
+  if (!input.roomCode) {
+    // Ausserhalb eines Raums ist "host-level" sonst unbeschraenkt: hier ausdruecklich auf den
+    // Host des Spielstands einengen.
+    const owner = input.activeOwnerId?.trim() || DEFAULT_ACTIVE_OWNER_ID;
+    const isLocalHost = owner === DEFAULT_ACTIVE_OWNER_ID || resolveSaveCreatedByOwnerId(input.saveId) === owner;
+    if (!isLocalHost) {
+      return asOwner;
+    }
+  }
+  return asHost;
+}
