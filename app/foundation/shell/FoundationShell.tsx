@@ -150,18 +150,19 @@ export default function FoundationShell({
     }
     return undefined;
   }, [activeView]);
-  // Vollbild nur, wenn die Bühne wirklich läuft (Leinwand/Iframe im Arena-Container). Die Seite „Vor dem
-  // Anpfiff“ (Einsatzliste unvollständig) behält Band und Schiene, sonst käme man nirgends mehr hin.
+  // Vollbild nur, wenn die Bühne wirklich als Vollfläche liegt (`ArenaVollflaecheBuehne`, #1578:
+  // `.oly-arena-buehne[data-voll="1"]`). „Vor dem Anpfiff“ und der Seitenmodus der Bühne behalten
+  // Band und Schiene, sonst käme man nirgends mehr hin.
   const [buehneDa, setBuehneDa] = useState(false);
   useEffect(() => {
     if (!istArena) {
       setBuehneDa(false);
       return undefined;
     }
-    const pruefe = () => setBuehneDa(Boolean(document.querySelector("#foundation-matchday-arena canvas, #foundation-matchday-arena iframe")));
+    const pruefe = () => setBuehneDa(Boolean(document.querySelector('#foundation-matchday-arena .oly-arena-buehne[data-voll="1"]')));
     pruefe();
     const beobachter = new MutationObserver(pruefe);
-    beobachter.observe(document.body, { childList: true, subtree: true });
+    beobachter.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-voll"] });
     return () => beobachter.disconnect();
   }, [istArena]);
   const arenaVoll = istArena && !arenaRahmen && buehneDa;

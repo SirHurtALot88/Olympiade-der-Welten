@@ -719,3 +719,8 @@ button.fb-chip:hover {
   background: rgba(243, 181, 74, 0.1);
   white-space: nowrap;
 }
+
+/* Arena-Bühne als Vollfläche (#1578): kein Einschweben, das einen Containing Block für position:fixed bildet. */
+.foundation-shell-layout:has(.oly-arena-buehne[data-voll="1"]) .foundation-shell-content.foundation-view-enter > * {
+  animation: none;
+}

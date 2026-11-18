@@ -5,7 +5,7 @@
 //
 // AUFRUF: npx tsx scripts/screenshot-saisonstand-matrix-duell.ts [spieltage=11]
 // ===================================================================================
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -77,15 +77,15 @@ async function isServerReachable(timeoutMs: number) {
   }
 }
 
-function startDevServer(): ChildProcessWithoutNullStreams {
+function startDevServer(): ChildProcess {
   console.log("[screenshot-rahmen] starte Dev-Server (OLY_AUTO_EXPORT_SAVES=0, OLY_AUTO_EXPORT_PUSH=0) ...");
   const child = spawn("npm", ["run", "dev"], {
     env: { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT: PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
-  child.stdout.on("data", (chunk) => process.stdout.write(`[dev] ${chunk}`));
-  child.stderr.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
+  child.stdout?.on("data", (chunk) => process.stdout.write(`[dev] ${chunk}`));
+  child.stderr?.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
   return child;
 }
 
@@ -121,6 +121,7 @@ async function main() {
     ids = await baueSave();
     if (BEHALTEN) await fs.writeFile(IDS_PATH, JSON.stringify(ids));
   }
+  process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
   const { saveId, teamId } = ids;
   const server = startDevServer();
   let browser: Browser | null = null;
@@ -160,16 +161,41 @@ async function main() {
       await ctx.close();
     };
     const nichts = async () => undefined;
-    for (const [w, h, g] of GROESSEN) {
-      await aufnehmen("season-v2", w, h, `app-saisonstand-${g}.png`, nichts);
-      await aufnehmen("lineup", w, h, `app-einsatzliste-${g}.png`, nichts);
-      await aufnehmen("home", w, h, `app-start-${g}.png`, nichts);
-      await aufnehmen("matchday-arena", w, h, `app-arena-vollbild-${g}.png`, nichts);
+    const aufnehmenMitVerzoegerung = async (ansicht: string, breite: number, hoehe: number, datei: string) => {
+      const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe } });
+      const page = await ctx.newPage();
+      await page.route("**/api/lineups/legacy/ai-batch-apply**", async (route) => { await new Promise((r) => setTimeout(r, 40_000)); await route.abort().catch(() => undefined); });
+      const url = new URL("/foundation", BASE_URL);
+      url.searchParams.set("view", ansicht);
+      url.searchParams.set("saveId", saveId);
+      url.searchParams.set("team", teamId);
+      await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 90_000 });
+      await dismissSeasonBriefingIfOpen(page, 30_000);
+      await page.getByTestId("foundation-regieband").waitFor({ state: "visible", timeout: 150_000 });
+      await page.waitForTimeout(6000);
+      await page.screenshot({ path: path.join(OUTPUT_DIR, datei) });
+      console.log(`[screenshot-rahmen] ${path.join(OUTPUT_DIR, datei)}`);
+      await ctx.close();
+    };
+    void GROESSEN;
+    // 1) Taktgeber „läuft“: die KI-Aufstellung der Arena wird künstlich 40 s verzögert -> Aktivität läuft.
+    await aufnehmenMitVerzoegerung("matchday-arena", 1920, 1080, "app-takt-laeuft-1920x1080.png");
+    await aufnehmen("season-v2", 1920, 1080, "app-takt-bereit-1920x1080.png", async (p) => { await p.getByTestId("foundation-takt-status").click(); });
+    // 2) Einsatzlisten für alle Teams setzen (KI-Aufstellung wie beim Öffnen der Arena), dann Bühne und Start.
+    const persistence = createPersistenceService();
+    const stand = persistence.getSaveById(saveId)!.gameState;
+    const antwort = await fetch(
+      `${BASE_URL}/api/lineups/legacy/ai-batch-apply?${new URLSearchParams({ saveId, seasonId: stand.season.id, matchdayId: stand.matchdayState.matchdayId, source: "sqlite" })}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false, confirm: true, includeWarningTeams: true, overwriteExisting: false, forceAiTeams: true }) },
+    );
+    console.log(`[screenshot-rahmen] Aufstellungen: HTTP ${antwort.status}`);
+    for (const [w, h, g] of [[1920, 1080, "1920x1080"], [2560, 1440, "2560x1440"], [1710, 1112, "1710x1112"]] as Array<[number, number, string]>) {
+      await aufnehmen("matchday-arena", w, h, `app-arena-buehne-${g}.png`, nichts);
     }
-    await aufnehmen("season-v2", 1920, 1080, "app-schiene-hover-1920x1080.png", async (p) => { await p.getByTestId("foundation-sidebar").hover(); await p.waitForTimeout(600); });
-    await aufnehmen("season-v2", 1920, 1080, "app-takt-ablauf-1920x1080.png", async (p) => { await p.getByTestId("foundation-takt-status").click(); });
-    await aufnehmen("home", 1920, 1080, "app-office-1920x1080.png", async (p) => { await p.getByTestId("foundation-rail-office").click(); });
-    await aufnehmen("matchday-arena", 1920, 1080, "app-arena-mit-rahmen-1920x1080.png", async (p) => { await p.keyboard.press("r"); });
+    await aufnehmen("matchday-arena", 1920, 1080, "app-arena-buehne-mit-rahmen-1920x1080.png", async (p) => { await p.keyboard.press("r"); });
+    await aufnehmen("matchday-arena", 1920, 1080, "app-takt-zu-1920x1080.png", async (p) => { await p.keyboard.press("r"); });
+    await aufnehmen("home", 1920, 1080, "app-start-neu-1920x1080.png", nichts);
+    await aufnehmen("lineup", 2560, 1440, "app-einsatzliste-neu-2560x1440.png", nichts);
   } finally {
     await browser?.close();
     try { process.kill(-server.pid!, "SIGTERM"); } catch { server.kill("SIGTERM"); }
