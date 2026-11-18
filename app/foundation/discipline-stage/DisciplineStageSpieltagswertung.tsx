@@ -23,6 +23,7 @@ import {
   baueWertungsZeilen,
   beschreibeWertungsErgebnis,
   filtereWertungsZeilen,
+  gruppiereNachLiga,
   hatLigaTrennung,
   sortiereWertungsZeilen,
   startFilter,
@@ -107,7 +108,7 @@ function Menschenmarke({ zeile }: { zeile: WertungsZeile }) {
 }
 
 /** Zelle einer Disziplin in der Tabelle: Marke, Endstand bzw. Platz, Punkte. */
-function DisziplinZelle({ seite }: { seite: WertungsSeitenWerte }) {
+function DisziplinZelle({ seite, kurz = false }: { seite: WertungsSeitenWerte; kurz?: boolean }) {
   if (!seite.aufgedeckt) {
     return (
       <span className="dz" title="Erst nach dieser Disziplin — kein Spoiler">
@@ -117,6 +118,14 @@ function DisziplinZelle({ seite }: { seite: WertungsSeitenWerte }) {
   }
   const marke = wertungsMarke(seite.ergebnis);
   const e = seite.ergebnis;
+  if (kurz) {
+    return (
+      <span className="dz">
+        {marke ? <span className={`pl ${marke.ton}`}>{marke.text}</span> : null}
+        <em className={`t${seite.punkte ? "" : " o"}`}>{punkteText(seite.punkte)}</em>
+      </span>
+    );
+  }
   return (
     <span className="dz">
       {marke ? <span className={`pl ${marke.ton}`}>{marke.text}</span> : null}
@@ -279,9 +288,10 @@ function Blatt({
 }
 
 const FILTER_NAMEN: Array<[WertungsFilter, string]> = [
+  ["beide", "Beide Ligen"],
   ["liga2", "Liga 2"],
   ["liga1", "Liga 1"],
-  ["alle", "Alle"],
+  ["alle", "Alle Teams"],
   ["gruppe", "Meine Gruppe"],
   ["mensch", "Menschen"],
 ];
@@ -329,7 +339,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
   const mitLiga = hatLigaTrennung(alleZeilen);
   const gruppeDa = findeEigeneGruppe(alleZeilen, ownTeamId) != null;
   const hatMenschen = alleZeilen.some((z) => z.mensch != null);
-  const filter = filterWahl ?? startFilter(alleZeilen, ownTeamId);
+  const filter = filterWahl ?? startFilter(alleZeilen);
   const zeilen = useMemo(
     () => sortiereWertungsZeilen(filtereWertungsZeilen(alleZeilen, filter, ownTeamId), sortierung),
     [alleZeilen, filter, ownTeamId, sortierung],
@@ -345,7 +355,9 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
 
   const d1Name = d1?.displayName ?? "Disziplin 1";
   const d2Name = d2?.displayName ?? "Disziplin 2";
-  const zeigeLiga = filter === "alle" || filter === "mensch";
+  const zeigeLiga = mitLiga && filter === "mensch";
+  const beide = mitLiga && filter === "beide";
+  const bloecke = beide ? gruppiereNachLiga(zeilen, ownTeamId, sortierung) : [];
   const gesperrt = !d2Revealed;
 
   const kopf = (schluessel: WertungsSortierung, text: string, klasse?: string) => (
@@ -376,7 +388,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
           <span className="sp" />
           <div className="filt" role="group" aria-label="Teams filtern">
             {FILTER_NAMEN.filter(([wert]) =>
-              wert === "liga1" || wert === "liga2" ? mitLiga : wert === "gruppe" ? gruppeDa : wert === "mensch" ? hatMenschen : true,
+              wert === "beide" || wert === "liga1" || wert === "liga2" ? mitLiga : wert === "alle" ? !mitLiga : wert === "gruppe" ? gruppeDa : wert === "mensch" ? hatMenschen : true,
             ).map(([wert, text]) => (
               <button
                 key={wert}
@@ -385,12 +397,66 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
                 aria-pressed={filter === wert}
                 onClick={() => setFilterWahl(wert)}
               >
-                {wert === "alle" ? `Alle ${alleZeilen.length}` : text}
+                {text}
               </button>
             ))}
           </div>
         </div>
 
+        {beide ? (
+          <div className="ligen" data-testid="spieltagswertung-ligen">
+            {bloecke.map((b) => (
+              <section
+                key={b.liga ?? "ohne"}
+                className={`pan tab kompakt${b.istEigene ? " eigene" : ""}`}
+                data-testid={`spieltagswertung-liga-${b.liga ?? "ohne"}`}
+                aria-label={b.titel}
+              >
+                <div className="lk">
+                  <h3>{b.titel}</h3>
+                  {b.istEigene ? <span className="du">Deine Liga</span> : null}
+                  <span className="n t">{b.zeilen.length} Teams</span>
+                </div>
+                <div className="hd">
+                  {kopf("ges", "#")}
+                  {kopf("ges", "Team")}
+                  {kopf("d1", d1Name)}
+                  {kopf("d2", d2Name)}
+                  {kopf("ges", "Gesamt", "re")}
+                  {kopf("sai", "Saison", "re")}
+                </div>
+                <div className="body">
+                  {b.zeilen.map((z) => (
+                    <button
+                      type="button"
+                      key={z.teamId}
+                      data-testid={`spieltagswertung-zeile-${z.teamId}`}
+                      className={`zr${z.istEigen ? " e" : ""}${z.teamId === auswahlTeamId ? " sel" : ""}`}
+                      aria-pressed={z.teamId === auswahlTeamId}
+                      onClick={() => setGewaehlt(z.teamId)}
+                      onMouseEnter={() => onHoverTeam?.(z.teamId)}
+                      onMouseLeave={() => onHoverTeam?.(null)}
+                    >
+                      <span className="rg t">{gesperrt || z.ligaRang == null ? "–" : z.ligaRang}</span>
+                      <span className="tm">
+                        <Wappen zeile={z} />
+                        <b>{z.name}</b>
+                        <Menschenmarke zeile={z} />
+                      </span>
+                      <DisziplinZelle seite={z.d1} kurz />
+                      <DisziplinZelle seite={z.d2} kurz />
+                      <span className="ges t">{gesperrt ? <Icon name="schloss" /> : de(z.gesamt)}</span>
+                      <span className="sr t">
+                        <i>{z.vorRang != null ? `${z.vorRang}.` : "–"}</i>→
+                        {gesperrt ? <Icon name="schloss" /> : <b>{z.nachRang != null ? `${z.nachRang}.` : "–"}</b>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
         <section className="pan tab" data-testid="spieltagswertung-tabelle">
           <div className="grp">
             <span style={{ gridColumn: "1/3", border: 0 }} />
@@ -422,7 +488,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
                 onMouseEnter={() => onHoverTeam?.(z.teamId)}
                 onMouseLeave={() => onHoverTeam?.(null)}
               >
-                <span className="rg t">{gesperrt || z.tagesRang == null ? "–" : z.tagesRang}</span>
+                <span className="rg t">{gesperrt || z.ligaRang == null ? "–" : z.ligaRang}</span>
                 <span className="tm">
                   <Wappen zeile={z} />
                   <b>{z.name}</b>
@@ -458,6 +524,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
             zusätzlich
           </div>
         </section>
+        )}
 
         {auswahl ? (
           <Blatt
