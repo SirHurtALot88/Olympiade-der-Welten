@@ -81,4 +81,7 @@ describe("Saisonstand modern: Verträge", () => {
     const ohneKommentare = MODERN.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(ohneKommentare).not.toMatch(/Papierform|Siegchance|Rekord/);
   });
+  it("Saisonlänge kommt aus der Spieltags-Liste, nicht aus dem Ledger (sonst Endstand mitten in der Saison)", () => {
+    expect(MODERN).toContain("const gesamtSpieltage = Math.max(spieltagListe.length, verlauf ? verlauf.spieltage.length : 0);");
+  });
 });

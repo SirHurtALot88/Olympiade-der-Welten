@@ -207,7 +207,9 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   );
 
   const gespielteAnzahl = verlauf ? verlauf.spieltage.filter((t) => t.played).length : spieltagListe.filter((o) => o.gespielt).length;
-  const gesamtSpieltage = verlauf ? verlauf.spieltage.length : spieltagListe.length;
+  // Das Feld-Rennen-Ledger kennt nur GEWERTETE Spieltage (`getMatchdaySummaryOptions`), die Spieltags-
+  // Liste alle der Saison — sonst stünde mitten in der Saison „Endstand" und „Noch 0 Spieltage".
+  const gesamtSpieltage = Math.max(spieltagListe.length, verlauf ? verlauf.spieltage.length : 0);
 
   // Gewählter Spieltag, sonst der letzte gespielte (vom Host vorgerechnet) — abgeleitet, kein Effekt.
   const spieltagId = spieltage?.verfuegbar
