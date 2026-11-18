@@ -25,7 +25,7 @@ function eingabe(over: Partial<WertungsEingabe> = {}): WertungsEingabe {
       {
         teamId: "a",
         d1DisciplineId: "basket",
-        d1Points: 2,
+        d1Points: 2.3,
         d2DisciplineId: "bf",
         d2Points: 1,
         totalPoints: 3,
@@ -80,11 +80,47 @@ function eingabe(over: Partial<WertungsEingabe> = {}): WertungsEingabe {
 }
 
 describe("Spieltagswertung neu: Zeilen", () => {
-  it("rechnet Punkte, Mutator und Gesamt wie die alte Tabelle (sum, mutPp, total)", () => {
+  it("zählt den Mutator einmal: die Arena liefert d1Points/d2Points schon MIT Mutator", () => {
     const zeile = baueWertungsZeilen(eingabe()).find((z) => z.teamId === "a")!;
-    expect(zeile.punkte).toBe(3);
-    expect(zeile.mutator).toBeCloseTo(0.3);
     expect(zeile.gesamt).toBeCloseTo(3.3);
+    expect(zeile.mutator).toBeCloseTo(0.3);
+    expect(zeile.punkte).toBeCloseTo(3);
+    expect(zeile.d1.punkte).toBeCloseTo(2);
+  });
+
+  it("Gesamt ist genau das gebuchte pointsDelta der Saisontabelle (Platzierung + Team-Mutator)", () => {
+    // Buchung (`standings-preview-engine.ts`): pointsDelta = d1Points + d2Points (Platzierung) + Team-Mutator.
+    // Die Arena addiert den Mutator je Seite in d1Points/d2Points; die Summe muss dasselbe ergeben.
+    const platzierung = { a: [2, 1], b: [0, 2], e: [1, 0] } as const;
+    const mutator = { a: [0.3, 0.3], b: [0, 0], e: [0.6, 0] } as const;
+    const gebuchtesDelta = (id: "a" | "b" | "e") =>
+      Math.round((platzierung[id][0] + platzierung[id][1] + mutator[id][0] + mutator[id][1]) * 10) / 10;
+    const teamResults = (["a", "b", "e"] as const).map((id) => ({
+      teamId: id,
+      d1DisciplineId: "basket",
+      d1Points: platzierung[id][0] + mutator[id][0],
+      d2DisciplineId: "bf",
+      d2Points: platzierung[id][1] + mutator[id][1],
+      totalPoints: 0,
+    }));
+    const standings = (["a", "b", "e"] as const).map((id, i) => ({
+      teamId: id,
+      currentRank: i + 1,
+      projectedRank: i + 1,
+      currentPoints: 10,
+      projectedPoints: 10 + gebuchtesDelta(id),
+      pointsDelta: gebuchtesDelta(id),
+    }));
+    const mutatorByTeam = new Map(
+      (["a", "b", "e"] as const).map((id) => [id, { d1Pp: mutator[id][0], d2Pp: mutator[id][1], d1Players: [], d2Players: [] }]),
+    );
+    const zeilen = baueWertungsZeilen(eingabe({ teamResults, standings, mutatorByTeam }));
+    for (const z of zeilen) {
+      const s = standings.find((x) => x.teamId === z.teamId)!;
+      expect(z.gesamt).toBeCloseTo(s.pointsDelta);
+      expect(z.punkte + z.mutator).toBeCloseTo(s.pointsDelta);
+      expect(z.nachPunkte! - z.vorPunkte!).toBeCloseTo(z.gesamt);
+    }
   });
 
   it("hält Form und Captain getrennt von Punkten und Gesamt", () => {
@@ -102,6 +138,7 @@ describe("Spieltagswertung neu: Zeilen", () => {
     expect(zeile.d2.punkte).toBeNull();
     expect(zeile.d2.ergebnis).toBeNull();
     expect(zeile.punkte).toBe(2);
+    expect(zeile.gesamt).toBeCloseTo(2.3);
     expect(zeile.form).toBe(3);
   });
 

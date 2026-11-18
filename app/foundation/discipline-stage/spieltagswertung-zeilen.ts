@@ -2,13 +2,18 @@
 // Spieltagswertung (neu, 18.11.) — Zeilen, Filter, Sortierung. Reine Funktionen, kein React.
 // =====================================================================================
 //
-// GEZEIGT = GEBUCHT: nichts wird hier neu gerechnet. Jede Zahl stammt aus den Props der alten Wertung
-// (`teamResults`, `standings`, `mutatorByTeam`, `modifiersByTeam`, `playersByTeam`) und folgt DERSELBEN
-// Aufdeck-Regel wie `DisciplineStageMatchdayPanel` (verdeckte Seite = kein Wert, nie eine erfundene 0):
-//   Punkte  = d1Points + d2Points der aufgedeckten Seiten      (= `sum` der alten Tabelle)
-//   Mutator = Σ Mutator-PP der aufgedeckten Seiten              (= `mutPp`)
-//   Gesamt  = Punkte + Mutator                                  (= `total`)
-//   Form / Captain = Σ `formModifier` / `captainBonus` der aufgedeckten Seiten (Score, KEINE Punkte)
+// GEZEIGT = GEBUCHT: nichts wird hier neu gerechnet. Jede Zahl stammt aus den Props (`teamResults`,
+// `standings`, `mutatorByTeam`, `modifiersByTeam`, `playersByTeam`); verdeckte Seite = kein Wert, nie eine 0.
+//
+// MUTATOR NUR EINMAL (18.11., nachgemessen): die Saisontabelle bucht je Spieltag
+// `pointsDelta = d1Points + d2Points (Platzierung) + Team-Mutator` (`standings-preview-engine.ts`), und die
+// Arena reicht `d1Points`/`d2Points` bereits MIT Mutator durch (`mitMutator` in `DisciplineStageArena.tsx`) —
+// die Summe ist also schon der gebuchte Wert. Daher hier:
+//   Gesamt  = d1Points + d2Points der aufgedeckten Seiten   (= gebuchtes `pointsDelta` der Tabelle)
+//   Mutator = Σ Mutator-PP der aufgedeckten Seiten           (steckt in Gesamt, wird nur ausgewiesen)
+//   Punkte  = Gesamt − Mutator                               (Platzierungs-Punkte; je Seite dasselbe)
+//   Form / Captain = Σ `formModifier` / `captainBonus` (Score, KEINE Punkte, nicht in Gesamt)
+// Die alte Tabelle rechnete `sum + mutPp` und zählte den Mutator damit doppelt.
 // Tagesrang und Saison-Rang-Spalte laufen über dieselben, bereits getesteten Helfer des alten Panels.
 
 import {
@@ -151,10 +156,16 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
     const d2Id = eingabe.d2?.disciplineId;
     const d1Pts = res ? (res.d1DisciplineId === d1Id ? res.d1Points : res.d2DisciplineId === d1Id ? res.d2Points : null) : null;
     const d2Pts = res ? (res.d1DisciplineId === d2Id ? res.d1Points : res.d2DisciplineId === d2Id ? res.d2Points : null) : null;
-    const d1 = seitenWerte("d1", eingabe.d1Revealed, d1Pts, eingabe, s.teamId, res);
-    const d2 = seitenWerte("d2", eingabe.d2Revealed, d2Pts, eingabe, s.teamId, res);
-    const punkte = (d1.aufgedeckt ? d1Pts ?? 0 : 0) + (d2.aufgedeckt ? d2Pts ?? 0 : 0);
-    const mutator = (d1.mutator ?? 0) + (d2.mutator ?? 0);
+    const mut = eingabe.mutatorByTeam?.get(s.teamId);
+    const runde = (x: number) => Math.round(x * 10) / 10;
+    // Seitenpunkte kommen MIT Mutator; für die Anzeige je Seite die Platzierungs-Punkte daraus.
+    const d1Platz = d1Pts == null ? null : runde(d1Pts - (mut?.d1Pp ?? 0));
+    const d2Platz = d2Pts == null ? null : runde(d2Pts - (mut?.d2Pp ?? 0));
+    const d1 = seitenWerte("d1", eingabe.d1Revealed, d1Platz, eingabe, s.teamId, res);
+    const d2 = seitenWerte("d2", eingabe.d2Revealed, d2Platz, eingabe, s.teamId, res);
+    const gebucht = runde((d1.aufgedeckt ? d1Pts ?? 0 : 0) + (d2.aufgedeckt ? d2Pts ?? 0 : 0));
+    const mutator = runde((d1.mutator ?? 0) + (d2.mutator ?? 0));
+    const punkte = runde(gebucht - mutator);
     const form = (d1.form ?? 0) + (d2.form ?? 0);
     const captain = (d1.captain ?? 0) + (d2.captain ?? 0);
     const meta = eingabe.teamMetaById.get(s.teamId);
@@ -171,7 +182,7 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
       d2,
       punkte,
       mutator,
-      gesamt: punkte + mutator,
+      gesamt: gebucht,
       form,
       captain,
       hatForm: (d1.formLabel ?? d2.formLabel) != null,
@@ -192,7 +203,7 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
   const rankInput = zeilen.map((z) => ({
     teamId: z.teamId,
     currentPoints: standingById.get(z.teamId)?.currentPoints ?? null,
-    sum: z.punkte,
+    sum: z.gesamt,
     projectedRank: z.nachRang,
   }));
   applySeasonRankColumn(rankInput);
