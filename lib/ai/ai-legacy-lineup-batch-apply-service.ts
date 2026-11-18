@@ -28,6 +28,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -1526,6 +1527,8 @@ export function buildAiLegacyLineupModifiers(
   const formCardSeasonPlan = buildAiFormCardSeasonPlan({
     cards: formCards.map((card) => ({ id: card.id, value: card.value, color: card.color })),
     slots: planSlots,
+    // Farbregel-Prototyp (17.11., Standard AUS): ohne OLY_FORMKARTEN_FARBREGEL bleibt der Plan der alte.
+    ...(isFormkartenFarbregelEnabled() ? { farbregel: resolveFormkartenFarbregel() } : {}),
   });
   const plannedCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
     d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1"),

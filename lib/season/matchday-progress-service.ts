@@ -1,3 +1,4 @@
+import { advancePlayerFormState, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
@@ -315,6 +316,10 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
         },
         seasonState: nextSeasonState,
         playerMoraleState: buildCurrentMoraleState(save.gameState),
+        // Form-Prototyp (17.11., Standard AUS): ohne OLY_FORM_MORAL=1 kommt das Feld nicht hinzu.
+        ...(isFormMoralEnabled()
+          ? { playerFormState: advancePlayerFormState(save.gameState, prepared.currentMatchdayId) }
+          : {}),
         matchdayState: {
           matchdayId: prepared.nextMatchdayId ?? prepared.currentMatchdayId,
           status: prepared.nextMatchdayId ? "planning" : "resolved",

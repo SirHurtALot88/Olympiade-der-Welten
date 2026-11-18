@@ -5,9 +5,18 @@ import { nutztEchteFormkarten } from "@/lib/battle/formkarten-echt-disziplinen";
 import {
   calculateFormModifierForSide,
   getFormCardColorForDisciplineCategory,
+  getModifierSelectionForSide,
+  getPlayerClassColor,
   getTeamFormCardOptions,
   resolveEffectiveLineupModifiers,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import {
+  formkartenSummeFuerSpieler,
+  isFormkartenFarbregelEnabled,
+  resolveFormkartenFarbregel,
+  type FormkartePlay,
+} from "@/lib/lineups/formkarten-farbregel";
+import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import {
   buildStaffelWechselPaarBonusByNehmer,
   STAFFEL_DISCIPLINE_ID,
@@ -144,7 +153,16 @@ export function buildArenaAufstellung(
   // P4 ECHTE FORMKARTE/INTENSITAET: je Seite EINMAL gerechnet, mit genau der Funktion der Wertung
   // (calculateFormModifierForSide, "Plan schlaegt Entwurf" ueber resolveEffectiveLineupModifiers),
   // damit Motor und Spieltagswertung dieselbe Zahl sehen. Nur fuer freigeschaltete Disziplinen.
-  const formJeSeite = new Map<string, { form: number; intensitaet: "schonen" | "normal" | "push" }>();
+  const formJeSeite = new Map<
+    string,
+    { form: number; intensitaet: "schonen" | "normal" | "push"; karten: FormkartePlay[]; disziplinFarbe: string | null }
+  >();
+  // Farbregel (Prototyp 17.11., Standard AUS): je Spieler statt je Seite, s. formkarten-farbregel.ts.
+  const farbregel = isFormkartenFarbregelEnabled() ? resolveFormkartenFarbregel() : null;
+  const spielerById = farbregel ? new Map(gameState.players.map((p) => [p.id, p])) : null;
+  const formStufeVon = isFormMoralEnabled()
+    ? new Map((gameState.playerFormState ?? []).map((z) => [z.playerId, formToStufe(z.form)]))
+    : null;
   const echteFormDerSeite = (disciplineId: string, side: "d1" | "d2") => {
     const schluessel = `${disciplineId}|${side}`;
     const vorhanden = formJeSeite.get(schluessel);
@@ -159,16 +177,25 @@ export function buildArenaAufstellung(
       matchdayId,
     });
     const kategorie = (gameState.disciplines ?? []).find((discipline) => discipline.id === disciplineId)?.category;
+    const disziplinFarbe = getFormCardColorForDisciplineCategory(kategorie);
+    const formCards = getTeamFormCardOptions({ gameState, seasonId: entwurf.seasonId, teamId, lineupId: entwurf.lineupId });
     const ergebnis = calculateFormModifierForSide({
       modifiers,
       disciplineSide: side,
-      disciplineColor: getFormCardColorForDisciplineCategory(kategorie),
+      disciplineColor: disziplinFarbe,
       playerCount: 1,
-      formCards: getTeamFormCardOptions({ gameState, seasonId: entwurf.seasonId, teamId, lineupId: entwurf.lineupId }),
+      formCards,
     });
+    const auswahl = getModifierSelectionForSide(modifiers, side);
+    const karten: FormkartePlay[] = [auswahl.primaryFormCardId, auswahl.secondaryFormCardId]
+      .map((id) => (id ? formCards.find((card) => card.id === id) ?? null : null))
+      .filter((card): card is NonNullable<typeof card> => card != null && !card.isUsed)
+      .map((card) => ({ wert: card.value, farbe: card.color }));
     const stufe = modifiers[side].intensity;
     const wert = {
       form: Number.isFinite(ergebnis.formPerPlayer) ? ergebnis.formPerPlayer : 0,
+      karten,
+      disziplinFarbe,
       intensitaet: stufe === "conserve" ? ("schonen" as const) : stufe === "push" ? ("push" as const) : ("normal" as const),
     };
     formJeSeite.set(schluessel, wert);
@@ -191,7 +218,21 @@ export function buildArenaAufstellung(
     aufstellung[name] = { d: eintrag.disciplineId, slot };
     if (nutztEchteFormkarten(eintrag.disciplineId)) {
       const echt = echteFormDerSeite(eintrag.disciplineId, eintrag.disciplineSide);
-      aufstellung[name] = { ...aufstellung[name], form: echt.form, intensitaet: echt.intensitaet };
+      // Farbregel AN: Kartenwert je Spieler (alle + Farbträger-Zusatz, ggf. Form-Hebel); AUS: der alte
+      // Seitenwert `echt.form`, Zeichen für Zeichen wie vorher.
+      const form = farbregel
+        ? formkartenSummeFuerSpieler({
+            karten: echt.karten,
+            disziplinFarbe: echt.disziplinFarbe,
+            spielerFarbe: (() => {
+              const spieler = spielerById?.get(spielerId);
+              return spieler ? getPlayerClassColor(spieler) : null;
+            })(),
+            formStufe: formStufeVon?.get(spielerId),
+            regel: farbregel,
+          })
+        : echt.form;
+      aufstellung[name] = { ...aufstellung[name], form, intensitaet: echt.intensitaet };
     }
   }
 

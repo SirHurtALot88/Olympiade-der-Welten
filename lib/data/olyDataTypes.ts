@@ -252,6 +252,20 @@ export type PlayerMoraleState = {
   contractIntent: PlayerMoraleContractIntent;
 };
 
+/**
+ * Spieler-Form (0..100, 50 neutral), Prototyp 17.11. hinter `OLY_FORM_MORAL`
+ * (lib/morale/form-moral-modifikator.ts). Additiv und optional: ohne den Schalter wird das Feld
+ * nie geschrieben, ältere Spielstände laden unverändert.
+ */
+export type PlayerFormState = {
+  playerId: string;
+  teamId: string;
+  form: number;
+  lastSeasonId: string;
+  lastMatchdayId: string;
+  appearances: number;
+};
+
 export type PlayerRelationshipEventRecord = {
   eventId: string;
   seasonId: string;
@@ -4023,6 +4037,8 @@ export type GameState = {
   seasonEconomyFactorGuardEvents?: SeasonEconomyFactorGuardEvent[];
   playerPotential?: PlayerPotentialRecord[];
   playerMoraleState?: PlayerMoraleState[];
+  /** Spieler-Form, nur mit `OLY_FORM_MORAL=1` gepflegt (s. `PlayerFormState`). */
+  playerFormState?: PlayerFormState[];
   playerRelationshipEvents?: PlayerRelationshipEventRecord[];
   playerDemands?: PlayerDemandRecord[];
   teamCaptains?: TeamCaptainRecord[];
