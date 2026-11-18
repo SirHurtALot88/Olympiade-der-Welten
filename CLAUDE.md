@@ -223,6 +223,21 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
 
+## Player Points (PPs): Leistungsmaß, Top-Spieler um 5 je Disziplin (Chris, 18.11.)
+
+Wörtlich: „die PPs sollen weiterhin eine Darstellung der Leistung der Spieler sein, Top-Spieler sollen in einer Diszi um
+die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! bin da offen für changes“. Zielskala: der
+beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
+Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
+
+## Neuer Stil überall — Seite für Seite neu konzipieren, nicht mischen (Chris, 18.11.)
+
+Wörtlich: „ich denke wir haben nun einen sehr guten Style gefunden mit den neuen Mockups und genau so möchte ich das auch
+umgesetzt haben, nicht nur integriert — das ist ganz wichtig. Der alte Stil darf dann nicht überall mit dem neuen gemixt
+sein, sondern letztendlich müssen wir step by step die Seiten neu konzeptionieren und aufsetzen inkl. der neuen Mechaniken.“
+Jede Seite wird nach dem Mockup **neu gebaut** (eigene Komponente, eigenes CSS im Mockup-Stil), nicht in die alte Seite
+eingehängt; die alte Fassung fliegt danach raus. Reihenfolge und Stand je Seite: `docs/design/seiten-umbau-fahrplan-18-11.md`.
+
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 
 Chris am 13.09., wörtlich: „breaking NICHT breakdance ist sondern ein foltern!!!! […] einer
