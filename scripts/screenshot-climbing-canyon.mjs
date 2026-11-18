@@ -63,7 +63,8 @@ try {
   const szenen = [
     ["01-start", 0.8], ["02-band-rangelei", zeiten?.rangel], ["03-seilschaft-hilft", zeiten?.zieht],
     ["04-ueberhang", zeiten?.dach], ["05-topp", zeiten?.ziel], ["06-ende", zeiten?.ende],
-  ].filter(([, t]) => t != null);
+  ].filter(([, t]) => t != null).sort((a, b) => a[1] - b[1]);
+  await seite.click("#t2");   // Reiter ARENA
   await seite.evaluate(() => { window.__arena.setDisc("climbing"); });
   await seite.waitForTimeout(1500);   // Bilder laden
   let simBisher = 0;
@@ -77,7 +78,9 @@ try {
     for (let i = 0; i < 12; i++) await seite.evaluate(() => window.__arena.sondenLauf(4));
     simBisher = ziel + (12 * 4) / 60 / (await seite.evaluate(() => window.__arena.canyonZeitDehnung()));
     const datei = path.join(ordner, `${name}.png`);
-    await seite.screenshot({ path: datei });
+    const raum = (await seite.$(".arenaraum")) || (await seite.$("#cv"));
+    await raum.scrollIntoViewIfNeeded();
+    await raum.screenshot({ path: datei });
     console.log(`Screenshot ${datei} (Sim ${simBisher.toFixed(1)} s)`);
   }
   console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
