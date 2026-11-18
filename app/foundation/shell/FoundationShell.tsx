@@ -150,13 +150,27 @@ export default function FoundationShell({
     }
     return undefined;
   }, [activeView]);
-  const arenaVoll = istArena && !arenaRahmen;
+  // Vollbild nur, wenn die Bühne wirklich läuft (Leinwand/Iframe im Arena-Container). Die Seite „Vor dem
+  // Anpfiff“ (Einsatzliste unvollständig) behält Band und Schiene, sonst käme man nirgends mehr hin.
+  const [buehneDa, setBuehneDa] = useState(false);
+  useEffect(() => {
+    if (!istArena) {
+      setBuehneDa(false);
+      return undefined;
+    }
+    const pruefe = () => setBuehneDa(Boolean(document.querySelector("#foundation-matchday-arena canvas, #foundation-matchday-arena iframe")));
+    pruefe();
+    const beobachter = new MutationObserver(pruefe);
+    beobachter.observe(document.body, { childList: true, subtree: true });
+    return () => beobachter.disconnect();
+  }, [istArena]);
+  const arenaVoll = istArena && !arenaRahmen && buehneDa;
   const verlasseArena = useCallback(() => {
     const ziel = vorherigeAnsicht.current && vorherigeAnsicht.current !== "matchdayArena" ? vorherigeAnsicht.current : "homeV2";
     onNavigate(ziel);
   }, [onNavigate]);
   useEffect(() => {
-    if (!istArena) return undefined;
+    if (!istArena || (!arenaVoll && !arenaRahmen)) return undefined;
     const onKey = (event: KeyboardEvent) => {
       const el = event.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
@@ -171,7 +185,7 @@ export default function FoundationShell({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [istArena, arenaRahmen, verlasseArena]);
+  }, [istArena, arenaVoll, arenaRahmen, verlasseArena]);
 
   const spieltag = typeof currentMatchday === "number" && Number.isFinite(currentMatchday) ? currentMatchday : null;
   const saisonNr = seasonLabel?.match(/Season (\d+)/i)?.[1] ?? null;

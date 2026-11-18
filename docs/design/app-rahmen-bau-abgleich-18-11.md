@@ -55,5 +55,14 @@ Wertung nicht berührt (reine Rahmen-Änderung).
 
 ## Bilder
 
-Siehe `docs/design/app-rahmen-bau-18-11/` (`app-<ansicht>-<breite>x<höhe>.png`). Abgleich links App / rechts Mockup:
-`docs/design/app-rahmen-bau-18-11/abgleich-*.png` (soweit aufgenommen).
+`docs/design/app-rahmen-bau-18-11/`: `abgleich-saisonstand|einsatzliste|start-1920x1080.png` (links App, rechts Mockup),
+`app-saisonstand-1920x1080|2560x1440|1710x1112`, `app-einsatzliste-1920x1080|2560x1440`, `app-start-1920x1080`,
+`app-takt-ablauf-1920x1080` (Taktgeber mit Ablauf), `app-schiene-hover-1920x1080`, `app-office-1920x1080`,
+`app-arena-vollbild-1920x1080`.
+
+Lücken der Aufnahme (Rechner voll, Chromium stürzte mehrfach ab): 1710-Aufnahmen nur Saisonstand, 2560 nur
+Saisonstand und Einsatzliste; Taktgeber-Zustände „läuft“ und „zu“ nicht im Bild (nur „bereit zum Weiter“); die
+Arena-Aufnahme zeigt „Vor dem Anpfiff“ (Wegwerf-Save ohne Einsatzliste) – Vollbild mit laufender Bühne ist nicht
+bebildert. Der Vollbild-Schalter greift deshalb nur, wenn im Arena-Container eine Leinwand/ein Iframe steht
+(`MutationObserver` in `FoundationShell`); „Vor dem Anpfiff“ behält Band und Schiene. Das Bild
+`app-arena-vollbild-1920x1080.png` stammt von einem Zwischenstand (Band ausgeblendet, Seite ohne Bühne).
