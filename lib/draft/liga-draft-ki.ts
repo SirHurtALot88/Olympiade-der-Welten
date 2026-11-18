@@ -19,6 +19,9 @@
  */
 import type { GameState, LigaDraftZustand, Player, Team } from "@/lib/data/olyDataTypes";
 import { buildOrganicDraftFrame, toOrganicPlayerView } from "@/lib/ai/organic-squad/draft-adapter";
+import { computeDisciplineNeeds } from "@/lib/ai/organic-squad/discipline-need";
+import { SOLIDE_THRESHOLD, type OrganicPlayerView } from "@/lib/ai/organic-squad/types";
+import { buildLeagueMarketBrackets, type LeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   applyOrganicBuyStep,
   createOrganicPlanStepState,
@@ -26,12 +29,35 @@ import {
   type OrganicBuyStepResult,
 } from "@/lib/ai/organic-squad/draft-builder";
 
+/**
+ * Anzeige-Grund einer Top-3-Karte (Mockup: „Star, Bedarf an einer Disziplin, Preis-Leistung, Kadertiefe“). Nur fuer die
+ * Anzeige abgeleitet, die Entscheidung trifft allein die Bewertung. `bedarf` nennt eine Disziplin, in der das Team noch
+ * keinen soliden Spieler hat und der Kandidat solide ist — das ist ein Marktsignal wie die Top 3 selbst.
+ */
+export type LigaDraftPickGrund =
+  | { art: "star" }
+  | { art: "bedarf"; disziplinId: string }
+  | { art: "preis_leistung" }
+  | { art: "kadertiefe" };
+
+function pickGrund(
+  spieler: OrganicPlayerView,
+  offeneDisziplinen: readonly string[],
+  brackets: LeagueMarketBrackets,
+): LigaDraftPickGrund {
+  if (spieler.marketValue >= brackets.star.floorMw) return { art: "star" };
+  const bedarf = offeneDisziplinen.find((id) => (spieler.disciplineRatings[id] ?? 0) > SOLIDE_THRESHOLD);
+  if (bedarf) return { art: "bedarf", disziplinId: bedarf };
+  if (spieler.marketValue < brackets.core.floorMw) return { art: "preis_leistung" };
+  return { art: "kadertiefe" };
+}
+
 export type LigaDraftKiBewertung = {
   teamId: string;
   kind: OrganicBuyStepResult["kind"];
   /** Bester Kandidat (die KI nimmt immer Platz 1). */
   bestPlayerId: string | null;
-  top: Array<{ playerId: string; nutzen: number; marketValue: number; salary: number }>;
+  top: Array<{ playerId: string; nutzen: number; marketValue: number; salary: number; grund: LigaDraftPickGrund }>;
   stopNutzen: number | null;
   /** Die Rücklage, mit der das Team plant (Saison 1: halb), und sein Zielkader. */
   ruecklage: number;
@@ -123,6 +149,12 @@ export function bewerteKiPick(input: {
   schritt.cash = gameState.teams.find((eintrag) => eintrag.teamId === teamId)?.cash ?? schritt.cash;
 
   const ergebnis = organicBuyStep(frame.planInput, schritt, { topN: Math.max(1, input.topN ?? 3) });
+  const offeneDisziplinen = computeDisciplineNeeds(schritt.squad, frame.planInput.identityAxisWeights, frame.planInput.disciplines)
+    .filter((bedarf) => bedarf.coveredCount === 0)
+    .sort((a, b) => b.needWeight - a.needWeight)
+    .map((bedarf) => bedarf.disciplineId);
+  const brackets =
+    frame.planInput.composition?.brackets ?? buildLeagueMarketBrackets(frame.planInput.candidates.map((view) => view.marketValue));
   return {
     teamId,
     kind: ergebnis.kind,
@@ -132,6 +164,7 @@ export function bewerteKiPick(input: {
       nutzen: Math.round(eintrag.utility * 100) / 100,
       marketValue: eintrag.player.marketValue,
       salary: eintrag.player.salary,
+      grund: pickGrund(eintrag.player, offeneDisziplinen, brackets),
     })),
     stopNutzen: ergebnis.stopUtility == null ? null : Math.round(ergebnis.stopUtility * 100) / 100,
     ruecklage: frame.ruecklage,

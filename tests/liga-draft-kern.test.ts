@@ -162,13 +162,14 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
   it("die Sicht zeigt: Mensch am Zug, Draft wartet, Vorschlag des GM, Top 3 der naechsten KI-Teams", () => {
     const sicht = ansicht.baueLigaDraftAnsicht({ gameState: lade(), saveId, betrachterTeamId: menschTeamId, vorschau: 3 })!;
     expect(sicht.wartetAufMensch).toBe(true);
-    expect(sicht.amZug).toMatchObject({ teamId: menschTeamId, art: "mensch", top3: null });
+    expect(sicht.amZug).toMatchObject({ teamId: menschTeamId, art: "mensch", top3: null, top3Gruende: null });
     expect(sicht.mein).toMatchObject({ amZug: true, darfPicken: true, darfAuslassen: true, darfFertig: false });
     expect(sicht.mein!.vorschlag).toHaveLength(3);
     // Danach: Runde 2, KI-Teams mit ihren Top 3 und Karten ohne verdeckte Werte.
     const kiZug = sicht.naechste.find((zug) => zug.art === "ki")!;
     expect(kiZug.runde).toBe(2);
     expect(kiZug.top3).toHaveLength(3);
+    expect(kiZug.top3Gruende!.map((g) => g.art).every((art) => ["star", "bedarf", "preis_leistung", "kadertiefe"].includes(art))).toBe(true);
     const karte = sicht.spieler[kiZug.top3![0]!]!;
     expect(Object.keys(karte).sort()).toEqual(["className", "gehalt", "marktwert", "name", "playerId", "race"]);
   }, 120_000);

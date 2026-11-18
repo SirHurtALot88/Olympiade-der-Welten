@@ -13,7 +13,7 @@
  * „gefragt“ zaehlt deshalb ueber diese Teams, nicht ueber alle 32.
  */
 import type { GameState, LigaDraftEintrag, LigaDraftZustand } from "@/lib/data/olyDataTypes";
-import { bewerteKiPick, freieSpieler } from "@/lib/draft/liga-draft-ki";
+import { bewerteKiPick, freieSpieler, type LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
 import { kaderStaerkeFuerReihenfolge, naechsteZuege, werIstDran } from "@/lib/draft/liga-draft-modell";
 import { pflichtReserve } from "@/lib/draft/liga-draft-dienst";
 
@@ -35,8 +35,10 @@ export type LigaDraftZugAnsicht = {
   art: "ki" | "mensch";
   automatisch: boolean;
   ownerId: string | null;
-  /** Top 3 der KI fuer diesen Zug, Rang 1 zuerst (nur KI und Auto-Pick; Menschen: `null`). */
+  /** Top 3 der KI fuer diesen Zug, Rang 1 zuerst (nur KI und Auto-Pick; Menschen: `null`). Die KI nimmt Rang 1. */
   top3: string[] | null;
+  /** Anzeige-Grund je Top-3-Karte (gleiche Reihenfolge wie `top3`). */
+  top3Gruende: LigaDraftPickGrund[] | null;
   /** Was die KI tun wuerde: kaufen oder aufhoeren (`null` bei Menschen). */
   absicht: "pick" | "aufhoeren" | null;
 };
@@ -106,7 +108,7 @@ export type LigaDraftAnsicht = {
   };
 };
 
-type KiCacheWert = { top: string[]; absicht: "pick" | "aufhoeren" };
+type KiCacheWert = { top: string[]; gruende: LigaDraftPickGrund[]; absicht: "pick" | "aufhoeren" };
 const kiCache = new Map<string, KiCacheWert>();
 const KI_CACHE_MAX = 256;
 
@@ -117,6 +119,7 @@ function kiBewertungGemerkt(gameState: GameState, saveId: string, draft: LigaDra
   const bewertung = bewerteKiPick({ gameState, saveId, draft, teamId, topN: 3, freiePool: pool });
   const wert: KiCacheWert = {
     top: bewertung.top.map((eintrag) => eintrag.playerId),
+    gruende: bewertung.top.map((eintrag) => eintrag.grund),
     absicht: bewertung.kind === "buy" ? "pick" : "aufhoeren",
   };
   if (kiCache.size >= KI_CACHE_MAX) kiCache.delete(kiCache.keys().next().value as string);
@@ -155,14 +158,16 @@ export function baueLigaDraftAnsicht(input: {
   const zugAnsicht = (zug: { teamId: string; runde: number; platz: number; automatisch: boolean }): LigaDraftZugAnsicht => {
     const team = draft.teams[zug.teamId]!;
     let top3: string[] | null = null;
+    let top3Gruende: LigaDraftPickGrund[] | null = null;
     let absicht: LigaDraftZugAnsicht["absicht"] = null;
     if (zug.automatisch) {
       const bewertung = kiBewertungGemerkt(gameState, saveId, draft, zug.teamId, pool);
       top3 = bewertung.top;
+      top3Gruende = bewertung.gruende;
       absicht = bewertung.absicht;
       top3.forEach(karte);
     }
-    return { teamId: zug.teamId, runde: zug.runde, platz: zug.platz, art: team.art, automatisch: zug.automatisch, ownerId: team.ownerId, top3, absicht };
+    return { teamId: zug.teamId, runde: zug.runde, platz: zug.platz, art: team.art, automatisch: zug.automatisch, ownerId: team.ownerId, top3, top3Gruende, absicht };
   };
 
   const jetzt = werIstDran(draft);
