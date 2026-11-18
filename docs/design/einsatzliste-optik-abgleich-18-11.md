@@ -71,7 +71,8 @@ nur größere Spalten bei breiten Schirmen (Kader und Kontext wachsen mit `clamp
 
 ## Offene Punkte
 
-1. Rahmen-Mockup-Bühne (Figuren-Szene oben, Kartenraster unten) ist nicht nachgebaut, siehe Tabelle.
+1. Rahmen-Mockup-Bühne (Figuren-Szene mit Kulissenbild oben, Kartenraster unten) ist nicht nachgebaut, siehe Tabelle. Kommt als nächster PR. Aufwand grob 1 Tag: Feld in Bühne (Kulisse aus `einsatzlisteKulisseBild`, Figuren je Slot mit Rollen-Kürzel am Fuß, Gegner gegenüber) und Kartenraster teilen, die Formations-Geometrie für Figuren-Positionen umrechnen, Abgleich mit `app-rahmen-modern-18-11.html`. Die Figuren selbst stehen schon (diese PR), das Umbauen betrifft nur die Anordnung.
+1a. Die App-Aufnahmen (drei Größen, Abgleich-Bilder Mockup | App) fehlen in diesem Stand: Aufnahme-Läufe stürzten am Speicherdeckel ab. Sie kommen aus dem zentralen Screenshot-Lauf; Skripte `scripts/screenshot-einsatzliste-optik.ts` (zwei Phasen `bau` und `foto`) und `scripts/baue-einsatzliste-abgleich.sh` liegen bereit.
 2. Bei Scouting-Stufe 0 sind Gegner-Plätze verdeckt (bestehende Regel von 08.11.): Platz gegen Platz zeigt dann nur „?“,
    darüber steht aber der Schnitt. Mehr Scouting öffnet die Namen und Figuren.
 3. Saisonrang des Gegners (siehe oben).
