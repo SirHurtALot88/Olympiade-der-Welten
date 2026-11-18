@@ -12,6 +12,8 @@ import {
   resolveSeasonTrainingAccumulatorInputs,
 } from "@/lib/training/organic-season-progression";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
+import { getMatchdayBookedTrainingIds } from "@/lib/training/organic-season-progression";
+import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
 
 /**
  * Kumulierte Trainings-Prognose der laufenden Saison (ein Wert pro Attribut, kein Spieltag-Verlauf).
@@ -124,8 +126,12 @@ export function buildPlayerSeasonTrainingForecast(input: {
 
   // Trainings-Budget aus den Modi aller gespielten Spieltage (Nenner bleibt die volle Saisonlänge)
   // — exakt dieselbe Ableitung wie im Saisonende-Apply.
+  // Training je Spieltag (18.11.): gebuchte Spieltage stecken schon in den Attributen; ihr Zuwachs kommt
+  // exakt aus dem Verlauf (gezeigt = gebucht), die Projektion rechnet nur noch die ungebuchten.
+  const jeSpieltag = isTrainingJeSpieltagAktiv();
+  const gebuchteIds = jeSpieltag ? getMatchdayBookedTrainingIds(accumulator, seasonId) : new Set<string>();
   const subsetModes: Record<string, PlayerTrainingMode> = {};
-  for (const id of playedMatchdayIds) subsetModes[id] = modeByMatchday[id];
+  for (const id of playedMatchdayIds) if (!gebuchteIds.has(id)) subsetModes[id] = modeByMatchday[id];
   const accInputs = resolveSeasonTrainingAccumulatorInputs({
     accumulator: {
       seasonId,
@@ -142,7 +148,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
     gameState: truncatedGameState,
     player,
     facilities: input.facilities ?? undefined,
-    accumulatedBaseTrainingBudget: accInputs?.accumulatedBaseTrainingBudget,
+    accumulatedBaseTrainingBudget: jeSpieltag ? (accInputs?.accumulatedBaseTrainingBudget ?? 0) : accInputs?.accumulatedBaseTrainingBudget,
     performanceWeightMultiplier: accInputs?.performanceWeightMultiplier,
     // Ursache des früheren Schiefstands: Training (anteiliges Budget) und Performance (nur
     // Records bis heute) waren bereits auf die gespielten Spieltage beschnitten, die Regression
@@ -172,8 +178,20 @@ export function buildPlayerSeasonTrainingForecast(input: {
     performanceByAttr[entry.attribute] = entry.performance ?? 0;
     regressionByAttr[entry.attribute] = entry.regression ?? 0;
   }
+  let gebuchtTotal = 0;
+  if (jeSpieltag) {
+    for (const eintrag of accumulator.verlauf ?? []) {
+      if (eintrag.s !== "t" || !eintrag.z) continue;
+      for (const [attribute, wert] of Object.entries(eintrag.z) as Array<[PlayerGeneratorAttributeName, number]>) {
+        cumulativeByAttr[attribute] = (cumulativeByAttr[attribute] ?? 0) + wert;
+        trainingByAttr[attribute] = (trainingByAttr[attribute] ?? 0) + wert;
+        gebuchtTotal += wert;
+      }
+    }
+  }
 
-  const baseline = player.attributeSheetStats ?? null;
+  // Mit Training je Spieltag ist der Saisonstart-Wert der Bezug (die Attribute tragen den Zuwachs schon).
+  const baseline = (jeSpieltag ? accumulator.startAttribute : null) ?? player.attributeSheetStats ?? null;
   const attributes = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const cumulative = round1(cumulativeByAttr[attribute]);
     const baseValue = baseline?.[attribute];
@@ -207,7 +225,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
     matchdaysPlayed: playedMatchdayIds.length,
     totalMatchdays,
     netCumulative,
-    trainingTotal: round1(trainingTotal),
+    trainingTotal: round1(trainingTotal + gebuchtTotal),
     spilloverTotal: round1(spilloverTotal),
     performanceTotal: round1(performanceTotal),
     regressionTotal: round1(regressionTotal),
