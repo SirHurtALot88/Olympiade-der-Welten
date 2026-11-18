@@ -56,8 +56,19 @@ try {
   const seite = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
-  await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
-  await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+  const url = `http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`;
+  // LADEZEIT bis der Motor bereit ist (window.__arena), kalt und mit warmem HTTP-Cache -- der Unterschied
+  // ist, was das Vorladen waehrend des Vorlaufs (lib/foundation/battle-arena/arena-vorladen.ts) spart.
+  // Lokaler Server: die Uebertragungszeit eines echten Netzes fehlt, gemessen wird Laden+Parsen.
+  const ladeZeit = async () => {
+    const t0 = Date.now();
+    await seite.goto(url, { waitUntil: "load" });
+    await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000, polling: 20 });
+    return Date.now() - t0;
+  };
+  const kalt = await ladeZeit();
+  const warm = await ladeZeit();
+  console.log(`Ladezeit bis Motor bereit: kalt ${kalt} ms, warmer Cache ${warm} ms`);
   if (disziplin === "alle") {
     // Nur der Stand VOR dem Start, fuer jede Disziplin (alle Chassis): Kopfzeile und Kaderleisten-Mitte.
     const zeilen = await seite.evaluate(async () => {
