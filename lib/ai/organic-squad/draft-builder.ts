@@ -282,10 +282,27 @@ function cheapestPriceSum(pool: OrganicPlayerView[], count: number): number {
   return sum;
 }
 
-/** Summe der `count` ersten Werte einer aufsteigend sortierten Preisliste. */
-function cheapestFromSorted(sortiert: readonly number[], count: number): number {
+/**
+ * Summe von `count` billigen Preisen einer aufsteigend sortierten Preisliste. Mit Wettbewerb (Einzelschritt, T Teams picken reihum)
+ * jeder T-te Preis statt der `count` billigsten: dieselbe Rechnung wie `platzReserve`, nur fuer die guenstigen Plaetze. Gemessen
+ * 18.11. (Review-Fixes): mit den nackten billigsten Preisen endeten im Einzelschritt 3 Teams einen Platz unter Opt, weil die wenigen
+ * Spieler unter 4 laengst weg waren, als ihr letzter Platz dran war. Ohne Wettbewerb (Block) die `count` billigsten wie bisher.
+ */
+function billigeReserve(sortiert: readonly number[], count: number, wettbewerb = 1): number {
+  if (count <= 0) return 0;
+  const schritt = Number.isFinite(wettbewerb) ? Math.max(1, Math.floor(wettbewerb)) : 1;
   let sum = 0;
-  for (let i = 0; i < count && i < sortiert.length; i += 1) sum += sortiert[i]!;
+  let n = 0;
+  for (let i = schritt - 1; i < sortiert.length && n < count; i += schritt) {
+    sum += sortiert[i]!;
+    n += 1;
+  }
+  // Zu wenige Preise fuer den Abstand: die teuersten uebrigen (vorsichtig) bis `count`.
+  for (let i = sortiert.length - 1; i >= 0 && n < count; i -= 1) {
+    if ((i + 1) % schritt === 0) continue;
+    sum += sortiert[i]!;
+    n += 1;
+  }
   return sum;
 }
 
@@ -459,7 +476,11 @@ export function kaderplanRahmen(input: OrganicSquadPlanInput, step: OrganicPlanS
   const billigsterPlatz = aktuellePreise.find((wert) => wert >= KADERPLAN_PLATZ_MIN_MW) ?? Infinity;
   // Reserve fuer `m` weitere Plaetze, davon `n` zum Platzpreis und `m - n` zum Preis der billigsten Spieler im aktuellen Pool.
   const reserveFuer = (n: number, m: number) =>
-    Math.max(reserveForMin, platzReserve(sortiertePreise, n, input.economy.platzWettbewerb) + cheapestFromSorted(aktuellePreise, m - n));
+    Math.max(
+      reserveForMin,
+      platzReserve(sortiertePreise, n, input.economy.platzWettbewerb) +
+        billigeReserve(aktuellePreise, m - n, input.economy.platzWettbewerb),
+    );
   const traegt = (n: number, m: number, kauf: number) => {
     const reserve = reserveFuer(n, m);
     return cash - kauf - reserve >= affordFloor && (feeCap == null || spentFee + kauf + reserve <= feeCap + 1e-9);

@@ -197,6 +197,45 @@ p("Stufen gesamt nach dem Draft: " + laufNamen.map((ln) => {
 }).join(" · "));
 p("");
 
+// ---- Review-Fixes (18.11.): Kadergroessen, Fueller, Notwege, Gruende, Gehaltssumme nach dem Picken ----
+// Chris 18.11.: „nach dem Picken liegen die meisten Teams bei etwa 50–70 Gehalt". Gehalt = Summe der Gehaltsforderungen des Kaders.
+// Gruende/Notwege: Block aus der In-Memory-Block-Simulation (dieselbe Schleife, `simTreffer` zeigt die Deckung mit dem echten Lauf),
+// Einzelschritt aus dem Verlauf (`kaderplan:`, `kaderplan_notwege:`, `notweg:`, `kauf_gescheitert:`).
+p("## Review-Fixes: Kader, Füller, Gehalt nach dem Picken");
+p("");
+p("| Lauf | Kader Ø (min–max) | unter 8 | unter Opt | Füller < 12 (Teams) | Gehalt Median (min–max) | in 50–70 | über 70 | unter 50 |");
+p("|---|---|---:|---:|---|---|---:|---:|---:|");
+for (const ln of laufNamen) {
+  const z = zeilen.filter((x) => x.lauf === ln);
+  const lauf = laeufe.find((l) => `${l.label}/${l.draft}` === ln);
+  const k = z.map((x) => x.kader);
+  const g = z.map((x) => x.gehalt);
+  const fueller = Object.values(lauf.teams).map((t) => (t.nachDraft.spielerWerte ?? []).filter((w) => w.mw < 12).length);
+  p(
+    `| ${ln} | ${r1(mittel(k))} (${Math.min(...k)}–${Math.max(...k)}) | ${z.filter((x) => x.kader < 8).length} | ${z.filter((x) => x.unterOpt).length} | ${fueller.reduce((a, b) => a + b, 0)} (${fueller.filter((f) => f > 0).length}) | ${r1(median(g))} (${r1(Math.min(...g))}–${r1(Math.max(...g))}) | ${g.filter((v) => v >= 50 && v <= 70).length} | ${g.filter((v) => v > 70).length} | ${g.filter((v) => v < 50).length} |`,
+  );
+}
+p("");
+for (const l of laeufe) {
+  const ln = `${l.label}/${l.draft}`;
+  if (l.simulation) {
+    const gruende = {};
+    const wege = {};
+    for (const t of Object.values(l.simulation.jeTeam)) {
+      if (t.kaderplan) gruende[t.kaderplan.grund] = (gruende[t.kaderplan.grund] ?? 0) + 1;
+      for (const w of t.kaderplan?.notwege ?? t.notwege ?? []) wege[w] = (wege[w] ?? 0) + 1;
+    }
+    const treffer = Object.values(l.teams).map((t) => t.simTreffer).filter(Boolean);
+    const gleich = treffer.reduce((a, t) => a + t.gleich, 0);
+    const echt = treffer.reduce((a, t) => a + t.echt, 0);
+    p(`* ${ln} (Block-Simulation, Deckung mit dem echten Lauf ${gleich}/${echt} Spieler): Gründe ${Object.entries(gruende).map(([k, v]) => `${k} ${v}`).join(", ") || "–"}; Notwege ${Object.entries(wege).map(([k, v]) => `${k} ${v}`).join(", ") || "0"}`);
+  }
+  if (l.einzelschritt) {
+    p(`* ${ln} (Verlauf): ${Object.entries(l.einzelschritt.kaderplanGruende ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "–"}`);
+  }
+}
+p("");
+
 // ---- Stars relativ ----
 if (zeilen.some((x) => x.hatWerte)) {
   p("## Stars relativ (Markt: Star ≥ 45, Superstar ≥ 60 · Budget: Abloese ≥ 15 % bzw. ≥ 25 % des Startbudgets)");

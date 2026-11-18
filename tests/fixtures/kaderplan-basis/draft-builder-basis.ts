@@ -1,4 +1,3 @@
-/* eslint-disable */
 // FIXTURE (Review K6, 18.11.): unveraenderte Kopie von lib/ai/organic-squad/draft-builder.ts aus der Basis #1618
 // (origin/claude/finanzen-v2-seite-18-11, Stand a78c5ada) -- der Builder OHNE Kaderplan. tests/ki-kaderplan-prototyp.test.ts
 // vergleicht den heutigen Builder mit abgeschaltetem Kaderplan gegen diese Kopie. NICHT anpassen: sie ist der Massstab.
