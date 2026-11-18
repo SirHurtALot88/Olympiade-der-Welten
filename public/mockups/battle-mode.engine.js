@@ -49508,7 +49508,12 @@
   // `spurtFormatExplizit`: true, sobald jemand das Format AUSDRUECKLICH setzt (startFlags/
   // window.__arena.bahnFlags). Nur ohne ausdruecklichen Wunsch greift im echten Spiel die
   // Formatwahl per Saat (spurtFormatWaehlen(), 16.11.).
-  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle", spurtFormatExplizit:false};
+  // `climbingFormat` (Climbing-Canyon-Bau 18.11., docs/design/climbing-canyon-bau-18-11.md): "standard"
+  // (Vorgabe, bit-identisch zum Stand davor) oder "canyon" (die neue Wand mit drei Wegen, Engstelle,
+  // Rangeln und Seilschaften, s. baueCanyon()/stepClimbingCanyon()). Gesetzt NUR ueber
+  // window.__arena.bahnFlags({climbingFormat}) oder window.__olyBahnFlags vor dem Laden -- das echte
+  // Spiel setzt beides nicht, der Schalter ist dort AUS, bis Chris nach der Messung entscheidet.
+  const BAHN_FLAGS={spurtFormat:"klassisch", hyroxAnsicht:"halle", spurtFormatExplizit:false, climbingFormat:"standard"};
   try{
     const startFlags=window.__olyBahnFlags;
     if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string"){
@@ -49516,6 +49521,8 @@
     }
     if(startFlags&&typeof startFlags==="object"&&(startFlags.hyroxAnsicht==="bahn"||startFlags.hyroxAnsicht==="halle"))
       BAHN_FLAGS.hyroxAnsicht=startFlags.hyroxAnsicht;
+    if(startFlags&&typeof startFlags==="object"&&(startFlags.climbingFormat==="standard"||startFlags.climbingFormat==="canyon"))
+      BAHN_FLAGS.climbingFormat=startFlags.climbingFormat;
   }catch(e){}
   const BAHN_ART={
     spurt:{
@@ -51083,6 +51090,10 @@
   // hindernisNamen) -- die eigentliche ZEITWIRKUNG steht je Laeufer in `u.hyroxZeit`
   // (s. baueHyroxStationen()). `null` ausserhalb von Hyrox.
   let bahnHyroxAktiv=false, HYROX_STATIONEN=null;
+  // CLIMBING-FORMAT "CANYON" (Bau 18.11.): dasselbe Muster wie bahnHyroxAktiv -- nur waehrend eines mit
+  // BAHN_FLAGS.climbingFormat==="canyon" gebauten Climbing-Rennens true. `CANYON` haelt den ganzen
+  // Format-Zustand (Kletterer-Zustand je Laeufer-id, Seilschaften, Ereignisse), s. baueCanyon().
+  let bahnCanyonAktiv=false, CANYON=null;
   // HALLENRUNDE (Hallenrunde-PR, Design-Dokument Abschnitt 6/7.2): die Wegtabelle der
   // Hallenrunde (Quellpixel-Koordinaten + Abschnittsliste), gebaut von `baueHyroxWeg()`
   // (s. dort) -- `null` solange sie nicht existiert (Vorher-Stand/Ansicht "bahn"). Haengt
@@ -51929,6 +51940,7 @@
     // Sicherungsposition (Teleport statt sichtbarer Bewegung). `u.pos` selbst bleibt der
     // Motor-Wert, hier wird nur die gezeichnete Hoehe kurz interpoliert (s. Kommentar bei
     // `climbAnzeigeAnteil`, bodenWand()).
+    if(bahnCanyonAktiv&&CANYON)return canyonSchirmXY(u);   // Climbing-Canyon: Ort aus der Wand-Geometrie
     if(istWand())return {x:wandX(u.bahnZ), y:camY(climbAnzeigeAnteil(u))};
     // ZEITFAHREN-SEITENANSICHT (Task #155): eine Strasse ueber dem Huegel statt zwoelf gerader Spuren.
     if(zfSeite())return zfSeitenXY(u,platz);
@@ -52816,6 +52828,11 @@
     bahnHyroxAktiv=!!(art.spurt&&spurtFmt==="hyrox");
     HYROX_STATIONEN=null;
     if(bahnHyroxAktiv)baueHyroxStationen();
+    // CLIMBING-FORMAT "CANYON": nur Climbing, nur mit gesetztem Schalter. Ohne ihn bleibt
+    // `bahnCanyonAktiv` false und bauSpurt() endet hier bit-identisch zu vorher.
+    bahnCanyonAktiv=!!(art.climbing&&BAHN_FLAGS.climbingFormat==="canyon");
+    CANYON=null;
+    if(bahnCanyonAktiv)baueCanyon();
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -54339,8 +54356,516 @@
     ctx.restore();
   }
 
+  // =====================================================================================
+  // CLIMBING-FORMAT "CANYON" (Bau 18.11., Mockup + Konzept docs/design/climbing-neu-18-11.md,
+  // Bau-Dokument docs/design/climbing-canyon-bau-18-11.md). Chris' Freigabe vom 18.11.: neues
+  // Format NEBEN dem Standard hinter dem Schalter `BAHN_FLAGS.climbingFormat==="canyon"`, der
+  // Standard bleibt bit-identisch (Fingerabdruck GESAMT unveraendert).
+  //
+  // Die Wand ist ein ORT (Weltkoordinaten 1584 x 600, dieselben wie im Mockup): Einstiegswand
+  // (oder Kamin fuer Technik-Seilschaften), Quergang am Band, Engstelle (Felsbloecke, immer nur
+  // einer, "obenrum" als Ausweichlinie), Gabelung in drei Wege (Kraft: Dach + Lippe, Technik:
+  // Kamin + Seilbruecke, Ausdauer: Band + Flanke + Leiter), Gipfelgrat, Glocke.
+  //
+  // WERTUNG: je Kletterer die eigene Glockenzeit (`u.fertig`) wie im Standard -- MOTOREN.climbing
+  // .wert(), bahnRangliste() und bahnTeamstand() bleiben unveraendert (PM-Entscheidung zu Frage
+  // 8: Einzelwertung ist die Basis, Teampunkte aus der bestehenden Rang-Logik). Seilschaften und
+  // "Seilschaft oben" sind Anzeige und Interaktion, keine zweite Wertung.
+  //
+  // ZUSTAND: alles Canyon-Eigene liegt in `CANYON` (modulweit, gesichert/zurueckgesetzt ueber
+  // bahnAnzeigeSichern()); an den Laeufern werden nur die vorhandenen Felder `pos`, `hoch`,
+  // `fertig`, `reserve`, `leer` geschrieben, die jede Bahn ohnehin traegt.
+  //
+  // Tempo ist WELT-Zeit: der Motor rechnet mit dtw = dt * CANYON_P.tempo (die Konstanten stammen
+  // aus der Schau-Simulation des Mockups und sind dort in "Mockup-Sekunden" gedacht); rennT und
+  // u.fertig bleiben Simulationssekunden wie bei jeder Bahn.
+  // =====================================================================================
+  const CANYON_WELT={B:1584, H:600, BAND:352, BODEN:588, GIPFEL:{x:1338,y:14}};
+  const CANYON_WEG_NAME={kraft:"Kraftweg", technik:"Technikweg", ausdauer:"Ausdauerweg"};
+  // Kalibrierwerte (Messrunde docs/design/climbing-canyon-bau-18-11.md Abschnitt 4). Ueber
+  // window.__arena.canyonParameter() fuer Messskripte veraenderbar, im Spiel fest.
+  const CANYON_P_STANDARD={
+    tempo:3.0,                 // Welt-Sekunden je Simulationssekunde
+    sockel:0.25, spanne:1.30,  // v = basis * (sockel + spanne * Kanal/100); Spanne traegt die Rangtreue
+    formStreu:0.03,            // Tagesform je Kletterer +-3 %
+    basis:{boden:60,wand:25,kamin:23,band:44,block:34,dach:31,lippe:28,grat:40,bruecke:26,leiter:36},
+    // TEMPO-STELLEN (boden, band, block, grat) tragen Zug/Umsetzen/Ausdauertempo; KLETTER-STELLEN
+    // (wand, kamin, dach, lippe, leiter, bruecke) tragen Kraftausdauer/Griff/Kraftzug/Zaehigkeit/Kopf
+    // und das Wegprofil -- Tempo zaehlt dort nicht (Chris 18.11.: "schnelligkeit und agilitaet hilft
+    // ... heisst nicht zwangsweise dass man dann schneller klettert").
+    mix:{
+      boden:  {ANTRITT:.5, WENDIGKEIT:.25, ENDTEMPO:.25},
+      band:   {ENDTEMPO:.3, ANTRITT:.3, WENDIGKEIT:.25, TECHNIK:.15},
+      block:  {WENDIGKEIT:.5, ANTRITT:.3, ENDTEMPO:.2},
+      grat:   {ENDTEMPO:.45, ANTRITT:.3, WENDIGKEIT:.25},
+      wand:   {STEHEN:.3, ROBUST:.25, TECHNIK:.15, WUCHT:.15, GLEICHGEWICHT:.15},
+      kamin:  {TECHNIK:.4, GLEICHGEWICHT:.2, STEHEN:.2, ROBUST:.2},
+      dach:   {WUCHT:.45, STEHEN:.3, ROBUST:.25},
+      lippe:  {WUCHT:.5, STEHEN:.3, GLEICHGEWICHT:.2},
+      bruecke:{GLEICHGEWICHT:.45, TECHNIK:.35, STEHEN:.2},
+      leiter: {STEHEN:.4, ROBUST:.4, GLEICHGEWICHT:.2}
+    },
+    ausdauerMix:{ROBUST:.4, STEHEN:.35, ENDTEMPO:.25},   // Puste-Zehrung (1,5 - Ausdauer/100)
+    zehr:{boden:0,wand:.030,kamin:.012,band:.011,block:.03,dach:.062,lippe:.058,grat:.008,bruecke:.006,leiter:.030},
+    leerAb:0.3, leerBoden:0.5,                           // unter 30 % Puste langsamer, bis 50 %
+    rastRate:0.135,
+    rast:[{x:470,schwelle:.52,auf:.8},{x:1180,schwelle:.50,auf:.8,kraftSchwelle:.86,kraftAuf:.97}],
+    buchten:[[440,690],[1000,1160],[1220,1480]],
+    // Wegprofil: welcher Kanal entscheidet, welcher Weg zu einer Seilschaft passt.
+    wegProfil:{kraft:{WUCHT:1}, technik:{TECHNIK:.5,GLEICHGEWICHT:.5}, ausdauer:{STEHEN:.5,ROBUST:.5}},
+    // Kalibrierung R2 (Messrunde 18.11., n=96 x 5 Kader): gleiche Eignung = gleiche Zeit je Weg innerhalb
+    // +-2 % (gemessen Kraft +0,7 %, Technik +1,0 %, Ausdauer -1,7 %). Wirkt nur auf die Kletter-Stellen
+    // hinter der Gabel (die Kanten mit `weg`).
+    wegFaktor:{kraft:0.96, technik:1.10, ausdauer:0.92},
+    kaminStart:true, kaminFaktor:1,
+    planGewicht:0.5,                                      // Rennplan: Tempo gegen Puste
+    // SEILSCHAFT-HILFE (R9). "aus" | "gedeckelt" | "voll" (Mockup-Werte).
+    hilfe:"gedeckelt",
+    hilfeVoll:    {zugPause:1.4, zugSchub:1.8, zugFaktor:1.9, zugMax:3, zugCd:9, schiebSchub:1.5, schiebCd:6, schubZehr:.5},
+    hilfeGedeckelt:{zugPause:1.0, zugSchub:1.0, zugFaktor:1.5, zugMax:2, zugCd:12, schiebSchub:0.8, schiebCd:9, schubZehr:.7},
+    // RANGELN (Chris 18.11.: "geht mehrfach aber kostet ausdauer"): beliebig oft, jedes Mal teurer.
+    rangeln:true, rangelPuste:.05, rangelEskal:.6, rangelVerlierer:1.2, rangelGewinner:0.6,
+    rangelPaarCd:6, rangelVorn:4, rangelWuerfel:16,
+    // PROBEN und Zwischenfaelle (R4): an Kanal und Puste gebunden, gedeckelt.
+    lippeBasis:.74, lippePause:1.6, brueckeBasis:.62, brueckePause:1.1,
+    fehlgriffBasis:.50, fehlgriffPause:1.0, sturzPause:2.0, sturzRueck:28,
+    wechselPause:0.6, wechselLeer:0.22,
+    // ABSTAENDE (Welt-Pixel): Folgeabstand und Halt hinter dem Vordermann, Einstieg in den naechsten
+    // Abschnitt (Band / Wand-Kamin-Leiter); Wartedeckel am Band (W2) in Welt-Sekunden.
+    folge:18, stopp:14, eintrittBand:12, eintritt:14, warteDeckel:0.4, engDeckel:0.3,
+    deckelSek:80              // Sicherheitsdeckel in Simulationssekunden (danach Hochrechnung)
+  };
+  let CANYON_P=JSON.parse(JSON.stringify(CANYON_P_STANDARD));
+  let canyonLetzteMessung=null;   // Messwerte des zuletzt beendeten Canyon-Rennens (nur Mess-/Testzugriff)
+
+  function canyonSeg(ax,ay,bx,by,typ,o){
+    const s={ax,ay,bx,by,typ,len:Math.hypot(bx-ax,by-ay),id:typ==="band"?"band":ax+","+ay+">"+bx+","+by};
+    if(o)Object.assign(s,o);
+    return s;
+  }
+  function canyonKopf(K){
+    const {BAND,BODEN}=CANYON_WELT, P=[];
+    if(K.kamin){
+      P.push(canyonSeg(K.sx,BODEN,342,BODEN,"boden"));
+      P.push(canyonSeg(342,BODEN,346,BAND,"kamin",{marke:"band",kaminStart:true}));
+      P.push(canyonSeg(346,BAND,720,BAND,"band"));
+    } else {
+      P.push(canyonSeg(K.sx,BODEN,K.sx,BAND,"wand",{crux:.5,marke:"band"}));
+      P.push(canyonSeg(K.sx,BAND,720,BAND,"band"));
+    }
+    P.push(canyonSeg(720,BAND,762,318,"block",{eng:1}));
+    P.push(canyonSeg(762,318,802,BAND,"block",{marke:"eng"}));
+    P.push(canyonSeg(802,BAND,915,BAND,"band",{gabel:1}));
+    return P;
+  }
+  function canyonSchwanz(weg){
+    const {BAND,GIPFEL}=CANYON_WELT, P=[], w={weg};
+    if(weg==="kraft"){
+      P.push(canyonSeg(915,BAND,1180,BAND,"band",{nische:1}));
+      P.push(canyonSeg(1180,BAND,1180,228,"wand",w));
+      P.push(canyonSeg(1180,228,1014,206,"dach",w));
+      P.push(canyonSeg(1014,206,998,150,"lippe",{probe:"lippe",weg}));
+      P.push(canyonSeg(998,150,1040,84,"lippe",w));
+      P.push(canyonSeg(1040,84,1075,60,"grat",{marke:"grat"}));
+    } else if(weg==="technik"){
+      P.push(canyonSeg(915,BAND,911,205,"kamin",{schluessel:1,weg}));
+      P.push(canyonSeg(911,205,915,104,"kamin",w));
+      P.push(canyonSeg(915,104,886,52,"wand",w));
+      P.push(canyonSeg(886,52,1062,58,"bruecke",{probe:"bruecke",weg}));
+      P.push(canyonSeg(1062,58,1075,60,"grat",{marke:"grat"}));
+    } else {
+      P.push(canyonSeg(915,BAND,1512,BAND,"band"));
+      P.push(canyonSeg(1512,BAND,1516,186,"wand",{schluessel:1,weg}));
+      P.push(canyonSeg(1516,186,1512,64,"leiter",w));
+      P.push(canyonSeg(1512,64,1420,34,"grat",{marke:"grat"}));
+      P.push(canyonSeg(1420,34,GIPFEL.x+10,GIPFEL.y,"grat"));
+    }
+    if(weg!=="ausdauer"){
+      P.push(canyonSeg(1075,60,1200,46,"grat"));
+      P.push(canyonSeg(1200,46,GIPFEL.x-10,GIPFEL.y,"grat"));
+    }
+    // Dach und Lippe sind die Schluesselstelle des Kraftwegs (fuer den Wegwechsel an der Gabel).
+    for(const s of P)if(weg==="kraft"&&(s.typ==="dach"||s.typ==="lippe"))s.schluessel=1;
+    return P;
+  }
+  function canyonVermessen(K){
+    const P=K.pfad; K.gesamt=0;
+    for(let i=0;i<P.length;i++){
+      P[i].vor=K.gesamt; K.gesamt+=P[i].len;
+      if(P[i].typ==="lippe"){
+        const e=P[i-1].typ==="lippe";
+        P[i].lip0=e?P[i-1].len:0;
+        P[i].lipG=e?P[i-1].len+P[i].len:P[i].len+(P[i+1]?P[i+1].len:0);
+      }
+    }
+  }
+  const canyonGabelIdx=(K)=>{ for(let i=0;i<K.pfad.length;i++)if(K.pfad[i].gabel)return i; return 99; };
+  // \`diagPlus\` (nur Messung, s. scripts/miss-climbing-canyon.mjs --empfindlichkeit): hebt einen Sub-Skill
+  // fuer die Kletterer der Seite 0 an, um zu messen, wie stark er die Zeit traegt. Im Spiel nie gesetzt.
+  const canyonSk=(u,k)=>(u[k]||0)+((CANYON_P.diagPlus&&u.seite===0&&CANYON_P.diagPlus[k])||0);
+  const canyonKanal=(u,mix)=>{ let a=0; for(const k in mix)a+=mix[k]*canyonSk(u,k); return a; };
+  const canyonInBucht=(x)=>CANYON_P.buchten.some(b=>x>=b[0]&&x<=b[1]);
+
+  // SEILSCHAFTEN AUS DER EINSATZLISTE (Chris 18.11., Frage 9: "die slots in der einsatzliste"):
+  // benachbarte Slots eines Teams bilden eine Seilschaft. 6 -> 2+2+2, 5 -> 3+2, 4 -> 2+2,
+  // 3 -> 3, 2 -> 2, 1 -> allein. Keine zusaetzliche Oberflaeche.
+  function canyonSeilGroessen(n){
+    if(n>=6){ const g=[]; let r=n; while(r>0){ const k=(r===3||r===5)?3:2; g.push(Math.min(k,r)); r-=Math.min(k,r); } return g; }
+    return ({5:[3,2],4:[2,2],3:[3],2:[2],1:[1]})[n]||[];
+  }
+  function canyonSlotReihe(liste){
+    const sl=slotsVon(bahnDisc);
+    const idx=liste.map(u=>sl.findIndex(s=>s.id===(place[u.n]&&place[u.n].d===bahnDisc&&place[u.n].slot)));
+    if(idx.some(i=>i<0)||new Set(idx).size!==idx.length)return liste;   // ohne saubere Slots: Aufstellungsreihenfolge
+    return liste.map((u,i)=>({u,i:idx[i]})).sort((a,b)=>a.i-b.i).map(x=>x.u);
+  }
+
+  function baueCanyon(){
+    const P=CANYON_P, {BODEN}=CANYON_WELT;
+    canyonLetzteMessung=null;
+    const Z={t:0, K:new Map(), S:[], ereignisse:[], fertig:0, seilFertig:0, duelle:{},
+      warteJetzt:0, warteMax:0, warteDreiSek:0, warteVierSek:0, laengste:0, letzterCallout:-9, warteOrt:{},
+      zaehler:{rangeln:0,abgeblockt:0,zieht:0,schiebt:0,vorstieg:0,aussen:0,obenrum:0,wechsel:0,rutsch:0,sturz:0,wanken:0,fehlgriff:0,rast:0}};
+    CANYON=Z;
+    // Seilschaften je Seite aus der Slot-Reihenfolge
+    const seiten=[...new Set(LAEUFER.map(u=>u.seite))].sort((a,b)=>a-b);
+    for(const s of seiten){
+      const reihe=canyonSlotReihe(LAEUFER.filter(u=>u.seite===s));
+      let i=0, nr=1;
+      for(const g of canyonSeilGroessen(reihe.length)){
+        Z.S.push({seite:s, nr:nr++, m:reihe.slice(i,i+g), weg:null, ziel:null, hilfen:0, umgeplant:false});
+        i+=g;
+      }
+    }
+    // WEGWAHL aus dem Sub-Skill-Profil (Frage 3: "aus dem Profil, ingame anpassbar"): je Seite
+    // werden die Seilschaften so auf die drei Wege verteilt, dass die Summe der Profilwerte am
+    // groessten ist (verschiedene Wege, solange es nicht mehr Seilschaften als Wege gibt).
+    const wege=["kraft","technik","ausdauer"];
+    const passt=(S,w)=>S.m.reduce((a,u)=>a+canyonKanal(u,P.wegProfil[w]),0)/Math.max(1,S.m.length);
+    for(const s of seiten){
+      const SS=Z.S.filter(S=>S.seite===s);
+      let best=null, bestW=-1e9;
+      const versuch=(i,frei,wahl,summe)=>{
+        if(i===SS.length){ if(summe>bestW){bestW=summe; best=wahl.slice();} return; }
+        const kandidaten=frei.length?frei:wege;
+        for(const w of kandidaten){ wahl.push(w); versuch(i+1,frei.filter(x=>x!==w),wahl,summe+passt(SS[i],w)); wahl.pop(); }
+      };
+      versuch(0,wege,[],0);
+      SS.forEach((S,i)=>{ S.weg=best[i]; });
+    }
+    // Startplaetze: Kamin-Seilschaften links vor dem Kamin, alle anderen je eine Linie an der
+    // Einstiegswand, Seilschaftspartner nebeneinander, Teams abwechselnd.
+    const wandListe=[], kaminListe=[];
+    const reihum=[...Z.S].sort((a,b)=>a.nr-b.nr||a.seite-b.seite);
+    for(const S of reihum)for(const u of S.m)((P.kaminStart&&S.weg==="technik")?kaminListe:wandListe).push(u);
+    const wandAbst=Math.min(30,300/Math.max(1,wandListe.length-1));
+    const kaminAbst=Math.min(22,110/Math.max(1,kaminListe.length-1));
+    wandListe.forEach((u,i)=>{ Z.K.set(u.id,{sx:405+i*wandAbst, kamin:false}); });
+    kaminListe.forEach((u,i)=>{ Z.K.set(u.id,{sx:228+i*kaminAbst, kamin:true}); });
+    for(const S of Z.S)S.m.forEach((u,k)=>{
+      const K=Z.K.get(u.id);
+      Object.assign(K,{u, seil:S, weg:S.weg, eigen:wege.reduce((b,w)=>canyonKanal(u,P.wegProfil[w])>canyonKanal(u,P.wegProfil[b])?w:b,"ausdauer"),
+        partner:S.m.filter((o,j)=>Math.abs(j-k)===1),
+        form:1+(rr()-0.5)*2*P.formStreu, si:0, d:0, res:1, pause:0, zustand:"los", aussen:null, aussenFrei:false,
+        vorstieg:false, ziel:null, splits:{}, versuche:0, x:K.sx, y:BODEN, wartet:false, schritt:0, schub:0,
+        schiebt:0, hilfeCd:0, zuege:0, rangelN:0, warteLauf:0, warteSumme:0, engWarte:0, gegner:null,
+        nachRangel:null, rasten:{}, gegeben:0, bekommen:0, gewechselt:0, obenrum:false, wegStart:S.weg});
+      K.pfad=canyonKopf(K).concat(canyonSchwanz(K.weg)); canyonVermessen(K);
+    });
+    for(const u of LAEUFER){ u.pos=0; u.hoch=0; }
+  }
+
+  function canyonAnteil(K){ if(K.ziel!=null)return 1; const s=K.pfad[Math.min(K.si,K.pfad.length-1)]; return Math.max(0,Math.min(1,(s.vor+K.d)/K.gesamt)); }
+  function canyonOrt(K){
+    const s=K.pfad[Math.min(K.si,K.pfad.length-1)], f=s.len?K.d/s.len:1;
+    K.x=s.ax+(s.bx-s.ax)*f; K.y=s.ay+(s.by-s.ay)*f;
+  }
+  const canyonLage=(K)=>{ const s=K.pfad[K.si]; return s.typ==="band"?K.x:K.d; };
+  function canyonTempo(K,s){
+    const P=CANYON_P, u=K.u;
+    const planT=canyonAnteil(K)>=(u.ab??0)?1:(u.tempo||1);
+    let v=P.basis[s.typ]*(P.sockel+P.spanne*canyonKanal(u,P.mix[s.typ])/100)*K.form
+      *(s.weg?(P.wegFaktor[s.weg]||1):1)*(s.kaminStart?P.kaminFaktor:1)
+      *(1+P.planGewicht*(planT-0.93));
+    if(K.res<P.leerAb)v*=P.leerBoden+(1-P.leerBoden)*K.res/P.leerAb;
+    return Math.max(1,v);
+  }
+  function canyonMelde(typ,K,text,gross,m){
+    const e={t:rennT, typ, id:K.u.id, seite:K.u.seite, x:K.x, y:K.y, text, gross:gross||"", m:m?m.u.id:-1};
+    CANYON.ereignisse.push(e);
+    if(stumm)return;
+    // Verlauf (Ticker) fuer alles Spielrelevante, Einblender nur fuer die grossen Momente --
+    // gedrosselt, damit nicht zwei Einblender uebereinander liegen.
+    if(gross){
+      feedEreignis(K.u.seite,text,true);
+      if(rennT-CANYON.letzterCallout>1.2){ CANYON.letzterCallout=rennT; try{ callout(text,null,gross,K.u.seite); }catch(err){} }
+    } else feedRoutine(K.u.seite,text);
+  }
+  function canyonObenrum(K){
+    const {BAND}=CANYON_WELT;
+    K.pfad.splice(K.si+1,3,canyonSeg(720,BAND,738,296,"wand"),canyonSeg(738,296,808,296,"block"),
+      canyonSeg(808,296,828,BAND,"wand",{marke:"eng"}),canyonSeg(828,BAND,915,BAND,"band",{gabel:1}));
+    canyonVermessen(K); K.obenrum=true; CANYON.zaehler.obenrum++;
+  }
+  function canyonUmplanen(K,weg,grund){
+    // WEGWECHSEL (Chris 18.11., Antwort 3: "spieler koennen ingame adjusten und eine andere route
+    // waehlen"): an der Gabel die ganze Seilschaft (wer die Gabel noch nicht passiert hat), an der
+    // Rastnische des Kraftwegs der einzelne Kletterer. Kostet eine kurze Pause.
+    const alt=K.weg;
+    const betroffen=grund==="leer"?[K]:K.seil.m.map(u=>CANYON.K.get(u.id)).filter(k=>k===K||(k.ziel==null&&k.si<=canyonGabelIdx(k)));
+    for(const k of betroffen){
+      if(grund==="leer"){
+        // an der Nische: das Band laeuft zur Flanke weiter
+        k.pfad=k.pfad.slice(0,k.si).concat(canyonSchwanz("ausdauer"));
+        k.pfad[k.si]=canyonSeg(k.x,CANYON_WELT.BAND,1512,CANYON_WELT.BAND,"band");
+        k.d=0;
+      } else {
+        const gi=canyonGabelIdx(k);
+        k.pfad=k.pfad.slice(0,gi+1).concat(canyonSchwanz(weg));
+      }
+      canyonVermessen(k); k.weg=weg; k.gewechselt++;
+    }
+    if(grund!=="leer"){ K.seil.weg=weg; K.seil.umgeplant=true; }
+    K.pause=Math.max(K.pause,CANYON_P.wechselPause); K.zustand="umplan";
+    CANYON.zaehler.wechsel++;
+    canyonMelde("umplan",K,grund==="leer"
+      ? K.u.n+" ist leer gepumpt — nimmt statt des Dachs den "+CANYON_WEG_NAME[weg]
+      : "Seilschaft von "+K.u.n+" weicht aus: "+CANYON_WEG_NAME[weg]+" statt "+CANYON_WEG_NAME[alt]+" (Schlüsselstelle belegt)","WEG GEWECHSELT");
+  }
+
+  function stepClimbingCanyon(dt){
+    if(done)return;
+    rennT+=dt;
+    const P=CANYON_P, Z=CANYON, dtw=dt*P.tempo;
+    Z.t+=dtw;
+    const H=P.hilfe==="voll"?P.hilfeVoll:P.hilfeGedeckelt, hilfeAn=P.hilfe!=="aus";
+    const alle=LAEUFER.map(u=>Z.K.get(u.id));
+    let wj=0;
+    for(const K of alle){
+      const u=K.u;
+      if(K.ziel!=null)continue;
+      if(K.hilfeCd>0)K.hilfeCd-=dtw;
+      if(K.schiebt>0)K.schiebt-=dtw;
+      if(K.pause>0){
+        K.pause-=dtw;
+        if(K.zustand==="rast")K.res=Math.min(1,K.res+dtw*P.rastRate);
+        if(K.pause<=0){
+          if(K.zustand==="sturz")K.d=Math.max(0,K.d-P.sturzRueck);
+          if(K.nachRangel){ K.aussen=K.nachRangel; K.aussenFrei=true; K.vorstieg=false; K.nachRangel=null; }
+          K.zustand="los";
+        }
+        canyonOrt(K); continue;
+      }
+      let s=K.pfad[K.si], v=canyonTempo(K,s), zehr=P.zehr[s.typ];
+      if(K.schub>0){ K.schub-=dtw; v*=H.zugFaktor; zehr*=H.schubZehr; }
+      K.wartet=false;
+      // ---- SEILSCHAFT: hochziehen (Vorsteiger) und anschieben (Hintermann) ----
+      if(hilfeAn&&K.hilfeCd<=0&&Z.t>5)for(const pu of K.partner){
+        const p=Z.K.get(pu.id);
+        if(p.ziel!=null||p.pause>0||p.schub>0)continue;
+        const ps=p.pfad[p.si], dist=Math.hypot(K.x-p.x,K.y-p.y), vorn=canyonAnteil(K)>canyonAnteil(p);
+        const kletter=ps.typ==="wand"||ps.typ==="kamin"||ps.typ==="dach"||ps.typ==="lippe"||ps.typ==="leiter";
+        if(vorn&&dist>100&&K.zuege<H.zugMax&&kletter&&K.res>.22&&s.typ!=="dach"&&s.typ!=="lippe"&&s.typ!=="bruecke"){
+          K.pause=H.zugPause; K.zustand="zieht"; K.res=Math.max(.05,K.res-.05); p.schub=H.zugSchub; K.hilfeCd=H.zugCd;
+          K.zuege++; K.gegeben++; p.bekommen++; K.seil.hilfen++; Z.zaehler.zieht++;
+          canyonMelde("zieht",K,K.u.n+" zieht "+p.u.n+" am Seil hoch","ZIEHT HOCH!",p);
+          break;
+        }
+        if(!vorn&&dist<34&&ps.id===s.id&&ps.typ!=="grat"&&ps.typ!=="boden"&&canyonTempo(K,ps)>canyonTempo(p,ps)*1.07
+           &&K.res>.4&&!p.aussen&&!K.aussen){
+          K.res=Math.max(.05,K.res-.04); p.schub=H.schiebSchub; K.schiebt=1.3; K.hilfeCd=H.schiebCd;
+          K.gegeben++; p.bekommen++; K.seil.hilfen++; Z.zaehler.schiebt++;
+          canyonMelde("schiebt",K,K.u.n+" schiebt "+p.u.n+" an",K.seil.hilfen===1?"ANGESCHOBEN!":"",p);
+          break;
+        }
+      }
+      if(K.pause>0){ canyonOrt(K); continue; }
+      const istPartner=(o)=>K.partner.includes(o.u);
+      if(hilfeAn&&K.partner.some(pu=>{ const p=Z.K.get(pu.id); return p.ziel==null&&canyonAnteil(p)>canyonAnteil(K); }))zehr*=.85; // Nachstieg am Seil
+      // ---- Abstand auf geteilten Abschnitten; Ueberholen in den Buchten; sonst Rangeln ----
+      let vorn=null, luecke=1e9;
+      for(const o of alle){
+        if(o===K||o.ziel!=null||o.zustand==="rast"||o.aussen)continue;
+        if(o.pfad[o.si].id!==s.id)continue;
+        const g=canyonLage(o)-canyonLage(K);
+        if((g>0&&g<luecke)||(g===0&&o.u.id<K.u.id&&luecke>0)){ luecke=g; vorn=o; }
+      }
+      if(K.aussen){
+        const a=K.aussen;
+        if(s.typ!=="band"||a.ziel!=null||a.pfad[a.si].typ!=="band"||K.x>a.x+28||(!K.aussenFrei&&!canyonInBucht(K.x+6))){
+          K.aussen=null; K.aussenFrei=false; K.vorstieg=false;
+        } else { if(!K.vorstieg)zehr*=2.4; v*=1.04; }
+      }
+      if(s.typ==="grat"||s.typ==="boden")vorn=null;   // Tempo-Stellen ohne Stau (W5)
+      if(!K.aussen&&vorn&&luecke<P.folge){
+        const vv=vorn.pause>0?0:canyonTempo(vorn,vorn.pfad[vorn.si]);
+        const bucht=s.typ==="band"&&canyonInBucht(K.x)&&canyonInBucht(K.x+60);
+        const paar=Math.min(K.u.id,vorn.u.id)+"-"+Math.max(K.u.id,vorn.u.id);
+        const kosten=P.rangelPuste*(1+P.rangelEskal*K.rangelN);
+        if(istPartner(vorn)&&bucht&&K.res>vorn.res+.18&&vorn.pause<=0){
+          K.aussen=vorn; K.vorstieg=true; Z.zaehler.vorstieg++;
+          canyonMelde("vorstieg",K,K.u.n+" übernimmt den Vorstieg von "+vorn.u.n);
+        } else if(!istPartner(vorn)&&bucht&&((vorn.u.seite!==u.seite&&v>vv*1.10&&K.res>.34)||(vorn.pause>.6&&K.res>.25))){
+          K.aussen=vorn; K.vorstieg=false; Z.zaehler.aussen++;
+          canyonMelde("ueberholt",K,K.u.n+" hangelt außen an "+vorn.u.n+" vorbei",vorn.u.seite!==u.seite?"AUSSEN VORBEI!":"",vorn);
+        } else if(P.rangeln&&s.typ==="band"&&!bucht&&vorn.u.seite!==u.seite&&vorn.pause<=0&&!vorn.wartet&&v>vv*1.06
+                  &&Z.t>9&&(Z.duelle[paar]==null||Z.t-Z.duelle[paar]>P.rangelPaarCd)&&K.res>kosten+.1){
+          // RANGELN: Kraftzug (WUCHT) und Kopf (GLEICHGEWICHT) entscheiden, beide zahlen Puste,
+          // der Angreifer jedes weitere Mal mehr (Chris 18.11.: "geht mehrfach aber kostet ausdauer").
+          Z.duelle[paar]=Z.t; K.rangelN++; vorn.rangelN++; K.gegner=vorn; vorn.gegner=K;
+          const pc=.6*canyonSk(K.u,"WUCHT")+.4*canyonSk(K.u,"GLEICHGEWICHT")+rr()*P.rangelWuerfel;
+          const po=.6*canyonSk(vorn.u,"WUCHT")+.4*canyonSk(vorn.u,"GLEICHGEWICHT")+rr()*P.rangelWuerfel+P.rangelVorn;
+          K.res=Math.max(.05,K.res-kosten); vorn.res=Math.max(.05,vorn.res-P.rangelPuste);
+          if(pc>po){
+            vorn.pause=P.rangelVerlierer; vorn.zustand="rangelt"; vorn.res=Math.max(.05,vorn.res-.03);
+            K.pause=P.rangelGewinner; K.zustand="rangelt"; K.nachRangel=vorn; Z.zaehler.rangeln++;
+            canyonMelde("rangel",K,"Rangelei: "+K.u.n+" schiebt "+vorn.u.n+" beiseite","RANGELEI!",vorn);
+          } else {
+            K.pause=P.rangelVerlierer; K.zustand="rangelt"; K.res=Math.max(.05,K.res-.03);
+            vorn.pause=P.rangelGewinner; vorn.zustand="rangelt"; Z.zaehler.abgeblockt++;
+            canyonMelde("rangel",vorn,"Rangelei: "+vorn.u.n+" blockt "+K.u.n+" ab","ABGEBLOCKT!",K);
+          }
+          canyonOrt(K); continue;
+        } else if(s.typ==="band"&&K.warteLauf>P.warteDeckel&&K.res>.15&&(!istPartner(vorn)||vorn.wartet)){
+          K.aussen=vorn; K.aussenFrei=true; K.vorstieg=false; Z.zaehler.aussen++;
+          canyonMelde("ueberholt",K,K.u.n+" wartet nicht – außen an "+vorn.u.n+" vorbei");
+        } else { v=luecke<P.stopp?0:Math.min(v,vv); K.wartet=v===0; }
+      }
+      // ---- Rastnische: wer leer gepumpt ist, nimmt statt des Dachs das Band weiter (Wegwechsel) ----
+      // (so leer, dass selbst die laengste Rast nicht ueber die Lippe reicht: Rast bringt hoechstens
+      // 2,8 s x rastRate). Steht vor der Rast-Pruefung, damit er nicht erst rastet und dann wechselt.
+      if(s.nische&&K.weg==="kraft"&&K.res<P.wechselLeer&&!K.leerGewechselt&&K.x+v*dtw>=1170){
+        K.leerGewechselt=true; K.rasten[1]=true; canyonUmplanen(K,"ausdauer","leer"); canyonOrt(K); continue;
+      }
+      // ---- Rastpunkte am Band (W3: Rastende stehen neben der Linie) ----
+      if(s.typ==="band"&&!K.aussen)P.rast.forEach((R,r)=>{
+        const kraft=r===1&&K.weg==="kraft"&&R.kraftSchwelle!=null;
+        const sw=kraft?R.kraftSchwelle:R.schwelle;
+        if(K.x<R.x&&K.x+v*dtw>=R.x&&K.res<sw&&!K.rasten[r]&&K.pause<=0){
+          K.rasten[r]=true; Z.zaehler.rast++;
+          K.pause=Math.max(1.4,Math.min(2.8,((kraft?R.kraftAuf:R.auf)-K.res)/P.rastRate)); K.zustand="rast";
+          canyonMelde("rast",K,K.u.n+" schüttelt am Rastpunkt aus");
+        }
+      });
+      if(K.pause>0){ canyonOrt(K); continue; }
+      // ---- Fehlgriff an der Schluesselstelle der Einstiegswand ----
+      if(s.crux&&!K.cruxDurch&&K.d/s.len>=s.crux){
+        K.cruxDurch=true;
+        const pf=Math.max(.04,Math.min(.5,P.fehlgriffBasis-canyonSk(u,"TECHNIK")/210-K.res*.12));
+        if(rr()<pf){ K.pause=P.fehlgriffPause; K.zustand="fehlgriff"; K.res=Math.max(.05,K.res-.05); Z.zaehler.fehlgriff++;
+          canyonMelde("fehlgriff",K,"Fehlgriff – "+u.n+" verliert Zeit"); canyonOrt(K); continue; }
+      }
+      // ---- Dach: leer gepumpt = Sturz ins Seil (hoechstens einmal) ----
+      if(s.typ==="dach"&&K.res<.12&&K.d>20&&!K.gestuerzt){
+        K.gestuerzt=true; K.pause=P.sturzPause; K.zustand="sturz"; K.res+=.30; Z.zaehler.sturz++;
+        canyonMelde("sturz",K,u.n+" platzt am Dach – Sturz ins Seil","STURZ INS SEIL"); canyonOrt(K); continue;
+      }
+      const nd=K.d+v*dtw;
+      if(nd>=s.len){
+        let n=K.pfad[K.si+1];
+        if(!n){
+          K.ziel=rennT; K.d=s.len; canyonOrt(K); K.zustand="ziel"; K.splits.glocke=rennT; K.rang=++Z.fertig;
+          u.fertig=rennT; u.pos=1; u.hoch=1; rennFertig.push(u);
+          canyonMelde("ziel",K,"GLOCKE! "+u.n+" toppt als "+K.rang+".",K.rang===1?"GLOCKE!":"");
+          if(!stumm)try{ sfx("climbing","topout"); }catch(err){}
+          if(K.seil.m.every(m=>Z.K.get(m.id).ziel!=null)){
+            K.seil.ziel=rennT; K.seil.rang=++Z.seilFertig;
+            canyonMelde("seil",K,"Seilschaft oben: "+K.seil.m.map(m=>m.n).join(" + "),K.seil.m.length>1?"SEILSCHAFT OBEN!":"");
+          }
+          continue;
+        }
+        let frei=true;
+        if(n.eng&&!s.eng){
+          let schlange=0;
+          for(const o of alle){ if(o===K||o.ziel!=null)continue;
+            if(o.pfad[o.si].eng)frei=false; else if(o.wartet&&o.pfad[o.si].bx===720)schlange++; }
+          if(!frei){
+            K.engWarte+=dtw;
+            if((K.engWarte>P.engDeckel||schlange>=1)&&K.res>.15){
+              canyonObenrum(K); canyonMelde("obenrum",K,u.n+" weicht obenrum aus – kein Warten an der Engstelle");
+              n=K.pfad[K.si+1]; frei=true;
+            }
+          }
+        }
+        if(frei&&n.id!==s.id&&!n.eng){
+          for(const o of alle){ if(o===K||o.ziel!=null)continue; const so=o.pfad[o.si]; if(so.id!==n.id)continue;
+            if(n.typ==="band"){ if(Math.abs(o.x-n.ax)<P.eintrittBand&&!o.aussen)frei=false; }
+            else if(n.typ!=="grat"&&o.d<P.eintritt)frei=false; }
+        }
+        if(frei&&s.gabel){
+          // W4: ist die Schluesselstelle des eigenen Wegs belegt und steht dort jemand, wechselt
+          // die Seilschaft auf den Ausdauerweg (einmal je Seilschaft).
+          if(K.weg!=="ausdauer"&&!K.seil.umgeplant){
+            let voll=0, steht=0;
+            for(const o of alle){ if(o.seil===K.seil||o.weg!==K.weg||o.ziel!=null)continue;
+              const so=o.pfad[o.si]; if(!so.schluessel)continue; voll++; if(o.pause>0||o.wartet)steht++; }
+            if(voll>=1&&steht>=1){ canyonUmplanen(K,"ausdauer","belegt"); n=K.pfad[K.si+1]; }
+          }
+          if(!K.splits.gabel){ K.splits.gabel=rennT; canyonMelde("weg",K,u.n+" nimmt den "+CANYON_WEG_NAME[K.weg]); }
+        }
+        if(frei&&n.probe&&!K["p_"+n.probe]){
+          if(n.probe==="lippe"){
+            const pl=Math.max(.04,Math.min(.62,P.lippeBasis-canyonSk(u,"WUCHT")/150+(.42-K.res)*.7-K.versuche*.3));
+            if(rr()<pl){
+              K.versuche++; K.pause=P.lippePause; K.zustand="rutsch"; K.res=Math.max(.08,K.res-.05)+.12; Z.zaehler.rutsch++;
+              canyonMelde("rutsch",K,u.n+" rutscht an der Lippe ab – hängt im Seil","ABGERUTSCHT!");
+              K.d=s.len; canyonOrt(K); continue;
+            }
+            K.p_lippe=true; canyonMelde("lippe",K,u.n+" zieht über die Lippe","ÜBER DIE LIPPE!");
+          }
+          if(n.probe==="bruecke"){
+            K.p_bruecke=true;
+            const pb=Math.max(.05,Math.min(.5,P.brueckeBasis-canyonSk(u,"GLEICHGEWICHT")/140));
+            if(rr()<pb){ K.wackel=true; Z.zaehler.wanken++; canyonMelde("wackel",K,u.n+" wankt auf der Seilbrücke"); }
+          }
+        }
+        if(!frei){ K.d=s.len-.01; K.wartet=true; }
+        else { if(s.marke)K.splits[s.marke]=rennT; K.si++; K.d=Math.min(nd-s.len,n.len*.5); s=n;
+          if(n.typ==="dach"&&Z.ersterDach==null)Z.ersterDach=rennT; }
+      } else K.d=nd;
+      if(K.wackel&&s.typ==="bruecke"&&K.d>s.len*.45){ K.wackel=false; K.pause=P.brueckePause; K.zustand="wackel"; }
+      const aus=canyonKanal(u,P.ausdauerMix);
+      const planZehr=Math.pow((canyonAnteil(K)>=(u.ab??0)?1:(u.tempo||1))/0.93,2);
+      K.res=Math.max(.05,K.res-zehr*Math.max(.3,1.5-aus/100)*planZehr*dtw*(K.wartet?.25:1));
+      if(!K.wartet)K.schritt+=v*dtw;
+      if(K.wartet){ wj++; K.warteLauf+=dtw; K.warteSumme+=dtw; if(K.warteLauf>Z.laengste)Z.laengste=K.warteLauf;
+        const ort=s.typ+"@"+Math.round(s.bx); Z.warteOrt[ort]=(Z.warteOrt[ort]||0)+dtw; }
+      else K.warteLauf=0;
+      canyonOrt(K);
+    }
+    // Laeufer-Felder, die jede Bahn traegt (Rangliste, HUD, Wertung)
+    for(const K of alle){
+      const u=K.u;
+      if(K.ziel==null){ u.pos=canyonAnteil(K); u.hoch=Math.max(u.hoch||0,u.pos); }
+      u.reserve=K.res*u.reserveMax; u.leer=K.res<P.leerAb;
+    }
+    Z.warteJetzt=wj; if(wj>Z.warteMax){ Z.warteMax=wj; Z.warteMaxT=rennT; Z.warteMaxOrte=alle.filter(K=>K.wartet).map(K=>{ const q=K.pfad[K.si]; return q.typ+"@"+Math.round(q.bx); }); } if(wj>=3)Z.warteDreiSek+=dt; if(wj>=4)Z.warteVierSek+=dt;
+    if(rennFertig.length>=LAEUFER.length||rennT>P.deckelSek){
+      for(const K of alle)if(K.ziel==null){
+        // Sicherheitsdeckel: aus dem Fortschritt hochgerechnete Zielzeit (wie im Standard nach #1617)
+        const u=K.u, p=Math.max(0.05,canyonAnteil(K));
+        u.fertig=rennT/p; K.ziel=u.fertig; K.hochgerechnet=true; rennFertig.push(u);
+      }
+      done=true;
+      canyonLetzteMessung=canyonMesswerte();
+    }
+  }
+  function canyonMesswerte(){
+    const Z=CANYON; if(!Z)return null;
+    const laeufer=LAEUFER.map(u=>{ const K=Z.K.get(u.id);
+      return {n:u.n, id:u.id, seite:u.seite, eig:u.eig, weg:K.weg, wegStart:K.wegStart, eigen:K.eigen, seilNr:K.seil.nr,
+        seilGroesse:K.seil.m.length, zeit:u.fertig, warte:+K.warteSumme.toFixed(3), gegeben:K.gegeben, bekommen:K.bekommen,
+        rangeln:K.rangelN, gewechselt:K.gewechselt, obenrum:K.obenrum, hochgerechnet:!!K.hochgerechnet,
+        splits:{...K.splits}}; });
+    return {zeit:rennT, weltZeit:Z.t, warteMax:Z.warteMax, warteMaxT:Z.warteMaxT??null, warteMaxOrte:Z.warteMaxOrte||[], warteDreiSek:Z.warteDreiSek, warteVierSek:Z.warteVierSek, laengste:Z.laengste,
+      zaehler:{...Z.zaehler}, warteOrt:{...Z.warteOrt}, ereignisse:Z.ereignisse.length,
+      erste:(()=>{ const o={dach:Z.ersterDach??null, ende:rennT}; for(const e of Z.ereignisse)if(o[e.typ]==null)o[e.typ]=e.t; return o; })(), seilschaften:Z.S.map(S=>({seite:S.seite,nr:S.nr,weg:S.weg,
+      groesse:S.m.length,ziel:S.ziel,hilfen:S.hilfen,umgeplant:S.umgeplant})), laeufer};
+  }
+
   function stepSpurt(dt){
     if(done)return;
+    if(bahnCanyonAktiv){ stepClimbingCanyon(dt); return; }
     if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
     if(bahnHyroxAktiv){ stepSpurtHyrox(dt); return; }
     rennT+=dt;
@@ -56495,6 +57020,359 @@
     c.restore();
     return true;
   }
+  // =====================================================================================
+  // CLIMBING-CANYON: ZEICHNEN (reine Anzeige, Bau 18.11.). Portiert aus dem freigegebenen Mockup
+  // public/mockups/climbing-neu-18-11.html (Ebenen E0-E7, Posen aus Ruck/Neigung/Versatz, Seil,
+  // Schlagschatten, Marken). Liest nur CANYON/LAEUFER und schreibt nichts, was die Wertung liest;
+  // Kamera, Teilchen und Glockenschwung liegen in `canyonAnzeige` (modulweit, nur Anzeige).
+  // KEINE NEUEN ANIMATIONEN: verwendet werden nur north/south/east(west gespiegelt), walk-north,
+  // walk-east und treffer-north der vorhandenen PixelLab-Figuren (Chris 18.11., Antwort 4).
+  // =====================================================================================
+  const CANYON_BILD_NAMEN=["wand_canyon","panorama_canyon","glocke","seilbruecke","strickleiter","griffe","rastplatz","felsnase"];
+  const canyonBild={};
+  let canyonBilderGeladen=false;
+  function canyonBilderLaden(){
+    if(canyonBilderGeladen||typeof Image==="undefined")return;
+    canyonBilderGeladen=true;
+    let basis="/sprites/kulissen/climbing-canyon/";
+    try{ basis=new URL("../sprites/kulissen/climbing-canyon/",ENGINE_BILD_BASIS).href; }catch(e){}
+    for(const n of CANYON_BILD_NAMEN){ const im=new Image(); im.src=basis+n+".png"; canyonBild[n]=im; }
+  }
+  const canyonDa=(n)=>{ const im=canyonBild[n]; return !!im&&im.complete&&im.naturalWidth>0; };
+  const CANYON_WEG_FARBE={kraft:"#ff6a55", technik:"#5fa8ff", ausdauer:"#7ddc7a"};
+  const CANYON_WEG_KUERZEL={kraft:"K", technik:"T", ausdauer:"A"};
+  const CANYON_GRIFF_ZELLE={0:[0,0],1:[1,0],2:[3,0],3:[3,1],5:[2,1],6:[2,0],7:[1,1]};
+  const CANYON_GRIFFE=(()=>{
+    const g=[]; let a=4711;
+    const r=()=>{ a=(Math.imul(a,1664525)+1013904223)>>>0; return a/4294967296; };
+    const linie=(ax,ay,bx,by,f,n)=>{ for(let i=0;i<n;i++){ const q=(i+.5)/n; g.push({x:ax+(bx-ax)*q+(r()-.5)*16,y:ay+(by-ay)*q+(r()-.5)*10,f}); } };
+    for(let l=0;l<11;l++)linie(405+l*30,575,405+l*30,366,[0,2,3,5,6,7,0,3,2,5,6][l],8);
+    linie(722,344,738,300,7,2); linie(742,292,804,292,7,4);
+    linie(1180,340,1180,236,0,4); linie(1170,224,1020,204,0,7); linie(1006,196,1000,150,0,2); linie(1004,140,1040,88,0,3);
+    linie(915,196,888,60,1,5); linie(1512,340,1516,190,3,6);
+    return g;
+  })();
+  const CANYON_ROUTEN=[
+    {weg:"kraft",p:[[915,352],[1180,352],[1180,228],[1014,206],[998,150],[1040,84],[1075,60],[1200,46],[1328,14]]},
+    {weg:"technik",p:[[342,588],[346,352],[720,352]]},
+    {weg:"technik",p:[[915,352],[911,205],[915,104],[886,52],[1062,58],[1075,60]]},
+    {weg:"ausdauer",p:[[915,352],[1512,352],[1516,186],[1512,64],[1420,34],[1348,14]]}];
+  let canyonAnzeige=null;   // {kam, teilchen, glocke, gelesen, wackelBis, letzteUz, fuer}
+  function canyonAnzeigeFuer(){
+    if(!canyonAnzeige||canyonAnzeige.fuer!==CANYON)
+      canyonAnzeige={fuer:CANYON, kam:{x:560,y:430,z:1.0}, teilchen:[], glocke:{schwung:0,t:0}, gelesen:0, wackelBis:-1, letzteUz:null, wellen:[]};
+    return canyonAnzeige;
+  }
+  function canyonRuck(d,weite,halt){
+    const n=Math.floor(d/weite); let f=d/weite-n;
+    f=f<halt?0:(f-halt)/(1-halt); f=f*f*(3-2*f);
+    return {n, v:(n+f)*weite-d, f};
+  }
+  // Wo und wie eine Figur gezeichnet wird -- die Basisposition ist IMMER der gebuchte Ort (K.x, K.y);
+  // Ruck, Versatz, Neigung und Pendeln sind Anzeige um diesen Punkt (gezeigt = gebucht).
+  function canyonSicht(K,uz){
+    const s=K.pfad[Math.min(K.si,K.pfad.length-1)], ux=s.len?(s.bx-s.ax)/s.len:0, uy=s.len?(s.by-s.ay)/s.len:-1;
+    const o={x:K.x,y:K.y,rot:0,bild:"north",fr:-1,spiegel:false,hang:false,dy:0,hy:K.y-24,marke:null,mf:null};
+    const id=K.u.id, w=Math.sin(uz*9+id);
+    if(K.zustand==="ziel"){
+      const k=(K.rang||1)-1, G=CANYON_WELT.GIPFEL;
+      o.x=G.x-44-(k%8)*24+(k>=8?290:0); o.y=k>=8?26+(k-8)*3:22+(k%8)*6.2; o.bild="south";
+      o.dy=-Math.abs(Math.sin(uz*6+id))*5; o.hy=o.y-24; return o;
+    }
+    if(K.zustand==="rutsch"||K.zustand==="sturz"){
+      const lang=K.zustand==="sturz"?CANYON_P.sturzPause:CANYON_P.lippePause;
+      const fall=Math.max(0,Math.min(1,(lang-K.pause)/Math.max(.1,lang)*1.6));
+      o.bild="treffer-north"; o.fr=Math.min(8,Math.floor(fall*10)); o.y+=22+Math.min(26,fall*90)+Math.sin(uz*5)*3;
+      o.x+=Math.sin(uz*3+id)*6; o.rot=Math.sin(uz*3+id)*.25; o.hy=o.y-22; return o;
+    }
+    if(K.zustand==="rangelt"){
+      const gx=K.gegner?(K.gegner.x>K.x?1:-1):1, st=Math.sin(uz*17+id);
+      o.bild=st>0?"walk-north":"treffer-north"; o.fr=Math.floor(uz*12)%8; o.x+=gx*(5+st*5); o.rot=gx*(.16+st*.12);
+      o.dy=-Math.abs(st)*3; o.hy=o.y-24; o.marke="RANGELT"; o.mf="#ff6058"; return o;
+    }
+    if(K.zustand==="zieht"){ const zz=Math.sin(uz*11); o.bild="north"; o.dy=zz*2.5; o.rot=zz*.07; o.marke="ZIEHT"; o.mf="#ffe08a"; return o; }
+    if(K.zustand==="fehlgriff"){ o.bild="treffer-north"; o.fr=Math.floor((uz*10)%8); o.y+=6; o.x+=w*1.5; o.rot=w*.08; o.hy=o.y-24; return o; }
+    if(K.zustand==="rast"){ o.bild="north"; o.dy=Math.sin(uz*3+id)*1.2; o.rot=Math.sin(uz*7+id)*.05; o.marke="RAST"; o.mf="#62d394"; return o; }
+    if(K.zustand==="umplan"){ o.bild="east"; o.spiegel=Math.sin(uz*4+id)>0; o.marke="WEG?"; o.mf="#f0c35a"; return o; }
+    let r;
+    switch(s.typ){
+      case "boden": case "grat":
+        o.bild="walk-east"; o.fr=Math.floor(K.schritt/4); o.spiegel=ux<0; o.dy=-2;
+        o.rot=Math.atan2(uy,Math.abs(ux))*(ux<0?-1:1)*.5; break;
+      case "bruecke": {
+        o.bild="walk-east"; o.fr=Math.floor(K.schritt/5); const q=K.d/s.len;
+        o.y+=Math.sin(q*Math.PI)*11-6; o.dy=Math.sin(uz*8+id)*1.5;
+        o.rot=K.zustand==="wackel"?Math.sin(uz*14)*.22:Math.sin(uz*5+id)*.05;
+        if(K.zustand==="wackel"){ o.x+=Math.sin(uz*14)*3; o.marke="WANKT"; o.mf="#ff9f43"; }
+        break; }
+      case "wand": case "leiter":
+        r=canyonRuck(K.d,13,.42); o.x+=ux*r.v+((r.n%2)?3.5:-3.5)*(1-r.f*.5); o.y+=uy*r.v;
+        o.rot=((r.n%2)?1:-1)*(.10-.06*r.f); o.bild="walk-north"; o.fr=r.n*4+Math.floor(r.f*3); o.griff=r.f>0&&r.f<.35; break;
+      case "kamin":
+        r=canyonRuck(K.d,11,.38); o.y+=uy*r.v; o.x+=ux*r.v+((r.n%2)?6:-6); o.bild="east"; o.spiegel=!!(r.n%2); o.rot=((r.n%2)?-1:1)*.20; break;
+      case "band":
+        r=canyonRuck(K.d,12,.3); o.x+=ux*r.v; o.rot=.06+.05*Math.sin(r.f*Math.PI); o.dy=-Math.sin(r.f*Math.PI)*2; o.bild="walk-north"; o.fr=r.n*2;
+        if(K.aussen){ o.y+=22; o.hang=true; o.rot=Math.sin(uz*6+id)*.22; o.griff=r.f>0&&r.f<.3; o.hy=o.y-40; return o; }
+        if(K.wartet){ o.bild="north"; o.rot=0; if(K.warteLauf>.5){ o.marke="WARTET"; o.mf="#9aa7ba"; } }
+        break;
+      case "block":
+        r=canyonRuck(K.d,11,.4); o.x+=ux*r.v; o.y+=uy*r.v; o.rot=Math.atan2(uy,ux)*.45+((r.n%2)?.07:-.07); o.bild="walk-north"; o.fr=r.n*4; break;
+      case "dach":
+        r=canyonRuck(K.d,15,.45); o.x+=ux*r.v; o.y+=uy*r.v+40; o.hang=true;
+        o.rot=.32*Math.sin(uz*4.2+id)+(r.f>0?-.25*(1-r.f):0); o.bild="north"; o.griff=r.f>0&&r.f<.3; o.hy=o.y-40; return o;
+      case "lippe": {
+        r=canyonRuck(K.d,10,.5); const ges=Math.max(0,Math.min(1,((s.lip0||0)+K.d)/Math.max(1,s.lipG||s.len)));
+        o.x+=ux*r.v-10*(1-ges); o.y+=uy*r.v+34*(1-ges); o.rot=-.75*(1-ges)+w*.04*(K.res<.3?2:1);
+        o.bild="walk-north"; o.fr=r.n*4; o.griff=r.f>0&&r.f<.3; o.hy=o.y-30; return o; }
+    }
+    if(!o.marke&&K.schiebt>0){ o.marke="SCHIEBT"; o.mf="#ffe08a"; }
+    else if(!o.marke&&K.schub>0){ o.marke="▲ HILFE"; o.mf="#ffe08a"; }
+    o.hy=o.y-24+o.dy; return o;
+  }
+  // Pose einer PixelLab-Figur als {e, n}: Bild-Eintrag und Bildzahl. Nur vorhandene Posen.
+  function canyonPoseBild(z,bild){
+    const fig=z.fig;
+    if(bild.indexOf("-")>0){
+      const [art,dir]=bild.split("-"); const def=fig.a&&fig.a[art]&&fig.a[art][dir];
+      if(def){ const e=z.bilder.get(def[0]+"-"+dir+".png"); if(e&&e.im&&e.mass)return {e,n:def[1]}; }
+      bild=dir;
+    }
+    const e=z.bilder.get(bild+".png")||z.bilder.get("south.png");
+    return (e&&e.im&&e.mass)?{e,n:1}:null;
+  }
+  let canyonSchattenLw=null;
+  function canyonFigur(K,p,A,uz){
+    const u=K.u, z=pixelFigurBereit(u.n), HOCH=46;
+    ctx.save();
+    ctx.translate(p.x,p.y+p.dy);
+    if(p.hang){ ctx.translate(0,-40); ctx.rotate(p.rot); ctx.translate(0,40); } else ctx.rotate(p.rot);
+    if(p.spiegel)ctx.scale(-1,1);
+    const pb=z?canyonPoseBild(z,p.bild):null;
+    if(pb){
+      const grund=pixelGrundBild(z), m=pb.e.mass, s=HOCH/Math.max(1,(grund&&grund.mass?grund.mass.hoehe:m.hoehe));
+      const f=pb.n>1?(((p.fr<0?0:p.fr)%pb.n)+pb.n)%pb.n:0;
+      // Schlagschatten der eigenen Pose auf der Wand (Figur haengt VOR der Wand, Mockup 2.2)
+      try{
+        if(!canyonSchattenLw){ canyonSchattenLw=document.createElement("canvas"); canyonSchattenLw.width=160; canyonSchattenLw.height=160; }
+        const sl=canyonSchattenLw, sx=sl.getContext("2d");
+        sx.clearRect(0,0,160,160); sx.globalCompositeOperation="source-over"; sx.imageSmoothingEnabled=false;
+        sx.drawImage(pb.e.im,f*m.fw,0,m.fw,m.fh,0,0,m.fw,m.fh);
+        sx.globalCompositeOperation="source-in"; sx.fillStyle="#1a0a12"; sx.fillRect(0,0,160,160);
+        ctx.globalAlpha=.34; ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(sl,0,0,m.fw,m.fh,-m.mitteX*s+(p.spiegel?-5:5),-m.unten*s+7,m.fw*s,m.fh*s);
+        ctx.globalAlpha=1;
+      }catch(e){ ctx.globalAlpha=1; }
+      ctx.imageSmoothingEnabled=false;
+      try{ ctx.drawImage(pb.e.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(e){}
+    } else {
+      // Spieler ohne PixelLab-Satz: dieselbe Rueckfallfigur wie auf jeder Bahn
+      try{ ctx.scale(.78,.78); zeichneSprite(ctx,{n:u.n,id:u.id,vx:0,vy:-4,side:u.seite,hp:1,max:1},0,-22); }catch(e){}
+    }
+    ctx.restore();
+    // Kreide beim Greifen, Steinchen beim Abrutschen (nur Anzeige)
+    if(p.griff&&Math.random()<.4)A.teilchen.push({x:p.x+(Math.random()-.5)*14,y:p.y-(p.hang?44:38),vx:(Math.random()-.5)*10,vy:6+Math.random()*10,g:20,t:0,l:.7,r:2.2,a:.75,f:"255,250,240",wachs:1});
+    if((K.zustand==="rutsch"||K.zustand==="sturz"||K.zustand==="fehlgriff")&&Math.random()<.4)
+      A.teilchen.push({x:p.x+(Math.random()-.5)*16,y:p.y-30,vx:(Math.random()-.5)*26,vy:20+Math.random()*30,g:160,t:0,l:.9,r:2.4,a:.95,f:"120,60,30"});
+    // Marke ueber dem Kopf: Teamfarbe, Puste-Bogen, Weg-Buchstabe, Zustand
+    const mx=p.x, my=p.hang?p.y+16:p.y+p.dy-58;
+    ctx.fillStyle="rgba(9,12,18,.86)"; ctx.beginPath(); ctx.arc(mx,my,7.2,0,7); ctx.fill();
+    ctx.strokeStyle=K.res<.3?"#ff6058":bahnSeitenFarbe(u.seite); ctx.lineWidth=2.2;
+    ctx.beginPath(); ctx.arc(mx,my,6.1,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(1,K.res))); ctx.stroke();
+    ctx.fillStyle=CANYON_WEG_FARBE[K.weg]; setzeFont(ctx,"800 8px 'Barlow Condensed',sans-serif");
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(CANYON_WEG_KUERZEL[K.weg],mx,my+.6);
+    if(A.kam.z>0.95||p.marke){
+      const name=u.n.length>11?u.n.slice(0,10)+"…":u.n;
+      setzeFont(ctx,"700 7.5px 'Barlow Condensed',sans-serif");
+      const txt=p.marke?p.marke+" · "+name:name, mw=ctx.measureText(txt).width+8, ly=p.hang?my+11:my-14;
+      ctx.fillStyle="rgba(9,12,18,.82)"; ctx.fillRect(mx-mw/2,ly-5.5,mw,10);
+      ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fillRect(mx-mw/2,ly-5.5,2,10);
+      ctx.fillStyle=p.marke?p.mf:"#f4e6c4"; ctx.fillText(txt,mx+1,ly);
+    }
+    if(K.schiebt>0&&K.partner.length){
+      const pk=CANYON.K.get(K.partner[0].id), hx=pk&&pk.x>K.x?1:-1;
+      ctx.fillStyle="#ffe08a";
+      for(let q=0;q<2;q++){ const ox=mx+hx*(12+q*7+((uz*20)%7)); ctx.beginPath(); ctx.moveTo(ox,my+26); ctx.lineTo(ox-hx*5,my+22); ctx.lineTo(ox-hx*5,my+30); ctx.fill(); }
+    }
+  }
+  function canyonKamZiel(A){
+    const {B}=CANYON_WELT, totaleZ=W/B;
+    const E=CANYON.ereignisse;
+    for(let i=E.length-1;i>=0&&rennT-E[i].t<1.6;i--)if(E[i].gross&&E[i].typ!=="ziel"&&E[i].typ!=="seil")return {x:E[i].x,y:E[i].y-14,z:1.3};
+    const offen=LAEUFER.map(u=>CANYON.K.get(u.id)).filter(K=>K&&K.ziel==null).sort((a,b)=>canyonAnteil(b)-canyonAnteil(a)).slice(0,4);
+    if(!offen.length)return {x:1250,y:60,z:1.2};
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const K of offen){ x0=Math.min(x0,K.x); x1=Math.max(x1,K.x); y0=Math.min(y0,K.y); y1=Math.max(y1,K.y); }
+    const zz=Math.max(totaleZ,Math.min(1.25,Math.min(W/(x1-x0+380),H/(y1-y0+190))));
+    return {x:(x0+x1)/2,y:(y0+y1)/2-26,z:zz};
+  }
+  function zeichneCanyon(){
+    if(!CANYON){ zeichneSpurt(); return; }
+    canyonBilderLaden();
+    const A=canyonAnzeigeFuer(), {B,H:WH,BAND,BODEN,GIPFEL}=CANYON_WELT;
+    const uz=rennT*zeitFaktor();
+    const dt=A.letzteUz==null?0:Math.max(0,Math.min(.1,uz-A.letzteUz)); A.letzteUz=uz;
+    // Kamera (Regie: folgt den vorderen vier, haelt grosse Momente kurz)
+    const roh=A.letzteUzRoh==null?1e9:uz-A.letzteUzRoh; A.letzteUzRoh=uz;
+    const ziel=canyonKamZiel(A), k=roh>1.5||roh<0?1:(roh>0?1-Math.exp(-roh*2.4):(rennT<=0?1:0));
+    A.kam.x+=(ziel.x-A.kam.x)*k; A.kam.y+=(ziel.y-A.kam.y)*k; A.kam.z+=(ziel.z-A.kam.z)*k;
+    const hw=W/2/A.kam.z, hh=H/2/A.kam.z;
+    A.kam.x=Math.max(hw,Math.min(B-hw,A.kam.x)); A.kam.y=Math.max(-250+hh,Math.min(780-hh,A.kam.y));
+    // neue Ereignisse: Glocke, Kamerawackler beim Rangeln, Staub
+    while(A.gelesen<CANYON.ereignisse.length){
+      const e=CANYON.ereignisse[A.gelesen++];
+      if(e.typ==="rangel"){ A.wackelBis=uz+0.45; for(let i=0;i<12;i++)A.teilchen.push({x:e.x+(Math.random()-.5)*20,y:e.y-6,vx:(Math.random()-.5)*50,vy:-10-Math.random()*20,g:60,t:0,l:.8,r:3,a:.6,f:"190,140,90",wachs:1}); }
+      if(e.typ==="ziel"){ A.glocke.schwung=1; A.glocke.t=uz; A.wellen.push({r:8,a:.9}); }
+    }
+    const z=A.kam.z;
+    ctx.save();
+    ctx.imageSmoothingEnabled=false;
+    // E0 Himmel
+    const hg=ctx.createLinearGradient(0,0,0,H);
+    hg.addColorStop(0,"#3f6fb4"); hg.addColorStop(.45,"#8fb4d9"); hg.addColorStop(.75,"#f1c9a0"); hg.addColorStop(1,"#e7a274");
+    ctx.fillStyle=hg; ctx.fillRect(0,0,W,H);
+    // E1 Fernpanorama, Parallax 0,08
+    if(canyonDa("panorama_canyon")){
+      ctx.imageSmoothingEnabled=true; const pz=3.4+(z-.78)*.2, pw=400*pz, ph=224*pz;
+      ctx.drawImage(canyonBild.panorama_canyon,W/2-pw/2-(A.kam.x-792)*.08*z,H*.46-ph/2-(A.kam.y-290)*.06*z,pw,ph);
+      ctx.imageSmoothingEnabled=false;
+    }
+    // E2 Dunst
+    const dg=ctx.createLinearGradient(0,H*.35,0,H); dg.addColorStop(0,"rgba(255,214,170,0)"); dg.addColorStop(1,"rgba(255,206,160,.55)");
+    ctx.fillStyle=dg; ctx.fillRect(0,0,W,H);
+    // E3 zweite Felsreihe: dieselbe Wand gespiegelt und violett getoent, Parallax 0,45
+    if(canyonDa("wand_canyon")){
+      if(!A.fern){ try{ const c=document.createElement("canvas"); c.width=792; c.height=300; const x=c.getContext("2d");
+        x.drawImage(canyonBild.wand_canyon,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="rgba(116,92,150,.72)"; x.fillRect(0,0,792,300); A.fern=c; }catch(e){ A.fern=null; } }
+      if(A.fern){ const fz=z*.78, fx=W/2-(A.kam.x-792)*.45*z, fy=H/2+(-84-A.kam.y)*z;
+        ctx.save(); ctx.translate(fx,fy); ctx.scale(-1,1); ctx.imageSmoothingEnabled=true; ctx.globalAlpha=.92;
+        ctx.drawImage(A.fern,-B*fz/2,0,B*fz,WH*fz); ctx.restore(); ctx.globalAlpha=1; ctx.imageSmoothingEnabled=false; }
+    }
+    // Welt
+    const wk=uz<A.wackelBis?4:0;
+    ctx.save();
+    ctx.translate(W/2-A.kam.x*z+Math.sin(uz*61)*wk,H/2-A.kam.y*z+Math.cos(uz*53)*wk); ctx.scale(z,z);
+    const bg=ctx.createLinearGradient(0,596,0,780); bg.addColorStop(0,"#b8672f"); bg.addColorStop(.25,"#8f4a24"); bg.addColorStop(1,"#3d1c14");
+    ctx.fillStyle=bg; ctx.fillRect(-300,596,B+600,260);
+    if(canyonDa("wand_canyon"))ctx.drawImage(canyonBild.wand_canyon,0,0,B,WH);
+    else { ctx.fillStyle="#a8643a"; ctx.fillRect(0,40,B,WH-40); }
+    const sg=ctx.createLinearGradient(0,205,0,345); sg.addColorStop(0,"rgba(20,6,22,.34)"); sg.addColorStop(1,"rgba(20,6,22,0)");
+    ctx.fillStyle=sg; ctx.fillRect(1016,205,470,140);
+    if(canyonDa("griffe"))for(const h of CANYON_GRIFFE){ const c=CANYON_GRIFF_ZELLE[h.f]||[0,0]; ctx.drawImage(canyonBild.griffe,c[0]*32+4,c[1]*32+2,24,28,h.x-5,h.y-6,10,12); }
+    if(canyonDa("strickleiter"))ctx.drawImage(canyonBild.strickleiter,1496,62,35,124);
+    if(canyonDa("rastplatz"))ctx.drawImage(canyonBild.rastplatz,438,322,56,40);
+    if(aDa("climbing_kreidebeutel"))ctx.drawImage(aBild.climbing_kreidebeutel,1196,326,16,21);
+    if(aDa("climbing_matte"))for(let m=0;m<11;m++)ctx.drawImage(aBild.climbing_matte,380+m*36,584,40,22);
+    if(aDa("climbing_seilsack")){ ctx.drawImage(aBild.climbing_seilsack,306,570,32,28); ctx.drawImage(aBild.climbing_seilsack,736,572,32,28); }
+    // Routen dezent (die drei Wege in ihrer Farbe), Ueberholbuchten gold
+    ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.setLineDash([2,8]); ctx.globalAlpha=.55;
+    for(const r of CANYON_ROUTEN){ ctx.strokeStyle=CANYON_WEG_FARBE[r.weg]; ctx.beginPath(); r.p.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]-12):ctx.moveTo(q[0],q[1]-12)); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+    for(const b of CANYON_P.buchten){ ctx.fillStyle="rgba(240,195,90,.22)"; ctx.fillRect(b[0],BAND+4,b[1]-b[0],5); }
+    const alle=LAEUFER.map(u=>CANYON.K.get(u.id)).filter(Boolean);
+    const sichten=new Map(alle.map(K=>[K,canyonSicht(K,uz)]));
+    // Seile: vom Wandfuss ueber jeden passierten Punkt bis zur Huefte (zeichnet nebenbei den Weg nach)
+    ctx.lineWidth=1.3; ctx.lineJoin="round";
+    for(const K of alle){
+      const p=sichten.get(K);
+      ctx.strokeStyle=K.u.seite===0?"rgba(250,180,90,.34)":(K.u.seite===1?"rgba(110,200,225,.34)":"rgba(200,200,200,.3)");
+      ctx.beginPath(); ctx.moveTo(K.sx,BODEN+2); let lx=K.sx, ly=BODEN;
+      for(let i=0;i<Math.min(K.si,K.pfad.length);i++){ const s=K.pfad[i];
+        if(s.typ==="boden"){ ctx.moveTo(s.bx,s.by); lx=s.bx; ly=s.by; continue; }
+        ctx.quadraticCurveTo((lx+s.bx)/2,(ly+s.by)/2+Math.min(7,Math.abs(s.bx-lx)*.04),s.bx,s.by-10); lx=s.bx; ly=s.by-10; }
+      ctx.quadraticCurveTo((lx+p.x)/2,(ly+p.hy)/2+5,p.x,p.hy); ctx.stroke();
+    }
+    // Seilschaft: Seil zwischen benachbarten Partnern, straff und hell, wenn gezogen/geschoben wird
+    for(const S of CANYON.S)for(let i=0;i+1<S.m.length;i++){
+      const a=CANYON.K.get(S.m[i].id), b=CANYON.K.get(S.m[i+1].id);
+      if(!a||!b||(a.ziel!=null&&b.ziel!=null))continue;
+      const pa=sichten.get(a), pb=sichten.get(b), hilft=a.zustand==="zieht"||b.zustand==="zieht"||a.schub>0||b.schub>0;
+      const dd=Math.hypot(pa.x-pb.x,pa.hy-pb.hy), hang=hilft?1:Math.max(2,26-dd*.2);
+      ctx.strokeStyle="rgba(12,8,14,.55)"; ctx.lineWidth=hilft?4:3.2;
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.hy); ctx.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy); ctx.stroke();
+      ctx.strokeStyle=hilft?"#ffe08a":bahnSeitenFarbe(S.seite); ctx.lineWidth=hilft?2.4:1.8; ctx.setLineDash(hilft?[]:[5,2]);
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.hy); ctx.quadraticCurveTo((pa.x+pb.x)/2,(pa.hy+pb.hy)/2+hang,pb.x,pb.hy); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if(canyonDa("seilbruecke"))ctx.drawImage(canyonBild.seilbruecke,882,34,184,32);
+    // Glocke
+    A.glocke.schwung*=Math.exp(-dt*1.6);
+    ctx.save(); ctx.translate(GIPFEL.x,GIPFEL.y-64); ctx.fillStyle="#3b2216"; ctx.fillRect(-2,6,4,62);
+    ctx.rotate(Math.sin((uz-A.glocke.t)*13)*A.glocke.schwung*.5);
+    if(canyonDa("glocke"))ctx.drawImage(canyonBild.glocke,-23,-6,46,50); else { ctx.fillStyle="#d8a640"; ctx.beginPath(); ctx.arc(0,18,14,Math.PI,0); ctx.fill(); }
+    ctx.restore();
+    A.wellen=A.wellen.filter(w=>{ w.r+=dt*70; w.a-=dt*.9; if(w.a<=0)return false;
+      ctx.strokeStyle="rgba(255,225,130,"+w.a+")"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(GIPFEL.x,GIPFEL.y-40,w.r,0,7); ctx.stroke(); return true; });
+    // Figuren (von oben nach unten, damit Untere vorne stehen)
+    for(const K of [...alle].sort((a,b)=>sichten.get(a).y-sichten.get(b).y))canyonFigur(K,sichten.get(K),A,uz);
+    A.teilchen=A.teilchen.filter(q=>{ q.t+=dt; if(q.t>q.l)return false; q.x+=q.vx*dt; q.y+=q.vy*dt; q.vy+=q.g*dt;
+      const al=(1-q.t/q.l)*q.a, r=q.r*(q.wachs?1+q.t*2.4:1); ctx.fillStyle="rgba("+q.f+","+al.toFixed(2)+")";
+      ctx.fillRect(Math.round(q.x-r/2),Math.round(q.y-r/2),Math.ceil(r),Math.ceil(r)); return true; });
+    ctx.restore();
+    // E5 Vordergrund-Felsnase (Parallax 1,35), E6 Licht, Vignette
+    if(canyonDa("felsnase")){
+      if(!A.vorn){ try{ const im=canyonBild.felsnase, c=document.createElement("canvas"); c.width=im.naturalWidth; c.height=im.naturalHeight; const x=c.getContext("2d");
+        x.drawImage(im,0,0); x.globalCompositeOperation="source-atop"; x.fillStyle="rgba(24,12,22,.66)"; x.fillRect(0,0,c.width,c.height); A.vorn=c; }catch(e){ A.vorn=null; } }
+      if(A.vorn){ ctx.imageSmoothingEnabled=true; const vz=z*1.25, pp=1.35;
+        ctx.drawImage(A.vorn,W/2+(150-A.kam.x)*z*pp,H/2+(646-A.kam.y)*z*pp-203*vz,172*vz,203*vz);
+        ctx.save(); ctx.translate(W/2+(1432-A.kam.x)*z*pp,H/2+(668-A.kam.y)*z*pp-203*vz); ctx.scale(-1,1); ctx.drawImage(A.vorn,0,0,172*vz,203*vz); ctx.restore();
+        ctx.imageSmoothingEnabled=false; }
+    }
+    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.translate(-(A.kam.x-792)*.2,0);
+    for(const s of [[-80,200,.10],[170,120,.07],[420,160,.06]]){
+      const lg=ctx.createLinearGradient(s[0],0,s[0]+600,H); lg.addColorStop(0,"rgba(255,226,170,"+s[2]*1.6+")"); lg.addColorStop(1,"rgba(255,200,140,0)");
+      ctx.fillStyle=lg; ctx.beginPath(); ctx.moveTo(s[0],-20); ctx.lineTo(s[0]+s[1],-20); ctx.lineTo(s[0]+s[1]+650,H+20); ctx.lineTo(s[0]+400,H+20); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    const vg=ctx.createRadialGradient(W/2,H*.48,H*.42,W/2,H*.5,H*1.1); vg.addColorStop(0,"rgba(30,10,20,0)"); vg.addColorStop(1,"rgba(22,8,18,.55)");
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+    zeichneCanyonHud(A,alle,sichten);
+    ctx.restore();
+  }
+  // HUD im Bild (Stil HUD-System 17.11.: dunkle Glasflaechen, Barlow-Zahlen, Teamfarbe als Bedeutung):
+  // Kopf mit "Seilschaften oben" und Wartezaehler, Weg-Legende links, Routen-Inset rechts unten.
+  function zeichneCanyonHud(A,alle,sichten){
+    const ob=Math.max(8,hudBandUnten()+6);
+    ctx.save(); ctx.textBaseline="middle";
+    // Weg-Legende
+    const lx=10, ly=ob;
+    ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(lx,ly,142,74);
+    setzeFont(ctx,"700 9px 'Barlow Condensed',sans-serif"); ctx.textAlign="left";
+    [["kraft","Kraftweg · Dach + Lippe"],["technik","Technikweg · Kamin + Brücke"],["ausdauer","Ausdauerweg · Flanke + Leiter"]].forEach(([w,t],i)=>{
+      ctx.fillStyle=CANYON_WEG_FARBE[w]; ctx.fillRect(lx+7,ly+8+i*13,10,4); ctx.fillStyle="#f4e6c4"; ctx.fillText(t,lx+22,ly+10+i*13); });
+    ctx.fillStyle="#9fb3c8"; setzeFont(ctx,"600 8px 'Barlow Condensed',sans-serif");
+    ctx.fillText("Tempo-Stellen: Anlauf, Band, Blöcke, Grat",lx+7,ly+52);
+    ctx.fillText("Kletter-Stellen: Ausdauer + Wegprofil",lx+7,ly+63);
+    // Kopf: Seilschaften oben je Team, Wartezaehler
+    const seiten=[...new Set(CANYON.S.map(S=>S.seite))].sort((a,b)=>a-b);
+    const txt=seiten.map(s=>CANYON.S.filter(S=>S.seite===s&&S.ziel!=null).length+"/"+CANYON.S.filter(S=>S.seite===s).length);
+    const kw=150+seiten.length*34, kx=W/2-kw/2;
+    ctx.fillStyle="rgba(9,12,18,.8)"; ctx.fillRect(kx,ob,kw,22);
+    setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle="#9fb3c8"; ctx.textAlign="left";
+    ctx.fillText("SEILSCHAFTEN OBEN",kx+8,ob+11);
+    setzeFont(ctx,"800 13px 'Barlow Condensed',sans-serif");
+    txt.forEach((t,i)=>{ ctx.fillStyle=bahnSeitenFarbe(seiten[i]); ctx.fillText(t,kx+96+i*34,ob+11.5); });
+    const lang=alle.reduce((m,K)=>Math.max(m,K.wartet?K.warteLauf:0),0);
+    setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle=CANYON.warteJetzt>=3?"#ff9f43":"#9fb3c8"; ctx.textAlign="right";
+    ctx.fillText("WARTEN "+CANYON.warteJetzt+(lang>0?" · "+(lang/CANYON_P.tempo*zeitFaktor()).toFixed(1)+" s":""),kx+kw-8,ob+11);
+    // Routen-Inset
+    const iw=180, ih=iw*CANYON_WELT.H/CANYON_WELT.B, ix=W-iw-10, iy=H-ih-12, is=iw/CANYON_WELT.B;
+    ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(ix-4,iy-4,iw+8,ih+8);
+    ctx.imageSmoothingEnabled=true;
+    if(canyonDa("wand_canyon"))ctx.drawImage(canyonBild.wand_canyon,ix,iy,iw,ih);
+    ctx.fillStyle="rgba(9,12,18,.3)"; ctx.fillRect(ix,iy,iw,ih);
+    ctx.lineWidth=1.4;
+    for(const r of CANYON_ROUTEN){ ctx.strokeStyle=CANYON_WEG_FARBE[r.weg]; ctx.beginPath(); r.p.forEach((q,i)=>i?ctx.lineTo(ix+q[0]*is,iy+q[1]*is-1):ctx.moveTo(ix+q[0]*is,iy+q[1]*is-1)); ctx.stroke(); }
+    for(const K of alle){ const p=sichten.get(K); ctx.fillStyle="#0b0e14"; ctx.fillRect(ix+p.x*is-3,iy+p.y*is-5,6,6); ctx.fillStyle=bahnSeitenFarbe(K.u.seite); ctx.fillRect(ix+p.x*is-2,iy+p.y*is-4,4,4); }
+    const hw=W/2/A.kam.z*is, hh=H/2/A.kam.z*is;
+    ctx.strokeStyle="rgba(244,230,196,.95)"; ctx.lineWidth=1; ctx.strokeRect(ix+A.kam.x*is-hw,Math.max(iy,iy+A.kam.y*is-hh),hw*2,Math.min(ih,hh*2));
+    ctx.restore();
+  }
+  // Bildschirmort einer Figur fuer Schwebetexte/Einblender (laeuferXY im Canyon-Format)
+  function canyonSchirmXY(u){
+    const K=CANYON&&CANYON.K.get(u.id), A=canyonAnzeige&&canyonAnzeige.fuer===CANYON?canyonAnzeige:null;
+    if(!K||!A)return {x:W/2,y:H/2};
+    return {x:(K.x-A.kam.x)*A.kam.z+W/2, y:(K.y-24-A.kam.y)*A.kam.z+H/2};
+  }
+
   function zeichneSpurt(){
     zeichneBoden();
     // DIE HATZ (s. BAHN_FLAGS/stepSpurtHatz): nur die zusaetzliche Bedrohungs-Zeichnung,
@@ -57728,7 +58606,7 @@
     // die Chassis-Zeichnung ohne laufende grosse Feier unveraendert direkt auf, s. dort.
     if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspielMitKamera);return;} // KAMERA-MODUL (ohne kamera-Block: Totale)
     if(istBuehne(disc)){mitTeamFeierWackeln(zeichneBuehne);return;}
-    if(istBahn(disc)){mitTeamFeierWackeln(zeichneSpurt);return;}
+    if(istBahn(disc)){mitTeamFeierWackeln(bahnCanyonAktiv?zeichneCanyon:zeichneSpurt);return;}
     zeichneBoden();
     if(KP)zeichneKontrollpunkt();
     if(disc==="tdm"){
@@ -58783,7 +59661,10 @@
   // WEG C PARALLEL (Stufe 3): die Schicht laeuft 1:1 (Simulationssekunde = Zuschausekunde, 150 s
   // Schicht = 2:30 Sendezeit). Die Dehnung 4 gilt den Hantel-Versuchen und wuerde die Schicht auf
   // 10 Minuten strecken. Ohne Szene (jedes andere Flag) unveraendert.
-  const zeitFaktor=()=>(SANDSACK_PAR_SZENE&&istBuehne(disc))?1:(ZEIT_DEHNUNG[disc]||1);
+  // CLIMBING-CANYON (Bau 18.11.): eigene Zeitdehnung, weil das Format in Welt-Sekunden rechnet (s.
+  // CANYON_P.tempo) -- reine Anzeige, die Wertung liest zeitFaktor() nicht.
+  const CANYON_ZEIT_DEHNUNG=1.6;
+  const zeitFaktor=()=>(SANDSACK_PAR_SZENE&&istBuehne(disc))?1:((bahnCanyonAktiv&&disc==="climbing")?CANYON_ZEIT_DEHNUNG:(ZEIT_DEHNUNG[disc]||1));
 
   // SCHWEBETEXTE FORTSCHREIBEN — ausgelagert (A0.2), damit der Sonden-Modus (s.
   // window.__arena.sondenLauf() weiter unten) dieselbe Formel je TICK anwenden kann statt
@@ -67431,7 +68312,7 @@
       hyroxCamStationIdx, hyroxCamNaechsterSchnitt, hyroxCamGruppe,
       // HALLENRUNDE (Stufe 2, Design-Dokument 7.9): `hyroxCamZiel` und `HYROX_WEG`
       // mitnehmen -- dieselbe Begruendung wie bei den Hyrox-Feldern direkt darueber.
-      hyroxCamZiel, HYROX_WEG};
+      hyroxCamZiel, HYROX_WEG, bahnCanyonAktiv, CANYON};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
@@ -67440,6 +68321,7 @@
     hyroxCamStationIdx=a.hyroxCamStationIdx??-1; hyroxCamNaechsterSchnitt=a.hyroxCamNaechsterSchnitt??0;
     hyroxCamGruppe=a.hyroxCamGruppe??null;
     hyroxCamZiel=a.hyroxCamZiel??null; HYROX_WEG=a.HYROX_WEG??HYROX_WEG;
+    bahnCanyonAktiv=!!a.bahnCanyonAktiv; CANYON=a.CANYON??null;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -69295,12 +70177,43 @@
     // Hatz" fuer den naechsten bauSpurt()-Aufruf an dieser Seite ein, {spurtFormat:"klassisch"}
     // (oder weglassen) ist der unveraenderte Standard. Unbekannte Werte werden ignoriert.
     // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
+    // CLIMBING-CANYON (Bau 18.11.): Kalibrierwerte lesen/setzen (nur Messung, wie hatzGewichte) und
+    // die Messwerte des zuletzt beendeten Canyon-Rennens. {zuruecksetzen:true} stellt die Vorgabe her.
+    canyonParameter:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        if(neu.zuruecksetzen)CANYON_P=JSON.parse(JSON.stringify(CANYON_P_STANDARD));
+        const tief=(z,q)=>{ for(const k in q){ if(k==="zuruecksetzen")continue;
+          if(q[k]&&typeof q[k]==="object"&&!Array.isArray(q[k])&&z[k]&&typeof z[k]==="object")tief(z[k],q[k]); else z[k]=q[k]; } };
+        tief(CANYON_P,neu);
+      }
+      return JSON.parse(JSON.stringify(CANYON_P));
+    },
+    canyonMessung:()=>canyonLetzteMessung?JSON.parse(JSON.stringify(canyonLetzteMessung)):null,
+    canyonZeitDehnung:()=>CANYON_ZEIT_DEHNUNG,
+    // Zeitpunkte (Sim-s) der ersten Ereignisse je Art im gebuchten Lauf dieser Saat -- fuer Screenshots.
+    canyonEreignisZeiten:(saat)=>{
+      const M=MOTOREN.climbing, g=M.sichern(); M.vorher(); M.bau(saat||1337);
+      stumm=true; let guard=0;
+      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; } } finally { stumm=false; }
+      const m=bahnCanyonAktiv&&canyonLetzteMessung?canyonLetzteMessung.erste:null;
+      M.zurueck(g); return m;
+    },
+    // Was gezeichnet wird: je Kletterer der gebuchte Ort (Welt), die Sicht-Basis und der Fortschritt.
+    canyonFigurenProbe:()=>{
+      if(!bahnCanyonAktiv||!CANYON)return null;
+      return {rennT, laeufer:LAEUFER.map(u=>{ const K=CANYON.K.get(u.id), p=canyonSicht(K,0);
+        return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, x:K.x, y:K.y, zustand:K.zustand, weg:K.weg,
+          figurAngemeldet:Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,u.n), sichtX:p.x, sichtY:p.y}; })};
+    },
     bahnFlags:(neu)=>{
       if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"||neu.spurtFormat==="hyrox"))
         { BAHN_FLAGS.spurtFormat=neu.spurtFormat; BAHN_FLAGS.spurtFormatExplizit=true; }
       // HALLENRUNDE/BAHN-ANSICHT (Design-Dokument 7.1): nur fuer Vorher-/Nachher-Screenshots.
       if(neu&&typeof neu==="object"&&(neu.hyroxAnsicht==="bahn"||neu.hyroxAnsicht==="halle"))
         BAHN_FLAGS.hyroxAnsicht=neu.hyroxAnsicht;
+      // CLIMBING-FORMAT (Canyon-Bau 18.11.): {climbingFormat:"canyon"|"standard"}.
+      if(neu&&typeof neu==="object"&&(neu.climbingFormat==="standard"||neu.climbingFormat==="canyon"))
+        BAHN_FLAGS.climbingFormat=neu.climbingFormat;
       // KONTAKT (Schritt 0): {kontakt:{spurt:{...}|null}} -> BAHN_ART[d].kontakt, s. kontaktFlags.
       if(neu&&typeof neu==="object"&&neu.kontakt&&typeof neu.kontakt==="object")kontaktFlagsSetzen(neu.kontakt,BAHN_ART);
       return {...BAHN_FLAGS};
@@ -71753,6 +72666,9 @@
             // Brett-/Haltungskennzahlen der Nachtkonzept-Mechaniken (s. buehneDiagVon()). Ohne
             // die Option fehlt das Feld, die Rueckgabe bleibt byte-identisch.
             ...(o.buehneDiag&&istBuehne(dId)?{buehne:buehneDiagVon(dId,o.haltungEV||0)}:{}),
+            // CLIMBING-CANYON (Bau 18.11.): Wartezeiten, Wege, Hilfen je Rennen -- nur mit
+            // \`o.canyonDiag\`; ohne die Option fehlt das Feld (Rueckgabe byte-identisch).
+            ...(o.canyonDiag&&bahnCanyonAktiv&&canyonLetzteMessung?{canyon:JSON.parse(JSON.stringify(canyonLetzteMessung))}:{}),
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
               wert:Math.round((w[u.n]||0)*100)/100,

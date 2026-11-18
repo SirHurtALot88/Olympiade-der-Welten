@@ -74,6 +74,10 @@ const DISZIPLINEN = ["tdm", "mini-dm", "battlefield", "basketball", "football", 
 const SAATEN = [1, 7, 42];
 const KULISSEN_EFFEKT = process.argv.slice(2).find((a) => a.startsWith("--kulissen-effekt="))?.split("=")[1] ?? null;
 const KONTAKT_FLAG = process.argv.slice(2).includes("--kontakt-flag");
+// --node (Climbing-Canyon-Bau 18.11.): derselbe Abgleich ueber den Node-Motor (lib/battle/arena-node-motor.mjs,
+// scripts/lib/node-arena-seite.mjs) statt Chromium -- ohne Browser und ohne Aufnahme-Sperre; der Node-Motor
+// trifft die Chromium-Pruefsumme (s. docs/design/arena-start-ende-figuren-18-11.md).
+const NODE = process.argv.slice(2).includes("--node");
 const KONTAKT_AUS = process.argv.slice(2).includes("--kontakt-aus");
 const KONTAKT_ZWANG = process.argv.slice(2).find((a) => a.startsWith("--kontakt-zwang="))?.split("=")[1] ?? null;
 if (KONTAKT_ZWANG !== null && !["draufgaenger", "opportunist", "duellant", "schleicher", "beschuetzer", "bollwerk"].includes(KONTAKT_ZWANG)) {
@@ -94,12 +98,19 @@ const sicher = (x) => { const auf = new WeakSet(); return JSON.stringify(x, (k, 
   if (w && typeof w === "object") { if (auf.has(w)) return "[verweis]"; auf.add(w); }
   return w; }); };
 const h = (x) => createHash("sha256").update(sicher(x)).digest("hex").slice(0, 12);
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = NODE ? null : await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+let nodeSeite = null;
 try {
-  const seite = await browser.newPage();
-  await seite.addInitScript(() => { window.AudioContext = undefined; });
-  await seite.goto(SEITE);
-  await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
+  let seite;
+  if (NODE) {
+    const { oeffneNodeSeite } = await import("./lib/node-arena-seite.mjs");
+    seite = nodeSeite = await oeffneNodeSeite(path.join(WURZEL, "public", "mockups"));
+  } else {
+    seite = await browser.newPage();
+    await seite.addInitScript(() => { window.AudioContext = undefined; });
+    await seite.goto(SEITE);
+    await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
+  }
   const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG }) => {
     const A = window.__arena;
     if (KULISSEN_EFFEKT) A.kulissePin(KULISSEN_EFFEKT);
@@ -126,12 +137,27 @@ try {
       zwang: A.kontaktPersZwang(),
       zaehler: ["spurt", "takeshis-castle"].map((d) => { A.spiele(d, 7); return [d, A.kontaktZaehler()]; }),
     } : null;
-    return { aus, kontakt };
+    // CLIMBING-FORMAT "CANYON" (Bau 18.11., docs/design/climbing-canyon-bau-18-11.md): eigene Eintraege
+    // NACH allen anderen und AUSSERHALB von GESAMT -- GESAMT bleibt der Abgleich des Standards (Schalter aus)
+    // und damit vergleichbar mit allen frueheren Staenden; die Canyon-Zeilen haben ihre eigene Summe.
+    const canyon = [];
+    if (A.canyonParameter) for (const s of SAATEN) {
+      try {
+        A.bahnFlags({ climbingFormat: "canyon" });
+        canyon.push([`spiele climbing/canyon ${s}`, A.spiele("climbing", s)]);
+      } catch (e) { canyon.push([`spiele climbing/canyon ${s}`, "FEHLER " + String(e)]); }
+      finally { A.bahnFlags({ climbingFormat: "standard" }); }
+    }
+    return { aus, kontakt, canyon };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
+  for (const [name, wert] of ergebnis.canyon || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.canyon?.length) console.log(`CANYON ${h(ergebnis.canyon)} (${ergebnis.canyon.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
   if (ergebnis.kontakt) console.log("KONTAKT " + JSON.stringify(ergebnis.kontakt));
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
+  if (nodeSeite) nodeSeite.schliessen();
 }
+if (NODE) process.exit(0);
