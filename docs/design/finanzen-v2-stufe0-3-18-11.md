@@ -44,7 +44,7 @@ Vertrauen = `seasonState.boardConfidence[team].value` (1 bis 10, vorhandenes Boa
 
 ## 4. A/B-Messung
 
-Methode: zwei Anlagen (Saaten `new-game-1794999053691-yyec6b`, `new-game-1794999386737-3dhmr5`), je 32 KI-Teams, Anlage-SQLite kopiert, dann **gleiche Basis, nur die Schalter verschieden** (paarweise). „vorher“ = alle drei Schalter 0. Saison 1 wurde bis zum Draft an beiden Saaten gemessen; Saison 1 komplett plus Kaufphase Saison 2 an der ersten Saat (siehe 4.3).
+Methode: zwei Anlagen (Saaten `new-game-1794999053691-yyec6b`, `new-game-1794999386737-3dhmr5`), je 32 KI-Teams, Anlage-SQLite kopiert, dann **gleiche Basis, nur die Schalter verschieden** (paarweise). „vorher“ = alle drei Schalter 0. Saison 1 bis zum Draft an beiden Saaten, Saison 1 komplett plus Kaufphase Saison 2 an der ersten Saat (4.3).
 
 ### 4.1 Saison 1 nach dem Draft (Stufen 1 und 2; Stufe 3 gibt in S1 100 % frei)
 
@@ -102,7 +102,23 @@ Stand nach Chris' Zwei-Budget-Entscheid (18.11.): **Draft-Ruecklage in Saison 1 
 
 ### 4.3 Saison 2, Kaufphase
 
-SAISON2_PLATZHALTER
+Voller Lauf (eine Saat, paarweise, aktueller Stand mit halber S1-Ruecklage und Zwei-Toepfe-Freigabe): Saison 1 komplett gespielt, danach die Kaufphase der KI in Saison 2. In Saison 2 gilt die Ruecklage voll und der Vorstand die Vertrauensquote (Stufen zu Beginn: 20 hoch, 11 mittel, 1 niedrig, 0 Sparauflage).
+
+| Kennzahl (32 KI-Teams) | vorher | nachher |
+|---|---:|---:|
+| Σ GuV Liga Saison 1 | -124 C | +63 C |
+| Teams mit negativer Kasse nach der S1-Abrechnung | 13 | 6 |
+| Sponsor / Gehalt (Median, Abrechnung) | 0,90 | 0,95 |
+| Cash nach S2-Kaufphase (Median) | 43,4 | 51,8 |
+| Cash nach S2-Kaufphase, FW unter 3 / 3 bis 7 / ab 7 | 38,3 / 46,5 / 34,8 | 41,8 / 52,4 / 51,8 |
+| Kader nach S2-Kaufphase (Median) | 9 | 9 |
+| Teams unter dem Minimum 8 nach der Kaufphase | 5 | 3 |
+| **Kaderstaerke S2, Median** | 44,60 | 44,71 (**+0,2 %**) |
+| **Kaderstaerke S2, unterstes Viertel** | 38,64 | 38,70 (+0,2 %) |
+| Kaderstaerke S1 nach Draft (Median / P25) | 48,28 | 47,96 (**-0,7 %** / -3,2 %) |
+
+Lesart: In Saison 2 ist die Kaderstaerke **nicht schwaecher** (Median +0,2 %), die Kasse liegt hoeher, weniger Teams im Minus und weniger unter dem Minimum. Dass nach der Kaufphase noch Kader unter 8 stehen, ist in beiden Varianten so: das Auffuellen der Kader geschieht erst spaeter in der Vorbereitung (die Messung endet vor dem Auffuellen). Die Vorstand-Sperre hat dabei in Saison 2 kaum gegriffen, weil 20 von 32 Teams „hoch“ (100 %) stehen; eine Saison-2-Wirkung der Stufen mittel/niedrig ist an einer Saat nicht belastbar auszuweisen. Kein Abbruchkriterium ausgeloest.
+
 
 ## 5. Tests
 
