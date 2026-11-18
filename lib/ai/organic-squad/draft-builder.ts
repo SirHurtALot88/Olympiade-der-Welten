@@ -320,6 +320,54 @@ function cheapestSalarySum(pool: OrganicPlayerView[], count: number): number {
     .reduce((sum, p) => sum + Math.max(0, p.salary), 0);
 }
 
+/** Preis und Gehalt eines Pool-Spielers, aufsteigend nach Preis sortiert: Grundlage der Gehalts-Seite der Platz-Reserve. */
+type PreisGehalt = { preis: number; gehalt: number };
+
+/**
+ * Review S3 (Fenster auf Opt, 18.11.): die GEHALTS-Seite von `platzReserve` — dieselben Plaetze (jeder T-te Spieler ab Platzpreis,
+ * fehlen welche, die billigsten darunter), nur ihr Jahresgehalt statt ihrer Ablose. `paare` aufsteigend nach Preis.
+ */
+function platzReserveGehalt(paare: readonly PreisGehalt[], count: number, wettbewerb = 1): number {
+  if (count <= 0) return 0;
+  const schritt = Number.isFinite(wettbewerb) ? Math.max(1, Math.floor(wettbewerb)) : 1;
+  let sum = 0;
+  let n = 0;
+  let index = 0;
+  for (const paar of paare) {
+    if (paar.preis < KADERPLAN_PLATZ_MIN_MW) continue;
+    index += 1;
+    if (index % schritt !== 0) continue;
+    sum += paar.gehalt;
+    n += 1;
+    if (n >= count) return sum;
+  }
+  for (const paar of paare) {
+    if (paar.preis >= KADERPLAN_PLATZ_MIN_MW) break;
+    if (n >= count) break;
+    sum += paar.gehalt;
+    n += 1;
+  }
+  return sum;
+}
+
+/** Review S3: die GEHALTS-Seite von `billigeReserve` (dieselben Plaetze, ihr Jahresgehalt). `paare` aufsteigend nach Preis. */
+function billigeReserveGehalt(paare: readonly PreisGehalt[], count: number, wettbewerb = 1): number {
+  if (count <= 0) return 0;
+  const schritt = Number.isFinite(wettbewerb) ? Math.max(1, Math.floor(wettbewerb)) : 1;
+  let sum = 0;
+  let n = 0;
+  for (let i = schritt - 1; i < paare.length && n < count; i += schritt) {
+    sum += paare[i]!.gehalt;
+    n += 1;
+  }
+  for (let i = paare.length - 1; i >= 0 && n < count; i -= 1) {
+    if ((i + 1) % schritt === 0) continue;
+    sum += paare[i]!.gehalt;
+    n += 1;
+  }
+  return sum;
+}
+
 /**
  * EINZELSCHRITT DES GREEDY-LOOPS (Draft-Neubau, 18.11.).
  *
@@ -448,6 +496,11 @@ export type KaderplanRahmen = {
   plaetze: number;
   /** Reservierter Betrag fuer die restlichen Plaetze. */
   reserve: number;
+  /**
+   * Review S3: reserviertes JAHRESGEHALT fuer dieselben Plaetze. Gilt gegen die Gehaltsgrenze (`kaufGrenze().salary`, sonst
+   * `salaryCap`); ohne Gehaltsgrenze (Saison 1) wird es berechnet, aber nirgends geprueft.
+   */
+  reserveGehalt: number;
   /** Fueller (< Platzpreis-Untergrenze) gesperrt, weil der Rahmen alle Plaetze bis Opt zum Platzpreis traegt. */
   fuellerSperre: boolean;
 };
@@ -464,51 +517,72 @@ export function kaderplanRahmen(input: OrganicSquadPlanInput, step: OrganicPlanS
   const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
   const minFillFloor = Math.max(0, input.economy.minFillFloor ?? 0);
   const feeCap = input.economy.feeCap;
-  const { squad, pool, cash, spentFee } = step;
+  const salaryCap = input.economy.salaryCap;
+  const { squad, pool, cash, spentFee, spentSalary } = step;
+  // Kaderpflicht-Freigabe (#1618): dieselbe laufende Grenze wie der Kaufschritt und die Sperre (`kaufRahmen().grenzeFuer`).
+  const grenze = input.economy.kaufGrenze ? input.economy.kaufGrenze(squad.length, spentFee, spentSalary) : null;
   const belowMin = squad.length < rosterMin;
   const belowOpt = squad.length < optTarget;
   const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
   const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
   const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
+  const reserveSalaryForMin = cheapestSalarySum(pool, remainingToMinAfterBuy);
   const sortiertePreise = input.economy.platzPreise ?? pool.map(price).sort((left, right) => left - right);
-  let billigster = Infinity;
-  for (const candidate of pool) billigster = Math.min(billigster, price(candidate));
-  if (!Number.isFinite(billigster)) billigster = 0;
+  let billigster: OrganicPlayerView | null = null;
+  for (const candidate of pool) if (billigster == null || price(candidate) < price(billigster)) billigster = candidate;
+  const billigsterPreis = billigster ? price(billigster) : 0;
   const voll = Math.max(0, optTarget - (squad.length + 1));
-  const aktuellePreise = pool.map(price).sort((left, right) => left - right);
+  const aktuellePaare: PreisGehalt[] = pool
+    .map((candidate) => ({ preis: price(candidate), gehalt: Math.max(0, candidate.salary) }))
+    .sort((left, right) => left.preis - right.preis);
+  const aktuellePreise = aktuellePaare.map((paar) => paar.preis);
   // Billigster Spieler ab Platzpreis, der JETZT im Pool liegt (nicht die nackte 12): im Einzelschritt sind die 12,0er spaet
   // laengst vergeben, und eine Rechnung gegen einen Preis, den es nicht mehr gibt, verspricht etwas Unmoegliches.
-  const billigsterPlatz = aktuellePreise.find((wert) => wert >= KADERPLAN_PLATZ_MIN_MW) ?? Infinity;
+  const platzPaar = aktuellePaare.find((paar) => paar.preis >= KADERPLAN_PLATZ_MIN_MW) ?? null;
+  const billigsterPlatz = platzPaar?.preis ?? Infinity;
+  const wettbewerb = input.economy.platzWettbewerb;
   // Reserve fuer `m` weitere Plaetze, davon `n` zum Platzpreis und `m - n` zum Preis der billigsten Spieler im aktuellen Pool.
   const reserveFuer = (n: number, m: number) =>
+    Math.max(reserveForMin, platzReserve(sortiertePreise, n, wettbewerb) + billigeReserve(aktuellePreise, m - n, wettbewerb));
+  // Review S3: dieselben Plaetze auf der Gehaltsseite (Jahresgehalt), gegen die Gehaltsgrenze.
+  const gehaltFuer = (n: number, m: number) =>
     Math.max(
-      reserveForMin,
-      platzReserve(sortiertePreise, n, input.economy.platzWettbewerb) +
-        billigeReserve(aktuellePreise, m - n, input.economy.platzWettbewerb),
+      reserveSalaryForMin,
+      platzReserveGehalt(aktuellePaare, n, wettbewerb) + billigeReserveGehalt(aktuellePaare, m - n, wettbewerb),
     );
-  const traegt = (n: number, m: number, kauf: number) => {
+  const gehaltGrenze = grenze ? grenze.salary : salaryCap != null ? salaryCap - spentSalary : Infinity;
+  const traegt = (n: number, m: number, kauf: number, kaufGehalt: number) => {
     const reserve = reserveFuer(n, m);
-    return cash - kauf - reserve >= affordFloor && (feeCap == null || spentFee + kauf + reserve <= feeCap + 1e-9);
+    if (cash - kauf - reserve < affordFloor) return false;
+    if (grenze) {
+      if (kauf + reserve > grenze.fee + 1e-9) return false;
+    } else if (feeCap != null && spentFee + kauf + reserve > feeCap + 1e-9) return false;
+    // Ohne Gehaltsgrenze (Saison 1: kein Gehaltstopf) bleibt die Rechnung wie vor dem S3-Fix.
+    if (Number.isFinite(gehaltGrenze) && kaufGehalt + gehaltFuer(n, m) > gehaltGrenze + 1e-9) return false;
+    return true;
   };
   // (1) Wie viele weitere Plaetze traegt der Rahmen ueberhaupt (dieser Kauf zum billigsten Preis, die uebrigen billigst)? Review S1:
   // frueher blieben hier immer ALLE `voll` Plaetze reserviert; trug die Kasse sie nicht, bestand kein Kandidat, und ueber dem
   // Minimum endete das Team mit `nothing_affordable` KLEINER als ohne Kaderplan. Jetzt schrittweise bis zum groessten tragbaren m
   // (m = 0 ist genau die Schranke ohne Kaderplan).
+  const billigsterGehalt = billigster ? Math.max(0, billigster.salary) : 0;
   let plaetzeGesamt = voll;
-  while (plaetzeGesamt > 0 && !traegt(0, plaetzeGesamt, billigster)) plaetzeGesamt -= 1;
+  while (plaetzeGesamt > 0 && !traegt(0, plaetzeGesamt, billigsterPreis, billigsterGehalt)) plaetzeGesamt -= 1;
   // (2) Davon zum Platzpreis: gerechnet mit dem aktuellen Kauf ZUM PLATZPREIS (Review S2: mit dem absolut billigsten, oft einem
   // Fueller, war die Zaehlung um bis zu 1 zu hoch, die Fueller-Sperre fiel spaeter, und ein Fueller kam unter Opt).
-  const kaufZumPlatzpreis = Number.isFinite(billigsterPlatz) && traegt(0, plaetzeGesamt, billigsterPlatz);
+  const platzGehalt = platzPaar?.gehalt ?? 0;
+  const kaufZumPlatzpreis = Number.isFinite(billigsterPlatz) && traegt(0, plaetzeGesamt, billigsterPlatz, platzGehalt);
   let rest = 0;
   if (kaufZumPlatzpreis) {
     rest = plaetzeGesamt;
-    while (rest > 0 && !traegt(rest, plaetzeGesamt, billigsterPlatz)) rest -= 1;
+    while (rest > 0 && !traegt(rest, plaetzeGesamt, billigsterPlatz, platzGehalt)) rest -= 1;
   }
   const reserve = reserveFuer(rest, plaetzeGesamt);
+  const reserveGehalt = gehaltFuer(rest, plaetzeGesamt);
   // Traegt der Rahmen ALLE geplanten Plaetze zum Platzpreis, gibt es keinen Grund fuer einen Fueller unter dem Platzpreis
   // (Chris: „keine filler mehr"); ein Fueller in diesem Fall ist ein Notweg (`fueller_rueckfall`).
   const fuellerSperre = kaufZumPlatzpreis && plaetzeGesamt === voll && rest === voll;
-  return { plaetze: kaufZumPlatzpreis ? squad.length + 1 + rest : squad.length, reserve, fuellerSperre };
+  return { plaetze: kaufZumPlatzpreis ? squad.length + 1 + rest : squad.length, reserve, reserveGehalt, fuellerSperre };
 }
 
 /**
@@ -610,6 +684,8 @@ export function organicBuyStep(
   const kaderplan = kaderplanAn(input);
   const rahmen = kaderplan && belowOpt ? kaderplanRahmen(input, step) : null;
   const reserveForPlan = rahmen ? Math.max(reserveForMin, rahmen.reserve) : reserveForMin;
+  // Review S3 (Fenster auf Opt): mit Kaderplan haelt auch der Gehaltstopf die Plaetze bis Opt frei, nicht nur die bis zum Minimum.
+  const reserveSalaryForPlan = rahmen ? Math.max(reserveSalaryForMin, rahmen.reserveGehalt) : reserveSalaryForMin;
   const fuellerSperre = rahmen?.fuellerSperre ?? false;
   let best: OrganicPlayerView | null = null;
   let bestUtility = -Infinity;
@@ -634,13 +710,14 @@ export function organicBuyStep(
       if (mitFuellerSperre && price(candidate) < KADERPLAN_PLATZ_MIN_MW) continue;
       // Mit Kaderplan plant der Topf dieselben Plaetze wie die Kasse (Chris: gegen den echten Rahmen planen, nicht gegen die Kasse).
       const feeReserve = kaderplan ? reserveForPlan : reserveForMin;
+      const gehaltReserve = kaderplan ? reserveSalaryForPlan : reserveSalaryForMin;
       if (grenze) {
         // Kaderpflicht-Freigabe (#1618): die laufende Grenze ist schon „ab jetzt" (abzueglich des bisher Ausgegebenen).
         if (price(candidate) + feeReserve > grenze.fee + 1e-9) continue;
-        if (Math.max(0, candidate.salary) + reserveSalaryForMin > grenze.salary + 1e-9) continue;
+        if (Math.max(0, candidate.salary) + gehaltReserve > grenze.salary + 1e-9) continue;
       } else {
         if (feeCap != null && spentFee + price(candidate) + feeReserve > feeCap + 1e-9) continue;
-        if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
+        if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + gehaltReserve > salaryCap + 1e-9) continue;
       }
       if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       score(candidate);

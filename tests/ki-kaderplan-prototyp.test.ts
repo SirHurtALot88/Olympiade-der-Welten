@@ -272,15 +272,35 @@ describe("Kaderplan: kein Billigster-Spieler-Notweg", () => {
   });
 });
 
-describe("Kaderplan: nur im Saison-1-Setup-Draft (Review S3), Standard an", () => {
-  it("Saison 1 an, ab Saison 2 aus; `OLY_KI_KADERPLAN=0` schaltet ab", () => {
-    expect(istKaderplanAktiv({ season: { id: "season-1" } } as never)).toBe(true);
-    expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(false);
-    expect(istKaderplanAktiv({ season: { id: "season-11" } } as never)).toBe(false);
-    process.env.OLY_KI_KADERPLAN = "0";
-    expect(istKaderplanAktiv({ season: { id: "season-1" } } as never)).toBe(false);
-    process.env.OLY_KI_KADERPLAN = "1";
-    expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(false);
+describe("Kaderplan: Saison-1-Draft und (seit Fenster auf Opt) das Transferfenster ab Saison 2, Standard an", () => {
+  it("Saison 1 an; ab Saison 2 an mit Fenster auf Opt, aus mit `OLY_FENSTER_AUF_OPT=0`; `OLY_KI_KADERPLAN=0` schaltet ab", () => {
+    const vorher = { fenster: process.env.OLY_FENSTER_AUF_OPT, gemeinsam: process.env.OLY_TRANSFERFENSTER_GEMEINSAM };
+    try {
+      delete process.env.OLY_FENSTER_AUF_OPT;
+      delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      expect(istKaderplanAktiv({ season: { id: "season-1" } } as never)).toBe(true);
+      // Review S3 geloest (Gehaltsseite der Plaetze bis Opt reserviert): ab Saison 2 im Fenster an.
+      expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(true);
+      expect(istKaderplanAktiv({ season: { id: "season-11" } } as never)).toBe(true);
+      // Alter Stand: nur Saison 1.
+      process.env.OLY_FENSTER_AUF_OPT = "0";
+      expect(istKaderplanAktiv({ season: { id: "season-1" } } as never)).toBe(true);
+      expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(false);
+      delete process.env.OLY_FENSTER_AUF_OPT;
+      // Ohne gemeinsames Fenster gibt es kein Fenster auf Opt.
+      process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+      expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(false);
+      delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      process.env.OLY_KI_KADERPLAN = "0";
+      expect(istKaderplanAktiv({ season: { id: "season-1" } } as never)).toBe(false);
+      expect(istKaderplanAktiv({ season: { id: "season-2" } } as never)).toBe(false);
+      process.env.OLY_KI_KADERPLAN = "1";
+    } finally {
+      if (vorher.fenster === undefined) delete process.env.OLY_FENSTER_AUF_OPT;
+      else process.env.OLY_FENSTER_AUF_OPT = vorher.fenster;
+      if (vorher.gemeinsam === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorher.gemeinsam;
+    }
   });
 });
 

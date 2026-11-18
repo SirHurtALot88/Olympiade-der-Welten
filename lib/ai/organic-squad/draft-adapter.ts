@@ -43,6 +43,7 @@ import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { GM_OPT_SENKUNG_MAX, getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
+import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   istKiRuecklageV2Aktiv,
@@ -523,13 +524,18 @@ export function istSaisonEins(gameState: Pick<GameState, "season">): boolean {
 }
 
 /**
- * KADERPLAN (docs/design/ki-pick-analyse-18-11.md): im Saison-1-Setup-Draft Standard AN (`OLY_KI_KADERPLAN=0` schaltet ab), ab
- * Saison 2 AUS. Grund fuer die Begrenzung (Review S3): ueber dem Minimum prueft der Builder den Gehaltstopf (`salaryCap`, erst ab
- * Saison 2 gesetzt) nur mit der Mindestkader-Reserve; die Gehaltsseite der Plaetze bis Opt ist noch nicht reserviert. Das kommt
- * mit der S2-Umstellung; bis dahin plant der Kaderplan nur, wo es keinen Gehaltstopf gibt.
+ * KADERPLAN (docs/design/ki-pick-analyse-18-11.md): im Saison-1-Setup-Draft Standard AN (`OLY_KI_KADERPLAN=0` schaltet ab).
+ *
+ * Ab Saison 2 im gemeinsamen Transferfenster ebenfalls AN (`docs/design/fenster-auf-opt-18-11.md`, Schalter `istFensterAufOpt`,
+ * `OLY_FENSTER_AUF_OPT=0` stellt „nur Saison 1" her). Die fruehere Begrenzung auf Saison 1 (Review S3: die Gehaltsseite der
+ * Plaetze bis Opt war im Gehaltstopf nicht reserviert) ist aufgehoben: `kaderplanRahmen` reserviert seit dem 18.11. Ablose UND
+ * Gehalt der Plaetze bis Opt gegen die Kaderpflicht-Grenze (`kaufRahmen().grenzeFuer`) bzw. die Toepfe.
+ * Ab Saison 2 kauft die KI nur im Fenster; jeder Aufruf des Planers ab Saison 2 ist ein Fenster-Kauf (Kaufrunde, Nachrunde,
+ * Kreditprobe, „KI picken").
  */
 export function istKaderplanAktiv(gameState: Pick<GameState, "season">): boolean {
-  return istKaderplanSchalterAn() && istSaisonEins(gameState);
+  if (!istKaderplanSchalterAn()) return false;
+  return istSaisonEins(gameState) || istFensterAufOpt();
 }
 
 /** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
