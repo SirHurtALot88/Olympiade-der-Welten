@@ -107,3 +107,16 @@ beiden Teams der Gruppe in Buchungsreihenfolge, nicht das gesteuerte Team.
 **Fix:** der Host reicht je Pod `eigeneSeite` (Index des gesteuerten Teams) und `gegnerSeite` (sein Spieltagsgegner) mit,
 `einlaufSeiten()` im Motor zeigt diese beiden. Gruppenreihenfolge, Saat und Aufstellung bleiben die der Buchung. Gilt
 auch fuer die Bahn-Pods (Takeshi, Staffel). Test: `tests/arena-start-ende-anzeige.test.ts`.
+
+## 6. Nachweise
+
+- **Fingerabdruck mit dem offiziellen Chromium-Skript** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, unter
+  `flock /tmp/oly-aufnahme.lock`): `GESAMT d3a39030a3ef (75 Eintraege)` -- deckt sich mit dem Node-Lauf.
+- **Stand vor dem Start, alle 20 Disziplinen** (`node scripts/screenshot-arena-start-ende.mjs alle`): vorher Spurt
+  „34 · 21“ und Climbing „57 · 21“ (voller Demo-Kader), nachher beide „0 · 0 … vor dem Start“; alle anderen Chassis
+  standen schon vorher bei ihrem Nullstand (Breaking zeigt „6 : 6 Verbliebene“, das ist kein Ergebnis).
+- **Ladezeit bis Motor bereit** (lokal, ohne Netz): kalt 3,1-3,5 s, mit warmem Cache 2,7-2,9 s. Ueber Chris' Leitung
+  kommt die Uebertragung der ~5 MB dazu, die jetzt in die Vorlauf-Wartezeit faellt.
+- **Bilder** (1920x1080, Kader „Mortal Sin gegen Natures Wrath“ aus der Kaderfamilie, 3 je Seite, darin Fungor ohne
+  eigene Figur): `arena-start-ende-figuren-18-11/vorher-*.png` und `nachher-*.png`, je Climbing und Spurt
+  `1-start`, `2-lauf`, `3-ende`.
