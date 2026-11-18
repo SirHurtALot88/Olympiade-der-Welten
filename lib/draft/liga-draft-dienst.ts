@@ -380,7 +380,12 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
   const jetzt = jetztIso();
 
   if (kaderGroesse(gameState, zug.teamId) >= rosterMaxFuer(gameState, zug.teamId)) {
-    const naechster = bucheAusstieg({ draft, gameState, teamId: zug.teamId, grund: "kader_voll", quelle, jetzt });
+    // KADERPLAN: auch der Ausstieg am Kader-Maximum traegt das Protokoll (Grund, Fueller unter Opt als Notweg).
+    const kaderplan = istKaderplanAktiv(gameState) ? bewerteKiPick({ gameState, saveId, draft, teamId: zug.teamId, topN: 1 }).kaderplan : undefined;
+    const naechster = mitKaderplanGrund(
+      bucheAusstieg({ draft, gameState, teamId: zug.teamId, grund: "kader_voll", quelle, jetzt }),
+      kaderplan,
+    );
     setzeDraftImKontext(ctx, naechster);
     return naechster.verlauf[naechster.verlauf.length - 1]!;
   }
