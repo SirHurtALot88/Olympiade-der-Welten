@@ -12,7 +12,9 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (17.11., Staffel "ganze Runde, Puste wirkt" plus Review-Nachtrag, bewusste Wertungsaenderung,
+// GESAMT-STAND (17.11., Basketball-Benchmark #1562, docs/design/benchmark-basketball-17-11.md): `GESAMT 38b176d7185b (75 Eintraege)`;
+// gegenueber main (`97cccd6017fb`) aendern sich NUR die drei Zeilen `spiele basketball 1|7|42`.
+// VORSTAND (17.11., Staffel "ganze Runde, Puste wirkt" plus Review-Nachtrag, bewusste Wertungsaenderung,
 // docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2 und 2.7): `GESAMT 97cccd6017fb (75 Eintraege)`;
 // gegenueber dem Vorstand (`d09e10bb872c`, I-Spy V2) aendern sich genau die vier Staffel-Zeilen (spiele staffel
 // 1/7/42, spieleBahnPod staffel), alle anderen 71 sind byte-gleich. Zwischenstand vor dem Review: `8bbc6ea215f6`

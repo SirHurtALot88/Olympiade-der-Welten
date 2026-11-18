@@ -1,0 +1,96 @@
+// BENCHMARK-SCREENSHOTS BASKETBALL (17.11., docs/design/benchmark-basketball-17-11.md).
+//
+// Fotografiert feste Spielsituationen aus der ECHTEN Arena-Seite (battle-mode.html, ueber HTTP
+// serviert wie scripts/screenshot-disziplin.mjs), reproduzierbar ueber Saat + Situation:
+// window.__arena.szeneFeldspiel(saat, situation, ab) spult die Simulation bis zur Situation vor,
+// danach steht der Zustand und der Zeichen-Loop malt genau dieses Bild.
+//
+//   node scripts/screenshot-basketball-benchmark.mjs <zielordner> [praefix] [engine.js]
+//
+// [engine.js] (optional): eine andere Engine-Datei statt public/mockups/battle-mode.engine.js
+// ausliefern -- fuer Vorher/Nachher aus demselben Skript (z.B. eine Kopie des main-Stands).
+// Die alte Engine braucht dafuer die Sonde szeneFeldspiel; fehlt sie, bricht das Skript ab.
+import { chromium } from "playwright";
+import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
+import { createServer } from "node:http";
+import path from "node:path";
+
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PUBLIC = path.join(WURZEL, "public");
+const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".webp": "image/webp",
+  ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".woff2": "font/woff2", ".ttf": "font/ttf" };
+
+const [zielArg, praefix = "nachher", engineArg] = process.argv.slice(2);
+if (!zielArg) {
+  console.error("Aufruf: node scripts/screenshot-basketball-benchmark.mjs <zielordner> [praefix] [engine.js]");
+  process.exit(1);
+}
+const ziel = path.resolve(zielArg);
+mkdirSync(ziel, { recursive: true });
+const engineErsatz = engineArg ? path.resolve(engineArg) : null;
+
+// Situation, Saat, fruehester Spielzeitpunkt.
+const SZENEN = [
+  { name: "1-halbfeld-aufbau", situation: "aufbau", saat: 7, ab: 20 },
+  { name: "2-wurf-am-ring", situation: "wurf", saat: 7, ab: 40 },
+  { name: "3-dreier-im-flug", situation: "dreier", saat: 42, ab: 10 },
+  { name: "4-treffer-im-netz", situation: "treffer", saat: 7, ab: 60 },
+  { name: "5-rebound", situation: "rebound", saat: 1, ab: 30 },
+];
+
+function starteServer() {
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      const url = new URL(req.url, "http://localhost");
+      let p = path.join(PUBLIC, decodeURIComponent(url.pathname));
+      if (engineErsatz && url.pathname.endsWith("/mockups/battle-mode.engine.js")) p = engineErsatz;
+      else if (!p.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
+      try {
+        const st = statSync(p);
+        if (st.isDirectory()) p = path.join(p, "index.html");
+        res.writeHead(200, { "Content-Type": MIME[path.extname(p)] || "application/octet-stream" });
+        createReadStream(p).pipe(res);
+      } catch {
+        res.writeHead(404); res.end("not found");
+      }
+    });
+    server.listen(0, "127.0.0.1", () => resolve(server));
+  });
+}
+
+const server = await starteServer();
+let browser;
+try {
+  browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+  const seite = await browser.newPage({ viewport: { width: 1300, height: 700 }, deviceScaleFactor: 1.5 });
+  const fehler = [];
+  seite.on("pageerror", (e) => fehler.push(String(e)));
+  await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
+  await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+  await seite.evaluate(() => window.__arena.setDisc("basketball"));
+  await seite.click("#t2");
+  await seite.waitForTimeout(800);
+  for (const sz of SZENEN) {
+    const erg = await seite.evaluate(({ saat, situation, ab }) => {
+      if (typeof window.__arena.szeneFeldspiel !== "function") return { fehlt: true };
+      return window.__arena.szeneFeldspiel(saat, situation, ab);
+    }, sz);
+    if (erg.fehlt) throw new Error("window.__arena.szeneFeldspiel fehlt in dieser Engine.");
+    // Einlauf-Tafel (Aufstellungen vor dem Anpfiff) verdeckt sonst das Feld.
+    // Ereignis-Banner ("DUNK", "FUEHRUNGSWECHSEL") stammen aus dem Vorspulen und verdecken das Feld.
+    await seite.evaluate(() => {
+      for (const id of ["einlauf", "bbugcallout", "viertelpause"]) { const e = document.getElementById(id); if (e) e.hidden = true; }
+    });
+    await seite.waitForTimeout(500);
+    const out = path.join(ziel, `${praefix}-${sz.name}.png`);
+    await (await seite.$("#cv")).screenshot({ path: out });
+    console.log(`${out}  (${sz.situation}, Saat ${sz.saat}, t=${erg.t}s, Stand ${erg.punkte.join(":")}, gefunden=${erg.gefunden})`);
+  }
+  console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
+} finally {
+  if (browser) await browser.close();
+  server.close();
+}

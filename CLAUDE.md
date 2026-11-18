@@ -507,7 +507,7 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-17.11.: **GESAMT 97cccd6017fb (75 Eintraege)** — absichtlich bewegt von der Staffel „ganze Runde, Puste wirkt“
+17.11.: **GESAMT 38b176d7185b (75 Eintraege)** — Basketball-Benchmark (#1562: FIBA-Feld, Spacing-Modul, Review-Fix Seitenlinie) oben auf dem Staffel-Stand `97cccd6017fb`; gegenueber main bewegen sich NUR die drei `spiele basketball`-Zeilen (1/7/42). Davor absichtlich bewegt von der Staffel „ganze Runde, Puste wirkt“
 (`docs/design/vier-teams-staffel-battlefield-17-11.md` Abschnitt 2 und Review-Nachtrag 2.7); gegenueber dem Vorstand
 `d09e10bb872c` (I-Spy-Knack-Motor V2) haben sich NUR die vier Staffel-Eintraege geaendert (`spiele staffel 1/7/42`,
 `spieleBahnPod staffel`; Zwischenstand vor dem Review `8bbc6ea215f6`). Davor: `7c9257b4435c` (Kontakt im klassischen Spurt scharf,

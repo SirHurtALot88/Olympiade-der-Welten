@@ -25,6 +25,8 @@ Konzept Abschnitt 11). Die CI-Schranke bleibt grün, die Basislinie unverändert
 Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nur `spiele spurt 1` und
 `spiele spurt 7`; `--kontakt-aus` ergibt wieder `e80babacb68c`. Keine Rezept- oder Matrixänderung.
 
+**Basketball-Benchmark 17.11./18.11. (#1562, Review-Fix).** FIBA-Feld, Feld-Metrik, Spacing-Modul; Review-Fix: Spacing-Ziele bleiben im Spielfeld (0 von 17.352 Proben ausserhalb der Seitenlinie). rho je Spiel 0,822 → **0,867** (Spannweite 0,086, Saison 0,923), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **7,6 %**, Ballführer mit freier Anspielstation 27 → **52 %**. Wertungs-Fingerabdruck **GESAMT 97cccd6017fb → 38b176d7185b**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix unangetastet; Pp siehe `docs/design/benchmark-basketball-17-11.md`.
+
 **Sechsunddreißigster Nachtrag 17.11. — Staffel: ganze Runde, Puste wirkt; vier Teams in der Arena.**
 Chris am 17.11.: Staffel läuft nur halbe Runden, Puste ist egal, nur 2 Teams in Takeshi/Staffel/Battlefield. Befund und Messung:
 `docs/design/vier-teams-staffel-battlefield-17-11.md`. Staffel Duell rho je Spiel 0,924 → **0,957**, Pp 22,0 / 21,6 → **13,2 / 14,0**;
