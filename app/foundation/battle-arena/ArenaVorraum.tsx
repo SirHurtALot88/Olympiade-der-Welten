@@ -20,7 +20,7 @@ const CSS = `
   background:radial-gradient(120% 90% at 50% 30%,#18202c 0%,#0d1219 60%,#07090d 100%)}
 .oly-arena-buehne[data-voll="0"] .oly-vorraum{position:relative;min-height:520px}
 .oly-arena-buehne[data-voll="0"] .oly-vorraum ~ div{display:none}
-.oly-vorraum h1{margin:0;font-size:clamp(28px,3.2vw,52px);letter-spacing:.02em;text-transform:uppercase}
+.oly-vorraum h2.oly-vorraum-titel{margin:0;font-size:clamp(28px,3.2vw,52px);letter-spacing:.02em;text-transform:uppercase}
 .oly-vorraum .gk{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#9aa7ba}
 .oly-vorraum .duo,.oly-vorraum .vier{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap;width:min(1500px,100%)}
 .oly-vteam{--tf:#3CC8D6;flex:1 1 240px;min-width:220px;max-width:420px;padding:14px 16px;border-radius:12px;
@@ -147,7 +147,7 @@ export function ArenaLadebild({
       <div className="gk">
         Disziplin {disziplinNr} von {disziplinAnzahl} · {disziplinName}
       </div>
-      <h1>Arena wird vorbereitet</h1>
+      <h2 className="oly-vorraum-titel">Arena wird vorbereitet</h2>
       <div className={art === "pod" ? "vier" : "duo"}>
         {teams.map((team, index) => (
           <div key={team.teamId} style={{ display: "contents" }}>
@@ -221,7 +221,7 @@ export function ArenaVorstellung({
       <div className="gk">
         Disziplin {disziplinNr} von {disziplinAnzahl} · {art === "pod" ? "Vierergruppe · jeder gegen jeden" : "Duell"}
       </div>
-      <h1>{disziplinName}</h1>
+      <h2 className="oly-vorraum-titel">{disziplinName}</h2>
       <div className="oly-schema" data-testid="arena-vorstellung-schema">
         {punkteSchema(art).map((eintrag) => (
           <div key={eintrag.label}>
