@@ -22,23 +22,25 @@ Alle drei KI-Stufen sind einzeln per Env abschaltbar (`OLY_KI_RUECKLAGE_V2=0`, `
 * **Kein neuer Gehaltsdeckel.** Die Orientierung am Sponsor ist weich: Forecast (Stufe 2), Ruecklage (Stufe 1), Vorstand (Stufe 3).
 * **Vorstand nimmt nichts weg** (Chris' Praezisierung): Das Geld bleibt auf dem Konto, freigegeben sind nur X % zum Ausgeben, fuer Abloesen UND Jahresgehaelter neuer Vertraege.
 
-## 3. Vorstand-Budgetfreigabe (Stufe 3)
+## 3. Vorstand-Budgetfreigabe (Stufe 3, Zwei-Toepfe-Form)
 
 Vertrauen = `seasonState.boardConfidence[team].value` (1 bis 10, vorhandenes Board-System, nichts neu berechnet).
 
-| Vertrauen | Stufe | Freigabe |
-|---|---|---:|
-| ab 6 | hoch | 100 % |
-| 4 bis unter 6 | mittel | 85 % |
-| 2,5 bis unter 4 | niedrig | 70 % |
-| darunter | Sparauflage | 50 % |
+| Vertrauen | Stufe | Transfer-Quote | Gehalts-Quote |
+|---|---|---:|---:|
+| ab 6 | hoch | 100 % | 100 % |
+| 4 bis unter 6 | mittel | 85 % | 85 % |
+| 2,5 bis unter 4 | niedrig | 70 % | 75 % |
+| darunter | Sparauflage | 50 % | 75 % |
 
-* Saison 1: immer 100 % (kein Vorjahr, Board neutral 5, sonst waere jedes Team „mittel“ ohne Misserfolg).
-* **Hart**: `pruefeKaufGegenVorstandFreigabe` blockiert im Kaufpfad (`executeLocalTransfermarktBuy`, Vorschau und Fast-Batch; Grund `vorstand_budget_nicht_freigegeben`). Ausnahme: unter dem Kader-Minimum (8) gilt die Sperre nicht, ein spielfaehiger Kader geht vor.
-* **Verkaufserloese unter derselben Quote**: freigegeben = Anteil x (Anfangskasse + Verkaufserloese). Bei 70 % werden von 20 C Erloes 14 C frei, 6 C bleiben als Puffer.
-* **Anzeige-Funktion** `berechneVorstandBudgetStand(gameState, teamId)` fuer Transfermarkt und Spielerprofil: `freigegebenGesamt`, `ausgegeben`, `nochFrei`, `gesperrt` (auf dem Konto, nicht ausgebbar), `grund` (ein Satz). Der Rueckgabewert traegt schon zwei Toepfe (`investition`, `gehalt`, `getrennt: false`); heute ist `gehalt` ein leerer Platzhalter und die Gehaelter zaehlen gegen die gemeinsame Freigabe.
-* Rechnung ohne neuen Speicher, aus dem Transferverlauf der Saison. **Nicht erfasst:** Gehaltserhoehungen bei Vertragsverlaengerungen (anderer Buchungspfad) und eine UI.
-* Die weiche Ruecklage (Stufe 1) bleibt weich.
+* **Saison 1: 100 % fuer alle**, die Vertrauensquote greift ab Saison 2.
+* **Hart**, Mensch und KI gleich: `pruefeKaufGegenVorstandFreigabe` blockiert im Kaufpfad (`executeLocalTransfermarktBuy`, Vorschau und Fast-Batch) mit `vorstand_transferbudget_nicht_freigegeben` bzw. `vorstand_gehaltsbudget_nicht_freigegeben`. Ausnahme: unter dem Kader-Minimum (8) gilt die Sperre nicht.
+* **Das Geld bleibt auf dem Konto**; gesperrt heisst nur „nicht ausgebbar“. Die Ruecklage nach Finanzwert (Stufe 1) bleibt weich.
+* **Transfertopf**: gesamt = Quote x (Anfangskasse + Verkaufserloese). Verkaufserloese zaehlen nur zu X % (bei 70 %: 20 C -> 14 C frei, 6 C Puffer).
+* **Gehaltstopf**: Quote nie unter 75 %. Basis (Startwert) = max(erwarteter Sponsor 0,92 x Anker, Zielgehalt bei Soll-Kader); ausgegeben = aktuelle Gehaltssumme; bei einem Verkauf faellt die Summe, das **Gehalt kommt zu 100 % zurueck**.
+* **Gebaeude** sollen aus dem Transfertopf kommen — noch nicht verdrahtet (Zwei-Budget-Bau danach).
+* **Funktion** `berechneVorstandBudgetStand(gameState, teamId)`: `investition` und `gehalt` je `{ gesamt, ausgegeben, frei, gesperrt, quote, grund }` (ein Satz Begruendung), dazu die Kurzformen `freigegebenGesamt/ausgegeben/nochFrei/gesperrt` des Transfertopfs fuer Transfermarkt und Spielerprofil.
+* Nicht erfasst: Gehaltserhoehungen bei Verlaengerungen, Gebaeudekaeufe, UI. Spaeter (nicht hier): „Ruecklage anzapfen“ / „Alles auf eine Karte“.
 
 ## 4. A/B-Messung
 
@@ -51,19 +53,19 @@ Methode: zwei Anlagen (Saaten `new-game-1794999053691-yyec6b`, `new-game-1794999
 
 | Klasse | n | Cash C (Median) vorher | Cash C (Median) nachher | Cash % Budget (Median) vorher | Cash % Budget (Median) nachher | Kader (Median) vorher | Kader (Median) nachher | Kader min vorher | Kader min nachher | Gehalt (Median) vorher | Gehalt (Median) nachher |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| FW < 3 | 14 | 5.9 | 23.1 | 2.4 % | 9.0 % | 11.0 | 10.0 | 9.0 | 9.0 | 75.6 | 70.7 |
-| FW 3 bis 7 | 30 | 6.5 | 33.5 | 2.8 % | 13.1 % | 11.5 | 10.0 | 9.0 | 8.0 | 63.3 | 56.9 |
-| FW ab 7 | 20 | 6.8 | 52.3 | 3.2 % | 20.9 % | 12.0 | 10.0 | 10.0 | 8.0 | 64.4 | 53.1 |
-| alle | 64 | 6.4 | 33.8 | 2.9 % | 15.3 % | 11.0 | 10.0 | 9.0 | 8.0 | 64.6 | 56.5 |
+| FW < 3 | 14 | 5.9 | 11.7 | 2.4 % | 4.8 % | 11.0 | 10.0 | 9.0 | 9.0 | 75.6 | 74.3 |
+| FW 3 bis 7 | 30 | 6.5 | 16.7 | 2.8 % | 7.3 % | 11.5 | 11.0 | 9.0 | 8.0 | 63.3 | 62.2 |
+| FW ab 7 | 20 | 6.8 | 26.7 | 3.2 % | 11.6 % | 12.0 | 11.0 | 10.0 | 9.0 | 64.4 | 58.0 |
+| alle | 64 | 6.4 | 17.4 | 2.9 % | 7.6 % | 11.0 | 11.0 | 9.0 | 8.0 | 64.6 | 62.6 |
 
 ### Saison 1, nach dem Draft: Sponsor-Deckung (erwarteter Sponsor 0,92 x Anker / Gehalt)
 
 | Klasse | n | Quote (Median) vorher | Quote (Median) nachher | Teams mit Quote < 0,8 vorher | Teams mit Quote < 0,8 nachher |
 |---|---:|---:|---:|---:|---:|
-| FW < 3 | 14 | 0.88 | 0.90 | 6 | 4 |
-| FW 3 bis 7 | 30 | 1.01 | 1.11 | 3 | 2 |
-| FW ab 7 | 20 | 1.01 | 1.25 | 3 | 0 |
-| alle | 64 | 1.00 | 1.10 | 12 | 6 |
+| FW < 3 | 14 | 0.88 | 0.89 | 6 | 6 |
+| FW 3 bis 7 | 30 | 1.01 | 1.05 | 3 | 1 |
+| FW ab 7 | 20 | 1.01 | 1.10 | 3 | 1 |
+| alle | 64 | 1.00 | 1.04 | 12 | 8 |
 
 ### Kaderstaerke nach dem Draft (Saison 1)
 
@@ -71,10 +73,10 @@ Top-6-Eignung je Disziplin und Team (fehlende Plaetze zaehlen 0); je Disziplin M
 
 | Kennzahl | vorher | nachher | Aenderung |
 |---|---:|---:|---:|
-| Median (Mittel ueber Disziplinen) | 48.12 | 46.19 | -4.0 % |
-| Unterstes Viertel P25 | 42.40 | 40.02 | -5.6 % |
+| Median (Mittel ueber Disziplinen) | 48.12 | 47.63 | -1.0 % |
+| Unterstes Viertel P25 | 42.40 | 41.19 | -2.9 % |
 
-Groesster Rueckgang je Disziplin (Median): staffel -7.6 %, mini-dm -5.1 %, speed-schach -5.0 %
+Groesster Rueckgang je Disziplin (Median): showcase -3.4 %, gewichtheben -3.0 %, tennis -3.0 %
 
 Kader unter Minimum (8) — s1_01_nach_draft, vorher: 0 von 64
 
@@ -89,10 +91,14 @@ Zerlegung: Nur Stufe 1 (Stufe 2 aus) liefert fast dieselben Zahlen (Kaderstaerke
 
 ### 4.2 Lesart
 
-* Cash nach Draft je Finanzwert-Klasse: FW unter 3 **9,0 %**, FW 3 bis 7 **13,1 %**, FW ab 7 **20,9 %** des Budgets (vorher 2,4 / 2,8 / 3,2 %). Das entspricht der Vorgabe.
-* Kader im Median **10 statt 11 Spieler**, kleinster Kader 8 statt 9, **kein Kader unter dem Minimum**. Gehalt im Median 56,5 statt 64,6 (-12,5 %); Sponsor-Deckung (0,92 x Anker / Gehalt) im Median 1,10 statt 1,00, Teams mit Quote unter 0,8: 6 statt 12 von 64.
-* Kaderstaerke im Median **-4,0 %**, unterstes Viertel **-5,6 %** (Mittel ueber 20 Disziplinen). Das ist knapp unter der Abbruchgrenze von 5 % im Median (die Grenze betrifft den Median), aber nahe daran: die Abbruchbedingung ist **nicht ausgeloest**, der Spielraum ist klein. Groesster Rueckgang: Staffel (-7,6 %), Mini-DM, Speed-Schach.
-* Ausgangsbefund Saison 1 (nur „vorher“-Lauf, volle Saison): Median Sponsor/Gehalt 0,90, 16 von 32 Teams unter 0,9, Σ GuV der Liga -124 C, **13 von 32 Teams mit negativer Kasse nach der Saison-Abrechnung**; die Kasse bleibt ueber alle 20 Spieltage flach (alles wird heute am Saisonende gebucht, Taktung ist Stufe 4).
+Stand nach Chris' Zwei-Budget-Entscheid (18.11.): **Draft-Ruecklage in Saison 1 halbiert**, Budgets unveraendert, Vorstandsquote in S1 = 100 %.
+
+* Cash nach Draft je Finanzwert-Klasse: FW unter 3 **4,8 %**, FW 3 bis 7 **7,3 %**, FW ab 7 **11,6 %** des Budgets (vorher 2,4 / 2,8 / 3,2 %; mit voller Ruecklage waren es 9,0 / 13,1 / 20,9 %). Ab Saison 2 gilt die volle Ruecklage.
+* Kader im Median **11 wie vorher** (mit voller Ruecklage 10), kleinster Kader 8 statt 9, **kein Kader unter dem Minimum**.
+* Kaderstaerke im Median **-1,0 %**, unterstes Viertel **-2,9 %** (vorher mit voller Ruecklage: -4,0 % / -5,6 %). Abbruchkriterium (-5 % im Median) **nicht ausgeloest**, mit deutlichem Abstand.
+* Sponsor-Deckung im Median 1,04 statt 1,00; Teams mit Quote unter 0,8: 8 statt 12 von 64.
+* Stufe 2 (Sponsor im Forecast) bewegt in S1 praktisch nichts: die harten Boeden der Ruecklage begrenzen den Kauf, bevor der weiche Bremsnutzen entscheidet (Test nur mit Stufe 1: nahezu identische Zahlen).
+* Ausgangsbefund Saison 1 (nur „vorher“, volle Saison): Median Sponsor/Gehalt 0,90, 16 von 32 Teams unter 0,9, Σ GuV der Liga -124 C, **13 von 32 Teams mit negativer Kasse nach der Abrechnung**; die Kasse bleibt ueber alle 20 Spieltage flach (alles wird heute am Saisonende gebucht, Taktung ist Stufe 4).
 
 ### 4.3 Saison 2, Kaufphase
 
@@ -104,7 +110,7 @@ SAISON2_PLATZHALTER
 
 ## 6. Offene Punkte
 
-1. **Kaderstaerke -4 % im Median / -5,6 % im unteren Viertel, Kader 10 statt 11**: unter der Abbruchgrenze, aber der Preis der Ruecklage. Offene Frage an Chris: Startbudgets +15 %.
+1. **Kaderstaerke S1 -1,0 % im Median / -2,9 % im unteren Viertel, Kader 11 wie vorher** (halbe S1-Ruecklage). Startbudgets bleiben (Chris 18.11.), keine +15 %.
 2. Vorstand-Sperre fuer Gehaltserhoehungen bei Verlaengerungen und die UI (Transfermarkt, Spielerprofil) fehlen noch.
 3. Der Kontoauszug zeigt heute nur Saisonende- und Transferzeilen; Spieltagszeilen kommen mit Stufe 4.
 4. Zwei Saaten im Draft-A/B, eine im Voll-Lauf: fuer Verteilungsaussagen duenn.
