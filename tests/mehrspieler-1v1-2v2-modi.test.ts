@@ -127,13 +127,13 @@ describe("resolveFoundationSaveModeForPreset (Eigenschaft 4 + Gegenprobe 5)", ()
 
 describe("getGameModeOwnershipLimits -- die neuen Save-Modi (Eigenschaft 4 + Gegenprobe 5)", () => {
   it("online_1v1: Obergrenze 1/1", () => {
-    expect(getGameModeOwnershipLimits("online_1v1")).toEqual({ chrisMax: 1, frankyMax: 1 });
+    expect(getGameModeOwnershipLimits("online_1v1")).toEqual({ chrisMax: 1, frankyMax: 1, ramonaMax: 1 });
   });
   it("online_2v2: Obergrenze 2/2", () => {
-    expect(getGameModeOwnershipLimits("online_2v2")).toEqual({ chrisMax: 2, frankyMax: 2 });
+    expect(getGameModeOwnershipLimits("online_2v2")).toEqual({ chrisMax: 2, frankyMax: 2, ramonaMax: 2 });
   });
   it("GEGENPROBE: online_4v4 bleibt 4/4", () => {
-    expect(getGameModeOwnershipLimits("online_4v4")).toEqual({ chrisMax: 4, frankyMax: 4 });
+    expect(getGameModeOwnershipLimits("online_4v4")).toEqual({ chrisMax: 4, frankyMax: 4, ramonaMax: 4 });
   });
 });
 

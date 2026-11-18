@@ -135,6 +135,12 @@ export type ScenarioMeta = {
   // `createRoomCoopSave`s Aufruf in room-store.ts) -- nur die zwei fuer Paket 2 tatsaechlich
   // benoetigten Stellen (hier und lib/persistence/types.ts) wurden ergaenzt.
   saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
+  /**
+   * Fog of War des Transfermarkts (Chris, 18.11.): `true` schaltet den Scouting-Nebel ganz aus, alle Werte erscheinen
+   * exakt und werden danach sortiert (Test und Spielbeginn). Fehlt das Feld, ist der Nebel AN (Standard). Gelesen von
+   * `lib/market/transfermarkt-nebel-einstellung.ts`.
+   */
+  scoutingNebelAus?: boolean;
   newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
   humanControlledTeamCount?: number;
   createdAt: string;
@@ -1260,8 +1266,37 @@ export type TeamControlSettings = {
    * draussen sein.
    */
   lendingBudget?: number | null;
+  /**
+   * DELEGATION JE BEREICH (Chris, 18.11., docs/design/mehrspieler-delegation-18-11.md): welcher
+   * Bereich eines MENSCHLICHEN Teams von der KI erledigt wird. Nur fuer `controlMode: "manual"` von
+   * Belang. Fehlt das Feld, gilt die Voreinstellung des Besitzers (`resolveTeamDelegation` in
+   * lib/foundation/team-delegation.ts): Chris/Franky „voll selbst“ (= Verhalten wie vor dem Feld),
+   * Ramona „Halbautomatik“.
+   */
+  delegation?: TeamDelegation | null;
   notes?: string | null;
   strategyLock?: string | null;
+};
+
+/** Die Bereiche, die ein menschlicher Manager selbst entscheidet oder an die KI abgibt. */
+export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor";
+
+/** Die drei festen Stufen; Einzelschalter in `TeamDelegation.bereiche` gehen ihnen vor. */
+export type DelegationStufe = "voll_selbst" | "halbautomatik" | "voll_ki";
+
+export type DelegationWahl = "selbst" | "ki";
+
+export type TeamDelegation = {
+  stufe: DelegationStufe;
+  /** Einzelschalter je Bereich; ueberschreiben die Stufe. */
+  bereiche?: Partial<Record<DelegationBereich, DelegationWahl>> | null;
+  /**
+   * „Mensch ueberschreibt, KI respektiert das“ fuer das Training: Spieler, deren Trainingsmodus/
+   * -klasse der Mensch selbst gesetzt hat. Die delegierte KI fasst sie nicht an, bis der Mensch
+   * den Spieler zurueck auf KI stellt (`/api/training` mit `zurueckAufKi: true`).
+   */
+  trainingSelbstSpielerIds?: string[] | null;
+  geaendertAm?: string | null;
 };
 
 export type TeamStrategyBias = {

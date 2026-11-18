@@ -245,6 +245,10 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
   verraten (Chris, 18.11.).
+  Regeln (Chris, 18.11., Kader-&-Teams-Mockup #1595 Abschnitt 7a): feste Stufen (unbekannt 10er, beobachtet 5er, gescoutet
+  exakt), nie „~Zahl“ um den wahren Wert; Sortieren nach Stufe, Gleichstand nach Name. **Marktwert ist immer exakt
+  sichtbar.** Kaderstärke fremder Teams als grobe Stufe, exakt nur bei vollem Scouting. **Eine Einstellung schaltet den Fog
+  of War ganz aus** (Testzwecke, Spielbeginn). Ränge gegen die eigene Liga, klein daneben gegen alle 32.
 - **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
@@ -255,6 +259,17 @@ Wörtlich: „die PPs sollen weiterhin eine Darstellung der Leistung der Spieler
 die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! bin da offen für changes“. Zielskala: der
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
+
+## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
+
+Wörtlich: „Wichtig: wenn du neue Dinge baust, IMMER einen Abgleich machen — Screenshot schauen und vergleichen mit dem
+Mockup, dann Korrekturschleife, bis die Funktionen drin sind und die Optik so aussieht wie im Mockup.“ Ein Bau-PR ist erst
+fertig, wenn (1) Aufnahmen aus der **echten App** bei 1920×1080 und 2560×1440 neben dem Mockup liegen, (2) der Agent sie
+**selbst angesehen** und jede Abweichung behoben oder begründet hat (Liste drin / angepasst / fehlt), (3) kein
+Seitenscroll, keine Überlappung, kein abgeschnittener Text, keine doppelten Knöpfe, kein Platzhaltertext bleibt, und
+(4) bei Seiten je Disziplin **Stichproben über mehrere Disziplinen** (mindestens ein Feldspiel, eine Bahn, eine Bühne,
+Mini-DM/Spurt) gemacht sind. Code mit grünen Tests ohne Abgleich-Bilder ist kein fertiger Bau. Aufnahmen laufen unter
+`flock /tmp/oly-aufnahme.lock` (Rechner hat 15 GB RAM, ein Browser zugleich).
 
 ## Training und Entwicklung: je Spieltag (Chris, 18.11.)
 
@@ -442,6 +457,30 @@ Icon-Schiene), HUD und Steuerelemente liegen darüber oder am Rand, nicht darüb
 abgeschnitten oder unnötig scrollend sein; auf dem 4K-Monitor darf nichts verloren wirken (keine
 leeren Riesenränder, Schrift und Tafeln wachsen mit). Wird die genaue Skalierung eines Geräts
 bekannt, hier eintragen.
+
+## Mehrspieler ist Pflicht (Chris, 18.11.)
+
+Wörtlich: „wichtig ist auch, dass ALL das weiterhin im Multiplayer möglich ist, wenn ich Franky als Spieler noch
+hinzufüge und ggf. Ramona auch mal mitmachen möchte.“ Es spielen bis zu **drei Menschen**: Chris, Franky, Ramona (eigener
+Login, Besitzer `ramona_local`). **Jede neue Seite und jede neue Mechanik** muss deshalb:
+
+- **mit mehreren menschlichen Managern funktionieren:** das aktive Team kommt aus `activeManagerTeamId`, Besitz aus
+  `ownerId` (`canOwnerManageTeam`), nie hart „Chris“, `user_local`, „das erste menschliche Team“ oder `teams[0]`;
+  Online-Abfragen über `isOnlineSaveMode()`, nicht `=== "online_4v4"`. Jeder Schreibweg läuft durch
+  `authorizeServerRoomWrite` mit `resolveAuthoritativeWriteOwnerId` und liest frisch vom Server.
+- **je Team bzw. je Manager getrennte Zustände haben:** Merkliste, Scouting, Fog of War, Vorstands-Freigabe,
+  Trainingsplan, Formkarten-Plan. Chris sieht in Taktgeber, Inbox und Startseite nur seine Teams; Vorfälle in fremden
+  Teams halten seine Leertaste nicht an.
+- **delegierbar sein:** je Bereich (Einsatzliste/Formkarten, Draft, Käufe/Verkäufe/Verträge, Training, Gebäude,
+  Sponsor) kann ein Mensch selbst entscheiden oder an die KI geben (`TeamControlSettings.delegation`,
+  `isBereichDelegiert` in `lib/foundation/team-delegation.ts`). Drei Stufen: **Voll selbst** (Chris, Franky),
+  **Halbautomatik** (Ramona: KI stellt auf und trainiert, Käufe/Verkäufe macht sie selbst), **Voll KI**. Die delegierte
+  KI nutzt dieselben Regeln und Funktionen wie für KI-Teams, **füllt nur, was der Mensch nicht selbst gesetzt hat**
+  („Mensch überschreibt, KI respektiert das“) und hält die Vorstands-Freigabe ein. Ein Spieltag wartet nie auf einen
+  abwesenden Menschen, dessen Bereich delegiert ist.
+
+Konzept, Lückenliste und offene Fragen: `docs/design/mehrspieler-delegation-18-11.md`. Ramonas Passwort steht nur auf
+dem Server (`OLY_USER_RAMONA_PASSWORD` in `deploy/hetzner/.env`), nie im Repo.
 
 ## An die Spielstände kommen
 

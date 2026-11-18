@@ -545,6 +545,8 @@ export function useFoundationPageState({
   const [newGameMode, setNewGameMode] = useState<GameMode>("manager");
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
   const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
+  // Ramona, dritte Spielerin (18.11.): startet ohne Teams; ihre Teams laufen in der Halbautomatik.
+  const [newGameRamonaTeamIds, setNewGameRamonaTeamIds] = useState<string[]>([]);
   /**
    * Benutzerdefinierte Liga-1/2-Zuordnung fuer den Battle-Mode-Schritt (31.10., Chris: "alle teams
    * in der 2. liga muss man bei erstellung auch wählen können"). `null` = automatische
@@ -972,6 +974,8 @@ export function useFoundationPageState({
     setNewGameChrisTeamIds,
     newGameFrankyTeamIds,
     setNewGameFrankyTeamIds,
+    newGameRamonaTeamIds,
+    setNewGameRamonaTeamIds,
     newGameLeagueOverride,
     setNewGameLeagueOverride,
     newGameSandbox,

@@ -18,6 +18,9 @@ export type HomeV2TopPlayerCard = {
   men: number | null;
   soc: number | null;
   contractLength: number | null;
+  /** Klasse und Volk aus dem Spielerprofil (Startseite zeigt „Hero · Lizard“). */
+  className?: string | null;
+  race?: string | null;
   marketValue: number | null;
   highlight?: "top" | "prospect" | null;
   ovrRank?: number | null;

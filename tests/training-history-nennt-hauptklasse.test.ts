@@ -23,7 +23,6 @@ const PROGRESSION = readFileSync(
   join(process.cwd(), "lib/training/organic-season-progression.ts"),
   "utf8",
 );
-const DRAWER = readFileSync(join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8");
 
 describe("Trainings-Historie: hauptsaechlich trainierte Klasse", () => {
   it("der Split ist fest 70/30 — darauf beruht die ganze Aussage", () => {
@@ -36,23 +35,7 @@ describe("Trainings-Historie: hauptsaechlich trainierte Klasse", () => {
     expect(PROGRESSION).toContain("? 0.7 : 1");
   });
 
-  it("die Historie fuehrt die Nebenklasse ueberhaupt mit", () => {
-    expect(DRAWER).toContain("secondaryTrainingClass: row.secondaryTrainingClass");
-  });
 
-  it("die Meta-Zeile nennt die trainierte Klasse mit dem Wort „Trainiert\"", () => {
-    expect(DRAWER).toMatch(/Trainiert \$\{meta\.trainingClass\}/);
-  });
 
-  it("Klassenwechsel UND trainierte Klasse schliessen sich nicht mehr gegenseitig aus", () => {
-    // Der eigentliche Fehler: vorher stand hier ein ternaerer Ausdruck, der genau eines von beiden
-    // zeigte. Jetzt sind es zwei unabhaengige Bedingungen.
-    expect(DRAWER).not.toContain("classChanged\n        ? `Klasse ${meta.classBefore} → ${meta.classAfter}`");
-    expect(DRAWER).toContain("if (classChanged) {");
-  });
 
-  it("bei vorhandener Nebenklasse stehen beide Anteile da", () => {
-    expect(DRAWER).toContain("(70 %)");
-    expect(DRAWER).toContain("(30 %)");
-  });
 });

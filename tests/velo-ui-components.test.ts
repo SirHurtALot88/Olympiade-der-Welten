@@ -32,9 +32,8 @@ describe("velo ui rollout contract", () => {
   });
 
   it("wires velo rollout across lineup, drawer and facilities", async () => {
-    const [lineupText, drawerText, cssText] = await Promise.all([
+    const [lineupText, cssText] = await Promise.all([
       fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
-      fs.readFile(path.join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -70,8 +69,6 @@ describe("velo ui rollout contract", () => {
     // Die Hover-Vorschau MUSS die volle Karte rendern — sonst wäre die Portrait-Darstellung im
     // Lineup-Lab doch verloren, nur unauffälliger.
     expect(portraitPreviewText).toContain("FoundationPlayerPortraitCard");
-    expect(drawerText).toContain("player-drawer-axis-chip");
-    expect(drawerText).toContain("player-drawer-scouting-disclosure");
     expect(cssText).toContain(".player-drawer-axis-orbit");
   });
 

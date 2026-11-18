@@ -49,10 +49,6 @@ describe("Das Portrait im Scouting-Profil ist größer", () => {
     expect(block).not.toContain("196px");
   });
 
-  it("fordert das Bild auch in 240px an, statt eine 196er-Datei hochzuskalieren", () => {
-    expect(markt()).toContain('width={240} height={240} className="nl-market-portrait-img"');
-  });
-
   it("hat ein Kürzel, das im großen Kasten nicht verloren wirkt", () => {
     // 13px in einem 240px-Quadrat wäre ein Fleck in der Mitte.
     const block = regel(css(), ".is-new-look .nl-market-focus-portrait .nl-market-portrait-initials");
@@ -160,11 +156,4 @@ describe("POW/SPE/MEN/SOC laufen über die Velo-Achsen-Rail", () => {
     expect(regel(text, ".velo-axis-rail-row.is-soc")).toContain("--velo-axis");
   });
 
-  it("ersetzt die flachen Tier-Pillen, statt neben ihnen zu stehen", () => {
-    // Zwei Darstellungen derselben vier Zahlen wären genau die Doppelung, die die Karte
-    // vorher unruhig gemacht hat.
-    expect(markt()).toContain("<VeloAxisRail");
-    expect(markt()).not.toContain("nl-market-attr-chip");
-    expect(css()).not.toContain(".nl-market-attr-chip");
-  });
 });

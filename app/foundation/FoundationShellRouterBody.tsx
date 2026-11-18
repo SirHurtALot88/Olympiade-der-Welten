@@ -8,10 +8,11 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
-import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
-import { useEffect, useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
 import {
   buildTeamShellThemeVars,
   buildTeamVoidVars,
@@ -145,9 +146,17 @@ const FoundationHomeV2Panel = dynamic(() => import("@/app/foundation/home-v2/Fou
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
 });
-const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
+const SpielerprofilSeite = dynamic(() => import("@/app/foundation/spielerprofil/SpielerprofilSeite"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Spielerprofil wird geladen…" />,
+});
+const SpielerKurzprofilHost = dynamic(() => import("@/app/foundation/spielerprofil/SpielerKurzprofilHost"), {
+  ssr: false,
+  loading: () => null,
+});
+const FoundationRosterSellPeekDrawer = dynamic(() => import("@/app/foundation/teams-v2/FoundationRosterSellPeekDrawer"), {
+  ssr: false,
+  loading: () => null,
 });
 const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
   ssr: false,
@@ -311,6 +320,7 @@ const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
 };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
+  const [profilStartDisziplin, setProfilStartDisziplin] = useState<string | null>(null);
   const {
   activeContextMeta,
   activeContextStatusChips,
@@ -975,7 +985,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
         takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
         onSearch={() => setShowCommandPalette(true)}
-        kasseLabel={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : null}
+        kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
         teamName={selectedTeam?.name ?? null}
         teamCrest={
@@ -2039,12 +2049,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           <section className={`panel foundation-player-profile-panel${getViewClass("playerProfile")}`}>
             {activeView === "playerProfile" && playerProfileData ? (
-              <PlayerProfileClient
+              <SpielerprofilSeite
+                key={playerProfileData.playerId}
                 data={playerProfileData}
                 activeTab={playerProfileTab}
                 onTabChange={(tab) => {
                   setPlayerProfileTab(tab);
                   syncFoundationViewInUrl("playerProfile", tab, playerProfileData.playerId);
+                }}
+                onNavigatePlayer={(playerId) => {
+                  void props.openPlayerProfileById?.(playerId, null, { tab: playerProfileTab, push: false });
                 }}
                 onClose={() => {
                   playerProfileHydrationSequenceRef.current += 1;
@@ -2052,9 +2066,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   // Zurück soll auf den Herkunfts-Tab führen (z. B. Teams, Marktplatz,
                   // Rangliste), von dem das Spieler-Profil geöffnet wurde — nicht
                   // pauschal auf Home. Das Öffnen pusht einen History-Eintrag
-                  // (openPlayerDrawerById / openPlayerProfileById mit push: true), also
-                  // bringt uns der Browser-Back verlässlich dorthin zurück. Nur ohne
-                  // History fällt es auf Home zurück.
+                  // (openPlayerProfileById mit push: true), also bringt uns der
+                  // Browser-Back verlässlich dorthin zurück. Nur ohne History fällt es
+                  // auf Home zurück.
                   if (canFoundationNavigateBack()) {
                     foundationNavigateBack();
                     return;
@@ -2062,20 +2076,30 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   setFoundationView("homeV2", setActiveView);
                   syncFoundationViewInUrl("homeV2");
                 }}
-                onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
-                onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
-                onOpenLeagueLeaders={onOpenLeagueLeaders}
                 onOpenTeam={(teamId) => openTeamProfileById(teamId)}
-                trainingRow={playerProfileTrainingRow}
-                trainingModeOptions={trainingV2ModeOptions}
-                trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}
-                onSetTrainingMode={(playerId, mode) => {
-                  void setPlayerTrainingMode(playerId, mode);
+                ownerId={effectiveActiveOwnerId}
+                startDisziplin={profilStartDisziplin}
+                onStartDisziplin={setProfilStartDisziplin}
+                training={{
+                  row: playerProfileTrainingRow,
+                  modeOptions: trainingV2ModeOptions,
+                  classOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
+                  onSetMode: (playerId, mode) => {
+                    void setPlayerTrainingMode(playerId, mode);
+                  },
+                  onSetClass: (playerId, trainingClass) => {
+                    void setPlayerTrainingClass(playerId, trainingClass);
+                  },
+                  readOnly: playerProfileTrainingReadOnly,
                 }}
-                onSetTrainingClass={(playerId, trainingClass) => {
-                  void setPlayerTrainingClass(playerId, trainingClass);
-                }}
-                trainingReadOnly={playerProfileTrainingReadOnly}
+                aktionen={baueVertragsAktionen({
+                  data: playerProfileData,
+                  gameState,
+                  readOnly: readMeta.readOnly,
+                  manageableTeamIds: foundationManageableTeamIds,
+                  openRenewal: props.openContractRenewalNegotiation,
+                  openSell: props.openMarketSellPeek,
+                })}
               />
             ) : activeView === "playerProfile" ? (
               <div className="foundation-view-loading-panel" data-testid="foundation-player-profile-loading">
@@ -2095,6 +2119,28 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </div>
             ) : null}
           </section>
+
+          <SpielerKurzprofilHost
+            manageableTeamIds={foundationManageableTeamIds}
+            ownerId={effectiveActiveOwnerId}
+            saveId={activeSaveId}
+            openPlayerProfileById={props.openPlayerProfileById}
+            openContractRenewalNegotiation={props.openContractRenewalNegotiation}
+            openMarketSellPeek={props.openMarketSellPeek}
+            onStartDisziplin={setProfilStartDisziplin}
+          />
+          {activeView !== "teams" && props.marketSellPeekSubject ? (
+            <FoundationRosterSellPeekDrawer
+              subject={props.marketSellPeekSubject}
+              preview={props.marketSellPeekPreview}
+              busy={props.marketSellPeekBusy}
+              error={props.marketSellPeekError}
+              onClose={() => props.closeMarketSellPeek?.()}
+              onOpenSell={(subject) => {
+                void props.openMarketSellFromPeek?.(subject, playerProfileData?.teamId ?? undefined);
+              }}
+            />
+          ) : null}
 
           <section className={`panel foundation-team-profile-panel${getViewClass("teamProfile")}`}>
             {activeView === "teamProfile" && teamProfileData ? (

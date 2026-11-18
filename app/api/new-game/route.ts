@@ -14,6 +14,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
@@ -23,6 +25,8 @@ type NewGameRequestBody = {
   gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
+  // Ramona, dritte Spielerin (18.11.), optional. Ihre Teams starten in der Halbautomatik.
+  ramonaTeamIds?: string[];
   // Optionale, im Anlege-Assistenten umstellbare Liga-1/2-Zuordnung (s. Kommentar an
   // `leagueByTeamId` in lib/game/new-game-setup-service.ts). Nur in Battle Mode wirksam, und nur,
   // wenn sie fuer die 32 Teams dieses neuen Saves gueltig ist -- sonst automatische Zuteilung.
@@ -41,6 +45,7 @@ function normalizeBody(body: NewGameRequestBody) {
     gameMode: body.gameMode === "battle" ? "battle" : ("manager" as GameMode),
     chrisTeamIds: body.chrisTeamIds,
     frankyTeamIds: body.frankyTeamIds,
+    ramonaTeamIds: body.ramonaTeamIds,
     leagueByTeamId: body.leagueByTeamId,
     sandbox: Boolean(body.sandbox),
     saveName: body.saveName,
@@ -99,7 +104,21 @@ export async function POST(request: Request) {
     // no human team, so its whole-league draft is harmless), the "Neues Spiel" wizard hands one or
     // more teams to Chris/Franky (controlMode "manual", humanControlled true) — those players draft
     // their own squad, so their team ids must never reach `runAiPicksExecutePreview`.
-    const humanTeamIds = [...result.preview.chrisTeamIds, ...result.preview.frankyTeamIds];
+    //
+    // DELEGIERTER DRAFT (18.11., docs/design/mehrspieler-delegation-18-11.md): ein menschliches
+    // Team, dessen Draft an die KI delegiert ist (Ramonas Halbautomatik), pickt hier mit der Liga
+    // mit — dieselben Regeln wie fuer KI-Teams. Chris' Regel vom 19.08. („keiner von uns soll
+    // seinen Kader per KI füllen“) bleibt fuer jedes Team mit `draft: "selbst"` unberuehrt.
+    // Frisch aus der Persistenz gelesen; fehlt der Stand (Test-Doubles), gilt jedes Team als „selbst“.
+    const nachAnlage = persistence.getSaveById?.(setupSaveId)?.gameState;
+    const settingsNachAnlage = nachAnlage
+      ? buildTeamControlSettingsMap(nachAnlage.teams, nachAnlage.seasonState?.teamControlSettings)
+      : {};
+    const humanTeamIds = [
+      ...result.preview.chrisTeamIds,
+      ...result.preview.frankyTeamIds,
+      ...(result.preview.ramonaTeamIds ?? []),
+    ].filter((teamId) => !isBereichDelegiert(settingsNachAnlage[teamId], "draft"));
     kickoffLeagueSetupDraft({
       persistence,
       saveId: setupSaveId,

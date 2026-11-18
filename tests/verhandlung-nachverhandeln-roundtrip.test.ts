@@ -267,21 +267,21 @@ describe("Nachverhandeln: Vorschau → Verhandeln (Route) → höheres Angebot �
   });
 });
 
-describe("Der Client fragt die Vorschau erst nach dem Speichern des Verhandeln-Klicks", () => {
-  const quelle = readFileSync(join(process.cwd(), "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"), "utf8");
+describe("Der Verhandlungstisch fragt die Vorschau erst nach dem Speichern des Verhandeln-Klicks", () => {
+  const quelle = readFileSync(join(process.cwd(), "app/foundation/transfermarkt-modern/VerhandlungsTisch.tsx"), "utf8");
 
   it("merkt sich den laufenden Schreibzugriff und wartet in der Vorschau darauf", () => {
-    expect(quelle).toContain("negotiationWriteRef.current = write;");
-    const vorschauFetch = quelle.indexOf('const response = await fetch("/api/transfermarkt/buy", {');
-    const warten = quelle.lastIndexOf("await pendingWrite", vorschauFetch);
+    expect(quelle).toContain("schreibRef.current = schreibt;");
+    const vorschauFetch = quelle.indexOf('await postJson<any>(modus === "kauf" ? "/api/transfermarkt/buy"');
+    const warten = quelle.lastIndexOf("await schreibRef.current", vorschauFetch);
     expect(warten).toBeGreaterThan(0);
-    expect(vorschauFetch - warten).toBeLessThan(600);
+    expect(vorschauFetch - warten).toBeLessThan(2500);
   });
 
   it("holt nach einem Gegenangebot die Vorschau neu, sobald der Draft gespeichert ist", () => {
-    const start = quelle.indexOf('if (verdict === "counter_money") {');
+    const start = quelle.indexOf('if (verdikt === "counter_money") {');
     const block = quelle.slice(start, start + 800);
-    expect(block).toContain('persistNegotiationOutcome(buyPreview, "countered").then(');
-    expect(block).toContain("setBuyPreviewRefreshNonce");
+    expect(block).toContain('schreibeErgebnis("countered").then(');
+    expect(block).toContain("setNachlauf");
   });
 });

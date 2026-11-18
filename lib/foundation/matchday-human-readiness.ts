@@ -1,3 +1,6 @@
+import type { TeamControlMode, TeamDelegation } from "@/lib/data/olyDataTypes";
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
+
 /**
  * Wann darf der Flow nach dem Speichern einer Einsatzliste weiter in die Arena?
  *
@@ -15,6 +18,11 @@ export type MatchdayReadinessTeam = {
   id: string;
   controlMode: string;
   currentMatchdayReady: boolean;
+  /**
+   * Menschliches Team mit an die KI delegierter Einsatzliste (Halbautomatik, 18.11.). Blockiert nie:
+   * die KI stellt es beim Spieltag auf (Lueckenfuellung im KI-Batch). Fehlt das Feld: wie bisher.
+   */
+  lineupDelegated?: boolean;
 };
 
 export type MatchdayHumanReadiness = {
@@ -29,7 +37,8 @@ export type MatchdayHumanReadiness = {
 export function evaluateMatchdayHumanReadiness(
   teams: readonly MatchdayReadinessTeam[] | null | undefined,
 ): MatchdayHumanReadiness {
-  const humanTeams = (teams ?? []).filter((team) => team.controlMode === "manual");
+  // Ein Spieltag wartet nie auf einen Menschen, dessen Einsatzliste delegiert ist (Chris, 18.11.).
+  const humanTeams = (teams ?? []).filter((team) => team.controlMode === "manual" && !team.lineupDelegated);
   const pendingTeamIds = humanTeams.filter((team) => !team.currentMatchdayReady).map((team) => team.id);
   return {
     // Ohne menschliche Teams (reiner KI-Save) gibt es nichts zu blockieren.
@@ -57,7 +66,9 @@ export function evaluateMatchdayHumanReadiness(
  */
 export function buildMatchdayReadinessTeamsFromState(input: {
   teams: ReadonlyArray<{ teamId: string }>;
-  controlModeByTeamId: Readonly<Record<string, { controlMode: string } | undefined>>;
+  controlModeByTeamId: Readonly<
+    Record<string, { controlMode: string; ownerId?: string | null; delegation?: TeamDelegation | null } | undefined>
+  >;
   lineupDrafts:
     | ReadonlyArray<{
         teamId: string;
@@ -81,11 +92,19 @@ export function buildMatchdayReadinessTeamsFromState(input: {
     }
     sidesByTeam.set(draft.teamId, sides);
   }
-  return input.teams.map((team) => ({
-    id: team.teamId,
-    controlMode: input.controlModeByTeamId[team.teamId]?.controlMode ?? "manual",
-    currentMatchdayReady: (sidesByTeam.get(team.teamId)?.size ?? 0) >= 2,
-  }));
+  return input.teams.map((team) => {
+    const settings = input.controlModeByTeamId[team.teamId];
+    const controlMode = settings?.controlMode ?? "manual";
+    const lineupDelegated =
+      settings != null &&
+      isBereichDelegiert({ ...settings, controlMode: controlMode as TeamControlMode }, "einsatzliste");
+    return {
+      id: team.teamId,
+      controlMode,
+      currentMatchdayReady: (sidesByTeam.get(team.teamId)?.size ?? 0) >= 2,
+      ...(lineupDelegated ? { lineupDelegated: true } : {}),
+    };
+  });
 }
 
 export function canJumpToArenaAfterLineupSave(input: {

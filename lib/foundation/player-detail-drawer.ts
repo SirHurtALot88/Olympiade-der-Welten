@@ -786,10 +786,9 @@ function maskEconomyForVisibility(
   if (visibility === "exact") {
     return economy;
   }
+  // Marktwert ist für ALLE Spieler exakt sichtbar, auch für fremde und ungescoutete (Chris 18.11.); Gehalt und Kaufpreis bleiben verdeckt.
   return {
     ...economy,
-    marketValue: null,
-    marketValueSource: "missing_source",
     salary: null,
     annualSalary: null,
     salarySource: "missing_source",

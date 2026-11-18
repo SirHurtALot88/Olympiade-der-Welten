@@ -46,6 +46,11 @@ export type NewGameSetupInput = {
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
   /**
+   * Ramona, dritte Spielerin (Chris, 18.11.): optional, dieselben Rechte wie Franky. Ihre Teams
+   * starten in der Halbautomatik (lib/foundation/team-delegation.ts). Fehlt das Feld: keine Teams.
+   */
+  ramonaTeamIds?: string[];
+  /**
    * OPTIONALE BENUTZERDEFINIERTE LIGA-ZUORDNUNG (Chris, 31.10.: "alle teams in der 2. liga muss man
    * bei erstellung auch wählen können"). Nur in Battle Mode relevant; nur wirksam, wenn sie fuer
    * GENAU die Teams dieses neuen Saves gueltig ist (`isValidLeagueAssignment`, s.u.) -- fehlt sie
@@ -80,11 +85,14 @@ export type NewGameSetupPreview = {
   scenarioType: ScenarioType;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
+  /** Ramona (18.11.). Leer, wenn ihr keine Teams zugeordnet sind. */
+  ramonaTeamIds: string[];
   aiTeamIds: string[];
   teams: NewGameTeamPreview[];
   counts: {
     chris: number;
     franky: number;
+    ramona: number;
     ai: number;
     passive: number;
     total: number;
@@ -252,6 +260,7 @@ function createConfirmToken(input: {
   presetId: NewGamePresetId;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
+  ramonaTeamIds?: string[];
   sandbox: boolean;
   baselineCount: number;
   playerCount: number;
@@ -263,6 +272,8 @@ function createConfirmToken(input: {
     input.sandbox ? "sandbox" : "standard",
     input.chrisTeamIds.join(","),
     input.frankyTeamIds.join(","),
+    // Nur mit Ramona-Teams angehaengt: Spielstaende ohne Ramona behalten ihr bisheriges Token.
+    ...(input.ramonaTeamIds && input.ramonaTeamIds.length > 0 ? [`ramona=${input.ramonaTeamIds.join(",")}`] : []),
     input.baselineCount,
     input.playerCount,
     input.rankSignature,
@@ -324,6 +335,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const rawFrankyTeamIds = uniqueTeamIds(input.frankyTeamIds ?? preset.frankyTeamIds, validTeamIds).filter(
     (teamId) => !rawChrisTeamIds.includes(teamId),
   );
+  const rawRamonaTeamIds = uniqueTeamIds(input.ramonaTeamIds ?? [], validTeamIds).filter(
+    (teamId) => !rawChrisTeamIds.includes(teamId) && !rawFrankyTeamIds.includes(teamId),
+  );
 
   /**
    * TASK #155 — LIGA 2 IST IM BATTLE MODE KOMPLETT KI-GESTEUERT (WIZARD-FILTER).
@@ -367,9 +381,10 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const isLiga2TeamId = (teamId: string) => leagueAssignmentForNewGame?.[teamId] === "liga2";
   const chrisTeamIds = rawChrisTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
   const frankyTeamIds = rawFrankyTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
-  const droppedLiga2HumanTeamIds = [...rawChrisTeamIds, ...rawFrankyTeamIds].filter(isLiga2TeamId);
+  const ramonaTeamIds = rawRamonaTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
+  const droppedLiga2HumanTeamIds = [...rawChrisTeamIds, ...rawFrankyTeamIds, ...rawRamonaTeamIds].filter(isLiga2TeamId);
 
-  const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds]);
+  const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds, ...ramonaTeamIds]);
   const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
   const warnings: string[] = [];
   const blockers: string[] = [];
@@ -415,7 +430,13 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     frankyTeamIds,
   });
 
-  const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(baseGameState.teams, chrisTeamIds, frankyTeamIds);
+  const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(
+    baseGameState.teams,
+    chrisTeamIds,
+    frankyTeamIds,
+    undefined,
+    ramonaTeamIds,
+  );
 
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
 
@@ -655,6 +676,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     scenarioType,
     chrisTeamIds,
     frankyTeamIds,
+    ramonaTeamIds,
     aiTeamIds,
     teams: gameState.teams.map((team) => {
       const setting = teamControlSettings[team.teamId]!;
@@ -672,6 +694,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     counts: {
       chris: chrisTeamIds.length,
       franky: frankyTeamIds.length,
+      ramona: ramonaTeamIds.length,
       ai: aiTeamIds.length,
       passive: 0,
       total: gameState.teams.length,
@@ -706,6 +729,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       presetId: input.presetId,
       chrisTeamIds,
       frankyTeamIds,
+      ramonaTeamIds,
       sandbox: Boolean(input.sandbox),
       baselineCount: baseGameState.playerBaselines?.length ?? 0,
       playerCount: baseGameState.players.length,

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import {
   applyGameModeOwnership,
+  buildTeamControlSettingsMap,
   deriveChrisFrankyTeamIdsFromSettings,
   getGameModeOwnershipLimits,
   resolveGameModeFromState,
@@ -39,6 +40,11 @@ type TeamOwnershipUpdateBody = {
   saveId?: string;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
+  /**
+   * Ramona (dritte Spielerin, 18.11.). Optional: fehlt das Feld, bleiben ihre bestehenden Teams bei
+   * ihr (die Team-Zuordnung der Oberflaeche kennt sie noch nicht). `[]` nimmt ihr alle Teams.
+   */
+  ramonaTeamIds?: string[];
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -63,6 +69,11 @@ export async function POST(request: Request) {
     const saveId = body.saveId?.trim() ?? "";
     const chrisTeamIds = leseTeamIds(body.chrisTeamIds);
     const frankyTeamIds = leseTeamIds(body.frankyTeamIds ?? []);
+    const ramonaAngegeben = body.ramonaTeamIds !== undefined;
+    const ramonaTeamIdsEingabe = ramonaAngegeben ? leseTeamIds(body.ramonaTeamIds) : null;
+    if (ramonaAngegeben && ramonaTeamIdsEingabe == null) {
+      return NextResponse.json({ success: false, error: "ramonaTeamIds must be a list of team ids." }, { status: 400 });
+    }
 
     if (source === "prisma") {
       return NextResponse.json({ success: false, error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
@@ -105,11 +116,23 @@ export async function POST(request: Request) {
     const saveMode = resolveGameModeFromState(save.gameState);
     const limits = getGameModeOwnershipLimits(saveMode);
     const gueltigeTeamIds = new Set(save.gameState.teams.map((team) => team.teamId));
-    const unbekannt = [...chrisTeamIds, ...frankyTeamIds].filter((teamId) => !gueltigeTeamIds.has(teamId));
+    const bisherigeZuordnung = deriveChrisFrankyTeamIdsFromSettings(
+      save.gameState.teams,
+      buildTeamControlSettingsMap(save.gameState.teams, save.gameState.seasonState.teamControlSettings),
+    );
+    // Ohne Angabe: Ramonas bisherige Teams, abzueglich derer, die jetzt ausdruecklich an Chris oder
+    // Franky gehen (dieselbe Vorrangregel wie in `applyChrisFrankyOwnershipToTeamControlSettings`).
+    const ramonaTeamIds = (ramonaTeamIdsEingabe ?? bisherigeZuordnung.ramonaTeamIds).filter(
+      (teamId) => ramonaAngegeben || (!chrisTeamIds.includes(teamId) && !frankyTeamIds.includes(teamId)),
+    );
+    const unbekannt = [...chrisTeamIds, ...frankyTeamIds, ...ramonaTeamIds].filter((teamId) => !gueltigeTeamIds.has(teamId));
     if (unbekannt.length > 0) {
       return NextResponse.json({ success: false, error: "unknown_team_id" }, { status: 400 });
     }
-    const doppelt = chrisTeamIds.filter((teamId) => frankyTeamIds.includes(teamId));
+    const doppelt = [
+      ...chrisTeamIds.filter((teamId) => frankyTeamIds.includes(teamId) || ramonaTeamIds.includes(teamId)),
+      ...frankyTeamIds.filter((teamId) => ramonaTeamIds.includes(teamId)),
+    ];
     if (doppelt.length > 0) {
       return NextResponse.json({ success: false, error: "team_owned_twice" }, { status: 400 });
     }
@@ -119,16 +142,20 @@ export async function POST(request: Request) {
     if (saveMode === "solo_1" && chrisTeamIds.length !== 1) {
       return NextResponse.json({ success: false, error: "solo_needs_exactly_one_human_team" }, { status: 400 });
     }
-    if (chrisTeamIds.length > limits.chrisMax || frankyTeamIds.length > limits.frankyMax) {
+    if (
+      chrisTeamIds.length > limits.chrisMax ||
+      frankyTeamIds.length > limits.frankyMax ||
+      ramonaTeamIds.length > limits.ramonaMax
+    ) {
       return NextResponse.json({ success: false, error: "too_many_human_teams_for_mode" }, { status: 400 });
     }
     // Ohne diesen Riegel könnte der Host die Liga vollständig auf KI stellen und säße in einem
     // Spielstand, den niemand mehr führt.
-    if (chrisTeamIds.length + frankyTeamIds.length === 0) {
+    if (chrisTeamIds.length + frankyTeamIds.length + ramonaTeamIds.length === 0) {
       return NextResponse.json({ success: false, error: "at_least_one_human_team_required" }, { status: 400 });
     }
 
-    const nextGameState = applyGameModeOwnership(save.gameState, { saveMode, chrisTeamIds, frankyTeamIds });
+    const nextGameState = applyGameModeOwnership(save.gameState, { saveMode, chrisTeamIds, frankyTeamIds, ramonaTeamIds });
     const persisted = persistence.saveSingleplayerState(saveId, nextGameState);
 
     notifyRoomGameplayWrite(writeAuth, {
@@ -150,6 +177,7 @@ export async function POST(request: Request) {
       saveVersion: persisted.gameState.saveVersion,
       chrisTeamIds: gespeicherteZuordnung.chrisTeamIds,
       frankyTeamIds: gespeicherteZuordnung.frankyTeamIds,
+      ramonaTeamIds: gespeicherteZuordnung.ramonaTeamIds,
     });
   } catch (error) {
     const koopKonflikt = koopSchreibkonfliktAntwort(error);
