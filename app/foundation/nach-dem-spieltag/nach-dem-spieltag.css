@@ -46,7 +46,7 @@
   position: relative;
   flex: 1 1 0;
   min-width: 0;
-  max-width: clamp(300px, 17vw, 420px);
+  max-width: clamp(360px, 21vw, 540px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -223,7 +223,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: 150px;
+  padding-bottom: 8px;
 }
 .nds-mz {
   min-height: var(--nds-zeile);
@@ -453,13 +453,14 @@
 
 /* ---------- Bauchbinde ---------- */
 .nds-einbl {
-  position: absolute;
+  position: relative;
+  flex: none;
   z-index: 40;
-  /* Mittig ueber der linken Tafel (Spaltenverhaeltnis 1,5 : 1), damit sie die rechten Kaesten nicht verdeckt. */
-  left: calc(14px + (100% - 40px) * 0.3);
-  bottom: 22px;
-  transform: translateX(-50%);
-  width: min(clamp(700px, 42vw, 1080px), calc((100% - 40px) * 0.6 - 16px));
+  /* Im Fluss unter den Tafeln (nicht mehr darueber gelegt): sie deckt keine Zeile der Liste ab, die Liste scrollt darueber.
+     Breite = linke Tafel (Spaltenverhaeltnis 1,5 : 1), damit sie die rechten Kaesten nicht beruehrt. */
+  align-self: flex-start;
+  margin: 0 0 14px 14px;
+  width: min(clamp(700px, 42vw, 1080px), calc((100% - 40px) * 0.6));
   display: grid;
   grid-template-columns: clamp(86px, 4vw, 120px) minmax(0, 1fr) auto;
   align-items: stretch;
@@ -617,8 +618,7 @@
   .nds-einbl {
     position: sticky;
     bottom: 8px;
-    left: auto;
-    transform: none;
+    align-self: auto;
     margin: 0 auto 8px;
     grid-template-columns: 60px minmax(0, 1fr);
     width: calc(100% - 16px);

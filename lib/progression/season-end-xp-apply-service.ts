@@ -31,9 +31,10 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import {
   buildOrganicSeasonProgression,
-  resolveSeasonTrainingAccumulatorInputs,
+  resolveSeasonEndTrainingAccumulatorOverrides,
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
+import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
 import {
   reconcilePlayerPotentialRecordsForGameState,
   resolvePlayerPotentialRecordForProgression,
@@ -273,13 +274,26 @@ function resolveSeasonTotalMatchdays(gameState: GameState): number {
  * result is `{}`, so both params stay undefined and the organic module falls back to mode-at-season-end.
  */
 function accumulatorProgressionOverrides(gameState: GameState, player: Player) {
-  return (
-    resolveSeasonTrainingAccumulatorInputs({
-      accumulator: player.seasonTrainingAccumulator,
-      seasonId: gameState.season.id,
-      totalMatchdays: resolveSeasonTotalMatchdays(gameState),
-    }) ?? {}
-  );
+  // Training je Spieltag (18.11.): was je Spieltag gebucht ist, steckt schon in den Attributen und
+  // zaehlt hier NICHT noch einmal — das Budget umfasst nur ungebuchte Alt-Spieltage (Schalter aus:
+  // unveraendert die alte Ableitung).
+  return resolveSeasonEndTrainingAccumulatorOverrides({
+    accumulator: player.seasonTrainingAccumulator,
+    seasonId: gameState.season.id,
+    totalMatchdays: resolveSeasonTotalMatchdays(gameState),
+    jeSpieltag: isTrainingJeSpieltagAktiv(),
+  });
+}
+
+/**
+ * Saisonbilanz der Disziplinwerte: mit Training je Spieltag stehen die Werte am Saisonende schon um den
+ * Trainingsanteil hoeher. Das Saison-Delta (`disciplineDelta`, `lastSeasonDisciplineValues`) muss gegen
+ * den Stand VOR dem ersten Trainings-Spieltag rechnen, sonst zeigte es nur noch Leistung und Abbau.
+ */
+function seasonStartDisciplineBaseline(player: Player, seasonId: string): Record<string, number> | null {
+  const akku = player.seasonTrainingAccumulator;
+  if (!akku || akku.seasonId !== seasonId || !akku.startDisziplinwerte) return null;
+  return { ...akku.startDisziplinwerte };
 }
 
 /**
@@ -1091,7 +1105,11 @@ export function applySeasonEndXpSpend(
     if (!playerPreview || !affectedPlayerIds.has(player.id)) return player;
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
     const nextDisciplineRatings = disciplineRatingsAfterByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
-    const baselineDisciplineRatings = disciplineRatingsBeforeByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
+    const baselineDisciplineRatings =
+      seasonStartDisciplineBaseline(player, save.gameState.season.id) ??
+      disciplineRatingsBeforeByPlayerId.get(player.id) ??
+      player.disciplineRatings ??
+      {};
     const disciplineDelta = Object.fromEntries(
       Object.entries(nextDisciplineRatings).map(([disciplineId, current]) => [
         disciplineId,
@@ -1304,7 +1322,10 @@ export function applySeasonEndProgressionMutations(input: {
     if (!playerPreview) return player;
 
     progressedPlayerIds.push(player.id);
-    disciplineBaselinesBefore.set(player.id, { ...(player.disciplineRatings ?? {}) });
+    disciplineBaselinesBefore.set(
+      player.id,
+      seasonStartDisciplineBaseline(player, seasonId) ?? { ...(player.disciplineRatings ?? {}) },
+    );
 
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
     const materializedSalaryExpectation = playerPreview.economyAudit.salaryExpectation;
