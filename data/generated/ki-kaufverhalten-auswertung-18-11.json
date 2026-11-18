@@ -1,0 +1,796 @@
+{
+ "klassen": [
+  {
+   "liga": "liga1",
+   "klasse": "reich",
+   "n": 5,
+   "budgetMin": 305,
+   "budgetMax": 325,
+   "budgetMittel": 315,
+   "draftCashMed": 6.9,
+   "draftCashMin": 5,
+   "draftCashMax": 12.3,
+   "draftPctMed": 2.2,
+   "gehaltMed": 88.6,
+   "cashZuGehaltMed": 0.08,
+   "s2VorMed": 90.1,
+   "s2NachMed": 66.1,
+   "s2NachMin": 14.4,
+   "s2NachMax": 101.6,
+   "s2KaderVor": 8.1,
+   "s2KaderNach": 9.1,
+   "s2SchuldMean": 5.7,
+   "s2MitKredit": "2/10"
+  },
+  {
+   "liga": "liga1",
+   "klasse": "mittel",
+   "n": 6,
+   "budgetMin": 275,
+   "budgetMax": 300,
+   "budgetMittel": 287.5,
+   "draftCashMed": 6.3,
+   "draftCashMin": 5.1,
+   "draftCashMax": 13.5,
+   "draftPctMed": 2.2,
+   "gehaltMed": 79.7,
+   "cashZuGehaltMed": 0.08,
+   "s2VorMed": 82.6,
+   "s2NachMed": 54.6,
+   "s2NachMin": 4.4,
+   "s2NachMax": 80.7,
+   "s2KaderVor": 7.6,
+   "s2KaderNach": 9.1,
+   "s2SchuldMean": 10.7,
+   "s2MitKredit": "3/12"
+  },
+  {
+   "liga": "liga1",
+   "klasse": "arm",
+   "n": 5,
+   "budgetMin": 250,
+   "budgetMax": 270,
+   "budgetMittel": 260,
+   "draftCashMed": 6.1,
+   "draftCashMin": 5.2,
+   "draftCashMax": 13.5,
+   "draftPctMed": 2.4,
+   "gehaltMed": 67.6,
+   "cashZuGehaltMed": 0.09,
+   "s2VorMed": 77,
+   "s2NachMed": 57.4,
+   "s2NachMin": 3.6,
+   "s2NachMax": 91.6,
+   "s2KaderVor": 7.2,
+   "s2KaderNach": 8.2,
+   "s2SchuldMean": 7.6,
+   "s2MitKredit": "3/10"
+  },
+  {
+   "liga": "liga2",
+   "klasse": "reich",
+   "n": 5,
+   "budgetMin": 225,
+   "budgetMax": 245,
+   "budgetMittel": 235,
+   "draftCashMed": 6.3,
+   "draftCashMin": 5.1,
+   "draftCashMax": 11.1,
+   "draftPctMed": 2.8,
+   "gehaltMed": 63.6,
+   "cashZuGehaltMed": 0.1,
+   "s2VorMed": 90.7,
+   "s2NachMed": 72.3,
+   "s2NachMin": 41,
+   "s2NachMax": 87.9,
+   "s2KaderVor": 6.9,
+   "s2KaderNach": 7.6,
+   "s2SchuldMean": 8.3,
+   "s2MitKredit": "3/10"
+  },
+  {
+   "liga": "liga2",
+   "klasse": "mittel",
+   "n": 6,
+   "budgetMin": 195,
+   "budgetMax": 220,
+   "budgetMittel": 207.5,
+   "draftCashMed": 7.3,
+   "draftCashMin": 5,
+   "draftCashMax": 12.4,
+   "draftPctMed": 3.5,
+   "gehaltMed": 54.7,
+   "cashZuGehaltMed": 0.14,
+   "s2VorMed": 80.9,
+   "s2NachMed": 59.8,
+   "s2NachMin": 3.4,
+   "s2NachMax": 84.9,
+   "s2KaderVor": 6.9,
+   "s2KaderNach": 8.5,
+   "s2SchuldMean": 8.4,
+   "s2MitKredit": "3/12"
+  },
+  {
+   "liga": "liga2",
+   "klasse": "arm",
+   "n": 5,
+   "budgetMin": 170,
+   "budgetMax": 190,
+   "budgetMittel": 180,
+   "draftCashMed": 6.9,
+   "draftCashMin": 5.2,
+   "draftCashMax": 11.1,
+   "draftPctMed": 3.8,
+   "gehaltMed": 47.5,
+   "cashZuGehaltMed": 0.15,
+   "s2VorMed": 69.8,
+   "s2NachMed": 50.5,
+   "s2NachMin": 26.9,
+   "s2NachMax": 63.9,
+   "s2KaderVor": 6.9,
+   "s2KaderNach": 8,
+   "s2SchuldMean": 1.4,
+   "s2MitKredit": "1/10"
+  }
+ ],
+ "gehaltVsSponsor": {
+  "verteilung": {
+   "n": 93,
+   "p10": 0.6966067864271457,
+   "p25": 0.8360655737704918,
+   "med": 1.0177514792899407,
+   "p75": 1.1801242236024843,
+   "p90": 1.3608617594254937,
+   "unter1": 41,
+   "unter08": 21,
+   "ueber12": 20
+  },
+  "histogramm": [
+   {
+    "von": 0,
+    "bis": 0.7,
+    "n": 10
+   },
+   {
+    "von": 0.7,
+    "bis": 0.85,
+    "n": 16
+   },
+   {
+    "von": 0.85,
+    "bis": 1,
+    "n": 15
+   },
+   {
+    "von": 1,
+    "bis": 1.15,
+    "n": 26
+   },
+   {
+    "von": 1.15,
+    "bis": 1.3,
+    "n": 14
+   },
+   {
+    "von": 1.3,
+    "bis": 9,
+    "n": 12
+   }
+  ],
+  "nachKlasse": [
+   {
+    "klasse": "reich",
+    "n": 27,
+    "ratioMed": 1.13,
+    "gehaltMed": 67.8,
+    "sponsorMed": 76,
+    "unter1": 9
+   },
+   {
+    "klasse": "mittel",
+    "n": 36,
+    "ratioMed": 1.02,
+    "gehaltMed": 65.3,
+    "sponsorMed": 68.2,
+    "unter1": 13
+   },
+   {
+    "klasse": "arm",
+    "n": 30,
+    "ratioMed": 0.89,
+    "gehaltMed": 58.9,
+    "sponsorMed": 50.6,
+    "unter1": 19
+   }
+  ],
+  "nachLiga": [
+   {
+    "liga": "liga1",
+    "n": 45,
+    "ratioMed": 0.87,
+    "unter1": 28
+   },
+   {
+    "liga": "liga2",
+    "n": 48,
+    "ratioMed": 1.11,
+    "unter1": 13
+   }
+  ],
+  "nachLigaKlasse": [
+   {
+    "liga": "liga1",
+    "klasse": "reich",
+    "n": 12,
+    "ratioMed": 1.09,
+    "deckungSumme": 1.14,
+    "gehaltMed": 81.1,
+    "sponsorMed": 93.7,
+    "unter1": 4
+   },
+   {
+    "liga": "liga1",
+    "klasse": "mittel",
+    "n": 18,
+    "ratioMed": 0.93,
+    "deckungSumme": 0.93,
+    "gehaltMed": 79.7,
+    "sponsorMed": 73.1,
+    "unter1": 10
+   },
+   {
+    "liga": "liga1",
+    "klasse": "arm",
+    "n": 15,
+    "ratioMed": 0.7,
+    "deckungSumme": 0.72,
+    "gehaltMed": 67.6,
+    "sponsorMed": 50.5,
+    "unter1": 14
+   },
+   {
+    "liga": "liga2",
+    "klasse": "reich",
+    "n": 15,
+    "ratioMed": 1.15,
+    "deckungSumme": 1.09,
+    "gehaltMed": 63.6,
+    "sponsorMed": 72.4,
+    "unter1": 5
+   },
+   {
+    "liga": "liga2",
+    "klasse": "mittel",
+    "n": 18,
+    "ratioMed": 1.1,
+    "deckungSumme": 1.16,
+    "gehaltMed": 54.7,
+    "sponsorMed": 55.5,
+    "unter1": 3
+   },
+   {
+    "liga": "liga2",
+    "klasse": "arm",
+    "n": 15,
+    "ratioMed": 1.1,
+    "deckungSumme": 1.08,
+    "gehaltMed": 47.5,
+    "sponsorMed": 50.9,
+    "unter1": 5
+   }
+  ],
+  "korrelationen": {
+   "ratio_budget": -0.16,
+   "ratio_gehalt": -0.3,
+   "ratio_ambition": -0.17,
+   "ratio_finances": 0.37,
+   "ratio_kader": 0.23,
+   "gehalt_anchor": 0.59,
+   "sponsor_anchor": 0.77
+  },
+  "ankerVsReal": {
+   "n": 93,
+   "ankerMed": 66.2,
+   "realMed": 61.5,
+   "real_zu_anker_med": 0.92
+  },
+  "gehaltZuAnker": {
+   "med": 0.91,
+   "p90": 1.28,
+   "ueber1": 28
+  },
+  "deckelSzenarien": [
+   {
+    "k": 0.9,
+    "teamLaeufeUeberDeckel": 69,
+    "von": 93,
+    "kappungMed": 8.7,
+    "kappungSumme": 874.3,
+    "davonLiga1": 39
+   },
+   {
+    "k": 1,
+    "teamLaeufeUeberDeckel": 41,
+    "von": 93,
+    "kappungMed": 12.1,
+    "kappungSumme": 539.4,
+    "davonLiga1": 30
+   },
+   {
+    "k": 1.1,
+    "teamLaeufeUeberDeckel": 28,
+    "von": 93,
+    "kappungMed": 11.4,
+    "kappungSumme": 352.4,
+    "davonLiga1": 26
+   },
+   {
+    "k": 1.2,
+    "teamLaeufeUeberDeckel": 22,
+    "von": 93,
+    "kappungMed": 8.9,
+    "kappungSumme": 216.8,
+    "davonLiga1": 21
+   },
+   {
+    "k": 1.3,
+    "teamLaeufeUeberDeckel": 15,
+    "von": 93,
+    "kappungMed": 8.7,
+    "kappungSumme": 124.3,
+    "davonLiga1": 15
+   }
+  ],
+  "ueberzieher": [
+   {
+    "lauf": "A",
+    "team": "N-N",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 270,
+    "gehalt": 80.6,
+    "sponsor": 44.8,
+    "ratio": 0.56,
+    "kader": 10,
+    "amb": 6.12,
+    "fin": 2.92,
+    "anchor": 54.35,
+    "startRank": 12,
+    "endRank": 14
+   },
+   {
+    "lauf": "C",
+    "team": "N-N",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 270,
+    "gehalt": 78.7,
+    "sponsor": 43.8,
+    "ratio": 0.56,
+    "kader": 11,
+    "amb": 6.12,
+    "fin": 2.92,
+    "anchor": 54.35,
+    "startRank": 12,
+    "endRank": 16
+   },
+   {
+    "lauf": "A",
+    "team": "V-D",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 250,
+    "gehalt": 67.6,
+    "sponsor": 39.2,
+    "ratio": 0.58,
+    "kader": 12,
+    "amb": 5.03,
+    "fin": 2.92,
+    "anchor": 46.55,
+    "startRank": 16,
+    "endRank": 16
+   },
+   {
+    "lauf": "B",
+    "team": "V-D",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 250,
+    "gehalt": 64.4,
+    "sponsor": 39.4,
+    "ratio": 0.61,
+    "kader": 12,
+    "amb": 5.03,
+    "fin": 2.92,
+    "anchor": 46.55,
+    "startRank": 16,
+    "endRank": 16
+   },
+   {
+    "lauf": "B",
+    "team": "N-N",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 270,
+    "gehalt": 80,
+    "sponsor": 50.5,
+    "ratio": 0.63,
+    "kader": 12,
+    "amb": 6.12,
+    "fin": 2.92,
+    "anchor": 54.35,
+    "startRank": 12,
+    "endRank": 10
+   },
+   {
+    "lauf": "C",
+    "team": "V-D",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 250,
+    "gehalt": 69.1,
+    "sponsor": 46.2,
+    "ratio": 0.67,
+    "kader": 13,
+    "amb": 5.03,
+    "fin": 2.92,
+    "anchor": 46.55,
+    "startRank": 16,
+    "endRank": 12
+   },
+   {
+    "lauf": "C",
+    "team": "W-W",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 255,
+    "gehalt": 64,
+    "sponsor": 43.8,
+    "ratio": 0.68,
+    "kader": 11,
+    "amb": 6.7,
+    "fin": 7.4,
+    "anchor": 55.54,
+    "startRank": 15,
+    "endRank": 14
+   },
+   {
+    "lauf": "B",
+    "team": "W-L",
+    "liga": "liga1",
+    "klasse": "mittel",
+    "budget": 290,
+    "gehalt": 85.7,
+    "sponsor": 59.6,
+    "ratio": 0.7,
+    "kader": 12,
+    "amb": 5.34,
+    "fin": 10,
+    "anchor": 83.3,
+    "startRank": 8,
+    "endRank": 11
+   },
+   {
+    "lauf": "B",
+    "team": "H-R",
+    "liga": "liga1",
+    "klasse": "mittel",
+    "budget": 285,
+    "gehalt": 82.7,
+    "sponsor": 57.6,
+    "ratio": 0.7,
+    "kader": 11,
+    "amb": 8.8,
+    "fin": 2.1,
+    "anchor": 66.19,
+    "startRank": 9,
+    "endRank": 9
+   },
+   {
+    "lauf": "C",
+    "team": "Z-H",
+    "liga": "liga1",
+    "klasse": "reich",
+    "budget": 320,
+    "gehalt": 100.2,
+    "sponsor": 69.8,
+    "ratio": 0.7,
+    "kader": 11,
+    "amb": 10,
+    "fin": 2,
+    "anchor": 96.08,
+    "startRank": 2,
+    "endRank": 8
+   },
+   {
+    "lauf": "A",
+    "team": "T-T",
+    "liga": "liga1",
+    "klasse": "arm",
+    "budget": 260,
+    "gehalt": 71.9,
+    "sponsor": 50.6,
+    "ratio": 0.7,
+    "kader": 14,
+    "amb": 4.77,
+    "fin": 8.85,
+    "anchor": 54.6,
+    "startRank": 14,
+    "endRank": 15
+   },
+   {
+    "lauf": "A",
+    "team": "V-V",
+    "liga": "liga2",
+    "klasse": "reich",
+    "budget": 235,
+    "gehalt": 68.7,
+    "sponsor": 49.3,
+    "ratio": 0.72,
+    "kader": 10,
+    "amb": 9.2,
+    "fin": 3,
+    "anchor": 72.42,
+    "startRank": 3,
+    "endRank": 12
+   },
+   {
+    "lauf": "B",
+    "team": "R-L",
+    "liga": "liga1",
+    "klasse": "mittel",
+    "budget": 295,
+    "gehalt": 80.3,
+    "sponsor": 59.5,
+    "ratio": 0.74,
+    "kader": 9,
+    "amb": 7.72,
+    "fin": 1.72,
+    "anchor": 88.79,
+    "startRank": 7,
+    "endRank": 14
+   },
+   {
+    "lauf": "B",
+    "team": "V-V",
+    "liga": "liga2",
+    "klasse": "reich",
+    "budget": 235,
+    "gehalt": 67.6,
+    "sponsor": 50.4,
+    "ratio": 0.75,
+    "kader": 9,
+    "amb": 9.2,
+    "fin": 3,
+    "anchor": 72.42,
+    "startRank": 3,
+    "endRank": 8
+   }
+  ],
+  "wiederholer": [
+   {
+    "team": "H-R",
+    "laeufe": 3,
+    "budget": 285,
+    "fin": 2.1,
+    "amb": 8.8
+   },
+   {
+    "team": "N-N",
+    "laeufe": 3,
+    "budget": 270,
+    "fin": 2.92,
+    "amb": 6.12
+   },
+   {
+    "team": "N-W",
+    "laeufe": 2,
+    "budget": 265,
+    "fin": 4.14,
+    "amb": 4.86
+   },
+   {
+    "team": "P-S",
+    "laeufe": 2,
+    "budget": 300,
+    "fin": 3.64,
+    "amb": 3.61
+   },
+   {
+    "team": "S-C",
+    "laeufe": 2,
+    "budget": 205,
+    "fin": 5.59,
+    "amb": 8
+   },
+   {
+    "team": "T-T",
+    "laeufe": 2,
+    "budget": 260,
+    "fin": 8.85,
+    "amb": 4.77
+   },
+   {
+    "team": "V-D",
+    "laeufe": 3,
+    "budget": 250,
+    "fin": 2.92,
+    "amb": 5.03
+   },
+   {
+    "team": "V-V",
+    "laeufe": 2,
+    "budget": 235,
+    "fin": 3,
+    "amb": 9.2
+   },
+   {
+    "team": "W-W",
+    "laeufe": 3,
+    "budget": 255,
+    "fin": 7.4,
+    "amb": 6.7
+   },
+   {
+    "team": "Z-H",
+    "laeufe": 2,
+    "budget": 320,
+    "fin": 2,
+    "amb": 10
+   },
+   {
+    "team": "B-B",
+    "laeufe": 2,
+    "budget": 185,
+    "fin": 3.68,
+    "amb": 6.28
+   },
+   {
+    "team": "R-L",
+    "laeufe": 2,
+    "budget": 295,
+    "fin": 1.72,
+    "amb": 7.72
+   },
+   {
+    "team": "T-G",
+    "laeufe": 2,
+    "budget": 230,
+    "fin": 2.64,
+    "amb": 6.28
+   }
+  ],
+  "gehalt_startrang": -0.4
+ },
+ "zufluss": {
+  "A": {
+   "kasseDraft": 243.8,
+   "kasseNachAbrechnung": 341.9,
+   "marktwertDraft": 7676.2,
+   "transfersNachQuelle": [
+    {
+     "schluessel": "season-1|contract_renewal|ai_contract_expiry|contract_exit",
+     "n": 59,
+     "fee": 1244.4,
+     "netto": 1244.4
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_roster_fill|buy",
+     "n": 369,
+     "fee": 7671.5,
+     "netto": 7671.5
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_organic_squad_sell|sell",
+     "n": 74,
+     "fee": 1190,
+     "netto": 993
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_preseason_market_buy|buy",
+     "n": 75,
+     "fee": 1854,
+     "netto": 1854
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_injury_depth_topup|buy",
+     "n": 5,
+     "fee": 20.9,
+     "netto": 20.9
+    },
+    {
+     "schluessel": "season-1|mascot_rule|nula_mascot_rule_buy|buy",
+     "n": 1,
+     "fee": 4.6,
+     "netto": -4.6
+    }
+   ]
+  },
+  "B": {
+   "kasseDraft": 238.2,
+   "kasseNachAbrechnung": 165.5,
+   "marktwertDraft": 7681.9,
+   "transfersNachQuelle": [
+    {
+     "schluessel": "season-1|contract_renewal|ai_contract_expiry|contract_exit",
+     "n": 79,
+     "fee": 1574.1,
+     "netto": 1574.1
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_roster_fill|buy",
+     "n": 368,
+     "fee": 7677.2,
+     "netto": 7677.2
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_organic_squad_sell|sell",
+     "n": 64,
+     "fee": 938.6,
+     "netto": 814.4
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_injury_depth_topup|buy",
+     "n": 13,
+     "fee": 65.8,
+     "netto": 65.8
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_preseason_market_buy|buy",
+     "n": 12,
+     "fee": 312.3,
+     "netto": 312.3
+    },
+    {
+     "schluessel": "season-1|mascot_rule|nula_mascot_rule_buy|buy",
+     "n": 1,
+     "fee": 4.6,
+     "netto": -4.6
+    }
+   ]
+  },
+  "C": {
+   "kasseDraft": 228.2,
+   "kasseNachAbrechnung": 238,
+   "marktwertDraft": 7691.8,
+   "transfersNachQuelle": [
+    {
+     "schluessel": "season-1|contract_renewal|ai_contract_expiry|contract_exit",
+     "n": 70,
+     "fee": 1796.4,
+     "netto": 1796.4
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_roster_fill|buy",
+     "n": 369,
+     "fee": 7687.2,
+     "netto": 7687.2
+    },
+    {
+     "schluessel": "season-1|manual_transfer_window|ai_organic_squad_sell|sell",
+     "n": 61,
+     "fee": 831,
+     "netto": 682.5
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_preseason_market_buy|buy",
+     "n": 34,
+     "fee": 823.3,
+     "netto": 823.3
+    },
+    {
+     "schluessel": "season-2|manual_transfer_window|ai_injury_depth_topup|buy",
+     "n": 16,
+     "fee": 95.2,
+     "netto": 95.2
+    },
+    {
+     "schluessel": "season-1|mascot_rule|nula_mascot_rule_buy|buy",
+     "n": 1,
+     "fee": 4.6,
+     "netto": -4.6
+    }
+   ]
+  }
+ }
+}
