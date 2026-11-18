@@ -9908,7 +9908,7 @@
               nahZoom:1.75, nahDauer:1.1, nahVersatz:0.16,
               // Review 18.11.: Zoom gibt nach, bis alle zehn Figuren (Kopf 40 px ueber, Fuss 10 px unter
               // dem Standpunkt) in der Hoehe ins Bild passen, nie unter zoomMin; Bildmitte zu 60 % zur Spielermitte.
-              alleImBild:{oben:40, unten:10, zoomMin:1.2, mitte:0.6}},
+              alleImBild:{oben:40, unten:10, zoomMin:1.24, mitte:0.6}},
       // TEAMFOULS / BONUS (Runde 2, FIBA-Regel 41): jedes Spielerfoul zaehlt als Teamfoul im
       // laufenden Viertel. Ab dem 5. Teamfoul (`bonusAb`) gibt jedes Foul ohne Wurf zwei
       // Freiwuerfe, davor nur Einwurf (Ballbesitz bleibt, Schussuhr auf `einwurfUhr` s gedeckelt).
@@ -20154,7 +20154,7 @@
         const kx=e.x, ry=e.y-F.ringZ, n=e.dunk?14:10, r=8+t*(e.dunk?70:50), a=1-t/0.7;
         // PixelLab-VFX aus dem Bestand (Review 18.11., 0 neue Generationen): Funkenregen beim Dunk,
         // goldenes Feuerwerk beim Dreier -- hinter den gezeichneten Strahlen, damit beides lesbar bleibt.
-        zeichneFxBild(e.dunk?"fx_funken":"fx_feuerwerk",kx,ry+(e.dunk?6:0),Math.min(1,t/0.7),e.dunk?"#ff9a3a":"#ffd34a",e.dunk?0.85:0.6);
+        zeichneFxBild(e.dunk?"fx_funken":"fx_feuerwerk",kx,ry+(e.dunk?6:0),Math.min(1,t/0.7),e.dunk?"#ff9a3a":"#ffd34a",e.dunk?1.25:0.95);
         ctx.save(); ctx.globalAlpha=a;
         for(let i=0;i<n;i++){
           const w=i/n*Math.PI*2+(e.dunk?0:0.2);
@@ -20178,16 +20178,17 @@
         ctx.fillStyle="rgba(255,255,255,"+(a*0.6)+")"; ctx.beginPath(); ctx.arc(e.x,e.y,5*(1-t),0,6.3); ctx.fill();
         ctx.restore();
       } else if(e.art==="steal"&&t<0.6){
-        const a=1-t/0.6, farbe=e.seite===0?css("--home"):css("--away"), r=14+t*34, rich=e.dx>=0?0:Math.PI;
-        if(!zeichneFxBild("fx_funken",e.x,e.y,Math.min(1,t/0.6),farbe,0.45)){
+        const a=1-t/0.6, farbe=e.seite===0?css("--home"):css("--away"), r=18+t*46, rich=e.dx>=0?0:Math.PI;
+        if(t<0.16){ ctx.save(); ctx.globalAlpha=(1-t/0.16)*0.7; ctx.fillStyle="#ffffff"; ctx.beginPath(); ctx.arc(e.x,e.y,9+t*60,0,6.3); ctx.fill(); ctx.restore(); }
+        if(!zeichneFxBild("fx_funken",e.x,e.y,Math.min(1,t/0.6),farbe,0.8)){
           ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=farbe;
           for(let i=0;i<6;i++){ const w=i/6*Math.PI*2; ctx.beginPath(); ctx.arc(e.x+Math.cos(w)*r*0.8,e.y+Math.sin(w)*r*0.5,2,0,6.3); ctx.fill(); }
           ctx.restore();
         }
         ctx.save(); ctx.globalAlpha=a; ctx.lineCap="round";
-        ctx.strokeStyle="#ffffff"; ctx.lineWidth=5*a+1;
+        ctx.strokeStyle="#ffffff"; ctx.lineWidth=7*a+1.5;
         ctx.beginPath(); ctx.arc(e.x,e.y,r,rich-1.1,rich+1.1); ctx.stroke();
-        ctx.strokeStyle=farbe; ctx.lineWidth=3*a+1;
+        ctx.strokeStyle=farbe; ctx.lineWidth=4*a+1.5;
         ctx.beginPath(); ctx.arc(e.x,e.y,r+5,rich-0.9,rich+0.9); ctx.stroke();
         ctx.restore();
       } else if(e.art==="staub"&&t<0.6){
@@ -58593,7 +58594,11 @@
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
     // Umrechnung wie dort, nur hier fuer den Ticker-Zeitstempel.
-    d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
+    // EINE UHR (Basketball-Review 18.11.): mit dem HUD-System trug der Ticker die abgelaufene Zeit ("1:25"),
+    // der Spielverlauf im Dock dieselbe Szene als Restzeit des Viertels ("Q1 0:49") -- zwei Zeitachsen
+    // nebeneinander. Bei Basketball steht jetzt auch im Ticker die Spieluhr der Kopfleiste.
+    const tkUhr=(feldspielDisc==="basketball"&&istFeldspiel(disc)&&hudSysAn&&typeof hudUhrJetzt==="function"&&hudProfil())?hudUhrJetzt():"";
+    d.appendChild(el("span","tk",tkUhr||(Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0"))));
     const tSpan=el("span",(side===0?"h":"a")+(big?" big":""),txt);
     if(side>=2&&istKampf(disc))tSpan.style.color=kampfSeitenFarbe(side); // Pod-Seite 2/3
     if(side>=2&&bahnPodAnzeigeAktiv())tSpan.style.color=bahnSeitenFarbe(side); // Bahn-Pod-Seite 2/3
@@ -60553,6 +60558,9 @@
   function hudCallout(txt,caption,titel,seite,kind){
     const p=hudProfil(); if(!p||!document.getElementById("hudEinblender"))return false;
     { const es=document.getElementById("endstand"); if(es&&!es.hidden)return true; }
+    // Viertelende bei Basketball: die Viertel-Bauchbinde (hudViertelBauchbinde) zeigt Stand und Linescore --
+    // kein zweiter Einblender "Zwischenstand!" darueber (Review 18.11.: beide lagen gleichzeitig im Bild).
+    if(kind==="zwischenstand"&&hudSysAn&&feldspielDisc==="basketball"&&p.chassis==="feldspiel")return true;
     const s=seite===1?1:0;
     hudEinblenderOffen={nr:++hudEinblenderZaehler,seite:s,txt,caption,titel:titel||"",kind:kind||"",abIdx:fsZuege.length,bisMs:jetztMs()+3400,gezeichnet:""};
     if(hudEinblenderTimer)clearTimeout(hudEinblenderTimer);
@@ -71374,6 +71382,7 @@
       const laengen=[]; // floats-Laenge der letzten 30 Ticks (s. unten)
       while(!done&&guard<60000){ laengen.push(floats.length); if(laengen.length>30)laengen.shift(); stepFeldspiel(1/60); guard++; if(passt())break; }
       vpSichtbarBis=0; // Viertelpausen-Tafel (Wandzeit) nicht ueber das Standbild legen
+      hudViertelBis=0; { const hv=document.getElementById("hudViertel"); if(hv)hv.hidden=true; } // dto. Viertel-Bauchbinde (Review 18.11.)
       // Schwebetexte aus dem Vorspulen ("STEAL!", "BLOCK!" laengst vergangener Szenen) nicht ins
       // Standbild uebernehmen — nur die der letzten halben Sekunde (30 Ticks) bleiben (Runde 2).
       if(laengen.length)floats.splice(0,Math.min(floats.length,laengen[0]));

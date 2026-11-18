@@ -1307,6 +1307,11 @@ PL_RAENDER = {
 }
 
 
+# HELLIGKEIT (Basketball-Review 18.11.): die Street-Court-Fassung vom 18.11. ist eine Abendszene (mittlere
+# Helligkeit 0,235); dunkle Figuren (Golem, Schattenwesen) verschwammen auf dem violetten Asphalt. Faktor auf
+# das fertige Bild (PIL ImageEnhance.Brightness), deterministisch.
+PL_HELL = {("basketball", "streetcourt"): 1.22}
+
 # Varianten, die es NUR als PixelLab-Breitform gibt (kein BAUER-Zweig in diesem Skript).
 PL_NUR = {"wettessen": ["nachtmarkt", "bierzelt"], "battlefield": ["wuestenruine"]}
 
@@ -1396,7 +1401,11 @@ def pixellab_breitform(disziplin: str, variante: str) -> Image.Image | None:
     ys = _achse(LH * 2, roh.height, s * 2, *(None if k not in rd else (rd[k][0], rd[k][1] * 2) for k in ("oben", "unten")))
     xs = _achse(LW * 2, roh.width, s * 2, *(None if k not in rd else (rd[k][0], rd[k][1] * 2) for k in ("links", "rechts")))
     a = np.asarray(roh)[ys.astype(int)[:, None], xs.astype(int)[None, :]]
-    return Image.fromarray(a).resize((LW, LH), Image.LANCZOS)
+    bild = Image.fromarray(a).resize((LW, LH), Image.LANCZOS)
+    if (disziplin, variante) in PL_HELL:
+        from PIL import ImageEnhance
+        bild = ImageEnhance.Brightness(bild).enhance(PL_HELL[(disziplin, variante)])
+    return bild
 
 
 def main() -> None:
