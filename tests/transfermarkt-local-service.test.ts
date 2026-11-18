@@ -2182,6 +2182,11 @@ describe("transfermarkt local service", () => {
 
   // Bug #12: Der AI-Liquiditaetspuffer darf nur AI-/Auto-Kaeufe begrenzen, nicht menschliche.
   it("gates human buys on raw on-hand cash but keeps the AI liquidity buffer for AI-controlled teams", async () => {
+    // Dieser Test prueft den Liquiditaetspuffer, nicht den Vorstand: das Fixture-Team (Kasse 10, Zielgehalt 41) hat ab Saison 2
+    // keinen freien Transfertopf (Ruecklage + Gehaltspuffer 14 > Kasse), das gaebe `vorstand_transferbudget_nicht_freigegeben`.
+    const vorstandVorher = process.env.OLY_VORSTAND_BUDGET;
+    process.env.OLY_VORSTAND_BUDGET = "0";
+    try {
     // Distinkte saveIds, damit der inhaltsbasierte Market-Context-Cache die beiden
     // Szenarien nicht vermischt (humanControlled fliesst nicht in die Content-Signatur ein).
     const buildSave = (saveId: string, humanControlled: boolean) => {
@@ -2245,6 +2250,10 @@ describe("transfermarkt local service", () => {
     });
     expect(aiPreview.blockingReasons).toContain("insufficient_cash");
     expect(aiPreview.canBuy).toBe(false);
+    } finally {
+      if (vorstandVorher === undefined) delete process.env.OLY_VORSTAND_BUDGET;
+      else process.env.OLY_VORSTAND_BUDGET = vorstandVorher;
+    }
   });
 
   // S7 regression: the transfer window used to be enforced only at the route layer

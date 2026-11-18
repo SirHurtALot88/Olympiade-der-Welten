@@ -646,6 +646,7 @@ function buildFinalBuyGate(input: {
   const vorstandRahmen = kaufRahmen(input.gameState, input.team.teamId);
   let vorstandAbloese = 0;
   let vorstandGehalt = 0;
+  const rahmenNurBlockiert = new Set<string>();
   const pflichtReserve = (rosterAfterThis: number, exclude: string) => {
     const fehlt = Math.max(0, VORSTAND_PFLICHT_KADER - rosterAfterThis);
     if (fehlt <= 0) return { fee: 0, salary: 0 };
@@ -771,6 +772,7 @@ function buildFinalBuyGate(input: {
     });
     if (!accepted) {
       blockedCandidateIds.add(candidate.playerId);
+      if (reasons.length === 1 && rahmenBlocked) rahmenNurBlockiert.add(candidate.playerId);
       continue;
     }
     picked.push(candidate);
@@ -789,7 +791,8 @@ function buildFinalBuyGate(input: {
   // Plaetze, werden die billigsten uebrigen Kandidaten genommen (zaehlen gegen den Topf, duerfen ihn ueberziehen).
   if (vorstandRahmen.gedeckelt) {
     const rest = input.candidates
-      .filter((c) => !picked.some((e) => e.playerId === c.playerId) && !input.claimedPlayerIds.has(c.playerId))
+      // Nur Kandidaten, die AUSSCHLIESSLICH am Rahmen scheiterten (nicht an Hard-No-Go, Cash-Puffer oder Doppelvergabe).
+      .filter((c) => rahmenNurBlockiert.has(c.playerId) && !picked.some((e) => e.playerId === c.playerId) && !input.claimedPlayerIds.has(c.playerId))
       .sort((a, b) => (a.price ?? a.marketValue ?? 0) - (b.price ?? b.marketValue ?? 0));
     for (const c of rest) {
       if (rosterBase + picked.length >= VORSTAND_PFLICHT_KADER) break;
