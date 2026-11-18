@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -41,7 +42,7 @@ let browser;
 try {
   const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  const seite = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const seite = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });   // Arenaraum ~938 CSS-px breit -> ~1876 Bildpixel
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.addInitScript(() => {
@@ -66,7 +67,12 @@ try {
   ].filter(([, t]) => t != null).sort((a, b) => a[1] - b[1]);
   await seite.click("#t2");   // Reiter ARENA
   await seite.evaluate(() => { window.__arena.setDisc("climbing"); });
+  await sendungsrahmenAus(seite, { countdown: true, finale: true, nachlauf: true, figuren: true });
   await seite.waitForTimeout(1500);   // Bilder laden
+  // Vorstellung vor dem Start schliessen: einmal Start, sofort Pause; weiter nur ueber sondenLauf (Simulationsuhr)
+  await seite.click("#play");
+  await seite.waitForTimeout(300);
+  await seite.click("#play");
   let simBisher = 0;
   for (const [name, t] of szenen) {
     const ziel = Math.max(simBisher, t - 0.25);
