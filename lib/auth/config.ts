@@ -1,15 +1,21 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID, RAMONA_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 /**
- * Phase-1-Login: zwei feste Benutzer (Chris und Franky). Kein Benutzerregister,
- * keine Registrierung - nur die zwei Personen, die dieses Spiel gemeinsam spielen.
+ * Phase-1-Login: feste Benutzer (Chris, Franky und seit 18.11. Ramona). Kein Benutzerregister,
+ * keine Registrierung - nur die Personen, die dieses Spiel gemeinsam spielen.
+ *
+ * EIN WEITERER BENUTZER = EIN EINTRAG in `AUTH_USERS` (plus `OLY_USER_<NAME>_PASSWORD` in
+ * deploy/hetzner/docker-compose.yml, .env.example und README). Benutzerliste, Login-Auswahl und
+ * Passwort-Variable leiten sich daraus ab — es gibt keine zweite Stelle mit "zwei Benutzern".
  *
  * WICHTIG: Solange OLY_AUTH_ENABLED nicht gesetzt ist, greift keiner dieser Werte -
  * die App verhaelt sich exakt wie vorher (siehe isAuthEnabled()).
  */
-export type AuthUsername = "chris" | "franky";
+export const AUTH_USERNAMES = ["chris", "franky", "ramona"] as const;
+
+export type AuthUsername = (typeof AUTH_USERNAMES)[number];
 
 export type AuthUserConfig = {
   username: AuthUsername;
@@ -30,10 +36,22 @@ export const AUTH_USERS: Record<AuthUsername, AuthUserConfig> = {
     displayName: "Franky",
     ownerId: FRANKY_OWNER_ID,
   },
+  // Chris, 18.11.: „Eigener Login für Ramona, mit denselben Rechten wie Franky“. Eigener Besitzer,
+  // ihre Teams laufen standardmaessig in der Halbautomatik (lib/foundation/team-delegation.ts).
+  ramona: {
+    username: "ramona",
+    displayName: "Ramona",
+    ownerId: RAMONA_OWNER_ID,
+  },
 };
 
 function isKnownUsername(value: string): value is AuthUsername {
-  return value === "chris" || value === "franky";
+  return (AUTH_USERNAMES as readonly string[]).includes(value);
+}
+
+/** Name der Passwort-Variable je Benutzer: `OLY_USER_<NAME>_PASSWORD`. */
+export function authPasswordEnvVarName(username: AuthUsername): string {
+  return `OLY_USER_${username.toUpperCase()}_PASSWORD`;
 }
 
 export function getAuthUserConfig(username: string | null | undefined): AuthUserConfig | null {
@@ -57,22 +75,17 @@ export function isAuthEnabled(): boolean {
   return process.env.OLY_AUTH_ENABLED === "1";
 }
 
-const DEV_FALLBACK_PASSWORDS: Record<AuthUsername, string> = {
-  chris: "chris",
-  franky: "franky",
-};
-
 const DEV_FALLBACK_SESSION_SECRET = "oly-dev-only-session-secret-do-not-use-in-production";
 
 function getConfiguredPassword(username: AuthUsername): string | null {
-  const envVarName = username === "chris" ? "OLY_USER_CHRIS_PASSWORD" : "OLY_USER_FRANKY_PASSWORD";
-  const configured = process.env[envVarName];
+  const configured = process.env[authPasswordEnvVarName(username)];
   if (configured && configured.length > 0) {
     return configured;
   }
 
   if (!isProduction()) {
-    return DEV_FALLBACK_PASSWORDS[username];
+    // Nur ausserhalb der Produktion: das Passwort ist der Benutzername (wie bisher fuer Chris/Franky).
+    return username;
   }
 
   // Fail closed: in production, without a configured password there is no login.

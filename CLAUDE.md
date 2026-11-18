@@ -451,6 +451,30 @@ abgeschnitten oder unnötig scrollend sein; auf dem 4K-Monitor darf nichts verlo
 leeren Riesenränder, Schrift und Tafeln wachsen mit). Wird die genaue Skalierung eines Geräts
 bekannt, hier eintragen.
 
+## Mehrspieler ist Pflicht (Chris, 18.11.)
+
+Wörtlich: „wichtig ist auch, dass ALL das weiterhin im Multiplayer möglich ist, wenn ich Franky als Spieler noch
+hinzufüge und ggf. Ramona auch mal mitmachen möchte.“ Es spielen bis zu **drei Menschen**: Chris, Franky, Ramona (eigener
+Login, Besitzer `ramona_local`). **Jede neue Seite und jede neue Mechanik** muss deshalb:
+
+- **mit mehreren menschlichen Managern funktionieren:** das aktive Team kommt aus `activeManagerTeamId`, Besitz aus
+  `ownerId` (`canOwnerManageTeam`), nie hart „Chris“, `user_local`, „das erste menschliche Team“ oder `teams[0]`;
+  Online-Abfragen über `isOnlineSaveMode()`, nicht `=== "online_4v4"`. Jeder Schreibweg läuft durch
+  `authorizeServerRoomWrite` mit `resolveAuthoritativeWriteOwnerId` und liest frisch vom Server.
+- **je Team bzw. je Manager getrennte Zustände haben:** Merkliste, Scouting, Fog of War, Vorstands-Freigabe,
+  Trainingsplan, Formkarten-Plan. Chris sieht in Taktgeber, Inbox und Startseite nur seine Teams; Vorfälle in fremden
+  Teams halten seine Leertaste nicht an.
+- **delegierbar sein:** je Bereich (Einsatzliste/Formkarten, Draft, Käufe/Verkäufe/Verträge, Training, Gebäude,
+  Sponsor) kann ein Mensch selbst entscheiden oder an die KI geben (`TeamControlSettings.delegation`,
+  `isBereichDelegiert` in `lib/foundation/team-delegation.ts`). Drei Stufen: **Voll selbst** (Chris, Franky),
+  **Halbautomatik** (Ramona: KI stellt auf und trainiert, Käufe/Verkäufe macht sie selbst), **Voll KI**. Die delegierte
+  KI nutzt dieselben Regeln und Funktionen wie für KI-Teams, **füllt nur, was der Mensch nicht selbst gesetzt hat**
+  („Mensch überschreibt, KI respektiert das“) und hält die Vorstands-Freigabe ein. Ein Spieltag wartet nie auf einen
+  abwesenden Menschen, dessen Bereich delegiert ist.
+
+Konzept, Lückenliste und offene Fragen: `docs/design/mehrspieler-delegation-18-11.md`. Ramonas Passwort steht nur auf
+dem Server (`OLY_USER_RAMONA_PASSWORD` in `deploy/hetzner/.env`), nie im Repo.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch

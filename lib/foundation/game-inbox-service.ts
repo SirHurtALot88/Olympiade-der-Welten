@@ -15,6 +15,8 @@ import { buildSeasonRecap } from "@/lib/foundation/season-recap-service";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
+import { DELEGATION_BEREICH_LABEL, isBereichDelegiert } from "@/lib/foundation/team-delegation";
+import type { DelegationBereich } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
@@ -1127,7 +1129,41 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     }
   }
 
-  return items;
+  return entschaerfeDelegierteAufgaben(items, settingsMap);
+}
+
+/**
+ * Welcher Delegations-Bereich hinter einer Team-Aufgabe steht (Praefix der `itemId`).
+ * Nur die Aufgaben, die die delegierte KI wirklich selbst erledigt.
+ */
+const DELEGIERTE_AUFGABEN: ReadonlyArray<{ praefix: string; bereich: DelegationBereich }> = [
+  { praefix: "lineup_missing:", bereich: "einsatzliste" },
+  { praefix: "lineup_not_submitted:", bereich: "einsatzliste" },
+  { praefix: "formcards_open:", bereich: "einsatzliste" },
+  { praefix: "formcards_negative_open:", bereich: "einsatzliste" },
+  { praefix: "sponsor_choice_missing:", bereich: "sponsor" },
+  { praefix: "training_missing:", bereich: "training" },
+];
+
+/**
+ * KEINE BLOCKADE DURCH DELEGIERTE BEREICHE (Chris, 18.11.): „Kritische Punkte bei Ramonas Teams
+ * blockieren Chris' Leertaste nicht. Gilt ihr Bereich als delegiert, löst ihn die KI.“ Eine offene
+ * Aufgabe in einem delegierten Bereich bleibt sichtbar (wer das Team gezielt auswaehlt, soll sehen,
+ * was ansteht), aber nur als Hinweis: die KI erledigt sie vor dem Spieltag (Einsatzliste: Batch mit
+ * Lueckenfuellung, Training: Neubewertung je Spieltag). Der Taktgeber zaehlt nur `critical` als
+ * kritisch — damit haelt sie auch die Leertaste nicht mehr an.
+ */
+function entschaerfeDelegierteAufgaben(items: GameInboxItem[], settingsMap: Record<string, TeamControlSettings>) {
+  return items.map((item) => {
+    if (item.status !== "open" || item.severity === "info" || !item.teamId) return item;
+    const treffer = DELEGIERTE_AUFGABEN.find((eintrag) => item.itemId.startsWith(eintrag.praefix));
+    if (!treffer || !isBereichDelegiert(settingsMap[item.teamId], treffer.bereich)) return item;
+    return {
+      ...item,
+      severity: "info" as const,
+      description: `${item.description} Die KI übernimmt (${DELEGATION_BEREICH_LABEL[treffer.bereich]} delegiert).`,
+    };
+  });
 }
 
 function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {

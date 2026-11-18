@@ -2086,9 +2086,11 @@ export type NewGameSetupPreview = {
   scenarioType: string;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
+  /** Ramona (18.11.); fehlt bei Vorschauen aelterer Server. */
+  ramonaTeamIds?: string[];
   aiTeamIds: string[];
   teams: NewGameTeamPreview[];
-  counts: { chris: number; franky: number; ai: number; passive: number; total: number };
+  counts: { chris: number; franky: number; ramona?: number; ai: number; passive: number; total: number };
   baseline: { playerCount: number; baselineCount: number; resetPlayers: number };
   seasonSetup: {
     seasonId: string;

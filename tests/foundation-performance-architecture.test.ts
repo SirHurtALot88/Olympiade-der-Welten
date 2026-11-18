@@ -900,7 +900,11 @@ describe("foundation performance architecture helpers", () => {
     // unveraendertes Verhalten). Er sitzt bewusst im selben `newGame*`-Bausatz wie
     // `newGameChrisTeamIds`/`newGameFrankyTeamIds` direkt daneben, aus dem `runNewGameSetup()`
     // den `/api/new-game`-Payload baut — dieselbe Begruendung wie beim vorigen Zugang hier.
+    // 242 -> 243, wieder bewusst statt heimlich: Ramona als dritte waehlbare Spielerin (Chris,
+    // 18.11., docs/design/mehrspieler-delegation-18-11.md) ergaenzt GENAU EINEN Zustand —
+    // `newGameRamonaTeamIds`, das Gegenstueck zu `newGameFrankyTeamIds` im selben Bausatz, aus dem
+    // `runNewGameSetup()` den Payload baut. Dieselbe Begruendung wie bei den Zugaengen davor.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(242);
+    expect(useStateCallCount).toBeLessThanOrEqual(243);
   });
 });

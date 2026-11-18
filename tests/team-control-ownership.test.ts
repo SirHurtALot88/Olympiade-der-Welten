@@ -222,6 +222,7 @@ describe("team control ownership", () => {
     expect(deriveChrisFrankyTeamIdsFromSettings(teams, settings)).toEqual({
       chrisTeamIds: ["M-M"],
       frankyTeamIds: [],
+      ramonaTeamIds: [],
     });
   });
 
