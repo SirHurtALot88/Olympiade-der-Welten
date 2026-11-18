@@ -7,6 +7,7 @@ import type {
   PlayerPotentialRecord,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
+import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
 import {
   getAcademyDevelopmentBoostPct,
   getFacilityEfficiency,
@@ -685,10 +686,13 @@ function getDisciplineWeightDistribution(disciplineId: string) {
   return normalizeWeights(raw);
 }
 
-function getPerformanceSetpoints(record: PlayerDisciplinePerformanceRecord) {
+function getPerformanceSetpoints(record: PlayerDisciplinePerformanceRecord, ppEinsatzFaktor = 1) {
   const scoreSignal = clamp((record.finalPlayerScore ?? 0) / 100, 0, 1.25) * 0.28;
   const rankSignal = record.rankInDiscipline === 1 ? 0.72 : record.isTop10 ? 0.42 : record.rankInDiscipline <= 16 ? 0.18 : 0.08;
-  const contributionSignal = clamp((record.scoreContribution ?? 0) / 30, 0, 1.2) * 0.22;
+  // PP-SKALA C2 (18.11.): `scoreContribution` ist der PP-Wert des Einsatzes. In einer C2-Saison wird die
+  // feste Bezugszahl 30 mit dem gemessenen Verhaeltnis C2/alt des mittleren Einsatzes umgerechnet
+  // (`ppSkalaUmrechnung().einsatz`), damit der Kanal sich durch die neue Skala nicht verschiebt.
+  const contributionSignal = clamp((record.scoreContribution ?? 0) / (30 * ppEinsatzFaktor), 0, 1.2) * 0.22;
   return roundValue((scoreSignal + rankSignal + contributionSignal) * ORGANIC_PERFORMANCE_SETPOINT_SCALE, 3);
 }
 
@@ -720,8 +724,9 @@ export function buildSeasonPerformanceSignals(input: {
 
   let totalBudget = 0;
   let totalScore = 0;
+  const ppEinsatzFaktor = ppSkalaUmrechnung(input.gameState).einsatz;
   for (const record of records) {
-    totalBudget += getPerformanceSetpoints(record);
+    totalBudget += getPerformanceSetpoints(record, ppEinsatzFaktor);
     totalScore += record.finalPlayerScore ?? 0;
   }
 
@@ -740,11 +745,12 @@ export function buildSeasonPerformanceSignals(input: {
 function buildPerformanceDeltas(gameState: GameState, playerId: string) {
   const deltas = Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0])) as Record<PlayerGeneratorAttributeName, number>;
   let totalBudget = 0;
+  const ppEinsatzFaktor = ppSkalaUmrechnung(gameState).einsatz;
 
   for (const record of getPerformanceRecords(gameState, playerId)) {
     const distribution = getDisciplineWeightDistribution(record.disciplineId);
     if (!distribution) continue;
-    const budget = getPerformanceSetpoints(record);
+    const budget = getPerformanceSetpoints(record, ppEinsatzFaktor);
     totalBudget += budget;
     for (const attribute of PROGRESSION_ATTRIBUTE_ORDER) {
       deltas[attribute] += budget * distribution[attribute];

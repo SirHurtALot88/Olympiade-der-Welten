@@ -1,3 +1,4 @@
+import { ergebnisMitSkalaText } from "@/lib/resolve/ergebnis-skala";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   DisciplineTeamResolvePreview,
@@ -195,7 +196,9 @@ export function beschreibeGebuchtesArenaErgebnis(
   const punkteText = punkte != null ? ` · ${fmt(punkte)} Pkt.` : "";
   if (entscheidung.art === "pod") {
     const platz = eigen.miniDmPod?.platz ?? null;
-    return { ausgang: null, text: `${teamName(eigen.teamId)}: Platz ${platz ?? "?"} von 4${punkteText}` };
+    // ERGEBNISSKALA (18.11.): der gebuchte 0-10-Wert des Teams in seiner Vierergruppe.
+    const wert = typeof eigen.miniDmPod?.wert === "number" ? ` → ${eigen.miniDmPod.wert}` : "";
+    return { ausgang: null, text: `${teamName(eigen.teamId)}: Platz ${platz ?? "?"} von 4${wert}${punkteText}` };
   }
   const gegner = entscheidung.gegnerZeile;
   const seiten = Array.isArray(eigen.duellSeiten) ? eigen.duellSeiten : null;
@@ -210,7 +213,11 @@ export function beschreibeGebuchtesArenaErgebnis(
   }
   const wort = ausgang === "sieg" ? "Sieg" : ausgang === "niederlage" ? "Niederlage" : ausgang === "remis" ? "Remis" : "Ergebnis";
   const gegnerName = eigen.opponentTeamId ? teamName(eigen.opponentTeamId) : "Gegner";
-  const stand = seiten ? ` ${fmt(seiten[0])} : ${fmt(seiten[1])}` : "";
+  // ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): native Zahl der Arena UND gebuchte Skala,
+  // "87 : 79 → 7 : 4" -- beides aus derselben gebuchten Zeile.
+  const skala = Array.isArray(eigen.ergebnisNormiert) ? eigen.ergebnisNormiert : null;
+  const standText = ergebnisMitSkalaText({ seiten, skala });
+  const stand = standText ? ` ${standText}` : "";
   return { ausgang, text: `${wort} gegen ${gegnerName}${stand}${punkteText}` };
 }
 

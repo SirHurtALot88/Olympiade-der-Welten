@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { wertungsSkalenFuerNeueSaison } from "@/lib/resolve/wertungs-skalen";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -657,6 +658,10 @@ function buildNextSeasonGameState(
   const nextSeasonState: SeasonState = {
     ...save.gameState.seasonState,
     seasonId: nextSeasonId,
+    // WERTUNGSSKALEN (18.11., lib/resolve/wertungs-skalen.ts): der einzige Ort neben dem Anlegen, an dem
+    // die PP- und Ergebnisskala eines Spielstands wechseln darf -- zum Saisonwechsel, damit die Historie
+    // einer laufenden Saison nie verrutscht. Bestehende Saves bekommen hier die neuen Skalen.
+    wertungsSkalen: wertungsSkalenFuerNeueSaison(nextSeasonId),
     // Battle-Mode-Saves mit aktivem Liga-Split bekommen ab Saison 2 den echten Circle-Spielplan
     // (leagueTier je Fixture, Gegner ueber Runden verteilt) statt der alten Dummy-Paarung --
     // Manager-Mode-/Legacy-Saves ohne `leagueByTeamId` bleiben unveraendert bei `buildSeasonFixtures`.

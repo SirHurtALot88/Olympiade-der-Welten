@@ -168,7 +168,10 @@ function buildFixtureResultLabel(paarung: SpieltagsPaarung): string | null {
   return paarung.disziplinen
     .map((disziplin) =>
       disziplin.gespielt
-        ? `${disziplin.disciplineName} ${disziplin.punkteHeim ?? "–"}:${disziplin.punkteGast ?? "–"}`
+        ? // ERGEBNISSKALA (18.11.): das gebuchte 0-10-Ergebnis, wo es eins gibt; sonst die Duell-Punkte.
+          disziplin.ergebnisNormiert && !disziplin.miniDmPodIdHeim && !disziplin.miniDmPodIdGast
+          ? `${disziplin.disciplineName} ${disziplin.ergebnisNormiert[0]}:${disziplin.ergebnisNormiert[1]}`
+          : `${disziplin.disciplineName} ${disziplin.punkteHeim ?? "–"}:${disziplin.punkteGast ?? "–"}`
         : `${disziplin.disciplineName} ausstehend`,
     )
     .join(" · ");

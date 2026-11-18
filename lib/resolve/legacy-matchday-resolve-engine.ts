@@ -48,7 +48,9 @@ import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID
 // wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ergebnisSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
+import { wendeErgebnisSkalaE1An } from "@/lib/resolve/ergebnis-skala-anwenden";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -957,6 +959,7 @@ export function buildLegacyMatchdayResolvePreview(
       : null;
     // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
     const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
+    const ppSkalaFuerDieseSaison = ppSkalaModus(base.gameState);
     const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
     // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
     // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
@@ -1224,12 +1227,14 @@ export function buildLegacyMatchdayResolvePreview(
           ? new Map(
               rankedWithinTeam.map(({ entry }) => [
                 entry.playerId,
-                // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md): bei AUS der unveraenderte Pfad.
-                ppSkalaAktiv()
+                // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel; "aus" = alter Pfad.
+                ppSkalaFuerDieseSaison !== "aus"
                   ? ppAusKurveSkaliert({
                       disciplineId,
                       wert: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
                       referenz: spielerPpReferenzFuerDiesesDisziplin,
+                      modus: ppSkalaFuerDieseSaison,
+                      playerCount: legacyScorePlayerCountForThisDiscipline,
                     })
                   : ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
               ] as const),
@@ -1346,6 +1351,19 @@ export function buildLegacyMatchdayResolvePreview(
         disciplineSide: score.disciplineSide ?? side,
       }));
     });
+
+    // ERGEBNISSKALA E1 (18.11., lib/resolve/ergebnis-skala.ts): NACH Ausgang, Pod-Platz und Spieler-PP.
+    // Aendert nur `verhaeltnis`/`ergebnisNormiert`/`miniDmPod.wert`, nie wer gewinnt. Nur in Battle-Saves,
+    // deren Saison mit E1 gestempelt ist (lib/resolve/wertungs-skalen.ts) -- aeltere Saisons und der
+    // Manager-Modus bleiben byte-identisch.
+    if (isBattleModeArenaEligible && ergebnisSkalaVersionFuer(base.gameState) === "e1") {
+      wendeErgebnisSkalaE1An({
+        teamResults: teamResultsRanked,
+        spielerZeilen: rawPlayerEntries,
+        disciplineId,
+        playerCount: legacyScorePlayerCountForThisDiscipline,
+      });
+    }
 
     const topPlayers = rankDescending(rawPlayerEntries, (entry) => entry.finalPlayerScore).map<PlayerPerformancePreview>(({ item, rank }) => ({
       ...item,

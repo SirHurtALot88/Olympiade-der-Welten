@@ -2748,6 +2748,12 @@ export type DisciplineResultRecord = {
    */
   ergebnisNormiert?: [number, number] | null;
   /**
+   * ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): `"e1"`, wenn `ergebnisNormiert`,
+   * `verhaeltnis` und `miniDmPod.wert` dieser Zeile nach der einheitlichen Skala E1 gerechnet sind
+   * (Saison-Stempel `seasonState.wertungsSkalen.ergebnis`). Fehlt = Skala vom 19.10.
+   */
+  ergebnisSkala?: "e1";
+  /**
    * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
    * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
    * Modus bleibt unberuehrt. Seit 01.11. fuer JEDE Vierer-Pod-Disziplin (Mini-DM, Battlefield, s.
@@ -3373,6 +3379,12 @@ export type SeasonSnapshotRecord = {
   sourceStatus?: "mapped" | "partial" | "missing_source";
   finalStandings: SeasonSnapshotTeamRecord[];
   teamSnapshots?: SeasonSnapshotTeamRecord[];
+  /**
+   * WERTUNGSSKALEN DER ARCHIVIERTEN SAISON (18.11., lib/resolve/wertungs-skalen.ts): mit welcher PP- und
+   * Ergebnisskala diese Saison gerechnet wurde. Fehlt = vor dem 18.11. archiviert (alte Skalen).
+   * Saisonuebergreifende Summen (ewige Tabelle, Laufbahn) koennen daran ablesen, ab wann die neue Skala gilt.
+   */
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1" } | null;
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
@@ -3789,6 +3801,13 @@ export type SeasonState = {
    * die V3-Basis gehoben wurden — und danach rechnen alle noch offenen Vertraege nach V3.
    */
   sponsorSystemVersion?: 1 | 2 | 3;
+  /**
+   * WERTUNGSSKALEN DIESER SAISON (18.11., lib/resolve/wertungs-skalen.ts): welche Spieler-PP-Skala
+   * ("c2" = Zwei-Anker, Deckel 5) und welche Team-Ergebnisskala ("e1" = einheitliche 0-10-Skala) diese
+   * Saison rechnet. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
+   * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
+   */
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1" };
   /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.

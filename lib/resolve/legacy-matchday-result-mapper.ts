@@ -90,6 +90,12 @@ export type DisciplineResultWritePayload = {
   /** NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.) -- s. `DisciplineResultRecord.ergebnisNormiert`. */
   ergebnisNormiert?: [number, number] | null;
   /**
+   * ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): `"e1"`, wenn `ergebnisNormiert`,
+   * `verhaeltnis` und `miniDmPod.wert` dieser Zeile nach der einheitlichen Skala E1 gerechnet sind
+   * (Saison-Stempel `seasonState.wertungsSkalen.ergebnis`). Fehlt = Skala vom 19.10.
+   */
+  ergebnisSkala?: "e1";
+  /**
    * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
    * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.).
    */
@@ -280,6 +286,9 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           // dass das etwas ueber das Vorhandensein des Pods aussagt) -- nur gesetzt, wenn diese
           // Zeile tatsaechlich aus einem Pod stammt.
           ...(teamResult.miniDmPod ? { miniDmPod: teamResult.miniDmPod } : {}),
+          // ERGEBNISSKALA E1 (18.11.): nur an Zeilen, die nach E1 gerechnet sind -- aeltere Saisons
+          // bekommen keinen neuen Schluessel.
+          ...(teamResult.ergebnisSkala ? { ergebnisSkala: teamResult.ergebnisSkala } : {}),
         };
       }),
   );

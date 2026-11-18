@@ -1,4 +1,5 @@
 import type { GameState, Player, PlayerDisciplinePerformanceRecord, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
+import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
@@ -699,7 +700,10 @@ export function buildPlayerProgressionForecast(input: {
   const facilityTrainingDelta = facilityTrainingXp.after - facilityTrainingXp.before;
   const appearanceXP = appearances * PLAYER_PROGRESSION_XP_CONSTANTS.appearanceXp;
   const mvsXP = isFiniteNumber(mvs) ? roundValue(mvs * PLAYER_PROGRESSION_XP_CONSTANTS.mvsMultiplier, 0) : 0;
-  const ppsBonusXP = calculatePpsBonusXp(pps, mvsXP);
+  // PP-SKALA C2 (18.11.): `pps x 4` ist eine feste PP-Zahl. In einer C2-Saison wird die Saisonsumme mit dem
+  // gemessenen Verhaeltnis C2/alt der Spieler-Saisonsumme zurueckgerechnet, damit der Bonus sich nicht verschiebt.
+  const ppSaisonFaktor = ppSkalaUmrechnung(input.gameState).spielerSaison;
+  const ppsBonusXP = calculatePpsBonusXp(pps != null && ppSaisonFaktor !== 1 ? pps / ppSaisonFaktor : pps, mvsXP);
   const topPlayerXP = calculateTopPlayerXp({ top10Count, rank1Count });
   const highlightXP = calculateHighlightXp({ mvpCount, highlightCount });
 

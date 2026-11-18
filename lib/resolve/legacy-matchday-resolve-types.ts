@@ -208,6 +208,12 @@ export type DisciplineTeamResolvePreview = {
    */
   ergebnisNormiert?: [number, number] | null;
   /**
+   * ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): `"e1"`, wenn `ergebnisNormiert`,
+   * `verhaeltnis` und `miniDmPod.wert` dieser Zeile nach der einheitlichen Skala E1 gerechnet sind
+   * (Saison-Stempel `seasonState.wertungsSkalen.ergebnis`). Fehlt = Skala vom 19.10.
+   */
+  ergebnisSkala?: "e1";
+  /**
    * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
    * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau
    * dieses Arena-Duell reproduzieren liesse. Die "Versionierung", die Chris fuer PR7 wollte — keine
