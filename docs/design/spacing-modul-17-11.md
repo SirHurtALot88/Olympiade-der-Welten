@@ -95,3 +95,29 @@ Zahl (9 %) ist die Größe, die den Klumpen trifft.
 - `node scripts/miss-spacing.mjs [disziplin] [spiele] [sekunden] [radius]`, mit
   `OLY_ENGINE_DATEI=<kopie>` für Vorher/Nachher gegen eine eingefrorene Engine-Kopie.
 - `window.__arena.diagSpacing(saaten, bis, dId, r)`: read-only, wie `diagAbstaende`.
+
+## 6. Runde 2 (17.11. abends): Laufwege, Feld-Grenze, Kamera — dieselbe Anschlusslogik
+
+Drei weitere Bausteine nach demselben Muster (Parameterblock in `FELDSPIEL_ART[d]`, ohne Block altes
+Verhalten zeichengleich). Erste Anwendung wieder Basketball, Messungen in
+`docs/design/benchmark-basketball-17-11.md` Abschnitt 7.
+
+| Baustein | Block | Was eine andere Disziplin zum Anschalten braucht |
+|---|---|---|
+| **FELD-GRENZE** `feldGrenze(zx,zy)` | `feld.grenze {laengs:[a,b], querHalb, rand}` | die gezeichneten Grundlinien (Anteil von W) und die halbe Feldbreite in px. Hockey: Bande statt Linie (`RINK()`), Football: Seitenlinien. Abnahme: `diagSpielzuege(n).seitenlinie.ausserhalb` = 0. |
+| **LAUFWEG-MODUL** `lwBallfuehrer`, `lwAngreifer`, `lwVerteidiger`, `lwCrash`, `lwFastbreakLane` | `laufwege {postBlock, postUp, backdoor, deny, pickRoll, ausboxen, crash, fastbreak, rotation, tempo, passArt, wurfAbsicht}` | Jeder Unterblock einzeln: fehlt er (`null`), ist der Baustein aus. Hockey: `deny`+`backdoor` (Pass in den Rücken des Verteidigers), `crash` (Netfront), `fastbreak` (Odd-Man-Rush), `tempo`. Fußball-artige: `deny`, `rotation`, `fastbreak`. Post-up/Pick sind basketballnah, bleiben dort aus. |
+| **KAMERA-MODUL** `feldKameraAnwenden` | `kamera {zoom, korbZug, querZug, daempfung, zoomDaempfung, nahZoom, nahDauer, nahVersatz}` | nichts außer dem Block — liest Ball, Ballbesitz und den laufenden Wurf; `korbXVon` liefert das angegriffene Ziel (Tor/Endzone). |
+| **TEAMFOUL-/BONUS-MODUL** | `fouls {bonusAb, reachIn, einwurfRest}` | basketballspezifisch; Hockey hat Strafzeiten. |
+| **EFFEKT-/TON-MODUL** | — (basketballeigen) | Muster (Ereignis-Warteschlange mit Deckel, Ton erst nach Geste) übertragbar. |
+
+Zustand aller Module liegt in WeakMaps bzw. modulweiten Variablen, nie an den Spielerobjekten
+(Fingerabdruck). Abnahme beim Anschalten wie in Abschnitt 4: `miss-alle-disziplinen.mjs`,
+`messe-arena-einfluss.mjs`, `miss-spacing.mjs`, dazu `diagSpielzuege` für die Häufigkeit der Aktionen.
+
+**Eine Begrenzung, nicht zwei (18.11.).** Der Review-Fix von #1562 hatte zusätzlich das Spacing-Ziel in
+`spacingMitspielerZiel` auf das Feld geklemmt (12 px Rand). Beim Zusammenführen mit Runde 2 ist nur die
+FELD-GRENZE geblieben: sie wirkt am Ende der Zielrechnung auf jedes Laufziel (auch Laufweg-, Abstoßungs- und
+Rückzugsziele), die Spacing-Klemme nur auf ein Zwischenziel. Gemessen allein: Feld-Grenze 0 von 3,32 Mio.
+Proben außerhalb, rho 0,862; Spacing-Klemme 4 792 von 3,27 Mio. außerhalb, rho 0,853
+(`docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9). Eine andere Disziplin schaltet deshalb
+`feld.grenze` an, keine eigene Klemme im Spacing.

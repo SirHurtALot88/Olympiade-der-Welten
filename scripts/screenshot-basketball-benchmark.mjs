@@ -6,6 +6,11 @@
 // danach steht der Zustand und der Zeichen-Loop malt genau dieses Bild.
 //
 //   node scripts/screenshot-basketball-benchmark.mjs <zielordner> [praefix] [engine.js]
+//   OLY_BB_SZENEN=runde2 node scripts/screenshot-basketball-benchmark.mjs <zielordner> runde2
+//
+// OLY_BB_SZENEN=runde2 (17.11., Runde 2): fotografiert statt der fuenf Grundsituationen die
+// Spielzuege des LAUFWEG-MODULS (Backdoor, Pick, Roll, Post-up, Ausboxen, Fast-Break, Lob,
+// Bodenpass, Spot-up/Pull-up/Drive). deviceScaleFactor 1 fuer diese Reihe (kleinere Dateien).
 //
 // [engine.js] (optional): eine andere Engine-Datei statt public/mockups/battle-mode.engine.js
 // ausliefern -- fuer Vorher/Nachher aus demselben Skript (z.B. eine Kopie des main-Stands).
@@ -40,6 +45,27 @@ const SZENEN = [
   { name: "4-treffer-im-netz", situation: "treffer", saat: 7, ab: 60 },
   { name: "5-rebound", situation: "rebound", saat: 1, ab: 30 },
 ];
+const SZENEN_RUNDE2 = [
+  { name: "r2-01-backdoor-cut", situation: "backdoor", saat: 7, ab: 15 },
+  { name: "r2-02-pick-gestellt", situation: "pick", saat: 7, ab: 10 },
+  { name: "r2-03-roll-oder-pop", situation: "roll", saat: 42, ab: 10 },
+  { name: "r2-04-post-up", situation: "postup", saat: 1, ab: 10 },
+  { name: "r2-05-ausboxen", situation: "ausboxen", saat: 7, ab: 30 },
+  { name: "r2-06-fast-break-lanes", situation: "fastbreak", saat: 42, ab: 20 },
+  { name: "r2-07-lob-pass", situation: "lob", saat: 7, ab: 10 },
+  { name: "r2-08-bodenpass", situation: "bodenpass", saat: 1, ab: 10 },
+  { name: "r2-09-spot-up", situation: "spotup", saat: 7, ab: 10 },
+  { name: "r2-10-pull-up", situation: "pullup", saat: 42, ab: 10 },
+  { name: "r2-11-drive", situation: "drive", saat: 1, ab: 10 },
+  { name: "r2-12-fx-dunk", situation: "fx-dunk", saat: 7, ab: 10 },
+  { name: "r2-13-fx-ringwackeln", situation: "fx-ring", saat: 7, ab: 10 },
+  { name: "r2-14-fx-block", situation: "fx-block", saat: 42, ab: 5 },
+  { name: "r2-15-fx-dreier-spur", situation: "dreier", saat: 42, ab: 10 },
+];
+const RUNDE2 = process.env.OLY_BB_SZENEN === "runde2" || process.env.OLY_BB_SZENEN === "kamera";
+// OLY_BB_SZENEN=kamera: Bildfolge der Halbfeld-/Folgekamera (Nahzoom auf einen Dreier, danach
+// zurueck in den Halbfeld-Ausschnitt), plus die Totale (feldKamera(false)) als Vergleich.
+const KAMERA = process.env.OLY_BB_SZENEN === "kamera";
 
 function starteServer() {
   return new Promise((resolve) => {
@@ -65,7 +91,7 @@ const server = await starteServer();
 let browser;
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  const seite = await browser.newPage({ viewport: { width: 1300, height: 700 }, deviceScaleFactor: 1.5 });
+  const seite = await browser.newPage({ viewport: { width: 1300, height: 700 }, deviceScaleFactor: RUNDE2 ? 1 : 1.5 });
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
@@ -73,7 +99,26 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("basketball"));
   await seite.click("#t2");
   await seite.waitForTimeout(800);
-  for (const sz of SZENEN) {
+  if (KAMERA) {
+    const zeige = async (name) => {
+      await seite.evaluate(() => { for (const id of ["einlauf", "bbugcallout", "viertelpause"]) { const e = document.getElementById(id); if (e) e.hidden = true; } });
+      const out = path.join(ziel, `${praefix}-${name}.png`);
+      await (await seite.$("#cv")).screenshot({ path: out });
+      console.log(out);
+    };
+    await seite.evaluate(() => window.__arena.feldKamera(false));
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(42, "dreier", 10));
+    await seite.waitForTimeout(400); await zeige("k0-totale");
+    await seite.evaluate(() => window.__arena.feldKamera(true));
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(7, "aufbau", 20));
+    await seite.waitForTimeout(1500); await zeige("k1-halbfeld");
+    await seite.evaluate(() => window.__arena.szeneFeldspiel(42, "dreier", 10));
+    for (const [ms, n] of [[60, "k2-dreier-0,06s"], [300, "k3-dreier-0,36s"], [500, "k4-dreier-0,86s"], [900, "k5-dreier-1,8s-zurueck"]]) {
+      await seite.waitForTimeout(ms); await zeige(n);
+    }
+    console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
+  }
+  for (const sz of (KAMERA ? [] : RUNDE2 ? SZENEN_RUNDE2 : SZENEN)) {
     const erg = await seite.evaluate(({ saat, situation, ab }) => {
       if (typeof window.__arena.szeneFeldspiel !== "function") return { fehlt: true };
       return window.__arena.szeneFeldspiel(saat, situation, ab);
@@ -84,7 +129,9 @@ try {
     await seite.evaluate(() => {
       for (const id of ["einlauf", "bbugcallout", "viertelpause"]) { const e = document.getElementById(id); if (e) e.hidden = true; }
     });
-    await seite.waitForTimeout(500);
+    // Runde 2: die Kamera (KAMERA-MODUL) braucht ~1,5 s Wandzeit, bis sie von der vorigen Szene
+    // herueber geschwenkt ist.
+    await seite.waitForTimeout(RUNDE2 ? 1500 : 500);
     const out = path.join(ziel, `${praefix}-${sz.name}.png`);
     await (await seite.$("#cv")).screenshot({ path: out });
     console.log(`${out}  (${sz.situation}, Saat ${sz.saat}, t=${erg.t}s, Stand ${erg.punkte.join(":")}, gefunden=${erg.gefunden})`);

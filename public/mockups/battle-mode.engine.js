@@ -9887,7 +9887,11 @@
       // (230 px/s = 5,9 m/s). Gemessen (Node-Motor, 12 Spiele): das echte Feld ist in Logik-
       // Einheiten kuerzer (Wurfreichweite beginnt frueher), FGA steigen schon bei 1,0 von 76 auf
       // 113 je Spiel; 1,55 trieb sie auf 150 (hektisch), 0,8 senkt auf 98, wirkt aber traege.
-      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0},
+      feld:{skala:{x:2.3321, y:1.3963}, eckeDreierY:110.3, tempo:1.0,
+            // FELD-GRENZE (Runde 2, Review PR #1562): jedes Laufziel bleibt im gezeichneten Feld —
+            // laengs zwischen den Grundlinien (Anteil von W), quer innerhalb der Seitenlinien
+            // (7,5 m = 175 px um H/2), mit `rand` px Abstand. Ohne `grenze`: keine Begrenzung.
+            grenze:{laengs:[0.06,0.94], querHalb:175, rand:0}},
       // SPACING/POSITIONSTREUE (Chris 17.11.: "spieler brauchen mehr positionstreue und nicht
       // alle nur dem puck/ball hinterher") — Parameter des generischen SPACING-MODULS (s. dort):
       //   jaegerJeSeite      wie viele je Team einem freien Ball nachlaufen (der Rest haelt Zone)
@@ -9898,6 +9902,53 @@
       //   ruecklauf          Angreifer, die beim Wurf NICHT zum Rebound gehen, laufen bis zu
       //                      diesem Anteil Richtung Mittellinie zurueck (Transition-Sicherung)
       spacing:{jaegerJeSeite:2, jaegerRadius:200, mitspielerMin:58, mitspielerStaerke:0.8, ruecklauf:0.35},
+      // KAMERA (Runde 2, reine Anzeige, s. KAMERA-MODUL): Halbfeld-Zoom, Zug zum angegriffenen
+      // Korb, Daempfung des Schwenks (1/s), kurzer Nahzoom auf den Ring bei Dunk/Dreier/Alley-Oop.
+      kamera:{zoom:1.32, korbZug:0.38, querZug:0.65, daempfung:3.2, zoomDaempfung:4.0,
+              nahZoom:1.75, nahDauer:1.1, nahVersatz:0.16},
+      // TEAMFOULS / BONUS (Runde 2, FIBA-Regel 41): jedes Spielerfoul zaehlt als Teamfoul im
+      // laufenden Viertel. Ab dem 5. Teamfoul (`bonusAb`) gibt jedes Foul ohne Wurf zwei
+      // Freiwuerfe, davor nur Einwurf (Ballbesitz bleibt, Schussuhr auf `einwurfUhr` s gedeckelt).
+      // NEU ist das Foul OHNE Wurf: Reach-in beim missglueckten Steal-Versuch. Chance je Versuch
+      // `reachIn.basis`, gute Verteidiger (ABWEHR) foulen seltener (`reachIn.k` je Punkt).
+      //
+      // GEMESSEN 17.11. (scripts/miss-alle-disziplinen.mjs-Rechnung im Node-Motor, 24 Spiele x 5
+      // Kader): ohne Reach-in 0,865 | Reach-in basis 0,10 (12,5 Fouls/Spiel, Bonus-FW 0,3/Spiel)
+      // 0,841 | basis 0,18 (18 Fouls/Spiel, Bonus-FW 1,3/Spiel) 0,853. Beide unter dem Stand
+      // ohne Foul ohne Wurf (0,865), die erste unter 0,85. Deshalb steht `reachIn` auf null:
+      // gezaehlt und angezeigt werden die Teamfouls (Wurf-Fouls), der Bonus greift, sobald eine
+      // Foulquelle ohne Wurf aktiv ist. Zum Einschalten: reachIn:{basis:0.18, k:0.0020, min:0.03,
+      // max:0.24} — vorher neu messen (rho >= 0,85 Pflicht, docs/design/benchmark-basketball-17-11.md 7.2).
+      fouls:{bonusAb:5, reachIn:null, einwurfRest:0.5},
+      // LAUFWEGE MIT ABSICHT (Runde 2, 17.11.) — Parameter des generischen LAUFWEG-MODULS (s. dort).
+      // Alle Laengen in Logik-px (1 Logik-px = 1/16,7 m), Tempi als Faktor aufs Lauftempo.
+      //   postBlock   Center (Slot 0) steht am Block der Ballseite (laengs vor dem Ring, quer)
+      //   postUp      Innenspieler mit Ball drueckt rueckwaerts zum Korb (Profil NAH-FERN >= profil)
+      //   backdoor    Cut hinter einen ueberspielenden Decker; Chance nach TECHNIK
+      //   deny        Decker ueberspielt die Passlinie, wenn sein Mann eine Passstation entfernt ist
+      //   pickRoll    Ballfuehrer laeuft um einen gestellten Block (gestellt = Screener am Decker)
+      //   ausboxen    Verteidiger stellen sich beim Wurf zwischen Mann und Korb
+      //   crash       die zwei korbnaechsten Angreifer gehen beim Wurf zum Offensiv-Rebound
+      //   fastbreak   Sprinter fuellen die Aussenbahnen
+      //   rotation    der naechste Verteidiger rueckt auf den Mann des Helfers
+      //   tempo       Zoegern/Antritt des Ballfuehrers, Joggen nahe dem eigenen Spot
+      laufwege:{
+        postBlock:{laengs:28, quer:30},
+        postUp:{profil:6, radius:80, innen:30, tempo:0.5},
+        backdoor:{reaktion:0.7, pruefCd:1.2, cd:3.0, dauer:1.1, chanceBasis:0.35, chanceK:0.010,
+                  chanceMin:0.10, chanceMax:0.70, ziel:14, zielQuer:16, sprint:1.25,
+                  deckerZoegern:0.6, deckerTempo:0.75},
+        deny:{passWeit:150, versatz:20},
+        pickRoll:{halbfeld:175, gestellt:34, umlauf:30, antritt:1.15, popProfil:4, popRadius:122, popQuer:40},
+        ausboxen:{abstand:16, tempo:1.1},
+        passArt:{lobNah:14, bodenNah:20},          // Anzeige: Verteidiger so nah an der Passlinie -> Lob/Bodenpass
+        wurfAbsicht:{spotupFenster:1.2},           // Anzeige: Wurf binnen x s nach der Ballannahme = Spot-up
+        crash:{anzahl:1, laengs:18, quer:24},
+        fastbreak:{tief:40, quer:72},
+        rotation:{reichweite:220, anteil:0.35, tempo:1.2},
+        tempo:{periode:1.6, zoegernAnteil:0.25, zoegern:0.55, antrittAnteil:0.31, antritt:1.3, abWeg:30,
+               joggen:0.7, joggenNah:40, cutSprint:1.2}
+      },
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Plan 1.2 Punkt 1,
       // s. rezeptAus() weiter oben). Dort steht es zeichengleich weiter — mitsamt der
       // kompletten Kalibrier-Historie: Chris' Budget-Methode, die zurueckgerechneten
@@ -11699,6 +11750,12 @@
     const s=feldSkala();
     return s?{x:dxL*s.x,y:dyL*s.y}:{x:dxL,y:dyL};
   }
+  // FELD-GRENZE: Laufziel auf das gezeichnete Feld begrenzen (ohne `feld.grenze`: unveraendert).
+  function feldGrenze(zx,zy){
+    const a=feldArtLive(), g=a&&a.feld&&a.feld.grenze; if(!g)return null;
+    return {x:Math.max(W*g.laengs[0]+g.rand,Math.min(W*g.laengs[1]-g.rand,zx)),
+            y:Math.max(H/2-g.querHalb+g.rand,Math.min(H/2+g.querHalb-g.rand,zy))};
+  }
   // Querablage zur Korbachse in Logik-px (fuer die Ecken-Dreier-Regel).
   function feldLogikDy(p){ const s=feldSkala(); return (p.y-H/2)/(s?s.y:1); }
   // Laufgeschwindigkeit im Feldmassstab: ein groesseres, echtes Feld braucht ein hoeheres
@@ -11739,20 +11796,296 @@
       if(d<sp.mitspielerMin){ const f=(sp.mitspielerMin-d)/d; px+=dx*f; py+=dy*f; }
     }
     let rx=zx+px*s.x*sp.mitspielerStaerke, ry=zy+py*s.y*sp.mitspielerStaerke;
-    // Basketball: das Ziel bleibt NACH dem Abstand im Spielfeld (Seitenlinien/Grundlinien aus
-    // BK_FIBA, 12 px Rand) — sonst schob der Abstand Ecken-/Fluegelziele ueber die Linie hinaus
-    // bis fast an den Leinwandrand (Review PR #1562).
-    if(feldspielDisc==="basketball"){
-      const halbQ=7.5*BK_FIBA.my-12, halbL=14*BK_FIBA.mx-12;
-      ry=Math.max(H/2-halbQ,Math.min(H/2+halbQ,ry));
-      rx=Math.max(W/2-halbL,Math.min(W/2+halbL,rx));
-    }
+    // Keine eigene Begrenzung hier: das Spielfeld haelt die FELD-GRENZE (feldGrenze, Parameter
+    // FELDSPIEL_ART.basketball.feld.grenze) am Ende der Zielrechnung fuer JEDES Laufziel. Die
+    // Ziel-Begrenzung aus dem Review-Fix #1562 (nur Spacing-Ziele, 12 px Rand) ist beim Zusammen-
+    // fuehren mit Runde 2 entfallen: allein liess sie 4 792 von 3,27 Mio. Proben ausserhalb
+    // (Laufweg-/Abstossungsziele), s. docs/design/benchmark-basketball-17-11.md Abschnitt 7.9.
     return {x:rx, y:ry};
   }
   // RUECKLAUF: Laufziel eines Nicht-Jaegers der werfenden Seite Richtung Mittellinie ziehen.
   function spacingRuecklauf(zx){
     const sp=spacingVon(); if(!sp||!sp.ruecklauf)return zx;
     return zx+(W/2-zx)*sp.ruecklauf;
+  }
+  // ===================================================================================
+  // LAUFWEG-MODUL — Laufwege mit Absicht (Benchmark Basketball Runde 2, 17.11.,
+  // docs/design/benchmark-basketball-17-11.md Abschnitt 7, docs/design/spacing-modul-17-11.md
+  // Abschnitt 6). Das SPACING-MODUL oben sorgt dafuer, dass niemand klumpt; dieses Modul gibt
+  // den Laufwegen eine erkennbare ABSICHT: Center am Block, Post-up, Deny + Backdoor-Cut,
+  // Pick-and-Roll / Pick-and-Pop als Formation, Ausboxen beim Wurf, Fast-Break-Lanes, Help-
+  // Rotation, Tempowechsel (Zoegern/Antritt statt Dauerlauf). Parameter je Disziplin in
+  // FELDSPIEL_ART[d].laufwege — ohne Block liefert jede Funktion `null` bzw. das alte Ziel,
+  // die Aufrufstellen bleiben dann zeichengleich (Hockey/Football unberuehrt).
+  //
+  // Zustand NICHT an den Spielerobjekten (CLAUDE.md, Fingerabdruck): eine WeakMap je Spieler,
+  // mit Spiel-Generation, damit ein neues bauFeldspiel() nie alten Zustand erbt.
+  // Zaehler (lwZaehler) sind reine Sonde (window.__arena.diagSpielzuege), keine Formel liest sie.
+  // ===================================================================================
+  const laufwegeVon=()=>{ const a=feldArtLive(); return a&&a.laufwege?a.laufwege:null; };
+  const LW_ZUST=new WeakMap();
+  let lwGen=0, lwZaehler={}, lwBesitzNr=0;
+  function lwZ(u){
+    let z=LW_ZUST.get(u);
+    if(!z||z.gen!==lwGen){
+      z={gen:lwGen,art:null,bis:0,cd:0,denySeit:null,deny:false,boxt:false,rot:false,
+         postSeit:null,pnrFuer:null,ballSeit:null,denyBesitz:-1,ueberspieltBis:0,rollZaehlt:0,cutZaehlt:0,rotZaehlt:0,wurfArt:null,wurfT:-9};
+      LW_ZUST.set(u,z);
+    }
+    return z;
+  }
+  function lwNeuesSpiel(){ lwGen++; lwZaehler={}; lwBesitzNr=0; }
+  function lwZaehle(k,n){ lwZaehler[k]=(lwZaehler[k]||0)+(n==null?1:n); }
+  // Logik-Punkt relativ zum Korb (radius laengs, quer) -> Bildschirm.
+  function lwKorbPunkt(korbX,side,laengsL,querL){
+    const v=feldVersatz((side===0?-1:1)*laengsL,querL);
+    return {x:korbX+v.x,y:H/2+v.y};
+  }
+  // TEMPOWECHSEL (Ballfuehrer): Zoegern -> Antritt -> Reisetempo, je Ballbesitz phasenversetzt
+  // nach Spieler-id. Mittel ueber eine Periode ~1,0 (kein Netto-Tempogewinn), sichtbar als
+  // Rhythmus statt Dauerlauf.
+  function lwTempoBall(u,lw){
+    const T=lw.tempo, p=((fsLive.angriffSeit+u.id*0.37)%T.periode)/T.periode;
+    return p<T.zoegernAnteil?T.zoegern:p<T.zoegernAnteil+T.antrittAnteil?T.antritt:1;
+  }
+  // BALLFUEHRER: Post-up, Nutzung eines gestellten Blocks (Pick-and-Roll), Tempowechsel.
+  function lwBallfuehrer(u,zx,zy,korbX,lw){
+    const z=lwZ(u);
+    const zumKorb=feldLogikDist(u,{x:korbX,y:H/2});
+    const innen=u.slotIdx===0||(u.SCHUSS_NAH-u.SCHUSS_FERN)>=lw.postUp.profil;
+    if(lw.postUp&&innen&&zumKorb<lw.postUp.radius&&zumKorb>lw.postUp.innen){
+      if(z.postSeit==null){ z.postSeit=fsT; lwZaehle("postUps"); }
+      z.art="postup";
+      return {x:korbX,y:H/2,tempo:lw.postUp.tempo};
+    }
+    z.postSeit=null;
+    const screener=FSTEAM[u.side].find(s=>s.screent&&s.screent.fuer===u&&fsT<s.screent.bis);
+    const decker=FSTEAM[1-u.side].find(v=>v.deckt===u);
+    if(lw.pickRoll&&screener&&decker&&zumKorb<lw.pickRoll.halbfeld&&dist(screener,decker)<lw.pickRoll.gestellt){
+      if(z.pnrFuer!==screener.screent){ z.pnrFuer=screener.screent; lwZaehle("pickNutzung"); }
+      // Um den Block herum: auf die vom Decker abgewandte Seite des Screeners, Richtung Korb.
+      const ax=screener.x-decker.x, ay=screener.y-decker.y, al=Math.hypot(ax,ay)||1;
+      const k=lwKorbPunkt(korbX,u.side,0,0), kx=k.x-screener.x, ky=k.y-screener.y, kl=Math.hypot(kx,ky)||1;
+      z.art="pnr";
+      return {x:screener.x+ax/al*lw.pickRoll.umlauf+kx/kl*lw.pickRoll.umlauf,
+              y:screener.y+ay/al*lw.pickRoll.umlauf+ky/kl*lw.pickRoll.umlauf,tempo:lw.pickRoll.antritt};
+    }
+    z.art=null;
+    const weg=Math.hypot(zx-u.x,zy-u.y);
+    return {x:zx,y:zy,tempo:lw.tempo.periode&&weg>lw.tempo.abWeg?lwTempoBall(u,lw):1};
+  }
+  // ANGREIFER OHNE BALL (Halbfeld): Center am Block der Ballseite, Backdoor-Cut gegen einen
+  // ueberspielenden Decker, Joggen statt Sprinten in der Naehe des eigenen Spots.
+  // Rueckgabe {x,y,tempo} oder null (= Slotziel bleibt).
+  function lwAngreifer(u,bx,by,korbX,lw){
+    const z=lwZ(u);
+    const traeger=fsLive.ball.traeger;
+    if(z.art==="backdoor"&&fsT<z.bis){
+      const quer=Math.sign(u.y-H/2)||1;
+      const p=lwKorbPunkt(korbX,u.side,lw.backdoor.ziel,quer*lw.backdoor.zielQuer);
+      return {x:p.x,y:p.y,tempo:lw.backdoor.sprint};
+    }
+    if(z.art==="backdoor"){ z.art=null; z.cd=fsT+lw.backdoor.cd; }
+    if(traeger&&traeger.side===u.side&&traeger!==u){
+      const decker=FSTEAM[1-u.side].find(v=>v.deckt===u);
+      const dz=decker?lwZ(decker):null;
+      if(lw.backdoor&&dz&&dz.deny&&dz.denySeit!=null&&fsT-dz.denySeit>=lw.backdoor.reaktion&&fsT>=z.cd&&u.slotIdx!==0){
+        z.cd=fsT+lw.backdoor.pruefCd;
+        const chance=Math.min(lw.backdoor.chanceMax,Math.max(lw.backdoor.chanceMin,
+          lw.backdoor.chanceBasis+(u.TECHNIK-50)*lw.backdoor.chanceK));
+        if(rr()<chance){
+          z.art="backdoor"; z.bis=fsT+lw.backdoor.dauer; lwZaehle("backdoorCuts");
+          dz.denySeit=null; dz.ueberspieltBis=fsT+lw.backdoor.deckerZoegern;
+        }
+      }
+      if(lw.postBlock&&u.slotIdx===0){
+        // Center: Block-zu-Block auf der Ballseite (unter dem Korb, nicht an der Freiwurflinie).
+        const seite=Math.sign(traeger.y-H/2)||(u.id%2?1:-1);
+        const p=lwKorbPunkt(korbX,u.side,lw.postBlock.laengs,seite*lw.postBlock.quer);
+        return {x:p.x,y:p.y,tempo:Math.hypot(p.x-u.x,p.y-u.y)<lw.tempo.joggenNah?lw.tempo.joggen:1};
+      }
+    }
+    return lw.tempo.joggen&&Math.hypot(bx-u.x,by-u.y)<lw.tempo.joggenNah?{x:bx,y:by,tempo:lw.tempo.joggen}:null;
+  }
+  // FAST-BREAK-LANES: die zwei Sprinter fuellen die Aussenbahnen, der Rest trabt hinterher.
+  function lwFastbreakLane(u,korbX,lw,istSprinter){
+    if(!istSprinter||!lw.fastbreak)return null;
+    const tr=fsLive.ball.traeger;
+    const quer=(tr?Math.sign(u.y-tr.y):0)||(u.id%2?1:-1);
+    return lwKorbPunkt(korbX,u.side,lw.fastbreak.tief,quer*lw.fastbreak.quer);
+  }
+  // VERTEIDIGER: Ausboxen beim Wurf/Abpraller, Deny eine Passstation vom Ball, Help-Rotation.
+  // Rueckgabe {x,y,tempo} oder null (= Manndeckung wie bisher).
+  function lwVerteidiger(u,eigenerKorbX,lw,jaeger){
+    const z=lwZ(u), man=u.deckt;
+    z.boxt=false; z.rot=false;
+    if(!man)return null;
+    const flug=fsLive.ball.flug;
+    const wurfInDerLuft=flug&&(flug.art==="wurf"||flug.art==="alley")&&flug.schuetze&&flug.schuetze.side!==u.side;
+    const abpraller=fsLive.ball.frei&&fsLive.ball.frei.vonSeite!==u.side&&!(jaeger&&jaeger.has(u));
+    if(lw.ausboxen&&(wurfInDerLuft||abpraller)){
+      const kx=eigenerKorbX-man.x, ky=H/2-man.y, kl=Math.hypot(kx,ky)||1;
+      z.boxt=true; z.deny=false; z.denySeit=null;
+      return {x:man.x+kx/kl*lw.ausboxen.abstand,y:man.y+ky/kl*lw.ausboxen.abstand,tempo:lw.ausboxen.tempo};
+    }
+    const tr=fsLive.ball.traeger;
+    if(!tr||tr.side===u.side){ z.deny=false; z.denySeit=null; return null; }
+    // HELP-ROTATION: hilft ein Mitspieler am Ball, rueckt der naechste freie Verteidiger auf
+    // dessen Mann zwischen ihn und den Korb (X-out light).
+    const helfer=FSTEAM[u.side].find(h=>h!==u&&h.hilfeBis&&fsT<h.hilfeBis&&h.deckt&&h.deckt!==tr);
+    if(lw.rotation&&helfer&&u.deckt!==tr){
+      const offen=helfer.deckt;
+      let naechster=null, nd=Infinity;
+      for(const v of FSTEAM[u.side]){
+        if(v===helfer||v.deckt===tr||(v.hilfeBis&&fsT<v.hilfeBis))continue;
+        const d=dist(v,offen); if(d<nd){nd=d;naechster=v;}
+      }
+      if(naechster===u&&nd<lw.rotation.reichweite){
+        if(z.rotZaehlt!==helfer.hilfeBis){ z.rotZaehlt=helfer.hilfeBis; lwZaehle("rotationen"); }
+        z.rot=true;
+        const kx=eigenerKorbX-offen.x, ky=H/2-offen.y;
+        return {x:offen.x+kx*lw.rotation.anteil,y:offen.y+ky*lw.rotation.anteil,tempo:lw.rotation.tempo};
+      }
+    }
+    // DENY: steht mein Mann eine Passstation vom Ball (Fluegel/Ecke), ueberspiele ich die
+    // Passlinie — jeder zweite Ballbesitz (gerade/ungerade Spieler-id), nie gegen den Center.
+    const passWeit=feldLogikDist(man,tr);
+    const ueberspielt=fsT<(z.ueberspieltBis||0);
+    // Hysterese: wer schon ueberspielt, bleibt dabei, bis sein Mann 25 % weiter weg ist
+    // (sonst flackert die Deny-Stellung bei jedem Dribbling an der Grenze).
+    const grenze=lw.deny.passWeit*(z.deny?1.25:1);
+    if(lw.deny&&!ueberspielt&&man.slotIdx!==0&&passWeit<grenze&&((u.id+lwBesitzNr)%2===0)){
+      if(!z.deny){ z.deny=true; z.denySeit=fsT; if(z.denyBesitz!==lwBesitzNr){ z.denyBesitz=lwBesitzNr; lwZaehle("denies"); } }
+      const dx=tr.x-man.x, dy=tr.y-man.y, dl=Math.hypot(dx,dy)||1;
+      return {x:man.x+dx/dl*lw.deny.versatz,y:man.y+dy/dl*lw.deny.versatz,tempo:1.1};
+    }
+    z.deny=false; z.denySeit=null;
+    if(ueberspielt&&lw.backdoor){ const kx=eigenerKorbX-man.x; return {x:man.x+Math.sign(kx)*10,y:man.y,tempo:lw.backdoor.deckerTempo}; }
+    return null;
+  }
+  // CRASH: waehrend ein eigener Wurf fliegt, gehen die zwei korbnaechsten Mitspieler zum
+  // Abpraller-Raum (Offensiv-Rebound), die anderen bleiben/sichern (SPACING Ruecklauf).
+  function lwCrash(u,korbX,lw){
+    const flug=fsLive.ball.flug;
+    if(!lw.crash)return null;
+    if(!flug||!(flug.art==="wurf"||flug.art==="alley")||!flug.schuetze||flug.schuetze.side!==u.side||flug.schuetze===u)return null;
+    const k={x:korbX,y:H/2};
+    const nah=FSTEAM[u.side].filter(m=>m!==flug.schuetze&&!stehtImTor(m))
+      .sort((a,b)=>feldLogikDist(a,k)-feldLogikDist(b,k)).slice(0,lw.crash.anzahl);
+    if(nah.indexOf(u)<0)return null;
+    const quer=(Math.sign(u.y-H/2)||1)*lw.crash.quer;
+    return lwKorbPunkt(korbX,u.side,lw.crash.laengs,quer);
+  }
+  // PASS-ART (reine Anzeige + Sonde): Lob zum Cutter/Abroller am Korb, Bodenpass, wenn ein
+  // Verteidiger nahe der Passlinie steht, sonst Brustpass. Bestimmt aus der Geometrie beim
+  // Abspiel, kein Zufall, keine Formel liest es.
+  const LW_PASS=new WeakMap();
+  function lwPassArtBestimmen(flug,von,nach,minD){
+    const nz=lwZ(nach), lw0=laufwegeVon();
+    const amKorb=feldLogikDist(nach,{x:korbXVon(nach.side),y:H/2})<KORB_NAH_RADIUS;
+    const schneidet=nz.art==="backdoor"||(nach.cutBis||0)>fsT||(nach.rollBis||0)>fsT;
+    const art=(schneidet&&amKorb)||(amKorb&&minD<lw0.passArt.lobNah)?"lob":minD<lw0.passArt.bodenNah?"bodenpass":"brustpass";
+    LW_PASS.set(flug,art); lwZaehle("pass_"+art);
+    return art;
+  }
+  // WURF-ABSICHT (reine Anzeige + Sonde): Spot-up (gefangen und sofort hoch), Drive (mit Tempo
+  // zum Ring), Pull-up (aus dem Dribbling gestoppt), Post-up (mit dem Ruecken zum Korb).
+  function lwWurfAbsicht(schuetze,tier,zug){
+    const z=lwZ(schuetze);
+    const tempo=Math.hypot(schuetze.vx||0,schuetze.vy||0);
+    const art=zug?"alleyoop":z.art==="postup"?"postup":(tier==="dunk"||tier==="nah")&&tempo>1.5?"drive"
+      :fsT-(z.ballSeit==null?-9:z.ballSeit)<laufwegeVon().wurfAbsicht.spotupFenster?"spotup":"pullup";
+    z.wurfArt=art; z.wurfT=bkAnzeigeUhr; lwZaehle("wurf_"+art);
+    return art;
+  }
+  // ---- Anzeige der Laufwege (liest nur, schreibt nichts, das eine Formel liest) ----
+  // Ballhoehe je Pass-Art: Brustpass flach, Bodenpass mit Aufsetzer bei 55 %, Lob im Bogen.
+  function lwPassZ(art,phase){
+    if(art==="lob")return 26+Math.sin(phase*Math.PI)*58;
+    if(art==="bodenpass"){ const k=0.55; return phase<k?26*(1-phase/k)+2:2+24*Math.sin((phase-k)/(1-k)*Math.PI/2); }
+    return 24;
+  }
+  const LW_WURF_LABEL={spotup:"SPOT-UP",pullup:"PULL-UP",drive:"DRIVE",postup:"POST-UP",alleyoop:"ALLEY-OOP"};
+  const LW_WURF_DAUER=0.75;
+  // Figur mit Haltung zeichnen: Wurf-Absicht als Sprung (Squash/Stretch, Hoehe, Vorlage),
+  // Post-up mit dem Ruecken zum Korb, Ausboxen geduckt mit Blick auf den Mann. Nur ctx-
+  // Transformationen und eine kurzzeitig gedrehte Blickrichtung (vx/vy werden sofort
+  // zurueckgesetzt), kein neues Animationsblatt (CLAUDE.md: neue PixelLab-Animationen gesperrt).
+  function lwZeichneFigur(u,x,y){
+    const z=lwZ(u), fussY=y+19;
+    let sx=1, sy=1, dx=0, dy=0, vxAlt=u.vx, vyAlt=u.vy, blickTausch=false;
+    const tw=bkAnzeigeUhr-z.wurfT;
+    if(z.wurfArt&&tw>=0&&tw<LW_WURF_DAUER){
+      const p=tw/LW_WURF_DAUER, sprung=Math.sin(Math.min(1,Math.max(0,(p-0.12)/0.88))*Math.PI);
+      const zumKorb=Math.sign(korbXVon(u.side)-u.x)||1;
+      if(p<0.12){ sx=1.08; sy=0.88; } else { sx=1-0.05*sprung; sy=1+0.07*sprung; }
+      if(z.wurfArt==="spotup")dy=-12*sprung;
+      else if(z.wurfArt==="pullup")dy=-16*sprung;
+      else if(z.wurfArt==="drive"){ dy=-20*sprung; dx=zumKorb*10*p; sy+=0.04*sprung; }
+      else if(z.wurfArt==="postup"){ dy=-11*sprung; dx=-zumKorb*7*p; }
+    }
+    if(u.hatBall&&z.art==="postup"){ u.vx=-(u.vx||0)||-(Math.sign(korbXVon(u.side)-u.x)||1); u.vy=-(u.vy||0); blickTausch=true; sx*=1.03; sy*=0.95; }
+    else if(z.boxt&&u.deckt){ u.vx=(Math.sign(u.deckt.x-u.x)||1)*3; u.vy=0; blickTausch=true; sx*=1.07; sy*=0.9; }
+    ctx.save();
+    if(sx!==1||sy!==1||dx||dy){ ctx.translate(x+dx,fussY+dy); ctx.scale(sx,sy); ctx.translate(-x,-fussY); }
+    zeichneSprite(ctx,u,x,y,true);
+    ctx.restore();
+    if(blickTausch){ u.vx=vxAlt; u.vy=vyAlt; }
+    if(z.wurfArt&&tw>=0&&tw<LW_WURF_DAUER&&LW_WURF_LABEL[z.wurfArt]){
+      ctx.save(); ctx.globalAlpha=Math.max(0,1-tw/LW_WURF_DAUER)*0.85;
+      ctx.font="700 10px system-ui,sans-serif"; ctx.textAlign="center";
+      ctx.fillStyle="rgba(0,0,0,.55)"; ctx.fillText(LW_WURF_LABEL[z.wurfArt],x+1,fussY+15);
+      ctx.fillStyle="#fff"; ctx.fillText(LW_WURF_LABEL[z.wurfArt],x,fussY+14);
+      ctx.restore();
+    }
+  }
+  // Spielzug-Zeichen am Boden (Taktiktafel-Stil): gestrichelter Pfeil fuer Cuts (Backdoor,
+  // Give-and-Go, Roll/Pop, Fast-Break-Lane, Post-up), ein Balken fuer den gestellten Block.
+  function lwZeichneBoden(){
+    const lw=laufwegeVon(); if(!lw||!fsLive||fsLive.phase!=="laufend")return;
+    const pfeil=(u,farbe,alpha,txt)=>{
+      const tx=u._zielHomeX, ty=u._zielHomeY; if(tx==null)return;
+      const x0=u.x+(u._zvx||0), y0=u.y+(u._zvy||0)+19, x1=tx, y1=ty+19;
+      const l=Math.hypot(x1-x0,y1-y0); if(l<26)return;
+      const ux=(x1-x0)/l, uy=(y1-y0)/l;
+      ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=farbe; ctx.fillStyle=farbe; ctx.lineWidth=2;
+      ctx.setLineDash([6,5]); ctx.beginPath(); ctx.moveTo(x0+ux*14,y0+uy*14); ctx.lineTo(x1-ux*8,y1-uy*8); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-ux*9-uy*5,y1-uy*9+ux*5); ctx.lineTo(x1-ux*9+uy*5,y1-uy*9-ux*5); ctx.closePath(); ctx.fill();
+      if(txt){ ctx.globalAlpha=alpha*1.4; ctx.font="700 9px system-ui,sans-serif"; ctx.textAlign="center";
+        ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillText(txt,(x0+x1)/2+1,(y0+y1)/2-3);
+        ctx.fillStyle="#fff"; ctx.fillText(txt,(x0+x1)/2,(y0+y1)/2-4); }
+      ctx.restore();
+    };
+    const fb=fsLive.fastbreak&&fsT<fsLive.fastbreak.bis?fsLive.fastbreak:null;
+    for(const team of FSTEAM)for(const u of team){
+      const c=u.side===0?css("--home"):css("--away"), z=lwZ(u);
+      if(z.art==="backdoor"&&fsT<z.bis)pfeil(u,c,0.75,"BACKDOOR");
+      else if(u.rollBis>fsT)pfeil(u,c,0.6,(u.SCHUSS_FERN-u.SCHUSS_NAH)>=(lw.pickRoll?lw.pickRoll.popProfil:99)?"POP":"ROLL");
+      else if(u.cutBis>fsT&&!u.hatBall)pfeil(u,c,0.4,null);
+      else if(fb&&fb.seite===u.side&&!u.hatBall&&Math.hypot(u.vx||0,u.vy||0)>2)pfeil(u,c,0.35,null);
+      else if(u.hatBall&&z.art==="postup")pfeil(u,c,0.45,"POST-UP");
+    }
+  }
+  // Ueber den Figuren: der gestellte Block (PICK) — am Boden verdeckte ihn der Screener selbst.
+  function lwZeichneOben(){
+    const lw=laufwegeVon(); if(!lw||!fsLive||fsLive.phase!=="laufend")return;
+    for(const team of FSTEAM)for(const u of team){
+      if(u.screent&&fsT<u.screent.bis){
+        const bf=u.screent.fuer, d=FSTEAM[1-bf.side].find(v=>v.deckt===bf);
+        if(d&&dist(u,d)<(lw.pickRoll?lw.pickRoll.gestellt:34)){
+          const ax=d.x-bf.x, ay=d.y-bf.y, al=Math.hypot(ax,ay)||1, nx=-ay/al, ny=ax/al;
+          const bx=u.x+(u._zvx||0), by=u.y+(u._zvy||0)+19;
+          const c=u.side===0?css("--home"):css("--away");
+          ctx.save(); ctx.globalAlpha=0.85; ctx.lineCap="round";
+          ctx.strokeStyle="rgba(0,0,0,.55)"; ctx.lineWidth=7;
+          ctx.beginPath(); ctx.moveTo(bx-nx*15,by-8-ny*15*0.6); ctx.lineTo(bx+nx*15,by-8+ny*15*0.6); ctx.stroke();
+          ctx.strokeStyle=c; ctx.lineWidth=4;
+          ctx.beginPath(); ctx.moveTo(bx-nx*15,by-8-ny*15*0.6); ctx.lineTo(bx+nx*15,by-8+ny*15*0.6); ctx.stroke();
+          ctx.font="800 10px system-ui,sans-serif"; ctx.textAlign="center";
+          ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText("PICK",bx+1,by+7); ctx.fillStyle="#fff"; ctx.fillText("PICK",bx,by+6); ctx.restore();
+        }
+      }
+    }
   }
   // HANDPUNKTE FUER DEN GETRAGENEN BALL (Chris, 03.09.: "die Spieler den tragen mit den
   // Animationen"). Reine Uebernahme der Messung aus docs/design/sprite-handpunkte.md
@@ -11837,6 +12170,9 @@
     // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
     kickoffSeed=(normalisiereSaat(saat)+777777)>>>0;
     fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    lwNeuesSpiel(); // LAUFWEG-MODUL: Zustand/Zaehler je Spiel neu (WeakMap-Generation)
+    tfNeuesSpiel(); // TEAMFOUL-/BONUS-MODUL
+    bkFxNeuesSpiel(); // EFFEKT-/TON-MODUL
     // ENDSTAND-OVERLAY-WAECHTER (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe
     // Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` (s. dort) -- ohne
     // diese Bremse wuerde updateHudFeldspiel() das #endstand-Overlay bei JEDEM Frame nach
@@ -12176,7 +12512,7 @@
       // and-eins) hat keinen eigenen "fehlwurf"-Eintrag (der Pfiff ersetzt ihn komplett,
       // s. loeseFlugAuf) — zaehlt hier trotzdem als FGA, echtem Basketball-Boxscore-Verhalten
       // entsprechend.
-      else if(e.art==="foul"){ s(e.verteidiger).fouls++; if(!e.undEins)s(e.spieler).feldwuerfe++; }
+      else if(e.art==="foul"){ s(e.verteidiger).fouls++; if(!e.undEins&&!e.ohneWurf)s(e.spieler).feldwuerfe++; }
     }
     return {team,spieler};
   }
@@ -14688,6 +15024,7 @@
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
     merkeBeruehrung(u);
+    if(laufwegeVon())lwZ(u).ballSeit=fsT; // LAUFWEG-MODUL (Wurf-Absicht), Anzeige/Sonde
     // Kein Assist-Fenster: hierher kommt man ueber Rebound, Steal, Anwurf oder neuen
     // Angriff — nie ueber ein Zuspiel (das laeuft ueber loeseFlugAuf, s. dort).
     u.frischerPassVon=null;
@@ -14743,6 +15080,7 @@
       return;
     }
     fsLive.angriffSeit=0;
+    lwBesitzNr++; // LAUFWEG-MODUL: Deny-Wechsel je Ballbesitz (modulweit, kein Spielerfeld)
     if(!ausViertelpause)zuordneSlots(seite);
     // FOOTBALL HAT KEINEN KONTINUIERLICHEN BALLBESITZ: jeder Wechsel ist eine neue Serie
     // mit eigenem Down/Distance/Feldstand (beginneFootballSerie ruft ballUebernehmen()
@@ -15519,6 +15857,7 @@
           u.screenRuf=1.5; // PLATZHALTER — Sperre gegen sofortigen erneuten Ruf
           if(!screener.screent){
             screener.screent={fuer:u,bis:fsT+1.2}; // PLATZHALTER
+            if(laufwegeVon())lwZaehle("screens");
           }
         }
       }
@@ -15635,6 +15974,7 @@
       gravityKandidaten,
       schuetze, passgeber, zug, ziel:schuetze, blockKandidat
     };
+    if(laufwegeVon())lwWurfAbsicht(schuetze,tier,zug); // Anzeige + Sonde
   }
 
   // FREIWURF: hohe, NUR LEICHT attributabhaengige Trefferquote — ein Freiwurf ist
@@ -16153,6 +16493,7 @@
       // Verteidiger, der knapp daneben steht, daempft die Qualitaet trotzdem.
       passLinienAbwehr:waechter?waechter.ABWEHR:50,
       abgefangenVon,eigenerFehler};
+    if(laufwegeVon())lwPassArtBestimmen(fsLive.ball.flug,von,nach,minD); // Anzeige + Sonde
   }
 
   // Steal-Versuch des Deckers — unabhaengig von der Ballfuehrer-Entscheidung, der
@@ -16341,14 +16682,78 @@
       // muss deshalb NACH diesem Aufruf kommen, sonst loescht er sein eigenes Fenster.
       naechsterAngriff(decker.side);
       startFastbreak(decker.side);
+    } else if(foulRegelVon()&&!istHockey()){
+      tfReachIn(decker,traeger); // TEAMFOUL-/BONUS-MODUL: Foul ohne Wurf (Reach-in)
     }
   }
 
   // FASTBREAK: nach Steal/Interception/Defensiv-Rebound zaehlt Tempo, nicht nur
   // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
   // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
+
+  // ===================================================================================
+  // TEAMFOUL-/BONUS-MODUL (Benchmark Basketball Runde 2, 17.11., FIBA Regel 41). Parameter
+  // in FELDSPIEL_ART[d].fouls; ohne Block zaehlt nichts mit und es gibt kein Foul ohne Wurf
+  // (Hockey/Football unberuehrt). Zustand modulweit (kein Spielerfeld, Fingerabdruck).
+  //   * tfZaehle(seite)   ein Spielerfoul der Seite -> Teamfoul im laufenden Viertel
+  //   * tfImBonus(seite)  hat die Seite ihr 4. Teamfoul schon begangen -> jedes weitere Foul
+  //                        bringt dem Gegner Freiwuerfe (Bonus ab dem 5. Foul)
+  //   * Reach-in          Foul ohne Wurf beim missglueckten Steal (versucheSteal)
+  // Read-only Sonde: window.__arena.teamFouls() -> {viertel, fouls:[heim,gast], bonus:[..]}.
+  // ===================================================================================
+  let tfStand={viertel:1,fouls:[0,0]}, tfZaehler={reachIn:0,bonusFreiwuerfe:0,einwuerfe:0,wurfFouls:0};
+  const foulRegelVon=()=>{ const a=(typeof FELDSPIEL_ART!=="undefined")&&FELDSPIEL_ART[feldspielDisc]; return a&&a.fouls?a.fouls:null; };
+  function tfNeuesSpiel(){ tfStand={viertel:1,fouls:[0,0]}; tfZaehler={reachIn:0,bonusFreiwuerfe:0,einwuerfe:0,wurfFouls:0}; }
+  function tfViertelPruefen(){ const v=fsLive?fsLive.viertel:1; if(tfStand.viertel!==v)tfStand={viertel:v,fouls:[0,0]}; }
+  function tfImBonus(seite){ const r=foulRegelVon(); if(!r)return false; tfViertelPruefen(); return tfStand.fouls[seite]>=r.bonusAb-1; }
+  function tfZaehle(seite){ if(!foulRegelVon())return; tfViertelPruefen(); tfStand.fouls[seite]++; }
+  // Reach-in beim missglueckten Steal: gibt true zurueck, wenn gepfiffen wurde (Ablauf erledigt).
+  function tfReachIn(decker,traeger){
+    const r=foulRegelVon(); if(!r||!r.reachIn)return false;
+    const c=Math.min(r.reachIn.max,Math.max(r.reachIn.min,r.reachIn.basis-(decker.ABWEHR-50)*r.reachIn.k));
+    if(rr()>=c)return false;
+    const bonus=tfImBonus(decker.side);
+    decker.fouls++; tfZaehle(decker.side); tfZaehler.reachIn++;
+    logZug(decker.side,"foul",{verteidiger:decker,spieler:traeger,anzahl:bonus?2:0,ohneWurf:true});
+    if(bonus){
+      tfZaehler.bonusFreiwuerfe++;
+      feed(traeger.side,decker.n+" greift "+traeger.n+" in den Arm — Teamfoul "+tfStand.fouls[decker.side]+", Bonus: zwei Freiwürfe.",true,undefined,"bonus");
+      starteFreiwuerfe(traeger,2,decker,false);
+    } else {
+      tfZaehler.einwuerfe++;
+      feedRoutine(traeger.side,decker.n+" greift "+traeger.n+" in den Arm — Foul ("+tfStand.fouls[decker.side]+". Teamfoul), Einwurf.");
+      schiriPfeift(traeger,decker);
+      // Einwurf: Ballbesitz bleibt, kurze Unterbrechung; die Schussuhr laeuft nicht voll weiter.
+      const L=LIVE()||{}, uhr=L.schussuhr||SCHUSSUHR_BASKETBALL;
+      fsLive.angriffSeit=Math.min(fsLive.angriffSeit,uhr*r.einwurfRest);
+      traeger.reevBall=Math.max(traeger.reevBall||0,0.5);
+    }
+    return true;
+  }
+
+  // Teamfouls als fuenf Punkte unter der Korbanlage der VERTEIDIGENDEN Seite (am eigenen
+  // Korb), rot ab dem Bonus. Reine Anzeige in Feldkoordinaten (keine HUD-/Scorebug-Aenderung).
+  function tfZeichne(){
+    const r=foulRegelVon(); if(!r||!fsLive)return;
+    tfViertelPruefen();
+    for(const seite of [0,1]){
+      const n=tfStand.fouls[seite], kx=korbXVon(1-seite), links=kx<W/2;
+      const x0=kx+(links?-6:6), y0=H/2+58, bonus=n>=r.bonusAb;
+      ctx.save(); ctx.textAlign="center"; ctx.font="800 9px system-ui,sans-serif";
+      ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(x0-25,y0-10,50,bonus?26:18);
+      ctx.fillStyle=seite===0?css("--home"):css("--away"); ctx.fillText("FOULS",x0,y0-1);
+      for(let i=0;i<r.bonusAb;i++){
+        ctx.beginPath(); ctx.arc(x0-16+i*8,y0+4,3,0,6.3);
+        ctx.fillStyle=i<n?(bonus?"#ff4a3a":"#ffd34a"):"rgba(255,255,255,.25)"; ctx.fill();
+      }
+      if(bonus){ ctx.fillStyle="#ff4a3a"; ctx.fillText("BONUS",x0,y0+13); }
+      ctx.restore();
+    }
+  }
+
   function startFastbreak(seite){
     fsLive.fastbreak={seite, bis:fsT+3, ausbrecher:null};
+    if(laufwegeVon())lwZaehle("fastBreaks"); // Sonde diagSpielzuege
     // AUSBRUCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben). Der Fastbreak selbst gab es
     // schon; was fehlte, war ein Grund, warum ein SCHNELLER Spieler davon mehr hat als
     // ein langsamer. Genau das ist dieser Block: er sucht den schnellsten Mann des
@@ -16596,6 +17001,7 @@
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       merkeBeruehrung(flug.ziel);
+      if(laufwegeVon())lwZ(flug.ziel).ballSeit=fsT; // LAUFWEG-MODUL (Wurf-Absicht), Anzeige/Sonde
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_CUT_DAUER oben): nur Basketball,
       // nur bei einem ECHTEN Zuspiel (dieser Zweig — die beiden `return`s oben fangen
@@ -16678,7 +17084,7 @@
       // (Foul und Block schliessen sich gegenseitig aus, s. `foul`-Wuerfel in `wirf`).
       if(flug.foul&&flug.blockKandidat){
         const verteidiger=flug.blockKandidat;
-        verteidiger.fouls++;
+        verteidiger.fouls++; tfZaehle(verteidiger.side); tfZaehler.wurfFouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
         // AND-ONE ist selten und sofort verstaendlich -- immer big (Konzept Abschnitt 4.3,
         // Nachzug 3).
@@ -16701,7 +17107,7 @@
       // Zweier (dunk/nah/mit), 3 fuer einen gefoulten Dreier — die vom Wurftyp geforderte
       // Teilmenge (kein 1-und-1/Bonus-Regelwerk, s. Bericht: bewusst nicht gebaut).
       const verteidiger=flug.blockKandidat;
-      verteidiger.fouls++;
+      verteidiger.fouls++; tfZaehle(verteidiger.side); tfZaehler.wurfFouls++;
       const anzahl=flug.tier==="fern"?3:2;
       logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
       feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
@@ -16722,6 +17128,7 @@
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
         schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:flug.blockKandidat.id});
+        bkFxPush({art:"block",x:(schuetze.x+flug.blockKandidat.x)/2,y:Math.min(schuetze.y,flug.blockKandidat.y)-30}); // EFFEKT-MODUL
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
@@ -16803,6 +17210,7 @@
     // Standphase ist die freie Simulation ohnehin ausgesetzt (kein entscheideBallaktion,
     // kein Steal, keine Deckung), es liest also niemand diese Abstaende.
     const SEP_RADIUS_STAND=30, SEP_STAERKE_STAND=0.45; // PLATZHALTER
+    const LW=laufwegeVon(); // LAUFWEG-MODUL (null = alte Laufwege, Hockey/Football)
     for(const team of FSTEAM)for(const u of team){
       // Opus-Review-2-Fund (Volumen-Hebel, Pp-neutral): das Spiel produzierte nur ~6,7
       // Wuerfe/Spiel — zu wenig, damit sich Spezialisierung ueberhaupt zeigen kann, egal
@@ -16886,6 +17294,12 @@
         if(fsT<(u.ausbruchBis||0)){
           zx=korbX; zy=H/2;
           tempoMul=Math.max(tempoMul,AUSBRUCH_TEMPO_MUL); dribbelFaktor=0.85;
+        } else if(LW&&!(imFastbreak&&fastbreak.seite===u.side)){
+          const r=lwBallfuehrer(u,zx,zy,korbX,LW); zx=r.x; zy=r.y; tempoMul*=r.tempo;
+        }
+        if(LW&&(fsT<(u.ausbruchBis||0)||(imFastbreak&&fastbreak.seite===u.side))){
+          // Ausbruch/Fast-Break: keine Halbfeld-Absicht (nur Anzeige/Sonde, keine Formel liest es).
+          const z=lwZ(u); if(z.art==="postup"||z.art==="pnr"){ z.art=null; z.postSeit=null; }
         }
       } else if(fsLive.ball.frei&&(istHockey()
                  ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
@@ -16903,6 +17317,15 @@
         // der Alley-Oop eingeschlossen (Passgewicht dafuer in offensterMitspieler/
         // gewichtetesLosNach fuer den Spielzug-Kandidaten).
         zx=korbX; zy=H/2;
+        if(LW){
+          // LAUFWEG-MODUL: Pick-and-ROLL fuer Innenspieler, Pick-and-POP fuer Werfer (Profil
+          // FERN-NAH >= popProfil): der Werfer laeuft nach dem Block an die Dreierlinie.
+          const z=lwZ(u), pop=(u.SCHUSS_FERN-u.SCHUSS_NAH)>=LW.pickRoll.popProfil;
+          if(z.rollZaehlt!==u.rollBis){ z.rollZaehlt=u.rollBis; lwZaehle(pop?"pickPops":"pickRolls"); }
+          if(pop&&LW.pickRoll){ const q=(Math.sign(u.y-H/2)||1)*LW.pickRoll.popQuer;
+            const pp=lwKorbPunkt(korbX,u.side,Math.sqrt(Math.max(0,LW.pickRoll.popRadius*LW.pickRoll.popRadius-q*q)),q); zx=pp.x; zy=pp.y; }
+          tempoMul=LW.tempo.cutSprint||1;
+        }
       } else if(u.cutBis>fsT){
         // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_CUT_DAUER oben): derselbe
         // Zielpunkt wie beim Roll zwei Zeilen drueber — bewusst, der "offene Raum" nach
@@ -16911,6 +17334,7 @@
         // dieselbe Formel, nur ueber ein anderes Ereignis (abgeschlossenes Zuspiel statt
         // abgeschlossener Screen) ausgeloest.
         zx=korbX; zy=H/2;
+        if(LW){ const z=lwZ(u); if(z.cutZaehlt!==u.cutBis){ z.cutZaehlt=u.cutBis; lwZaehle("giveAndGo"); } tempoMul=LW.tempo.cutSprint||1; }
       } else if(ballSeite===u.side){
         // Angriff ohne Ball: rollenbasierte Slots (zuordneSlots) statt einer fixen
         // Team-Index-Formation, PLUS Ausweichdruck vom Ballfuehrer PLUS gelegentliches
@@ -16959,6 +17383,14 @@
         if(JAEGER&&!JAEGER.has(u))bx=spacingRuecklauf(bx);
         if(spacingVon()){ const m=spacingMitspielerZiel(u,bx,by); bx=m.x; by=m.y; }
         zx=bx; zy=by;
+        if(LW){
+          // LAUFWEG-MODUL: Crash beim eigenen Wurf, sonst Center am Block / Backdoor / Joggen.
+          const c=lwCrash(u,korbX,LW);
+          if(c){ zx=c.x; zy=c.y; tempoMul=LW.tempo.cutSprint||1; }
+          else if(!(imFastbreak&&fastbreak.seite===u.side)){
+            const r=lwAngreifer(u,zx,zy,korbX,LW); if(r){ zx=r.x; zy=r.y; tempoMul=r.tempo; }
+          }
+        }
         if(imFastbreak&&fastbreak.seite===u.side){
           if(fastbreak.ausbrecher===u&&fsT<(u.ausbruchBis||0)){
             // AUSBRUCH OHNE BALL: er laeuft nicht in seinen Slot, sondern DURCH — an den
@@ -16969,7 +17401,10 @@
             // Halbfeld-Slots an, nur schneller.
             zx=korbX; zy=H/2+feldVersatz(0,u.id%2?26:-26).y;
             tempoMul=AUSBRUCH_TEMPO_MUL;
-          } else if(SPRINTER[u.side].indexOf(u)>=0)tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
+          } else if(SPRINTER[u.side].indexOf(u)>=0){
+            tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
+            if(LW){ const l=lwFastbreakLane(u,korbX,LW,true); if(l){ zx=l.x; zy=l.y; } } // Aussenbahnen fuellen
+          }
         }
       } else if(u.deckt){
         if(imFastbreak&&fastbreak.seite!==u.side){
@@ -17096,6 +17531,7 @@
             }
             const screener=FSTEAM[u.deckt.side].find(s=>s.screent&&s.screent.fuer===u.deckt&&fsT<s.screent.bis);
             if(screener&&dist(screener,{x:(u.x+u.deckt.x)/2,y:(u.y+u.deckt.y)/2})<26)tempoMul=0.35; // PLATZHALTER
+            if(LW){ const r=lwVerteidiger(u,eigenerKorbX,LW,JAEGER); if(r){ zx=r.x; zy=r.y; tempoMul=r.tempo; } } // LAUFWEG-MODUL
           }
         }
       } else {
@@ -17128,6 +17564,7 @@
         }
         zx+=sepX*sepR*sepS; zy+=sepY*sepR*sepS;
       }
+      { const g=feldGrenze(zx,zy); if(g){ zx=g.x; zy=g.y; } } // FELD-GRENZE: nie ueber Seiten-/Grundlinie
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
       // (`dribbelFaktor`, ersetzt das alte separate kDribble; im Fastbreak leichter, s.
@@ -17391,10 +17828,14 @@
         x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
         y:flug.von.y+(flug.nach.y-flug.von.y)*phase
           -Math.sin(phase*Math.PI)*(istHockey()?0:flug.art==="alley"?90:flug.art==="wurf"?36:0)};
+      if(flug.art==="pass"&&LW_PASS.has(flug))fsBall.z=lwPassZ(LW_PASS.get(flug),phase); // Pass-Art, nur Anzeige
       if(flug.art==="alley"&&phase>0.66)flug.ziel.hop=Math.sin(((phase-0.66)/0.34)*Math.PI)*28;
       if(phase>=1){
         if(bkWurfFlug)bkNachlauf={art:flug.treffer?"netz":"abpraller",t0:bkAnzeigeUhr,
           x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,dunk:flug.tier==="dunk"||flug.art==="alley"};
+        if(bkWurfFlug&&!flug.foul)bkFxPush({art:flug.treffer?"treffer":"ring",x:flug.nach.x,y:flug.nach.y,links:flug.nach.x<W/2,
+          dunk:flug.tier==="dunk"||flug.art==="alley",fern:!!flug.fern,brett:!flug.treffer&&flug.tier==="mit",
+          knapp:fsLive.viertel>=4&&Math.abs(fsPunkte[0]-fsPunkte[1])<=4}); // EFFEKT-MODUL, nur Anzeige
         loeseFlugAuf(flug,art); fsLive.ball.flug=null;
       }
     } else if(fsLive.ball.frei){
@@ -18647,6 +19088,17 @@
   // Ring) und wird fuer den rechten gespiegelt. Ist ein PNG geladen, ersetzt es die Primitive
   // seiner Ebene vollstaendig; fehlt es oder laedt es nicht, bleibt die Zeichnung unten.
   function zeichneKorbAnlage(links,ebene){
+    const wk=bkRingWackeln(links); // EFFEKT-MODUL: Ringwackeln (nur Anzeige)
+    if(wk.dx||wk.dy||wk.rot){
+      const kx0=korbXVon(links?1:0);
+      ctx.save(); ctx.translate(wk.dx,wk.dy);
+      ctx.translate(kx0,H/2); ctx.rotate(wk.rot); ctx.translate(-kx0,-H/2);
+      try{ zeichneKorbAnlageRoh(links,ebene); } finally { ctx.restore(); }
+      return;
+    }
+    zeichneKorbAnlageRoh(links,ebene);
+  }
+  function zeichneKorbAnlageRoh(links,ebene){
     const F=BK_FIBA, kx=korbXVon(links?1:0), my=H/2, z=links?1:-1;
     const ry=my-F.ringZ;                       // Bildschirm-y des Ringmittelpunkts
     // PNG-Anlage (Fable 17.11., data/generated/pixellab-requisiten/basketball-17-11/anker.json):
@@ -18956,6 +19408,7 @@
   function zeichneFeldspiel(){
     bodenFeldspiel();
     zeichenVersatzSchritt();
+    if(feldspielDisc==="basketball")lwZeichneBoden(); // LAUFWEG-MODUL: Spielzug-Zeichen am Boden
     const art=FB();
     let fokusMarke=null; // gefuellt in der Spieler-Schleife, gezeichnet danach (s. unten)
     // WER TRAEGT DEN NAMEN: Ankerpunkt fuer NAME_NAH_RADIUS (s. dort). Im laufenden Spiel
@@ -19068,7 +19521,8 @@
             ctx.globalAlpha=1;
           }
         }
-        zeichneSprite(ctx,u,x,y,true);
+        if(feldspielDisc==="basketball"&&laufwegeVon())lwZeichneFigur(u,x,y); // LAUFWEG-MODUL: Haltung
+        else zeichneSprite(ctx,u,x,y,true);
         // AUFPRALL-BOGEN DES BODYCHECKS (13.09.). Dieselbe Bauform wie der "hieb"-Effekt
         // im Kampf und beim Bahn-Rempler (zeichneEffekte, typ:"hieb"): ein Bogen um den
         // Aufprallpunkt, aus der Richtung des Checkenden geoeffnet, mit der Restzeit
@@ -19159,6 +19613,8 @@
       }
     });
     korbHinten(); // alle Figuren standen hinter dem Korb
+    if(feldspielDisc==="basketball")lwZeichneOben(); // LAUFWEG-MODUL: gestellter Block
+    if(feldspielDisc==="basketball")tfZeichne(); // TEAMFOUL-/BONUS-MODUL: Teamfouls am Korb
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
     // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
     // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
@@ -19335,6 +19791,7 @@
     }
     // Vordere Ebene der Korbanlage NACH dem Ball: der Ball faellt durch den Ring ins Netz.
     if(feldspielDisc==="basketball")for(const links of [true,false])zeichneKorbAnlage(links,"vorne");
+    if(feldspielDisc==="basketball")bkFxZeichne(); // EFFEKT-/TON-MODUL
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
@@ -19365,6 +19822,216 @@
   // Zeitbasis ziehen — statt dreier unabhaengig gewaehlter Zahlen, die zufaellig
   // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
   // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
+
+  // ===================================================================================
+  // KAMERA-MODUL — Halbfeld-/Folgekamera fuer die Feldspiele (Benchmark Basketball Runde 2,
+  // 17.11., docs/design/benchmark-basketball-17-11.md Abschnitt 7.3). REINE ANZEIGE: liest den
+  // Ball, den Ballbesitz und den laufenden Wurf, schreibt nichts, das eine Formel liest
+  // (Fingerabdruck unveraendert, gezeigt = gebucht unberuehrt — die Linien liegen weiter genau
+  // dort, wo die Logik misst; die Kamera schiebt und vergroessert nur das ganze Bild).
+  //   * Halbfeld: Bildausschnitt mit `zoom` auf die Angriffshaelfte, Mitte zwischen Ball und
+  //     angegriffenem Korb (`korbZug`), quer weich zur Feldmitte gezogen (`querZug`).
+  //   * Weicher Schwenk: kritisch gedaempfte Annaeherung in Wandzeit (`daempfung` je Sekunde),
+  //     beim Ballbesitzwechsel faehrt das Bild also sichtbar mit statt zu springen.
+  //   * Kurzer Zoom bei Dunk und Dreier: `nahZoom` auf den Ring, `nahDauer` s lang ab Abwurf.
+  //   * Der Ausschnitt bleibt immer innerhalb der Leinwand (kein schwarzer Rand).
+  // Parameter je Disziplin in FELDSPIEL_ART[d].kamera; ohne Block steht die alte Totale.
+  // Abschaltbar: window.__arena.feldKamera(false) (Totale), Vorgabe an.
+  // ===================================================================================
+  let fkAn=true, fkZustand=null, fkLetzteWand=0;
+  const FK_GESEHEN=new WeakSet();
+  const feldKameraVon=()=>{ const a=(typeof FELDSPIEL_ART!=="undefined")&&FELDSPIEL_ART[feldspielDisc]; return a&&a.kamera?a.kamera:null; };
+  function feldKameraZiel(k){
+    const fl=fsLive&&fsLive.ball.flug, tr=fsLive&&fsLive.ball.traeger;
+    const seite=fl&&fl.schuetze?fl.schuetze.side:fl&&fl.passgeber?fl.passgeber.side:tr?tr.side:(fsLive?fsLive.amBall:0);
+    const korbX=korbXVon(seite);
+    const bx=fsBall&&fsBall.sichtbar?fsBall.x:W/2, by=fsBall&&fsBall.sichtbar?fsBall.y:H/2;
+    let z=k.zoom, cx=bx+(korbX-bx)*k.korbZug, cy=by+(H/2-by)*k.querZug;
+    if(!fsLive||fsLive.phase==="viertelpause"||done){ z=1; cx=W/2; cy=H/2; }
+    else if(fsLive.phase==="freiwurf"){ z=k.zoom; cx=korbX+(W/2-korbX)*0.25; cy=H/2; }
+    if(fl&&(fl.art==="wurf"||fl.art==="alley")&&(fl.tier==="dunk"||fl.fern||fl.art==="alley")&&!FK_GESEHEN.has(fl)){
+      FK_GESEHEN.add(fl); fkZustand.nahBis=fkLetzteWand+k.nahDauer; fkZustand.nahX=korbX;
+    }
+    // EFFEKT-/TON-MODUL: ein Dunk/Dreier, der eben am Ring ankam (Spielzeit), haelt den
+    // Nahzoom ebenfalls — so steht er auch im Standbild (Sonde szeneFeldspiel) und nach Sprung.
+    if(typeof bkFx!=="undefined"&&bkFx.length){
+      const e=bkFx[bkFx.length-1];
+      if(e.art==="treffer"&&(e.dunk||e.fern)&&bkAnzeigeUhr-e.t0<k.nahDauer*0.7){ fkZustand.nahBis=Math.max(fkZustand.nahBis,fkLetzteWand+0.05); fkZustand.nahX=e.x; }
+    }
+    if(fkZustand.nahBis>fkLetzteWand){ z=k.nahZoom; cx=fkZustand.nahX+(W/2-fkZustand.nahX)*k.nahVersatz; cy=H/2-H*0.04; }
+    return {z,cx,cy};
+  }
+  // Einmal je Bild: Zustand weich nachfuehren, dann Transformation setzen. Gibt true zurueck,
+  // wenn transformiert wurde (Aufrufer macht ctx.save/restore).
+  function feldKameraAnwenden(){
+    const k=feldKameraVon();
+    const jetzt=(typeof performance!=="undefined"&&performance.now)?performance.now()/1000:0;
+    const dt=fkLetzteWand?Math.min(0.1,Math.max(0,jetzt-fkLetzteWand)):0; fkLetzteWand=jetzt;
+    if(!k||!fkAn){ fkZustand=null; return false; }
+    if(!fkZustand)fkZustand={z:1,cx:W/2,cy:H/2,nahBis:0,nahX:W/2};
+    const ziel=feldKameraZiel(k);
+    const a=1-Math.exp(-k.daempfung*dt), az=1-Math.exp(-k.zoomDaempfung*dt);
+    fkZustand.z+=(ziel.z-fkZustand.z)*az;
+    fkZustand.cx+=(ziel.cx-fkZustand.cx)*a; fkZustand.cy+=(ziel.cy-fkZustand.cy)*a;
+    const z=Math.max(1,fkZustand.z), hw=W/(2*z), hh=H/(2*z);
+    const cx=Math.max(hw,Math.min(W-hw,fkZustand.cx)), cy=Math.max(hh,Math.min(H-hh,fkZustand.cy));
+    if(z<1.001&&Math.abs(cx-W/2)<0.5&&Math.abs(cy-H/2)<0.5)return false;
+    ctx.translate(W/2,H/2); ctx.scale(z,z); ctx.translate(-cx,-cy);
+    fkZustand.anzeige={z,cx,cy};
+    return true;
+  }
+  // Bildschirm -> Feld (fuer Klicks auf Figuren, s. Fokus-Klick auf der Leinwand).
+  function feldKameraInvers(mx,my){
+    const a=fkZustand&&fkZustand.anzeige; if(!a||!fkAn||!feldKameraVon())return {x:mx,y:my};
+    return {x:(mx-W/2)/a.z+a.cx, y:(my-H/2)/a.z+a.cy};
+  }
+  function zeichneFeldspielMitKamera(){
+    ctx.save();
+    try{ feldKameraAnwenden(); zeichneFeldspiel(); } finally { ctx.restore(); }
+  }
+
+
+  // ===================================================================================
+  // EFFEKT-/TON-MODUL BASKETBALL (Benchmark Runde 2, 17.11., Bogen-Zeilen 2/8/9). REINE
+  // ANZEIGE: eine kleine Ereignis-Warteschlange (hoechstens BK_FX_MAX Eintraege, in Mess-
+  // laeufen also kein Speicherwachstum), gefuellt an den Stellen, an denen der Ball am Ring
+  // ankommt oder geblockt wird; gelesen nur in zeichneFeldspiel. Kein rr(), keine Felder an
+  // Spielern (Fingerabdruck unberuehrt).
+  //   * Ringwackeln     bei Ringtreffer (Fehlwurf) gedaempfte Schwingung, beim Dunk staerker
+  //                     und mit Neigung (der ganze Korb samt Ring wackelt, PNG oder Primitiv)
+  //   * Dunk            Funkenkranz am Ring, Staubring bei der Landung
+  //   * Dreier          Leuchtspur hinter dem Ball, Goldfunken bei Treffer
+  //   * Block           weisser Stern + Splitter am Blockpunkt
+  //   * Staub/Schweiss  Staubwoelkchen beim Abstoppen (Pull-up) und Absprung (Drive),
+  //                     Schweisstropfen beim Drive
+  //   * Ton             WebAudio-Synthese aus den Bausteinen tonKlick/tonSchlag/tonMetall/
+  //                     tonRauschen (kein Asset): Swish != Ringtreffer != Brett/Block, Dunk-
+  //                     Wumms, Turnschuh-Quietschen, Publikum steigt bei knappem Stand im
+  //                     letzten Viertel an. Erst nach einer Nutzergeste (Autoplay-Regel),
+  //                     abschaltbar: window.__arena.bkSynthTon(false), gemerkt in
+  //                     localStorage "bkSynthTon". Lautstaerke/Stumm ueber bkPegel (gleicher
+  //                     Regler wie alle Basketball-Toene).
+  // ===================================================================================
+  const BK_FX_MAX=24;
+  let bkFx=[], bkFxSpur=[], bkGesteDa=false;
+  let bkSynthAn=(()=>{ try{ return localStorage.getItem("bkSynthTon")!=="0"; }catch(e){ return true; } })();
+  try{
+    if(typeof document!=="undefined"&&document.addEventListener){
+      const geste=()=>{ bkGesteDa=true; };
+      document.addEventListener("pointerdown",geste,{once:true,capture:true});
+      document.addEventListener("keydown",geste,{once:true,capture:true});
+    }
+  }catch(e){}
+  function bkFxPush(e){ if(feldspielDisc!=="basketball")return; e.t0=bkAnzeigeUhr; bkFx.push(e); if(bkFx.length>BK_FX_MAX)bkFx.shift(); }
+  function bkFxNeuesSpiel(){ bkFx=[]; bkFxSpur=[]; }
+  function bkTon(art){
+    if(!bkSynthAn||!bkGesteDa||stumm||(typeof schnelldurchAktiv!=="undefined"&&schnelldurchAktiv))return;
+    try{
+      if(art==="swish"){ tonRauschen(0.22,5200,0.16); tonKlick(0.10,6500,0.05); }
+      else if(art==="ring"){ tonMetall(0.30,1180,0.32); tonSchlag(0.12,420,240,0.10); }
+      else if(art==="brett"){ tonSchlag(0.36,190,70,0.14); tonKlick(0.18,900,0.04); }
+      else if(art==="dunk"){ tonSchlag(0.55,120,45,0.30); tonMetall(0.26,760,0.45); tonRauschen(0.14,900,0.6); }
+      else if(art==="block"){ tonSchlag(0.40,260,90,0.12); tonKlick(0.22,1400,0.05); }
+      else if(art==="quietschen"){ tonSchlag(0.07,2600,3500,0.07); }
+      else if(art==="publikum"){ tonRauschen(0.16,800,1.3); }
+    }catch(e){}
+  }
+  // Ein Ereignis wird beim ersten Zeichnen "gehoert": Ton genau einmal, danach nur Bild.
+  function bkFxTonEinmal(e){
+    if(e.tonGespielt)return; e.tonGespielt=true;
+    if(e.art==="treffer"){ bkTon(e.dunk?"dunk":"swish"); if(e.knapp)bkTon("publikum"); }
+    else if(e.art==="ring")bkTon(e.brett?"brett":"ring");
+    else if(e.art==="block")bkTon("block");
+    else if(e.art==="quietschen")bkTon("quietschen");
+  }
+  // Ring-Auslenkung je Seite (links = Korb bei kleinem x): {dx,dy,rot}
+  function bkRingWackeln(links){
+    let dx=0, dy=0, rot=0;
+    for(const e of bkFx){
+      if(e.links!==links||!(e.art==="ring"||(e.art==="treffer"&&e.dunk)))continue;
+      const t=bkAnzeigeUhr-e.t0; if(t<0||t>0.9)continue;
+      const amp=(e.art==="treffer"?3.6:e.brett?1.2:2.2)*Math.exp(-t*5.5);
+      dy+=Math.sin(t*38)*amp; dx+=Math.sin(t*29+1)*amp*0.35;
+      if(e.art==="treffer")rot+=Math.sin(t*31)*0.035*Math.exp(-t*5);
+    }
+    return {dx,dy,rot};
+  }
+  // Drei-Punkte-Spur: die Flugbahn der letzten ~30 % eines Distanzwurfs, aus derselben
+  // Bahnformel wie der Ball selbst (bkBogenZ) — stimmt auch im Standbild.
+  function bkFxSpurPflegen(){
+    bkFxSpur=[];
+    const fl=fsLive&&fsLive.ball.flug;
+    if(!(fl&&fl.art==="wurf"&&fl.fern))return;
+    const ph=Math.min(1,fl.t/fl.dauer), hoch=Math.min(70,18+feldLogikDist(fl.von,fl.nach)*0.32);
+    for(let k=12;k>=0;k--){
+      const q=ph-k*0.025; if(q<0)continue;
+      bkFxSpur.push({x:fl.von.x+(fl.nach.x-fl.von.x)*q, y:fl.von.y+(fl.nach.y-fl.von.y)*q-bkBogenZ(q,hoch)});
+    }
+  }
+  function bkFxZeichne(){
+    bkFxSpurPflegen();
+    if(bkFxSpur.length>1){
+      ctx.save(); ctx.lineCap="round";
+      for(let i=1;i<bkFxSpur.length;i++){
+        const a=i/bkFxSpur.length;
+        ctx.strokeStyle="rgba(255,196,64,"+(a*0.75)+")"; ctx.lineWidth=1+a*4;
+        ctx.beginPath(); ctx.moveTo(bkFxSpur[i-1].x,bkFxSpur[i-1].y); ctx.lineTo(bkFxSpur[i].x,bkFxSpur[i].y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // Staub/Schweiss aus den Wurf-Absichten (LAUFWEG-MODUL), Ereignis je Wurf einmal.
+    if(typeof laufwegeVon==="function"&&laufwegeVon()){
+      for(const team of FSTEAM)for(const u of team){
+        const z=lwZ(u), tw=bkAnzeigeUhr-z.wurfT;
+        if(z.wurfArt&&tw>=0&&tw<0.5&&z.fxWurfT!==z.wurfT){
+          z.fxWurfT=z.wurfT;
+          if(z.wurfArt==="pullup"||z.wurfArt==="drive"||z.wurfArt==="postup")
+            bkFxPush({art:"staub",x:u.x,y:u.y+19,schweiss:z.wurfArt==="drive",id:u.id});
+          if(z.wurfArt==="pullup")bkFxPush({art:"quietschen"});
+        }
+        if(z.art==="backdoor"&&z.fxCutBis!==z.bis){ z.fxCutBis=z.bis; bkFxPush({art:"staub",x:u.x,y:u.y+19}); bkFxPush({art:"quietschen"}); }
+      }
+    }
+    const F=BK_FIBA;
+    for(const e of bkFx){
+      const t=bkAnzeigeUhr-e.t0; if(t<0)continue;
+      bkFxTonEinmal(e);
+      if(e.art==="treffer"&&(e.dunk||e.fern)&&t<0.7){
+        const kx=e.x, ry=e.y-F.ringZ, n=e.dunk?14:10, r=8+t*(e.dunk?70:50), a=1-t/0.7;
+        ctx.save(); ctx.globalAlpha=a;
+        for(let i=0;i<n;i++){
+          const w=i/n*Math.PI*2+(e.dunk?0:0.2);
+          ctx.strokeStyle=e.dunk?(i%2?"#ffe08a":"#ff8a3a"):"#ffd34a"; ctx.lineWidth=e.dunk?2.4:1.8;
+          ctx.beginPath(); ctx.moveTo(kx+Math.cos(w)*r*0.55,ry+Math.sin(w)*r*0.55*0.7);
+          ctx.lineTo(kx+Math.cos(w)*r,ry+Math.sin(w)*r*0.7); ctx.stroke();
+        }
+        if(e.dunk&&t<0.18){ ctx.globalAlpha=(1-t/0.18)*0.8; ctx.fillStyle="#fff7d6";
+          ctx.beginPath(); ctx.ellipse(kx,ry,F.ringRx*1.6,F.ringRy*1.6,0,0,6.3); ctx.fill(); }
+        ctx.restore();
+        if(e.dunk&&t>0.32&&t<0.9){ // Landung: Staubring unter dem Korb
+          const q=(t-0.32)/0.58;
+          ctx.save(); ctx.globalAlpha=(1-q)*0.45; ctx.strokeStyle="#d8d0c0"; ctx.lineWidth=3*(1-q)+1;
+          ctx.beginPath(); ctx.ellipse(kx+(e.links?18:-18),e.y+14,10+q*30,4+q*10,0,0,6.3); ctx.stroke(); ctx.restore();
+        }
+      } else if(e.art==="block"&&t<0.55){
+        const a=1-t/0.55, r=10+t*60;
+        ctx.save(); ctx.globalAlpha=a; ctx.strokeStyle="#fff6c8"; ctx.lineWidth=3.5; ctx.lineCap="round";
+        for(let i=0;i<8;i++){ const w=i/8*Math.PI*2;
+          ctx.beginPath(); ctx.moveTo(e.x+Math.cos(w)*r*0.35,e.y+Math.sin(w)*r*0.35); ctx.lineTo(e.x+Math.cos(w)*r,e.y+Math.sin(w)*r); ctx.stroke(); }
+        ctx.fillStyle="rgba(255,255,255,"+(a*0.6)+")"; ctx.beginPath(); ctx.arc(e.x,e.y,5*(1-t),0,6.3); ctx.fill();
+        ctx.restore();
+      } else if(e.art==="staub"&&t<0.6){
+        const q=t/0.6;
+        ctx.save(); ctx.globalAlpha=(1-q)*0.5; ctx.fillStyle="#cfc6b4";
+        for(let i=0;i<5;i++){ const w=Math.PI*(0.15+i*0.17);
+          ctx.beginPath(); ctx.arc(e.x+Math.cos(w)*(6+q*16)*(i%2?1:-1),e.y-Math.sin(w)*q*6,2+q*4,0,6.3); ctx.fill(); }
+        if(e.schweiss&&t<0.45){ ctx.globalAlpha=(1-t/0.45)*0.85; ctx.fillStyle="#bfe6ff";
+          for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(e.x+(i-1)*7+(i-1)*t*30,e.y-46-t*20+t*t*120,1.6,0,6.3); ctx.fill(); } }
+        ctx.restore();
+      }
+    }
+  }
+
   const BREAKING_BPM=100;
   // B5 (Broadcast-Optik-Recherche 27.09.): Dauer des "GEBROCHEN"-Stempels in Buehnenzeit
   // (buehneT-Domaene, also real ablaufend, keine Enthuellungs-Pause, s. zeichneBreaking()).
@@ -56896,7 +57563,7 @@
     ctx.clearRect(0,0,W,H);
     // TEAM-FEIER-WACKELN (Konzept team-publikum-feiermomente 2.5): mitTeamFeierWackeln() ruft
     // die Chassis-Zeichnung ohne laufende grosse Feier unveraendert direkt auf, s. dort.
-    if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspiel);return;}
+    if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspielMitKamera);return;} // KAMERA-MODUL (ohne kamera-Block: Totale)
     if(istBuehne(disc)){mitTeamFeierWackeln(zeichneBuehne);return;}
     if(istBahn(disc)){mitTeamFeierWackeln(zeichneSpurt);return;}
     zeichneBoden();
@@ -60442,8 +61109,9 @@
       if(!fokusAuswahlMoeglich())return;
       const r=leinwand.getBoundingClientRect();
       if(!r.width||!r.height)return;
-      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
-      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      const mx0=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my0=(ev.clientY-r.top)*(leinwand.height/r.height);
+      const mk=feldKameraInvers(mx0,my0), mx=mk.x, my=mk.y; // KAMERA-MODUL: Klick ins Feld zurueckrechnen
       let treffer=null,minD=FOKUS_GREIF_RADIUS;
       for(const g of FSTEAM[1]){
         const d=Math.hypot(g.x-mx,g.y-my);
@@ -70241,6 +70909,46 @@
         passFreiProzent:f(acc.frei1/Math.max(1,acc.ballTicks)*100), freieAnspielstationen:f(acc.freiN/Math.max(1,acc.ballTicks),2),
         breite:f(acc.breite/Math.max(1,acc.ballTicks))};
     },
+    // SPIELZUG-SONDE (Benchmark Basketball Runde 2, 17.11., LAUFWEG-MODUL): zaehlt je Spiel, wie
+    // oft die Laufwege mit Absicht wirklich vorkommen (Backdoor-Cuts, Give-and-Go, Screens,
+    // Pick-and-Roll/-Pop, Post-ups, Fast-Breaks, Deny, Help-Rotation), welche Pass-Arten und
+    // Wurf-Absichten gezeigt werden und bei wie vielen Wuerfen ausgeboxt wird. Read-only wie
+    // diagSpacing: dieselben Saaten, volle Spiellaenge, Werte als Mittel je Spiel.
+    // TEAMFOUL-/BONUS-MODUL: Stand im laufenden Viertel (read-only, fuer HUD/Scorebug).
+    teamFouls:()=>{ const r=foulRegelVon(); if(!r)return null; tfViertelPruefen();
+      return {viertel:tfStand.viertel,fouls:[...tfStand.fouls],bonus:[0,1].map(sd=>tfStand.fouls[sd]>=r.bonusAb),bonusAb:r.bonusAb}; },
+    // KAMERA-MODUL: an/aus (Totale), gibt den neuen Zustand zurueck. Reine Anzeige.
+    // EFFEKT-/TON-MODUL: Synth-Ton an/aus (gemerkt), gibt den Zustand zurueck.
+    bkSynthTon:(an)=>{ if(an!=null){ bkSynthAn=!!an; try{ localStorage.setItem("bkSynthTon",bkSynthAn?"1":"0"); }catch(e){} } return bkSynthAn; },
+    feldKamera:(an)=>{ if(an!=null)fkAn=!!an; fkZustand=null; return fkAn; },
+    diagSpielzuege:(n,dId)=>{
+      const N=n||12, summe={}; let wuerfe=0, mitBoxout=0, boxerSumme=0, besitze=0, proben=0, aussen=0, maxQuer=0;
+      // SEITENLINIEN-PROBE (Review PR #1562): jede Spielerposition je Tick gegen das gezeichnete
+      // Feld (Laengs W*0,06..W*0,94, quer H/2 +- 7,5 m). Abnahme: 0 Proben ausserhalb.
+      const halbQuer=7.5*BK_FIBA.my;
+      for(let i=0;i<N;i++){
+        feldspielDisc=dId||"basketball"; bauFeldspiel(1337+i*7919);
+        let guard=0, flugAkt=null, maxBox=0;
+        while(!done&&guard<80000){
+          stepFeldspiel(1/60); guard++;
+          for(const t of FSTEAM)for(const u of t){ proben++; const q=Math.abs(u.y-H/2); if(q>maxQuer)maxQuer=q;
+            if(q>halbQuer+0.5||u.x<W*0.06-0.5||u.x>W*0.94+0.5)aussen++; }
+          const fl=fsLive&&fsLive.ball.flug;
+          if(fl&&(fl.art==="wurf"||fl.art==="alley")){
+            if(fl!==flugAkt){ flugAkt=fl; wuerfe++; maxBox=0; }
+            const n2=FSTEAM[1-fl.schuetze.side].filter(v=>lwZ(v).boxt).length;
+            if(n2>maxBox){ if(maxBox===0&&n2>0)mitBoxout++; boxerSumme+=n2-maxBox; maxBox=n2; }
+          }
+        }
+        besitze+=lwBesitzNr;
+        for(const k in lwZaehler)summe[k]=(summe[k]||0)+lwZaehler[k];
+        for(const k in tfZaehler)summe["foul_"+k]=(summe["foul_"+k]||0)+tfZaehler[k];
+      }
+      const je={}; for(const k of Object.keys(summe).sort())je[k]=+(summe[k]/N).toFixed(2);
+      return {spiele:N,jeSpiel:je,besitzeJeSpiel:+(besitze/N).toFixed(1),wuerfeJeSpiel:+(wuerfe/N).toFixed(1),
+        ausboxenAnteilWuerfe:+(mitBoxout/Math.max(1,wuerfe)*100).toFixed(1),boxerJeWurf:+(boxerSumme/Math.max(1,wuerfe)).toFixed(2),
+        seitenlinie:{proben,ausserhalb:aussen,maxQuerPx:+maxQuer.toFixed(1),halbQuerPx:+halbQuer.toFixed(1)}};
+    },
     // GEZEIGT = GEBUCHT (Benchmark Basketball 17.11.): prueft fuer jeden Wurf aus n Spielen, ob
     // die gebuchte Stufe (Zweier/Dreier) zur GEZEICHNETEN FIBA-Linie passt — rein geometrisch in
     // Metern aus BK_FIBA, unabhaengig von der Logik-Metrik — und ob die angezeigte Punktzahl
@@ -70284,6 +70992,24 @@
         if(situation==="wurf")return !!fl&&(fl.art==="wurf"||fl.art==="alley")&&fl.t/fl.dauer>=0.8;
         if(situation==="dreier")return !!fl&&fl.art==="wurf"&&fl.fern&&fl.t/fl.dauer>=0.55;
         if(situation==="rebound")return !!fsLive.ball.frei&&!!fsLive.reboundKampf&&fsLive.reboundKampf.t>0.2;
+        // Runde 2 (LAUFWEG-MODUL): Spielzuege und Wurf-Absichten, je im sichtbarsten Moment.
+        const alle=()=>[...FSTEAM[0],...FSTEAM[1]];
+        if(situation==="backdoor")return fsLive.phase==="laufend"&&alle().some(u=>{const z=lwZ(u); return z.art==="backdoor"&&z.bis-fsT<0.75;});
+        if(situation==="pick")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&lwZ(fsLive.ball.traeger).art==="pnr"&&feldLogikDist(fsLive.ball.traeger,{x:korbXVon(fsLive.ball.traeger.side),y:H/2})<135&&alle().some(u=>u.screent&&fsT<u.screent.bis&&fsT>u.screent.bis-0.7);
+        if(situation==="roll")return fsLive.phase==="laufend"&&!!fsLive.ball.traeger&&alle().some(u=>u.rollBis>fsT&&u.rollBis-fsT<1.1&&u.side===fsLive.ball.traeger.side);
+        if(situation==="postup")return !!fsLive.ball.traeger&&lwZ(fsLive.ball.traeger).art==="postup"&&fsT-lwZ(fsLive.ball.traeger).postSeit>0.4;
+        if(situation==="ausboxen")return !!fl&&fl.art==="wurf"&&fl.t/fl.dauer>=0.85&&FSTEAM[1-fl.schuetze.side].filter(v=>lwZ(v).boxt).length>=4;
+        if(situation==="fastbreak")return !!fsLive.fastbreak&&fsT<fsLive.fastbreak.bis&&fsLive.fastbreak.bis-fsT<1.9&&!!fsLive.ball.traeger;
+        if(situation==="lob"||situation==="bodenpass")return !!fl&&fl.art==="pass"&&LW_PASS.get(fl)===situation&&fl.t/fl.dauer>=0.45&&fl.t/fl.dauer<=0.6;
+        // Effekt-Momente (EFFEKT-/TON-MODUL): kurz nach dem Ereignis am Ring/Blockpunkt.
+        if(situation==="fx-dunk"||situation==="fx-ring"||situation==="fx-block"){
+          const e=bkFx[bkFx.length-1], tt=e?bkAnzeigeUhr-e.t0:-1;
+          if(situation==="fx-dunk")return !!e&&e.art==="treffer"&&e.dunk&&tt>=0.09&&tt<0.2;
+          if(situation==="fx-ring")return !!e&&e.art==="ring"&&!e.brett&&tt>=0.04&&tt<0.15;
+          return !!e&&e.art==="block"&&tt>=0.08&&tt<0.2;
+        }
+        if(situation==="spotup"||situation==="pullup"||situation==="drive"){
+          const w=alle().find(u=>lwZ(u).wurfArt===situation&&bkAnzeigeUhr-lwZ(u).wurfT>0.25&&bkAnzeigeUhr-lwZ(u).wurfT<0.32); return !!w; }
         if(situation==="treffer"){
           if(nachTreffer!=null)return fsT>=nachTreffer;
           if(fl&&fl.art==="wurf"&&fl.treffer&&fl.t+1/60>=fl.dauer)nachTreffer=fsT+0.12;
@@ -70291,8 +71017,12 @@
         }
         return false;
       };
-      while(!done&&guard<60000){ stepFeldspiel(1/60); guard++; if(passt())break; }
+      const laengen=[]; // floats-Laenge der letzten 30 Ticks (s. unten)
+      while(!done&&guard<60000){ laengen.push(floats.length); if(laengen.length>30)laengen.shift(); stepFeldspiel(1/60); guard++; if(passt())break; }
       vpSichtbarBis=0; // Viertelpausen-Tafel (Wandzeit) nicht ueber das Standbild legen
+      // Schwebetexte aus dem Vorspulen ("STEAL!", "BLOCK!" laengst vergangener Szenen) nicht ins
+      // Standbild uebernehmen — nur die der letzten halben Sekunde (30 Ticks) bleiben (Runde 2).
+      if(laengen.length)floats.splice(0,Math.min(floats.length,laengen[0]));
       return {gefunden:!done&&guard<60000, t:+fsT.toFixed(2), punkte:[...fsPunkte]};
     },
     // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der

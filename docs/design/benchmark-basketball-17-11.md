@@ -9,35 +9,41 @@ Für eine andere Disziplin kopiert man die Tabelle und füllt Spalte 3 und 4 neu
 
 Begleitdokumente: `docs/design/spacing-modul-17-11.md` (Bewegung/Spacing), `docs/design/basketball-assets-17-11.md`
 (Assets von Fable). Screenshots: `docs/design/benchmark-basketball-17-11/` (vorher/nachher, fünf Situationen,
-reproduzierbar mit `node scripts/screenshot-basketball-benchmark.mjs <ordner> [praefix] [engine.js]`).
+reproduzierbar mit `node scripts/screenshot-basketball-benchmark.mjs <ordner> [praefix] [engine.js]`; Runde 2: `runde2-*`, 15 Spielzüge/Effekte + Kamera-Bildfolge, Abschnitt 7.7).
 
 ## 1. Der Bogen
 
 Gewicht = Anteil am Gesamtwert. Die Prozente sind eine Einschätzung gegen die Prüfkriterien, keine Messung.
 Wo es eine Messung gibt, steht sie dabei.
 
-| # | Bereich | Gewicht | Prüfkriterium („fertig“ heißt …) | Ist Basketball | Fehlt bis 90 % |
-|---|---|---:|---|---:|---|
-| 1 | **Layout / Spielfeld** | 15 | Echte Maße des Vorbilds. Jede Wertungslinie ist sichtbar und liegt dort, wo die Logik misst. Auf jeder Kulisse vorhanden. | **90 %** | Nichts Wesentliches. Ring–Grundlinie ist 0,5 m statt FIBA 1,575 m, wegen der Korb-PNG (Abschnitt 3.2). |
-| 2 | **Spielgerät & Ziel** (Korb, Tor, Ball) | 10 | Eigenes Objekt mit Höhe, in Ebenen gezeichnet. Größe passt zur Figur. Ein Treffer ist sichtbar *im* Ziel. | **85 %** | Netz-„Swish“ auf der PNG nur als Primitiv-Überlage. Ringwackeln bei Fehlwurf fehlt. |
-| 3 | **Bewegung / Spacing** | 20 | Rollen halten Zonen. Höchstens 1–2 Spieler am Ball. Freie Anspielstationen. Kein Dauerklumpen (Messung `miss-spacing.mjs`). | **75 %** | Laufwege mit Absicht: Backdoor-Cut gegen überspielte Verteidiger, Post-up, sichtbare Spielzüge (Horns, Pick-and-Roll als Formation). Ausboxen sichtbar machen. |
-| 4 | **Regeln & Wertung sichtbar** | 15 | Jede Regel, die zählt, sieht man (2/3, Uhr, Fouls, Freiwürfe). Gezeigt = gebucht: 0 Abweichungen in der Sonde. | **90 %** | Foul-Zähler je Spieler/Team im HUD, Bonus-Situation. |
-| 5 | **Kamera** | 10 | Bildausschnitt folgt dem Spiel, wichtige Momente sind nah genug. | **40 %** | Halbfeld-Kamera mit weichem Schwenk beim Seitenwechsel. Kurzer Zoom auf Dunk/Dreier. Heute steht eine feste Vollfeld-Totale. |
-| 6 | **HUD / Live-Stand** | 10 | Stand, Zeit/Periode, Uhr, wer führt, Lauf, Top-Spieler, ohne das Feld zu verdecken. | **80 %** | Shot-Clock sitzt jetzt am Korb (Rahmen-PNG). Es fehlt die Live-Stand-Overlay-Linie (Konzept Fable 17.11.) und ein Foul-/Bonus-Zähler. |
-| 7 | **Kulisse** | 5 | Mindestens zwei Schauplätze, Linien als Asset, Mittelkreis-Wappen. | **85 %** | Zuschauer reagieren nicht auf Ereignisse. |
-| 8 | **Effekte** | 5 | Treffer-, Block- und Steal-Momente haben ein eigenes Bild. | **60 %** | Dunk-Effekt (Ring wackelt, Funken), Dreier-Leuchtspur, Block-Abpraller. |
-| 9 | **Ton / Feedback** | 5 | Jedes Ereignis klingt. Treffer ≠ Ringtreffer ≠ Brett. | **70 %** | Swish und Ringtreffer klingen unterschiedlich. Publikum steigt bei knappem Stand an. |
-| 10 | **Figuren-Animation** | 5 | Wurf-, Dunk-, Block-, Pass-Pose. | **45 %** | Nur Grundposen + `lunge`/`hop`. Neue PixelLab-Animationen nur mit Chris' Freigabe (Abschnitt 5). |
-| | **Gesamt (gewichtet)** | 100 | | **≈ 76 %** | Layout + Bewegung (die von Chris genannten 90 %): Layout 90, Bewegung 75 → ≈ 81 % |
+**Stand Runde 2 (17.11. abends).** Spalte „R1“ = nach der ersten Benchmark-Runde, „R2“ = nach dieser.
+Belege und Messungen zu R2 stehen in Abschnitt 7.
+
+| # | Bereich | Gewicht | Prüfkriterium („fertig“ heißt …) | R1 | **R2** | Beleg R2 / was noch fehlt |
+|---|---|---:|---|---:|---:|---|
+| 1 | **Layout / Spielfeld** | 15 | Echte Maße des Vorbilds. Jede Wertungslinie ist sichtbar und liegt dort, wo die Logik misst. Auf jeder Kulisse vorhanden. | 90 % | **92 %** | Feld-Grenze: 0 von 3,3 Mio. Spielerproben außerhalb der Linien (vorher 7 596, max. 224 px quer bei 175 px Seitenlinie). Offen: Ring–Grundlinie 0,5 statt 1,575 m (3.2). |
+| 2 | **Spielgerät & Ziel** (Korb, Tor, Ball) | 10 | Eigenes Objekt mit Höhe, in Ebenen gezeichnet. Größe passt zur Figur. Ein Treffer ist sichtbar *im* Ziel. | 85 % | **92 %** | Ringwackeln bei Ringtreffer und Dunk, Netz-Swish, Ball fliegt je Pass-Art anders (Brust flach, Boden mit Aufsetzer, Lob im Bogen). Offen: Korb mit Ausleger. |
+| 3 | **Bewegung / Spacing** | 20 | Rollen halten Zonen. Höchstens 1–2 Spieler am Ball. Freie Anspielstationen. Kein Dauerklumpen. Laufwege mit Absicht. | 75 % | **91 %** | LAUFWEG-MODUL, je Spiel gezählt (7.1): 33 Backdoor-Cuts, 166 Give-and-Go-Cuts, 28 Screens → 6 Roll + 6 Pop, 58 Post-ups, 47 Fast-Breaks mit Außenbahnen, 116 Help-Rotationen, Ausboxen bei 97,5 % der Würfe. Center am Block, Guards außen. Kosten: Klumpen ≥3 Mitspieler 9,4 → 12,1 %, freie Anspielstation 50 → 43 % (Deny + Feld-Grenze). |
+| 4 | **Regeln & Wertung sichtbar** | 15 | Jede Regel, die zählt, sieht man (2/3, Uhr, Fouls, Freiwürfe). Gezeigt = gebucht: 0 Abweichungen. | 90 % | **92 %** | Teamfouls je Viertel am Korb (fünf Punkte, rot + BONUS ab dem 5.), Sonde `__arena.teamFouls()`. 0 von 846 Würfen falsch gebucht. Offen: Foul ohne Wurf (gebaut, gemessen, aus, 7.2). |
+| 5 | **Kamera** | 10 | Bildausschnitt folgt dem Spiel, wichtige Momente sind nah genug. | 40 % | **85 %** | Halbfeld-Folgekamera (Zoom 1,32, gedämpfter Schwenk), Nahzoom 1,75 auf Dunk/Dreier/Alley-Oop (Bildfolge `runde2-k*.png`). Offen: Kamera-Timing bei Freiwürfen, Wackeln beim Dunk. |
+| 6 | **HUD / Live-Stand** | 10 | Stand, Zeit/Periode, Uhr, wer führt, Lauf, Top-Spieler, ohne das Feld zu verdecken. | 80 % | 80 % | Nicht angefasst (HUD-Agent, Block „HUD-SYSTEM“). `teamFouls()` steht für den Scorebug bereit. |
+| 7 | **Kulisse** | 5 | Mindestens zwei Schauplätze, Linien als Asset, Mittelkreis-Wappen. | 85 % | 85 % | Unverändert. Zuschauer reagieren nicht. |
+| 8 | **Effekte** | 5 | Treffer-, Block- und Steal-Momente haben ein eigenes Bild. | 60 % | **88 %** | Dunk-Funken + Landestaub, Dreier-Leuchtspur, Block-Stern, Staub beim Abstoppen, Schweiß beim Drive, Ringwackeln (`runde2-r2-12…15`). Offen: Steal-Moment. |
+| 9 | **Ton / Feedback** | 5 | Jedes Ereignis klingt. Treffer ≠ Ringtreffer ≠ Brett. | 70 % | **85 %** | WebAudio-Synthese: Swish ≠ Ring ≠ Brett ≠ Dunk ≠ Block, Turnschuh-Quietschen, Publikum steigt bei knappem Stand im 4. Viertel. Erst nach Nutzergeste, Schalter `__arena.bkSynthTon(false)`. |
+| 10 | **Figuren-Animation** | 5 | Wurf-, Dunk-, Block-, Pass-Pose. | 45 % | **60 %** | Aus dem Bestand: Squash/Stretch + Sprunghöhe je Wurf-Absicht, Post-up mit dem Rücken zum Korb, Ausboxen geduckt. Echte Posen fehlen (Kostenschätzung 7.5). |
+| | **Gesamt (gewichtet)** | 100 | | ≈ 76 % | **≈ 87 %** | **Layout + Bewegung (Chris' 90 %): R1 ≈ 81 % → R2 ≈ 91 %.** |
 
 **Abnahme-Zeile** (Pflicht, kein Prozentwert, sondern bestanden/nicht bestanden):
 
-| Abnahme | Schranke | main | neu |
-|---|---|---:|---:|
-| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | **0,867** (Spannweite 0,086, Saison 0,923) |
-| Pp-Abweichung (`messe-arena-einfluss.mjs basketball 48`, zwei Saatstämme) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | **13,6 / 16,0** (n=48, vor Review-Fix); nach dem Fix n=16: 20,4 / 22,1 (beide ≤ 25, n=48 war in vertretbarer Zeit nicht machbar) |
-| Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | **0 von 828 Würfen**, Anzeigetafel = Spielerpunkte in 8/8 Spielen |
-| Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | nur `spiele basketball 1/7/42` (Abschnitt 4) |
+| Abnahme | Schranke | main | R1 | #1562 (R1 + Review-Fix) | R2 (alter main) | **R2 + #1562 (18.11.)** |
+|---|---|---:|---:|---:|---:|---:|
+| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | 0,859 (Spannweite 0,111, Saison 0,909) | 0,867 (0,086 / 0,923) | 0,862 (0,136 / 0,881) | **0,862** (Spannweite 0,136, Saison 0,881) |
+| Pp-Abweichung (`einflussVon("basketball",n)`, Saat 0 / 10 000 000) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | 13,6 / 16,0 | 20,4 / 22,1 (nur n=16) | 7,5 / 13,4 | **7,5 / 13,4** (n=48, Node-Motor) |
+| Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | 0 von 828 Würfen | 0 von 828 | 0 von 846 | **0 von 846**, Anzeige = Buchung in 8/8 Spielen |
+| Seitenlinie (`__arena.diagSpielzuege(12).seitenlinie`) | 0 Proben außerhalb | — | 7 596 von 3,3 Mio. | — | 0 von 3,32 Mio. | **0 von 3,32 Mio.** |
+| Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | 97c267e8b7c7 | 38b176d7185b | 004f26374565 | **ce8fcef66028**, nur `spiele basketball 1/7/42` gegen main mit #1562 `38b176d7185b` |
+
+Abschnitt 4 beschreibt den Stand von #1562 (R1 + Review-Fix), Abschnitt 7 Runde 2, Abschnitt 7.9 die Zusammenführung beider.
 
 ## 2. Was diese Runde gebaut hat
 
@@ -136,3 +142,205 @@ python3 -I scripts/baue-basketball-assets.py --korb-x 0.076 --zone-tiefe 184.49 
 ```
 
 Neue read-only Sonden in `window.__arena`: `diagSpacing`, `diagGezeigtGebucht`, `szeneFeldspiel`.
+
+## 7. Runde 2 (17.11. abends): Bewegung und Gameplay auf über 90 %
+
+Auftrag: die Lücken aus Abschnitt 5 schließen, Reihenfolge nach Hebel. Fünf getrennte Commits auf
+`bb-runde2` (jeder einzeln verwerfbar): Laufwege, Foul/Bonus, Kamera, Effekte/Ton, Feld-Grenze.
+Alles Verallgemeinerbare sitzt in eigenen Modulen mit Parameterblock in `FELDSPIEL_ART[d]`; ohne Block
+verhält sich jede Disziplin wie vorher (Hockey, Football und alle anderen bleiben im Fingerabdruck
+byte-gleich).
+
+### 7.1 Laufwege mit Absicht (LAUFWEG-MODUL, `FELDSPIEL_ART.basketball.laufwege`)
+
+| Baustein | Was man sieht | Wie es entsteht |
+|---|---|---|
+| Center am Block | Slot 0 steht tief am Block der Ballseite, nicht an der Freiwurflinie | `postBlock` (1,7 m vor dem Ring, 1,8 m quer) |
+| Post-up | Innenspieler mit Ball drückt mit dem Rücken zum Korb langsam rein, Pfeil „POST-UP“ | Slot 0 oder Profil NAH−FERN ≥ 6, 1,8–4,8 m vor dem Ring, Tempo 0,5 |
+| Deny + Backdoor-Cut | Decker überspielt die Passlinie, der Angreifer schneidet hinter ihm zum Korb, Pfeil „BACKDOOR“ | Deny jeden zweiten Ballbesitz, eine Passstation vom Ball; Cut-Chance nach TECHNIK (0,35 ± 0,01/Punkt); der überspielte Decker zögert 0,6 s |
+| Pick-and-Roll / -Pop | Balken „PICK“ am Screener, Ballführer läuft um den Block, danach „ROLL“ (Innen) oder „POP“ (Werfer an die Dreierlinie) | bestehender Screen-Ruf; neu: Nutzung des Blocks im Halbfeld, Pop für Profil FERN−NAH ≥ 4 |
+| Ausboxen | Verteidiger stellen sich beim Wurf zwischen Mann und Korb, geduckt, Blick zum Mann | Wurf in der Luft oder Abpraller, alle Nicht-Jäger |
+| Crash | der korbnächste Angreifer geht zum Offensiv-Rebound | `crash.anzahl` 1 (2 gemessen: rho 0,852) |
+| Fast-Break-Lanes | die zwei Sprinter füllen die Außenbahnen, Pfeile | bestehender Fast-Break; neu: Bahnziel statt Halbfeld-Slot |
+| Help-Rotation | hilft einer am Ball, rückt der nächste auf dessen Mann | an die bestehende Hilfe gekoppelt |
+| Tempowechsel | Ballführer zögert, tritt an, reist; ohne Ball wird am Spot getrabt statt gesprintet | Periode 1,6 s, Mittel ≈ 1,0 (kein Netto-Tempogewinn) |
+| Pass-Art | Brustpass flach, Bodenpass mit Aufsetzer, Lob zum Cutter | nur Anzeige, aus der Geometrie beim Abspiel |
+| Wurf-Absicht | „SPOT-UP“/„PULL-UP“/„DRIVE“/„POST-UP“ am Schützen, Sprung je Absicht verschieden | nur Anzeige: Fangzeit, Tempo, Post-Zustand |
+
+Zustand in einer WeakMap (keine neuen Spielerfelder). **Gezählt** mit der neuen read-only Sonde
+`window.__arena.diagSpielzuege(12)` (Mittel je Spiel, 12 volle Spiele, ≈ 88 Ballbesitze, 106 Würfe):
+
+| Aktion je Spiel | R2 | | Aktion je Spiel | R2 |
+|---|---:|---|---|---:|
+| Backdoor-Cuts | 32,6 | | Pässe Brust / Boden / Lob | 48,9 / 102,8 / 23,5 |
+| Give-and-Go-Cuts | 165,8 | | Würfe Spot-up / Pull-up / Drive | 40,3 / 22,8 / 25,4 |
+| Screens gerufen | 28,0 | | Würfe Post-up / Alley-Oop | 14,9 / 2,3 |
+| Block genutzt (Halbfeld) | 3,2 | | Würfe mit Ausboxen | 97,5 % (5,8 Boxer je Wurf) |
+| Pick-and-Roll / Pick-and-Pop | 5,8 / 5,8 | | Deny-Stellungen | 147 |
+| Post-ups | 58,3 | | Help-Rotationen | 116 |
+| Fast-Breaks | 46,9 | | Wurf-Fouls | 4,0 |
+
+Ehrliche Grenzen: Give-and-Go war schon da (nach jedem Pass schneidet der Passgeber) und bleibt so
+häufig; der Block wird nur 3-mal je Spiel wirklich genutzt, weil der Screen-Ruf oft schon im
+Übergang fällt. Fürs Auge ist es trotzdem eine Formation (Balken + Roll/Pop-Pfeil). Spacing nach R2
+(`miss-spacing.mjs basketball 6 120 45`): Mitspielerabstand 185 → 181 px, Klumpen ≥ 3 Mitspieler
+9,4 → 12,1 %, Spieler um den Ballführer 2,44 → 2,61, freie Anspielstation 50 → 43 %. Das ist der Preis
+von Deny (überspielte Passlinien sind gewollt nicht frei) und Feld-Grenze (Eckspieler stehen an der
+Linie statt dahinter).
+
+### 7.2 Foul/Bonus (TEAMFOUL-/BONUS-MODUL, `FELDSPIEL_ART.basketball.fouls`)
+
+Jedes Spielerfoul zählt als Teamfoul im laufenden Viertel. Ab dem 5. gibt jedes Foul ohne Wurf zwei
+Freiwürfe, davor Einwurf (Ballbesitz bleibt, Schussuhr auf die Hälfte gedeckelt). Angezeigt am Korb
+der verteidigenden Seite (fünf Punkte, rot + „BONUS“), Sonde `__arena.teamFouls()` für den Scorebug.
+
+Bisher gab es nur Wurf-Fouls (Freiwürfe ohnehin), der Bonus hat also nur mit einem Foul **ohne** Wurf
+eine Wirkung. Gebaut: Reach-in beim missglückten Steal, gute Verteidiger (ABWEHR) foulen seltener.
+Gemessen (Node-Motor, rechnet wie `miss-alle-disziplinen.mjs 24 basketball`, 5 Kader):
+
+| Fassung | Fouls ohne Wurf / Spiel | Bonus-Freiwürfe / Spiel | rho je Spiel | Saison |
+|---|---:|---:|---:|---:|
+| ohne Reach-in (Stand nach Laufwegen) | 0 | 0 | 0,865 | 0,923 |
+| Reach-in, Basis 0,10 | 12,5 | 0,3 | **0,841** | 0,888 |
+| Reach-in, Basis 0,18 | 18,1 | 1,3 | 0,853 | 0,902 |
+
+Beide Fassungen liegen unter dem Stand ohne (0,865), die erste unter 0,85. **Entscheidung: Reach-in
+steht auf `null`** (Zählung und Anzeige der Teamfouls laufen, die Wertung ist unberührt, Fingerabdruck
+gleich). Empfehlung an Chris: den Bonus erst mit einem Foul ohne Wurf einschalten, das über eine
+Fähigkeit läuft (z. B. Ausboxen-Foul nach ABWEHR gegen ZWEITCHANCE) und dann neu messen.
+
+### 7.3 Kamera (KAMERA-MODUL, `FELDSPIEL_ART.basketball.kamera`)
+
+Halbfeld-Folgekamera: Zoom 1,32, Mitte zwischen Ball und angegriffenem Korb (Zug 0,38), quer zur
+Feldmitte gezogen, kritisch gedämpfter Schwenk (3,2/s) in Wandzeit. Nahzoom 1,75 auf den Ring bei
+Dunk, Dreier und Alley-Oop, 1,1 s lang; der Ausschnitt bleibt immer in der Leinwand. Klicks auf Figuren
+werden zurückgerechnet. Reine Anzeige, `__arena.feldKamera(false)` schaltet auf die Totale zurück.
+Bildfolge: `runde2-k0-totale.png` (vorher), `runde2-k1-halbfeld.png`, `runde2-k2…k5` (Dreier: Zoom
+fährt rein und nach 1,1 s zurück).
+
+### 7.4 Effekte und Ton (EFFEKT-/TON-MODUL)
+
+Ringwackeln (Ringtreffer gedämpft, Dunk stärker mit Neigung), Dunk-Funkenkranz + Landestaub,
+Dreier-Leuchtspur aus der echten Flugbahn, Block-Stern, Staub beim Abstoppen (Pull-up) und Absprung
+(Drive), Schweiß beim Drive. Ton per WebAudio aus den vorhandenen Bausteinen (`tonKlick/Schlag/Metall/
+Rauschen`): Swish, Ringklang, Brett, Dunk-Wumms, Block, Turnschuh-Quietschen, Publikum bei knappem
+Stand im 4. Viertel. Erst nach einer Nutzergeste, Schalter `__arena.bkSynthTon(false)` (gemerkt).
+**PixelLab: 0 Generationen.** Alle Effekte sind prozedural und lesbar genug; VFX-Sprites über `/v2/vfx`
+waren nicht nötig, Kontostand deshalb nicht angefasst.
+
+### 7.5 Posen: was mit dem Bestand geht, und was echte Posen kosten würden
+
+Aus dem Bestand (Grundposen, Angriff, Fall, Nord) ohne neue Animation: Squash vor dem Absprung,
+Stretch im Sprung, Sprunghöhe je Wurf-Absicht (Spot-up 12, Pull-up 16, Drive 20 px mit Vorlage zum
+Ring, Post-up 11 px mit Fadeaway), Post-up mit gedrehter Blickrichtung (Rücken zum Korb), Ausboxen
+geduckt mit Blick zum Mann, Schatten bleibt am Boden. Das trägt den Bogen von 45 auf 60 %. Was fehlt,
+sind Arme: Wurf (beide Arme hoch), Dunk (ein Arm über dem Ring) und Block (Arme hoch, frontal).
+
+**Kostenschätzung (Vorschlag, nichts bestellt).** Preise laut `docs/design/pixellab-hud-effekte-schiri-plan-17-11.md`:
+Animation 80×80 mit 8 Bildern = 1 Gen. je Richtung, 16 Bilder = 2 Gen. Der Motor zeichnet vier
+Richtungen (hinten, links, vorn, rechts).
+
+| Umfang je Spieler | Posen | Richtungen | Gen. je Spieler |
+|---|---|---:|---:|
+| Minimal | „Wurf“ (deckt auch Block) + „Dunk“, nur Profil links/rechts, 8 Bilder | 2 | **4** |
+| Standard | Wurf, Dunk, Block, 8 Bilder | 4 | **12** |
+| Voll | Wurf, Dunk, Block, 16 Bilder | 4 | **24** |
+
+| Szenario | Minimal | Standard | Voll |
+|---|---:|---:|---:|
+| ganzer Figurenbestand (≈ 360) | 1 440 | 4 320 | 8 640 |
+| **nur gepickte Spieler, ein Team** (6 auf dem Feld + 2–4 Bank = 8–10) | 32–40 | 96–120 | 192–240 |
+| ein Spiel, beide Teams neu | 64–80 | 192–240 | 384–480 |
+| ein Spiel, ein Team schon erzeugt (Wiederverwendung) | 32–40 | 96–120 | 192–240 |
+| Saison mit *T* Teams × 10 Spielern, danach nur Neuzugänge | 40·*T* | 120·*T* | 240·*T* |
+
+Chris' Gedanke (Posen nur für die wirklich gepickten Spieler erzeugen, wenn gespielt wird) verteilt die
+Kosten und deckelt sie bei der Zahl der eingesetzten Figuren: bei 8 Teams kostet „Standard“ einmalig
+960 statt 4 320 Gen., jede weitere Saison nur noch die Neuzugänge (ein Transfer = 12 Gen.). Jede
+erzeugte Pose wird gespeichert und in allen späteren Spielen wiederverwendet; die Wurf-Pose taugt auch
+für Football (Pass) und Handball-artige Disziplinen. Empfehlung: erst „Minimal“ für ein Pilot-Team
+(≈ 40 Gen.) als Stilprobe, dann entscheiden.
+
+### 7.6 Messwerte vorher/nachher (R1 = Stand PR #1562, R2 = dieser Branch)
+
+| Größe | R1 | R2 | Werkzeug |
+|---|---:|---:|---|
+| rho je Spiel (Median, 5 Kader) | 0,859 | **0,862** | Node-Motor wie `miss-alle-disziplinen.mjs 24 basketball` (R1 dort Chromium 0,859 = Node 0,859) |
+| Spannweite / rho Saison | 0,111 / 0,909 | 0,136 / 0,881 | dto. |
+| Zwischenstände | | Laufwege 0,865 (Saison 0,923), + Feld-Grenze 0,862 | dto. |
+| Pp-Abweichung (Saat 0 / 10 000 000) | 13,6 / 16,0 | **7,5 / 13,4** | `einflussVon("basketball",48)` im Node-Motor |
+| Gezeigt = gebucht | 0 / 828 | **0 / 846** | `__arena.diagGezeigtGebucht(8)` |
+| Proben außerhalb des Feldes | 7 596 / 3,30 Mio. | **0 / 3,32 Mio.** | `__arena.diagSpielzuege(12).seitenlinie` |
+| Würfe je Spiel | 103 | 106 | dto. |
+| Fingerabdruck GESAMT | 97c267e8b7c7 | **004f26374565** | `pruefe-wertung-fingerabdruck.mjs`, nur `spiele basketball 1/7/42` anders |
+
+Verworfene Fassungen (je rho je Spiel): Laufwege mit 2 Crashern 0,852 (bzw. 0,863 ohne Halbfeld-Grenze
+für die Blocknutzung), Deny-Reichweite 130 0,856, Joggen 0,85 0,866 (Saison 0,902), Feld-Grenze mit
+4 px Rand 0,841, Eckslots seitlich 1,18 0,841, Reach-in 0,841/0,853 (7.2). Die Unterschiede zwischen
+den Fassungen liegen in der Kader-Spannweite (≈ 0,1); gewählt wurde je Schritt die Fassung über 0,859.
+
+### 7.7 Werkzeuge dieser Runde
+
+```sh
+OLY_BB_SZENEN=runde2 node scripts/screenshot-basketball-benchmark.mjs docs/design/benchmark-basketball-17-11 runde2
+OLY_BB_SZENEN=kamera node scripts/screenshot-basketball-benchmark.mjs docs/design/benchmark-basketball-17-11 runde2
+node scripts/miss-spacing.mjs basketball 6 120 45
+```
+
+Neue read-only Sonden in `window.__arena`: `diagSpielzuege(n)` (Aktionen je Spiel, Seitenlinien-Probe),
+`teamFouls()`, Schalter `feldKamera(an)` und `bkSynthTon(an)`. `szeneFeldspiel` kennt die Situationen
+`backdoor`, `pick`, `roll`, `postup`, `ausboxen`, `fastbreak`, `lob`, `bodenpass`, `spotup`, `pullup`,
+`drive`, `fx-dunk`, `fx-ring`, `fx-block`.
+
+### 7.8 Was bis 100 % offen bleibt
+
+1. Echte Wurf-/Dunk-/Block-Posen (Kostenschätzung 7.5, Freigabe Chris).
+2. Foul ohne Wurf, das über eine Fähigkeit läuft, damit der Bonus wirkt (7.2).
+3. Block-Nutzung häufiger im Halbfeld: den Screen-Ruf selbst erst im Halbfeld zulassen (Wertungsänderung, messen).
+4. Steal-Effekt, Zuschauer-Reaktion, Kamera-Wackeln beim Dunk.
+5. HUD: Teamfouls/Bonus in den Scorebug (`teamFouls()` liefert sie).
+
+### 7.9 Zusammenführung mit #1562 (18.11.): eine Feldbegrenzung
+
+Branch `claude/basketball-runde2-17-11` = Runde 2 (`backup/basketball-runde2-final-17-11`) mit `origin/main` gemergt
+(91aabc6f: #1562 als Squash inkl. Review-Fix und Einsatzliste-Registry ad4c805f, davor HUD #1564, Staffel #1561, #1567), kein Rebase. Beide Stände hielten
+Spieler im Feld, jeder auf seine Art:
+
+- **Feld-Grenze** (Runde 2): `feldGrenze(zx,zy)` am Ende der Zielrechnung in `stepFeldspiel`, für jedes Laufziel,
+  Parameter `FELDSPIEL_ART.basketball.feld.grenze`.
+- **Ziel-Begrenzung** (#1562): Klemme in `spacingMitspielerZiel` (BK_FIBA-Feld, 12 px Rand), nur für das Spacing-Ziel.
+
+Beide zusammen wären doppelt. Gemessen wurde jede allein, am selben gemergten Stand (Kopien der Mockups über
+`OLY_SEITE` bzw. Node-Motor):
+
+| Größe | Feld-Grenze allein | Ziel-Begrenzung allein |
+|---|---:|---:|
+| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`, Median 5 Kader) | **0,862** (Spannweite 0,136) | 0,853 (Spannweite 0,090) |
+| rho Saison | 0,881 | 0,902 |
+| Pp, Saat 0 / 10 000 000, n=16 (gleiche Saaten für beide) | **11,1 / 16,0** | 13,0 / 20,5 |
+| Pp, Saat 0 / 10 000 000, n=48 | **7,5 / 13,4** | nicht gemessen (verworfen) |
+| Proben außerhalb des Feldes (`diagSpielzuege(12).seitenlinie`) | **0 von 3 321 732** (max. quer 175 px) | 4 792 von 3 272 796 (max. quer 185 px) |
+| Klumpen ≥ 3 Mitspieler / freie Anspielstation (`miss-spacing.mjs basketball 6 120 45`) | 12,1 % / 43 % | 10,9 % / 41 % |
+
+**Behalten: die Feld-Grenze.** Sie ist bei rho je Spiel (die Abnahmezahl, +0,009) und bei Pp in beiden Saatstämmen
+besser (n=16: 11,1 / 16,0 gegen 13,0 / 20,5) und hält als
+einzige die Abnahme „0 Proben außerhalb“: die Ziel-Begrenzung wirkt nur auf ein Zwischenziel, Laufweg-, Abstoßungs-
+und Rückzugsziele laufen an ihr vorbei. Die Klemme in `spacingMitspielerZiel` ist entfernt (Kommentar an der Stelle).
+Damit rechnet Basketball wie Runde 2: die drei `spiele basketball`-Zeilen sind dieselben wie im Runde-2-Lauf, nur
+GESAMT ist wegen der Staffel-Zeilen von main ein anderer. Basketball-SLOTS im Motor sind unverändert, `MOTOR_BASKETBALL_SLOTS`
+(`lib/lineups/formation/formation-registry.ts`) braucht deshalb nichts.
+
+Endstand, gegen main mit #1562 `38b176d7185b` (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium, beide Läufe
+am selben Tag auf derselben Maschine):
+**GESAMT ce8fcef66028 (75 Einträge)**. Anders sind genau drei Zeilen:
+
+| Zeile | main | neu |
+|---|---|---|
+| `spiele basketball 1` | 076bfb746272 | 91a13edbaa37 |
+| `spiele basketball 7` | db37a3d13314 | 9cae043e306d |
+| `spiele basketball 42` | 0f9d5b90711e | 8a75782eceaa |
+
+Alle 72 anderen Zeilen sind gleich (gegen den alten main `97cccd6017fb` ebenso nur diese drei Zeilen). Weitere Werte des Endstands: gezeigt = gebucht 0 von 846 Würfen (8/8 Spiele
+Anzeige = Buchung), Pp 7,5 / 13,4 (Node-Motor, `einflussVon("basketball",48,…,0 bzw. 10000000)`), Spacing wie Runde 2
+(Mitspielerabstand 181 px, Klumpen 12,1 %, freie Anspielstation 43 %; #1562 allein: 186 px, 7,6 %, 52 %). Die
+Spacing-Kosten der Laufwege (Deny, Post-up) bleiben ein offener Punkt aus Runde 2, nicht aus der Begrenzung.
