@@ -1301,7 +1301,7 @@ PL_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
 # Tennis-Dach: Zaununterkante sonst unter der fernen Grundlinie (H*0.17); Waldsee: Ufer/Tannen sonst
 # innerhalb der Bande (kuerFlaeche: ~110..1130 x 60..410).
 PL_RAENDER = {
-    ("basketball", "streetcourt"): {"oben": (72, 58), "unten": (239, LH - 58)},
+    ("basketball", "streetcourt"): {"oben": (62, 58), "unten": (256, LH - 58)},  # Remake 18.11. (vorher 72/239)
     ("tennis", "dach"): {"oben": (75, 78)},
     ("eiskunstlauf", "waldsee"): {"oben": (76, 64), "unten": (262, LH - 58), "links": (97, 112), "rechts": (695, LW - 112)},
 }

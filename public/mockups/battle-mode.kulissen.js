@@ -13,7 +13,7 @@ window.__ARENA_KULISSEN={
    "id": "streetcourt",
    "label": "Street-Court",
    "bild": "/sprites/kulissen/basketball/streetcourt.jpg",
-   "dunkel": 0.1
+   "dunkel": 0.06
   }
  ],
  "battlefield": [

@@ -251,26 +251,46 @@
   },
   "basketball/streetcourt.jpg": {
     "paket": "PixelLab",
-    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+    "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (REMAKE 18.11., Basketball-Review: ersetzt die flache blaue Fassung vom 17.11.)",
     "auftrag": {
-      "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+      "prompt": "top-down view of one single very wide empty outdoor street court in a fantasy city at dusk, a graffiti brick wall with hanging lanterns and ivy along the top edge, a chain-link fence with street lamps along the bottom edge, the rest is open flat worn blue painted asphalt with subtle cracks and patches, no lines, no markings, dark cobblestone strips at the far left and right, warm lantern light, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
       "seed": 11,
       "gen": [
         792,
         300
       ],
-      "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
-      "kandidat": 0
+      "job": "7ff19691-8e0f-437d-81f6-9e6699f5ae7c",
+      "kandidat": 0,
+      "generationen": 25.0
     },
-    "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png",
-    "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+    "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png (Kopie von data/generated/pixellab-requisiten/basketball-18-11/kulisse_basketball_streetcourt_v2/00.png)",
+    "bau": "scripts/baue-kulisse-buehnen.py pixellab_breitform('basketball','streetcourt'), PL_RAENDER oben (62,58) / unten (256, LH-58); JPEG wie scripts/baue-arena-kulissen.py, dunkel 0.06 (hell 0.235)",
     "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
-    "erzeugt": "2026-11-17",
-    "verwendung": "Basketball, Variante Street-Court",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Basketball, Variante Street-Court (Graffiti-Mauer mit Laternen oben, Maschendrahtzaun mit Strassenlampen unten, rissiger Asphalt mit Lichtkegeln)",
     "vorher": {
-      "paket": "prozedural (kein PixelLab)",
-      "quelle": "public/szenen/basketball/streetcourt.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_basketball()",
-      "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+      "paket": "PixelLab",
+      "quelle": "api.pixellab.ai /v2/generate-image-v2, Breitformat-Kulisse 792x300 (Welle A, ersetzt die prozedural gemalte Variante)",
+      "auftrag": {
+        "prompt": "top-down view of one single very wide empty outdoor street court in a city neighbourhood, a chain-link fence in front of red brick apartment buildings along the top edge and along the bottom edge, the whole rest is open flat floor of plain faded blue painted asphalt with no lines and no markings, only a narrow strip of dark grey asphalt at the far left and right borders, urban colours, even daylight, nothing in the middle, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+        "seed": 11,
+        "gen": [
+          792,
+          300
+        ],
+        "job": "db228ada-d112-4fa7-9eab-0d7694a0f585",
+        "kandidat": 0
+      },
+      "roh": "data/generated/pixellab-requisiten/roh/kulisse_basketball_streetcourt.png",
+      "bau": "python3 -I scripts/baue-kulisse-buehnen.py basketball && python3 -I scripts/baue-arena-kulissen.py (Randstreifen per PL_RAENDER unverzerrt an die Motor-Geometrie gerueckt, freier Boden gestreckt, dann LANCZOS auf 1240x470; deterministisch, ohne Netz)",
+      "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+      "erzeugt": "2026-11-17",
+      "verwendung": "Basketball, Variante Street-Court",
+      "vorher": {
+        "paket": "prozedural (kein PixelLab)",
+        "quelle": "public/szenen/basketball/streetcourt.html aus scripts/baue-szenen-schauplaetze.py (Umgebung mit PIL gemalt), zugeschnitten von baue_basketball()",
+        "befund": "Audit docs/design/pixellab-nur-neue-assets-audit-17-11.md Abschnitt 2; der alte Bau bleibt Rueckfall, wenn das Rohbild fehlt"
+      }
     }
   },
   "basketball/parkett.jpg": {

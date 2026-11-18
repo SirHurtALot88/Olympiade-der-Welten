@@ -1,0 +1,49 @@
+{
+ "_hinweis": "Basketball-Review 18.11., docs/design/basketball-review-18-11.md",
+ "auftraege": [
+  {
+   "name": "bb_publikum_reihe",
+   "datum": "2026-11-18T14:17:10Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "one long single row of small seated spectators on a wooden grandstand bench, seen from the front and slightly above, mixed fantasy crowd of knights, orcs, elves and townsfolk shoulder to shoulder, some raising arms and waving small orange and teal flags, warm torch light, 3/4 top-down RPG view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    256,
+    64
+   ],
+   "no_background": true,
+   "job": "6b942155-8b79-42c8-aee4-f5e935dd35a6",
+   "status": "completed",
+   "quoted": null,
+   "usage_job": {
+    "type": "generations",
+    "generations": 10.0
+   },
+   "gen_vorher": 831.7351005208002,
+   "gen_nachher": 821.7351005208002,
+   "kandidaten": 1
+  },
+  {
+   "name": "kulisse_basketball_streetcourt_v2",
+   "datum": "2026-11-18T14:23:36Z",
+   "endpunkt": "/v2/generate-image-v2",
+   "prompt": "top-down view of one single very wide empty outdoor street court in a fantasy city at dusk, a graffiti brick wall with hanging lanterns and ivy along the top edge, a chain-link fence with street lamps along the bottom edge, the rest is open flat worn blue painted asphalt with subtle cracks and patches, no lines, no markings, dark cobblestone strips at the far left and right, warm lantern light, no hoops, no characters, no text, 16-bit RPG top-down map, pixel art",
+   "seed": 11,
+   "gen": [
+    792,
+    300
+   ],
+   "no_background": false,
+   "job": "7ff19691-8e0f-437d-81f6-9e6699f5ae7c",
+   "status": "completed",
+   "quoted": null,
+   "usage_job": {
+    "type": "generations",
+    "generations": 25.0
+   },
+   "gen_vorher": 821.7351005208002,
+   "gen_nachher": 796.7351005208002,
+   "kandidaten": 1
+  }
+ ]
+}

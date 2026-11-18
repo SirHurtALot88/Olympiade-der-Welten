@@ -9905,7 +9905,10 @@
       // KAMERA (Runde 2, reine Anzeige, s. KAMERA-MODUL): Halbfeld-Zoom, Zug zum angegriffenen
       // Korb, Daempfung des Schwenks (1/s), kurzer Nahzoom auf den Ring bei Dunk/Dreier/Alley-Oop.
       kamera:{zoom:1.32, korbZug:0.38, querZug:0.65, daempfung:3.2, zoomDaempfung:4.0,
-              nahZoom:1.75, nahDauer:1.1, nahVersatz:0.16},
+              nahZoom:1.75, nahDauer:1.1, nahVersatz:0.16,
+              // Review 18.11.: Zoom gibt nach, bis alle zehn Figuren (Kopf 40 px ueber, Fuss 10 px unter
+              // dem Standpunkt) in der Hoehe ins Bild passen, nie unter zoomMin; Bildmitte zu 60 % zur Spielermitte.
+              alleImBild:{oben:40, unten:10, zoomMin:1.2, mitte:0.6}},
       // TEAMFOULS / BONUS (Runde 2, FIBA-Regel 41): jedes Spielerfoul zaehlt als Teamfoul im
       // laufenden Viertel. Ab dem 5. Teamfoul (`bonusAb`) gibt jedes Foul ohne Wurf zwei
       // Freiwuerfe, davor nur Einwurf (Ballbesitz bleibt, Schussuhr auf `einwurfUhr` s gedeckelt).
@@ -15183,6 +15186,10 @@
     // jetztMs() statt performance.now() direkt (A0.2, s. Definition oben bei sondenAktiv):
     // im echten Spiel identisch, im Sonden-Modus die simulationsgebundene Uhr.
     vpSichtbarBis=jetztMs()+(istHalbzeit?3600:2000);
+    // HUD-SYSTEM (Review 18.11.): statt der Vollflaechen-Tafel, die 2 s lang das ganze Feld zudeckte (und
+    // die letzte halbe Sekunde davon schon wieder laufendes Spiel verbarg), eine Bauchbinde am unteren
+    // Feldrand mit Linescore, Teamvergleich und Topscorer -- 6 s (Halbzeit 8 s), das Spiel bleibt sichtbar.
+    if(hudViertelBauchbinde(zuEnde,periode,istHalbzeit)){ vpSichtbarBis=0; return; }
     const vp=document.getElementById("viertelpause");
     if(vp){
       const titel=document.getElementById("vpTitel"), sub=document.getElementById("vpUntertitel");
@@ -16267,7 +16274,10 @@
     // kurze, schrille Signalton im Bestand und steht hier leise fuer den Pfiff, bis eine
     // echte pfiff.mp3 im Repo liegt — eine Audiodatei zu erfinden war ausgeschlossen.
     if(opt&&opt.still)return;
-    if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.30);
+    // TON (Review 18.11.): Trillerpfeife aus WebAudio (bkTon "pfiff"); der Buzzer bleibt Rueckfall,
+    // solange der Synth-Ton aus ist oder noch keine Nutzergeste kam. Der Buzzer ist sonst das
+    // Viertel-/Spielende -- ein Foul klang bisher wie eine Viertelpause.
+    if(feldspielDisc==="basketball"){ if(!bkTon("pfiff"))bkSfx("buzzer.mp3",0.30); }
     schwebe({x:0,y:0,txt:"FOUL!",life:1.2,crit:true,_def:true,_spieler:ort.id});
   }
 
@@ -16677,6 +16687,9 @@
       schwebe({x:0,y:0,txt:wortStahl.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
+      // EFFEKT-MODUL (Review 18.11.): eigenes Bild und eigener Ton fuer den Steal-Moment, nur Anzeige.
+      if(feldspielDisc==="basketball")bkFxPush({art:"steal",x:(decker.x+traeger.x)/2,y:(decker.y+traeger.y)/2-16,
+        seite:decker.side,dx:decker.x-traeger.x});
       // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
       // fsLive.fastbreak bei JEDEM Ballwechsel (Opus-Review-Fund #11) — startFastbreak
       // muss deshalb NACH diesem Aufruf kommen, sonst loescht er sein eigenes Fenster.
@@ -16735,6 +16748,9 @@
   // Korb), rot ab dem Bonus. Reine Anzeige in Feldkoordinaten (keine HUD-/Scorebug-Aenderung).
   function tfZeichne(){
     const r=foulRegelVon(); if(!r||!fsLive)return;
+    // Seit 18.11. stehen die Teamfouls im Scorebug (HUD-Profil teamStat). Mit dem HUD-System entfaellt das
+    // Kaestchen am Korb: es lag in der Zone ueber den Figuren, und jede Zahl soll genau einen Ort haben.
+    if(typeof hudProfil==="function"&&hudSysAn&&hudProfil())return;
     tfViertelPruefen();
     for(const seite of [0,1]){
       const n=tfStand.fouls[seite], kx=korbXVon(1-seite), links=kx<W/2;
@@ -17002,6 +17018,7 @@
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       merkeBeruehrung(flug.ziel);
       if(laufwegeVon())lwZ(flug.ziel).ballSeit=fsT; // LAUFWEG-MODUL (Wurf-Absicht), Anzeige/Sonde
+      if(feldspielDisc==="basketball")bkFxPush({art:"fang"}); // TON (Review 18.11.): Ballannahme hoerbar, nur Anzeige
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_CUT_DAUER oben): nur Basketball,
       // nur bei einem ECHTEN Zuspiel (dieser Zweig — die beiden `return`s oben fangen
@@ -18248,6 +18265,13 @@
     return Math.max(0,voll-fsLive.angriffSeit);
   }
   const fmtSchussuhr=(rest)=>rest<5?rest.toFixed(1):String(Math.ceil(rest));
+  // SCHUSSUHR IN SENDEZEIT (Review 18.11., docs/design/basketball-review-18-11.md): die Spieluhr im
+  // HUD laeuft seit der Zeitdehnung (ZEIT_DEHNUNG.basketball 1,5) in Sendezeit (Simulationssekunden x
+  // zeitFaktor()), die Schussuhr lief weiter in Simulationssekunden. Nebeneinander tickten die beiden
+  // Uhren dadurch verschieden schnell, und weil SCHUSSUHR_BASKETBALL nur 8 Simulationssekunden hat,
+  // stand die Ziffer fast den ganzen Angriff rot unter 5. Anzeige jetzt in derselben Zeitbasis wie die
+  // Spieluhr. REINE ANZEIGE: die Wertung liest fsLive.angriffSeit, nie diesen Wert.
+  const bkSchussuhrSendezeit=(rest)=>rest==null?null:rest*(typeof zeitFaktor==="function"?zeitFaktor():1);
   // H1 -- POWER-PLAY-UHR (Hockey, A, Prio 1 = Review-T0): welche Seite gerade in Ueberzahl
   // spielt und wie lange noch, aus `u.strafeBis` je Team hergeleitet -- "Zustand.
   // max(u.strafeBis) - fsT je Seite" laut Bauplan. Sitzen beide Teams gleichzeitig in
@@ -18306,7 +18330,7 @@
     if(!fsLive)return "";
     if(feldspielDisc==="basketball"){
       const teile=[];
-      const rest=basketballSchussuhrRest();
+      const rest=bkSchussuhrSendezeit(basketballSchussuhrRest());
       // ROTFAERBUNG UNTER 5S (Nachtrag, Review-Fund 27.09.): der Bauplan verlangt fuer B1(a)
       // ausdruecklich dieselbe Warnfarbe wie die Canvas-Ziffernbox (zeichneShotClock(), unten,
       // `knapp=rest<5`) -- die erste Fassung dieser Zeile war reiner Text ohne Farblogik.
@@ -19033,6 +19057,7 @@
         for(let x=W*0.04;x<W*0.96;x+=zw)
           ctx.drawImage(bkBild.zuschauer,zFrame*zw,0,zw,zh,x,y,zw,zh);
     }
+    if(mitKulisse)bkPublikumZeichnen(false); // PUBLIKUM (Review 18.11.): Tribuene an der oberen Seitenlinie
     // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld. Spielrichtung
     // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
     // Grund-/Deckenlinien eines hochkant gedachten Courts.
@@ -19253,7 +19278,7 @@
   // gezeichnet als Teil von bodenFeldspiel() -- also VOR den Spielfiguren, wie der Korb
   // selbst. Reine Zeichnung, kein rr()-Aufruf, keine Rueckschreibung in den Simzustand.
   function zeichneShotClock(){
-    const rest=basketballSchussuhrRest();
+    const rest=bkSchussuhrSendezeit(basketballSchussuhrRest());
     if(rest==null||fsLive.amBall==null)return;
     const seite=fsLive.amBall, linksSeite=seite===1;
     // Seit 17.11. an der Korbanlage (wie in echten Hallen), nicht mehr frei an der Grundlinie:
@@ -19613,6 +19638,7 @@
       }
     });
     korbHinten(); // alle Figuren standen hinter dem Korb
+    if(feldspielDisc==="basketball"&&kulisseAktiv&&kulisseAktiv.disc===disc)bkPublikumZeichnen(true); // PUBLIKUM: Koepfe im Vordergrund
     if(feldspielDisc==="basketball")lwZeichneOben(); // LAUFWEG-MODUL: gestellter Block
     if(feldspielDisc==="basketball")tfZeichne(); // TEAMFOUL-/BONUS-MODUL: Teamfouls am Korb
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
@@ -19839,6 +19865,25 @@
   // Abschaltbar: window.__arena.feldKamera(false) (Totale), Vorgabe an.
   // ===================================================================================
   let fkAn=true, fkZustand=null, fkLetzteWand=0;
+  // KAMERAWAHL (Review 18.11., wie im Basketball-Mockup 17.11. "Kamera: Ueberblick / Ball / Spieler"):
+  // "ball" = Halbfeld-Folgekamera (Vorgabe), "totale" = ganzes Feld, "spieler" = folgt dem Spieler der
+  // offenen/zuletzt geoeffneten Spielerkarte (hudKarteId). Taste K und Knopf in der Bedienleiste schalten
+  // durch; gemerkt in localStorage "feldKameraModus". Reine Anzeige wie das ganze Modul.
+  const FK_MODI=["ball","totale","spieler"], FK_MODUS_NAME={ball:"Ball",totale:"Überblick",spieler:"Spieler"};
+  let fkModus=(()=>{ try{ const m=localStorage.getItem("feldKameraModus"); return FK_MODI.includes(m)?m:"ball"; }catch(e){ return "ball"; } })();
+  let fkSpielerId=null;
+  function feldKameraModusSetzen(m){
+    if(!FK_MODI.includes(m))return fkModus;
+    fkModus=m; try{ localStorage.setItem("feldKameraModus",m); }catch(e){}
+    return fkModus;
+  }
+  function feldKameraSpieler(){
+    const id=(typeof hudKarteId!=="undefined"&&hudKarteId!=null)?hudKarteId:fkSpielerId;
+    if(id==null||typeof FSTEAM==="undefined")return null;
+    fkSpielerId=id;
+    for(const team of FSTEAM)for(const u of team)if(u.id===id)return u;
+    return null;
+  }
   const FK_GESEHEN=new WeakSet();
   const feldKameraVon=()=>{ const a=(typeof FELDSPIEL_ART!=="undefined")&&FELDSPIEL_ART[feldspielDisc]; return a&&a.kamera?a.kamera:null; };
   function feldKameraZiel(k){
@@ -19847,8 +19892,23 @@
     const korbX=korbXVon(seite);
     const bx=fsBall&&fsBall.sichtbar?fsBall.x:W/2, by=fsBall&&fsBall.sichtbar?fsBall.y:H/2;
     let z=k.zoom, cx=bx+(korbX-bx)*k.korbZug, cy=by+(H/2-by)*k.querZug;
+    // ALLE IM BILD (Review 18.11.): bei Zoom 1,32 zeigt der Ausschnitt nur 356 von 470 Feld-px in der
+    // Hoehe -- Spieler an der oberen/unteren Seitenlinie (Ecken-Dreier!) standen halb oder ganz ausserhalb
+    // des Bildes. Der Zoom gibt jetzt so weit nach, dass alle zehn Figuren samt Kopf in der Hoehe Platz
+    // haben (hoechstens bis `zoomMin`), und die Bildmitte rueckt zur Mitte der Spieler. Reine Anzeige.
+    if(k.alleImBild&&typeof FSTEAM!=="undefined"){
+      let y0=Infinity, y1=-Infinity;
+      for(const team of FSTEAM)for(const u of team){ if(u.y<y0)y0=u.y; if(u.y>y1)y1=u.y; }
+      if(isFinite(y0)){
+        y0-=k.alleImBild.oben; y1+=k.alleImBild.unten;
+        z=Math.max(k.alleImBild.zoomMin,Math.min(z,H/Math.max(1,y1-y0)));
+        cy=cy*(1-k.alleImBild.mitte)+((y0+y1)/2)*k.alleImBild.mitte;
+      }
+    }
     if(!fsLive||fsLive.phase==="viertelpause"||done){ z=1; cx=W/2; cy=H/2; }
     else if(fsLive.phase==="freiwurf"){ z=k.zoom; cx=korbX+(W/2-korbX)*0.25; cy=H/2; }
+    else if(fkModus==="totale"){ z=1; cx=W/2; cy=H/2; }
+    else if(fkModus==="spieler"){ const u=feldKameraSpieler(); if(u){ z=k.zoom*1.08; cx=u.x+(korbX-u.x)*0.15; cy=u.y+(H/2-u.y)*0.35; } }
     if(fl&&(fl.art==="wurf"||fl.art==="alley")&&(fl.tier==="dunk"||fl.fern||fl.art==="alley")&&!FK_GESEHEN.has(fl)){
       FK_GESEHEN.add(fl); fkZustand.nahBis=fkLetzteWand+k.nahDauer; fkZustand.nahX=korbX;
     }
@@ -19858,6 +19918,7 @@
       const e=bkFx[bkFx.length-1];
       if(e.art==="treffer"&&(e.dunk||e.fern)&&bkAnzeigeUhr-e.t0<k.nahDauer*0.7){ fkZustand.nahBis=Math.max(fkZustand.nahBis,fkLetzteWand+0.05); fkZustand.nahX=e.x; }
     }
+    if(fkModus==="totale")fkZustand.nahBis=0;
     if(fkZustand.nahBis>fkLetzteWand){ z=k.nahZoom; cx=fkZustand.nahX+(W/2-fkZustand.nahX)*k.nahVersatz; cy=H/2-H*0.04; }
     return {z,cx,cy};
   }
@@ -19875,8 +19936,16 @@
     fkZustand.cx+=(ziel.cx-fkZustand.cx)*a; fkZustand.cy+=(ziel.cy-fkZustand.cy)*a;
     const z=Math.max(1,fkZustand.z), hw=W/(2*z), hh=H/(2*z);
     const cx=Math.max(hw,Math.min(W-hw,fkZustand.cx)), cy=Math.max(hh,Math.min(H-hh,fkZustand.cy));
-    if(z<1.001&&Math.abs(cx-W/2)<0.5&&Math.abs(cy-H/2)<0.5)return false;
-    ctx.translate(W/2,H/2); ctx.scale(z,z); ctx.translate(-cx,-cy);
+    // DUNK-WACKELN (Review 18.11.): kurzer, gedaempfter Stoss der Kamera beim Dunk-Aufprall
+    // (0,35 s, hoechstens 3,5 Feld-px), aus derselben Ereignis-Warteschlange wie Ringwackeln und Funken.
+    let sx=0, sy=0;
+    if(typeof bkFx!=="undefined")for(const e of bkFx){
+      if(e.art!=="treffer"||!e.dunk)continue;
+      const t=bkAnzeigeUhr-e.t0; if(t<0||t>0.35)continue;
+      const a=3.5*Math.exp(-t*9); sx+=Math.sin(t*61)*a*0.6; sy+=Math.sin(t*47+0.7)*a;
+    }
+    if(z<1.001&&Math.abs(cx-W/2)<0.5&&Math.abs(cy-H/2)<0.5&&!sx&&!sy)return false;
+    ctx.translate(W/2+sx,H/2+sy); ctx.scale(z,z); ctx.translate(-cx,-cy);
     fkZustand.anzeige={z,cx,cy};
     return true;
   }
@@ -19912,6 +19981,63 @@
   //                     localStorage "bkSynthTon". Lautstaerke/Stumm ueber bkPegel (gleicher
   //                     Regler wie alle Basketball-Toene).
   // ===================================================================================
+  // PUBLIKUM (Basketball-Review 18.11., docs/design/basketball-review-18-11.md). REINE ANZEIGE: eine
+  // PixelLab-Zuschauerreihe (public/sprites/basketball/publikum_reihe.png, Herkunft in quellen.json)
+  // als Tribuene an der oberen Seitenlinie und als dunkle Kopf-Silhouetten im Vordergrund (Tiefe wie im
+  // TV-Bild, wo die erste Reihe vor der Kamera sitzt). Die Reihe REAGIERT: sie wird in 16-px-Spalten
+  // gezeichnet, die bei einem Treffer springen (Dunk/Dreier/Lauf ab 8:0/knappes 4. Viertel staerker),
+  // dazwischen wippt sie leicht. Zeitbasis bkAnzeigeUhr, Anlass die Ereignis-Warteschlange bkFx -- kein
+  // rr(), kein Feld an Spielern, keine Simulationsgroesse wird gelesen ausser zum Zeichnen.
+  let bkPublikumSchatten=null;
+  function bkPublikumErregung(){
+    let amp=0;
+    if(typeof bkFx==="undefined")return 0;
+    const lauf=typeof basketballLaufInfo==="function"?basketballLaufInfo():null;
+    for(const e of bkFx){
+      if(e.art!=="treffer"&&e.art!=="steal"&&e.art!=="block")continue;
+      const t=bkAnzeigeUhr-e.t0; if(t<0||t>1.6)continue;
+      let a=e.art==="treffer"?(e.dunk||e.fern?6:3.2):2.4;
+      if(e.knapp)a*=1.5; if(lauf&&lauf.punkte>=8)a*=1.3;
+      amp=Math.max(amp,a*(1-t/1.6));
+    }
+    return amp;
+  }
+  function bkPublikumZeichnen(vorne){
+    if(!bkDa("publikum_reihe"))return;
+    const im=bkBild.publikum_reihe, iw=im.naturalWidth, ih=Math.min(70,im.naturalHeight);
+    const sk=vorne?1.05:0.82, tw=iw*sk, th=ih*sk, spalte=16;
+    const amp=bkPublikumErregung(), u=bkAnzeigeUhr;
+    let quelle=im;
+    if(vorne){
+      if(!bkPublikumSchatten){
+        try{
+          const c=document.createElement("canvas"); c.width=iw; c.height=ih; const g=c.getContext("2d");
+          g.drawImage(im,0,0); g.globalCompositeOperation="source-in"; g.fillStyle="#06080d"; g.fillRect(0,0,iw,ih);
+          bkPublikumSchatten=c;
+        }catch(e){ return; }
+      }
+      quelle=bkPublikumSchatten;
+    }
+    const y0=vorne?H-th*0.42:56-th*0.92, x0=vorne?-20:W*0.055, x1=vorne?W+20:W*0.945;
+    ctx.save(); ctx.imageSmoothingEnabled=false;
+    if(vorne)ctx.globalAlpha=0.9;
+    let k=0;
+    for(let x=x0;x<x1;x+=tw,k++){
+      const spiegeln=k%2===1;
+      for(let sx=0;sx<iw;sx+=spalte){
+        const bx=x+sx*sk; if(bx>x1)break;
+        const n=k*31+sx/spalte;
+        const hopp=amp>0?Math.abs(Math.sin(u*10+n*1.7))*amp:0;
+        const wipp=Math.sin(u*1.4+n*0.9)*0.6;
+        const w=Math.min(spalte,iw-sx), qx=spiegeln?iw-sx-w:sx;
+        ctx.save();
+        if(spiegeln){ ctx.translate(bx+w*sk,0); ctx.scale(-1,1); ctx.drawImage(quelle,qx,0,w,ih,0,y0-hopp+wipp,w*sk,th); }
+        else ctx.drawImage(quelle,qx,0,w,ih,bx,y0-hopp+wipp,w*sk,th);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
   const BK_FX_MAX=24;
   let bkFx=[], bkFxSpur=[], bkGesteDa=false;
   let bkSynthAn=(()=>{ try{ return localStorage.getItem("bkSynthTon")!=="0"; }catch(e){ return true; } })();
@@ -19924,9 +20050,30 @@
   }catch(e){}
   function bkFxPush(e){ if(feldspielDisc!=="basketball")return; e.t0=bkAnzeigeUhr; bkFx.push(e); if(bkFx.length>BK_FX_MAX)bkFx.shift(); }
   function bkFxNeuesSpiel(){ bkFx=[]; bkFxSpur=[]; }
+  // Trillerpfeife: zwei Rechteck-Oszillatoren um 2,9 kHz, deren Tonhoehe ein schneller LFO (~26 Hz)
+  // moduliert -- das Trillern der Erbse. Zwei Stoesse (kurz, lang) wie ein Foulpfiff.
+  function bkPfiff(vol){
+    const c=tonKontext(); if(!c)return;
+    for(const [ab,d] of [[0,0.11],[0.16,0.34]]){
+      const t0=c.currentTime+ab;
+      const filt=c.createBiquadFilter(); filt.type="bandpass"; filt.frequency.value=3000; filt.Q.value=3;
+      const gain=c.createGain(); tonHuelle(gain,t0,0.01,d,bkPegel(vol));
+      const lfo=c.createOscillator(); lfo.frequency.value=26; const tief=c.createGain(); tief.gain.value=180;
+      lfo.connect(tief);
+      for(const f of [2900,2965]){ const o=c.createOscillator(); o.type="square"; o.frequency.value=f;
+        tief.connect(o.frequency); o.connect(filt); o.start(t0); o.stop(t0+d+0.04); }
+      lfo.start(t0); lfo.stop(t0+d+0.04);
+      filt.connect(gain); gain.connect(c.destination);
+    }
+  }
   function bkTon(art){
-    if(!bkSynthAn||!bkGesteDa||stumm||(typeof schnelldurchAktiv!=="undefined"&&schnelldurchAktiv))return;
+    if(!bkSynthAn||!bkGesteDa||stumm||(typeof schnelldurchAktiv!=="undefined"&&schnelldurchAktiv))return false;
     try{
+      if(art==="pfiff"){ bkPfiff(0.10); return true; }
+      if(art==="fang"){ tonSchlag(0.07,300,150,0.05); tonKlick(0.05,1400,0.025); return true; }
+      if(art==="steal"){ tonRauschen(0.20,2600,0.12); tonKlick(0.14,3200,0.03); tonSchlag(0.06,2400,3300,0.06); return true; }
+      if(art==="raunen"){ tonRauschen(0.20,260,0.75); return true; }
+      if(art==="ausbruch"){ tonRauschen(0.24,900,1.2); return true; }
       if(art==="swish"){ tonRauschen(0.22,5200,0.16); tonKlick(0.10,6500,0.05); }
       else if(art==="ring"){ tonMetall(0.30,1180,0.32); tonSchlag(0.12,420,240,0.10); }
       else if(art==="brett"){ tonSchlag(0.36,190,70,0.14); tonKlick(0.18,900,0.04); }
@@ -19934,13 +20081,20 @@
       else if(art==="block"){ tonSchlag(0.40,260,90,0.12); tonKlick(0.22,1400,0.05); }
       else if(art==="quietschen"){ tonSchlag(0.07,2600,3500,0.07); }
       else if(art==="publikum"){ tonRauschen(0.16,800,1.3); }
-    }catch(e){}
+    }catch(e){ return false; }
+    return true;
   }
   // Ein Ereignis wird beim ersten Zeichnen "gehoert": Ton genau einmal, danach nur Bild.
   function bkFxTonEinmal(e){
     if(e.tonGespielt)return; e.tonGespielt=true;
-    if(e.art==="treffer"){ bkTon(e.dunk?"dunk":"swish"); if(e.knapp)bkTon("publikum"); }
-    else if(e.art==="ring")bkTon(e.brett?"brett":"ring");
+    if(e.art==="treffer"){ bkTon(e.dunk?"dunk":"swish");
+      // Publikum: knapper Stand im 4. Viertel, Dunk/Dreier, oder ein Lauf ab 8:0 (dieselbe Quelle
+      // wie die Lauf-Marke im Scorebug, basketballLaufInfo()).
+      const lauf=typeof basketballLaufInfo==="function"?basketballLaufInfo():null;
+      if(e.knapp)bkTon("publikum"); else if(lauf&&lauf.punkte>=8)bkTon("ausbruch"); else if(e.dunk||e.fern)bkTon("publikum"); }
+    else if(e.art==="ring"){ bkTon(e.brett?"brett":"ring"); if(e.fern)bkTon("raunen"); }
+    else if(e.art==="steal"){ bkTon("steal"); bkTon("quietschen"); }
+    else if(e.art==="fang")bkTon("fang");
     else if(e.art==="block")bkTon("block");
     else if(e.art==="quietschen")bkTon("quietschen");
   }
@@ -19998,6 +20152,9 @@
       bkFxTonEinmal(e);
       if(e.art==="treffer"&&(e.dunk||e.fern)&&t<0.7){
         const kx=e.x, ry=e.y-F.ringZ, n=e.dunk?14:10, r=8+t*(e.dunk?70:50), a=1-t/0.7;
+        // PixelLab-VFX aus dem Bestand (Review 18.11., 0 neue Generationen): Funkenregen beim Dunk,
+        // goldenes Feuerwerk beim Dreier -- hinter den gezeichneten Strahlen, damit beides lesbar bleibt.
+        zeichneFxBild(e.dunk?"fx_funken":"fx_feuerwerk",kx,ry+(e.dunk?6:0),Math.min(1,t/0.7),e.dunk?"#ff9a3a":"#ffd34a",e.dunk?0.85:0.6);
         ctx.save(); ctx.globalAlpha=a;
         for(let i=0;i<n;i++){
           const w=i/n*Math.PI*2+(e.dunk?0:0.2);
@@ -20019,6 +20176,19 @@
         for(let i=0;i<8;i++){ const w=i/8*Math.PI*2;
           ctx.beginPath(); ctx.moveTo(e.x+Math.cos(w)*r*0.35,e.y+Math.sin(w)*r*0.35); ctx.lineTo(e.x+Math.cos(w)*r,e.y+Math.sin(w)*r); ctx.stroke(); }
         ctx.fillStyle="rgba(255,255,255,"+(a*0.6)+")"; ctx.beginPath(); ctx.arc(e.x,e.y,5*(1-t),0,6.3); ctx.fill();
+        ctx.restore();
+      } else if(e.art==="steal"&&t<0.6){
+        const a=1-t/0.6, farbe=e.seite===0?css("--home"):css("--away"), r=14+t*34, rich=e.dx>=0?0:Math.PI;
+        if(!zeichneFxBild("fx_funken",e.x,e.y,Math.min(1,t/0.6),farbe,0.45)){
+          ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=farbe;
+          for(let i=0;i<6;i++){ const w=i/6*Math.PI*2; ctx.beginPath(); ctx.arc(e.x+Math.cos(w)*r*0.8,e.y+Math.sin(w)*r*0.5,2,0,6.3); ctx.fill(); }
+          ctx.restore();
+        }
+        ctx.save(); ctx.globalAlpha=a; ctx.lineCap="round";
+        ctx.strokeStyle="#ffffff"; ctx.lineWidth=5*a+1;
+        ctx.beginPath(); ctx.arc(e.x,e.y,r,rich-1.1,rich+1.1); ctx.stroke();
+        ctx.strokeStyle=farbe; ctx.lineWidth=3*a+1;
+        ctx.beginPath(); ctx.arc(e.x,e.y,r+5,rich-0.9,rich+0.9); ctx.stroke();
         ctx.restore();
       } else if(e.art==="staub"&&t<0.6){
         const q=t/0.6;
@@ -45792,7 +45962,8 @@
   // (korb_topdown.png bleibt als Datei liegen, wird aber nicht mehr geladen — die Korbanlage ist ersetzt.)
   // Korbanlage in zwei Ebenen + Schussuhr-Rahmen: Fable 17.11. (docs/design/basketball-assets-17-11.md).
   const BK_TEILE=["parkett","zuschauer","ball",
-    "korb_links_hinten","korb_links_vorne","korb_rechts_hinten","korb_rechts_vorne","schussuhr_rahmen"];
+    "korb_links_hinten","korb_links_vorne","korb_rechts_hinten","korb_rechts_vorne","schussuhr_rahmen",
+    "publikum_reihe"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
   const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -59842,12 +60013,21 @@
       daten:{
         stand:()=>[fsPunkte[0]||0,fsPunkte[1]||0],
         uhr:()=>hudUhrFeldspiel(),
-        zusatz:()=>{ const r=basketballSchussuhrRest(); return r==null?null:{txt:fmtSchussuhr(r),eng:r<5}; },
+        zusatz:()=>{ const r=bkSchussuhrSendezeit(basketballSchussuhrRest()); return r==null?null:{txt:fmtSchussuhr(r),eng:r<5}; },
         ballbesitz:()=>fsLive&&!done?fsLive.amBall:null,
         ballTraegerId:()=>(!done&&fsLive&&fsLive.ball&&fsLive.ball.traeger)?fsLive.ball.traeger.id:null,
         lauf:()=>basketballLaufInfo(),
         fouls:()=>{ const m=new Map(); for(const [id,st] of fsBisher().spieler)m.set(id,st.fouls||0); return m; },
-        einblenderStat:(u)=>{ const st=fsBisher().spieler.get(u.id); return st?st.punkte+" PKT · "+st.feldwuerfeTreffer+"/"+st.feldwuerfe+" FG"+(st.assists?" · "+st.assists+" AST":""):""; }
+        einblenderStat:(u)=>{ const st=fsBisher().spieler.get(u.id); return st?st.punkte+" PKT · "+st.feldwuerfeTreffer+"/"+st.feldwuerfe+" FG"+(st.assists?" · "+st.assists+" AST":""):""; },
+        // TEAMFOULS IM SCORERBUG (Review 18.11.): dieselbe Zaehlung wie tfZeichne() und die Sonde
+        // __arena.teamFouls() (tfStand, laufendes Viertel) -- vorher nur als kleines Kaestchen am Korb.
+        teamStat:(s)=>{
+          const r=fsLive?foulRegelVon():null; if(!r)return null;
+          tfViertelPruefen();
+          const n=tfStand.fouls[s]||0, bonus=n>=r.bonusAb;
+          let pk=""; for(let i=0;i<r.bonusAb;i++)pk+=i<n?"●":"○";
+          return {txt:(bonus?"BONUS ":"FOULS ")+pk,titel:"Teamfouls im laufenden Viertel: "+n+(bonus?" -- Bonus: jedes weitere Foul gibt dem Gegner Freiwürfe":" (Bonus ab dem "+r.bonusAb+".)"),eng:bonus};
+        }
       },
       zusatzTitel:"Schussuhr",
       kern:"pkt",leiste:["reb","ast"],karte:["pkt","reb","ast","stl","blk","to","fg","fgp","imp"],
@@ -60233,6 +60413,7 @@
       const st=d.teamStat?d.teamStat(s):null;
       if(e.hidden===!!st)e.hidden=!st;
       if(st){ hudText(kopf,"stat"+s,st.txt); if(e.title!==(st.titel||""))e.title=st.titel||""; }
+      if(e.classList.contains("eng")!==!!(st&&st.eng))e.classList.toggle("eng",!!(st&&st.eng));
     }
     const mom=hudMomentum(p);
     const balken=hudFeld(kopf,"momBalken");
@@ -60408,17 +60589,75 @@
     e.classList.add("an");
   }
 
+  // ---------- Viertel-Bauchbinde (Review 18.11.) ------------------------------------------------
+  // Gezeigt = gebucht: Linescore aus fsPeriodenStand (dieselbe Quelle wie die Linescore im Endstand),
+  // Teamwerte als Summe von fsBisher().spieler (dieselben Zeilen wie Dock, Karte und Wertungstabelle).
+  let hudViertelBis=0;
+  function hudViertelBauchbinde(zuEnde,periode,istHalbzeit){
+    if(typeof document==="undefined"||!document.getElementById||stumm||sondenAktiv)return false; // Messlaeufe: alter Weg
+    const p=hudProfil(); if(!p||!hudSysAn||p.chassis!=="feldspiel"||feldspielDisc!=="basketball")return false;
+    const anker=document.getElementById("hudEinblender"); if(!anker||!anker.parentElement)return false;
+    let e=document.getElementById("hudViertel");
+    if(!e){ e=document.createElement("div"); e.id="hudViertel"; e.className="hud-viertel"; e.setAttribute("aria-live","polite"); anker.parentElement.insertBefore(e,anker); }
+    const st=fsBisher().spieler, summe=(seite)=>{
+      const t={pkt:0,fg:0,fga:0,reb:0,ast:0,stl:0,blk:0,to:0,fouls:0,top:null};
+      for(const u of FSTEAM[seite]||[]){ const z=st.get(u.id); if(!z)continue;
+        t.pkt+=z.punkte||0; t.fg+=z.feldwuerfeTreffer||0; t.fga+=z.feldwuerfe||0; t.reb+=z.rebounds||0; t.ast+=z.assists||0;
+        t.stl+=z.steals||0; t.blk+=z.bloecke||0; t.to+=z.verluste||0; t.fouls+=z.fouls||0;
+        if(!t.top||(z.punkte||0)>t.top.pkt)t.top={n:u.n,pkt:z.punkte||0,u}; }
+      return t; };
+    const T=[summe(0),summe(1)];
+    const pr=(a,b)=>b?Math.round(a/b*100)+" %":"–";
+    const zeile=(titel,a,b,mehrGut)=>{ const wa=parseFloat(a), wb=parseFloat(b);
+      const ga=isFinite(wa)&&isFinite(wb)&&(mehrGut?wa>wb:wa<wb), gb=isFinite(wa)&&isFinite(wb)&&(mehrGut?wb>wa:wb<wa);
+      return "<div class=\"hv-z\"><b class=\"t"+(ga?" gut":"")+"\">"+lsEsc(String(a))+"</b><span>"+lsEsc(titel)+"</span><b class=\"t"+(gb?" gut":"")+"\">"+lsEsc(String(b))+"</b></div>"; };
+    const ls=fsPeriodenStand.map(q=>"<th>Q"+q.periode+"</th>").join("");
+    const lz=(seite)=>"<tr class=\""+(seite===0?"h":"a")+"\"><td class=\"hv-n\">"+lsEsc(hudKuerzel(seite))+"</td>"
+      +fsPeriodenStand.map(q=>"<td class=\"t\">"+(seite===0?q.a:q.b)+"</td>").join("")+"<td class=\"t hv-g\">"+fsPunkte[seite]+"</td></tr>";
+    const top=(seite)=>T[seite].top?"<div class=\"hv-top "+(seite===0?"h":"a")+"\">"+hudPortraitHtml(T[seite].top.n,"hud-por")
+      +"<span><b>"+lsEsc(T[seite].top.n)+"</b><em class=\"t\">"+T[seite].top.pkt+" PKT</em></span></div>":"";
+    e.innerHTML="<div class=\"hv-kopf\">"+(istHalbzeit?"Halbzeit":"Ende "+zuEnde+". "+periode)+"</div>"
+      +"<div class=\"hv-reihe\">"+top(0)
+      +"<div class=\"hv-mitte\"><table class=\"hv-ls\"><thead><tr><th></th>"+ls+"<th>Ges.</th></tr></thead><tbody>"+lz(0)+lz(1)+"</tbody></table>"+hudFuehrungsverlauf()+"</div>"
+      +"<div class=\"hv-vgl\">"+zeile("Feldwürfe",T[0].fg+"/"+T[0].fga,T[1].fg+"/"+T[1].fga,true)
+      +zeile("Quote",pr(T[0].fg,T[0].fga),pr(T[1].fg,T[1].fga),true)+zeile("Rebounds",T[0].reb,T[1].reb,true)
+      +zeile("Assists",T[0].ast,T[1].ast,true)+zeile("Ballverluste",T[0].to,T[1].to,false)+zeile("Fouls",T[0].fouls,T[1].fouls,false)+"</div>"
+      +top(1)+"</div>";
+    e.hidden=false; e.classList.remove("an"); void e.offsetWidth; e.classList.add("an");
+    hudViertelBis=jetztMs()+(istHalbzeit?8000:6000);
+    return true;
+  }
+  // Fuehrungsverlauf (Mockup-Bauteil 15): Punktedifferenz nach jedem Korb (fsZuege, art "treffer"), x = Korb Nr.
+  function hudFuehrungsverlauf(){
+    const pkt=[0,0], d=[0];
+    for(let i=0;i<fsZeiger&&i<fsZuege.length;i++){ const z=fsZuege[i]; if(z.art!=="treffer")continue; pkt[z.seite]+=z.punkte||0; d.push(pkt[0]-pkt[1]); }
+    if(d.length<3)return "";
+    const W2=180, H2=38, m=Math.max(4,...d.map(Math.abs)), x=(i)=>(i/(d.length-1)*W2).toFixed(1), y=(v)=>(H2/2-v/m*(H2/2-2)).toFixed(1);
+    const pfad=d.map((v,i)=>(i?"L":"M")+x(i)+" "+y(v)).join(" ");
+    return "<svg class=\"hv-fv\" viewBox=\"0 0 "+W2+" "+H2+"\" width=\""+W2+"\" height=\""+H2+"\" aria-label=\"Führungsverlauf\">"
+      +"<defs><clipPath id=\"hvO\"><rect x=\"0\" y=\"0\" width=\""+W2+"\" height=\""+(H2/2)+"\"/></clipPath><clipPath id=\"hvU\"><rect x=\"0\" y=\""+(H2/2)+"\" width=\""+W2+"\" height=\""+(H2/2)+"\"/></clipPath></defs>"
+      +"<line x1=\"0\" x2=\""+W2+"\" y1=\""+(H2/2)+"\" y2=\""+(H2/2)+"\" class=\"hv-null\"/>"
+      +"<path d=\""+pfad+"\" class=\"hv-h\" clip-path=\"url(#hvO)\"/><path d=\""+pfad+"\" class=\"hv-a\" clip-path=\"url(#hvU)\"/></svg>";
+  }
+  function hudViertelTick(){
+    if(!hudViertelBis)return;
+    const e=document.getElementById("hudViertel");
+    if(!e){ hudViertelBis=0; return; }
+    if(jetztMs()>hudViertelBis||done||!fsLive||disc!=="basketball"){ e.hidden=true; hudViertelBis=0; }
+  }
+
   // ---------- Bedienleiste + Tastatur ----------------------------------------------------------
   function hudBedienTick(bed){
     const play=document.getElementById("play"), spd=document.getElementById("spd");
     const ls=lsModus==="band"?"Band":lsModus==="tafel"?"Tafel":"aus";
-    const sig=(play?play.textContent:"")+"|"+(spd?spd.textContent:"")+"|"+ls+"|"+hudVerlaufFilter;
+    const sig=(play?play.textContent:"")+"|"+(spd?spd.textContent:"")+"|"+ls+"|"+hudVerlaufFilter+"|"+fkModus;
     if(sig===hudBedienSig)return;
     hudBedienSig=sig;
     bed.innerHTML="<button type=\"button\" class=\"hud-tb prim\" data-hud-aktion=\"play\" data-tip=\"Start / Pause (Leertaste)\">"
       +lsEsc(play?play.textContent:"Start")+"<kbd>␣</kbd></button>"
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"tempo\" data-tip=\"Tempo umschalten (T)\">"+lsEsc(spd?spd.textContent.replace("Tempo ",""):"1×")+"<kbd>T</kbd></button>"
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"stand\" aria-pressed=\""+(ls!=="aus")+"\" data-tip=\"Live-Stand: Band → Tafel → aus (L)\">Stand: "+ls+"<kbd>L</kbd></button>"
+      +(feldKameraVon()?"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"kamera\" data-tip=\"Kamera: Ball (Halbfeld) → Überblick → Spieler der Karte (K)\">Kamera: "+FK_MODUS_NAME[fkModus]+"<kbd>K</kbd></button>":"")
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"karte\" data-tip=\"Spielerkarte öffnen und durchschalten (← →), schließen mit Esc\">Spieler<kbd>←→</kbd></button>"
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"filter\" data-tip=\"Spielverlauf-Filter durchschalten (F)\">Filter<kbd>F</kbd></button>";
   }
@@ -60427,6 +60666,15 @@
     else if(a==="tempo"){ const b=document.getElementById("spd"); if(b)b.click(); }
     else if(a==="stand")liveStandModusWeiter();
     else if(a==="karte")hudKarteSchritt(0);
+    else if(a==="kamera"){
+      const m=FK_MODI[(FK_MODI.indexOf(fkModus)+1)%FK_MODI.length];
+      feldKameraModusSetzen(m);
+      // Spieler-Kamera ohne gewaehlten Spieler: die Karte des Ballfuehrers (sonst des ersten Spielers) oeffnen.
+      if(m==="spieler"&&hudKarteId==null&&fkSpielerId==null){
+        const tr=fsLive&&fsLive.ball&&fsLive.ball.traeger;
+        if(tr)hudKarteOeffnen(tr.id); else hudKarteSchritt(0);
+      }
+    }
     else if(a==="vor")hudKarteSchritt(-1);
     else if(a==="nach")hudKarteSchritt(1);
     else if(a==="zu")hudKarteOeffnen(null);
@@ -60453,6 +60701,7 @@
     if(k===" "){ if(tag==="BUTTON"||ev.repeat)return; ev.preventDefault(); hudAktion("play"); }
     else if((k==="t"||k==="T")&&!ev.repeat){ ev.preventDefault(); hudAktion("tempo"); }
     else if((k==="f"||k==="F")&&!ev.repeat){ ev.preventDefault(); hudAktion("filter"); }
+    else if((k==="k"||k==="K")&&!ev.repeat&&feldKameraVon()){ ev.preventDefault(); hudAktion("kamera"); }
     else if(k==="ArrowLeft"){ ev.preventDefault(); hudKarteSchritt(-1); }
     else if(k==="ArrowRight"){ ev.preventDefault(); hudKarteSchritt(1); }
     else if(k==="Escape"&&hudKarteId!=null){ ev.preventDefault(); hudKarteOeffnen(null); }
@@ -60468,6 +60717,18 @@
         if(t.dataset.hudAktion)hudAktion(t.dataset.hudAktion);
       };
       for(const id of ["hudDock","hudKarte","hudBedien"]){ const e=document.getElementById(id); if(e&&e.addEventListener)e.addEventListener("click",klick); }
+      // BAUTEIL 9 (Review 18.11.): Klick auf eine Figur im Feld oeffnet ihre Spielerkarte. Ausnahme: ein
+      // Gegner, solange Fokus-Doppeln waehlbar ist -- der bestehende Klick (fokusUmschalten) bleibt dort.
+      if(cv&&cv.addEventListener)cv.addEventListener("click",(ev)=>{
+        if(!hudProfil()||!hudSysAn||!istFeldspiel(disc)||typeof FSTEAM==="undefined")return;
+        const r=cv.getBoundingClientRect(); if(!r.width||!r.height)return;
+        const mk=feldKameraInvers((ev.clientX-r.left)*(cv.width/r.width),(ev.clientY-r.top)*(cv.height/r.height));
+        let treffer=null, minD=30;
+        for(const team of FSTEAM)for(const u of team){ const d=Math.min(Math.hypot(u.x-mk.x,u.y-mk.y),Math.hypot(u.x-mk.x,u.y-20-mk.y)); if(d<minD){ minD=d; treffer=u; } }
+        if(!treffer)return;
+        if(treffer.side===1&&typeof fokusAuswahlMoeglich==="function"&&fokusAuswahlMoeglich())return;
+        hudKarteOeffnen(treffer.id);
+      });
       if(document.addEventListener)document.addEventListener("keydown",hudTaste);
     }catch{}
   }
@@ -60477,6 +60738,7 @@
   function hudWarnung(e){ if(hudWarnungGemeldet)return; hudWarnungGemeldet=true; try{ console.warn("HUD-System: "+(e&&e.message||e)); }catch{} }
   function hudSysTick(sofort){
     if(typeof document==="undefined")return;
+    hudViertelTick(); // Review 18.11.: Viertel-Bauchbinde nach Wandzeit ausblenden
     const kopf=document.getElementById("hudKopf");
     if(!kopf)return;
     const haupt=kopf.parentElement;
@@ -71005,6 +71267,7 @@
     // Wurf-Absichten gezeigt werden und bei wie vielen Wuerfen ausgeboxt wird. Read-only wie
     // diagSpacing: dieselben Saaten, volle Spiellaenge, Werte als Mittel je Spiel.
     // TEAMFOUL-/BONUS-MODUL: Stand im laufenden Viertel (read-only, fuer HUD/Scorebug).
+    feldKameraModus:(m)=>{ if(m!==undefined){ feldKameraModusSetzen(m); hudBedienSig=""; } return {modus:fkModus,spieler:fkSpielerId,anzeige:fkZustand&&fkZustand.anzeige?{...fkZustand.anzeige}:null}; },
     teamFouls:()=>{ const r=foulRegelVon(); if(!r)return null; tfViertelPruefen();
       return {viertel:tfStand.viertel,fouls:[...tfStand.fouls],bonus:[0,1].map(sd=>tfStand.fouls[sd]>=r.bonusAb),bonusAb:r.bonusAb}; },
     // KAMERA-MODUL: an/aus (Totale), gibt den neuen Zustand zurueck. Reine Anzeige.
@@ -71092,8 +71355,9 @@
         if(situation==="fastbreak")return !!fsLive.fastbreak&&fsT<fsLive.fastbreak.bis&&fsLive.fastbreak.bis-fsT<1.9&&!!fsLive.ball.traeger;
         if(situation==="lob"||situation==="bodenpass")return !!fl&&fl.art==="pass"&&LW_PASS.get(fl)===situation&&fl.t/fl.dauer>=0.45&&fl.t/fl.dauer<=0.6;
         // Effekt-Momente (EFFEKT-/TON-MODUL): kurz nach dem Ereignis am Ring/Blockpunkt.
-        if(situation==="fx-dunk"||situation==="fx-ring"||situation==="fx-block"){
+        if(situation==="fx-dunk"||situation==="fx-ring"||situation==="fx-block"||situation==="fx-steal"){
           const e=bkFx[bkFx.length-1], tt=e?bkAnzeigeUhr-e.t0:-1;
+          if(situation==="fx-steal")return !!e&&e.art==="steal"&&tt>=0.08&&tt<0.2; // Review 18.11.
           if(situation==="fx-dunk")return !!e&&e.art==="treffer"&&e.dunk&&tt>=0.09&&tt<0.2;
           if(situation==="fx-ring")return !!e&&e.art==="ring"&&!e.brett&&tt>=0.04&&tt<0.15;
           return !!e&&e.art==="block"&&tt>=0.08&&tt<0.2;

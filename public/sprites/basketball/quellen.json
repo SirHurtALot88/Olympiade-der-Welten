@@ -334,5 +334,25 @@
   },
   "anker": "48x32; Rahmen-Box x 4..43, y 2..31; Schiefertafel innen x 11..36, y 9..23 (26x15); Ziffernmitte (24,16)",
   "verwendung": "Rahmen fuer die Schussuhr am Korb (zeichneShotClock zeichnet heute eine 38x22-Canvas-Box). Vom Motor nicht geladen (nur die Ebenen hinten/vorne werden gezeichnet), s. docs/design/basketball-assets-17-11.md"
+ },
+ "publikum_reihe.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "one long single row of small seated spectators on a wooden grandstand bench, seen from the front and slightly above, mixed fantasy crowd of knights, orcs, elves and townsfolk shoulder to shoulder, some raising arms and waving small orange and teal flags, warm torch light, 3/4 top-down RPG view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    256,
+    64
+   ],
+   "job": "6b942155-8b79-42c8-aee4-f5e935dd35a6",
+   "kandidat": 0,
+   "generationen": 10.0
+  },
+  "roh": "data/generated/pixellab-requisiten/basketball-18-11/bb_publikum_reihe/",
+  "bau": "Kandidat 00; rechter Teil der Bank per Spaltenversatz waagerecht gerueckt (ab x=128 bis +10,5 px), auf die Alpha-Box beschnitten (255x75); Basketball-Review 18.11.",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-18",
+  "verwendung": "Tribuene an der oberen Seitenlinie (16-px-Spalten springen bei Treffern) und dunkle Kopf-Silhouetten im Vordergrund, bkPublikumZeichnen() in battle-mode.engine.js"
  }
 }

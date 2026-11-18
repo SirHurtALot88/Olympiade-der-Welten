@@ -1915,6 +1915,7 @@
   .oly-battle-arena.oly-battle-arena .hud-chip[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .hud-lauf{animation:hudChipRein .4s ease-out}
   .oly-battle-arena.oly-battle-arena .hud-stat{background:rgba(255,255,255,.1);color:var(--hud-tinte);font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .hud-stat.eng{background:#c62a30;color:#fff}
   @keyframes hudChipRein{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
   .oly-battle-arena.oly-battle-arena .hud-stand{flex:none;min-width:62px;text-align:center;font-size:48px;font-weight:700;line-height:1;color:#fff;letter-spacing:-.01em}
   .oly-battle-arena.oly-battle-arena .hud-stand.fuehrt{color:var(--tf)}
@@ -2094,6 +2095,49 @@
   .oly-battle-arena.oly-battle-arena .hud-eplus{font-size:40px;font-weight:800;color:#fff;line-height:1}
   /* Ist die Spielerkarte links offen, weicht der Einblender nach rechts aus (und umgekehrt). */
   .oly-battle-arena.oly-battle-arena .arenaraum:has(.hud-karte:not([hidden]):not(.rechts)) .hud-einblender{left:auto;right:2.5%;width:min(520px,calc(100% - 410px))}
+
+  /* --- Viertel-Bauchbinde (Review 18.11.): Linescore, Teamvergleich, Topscorer am unteren Feldrand;
+     ersetzt bei Basketball die Vollflaechen-Tafel .viertelpause, das Spiel bleibt sichtbar. --- */
+  .oly-battle-arena.oly-battle-arena .hud-viertel{position:absolute;z-index:7;left:50%;bottom:7%;transform:translateX(-50%);width:min(980px,90%);pointer-events:none;
+    font-family:var(--hud-zahl);color:var(--hud-tinte);opacity:0}
+  .oly-battle-arena.oly-battle-arena .hud-viertel[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .hud-viertel.an{animation:hudViertelRein .45s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes hudViertelRein{from{opacity:0;transform:translate(-50%,24px)}to{opacity:1;transform:translate(-50%,0)}}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-kopf{display:inline-block;margin-left:18px;padding:4px 16px 3px;font:700 italic 17px/1.1 var(--hud-haus);color:#10131a;
+    background:var(--hud-gold);transform:skewX(-14deg)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-reihe{display:grid;grid-template-columns:minmax(0,1fr) auto auto minmax(0,1fr);align-items:center;gap:16px;padding:10px 16px;
+    background:linear-gradient(180deg,rgba(9,12,18,.95),rgba(5,7,11,.93));border:1px solid var(--hud-linie);border-top:2px solid var(--hud-gold);box-shadow:0 18px 44px rgba(0,0,0,.6)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top{display:flex;align-items:center;gap:9px;min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top.a{flex-direction:row-reverse;text-align:right}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top span{display:flex;flex-direction:column;min-width:0}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top b{font:700 italic 16px/1.1 var(--hud-haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top em{font-style:normal;font-size:14px;font-weight:700;letter-spacing:.08em;color:var(--hud-creme)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top.h .hud-por{border:2px solid var(--hud-heim)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top.a .hud-por{border:2px solid var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls{border-collapse:collapse;font-size:16px;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls th{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--hud-leise);padding:0 7px 3px;text-align:center}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls td{padding:2px 7px;text-align:center;font-weight:600}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls .hv-n{text-align:left;font-weight:800;letter-spacing:.06em;border-left:4px solid var(--hud-heim);padding-left:6px}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls tr.a .hv-n{border-left-color:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-ls .hv-g{font-size:19px;font-weight:800;color:#fff}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-mitte{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-fv{display:block}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-fv .hv-null{stroke:var(--hud-linie-2);stroke-width:1;stroke-dasharray:3 3}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-fv path{fill:none;stroke-width:2.2;stroke-linejoin:round}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-fv .hv-h{stroke:var(--hud-heim)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-fv .hv-a{stroke:var(--hud-gast)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-vgl{display:grid;grid-template-columns:repeat(3,auto);column-gap:18px;row-gap:2px}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-z{display:grid;grid-template-columns:48px auto 48px;align-items:baseline;gap:6px;font-size:15px}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-z b{font-weight:700;text-align:right}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-z b:last-child{text-align:left}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-z b.gut{color:var(--hud-gut)}
+  .oly-battle-arena.oly-battle-arena .hud-viertel .hv-z span{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--hud-leise);text-transform:uppercase;text-align:center}
+  @media (max-width:760px){
+    .oly-battle-arena.oly-battle-arena .hud-viertel{width:96%;bottom:4px}
+    .oly-battle-arena.oly-battle-arena .hud-viertel .hv-reihe{grid-template-columns:auto;gap:6px}
+    .oly-battle-arena.oly-battle-arena .hud-viertel .hv-top{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){ .oly-battle-arena.oly-battle-arena .hud-viertel.an{animation:none;opacity:1} }
 
   /* --- Bauteil 16: Bedienleiste mit Tastenkuerzeln ------------------------------------------ */
   .oly-battle-arena.oly-battle-arena .hud-bedien{position:absolute;z-index:6;right:10px;bottom:10px;display:flex;align-items:center;gap:2px;padding:3px;
