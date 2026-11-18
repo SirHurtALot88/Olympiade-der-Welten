@@ -174,5 +174,18 @@ Reihenfolge-Vorschlag: 0 → 1 → 2 → 3, weil das die Befunde vom Spieltag di
 
 ## 8. Bilder
 
-Aufgenommen aus dem Mockup (`?still=1`), 1920 × 1080 und 2560 × 1440, PNG mit 256 Farben:
-Liste in `docs/design/arena-spieltag-modern-18-11/`.
+Aufgenommen aus dem Mockup (`?still=1`), PNG mit 256 Farben, in `docs/design/arena-spieltag-modern-18-11/`:
+
+| Datei | Screen |
+|---|---|
+| `01-laden-1920.png` | Laden, Disziplin 1 von 2 |
+| `02-vorstellung-duell-1920.png` | Vorstellung Duell |
+| `03-vorstellung-vierergruppe-1920.png` | Vorstellung Vierergruppe |
+| `04-live-vierergruppe-vor-start-1920.png` | Live Vierergruppe vor dem Start, ohne Stand |
+| `05-live-vierergruppe-1920.png`, `-2560.png` | Live Vierergruppe, Spiel läuft |
+| `06-ergebnis-duell-1920.png` | Ergebnis Duell |
+| `07-ergebnis-vierergruppe-1920.png`, `-2560.png` | Ergebnis Vierergruppe, Rangfolge 1–4 |
+| `08-wechsel-d1-d2-1920.png` | Wechsel Disziplin 1 → 2 |
+| `09-spieltagswertung-1920.png`, `-2560.png` | Spieltagswertung, Liga 2, eigenes Team im Blatt |
+
+Live Duell, der Zustand „fremdes Spiel angesehen“ und die Filter der Spieltagswertung sind nur im Mockup zu sehen.
