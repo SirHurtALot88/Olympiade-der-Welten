@@ -1337,6 +1337,13 @@ export function getPlayerClassColor(player: Player): FormCardColor | null {
   return CLASS_COLOR_MAP[player.className] ?? null;
 }
 
+/** Die Klassen einer Kartenfarbe (fuer den Hinweis "Farbbonus nur fuer ..."), in fester Reihenfolge. */
+export function getClassNamesForFormCardColor(color: string | null | undefined): string[] {
+  return Object.entries(CLASS_COLOR_MAP)
+    .filter(([, farbe]) => farbe === color)
+    .map(([klasse]) => klasse);
+}
+
 export function getFormCardColorForDisciplineCategory(category: string | null | undefined): FormCardColor | null {
   if (category === "power") return "red";
   if (category === "speed") return "green";

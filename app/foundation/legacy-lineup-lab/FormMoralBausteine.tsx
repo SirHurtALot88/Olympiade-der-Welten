@@ -11,7 +11,7 @@
 import { BcFormPfeil, BcMoralGesicht } from "@/components/foundation/broadcast";
 import { moralFarbe, moralStufe } from "@/lib/morale/moral-anzeige";
 import { formBegruendung, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
-import type { KartenWirkung } from "@/lib/lineups/formkarten-wirkung";
+import { FARB_KURZ, type KartenWirkung } from "@/lib/lineups/formkarten-wirkung";
 import "./form-moral.css";
 
 const ZAHL = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -234,6 +234,7 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
           <small className="fm-leise">
             alle {vz(alle)} · Farbe {vz(farbe)} · Form {vz(form)} (+ Tagesform ±{w.tagesformSpanne} je Spieler)
           </small>
+          {w.farbHinweis ? <small className="fm-leise" data-testid="fm-farbhinweis">{w.farbHinweis}</small> : null}
         </div>
       ) : (
         <p className="fm-warn">{w.buchung.grund}</p>
@@ -243,11 +244,11 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
 }
 
 /** Dreiteilige Karten-Marke am Platz: alle / Farbe / Form. */
-export function KartenMarke({ alle, traeger, form, farbe }: { alle: number; traeger: number; form: number; farbe: string | null }) {
+export function KartenMarke({ alle, traeger, form, farbe, grund }: { alle: number; traeger: number; form: number; farbe: string | null; grund?: string | null }) {
   const summe = alle + traeger + form;
   if (summe === 0) return null;
   return (
-    <span className="fm-kmarke" title={`Karten: ${vz(alle)} für alle, ${vz(traeger)} Farbe, ${vz(form)} Form`} data-testid="fm-kmarke">
+    <span className="fm-kmarke" title={`Karten: ${vz(alle)} für alle, ${vz(traeger)} Farbbonus, ${vz(form)} Form${grund ? ` — ${grund}` : ""}`} data-testid="fm-kmarke">
       <b className="fm-kmarke__sum t">{vz(summe)}</b>
       {traeger !== 0 ? <i className="fm-kmarke__tr t" style={{ color: farbe ? FORM_HEX[farbe] : undefined }}>{vz(traeger)}</i> : null}
       {form !== 0 ? <i className="fm-kmarke__fo t">{vz(form)}</i> : null}
@@ -281,6 +282,11 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
         <b>{satz}</b>: {vz(w.alleAnteil)} für alle
         {w.traegerAnzahl > 0 ? `, zusätzlich für ${w.traegerAnzahl} Spieler der Kartenfarbe.` : ", kein Spieler dieser Farbe im Einsatz."}
       </p>
+      {w.farbHinweis ? (
+        <p className="fm-leise" data-testid="fm-farbhinweis">
+          Den Farbbonus bekommt, wessen <b>Klasse</b> die Kartenfarbe hat — nicht die Disziplinfarbe, nicht die Rolle. {w.farbHinweis}.
+        </p>
+      ) : null}
       {!w.buchung.gebucht ? (
         <p className="fm-warn" data-testid="fm-nicht-gebucht">
           {w.buchung.grund}
@@ -304,12 +310,16 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
       ) : null}
       <table className="fm-tabelle">
         <thead>
-          <tr><th>Wer bekommt</th><th>alle</th><th>Farbe</th><th>Form</th><th>Karte</th></tr>
+          <tr><th>Wer bekommt</th><th>Klasse</th><th>alle</th><th>Farbe</th><th>Form</th><th>Karte</th></tr>
         </thead>
         <tbody>
           {w.spieler.map((s) => (
             <tr key={s.playerId} className={s.zerlegung.istTraeger ? "is-traeger" : ""}>
               <td>{namen(s.playerId)}</td>
+              <td title={s.farbGrund} data-testid={`fm-klasse-${s.playerId}`}>
+                {s.klasse ?? "–"}
+                {s.klassenFarbe ? <small style={{ color: FORM_HEX[s.klassenFarbe] }}> {FARB_KURZ[s.klassenFarbe] ?? s.klassenFarbe}</small> : null}
+              </td>
               <td className="t">{vz(s.zerlegung.alle)}</td>
               <td className="t">{s.zerlegung.traeger ? vz(s.zerlegung.traeger) : "–"}</td>
               <td className="t">{s.zerlegung.form ? vz(s.zerlegung.form) : "–"}</td>
@@ -318,7 +328,7 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
           ))}
         </tbody>
         <tfoot>
-          <tr><td colSpan={4}>Team (Karten)</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
+          <tr><td colSpan={5}>Team (Karten)</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
         </tfoot>
       </table>
     </div>

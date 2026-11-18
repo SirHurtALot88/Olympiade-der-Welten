@@ -31,6 +31,32 @@ export const FORMKARTEN_ECHT_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // rho je Spiel 0,910 -> 0,938 (Saison 0,963 -> 0,951), Pp 19,4/14,9 -> 18,5/15,4. Beide
   // Pflichtkriterien bestanden (rho sogar gestiegen).
   "spurt",
+  // ALLE UEBRIGEN MOTOR-GEBUCHTEN DISZIPLINEN (18.11., Chris aus dem Live-Spiel: "das auch noch fixen,
+  // dass die Karten nicht zaehlen"). Bis hier stand in der Einsatzliste unter jeder anderen Arena-
+  // Disziplin "zaehlt hier noch nicht" — der Motor nahm eine Ersatzkarte. Seit 18.11. bekommt jede
+  // Disziplin, deren Ergebnis im Battle-Modus aus dem Motor gebucht wird, die gespielte Karte:
+  // die 14 restlichen Duelle aus ARENA_RESOLVED_DISCIPLINE_IDS (an Pod-Spieltagen auch Staffel/Takeshi
+  // als Bahn-Pod — der Pod uebernimmt die place-Eintraege samt `form`), Battlefield (Pod, ebenso) und
+  // Mini-DM-FFA (eigene Durchreichung FORM_POD in spieleMiniDmFfaEvent()). Messung mit echten Karten:
+  // docs/design/formkarten-alle-disziplinen-18-11.md.
+  "gewichtheben",
+  "speed-schach",
+  "showcase",
+  "eiskunstlauf",
+  "breaking",
+  "wettessen",
+  "tennis",
+  "fechten",
+  "staffel",
+  "takeshis-castle",
+  "climbing",
+  "basketball",
+  "i-spy",
+  "hockey",
+  "tdm",
+  "football",
+  "battlefield",
+  "mini-dm",
 ]);
 
 export function nutztEchteFormkarten(disciplineId: string | null | undefined): boolean {

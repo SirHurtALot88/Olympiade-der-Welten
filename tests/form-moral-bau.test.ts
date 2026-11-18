@@ -149,12 +149,10 @@ describe("Formkarten-Farbregel: eine Wahrheit", () => {
 describe("Formkarten: gezeigt = gebucht", () => {
   const battle = { scenarioMeta: { gameMode: "battle" } } as unknown as GameState;
   const manager = { scenarioMeta: { gameMode: "manager" } } as unknown as GameState;
-  it("Battle-Modus: nur Disziplinen mit echten Karten buchen, die übrigen Arena-Disziplinen nicht", () => {
-    expect(formkartenBuchung(battle, "time-trial").gebucht).toBe(true);
-    expect(formkartenBuchung(battle, "spurt").gebucht).toBe(true);
-    const basketball = formkartenBuchung(battle, "basketball");
-    expect(basketball.gebucht).toBe(false);
-    expect(basketball.grund).toMatch(/Ersatzkarte/);
+  it("Battle-Modus: seit 18.11. bucht jede Arena-Disziplin die gespielte Karte (kein 'zählt hier noch nicht' mehr)", () => {
+    for (const d of ["time-trial", "spurt", "basketball", "climbing", "hockey", "tdm", "battlefield", "mini-dm", "football"]) {
+      expect(formkartenBuchung(battle, d)).toEqual({ gebucht: true, grund: null });
+    }
   });
   it("Manager-Modus (Legacy-Wertung): überall gebucht", () => {
     expect(formkartenBuchung(manager, "basketball").gebucht).toBe(true);

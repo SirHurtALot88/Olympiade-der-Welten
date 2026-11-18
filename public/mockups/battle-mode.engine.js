@@ -9307,8 +9307,15 @@
   // `formModus:"echt"`): eine Map Name -> {form, int}, die Vorrang hat. Im Spiel immer null.
   let FORM_MESS=null;
   let FORM_MESS_MODUS="ersatz";
+  // FORM_POD (18.11., Formkarten in ALLEN Disziplinen): Mini-DM-FFA liest seine Aufstellung NICHT
+  // ueber das globale `place` (spieleMiniDmFfaEvent() reicht `platzJeTeam` direkt an die
+  // Rollenwahl), die gespielte Karte kam dort deshalb nie an. Waehrend eines FFA-Events haelt
+  // diese Map Name -> place-Eintrag fuer genau die Eintraege, die eine `form` tragen; sonst null.
+  let FORM_POD=null;
   function formEchtVon(n,d){
     if(FORM_MESS&&FORM_MESS.has(n))return FORM_MESS.get(n);
+    const ep=FORM_POD&&FORM_POD.get(n);
+    if(ep&&ep.d===d)return {form:ep.form,int:INTENSITAET[ep.intensitaet]?ep.intensitaet:"normal"};
     const e=place[n];
     if(e&&e.d===d&&typeof e.form==="number"&&Number.isFinite(e.form))
       return {form:e.form,int:INTENSITAET[e.intensitaet]?e.intensitaet:"normal"};
@@ -66366,6 +66373,10 @@
     }
     const opt=optionen||{};
     if(opt.formSaat!=null)mdffaFormkartenFuer(vierTeams,normalisiereSaat(opt.formSaat));
+    // GESPIELTE FORMKARTE (18.11.): die `form` aus `platzJeTeam` fuer die Dauer des Events, s. FORM_POD.
+    const formPodVorher=FORM_POD;
+    FORM_POD=mdffaFormAusPlatz(platzJeTeam)||formPodVorher;
+    try{
     const {rollen,rollenDefs}=mdffaRollenFuerK(opt.k);
     const saatBasis=normalisiereSaat(saat);
     const aufstellung=mdffaAuswahlVorbereiten(vierTeams,platzJeTeam);
@@ -66411,6 +66422,7 @@
         eventPlatz:eventPlatz[side], ligaPunkte:ligaPunkte[side]
       }))
     };
+    } finally { FORM_POD=formPodVorher; }
   }
 
   // ===================================================================================
@@ -66426,6 +66438,24 @@
     let z=saat>>>0;
     const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
     for(const kader of teams)for(const p of kader)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
+    // P4-MESSSCHALTER auch fuer Pods (18.11.): im Modus "echt" je Pod-Team ein Einsatzlisten-
+    // Szenario wie in zieheFormkarten() fuer SQUAD/OPP. Im Spiel steht der Modus immer auf
+    // "ersatz" -- dann wird FORM_MESS nicht angefasst (bit-identisch).
+    if(FORM_MESS_MODUS==="echt")FORM_MESS=zieheFormSzenarioEcht((saat^0x5bd1e995)>>>0,teams);
+  }
+  // Mini-DM-FFA: die `form`-tragenden Eintraege aus `platzJeTeam` (buildArenaAufstellung) fuer
+  // formEchtVon(); ohne einen einzigen solchen Eintrag null -- dann bleibt alles wie vorher.
+  function mdffaFormAusPlatz(platzJeTeam){
+    if(!Array.isArray(platzJeTeam))return null;
+    let m=null;
+    for(const pl of platzJeTeam)if(pl)for(const name in pl){
+      const e=pl[name];
+      if(e&&typeof e.d==="string"&&typeof e.form==="number"&&Number.isFinite(e.form)){
+        if(!m)m=new Map();
+        m.set(name,{d:e.d,form:e.form,intensitaet:e.intensitaet});
+      }
+    }
+    return m;
   }
   // Eine Event-Saat je (Gruppe, Lauf), dieselbe Bauart wie disziplinProbe/einflussVon.
   const mdffaEventSaat=(g,i,versatz)=>(7001+(versatz||0)+g*7919+i*104729)>>>0;
