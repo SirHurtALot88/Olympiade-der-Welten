@@ -30,18 +30,27 @@ import {
 import { LEAGUE_SIZE } from "@/lib/season/league-split";
 import { beschreibeBilanz, formatiereBilanz } from "@/lib/standings/standings-bilanz";
 import {
+  abstandZumFuehrer,
   baueVerlaufsLinien,
   bestimmeZone,
   bewegungText,
   formAusVerlauf,
+  formPlaetze,
+  kaderStaerkeAnteil,
+  rangBand,
+  sparklinePunkte,
+  waehleShowdownPaarungen,
+  wertRaenge,
   istDuellVerlauf,
   lagesatz,
   anteilStufe,
   duellPunkteJeDisziplin,
+  einsatzZeile,
   matrixStufe,
   rangStufe,
   type DuellZelle,
   stehtAufDemSpiel,
+  type StehtAufDemSpiel,
   teileNachLiga,
   ZONEN_MARKE_ENDE,
   ZONEN_TEXT,
@@ -134,6 +143,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     rivalTeamIds,
     teamBilanzByTeamId,
     teamStrengthRankByTeamId,
+    teamStrengthValueByTeamId,
     topPlayers,
     disciplineLeaders,
     spieltage,
@@ -165,6 +175,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   const [matrixSort, setMatrixSort] = useState<string | null>(null);
   const [verlaufModus, setVerlaufModus] = useState<"rang" | "punkte">("rang");
   const [gewaehlterSpieltag, setSpieltagId] = useState<string | null>(null);
+  const [kontextTab, setKontextTab] = useState<"karte" | "showdown">("karte");
   const [spieltagModus, setSpieltagModus] = useState<"ergebnisse" | "ansetzungen">("ergebnisse");
 
   // Die Liga des eigenen Teams ist der Einstieg; ohne Liga-Zuordnung gibt es nur „gesamt".
@@ -186,14 +197,28 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     const gespielte = spieltage.matchdayOptions.filter((o) => o.gespielt);
     return duellPunkteJeDisziplin(gespielte.map((o) => spieltage.getUebersicht(o.id)));
   }, [spieltage]);
+  // EINE Übersicht des nächsten Spieltags für Kopf, Matrix-Markierung, „Nä."-Spalte und Showdown.
+  const naechsteUebersicht = useMemo(
+    () => (spieltage?.verfuegbar && naechsterSpieltag ? spieltage.getUebersicht(naechsterSpieltag.id) : null),
+    [spieltage, naechsterSpieltag],
+  );
   const naechsteDisziplinen = useMemo(() => {
     const ids = new Set<string>();
-    if (!spieltage?.verfuegbar || !naechsterSpieltag) return ids;
-    const u = spieltage.getUebersicht(naechsterSpieltag.id);
+    const u = naechsteUebersicht;
+    if (!u) return ids;
     for (const p of u?.paarungen ?? []) for (const d of p.disziplinen) ids.add(d.disciplineId);
     for (const pod of u?.miniDmPods ?? []) ids.add(pod.disciplineId);
     return ids;
-  }, [spieltage, naechsterSpieltag]);
+  }, [naechsteUebersicht]);
+  /** Gegner im nächsten Spieltag je Team (Spalte „Nä."). */
+  const gegnerVon = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of naechsteUebersicht?.paarungen ?? []) {
+      m.set(p.homeTeamId, p.awayTeamId);
+      m.set(p.awayTeamId, p.homeTeamId);
+    }
+    return m;
+  }, [naechsteUebersicht]);
   const duellZelle = useCallback(
     (teamId: string, key: SeasonDisciplineKey): DuellZelle | null =>
       duellMatrix?.get(teamId)?.get(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]) ?? null,
@@ -223,13 +248,13 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
 
   // Nur für den Kopf: der nächste Gegner des eigenen Teams. Eine Übersicht, nicht zwanzig.
   const naechsterGegner = useMemo(() => {
-    if (!spieltage?.verfuegbar || !naechsterSpieltag || !eigene) return null;
-    const u = spieltage.getUebersicht(naechsterSpieltag.id);
+    if (!naechsterSpieltag || !eigene) return null;
+    const u = naechsteUebersicht;
     const paarung = u?.paarungen.find((p) => p.homeTeamId === eigene.teamId || p.awayTeamId === eigene.teamId);
     if (!paarung) return null;
     const gegnerId = paarung.homeTeamId === eigene.teamId ? paarung.awayTeamId : paarung.homeTeamId;
     return { zeile: standingsRows.find((z) => z.teamId === gegnerId) ?? null, label: naechsterSpieltag.label };
-  }, [spieltage, naechsterSpieltag, eigene, standingsRows]);
+  }, [naechsterSpieltag, naechsteUebersicht, eigene, standingsRows]);
 
   const zeilenFuer = useCallback(
     (a: LigaAnsicht): Zeile[] => {
@@ -279,10 +304,18 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
 
   const formSinnvoll = useMemo(() => istDuellVerlauf(verlauf), [verlauf]);
   const formVon = useCallback((teamId: string) => (formSinnvoll ? formAusVerlauf(verlauf?.byTeamId[teamId]) : []), [verlauf, formSinnvoll]);
+  // Platzentwicklung je Team (Rang innerhalb der eigenen Liga je GEWERTETEM Spieltag) für die Sparkline.
+  const linienJeTeam = useMemo(() => {
+    if (!verlauf) return new Map<string, Array<number | null>>();
+    return new Map(baueVerlaufsLinien(verlauf, standingsRows).linien.map((l) => [l.teamId, l.raenge] as const));
+  }, [verlauf, standingsRows]);
+  const hatSparkline = useMemo(() => [...linienJeTeam.values()].some((r) => r.filter((x) => x != null).length >= 2), [linienJeTeam]);
+  const hatGegner = gegnerVon.size > 0;
   const gesamtPlatz = (z: Zeile) => (z.rank == null ? null : z.leagueTier === "liga2" ? z.rank + LEAGUE_SIZE : z.rank);
 
   const waehleTeam = (teamId: string) => {
     setKartenTeamId(teamId);
+    setKontextTab("karte");
     if (phone) setBlattOffen(true);
   };
 
@@ -324,12 +357,36 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     const form = formVon(z.teamId);
     if (form.length === 0) return <span className="bc-null">–</span>;
     return (
-      <span className="ssm-form" data-bc-tip="Letzte Spieltage, älteste zuerst: grün 3–4 Punkte, grau 2, rot 0–1">
-        {form.map((f, i) => (
+      <span className="ssm-form" data-testid="ssm-form" data-bc-tip="Letzte 6 Spieltage, älteste zuerst: grün 3–4 Punkte, grau 2, rot 0–1">
+        {formPlaetze(form).map((f, i) => (
           <i key={i} className={`is-${f.ton}`} />
         ))}
       </span>
     );
+  };
+
+  const verlaufZelle = (z: Zeile) => {
+    const raenge = linienJeTeam.get(z.teamId);
+    const gruppe = ligaDerZeile(z);
+    const spark = raenge ? sparklinePunkte(raenge, Math.max(gruppe.length, 2)) : null;
+    if (!spark) return <span className="bc-null">–</span>;
+    const letzter = [...(raenge ?? [])].reverse().find((r) => r != null);
+    return (
+      <svg className={`ssm-spark${z.isSelected ? " is-eigene" : ""}`} viewBox="0 0 84 22" role="img" aria-label="Platzentwicklung" data-testid="ssm-spark" data-bc-tip={`Tabellenplatz in der Liga über ${raenge?.length ?? 0} gewertete Spieltage, jetzt Platz ${letzter}`}>
+        <polyline points={spark.punkte} fill="none" strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx={spark.ende.x} cy={spark.ende.y} r="2.4" />
+      </svg>
+    );
+  };
+
+  const gegnerZelle = (z: Zeile) => {
+    const gegner = standingsRows.find((x) => x.teamId === gegnerVon.get(z.teamId));
+    return gegner ? <Wappen zeile={gegner} klasse="ssm-wappen ssm-wappen--klein" /> : <span className="bc-null">–</span>;
+  };
+
+  const abstandZelle = (z: Zeile) => {
+    const a = abstandZumFuehrer(z, ligaDerZeile(z));
+    return <span className="bc-t ssm-abst" data-bc-tip={a == null ? undefined : `${a} Pkt hinter dem Tabellenführer`}>{z.points == null ? "–" : a == null ? "–" : `−${ZAHL.format(a)}`}</span>;
   };
 
   const bilanzZelle = (z: Zeile) => {
@@ -341,10 +398,21 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     <span className={`bc-t${vorzeichen && wert != null && wert < 0 ? " bc-minus" : ""}`}>{formatNlMoney(wert)}</span>
   );
 
+  // POW/SPE/MEN/SOC: Rang je Bereich innerhalb der angezeigten Liga (Gesamt: über alle 32) -> Band 1–3 grün, 4–6 gelb, 7–10 rot.
+  const bereichsRaenge = useMemo(() => {
+    const basis = zeilenFuer(aktiveLiga);
+    const r = {} as Record<SeasonDisciplineAreaId, Map<string, number>>;
+    for (const id of ["pow", "spe", "men", "soc"] as const) r[id] = wertRaenge(basis, (z) => z.teamId, (z) => (z.points == null ? null : z[id]));
+    return r;
+  }, [zeilenFuer, aktiveLiga]);
+
   const spaltenSport = useMemo<BcTableColumn<Zeile>[]>(() => {
     const sk = (key: SortKey, d: "asc" | "desc" = "desc") => ({ onKopf: () => klickSort(key, d), aktiv: sort.key === key });
     const bereich = (id: SeasonDisciplineAreaId): BcTableColumn<Zeile> => ({
-      key: id, kopf: AREA_LABEL[id], breite: "46px", rechts: true, ...sk(id), render: (z) => <span className="bc-t">{hatWertung ? zahl(z[id]) : "–"}</span>,
+      key: id, kopf: AREA_LABEL[id], breite: "46px", rechts: true, ...sk(id), render: (z) => {
+        const band = hatWertung ? rangBand(bereichsRaenge[id].get(z.teamId)) : null;
+        return <span className={`bc-t ssm-band${band ? ` ssm-band--${band}` : ""}`} data-bc-tip={band ? `${AREA_LABEL[id]}: Rang ${bereichsRaenge[id].get(z.teamId)} in dieser Ansicht` : undefined}>{hatWertung ? zahl(z[id]) : "–"}</span>;
+      },
     });
     return [
       { key: "rang", kopf: "#", breite: "46px", ...sk("rank", "asc"), render: rangZelle },
@@ -352,12 +420,15 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       { key: "team", kopf: "Team", breite: "minmax(0,1fr)", ...sk("team", "asc"), render: teamZelle },
       { key: "sun", kopf: "S-U-N", breite: phone ? "58px" : "64px", rechts: true, render: bilanzZelle },
       ...(hatVerhaeltnis && !phone ? [{ key: "verh", kopf: "Verh.", breite: "52px", rechts: true, ...sk("verh"), render: (z: Zeile) => <span className={`bc-t ${z.verhaeltnis != null && z.verhaeltnis < 0 ? "bc-minus" : z.verhaeltnis != null && z.verhaeltnis > 0 ? "bc-plus" : ""}`}>{vz(z.verhaeltnis)}</span> } as BcTableColumn<Zeile>] : []),
-      ...(formSinnvoll ? [{ key: "form", kopf: "Form", breite: phone ? "54px" : "70px", render: formZelle } as BcTableColumn<Zeile>] : []),
+      ...(formSinnvoll ? [{ key: "form", kopf: "Form", breite: phone ? "76px" : "100px", render: formZelle } as BcTableColumn<Zeile>] : []),
+      ...(hatSparkline && !phone ? [{ key: "verlauf", kopf: "Verlauf", breite: "92px", rechts: true, render: verlaufZelle } as BcTableColumn<Zeile>] : []),
       ...(phone ? [] : (["pow", "spe", "men", "soc"] as const).map(bereich)),
+      ...(hatGegner && !phone ? [{ key: "naech", kopf: "Nä.", breite: "40px", render: gegnerZelle } as BcTableColumn<Zeile>] : []),
+      ...(hatWertung && !phone ? [{ key: "abst", kopf: "Abst.", breite: "50px", rechts: true, render: abstandZelle } as BcTableColumn<Zeile>] : []),
       { key: "pkt", kopf: "Pkt", breite: "52px", rechts: true, ...sk("points"), render: (z) => <strong className="ssm-pkt bc-t">{zahl(z.points)}</strong> },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon]);
+  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon, bereichsRaenge, hatSparkline, hatGegner, linienJeTeam, gegnerVon, standingsRows, nachLiga]);
 
   const spaltenVerein = useMemo<BcTableColumn<Zeile>[]>(() => {
     const sk = (key: SortKey, d: "asc" | "desc" = "desc") => ({ onKopf: () => klickSort(key, d), aktiv: sort.key === key });
@@ -433,6 +504,12 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
           </>
         ) : null}
         <span><BcMarke ton="gelb">DU</BcMarke> dein Team</span>
+        {satz === "sport" && hatWertung ? (
+          <>
+            <span data-testid="ssm-legende-baender"><i className="ssm-leg ssm-leg--gut" /> POW/SPE/MEN/SOC Rang 1–3 · <i className="ssm-leg ssm-leg--warn" /> 4–6 · <i className="ssm-leg ssm-leg--risk" /> 7–10</span>
+            {formSinnvoll ? <span><span className="ssm-form ssm-form--leg"><i className="is-s" /><i className="is-u" /><i className="is-n" /></span> Form: 3–4 · 2 · 0–1 Punkte je Spieltag</span> : null}
+          </>
+        ) : null}
         {onOpenRanks ? <button type="button" className="bc-pan__mehr" onClick={onOpenRanks}>Ranks ›</button> : null}
         {onOpenPrize ? <button type="button" className="bc-pan__mehr" onClick={onOpenPrize}>Sponsoren ›</button> : null}
       </footer>
@@ -461,6 +538,16 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   const verbleibend = gesamtSpieltage > 0 ? gesamtSpieltage - gespielteAnzahl : null;
   const stehtAuf = kartenTeam ? stehtAufDemSpiel(kartenTeam, kartenLiga, isSeasonEnded ? 0 : verbleibend) : [];
 
+  const stehtBlock = (liste: StehtAufDemSpiel[]) =>
+    liste.length > 0 ? (
+      <section className="ssm-karte__block" data-testid="ssm-steht-auf-dem-spiel">
+        <h3 className="bc-gk">Was auf dem Spiel steht</h3>
+        {liste.map((x) => (
+          <div key={x.id} className="ssm-steht"><span>{x.label}</span><strong className={`bc-t${x.ton === "gut" ? " bc-plus" : x.ton === "warn" ? " bc-minus" : ""}`}>{x.wert}</strong></div>
+        ))}
+      </section>
+    ) : null;
+
   const teamKarte = kartenTeam ? (
     <div className="ssm-karte" data-testid="ssm-teamkarte">
       <div className="ssm-karte__kopf">
@@ -479,14 +566,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
         <div><dt>S-U-N</dt><dd className="bc-t">{teamBilanzByTeamId?.get(kartenTeam.teamId) ? formatiereBilanz(teamBilanzByTeamId.get(kartenTeam.teamId)!) : "–"}</dd></div>
         {hatVerhaeltnis ? <div><dt>Verh.</dt><dd className="bc-t">{vz(kartenTeam.verhaeltnis)}</dd></div> : null}
       </dl>
-      {stehtAuf.length > 0 ? (
-        <section className="ssm-karte__block" data-testid="ssm-steht-auf-dem-spiel">
-          <h3 className="bc-gk">Was auf dem Spiel steht</h3>
-          {stehtAuf.map((s) => (
-            <div key={s.id} className="ssm-steht"><span>{s.label}</span><strong className={`bc-t${s.ton === "gut" ? " bc-plus" : s.ton === "warn" ? " bc-minus" : ""}`}>{s.wert}</strong></div>
-          ))}
-        </section>
-      ) : null}
+      {stehtBlock(stehtAuf)}
       {kartenKader.length > 0 ? (
         <section className="ssm-karte__block">
           <h3 className="bc-gk">Beste Spieler im Kader</h3>
@@ -525,6 +605,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   );
 
   /* ------------------------------ Matrix ------------------------------ */
+  const teamNameVon = (id: string) => standingsRows.find((z) => z.teamId === id)?.teamName ?? id;
   const matrixSchluessel = SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.flatMap((g) => g.keys);
   const matrixZeilen = useMemo(() => {
     const basis = zeilenFuer(aktiveLiga);
@@ -614,7 +695,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
                         const zelle = duellZelle(z.teamId, key);
                         const stufe = anteilStufe(zelle);
                         return (
-                          <td key={key} className={`bc-t ssm-zelle${stufe == null ? "" : ` ssm-stufe-${stufe}`}`} data-bc-tip={zelle ? `${SEASON_DISCIPLINE_LABELS[key]}: ${zelle.punkte} von ${zelle.moeglich} möglichen Punkten` : `${SEASON_DISCIPLINE_LABELS[key]}: noch nicht gespielt`}>
+                          <td key={key} className={`bc-t ssm-zelle${stufe == null ? "" : ` ssm-stufe-${stufe}`}`} data-bc-tip={zelle ? [`${SEASON_DISCIPLINE_LABELS[key]}: ${zelle.punkte} von ${zelle.moeglich} möglichen Punkten`, ...zelle.einsaetze.map((e) => einsatzZeile(e, teamNameVon))].join("\n") : `${SEASON_DISCIPLINE_LABELS[key]}: noch nicht gespielt`}>
                             {zelle ? zelle.punkte : "·"}
                           </td>
                         );
@@ -737,7 +818,19 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
           return (
             <div key={d.disciplineId} className="ssm-paarung__disz">
               <span className="ssm-paarung__dn">{d.disciplineName}{d.occurrenceInSeason ? <em> · {d.occurrenceInSeason}. Durchgang</em> : null}</span>
-              {!d.gespielt && staerkeH && staerkeG ? <span className="ssm-paarung__st" data-bc-tip="Stärke-Rang der Kader in dieser Disziplin (1 = stärkster Kader)">#{staerkeH} gg. #{staerkeG}</span> : null}
+              {!d.gespielt && staerkeH && staerkeG ? (
+                (() => {
+                  const pod = d.resolutionSource === "mini_dm_pod" || d.miniDmPodIdHeim != null || d.miniDmPodIdGast != null;
+                  const anteil = pod ? null : kaderStaerkeAnteil(teamStrengthValueByTeamId?.get(p.homeTeamId)?.[d.disciplineId], teamStrengthValueByTeamId?.get(p.awayTeamId)?.[d.disciplineId]);
+                  return anteil != null ? (
+                    <span className="ssm-paarung__st ssm-paarung__st--balken" data-bc-tip={`Kaderstärke ${d.disciplineName}: Rang ${staerkeH} gegen Rang ${staerkeG} — Verhältnis, kein Ergebnis`}>
+                      <span className="ssm-wb"><i style={{ width: `${anteil}%` }} /></span><span className="bc-t">{anteil} %</span>
+                    </span>
+                  ) : (
+                    <span className="ssm-paarung__st" data-bc-tip="Stärke-Rang der Kader in dieser Disziplin (1 = stärkster Kader)">#{staerkeH} gg. #{staerkeG}</span>
+                  );
+                })()
+              ) : null}
               <span className="ssm-paarung__pkt bc-t">{d.gespielt ? `${d.punkteHeim ?? 0}:${d.punkteGast ?? 0}` : ""}</span>
               <span className="ssm-paarung__wert bc-t">{ergebnis}</span>
             </div>
@@ -940,10 +1033,93 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     { id: "bestenliste", label: "Bestenliste" },
   ];
 
+  /* ------------------------------ Showdown (Forecast) ------------------------------ */
+  const kurzVonKatalogId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const key of Object.keys(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID) as SeasonDisciplineKey[]) m.set(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key], SEASON_DISCIPLINE_LABELS[key]);
+    return m;
+  }, []);
+  const showdownPaarungen = useMemo(() => {
+    const u = naechsteUebersicht;
+    if (!u || !eigene) return [];
+    const liste = u.paarungen.filter((p) => !eigene.leagueTier || p.leagueTier === eigene.leagueTier);
+    const rangVon = (id: string) => standingsRows.find((z) => z.teamId === id)?.rank ?? null;
+    const auswahl = waehleShowdownPaarungen(
+      liste.map((p) => ({ id: p.fixtureId, rangHeim: rangVon(p.homeTeamId), rangGast: rangVon(p.awayTeamId), eigen: p.homeTeamId === eigene.teamId || p.awayTeamId === eigene.teamId })),
+    );
+    return auswahl.flatMap((a) => {
+      const paarung = liste.find((p) => p.fixtureId === a.id);
+      return paarung ? [{ tag: a.tag, paarung }] : [];
+    });
+  }, [naechsteUebersicht, eigene, standingsRows]);
+  const hatShowdown = showdownPaarungen.length > 0;
+  const showdownKarte = (tag: string, p: SpieltagsPaarung) => {
+    const heim = teamKurz(p.homeTeamId);
+    const gast = teamKurz(p.awayTeamId);
+    const eigenSpiel = heim?.isSelected || gast?.isSelected;
+    const seite = (z: Zeile | undefined, id: string, klasse: string) => (
+      <button type="button" className={klasse} onClick={() => z && waehleTeam(z.teamId)}>
+        {z ? <Wappen zeile={z} klasse="ssm-wappen ssm-wappen--mittel" /> : null}
+        <b>{z?.teamName ?? id}</b>
+        <small className="bc-t">{z?.rank != null ? `${z.rank}. · ${zahl(z.points)} Pkt` : ""}</small>
+      </button>
+    );
+    return (
+      <article key={p.fixtureId} className={`ssm-sd${eigenSpiel ? " is-eigene" : ""}`} data-testid="ssm-showdown-paarung">
+        <header className="ssm-sd__kopf"><span>{tag}</span><small>{p.leagueTier === "liga1" ? "Liga 1" : p.leagueTier === "liga2" ? "Liga 2" : ""}</small></header>
+        <div className="ssm-sd__par">
+          {seite(heim, p.homeTeamId, "ssm-sd__team ssm-sd__team--heim")}
+          <span className="ssm-sd__vs">vs</span>
+          {seite(gast, p.awayTeamId, "ssm-sd__team ssm-sd__team--gast")}
+        </div>
+        {p.disziplinen.map((d) => {
+          const pod = d.resolutionSource === "mini_dm_pod" || d.miniDmPodIdHeim != null || d.miniDmPodIdGast != null;
+          const rH = staerkeInLiga(p.homeTeamId, d.disciplineId);
+          const rG = staerkeInLiga(p.awayTeamId, d.disciplineId);
+          const wH = teamStrengthValueByTeamId?.get(p.homeTeamId)?.[d.disciplineId];
+          const wG = teamStrengthValueByTeamId?.get(p.awayTeamId)?.[d.disciplineId];
+          const anteil = pod ? null : kaderStaerkeAnteil(wH, wG);
+          const kurz = kurzVonKatalogId.get(d.disciplineId) ?? d.disciplineName;
+          const tipp = `${d.disciplineName} · Kaderstärke${rH && rG ? `: Rang ${rH} gegen Rang ${rG}` : ""}${wH != null && wG != null ? ` (Werte ${zahl(wH)} : ${zahl(wG)})` : ""}${pod ? " · Vierer-Pod: kein Zweikampf" : ""}`;
+          return (
+            <div key={d.disciplineId} className="ssm-sd__pf" data-bc-tip={tipp} data-testid="ssm-showdown-zeile">
+              <span className="bc-gk">{kurz}</span>
+              {anteil != null ? (
+                <>
+                  <span className="ssm-wb" role="img" aria-label={`Kaderstärke ${heim?.teamName ?? ""} ${anteil} Prozent`}><i style={{ width: `${anteil}%` }} /></span>
+                  <span className="bc-t ssm-sd__pct">{anteil} %</span>
+                </>
+              ) : (
+                <>
+                  <span className="ssm-sd__chips">{pod ? "Vierer-Pod · " : ""}Kaderstärke {rH ? `#${rH}` : "–"} · {rG ? `#${rG}` : "–"}</span>
+                  <span />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </article>
+    );
+  };
+  const showdown = hatShowdown ? (
+    <div className="ssm-showdown" data-testid="ssm-showdown">
+      <h3 className="bc-gk">{naechsterSpieltag?.label ?? "Nächster Spieltag"} · Kaderstärke der Disziplin</h3>
+      {showdownPaarungen.map(({ tag, paarung }) => showdownKarte(tag, paarung))}
+      <p className="ssm-fussnote">Balken = Verhältnis der Kaderstärke beider Teams (Top-6-Eignung der Disziplin), kein Ergebnis und keine Prognose.</p>
+      {eigene ? stehtBlock(stehtAufDemSpiel(eigene, ligaDerZeile(eigene), isSeasonEnded ? 0 : verbleibend)) : null}
+    </div>
+  ) : null;
+
   const kontext = (
-    <aside className="ssm-kontext" aria-label="Teamkarte">
-      <BcSheet offen={blattOffen} onSchliessen={() => setBlattOffen(false)} titel={kartenTeam?.teamName ?? "Team"} className="ssm-blatt">
-        <div className="bc-pan__koerper">{teamKarte}</div>
+    <aside className="ssm-kontext" aria-label="Teamkarte und Showdown">
+      <BcSheet offen={blattOffen} onSchliessen={() => setBlattOffen(false)} titel={kontextTab === "showdown" && hatShowdown ? "Showdown" : kartenTeam?.teamName ?? "Team"} className="ssm-blatt">
+        {hatShowdown ? (
+          <nav className="ssm-ktabs" role="tablist" aria-label="Kontext">
+            <button type="button" role="tab" aria-selected={kontextTab === "karte"} className={kontextTab === "karte" ? "is-an" : undefined} onClick={() => setKontextTab("karte")}>Teamkarte</button>
+            <button type="button" role="tab" aria-selected={kontextTab === "showdown"} className={kontextTab === "showdown" ? "is-an" : undefined} onClick={() => setKontextTab("showdown")} data-testid="ssm-tab-showdown">Showdown</button>
+          </nav>
+        ) : null}
+        <div className="bc-pan__koerper">{kontextTab === "showdown" && showdown ? showdown : teamKarte}</div>
       </BcSheet>
     </aside>
   );

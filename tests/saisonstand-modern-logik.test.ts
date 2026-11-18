@@ -5,6 +5,14 @@ import {
   bestimmeZone,
   bewegungText,
   formAusVerlauf,
+  formPlaetze,
+  einsatzZeile,
+  rangBand,
+  wertRaenge,
+  sparklinePunkte,
+  abstandZumFuehrer,
+  kaderStaerkeAnteil,
+  waehleShowdownPaarungen,
   istDuellVerlauf,
   lagesatz,
   matrixAnteil,
@@ -153,18 +161,18 @@ describe("Saisonstand modern: Matchwinner", () => {
     };
     const u2 = { paarungen: [{ homeTeamId: "B", awayTeamId: "A", disziplinen: [d("climbing", 2, 0), d("tdm", null, null)] }], miniDmPods: [] };
     const m = duellPunkteJeDisziplin([u1, u2, null] as never);
-    expect(m.get("A")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
-    expect(m.get("B")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
-    expect(m.get("A")?.get("wettessen")).toEqual({ punkte: 1, moeglich: 2 });
-    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
+    expect(m.get("A")?.get("climbing")).toMatchObject({ punkte: 2, moeglich: 4 });
+    expect(m.get("B")?.get("climbing")).toMatchObject({ punkte: 2, moeglich: 4 });
+    expect(m.get("A")?.get("wettessen")).toMatchObject({ punkte: 1, moeglich: 2 });
+    expect(m.get("A")?.get("mini-dm")).toMatchObject({ punkte: 2, moeglich: 2 });
     expect(m.get("A")?.has("tdm")).toBe(false);
     expect(m.has("C")).toBe(false);
     for (const jeD of m.values()) for (const z of jeD.values()) expect(Number.isInteger(z.punkte)).toBe(true);
-    expect(anteilStufe({ punkte: 0, moeglich: 2 })).toBe(0);
-    expect(anteilStufe({ punkte: 1, moeglich: 4 })).toBe(1);
-    expect(anteilStufe({ punkte: 1, moeglich: 2 })).toBe(2);
-    expect(anteilStufe({ punkte: 3, moeglich: 4 })).toBe(3);
-    expect(anteilStufe({ punkte: 4, moeglich: 4 })).toBe(4);
+    expect(anteilStufe({ punkte: 0, moeglich: 2, einsaetze: [] })).toBe(0);
+    expect(anteilStufe({ punkte: 1, moeglich: 4, einsaetze: [] })).toBe(1);
+    expect(anteilStufe({ punkte: 1, moeglich: 2, einsaetze: [] })).toBe(2);
+    expect(anteilStufe({ punkte: 3, moeglich: 4, einsaetze: [] })).toBe(3);
+    expect(anteilStufe({ punkte: 4, moeglich: 4, einsaetze: [] })).toBe(4);
     expect(anteilStufe(null)).toBeNull();
   });
 
@@ -174,7 +182,100 @@ describe("Saisonstand modern: Matchwinner", () => {
       miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [{ teamId: "A", teamPoints: 2 }, { teamId: "B", teamPoints: 1 }] }],
     };
     const m = duellPunkteJeDisziplin([u] as never);
-    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
-    expect(m.get("B")?.get("mini-dm")).toEqual({ punkte: 1, moeglich: 2 });
+    expect(m.get("A")?.get("mini-dm")).toMatchObject({ punkte: 2, moeglich: 2 });
+    expect(m.get("B")?.get("mini-dm")).toMatchObject({ punkte: 1, moeglich: 2 });
+  });
+});
+
+describe("Runde 2: Form, Bänder, Sparkline, Abstand, Kaderstärke", () => {
+  it("Form hat immer sechs Plätze, vorn leer, ältester zuerst", () => {
+    const eintraege = [4, 2, 0, 3].map((p, i) => ({ played: true, tagespunkte: p, cumulativePoints: i }));
+    const form = formAusVerlauf(eintraege);
+    expect(form.map((f) => f.ton)).toEqual(["s", "u", "n", "s"]);
+    const plaetze = formPlaetze(form);
+    expect(plaetze).toHaveLength(6);
+    expect(plaetze.map((f) => f.ton)).toEqual(["o", "o", "s", "u", "n", "s"]);
+    const lang = formAusVerlauf(Array.from({ length: 9 }, (_, i) => ({ played: true, tagespunkte: i % 5, cumulativePoints: i })));
+    expect(lang).toHaveLength(6);
+  });
+  it("Rang-Bänder: 1–3 gut, 4–6 warn, 7–10 risk, ab 11 keins", () => {
+    expect([1, 3, 4, 6, 7, 10, 11, 16].map(rangBand)).toEqual(["gut", "gut", "warn", "warn", "risk", "risk", null, null]);
+    expect(rangBand(null)).toBeNull();
+    expect(rangBand(0)).toBeNull();
+  });
+  it("wertRaenge: höher = besser, Gleichstand teilt den schlechteren Rang, ohne Wert kein Rang", () => {
+    const r = wertRaenge([{ id: "a", w: 10 }, { id: "b", w: 8 }, { id: "c", w: 8 }, { id: "d", w: 1 }, { id: "e", w: null }], (t) => t.id, (t) => t.w);
+    expect(r.get("a")).toBe(1);
+    expect(r.get("b")).toBe(3);
+    expect(r.get("c")).toBe(3);
+    expect(r.get("d")).toBe(4);
+    expect(r.has("e")).toBe(false);
+    const alleNull = wertRaenge([{ id: "a", w: 0 }, { id: "b", w: 0 }], (t) => t.id, (t) => t.w);
+    expect(alleNull.get("a")).toBe(2);
+  });
+  it("Sparkline: Platz 1 oben, Endpunkt auf dem letzten Wert, unter zwei Punkten keine Linie", () => {
+    expect(sparklinePunkte([3], 16)).toBeNull();
+    const s = sparklinePunkte([1, 16], 16)!;
+    expect(s.punkte).toBe("3.0,3.0 79.0,19.0");
+    expect(s.ende).toEqual({ x: 79, y: 19 });
+    const luecke = sparklinePunkte([2, null, 2], 16)!;
+    expect(luecke.punkte.split(" ")).toHaveLength(2);
+  });
+  it("Abstand zum Führer: Führer und ohne Wertung ohne Zahl", () => {
+    expect(abstandZumFuehrer(liga2[0]!, liga2)).toBeNull();
+    expect(abstandZumFuehrer(liga2[3]!, liga2)).toBe(4);
+    expect(abstandZumFuehrer(zeile("x", 1, null), [zeile("x", 1, null)])).toBeNull();
+  });
+  it("Kaderstärke-Anteil ist ein Verhältnis, keine Siegchance: A/(A+B)", () => {
+    expect(kaderStaerkeAnteil(30, 10)).toBe(75);
+    expect(kaderStaerkeAnteil(10, 10)).toBe(50);
+    expect(kaderStaerkeAnteil(0, 0)).toBeNull();
+    expect(kaderStaerkeAnteil(undefined, 5)).toBeNull();
+  });
+  it("Showdown-Auswahl: eigenes Spiel, Spitzenspiel (kleinste Rangsumme), Kellerduell (größte), ohne Doppelte", () => {
+    const k = [
+      { id: "p1", rangHeim: 1, rangGast: 2, eigen: false },
+      { id: "p2", rangHeim: 5, rangGast: 9, eigen: true },
+      { id: "p3", rangHeim: 15, rangGast: 16, eigen: false },
+      { id: "p4", rangHeim: 7, rangGast: 8, eigen: false },
+    ];
+    expect(waehleShowdownPaarungen(k)).toEqual([
+      { id: "p2", tag: "Dein Spiel" }, { id: "p1", tag: "Spitzenspiel" }, { id: "p3", tag: "Kellerduell" },
+    ]);
+    expect(waehleShowdownPaarungen([k[0]!])).toEqual([{ id: "p1", tag: "Spitzenspiel" }]);
+  });
+});
+
+describe("Matrix-Hover: Einzeleinsätze", () => {
+  const dz = (id: string, name: string, h: number, g: number, norm: [number, number] | null, seiten: [number, number] | null) => ({
+    disciplineId: id, disciplineName: name, gespielt: true, punkteHeim: h, punkteGast: g, ergebnisNormiert: norm, seiten, miniDmPodIdHeim: null, miniDmPodIdGast: null,
+  });
+  it("Duell: Gegner, normierte Zahl aus der Sicht der Seite, Ausgang, Spieltag-Nummer", () => {
+    const u = { matchdayIndex: 2, paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [dz("climbing", "Climbing", 2, 0, [8, 4], [70, 15])] }], miniDmPods: [] };
+    const m = duellPunkteJeDisziplin([u] as never);
+    const a = m.get("A")!.get("climbing")!.einsaetze[0]!;
+    const b = m.get("B")!.get("climbing")!.einsaetze[0]!;
+    expect(a).toMatchObject({ spieltag: 3, gegner: ["B"], eigene: 8, gegnerZahl: 4, punkte: 2, ausgang: "sieg", platz: null });
+    expect(b).toMatchObject({ eigene: 4, gegnerZahl: 8, punkte: 0, ausgang: "niederlage" });
+    const namen: Record<string, string> = { A: "Alpha", B: "Royal Court" };
+    expect(einsatzZeile(a, (id) => namen[id]!)).toBe("2 Pkt · Sieg 8–4 gegen Royal Court (Spieltag 3)");
+  });
+  it("ohne Normierung: gerundete Rohwerte; ohne beides: keine Zahlen", () => {
+    const u = { matchdayIndex: 0, paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [dz("x", "X", 1, 1, null, [70.4, 69.6]), dz("y", "Y", 1, 1, null, null)] }], miniDmPods: [] };
+    const m = duellPunkteJeDisziplin([u] as never);
+    expect(m.get("A")!.get("x")!.einsaetze[0]).toMatchObject({ eigene: 70, gegnerZahl: 70, ausgang: "remis" });
+    expect(einsatzZeile(m.get("A")!.get("y")!.einsaetze[0]!, (id) => id)).toBe("1 Pkt · Unentschieden gegen B (Spieltag 1)");
+  });
+  it("zweimal in der Saison: zwei Zeilen; Vierergruppe: Platz und drei Gegner", () => {
+    const u1 = { matchdayIndex: 0, paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [dz("c", "C", 2, 0, [9, 1], null)] }], miniDmPods: [] };
+    const u2 = { matchdayIndex: 5, paarungen: [{ homeTeamId: "C", awayTeamId: "A", disziplinen: [dz("c", "C", 0, 2, [3, 7], null)] }], miniDmPods: [] };
+    const z = duellPunkteJeDisziplin([u1, u2] as never).get("A")!.get("c")!;
+    expect(z.einsaetze.map((e) => e.spieltag)).toEqual([1, 6]);
+    expect(z.punkte).toBe(4);
+    const pod = { matchdayIndex: 1, paarungen: [], miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [
+      { teamId: "A", teamPoints: 2, platz: 1 }, { teamId: "B", teamPoints: 1, platz: 2 }, { teamId: "C", teamPoints: 0, platz: 3 }, { teamId: "D", teamPoints: 0, platz: 4 }] }] };
+    const e = duellPunkteJeDisziplin([pod] as never).get("A")!.get("mini-dm")!.einsaetze[0]!;
+    expect(e.gegner).toEqual(["B", "C", "D"]);
+    expect(einsatzZeile(e, (id) => id)).toBe("2 Pkt · Platz 1 von 4 · gegen B, C, D (Spieltag 2)");
   });
 });

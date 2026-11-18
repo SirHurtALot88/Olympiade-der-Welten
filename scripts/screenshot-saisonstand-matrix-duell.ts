@@ -23,8 +23,13 @@ import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 const PORT = process.env.SCREENSHOT_PORT ?? "3200";
 const BASE_URL = `http://localhost:${PORT}`;
 const OUTPUT_DIR = path.join(process.cwd(), "docs", "design", "saisonstand-modern-17-11");
-const SQLITE_PATH = path.join(os.tmpdir(), "oly-saisonstand-matrix-screenshot.sqlite");
+// OLY_SHOT_BEHALTEN=1: feste Wegwerf-Datei, die nach dem Lauf stehen bleibt und beim naechsten Lauf wiederverwendet wird (spart das Spielen der Spieltage).
+const BEHALTEN = process.env.OLY_SHOT_BEHALTEN === "1";
+const SQLITE_PATH = path.join(os.tmpdir(), BEHALTEN ? "oly-saisonstand-r2-behalten.sqlite" : `oly-saisonstand-matrix-screenshot-${process.pid}.sqlite`);
+const IDS_PATH = `${SQLITE_PATH}.ids.json`;
 const SPIELTAGE = Number(process.argv[2] ?? 11);
+// "r2" als dritter Parameter: Runde-2-Bilder (Tabelle mit Sport-Spalten, Showdown, Phone-Tabelle) statt der Matrix-Bilder.
+const RUNDE2 = process.argv[3] === "r2";
 
 async function baueSave(): Promise<{ saveId: string; teamId: string }> {
   process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
@@ -104,22 +109,29 @@ async function dismissSeasonBriefingIfOpen(page: Page, timeoutMs: number) {
 async function waitForServer(timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await isServerReachable(5000)) return;
+    if (await isServerReachable(40_000)) return;
     await delay(2000);
   }
   throw new Error("Dev-Server wurde nicht rechtzeitig erreichbar.");
 }
 
 async function main() {
-  await fs.rm(SQLITE_PATH, { force: true });
-  const { saveId, teamId } = await baueSave();
+  let ids: { saveId: string; teamId: string } | null = null;
+  if (BEHALTEN) ids = await fs.readFile(IDS_PATH, "utf8").then((t) => JSON.parse(t) as { saveId: string; teamId: string }).catch(() => null);
+  if (!ids) {
+    await fs.rm(SQLITE_PATH, { force: true });
+    ids = await baueSave();
+    if (BEHALTEN) await fs.writeFile(IDS_PATH, JSON.stringify(ids));
+  }
+  const { saveId, teamId } = ids;
   const server = startDevServer();
   let browser: Browser | null = null;
   try {
-    await waitForServer(180_000);
+    await waitForServer(900_000);
     browser = await chromium.launch();
-    const aufnehmen = async (breite: number, hoehe: number, datei: string, vorher: (p: Page) => Promise<void>, fullPage = false, clip?: string) => {
-      const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 2 });
+    const aufnehmen = async (breite: number, hoehe: number, datei: string, vorher: (p: Page) => Promise<void>, fullPage = false, clip?: string, matrix = true, dsf = 2) => {
+      if (process.env.OLY_SHOT_NUR && !datei.includes(process.env.OLY_SHOT_NUR)) return;
+      const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: dsf });
       const page = await ctx.newPage();
       const url = new URL("/foundation", BASE_URL);
       url.searchParams.set("view", "season-v2");
@@ -129,8 +141,10 @@ async function main() {
       await dismissSeasonBriefingIfOpen(page, 30_000);
       await page.getByTestId("saisonstand-modern").waitFor({ state: "visible", timeout: 90_000 });
       await page.waitForTimeout(800);
-      await page.getByText("Disziplin-Matrix", { exact: true }).first().click();
-      await page.getByTestId("ssm-matrix").waitFor({ state: "visible", timeout: 30_000 });
+      if (matrix) {
+        await page.getByText("Disziplin-Matrix", { exact: true }).first().click();
+        await page.getByTestId("ssm-matrix").waitFor({ state: "visible", timeout: 30_000 });
+      }
       await vorher(page);
       await page.waitForTimeout(600);
       const ziel = path.join(OUTPUT_DIR, datei);
@@ -139,6 +153,27 @@ async function main() {
       console.log(`[screenshot-matrix] ${ziel}`);
       await ctx.close();
     };
+    if (RUNDE2) {
+      const tab = async (p: Page) => { await p.getByTestId("ssm-zeile").first().waitFor({ state: "visible", timeout: 30_000 }); };
+      const showdown = async (p: Page) => { await tab(p); await p.getByTestId("ssm-tab-showdown").click(); };
+      const ansicht = async (p: Page, name: string) => { await tab(p); await p.locator(".ssm-ansichten").getByText(name, { exact: true }).click(); await p.waitForTimeout(500); };
+      // Abgleich-Bilder gegen das Mockup (1600x900, 16:9)
+      await aufnehmen(1600, 900, "app-r2-a1-tabelle-showdown.png", showdown, false, undefined, false);
+      await aufnehmen(1600, 900, "app-r2-a2-liga1.png", async (p) => { await tab(p); await p.locator(".bc-reiter").first().click(); await p.waitForTimeout(400); }, false, undefined, false);
+      await aufnehmen(1600, 900, "app-r2-a3-spieltag-ergebnisse.png", async (p) => { await ansicht(p, "Spieltage"); }, false, undefined, false);
+      await aufnehmen(1600, 900, "app-r2-a4-ansetzungen.png", async (p) => { await ansicht(p, "Spieltage"); await p.getByText("Ansetzungen", { exact: true }).first().click(); await p.waitForTimeout(400); }, false, undefined, false);
+      // Chris' Geraete
+      await aufnehmen(1710, 1112, "app-r2-01-tabelle-1710.png", tab, false, undefined, false, 2);
+      await aufnehmen(1710, 1112, "app-r2-02-showdown-1710.png", showdown, false, undefined, false, 2);
+      await aufnehmen(1920, 1080, "app-r2-03-tabelle-1920.png", tab, false, undefined, false, 2);
+      await aufnehmen(2560, 1440, "app-r2-04-tabelle-2560.png", tab, false, undefined, false, 1);
+      await aufnehmen(2560, 1440, "app-r2-05-showdown-2560.png", showdown, false, undefined, false, 1);
+      await aufnehmen(1710, 1112, "app-r2-06-gesamt-1710.png", async (p) => { await tab(p); await p.getByText("Gesamt", { exact: true }).first().click(); await p.waitForTimeout(400); }, false, undefined, false, 2);
+      await aufnehmen(1710, 1112, "app-r2-07-matrix-hover-1710.png", async (p) => { await p.locator("td.ssm-zelle[data-bc-tip*='gegen']").nth(40).hover(); await p.waitForTimeout(300); }, false, undefined, true, 2);
+      await aufnehmen(412, 900, "app-r2-08-phone-tabelle.png", tab, false, "saisonstand-modern", false, 2);
+      await aufnehmen(412, 900, "app-r2-09-phone-showdown.png", async (p) => { await tab(p); await p.getByTestId("ssm-zeile").first().click({ force: true }); await p.getByTestId("ssm-tab-showdown").click({ force: true }); await p.waitForTimeout(500); }, false, "saisonstand-modern", false, 2);
+      return;
+    }
     await aufnehmen(1600, 900, "app-n-01-matrix-bereiche-stufen.png", async (p) => {
       // Gegenprobe: Pkt-Spalte gegen Summe der Zellen, keine Nachkommastellen.
       const zeilen = await p.locator('[data-testid="ssm-matrix"] tbody tr').evaluateAll((trs) =>
@@ -157,9 +192,11 @@ async function main() {
   } finally {
     await browser?.close();
     try { process.kill(-server.pid!, "SIGTERM"); } catch { server.kill("SIGTERM"); }
-    await fs.rm(SQLITE_PATH, { force: true });
-    await fs.rm(`${SQLITE_PATH}-wal`, { force: true });
-    await fs.rm(`${SQLITE_PATH}-shm`, { force: true });
+    if (!BEHALTEN) {
+      await fs.rm(SQLITE_PATH, { force: true });
+      await fs.rm(`${SQLITE_PATH}-wal`, { force: true });
+      await fs.rm(`${SQLITE_PATH}-shm`, { force: true });
+    }
   }
 }
 

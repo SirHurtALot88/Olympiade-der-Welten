@@ -158,12 +158,24 @@ export function istDuellVerlauf(verlauf: SaisonVerlauf | null | undefined): bool
 
 export type FormTon = "s" | "u" | "n";
 
+/** Das Mockup zeigt die letzten sechs Spieltage. */
+export const FORM_ANZAHL = 6;
+
+/** Immer `anzahl` Plätze: vorn leere Plätze („o"), dann die Form, ältester zuerst. */
+export function formPlaetze(form: ReadonlyArray<{ ton: FormTon; punkte: number }>, anzahl = FORM_ANZAHL): Array<{ ton: FormTon | "o"; punkte: number | null }> {
+  const rest = form.slice(-anzahl);
+  return [
+    ...Array.from({ length: Math.max(0, anzahl - rest.length) }, () => ({ ton: "o" as const, punkte: null })),
+    ...rest,
+  ];
+}
+
 /**
  * Form aus den Tagespunkten der letzten gespielten Spieltage: 3–4 Punkte = Sieg (grün),
  * 2 = Unentschieden (grau), 0–1 = Niederlage (rot). Ältester zuerst. Ein Spieltag trägt zwei Einsätze
  * zu je 2/1/0 Punkten, daher höchstens 4 — die Schwellen sind Anzeige, keine Wertungsregel.
  */
-export function formAusVerlauf(eintraege: readonly VerlaufEintrag[] | undefined | null, anzahl = 5): Array<{ ton: FormTon; punkte: number }> {
+export function formAusVerlauf(eintraege: readonly VerlaufEintrag[] | undefined | null, anzahl = FORM_ANZAHL): Array<{ ton: FormTon; punkte: number }> {
   const gespielt = (eintraege ?? []).filter((e) => e.played && e.tagespunkte != null);
   return gespielt.slice(-anzahl).map((e) => {
     const p = e.tagespunkte ?? 0;
@@ -244,8 +256,34 @@ export function rangStufe(platz: number | null | undefined, n: number): number |
   return Math.max(0, Math.min(4, 4 - Math.floor(anteil * 5 - 1e-9)));
 }
 
-/** Duellpunkte eines Teams in einer Disziplin: geholt und möglich (2 je gespieltem Einsatz). */
-export type DuellZelle = { punkte: number; moeglich: number };
+/** EIN Einsatz einer Disziplin: gegen wen, mit welcher Zahl, wie ausgegangen (für den Tooltip der Matrix). */
+export type DuellEinsatz = {
+  /** Spieltag-Nummer (1-basiert). */
+  spieltag: number;
+  /** Ein Gegner im Duell, drei in der Vierergruppe. */
+  gegner: string[];
+  /** 0–10-Normierung (`ergebnisNormiert`), sonst gerundete Rohwerte (`seiten`), sonst null. */
+  eigene: number | null;
+  gegnerZahl: number | null;
+  punkte: number;
+  ausgang: "sieg" | "remis" | "niederlage";
+  /** Nur Vierergruppe: Platz 1–4. */
+  platz: number | null;
+};
+
+/** Duellpunkte eines Teams in einer Disziplin: geholt und möglich (2 je gespieltem Einsatz), dazu die Einzeleinsätze. */
+export type DuellZelle = { punkte: number; moeglich: number; einsaetze: DuellEinsatz[] };
+
+const ausgangVon = (p: number): DuellEinsatz["ausgang"] => (p >= 2 ? "sieg" : p === 1 ? "remis" : "niederlage");
+
+/** Eine Tooltip-Zeile je Einsatz: „2 Pkt · Sieg 8–4 gegen Royal Court (Spieltag 3)". */
+export function einsatzZeile(e: DuellEinsatz, name: (teamId: string) => string): string {
+  const wer = e.gegner.map(name).join(", ");
+  if (e.platz != null) return `${e.punkte} Pkt · Platz ${e.platz} von 4 · gegen ${wer} (Spieltag ${e.spieltag})`;
+  const wort = e.ausgang === "sieg" ? "Sieg" : e.ausgang === "remis" ? "Unentschieden" : "Niederlage";
+  const zahlen = e.eigene != null && e.gegnerZahl != null ? ` ${e.eigene}–${e.gegnerZahl}` : "";
+  return `${e.punkte} Pkt · ${wort}${zahlen} gegen ${wer} (Spieltag ${e.spieltag})`;
+}
 
 /**
  * Duellpunkte je Team und Disziplin (Katalog-Id) über alle gespielten Spieltage — die Zahl, die in
@@ -254,35 +292,41 @@ export type DuellZelle = { punkte: number; moeglich: number };
  * Die Leistungspunkte der Spieler (PPs, mit Komma) gehören nicht in diese Matrix.
  */
 export function duellPunkteJeDisziplin(
-  uebersichten: ReadonlyArray<Pick<SpieltagsUebersicht, "paarungen" | "miniDmPods"> | null | undefined>,
+  uebersichten: ReadonlyArray<Pick<SpieltagsUebersicht, "paarungen" | "miniDmPods"> & { matchdayIndex?: number } | null | undefined>,
 ): Map<string, Map<string, DuellZelle>> {
   const ergebnis = new Map<string, Map<string, DuellZelle>>();
-  const buche = (teamId: string, disciplineId: string, punkte: number) => {
+  const buche = (teamId: string, disciplineId: string, punkte: number, einsatz: Omit<DuellEinsatz, "punkte" | "ausgang">) => {
     let jeDisziplin = ergebnis.get(teamId);
     if (!jeDisziplin) ergebnis.set(teamId, (jeDisziplin = new Map()));
-    const zelle = jeDisziplin.get(disciplineId) ?? { punkte: 0, moeglich: 0 };
+    const zelle = jeDisziplin.get(disciplineId) ?? { punkte: 0, moeglich: 0, einsaetze: [] };
     zelle.punkte += punkte;
     zelle.moeglich += 2;
+    zelle.einsaetze.push({ ...einsatz, punkte, ausgang: ausgangVon(punkte) });
     jeDisziplin.set(disciplineId, zelle);
   };
-  for (const u of uebersichten) {
-    if (!u) continue;
+  uebersichten.forEach((u, position) => {
+    if (!u) return;
+    const spieltag = (u.matchdayIndex ?? position) + 1;
     for (const p of u.paarungen) {
       for (const d of p.disziplinen) {
         if (!d.gespielt || d.punkteHeim == null || d.punkteGast == null) continue;
         // Vierergruppen-Disziplinen (Mini-DM, Battlefield) stehen hier UND in `miniDmPods`: dort zählen,
         // sonst würden die Punkte doppelt gebucht (Pkt-Spalte wäre kleiner als die Zeilensumme).
-        if (!d.miniDmPodIdHeim) buche(p.homeTeamId, d.disciplineId, d.punkteHeim);
-        if (!d.miniDmPodIdGast) buche(p.awayTeamId, d.disciplineId, d.punkteGast);
+        // Zahlen aus Sicht der jeweiligen Seite: bevorzugt die 0–10-Normierung, sonst die gerundeten Rohwerte.
+        const zahlen: [number, number] | null = d.ergebnisNormiert ?? (d.seiten ? [Math.round(d.seiten[0]), Math.round(d.seiten[1])] : null);
+        if (!d.miniDmPodIdHeim) buche(p.homeTeamId, d.disciplineId, d.punkteHeim, { spieltag, gegner: [p.awayTeamId], eigene: zahlen?.[0] ?? null, gegnerZahl: zahlen?.[1] ?? null, platz: null });
+        if (!d.miniDmPodIdGast) buche(p.awayTeamId, d.disciplineId, d.punkteGast, { spieltag, gegner: [p.homeTeamId], eigene: zahlen?.[1] ?? null, gegnerZahl: zahlen?.[0] ?? null, platz: null });
       }
     }
     for (const pod of u.miniDmPods ?? []) {
       for (const m of pod.mitglieder) {
         if (m.teamPoints == null) continue;
-        buche(m.teamId, pod.disciplineId, m.teamPoints);
+        buche(m.teamId, pod.disciplineId, m.teamPoints, {
+          spieltag, gegner: pod.mitglieder.filter((x) => x.teamId !== m.teamId).map((x) => x.teamId), eigene: null, gegnerZahl: null, platz: m.platz,
+        });
       }
     }
-  }
+  });
   return ergebnis;
 }
 
@@ -295,4 +339,86 @@ export function anteilStufe(zelle: DuellZelle | null | undefined): number | null
   if (a < 0.5) return 1;
   if (a > 0.5) return 3;
   return 2;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Runde 2 (18.11.): Rang-Bänder der Bereiche, Sparkline, Abstand zum Führer, Kaderstärke-Verhältnis.
+ * ---------------------------------------------------------------------------------------------- */
+
+export type RangBand = "gut" | "warn" | "risk";
+
+/** Projekt-Konvention (Top-10-Markierung): Rang 1–3 gut (grün), 4–6 warn (gelb), 7–10 risk (rot), ab 11 keine. */
+export function rangBand(rang: number | null | undefined): RangBand | null {
+  if (rang == null || !Number.isFinite(rang) || rang < 1) return null;
+  if (rang <= 3) return "gut";
+  if (rang <= 6) return "warn";
+  if (rang <= 10) return "risk";
+  return null;
+}
+
+/**
+ * Rang je Team nach einem Wert (höher = besser) innerhalb der übergebenen Gruppe. Gleichstand teilt den
+ * SCHLECHTEREN Rang (wie `buildValueRanks` der klassischen Ansicht): zu Saisonbeginn stehen alle auf 0
+ * und bekommen dann keinen grünen Rang. Teams ohne Wert tauchen nicht auf.
+ */
+export function wertRaenge<T>(gruppe: readonly T[], id: (t: T) => string, wert: (t: T) => number | null | undefined): Map<string, number> {
+  const werte = gruppe.map((t) => ({ id: id(t), w: wert(t) })).filter((e): e is { id: string; w: number } => e.w != null && Number.isFinite(e.w));
+  return new Map(werte.map((e) => [e.id, werte.filter((o) => o.w >= e.w).length] as const));
+}
+
+/** Sparkline des Tabellenplatzes: Punkte für ein `<polyline>` und der Endpunkt. Platz 1 liegt oben. */
+export function sparklinePunkte(
+  raenge: ReadonlyArray<number | null>,
+  ligaGroesse: number,
+  breite = 84,
+  hoehe = 22,
+): { punkte: string; ende: { x: number; y: number } } | null {
+  const gueltig = raenge.map((r, i) => ({ r, i })).filter((e): e is { r: number; i: number } => e.r != null && Number.isFinite(e.r));
+  if (gueltig.length < 2) return null;
+  const n = raenge.length;
+  const x = (i: number) => 3 + (i / (n - 1)) * (breite - 8);
+  const y = (r: number) => 3 + ((r - 1) / Math.max(ligaGroesse - 1, 1)) * (hoehe - 6);
+  const punkte = gueltig.map((e) => `${x(e.i).toFixed(1)},${y(e.r).toFixed(1)}`);
+  const letzter = gueltig[gueltig.length - 1]!;
+  return { punkte: punkte.join(" "), ende: { x: Number(x(letzter.i).toFixed(1)), y: Number(y(letzter.r).toFixed(1)) } };
+}
+
+/** Punkte hinter dem Tabellenführer der Liga (Zahl > 0); der Führer selbst und Teams ohne Wertung: null. */
+export function abstandZumFuehrer(zeile: Pick<SaisonstandZeile, "points">, liga: ReadonlyArray<Pick<SaisonstandZeile, "points">>): number | null {
+  const eigene = punkte(zeile);
+  if (eigene == null) return null;
+  const beste = Math.max(...liga.map((z) => punkte(z) ?? Number.NEGATIVE_INFINITY));
+  if (!Number.isFinite(beste)) return null;
+  const abstand = beste - eigene;
+  return abstand > 0 ? abstand : null;
+}
+
+/**
+ * Kaderstärke-Verhältnis zweier Teams in einer Disziplin: Anteil A an A+B in ganzen Prozent.
+ * KEINE Siegchance und keine Prognose — nur das Verhältnis der beiden Kaderstärke-Werte (Top-6-Summe
+ * der Disziplin-Eignung). Ohne Werte oder ohne Summe: null.
+ */
+export function kaderStaerkeAnteil(a: number | null | undefined, b: number | null | undefined): number | null {
+  if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0 || a + b <= 0) return null;
+  return Math.round((a / (a + b)) * 100);
+}
+
+export type ShowdownKandidat = { id: string; rangHeim: number | null; rangGast: number | null; eigen: boolean };
+export type ShowdownAuswahl = { id: string; tag: "Dein Spiel" | "Spitzenspiel" | "Kellerduell" };
+
+/**
+ * Welche Paarungen der eigenen Liga der Showdown zeigt: das eigene Spiel, das Spitzenspiel (kleinste
+ * Rangsumme) und das Kellerduell (größte Rangsumme). Eine Paarung steht nur einmal da.
+ */
+export function waehleShowdownPaarungen(kandidaten: readonly ShowdownKandidat[]): ShowdownAuswahl[] {
+  const aus: ShowdownAuswahl[] = [];
+  const eigen = kandidaten.find((k) => k.eigen);
+  if (eigen) aus.push({ id: eigen.id, tag: "Dein Spiel" });
+  const summe = (k: ShowdownKandidat) => (k.rangHeim != null && k.rangGast != null ? k.rangHeim + k.rangGast : null);
+  const rest = kandidaten.filter((k) => !k.eigen && summe(k) != null).sort((x, y) => summe(x)! - summe(y)!);
+  const spitze = rest[0];
+  const keller = rest.length > 1 ? rest[rest.length - 1] : undefined;
+  if (spitze) aus.push({ id: spitze.id, tag: "Spitzenspiel" });
+  if (keller) aus.push({ id: keller.id, tag: "Kellerduell" });
+  return aus;
 }
