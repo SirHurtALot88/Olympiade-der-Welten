@@ -225,6 +225,15 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   unterliegen derselben Quote** — bei 70 % werden von 20 C Verkauf nur 14 C ausgebbar, der Rest bleibt als gewollter Puffer
   auf dem Konto. Stufen nach Vertrauen: ab 6 → 100 %, 4–6 → 85 %, 2,5–4 → 70 %, darunter 50 %. Die Rücklage nach Finanzwert
   bleibt dagegen **weich** (Warnung, Vertrauensverlust).
+- **Zwei Budgets wie im FM (Chris, 18.11.: „optisch und inhaltlich so bauen“):** Transfer-/Investitionstopf und
+  Gehaltstopf, Konzept `docs/design/finanzkonzept-v2-budgets-18-11.md` (Abschnitt 12 = Entscheidungen). Festgelegt:
+  - **Saison 1:** Vorstands-Quote für alle 100 %; die Draft-Rücklage nach Finanzwert ist **halb so hoch** wie üblich (mehr
+    Spielraum beim Draft), voll erst ab Saison 2. Startbudgets und Sponsoren bleiben unverändert.
+  - **Gehaltstopf:** der Vorstand kürzt ihn höchstens auf **75 %** (nie 50 %); frei werdendes Gehalt eines verkauften
+    Spielers fließt zu **100 %** in den Gehaltstopf zurück. Nur der Verkaufserlös unterliegt der Transfer-Quote.
+  - **Gebäude** zahlen aus dem Transfer-/Investitionstopf, kein dritter Topf.
+  - **„Alles auf eine Karte“** (später): beantragt vom Menschen, gewollt von einem Top-Team oder vom Vorstand als Ziel
+    gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet Vertrauen).
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
@@ -239,6 +248,14 @@ Wörtlich: „die PPs sollen weiterhin eine Darstellung der Leistung der Spieler
 die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! bin da offen für changes“. Zielskala: der
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
+
+## Training und Entwicklung: je Spieltag (Chris, 18.11.)
+
+Mockup `public/mockups/training-modern-18-11.html`, Konzept `docs/design/training-modern-18-11.md` (Abschnitt 7a),
+Chris: „bitte setz das 1:1 so um“. **Training wirkt je Spieltag** und wird je Spieltag gebucht und getrackt (nicht am
+Saisonende); die Raten müssen dafür neu gebalanced werden (bisher auf ~10 Spieltage ausgelegt, die Saison hat 20).
+Trainiert wird auf eine **Ziel-Disziplin mit Weg** (Primär-/Nebenweg, Matrix nur gelesen), Fokus jederzeit wechselbar.
+Verletzte trainieren nicht; Überlastung drückt die Form leicht. Kein Alter.
 
 ## Neuer Stil überall — Seite für Seite neu konzipieren, nicht mischen (Chris, 18.11.)
 

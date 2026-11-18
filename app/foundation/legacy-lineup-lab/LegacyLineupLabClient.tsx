@@ -380,6 +380,7 @@ type LegacyLineupLabClientProps = {
     matchdayId: string;
     teamId: string;
   }) => void;
+  onOpenNachDemSpieltag?: () => void;
   roomContext?: FoundationRoomContext | null;
 };
 
@@ -6448,6 +6449,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onPlayerFilterChange={setPlayerFilter}
         rosterShortfall={lineupRosterShortfall}
         spieltagsGegner={spieltagsGegner}
+        onOpenNachDemSpieltag={props.onOpenNachDemSpieltag}
         arenaReady={focusV2ArenaReady}
         onNavigateArena={
           props.onOpenArena

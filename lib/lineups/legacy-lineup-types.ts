@@ -576,6 +576,17 @@ export type LegacyLineupValidationOptions = {
    * der Pruefung selbst (`legacy-lineup-validator.ts`).
    */
   lineupIsLocked?: boolean;
+  /**
+   * Die Eintraege des bisher gespeicherten Entwurfs — nur der Speicherweg einer Einsatzliste setzt
+   * sie (`legacy-lineup-local-service.ts`, `buildValidationOptions`).
+   *
+   * Wer sich AN DIESEM Spieltag verletzt hat, darf im Entwurf stehen bleiben — aber nur auf dem
+   * Platz, auf dem er gespielt hat (seine bereits gebuchte Seite). Ohne diese Liste konnte man ihn
+   * beim Speichern aus D1 nehmen und in die noch offene D2 setzen: die Pruefung sah nur „heute
+   * verletzt" und liess ihn mit einer Warnung durch (Chris, 18.11.: „gar nicht einsetzbar").
+   * Fehlt die Liste (Bereitschaft, KI, Vorschau), gilt die bisherige Regel unveraendert.
+   */
+  bisherigeEintraege?: ReadonlyArray<{ playerId: string; disciplineId: string; disciplineSide: string }> | null;
   seasonCaptainLimit?: number;
   captainUsedBeforeCurrentDraft?: number;
   captainUsedBeforeCurrentDraftSides?: string[];

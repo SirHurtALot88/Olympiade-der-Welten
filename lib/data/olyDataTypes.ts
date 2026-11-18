@@ -250,6 +250,11 @@ export type PlayerMoraleState = {
   inactiveSeasons?: number;
   reasons: PlayerMoraleReason[];
   contractIntent: PlayerMoraleContractIntent;
+  /**
+   * Additiv (18.11., Ansicht "Nach dem Spieltag"): der gespeicherte Wert VOR der Fortschreibung dieses
+   * Spieltags. Reine Anzeige-Hilfe, geht in keine Rechnung ein. Alte Staende haben das Feld nicht.
+   */
+  vorher?: { morale: number; matchdayId: string };
 };
 
 /**
