@@ -330,6 +330,8 @@ export type SeasonStandingsV2ClientProps = {
    * Spieltage-Modus unverändert (nur Tabellenrang).
    */
   teamStrengthRankByTeamId?: Map<string, Record<string, number>> | null;
+  /** Katalog-IDs der Disziplinen in der Reihenfolge des Saison-Spielplans (Teamkarte); ohne Angabe bleibt die Standardordnung. */
+  spielplanDisziplinen?: string[] | null;
   /**
    * Die Werte hinter den Stärke-Rängen: Summe der besten sechs Disziplin-Eignungen des Kaders je
    * Team und Disziplin (`row.scorePack.disciplines` derselben Rechnung). Nur die moderne Ansicht
