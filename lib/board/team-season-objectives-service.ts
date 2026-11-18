@@ -40,6 +40,7 @@ import {
   statusForLeagueRank,
 } from "@/lib/board/board-objective-league-calibration";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { rangAnzahlAnteilig, rangRaumDesTeams, rangSchwelleOben, rangSchwelleUnten } from "@/lib/season/rang-schwelle";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -785,7 +786,22 @@ export function getSportTarget(input: {
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  /**
+   * Optional: mit aktivem Liga-Split werden Staerkerang und alle Rang-Schwellen auf die ECHTE
+   * Teamzahl der eigenen Liga umgerechnet (`row.rank` zaehlt pro Liga 1..16). Ohne gameState oder ohne
+   * Liga-Split bleibt alles beim 32er-Raum, bit-identisch zu vorher.
+   */
+  gameState?: GameState | null;
 }) {
+  const rangRaum = rangRaumDesTeams(input.gameState, input.team.teamId);
+  const oben = (wert32: number) => rangSchwelleOben(wert32, rangRaum);
+  const unten = (wert32: number) => rangSchwelleUnten(wert32, rangRaum);
+  const anzahl = (wert32: number) => rangAnzahlAnteilig(wert32, rangRaum);
+  const staerkeRows = resolveLeagueScopedRows({
+    gameState: input.gameState,
+    teamId: input.team.teamId,
+    rowsByTeamId: input.rowsByTeamId,
+  });
   const code = input.team.shortCode;
   const starPriority = input.profile?.bias.starPriority ?? 5;
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
@@ -802,76 +818,76 @@ export function getSportTarget(input: {
   const strengthReady = ppsTotal >= 95 || marketValueTotal >= Math.max(170, playerOpt * 18);
   const ppsRank = getRelativeMetricRank({
     teamId: input.team.teamId,
-    rowsByTeamId: input.rowsByTeamId,
+    rowsByTeamId: staerkeRows,
     metric: "ppsTotal",
   }).rank;
   const marketValueRank = getRelativeMetricRank({
     teamId: input.team.teamId,
-    rowsByTeamId: input.rowsByTeamId,
+    rowsByTeamId: staerkeRows,
     metric: "marketValueTotal",
   }).rank;
   const compositeStrengthRank = Math.round((ppsRank * 2 + marketValueRank) / 3);
-  const bottomThird = compositeStrengthRank >= 22;
-  const weakMiddle = compositeStrengthRank >= 16;
-  const topThird = compositeStrengthRank <= 10;
-  const titleTier = compositeStrengthRank <= 6;
+  const bottomThird = compositeStrengthRank >= unten(22);
+  const weakMiddle = compositeStrengthRank >= unten(16);
+  const topThird = compositeStrengthRank <= oben(10);
+  const titleTier = compositeStrengthRank <= oben(6);
 
   if (currentRank != null) {
-    if (currentRank >= 29) return { rank: 27, label: "Survival: nicht Bottom 5" };
-    if (currentRank >= 25) {
+    if (currentRank >= unten(29)) return { rank: oben(27), label: `Survival: nicht Bottom ${anzahl(5)}` };
+    if (currentRank >= unten(25)) {
       return weakMiddle || !strengthReady
-        ? { rank: 24, label: "Bottom 8 vermeiden" }
-        : { rank: 20, label: "Top-20-Anschluss finden" };
+        ? { rank: oben(24), label: `Bottom ${anzahl(8)} vermeiden` }
+        : { rank: oben(20), label: `Top-${oben(20)}-Anschluss finden` };
     }
-    if (currentRank >= 21) {
+    if (currentRank >= unten(21)) {
       return weakMiddle || !strengthReady
-        ? { rank: 24, label: "Rebuild ohne Absturz" }
-        : { rank: 20, label: "Top-20-Anschluss finden" };
+        ? { rank: oben(24), label: "Rebuild ohne Absturz" }
+        : { rank: oben(20), label: `Top-${oben(20)}-Anschluss finden` };
     }
-    if (currentRank >= 17) {
+    if (currentRank >= unten(17)) {
       return weakMiddle && !strengthReady
-        ? { rank: 18, label: "Mittelfeldkontakt herstellen" }
-        : { rank: 16, label: "Mittelfeld erreichen" };
+        ? { rank: oben(18), label: "Mittelfeldkontakt herstellen" }
+        : { rank: oben(16), label: "Mittelfeld erreichen" };
     }
-    if (currentRank >= 13) {
+    if (currentRank >= unten(13)) {
       return topThird && strengthReady
-        ? { rank: 12, label: "Breite Playoff-Zone erreichen" }
-        : { rank: 16, label: "Mittelfeld erreichen" };
+        ? { rank: oben(12), label: "Breite Playoff-Zone erreichen" }
+        : { rank: oben(16), label: "Mittelfeld erreichen" };
     }
   }
 
   if (code === "M-M") {
-    return currentRank != null && currentRank > 6
-      ? { rank: 6, label: "Top 6 erreichen" }
-      : { rank: 3, label: "Top 3 / Titelkampf erreichen" };
+    return currentRank != null && currentRank > oben(6)
+      ? { rank: oben(6), label: `Top ${oben(6)} erreichen` }
+      : { rank: oben(3), label: `Top ${oben(3)} / Titelkampf erreichen` };
   }
   if (!rosterReady) {
     return rosterCount < playerMin
-      ? { rank: 24, label: "Kader stabilisieren" }
-      : { rank: 20, label: "Kaderbreite in Punkte verwandeln" };
+      ? { rank: oben(24), label: "Kader stabilisieren" }
+      : { rank: oben(20), label: "Kaderbreite in Punkte verwandeln" };
   }
   if (bottomThird) {
     return ambition >= 8 && !strengthReady
-      ? { rank: 20, label: "Top-20-Anschluss finden" }
-      : { rank: 24, label: "Rebuild ohne Absturz" };
+      ? { rank: oben(20), label: `Top-${oben(20)}-Anschluss finden` }
+      : { rank: oben(24), label: "Rebuild ohne Absturz" };
   }
   if (!strengthReady && ambition < 9) {
     return ambition <= 4
-      ? { rank: 24, label: "Rebuild ohne Absturz" }
-      : { rank: 18, label: "Mittelfeldkontakt herstellen" };
+      ? { rank: oben(24), label: "Rebuild ohne Absturz" }
+      : { rank: oben(18), label: "Mittelfeldkontakt herstellen" };
   }
   if (starPriority >= 8 || ambition >= 8) {
-    if (titleTier && strengthReady) return { rank: 6, label: "Top 6 erreichen" };
-    if (topThird && strengthReady) return { rank: 10, label: "Top 10 angreifen" };
-    if (weakMiddle) return { rank: 16, label: "Mittelfeld erreichen" };
-    return strengthReady ? { rank: 12, label: "Top-12 Anschluss suchen" } : { rank: 16, label: "Mittelfeldkontakt herstellen" };
+    if (titleTier && strengthReady) return { rank: oben(6), label: `Top ${oben(6)} erreichen` };
+    if (topThird && strengthReady) return { rank: oben(10), label: `Top ${oben(10)} angreifen` };
+    if (weakMiddle) return { rank: oben(16), label: "Mittelfeld erreichen" };
+    return strengthReady ? { rank: oben(12), label: `Top-${oben(12)} Anschluss suchen` } : { rank: oben(16), label: "Mittelfeldkontakt herstellen" };
   }
-  if (code === "A-A") return { rank: 27, label: "Survival: nicht Bottom 5" };
-  if (cashPriority >= 9 && ambition <= 6) return { rank: 16, label: "Value-Saison ohne Cash-Risiko" };
-  if (sellPriority >= 8 && starPriority <= 6) return { rank: 18, label: "Positive Bilanz ohne Absturz" };
-  if (ambition <= 4) return { rank: 20, label: "Rebuild: konkurrenzfaehig bleiben" };
-  if (depthPriority >= 8) return { rank: 12, label: "Breite Playoff-Zone erreichen" };
-  return strengthReady ? { rank: 12, label: "Breite Playoff-Zone erreichen" } : { rank: 16, label: "Mittelfeld erreichen" };
+  if (code === "A-A") return { rank: oben(27), label: `Survival: nicht Bottom ${anzahl(5)}` };
+  if (cashPriority >= 9 && ambition <= 6) return { rank: oben(16), label: "Value-Saison ohne Cash-Risiko" };
+  if (sellPriority >= 8 && starPriority <= 6) return { rank: oben(18), label: "Positive Bilanz ohne Absturz" };
+  if (ambition <= 4) return { rank: oben(20), label: "Rebuild: konkurrenzfaehig bleiben" };
+  if (depthPriority >= 8) return { rank: oben(12), label: "Breite Playoff-Zone erreichen" };
+  return strengthReady ? { rank: oben(12), label: "Breite Playoff-Zone erreichen" } : { rank: oben(16), label: "Mittelfeld erreichen" };
 }
 
 /**
@@ -966,7 +982,7 @@ export function getSportTargetV2(input: {
   );
   const ambition01 = clamp(input.ambition01 ?? (input.identity?.ambition ?? 5) / 10, 0, 1);
   let maxStretch = BOARD_V2_CALIBRATION.maxStretch;
-  if (expectedRank >= BOARD_V2_CALIBRATION.bottomDampFromRank) {
+  if (expectedRank >= rangSchwelleUnten(BOARD_V2_CALIBRATION.bottomDampFromRank, rangRaumDesTeams(input.gameState, input.teamId))) {
     maxStretch *= BOARD_V2_CALIBRATION.bottomDampFactor;
   }
   const stretch = Math.round(BOARD_V2_CALIBRATION.minStretch + (maxStretch - BOARD_V2_CALIBRATION.minStretch) * ambition01);
@@ -1470,9 +1486,14 @@ export function getMatchdayMedalObjective(input: {
   // hing bisher allein an Ambition/Star-Priorität — ein ehrgeiziges, sportlich aber schwaches Team bekam
   // damit eine über die ganze Saison unerreichbare Vorgabe (gemessen: "0, bestes Team-Rank #5 · Ziel 1"
   // bei Liga-Rang 19). Wer nach Stärke-Erwartung nicht in Medaillennähe steht, bekommt sie gar nicht erst.
-  const leagueSize = Math.max(1, input.rowsByTeamId.size);
+  // Mit Liga-Split ligalokal (wie getSportTargetV2): sonst steht ein Liga-2-Team im Staerkerang 17..32
+  // und faellt nie ins Medaillen-Gate. Ohne Split unveraendert ueber alle Zeilen.
+  const leagueSize = Math.max(
+    1,
+    resolveLeagueScopedRows({ gameState: input.gameState, teamId: input.team.teamId, rowsByTeamId: input.rowsByTeamId }).size,
+  );
   const expectedRank = clamp(
-    resolveExpectedLeagueRank({ teamId: input.team.teamId, rowsByTeamId: input.rowsByTeamId }),
+    resolveExpectedLeagueRank({ teamId: input.team.teamId, rowsByTeamId: input.rowsByTeamId, gameState: input.gameState }),
     1,
     leagueSize,
   );
@@ -2024,7 +2045,7 @@ function buildTeamObjectives(input: {
   const disposition = boardV2 ? resolveBoardDisposition({ identity, previousSeasonBoard }) : null;
   const sportTarget = boardV2
     ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition, gameState })
-    : getSportTarget({ team, identity, profile, row, rowsByTeamId });
+    : getSportTarget({ team, identity, profile, row, rowsByTeamId, gameState });
   // F4: dynamic slate size 3–5 from disposition ambition + last-known perceived pressure.
   const slateSize = disposition
     ? clamp(
@@ -2068,8 +2089,8 @@ function buildTeamObjectives(input: {
         targetValue: sportTarget.rank,
         currentValue: row.rank,
         status: statusForRank(row.rank, sportTarget.rank),
-        rewardCash: sportTarget.rank <= 4 ? 12 : 6,
-        penaltyCash: sportTarget.rank <= 4 ? 4 : 1,
+        rewardCash: sportTarget.rank <= rangSchwelleOben(4, rangRaumDesTeams(gameState, team.teamId)) ? 12 : 6,
+        penaltyCash: sportTarget.rank <= rangSchwelleOben(4, rangRaumDesTeams(gameState, team.teamId)) ? 4 : 1,
         boardConfidenceDelta: statusForRank(row.rank, sportTarget.rank) === "completed" ? 0.8 : -0.6,
         rankTarget: true,
         source: "team_identity_ambition_current_rank",

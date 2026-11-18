@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDoctrineAuditBundle,
+  buildDoctrineSeasonReview,
   buildLineupStrategyAudit,
   buildSeasonStrategyState,
   buildTacticalAdaptationAudit,
@@ -292,5 +293,67 @@ describe("ai-manager-doctrine-service", () => {
 
     expect(result.doctrineFit).toBe("red");
     expect(result.hardFails).toContain("stop_under_opt_without_reason");
+  });
+});
+
+describe("ai-manager-doctrine-service: Rang-Schwellen pro Liga", () => {
+  /** 32 Teams; mit `split` zaehlt der Rang pro Liga 1..16 (Liga 1 = Team 1..16), sonst 1..32. */
+  function ligaState(split: boolean, rankOf: (index: number) => number) {
+    const teams = Array.from({ length: 32 }, (_, i) => team(`T${String(i + 1).padStart(2, "0")}`));
+    const base = gameState();
+    return gameState({
+      teams,
+      teamIdentities: [],
+      seasonState: {
+        ...base.seasonState,
+        standings: Object.fromEntries(teams.map((entry, i) => [entry.teamId, { points: 100 - i, rank: rankOf(i) }])),
+        ...(split
+          ? { leagueByTeamId: Object.fromEntries(teams.map((entry, i) => [entry.teamId, i < 16 ? "liga1" : "liga2"])) }
+          : {}),
+      } as GameState["seasonState"],
+    });
+  }
+  const modes = (state: GameState) =>
+    Object.fromEntries(buildTacticalAdaptationAudit(state).map((row) => [row.teamId, row.tacticalMode]));
+
+  it("16er-Liga: unteres Tabellenende jagt jetzt (vorher nie), oberes Ende schuetzt anteilig", () => {
+    const result = modes(ligaState(true, (i) => (i % 16) + 1));
+    expect(result["T03"]).toBe("protect_lead");
+    expect(result["T04"]).toBe("standard");
+    expect(result["T13"]).toBe("standard");
+    expect(result["T14"]).toBe("chase_top10");
+    expect(result["T16"]).toBe("chase_top10");
+    expect(result["T30"]).toBe("chase_top10");
+  });
+
+  it("32er-Modus ohne Liga-Split bleibt exakt wie vorher (<= 5 schuetzt, >= 27 jagt)", () => {
+    const result = modes(ligaState(false, (i) => i + 1));
+    expect(result["T05"]).toBe("protect_lead");
+    expect(result["T06"]).toBe("standard");
+    expect(result["T26"]).toBe("standard");
+    expect(result["T27"]).toBe("chase_top10");
+  });
+
+  it("Saisonrueckblick: Vorstandszufriedenheit und Zielerreichung nach Ligagroesse", () => {
+    const review = (split: boolean) =>
+      Object.fromEntries(
+        buildDoctrineSeasonReview(ligaState(split, (i) => (split ? (i % 16) + 1 : i + 1))).teamReview.map((row) => [row.teamId, row]),
+      );
+    const liga = review(true);
+    expect(liga["T04"].boardSatisfaction).toBe("high");
+    expect(liga["T05"].boardSatisfaction).toBe("medium");
+    expect(liga["T10"].boardSatisfaction).toBe("medium");
+    expect(liga["T11"].boardSatisfaction).toBe("low");
+    expect(liga["T08"].goalAchieved).toBe(true);
+    expect(liga["T09"].goalAchieved).toBe(false);
+    expect(liga["T06"].strategySuccess).toBe("high");
+    expect(liga["T07"].strategySuccess).toBe("medium");
+    const alt = review(false);
+    expect(alt["T08"].boardSatisfaction).toBe("high");
+    expect(alt["T09"].boardSatisfaction).toBe("medium");
+    expect(alt["T20"].boardSatisfaction).toBe("medium");
+    expect(alt["T21"].boardSatisfaction).toBe("low");
+    expect(alt["T16"].goalAchieved).toBe(true);
+    expect(alt["T17"].goalAchieved).toBe(false);
   });
 });
