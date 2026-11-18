@@ -117,6 +117,6 @@ auch fuer die Bahn-Pods (Takeshi, Staffel). Test: `tests/arena-start-ende-anzeig
   standen schon vorher bei ihrem Nullstand (Breaking zeigt „6 : 6 Verbliebene“, das ist kein Ergebnis).
 - **Ladezeit bis Motor bereit** (lokal, ohne Netz): kalt 3,1-3,5 s, mit warmem Cache 2,7-2,9 s. Ueber Chris' Leitung
   kommt die Uebertragung der ~5 MB dazu, die jetzt in die Vorlauf-Wartezeit faellt.
-- **Bilder** (1920x1080, Kader „Mortal Sin gegen Natures Wrath“ aus der Kaderfamilie, 3 je Seite, darin Fungor ohne
-  eigene Figur): `arena-start-ende-figuren-18-11/vorher-*.png` und `nachher-*.png`, je Climbing und Spurt
+- **Bilder** (1920x1080, Spieler von Mortal Sin und Natures Wrath aus der Kaderfamilie, 3 je Seite, darin Fungor
+  ohne eigene Figur; die Teamnamen im Bild bleiben die des Demo-Rahmens): `arena-start-ende-figuren-18-11/vorher-*.png` und `nachher-*.png`, je Climbing und Spurt
   `1-start`, `2-lauf`, `3-ende`.
