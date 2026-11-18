@@ -335,7 +335,7 @@ describe("legacy matchday resolve preview", () => {
     expect(Math.round(bahnenSumme * 10) / 10).toBe(d1Preview?.teamResults[0]?.finalPreviewScore);
   });
 
-  it("applies same-day injury malus on top of fatigue during resolve scoring", () => {
+  it("applies the same-day injury as 50 % of the BASE (replacing the fatigue malus) during resolve scoring", () => {
     const baselineContext = createContext({
       teamId: "A-A",
       teamName: "Alpha",
@@ -372,8 +372,9 @@ describe("legacy matchday resolve preview", () => {
     // independent of fatigue/injury — the jitter is a separate team-level summand added
     // after the fatigue/injury/morale multiplier chain, see legacy-score-engine.ts prePowerScore).
     expect(baselineD1?.teamResults[0]?.finalPreviewScore).toBe(74.8);
-    // Injured: 75 * INJURY_PERFORMANCE_MULTIPLIER, then the same -0.2 jitter.
-    const expectedInjured = Number((75 * INJURY_PERFORMANCE_MULTIPLIER - 0.2).toFixed(1));
+    // Injured (Chris, 18.11.: „nur 50 % seiner Basisleistung"): 100 * INJURY_PERFORMANCE_MULTIPLIER —
+    // auf der BASIS, nicht auf dem Fatigue-Wert 75 (vorher 75 * 0,5 = 37,5) —, dann derselbe -0.2-Jitter.
+    const expectedInjured = Number((100 * INJURY_PERFORMANCE_MULTIPLIER - 0.2).toFixed(1));
     expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(expectedInjured);
   });
 
@@ -798,7 +799,7 @@ describe("legacy matchday resolve preview payload", () => {
 
     expect(baseline).not.toBeNull();
     // Der Malus senkt den Score genau um den Faktor INJURY_PERFORMANCE_MULTIPLIER — gemessen auf
-    // `injuryAdjustedValue`, also der Ebene, auf der er wirkt (nach Fatigue, vor allem anderen).
+    // `injuryAdjustedValue`, also der Ebene, auf der er wirkt (auf der Basis, vor allem anderen).
     //
     // Vorher stand diese Zusage auf `finalPlayerScore`. Das ging nur, solange dort ausschliesslich
     // multiplikative Spieler-Effekte steckten. Seit der Zuteilung traegt `finalPlayerScore` auch
@@ -811,7 +812,14 @@ describe("legacy matchday resolve preview payload", () => {
     const baselineRoh = injuryAdjustedFor(previewNoInjury);
     const withMalusRoh = injuryAdjustedFor(previewWithInjury);
     expect(baselineRoh).not.toBeNull();
-    expect(withMalusRoh).toBeCloseTo(INJURY_PERFORMANCE_MULTIPLIER * baselineRoh!, 5);
+    // Seit 18.11. (Chris: „nur 50 % seiner Basisleistung") wirkt der Faktor auf die BASIS, nicht
+    // auf den Fatigue-Wert — das Opfer hat Fatigue 100, `baselineRoh` ist also schon gedrueckt.
+    const basisFor = (payload: ReturnType<typeof buildLegacyMatchdayResolvePreviewPayload> | null) =>
+      payload?.preview.disciplinePreviews
+        .find((discipline) => discipline.disciplineId === "mini-dm")
+        ?.topPlayers.find((player) => player.playerId === victimId)?.baseValue ?? null;
+    expect(withMalusRoh).toBeCloseTo(Math.round(INJURY_PERFORMANCE_MULTIPLIER * basisFor(previewWithInjury)! * 10) / 10, 5);
+    expect(withMalusRoh!).toBeLessThan(baselineRoh!);
     // Der Endscore faellt trotzdem — nur eben nicht mehr um exakt den Faktor.
     expect(withMalus!).toBeLessThan(baseline!);
     // Und die Vorschau matcht das angewandte Ergebnis exakt (nicht divergent).
