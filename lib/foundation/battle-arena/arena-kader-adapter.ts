@@ -1,5 +1,7 @@
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { getPlayerGroesse } from "@/lib/data/playerSizeData";
+import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
+import type { ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import {
   buildFormMoralMultipliers,
   isFormMoralEnabled,
@@ -153,6 +155,19 @@ export function buildArenaTeam(
   gameState: GameState,
   teamId: string,
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>,
+  /**
+   * VERLETZUNG IM MOTOR (Chris, 18.11., docs/design/verletzung-regel-18-11.md Luecke D/B), aus
+   * `ermittleArenaVerletzungsstand` (fatigue-injury-service.ts) fuer den Spieltag des Laufs:
+   *   - `gesperrt` (Sperre aus einem Vorspieltag): fehlt im Kader, tritt also gar nicht an — auch
+   *     nicht ueber die Ersatzaufstellung des Motors.
+   *   - `heuteVerletzt` (Wurf dieses Spieltags trifft): tritt mit INJURY_PERFORMANCE_MULTIPLIER seiner
+   *     Eignung (`d`) und Attribute (`a`) an — dieselbe Skalierung, mit der Form/Moral schon in den
+   *     Motor gehen (`scaleArenaPlayerByMultiplier`).
+   * Die REIHENFOLGE des Kaders bleibt die ohne Verletzung (Sortierung vor der Skalierung): der Motor
+   * leitet aus ihr Ersatzaufstellung, Reihum-Slots und Staffel-Beine ab, und die Mitspieler sollen
+   * dadurch nicht umsortiert werden. Ohne Stand (oder mit leeren Mengen) exakt der alte Kader.
+   */
+  verletzungsstand?: ArenaVerletzungsstand | null,
 ): ArenaSpieler[] {
   const spielerIds = new Set(
     gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
@@ -163,7 +178,9 @@ export function buildArenaTeam(
   // Form + Moral (Prototyp 17.11., Standard AUS): ohne OLY_FORM_MORAL=1 bleibt die Map leer und
   // jeder Spieler exakt wie vorher (gleiche Referenz, kein Rechenschritt).
   const formMoral = isFormMoralEnabled() ? buildFormMoralMultipliers(gameState, teamId) : null;
+  const gesperrt = verletzungsstand?.gesperrt;
   for (const playerId of spielerIds) {
+    if (gesperrt && gesperrt.size > 0 && gesperrt.has(`${teamId}::${playerId}`)) continue;
     const basisSpieler = spielerById.get(playerId);
     if (!basisSpieler) continue;
     const override = attributeSheetOverrides?.get(playerId);
@@ -174,7 +191,11 @@ export function buildArenaTeam(
     kader.push(signal ? scaleArenaPlayerByMultiplier(arenaSpieler, signal.multiplier) : arenaSpieler);
   }
   kader.sort((a, b) => (b.d.tdm ?? 0) - (a.d.tdm ?? 0));
-  return kader;
+  const heuteVerletzt = verletzungsstand?.heuteVerletzt;
+  if (!heuteVerletzt || heuteVerletzt.size === 0) return kader;
+  return kader.map((spieler) =>
+    heuteVerletzt.has(`${teamId}::${spieler.id}`) ? scaleArenaPlayerByMultiplier(spieler, INJURY_PERFORMANCE_MULTIPLIER) : spieler,
+  );
 }
 
 /** Bequemer Default fuer den Team-Picker: das Team des aktiven Managers, falls es eines gibt. */

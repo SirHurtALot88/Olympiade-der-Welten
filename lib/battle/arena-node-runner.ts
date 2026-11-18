@@ -326,7 +326,7 @@ export async function runArenaFixturesNode(
   // (`kulisseByDisciplineId`), genau wie `runArenaFixtures()`. Ohne sie fiel der Motor auf seinen
   // eigenen Hash ohne Teams/Spieltag zurueck und spielte Tennis (bisher die einzige Disziplin mit
   // Kulissen-Profil) oft auf einer anderen Oberflaeche als Chromium (Task #169, 16.11.).
-  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin);
+  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin, options.verletzungsstand);
   const chassis = waehleArenaChassis(disziplin);
   const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
   const roh = await fuehreWorkerAus(
