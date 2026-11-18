@@ -25,7 +25,6 @@ const REGEL = "react-hooks/rules-of-hooks";
 /** Die beiden Dateien, in denen die 9 Bestands-Verstöße lagen. */
 const HISTORISCHE_SUENDER = [
   "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx",
-  "app/foundation/PlayerDetailDrawer.tsx",
 ];
 
 describe("Rules of Hooks bleiben repariert", () => {

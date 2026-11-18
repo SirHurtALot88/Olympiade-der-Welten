@@ -80,14 +80,15 @@ statt immer Chris' Teams).
 
 So wird der Login auf dem Server eingeschaltet:
 
-1. In `deploy/hetzner/.env` (aus `.env.example` erstellt) vier Variablen setzen:
+1. In `deploy/hetzner/.env` (aus `.env.example` erstellt) diese Variablen setzen (`OLY_USER_RAMONA_PASSWORD` seit 18.11.; fehlt es, kann sich Ramona in Produktion nicht anmelden, Chris und Franky bleiben unberuehrt):
    ```sh
    OLY_AUTH_ENABLED=1
    OLY_AUTH_SECRET=<mit `openssl rand -hex 32` erzeugen>
    OLY_USER_CHRIS_PASSWORD=<echtes Passwort fuer Chris>
    OLY_USER_FRANKY_PASSWORD=<echtes Passwort fuer Franky>
+   OLY_USER_RAMONA_PASSWORD=<echtes Passwort fuer Ramona>
    ```
-2. Neu deployen (Docker Compose liest die vier Variablen automatisch aus der
+2. Neu deployen (Docker Compose liest die Variablen automatisch aus der
    `.env`-Datei und reicht sie an den `oly-app`-Container durch):
    ```sh
    docker compose -f deploy/hetzner/docker-compose.yml --env-file deploy/hetzner/.env up -d --build

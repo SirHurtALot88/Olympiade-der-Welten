@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BcHero, BcIcon, BcMarke, BcPanel, BcReiter, BcSeg, BcSheet, BcTable, BcChip, BcLast, type BcTableColumn } from "@/components/foundation/broadcast";
 import { getDisciplineIconSrc } from "@/app/foundation/DisciplineIcon";
 import { getPlayerPortraitInitials, getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
+import { figurPoseUrl, getFigurSpriteForPlayer } from "@/lib/data/figurenSprites";
 import {
   GOLD_TOLERANZ,
   goldPruefung,
@@ -44,13 +45,14 @@ import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
 
 import type { LineupNewLookProps } from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
+import { EinsatzlisteKartenHand } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteKartenHand";
+import { EinsatzlisteGegnerTab } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteGegnerTab";
 import { FeldHintergrund } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteFeldHintergrund";
 import {
   FormMoralMarke,
   FormMoralProfil,
   FormMoralUebersicht,
   KartenMarke,
-  KartenLeiste,
   KartenWirkungPanel,
   TeamFormKopf,
   WarumBlock,
@@ -60,6 +62,7 @@ import { baueFormMoralAnzeige, moralUrsachen, type FormMoralAnzeige } from "@/li
 import { berechneKartenWirkung, wertungsPfad } from "@/lib/lineups/formkarten-wirkung";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import "./einsatzliste-modern.css";
+import "./einsatzliste-optik.css";
 
 type Props = LineupNewLookProps;
 type Karte = Props["rosterCardByActivePlayerId"] extends Map<string, infer C> ? C : never;
@@ -76,7 +79,6 @@ const STUFEN: ReadonlyArray<{ id: MatchdayIntensityStage; label: string; heiss?:
   { id: "normal", label: "Normal" },
   { id: "push", label: "Vollgas", heiss: true },
 ];
-const FORM_HEX: Record<string, string> = { red: "#ff8b86", green: "#a8e7aa", blue: "#a9ccff", yellow: "#ffd987" };
 const GLYPHEN_TON: Record<Glyphe, string> = { "++": "bc-plus", "+": "bc-plus", "·": "bc-null", "−": "bc-minus", "−−": "bc-minus" };
 
 /** Verbindliche Sperrgründe: Spieler, die gar nicht antreten können oder dürfen (nicht: „steht in der anderen Disziplin"). */
@@ -96,6 +98,21 @@ function Por({ url, name, klasse }: { url?: string | null; name: string; klasse:
         <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFehler(true)} />
       ) : null}
     </span>
+  );
+}
+
+/**
+ * Pixel-Figur eines Spielers auf dem Feld (PixelLab-Grundpose aus `public/sprites/figuren/`, derselbe Bestand und
+ * dieselbe Zuordnung Spieler -> Figur wie in Arena und Battle Arena). Fehlt die Figur, bleibt nur das Porträt
+ * der Platzkarte. Es werden keine Figuren oder Animationen neu erzeugt.
+ */
+function FeldFigur({ spielerId, blick, klasse }: { spielerId: string | null | undefined; blick: "east" | "west"; klasse: string }) {
+  const [fehler, setFehler] = useState(false);
+  const sprite = getFigurSpriteForPlayer(spielerId);
+  if (!sprite || fehler) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className={klasse} src={figurPoseUrl(sprite, blick)} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFehler(true)} data-testid="elm-figur" />
   );
 }
 
@@ -173,6 +190,7 @@ export default function EinsatzlisteModern(props: Props) {
   const [zieht, setZieht] = useState<{ id: string; von: string | null } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [ruettel, setRuettel] = useState(false);
+  const [flaechenFehler, setFlaechenFehler] = useState<string[]>([]);
   const toastTimer = useRef<number | null>(null);
   const kannBedienen = !isReadOnly && !isBusy;
 
@@ -700,6 +718,7 @@ export default function EinsatzlisteModern(props: Props) {
       >
         {istGold ? <i className="elm-slot__raute" title="Bestbesetzung: Hier steht, wo die beste Verteilung des ganzen Kaders ihn hinstellt." /> : null}
         {verschenkt ? <i className="elm-slot__raute is-leer" title={`Bestbesetzung verschenkt: Diese Besetzung kostet die Gesamtverteilung ${f1(kosten)}.`} /> : null}
+        {karte ? <FeldFigur spielerId={karte.id} blick="east" klasse="elm-slot__fig" /> : null}
         {id && captains[slot.disciplineSide] === id ? <span className="elm-slot__cap" title="Captain">C</span> : null}
         {paar ? <span className="elm-slot__lf" title={`Übernimmt den Stab von ${paar.geber}`}>{paar.spiele}× eingespielt</span> : null}
         <span className="elm-slot__ro">
@@ -1040,64 +1059,32 @@ export default function EinsatzlisteModern(props: Props) {
   })();
 
   const gegnerTab = (
-    <>
-      {gegner.status === "geschaetzt" ? (
-        <div className="elm-geg">
-          <span className="bc-gk">{gruppeEintrag?.art === "pod" ? "Gegner in der Gruppe" : "Gegner"} · {gegner.steuerung === "ki" ? "KI" : "Mensch"}</span>
-          <b>{gegner.gegnerName}</b>
-          <span title="Scouting-Stufe der Kader-Spieler, gemittelt">
-            Scouting Stufe {gegner.stufe} von 5 · Treffsicherheit ca. {gegner.treffsicherheitPct} %
-          </span>
-          <span>
-            {gegner.quelle === "verdeckt"
-              ? "Auf dieser Stufe ist die Aufstellung nicht erkennbar."
-              : gegner.quelle === "ki-muster"
-                ? "Aufstellung aus dem erkannten Einsatzmuster der KI. Immer noch eine Schätzung."
-                : "Wahrscheinlichste beste Aufstellung (Prognose). Der Gegner kann abweichen."}
-          </span>
-        </div>
-      ) : (
-        <p className="elm-leer">{gegner.grund}.</p>
-      )}
-      {gruppeEintrag && gruppeEintrag.gegnerNamen.length > 0 ? (
-        <div className="elm-ab">
-          <span className="bc-gk">{gruppeEintrag.art === "pod" ? "Vierergruppe" : "Duell"}</span>
-          <p style={{ fontSize: 15 }}>{gruppeEintrag.gegnerNamen.join(" · ")}</p>
-        </div>
-      ) : null}
-      {gegnerSeite ? (
-        <div className="elm-ab">
-          <span className="bc-gk"><span>Platz gegen Platz</span><span>Eignung</span></span>
-          {duellSlots.map((slot) => {
-            const eigenId = selections[slot.key];
-            const eigenWert = eigenId ? eignung(eigenId, seite) : null;
-            const g = gegnerSeite.slots.find((s) => s.slotIndex === slot.slotIndex);
-            const stand = eigenWert != null && g?.spanne ? (eigenWert > g.spanne.max ? ["▲", "bc-plus"] : eigenWert < g.spanne.min ? ["▼", "bc-minus"] : ["≈", "bc-null"]) : ["·", "bc-null"];
-            return (
-              <div key={slot.key} className="elm-duell bc-t" title={stand[0] === "≈" ? "Innerhalb der Unsicherheit" : undefined}>
-                <span className="l">{eigenId ? `${spielerName(eigenId)} ${f0(eigenWert)}` : "—"}</span>
-                <span className={`m ${stand[1]}`}>{stand[0]} {kuerzelJeSlot.get(slot.key)}</span>
-                <span className="r">{g?.spielerName ? `${g.spielerName} ${g.spanne ? `${g.spanne.min}–${g.spanne.max}` : ""}` : "unbekannt"}</span>
-              </div>
-            );
-          })}
-          <p style={{ fontSize: 12.5, color: "var(--bc-stumm)", marginTop: 8 }}>
-            Gezeigt wird die rohe Disziplin-Eignung, nicht der Platzwert mit Rolle und Einsatz. Grau heißt: innerhalb der Unsicherheit.
-          </p>
-        </div>
-      ) : null}
-      {rivalen.length > 0 ? (
-        <div className="elm-ab">
-          <span className="bc-gk">Zu schlagen (Saison-Rivalen)</span>
-          {rivalen.slice(0, 3).map((r) => (
-            <div key={r.teamId} className="elm-duell" style={{ gridTemplateColumns: "40px minmax(0,1fr)" }}>
-              <b className="bc-t">#{r.rank}</b>
-              <span>{r.teamName}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </>
+    <EinsatzlisteGegnerTab
+      gameState={gs}
+      eigenesTeamId={context.team.id}
+      eigenerTeamName={context.team.name}
+      seasonId={context.season.id}
+      matchdayId={context.matchday.id}
+      seite={seite}
+      disziplinId={dSeite?.disciplineId ?? null}
+      disziplinName={dSeite?.displayName ?? ""}
+      plaetze={duellSlots.map((slot) => {
+        const eigenId = selections[slot.key] ?? null;
+        const k = eigenId ? rosterCardByActivePlayerId.get(eigenId) ?? null : null;
+        return {
+          key: slot.key,
+          slotIndex: slot.slotIndex,
+          kuerzel: kuerzelJeSlot.get(slot.key) ?? "–",
+          rolle: slotRoleByKey.get(slot.key)?.label ?? `Platz ${slot.slotIndex + 1}`,
+          eigenName: k?.name ?? null,
+          eigenPortrait: k?.portraitUrl ?? null,
+          eigenWert: eigenId ? eignung(eigenId, seite) : null,
+        };
+      })}
+      gegner={gegner}
+      gruppe={gruppeEintrag}
+      rivalen={rivalen.map((r) => ({ teamId: r.teamId, teamName: r.teamName, rank: r.rank }))}
+    />
   );
 
   /* ---- Kontext: Prüfung ---- */
@@ -1132,24 +1119,10 @@ export default function EinsatzlisteModern(props: Props) {
   const captainInfo = new Map((captainInfoBySide[seite] ?? []).map((info) => [info.activePlayerId, info] as const));
   const tacticVorschau = disciplineTacticPreviewBySide?.[seite] ?? null;
 
-  const formKartenplatz = (art: "primary" | "secondary", titel: string) => {
-    if (!formSteuerung) return null;
-    const gewaehlt = art === "primary" ? formSteuerung.primarySelectedId : formSteuerung.secondarySelectedId;
-    const optionen = art === "primary" ? formSteuerung.primaryOptions : formSteuerung.secondaryOptions;
-    const treffer = optionen.find((o) => o.id === gewaehlt) ?? null;
-    return (
-      <FormMenue
-        key={art}
-        titel={titel}
-        gewaehlt={treffer}
-        optionen={optionen}
-        gesperrt={!kannBedienen || formWartet}
-        onWahl={(id) => onAssignDisciplineFormCard?.(seite, art, id, formSteuerung.disciplineId)}
-      />
-    );
-  };
-
   const kulisse = kulisseBySide?.[seite] ?? null;
+  // Spielfläche (PixelLab, 18.11.): je Disziplin ein ruhiges Bild unter den Linien; fehlt die Datei, bleibt der Vollton.
+  const flaecheId = dSeite?.disciplineId ?? null;
+  const flaecheUrl = flaecheId && !flaechenFehler.includes(flaecheId) ? `/sprites/einsatzliste-flaechen/${flaecheId}.jpg` : null;
   const ges = (matchdayPreviewCards.d1Projected ?? 0) + (matchdayPreviewCards.d2Projected ?? 0);
   const gesamtOffen = matchdayPreviewCards.d1Projected == null && matchdayPreviewCards.d2Projected == null;
 
@@ -1340,8 +1313,12 @@ export default function EinsatzlisteModern(props: Props) {
           </div>
 
           <div className="elm-pitchw">
-            <div className="elm-feld__box" data-feld={form.definition.feld}>
-              <FeldHintergrund art={form.definition.feld} spuren={slotsJeSeite[seite].length} etiketten={form.etiketten} />
+            <div className={`elm-feld__box${flaecheUrl ? " has-bild" : ""}`} data-feld={form.definition.feld} data-flaeche={flaecheId ?? undefined}>
+              {flaecheUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="elm-feld__bild" src={flaecheUrl} alt="" decoding="async" onError={() => setFlaechenFehler((alt) => (flaecheId && !alt.includes(flaecheId) ? [...alt, flaecheId] : alt))} />
+              ) : null}
+              <FeldHintergrund art={form.definition.feld} spuren={slotsJeSeite[seite].length} etiketten={form.etiketten} disziplinId={flaecheId} />
               <div className="elm-hinw">{form.definition.kopfzeile}{kulisse ? ` · Platz: ${kulisse.label}` : ""}</div>
               {form.definition.gegner !== "keiner" && form.definition.gegner !== "schatten"
                 ? slotsJeSeite[seite].map((slot) => {
@@ -1349,7 +1326,8 @@ export default function EinsatzlisteModern(props: Props) {
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
                     if (!platz?.gegner || !g?.spielerName) return null;
                     return (
-                      <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": platz.gegner.x, "--y": platz.gegner.y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Scouting)">
+                      <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": platz.gegner.x, "--y": platz.gegner.y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
+                        <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
                         <b>{g.spielerName}</b>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}
                       </div>
@@ -1375,20 +1353,6 @@ export default function EinsatzlisteModern(props: Props) {
               />
               {tacticVorschau?.[stufe] != null ? <small>erwartet {f1(tacticVorschau[stufe])} Punkte</small> : null}
             </div>
-            {formSteuerung ? (
-              <div>
-                <span className="bc-gk">Formkarten{formSteuerung.colorLabel ? ` · ${formSteuerung.colorLabel}` : ""}{formWartet ? " · speichert…" : ""}</span>
-                {formSteuerung.primaryOptions.length + formSteuerung.secondaryOptions.length === 0 && !formSteuerung.primarySelectedId && !formSteuerung.secondarySelectedId ? (
-                  <small>Keine Formkarte mehr verfügbar — alle Karten dieser Saison sind gespielt.</small>
-                ) : (
-                  <div className="elm-fkart">
-                    {formKartenplatz("primary", "Primär")}
-                    {formKartenplatz("secondary", "Sekundär +")}
-                  </div>
-                )}
-                {kartenWirkungJeSeite[seite] ? <KartenLeiste w={kartenWirkungJeSeite[seite]!} /> : null}
-              </div>
-            ) : null}
             {captainEintraege.length > 0 ? (
               <div>
                 <span className="bc-gk">Captain · {captainDraftRemaining} frei heute · {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison</span>
@@ -1460,6 +1424,19 @@ export default function EinsatzlisteModern(props: Props) {
               })()
             ) : null}
           </div>
+          {formSteuerung && kartenWirkungJeSeite[seite] ? (
+            <EinsatzlisteKartenHand
+              w={kartenWirkungJeSeite[seite]!}
+              colorLabel={formSteuerung.colorLabel}
+              primaryId={formSteuerung.primarySelectedId}
+              secondaryId={formSteuerung.secondarySelectedId}
+              primaryFrei={new Set(formSteuerung.primaryOptions.map((o) => o.id))}
+              secondaryFrei={new Set(formSteuerung.secondaryOptions.map((o) => o.id))}
+              gesperrt={!kannBedienen}
+              wartet={formWartet}
+              onWahl={(art, id) => onAssignDisciplineFormCard?.(seite, art, id, formSteuerung.disciplineId)}
+            />
+          ) : null}
         </BcPanel>
 
         {/* ------------ Kontext ------------ */}
@@ -1534,69 +1511,6 @@ export default function EinsatzlisteModern(props: Props) {
       </BcSheet>
 
       {toast ? <div className="elm-toast" role="status" data-testid="elm-toast">{toast}</div> : null}
-    </div>
-  );
-}
-
-/** Ein Kartenplatz der Taktik-Leiste: gefüllt oder leer, öffnet eine Liste zum Wählen. */
-function FormMenue({
-  titel,
-  gewaehlt,
-  optionen,
-  gesperrt,
-  onWahl,
-}: {
-  titel: string;
-  gewaehlt: { id: string; label: string; color?: string | null } | null;
-  optionen: Array<{ id: string; label: string; color?: string | null }>;
-  gesperrt: boolean;
-  onWahl: (id: string | null) => void;
-}) {
-  const [offen, setOffen] = useState(false);
-  const wurzel = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!offen) return;
-    const zu = (event: MouseEvent) => {
-      if (wurzel.current && !wurzel.current.contains(event.target as Node)) setOffen(false);
-    };
-    document.addEventListener("mousedown", zu);
-    return () => document.removeEventListener("mousedown", zu);
-  }, [offen]);
-  return (
-    <div ref={wurzel} style={{ position: "relative" }}>
-      <button
-        type="button"
-        className={`elm-fka${gewaehlt ? " is-voll" : ""}`}
-        disabled={gesperrt}
-        aria-haspopup="menu"
-        aria-expanded={offen}
-        onClick={() => setOffen((v) => !v)}
-        title={gewaehlt?.label ?? `${titel}: keine Formkarte gesetzt`}
-      >
-        <BcIcon name="karte" />
-        {gewaehlt ? (
-          <span style={gewaehlt.color ? { color: FORM_HEX[gewaehlt.color] } : undefined}>{gewaehlt.label}</span>
-        ) : (
-          <span>{titel}: leer</span>
-        )}
-      </button>
-      {offen ? (
-        <div className="elm-menu" role="menu" aria-label={`${titel} Formkarte`}>
-          <button type="button" role="menuitemradio" aria-checked={!gewaehlt} onClick={() => { onWahl(null); setOffen(false); }}>— keine —</button>
-          {optionen.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="option"
-              aria-checked={gewaehlt?.id === o.id}
-              style={o.color ? { color: FORM_HEX[o.color] } : undefined}
-              onClick={() => { onWahl(o.id); setOffen(false); }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

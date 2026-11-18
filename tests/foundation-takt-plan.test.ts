@@ -82,6 +82,23 @@ describe("Taktplan: Pflichtschritte und kritische Punkte", () => {
     expect(sprung).toHaveBeenCalledTimes(1);
   });
 
+  it("vor Spieltag 1 entfällt „Letzten Spieltag prüfen“, danach steht er wieder da", () => {
+    const schritte = [schritt("review_last_matchday", "ready"), schritt("set_lineup", "ready")];
+    const vor = baueTaktPlan({ steps: schritte, currentStepId: "set_lineup", formatGrund: (g) => g, sprungZuSchritt: () => () => undefined, inbox: [], hatGespielt: false });
+    expect(vor.schritte.some((s) => s.id === "schritt:review_last_matchday")).toBe(false);
+    const nach = baueTaktPlan({ steps: schritte, currentStepId: "set_lineup", formatGrund: (g) => g, sprungZuSchritt: () => () => undefined, inbox: [], hatGespielt: true });
+    expect(nach.schritte.some((s) => s.id === "schritt:review_last_matchday")).toBe(true);
+  });
+
+  it("„Lineup fehlt“ (Inbox) und der Schritt „Einsatzliste setzen“ sind EIN Eintrag, rot, wenn kritisch", () => {
+    const plan = baue([schritt("set_lineup", "ready", { label: "Einsatzliste setzen", warnings: ["lineup_pending"] })], "set_lineup", [
+      { id: "l", title: "Lineup fehlt", detail: "Einsatzliste unvollständig", severity: "critical", sprung: () => undefined },
+    ]);
+    expect(plan.schritte).toHaveLength(1);
+    expect(plan.schritte[0]).toMatchObject({ id: "schritt:set_lineup", label: "Einsatzliste setzen", status: "rot" });
+    expect(plan.kritisch.map((k) => k.id)).toEqual(["schritt:set_lineup"]);
+  });
+
   it("alles in Ordnung: keine kritischen Punkte", () => {
     expect(baue([schritt("set_lineup", "ready")], "set_lineup").kritisch).toEqual([]);
   });

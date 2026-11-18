@@ -1,0 +1,154 @@
+/**
+ * Finanzkonzept V2, Stufe 0: Kontoauszug je Team — NUR LESEN.
+ *
+ * Jede Zeile kommt aus einem Ledger, das es schon gibt (Transferverlauf, Sponsor-Auszahlungslog,
+ * Apron-Log, Vorstandsziel-Log, Notfall-Kasse). Es wird nichts neu gebucht, die GuV
+ * (`season-end-guv.ts`) bleibt unveraendert; der Kontoauszug ist die Zeilen-Sicht auf dieselben Quellen.
+ *
+ * Jede Zeile traegt Saison, Spieltag (soweit das Ledger ihn kennt; sonst die Phase), Art, Quelle und
+ * Betrag mit Vorzeichen (+ Zufluss, - Abfluss). Heute fallen Sponsor, Gehalt, Apron und Ziele am
+ * Saisonende an (Phase `season_end`); mit der Taktung (Stufe 4 des Konzepts) kommen Spieltags-Zeilen
+ * hinzu, ohne dass sich dieses Format aendert.
+ */
+
+import type { GameState } from "@/lib/data/olyDataTypes";
+
+export type KontoauszugArt =
+  | "transfer_kauf"
+  | "transfer_verkauf"
+  | "vertragsende_abloese"
+  | "sponsor"
+  | "gehalt_und_sponsor_saisonende"
+  | "apron"
+  | "vorstandsziele"
+  | "notfall_kasse";
+
+export type KontoauszugZeile = {
+  seasonId: string;
+  /** Spieltag-ID, soweit das Ledger sie fuehrt; sonst null. */
+  matchdayId: string | null;
+  /** Phase: "kaufphase" (Transfer vor Spieltag 1), "saison" (Spieltag), "saisonende" (Abrechnung). */
+  phase: "kaufphase" | "saison" | "saisonende" | "unbekannt";
+  art: KontoauszugArt;
+  /** Ledger, aus dem die Zeile stammt (Feldname im Spielstand). */
+  quelle: string;
+  /** Kurzbeschreibung (Spieler, Komponente, Quelle). */
+  text: string;
+  /** Betrag mit Vorzeichen in C. */
+  betrag: number;
+  /** Zeitstempel des Ledger-Eintrags, soweit vorhanden (nur zur Sortierung). */
+  zeit: string | null;
+};
+
+export type TeamKontoauszug = {
+  teamId: string;
+  zeilen: KontoauszugZeile[];
+  summeZufluss: number;
+  summeAbfluss: number;
+  saldo: number;
+  /** Saldo je Art. */
+  jeArt: Partial<Record<KontoauszugArt, number>>;
+};
+
+function r2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+/** Zeilen aller Teams in einem Durchlauf (ein Pass ueber die Ledger, nicht einer je Team). */
+export function buildKontoauszuege(gameState: GameState, seasonId?: string | null): Map<string, TeamKontoauszug> {
+  const nurSaison = seasonId ?? null;
+  const proTeam = new Map<string, KontoauszugZeile[]>();
+  const add = (teamId: string | null | undefined, zeile: KontoauszugZeile) => {
+    if (!teamId || !Number.isFinite(zeile.betrag) || zeile.betrag === 0) return;
+    if (nurSaison && zeile.seasonId !== nurSaison) return;
+    (proTeam.get(teamId) ?? proTeam.set(teamId, []).get(teamId)!).push({ ...zeile, betrag: r2(zeile.betrag) });
+  };
+
+  // 1) Transfers (Kauf, Verkauf, Vertragsende). Verkauf nutzt die tatsaechliche Cash-Wirkung (netto).
+  for (const e of gameState.transferHistory ?? []) {
+    const text = `${e.playerName ?? e.playerId} (${e.source ?? "transfer"})`;
+    const phase = e.matchdayId ? "saison" : "kaufphase";
+    if (e.transferType === "buy") {
+      add(e.toTeamId, {
+        seasonId: e.seasonId, matchdayId: e.matchdayId ?? null, phase: phase === "saison" ? "saison" : "kaufphase",
+        art: "transfer_kauf", quelle: "transferHistory", text, betrag: -(e.netCashImpact ?? e.fee), zeit: e.happenedAt,
+      });
+    } else if (e.transferType === "sell") {
+      add(e.fromTeamId, {
+        seasonId: e.seasonId, matchdayId: e.matchdayId ?? null, phase: phase === "saison" ? "saison" : "kaufphase",
+        art: "transfer_verkauf", quelle: "transferHistory", text, betrag: e.netCashImpact ?? e.fee, zeit: e.happenedAt,
+      });
+    } else if (e.transferType === "contract_exit") {
+      add(e.fromTeamId, {
+        seasonId: e.seasonId, matchdayId: e.matchdayId ?? null, phase: "saisonende",
+        art: "vertragsende_abloese", quelle: "transferHistory", text, betrag: e.netCashImpact ?? e.fee, zeit: e.happenedAt,
+      });
+    }
+  }
+
+  // 2) Sponsor- und Gehaltszeilen (Auszahlungslog; die Saisonende-Zeilen enthalten auch den Gehaltsabzug).
+  for (const l of gameState.seasonState.sponsorPayoutLogs ?? []) {
+    add(l.teamId, {
+      seasonId: l.seasonId, matchdayId: null, phase: l.phase === "season_end" ? "saisonende" : "unbekannt",
+      art: l.phase === "season_end" ? "gehalt_und_sponsor_saisonende" : "sponsor",
+      quelle: "sponsorPayoutLogs", text: `${l.phase}${l.componentId ? `:${l.componentId}` : ""}`, betrag: l.cashDelta, zeit: l.createdAt,
+    });
+  }
+
+  // 3) Apron.
+  for (const l of gameState.seasonState.apronSettlementLogs ?? []) {
+    add(l.teamId, {
+      seasonId: l.seasonId, matchdayId: null, phase: "saisonende", art: "apron", quelle: "apronSettlementLogs",
+      text: l.kind, betrag: l.cashDelta, zeit: l.createdAt,
+    });
+  }
+
+  // 4) Vorstandsziele (Beleg je Team, sofern das Log ihn fuehrt; aeltere Spielstaende fuehren ihn nicht).
+  for (const l of gameState.seasonState.objectiveRewardApplyLogs ?? []) {
+    for (const [teamId, delta] of Object.entries(l.payload.cashDeltaByTeamId ?? {})) {
+      add(teamId, {
+        seasonId: l.seasonId, matchdayId: null, phase: "saisonende", art: "vorstandsziele", quelle: "objectiveRewardApplyLogs",
+        text: "Vorstandsziele", betrag: delta, zeit: l.createdAt,
+      });
+    }
+  }
+
+  // 5) Notfall-Kasse der KI (Geld aus dem Nichts, deshalb sichtbar).
+  for (const i of gameState.seasonState.aiEmergencyCashInjections ?? []) {
+    add(i.teamId, {
+      seasonId: i.seasonId, matchdayId: null, phase: "kaufphase", art: "notfall_kasse", quelle: "aiEmergencyCashInjections",
+      text: i.reason, betrag: i.amount, zeit: i.createdAt,
+    });
+  }
+
+  const out = new Map<string, TeamKontoauszug>();
+  for (const team of gameState.teams) {
+    const zeilen = (proTeam.get(team.teamId) ?? []).sort((a, b) => (a.zeit ?? "").localeCompare(b.zeit ?? ""));
+    let zufluss = 0;
+    let abfluss = 0;
+    const jeArt: Partial<Record<KontoauszugArt, number>> = {};
+    for (const z of zeilen) {
+      if (z.betrag >= 0) zufluss += z.betrag;
+      else abfluss += z.betrag;
+      jeArt[z.art] = r2((jeArt[z.art] ?? 0) + z.betrag);
+    }
+    out.set(team.teamId, {
+      teamId: team.teamId,
+      zeilen,
+      summeZufluss: r2(zufluss),
+      summeAbfluss: r2(abfluss),
+      saldo: r2(zufluss + abfluss),
+      jeArt,
+    });
+  }
+  return out;
+}
+
+/** Kontoauszug eines Teams (fuer die Anzeige). Fuer alle Teams besser `buildKontoauszuege`. */
+export function buildTeamKontoauszug(gameState: GameState, teamId: string, seasonId?: string | null): TeamKontoauszug {
+  return (
+    buildKontoauszuege(gameState, seasonId).get(teamId) ?? {
+      teamId, zeilen: [], summeZufluss: 0, summeAbfluss: 0, saldo: 0, jeArt: {},
+    }
+  );
+}

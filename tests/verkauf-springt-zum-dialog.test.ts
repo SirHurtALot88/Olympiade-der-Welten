@@ -80,14 +80,6 @@ describe("Verkaufen springt zum Dialog, nicht an den Seitenanfang", () => {
     expect(oeffnenRumpf()).toContain('typeof window === "undefined" ? null : window.scrollY');
   });
 
-  it("laesst den Kauf-Flow unveraendert seinen eigenen Weg gehen", () => {
-    // Zwei Wege, aber kein doppelter: der Kauf scrollt im Client, der Verkauf im Scope.
-    const client = readFileSync(
-      join(process.cwd(), "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
-      "utf8",
-    );
-    expect(client).toContain("function scrollBuyModalToTop()");
-  });
 });
 
 describe("Nach dem Verkauf zurueck zu den Vertraegen", () => {

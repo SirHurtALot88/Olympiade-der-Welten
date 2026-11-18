@@ -5,7 +5,7 @@
 //
 // AUFRUF: npx tsx scripts/screenshot-startseite-neu.ts [spieltage=12] [tag=mitte|vor|ende] [BxH,...]
 // ===================================================================================
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -91,7 +91,7 @@ async function isServerReachable(timeoutMs: number) {
   }
 }
 
-function startDevServer(): ChildProcessWithoutNullStreams {
+function startDevServer(): ChildProcess {
   console.log("[screenshot-start] starte Dev-Server (OLY_AUTO_EXPORT_SAVES=0, OLY_AUTO_EXPORT_PUSH=0) ...");
   const child = spawn("npm", ["run", "dev"], {
     env: { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT: PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
@@ -134,7 +134,7 @@ async function main() {
   const server = startDevServer();
   let browser: Browser | null = null;
   try {
-    await waitForServer(180_000);
+    await waitForServer(720_000);
     browser = await chromium.launch();
     for (const [breite, hoehe] of GROESSEN) {
       const ctx = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1 });

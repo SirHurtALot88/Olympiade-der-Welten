@@ -30,6 +30,17 @@ import {
   type StehtAufDemSpiel,
 } from "@/lib/season/saisonstand-modern-logik";
 import { summiereSaisonBilanz, type SaisonBilanz } from "@/lib/standings/standings-bilanz";
+import {
+  baueAbgeleiteteEntscheidungen,
+  bestesHeimspiel,
+  einsatzStatus,
+  spielerDerSaison,
+  spielerDesTages,
+  type AbgeleiteteEntscheidung,
+  type EinsatzStatus,
+  type SeitenEinsatz,
+  type SpielerEhrung,
+} from "@/lib/foundation/startseite-modern-zustand";
 
 /* ------------------------------------------------------------------ Regeln (reine Anzeige) */
 
@@ -125,6 +136,10 @@ export type SpieltagsKarte = {
   anteil: number | null;
   papier: { wort: "Vorteil" | "Nachteil" | "offen"; ton: Ton } | null;
   gruppe: KartenMitglied[];
+  /** Einsatzliste dieser Disziplin-Seite (x von n Plätzen); `null`, wenn der Entwurf nicht zum gezeigten Spieltag gehört. */
+  einsatz: SeitenEinsatz | null;
+  /** Hat das Team einen Formkarten-Pool? Sonst gibt es nichts zu legen und die Zeile entfällt. */
+  hatFormkartenPool: boolean;
 };
 
 export type NaechsterSpieltag = {
@@ -176,6 +191,10 @@ export type StartseiteDaten = {
   kopfBilder: string[];
   formMoral: Record<string, FormMoralAnzeige>;
   tabellenfuehrer: { name: string; punkte: number } | null;
+  einsatz: EinsatzStatus | null;
+  /** Aus dem echten Zustand abgeleitete Entscheidungen (Einsatzliste, Minuskarte, Moral, Verträge). */
+  entscheidungen: AbgeleiteteEntscheidung[];
+  spielerDesTages: (SpielerEhrung & { formStufe: number | null }) | null;
 };
 
 export type StartseiteEingabe = {
@@ -321,6 +340,7 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
   const dieseDisziplinen = [eintrag?.discipline1?.disciplineId, eintrag?.discipline2?.disciplineId].filter((x): x is string => Boolean(x));
   const dName = (id: string) => gameState.disciplines.find((d) => d.id === id)?.name ?? id;
 
+  const einsatz = naechsteId ? einsatzStatus(gameState, teamId, naechsteId) : null;
   let naechster: NaechsterSpieltag | null = null;
   if (naechsteId) {
     const uebersicht = uebersichtFuer(naechsteId);
@@ -363,6 +383,8 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
             anteil: null,
             papier: platz > 0 ? papierformVierer(platz) : null,
             gruppe: nachStaerke,
+            einsatz: einsatz ? einsatz[d.disciplineSide] : null,
+            hatFormkartenPool: einsatz?.hatFormkartenPool ?? false,
           });
         } else {
           const a = eigeneStaerke?.scorePack.disciplines[d.disciplineId] ?? 0;
@@ -376,6 +398,8 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
             anteil,
             papier: papierform(anteil),
             gruppe: [],
+            einsatz: einsatz ? einsatz[d.disciplineSide] : null,
+            hatFormkartenPool: einsatz?.hatFormkartenPool ?? false,
           });
         }
       }
@@ -468,6 +492,13 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
       const d = eigene.punkte - naechsterDarunter.punkte;
       zeilenBilanz.push({ label: "Abstand nach hinten", wert: `${d >= 0 ? "+" : "−"}${Math.abs(d)} Pkt auf ${naechsterDarunter.name} (${naechsterDarunter.rang}.)` });
     }
+    const saisonSpieler = spielerDerSaison(gameState, teamId);
+    if (saisonSpieler) zeilenBilanz.push({ label: "Spieler der Saison", wert: `${saisonSpieler.name} · ${saisonSpieler.text}` });
+    const heim = bestesHeimspiel(gameState, teamId);
+    if (heim) {
+      const gegnerName = zeileDe(heim.gegnerId)?.teamName ?? heim.gegnerId;
+      zeilenBilanz.push({ label: "Bestes Heimspiel", wert: `Spieltag ${heim.spieltag} · ${heim.punkte} von ${heim.moeglich} Pkt gegen ${gegnerName}` });
+    }
     bilanzEnde = {
       rang: eigene.rang,
       wort: eigene.zone ? ZONEN_MARKE_ENDE[eigene.zone] : null,
@@ -488,6 +519,8 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
     .map((id) => naechster?.karten.find((k) => k.disciplineId === id)?.bild ?? einsatzlisteKulisseBild(id))
     .filter((x): x is string => Boolean(x));
   const fuehrer = hatWertung ? zeilen[0] ?? null : null;
+  const entscheidungen = baueAbgeleiteteEntscheidungen({ gameState, teamId, einsatz, formMoral, gespielteSpieltage, gesamtSpieltage, saisonEnde });
+  const tagesEhrung = hatWertung ? spielerDesTages(gameState, teamId, gameState.season.matchdayIds[gespielteSpieltage - 1] ?? "") : null;
 
   return {
     ligaTier: tier,
@@ -508,6 +541,9 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
     kopfBilder,
     formMoral,
     tabellenfuehrer: fuehrer ? { name: fuehrer.name, punkte: fuehrer.punkte } : null,
+    einsatz,
+    entscheidungen,
+    spielerDesTages: tagesEhrung ? { ...tagesEhrung, formStufe: formMoral[tagesEhrung.playerId]?.formVerfuegbar ? formMoral[tagesEhrung.playerId]!.formStufe : null } : null,
   };
 }
 

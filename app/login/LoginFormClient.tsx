@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 
 import { LobbyCard } from "@/components/LobbyCard";
 
-type AuthUsername = "chris" | "franky";
+// Bewusst nicht aus lib/auth/config.ts importiert: das Modul zieht `node:crypto` und gehoert nicht
+// ins Client-Bundle. Die Liste muss zu `AUTH_USERNAMES` passen (tests/auth-ramona-login.test.ts).
+type AuthUsername = "chris" | "franky" | "ramona";
 
 const USER_OPTIONS: Array<{ username: AuthUsername; label: string }> = [
   { username: "chris", label: "Chris" },
   { username: "franky", label: "Franky" },
+  { username: "ramona", label: "Ramona" },
 ];
 
 export default function LoginFormClient() {

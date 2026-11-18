@@ -91,6 +91,7 @@ import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start
 import {
   FOUNDATION_SAVE_MODE_OPTIONS,
   formatFoundationSaveModeLabel,
+  isOnlineSaveMode,
   normalizeFoundationSaveMode,
   resolveFoundationSaveMode,
   type FoundationSaveMode,
@@ -441,7 +442,8 @@ import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-seaso
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
-import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { PLAYER_PROFILE_TABS, normalisierePlayerProfileTab, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { oeffneSpielerKurzprofil } from "@/lib/foundation/spieler-kurzprofil-store";
 
 import { useFoundationPageState } from "@/lib/foundation/tabs/use-foundation-page-state";
 import { useFoundationPersistenceActions } from "@/lib/foundation/tabs/use-foundation-persistence-actions";
@@ -817,12 +819,7 @@ import {
 } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 
 
-const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
 const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
-  ssr: false,
-  loading: () => null,
-});
-const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
   ssr: false,
   loading: () => null,
 });
@@ -1069,7 +1066,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameLeagueOverride, setNewGameLeagueOverride, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameRamonaTeamIds, setNewGameRamonaTeamIds, newGameLeagueOverride, setNewGameLeagueOverride, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -3124,8 +3121,12 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Alle Listen öffnen das Kurzprofil (Drawer), nicht mehr die ganze Seite (Chris 18.11., Punkt 2). „Ganzes Profil öffnen“ im
+   * Drawer führt über `openPlayerProfileById` auf die Seite. Der Drawer selbst steht in `SpielerKurzprofilHost`.
+   */
   async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
-    await openPlayerProfileById(playerId, activePlayerId, { push: true });
+    oeffneSpielerKurzprofil({ playerId, activePlayerId });
   }
 
   function navigateHomeTab(tab: "overview" | "office") {
@@ -3289,7 +3290,7 @@ export function useFoundationShellRouterBodyScope({
       }
       setPlayerProfileLoading(true);
       void openPlayerProfileById(state.playerId, null, {
-        tab: (state.tab as PlayerProfileTabId | null) ?? "overview",
+        tab: normalisierePlayerProfileTab(state.tab),
       });
     } else if (state.view === "playerProfile") {
       playerProfileHydrationSequenceRef.current += 1;
@@ -5105,9 +5106,9 @@ export function useFoundationShellRouterBodyScope({
     if (requestedView === "playerProfile" && requestedPlayerId) {
       pendingPlayerProfileHydrationRef.current = {
         playerId: requestedPlayerId,
-        tab: (requestedTab as PlayerProfileTabId | null) ?? "overview",
+        tab: normalisierePlayerProfileTab(requestedTab),
       };
-      setPlayerProfileTab((requestedTab as PlayerProfileTabId | null) ?? "overview");
+      setPlayerProfileTab(normalisierePlayerProfileTab(requestedTab));
       setPlayerProfileLoading(true);
       setActiveView("playerProfile");
     } else if (requestedView) {
@@ -5212,7 +5213,7 @@ export function useFoundationShellRouterBodyScope({
     const pending = pendingPlayerProfileHydrationRef.current;
     const urlState = parseFoundationUrlStateFromLocation();
     const playerId = pending?.playerId ?? urlState.playerId;
-    const tab = pending?.tab ?? (urlState.tab as PlayerProfileTabId | null) ?? playerProfileTab;
+    const tab = pending?.tab ?? (urlState.tab ? normalisierePlayerProfileTab(urlState.tab) : playerProfileTab);
 
     if (!playerId) {
       return;
@@ -6376,6 +6377,7 @@ export function useFoundationShellRouterBodyScope({
     setNewGamePresetId(presetId);
     setNewGameChrisTeamIds(preset.chrisTeamIds);
     setNewGameFrankyTeamIds(preset.frankyTeamIds);
+    setNewGameRamonaTeamIds([]);
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6433,6 +6435,7 @@ export function useFoundationShellRouterBodyScope({
     if (nextTier === "liga2") {
       setNewGameChrisTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
       setNewGameFrankyTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
+      setNewGameRamonaTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
     }
     setNewGamePreview(null);
     setNewGameError(null);
@@ -6450,6 +6453,7 @@ export function useFoundationShellRouterBodyScope({
       const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
       setNewGameChrisTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
       setNewGameFrankyTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+      setNewGameRamonaTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
     }
     setNewGamePreview(null);
     setNewGameError(null);
@@ -6459,19 +6463,24 @@ export function useFoundationShellRouterBodyScope({
   function setNewGameSoloTeam(teamId: string) {
     setNewGameChrisTeamIds([teamId]);
     setNewGameFrankyTeamIds([]);
+    setNewGameRamonaTeamIds([]);
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
   }
 
-  function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
+  function toggleNewGameTeam(owner: "chris" | "franky" | "ramona", teamId: string) {
     // TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert, nicht wählbar. Die Klub-Raster
     // rendern Liga-2-Karten im Battle-Mode-Schritt schon gar nicht als anklickbar; diese Sperre
     // ist die zweite Verteidigungslinie, falls dieser Handler je anders aufgerufen wird. Ein
     // Abwählen (Team ist bereits in der Liste) bleibt immer erlaubt.
     if (newGameMode === "battle") {
       const alreadySelected =
-        owner === "chris" ? newGameChrisTeamIds.includes(teamId) : newGameFrankyTeamIds.includes(teamId);
+        owner === "chris"
+          ? newGameChrisTeamIds.includes(teamId)
+          : owner === "franky"
+            ? newGameFrankyTeamIds.includes(teamId)
+            : newGameRamonaTeamIds.includes(teamId);
       if (!alreadySelected && getNewGameLeagueAssignment()[teamId] === "liga2") {
         return;
       }
@@ -6489,8 +6498,22 @@ export function useFoundationShellRouterBodyScope({
             : current.length >= limits.chrisMax
               ? current
               : [...current.filter((entry) => entry !== teamId), teamId].filter(
-                  (entry) => !newGameFrankyTeamIds.includes(entry),
+                  (entry) => !newGameFrankyTeamIds.includes(entry) && !newGameRamonaTeamIds.includes(entry),
                 ),
+      );
+      return;
+    }
+
+    if (owner === "ramona") {
+      // Ramona (dritte Spielerin, 18.11.): dieselben Rechte und dieselbe Obergrenze wie Franky.
+      setNewGameRamonaTeamIds((current) =>
+        current.includes(teamId)
+          ? current.filter((entry) => entry !== teamId)
+          : current.length >= limits.ramonaMax
+            ? current
+            : [...current.filter((entry) => entry !== teamId), teamId].filter(
+                (entry) => !newGameChrisTeamIds.includes(entry) && !newGameFrankyTeamIds.includes(entry),
+              ),
       );
       return;
     }
@@ -6500,7 +6523,9 @@ export function useFoundationShellRouterBodyScope({
         ? current.filter((entry) => entry !== teamId)
         : current.length >= limits.frankyMax
           ? current
-          : [...current.filter((entry) => entry !== teamId), teamId].filter((entry) => !newGameChrisTeamIds.includes(entry)),
+          : [...current.filter((entry) => entry !== teamId), teamId].filter(
+              (entry) => !newGameChrisTeamIds.includes(entry) && !newGameRamonaTeamIds.includes(entry),
+            ),
     );
   }
 
@@ -6541,6 +6566,8 @@ export function useFoundationShellRouterBodyScope({
           gameMode: newGameMode,
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
+          // Ramona nur mitschicken, wenn sie Teams hat: der Payload bleibt sonst bytegleich.
+          ...(newGameRamonaTeamIds.length > 0 ? { ramonaTeamIds: newGameRamonaTeamIds } : {}),
           // Nur gesetzt, sobald der Nutzer im Liga-Picker mindestens ein Team verschoben hat --
           // sonst bleibt der Payload unveraendert und der Server faellt auf die automatische
           // Budget-Zuteilung zurueck (s. Kommentar an `leagueByTeamId` in
@@ -6579,7 +6606,11 @@ export function useFoundationShellRouterBodyScope({
         // new tab, or the homepage "Solo spielen" link loads exactly this
         // save instead of falling back to the global active save row.
         syncFoundationSaveIdInUrl(newSaveId);
-        const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
+        const firstTeamId =
+          payload.result.preview.chrisTeamIds[0] ??
+          payload.result.preview.frankyTeamIds[0] ??
+          payload.result.preview.ramonaTeamIds?.[0] ??
+          null;
         if (firstTeamId) {
           // Scope the active-team preference to the NEW save id explicitly: the
           // `activeSaveId` in this closure is still the previous save's id, so
@@ -7453,7 +7484,7 @@ export function useFoundationShellRouterBodyScope({
         // Arena, deren Aufstellungen noch unvollstaendig sind — und saehe
         // Ergebnisse, bevor der Mitspieler gesetzt hat. Solo bleibt es beim
         // eigenen Team.
-        isOnlineGame: activeSaveGameMode === "online_4v4",
+        isOnlineGame: isOnlineSaveMode(activeSaveGameMode),
         activeTeamReady: activeManagerMatchdayReady,
         teams: buildMatchdayReadinessTeamsFromState({
           teams: gameState.teams,
@@ -7668,6 +7699,9 @@ export function useFoundationShellRouterBodyScope({
   const taktPlan = baueTaktPlan({
     steps: gameFlowState.steps,
     currentStepId: gameFlowState.currentStepId,
+    hatGespielt: (gameState.seasonState.matchdayResults ?? []).some(
+      (result) => result.seasonId === gameState.season.id && result.status === "preview_applied",
+    ),
     formatGrund: formatGameFlowBlocker,
     sprungZuSchritt: (schritt) => () => navigateToGameFlowStep(schritt.targetView, schritt.teamId, schritt.targetPanel),
     inbox: activeTeamOpenInboxItems.map((item: GameInboxItem) => ({
@@ -13170,6 +13204,7 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameRamonaTeamIds,
     newGameLeagueOverride,
     newGameMode,
     newGamePresetId,
@@ -13566,7 +13601,6 @@ export {
   PROGRESSION_CLASS_ORDER,
   PlayerGeneratorPanel,
   PlayerPortrait,
-  PlayerProfileClient,
   RaceIcon,
   SEASON_TRANSITION_STATIC_STEPS,
   SPECIALIST_WING_VARIANTS,

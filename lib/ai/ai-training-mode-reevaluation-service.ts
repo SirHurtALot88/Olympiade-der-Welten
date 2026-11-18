@@ -4,10 +4,17 @@ import {
   type AiTeamTrainingIntensity,
 } from "@/lib/ai/ai-player-training-load-service";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { resolveTeamDelegation } from "@/lib/foundation/team-delegation";
+import { buildTeamPlayerTrainingClassPlans } from "@/lib/ai/ai-player-training-class-service";
 import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { applyPlayerTrainingModes, previewPlayerTrainingModes } from "@/lib/training/training-settings-service";
+import {
+  applyPlayerTrainingClasses,
+  applyPlayerTrainingModes,
+  previewPlayerTrainingClasses,
+  previewPlayerTrainingModes,
+} from "@/lib/training/training-settings-service";
 
 /**
  * Per-Spieltag-Neubewertung der individuellen AI-Trainingsmodi (Fatigue-Schoner).
@@ -31,6 +38,12 @@ import { applyPlayerTrainingModes, previewPlayerTrainingModes } from "@/lib/trai
  *  - Die Team-Baseline-Intensitaet stammt aus der eingefrorenen Preseason-Einstellung
  *    (aiManagerTrainingSettings) — die Preseason-Modus-Setzung bleibt der Ausgangspunkt, hier wird
  *    nur die per-Spieler-Anpassung an die aktuelle Fatigue OBEN DRAUF gelegt.
+ *  - DELEGATION (18.11., lib/foundation/team-delegation.ts): ein MENSCHLICHES Team, dessen Training
+ *    an die KI delegiert ist (Halbautomatik/Voll KI), wird genauso bewertet wie ein KI-Team — mit
+ *    einer Ausnahme: Spieler, deren Training der Mensch selbst gesetzt hat
+ *    (`delegation.trainingSelbstSpielerIds`), fasst die KI nicht an. Zusaetzlich setzt sie Spielern
+ *    ohne Trainingsklasse einmal eine (dieselbe Auswahl wie die Vorsaison-KI). Teams ohne Delegation
+ *    bleiben unberuehrt wie zuvor.
  *  - Kein Zufall/Datum: die Modus-Entscheidung ist deterministisch (stabile Hash-Seeds pro
  *    (Spieler, Spieltag) in resolveModeForPlayer / shouldRestForFatigue).
  *  - Persistiert ueber den bestehenden Trainings-Settings-Pfad (applyPlayerTrainingModes) — derselbe,
@@ -50,6 +63,10 @@ export type AiTrainingModeReevaluationResult = {
   teamsUpdated: number;
   playersReassigned: number;
   skippedManual: number;
+  /** Menschliche Teams mit delegiertem Training, die bewertet wurden. */
+  delegatedTeamsEvaluated: number;
+  /** Spieler, deren Training der Mensch selbst gesetzt hat und die deshalb unberuehrt blieben. */
+  delegatedPlayersRespected: number;
 };
 
 export function reevaluateAiTrainingModesForMatchday(input: {
@@ -63,6 +80,8 @@ export function reevaluateAiTrainingModesForMatchday(input: {
     teamsUpdated: 0,
     playersReassigned: 0,
     skippedManual: 0,
+    delegatedTeamsEvaluated: 0,
+    delegatedPlayersRespected: 0,
   };
   if (!seed) return empty;
 
@@ -84,15 +103,30 @@ export function reevaluateAiTrainingModesForMatchday(input: {
   let teamsUpdated = 0;
   let playersReassigned = 0;
   let skippedManual = 0;
+  let delegatedTeamsEvaluated = 0;
+  let delegatedPlayersRespected = 0;
 
   for (const team of currentSave.gameState.teams) {
-    const controlMode = controlSettingsMap[team.teamId]?.controlMode ?? "manual";
-    // NUR AI-gesteuerte Teams. Menschlich (manual) gesteuerte Teams NIE ueberschreiben.
-    if (controlMode !== "ai") {
+    const teamSettings = controlSettingsMap[team.teamId];
+    const controlMode = teamSettings?.controlMode ?? "manual";
+    const delegation = controlMode === "manual" ? resolveTeamDelegation(teamSettings) : null;
+    const trainingDelegiert = delegation?.bereiche.training === "ki";
+    // AI-gesteuerte Teams und menschliche Teams mit delegiertem Training. Menschliche Teams ohne
+    // Delegation NIE ueberschreiben.
+    if (controlMode !== "ai" && !trainingDelegiert) {
       if (controlMode === "manual") skippedManual += 1;
       continue;
     }
     teamsEvaluated += 1;
+    const selbstGesetzt = new Set(delegation?.trainingSelbstSpielerIds ?? []);
+    if (trainingDelegiert) {
+      delegatedTeamsEvaluated += 1;
+      const rosterIds = new Set(
+        currentSave.gameState.rosters.filter((entry) => entry.teamId === team.teamId).map((entry) => entry.playerId),
+      );
+      delegatedPlayersRespected += [...selbstGesetzt].filter((playerId) => rosterIds.has(playerId)).length;
+      currentSave = fillMissingTrainingClassesForDelegatedTeam(currentSave, team.teamId, selbstGesetzt, persistence);
+    }
 
     const intensity = resolveTeamBaselineIntensity(currentSave.gameState, team.teamId);
     const plans = buildTeamPlayerTrainingLoadPlans({
@@ -105,7 +139,10 @@ export function reevaluateAiTrainingModesForMatchday(input: {
     const currentModeById = new Map(
       currentSave.gameState.players.map((player) => [player.id, player.trainingMode] as const),
     );
-    const assignments = plans.map((plan) => ({ playerId: plan.playerId, trainingMode: plan.selectedMode }));
+    const assignments = plans
+      .filter((plan) => !selbstGesetzt.has(plan.playerId))
+      .map((plan) => ({ playerId: plan.playerId, trainingMode: plan.selectedMode }));
+    if (assignments.length === 0) continue;
     // Nur echte Aenderungen zaehlen (und ueberhaupt schreiben) — spart Writes, wenn nichts kippt.
     const changedCount = assignments.filter(
       (assignment) => currentModeById.get(assignment.playerId) !== assignment.trainingMode,
@@ -121,7 +158,7 @@ export function reevaluateAiTrainingModesForMatchday(input: {
       assignments,
       preview.confirmToken,
       persistence,
-      "ai_matchday_training_reeval",
+      trainingDelegiert ? "delegation_matchday_training_reeval" : "ai_matchday_training_reeval",
     );
     if (result.applied) {
       teamsUpdated += 1;
@@ -132,5 +169,36 @@ export function reevaluateAiTrainingModesForMatchday(input: {
 
   deferred.flush();
 
-  return { teamsEvaluated, teamsUpdated, playersReassigned, skippedManual };
+  return {
+    teamsEvaluated,
+    teamsUpdated,
+    playersReassigned,
+    skippedManual,
+    delegatedTeamsEvaluated,
+    delegatedPlayersRespected,
+  };
+}
+
+/**
+ * Delegiertes Training: Spieler OHNE Trainingsklasse bekommen die Klasse, die die Vorsaison-KI
+ * ihnen geben wuerde (`buildTeamPlayerTrainingClassPlans`, Schwerpunkt aus den KI-Trainings-
+ * Einstellungen des Teams, sonst ausgewogen). Eine vorhandene Klasse bleibt — die hat entweder der
+ * Mensch gewaehlt oder ein frueherer Lauf, und Klassenwechsel je Spieltag waeren Unruhe ohne Grund.
+ */
+function fillMissingTrainingClassesForDelegatedTeam(
+  save: PersistedSaveGame,
+  teamId: string,
+  selbstGesetzt: ReadonlySet<string>,
+  persistence: PersistenceService,
+): PersistedSaveGame {
+  const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
+  const focus = save.gameState.seasonState.aiManagerTrainingSettings?.[teamId]?.trainingFocus ?? "BALANCED";
+  const assignments = buildTeamPlayerTrainingClassPlans({ gameState: save.gameState, teamId, trainingFocus: focus })
+    .filter((plan) => !selbstGesetzt.has(plan.playerId) && !playersById.get(plan.playerId)?.trainingClass)
+    .map((plan) => ({ playerId: plan.playerId, trainingClass: plan.trainingClass }));
+  if (assignments.length === 0) return save;
+  const preview = previewPlayerTrainingClasses({ save, teamId, assignments });
+  if (!preview.ok || !preview.confirmToken) return save;
+  const result = applyPlayerTrainingClasses(save, teamId, assignments, preview.confirmToken, persistence);
+  return result.applied ? (result.save ?? persistence.getSaveById(save.saveId) ?? save) : save;
 }

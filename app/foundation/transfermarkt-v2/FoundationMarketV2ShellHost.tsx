@@ -22,6 +22,12 @@ import {
   isTeamSetupDraftWishlistPhase,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
+import { baueDisziplinBedarf } from "@/lib/market/transfermarkt-disziplin-bedarf";
+import { isPlayerAvailabilityInjured } from "@/lib/fatigue/fatigue-injury-service";
+import { getLeagueOf, getLeagueTeamIds } from "@/lib/season/league-split";
+import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { useMemo } from "react";
 import { useMarketV2Derivations } from "@/lib/foundation/tabs/use-market-v2-derivations";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 
@@ -176,6 +182,23 @@ export default function FoundationMarketV2ShellHost({
     getRosterEntryDisplaySalary,
   });
 
+  const leagueTeamIds = useMemo(() => {
+    const tier = activeManagerTeamId ? getLeagueOf(gameState, activeManagerTeamId) : null;
+    return tier ? getLeagueTeamIds(gameState, tier) : [];
+  }, [gameState, activeManagerTeamId]);
+  const injuredPlayerIds = useMemo(
+    () =>
+      (gameState.seasonState.playerAvailabilityState ?? [])
+        .filter((entry) => isPlayerAvailabilityInjured(entry))
+        .map((entry) => entry.playerId),
+    [gameState.seasonState.playerAvailabilityState],
+  );
+  // Wichtigkeit je Disziplin aus dem echten Spielplan der laufenden bzw. kommenden Saison (beim Draft aus der Saisonvorlage).
+  const disziplinBedarf = useMemo(
+    () => baueDisziplinBedarf(getSeasonDisciplineSchedule(gameState, { saveId: activeSaveId }).map((entry) => [entry.discipline1, entry.discipline2])),
+    [gameState, activeSaveId],
+  );
+
   return (
     <FoundationTransfermarktV2Panel
       active
@@ -212,6 +235,21 @@ export default function FoundationMarketV2ShellHost({
         disciplines: gameState.disciplines as Discipline[],
         disciplineRanksByTeamId: transferMarketDisciplineRanksByTeamId,
         leagueTeamCount: gameState.teams.length,
+        leagueTeamIds,
+        nebelAus: isScoutingNebelAus(gameState),
+        injuredPlayerIds,
+        disziplinBedarf,
+        // Vorstand-Freigabe: Datenvertrag `TransferFreigabe` (lib/market/transfermarkt-freigabe.ts). Die Zahlen liefert die
+        // Finanzen-Stufe 3; bis sie auf main ist, gibt es keine, und die Seite zeigt nur den Kontostand.
+        freigabe: null,
+        onSellCompleted: async () => {
+          await loadSave(activeSaveId);
+          bumpMarketReloadToken();
+        },
+        onRenewCompleted: async () => {
+          await loadSave(activeSaveId);
+          bumpMarketReloadToken();
+        },
         rosterRows: transferMarketV2RosterRows,
         playerRatingsById,
         wishlistEntries: transferWishlistEntriesForMarketV2,

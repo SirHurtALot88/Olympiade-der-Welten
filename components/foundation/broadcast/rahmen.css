@@ -783,3 +783,11 @@ button.fb-chip:hover {
   font-size: 0.8em;
   color: var(--fb-leise);
 }
+
+/* Ablauf: passt in den Bildschirm, eigener Scroll mit Schatten unten; Erledigtes ist eine einzige Zeile. */
+.foundation-takt-ablauf{max-height:min(70vh,calc(100vh - 9em));scrollbar-width:thin;background-image:linear-gradient(var(--fb-f2),var(--fb-f2)),linear-gradient(to top,rgba(0,0,0,.55),transparent);background-size:100% 100%,100% 1.6em;background-position:0 0,0 100%;background-repeat:no-repeat;background-attachment:local,scroll}
+.foundation-takt-erledigt{margin:0 0 .4em}
+.foundation-takt-erledigt summary{display:flex;align-items:center;gap:.6em;cursor:pointer;color:var(--fb-leise);font-size:.95em;list-style:none}
+.foundation-takt-erledigt summary::-webkit-details-marker{display:none}
+.foundation-takt-erledigt summary::after{content:"▾";margin-left:auto}
+.foundation-takt-erledigt[open] summary::after{content:"▴"}
