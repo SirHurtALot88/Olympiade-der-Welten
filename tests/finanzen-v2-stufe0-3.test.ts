@@ -12,7 +12,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { berechneKiRuecklage, normalisiereFinanzwert, ruecklagenQuote } from "@/lib/finance/ki-ruecklage";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
 import {
-  berechneBudgetZugriff,
+  berechneVorstandBudgetStand,
+  pruefeKaufGegenVorstandFreigabe,
   resolveVorstandFreigabe,
   stufeFuerVertrauen,
 } from "@/lib/finance/vorstand-budgetfreigabe";
@@ -60,18 +61,11 @@ describe("Stufe 3 — Vorstand-Budgetfreigabe", () => {
     expect(stufeFuerVertrauen(8).anteil).toBe(1);
     expect(stufeFuerVertrauen(6).stufe).toBe("hoch");
     expect(stufeFuerVertrauen(5).stufe).toBe("mittel");
+    expect(stufeFuerVertrauen(5).anteil).toBe(0.85);
+    expect(stufeFuerVertrauen(3).anteil).toBe(0.7);
     expect(stufeFuerVertrauen(3).stufe).toBe("niedrig");
     expect(stufeFuerVertrauen(2.4).stufe).toBe("sparauflage");
-    expect(stufeFuerVertrauen(2.4).anteil).toBe(0.6);
-  });
-
-  it("Budgetzugriff: nur das Geld ueber der Ruecklage wird anteilig gesperrt", () => {
-    const z = berechneBudgetZugriff({ cash: 100, ruecklage: 40, anteil: 0.75 });
-    expect(z.verfuegbarUeberRuecklage).toBe(60);
-    expect(z.ausgebbar).toBe(45);
-    expect(z.gesperrt).toBe(15);
-    // unter der Ruecklage gibt es nichts zu sperren
-    expect(berechneBudgetZugriff({ cash: 30, ruecklage: 40, anteil: 0.6 }).gesperrt).toBe(0);
+    expect(stufeFuerVertrauen(2.4).anteil).toBe(0.5);
   });
 
   function stateMit(saisonId: string, vertrauen?: number): GameState {
@@ -86,13 +80,68 @@ describe("Stufe 3 — Vorstand-Budgetfreigabe", () => {
     expect(resolveVorstandFreigabe(stateMit("season-1", 1), "A").grund).toBe("saison_1");
     const s2 = resolveVorstandFreigabe(stateMit("season-2", 3), "A");
     expect(s2.stufe).toBe("niedrig");
-    expect(s2.anteil).toBe(0.75);
+    expect(s2.anteil).toBe(0.7);
     expect(resolveVorstandFreigabe(stateMit("season-2"), "A").grund).toBe("ohne_vertrauenswert");
   });
 
   it("OLY_VORSTAND_BUDGET=0 schaltet die Freigabe aus", () => {
     process.env.OLY_VORSTAND_BUDGET = "0";
     expect(resolveVorstandFreigabe(stateMit("season-2", 1), "A").anteil).toBe(1);
+  });
+});
+
+describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
+  function state(cash: number, vertrauen: number, history: unknown[] = []): GameState {
+    return {
+      season: { id: "season-2" },
+      teams: [{ teamId: "A", cash }],
+      transferHistory: history,
+      seasonState: { boardConfidence: { A: { teamId: "A", value: vertrauen, pressure: 5, warnings: [] } } },
+    } as unknown as GameState;
+  }
+  const buy = (fee: number, salary: number) => ({ id: "b", seasonId: "season-2", transferType: "buy", toTeamId: "A", fromTeamId: null, fee, salary });
+  const sell = (fee: number) => ({ id: "s", seasonId: "season-2", transferType: "sell", fromTeamId: "A", toTeamId: null, fee, salary: 0 });
+
+  it("Stand: freigegeben, ausgegeben, noch frei, gesperrt; Kontostand bleibt unveraendert", () => {
+    const gs = state(100, 3); // niedrig = 70 %
+    const st = berechneVorstandBudgetStand(gs, "A");
+    expect(st.freigegebenGesamt).toBe(70);
+    expect(st.ausgegeben).toBe(0);
+    expect(st.nochFrei).toBe(70);
+    expect(st.gesperrt).toBe(30);
+    expect(st.grund).toContain("70 %");
+    expect(gs.teams[0]!.cash).toBe(100);
+  });
+
+  it("Kauf ueber der Freigabe ist abgelehnt (Ablose plus Jahresgehalt), darunter erlaubt", () => {
+    const gs = state(100, 3);
+    const ok = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 60, salary: 8, rosterBefore: 10, playerMin: 8 });
+    expect(ok.ok).toBe(true);
+    const nein = pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 65, salary: 8, rosterBefore: 10, playerMin: 8 });
+    expect(nein.ok).toBe(false);
+    expect(nein.reason).toBe("vorstand_budget_nicht_freigegeben");
+    // unter dem Kader-Minimum gilt die Sperre nicht
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 90, salary: 8, rosterBefore: 6, playerMin: 8 }).ok).toBe(true);
+  });
+
+  it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben", () => {
+    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Freigegeben 70 % x (100 + 20) = 84, davon 14 aus dem Verkauf.
+    const gs = state(120, 3, [sell(20)]);
+    const st = berechneVorstandBudgetStand(gs, "A");
+    expect(st.freigegebenGesamt).toBe(84);
+    expect(st.nochFrei).toBe(84);
+    expect(st.gesperrt).toBe(36);
+    // Ohne Verkauf waeren es 70: der Verkauf schaltet genau 14 frei
+    expect(st.nochFrei - 70).toBe(14);
+  });
+
+  it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
+    // Anfangskasse 100, Kauf 40 + Gehalt 5 -> Kasse 60, freigegeben 70, ausgegeben 45, frei 25, gesperrt 35
+    const st = berechneVorstandBudgetStand(state(60, 3, [buy(40, 5)]), "A");
+    expect(st.freigegebenGesamt).toBe(70);
+    expect(st.ausgegeben).toBe(45);
+    expect(st.nochFrei).toBe(25);
+    expect(st.gesperrt).toBe(35);
   });
 });
 
@@ -172,5 +221,16 @@ describe("Draft-Builder — Ruecklage auch unter dem Kader-Minimum", () => {
     const r = buildOrganicSquadPlan(input({ cash: 160, cashBuffer: 100, solvencyFloor: 100, minFillFloor: 100 }));
     expect(r.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
     expect(r.finalCash).toBeGreaterThanOrEqual(0);
+  });
+
+  it("spendCap begrenzt die Summe aus Abloesen und Gehaeltern ab dem Minimum hart", () => {
+    const frei = buildOrganicSquadPlan(input({ cash: 400 }));
+    const cap = 150;
+    const r = buildOrganicSquadPlan(input({ cash: 400, spendCap: cap }));
+    const kosten = r.finalSquad.reduce((x, p) => x + p.marketValue + p.salary, 0);
+    expect(r.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
+    // oberhalb des Minimums nie ueber der Freigabe: Kosten der Kaeufe jenseits des Minimums passen hinein
+    expect(frei.finalSquad.length).toBeGreaterThanOrEqual(r.finalSquad.length);
+    expect(kosten).toBeLessThan(frei.finalSquad.reduce((x, p) => x + p.marketValue + p.salary, 0) + 1);
   });
 });

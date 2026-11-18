@@ -44,11 +44,7 @@ import {
   type KiRuecklageErgebnis,
 } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
-import {
-  berechneBudgetZugriff,
-  resolveVorstandFreigabe,
-  type VorstandFreigabe,
-} from "@/lib/finance/vorstand-budgetfreigabe";
+import { berechneVorstandBudgetStand, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
@@ -397,7 +393,7 @@ export type OrganicDraftPlanResult = {
   /** Finanzkonzept V2 Stufe 1: die Finanzwert-Ruecklage dieses Aufrufs (undefined bei `OLY_KI_RUECKLAGE_V2=0`). */
   ruecklageDebug?: KiRuecklageErgebnis;
   /** Finanzkonzept V2 Stufe 3: Vorstand-Freigabe dieses Aufrufs und das gesperrte Geld (C). */
-  vorstandDebug?: VorstandFreigabe & { gesperrt: number };
+  vorstandDebug?: VorstandBudgetStand;
   /** Finanzkonzept V2 Stufe 2: der in den Forecast eingespeiste erwartete Sponsor (C). */
   sponsorForecast?: number;
 };
@@ -495,10 +491,10 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     });
   }
   const ruecklage = ruecklageDebug?.ruecklage ?? 0;
-  const vorstand = resolveVorstandFreigabe(input.gameState, input.team.teamId);
-  const zugriff = berechneBudgetZugriff({ cash: ctx.cash, ruecklage: Math.max(ruecklage, ORGANIC_CASH_BUFFER), anteil: vorstand.anteil });
-  const vorstandGesperrt = vorstand.anteil < 1 ? zugriff.gesperrt : 0;
-  const planCash = ctx.cash - vorstandGesperrt;
+  // Stufe 3 (hart): der Vorstand gibt nur `nochFrei` zum Ausgeben (Ablosen + Jahresgehaelter) frei; das Geld bleibt auf dem Konto.
+  const vorstand = berechneVorstandBudgetStand(input.gameState, input.team.teamId);
+  const spendCap = vorstand.anteil < 1 ? vorstand.nochFrei : undefined;
+  const planCash = ctx.cash;
   const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
   const sponsorForecast =
     istSponsorForecastAktiv() && input.forecast?.sponsorIncome === undefined
@@ -633,22 +629,21 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
       // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
       minFillFloor: ruecklage > 0 ? ruecklage : undefined,
+      spendCap,
     },
     draftSeed: input.draftSeed ?? null,
   });
 
   return {
     decisions: result.decisions,
-    // Die Vorstand-Sperre war nie ausgebbar und liegt weiter in der Kasse: wieder aufschlagen, damit Aufrufer
-    // (Kredit-Probe: Ausgabe = Startkasse - finalCash) die echte Ausgabe sehen.
-    finalCash: result.finalCash + vorstandGesperrt,
+    finalCash: result.finalCash,
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
     optTarget: planWeights.optTarget,
     salaryCeilingDebug,
     ruecklageDebug,
-    vorstandDebug: { ...vorstand, gesperrt: vorstandGesperrt },
+    vorstandDebug: vorstand,
     sponsorForecast,
   };
 }
