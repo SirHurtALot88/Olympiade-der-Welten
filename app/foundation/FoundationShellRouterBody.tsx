@@ -963,6 +963,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
            bestimmt, nur zweimal verwendet (sichtbar als Krume, semantisch als h1). */
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
+        nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
         takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext }}
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : null}
@@ -1687,17 +1688,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
       {roomContext && roomLiveState ? (
         <FoundationRoomFlowBar roomContext={roomContext} roomLiveState={roomLiveState} />
-      ) : null}
-
-      {readOnlyBannerMessage ? (
-        <section
-          className="foundation-access-banner is-readonly is-compact"
-          role="status"
-          aria-label="Steuerungsstatus"
-          title={readOnlyBannerMessage}
-        >
-          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
-        </section>
       ) : null}
 
       {activeView === "homeV2" && foundationWarningInboxItems.some((item: FoundationWarningInboxItem) => item.severity === "blocked") ? (

@@ -61,6 +61,8 @@ type FoundationShellProps = {
    * Statuschip + Weiter-Knopf; die Aktivitätsliste steht im Ablauf-Aufklapper des Taktgebers.
    */
   takt?: Omit<FoundationTaktgeberProps, "activities">;
+  /** Nur-Ansicht-Hinweis (Text = Erklärung) als kleine Marke im Band statt als eigenes Band. */
+  nurAnsicht?: string | null;
   /** Suche öffnen (Lupe im Band). */
   onSearch?: () => void;
   /** Kasse des aktiven Teams, fertig formatiert („3,2 Mio“). */
@@ -111,6 +113,7 @@ export default function FoundationShell({
   viewTitle,
   compactRail = true,
   takt,
+  nurAnsicht,
   onSearch,
   kasseLabel,
   onOpenSeason,
@@ -218,6 +221,11 @@ export default function FoundationShell({
           {subNav ? <div className="fb-reiter">{subNav}</div> : null}
           <FoundationBandSlotTarget />
           <div className="foundation-shell-header-actions fb-rechts">
+            {nurAnsicht ? (
+              <span className="fb-hinweis" data-testid="foundation-band-nur-ansicht" title={nurAnsicht} role="status">
+                Nur Ansicht
+              </span>
+            ) : null}
             {seasonContextLabel ? (
               <button
                 type="button"
