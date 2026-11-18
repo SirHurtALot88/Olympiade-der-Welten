@@ -272,6 +272,8 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         men: row.player.coreStats.men,
         soc: row.player.coreStats.soc,
         contractLength: row.entry.contractLength ?? null,
+        className: row.player.className ?? null,
+        race: row.player.race ?? null,
         marketValue: row.marketValue,
         highlight: index === 0 ? ("top" as const) : null,
         ovrRank: rating?.ovrRank ?? null,

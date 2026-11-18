@@ -7668,6 +7668,9 @@ export function useFoundationShellRouterBodyScope({
   const taktPlan = baueTaktPlan({
     steps: gameFlowState.steps,
     currentStepId: gameFlowState.currentStepId,
+    hatGespielt: (gameState.seasonState.matchdayResults ?? []).some(
+      (result) => result.seasonId === gameState.season.id && result.status === "preview_applied",
+    ),
     formatGrund: formatGameFlowBlocker,
     sprungZuSchritt: (schritt) => () => navigateToGameFlowStep(schritt.targetView, schritt.teamId, schritt.targetPanel),
     inbox: activeTeamOpenInboxItems.map((item: GameInboxItem) => ({

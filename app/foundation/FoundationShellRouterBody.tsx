@@ -8,7 +8,7 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
-import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, type CSSProperties } from "react";
@@ -973,7 +973,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
         takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
         onSearch={() => setShowCommandPalette(true)}
-        kasseLabel={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : null}
+        kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
         teamName={selectedTeam?.name ?? null}
         teamCrest={
