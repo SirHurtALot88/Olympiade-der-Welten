@@ -7131,6 +7131,38 @@
     // unuebersehbare Merkmal" aus dem Bildbefund, nicht nur ein Farbtupfer auf dem Koerper).
     if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
     if(b.geist)ctx.globalAlpha=1;
+    // GESICHTSMARKE FUER SPIELER OHNE EIGENE FIGUR (18.11., s. ohneEigeneFigur()).
+    if(b===BAU_STD&&!u.down&&ohneEigeneFigur(u.n))zeichneGesichtsMarke(ctx,u,x,y-58*Z,Z);
+  }
+  // SPIELER OHNE EIGENE FIGUR (Chris' Live-Befund 18.11., Spieltag 1: "Crimson Shadow, Fungor und
+  // Nukka klettern als dieselbe generische glatzkoepfige Figur, nur Abyssalfin echt"). URSACHE: kein
+  // Ladefehler und keine fehlende Pose -- diese Spieler HABEN keinen PixelLab-Satz. Der Figuren-Index
+  // (data/generated/figuren-sprites.json -> battle-mode.figuren.js) fuehrt 361 Spieler von 2984; wer
+  // fehlt, faellt auf BAU_STD, und seit die alten LPC-Baukasten-Eintraege am 30.10. abgeschaltet
+  // wurden, sieht jeder davon gleich aus. Neue Figuren bestellen ist gesperrt (CLAUDE.md, PixelLab).
+  // Mit dem, was da ist, wird der Platzhalter wenigstens unterscheidbar: ueber dem Kopf steht das
+  // PORTRAET des Spielers als runde Marke (dasselbe Bild, das die Kaderleiste/Spielerkamera schon
+  // zeigen, `battlePortraitBild`), und die Kaderleiste zeigt fuer ihn nur noch das Portraet statt
+  // eines zweiten, nichtssagenden Platzhalters. Nur ueber HTTP (PIXEL_FIGUR_AKTIV): unter file://
+  // (Messlaeufe, renderProbe) bleibt jedes Bild unveraendert. Reine Anzeige, liest nur u.n/u.down.
+  function ohneEigeneFigur(name){
+    return !!name&&PIXEL_FIGUR_AKTIV&&!BAU[name]&&!Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,name);
+  }
+  function zeichneGesichtsMarke(ctx,u,x,yMitte,Z){
+    const e=battlePortraitBild(u);
+    if(!e.geladen||e.fehler)return;
+    const r=Math.max(5.5,8*Z);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x,yMitte,r,0,Math.PI*2); ctx.closePath();
+    ctx.fillStyle="rgba(8,10,14,.85)"; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(e.im,x-r,yMitte-r,2*r,2*r);
+    ctx.restore();
+    ctx.lineWidth=Math.max(1,1.3*Z);
+    ctx.strokeStyle="rgba(242,233,216,.9)";
+    ctx.stroke();
+    ctx.restore();
   }
 
   // SKILLS — Struktur aus Eslabong uebernommen, Zahlen bleiben unsere.
@@ -44586,6 +44618,15 @@
         zeitSpanne=Math.max(...fertigeZeiten)-zeitBest;
       }
     }
+    // KEIN STAND VOR DEM START (Chris' Live-Befund 18.11., Spieltag 1, D1 Climbing: vor dem
+    // Anpfiff stand oben "7 · 3" und unten in der Kaderleiste "7:3"). Vor dem ersten Tick hat
+    // noch niemand einen Meter gezeigt, alle stehen gleich -- die Sortierung oben ist dann
+    // nur die stabile LAEUFER-Reihenfolge (Heim zuerst bzw. Bahnfolge), und die Rangpunkte
+    // N..1 darauf sahen aus wie ein Ergebnis. Vor dem Start bekommt deshalb jeder 0 Punkte,
+    // beide Seiten stehen 0 : 0; HUD, Kaderleiste (#kmitte) und Kacheln lesen alle diese
+    // Funktion. Reine Anzeige: sobald `rennT>0` ist (erster Sim-Tick) gilt die alte Zeile
+    // unveraendert -- am Rennende, wo wert()/Sonde/Endstand lesen, also bit-identisch.
+    const vorStart=!done&&!(rennT>0);
     reihe.forEach((u,i)=>{
       const rangP=N-i;
       let p=rangP;
@@ -44593,9 +44634,10 @@
         const marginP=N-(bahnZeit(u)-zeitBest)/zeitSpanne*(N-1);
         p=(1-marginAnteil)*rangP+marginAnteil*marginP;
       }
+      if(vorStart)p=0;
       punkte.set(u.id,p); seiten[u.seite]+=p;
     });
-    return {reihe,punkte,seiten};
+    return {reihe,punkte,seiten,vorStart};
   }
   let bahnEndeGemeldet=false;
   // FUEHRUNGSWECHSEL (Broadcast-Praesentation Runde 2, Vorschlag 1, 22.09./26.09.): das
@@ -44712,6 +44754,7 @@
       // Banner GENAU EINEN sprechenden Zusatz bekommt, ohne die Live-Anzeige zu beruehren.
       const diff=Math.round(Math.abs(w.seiten[0]-w.seiten[1])*10)/10;
       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true,
+        vorStart:!!w.vorStart,
         bannerZusatz:diff>0?"mit "+diff+" Punkten Vorsprung":null};
     }
     // TIME-TRIAL (22.09.): ZWEI Groessen, GENAU WIE BEI DER STAFFEL bewusst nicht eine
@@ -45253,7 +45296,7 @@
     const rangSpiel=stand.gewertet&&BA().wertung==="rang"&&LAEUFER.length>0;
     document.getElementById("klsuffix").textContent=
       stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
-      +(stand.gewertet&&!done?" · vorläufig":"");
+      +(stand.vorStart?" · vor dem Start":stand.gewertet&&!done?" · vorläufig":"");
     // DEUTSCHES KOMMA AUCH HIER (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `stand.seiten`
     // sind bei Takeshi (Burgpunkte) Dezimalwerte — ohne `stand.fmt` haette der rohe
     // Zahlenwert per String-Verkettung einen Punkt gezeigt ("40.1 : 22.7"), waehrend
@@ -60871,13 +60914,36 @@
     return frag;
   }
 
+  // WELCHE ZWEI SEITEN DIE VORSTELLUNG ZEIGT (Chris' Live-Befund 18.11., Spieltag 1, D2 Battlefield:
+  // "Obwohl ich N-N steuere, geht er auf ein anderes Spiel, wenn ich zu Diszi 2 wechsle"). Die
+  // Vorstellung hat zwei Plaetze (L/R) und las immer Seite 0 und 1 -- im Vier-Team-Pod sind das die
+  // ersten beiden Teams der GRUPPE (Pod-Reihenfolge der Buchung), nicht das gesteuerte Team. Der Host
+  // reicht im Pod `eigeneSeite` (Index des gesteuerten Teams in der Gruppe) und `gegnerSeite` (sein
+  // Spieltagsgegner, falls in derselben Gruppe) mit; die Vorstellung zeigt dann diese beiden. Reine
+  // Anzeige: Seitennummern, Pod-Reihenfolge, Saat und Aufstellung des Laufs bleiben unberuehrt.
+  // Ohne Pod oder ohne Angabe bleibt es bei [0,1] wie bisher.
+  function einlaufSeiten(){
+    let roh=null;
+    try{
+      if(istKampf(disc)&&bfPodAktiv())roh=bfPodAnzeigeKontext();
+      else if(istBahn(disc)&&bahnPodAnzeigeAktiv())roh=bahnPodAnzeigeKontext();
+    }catch(e){ roh=null; }
+    if(!roh)return [0,1];
+    const N=roh.teams.length;
+    const gueltig=(s)=>Number.isInteger(s)&&s>=0&&s<N;
+    const eigen=gueltig(roh.eigeneSeite)?roh.eigeneSeite:0;
+    const gegner=gueltig(roh.gegnerSeite)&&roh.gegnerSeite!==eigen?roh.gegnerSeite:(eigen===0?1:0);
+    return [eigen,gegner];
+  }
   function renderEinlauf(){
+    const seitenZuordnung=einlaufSeiten();
     // Erster Durchlauf ueber beide Seiten: Basis+Anpassung je Spieler EINMAL berechnen
     // (nicht pro Zeile neu, s.u.) und den Anpassungs-Pool fuer die Faerbung sammeln —
     // braucht beide Teams, bevor die erste Zeile gezeichnet wird.
     const aufschluesselungenJeSeite=[[],[]];
     const deltaPool=[];
-    for(const seite of [0,1]){
+    for(const platzL of [0,1]){
+      const seite=seitenZuordnung[platzL];
       const feldRoh=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite)
         :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite)
         :istFeldspiel(disc)?FSTEAM[seite]
@@ -60885,7 +60951,7 @@
       for(const u of feldRoh){
         const p=seite===0?SQUAD.find(x=>x.n===u.n):OPP.find(x=>x.n===u.n);
         const auf=p?aufschluesselung(p,disc,seite===1):{teile:[["Basis",u.eig,""]],summe:u.eig};
-        aufschluesselungenJeSeite[seite].push(auf);
+        aufschluesselungenJeSeite[platzL].push(auf);
         deltaPool.push(auf.summe-auf.teile[0][1]);
       }
     }
@@ -60899,9 +60965,10 @@
       for(const sk of Object.keys(BASKETBALL_SKILL_LABEL))
         basketballSkillPool[sk]=alle.map(x=>x[sk]).filter(Number.isFinite);
     }
-    for(const seite of [0,1]){
-      const v=VEREIN[seite];
-      const k=document.getElementById(seite===0?"eteamL":"eteamR");
+    for(const platzL of [0,1]){
+      const seite=seitenZuordnung[platzL];
+      const v=VEREIN[seite]||VEREIN[platzL];
+      const k=document.getElementById(platzL===0?"eteamL":"eteamR");
       k.textContent="";
       k.appendChild(wappen(v));
       const txt=el("div");
@@ -60926,7 +60993,7 @@
 
       // Die Aufstellung kommt aus DENSELBEN Einheiten, die gleich kaempfen — nicht aus
       // einer zweiten Liste, die auseinanderlaufen koennte.
-      const liste=document.getElementById(seite===0?"elisteL":"elisteR");
+      const liste=document.getElementById(platzL===0?"elisteL":"elisteR");
       liste.textContent="";
       const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
         :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
@@ -60954,7 +61021,7 @@
         // (Slot/Form/Mutator/Intensitaet zusammen) in Klammern, z.B. "71 (+8,5)". Die
         // Anpassung ist gefaerbt (heatBand, s.o.) — rot=verschlechtert den Spieler fuer
         // diesen Slot spuerbar, blau=hebt ihn deutlich, dieselbe Skala wie im echten Spiel.
-        const auf=aufschluesselungenJeSeite[seite][i];
+        const auf=aufschluesselungenJeSeite[platzL][i];
         const basis=auf.teile[0][1], deltaWert=auf.summe-basis;
         const w=el("span","ewert");
         w.appendChild(document.createTextNode(basis.toFixed(1)+" "));
@@ -62028,7 +62095,9 @@
         // genau wie kaderFigur() daneben.
         const kopf=el("div","kkkopf");
         kopf.appendChild(kaderPortraet(u.n));
-        kopf.appendChild(kaderFigur(u.n));
+        // Ohne eigene PixelLab-Figur (s. ohneEigeneFigur()) waere die Figur daneben nur der
+        // gleiche Platzhalter wie bei jedem anderen solchen Spieler -- dann steht das Portraet allein.
+        if(!ohneEigeneFigur(u.n))kopf.appendChild(kaderFigur(u.n));
         kopf.appendChild(el("b",null,u.n));
         // Was die Leiste frueher trug, steht jetzt als Zahl neben dem Namen — der
         // Streckenanteil auf der Bahn, der Punktestand im Feldspiel/auf der Buehne. Eine
@@ -69977,6 +70046,8 @@
       return JSON.parse(JSON.stringify(BF_D5));
     },
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
+    // Welche zwei Seiten die Vorstellung gerade zeigt (einlaufSeiten(), 18.11.) -- nur gelesen.
+    einlaufSeitenProbe:()=>einlaufSeiten(),
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
     // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine
