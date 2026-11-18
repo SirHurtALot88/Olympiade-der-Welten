@@ -100,8 +100,8 @@ Wo es eine Messung gibt, steht sie dabei.
 | Dunk-Anteil / Quote | 16,4 % / 95 % | 10,7 % / 83 % | dto. |
 | Gezeigt = gebucht | — | 0 / 828 | `__arena.diagGezeigtGebucht(8)` |
 
-**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT d09e10bb872c (75 Einträge)`,
-neu **`GESAMT 4a7f5d7befee (75 Einträge)`** (nach Review-Fix Seitenlinie und Merge von main #1564). Der diff betrifft genau drei Zeilen:
+**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT 97cccd6017fb (75 Einträge)`,
+neu **`GESAMT 38b176d7185b (75 Einträge)`** (nach Review-Fix Seitenlinie und Merge von main inkl. #1564, #1561). Der diff betrifft genau drei Zeilen:
 `spiele basketball 1` b37fd82fb384 → 076bfb746272, `spiele basketball 7` e04f9806dc23 → db37a3d13314,
 `spiele basketball 42` c52a59d8d024 → 0f9d5b90711e. Alle 72 übrigen Zeilen sind gleich. Der Node-Vorabgleich
 (20 Disziplinen × Saaten 1/7/42) zeigt dasselbe: 3 von 60 anders, alle Basketball.

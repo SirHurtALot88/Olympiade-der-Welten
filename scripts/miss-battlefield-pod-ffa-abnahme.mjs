@@ -65,6 +65,9 @@ const PP_LAEUFE = Number(wert("pp") || 24);
 const NUR_PP = hat("nur-pp");
 const PP_JE_SEITE_LISTE = wert("pp-je-seite") ? parseListe(wert("pp-je-seite")) : [undefined];
 const ECHTZEIT = hat("echtzeit");
+// --format=domination5 (17.11.): misst das Fuenf-Punkte-Format (window.__arena.battlefieldFormat);
+// ohne Schalter das Standardformat "orte3", unveraendert.
+const FORMAT = wert("format");
 
 // --- Kader: zehn Teams aus der Familie ------------------------------------------------
 const familie = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8"));
@@ -160,6 +163,7 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.battlefieldPodSonde, null, { timeout: 60000 });
+  if (FORMAT) await seite.evaluate((f) => window.__arena.battlefieldFormat(f), FORMAT);
   if (!NUR_PP) for (const js of JE_SEITE) {
     for (const versatz of STROEME) {
       const t0 = Date.now();
@@ -206,7 +210,7 @@ try {
 
 const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : "  —  ");
 const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : " — ");
-console.log(`Battlefield-Pod-Abnahme (${ECHTZEIT ? "Echtzeit-FFA" : "Gefecht je Ort"}) — ${SPIELE} Kaempfe je Gruppe, ${GRUPPEN4.length} von ${ALLE4.length} Vierergruppen, Saatstroeme ${STROEME.join(" / ")}`);
+console.log(`Battlefield-Pod-Abnahme (${ECHTZEIT ? "Echtzeit-FFA" : FORMAT === "domination5" ? "Domination, fuenf Punkte" : "Gefecht je Ort"}) — ${SPIELE} Kaempfe je Gruppe, ${GRUPPEN4.length} von ${ALLE4.length} Vierergruppen, Saatstroeme ${STROEME.join(" / ")}`);
 console.log(`Kader: ${TEAMNAMEN.length} Teams der Kader-Familie\n`);
 console.log("k  Strom     rho/Kampf Median  Mittel  min..max       <0,80  Saison  Star#1  Star<=2  letzt  Paar>=15  Team-rho  bestesTeam 1./<=2./4.   Ende allein/limit/zeit  Dauer  ms/Kampf");
 for (const l of ausgabe.laeufe) {

@@ -10,6 +10,7 @@ import {
   buildArenaAufstellungBeide,
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
 import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
@@ -1647,7 +1648,7 @@ export type RunBattlefieldPodFixturesOptions = {
 };
 
 async function simuliereBattlefieldPodsImBrowser(payload: {
-  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen: { jeSeite?: number; formSaat: number } }>;
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen: { jeSeite?: number; formSaat: number; format?: string } }>;
   timeoutMs: number;
 }): Promise<Array<RoherBattlefieldPodErgebnis | null>> {
   const fenster = window as unknown as {
@@ -1656,7 +1657,7 @@ async function simuliereBattlefieldPodsImBrowser(payload: {
         teams: ArenaSpieler[][],
         saat: number,
         platzJeTeam?: ArenaAufstellung[],
-        optionen?: { jeSeite?: number; formSaat?: number },
+        optionen?: { jeSeite?: number; formSaat?: number; format?: string },
       ) => RoherBattlefieldPodErgebnis | null;
     };
   };
@@ -1773,7 +1774,7 @@ export async function runBattlefieldPodFixtures(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
       })),
       timeoutMs,
     });
