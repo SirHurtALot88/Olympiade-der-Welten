@@ -113,11 +113,12 @@ async function main() {
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(OUTPUT_DIR, `app-01-login-${BREITE}x${HOEHE}.png`) });
 
-    // Als Chris anmelden (Host, legt Spiele an).
-    await page.getByRole("radio", { name: "Chris" }).click();
-    await page.locator('input[type="password"]').fill(TEST_PASSWORT);
-    await page.getByRole("button", { name: /^Anmelden$/ }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 60_000 });
+    // Als Chris anmelden (Host, legt Spiele an) — ueber denselben Login-Endpunkt wie das Formular;
+    // der Sitzungs-Cookie landet im Browser-Kontext.
+    const login = await ctx.request.post(`${BASE_URL}/api/auth/login`, {
+      data: { username: "chris", password: TEST_PASSWORT },
+    });
+    if (!login.ok()) throw new Error(`Login fehlgeschlagen: ${login.status()}`);
 
     // 02/03 Neues Spiel: Ramona-Teams zuordnen
     const url = new URL("/foundation", BASE_URL);
@@ -140,11 +141,12 @@ async function main() {
     await page.evaluate(() => window.scrollBy(0, -260));
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(OUTPUT_DIR, `app-02-neues-spiel-klubs-${BREITE}x${HOEHE}.png`) });
-    const mitspieler = page.locator("summary", { hasText: "Mitspieler (Franky, Ramona)" });
+    // Die Seite scrollt in einem inneren Container, nicht im Fenster: deshalb ein Element-Bild des
+    // aufgeklappten Abschnitts statt eines Fensterbilds.
+    const mitspieler = page.locator("details", { has: page.locator("summary", { hasText: "Mitspieler (Franky, Ramona)" }) });
     await mitspieler.scrollIntoViewIfNeeded();
-    await page.evaluate(() => window.scrollBy(0, -120));
     await page.waitForTimeout(400);
-    await page.screenshot({ path: path.join(OUTPUT_DIR, `app-03-mitspieler-${BREITE}x${HOEHE}.png`) });
+    await mitspieler.screenshot({ path: path.join(OUTPUT_DIR, `app-03-mitspieler-${BREITE}x${HOEHE}.png`) });
 
     // 04 Laufender Spielstand: wer steuert was
     url.searchParams.set("tab", "control");

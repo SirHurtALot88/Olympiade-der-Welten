@@ -244,6 +244,8 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   of War ganz aus** (Testzwecke, Spielbeginn). Ränge gegen die eigene Liga, klein daneben gegen alle 32.
 - **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
+- **Gehaltsanzeige (Chris, 18.11.):** Wo ein Gehalt in Saison- und Spieltagswert gezeigt wird, steht **groß das Gehalt je
+  Saison, klein darunter das je Spieltag.** Nie umgekehrt, nie gleich groß nebeneinander.
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
 
 ## Player Points (PPs): Leistungsmaß, Top-Spieler um 5 je Disziplin (Chris, 18.11.)
@@ -252,6 +254,19 @@ Wörtlich: „die PPs sollen weiterhin eine Darstellung der Leistung der Spieler
 die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! bin da offen für changes“. Zielskala: der
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
+
+**Scharf seit 18.11. (Chris: Variante C2, dazu die Ergebnisskala E1 für die Team-Ergebnisse):** Welche Skala gilt,
+steht im Spielstand, nicht im Serverstart: `seasonState.wertungsSkalen = { seasonId, pp: "c2"|"alt", ergebnis:
+"e1"|"alt" }` (`lib/resolve/wertungs-skalen.ts`), gesetzt nur beim Anlegen eines Spiels und beim Saisonwechsel. Neues
+Spiel: C2 + E1 ab Saison 1; bestehender Battle-Save mit höchstens 3 gebuchten Spieltagen: C2 ab dem nächsten Spieltag
+(Lade-Migration `stelleLaufendeSaisonAufC2Um`, Feld `ppAb`; gebuchte Spieltage bleiben, Zeilen tragen `ppSkala: "c2"`),
+sonst ab dem nächsten Saisonwechsel; E1 immer erst zum Saisonwechsel. Rückweg
+`OLY_PP_SKALA=aus` / `OLY_ERGEBNIS_SKALA=aus` (wirkt ab der nächsten Saison), Notbremse `…=aus-sofort`. Jeder
+Rechenweg fragt `ppSkalaModus(gameState)` bzw. `ergebnisSkalaVersionFuer(gameState)`, nie eine Prozess-Variable.
+E1: je Begegnung 0–10 je Seite (Kantersieg 10:0, Median-Sieg 7:4, Remis bleibt Remis), Verhältnis = Abstand, Pods
+„eigener Wert minus Mittel der Gegner“; die Arena zeigt „87 : 79 → 7 : 4“. Anker nachkalibrieren:
+`werte-pp-skala-aus.mjs` dann `werte-ergebnisskala-aus.ts` (je `--schreibe-kalibrierung`). Doku:
+`docs/design/pp-skala-18-11.md` Abschnitt 8, `docs/design/ergebnisskala-18-11.md`.
 
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
@@ -279,6 +294,13 @@ umgesetzt haben, nicht nur integriert — das ist ganz wichtig. Der alte Stil da
 sein, sondern letztendlich müssen wir step by step die Seiten neu konzeptionieren und aufsetzen inkl. der neuen Mechaniken.“
 Jede Seite wird nach dem Mockup **neu gebaut** (eigene Komponente, eigenes CSS im Mockup-Stil), nicht in die alte Seite
 eingehängt; die alte Fassung fliegt danach raus. Reihenfolge und Stand je Seite: `docs/design/seiten-umbau-fahrplan-18-11.md`.
+
+**Schriftregel (Chris, 18.11.):** **RaniraSeason für Überschriften und Namen, Barlow Condensed für Fließtext, Zahlen und
+Labels — beide lokal** (`public/fonts/`, `@font-face` mit `font-display: swap` in `app/globals.css`, kein Google-CDN). Die App
+hängt an zwei Tokens: `--schrift-haus` (RaniraSeason, Rückfall Georgia) und `--schrift-zahl` (Barlow Condensed, Rückfall
+Roboto Condensed/Arial Narrow); `--nl-display` und `--nl-sans` zeigen darauf, in den Mockups heißen sie `--haus` und `--zahl`.
+Seiten tragen keine eigene Schrift (kein Georgia, kein `system-ui`) ein, sondern nutzen die Tokens. Ausgenommen ist die Arena
+(Canvas/SVG-Beschriftungen in `battle-mode.engine.js` und `discipline-stage/arena/`).
 
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 
@@ -661,7 +683,11 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-18.11.: **GESAMT ce8fcef66028 (75 Eintraege)** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
+18.11. (Climbing „Ende erst, wenn alle oben sind“): **GESAMT d3a39030a3ef (75 Eintraege)** — absichtlich bewegt, weil
+Climbing kein Lead-Zeitlimit mehr hat (Chris 18.11.: „Ende bitte erst wenn ALLE im Ziel sind“; Sicherheitsdeckel 60 Sim-s
+mit hochgerechneter Zeit, `docs/design/arena-start-ende-figuren-18-11.md`); gegenueber `ce8fcef66028` bewegen sich NUR die
+drei `spiele climbing`-Zeilen (1/7/42). Die Anzeige-Commits derselben PR (kein Stand vor dem Start, Vorstellung im Pod,
+Gesichtsmarke, Vorlauf-Fortschritt) lassen `ce8fcef66028` unveraendert. Davor: **GESAMT ce8fcef66028** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
 sind reine Anzeige) auf main mit #1562 (`38b176d7185b`); gegenueber diesem main bewegen sich NUR die drei
 `spiele basketball`-Zeilen (1/7/42), `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9. Von den zwei
 Feldbegrenzungen blieb nur die Feld-Grenze (`feldGrenze`); die Ziel-Begrenzung in `spacingMitspielerZiel` aus #1562 ist

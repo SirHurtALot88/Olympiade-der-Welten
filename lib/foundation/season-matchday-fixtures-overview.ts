@@ -96,6 +96,8 @@ export type SpieltagsDuellDisziplin = {
    * `berechneErgebnisNormiert()`).
    */
   ergebnisNormiert: [number, number] | null;
+  /** `"e1"`, wenn die gebuchte Zeile nach der Ergebnisskala E1 gerechnet ist (sonst alte Skala, `null`). */
+  ergebnisSkala: "e1" | null;
   /** `null`, solange nicht gewertet. */
   resolutionSource: "pps" | "arena" | "pps_duell" | "mini_dm_pod" | null;
   arenaAusfall: ArenaAusfall | null;
@@ -550,6 +552,7 @@ export function buildSpieltagsUebersicht(
         // 2/1/0-Teampunkte-Schema zurueck (`punkteHeim:punkteGast`), wie vor PR #1294.
         seiten: gespielt && homeRow?.resolutionSource === "arena" && homeRow?.duellSeiten ? homeRow.duellSeiten : null,
         ergebnisNormiert: gespielt ? resolveErgebnisNormiertFuerAnzeige(homeRow, awayRow) : null,
+        ergebnisSkala: gespielt && homeRow?.ergebnisSkala === "e1" ? "e1" : null,
         verhaeltnisHeim: gespielt ? homeRow?.verhaeltnis ?? null : null,
         verhaeltnisGast: gespielt ? awayRow?.verhaeltnis ?? null : null,
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,

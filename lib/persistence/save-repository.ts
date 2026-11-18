@@ -26,6 +26,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { stelleLaufendeSaisonAufC2Um } from "@/lib/resolve/wertungs-skalen";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
@@ -1424,7 +1425,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // MIGRATION M3 (PR #1384): bei Liga-Split noch nicht abgerechnete 32er-Vertragsleitern auf die
   // liga-lokalen 16 Sprossen umbauen. Aussen um den Gehaltsfaktor-Nachtrag, damit sie den Faktor der
   // laufenden Saison am Vertrag schon vorfindet; idempotent (eine 16er-Leiter ist kein Kandidat).
-  const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  // PP-SKALA C2 IN DER LAUFENDEN SAISON (Chris 18.11.: "nicht JEDER soll 5,5 bekommen"): ein Battle-Save
+  // ohne Skalen-Stempel mit hoechstens 3 gebuchten Spieltagen rechnet ab dem naechsten Spieltag mit C2;
+  // gebuchte Spieltage bleiben, wie sie sind (lib/resolve/wertungs-skalen.ts `stelleLaufendeSaisonAufC2Um`).
+  // Rein und idempotent wie die Migrationen darunter; persistiert mit dem naechsten Schreiben.
+  const gameStateWithoutBaseline = stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1448,7 +1453,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  ));
+  )));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

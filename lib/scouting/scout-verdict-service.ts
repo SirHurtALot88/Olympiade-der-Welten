@@ -200,7 +200,7 @@ function fmt(value: number, digits = 0) {
 }
 
 function fmtMoney(value: number) {
-  return `${fmt(value, value % 1 === 0 ? 0 : 1)} Mio`;
+  return `${fmt(value, value % 1 === 0 ? 0 : 1)} C`;
 }
 
 function toneFromScore(score: number, high = 0.62, low = 0.38): ScoutVerdictTone {
