@@ -105,8 +105,8 @@ describe("game inbox UI contract", () => {
     ).toContain("inboxCriticalCount");
     expect(
       readFileSync(join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8") +
-        readFileSync(join(root, "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8"),
-    ).toContain("Alle Aufgaben");
+        readFileSync(join(root, "app/foundation/home-v2/HomeModern.tsx"), "utf8"),
+    ).toContain("onOpenInbox");
     expect(
       readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8") +
         readFileSync(join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx"), "utf8"),

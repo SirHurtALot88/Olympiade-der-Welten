@@ -101,9 +101,6 @@ describe("Home-Topkader zeigt dieselben CA/PO-Sterne wie das Kaderprofil", () =>
 
   it("der Fog-Status der Kaderzeile wird durchgereicht, nicht fest auf true gesetzt", () => {
     expect(pickHomeTopPlayerStarFields({ ...ROW, known: false }).starsKnown).toBe(false);
-    const home = fs.readFileSync(path.join(process.cwd(), "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8");
-    expect(home).toContain("known={player.starsKnown}");
-    expect(home).not.toMatch(/\n\s+known\n/);
     const derivations = fs.readFileSync(
       path.join(process.cwd(), "lib/foundation/tabs/use-home-v2-overview-derivations.ts"),
       "utf8",

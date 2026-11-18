@@ -361,7 +361,7 @@ export function resolveFoundationPanelScrollTarget(input: {
    * DER RUECKFALL MUSS EXISTIEREN, sonst ist er keiner.
    *
    * Hier stand "foundation-home". Ein Element dieses Namens gibt es nicht — die Startseite traegt
-   * `id="foundation-home-v2"` (HomeV2NewLook.tsx:432, FoundationHomeV2Panel.tsx:35). Jeder Sprung
+   * `id="foundation-home-v2"` (HomeModern.tsx, FoundationHomeV2Panel.tsx:35). Jeder Sprung
    * ohne eigene Zuordnung landete damit bei `getElementById(null)` und fiel still aus.
    */
   return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home-v2";
