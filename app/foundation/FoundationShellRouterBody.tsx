@@ -390,6 +390,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationTrainingCompactHostProps,
   foundationWarningInboxItems,
   gameFlowActionStep,
+  taktPlan,
   matchdayAdvanceStep,
   gameState,
   getTableColumnWidth,
@@ -682,17 +683,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
   const newLookBreadcrumbData = getFoundationBreadcrumb(activeView as FoundationViewId);
+  // Regieband (18.11.): goldene Kopfzeile (Gruppe, bei Teamseiten das Team) über dem Seitentitel.
   const newLookBreadcrumb = newLookBreadcrumbData ? (
     <nav className="foundation-shell-breadcrumb nl-breadcrumb" aria-label="Brotkrumen-Navigation" data-testid="foundation-breadcrumb">
-      <span className="foundation-shell-breadcrumb-crumb is-root">{newLookBreadcrumbData.group}</span>
-      <span className="foundation-shell-breadcrumb-sep" aria-hidden="true">›</span>
+      <span className="foundation-shell-breadcrumb-crumb is-root">
+        {newLookBreadcrumbData.group}
+        {activeView === "teams" && selectedTeam ? <> · {selectedTeam.name}</> : null}
+      </span>
       <strong className="foundation-shell-breadcrumb-crumb is-view">{newLookBreadcrumbData.view}</strong>
-      {activeView === "teams" && selectedTeam ? (
-        <>
-          <span className="foundation-shell-breadcrumb-sep" aria-hidden="true">›</span>
-          <span className="foundation-shell-breadcrumb-crumb is-context">{selectedTeam.name}</span>
-        </>
-      ) : null}
     </nav>
   ) : undefined;
 
@@ -972,6 +970,27 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
            bestimmt, nur zweimal verwendet (sichtbar als Krume, semantisch als h1). */
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
+        nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
+        takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
+        onSearch={() => setShowCommandPalette(true)}
+        kasseLabel={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : null}
+        onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
+        teamName={selectedTeam?.name ?? null}
+        teamCrest={
+          selectedTeam ? (
+            <OptimizedMediaImage
+              className="foundation-rail-wappen-bild"
+              src={getTeamLogoModel(selectedTeam).src}
+              alt={`${selectedTeam.name} Wappen`}
+              loading="eager"
+              fallbackLabel={selectedTeam.shortCode}
+              fallback={<span className="foundation-rail-wappen-bild team-logo-placeholder">{selectedTeam.shortCode}</span>}
+            />
+          ) : null
+        }
+        onOpenOffice={() => navigateHomeTab("office")}
+        meldungen={homeV2InboxItems}
+        onOpenMeldungen={() => setFoundationView("inboxV2", setActiveView, { push: true })}
         subNav={
           activeView === "marketV2" ? (
             <FoundationSubNav
@@ -1128,25 +1147,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 {screenPrimaryAction.buttonLabel}
               </button>
             ) : null}
-            <button
-              className={`primary-button foundation-global-next-button ${globalNextStatusClass}`}
-              data-testid="foundation-global-next-button"
-              type="button"
-              onClick={triggerGlobalNext}
-              title={globalNextTitle}
-            >
-              <span>Weiter</span>
-              <strong>{globalNextLabel}</strong>
-              <small>Leertaste</small>
-            </button>
-            <button
-              className="pill foundation-tab foundation-tab-search"
-              type="button"
-              title="Suche öffnen"
-              onClick={() => setShowCommandPalette(true)}
-            >
-              Suchen
-            </button>
           </>
         }
       >
@@ -1695,17 +1695,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
       {roomContext && roomLiveState ? (
         <FoundationRoomFlowBar roomContext={roomContext} roomLiveState={roomLiveState} />
-      ) : null}
-
-      {readOnlyBannerMessage ? (
-        <section
-          className="foundation-access-banner is-readonly is-compact"
-          role="status"
-          aria-label="Steuerungsstatus"
-          title={readOnlyBannerMessage}
-        >
-          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
-        </section>
       ) : null}
 
       {activeView === "homeV2" && foundationWarningInboxItems.some((item: FoundationWarningInboxItem) => item.severity === "blocked") ? (

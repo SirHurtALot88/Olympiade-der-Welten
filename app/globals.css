@@ -930,20 +930,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   cursor: default;
 }
 
-.foundation-sidebar-season-context {
-  display: inline-flex;
-  align-self: start;
-  align-items: center;
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  background: rgba(56, 189, 248, 0.08);
-  color: rgba(224, 242, 254, 0.92);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
 .foundation-sidebar-save-link {
   font-size: 0.78rem;
@@ -66263,51 +66249,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
-/* --- #43 Kontext-Portal (Saison → Saisonstand, Spieltag → Arena) --- */
-.is-new-look .foundation-sidebar-context-portal {
-  display: inline-flex;
-  align-self: start;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--nl-line-2);
-  border-radius: var(--nl-r-pill);
-  background: var(--nl-bg-2);
-}
-
-.is-new-look .foundation-sidebar-context-chip {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--nl-mut);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: var(--nl-r-pill);
-  cursor: pointer;
-  font-variant-numeric: tabular-nums;
-  transition:
-    background var(--nl-t-fast) var(--nl-ease),
-    color var(--nl-t-fast) var(--nl-ease);
-}
-
-.is-new-look .foundation-sidebar-context-chip:hover {
-  background: var(--nl-accent-soft);
-  color: var(--nl-ink);
-}
-
-.is-new-look .foundation-sidebar-context-chip:focus-visible {
-  outline: 2px solid var(--nl-accent);
-  outline-offset: 1px;
-}
-
-.is-new-look .foundation-sidebar-context-sep {
-  color: var(--nl-mut-2);
-  font-weight: 700;
-}
-
 /* --- #80 Activity-Strip -------------------------------------- */
 .is-new-look .foundation-activity-strip {
   border: 1px solid var(--nl-line);
@@ -66334,50 +66275,7 @@ span.nl-facility-ampel-chip {
   background: var(--nl-accent);
 }
 
-/* --- #81 Header + Breadcrumb ---------------------------------
-   Kompakte Kopfzeile statt XL-Titel: Aktives-Team-Kontext lebt jetzt in der
-   Sidebar, hier bleibt nur ein schmaler Brotkrumen. */
-.is-new-look .foundation-shell-header {
-  justify-content: space-between;
-  align-items: center;
-}
-
-.is-new-look .foundation-shell-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.is-new-look .foundation-shell-breadcrumb-crumb {
-  font-size: 0.76rem;
-  color: var(--nl-mut);
-  white-space: nowrap;
-}
-
-.is-new-look .foundation-shell-breadcrumb-crumb.is-root {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.62rem;
-  /* Informationstragend (Bereichsname im Brotkrumen) → --nl-mut, nicht Deko-Stufe. */
-  color: var(--nl-mut);
-}
-
-.is-new-look .foundation-shell-breadcrumb-crumb.is-view {
-  color: var(--nl-ink);
-  font-weight: 700;
-  font-size: 0.84rem;
-}
-
-.is-new-look .foundation-shell-breadcrumb-crumb.is-context {
-  color: var(--nl-accent-text, var(--nl-accent));
-  font-weight: 600;
-}
-
-.is-new-look .foundation-shell-breadcrumb-sep {
-  color: var(--nl-mut-2);
-}
+/* (Kopf/Brotkrume: Regieband, components/foundation/broadcast/rahmen.css) */
 
 /* --- #80 Subnav + #82 Zähler-Badges -------------------------- */
 .is-new-look .foundation-subnav {
@@ -66499,7 +66397,6 @@ span.nl-facility-ampel-chip {
 
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .foundation-sidebar-item,
-  .is-new-look .foundation-sidebar-context-chip,
   .is-new-look .foundation-subnav-item {
     transition: none;
   }
