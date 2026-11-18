@@ -8,6 +8,10 @@ import {
   istDuellVerlauf,
   lagesatz,
   matrixAnteil,
+  anteilStufe,
+  duellPunkteJeDisziplin,
+  matrixStufe,
+  rangStufe,
   stehtAufDemSpiel,
   teileNachLiga,
   type SaisonstandZeile,
@@ -125,5 +129,52 @@ describe("Saisonstand modern: Matchwinner", () => {
   });
   it("leer ohne gewertete Spieltage", () => {
     expect(baueMatchwinnerListe(stand, "andere")).toEqual([]);
+  });
+
+  it("Matrix-Stufen: fünf klar getrennte Stufen nach Platz in der Spalte", () => {
+    const stufen = Array.from({ length: 16 }, (_, i) => rangStufe(i + 1, 16));
+    expect(stufen).toEqual([4, 4, 4, 4, 3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0]);
+    expect(rangStufe(null, 16)).toBeNull();
+    expect(rangStufe(1, 1)).toBe(2);
+    const spalte = [16.7, 18.9, 8.9, 7.7, 3.7, 2.5, 14.9, 18.3, 10.8, 2.9, 4.4, null];
+    expect(matrixStufe(18.9, spalte)).toBe(4);
+    expect(matrixStufe(2.5, spalte)).toBe(0);
+    expect(matrixStufe(null, spalte)).toBeNull();
+    expect(matrixStufe(5, [5, 5, 5])).toBe(4);
+  });
+
+  it("Matrix im Duell-Save: ganzzahlige Duellpunkte je Disziplin, keine PPs", () => {
+    const d = (disciplineId: string, h: number | null, g: number | null) => ({ disciplineId, gespielt: h != null, punkteHeim: h, punkteGast: g });
+    const u1 = {
+      paarungen: [
+        { homeTeamId: "A", awayTeamId: "B", disziplinen: [d("climbing", 2, 0), d("wettessen", 1, 1)] },
+      ],
+      miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [{ teamId: "A", teamPoints: 2 }, { teamId: "B", teamPoints: 0 }, { teamId: "C", teamPoints: null }] }],
+    };
+    const u2 = { paarungen: [{ homeTeamId: "B", awayTeamId: "A", disziplinen: [d("climbing", 2, 0), d("tdm", null, null)] }], miniDmPods: [] };
+    const m = duellPunkteJeDisziplin([u1, u2, null] as never);
+    expect(m.get("A")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
+    expect(m.get("B")?.get("climbing")).toEqual({ punkte: 2, moeglich: 4 });
+    expect(m.get("A")?.get("wettessen")).toEqual({ punkte: 1, moeglich: 2 });
+    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
+    expect(m.get("A")?.has("tdm")).toBe(false);
+    expect(m.has("C")).toBe(false);
+    for (const jeD of m.values()) for (const z of jeD.values()) expect(Number.isInteger(z.punkte)).toBe(true);
+    expect(anteilStufe({ punkte: 0, moeglich: 2 })).toBe(0);
+    expect(anteilStufe({ punkte: 1, moeglich: 4 })).toBe(1);
+    expect(anteilStufe({ punkte: 1, moeglich: 2 })).toBe(2);
+    expect(anteilStufe({ punkte: 3, moeglich: 4 })).toBe(3);
+    expect(anteilStufe({ punkte: 4, moeglich: 4 })).toBe(4);
+    expect(anteilStufe(null)).toBeNull();
+  });
+
+  it("Vierergruppen-Disziplin wird nicht doppelt gebucht (Paarung und Pod)", () => {
+    const u = {
+      paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [{ disciplineId: "mini-dm", gespielt: true, punkteHeim: 2, punkteGast: 1, miniDmPodIdHeim: "p1", miniDmPodIdGast: "p1" }] }],
+      miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [{ teamId: "A", teamPoints: 2 }, { teamId: "B", teamPoints: 1 }] }],
+    };
+    const m = duellPunkteJeDisziplin([u] as never);
+    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
+    expect(m.get("B")?.get("mini-dm")).toEqual({ punkte: 1, moeglich: 2 });
   });
 });

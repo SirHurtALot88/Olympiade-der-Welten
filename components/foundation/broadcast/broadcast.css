@@ -294,7 +294,23 @@
   background-size: cover;
   background-position: center 40%;
   filter: blur(14px) saturate(1.15);
-  opacity: 0.5;
+  opacity: var(--bc-kul-deckkraft, 0.5);
+}
+.bc-hero__kul.is-neu {
+  animation: bc-kul-ein 0.6s ease both;
+}
+@keyframes bc-kul-ein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--bc-kul-deckkraft, 0.5);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-hero__kul.is-neu {
+    animation: none;
+  }
 }
 .bc-hero__kul.is-farbe {
   background: radial-gradient(ellipse at 20% 30%, color-mix(in srgb, var(--bc-team) 55%, transparent), transparent 60%);

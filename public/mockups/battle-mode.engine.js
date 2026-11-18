@@ -58575,7 +58575,15 @@
     // hektisch"-Sorge vom 29.08. bezog sich auf dieselbe Zeichenflaeche wie heute; ein
     // erneuter Fund dazu ist ein eigenes Ticket, kein Grund, Chris' expliziten Auftrag zur
     // Viertellaenge liegen zu lassen.
-    basketball:1,
+    //
+    // 18.11. AUF 1,5 (Chris woertlich: "basketball laeuft von den Spielzuegen, Passen etc zu
+    // schnell schon auf 1x ab, man kann optisch kaum mit den Augen folgen"). Seit Runde 1/2
+    // (Laufwege, echter Korb, Kamera) passiert je Sekunde deutlich mehr Sichtbares. 1,5 macht
+    // aus 90 Simulationssekunden 135 Zuschausekunden (Viertel 2:15, Spiel rund 9 Minuten);
+    // die Uhr im HUD zaehlt weiter Simulationssekunden ("1:30"). Wer es schneller will, nimmt
+    // 2x. Reine Praesentation wie oben: Sonden laufen nie durch zeitFaktor(), der
+    // Wertungs-Fingerabdruck ist unveraendert (nachgemessen).
+    basketball:1.5,
     // Hockey bekommt denselben Faktor aus demselben Grund (Chris' Fund zur Hektik auf dem
     // Court): 240 s Simulationszeit werden damit zu rund 8 Minuten Zuschauzeit. Eishockey
     // ist im Original schneller als Basketball, aber die Lesbarkeit auf einem 1240x470

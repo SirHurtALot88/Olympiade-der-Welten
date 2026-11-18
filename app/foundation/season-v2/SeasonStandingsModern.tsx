@@ -15,7 +15,7 @@
  * Ansetzungen, Pods), D Disziplin-Matrix, E Saisonverlauf, F „Was auf dem Spiel steht" und Matchwinner.
  * NICHT gebaut (keine Datenquelle oder offen): G Zeitregler, Papierform-Prozent, Rekorde, Spieler-Form.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { BcHero, BcIcon, BcMarke, BcPanel, BcReiter, BcSeg, BcSheet, BcTable, type BcTableColumn } from "@/components/foundation/broadcast";
 import { formatNlMoney } from "@/components/foundation/new-look";
@@ -36,9 +36,11 @@ import {
   formAusVerlauf,
   istDuellVerlauf,
   lagesatz,
-  matrixAnteil,
-  matrixFarbe,
-  staerkeFarbe,
+  anteilStufe,
+  duellPunkteJeDisziplin,
+  matrixStufe,
+  rangStufe,
+  type DuellZelle,
   stehtAufDemSpiel,
   teileNachLiga,
   ZONEN_MARKE_ENDE,
@@ -175,8 +177,39 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
 
   const spieltagListe = useMemo(() => (spieltage?.verfuegbar ? spieltage.matchdayOptions : []), [spieltage]);
   const naechsterSpieltag = useMemo(() => spieltagListe.find((o) => !o.gespielt) ?? null, [spieltagListe]);
+  /*
+   * Duellpunkte je Disziplin (2/1/0, Vierergruppe 2-1-0-0) — das, was in die Tabelle eingeht. Nur
+   * Alt-Saves ohne Duell-Spielplan zeigen weiter die Leistungspunkte (PPs) aus dem Punkte-Ledger.
+   */
+  const duellMatrix = useMemo(() => {
+    if (!spieltage?.verfuegbar) return null;
+    const gespielte = spieltage.matchdayOptions.filter((o) => o.gespielt);
+    return duellPunkteJeDisziplin(gespielte.map((o) => spieltage.getUebersicht(o.id)));
+  }, [spieltage]);
+  const naechsteDisziplinen = useMemo(() => {
+    const ids = new Set<string>();
+    if (!spieltage?.verfuegbar || !naechsterSpieltag) return ids;
+    const u = spieltage.getUebersicht(naechsterSpieltag.id);
+    for (const p of u?.paarungen ?? []) for (const d of p.disziplinen) ids.add(d.disciplineId);
+    for (const pod of u?.miniDmPods ?? []) ids.add(pod.disciplineId);
+    return ids;
+  }, [spieltage, naechsterSpieltag]);
+  const duellZelle = useCallback(
+    (teamId: string, key: SeasonDisciplineKey): DuellZelle | null =>
+      duellMatrix?.get(teamId)?.get(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]) ?? null,
+    [duellMatrix],
+  );
+  /** Der Zahlenwert einer Matrix-Zelle: Duellpunkte (ganzzahlig) oder, im Alt-Save, PPs. */
+  const disziplinWert = useCallback(
+    (z: Zeile, key: SeasonDisciplineKey): number | null =>
+      duellMatrix ? (duellZelle(z.teamId, key)?.punkte ?? null) : (z.disciplineValues[key] ?? null),
+    [duellMatrix, duellZelle],
+  );
+
   const gespielteAnzahl = verlauf ? verlauf.spieltage.filter((t) => t.played).length : spieltagListe.filter((o) => o.gespielt).length;
-  const gesamtSpieltage = verlauf ? verlauf.spieltage.length : spieltagListe.length;
+  // Das Feld-Rennen-Ledger kennt nur GEWERTETE Spieltage (`getMatchdaySummaryOptions`), die Spieltags-
+  // Liste alle der Saison — sonst stünde mitten in der Saison „Endstand" und „Noch 0 Spieltage".
+  const gesamtSpieltage = Math.max(spieltagListe.length, verlauf ? verlauf.spieltage.length : 0);
 
   // Gewählter Spieltag, sonst der letzte gespielte (vom Host vorgerechnet) — abgeleitet, kein Effekt.
   const spieltagId = spieltage?.verfuegbar
@@ -471,7 +504,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
         <h3 className="bc-gk">Disziplinen · Punkte und Kaderstärke</h3>
         <div className="ssm-kacheln">
           {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.flatMap((g) => g.keys).map((key) => {
-            const punkte = kartenTeam.disciplineValues[key];
+            const punkte = disziplinWert(kartenTeam, key);
             const stark = staerkeInLiga(kartenTeam.teamId, SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]);
             return (
               <span key={key} className="ssm-kachel" data-bc-tip={`${SEASON_DISCIPLINE_LABELS[key]}: ${zahl(punkte)} Punkte${stark ? `, Kaderstärke Platz ${stark}` : ""}`}>
@@ -497,13 +530,14 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     const basis = zeilenFuer(aktiveLiga);
     if (!matrixSort) return basis;
     const key = matrixSort as SeasonDisciplineKey;
-    return [...basis].sort((a, b) => (b.disciplineValues[key] ?? -1) - (a.disciplineValues[key] ?? -1) || (a.rank ?? 999) - (b.rank ?? 999));
-  }, [zeilenFuer, aktiveLiga, matrixSort]);
-  const matrixMax = useMemo(() => {
-    const m: Partial<Record<SeasonDisciplineKey, number>> = {};
-    for (const key of matrixSchluessel) m[key] = Math.max(0, ...standingsRows.map((z) => z.disciplineValues[key] ?? 0));
+    return [...basis].sort((a, b) => (disziplinWert(b, key) ?? -1) - (disziplinWert(a, key) ?? -1) || (a.rank ?? 999) - (b.rank ?? 999));
+  }, [zeilenFuer, aktiveLiga, matrixSort, disziplinWert]);
+  const matrixSpalten = useMemo(() => {
+    const m: Partial<Record<SeasonDisciplineKey, Array<number | null | undefined>>> = {};
+    const basis = zeilenFuer(aktiveLiga);
+    for (const key of matrixSchluessel) m[key] = basis.map((z) => disziplinWert(z, key));
     return m;
-  }, [standingsRows, matrixSchluessel]);
+  }, [zeilenFuer, aktiveLiga, matrixSchluessel, disziplinWert]);
 
   const matrix = (
     <BcPanel
@@ -511,30 +545,55 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       titel="Disziplin-Matrix"
       aktionen={
         <BcSeg ariaLabel="Matrix-Modus" wert={matrixModus} onWahl={setMatrixModus} optionen={[
-          { id: "punkte", label: "Punkte", titel: "Punkte je Disziplin, Farbe relativ zum Besten der Disziplin" },
+          { id: "punkte", label: "Punkte", titel: "Punkte je Disziplin, Farbe nach Platz in der Liga" },
           { id: "staerke", label: "Kaderstärke", titel: "Rang der Kaderstärke in der Liga (reine Kader, nicht der Saisonverlauf)" },
         ]} />
       }
       bodyClassName="ssm-matrix-wrap"
     >
+      <div className="ssm-matrix-legende" aria-hidden>
+        {duellMatrix && matrixModus === "punkte" ? (
+          <>
+            <span>Duellpunkte · Sieg 2 · Remis 1 · Niederlage 0 — Anteil der möglichen</span>
+            <i className="ssm-stufe-4">alle</i><i className="ssm-stufe-3">mehr als die Hälfte</i><i className="ssm-stufe-2">Hälfte</i><i className="ssm-stufe-1">weniger</i><i className="ssm-stufe-0">keine</i>
+          </>
+        ) : (
+          <>
+            <span>Platz in der Liga</span>
+            <i className="ssm-stufe-4">Spitze</i><i className="ssm-stufe-3">gut</i><i className="ssm-stufe-2">Mitte</i><i className="ssm-stufe-1">schwach</i><i className="ssm-stufe-0">Schluss</i>
+          </>
+        )}
+        {naechsteDisziplinen.size > 0 ? <em className="ssm-matrix-legende__naechst">am nächsten Spieltag</em> : null}
+        <span className="ssm-matrix-legende__leer">· = noch nicht gespielt</span>
+      </div>
       <table className="ssm-matrix" data-testid="ssm-matrix">
         <thead>
           <tr>
             <th className="ssm-matrix__team">Team</th>
-            {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((g) => (
-              <th key={g.id} colSpan={g.keys.length} className="ssm-matrix__bereich">{AREA_LABEL[g.id]}</th>
+            {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((g, gi) => (
+              <Fragment key={g.id}>
+                {gi > 0 ? <th className="ssm-matrix__luecke" aria-hidden /> : null}
+                <th colSpan={g.keys.length} className={`ssm-matrix__bereich ssm-bereich-${g.id}`}>{AREA_LABEL[g.id]}</th>
+              </Fragment>
             ))}
+            <th className="ssm-matrix__luecke" aria-hidden />
             <th>Pkt</th>
           </tr>
           <tr>
             <th className="ssm-matrix__team" />
-            {matrixSchluessel.map((key) => (
-              <th key={key}>
-                <button type="button" className={matrixSort === key ? "is-an" : undefined} onClick={() => setMatrixSort((a) => (a === key ? null : key))} data-bc-tip="Nach dieser Disziplin sortieren">
-                  {SEASON_DISCIPLINE_LABELS[key]}
-                </button>
-              </th>
+            {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((g, gi) => (
+              <Fragment key={g.id}>
+                {gi > 0 ? <th className="ssm-matrix__luecke" aria-hidden /> : null}
+                {g.keys.map((key) => (
+                  <th key={key} className={`ssm-matrix__diszi ssm-bereich-${g.id}${naechsteDisziplinen.has(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]) ? " is-naechster" : ""}`}>
+                    <button type="button" className={matrixSort === key ? "is-an" : undefined} onClick={() => setMatrixSort((a) => (a === key ? null : key))} data-bc-tip="Nach dieser Disziplin sortieren">
+                      {SEASON_DISCIPLINE_LABELS[key]}
+                    </button>
+                  </th>
+                ))}
+              </Fragment>
             ))}
+            <th className="ssm-matrix__luecke" aria-hidden />
             <th />
           </tr>
         </thead>
@@ -546,16 +605,32 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
                   <Wappen zeile={z} /> <span className="ssm-team__kz">{z.teamCode}</span> {phone ? null : <span className="ssm-team__name">{z.teamName}</span>}
                 </button>
               </th>
-              {matrixSchluessel.map((key) => {
-                if (matrixModus === "punkte") {
-                  const w = z.disciplineValues[key];
-                  const a = matrixAnteil(w, matrixMax[key] ?? 0);
-                  return <td key={key} className="bc-t" style={{ background: matrixFarbe(a) }}>{w == null ? "·" : zahl(w)}</td>;
-                }
-                const r = staerkeInLiga(z.teamId, SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]);
-                return <td key={key} className="bc-t" style={{ background: staerkeFarbe(r) }}>{r ?? "·"}</td>;
-              })}
-              <td className="bc-t"><strong>{zahl(z.points)}</strong></td>
+              {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((g, gi) => (
+                <Fragment key={g.id}>
+                  {gi > 0 ? <td className="ssm-matrix__luecke" aria-hidden /> : null}
+                  {g.keys.map((key) => {
+                    if (matrixModus === "punkte") {
+                      if (duellMatrix) {
+                        const zelle = duellZelle(z.teamId, key);
+                        const stufe = anteilStufe(zelle);
+                        return (
+                          <td key={key} className={`bc-t ssm-zelle${stufe == null ? "" : ` ssm-stufe-${stufe}`}`} data-bc-tip={zelle ? `${SEASON_DISCIPLINE_LABELS[key]}: ${zelle.punkte} von ${zelle.moeglich} möglichen Punkten` : `${SEASON_DISCIPLINE_LABELS[key]}: noch nicht gespielt`}>
+                            {zelle ? zelle.punkte : "·"}
+                          </td>
+                        );
+                      }
+                      const w = z.disciplineValues[key];
+                      const stufe = matrixStufe(w, matrixSpalten[key] ?? []);
+                      return <td key={key} className={`bc-t ssm-zelle${stufe == null ? "" : ` ssm-stufe-${stufe}`}`}>{w == null ? "·" : zahl(w)}</td>;
+                    }
+                    const r = staerkeInLiga(z.teamId, SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]);
+                    const stufe = rangStufe(r, zeilenFuer(aktiveLiga).length);
+                    return <td key={key} className={`bc-t ssm-zelle${stufe == null ? "" : ` ssm-stufe-${stufe}`}`}>{r ?? "·"}</td>;
+                  })}
+                </Fragment>
+              ))}
+              <td className="ssm-matrix__luecke" aria-hidden />
+              <td className="bc-t ssm-matrix__summe"><strong>{zahl(z.points)}</strong></td>
             </tr>
           ))}
         </tbody>
