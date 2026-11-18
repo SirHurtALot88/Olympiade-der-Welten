@@ -6,7 +6,7 @@
 //
 // AUFRUF: npx tsx scripts/screenshot-transfermarkt-neu.ts
 // ===================================================================================
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -70,6 +70,8 @@ async function baueSave(): Promise<{ saveId: string; teamId: string; gescoutet: 
       },
     },
   };
+  // Genug Kasse für den Kauf im Bild.
+  zustand = { ...zustand, teams: zustand.teams.map((t) => (t.teamId === teamId ? { ...t, cash: 400, budget: Math.max(t.budget, 400) } : t)) };
   persistence.saveSingleplayerState(saveId, zustand);
   return { saveId, teamId, gescoutet: frei };
 }
@@ -86,15 +88,15 @@ async function istErreichbar(timeoutMs: number) {
   }
 }
 
-function starteDevServer(): ChildProcessWithoutNullStreams {
+function starteDevServer(): ChildProcess {
   console.log("[screenshot-tm] starte Dev-Server (OLY_AUTO_EXPORT_SAVES=0, OLY_AUTO_EXPORT_PUSH=0) ...");
   const kind = spawn("npm", ["run", "dev"], {
     env: { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
-  kind.stdout.on("data", (chunk) => process.stdout.write(`[dev] ${chunk}`));
-  kind.stderr.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
+  kind.stdout?.on("data", (chunk) => process.stdout.write(`[dev] ${chunk}`));
+  kind.stderr?.on("data", (chunk) => process.stderr.write(`[dev] ${chunk}`));
   return kind;
 }
 
@@ -144,7 +146,7 @@ async function main() {
       await page.getByTestId("transfermarkt-modern").waitFor({ state: "visible", timeout: 45_000 }).catch(async () => {
         console.log("[screenshot-tm] Markt nicht direkt offen, klicke in der Schiene");
         await page.screenshot({ path: path.join(OUTPUT_DIR, "debug-vor-klick.png") });
-        await page.locator('[aria-label*="Transfermarkt"], [title*="Transfermarkt"], a:has-text("Transfermarkt"), button:has-text("Transfermarkt")').first().click({ timeout: 15_000 });
+        await page.getByTestId("foundation-nav-marketV2").click({ timeout: 20_000 });
       });
       await page.getByTestId("transfermarkt-modern").waitFor({ state: "visible", timeout: 90_000 });
       await page.getByTestId("tm-zeile").first().waitFor({ state: "visible", timeout: 90_000 }).catch(async (e) => {
@@ -157,20 +159,26 @@ async function main() {
       return { ctx, page, fehler };
     };
     const ziel = (name: string) => path.join(OUTPUT_DIR, name);
+    const messen = async (page: Page, tag: string, fehler: string[]) => {
+      const mass = await page.evaluate(() => {
+        const wurzel = document.querySelector<HTMLElement>(".tmk");
+        return { scrollH: document.documentElement.scrollHeight, innerH: window.innerHeight, scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth, kasten: wurzel ? wurzel.getBoundingClientRect().toJSON() : null };
+      });
+      console.log(`[screenshot-tm] ${tag}: ${JSON.stringify(mass)}`);
+      if (fehler.length) console.log(`[screenshot-tm] ${tag} Konsole: ${fehler.slice(0, 4).join(" || ")}`);
+    };
+    const GROESSEN = [[2560, 1440, 1, "2560"], [1920, 1080, 1, "1920"]] as const;
 
-    for (const [breite, hoehe, dsf, tag] of [[2560, 1440, 1, "2560"], [1920, 1080, 1, "1920"], [1710, 1112, 2, "1710"]] as const) {
+    // --- Kaufphase: Markt (ungescoutet / gescoutet), Kauf bis zum Abschluss -----------------------------------
+    for (const [breite, hoehe, dsf, tag] of GROESSEN) {
       const { ctx, page, fehler } = await sitzung(breite, hoehe, dsf);
-      // Markt mit Disziplin-Fokus Hockey: der Fokus-Spieler ist der erste der Liste (ungescoutet).
       await page.getByTestId("tm-disziplin-hockey").click();
       await page.waitForTimeout(500);
       await page.screenshot({ path: ziel(`01-markt-ungescoutet-${tag}.png`) });
-      // Gescoutet: ein voll gescouteter Spieler (suche nach seinem Namen ist unnoetig, die Zeile traegt die Id).
       const gescoutetZeile = page.locator(`[data-testid="tm-zeile"][data-player-id="${gescoutet[0]}"]`);
       if (await gescoutetZeile.count()) {
-        await gescoutetZeile.first().scrollIntoViewIfNeeded();
         await gescoutetZeile.first().click();
       } else {
-        // Nicht auf dem ersten Blatt: Suche ueber den Namen waere noetig; Blaettern bis gefunden.
         for (let i = 0; i < 400 && !(await page.locator(`[data-player-id="${gescoutet[0]}"]`).count()); i += 1) {
           const weiter = page.getByLabel("Nächstes Blatt");
           if (await weiter.isDisabled().catch(() => true)) break;
@@ -180,46 +188,77 @@ async function main() {
       }
       await page.waitForTimeout(600);
       await page.screenshot({ path: ziel(`02-markt-gescoutet-${tag}.png`) });
-      if (tag === "1920" || tag === "2560") {
-        await page.getByTestId("tm-verhandeln-oeffnen").click();
-        await page.getByTestId("tm-tisch").waitFor({ state: "visible", timeout: 30_000 });
-        await page.waitForTimeout(1500);
-        await page.screenshot({ path: ziel(`03-kauf-angebot-${tag}.png`) });
-        const verhandeln = page.getByTestId("tm-verhandeln");
-        if (await verhandeln.isEnabled().catch(() => false)) {
-          await verhandeln.click();
-          await page.waitForTimeout(1500);
-          await page.screenshot({ path: ziel(`04-kauf-antwort-${tag}.png`) });
-        }
+      // Kauf: der Billigste der Liste (bezahlbar), verhandeln, abschließen.
+      await page.getByTestId("tm-sort-abloese").click();
+      await page.waitForTimeout(500);
+      await page.locator('[data-testid="tm-zeile"]').first().click();
+      await page.getByTestId("tm-verhandeln-oeffnen").click();
+      await page.getByTestId("tm-tisch").waitFor({ state: "visible", timeout: 30_000 });
+      await page.getByTestId("tm-verhandeln").waitFor({ state: "visible" });
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: ziel(`03-kauf-angebot-${tag}.png`) });
+      await page.getByTestId("tm-verhandeln").click();
+      await page.getByTestId("tm-antwort").waitFor({ state: "visible", timeout: 30_000 });
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: ziel(`04-kauf-antwort-${tag}.png`) });
+      const abschliessen = page.getByTestId("tm-abschliessen");
+      if (await abschliessen.isEnabled().catch(() => false)) {
+        await abschliessen.click();
+        await page.getByTestId("tm-tisch").waitFor({ state: "hidden", timeout: 60_000 }).catch(() => undefined);
+        await page.getByTestId("tm-zeile").first().waitFor({ state: "visible", timeout: 90_000 });
+        await page.waitForTimeout(2500);
+        await page.screenshot({ path: ziel(`05-kauf-erfolgreich-${tag}.png`) });
+      } else {
+        console.log(`[screenshot-tm] ${tag}: Abschluss gesperrt`);
         await page.getByLabel("Schließen").first().click();
       }
+      await messen(page, `${tag} markt`, fehler);
+      await ctx.close();
+    }
+
+    // --- Verkaufsfenster öffnen (Saisonende-Management), dann Verkauf mit Erlös und Verträge -----------------
+    const persistence = createPersistenceService();
+    const stand = persistence.getSaveById(saveId)!;
+    persistence.saveSingleplayerState(saveId, { ...stand.gameState, gamePhase: "transfer_sell_phase" });
+    for (const [breite, hoehe, dsf, tag] of GROESSEN) {
+      const { ctx, page, fehler } = await sitzung(breite, hoehe, dsf);
       await page.getByTestId("tm-reiter-verkauf").click();
-      await page.getByTestId("tm-verkauf-erloes").waitFor({ state: "visible", timeout: 60_000 }).catch(() => undefined);
-      await page.waitForTimeout(1200);
-      await page.screenshot({ path: ziel(`05-verkauf-${tag}.png`) });
+      await page.getByTestId("tm-verkauf-erloes").waitFor({ state: "visible", timeout: 60_000 });
+      await page.waitForTimeout(4000);
+      await page.screenshot({ path: ziel(`06-verkauf-erloes-${tag}.png`) });
+      if (tag === "1920") {
+        const verkaufen = page.getByTestId("tm-verkaufen");
+        if (await verkaufen.isEnabled().catch(() => false)) {
+          await verkaufen.click();
+          await page.getByTestId("tm-verkauf-bestaetigen").click();
+          await page.waitForTimeout(3500);
+          await page.screenshot({ path: ziel(`07-verkauf-erledigt-${tag}.png`) });
+        } else console.log("[screenshot-tm] Verkaufen gesperrt");
+      }
       await page.getByTestId("tm-reiter-vertraege").click();
       await page.waitForTimeout(800);
-      await page.screenshot({ path: ziel(`06-vertraege-${tag}.png`) });
-      if (tag === "1920") {
-        await page.getByTestId("tm-reiter-markt").click().catch(() => undefined);
-        await page.getByTestId("tm-reiter-markt").click().catch(() => undefined);
-        await page.waitForTimeout(400);
-        const pins = page.locator(".pinb");
-        await pins.nth(0).click();
-        await pins.nth(1).click();
-        await pins.nth(2).click();
-        await page.getByTestId("tm-vergleich-oeffnen").click();
-        await page.getByTestId("tm-vergleich").waitFor({ state: "visible", timeout: 30_000 });
-        await page.waitForTimeout(600);
-        await page.screenshot({ path: ziel("07-vergleich-1920.png") });
-      }
-      // Messung: kein Seitenscroll, nichts laeuft ueber.
-      const mass = await page.evaluate(() => {
-        const wurzel = document.querySelector<HTMLElement>(".tmk");
-        return { scrollH: document.documentElement.scrollHeight, innerH: window.innerHeight, scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth, kasten: wurzel ? wurzel.getBoundingClientRect().toJSON() : null };
-      });
-      console.log(`[screenshot-tm] ${tag}: ${JSON.stringify(mass)}`);
-      if (fehler.length) console.log(`[screenshot-tm] ${tag} Konsole: ${fehler.slice(0, 5).join(" || ")}`);
+      await page.screenshot({ path: ziel(`08-vertraege-${tag}.png`) });
+      await messen(page, `${tag} verkauf`, fehler);
+      await ctx.close();
+    }
+    // Verkaufsfenster zu (Kaufphase): die Seite sagt es klar. Dazu der Vergleich.
+    persistence.saveSingleplayerState(saveId, { ...persistence.getSaveById(saveId)!.gameState, gamePhase: "season_active" });
+    {
+      const { ctx, page } = await sitzung(1920, 1080, 1);
+      await page.getByTestId("tm-reiter-verkauf").click();
+      await page.getByTestId("tm-verkauf-fenster-zu").waitFor({ state: "visible", timeout: 60_000 }).catch(() => undefined);
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: ziel("09-verkauf-fenster-zu-1920.png") });
+      await page.getByTestId("tm-reiter-markt").click();
+      await page.waitForTimeout(400);
+      const pins = page.locator(".pinb");
+      await pins.nth(0).click();
+      await pins.nth(1).click();
+      await pins.nth(2).click();
+      await page.getByTestId("tm-vergleich-oeffnen").click();
+      await page.getByTestId("tm-vergleich").waitFor({ state: "visible", timeout: 30_000 });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: ziel("10-vergleich-1920.png") });
       await ctx.close();
     }
   } finally {

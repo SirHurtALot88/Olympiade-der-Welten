@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import { figurPoseUrl, getFigurSpriteForPlayer } from "@/lib/data/figurenSprites";
@@ -31,6 +31,7 @@ import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import { berechneFreigabeAnzeige, freigabeKosten, freigabeSperre } from "@/lib/market/transfermarkt-freigabe";
 
+import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
@@ -73,8 +74,7 @@ function kandidatSpanne(sicht: SpielerSicht, disziplinId: string): KandidatRange
 
 function eignungText(sicht: SpielerSicht, disziplinId: string): string {
   const wert = sicht.disziplinen[disziplinId];
-  if (!wert || wert.schaetzung == null) return "—";
-  return wert.exakt ? String(wert.schaetzung) : `~${wert.schaetzung}`;
+  return wert ? wert.text : "—";
 }
 
 function Stern({ an, onClick, titel }: { an: boolean; onClick: () => void; titel: string }) {
@@ -111,6 +111,26 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const darfVerwalten = Boolean(teamId && manageableTeamIds.includes(teamId));
   const controlMode = props.teamControlModesByTeamId?.[teamId] ?? null;
 
+  const nebelAus = props.nebelAus === true;
+  // Die Seite füllt den Rest des Fensters: Höhe = Fensterhöhe minus Abstand von oben minus Rand (der Rahmen kann
+  // wachsen). Gemessen statt geraten, damit nichts scrollt (2560x1440, 1920x1080, 1710x1112).
+  const wurzelRef = useRef<HTMLDivElement | null>(null);
+  const [hoehe, setHoehe] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    function messen() {
+      const el = wurzelRef.current;
+      if (!el) return;
+      const oben = el.getBoundingClientRect().top + window.scrollY;
+      setHoehe(Math.max(420, Math.floor(window.innerHeight - oben - 28)));
+    }
+    messen();
+    window.addEventListener("resize", messen);
+    const t = window.setTimeout(messen, 600);
+    return () => {
+      window.removeEventListener("resize", messen);
+      window.clearTimeout(t);
+    };
+  }, []);
   const [ansicht, setAnsicht] = useState<Ansicht>("markt");
   const [disziplin, setDisziplin] = useState<string>("hockey");
   const [suche, setSuche] = useState("");
@@ -174,7 +194,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   );
 
   // ---------------------------------------------------------------- Zeilen (alles aus der SICHT)
-  const zeilen = useMemo<Zeile[]>(() => feed.items.map((item) => ({ item, sicht: baueSpielerSicht(item) })), [feed.items]);
+  const zeilen = useMemo<Zeile[]>(() => feed.items.map((item) => ({ item, sicht: baueSpielerSicht(item, { nebelAus }) })), [feed.items, nebelAus]);
   const merkliste = useMemo(() => new Set(props.wishlistPlayerIds ?? []), [props.wishlistPlayerIds]);
   const cash = feed.teamContext?.teamCash ?? team?.cash ?? null;
 
@@ -282,35 +302,33 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const vorschauAnteil = cash && fokusAblöse ? begrenze((Math.min(fokusAblöse, cash) / Math.max(cash, 1)) * 100, 0, 100) : 0;
 
   return (
-    <div className="tmk" data-testid="transfermarkt-modern">
-      <div className="tmk-kopf">
-        <div>
-          <em>{team ? `${team.shortCode} · ${team.name}` : "Transfermarkt"}</em>
-          <h1>Transfermarkt</h1>
-        </div>
-        <nav className="reiter" aria-label="Transfermarkt-Ansichten">
-          {(
-            [
-              ["markt", "Markt"],
-              ["verkauf", "Verkauf"],
-              ["vertraege", "Verträge"],
-            ] as Array<[Ansicht, string]>
-          ).map(([id, label]) => (
-            <button key={id} type="button" className={ansicht === id ? "an" : ""} onClick={() => setAnsicht(id)} data-testid={`tm-reiter-${id}`}>
-              {label}
+    <div className="tmk" data-testid="transfermarkt-modern" ref={wurzelRef} style={hoehe != null ? ({ ["--tmk-hoehe" as string]: `${hoehe}px` } as React.CSSProperties) : undefined}>
+      {/* Reiter und Fenster-Status wohnen im Seiten-Slot des Regierbands (App-Rahmen); die Seite hat keine eigene Kopfzeile. */}
+      <FoundationBandSlot>
+        <div className="tmk-bs" data-testid="tm-bandslot">
+          <nav className="tmk-bs-reiter" aria-label="Transfermarkt-Ansichten">
+            {(
+              [
+                ["markt", "Markt"],
+                ["verkauf", "Verkauf"],
+                ["vertraege", "Verträge"],
+              ] as Array<[Ansicht, string]>
+            ).map(([id, label]) => (
+              <button key={id} type="button" className={ansicht === id ? "an" : ""} onClick={() => setAnsicht(id)} data-testid={`tm-reiter-${id}`}>
+                {label}
+              </button>
+            ))}
+            <button type="button" onClick={() => props.onOpenHistory?.()} data-testid="tm-reiter-historie">Historie</button>
+            <button type="button" className={ansicht === "draft" ? "an" : ""} onClick={() => setAnsicht("draft")} data-testid="tm-reiter-draft">
+              Draft <small>bald</small>
             </button>
-          ))}
-          <button type="button" onClick={() => props.onOpenHistory?.()} data-testid="tm-reiter-historie">Historie</button>
-          <button type="button" className={ansicht === "draft" ? "an" : ""} onClick={() => setAnsicht("draft")} data-testid="tm-reiter-draft">
-            Draft <small>bald</small>
-          </button>
-        </nav>
-        <span className="sp" />
-        <div className="tmk-status" data-testid="tm-fenster">
-          <span className={`tag ${transferWindow?.open === false ? "w" : "g"}`}>{transferWindow ? transferWindow.phaseLabel : "Transferfenster"}</span>
-          <small>Kauf und Verkauf teilen sich ein Fenster{transferWindow ? ` · Kauf ${transferWindow.canBuy ? "offen" : "zu"} · Verkauf ${transferWindow.canSell ? "offen" : "zu"}` : ""}</small>
+          </nav>
+          <div className="tmk-bs-fenster" data-testid="tm-fenster" title="Kauf und Verkauf teilen sich ein Transferfenster">
+            <b className={transferWindow?.open === false ? "zu" : "auf"}>{transferWindow ? transferWindow.phaseLabel : "Transferfenster"}</b>
+            <small>{transferWindow ? `Kauf ${transferWindow.canBuy ? "offen" : "zu"} · Verkauf ${transferWindow.canSell ? "offen" : "zu"}` : ""}</small>
+          </div>
         </div>
-      </div>
+      </FoundationBandSlot>
       {hinweis && (
         <div className="tmk-meldung" role="status" onClick={() => setHinweis(null)}>{hinweis}</div>
       )}
@@ -348,7 +366,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                   </>
                 )}
                 <div>
-                  <div className="gz"><span>Gehalt je Spieltag</span><b className="t">{betragC(jeSpieltag(teamGehalt), 2)}<small>{betragC(teamGehalt)} je Saison</small></b></div>
+                  <div className="gz"><span>Gehalt je Saison</span><b className="t">{betragC(teamGehalt)}<small>{betragC(jeSpieltag(teamGehalt), 2)} je Spieltag</small></b></div>
                   <div className="gz"><span>Kader</span><b className="t">{kader ?? "—"}<small>Minimum {kaderMin}{freiePlaetze != null ? ` · ${freiePlaetze} Plätze frei` : ""}</small></b></div>
                 </div>
               </div>
@@ -416,7 +434,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[a]}</i>)}</span>
                 <span title="erwartete Player Points je Einsatz (Näherung aus der Eignung)">≈ PP</span>
                 <span className={`re ${sortierung === "abloese" ? "so" : ""}`}>Ablöse</span>
-                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`}>je Spieltag</span>
+                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`}>Gehalt/Saison</span>
                 <span className={sortierung === "hebt" ? "so" : ""}>Kaderrang</span>
                 <span />
               </div>
@@ -439,22 +457,21 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                       <b>{it.name}</b>
                       <small>{it.className} · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
                     </span>
-                    <span className="eg" title={wert ? (wert.exakt ? "Eignung (exakt gescoutet)" : `Schätzung, Spanne ${wert.von}–${wert.bis} (Scouting-Stufe ${z.sicht.stufe})`) : "unbekannt"}>
+                    <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text} (Scouting-Stufe ${z.sicht.stufe}); Scouten schärft das Bild`) : "unbekannt"}>
                       <b className="t">{eignungText(z.sicht, disziplin)}</b>
                       <span className="bal">
-                        {wert && wert.von != null && wert.bis != null && !wert.exakt && <u style={{ left: `${wert.von}%`, width: `${wert.bis - wert.von}%` }} />}
-                        <i style={{ width: `${wert?.schaetzung ?? 0}%` }} />
+                        {wert && wert.von != null && wert.bis != null && !wert.exakt ? <u style={{ left: `${wert.von}%`, width: `${wert.bis - wert.von + 1}%` }} /> : <i style={{ width: `${wert?.schaetzung ?? 0}%` }} />}
                       </span>
                     </span>
                     <span className="ax t">
                       {MARKT_ACHSEN.map((a) => {
                         const s = z.sicht.achsen[a];
-                        return <i key={a} className={s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : ""} title={s.exakt ? "exakt gescoutet" : "grober Bereich"}>{s.anzeige ?? "?"}</i>;
+                        return <i key={a} className={s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : ""} title={s.exakt ? "Note (beobachtet/gescoutet)" : "Zweier-Gruppe (ungescoutet)"}>{s.anzeige ?? "?"}</i>;
                       })}
                     </span>
-                    <span className="ppz t" title="erwartete Player Points je Einsatz, Näherung aus der Eignung">{pp ? (pp.exakt ? `≈ ${de(pp.mitte)}` : `≈ ${de(pp.von)}–${de(pp.bis)}`) : "—"}</span>
+                    <span className="ppz t" title="erwartete Player Points je Einsatz, grobe Näherung aus der Eignungs-Stufe">{pp ? pp.text : "—"}</span>
                     <span className={`re ${teuer ? "zt" : ""}`} title={teuer ? "über deiner Kasse" : ""}><b className="t">{de(it.marketValue ?? 0, 1)}</b></span>
-                    <span className="re"><b className="t">{de((jeSpieltag(it.salary) ?? 0), 2)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(it.salary ?? 0, 1)}/Saison</small></span>
+                    <span className="re"><b className="t">{de(it.salary ?? 0, 1)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(jeSpieltag(it.salary) ?? 0, 2)}/Spieltag</small></span>
                     <RangAnzeige w={w} />
                     <button type="button" className={`pinb pin${pins.includes(it.playerId) ? " an" : ""}`} onClick={(e) => { e.stopPropagation(); pinne(it.playerId); }} title="Zum Vergleich anheften">{pins.includes(it.playerId) ? "drin" : "Vgl."}</button>
                   </div>
@@ -463,7 +480,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
             </div>
             <div className="mfuss">
               <span><b className="t" style={{ color: "var(--tinte)" }}>{gefiltert.length}</b> von {feed.total} Spielern{feed.nachladen ? " · lädt weiter …" : ""}</span>
-              <span>Werte mit <b>~</b> sind Schätzungen: die Spanne schrumpft mit der Scouting-Stufe</span>
+              <span>Fremde Werte stehen als Stufen: 10er ungescoutet, 5er beobachtet, exakt erst gescoutet</span>
               <span className="sp" />
               {seiten > 1 && (
                 <>
@@ -487,6 +504,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 ueberKasse={ueberKasse}
                 freigabeSperre={fokusSperre}
                 freigabeAktiv={freigabeAnzeige != null}
+                nebelAus={nebelAus}
                 kaufSperre={kaufSperre}
                 kannKaufen={kannKaufen}
                 gemerkt={merkliste.has(fokus.item.playerId)}
@@ -666,6 +684,7 @@ function FokusSpieler(props: {
   ueberKasse: boolean;
   freigabeSperre: string | null;
   freigabeAktiv: boolean;
+  nebelAus: boolean;
   kaufSperre: string | null;
   kannKaufen: boolean;
   gemerkt: boolean;
@@ -699,19 +718,19 @@ function FokusSpieler(props: {
       <div className="buehne-f" style={props.kulisse ? { backgroundImage: `url(${props.kulisse})` } : undefined}>
         {sprite ? <img className="fig" src={figurPoseUrl(sprite, "south")} alt="" /> : bild ? <img className="por" src={bild} alt="" /> : null}
         <div className="ov">
-          {(it.scoutingLevel ?? 0) >= 5 ? <span className="tag g">voll gescoutet</span> : (it.scoutingLevel ?? 0) === 0 ? <span className="tag a">ungescoutet · Nebel</span> : <span className="tag a">teilweise gescoutet · Stufe {it.scoutingLevel}</span>}
+          {props.nebelAus ? <span className="tag go">Nebel aus (Test)</span> : (it.scoutingLevel ?? 0) >= 5 ? <span className="tag g">voll gescoutet</span> : (it.scoutingLevel ?? 0) === 0 ? <span className="tag a">ungescoutet · Nebel</span> : <span className="tag a">teilweise gescoutet · Stufe {it.scoutingLevel}</span>}
           {props.gemerkt && <span className="tag go">★ Merkliste</span>}
         </div>
         <div className="gr"><strong className="t">{potenzial}</strong><small>Potenzial (Spanne)</small></div>
         <div className="txt"><em>{it.className} · {it.race}</em><h3>{it.name}</h3></div>
       </div>
       <div className="fb">
-        <h4>Eignung in 20 Disziplinen <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>Klick wählt die Disziplin · Schätzung</span></h4>
+        <h4>Eignung in 20 Disziplinen <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>Klick wählt die Disziplin · Stufen</span></h4>
         <div className="d20">
           {officialDisciplineWeightOrder.map((d) => {
             const w = z.sicht.disziplinen[d];
             return (
-              <button type="button" key={d} className={d === disziplin ? "an" : top3.includes(d) ? "top" : ""} onClick={() => props.onDisziplin(d)} title={`${disziplinNamen[d]} ${w ? (w.exakt ? w.schaetzung : `~${w.schaetzung} (${w.von}–${w.bis})`) : "?"}`}>
+              <button type="button" key={d} className={d === disziplin ? "an" : top3.includes(d) ? "top" : ""} onClick={() => props.onDisziplin(d)} title={`${disziplinNamen[d]} ${w ? w.text : "?"}`}>
                 <i style={{ height: `${w?.schaetzung ?? 0}%` }} />
               </button>
             );
@@ -746,8 +765,8 @@ function FokusSpieler(props: {
         </div>
         <div className="kost">
           <div><small>Ablöse</small><strong className={`t ${props.ueberKasse ? "minus" : ""}`}>{de(it.marketValue ?? 0, 1)} C</strong><em>fest = Marktwert</em></div>
-          <div><small>Forderung</small><strong className="t">{de(jeSpieltag(it.salary) ?? 0, 2)} C</strong><em>je Spieltag · {de(it.salary ?? 0, 1)} C je Saison</em></div>
-          <div><small>≈ PP</small><strong className="t">{pp ? (pp.exakt ? de(pp.mitte) : `${de(pp.von)}–${de(pp.bis)}`) : "—"}</strong><em>je Einsatz in {disziplinNamen[disziplin]} · Näherung</em></div>
+          <div><small>Forderung</small><strong className="t">{de(it.salary ?? 0, 1)} C</strong><em>je Saison · {de(jeSpieltag(it.salary) ?? 0, 2)} C je Spieltag</em></div>
+          <div><small>≈ PP</small><strong className="t">{pp ? pp.text.replace("≈ ", "") : "—"}</strong><em>je Einsatz in {disziplinNamen[disziplin]} · Näherung</em></div>
         </div>
         {props.kaufSperre ? <div className="hin w">{props.kaufSperre}</div> : props.freigabeSperre ? <div className="hin w"><b>Gesperrt:</b> {props.freigabeSperre} Verkaufserlöse werden nur zur Quote frei.</div> : props.ueberKasse ? <div className="hin w"><b>Über deiner Kasse:</b> es fehlen {betragC((it.marketValue ?? 0) - (props.cash ?? 0))}.</div> : <div className="hin">{props.freigabeAktiv ? "Passt in die Freigabe." : "Passt in die Kasse."}</div>}
         <div className="akt">

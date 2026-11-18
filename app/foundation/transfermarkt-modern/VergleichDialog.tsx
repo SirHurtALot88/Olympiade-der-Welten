@@ -38,8 +38,8 @@ export default function VergleichDialog(props: {
   const reihen: ReihenDef[] = [
     { schluessel: "g-kosten", gruppe: "Kosten" },
     { schluessel: "abloese", label: "Ablöse", zahl: (z) => z.item.marketValue, besser: "tief", text: (z) => betragC(z.item.marketValue) },
-    { schluessel: "st", label: "Gehalt je Spieltag", zahl: (z) => z.item.salary, besser: "tief", text: (z) => betragC(jeSpieltag(z.item.salary), 2) },
     { schluessel: "saison", label: "Gehalt je Saison", zahl: (z) => z.item.salary, besser: "tief", text: (z) => betragC(z.item.salary) },
+    { schluessel: "st", label: "Gehalt je Spieltag", zahl: (z) => z.item.salary, besser: "tief", text: (z) => betragC(jeSpieltag(z.item.salary), 2) },
     { schluessel: "g-profil", gruppe: "Profil (so weit gescoutet)" },
     {
       schluessel: "potenzial",
@@ -64,7 +64,7 @@ export default function VergleichDialog(props: {
       besser: "hoch",
       text: (z) => {
         const w = z.sicht.disziplinen[d];
-        return !w || w.schaetzung == null ? "?" : w.exakt ? String(w.schaetzung) : `~${w.schaetzung}`;
+        return w ? w.text : "?";
       },
       balken: (z) => z.sicht.disziplinen[d]?.schaetzung ?? null,
       rang: (z) => {
@@ -78,14 +78,15 @@ export default function VergleichDialog(props: {
     })),
   ];
 
-  function besterIndex(r: ReihenDef): number {
-    if (!r.zahl) return -1;
+  /** Alle Spalten mit dem besten SICHTBAREN Wert (gleiche Stufe = gleichauf, alle gold). */
+  function istBester(r: ReihenDef, spalte: number): boolean {
+    if (!r.zahl) return false;
     const werte = zeilen.map((z) => r.zahl!(z));
     const gueltig = werte.filter((w): w is number => w != null);
-    if (gueltig.length < 2) return -1;
+    if (gueltig.length < 2) return false;
     const ziel = r.besser === "tief" ? Math.min(...gueltig) : Math.max(...gueltig);
-    if (gueltig.every((w) => w === ziel)) return -1;
-    return werte.indexOf(ziel);
+    if (gueltig.every((w) => w === ziel)) return false;
+    return werte[spalte] === ziel;
   }
 
   return (
@@ -95,7 +96,7 @@ export default function VergleichDialog(props: {
           <em>Vergleich</em>
           <h2>{zeilen.length} Spieler nebeneinander</h2>
           <span className="sp" />
-          <span className="gk">Bester sichtbarer Wert je Zeile in Gold · Werte mit ~ sind Schätzungen</span>
+          <span className="gk">Bester sichtbarer Wert je Zeile in Gold · fremde Werte als Stufen</span>
           <button type="button" className="zu" onClick={props.onSchliessen} aria-label="Schließen">×</button>
         </div>
         <div className="vg" style={{ ["--n" as string]: zeilen.length }}>
@@ -118,7 +119,7 @@ export default function VergleichDialog(props: {
                 </div>
                 {reihen.map((r) => {
                   if (r.gruppe) return <div key={r.schluessel} className="vz gr" />;
-                  const bester = besterIndex(r) === spalte;
+                  const bester = istBester(r, spalte);
                   const w = r.rang?.(z) ?? null;
                   return (
                     <div key={r.schluessel} className={`vz${bester ? " best" : ""}`}>

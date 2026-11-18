@@ -135,6 +135,12 @@ export type ScenarioMeta = {
   // `createRoomCoopSave`s Aufruf in room-store.ts) -- nur die zwei fuer Paket 2 tatsaechlich
   // benoetigten Stellen (hier und lib/persistence/types.ts) wurden ergaenzt.
   saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
+  /**
+   * Fog of War des Transfermarkts (Chris, 18.11.): `true` schaltet den Scouting-Nebel ganz aus, alle Werte erscheinen
+   * exakt und werden danach sortiert (Test und Spielbeginn). Fehlt das Feld, ist der Nebel AN (Standard). Gelesen von
+   * `lib/market/transfermarkt-nebel-einstellung.ts`.
+   */
+  scoutingNebelAus?: boolean;
   newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
   humanControlledTeamCount?: number;
   createdAt: string;

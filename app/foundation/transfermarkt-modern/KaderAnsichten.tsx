@@ -13,6 +13,7 @@ import { formatMarketPreviewError } from "@/lib/room/parse-room-write-context";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 
 import { erloesFreigabe } from "@/lib/market/transfermarkt-freigabe";
+import { translateSellBlockingReason } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
 import { betragC, de, jeSpieltag, rangText } from "./tm-format";
 import { postJson, schreibKontext } from "./tm-daten";
 import type { TransfermarktV2RosterRow } from "./tm-typen";
@@ -179,17 +180,17 @@ export default function KaderAnsichten(props: Props) {
         <div className="pk">
           <h2>{modus === "verkauf" ? "Mein Kader" : "Verträge"}</h2>
           <span className="sp" />
-          <span className="gk">{sortiert.length} Spieler · Gehalt {betragC(jeSpieltag(props.teamGehalt), 2)} je Spieltag · {betragC(props.teamGehalt)} je Saison</span>
+          <span className="gk">{sortiert.length} Spieler · Gehalt {betragC(props.teamGehalt)} je Saison · {betragC(jeSpieltag(props.teamGehalt), 2)} je Spieltag</span>
         </div>
         <div className={`kt${kopfSpalten ? "" : " vt"}`} style={{ ["--zeilen" as string]: Math.max(10, Math.min(14, sortiert.length)) }}>
           <div className="mz kopf">
             {kopfSpalten ? (
               <>
-                <span /><span>Spieler</span><span>Stamm in</span><span className="re">Marktwert</span><span className="re">je Spieltag</span><span className="re">je Saison</span><span>Saison-PP</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Restlaufzeit</span>
+                <span /><span>Spieler</span><span>Stamm in</span><span className="re">Marktwert</span><span className="re">je Saison</span><span className="re">je Spieltag</span><span>Saison-PP</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Restlaufzeit</span>
               </>
             ) : (
               <>
-                <span /><span>Spieler</span><span>Saison-PP</span><span className="re">je Spieltag</span><span className="re">je Saison</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Laufzeit</span><span>Status</span><span />
+                <span /><span>Spieler</span><span>Saison-PP</span><span className="re">je Saison</span><span className="re">je Spieltag</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Laufzeit</span><span>Status</span><span />
               </>
             )}
           </div>
@@ -217,8 +218,8 @@ export default function KaderAnsichten(props: Props) {
                   <>
                     <span className="t">{stammR} Disz.</span>
                     <span className="re"><b className="t">{de(r.marketValue ?? 0, 1)}</b></span>
-                    <span className="re"><b className="t">{de(jeSpieltag(r.salary) ?? 0, 2)}</b></span>
                     <span className="re"><b className="t">{de(r.salary ?? 0, 1)}</b></span>
+                    <span className="re klein">{de(jeSpieltag(r.salary) ?? 0, 2)}</span>
                     {pp}
                     <span className="null" title="Form folgt mit Form/Moral">–</span>
                     <span />
@@ -227,8 +228,8 @@ export default function KaderAnsichten(props: Props) {
                 ) : (
                   <>
                     {pp}
-                    <span className="re"><b className="t">{de(jeSpieltag(r.salary) ?? 0, 2)}</b></span>
                     <span className="re"><b className="t">{de(r.salary ?? 0, 1)}</b></span>
+                    <span className="re klein">{de(jeSpieltag(r.salary) ?? 0, 2)}</span>
                     <span className="null" title="Form folgt mit Form/Moral">–</span>
                     <span />
                     <Laufzeit n={r.contractLength} />
@@ -250,6 +251,12 @@ export default function KaderAnsichten(props: Props) {
               <div className="fb" style={{ overflow: "auto" }}>
                 <h4>Erlös</h4>
                 {vorschauLaedt && !vorschau && <div className="hin">Vorschau lädt …</div>}
+                {vorschau && !vorschau.canSell && (vorschau.blockingReasons ?? []).length > 0 && (
+                  <div className="vorst rot" data-testid="tm-verkauf-fenster-zu">
+                    <b>Verkaufsfenster zu.</b>
+                    <small>{vorschau.blockingReasons.map((b) => translateSellBlockingReason(b)).join(" · ")} Preise und Erlös erscheinen, sobald das Fenster offen ist.</small>
+                  </div>
+                )}
                 <div className="fw" data-testid="tm-verkauf-erloes">
                   <div className="z"><span>Marktwert</span><b className="t">{betragC(vorschau?.marketValueReference ?? gewaehlt.marketValue)}</b></div>
                   <div className="z"><span>Verkaufsfaktor</span><b className="t">{vorschau?.saleFactor != null ? de(vorschau.saleFactor, 2) : "—"}</b></div>
@@ -265,8 +272,8 @@ export default function KaderAnsichten(props: Props) {
                 <h4>Danach</h4>
                 <div className="fw">
                   <div className="z"><span>Kasse</span><b className="t">{betragC(vorschau?.cashBefore ?? props.cash)} → {betragC(vorschau?.cashAfter ?? null)}</b></div>
-                  <div className="z"><span>Gehalt je Spieltag</span><b className="t">{betragC(jeSpieltag(vorschau?.teamSalaryBefore ?? props.teamGehalt), 2)} → {betragC(jeSpieltag(vorschau?.teamSalaryAfter ?? null), 2)}</b></div>
                   <div className="z"><span>Gehalt je Saison</span><b className="t">{betragC(vorschau?.teamSalaryBefore ?? props.teamGehalt)} → {betragC(vorschau?.teamSalaryAfter ?? null)}</b></div>
+                  <div className="z"><span>Gehalt je Spieltag</span><b className="t">{betragC(jeSpieltag(vorschau?.teamSalaryBefore ?? props.teamGehalt), 2)} → {betragC(jeSpieltag(vorschau?.teamSalaryAfter ?? null), 2)}</b></div>
                   <div className="z"><span>Kader (Minimum {props.kaderMin})</span><b className="t">{vorschau?.rosterBefore ?? "—"} → {vorschau?.rosterAfter ?? "—"}</b></div>
                 </div>
                 <h4>Kaderränge, wenn er geht</h4>
@@ -279,8 +286,7 @@ export default function KaderAnsichten(props: Props) {
                 {vorschau?.coaching && "headline" in (vorschau.coaching as object) && (
                   <div className="hin">{String((vorschau.coaching as { headline?: string }).headline ?? "")}</div>
                 )}
-                {(vorschau?.blockingReasons ?? []).length > 0 && <div className="hin w">{vorschau!.blockingReasons.map((b) => formatMarketPreviewError(b) ?? b).join(" · ")}</div>}
-                {props.verkaufSperre && <div className="hin w">{props.verkaufSperre}</div>}
+                                {props.verkaufSperre && <div className="hin w">{props.verkaufSperre}</div>}
                 {vorschauFehler && <div className="hin w">{vorschauFehler}</div>}
                 <div className="akt">
                   {!bestaetigen ? (
@@ -318,7 +324,7 @@ export default function KaderAnsichten(props: Props) {
                     </div>
                   ))}
                 </div>
-                <div className="hin">Die Verhandlung läuft am selben Tisch wie ein Kauf: Gehalt je Spieltag, Laufzeit, Vertragsform, Reaktion, dann Unterschrift.</div>
+                <div className="hin">Die Verhandlung läuft am selben Tisch wie ein Kauf: Gehalt je Saison, Laufzeit, Vertragsform, Reaktion, dann Unterschrift.</div>
               </div>
             </>
           )

@@ -66,6 +66,8 @@ export type TransfermarktModernProps = {
   leagueTeamCount?: number;
   /** Team-Ids der eigenen Liga (Rang wird nur gegen sie gerechnet). Fehlt es: alle Teams. */
   leagueTeamIds?: string[];
+  /** Fog of War aus (Spielstand-Einstellung `scenarioMeta.scoutingNebelAus`): exakte Werte, Sortierung nach ihnen. */
+  nebelAus?: boolean;
   /** Verletzte Spieler (nicht einsetzbar, zählen in der Kaderstärke nicht). */
   injuredPlayerIds?: string[];
   /** Vorstand-Freigabe (Datenvertrag `TransferFreigabe`); `null` = nicht vorhanden, dann zeigt die Seite nur den Kontostand. */

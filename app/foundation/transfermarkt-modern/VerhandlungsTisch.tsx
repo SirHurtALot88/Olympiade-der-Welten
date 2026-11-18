@@ -273,7 +273,7 @@ export default function VerhandlungsTisch(props: TischProps) {
       setAntwort({
         art: "gegen",
         titel: neg.concededFromLastCounter ? "Er kommt dir entgegen" : "Gegenangebot",
-        text: `${name} will eher ${betragC(jeSpieltag(neg.counterSalary ?? null), 2)} je Spieltag (${betragC(neg.counterSalary ?? null)} je Saison).`,
+        text: `${name} will eher ${betragC(neg.counterSalary ?? null)} je Saison (${betragC(jeSpieltag(neg.counterSalary ?? null), 2)} je Spieltag).`,
         gegenGehalt: neg.counterSalary ?? null,
       });
       return;
@@ -410,14 +410,14 @@ export default function VerhandlungsTisch(props: TischProps) {
               <h4>Forderung</h4>
               <div className="regler">
                 <div className="o">
-                  <strong className="t">{betragC(jeSpieltag(forderung), 2).replace(" C", "")}</strong>
-                  <small>C je Spieltag<br />{betragC(forderung)} je Saison</small>
+                  <strong className="t">{betragC(forderung).replace(" C", "")}</strong>
+                  <small>C je Saison<br />{betragC(jeSpieltag(forderung), 2)} je Spieltag</small>
                 </div>
               </div>
               {modus === "kauf" ? (
                 <div className="gz"><span>Ablöse = Marktwert</span><b className="t">{betragC(stand?.purchasePrice ?? null)}</b></div>
               ) : (
-                <div className="gz"><span>Heutiges Gehalt</span><b className="t">{betragC(jeSpieltag(props.aktuellesGehalt ?? null), 2)}<small>{betragC(props.aktuellesGehalt ?? null)} je Saison</small></b></div>
+                <div className="gz"><span>Heutiges Gehalt</span><b className="t">{betragC(props.aktuellesGehalt ?? null)}<small>{betragC(jeSpieltag(props.aktuellesGehalt ?? null), 2)} je Spieltag</small></b></div>
               )}
               <h4>Warum er so reagiert</h4>
               <div className="mag">
@@ -437,10 +437,10 @@ export default function VerhandlungsTisch(props: TischProps) {
               <h4>Mein Angebot</h4>
               <div className="regler">
                 <div className="o">
-                  <strong className="t">{angebot != null ? de((angebot ?? 0) / 20, 2) : "—"}</strong>
-                  <small>C je Spieltag<br />{betragC(angebot)} je Saison</small>
+                  <strong className="t">{angebot != null ? de(angebot ?? 0, 1) : "—"}</strong>
+                  <small>C je Saison<br />{betragC(jeSpieltag(angebot ?? null), 2)} je Spieltag</small>
                   <span className="sp" />
-                  <span className="ford">Zusage ab<b className="t">{betragC(jeSpieltag(neg.acceptThresholdSalary ?? null), 2)}</b></span>
+                  <span className="ford">Zusage ab<b className="t">{betragC(neg.acceptThresholdSalary ?? null)}</b><small>{betragC(jeSpieltag(neg.acceptThresholdSalary ?? null), 2)} je Spieltag</small></span>
                 </div>
                 <input
                   type="range"
@@ -536,16 +536,16 @@ export default function VerhandlungsTisch(props: TischProps) {
                 </div>
               )}
               <div className="fw">
-                <div className="z"><span>Gehalt des Teams je Spieltag</span>
-                  <b className="t">
-                    {betragC(jeSpieltag(stand?.salaryBefore ?? props.teamGehalt), 2)}
-                    {stand?.salaryAfter != null && <> → {betragC(jeSpieltag(stand.salaryAfter), 2)}</>}
-                  </b>
-                </div>
-                <div className="z"><span>je Saison</span>
+                <div className="z"><span>Gehalt des Teams je Saison</span>
                   <b className="t">
                     {betragC(stand?.salaryBefore ?? props.teamGehalt)}
                     {stand?.salaryAfter != null && <> → {betragC(stand.salaryAfter)}</>}
+                  </b>
+                </div>
+                <div className="z"><span>je Spieltag</span>
+                  <b className="t">
+                    {betragC(jeSpieltag(stand?.salaryBefore ?? props.teamGehalt), 2)}
+                    {stand?.salaryAfter != null && <> → {betragC(jeSpieltag(stand.salaryAfter), 2)}</>}
                   </b>
                 </div>
                 {modus === "kauf" && (

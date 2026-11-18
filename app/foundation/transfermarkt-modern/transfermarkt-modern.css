@@ -15,7 +15,7 @@
   --r: calc(0.625 * var(--u));
   /* Freier Bereich: Breite ohne Schiene (~90 px), Höhe ohne Kopfzeile der Shell (~140 px). */
   --tmk-breite: calc(100vw - 96px);
-  --tmk-hoehe: calc(100vh - 160px);
+  --tmk-hoehe: calc(100vh - 110px);
   --u: clamp(11px, min(calc(var(--tmk-breite) / 118), calc(var(--tmk-hoehe) / 63)), 34px);
   position: relative;
   display: flex;
@@ -441,3 +441,20 @@
 .tmk .gz small { white-space: nowrap; }
 .tmk .gz b { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .tmk *, .tmk *::before, .tmk *::after { animation-duration: 0.01s !important; transition-duration: 0.01s !important; } }
+
+/* Seiten-Slot im Regieband (liegt per Portal AUSSERHALB von .tmk, deshalb eigener Block) */
+.tmk-bs { display: flex; align-items: center; gap: 1.4em; min-width: 0; }
+.tmk-bs-reiter { display: flex; gap: 0.2em; }
+.tmk-bs-reiter button { position: relative; padding: 0.5em 0.8em; font: 700 0.95em / 1 "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #9aa7ba; background: none; border: 0; cursor: pointer; white-space: nowrap; }
+.tmk-bs-reiter button:hover { color: #eef2f8; }
+.tmk-bs-reiter button.an { color: #f4e6c4; }
+.tmk-bs-reiter button.an::after { content: ""; position: absolute; left: 0.6em; right: 0.6em; bottom: -0.2em; height: 0.2em; background: #f0c35a; transform: skewX(-14deg); }
+.tmk-bs-reiter small { margin-left: 0.4em; padding: 0.05em 0.35em; border: 1px solid rgba(244, 230, 196, 0.3); border-radius: 0.2em; font-size: 0.65em; color: #f0c35a; }
+.tmk-bs-fenster { display: flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
+.tmk-bs-fenster b { font: 700 0.95em "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.tmk-bs-fenster b.auf { color: #62d394; }
+.tmk-bs-fenster b.zu { color: #ff6058; }
+.tmk-bs-fenster small { font-size: 0.8em; color: #9aa7ba; }
+
+.tmk .mz .re.klein { font-size: calc(0.86 * var(--u)); color: var(--stumm); font-weight: 600; }
+.tmk .regler .o .ford small { display: block; font-size: calc(0.75 * var(--u)); color: var(--stumm); }

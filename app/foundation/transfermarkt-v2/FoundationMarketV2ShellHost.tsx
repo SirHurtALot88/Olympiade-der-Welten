@@ -22,6 +22,7 @@ import {
   isTeamSetupDraftWishlistPhase,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import { baueDisziplinBedarf } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import { isPlayerAvailabilityInjured } from "@/lib/fatigue/fatigue-injury-service";
 import { getLeagueOf, getLeagueTeamIds } from "@/lib/season/league-split";
@@ -235,6 +236,7 @@ export default function FoundationMarketV2ShellHost({
         disciplineRanksByTeamId: transferMarketDisciplineRanksByTeamId,
         leagueTeamCount: gameState.teams.length,
         leagueTeamIds,
+        nebelAus: isScoutingNebelAus(gameState),
         injuredPlayerIds,
         disziplinBedarf,
         // Vorstand-Freigabe: Datenvertrag `TransferFreigabe` (lib/market/transfermarkt-freigabe.ts). Die Zahlen liefert die

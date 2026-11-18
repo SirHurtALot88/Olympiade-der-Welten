@@ -1,6 +1,7 @@
 /**
  * SCOUTING-NEBEL DES TRANSFERMARKTS (Chris, 18.11.): „Für nicht (voll) gescoutete Spieler sieht man nur grobe
- * Bereiche. Sortieren und Filtern dürfen keine verdeckten Werte verraten.“
+ * Bereiche. Sortieren und Filtern dürfen keine verdeckten Werte verraten.“ Danach (Koordination, 18.11.): FESTE STUFEN
+ * statt Spanne um den wahren Wert, wie im Kader-&-Teams-Mockup (10er-Stufe unbekannt, 5er-Stufe beobachtet, exakt gescoutet).
  *
  * Dieses Modul ist die EINE Stelle, an der aus einem Feed-Eintrag (`TransfermarktFreeAgentItem`) die SICHTBARE
  * Sicht auf einen Spieler gebaut wird. Alles, was die neue Markt-Seite anzeigt, sortiert oder filtert, liest
@@ -11,17 +12,16 @@
  *  - `buildScoutedDisciplineTiers` (transfermarkt-scouting.ts): je Disziplin eine gestörte Schätzung, deterministisch
  *    je Spielstand und Spieler, Rauschen schrumpft mit der Scouting-Stufe, ab Stufe 5 exakt. Der Lesedienst schickt
  *    sie für alle 20 Disziplinen als `disciplineEstimates`.
- *  - `getScoutingTierWindow`: Achsen und Attribute als Tier-Bereich („B-C"), exakt erst bei hoher Sicherheit.
+ *  - Achsen und Attribute: ungescoutet nur als Zweier-Gruppe („B–A“), sonst als Note; Zahlen gibt es für sie nie.
  *  - `buildTransfermarktScoutedAttributeRows`: welche der zwölf Attribute überhaupt aufgedeckt sind.
  *
- * Sortieren und Gleichstände: Schlüssel ist die MITTE der sichtbaren Spanne; bei Gleichstand entscheidet der Name
+ * Sortieren und Gleichstände: Schlüssel ist die MITTE der sichtbaren Stufe (für alle Spieler einer Stufe gleich); bei
+ * Gleichstand entscheidet der Name
  * (und danach die Spieler-Id), nie ein wahrer Wert.
  */
 import {
   buildTransfermarktScoutedAttributeRows,
-  getScoutingTierWindow,
   normalizeTransfermarktScoutingLevel,
-  resolveScoutingConfidenceFromLevel,
   TRANSFERMARKT_SCOUT_TIER_ORDER,
   type TransfermarktAttributeKey,
   type TransfermarktAttributeRatings,
@@ -37,23 +37,34 @@ import {
 export type MarktAchse = "pow" | "spe" | "men" | "soc";
 export const MARKT_ACHSEN: MarktAchse[] = ["pow", "spe", "men", "soc"];
 
-/** Halbe Breite der sichtbaren Spanne je Scouting-Stufe 0..5 (Summe aus gemeinsamer Verzerrung und Einzelrauschen). */
-const SPANNE_HALB_JE_STUFE = [11.5, 8.5, 6.25, 4, 2, 0] as const;
+/**
+ * FESTE STUFEN STATT SPANNE UM DEN WAHREN WERT (Chris/Koordination, 18.11.): wer ungescoutet nach Stärke sortieren
+ * könnte, fände den perfekten Spieler zu leicht. Darum gilt wie im Kader-&-Teams-Mockup:
+ *   Stufe 0 (unbekannt):                10er-Stufe („90–99“), Achsen/Attribute in Zweier-Gruppen („B–A“)
+ *   Stufe 1–4 (beobachtet/teilweise):   5er-Stufe („85–89“), Achsen/Attribute als Note („B“)
+ *   Stufe 5 (gescoutet):                exakt
+ * Angezeigt wird immer die Stufe, nie „~Zahl“. Alle Spieler einer Stufe sind für Sortieren und Filtern gleich; die
+ * Reihenfolge innerhalb einer Stufe entscheidet der Name.
+ */
+export type SichtArt = "grob" | "fein" | "exakt";
 
 export type SichtWert = {
-  /** Die sichtbare Schätzung (Mitte der Spanne). `null`: nichts bekannt. */
+  /** Mitte der Stufe (für alle Spieler einer Stufe gleich) bzw. der exakte Wert. `null`: nichts bekannt. */
   schaetzung: number | null;
+  /** Untere und obere Grenze der Stufe (bei exakt gleich dem Wert). */
   von: number | null;
   bis: number | null;
-  /** Ab Scouting-Stufe 5 ist die Schätzung der wahre Wert. */
   exakt: boolean;
+  art: SichtArt | null;
+  /** Anzeige: „90–99“, „85–89“ oder „88“. */
+  text: string;
 };
 
 export type SichtAchse = {
   achse: MarktAchse;
-  /** „B-C" oder exakt „B"; `null`: verdeckt. */
+  /** „B–A“ (unbekannt), „B“ (beobachtet/gescoutet); `null`: verdeckt. */
   anzeige: string | null;
-  /** Sortierschlüssel 0..7 (Mitte des sichtbaren Tier-Bereichs), `null` = verdeckt. */
+  /** Sortierschlüssel 0..7 (Mitte der Stufe), `null` = verdeckt. */
   sortWert: number | null;
   exakt: boolean;
 };
@@ -62,9 +73,9 @@ export type SichtAttribut = {
   key: TransfermarktAttributeKey;
   label: string;
   aufgedeckt: boolean;
-  /** Anzeige: exakte Note, Bereich („C-D") oder `null` (verdeckt). */
+  /** Anzeige: Note („B“) bzw. Zweier-Gruppe („B–A“) oder `null` (verdeckt). */
   anzeige: string | null;
-  /** Balkenfüllung 0..100 aus der sichtbaren Note, `null` = verdeckt. */
+  /** Balkenfüllung 0..100 aus der sichtbaren Stufe, `null` = verdeckt. */
   prozent: number | null;
   exakt: boolean;
 };
@@ -79,36 +90,45 @@ export type SpielerSicht = {
   attribute: Record<string, SichtAttribut>;
 };
 
-export function spannenHalbbreite(stufe: number | null | undefined): number {
-  return SPANNE_HALB_JE_STUFE[normalizeTransfermarktScoutingLevel(stufe)] ?? SPANNE_HALB_JE_STUFE[0];
+/** Breite der Eignungs-Stufe: 10 ungescoutet, 5 beobachtet, 1 (exakt) bei Stufe 5. */
+export function stufenBreite(stufe: number | null | undefined): number {
+  const s = normalizeTransfermarktScoutingLevel(stufe);
+  return s >= 5 ? 1 : s === 0 ? 10 : 5;
 }
 
 export function baueSichtWert(schaetzung: number | null | undefined, stufe: number | null | undefined): SichtWert {
   if (typeof schaetzung !== "number" || !Number.isFinite(schaetzung)) {
-    return { schaetzung: null, von: null, bis: null, exakt: false };
+    return { schaetzung: null, von: null, bis: null, exakt: false, art: null, text: "?" };
   }
-  const halb = spannenHalbbreite(stufe);
-  if (halb === 0) {
-    return { schaetzung, von: schaetzung, bis: schaetzung, exakt: true };
+  const breite = stufenBreite(stufe);
+  const wert = Math.max(0, Math.min(99, Math.round(schaetzung)));
+  if (breite === 1) {
+    return { schaetzung: wert, von: wert, bis: wert, exakt: true, art: "exakt", text: String(wert) };
   }
-  return {
-    schaetzung,
-    von: Math.max(0, Math.round(schaetzung - halb)),
-    bis: Math.min(100, Math.round(schaetzung + halb)),
-    exakt: false,
-  };
+  const von = Math.floor(wert / breite) * breite;
+  const bis = Math.min(99, von + breite - 1);
+  return { schaetzung: (von + bis) / 2, von, bis, exakt: false, art: breite === 10 ? "grob" : "fein", text: `${von}–${bis}` };
 }
 
 const TIER_INDEX = new Map<string, number>(TRANSFERMARKT_SCOUT_TIER_ORDER.map((tier, index) => [tier, index]));
 
-/** Tier-Bereich → Sortierschlüssel (Mitte der Indizes). „B-C" → 3,5; „B" → 4. */
+const TIER_GRUPPEN = ["F–E", "D–C", "B–A", "S–S+"] as const;
+
+/** Note → Sortierschlüssel 0..7. Gruppe („B–A“) → Mitte der beiden Noten. */
 export function tierBereichSortWert(anzeige: string | null | undefined): number | null {
   if (!anzeige) return null;
-  const teile = anzeige.split("-").filter(Boolean);
-  // „S-S+" und „S+" enthalten selbst ein Minus-freies Plus; Trennung nur am Bindestrich zwischen den Noten.
+  const teile = anzeige.split("–").filter(Boolean);
   const indizes = teile.map((teil) => TIER_INDEX.get(teil)).filter((index): index is number => index != null);
   if (indizes.length === 0) return null;
   return indizes.reduce((summe, index) => summe + index, 0) / indizes.length;
+}
+
+/** Eine Note unter dem Nebel: ungescoutet nur die Zweier-Gruppe, sonst die Note selbst. */
+function tierAnzeige(tier: TransfermarktRatingTier | null | undefined, stufe: number): string | null {
+  if (!tier) return null;
+  if (stufe >= 1) return tier;
+  const index = TIER_INDEX.get(tier);
+  return index == null ? null : TIER_GRUPPEN[Math.floor(index / 2)];
 }
 
 function attributRatings(item: TransfermarktFreeAgentItem): TransfermarktAttributeRatings {
@@ -128,23 +148,18 @@ function attributRatings(item: TransfermarktFreeAgentItem): TransfermarktAttribu
   };
 }
 
-function achseSicht(
-  achse: MarktAchse,
-  tier: TransfermarktRatingTier | null,
-  sicherheit: number,
-): SichtAchse {
-  if (!tier) return { achse, anzeige: null, sortWert: null, exakt: false };
-  const anzeige = getScoutingTierWindow(tier, sicherheit);
-  return { achse, anzeige, sortWert: tierBereichSortWert(anzeige), exakt: !anzeige.includes("-") };
+function achseSicht(achse: MarktAchse, tier: TransfermarktRatingTier | null, stufe: number): SichtAchse {
+  const anzeige = tierAnzeige(tier, stufe);
+  return { achse, anzeige, sortWert: tierBereichSortWert(anzeige), exakt: stufe >= 1 };
 }
 
 /**
  * Baut die sichtbare Sicht. Liest vom Feed-Eintrag nur Felder, die ohnehin für die Anzeige freigegeben sind
  * (Schätzungen, Tier-Bereiche nach Scouting-Stufe, aufgedeckte Attribute).
  */
-export function baueSpielerSicht(item: TransfermarktFreeAgentItem): SpielerSicht {
-  const stufe = normalizeTransfermarktScoutingLevel(item.scoutingLevel);
-  const sicherheit = item.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(stufe);
+export function baueSpielerSicht(item: TransfermarktFreeAgentItem, optionen?: { nebelAus?: boolean }): SpielerSicht {
+  // Nebel aus (Einstellung): jeder Spieler zählt als voll gescoutet, die Sicht zeigt exakte Werte.
+  const stufe = optionen?.nebelAus ? 5 : normalizeTransfermarktScoutingLevel(item.scoutingLevel);
 
   const schaetzungen: Record<string, number> = {};
   for (const eintrag of item.topDisciplineScores ?? []) {
@@ -155,29 +170,30 @@ export function baueSpielerSicht(item: TransfermarktFreeAgentItem): SpielerSicht
   for (const [id, wert] of Object.entries(schaetzungen)) disziplinen[id] = baueSichtWert(wert, stufe);
 
   const achsen = {
-    pow: achseSicht("pow", item.powTier, sicherheit),
-    spe: achseSicht("spe", item.speTier, sicherheit),
-    men: achseSicht("men", item.menTier, sicherheit),
-    soc: achseSicht("soc", item.socTier, sicherheit),
+    pow: achseSicht("pow", item.powTier, stufe),
+    spe: achseSicht("spe", item.speTier, stufe),
+    men: achseSicht("men", item.menTier, stufe),
+    soc: achseSicht("soc", item.socTier, stufe),
   } satisfies Record<MarktAchse, SichtAchse>;
 
   const ratings = attributRatings(item);
   const reihen = buildTransfermarktScoutedAttributeRows({
     ratings,
-    scoutingLevel: stufe,
+    scoutingLevel: Math.min(stufe, 4),
     playerId: item.playerId,
   });
   const attribute: Record<string, SichtAttribut> = {};
   for (const reihe of reihen) {
-    const anzeige = reihe.ratingLabel ?? reihe.rangeLabel ?? null;
+    // Welche Attribute aufgedeckt sind, bestimmt der bestehende Aufdeck-Plan; die ANZEIGE kennt nur Stufen.
+    const anzeige = reihe.revealed ? tierAnzeige(ratings[reihe.key], stufe) : null;
     const sortWert = tierBereichSortWert(anzeige);
     attribute[reihe.key] = {
       key: reihe.key,
       label: reihe.label,
-      aufgedeckt: reihe.revealed && anzeige != null,
-      anzeige: reihe.revealed ? anzeige : null,
+      aufgedeckt: anzeige != null,
+      anzeige,
       prozent: sortWert == null ? null : Math.round(((sortWert + 1) / TRANSFERMARKT_SCOUT_TIER_ORDER.length) * 100),
-      exakt: reihe.revealed && reihe.ratingLabel != null,
+      exakt: anzeige != null && stufe >= 1,
     };
   }
 
@@ -256,15 +272,22 @@ export function erwartetePp(eignung: number | null | undefined): number | null {
   return Math.max(0, Math.min(PP_SKALA_MAX, (eignung - PP_EIGNUNG_NULL) / PP_EIGNUNG_PRO_PUNKT));
 }
 
-export type PpSpanne = { von: number; bis: number; mitte: number; exakt: boolean };
+export type PpSpanne = { von: number; bis: number; mitte: number; exakt: boolean; text: string };
 
+const halbe = (x: number) => Math.round(x * 2) / 2;
+
+/** PP-Anzeige GROB: unter dem Nebel auf halbe Punkte gerundet („≈ 4–5“), exakt erst ab Stufe 5. */
 export function erwartetePpSpanne(wert: SichtWert | null | undefined): PpSpanne | null {
   if (!wert || wert.schaetzung == null || wert.von == null || wert.bis == null) return null;
   const von = erwartetePp(wert.von);
   const bis = erwartetePp(wert.bis);
   const mitte = erwartetePp(wert.schaetzung);
   if (von == null || bis == null || mitte == null) return null;
-  return { von, bis, mitte, exakt: wert.exakt };
+  const f = (x: number) => x.toFixed(1).replace(".", ",");
+  if (wert.exakt) return { von, bis, mitte, exakt: true, text: `≈ ${f(mitte)}` };
+  const a = halbe(von);
+  const b = halbe(bis);
+  return { von: a, bis: b, mitte: halbe(mitte), exakt: false, text: a === b ? `≈ ${f(a)}` : `≈ ${f(a)}–${f(b)}` };
 }
 
 export type WegZeile = {

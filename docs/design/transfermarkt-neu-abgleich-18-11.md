@@ -5,73 +5,91 @@ Neue Komponente `app/foundation/transfermarkt-modern/`, eigenes CSS unter `.tmk`
 Kauf-/Verkaufsweg: Vorschau und Abschluss laufen über `/api/transfermarkt/buy`, `/api/transfermarkt/sell` und
 `/api/contracts/renewal`, das Verhandlungsgedächtnis wird wie bisher geschrieben.
 
-Bilder aus der echten App (Wegwerf-Battle-Save im Transferfenster, `scripts/screenshot-transfermarkt-neu.ts`, Port 3216):
+Bilder aus der echten App (Wegwerf-Battle-Save, `scripts/screenshot-transfermarkt-neu.ts`, Port 3216):
 `docs/design/transfermarkt-neu-18-11/`.
 
-## Scouting-Nebel (Chris, 18.11.: Pflicht)
+## App-Rahmen
 
-Eine Stelle, `lib/market/transfermarkt-sicht.ts`, baut aus dem Feed-Eintrag die **sichtbare Sicht** eines Spielers. Die Seite
-liest nur diese Sicht, nie `pow`/`ovr`/`mvs`/Tier-Rohwerte (der Feed schickt sie technisch mit; ein Vertragstest hält fest, dass
-die Komponenten sie nicht anfassen).
+Reiter (Markt · Verkauf · Verträge · Historie · Draft „bald") und der Fenster-Status (Phase, Kauf offen/zu, Verkauf offen/zu)
+stehen im Seiten-Slot des Regierbands (`FoundationBandSlot`). Die Seite hat keine eigene Kopfzeile mehr; die Hauptaktion und
+Kasse trägt das Band. Der Reiter „Vertragsangebot“ im Unterreiter ist der des Rahmens (öffnet den Verhandlungstisch).
 
-| Größe | Sichtbar als | Quelle |
-|---|---|---|
-| Eignung je Disziplin (alle 20) | Schätzung mit Spanne (`~72`, Balken mit Spannenband); ab Scouting-Stufe 5 exakt | `buildScoutedDisciplineTiers` über das neue Feld `disciplineEstimates` des Lesedienstes (Stufe je Spieler und Team aus `getEffectiveScoutingLevel`); Halbbreite der Spanne je Stufe 11,5 / 8,5 / 6,25 / 4 / 2 / 0 (Summe der Rausch-Amplituden der Schätzung) |
-| Achsen POW/SPE/MEN/SOC | Tier-Bereich („B-C"), exakt erst bei hoher Sicherheit | `getScoutingTierWindow` |
-| Attribute (Wege zum Erfolg) | aufgedeckt als Note oder Bereich, sonst „?" | `buildTransfermarktScoutedAttributeRows` |
-| Erwartete PP | Spanne („≈ 2,1–3,4") aus der Eignungs-Spanne; Näherung (Gerade des Mockups, Umrechnung aus den PP-Referenzen steht aus) | `erwartetePpSpanne` |
-| Kaderrang mit ihm | Rangspanne („9.–11.") aus unterer und oberer Spannengrenze | `wirkungMitKandidat` |
+## Scouting-Nebel (Chris, 18.11.: Pflicht), feste Stufen
 
-**Sortieren und Filtern:** der Schlüssel ist die Mitte der sichtbaren Spanne; Gleichstand entscheidet der Name, dann die Id,
-nie ein wahrer Wert (`sortiereNachSicht`). Unbekanntes steht am Ende. Der Filter „kann meinen Rang heben" und „Achse ≥ B" nutzen
-die obere Grenze der sichtbaren Spanne („könnte reichen"). Test: `tests/transfermarkt-sicht-nebel.test.ts` (zwei Spieler mit
-gleicher sichtbarer Spanne, stark unterschiedlichem wahren Wert: Reihenfolge ändert sich beim Tauschen der wahren Werte nicht;
-die Sicht enthält keinen der Rohwerte).
+Regel wie im Kader-&-Teams-Mockup: **unbekannt 10er-Stufe, beobachtet 5er-Stufe, gescoutet exakt**. Angezeigt wird die Stufe,
+nie „~Zahl“, nie eine Spanne um den wahren Wert. Eine Stelle, `lib/market/transfermarkt-sicht.ts`, baut aus dem Feed-Eintrag die
+**sichtbare Sicht**; die Seite liest nur sie. Der **Marktwert** ist für alle Spieler exakt sichtbar (kein Nebel).
 
-Bekannt: der Feed enthält die Rohwerte weiterhin im Netzwerkverkehr (alter Zustand, andere Abnehmer wie die KI-Dienste). Die
-Oberfläche zeigt, sortiert und filtert sie nicht. Sie serverseitig zu entfernen ist ein eigener Schritt.
+| Größe | Unbekannt (Stufe 0) | Beobachtet/teilweise (1–4) | Gescoutet (5) |
+|---|---|---|---|
+| Eignung je Disziplin (alle 20) | 10er-Stufe „90–99“ | 5er-Stufe „85–89“ | exakt |
+| Achsen POW/SPE/MEN/SOC | Zweier-Gruppe „B–A“ | Note „B“ | Note |
+| Attribute (Wege zum Erfolg) | aufgedeckte nur als Gruppe | als Note (nie genauer, auch bei Stufe 4 keine Zahl) | Note |
+| Erwartete PP | grob auf halbe Punkte („≈ 4,5–5,0“, oben gedeckelt „≈ 5,0“) | wie links aus der 5er-Stufe | exakt |
+| Kaderrang mit ihm | Rangspanne aus der Stufe | Rangspanne | exakt |
+
+**Sortieren und Filtern** nur nach Stufe: der Schlüssel ist die Mitte der Stufe (für alle Spieler der Stufe gleich), bei
+Gleichstand entscheidet der Name, dann die Id (`sortiereNachSicht`). Die Filter „kann meinen Rang heben“ und „Achse ≥ B“ nutzen die
+obere Grenze der Stufe. Der Lesedienst liefert dafür neu `disciplineEstimates` (alle 20 Disziplinen, mit der Stufe des Spielers
+fürs gewählte Team). Tests: `tests/transfermarkt-sicht-nebel.test.ts` (innerhalb einer Stufe alphabetisch, auch wenn die wahren
+Werte umgekehrt liegen; 99 und 90 sind ungescoutet nicht unterscheidbar; Stufe 4 zeigt Attribute nur als Note).
+
+**Fog of War abschaltbar:** `scenarioMeta.scoutingNebelAus` im Spielstand (Standard: fehlt = Nebel AN; es gab keine bestehende
+Einstellung). Aus: der Lesedienst rechnet jeden Spieler als voll gescoutet, die Sicht zeigt exakte Werte und sortiert nach ihnen,
+das Panel trägt „Nebel aus (Test)“. `lib/market/transfermarkt-nebel-einstellung.ts`, Test `tests/transfermarkt-nebel-aus.test.ts`
+(beide Fälle). Einen Schalter in der Oberfläche gibt es nicht; die Einstellung wird im Spielstand gesetzt.
+
+Bekannt: der Feed enthält Rohwerte weiterhin im Netzwerkverkehr (andere Abnehmer, KI-Dienste); die Oberfläche zeigt, sortiert und
+filtert sie nicht (ein Vertragstest hält das fest). Das Potenzial im Panel kommt als Spanne aus dem vorhandenen Potenzial-Scouting
+(`buildPlayerScoutPotential`) und ist noch nicht auf feste Stufen umgestellt.
 
 ## Vorgaben von Chris (18.11.), eingearbeitet
 
-- Kaderstärke über die **besten 6**; Rang gegen die eigene Liga (`leagueTeamIds`, sonst alle Teams); Verletzte zählen nicht.
-- Gehalt überall **je Spieltag und je Saison** (Liste, Fokus, Verhandlungstisch, Verkauf, Verträge).
-- Fit, Value-Chip, Bracket, gespeicherte Suchen entfallen; „Value" ist nur noch eine Sortierung. Einheit überall **C**.
-- Ein gemeinsames Transferfenster: die Kopfzeile zeigt Phase, Kauf und Verkauf getrennt als offen/zu.
-- Verkauf und Verträge zeigen die **Saison-Leistung** (PP mit Liga-Rang). Form folgt mit Form/Moral (Spalte ist angelegt).
-- Draft: nur Platzhalter-Reiter („bald"), er führt zurück zum Markt (heutiger Draft-Weg).
-- **Vorstand-Freigabe**: Datenvertrag `lib/market/transfermarkt-freigabe.ts` (`TransferFreigabe`: Quote, freigegeben, ausgegeben,
-  Grund). Der Geld-Block zeigt Kontostand, davon freigegeben, schon ausgegeben, noch frei, gesperrt mit Grund; die Sperre ist
-  **hart** (Ablöse plus Gehalt über dem freien Betrag sperrt den Abschluss, Verhandeln bleibt möglich); im Verkauf steht „davon
-  werden X C frei". Der Host übergibt heute `freigabe: null`, die Seite zeigt dann nur den Kontostand. Anschluss: Finanzen-Stufe 3
-  füllt `freigabe` im Host (`FoundationMarketV2ShellHost`). Stufen nach Vertrauen als Funktion bereit (`freigabeQuoteAusVertrauen`).
-- **Was ist diese Saison wichtig?** Der Kaderstärke-Block zeigt je Disziplin Auftritte in der Saison (aus dem Spielplan,
-  `getSeasonDisciplineSchedule`, vor dem ersten Spieltag aus der Saisonvorlage), Einsatz-Slots, eigene Stärke (beste 6) und
-  Liga-Rang, sortierbar nach Wichtigkeit (Auftritte × Slots) und mit Bedarfs-Hinweis („häufig, aber schwach besetzt"); die
-  gewählte Disziplin trägt das in die Liste (Filterleiste, Fußzeile). `lib/market/transfermarkt-disziplin-bedarf.ts`.
+- Kaderstärke über die **besten 6**; Rang gegen die eigene Liga; Verletzte zählen nicht.
+- **Gehalt: groß je Saison, klein darunter je Spieltag**, überall (Liste, Panel, Geld-Block, Vergleich, Verkauf, Verträge, Tisch).
+- Einheit C; Fit, Value-Chip, Bracket, gespeicherte Suchen entfallen (Value nur als Sortierung).
+- Ein gemeinsames Transferfenster in der Anzeige: Phase, Kauf und Verkauf getrennt als offen/zu.
+- Verkauf und Verträge zeigen die Saison-Leistung (PP mit Liga-Rang). Form folgt mit Form/Moral (Spalte angelegt).
+- Draft: nur Platzhalter-Reiter.
+- **Vorstand-Freigabe** als Datenvertrag `lib/market/transfermarkt-freigabe.ts` (Kontostand, freigegeben, ausgegeben, noch frei,
+  gesperrt mit Grund; harte Sperre nur für den Abschluss, Ablöse plus Gehalt; Verkaufserlös nur zur Quote frei, „davon werden
+  X C frei“). Der Host übergibt heute `freigabe: null`, dann zeigt die Seite nur den Kontostand. Finanzen-Stufe 3 füllt `freigabe`.
+- **Was ist diese Saison wichtig?** Kaderstärke-Block mit Auftritten, Slots, eigener Stärke, Liga-Rang, Bedarfs-Hinweis, nach
+  Wichtigkeit sortierbar; die gewählte Disziplin trägt das in die Liste (`lib/market/transfermarkt-disziplin-bedarf.ts`).
 
-## Drin
+## Kauf und Verkauf geprüft (Integrationstest)
 
-Markt als Seite (15 Zeilen je Blatt, drei Spalten), Disziplin-Fokus über alle 20 Disziplinen, Geld und Freigabe links, Kaderstärke
-mit „mit ihm", Spieler-Panel mit PixelLab-Figur (sonst Porträt) vor der Disziplin-Kulisse, Eignungsprofil, Wege zum Erfolg
-(Primär-/Nebenweg/offen), Wirkung auf den Kader, Charakter, Kosten, Merkliste, Profil, Vergleich bis zu drei Spieler,
-Verhandlungstisch (Kauf und Verlängerung) mit Zusage/Gegenangebot/Absage, Verkauf mit zweistufiger Bestätigung und Erlös,
-Verträge mit Gehaltslast je Saison. Von außen geöffnete Deals (Hauptaktion, Spieler-Drawer) öffnen den Verhandlungstisch.
+`tests/transfermarkt-modern-integration.test.ts` fährt die Produktionswege (`previewLocal…`/`executeLocal…`,
+`previewContractRenewalAction`/`applyContractRenewalAction`) gegen einen Wegwerf-Spielstand mit genug Kasse:
 
-## Angepasst gegenüber dem Mockup
+- **Kauf:** Vorschau, Angebot an der Zusage-Schwelle, abschließen. Spieler im Kader, Kasse um die Ablöse gesenkt, Gehalt um sein
+  Gehalt erhöht, Laufzeit stimmt; derselbe Idempotenz-Schlüssel bucht nicht doppelt.
+- **Verkauf:** im Kauffenster (Saisonstart) liefert die Vorschau `canSell: false` mit `sell_only_at_season_end` (so ist der **409 der
+  Route**: Fenster zu, nicht ein Fehler; die Vorschau trägt dann keine Preise). Die Seite sagt das jetzt klar („Verkaufsfenster zu“,
+  Text aus `translateSellBlockingReason`) statt „Vorschau lädt“. Im Verkaufsfenster (`transfer_sell_phase`): Vorschau mit Erlös,
+  abschließen, Spieler weg, Kasse um den Erlös erhöht.
+- **Verlängerung:** Vorschau mit Forderung, Bestätigung, anwenden; Laufzeit und Gehalt stehen im Kader.
 
-- Kein Regieband im Rahmen: der Rahmen ist noch nicht auf main; die Reiter und der Fenster-Status stehen in einer eigenen
-  Kopfzeile der Seite und wandern später in den Slot.
-- „Gesamt" fehlt (wäre ein wahrer Wert); statt dessen Potenzial als Spanne aus dem Scouting.
-- Form und Moral (Liste, Fokus) fehlen bis Form/Moral gebaut ist; die Verkaufs-Spalte „Form" ist angelegt.
-- Vertragswunsch (Wunschlaufzeit/-form) kommt im Verhandlungstisch aus der Server-Vorschau, nicht im Fokus-Panel.
-- Verkaufsfaktor und Erlös kommen aus der echten Vorschau (nicht fest 0,90).
+Die Routen selbst brauchen eine Sitzung (Cookies) und sind im Test nicht aufrufbar; ihre Phasensperren werden mit derselben Funktion
+geprüft (`evaluateGamePhaseAction`). Im Browser lief der Kauf bis zum Abschluss und der Verkauf mit Erlös (Bilder 05, 06, 07).
+Hinweis: Kauf- und Verkaufsfenster sind in der Phasen-Politik noch getrennt (Kauf bei Saisonstart, Verkauf am Saisonende); das
+„gemeinsame Fenster“ ist hier nur die Anzeige, die Politik (`transfer-window-policy.ts`) ist nicht geändert.
 
-## Fehlt
+## Drin / Angepasst / Fehlt
 
-- Echte Freigabe-Zahlen und Rücklage-Ziel, Kassensturz-Vorschau, Apron-Linien (Finanzen V2).
-- Abschlag → Liga-Topf (Finanzen V2).
-- Form/Moral; Verletzungsdauer („n Spieltage"): es gibt nur „verletzt".
-- Draft-Neubau (16 Runden, höchstens 14 Spieler, Verhandlung im Draft, Skip): eigener Schritt.
-- Rohwerte aus dem Feed-Payload entfernen (siehe oben).
-- Alte Reste: `FoundationMarketSellShellHost` (Verkaufs-Dialog der Teams-Ansicht) und `.nl-market-deal-*` in `globals.css` bleiben,
-  bis die Teams-Seite neu gebaut ist; sonst ist die alte Markt-Seite samt Kauf-Modal entfernt.
+**Drin:** Markt (15 Zeilen je Blatt), Disziplin-Fokus über 20 Disziplinen, Geld-Block, Kaderstärke mit „mit ihm“, Spieler-Panel mit
+PixelLab-Figur (sonst Porträt), Wege zum Erfolg, Wirkung auf den Kader, Merkliste, Vergleich (bis drei), Verhandlungstisch (Kauf und
+Verlängerung), Verkauf mit zweistufiger Bestätigung, Verträge mit Gehaltslast je Saison.
+
+**Angepasst:** Kopfzeile im Rahmen-Slot; „Gesamt“ fehlt (wäre ein wahrer Wert), dafür Potenzial; Form/Moral fehlen bis zum Bau; der
+Vertragswunsch kommt im Tisch aus der Server-Vorschau.
+
+**Fehlt:** echte Freigabe-Zahlen, Rücklage-Ziel, Kassensturz, Apron-Linien, Abschlag in den Liga-Topf (Finanzen V2); Form/Moral;
+Verletzungsdauer; Draft-Neubau; Rohwerte aus dem Feed-Payload entfernen; Potenzial auf feste Stufen; die echte PP-Umrechnung (die
+Gerade des Mockups ist eine Näherung); ein Schalter für den Nebel in der Oberfläche. Alte Reste bis zum Teams-Umbau:
+`FoundationMarketSellShellHost` (Verkaufs-Dialog der Teams-Ansicht) und `.nl-market-deal-*` in `globals.css`.
+
+## Design-Token-Lint
+
+`scripts/lint-design-tokens.ts` meldet 220 Verstöße, keiner in Dateien dieses PR (neuer Ordner, `lib/market`, Skript, Tests). Die
+veralteten Baseline-Einträge der gelöschten Dateien sind entfernt.

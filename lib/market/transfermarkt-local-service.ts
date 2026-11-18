@@ -11,6 +11,7 @@ import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-l
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
@@ -2070,7 +2071,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
 
     if (compactListMode) {
       const player = playersById.get(baseItem.playerId) ?? null;
-      const playerScoutingLevel = getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
+      // Fog of War abschaltbar (scenarioMeta.scoutingNebelAus): dann gilt jeder Spieler als voll gescoutet.
+      const playerScoutingLevel = isScoutingNebelAus(gameState) ? 5 : getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
       const compactFitPlayer = {
         race: baseItem.race,
         alignment: baseItem.alignment,
