@@ -186,6 +186,19 @@ describe("Kaderpflicht-Freigabe (Chris 18.11.): Geld da, nicht freigegeben, Kade
     expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 20, salary: 5, rosterBefore: 6, playerMin: 10 }).ok).toBe(true);
   });
 
+  it("auch die Gehaltsseite wird freigegeben: Kader am Minimum, Gehaltstopf leer, Weg Richtung Opt (Befund Z-H aus #1634)", () => {
+    const basis = { kaderMin: 9, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15, cash: 87 };
+    // Am Minimum: Gehalt der Plaetze bis Opt (3 x 5 C) unabhaengig von Kasse und Gehaltstopf
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9 }).gehalt).toBe(15);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 5 }).gehalt).toBe(15);
+    // Unter dem Minimum: Gehalt der fehlenden Plaetze bis Minimum
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 7 }).gehalt).toBe(10);
+    // Die Grenze fuer den naechsten Kauf nimmt das Groessere aus Rahmen nach Quote und Kaderpflicht
+    const rahmen = kaufRahmen(team(9, 87, { playerMin: 9, playerOpt: 12 }), "A");
+    expect(rahmen.grenzeFuer(9, 0, 0).salary).toBeGreaterThanOrEqual(15 - 1e-9);
+    expect(rahmen.grenzeFuer(9, 0, 1000).salary).toBeGreaterThanOrEqual(15 - 1e-9);
+  });
+
   it("Team bei Opt: keine Wirkung", () => {
     const rahmen = kaufRahmen(team(11, 87), "A");
     expect(rahmen.stand.kaderpflicht.aktiv).toBe(false);
