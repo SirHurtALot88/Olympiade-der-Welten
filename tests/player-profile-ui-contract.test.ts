@@ -117,6 +117,14 @@ describe("Spielerprofil-Seite (neu)", () => {
     expect(KURZ).toContain("grobBereich");
   });
 
+  it("Marktwert bleibt auch bei fremden, ungescouteten Spielern exakt (Chris 18.11.), Gehalt und Kaufpreis bleiben verdeckt", async () => {
+    const daten = await lies("lib/foundation/player-detail-drawer.ts");
+    const maske = daten.slice(daten.indexOf("function maskEconomyForVisibility"), daten.indexOf("function maskEconomyForVisibility") + 900);
+    expect(maske).not.toContain("marketValue: null");
+    expect(maske).toContain("salary: null");
+    expect(maske).toContain("purchasePrice: null");
+  });
+
   it("Figur groß auf der Kulisse der besten Disziplin, vier Posen anklickbar, Porträt groß ohne Figur", () => {
     expect(BAUSTEINE).toContain("spielerprofil-posen");
     for (const pose of ["Stand", "Lauf", "Angriff", "Treffer"]) {
