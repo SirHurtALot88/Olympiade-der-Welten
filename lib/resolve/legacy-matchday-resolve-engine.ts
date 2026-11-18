@@ -47,6 +47,7 @@ import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
 // wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -851,6 +852,8 @@ export function buildLegacyMatchdayResolvePreview(
     const erklaerterArenaAusfallFuerDiesesDisziplin =
       isBattleModeArenaEligible ? resolveOptions.arenaAusfallByDisciplineId?.get(disciplineId) ?? null : null;
     // BOXSCORE-AN-PPS: dieselbe Sperre wie oben — s. docs/design/boxscore-an-pps.md.
+    // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md): diese Map kommt bei OLY_PP_SKALA=an schon
+    // skaliert aus den Erzeugern (Arena, Bahn-/Battlefield-/Mini-DM-Pod) -- hier NICHT nochmal skalieren.
     const arenaIndividualPpsForThisDiscipline =
       isBattleModeArenaEligible
         ? resolveOptions.arenaIndividualBoxscorePpsByDisciplineId?.get(disciplineId) ?? null
@@ -1202,7 +1205,14 @@ export function buildLegacyMatchdayResolvePreview(
           ? new Map(
               rankedWithinTeam.map(({ entry }) => [
                 entry.playerId,
-                ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
+                // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md): bei AUS der unveraenderte Pfad.
+                ppSkalaAktiv()
+                  ? ppAusKurveSkaliert({
+                      disciplineId,
+                      wert: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
+                      referenz: spielerPpReferenzFuerDiesesDisziplin,
+                    })
+                  : ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
               ] as const),
             )
           : null;
