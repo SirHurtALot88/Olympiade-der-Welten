@@ -92,7 +92,7 @@ export default function SpielerprofilSeite({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {data.portraitUrl ? <img className="spr-kopf__port" src={data.portraitUrl} alt="" /> : <span className="spr-kopf__port" aria-hidden="true" />}
           <div style={{ minWidth: 0 }}>
-            <h1 className="spr-kopf__name" style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+            <h2 className="spr-kopf__name" style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
               <span className="spr-blaettern" role="group" aria-label="Im Kader blättern">
                 <button type="button" disabled={!vorher} onClick={() => vorher && onNavigatePlayer?.(vorher)} aria-label="Vorheriger Spieler" title="Vorheriger Spieler (↑)">
@@ -102,7 +102,7 @@ export default function SpielerprofilSeite({
                   <BcIcon name="ab" />
                 </button>
               </span>
-            </h1>
+            </h2>
             <div className="spr-kopf__sub">
               {data.teamId && onOpenTeam ? (
                 <button type="button" onClick={() => onOpenTeam(data.teamId as string)} style={{ color: "var(--bc-tinte)", fontWeight: 600 }}>
