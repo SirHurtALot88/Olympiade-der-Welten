@@ -1,3 +1,4 @@
+import type { FormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import type {
   AiLineupStrategy,
   DisciplineCategory,
@@ -163,6 +164,12 @@ export type LegacyLineupEntryScore = {
   morale?: number | null;
   moraleMultiplier?: number | null;
   moraleModifierPct?: number | null;
+  /** Spieler-Form (18.11.): Prozent auf den Spielerwert, nur mit aktivem Form + Moral. */
+  formWirkungPct?: number | null;
+  /** Punkte durch den Form-Multiplikator (eigener Schritt, nicht in `moraleModifier`). */
+  formMultiplierPunkte?: number | null;
+  /** Systematischer Form-Anteil (Multiplikator + flacher Kartenwert, ohne Tagesform-Zufall) — Grundlage der Form-Fortschreibung. */
+  formSystematisch?: number | null;
   moraleModifier?: number | null;
   moraleAdjustedScore?: number | null;
   isCaptain?: boolean;
@@ -520,6 +527,8 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   teamPowerSource?: LegacyModifierSourceSummary;
   formCards?: LegacyFormCardOption[];
   formCardPlans?: FormCardPlanRecord[];
+  /** Regelstand von Form + Moral + Farbregel, vom SERVER gesetzt (Review-Befund 3): Anzeige und lokale Vorschau lesen ihn statt `process.env`. */
+  formMoralRegeln?: FormMoralRegeln;
   teamPowers?: LegacyTeamPowerOption[];
   teamPowerWindows?: Record<string, {
     disciplineId: string;

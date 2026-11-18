@@ -16,7 +16,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 376px) minmax(0, 1fr) minmax(300px, 356px);
+  grid-template-columns: minmax(300px, 448px) minmax(0, 1fr) minmax(300px, 356px);
   gap: 12px;
   padding: 12px 14px;
   height: min(760px, calc(100vh - 250px));
@@ -37,6 +37,11 @@
 /* Hero: Reiter dürfen nicht schrumpfen, bis die Zahl abgeschnitten wird. */
 .elm .bc-hero {
   grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  /* Kulisse der Disziplin: nur eine Ahnung, kein Bild (Chris 18.11.: „nicht aufdringlich“). */
+  --bc-kul-deckkraft: 0.55;
+}
+.elm .bc-hero__kul:not(.is-farbe) {
+  filter: blur(18px) saturate(1.1);
 }
 .elm .bc-hero__mitte {
   justify-content: flex-start;
@@ -1072,6 +1077,7 @@ button.elm-pr:hover {
     padding-bottom: calc(74px + env(safe-area-inset-bottom));
   }
   .elm .bc-hero {
+    --bc-kul-deckkraft: 0.34;
     position: sticky;
     top: 0;
     z-index: 30;

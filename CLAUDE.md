@@ -183,6 +183,26 @@ Ansatz ersetzt werden kann, statt Spieler ohne das eine geforderte Attribut komp
 Kein Auftrag, alle zwanzig Disziplinen deswegen anzufassen — nur ein Kriterium, das ab jetzt bei
 jeder ohnehin anstehenden Rezept- oder Mechanik-Runde mitgedacht werden soll.
 
+## Spieler-Form, Moral und Formkarten-Farbregel sind scharf (18.11.)
+
+Seit 18.11. im Spiel aktiv, jeweils per Umgebungsvariable abschaltbar (Details und Messung:
+`docs/design/form-moral-17-11.md` Abschnitt 7-8, Bau: `docs/design/form-moral-bau-18-11.md`):
+
+| Schalter | Standard | Abschalten |
+|---|---|---|
+| `OLY_FORM_MORAL` (Form fortschreiben, Form + Moral skalieren die Arena-Eignung, Form wirkt in der Legacy-Wertung) | AN | `OLY_FORM_MORAL=0` |
+| `OLY_FORM_MORAL_DOSIS` (Prozent je Form-Stufe) | 1,0 | Zahl 0..4 |
+| `OLY_FORMKARTEN_FARBREGEL` (neue Regel: alle + Farbträger, Spitze 12) | neu | `OLY_FORMKARTEN_FARBREGEL=alt` |
+
+**Eine Wahrheit für die Kartenwerte:** `calculateFormModifierForSide` (`lib/lineups/legacy-lineup-modifiers.ts`) rechnet über
+`formkartenZerlegungFuerSpieler` (`lib/lineups/formkarten-farbregel.ts`) und liefert `formByPlayerId`. Legacy-Wertung, Einsatzliste
+(`lib/lineups/formkarten-wirkung.ts`), Arena-Aufstellungsadapter und KI-Kartenplan lesen genau diese Funktion; ein Pfad, der selbst
+x2 rechnet, ist ein Fehler. **Gezeigt = gebucht:** `formkartenBuchung` sagt, ob die gespielte Karte in dieser Disziplin gebucht wird
+(Battle-Modus: nur `FORMKARTEN_ECHT_DISCIPLINE_IDS`, sonst Ersatzkarte); die Einsatzliste verspricht dort sonst keine Punkte.
+**Moral wird als Gesicht in Farbe (grün bis rot) plus Zahl gezeigt** (`BcMoralGesicht`, Stufen 80/60/40/20: sehr zufrieden, zufrieden,
+neutral, unzufrieden, verärgert), nicht als Herz und nicht als Emoji. Der Form-Verlauf liegt je Spieler in `playerFormState[].verlauf`
+(Saison-Reset zur Mitte beim Saisonwechsel). Wertungs-Fingerabdruck blieb bei `ce8fcef66028`, weil die Engine nicht angefasst wurde.
+
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 
 Chris am 13.09., wörtlich: „breaking NICHT breakdance ist sondern ein foltern!!!! […] einer
@@ -320,6 +340,39 @@ nächsten Wochen hardcore verbessern!!"
   `docs/design/oly-seiten-modern-17-11.md` (Designsystem: Tokens, Barlow-Condensed-Zahlen lokal, Karten,
   Tabellen, Icon-Schiene, Blatt). Neue Mockups übernehmen dieses System exakt, damit die App aus einem
   Guss wird. Reine CSS/SVG-Gestaltung; PixelLab nur, wo ein Bild echten Mehrwert hat.
+- **Nach dem Bau immer mit dem Mockup abgleichen** (Chris, 18.11.: „wichtig, dass die ganzen coolen
+  Features und Optik, die man vorher sieht, dann auch im Spiel wiederfindet“). Pflicht zum Abschluss
+  jedes Baus nach Mockup: je Ansicht ein Bildpaar „Mockup | App“ nebeneinander unter `docs/design/…`
+  und eine Liste jedes sichtbaren Mockup-Features als **drin / angepasst (warum) / fehlt (warum)**.
+  Was im Mockup erfunden war (z. B. Siegchancen ohne Datenquelle), wird ehrlich ersetzt, nicht
+  stillschweigend weggelassen.
+
+## Zielbildschirme: 15"-MacBook M4 und 32"-4K-Monitor
+
+Chris, 18.11., wörtlich: „Bitte alle Layouts, Spiele etc. auf 16:9 optimiert, 15" MacBook und
+Hauptscreen ist 32" OLED, bitte merken.“ Nachgeschärft: „MacBook M4 hat 'ne bessere Auflösung […]
+und Rechner ist 4K-Monitor!“ Jede Seite, jede Arena und jedes HUD wird für diese zwei Geräte gebaut
+und geprüft:
+
+| Gerät | Viewport zum Prüfen (CSS-px) | Pixeldichte |
+|---|---|---|
+| MacBook Air 15" M4 (2880×1864 nativ, Standard-Skalierung) | 1710×1112 (16:10) | 2 |
+| 32" 4K-Monitor (3840×2160) | 2560×1440 (150 %) und 1920×1080 (200 %) | 1,5 bzw. 2 |
+
+**Hauptziel ist der 4K-Monitor in 16:9** (Chris, 18.11.: „hauptsächlich auf den 4K-Monitor
+aussteuern, dass alles drauf passt — wäre doof, wenn du auf 16:10 skalierst und nur am MacBook die
+Breite aufgeht, es sonst aber nicht passt“). Erst muss alles bei **2560×1440** (und 1920×1080) ohne
+Scrollen und ohne leere Ränder passen, dann wird **1710×1112** (MacBook, 16:10) geprüft; 3840×2160
+(100 %) und Phone (412 breit) sind Nebenproben.
+
+**Jeder Screen nutzt so viel vom Bildschirm wie möglich** (Chris, 18.11.: „bau alle Screens so,
+dass sie möglichst viel vom Bildschirm nutzen, und vor allem die Battle Arena … die braucht ja
+wirklich jeden cm Breite und Höhe“). Keine zentrierte Schmalspalte mit leeren Rändern, keine
+festen Pixelbreiten für Hauptinhalte; die Arena füllt Breite und Höhe des Fensters (abzüglich der
+Icon-Schiene), HUD und Steuerelemente liegen darüber oder am Rand, nicht darüber/darunter im Fluss. Auf dem MacBook darf nichts gequetscht,
+abgeschnitten oder unnötig scrollend sein; auf dem 4K-Monitor darf nichts verloren wirken (keine
+leeren Riesenränder, Schrift und Tafeln wachsen mit). Wird die genaue Skalierung eines Geräts
+bekannt, hier eintragen.
 
 ## An die Spielstände kommen
 

@@ -44,6 +44,8 @@ type ScoreSideInput = {
   fatigueSourceStatus?: "mapped" | "missing_source";
   injurySourceStatus?: "mapped" | "not_applied";
   moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
+  /** Spieler-Form als Multiplikator je Spieler (nur mit aktivem Form + Moral), wirkt neben der Moral. */
+  formWirkungByPlayerId?: Record<string, { multiplier: number; modifierPct: number }> | null;
   intensity?: "conserve" | "normal" | "push" | null;
   slotRoleModifier?: number | null;
   /**
@@ -57,6 +59,8 @@ type ScoreSideInput = {
   formModifier?: number | null;
   /** Kartenwert PRO SPIELER — siehe distributePerPlayerFormShares: verhindert den Vorzeichen-Kipp. */
   formPerPlayer?: number | null;
+  /** Kartenwert JE SPIELER nach der Farbregel (Summe alle+Farbe+Form); fehlt ein Spieler -> `formPerPlayer`. */
+  formByPlayerId?: Record<string, { summe: number }> | null;
   formCardStatus?: "ready" | "missing_source";
   formCardLabel?: string | null;
   mutatorMode?: LegacyResolveMutatorMode;
@@ -277,10 +281,17 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
         : roundPreviewScore(fatigueAdjustedScore * injuryMultiplier);
     const morale = input.moraleByPlayerId?.[entry.playerId] ?? null;
     const moraleMultiplier = moraleStatus === "mapped" ? (morale?.multiplier ?? 1) : null;
+    const formWirkung = input.formWirkungByPlayerId?.[entry.playerId] ?? null;
     const moraleAdjustedScore =
       injuryAdjustedScore == null || moraleMultiplier == null
         ? injuryAdjustedScore
         : roundPreviewScore(injuryAdjustedScore * moraleMultiplier);
+    // Spieler-Form (18.11.) als EIGENER Schritt hinter der Moral: `moraleModifier` bleibt reine Moral
+    // (Review-Befund 7), der Form-Anteil steht in `formMultiplierPunkte`.
+    const formAdjustedScore =
+      moraleAdjustedScore == null || !formWirkung ? moraleAdjustedScore : roundPreviewScore(moraleAdjustedScore * formWirkung.multiplier);
+    const formMultiplierPunkte =
+      moraleAdjustedScore == null || formAdjustedScore == null ? 0 : roundPreviewScore(formAdjustedScore - moraleAdjustedScore);
     const moraleModifier =
       fatigueAdjustedScore == null || moraleAdjustedScore == null
         ? null
@@ -313,6 +324,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       morale: morale?.morale ?? null,
       moraleMultiplier,
       moraleModifierPct: morale?.modifierPct ?? null,
+      formWirkungPct: formWirkung?.modifierPct ?? null,
       moraleModifier,
       moraleAdjustedScore,
       isCaptain: Boolean(entry.isCaptain),
@@ -321,7 +333,9 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       mutatorBonus: 0,
       mutatorPpsBonus: 0,
       formShare: 0,
-      finalContribution: moraleAdjustedScore,
+      formMultiplierPunkte,
+      formSystematisch: formMultiplierPunkte,
+      finalContribution: formAdjustedScore,
       sourceStatus,
       warnings,
     };
@@ -380,11 +394,21 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   let appliedFormModifier = formModifier;
   if (formModifier != null && formModifier !== 0 && scoredEntries.length > 0) {
     const seeds = scoredEntries.map((entry) => `${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`);
-    const shares = distributePerPlayerFormShares({ formPerPlayer, formModifier, seeds });
+    const shares = distributePerPlayerFormShares({
+      formPerPlayer,
+      formModifier,
+      seeds,
+      flatBySeedIndex: input.formByPlayerId
+        ? scoredEntries.map((entry) => input.formByPlayerId?.[entry.playerId]?.summe ?? null)
+        : undefined,
+    });
     let applied = 0;
     scoredEntries.forEach((entry, index) => {
       const share = shares[index] ?? 0;
       if (entry.finalContribution != null) {
+        // Systematischer Anteil (ohne Tagesform-Zufall): Kartenwert dieses Spielers + Form-Multiplikator.
+        const flat = input.formByPlayerId?.[entry.playerId]?.summe ?? formPerPlayer ?? 0;
+        entry.formSystematisch = roundPreviewScore((entry.formMultiplierPunkte ?? 0) + (Number.isFinite(flat) ? flat : 0));
         entry.formShare = share;
         entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + share);
         entry.score = entry.finalContribution;

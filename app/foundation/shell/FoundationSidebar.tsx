@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { FoundationRailIcon } from "@/app/foundation/shell/foundation-nav-icons";
+
 import { getAppVersionBadge } from "@/lib/app-version";
 import { FOUNDATION_NAV_GROUPS, isFoundationNavViewActive } from "@/lib/foundation/foundation-nav-config";
 import type { FoundationNavAttentionMap } from "@/lib/foundation/foundation-nav-attention";
@@ -58,7 +60,16 @@ type FoundationSidebarProps = {
   // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
   // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
   teamPicker?: ReactNode;
+  /**
+   * Icon-Schiene: ohne diese Prop bleibt die breite Seitenleiste. Mit ihr ist die Leiste kompakt
+   * (nur Symbole), fährt bei Hover/Tastaturfokus aus und hält sich bei `pinned` dauerhaft offen.
+   */
+  rail?: { pinned: boolean; onPinnedChange: (pinned: boolean) => void };
 };
+
+// Kurze Absicht, bevor die Schiene ausfährt: ein Streifen über die Leiste soll sie nicht aufblitzen
+// lassen (Mockup: ruhige Leiste, Beschriftung nur auf Wunsch).
+const RAIL_HOVER_DELAY_MS = 140;
 
 const VIEW_WIDTH_SEGMENTS: ReadonlyArray<{
   mode: ViewWidthMode;
@@ -88,7 +99,18 @@ export default function FoundationSidebar({
   attentionByViewId,
   seasonContextLabel,
   teamPicker,
+  rail,
 }: FoundationSidebarProps) {
+  const [railHover, setRailHover] = useState(false);
+  const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearRailTimer = () => {
+    if (railTimer.current) {
+      clearTimeout(railTimer.current);
+      railTimer.current = null;
+    }
+  };
+  useEffect(() => clearRailTimer, []);
+  const railMode = rail ? (rail.pinned ? "pinned" : railHover ? "open" : "compact") : undefined;
   const [viewWidthMode, setViewWidthMode] = useViewWidth();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
@@ -190,10 +212,75 @@ export default function FoundationSidebar({
   });
 
   return (
-    <aside className="foundation-sidebar" data-testid="foundation-sidebar" aria-label="Foundation Navigation">
+    <aside
+      className="foundation-sidebar"
+      data-testid="foundation-sidebar"
+      data-rail={railMode}
+      aria-label="Foundation Navigation"
+      onMouseEnter={
+        rail
+          ? () => {
+              clearRailTimer();
+              railTimer.current = setTimeout(() => setRailHover(true), RAIL_HOVER_DELAY_MS);
+            }
+          : undefined
+      }
+      onMouseLeave={
+        rail
+          ? () => {
+              clearRailTimer();
+              setRailHover(false);
+            }
+          : undefined
+      }
+      onFocus={
+        rail
+          ? (event) => {
+              // Nur Tastaturfokus klappt aus; ein Mausklick soll die Leiste nicht aufgeklappt festhalten.
+              if (event.target instanceof HTMLElement && event.target.matches(":focus-visible")) {
+                clearRailTimer();
+                setRailHover(true);
+              }
+            }
+          : undefined
+      }
+      onBlur={
+        rail
+          ? (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setRailHover(false);
+              }
+            }
+          : undefined
+      }
+    >
       <a className="foundation-skip-link" href="#foundation-main-content">
         Zum Hauptinhalt springen
       </a>
+      {rail ? (
+        <div className="foundation-rail-head">
+          {seasonPart ? (
+            <span className="foundation-rail-mini" data-testid="foundation-rail-mini" title={seasonContextLabel ?? undefined}>
+              <b>{seasonPart}</b>
+              {matchdayPart ? <i>{matchdayPart.replace(/^MD\s*/, "MD ")}</i> : null}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="foundation-rail-pin"
+            data-testid="foundation-rail-pin"
+            aria-pressed={rail.pinned}
+            aria-label="Beschriftung immer zeigen"
+            title={rail.pinned ? "Beschriftung wieder einklappen" : "Beschriftung immer zeigen"}
+            onClick={() => rail.onPinnedChange(!rail.pinned)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7" />
+            </svg>
+            <span className="foundation-rail-pin-text">{rail.pinned ? "Angeheftet" : "Anheften"}</span>
+          </button>
+        </div>
+      ) : null}
       <div className="foundation-sidebar-brand">
         <Link className="foundation-sidebar-save-link" href="/">
           Spielstände
@@ -292,6 +379,8 @@ export default function FoundationSidebar({
                   className={`foundation-sidebar-item${isActive ? " is-active" : ""}${needsAttention ? " is-attention" : ""}${isDragging ? " is-dragging" : ""}`}
                   data-testid={`foundation-nav-${item.id}`}
                   title={item.tooltip}
+                  aria-label={rail ? `${item.label}${item.badge ? ` (${item.badge})` : ""}${needsAttention ? " — braucht Aufmerksamkeit" : ""}` : undefined}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => onNavigate(targetView)}
                   onMouseEnter={() => onPrefetchView?.(item.id)}
                   onFocus={() => onPrefetchView?.(item.id)}
@@ -312,7 +401,11 @@ export default function FoundationSidebar({
                       <circle cx="9" cy="10" r="1" />
                     </svg>
                   </span>
-                  {NAV_VIEW_ICON_SVGS[item.id] ? (
+                  {rail ? (
+                    <span className="foundation-sidebar-icon foundation-sidebar-icon-svg foundation-rail-icon" aria-hidden="true">
+                      <FoundationRailIcon viewId={item.id} fallback={item.icon} />
+                    </span>
+                  ) : NAV_VIEW_ICON_SVGS[item.id] ? (
                     <span className="foundation-sidebar-icon foundation-sidebar-icon-svg" aria-hidden="true">
                       {NAV_VIEW_ICON_SVGS[item.id]}
                     </span>
@@ -320,6 +413,11 @@ export default function FoundationSidebar({
                     <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span>
                   ) : null}
                   <span className="foundation-sidebar-item-label">{item.label}</span>
+                  {rail && needsAttention ? (
+                    <span className="foundation-rail-zahl" data-testid={`foundation-nav-attention-${item.id}`} aria-hidden="true">
+                      !
+                    </span>
+                  ) : null}
                   {item.badge ? (
                     <span className="foundation-sidebar-item-badge" data-testid={`foundation-nav-badge-${item.id}`}>
                       {item.badge}

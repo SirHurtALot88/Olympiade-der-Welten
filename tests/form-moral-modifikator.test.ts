@@ -10,15 +10,16 @@ import {
 } from "@/lib/morale/form-moral-modifikator";
 
 describe("Form + Moral Modifikator (Prototyp, Standard AUS)", () => {
-  it("ist ohne Umgebungsvariable aus und akzeptiert 1/an/on/true", () => {
-    expect(isFormMoralEnabled({})).toBe(false);
+  it("ist seit 18.11. ohne Umgebungsvariable AN und lässt sich mit 0/aus/off abschalten", () => {
+    expect(isFormMoralEnabled({})).toBe(true);
     expect(isFormMoralEnabled({ OLY_FORM_MORAL: "0" })).toBe(false);
+    expect(isFormMoralEnabled({ OLY_FORM_MORAL: "aus" })).toBe(false);
     expect(isFormMoralEnabled({ OLY_FORM_MORAL: "1" })).toBe(true);
     expect(isFormMoralEnabled({ OLY_FORM_MORAL: "an" })).toBe(true);
   });
 
-  it("Dosis: Standard 1,5 und Deckel 4", () => {
-    expect(resolveFormMoralDosisPct({})).toBe(1.5);
+  it("Dosis: Standard 1,0 und Deckel 4", () => {
+    expect(resolveFormMoralDosisPct({})).toBe(1.0);
     expect(resolveFormMoralDosisPct({ OLY_FORM_MORAL_DOSIS: "2.5" })).toBe(2.5);
     expect(resolveFormMoralDosisPct({ OLY_FORM_MORAL_DOSIS: "99" })).toBe(4);
   });
@@ -33,11 +34,11 @@ describe("Form + Moral Modifikator (Prototyp, Standard AUS)", () => {
   });
 
   it("Höchstwirkung bei Dosis 1,5: Form +-3 %, Moral +-1 %, zusammen +-4 %", () => {
-    const hoch = calculateFormMoralSignal({ form: 100, morale: 100 });
+    const hoch = calculateFormMoralSignal({ form: 100, morale: 100, dosisPct: 1.5 });
     expect(hoch.formPct).toBeCloseTo(3, 5);
     expect(hoch.moralePct).toBeCloseTo(1, 5);
     expect(hoch.modifierPct).toBeCloseTo(4, 5);
-    const tief = calculateFormMoralSignal({ form: 0, morale: 0 });
+    const tief = calculateFormMoralSignal({ form: 0, morale: 0, dosisPct: 1.5 });
     expect(tief.modifierPct).toBeCloseTo(-4, 5);
     expect(tief.multiplier).toBeCloseTo(0.96, 5);
   });
