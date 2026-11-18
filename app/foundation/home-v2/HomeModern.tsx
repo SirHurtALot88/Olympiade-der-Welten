@@ -26,6 +26,7 @@ import {
   type SpieltagsKarte,
   type StartseiteDaten,
 } from "@/lib/foundation/startseite-modern";
+import { inboxEintragIstDoppelt } from "@/lib/foundation/startseite-modern-zustand";
 import { formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import "./home-modern.css";
 
@@ -413,8 +414,7 @@ function Entscheidungen({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten |
     oeffne: p.onOpenInbox,
   }));
   // Abgeleitete Zeilen zuerst (aus dem echten Zustand), dann die Inbox; Einträge der Inbox, die dasselbe sagen, entfallen.
-  const gesehen = new Set(abgeleitet.map((z) => z.titel.toLowerCase()));
-  const items = [...abgeleitet, ...ausInbox.filter((z) => !gesehen.has(z.titel.toLowerCase()))].slice(0, 5);
+  const items = [...abgeleitet, ...ausInbox.filter((z) => !inboxEintragIstDoppelt(z.titel, abgeleitet))].slice(0, 5);
   if (items.length < 5) {
     const z = p.boardObjectives[0];
     if (z) {
