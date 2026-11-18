@@ -384,7 +384,10 @@ async function waitForTransferMarketV2Ready(page: Page, timeoutMs: number) {
         Boolean(marketRoot.querySelector(".market-v2-budget-strip")) ||
         Boolean(marketRoot.querySelector(".market-v2-context-grid")) ||
         Boolean(marketRoot.querySelector('[data-testid="transfer-candidate-card"]')) ||
-        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]'));
+        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]')) ||
+        // Transfermarkt neu (18.11.): Markt-Tabelle mit Zeilen statt Kandidatenkarten.
+        Boolean(marketRoot.querySelector('[data-testid="tm-zeile"]')) ||
+        Boolean(marketRoot.querySelector('[data-testid="tm-markt"]'));
       return hasMarketBody && needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
     },
     TRANSFER_MARKET_READY_NEEDLES,
@@ -771,7 +774,7 @@ async function main() {
         await waitForTransferMarketV2Ready(page, viewTimeoutMs);
         await page.waitForFunction(
           () =>
-            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"]').length > 0 ||
+            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"], [data-testid="tm-zeile"]').length > 0 ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Freie Spieler") ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Free Agents") ||
             (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Kandidaten") ||
@@ -782,7 +785,9 @@ async function main() {
         ).catch(() => undefined);
         const buyButtons =
           (await page.getByTestId("transfer-deal-open-button").count()) +
-          (await page.getByTestId("transfer-buy-preview-button").count());
+          (await page.getByTestId("transfer-buy-preview-button").count()) +
+          (await page.getByTestId("tm-zeile").count()) +
+          (await page.getByTestId("tm-draft-platzhalter").count());
         const text = await page.getByTestId("transfer-market").innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, selectedTeam, `Team auswählbar${selectedTeam ? `: ${selectedTeam}` : ""}.`);
         assertStep(

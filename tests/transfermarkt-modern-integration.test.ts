@@ -93,10 +93,11 @@ describe("Transfermarkt neu: Kauf, Verkauf, Verlängerung gegen einen echten Spi
     expect(ergebnis.canBuy).toBe(true);
     expect(ergebnis.activePlayerCreated).toBe(true);
     expect(ergebnis.transferCreated).toBe(true);
-    activePlayerId = ergebnis.activePlayerId!;
     kaufPreis = ergebnis.purchasePrice!;
 
     const nachher = teamStand();
+    // Die Seite verkauft über die Kaderzeile (roster.id); die activePlayerId im Kauf-Ergebnis ist nur ein Anzeige-Schlüssel.
+    activePlayerId = nachher.kader.find((r) => r.playerId === kaufSpieler)!.id;
     expect(nachher.kader.some((r) => r.playerId === kaufSpieler)).toBe(true);
     expect(nachher.kader.length).toBe(vorher.kader.length + 1);
     expect(nachher.team.cash).toBeCloseTo(vorher.team.cash - kaufPreis, 1);
