@@ -122,9 +122,9 @@ describe("Draft-Seite: Fehlertexte und Anzeige", () => {
     expect(istStandKonflikt("kader_voll")).toBe(false);
   });
 
-  it("zeigt abgebrochen und Notkauf", () => {
+  it("zeigt abgebrochen, Notkauf-Grund neutral als KI-Pick", () => {
     expect(fertigGrundText("abgebrochen")).toBe("Draft abgebrochen");
-    expect(pickHerkunft({ quelle: "ki", grund: "notkauf_mindestkader" })).toMatch(/Notkauf/);
+    expect(pickHerkunft({ quelle: "ki", grund: "notkauf_mindestkader" })).toBe("KI");
     expect(pickHerkunft({ quelle: "ki", grund: null })).toBe("KI");
   });
 });

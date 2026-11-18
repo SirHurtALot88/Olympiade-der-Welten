@@ -95,8 +95,8 @@ export function fertigGrundText(grund: string | null | undefined): string | null
 
 /** Herkunftszeile eines Picks (Pick-Tafel/Ticker). */
 export function pickHerkunft(e: { quelle: string; grund?: string | null }): string {
-  const basis = e.quelle === "mensch" || e.quelle === "nachzug" ? "Mensch" : e.quelle === "auto" ? "Auto-Pick" : "KI";
-  return e.grund === "notkauf_mindestkader" ? `${basis} · Notkauf (Mindestkader)` : basis;
+  // Der Grund `notkauf_mindestkader` bleibt im Kern, die Seite zeigt ihn neutral als normalen Pick (Chris: keine Notkaeufe).
+  return e.quelle === "mensch" || e.quelle === "nachzug" ? "Mensch" : e.quelle === "auto" ? "Auto-Pick" : "KI";
 }
 
 export function fehlerText(code: string | null | undefined): string {

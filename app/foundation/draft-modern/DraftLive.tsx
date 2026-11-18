@@ -440,7 +440,7 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
             <span className="nr t">#{e.pickNr}</span>
             <Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} />
             <b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
-            <small>{k.teamKuerzel(e.teamId)}{e.grund === "notkauf_mindestkader" ? " · Notkauf" : ""}</small>
+            <small>{k.teamKuerzel(e.teamId)}</small>
             <em className="t">{de(e.abloese ?? 0)}</em>
           </span>
         );
