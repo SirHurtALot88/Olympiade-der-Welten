@@ -100,7 +100,7 @@ Die drei Stufen (`DELEGATION_STUFEN` in `lib/foundation/team-delegation.ts`):
 | Bereich | Voll selbst | Halbautomatik | Voll KI |
 |---|---|---|---|
 | Einsatzliste und Formkarten | selbst | **KI**, Mensch überschreibt | KI |
-| Draft-Picks | selbst | **KI** | KI |
+| Draft-Picks | selbst | **selbst** (Chris, 18.11. abends) | KI |
 | Käufe, Verkäufe, Verträge | selbst | **selbst** | KI |
 | Training und Entwicklung | selbst | **KI**, Mensch überschreibt | KI |
 | Gebäude | selbst | KI (Empfehlung, F3) | KI |
@@ -195,7 +195,8 @@ Bisher: Chris überspringt den Draft, die KI-Teams picken durch, er pickt danach
   gewählt haben.
 - „Überspringen“ ist eine Wahl je Manager, nicht für den Raum. Wer überspringt, pickt danach in Ruhe, solange das
   Kauffenster offen ist.
-- Ramona (Halbautomatik, `draft: "ki"`) muss nichts tun: die KI pickt ihre Teams im selben Durchlauf wie die KI-Teams.
+- Ramona (Halbautomatik) draftet selbst (Chris, 18.11. abends: „ramona draftet und kauft und verkauft selber alles
+  andere startet mit AI“). Stellt sie den Bereich Draft auf KI, pickt die KI ihre Teams im selben Durchlauf wie die KI-Teams.
 - Ist Ramona `draft: "selbst"` und überspringt, bleiben ihre Teams bis zu ihrem nächsten Besuch auf dem Mindestkader;
   der Saisonstart prüft das Kaderminimum und lässt die KI notfalls bis zum Minimum auffüllen (Frage F5).
 
