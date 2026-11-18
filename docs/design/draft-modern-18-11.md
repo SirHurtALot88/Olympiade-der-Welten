@@ -246,3 +246,8 @@ abschließen“, Pick-Tafel, Ergebnis.
 | `07-nachzug-1920.png` | Nachzug nach Variante A |
 | `08-ergebnis-1920.png`, `-2560` | Ergebnis |
 | `09-mit-mockup-leiste-1920.png` | mit der grauen Steuerleiste |
+| `10-du-bist-dran-1710.png` | eigener Pick auf dem MacBook (1710×1112) |
+
+Geprüft je Bild: keine Skriptfehler, kein Seitenscroll, keine Tafel läuft über (automatisch gemessen; der Live-Ticker läuft
+absichtlich rechts aus). Nicht geprüft: Firefox und Safari, Tastatur, ein voller Klick-Durchlauf im Browser (die Abläufe
+liefen nur als Trockenlauf der Logik ohne Browser).
