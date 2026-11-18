@@ -2142,5 +2142,125 @@
     "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
     "erzeugt": "2026-11-17",
     "verwendung": "HYROX-Arena (Variante B, 17.11.) -- echtes Geraet Farmers Carry (Station 6, KRAFT), Dark-Fantasy-Fassung; Requisite, keine Figur. s. HYROX_GERAETE in battle-mode.engine.js."
+  },
+  "mockup/climbing-neu-18-11/glocke.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "brass summit bell hanging from a weathered wooden beam bolted to a rock, short pull rope, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 18,
+      "gen": [
+        64,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/glocke.png",
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten (46x50), 255 Farben",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Gipfelglocke am Topp (Zielereignis)",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/seilbruecke.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "sagging rope bridge with wooden planks and rope handrails seen from the side, spanning horizontally between two anchor points, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 24,
+      "gen": [
+        192,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/seilbruecke.png",
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten (182x32), 255 Farben",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Seilbruecke zwischen Felsturm und Dachblock (Technikweg)",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/strickleiter.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "rope ladder with wooden rungs hanging straight down, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 42,
+      "gen": [
+        48,
+        128
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/strickleiter.png",
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten (35x120), 255 Farben",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Strickleiter an der rechten Flanke (Ausdauerweg)",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/griffe.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different colorful resin climbing wall holds, jugs, crimps and slopers in red, blue, yellow and green, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 43,
+      "gen": [
+        128,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/griffe.png",
+    "bearbeitung": "255 Farben, Masse unveraendert 128x64",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Blatt mit acht Klettergriffen (4x2 Zellen zu 32 px), Routenfarben",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/rastplatz.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "small wooden rest platform ledge bolted to a cliff with two chains, a chalk bucket and a coiled rope on it, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 45,
+      "gen": [
+        96,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/rastplatz.png",
+    "bearbeitung": "auf Alpha-Begrenzung beschnitten (80x57), 255 Farben",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Rastpunkt mit Kreideeimer am Band",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "mockup/climbing-neu-18-11/felsnase.png": {
+    "paket": "PixelLab",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "dark orange-brown sandstone rock outcrop in the foreground with a gnarled windswept pine tree growing on top, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 41,
+      "gen": [
+        192,
+        224
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "datei": "public/mockups/climbing-neu-18-11/felsnase.png",
+    "bearbeitung": "grauer Hintergrund per Flutfuellung von den Ecken entfernt, beschnitten (172x203), 255 Farben",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing-Neuentwurf: Vordergrund-Silhouette Felsnase mit Kiefer (Ebene E5, Parallax 1,35, im Mockup abgedunkelt)",
+    "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
   }
 }

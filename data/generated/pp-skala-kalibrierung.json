@@ -1,5 +1,5 @@
 {
-  "hinweis": "PP-Skala-Prototyp (docs/design/pp-skala-18-11.md, Variante C2): je Disziplin rTop = Median der ungedeckelten Tagesbesten (-> 5 PP), rMed = Median aller Einsaetze (-> 1,25 PP), beide auf der alten Kurvenskala; faktor = 5/rTop nur zum Vergleich (Variante C). Gemessen mit scripts/miss-pp-skala.ts + scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung. Wirkt nur mit OLY_PP_SKALA=an.",
+  "hinweis": "PP-Skala C2 (docs/design/pp-skala-18-11.md): je Disziplin rTop = Median der ungedeckelten Tagesbesten (-> 5 PP), rMed = Median aller Einsaetze (-> 1,25 PP), beide auf der alten Kurvenskala; feldgroessen = dieselben Anker je Feldgroesse (ab 2 roh-Zellen), sonst gilt der Disziplin-weite Anker; faktor = 5/rTop nur zum Vergleich (Variante C). Gemessen mit scripts/miss-pp-skala.ts + scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung. Wirkt in jeder Saison mit Stempel wertungsSkalen.pp = c2.",
   "ziel": 5,
   "gemessenAm": "2026-11-18",
   "quellen": [
@@ -10,187 +10,679 @@
     {
       "saveId": "new-game-1795003737169-pwc22d",
       "spieltage": 20
+    },
+    {
+      "saveId": "new-game-1795011793384-p2zt62",
+      "spieltage": 20
+    },
+    {
+      "saveId": "new-game-1795012121998-eyyjbp",
+      "spieltage": 20
+    },
+    {
+      "saveId": "new-game-1795012815966-z97iaz",
+      "spieltage": 20
     }
   ],
+  "umrechnung": {
+    "einsatz": 1.0246,
+    "spielerSaison": 1.0264,
+    "teamSaison": 1.0273
+  },
   "disziplinen": {
     "basketball": {
-      "rTop": 8.05,
-      "rMed": 1.3,
-      "faktor": 0.6211,
-      "medianTagesbester": 8.05,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.12,
+          "rMed": 1.295,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 5.1,
+          "rMed": 1.615,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 8.05,
+          "rMed": 1.34,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 7.47,
+          "rMed": 1.23,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 7.23,
+          "rMed": 1.37,
+          "zellen": 4
+        }
+      },
+      "rTop": 6.67,
+      "rMed": 1.43,
+      "faktor": 0.7496,
+      "medianTagesbester": 6.67,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 1
     },
     "battlefield": {
-      "rTop": 4.85,
-      "rMed": 1.165,
-      "faktor": 1.0309,
-      "medianTagesbester": 4.85,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.47,
+          "rMed": 1.065,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 5.72,
+          "rMed": 0.52,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 5.17,
+          "rMed": 1,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.02,
+          "rMed": 1.2,
+          "zellen": 4
+        }
+      },
+      "rTop": 5.23,
+      "rMed": 1,
+      "faktor": 0.956,
+      "medianTagesbester": 5.23,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "breaking": {
-      "rTop": 3,
-      "rMed": 0.765,
-      "faktor": 1.6667,
-      "medianTagesbester": 3,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 2.32,
+          "rMed": 0.565,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 3.45,
+          "rMed": 0.73,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 3,
+          "rMed": 0.905,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 3.97,
+          "rMed": 0.955,
+          "zellen": 4
+        }
+      },
+      "rTop": 3.55,
+      "rMed": 0.79,
+      "faktor": 1.4085,
+      "medianTagesbester": 3.55,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "climbing": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.5,
+          "rMed": 1.53,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 5.5,
+          "rMed": 1.43,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 5.5,
+          "rMed": 1.04,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.5,
+          "rMed": 1.1,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 5.5,
+          "rMed": 1.15,
+          "zellen": 4
+        }
+      },
       "rTop": 5.5,
       "rMed": 1.15,
       "faktor": 0.9091,
       "medianTagesbester": 5.5,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 4
     },
     "eiskunstlauf": {
-      "rTop": 3.54,
-      "rMed": 1.03,
-      "faktor": 1.4124,
-      "medianTagesbester": 3.54,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.37,
+          "rMed": 0.905,
+          "zellen": 6
+        },
+        "3": {
+          "rTop": 5.74,
+          "rMed": 0.95,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 3.99,
+          "rMed": 0.57,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 7.34,
+          "rMed": 1.435,
+          "zellen": 4
+        }
+      },
+      "rTop": 5.88,
+      "rMed": 1.06,
+      "faktor": 0.8503,
+      "medianTagesbester": 5.88,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 4
     },
     "fechten": {
-      "rTop": 5.76,
-      "rMed": 1.18,
-      "faktor": 0.8681,
-      "medianTagesbester": 5.76,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 3,
+          "rMed": 0.53,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 4.1,
+          "rMed": 1.1,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 5.47,
+          "rMed": 1.59,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 4,
+          "rMed": 0.84,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 5.05,
+          "rMed": 0.99,
+          "zellen": 4
+        }
+      },
+      "rTop": 4.93,
+      "rMed": 0.99,
+      "faktor": 1.0142,
+      "medianTagesbester": 4.93,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "football": {
-      "rTop": 4.28,
-      "rMed": 1.44,
-      "faktor": 1.1682,
-      "medianTagesbester": 4.28,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.02,
+          "rMed": 1.61,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 3.58,
+          "rMed": 1.32,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 5.44,
+          "rMed": 1.3,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.15,
+          "rMed": 1.4,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 7.07,
+          "rMed": 1.5,
+          "zellen": 2
+        }
+      },
+      "rTop": 5.44,
+      "rMed": 1.425,
+      "faktor": 0.9191,
+      "medianTagesbester": 5.44,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 2
     },
     "gewichtheben": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 3.26,
+          "rMed": 0.4,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 4.2,
+          "rMed": 0.69,
+          "zellen": 6
+        },
+        "5": {
+          "rTop": 3.47,
+          "rMed": 0.94,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 5.15,
+          "rMed": 1.41,
+          "zellen": 4
+        }
+      },
       "rTop": 4.47,
       "rMed": 1.07,
       "faktor": 1.1186,
       "medianTagesbester": 4.47,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "hockey": {
-      "rTop": 8.46,
-      "rMed": 1.29,
-      "faktor": 0.591,
-      "medianTagesbester": 8.46,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 6.33,
+          "rMed": 1.12,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 3.76,
+          "rMed": 1.27,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 10.47,
+          "rMed": 1.32,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 6.84,
+          "rMed": 1.375,
+          "zellen": 8
+        },
+        "6": {
+          "rTop": 5.19,
+          "rMed": 1.49,
+          "zellen": 2
+        }
+      },
+      "rTop": 6.84,
+      "rMed": 1.34,
+      "faktor": 0.731,
+      "medianTagesbester": 6.84,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 3
     },
     "i-spy": {
-      "rTop": 5.64,
-      "rMed": 1.315,
-      "faktor": 0.8865,
-      "medianTagesbester": 5.64,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.02,
+          "rMed": 1.225,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 5.71,
+          "rMed": 1.41,
+          "zellen": 6
+        },
+        "5": {
+          "rTop": 5.31,
+          "rMed": 1.235,
+          "zellen": 6
+        }
+      },
+      "rTop": 5.47,
+      "rMed": 1.3,
+      "faktor": 0.9141,
+      "medianTagesbester": 5.47,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 4
     },
     "mini-dm": {
-      "rTop": 5.08,
-      "rMed": 1.21,
-      "faktor": 0.9843,
-      "medianTagesbester": 5.08,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.99,
+          "rMed": 1.13,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 4.46,
+          "rMed": 1.2,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 5.36,
+          "rMed": 1.12,
+          "zellen": 6
+        },
+        "6": {
+          "rTop": 5.43,
+          "rMed": 1.115,
+          "zellen": 4
+        }
+      },
+      "rTop": 5.31,
+      "rMed": 1.12,
+      "faktor": 0.9416,
+      "medianTagesbester": 5.31,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 1
     },
     "showcase": {
-      "rTop": 4.48,
-      "rMed": 1.23,
-      "faktor": 1.1161,
-      "medianTagesbester": 4.48,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "4": {
+          "rTop": 4.48,
+          "rMed": 1.04,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 4.4,
+          "rMed": 1.2,
+          "zellen": 6
+        },
+        "6": {
+          "rTop": 4.77,
+          "rMed": 1.23,
+          "zellen": 6
+        }
+      },
+      "rTop": 4.77,
+      "rMed": 1.18,
+      "faktor": 1.0482,
+      "medianTagesbester": 4.77,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "speed-schach": {
-      "rTop": 5.39,
-      "rMed": 1.25,
-      "faktor": 0.9276,
-      "medianTagesbester": 5.39,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.61,
+          "rMed": 1.08,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 3.88,
+          "rMed": 1.13,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 5.29,
+          "rMed": 1.39,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 5.16,
+          "rMed": 1.11,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 5.12,
+          "rMed": 1.175,
+          "zellen": 6
+        }
+      },
+      "rTop": 5.12,
+      "rMed": 1.17,
+      "faktor": 0.9766,
+      "medianTagesbester": 5.12,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 1
     },
     "spurt": {
-      "rTop": 2.85,
+      "feldgroessen": {
+        "2": {
+          "rTop": 2.46,
+          "rMed": 1.38,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 3.15,
+          "rMed": 1.34,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 3.92,
+          "rMed": 1.38,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 5,
+          "rMed": 1.38,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 5.8,
+          "rMed": 1.55,
+          "zellen": 2
+        }
+      },
+      "rTop": 3.15,
       "rMed": 1.37,
-      "faktor": 1.7544,
-      "medianTagesbester": 2.85,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "faktor": 1.5873,
+      "medianTagesbester": 3.15,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "staffel": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.5,
+          "rMed": 1.405,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 5.5,
+          "rMed": 1.38,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 5.5,
+          "rMed": 1.72,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 5.5,
+          "rMed": 1.26,
+          "zellen": 6
+        }
+      },
       "rTop": 5.5,
-      "rMed": 1.63,
+      "rMed": 1.49,
       "faktor": 0.9091,
       "medianTagesbester": 5.5,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 3
     },
     "takeshis-castle": {
-      "rTop": 4.58,
-      "rMed": 0.935,
-      "faktor": 1.0917,
-      "medianTagesbester": 4.58,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.74,
+          "rMed": 0.97,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 4.35,
+          "rMed": 0.955,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 4.58,
+          "rMed": 0.83,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.06,
+          "rMed": 1.13,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 5.41,
+          "rMed": 1.19,
+          "zellen": 2
+        }
+      },
+      "rTop": 4.77,
+      "rMed": 1.01,
+      "faktor": 1.0482,
+      "medianTagesbester": 4.77,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "tdm": {
-      "rTop": 6.08,
+      "feldgroessen": {
+        "3": {
+          "rTop": 7.22,
+          "rMed": 1.13,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 5.61,
+          "rMed": 1.21,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.26,
+          "rMed": 1.43,
+          "zellen": 4
+        },
+        "6": {
+          "rTop": 6,
+          "rMed": 1.47,
+          "zellen": 2
+        }
+      },
+      "rTop": 6.32,
       "rMed": 1.28,
-      "faktor": 0.8224,
-      "medianTagesbester": 6.08,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "faktor": 0.7911,
+      "medianTagesbester": 6.32,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 2
     },
     "tennis": {
-      "rTop": 4.06,
-      "rMed": 0.99,
-      "faktor": 1.2315,
-      "medianTagesbester": 4.06,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.06,
+          "rMed": 1.25,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 4.27,
+          "rMed": 0.67,
+          "zellen": 8
+        },
+        "4": {
+          "rTop": 3.32,
+          "rMed": 0.755,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 3.95,
+          "rMed": 1.055,
+          "zellen": 4
+        }
+      },
+      "rTop": 4.27,
+      "rMed": 0.84,
+      "faktor": 1.171,
+      "medianTagesbester": 4.27,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "time-trial": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.5,
+          "rMed": 1.41,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 5.5,
+          "rMed": 1.32,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 5.5,
+          "rMed": 1.26,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.5,
+          "rMed": 1.445,
+          "zellen": 4
+        }
+      },
       "rTop": 5.5,
-      "rMed": 1.3,
+      "rMed": 1.32,
       "faktor": 0.9091,
       "medianTagesbester": 5.5,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 4
     },
     "wettessen": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 3.52,
+          "rMed": 1.18,
+          "zellen": 6
+        },
+        "3": {
+          "rTop": 4.28,
+          "rMed": 1.35,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 3.54,
+          "rMed": 1.25,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 6.49,
+          "rMed": 1.85,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 4.96,
+          "rMed": 1.16,
+          "zellen": 4
+        }
+      },
       "rTop": 4.28,
-      "rMed": 1.19,
+      "rMed": 1.32,
       "faktor": 1.1682,
       "medianTagesbester": 4.28,
-      "zellen": 8,
-      "zellenRoh": 4,
+      "zellen": 20,
+      "zellenRoh": 16,
       "zensiert": 1
     }
   }

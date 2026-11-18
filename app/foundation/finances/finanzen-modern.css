@@ -12,7 +12,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: max(660px, calc(100dvh - 150px));
+  /* Die Schale (Kopf, Rand, Fuss) waechst mit der Breite: ab 1710 px kommen ca. 0,04 px je px Breite dazu. Ohne den Zuschlag scrollt die Seite (9 px bei 1920, 34 px bei 2560). */
+  height: max(660px, calc(100dvh - 152px - max(0px, (100vw - 1700px) * 0.04)));
   border: 1px solid var(--bc-linie);
   border-radius: var(--bc-r);
   overflow: hidden;
@@ -772,7 +773,7 @@ button.fin-tz:hover {
 .fin-herl {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   padding: 8px 10px;
   border-radius: 6px;
   background: #06080c;

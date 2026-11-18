@@ -231,7 +231,7 @@ export default function FoundationPlayersQueryChipsBar({
               step="0.1"
               value={draftValue}
               onChange={(event) => setDraftValue(event.target.value)}
-              placeholder={activeAttrMeta.money ? "Mio." : "Wert"}
+              placeholder={activeAttrMeta.money ? "C" : "Wert"}
               aria-label="Wert"
             />
           )}

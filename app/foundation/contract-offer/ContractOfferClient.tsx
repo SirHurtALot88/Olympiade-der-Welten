@@ -97,7 +97,7 @@ export default function ContractOfferClient({
               der Wert ist das JAHRESgehalt in Mio (dieselbe Größe wie „Forderung
               10,8 Mio p.a." direkt darunter). Richtige Bezugsgröße + Einheit am Feld. */}
           <label className="filter-field">
-            <span>Gehalt p.a. (Mio)</span>
+            <span>Gehalt p.a. (C)</span>
             <input
               className="input"
               type="number"

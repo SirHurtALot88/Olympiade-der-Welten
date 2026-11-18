@@ -385,7 +385,7 @@ function BudgetsAnsicht({
   const anzapfWert = anzapf ?? s.ruecklageAnzapfen.bereitsAngezapft;
   const anzapfMax = s.ruecklageAnzapfen.bereitsAngezapft + s.ruecklageAnzapfen.moeglich;
   return (
-    <div className="fin-gr" data-testid="fin-budgets">
+    <div className="fin-gr" style={{ gridTemplateRows: "auto auto minmax(0, 1fr) auto" }} data-testid="fin-budgets">
       <div className="fin-rech is-gross is-voll" style={{ "--n": 4, margin: 0 } as CSSProperties}>
         <div>
           <small>Freigabe des Vorstands</small>
