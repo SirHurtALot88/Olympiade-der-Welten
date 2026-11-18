@@ -4,6 +4,7 @@ import path from "node:path";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaTeam } from "@/lib/foundation/battle-arena/arena-kader-adapter";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { buildArenaAufstellung, buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-strategie-adapter";
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
@@ -37,6 +38,10 @@ function ppSkalaTeil(gameState: GameState, matchdayId: string): { ppSkala?: "c2"
  *   - die Teilaufstellung beider Seiten (`buildArenaAufstellungBeide`) — Slot-Zuordnung je Spieler;
  *   - den ECHTEN Spieltagswurf der Mutatoren (`mutatoren`, vom Aufrufer uebergeben — der Vorlauf
  *     zieht ihn ohnehin schon fuer `runBattleModeArenaMatchday()`, s. dort);
+ *   - den Verletzungsstand des Spieltags (`ermittleArenaVerletzungsstand`, Chris 18.11.,
+ *     docs/design/verletzung-regel-18-11.md) implizit ueber den Kader: ein heute Verletzter steht
+ *     dort mit 50 % seiner Eignung, ein aus einem Vorspieltag Gesperrter fehlt (und hat keinen Platz
+ *     in der Aufstellung). Faellt der Wurf anders als beim Vorlauf, kippt der Hash;
  *   - einen Hash der Motor-Dateien selbst (`battle-mode.engine.js`/`battle-mode.rezepte.js`), weil
  *     ein Deploy zwischen Vorlauf und Buchung die Rechenvorschrift aendern koennte.
  *
@@ -73,6 +78,7 @@ export function berechneArenaEingabeHash(input: {
   mutatoren: readonly string[];
 }): string {
   const fixtures = findeSpieltagsFixtures(input.gameState, input.matchdayId);
+  const verletzungsstand = ermittleArenaVerletzungsstand(input);
   const teile: string[] = [];
   for (const fixture of [...fixtures].sort((left, right) =>
     `${left.homeTeamId}:${left.awayTeamId}`.localeCompare(`${right.homeTeamId}:${right.awayTeamId}`),
@@ -85,8 +91,8 @@ export function berechneArenaEingabeHash(input: {
       homeTeamId: fixture.homeTeamId,
       awayTeamId: fixture.awayTeamId,
     });
-    const heim = buildArenaTeam(input.gameState, fixture.homeTeamId);
-    const gast = buildArenaTeam(input.gameState, fixture.awayTeamId);
+    const heim = buildArenaTeam(input.gameState, fixture.homeTeamId, undefined, verletzungsstand);
+    const gast = buildArenaTeam(input.gameState, fixture.awayTeamId, undefined, verletzungsstand);
     const aufstellung = buildArenaAufstellungBeide(input.gameState, fixture.homeTeamId, fixture.awayTeamId, input.matchdayId);
     // STRATEGIE-VORLAGE (Pilot Wettessen, 17.11.): bestimmt das Duell mit, gehoert also in den Hash --
     // eine nach dem Vorlauf geaenderte Vorlage verwirft die Vorberechnung wie jede andere Eingabe.
@@ -140,6 +146,7 @@ export function berechneMiniDmFfaEingabeHash(input: {
   mutatoren: readonly string[];
 }): string {
   const pods = getMiniDmPodsForMatchday(input.gameState, input.matchdayId, { saveId: input.saveId });
+  const verletzungsstand = ermittleArenaVerletzungsstand(input);
   const teile: string[] = [];
   for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
     const seed = buildMiniDmFfaPodMatchSeed({
@@ -148,7 +155,7 @@ export function berechneMiniDmFfaEingabeHash(input: {
       matchdayId: input.matchdayId,
       podId: pod.id,
     });
-    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId, undefined, verletzungsstand));
     const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
     teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
   }
@@ -186,6 +193,7 @@ export function berechneBahnPodEingabeHash(input: {
   mutatoren: readonly string[];
 }): string {
   const pods = getPodsForMatchday(input.gameState, input.matchdayId, input.disciplineId, { saveId: input.saveId });
+  const verletzungsstand = ermittleArenaVerletzungsstand(input);
   const teile: string[] = [];
   for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
     const seed = buildBahnPodMatchSeed({
@@ -195,7 +203,7 @@ export function berechneBahnPodEingabeHash(input: {
       disciplineId: input.disciplineId,
       podId: pod.id,
     });
-    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId, undefined, verletzungsstand));
     const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
     teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
   }
@@ -231,6 +239,7 @@ export function berechneBattlefieldPodEingabeHash(input: {
   mutatoren: readonly string[];
 }): string {
   const pods = getPodsForMatchday(input.gameState, input.matchdayId, "battlefield", { saveId: input.saveId });
+  const verletzungsstand = ermittleArenaVerletzungsstand(input);
   const teile: string[] = [];
   for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
     const seed = buildBattlefieldPodMatchSeed({
@@ -239,7 +248,7 @@ export function berechneBattlefieldPodEingabeHash(input: {
       matchdayId: input.matchdayId,
       podId: pod.id,
     });
-    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId, undefined, verletzungsstand));
     const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
     teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
   }
