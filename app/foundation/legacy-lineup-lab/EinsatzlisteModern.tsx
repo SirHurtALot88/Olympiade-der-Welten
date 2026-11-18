@@ -45,6 +45,17 @@ import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/stra
 
 import type { LineupNewLookProps } from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
 import { FeldHintergrund } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteFeldHintergrund";
+import {
+  FormMoralMarke,
+  FormMoralProfil,
+  FormMoralUebersicht,
+  KartenMarke,
+  KartenWirkungPanel,
+  WarumBlock,
+  type UrsachenZeile,
+} from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
+import { baueFormMoralAnzeige, moralUrsachen, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
+import { berechneKartenWirkung } from "@/lib/lineups/formkarten-wirkung";
 import "./einsatzliste-modern.css";
 
 type Props = LineupNewLookProps;
@@ -147,12 +158,14 @@ export default function EinsatzlisteModern(props: Props) {
   } = props;
 
   const [seite, setSeite] = useState<Seite>("d1");
-  const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung">("rolle");
+  const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung" | "formmoral">("rolle");
   const [blatt, setBlatt] = useState<null | "kader" | "kontext">(null);
   const [steuerungOffen, setSteuerungOffen] = useState(false);
   const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name">("platz");
   const [kaderFilter, setKaderFilter] = useState<"alle" | "frei" | "gesetzt" | "gesperrt">("alle");
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [profilBlatt, setProfilBlatt] = useState<string | null>(null);
+  const [warumId, setWarumId] = useState<string | null>(null);
   const [zieht, setZieht] = useState<{ id: string; von: string | null } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [ruettel, setRuettel] = useState(false);
@@ -385,6 +398,7 @@ export default function EinsatzlisteModern(props: Props) {
       const ziel = event.target as HTMLElement | null;
       if (ziel && (/^(input|textarea|select)$/i.test(ziel.tagName) || ziel.isContentEditable)) return;
       if (event.key === "Escape") {
+        setProfilBlatt(null);
         setBlatt(null);
         setSteuerungOffen(false);
         return;
@@ -534,6 +548,53 @@ export default function EinsatzlisteModern(props: Props) {
   };
 
   /* ---------------- Rendern ---------------- */
+  /* ---------------- Form + Moral (18.11.) ---------------- */
+  const gs = context?.gameState ?? null;
+  const formMoralVon = useMemo(() => {
+    const karte = new Map<string, FormMoralAnzeige>();
+    for (const [aid, k] of rosterCardByActivePlayerId) karte.set(aid, baueFormMoralAnzeige(gs, k.id));
+    return karte;
+  }, [gs, rosterCardByActivePlayerId]);
+  const fmVon = (aid: string | null | undefined) => (aid ? formMoralVon.get(aid) ?? null : null);
+  const disziplinNameVon = (id: string) => (gs?.disciplines ?? []).find((d) => d.id === id)?.name ?? id;
+  const ursachenVon = (aid: string): UrsachenZeile[] => {
+    const k = rosterCardByActivePlayerId.get(aid);
+    return k ? moralUrsachen(gs, k.id, context?.team.id ?? null) : [];
+  };
+  // Karten-Wirkung je Seite aus DERSELBEN Funktion wie die Wertung (calculateFormModifierForSide);
+  // die Auswahl kommt aus den Formkarten-Dropdowns.
+  const kartenWirkungJeSeite = useMemo(() => {
+    const ergebnis = {} as Record<Seite, ReturnType<typeof berechneKartenWirkung> | null>;
+    for (const sd of SEITEN) {
+      const steuerung = formCardControlsBySide?.[sd] ?? null;
+      const d = (sd === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2) ?? null;
+      if (!steuerung || !d || !context) {
+        ergebnis[sd] = null;
+        continue;
+      }
+      const spielerIds = slots
+        .filter((slot) => slot.disciplineSide === sd)
+        .map((slot) => selections[slot.key])
+        .filter((aid): aid is string => Boolean(aid))
+        .map((aid) => rosterCardByActivePlayerId.get(aid)?.id)
+        .filter((id): id is string => Boolean(id));
+      ergebnis[sd] = berechneKartenWirkung({
+        gameState: gs,
+        side: sd,
+        disciplineId: d.disciplineId,
+        disciplineCategory: d.category,
+        formCards: context.formCards ?? [],
+        primaryCardId: steuerung.primarySelectedId,
+        secondaryCardId: steuerung.secondarySelectedId,
+        playerIds: spielerIds,
+        rosterPlayers: context.rosterPlayers,
+      });
+    }
+    return ergebnis;
+  }, [formCardControlsBySide, context, slots, selections, rosterCardByActivePlayerId, gs]);
+  const kartenFuerSpieler = (sd: Seite, playerId: string | undefined) =>
+    playerId ? kartenWirkungJeSeite[sd]?.spieler.find((x) => x.playerId === playerId)?.zerlegung ?? null : null;
+
   if (!context) {
     return (
       <div className="bc elm" data-testid="lineup-modern">
@@ -646,6 +707,16 @@ export default function EinsatzlisteModern(props: Props) {
               <strong>{f1(vorschau?.projected.totalProjected)}</strong>
               {glyphe ? <span className={`pg ${GLYPHEN_TON[glyphe]}`} title="Rollenpassung (Aufschlag der Rolle in Punkten)">{glyphe}</span> : null}
               {last != null ? <BcLast wert={last} titel={`Erschöpfung ${Math.round(last)} von 100`} /> : null}
+              {fmVon(id) ? (
+                <button type="button" className="fm-wz" data-testid={`fm-marke-${slot.key}`} onClick={(event) => { event.stopPropagation(); setWarumId(id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form und Moral dieses Spielers">
+                  <FormMoralMarke a={fmVon(id)!} />
+                </button>
+              ) : null}
+              {(() => {
+                const z = kartenFuerSpieler(seite, karte?.id);
+                const w = kartenWirkungJeSeite[seite];
+                return z && w?.buchung.gebucht ? <KartenMarke alle={z.alle} traeger={z.traeger} form={z.form} farbe={w.karten[0]?.farbe ?? null} /> : null;
+              })()}
               {risiko ? <span className={risiko.riskPercent >= 8 ? "bc-minus" : "bc-null"} title="Verletzungsrisiko dieses Einsatzes" style={{ fontSize: 12, fontWeight: 700 }}>{f1(risiko.riskPercent)}%</span> : null}
             </span>
             {kannBedienen ? (
@@ -738,6 +809,19 @@ export default function EinsatzlisteModern(props: Props) {
           {z.delta != null ? <small className={z.delta > 0 ? "bc-plus" : z.delta < 0 ? "bc-minus" : "bc-null"}>{vz(z.delta)}</small> : null}
         </span>
       ),
+    },
+    {
+      key: "fm",
+      kopf: "Form · Moral",
+      breite: "74px",
+      render: (z) => {
+        const a = fmVon(z.id);
+        return a ? (
+          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form und Moral">
+            <FormMoralMarke a={a} />
+          </button>
+        ) : null;
+      },
     },
     {
       key: "last",
@@ -889,6 +973,36 @@ export default function EinsatzlisteModern(props: Props) {
   const gegnerSeite = gegner.status === "geschaetzt" ? gegner.seiten[seite] ?? null : null;
   const gruppeEintrag = spieltagsGegner?.find((eintrag) => eintrag.disciplineSide === seite) ?? null;
   const rivalen = (dSeite?.disciplineId ? context.teamPowerWindows?.[dSeite.disciplineId]?.top8Rivals : null) ?? [];
+  const formMoralTab = (() => {
+    const waehle = warumId ?? fokusBesetzer ?? null;
+    const a = fmVon(waehle);
+    const zeilen = slotsJeSeite[seite].flatMap((slot) => {
+      const aid = selections[slot.key];
+      const k = aid ? rosterCardByActivePlayerId.get(aid) : null;
+      const an = fmVon(aid);
+      return aid && k && an ? [{ id: aid, name: k.name, platz: slotName(slot.key), a: an }] : [];
+    });
+    const w = kartenWirkungJeSeite[seite];
+    return (
+      <div className="fm-tab">
+        {waehle && a ? (
+          <>
+            <h3 style={{ margin: "0 0 6px" }}>{spielerName(waehle)}</h3>
+            <WarumBlock a={a} ursachen={ursachenVon(waehle)} disziplinName={disziplinNameVon} onProfil={() => setProfilBlatt(waehle)} />
+            <hr style={{ borderColor: "var(--bc-linie)", margin: "12px 0" }} />
+          </>
+        ) : null}
+        <FormMoralUebersicht zeilen={zeilen} onWaehle={(id) => setWarumId(id)} />
+        {w ? (
+          <>
+            <hr style={{ borderColor: "var(--bc-linie)", margin: "12px 0" }} />
+            <KartenWirkungPanel w={w} namen={(pid) => [...rosterCardByActivePlayerId.values()].find((k) => k.id === pid)?.name ?? pid} />
+          </>
+        ) : null}
+      </div>
+    );
+  })();
+
   const gegnerTab = (
     <>
       {gegner.status === "geschaetzt" ? (
@@ -1228,6 +1342,13 @@ export default function EinsatzlisteModern(props: Props) {
                     {formKartenplatz("secondary", "Sekundär +")}
                   </div>
                 )}
+                {kartenWirkungJeSeite[seite] && kartenWirkungJeSeite[seite]!.karten.length > 0 ? (
+                  <small data-testid="elm-karten-live">
+                    {kartenWirkungJeSeite[seite]!.buchung.gebucht
+                      ? `Karten fürs Team: ${vz(kartenWirkungJeSeite[seite]!.teamSumme)} (Details im Reiter „Form & Moral“)`
+                      : kartenWirkungJeSeite[seite]!.buchung.grund}
+                  </small>
+                ) : null}
               </div>
             ) : null}
             {captainEintraege.length > 0 ? (
@@ -1308,12 +1429,13 @@ export default function EinsatzlisteModern(props: Props) {
           <div className="elm-ktabs" role="tablist">
             <button type="button" role="tab" aria-selected={kontextTab === "rolle"} className={kontextTab === "rolle" ? "is-an" : ""} onClick={() => setKontextTab("rolle")}>Rolle</button>
             <button type="button" role="tab" aria-selected={kontextTab === "gegner"} className={kontextTab === "gegner" ? "is-an" : ""} onClick={() => setKontextTab("gegner")}>Gegner</button>
+            <button type="button" role="tab" aria-selected={kontextTab === "formmoral"} className={kontextTab === "formmoral" ? "is-an" : ""} onClick={() => setKontextTab("formmoral")} data-testid="elm-tab-formmoral">Form &amp; Moral</button>
             <button type="button" role="tab" aria-selected={kontextTab === "pruefung"} className={kontextTab === "pruefung" ? "is-an" : ""} onClick={() => setKontextTab("pruefung")}>
               Prüfung
               {fehlerAnzahl + warnAnzahl > 0 ? <span className="pkt">{fehlerAnzahl + warnAnzahl}</span> : <span className="pkt is-gut">✓</span>}
             </button>
           </div>
-          <div className="elm-kb">{kontextTab === "rolle" ? rolleTab : kontextTab === "gegner" ? gegnerTab : pruefTab}</div>
+          <div className="elm-kb">{kontextTab === "rolle" ? rolleTab : kontextTab === "gegner" ? gegnerTab : kontextTab === "formmoral" ? formMoralTab : pruefTab}</div>
         </BcSheet>
       </div>
 
@@ -1322,6 +1444,12 @@ export default function EinsatzlisteModern(props: Props) {
         <button type="button" className="bc-btn bc-btn--klein" disabled={!kannBedienen || !onApplyAssignments} onClick={() => verteile("auffuellen")}><BcIcon name="zauber" /> Auffüllen</button>
         <button type="button" className="bc-btn bc-btn--klein" onClick={() => setBlatt("kontext")}><BcIcon name="info" /> Rolle</button>
       </div>
+
+      <BcSheet modal titel="Form & Moral" offen={profilBlatt != null} onSchliessen={() => setProfilBlatt(null)} className="elm-profilblatt" data-testid="elm-profilblatt">
+        {profilBlatt && fmVon(profilBlatt) ? (
+          <FormMoralProfil name={spielerName(profilBlatt)} a={fmVon(profilBlatt)!} ursachen={ursachenVon(profilBlatt)} disziplinName={disziplinNameVon} />
+        ) : null}
+      </BcSheet>
 
       <div className="bc-dock" data-testid="elm-dock">
         <div className="elm-stat">

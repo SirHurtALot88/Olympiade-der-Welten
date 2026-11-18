@@ -257,6 +257,23 @@ export type PlayerMoraleState = {
  * (lib/morale/form-moral-modifikator.ts). Additiv und optional: ohne den Schalter wird das Feld
  * nie geschrieben, ältere Spielstände laden unverändert.
  */
+export type PlayerFormHistoryEntry = {
+  seasonId: string;
+  matchdayId: string;
+  /** Form nach diesem Spieltag (0..100). */
+  form: number;
+  /** Form davor. */
+  vorher: number;
+  eingesetzt: boolean;
+  /** Perzentil der tatsaechlichen Leistung / der Erwartung (0..100), nur bei Einsatz in einer Disziplin mit >=3 Teilnehmern. */
+  leistungPerz?: number | null;
+  erwartungPerz?: number | null;
+  /** Disziplin, aus der das Perzentil stammt (bei zwei Disziplinen die mit dem groesseren Abstand). */
+  disziplinId?: string | null;
+  /** Bremse: Erschoepfung (Punkte Abzug am Ziel) oder Verletzung (feste Punkte). */
+  bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
+};
+
 export type PlayerFormState = {
   playerId: string;
   teamId: string;
@@ -264,6 +281,11 @@ export type PlayerFormState = {
   lastSeasonId: string;
   lastMatchdayId: string;
   appearances: number;
+  /**
+   * Verlauf der laufenden Saison (neueste zuletzt, hoechstens `FORM_VERLAUF_MAX`). Additiv und optional:
+   * Staende ohne das Feld laden unveraendert, die Kurve beginnt dann beim naechsten Spieltag.
+   */
+  verlauf?: PlayerFormHistoryEntry[];
 };
 
 export type PlayerRelationshipEventRecord = {

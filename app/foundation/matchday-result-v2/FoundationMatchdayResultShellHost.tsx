@@ -2,7 +2,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 
-import type { Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
+import type { GameState, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import type { MatchdaySummary, MatchdaySummaryTeamRow } from "@/lib/foundation/matchday-summary";
 import MatchdayResultNewLook from "@/app/foundation/matchday-result-v2/MatchdayResultNewLook";
@@ -27,6 +27,8 @@ export type FoundationMatchdayResultShellHostProps = {
   openTeamProfileById: (teamId: string) => void;
   /** Kanonische "Weiter"-Aktion (schließt den Loop / startet den nächsten Spieltag). */
   triggerGlobalNext: () => void | Promise<void>;
+  /** Fuer die Form-Meldungen (18.11.); fehlt er, bleiben sie weg. */
+  gameState?: GameState | null;
 };
 
 /**

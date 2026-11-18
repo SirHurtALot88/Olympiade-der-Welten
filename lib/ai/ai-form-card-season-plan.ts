@@ -1,5 +1,5 @@
 import type { FormCardColor } from "@/lib/data/olyDataTypes";
-import type { FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { kartenWertFuerSpieler, type FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 
 /**
  * SAISONPLANUNG DER FORMKARTEN (KI)
@@ -127,10 +127,12 @@ export function formCardSlotValue(card: FormCardSeasonPlanCard, slot: FormCardSe
   if (slot.farbregel) {
     // NEUE REGEL: alle Spieler v x alle(passend|fremd), dazu v x traeger je Spieler der Kartenfarbe.
     // Erwartete Träger = Kadergröße x Farbanteil des Teams (Standard 1/4: vier Farben gleich verteilt).
-    const passend = slot.color != null && card.color === slot.color;
-    const alle = card.value * (passend ? slot.farbregel.allePassend : slot.farbregel.alleFremd);
+    // Die Zahl selbst kommt aus kartenWertFuerSpieler (eine Wahrheit mit Wertung, Arena, Einsatzliste).
+    const karte = { wert: card.value, farbe: card.color as string };
+    const alle = kartenWertFuerSpieler({ karte, disziplinFarbe: slot.color, spielerFarbe: null, regel: slot.farbregel });
+    const traeger = kartenWertFuerSpieler({ karte, disziplinFarbe: slot.color, spielerFarbe: card.color, regel: slot.farbregel }) - alle;
     const anteil = slot.farbAnteile?.[card.color] ?? 0.25;
-    return (alle + card.value * slot.farbregel.traeger * anteil) * resolvePlanSlotPlayerCount(slot);
+    return (alle + traeger * anteil) * resolvePlanSlotPlayerCount(slot);
   }
   const multiplier = slot.color != null && card.color === slot.color ? 2 : 1;
   return card.value * multiplier * resolvePlanSlotPlayerCount(slot);

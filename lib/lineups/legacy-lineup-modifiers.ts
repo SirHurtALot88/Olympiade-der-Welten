@@ -9,6 +9,17 @@ import type {
   LegacyRosterPlayerRef,
 } from "@/lib/lineups/legacy-lineup-types";
 
+import {
+  formkartenZerlegungFuerSpieler,
+  isFormkartenFarbregelEnabled,
+  kartenWertFuerSpieler,
+  resolveFormkartenFarbregel,
+  type FormkartenFarbregel,
+  type FormkartenZerlegung,
+} from "@/lib/lineups/formkarten-farbregel";
+
+import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
+
 const FORM_CARD_VALUES = [0, 2, 4, 8] as const;
 
 const CLASS_COLOR_MAP: Record<string, FormCardColor> = {
@@ -809,13 +820,44 @@ export function getModifierSelectionForSide(
   return normalizeLineupDraftModifiers(modifiers)[disciplineSide];
 }
 
+/**
+ * Spielerliste fuer die Farbregel: Klasse aus dem Kader, Form-Stufe aus `playerFormState` (nur wenn
+ * Form + Moral aktiv ist). Alle Pfade (Wertung, Vorschau, Arena-Adapter, KI) bauen sie hiermit.
+ */
+export function buildFormkartenPlayers(input: {
+  playerIds: string[];
+  rosterPlayers?: Array<{ id: string; className?: string | null }> | null;
+  gameState?: GameState | null;
+}): Array<{ playerId: string; className: string | null; formStufe: number }> {
+  const klasse = new Map((input.rosterPlayers ?? []).map((p) => [p.id, p.className ?? null]));
+  const spielerKlasse = input.gameState ? new Map(input.gameState.players.map((p) => [p.id, p.className])) : null;
+  const stufen = isFormMoralEnabled() && input.gameState
+    ? new Map((input.gameState.playerFormState ?? []).map((z) => [z.playerId, formToStufe(z.form)]))
+    : null;
+  return input.playerIds.map((playerId) => ({
+    playerId,
+    className: klasse.get(playerId) ?? spielerKlasse?.get(playerId) ?? null,
+    formStufe: stufen?.get(playerId) ?? 0,
+  }));
+}
+
 export function calculateFormModifierForSide(input: {
   modifiers: LineupDraftModifiers | undefined | null;
   disciplineSide: LineupDisciplineSide;
   disciplineColor?: string | null;
   playerCount: number;
   formCards: LegacyFormCardOption[];
+  /**
+   * FARBREGEL (eine Wahrheit, 18.11.): die Spieler dieser Seite mit Klasse und Form-Stufe. Ist die
+   * neue Regel aktiv (`isFormkartenFarbregelEnabled()` bzw. `farbregel`), rechnet diese Funktion den
+   * Kartenwert JE SPIELER (`formkartenSummeFuerSpieler`); ohne die Liste zaehlen alle als Nicht-Traeger.
+   */
+  players?: Array<{ playerId: string; className?: string | null; formStufe?: number | null }>;
+  /** Regel erzwingen (Messung/Test): `null` = alte Regel, Objekt = neue Regel, fehlt = Schalterstand. */
+  farbregel?: FormkartenFarbregel | null;
 }): {
+  /** Je Spieler zerlegt (alle / Farbe / Form-Hebel / Summe) — nur bei neuer Regel, sonst `null`. */
+  formByPlayerId: Record<string, FormkartenZerlegung> | null;
   formCardsAvailable: number;
   formCardsSelected: number;
   formCardLabel: string | null;
@@ -858,19 +900,46 @@ export function calculateFormModifierForSide(input: {
     warnings.push(`Die zweite Formkarte auf ${input.disciplineSide.toUpperCase()} darf nicht negativ sein.`);
   }
   const normalizedColor = normalizeColor(input.disciplineColor);
-  const effectiveSum = selectedCards.reduce((sum, card) => {
+  const regel =
+    input.farbregel !== undefined ? input.farbregel : isFormkartenFarbregelEnabled() ? resolveFormkartenFarbregel() : null;
+  let effectiveSum = selectedCards.reduce((sum, card) => {
     const multiplier = normalizedColor && card.color === normalizedColor ? 2 : 1;
     return sum + card.value * multiplier;
   }, 0);
+  let formByPlayerId: Record<string, FormkartenZerlegung> | null = null;
+  let teamSumme = effectiveSum * input.playerCount;
+  if (regel) {
+    const karten = selectedCards.map((card) => ({ wert: card.value, farbe: card.color as string | null }));
+    const spieler = input.players ?? [];
+    formByPlayerId = {};
+    let summe = 0;
+    for (const p of spieler) {
+      const zerlegung = formkartenZerlegungFuerSpieler({
+        karten,
+        disziplinFarbe: normalizedColor,
+        spielerFarbe: p.className ? CLASS_COLOR_MAP[p.className] ?? null : null,
+        formStufe: p.formStufe ?? 0,
+        regel,
+      });
+      formByPlayerId[p.playerId] = zerlegung;
+      summe += zerlegung.summe;
+    }
+    teamSumme = summe;
+    // Mittel je Spieler (Anzeige/Rueckfall); ohne Spielerliste der "alle"-Anteil.
+    effectiveSum = spieler.length > 0 ? summe / spieler.length : karten.reduce((a, k) => a + kartenWertFuerSpieler({ karte: k, disziplinFarbe: normalizedColor, spielerFarbe: null, regel }), 0);
+    if (spieler.length === 0) teamSumme = effectiveSum * input.playerCount;
+  }
 
   return {
+    formByPlayerId,
     formCardsAvailable: input.formCards.filter((card) => !card.isUsed || selectedIds.includes(card.id)).length,
     formCardsSelected: selectedCards.length,
     formCardLabel: formatSelectedFormCardLabels({
       selectedCards,
-      disciplineColor: input.disciplineColor,
+      // Neue Regel: kein "×2" am Label (die Karte wirkt nicht mehr doppelt), der Aufschluss steht in der Karten-Wirkung.
+      disciplineColor: regel ? null : input.disciplineColor,
     }),
-    formModifier: Number((effectiveSum * input.playerCount).toFixed(1)),
+    formModifier: Number(teamSumme.toFixed(1)),
     formPerPlayer: Number(effectiveSum.toFixed(1)),
     warnings,
   };
@@ -943,6 +1012,8 @@ export function distributePerPlayerFormShares(input: {
   formModifier?: number | null;
   seeds: string[];
   jitterMax?: number;
+  /** Farbregel: flacher Anteil je Spieler (gleiche Reihenfolge wie `seeds`); `null` -> `formPerPlayer`. */
+  flatBySeedIndex?: Array<number | null>;
 }): number[] {
   const n = input.seeds.length;
   if (n === 0) {
@@ -956,11 +1027,17 @@ export function distributePerPlayerFormShares(input: {
   const flat = input.formPerPlayer != null && Number.isFinite(input.formPerPlayer)
     ? input.formPerPlayer
     : (input.formModifier ?? 0) / n;
-  if (!Number.isFinite(flat) || flat === 0) {
+  const jeSpieler = input.flatBySeedIndex;
+  if (!jeSpieler && (!Number.isFinite(flat) || flat === 0)) {
     return input.seeds.map(() => 0);
   }
   const jitterMax = input.jitterMax ?? 4;
-  return input.seeds.map((seed) => Number((flat + seededFormJitter(seed, jitterMax)).toFixed(1)));
+  return input.seeds.map((seed, index) => {
+    const eigener = jeSpieler?.[index];
+    const wert = eigener != null && Number.isFinite(eigener) ? eigener : flat;
+    if (!Number.isFinite(wert) || wert === 0) return 0;
+    return Number((wert + seededFormJitter(seed, jitterMax)).toFixed(1));
+  });
 }
 
 export function calculatePerPlayerFormModifier(input: {

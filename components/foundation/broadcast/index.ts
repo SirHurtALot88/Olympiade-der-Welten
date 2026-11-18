@@ -8,3 +8,4 @@ export { BcPanel } from "./BcPanel";
 export { BcTable, type BcTableColumn } from "./BcTable";
 export { BcSheet } from "./BcSheet";
 export { BcMarke, BcChip, BcLast, BcSeg } from "./BcBits";
+export { BcMoralGesicht, BcFormPfeil } from "./BcMoralGesicht";

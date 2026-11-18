@@ -163,6 +163,8 @@ export type LegacyLineupEntryScore = {
   morale?: number | null;
   moraleMultiplier?: number | null;
   moraleModifierPct?: number | null;
+  /** Spieler-Form (18.11.): Prozent auf den Spielerwert, nur mit aktivem Form + Moral. */
+  formWirkungPct?: number | null;
   moraleModifier?: number | null;
   moraleAdjustedScore?: number | null;
   isCaptain?: boolean;

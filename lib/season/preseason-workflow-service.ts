@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonSnapshotTeamRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
@@ -325,6 +326,7 @@ export function applySeasonBaselineProgression(
     ...gameState,
     players,
     playerMoraleState: advancePlayerMoraleCarryState(gameState),
+    ...(gameState.playerFormState ? { playerFormState: resetPlayerFormForNewSeason(gameState.playerFormState) } : {}),
     rosters: gameState.rosters.map((entry) => {
       const nextMarketValue = nextMarketValueByPlayerId.get(entry.playerId);
       if (nextMarketValue == null) return entry;
@@ -354,6 +356,7 @@ export function applySeasonBoundaryPlayerResets(gameState: GameState): GameState
       fatigue: 0,
     })),
     playerMoraleState: advancePlayerMoraleCarryState(gameState),
+    ...(gameState.playerFormState ? { playerFormState: resetPlayerFormForNewSeason(gameState.playerFormState) } : {}),
   };
 }
 

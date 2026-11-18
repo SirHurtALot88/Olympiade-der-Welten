@@ -908,3 +908,12 @@ button.bc-chip:hover {
     transition: none !important;
   }
 }
+
+/* ---- Form-Pfeil und Moral-Gesicht (18.11.) ---- */
+.bc-moral { display: inline-flex; align-items: center; gap: 3px; line-height: 1; vertical-align: middle; }
+.bc-moral svg { display: block; flex: none; }
+.bc-moral__zahl { font-family: "Barlow Condensed", system-ui, sans-serif; font-weight: 700; font-size: 1em; font-variant-numeric: tabular-nums; }
+.bc-formpfeil { font-weight: 700; letter-spacing: -1px; font-size: 0.85em; line-height: 1; }
+.bc-formpfeil.is-auf { color: var(--bc-gut, #62d394); }
+.bc-formpfeil.is-ab { color: var(--bc-warn, #ff6058); }
+.bc-formpfeil.is-mitte { color: var(--bc-leise, #9aa7ba); }
