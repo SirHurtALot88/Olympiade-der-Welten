@@ -4,55 +4,54 @@ Auftrag (Chris, wörtlich): „wenn ein spieler nicht selber pickt soll SINNVOLL
 das soll nicht über so einen NOTFALL weg fahren! niemals — und es gibt immer jemanden der affordable ist, deswegen wollte ich das nicht
 mit dem beschränkten draft mode sondern man soll aus ALLEN knapp 3k spielern picken können! … versuch mal bitte zu verstehen wie die AI
 aktuell pickt und ob das mit dem draft mode funktionieren kann … und die team identitäten widerspiegelt und man nicht nur minimum picks
-hat mit einem star drin". Dazu im Lauf des Abends: „wenn C-C 14 picks plant, sollte es am Ende nicht 8 haben", die Planer-Vorgabe
-(„mit dem adjusted Budget rechnen und trotzdem die Slots füllen") und die Rücklage-Vorgaben (Spreizung nach Persönlichkeit,
-„Notrücklage, kein greedy Vorstand").
+hat mit einem star drin". Im Lauf des Abends dazu: „wenn C-C 14 picks plant, sollte es am Ende nicht 8 haben", „der Planner soll mit
+dem adjusted Budget rechnen und trotzdem die Slots füllen", „keine Notkäufe im Modell, gar keine — der Plan muss von Anfang an so stehen",
+„Top-20 nicht kaufen ist richtig", „Stars relativ sehen", „der GM kann aus Opt 13 z. B. 12 oder 11 machen", Rücklage-Vorgaben
+(Spreizung nach Persönlichkeit, „Notrücklage, kein greedy Vorstand") und das gemeinsame Transferfenster.
 
-**Basis dieses Branches:** `claude/finanzen-v2-seite-18-11` (#1618, KI-Planung mit Töpfen) **plus** `claude/draft-neubau-kern-18-11`
-(#1619, Liga-Draft im Einzelschritt) **plus** `main`. Beide PRs ändern denselben Kaufschritt; die #1618-Änderungen sind hier in
-`organicBuyStep` (#1619) übertragen — dieselbe Auflösung braucht, wer die beiden PRs nacheinander merged.
-Baut auf der Messung `docs/design/messung-s1-ohne-draft-18-11.md` (#1628) auf und wiederholt sie nicht.
+**PM-Entscheidung (18.11.):** Draft bleibt, Kaderplan wird nach unabhängigem Review Standard. Dieser PR liefert Analyse, Prototyp
+(`OLY_KI_KADERPLAN=1`, Standard **aus**) und Messung; S2-Kauf und Star-Teams Stufe 2 sind **nicht** Teil davon (Abschnitt 7).
 
-Werkzeuge (alle neu, nur `scripts/`): `scripts/miss-ki-pick-analyse-18-11.ts` (Messlauf), `scripts/auswerte-ki-pick-analyse-18-11.mjs`
-(Tabellen), `scripts/sonde-ki-topstars-18-11.ts` (warum kein Top-Star), `scripts/rechne-ruecklage-s2-vorschlag-18-11.ts` (Rücklage S2,
-Rechnung). Rohdaten und volle Auswertung: `data/generated/ki-pick-analyse-18-11/`. Alles auf Wegwerf-SQLite (gelöscht),
-`data/online-saves` unberührt, kein Dev-Server. Arena-Fingerabdruck unverändert **`ce8fcef66028`** (75 Einträge).
+**Basis des Branches:** `claude/finanzen-v2-seite-18-11` (#1618, inzwischen mit `main` samt #1619) plus #1628 (Messung S1 ohne Draft,
+Konflikt im Messskript gelöst: `--variante A|C|C2`, `--mischen` und `--draft block|einzelschritt` funktionieren zusammen). Die #1618-
+Änderungen am Kaufschritt sind in `organicBuyStep` (#1619) übertragen. Baut auf `docs/design/messung-s1-ohne-draft-18-11.md` (#1628) auf.
 
-Messaufbau: neues Spiel (Battle, `solo_1`, Liga-Split 2×16), **32 KI-Teams mit Sponsor**, zwei Saaten (zwei Anlagen,
-`new-game-1795031007669-tlnbzg`, `new-game-1795031831980-4fi8up`). Jede Variante paarweise ab derselben SQLite-Kopie. Neben dem echten Lauf
-rechnet das Messskript je Team den **Solo-Plan** (die KI darf als Erste aus dem vollen Pool) und eine **Block-Simulation** im Speicher
-mit Abbruchgrund je Team; die Simulation trifft den echten Blocklauf zu **99,7 %** (1475 von 1479 Spielern).
+Werkzeuge (nur `scripts/`): `scripts/miss-ki-pick-analyse-18-11.ts` (Messlauf), `scripts/auswerte-ki-pick-analyse-18-11.mjs` (Tabellen),
+`scripts/sonde-ki-topstars-18-11.ts` (Top-Spieler), `scripts/rechne-ruecklage-s2-vorschlag-18-11.ts` (Rücklage S2, Rechnung). Rohdaten und
+volle Auswertung (je Team): `data/generated/ki-pick-analyse-18-11/`. Alles auf Wegwerf-SQLite (gelöscht), `data/online-saves` unberührt,
+kein Dev-Server. Arena-Fingerabdruck **`d3a39030a3ef`** (75 Einträge) = aktueller Stand in CLAUDE.md (die Kaufschritt-Änderung berührt die Arena nicht).
+
+Messaufbau: neues Spiel (Battle, `solo_1`, Liga-Split 2×16), **32 KI-Teams mit Sponsor**, **zwei Saaten** (zwei Anlagen
+`new-game-1795033498271-kba61o`, `new-game-1795033515552-p067ow`), je Saat Blocklauf und Einzelschritt, vorher und mit Kaderplan, paarweise
+ab derselben SQLite-Kopie. Das Messskript rechnet je Team zusätzlich den **Solo-Plan** (Team darf als Erstes aus dem vollen Pool) und eine
+**Block-Simulation** im Speicher mit Abbruchgrund; sie trifft den echten Blocklauf zu **99,7 %** (1448 von 1452 Spielern).
 
 ---
 
 ## 0. Kurzfassung
 
-1. **Pool: es gibt immer jemanden, der bezahlbar ist — und die KI sieht schon heute alle.** Im frischen Spiel 2984 Spieler, **2983 frei
-   und kaufbar** (Marktwert > 0). Billigster 2,6, die acht billigsten zusammen 29,9; das ärmste Team hat 170. Blocklauf und Einzelschritt
-   bewerten bei **jedem** Kauf alle 2983 (`listLocalTransfermarktFreeAgents({ fullPool: true })` bzw. `freieSpieler`). Die „Top 3 → 20 →
-   200" in #1619 sind keine Pool-Grenze, sondern nur die Nachrück-Reihenfolge nach einem gescheiterten Kauf.
-2. **Wie die KI heute endet (S1):** nicht „Minimum + ein Star", sondern **flach und 1 bis 4 Spieler unter dem eigenen Kaderziel**.
-   29 von 32 Teams unter Opt (48 leere Plätze), Kader 8–13 (Ø 10,8), **26 Teams ohne einen Star** (Marktwert ≥ 45), Geld bis auf die
-   Rücklage ausgegeben (Median 2,1 über der Rücklage). Grund: die Schleife reserviert Geld nur fürs **Minimum 8**, nicht für die
-   **geplanten Plätze bis Opt**; sie zahlt im Schnitt mehr je Spieler, als ihr Budget je geplantem Platz hergibt (29 von 32 Teams), und
-   steht dann mit `nothing_affordable` an der Rücklage. Kein Kandidat „fehlt", der Topf ist leer.
-3. **Identität zeigt sich bei der Kadergröße und der Star-Konzentration, aber zu schwach bei Stars.** Spearman Opt ↔ Kader 0,80,
-   Elite-Neigung ↔ Kader −0,80, Star-Priorität ↔ Anteil des Teuersten am Kaderwert 0,76. Aber: der Kompositionsplan sieht für 25 von 32
-   Teams **keinen** Star vor, kein Top-20-Spieler (Marktwert 81–113) wird je gekauft — die Preis-Strafe eines 100er-Spielers (5–6 „Plätze"
-   Budget, ≈ 125–180 Nutzenpunkte) schlägt jeden Stärkegewinn (Abschnitt 2.4).
-4. **Einzelschritt-Draft funktioniert mit dieser Logik.** Gleiche Kader wie der Blocklauf (Stärke 46,7 gegen 46,8, gleiche Stufen, gleiche
-   Kasse), **0 Notkäufe**, 0 Nachrücker in einer reinen KI-Liga. Der Greedy-Loop entscheidet ohnehin Schritt für Schritt; der Einzelschritt
-   ist nur ein anderer Takt. **Entscheidung: Draft JA** — mit dem Kaderplan unten und ohne Notweg.
-5. **Der Notweg ist an sechs Stellen eingebaut**; in S1 greift er in einer KI-Liga praktisch nie, in S2 dagegen strukturell (Marktplan
-   mit Kurzliste). Empfehlung je Stelle in Abschnitt 4.
-6. **Prototyp „Kaderplan" (`OLY_KI_KADERPLAN=1`, Standard aus):** jeder Kauf unter Opt reserviert die restlichen geplanten Plätze zum
-   Platzpreis (ab 12, keine Füller), Füller gesperrt solange das Budget den Plan trägt, kein „Aufhören" unter Opt, kein
-   Billigster-Spieler-Notweg mehr (Bestbewertung mit gelockerter Schranke). Gemessen, beide Saaten und beide Draft-Arten:
-   **0 Teams unter Opt (vorher 28–30), Kader 10–14 (8–10 Teams mit 14), Kasse genau an der Rücklage, Stärke 45,8 statt 46,8 (−2,2 %)**,
-   Block und Einzelschritt identisch verteilt.
-7. **Saison 2 ist die eigentliche Baustelle** (Horten, Stopp bei 8–9): dort kauft **eine zweite KI** (Marktplan mit Kurzliste
-   `max(3, Lücke bis Minimum + 2)`), nicht der organische Planer. Vorschlag: **ein** Kaufweg für Draft, S1, S2 und Auto-Pick —
-   der organische Schritt mit Kaderplan; Rücklage ab S2 nach Sparneigung und **angespart statt gesperrt**, als **Notrücklage**.
+1. **Pool: es gibt immer jemanden, der bezahlbar ist — und die KI sieht schon heute alle.** 2984 Spieler, **2983 frei und kaufbar**, alle
+   für das ärmste Team (170) bezahlbar; billigster 2,6, die acht billigsten zusammen 29,9. Blocklauf und Einzelschritt bewerten bei
+   **jedem** Kauf alle 2983. Die „Top 3 → 20 → 200" des Einzelschritts sind nur die Nachrück-Reihenfolge nach einem gescheiterten Kauf.
+2. **Wie die KI heute endet (S1):** flach und **1 bis 4 Spieler unter dem eigenen Kaderziel**: 27–32 von 32 Teams unter Opt (44–51 leere
+   Plätze), Kader 8–14 (Ø 10,7–10,8). Geld bis auf die Rücklage ausgegeben (1–1,7 darüber). Grund: Geld wird nur für die Plätze bis **8**
+   reserviert, nicht bis Opt; frühere Käufe verbrauchen das Budget der späteren Plätze (`nothing_affordable` bei 29–31 Teams). Kein
+   Kandidat „fehlt".
+3. **Stars, relativ gesehen (neu):** Star = Marktwert ≥ 45 bzw. Ablöse ≥ 15 % des eigenen Startbudgets; Superstar ≥ 60 bzw. ≥ 25 %.
+   Heute haben **13–16 Teams einen Star nach Budget** (Σ 15–20), 8 nach Markt; die Superstars (≥ 60) haben die drei Teams mit Liga-Lizenz.
+   Star-Chaser liegen beim teuersten Spieler bei 20 % ihres Budgets, Schnäppchenjäger bei 12 %. Top-20-Spieler (81–113) kauft niemand —
+   **richtig so** (Chris).
+4. **Identität zeigt sich** (Opt ↔ Kader 0,80, Elite-Neigung ↔ Kader −0,76, Star-Priorität ↔ Anteil des Teuersten 0,76), aber die
+   12–14er-Teams kommen nicht an (C-C plant 14, kauft 11) und die Kompakt-Teams sind kompakt, weil das Geld aus war, nicht aus Absicht.
+5. **Einzelschritt-Draft funktioniert mit dieser Logik**: vorher wie nachher dieselben Kadergrößen, Stärken und Kassen wie der Blocklauf,
+   **0 Notkäufe, 0 Nachrücker**. **Entscheidung: Draft JA.**
+6. **Prototyp Kaderplan** (beide Saaten, Block und Einzelschritt): **0 Teams unter Opt** (vorher 27–32), Kader 9–14 mit **9 Teams bei 14**,
+   **kein Rückfall/Notweg gegriffen** (gezählt: 0), Kasse genau an der Rücklage (0–0,7 darüber), Block und Einzelschritt **gleich**
+   (Kadergrößen-Histogramm identisch, Stärke 45,9–46,0 gegen 45,6–45,7, Füller unter 12: 1 gegen 10–11). Star-Chaser planen bewusst
+   kompakt (Opt 11 → 9,4) und haben dafür 1,6 Stars (Markt) bzw. 1,8 (Budget). Preis: Top-6-Stärke −0,9 Punkte (−1,9 %).
+7. **Saison 2 ist die eigentliche Baustelle** (Stopp bei 8–9 mit Geld): dort kauft **eine zweite KI** (Marktplan mit Kurzliste). Vorschlag:
+   ein Kaufweg (der Kaufschritt mit Kaderplan) im gemeinsamen Fenster; Rücklage S2 nach Sparneigung, angespart, als Notrücklage.
+   **Nicht in diesem PR** (Session-Datei gehört dem Transferfenster-Agenten).
 
 ---
 
@@ -62,34 +61,31 @@ mit Abbruchgrund je Team; die Simulation trifft den echten Blocklauf zu **99,7 %
 
 | Zeitpunkt | Aufrufer | Entscheider | Kandidaten |
 |---|---|---|---|
-| S1-Draft, Blocklauf (live) | `kickoffLeagueSetupDraft` → `fuehreLigaSetupDraftAus` → `runAiPicksExecutePreview` → `runOrganicTeamDraftExecute` (`lib/ai/ai-picks-run-service.ts:2953`) | organischer Planer `planOrganicDraftForTeam` (`lib/ai/organic-squad/draft-adapter.ts`), ganzer Kader am Stück je Team | alle freien Spieler (`fullPool: true`, Z. 3020), 2983 |
-| S1-Draft, Einzelschritt (#1619, `OLY_LIGA_DRAFT_MODUS=einzelschritt`) | `laufeKiZuege` → `bewerteKiPick` (`lib/draft/liga-draft-ki.ts`) | **derselbe** Schritt `organicBuyStep`, ein Pick je Zug | alle freien Spieler (`freieSpieler`), 2983 |
-| S2+-Kauffenster (live) | `fuehreKiPreseasonLaufAus` → `applyAiMarketPlanLocally` (`lib/ai/ai-preseason-background-service.ts:377`) | **Marktplan** (`buildAiMarketPlanPreview`, `ai-transfermarkt-preview-service.ts`) — nicht der organische Planer | **Kurzliste** `recommendedBuys = max(3, Lücke bis Minimum + 2)` (`ai-transfermarkt-preview-service.ts:2093`) |
+| S1-Draft, Blocklauf (live) | `kickoffLeagueSetupDraft` → `fuehreLigaSetupDraftAus` → `runAiPicksExecutePreview` → `runOrganicTeamDraftExecute` (`lib/ai/ai-picks-run-service.ts`) | organischer Planer `planOrganicDraftForTeam` (`lib/ai/organic-squad/draft-adapter.ts`), ganzer Kader am Stück je Team | alle freien Spieler (`fullPool: true`), 2983 |
+| S1-Draft, Einzelschritt (#1619, `OLY_LIGA_DRAFT_MODUS=einzelschritt`) | `laufeKiZuege` → `bewerteKiPick` (`lib/draft/liga-draft-ki.ts`) | **derselbe** Schritt `organicBuyStep`, ein Pick je Zug | alle freien Spieler, 2983 |
+| S2+-Kauffenster (live) | `fuehreKiPreseasonLaufAus` → `applyAiMarketPlanLocally` (`lib/ai/ai-preseason-background-service.ts`) | **Marktplan** (`buildAiMarketPlanPreview`) — nicht der organische Planer | **Kurzliste** `recommendedBuys = max(3, Lücke bis Minimum + 2)` (`ai-transfermarkt-preview-service.ts`) |
 | S2+ organisch (gebaut, im Spiel nicht im Kauffenster) | `runTransferWindowSession` → `runOrganicBuyCycle` | organischer Planer | alle freien |
 
-Reihenfolge im Blocklauf: `orderTeamsForDraft` (Z. 2514) — höchster Startrang (schwächstes Team) zuerst, jedes Team plant seinen ganzen
-Kader gegen den Restpool. Im Einzelschritt: Runde für Runde, schwächstes Team zuerst (`berechneRundenReihenfolge`).
+Reihenfolge im Blocklauf: `orderTeamsForDraft` — höchster Startrang (schwächstes Team) zuerst, jedes Team plant seinen ganzen Kader
+gegen den Restpool. Einzelschritt: Runde für Runde, schwächstes Team zuerst.
 
-### 1.2 Der Kaufschritt (organisch)
+### 1.2 Der Kaufschritt (organisch, heute)
 
 Je Schritt (`organicBuyStep`, `lib/ai/organic-squad/draft-builder.ts`):
 
-1. **Bezahlbar** ist ein Kandidat, wenn `Kasse − Preis − Reserve fürs Minimum ≥ Untergrenze`. Untergrenze: unter 8 die Rücklage (S1
-   halbiert, fällt auf 0, wenn das Minimum sonst nicht erreichbar ist), zwischen 8 und Opt die Rücklage, ab Opt der volle Puffer
-   (`max(Rücklage, 0,35 × Gehalt)`). Reserve fürs Minimum = Summe der billigsten Preise für die fehlenden Plätze **bis 8**. Mit #1618
-   zusätzlich Transfer- und Gehaltstopf des Vorstands (`kaufRahmen`).
-2. **Bewertung** (`buyUtility`, `utility.ts:468`): `wWin × Stärkezuwachs` (Eignung je Disziplin, gedämpft durch die Abdeckung, Identitäts-
-   Achsen) + Rotationswert unter Opt + Füllqualität + Themen-Passung + Kompositions-Zuschlag (Soll-Pyramide Superstar/Star/Core/Depth/
-   Backup/Reserve aus `deriveCompositionCounts`) + Potenzial − **`wThrift × Preis in Plätzen × 30`** − Gehaltslast + Saat-Jitter (±7,5).
+1. **Bezahlbar**, wenn `Kasse − Preis − Reserve fürs Minimum ≥ Untergrenze`. Untergrenze: unter 8 die Rücklage (S1 halbiert; fällt auf 0,
+   wenn das Minimum sonst nicht erreichbar ist), zwischen 8 und Opt die Rücklage, ab Opt der volle Puffer. Reserve fürs Minimum = Summe
+   der billigsten Preise **bis 8**. Mit #1618 zusätzlich Transfer- und Gehaltstopf (`kaufRahmen`).
+2. **Bewertung** (`buyUtility`): `wWin × Stärkezuwachs` (Eignung, Abdeckung, Identitäts-Achsen) + Rotationswert unter Opt + Füllqualität
+   + Themen-Passung + Kompositions-Zuschlag (Soll-Pyramide) + Potenzial − **`wThrift × Preis in Plätzen × 30`** − Gehaltslast + Saat-Jitter.
    „Preis in Plätzen" = (Ablöse + 2 × Gehalt) / (Kasse / offene Plätze bis Opt).
-3. **Stopp**, wenn (ab 8) `wPatience × Cash-Optionswert ≥ bester Kauf`, wenn der Kader voll ist (14) oder wenn nichts bezahlbar ist.
+3. **Stopp**, wenn (ab 8) der Cash-Optionswert den besten Kauf schlägt, der Kader voll ist (14) oder nichts bezahlbar ist.
 
-Gewichte aus Identität und GM (`weights.ts`): `wWin` aus Ambition/Vorstandsdruck/Star-Priorität, `wThrift` aus Finanzwert/Wertorientierung,
-`wPatience` aus Finanzwert/Cash-Priorität; **Opt = Blatt-`playerOpt` (11–14), GM-Tiefe darf nur nach oben schieben**.
+Gewichte aus Identität und GM (`weights.ts`); **Opt = Blatt-`playerOpt` (11–14), die GM-Tiefe schiebt nur nach oben**.
 
 ---
 
-## 2. Messung heute (S1, 32 KI-Teams)
+## 2. Messung heute (S1, 32 KI-Teams, zwei Saaten)
 
 ### 2.1 Pool
 
@@ -97,98 +93,95 @@ Gewichte aus Identität und GM (`weights.ts`): `wWin` aus Ambition/Vorstandsdruc
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2984 | 2983 | 2983 | 2,6 | 12,1 | 25,0 | 48,4 | 113,5 | 29,9 | **2983** |
 
-Stufen im Pool: Superstar (≥ 65) 89, Star (45–65) 297, Core 710, Depth 855, Backup (12–20) 743, Reserve (< 12) 289.
-Σ Kassen der Liga 7915 bei 32 × Opt ≈ 390 Plätzen: **im Schnitt 20 je Platz** — genau die Depth-Stufe. Mehr Stars heißt zwingend
-billigere Plätze daneben; das ist die Stellschraube der Identität (Abschnitt 5.3).
+Σ Kassen der Liga 7915 bei 32 × Opt ≈ 390 Plätzen: **im Schnitt 20 je Platz**. Wer einen Star will, zahlt ihn mit billigeren Plätzen
+daneben — das ist die Stellschraube der Identität.
 
 ### 2.2 Verteilung nach dem Draft (vorher)
 
-| Lauf | Kader Ø (min–max) | unter Opt | Stars (0 / 1 / ≥ 2 Teams) | Top-1-Anteil am Kaderwert | Kasse Median (% Start) | über Rücklage Median | Stärke Ø |
-|---|---|---:|---|---:|---|---:|---:|
-| Block, Saat 1 | 10,8 (8–13) | 29 | 26 / 3 / 3 | 0,16 | 19,0 (8 %) | 2,1 | 46,8 |
-| Einzelschritt, Saat 1 | 10,7 (9–13) | 30 | 26 / 3 / 3 | 0,16 | 17,5 (8 %) | 1,9 | 46,7 |
-| Block, Saat 2 | 10,8 (8–14) | 28 | 26 / 3 / 3 | 0,16 | 18,2 (8 %) | 1,4 | 46,8 |
+| Lauf | Kader Ø (min–max) | unter Opt | leere Plätze | Kasse Median (% Start) | über Rücklage Median | Stärke Ø |
+|---|---|---:|---:|---|---:|---:|
+| Block, Saat 1 | 10,7 (8–14) | 29 | 51 | 17,9 (8 %) | 1,7 | 46,9 |
+| Einzelschritt, Saat 1 | 10,7 (9–13) | 32 | 51 | 18,1 (7 %) | 1,7 | 46,9 |
+| Block, Saat 2 | 10,8 (8–14) | 27 | 44 | 18,4 (8 %) | 1,7 | 46,8 |
+| Einzelschritt, Saat 2 | 10,8 (8–14) | 29 | 46 | 17,9 (8 %) | 1,0 | 46,8 |
 
-Stufen gesamt (Saat 1, Block): Superstar 3, Star 6, Core 46, Depth 146, Backup 89, Reserve 55. Abbruchgrund (Block-Simulation):
-**`nothing_affordable` 31, stop 1** — die Teams hören nicht freiwillig auf, das Geld ist an der Rücklage aus.
-
-**In S1 hortet die KI nicht** (Kasse 8 % des Startbudgets, wie #1628 und #1618 gemessen). Kasse ↔ Finanzwert Spearman 0,87 —
-das ist die Rücklage nach Finanzwert, nicht Zögern.
+Abbruchgrund (Block-Simulation): `nothing_affordable` 30–31, voll 1–2 — die Teams hören nicht freiwillig auf, das Geld ist an der
+Rücklage aus. **In S1 hortet die KI nicht** (8 % des Startbudgets, wie #1628 und #1618).
 
 ### 2.3 Plan gegen Ist (Chris: „wenn C-C 14 picks plant …")
 
+Block, Saat 1:
+
 | Team | Archetyp | geplant (Opt) | gekauft | Lücke | Abbruch | Budget je geplantem Platz | Ø Preis je gekauftem Spieler | Kasse über Rücklage |
 |---|---|---:|---:|---:|---|---:|---:|---:|
-| R-C | rivalry_hawk | 13 | 9 | 4 | nothing_affordable | 15,4 | 21,9 | 3,0 |
-| P-C | bargain_hunter | 12 | 9 | 3 | nothing_affordable | 14,7 | 19,0 | 5,8 |
-| S-C | rivalry_hawk | 12 | 9 | 3 | nothing_affordable | 15,8 | 21,0 | 0,0 |
-| V-V | star_chaser | 11 | 8 | 3 | nothing_affordable | 20,4 | 27,6 | 3,1 |
-| C-C | bargain_hunter | 14 | 12 | 2 | nothing_affordable | 13,5 | 15,7 | 0,1 |
-| C-S | facility_architect | 12 | 10 | 2 | nothing_affordable | 23,5 | 28,1 | 0,5 |
-| D-P | culture_keeper | 12 | 12 | 0 | nothing_affordable | 19,0 | 19,0 | 0,1 |
+| R-C | rivalry_hawk | 13 | 9 | 4 | nothing_affordable | 15,4 | 21,9 | 3,2 |
+| C-C | bargain_hunter | 14 | 11 | 3 | nothing_affordable | 13,5 | 17,2 | 0,0 |
+| P-C | bargain_hunter | 13 | 10 | 3 | nothing_affordable | 13,6 | 17,3 | 3,6 |
+| S-C | rivalry_hawk | 11 | 8 | 3 | nothing_affordable | 17,2 | 23,4 | 2,6 |
+| T-C | depth_spammer | 14 | 11 | 3 | nothing_affordable | 13,6 | 17,1 | 2,4 |
+| V-V | star_chaser | 11 | 8 | 3 | nothing_affordable | 20,4 | 27,5 | 3,6 |
+| D-P | culture_keeper | 13 | 12 | 1 | nothing_affordable | 17,6 | 19,0 | 0,8 |
 
-Σ 48 leere geplante Plätze bei 29 Teams. **Warum ein geplanter Platz leer bleibt:** nicht, weil der Wunschkandidat weg ist (es gibt
-2983, der Schritt nimmt den nächstbesten), nicht wegen Stop-Nutzen (1 von 32), nicht wegen der Vorstandssperre (in S1 100 %), sondern
-weil **frühere Käufe das Budget der späteren Plätze verbraucht haben**: im Schnitt teurer als Budget je Platz bei 29 von 32 Teams. Die
-Schleife reserviert nur für die Plätze bis 8. Das Bild „C-C endet bei 8" stammt aus **Saison 2** (#1618: C-C, D-P stehen nach dem
-Fenster bei 8–9 mit ≈ 30 frei) — dort ist der Grund die Kurzliste des Marktplans (Abschnitt 4, Stelle 6).
+**Warum ein geplanter Platz leer bleibt:** nicht, weil der Wunschkandidat weg ist (der Schritt nimmt aus 2983 den nächstbesten), nicht
+wegen Stop-Nutzen, nicht wegen der Vorstandssperre (S1 100 %), sondern weil **frühere Käufe das Budget der späteren Plätze verbraucht
+haben**: im Schnitt teurer als Budget je Platz bei 29 von 32 Teams. Das Bild „C-C endet bei 8" stammt aus **Saison 2** (#1618: C-C, D-P bei
+8–9 mit ≈ 30 frei) — dort ist der Grund die Kurzliste des Marktplans (Abschnitt 4, Stelle 6).
 
-### 2.4 Warum kein Top-Star (Marktwert 81–113) gekauft wird
+### 2.4 Stars, relativ (Chris 18.11.)
 
-`scripts/sonde-ki-topstars-18-11.ts`, erster Kaufschritt aus dem vollen Pool:
+Chris: „Zu Beginn ist ein 60er-Spieler ein Superstar, ab 45 eigentlich ein Star." „Wenn … ein Spieler schon alleine 25 % vom Budget beim
+Kauf kostet … dann ist das wohl ein Star oder sogar Superstar." „Ich erwarte nicht, dass Star-Chaser-GMs in einem Team wie Z-H einen Spieler
+für > 80 Mio holen."
 
-| Team | Kasse / Opt | Budget je Platz | Lizenz | Platz 1 (MW, Nutzen) | Top-5-Spieler: Rang von 2983 | Preis in Plätzen | Preis-Strafe |
-|---|---|---:|---|---|---|---:|---:|
-| M-M | 325 / 12 | 27,1 | ja | 65,7 / 300 | 451 – 1785 | 5,4–6,2 | 126–146 |
-| Z-H | 320 / 11 | 29,1 | ja | 47,2 / 283 | 1412 – 1783 | 5,0–5,8 | 154–178 |
-| R-L | 295 / 10 | 29,5 | ja | 52,1 / 299 | 523 – 1939 | 5,0–5,7 | 147–169 |
-| C-S | 315 / 11 | 28,6 | nein | 30,4 / 254 | 2066 – 2866 | 5,1–5,9 | 99–115 |
+**Vorgeschlagene Schwellen (in Auswertung und Doku so verwendet):**
 
-Bester Rang irgendeines Top-20-Spielers über alle Teams: **11**. Ursache ist allein der **budgetrelative Preis-Term**: ein 100er-Spieler
-„kostet" 5–6 Plätze Budget, das sind 125–180 Nutzenpunkte Strafe, der Stärkegewinn bringt ≈ 60–90. Keine Preisdeckelung, kein Vorstand,
-keine Rücklage, kein Stopp. Dazu plant der Kompositionsplan Stars nur bei hoher Prämien-Neigung (`STAR_APPETITE_THRESHOLD 0,95`,
-Superstar nur mit Liga-Lizenz für 2–3 Teams): **25 von 32 Teams planen 0 Stars**, M-M/R-L/Z-H je einen Superstar.
+| Maß | Star | Superstar | Bedeutung |
+|---|---|---|---|
+| **Markt** (Startpool S1) | Marktwert ≥ 45 | ≥ 60 | absolut, was die Liga als Star sieht. Später relativ zum Pool der Saison: Star ab P87, Superstar ab P96 (im S1-Startpool genau 45 bzw. ≈ 60) |
+| **Budget** (Identität) | Ablöse ≥ 15 % des eigenen Startbudgets | ≥ 25 % | was das Team sich leistet — „Star-Neigung = Bereitschaft, einen relativ teuren Spieler zu holen", nicht einen absoluten Top-Spieler |
 
-### 2.5 Spiegelt sich die Identität? (Spearman, Saat 1 Block, n = 32)
+Gehaltsanteil des Teuersten am Kadergehalt wird mitgemessen (er liegt praktisch gleichauf mit dem Ablöse-Anteil, 13–15 % im Median).
 
-| Merkmal | Kader | Stars | Top-1-Anteil | MW max | Kasse | Stärke |
+| Lauf | Teams mit Star (Markt) | Stars Σ / Superstars Σ (Markt) | Teams mit Star (Budget) | Stars Σ / Superstars Σ (Budget) | teuerster: Anteil Budget (Median) |
+|---|---:|---|---:|---|---:|
+| vorher Block, Saat 1 | 8 | 12 / 3 | 15 | 20 / 1 | 14,6 % |
+| vorher Einzelschritt, Saat 1 | 7 | 11 / 3 | 16 | 20 / 1 | 15,1 % |
+| vorher Block, Saat 2 | 8 | 12 / 3 | 13 | 15 / 0 | 14,1 % |
+| vorher Einzelschritt, Saat 2 | 8 | 11 / 3 | 15 | 17 / 0 | 14,8 % |
+
+Nach Archetyp (vorher, Block Saat 1): star_chaser 1,2 Stars (Markt) / 1,4 (Budget), teuerster 20 % des Budgets; risk_gambler 0,8 / 0,8,
+18 %; elite_curator 1 / 2, 17 %; bargain_hunter, depth_spammer, talent_builder 0 / 0–0,3, 12–13 %. **Die Richtung stimmt**; die alte
+Aussage „26 Teams ohne Star" galt für die absolute Stufe ≥ 45 und war zu streng.
+
+**Top-20 (Marktwert 81–113):** niemand kauft sie (bester Rang eines Top-20-Spielers in der Bewertung über alle Teams: 11; ein 100er kostet
+5–6 Platzbudgets, 125–180 Strafpunkte, `scripts/sonde-ki-topstars-18-11.ts`). Das ist nach Chris **richtig**: zu Beginn sind sie für ihre
+Leistung viel zu teuer. Der Preis-Term bleibt.
+
+### 2.5 Spiegelt sich die Identität? (Spearman, vorher, Block Saat 1, n = 32)
+
+| Merkmal | Kader | Stars (≥ 45) | Anteil Teuerster | MW max | Kasse | Stärke |
 |---|---:|---:|---:|---:|---:|---:|
-| Opt (Blatt + GM) | **0,80** | −0,49 | −0,48 | −0,52 | 0,20 | −0,49 |
-| Elite-Neigung (GM) | **−0,80** | 0,48 | **0,73** | 0,69 | −0,45 | 0,49 |
-| Tiefen-Neigung (GM) | **0,73** | −0,50 | −0,58 | −0,58 | 0,33 | −0,47 |
-| Star-Priorität (GM) | −0,35 | 0,56 | **0,76** | 0,63 | −0,83 | 0,37 |
-| Finanzwert | 0,13 | −0,46 | −0,49 | −0,44 | **0,87** | −0,23 |
-| Startkasse | −0,26 | 0,54 | 0,06 | 0,67 | 0,30 | **0,95** |
-
-Nach Archetyp (Block, Saat 1): star_chaser Kader 9,6 / Stars 1,0, risk_gambler 10,2 / 0,8, depth_spammer 12,7 / 0, culture_keeper 12,3 / 0,
-bargain_hunter 11,0 / 0. **Die Richtung stimmt überall** (Startrang ↔ Zugriff ≈ 0, #1628). Was fehlt: echte **Star-Teams** (2–3 Stars)
-und die **12–14er-Teams**, die ihr Ziel auch erreichen. Die Stärke folgt fast nur dem Geld (0,95).
+| Opt (Blatt + GM) | **0,80** | −0,57 | −0,62 | −0,77 | 0,04 | −0,63 |
+| Elite-Neigung (GM) | **−0,76** | 0,71 | **0,75** | 0,79 | −0,27 | 0,53 |
+| Tiefen-Neigung (GM) | **0,72** | −0,68 | −0,64 | −0,74 | 0,20 | −0,51 |
+| Star-Priorität (GM) | −0,38 | 0,65 | **0,76** | 0,70 | −0,77 | 0,37 |
+| Finanzwert | 0,01 | −0,50 | −0,45 | −0,46 | **0,84** | −0,19 |
+| Startkasse | −0,31 | 0,50 | 0,05 | 0,64 | 0,41 | **0,95** |
 
 ---
 
 ## 3. Einzelschritt-Draft: funktioniert er mit dieser Logik?
 
-**Ja.** Gemessen (Saat 1, ab derselben Anlage):
+**Ja.** Vorher (Saat 1 / Saat 2) Block gegen Einzelschritt: Kader 10,7 / 10,7 und 10,8 / 10,8, Stärke 46,9 / 46,9 und 46,8 / 46,8,
+Kasse an der Rücklage, **0 Notkäufe, 0 Nachrücker**. Mit Kaderplan genauso (Abschnitt 5.3). Wo es brechen **könnte**:
 
-| | Block | Einzelschritt |
-|---|---:|---:|
-| Kader Ø / unter Opt | 10,8 / 29 | 10,7 / 30 |
-| Stufen Superstar/Star/Core/Depth/Backup/Reserve | 3/6/46/146/89/55 | 3/6/46/147/90/51 |
-| Kasse Median / über Rücklage | 19,0 / 2,1 | 17,5 / 1,9 |
-| Stärke Ø | 46,8 | 46,7 |
-| Ausstiege | — | `nichts_leistbar` 32 |
-| Notkäufe / Nachrücker | — | **0 / 0** |
-
-Wo es brechen **könnte** und warum es das nicht tut:
-
-* **Neuplanen je Schritt** — der Greedy-Loop plant ohnehin nicht voraus; Rahmen (Rücklage, Komposition, Lizenz) entsteht einmal zu
-  Draft-Beginn und wird je Pick nachgespielt (`bewerteKiPick`). Kein Unterschied zur Schleife außer dem Pool.
-* **Pool leert sich** — nach dem Draft liegen noch ≈ 2590 Spieler frei; es fehlt nie ein Kandidat, nur Geld.
-* **Top-N** — nur Nachrück-Reihenfolge nach einem gescheiterten Kauf, keine Pool-Grenze; in der Messung nie ausgelöst.
-* **Aufgeben** — `nichts_leistbar` heißt heute „Geld an der Rücklage", nicht „nichts da". Mit dem Kaderplan landen alle am Opt (Abschnitt 5).
-
-Mit Menschen im Draft gilt: Auto-Pick für einen Abwesenden ist **bereits** `bewerteKiPick` — die volle KI des Teams (eigene Identität,
-eigener GM). Ein Notweg ist dafür nicht nötig.
+* **Neuplanen je Schritt** — der Greedy-Loop plant nicht voraus; Rahmen (Rücklage, Komposition, Lizenz, Opt) entsteht zu Draft-Beginn
+  und wird je Pick nachgespielt. Kein Unterschied zur Schleife außer dem Pool.
+* **Pool leert sich** — nach dem Draft liegen ≈ 2600 Spieler frei. Was sich ändert: die billigen 12er nehmen sich alle 32 Teams zugleich
+  weg. Das hat der Kaderplan zunächst falsch eingeschätzt (50 Füller im Einzelschritt, 1 im Block); gelöst mit der Wettbewerbs-Reserve
+  (Abschnitt 5.2).
+* **Top-N** — nur Nachrück-Reihenfolge nach Fehlkauf, keine Pool-Grenze; nie ausgelöst.
+* **Auto-Pick eines Abwesenden** ist schon heute `bewerteKiPick` — die volle KI des Teams (eigene Identität, eigener GM).
 
 ---
 
@@ -196,82 +189,120 @@ eigener GM). Ein Notweg ist dafür nicht nötig.
 
 | # | Stelle | Was passiert | Greift heute? | Empfehlung |
 |---|---|---|---|---|
-| 1 | `lib/ai/ai-picks-run-service.ts` `runSeason1ExecuteEmergencyMinFill` (Z. 2733, Aufrufe 4142, 4492) | Füllt im Legacy-S1-Execute bis zum Minimum | **nein** — nur bei `OLY_ORGANIC_SQUAD_BUILDER=0`; der organische Zweig endet vorher mit `continue` (Z. 3968) | **entfernen** zusammen mit dem Legacy-Execute-Pfad (eigener Aufräum-PR) |
-| 2 | Cockpit „Kader-Fill" → `app/api/ai/roster-fill/route.ts` → `lib/ai/auto-roster-fill-service.ts` | Alter Füll-Lauf, Bewertung **ohne Qualitätsterm** (Z. 10ff., `scoreRosterFillCandidate`), ab S2 gesperrt, füllt in S1 auch Menschen-Teams | nur per Knopf | **ersetzen**: Knopf ruft den organischen Planer mit Kaderplan für KI- und delegierte Teams, nie für selbst pickende Menschen; Test `tests/auto-roster-fill-service.test.ts` (erwartet Menschen-Füllung) anpassen |
-| 3 | `lib/draft/liga-draft-dienst.ts` `notkauf_mindestkader` (#1619) | Nach Fehlkäufen unter 8 der billigste bezahlbare Spieler | in KI-Liga 0× gemessen | **ersetzt (Prototyp)**: weiter in der Rangliste der KI über den ganzen Pool, nie nach Preis |
-| 4 | `lib/ai/organic-squad/draft-builder.ts` Auffangnetz (#1618) | Unter 8 mit Töpfen: billigster bezahlbarer Spieler, darf den Topf überziehen | selten (Topf zu) | **ersetzt (Prototyp)**: bestbewerteter bezahlbarer Spieler, Topf-Schranke gelockert, Kasse hart |
-| 5 | `lib/ai/ai-market-plan-apply-service.ts` `pflichtkader_auffangnetz` (#1618, Z. 802) | S2-Marktplan: billigste übrige Kandidaten bis 8 | ja, in S2 | **entfällt** mit Stelle 6 (S2 auf organisch); bis dahin übergangsweise nach Gate-Rangfolge statt Preis |
-| 6 | S2-Marktplan Kurzliste `recommendedBuys = max(3, Lücke bis Minimum + 2)` (`ai-transfermarkt-preview-service.ts:2093`) + `resolveAllowedMarketBuyCount` | Kauft höchstens die vorab geplanten Kandidaten; ist einer weg oder gesperrt, gibt es keinen Ersatz → Stopp bei 8–9 mit Geld | **ja** — #1628: 21/32 Teams fertig, Kader 7 → 9 bei Opt 12, 6 unter 8, Trockenlauf danach plant 36 weitere Käufe | **ersetzen**: S2-Kauf über den organischen Schritt mit Kaderplan (derselbe wie im Draft) |
-| 7 | Delegierte Menschen (`draft: "ki"`) ab S2: `ai-preseason-background-service.ts:106-117` (`getAiTeamIds` nur `controlMode "ai"`), `ai-transfer-window-session-service.ts:672ff.` (`manualTeamIds` gefiltert) | Bekommen ab S2 **gar keine** Käufe | ja | **Lücke schließen**: Bereich „Transfers" delegiert ⇒ Team läuft durch dieselbe KI (eigene Identität), Schutz für selbst pickende Menschen bleibt |
-| 8 | Builder-Rückfälle unter 8 ohne Töpfe (Floor 0, dann ohne Mindest-Reserve) | Lockern die Kassen-Schranke, **Wahl bleibt die Bewertung** | in S1 0× | **behalten** — das ist Schranke lockern, nicht Logik wechseln; mit Kaderplan praktisch unerreichbar |
+| 1 | `lib/ai/ai-picks-run-service.ts` `runSeason1ExecuteEmergencyMinFill` | Füllt im Legacy-S1-Execute bis zum Minimum | **nein** — nur bei `OLY_ORGANIC_SQUAD_BUILDER=0` | **entfernen** mit dem Legacy-Pfad (Folge-PR) |
+| 2 | Cockpit „Kader-Fill" → `app/api/ai/roster-fill/route.ts` → `lib/ai/auto-roster-fill-service.ts` | Alter Füll-Lauf **ohne Qualitätsterm**, ab S2 gesperrt, füllt in S1 auch Menschen-Teams | nur per Knopf | **ersetzen** durch den Kaufschritt mit Kaderplan für KI- und delegierte Teams (Folge-PR; Test `tests/auto-roster-fill-service.test.ts` anpassen) |
+| 3 | `lib/draft/liga-draft-dienst.ts` `notkauf_mindestkader` (#1619) | Nach Fehlkäufen unter 8 der billigste bezahlbare Spieler | 0× gemessen | **in diesem PR ersetzt** (mit Schalter): weiter in der Rangliste der KI über den ganzen Pool, nie nach Preis |
+| 4 | `lib/ai/organic-squad/draft-builder.ts` Auffangnetz (#1618) | Unter 8 mit Töpfen der billigste bezahlbare Spieler | selten | **in diesem PR ersetzt** (mit Schalter): Bestbewertung mit gelockertem Topf, laut protokolliert (`notweg: topf_ueberzogen`), gemessen 0× |
+| 5 | `lib/ai/ai-market-plan-apply-service.ts` `pflichtkader_auffangnetz` (#1618) | S2-Marktplan: übrige Kandidaten bis 8 (seit dem neuen #1618-Stand nur, wenn sie allein am Rahmen scheiterten) | in S2 | **entfällt** mit Stelle 6 (Folge-PR) |
+| 6 | S2-Marktplan Kurzliste `max(3, Lücke bis Minimum + 2)` + `resolveAllowedMarketBuyCount` | Kauft höchstens die vorab geplanten Kandidaten, ohne Ersatz → Stopp bei 8–9 mit Geld | **ja** — #1628: 21/32 Teams fertig, Kader 7 → 9 bei Opt 12, 6 unter 8 | **ersetzen**: S2-Kauf über den Kaufschritt mit Kaderplan (Folge-PR mit dem Transferfenster-Agenten) |
+| 7 | Delegierte Menschen (`draft: "ki"`) ab S2: `getAiTeamIds` nur `controlMode "ai"`; `manualTeamIds` in der Kaufsitzung gefiltert | Bekommen ab S2 **keine** Käufe | ja | **Lücke schließen** (Folge-PR): delegierter Transfer-Bereich ⇒ dieselbe KI, Schutz selbst pickender Menschen bleibt |
+| 8 | Builder-Rückfälle unter 8 ohne Töpfe (Rücklage angetastet, ohne Mindestreserve) | Lockern die Kassen-Schranke, Wahl bleibt die Bewertung | 0× | **bleiben als Fehlerfall**: mit Kaderplan laut protokolliert (`notweg`), gemessen 0× |
 
-Leitsatz für alle Stellen: **Schranken dürfen sich stufenweise lockern, die Wahl ist immer die Bewertung über den ganzen Pool.**
-Kein Pfad sortiert je nach Preis.
+Leitsatz: **Der Plan reserviert von Anfang an genug für Opt; Schranken lockern sich nie still, und die Wahl ist immer die Bewertung über den
+ganzen Pool.** Kein Pfad sortiert nach Preis.
 
 ---
 
-## 5. Vorschlag: „Kaderplan" — eine KI für Draft, S1, S2 und Auto-Pick
+## 5. Vorschlag „Kaderplan" — eine KI für Draft, S1, S2 und Auto-Pick
 
 ### 5.1 Regeln (aus Chris' Vorgaben)
 
-1. **Ein Kaufschritt.** Draft (Block wie Einzelschritt), S2-Kauffenster, Auto-Pick eines Abwesenden und delegierte Teams laufen durch
-   `organicBuyStep` — gleiche Bewertung, gleicher Pool (alle freien Spieler).
-2. **Plan gegen den echten Rahmen.** Die Plätze bis Opt werden vom ersten Kauf an gegen **Kasse − Rücklage und `kaufRahmen`
-   (Transfertopf)** reserviert, nicht nur bis 8. Ein Kauf ist nur erlaubt, wenn danach die restlichen geplanten Plätze zum **Platzpreis**
-   (billigste Spieler ab 12 = Backup-Stufe, keine Füller) bezahlbar bleiben.
-3. **Ein Platz hat viele Kandidaten.** Passt der Wunschspieler nicht, nimmt der Schritt den bestbewerteten, der in den Plan passt — der
-   Platz fällt nicht weg. Füller unter 12 nur, wenn das Budget den Plan zu 12 je Platz nicht trägt.
-4. **Weniger als Opt nur bewusst.** Unter Opt gewinnt „aufhören" nicht nebenbei. Ein kleinerer Kader ist eine Identitäts-Entscheidung,
-   die im Opt selbst steckt (Blatt + GM-Elite/Tiefe) bzw. in Stufe 2 explizit protokolliert wird („einen weniger, dafür stärker": Ambition,
-   Verletzungsrisiko, Vorstandsziel Kadergröße).
-5. **Kein Notweg.** Siehe Abschnitt 4.
+1. **Ein Kaufschritt.** Draft (Block wie Einzelschritt), Kauffenster, Auto-Pick und delegierte Teams laufen durch `organicBuyStep` —
+   gleiche Bewertung, gleicher Pool (alle freien Spieler).
+2. **Opt ist das Ziel, nicht das Minimum.** Vom ersten Kauf an reserviert der Plan Geld für **alle** Plätze bis Opt, gegen Kasse − Rücklage
+   **und** den Transfertopf (`kaufRahmen`): so viele Plätze wie möglich zum **Platzpreis** (billigste Spieler ab 12 = Backup-Stufe, keine
+   Füller), den Rest zu den billigsten Preisen im Pool (`kaderplanRahmen`). Ein Kauf ist nur erlaubt, wenn danach der Rest des Plans
+   bezahlbar bleibt.
+3. **Ein Platz hat viele Kandidaten.** Passt der Wunschspieler nicht, nimmt der Schritt den bestbewerteten, der in den Plan passt.
+4. **Füller nur nach Plan.** Unter Opt sind zuerst nur Spieler ab Platzpreis wählbar. Einen günstigeren gibt es nur, wenn der Plan
+   selbst günstige Plätze vorsieht (Rahmen trägt nicht alle zum Platzpreis — „Tiefe vor Qualität", protokolliert).
+5. **Weniger als Opt nur bewusst** (Abschnitt 5.4): die GM-Senkung des Opt ist die einzige Quelle; unter Opt gewinnt „aufhören" nicht.
+6. **Kein Notweg.** Alle Rückfälle sind laut protokolliert und gezählt; Soll ist 0.
 
-### 5.2 Prototyp und Messung vorher/nachher
+### 5.2 Platzpreis: Startpool, Restpool, Wettbewerb (Messweg)
 
-Gebaut hinter `OLY_KI_KADERPLAN=1` (Standard aus, Live unverändert): `lib/ai/organic-squad/draft-builder.ts` (Platz-Reserve bis Opt
-gegen Kasse **und** Transfertopf, Füller-Sperre mit Rückfall, kein Stopp unter Opt, Auffangnetz nach Bewertung),
-`lib/draft/liga-draft-dienst.ts` (Nachrücken über die ganze Rangliste, keine Billig-Liste). Test: `tests/ki-kaderplan-prototyp.test.ts`.
+Der Auftrag „Platzpreis aus dem Startpool festlegen" ist umgesetzt (Messschalter `OLY_KI_KADERPLAN_STARTPOOL=1`) und gemessen:
 
-| Lauf | Kader Ø (min–max) | unter Opt | leere Plätze | Stars (0/1/≥2) | Kasse Median (% Start) | über Rücklage Median (max) | Stärke Ø |
-|---|---|---:|---:|---|---|---|---:|
-| vorher Block, Saat 1 | 10,8 (8–13) | 29 | 48 | 26/3/3 | 19,0 (8 %) | 2,1 (5,8) | 46,8 |
-| **Kaderplan Block, Saat 1** | **12,3 (10–14)** | **0** | **0** | 26/3/3 | 16,2 (7 %) | **0 (0,2)** | 45,8 |
-| vorher Einzelschritt, Saat 1 | 10,7 (9–13) | 30 | 50 | 26/3/3 | 17,5 (8 %) | 1,9 (6,6) | 46,7 |
-| **Kaderplan Einzelschritt, Saat 1** | **12,3 (10–14)** | **0** | **0** | 26/3/3 | 16,4 (7 %) | 0,5 (6,5) | 45,8 |
-| vorher Block, Saat 2 | 10,8 (8–14) | 28 | 49 | 26/3/3 | 18,2 (8 %) | 1,4 (5,7) | 46,8 |
-| **Kaderplan Block, Saat 2** | **12,3 (9–14)** | **0** | **0** | 26/4/2 | 16,2 (7 %) | 0 (2,4) | 45,7 |
+| Variante | Block: Füller < 12 | Einzelschritt: Füller < 12 | Bewertung |
+|---|---:|---:|---|
+| Restpool, Füller-Sperre nur bei vollem Rahmen (erster Prototyp) | 1 | 54 | Einzelschritt ≠ Block |
+| **Startpool** (Auftrag) | 65 | 66 | gleich, aber beide schlecht: die Reserve rechnet mit 12er-Preisen, die andere Teams längst gekauft haben; die letzten Plätze passen dann nur noch mit Füllern |
+| Restpool + Füller-Sperre immer + günstige Reserve für nicht getragene Plätze | 1 | 50 | Block gut, Einzelschritt nicht |
+| **Restpool + Wettbewerbs-Reserve im Einzelschritt (Standard)** | **1** | **10–11** | gleich genug |
 
-Kadergrößen: vorher 8er 1, 9er 8, 10er 3, 11er 9, 12er 7, 13er 4 — **nachher 10er 3, 11er 6, 12er 10, 13er 5, 14er 8** (Saat 2: 14er 10).
-C-C, D-L, M-S, N-W, T-C, T-T, U-A, L-K kommen bei 14 an; B-P (10), P-S (10), R-L (10) bleiben kompakt. Plan gegen Ist: **0 leere Plätze**
-in allen drei Läufen. Spearman Opt ↔ Kader 0,76 (Block) bzw. **1,00** (Einzelschritt), Elite-Neigung ↔ Top-1-Anteil 0,92.
+Wettbewerbs-Reserve: im Einzelschritt picken T Teams reihum; der i-te eigene Platz kommt erst nach i × T fremden Picks dran. Die Reserve
+rechnet deshalb mit jedem T-ten Preis ab Platzpreis (T = Teams, die noch aktiv picken), im Blocklauf mit T = 1. Startpool bleibt als
+Messschalter im Code, Standard ist der Restpool.
 
-Stufen (Saat 1): Block vorher Depth 146 / Backup 89 / Reserve 55 → nachher Depth 76 / Backup 265 / **Reserve 1**; Einzelschritt
-nachher Depth 95 / Backup 193 / Reserve 54. Abbruchgründe nachher: `nothing_affordable` 22–24 (am Opt, Geld an der Rücklage),
-`roster_full` 8–10, **stop 0, Notkäufe 0**.
+### 5.3 Messung vorher / Kaderplan (Endstand, beide Saaten)
 
-**Preis dafür, ehrlich:** dieselbe Geldmenge auf mehr Köpfe. Top-6-Stärke −1,0 Punkte (−2,2 %), Depth-Spieler werden zu Backup-Spielern.
-Das ist genau Chris' Abwägung „einen weniger, dafür stärker — oder füllen, um vor Verletzungen geschützt zu sein": heute entscheidet sie
-das leere Konto, mit Kaderplan das Opt der Identität. Die Arena-Wertung ist nicht berührt (Fingerabdruck `ce8fcef66028`); ob die breiteren
-Kader in der Saison (Ermüdung, Verletzungen, Einsatz in 20 Disziplinen) die Top-6-Differenz zurückholen, misst erst ein Saisonlauf.
+| Lauf | Kader Ø (min–max) | unter Opt | leere Plätze | Füller < 12 | Kasse Median (% Start) | über Rücklage Median (max) | Stärke Ø | Notwege |
+|---|---|---:|---:|---:|---|---|---:|---:|
+| vorher Block, Saat 1 | 10,7 (8–14) | 29 | 51 | 54 | 17,9 (8 %) | 1,7 (4,4) | 46,9 | — |
+| **Kaderplan Block, Saat 1** | **11,9 (9–14)** | **0** | **0** | **1** | 16,2 (7 %) | 0 (0,7) | 46,0 | **0** |
+| vorher Einzelschritt, Saat 1 | 10,7 (9–13) | 32 | 51 | 54 | 18,1 (7 %) | 1,7 (5,7) | 46,9 | — |
+| **Kaderplan Einzelschritt, Saat 1** | **11,9 (9–14)** | **0** | **0** | 11 | 16,5 (7 %) | 0,6 (2,2) | 45,6 | **0** |
+| vorher Block, Saat 2 | 10,8 (8–14) | 27 | 44 | 57 | 18,4 (8 %) | 1,7 (5,5) | 46,8 | — |
+| **Kaderplan Block, Saat 2** | **11,9 (9–14)** | **0** | **0** | **1** | 16,2 (7 %) | 0 (2,3) | 45,9 | **0** |
+| vorher Einzelschritt, Saat 2 | 10,8 (8–14) | 29 | 46 | 55 | 17,9 (8 %) | 1,0 (6,4) | 46,8 | — |
+| **Kaderplan Einzelschritt, Saat 2** | **11,9 (9–14)** | **0** | **0** | 10 | 17,3 (7 %) | 0,7 (2,1) | 45,7 | **0** |
 
-Offen im Prototyp: im Einzelschritt bleiben 54 Spieler unter 12 (Block: 1). Im Einzelschritt nehmen sich 32 Teams gleichzeitig die
-billigen 12–15er weg, der Platzpreis steigt, die Füller-Sperre fällt öfter auf den Rückfall. Lösung in Stufe 1: Platzpreis aus dem
-Startpool des Drafts fest machen statt aus dem Restpool.
+Kadergrößen: vorher (Block, Saat 1) 8er 2, 9er 6, 10er 6, 11er 8, 12er 6, 13er 3, 14er 1 — **Kaderplan 9er 4, 10er 4, 11er 4, 12er 7, 13er 4,
+14er 9**; im Einzelschritt **identisch**. Notwege: Block-Simulation 0, Einzelschritt-Verlauf 0 `notweg:`; Notkäufe 0, Nachrücker 0.
+Kaderplan-Protokoll: Block 32 × `opt_erreicht`; Einzelschritt 20–21 × `opt_erreicht`, 2–3 × `opt_erreicht_tiefe_vor_qualitaet`, die
+übrigen 9 enden mit 14 Picks (= Opt 14).
 
-### 5.3 Stufe 2: Star-Teams möglich machen (Entwurf, nicht gebaut)
+**Stars mit Kaderplan:**
 
-Heute planen 25 von 32 Teams keinen Star, und die Preis-Strafe verhindert jeden 80+-Spieler. Vorschlag:
+| Lauf | Teams mit Star (Markt) | Stars Σ / Superstars Σ (Markt) | Teams mit Star (Budget) | Stars Σ / Superstars Σ (Budget) | GM-Senkung (Teams, Σ Plätze) |
+|---|---:|---|---:|---|---|
+| Block, Saat 1 | 8 | 14 / 3 | 11 | 18 / 1 | 9, −12 |
+| Einzelschritt, Saat 1 | 6 | 12 / 3 | 10 | 18 / 0 | 9, −12 |
+| Block, Saat 2 | 8 | 14 / 3 | 12 | 17 / 0 | 8, −11 |
+| Einzelschritt, Saat 2 | 8 | 14 / 3 | 11 | 17 / 0 | 8, −11 |
 
-* **Star-Budget aus der Identität:** Star-Neigung `= f(Star-Priorität, Elite-Neigung, Ambition)` bestimmt, wie viele Plätze des Plans
-  als Star-Plätze gelten (0 bis 3) und wie viel Budget sie bekommen; der Rest wird zum Platzpreis gerechnet. Ein star_chaser mit 295
-  und Opt 10 plant z. B. 2 × 70 + 8 × 19.
-* **Preis-Term gegen den Plan statt gegen den Durchschnitt:** „Preis in Plätzen" eines Star-Kandidaten gegen das Star-Budget messen, nicht
-  gegen Kasse / offene Plätze. Dann ist ein 90er für ein Star-Team ein normaler Kauf und für ein Tiefen-Team weiter zu teuer.
-* **Kompakt bewusst:** Star-Teams dürfen Opt um 1–2 senken (protokolliert), Tiefen-Teams nie.
-* Messung: Stars je Archetyp, Top-20-Spieler gekauft (heute 0), Kadergrößen-Spreizung, Stärke je Archetyp. Vorher Mockup/Erklärung
-  für Chris (größeres Konzept).
+Nach Archetyp (Kaderplan, Block Saat 1; Opt Identität → Plan, Kader, Stars Markt / Budget, teuerster Anteil am Budget):
 
----
+| Archetyp | Opt → Plan | Kader | Stars Markt | Stars Budget | teuerster |
+|---|---|---:|---:|---:|---:|
+| star_chaser (5) | 11 → 9,4 | 9,4 | 1,6 | 1,8 | 21 % |
+| risk_gambler (5) | 11,4 → 11,2 | 11,2 | 1,0 | 1,0 | 18 % |
+| elite_curator (1) | 10 → 9 | 9 | 1 | 2 | 17 % |
+| rivalry_hawk (4) | 12,3 → 11,8 | 11,8 | 0 | 0,5 | 15 % |
+| bargain_hunter (4) | 13 → 13 | 13 | 0 | 0 | 10 % |
+| culture_keeper (4) | 13,5 → 13,5 | 13,5 | 0 | 0 | 11 % |
+| depth_spammer (3) | 14 → 14 | 14 | 0 | 0 | 8 % |
+| talent_builder (3) | 13,3 → 13,3 | 13,3 | 0 | 0 | 11 % |
+
+Beispiele je Team (Block Saat 1, volle Tabelle in `data/generated/ki-pick-analyse-18-11/auswertung.md`): **R-L** (star_chaser) Opt 10 → 9,
+2 Stars + 1 Superstar (68,1 = 23 % des Budgets); **Z-H** 11 → 10, 3 Stars + 1 Superstar (65,7, 21 %); **M-M** 11, 2 Stars + 1 Superstar
+(67,1); **A-A** 12 → 10, ein Spieler für 28 % des Budgets (Superstar nach Budget); **B-P** (elite_curator) 10 → 9, 2 Stars nach Budget;
+**C-C, D-L, N-W, T-C, T-T, U-A, L-K, M-S, G-G** bei 14 mit Spielern ≤ 15 % des Budgets.
+
+**Preis, ehrlich:** dieselbe Geldmenge auf mehr Köpfe. Top-6-Stärke −0,9 Punkte (−1,9 %), Depth-Spieler (20–30) werden zu Backup-Spielern
+(12–20): Depth 139 → 71, Backup 91 → 252, Füller 54 → 1. Das ist Chris' Abwägung „einen weniger, dafür stärker — oder füllen, um vor
+Verletzungen geschützt zu sein": heute entscheidet das leere Konto, mit Kaderplan die Identität (Opt) und der GM. Die Arena-Wertung ist
+nicht berührt; ob breitere Kader in der Saison (Ermüdung, Verletzungen, 20 Disziplinen) die Top-6-Differenz zurückholen, misst erst ein
+Saisonlauf.
+
+### 5.4 Bewusste GM-Entscheidung „weniger, dafür stärker"
+
+`gmKaderOptAnpassung` (`lib/foundation/team-general-managers.ts`, nur mit Kaderplan): Kompakt-Neigung = Mittel aus Star-Priorität und
+Elite-Kader-Neigung (1..10, neutral 5) über neutral; **≥ 4 → Opt − 2, ≥ 2,5 → Opt − 1**, sonst 0. Eine Tiefen-Neigung ≥ 7 verhindert die
+Senkung. **Untergrenze Minimum + 1 (9)** — es wird nie nur bis zum Minimum gepickt. Gemessen senken 8–9 GMs um Σ 11–12 Plätze: die fünf
+Star-Chaser (−1 bis −2), B-P, S-C, T-G, Z-H (−1). Protokolliert: im Blocklauf als Warnung `kaderplan_gm:…`, im Einzelschritt am Ausstieg im
+Verlauf („GM kompakt (Star 10, Elite 9): Opt 12 → 10, weniger Spieler, dafür stärker").
+
+### 5.5 Protokoll je Team
+
+`KaderplanProtokoll` (Block: Warnung `kaderplan:<grund>:opt=…:kader=…:rahmen=…:gm=…:notwege=…`; Einzelschritt: Kurzgrund des Ausstiegs im
+Verlauf):
+
+* `opt_erreicht` — Zielkader erreicht, der Rahmen trug alle Plätze zum Platzpreis;
+* `opt_erreicht_tiefe_vor_qualitaet` — Zielkader erreicht, der Rahmen trug zu Beginn nur n Plätze ab 12, der Rest bewusst günstiger;
+* `unter_opt_rahmen_erschoepft` — Warnsignal, darf mit dem Kaderplan nicht vorkommen (gemessen 0×);
+* `notwege` — Rückfälle, die einen Kauf geliefert haben (`fueller_rueckfall`, `ruecklage_angetastet`, `ohne_mindestreserve`,
+  `topf_ueberzogen`); jeder wird zusätzlich mit `console.warn` laut gemeldet. Gemessen: **0** in allen Läufen.
 
 ## 6. Rücklage ab Saison 2 und Notrücklage (Entwurf + Rechnung)
 
@@ -282,7 +313,7 @@ in der Not lieber freigibt, als Kredit aufzunehmen oder Spieler zu verkaufen.
 (10–75 %); **Ziel = q × Gehalt**; im Kauffenster gesperrt nur `max(0, Ziel − erwarteter Überschuss bis Saisonende)`, der Rest wird über
 die Saison angespart.
 
-Rechnung (`scripts/rechne-ruecklage-s2-vorschlag-18-11.ts`, Saat 1; Gehalt = Kader nach dem S1-Draft, Überschuss = Sponsor-Erwartung
+Rechnung (`scripts/rechne-ruecklage-s2-vorschlag-18-11.ts`, erste Anlage `new-game-1795031007669-tlnbzg`; Gehalt = Kader nach dem S1-Draft, Überschuss = Sponsor-Erwartung
 (Anker × 0,92) − Gehalt, ohne Tickets/Merch/Fixkosten, nur Größenordnung). Auszug, volle Tabelle `data/generated/ki-pick-analyse-18-11/ruecklage-s2-rechnung.md`:
 
 | Team | Fin | Amb | s | q #1618 → neu | Rücklage #1618 → Ziel neu | Überschuss | im Fenster gesperrt |
@@ -329,24 +360,28 @@ zählt zu Saison N. Phasenpolitik, Session-Reihenfolge (Verkauf → Kauf → Nac
 
 ---
 
+---
+
 ## 7. Entscheidung und Bauplan
 
-**Draft: JA.** Der Einzelschritt-Draft ist mit der KI-Logik gleichwertig (gleiche Kader, gleiche Kasse, 0 Notkäufe) und hat mit dem
-Kaderplan dieselbe Verteilung wie der Blocklauf. Der „beschränkte Draft-Modus" beschränkt den Pool nicht. Der Grund, den Weg zu lassen,
-wäre ein Logikproblem — das liegt aber im Kaufschritt selbst (Plätze bis Opt, Stars) und im S2-Marktplan, nicht im Draft.
+**Draft: JA** (PM-Entscheidung 18.11.). Der Einzelschritt-Draft ist mit der KI-Logik gleichwertig (vorher wie mit Kaderplan gleiche
+Kader, gleiche Kasse, 0 Notkäufe). Der „beschränkte Draft-Modus" beschränkt den Pool nicht. Die Probleme lagen im Kaufschritt selbst
+(Plätze bis Opt) und im S2-Marktplan — nicht im Draft.
 
-| Stufe | Inhalt | Prüfung |
-|---|---|---|
-| 1 | Kaderplan an (Schalter auf Standard), Platzpreis aus dem Startpool, Protokoll „bewusst unter Opt" | Messlauf wie hier, 2 Saaten: 0 unter Opt, 0 Notkäufe, Füller < 12 ≤ 5 je Liga, Stärke ≥ −3 % |
-| 2 | Notwege 3/4/5 raus (#1618/#1619 übernehmen den Prototyp), Legacy-Emergency-Fill (1) löschen, Kader-Fill-Knopf (2) auf organisch | Tests der Notwege umschreiben; `tests/auto-roster-fill-service.test.ts` |
-| 3 | Kauf im gemeinsamen Fenster über den organischen Schritt mit Kaderplan (statt `applyAiMarketPlanLocally`; die Session-Reihenfolge baut der Fenster-Agent, dieser Teil liefert den Kaufschritt und `kaufRahmen` nach Verkäufen), delegierte Teams (7) einbeziehen, Rücklage S2 nach Sparneigung, angespart, Notrücklage-Reihenfolge | Mehrsaisonlauf S1→S2 (`scripts/miss-teamfinanzen-saison.ts`): kein Team < 8, Kader nahe Opt, Kasse nach Fenster im Rücklage-Band, Spreizung nach Identität, jedes Team kauft, Zählung Notrücklage/Kredit/Notverkauf |
-| 4 | Star-Teams (5.3): Mockup + Erklärung an Chris, dann bauen | Stars je Archetyp, Top-20 gekauft > 0, Stärke je Archetyp |
-
-Opus-Review der Kaufschritt-Änderung vor Stufe 1 (Wertungsnähe: ändert Kader, nicht die Arena).
+| Stufe | Inhalt | In diesem PR? | Prüfung |
+|---|---|---|---|
+| 1 | Kaderplan (Reserve bis Opt, Füller nur nach Plan, kein Stopp unter Opt, Wettbewerbs-Reserve, GM-Opt, Protokoll), Notwege 3 und 4 ersetzt | **ja, hinter `OLY_KI_KADERPLAN=1`** | gemessen (Abschnitt 5.3); danach **unabhängiges Opus-Review**, erst dann Schalter auf Standard |
+| 2 | Notwege 1, 2, 5, 7, 8: Legacy-Emergency-Fill löschen, Kader-Fill-Knopf auf den Kaufschritt, delegierte Teams ab S2, Rest-Rückfälle entfernen | nein, Folge-PR nach dem Review | Tests der Notwege umschreiben |
+| 3 | Kauf im gemeinsamen Fenster über den Kaufschritt mit Kaderplan (Stelle 6), Rahmen nach Verkäufen neu, Rücklage S2 nach Sparneigung und angespart, Notrücklage-Reihenfolge | nein — die Session-Datei gehört dem Transferfenster-Agenten; der PM koordiniert | Mehrsaisonlauf S1 → S2: kein Team < 8, Kader nahe Opt, Kasse im Band, Spreizung nach Identität, jedes Team kauft, Zählung Notrücklage/Kredit/Notverkauf |
+| 4 | Star-Teams (bewusste Star-Plätze im Plan, Preis-Term gegen das Star-Budget) | nein — erst Mockup + Erklärung für Chris | Stars relativ je Archetyp (Abschnitt 2.4), Kadergrößen-Spreizung, Stärke je Archetyp |
 
 ## 8. Grenzen
 
 * Zwei Saaten derselben Spielerdaten (nur die Saat der KI unterscheidet sich); Budgets und Pool sind je Anlage gleich.
 * „Stärke" = Top-6-Eignung je Disziplin; sie belohnt Breite nicht. Kein Saisonlauf mit dem Prototyp.
-* S2-Aussagen zu Stelle 6 aus Code + Messung #1618/#1628, nicht neu gemessen; Rücklage S2 nur gerechnet.
-* Die Merge-Auflösung #1618 × #1619 im Kaufschritt ist hier gemacht, aber nicht von den Autoren beider PRs geprüft.
+* S2-Aussagen (Stelle 6) aus Code und den Messungen #1618/#1628, nicht neu gemessen; Rücklage S2 nur gerechnet (erste Anlage
+  `new-game-1795031007669-tlnbzg`, Gehalt nach dem S1-Draft).
+* Im Einzelschritt bleiben 10–11 Füller (Block 1); die Wettbewerbs-Reserve rechnet mit dem schlechtesten Fall (alle anderen nehmen die
+  billigsten 12er) und ist trotzdem nicht ganz dicht, weil Teams ihre letzten Plätze in derselben Runde füllen.
+* Fingerabdruck auf diesem Branch `d3a39030a3ef` = aktueller Stand in CLAUDE.md (auf `main` bewegt durch #1617 Climbing, nicht durch
+  diesen PR; die Kaufschritt-Änderung berührt die Arena nicht).
