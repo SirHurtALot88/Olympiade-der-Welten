@@ -768,3 +768,29 @@
 .elm .elm-slot {
   transform: translate(-50%, -50%) scale(var(--z, 1));
 }
+
+/* Geteiltes Feld: links wir, rechts die erwartete Gegner-Aufstellung (Schätzung mit Unsicherheit) */
+.elm .elm-feld__box[data-links="1"]::after {
+  content: "Erwartete Gegner-Aufstellung · Schätzung";
+  position: absolute;
+  right: 14px;
+  top: 8px;
+  font-size: clamp(11.5px, 0.7cqw, 15px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--bc-gast);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+.elm .elm-feld__box[data-links="1"] .elm-geist {
+  font-size: clamp(14px, 1.15cqw, 19px);
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: rgba(8, 18, 26, 0.82);
+  border-style: solid;
+  border-color: rgba(69, 176, 201, 0.7);
+}
+.elm .elm-feld__box[data-links="1"] .elm-geist b {
+  font-weight: 700;
+}

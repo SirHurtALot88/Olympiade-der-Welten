@@ -761,6 +761,14 @@ export default function EinsatzlisteModern(props: Props) {
       k.style.left = `${ergebnis.pos[i]!.x}px`;
       k.style.top = `${ergebnis.pos[i]!.y}px`;
       k.style.setProperty("--z", String(ergebnis.z));
+      if (links) {
+        // Gegner-Platz gegenüber auf der rechten Hälfte, auf Höhe des eigenen Platzes (Duell Platz gegen Platz).
+        const geist = box.querySelector<HTMLElement>(`.elm-geist[data-gsk="${k.dataset.sk}"]`);
+        if (geist) {
+          geist.style.left = `${Math.min(W - 70, ergebnis.pos[i]!.x + W * 0.5)}px`;
+          geist.style.top = `${ergebnis.pos[i]!.y}px`;
+        }
+      }
     });
   }, []);
   useEffect(() => {
@@ -856,6 +864,7 @@ export default function EinsatzlisteModern(props: Props) {
         className={klassen}
         style={{ "--x": x, "--y": y, "--x2": x2, "--pc": farbe, ...(reihig ? { "--w": `calc(${(geteiltFeld ? 44 : 100) / spaltenZahl}% - 14px)` } : {}) } as React.CSSProperties}
         data-testid={`elm-slot-${slot.key}`}
+        data-sk={slot.key}
         data-bx={reihig ? undefined : x}
         data-by={reihig ? undefined : y}
         aria-label={`${slotName(slot.key)}${karte ? `: ${karte.name}` : ": offen"}`}
@@ -1507,7 +1516,7 @@ export default function EinsatzlisteModern(props: Props) {
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
                     if (!platz?.gegner || !g || (!g.spielerName && !geteiltFeld)) return null;
                     return (
-                      <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
+                      <div key={`g-${slot.key}`} data-gsk={slot.key} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
                         <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
                         <b>{g.spielerName ?? "Gegner ?"}</b>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}

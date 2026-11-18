@@ -168,7 +168,16 @@ async function foto() {
             await page.waitForTimeout(900);
           }
           await page.screenshot({ path: path.join(OUT, `${praefix}-${disz}-${w}.png`) });
-          console.log(`[optik] ${disz} ${w}x${h}`);
+          const mass = await page.evaluate(() => ({ scroll: document.scrollingElement?.scrollHeight ?? 0, fenster: window.innerHeight, ueberlappung: (() => {
+            const k = Array.from(document.querySelectorAll<HTMLElement>(".elm-slot")).map((e) => e.getBoundingClientRect());
+            let n = 0;
+            for (let i = 0; i < k.length; i += 1) for (let j = i + 1; j < k.length; j += 1) {
+              const a = k[i]!; const b = k[j]!;
+              if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2) n += 1;
+            }
+            return n;
+          })() }));
+          console.log(`[optik] ${disz} ${w}x${h} scroll=${mass.scroll}/${mass.fenster} kartenUeberlappungen=${mass.ueberlappung}`);
           const tab = page.getByRole("tab", { name: /^Gegner$/ });
           if (await tab.first().isVisible().catch(() => false)) {
             await tab.first().click();
