@@ -56,10 +56,10 @@ export const DELEGATION_STUFE_LABEL: Record<DelegationStufe, string> = {
 };
 
 /**
- * Was jede Stufe je Bereich bedeutet. Halbautomatik nach Chris' Vorgabe: Einsatzliste und
- * Training macht die KI, Kaeufe/Verkaeufe/Vertraege der Mensch. Draft, Gebaeude und Sponsor stehen
- * in der Halbautomatik auf KI — Ramonas Beispiel nennt den Draft ausdruecklich, Gebaeude und
- * Sponsor sind Empfehlung (offene Frage im Konzept, Abschnitt 7).
+ * Was jede Stufe je Bereich bedeutet. Halbautomatik nach Chris' Vorgabe (18.11. abends, wörtlich:
+ * „ramona draftet und kauft und verkauft selber alles andere startet mit AI“): Draft-Picks und
+ * Kaeufe/Verkaeufe/Vertraege macht der Mensch, alles andere (Einsatzliste, Training, Gebaeude,
+ * Sponsor) startet auf KI und kann je Bereich auf „selbst“ umgestellt werden.
  */
 export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich, DelegationWahl>> = {
   voll_selbst: {
@@ -72,7 +72,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
   },
   halbautomatik: {
     einsatzliste: "ki",
-    draft: "ki",
+    draft: "selbst",
     transfers: "selbst",
     training: "ki",
     gebaeude: "ki",
