@@ -12,7 +12,7 @@
 import type { KartenWirkung } from "@/lib/lineups/formkarten-wirkung";
 import { FARB_NAME } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 
-const FORM_HEX: Record<string, string> = { red: "#ff8b86", green: "#a8e7aa", blue: "#a9ccff", yellow: "#ffd987" };
+export const FORM_HEX: Record<string, string> = { red: "#ff8b86", green: "#a8e7aa", blue: "#a9ccff", yellow: "#ffd987" };
 const vz = (x: number, nk = 0) => {
   const t = new Intl.NumberFormat("de-DE", { minimumFractionDigits: nk, maximumFractionDigits: nk }).format(Math.abs(x));
   return `${x > 0.0001 ? "+" : x < -0.0001 ? "−" : "±"}${t}`;
@@ -49,12 +49,23 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
     <div className="elm-hand" data-testid="elm-kartenhand">
       <div className="elm-hand__kopf bc-gk">
         <span>Formkarten · {gelegt} von 2 gelegt{colorLabel ? <> · Disziplin-Farbe <b>{colorLabel}</b></> : null}{wartet ? " · speichert…" : ""}</span>
-        <small>{w.buchung.gebucht ? "zählt in dieser Wertung" : "zählt hier noch nicht"}</small>
+        {w.buchung.gebucht ? (
+          <span className="elm-hand__summe" data-testid="fm-leiste-team" title="Summe der gelegten Karten fürs Team in dieser Wertung">
+            Karten fürs Team <strong className="bc-t">{vz(w.teamSumme, 1)}</strong>
+            <small>alle {vz(alle, 1)} · Farbe {vz(farbe, 1)} · Form {vz(form, 1)} · + Tagesform ±{w.tagesformSpanne} je Spieler</small>
+            {w.farbHinweis ? <small data-testid="elm-farbhinweis">{w.farbHinweis}</small> : null}
+          </span>
+        ) : (
+          <span className="elm-hand__summe" data-testid="fm-leiste-team" title={w.buchung.grund ?? undefined}>
+            <small className="elm-hand__warn">zählt hier noch nicht · der Motor nimmt in dieser Disziplin eine Ersatzkarte</small>
+          </span>
+        )}
       </div>
       <div className="elm-hand__zeile">
         <div className="elm-hand__karten" role="group" aria-label="Formkarten der Hand">
           {w.vergleich.length === 0 ? <span className="fm-leise">Keine Formkarte mehr verfügbar — alle Karten dieser Saison sind gespielt.</span> : null}
-          {w.vergleich.map((k) => {
+          {/* Alle Karten auf einmal sichtbar: oben die guten, unten die negativen, nach Wert sortiert (Chris 18.11.). */}
+          {[...w.vergleich].sort((a, b) => b.wert - a.wert || a.spielerName.localeCompare(b.spielerName, "de")).map((k) => {
             const nr = k.id === primaryId ? "1" : k.id === secondaryId ? "2" : null;
             const waehlbar = nr != null || primaryFrei.has(k.id) || (k.wert > 0 && secondaryFrei.has(k.id));
             return (
@@ -77,19 +88,6 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
               </button>
             );
           })}
-        </div>
-        <div className="elm-hand__summe" data-testid="fm-leiste-team">
-          <span className="bc-gk">Karten fürs Team</span>
-          {w.buchung.gebucht ? (
-            <>
-              <strong className="bc-t">{vz(w.teamSumme, 1)}</strong>
-              <small>alle {vz(alle, 1)} · Farbe {vz(farbe, 1)} · Form {vz(form, 1)}</small>
-              {w.farbHinweis ? <small data-testid="elm-farbhinweis">{w.farbHinweis}</small> : null}
-              <small>+ Tagesform ±{w.tagesformSpanne} je Spieler</small>
-            </>
-          ) : (
-            <small className="elm-hand__warn">{w.buchung.grund}</small>
-          )}
         </div>
       </div>
     </div>

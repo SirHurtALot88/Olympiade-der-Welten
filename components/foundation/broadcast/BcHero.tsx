@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import "./broadcast.css";
 import { BcHeroKulisse } from "./BcHeroKulisse";
@@ -62,6 +62,7 @@ export function BcReiter({
   wert,
   wertNote,
   titelAttr,
+  farbe,
 }: {
   aktiv: boolean;
   onClick: () => void;
@@ -73,6 +74,8 @@ export function BcReiter({
   wert?: ReactNode;
   wertNote?: ReactNode;
   titelAttr?: string;
+  /** Kategorie-Farbe der Disziplin (Rand), z. B. Power rot, Speed grün, Mental blau, Social gelb. */
+  farbe?: string;
 }) {
   return (
     <button
@@ -80,7 +83,8 @@ export function BcReiter({
       role="tab"
       aria-selected={aktiv}
       title={titelAttr}
-      className={`bc-reiter${aktiv ? " is-an" : ""}`}
+      className={`bc-reiter${aktiv ? " is-an" : ""}${farbe ? " has-dk" : ""}`}
+      style={farbe ? ({ "--dk": farbe } as CSSProperties) : undefined}
       onClick={onClick}
     >
       <span className="bc-reiter__ic">{symbol}</span>

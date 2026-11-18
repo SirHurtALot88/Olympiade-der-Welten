@@ -11,8 +11,9 @@ import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractR
 import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
+import { abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
 import {
   buildTeamShellThemeVars,
   buildTeamVoidVars,
@@ -124,6 +125,8 @@ import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-f
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { disziplinReihenfolgeAusSpielplan } from "@/lib/season/saisonstand-modern-logik";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
@@ -692,6 +695,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
+  // Abgabe der Einsatzliste als Hauptaktion des Taktgebers (statt zweitem Knopf im Dock der Einsatzliste).
+  const einsatzlisteAbgabe = useSyncExternalStore(abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe, () => null);
   const newLookBreadcrumbData = getFoundationBreadcrumb(activeView as FoundationViewId);
   // Regieband (18.11.): goldene Kopfzeile (Gruppe, bei Teamseiten das Team) über dem Seitentitel.
   const newLookBreadcrumb = newLookBreadcrumbData ? (
@@ -981,7 +986,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
-        takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
+        takt={
+          einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
+            ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan }
+            : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
+        }
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
@@ -2826,6 +2835,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               areaVerhaeltnisByTeamId={seasonV2AreaVerhaeltnisByTeamId}
               teamBilanzByTeamId={seasonV2TeamBilanzByTeamId}
               teamStrengthRankByTeamId={seasonV2TeamStrengthRankByTeamId}
+              spielplanDisziplinen={disziplinReihenfolgeAusSpielplan(getSeasonDisciplineSchedule(gameState, { saveId: activeSaveId }))}
               teamStrengthValueByTeamId={seasonV2TeamStrengthValueByTeamId}
               verlauf={seasonV2Verlauf}
               matchwinner={seasonV2Matchwinner}

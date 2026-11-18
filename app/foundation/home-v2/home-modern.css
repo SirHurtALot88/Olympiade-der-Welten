@@ -61,7 +61,7 @@
 .hm-cta small{font-size:.82rem;color:var(--leise)}
 
 /* RASTER: fuellt die Resthoehe, nichts scrollt */
-.hm-raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.3fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
+.hm-raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.55fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
 .hm-pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
 .hm-p-tag{grid-column:1/6;grid-row:1} .hm-p-kad{grid-column:1/6;grid-row:2}
 .hm-p-tab{grid-column:6/10;grid-row:1/3}
@@ -82,12 +82,12 @@
 .hm-match small{color:var(--leise);font-size:.85rem;white-space:nowrap}
 .hm-match .hm-vs{font:400 1.5rem/1 var(--haus);color:var(--stumm)}
 .hm-dzs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.7rem;flex:1;min-height:0}
-.hm-dz{position:relative;display:flex;flex-direction:column;gap:.35rem;padding:.6rem .75rem .6rem;border-radius:.55rem;border:1px solid rgba(240,195,90,.55);overflow:hidden;isolation:isolate;min-height:0}
+.hm-dz{position:relative;display:flex;flex-direction:column;gap:.28rem;padding:.55rem .75rem .5rem;border-radius:.55rem;border:1px solid rgba(240,195,90,.55);overflow:hidden;isolation:isolate;min-height:0}
 .hm-dz:hover{border-color:var(--gold)}
 .hm-dz::before{content:"";position:absolute;inset:0;z-index:-2;background:var(--bild) center/cover;opacity:.55}
 .hm-dz::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(8,11,17,.55) 0%,rgba(8,11,17,.9) 46%,rgba(8,11,17,.97) 100%)}
 .hm-dz .hm-kopf{display:flex;align-items:baseline;gap:.5rem}
-.hm-dz .hm-kopf b{font:400 1.35rem/1 var(--haus);color:#fff} .hm-dz .hm-kopf small{font-size:.8rem;color:var(--creme);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-dz .hm-kopf b{font:400 1.35rem/1 var(--haus);color:#fff;white-space:nowrap;flex:none} .hm-dz .hm-kopf small{flex:1 1 0;min-width:0} .hm-dz .hm-kopf small{font-size:.8rem;color:var(--creme);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hm-dz .hm-sp{flex:1}
 .hm-dz .hm-wb{height:clamp(.7rem,1.6vh,1.3rem)}
 .hm-dz .hm-lab{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;color:var(--leise)}

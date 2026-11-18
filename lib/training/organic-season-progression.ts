@@ -50,7 +50,12 @@ import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-te
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import type { PlayerProgressionRatingTier, PlayerTrainingMode } from "@/lib/training/training-plan-types";
-import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
+import {
+  FATIGUE_LOAD_BY_MODE,
+  getTrainingSetpointsJeSpieltag,
+  TRAINING_SETPOINTS_BY_MODE,
+} from "@/lib/training/training-mode-presentation";
+import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
 import {
   DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
   getDevelopmentRouteBonusMultiplier,
@@ -309,17 +314,61 @@ function computeAccumulatorOverridesFromCounts(
   return { accumulatedBaseTrainingBudget, performanceWeightMultiplier };
 }
 
+/** Spieltage, deren Trainingszuwachs schon JE SPIELTAG gebucht ist (Eintrag `s: "t"` im Verlauf). */
+export function getMatchdayBookedTrainingIds(
+  accumulator: Player["seasonTrainingAccumulator"] | undefined,
+  seasonId: string,
+): Set<string> {
+  const ids = new Set<string>();
+  if (!accumulator || accumulator.seasonId !== seasonId) return ids;
+  for (const eintrag of accumulator.verlauf ?? []) {
+    if (eintrag.s === "t") ids.add(eintrag.m);
+  }
+  return ids;
+}
+
 function countAccumulatorModes(
   accumulator: Player["seasonTrainingAccumulator"] | undefined,
   seasonId: string,
+  options?: { ohneJeSpieltagGebuchte?: boolean },
 ): Record<PlayerTrainingMode, number> {
   const counts: Record<PlayerTrainingMode, number> = { leicht: 0, mittel: 0, hart: 0 };
   if (!accumulator || accumulator.seasonId !== seasonId) return counts;
+  const gebucht = options?.ohneJeSpieltagGebuchte ? getMatchdayBookedTrainingIds(accumulator, seasonId) : null;
   for (const matchdayId of Object.keys(accumulator.modeByMatchday)) {
+    if (gebucht?.has(matchdayId)) continue;
     const mode = accumulator.modeByMatchday[matchdayId];
     if (mode === "leicht" || mode === "mittel" || mode === "hart") counts[mode] += 1;
   }
   return counts;
+}
+
+/**
+ * SAISONENDE MIT TRAINING JE SPIELTAG (Chris, 18.11.): kein Doppel-Buchen.
+ *
+ * Schalter AUS -> exakt `resolveSeasonTrainingAccumulatorInputs` (alte Buchung, `{}` ohne Akkumulator).
+ * Schalter AN -> das Trainingsbudget am Saisonende umfasst NUR die Spieltage, die gezaehlt, aber
+ * nicht je Spieltag gebucht wurden (Alt-Spieltage eines laufenden Spielstands vor dem Umstieg). Ohne
+ * solche Spieltage ist es 0 — auch ohne Akkumulator (wer an keinem Spieltag mittrainiert hat, bekommt
+ * am Saisonende kein Pauschalbudget mehr). Der Leistungs-Gewichtsfaktor mittelt weiter ueber ALLE
+ * gezaehlten Spieltage, denn der Leistungsanteil wird unveraendert am Saisonende gebucht.
+ */
+export function resolveSeasonEndTrainingAccumulatorOverrides(input: {
+  accumulator: Player["seasonTrainingAccumulator"] | undefined;
+  seasonId: string;
+  totalMatchdays: number;
+  jeSpieltag: boolean;
+}): { accumulatedBaseTrainingBudget?: number; performanceWeightMultiplier?: number } {
+  const alle = resolveSeasonTrainingAccumulatorInputs(input);
+  if (!input.jeSpieltag) return alle ?? {};
+  const ungebucht = computeAccumulatorOverridesFromCounts(
+    countAccumulatorModes(input.accumulator, input.seasonId, { ohneJeSpieltagGebuchte: true }),
+    input.totalMatchdays,
+  );
+  return {
+    accumulatedBaseTrainingBudget: ungebucht?.accumulatedBaseTrainingBudget ?? 0,
+    ...(alle ? { performanceWeightMultiplier: alle.performanceWeightMultiplier } : {}),
+  };
 }
 
 export function resolveSeasonTrainingAccumulatorInputs(input: {
@@ -357,6 +406,27 @@ export function buildProjectedSeasonTrainingAccumulatorOverrides(input: {
   draftMode: PlayerTrainingMode;
 }): { accumulatedBaseTrainingBudget?: number; performanceWeightMultiplier?: number } {
   const totalMatchdays = resolveSeasonTotalMatchdaysForProgression(input.gameState);
+  if (isTrainingJeSpieltagAktiv()) {
+    // Training je Spieltag: was schon gebucht ist, steckt bereits in den Attributen und darf hier
+    // nicht noch einmal auftauchen. Prognose = ungebuchte Alt-Spieltage (Saisonend-Satz) + offene
+    // Spieltage zum Satz JE SPIELTAG im aktuell gewaehlten Modus. Verteilt wird hier weiter nach
+    // Klasse (Alt-Anzeige); die genaue Vorschau je Spieltag liefert `prognostiziereSpieltagsTraining`.
+    const alle = countAccumulatorModes(input.player.seasonTrainingAccumulator, input.gameState.season.id);
+    const ungebucht = countAccumulatorModes(input.player.seasonTrainingAccumulator, input.gameState.season.id, {
+      ohneJeSpieltagGebuchte: true,
+    });
+    const gezaehlt = alle.leicht + alle.mittel + alle.hart;
+    const offen = Math.max(0, Math.floor(totalMatchdays) - gezaehlt);
+    const altBudget = computeAccumulatorOverridesFromCounts(ungebucht, totalMatchdays)?.accumulatedBaseTrainingBudget ?? 0;
+    const draft = normalizeTrainingMode(input.draftMode);
+    const projiziert = { ...alle };
+    projiziert[draft] += offen;
+    const leistung = computeAccumulatorOverridesFromCounts(projiziert, totalMatchdays);
+    return {
+      accumulatedBaseTrainingBudget: altBudget + offen * getTrainingSetpointsJeSpieltag(draft),
+      ...(leistung ? { performanceWeightMultiplier: leistung.performanceWeightMultiplier } : {}),
+    };
+  }
   const counts = countAccumulatorModes(input.player.seasonTrainingAccumulator, input.gameState.season.id);
   const countedPast = counts.leicht + counts.mittel + counts.hart;
   const remaining = Math.max(0, Math.floor(totalMatchdays) - countedPast);
@@ -542,7 +612,7 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
  * dann wird der Achswert aus `coreStats` als Attributwert genutzt, damit die
  * Trainings-Prognose nie stumm auf 0 kollabiert (siehe normalizePlayerAttributes).
  */
-const ATTRIBUTE_FALLBACK_AXIS: Record<PlayerGeneratorAttributeName, "pow" | "spe" | "men" | "soc"> = {
+export const ATTRIBUTE_FALLBACK_AXIS: Record<PlayerGeneratorAttributeName, "pow" | "spe" | "men" | "soc"> = {
   power: "pow",
   health: "pow",
   stamina: "pow",
@@ -632,6 +702,31 @@ function distributeByClassProfile(input: {
   }
 
   return deltas;
+}
+
+/**
+ * Regel A: Budget nach einem festen Gewichtsprofil verteilen (z. B. 60 / 25 / 15 aus der Matrix der
+ * Ziel-Disziplin). Nur positive Gewichte, normiert auf 1 — keine negativen Nebenwirkungen wie bei
+ * den Klassenprofilen.
+ */
+function distributeByWeightProfile(input: {
+  weights: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  budget: number;
+}) {
+  const normalized = normalizeWeights(input.weights);
+  return Object.fromEntries(
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, input.budget * normalized[attribute]]),
+  ) as Record<PlayerGeneratorAttributeName, number>;
+}
+
+/**
+ * Wachstum je Spieltag: nur nach oben, nie ueber die Decke, und ein Attribut, das (z. B. nach einer
+ * Potenzial-Neubewertung) schon ueber der Decke steht, wird NICHT heruntergezogen — Training nimmt
+ * nichts weg. Drei Nachkommastellen.
+ */
+function growOnlyTowardsCap(before: number, gain: number, cap: number) {
+  const room = Math.max(0, Math.min(99, cap) - before);
+  return roundValue(before + Math.max(0, Math.min(gain, room)), 3);
 }
 
 function getSecondaryTrainingClass(player: Player, facilities: TeamFacilityCollection | null | undefined) {
@@ -932,6 +1027,19 @@ export function buildOrganicSeasonProgression(input: {
    * gebuchte Entwicklung bleibt unverändert.
    */
   regressionMatchdayScale?: number;
+  /**
+   * REGEL A (Chris, 18.11., Training je Spieltag): Trainingsprofil direkt aus der Ziel-Disziplin
+   * (60 / 25 / 15 auf die drei schwersten Matrix-Attribute, `lib/training/spieltag-training.ts`).
+   * Gesetzt ERSETZT es die Klassen-Verteilung (Primaer- und Zweitklasse); nur positive Gewichte.
+   */
+  trainingProfileOverride?: Partial<Record<PlayerGeneratorAttributeName, number>> | null;
+  /** Route fuer den Fokusachsen-Bonus, wenn das Profil nicht aus einer Klasse kommt (Achse des Hauptattributs). */
+  trainingRouteOverride?: PlayerDevelopmentRouteSuggestion | null;
+  /**
+   * NUR der Trainingsanteil (Zuwachs je Spieltag): keine Regression, keine Leistung, kein Abwaertsclamp,
+   * Werte auf drei Nachkommastellen statt einer (sonst schluckt die Rundung den kleinen Spieltagsanteil).
+   */
+  nurTraining?: boolean;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
   /**
@@ -1089,8 +1197,10 @@ export function buildOrganicSeasonProgression(input: {
   // S1: Achse UND Bonushöhe kommen aus derselben Quelle — steht ein Specialist Wing, setzt seine
   // Variante die Achse und seine Stufe die Bonushöhe (8 % → 13 %). Ohne Flügel: Achse aus der
   // Trainingseinstellung, Bonus auf der historischen Basis von 8 %.
+  const profileOverride = input.trainingProfileOverride ?? null;
+  const nurTraining = input.nurTraining === true;
   const routeBonusMultiplier = getDevelopmentRouteBonusMultiplier(
-    classNameToDevelopmentRoute(primaryTrainingClass),
+    input.trainingRouteOverride ?? classNameToDevelopmentRoute(primaryTrainingClass),
     resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
     getSpecialistWingFocusBonusPct(input.facilities),
   );
@@ -1103,15 +1213,17 @@ export function buildOrganicSeasonProgression(input: {
       (1 + academyDevelopmentBoostPct / 100),
     2,
   );
-  const primaryShare = secondaryTrainingClass ? 0.7 : 1;
-  const secondaryShare = secondaryTrainingClass ? 0.3 : 0;
-  const primaryTrainingDeltas = distributeByClassProfile({
-    className: primaryTrainingClass,
-    budget: trainingSetpoints,
-    share: primaryShare,
-    adminConfig: input.gameState.seasonState.adminBalancingConfig,
-  });
-  const secondaryTrainingDeltas = secondaryTrainingClass
+  const primaryShare = secondaryTrainingClass && !profileOverride ? 0.7 : 1;
+  const secondaryShare = secondaryTrainingClass && !profileOverride ? 0.3 : 0;
+  const primaryTrainingDeltas = profileOverride
+    ? distributeByWeightProfile({ weights: profileOverride, budget: trainingSetpoints })
+    : distributeByClassProfile({
+        className: primaryTrainingClass,
+        budget: trainingSetpoints,
+        share: primaryShare,
+        adminConfig: input.gameState.seasonState.adminBalancingConfig,
+      });
+  const secondaryTrainingDeltas = secondaryTrainingClass && !profileOverride
     ? distributeByClassProfile({
         className: secondaryTrainingClass,
         budget: trainingSetpoints,
@@ -1184,15 +1296,17 @@ export function buildOrganicSeasonProgression(input: {
     const regressionHeadroomMultiplier = ORGANIC_REGRESSION_HEADROOM_MULTIPLIER[attributeHeadroom.state] ?? 1;
     // regressionScale: bei Zwischenstands-Prognosen anteilig zu den gespielten Spieltagen (s. o.);
     // im Saisonende-Apply immer 1 → identische Rechnung wie bisher.
-    const regression =
-      -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) *
-      regressionHeadroomMultiplier *
-      regressionScale;
+    const regression = nurTraining
+      ? 0
+      : -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) *
+        regressionHeadroomMultiplier *
+        regressionScale;
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
-    const performanceDelta =
-      applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
-      performanceWeightMultiplier;
-    const delta = roundValue(regression + training + performanceDelta, 2);
+    const performanceDelta = nurTraining
+      ? 0
+      : applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
+        performanceWeightMultiplier;
+    const delta = roundValue(regression + training + performanceDelta, nurTraining ? 4 : 2);
     const before = attributesBefore[attribute];
     // Harte Ceiling-Bindung: Attributwachstum darf das (reconciled) Attribut-Ceiling
     // nie ueberschreiten. Damit bindet der Potenzial-Cap (v4) tatsaechlich als
@@ -1205,14 +1319,16 @@ export function buildOrganicSeasonProgression(input: {
       : 99;
     ceilingStateByAttribute[attribute] = attributeHeadroom.state;
     ceilingCapByAttribute[attribute] = Math.max(1, attributeCeilingCap);
-    const after = roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
+    const after = nurTraining
+      ? growOnlyTowardsCap(before, delta, ceilingCapByAttribute[attribute])
+      : roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
     return {
       attribute,
       before,
       after,
-      delta: roundValue(after - before, 2),
+      delta: roundValue(after - before, nurTraining ? 3 : 2),
       regression: roundValue(regression, 2),
-      training: roundValue(training, 2),
+      training: roundValue(training, nurTraining ? 4 : 2),
       performance: roundValue(performanceDelta, 2),
       spillover: 0,
       affinity,
@@ -1228,7 +1344,7 @@ export function buildOrganicSeasonProgression(input: {
   // Der gebundene Rest kann das Budget nie übersteigen (bei Klassen mit negativen Nebenwirkungen
   // auf die Fokus-Stats würde `budget − focusApplied` sonst über das Budget hinauslaufen).
   const boundRest = Math.min(trainingSetpoints, Math.max(0, trainingSetpoints - focusAppliedTraining));
-  const spilloverPool = roundValue(boundRest * TRAINING_SPILLOVER_SHARE, 2);
+  const spilloverPool = roundValue(boundRest * TRAINING_SPILLOVER_SHARE, nurTraining ? 4 : 2);
   if (spilloverPool > 0) {
     const recipients = rawAttributeBreakdown.filter(
       (entry) =>
@@ -1245,13 +1361,15 @@ export function buildOrganicSeasonProgression(input: {
       const jitterSum = jittered.reduce((sum, value) => sum + value, 0) || 1;
       const scale = spilloverPool / jitterSum; // renormieren, damit die Summe exakt dem Pool entspricht
       recipients.forEach((entry, index) => {
-        const add = roundValue(jittered[index] * scale, 2);
+        const add = roundValue(jittered[index] * scale, nurTraining ? 4 : 2);
         if (add <= 0) return;
         entry.spillover = add;
         const rawDelta = entry.regression + entry.training + entry.spillover + entry.performance;
-        const after = roundValue(clamp(entry.before + rawDelta, 1, ceilingCapByAttribute[entry.attribute]), 1);
+        const after = nurTraining
+          ? growOnlyTowardsCap(entry.before, rawDelta, ceilingCapByAttribute[entry.attribute])
+          : roundValue(clamp(entry.before + rawDelta, 1, ceilingCapByAttribute[entry.attribute]), 1);
         entry.after = after;
-        entry.delta = roundValue(after - entry.before, 2);
+        entry.delta = roundValue(after - entry.before, nurTraining ? 3 : 2);
       });
     }
   }

@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scouting – modern (Mockup 18.11.)</title>
+<!--
+  SCOUTING IM NEUEN STIL (Fable, 18.11.). Zwei Reiter wie heute: Uebersicht (Office + Wunschliste) und Scouting Report.
+  ECHT: Slots, Tempo und passive Plaetze je Stufe des Scouting Office (lib/scouting/facility-scout-pipeline-service.ts:
+        Stufe 2 = 10 Slots, +10 je Spieltag, 1 passiv; Fokus-Ziel +20), Erkenntnisstufe = Office-Stufe + Intel/25, hoechstens 5
+        (scouting-reveal-state.ts), die sechs Stufennamen Gesichtet bis Vollstaendig (ScoutingKnowledgeLadder.tsx), Status
+        Fokus / Aktiv / Wartet / Kaufbereit und die Spalten der Wunschliste (ScoutingShortlistBoard.tsx), Scout-Note 1 bis 6 im Ring
+        (ScoutGradeRing.tsx), Abschnitte des Reports (ScoutingReportPanel.tsx), Schalter "Scouting-Nebel aus" je Spielstand
+        (scenarioMeta.scoutingNebelAus), Spieler mit Klasse, Achsen, Eignungen, Traits, Marktwert, Gehalt (oly-player-stats.json).
+  ERFUNDEN: Intel-Staende, Breite der Spannen je Stand, Team-Bestwerte der Wranglers, Wirkung auf die Top-6, Scout-Texte.
+  URL: ?ansicht=uebersicht|report  ?nebel=an|aus  ?spieler=watcher|kelektros|...  ?still=1 (ohne Mockup-Leiste)
+  Steht IM App-Rahmen aus app-rahmen-modern-18-11.html (Schiene, Regieband, Taktgeber: CSS unveraendert uebernommen,
+  wie in training-modern-18-11.html). Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  Erklaerung und offene Fragen: docs/design/fehlende-seiten-mockups-18-11.md
+-->
+
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* VOLLE FLAECHE: Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px). Die Wurzelgroesse waechst mit Breite UND Hoehe. */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.9rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* ICON-SCHIENE: kompakt 4 rem, klappt bei Hover als Ueberlagerung aus (wie PR #1576) */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.2rem;padding:.6rem .6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover,body.navauf .rail{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem;flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .grp{height:1.1rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp,body.navauf .rail .grp{opacity:1}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n,body.navauf .rail a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;left:1.7rem;top:.2rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}
+/* HERO mit geteilter Disziplin-Kulisse */
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;padding:1.05rem 1.5rem 1rem;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr}
+.hero .kul i{background-position:center 42%;background-size:cover;filter:saturate(1.1);opacity:.62}
+.hero .kul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.hero .kul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.96) 0%,rgba(6,8,12,.72) 30%,rgba(6,8,12,.5) 55%,rgba(6,8,12,.82) 100%),linear-gradient(180deg,rgba(6,8,12,.2) 30%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:1rem}
+.hk .crest{width:5.25rem;height:5.25rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk span.lage{font-size:.97rem;color:var(--leise)} .hk span.lage b{color:var(--creme);font-weight:600}
+.kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
+.kpi{min-width:7.2rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:flex;align-items:center;gap:.4rem;font-size:2rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap;height:2rem}
+.kpi small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.kpi.zone{border-top:2px solid var(--gut)}
+.fm{display:inline-flex;gap:.18rem}
+.fm i{width:.82rem;height:.82rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)} .fm i.x{background:rgba(255,255,255,.1)}
+.kpi .fm i{width:1rem;height:1rem}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.5rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+.cta small{font-size:.82rem;color:var(--leise)}
+
+/* RASTER: fuellt die Resthoehe, nichts scrollt */
+.raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.12fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+#p-tag{grid-column:1/6;grid-row:1} #p-kad{grid-column:1/6;grid-row:2}
+#p-tab{grid-column:6/10;grid-row:1/3}
+#p-ent{grid-column:10/13;grid-row:1} #p-fin{grid-column:10/13;grid-row:2}
+#p-dis{grid-column:1/13;grid-row:3} .ticker{grid-column:1/13;grid-row:4}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a{font-size:.85rem;font-weight:600;color:var(--gold);white-space:nowrap}
+.pk .marke{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:.12rem .5rem;border-radius:.2rem;background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.pk .marke.g{background:rgba(69,176,201,.14);color:var(--gast);border-color:rgba(69,176,201,.5)}
+.pb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* KADER MIT FORM & MORAL */
+.tfk{display:flex;align-items:center;gap:1.1rem;font-size:.88rem;color:var(--leise);white-space:nowrap;flex:none;margin-bottom:.6rem;overflow:hidden}
+.tfk .zz{display:inline-flex;align-items:center;gap:.7rem;padding:.25rem .7rem;border-radius:.4rem;background:var(--flaeche-2);border:1px solid var(--linie)}
+.tfk .zz span{display:inline-flex;align-items:baseline;gap:.25rem} .tfk .zz b{font-size:1.05rem;color:var(--tinte)}
+.pfeil{font-weight:700;letter-spacing:-.12em;font-size:.82em;padding-right:.12em}
+.pfeil.s2,.pfeil.s1{color:var(--gut)} .pfeil.s0{color:var(--stumm);letter-spacing:0} .pfeil.s-1,.pfeil.s-2{color:var(--warn)}
+svg.ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
+.kk{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;flex:1;min-height:0}
+.sk{position:relative;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);background:#111;display:block;min-height:0}
+.sk:hover{border-color:var(--gold)}
+.sk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(4,6,10,.97) 80%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:.5rem;padding:.05rem .6rem .05rem .5rem;background:var(--gold);color:#17120a;font-weight:700;font-size:.88rem;clip-path:polygon(0 0,100% 0,calc(100% - .45rem) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:.5rem;right:.5rem;bottom:.45rem}
+.sk b{display:block;font:400 1.1rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:.78rem;color:var(--leise);white-space:nowrap}
+.sk .ov{display:flex;align-items:center;gap:.22rem;margin-top:.2rem;font-size:.88rem} .sk .ov strong{font-size:1.3rem;line-height:1;color:var(--creme);margin-right:auto}
+.sk .ov .mo{display:inline-flex;align-items:center;gap:.12rem;font-weight:700}
+
+/* KASSE */
+.kas{display:flex;align-items:flex-end;gap:.9rem;flex:none}
+.kas strong{font-size:2.3rem;line-height:.95;color:var(--creme)} .kas small{font-size:.85rem;color:var(--leise);padding-bottom:.15rem}
+.kurve{flex:1;min-height:1.6rem;margin:.35rem 0 .1rem;position:relative}
+.kurve svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.kx{display:flex;justify-content:space-between;font-size:.7rem;color:var(--stumm);letter-spacing:.08em;flex:none;margin-bottom:.3rem}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem;flex:none;white-space:nowrap}
+.zeile span{overflow:hidden;text-overflow:ellipsis} .zeile small{color:var(--leise);font-size:.8rem;margin-left:.35rem}
+.zeile strong{font-size:1.1rem}
+.zeile.next small{display:block;margin:0}
+.zeile.next{align-items:center;margin-top:.25rem;padding:.3rem .55rem;border:1px solid var(--linie-2);border-radius:.4rem;background:var(--flaeche-2)}
+.apr{flex:none;margin-top:.45rem;font-size:.85rem;color:var(--leise)}
+.apr .kopfz{display:flex;justify-content:space-between} .apr b{color:var(--tinte)}
+.apr .bn{position:relative;height:.5rem;background:rgba(255,255,255,.08);margin-top:.25rem;transform:skewX(-14deg)}
+.apr .bn i{display:block;height:100%;background:var(--gut)} .apr .bn u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:var(--acht)} .apr .bn u+u{background:var(--warn)}
+/* ===================== RAHMEN ===================== */
+.demo{padding-left:.9rem;position:relative;z-index:90}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+.demo a{cursor:pointer}
+.app{grid-template-rows:minmax(0,1fr);transition:grid-template-columns .22s ease}
+body.pin .app{grid-template-columns:15rem minmax(0,1fr)}
+body.arena:not(.rahmen) .app{grid-template-columns:0rem minmax(0,1fr)}
+
+/* --- Schiene --- */
+.rail{gap:.12rem;transition:width .16s ease,box-shadow .16s ease,transform .25s ease}
+body.pin .rail{width:15rem;box-shadow:none}
+body.pin .rail .grp,body.pin .rail a span.n,body.pin .rail .wer{opacity:1}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{margin:0;border-color:var(--heim);position:relative;overflow:visible}
+.rail .logo img{border-radius:.5rem}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer,body.navauf .rail .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem}
+.rail a{height:2.55rem;transition:color .12s,background .12s}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04))}
+.rail a.an::before{display:none}
+.rail .marker{position:absolute;left:0;width:.19rem;height:1.5rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7);transition:top .26s cubic-bezier(.3,1.3,.5,1)}
+.rail .zahl{top:.1rem}
+.rail a.pinan{color:var(--gold)}
+body.arena:not(.rahmen) .rail{transform:translateX(-100%);box-shadow:none}
+body.arena:not(.rahmen) .railplatz:hover .rail,body.arena.griffauf .rail{transform:none;width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.7)}
+body.arena:not(.rahmen) .railplatz:hover .rail .grp,body.arena:not(.rahmen) .railplatz:hover .rail a span.n,body.arena:not(.rahmen) .railplatz:hover .rail .wer{opacity:1}
+/* Griff: der einzige Rest des Rahmens im Arena-Vollbild */
+.griff{display:none;position:absolute;left:0;top:50%;width:.95rem;height:5.5rem;margin-top:-2.75rem;border-radius:0 .5rem .5rem 0;background:rgba(8,11,17,.78);border:1px solid var(--linie-2);border-left:0;place-items:center;color:var(--creme);font-size:.8rem}
+.griff u{position:absolute;right:-.3rem;top:-.3rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--warn);display:none}
+body.arena:not(.rahmen) .griff{display:grid}
+body.arena:not(.rahmen) .railplatz{width:.95rem}
+body.arena:not(.rahmen) .railplatz:hover .griff{display:none}
+body.arena.wartet .griff u{display:block}
+
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0;position:relative;transition:grid-template-rows .28s ease}
+body.arena .rechts{grid-template-rows:0rem minmax(0,1fr)}
+
+/* --- Regieband: EINE Zeile fuer Ort, Unterreiter, Seiten-Slot, Saison, Kasse, Suche, Inbox, Weiter --- */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);isolation:isolate;white-space:nowrap;transition:transform .28s ease,opacity .2s}
+body.arena .band{transform:translateY(-100%);opacity:0;pointer-events:none}
+.band .bkul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.band .bkul i{background-position:center 36%;background-size:cover;opacity:.5;transition:background-image .4s}
+.band .bkul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.band .bkul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.band::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.97) 0%,rgba(6,8,12,.8) 28%,rgba(6,8,12,.62) 55%,rgba(6,8,12,.9) 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.ort.neu em,.ort.neu h1{animation:hoch .3s both} .ort.neu h1{animation-delay:.04s}
+@keyframes hoch{from{opacity:0;transform:translateY(.5rem)}to{opacity:1;transform:none}}
+.reiter{display:flex;align-self:stretch;gap:.1rem;flex:none}
+.reiter a{position:relative;display:flex;align-items:flex-end;padding:0 .62rem .85rem;font-size:.9rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--leise)}
+.reiter a:hover{color:var(--tinte)}
+.reiter a.an{color:var(--creme)}
+.reiter a.an::after{content:"";position:absolute;left:.5rem;right:.5rem;bottom:-1px;height:.19rem;background:var(--gold);transform:skewX(-14deg)}
+.slot{flex:1;min-width:0;display:flex;justify-content:center;gap:.45rem;overflow:hidden}
+.slot.neu>*{animation:hoch .3s both} .slot.neu>:nth-child(2){animation-delay:.04s} .slot.neu>:nth-child(3){animation-delay:.08s} .slot.neu>:nth-child(4){animation-delay:.12s}
+.kpi.k{min-width:0;padding:.38rem 1.05rem .42rem 1.1rem}
+.kpi.k .gk{font-size:.64rem;display:block}
+.kpi.k strong{font-size:1.5rem;height:1.6rem}
+.kpi.k strong small{font-weight:500;font-size:.8rem;color:var(--leise)}
+.kpi.k .fm i{width:.82rem;height:.82rem}
+.sl{display:flex;align-items:center;gap:.5rem;padding:.4rem 1.05rem .4rem 1rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%);color:var(--leise)}
+.sl.an{background:linear-gradient(180deg,rgba(240,195,90,.22),rgba(14,19,29,.9));border-top:2px solid var(--gold);color:var(--tinte)}
+.sl u{text-decoration:none;font-weight:700;font-size:.8rem;padding:.1rem .4rem;border:1px solid var(--linie-2);border-radius:.2rem}
+.sl b{display:block;font:400 1.2rem/1 var(--haus);color:inherit}
+.sl small{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.sl strong{font-size:1.5rem;line-height:1;color:var(--creme);margin-left:.5rem}
+.regie{display:flex;align-items:center;gap:.55rem;flex:none}
+.chip{display:flex;flex-direction:column;justify-content:center;gap:.22rem;height:3rem;padding:0 .75rem;border-radius:.5rem;background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.chip:hover,.ikn:hover{border-color:var(--linie-2);background:var(--flaeche-2)}
+.chip .o{display:flex;align-items:baseline;gap:.4rem;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--leise)}
+.chip .o b{font-size:1.12rem;letter-spacing:0;color:var(--creme);font-weight:700;text-transform:none}
+.chip .o span{letter-spacing:0;text-transform:none;font-size:.82rem}
+.tk{display:flex;gap:.14rem}
+.tk i{width:.34rem;height:.5rem;transform:skewX(-14deg);background:rgba(255,255,255,.13);border-radius:1px}
+.tk i.s{background:var(--gut)} .tk i.u{background:var(--acht)} .tk i.n{background:var(--warn)}
+.tk i.j{background:var(--gold);box-shadow:0 0 .4rem var(--gold);height:.7rem;margin-top:-.1rem}
+.ikn{position:relative;width:3rem;height:3rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.2rem;color:var(--leise);background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.ikn kbd{position:absolute;right:.2rem;bottom:.12rem;font:600 .56rem/1 var(--zahl);color:var(--stumm)}
+.ikn .zahl{position:absolute;right:-.3rem;top:-.3rem;min-width:1.05rem;height:1.05rem;border-radius:.55rem;background:var(--warn);color:#fff;font:700 .7rem/1.05rem var(--zahl);text-align:center;padding:0 .2rem}
+.ikn.wack{animation:wack .5s} @keyframes wack{25%{transform:rotate(-14deg)}60%{transform:rotate(10deg)}}
+
+/* --- Taktgeber: Status + Hauptaktion in einem --- */
+.takt{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:.22rem;width:16rem;margin-left:.25rem}
+.tb{position:relative;height:2.6rem;padding:0 1.3rem;display:flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:1.02rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%);overflow:hidden;white-space:nowrap}
+.tb:hover{filter:brightness(1.08)}
+.tb .fuell{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gold);z-index:0}
+.tb>*:not(.fuell){position:relative;z-index:1}
+.ts{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--leise);padding-left:.7rem;overflow:hidden}
+.ts:hover{color:var(--tinte)}
+.ts i{width:.5rem;height:.5rem;border-radius:50%;background:var(--acht);flex:none}
+.ts b{color:var(--tinte);font-weight:600}
+.ts span{overflow:hidden;text-overflow:ellipsis}
+/* gesperrt */
+.takt.zu .tb{background:var(--flaeche-3);color:var(--leise);box-shadow:inset 0 0 0 1px var(--linie-2)}
+.takt.zu .ts i{background:var(--warn)}
+.takt.ruck .tb{animation:ruck .3s} @keyframes ruck{25%{transform:translateX(-.3rem)}75%{transform:translateX(.3rem)}}
+/* Aktion laeuft */
+.takt.laeuft .tb{background:var(--flaeche-3);color:var(--creme);cursor:progress}
+.takt.laeuft .tb .fuell{background:linear-gradient(90deg,rgba(240,195,90,.25),rgba(240,195,90,.6));transition:width .18s linear}
+.takt.laeuft .ts i{background:var(--gold);animation:blink .8s infinite alternate} @keyframes blink{to{opacity:.25}}
+.band .lauf{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden;opacity:0}
+.band .lauf::after{content:"";position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:lauf 1.1s linear infinite}
+@keyframes lauf{from{left:-30%}to{left:100%}}
+body.s-laeuft .band .lauf{opacity:1}
+/* Spieltag bereit */
+.takt.weiter .tb{animation:puls 1.6s ease-in-out infinite}
+.takt.weiter .tb::after{content:"";position:absolute;top:0;bottom:0;width:2.2rem;left:-3rem;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-20deg);animation:glanz 2.4s ease-in-out infinite}
+@keyframes glanz{0%,55%{left:-3rem}100%{left:110%}}
+@keyframes puls{50%{filter:brightness(1.18) drop-shadow(0 0 .5rem rgba(240,195,90,.8))}}
+.takt.weiter .ts i{background:var(--gut)}
+.takt.weiter::before{content:"";position:absolute;inset:-.35rem -.3rem 1rem -.3rem;z-index:-1;background:radial-gradient(closest-side,rgba(240,195,90,.35),transparent);animation:blink 1.6s infinite alternate}
+
+/* --- Aufklapper (Ablauf, Inbox) --- */
+.klapp{position:absolute;z-index:70;top:4.2rem;width:23rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 1.2rem 3rem rgba(0,0,0,.7);display:none;white-space:normal;overflow:hidden}
+.klapp.auf{display:block;animation:hoch .18s both}
+.klapp h3{margin:0;padding:.7rem .9rem .55rem;font:400 1.1rem/1 var(--haus);color:var(--creme);border-bottom:1px solid var(--linie)}
+.klapp h3 small{font:600 .72rem/1 var(--zahl);letter-spacing:.12em;text-transform:uppercase;color:var(--leise);margin-left:.5rem}
+.klapp .ent{max-height:none;min-height:3.2rem;flex:none}
+.klapp .fuss{padding:.5rem .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise)}
+#k-ablauf{right:1rem} #k-inbox{right:18rem}
+.ent.ok .tx{color:var(--leise)}
+
+/* --- Buehne und Seitenwechsel --- */
+main.buehne{display:block;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--grund)}
+.seite{position:absolute;inset:0}
+.seite:not(.an){display:none!important}
+.seite.raus{opacity:0;transform:translateY(-.35rem);transition:opacity .11s ease,transform .11s ease}
+.seite.rein>*{animation:auf .34s cubic-bezier(.2,.8,.3,1) both}
+.seite.rein>:nth-child(2){animation-delay:.03s} .seite.rein>:nth-child(3){animation-delay:.06s} .seite.rein>:nth-child(4){animation-delay:.09s}
+.seite.rein>:nth-child(5){animation-delay:.12s} .seite.rein>:nth-child(6){animation-delay:.15s} .seite.rein>:nth-child(7){animation-delay:.18s}
+@keyframes auf{from{opacity:0;transform:translateY(.9rem)}to{opacity:1;transform:none}}
+/* Sendewisch: nur beim Wechsel in die Arena und zurueck */
+.wisch{position:fixed;inset:0;z-index:200;pointer-events:none;overflow:hidden;display:none}
+.wisch.an{display:block}
+.wisch i{position:absolute;top:-10%;bottom:-10%;width:140%;left:-160%;transform:skewX(-14deg)}
+.wisch i:nth-child(1){background:var(--gold);animation:wisch .72s cubic-bezier(.6,0,.3,1) both}
+.wisch i:nth-child(2){background:#06080c;animation:wisch .72s cubic-bezier(.6,0,.3,1) .07s both}
+.wisch b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:400 4.2rem/1 var(--haus);color:var(--creme);white-space:nowrap;opacity:0;animation:wtext .72s .07s both}
+.wisch b small{display:block;text-align:center;font:700 1rem/1.6 var(--zahl);letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
+@keyframes wisch{0%{left:-160%}45%,55%{left:-20%}100%{left:120%}}
+@keyframes wtext{0%,25%{opacity:0}40%,60%{opacity:1}75%,100%{opacity:0}}
+
+/* --- Meldungen (Bauchbinden unten rechts) --- */
+.meld{position:fixed;z-index:80;right:1rem;bottom:1rem;display:flex;flex-direction:column;gap:.5rem;width:24rem}
+.mb{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.7rem;align-items:center;padding:.65rem .9rem .7rem 1rem;background:rgba(12,16,23,.97);border:1px solid var(--linie-2);border-left:.25rem solid var(--gold);border-radius:.35rem;box-shadow:0 .8rem 2rem rgba(0,0,0,.6);animation:mrein .32s cubic-bezier(.2,.8,.3,1) both;overflow:hidden}
+.mb.w{border-left-color:var(--warn)} .mb.g{border-left-color:var(--gut)}
+.mb .ic{font-size:1.4rem;color:var(--gold)} .mb.w .ic{color:var(--warn)} .mb.g .ic{color:var(--gut)}
+.mb b{display:block;font:400 1.08rem/1.15 var(--haus);color:#fff}
+.mb small{font-size:.86rem;color:var(--leise)}
+.mb a{color:var(--gold);font-weight:600;font-size:.86rem}
+.mb u{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--gold);opacity:.6;animation:ablauf 6s linear both}
+.mb.geht{animation:mraus .25s both}
+@keyframes mrein{from{opacity:0;transform:translateX(2rem)}to{opacity:1;transform:none}}
+@keyframes mraus{to{opacity:0;transform:translateX(2rem)}}
+@keyframes ablauf{from{width:100%}to{width:0}}
+body.arena .meld{display:none}
+
+/* --- Suche (Befehlspalette) --- */
+.schleier{position:fixed;inset:0;z-index:100;background:rgba(2,3,5,.72);display:none;backdrop-filter:blur(3px)}
+.schleier.auf{display:block}
+.pal{position:absolute;left:50%;top:16%;width:38rem;margin-left:-19rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 2rem 5rem rgba(0,0,0,.8);overflow:hidden;animation:hoch .18s both}
+.pal input{width:100%;height:3.4rem;padding:0 1.1rem;background:none;border:0;border-bottom:1px solid var(--linie);color:var(--tinte);font:500 1.25rem var(--zahl);outline:0}
+.pal .gk{display:block;padding:.6rem 1.1rem .2rem}
+.pal a{display:flex;align-items:center;gap:.7rem;padding:.5rem 1.1rem;font-size:1.05rem;color:var(--tinte)}
+.pal a img{width:1.8rem;height:1.8rem;border-radius:.25rem;object-fit:cover}
+.pal a svg{font-size:1.2rem;color:var(--leise);width:1.8rem}
+.pal a small{margin-left:auto;color:var(--stumm);font-size:.82rem}
+.pal a.an,.pal a:hover{background:rgba(240,195,90,.14)}
+.pal .fuss{display:flex;gap:1.2rem;padding:.5rem 1.1rem;border-top:1px solid var(--linie);font-size:.8rem;color:var(--stumm)}
+/* --- Office als Blatt --- */
+.blatt{position:absolute;right:0;top:0;bottom:0;width:30rem;background:var(--flaeche-1);border-left:1px solid var(--linie-2);box-shadow:-2rem 0 4rem rgba(0,0,0,.7);display:flex;flex-direction:column;animation:brein .26s cubic-bezier(.2,.8,.3,1) both}
+@keyframes brein{from{transform:translateX(100%)}to{transform:none}}
+.blatt .pk{height:4.5rem} .blatt .pk h2{font-size:1.6rem}
+.blatt .ents{flex:none} .blatt .ent{min-height:4.2rem;flex:none}
+.blatt p{margin:auto 1rem 1rem;font-size:.86rem;color:var(--stumm)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01s!important;animation-iteration-count:1!important;transition-duration:.01s!important}}
+/* ===================== BEREICH ENTWICKLUNG: TRAINING UND GEBAEUDE (neu, 18.11.) ===================== */
+:root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a;--reha:#9aa7ba;--z0:#62d394;--z1:#e8c34a;--z2:#f08a3c;--z3:#ff5a52}
+.reiter a small{font-size:.6rem;margin-left:.3rem;padding:.02rem .3rem;border-radius:.6rem;background:var(--warn);color:#fff;letter-spacing:0;align-self:flex-end;margin-bottom:.15rem}
+.takt.warn .ts i{background:var(--warn);animation:blink .7s infinite alternate}
+.seite{display:grid;gap:.72rem;padding:.8rem 1rem}
+.pk small{font-size:.86rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk .seg{margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden;flex:none}
+.seg a{padding:.16rem .6rem;font-size:.82rem;font-weight:700;letter-spacing:.04em;color:var(--leise);border-left:1px solid var(--linie)}
+.seg a:first-child{border-left:0}
+.seg a:hover{color:var(--tinte);background:var(--flaeche-3)}
+.seg a.an{background:var(--gold);color:#17120a}
+.seg a.an.l{background:var(--z0)} .seg a.an.h{background:var(--z2)}
+.seg a.wu{box-shadow:inset 0 -2px 0 var(--gast)}
+.mk{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.1rem .42rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap}
+.mk.p{color:var(--gut);border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.1)}
+.mk.n{color:var(--gast);border-color:rgba(69,176,201,.5);background:rgba(69,176,201,.1)}
+.mk.w{color:var(--warn);border-color:rgba(255,96,88,.55);background:rgba(255,96,88,.12)}
+.mk.a{color:var(--acht);border-color:rgba(243,181,74,.5);background:rgba(243,181,74,.1)}
+.mk.g{color:var(--gold);border-color:rgba(240,195,90,.55);background:rgba(240,195,90,.12)}
+.mk.neu{color:#c9a7ff;border-color:rgba(201,167,255,.5);background:rgba(201,167,255,.1)}
+.ax{display:inline-block;width:.55rem;height:.55rem;border-radius:1px;transform:skewX(-14deg);flex:none}
+.ax.a0{background:var(--pow)} .ax.a1{background:var(--spe)} .ax.a2{background:var(--men)} .ax.a3{background:var(--soc)}
+.dk{display:inline-block;min-width:2.3rem;text-align:center;font-weight:700;font-size:.8rem;letter-spacing:.04em;padding:.08rem .3rem;border-radius:.2rem;background:var(--flaeche-3);color:var(--creme)}
+.kn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.3rem;padding:0 1rem;font-weight:700;font-size:.92rem;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--linie-2);border-radius:.3rem;color:var(--creme);white-space:nowrap}
+.kn:hover{border-color:var(--gold);color:#fff}
+.kn.gold{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.kn.rot{background:rgba(255,96,88,.16);border-color:var(--warn);color:#ffd9d6}
+.kn.zu{opacity:.45;cursor:not-allowed}
+.hinw{font-size:.84rem;color:var(--leise);line-height:1.3}
+/* ===================== GEMEINSAME BAUSTEINE DER VIER SEITEN-MOCKUPS (18.11., fehlende Seiten) ===================== */
+:root{--chris:#F2A03D;--franky:#45B0C9;--ramona:#c9a7ff;--ki:#66738a}
+.demo{gap:.6rem}
+.demo .dg{display:inline-flex;gap:.3rem;align-items:center}
+.pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
+.pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
+.pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
+.pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
+.ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.ptr.k{width:1.9rem;height:1.9rem;border-radius:.3rem}
+.ptr.g{width:5.5rem;height:5.5rem;border-radius:.6rem}
+.lg{width:2.2rem;height:2.2rem;border-radius:.35rem;object-fit:cover;border:1px solid var(--linie-2);flex:none}
+.lg.k{width:1.5rem;height:1.5rem;border-radius:.25rem}
+/* Menschen am Tisch: Chris, Franky, Ramona, KI */
+.mn{display:inline-grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;font-weight:700;font-size:.92rem;color:#0b0e14;flex:none;background:var(--ki)}
+.mn.c{background:var(--chris)} .mn.f{background:var(--franky)} .mn.r{background:var(--ramona)} .mn.k{background:#2a3344;color:var(--leise)}
+.mn.g{width:3rem;height:3rem;font-size:1.4rem}
+.mn.s{width:1.3rem;height:1.3rem;font-size:.7rem}
+/* schraeger Balken */
+.bal{position:relative;height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);border-radius:1px;min-width:2rem}
+.bal i{display:block;height:100%;background:var(--gold);border-radius:1px}
+.bal i.g{background:var(--gut)} .bal i.w{background:var(--warn)} .bal i.a{background:var(--acht)} .bal i.b{background:var(--gast)}
+.bal u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}
+.bal s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(90deg,rgba(240,195,90,.5) 0 2px,transparent 2px 5px)}
+/* Kachel mit Zahl */
+.ka{padding:.5rem .7rem .55rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.45rem;min-width:0}
+.ka strong{display:block;font-size:1.6rem;line-height:1.05;color:var(--creme);white-space:nowrap}
+.ka strong small{font-size:.85rem;font-weight:500;color:var(--leise)}
+.ka small{font-size:.82rem;color:var(--leise)}
+.kas3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.kas2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.kas4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem}
+/* Abschnittstitel in einer Karte */
+.ab{display:flex;align-items:center;gap:.5rem;margin:.75rem 0 .4rem;flex:none}
+.ab:first-child{margin-top:0}
+.ab::after{content:"";flex:1;height:1px;background:var(--linie)}
+.ab b{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
+.ab span{font-size:.82rem;color:var(--stumm);white-space:nowrap}
+/* Schalter */
+.sw{position:relative;width:2.9rem;height:1.5rem;border-radius:.2rem;background:var(--flaeche-3);border:1px solid var(--linie-2);flex:none;transform:skewX(-14deg);transition:background .15s}
+.sw::after{content:"";position:absolute;top:.14rem;left:.14rem;width:1.1rem;height:1.1rem;background:var(--leise);border-radius:1px;transition:left .15s,background .15s}
+.sw.an{background:rgba(240,195,90,.3);border-color:var(--gold)} .sw.an::after{left:1.55rem;background:var(--gold)}
+.txt{font-size:.95rem;line-height:1.35;color:var(--leise)} .txt b{color:var(--tinte);font-weight:600}
+.neu-m{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.05rem .35rem;border-radius:.2rem;color:#c9a7ff;border:1px solid rgba(201,167,255,.5);background:rgba(201,167,255,.1);white-space:nowrap;vertical-align:.1em}
+.leer{margin:auto;text-align:center;color:var(--leise);font-size:1rem;max-width:26rem}
+.leer b{display:block;font:400 1.5rem/1.2 var(--haus);color:var(--creme);margin-bottom:.3rem}
+.leer svg{font-size:2.6rem;color:var(--gut);margin-bottom:.4rem}
+
+/* ===================== SCOUTING ===================== */
+:root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a}
+.seite.ue{grid-template-columns:22.5rem minmax(0,1fr) 31.5rem;grid-template-rows:minmax(0,1fr)}
+.seite.rp{grid-template-columns:19rem minmax(0,1fr) 31rem;grid-template-rows:minmax(0,1fr)}
+.nb{display:flex;align-items:center;gap:.6rem;padding:.45rem .8rem;margin-bottom:.6rem;border:1px solid rgba(240,195,90,.55);border-radius:.45rem;background:rgba(240,195,90,.1);font-size:.92rem;color:var(--creme);flex:none}
+.nb svg{font-size:1.2rem;color:var(--gold)}
+.tp{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.3rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.96rem;flex:none}
+.tp:first-of-type{border-top:0} .tp small{display:block;font-size:.82rem;color:var(--leise)} .tp b{font-size:1.15rem;color:var(--creme)}
+.lt{display:grid;grid-template-columns:1.6rem minmax(0,1fr) auto;gap:.55rem;align-items:center;padding:.26rem 0;font-size:.95rem;flex:none}
+.lt i{width:1.6rem;height:1.6rem;border-radius:.3rem;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:.9rem;background:var(--flaeche-3);color:var(--leise);transform:skewX(-8deg)}
+.lt.e i{background:var(--gold);color:#17120a}
+.lt small{color:var(--stumm);font-size:.82rem;white-space:nowrap}
+.lt.e span{color:var(--tinte)} .lt span{color:var(--leise)}
+/* Wunschliste */
+.wz{display:grid;grid-template-columns:1.2rem 1.3rem 2.5rem minmax(0,1.45fr) 5.3rem minmax(0,1.1fr) 2.9rem 3.9rem 4.6rem 2.8rem 4.2rem 3.8rem;gap:.55rem;align-items:center;min-height:3.5rem;max-height:4.5rem;flex:1;padding:0 .6rem;border-radius:.4rem;font-size:.98rem;border:1px solid transparent}
+.wz.kopf{min-height:1.9rem;max-height:1.9rem;flex:none;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
+.wz:not(.kopf):nth-child(even){background:rgba(255,255,255,.025)}
+.wz:not(.kopf):hover{border-color:var(--linie-2)}
+.wz.an{border-color:var(--gold);background:linear-gradient(90deg,rgba(240,195,90,.13),transparent 70%)!important}
+.wz.wa{opacity:.6}
+.wz .r{text-align:right;color:var(--stumm);font-weight:700}
+.wz .zg{display:flex;flex-direction:column;font-size:.8rem;color:var(--stumm);line-height:.9} .wz .zg a:hover{color:var(--gold)}
+.wz .nm b{display:block;font:400 1.1rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .wz .nm small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.wz .in{display:grid;grid-template-columns:minmax(0,1fr) 3rem;white-space:nowrap;gap:.4rem;align-items:center} .wz .in b{text-align:right} .wz .in small{grid-column:1/3;font-size:.76rem;color:var(--leise);margin-top:-.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wz .z{text-align:right;font-weight:600} .wz .z small{display:block;font-weight:500;font-size:.76rem;color:var(--stumm)}
+.wz .sp2{color:var(--leise)}
+.st5{display:inline-flex;gap:.12rem} .st5 i{width:.38rem;height:.8rem;transform:skewX(-14deg);background:rgba(255,255,255,.13);border-radius:1px} .st5 i.a{background:var(--gold)}
+.ring{position:relative;width:2.7rem;height:2.7rem;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:1.05rem;font-weight:700;color:var(--creme);letter-spacing:-.02em}
+.ring.g{width:6.2rem;height:6.2rem} .ring.g b{font-size:2.3rem} .ring.g small{position:absolute;left:0;right:0;bottom:1rem;text-align:center;font-size:.72rem;color:var(--leise)}
+/* Kurzbericht / Report */
+.kopf3{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1rem;align-items:center;padding:.9rem 1rem;border-bottom:1px solid var(--linie);isolation:isolate;overflow:hidden;flex:none}
+.kopf3 .bg{position:absolute;inset:0;z-index:-1;background-size:cover;background-position:center 22%;opacity:.28;-webkit-mask-image:linear-gradient(90deg,transparent 10%,#000 70%);mask-image:linear-gradient(90deg,transparent 10%,#000 70%)}
+.kopf3 h3{margin:.2rem 0 .15rem;font:400 1.8rem/1.05 var(--haus);color:#fff;white-space:nowrap} .kopf3 small{font-size:.9rem;color:var(--leise)}
+.kopf3.gr .ptr.g{width:7rem;height:7rem} .kopf3.gr h3{font-size:2.4rem}
+.spn{display:grid;grid-template-columns:3rem minmax(0,1fr) 5.2rem;gap:.7rem;align-items:center;padding:.3rem 0;flex:none}
+.spn em{font-style:normal;font-weight:700;font-size:.85rem;letter-spacing:.08em}
+.spn .bahn{position:relative;height:.7rem;background:rgba(255,255,255,.07);transform:skewX(-14deg);border-radius:1px}
+.spn .bahn i{position:absolute;top:0;bottom:0;border-radius:1px;opacity:.85}
+.spn .bahn u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:#fff;opacity:.7}
+.spn .bahn u.w{background:var(--heim);opacity:1}
+.spn b{text-align:right;font-size:1.08rem;color:var(--creme);white-space:nowrap}
+.erk{padding:.55rem .75rem;border:1px solid rgba(98,211,148,.45);border-radius:.45rem;background:rgba(98,211,148,.08);font-size:.92rem;color:var(--tinte);flex:none}
+.erk b{color:var(--gut)} .erk .gk{color:var(--gut);display:block;margin-bottom:.15rem}
+.trs{display:flex;flex-wrap:wrap;gap:.3rem;flex:none}
+.trs .mk.q{color:var(--stumm);border-style:dashed}
+.dz{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem;flex:none}
+.dz .d1{padding:.4rem .55rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2)}
+.dz .d1 small{display:block;font-size:.8rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz .d1 b{font-size:1.25rem;color:var(--creme)} .dz .d1 span{font-size:.8rem;margin-left:.3rem}
+.dz .d1.top{border-color:rgba(98,211,148,.5)}
+.akt2{display:flex;gap:.45rem;flex-wrap:wrap;padding:.6rem .9rem;border-top:1px solid var(--linie);flex:none}
+.mini{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.35rem .5rem;border-radius:.4rem;border:1px solid transparent;flex:none}
+.mini:hover{background:var(--flaeche-2)} .mini.an{border-color:var(--gold);background:rgba(240,195,90,.1)}
+.mini>span:not(.ring) b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .mini>span:not(.ring) small{font-size:.8rem;color:var(--leise)}
+.vg{display:grid;grid-template-columns:3rem minmax(0,1fr) 3.2rem 3.6rem;gap:.6rem;align-items:center;padding:.3rem 0;font-size:.95rem;flex:none}
+.vg b{text-align:right;color:var(--tinte)} .vg .dl{text-align:right;font-weight:700}
+.lei{display:grid;grid-template-columns:1.6rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.3rem 0;flex:none;position:relative}
+.lei i{width:1.6rem;height:1.6rem;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;font-weight:700;border:1px solid var(--linie-2);color:var(--stumm);background:var(--flaeche-1);position:relative;z-index:1}
+.lei.e i{background:var(--gut);border-color:var(--gut);color:#06080c} .lei.j i{border-color:var(--gold);color:var(--gold);box-shadow:0 0 .5rem rgba(240,195,90,.5)}
+.lei:not(:last-child)::before{content:"";position:absolute;left:.78rem;top:1.6rem;bottom:-.3rem;width:1px;background:var(--linie-2)}
+.lei b{display:block;font-size:.98rem;color:var(--tinte)} .lei small{font-size:.82rem;color:var(--leise)} .lei span.w{font-size:.82rem;color:var(--stumm);white-space:nowrap}
+.lei:not(.e):not(.j) b{color:var(--leise)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-spieler" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-bau" viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M3 21h18M9 21v-7h6v7"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-karte" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-rank" viewBox="0 0 24 24"><path d="M8 21V9h8v12M2 21v-7h6M16 21v-9h6v9M1 21h22"/></symbol>
+  <symbol id="i-kal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-buero" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/></symbol>
+  <symbol id="i-flagge" viewBox="0 0 24 24"><path d="M5 21V4h13l-3 4 3 4H5"/></symbol>
+  <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-ton" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 9c1.5 1.5 1.5 4.5 0 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-rahmen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/></symbol>
+  <symbol id="i-stern" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-waage" viewBox="0 0 24 24"><path d="M12 4v16M6 20h12M4 8h16M4 8l-2 6h6zM20 8l-2 6h6z"/></symbol>
+  <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-kreuz" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8M4 5v4h4M12 8v5l3 2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18v.5"/></symbol>
+  <symbol id="i-hoch" viewBox="0 0 24 24"><path d="M12 20V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-werk" viewBox="0 0 24 24"><path d="M14 6a4 4 0 005 5l-9 9-4-4 9-9zM5 19l-2 2"/></symbol>
+  <symbol id="i-herz" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
+  <symbol id="i-ziel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></symbol>
+  <symbol id="i-ki" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M12 7V3M9 12v2M15 12v2M2 12v3M22 12v3"/></symbol>
+  <symbol id="i-g0" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-g1" viewBox="0 0 24 24"><path d="M3 18v-6h18v6M3 12V7M7 12V9h5v3M3 20v-2M21 20v-2"/></symbol>
+  <symbol id="i-g2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-g3" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-g4" viewBox="0 0 24 24"><path d="M4 9l2-5h12l2 5M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></symbol>
+  <symbol id="i-g5" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="6"/><ellipse cx="12" cy="12" rx="5" ry="2.5"/></symbol>
+  <symbol id="i-g6" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5zM6 11v5c3 3 9 3 12 0v-5M22 9v6"/></symbol>
+  <symbol id="i-g7" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-rad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-pokal" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 01-10 0zM7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4M12 14v3M8 20h8"/></symbol>
+  <symbol id="i-vertrag" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4v13H6zM14.5 3.5V8H19M9 12h6M9 15.5h4"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M12 6.5l-3.5 3a1.6 1.6 0 002.2 2.3L13 9.5l5 4.5M2.5 7L7 5l5 1.5L17 5l4.5 2M6 13l4 4a1.5 1.5 0 002.1-2.1"/></symbol>
+  <symbol id="i-zeitung" viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2h-1M7 9h7M7 12.5h7M7 16h4"/></symbol>
+  <symbol id="i-auge" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-nebel" viewBox="0 0 24 24"><path d="M4 8h13M7 12h13M4 16h10M17 16h3"/></symbol>
+  <symbol id="i-griff" viewBox="0 0 24 24"><path d="M9 6v.1M15 6v.1M9 12v.1M15 12v.1M9 18v.1M15 18v.1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H5zM8 3v6h8V3M8 21v-7h8v7"/></symbol>
+  <symbol id="i-uhr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-kopie" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></symbol>
+  <symbol id="i-muell" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-krone" viewBox="0 0 24 24"><path d="M3 18l-1-10 6 4 4-7 4 7 6-4-1 10zM3 21h18"/></symbol>
+  <symbol id="i-u" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-o" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+</defs></svg>
+
+<div class="demo" id="demo"></div>
+
+<div class="app">
+  <div class="railplatz">
+    <nav class="rail" id="rail" aria-label="Hauptnavigation">
+      <i class="marker" id="marker"></i>
+      <div class="kopf"><span class="logo" title="Aktives Team wechseln"><img src="../team-logos/V-W.jpg" alt=""></span><span class="wer"><b>Vigilante Wranglers</b><small>4. in Liga 2 · Team wechseln ▾</small></span></div>
+      <div class="grp">Spieltag</div>
+      <a><svg class="i"><use href="#i-home"/></svg><span class="n">Home</span></a>
+      <a><svg class="i"><use href="#i-post"/></svg><span class="zahl" id="r-post">9</span><span class="n">Inbox</span></a>
+      <a><svg class="i"><use href="#i-liste"/></svg><span class="n">Einsatzliste</span></a>
+      <a><svg class="i"><use href="#i-arena"/></svg><span class="n">Arena</span></a>
+      <a><svg class="i"><use href="#i-tab"/></svg><span class="n">Saisonstand</span></a>
+      <div class="grp">Team</div>
+      <a><svg class="i"><use href="#i-team"/></svg><span class="n">Teams</span></a>
+      <a><svg class="i"><use href="#i-spieler"/></svg><span class="n">Spieler</span></a>
+      <a><svg class="i"><use href="#i-train"/></svg><span class="n">Entwicklung</span></a>
+      <div class="grp">Markt</div>
+      <a><svg class="i"><use href="#i-markt"/></svg><span class="n">Transfermarkt</span></a>
+      <a><svg class="i"><use href="#i-scout"/></svg><span class="n">Scouting</span></a>
+      <a><svg class="i"><use href="#i-geld"/></svg><span class="n">Finanzen</span></a>
+      <div class="grp">Welt</div>
+      <a><svg class="i"><use href="#i-rank"/></svg><span class="n">Ranks</span></a>
+      <a><svg class="i"><use href="#i-kal"/></svg><span class="n">Spielplan</span></a>
+      <span class="luecke"></span>
+      <a><svg class="i"><use href="#i-buero"/></svg><span class="n">Office</span></a>
+      <a><svg class="i"><use href="#i-rad"/></svg><span class="n">Einstellungen</span></a>
+      <a><svg class="i"><use href="#i-flagge"/></svg><span class="n">Fehler melden</span></a>
+      <a><svg class="i"><use href="#i-pin"/></svg><span class="n">Schiene anheften</span></a>
+    </nav>
+  </div>
+
+  <div class="rechts">
+    <header class="band" id="band">
+      <div class="bkul"><i style="background-image:url(../sprites/kulissen/i-spy/aztec.jpg)"></i><i style="background-image:url(../sprites/kulissen/i-spy/ruinengarten.jpg)"></i></div>
+      <div class="ort" id="ort"><em id="b-krume"></em><h1 id="b-titel"></h1></div>
+      <nav class="reiter" id="b-reiter"></nav>
+      <div class="slot" id="b-slot"></div>
+      <div class="regie">
+        <a class="chip" title="Spielplan"><span class="o">Saison 1 · Spieltag <b class="t">13</b><span>/ 20</span></span><span class="tk" id="b-tk"></span></a>
+        <a class="chip" title="Finanzen"><span class="o">Kasse</span><span class="o"><b class="t">78,0 C</b></span></a>
+        <a class="ikn" title="Suche"><svg class="i"><use href="#i-scout"/></svg><kbd>⌘K</kbd></a>
+        <a class="ikn" title="Meldungen"><svg class="i"><use href="#i-glocke"/></svg><span class="zahl" id="b-gz">2</span></a>
+        <div class="takt" id="takt">
+          <button class="tb" id="tb" data-tu="takt"><span class="fuell"></span><span id="tbt"></span><svg class="i"><use href="#i-r"/></svg></button>
+          <button class="ts" id="ts"></button>
+        </div>
+      </div>
+      <i class="lauf"></i>
+    </header>
+
+    <main class="buehne" id="buehne">
+      <div class="seite ue" id="s-uebersicht">
+        <section class="pan" id="u-office"></section>
+        <section class="pan" id="u-liste"></section>
+        <section class="pan" id="u-kurz"></section>
+      </div>
+      <div class="seite rp" id="s-report">
+        <section class="pan" id="r-liste"></section>
+        <section class="pan" id="r-bericht"></section>
+        <section class="pan" id="r-rechts"></section>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="meld" id="meld"></div>
+
+<script>
+"use strict";
+/* ---------- Helfer (wie app-rahmen-modern-18-11 / training-modern-18-11) ---------- */
+var q=new URLSearchParams(location.search);
+var $=function(id){return document.getElementById(id)};
+function de(x,nk){return x.toFixed(nk==null?1:nk).replace(".",",")}
+function vz(x,nk){var r=+x.toFixed(nk==null?1:nk);return (r>0?"+":r<0?"−":"±")+de(Math.abs(x),nk)}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function schluessel(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+function port(n){return "../portraits/"+schluessel(n)+".jpg"}
+function logo(k){return "../team-logos/"+k+".jpg"}
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+function pfeil(s){return '<span class="pfeil s'+s+'" title="Form">'+({"2":"▲▲","1":"▲","0":"–","-1":"▼","-2":"▼▼"})[s]+'</span>'}
+function moralFarbe(w){var R=[255,96,88],B=[243,181,74],G=[98,211,148],a=w<50?R:B,b=w<50?B:G,t=w<50?w/50:(w-50)/50;return "rgb("+[0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)}).join(",")+")"}
+function gesicht(w){var m=kl((w-50)/50,-1,1),f=moralFarbe(w),y=15+m*-1.2,c=y+m*4.2;
+  return '<svg class="ges" viewBox="0 0 24 24" aria-label="Moral '+w+'"><title>Moral '+w+'</title><circle cx="12" cy="12" r="10" fill="'+f+'" fill-opacity=".16" stroke="'+f+'" stroke-width="2"/><circle cx="8.6" cy="9.6" r="1.3" fill="'+f+'"/><circle cx="15.4" cy="9.6" r="1.3" fill="'+f+'"/><path d="M7.6 '+y.toFixed(1)+' Q12 '+c.toFixed(1)+' 16.4 '+y.toFixed(1)+'" fill="none" stroke="'+f+'" stroke-width="2" stroke-linecap="round"/></svg>'}
+function mensch(w,kl2){var m={c:"C",f:"F",r:"R",k:"KI"}[w];return '<span class="mn '+w+(kl2?" "+kl2:"")+'" title="'+({c:"Chris",f:"Franky",r:"Ramona",k:"KI"})[w]+'">'+m+'</span>'}
+var HEUTE=13;
+
+/* ---------- Rahmen: Ort, Reiter, Slot, Taktgeber, Demo-Leiste ---------- */
+var RAHMEN={rail:"",krume:"",titel:"",reiter:[],demo:[],notiz:""};
+function rahmenStart(o){RAHMEN=o;
+  var tk="",e=["s","s","n","s","u","s","n","s","s","n","s","s"];for(var i=1;i<=20;i++)tk+='<i class="'+(i<HEUTE?e[i-1]:i===HEUTE?"j":"")+'"></i>';$("b-tk").innerHTML=tk;
+  [].forEach.call(document.querySelectorAll("#rail a"),function(a){var n=a.querySelector(".n");if(n&&n.textContent===o.rail){a.classList.add("an");a.id="railan"}});
+  if(q.get("still")==="1")document.body.classList.add("still");
+  if(q.get("nav")==="auf")document.body.classList.add("navauf");
+}
+function rahmenZeichne(z){
+  $("b-krume").innerHTML=RAHMEN.krume;$("b-titel").textContent=RAHMEN.titel;
+  $("b-reiter").innerHTML=RAHMEN.reiter.map(function(r){return '<a data-s="ans:'+r[0]+'"'+(z.ans===r[0]?' class="an"':'')+'>'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</a>'}).join("");
+  $("demo").innerHTML='<b>Mockup 18.11. · '+RAHMEN.titel+'</b>'+RAHMEN.demo.map(function(g){
+    return '<span>'+g[0]+'</span><span class="dg">'+g[2].map(function(w){return '<a data-s="'+g[1]+':'+w[0]+'"'+(String(z[g[1]])===String(w[0])?' class="an"':'')+'>'+w[1]+'</a>'}).join("")+'</span><i class="tr"></i>'}).join("")+'<span>'+RAHMEN.notiz+'</span>';
+  var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px";
+  [].forEach.call(document.querySelectorAll(".seite"),function(s){s.classList.toggle("an",s.id==="s-"+z.ans)});
+}
+function takt(text,status,art,tu){var t=$("takt");t.className="takt"+(art?" "+art:"");$("tbt").textContent=text;$("ts").innerHTML='<i></i><span>'+status+'</span>';$("tb").dataset.tu=tu||"takt"}
+function slot(teile){$("b-slot").innerHTML=teile.map(function(k){return '<div class="kpi k'+(k[3]?" zone":"")+'"><span class="gk">'+k[0]+'</span><strong class="t"'+(k[2]?' style="color:'+k[2]+'"':'')+'>'+k[1]+'</strong></div>'}).join("")}
+function melde(titel,text,art){var d=document.createElement("div");d.className="mb "+(art||"");d.innerHTML='<span class="ic">'+ic(art==="w"?"warn":"check")+'</span><span><b>'+titel+'</b><small>'+text+'</small></span><u></u>';$("meld").appendChild(d);
+  setTimeout(function(){d.classList.add("geht");setTimeout(function(){d.remove()},260)},4200)}
+function urlSetzen(z,schl){var p=new URLSearchParams(location.search);schl.forEach(function(k){p.set(k[1],z[k[0]])});try{history.replaceState(null,"","?"+p.toString())}catch(e){}}
+/* Klicks: data-s="schluessel:wert" setzt Zustand, data-tu="aktion[:arg]" ruft TU[aktion](arg) */
+function klicks(z,zeichne,TU){document.addEventListener("click",function(ev){
+  var a=ev.target.closest("[data-s],[data-tu]");if(!a)return;
+  if(a.dataset.s){var i=a.dataset.s.indexOf(":"),k=a.dataset.s.slice(0,i),v=a.dataset.s.slice(i+1);z[k]=/^-?\d+$/.test(v)?+v:v;if(TU&&TU["_"+k])TU["_"+k](v);zeichne();return}
+  var t=a.dataset.tu.split(":");if(TU&&TU[t[0]]){TU[t[0]](t[1],a);zeichne()}
+})}
+window.addEventListener("resize",function(){var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px"});
+
+var DK=["TDM","Mini DM","Battlefield","Gewichtheben","Climbing","Staffel","Time Trial","Spurt","Tennis","Hockey","Showcase","Speed-Schach","Takeshi","Breaking","Wettessen","Basketball","Football","Eiskunstlauf","Fechten","I-Spy"];
+var AX=["POW","SPE","MEN","SOC"],AXF=["var(--pow)","var(--spe)","var(--men)","var(--soc)"];
+/* Echte Marktspieler: Name, Klasse, Rasse, CA, PO-Decke, Marktwert, Gehalt, Achsen, 20 Eignungen, Traits +, Traits − | danach erfunden: Intel, Team */
+var ROH=[["Watcher","Rogue","Lizard",67.3,71.3,67.0,13.26,[54,74,70,72],[57,44,67,55,78,82,73,73,90,68,74,72,64,45,53,79,71,72,66,72],["Flexible","Fair"],["Timid","Obsessive"]],["Kelektros","Charger","Dragon",67.9,71.9,65.7,17.18,[74,87,61,46],[63,76,44,62,96,65,81,98,48,94,43,63,62,74,72,47,59,38,93,60],["FiredUp","Healthy"],["Mercenary","Cruel"]],["Ronin","Overseer","Human",58.4,62.4,47.0,12.42,[50,61,59,62],[47,49,62,59,58,63,63,62,57,48,66,58,64,48,48,62,53,68,61,66],["Loyal","Diligent"],["Gambler","Vindictive"]],["Malagor","Templar","Demon",69.5,73.5,71.0,17.81,[82,76,72,46],[67,94,53,59,88,47,67,95,48,92,40,73,74,96,93,45,64,28,81,71],["Disciplined"],["Cruel","Vindictive"]],["Kaijo Murane","Rogue","Aqua",62.0,66.0,57.7,13.67,[57,89,61,45],[44,66,43,47,89,64,100,94,64,69,41,71,57,58,52,53,45,44,99,60],["Flexible"],["Cruel","Timid"]],["Darkblade","Rogue","Voidborn",60.3,64.3,54.0,13.58,[56,84,56,49],[45,61,44,45,75,64,91,92,59,72,43,60,49,56,46,58,54,44,98,64],[],["ColdBlooded","Vindictive"]],["D'Artagnon","Hero","Human",58.8,62.8,50.2,11.82,[58,45,56,76],[71,44,82,70,48,56,39,44,55,56,88,47,61,48,55,67,75,67,40,63],["Eloquent","Sexy"],["Obsessive"]],["Umbrafond","Berserker","Plant",58.3,62.3,48.0,10.58,[71,65,48,45],[63,73,43,60,73,47,49,84,41,85,41,44,48,71,62,42,63,34,74,46],["Healthy","Loyal"],["Timid","Lazy"]],["Steel Sentinel","Hero","Construct",62.2,66.2,54.6,13.72,[72,47,54,68],[83,58,76,78,61,56,26,49,44,73,67,43,65,67,72,50,95,51,41,48],["Loyal","Fair"],["Mercenary"]]];
+var INTEL=[100,62,38,71,24,12,46,0,0],TEAM=["Free Agent","Riptide Rivers","Free Agent","Cold Steel","Free Agent","Pirate Crew","Royal Court","Free Agent","The Giants"],NEU=[0,1,1,0,0,0,0,0,0];
+var W=ROH.map(function(r,i){return {n:r[0],kl:r[1],ra:r[2],ca:r[3],po:r[4],mw:r[5],geh:r[6],ax:r[7],d:r[8],tp:r[9],tn:r[10],intel:INTEL[i],team:TEAM[i],neu:NEU[i],s:schluessel(r[0])}});
+/* Wranglers (erfunden): Schnitt der sechs Besten je Achse, bester Wert je Disziplin */
+var T6=[55,52,56,61],TB=[58,55,66,60,62,64,57,60,70,66,74,63,61,52,56,65,62,68,57,66];
+var OFFICE={st:2,slots:10,tempo:10,passiv:1,fokus:20,aktivMax:4};
+var Z={ans:q.get("ansicht")==="report"?"report":"uebersicht",nebel:q.get("nebel")==="aus"?"aus":"an",sel:0,fok:1};
+(function(){var s=q.get("spieler");W.forEach(function(p,i){if(p.s===s)Z.sel=i})})();
+function nebelAus(){return Z.nebel==="aus"}
+function voll(p){return nebelAus()||p.intel>=100}
+function stufe(p){return nebelAus()?5:kl(OFFICE.st+Math.floor(p.intel/25),0,5)}
+function breite(p,f){return voll(p)?0:Math.max(1,Math.round((1-p.intel/100)*12*(f||1)))}
+function saat(p,k){var h=0,t=p.n+k;for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%997;return .25+(h/997)*.5}
+function spanne(p,v,k,f){var b=breite(p,f);if(!b)return [v,v];var lo=Math.round(v-b*2*saat(p,k));return [Math.max(1,lo),Math.min(100,lo+b*2)]}
+function sp(p,v,k,nk,f){var s=spanne(p,v,k,f);return s[0]===s[1]?de(v,nk==null?0:nk):s[0]+"–"+s[1]}
+function status(p,i){if(i===Z.fok&&!voll(p))return ["Fokus","g"];if(voll(p))return ["Kaufbereit","p"];var akt=W.filter(function(x,j){return j<=i&&!voll(x)}).length;return akt<=OFFICE.aktivMax?["Aktiv","n"]:["Wartet",""]}
+function gewinn(p,i){var s=status(p,i)[0];return s==="Fokus"?OFFICE.fokus:s==="Aktiv"?OFFICE.tempo:0}
+function eta(p,i){var g=gewinn(p,i);return voll(p)?"fertig":g?Math.ceil((100-p.intel)/g)+" ST":"—"}
+function note(p){var n=kl(Math.round(6-(p.ca-28)/8),1,6);if(voll(p))return String(n);if(p.intel<20)return "?";if(p.intel<55)return n+"–"+Math.min(6,n+1);return "≈"+n}
+function ton(p){var n=kl(Math.round(6-(p.ca-28)/8),1,6);return p.intel<20&&!nebelAus()?"var(--stumm)":n<=1?"#5b9bff":n<=2?"var(--gut)":n<=3?"var(--acht)":"var(--warn)"}
+function ring(p,g){var pr=nebelAus()?100:p.intel,u=2*Math.PI*16;return '<span class="ring'+(g?" g":"")+'" title="Scout-Note, Ring = Scouting-Fortschritt"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="'+(g?3.4:4)+'"/><circle cx="20" cy="20" r="16" fill="none" stroke="'+ton(p)+'" stroke-width="'+(g?3.4:4)+'" stroke-dasharray="'+(u*pr/100).toFixed(1)+' '+u.toFixed(1)+'"/></svg><b>'+note(p)+'</b>'+(g?'<small>'+pr+' %</small>':'')+'</span>'}
+function impact(p){var s=0;p.ax.forEach(function(a,i){s+=Math.max(0,a-T6[i])/6});return s/4}
+function st5(n){var h="";for(var i=1;i<=5;i++)h+='<i'+(i<=n?' class="a"':'')+'></i>';return '<span class="st5" title="Erkenntnisstufe '+n+' von 5">'+h+'</span>'}
+var LEITER=[["Gesichtet","nur Klasse, Rasse, Marktwert grob"],["Beobachtet","Achsen als breite Spanne"],["Analysiert","Top-Disziplinen sichtbar, erste Traits"],["Vertieft","Spannen halbiert, Gehaltsforderung"],["Durchleuchtet","Potenzial-Decke eng, alle Stärken"],["Vollständig","alle Werte exakt, alle Traits"]];
+function nebelBand(){return nebelAus()?'<div class="nb">'+ic("nebel")+'<span><b>Scouting-Nebel ist für diesen Spielstand aus.</b> Alle Werte sind exakt, Slots und Tempo haben keine Wirkung. Umschalten: Einstellungen → Spielregeln.</span></div>':''}
+function zeichneOffice(){var bel=W.filter(function(p){return !voll(p)}).length;
+  $("u-office").innerHTML='<div class="pk"><h2>Scouting Office</h2><span class="sp"></span><span class="mk g">Stufe '+OFFICE.st+' von 5</span></div><div class="pb sc">'+
+   '<div class="kas3"><div class="ka"><small>Slots</small><strong class="t">'+bel+' <small>/ '+OFFICE.slots+'</small></strong><small>belegt</small></div><div class="ka"><small>Tempo</small><strong class="t">+'+OFFICE.tempo+'</strong><small>Intel je Spieltag</small></div><div class="ka"><small>Passiv</small><strong class="t">'+OFFICE.passiv+'</strong><small>läuft nebenher</small></div></div>'+
+   '<div class="ab"><b>Tempo je Spieltag</b></div>'+
+   '<div class="tp"><span>Fokus-Ziel<small>ein Spieler, den du auswählst</small></span><b class="t plus">+'+OFFICE.fokus+'</b></div>'+
+   '<div class="tp"><span>Wunschliste<small>die obersten '+OFFICE.aktivMax+' nicht fertigen Einträge</small></span><b class="t">+'+OFFICE.tempo+'</b></div>'+
+   '<div class="tp"><span>Passiv<small>'+OFFICE.passiv+' Platz, das Office wählt selbst</small></span><b class="t">+'+(OFFICE.tempo-2)+'</b></div>'+
+   '<div class="tp"><span>Von selbst<small>jeder Spieler wird mit der Zeit klarer</small></span><b class="t null">langsam</b></div>'+
+   '<div class="ab"><b>Nächste Stufe</b></div><div class="tp"><span>Scouting Office Stufe 3<small>13 Slots · +12 je Spieltag · 2 passiv</small></span><b class="t">20,0 C</b></div><a class="kn" style="margin-top:.4rem;align-self:flex-start">Gebäude öffnen '+ic("r")+'</a>'+
+   '<div class="ab"><b>Erkenntnisleiter</b><span>Office-Stufe + Intel / 25</span></div>'+LEITER.map(function(l,i){return '<div class="lt'+(i<=OFFICE.st?" e":"")+'"><i>'+i+'</i><span>'+l[0]+'</span><small>'+l[1]+'</small></div>'}).join("")+
+   '<p class="hinw" style="margin-top:.5rem">Mit Office-Stufe '+OFFICE.st+' startet jeder Spieler schon auf Stufe '+OFFICE.st+'. Eigene Spieler sind immer vollständig bekannt.</p></div>'}
+function zeichneListe(){var kb=W.filter(voll).length;
+  $("u-liste").innerHTML='<div class="pk"><h2>Wunschliste</h2><small>Reihenfolge = Priorität · ziehen oder Pfeile</small><span class="sp"></span><span class="zz">'+kb+' kaufbereit</span><a>Transfermarkt öffnen ›</a></div><div class="pb">'+nebelBand()+
+   '<div class="wz kopf"><span class="r">#</span><span></span><span></span><span>Spieler</span><span>Status</span><span>Intel</span><span>Stufe</span><span style="text-align:right">CA</span><span style="text-align:right">PO-Decke</span><span>Note</span><span style="text-align:right">Fee</span><span style="text-align:right">Top-6</span></div>'+
+   W.map(function(p,i){var s=status(p,i),g=gewinn(p,i),im=impact(p);
+    return '<a class="wz'+(Z.sel===i?" an":"")+(s[0]==="Wartet"?" wa":"")+'" data-s="sel:'+i+'"><span class="r t">'+(i+1)+'</span><span class="zg"><span data-tu="hoch:'+i+'" title="Nach oben">'+ic("o")+'</span><span data-tu="runter:'+i+'" title="Nach unten">'+ic("u")+'</span></span><img class="ptr" src="'+port(p.n)+'" alt="">'+
+     '<span class="nm"><b>'+p.n+(p.neu&&!nebelAus()?' <span class="mk p">neu</span>':'')+'</b><small>'+p.kl+' · '+p.ra+' · '+p.team+'</small></span><span><span class="mk '+s[1]+'">'+(s[0]==="Fokus"?ic("ziel")+" ":"")+s[0]+'</span></span>'+
+     '<span class="in"><span class="bal"><i class="'+(voll(p)?"g":s[0]==="Wartet"?"":"b")+'" style="width:'+(nebelAus()?100:p.intel)+'%'+(s[0]==="Wartet"?";background:var(--stumm)":"")+'"></i>'+(g&&!nebelAus()?'<s style="left:'+p.intel+'%;width:'+Math.min(g,100-p.intel)+'%"></s>':'')+'</span><b class="t">'+(nebelAus()?"—":p.intel+" %")+'</b>'+(nebelAus()?'':'<small>'+(voll(p)?"vollständig":g?"+"+g+" je ST · noch "+eta(p,i):"wartet auf Slot")+'</small>')+'</span>'+
+     st5(stufe(p))+'<span class="z t'+(voll(p)?"":" sp2")+'">'+sp(p,p.ca,"ca",1)+'</span><span class="z t'+(voll(p)?"":" sp2")+'">'+sp(p,p.po,"po",1,1.3)+'</span>'+ring(p)+
+     '<span class="z t">'+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</span><span class="z t '+(im>.4?"plus":"null")+'">'+(p.intel<20&&!nebelAus()?'<small>Report laden</small>':(voll(p)?"":"≈")+vz(im))+'</span></a>'}).join("")+
+   '<p class="hinw" style="flex:none;margin-top:.4rem">Graue Zahlen sind Spannen und werden mit jedem Spieltag enger. Top-6: Veränderung im Schnitt deiner sechs Besten je Achse, wenn du kaufst.</p></div>'}
+function achsen(p,vgl){return p.ax.map(function(a,i){var s=spanne(p,a,"ax"+i);return '<div class="spn"><em style="color:'+AXF[i]+'">'+AX[i]+'</em><div class="bahn"><i style="left:'+s[0]+'%;width:'+Math.max(1.2,s[1]-s[0])+'%;background:'+AXF[i]+'"></i>'+(vgl?'<u class="w" style="left:'+T6[i]+'%" title="Schnitt deiner Top 6: '+T6[i]+'"></u>':'')+'</div><b class="t">'+sp(p,a,"ax"+i)+'</b></div>'}).join("")}
+function traits(p){var n=p.tp.length+p.tn.length,zeig=voll(p)?n:Math.min(n,Math.floor(stufe(p)*n/5)),al=p.tp.map(function(t){return [t,"p"]}).concat(p.tn.map(function(t){return [t,"w"]}));
+  return '<div class="trs">'+al.map(function(t,i){return i<zeig?'<span class="mk '+t[1]+'">'+t[0]+'</span>':'<span class="mk q">? verdeckt</span>'}).join("")+(n?"":'<span class="hinw">Keine Traits</span>')+'</div>'}
+function erkenntnis(p){return p.neu&&!nebelAus()?'<div class="erk"><span class="gk">Neue Erkenntnis seit letztem Blick</span>Stufe <b>'+(stufe(p)-1)+' → '+stufe(p)+' ('+LEITER[stufe(p)][0]+')</b> · PO-Spanne jetzt <b>'+sp(p,p.po,"po",1,1.3)+'</b> · neuer Trait <b>'+(p.tp[0]||p.tn[0])+'</b></div>':''}
+function urteil(p){var im=impact(p),best=p.d.map(function(v,i){return [v-TB[i],i]}).sort(function(a,b){return b[0]-a[0]})[0];
+  return (p.intel<20&&!nebelAus()?"Noch zu wenig gesehen für ein Urteil. ":im>.8?"Hebt deine erste Reihe sofort. ":im>.3?"Verstärkung auf einzelnen Achsen. ":"Breite, keine Verstärkung der ersten Reihe. ")+(stufe(p)>=2?"Stärkster Hebel: <b>"+DK[best[1]]+"</b> ("+(voll(p)?"+"+best[0]:"etwa +"+Math.round(best[0]/5)*5)+" gegenüber deinem Besten).":"")}
+function zeichneKurz(){var p=W[Z.sel],i=Z.sel,s=status(p,i);
+  $("u-kurz").innerHTML='<div class="kopf3"><i class="bg" style="background-image:url('+port(p.n)+')"></i><img class="ptr g" src="'+port(p.n)+'" alt=""><div><span class="mk '+s[1]+'">'+s[0]+'</span> <span class="mk">'+LEITER[stufe(p)][0]+'</span><h3>'+p.n+'</h3><small>'+p.kl+' · '+p.ra+' · '+p.team+'</small></div>'+ring(p,1)+'</div><div class="pb sc">'+
+   erkenntnis(p)+'<div class="ab"><b>Fähigkeiten</b><span>oranger Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+
+   '<div class="kas3" style="margin-top:.5rem"><div class="ka"><small>CA</small><strong class="t">'+sp(p,p.ca,"ca",1)+'</strong><small>Können heute</small></div><div class="ka"><small>PO-Decke</small><strong class="t">'+sp(p,p.po,"po",1,1.3)+'</strong><small>Potenzial</small></div><div class="ka"><small>Fee</small><strong class="t">'+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</strong><small>Gehalt '+(stufe(p)>=3?sp(p,p.geh,"geh",1,.25)+" C":"unbekannt")+'</small></div></div>'+
+   '<div class="ab"><b>Traits</b></div>'+traits(p)+'<div class="ab"><b>Urteil des Scouts</b></div><p class="txt" style="margin:0">'+urteil(p)+'</p>'+
+   '<p class="hinw" style="margin-top:.6rem">'+(voll(p)?"Vollständig bekannt. Der Slot ist frei für den nächsten Eintrag.":"Fertig in "+eta(p,i)+(s[0]==="Fokus"?" (Fokus).":s[0]==="Aktiv"?". Als Fokus doppelt so schnell.":". Rückt nach, sobald ein Slot frei wird."))+'</p></div>'+
+   '<div class="akt2"><a class="kn gold" data-s="ans:report">Scouting Report '+ic("r")+'</a>'+(voll(p)?'<a class="kn">Zum Transfermarkt</a>':i===Z.fok?'':'<a class="kn" data-tu="fokus:'+i+'">'+ic("ziel")+' Fokus setzen</a>')+'<a class="kn" data-tu="weg:'+i+'" style="margin-left:auto">'+ic("x")+' Entfernen</a></div>'}
+function zeichneReport(){var p=W[Z.sel],i=Z.sel,s=status(p,i),st=stufe(p);
+  $("r-liste").innerHTML='<div class="pk"><h2>Wunschliste</h2><span class="sp"></span><a data-s="ans:uebersicht">Übersicht ›</a></div><div class="pb sc eng">'+W.map(function(x,j){return '<a class="mini'+(j===Z.sel?" an":"")+'" data-s="sel:'+j+'"><img class="ptr" src="'+port(x.n)+'" alt=""><span><b>'+x.n+'</b><small>'+status(x,j)[0]+' · '+(nebelAus()?"exakt":x.intel+" %")+'</small></span>'+ring(x)+'</a>'}).join("")+'</div>';
+  var top=p.d.map(function(v,k){return [v,k]}).sort(function(a,b){return b[0]-a[0]}).slice(0,8);
+  $("r-bericht").innerHTML='<div class="kopf3 gr"><i class="bg" style="background-image:url('+port(p.n)+')"></i><img class="ptr g" src="'+port(p.n)+'" alt=""><div><span class="mk '+s[1]+'">'+s[0]+'</span> <span class="mk">Stufe '+st+' · '+LEITER[st][0]+'</span>'+(nebelAus()?' <span class="mk g">Nebel aus (Test)</span>':'')+'<h3>'+p.n+'</h3><small>'+p.kl+' · '+p.ra+' · '+p.team+' · Marktwert '+(voll(p)?de(p.mw):"≈"+Math.round(p.mw/5)*5)+' C</small></div>'+ring(p,1)+'</div><div class="pb sc">'+nebelBand()+erkenntnis(p)+
+   '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1.4rem;flex:none"><div><div class="ab"><b>Fähigkeiten</b><span>oranger Strich: Schnitt deiner Top 6</span></div>'+achsen(p,1)+'</div>'+
+   '<div><div class="ab"><b>Können und Potenzial</b></div><div class="kas2"><div class="ka"><small>CA · Können heute</small><strong class="t">'+sp(p,p.ca,"ca",1)+'</strong><small>'+(voll(p)?"exakt":"Spanne ±"+breite(p))+'</small></div><div class="ka"><small>PO-Decke</small><strong class="t">'+sp(p,p.po,"po",1,1.3)+'</strong><small>'+(p.po-p.ca>3.5?"Luft nach oben":"nahe an der Decke")+'</small></div></div>'+
+   '<div class="ab"><b>Markt</b></div><div class="kas2"><div class="ka"><small>Marktwert</small><strong class="t">'+(voll(p)?de(p.mw):sp(p,p.mw,"mw",0,.8))+' C</strong><small>'+(p.team==="Free Agent"?"ablösefrei, Handgeld":"Ablöse an "+p.team)+'</small></div><div class="ka"><small>Gehaltsforderung</small><strong class="t">'+(st>=3?sp(p,p.geh,"geh",1,.25)+" C":"?")+'</strong><small>'+(st>=3?"je Saison":"ab Stufe 3 (Vertieft)")+'</small></div></div></div></div>'+
+   '<div class="ab"><b>Disziplinen</b><span>'+(st>=2?"die acht stärksten · Zahl daneben: Abstand zu deinem Besten":"ab Stufe 2 (Analysiert)")+'</span></div>'+
+   (st>=2?'<div class="dz">'+top.map(function(t){var dl=t[0]-TB[t[1]];return '<div class="d1'+(dl>0?" top":"")+'"><small>'+DK[t[1]]+'</small><b class="t">'+sp(p,t[0],"d"+t[1])+'</b><span class="t '+(dl>0?"plus":"null")+'">'+(dl>0?"+":"−")+Math.abs(voll(p)?dl:Math.round(dl/5)*5)+'</span></div>'}).join("")+'</div>':'<p class="hinw">Noch nicht bekannt.</p>')+
+   '<div class="ab"><b>Traits</b><span>'+(voll(p)?"alle bekannt":"verdeckte werden mit höherer Stufe sichtbar")+'</span></div>'+traits(p)+
+   '<div class="ab"><b>Urteil des Scouts</b></div><p class="txt" style="margin:0">'+urteil(p)+'</p></div>'+
+   '<div class="akt2">'+(voll(p)?'<a class="kn gold">Zum Transfermarkt: Angebot machen '+ic("r")+'</a>':i===Z.fok?'<span class="mk g" style="align-self:center">'+ic("ziel")+' Fokus · fertig in '+eta(p,i)+'</span>':'<a class="kn gold" data-tu="fokus:'+i+'">'+ic("ziel")+' Fokus setzen</a>')+'<a class="kn">Spielerprofil</a><a class="kn">Vergleichen</a><a class="kn" data-tu="weg:'+i+'" style="margin-left:auto">'+ic("x")+' Entfernen</a></div>';
+  var im=impact(p);
+  $("r-rechts").innerHTML='<div class="pk"><h2>Einordnung im Kader</h2><small>POW / SPE / MEN / SOC</small></div><div class="pb sc">'+
+   '<div class="vg" style="font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:700"><span>Achse</span><span>deine Top 6 → mit ihm</span><span style="text-align:right">jetzt</span><span style="text-align:right">Wirkung</span></div>'+
+   p.ax.map(function(a,k){var d=Math.max(0,a-T6[k])/6;return '<div class="vg"><em style="font-style:normal;font-weight:700;color:'+AXF[k]+'">'+AX[k]+'</em><div class="bal"><i style="width:'+T6[k]+'%;background:'+AXF[k]+';opacity:.55"></i>'+(d>0?'<s style="left:'+T6[k]+'%;width:'+Math.max(1.5,d*3)+'%"></s>':'')+'</div><b class="t">'+T6[k]+'</b><span class="dl t '+(d>.05?"plus":"null")+'">'+(p.intel<20&&!nebelAus()?"?":(voll(p)?"":"≈")+vz(d))+'</span></div>'}).join("")+
+   '<div class="ka" style="margin-top:.5rem"><small>Top-6-Impact (dein Team)</small><strong class="t '+(im>.4?"plus":"")+'">'+(p.intel<20&&!nebelAus()?"?":(voll(p)?"":"≈ ")+vz(im))+'</strong><small>'+(voll(p)?"exakt":"Schätzwert auf Basis des Scouting-Standes")+'</small></div>'+
+   '<div class="ab"><b>Erkenntnisleiter</b><span>dieser Spieler</span></div>'+LEITER.map(function(l,k){var g=gewinn(p,i),noetig=Math.max(0,(k-OFFICE.st)*25-p.intel);
+     return '<div class="lei'+(k<st?" e":k===st?" j":"")+'"><i>'+(k<st?"✓":k)+'</i><span><b>'+l[0]+'</b><small>'+l[1]+'</small></span><span class="w t">'+(k<=st?(k===st?"jetzt":""):nebelAus()?"":g?"in "+Math.ceil(noetig/g)+" ST":"wartet")+'</span></div>'}).join("")+'</div>'}
+function zeichne(){var kb=W.filter(voll).length,bel=W.filter(function(p){return !voll(p)}).length;
+  RAHMEN.reiter=[["uebersicht","Übersicht",W.filter(function(p){return p.neu}).length&&!nebelAus()?String(W.filter(function(p){return p.neu}).length):""],["report","Scouting Report"]];
+  rahmenZeichne(Z);
+  slot([["Slots",bel+' <small>/ '+OFFICE.slots+'</small>',null],["Kaufbereit",kb,kb?"var(--gut)":null,kb>0],["Fokus",Z.fok!=null&&W[Z.fok]&&!voll(W[Z.fok])?W[Z.fok].n:"—",null],["Nebel",nebelAus()?"aus":"an",nebelAus()?"var(--gold)":null]]);
+  takt("Weiter: Einsatzliste","Scouting läuft von selbst · <b>+"+OFFICE.tempo+" Intel</b> beim Spieltagswechsel","");
+  if(Z.ans==="report")zeichneReport();else{zeichneOffice();zeichneListe();zeichneKurz()}
+  urlSetzen(Z,[["ans","ansicht"],["nebel","nebel"]])}
+function tausch(i,j){if(j<0||j>=W.length)return;var t=W[i];W[i]=W[j];W[j]=t;if(Z.fok===i)Z.fok=j;else if(Z.fok===j)Z.fok=i;Z.sel=j}
+var TU={hoch:function(i){tausch(+i,+i-1)},runter:function(i){tausch(+i,+i+1)},
+  fokus:function(i){Z.fok=+i;melde("Fokus: "+W[+i].n,"+"+OFFICE.fokus+" Intel je Spieltag, fertig in "+eta(W[+i],+i),"g")},
+  weg:function(i){var p=W.splice(+i,1)[0];if(Z.fok===+i)Z.fok=null;else if(Z.fok>+i)Z.fok--;Z.sel=Math.min(Z.sel,W.length-1);melde(p.n+" entfernt","Der Slot geht an den nächsten wartenden Eintrag. Der Scouting-Stand bleibt erhalten.")},
+  takt:function(){melde("Weiter","Im Mockup endet der Weg hier.")}};
+rahmenStart({rail:"Scouting",krume:"Markt <span>· Vigilante Wranglers</span>",titel:"Scouting",reiter:[],
+  demo:[["Ansicht","ans",[["uebersicht","Übersicht"],["report","Scouting Report"]]],["Scouting-Nebel","nebel",[["an","an"],["aus","aus (Spielstand-Schalter)"]]]],
+  notiz:"Die graue Leiste gehört nicht zum UI. Spieler, Office-Stufen, Tempo, Stufennamen, Status wie im Spiel · Intel-Stände und Spannenbreiten erfunden."});
+klicks(Z,zeichne,TU);zeichne();
+</script>
+</body>
+</html>
