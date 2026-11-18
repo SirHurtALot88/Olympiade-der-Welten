@@ -21,7 +21,7 @@ const globalsPath = path.join(root, "app/globals.css");
 // Neuer Look: the *Client.tsx surfaces are thin data/logic wrappers that render
 // their *NewLook.tsx sibling (the actual UI/markup). Contract assertions read the
 // wrapper + NewLook concatenated so a token is found wherever it now lives.
-const homeV2NewLookPath = path.join(root, "app/foundation/home-v2/HomeV2NewLook.tsx");
+const homeV2NewLookPath = path.join(root, "app/foundation/home-v2/HomeModern.tsx");
 const facilitiesOverviewV2NewLookPath = path.join(
   root,
   "app/foundation/facilities-overview-v2/FacilitiesOverviewV2NewLook.tsx",
@@ -64,34 +64,22 @@ describe("foundation home v2 ui contract", () => {
     expect(hostText).toContain("onOpenOffice");
   });
 
-  it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
+  it("the new start page (HomeModern, Mockup 18.11.) shows table, matchday card, decisions, squad, cash and disciplines", async () => {
     const fileText = await readHomeV2Source();
 
-    expect(fileText).toContain("Top-Kader · Deine besten 6");
-    expect(fileText).toContain("HOME_V2_TOP_PLAYER_COUNT");
-    expect(fileText).toContain("nl-home-portrait-grid");
-    expect(fileText).toContain("nl-home-hero-kpis");
-    expect(fileText).toContain("nl-home-warning-row");
-    expect(fileText).not.toContain("home-v2-quick-nav");
+    for (const testId of ["hm-hero", "hm-spieltag", "hm-tabelle", "hm-entscheidungen", "hm-kader", "hm-kasse", "hm-disziplinen", "hm-band"]) {
+      expect(fileText).toContain(`data-testid="${testId}"`);
+    }
+    expect(fileText).toContain("HomeModern");
     expect(fileText).toContain("onContinue");
     expect(fileText).toContain("onOpenBoardObjectives");
-    expect(fileText).toContain("nl-home-board-card");
-    expect(fileText).toContain("nl-home-development-card");
+    expect(fileText).not.toContain("home-v2-quick-nav");
     expect(fileText).not.toContain("Manager Overview V2");
     expect(fileText).not.toContain("HQ öffnen");
-    // S1: „Heute wichtig" ist EINE Handlungszeile mit echtem CTA-Button statt
-    // drei Karten — die Karten 2/3 wiederholten Hero-Rang und Aufgaben-Zähler.
-    expect(fileText).toContain("Heute wichtig");
-    expect(fileText).toContain("nl-home-next-band");
-    expect(fileText).toContain("nl-home-next-band-cta");
-    expect(fileText).toContain("Gebäude");
-    expect(fileText).toContain("Entscheidungen");
-    expect(fileText).toContain('data-testid="foundation-home-v2"');
   });
 
   it("shows core axis stats and absolute CA/PO range on top player cards", async () => {
-    const [homeText, typesText, hostText, scopeText, overviewDerivationsText] = await Promise.all([
-      readHomeV2Source(),
+    const [typesText, hostText, scopeText, overviewDerivationsText] = await Promise.all([
       fs.readFile(
         path.join(process.cwd(), "app/foundation/home-v2/home-v2-types.ts"),
         "utf8",
@@ -101,12 +89,6 @@ describe("foundation home v2 ui contract", () => {
       fs.readFile(path.join(process.cwd(), "lib/foundation/tabs/use-home-v2-overview-derivations.ts"), "utf8"),
     ]);
 
-    expect(homeText).toContain("FoundationPlayerPortraitCard");
-    expect(homeText).toContain("leagueHeatPools");
-    expect(homeText).toContain("is-rank-gold");
-    expect(homeText).toContain("is-rank-silver");
-    expect(homeText).toContain("is-rank-bronze");
-    expect(homeText).not.toContain("VeloStarRating");
     expect(hostText).toContain("leagueHeatPools: leaguePlayerHeatPools");
     expect(scopeText).toContain('activeView !== "homeV2"');
     expect(typesText).toContain("leagueHeatPools");
@@ -212,18 +194,13 @@ describe("foundation ui v2 roadmap contract", () => {
   });
 
   it("exposes sprint N urgency sort, inbox checkoffs, compact save menu, and quieter mobile nav", async () => {
-    const [homeText, shellText, overviewDerivationsText, auditText, cssText, crossTabFlowText] = await Promise.all([
-      readHomeV2Source(),
+    const [shellText, overviewDerivationsText, auditText, cssText, crossTabFlowText] = await Promise.all([
       fs.readFile(shellRouterBodyPath, "utf8"),
       fs.readFile(path.join(root, "lib/foundation/tabs/use-home-v2-overview-derivations.ts"), "utf8"),
       fs.readFile(path.join(root, "scripts/tmp-ux-audit-play.ts"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
       fs.readFile(path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-game-flow.ts"), "utf8"),
     ]);
-
-    expect(homeText).toContain("relevantWarnings");
-    expect(homeText).toContain("home-v2-inbox-checkoff");
-    expect(homeText).toContain("onCompleteInboxItem");
 
     expect(overviewDerivationsText).toContain("homeTodayCards");
     expect(overviewDerivationsText).toContain("sortTodayCardsByUrgency");

@@ -544,6 +544,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2TeamStrengthRankByTeamId,
   seasonV2TeamStrengthValueByTeamId,
   seasonV2Verlauf,
+  homeStartseiteModern,
   seasonV2Matchwinner,
   seasonV2TopPlayers,
   selectedBoardConfidence,
@@ -1899,6 +1900,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               inboxOpenCount: homeOpenTaskCount,
               inboxCriticalCount: activeTeamCriticalInboxItems.length,
               todayCards: homeTodayCards,
+              startseite: homeStartseiteModern,
               // S1 (Mockup homeV2): Kapitän-Hinweis im Board-Block — dieselbe Quelle
               // wie die Kapitänwahl im Office (Kandidatenliste), keine zweite Rechnung.
               captainSummary: (() => {

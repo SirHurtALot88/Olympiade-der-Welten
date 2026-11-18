@@ -138,10 +138,8 @@ describe("foundation player portrait card ui contract", () => {
     const path = await import("node:path");
     const root = process.cwd();
 
-    const [cardText, homeText, cssText, presetsPath] = await Promise.all([
+    const [cardText, cssText, presetsPath] = await Promise.all([
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitCard.tsx"), "utf8"),
-      // HomeV2Client.tsx is now a thin wrapper; the actual markup lives in HomeV2NewLook.tsx.
-      fs.readFile(path.join(root, "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/globals.css"), "utf8"),
       fs.readFile(path.join(root, "lib/foundation/player-portrait-stat-presets.ts"), "utf8"),
     ]);
@@ -158,8 +156,6 @@ describe("foundation player portrait card ui contract", () => {
     expect(cardText).toContain('density = "full"');
     expect(cardText).toContain("is-density-${density}");
     expect(cardText).toContain("interactive = true");
-    expect(homeText).toContain("FoundationPlayerPortraitCard");
-    expect(homeText).toContain("leagueHeatPools");
     expect(presetsPath).toContain("getPoolHeatClass");
     expect(presetsPath).toContain('"training"');
     expect(presetsPath).toContain('"market"');
