@@ -6,7 +6,7 @@
 //
 // AUFRUF: npx tsx scripts/screenshot-spielerprofil-neu.ts [spieltage=7]
 // ===================================================================================
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -121,12 +121,22 @@ async function istErreichbar(timeoutMs: number) {
 }
 
 function starteDevServer(): ChildProcessWithoutNullStreams {
+  const env: NodeJS.ProcessEnv = { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" };
+  // `--use-openssl-ca` in NODE_OPTIONS lässt „Collecting page data“ des Builds scheitern.
+  delete env.NODE_OPTIONS;
+  if (process.env.OLY_SHOT_PROD === "1") {
+    // Produktionsbuild statt Dev-Server (spart Speicher): erst bauen, dann starten. `.next` räumt der Aufrufer danach weg.
+    console.log("[screenshot-profil] baue Produktionsbuild (npm run build) ...");
+    const bau = spawnSync("npm", ["run", "build"], { env, stdio: "inherit" });
+    if (bau.status !== 0) throw new Error(`Build fehlgeschlagen (Status ${bau.status}).`);
+    console.log("[screenshot-profil] starte Produktionsserver (npm run start) ...");
+    const kind = spawn("npm", ["run", "start"], { env, stdio: ["ignore", "pipe", "pipe"], detached: true });
+    kind.stdout.on("data", (stueck) => process.stdout.write(`[srv] ${stueck}`));
+    kind.stderr.on("data", (stueck) => process.stderr.write(`[srv] ${stueck}`));
+    return kind;
+  }
   console.log("[screenshot-profil] starte Dev-Server (OLY_AUTO_EXPORT_SAVES=0, OLY_AUTO_EXPORT_PUSH=0) ...");
-  const kind = spawn("npm", ["run", "dev"], {
-    env: { ...process.env, OLY_APP_SQLITE_PATH: SQLITE_PATH, PORT, OLY_AUTO_EXPORT_SAVES: "0", OLY_AUTO_EXPORT_PUSH: "0" },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+  const kind = spawn("npm", ["run", "dev"], { env, stdio: ["ignore", "pipe", "pipe"], detached: true });
   kind.stdout.on("data", (stueck) => process.stdout.write(`[dev] ${stueck}`));
   kind.stderr.on("data", (stueck) => process.stderr.write(`[dev] ${stueck}`));
   return kind;
@@ -175,6 +185,10 @@ async function main() {
     persistence.saveSingleplayerState(
       ids.saveId, applyGameModeOwnership(stand, { saveMode: "solo_1", chrisTeamIds: [ids.teamId], frankyTeamIds: [] }),
     );
+  }
+  if (process.env.OLY_SHOT_NUR_SAVE === "1") {
+    console.log("[screenshot-profil] Save fertig, Abbruch wie gewünscht (OLY_SHOT_NUR_SAVE=1).");
+    return;
   }
   const gewaehlt = ids;
   console.log(`[screenshot-profil] Star ${gewaehlt.starId}, verletzt ${gewaehlt.verletztId}, fremd ${gewaehlt.fremdId}, ohne Figur ${gewaehlt.ohneFigurId}`);
@@ -231,6 +245,7 @@ async function main() {
       const dsf = b === 2560 ? 1 : 1;
       await aufnehmen(b, h, `01-ueberblick-star-${name}.png`, gewaehlt.starId, "overview", undefined, dsf);
       await aufnehmen(b, h, `02-ueberblick-verletzt-${name}.png`, gewaehlt.verletztId, "overview", undefined, dsf);
+      if (name === "1710x1112") continue;
       await aufnehmen(b, h, `03-disziplinen-${name}.png`, gewaehlt.starId, "disciplines", undefined, dsf);
       await aufnehmen(b, h, `04-leistung-verletzt-${name}.png`, gewaehlt.verletztId, "performance", undefined, dsf);
       await aufnehmen(b, h, `05-vertrag-${name}.png`, gewaehlt.starId, "contract", undefined, dsf);
@@ -240,7 +255,7 @@ async function main() {
       await aufnehmen(b, h, `09-ohne-figur-${name}.png`, gewaehlt.ohneFigurId, "overview", undefined, dsf);
     }
     // Kurzprofil: Liste öffnen (Kader im Team) und auf einen Spieler klicken.
-    const drawer = async (b: number, h: number, name: string, spielerId: string, datei: string) => {
+    const drawer = async (b: number, h: number, name: string, spielerId: string, datei: string, aktion?: "verlaengern" | "verkaufen" | "ganzes-profil") => {
       if (nur && !datei.includes(nur)) return;
       if (process.env.OLY_SHOT_VORHANDENE_UEBERSPRINGEN === "1" && (await fs.stat(path.join(OUTPUT_DIR, datei)).then(() => true, () => false))) return;
       const ctx = await browser!.newContext({ viewport: { width: b, height: h }, deviceScaleFactor: 1 });
@@ -270,12 +285,24 @@ async function main() {
       await page.getByTestId("spielerkurzprofil").waitFor({ state: "visible", timeout: 30_000 }).catch(() => undefined);
       await page.waitForTimeout(1200);
       await page.screenshot({ path: path.join(OUTPUT_DIR, datei) });
+      if (aktion) {
+        const knopf = aktion === "verlaengern" ? page.getByRole("button", { name: /^Verlängern$/ }) : aktion === "verkaufen" ? page.getByRole("button", { name: /^Verkaufen$/ }) : page.getByTestId("spielerkurzprofil-ganzes-profil");
+        await knopf.first().click({ timeout: 20_000 }).catch((e) => console.log(`[screenshot-profil] Klick ${aktion} fehlgeschlagen: ${String(e).slice(0, 120)}`));
+        await page.waitForTimeout(aktion === "ganzes-profil" ? 8000 : 5000);
+        console.log(`[screenshot-profil] nach Klick ${aktion}: ${page.url().replace(/saveId=[^&]+/, "saveId=…")}`);
+        const zielDatei = datei.replace("drawer-", `aktion-${aktion}-`);
+        await page.screenshot({ path: path.join(OUTPUT_DIR, zielDatei) });
+      }
       await ctx.close();
     };
     for (const [b, h, name] of geraete) {
+      if (name === "1710x1112") continue;
       await drawer(b, h, name, gewaehlt.starId, `10-drawer-star-${name}.png`);
       await drawer(b, h, name, gewaehlt.verletztId, `11-drawer-verletzt-${name}.png`);
     }
+    await drawer(1920, 1080, "1920x1080", gewaehlt.verletztId, "13-drawer-verlaengern-1920x1080.png", "verlaengern");
+    await drawer(1920, 1080, "1920x1080", gewaehlt.verletztId, "14-drawer-verkaufen-1920x1080.png", "verkaufen");
+    await drawer(1920, 1080, "1920x1080", gewaehlt.verletztId, "15-drawer-ganzes-profil-1920x1080.png", "ganzes-profil");
     // Zum Schluss: auch der Star (mit Pixel-Figur) verletzt — für das rote Band über der Figur.
     {
       const persistence = createPersistenceService();
