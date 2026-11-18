@@ -1992,8 +1992,8 @@ export function previewContractRenewalAction(input: {
       blockingReasons.length === 0 &&
       (negotiationPreview?.blockingReasons.length ?? 0) === 0 &&
       moraleBlockingReasons.length === 0 &&
-      verdiktBlockingReasons.length === 0 &&
-      vorstandBlockingReasons.length === 0,
+      vorstandBlockingReasons.length === 0 &&
+      verdiktBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
     teamId: input.teamId,
