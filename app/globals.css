@@ -80678,6 +80678,22 @@ span.nl-facility-ampel-chip {
 /* Zwischenstands-Hinweis des halb gewerteten Spieltags (D1 gebucht, D2 offen):
    dieselbe Aussage wie "Spieltag N · läuft" im Spielplan, als Status-Banner über
    den vorläufigen Zahlen. Warnton bewusst gedämpft — es ist ein Zustand, kein Fehler. */
+.nl-result-nds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--nl-line, rgba(244, 230, 196, 0.13));
+  border-left: 3px solid var(--nl-accent, #f0c35a);
+  font-size: 14px;
+}
+.nl-result-nds strong {
+  color: var(--nl-accent, #f0c35a);
+}
 .nl-result-partial-note {
   margin: 0 0 12px;
   padding: 9px 12px;

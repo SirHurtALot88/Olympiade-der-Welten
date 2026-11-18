@@ -157,6 +157,12 @@ export type FormMeldung = {
   delta: number;
   richtung: "gestiegen" | "gefallen" | "gleich";
   grund: string;
+  /** Additiv (18.11., Ansicht "Nach dem Spieltag"): dieselben Verlaufsdaten, nur ohne Umweg ueber den Satz. */
+  eingesetzt?: boolean;
+  disziplinId?: string | null;
+  /** Leistungs- minus Erwartungs-Perzentil (nur bei Einsatz mit Vergleich). */
+  abstand?: number | null;
+  bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
 };
 
 /**
@@ -191,6 +197,10 @@ export function baueFormMeldungen(
       delta,
       richtung: delta > 0.05 ? "gestiegen" : delta < -0.05 ? "gefallen" : "gleich",
       grund: formBegruendung(eintrag, eintrag.disziplinId ? disziplinName(eintrag.disziplinId) : null),
+      eingesetzt: eintrag.eingesetzt,
+      disziplinId: eintrag.disziplinId ?? null,
+      abstand: eintrag.leistungPerz != null && eintrag.erwartungPerz != null ? eintrag.leistungPerz - eintrag.erwartungPerz : null,
+      bremse: eintrag.bremse ?? null,
     });
   }
   return meldungen.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));

@@ -289,7 +289,7 @@ export function getViewSourceBadgeLabel(view: FoundationViewId, meta?: SaveSumma
   if (view === "historyV2") return "Spielstand: aktiv";
   if (view === "training" || view === "trainingV2") return "Kader: Entwicklung";
   if (view === "matchdayArena") return meta?.containsFinalStandings ? "Spieltag: entschieden" : "Spieltag: aktiv";
-  if (view === "matchdayResult") return "Spieltag: Ergebnisse";
+  if (view === "matchdayResult" || view === "nachDemSpieltag") return "Spieltag: Ergebnisse";
   if (view === "history") return "Spielstand: aktiv";
   return "Spielstand: aktiv";
 }
