@@ -12,6 +12,9 @@ import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/n
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
+import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
+const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
 import {
   buildTeamShellThemeVars,
@@ -650,6 +653,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   visibleInboxItems,
   } = props;
 
+  // Draft-Neubau (18.11.): mit `OLY_LIGA_DRAFT_MODUS=einzelschritt` zeigt die Shell statt des Schildes
+  // „Liga wird erstellt …“ die Draft-Seite; ohne Schalter antwortet die Probe „kein Draft“ und nichts ändert sich.
+  const ligaDraftTor = useLigaDraftTor({ gameState, saveId: activeSaveId, leagueSetupStatus });
+  const [draftTakt, setDraftTakt] = useState<DraftTaktZustand | null>(null);
+
   // Rivalen-Hervorhebung (additiv): Team-IDs aller Rivalen des aktiven Teams.
   // Leeres Set, wenn kein aktives Team oder keine Rivalität existiert (graceful).
   const activeTeamRivalIds = getActiveTeamRivalTeamIds(gameState, activeManagerTeamId);
@@ -883,7 +891,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <strong>{persistenceError ?? saveSyncError}</strong>
         </div>
       ) : null}
-      {leagueSetupStatus === "in_progress" ? (
+      {leagueSetupStatus === "in_progress" && ligaDraftTor.aktiv ? null : leagueSetupStatus === "in_progress" ? (
         <div
           className="foundation-persistence-banner transfer-callout is-info"
           role="status"
@@ -981,7 +989,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
-        takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
+        takt={ligaDraftTor.aktiv && draftTakt ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick } : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
@@ -1161,6 +1169,22 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         }
       >
 
+      {ligaDraftTor.aktiv ? (
+        <LigaDraftSeite
+          hostProps={foundationMarketV2ShellHostProps}
+          onTakt={setDraftTakt}
+          onWeiter={() => {
+            void (async () => {
+              try {
+                await foundationMarketV2ShellHostProps.loadSave(activeSaveId);
+              } finally {
+                ligaDraftTor.schliessen();
+              }
+            })();
+          }}
+        />
+      ) : (
+      <>
       {foundationSecondaryViews.some((view) => view.id === activeView) ? (
         <div className="foundation-utility-strip">
           <span className="pill foundation-utility-label">Technische Ansicht</span>
@@ -3384,6 +3408,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "debug" ? <FoundationDebugGameStatePanel gameState={gameState} /> : null}
 
       </div>
+      </>
+      )}
       </FoundationShell>
     </main>
   )
