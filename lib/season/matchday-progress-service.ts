@@ -1,6 +1,7 @@
 import { advancePlayerFormState, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
+import { ueberlastungsAbzuegeFuerSpieltag } from "@/lib/training/spieltag-training";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -322,7 +323,15 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
         playerMoraleState: buildCurrentMoraleState(save.gameState, prepared.currentMatchdayId),
         // Form-Prototyp (17.11., Standard AUS): ohne OLY_FORM_MORAL=1 kommt das Feld nicht hinzu.
         ...(isFormMoralEnabled()
-          ? { playerFormState: advancePlayerFormState(save.gameState, prepared.currentMatchdayId) }
+          ? {
+              playerFormState: advancePlayerFormState(
+                save.gameState,
+                prepared.currentMatchdayId,
+                undefined,
+                // Regel E (Training je Spieltag): Ueberlastung drueckt die Form gering, mit Grund im Verlauf.
+                ueberlastungsAbzuegeFuerSpieltag(save.gameState, prepared.currentMatchdayId),
+              ),
+            }
           : {}),
         matchdayState: {
           matchdayId: prepared.nextMatchdayId ?? prepared.currentMatchdayId,

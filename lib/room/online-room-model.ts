@@ -199,6 +199,12 @@ export function canParticipantControlTeam(state: Pick<OlyRoomState, "roomPartici
 
 export type TeamWriteAction =
   | "buy"
+  /**
+   * Liga-Draft im Einzelschritt (/api/draft): Pick, Auslassen, Fertig, Ueberspringen, Auto-Pick und das Vorspulen der
+   * KI-Zuege. Team-Ebene: wer schreibt, muss ein eigenes Team im Spielstand fuehren (beim Vorspulen beweist das nur
+   * den Sitz — die KI-Zuege selbst gehoeren keinem Menschen).
+   */
+  | "draft_pick"
   | "sell"
   | "lineup_save"
   | "facility_apply"

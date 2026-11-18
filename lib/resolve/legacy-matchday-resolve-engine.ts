@@ -47,8 +47,9 @@ import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
 // wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
-import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ergebnisSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
+import { wendeErgebnisSkalaE1An } from "@/lib/resolve/ergebnis-skala-anwenden";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -957,6 +958,7 @@ export function buildLegacyMatchdayResolvePreview(
       : null;
     // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
     const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
+    const ppSkalaFuerDieseSaison = ppSkalaModus(base.gameState, base.matchdayId);
     const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
     // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
     // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
@@ -1167,22 +1169,17 @@ export function buildLegacyMatchdayResolvePreview(
       const rankedTeam = teamResultsRanked.find((entry) => entry.teamId === context.team.id && entry.disciplineSide === side);
       // 50 % DER BASIS AUCH FUER ARENA-PP (Chris, 18.11.: „IN der Disziplin, wo er sich verletzt hat,
       // hat er nur 50 % seiner Basisleistung bzw. Eignung/Score"). Im PPS-Pfad steckt der Abschlag
-      // schon im `finalPlayerScore` (legacy-score-engine.ts). Die Boxscore-PP einer arena- oder
-      // pod-gewerteten Disziplin kommen dagegen aus dem Motorlauf, der von der Verletzung nichts weiss
-      // — der Verletzungswurf faellt erst mit der Buchung. Ohne diese Stelle bekam ein Spieler, der
-      // sich IN der Arena-Disziplin verletzte, seine vollen Arena-PP. EINE Funktion fuer beide Leser
-      // unten (Buehne `rankedTeam.entries` und persistierte Zeile `rawPlayerEntries`), damit
-      // gezeigt == gebucht bleibt.
-      const heuteVerletztIds = new Set(
-        score.entries
-          .filter((entry) => entry.injuryStatus === "mapped" && entry.injuryMultiplier != null && entry.injuryMultiplier < 1)
-          .map((entry) => entry.playerId),
-      );
-      const arenaPpsFuer = (playerId: string): number | null => {
-        const pps = arenaIndividualPpsForThisDiscipline?.get(playerId) ?? null;
-        if (pps == null || !heuteVerletztIds.has(playerId)) return pps;
-        return Math.round(pps * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100;
-      };
+      // im `finalPlayerScore` (legacy-score-engine.ts). Die Boxscore-PP einer arena- oder
+      // pod-gewerteten Disziplin kommen aus dem Motorlauf — und der KENNT die Verletzung seit Luecke D
+      // (docs/design/verletzung-regel-18-11.md): der Wurf faellt VOR dem Lauf
+      // (`ermittleArenaVerletzungsstand`), der Verletzte tritt mit 50 % seiner Eignung an
+      // (`buildArenaTeam`), und Teamergebnis UND Boxscore tragen das schon. Die PP werden deshalb
+      // NICHT noch einmal halbiert (vorher, als Notbehelf: `pps * INJURY_PERFORMANCE_MULTIPLIER` —
+      // jetzt waere das ein doppelter Abzug). Ein Vorlauf, der den Wurf noch nicht kannte, besteht die
+      // Eingabe-Hash-Pruefung beim Buchen nicht mehr (der Kader im Hash traegt den Verletzten mit 50 %)
+      // und wird neu gerechnet. EINE Funktion fuer beide Leser unten (Buehne `rankedTeam.entries` und
+      // persistierte Zeile `rawPlayerEntries`), damit gezeigt == gebucht bleibt.
+      const arenaPpsFuer = (playerId: string): number | null => arenaIndividualPpsForThisDiscipline?.get(playerId) ?? null;
 
       const distributedPoints = distributeRankPointsToPlayers({
         // REVIEW-FIX (PR #930, 14.09.): s. Kommentar an der `teamPoints`-Zuweisung oben.
@@ -1224,12 +1221,14 @@ export function buildLegacyMatchdayResolvePreview(
           ? new Map(
               rankedWithinTeam.map(({ entry }) => [
                 entry.playerId,
-                // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md): bei AUS der unveraenderte Pfad.
-                ppSkalaAktiv()
+                // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel; "aus" = alter Pfad.
+                ppSkalaFuerDieseSaison !== "aus"
                   ? ppAusKurveSkaliert({
                       disciplineId,
                       wert: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
                       referenz: spielerPpReferenzFuerDiesesDisziplin,
+                      modus: ppSkalaFuerDieseSaison,
+                      playerCount: legacyScorePlayerCountForThisDiscipline,
                     })
                   : ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
               ] as const),
@@ -1346,6 +1345,26 @@ export function buildLegacyMatchdayResolvePreview(
         disciplineSide: score.disciplineSide ?? side,
       }));
     });
+
+    // ERGEBNISSKALA E1 (18.11., lib/resolve/ergebnis-skala.ts): NACH Ausgang, Pod-Platz und Spieler-PP.
+    // Aendert nur `verhaeltnis`/`ergebnisNormiert`/`miniDmPod.wert`, nie wer gewinnt. Nur in Battle-Saves,
+    // deren Saison mit E1 gestempelt ist (lib/resolve/wertungs-skalen.ts) -- aeltere Saisons und der
+    // Manager-Modus bleiben byte-identisch.
+    // PP-SKALA DER ZEILE (18.11.): in einer C2-Saison traegt jede Battle-Zeile den Vermerk, damit der
+    // Ledger sie nach derselben Skala nachrechnet, mit der sie gebucht wurde (auch nach einer Umstellung
+    // mitten in der Saison, lib/resolve/wertungs-skalen.ts `stelleLaufendeSaisonAufC2Um()`).
+    if (isBattleModeArenaEligible && ppSkalaFuerDieseSaison === "an") {
+      for (const zeile of teamResultsRanked) zeile.ppSkala = "c2";
+    }
+    // E1 nur zusammen mit C2: die Anker der Ergebnisskala sind auf C2-Spieler-PP gezogen.
+    if (isBattleModeArenaEligible && ppSkalaFuerDieseSaison === "an" && ergebnisSkalaVersionFuer(base.gameState) === "e1") {
+      wendeErgebnisSkalaE1An({
+        teamResults: teamResultsRanked,
+        spielerZeilen: rawPlayerEntries,
+        disciplineId,
+        playerCount: legacyScorePlayerCountForThisDiscipline,
+      });
+    }
 
     const topPlayers = rankDescending(rawPlayerEntries, (entry) => entry.finalPlayerScore).map<PlayerPerformancePreview>(({ item, rank }) => ({
       ...item,

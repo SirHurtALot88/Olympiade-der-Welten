@@ -38,7 +38,9 @@ describe("gameplay smoke script contract", () => {
     expect(scriptText).toContain("foundation-active-save-id");
     expect(scriptText).toContain("transfer-market");
     expect(scriptText).toContain("foundation-training-compact");
-    expect(scriptText).toContain("foundation-player-profile");
+    // Spielerprofil-Neubau 18.11.: Klick öffnet das Kurzprofil, von dort die Profilseite.
+    expect(scriptText).toContain("spielerkurzprofil");
+    expect(scriptText).toContain("spielerprofil-seite");
     expect(scriptText).toContain("transfer-deal-open-button");
     expect(scriptText).toContain("foundation-lineup");
     expect(scriptText).toContain("foundation-cockpit");

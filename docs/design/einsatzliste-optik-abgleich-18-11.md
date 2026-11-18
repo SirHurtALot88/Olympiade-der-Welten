@@ -84,3 +84,38 @@ Aufnahmen mit `scripts/screenshot-einsatzliste-optik.ts` (Wegwerf-Battle-Save, P
 „Auffüllen“ besetzt) und `scripts/screenshot-einsatzliste-mockups.mjs`; Abgleich-Bilder mit
 `scripts/baue-einsatzliste-abgleich.sh`. Alles in `docs/design/einsatzliste-optik-18-11/`:
 `app-<disziplin>-<breite>.png`, `app-<disziplin>-gegner-<breite>.png`, `mockup-*.png`, `abgleich-*.png`.
+
+
+## Layout-Fix und Abgleich mit echten App-Aufnahmen (18.11., Branch `claude/einsatzliste-layout-fix-18-11`)
+
+Aufnahmen aus der echten App (Produktions-Build, Wegwerf-Battle-Save, Kapitän gesetzt, „Auffüllen“): Basketball (Feldspiel),
+Time Trial und Climbing (Bahn/Wand), Spurt, Mini-DM, Battlefield (Vierergruppe), Tennis (Bühne) bei 2560×1440, 1920×1080 und
+1710×1112. Pfade: `docs/design/einsatzliste-optik-18-11/app-<disziplin>-<breite>.png`, Reiter Gegner `app-<disziplin>-gegner-1920|…`,
+Mockup | App unter `abgleich-<disziplin>-1920.png`. Messung je Aufnahme (Skript `screenshot-einsatzliste-optik.ts`): **Seitenscroll 0
+(scrollHeight = Fensterhöhe) und 0 überlappende Platzkarten in allen 21 Aufnahmen.**
+
+| Befund (Chris, Abnahme-Kamera) | Behebung |
+|---|---|
+| Feld zu klein, Mitte „hochgezogen“, riesiger leerer Streifen unter dem Feld | Arbeitsfläche füllt die Höhe (`calc(100vh - 302px - 2.2vh)`), Schalenrand halb zurückgenommen; Einsatz/Captain als eine Zeile, Formkarten als eine Reihe darunter; Feld 400 bis 700 px hoch |
+| Platzkarten überlappen (Time Trial, Climbing, Battlefield) | Entzerrung in `EinsatzlisteModern.tsx` (`entzerre`): Pixelrechnung am echten Feld, schiebt Karten auseinander; reicht der Platz nicht, erst ohne Figuren, dann Karten bis auf 64 % verkleinert. Nur Anzeige, die Plätze bleiben |
+| Eigene Plätze links, erwartete Gegner rechts | Formationen mit Gegner auf dem Feld (`spiegel-y`: Bahn, Bühne): eigene Karten in der linken Hälfte, rechts die geschätzten Gegner auf Höhe des Duell-Platzes („Gegner ?“ bei verdecktem Scouting), Beschriftung „Erwartete Gegner-Aufstellung · Schätzung“. Spiegel-x-Formationen (Basketball, TDM, Mini-DM) lagen schon links/rechts |
+| Kaderliste ohne Namen, Spaltenköpfe überdrucken sich | Kaderspalte breiter (`clamp(430px, 22.5vw, 620px)`), engere Spalten, Köpfe „Eig.“/„Platz“; Rollen-Chips mit lesbarem Text |
+| Abgabeleiste unter dem Falz, doppelte Hauptaktion | Kein Seitenscroll mehr. Abgeben ist jetzt der Hauptknopf des Taktgebers im Regieband („Weiter Abgeben“, bzw. „Zur Arena“, „Abgabe gesperrt“); das Dock zeigt nur Status, Summe, Leeren. Speicher: `lib/foundation/einsatzliste-abgabe-store.ts` |
+| Platzhalter „Platz n …“ im Hinweis | Formulierungen ausgeschrieben (Wettessen, Gewichtheben, Tennis, Schach) |
+| Toast „11 Plätze aufgefüllt“ verdeckt Formkarten | Toast steht in der Fußleiste |
+| „RANG 19“ unklar | war der **Kaderstärke-Rang** (Summe der sechs besten Disziplin-Eignungen) über alle Teams. Jetzt: „D1 · RANG · KADERSTÄRKE“, groß der Ligarang, klein „n. von 32“; sobald die Disziplin gewertet wurde: „RANG · SAISON“ nach Teampunkten (`lib/lineups/einsatzliste-diszi-rang.ts`). Abstand zum Vordermann im Tooltip |
+| Intensität: „erwartet“ springt zweimal | Ursache: `updateDisciplineIntensityStage` setzte die Vorschau auf null; die Pro-Platz-Anteile von Form, Captain, Mutator, Team-Power stammen aber aus dieser Vorschau, bis die entprellte Neuberechnung (700 ms) kam. Jetzt bleibt die Vorschau stehen. Test `tests/einsatzliste-intensitaet-ein-rechenweg.test.ts` |
+| Disziplin-Farbe am Rahmen | Kopfkarten (Randbalken), Feldrahmen, Platzkarten, Formkarten-Bereich und Kartenkacheln in der Kategorie-Farbe (Power rot, Speed grün, Mental blau, Social gelb, wie die Formkarten) |
+| Karte je Spieler in der Kaderliste | Spalte „Karte“ zeigt die Karte des Spielers (Farbe, Wert), gelegte Karten hell hinterlegt |
+| Formkarten-Auswahl: alle sichtbar, oben positiv | Hand umbrochen statt gescrollt, nach Wert sortiert, alle Karten in einer Reihe (bei 1710 zwei) |
+| Klassen farbig | Klassenname in der Klassenfarbe des bestehenden Formkarten-Schemas |
+
+**Hinweis „In dieser Arena-Disziplin zählt die gespielte Karte noch nicht“**: stimmt für Climbing weiterhin. `FORMKARTEN_ECHT_DISCIPLINE_IDS`
+(`lib/battle/formkarten-echt-disziplinen.ts`) enthält nur `time-trial` und `spurt`; Climbing ist nicht aufgenommen (Aufnahmeregel: rho und Pp mit
+echten Karten gemessen). Es ist also kein veralteter Text, sondern ein offenes Gezeigt-gleich-gebucht-Thema für den Kartenlogik-Agenten.
+
+**Was noch vom Mockup abweicht**
+1. Die Figuren-Bühne (Kulissenbild oben, Kartenraster darunter) ist nicht nachgebaut; Figuren stehen auf den Platzkarten. Bei engem Feld (Battlefield, 8 Plätze) werden sie ausgeblendet, damit die Karten frei bleiben.
+2. Die Abgabe liegt im Taktgeber statt im Dock (Mockup: Dock-Knopf „Aufstellung abgeben“). Bewusst, damit es nur einen Knopf gibt; Leertaste löst weiter den allgemeinen „Weiter“-Schritt aus, nicht die Abgabe.
+3. Bei 1710 Breite brechen die Formkarten auf zwei Reihen und das Feld ist niedriger (rund 335 px).
+4. Gegner-Platzhalter „Gegner ?“ bei Scouting-Stufe 0; Namen und Figuren erscheinen mit mehr Scouting.

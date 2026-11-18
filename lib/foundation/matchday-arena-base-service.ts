@@ -3,7 +3,7 @@ import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import { buildMatchdayResolveSignature, readArenaVorlaufRecord, readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
-import { kickoffArenaVorlauf } from "@/lib/battle/arena-vorlauf-service";
+import { kickoffArenaVorlauf, leseArenaVorlaufFortschritt } from "@/lib/battle/arena-vorlauf-service";
 import {
   loadSqliteLegacyMatchdayResolvePreview,
   type LegacyMatchdayResolvePreviewPayload,
@@ -224,8 +224,17 @@ export async function loadMatchdayArenaBase(input: {
     {},
     persistence,
   );
+  // FORTSCHRITT (18.11.): solange der Vorlauf rechnet, welche Disziplinen schon fertig sind -- fuer die
+  // Anzeige "Arena wird vorbereitet … Climbing 1/2" (s. `leseArenaVorlaufFortschritt`). Nur Anzeige.
   const arenaVorlauf = arenaVorlaufKickoff.applicable
-    ? { status: arenaVorlaufKickoff.status, disziplinen: arenaVorlaufKickoff.record?.disziplinen ?? null }
+    ? {
+        status: arenaVorlaufKickoff.status,
+        disziplinen: arenaVorlaufKickoff.record?.disziplinen ?? null,
+        fortschritt:
+          arenaVorlaufKickoff.status === "in_progress"
+            ? leseArenaVorlaufFortschritt({ saveId: save.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId })
+            : null,
+      }
     : null;
 
   if (input.includeDetails === true) {

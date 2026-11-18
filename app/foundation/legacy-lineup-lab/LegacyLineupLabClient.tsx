@@ -5294,7 +5294,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	  }
 
 	  function updateDisciplineIntensityStage(disciplineSide: "d1" | "d2", intensity: MatchdayIntensityStage) {
-	    setPreview(null);
+	    // Die letzte Vorschau BLEIBT stehen (Chris 18.11.: „erwartet“ sprang erst runter, dann wieder hoch). Form-,
+	    // Captain-, Mutator- und Team-Power-Anteile je Platz kommen aus dieser Vorschau (buildSlotPreviewByKey);
+	    // ohne sie rechnete die Anzeige 700 ms lang ohne diese Posten, bis die entprellte Neuberechnung nachzog.
+	    // Mit stehender Vorschau springt der Wert genau einmal auf den neuen Endwert, die Nachberechnung bestaetigt ihn.
 	    setMatchdayScorePreview(null);
 	    setVisibleScoreboardSide(null);
 	    setDraft(null);

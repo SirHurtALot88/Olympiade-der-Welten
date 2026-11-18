@@ -898,7 +898,7 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
               : `${formatNlNumber(gedeckeltOhneAbgabe, 0)} weitere Teams tragen das Deckel-Abzeichen, zahlen dank Deckel aber 0,0 und bleiben neutral. `
             : "";
         })()}
-        Beträge auf 0,1 Mio gerundet, verteilt wird ungerundet — die Summe der gerundeten Zeilen kann darum minimal von Topf und Ausschüttung abweichen.
+        Beträge auf 0,1 C gerundet, verteilt wird ungerundet — die Summe der gerundeten Zeilen kann darum minimal von Topf und Ausschüttung abweichen.
       </p>
     </section>
   );

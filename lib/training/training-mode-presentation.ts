@@ -1,6 +1,7 @@
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
 import { TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { resolveTrainingJeSpieltagFaktor } from "@/lib/training/training-je-spieltag-schalter";
 
 /** Base training budget per mode (season-end organic progression).
  *  Calibrated for peak P90 ~5–8 and league Ø Δ within ±0.4.
@@ -20,6 +21,25 @@ export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
   mittel: 3.47,
   hart: 4.92,
 };
+
+/**
+ * TRAINING JE SPIELTAG (Chris, 18.11.): Grundbudget, das an EINEM Spieltag gebucht wird.
+ *
+ * Bisher galt `TRAINING_SETPOINTS_BY_MODE` je SAISON und wurde am Saisonende gebucht (anteilig nach
+ * gezaehlten Spieltagen / Saison-Spieltagen). Jetzt bucht jeder Spieltag seinen Anteil sofort. Die
+ * Saisonsumme ergibt sich aus dem Satz je Spieltag mal den Spieltagen, an denen der Spieler trainiert
+ * (Verletzte trainieren nicht). Herleitung und Messung: `docs/design/training-je-spieltag-18-11.md`.
+ */
+export const TRAINING_SETPOINTS_JE_SPIELTAG: Record<PlayerTrainingMode, number> = {
+  leicht: 0.178,
+  mittel: 0.226,
+  hart: 0.32,
+};
+
+/** Satz je Spieltag inklusive `OLY_TRAINING_JE_SPIELTAG_FAKTOR`. */
+export function getTrainingSetpointsJeSpieltag(mode: PlayerTrainingMode): number {
+  return (TRAINING_SETPOINTS_JE_SPIELTAG[mode] ?? TRAINING_SETPOINTS_JE_SPIELTAG.mittel) * resolveTrainingJeSpieltagFaktor();
+}
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {
   leicht: 6,
