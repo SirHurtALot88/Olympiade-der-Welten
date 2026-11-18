@@ -27,6 +27,11 @@ import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-poli
 import { getPhaseAfterStep, isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { SEASON_TRANSITION_STEPS } from "@/lib/season/season-transition-steps";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die Checkliste des Saisonabschlusses mit Verkaufsfenster am Saisonende,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 const read = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
 const panel = () => read("app/foundation/season-v2/FoundationSeasonFinalePanel.tsx");
 
@@ -146,7 +151,8 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
     // allem auf einmal. Sie heisst jetzt nach dem, was sie wirklich aufmacht.
     const text = panel();
     const zeile = text.slice(text.indexOf('key: "transfer-window"'), text.indexOf('key: "contracts"'));
-    expect(zeile).toContain('title: "Verkäufe & Verträge öffnen"');
+    // Mit gemeinsamem Transferfenster (Chris 18.11.) heisst die Zeile „Verträge öffnen", im alten Ablauf wie bisher.
+    expect(zeile).toContain('title: gemeinsamesFenster ? "Verträge öffnen" : "Verkäufe & Verträge öffnen"');
     expect(zeile).not.toContain("verkaufen und kaufen sind freigeschaltet");
     expect(zeile).toContain("vor dem 1. Spieltag");
   });

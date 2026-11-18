@@ -33,11 +33,17 @@ import type {
   GameState,
   SeasonSnapshotPlayerPerformanceRecord,
   SeasonSnapshotRecord,
+  TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
 
 import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
 import { getLeagueLevel } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
+import {
+  berechneTransferbuchungJeTeam,
+  historieKenntSaison,
+  rechneTransferbilanzImDatensatzUm,
+} from "@/lib/season/transferbilanz-buchung";
 
 /**
  * Eine Team-Zeile einer abgeschlossenen Saison.
@@ -83,7 +89,10 @@ export type FoundationSeasonHistoryTeamEntry = {
    */
   startplatz: number | null;
   rankDiff: number | null;
+  /** Transferbilanz nach „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.); `null` in Saison 1. */
   transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (negativ = ausgegeben). Optional: aeltere Kurzfassungen. */
+  kaderaufbauNet?: number | null;
   /**
    * LIGA DIESES TEAMS IN DIESER SAISON — eingefroren im Schnappschuss (`season-snapshot-service`,
    * vor `league_movement`). Ohne dieses Feld wuesste der Browser nach einem Auf-/Abstieg nicht mehr,
@@ -228,6 +237,7 @@ function projiziereTeam(record: {
   startplatz?: number | null;
   rankDiff?: number | null;
   transferNet?: number | null;
+  kaderaufbauNet?: number | null;
   leagueTier?: string | null;
 }): FoundationSeasonHistoryTeamEntry {
   const bereich = record.disciplinePointsByArea ?? {};
@@ -266,6 +276,7 @@ function projiziereTeam(record: {
     startplatz: zahlOderNull(record.startplatz),
     rankDiff: zahlOderNull(record.rankDiff),
     transferNet: zahlOderNull(record.transferNet),
+    ...(record.kaderaufbauNet !== undefined ? { kaderaufbauNet: zahlOderNull(record.kaderaufbauNet) } : {}),
     // Nur mitnehmen, wenn der Schnappschuss das Feld kennt — ein fehlendes Feld bleibt fehlend
     // (dann rechnet `buildHistoricalLeagueTierLookup` zurueck), ein `null` bleibt „keine Liga".
     ...(record.leagueTier !== undefined ? { leagueTier: textOderNull(record.leagueTier) } : {}),
@@ -304,8 +315,16 @@ function projiziereSpieler(record: SeasonSnapshotPlayerPerformanceRecord): Found
 }
 
 export function projiziereSaisonHistorie(
-  snapshots: readonly SeasonSnapshotRecord[] | undefined,
+  rohSnapshots: readonly SeasonSnapshotRecord[] | undefined,
+  /**
+   * Mit der Transferhistorie werden die Transferzahlen alter Schnappschuesse nach der Buchungsregel vom 18.11.
+   * umgerechnet (`rechneTransferbilanzInSchnappschuessenUm`). Ohne sie bleibt es bei den Archivwerten.
+   */
+  buchungsQuelle?: TransferbilanzBuchungsQuelle,
 ): FoundationSeasonHistoryEntry[] {
+  const snapshots = buchungsQuelle
+    ? rechneTransferbilanzInSchnappschuessenUm(rohSnapshots ?? [], buchungsQuelle)
+    : rohSnapshots;
   return (snapshots ?? []).map((snapshot) => ({
     seasonId: snapshot.seasonId,
     seasonName: snapshot.seasonName ?? null,
@@ -343,9 +362,65 @@ export function projiziereSaisonHistorie(
 export function leseSaisonHistorie(gameState: GameState): FoundationSeasonHistoryEntry[] {
   const voll = gameState.seasonState.seasonSnapshots;
   if (voll != null && voll.length > 0) {
-    return projiziereSaisonHistorie(voll);
+    return projiziereSaisonHistorie(voll, buchungsQuelleAus(gameState));
   }
   return gameState.seasonState.foundationSeasonHistory ?? [];
+}
+
+/** Was die Umrechnung der Transferbilanz braucht — aus dem Spielstand. */
+export type TransferbilanzBuchungsQuelle = {
+  transferHistory: readonly TransferHistoryEntry[] | null | undefined;
+  spieltageProSaison: number | null;
+};
+
+export function buchungsQuelleAus(gameState: Pick<GameState, "transferHistory" | "season">): TransferbilanzBuchungsQuelle {
+  return {
+    transferHistory: gameState.transferHistory,
+    spieltageProSaison: gameState.season?.matchdayIds?.length ?? null,
+  };
+}
+
+const umrechnungsCache = new WeakMap<
+  readonly SeasonSnapshotRecord[],
+  { historie: unknown; laenge: number; ergebnis: SeasonSnapshotRecord[] }
+>();
+
+/**
+ * ALTSTAENDE: DIE TRANSFERBILANZ NACHTRAEGLICH RICHTIG ZUORDNEN (Chris 18.11.).
+ *
+ * Archivierte Saisonen tragen ihre Transferzahlen nach der alten Rechnung — in Saison 1 also den Draft als Kauf
+ * gegen die Saisonende-Verkaeufe. Hier werden sie aus der Transferhistorie nach der einen Buchungsregel neu
+ * gesetzt (`lib/season/transferbilanz-buchung.ts`): Saison 1 → Transferbilanz `null` und Kaderaufbau; ab Saison 2
+ * die Bewegungen des Fensters vor dieser Saison. Am gespeicherten Archiv und am Geld aendert sich nichts.
+ */
+export function rechneTransferbilanzInSchnappschuessenUm(
+  snapshots: readonly SeasonSnapshotRecord[],
+  quelle: TransferbilanzBuchungsQuelle,
+): SeasonSnapshotRecord[] {
+  const historie = quelle.transferHistory ?? [];
+  const gemerkt = umrechnungsCache.get(snapshots);
+  if (gemerkt && gemerkt.historie === historie && gemerkt.laenge === historie.length) return gemerkt.ergebnis;
+  const ergebnis = snapshots.map((snapshot) => {
+    const records = resolveSeasonSnapshotTeamRecords(snapshot);
+    const teamIds = [...new Set(records.map((record) => record.teamId))];
+    const buchung = historieKenntSaison(historie, snapshot.seasonId)
+      ? berechneTransferbuchungJeTeam({
+          transferHistory: historie,
+          seasonId: snapshot.seasonId,
+          teamIds,
+          spieltageProSaison: quelle.spieltageProSaison,
+        })
+      : null;
+    const rechne = <T extends SeasonSnapshotRecord["finalStandings"][number]>(record: T): T =>
+      rechneTransferbilanzImDatensatzUm(record, snapshot.seasonId, buchung?.get(record.teamId) ?? null);
+    return {
+      ...snapshot,
+      finalStandings: (snapshot.finalStandings ?? []).map(rechne),
+      ...(snapshot.teamSnapshots != null ? { teamSnapshots: snapshot.teamSnapshots.map(rechne) } : {}),
+    };
+  });
+  umrechnungsCache.set(snapshots, { historie, laenge: historie.length, ergebnis });
+  return ergebnis;
 }
 
 /**
@@ -415,6 +490,7 @@ export function alsSchnappschussErsatz(
         startplatz: team.startplatz,
         rankDiff: team.rankDiff,
         transferNet: team.transferNet,
+        ...(team.kaderaufbauNet !== undefined ? { kaderaufbauNet: team.kaderaufbauNet } : {}),
         ...(team.leagueTier !== undefined ? { leagueTier: team.leagueTier } : {}),
         // Aus dem Rang abgeleitet, nicht mitgefahren: dieselbe Regel wie im echten
         // Schnappschuss (`season-snapshot-service`). Bei Liga-Split zaehlt `rank` je Liga — der
@@ -457,7 +533,13 @@ export function alsSchnappschussErsatz(
 export function leseSaisonSchnappschuesse(gameState: GameState): SeasonSnapshotRecord[] {
   const voll = gameState.seasonState.seasonSnapshots;
   if (voll != null && voll.length > 0) {
-    return [...voll];
+    // Transferbilanz nach der Buchungsregel vom 18.11. (Altstaende umgerechnet, Archiv unveraendert).
+    return [...rechneTransferbilanzInSchnappschuessenUm(voll, buchungsQuelleAus(gameState))];
   }
-  return alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams);
+  return [
+    ...rechneTransferbilanzInSchnappschuessenUm(
+      alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams),
+      buchungsQuelleAus(gameState),
+    ),
+  ];
 }

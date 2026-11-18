@@ -699,6 +699,9 @@ export function getTransferSpendCeilingObjective(input: {
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   if (cashPriority < 7) return null;
+  // Saison 1 hat keine Transferbilanz (Chris 18.11.: der Draft ist Kaderaufbau aus dem Startbudget,
+  // `transferbilanz-buchung.ts`) — also auch kein Ziel auf Netto-Transferausgaben.
+  if (input.row.transferNet == null) return null;
 
   // GEMESSEN am Live-Save: der feste Deckel stand in Saison 2 bei fünf Teams gegen Netto-Ausgaben
   // von 218 bis 281 Mio — alle fünf „verfehlt". Der bisherige S1-Ausweg („in Saison 1 kauft jedes

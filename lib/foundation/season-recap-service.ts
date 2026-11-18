@@ -31,6 +31,7 @@ import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing"
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { formatLeagueTierLabel } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
+import { istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 
 export type SeasonRecapSlot =
   | "zeugnis"
@@ -66,6 +67,16 @@ function signed(value: number | null | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   const rounded = Math.round(value * 10) / 10;
   return `${rounded > 0 ? "+" : ""}${`${rounded}`.replace(".", ",")}`;
+}
+
+/** „Kasse … · Kaderaufbau … · Transferbilanz …" — Saison 1 ohne Transferbilanz, mit Kaderaufbau. */
+export function zeugnisGeldzeile(seasonId: string, record: SeasonSnapshotTeamRecord): string {
+  if (istKaderaufbauSaison(seasonId)) {
+    const aufbau = record.kaderaufbauNet;
+    const aufbauText = typeof aufbau === "number" && Number.isFinite(aufbau) ? ` · Kaderaufbau ${signed(aufbau)} C` : "";
+    return `Kasse ${money(record.cashEnd)} C${aufbauText} · Transferbilanz —.`;
+  }
+  return `Kasse ${money(record.cashEnd)} C · Transferbilanz ${record.transferNet == null ? "—" : `${signed(record.transferNet)} C`}.`;
 }
 
 function nameOf(record: SeasonSnapshotTeamRecord): string {
@@ -121,7 +132,10 @@ function buildZeugnis(input: {
       title: `Dein Saison-Zeugnis: Platz ${platz}`,
       description: [
         start != null ? `Start als Nummer ${start}, Ende auf Platz ${platz} — ${bewegung}.` : `Endplatz ${platz}.`,
-        `Kasse ${money(record.cashEnd)} · Transferbilanz ${signed(record.transferNet)}.`,
+        // „Das Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.): in Saison 1 gibt es keine Transferbilanz,
+        // nur den Kaderaufbau aus dem Startbudget. Die Zahlen kommen aus `leseSaisonSchnappschuesse`, das alte
+        // Spielstaende nach derselben Regel umrechnet.
+        zeugnisGeldzeile(input.snapshot.seasonId, record),
       ].join(" "),
       targetView: "seasonV2",
       targetParams: { season: input.snapshot.seasonId, team: record.teamId },

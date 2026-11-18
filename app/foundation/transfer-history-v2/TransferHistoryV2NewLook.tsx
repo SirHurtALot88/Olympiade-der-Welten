@@ -352,6 +352,8 @@ export default function TransferHistoryV2NewLook({
     const spendByLabel = new Map<string, number>();
     const incomeByLabel = new Map<string, number>();
     for (const row of filteredRows) {
+      // Der Kaderaufbau von Saison 1 ist keine Transferbilanz (Chris 18.11.) — er faellt aus den Balken.
+      if (row.buchungsArt === "kaderaufbau") continue;
       if (row.type === "buy") {
         spendByLabel.set(row.seasonLabel, (spendByLabel.get(row.seasonLabel) ?? 0) + row.fee);
       } else if (row.type === "sell") {
@@ -520,8 +522,17 @@ export default function TransferHistoryV2NewLook({
             label="Netto"
             value={formatNlSignedMoney(summary.netTransferBalance)}
             tone={summary.netTransferBalance >= 0 ? "good" : "risk"}
-            sub="Transferbilanz"
+            sub={summary.kaderaufbauNet != null ? "Transferbilanz ohne Kaderaufbau" : "Transferbilanz"}
           />
+          {summary.kaderaufbauNet != null ? (
+            <StatChip
+              label="Kaderaufbau"
+              value={formatNlSignedMoney(summary.kaderaufbauNet)}
+              tone="neutral"
+              sub="Startkader Saison 1, aus dem Startbudget"
+              title="Draft und Startkader in Saison 1 sind kein Transfer, sondern Kaderaufbau aus dem Startbudget."
+            />
+          ) : null}
           <StatChip label="Ø Fee" value={formatTransfermarktCurrency(summary.averageFee ?? null)} tone="neutral" sub="pro Deal" />
           <StatChip
             label="Ø GuV"

@@ -162,5 +162,7 @@ describe("Die Arena zeigt sie auch wirklich an", () => {
     expect(ARENA).toContain("arena-prematch-kaufwarnung");
     const knopf = ARENA.slice(ARENA.indexOf("arena-prematch-start-cta"));
     expect(knopf.slice(0, 600)).toContain("schließt die Kaufphase");
+    // Gemeinsames Transferfenster (Chris 18.11.): der Spieltag schliesst Kauf UND Verkauf.
+    expect(knopf.slice(0, 600)).toContain("schließt das Transferfenster");
   });
 });

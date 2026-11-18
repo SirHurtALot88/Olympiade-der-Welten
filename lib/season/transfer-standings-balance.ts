@@ -4,6 +4,11 @@ import {
   isSeasonOneDraftBuySource,
   SEASON_ONE_DRAFT_BUY_SOURCES,
 } from "@/lib/season/transfer-season-policy";
+import {
+  berechneTransferbuchungFuerTeam,
+  berechneTransferbuchungJeTeam,
+  type TeamTransferBuchung,
+} from "@/lib/season/transferbilanz-buchung";
 
 /**
  * DIE EIGENEN TRANSFERS ZAEHLTEN NICHT MIT — gemeldet als `ls9jfg`:
@@ -48,15 +53,16 @@ export type StandingsTransferBalance = {
   transferSellCount: number;
   transferBuyTotal: number;
   transferSellTotal: number;
-  transferNet: number;
+  /** `null` in Saison 1: der Draft ist Kaderaufbau, keine Transferbilanz (Chris 18.11.). */
+  transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (Erloese − Ausgaben), sonst `null`. */
+  kaderaufbauNet: number | null;
+  kaderaufbauBuyTotal: number | null;
+  kaderaufbauBuyCount: number | null;
 };
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
-}
-
-function transferFee(entry: TransferHistoryEntry) {
-  return typeof entry.fee === "number" && Number.isFinite(entry.fee) ? entry.fee : 0;
 }
 
 export function parseSeasonNumber(seasonId: string): number {
@@ -87,62 +93,55 @@ export function isPreseasonMarketBuy(entry: TransferHistoryEntry): boolean {
 }
 
 /**
- * Saisonstand-Transferbilanz:
- * - S1: nur Markt-Verkäufe am S1-Ende (Draft-Käufe zählen nicht).
- * - S2+: Verkäufe am Ende der Vorsaison minus Käufe zu Beginn der aktuellen Saison.
+ * Saisonstand-Transferbilanz — seit 18.11. ueber die EINE Buchungsregel (`transferbilanz-buchung.ts`):
+ * „das Fenster vor Saison N gehoert zu Saison N".
+ * - S1: KEINE Transferbilanz (`null`, „—"). Draft und Startkader sind Kaderaufbau aus dem Startbudget; die
+ *   Verkaeufe am S1-Ende (alter Ablauf) gehoeren zum Fenster von S2.
+ * - S2+: Erloese − Ablösen aller Kaeufe/Verkaeufe des Fensters dieser Saison — egal welche Quelle. Im alten
+ *   Ablauf sind das die Verkaeufe am Ende der Vorsaison plus die Kaeufe zu Beginn dieser; im gemeinsamen
+ *   Fenster liegen beide in dieser Saison vor Spieltag 1.
+ *
+ * Die Quellenlisten oben bleiben fuer Altaufrufer stehen, zaehlen hier aber nicht mehr: sie liessen schon
+ * einmal ganze Transferarten fallen (`ls9jfg`), und die Fensterzuordnung braucht sie nicht.
  */
 export function buildStandingsTransferBalanceForTeam(
   gameState: GameState,
   seasonId: string,
   teamId: string,
 ): StandingsTransferBalance {
-  const history = gameState.transferHistory ?? [];
-  const seasonNumber = parseSeasonNumber(seasonId);
-  let transferBuyTotal = 0;
-  let transferSellTotal = 0;
-  let transferBuyCount = 0;
-  let transferSellCount = 0;
+  return zuStandingsBilanz(
+    berechneTransferbuchungFuerTeam({
+      transferHistory: gameState.transferHistory,
+      seasonId,
+      teamId,
+      spieltageProSaison: gameState.season?.matchdayIds?.length ?? null,
+    }),
+  );
+}
 
-  if (seasonNumber === 1) {
-    for (const entry of history) {
-      if (entry.seasonId !== seasonId || entry.fromTeamId !== teamId || !isSeasonEndMarketSell(entry)) {
-        continue;
-      }
-      transferSellCount += 1;
-      transferSellTotal = roundValue(transferSellTotal + transferFee(entry));
-    }
-  } else {
-    const priorSeasonId = previousSeasonId(seasonId);
-    if (priorSeasonId) {
-      for (const entry of history) {
-        if (entry.seasonId !== priorSeasonId || entry.fromTeamId !== teamId || !isSeasonEndMarketSell(entry)) {
-          continue;
-        }
-        transferSellCount += 1;
-        transferSellTotal = roundValue(transferSellTotal + transferFee(entry));
-      }
-    }
-    for (const entry of history) {
-      if (entry.seasonId !== seasonId || entry.toTeamId !== teamId || !isPreseasonMarketBuy(entry)) {
-        continue;
-      }
-      transferBuyCount += 1;
-      transferBuyTotal = roundValue(transferBuyTotal + transferFee(entry));
-    }
-  }
-
+function zuStandingsBilanz(buchung: TeamTransferBuchung): StandingsTransferBalance {
+  const summe = buchung.transfer;
   return {
-    transferCount: transferBuyCount + transferSellCount,
-    transferBuyCount,
-    transferSellCount,
-    transferBuyTotal,
-    transferSellTotal,
-    transferNet: roundValue(transferSellTotal - transferBuyTotal),
+    transferCount: (summe?.anzahlKaeufe ?? 0) + (summe?.anzahlVerkaeufe ?? 0),
+    transferBuyCount: summe?.anzahlKaeufe ?? 0,
+    transferSellCount: summe?.anzahlVerkaeufe ?? 0,
+    transferBuyTotal: roundValue(summe?.kaeufe ?? 0),
+    transferSellTotal: roundValue(summe?.verkaeufe ?? 0),
+    transferNet: buchung.transferNet == null ? null : roundValue(buchung.transferNet),
+    kaderaufbauNet: buchung.kaderaufbauNet,
+    kaderaufbauBuyTotal: buchung.kaderaufbau?.kaeufe ?? null,
+    kaderaufbauBuyCount: buchung.kaderaufbau?.anzahlKaeufe ?? null,
   };
 }
 
 export function buildStandingsTransferBalanceByTeamId(gameState: GameState, seasonId: string) {
+  const buchung = berechneTransferbuchungJeTeam({
+    transferHistory: gameState.transferHistory,
+    seasonId,
+    teamIds: gameState.teams.map((team) => team.teamId),
+    spieltageProSaison: gameState.season?.matchdayIds?.length ?? null,
+  });
   return Object.fromEntries(
-    gameState.teams.map((team) => [team.teamId, buildStandingsTransferBalanceForTeam(gameState, seasonId, team.teamId)] as const),
+    gameState.teams.map((team) => [team.teamId, zuStandingsBilanz(buchung.get(team.teamId)!)] as const),
   );
 }

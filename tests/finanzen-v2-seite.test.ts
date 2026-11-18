@@ -3,7 +3,7 @@
  * Ruecklage anzapfen, „Alles auf eine Karte“, KI-Entscheidung, Kontoauszug-Verlauf der Seite.
  * Gebaut auf einem kleinen Spielstand ohne Datenbank; die harte Sperre laeuft ueber dieselben Funktionen wie im Spiel.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildFinanzSeiteModell } from "@/lib/finance/finanzseite-modell";
@@ -179,6 +179,17 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
 });
 
 describe("Lockerung nach Verkaeufen", () => {
+  // Die Lockerung gibt einbehaltene Verkaufserloese frei. Im gemeinsamen Transferfenster (#1634) sind Erloese ohnehin zu 100 %
+  // frei, es bleibt nichts einbehalten; die Lockerung gilt nur im alten Ablauf (`OLY_TRANSFERFENSTER_GEMEINSAM=0`).
+  const vorherFenster = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+  beforeEach(() => {
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+  });
+  afterEach(() => {
+    if (vorherFenster === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorherFenster;
+  });
+
   it("greift erst ab der Schwelle (einbehaltener Anteil >= Puffer), eine Stufe, nie mehr als verkauft", () => {
     const basis = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 100 }), "A");
     expect(basis.lockerung.aktiv).toBe(false);
