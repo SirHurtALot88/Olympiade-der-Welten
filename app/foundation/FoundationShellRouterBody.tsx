@@ -907,10 +907,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               antworten waehrend des Drafts mit 200/success. Der Satz steht nur im Raum, weil nur
               dort gemessen wurde; im Solo-Fall behaupten wir es deshalb nicht. */}
           {roomContext ? (
-            <span data-testid="foundation-league-setup-banner-schon-moeglich">
-              Sponsor wählen und einkaufen geht bereits — beides wartet nicht auf die KI-Kader. Erst
-              der Spieltag braucht sie.
-            </span>
+            gameState.seasonState.ligaDraft?.saisonId !== gameState.season.id ||
+            gameState.seasonState.ligaDraft.status !== "laeuft" ? (
+              <span data-testid="foundation-league-setup-banner-schon-moeglich">
+                Sponsor wählen und einkaufen geht bereits — beides wartet nicht auf die KI-Kader. Erst
+                der Spieltag braucht sie.
+              </span>
+            ) : (
+              // Liga-Draft im Einzelschritt (nur mit OLY_LIGA_DRAFT_MODUS=einzelschritt angelegt, Review #1619 A8): in
+              // der geordneten Phase lehnt /api/transfermarkt/buy echte Kaeufe ab (`liga_draft_laeuft`) — der Satz
+              // oben waere dann falsch. Ohne Liga-Draft (Schalter aus) bleibt er unveraendert.
+              <span data-testid="foundation-league-setup-banner-liga-draft">
+                Liga-Draft läuft — gekauft wird jetzt nur im Draft, Pick für Pick. Sponsor wählen geht bereits.
+              </span>
+            )
           ) : null}
         </div>
       ) : leagueSetupStatus === "failed" ? (

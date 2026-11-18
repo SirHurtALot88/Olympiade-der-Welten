@@ -6,7 +6,8 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import { istDuellWertung, ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert } from "@/lib/resolve/pp-skala";
+import { ppSkalaVersionFuerZeile } from "@/lib/resolve/wertungs-skalen";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -295,16 +296,22 @@ function derivePlayerPointsForDuellGroup(
     disciplineSide: reference.disciplineSide,
   });
   const referenz = resolveSpielerPpReferenz(reference.disciplineId, playerCount);
+  // PP-SKALA C2 (docs/design/pp-skala-18-11.md): dieselbe Rechnung wie in der Engine, mit DEMSELBEN
+  // Saison-Stempel (`seasonState.wertungsSkalen`), sonst gilt "gezeigt != gebucht". Arena-/Pod-Zeilen
+  // oben vertrauen dem persistierten Wert, der schon skaliert geschrieben wurde -- dort wird hier NICHT
+  // ein zweites Mal skaliert. Weil der Stempel nur zum Saisonwechsel wechselt, rechnet dieser Zweig eine
+  // laufende Saison nie rueckwirkend um.
+  // Je ZEILE (nicht je Saison): nach einer Umstellung mitten in der Saison bleiben frueher gebuchte
+  // Zeilen alt (`ppSkalaVersionFuerZeile`, lib/resolve/wertungs-skalen.ts).
+  const zeilenVersion = ppSkalaVersionFuerZeile(gameState, teamResult);
+  const ppSkala = zeilenVersion === "roh" ? "roh" : zeilenVersion === "c2" ? "an" : "aus";
   const pointsByPerformanceId = new Map(
-    // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS): dieselbe Rechnung wie in der
-    // Engine, sonst gilt "gezeigt != gebucht". Arena-/Pod-Zeilen oben vertrauen dem persistierten Wert,
-    // der bei AN schon skaliert geschrieben wurde -- dort wird hier NICHT ein zweites Mal skaliert.
     performances.map(
       (performance) =>
         [
           performance.id,
-          ppSkalaAktiv()
-            ? ppAusKurveSkaliert({ disciplineId: reference.disciplineId, wert: performance.finalPlayerScore, referenz })
+          ppSkala !== "aus"
+            ? ppAusKurveSkaliert({ disciplineId: reference.disciplineId, wert: performance.finalPlayerScore, referenz, modus: ppSkala, playerCount })
             : ppAusSpielerScore(performance.finalPlayerScore, referenz),
         ] as const,
     ),

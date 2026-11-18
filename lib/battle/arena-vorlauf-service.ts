@@ -473,15 +473,59 @@ const MAX_AUTOMATISCHE_VERSUCHE = 2;
  */
 const RETRYBARE_AUSFALL_GRUENDE: ReadonlySet<ArenaAusfallGrund> = new Set(["absturz", "timeout", "chromium_start"]);
 
+/**
+ * FORTSCHRITT EINES LAUFENDEN VORLAUFS (18.11., Chris' Live-Befund "lange Wartezeit nach Einsatzliste
+ * abgeben, bis die Arena erscheint"). Die Buehne pollte bisher nur `in_progress` und sagte nichts
+ * darueber, WAS gerade rechnet. Jetzt merkt sich der Prozess je Spieltag, welche Disziplinen der
+ * Vorlauf rechnet und welche schon fertig sind -- die Disziplinen laufen in `fuehreVorlaufAus()`
+ * nacheinander, ein Eintrag in `disziplinen` heisst "fertig". Rein im Speicher dieses Prozesses (der
+ * Vorlauf laeuft im selben Next-Server wie die Status-Route), nie persistiert, nach dem Lauf geloescht.
+ * Aendert an Rechnung, Datensatz und Buchung nichts.
+ */
+export type ArenaVorlaufFortschritt = { geplant: string[]; fertig: string[]; laufendSeitMs: number };
+const vorlaufFortschritte = new Map<string, { geplant: string[]; disziplinen: Record<string, unknown>; start: number }>();
+const fortschrittSchluessel = (scope: MatchdayResolveScope) => `${scope.saveId}\u0000${scope.seasonId}\u0000${scope.matchdayId}`;
+
+export function leseArenaVorlaufFortschritt(scope: MatchdayResolveScope): ArenaVorlaufFortschritt | null {
+  const eintrag = vorlaufFortschritte.get(fortschrittSchluessel(scope));
+  if (!eintrag) return null;
+  const fertig = eintrag.geplant.filter((d) => d in eintrag.disziplinen);
+  return { geplant: [...eintrag.geplant], fertig, laufendSeitMs: Date.now() - eintrag.start };
+}
+
 async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorlaufRecord | null> {
   const scope: MatchdayResolveScope = { saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId };
+  const disziplinen: Record<string, ArenaVorlaufDisziplinEintrag> = {};
+  const schluessel = fortschrittSchluessel(scope);
+  const fortschritt = {
+    geplant: [
+      ...input.arenaDisciplineIds,
+      ...(input.miniDmPresent ? [MINI_DM_DISCIPLINE_ID] : []),
+      ...(input.battlefieldPresent ? [BATTLEFIELD_DISCIPLINE_ID] : []),
+      ...input.bahnPodDisciplineIds,
+    ],
+    disziplinen,
+    start: Date.now(),
+  };
+  vorlaufFortschritte.set(schluessel, fortschritt);
+  try {
+    return await fuehreVorlaufAusOhneFortschritt(input, scope, disziplinen);
+  } finally {
+    if (vorlaufFortschritte.get(schluessel) === fortschritt) vorlaufFortschritte.delete(schluessel);
+  }
+}
+
+async function fuehreVorlaufAusOhneFortschritt(
+  input: FuehreVorlaufAusInput,
+  scope: MatchdayResolveScope,
+  disziplinen: Record<string, ArenaVorlaufDisziplinEintrag>,
+): Promise<ArenaVorlaufRecord | null> {
   const current = input.persistence.getSaveById(input.saveId);
   if (!current) {
     console.error(`[arena-vorlauf] Save ${input.saveId} nicht mehr gefunden.`);
     return null;
   }
 
-  const disziplinen: Record<string, ArenaVorlaufDisziplinEintrag> = {};
   const arenaTeamPointsByDisciplineId = new Map<string, Map<string, ArenaTeamPointsOverride>>();
   const arenaIndividualBoxscorePpsByDisciplineId = new Map<string, Map<string, number>>();
   const arenaAusfallByDisciplineId = new Map<string, ArenaAusfall>();

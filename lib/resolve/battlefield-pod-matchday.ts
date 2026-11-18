@@ -16,7 +16,7 @@
  * aufgestellte Spieler, wie bei Mini-DM.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { ppAusKurveSkaliert, ppSkalaAktiv } from "@/lib/resolve/pp-skala";
+import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -120,6 +120,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
   const referenz = resolveBattlefieldPodSpielerPpReferenz(k);
+  const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
 
   pods.forEach((pod, index) => {
     const ergebnis = ergebnisse[index] ?? null;
@@ -155,9 +156,9 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
       if (!gesetztJeTeam.get(eintrag.teamId)?.has(eintrag.name)) continue;
       playerPpsByPlayerId.set(
         eintrag.playerId,
-        // PP-SKALA-PROTOTYP (docs/design/pp-skala-18-11.md, Standard AUS).
-        ppSkalaAktiv()
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz })
+        // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
+        ppSkala !== "aus"
+          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }

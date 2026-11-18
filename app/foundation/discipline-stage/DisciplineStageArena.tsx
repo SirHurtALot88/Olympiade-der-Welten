@@ -6,6 +6,7 @@ import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
 import type { ArenaVorlaufStatus, GameState } from "@/lib/data/olyDataTypes";
+import { vorladeArenaDateien } from "@/lib/foundation/battle-arena/arena-vorladen";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
 import type { RoomArenaState } from "@/types/game";
@@ -43,6 +44,7 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
+import { getLeagueOf } from "@/lib/season/league-split";
 import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
 import { ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
@@ -62,7 +64,8 @@ const DisciplineStageDrawer = dynamic(() => import("@/app/foundation/discipline-
 // BATTLE ARENA IM SPIELTAG (02.11., lib/foundation/battle-arena/arena-spieltag-ansicht.ts): der
 // echte Motor mit den PixelLab-Figuren. Nur in Battle-Saves mit Motor-Wertung im Baum, deshalb
 // dynamisch -- Manager-Saves laden den Chunk nie.
-const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
+const ladeBattleArenaHost = () => import("@/app/foundation/battle-arena/FoundationBattleArenaHost");
+const FoundationBattleArenaHost = dynamic(ladeBattleArenaHost, {
   ssr: false,
 });
 // PERF-GEGENPROBE: DisciplineStageMatchdayPanel (~1.187 Zeilen) bleibt bewusst STATISCH.
@@ -74,10 +77,12 @@ const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-
 // Panel ohnehin sofort erscheinen soll — im Cache-Treffer-Fall bekäme der Spieler einen
 // echten Ladeframe direkt unter der Bühne zu sehen, den es vorher nicht gab. Das wäre ein
 // sichtbarer Rückschritt, deshalb bleibt dieser Import unverändert.
-import DisciplineStageMatchdayPanel, {
-  type MatchdayPanelPlayerRow,
-  type MatchdayPanelStandingRow,
-  type MatchdayPanelTeamResult,
+import DisciplineStageSpieltagswertung from "@/app/foundation/discipline-stage/DisciplineStageSpieltagswertung";
+import type {
+  MatchdayPanelPlayerRow,
+  MatchdayPanelSideResult,
+  MatchdayPanelStandingRow,
+  MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
 import { buildStandingsMatchdayRankPair } from "@/lib/foundation/season-standings-matchday-rank-delta";
@@ -790,6 +795,14 @@ export default function DisciplineStageArena({
    * sofort, dieses Feld steuert nur den stillen Nachlade-Poll unten und den kleinen Hinweis-Badge.
    */
   const [arenaVorlaufStatus, setArenaVorlaufStatus] = useState<ArenaVorlaufStatus | null>(null);
+  // FORTSCHRITT DES VORLAUFS (18.11., Chris: "lange Wartezeit nach Einsatzliste abgeben"): welche
+  // Disziplinen der Server gerade rechnet und welche fertig sind (`leseArenaVorlaufFortschritt`), fuer
+  // "Arena wird vorbereitet … Climbing 1/2". Nur Anzeige.
+  const [arenaVorlaufFortschritt, setArenaVorlaufFortschritt] = useState<{
+    geplant: string[];
+    fertig: string[];
+    laufendSeitMs: number;
+  } | null>(null);
   const [briefingItems, setBriefingItems] = useState<
     { teamId: string; currentRank: number | null; projectedRank: number | null }[]
   >([]);
@@ -855,7 +868,10 @@ export default function DisciplineStageArena({
             resolvePreview?: { preview?: unknown } | null;
             briefingStandings?: { items?: unknown } | null;
             standingsPreview?: { items?: unknown } | null;
-            arenaVorlauf?: { status?: ArenaVorlaufStatus | null } | null;
+            arenaVorlauf?: {
+              status?: ArenaVorlaufStatus | null;
+              fortschritt?: { geplant: string[]; fertig: string[]; laufendSeitMs: number } | null;
+            } | null;
           }>(sessionKey);
     if (cached) {
       const cachedPreview = (cached.resolvePreview?.preview ?? null) as typeof preview;
@@ -864,6 +880,7 @@ export default function DisciplineStageArena({
       setStandingsItems(Array.isArray(cached.standingsPreview?.items) ? (cached.standingsPreview.items as MatchdayPanelStandingRow[]) : []);
       setPreviewState(cachedPreview ? "ready" : "unavailable");
       setArenaVorlaufStatus(cached.arenaVorlauf?.status ?? null);
+      setArenaVorlaufFortschritt(cached.arenaVorlauf?.fortschritt ?? null);
       return;
     }
 
@@ -887,6 +904,7 @@ export default function DisciplineStageArena({
         setStandingsItems(Array.isArray(payloadJson?.standingsPreview?.items) ? payloadJson.standingsPreview.items : []);
         setPreviewState(enginePreview ? "ready" : "unavailable");
         setArenaVorlaufStatus(payloadJson?.arenaVorlauf?.status ?? null);
+        setArenaVorlaufFortschritt(payloadJson?.arenaVorlauf?.fortschritt ?? null);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -921,6 +939,12 @@ export default function DisciplineStageArena({
     let versuch = 0;
     const ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS = 4_000;
     const ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE = 225; // ~15 Minuten Reserve, s. Kommentar oben.
+    // SCHNELL ZUERST (18.11., Wartezeit-Befund): ein Spieltags-Vorlauf ist meist nach wenigen Sekunden
+    // fertig; mit festen 4 s wartete die Buehne danach im Mittel noch ~2 s, bis sie es merkte. Die ersten
+    // 20 Abfragen (~20 s) gehen deshalb im Sekundentakt -- die Status-Abfrage ohne Details ist billig
+    // (s. Kommentar oben) --, danach wie bisher alle 4 s. Die Gesamtreserve (Versuche) bleibt.
+    const ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS = 1_000;
+    const ARENA_VORLAUF_STAGE_POLL_SCHNELL_VERSUCHE = 20;
 
     const sessionKey = buildMatchdayArenaBaseSessionKey({
       saveId,
@@ -949,7 +973,10 @@ export default function DisciplineStageArena({
     };
     const naechsterVersuchOderAufgeben = () => {
       if (versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
-        timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+        timerRef = window.setTimeout(
+          () => void pollEinmal(),
+          versuch < ARENA_VORLAUF_STAGE_POLL_SCHNELL_VERSUCHE ? ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS : ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS,
+        );
       } else {
         // Worst-Case-Budget ausgeschoepft -- server-seitig B1/B2 (arena-vorlauf-service.ts)
         // haetten den Lauf laengst terminal gemacht. Aufgeben statt endlos weiterzufragen; der
@@ -964,6 +991,7 @@ export default function DisciplineStageArena({
         const statusJson = await holeJson(statusQuery);
         if (controller.signal.aborted) return;
         const nextStatus: ArenaVorlaufStatus | null = statusJson?.arenaVorlauf?.status ?? null;
+        setArenaVorlaufFortschritt(statusJson?.arenaVorlauf?.fortschritt ?? null);
         if (nextStatus === "in_progress") {
           naechsterVersuchOderAufgeben();
           return;
@@ -998,12 +1026,21 @@ export default function DisciplineStageArena({
       }
     };
 
-    let timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+    let timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS);
     return () => {
       controller.abort();
       window.clearTimeout(timerRef);
     };
   }, [arenaVorlaufStatus, saveId, seasonId, matchdayId, ownTeamId, lineupRevision]);
+
+  // VORLADEN WAEHREND DES WARTENS (18.11., s. lib/foundation/battle-arena/arena-vorladen.ts): solange
+  // der Vorlauf rechnet, holt der Browser schon das Host-Modul und die Arena-Dateien (Huelle, CSS, ~5 MB
+  // Motor) -- vorher begann das Laden erst, wenn der Vorlauf fertig war.
+  useEffect(() => {
+    if (arenaVorlaufStatus !== "in_progress") return;
+    void ladeBattleArenaHost().catch(() => undefined);
+    vorladeArenaDateien();
+  }, [arenaVorlaufStatus]);
 
   const engineDiscipline = useMemo(
     () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
@@ -1191,6 +1228,8 @@ export default function DisciplineStageArena({
             // eingesetzten Spieler und die Raenge waeren falsch (Top 50 der Liga, nicht
             // Top 50 dieses Spieltags).
             ovrRank: ratingByPlayerId.get(e.playerId)?.ovrRank ?? null,
+            portraitUrl: portraitById.get(e.playerId) ?? null,
+            isCaptain: e.isCaptain === true,
           });
         }
         playersByTeam.set(tr.teamId, cur);
@@ -1274,6 +1313,40 @@ export default function DisciplineStageArena({
       }
       return map;
     };
+    /**
+     * ERGEBNIS IN WORTEN je Team und Seite (Spieltagswertung neu, 18.11.) — nur Felder, die die Preview
+     * schon liefert: Gruppe aus `miniDmPod` (Platz, Gruppenwert, die vier Teams), Duell aus
+     * `duellSeiten` + `opponentTeamId`. Keine eigene Rechnung; fehlt beides, bleibt der Eintrag leer.
+     */
+    const ergebnisForSide = (
+      discipline: { disciplineId: string; displayName: string } | null,
+    ): Map<string, MatchdayPanelSideResult> => {
+      const map = new Map<string, MatchdayPanelSideResult>();
+      if (!discipline) return map;
+      const dp = (preview.disciplinePreviews ?? []).find((entry) => entry.disciplineId === discipline.disciplineId);
+      if (!dp) return map;
+      for (const tr of dp.teamResults ?? []) {
+        if (tr.miniDmPod) {
+          map.set(tr.teamId, {
+            art: "gruppe",
+            platz: tr.miniDmPod.platz,
+            wert: tr.miniDmPod.teamWert ?? tr.miniDmPod.wert ?? null,
+            podId: tr.miniDmPod.podId,
+            teamIds: [...tr.miniDmPod.teamIds],
+          });
+        } else if (tr.duellSeiten) {
+          map.set(tr.teamId, {
+            art: "duell",
+            eigen: tr.duellSeiten[0],
+            gegner: tr.duellSeiten[1],
+            gegnerTeamId: tr.opponentTeamId ?? null,
+          });
+        }
+      }
+      return map;
+    };
+    const d1ErgebnisByTeam = ergebnisForSide(d1);
+    const d2ErgebnisByTeam = ergebnisForSide(d2);
     const d1ArenaAusfallByTeam = arenaAusfallGrundForSide(d1);
     const d2ArenaAusfallByTeam = arenaAusfallGrundForSide(d2);
     const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
@@ -1311,6 +1384,8 @@ export default function DisciplineStageArena({
         missingLineup: r.missingLineup,
         d1ArenaAusfallGrund: d1ArenaAusfallByTeam.get(r.teamId) ?? null,
         d2ArenaAusfallGrund: d2ArenaAusfallByTeam.get(r.teamId) ?? null,
+        d1Ergebnis: d1ErgebnisByTeam.get(r.teamId) ?? null,
+        d2Ergebnis: d2ErgebnisByTeam.get(r.teamId) ?? null,
       };
     });
     // Captain-/Formkarten-Einsatz je Team — 1:1 aus derselben Preview, damit die
@@ -1321,7 +1396,27 @@ export default function DisciplineStageArena({
       d2DisciplineId: d2?.disciplineId ?? null,
     });
     return { d1, d2, standings, mutatorByTeam, modifierBaseByTeam, playersByTeam, modifiersByTeam, teamResults };
-  }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
+  }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId, portraitById]);
+
+  /**
+   * Liga und Besitzer je Team für die Filter der Spieltagswertung (Ligen, „Menschen") und die Marke „Du" bzw.
+   * den Namen des Menschen. Quelle sind `seasonState.leagueByTeamId` und `teamControlSettings` — dieselben
+   * wie bei der Arena-Teamauswahl; auf einem halbfertigen Spielstand ohne `seasonState` bleibt beides leer.
+   */
+  const wertungsTeamInfo = useMemo(() => {
+    const leagueByTeam = new Map<string, "liga1" | "liga2">();
+    const humanLabelByTeam = new Map<string, string>();
+    if (!gameState?.seasonState) return { leagueByTeam, humanLabelByTeam };
+    for (const team of gameState.teams ?? []) {
+      const tier = getLeagueOf(gameState, team.teamId);
+      if (tier) leagueByTeam.set(team.teamId, tier);
+    }
+    for (const teamId of getManualControlTeamIds(gameState)) {
+      const label = resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, teamId)));
+      humanLabelByTeam.set(teamId, label ?? "Mensch");
+    }
+    return { leagueByTeam, humanLabelByTeam };
+  }, [gameState]);
 
   /**
    * Buchungszustand des Spieltags aus dem SAVE (nicht aus Session-State): welche
@@ -1422,6 +1517,18 @@ export default function DisciplineStageArena({
     () => (devMode || matchdayDisciplineOptions.length === 0 ? disciplines : matchdayDisciplineOptions),
     [devMode, matchdayDisciplineOptions, disciplines],
   );
+  // "Arena wird vorbereitet … Climbing 1/2" (18.11.): die Disziplin, die der Vorlauf gerade rechnet,
+  // ihre Nummer unter allen geplanten und die bisherige Rechenzeit. Ohne Fortschritt (aelterer Server,
+  // anderer Prozess) nur der Satz ohne Zahl.
+  const arenaVorlaufText = useMemo(() => {
+    const f = arenaVorlaufFortschritt;
+    if (!f || f.geplant.length === 0) return "Arena wird vorbereitet …";
+    const aktuell = f.geplant.find((d) => !f.fertig.includes(d)) ?? f.geplant[f.geplant.length - 1];
+    const name = disciplines.find((d) => d.id === aktuell)?.name ?? aktuell;
+    const nummer = Math.min(f.geplant.length, f.fertig.length + 1);
+    const sekunden = Math.max(0, Math.round(f.laufendSeitMs / 1000));
+    return `Arena wird vorbereitet … ${name} ${nummer}/${f.geplant.length} (${sekunden} s)`;
+  }, [arenaVorlaufFortschritt, disciplines]);
 
   // Die 2 aktiven Mutatoren dieser Disziplin (disziplin-weit gleich) — für die
   // Anzeige „welche beiden es sind". Aus den mutatorSlots eines beliebigen Teams.
@@ -2848,8 +2955,8 @@ export default function DisciplineStageArena({
                 <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
                 ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
                 {kaufphaseSchliesstMitDiesemSpieltag.teamCount === 1
-                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`
-                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`}
+                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`
+                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`}
               </p>
             ) : null}
             {slotCells.length > 0 ? (
@@ -3260,8 +3367,9 @@ export default function DisciplineStageArena({
         >
           <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Battle Arena · {model.disciplineName}</div>
           {battleOhneMotorGrund === "vorlauf" ? (
-            <span>
-              ⏳ Die Arena-Duelle dieses Spieltags werden im Hintergrund berechnet. Sobald das gebuchte Spiel feststeht,
+            <span data-testid="arena-vorlauf-fortschritt">
+              <strong style={{ display: "block", marginBottom: 2 }}>⏳ {arenaVorlaufText}</strong>
+              Die Arena-Duelle dieses Spieltags werden im Hintergrund berechnet. Sobald das gebuchte Spiel feststeht,
               erscheint es hier in der Battle Arena.
             </span>
           ) : battleOhneMotorGrund === "bruecke" ? (
@@ -3390,7 +3498,7 @@ export default function DisciplineStageArena({
               background: "color-mix(in srgb, var(--nl-accent) 12%, transparent)",
             }}
           >
-            ⏳ Arena-Duelle werden im Hintergrund berechnet — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
+            ⏳ {arenaVorlaufText} — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
           </span>
         </div>
       ) : null}
@@ -3601,7 +3709,7 @@ export default function DisciplineStageArena({
           siehe Definition bei endedDisciplineIds). */}
       {mode === "real" && preview && matchdayPanel && (panelD1Revealed || panelD2Revealed) ? (
         <div style={{ marginTop: 14 }}>
-          <DisciplineStageMatchdayPanel
+          <DisciplineStageSpieltagswertung
             teamResults={matchdayPanel.teamResults}
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
@@ -3617,6 +3725,8 @@ export default function DisciplineStageArena({
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
             injuryMarksByTeam={matchdayInjuryMarks}
+            leagueByTeam={wertungsTeamInfo.leagueByTeam}
+            humanLabelByTeam={wertungsTeamInfo.humanLabelByTeam}
           />
         </div>
       ) : mode === "real" ? (
