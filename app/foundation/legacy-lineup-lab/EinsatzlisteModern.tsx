@@ -45,6 +45,7 @@ import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/stra
 
 import type { LineupNewLookProps } from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
 import { FeldHintergrund } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteFeldHintergrund";
+import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import "./einsatzliste-modern.css";
 
 type Props = LineupNewLookProps;
@@ -1006,6 +1007,7 @@ export default function EinsatzlisteModern(props: Props) {
   return (
     <div className={`bc elm${ruettel ? " bc-ruettel" : ""}`} data-testid="lineup-modern">
       <BcHero
+        kulisseUrl={einsatzlisteKulisseBild(disziplin(seite)?.disciplineId, kulisse?.varianteId)}
         wappen={getStaticTeamLogoUrl(context.team.id) ?? context.team.logoPath ?? null}
         wappenAlt={context.team.name}
         dachzeile={<>Einsatzliste · Spieltag {context.matchday.index}</>}
