@@ -24,6 +24,7 @@ import {
   type RunBattlefieldPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildBattlefieldPodMatchSeed } from "@/lib/battle/arena-seed";
+import { ermittleArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { getPodsForMatchday, resolvePodPlayerCountForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 import { BATTLEFIELD_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import {
@@ -113,6 +114,10 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
     mutatoren: input.mutatorTraits ? [...input.mutatorTraits] : undefined,
     k,
     matchdayId: input.matchdayId,
+    // VERLETZUNG IM MOTOR (18.11.), s. `runBattleModeArenaMatchday()`: derselbe Wurf wie Buchung und Hash.
+    verletzungsstand:
+      input.runBattlefieldPodFixturesOptions?.verletzungsstand ??
+      ermittleArenaVerletzungsstand({ gameState: input.gameState, saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId }),
   });
 
   const rohdatenByPodId = new Map<string, BattlefieldPodRohdaten>();

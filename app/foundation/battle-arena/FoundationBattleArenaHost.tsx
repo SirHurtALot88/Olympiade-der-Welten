@@ -16,6 +16,7 @@ import {
   buildArenaAufstellungBeide,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-strategie-adapter";
+import { ermittleArenaVerletzungsstand, type ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { resolveArenaHostSeeds } from "@/lib/battle/arena-host-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS, battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
@@ -416,33 +417,55 @@ export default function FoundationBattleArenaHost({
     activeManagerTeamId,
   ]);
 
+  // VERLETZUNG IM MOTOR (Chris, 18.11., docs/design/verletzung-regel-18-11.md Luecke D/B): derselbe
+  // Verletzungsstand wie Vorlauf, Arena-Eingabe-Hash und Buchung (`ermittleArenaVerletzungsstand`,
+  // deterministisch aus Saat und Spielstand) — ein heute Verletzter tritt auch auf der Buehne mit 50 %
+  // seiner Eignung an, ein aus einem Vorspieltag Gesperrter gar nicht. Gezeigt = gebucht.
+  // Je Spieltag einmal gerechnet (Pods koennen einen Vorschau-Spieltag zeigen, s. unten).
+  const verletzungsstandFuer = useMemo(() => {
+    const cache = new Map<string, ArenaVerletzungsstand>();
+    const seasonId = gameState.season?.id;
+    return (matchdayId: string | null | undefined): ArenaVerletzungsstand | null => {
+      if (!matchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
+      const vorhanden = cache.get(matchdayId);
+      if (vorhanden) return vorhanden;
+      const stand = ermittleArenaVerletzungsstand({ gameState, saveId, seasonId, matchdayId });
+      cache.set(matchdayId, stand);
+      return stand;
+    };
+  }, [gameState, saveId]);
+  const verletzungsstandHeute = useMemo(
+    () => verletzungsstandFuer(gameState.matchdayState?.matchdayId ?? null),
+    [verletzungsstandFuer, gameState.matchdayState?.matchdayId],
+  );
+
   const heimKader = useMemo(
-    () => buildArenaTeam(gameState, heimTeamId, sheetsByPlayerId),
-    [gameState, heimTeamId, sheetsByPlayerId],
+    () => buildArenaTeam(gameState, heimTeamId, sheetsByPlayerId, verletzungsstandHeute),
+    [gameState, heimTeamId, sheetsByPlayerId, verletzungsstandHeute],
   );
   const gastKader = useMemo(
-    () => buildArenaTeam(gameState, gastTeamId, sheetsByPlayerId),
-    [gameState, gastTeamId, sheetsByPlayerId],
+    () => buildArenaTeam(gameState, gastTeamId, sheetsByPlayerId, verletzungsstandHeute),
+    [gameState, gastTeamId, sheetsByPlayerId, verletzungsstandHeute],
   );
   // Die vier Pod-Kader EINZELN aufgebaut (nicht ueber heimKader/gastKader, s. `miniDmPod`-
   // Kommentar oben: der Pod kann heimTeamId an JEDER der vier Positionen tragen, und
   // gastTeamId muss darin gar nicht vorkommen) — exakt dasselbe `buildArenaTeam()` wie
   // heimKader/gastKader, nur viermal mit den echten Pod-IDs.
   const miniDmKader0 = useMemo(
-    () => (miniDmTeamId0 ? buildArenaTeam(gameState, miniDmTeamId0, sheetsByPlayerId) : []),
-    [gameState, miniDmTeamId0, sheetsByPlayerId],
+    () => (miniDmTeamId0 ? buildArenaTeam(gameState, miniDmTeamId0, sheetsByPlayerId, verletzungsstandHeute) : []),
+    [gameState, miniDmTeamId0, sheetsByPlayerId, verletzungsstandHeute],
   );
   const miniDmKader1 = useMemo(
-    () => (miniDmTeamId1 ? buildArenaTeam(gameState, miniDmTeamId1, sheetsByPlayerId) : []),
-    [gameState, miniDmTeamId1, sheetsByPlayerId],
+    () => (miniDmTeamId1 ? buildArenaTeam(gameState, miniDmTeamId1, sheetsByPlayerId, verletzungsstandHeute) : []),
+    [gameState, miniDmTeamId1, sheetsByPlayerId, verletzungsstandHeute],
   );
   const miniDmKader2 = useMemo(
-    () => (miniDmTeamId2 ? buildArenaTeam(gameState, miniDmTeamId2, sheetsByPlayerId) : []),
-    [gameState, miniDmTeamId2, sheetsByPlayerId],
+    () => (miniDmTeamId2 ? buildArenaTeam(gameState, miniDmTeamId2, sheetsByPlayerId, verletzungsstandHeute) : []),
+    [gameState, miniDmTeamId2, sheetsByPlayerId, verletzungsstandHeute],
   );
   const miniDmKader3 = useMemo(
-    () => (miniDmTeamId3 ? buildArenaTeam(gameState, miniDmTeamId3, sheetsByPlayerId) : []),
-    [gameState, miniDmTeamId3, sheetsByPlayerId],
+    () => (miniDmTeamId3 ? buildArenaTeam(gameState, miniDmTeamId3, sheetsByPlayerId, verletzungsstandHeute) : []),
+    [gameState, miniDmTeamId3, sheetsByPlayerId, verletzungsstandHeute],
   );
 
   // BATTLEFIELD 4-TEAM-FFA, Nutzlast fuer den Motor (`echterKader.battlefieldPod`, gelesen von
@@ -464,7 +487,7 @@ export default function FoundationBattleArenaHost({
       return {
         name: team?.name ?? teamId,
         kurz: gameState.teams.find((t) => t.teamId === teamId)?.shortCode ?? null,
-        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId),
+        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId, verletzungsstandFuer(matchdayId)),
       };
     });
     if (!podTeams.every((t) => t.kader.length > 0)) return null;
@@ -486,7 +509,7 @@ export default function FoundationBattleArenaHost({
       // Standard "orte3" fehlt das Feld, der Motor zeigt dann das Gefecht je Ort wie bisher.
       ...battlefieldPodFormatOption(),
     };
-  }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId, verletzungsstandFuer]);
 
   // BAHN-POD, Nutzlast fuer den Motor (`echterKader.bahnPodByDisciplineId[bd]`, gelesen von
   // `bahnPodAnzeigeKontext()` in battle-mode.engine.js): je Bahn-Pod-Disziplin dieses Spieltags die
@@ -523,7 +546,7 @@ export default function FoundationBattleArenaHost({
       const podTeams = podTeamIds.map((teamId) => ({
         name: teams.find((t) => t.teamId === teamId)?.name ?? teamId,
         kurz: gameState.teams.find((t) => t.teamId === teamId)?.shortCode ?? null,
-        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId),
+        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId, verletzungsstandFuer(matchdayId)),
       }));
       if (!podTeams.every((t) => t.kader.length > 0)) continue;
       karte[disciplineId] = {
@@ -544,7 +567,7 @@ export default function FoundationBattleArenaHost({
       };
     }
     return Object.keys(karte).length > 0 ? karte : null;
-  }, [bahnPodTakeshiTreffer, bahnPodStaffelTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [bahnPodTakeshiTreffer, bahnPodStaffelTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId, verletzungsstandFuer]);
 
   // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
   // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier
