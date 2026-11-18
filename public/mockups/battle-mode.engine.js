@@ -58604,7 +58604,8 @@
         uhr:()=>hudUhrFeldspiel(),
         zusatz:()=>{
           if(done||!fsLive)return null;
-          if(fsLive.kickoff)return {txt:"Kickoff",eng:false};
+          // fsLive.kickoff bleibt nach dem Anstoss als Objekt stehen (wird nie geleert): "gerade Kickoff" heisst phase==="kickoff".
+          if(fsLive.phase==="kickoff")return {txt:"Kickoff",eng:false};
           const fb=fsLive.football; if(!fb)return null;
           const ORD=["1st","2nd","3rd","4th"];
           const feld=fb.spot<=50?"OPP "+fb.spot:"OWN "+(100-fb.spot);

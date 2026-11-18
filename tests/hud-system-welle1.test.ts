@@ -219,6 +219,14 @@ describe.skipIf(!chromiumVerfuegbar())("HUD-System Welle 1 (Arena-Motor, Chromiu
           disc,
           { timeout: 200_000 },
         );
+        if (disc === "football") {
+          // Down & Distance ist waehrend des Spiels zu sehen (nicht dauerhaft "Kickoff").
+          await seite.waitForFunction(
+            () => /^(1st|2nd|3rd|4th) & \d+ · (OPP|OWN) \d+$/.test((window.__arena.hudProbe() as Probe).gezeigt.zusatz || ""),
+            null,
+            { timeout: 120_000 },
+          );
+        }
         await seite.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
         const vorPause = (await seite.textContent("#play"))?.trim();
         await seite.keyboard.press("Space");
