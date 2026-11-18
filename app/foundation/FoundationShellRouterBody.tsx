@@ -125,6 +125,8 @@ import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-f
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { disziplinReihenfolgeAusSpielplan } from "@/lib/season/saisonstand-modern-logik";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
@@ -2833,6 +2835,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               areaVerhaeltnisByTeamId={seasonV2AreaVerhaeltnisByTeamId}
               teamBilanzByTeamId={seasonV2TeamBilanzByTeamId}
               teamStrengthRankByTeamId={seasonV2TeamStrengthRankByTeamId}
+              spielplanDisziplinen={disziplinReihenfolgeAusSpielplan(getSeasonDisciplineSchedule(gameState, { saveId: activeSaveId }))}
               teamStrengthValueByTeamId={seasonV2TeamStrengthValueByTeamId}
               verlauf={seasonV2Verlauf}
               matchwinner={seasonV2Matchwinner}

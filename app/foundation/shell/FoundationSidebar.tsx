@@ -99,6 +99,7 @@ export default function FoundationSidebar({
   const asideRef = useRef<HTMLElement | null>(null);
   const [marke, setMarke] = useState<{ top: number; height: number } | null>(null);
   const [railHover, setRailHover] = useState(false);
+  const [menueOffen, setMenueOffen] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearRailTimer = () => {
     if (railTimer.current) {
@@ -221,6 +222,29 @@ export default function FoundationSidebar({
     },
   });
 
+  // Kopfblock (Spielstände, Oly Manager, Version, Aktives Team). In der Icon-Schiene liegt er als Menü am
+  // Wappen (`foundation-rail-menue`, absolut positioniert): er nimmt keine Höhe ein und verschiebt die Icons nie (18.11.).
+  const brandBlock = (
+    <>
+      <div className="foundation-sidebar-brand">
+        <Link className="foundation-sidebar-save-link" href="/">
+          Spielstände
+        </Link>
+        <div className="foundation-sidebar-brand-row">
+          <strong>Oly Manager</strong>
+          <span
+            className="foundation-sidebar-version-badge"
+            data-testid="foundation-sidebar-version-badge"
+            title={APP_VERSION_BADGE.title}
+          >
+            {APP_VERSION_BADGE.compact}
+          </span>
+        </div>
+      </div>
+      {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
+    </>
+  );
+
   return (
     <aside
       ref={asideRef}
@@ -241,6 +265,7 @@ export default function FoundationSidebar({
           ? () => {
               clearRailTimer();
               setRailHover(false);
+              setMenueOffen(false);
             }
           : undefined
       }
@@ -260,6 +285,7 @@ export default function FoundationSidebar({
           ? (event) => {
               if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                 setRailHover(false);
+                setMenueOffen(false);
               }
             }
           : undefined
@@ -271,10 +297,22 @@ export default function FoundationSidebar({
       {rail ? (
         <div className="foundation-rail-head">
           {teamCrest ? (
-            <span className="foundation-rail-wappen" data-testid="foundation-rail-wappen" title={teamName ?? undefined}>
+            <button
+              type="button"
+              className="foundation-rail-wappen"
+              data-testid="foundation-rail-wappen"
+              title={teamName ? `${teamName} – Spielstand, Version und Team wählen` : "Spielstand, Version und Team wählen"}
+              aria-haspopup="true"
+              aria-expanded={menueOffen}
+              onClick={() => {
+                clearRailTimer();
+                setRailHover(true);
+                setMenueOffen((offen) => !offen);
+              }}
+            >
               {teamCrest}
               {teamName ? <strong className="foundation-rail-wappen-name">{teamName}</strong> : null}
-            </span>
+            </button>
           ) : null}
           <button
             type="button"
@@ -292,22 +330,19 @@ export default function FoundationSidebar({
           </button>
         </div>
       ) : null}
-      <div className="foundation-sidebar-brand">
-        <Link className="foundation-sidebar-save-link" href="/">
-          Spielstände
-        </Link>
-        <div className="foundation-sidebar-brand-row">
-          <strong>Oly Manager</strong>
-          <span
-            className="foundation-sidebar-version-badge"
-            data-testid="foundation-sidebar-version-badge"
-            title={APP_VERSION_BADGE.title}
-          >
-            {APP_VERSION_BADGE.compact}
-          </span>
+      {rail ? (
+        <div
+          className="foundation-rail-menue"
+          data-testid="foundation-rail-menue"
+          data-offen={menueOffen && railMode !== "compact" ? "1" : "0"}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setMenueOffen(false);
+          }}
+        >
+          {brandBlock}
         </div>
-      </div>
-      {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
+      ) : null}
+      {!rail ? brandBlock : null}
       {navGroups.map((group) => (
         <section key={group.id} className="foundation-sidebar-group">
           <span className="foundation-sidebar-group-label">{group.label}</span>
