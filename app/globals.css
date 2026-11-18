@@ -79144,7 +79144,7 @@ span.nl-facility-ampel-chip {
 
 /* --- Schriftregel (Chris, 18.11.): Ueberschriften und Namen in RaniraSeason, alles andere Barlow ---- */
 .foundation-app :is(h1, h2, h3, h4),
-.foundation-app :is([class*="player-name"], [class*="team-name"], [class$="-name"], [class*="-name-"]):not(small):not(span.sr-only) {
+.foundation-app :is([class*="player-name"], [class*="team-name"]):not(small):not(.sr-only) {
   font-family: var(--schrift-haus);
   font-style: italic;
   font-weight: 700;

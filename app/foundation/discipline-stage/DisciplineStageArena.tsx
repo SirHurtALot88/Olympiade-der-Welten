@@ -2848,8 +2848,8 @@ export default function DisciplineStageArena({
                 <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
                 ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
                 {kaufphaseSchliesstMitDiesemSpieltag.teamCount === 1
-                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`
-                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`}
+                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`
+                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`}
               </p>
             ) : null}
             {slotCells.length > 0 ? (
