@@ -39,6 +39,17 @@ import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamI
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
+  istKiRuecklageV2Aktiv,
+  resolveKiRuecklageFuerTeam,
+  type KiRuecklageErgebnis,
+} from "@/lib/finance/ki-ruecklage";
+import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
+import {
+  berechneBudgetZugriff,
+  resolveVorstandFreigabe,
+  type VorstandFreigabe,
+} from "@/lib/finance/vorstand-budgetfreigabe";
+import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
 } from "@/lib/ai/ai-needs-picks-compare-service";
@@ -383,6 +394,12 @@ export type OrganicDraftPlanResult = {
    * without recomputing it.
    */
   salaryCeilingDebug?: ReturnType<typeof computeTeamSalaryCeiling>;
+  /** Finanzkonzept V2 Stufe 1: die Finanzwert-Ruecklage dieses Aufrufs (undefined bei `OLY_KI_RUECKLAGE_V2=0`). */
+  ruecklageDebug?: KiRuecklageErgebnis;
+  /** Finanzkonzept V2 Stufe 3: Vorstand-Freigabe dieses Aufrufs und das gesperrte Geld (C). */
+  vorstandDebug?: VorstandFreigabe & { gesperrt: number };
+  /** Finanzkonzept V2 Stufe 2: der in den Forecast eingespeiste erwartete Sponsor (C). */
+  sponsorForecast?: number;
 };
 
 /**
@@ -464,13 +481,37 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     .filter((view) => view.marketValue > 0);
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
 
+  // FINANZKONZEPT V2 (Stufe 1 bis 3), alles per Env einzeln abschaltbar fuer den A/B-Vergleich.
+  //  Stufe 1: Ruecklage nach Finanzwert (Budget = Kasse + Kaderwert, Zielgehalt statt Gehalt des leeren Kaders).
+  //  Stufe 3: der Vorstand sperrt vom Geld UEBER der Ruecklage den Anteil (1 - Freigabe); das Team plant mit
+  //           der Kasse abzueglich der Sperre, der Rest-Betrag wird am Ende wieder aufgeschlagen.
+  let ruecklageDebug: KiRuecklageErgebnis | undefined;
+  if (istKiRuecklageV2Aktiv()) {
+    ruecklageDebug = resolveKiRuecklageFuerTeam(input.gameState, input.team.teamId, {
+      cash: ctx.cash,
+      rosterSalaryTotal: resolveRosterSalaryTotal(input.gameState, input.team.teamId),
+      rosterMarketValue: startingSquad.reduce((sum, view) => sum + view.marketValue, 0),
+      finances: input.identity?.finances,
+    });
+  }
+  const ruecklage = ruecklageDebug?.ruecklage ?? 0;
+  const vorstand = resolveVorstandFreigabe(input.gameState, input.team.teamId);
+  const zugriff = berechneBudgetZugriff({ cash: ctx.cash, ruecklage: Math.max(ruecklage, ORGANIC_CASH_BUFFER), anteil: vorstand.anteil });
+  const vorstandGesperrt = vorstand.anteil < 1 ? zugriff.gesperrt : 0;
+  const planCash = ctx.cash - vorstandGesperrt;
+  const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
+  const sponsorForecast =
+    istSponsorForecastAktiv() && input.forecast?.sponsorIncome === undefined
+      ? erwarteterSponsorFuerPlanung(input.gameState, input.team.teamId)
+      : undefined;
+
   // ANPASSUNG B: cash-scaled opt-trim. If the club can't fund Depth-grade bodies across every open slot,
   // trim optTarget by up to 2 (never below ROSTER_MIN) so per-slot budget rises and Depth becomes
   // affordable — fewer, better bodies instead of a Reserve tail. Rich clubs get strain 0 (untouched).
   let planWeights = ctx.weights;
   if (FILLQ_B_ENABLED) {
     const slotsToFill = Math.max(1, ctx.weights.optTarget - startingSquad.length);
-    const budgetPerSlot = (ctx.cash - ORGANIC_CASH_BUFFER) / slotsToFill;
+    const budgetPerSlot = (planCash - ORGANIC_CASH_BUFFER) / slotsToFill;
     const strain = Math.min(1, Math.max(0, 1 - budgetPerSlot / DEPTH_REF_COST));
     const trimmedOpt = Math.max(ROSTER_MIN, ctx.weights.optTarget - Math.round(2 * strain));
     if (trimmedOpt !== ctx.weights.optTarget) {
@@ -548,7 +589,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     const counts = deriveCompositionCounts({
       optTarget: planWeights.optTarget,
       existingTiers,
-      spendableNet: ctx.cash - ORGANIC_CASH_BUFFER,
+      spendableNet: planCash - Math.max(ORGANIC_CASH_BUFFER, ruecklage),
       brackets,
       premiumAppetite: lanePhilosophy.premiumAppetite,
       premiumCap: lanePhilosophy.premiumCap,
@@ -564,7 +605,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
   // before the plan call since buildOrganicSquadPlan needs it on economy. An ADDITIONAL cap on top of the
   // existing cash/fee budgeting (never a replacement) — see draft-builder.ts's salaryCeilingActive gate.
   const salaryCeilingDebug = SALARY_CEILING_V2_ENABLED
-    ? computeTeamSalaryCeiling(input.gameState, input.team.teamId, { teamCash: ctx.cash })
+    ? computeTeamSalaryCeiling(input.gameState, input.team.teamId, { teamCash: planCash })
     : undefined;
 
   const result = buildOrganicSquadPlan({
@@ -574,12 +615,12 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     disciplines: ctx.disciplines,
     composition,
     economy: {
-      cash: ctx.cash,
-      cashBuffer: ctx.cashBuffer,
+      cash: planCash,
+      cashBuffer: planCashBuffer,
       salaryTotal,
       boardRisk: ctx.boardRisk,
       expectedPrize: input.forecast?.expectedPrize ?? 0,
-      sponsorIncome: input.forecast?.sponsorIncome ?? 0,
+      sponsorIncome: input.forecast?.sponsorIncome ?? sponsorForecast ?? 0,
       facilityNet: input.forecast?.facilityNet ?? 0,
       netTransfer: input.forecast?.netTransfer ?? 0,
       weights: planWeights,
@@ -588,19 +629,27 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       salaryCeiling: salaryCeilingDebug?.salaryCeiling,
       // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
       // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
-      solvencyFloor: ORGANIC_CASH_BUFFER,
+      solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
+      // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
+      // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
+      minFillFloor: ruecklage > 0 ? ruecklage : undefined,
     },
     draftSeed: input.draftSeed ?? null,
   });
 
   return {
     decisions: result.decisions,
-    finalCash: result.finalCash,
+    // Die Vorstand-Sperre war nie ausgebbar und liegt weiter in der Kasse: wieder aufschlagen, damit Aufrufer
+    // (Kredit-Probe: Ausgabe = Startkasse - finalCash) die echte Ausgabe sehen.
+    finalCash: result.finalCash + vorstandGesperrt,
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
     optTarget: planWeights.optTarget,
     salaryCeilingDebug,
+    ruecklageDebug,
+    vorstandDebug: { ...vorstand, gesperrt: vorstandGesperrt },
+    sponsorForecast,
   };
 }
 

@@ -85,6 +85,14 @@ export type OrganicSquadPlanInput = {
      */
     solvencyFloor?: number;
     /**
+     * FINANZKONZEPT V2 (Stufe 1): Untergrenze der Kasse auch UNTER dem Kader-Minimum. Fehlt sie (Standard),
+     * gilt wie bisher 0 — wer das Minimum erreichen muss, gibt alles aus. Gesetzt (Finanzwert-Ruecklage des
+     * Teams) haelt der Builder diese Kasse auch beim Auffuellen bis zum Minimum, solange das Minimum dabei
+     * noch erreichbar bleibt (`reserveForMin`); gelingt das nicht, faellt er auf die alte Regel (Floor 0)
+     * zurueck, Mindestkader vor Ruecklage.
+     */
+    minFillFloor?: number;
+    /**
      * ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2 — see draft-adapter.ts wiring / salary-ceiling.ts
      * computeTeamSalaryCeiling doc). Soft cap on TOTAL salary (existing roster + planned additions),
      * anchored on expected sponsor income and team value rather than the volatile cash snapshot. Enforced
@@ -147,6 +155,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const optTarget = input.economy.weights.optTarget;
   // Floor kept while building from min→opt (see solvencyFloor doc). Defaults to cashBuffer = old behaviour.
   const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
+  // FINANZKONZEPT V2: Ruecklage auch unter Min (undefined => 0 => bit-gleich zu vorher).
+  const minFillFloor = Math.max(0, input.economy.minFillFloor ?? 0);
   // ANPASSUNG SALCEIL: undefined ⇒ no salary gating (flag off / caller opted out) ⇒ bit-identical to before.
   const salaryCeiling = input.economy.salaryCeiling;
 
@@ -222,7 +232,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     // rather than blown on luxury depth. Affordability keeps cash ≥ floor AFTER the buy AND the min-fill.
     const belowMin = squad.length < rosterMin;
     const belowOpt = squad.length < optTarget;
-    const affordFloor = belowMin ? 0 : belowOpt ? optFillFloor : cashBuffer;
+    const affordFloor = belowMin ? Math.min(minFillFloor, cashBuffer) : belowOpt ? optFillFloor : cashBuffer;
     // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
     // ANPASSUNG SALCEIL: once the roster is at/above the hard minimum, a candidate whose salary would push
     // the TOTAL wage bill past salaryCeiling is treated as unaffordable-by-salary, same as the cash checks
@@ -243,6 +253,24 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       if (utility > bestUtility) {
         bestUtility = utility;
         best = candidate;
+      }
+    }
+
+    // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
+    // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
+    if (!best && belowMin && affordFloor > 0) {
+      for (const candidate of pool) {
+        if (cash - price(candidate) - reserveForMin < 0) continue;
+        if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
+        const jitter =
+          input.draftSeed && ORGANIC_DRAFT_JITTER > 0
+            ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
+            : 0;
+        const utility = buyUtility(candidate, state) + jitter;
+        if (utility > bestUtility) {
+          bestUtility = utility;
+          best = candidate;
+        }
       }
     }
 
