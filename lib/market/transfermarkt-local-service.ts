@@ -1,3 +1,4 @@
+import { pruefeKaufGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { randomUUID } from "node:crypto";
 
 import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
@@ -1449,6 +1450,15 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   ) {
     blockingReasons.push("insufficient_cash");
   }
+  if (team && purchasePrice != null && salary != null) {
+    const vorstand = pruefeKaufGegenVorstandFreigabe(gameState, params.teamId, {
+      fee: purchasePrice,
+      salary,
+      rosterBefore: rosterBefore,
+      playerMin: teamContext?.playerMin ?? null,
+    });
+    if (!vorstand.ok && vorstand.reason) blockingReasons.push(vorstand.reason);
+  }
   if (recentlySoldBySameTeam && !params.allowRecentlySoldRebuyOverride) {
     blockingReasons.push(RECENTLY_SOLD_SAME_PRESEASON_BLOCKER);
   }
@@ -2746,6 +2756,15 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
     }) < purchasePrice
   ) {
     blockingReasons.push("insufficient_cash");
+  }
+  if (team && purchasePrice != null && salary != null) {
+    const vorstand = pruefeKaufGegenVorstandFreigabe(gameState, params.teamId, {
+      fee: purchasePrice,
+      salary,
+      rosterBefore: rosterEntries.length,
+      playerMin: teamIdentity?.playerMin ?? null,
+    });
+    if (!vorstand.ok && vorstand.reason) blockingReasons.push(vorstand.reason);
   }
   if (purchasePriceOverride != null) {
     warnings.push(params.purchasePriceOverrideReason ?? "purchase_price_override_in_effect");
