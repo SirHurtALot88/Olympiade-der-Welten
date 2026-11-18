@@ -11,15 +11,15 @@ Keine Figuren, keine Animationen. Der Einbau in den Motor läuft auf `claude/cli
 | Guthaben vorher (`/balance`) | 761,7 | |
 | Canyon | 89,0 | 90 |
 | Eisfall | 67,2 | 95 |
-| Kletterhalle | 91,0 | 110 |
-| **Summe** | **247,2** | 280 |
-| Guthaben nachher (`/balance`) | 514,5 | Reserve 150 unberührt |
+| Kletterhalle | 94,0 | 110 |
+| **Summe** | **250,2** | 280 |
+| Guthaben nachher (`/balance`) | 511,5 | Reserve 150 unberührt |
 
-Die Summe stimmt mit der Kontodifferenz überein (761,735 − 514,540 = 247,195); in der Zeit hat niemand
+Die Summe stimmt mit der Kontodifferenz überein (761,735 − 511,540 = 250,195); in der Zeit hat niemand
 sonst bestellt. Jeder POST ging genau einmal hinaus, alle unter `flock /tmp/pixellab-bestell.lock`.
 Einzelposten mit `gen_vorher`/`gen_nachher`, Prompt, Saat und Job stehen in den beiden `quellen.json`.
 
-56 Aufträge: 51 Treffer (davon 2 mit Abstrich), 4 verworfen, 1 leer zurück (nicht berechnet).
+59 Aufträge: 52 Treffer (davon 4 mit Abstrich), 6 verworfen, 1 leer zurück (nicht berechnet).
 
 | Verworfen | Gen. | Grund |
 |---|---:|---|
@@ -28,11 +28,13 @@ Einzelposten mit `gen_vorher`/`gen_nachher`, Prompt, Saat und Job stehen in den 
 | Canyon `felsband` (Bandleiste) | 1 | Plattformer-Kacheln, passt nicht zur Wand. Das Band ist im Wandbild selbst |
 | Canyon `wandfuss_b` (Sandstreifen) | 1 | flacher, greller Streifen. Ersetzt durch das Geröll `wandfuss.png` |
 | Eisfall `aluleiter_bruecke` (erster Versuch) | 1 | dünner Strich zwischen zwei Eisklötzen. Zweiter Versuch: Treffer |
+| Halle `griffe_rot`, `griffe_blau`, `griffe_gelb` (erster Versuch) | 3 | nicht die bestellten Wettkampfgriffe: rot glänzende Klumpen, gelb wie Käse, blau wie die Canyon-Griffe. Einmal neu bestellt (3 Gen.), die Dateien sind ersetzt |
 | Canyon `wandfuss` (erster Auftrag) | 0 | kam leer zurück, laut API nicht berechnet (Konto unverändert) |
 
 Treffer mit Abstrich: `canyon_rastpodest.png` und `eisfall_rastpodest.png` sind wieder leicht von oben
 gesehen statt frontal (brauchbar, aber nicht die bestellte Frontansicht); `wandfuss.png` (Canyon) hat einen
-Gipfel in der Mitte und taugt eher als Geröllhaufen als als durchgehender Streifen.
+Gipfel in der Mitte und taugt eher als Geröllhaufen als als durchgehender Streifen; `halle_griffe_gelb.png` (zweiter Versuch) ist matt und
+lesbar, hat aber mehrere Schraublöcher je Griff statt einem.
 
 Nicht bestellt, weil der Canyon-Deckel erreicht war: Bohrhaken mit Schlinge, Standplatz-Kette, loser
 Einzelblock. Felsstaub und Eisstaub gibt es schon (`fx-bodenstaub-lite`, `fx-eisstaub-lite`).

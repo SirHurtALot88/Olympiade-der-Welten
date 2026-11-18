@@ -3092,18 +3092,30 @@
     "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
     "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
     "auftrag": {
-      "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them red, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
-      "seed": 123,
+      "prompt": "<b64 423>",
+      "seed": 131,
       "endpunkt": "/v2/create-image-pixflux",
       "generationen": 1.0,
-      "gen_vorher": 518.54,
-      "gen_nachher": 517.54,
-      "datum": "2026-11-18T20:57:52Z",
+      "gen_vorher": 514.54,
+      "gen_nachher": 513.54,
+      "datum": "2026-11-18T21:12:30Z",
       "gen": [
         128,
         64
       ]
-    }
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them red, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 123,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 518.54,
+        "gen_nachher": 517.54,
+        "datum": "2026-11-18T20:57:52Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
   },
   "climbing/halle_griffe_blau.png": {
     "paket": "PixelLab",
@@ -3119,18 +3131,30 @@
     "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
     "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
     "auftrag": {
-      "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them blue, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
-      "seed": 124,
+      "prompt": "<b64 424>",
+      "seed": 132,
       "endpunkt": "/v2/create-image-pixflux",
       "generationen": 1.0,
-      "gen_vorher": 517.54,
-      "gen_nachher": 516.54,
-      "datum": "2026-11-18T20:58:05Z",
+      "gen_vorher": 513.54,
+      "gen_nachher": 512.54,
+      "datum": "2026-11-18T21:12:54Z",
       "gen": [
         128,
         64
       ]
-    }
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them blue, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 124,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 517.54,
+        "gen_nachher": 516.54,
+        "datum": "2026-11-18T20:58:05Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
   },
   "climbing/halle_griffe_gelb.png": {
     "paket": "PixelLab",
@@ -3146,18 +3170,30 @@
     "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
     "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
     "auftrag": {
-      "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them yellow, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
-      "seed": 125,
+      "prompt": "<b64 426>",
+      "seed": 133,
       "endpunkt": "/v2/create-image-pixflux",
       "generationen": 1.0,
-      "gen_vorher": 516.54,
-      "gen_nachher": 515.54,
-      "datum": "2026-11-18T20:58:29Z",
+      "gen_vorher": 512.54,
+      "gen_nachher": 511.54,
+      "datum": "2026-11-18T21:13:12Z",
       "gen": [
         128,
         64
       ]
-    }
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them yellow, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 125,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 516.54,
+        "gen_nachher": 515.54,
+        "datum": "2026-11-18T20:58:29Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
   },
   "climbing/fx-climbing-kreide-lite.png": {
     "paket": "PixelLab",
