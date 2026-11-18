@@ -320,6 +320,27 @@ nächsten Wochen hardcore verbessern!!"
   `docs/design/oly-seiten-modern-17-11.md` (Designsystem: Tokens, Barlow-Condensed-Zahlen lokal, Karten,
   Tabellen, Icon-Schiene, Blatt). Neue Mockups übernehmen dieses System exakt, damit die App aus einem
   Guss wird. Reine CSS/SVG-Gestaltung; PixelLab nur, wo ein Bild echten Mehrwert hat.
+- **Nach dem Bau immer mit dem Mockup abgleichen** (Chris, 18.11.: „wichtig, dass die ganzen coolen
+  Features und Optik, die man vorher sieht, dann auch im Spiel wiederfindet“). Pflicht zum Abschluss
+  jedes Baus nach Mockup: je Ansicht ein Bildpaar „Mockup | App“ nebeneinander unter `docs/design/…`
+  und eine Liste jedes sichtbaren Mockup-Features als **drin / angepasst (warum) / fehlt (warum)**.
+  Was im Mockup erfunden war (z. B. Siegchancen ohne Datenquelle), wird ehrlich ersetzt, nicht
+  stillschweigend weggelassen.
+
+## Zielbildschirme: 16:9, 15"-MacBook und 32" OLED
+
+Chris, 18.11., wörtlich: „Bitte alle Layouts, Spiele etc. auf 16:9 optimiert, 15" MacBook und
+Hauptscreen ist 32" OLED, bitte merken.“ Jede Seite, jede Arena und jedes HUD wird für diese zwei
+Geräte gebaut und geprüft:
+
+| Gerät | Viewport zum Prüfen (CSS-px) |
+|---|---|
+| 15"-MacBook | 1440×900 (und 1512×982) |
+| 32" OLED, 4K | 2560×1440 (Nebenprobe 1920×1080) |
+
+Screenshots und Sichtprüfung laufen bei 1440×900 **und** 2560×1440, Phone (412 breit) bleibt
+Nebenprobe. Bei 1440 darf nichts gequetscht, abgeschnitten oder unnötig scrollend sein; bei 2560 darf
+nichts verloren wirken (keine leeren Riesenränder, Schrift und Tafeln wachsen mit).
 
 ## An die Spielstände kommen
 
