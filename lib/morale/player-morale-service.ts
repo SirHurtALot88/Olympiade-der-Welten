@@ -17,6 +17,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
+import { LEAGUE_SIZE, TEAM_COUNT_TOTAL, getLeagueOf, getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {
@@ -649,6 +650,59 @@ function getStoredMorale(
   return storedRows.find((entry) => entry.playerId === playerId) ?? null;
 }
 
+function smoothReasonsWithStored(
+  storedReasons: PlayerMoraleReason[],
+  freshReasons: PlayerMoraleReason[],
+  carryWeight: number,
+): PlayerMoraleReason[] {
+  const storedById = new Map<string, PlayerMoraleReason>();
+  for (const reason of storedReasons) {
+    if (!storedById.has(reason.reasonId)) storedById.set(reason.reasonId, reason);
+  }
+  const seen = new Set<string>();
+  const result: PlayerMoraleReason[] = [];
+  for (const reason of freshReasons) {
+    if (seen.has(reason.reasonId)) {
+      result.push(reason);
+      continue;
+    }
+    seen.add(reason.reasonId);
+    const previous = storedById.get(reason.reasonId);
+    result.push(
+      previous && previous.source === reason.source
+        ? { ...reason, valueDelta: roundValue(previous.valueDelta * carryWeight + reason.valueDelta * (1 - carryWeight), 1) }
+        : reason,
+    );
+  }
+  return result;
+}
+
+/**
+ * Rangraum, in dem `standings[teamId].rank` fuer dieses Team gezaehlt wird: mit Liga-Split die
+ * ECHTE Teamzahl der eigenen Liga aus `leagueByTeamId` (16 heute, aber nicht hart verdrahtet);
+ * im Legacy-32er-Modus (ohne Liga-Zuordnung) `TEAM_COUNT_TOTAL`, wie `sponsorRangraumFuer`.
+ */
+function getTeamRankSpace(gameState: GameState, teamId: string): number {
+  if (!isLeagueSplitActive(gameState)) return TEAM_COUNT_TOTAL;
+  const tier = getLeagueOf(gameState, teamId);
+  const size = tier ? getLeagueTeamIds(gameState, tier).length : 0;
+  return size > 0 ? size : LEAGUE_SIZE;
+}
+
+/**
+ * Die drei Rang-Schwellen der Moral, relativ zur Ligagroesse. Bei 32 Teams bit-identisch zu den
+ * frueheren festen Werten (<= 3, <= 8, >= 25): Titel = oberste 3/32, stark = oberes Viertel,
+ * Enttaeuschung = unteres Viertel. Bei 16: <= 2, <= 4, >= 13.
+ */
+export function getMoraleRankThresholds(rankSpace: number) {
+  const size = Math.max(4, Math.round(Number.isFinite(rankSpace) ? rankSpace : TEAM_COUNT_TOTAL));
+  return {
+    title: Math.max(1, Math.ceil((size * 3) / 32)),
+    success: Math.max(2, Math.ceil(size / 4)),
+    underperforming: size - Math.ceil(size / 4) + 1,
+  };
+}
+
 function normalizeCarryOverMorale(stored: PlayerMoraleState, seasonId: string, currentTeamId: string | null) {
   if (stored.lastUpdatedSeasonId === seasonId) {
     return {
@@ -720,20 +774,16 @@ export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssess
     renewalSalaryPreview: input.renewalSalaryPreview ?? null,
   });
 
-  // Nur die ersten zwei GESPEICHERTEN Reasons wandern unveraendert (Text UND Wert) in die
-  // Anzeige -- das haelt die Moral "ruhig" statt bei jedem Aufruf zu springen. Fuer
-  // `player_demands`-Reasons (Forderungen: Einsätze/Disziplin/Captain/...) ist das aber ein
-  // Bug, kein Feature: die werden JEDES Mal komplett frisch aus dem aktuellen Stand berechnet
-  // (`applyPlayerDemandMoraleImpact` oben), es gibt fuer sie also nichts zu "glaetten". Landete
-  // ein Forderungs-Reason einmal in den ersten zwei Slots (z. B. "Forderung verfehlt: 1/8
-  // Einsätze" am Spieltag 1), wanderte er unveraendert von Snapshot zu Snapshot weiter -- auch
-  // wenn die Forderung laengst erfuellt ist oder gar nicht mehr existiert, DENN eine erfuellte/
-  // offene Forderung erzeugt selbst gar keinen frischen Reason (delta 0 wird nicht hinzugefuegt,
-  // siehe `applyPlayerDemandMoraleImpact`), der den alten haette verdraengen koennen. Das war
-  // exakt der gemeldete Fall: Der Chip zeigte "1/8 Einsätze" weit ueber den Spieltag hinaus, an
-  // dem das zuletzt gestimmt hatte. `player_demands`-Reasons deshalb NIE aus dem Speicher
-  // uebernehmen -- nur aus der eben berechneten `assessment` (bereits frisch, siehe oben).
-  const carryableStoredReasons = stored.reasons.filter((reason) => reason.source !== "player_demands").slice(0, 2);
+  // Gruende werden mit der Moral GEGLAETTET, nicht blind uebernommen. Fruehere Fassung: die
+  // ersten zwei gespeicherten Gruende wanderten ungeprueft (Text UND Wert) in den naechsten
+  // Stand. Folge: ein Team auf Rang 11 zeigte "Titel/Meisterschaft +12", weil es einmal in den
+  // Top 3 stand; dasselbe Muster hatte schon die Forderungs-Gruende ("1/8 Einsaetze") festgehalten.
+  // `assessment.reasons` wird bei JEDEM Aufruf vollstaendig aus dem heutigen Stand berechnet --
+  // enthaelt es einen gespeicherten Grund nicht (mehr), gilt seine Bedingung nicht mehr, und er
+  // faellt weg (auch als abgeschwaechte Zahl waere "Titelkandidat" auf Rang 11 falsch). Gilt sie
+  // noch, wird der Wert mit demselben Gewicht wie die Moral selbst zwischen gespeichert und
+  // frisch gemischt (Abklingen statt Springen) und der Grund steht EINMAL in der Liste.
+  const smoothedReasons = smoothReasonsWithStored(stored.reasons, assessment.reasons, carryOver.carryWeight);
 
   return {
     ...assessment,
@@ -741,7 +791,7 @@ export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssess
     visibleMood,
     smiley: getSmiley(visibleMood),
     moodLabel: getMoodLabel(visibleMood),
-    reasons: [...carryableStoredReasons, ...assessment.reasons].slice(0, 8),
+    reasons: smoothedReasons.slice(0, 8),
     contractIntent: intent,
     moraleSalaryModifier: salaryModifier,
     moraleContractLengthLimit: getContractLengthLimit(blendedMorale, player),
@@ -776,8 +826,9 @@ function computePlayerMorale(input: {
     : getLatestSnapshotContext(gameState, team.teamId, player.id);
   const rank = snapshotContext?.teamRank ?? getTeamRank(gameState, team.teamId);
   const rankSource = snapshotContext?.teamRank != null ? "season_snapshot" : "standings";
+  const rankThresholds = getMoraleRankThresholds(getTeamRankSpace(gameState, team.teamId));
   if (rank != null) {
-    if (rank <= 3) {
+    if (rank <= rankThresholds.title) {
       const weight = clamp(
         relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.22 : 0) - (hasTrait(player, "loyal") ? 0.12 : 0),
         0.45,
@@ -786,7 +837,7 @@ function computePlayerMorale(input: {
       const delta = roundValue(12 * weight, 1);
       morale += delta;
       addReason(reasons, "team_title_contender", "Team spielt um Titel/Meisterschaft", delta, rankSource);
-    } else if (rank <= 8) {
+    } else if (rank <= rankThresholds.success) {
       const weight = clamp(
         relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.18 : 0) - (hasTrait(player, "loyal") ? 0.08 : 0),
         0.45,
@@ -795,7 +846,7 @@ function computePlayerMorale(input: {
       const delta = roundValue(7 * weight, 1);
       morale += delta;
       addReason(reasons, "team_success", "Team ist sportlich stark", delta, rankSource);
-    } else if (rank >= 25) {
+    } else if (rank >= rankThresholds.underperforming) {
       const weight = clamp(
         relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.45 : 0) - (hasTrait(player, "loyal") ? 0.22 : 0),
         0.3,
@@ -924,7 +975,7 @@ function computePlayerMorale(input: {
   if (rosterEntry.salary > 0 && renewalSalary != null && renewalSalary > rosterEntry.salary * 1.25) {
     const expectationRelief = relativeContext.strengthTier === "depth" ? 2 : relativeContext.strengthTier === "rotation" ? 1 : 0;
     const goodContextDiscount =
-      (rank != null && rank <= 3 ? 3 : rank != null && rank <= 8 ? 1 : 0) +
+      (rank != null && rank <= rankThresholds.title ? 3 : rank != null && rank <= rankThresholds.success ? 1 : 0) +
       (seasonPerformance.averageContribution != null && seasonPerformance.averageContribution >= 12 ? 2 : 0) +
       expectationRelief;
     const delta = Math.min(-2, (hasTrait(player, "mercenary") ? -10 : -6) + goodContextDiscount);

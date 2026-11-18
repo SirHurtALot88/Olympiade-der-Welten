@@ -23,6 +23,31 @@ function normalizeIntensity(value: unknown): "conserve" | "normal" | "push" {
   return value === "conserve" || value === "push" || value === "normal" ? value : "normal";
 }
 
+/**
+ * VERLETZT = NICHT EINSETZBAR (Chris, 18.11., woertlich): „Verletzt ist nicht nur −10, sondern gar
+ * nicht einsetzbar! Und IN der Disziplin, wo er sich verletzt hat, hat er nur 50 % seiner
+ * Basisleistung bzw. Eignung/Score."
+ *
+ * Ein Spieler mit einer Sperre aus einem VORSPIELTAG (`availabilityBlocker` gesetzt,
+ * `injuredAtMatchdayId` != dieser Spieltag) wird nicht gewertet — auch dann nicht, wenn er in einer
+ * gesperrten Aufstellung (oder ueber einen Override) noch auf dem Zettel steht. Die Aufstellungswege
+ * (Einsatzliste, KI, Auffuellen, eingefrorene KI-Entwuerfe) lassen ihn gar nicht erst hinein; das hier
+ * ist das Netz darunter, das vorher fehlte („die Score-Engine kennt keine Sperre",
+ * `legacy-lineup-validator.ts`).
+ *
+ * NICHT betroffen ist, wer sich AN DIESEM Spieltag verletzt hat (`injuredAtMatchdayId` == dieser
+ * Spieltag): der ist in seiner Disziplin GELAUFEN und wird mit 50 % seiner Basis gewertet (s. unten,
+ * `injuryAdjustedScore`). Fehlt `matchdayId`, greift nichts — kein Raten.
+ */
+export function istVerletzungsgesperrtAusVorspieltag(
+  rosterPlayer: Pick<LegacyRosterPlayerRef, "availabilityBlocker" | "injuredAtMatchdayId"> | null | undefined,
+  matchdayId: string | null | undefined,
+): boolean {
+  if (!rosterPlayer || !matchdayId) return false;
+  if (rosterPlayer.availabilityBlocker !== "player_injured_unavailable") return false;
+  return rosterPlayer.injuredAtMatchdayId != null && rosterPlayer.injuredAtMatchdayId !== matchdayId;
+}
+
 function buildScoreMap(disciplineScores: LegacyDisciplineScoreRef[]) {
   return new Map<string, number>(disciplineScores.map((entry) => [`${entry.playerId}::${entry.disciplineId}`, entry.score]));
 }
@@ -209,6 +234,21 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     );
   }
   const selectedPlayers = relevantEntries.length;
+  // Gesperrte (Verletzung aus einem Vorspieltag) belegen den Slot weiter — aufgestellt WAREN sie,
+  // die Seite wird dadurch nicht „unvollstaendig" und blockiert nichts —, aber sie werden nicht
+  // gewertet: kein Score, keine Anteile, keine PP (s. `istVerletzungsgesperrtAusVorspieltag`).
+  const gesperrtePlayerIds = new Set(
+    relevantEntries
+      .filter((entry) => istVerletzungsgesperrtAusVorspieltag(rosterPlayerById.get(entry.playerId), input.matchdayId))
+      .map((entry) => entry.playerId),
+  );
+  const wertbareEntries =
+    gesperrtePlayerIds.size === 0 ? relevantEntries : relevantEntries.filter((entry) => !gesperrtePlayerIds.has(entry.playerId));
+  for (const playerId of gesperrtePlayerIds) {
+    validationWarnings.push(
+      `player_injured_unavailable: Player ${playerId} is injured and not scored in ${input.disciplineId} (${input.disciplineSide}).`,
+    );
+  }
   const missingPlayers = requiredPlayers == null ? 0 : Math.max(0, requiredPlayers - selectedPlayers);
   const isComplete = requiredPlayers == null ? true : missingPlayers === 0;
 
@@ -227,7 +267,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   // dieselbe Zahl wie zuvor — dieselbe Reihenfolge, dieselbe Rundung.
   const intensityShareByPlayerId: Record<string, number> = {};
   let intensityShareSum = 0;
-  for (const entry of relevantEntries) {
+  for (const entry of wertbareEntries) {
     const share = seededIntensityShare(
       intensity,
       `intensity|${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`,
@@ -260,7 +300,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     );
   }
 
-  const scoredEntries: LegacyLineupScoreResult["entries"] = relevantEntries.map((entry) => {
+  const scoredEntries: LegacyLineupScoreResult["entries"] = wertbareEntries.map((entry) => {
     const scoreKey = `${entry.playerId}::${entry.disciplineId}`;
     const baseScore = scoreByPlayerAndDiscipline.get(scoreKey) ?? null;
     const activePlayer = entry.activePlayerId ? activePlayerById.get(entry.activePlayerId) ?? null : null;
@@ -275,10 +315,21 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     const injury = input.injuryByPlayerId?.[entry.playerId] ?? null;
     const injuryMultiplier =
       injurySourceStatus === "mapped" ? (injury?.multiplier ?? 1) : injurySourceStatus === "not_applied" ? 1 : null;
+    // 50 % DER BASIS (Chris, 18.11.): wer sich IN dieser Disziplin verletzt, bringt nur
+    // INJURY_PERFORMANCE_MULTIPLIER seiner Basisleistung (Eignung) ein — gerechnet auf `baseScore`,
+    // nicht auf den Fatigue-Wert. Vorher stand hier `fatigueAdjustedScore * 0,5`; bei hoher
+    // Erschoepfung (genau der Lage, in der Verletzungen entstehen) waren das bis zu 37,5 % der Basis
+    // statt 50 %. Die Verletzung ERSETZT den Fatigue-Abschlag, sie kommt nicht obendrauf. Die
+    // Folgeschritte (Moral, Form, Captain, Intensitaet, Rolle, Team-Power) wirken wie bei jedem
+    // anderen Spieler weiter. Ohne Verletzung (Faktor 1) bleibt die Rechnung Zeichen fuer Zeichen
+    // die alte.
+    const injuredHere = injuryMultiplier != null && injuryMultiplier < 1;
     const injuryAdjustedScore =
       fatigueAdjustedScore == null || injuryMultiplier == null
         ? fatigueAdjustedScore
-        : roundPreviewScore(fatigueAdjustedScore * injuryMultiplier);
+        : injuredHere && baseScore != null
+          ? roundPreviewScore(baseScore * injuryMultiplier)
+          : roundPreviewScore(fatigueAdjustedScore * injuryMultiplier);
     const morale = input.moraleByPlayerId?.[entry.playerId] ?? null;
     const moraleMultiplier = moraleStatus === "mapped" ? (morale?.multiplier ?? 1) : null;
     const formWirkung = input.formWirkungByPlayerId?.[entry.playerId] ?? null;
@@ -433,7 +484,16 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   );
   const mutatorTeamOnlyAdjustment =
     mutatorModifier == null ? 0 : roundPreviewScore(Math.max(0, (mutatorModifier ?? 0) - mutatorScoreAlreadyApplied));
-  const slotRoleModifier = input.slotRoleModifier ?? 0;
+  // Der Team-Rollenterm wird ausserhalb aus ALLEN Eintraegen gerechnet; der Anteil eines nicht
+  // gewerteten Gesperrten gehoert nicht in den Seiten-Score.
+  const gesperrterSlotRoleAnteil = [...gesperrtePlayerIds].reduce(
+    (sum, playerId) => sum + (input.slotRoleModifierByPlayerId?.[playerId] ?? 0),
+    0,
+  );
+  const slotRoleModifier =
+    gesperrtePlayerIds.size === 0 || !input.slotRoleModifierByPlayerId
+      ? input.slotRoleModifier ?? 0
+      : roundPreviewScore((input.slotRoleModifier ?? 0) - gesperrterSlotRoleAnteil);
   // Form ist bereits pro Spieler in finalContribution enthalten (s. oben) —
   // NICHT erneut als Team-Term addieren, sonst Doppelzählung.
   const prePowerScore = roundPreviewScore(

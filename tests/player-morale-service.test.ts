@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { assessPlayerMorale, getMoraleRankThresholds } from "@/lib/morale/player-morale-service";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -102,6 +102,7 @@ function createGameState(input: {
   teammate?: Player;
   seasonId?: string;
   playerMoraleState?: GameState["playerMoraleState"];
+  leagueTeamCount?: number;
 } = {}): GameState {
   const team = input.team ?? createTeam();
   const player = input.player ?? createPlayer("p1");
@@ -135,6 +136,14 @@ function createGameState(input: {
       seasonId: input.seasonId ?? "season-2",
       schedule: [],
       standings: { [team.teamId]: { points: 0, rank: input.rank ?? 12 } },
+      ...(input.leagueTeamCount
+        ? {
+            leagueByTeamId: Object.fromEntries([
+              [team.teamId, "liga1"],
+              ...Array.from({ length: input.leagueTeamCount - 1 }, (_, index) => [`filler-${index}`, "liga1"]),
+            ]),
+          }
+        : {}),
       matchdayResults: [{ id: "result-1", saveId: "save", seasonId: "season-2", matchdayId: "matchday-1", status: "preview_applied", sourceVersion: "test", teamsTotal: 1, teamsReady: 1, teamsUnderfilled: 0, teamsMissingLineup: 0, teamsInvalidLineup: 0, teamsMissingScoreCoverage: 0, warningsCount: 0, createdAt: "", updatedAt: "" }],
       playerDisciplinePerformances: performances,
     },
@@ -729,5 +738,87 @@ describe("player morale service", () => {
 
     const freshSnapshot = assessPlayerMorale({ gameState: caughtUpState, playerId: player.id, teamId: "M-M" });
     expect(freshSnapshot?.reasons.some((reason) => reason.reasonId === "player_demand_failed_appearances")).toBe(false);
+  });
+
+  describe("Rang-Schwellen und abgelaufene Gruende (Nach dem Spieltag, 18.11.)", () => {
+    const reasonIds = (state: GameState, playerId: string) =>
+      assessPlayerMorale({ gameState: state, playerId, teamId: "M-M" })?.reasons.map((reason) => reason.reasonId) ?? [];
+
+    it("misst die Schwellen an der echten Ligagroesse: Rang 14 von 16 ist Enttaeuschung, Rang 11 nicht", () => {
+      const player = createPlayer("liga16");
+      const build = (rank: number) =>
+        createGameState({ player, roster: createRosterEntry(player.id), rank, leagueTeamCount: 16 });
+      expect(reasonIds(build(14), player.id)).toContain("team_underperforming");
+      expect(reasonIds(build(11), player.id)).not.toContain("team_underperforming");
+      expect(reasonIds(build(2), player.id)).toContain("team_title_contender");
+      expect(reasonIds(build(4), player.id)).toContain("team_success");
+    });
+
+    it("liest die Teamzahl aus den Daten statt 16 zu verdrahten", () => {
+      const player = createPlayer("liga8");
+      const state = createGameState({ player, roster: createRosterEntry(player.id), rank: 7, leagueTeamCount: 8 });
+      expect(reasonIds(state, player.id)).toContain("team_underperforming");
+      expect(getMoraleRankThresholds(32)).toEqual({ title: 3, success: 8, underperforming: 25 });
+      expect(getMoraleRankThresholds(16)).toEqual({ title: 2, success: 4, underperforming: 13 });
+    });
+
+    it("tischt einen abgelaufenen Titel-Grund nicht mehr auf, wenn das Team auf Rang 11 steht", () => {
+      const player = createPlayer("abgestiegen");
+      const early = createGameState({ player, roster: createRosterEntry(player.id), rank: 1, leagueTeamCount: 16 });
+      const snapshot = assessPlayerMorale({ gameState: early, playerId: player.id, teamId: "M-M" })!;
+      expect(snapshot.reasons.some((reason) => reason.reasonId === "team_title_contender")).toBe(true);
+      const later = createGameState({
+        player,
+        roster: createRosterEntry(player.id),
+        rank: 11,
+        leagueTeamCount: 16,
+        playerMoraleState: [
+          {
+            playerId: player.id,
+            teamId: "M-M",
+            morale: snapshot.morale,
+            visibleMood: snapshot.visibleMood,
+            lastUpdatedSeasonId: "season-2",
+            inactiveSeasons: 0,
+            reasons: snapshot.reasons,
+            contractIntent: snapshot.contractIntent,
+          },
+        ],
+      });
+      expect(reasonIds(later, player.id)).not.toContain("team_title_contender");
+    });
+
+    it("mischt einen weiter geltenden Grund zwischen gespeichert und frisch, ohne ihn doppelt zu zeigen", () => {
+      const player = createPlayer("bleibt");
+      const base = createGameState({ player, roster: createRosterEntry(player.id), rank: 1, leagueTeamCount: 16 });
+      const snapshot = assessPlayerMorale({ gameState: base, playerId: player.id, teamId: "M-M" })!;
+      const stored = snapshot.reasons.map((reason) =>
+        reason.reasonId === "team_title_contender" ? { ...reason, valueDelta: 20 } : reason,
+      );
+      const again = createGameState({
+        player,
+        roster: createRosterEntry(player.id),
+        rank: 1,
+        leagueTeamCount: 16,
+        playerMoraleState: [
+          {
+            playerId: player.id,
+            teamId: "M-M",
+            morale: snapshot.morale,
+            visibleMood: snapshot.visibleMood,
+            lastUpdatedSeasonId: "season-2",
+            inactiveSeasons: 0,
+            reasons: stored,
+            contractIntent: snapshot.contractIntent,
+          },
+        ],
+      });
+      const reasons = assessPlayerMorale({ gameState: again, playerId: player.id, teamId: "M-M" })!.reasons.filter(
+        (reason) => reason.reasonId === "team_title_contender",
+      );
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0].valueDelta).toBeGreaterThan(snapshot.reasons.find((r) => r.reasonId === "team_title_contender")!.valueDelta);
+      expect(reasons[0].valueDelta).toBeLessThan(20);
+    });
   });
 });

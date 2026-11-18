@@ -9,6 +9,10 @@ Faktenbasis: `docs/design/finanzen-ist-messung-18-11.md` (Messung, Läufe A/B/C)
 stammen aus `scripts/rechne-finanzkonzept-v2-18-11.mjs` → `data/generated/finanzkonzept-v2-bilanz-18-11.json`
 (Hochrechnung auf den gemessenen Gehältern, Annahmen in Abschnitt 10). Geld in C.
 
+**Ergänzung vom 18.11. abends: `docs/design/finanzkonzept-v2-budgets-18-11.md` (Zwei Budgets des Vorstands, von Chris
+freigegeben).** Sie ersetzt Kernentscheidung 6, Abschnitt 5.3 (Gehaltsdeckel), die Folgen-Tabelle in 5.7 und die Baustufen 2 und 3.
+Die betroffenen Stellen sind unten markiert.
+
 Mockups: `public/mockups/finanzen-daten-modern-18-11.html` (wie die Daten im Hintergrund laufen) und
 `public/mockups/finanzen-modern-18-11.html` (Finanzseite, jetzt 20 Spieltage mit Heim/Auswärts). Bilder:
 `docs/design/finanzkonzept-v2-18-11/` (Liste in Abschnitt 11).
@@ -30,7 +34,7 @@ Mockups: `public/mockups/finanzen-daten-modern-18-11.html` (wie die Daten im Hin
    der Folgesaison: wer dann unter 0 steht, bekommt einen Pflichtkredit (Raten je Spieltag).
 5. **KI-Rücklage nach Finanzwert des Teams:** 5 % (Finanzwert 1) bis 25 % (Finanzwert 10) des Budgets, mindestens
    0,35 × Zielgehalt. Gerechnet: sparsame Teams halten im Median 22 %, sorglose 9 bis 10 % (heute alle 2 bis 4 %).
-6. **Gehaltsdeckel am gewählten Sponsor:** Gehalt ≤ k × tragbares Gehalt (Planeinnahmen aus dem Sponsor-Anker minus Fixkosten)
+6. *(ersetzt durch die zwei Budgets, siehe Ergänzung)* **Gehaltsdeckel am gewählten Sponsor:** Gehalt ≤ k × tragbares Gehalt (Planeinnahmen aus dem Sponsor-Anker minus Fixkosten)
    plus ein Drittel der freien Kasse. k = 1,0 vorsichtig, 1,1 normal, 1,25 aggressiv. Der Vorstand zieht k nach einer
    verfehlten Saison ein.
 7. **Fan-Stimmung 0 bis 100** je Team, je Spieltag fortgeschrieben; sie treibt Auslastung und Merch und wird von Ergebnis,
@@ -257,6 +261,10 @@ abzüglich `reserveForMin` kennen muss. `spendableNet` (`draft-adapter.ts:541`) 
 
 ### 5.3 Gehaltsdeckel am Sponsor (Vorgabe 8)
 
+> **Ersetzt** durch `finanzkonzept-v2-budgets-18-11.md`: Das tragbare Gehalt bleibt, wird aber zum Gehaltsbudget des Vorstands
+> (× Vertrauens-Quote). Der Faktor k und der Kassenterm entfallen; mehr Gehalt gibt es nur durch Umschichten aus dem
+> Transferbudget. Die Zahlen unten bleiben als Vergleich stehen.
+
 ```
 Planeinnahmen   = 0,92 × Sponsor-Anker + Tickets(S 50) + Merch(S 50) + 20 Siege × Prämie
 tragbares Gehalt = Planeinnahmen − Betrieb − Reise − Kaderprämie − Unterhalt − Kreditrate
@@ -311,6 +319,9 @@ Erwartungsrang = Rang der eigenen Gehaltssumme in der Liga. Am Saisonende:
 ΔVertrauen = clamp( (Erwartungsrang − Endrang) × 0,25 , −2 , +2 )
            + ( Kasse ≥ 0 ? +0,25 : −0,5 )  + ( GuV < −10 % des Gehalts und Endrang schlechter als erwartet ? −0,5 : 0 )
 ```
+
+> **Ersetzt:** Die Folgen laufen über die Freigabe-Quote (100 / 85 / 70 / 50 %), siehe `finanzkonzept-v2-budgets-18-11.md`
+> Abschnitt 7. Die Geldstrafe im letzten Absatz entfällt (der Vorstand verhängt keine Geldstrafen).
 
 | Vertrauen (0 bis 10) | Folge in der nächsten Kaufphase |
 |---|---|
@@ -374,6 +385,7 @@ Messwerkzeug für alle Stufen: `scripts/miss-teamfinanzen-saison.ts` (ein Lauf ~
 | 9 | Vorstand und Apron | 5.7 und Abschnitt 7 | Apron-Volumen 2 bis 3 % der Gehälter; aggressive Teams mit verfehltem Rang verlieren k |
 | 10 | Finanzseite | Bau nach den beiden Mockups | Bildpaar Mockup / App je Ansicht |
 
+**Stufen 2 und 3 sind durch 2a bis 2d ersetzt** (`finanzkonzept-v2-budgets-18-11.md` Abschnitt 9).
 Stufen 1 bis 3 ändern nur die KI und können vor der Taktung live gehen. Stufe 5 ist die einzige mit großem Eichrisiko.
 
 ---

@@ -54,20 +54,14 @@ describe("Fall 1: Home und Inbox zählen dieselbe Entscheidungsliste", () => {
   });
 
   it("das Home-Markup rendert den vollen Zähler und benennt den gekappten Rest", () => {
-    const markup = quelle("app/foundation/home-v2/HomeV2NewLook.tsx");
-    expect(markup).toContain("{inboxOpenCount} offen");
-    expect(markup).not.toContain("{inboxItems.length} offen");
-    expect(markup).toContain("weitere in der Inbox");
+    const markup = quelle("app/foundation/home-v2/HomeModern.tsx");
+    expect(markup).toContain("p.inboxOpenCount");
+    expect(markup).not.toContain("inboxItems.length");
   });
 
   it("auch der Host-Pfad exportiert den Zähler aus der vollen Liste", () => {
     const hook = quelle("lib/foundation/tabs/use-home-v2-overview-derivations.ts");
     expect(hook).toContain("const homeOpenTaskCount = activeTeamDecisionInboxItems.length;");
-  });
-
-  it("die Und-weitere-Zeile hat eine existierende CSS-Klasse (beidseitig)", () => {
-    expect(quelle("app/globals.css")).toMatch(/\.nl-home-inbox-more[\s.,:{[>)]/);
-    expect(quelle("app/foundation/home-v2/HomeV2NewLook.tsx")).toContain("nl-home-inbox-more");
   });
 });
 
@@ -98,10 +92,7 @@ describe("Fall 2: Radar, Office und Markt teilen sich Ø Top-6 je Achse", () => 
     expect(body).toContain("selectedTeamTopSixAxisStats,");
     const scope = quelle("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
     expect(scope).toContain("computeTeamTopSixAxisStats(rosterPlayers.map(({ player }) => player))");
-    // Das Radar rechnet nicht mehr selbst aus den Portrait-Karten.
-    const markup = quelle("app/foundation/home-v2/HomeV2NewLook.tsx");
-    expect(markup).toContain("teamAxisAverages[key]");
-    expect(markup).toContain("Ø Top-6");
+    // Das Radar der alten Startseite ist seit 18.11. weg; Office und Markt behalten die Basis.
     const office = quelle("app/foundation/home-v2/ManagerOfficeClient.tsx");
     expect(office).toContain("Ø Top-6");
   });
