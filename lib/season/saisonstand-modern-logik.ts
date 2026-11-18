@@ -422,3 +422,30 @@ export function waehleShowdownPaarungen(kandidaten: readonly ShowdownKandidat[])
   if (keller) aus.push({ id: keller.id, tag: "Kellerduell" });
   return aus;
 }
+
+
+/**
+ * Liga-Rang statt Gesamtrang: die Standings-Zeilen tragen je nach Quelle den Rang über alle 32 Teams
+ * (Abnahme 18.11.: Liga 1 zeigte 1, 3, 4, 8 … 32). Die Ansicht rechnet aber mit Platz 1–16 je Liga (Zonen, Lagesatz, Gesamt = Rang + 16).
+ * Neuer Rang = 1 + Zahl der Teams DERSELBEN Liga mit besserem Rang; gleiche Ränge bleiben gleich. Auf schon richtigen Liga-Rängen ändert das nichts.
+ */
+export function mitLigaRang<T extends { leagueTier?: LeagueTier | null; rank: number | null }>(zeilen: readonly T[]): T[] {
+  return zeilen.map((z) => {
+    if (!z.leagueTier || z.rank == null) return z;
+    const besser = zeilen.filter((o) => o.leagueTier === z.leagueTier && o.rank != null && o.rank < (z.rank as number)).length;
+    return besser + 1 === z.rank ? z : { ...z, rank: besser + 1 };
+  });
+}
+
+/**
+ * Punkte eines Teams je Bereich (POW/SPE/MEN/SOC) aus den Duellpunkten der Disziplinen des Bereichs: DIESELBE Quelle wie die Matrix und die
+ * Teamkarte. Die Leistungspunkte (PPs) des Ledgers stehen im Duell-Modus nicht in der Zeile (zeigte überall 0).
+ */
+export function bereichsPunkteAusDuellen(
+  duellMatrix: ReadonlyMap<string, ReadonlyMap<string, { punkte: number }>>,
+  teamId: string,
+  katalogIds: readonly string[],
+): number {
+  const zeile = duellMatrix.get(teamId);
+  return katalogIds.reduce((summe, id) => summe + (zeile?.get(id)?.punkte ?? 0), 0);
+}

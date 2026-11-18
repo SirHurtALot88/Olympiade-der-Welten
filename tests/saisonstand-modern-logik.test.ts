@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  mitLigaRang,
+  bereichsPunkteAusDuellen,
   baueVerlaufsLinien,
   bestimmeZone,
   bewegungText,
@@ -277,5 +279,29 @@ describe("Matrix-Hover: Einzeleinsätze", () => {
     const e = duellPunkteJeDisziplin([pod] as never).get("A")!.get("mini-dm")!.einsaetze[0]!;
     expect(e.gegner).toEqual(["B", "C", "D"]);
     expect(einsatzZeile(e, (id) => id)).toBe("2 Pkt · Platz 1 von 4 · gegen B, C, D (Spieltag 2)");
+  });
+});
+
+describe("Saisonstand modern: Liga-Rang und Bereichspunkte (Abnahme 18.11.)", () => {
+  it("Gesamtrang je Liga wird zum Liga-Rang, gleiche Ränge bleiben gleich", () => {
+    const zeilen = [
+      { id: "a", leagueTier: "liga1" as const, rank: 1 },
+      { id: "b", leagueTier: "liga2" as const, rank: 2 },
+      { id: "c", leagueTier: "liga1" as const, rank: 3 },
+      { id: "d", leagueTier: "liga1" as const, rank: 3 },
+      { id: "e", leagueTier: "liga2" as const, rank: 9 },
+    ];
+    expect(mitLigaRang(zeilen).map((z) => [z.id, z.rank])).toEqual([["a", 1], ["b", 1], ["c", 2], ["d", 2], ["e", 2]]);
+  });
+  it("richtige Liga-Ränge bleiben unverändert (dieselben Objekte)", () => {
+    const zeilen = [{ leagueTier: "liga1" as const, rank: 1 }, { leagueTier: "liga1" as const, rank: 2 }];
+    const aus = mitLigaRang(zeilen);
+    expect(aus[0]).toBe(zeilen[0]);
+    expect(aus[1]).toBe(zeilen[1]);
+  });
+  it("Bereichspunkte summieren die Duellpunkte der Disziplinen des Bereichs, ohne Einsatz sind es 0", () => {
+    const m = new Map([["T", new Map([["gewichtheben", { punkte: 2 }], ["hockey", { punkte: 1 }], ["tennis", { punkte: 2 }]])]]);
+    expect(bereichsPunkteAusDuellen(m, "T", ["gewichtheben", "hockey", "breaking"])).toBe(3);
+    expect(bereichsPunkteAusDuellen(m, "X", ["gewichtheben"])).toBe(0);
   });
 });

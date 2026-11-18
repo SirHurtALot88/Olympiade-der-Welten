@@ -52,6 +52,8 @@ import {
   stehtAufDemSpiel,
   type StehtAufDemSpiel,
   teileNachLiga,
+  mitLigaRang,
+  bereichsPunkteAusDuellen,
   ZONEN_MARKE_ENDE,
   ZONEN_TEXT,
   type LigaAnsicht,
@@ -139,7 +141,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     selectedSeasonLabel,
     isArchived,
     isSeasonEnded = false,
-    standingsRows,
+    standingsRows: standingsRowsRoh,
     rivalTeamIds,
     teamBilanzByTeamId,
     teamStrengthRankByTeamId,
@@ -159,6 +161,8 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   } = props;
 
   const phone = usePhone();
+  // Liga-Rang statt Gesamtrang (siehe `mitLigaRang`); der Rest der Ansicht rechnet mit Platz 1–16 je Liga.
+  const standingsRows = useMemo(() => mitLigaRang(standingsRowsRoh), [standingsRowsRoh]);
   const eigene = useMemo(() => standingsRows.find((z) => z.isSelected) ?? null, [standingsRows]);
   const hatLiga = useMemo(() => standingsRows.some((z) => z.leagueTier != null), [standingsRows]);
   const hatWertung = useMemo(() => standingsRows.some((z) => z.points != null && Number.isFinite(z.points)), [standingsRows]);
@@ -231,6 +235,16 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     [duellMatrix, duellZelle],
   );
 
+  /** Bereichspunkte (POW/SPE/MEN/SOC): im Duell-Modus die Duellpunkte der Disziplinen des Bereichs (wie Matrix und Teamkarte), sonst der Wert der Zeile. */
+  const bereichWert = useCallback(
+    (z: Zeile, id: SeasonDisciplineAreaId): number | null => {
+      if (!duellMatrix) return z[id] ?? null;
+      const gruppe = SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.find((g) => g.id === id);
+      return bereichsPunkteAusDuellen(duellMatrix, z.teamId, (gruppe?.keys ?? []).map((k) => SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[k]));
+    },
+    [duellMatrix],
+  );
+
   const gespielteAnzahl = verlauf ? verlauf.spieltage.filter((t) => t.played).length : spieltagListe.filter((o) => o.gespielt).length;
   // Das Feld-Rennen-Ledger kennt nur GEWERTETE Spieltage (`getMatchdaySummaryOptions`), die Spieltags-
   // Liste alle der Saison — sonst stünde mitten in der Saison „Endstand" und „Noch 0 Spieltage".
@@ -279,7 +293,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
         case "team": return z.teamName;
         case "verh": return z.verhaeltnis ?? Number.NEGATIVE_INFINITY;
         case "points": return z.points ?? Number.NEGATIVE_INFINITY;
-        case "pow": case "spe": case "men": case "soc": return z[sort.key] ?? Number.NEGATIVE_INFINITY;
+        case "pow": case "spe": case "men": case "soc": return bereichWert(z, sort.key) ?? Number.NEGATIVE_INFINITY;
         case "kader": return z.rosterCount;
         case "mw": return z.marketValueTotal ?? Number.NEGATIVE_INFINITY;
         case "cash": return z.cash ?? Number.NEGATIVE_INFINITY;
@@ -297,7 +311,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       const d = typeof x === "string" || typeof y === "string" ? String(x).localeCompare(String(y), "de-DE") : (x as number) - (y as number);
       return d !== 0 ? d * faktor : (a.rank ?? 999) - (b.rank ?? 999);
     });
-  }, [zeilenFuer, aktiveLiga, sort]);
+  }, [zeilenFuer, aktiveLiga, sort, bereichWert]);
 
   const klickSort = (key: SortKey, standardRichtung: "asc" | "desc" = "desc") =>
     setSort((alt) => (alt.key === key ? { key, dir: alt.dir === "asc" ? "desc" : "asc" } : { key, dir: standardRichtung }));
@@ -402,16 +416,16 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   const bereichsRaenge = useMemo(() => {
     const basis = zeilenFuer(aktiveLiga);
     const r = {} as Record<SeasonDisciplineAreaId, Map<string, number>>;
-    for (const id of ["pow", "spe", "men", "soc"] as const) r[id] = wertRaenge(basis, (z) => z.teamId, (z) => (z.points == null ? null : z[id]));
+    for (const id of ["pow", "spe", "men", "soc"] as const) r[id] = wertRaenge(basis, (z) => z.teamId, (z) => (z.points == null ? null : bereichWert(z, id)));
     return r;
-  }, [zeilenFuer, aktiveLiga]);
+  }, [zeilenFuer, aktiveLiga, bereichWert]);
 
   const spaltenSport = useMemo<BcTableColumn<Zeile>[]>(() => {
     const sk = (key: SortKey, d: "asc" | "desc" = "desc") => ({ onKopf: () => klickSort(key, d), aktiv: sort.key === key });
     const bereich = (id: SeasonDisciplineAreaId): BcTableColumn<Zeile> => ({
       key: id, kopf: AREA_LABEL[id], breite: "46px", rechts: true, ...sk(id), render: (z) => {
         const band = hatWertung ? rangBand(bereichsRaenge[id].get(z.teamId)) : null;
-        return <span className={`bc-t ssm-band${band ? ` ssm-band--${band}` : ""}`} data-bc-tip={band ? `${AREA_LABEL[id]}: Rang ${bereichsRaenge[id].get(z.teamId)} in dieser Ansicht` : undefined}>{hatWertung ? zahl(z[id]) : "–"}</span>;
+        return <span className={`bc-t ssm-band${band ? ` ssm-band--${band}` : ""}`} data-bc-tip={band ? `${AREA_LABEL[id]}: Rang ${bereichsRaenge[id].get(z.teamId)} in dieser Ansicht` : undefined}>{hatWertung ? zahl(bereichWert(z, id)) : "–"}</span>;
       },
     });
     return [
@@ -428,7 +442,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       { key: "pkt", kopf: "Pkt", breite: "52px", rechts: true, ...sk("points"), render: (z) => <strong className="ssm-pkt bc-t">{zahl(z.points)}</strong> },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon, bereichsRaenge, hatSparkline, hatGegner, linienJeTeam, gegnerVon, standingsRows, nachLiga]);
+  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon, bereichsRaenge, hatSparkline, hatGegner, linienJeTeam, gegnerVon, standingsRows, nachLiga, bereichWert]);
 
   const spaltenVerein = useMemo<BcTableColumn<Zeile>[]>(() => {
     const sk = (key: SortKey, d: "asc" | "desc" = "desc") => ({ onKopf: () => klickSort(key, d), aktiv: sort.key === key });
@@ -587,7 +601,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
             const punkte = disziplinWert(kartenTeam, key);
             const stark = staerkeInLiga(kartenTeam.teamId, SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]);
             return (
-              <span key={key} className="ssm-kachel" data-bc-tip={`${SEASON_DISCIPLINE_LABELS[key]}: ${zahl(punkte)} Punkte${stark ? `, Kaderstärke Platz ${stark}` : ""}`}>
+              <span key={key} className="ssm-kachel" data-bc-tip={`${SEASON_DISCIPLINE_LABELS[key]}: ${punkte == null ? "noch nicht gespielt" : `${zahl(punkte)} Punkte`}${stark ? `, Kaderstärke Platz ${stark}` : ""}`}>
                 <b>{SEASON_DISCIPLINE_LABELS[key]}</b>
                 <strong className="bc-t">{zahl(punkte)}</strong>
                 <em className="bc-t">{stark ? `#${stark}` : ""}</em>
