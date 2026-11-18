@@ -395,6 +395,7 @@ import {
   shouldBuildLeagueTrainingLeaderRows,
 } from "@/lib/foundation/tabs/season-v2-derivations";
 import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
+import { baueStartseiteModern } from "@/lib/foundation/startseite-modern";
 import {
   shouldLoadPrizePreviewFeed as resolveShouldLoadPrizePreviewFeed,
 } from "@/lib/foundation/tabs/prize-v2-derivations";
@@ -11490,6 +11491,34 @@ export function useFoundationShellRouterBodyScope({
     }
     return { spieltage: fieldRaceLedger.matchdays.map((m) => ({ nummer: m.matchdayNumber, played: m.played })), byTeamId };
   }, [fieldRaceLedger, isViewingArchivedSeason]);
+  /**
+   * STARTSEITE MODERN (18.11.): alle Daten der neuen Home-Ansicht in einem Memo, nur solange Home offen ist.
+   * Reine Funktion in `lib/foundation/startseite-modern.ts`; hier kommen nur die Quellen des Scopes hinein.
+   */
+  const homeStartseiteModern = useMemo(() => {
+    if (!shouldBuildHomeV2Overview || !selectedTeam) return null;
+    return baueStartseiteModern({
+      gameState,
+      teamId: selectedTeam.teamId,
+      saveId: activeSaveId,
+      rows: seasonStandRows.map((row) => {
+        const logo = getTeamLogoModel(row.team);
+        return {
+          teamId: row.teamId,
+          teamName: row.teamName,
+          teamCode: row.teamCode,
+          rank: row.rank ?? null,
+          points: row.points ?? null,
+          verhaeltnis: row.verhaeltnis ?? null,
+          logoUrl: logo.src,
+          logoInitials: logo.initials,
+          leagueTier: getLeagueOf(gameState, row.teamId),
+        };
+      }),
+      verlauf: seasonV2Verlauf,
+      bewegungByTeamId: resolveMatchdayRankDelta,
+    });
+  }, [activeSaveId, gameState, resolveMatchdayRankDelta, seasonStandRows, seasonV2Verlauf, selectedTeam, shouldBuildHomeV2Overview]);
   const seasonV2Matchwinner = useMemo(() => {
     if (isViewingArchivedSeason) return null;
     return baueMatchwinnerListe(gameState, seasonOverviewSeasonId).map((eintrag) => {
@@ -13249,6 +13278,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2TeamBilanzByTeamId,
     seasonV2TeamStrengthRankByTeamId,
     seasonV2Verlauf,
+    homeStartseiteModern,
     seasonV2Matchwinner,
     seasonV2TopPlayers,
     selectNewGameMode,
