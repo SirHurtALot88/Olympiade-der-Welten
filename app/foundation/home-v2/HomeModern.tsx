@@ -14,6 +14,7 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { BcFormPfeil, BcMoralGesicht } from "@/components/foundation/broadcast";
+import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
 import { FormMoralMarke } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 import type { HomeV2ClientProps, HomeV2InboxItem } from "@/app/foundation/home-v2/home-v2-types";
 import {
@@ -32,14 +33,6 @@ const de = (x: number, nk = 1) => new Intl.NumberFormat("de-DE", { minimumFracti
 const vz = (x: number, nk = 1) => `${x > 0 ? "+" : x < 0 ? "−" : "±"}${de(Math.abs(x), nk)}`;
 const ton = (x: number | null | undefined) => (x == null || x === 0 ? "hm-null" : x > 0 ? "hm-plus" : "hm-minus");
 const mio = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? "—" : `${de(x)} Mio`);
-
-function Chevron() {
-  return (
-    <svg className="hm-i" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
 
 function Wappen({ url, initials, alt = "" }: { url: string | null; initials: string; alt?: string }) {
   // Wappen sind Bilder mit Initialen-Rückfall: ohne URL oder bei einem Ladefehler ein neutraler Kasten.
@@ -67,7 +60,8 @@ function FormKaestchen({ form, anzahl = 5 }: { form: readonly string[]; anzahl?:
 
 /* ------------------------------------------------------------------------------------- Kopf */
 
-function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+/* Band-Kacheln: Rang, Punkte, Ergebnisse, Form · Moral stehen im Regieband des App-Rahmens (Slot), nicht mehr im Startseiten-Kopf. */
+function BandKacheln({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const eigene = sd?.eigene ?? null;
   const roster = sd ? Object.values(sd.formMoral) : [];
   const mitForm = roster.filter((a) => a.formVerfuegbar);
@@ -79,6 +73,57 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const kopfStufe = mitForm.length === 0 ? null : dominant < 2 ? 1 : dominant > 2 ? -1 : 0;
   const zone = eigene?.zone === "aufstieg" || eigene?.zone === "titel";
   const hatWertung = sd?.hatWertung ?? false;
+  return (
+    <FoundationBandSlot>
+      <div className="hm-bandkpis">
+        <div className={`hm-bk${zone ? " hm-zone" : ""}`}>
+          <span className="hm-gk">Rang</span>
+          <strong className="hm-t">{eigene?.rang != null ? `${eigene.rang}.` : "–"}</strong>
+          <small>
+            in {sd?.ligaName ?? "der Liga"}
+            {eigene?.bewegung ? <> · <span className={ton(eigene.bewegung)}>{eigene.bewegung > 0 ? "▲" : "▼"}{Math.abs(eigene.bewegung)}</span></> : null}
+          </small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Punkte</span>
+          <strong className="hm-t">{hatWertung ? eigene?.punkte ?? p.points ?? 0 : 0}</strong>
+          <small className="hm-t" title="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
+            {eigene?.bilanz ? (
+              <>
+                {sunText(eigene.bilanz)} · {duelleText(eigene.bilanz)}
+                {eigene.verhaeltnis != null ? <> · Verh. <span className={ton(eigene.verhaeltnis)}>{vz(eigene.verhaeltnis)}</span></> : null}
+              </>
+            ) : (
+              "noch kein Duell"
+            )}
+          </small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Ergebnisse</span>
+          <strong>
+            <FormKaestchen form={eigene?.form ?? []} />
+          </strong>
+          <small>{eigene && eigene.form.length > 0 ? `letzte ${eigene.form.length} Spieltage` : "noch kein Spieltag"}</small>
+        </div>
+        <div className="hm-bk">
+          <span className="hm-gk">Form · Moral</span>
+          <strong>
+            {kopfStufe == null ? <span className="hm-null">–</span> : <BcFormPfeil stufe={kopfStufe} />}
+            {moralSchnitt != null ? (
+              <span style={{ fontSize: ".75em", display: "inline-flex" }}>
+                <BcMoralGesicht wert={moralSchnitt} groesse={22} />
+              </span>
+            ) : null}
+          </strong>
+          <small className="hm-t">{mitForm.length > 0 ? `${zaehler[0]}×▲▲ ${zaehler[1]}×▲ · ${tief} im Tief` : "noch keine Form"}</small>
+        </div>
+      </div>
+    </FoundationBandSlot>
+  );
+}
+
+function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+  const eigene = sd?.eigene ?? null;
   const kicker = [
     p.seasonName,
     sd ? (sd.saisonEnde ? `nach Spieltag ${sd.gesamtSpieltage} von ${sd.gesamtSpieltage}` : `vor Spieltag ${sd.gespielteSpieltage + 1} von ${sd.gesamtSpieltage}`) : p.matchdayLabel,
@@ -110,61 +155,7 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
           </span>
         </div>
       </div>
-      <div className="hm-kpis">
-        <div className={`hm-kpi${zone ? " hm-zone" : ""}`}>
-          <span className="hm-gk">Rang</span>
-          <strong className="hm-t">{eigene?.rang != null ? `${eigene.rang}.` : "–"}</strong>
-          <small>
-            in {sd?.ligaName ?? "der Liga"}
-            {eigene?.bewegung ? <> · <span className={ton(eigene.bewegung)}>{eigene.bewegung > 0 ? "▲" : "▼"}{Math.abs(eigene.bewegung)}</span></> : null}
-          </small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Punkte</span>
-          <strong className="hm-t">{hatWertung ? eigene?.punkte ?? p.points ?? 0 : 0}</strong>
-          <small className="hm-t" title="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
-            {eigene?.bilanz ? (
-              <>
-                {sunText(eigene.bilanz)} · {duelleText(eigene.bilanz)}
-                {eigene.verhaeltnis != null ? <> · Verh. <span className={ton(eigene.verhaeltnis)}>{vz(eigene.verhaeltnis)}</span></> : null}
-              </>
-            ) : (
-              "noch kein Duell"
-            )}
-          </small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Ergebnisse</span>
-          <strong>
-            <FormKaestchen form={eigene?.form ?? []} />
-          </strong>
-          <small>{eigene && eigene.form.length > 0 ? `letzte ${eigene.form.length} Spieltage` : "noch kein Spieltag"}</small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Form · Moral</span>
-          <strong>
-            {kopfStufe == null ? <span className="hm-null">–</span> : <BcFormPfeil stufe={kopfStufe} />}
-            {moralSchnitt != null ? (
-              <span style={{ fontSize: ".75em", display: "inline-flex" }}>
-                <BcMoralGesicht wert={moralSchnitt} groesse={22} />
-              </span>
-            ) : null}
-          </strong>
-          <small className="hm-t">{mitForm.length > 0 ? `${zaehler[0]}×▲▲ ${zaehler[1]}×▲ · ${tief} im Tief` : "noch keine Form"}</small>
-        </div>
-        <div className="hm-kpi">
-          <span className="hm-gk">Kasse</span>
-          <strong className="hm-t">{mio(p.cash)}</strong>
-          <small className="hm-t">Gehälter {mio(p.salaryTotal)}</small>
-        </div>
-      </div>
-      <div className="hm-cta">
-        <span className="hm-gk">{sd?.saisonEnde ? "Saison beendet" : "Nächster Schritt"}</span>
-        <button type="button" className="hm-btn hm-haupt" onClick={p.onContinue} data-testid="hm-weiter">
-          {p.nextStepLabel} <Chevron />
-        </button>
-        <small>{p.nextStepDetail}</small>
-      </div>
+      {p.nextStepDetail ? <small className="hm-hinweis" data-testid="hm-hinweis">{p.nextStepDetail}</small> : null}
     </header>
   );
 }
@@ -674,6 +665,7 @@ export default function HomeModern(props: HomeV2ClientProps) {
   return (
     <div className="hm bc" data-testid="home-modern" ref={wurzel}>
       <Kopf p={props} sd={sd} />
+      <BandKacheln p={props} sd={sd} />
       {sd ? (
         <div className="hm-raster">
           <SpieltagKarte p={props} sd={sd} />

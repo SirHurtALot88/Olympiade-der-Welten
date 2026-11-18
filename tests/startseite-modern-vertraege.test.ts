@@ -51,6 +51,16 @@ describe("Startseite modern: beidseitige Klassen-Absicherung", () => {
   });
 });
 
+describe("Startseite modern: Regieband des App-Rahmens", () => {
+  it("Rang, Punkte, Ergebnisse und Form · Moral kommen per Slot ins Band, der Hauptknopf steht nur einmal (im Band)", () => {
+    expect(MARKUP).toContain("<FoundationBandSlot>");
+    expect(MARKUP).toContain("hm-bandkpis");
+    expect(MARKUP).not.toContain("hm-haupt");
+    expect(MARKUP).not.toContain('data-testid="hm-weiter"');
+    expect(MARKUP).not.toContain("onContinue");
+  });
+});
+
 describe("Startseite modern: Entscheidungen des PM", () => {
   it("Kasse: keine erfundene Kurve — der Platz bleibt als klar leere Fläche", () => {
     expect(MARKUP).toContain('data-testid="hm-kurve-leer"');

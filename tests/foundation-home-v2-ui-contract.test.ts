@@ -71,7 +71,9 @@ describe("foundation home v2 ui contract", () => {
       expect(fileText).toContain(`data-testid="${testId}"`);
     }
     expect(fileText).toContain("HomeModern");
-    expect(fileText).toContain("onContinue");
+    // Hauptaktion und Kopf-Kacheln stehen im Regieband des App-Rahmens (Slot), nicht doppelt im Seitenkopf.
+    expect(fileText).toContain("FoundationBandSlot");
+    expect(fileText).not.toContain("onContinue");
     expect(fileText).toContain("onOpenBoardObjectives");
     expect(fileText).not.toContain("home-v2-quick-nav");
     expect(fileText).not.toContain("Manager Overview V2");
