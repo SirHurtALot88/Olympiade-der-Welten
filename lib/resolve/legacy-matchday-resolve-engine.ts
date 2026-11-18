@@ -1362,7 +1362,8 @@ export function buildLegacyMatchdayResolvePreview(
     if (isBattleModeArenaEligible && ppSkalaFuerDieseSaison === "an") {
       for (const zeile of teamResultsRanked) zeile.ppSkala = "c2";
     }
-    if (isBattleModeArenaEligible && ergebnisSkalaVersionFuer(base.gameState) === "e1") {
+    // E1 nur zusammen mit C2: die Anker der Ergebnisskala sind auf C2-Spieler-PP gezogen.
+    if (isBattleModeArenaEligible && ppSkalaFuerDieseSaison === "an" && ergebnisSkalaVersionFuer(base.gameState) === "e1") {
       wendeErgebnisSkalaE1An({
         teamResults: teamResultsRanked,
         spielerZeilen: rawPlayerEntries,

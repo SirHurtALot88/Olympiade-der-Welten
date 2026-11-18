@@ -14,7 +14,7 @@ import {
 
 // WERTUNGSSKALEN JE SAISON (lib/resolve/wertungs-skalen.ts): die Skala haengt am Spielstand, nicht am Serverstart.
 const mitStempel = (seasonId: string, stempel?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1" }) =>
-  ({ season: { id: seasonId }, seasonState: { seasonId, ...(stempel ? { wertungsSkalen: stempel } : {}) } }) as unknown as GameState;
+  ({ scenarioMeta: { gameMode: "battle" }, season: { id: seasonId }, seasonState: { seasonId, ...(stempel ? { wertungsSkalen: stempel } : {}) } }) as unknown as GameState;
 
 describe("Wertungsskalen je Saison", () => {
   afterEach(() => {

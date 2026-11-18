@@ -29,7 +29,7 @@
  * nur scripts/miss-pp-skala.ts) und die Notbremse `OLY_PP_SKALA=aus-sofort` stehen ueber dem Stempel.
  */
 import kalibrierungJson from "@/data/generated/pp-skala-kalibrierung.json";
-import { ppSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
+import { gueltigerStempel, istBattleSpielstand, ppSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
 
 /** Neues Maximum je Disziplin-Einsatz (Chris 18.11.: "um die 5 PPs ... als Maximum"). */
 export const PP_SKALA_MAX = 5;
@@ -175,6 +175,13 @@ function faktor(wert: number | undefined): number {
 
 export function ppSkalaUmrechnung(gameState?: Parameters<typeof ppSkalaVersionFuer>[0]): PpSkalaUmrechnung {
   if (ppSkalaModus(gameState) !== "an") return KEINE_UMRECHNUNG;
+  // Nur Battle-Saves: ein Manager-Save rechnet nie mit C2.
+  if (!istBattleSpielstand(gameState)) return KEINE_UMRECHNUNG;
+  // Gemischte Saison (Umstellung mitten drin, `ppAb`): Faktor 1. Die Faktoren sind auf eine ganze C2-Saison
+  // gemessen; auf eine Saison, in der nur der Rest C2 ist, angewandt, waere die Skalierung falsch
+  // gewichtet. Der Fehler der unskalierten Teilsaison ist klein (die Saison ist ohnehin zu Ende)
+  // und nach dem Saisonwechsel gilt der volle Faktor.
+  if (gueltigerStempel(gameState)?.ppAb) return KEINE_UMRECHNUNG;
   const u = (kalibrierungJson as KalibrierungJson).umrechnung;
   return { einsatz: faktor(u?.einsatz), spielerSaison: faktor(u?.spielerSaison), teamSaison: faktor(u?.teamSaison) };
 }

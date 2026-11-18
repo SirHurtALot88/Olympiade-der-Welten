@@ -69,6 +69,11 @@ export function ergebnisSkalaSchalter(): Exclude<Schalter, "roh"> {
   return s === "roh" ? "an" : s;
 }
 
+/** Nur Battle-Saves bekommen einen Stempel und die neuen Skalen; der Manager-Modus bleibt unberuehrt. */
+export function istBattleSpielstand(gameState: { scenarioMeta?: { gameMode?: string | null } | null } | null | undefined): boolean {
+  return gameState?.scenarioMeta?.gameMode === "battle";
+}
+
 /** Der Stempel fuer eine NEU beginnende Saison, aus den Schaltern. */
 export function wertungsSkalenFuerNeueSaison(seasonId: string): WertungsSkalenStempel {
   const pp = ppSkalaSchalter();
@@ -86,20 +91,30 @@ export function stempleWertungsSkalen<T extends Pick<SeasonState, "seasonId" | "
   return { ...seasonState, wertungsSkalen: wertungsSkalenFuerNeueSaison(id) };
 }
 
+/** Der Stempel eines neuen Saisonstands je Spielmodus: Battle bekommt ihn, Manager keinen (`undefined`). */
+export function wertungsSkalenFuerSpielmodus(gameState: Parameters<typeof istBattleSpielstand>[0], seasonId: string): WertungsSkalenStempel | undefined {
+  return istBattleSpielstand(gameState) ? wertungsSkalenFuerNeueSaison(seasonId) : undefined;
+}
+
 /** Setzt den Stempel beim ANLEGEN eines Spiels. Idempotent: ein Stempel derselben Saison bleibt. */
 export function stempleWertungsSkalenBeimAnlegen(gameState: GameState): GameState {
   const seasonId = gameState.seasonState?.seasonId ?? gameState.season?.id;
   if (!seasonId) return gameState;
+  if (!istBattleSpielstand(gameState)) return gameState;
   if (gameState.seasonState?.wertungsSkalen?.seasonId === seasonId) return gameState;
   return { ...gameState, seasonState: stempleWertungsSkalen(gameState.seasonState, seasonId) };
 }
 
 type SkalenQuelle =
-  | { seasonState?: Pick<SeasonState, "seasonId" | "wertungsSkalen"> | null; season?: { matchdayIds?: readonly string[] } | null }
+  | {
+      seasonState?: Pick<SeasonState, "seasonId" | "wertungsSkalen"> | null;
+      season?: { matchdayIds?: readonly string[] } | null;
+      scenarioMeta?: { gameMode?: string | null } | null;
+    }
   | null
   | undefined;
 
-function gueltigerStempel(gameState: SkalenQuelle): WertungsSkalenStempel | null {
+export function gueltigerStempel(gameState: SkalenQuelle): WertungsSkalenStempel | null {
   const stempel = gameState?.seasonState?.wertungsSkalen;
   if (!stempel || stempel.seasonId !== gameState?.seasonState?.seasonId) return null;
   return stempel;
@@ -120,7 +135,9 @@ export function ppSkalaVersionFuer(gameState: SkalenQuelle, matchdayId?: string 
     const ids = gameState?.season?.matchdayIds ?? [];
     const ab = ids.indexOf(stempel.ppAb);
     const hier = ids.indexOf(matchdayId);
-    if (ab >= 0 && hier >= 0 && hier < ab) return "alt";
+    // Nicht aufloesbar (Spieltagsliste fehlt / ID unbekannt): im Zweifel "alt" -- ein schon gebuchter
+    // Spieltag darf durch eine Umstellung nie umgerechnet werden.
+    if (ab < 0 || hier < 0 || hier < ab) return "alt";
   }
   return stempel.pp;
 }

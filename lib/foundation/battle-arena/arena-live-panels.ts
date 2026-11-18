@@ -163,13 +163,13 @@ function resolveTeamDisplay(teamsById: ReadonlyMap<string, Pick<Team, "name" | "
   return { name: team?.name ?? teamId, code: team?.shortCode ?? teamId.slice(0, 3).toUpperCase() };
 }
 
-function buildFixtureResultLabel(paarung: SpieltagsPaarung): string | null {
+export function buildFixtureResultLabel(paarung: SpieltagsPaarung): string | null {
   if (!paarung.gespielt) return null;
   return paarung.disziplinen
     .map((disziplin) =>
       disziplin.gespielt
-        ? // ERGEBNISSKALA (18.11.): das gebuchte 0-10-Ergebnis, wo es eins gibt; sonst die Duell-Punkte.
-          disziplin.ergebnisNormiert && !disziplin.miniDmPodIdHeim && !disziplin.miniDmPodIdGast
+        ? // ERGEBNISSKALA (18.11.): das gebuchte 0-10-Ergebnis nur bei E1-Zeilen; sonst (laufende alte Saison) wie vor E1 die Duell-Punkte.
+          disziplin.ergebnisSkala === "e1" && disziplin.ergebnisNormiert && !disziplin.miniDmPodIdHeim && !disziplin.miniDmPodIdGast
           ? `${disziplin.disciplineName} ${disziplin.ergebnisNormiert[0]}:${disziplin.ergebnisNormiert[1]}`
           : `${disziplin.disciplineName} ${disziplin.punkteHeim ?? "–"}:${disziplin.punkteGast ?? "–"}`
         : `${disziplin.disciplineName} ausstehend`,

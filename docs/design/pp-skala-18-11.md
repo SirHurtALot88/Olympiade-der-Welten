@@ -628,7 +628,9 @@ nächsten Schreiben, wirkt nach dem Deploy ohne Handgriff auf dem Server. Gründ
 - Ein Skript hängt an einem Handgriff von Chris; die Lade-Migration erfasst auch Mehrspieler-Räume und jeden
   anderen jungen Save gleich.
 - Rückweg ohne Skript: `OLY_PP_SKALA=aus` verhindert die Umstellung (vor dem ersten Schreiben), `aus-sofort`
-  rechnet sofort wieder alt.
+  rechnet sofort wieder alt. **Das funktioniert seit dem Review-Nachtrag (Abschnitt 8.5) wirklich:** bis dahin
+  reichte `docker-compose.yml` weder `OLY_PP_SKALA` / `OLY_ERGEBNIS_SKALA` an den Container noch
+  `NEXT_PUBLIC_OLY_PP_SKALA` als Build-Argument durch -- ein Wert in `deploy/hetzner/.env` kam nie an.
 
 **Gezeigt = gebucht bleibt:**
 - Gebuchte Arena-/Pod-Zeilen sind mit ihrem Wert persistiert und werden nicht angefasst.
@@ -653,3 +655,40 @@ nächsten Schreiben, wirkt nach dem Deploy ohne Handgriff auf dem Server. Gründ
 Ab Spieltag 2 bekommt der Tagesbeste je Disziplin im Mittel 5,0 (Deckel 5), die Masse 1,1–1,5 (Abschnitt 8.2).
 Die Ergebnisskala E1 bleibt in der laufenden Saison aus, sonst stünden im Tiebreaker „Verh.“ zwei Skalen
 nebeneinander; sie kommt mit dem Saisonwechsel.
+
+### 8.5 Review-Nachträge (18.11.)
+
+**Schalter erreichen jetzt den Container (M1).** `deploy/hetzner/docker-compose.yml` reicht `OLY_PP_SKALA` und
+`OLY_ERGEBNIS_SKALA` an den Container durch und als Build-Argument `NEXT_PUBLIC_OLY_PP_SKALA` /
+`NEXT_PUBLIC_OLY_ERGEBNIS_SKALA` an den Browser-Build (Dockerfile `ARG`/`ENV`); ohne eigenen `NEXT_PUBLIC_`-Wert
+gilt der Server-Wert, damit Server und Browser nie auseinanderlaufen. Leer = Standard (neue Skala), nichts
+ändert sich, solange nichts gesetzt ist. So schaltet Chris auf dem Server um (Zeile in `deploy/hetzner/.env`
+eintragen, dann neu bauen, ein bloßer Neustart reicht nicht, weil der Browser-Wert beim Build eingebacken wird):
+
+```sh
+ssh root@135.181.102.2
+cd Olympiade-der-Welten/deploy/hetzner
+nano .env
+docker compose up -d --build
+```
+
+In `.env`: `OLY_PP_SKALA=aus` (neue Saisons alt, gestempelte rechnen weiter wie gestempelt) oder
+`OLY_PP_SKALA=aus-sofort` (Notbremse, jeder Stempel ignoriert), analog `OLY_ERGEBNIS_SKALA`. Zurück zum
+Standard: Wert leeren und wieder neu bauen.
+
+**Nur Battle-Saves (N1).** Stempel und C2-Umrechnungsfaktoren (`ppSkalaUmrechnung`) gibt es nur für Battle-Saves:
+`stempleWertungsSkalenBeimAnlegen` und der Saisonwechsel (`wertungsSkalenFuerSpielmodus`) setzen für einen
+Manager-Save keinen Stempel (ein alter wird beim Saisonwechsel entfernt), `ppSkalaUmrechnung` ist dort 1. In einer
+gemischten Saison (Stempel mit `ppAb`) ist die Umrechnung ebenfalls 1: die Faktoren sind auf eine ganze C2-Saison
+gemessen und würden auf eine nur teilweise C2-Saison falsch gewichtet; der kleine Fehler endet mit dem
+Saisonwechsel.
+
+**Nicht auflösbares `ppAb` (N2).** Fehlt die Spieltagsliste oder ist die ID unbekannt, rechnet der Spieltag alt statt
+mit dem Stempel.
+
+**E1 nur mit C2 (N3).** Die Anker der Ergebnisskala sind auf C2-Spieler-PP gezogen; die Engine wendet E1 nur an,
+wenn die Zeile mit C2 gerechnet wird.
+
+**Anzeige der laufenden Saison (Info).** "Nach dem Spieltag", die Arena-Paarungsliste und die gebuchte
+Arena-Zeile zeigen die 0-10-Skala und den Pod-Wert nur bei Zeilen mit `ergebnisSkala: "e1"`; eine Zeile der
+laufenden (alten) Saison zeigt exakt wie vor diesem PR.
