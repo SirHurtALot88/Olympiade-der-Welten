@@ -219,6 +219,16 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   neuer harter Gehaltsdeckel; die Orientierung am gepickten Sponsor läuft weich (Forecast mit Sponsor, Rücklage, Vorstand).
 - **Der Vorstand verhängt keine Geldstrafen.** Bei ausbleibendem Erfolg gibt er weniger Budget frei: das Team darf bei
   Transfers nur auf X % seines verfügbaren Budgets zugreifen.
+- **So wirkt die Freigabe (Chris, 18.11., „wie im Football Manager“):** Der Vorstand nimmt nichts weg — das Geld bleibt auf
+  dem Konto, nur X % davon dürfen für Ablösen UND Gehälter (neue Verträge, Gehaltserhöhungen) ausgegeben werden. Die Sperre
+  ist **hart**: ein Kauf oder Vertrag über dem freien Betrag ist nicht möglich (Mensch und KI gleich). **Verkaufserlöse
+  unterliegen derselben Quote** — bei 70 % werden von 20 C Verkauf nur 14 C ausgebbar, der Rest bleibt als gewollter Puffer
+  auf dem Konto. Stufen nach Vertrauen: ab 6 → 100 %, 4–6 → 85 %, 2,5–4 → 70 %, darunter 50 %. Die Rücklage nach Finanzwert
+  bleibt dagegen **weich** (Warnung, Vertrauensverlust).
+- **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
+  Ergebnis spoilern (Chris, 18.11.).
+- **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
+  verraten (Chris, 18.11.).
 - **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
