@@ -154,15 +154,58 @@ Lesart:
   halb positiv, halb negativ — genau das, was Chris an der alten Rechnung vermisst hatte.
 * Die Kasse sinkt deutlich: die **Nachrunde** kauft 27 Spieler (rund 490 C) für offene Plätze. Kader +7 Spieler ligaweit, kein
   Team im Minus, kein Notkredit. Ob die Nachrunde so großzügig sein soll, ist eine Planer-Frage (Rücklage, #1618).
-* **C-S bleibt in beiden Läufen unter 8** (Fenster-Start mit 6 Spielern nach Vertragsablauf, Kasse 87 C, 74 C frei; der Planer
-  plant keinen Kauf). Das ist kein Effekt des Fensters, sondern der „Pflichtkader 8“ des Planers — in #1618 gebaut
-  („Teams unter 8: 0“). Ein Notkauf hier ist ausdrücklich nicht gewollt.
+* **C-S unter 8** in diesem ersten Lauf: Ursache und Behebung in Abschnitt 6a (zweite Basis, drei Teams genau verfolgt).
 
 Altstände (Live-Abbild, nur Kopie): `swnjlk` und `hwz8fk` — Saison 1 vorher 32 von 32 Teams negativ (Median −239,3 bzw.
 −239,4), jetzt 32 × „—“ mit Kaderaufbau −239,3 bzw. −239,4. S2 jetzt min/Median/max −76,4/−36,8/0 bzw. −111,5/−43,9/0:
 in diesen alten Ständen hat die KI am S1-Ende noch nicht verkauft, nur Chris’ eigene Verkäufe zählen auf der Plusseite.
 
-Wertungs-Fingerabdruck: `GESAMT ce8fcef66028 (75 Eintraege)`, unverändert.
+Wertungs-Fingerabdruck: nach dem Merge von main `GESAMT d3a39030a3ef (75 Eintraege)` — derselbe Wert wie auf main.
+
+## 6a. Kein Team unter 8 — die Ursachen, Schritt für Schritt (Nachmessung 18.11.)
+
+Chris: „6 Spieler wird wohl sein, weil sie verkauft haben … damit kann man doch solide 4–5 Spieler holen.“ Nachgemessen auf
+einer zweiten Basis (neues Spiel, 32 KI-Teams, `new-game-…-1sn0ly`), das Fenster S1 → S2 mehrfach von derselben Kopie aus.
+Der erste Lauf ließ drei verschiedene Teams unter 8 — mit **drei verschiedenen Ursachen**, keine davon war ein Notkauf-Fall:
+
+| Team | Fenster-Start | Kasse | Was geschah | Ursache (Datei, Bedingung) |
+|---|---|---:|---|---|
+| **W-L** | 8 | 91,6 C | verkauft 1 → 7, kauft nichts nach | **Fenster-Reihenfolge (meins):** die Verkaufsrunde lief mit `allowBelowMin` wie früher am Saisonende — dort folgte eine eigene volle Kaufphase, im gemeinsamen Fenster nicht verlässlich. |
+| **M-M** | 5 (Vertragsablauf, kein Verkauf) | 61,5 C | kein Kauf | **Marktplan:** der Legacy-Plan nahm die zwei teuersten Kandidaten (30,0 + 30,3 C) → 7 Spieler, 1,2 C → Meldungen `cash_after_market_plan_below_reserve` + `roster_after_market_plan_below_player_min`. `ai-market-plan-preview-service.ts`, Unified-Overlay (`blockedOnlyByIncompleteRosterFill`): nur die Kader-Meldung allein ließ den Unified-Plan zu, mit der Rücklagen-Meldung daneben blieb das Team ganz ohne Kauf. |
+| **Z-H** | 7 (kein Verkauf) | 67,5 C | Kauf 1 (7 → 8) ging durch, Kauf 2 scheiterte, **beide** zurückgedreht | **Marktplan + Töpfe:** Kauf 2 scheiterte an `vorstand_gehaltsbudget_nicht_freigegeben` (`pruefeKaufGegenVorstandFreigabe` nimmt nur Kader **unter** dem Minimum aus; ab 8 greift der Gehaltstopf, Finanzwert 2,3). Danach `resetTransferRunContext(beforeTeamRun)` in `ai-market-plan-apply-service.ts` (beide Abbruchstellen der Kaufschleife) — das warf auch den gelungenen ersten Kauf weg. |
+
+C-S aus dem ersten Lauf (6 Spieler nach Vertragsablauf, **kein** eigener Verkauf, 87 C) lässt sich nicht mehr einzeln
+nachstellen (die Basis ist weg); das Muster — Kasse da, Kauf fällt im Marktplan weg — ist dasselbe wie bei M-M/Z-H.
+
+**Behoben in diesem PR:**
+
+1. **Verkaufsrunde (meins):** im gemeinsamen Fenster verkauft die KI nur bis max(8, playerMin)
+   (`ai-transfer-window-session-service.ts`, `sellNotBelowMin`). Der Verkaufsplan bleibt derselbe; ausgeführt wird nur bis zum
+   Minimum, Warnung `fenster_verkauf_bis_zum_minimum`.
+2. **Unified-Overlay** (`ai-market-plan-preview-service.ts`): unter dem Minimum zählt `cash_after_market_plan_below_reserve`
+   neben der Kader-Meldung als „unvollständiger Legacy-Plan“; der Unified-Plan prüft Kasse und Rücklage selbst. M-M plant
+   danach 4 Käufe (5 → 9) für 60,0 C.
+3. **Teilkauf behalten** (`ai-market-plan-apply-service.ts`, `behalteTeilkauf`): scheitert ein späterer Kaufschritt, bleiben die
+   bereits ausgeführten Käufe; die normale Nachprüfung (Kader-/Kassen-Riegel) läuft unverändert. Z-H: 7 → 8.
+
+| zweite Basis | vorher (zwei Fenster) | nachher, erster Lauf | **nachher mit den drei Korrekturen** |
+|---|---:|---:|---:|
+| Teams unter 8 | 3 (B-B 7, C-S 7, T-C 5) | 2 (M-M 5, W-L 7) | **0** (min 8, Median 10) |
+| Verkäufe Saisonende / Fenster | 47 / 0 | 0 / 44 | 0 / 28 |
+| Käufe im Fenster | 57 (952,9 C) | 66 (1630,1 C) | 64 (1635,9 C) |
+| Transferbilanz S2 Median, positiv/negativ | −14,9, 11/19 | −20,4, 6/24 | −34,0, 3/26 |
+| Kasse Summe / Median / min | 1660 / 53,5 / 5,3 | 841 / 11,7 / 3,1 | 830 / 13,3 / 3,3 |
+| Negative Kassen / Notkredite / Notverkäufe | 0/0/0 | 0/0/0 | 0/0/0 |
+
+Die Läufe sind nicht bitgleich wiederholbar (zwei Läufe von derselben Kopie weichen in Einzelkäufen ab); die Aussage „0 Teams
+unter 8“ gilt für diesen Lauf, die drei Ursachen sind einzeln am Spielstand nachgewiesen.
+
+**Für den Planer-/Finanz-Agenten (#1618/#1629):** Die „Kaderpflicht-Freigabe“ in `kaufRahmen` sollte auch den Fall Z-H
+abdecken: `pruefeKaufGegenVorstandFreigabe` (`lib/finance/vorstand-budgetfreigabe.ts`, Ausnahme `rosterBefore < playerMin`)
+nimmt nur Kader UNTER dem Minimum aus; ein Team, das bis Opt kaufen will und am Gehaltstopf hängt, kommt so nur bis genau 8.
+Die Rücklagen-Meldung des Legacy-Plans (Kandidaten nach Wertung statt nach Lücke ausgewählt,
+`ai-transfermarkt-preview-service.ts` `empfehlungsAnzahl = Math.max(3, kaderLuecke + 2)`, Rangfolge nach Score) ist der
+eigentliche Grund für M-M; der Overlay-Fix umgeht ihn, die Auswahl selbst bleibt Planer-Sache.
 
 ## 7. Offene Punkte
 

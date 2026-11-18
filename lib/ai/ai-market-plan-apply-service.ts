@@ -1913,6 +1913,25 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       : structuredClone(resolveLocalSave(persistence, preview.scope.saveId).gameState);
     recordPhase("beforeTeamRunClone", Date.now() - beforeTeamRunCloneStartedAt);
     let teamFailed = false;
+    /**
+     * TEILKAUF BEHALTEN (18.11., Messlauf gemeinsames Transferfenster, `docs/design/transferfenster-gemeinsam-18-11.md`).
+     *
+     * Scheiterte ein SPAETERER Kaufschritt, drehte der Teamlauf bisher ALLE Kaeufe dieses Teams zurueck
+     * (`resetTransferRunContext(beforeTeamRun)`). Gemessen an Z-H (7 Spieler, Minimum 8, 67,5 C): Kauf 1 ging durch
+     * (7 → 8, unter dem Minimum gilt die Vorstands-Sperre nicht), Kauf 2 scheiterte an
+     * `vorstand_gehaltsbudget_nicht_freigegeben` (ab 8 greift sie) — und der Rueckroll nahm auch Kauf 1 weg. Das Team
+     * blieb bei 7, obwohl genau der erste Kauf das Minimum hergestellt haette.
+     *
+     * Jetzt endet die Kaufschleife an dieser Stelle, die bereits ausgefuehrten Kaeufe bleiben, und der Teamlauf geht
+     * durch die normale Nachpruefung (Kader-/Kassen-Riegel weiter unten, unveraendert). Ohne vorherigen Kauf bleibt
+     * alles wie bisher.
+     */
+    const behalteTeilkauf = (gruende: readonly string[], marke: string) => {
+      if (nextResult.executedBuys <= 0) return false;
+      nextResult.blockingReasons = unique([...nextResult.blockingReasons, ...gruende, marke]);
+      nextResult.warnings = unique([...nextResult.warnings, "teilkauf_behalten_nach_gesperrtem_folgekauf"]);
+      return true;
+    };
 
     for (const candidate of effectiveSellPlan.candidates) {
       const sellPreview = previewLocalTransfermarktSell({
@@ -2053,6 +2072,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyPreview.canBuy) {
+        if (behalteTeilkauf(buyPreview.blockingReasons, "buy_preview_blocked")) break;
         if (process.env.OLY_DEBUG_BUY_GATE === "1") {
           console.error(
             `[buy-gate-debug] ${team.teamCode} candidate=${candidate.playerId} canBuy=false blockers=${buyPreview.blockingReasons.join("|")}`,
@@ -2095,6 +2115,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyResult.canBuy || !buyResult.transferCreated) {
+        if (behalteTeilkauf(buyResult.blockingReasons, "buy_execute_failed")) break;
         if (process.env.OLY_DEBUG_BUY_GATE === "1") {
           console.error(
             `[buy-gate-debug] ${team.teamCode} candidate=${candidate.playerId} execute-failed blockers=${buyResult.blockingReasons.join("|")}`,

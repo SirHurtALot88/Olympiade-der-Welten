@@ -9,6 +9,9 @@
  *  3. Altstand-Umrechnung: archivierte Saisonen werden in der Anzeige nach derselben Regel gelesen, ohne dass sich
  *     das Archiv aendert.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { GameState, SeasonSnapshotRecord, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
@@ -290,5 +293,37 @@ describe("Altstand-Umrechnung — Anzeige nachtraeglich, Archiv unveraendert", (
     expect(ohne).toMatchObject({ transferNet: null, kaderaufbauNet: -250, kaderaufbauBuyTotal: 250 });
     expect(rechneTransferbilanzImDatensatzUm(ohne, "season-1", null)).toEqual(ohne);
     expect(rechneTransferbilanzImDatensatzUm({ teamId: "A", transferNet: -25 }, "season-2", null)).toEqual({ teamId: "A", transferNet: -25 });
+  });
+});
+
+describe("Kein Team unter 8 nach dem Fenster (Messung 18.11., M-M und W-L)", () => {
+  const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
+
+  it("die Verkaufsrunde des Fensters verkauft nie unter max(8, playerMin)", () => {
+    const sitzung = quelle("lib/ai/ai-transfer-window-session-service.ts");
+    expect(sitzung).toContain('sellNotBelowMin: input.phase === "fenster_verkauf",');
+    expect(sitzung).toContain("const boden = Math.max(8, identity?.playerMin ?? 0);");
+    expect(sitzung).toContain("if (appliedSells >= verkaufsSpielraum) break;");
+  });
+
+  it("unter dem Minimum laesst die Ruecklagen-Meldung des Legacy-Plans den Unified-Plan zu", () => {
+    const vorschau = quelle("lib/ai/ai-market-plan-preview-service.ts");
+    const gate = vorschau.slice(
+      vorschau.indexOf("const blockedOnlyByIncompleteRosterFill"),
+      vorschau.indexOf("const planned = await planUnifiedTeamPicks"),
+    );
+    expect(gate).toContain('(unterMinimum && reason === "cash_after_market_plan_below_reserve")');
+    // Ohne die Kader-Meldung bleibt es beim alten Ausschluss: die Ruecklage allein oeffnet nichts.
+    expect(gate).toContain('team.blockingReasons.includes("roster_after_market_plan_below_player_min")');
+  });
+});
+
+describe("Teilkauf bleibt, wenn ein spaeterer Kaufschritt scheitert (Z-H, 18.11.)", () => {
+  it("beide Abbruchstellen der Kaufschleife behalten bereits ausgefuehrte Kaeufe", () => {
+    const apply = readFileSync(join(process.cwd(), "lib/ai/ai-market-plan-apply-service.ts"), "utf8");
+    expect(apply).toContain('if (behalteTeilkauf(buyPreview.blockingReasons, "buy_preview_blocked")) break;');
+    expect(apply).toContain('if (behalteTeilkauf(buyResult.blockingReasons, "buy_execute_failed")) break;');
+    // Ohne vorherigen Kauf bleibt es beim bisherigen Fehlerpfad.
+    expect(apply).toContain("if (nextResult.executedBuys <= 0) return false;");
   });
 });

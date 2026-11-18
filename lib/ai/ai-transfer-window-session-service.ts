@@ -205,6 +205,12 @@ async function runTeamCycle(input: {
   renewInSellCycle?: boolean;
   /** Im Verkaufszyklus: wirklich verkaufen (false = nur verlaengern, gemeinsames Fenster am Saisonende). */
   sellInSellCycle?: boolean;
+  /**
+   * Gemeinsames Fenster: nie unter das Kader-Minimum verkaufen (max(8, playerMin)). Die Verkaufsrunde laeuft
+   * VOR den Kaeufen desselben Fensters; ein Verkauf unter das Minimum ohne gesicherten Nachkauf ist ein Fehler
+   * (Chris 18.11.: kein Team unter 8).
+   */
+  sellNotBelowMin?: boolean;
   cycleIndex: number;
   leagueRound: number;
   excludeBuyPlayerIds: Set<string>;
@@ -452,7 +458,25 @@ async function runTeamCycle(input: {
     // bleiben im Kader und kommen in der Verkaufsrunde des Fensters der neuen Saison erneut auf den Tisch.
     if (input.sellInSellCycle === false) return;
     const activePlayerIdByPlayerId = new Map(entries.map((entry) => [entry.player.id, entry.activePlayerId]));
+    /**
+     * KEIN VERKAUF UNTER DAS MINIMUM IM GEMEINSAMEN FENSTER (18.11.).
+     *
+     * Am Saisonende durfte der Verkaufsplan bis 0 abbauen (`allowBelowMin`), weil die Kaufphase danach eine
+     * eigene, volle Runde war. Im gemeinsamen Fenster wurde das zum Loch: gemessen verkaufte W-L von 8 auf 7, und
+     * der Kaufplan desselben Fensters holte niemanden nach. Der Verkaufsplan bleibt derselbe (inkl. Upgrade-Tausch),
+     * ausgefuehrt wird aber nur, solange der Kader danach mindestens max(8, playerMin) hat.
+     */
+    let verkaufsSpielraum = Number.POSITIVE_INFINITY;
+    if (input.sellNotBelowMin) {
+      const kaderJetzt = rosterCount(gameState, input.teamId);
+      const boden = Math.max(8, identity?.playerMin ?? 0);
+      verkaufsSpielraum = Math.max(0, kaderJetzt - boden);
+      if (plan.decisions.length > verkaufsSpielraum) {
+        warnings.push(`fenster_verkauf_bis_zum_minimum:${input.teamId}:${verkaufsSpielraum}/${plan.decisions.length}`);
+      }
+    }
     for (const decision of plan.decisions) {
+      if (appliedSells >= verkaufsSpielraum) break;
       const activePlayerId = activePlayerIdByPlayerId.get(decision.playerId);
       if (!activePlayerId) continue;
       const sellResult = executeLocalTransfermarktSell({
@@ -1132,6 +1156,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           allowSells: allowSellsForCycle,
           renewInSellCycle,
           sellInSellCycle,
+          sellNotBelowMin: input.phase === "fenster_verkauf",
           cycleIndex: cycle,
           leagueRound,
           excludeBuyPlayerIds,
