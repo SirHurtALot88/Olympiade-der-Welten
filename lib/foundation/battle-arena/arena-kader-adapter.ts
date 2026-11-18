@@ -1,5 +1,10 @@
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { getPlayerGroesse } from "@/lib/data/playerSizeData";
+import {
+  buildFormMoralMultipliers,
+  isFormMoralEnabled,
+  scaleArenaPlayerByMultiplier,
+} from "@/lib/morale/form-moral-modifikator";
 
 /**
  * Bruecke zwischen dem echten Datenmodell und dem Motor in public/mockups/battle-mode.html.
@@ -155,13 +160,18 @@ export function buildArenaTeam(
   if (spielerIds.size === 0) return [];
   const spielerById = new Map(gameState.players.map((player) => [player.id, player]));
   const kader: ArenaSpieler[] = [];
+  // Form + Moral (Prototyp 17.11., Standard AUS): ohne OLY_FORM_MORAL=1 bleibt die Map leer und
+  // jeder Spieler exakt wie vorher (gleiche Referenz, kein Rechenschritt).
+  const formMoral = isFormMoralEnabled() ? buildFormMoralMultipliers(gameState, teamId) : null;
   for (const playerId of spielerIds) {
     const basisSpieler = spielerById.get(playerId);
     if (!basisSpieler) continue;
     const override = attributeSheetOverrides?.get(playerId);
     const player = override ? { ...basisSpieler, attributeSheetStats: override } : basisSpieler;
     if (!hatVollstaendigeAttribute(player)) continue;
-    kader.push(zuArenaSpieler(player));
+    const arenaSpieler = zuArenaSpieler(player);
+    const signal = formMoral?.get(playerId);
+    kader.push(signal ? scaleArenaPlayerByMultiplier(arenaSpieler, signal.multiplier) : arenaSpieler);
   }
   kader.sort((a, b) => (b.d.tdm ?? 0) - (a.d.tdm ?? 0));
   return kader;

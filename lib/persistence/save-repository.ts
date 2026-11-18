@@ -148,6 +148,7 @@ type GameMetadata = {
   playerProgressionEvents?: GameState["playerProgressionEvents"];
   playerPotential?: GameState["playerPotential"];
   playerMoraleState?: GameState["playerMoraleState"];
+  playerFormState?: GameState["playerFormState"];
   playerRelationshipEvents?: GameState["playerRelationshipEvents"];
   // #1: Der zugewiesene Saison-Kapitän (manuell/AI) muss dauerhaft überleben, sonst geht er
   // beim Kaltladen aus der DB verloren (bisher nur im flüchtigen Session-Cache gehalten).
@@ -1381,6 +1382,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.playerMoraleState
       ? { playerMoraleState: gameMetadata.playerMoraleState }
       : {}),
+    ...(gameMetadata?.playerFormState ? { playerFormState: gameMetadata.playerFormState } : {}),
     ...(gameMetadata?.playerRelationshipEvents
       ? { playerRelationshipEvents: gameMetadata.playerRelationshipEvents }
       : {}),
@@ -1840,6 +1842,7 @@ function createPersistedSaveRecord(input: {
       playerProgressionEvents: guardedGameState.playerProgressionEvents,
       playerPotential: guardedGameState.playerPotential,
       playerMoraleState: guardedGameState.playerMoraleState,
+      playerFormState: guardedGameState.playerFormState,
       playerRelationshipEvents: guardedGameState.playerRelationshipEvents,
       // #1: Zugewiesenen Saison-Kapitän dauerhaft schreiben (nicht nur im Session-Cache).
       teamCaptains: guardedGameState.teamCaptains,
