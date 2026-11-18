@@ -713,6 +713,8 @@ input[type=range]::-moz-range-thumb{width:.6rem;height:1.4rem;background:var(--c
 .gef.g1{color:var(--tinte)} .gef.g2{color:#17120a;background:var(--acht)} .gef.g3{color:#fff;background:var(--warn)}
 .fl .dk20{display:flex;gap:.16rem} .fl .dk20 a{min-width:2.05rem;height:1.6rem;display:grid;place-items:center;border-radius:.25rem;border:1px solid var(--linie);font-size:.7rem;font-weight:700;color:var(--leise);background:var(--flaeche-2)}
 .fl .dk20 a:hover{color:var(--tinte);border-color:var(--linie-2)} .fl .dk20 a.an{background:var(--gold);border-color:var(--gold);color:#17120a}
+.mz.kopf a{color:inherit;cursor:pointer} .mz.kopf a:hover{color:var(--tinte)} .mz.kopf a.so{color:var(--gold)} .mz.kopf a.re{text-align:right}
+.ltick{-webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent)}
 .blat{display:inline-flex;gap:.3rem;align-items:center} .blat a{width:1.7rem;height:1.5rem;display:grid;place-items:center;border:1px solid var(--linie);border-radius:.25rem;color:var(--tinte)!important}
 /* --- Mein Draft --- */
 #l-ich .buehne-f{height:10.2rem;flex:none}
@@ -724,15 +726,15 @@ input[type=range]::-moz-range-thumb{width:.6rem;height:1.4rem;background:var(--c
 .stapel .res{background:repeating-linear-gradient(135deg,rgba(255,96,88,.7) 0 .3rem,rgba(255,96,88,.22) .3rem .6rem)}
 .wl{display:flex;flex-direction:column}
 .wl div{display:flex;align-items:center;gap:.4rem;font-size:.88rem;padding:.14rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap;cursor:pointer}
-.wl div span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--tinte)} .wl div small{color:var(--leise)}
+.wl div>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--tinte)} .wl div small{color:var(--leise)}
 .trl{display:flex;gap:.3rem;flex-wrap:nowrap;overflow:hidden;min-height:1.25rem}
 /* --- Pick-Tafel --- */
 .tf{display:grid;grid-template-rows:auto minmax(0,1fr);gap:.72rem;padding:.8rem 1rem}
-.tg{display:grid;grid-template-columns:4.2rem repeat(32,minmax(0,1fr));grid-template-rows:3.2rem repeat(14,minmax(0,1fr));gap:.18rem;flex:1;min-height:0;padding:.6rem .7rem .7rem}
-.tg .kz{display:grid;place-items:center;position:relative} .tg .kz img{width:100%;max-width:2.5rem;aspect-ratio:1;border-radius:.3rem;object-fit:cover;border:2px solid transparent}
+.tg{display:grid;grid-template-columns:5.6rem repeat(32,minmax(0,1fr));grid-template-rows:3.2rem repeat(14,minmax(0,1fr));gap:.18rem;flex:1;min-height:0;padding:.6rem .7rem .7rem}
+.tg .kz{display:grid;place-items:center;position:relative} .tg .kz img{width:2.5rem;height:2.5rem;border-radius:.3rem;object-fit:cover;border:2px solid transparent}
 .tg .kz.ich img{border-color:var(--heim)} .tg .kz.fr img{border-color:var(--gast)} .tg .kz.ra img{border-color:var(--dritt)}
 .tg .rz{display:flex;flex-direction:column;justify-content:center;line-height:1.05;font-size:.7rem;color:var(--stumm);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
-.tg .rz b{font:400 1.15rem/1 var(--haus);color:var(--creme);letter-spacing:0;text-transform:none}
+.tg .rz b{font:400 1.05rem/1.1 var(--haus);white-space:nowrap;color:var(--creme);letter-spacing:0;text-transform:none}
 .tg .rz.an b{color:var(--gold)}
 .tg .ze{position:relative;border-radius:.25rem;overflow:hidden;background:rgba(255,255,255,.03);border:1px solid rgba(244,230,196,.06);min-height:0}
 .tg .ze img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 16%}
@@ -744,26 +746,26 @@ input[type=range]::-moz-range-thumb{width:.6rem;height:1.4rem;background:var(--c
 /* --- Ueberspringen --- */
 .dlg.skip{width:74rem;height:auto}
 .sk2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;padding:1.1rem}
-.so{display:flex;flex-direction:column;gap:.6rem;padding:1rem 1.1rem 1.1rem;border:1px solid var(--linie-2);border-radius:var(--r);background:var(--flaeche-2)}
-.so:hover{border-color:var(--gold)}
-.so em{font-style:normal;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
-.so h3{margin:0;font:400 1.5rem/1.1 var(--haus);color:#fff}
-.so p{margin:0;font-size:.95rem;line-height:1.35;color:var(--leise)} .so p b{color:var(--tinte);font-weight:600}
-.so ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.3rem;font-size:.92rem;color:var(--tinte)}
-.so li{display:flex;gap:.5rem;align-items:baseline} .so li i{font-style:normal;font-weight:700;width:.9rem;flex:none;color:var(--gut)} .so li.m i{color:var(--warn)}
-.so .knopf{margin-top:auto;align-self:flex-start}
+.sopt{display:flex;flex-direction:column;gap:.6rem;padding:1rem 1.1rem 1.1rem;border:1px solid var(--linie-2);border-radius:var(--r);background:var(--flaeche-2)}
+.sopt:hover{border-color:var(--gold)}
+.sopt em{font-style:normal;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.sopt h3{margin:0;font:400 1.5rem/1.1 var(--haus);color:#fff}
+.sopt p{margin:0;font-size:.95rem;line-height:1.35;color:var(--leise)} .sopt p b{color:var(--tinte);font-weight:600}
+.sopt ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.3rem;font-size:.92rem;color:var(--tinte)}
+.sopt li{display:flex;gap:.5rem;align-items:baseline} .sopt li i{font-style:normal;font-weight:700;width:.9rem;flex:none;color:var(--gut)} .sopt li.m i{color:var(--warn)}
+.sopt .knopf{margin-top:auto;align-self:flex-start}
 .skf{padding:.8rem 1.1rem 1rem;border-top:1px solid var(--linie);font-size:.9rem;color:var(--leise);display:flex;gap:1rem;align-items:center} .skf b{color:var(--tinte);font-weight:600} .skf .sp{flex:1}
 /* --- Ende --- */
 .en{display:grid;grid-template-columns:minmax(0,1fr) 33rem 31rem;grid-template-rows:auto minmax(0,1fr);gap:.72rem;padding:.8rem 1rem}
 .folge.ef{grid-template-columns:auto minmax(0,1fr) auto;padding:.6rem .9rem}
 .ef .kz4{display:flex;gap:.5rem;justify-content:center;min-width:0;overflow:hidden}
-.reihe{position:relative;height:13.5rem;flex:none;background:#0b0e14 center 62%/cover;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate;display:flex;align-items:flex-end;justify-content:center;gap:.2rem;padding:0 1rem .5rem}
+.reihe{position:relative;height:12rem;flex:none;background:#0b0e14 center 62%/cover;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate;display:flex;align-items:flex-end;justify-content:center;gap:.2rem;padding:0 1rem .5rem}
 .reihe::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,8,12,.35),rgba(6,8,12,.1) 45%,rgba(6,8,12,.9))}
 .reihe .f{flex:1 1 0;min-width:0;max-width:7.4rem;display:flex;flex-direction:column;align-items:center;gap:.15rem}
 .reihe .f img.fig{width:100%;aspect-ratio:1;filter:drop-shadow(0 .4rem .4rem rgba(0,0,0,.7))}
 .reihe .f img.por{width:72%;aspect-ratio:.8;border:2px solid var(--linie-2);margin-bottom:.3rem}
 .reihe .f small{font-size:.7rem;color:var(--creme);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.ek .mz{grid-template-columns:3.2rem 2.3rem minmax(7rem,1fr) 3.4rem 8.6rem minmax(8rem,10rem) 4rem 4rem}
+.ek .mz{grid-template-columns:5rem 2.3rem minmax(7rem,1fr) 3.4rem 8.6rem minmax(8rem,9.6rem) 3.6rem 3.4rem}
 .ks{display:grid;grid-template-rows:1.7rem repeat(20,minmax(0,1fr));flex:1;min-height:0}
 .kr{display:grid;grid-template-columns:7.4rem minmax(0,1fr) 2.6rem 9.5rem 3rem;gap:.6rem;align-items:center;padding:0 .9rem;border-top:1px solid rgba(244,230,196,.06);font-size:.95rem;white-space:nowrap;min-height:0}
 .kr.kopf{border-top:0;font-size:.64rem;letter-spacing:.11em;text-transform:uppercase;color:var(--stumm);font-weight:600}
@@ -1018,7 +1020,7 @@ function kopf(id){
   var fo=folge(Math.min(DR.runde,14)),t=amZug(),n=bisIch(),zt=DR.zeig?DR.zeig.t:t;
   var kette=fo.map(function(x,i){var c="l"+x.liga+(x.m?" "+x.m[1]:"")+(x.fertig?" fertig":!DR.ende&&i<DR.idx&&x!==zt?" durch":"")+(x===zt&&!DR.ende?" dran":"")+(Z.schau===x?" schau":"");
     return '<div class="kg">'+(x.m?'<em class="sitz '+x.m[1]+'">'+x.m[2]+'</em>':'')+'<a class="'+c+'" data-schau="'+x.c+'" title="'+(i+1)+'. '+x.n+' · Liga '+x.liga+' · Kader '+x.kader.length+(x.fertig?' · fertig':'')+'">'+logo(x.c)+'</a></div>'}).join("");
-  var sitze=T.filter(function(x){return x.m}).map(function(x){var z=x===ICH?"du":x.skip?"pickt später":x.auto?"Auto-Draft":x.m[1]==="ra"?"online · halbautomatisch":"online";
+  var sitze=T.filter(function(x){return x.m}).map(function(x){var z=x===ICH?"du":x.skip?"pickt später":x.auto?"Auto-Draft":x.m[1]==="ra"?"halbautomatisch":"online";
     return '<span class="'+x.m[1]+(live(x)&&x===t&&!DR.zeig?" dran":"")+'"><i></i><b>'+x.m[0]+'</b> '+z+'</span>'}).join("");
   $(id).innerHTML='<div class="rd"><b>'+(DR.modus==="rest"?"KI-Draft fertig":DR.ende?"Draft beendet":"Runde "+DR.runde+" von 14")+'</b><small>'+(DR.ende?DR.picks.length+" Picks · "+FB().length+" Spieler frei":"Pick "+nr()+" · "+(DR.runde%2?"Reihenfolge →":"Schlange ←")+" · gelost")+'</small></div>'+
     '<div class="kette">'+kette+'</div>'+
@@ -1031,7 +1033,7 @@ function kopf(id){
 function favKarte(t,p,i,z){var g=grund(t,p),k=p===DR.wahl||DR.wunsch.indexOf(p)>=0;
   return '<a class="fk e'+(i+1)+(z?(z.p===p?" pick":" raus"):"")+(k&&!z&&!t.m?" konf":"")+(t===ICH&&p===DR.wahl?" an":"")+'" data-dw="'+p.s+'"'+(z&&z.p===p?' data-st="PICK '+z.nr+'"':'')+'><img class="bg" src="../portraits/'+p.s+'.jpg" alt="">'+
     '<span class="rk t">'+(i+1)+'.</span><span class="tag gd '+g[0]+'">'+g[1]+'</span>'+
-    '<span class="un"><b>'+p.n+'</b><small>'+p.kl+' · '+p.ra+'</small><span class="zw"><span>Gesamt '+wz(p,p.ov,1).replace("<b","<strong").replace("</b>","</strong>")+'</span><strong class="t">'+de(p.mw)+' C</strong></span></span></a>'}
+    '<span class="un"><b>'+p.n+'</b><small>'+p.kl+' · '+p.ra+'</small><span class="zw"><span>GES '+wz(p,p.ov,1).replace("<b","<strong").replace("</b>","</strong>")+'</span><strong class="t">'+de(p.mw)+' C</strong></span></span></a>'}
 function teamKopf(t,extra){return '<div class="zt '+(t.m?t.m[1]:"")+'"><span class="lg">'+logo(t.c)+'</span><div class="mi"><h3>'+t.n+'</h3><small>'+(t.m?t.m[0]+" · pickt selbst":GM[t.gm])+' · Liga '+t.liga+' · Kader '+t.kader.length+(t.m?"":" / Ziel "+t.ziel)+'</small></div>'+
   '<div class="tp">Transfertopf frei<br><b class="t">'+C(tFrei(t))+'</b>'+(extra||"")+'</div></div>'}
 function zug(){
@@ -1073,6 +1075,7 @@ function liste(){var s=Z.such.toLowerCase();
     if(Z.f.leist&&leistbar(p))return false;if(Z.f.wunsch&&DR.wunsch.indexOf(p)<0)return false;if(Z.f.sc&&sc(p)<1)return false;
     if(Z.f.achse>=0){if(sc(p)<2)return false;if(p.ax.indexOf(Math.max.apply(null,p.ax))!==Z.f.achse)return false}   /* Achsen-Filter laesst Verdecktes weg */
     return true}).sort(function(a,b){return SORT[Z.sort][1](a)-SORT[Z.sort][1](b)||(a.n<b.n?-1:1)})}
+function sk(k,t,cls,titel){var an=Z.sort===k||(k==="bil"&&Z.sort==="abl")||(k==="abl"&&Z.sort==="bil");return '<a class="'+(cls||"")+(an?" so":"")+'" data-sort="'+k+'"'+(titel?' title="'+titel+'"':'')+'>'+t+(an?(Z.sort==="bil"?" ▴":" ▾"):"")+'</a>'}
 function brett(){
   var dran=ichDran(),L=liste(),seiten=Math.max(1,Math.ceil(L.length/13));Z.blatt=kl(Z.blatt,0,seiten-1);
   var kopf='<div class="pk"><h2>Draft-Brett</h2><div class="tabs"><a class="'+(Z.tab==="frei"?"an":"")+'" data-tab="frei">Freie Spieler · '+FB().length+'</a><a class="'+(Z.tab==="picks"?"an":"")+'" data-tab="picks">Alle Picks · '+DR.picks.length+'</a></div><span class="sp"></span>'+
@@ -1082,15 +1085,15 @@ function brett(){
       A.slice(Z.blatt*14,Z.blatt*14+14).map(function(x){return '<div class="mz pz'+(x.t===ICH?" an":"")+'"><b class="t" style="color:var(--stumm)">#'+x.nr+'</b><span class="t">'+(x.rd||"N")+'</span>'+logo(x.t.c,"lg")+'<span class="nm"><b>'+x.t.n+'</b><small>'+(x.t.m?x.t.m[0]:GM[x.t.gm])+'</small></span>'+por(x.p)+'<span class="nm"><b>'+x.p.n+'</b><small>'+x.p.kl+' · '+x.p.ra+'</small></span><span>'+wz(x.p,x.p.ov,1)+'</span><span class="re"><b class="t">'+de(x.p.mw)+'</b></span><span><span class="tag '+x.g[0]+'">'+x.g[1]+'</span></span></div>'}).join("")+'</div>'+
       '<div class="mfuss"><span>Runde „N“ = Nachzug nach dem Überspringen.</span><span class="sp"></span><span class="blat"><a data-blatt="-1">‹</a> Blatt '+(Z.blatt+1)+' / '+s2+' <a data-blatt="1">›</a></span></div>';return}
   $("l-brett").innerHTML=kopf+
-    '<div class="fl"><input id="such" placeholder="Name oder Klasse" value="'+Z.such.replace(/"/g,"&quot;")+'"><a class="fc'+(Z.f.leist?" an":"")+'" data-f="leist">leistbar</a><a class="fc'+(Z.f.wunsch?" an":"")+'" data-f="wunsch">★ Wunschliste</a><a class="fc'+(Z.f.sc?" an":"")+'" data-f="sc">beobachtet / gescoutet</a>'+
-      '<span class="gk">Achse</span>'+AX.map(function(a,i){return '<a class="fc'+(Z.f.achse===i?" an":"")+'" data-achse="'+i+'">'+a+'</a>'}).join("")+'<span class="sp"></span><span class="gk">Sortierung</span>'+Object.keys(SORT).map(function(k){return '<a class="fc'+(Z.sort===k?" an":"")+'" data-sort="'+k+'">'+SORT[k][0]+'</a>'}).join("")+'</div>'+
-    '<div class="fl"><span class="gk" style="margin-left:0">Eignung in</span><span class="dk20">'+DK.map(function(k,i){return '<a class="'+(Z.d===i?"an":"")+'" data-d="'+i+'" title="'+DN[i][0]+'">'+k+'</a>'}).join("")+'</span><span class="sp"></span>'+(Z.nebel&&(Z.sort==="ges"||Z.sort==="eig")?'<span class="tag" style="color:var(--nebel);border-color:rgba(143,180,217,.5)">im Nebel nach Stufe sortiert</span>':'')+'</div>'+
-    '<div class="mt" style="--zeilen:13"><div class="mz kopf"><span></span><span></span><span>Spieler</span><span class="'+(Z.sort==="ges"?"so":"")+'">Gesamt</span><span style="display:grid;grid-template-columns:repeat(4,1fr);text-align:center">'+AX.map(function(a){return '<i style="font-style:normal">'+a+'</i>'}).join("")+'</span><span class="'+(Z.sort==="eig"?"so":"")+'">'+DK[Z.d]+'</span><span class="re '+(Z.sort==="abl"||Z.sort==="bil"?"so":"")+'">Ablöse</span><span class="re">je ST</span><span class="'+(Z.sort==="gef"?"so":"")+'" title="So viele KI-Teams haben ihn gerade in ihren Top 3">gefragt</span><span></span></div>'+
+    '<div class="fl"><input id="such" style="width:10rem" placeholder="Name oder Klasse" value="'+Z.such.replace(/"/g,"&quot;")+'"><a class="fc'+(Z.f.leist?" an":"")+'" data-f="leist">leistbar</a><a class="fc'+(Z.f.wunsch?" an":"")+'" data-f="wunsch">★ Wunschliste</a><a class="fc'+(Z.f.sc?" an":"")+'" data-f="sc">mit Scouting</a>'+
+      '<span class="gk">Achse</span>'+AX.map(function(a,i){return '<a class="fc'+(Z.f.achse===i?" an":"")+'" data-achse="'+i+'">'+a+'</a>'}).join("")+'</div>'+
+    '<div class="fl"><span class="gk" style="margin-left:0">Eignung in</span><span class="dk20">'+DK.map(function(k,i){return '<a class="'+(Z.d===i?"an":"")+'" data-d="'+i+'" title="'+DN[i][0]+'">'+k+'</a>'}).join("")+'</span></div>'+
+    '<div class="mt" style="--zeilen:13"><div class="mz kopf"><span></span><span></span><span>Spieler</span>'+sk("ges","Gesamt")+'<span style="display:grid;grid-template-columns:repeat(4,1fr);text-align:center">'+AX.map(function(a){return '<i style="font-style:normal">'+a+'</i>'}).join("")+'</span>'+sk("eig",DK[Z.d])+sk(Z.sort==="abl"?"bil":"abl","Ablöse","re")+'<span class="re">je ST</span>'+sk("gef","gefragt","","So viele KI-Teams haben ihn gerade in ihren Top 3")+'<span></span></div>'+
     L.slice(Z.blatt*13,Z.blatt*13+13).map(function(x){var zt=leistbar(x),w=DR.wunsch.indexOf(x)>=0,g=gefragt(x);
       return '<div class="mz'+(x===DR.wahl?" an":"")+'" data-dw="'+x.s+'"><a class="st'+(w?" an":"")+'" data-stern="'+x.s+'" title="Wunschliste">'+(w?"★":"☆")+'</a>'+por(x)+'<span class="nm"><b>'+x.n+'</b><small>'+scp(x)+x.kl+' · '+x.ra+'</small></span><span style="font-size:1.12rem;color:var(--creme)">'+wz(x,x.ov,1)+'</span>'+achsen(x)+
        '<span style="font-size:1.05rem;color:var(--tinte)">'+wz(x,x.d[Z.d])+'</span><span class="re '+(zt==="Topf"?"zt":"")+'"><b class="t">'+de(x.mw)+'</b></span><span class="re '+(zt==="Gehalt"?"zt":"")+'"><b class="t">'+de(x.geh/20,2)+'</b></span><span><span class="gef g'+Math.min(3,g)+' t">'+(g?g+"×":"–")+'</span></span>'+
        '<span style="justify-self:end">'+(zt?'<span class="tag w" title="'+(zt==="Topf"?"sprengt den Transfertopf samt Reserve für die Pflichtplätze":"sprengt das Gehaltsbudget samt Reserve für die Pflichtplätze")+'">'+(zt==="Topf"?"zu teuer":"Gehalt")+'</span>':dran?'<a class="knopf klein haupt" data-dp="'+x.s+'">Picken</a>':x===DR.wahl?'<span class="tag go">vorgemerkt</span>':'<span class="tag">vormerken</span>')+'</span></div>'}).join("")+'</div>'+
-    '<div class="mfuss"><span><span class="scp s0"><i></i><i></i></span> unbekannt: 10er-Stufe · <span class="scp s1"><i></i><i></i></span> beobachtet: 5er-Stufe · <span class="scp s2"><i></i><i></i></span> gescoutet: exakt · Ablöse und Gehalt immer exakt</span><span class="sp"></span><span class="blat"><a data-blatt="-1">‹</a> Blatt '+(Z.blatt+1)+' / '+seiten+' <a data-blatt="1">›</a></span></div>';
+    '<div class="mfuss"><span>'+(Z.nebel?'<span class="scp s0"><i></i><i></i></span> unbekannt 10er-Stufe · <span class="scp s1"><i></i><i></i></span> beobachtet 5er-Stufe · <span class="scp s2"><i></i><i></i></span> gescoutet exakt · Ablöse immer exakt'+(Z.sort==="ges"||Z.sort==="eig"?' · <b style="color:var(--nebel)">im Nebel nach Stufe sortiert</b>':''):'Scouting-Nebel aus: alle Werte exakt')+'</span><span class="sp"></span><span class="blat"><a data-blatt="-1">‹</a> Blatt '+(Z.blatt+1)+' / '+seiten+' <a data-blatt="1">›</a></span></div>';
 }
 
 /* ---------- Mein Draft ---------- */
@@ -1100,9 +1103,9 @@ function toepfe(p){var t=ICH,g=grenzen(t),pm=p&&!p.team?p.mw:0,pg=p&&!p.team?p.g
     '<div class="stapel"><i class="aus" '+w(t.ausg,t.topf)+'></i><i class="vor" '+w(pm,t.topf)+'></i><i class="frei" '+w(fr,t.topf)+'></i><i class="res" '+w(g.rm,t.topf)+'></i></div></div>'+
     '<div class="zt2"><div class="tk2"><span class="gk">Gehalt je Spieltag</span><small>frei <b class="t">'+C(gFrei(t)/20,2)+'</b> von '+de(t.gbud/20,2)+'</small></div>'+
     '<div class="stapel"><i class="aus" '+w(t.geh,t.gbud)+'></i><i class="vor" '+w(pg,t.gbud)+'></i><i class="frei" '+w(gf,t.gbud)+'></i><i class="res" '+w(g.rg,t.gbud)+'></i></div></div>'+
-    '<div class="leg"><span><i style="background:var(--stumm)"></i>gepickt</span><span><i style="background:var(--acht)"></i>dieser Pick</span><span><i style="background:var(--gut)"></i>frei</span><span><i style="background:var(--warn)"></i>Reserve für '+g.pfl+' Pflichtplätze</span></div>'+
+    '<div class="leg"><span><i style="background:var(--stumm)"></i>gepickt</span><span><i style="background:var(--acht)"></i>dieser Pick</span><span><i style="background:var(--gut)"></i>frei</span><span><i style="background:var(--warn)"></i>Reserve für '+g.pfl+' Pflicht</span></div>'+
     '<div class="gz"><span>Für diesen Pick höchstens</span><b class="t">'+C(Math.max(0,g.mw))+' <small>und '+de(Math.max(0,g.geh)/20,2)+' C je Spieltag</small></b></div>'+
-    '<div class="vorst ok"><b>Vorstand, Saison 1:</b> Quote 100 % · Draft-Rücklage halb<small>Rücklage '+C(t.rl)+' statt '+de(t.rlVoll)+' (Finanzwert '+de(t.fw)+') · Gehaltspuffer '+C(t.puf)+' · bleiben in der Kasse</small></div></div>'}
+    '<div class="vorst ok"><b>Vorstand, Saison 1:</b> Quote 100 % · Draft-Rücklage halb<small>Rücklage '+de(t.rl)+' statt '+de(t.rlVoll)+' C · Gehaltspuffer '+C(t.puf)+'</small></div></div>'}
 function ich(){
   var p=DR.wahl,t=ICH,kd=t.kader,dran=ichDran(),n=bisIch(),zt=p?leistbar(p):"",kf=p&&DR.modus==="live"?konflikt(p):[],s=p?sc(p):0,pl="";
   for(var i=0;i<14;i++)pl+=kd[i]?'<div class="voll'+(i===kd.length-1&&kd[i].pnr===DR.picks.length?" neu":"")+'" title="'+kd[i].n+' · '+de(kd[i].mw)+' C"><img src="../portraits/'+kd[i].s+'.jpg" alt=""></div>':'<div class="'+(i<8?"pfl":"")+'">'+(i<8?"Pflicht":"frei")+'</div>';
@@ -1164,9 +1167,9 @@ function ende(){
 function skipDialog(){
   var ki=T.filter(function(t){return !t.m&&!t.fertig}).length;
   $("schleier").innerHTML='<div class="dlg skip"><div class="dk"><em>Draft · Runde '+DR.runde+'</em><h2>Draft überspringen</h2><span class="sp"></span><a class="zu" data-tu="zu">×</a></div>'+
-    '<div class="sk2"><div class="so"><em>Variante A</em><h3>KI fertig picken lassen, ich picke danach</h3><p>Die '+ki+' KI-Teams picken im Hintergrund zu Ende, das dauert wenige Sekunden. Du wählst danach <b>ohne Reihenfolge und ohne Zeitlimit</b> aus den übrigen Spielern.</p>'+
+    '<div class="sk2"><div class="sopt"><em>Variante A</em><h3>KI fertig picken lassen, ich picke danach</h3><p>Die '+ki+' KI-Teams picken im Hintergrund zu Ende, das dauert wenige Sekunden. Du wählst danach <b>ohne Reihenfolge und ohne Zeitlimit</b> aus den übrigen Spielern.</p>'+
       '<ul><li><i>+</i>volle Kontrolle über jeden deiner Picks</li><li><i>+</i>beide Budgets und die Wunschliste bleiben, wie sie sind</li><li class="m"><i>−</i>die begehrtesten Spieler sind dann weg</li></ul><a class="knopf haupt" data-tu="skipA">KI fertig picken lassen</a></div>'+
-    '<div class="so"><em>Variante B</em><h3>Auto-Draft: mein GM pickt für mich</h3><p>Dein Team bleibt in der Reihenfolge. Dein GM pickt nach <b>Wunschliste, dann nach Bedarf</b>, und hält beide Budgets ein. Du landest direkt im Ergebnis.</p>'+
+    '<div class="sopt"><em>Variante B</em><h3>Auto-Draft: mein GM pickt für mich</h3><p>Dein Team bleibt in der Reihenfolge. Dein GM pickt nach <b>Wunschliste, dann nach Bedarf</b>, und hält beide Budgets ein. Du landest direkt im Ergebnis.</p>'+
       '<ul><li><i>+</i>du bist sofort drin und spielbereit</li><li><i>+</i>dein Team pickt an seinem Platz, nicht aus dem Rest</li><li class="m"><i>−</i>du entscheidest nicht selbst; nachverpflichten geht danach am Markt</li></ul><a class="knopf haupt" data-tu="skipB">Auto-Draft starten</a></div></div>'+
     '<div class="skf"><span><b>Mitspieler:</b> Franky und Ramona entscheiden für sich. Wer live bleibt, pickt weiter an seinem Platz; die KI wartet dann nur noch auf ihn.</span><span class="sp"></span><a class="knopf" data-tu="zu">Zurück zum Draft</a></div></div>';
   $("schleier").classList.add("auf");
