@@ -11,6 +11,12 @@ services:
       args:
         NEXT_PUBLIC_OLY_BUILD_SHA: ${NEXT_PUBLIC_OLY_BUILD_SHA:-}
         NEXT_PUBLIC_OLY_BUILD_DATE: ${NEXT_PUBLIC_OLY_BUILD_DATE:-}
+        # Wertungsskalen (18.11., lib/resolve/wertungs-skalen.ts): der Browser rechnet PPS-Duell-Zeilen im
+        # Ledger nach und braucht den Schalter deshalb schon beim BUILD (Next.js inlined NEXT_PUBLIC_*).
+        # Ohne eigenen Wert gilt der Server-Schalter OLY_PP_SKALA / OLY_ERGEBNIS_SKALA aus deploy/hetzner/.env,
+        # damit Server und Browser nie auseinanderlaufen. Leer = Standard (neue Skala), nichts aendert sich.
+        NEXT_PUBLIC_OLY_PP_SKALA: ${NEXT_PUBLIC_OLY_PP_SKALA:-${OLY_PP_SKALA:-}}
+        NEXT_PUBLIC_OLY_ERGEBNIS_SKALA: ${NEXT_PUBLIC_OLY_ERGEBNIS_SKALA:-${OLY_ERGEBNIS_SKALA:-}}
     restart: unless-stopped
     # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
     # Chromium braucht beides, nicht nur eins von beiden.
@@ -72,6 +78,12 @@ services:
       # diese Variable HEUTE NOCH NICHT -- das ist bewusst nicht Teil dieses PRs, s.
       # PR-Beschreibung.
       OLY_ARENA_CHROMIUM_EXECUTABLE: ${OLY_ARENA_CHROMIUM_EXECUTABLE:-}
+      # Wertungsskalen-Schalter (18.11., PP-Skala C2 / Ergebnisskala E1): DIESELBE Falle wie bei
+      # OLY_ARENA_TIER_PARALLEL oben -- ohne diese Durchreichung erreicht ein Wert in deploy/hetzner/.env den
+      # Container NIE, der Rueckweg aus docs/design/pp-skala-18-11.md Abschnitt 8.4 waere wirkungslos.
+      # Leer = Code-Standard (neue Skala an). Siehe deploy/hetzner/.env.example.
+      OLY_PP_SKALA: ${OLY_PP_SKALA:-}
+      OLY_ERGEBNIS_SKALA: ${OLY_ERGEBNIS_SKALA:-}
     volumes:
       - oly-data:/app/data/persistence
       # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach

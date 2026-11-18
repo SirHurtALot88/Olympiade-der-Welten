@@ -137,7 +137,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.elm-kz__nm span {
+.elm-kz__nm > span {
   display: flex;
   align-items: center;
   gap: 5px;

@@ -11,6 +11,17 @@ import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 import { BATTLEFIELD_POD_FORMAT } from "@/lib/battle/arena-resolved-disciplines";
+import { ppSkalaModus } from "@/lib/resolve/pp-skala";
+
+/**
+ * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
+ * die Skala eines Spielstands, nachdem der Vorlauf gelaufen ist (Umstellung mitten in der Saison,
+ * lib/resolve/wertungs-skalen.ts), ist die Vorberechnung veraltet und wird neu gerechnet. In einer
+ * alten Saison bleibt der Hash Zeichen fuer Zeichen der alte (kein neuer Schluessel).
+ */
+function ppSkalaTeil(gameState: GameState, matchdayId: string): { ppSkala?: "c2" } {
+  return ppSkalaModus(gameState, matchdayId) === "an" ? { ppSkala: "c2" } : {};
+}
 
 /**
  * OPUS-AUFLAGE B2 (`docs/design/battle-arena-auto-run-anbindung-plan-16-10.md` Abschnitt 9,
@@ -98,7 +109,7 @@ export function berechneArenaEingabeHash(input: {
   const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
 
   return createHash("sha256")
-    .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash() }))
+    .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash(), ...ppSkalaTeil(input.gameState, input.matchdayId) }))
     .digest("hex");
 }
 
@@ -154,6 +165,7 @@ export function berechneMiniDmFfaEingabeHash(input: {
     .update(
       JSON.stringify({
         disciplineId: "mini-dm",
+        ...ppSkalaTeil(input.gameState, input.matchdayId),
         playerCount: input.playerCount,
         teile,
         mutatoren,
@@ -200,6 +212,7 @@ export function berechneBahnPodEingabeHash(input: {
     .update(
       JSON.stringify({
         disciplineId: input.disciplineId,
+        ...ppSkalaTeil(input.gameState, input.matchdayId),
         format: "bahn_pod",
         playerCount: input.playerCount,
         teile,
@@ -244,6 +257,7 @@ export function berechneBattlefieldPodEingabeHash(input: {
     .update(
       JSON.stringify({
         disciplineId: "battlefield",
+        ...ppSkalaTeil(input.gameState, input.matchdayId),
         // Format-Umschalter (17.11.): im Standard "orte3" bleibt der Hash Zeichen fuer Zeichen der alte.
         format: BATTLEFIELD_POD_FORMAT === "orte3" ? "pod-gefecht-je-ort" : `pod-${BATTLEFIELD_POD_FORMAT}`,
         playerCount: input.playerCount,

@@ -2,8 +2,8 @@
  * New-Look Geld-Formatierung ("Neuer Look" Design-System).
  *
  * Beträge liegen bereits in Mio-Einheit vor und werden app-weit EINHEITLICH als
- * "Mio" mit de-DE-Komma und genau einer Nachkommastelle dargestellt — auch kleine
- * Beträge (0,1 Mio statt "100k"), damit derselbe Wert nie in zwei Einheiten erscheint.
+ * "C" (früher "Mio") mit de-DE-Komma und genau einer Nachkommastelle dargestellt — auch kleine
+ * Beträge (0,1 C statt "100k"), damit derselbe Wert nie in zwei Einheiten erscheint.
  */
 export function formatNlMoney(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) {
@@ -11,12 +11,12 @@ export function formatNlMoney(value: number | null | undefined): string {
   }
   // Clamp a magnitude that rounds to zero so we never render "-0,0 Mio".
   const normalized = Math.round(value * 10) === 0 ? 0 : value;
-  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(normalized)} Mio`;
+  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(normalized)} C`;
 }
 
 /**
  * Einheit C (Chris, 18.11.): derselbe Betrag mit de-DE-Komma und einer Nachkommastelle, Einheit `C` statt `Mio`.
- * Die Startseite und die Kasse im Regieband nutzen sie; übrige Seiten zeigen bis zur Umstellung noch `formatNlMoney`.
+ * Seit 18.11. ist `formatNlMoney` selbst auf C umgestellt (Chris: Geld überall als C); `formatNlCoins` bleibt als Alias.
  */
 export function formatNlCoins(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) {

@@ -670,6 +670,9 @@ function buildSeasonSnapshotRecord(
     sourceStatus,
     finalStandings,
     teamSnapshots: finalStandings,
+    // WERTUNGSSKALEN (18.11.): nur der gueltige Stempel DIESER Saison wandert ins Archiv.
+    wertungsSkalen:
+      gameState.seasonState.wertungsSkalen?.seasonId === seasonId ? { ...gameState.seasonState.wertungsSkalen } : null,
     matchdayResults: structuredClone(seasonMatchdayResults),
     disciplineResults: structuredClone(seasonDisciplineResults),
     playerDisciplinePerformances: structuredClone(seasonPlayerPerformances),

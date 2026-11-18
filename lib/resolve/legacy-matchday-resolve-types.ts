@@ -208,6 +208,18 @@ export type DisciplineTeamResolvePreview = {
    */
   ergebnisNormiert?: [number, number] | null;
   /**
+   * ERGEBNISSKALA (18.11., lib/resolve/ergebnis-skala.ts): `"e1"`, wenn `ergebnisNormiert`,
+   * `verhaeltnis` und `miniDmPod.wert` dieser Zeile nach der einheitlichen Skala E1 gerechnet sind
+   * (Saison-Stempel `seasonState.wertungsSkalen.ergebnis`). Fehlt = Skala vom 19.10.
+   */
+  ergebnisSkala?: "e1";
+  /**
+   * PP-SKALA DER ZEILE (18.11., lib/resolve/wertungs-skalen.ts `ppSkalaVersionFuerZeile()`): `"c2"`, wenn
+   * die Spieler-PP dieser Zeile mit C2 gerechnet wurden. Der Ledger rechnet PPS-Duell-Zeilen damit nach
+   * derselben Skala nach, mit der sie gebucht wurden -- auch nach einer Umstellung mitten in der Saison.
+   */
+  ppSkala?: "c2";
+  /**
    * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
    * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau
    * dieses Arena-Duell reproduzieren liesse. Die "Versionierung", die Chris fuer PR7 wollte — keine
