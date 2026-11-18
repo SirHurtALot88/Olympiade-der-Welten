@@ -49,6 +49,10 @@ Entfernt: `PlayerDetailDrawer.tsx` (4337 Zeilen), `PlayerHeroNewLook.tsx`, `Play
 - Die Verletzungs-Mechanik selbst (50 % in der Verletzungs-Disziplin gebucht) liegt auf eigenem Branch; die Anzeige liest die vorhandenen Verletzungsdaten.
 - Phone ist nicht Teil dieses Baus.
 
+## Einbau in den App-Rahmen (Runde 2)
+
+Der Kopf der Seite (Zurück, Porträt, Name, Blättern, Team und Liga, Form, Moral, Status, Merken) steht jetzt im **Seiten-Slot des Regiebands** (`FoundationBandSlot`), die sechs Reiter im Unterreiter-Platz des Bands (`FoundationSubNav` in der Shell). Die Seite hat keinen eigenen Kopf mehr, ihre Höhe richtet sich nach `--fb-u` und der Bandhöhe. **Alle Bilder in `spielerprofil-neu-18-11/` stammen noch aus der Zeit vor diesem Einbau** (eigener Kopf in der Seite, alter Rahmen); die Neuaufnahme im Rahmen steht aus (siehe unten).
+
 ## Stand der Aufnahmen
 
 Vorhanden (Wegwerf-Save, Skript `scripts/screenshot-spielerprofil-neu.ts`): alle Reiter bei **2560x1440** (Überblick Star, Überblick verletzt, Disziplinen, Leistung verletzt, Vertrag, Entwicklung, Karriere, Nebel fremder Spieler, ohne Figur), bei **1920x1080** Überblick, Überblick verletzt, Disziplinen, Leistung, Vertrag, dazu vier Gegenüberstellungen `abgleich-*.png` (links Mockup, rechts App).
