@@ -101,12 +101,13 @@ function createSeasonLog(message: string): GameLogEntry {
   };
 }
 
-function buildCurrentMoraleState(gameState: GameState): PlayerMoraleState[] {
+function buildCurrentMoraleState(gameState: GameState, matchdayId?: string): PlayerMoraleState[] {
   // Ligaweite Neuberechnung ueber ~320 Kader-Eintraege: den Lookup-Index EINMAL
   // bauen statt pro Spieler linear ueber players/rosters/teams/moraleState zu
   // scannen (players allein ~3000 Eintraege → vorher ~1 Mio Vergleiche/Matchday).
   const index = buildMoraleLookupIndex(gameState);
   const rosteredPlayerIds = new Set(gameState.rosters.map((roster) => roster.playerId));
+  const vorherJeSpieler = new Map((gameState.playerMoraleState ?? []).map((entry) => [entry.playerId, entry.morale] as const));
   const activeRows = gameState.rosters
     .map((roster) => assessPlayerMorale({ gameState, playerId: roster.playerId, teamId: roster.teamId, index }))
     .filter((entry): entry is NonNullable<ReturnType<typeof assessPlayerMorale>> => Boolean(entry))
@@ -119,6 +120,9 @@ function buildCurrentMoraleState(gameState: GameState): PlayerMoraleState[] {
       inactiveSeasons: 0,
       reasons: assessment.reasons,
       contractIntent: assessment.contractIntent,
+      ...(matchdayId && vorherJeSpieler.has(assessment.playerId)
+        ? { vorher: { morale: vorherJeSpieler.get(assessment.playerId)!, matchdayId } }
+        : {}),
     }));
 
   const inactiveRows = (gameState.playerMoraleState ?? []).filter((entry) => !rosteredPlayerIds.has(entry.playerId));
@@ -315,7 +319,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
           currentMatchday: prepared.nextMatchdayIndex ?? save.gameState.season.currentMatchday,
         },
         seasonState: nextSeasonState,
-        playerMoraleState: buildCurrentMoraleState(save.gameState),
+        playerMoraleState: buildCurrentMoraleState(save.gameState, prepared.currentMatchdayId),
         // Form-Prototyp (17.11., Standard AUS): ohne OLY_FORM_MORAL=1 kommt das Feld nicht hinzu.
         ...(isFormMoralEnabled()
           ? { playerFormState: advancePlayerFormState(save.gameState, prepared.currentMatchdayId) }

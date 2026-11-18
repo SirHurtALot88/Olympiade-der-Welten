@@ -229,6 +229,11 @@ const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-
   loading: () => <FoundationPanelSkeleton label="Entwurf wird geladen…" />,
 });
 
+const NachDemSpieltagHost = dynamic(() => import("@/app/foundation/nach-dem-spieltag/NachDemSpieltag"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Nach dem Spieltag wird geladen…" />,
+});
+
 const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog/FoundationChangelogHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
@@ -2626,6 +2631,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onLineupSaved: handleHumanLineupSaved,
               onFormCardPlanSaved: handleFormCardPlanSaved,
               onOpenArena: () => setFoundationView("matchdayArena", setActiveView),
+              onOpenNachDemSpieltag: () => setFoundationView("nachDemSpieltag", setActiveView),
               roomContext,
             }}
           />
@@ -2703,6 +2709,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   jetzt in der Arena (onAdvanceMatchday oben). */}
           </div>
           ) : null}
+
+          {activeView === "nachDemSpieltag" ? <NachDemSpieltagHost {...foundationMatchdayResultHostProps} /> : null}
 
           <FoundationShellRouterMatchdayResult
             active={activeView === "matchdayResult"}
