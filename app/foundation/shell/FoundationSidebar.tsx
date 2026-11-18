@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { FoundationRailIcon } from "@/app/foundation/shell/foundation-nav-icons";
 
@@ -59,6 +59,11 @@ type FoundationSidebarProps = {
   // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
   // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
   teamPicker?: ReactNode;
+  /** Wappen und Name des aktiven Teams: Kopf der Schiene (18.11., App-Rahmen modern). */
+  teamCrest?: ReactNode;
+  teamName?: string | null;
+  /** Office: Punkt unten in der Schiene. */
+  onOpenOffice?: () => void;
   /**
    * Icon-Schiene: ohne diese Prop bleibt die breite Seitenleiste. Mit ihr ist die Leiste kompakt
    * (nur Symbole), fährt bei Hover/Tastaturfokus aus und hält sich bei `pinned` dauerhaft offen.
@@ -87,8 +92,14 @@ export default function FoundationSidebar({
   attentionByViewId,
   seasonContextLabel,
   teamPicker,
+  teamCrest,
+  teamName,
+  onOpenOffice,
   rail,
 }: FoundationSidebarProps) {
+  // Gleitende Marke: EINE Goldmarke fährt zum aktiven Punkt, statt an jedem Punkt neu zu erscheinen.
+  const asideRef = useRef<HTMLElement | null>(null);
+  const [marke, setMarke] = useState<{ top: number; height: number } | null>(null);
   const [railHover, setRailHover] = useState(false);
   const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearRailTimer = () => {
@@ -113,6 +124,26 @@ export default function FoundationSidebar({
     const savedOrder = loadFoundationSidebarOrder();
     setNavGroups(applyFoundationSidebarOrder(FOUNDATION_NAV_GROUPS, savedOrder));
   }, []);
+
+  useLayoutEffect(() => {
+    if (!rail) return undefined;
+    const messen = () => {
+      const aside = asideRef.current;
+      const aktiv = aside?.querySelector<HTMLElement>(".foundation-sidebar-item.is-active");
+      if (!aside || !aktiv) {
+        setMarke(null);
+        return;
+      }
+      const a = aside.getBoundingClientRect();
+      const b = aktiv.getBoundingClientRect();
+      const top = Math.round(b.top - a.top + aside.scrollTop + b.height * 0.2);
+      const height = Math.round(b.height * 0.6);
+      setMarke((alt) => (alt && alt.top === top && alt.height === height ? alt : { top, height }));
+    };
+    messen();
+    const timer = setTimeout(messen, 220);
+    return () => clearTimeout(timer);
+  }, [activeView, railMode, navGroups, rail]);
 
   const persistGroupOrder = (groupId: keyof FoundationSidebarOrderState, itemIds: FoundationViewId[]) => {
     const savedOrder = loadFoundationSidebarOrder() ?? {};
@@ -200,6 +231,7 @@ export default function FoundationSidebar({
 
   return (
     <aside
+      ref={asideRef}
       className="foundation-sidebar"
       data-testid="foundation-sidebar"
       data-rail={railMode}
@@ -246,10 +278,10 @@ export default function FoundationSidebar({
       </a>
       {rail ? (
         <div className="foundation-rail-head">
-          {seasonPart ? (
-            <span className="foundation-rail-mini" data-testid="foundation-rail-mini" title={seasonContextLabel ?? undefined}>
-              <b>{seasonPart}</b>
-              {matchdayPart ? <i>{matchdayPart.replace(/^MD\s*/, "MD ")}</i> : null}
+          {teamCrest ? (
+            <span className="foundation-rail-wappen" data-testid="foundation-rail-wappen" title={teamName ?? undefined}>
+              {teamCrest}
+              {teamName ? <strong className="foundation-rail-wappen-name">{teamName}</strong> : null}
             </span>
           ) : null}
           <button
@@ -386,6 +418,35 @@ export default function FoundationSidebar({
           </div>
         </section>
       ))}
+      {rail ? (
+        <>
+          <span
+            className={`foundation-rail-marke${marke ? " is-da" : ""}`}
+            style={marke ? { transform: `translateY(${marke.top}px)`, height: marke.height } : undefined}
+            aria-hidden="true"
+          />
+          <div className="foundation-rail-unten">
+            {onOpenOffice ? (
+              <button
+                type="button"
+                className="foundation-sidebar-item foundation-rail-office"
+                data-testid="foundation-rail-office"
+                aria-label="Office öffnen"
+                title="Office öffnen"
+                onClick={onOpenOffice}
+              >
+                <span className="foundation-sidebar-icon foundation-sidebar-icon-svg foundation-rail-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="3.5" y="7.5" width="17" height="12" rx="2" />
+                    <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" />
+                  </svg>
+                </span>
+                <span className="foundation-sidebar-item-label">Office</span>
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </aside>
   );
 }
