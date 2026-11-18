@@ -2262,5 +2262,1177 @@
     "erzeugt": "2026-11-18",
     "verwendung": "Climbing-Neuentwurf: Vordergrund-Silhouette Felsnase mit Kiefer (Ebene E5, Parallax 1,35, im Mockup abgedunkelt)",
     "status": "Stilprobe fuer das Mockup public/mockups/climbing-neu-18-11.html; noch nicht im Motor. Doku: docs/design/climbing-neu-18-11.md Abschnitt 8"
+  },
+  "climbing/canyon_glocke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_glocke.png",
+    "groesse": [
+      46,
+      50
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_glocke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "brass summit bell hanging from a weathered wooden beam bolted to a rock, short pull rope, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 18,
+      "gen": [
+        64,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/glocke.png"
+  },
+  "climbing/canyon_seilbruecke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_seilbruecke.png",
+    "groesse": [
+      182,
+      32
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_seilbruecke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "sagging rope bridge with wooden planks and rope handrails seen from the side, spanning horizontally between two anchor points, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 24,
+      "gen": [
+        192,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/seilbruecke.png"
+  },
+  "climbing/canyon_strickleiter.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_strickleiter.png",
+    "groesse": [
+      35,
+      120
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_strickleiter",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "rope ladder with wooden rungs hanging straight down, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 42,
+      "gen": [
+        48,
+        128
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/strickleiter.png"
+  },
+  "climbing/canyon_griffe_bunt.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_griffe_bunt.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_griffe_bunt",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different colorful resin climbing wall holds, jugs, crimps and slopers in red, blue, yellow and green, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 43,
+      "gen": [
+        128,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/griffe.png"
+  },
+  "climbing/canyon_rastpodest_schraeg.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_rastpodest_schraeg.png",
+    "groesse": [
+      80,
+      57
+    ],
+    "bearbeitung": "aus der Stilprobe (PR #1615) uebernommen",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_rastpodest_schraeg",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Stilprobe Climbing-Neuentwurf 18.11.)",
+    "auftrag": {
+      "prompt": "small wooden rest platform ledge bolted to a cliff with two chains, a chalk bucket and a coiled rope on it, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 45,
+      "gen": [
+        96,
+        64
+      ],
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0
+    },
+    "vorlage": "public/mockups/climbing-neu-18-11/rastplatz.png"
+  },
+  "climbing/canyon_rastpodest.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_rastpodest.png",
+    "groesse": [
+      54,
+      57
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_rastpodest",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small wooden rest platform made of planks hanging on two chains, seen straight from the front at eye level, a chalk bucket and a coiled rope standing on it, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 53,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 684.735,
+      "gen_nachher": 683.735,
+      "datum": "2026-11-18T20:17:39Z",
+      "gen": [
+        96,
+        64
+      ]
+    }
+  },
+  "climbing/canyon_wegweiser.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_wegweiser.png",
+    "groesse": [
+      84,
+      36
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_wegweiser",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "three small triangular route marker pennant flags on short wooden sticks side by side, one red, one blue, one green, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 54,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 683.735,
+      "gen_nachher": 682.735,
+      "datum": "2026-11-18T20:18:04Z",
+      "gen": [
+        96,
+        48
+      ]
+    }
+  },
+  "climbing/canyon_startbogen.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_startbogen.png",
+    "groesse": [
+      126,
+      80
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_startbogen",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "rustic wooden start gate arch made of two timber posts and a crossbeam with a hanging rope and small colorful pennants, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 55,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 682.735,
+      "gen_nachher": 681.735,
+      "datum": "2026-11-18T20:18:26Z",
+      "gen": [
+        192,
+        96
+      ]
+    }
+  },
+  "climbing/canyon_kiefer.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_kiefer.png",
+    "groesse": [
+      48,
+      75
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_kiefer",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small gnarled windswept desert pine tree growing out of a sandstone crack, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 56,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 681.735,
+      "gen_nachher": 680.735,
+      "datum": "2026-11-18T20:18:58Z",
+      "gen": [
+        64,
+        96
+      ]
+    }
+  },
+  "climbing/canyon_bloecke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_bloecke.png",
+    "groesse": [
+      86,
+      38
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_bloecke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "pile of three big rounded orange-brown sandstone boulders lying on flat ground, front view, sunlit from the upper left, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 57,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 680.735,
+      "gen_nachher": 679.735,
+      "datum": "2026-11-18T20:19:14Z",
+      "gen": [
+        112,
+        72
+      ]
+    }
+  },
+  "climbing/canyon_griffe_rot.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_griffe_rot.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_griffe_rot",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different resin climbing wall holds, jugs, crimps and slopers, all of them red, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 58,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 679.735,
+      "gen_nachher": 678.735,
+      "datum": "2026-11-18T20:19:48Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/canyon_griffe_blau.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_griffe_blau.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_griffe_blau",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different resin climbing wall holds, jugs, crimps and slopers, all of them blue, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 59,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 678.735,
+      "gen_nachher": 677.735,
+      "datum": "2026-11-18T20:20:07Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/canyon_griffe_gelb.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/canyon_griffe_gelb.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand canyon: Requisit/Effekt canyon_griffe_gelb",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different resin climbing wall holds, jugs, crimps and slopers, all of them yellow, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 60,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 677.735,
+      "gen_nachher": 676.735,
+      "datum": "2026-11-18T20:20:22Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_bloecke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_bloecke.png",
+    "groesse": [
+      93,
+      59
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_bloecke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "pile of three big angular blue-white glacier ice blocks with snow on top lying on flat ground, front view, lit from the upper left, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 83,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 620.735,
+      "gen_nachher": 619.735,
+      "datum": "2026-11-18T20:35:23Z",
+      "gen": [
+        112,
+        72
+      ]
+    }
+  },
+  "climbing/eisfall_leiter.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_leiter.png",
+    "groesse": [
+      34,
+      123
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_leiter",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "aluminium ladder hanging straight down on ropes with ice and frost on the rungs, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 85,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 618.735,
+      "gen_nachher": 617.735,
+      "datum": "2026-11-18T20:36:17Z",
+      "gen": [
+        48,
+        128
+      ]
+    }
+  },
+  "climbing/eisfall_glocke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_glocke.png",
+    "groesse": [
+      38,
+      60
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_glocke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "brass summit bell hanging from a wooden summit cross frame planted in snow, with frost and small icicles and a short pull rope, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 86,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 617.735,
+      "gen_nachher": 616.735,
+      "datum": "2026-11-18T20:36:30Z",
+      "gen": [
+        64,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_rastpodest.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_rastpodest.png",
+    "groesse": [
+      53,
+      52
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_rastpodest",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small hanging portaledge rest platform made of an aluminium frame and red fabric on two straps, seen straight from the front at eye level, a thermos flask and a coiled rope on it, a little snow, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 87,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 616.735,
+      "gen_nachher": 615.735,
+      "datum": "2026-11-18T20:36:48Z",
+      "gen": [
+        96,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_wegweiser.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_wegweiser.png",
+    "groesse": [
+      78,
+      26
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_wegweiser",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "three small triangular route marker pennant flags on short bamboo wands stuck in snow mounds side by side, one red, one blue, one yellow, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 88,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 615.735,
+      "gen_nachher": 614.735,
+      "datum": "2026-11-18T20:37:01Z",
+      "gen": [
+        96,
+        48
+      ]
+    }
+  },
+  "climbing/eisfall_startbogen.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_startbogen.png",
+    "groesse": [
+      165,
+      73
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_startbogen",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "expedition base camp start gate made of two tall bamboo poles and a rope with colorful prayer flags hanging between them, snow mounds at the feet, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 89,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 614.735,
+      "gen_nachher": 613.735,
+      "datum": "2026-11-18T20:37:15Z",
+      "gen": [
+        192,
+        96
+      ]
+    }
+  },
+  "climbing/eisfall_tanne.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_tanne.png",
+    "groesse": [
+      29,
+      52
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_tanne",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small snow-covered crooked mountain fir tree growing out of an icy rock crack, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 90,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 613.735,
+      "gen_nachher": 612.735,
+      "datum": "2026-11-18T20:37:50Z",
+      "gen": [
+        64,
+        96
+      ]
+    }
+  },
+  "climbing/eisfall_wechte.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_wechte.png",
+    "groesse": [
+      97,
+      39
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_wechte",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "overhanging snow cornice with a curled wind-blown edge and small icicles underneath, side view, wide, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 91,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 612.735,
+      "gen_nachher": 611.735,
+      "datum": "2026-11-18T20:38:12Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_griffe_rot.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_griffe_rot.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_griffe_rot",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different ice climbing anchors, ice screws with carabiners and short slings, all slings red, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 93,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 610.735,
+      "gen_nachher": 609.735,
+      "datum": "2026-11-18T20:38:41Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_griffe_blau.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_griffe_blau.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_griffe_blau",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different ice climbing anchors, ice screws with carabiners and short slings, all slings blue, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 94,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 609.735,
+      "gen_nachher": 608.735,
+      "datum": "2026-11-18T20:38:56Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_griffe_gelb.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_griffe_gelb.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_griffe_gelb",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sprite sheet of eight different ice climbing anchors, ice screws with carabiners and short slings, all slings yellow, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 95,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 608.735,
+      "gen_nachher": 607.735,
+      "datum": "2026-11-18T20:39:22Z",
+      "gen": [
+        128,
+        64
+      ]
+    }
+  },
+  "climbing/eisfall_aluleiter_bruecke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/eisfall_aluleiter_bruecke.png",
+    "groesse": [
+      158,
+      24
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand eisfall: Requisit/Effekt eisfall_aluleiter_bruecke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "one long silver aluminium ladder lying flat and horizontal, seen exactly from the side, many rungs, lashed with orange ropes at both ends, filling the whole image width, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 96,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 531.54,
+      "gen_nachher": 530.54,
+      "datum": "2026-11-18T20:52:25Z",
+      "gen": [
+        192,
+        48
+      ]
+    }
+  },
+  "climbing/halle_galerie.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_galerie.png",
+    "groesse": [
+      392,
+      25
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_galerie",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "long flat horizontal wooden gallery catwalk board seen straight from the front, a thin walkable plywood shelf on steel brackets with a light top surface and a shadowed underside, spanning the full image width from left edge to right edge, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 113,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 528.54,
+      "gen_nachher": 527.54,
+      "datum": "2026-11-18T20:53:43Z",
+      "gen": [
+        400,
+        40
+      ]
+    }
+  },
+  "climbing/halle_volumen.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_volumen.png",
+    "groesse": [
+      96,
+      36
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_volumen",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "pile of three big angular plywood climbing volumes, one sand coloured, one teal, one grey, with bolt holes, lying on flat ground, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 114,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 527.54,
+      "gen_nachher": 526.54,
+      "datum": "2026-11-18T20:54:18Z",
+      "gen": [
+        112,
+        72
+      ]
+    }
+  },
+  "climbing/halle_buzzer.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_buzzer.png",
+    "groesse": [
+      48,
+      45
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_buzzer",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "big round red finish buzzer button on a small black and yellow box mounted on a plywood panel, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 115,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 526.54,
+      "gen_nachher": 525.54,
+      "datum": "2026-11-18T20:54:38Z",
+      "gen": [
+        64,
+        64
+      ]
+    }
+  },
+  "climbing/halle_haengebruecke.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_haengebruecke.png",
+    "groesse": [
+      192,
+      38
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_haengebruecke",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "sagging hanging bridge made of orange plastic planks on two black straps with strap handrails, seen from the side, spanning horizontally between two anchor points, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 116,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 525.54,
+      "gen_nachher": 524.54,
+      "datum": "2026-11-18T20:55:01Z",
+      "gen": [
+        192,
+        64
+      ]
+    }
+  },
+  "climbing/halle_leiter.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_leiter.png",
+    "groesse": [
+      26,
+      122
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_leiter",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "hanging rope ladder with bright orange plastic rungs on two black straps, hanging straight down, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 117,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 524.54,
+      "gen_nachher": 523.54,
+      "datum": "2026-11-18T20:55:23Z",
+      "gen": [
+        48,
+        128
+      ]
+    }
+  },
+  "climbing/halle_rastpodest.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_rastpodest.png",
+    "groesse": [
+      54,
+      40
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_rastpodest",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small plywood box rest platform bolted to a wall on two steel brackets, seen straight from the front at eye level, a chalk bucket and a water bottle standing on it, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 118,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 523.54,
+      "gen_nachher": 522.54,
+      "datum": "2026-11-18T20:55:39Z",
+      "gen": [
+        96,
+        64
+      ]
+    }
+  },
+  "climbing/halle_wegweiser.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_wegweiser.png",
+    "groesse": [
+      80,
+      39
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_wegweiser",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "three small rectangular route marker tags hanging on short cords side by side, one red, one blue, one yellow, blank without text, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 119,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 522.54,
+      "gen_nachher": 521.54,
+      "datum": "2026-11-18T20:56:00Z",
+      "gen": [
+        96,
+        48
+      ]
+    }
+  },
+  "climbing/halle_startbogen.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_startbogen.png",
+    "groesse": [
+      142,
+      77
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_startbogen",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "competition start gate arch made of a black steel truss frame with a blank teal banner across the top and two small spotlights, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 120,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 521.54,
+      "gen_nachher": 520.54,
+      "datum": "2026-11-18T20:56:21Z",
+      "gen": [
+        192,
+        96
+      ]
+    }
+  },
+  "climbing/halle_tribuene.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_tribuene.png",
+    "groesse": [
+      119,
+      62
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_tribuene",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "small empty spectator grandstand with three rows of blue plastic seats and a steel railing, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 121,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 520.54,
+      "gen_nachher": 519.54,
+      "datum": "2026-11-18T20:56:43Z",
+      "gen": [
+        192,
+        96
+      ]
+    }
+  },
+  "climbing/halle_scheinwerfer.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_scheinwerfer.png",
+    "groesse": [
+      82,
+      50
+    ],
+    "bearbeitung": "Alpha hart geschnitten, auf Alpha-Begrenzung beschnitten",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_scheinwerfer",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "short steel truss bar with three hanging stage spotlights shining down, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+      "seed": 122,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 519.54,
+      "gen_nachher": 518.54,
+      "datum": "2026-11-18T20:57:16Z",
+      "gen": [
+        96,
+        64
+      ]
+    }
+  },
+  "climbing/halle_griffe_rot.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_griffe_rot.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_griffe_rot",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 423>",
+      "seed": 131,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 514.54,
+      "gen_nachher": 513.54,
+      "datum": "2026-11-18T21:12:30Z",
+      "gen": [
+        128,
+        64
+      ]
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them red, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 123,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 518.54,
+        "gen_nachher": 517.54,
+        "datum": "2026-11-18T20:57:52Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
+  },
+  "climbing/halle_griffe_blau.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_griffe_blau.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_griffe_blau",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 424>",
+      "seed": 132,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 513.54,
+      "gen_nachher": 512.54,
+      "datum": "2026-11-18T21:12:54Z",
+      "gen": [
+        128,
+        64
+      ]
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them blue, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 124,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 517.54,
+        "gen_nachher": 516.54,
+        "datum": "2026-11-18T20:58:05Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
+  },
+  "climbing/halle_griffe_gelb.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/halle_griffe_gelb.png",
+    "groesse": [
+      128,
+      64
+    ],
+    "bearbeitung": "Masse unveraendert 128x64 (Blatt 4x2 Zellen zu 32 px)",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand halle: Requisit/Effekt halle_griffe_gelb",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/create-image-pixflux (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "<b64 426>",
+      "seed": 133,
+      "endpunkt": "/v2/create-image-pixflux",
+      "generationen": 1.0,
+      "gen_vorher": 512.54,
+      "gen_nachher": 511.54,
+      "datum": "2026-11-18T21:13:12Z",
+      "gen": [
+        128,
+        64
+      ]
+    },
+    "verworfen": [
+      {
+        "prompt": "sprite sheet of eight different big modern competition climbing holds, rounded slopers, pinches and jugs with bolt holes, all of them yellow, each separate, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+        "seed": 125,
+        "endpunkt": "/v2/create-image-pixflux",
+        "generationen": 1.0,
+        "gen_vorher": 516.54,
+        "gen_nachher": 515.54,
+        "datum": "2026-11-18T20:58:29Z",
+        "grund": "erster Versuch verworfen: nicht die bestellten Wettkampfgriffe (rot glaenzende Klumpen, gelb wie Kaese, blau wie die Canyon-Griffe); Datei durch den zweiten Versuch ersetzt"
+      }
+    ]
+  },
+  "climbing/fx-climbing-kreide-lite.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/fx-climbing-kreide-lite.png",
+    "groesse": [
+      96,
+      96
+    ],
+    "bearbeitung": "Spritesheet wie geliefert; Rahmen/Anker in fx-climbing-kreide-lite.json",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand fx-climbing-kreide-lite: Requisit/Effekt fx-climbing-kreide-lite",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/vfx (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "A small puff of white climbing chalk dust when a hand slaps a rock hold, pixel art, plays once, about 0.5 seconds. A soft white-grey cloud bursts out and a few specks drift down and fade. Colours: white, light grey. Transparent background, crisp pixels, about 32 pixels across, centred, no text.",
+      "seed": null,
+      "endpunkt": "/v2/vfx",
+      "generationen": 1.0,
+      "gen_vorher": 675.735,
+      "gen_nachher": 674.735,
+      "datum": "2026-11-18T20:21:58Z",
+      "job": "6a1b36bf-83c5-45a9-b5a9-29095d166b23"
+    }
+  },
+  "climbing/fx-climbing-steinschlag-lite.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/fx-climbing-steinschlag-lite.png",
+    "groesse": [
+      128,
+      192
+    ],
+    "bearbeitung": "Spritesheet wie geliefert; Rahmen/Anker in fx-climbing-steinschlag-lite.json",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand fx-climbing-steinschlag-lite: Requisit/Effekt fx-climbing-steinschlag-lite",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/vfx (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "Small rockfall, pixel art, plays once, about 0.8 seconds. Five orange-brown sandstone pebbles and chips break loose at the top and tumble straight down with a little dust trail, fading at the bottom. Colours: orange-brown, dark brown, beige dust. Transparent background, crisp pixels, about 32 pixels wide and 64 tall, no text.",
+      "seed": null,
+      "endpunkt": "/v2/vfx",
+      "generationen": 1.0,
+      "gen_vorher": 674.735,
+      "gen_nachher": 673.735,
+      "datum": "2026-11-18T20:22:18Z",
+      "job": "670d4c97-ed13-4b18-be86-1941baa29591"
+    }
+  },
+  "climbing/fx-climbing-glocke-lite.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/fx-climbing-glocke-lite.png",
+    "groesse": [
+      256,
+      192
+    ],
+    "bearbeitung": "Spritesheet wie geliefert; Rahmen/Anker in fx-climbing-glocke-lite.json",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand fx-climbing-glocke-lite: Requisit/Effekt fx-climbing-glocke-lite",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/vfx (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "A ringing bell signal, pixel art, plays once, about 0.7 seconds. Three golden curved sound-wave arcs expand outward to both sides from the centre with a few bright sparkles, then fade. Colours: gold, warm yellow, white. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+      "seed": null,
+      "endpunkt": "/v2/vfx",
+      "generationen": 1.0,
+      "gen_vorher": 673.735,
+      "gen_nachher": 672.735,
+      "datum": "2026-11-18T20:22:51Z",
+      "job": "fcfee3ef-3f17-4b72-8212-883c8d2496f3"
+    }
+  },
+  "climbing/fx-climbing-eisbruch-lite.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/fx-climbing-eisbruch-lite.png",
+    "groesse": [
+      96,
+      192
+    ],
+    "bearbeitung": "Spritesheet wie geliefert; Rahmen/Anker in fx-climbing-eisbruch-lite.json",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand fx-climbing-eisbruch-lite: Requisit/Effekt fx-climbing-eisbruch-lite",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/vfx (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "An icicle breaking off, pixel art, plays once, about 0.8 seconds. A pale blue icicle snaps at the top, falls straight down and shatters at the bottom into small ice shards and a puff of white frost. Colours: pale blue, white, light cyan. Transparent background, crisp pixels, about 32 pixels wide and 64 tall, no text.",
+      "seed": null,
+      "endpunkt": "/v2/vfx",
+      "generationen": 1.195,
+      "gen_vorher": 607.735,
+      "gen_nachher": 606.54,
+      "datum": "2026-11-18T20:39:40Z",
+      "job": "3c782cc9-7ff0-4220-8cad-32ed97c04bd0"
+    }
+  },
+  "climbing/fx-climbing-buzzer-lite.png": {
+    "paket": "PixelLab",
+    "datei": "public/sprites/arena/climbing/fx-climbing-buzzer-lite.png",
+    "groesse": [
+      192,
+      192
+    ],
+    "bearbeitung": "Spritesheet wie geliefert; Rahmen/Anker in fx-climbing-buzzer-lite.json",
+    "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+    "erzeugt": "2026-11-18",
+    "verwendung": "Climbing neu (Format canyon/eisfall/halle), Wand fx-climbing-buzzer-lite: Requisit/Effekt fx-climbing-buzzer-lite",
+    "status": "bestellt und abgelegt 18.11. (PR claude/climbing-assets-18-11); Einbau in den Motor durch claude/climbing-canyon-bau-18-11. Doku: docs/design/climbing-assets-18-11.md",
+    "quelle": "api.pixellab.ai /v2/vfx (Climbing-Assets 18.11.)",
+    "auftrag": {
+      "prompt": "A finish buzzer flash, pixel art, plays once, about 0.6 seconds. A red button lights up with a bright red-white flash, two red light rings expand outward and a few white sparks fly off, then fade. Colours: red, white, a little yellow. Transparent background, crisp pixels, about 64 pixels across, centred, no text.",
+      "seed": null,
+      "endpunkt": "/v2/vfx",
+      "generationen": 1.0,
+      "gen_vorher": 515.54,
+      "gen_nachher": 514.54,
+      "datum": "2026-11-18T20:58:48Z",
+      "job": "53ecf281-ed1b-4d4c-9202-f015b61f807f"
+    }
   }
 }
