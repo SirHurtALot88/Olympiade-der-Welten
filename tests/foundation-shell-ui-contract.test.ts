@@ -30,21 +30,24 @@ describe("foundation shell ui contract", () => {
     expect(foundationText).toContain("syncFoundationUrlState");
     expect(foundationText).toContain("playerProfile");
     expect(shellText).toContain('data-testid="foundation-shell-layout"');
-    expect(shellText).toContain("FoundationActivityStrip");
+    // Seit dem Regieband (18.11.) sitzt die Aktivitätsliste im Ablauf-Aufklapper des Taktgebers.
+    expect(shellText).toContain("FoundationTaktgeber");
     expect(shellText).toContain("activities={activities}");
+    expect(await fs.readFile(path.join(root, "app/foundation/shell/FoundationTaktgeber.tsx"), "utf8")).toContain(
+      "FoundationActivityStrip",
+    );
     expect(foundationText).toContain("buildFoundationActivities");
     expect(foundationText).toContain("activities={foundationActivities}");
     expect(sidebarText).toContain("foundation-sidebar-drag-handle");
-    expect(sidebarText).toContain("foundation-sidebar-season-context");
-    expect(sidebarText).toContain('data-testid="foundation-season-context"');
+    // Saison/Spieltag stehen seit dem Regieband (18.11.) als Chip im Band, nicht mehr in der Schiene.
+    expect(shellText).toContain('data-testid="foundation-band-saison"');
+    expect(sidebarText).not.toContain("foundation-sidebar-season-context");
     expect(sidebarText).toContain("is-attention");
     expect(sidebarText).toContain("loadFoundationSidebarOrder");
     expect(shellText).toContain("buildSeasonContextLabel");
-    expect(shellText).toContain("seasonContextLabel={seasonContextLabel}");
     expect(foundationText).toContain("seasonLabel={canonicalSeasonLabel}");
     expect(foundationText).toContain("matchdayDisplayLabel={currentMatchdayDisplayLabel}");
     expect(foundationText).toContain("currentMatchday={gameState.season.currentMatchday}");
-    expect(cssText).toContain(".foundation-sidebar-season-context");
     expect(navConfigText).toContain("FOUNDATION_NAV_GROUPS");
     expect(navConfigText).toContain('label: "Sponsoren"');
     expect(navConfigText).toContain("players");

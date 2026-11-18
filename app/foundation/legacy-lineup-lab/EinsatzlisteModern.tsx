@@ -161,6 +161,7 @@ export default function EinsatzlisteModern(props: Props) {
     controlsSlot,
     arenaReady = false,
     onNavigateArena,
+    onOpenNachDemSpieltag,
     statusMessage,
     errors,
     rosterShortfall = null,
@@ -1170,6 +1171,7 @@ export default function EinsatzlisteModern(props: Props) {
             <button type="button" className="bc-btn" onClick={() => setSteuerungOffen(true)} data-bc-tip="Team, Spieltag, KI-Vorschläge und Sammelabgabe">
               <BcIcon name="team" /> Team &amp; Spieltag
             </button>
+            {onOpenNachDemSpieltag ? <button type="button" className="bc-btn bc-btn--klein" onClick={onOpenNachDemSpieltag} data-bc-tip="Form und Moral nach dem letzten Spieltag">Nach dem Spieltag</button> : null}
             <button type="button" className="bc-btn bc-btn--klein" onClick={() => setzeEinsatzlisteLook("klassisch")} data-bc-tip="Zur bisherigen Einsatzliste wechseln" aria-label="Klassische Ansicht">
               Klassisch
             </button>

@@ -168,6 +168,10 @@ export default function FoundationSeasonV2Host({
     const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
     return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
   }, [gameState]);
+  const teamStrengthValueByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.scorePack.disciplines] as const));
+  }, [gameState]);
 
   const model = useSeasonV2PanelModel({
     gameState,
@@ -206,6 +210,7 @@ export default function FoundationSeasonV2Host({
       areaVerhaeltnisByTeamId={areaVerhaeltnisByTeamId}
       teamBilanzByTeamId={teamBilanzByTeamId}
       teamStrengthRankByTeamId={teamStrengthRankByTeamId}
+      teamStrengthValueByTeamId={teamStrengthValueByTeamId}
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
       disciplineLeaders={model.disciplineLeaders}

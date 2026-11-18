@@ -152,6 +152,7 @@ export type LineupNewLookProps = Pick<
   | "controlsSlot"
   | "arenaReady"
   | "onNavigateArena"
+  | "onOpenNachDemSpieltag"
   | "disciplineTacticPreviewBySide"
 > & {
   /**

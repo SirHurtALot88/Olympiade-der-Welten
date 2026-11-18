@@ -330,6 +330,12 @@ export type SeasonStandingsV2ClientProps = {
    * Spieltage-Modus unverändert (nur Tabellenrang).
    */
   teamStrengthRankByTeamId?: Map<string, Record<string, number>> | null;
+  /**
+   * Die Werte hinter den Stärke-Rängen: Summe der besten sechs Disziplin-Eignungen des Kaders je
+   * Team und Disziplin (`row.scorePack.disciplines` derselben Rechnung). Nur die moderne Ansicht
+   * liest sie, für den Kaderstärke-Balken im Showdown (Anteil A/(A+B)).
+   */
+  teamStrengthValueByTeamId?: Map<string, Record<string, number>> | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;

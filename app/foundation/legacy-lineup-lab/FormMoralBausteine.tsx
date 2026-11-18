@@ -7,11 +7,10 @@
  * (gespeicherte Werte, dieselbe Rechnung wie die Wertung). Moral ist ueberall Gesicht + Zahl
  * (`BcMoralGesicht`, Chris 18.11.). Fehlt ein Wert, bleibt der Teil leer statt etwas zu erfinden.
  */
-import { useState } from "react";
 
 import { BcFormPfeil, BcMoralGesicht } from "@/components/foundation/broadcast";
 import { moralFarbe, moralStufe } from "@/lib/morale/moral-anzeige";
-import { formBegruendung, type FormMeldung, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
+import { formBegruendung, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
 import type { KartenWirkung } from "@/lib/lineups/formkarten-wirkung";
 import "./form-moral.css";
 
@@ -406,65 +405,5 @@ export function FormMoralProfil({
         )}
       </div>
     </section>
-  );
-}
-
-/** Nach dem Spieltag: Bauchbinde (groesste Bewegung, wegklickbar) + Liste aller Meldungen. */
-export function FormMeldungen({
-  meldungen,
-  spieltag,
-  bauchbinde = true,
-}: {
-  meldungen: FormMeldung[];
-  spieltag?: string | number | null;
-  bauchbinde?: boolean;
-}) {
-  if (meldungen.length === 0) return null;
-  const bewegt = meldungen.filter((m) => m.richtung !== "gleich");
-  return (
-    <section className="fm-meldungen" data-testid="fm-meldungen" aria-label="Form-Meldungen">
-      {bauchbinde && bewegt.length > 0 ? <FormBauchbinde meldungen={bewegt.slice(0, 5)} spieltag={spieltag} /> : null}
-      <h3>Form-Meldungen</h3>
-      <ul>
-        {meldungen.map((m) => (
-          <li key={m.playerId}>
-            <b>{m.name}</b>
-            <span className="t">
-              <BcFormPfeil stufe={m.stufeVorher} /> → <BcFormPfeil stufe={m.stufeNachher} />
-            </span>
-            <span className={`t ${m.delta > 0 ? "bc-plus" : m.delta < 0 ? "bc-minus" : ""}`}>
-              {Math.round(m.vorher)} → {Math.round(m.nachher)}
-            </span>
-            <span className="fm-leise">{m.grund}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-
-export function FormBauchbinde({ meldungen, spieltag }: { meldungen: FormMeldung[]; spieltag?: string | number | null }) {
-  const [index, setIndex] = useState(0);
-  const [zu, setZu] = useState(false);
-  if (zu || meldungen.length === 0) return null;
-  const m = meldungen[index % meldungen.length];
-  return (
-    <div className={`fm-bauchbinde ${m.richtung === "gestiegen" ? "is-auf" : "is-ab"}`} role="status" data-testid="fm-bauchbinde">
-      <div>
-        <small>Form {m.richtung}{spieltag != null ? ` · Spieltag ${spieltag}` : ""}</small>
-        <b>{m.name}</b>
-        <span>{m.grund}</span>
-      </div>
-      <span className="t fm-bauchbinde__pfeile">
-        <BcFormPfeil stufe={m.stufeVorher} /> → <BcFormPfeil stufe={m.stufeNachher} />
-      </span>
-      {meldungen.length > 1 ? (
-        <button type="button" className="bc-btn bc-btn--klein" onClick={() => setIndex((i) => i + 1)} aria-label="Nächste Meldung">
-          {(index % meldungen.length) + 1}/{meldungen.length} ›
-        </button>
-      ) : null}
-      <button type="button" className="bc-btn bc-btn--klein" onClick={() => setZu(true)} aria-label="Schließen">×</button>
-    </div>
   );
 }

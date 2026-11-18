@@ -36,6 +36,7 @@ export function shouldBuildFoundationMatchdaySummaryDerivations(activeView: stri
   return (
     activeView === "matchdayArena" ||
     activeView === "matchdayResult" ||
+    activeView === "nachDemSpieltag" ||
     activeView === "lineup" ||
     activeView === "lineupV2" ||
     activeView === "homeV2"
