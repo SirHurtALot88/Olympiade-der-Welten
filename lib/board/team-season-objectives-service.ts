@@ -2057,6 +2057,8 @@ function buildVorstandBudgetObjectiveDrafts(input: {
       targetValue: `Top ${karte.zielRang}`,
       currentValue: rank ?? "offen",
       status,
+      // Ein erfuelltes Vorstandsziel bringt Geld UND Vertrauen (Chris 18.11.); verfehlt: nur Vertrauen, keine Geldstrafe.
+      rewardCash: status === "completed" ? 3 : undefined,
       boardConfidenceDelta: status === "completed" ? 0.75 : status === "failed" ? -1 : 0,
       source: "vorstand_alles_auf_eine_karte",
     });

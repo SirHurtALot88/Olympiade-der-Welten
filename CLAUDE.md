@@ -223,7 +223,7 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   dem Konto, nur X % davon dürfen für Ablösen UND Gehälter (neue Verträge, Gehaltserhöhungen) ausgegeben werden. Die Sperre
   ist **hart**: ein Kauf oder Vertrag über dem freien Betrag ist nicht möglich (Mensch und KI gleich). **Verkaufserlöse
   unterliegen derselben Quote** — bei 70 % werden von 20 C Verkauf nur 14 C ausgebbar, der Rest bleibt als gewollter Puffer
-  auf dem Konto. Stufen nach Vertrauen: ab 6 → 100 %, 4–6 → 85 %, 2,5–4 → 70 %, darunter 50 %. Die Rücklage nach Finanzwert
+  auf dem Konto. Stufen nach Vertrauen (Chris, 18.11. abends): ab 7,5 → 100 %, Standard 90 % (ab 5), 80 % unter 5, 70 % unter 3, 50 % unter 1,5. Die Rücklage nach Finanzwert
   bleibt dagegen **weich** (Warnung, Vertrauensverlust).
 - **Zwei Budgets wie im FM (Chris, 18.11.: „optisch und inhaltlich so bauen“):** Transfer-/Investitionstopf und
   Gehaltstopf, Konzept `docs/design/finanzkonzept-v2-budgets-18-11.md` (Abschnitt 12 = Entscheidungen). Festgelegt:

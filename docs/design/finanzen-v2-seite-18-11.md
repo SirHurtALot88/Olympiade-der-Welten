@@ -20,7 +20,11 @@ Wertung und Arena-Motor unberührt (`pruefe-wertung-fingerabdruck.mjs`: GESAMT c
 Raus: `FoundationFinancesNewLook.tsx`, der `.nl-fin-*`-Block in `globals.css`, `finances-view-sections.ts`, die Markup-Tests der alten Seite.
 Gehälter stehen **groß je Saison, klein je Spieltag**, Einheit C.
 
-## 2. Entscheidungen (wo das Konzept offen war)
+## 2. Quoten (Chris, 18.11. abends, ersetzen 100/85/70/50)
+
+Vertrauen ab 7,5 → 100 %, ab 5 → **90 % (Standard)**, ab 3 → 80 %, ab 1,5 → 70 %, darunter 50 % (Sparauflage). Saison 1 bleibt 100 %. Gehaltstopf-Untergrenze 75 % bleibt. Lockerungs-Puffer 10 / 15 / 20 / 30 % (bei 90 / 80 / 70 / 50 %), Umschicht-Grenze 20 / 17,5 / 15 / 10 % (100 % → 25 %). Ein erfülltes Vorstandsziel bringt Geld und Vertrauen (die Wette: +3 C und +0,75). Der Gehaltspuffer in Saison 1 ist halbiert: in Saison 1 gibt es ihn nicht (alles frei), die Rücklage der KI im Draft war schon halb.
+
+## 3. Entscheidungen (wo das Konzept offen war)
 
 1. **Saison 1 bleibt voll frei** (Chris: Quote 100 % für alle). Ab Saison 2 gilt die harte Sperre, auch bei Quote 100 % für den Gehaltstopf.
 2. **Transfertopf ab Saison 2** = q × (Kasse − Rücklage-Ziel − Gehaltspuffer) + q × Verkaufserlöse (Konzept Abschnitt 1). Im ersten Fenster (Saison 2) zählt nur die **halbe** Rücklage (Übergang, Rückfrage an Chris unten).
@@ -35,7 +39,7 @@ Gehälter stehen **groß je Saison, klein je Spieltag**, Einheit C.
 11. **Liga-Vergleich** steht nach dem Mockup im Kontext-Panel (Reiter „Liga“), der Apron hat einen eigenen Reiter (Chris' frühere Vorgabe bleibt erfüllt, „ganz oben“ ist durch das Mockup ersetzt).
 12. Nicht gebaut: KI-Regel „Gebäude höchstens 30 % des freien Betrags und erst bei Soll-Kader“ (die harte Sperre wirkt trotzdem), Pflichtkredit-Lockerungssperre nur vereinfacht, Fans/Merch-Reiter des Mockups (die Mechaniken gibt es noch nicht).
 
-## 3. Messung (`scripts/miss-teamfinanzen-saison.ts`, 32 KI-Teams, Saison 1 voll gespielt, Kaufphase Saison 2, eine Saat)
+## 4. Messung (`scripts/miss-teamfinanzen-saison.ts`, 32 KI-Teams, Saison 1 voll gespielt, Kaufphase Saison 2, eine Saat)
 
 Paarweise auf identischem Stand vor der Kaufphase (`--stop-after vorkauf`, dann je Variante `--resume`). **vorher** = `OLY_VORSTAND_BUDGET=0` (identisch mit Stufen 1+2 allein); **nachher** = dieser Stand.
 
@@ -44,31 +48,32 @@ Paarweise auf identischem Stand vor der Kaufphase (`--stop-after vorkauf`, dann 
 | Käufe | 69 | 48 |
 | Kader (Median / kleinster) | 10 / 6 | 8 / 6 |
 | Teams unter Minimum 8 | 7 | 12 |
-| Kasse (Median) | 42,9 | 60,1 |
-| **Kaderstärke Median** | 44,30 | 41,62 (**−6,0 %**) |
-| Kaderstärke unterstes Viertel | 40,29 | 39,18 (−2,8 %) |
+| Kasse (Median) | 42,9 | 63,2 |
+| Negative Kassen / Σ Kasse | 0 / 1300 | 0 / 2108 |
+| **Kaderstärke Median** | 44,30 | 41,90 (**−5,4 %**) |
+| Kaderstärke unterstes Viertel | 40,29 | 39,28 (−2,5 %) |
 | Gebäude gesamt | 43 | 43 |
 
-**Abbruchkriterium (−5 % im Median) ist ausgelöst.** Der PR bleibt Draft und wird nicht gemergt.
+**Abbruchkriterium (−5 % im Median) ist knapp ausgelöst (−5,4 %; mit den alten Quoten −6,0 %).** Der PR bleibt Draft und wird nicht gemergt.
 
 Wie oft greift die Sperre (abgelehnte Prüfungen, Saison-2-Kaufphase):
 
 | Art | Prüfungen | Teams |
 |---|---:|---:|
-| Kauf, Ablöse über dem freien Transfertopf | 20 | 20 |
+| Kauf, Ablöse über dem freien Transfertopf | 21 | 21 |
 | Kauf, Gehalt über dem freien Gehaltstopf | 1 | 1 |
 | Gebäude | 0 (1 Lauf: 2 bei einem Team, mit voller Rücklage) | 0 bis 1 |
 | Verlängerung | 0 | 0 |
 
-„Alles auf eine Karte“: 0 Nutzungen, Umschichten: 0, Rücklage anzapfen: 0, Lockerung: 0 (KI-Bedingungen sind eng, im Lauf erfüllte keines der 32 Teams sie; Stufen zu Beginn: 18 hoch, 14 mittel, 0 niedrig, 0 Sparauflage).
+„Alles auf eine Karte“: 0 Nutzungen, Umschichten: 0, Rücklage anzapfen: 0, Lockerung: 0 (KI-Bedingungen sind eng, im Lauf erfüllte keines der 32 Teams sie; Stufen zu Beginn mit den neuen Quoten: 4 hoch (100 %), 24 Standard (90 %), 4 niedrig (80 %)).
 
 ### Diagnose
 
-* Es ist **nicht die Rücklage**: ohne Rücklage im Topf (Testlauf) und mit halber Rücklage kommen dieselben Zahlen heraus (Median 41,62).
+* Es ist **nicht die Rücklage**: ohne Rücklage im Topf (Testlauf) und mit halber Rücklage kommen dieselben Zahlen heraus (Median 41,6 bis 41,9).
 * Die abgelehnten Käufe sind je Team genau **ein teurer Zugang** (Ablöse 36 bis 45 C bei 7 bis 36 C frei). Sie kommen aus dem **Markt-Plan der KI** (`ai_preseason_market_buy`, `ai-market-plan-apply-service`), der die Töpfe nicht kennt, nur der organische Planer (`planOrganicDraftForTeam`) bekommt `feeCap`/`salaryCap`. Der Zugang scheitert an der harten Sperre, und die Teams bleiben mit Geld auf der Hand bei Kader 8 stehen (Kasse 60 statt 43).
 * **Empfohlene Behebung (nicht mehr in diesem PR):** den Markt-Plan-Planer mit `investition.frei` und `gehalt.frei` als Kaufgrenze füttern, damit er billigere Spieler plant statt eines gesperrten Stars; danach Messung wiederholen. Alternativ die Sperre für die KI nur über den organischen Planer wirken lassen.
 
-## 4. Offene Punkte für Chris
+## 5. Offene Punkte für Chris
 
 1. Soll im ersten Fenster (Saison 2) nur die halbe Rücklage zählen (Übergang)? Ohne diese Entscheidung wären die Töpfe im ersten Fenster noch enger.
 2. Die KI-Planer müssen die Töpfe kennen (siehe Diagnose), sonst kostet die harte Sperre Kaderstärke.

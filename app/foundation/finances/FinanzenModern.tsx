@@ -69,8 +69,9 @@ const klemme = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 const PHASEN_TEXT: Record<string, string> = {
   hoch: "hoch",
-  mittel: "mittel",
+  standard: "Standard",
   niedrig: "niedrig",
+  knapp: "knapp",
   sparauflage: "Sparauflage",
 };
 
@@ -372,10 +373,11 @@ function BudgetsAnsicht({
     }
   };
   const stufenText: Array<[number, string]> = [
-    [1, "ab 6"],
-    [0.85, "4 bis 6"],
-    [0.7, "2,5 bis 4"],
-    [0.5, "unter 2,5"],
+    [1, "ab 7,5"],
+    [0.9, "5 bis 7,5"],
+    [0.8, "3 bis 5"],
+    [0.7, "1,5 bis 3"],
+    [0.5, "unter 1,5"],
   ];
   const tGes = Math.max(s.investition.gesamt, s.investition.ausgegeben, 0.01);
   const gGes = Math.max(h.tragbaresGehalt, s.gehalt.ausgegeben, s.gehalt.gesamt, 0.01);

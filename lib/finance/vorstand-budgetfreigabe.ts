@@ -44,12 +44,14 @@ import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
 /** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
 export const GEHALTS_QUOTE_UNTERGRENZE = 0.75;
 
-export type VorstandStufe = "hoch" | "mittel" | "niedrig" | "sparauflage";
+export type VorstandStufe = "hoch" | "standard" | "niedrig" | "knapp" | "sparauflage";
 
 export const VORSTAND_STUFEN: ReadonlyArray<{ stufe: VorstandStufe; abVertrauen: number; anteil: number }> = [
-  { stufe: "hoch", abVertrauen: 6, anteil: 1.0 },
-  { stufe: "mittel", abVertrauen: 4, anteil: 0.85 },
-  { stufe: "niedrig", abVertrauen: 2.5, anteil: 0.7 },
+  // Chris, 18.11. abends: Standard 90 %, 100 % ab 7,5; 80 % unter 5, 70 % unter 3, 50 % unter 1,5 (ersetzt 100/85/70/50).
+  { stufe: "hoch", abVertrauen: 7.5, anteil: 1.0 },
+  { stufe: "standard", abVertrauen: 5, anteil: 0.9 },
+  { stufe: "niedrig", abVertrauen: 3, anteil: 0.8 },
+  { stufe: "knapp", abVertrauen: 1.5, anteil: 0.7 },
   { stufe: "sparauflage", abVertrauen: -Infinity, anteil: 0.5 },
 ];
 
@@ -111,11 +113,11 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
 /** Anteil des Ruecklage-Ziels im ersten Fenster (Saison 2). */
 export const RUECKLAGE_ERSTES_FENSTER = 0.5;
 /** Anteils-Stufen der Transfer-Quote, von streng nach locker. */
-export const QUOTEN_STUFEN = [0.5, 0.7, 0.85, 1] as const;
-/** Lockerungs-Puffer X als Anteil des tragbaren Gehalts je Ausgangsquote (50 / 70 / 85 %). */
-export const LOCKERUNG_PUFFER_ANTEIL: Record<number, number> = { 0.5: 0.3, 0.7: 0.2, 0.85: 0.1 };
+export const QUOTEN_STUFEN = [0.5, 0.7, 0.8, 0.9, 1] as const;
+/** Lockerungs-Puffer X als Anteil des tragbaren Gehalts je Ausgangsquote (50 / 70 / 80 / 90 %). */
+export const LOCKERUNG_PUFFER_ANTEIL: Record<number, number> = { 0.5: 0.3, 0.7: 0.2, 0.8: 0.15, 0.9: 0.1 };
 /** Umschicht-Grenze: Anteil des Gehaltstopfs je Ausgangsquote. */
-export const UMSCHICHT_GRENZE_ANTEIL: Record<number, number> = { 1: 0.25, 0.85: 0.2, 0.7: 0.15, 0.5: 0.1 };
+export const UMSCHICHT_GRENZE_ANTEIL: Record<number, number> = { 1: 0.25, 0.9: 0.2, 0.8: 0.175, 0.7: 0.15, 0.5: 0.1 };
 /** „Alles auf eine Karte“: nur dieser Anteil des Budgets bleibt als Puffer auf dem Konto. */
 export const ALLES_PUFFER_ANTEIL = 0.05;
 /** „Ruecklage anzapfen“: hoechstens dieser Anteil des Ruecklage-Ziels. */

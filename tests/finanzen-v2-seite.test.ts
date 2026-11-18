@@ -76,7 +76,7 @@ const bau = (cost: number) => ({ eventId: "e", seasonId: "season-2", teamId: "A"
 
 describe("Gebaeude zahlen aus dem Investitionstopf (hart)", () => {
   it("Bau ueber dem freien Betrag ist gesperrt, darunter erlaubt; Mensch und KI gleich (eine Funktion)", () => {
-    const gs = spielstand({ vertrauen: 3 });
+    const gs = spielstand({ vertrauen: 2 });
     const frei = berechneVorstandBudgetStand(gs, "A").investition.frei;
     expect(pruefeGebaeudeGegenVorstandFreigabe(gs, "A", frei - 1).ok).toBe(true);
     const zuTeuer = pruefeGebaeudeGegenVorstandFreigabe(gs, "A", frei + 1);
@@ -85,8 +85,8 @@ describe("Gebaeude zahlen aus dem Investitionstopf (hart)", () => {
   });
 
   it("ein gebautes Gebaeude zaehlt als ausgegeben und mindert den Rest; die Kasse bleibt Anfangskasse", () => {
-    const ohne = berechneVorstandBudgetStand(spielstand({ vertrauen: 7, cash: 100 }), "A");
-    const mit = berechneVorstandBudgetStand(spielstand({ vertrauen: 7, cash: 80, facilityEvents: [bau(20)] }), "A");
+    const ohne = berechneVorstandBudgetStand(spielstand({ vertrauen: 8, cash: 100 }), "A");
+    const mit = berechneVorstandBudgetStand(spielstand({ vertrauen: 8, cash: 80, facilityEvents: [bau(20)] }), "A");
     expect(mit.herleitung.anfangskasse).toBeCloseTo(ohne.herleitung.anfangskasse, 2);
     expect(mit.gebaeudeAusgegeben).toBe(20);
     expect(mit.ausgegeben).toBe(20);
@@ -94,14 +94,14 @@ describe("Gebaeude zahlen aus dem Investitionstopf (hart)", () => {
   });
 
   it("Gebaeude und Kaeufe teilen sich denselben Topf", () => {
-    const gs = spielstand({ vertrauen: 7, cash: 60, history: [buy(20)], facilityEvents: [bau(20)] });
+    const gs = spielstand({ vertrauen: 8, cash: 60, history: [buy(20)], facilityEvents: [bau(20)] });
     const st = berechneVorstandBudgetStand(gs, "A");
     expect(st.ausgegeben).toBe(40);
     expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: st.investition.frei + 1, salary: 1, rosterBefore: 10, playerMin: 8 }).ok).toBe(false);
   });
 
   it("Sparauflage: keine Gebaeude, ausser mit „Alles auf eine Karte“", () => {
-    const gs = spielstand({ vertrauen: 1.5 });
+    const gs = spielstand({ vertrauen: 1.0 });
     const r = pruefeGebaeudeGegenVorstandFreigabe(gs, "A", 1);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("vorstand_gebaeude_sparauflage");
@@ -118,7 +118,7 @@ describe("Gebaeude zahlen aus dem Investitionstopf (hart)", () => {
 
 describe("Gehaltserhoehungen bei Verlaengerungen zaehlen gegen den Gehaltstopf (hart)", () => {
   it("nur die Erhoehung zaehlt; gleiches oder niedrigeres Gehalt geht immer", () => {
-    const gs = spielstand({ vertrauen: 3 });
+    const gs = spielstand({ vertrauen: 2 });
     const st = berechneVorstandBudgetStand(gs, "A");
     expect(pruefeVerlaengerungGegenVorstandFreigabe(gs, "A", { altesGehalt: 8, neuesGehalt: 8 + st.gehalt.frei - 0.5 }).ok).toBe(true);
     const zuViel = pruefeVerlaengerungGegenVorstandFreigabe(gs, "A", { altesGehalt: 8, neuesGehalt: 8 + st.gehalt.frei + 0.5 });
@@ -128,7 +128,7 @@ describe("Gehaltserhoehungen bei Verlaengerungen zaehlen gegen den Gehaltstopf (
   });
 
   it("ueber dem Gehaltsbudget: Erhoehung gesperrt, gleiches Gehalt erlaubt, kein Zwangsverkauf", () => {
-    const gs = spielstand({ vertrauen: 3, gehaelter: new Array(14).fill(9) });
+    const gs = spielstand({ vertrauen: 2, gehaelter: new Array(14).fill(9) });
     const st = berechneVorstandBudgetStand(gs, "A");
     expect(st.gehalt.frei).toBe(0);
     expect(pruefeVerlaengerungGegenVorstandFreigabe(gs, "A", { altesGehalt: 9, neuesGehalt: 9.5 }).ok).toBe(false);
@@ -142,7 +142,7 @@ describe("Gehaltserhoehungen bei Verlaengerungen zaehlen gegen den Gehaltstopf (
 
 describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
   it("schiebt genau den Betrag zwischen den Toepfen und haelt die Grenze am Gehaltstopf", () => {
-    const gs = spielstand({ vertrauen: 7, cash: 120 });
+    const gs = spielstand({ vertrauen: 8, cash: 120 });
     const vor = berechneVorstandBudgetStand(gs, "A");
     expect(vor.umschichten.grenzeAnteil).toBe(0.25);
     const r = setzeUmschichtung(gs, "A", 4);
@@ -156,9 +156,9 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
 
   it("lehnt Betraege ueber der Grenze ab und kennt Quote 85 / 70 / 50 -> 20 / 15 / 10 %", () => {
     expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 5 }), "A").umschichten.grenzeAnteil).toBe(0.2);
-    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 3 }), "A").umschichten.grenzeAnteil).toBe(0.15);
+    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 2 }), "A").umschichten.grenzeAnteil).toBe(0.15);
     expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 1 }), "A").umschichten.grenzeAnteil).toBe(0.1);
-    const gs = spielstand({ vertrauen: 7, cash: 400 });
+    const gs = spielstand({ vertrauen: 8, cash: 400 });
     const grenze = berechneVorstandBudgetStand(gs, "A").umschichten.grenze;
     const r = setzeUmschichtung(gs, "A", grenze + 1);
     expect(r.ok).toBe(false);
@@ -166,7 +166,7 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
   });
 
   it("Gehalt -> Transfer geht nur im Fenster, Transfer -> Gehalt jederzeit", () => {
-    const imSpiel = spielstand({ vertrauen: 7, cash: 120, phase: "season_active" });
+    const imSpiel = spielstand({ vertrauen: 8, cash: 120, phase: "season_active" });
     imSpiel.season.currentMatchday = 6;
     (imSpiel as unknown as { matchdayState: { status: string } }).matchdayState.status = "resolved";
     expect(setzeUmschichtung(imSpiel, "A", -1).reason).toBe("nur_im_fenster");
@@ -180,20 +180,20 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
 
 describe("Lockerung nach Verkaeufen", () => {
   it("greift erst ab der Schwelle (einbehaltener Anteil >= Puffer), eine Stufe, nie mehr als verkauft", () => {
-    const basis = berechneVorstandBudgetStand(spielstand({ vertrauen: 3, cash: 100 }), "A");
+    const basis = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 100 }), "A");
     expect(basis.lockerung.aktiv).toBe(false);
     expect(basis.lockerung.vonAnteil).toBe(0.7);
-    expect(basis.lockerung.nachAnteil).toBe(0.85);
+    expect(basis.lockerung.nachAnteil).toBe(0.8);
     const schwelle = basis.lockerung.schwelle;
     expect(schwelle).toBeGreaterThan(0);
     // knapp darunter
-    const darunter = berechneVorstandBudgetStand(spielstand({ vertrauen: 3, cash: 100 + schwelle - 2, history: [sell(schwelle - 2)] }), "A");
+    const darunter = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 100 + schwelle - 2, history: [sell(schwelle - 2)] }), "A");
     expect(darunter.lockerung.aktiv).toBe(false);
     expect(darunter.lockerung.fehlt).toBeGreaterThan(0);
     // ab der Schwelle
-    const darueber = berechneVorstandBudgetStand(spielstand({ vertrauen: 3, cash: 100 + schwelle + 1, history: [sell(schwelle + 1)] }), "A");
+    const darueber = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 100 + schwelle + 1, history: [sell(schwelle + 1)] }), "A");
     expect(darueber.lockerung.aktiv).toBe(true);
-    expect(darueber.wirksamerAnteil).toBe(0.85);
+    expect(darueber.wirksamerAnteil).toBe(0.8);
     const ohneLockerung = 0.7 * (darueber.herleitung.verfuegbar + (schwelle + 1));
     expect(darueber.investition.gesamt).toBeGreaterThan(ohneLockerung);
     expect(darueber.investition.gesamt - ohneLockerung).toBeLessThanOrEqual(schwelle + 1 + 0.01);
@@ -202,15 +202,15 @@ describe("Lockerung nach Verkaeufen", () => {
   });
 
   it("keine Lockerung bei Quote 100 %, bei Kasse im Minus und in Saison 1", () => {
-    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 7 }), "A").lockerung.gesperrtGrund).toContain("voll freigegeben");
-    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 3, cash: -5, history: [sell(80)] }), "A").lockerung.aktiv).toBe(false);
-    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 3, saison: "season-1" }), "A").lockerung.aktiv).toBe(false);
+    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 8 }), "A").lockerung.gesperrtGrund).toContain("voll freigegeben");
+    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: -5, history: [sell(80)] }), "A").lockerung.aktiv).toBe(false);
+    expect(berechneVorstandBudgetStand(spielstand({ vertrauen: 2, saison: "season-1" }), "A").lockerung.aktiv).toBe(false);
   });
 });
 
 describe("Ruecklage anzapfen", () => {
   it("holt bis 50 % des Ziels in den Topf (zur Quote) und kostet 0,25 Vertrauen je angefangenem Viertel", () => {
-    const gs = spielstand({ vertrauen: 3, cash: 120 });
+    const gs = spielstand({ vertrauen: 2, cash: 120 });
     const vor = berechneVorstandBudgetStand(gs, "A");
     const ziel = vor.herleitung.ruecklageZiel;
     expect(vor.ruecklageAnzapfen.moeglich).toBeCloseTo(ziel * 0.5, 1);
@@ -225,9 +225,9 @@ describe("Ruecklage anzapfen", () => {
   });
 
   it("die Kosten wirken erst bei der naechsten Festlegung: die Quote dieser Saison bleibt", () => {
-    const gs = spielstand({ vertrauen: 4.1, cash: 120 });
+    const gs = spielstand({ vertrauen: 5.1, cash: 120 });
     const r = zapfeRuecklageAn(gs, "A", 100);
-    expect(r.stand!.anteil).toBe(0.85);
+    expect(r.stand!.anteil).toBe(0.9);
     // Das Vertrauensziel traegt den Abzug in die Abrechnung
     expect(r.gameState.seasonState.vorstandBudget?.A?.vertrauensKosten).toBeCloseTo(0.5, 2);
   });
@@ -260,7 +260,7 @@ describe("Alles auf eine Karte", () => {
   });
 
   it("der Vorstand lehnt einen Antrag unter Vertrauen 4 ab, mit Begruendung, ohne Geldstrafe", () => {
-    const gs = spielstand({ vertrauen: 3 });
+    const gs = spielstand({ vertrauen: 2 });
     const r = beantrageAlleAufEineKarte(gs, "A", "mensch");
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("vorstand_lehnt_ab");
@@ -280,7 +280,7 @@ describe("Alles auf eine Karte", () => {
   });
 
   it("friert das Ziel ein: Endrang um zwei Plaetze besser als die Kader-Erwartung", () => {
-    const gs = spielstand({ vertrauen: 7, kaderMarktwerte: { A: 10, B: 30, C: 40, D: 50, E: 60 } });
+    const gs = spielstand({ vertrauen: 8, kaderMarktwerte: { A: 10, B: 30, C: 40, D: 50, E: 60 } });
     const r = beantrageAlleAufEineKarte(gs, "A", "mensch");
     const karte = r.stand!.alleAufEineKarte.zustand!;
     expect(karte.erwartungsRang).toBe(5);
@@ -313,7 +313,7 @@ describe("KI-Entscheidung (dieselben Regeln wie der Mensch)", () => {
   });
 
   it("aggressives Top-Team mit hoher Ambition wettet, begruendet und genau einmal", () => {
-    const gs = spielstand({ risiko: 9, ambition: 9, vertrauen: 7, cash: 150, kaderMarktwerte: { A: 90, B: 30, C: 40 } });
+    const gs = spielstand({ risiko: 9, ambition: 9, vertrauen: 8, cash: 150, kaderMarktwerte: { A: 90, B: 30, C: 40 } });
     const r = entscheideKiVorstandMassnahmen(gs, "A");
     expect(r.massnahmen.map((m) => m.art)).toEqual(["alles_auf_eine_karte"]);
     const karte = berechneVorstandBudgetStand(r.gameState, "A").alleAufEineKarte.zustand!;
@@ -341,7 +341,7 @@ describe("KI-Entscheidung (dieselben Regeln wie der Mensch)", () => {
 
 describe("Seitenmodell", () => {
   it("Verlauf: Start, Spieltage, Ende; die Kasse am Ende ist die Prognose, Gehaelter je Saison und je Spieltag", () => {
-    const gs = spielstand({ vertrauen: 7, cash: 90, history: [{ ...buy(10), matchdayId: null, netCashImpact: 10, happenedAt: "2026-01-01T00:00:00Z", playerId: "x" }] });
+    const gs = spielstand({ vertrauen: 8, cash: 90, history: [{ ...buy(10), matchdayId: null, netCashImpact: 10, happenedAt: "2026-01-01T00:00:00Z", playerId: "x" }] });
     const m = buildFinanzSeiteModell(gs, "A", { status: "not_ready" });
     expect(m.verlauf[0]!.art).toBe("start");
     expect(m.verlauf[m.verlauf.length - 1]!.art).toBe("ende");

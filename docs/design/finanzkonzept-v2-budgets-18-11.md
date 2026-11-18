@@ -451,3 +451,10 @@ Beispiele).
 
 Im Mockup der Finanzseite und des Transfermarkts sind die Zahlen des Teams erfunden (wie in den Mockups bisher), die Regeln
 sind die dieses Dokuments. Der Datenfluss rechnet mit den echten Team-Werten aus Lauf C.
+
+## 13. Neue Quoten (Chris, 18.11. abends)
+
+Quote nach Vorstandsvertrauen: **Standard 90 %, 100 % ab Vertrauen 7,5, 80 % unter 5, 70 % unter 3, 50 % unter 1,5** (ersetzt 100/85/70/50 aus
+Abschnitt 1, 4 und 7). Saison 1 bleibt 100 %, die gekürzte Gehaltsquote bleibt bei mindestens 75 %. Ein erfülltes Vorstandsziel bringt Geld und
+Vertrauen. In Saison 1 wird neben der Draft-Rücklage auch der Gehaltspuffer halbiert (er greift erst ab Saison 2, dort ist Saison 1 ohnehin frei).
+Umgesetzt in `lib/finance/vorstand-budgetfreigabe.ts`; Messung und Folgen: `docs/design/finanzen-v2-seite-18-11.md`.
