@@ -1,0 +1,172 @@
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import DisciplineStageSpieltagswertung from "@/app/foundation/discipline-stage/DisciplineStageSpieltagswertung";
+import {
+  baueWertungsZeilen,
+  beschreibeWertungsErgebnis,
+  filtereWertungsZeilen,
+  startFilter,
+  wertungsMarke,
+  type WertungsEingabe,
+} from "@/app/foundation/discipline-stage/spieltagswertung-zeilen";
+
+/**
+ * Spieltagswertung neu (18.11.): gezeigt = gebucht. Die Zeilen übernehmen die Werte der Preview-Props und
+ * folgen der Aufdeck-Regel der alten Tabelle; Form und Captain laufen getrennt von den Punkten.
+ */
+
+const GRUPPE = ["a", "b", "c", "d"];
+
+function eingabe(over: Partial<WertungsEingabe> = {}): WertungsEingabe {
+  return {
+    teamResults: [
+      {
+        teamId: "a",
+        d1DisciplineId: "basket",
+        d1Points: 2,
+        d2DisciplineId: "bf",
+        d2Points: 1,
+        totalPoints: 3,
+        d1Ergebnis: { art: "duell", eigen: 78, gegner: 71, gegnerTeamId: "b" },
+        d2Ergebnis: { art: "gruppe", platz: 2, wert: 88, podId: "p1", teamIds: GRUPPE },
+      },
+      {
+        teamId: "b",
+        d1DisciplineId: "basket",
+        d1Points: 0,
+        d2DisciplineId: "bf",
+        d2Points: 2,
+        totalPoints: 2,
+        d1Ergebnis: { art: "duell", eigen: 71, gegner: 78, gegnerTeamId: "a" },
+        d2Ergebnis: { art: "gruppe", platz: 1, wert: 112, podId: "p1", teamIds: GRUPPE },
+      },
+      { teamId: "e", d1DisciplineId: "basket", d1Points: 1, d2DisciplineId: "bf", d2Points: 0, totalPoints: 1 },
+    ],
+    standings: [
+      { teamId: "a", currentRank: 3, projectedRank: 2, currentPoints: 4, projectedPoints: 7, pointsDelta: 3 },
+      { teamId: "b", currentRank: 2, projectedRank: 3, currentPoints: 5, projectedPoints: 7, pointsDelta: 2 },
+      { teamId: "e", currentRank: 1, projectedRank: 1, currentPoints: 6, projectedPoints: 7, pointsDelta: 1 },
+    ],
+    d1: { disciplineId: "basket", displayName: "Basketball" },
+    d2: { disciplineId: "bf", displayName: "Battlefield" },
+    d1Revealed: true,
+    d2Revealed: true,
+    teamMetaById: new Map([
+      ["a", { code: "AAA", name: "Team A", logoUrl: null }],
+      ["b", { code: "BBB", name: "Team B", logoUrl: null }],
+      ["e", { code: "EEE", name: "Team E", logoUrl: null }],
+    ]),
+    ownTeamId: "a",
+    mutatorByTeam: new Map([["a", { d1Pp: 0.3, d2Pp: 0, d1Players: [{ name: "P1", pp: 0.3 }], d2Players: [] }]]),
+    modifiersByTeam: new Map([
+      [
+        "a",
+        {
+          d1: { formCardLabel: "R+3", formModifier: 3, formTone: "positive", captainUsed: true, captainName: "P1", captainBonus: 1.5 },
+          d2: { formCardLabel: "B-2", formModifier: -2, formTone: "negative", captainUsed: false, captainName: null, captainBonus: null },
+        },
+      ],
+    ]),
+    leagueByTeam: new Map([
+      ["a", "liga2"],
+      ["b", "liga2"],
+      ["e", "liga1"],
+    ]),
+    humanLabelByTeam: new Map([["a", "Chris"]]),
+    ...over,
+  };
+}
+
+describe("Spieltagswertung neu: Zeilen", () => {
+  it("rechnet Punkte, Mutator und Gesamt wie die alte Tabelle (sum, mutPp, total)", () => {
+    const zeile = baueWertungsZeilen(eingabe()).find((z) => z.teamId === "a")!;
+    expect(zeile.punkte).toBe(3);
+    expect(zeile.mutator).toBeCloseTo(0.3);
+    expect(zeile.gesamt).toBeCloseTo(3.3);
+  });
+
+  it("hält Form und Captain getrennt von Punkten und Gesamt", () => {
+    const zeile = baueWertungsZeilen(eingabe()).find((z) => z.teamId === "a")!;
+    expect(zeile.form).toBe(1);
+    expect(zeile.captain).toBe(1.5);
+    expect(zeile.gesamt).toBeCloseTo(zeile.punkte + zeile.mutator);
+    expect(zeile.hatForm).toBe(true);
+    expect(zeile.hatCaptain).toBe(true);
+  });
+
+  it("zeigt bei verdeckter Disziplin 2 keinen Wert aus ihr", () => {
+    const zeile = baueWertungsZeilen(eingabe({ d2Revealed: false })).find((z) => z.teamId === "a")!;
+    expect(zeile.d2.aufgedeckt).toBe(false);
+    expect(zeile.d2.punkte).toBeNull();
+    expect(zeile.d2.ergebnis).toBeNull();
+    expect(zeile.punkte).toBe(2);
+    expect(zeile.form).toBe(3);
+  });
+
+  it("ordnet standardmäßig nach Gesamt und vergibt den Tagesrang daraus", () => {
+    const zeilen = baueWertungsZeilen(eingabe());
+    expect(zeilen.map((z) => z.teamId)).toEqual(["a", "b", "e"]);
+    expect(zeilen.map((z) => z.tagesRang)).toEqual([1, 2, 3]);
+  });
+
+  it("liest die Rangbewegung aus vorher und nachher", () => {
+    const zeilen = baueWertungsZeilen(eingabe());
+    expect(zeilen.find((z) => z.teamId === "a")!.bewegung).toBe(1);
+    expect(zeilen.find((z) => z.teamId === "b")!.bewegung).toBe(-1);
+    expect(zeilen.find((z) => z.teamId === "e")!.bewegung).toBe(0);
+  });
+});
+
+describe("Spieltagswertung neu: Filter und Worte", () => {
+  it("filtert nach Liga, Gruppe und Menschen", () => {
+    const zeilen = baueWertungsZeilen(eingabe());
+    expect(filtereWertungsZeilen(zeilen, "liga1", "a").map((z) => z.teamId)).toEqual(["e"]);
+    expect(filtereWertungsZeilen(zeilen, "liga2", "a").map((z) => z.teamId).sort()).toEqual(["a", "b"]);
+    expect(filtereWertungsZeilen(zeilen, "gruppe", "a").map((z) => z.teamId).sort()).toEqual(["a", "b"]);
+    expect(filtereWertungsZeilen(zeilen, "mensch", "a").map((z) => z.teamId)).toEqual(["a"]);
+    expect(startFilter(zeilen, "a")).toBe("liga2");
+  });
+
+  it("startet ohne Ligatrennung mit allen Teams", () => {
+    const zeilen = baueWertungsZeilen(eingabe({ leagueByTeam: null }));
+    expect(startFilter(zeilen, "a")).toBe("alle");
+  });
+
+  it("beschreibt Duell und Gruppe in Worten", () => {
+    const zeile = baueWertungsZeilen(eingabe()).find((z) => z.teamId === "a")!;
+    const name = (id: string) => (id === "b" ? "Team B" : null);
+    expect(beschreibeWertungsErgebnis(zeile.d1.ergebnis, name)).toBe("Sieg 78 : 71 gegen Team B");
+    expect(beschreibeWertungsErgebnis(zeile.d2.ergebnis, name)).toBe("Platz 2 von 4 · Gruppenwert 88");
+    expect(wertungsMarke(zeile.d1.ergebnis)).toEqual({ text: "S", ton: "s" });
+    expect(wertungsMarke(zeile.d2.ergebnis)).toEqual({ text: "2.", ton: "z" });
+  });
+});
+
+describe("Spieltagswertung neu: Anzeige", () => {
+  function render(over: Partial<WertungsEingabe> = {}) {
+    return renderToString(React.createElement(DisciplineStageSpieltagswertung as never, eingabe(over) as never));
+  }
+
+  it("zeigt eine Zeile je Team und Form/Captain in eigener Spaltengruppe", () => {
+    const html = render();
+    expect(html).toContain('data-testid="spieltagswertung-zeile-a"');
+    expect(html).toContain("Wirkung im Score · keine Punkte");
+    expect(html).toContain("Du");
+    // Liga 2 ist der Start-Filter: Team E (Liga 1) steht nicht in der Tabelle.
+    expect(html).not.toContain('data-testid="spieltagswertung-zeile-e"');
+  });
+
+  it("verschließt Gesamt und Rang nach dem Spieltag, solange Disziplin 2 fehlt", () => {
+    const html = render({ d2Revealed: false });
+    expect(html).not.toContain("3,3");
+    expect(html).toContain("Noch nicht gespielt");
+  });
+
+  it("rechnet im Blatt D1 + D2 + Mutator = Gesamt", () => {
+    const html = render();
+    expect(html).toContain("= Gesamt");
+    expect(html).toContain("3,3");
+  });
+});
