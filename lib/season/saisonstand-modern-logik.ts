@@ -270,8 +270,10 @@ export function duellPunkteJeDisziplin(
     for (const p of u.paarungen) {
       for (const d of p.disziplinen) {
         if (!d.gespielt || d.punkteHeim == null || d.punkteGast == null) continue;
-        buche(p.homeTeamId, d.disciplineId, d.punkteHeim);
-        buche(p.awayTeamId, d.disciplineId, d.punkteGast);
+        // Vierergruppen-Disziplinen (Mini-DM, Battlefield) stehen hier UND in `miniDmPods`: dort zählen,
+        // sonst würden die Punkte doppelt gebucht (Pkt-Spalte wäre kleiner als die Zeilensumme).
+        if (!d.miniDmPodIdHeim) buche(p.homeTeamId, d.disciplineId, d.punkteHeim);
+        if (!d.miniDmPodIdGast) buche(p.awayTeamId, d.disciplineId, d.punkteGast);
       }
     }
     for (const pod of u.miniDmPods ?? []) {

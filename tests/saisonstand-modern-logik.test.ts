@@ -167,4 +167,14 @@ describe("Saisonstand modern: Matchwinner", () => {
     expect(anteilStufe({ punkte: 4, moeglich: 4 })).toBe(4);
     expect(anteilStufe(null)).toBeNull();
   });
+
+  it("Vierergruppen-Disziplin wird nicht doppelt gebucht (Paarung und Pod)", () => {
+    const u = {
+      paarungen: [{ homeTeamId: "A", awayTeamId: "B", disziplinen: [{ disciplineId: "mini-dm", gespielt: true, punkteHeim: 2, punkteGast: 1, miniDmPodIdHeim: "p1", miniDmPodIdGast: "p1" }] }],
+      miniDmPods: [{ disciplineId: "mini-dm", mitglieder: [{ teamId: "A", teamPoints: 2 }, { teamId: "B", teamPoints: 1 }] }],
+    };
+    const m = duellPunkteJeDisziplin([u] as never);
+    expect(m.get("A")?.get("mini-dm")).toEqual({ punkte: 2, moeglich: 2 });
+    expect(m.get("B")?.get("mini-dm")).toEqual({ punkte: 1, moeglich: 2 });
+  });
 });
