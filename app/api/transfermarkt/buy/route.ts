@@ -12,6 +12,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { ligaDraftSperrtMarktkauf } from "@/lib/draft/liga-draft-modell";
 
 type BuyRequestBody = {
   saveId?: string;
@@ -109,6 +110,21 @@ export async function POST(request: Request) {
           summary: null,
           warnings: phaseGate.warnings,
           scope: { saveId, seasonId, teamId, playerId, dryRun, source, phase: phaseGate.phase },
+        },
+        { status: 409 },
+      );
+    }
+
+    // Liga-Draft im Einzelschritt (docs/design/draft-neubau-kern-18-11.md): waehrend der geordneten Phase kauft niemand
+    // am Draft vorbei — sonst haette ein Mensch die Reihenfolge umgangen. Gepickt wird dann ueber /api/draft.
+    if (!dryRun && ligaDraftSperrtMarktkauf(save.gameState)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "liga_draft_laeuft",
+          summary: null,
+          warnings: [],
+          scope: { saveId, seasonId, teamId, playerId, dryRun, source },
         },
         { status: 409 },
       );
