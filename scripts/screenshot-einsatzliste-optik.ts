@@ -31,7 +31,7 @@ const PORT = process.env.SCREENSHOT_PORT ?? "3211";
 const BASE_URL = `http://localhost:${PORT}`;
 const MODUS = process.argv[2] ?? "bau";
 const OUT = path.resolve(process.argv[3] ?? "docs/design/einsatzliste-optik-18-11");
-const TMP = os.tmpdir();
+const TMP = process.env.OPTIK_TMP ?? os.tmpdir();
 const META = path.join(TMP, "optik-meta.json");
 const kopiePfad = (d: string) => path.join(TMP, `optik-${d}.sqlite`);
 const ENDUNGEN = ["", "-wal", "-shm"];

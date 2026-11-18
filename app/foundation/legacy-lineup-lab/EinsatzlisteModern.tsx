@@ -47,7 +47,7 @@ import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
 
 import type { LineupNewLookProps } from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
-import { EinsatzlisteKartenHand } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteKartenHand";
+import { EinsatzlisteKartenHand, FORM_HEX } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteKartenHand";
 import { EinsatzlisteGegnerTab } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteGegnerTab";
 import { FeldHintergrund } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteFeldHintergrund";
 import {
@@ -62,6 +62,7 @@ import {
 } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
 import { baueFormMoralAnzeige, moralUrsachen, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
 import { berechneKartenWirkung, wertungsPfad } from "@/lib/lineups/formkarten-wirkung";
+import { getFormCardColorForDisciplineCategory, getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import "./einsatzliste-modern.css";
 import "./einsatzliste-optik.css";
@@ -117,6 +118,18 @@ function FeldFigur({ spielerId, blick, klasse }: { spielerId: string | null | un
     <img className={klasse} src={figurPoseUrl(sprite, blick)} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFehler(true)} data-testid="elm-figur" />
   );
 }
+
+/** Disziplin-Farbe nach Kategorie (Power rot, Speed grün, Mental blau, Social gelb): dieselben Farben wie Formkarten und Klassen. */
+const FARBE_NAME: Record<string, string> = { red: "Rot", green: "Grün", blue: "Blau", yellow: "Gelb" };
+const diszFarbeVon = (kategorie: string | null | undefined): string | undefined => {
+  const f = getFormCardColorForDisciplineCategory(kategorie);
+  return f ? FORM_HEX[f] : undefined;
+};
+/** Klassenfarbe eines Spielers (bestehendes Klassen-Schema der Formkarten, nichts Neues). */
+const klassenFarbeVon = (klasse: string | null | undefined): string | undefined => {
+  const f = klasse ? getPlayerClassColor({ className: klasse } as never) : null;
+  return f ? FORM_HEX[f] : undefined;
+};
 
 /** Kopf-Zeile der Disziplin-Karte: „UNSER RANG · KADERSTÄRKE“, groß der Ligarang, klein der Rang unter allen. */
 function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang | null; fallback: number | null }) {
@@ -611,10 +624,11 @@ export default function EinsatzlisteModern(props: Props) {
   /* ---------------- Form + Moral (18.11.) ---------------- */
   const gs = context?.gameState ?? null;
   // Rang des EIGENEN Teams je Disziplin (Kopf): vor der Wertung Kaderstärke, danach Saisonrang; Liga groß, alle klein.
+  const eigenTeamId = context?.team.id ?? null;
   const diszIdD1 = disziplin("d1")?.disciplineId ?? null;
-  const diszRangD1 = useMemo<DisziRang | null>(() => (gs && context?.team.id && diszIdD1 ? berechneDisziRang(gs, context.team.id, diszIdD1) : null), [gs, context?.team.id, diszIdD1]);
+  const diszRangD1 = useMemo<DisziRang | null>(() => (gs && eigenTeamId && diszIdD1 ? berechneDisziRang(gs, eigenTeamId, diszIdD1) : null), [gs, eigenTeamId, diszIdD1]);
   const diszIdD2 = disziplin("d2")?.disciplineId ?? null;
-  const diszRangD2 = useMemo<DisziRang | null>(() => (gs && context?.team.id && diszIdD2 ? berechneDisziRang(gs, context.team.id, diszIdD2) : null), [gs, context?.team.id, diszIdD2]);
+  const diszRangD2 = useMemo<DisziRang | null>(() => (gs && eigenTeamId && diszIdD2 ? berechneDisziRang(gs, eigenTeamId, diszIdD2) : null), [gs, eigenTeamId, diszIdD2]);
   const formMoralVon = useMemo(() => {
     const karte = new Map<string, FormMoralAnzeige>();
     const dis = (seite === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2) ?? null;
@@ -660,8 +674,94 @@ export default function EinsatzlisteModern(props: Props) {
     }
     return ergebnis;
   }, [formCardControlsBySide, context, slots, selections, rosterCardByActivePlayerId, gs]);
+  // Karte je Spieler (Spalte „Karte“ der Kaderliste, Mockup form-moral-modern): Farbe und Wert der Karte, die er trägt; gelegte Karten markiert.
+  const spielerKarten = useMemo(() => {
+    const karten = new Map<string, { farbe: string; wert: number; gewaehlt: boolean; passt: boolean }>();
+    for (const sd of SEITEN) {
+      for (const k of kartenWirkungJeSeite[sd]?.vergleich ?? []) {
+        const alt = karten.get(k.spielerName);
+        if (!alt || (k.gewaehlt && !alt.gewaehlt)) karten.set(k.spielerName, { farbe: k.farbe, wert: k.wert, gewaehlt: k.gewaehlt, passt: k.passt });
+      }
+    }
+    return karten;
+  }, [kartenWirkungJeSeite]);
   const kartenFuerSpieler = (sd: Seite, playerId: string | undefined) =>
     playerId ? kartenWirkungJeSeite[sd]?.spieler.find((x) => x.playerId === playerId)?.zerlegung ?? null : null;
+
+  // Entzerrung (18.11.): Platzkarten, die sich auf dem Feld überdecken würden, werden auseinandergeschoben (Pixelrechnung am
+  // echten Feld, nur Anzeige: die Plätze selbst bleiben, wie sie sind). Basiswerte stehen in data-bx/data-by der Karte.
+  const feldBoxRef = useRef<HTMLDivElement | null>(null);
+  const entzerre = useCallback(() => {
+    const box = feldBoxRef.current;
+    if (!box) return;
+    const karten = Array.from(box.querySelectorAll<HTMLElement>(".elm-slot[data-bx]"));
+    if (karten.length < 2) return;
+    const W = box.clientWidth;
+    const H = box.clientHeight;
+    const w = Math.max(...karten.map((k) => k.offsetWidth));
+    const h = Math.max(...karten.map((k) => k.offsetHeight));
+    const links = box.dataset.links === "1";
+    const loese = (mitFigur: boolean) => {
+      const hatFigur = karten.some((k) => k.querySelector(".elm-slot__fig"));
+      const figH = mitFigur && hatFigur ? Math.max(120, Math.min(300, 0.13 * W)) : 0; // wie --fh in einsatzliste-optik.css
+      const luecke = 6;
+      const rh = h + figH * 0.3; // Figur darf die Nachbarkarte etwas streifen, nicht verdecken
+      const kopf = figH * 0.82 + h / 2;
+      const maxX = links ? Math.max(w / 2 + 4, W * 0.5 - w / 2 - 4) : W - w / 2 - 4;
+      const klemme = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, hi < lo ? lo : v));
+      const pos = karten.map((k) => ({ x: Number(k.dataset.bx) * W, y: Number(k.dataset.by) * H }));
+      const begrenze = () => pos.forEach((q) => {
+        q.x = klemme(q.x, w / 2 + 4, maxX);
+        q.y = klemme(q.y, kopf, H - h / 2 - 8);
+      });
+      begrenze();
+      let rest = false;
+      for (let runde = 0; runde < 120; runde += 1) {
+        let bewegt = false;
+        for (let i = 0; i < pos.length; i += 1) {
+          for (let j = i + 1; j < pos.length; j += 1) {
+            const dx = pos[j]!.x - pos[i]!.x;
+            const dy = pos[j]!.y - pos[i]!.y;
+            const ox = w + luecke - Math.abs(dx);
+            const oy = rh + luecke - Math.abs(dy);
+            if (ox <= 0.5 || oy <= 0.5) continue;
+            bewegt = true;
+            if (oy <= ox) {
+              const r = (dy === 0 ? (j % 2 ? 1 : -1) : Math.sign(dy)) * (oy / 2 + 0.5);
+              pos[i]!.y -= r; pos[j]!.y += r;
+            } else {
+              const r = (dx === 0 ? (j % 2 ? 1 : -1) : Math.sign(dx)) * (ox / 2 + 0.5);
+              pos[i]!.x -= r; pos[j]!.x += r;
+            }
+          }
+        }
+        begrenze();
+        rest = bewegt;
+        if (!bewegt) break;
+      }
+      return { pos, rest };
+    };
+    let ergebnis = loese(true);
+    // Reicht der Platz auch dann nicht, stehen die Karten ohne Figuren (die Figur gehört zur Karte, nicht umgekehrt).
+    const ohneFigur = ergebnis.rest;
+    if (ohneFigur) ergebnis = loese(false);
+    box.dataset.eng = ohneFigur ? "1" : "0";
+    const pos = ergebnis.pos;
+    karten.forEach((k, i) => {
+      k.style.setProperty("--x", String(pos[i]!.x / W));
+      k.style.setProperty("--y", String(pos[i]!.y / H));
+    });
+  }, []);
+  useEffect(() => {
+    entzerre();
+  });
+  useEffect(() => {
+    const box = feldBoxRef.current;
+    if (!box || typeof ResizeObserver === "undefined") return undefined;
+    const beobachter = new ResizeObserver(() => entzerre());
+    beobachter.observe(box);
+    return () => beobachter.disconnect();
+  }, [entzerre, context]);
 
   if (!context) {
     return (
@@ -693,7 +793,8 @@ export default function EinsatzlisteModern(props: Props) {
     }
   }
 
-  const platzKarte = (slot: (typeof slots)[number]) => {
+  const geteiltFeld = form.definition.gegner === "spiegel-y";
+  const eigenPos = (slot: (typeof slots)[number]) => {
     const platz = form.plaetze.find((p) => p.slotIndex === slot.slotIndex);
     let x = platz?.x ?? 0.5;
     let y = platz?.y ?? 0.5;
@@ -705,6 +806,18 @@ export default function EinsatzlisteModern(props: Props) {
       x = ((i % spaltenZahl) + 0.5) / spaltenZahl;
       y = i < spaltenZahl ? 0.27 : 0.73;
     }
+    // Eigene Karten links, die erwartete Gegner-Aufstellung rechts (Chris 18.11.): nur wo der Gegner auf dem Feld steht.
+    if (geteiltFeld) x = 0.03 + x * 0.44;
+    return { platz, x, y, reihig, spaltenZahl };
+  };
+  /** Gegner-Platz: bei geteiltem Feld rechts, auf derselben Höhe wie der eigene Platz (Duell Platz gegen Platz). */
+  const geisterPos = (slot: (typeof slots)[number], g: { x: number; y: number }) => {
+    if (!geteiltFeld) return g;
+    const e = eigenPos(slot);
+    return { x: e.x + 0.5, y: e.y };
+  };
+  const platzKarte = (slot: (typeof slots)[number]) => {
+    const { x, y, reihig, spaltenZahl } = eigenPos(slot);
     const x2 = form.definition.gegner === "spiegel-x" ? Math.min(0.88, Math.max(0.12, x * 2)) : x;
     const id = selections[slot.key] ?? "";
     const karte = id ? rosterCardByActivePlayerId.get(id) ?? null : null;
@@ -730,8 +843,10 @@ export default function EinsatzlisteModern(props: Props) {
         role="button"
         tabIndex={0}
         className={klassen}
-        style={{ "--x": x, "--y": y, "--x2": x2, "--pc": farbe, ...(reihig ? { "--w": `calc(${100 / spaltenZahl}% - 14px)` } : {}) } as React.CSSProperties}
+        style={{ "--x": x, "--y": y, "--x2": x2, "--pc": farbe, ...(reihig ? { "--w": `calc(${(geteiltFeld ? 44 : 100) / spaltenZahl}% - 14px)` } : {}) } as React.CSSProperties}
         data-testid={`elm-slot-${slot.key}`}
+        data-bx={reihig ? undefined : x}
+        data-by={reihig ? undefined : y}
         aria-label={`${slotName(slot.key)}${karte ? `: ${karte.name}` : ": offen"}`}
         draggable={Boolean(id) && kannBedienen}
         onDragStart={(event) => {
@@ -832,7 +947,7 @@ export default function EinsatzlisteModern(props: Props) {
   const spalten: BcTableColumn<KaderZeile>[] = [
     {
       key: "por",
-      breite: "36px",
+      breite: "32px",
       render: (z) => <Por klasse="elm-kz__por" url={z.karte.portraitUrl} name={z.karte.name} />,
     },
     {
@@ -851,15 +966,15 @@ export default function EinsatzlisteModern(props: Props) {
                 {z.platz.startsWith("d1") ? "D1" : "D2"} {kuerzelJeSlot.get(z.platz) ?? ""}
               </BcMarke>
             ) : null}
-            {z.karte.className ?? ""}
+            {z.karte.className ? <span className="elm-kl" style={{ "--kl": klassenFarbeVon(z.karte.className) ?? "var(--bc-stumm)" } as React.CSSProperties} title={`Klasse ${z.karte.className}`}>{z.karte.className}</span> : null}
           </span>
         </span>
       ),
     },
     {
       key: "disz",
-      kopf: "Eignung",
-      breite: "42px",
+      kopf: "Eig.",
+      breite: "38px",
       rechts: true,
       onKopf: () => setSortKey("disz"),
       aktiv: sortKey === "disz",
@@ -867,8 +982,8 @@ export default function EinsatzlisteModern(props: Props) {
     },
     {
       key: "platz",
-      kopf: "Platzwert",
-      breite: "54px",
+      kopf: "Platz",
+      breite: "52px",
       rechts: true,
       onKopf: () => setSortKey("platz"),
       aktiv: sortKey === "platz",
@@ -882,7 +997,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "form",
       kopf: "Form",
-      breite: "28px",
+      breite: "24px",
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.formVerfuegbar ? (
@@ -895,7 +1010,7 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "moral",
       kopf: "Moral",
-      breite: "46px",
+      breite: "44px",
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.moral != null ? (
@@ -908,21 +1023,32 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "karte",
       kopf: "Karte",
-      breite: "40px",
+      breite: "42px",
       rechts: true,
       render: (z) => {
-        // Nur Aufgestellte bekommen die Karte (gezeigt = gebucht): Bankspieler zeigen keinen Wert.
+        const kk = spielerKarten.get(z.karte.name);
+        // Gezeigt = gebucht: die Summe der Karten, die dieser Spieler im Einsatz tatsaechlich bekommt, steht im Tooltip.
         const slotSeite = z.platz ? slots.find((s) => s.key === z.platz)?.disciplineSide : null;
         const w = slotSeite ? kartenWirkungJeSeite[slotSeite] : null;
         const pid = rosterCardByActivePlayerId.get(z.id)?.id;
         const zer = slotSeite && pid ? kartenFuerSpieler(slotSeite, pid) : null;
-        return zer && w?.buchung.gebucht ? <span className={`bc-t ${zer.summe > 0 ? "bc-plus" : zer.summe < 0 ? "bc-minus" : ""}`}>{vz(zer.summe)}</span> : <span className="fm-leise">–</span>;
+        const gebucht = zer && w?.buchung.gebucht ? ` Im Einsatz bekommt er ${vz(zer.summe)} durch Karten.` : "";
+        if (!kk) return <span className="fm-leise" title={`Trägt keine Karte.${gebucht}`}>–</span>;
+        return (
+          <span
+            className={`elm-kz__kk bc-t${kk.gewaehlt ? " is-gew" : ""}${kk.wert < 0 ? " is-neg" : ""}`}
+            style={{ "--kf": FORM_HEX[kk.farbe] ?? "#9aa7ba" } as React.CSSProperties}
+            title={`Karte ${FARBE_NAME[kk.farbe] ?? kk.farbe} ${vz(kk.wert)}${kk.passt ? "" : " (fremde Farbe, halber Wert)"}${kk.gewaehlt ? ", gelegt" : ""}.${gebucht}`}
+          >
+            {vz(kk.wert)}
+          </span>
+        );
       },
     },
     {
       key: "last",
       kopf: "Last",
-      breite: "38px",
+      breite: "34px",
       rechts: true,
       onKopf: () => setSortKey("last"),
       aktiv: sortKey === "last",
@@ -1204,6 +1330,7 @@ export default function EinsatzlisteModern(props: Props) {
                 if (w.karten.length === 0) return "erwartet · ohne Karte";
                 return w.buchung.gebucht ? `erwartet · Karten ${vz(w.teamSumme)}` : "erwartet · Karte zählt hier nicht";
               })()}
+              farbe={diszFarbeVon((s === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2)?.category)}
               titelAttr={`${d.displayName}: ${liste.filter((slot) => selections[slot.key]).length} von ${liste.length} Plätzen besetzt`}
             />
           );
@@ -1356,7 +1483,7 @@ export default function EinsatzlisteModern(props: Props) {
           </div>
 
           <div className="elm-pitchw">
-            <div className={`elm-feld__box${flaecheUrl ? " has-bild" : ""}`} data-feld={form.definition.feld} data-flaeche={flaecheId ?? undefined}>
+            <div ref={feldBoxRef} style={{ "--dk": diszFarbeVon(dSeite?.category) } as React.CSSProperties} data-links={geteiltFeld ? "1" : "0"} className={`elm-feld__box${flaecheUrl ? " has-bild" : ""}`} data-feld={form.definition.feld} data-flaeche={flaecheId ?? undefined}>
               {flaecheUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="elm-feld__bild" src={flaecheUrl} alt="" decoding="async" onError={() => setFlaechenFehler((alt) => (flaecheId && !alt.includes(flaecheId) ? [...alt, flaecheId] : alt))} />
@@ -1369,7 +1496,7 @@ export default function EinsatzlisteModern(props: Props) {
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
                     if (!platz?.gegner || !g?.spielerName) return null;
                     return (
-                      <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": platz.gegner.x, "--y": platz.gegner.y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
+                      <div key={`g-${slot.key}`} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
                         <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
                         <b>{g.spielerName}</b>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}
@@ -1381,7 +1508,7 @@ export default function EinsatzlisteModern(props: Props) {
             </div>
           </div>
 
-          <div className="elm-unten">
+          <div className="elm-unten" style={{ "--dk": diszFarbeVon(dSeite?.category) } as React.CSSProperties}>
           <div className="elm-tak" data-testid="elm-taktik">
             <div>
               <span className="bc-gk">Einsatz · {dSeite?.displayName}</span>

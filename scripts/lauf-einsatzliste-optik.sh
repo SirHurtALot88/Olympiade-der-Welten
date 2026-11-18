@@ -5,16 +5,20 @@
 set -u
 export OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0 SCREENSHOT_PORT=3211 OLY_SERVER=start
 DISZ="${DISZ:-basketball,tennis,spurt,mini-dm,battlefield,time-trial,climbing}"
+# Wegwerf-Saves liegen im Worktree (.optik-tmp), nicht in /tmp.
 OUT=docs/design/einsatzliste-optik-18-11
 rm -f /tmp/eliste-fertig /tmp/eliste-go /tmp/eliste-ende
-echo "[lauf] bau $(date)"
-npx tsx scripts/screenshot-einsatzliste-optik.ts bau "$OUT" "$DISZ" 2>&1 | tail -15
+export OPTIK_TMP="$PWD/.optik-tmp"
+if [ ! -f "$OPTIK_TMP/optik-meta.json" ]; then
+  echo "[lauf] bau $(date)"
+  npx tsx scripts/screenshot-einsatzliste-optik.ts bau "$OUT" "$DISZ" 2>&1 | tail -15
+fi
 # NODE_OPTIONS enthaelt --use-openssl-ca: das bricht next build ("Collecting page data").
 unset NODE_OPTIONS
 runde() {
   echo "[lauf] build $(date)"
   rm -rf .next
-  npx next build 2>&1 | tail -5
+  npm run build 2>&1 | tail -8
   for d in ${DISZ//,/ }; do
     npx tsx scripts/screenshot-einsatzliste-optik.ts foto "$OUT" "$d" app 2>&1 | tail -8
   done
