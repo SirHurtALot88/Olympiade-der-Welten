@@ -437,6 +437,8 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   defiance_surcharge_pending: "Trotz-Aufschlag: die letzte Runde macht dieses Angebot teurer.",
   high_priority_player_demand_failed: "Eine wichtige Spieler-Forderung ist gescheitert.",
   insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
+  vorstand_transferbudget_nicht_freigegeben: "Der Vorstand gibt dafür nicht genug Transferbudget frei.",
+  vorstand_gehaltsbudget_nicht_freigegeben: "Das Gehalt passt nicht mehr ins freigegebene Gehaltsbudget des Vorstands.",
   local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
   low_team_fit_reduces_acceptance: "Schwacher Teamfit drückt die Zusage.",
   market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschätzt.",

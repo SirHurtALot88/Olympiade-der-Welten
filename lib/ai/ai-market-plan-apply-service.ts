@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { kaufRahmen, VORSTAND_PFLICHT_KADER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
@@ -640,6 +641,21 @@ function buildFinalBuyGate(input: {
    */
   let apronSalaryAdded = 0;
   const apronBaseSalary = getTeamApronSalaryBase(input.gameState, input.team.teamId);
+  // Finanzkonzept V2: dieselbe Zahl wie die harte Sperre (kaufRahmen). Erst die Pflichtplaetze bis 8 reservieren
+  // (fehlende Plaetze x billigster passender Spieler, Gehalt eingeschlossen), nur den Rest nach Wunsch verteilen.
+  const vorstandRahmen = kaufRahmen(input.gameState, input.team.teamId);
+  let vorstandAbloese = 0;
+  let vorstandGehalt = 0;
+  const pflichtReserve = (rosterAfterThis: number, exclude: string) => {
+    const fehlt = Math.max(0, VORSTAND_PFLICHT_KADER - rosterAfterThis);
+    if (fehlt <= 0) return { fee: 0, salary: 0 };
+    const billig = input.candidates
+      .filter((c) => c.playerId !== exclude && !picked.some((e) => e.playerId === c.playerId))
+      .map((c) => ({ fee: c.price ?? c.marketValue ?? 0, salary: c.salary ?? 0 }))
+      .sort((a, b) => a.fee - b.fee)
+      .slice(0, fehlt);
+    return { fee: billig.reduce((x, c) => x + c.fee, 0), salary: billig.reduce((x, c) => x + c.salary, 0) };
+  };
 
   while (picked.length < input.allowedBuyCount) {
     const sorted = rankFinalBuyCandidates({
@@ -706,8 +722,14 @@ function buildFinalBuyGate(input: {
     const rosterAfter = rosterBase + picked.length + 1;
     const buffer = getTeamCashBuffer(input.gameState, input.team.teamId, coverageFallback);
     const duplicateClaim = input.claimedPlayerIds.has(candidate.playerId);
+    const reserve = pflichtReserve(rosterAfter, candidate.playerId);
+    const rahmenBlocked =
+      vorstandRahmen.gedeckelt &&
+      (vorstandAbloese + (price ?? 0) + reserve.fee > vorstandRahmen.abloeseFrei + 1e-9 ||
+        vorstandGehalt + (candidate.salary ?? 0) + reserve.salary > vorstandRahmen.gehaltFrei + 1e-9);
     const cashBlocked = cashAfter == null || cashAfter < buffer;
     const reasons = [
+      rahmenBlocked ? "vorstand_rahmen_ueberschritten" : null,
       duplicateClaim ? "candidate_already_claimed" : null,
       hardNoGo && !convergenceCoverageFill ? "team_hard_no_go" : null,
       belowUpgradeFloor ? `below_upgrade_floor:${price}<${effectiveMinUpgradeBuyPrice}` : null,
@@ -758,7 +780,27 @@ function buildFinalBuyGate(input: {
     if (classToken) classCounts.set(classToken, (classCounts.get(classToken) ?? 0) + 1);
     if (raceToken) raceCounts.set(raceToken, (raceCounts.get(raceToken) ?? 0) + 1);
     apronSalaryAdded += candidate.salary ?? 0;
+    vorstandAbloese += price ?? 0;
+    vorstandGehalt += candidate.salary ?? 0;
     if (cashAfter != null) cashRemaining = cashAfter;
+  }
+
+  // Auffangnetz (Chris 18.11.): kein Team bleibt wegen der Finanzregeln unter dem Pflichtkader. Fehlen nach dem Rahmen noch
+  // Plaetze, werden die billigsten uebrigen Kandidaten genommen (zaehlen gegen den Topf, duerfen ihn ueberziehen).
+  if (vorstandRahmen.gedeckelt) {
+    const rest = input.candidates
+      .filter((c) => !picked.some((e) => e.playerId === c.playerId) && !input.claimedPlayerIds.has(c.playerId))
+      .sort((a, b) => (a.price ?? a.marketValue ?? 0) - (b.price ?? b.marketValue ?? 0));
+    for (const c of rest) {
+      if (rosterBase + picked.length >= VORSTAND_PFLICHT_KADER) break;
+      if (picked.length >= input.allowedBuyCount) break;
+      const p = c.price ?? c.marketValue ?? 0;
+      if (cashRemaining != null && cashRemaining - p < 0) continue;
+      picked.push(c);
+      input.claimedPlayerIds.add(c.playerId);
+      if (cashRemaining != null) cashRemaining -= p;
+      rows.push({ teamId: input.team.teamId, playerId: c.playerId, price: p, status: "accepted", reasons: "pflichtkader_auffangnetz" });
+    }
   }
 
   return { candidates: picked, rows };
@@ -1662,8 +1704,14 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     );
     const missingSellValue = effectiveSellPlan.candidates.some((candidate) => candidate.expectedSellValue == null);
     const hasMarketActions = effectiveSellPlan.candidates.length + effectiveBuyPlan.candidates.length > 0;
-    const enforcementPlayerMin =
+    const enforcementPlayerMinRoh =
       options.convergenceIncrementalFill && coverageFallback ? identityPlayerMin : team.currentState.playerMin;
+    // Finanzkonzept V2: unter den Finanzregeln (Rahmen-Planung) bricht ein Plan nicht am Identity-Minimum (7 bis 12) ab, sondern
+    // erst unter dem Pflichtkader 8 (Chris 18.11.). Sonst blockt der Plan, den die Toepfe verkleinert haben, das ganze Team.
+    const enforcementPlayerMin =
+      enforcementPlayerMinRoh != null && enforcementPlayerMinRoh > VORSTAND_PFLICHT_KADER && kaufRahmen(preflightGameState, team.teamId).gedeckelt
+        ? Math.min(enforcementPlayerMinRoh, VORSTAND_PFLICHT_KADER)
+        : enforcementPlayerMinRoh;
     // Bug found during PRIO-3 rebuild-consistency testing (2026-07-04): with this gate enforced
     // unconditionally, a team rebuilding from a severe roster deficit (e.g. sold to 0-2 players)
     // could never pass it — a single apply call only buys `applyBuyStepsInBatch` (2-3) candidates,
@@ -2052,6 +2100,22 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         localRunContext: transferRunContext,
       });
 
+      // Leiter statt Stillstand: scheitert der Kauf NUR an der Vorstand-Sperre, wird der Kandidat uebersprungen und der naechste
+      // (billigere) versucht, das Team bleibt nicht stehen. Die Sperre selbst bleibt hart.
+      if (!buyPreview.canBuy && buyPreview.blockingReasons.length > 0 && buyPreview.blockingReasons.every((r) => r.startsWith("vorstand_"))) {
+        nextResult.skippedSteps.push({
+          stepType: "buy",
+          playerId: candidate.playerId,
+          playerName: candidate.playerName ?? candidate.name,
+          amount: candidate.price ?? candidate.marketValue ?? null,
+          salaryImpact: candidate.salary,
+          rosterImpact: 1,
+          status: "blocked",
+          reason: "Vorstand-Sperre, naechster Kandidat.",
+        });
+        continue;
+      }
+
       if (!buyPreview.canBuy) {
         if (process.env.OLY_DEBUG_BUY_GATE === "1") {
           console.error(
@@ -2333,6 +2397,14 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   for (const team of preflightGameState.teams) {
     if (!resultTeamIds.has(team.teamId)) {
       results.push(buildPreflightTeamResult(preflightGameState, team));
+    }
+  }
+
+  if (process.env.OLY_DEBUG_BUY_GATE === "1") {
+    for (const entry of results) {
+      console.error(
+        `[buy-gate-debug] RESULT ${entry.teamCode ?? entry.teamId} result=${entry.result} planned=${entry.plannedBuys} done=${entry.executedBuys} roster=${entry.rosterBefore}->${entry.rosterAfter} cash=${entry.cashBefore}->${entry.cashAfter} reasons=${entry.blockingReasons.join("|")}`,
+      );
     }
   }
 

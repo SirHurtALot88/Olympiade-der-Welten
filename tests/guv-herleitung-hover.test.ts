@@ -149,7 +149,7 @@ describe("Beide Ansichten lesen dieselbe Herleitung", () => {
   it("Saisonstand und Finanzen importieren aus lib/finance/guv-breakdown", () => {
     // Zwei Kopien wären genau der Zustand, der die Meldung ausgelöst hat.
     const standings = readFileSync(join(root, "app/foundation/season-v2/SeasonStandingsNewLook.tsx"), "utf8");
-    const finances = readFileSync(join(root, "app/foundation/finances/FoundationFinancesNewLook.tsx"), "utf8");
+    const finances = readFileSync(join(root, "app/foundation/finances/FinanzenModern.tsx"), "utf8");
     expect(standings).toContain('from "@/lib/finance/guv-breakdown"');
     expect(finances).toContain('from "@/lib/finance/guv-breakdown"');
     expect(standings).toContain("buildGuvBreakdown(");
