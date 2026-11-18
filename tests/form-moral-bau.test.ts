@@ -401,3 +401,30 @@ describe("Review-Befunde 18.11.", () => {
     expect(anteile.some((x) => x > 0) && anteile.some((x) => x < 0)).toBe(true);
   });
 });
+
+describe("Formkarten-Leiste und Vergleich (Mockup-Bausteine, gezeigt = gebucht)", () => {
+  it("Vergleich: jede freie Karte mit Team-Wirkung für DIESE Disziplin, beste zuerst, gelegte markiert", () => {
+    const karten = [
+      ...KARTEN,
+      { id: "k3", playerId: "z", playerName: "Zed", color: "red" as const, value: 6, isUsed: false, usedByLineupId: null },
+      { id: "k4", playerId: "u", playerName: "Used", color: "yellow" as const, value: 8, isUsed: true, usedByLineupId: "x" },
+    ];
+    const w = berechneKartenWirkung({
+      side: "d1",
+      disciplineId: "basketball",
+      disciplineCategory: "social",
+      formCards: karten,
+      primaryCardId: "k1",
+      secondaryCardId: null,
+      playerIds: ["a", "b", "c"],
+      rosterPlayers: [{ id: "a", name: "A", className: "Bard" }, { id: "b", name: "B", className: "Bard" }, { id: "c", name: "C", className: "Tank" }] as never,
+      regeln: { formMoral: true, dosisPct: 1, farbregel: "neu" },
+    });
+    expect(w.vergleich.map((v) => v.id)).toEqual(["k1", "k3", "k2"]);
+    expect(w.vergleich[0]).toMatchObject({ id: "k1", gewaehlt: true, passt: true, spielerName: "X", alle: 8, traegerZusatz: 4, teamSumme: 32 });
+    expect(w.vergleich.find((v) => v.id === "k3")!.passt).toBe(false);
+    // Die gelegte Karte im Vergleich == die Team-Summe der Wirkung (eine Wahrheit)
+    expect(w.vergleich[0].teamSumme).toBe(w.teamSumme);
+    expect(w.karten[0].spielerName).toBe("X");
+  });
+});

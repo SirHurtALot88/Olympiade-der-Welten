@@ -146,3 +146,50 @@ Spielstand keine `playerFormState` hat, die Karten-Zahlen der Einsatzliste folge
 9. **KI** (`formCardDeploymentValue`, `takeCheapestNegativeFormCard`) rechnet über `kartenEffekt`.
 CI-Fall `legacy-matchday-resolve` (Form-Summe 0,2 statt ≥ 4): gewollte neue Regel (Karte rot +4 / blau +2 in einer anderen Disziplinfarbe zählt nur halb bzw. voll
 ohne Farbträger); Test leitet den Sollwert jetzt aus `formkartenSummeFuerSpieler` ab, ein Zweitfall pinnt die alte Regel, dazu „Vorschau = Resolve“ je Regel.
+
+## Einsatzliste näher am Mockup (Chris 18.11.: „genauso hätte ich das auch gern“)
+
+Angeglichen an `public/mockups/form-moral-modern-17-11.html` (Branch `origin/claude/form-moral-mockup-17-11`), alle Zahlen aus der einen Wahrheit:
+
+| Mockup-Baustein | App (Einsatzliste modern) |
+|---|---|
+| Kopf „Team-Form · Moral Ø“ mit ▲▲/▲/–/▼/▼▼-Zählern | `TeamFormKopf` im Hero rechts (Aufgestellte beider Seiten, Moral-Schnitt als Gesicht) |
+| Disziplin-Reiter „Karten +61,5“ / „ohne Karte“ | Reiter-Zusatz „erwartet · Karten +X“ / „ohne Karte“ / „Karte zählt hier nicht“ (nicht gebucht) |
+| Kader-Spalten PLATZ · FORM · MORAL · KARTE | getrennte Spalten Form (Pfeil), Moral (Gesicht + Zahl), Karte (nur Aufgestellte, Bankspieler „–“) |
+| Platzkarten mit Form-Pfeil, Moral, Karten-Chips | `FormMoralMarke` + `KartenMarke` (alle / Farbe / Form), Karten-Chips nur wo gebucht |
+| Leiste „FORMKARTEN · n GELEGT“ mit Kacheln (passt / fremd ½) und „KARTEN FÜRS TEAM“ | `KartenLeiste` unter den Kartenwahl-Menüs: Kacheln mit Wert, Farbe, Spieler, passt/fremd ½, Summe alle · Farbe · Form |
+| Reiter „KARTEN-WIRKUNG \| FORM & MORAL“ | zwei eigene Kontext-Reiter; Karten-Wirkung mit Regelsatz, Tabelle „Wer bekommt“ (alle/Farbe/Form/Karte), Tagesform-Hinweis, „Alle Karten im Vergleich“ |
+
+Abweichung vom Mockup, bewusst: Das Mockup hat eine „Hand“ mit Antippen-Legen; die App behält die bestehenden Kartenwahl-Menüs (Plan wird gespeichert) und
+ergänzt Kacheln und Vergleich darüber. Bankspieler zeigen keine Karten-Wirkung („würde bekommen“ wäre nicht gebucht).
+
+**Screenshots:** Die Mockup-Bilder liegen auf dem Mockup-Branch (`docs/design/form-moral-anzeige-17-11/01…17-*.png`), die App-Bilder (`app-01…07`) in diesem Ordner.
+Die App-Bilder dieses Standes (mit den neuen Bausteinen) konnten nicht neu aufgenommen werden: die Platte der Umgebung war voll (< 1 GB frei, Dev-Server plus Spielstand-Kopie
+würden fremde Läufe gefährden). Die vorhandenen `app-*.png` stammen vom Stand davor (Kader-Spalte „Form · Moral“ zusammen, Karten-Wirkung im Reiter „Form & Moral“).
+Neu aufnehmen: Dev-Server mit `OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, Kopie des Abbilds, `scripts/form-am-save-abbild-nachfuehren.ts`, dann Playwright.
+
+### Abgleich Mockup | App je Feature
+
+| Mockup-Feature | Status |
+|---|---|
+| Kopf Team-Form · Moral Ø (Zähler) | drin |
+| Disziplin-Reiter mit Karten-Summe / ohne Karte | drin (angepasst: zusätzlich „Karte zählt hier nicht“) |
+| Kader-Spalten Platz · Form · Moral · Karte | drin (Karte nur für Aufgestellte) |
+| Platzkarte mit Form-Pfeil, Moral-Gesicht, Karten-Marke | drin (angepasst: Marke nur, wo gebucht; in dichten Feldern kann die Nachbarkarte den Klick überdecken) |
+| Moral als Herz | angepasst: Gesicht in Farbe (Chris) |
+| Formkarten-Leiste mit Kacheln und „Karten fürs Team“ | drin (angepasst: über den bestehenden Kartenwahl-Menüs statt Hand mit Antippen-Legen) |
+| Hover-Vorschau der Karte vor dem Legen | fehlt |
+| Karten in der Hand abgedunkelt („in Spurt“), Legen per Klick | fehlt (Menüs bleiben) |
+| Reiter Karten-Wirkung + Form & Moral | drin |
+| Tabelle „Wer bekommt“ (alle/Farbe/Form/gesamt) | drin |
+| Hinweisbox, Karten-Vergleich | drin (Vergleich: bis 8 Karten) |
+| Kader-Karte „würde bekommen“ für Bankspieler | bewusst nicht (nicht gebucht) |
+| Spielerprofil mit Kurve, Leistung gegen Erwartung, Moral-Ursachen | drin (Blatt) |
+| Bauchbinde nach dem Spieltag + Meldungen | drin |
+| Phone-Blätter | drin |
+
+**Zielgeräte (Chris, korrigiert 18.11.):** MacBook Air 15" M4 = Viewport 1710×1112 (16:10, DSF 2), Hauptrechner 32" 4K = 2560×1440 (Nebenprobe 1920×1080).
+Es gibt Regeln für unter 1500 px (kleinere Kacheln und Zähler) und ab 2200 px (größere Schrift in den Form-Bausteinen). **Aufnahmen bei 1710×1112, 2560×1440 und 1920×1080 stehen aus:**
+die Platte der Umgebung war wiederholt voll (zuletzt < 700 MB frei), ein Dev-Server plus Spielstand-Kopie hätte fremde Läufe gefährdet. Vorhanden sind nur die Aufnahmen
+bei 1600×900 und Phone 390×844 vom Stand davor. Vor dem Merge nachholen: Dev-Server (`OLY_AUTO_EXPORT_SAVES=0 OLY_AUTO_EXPORT_PUSH=0`, eigener Port), Kopie des Abbilds,
+`scripts/form-am-save-abbild-nachfuehren.ts --save new-game-1787123325719-swnjlk`, dann die drei Viewports mit Playwright.

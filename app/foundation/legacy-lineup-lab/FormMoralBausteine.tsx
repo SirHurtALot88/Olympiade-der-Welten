@@ -24,13 +24,13 @@ const FORM_HEX: Record<string, string> = { red: "#ff8b86", green: "#a8e7aa", blu
 export const FARB_NAME: Record<string, string> = { red: "Power", green: "Speed", blue: "Mental", yellow: "Social" };
 
 /** Pfeil + Gesicht nebeneinander (Platzkarte, Kader). Ohne Form-Wert nur das Gesicht. */
-export function FormMoralMarke({ a, nurMoral = false }: { a: FormMoralAnzeige; nurMoral?: boolean }) {
+export function FormMoralMarke({ a, nurMoral = false, nurForm = false }: { a: FormMoralAnzeige; nurMoral?: boolean; nurForm?: boolean }) {
   return (
     <span className="fm-marke">
       {a.formVerfuegbar && !nurMoral ? (
         <BcFormPfeil stufe={a.formStufe} titel={`Form ${a.form != null ? Math.round(a.form) : "–"}: ${a.formWort} (${vz(a.formPct)} ${einheit(a)})`} />
       ) : null}
-      {a.moral != null ? <BcMoralGesicht wert={a.moral} groesse={16} titel={`Moral ${Math.round(a.moral)}: ${a.moralWort} (${vz(a.moralPct)} ${einheit(a)})`} /> : null}
+      {a.moral != null && !nurForm ? <BcMoralGesicht wert={a.moral} groesse={16} titel={`Moral ${Math.round(a.moral)}: ${a.moralWort} (${vz(a.moralPct)} ${einheit(a)})`} /> : null}
     </span>
   );
 }

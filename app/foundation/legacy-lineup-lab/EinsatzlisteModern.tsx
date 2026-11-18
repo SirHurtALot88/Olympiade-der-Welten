@@ -50,7 +50,9 @@ import {
   FormMoralProfil,
   FormMoralUebersicht,
   KartenMarke,
+  KartenLeiste,
   KartenWirkungPanel,
+  TeamFormKopf,
   WarumBlock,
   type UrsachenZeile,
 } from "@/app/foundation/legacy-lineup-lab/FormMoralBausteine";
@@ -158,7 +160,7 @@ export default function EinsatzlisteModern(props: Props) {
   } = props;
 
   const [seite, setSeite] = useState<Seite>("d1");
-  const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung" | "formmoral">("rolle");
+  const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung" | "formmoral" | "karten">("rolle");
   const [blatt, setBlatt] = useState<null | "kader" | "kontext">(null);
   const [steuerungOffen, setSteuerungOffen] = useState(false);
   const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name">("platz");
@@ -814,16 +816,43 @@ export default function EinsatzlisteModern(props: Props) {
       ),
     },
     {
-      key: "fm",
-      kopf: "Form · Moral",
-      breite: "74px",
+      key: "form",
+      kopf: "Form",
+      breite: "34px",
       render: (z) => {
         const a = fmVon(z.id);
-        return a ? (
-          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form und Moral">
-            <FormMoralMarke a={a} />
+        return a && a.formVerfuegbar ? (
+          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form">
+            <FormMoralMarke a={a} nurForm />
           </button>
         ) : null;
+      },
+    },
+    {
+      key: "moral",
+      kopf: "Moral",
+      breite: "52px",
+      render: (z) => {
+        const a = fmVon(z.id);
+        return a && a.moral != null ? (
+          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Moral">
+            <FormMoralMarke a={a} nurMoral />
+          </button>
+        ) : null;
+      },
+    },
+    {
+      key: "karte",
+      kopf: "Karte",
+      breite: "44px",
+      rechts: true,
+      render: (z) => {
+        // Nur Aufgestellte bekommen die Karte (gezeigt = gebucht): Bankspieler zeigen keinen Wert.
+        const slotSeite = z.platz ? slots.find((s) => s.key === z.platz)?.disciplineSide : null;
+        const w = slotSeite ? kartenWirkungJeSeite[slotSeite] : null;
+        const pid = rosterCardByActivePlayerId.get(z.id)?.id;
+        const zer = slotSeite && pid ? kartenFuerSpieler(slotSeite, pid) : null;
+        return zer && w?.buchung.gebucht ? <span className={`bc-t ${zer.summe > 0 ? "bc-plus" : zer.summe < 0 ? "bc-minus" : ""}`}>{vz(zer.summe)}</span> : <span className="fm-leise">–</span>;
       },
     },
     {
@@ -985,7 +1014,6 @@ export default function EinsatzlisteModern(props: Props) {
       const an = fmVon(aid);
       return aid && k && an ? [{ id: aid, name: k.name, platz: slotName(slot.key), a: an }] : [];
     });
-    const w = kartenWirkungJeSeite[seite];
     return (
       <div className="fm-tab">
         {waehle && a ? (
@@ -996,13 +1024,16 @@ export default function EinsatzlisteModern(props: Props) {
           </>
         ) : null}
         <FormMoralUebersicht zeilen={zeilen} onWaehle={(id) => setWarumId(id)} />
-        {w ? (
-          <>
-            <hr style={{ borderColor: "var(--bc-linie)", margin: "12px 0" }} />
-            <KartenWirkungPanel w={w} namen={(pid) => [...rosterCardByActivePlayerId.values()].find((k) => k.id === pid)?.name ?? pid} />
-          </>
-        ) : null}
       </div>
+    );
+  })();
+
+  const kartenTab = (() => {
+    const w = kartenWirkungJeSeite[seite];
+    return w ? (
+      <KartenWirkungPanel w={w} namen={(pid) => [...rosterCardByActivePlayerId.values()].find((k) => k.id === pid)?.name ?? pid} />
+    ) : (
+      <p className="fm-leise">Für diese Disziplin sind keine Formkarten wählbar.</p>
     );
   })();
 
@@ -1148,13 +1179,19 @@ export default function EinsatzlisteModern(props: Props) {
                 return verletzte.has(id) || (slotIssuesByKey.get(slot.key) ?? []).some((i) => i.tone === "blocked" && i.label !== "Hier weiter") ? ("fe" as const) : ("an" as const);
               })}
               wert={projiziert != null ? f0(projiziert) : "–"}
-              wertNote="erwartet"
+              wertNote={(() => {
+                const w = kartenWirkungJeSeite[s];
+                if (!w) return "erwartet";
+                if (w.karten.length === 0) return "erwartet · ohne Karte";
+                return w.buchung.gebucht ? `erwartet · Karten ${vz(w.teamSumme)}` : "erwartet · Karte zählt hier nicht";
+              })()}
               titelAttr={`${d.displayName}: ${liste.filter((slot) => selections[slot.key]).length} von ${liste.length} Plätzen besetzt`}
             />
           );
         })}
         rechts={
           <>
+            <TeamFormKopf anzeigen={slots.flatMap((slot) => (selections[slot.key] ? [fmVon(selections[slot.key])] : [])).filter((a): a is FormMoralAnzeige => a != null)} />
             <button type="button" className="bc-btn" onClick={() => setSteuerungOffen(true)} data-bc-tip="Team, Spieltag, KI-Vorschläge und Sammelabgabe">
               <BcIcon name="team" /> Team &amp; Spieltag
             </button>
@@ -1345,13 +1382,7 @@ export default function EinsatzlisteModern(props: Props) {
                     {formKartenplatz("secondary", "Sekundär +")}
                   </div>
                 )}
-                {kartenWirkungJeSeite[seite] && kartenWirkungJeSeite[seite]!.karten.length > 0 ? (
-                  <small data-testid="elm-karten-live">
-                    {kartenWirkungJeSeite[seite]!.buchung.gebucht
-                      ? `Karten fürs Team: ${vz(kartenWirkungJeSeite[seite]!.teamSumme)} (+ Tagesform ±4 je Spieler; Details im Reiter „Form & Moral“)`
-                      : kartenWirkungJeSeite[seite]!.buchung.grund}
-                  </small>
-                ) : null}
+                {kartenWirkungJeSeite[seite] ? <KartenLeiste w={kartenWirkungJeSeite[seite]!} /> : null}
               </div>
             ) : null}
             {captainEintraege.length > 0 ? (
@@ -1432,13 +1463,14 @@ export default function EinsatzlisteModern(props: Props) {
           <div className="elm-ktabs" role="tablist">
             <button type="button" role="tab" aria-selected={kontextTab === "rolle"} className={kontextTab === "rolle" ? "is-an" : ""} onClick={() => setKontextTab("rolle")}>Rolle</button>
             <button type="button" role="tab" aria-selected={kontextTab === "gegner"} className={kontextTab === "gegner" ? "is-an" : ""} onClick={() => setKontextTab("gegner")}>Gegner</button>
+            <button type="button" role="tab" aria-selected={kontextTab === "karten"} className={kontextTab === "karten" ? "is-an" : ""} onClick={() => setKontextTab("karten")} data-testid="elm-tab-karten">Karten-Wirkung</button>
             <button type="button" role="tab" aria-selected={kontextTab === "formmoral"} className={kontextTab === "formmoral" ? "is-an" : ""} onClick={() => setKontextTab("formmoral")} data-testid="elm-tab-formmoral">Form &amp; Moral</button>
             <button type="button" role="tab" aria-selected={kontextTab === "pruefung"} className={kontextTab === "pruefung" ? "is-an" : ""} onClick={() => setKontextTab("pruefung")}>
               Prüfung
               {fehlerAnzahl + warnAnzahl > 0 ? <span className="pkt">{fehlerAnzahl + warnAnzahl}</span> : <span className="pkt is-gut">✓</span>}
             </button>
           </div>
-          <div className="elm-kb">{kontextTab === "rolle" ? rolleTab : kontextTab === "gegner" ? gegnerTab : kontextTab === "formmoral" ? formMoralTab : pruefTab}</div>
+          <div className="elm-kb">{kontextTab === "rolle" ? rolleTab : kontextTab === "gegner" ? gegnerTab : kontextTab === "formmoral" ? formMoralTab : kontextTab === "karten" ? kartenTab : pruefTab}</div>
         </BcSheet>
       </div>
 
