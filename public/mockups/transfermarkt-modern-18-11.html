@@ -13,7 +13,10 @@
         Teams, Wappen, Liga, Startbudget, Finanzwert, GM-Typ (ki-kaufverhalten-stammdaten-18-11.json), Formeln aus finanzkonzept-v2-18-11.md.
   ERFUNDEN: Geld-Lage der Wranglers, Freigabe-Stufen, Form, Moral, Verletzungen, Kader-Zuordnung, Liga-Raenge, PP-Umrechnung, Ablauf.
   Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
-  URL: ?ansicht=markt|vergleich|kauf|verkauf|vertrag|verl|draft   ?freigabe=100|70|50   ?kasse=minus   ?schritt=gegen|ja (Kauf) / 1 (Verkauf)
+  NEU 18.11. abends: Geld-Block mit ZWEI BALKEN (Transfer & Investition, Gehalt) und Lockerungshinweis nach dem Zwei-Budget-Modell
+  (docs/design/finanzkonzept-v2-budgets-18-11.md). Verkaufserloese fliessen zur Quote ein, der Kauf-Dialog prueft beide Budgets.
+  ?erl=<C> setzt Verkaufserloese im Fenster (zeigt die Lockerung), ?freigabe=85 ist neu.
+  URL: ?ansicht=markt|vergleich|kauf|verkauf|vertrag|verl|draft   ?freigabe=100|85|70|50   ?kasse=minus   ?schritt=gegen|ja (Kauf) / 1 (Verkauf)
        ?zug=1 (Draft: du bist dran)   ?still=1 (ohne Mockup-Leiste)
 -->
 <style>
@@ -369,6 +372,18 @@ body.arena .meld{display:none}
 .vorst b{color:var(--acht)} .vorst small{display:block;color:var(--leise);font-size:.8rem}
 .vorst.ok{border-color:rgba(98,211,148,.4);border-left-color:var(--gut);background:rgba(98,211,148,.06)} .vorst.ok b{color:var(--gut)}
 .vorst.rot{border-color:rgba(255,96,88,.5);border-left-color:var(--warn);background:rgba(255,96,88,.08)} .vorst.rot b{color:var(--warn)}
+/* zwei Toepfe im Geld-Block */
+.gf{gap:.55rem}
+.zt2{display:flex;flex-direction:column;gap:.28rem}
+.tk2{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;white-space:nowrap} .tk2 small{font-size:.78rem;color:var(--leise)} .tk2 small b{color:var(--tinte)}
+.gf .zt2 .gross{align-items:baseline} .gf .zt2 .gross strong{font-size:2rem} .gf .zt2 .gross small{font-size:.8rem;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gf .zt2 .stapel{height:.8rem} .stapel .geh{background:var(--p1)} .stapel .rot{background:var(--warn)}
+.gf .vorst{padding:.35rem .6rem} .gf .vorst small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lock{padding:.38rem .6rem;border:1px dashed rgba(243,181,74,.6);border-radius:.35rem;background:rgba(243,181,74,.05);display:flex;flex-direction:column;gap:.26rem}
+.lock .lk{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;font-size:.86rem;line-height:1.15} .lock .lk b{color:var(--creme);font-weight:600} .lock .lk span{font-weight:700;white-space:nowrap}
+.lock .lb{height:.36rem;background:rgba(255,255,255,.08);transform:skewX(-14deg)} .lock .lb i{display:block;height:100%;background:var(--acht)}
+.lock small{font-size:.74rem;color:var(--leise);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lock.da{border-style:solid;border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.06)} .lock.da .lk b{color:var(--gut)} .lock.da .lb i{background:var(--gut)}
 .gz{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.4rem;align-items:baseline;font-size:.9rem;padding:.16rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap}
 .gz span{color:var(--leise);overflow:hidden;text-overflow:ellipsis} .gz b{font-size:1.02rem;color:var(--tinte)} .gz small{color:var(--stumm);font-size:.78rem;margin-left:.3rem}
 .apr .bn b.vm{position:absolute;top:-.32rem;width:.5rem;height:.5rem;margin-left:-.25rem;border-radius:50%;background:#fff;border:2px solid var(--grund)}
@@ -757,12 +772,28 @@ var LIGA=DN.map(function(_,d){var z=zufall(4000+d*31),s=stark(K,d)+[4,-3,1,6,-5,
 /* ---------- Zustand ---------- */
 var Z={ans:"markt",d:9,fok:null,sort:"eig",f:{bez:false,stern:false,fit:false,achse:-1,hebt:false},such:"",blatt:0,pins:[],vk:null,vt:null,vkFrage:false};
 /* Geld: Kasse zu Fensterbeginn, Freigabe-Quote des Vorstands, Finanzwert der Team-Matrix (echt: V-W 3,1) */
-var F={kasse0:q.get("kasse")==="minus"?-9.4:78,quote:({"100":1,"70":.7,"50":.5})[q.get("freigabe")]||.7,ausg:0,erl:0,fw:WIR[4],median:76};
-function vertrauen(){return F.quote>=1?6.4:F.quote>=.7?3.4:2.1}
+var F={kasse0:q.get("kasse")==="minus"?-9.4:78,quote:({"100":1,"85":.85,"70":.7,"50":.5})[q.get("freigabe")]||.7,ausg:0,erl:+q.get("erl")||0,fw:WIR[4],median:76};
+/* Zwei Budgets des Vorstands (docs/design/finanzkonzept-v2-budgets-18-11.md): Transfer aus der Kasse, Gehalt aus den Einnahmen.
+   Beide x Quote, Verkaufserloese fliessen zur selben Quote ein, Lockerung um eine Stufe nach genug Verkaeufen. */
+var LOCKA={.85:.1,.7:.2,.5:.3};
+function vertrauen(){return F.quote>=1?6.4:F.quote>=.85?4.8:F.quote>=.7?3.4:2.1}
 function kasse(){return F.kasse0+F.erl-F.ausg}
-function freiStart(){return Math.max(0,F.kasse0)*F.quote}
-function frei(){return freiStart()+F.erl-F.ausg}
-function gesperrt(){return Math.max(0,F.kasse0)*(1-F.quote)}
+function tragbar(){return F.trag||(F.trag=Math.round((gehalt()/.7+3.5)*10)/10)}   /* erwartete Einnahmen - Fixkosten, erfunden */
+function rl0(){return F.rl0===undefined?(F.rl0=ruecklage()):F.rl0}                 /* Ruecklage-Ziel zu Fensterbeginn */
+function gBudget(){return F.quote*tragbar()}
+function gFrei(l){return gBudget()-gehalt(l)}
+function puffer(){return Math.max(0,.35*gBudget()-rl0())}
+function basis(){return Math.max(0,F.kasse0-rl0()-puffer())}
+function erlW(){return Math.max(0,F.erl+Math.min(0,F.kasse0))}                     /* Erloese fuellen zuerst ein Minus */
+function lockX(){return F.quote<1?LOCKA[F.quote]*tragbar():0}
+function lockSchwelle(){return F.quote<1?lockX()/(1-F.quote):0}
+function gelockert(){return F.quote<1&&F.kasse0>=0&&erlW()>=lockSchwelle()-1e-9}
+function quoteNeu(){return F.quote>=.85?1:F.quote>=.7?.85:.7}
+function tOhne(e){return F.quote*(basis()+e)}
+function tMit(e){return Math.max(tOhne(e),Math.min(quoteNeu()*(basis()+e),tOhne(e)+e,basis()+e-lockX()))}
+function tBudget(){var e=erlW();return gelockert()?tMit(e):tOhne(e)}
+function frei(){return tBudget()-F.ausg}
+function gesperrt(){return Math.max(0,basis()+erlW()-tBudget())}
 function kaderWert(){return K.reduce(function(a,p){return a+p.mw},0)}
 function ruecklageQ(){return .05+.2*(F.fw-1)/9}
 function ruecklage(){return ruecklageQ()*(Math.max(0,F.kasse0)+kaderWert())}
@@ -803,22 +834,28 @@ function band(){
   demo();
 }
 
-/* ---------- Geld & Freigabe ---------- */
+/* ---------- Geld & Freigabe: zwei Balken ---------- */
 function geld(vorschau){
-  var k0=Math.max(0,F.kasse0),ges=Math.max(k0+F.erl,1),fr=Math.max(0,frei()),g=gehalt(),rl=ruecklage(),v=vertrauen(),kr=kredit(kasse(),g);
-  var grund=F.kasse0<0?'<div class="vorst rot"><b>Kasse im Minus: nichts frei.</b><small>Die Saison endete mit '+C(F.kasse0)+'. Verkaufserlöse sind sofort frei. Bleibt die Kasse bis zum Fensterschluss im Minus, kommt der Pflichtkredit.</small></div>'
-    :F.quote>=1?'<div class="vorst ok"><b>Vorstand gibt 100 % frei.</b><small>Vertrauen '+de(v)+' von 10 · Endrang 5, erwartet 6. Du verfügst über die ganze Kasse.</small></div>'
-    :'<div class="vorst'+(F.quote<.6?" rot":"")+'"><b>Vorstand gibt nur '+Math.round(F.quote*100)+' % frei'+(F.quote<.6?" (Sparauflage)":"")+'.</b><small>Vertrauen '+de(v)+' von 10 · Endrang '+(F.quote<.6?14:11)+', erwartet 6. '+C(gesperrt())+' bleiben gesperrt. Ab Vertrauen '+(F.quote<.6?"2,5: 70":"4: 85")+' %. Verkaufserlöse sind voll frei.</small></div>';
-  var aus=F.ausg/ges*100,fw=fr/ges*100,vo=gesperrt()/ges*100,vs=vorschau?Math.min(vorschau,fr)/ges*100:0;
-  $("g-geld").innerHTML='<div class="pk"><h2>Geld &amp; Freigabe</h2><span class="sp"></span><a title="Zur Finanzseite">Finanzen '+ic("r")+'</a></div><div class="gf">'+
-    '<div class="phase"><span class="ok">Saisonabrechnung</span><span class="an">Transferfenster</span><span>Kassensturz</span></div>'+
-    '<div class="gross"><strong class="t '+(fr<=0?"minus":"")+'">'+de(fr)+' C</strong><small>frei für Transfers<br>von <b class="t">'+C(kasse())+'</b> Kasse</small></div>'+
-    '<div class="stapel" style="margin-top:.9rem"><i class="aus" style="width:'+aus+'%"></i><i class="frei" style="width:'+fw+'%"></i><i class="vor" style="width:'+vo+'%"></i>'+
-      (vs?'<span class="vsh" style="left:'+aus+'%;width:'+vs+'%"></span>':'')+(k0?'<u style="left:'+kl(100-rl/ges*100,0,100)+'%"></u>':'')+'</div>'+
-    '<div class="leg"><span><i style="background:var(--stumm)"></i>ausgegeben '+de(F.ausg)+'</span><span><i style="background:var(--gut)"></i>frei</span><span><i style="background:var(--acht)"></i>gesperrt '+de(gesperrt())+'</span></div>'+grund+
-    '<div><div class="gz"><span>Rücklage-Ziel <small>Finanzwert '+de(F.fw)+' → '+de(ruecklageQ()*100)+' %</small></span><b class="t">'+C(rl)+'</b></div>'+
-    '<div class="gz"><span>Gehalt je Spieltag <small>'+de(g)+' je Saison</small></span><b class="t">'+C(g/20,2)+'</b></div>'+
-    '<div class="gz"><span>Kassensturz am Fensterschluss</span><b class="t '+(kr?"minus":"plus")+'">'+(kr?"Kredit "+C(kr):"kein Kredit")+'</b></div></div>'+apron(g,null)+'</div>';
+  var q=F.quote,pz=Math.round(q*100),fr=frei(),g=gehalt(),gb=gBudget(),gf=gb-g,v=vertrauen(),kr=kredit(kasse(),g),lk=gelockert(),e=erlW();
+  var tGes=Math.max(basis()+e,F.ausg,1),vs=vorschau&&vorschau.mw?Math.min(vorschau.mw,Math.max(0,fr))/tGes*100:0;
+  var gGes=Math.max(tragbar(),g,1),gvs=vorschau&&vorschau.geh?Math.min(vorschau.geh,Math.max(0,gf))/gGes*100:0;
+  var grund=F.kasse0<0?'<div class="vorst rot"><b>Kasse im Minus: kein Transferbudget.</b><small>Saison endete mit '+C(F.kasse0)+'. Verkaufserlöse gleichen zuerst das Minus aus; sonst Pflichtkredit am Fensterschluss.</small></div>'
+    :q>=1?'<div class="vorst ok"><b>Vorstand gibt 100 % frei.</b><small>Vertrauen '+de(v)+' · Endrang 5, erwartet 6 · Rücklage '+C(rl0())+' bleibt liegen.</small></div>'
+    :'<div class="vorst'+(q<.6?" rot":"")+'"><b>Vorstand gibt '+(lk?Math.round(quoteNeu()*100)+' % frei (gelockert von '+pz+' %)':'nur '+pz+' % frei'+(q<.6?" (Sparauflage)":""))+'.</b><small>Vertrauen '+de(v)+' · Endrang '+(q<.6?14:q<.8?11:8)+', erwartet 6 · gilt für Ablösen und Gehälter.</small></div>';
+  var lock="";
+  if(q<1&&F.kasse0>=0){var sw=lockSchwelle(),fehlt=Math.max(0,sw-e),mehr=lk?tMit(e)-tOhne(e):tMit(sw)-tOhne(sw);
+    lock='<div class="lock'+(lk?" da":"")+'"><div class="lk"><b>'+(lk?ic("check")+' Gelockert auf '+Math.round(quoteNeu()*100)+' %':'Verkaufe noch '+C(fehlt)+', dann gibt der Vorstand '+Math.round(quoteNeu()*100)+' % frei')+'</b><span class="t plus">+'+de(mehr)+' C</span></div>'+
+      '<div class="lb"><i style="width:'+kl(e/sw*100,0,100)+'%"></i></div><small>'+(lk?'Kasse muss über '+C(rl0()+puffer()+lockX())+' bleiben · bis Fensterschluss · nur Transfer':'verkauft '+de(e)+' von '+de(sw)+' C · '+(100-pz)+' % jedes Erlöses bleiben als Puffer liegen')+'</small></div>'}
+  $("g-geld").innerHTML='<div class="pk"><h2>Geld &amp; Freigabe</h2><span class="sp"></span><a title="Zur Finanzseite, Reiter Budgets" href="finanzen-modern-18-11.html?ansicht=budget">Budgets '+ic("r")+'</a></div><div class="gf">'+
+    '<div class="zt2"><div class="tk2"><span class="gk">Transfer &amp; Investition</span><small>Kasse <b class="t">'+C(kasse())+'</b> · Rücklage '+de(rl0())+'</small></div>'+
+      '<div class="gross"><strong class="t '+(fr<=0?"minus":"")+'">'+de(Math.max(0,fr))+' C</strong><small>frei · ausgegeben '+de(F.ausg)+' · <span class="acht">gesperrt '+de(gesperrt())+'</span></small></div>'+
+      '<div class="stapel"><i class="aus" style="width:'+F.ausg/tGes*100+'%"></i><i class="frei" style="width:'+Math.max(0,fr)/tGes*100+'%"></i><i class="vor" style="width:'+gesperrt()/tGes*100+'%"></i>'+
+        (vs?'<span class="vsh" style="left:'+F.ausg/tGes*100+'%;width:'+vs+'%"></span>':'')+'</div></div>'+
+    '<div class="zt2"><div class="tk2"><span class="gk">Gehalt je Spieltag</span><small>Budget <b class="t">'+C(gb/20,2)+'</b> · laufend '+de(g/20,2)+'</small></div>'+
+      '<div class="gross"><strong class="t '+(gf<0?"minus":"")+'">'+(gf<0?"−":"")+de(Math.abs(gf)/20,2)+' C</strong><small>'+(gf<0?"über dem Budget · keine neuen Verträge":"frei · "+de(Math.max(0,gf))+" C je Saison")+'</small></div>'+
+      '<div class="stapel"><i class="geh" style="width:'+Math.min(g,gb)/gGes*100+'%"></i><i class="frei" style="width:'+Math.max(0,gf)/gGes*100+'%"></i><i class="rot" style="width:'+Math.max(0,g-gb)/gGes*100+'%"></i><i class="vor" style="width:'+Math.max(0,tragbar()-Math.max(g,gb))/gGes*100+'%"></i>'+
+        (gvs?'<span class="vsh" style="left:'+Math.min(g,gb)/gGes*100+'%;width:'+gvs+'%"></span>':'')+'</div></div>'+
+    grund+lock+apron(g,null)+'</div>';
 }
 function apron(g,gNeu){var max=linie2()*1.12,p=function(x){return kl(x/max*100,0,100)},gg=gNeu==null?g:gNeu,ab=apronAbgabe(gg);
   return '<div class="apr" style="margin-top:.1rem"><div class="kopfz"><span>Apron · Gehaltssumme gegen Liga-Median</span><b class="t">'+(ab?'<span class="acht">Abgabe '+C(ab/20,2)+' je Spieltag</span>':'unter Linie 1')+'</b></div>'+
@@ -839,19 +876,19 @@ function marktListe(){
   var s=Z.such.toLowerCase(),fr=frei();
   return M.filter(function(p){
     if(s&&(p.n+" "+p.kl+" "+p.ra+" "+p.tp.join(" ")).toLowerCase().indexOf(s)<0)return false;
-    if(Z.f.bez&&p.mw>fr)return false; if(Z.f.stern&&!p.stern)return false; if(Z.f.fit&&p.verl)return false;
+    if(Z.f.bez&&(p.mw>fr||p.geh>gFrei()))return false; if(Z.f.stern&&!p.stern)return false; if(Z.f.fit&&p.verl)return false;
     if(Z.f.achse>=0&&p.ax[Z.f.achse]<60)return false; if(Z.f.hebt&&rangMit(p,Z.d)>=rangJetzt(Z.d))return false;return true})
    .sort(function(a,b){return (a.weg?1:0)-(b.weg?1:0)||SORT[Z.sort][1](a)-SORT[Z.sort][1](b)});
 }
 function zeile(p){
-  var e=p.d[Z.d],fr=frei(),rl=ruecklage(),tk=p.mw>fr?"zt":kasse()-p.mw<rl?"zw":"",v=rangJetzt(Z.d),n=rangMit(p,Z.d),pin=Z.pins.indexOf(p)>=0;
+  var e=p.d[Z.d],fr=frei(),tk=p.mw>fr?"zt":p.geh>gFrei()?"zw":"",v=rangJetzt(Z.d),n=rangMit(p,Z.d),pin=Z.pins.indexOf(p)>=0;
   var w=weg(p,Z.d);
   return '<div class="mz'+(p===Z.fok?" an":"")+(p.weg?" fort":"")+'" data-p="'+p.s+'"><a class="st'+(p.stern?" an":"")+'" data-stern="'+p.s+'" title="Merkliste">★</a>'+por(p)+
     '<span class="nm"><b>'+p.n+'</b><small>'+p.kl+' · '+p.ra+(p.weg?' <span class="tag go">verpflichtet</span>':p.verl?' <span class="tag w">verletzt · '+p.verl+' Spieltage</span>':' <span class="tag '+w[0]+'" title="'+w[2]+'">'+w[1]+'</span>')+'</small></span>'+
     '<span class="eg"><b class="t">'+e+'</b><span class="bal"><i style="width:'+e+'%"></i></span></span>'+
     '<span class="ax t">'+p.ax.map(function(x){return '<i class="'+(x>=70?"h":x>=55?"m":"")+'">'+x+'</i>'}).join("")+'</span>'+
     pfeil(p.form)+moral(p.moral)+ppz(e)+
-    '<span class="re '+tk+'" title="'+(tk==="zt"?"über deiner Freigabe":tk==="zw"?"drückt die Kasse unter das Rücklage-Ziel":"")+'"><b class="t">'+de(p.mw)+'</b></span>'+
+    '<span class="re '+tk+'" title="'+(tk==="zt"?"über deinem Transferbudget":tk==="zw"?"Gehalt passt nicht ins Gehaltsbudget":"")+'"><b class="t">'+de(p.mw)+'</b></span>'+
     '<span class="re"><b class="t">'+de(p.geh/20,2)+'</b></span>'+rgz(v,n)+
     '<a class="pinb pin'+(pin?" an":"")+'" data-pin="'+p.s+'" title="Zum Vergleich anheften">'+ic("waage")+(pin?"drin":"Vgl.")+'</a></div>';
 }
@@ -859,14 +896,14 @@ function markt(){
   var L=marktListe(),n=15,seiten=Math.max(1,Math.ceil(L.length/n));Z.blatt=kl(Z.blatt,0,seiten-1);var S=L.slice(Z.blatt*n,Z.blatt*n+n);
   function fc(k,t,tt){return '<a class="fc'+(Z.f[k]?" an":"")+'" data-f="'+k+'" title="'+(tt||"")+'">'+t+'</a>'}
   $("m-liste").innerHTML='<div class="fl"><input id="such" placeholder="Name, Klasse, Rasse, Trait" value="'+Z.such+'"><span class="diszi" title="Disziplin links in der Kaderstärke wählen"><small>Disziplin</small>'+DN[Z.d][0]+'</span>'+
-     fc("bez","bezahlbar","Ablöse passt in deine Freigabe")+fc("hebt","hebt meinen Rang","verbessert den Kaderrang in "+DN[Z.d][0])+fc("fit","ohne Verletzte")+fc("stern","★ Merkliste")+
+     fc("bez","bezahlbar","Ablöse und Gehalt passen in beide Budgets")+fc("hebt","hebt meinen Rang","verbessert den Kaderrang in "+DN[Z.d][0])+fc("fit","ohne Verletzte")+fc("stern","★ Merkliste")+
      '<span class="sp"></span><a class="knopf klein" data-tu="vergleich">'+ic("waage")+'Vergleich ('+Z.pins.length+')</a></div>'+
     '<div class="fl"><span class="gk">Achse ≥ 60</span>'+AX.map(function(a,i){return '<a class="fc'+(Z.f.achse===i?" an":"")+'" data-achse="'+i+'">'+a+'</a>'}).join("")+
      '<span class="gk">Sortierung</span>'+Object.keys(SORT).map(function(k){return '<a class="fc'+(Z.sort===k?" an":"")+'" data-sort="'+k+'">'+SORT[k][0]+'</a>'}).join("")+
      '<span class="sp"></span><a class="fc" data-tu="reset">Filter zurücksetzen</a></div>'+
     '<div class="mt" style="--zeilen:'+n+'"><div class="mz kopf"><span></span><span></span><span>Spieler · Weg in '+DN[Z.d][0]+'</span><span class="'+(Z.sort==="eig"?"so":"")+'">Eignung '+DK[Z.d]+'</span><span style="display:grid;grid-template-columns:repeat(4,1fr);text-align:center"><i style="font-style:normal">POW</i><i style="font-style:normal">SPE</i><i style="font-style:normal">MEN</i><i style="font-style:normal">SOC</i></span><span>Form</span><span>Moral</span><span title="erwartete Player Points je Einsatz">PP</span><span class="re '+(Z.sort==="abl"?"so":"")+'">Ablöse</span><span class="re '+(Z.sort==="geh"?"so":"")+'">je Spieltag</span><span class="'+(Z.sort==="hebt"?"so":"")+'">Kaderrang</span><span></span></div>'+
      S.map(zeile).join("")+new Array(Math.max(0,n-S.length)+1).join('<div></div>')+'</div>'+
-    '<div class="mfuss"><span><b class="t" style="color:var(--tinte)">'+L.length+'</b> von '+M.length+' Spielern</span><span><b class="acht">gelb</b> Ablöse drückt die Kasse unter die Rücklage</span><span><b class="minus">rot</b> über der Freigabe</span><span class="sp"></span>'+
+    '<div class="mfuss"><span><b class="t" style="color:var(--tinte)">'+L.length+'</b> von '+M.length+' Spielern</span><span><b class="acht">gelb</b> Gehalt passt nicht ins Gehaltsbudget</span><span><b class="minus">rot</b> Ablöse über dem Transferbudget</span><span class="sp"></span>'+
      (seiten>1?'<a data-blatt="-1">'+ic("l")+'</a><span class="t">Blatt '+(Z.blatt+1)+' / '+seiten+'</span><a data-blatt="1">'+ic("r")+'</a>':'')+'</div>';
 }
 
@@ -880,7 +917,7 @@ function wegeBlock(p){var w=DAT.wege[Z.d],u=weg(p,Z.d);
    '<div class="wegurteil"><span class="tag '+u[0]+'">'+u[1]+'</span> '+u[2]+'</div>'}
 function fokus(){
   var p=Z.fok;if(!p){$("m-fokus").innerHTML="";return}
-  var top=p.d.map(function(v,i){return [v,i]}).sort(function(a,b){return b[0]-a[0]}).slice(0,3).map(function(x){return x[1]}),sp=spruenge(p).filter(function(x){return x[2]<x[1]}).slice(0,3),fr=frei(),zt=p.mw>fr,zw=!zt&&kasse()-p.mw<ruecklage();
+  var top=p.d.map(function(v,i){return [v,i]}).sort(function(a,b){return b[0]-a[0]}).slice(0,3).map(function(x){return x[1]}),sp=spruenge(p).filter(function(x){return x[2]<x[1]}).slice(0,3),fr=frei(),zt=p.mw>fr,zw=!zt&&p.geh>gFrei();
   $("m-fokus").innerHTML=buehneF(p)+'<div class="fb">'+
    '<h4>Eignung in 20 Disziplinen <span style="margin-left:auto;color:var(--stumm)">Klick wählt die Disziplin</span></h4>'+
    '<div class="d20">'+p.d.map(function(v,i){return '<a class="'+(i===Z.d?"an":top.indexOf(i)>=0?"top":"")+'" data-d="'+i+'" title="'+DN[i][0]+' '+v+'"><i style="height:'+v+'%"></i></a>'}).join("")+'</div>'+
@@ -889,7 +926,7 @@ function fokus(){
    '<div class="wirk">'+(sp.length?sp.map(function(x){return '<div><b>'+DN[x[0]][0]+'</b>Rang '+rgz(x[1],x[2])+'</div>'}).join(""):'<div style="grid-column:1/4">Kein Rang ändert sich: deine besten sechs sind überall stärker.</div>')+'</div>'+
    '<h4>Vertrag &amp; Charakter</h4><div class="rw"><div><span>Wunschlaufzeit</span><b class="t">'+p.wl+(p.wl===1?" Saison":" Saisons")+'</b></div><div><span>Vertragsform</span><b>'+FORMEN[p.wf][0]+'</b></div><div><span>Stärken</span><b style="font-weight:600">'+(p.scout?p.tp.join(", ")||"keine":"verdeckt")+'</b></div><div><span>Schwächen</span><b style="font-weight:600" class="'+(p.scout&&p.tn.length?"minus":"")+'">'+(p.scout?p.tn.join(", ")||"keine":"verdeckt · scouten")+'</b></div></div>'+
    '<div class="kost"><div><small>Ablöse</small><strong class="t '+(zt?"minus":zw?"acht":"")+'">'+de(p.mw)+' C</strong><em>fest = Marktwert</em></div><div><small>Forderung</small><strong class="t">'+de(p.geh/20,2)+' C</strong><em>je Spieltag · '+de(p.geh)+' je Saison</em></div><div><small>Erwartete PP</small><strong class="t">'+de(pp(p.d[Z.d]))+'</strong><em>je Einsatz in '+DK[Z.d]+' · Top ≈ 5</em></div></div>'+
-   (p.weg?'<div class="hin">Bereits verpflichtet.</div>':zt?'<div class="hin w"><b>Über der Freigabe:</b> es fehlen '+C(p.mw-fr)+'. Verkaufserlöse sind voll frei.</div>':zw?'<div class="hin a"><b>Unter Rücklage-Ziel:</b> die Kasse fiele auf '+C(kasse()-p.mw)+' (Ziel '+C(ruecklage())+'). Erlaubt, kostet Vertrauen.</div>':p.verl?'<div class="hin w">Verletzt: '+p.verl+' Spieltage nicht einsetzbar. Der Kaderrang oben zählt ihn erst danach.</div>':'<div class="hin">Passt in Freigabe und Rücklage.</div>')+
+   (p.weg?'<div class="hin">Bereits verpflichtet.</div>':zt?'<div class="hin w"><b>Über dem Transferbudget:</b> es fehlen '+C(p.mw-fr)+'. Verkaufserlöse fließen zu '+Math.round(F.quote*100)+' % ein.</div>':zw?'<div class="hin a"><b>Gehalt passt nicht:</b> '+C(p.geh/20,2)+' je Spieltag, frei sind '+C(Math.max(0,gFrei())/20,2)+'. Erst Gehalt abbauen oder umschichten.</div>':p.verl?'<div class="hin w">Verletzt: '+p.verl+' Spieltage nicht einsetzbar. Der Kaderrang oben zählt ihn erst danach.</div>':'<div class="hin">Passt in beide Budgets.</div>')+
    '<div class="akt">'+(p.weg?'':zt?'<a class="knopf haupt" data-kauf="'+p.s+'">Verhandeln</a><a class="knopf" data-an="verkauf">Erst verkaufen</a>':'<a class="knopf haupt" data-kauf="'+p.s+'">Verhandeln</a>')+'<a class="knopf" data-pin="'+p.s+'">'+ic("waage")+(Z.pins.indexOf(p)>=0?"Angeheftet":"Vergleichen")+'</a></div></div>';
 }
 
@@ -901,7 +938,7 @@ function chancen(){var r=V.geh/ford(),a=kl((r-.86)/.2,0,1);a-=.14*Math.abs(V.lz-
 function staffel(){var f=V.form===0?[1,1,1,1]:V.form===1?[1.18,1.06,.94,.82]:[.82,.94,1.06,1.18],a=[],s=0;for(var i=0;i<V.lz;i++){a.push(f[i]);s+=f[i]}return a.map(function(x){return V.geh*x*V.lz/s})}
 function kaufAuf(p,modus){V={p:p,modus:modus,geh:modus==="kauf"?p.geh:Math.round(p.gehIst*1.08*100)/100,lz:Math.min(p.wl,modus==="kauf"?4:4),form:p.wf,antw:null,gegen:null};if(modus==="verl")V.lz=Math.min(V.lz,maxLz());V.geh=ford();dialog()}
 function dialog(){
-  var p=V.p,kauf=V.modus==="kauf",f=ford(),ch=chancen(),st=staffel(),g=gehalt(),gNeu=kauf?g+V.geh:g-p.gehIst+V.geh,fr=frei(),da=fr-(kauf?p.mw:0),blk=kauf&&da<0,kn=kasse()-(kauf?p.mw:0),rl=ruecklage(),voll=kauf&&K.length>=14;
+  var p=V.p,kauf=V.modus==="kauf",f=ford(),ch=chancen(),st=staffel(),g=gehalt(),gNeu=kauf?g+V.geh:g-p.gehIst+V.geh,fr=frei(),da=fr-(kauf?p.mw:0),gda=gBudget()-gNeu,blkT=kauf&&da<0,blkG=gda<-1e-9&&gNeu>g+1e-9,blk=blkT||blkG,kn=kasse()-(kauf?p.mw:0),rl=rl0(),voll=kauf&&K.length>=14;
   var mag=[];
   mag.push(V.lz===p.wl?["p","Laufzeit trifft seinen Wunsch ("+p.wl+(p.wl===1?" Saison":" Saisons")+")"]:["m","Wünscht "+p.wl+(p.wl===1?" Saison":" Saisons")+", du bietest "+V.lz]);
   mag.push(V.form===p.wf?["p","Vertragsform „"+FORMEN[p.wf][0]+"“ ist seine bevorzugte"]:["m","Bevorzugt „"+FORMEN[p.wf][0]+"“"]);
@@ -914,10 +951,11 @@ function dialog(){
   if(an==="nein")antw='<div class="antw w">'+por(p)+'<span><b>„Das ist kein ernsthaftes Angebot.“</b><small>Absage. Er trägt es dir nach: die nächste Zusage-Chance sinkt um 10 Punkte. Erst Gehalt oder Vertrag ändern.</small></span><span class="tag w">Absage</span></div>';
   var sp=kauf?spruenge(p).slice(0,6):spruenge(p,true).slice(0,6);
   var fin=kauf?
-    '<h4>Vorstand-Freigabe</h4><div class="fw"><div class="z"><span>Frei für Transfers</span><b class="t">'+C(fr)+'</b></div><div class="z"><span>− Ablöse '+p.n+' <small style="color:var(--stumm)">fest = Marktwert</small></span><b class="t minus">−'+de(p.mw)+' C</b></div><div class="z sum'+(blk?" neg":"")+'"><span>'+(blk?"Fehlbetrag":"Danach frei")+'</span><b class="t">'+C(da)+'</b></div></div>'+
-    (blk?'<div class="vorst rot"><b>Der Vorstand gibt das nicht frei.</b><small>'+(F.kasse0<0?"Die Kasse steht im Minus.":"Nur "+Math.round(F.quote*100)+" % der Kasse sind freigegeben (Vertrauen "+de(vertrauen())+").")+' Es fehlen '+C(-da)+'. Verkaufserlöse sind voll frei.</small></div>'
-      :kn<rl?'<div class="vorst"><b>Kasse fällt unter das Rücklage-Ziel.</b><small>'+C(kn)+' statt '+C(rl)+' (Finanzwert '+de(F.fw)+'). Erlaubt; verfehlst du das Finanzziel am Saisonende, sinkt das Vertrauen und damit die nächste Freigabe.</small></div>'
-      :'<div class="vorst ok"><b>Im Rahmen.</b><small>Kasse danach '+C(kn)+', Rücklage-Ziel '+C(rl)+'.</small></div>')
+    '<h4>Zwei Budgets des Vorstands</h4><div class="fw"><div class="z"><span>Transferbudget frei</span><b class="t">'+C(fr)+'</b></div><div class="z"><span>− Ablöse '+p.n+' <small style="color:var(--stumm)">fest = Marktwert</small></span><b class="t minus">−'+de(p.mw)+' C</b></div><div class="z sum'+(blkT?" neg":"")+'"><span>'+(blkT?"Fehlbetrag Transfer":"Danach frei")+'</span><b class="t">'+C(da)+'</b></div>'+
+      '<div class="z"><span>Gehaltsbudget frei <small style="color:var(--stumm)">je Spieltag</small></span><b class="t">'+C(gFrei()/20,2)+'</b></div><div class="z"><span>− sein Gehalt</span><b class="t minus">−'+de(V.geh/20,2)+' C</b></div><div class="z sum'+(blkG?" neg":"")+'" style="margin-top:0;padding-top:.2rem"><span>'+(blkG?"Fehlbetrag Gehalt":"Danach frei")+'</span><b class="t" style="font-size:1.2rem">'+C(gda/20,2)+'</b></div></div>'+
+    (blkT?'<div class="vorst rot"><b>Der Vorstand gibt das nicht frei.</b><small>'+(F.kasse0<0?"Die Kasse steht im Minus.":"Freigabe "+Math.round(F.quote*100)+" % (Vertrauen "+de(vertrauen())+").")+' Im Transferbudget fehlen '+C(-da)+'. Verkaufserlöse fließen zu '+Math.round(F.quote*100)+' % ein.</small></div>'
+      :blkG?'<div class="vorst rot"><b>Das Gehaltsbudget reicht nicht.</b><small>Es fehlen '+C(-gda/20,2)+' je Spieltag. Die Ablöse wäre bezahlt, aber die Sperre ist hart: erst Gehalt abbauen oder Transfergeld umschichten (10 C ↔ 0,5 C je Spieltag).</small></div>'
+      :'<div class="vorst ok"><b>Passt in beide Budgets.</b><small>Kasse danach '+C(kn)+', Rücklage-Ziel '+C(rl)+' bleibt unberührt.</small></div>')
     :'<h4>Ohne Verlängerung</h4><div class="vorst"><b>'+p.n+' wird am Saisonende Free Agent.</b><small>Verlängert wird nur in der letzten Vertragssaison. Sein Gehalt von '+C(p.gehIst/20,2)+' je Spieltag fiele weg, die Ränge unten gingen verloren.</small></div>';
   $("schleier").innerHTML='<div class="dlg kurz" role="dialog"><div class="dk"><em>'+(kauf?"Kauf":"Vertragsverlängerung")+'</em><h2>'+p.n+'</h2><span class="tag">'+p.kl+' · '+p.ra+'</span><span class="sp"></span>'+
      '<div class="schritte"><span class="'+(an==="ja"?"ok":"an")+'">1 Verhandeln</span><span class="'+(an==="ja"?"an":"")+'">2 '+(kauf?"Kauf abschließen":"Unterschreiben")+'</span></div><a class="zu" data-tu="zu" title="Schließen">×</a></div>'+
@@ -932,9 +970,10 @@ function dialog(){
      '<h4>Verhandlungschancen</h4><div class="chance"><i class="ja" style="flex:0 0 '+ch[0]*100+'%"><span>'+(ch[0]>.12?"Zusage "+Math.round(ch[0]*100)+" %":"")+'</span></i><i class="nf" style="flex:1 1 0"><span>'+(ch[1]>.2?"Nachforderung "+Math.round(ch[1]*100)+" %":"")+'</span></i><i class="no" style="flex:0 0 '+ch[2]*100+'%"><span>'+(ch[2]>.12?"Absage "+Math.round(ch[2]*100)+" %":"")+'</span></i></div>'+antw+
      '<div class="dfuss"><span class="hin">'+(an==="ja"?"Zusage liegt vor. Abschluss rechts.":"Schritt 1: Angebot senden und die Reaktion abwarten. Nichts wird gebucht.")+'</span><span class="sp"></span><a class="knopf'+(an==="ja"?" zu":"")+'" data-tu="'+(an==="ja"?"":"ford")+'">Forderung übernehmen</a><a class="knopf '+(an==="ja"?"zu":"haupt")+'" data-tu="'+(an==="ja"?"":"senden")+'">Angebot senden</a></div></div></div>'+
    '<div><div class="dsp"><h4>Was der Deal mit deinem Geld macht</h4>'+fin+
-     '<div class="fw"><div class="z"><span>Gehalt je Spieltag</span><b class="t">'+de(g/20,2)+' → <span class="'+(gNeu>g?"acht":"plus")+'">'+de(gNeu/20,2)+' C</span></b></div><div class="z"><span>Kassensturz am Fensterschluss</span><b class="t '+(kredit(kn,gNeu)?"minus":"plus")+'">'+(kredit(kn,gNeu)?"Pflichtkredit "+C(kredit(kn,gNeu)):"kein Kredit")+'</b></div>'+(kauf?'<div class="z"><span>Kader</span><b class="t">'+K.length+' → '+(K.length+1)+' <span style="color:var(--stumm)">/ 14</span></b></div>':'')+'</div>'+apron(g,gNeu)+
+     (!kauf&&blkG?'<div class="vorst rot"><b>Das Gehaltsbudget reicht nicht für die Erhöhung.</b><small>Es fehlen '+C(-gda/20,2)+' je Spieltag. Verlängern geht nur zum gleichen oder niedrigeren Gehalt.</small></div>':'')+
+     '<div class="fw">'+(kauf?'':'<div class="z"><span>Gehalt je Spieltag <small style="color:var(--stumm)">Budget '+de(gBudget()/20,2)+'</small></span><b class="t">'+de(g/20,2)+' → <span class="'+(gNeu>g?"acht":"plus")+'">'+de(gNeu/20,2)+' C</span></b></div>')+'<div class="z"><span>Kassensturz am Fensterschluss</span><b class="t '+(kredit(kn,gNeu)?"minus":"plus")+'">'+(kredit(kn,gNeu)?"Pflichtkredit "+C(kredit(kn,gNeu)):"kein Kredit")+'</b></div>'+(kauf?'<div class="z"><span>Kader</span><b class="t">'+K.length+' → '+(K.length+1)+' <span style="color:var(--stumm)">/ 14</span></b></div>':'')+'</div>'+apron(g,gNeu)+
      '<h4>Kaderstärke: '+(kauf?"Rang vorher → nachher":"Rang, wenn er geht")+'</h4><div class="rw">'+(sp.length?sp.map(function(x){return '<div><span>'+DN[x[0]][0]+'</span>'+rgz(x[1],x[2])+'</div>'}).join(""):'<div style="grid-column:1/3"><span>Kein Rang ändert sich.</span></div>')+'</div>'+
-     '<div class="dfuss"><span class="hin">'+(blk?"Gesperrt: Freigabe reicht nicht.":voll?"Gesperrt: Kader voll (14).":an==="ja"?"Jetzt wird gebucht.":"Erst nach seiner Zusage.")+'</span><span class="sp"></span>'+(blk?'<a class="knopf" data-an="verkauf">Erst verkaufen</a>':'')+'<a class="knopf '+(an==="ja"&&!blk&&!voll?"haupt":"zu")+'" data-tu="'+(an==="ja"&&!blk&&!voll?"abschluss":"")+'">'+ic(an==="ja"&&!blk&&!voll?"check":"schloss")+(kauf?"Kauf abschließen":"Unterschreiben")+'</a></div></div></div></div></div>';
+     '<div class="dfuss"><span class="hin">'+(blkT?"Gesperrt: Transferbudget.":blkG?"Gesperrt: Gehaltsbudget.":voll?"Gesperrt: Kader voll (14).":an==="ja"?"Jetzt wird gebucht.":"Erst nach seiner Zusage.")+'</span><span class="sp"></span>'+(blk?'<a class="knopf" data-an="verkauf">Erst verkaufen</a>':'')+'<a class="knopf '+(an==="ja"&&!blk&&!voll?"haupt":"zu")+'" data-tu="'+(an==="ja"&&!blk&&!voll?"abschluss":"")+'">'+ic(an==="ja"&&!blk&&!voll?"check":"schloss")+(kauf?"Kauf abschließen":"Unterschreiben")+'</a></div></div></div></div></div>';
   $("schleier").classList.add("auf");
   var r=$("reg");if(r){r.oninput=function(){V.geh=+r.value;V.antw=null;$("regwert").textContent=de(V.geh/20,2)+" C"};r.onchange=function(){dialog();$("reg").focus()}}
 }
@@ -972,7 +1011,8 @@ function verkauf(){
   var ab=p.mw*.1,netto=p.mw-ab,g=gehalt(),sp=spruenge(p,true).slice(0,6),zuKlein=K.length<=8;
   $("v-fokus").innerHTML=buehneF(p)+'<div class="fb" style="gap:.6rem"><h4>Du bekommst</h4><div class="fw"><div class="z"><span>Marktwert</span><b class="t">'+C(p.mw)+'</b></div><div class="z"><span>− Abschlag <small style="color:var(--stumm)">Verkaufsfaktor 0,90 · → Liga-Topf</small></span><b class="t minus">−'+de(ab)+' C</b></div><div class="z sum"><span>Erlös in die Kasse</span><b class="t">'+C(netto)+'</b></div>'+
     '<div class="z"><span>gegen Kaufpreis '+C(p.kp)+'</span><b class="t '+(netto>=p.kp?"plus":"minus")+'">'+vz(netto-p.kp)+' C</b></div></div>'+
-    '<div class="vorst ok"><b>Frei für Transfers: '+C(frei())+' → '+C(frei()+netto)+'</b><small>Verkaufserlöse fallen nicht unter die Freigabe-Quote. Kasse danach '+C(kasse()+netto)+'.</small></div>'+
+    (function(){var vor=frei(),lv=gelockert();F.erl+=netto;var nach=frei(),ln=gelockert(),fe=Math.max(0,lockSchwelle()-erlW());F.erl-=netto;
+      return '<div class="vorst ok"><b>Transferbudget frei: '+C(vor)+' → '+C(nach)+'</b><small>'+(ln&&!lv?'Mit diesem Verkauf lockert der Vorstand auf '+Math.round(quoteNeu()*100)+' %.':'Der Erlös fließt zu '+Math.round(F.quote*100)+' % ein, '+C(netto*(1-F.quote))+' bleiben als Puffer liegen.'+(F.quote<1&&!ln?' Danach fehlen noch '+C(fe)+' bis zur Lockerung.':''))+' Kasse danach '+C(kasse()+netto)+'. Sein Gehalt geht voll ins Gehaltsbudget zurück.</small></div>'})()+
     '<div class="fw"><div class="z"><span>Gehalt je Spieltag</span><b class="t">'+de(g/20,2)+' → <span class="plus">'+de((g-p.gehIst)/20,2)+' C</span></b></div><div class="z"><span>Kader</span><b class="t '+(zuKlein?"minus":"")+'">'+K.length+' → '+(K.length-1)+' <span style="color:var(--stumm)">/ Minimum 8</span></b></div></div>'+
     '<h4>Kaderstärke: Rang, wenn er geht</h4><div class="rw">'+(sp.length?sp.map(function(x){return '<div><span>'+DN[x[0]][0]+'</span>'+rgz(x[1],x[2])+'</div>'}).join(""):'<div style="grid-column:1/3"><span>Kein Rang ändert sich: er gehört nirgends zu den besten sechs.</span></div>')+'</div>'+
     '<div class="hin">'+(p.moral<45?'<b style="color:var(--tinte)">Vorstand:</b> Verkauf wird begrüßt, die Moral von '+p.n+' belastet das Team. ':'')+'Marktsperre: nach dem Verkauf ist er 1 Saison für dein Team gesperrt.'+(p.rest>1?' Sein Vertrag läuft noch '+p.rest+' Saisons; es fällt kein Buyout an.':'')+'</div>'+
@@ -1054,7 +1094,7 @@ function meldung(art,t,s){var b=document.createElement("div");b.className="mb "+
 /* ---------- Alles zeichnen, Ansicht wechseln ---------- */
 function alles(){
   ["markt","verkauf","vertrag","draft"].forEach(function(a){$("s-"+a).classList.toggle("an",a===Z.ans)});
-  if(Z.ans==="markt"){geld(Z.fok&&!Z.fok.weg?Z.fok.mw:0);staerke();markt();fokus()}
+  if(Z.ans==="markt"){geld(Z.fok&&!Z.fok.weg?Z.fok:null);staerke();markt();fokus()}
   if(Z.ans==="verkauf")verkauf();if(Z.ans==="vertrag")vertrag();if(Z.ans==="draft")draft();
   band();
 }
@@ -1064,7 +1104,7 @@ function demo(){
   function l(liste,an,attr){return liste.map(function(x){return '<a class="'+(x[0]===an?"an":"")+'" '+attr+'="'+x[0]+'">'+x[1]+'</a>'}).join(" ")}
   var offen=$("schleier").classList.contains("auf");
   $("d-ans").innerHTML=l([["markt","Markt"],["vergleich","Vergleich"],["kauf","Kauf-Dialog"],["verkauf","Verkauf"],["vertrag","Verträge"],["verl","Verlängerung"],["draft","Draft"]],offen?(V?(V.modus==="kauf"?"kauf":"verl"):"vergleich"):Z.ans,"data-dm");
-  $("d-frei").innerHTML=l([["1","100 %"],["0.7","70 %"],["0.5","50 %"]],String(F.quote),"data-quote");
+  $("d-frei").innerHTML=l([["1","100 %"],["0.85","85 %"],["0.7","70 %"],["0.5","50 %"]],String(F.quote),"data-quote");
   $("d-kasse").innerHTML=l([["plus","+78 C"],["minus","−9,4 C"]],F.kasse0<0?"minus":"plus","data-kasse");
 }
 function zeige(m){
@@ -1089,7 +1129,7 @@ document.addEventListener("click",function(ev){
     if(t==="vergleich"){vergleich();demo()} if(t==="reset"){Z.f={bez:false,stern:false,fit:false,achse:-1,hebt:false};Z.such="";Z.sort="eig";alles()}
     if(t==="senden")senden(); if(t==="ford"){V.geh=ford();V.lz=Math.min(V.p.wl,maxLz());V.form=V.p.wf;V.antw="ja";dialog()} if(t==="gegen"){V.geh=V.gegen.geh;V.lz=V.gegen.lz;V.form=V.p.wf;V.antw="ja";dialog()} if(t==="abschluss")abschluss();
     if(t==="vkFrage"){Z.vkFrage=true;verkauf()} if(t==="vkNein"){Z.vkFrage=false;verkauf()}
-    if(t==="vkJa"){var s=Z.vk,netto=s.mw*.9;F.erl+=netto;K.splice(K.indexOf(s),1);Z.vk=null;Z.vkFrage=false;if(Z.vt===s)Z.vt=null;meldung("g",s.n+" verkauft","Erlös "+C(netto)+" · sofort frei für Transfers");alles()}
+    if(t==="vkJa"){var s=Z.vk,netto=s.mw*.9;var lv=gelockert();F.erl+=netto;K.splice(K.indexOf(s),1);Z.vk=null;Z.vkFrage=false;if(Z.vt===s)Z.vt=null;meldung("g",s.n+" verkauft",gelockert()&&!lv?"Erlös "+C(netto)+" · der Vorstand lockert auf "+Math.round(quoteNeu()*100)+" %":"Erlös "+C(netto)+" · davon "+C(netto*F.quote)+" im Transferbudget");alles()}
     if(t==="takt"){if(Z.ans==="draft"){if(DR.dran()&&!DR.laeuft){if(DR.wahl&&DR.wahl.mw<=DR.leistbar()){var w=DR.wahl;DR.pick(w,DR.folge()[DR.idx]);meldung("g",w.n+" gepickt","Runde "+DR.runde+" · Ablöse "+C(w.mw));draft();band();draftLauf()}else{$("takt").classList.add("ruck");setTimeout(function(){$("takt").classList.remove("ruck")},320)}}else draftLauf()}
       else{var k=kredit(kasse(),gehalt());meldung(k?"w":"g","Kassensturz",k?"Kasse "+C(kasse())+" → Pflichtkredit "+C(k)+", Rate "+C(k*1.24/40,2)+" je Spieltag über 2 Saisons.":"Kasse "+C(kasse())+": kein Kredit. Das Fenster schließt, Saison 2 beginnt.")}}
     return}
