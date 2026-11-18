@@ -683,7 +683,11 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-18.11.: **GESAMT ce8fcef66028 (75 Eintraege)** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
+18.11. (Climbing „Ende erst, wenn alle oben sind“): **GESAMT d3a39030a3ef (75 Eintraege)** — absichtlich bewegt, weil
+Climbing kein Lead-Zeitlimit mehr hat (Chris 18.11.: „Ende bitte erst wenn ALLE im Ziel sind“; Sicherheitsdeckel 60 Sim-s
+mit hochgerechneter Zeit, `docs/design/arena-start-ende-figuren-18-11.md`); gegenueber `ce8fcef66028` bewegen sich NUR die
+drei `spiele climbing`-Zeilen (1/7/42). Die Anzeige-Commits derselben PR (kein Stand vor dem Start, Vorstellung im Pod,
+Gesichtsmarke, Vorlauf-Fortschritt) lassen `ce8fcef66028` unveraendert. Davor: **GESAMT ce8fcef66028** — Basketball Runde 2 (Laufweg-Modul, Feld-Grenze; Kamera/Effekte/Teamfouls
 sind reine Anzeige) auf main mit #1562 (`38b176d7185b`); gegenueber diesem main bewegen sich NUR die drei
 `spiele basketball`-Zeilen (1/7/42), `docs/design/benchmark-basketball-17-11.md` Abschnitt 7.9. Von den zwei
 Feldbegrenzungen blieb nur die Feld-Grenze (`feldGrenze`); die Ziel-Begrenzung in `spacingMitspielerZiel` aus #1562 ist

@@ -157,6 +157,23 @@ async function warteAufMotor(fristMs: number): Promise<boolean> {
 // liefert dann `{}`), laeuft das Bild mit der Ersatzaufstellung nach Eignung. Gebucht wird spaeter die
 // Aufstellung, die bis dahin steht -- "gezeigt = gebucht" gilt dann nur unter dieser Annahme, und der
 // Hinweistext sagt es.
+/**
+ * Index des gesteuerten Teams und seines Spieltagsgegners in einer Vierergruppe (Pod-Reihenfolge der
+ * Buchung). Nur fuer die Anzeige (Vorstellung im Motor, `einlaufSeiten()`), s. `podGegnerTeamId`.
+ */
+function podSeitenFuer(
+  podTeamIds: readonly string[],
+  eigenesTeamId: string | null | undefined,
+  gegnerTeamId: string | null | undefined,
+): { eigeneSeite: number | null; gegnerSeite: number | null } {
+  const eigeneSeite = eigenesTeamId ? podTeamIds.indexOf(eigenesTeamId) : -1;
+  const gegnerSeite = gegnerTeamId ? podTeamIds.indexOf(gegnerTeamId) : -1;
+  return {
+    eigeneSeite: eigeneSeite >= 0 ? eigeneSeite : null,
+    gegnerSeite: gegnerSeite >= 0 && gegnerSeite !== eigeneSeite ? gegnerSeite : null,
+  };
+}
+
 function aufstellungNochOffen(pod: {
   aufstellung: Record<string, unknown>[];
   vorschau: { art: "heute" | "vorschau" | "rueckblick" } | null;
@@ -217,6 +234,13 @@ export default function FoundationBattleArenaHost({
   // Heimteam wie bisher; in der Spieltags-Ansicht das EIGENE Team -- Heim ist dort das Heimteam des
   // Fixtures, und das kann der Gegner sein, dessen Pod ein anderer ist.
   const podBezugTeamId = spieltag?.podTeamId ?? heimTeamId;
+  // EIGENES TEAM UND SEIN GEGNER IN DER VIERERGRUPPE (18.11., Chris' Live-Befund D2 Battlefield: die
+  // Vorstellung zeigte "Mayhem Mavericks vs Project Suicide" -- die ersten beiden Teams der Gruppe --,
+  // obwohl er Nunchuck Ninjas steuert). Der Motor bekommt je Pod den Index des gesteuerten Teams und
+  // seines Spieltagsgegners in der Gruppe mit (`eigeneSeite`/`gegnerSeite`, gelesen von
+  // `einlaufSeiten()` in battle-mode.engine.js). Reine Anzeige: Gruppenreihenfolge, Saat und
+  // Aufstellung bleiben die der Buchung ("gezeigt = gebucht").
+  const podGegnerTeamId = podBezugTeamId === heimTeamId ? gastTeamId : heimTeamId;
 
   // MINI-DM 4-TEAM-FFA, "GEZEIGT = GEBUCHT" (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-
   // Anzeige" — Nachtrag zu PR 5s Vorlauf-Verdrahtung). Bis hierher zog dieser Block ZWEI
@@ -482,11 +506,12 @@ export default function FoundationBattleArenaHost({
       aufstellung: podTeamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
       entwurf,
       vorschau: battlefieldPodTreffer && battlefieldPodTreffer.art !== "heute" ? battlefieldPodTreffer : null,
+      ...podSeitenFuer(podTeamIds, podBezugTeamId, podGegnerTeamId),
       // Format-Umschalter (17.11.): dieselbe Konstante wie die Buchung (BATTLEFIELD_POD_FORMAT); im
       // Standard "orte3" fehlt das Feld, der Motor zeigt dann das Gefecht je Ort wie bisher.
       ...battlefieldPodFormatOption(),
     };
-  }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId, podBezugTeamId, podGegnerTeamId]);
 
   // BAHN-POD, Nutzlast fuer den Motor (`echterKader.bahnPodByDisciplineId[bd]`, gelesen von
   // `bahnPodAnzeigeKontext()` in battle-mode.engine.js): je Bahn-Pod-Disziplin dieses Spieltags die
@@ -507,6 +532,9 @@ export default function FoundationBattleArenaHost({
         entwurf: boolean;
         /** Gebuchter Pod eines anderen Spieltags (Vorschau/Rueckblick), sonst null. */
         vorschau: { spieltagNummer: number; art: "heute" | "vorschau" | "rueckblick" } | null;
+        /** Index des gesteuerten Teams / seines Spieltagsgegners in der Gruppe (nur Anzeige). */
+        eigeneSeite: number | null;
+        gegnerSeite: number | null;
       }
     > = {};
     for (const [disciplineId, treffer] of [
@@ -541,10 +569,11 @@ export default function FoundationBattleArenaHost({
         aufstellung: podTeamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
         entwurf,
         vorschau: treffer && treffer.art !== "heute" ? treffer : null,
+        ...podSeitenFuer(podTeamIds, podBezugTeamId, podGegnerTeamId),
       };
     }
     return Object.keys(karte).length > 0 ? karte : null;
-  }, [bahnPodTakeshiTreffer, bahnPodStaffelTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId]);
+  }, [bahnPodTakeshiTreffer, bahnPodStaffelTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId, podBezugTeamId, podGegnerTeamId]);
 
   // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
   // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier

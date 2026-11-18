@@ -6,6 +6,7 @@ import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
 import type { ArenaVorlaufStatus, GameState } from "@/lib/data/olyDataTypes";
+import { vorladeArenaDateien } from "@/lib/foundation/battle-arena/arena-vorladen";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
 import type { RoomArenaState } from "@/types/game";
@@ -63,7 +64,8 @@ const DisciplineStageDrawer = dynamic(() => import("@/app/foundation/discipline-
 // BATTLE ARENA IM SPIELTAG (02.11., lib/foundation/battle-arena/arena-spieltag-ansicht.ts): der
 // echte Motor mit den PixelLab-Figuren. Nur in Battle-Saves mit Motor-Wertung im Baum, deshalb
 // dynamisch -- Manager-Saves laden den Chunk nie.
-const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
+const ladeBattleArenaHost = () => import("@/app/foundation/battle-arena/FoundationBattleArenaHost");
+const FoundationBattleArenaHost = dynamic(ladeBattleArenaHost, {
   ssr: false,
 });
 // PERF-GEGENPROBE: DisciplineStageMatchdayPanel (~1.187 Zeilen) bleibt bewusst STATISCH.
@@ -793,6 +795,14 @@ export default function DisciplineStageArena({
    * sofort, dieses Feld steuert nur den stillen Nachlade-Poll unten und den kleinen Hinweis-Badge.
    */
   const [arenaVorlaufStatus, setArenaVorlaufStatus] = useState<ArenaVorlaufStatus | null>(null);
+  // FORTSCHRITT DES VORLAUFS (18.11., Chris: "lange Wartezeit nach Einsatzliste abgeben"): welche
+  // Disziplinen der Server gerade rechnet und welche fertig sind (`leseArenaVorlaufFortschritt`), fuer
+  // "Arena wird vorbereitet … Climbing 1/2". Nur Anzeige.
+  const [arenaVorlaufFortschritt, setArenaVorlaufFortschritt] = useState<{
+    geplant: string[];
+    fertig: string[];
+    laufendSeitMs: number;
+  } | null>(null);
   const [briefingItems, setBriefingItems] = useState<
     { teamId: string; currentRank: number | null; projectedRank: number | null }[]
   >([]);
@@ -858,7 +868,10 @@ export default function DisciplineStageArena({
             resolvePreview?: { preview?: unknown } | null;
             briefingStandings?: { items?: unknown } | null;
             standingsPreview?: { items?: unknown } | null;
-            arenaVorlauf?: { status?: ArenaVorlaufStatus | null } | null;
+            arenaVorlauf?: {
+              status?: ArenaVorlaufStatus | null;
+              fortschritt?: { geplant: string[]; fertig: string[]; laufendSeitMs: number } | null;
+            } | null;
           }>(sessionKey);
     if (cached) {
       const cachedPreview = (cached.resolvePreview?.preview ?? null) as typeof preview;
@@ -867,6 +880,7 @@ export default function DisciplineStageArena({
       setStandingsItems(Array.isArray(cached.standingsPreview?.items) ? (cached.standingsPreview.items as MatchdayPanelStandingRow[]) : []);
       setPreviewState(cachedPreview ? "ready" : "unavailable");
       setArenaVorlaufStatus(cached.arenaVorlauf?.status ?? null);
+      setArenaVorlaufFortschritt(cached.arenaVorlauf?.fortschritt ?? null);
       return;
     }
 
@@ -890,6 +904,7 @@ export default function DisciplineStageArena({
         setStandingsItems(Array.isArray(payloadJson?.standingsPreview?.items) ? payloadJson.standingsPreview.items : []);
         setPreviewState(enginePreview ? "ready" : "unavailable");
         setArenaVorlaufStatus(payloadJson?.arenaVorlauf?.status ?? null);
+        setArenaVorlaufFortschritt(payloadJson?.arenaVorlauf?.fortschritt ?? null);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -924,6 +939,12 @@ export default function DisciplineStageArena({
     let versuch = 0;
     const ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS = 4_000;
     const ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE = 225; // ~15 Minuten Reserve, s. Kommentar oben.
+    // SCHNELL ZUERST (18.11., Wartezeit-Befund): ein Spieltags-Vorlauf ist meist nach wenigen Sekunden
+    // fertig; mit festen 4 s wartete die Buehne danach im Mittel noch ~2 s, bis sie es merkte. Die ersten
+    // 20 Abfragen (~20 s) gehen deshalb im Sekundentakt -- die Status-Abfrage ohne Details ist billig
+    // (s. Kommentar oben) --, danach wie bisher alle 4 s. Die Gesamtreserve (Versuche) bleibt.
+    const ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS = 1_000;
+    const ARENA_VORLAUF_STAGE_POLL_SCHNELL_VERSUCHE = 20;
 
     const sessionKey = buildMatchdayArenaBaseSessionKey({
       saveId,
@@ -952,7 +973,10 @@ export default function DisciplineStageArena({
     };
     const naechsterVersuchOderAufgeben = () => {
       if (versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
-        timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+        timerRef = window.setTimeout(
+          () => void pollEinmal(),
+          versuch < ARENA_VORLAUF_STAGE_POLL_SCHNELL_VERSUCHE ? ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS : ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS,
+        );
       } else {
         // Worst-Case-Budget ausgeschoepft -- server-seitig B1/B2 (arena-vorlauf-service.ts)
         // haetten den Lauf laengst terminal gemacht. Aufgeben statt endlos weiterzufragen; der
@@ -967,6 +991,7 @@ export default function DisciplineStageArena({
         const statusJson = await holeJson(statusQuery);
         if (controller.signal.aborted) return;
         const nextStatus: ArenaVorlaufStatus | null = statusJson?.arenaVorlauf?.status ?? null;
+        setArenaVorlaufFortschritt(statusJson?.arenaVorlauf?.fortschritt ?? null);
         if (nextStatus === "in_progress") {
           naechsterVersuchOderAufgeben();
           return;
@@ -1001,12 +1026,21 @@ export default function DisciplineStageArena({
       }
     };
 
-    let timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+    let timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_SCHNELL_MS);
     return () => {
       controller.abort();
       window.clearTimeout(timerRef);
     };
   }, [arenaVorlaufStatus, saveId, seasonId, matchdayId, ownTeamId, lineupRevision]);
+
+  // VORLADEN WAEHREND DES WARTENS (18.11., s. lib/foundation/battle-arena/arena-vorladen.ts): solange
+  // der Vorlauf rechnet, holt der Browser schon das Host-Modul und die Arena-Dateien (Huelle, CSS, ~5 MB
+  // Motor) -- vorher begann das Laden erst, wenn der Vorlauf fertig war.
+  useEffect(() => {
+    if (arenaVorlaufStatus !== "in_progress") return;
+    void ladeBattleArenaHost().catch(() => undefined);
+    vorladeArenaDateien();
+  }, [arenaVorlaufStatus]);
 
   const engineDiscipline = useMemo(
     () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
@@ -1483,6 +1517,18 @@ export default function DisciplineStageArena({
     () => (devMode || matchdayDisciplineOptions.length === 0 ? disciplines : matchdayDisciplineOptions),
     [devMode, matchdayDisciplineOptions, disciplines],
   );
+  // "Arena wird vorbereitet … Climbing 1/2" (18.11.): die Disziplin, die der Vorlauf gerade rechnet,
+  // ihre Nummer unter allen geplanten und die bisherige Rechenzeit. Ohne Fortschritt (aelterer Server,
+  // anderer Prozess) nur der Satz ohne Zahl.
+  const arenaVorlaufText = useMemo(() => {
+    const f = arenaVorlaufFortschritt;
+    if (!f || f.geplant.length === 0) return "Arena wird vorbereitet …";
+    const aktuell = f.geplant.find((d) => !f.fertig.includes(d)) ?? f.geplant[f.geplant.length - 1];
+    const name = disciplines.find((d) => d.id === aktuell)?.name ?? aktuell;
+    const nummer = Math.min(f.geplant.length, f.fertig.length + 1);
+    const sekunden = Math.max(0, Math.round(f.laufendSeitMs / 1000));
+    return `Arena wird vorbereitet … ${name} ${nummer}/${f.geplant.length} (${sekunden} s)`;
+  }, [arenaVorlaufFortschritt, disciplines]);
 
   // Die 2 aktiven Mutatoren dieser Disziplin (disziplin-weit gleich) — für die
   // Anzeige „welche beiden es sind". Aus den mutatorSlots eines beliebigen Teams.
@@ -3321,8 +3367,9 @@ export default function DisciplineStageArena({
         >
           <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Battle Arena · {model.disciplineName}</div>
           {battleOhneMotorGrund === "vorlauf" ? (
-            <span>
-              ⏳ Die Arena-Duelle dieses Spieltags werden im Hintergrund berechnet. Sobald das gebuchte Spiel feststeht,
+            <span data-testid="arena-vorlauf-fortschritt">
+              <strong style={{ display: "block", marginBottom: 2 }}>⏳ {arenaVorlaufText}</strong>
+              Die Arena-Duelle dieses Spieltags werden im Hintergrund berechnet. Sobald das gebuchte Spiel feststeht,
               erscheint es hier in der Battle Arena.
             </span>
           ) : battleOhneMotorGrund === "bruecke" ? (
@@ -3451,7 +3498,7 @@ export default function DisciplineStageArena({
               background: "color-mix(in srgb, var(--nl-accent) 12%, transparent)",
             }}
           >
-            ⏳ Arena-Duelle werden im Hintergrund berechnet — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
+            ⏳ {arenaVorlaufText} — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
           </span>
         </div>
       ) : null}
