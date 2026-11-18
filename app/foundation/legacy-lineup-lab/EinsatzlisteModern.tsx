@@ -140,12 +140,11 @@ function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang
   const titel = `Unser Rang in dieser Disziplin (${quelle === "Saison" ? "Saisonwertung nach Teampunkten" : "nach Kaderstärke: Summe der sechs besten Eignungen, noch keine Wertung"}): ${rang.liga != null ? `${rang.liga}. in ${rang.ligaName}, ` : ""}${rang.gesamt}. von ${rang.gesamtVon} Teams${rang.abstandVordermann != null ? `. ${rang.abstandVordermann} Punkte bis zum Vordermann` : ""}.`;
   return (
     <span className="elm-rang" title={titel}>
-      <span className="elm-rang__ko">{seite.toUpperCase()} · Unser Rang · {quelle}</span>
+      <span className="elm-rang__ko">{seite.toUpperCase()} · Rang · {quelle}</span>
       <span className="elm-rang__za">
         <b className="bc-t">{haupt}.</b>
         <span>{hauptText}</span>
-        {rang.liga != null ? <small className="bc-t">{rang.gesamt}. von {rang.gesamtVon}</small> : null}
-        {rang.abstandVordermann != null ? <small className="elm-rang__ab bc-t">−{rang.abstandVordermann} Pkt. zum Vordermann</small> : null}
+        {rang.liga != null ? <small className="bc-t">· {rang.gesamt}. von {rang.gesamtVon}</small> : null}
       </span>
     </span>
   );
