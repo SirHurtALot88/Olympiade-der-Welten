@@ -458,3 +458,7 @@ Quote nach Vorstandsvertrauen: **Standard 90 %, 100 % ab Vertrauen 7,5, 80 % unt
 Abschnitt 1, 4 und 7). Saison 1 bleibt 100 %, die gekürzte Gehaltsquote bleibt bei mindestens 75 %. Ein erfülltes Vorstandsziel bringt Geld und
 Vertrauen. In Saison 1 wird neben der Draft-Rücklage auch der Gehaltspuffer halbiert (er greift erst ab Saison 2, dort ist Saison 1 ohnehin frei).
 Umgesetzt in `lib/finance/vorstand-budgetfreigabe.ts`; Messung und Folgen: `docs/design/finanzen-v2-seite-18-11.md`.
+
+## 14. Rücklage ab Saison 2 nach Gehaltskosten (Chris, 18.11. abends)
+
+Chris: „ab season 2 sollten budgets gespart werden basierend auf den gehaltskosten oder nicht? das muss ja dann nicht mehr auf dem startbudget basieren was es in S1 mal gab“. Entscheidung: **Saison 1** bleibt `max(q x Startbudget, 0,35 x Zielgehalt)` mit halbierter Draft-Rücklage; **ab Saison 2** gilt `Rücklage = q(Finanzwert) x Jahresgehalt des Kaders auf Soll-Größe` (`lib/finance/ki-ruecklage.ts`, eine Funktion für Planer und Sperre). Der Boden 0,35 x Gehalt entfällt als Rücklage (er läge nie darunter), der Gehaltspuffer im Transfertopf (7 Spieltage) bleibt. Beispielwerte und Messung: `docs/design/finanzen-v2-seite-18-11.md` Abschnitt 4b.

@@ -101,7 +101,7 @@ export function zapfeRuecklageAn(gameState: GameState, teamId: string, betrag: n
   const ziel = vorher.herleitung.ruecklageZiel;
   const maximal = ziel * 0.5;
   const gesamt = r2(Math.min(betrag, maximal));
-  const viertel = ziel > 0 ? Math.ceil(gesamt / (ziel / 4) - 1e-9) : 0;
+  const viertel = ziel > 0 ? Math.ceil(Math.min(betrag, maximal) / (ziel / 4) - 1e-6) : 0;
   const kosten = r2(viertel * ANZAPFEN_VERTRAUEN_JE_VIERTEL);
   const zustand: VorstandBudgetZustand = {
     ...vorher.zustand,

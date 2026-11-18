@@ -293,6 +293,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
     finances: identity?.finances,
     budget: Math.max(0, anfangskasse) + kaderWert,
     zielgehalt,
+    saison: saisonNr,
   });
   const gedeckelt = istVorstandBudgetfreigabeAktiv() && saisonNr >= 2;
   // Erstes Fenster (Saison 2): nur die halbe Ruecklage. In Saison 1 hat niemand eine gehalten (halbe Draft-Ruecklage, Chris 18.11.),
@@ -461,20 +462,46 @@ function zaehleSperre(art: keyof typeof SPERRE_ZAEHLER, teamId: string): void {
   SPERRE_ZAEHLER[art][teamId] = (SPERRE_ZAEHLER[art][teamId] ?? 0) + 1;
 }
 
-/** Harte Pruefung eines Kaufs: Abloese in den Investitionstopf, Jahresgehalt in den Gehaltstopf. */
+/** Pflichtkader: Kaeufe bis zu diesem Kader sind NIE gesperrt (Chris 18.11.: keine Finanzregel darf ein Team unter 8 halten). */
+export const VORSTAND_PFLICHT_KADER = 8;
+
+export type KaufRahmen = {
+  gedeckelt: boolean;
+  /** Was der Investitionstopf noch fuer Abloesen frei hat (Infinity, wenn nicht gedeckelt). */
+  abloeseFrei: number;
+  /** Was der Gehaltstopf noch fuer Jahresgehaelter frei hat (Infinity, wenn nicht gedeckelt). */
+  gehaltFrei: number;
+  stand: VorstandBudgetStand;
+};
+
+/**
+ * DIE EINE ZAHL fuer Planung UND Sperre (Chris 18.11.: Planer und Pruefung rechneten frueher mit verschiedenen Zahlen).
+ * Jeder KI-Planer holt seinen Kaufrahmen hier, und die harte Sperre im Kaufweg prueft gegen dieselbe Funktion.
+ */
+export function kaufRahmen(gameState: GameState, teamId: string): KaufRahmen {
+  const stand = berechneVorstandBudgetStand(gameState, teamId);
+  if (!stand.gedeckelt) return { gedeckelt: false, abloeseFrei: Infinity, gehaltFrei: Infinity, stand };
+  return { gedeckelt: true, abloeseFrei: stand.investition.frei, gehaltFrei: stand.gehalt.frei, stand };
+}
+
+/**
+ * Harte Pruefung eines Kaufs: Abloese in den Investitionstopf, Jahresgehalt in den Gehaltstopf.
+ * Kaeufe, die ein Team auf den Pflichtkader (8) bringen, sind nie gesperrt; sie zaehlen gegen den Topf und duerfen ihn ueberziehen.
+ */
 export function pruefeKaufGegenVorstandFreigabe(
   gameState: GameState,
   teamId: string,
   input: { fee: number; salary: number; rosterBefore: number; playerMin: number | null },
 ): { ok: boolean; reason: string | null; stand: VorstandBudgetStand } {
-  const stand = berechneVorstandBudgetStand(gameState, teamId);
-  if (!stand.gedeckelt) return { ok: true, reason: null, stand };
-  if (input.rosterBefore < (input.playerMin ?? 8)) return { ok: true, reason: null, stand };
-  if (input.fee > stand.investition.frei + 1e-9) {
+  const rahmen = kaufRahmen(gameState, teamId);
+  const stand = rahmen.stand;
+  if (!rahmen.gedeckelt) return { ok: true, reason: null, stand };
+  if (input.rosterBefore < VORSTAND_PFLICHT_KADER) return { ok: true, reason: null, stand };
+  if (input.fee > rahmen.abloeseFrei + 1e-9) {
     zaehleSperre("kauf", teamId);
     return { ok: false, reason: "vorstand_transferbudget_nicht_freigegeben", stand };
   }
-  if (Math.max(0, input.salary) > stand.gehalt.frei + 1e-9) {
+  if (Math.max(0, input.salary) > rahmen.gehaltFrei + 1e-9) {
     zaehleSperre("kauf_gehalt", teamId);
     return { ok: false, reason: "vorstand_gehaltsbudget_nicht_freigegeben", stand };
   }

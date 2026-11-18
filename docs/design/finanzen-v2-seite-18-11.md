@@ -54,7 +54,7 @@ Paarweise auf identischem Stand vor der Kaufphase (`--stop-after vorkauf`, dann 
 | Kaderstärke unterstes Viertel | 40,29 | 39,28 (−2,5 %) |
 | Gebäude gesamt | 43 | 43 |
 
-**Abbruchkriterium (−5 % im Median) ist knapp ausgelöst (−5,4 %; mit den alten Quoten −6,0 %).** Der PR bleibt Draft und wird nicht gemergt.
+**Stand vor der Planer-Korrektur: Abbruchkriterium (−5 %) knapp ausgelöst (−5,4 %).** Behoben durch Abschnitt 4b (jetzt −0,8 %, 0 Teams unter 8); die Tabelle hier zeigt den Zwischenstand.
 
 Wie oft greift die Sperre (abgelehnte Prüfungen, Saison-2-Kaufphase):
 
@@ -72,6 +72,49 @@ Wie oft greift die Sperre (abgelehnte Prüfungen, Saison-2-Kaufphase):
 * Es ist **nicht die Rücklage**: ohne Rücklage im Topf (Testlauf) und mit halber Rücklage kommen dieselben Zahlen heraus (Median 41,6 bis 41,9).
 * Die abgelehnten Käufe sind je Team genau **ein teurer Zugang** (Ablöse 36 bis 45 C bei 7 bis 36 C frei). Sie kommen aus dem **Markt-Plan der KI** (`ai_preseason_market_buy`, `ai-market-plan-apply-service`), der die Töpfe nicht kennt, nur der organische Planer (`planOrganicDraftForTeam`) bekommt `feeCap`/`salaryCap`. Der Zugang scheitert an der harten Sperre, und die Teams bleiben mit Geld auf der Hand bei Kader 8 stehen (Kasse 60 statt 43).
 * **Empfohlene Behebung (nicht mehr in diesem PR):** den Markt-Plan-Planer mit `investition.frei` und `gehalt.frei` als Kaufgrenze füttern, damit er billigere Spieler plant statt eines gesperrten Stars; danach Messung wiederholen. Alternativ die Sperre für die KI nur über den organischen Planer wirken lassen.
+
+## 4b. KI-Planung mit Töpfen (Chris, 18.11. abends; gebaut in diesem PR)
+
+Chris: „das problem mit den budget pots hatten wir schon mal, konnten es nie lösen und nur das entfernen vom budget topf hat es gefixt — wie bekommt man das hin dass die KI trotzdem noch sinnvoll pickt?“ Die alten Fehler kamen daher, dass **Planer und Prüfung mit verschiedenen Zahlen rechneten** und ein gesperrter Wunschkauf das ganze Team stehen ließ.
+
+**Befund der Messung (vorher):** 19 von 32 Teams stehen nach dem Saisonwechsel unter 8 Spielern. Das hatte drei Ursachen, keine war die Rücklage:
+1. Die Sperre nahm als Ausnahme das **Identity-Minimum** (`playerMin`, bei vielen Teams 5 bis 7) statt der festen 8. Ein Team mit 6 Spielern und Identity-Minimum 5 wurde gesperrt.
+2. Der Markt-Plan (`ai_preseason_market_buy`) wählte einen Wunschkauf ohne Rahmen, scheiterte an der Sperre und **brach das ganze Team ab** (`failed_buy`).
+3. Ein verkleinerter Plan (weniger als das Identity-Minimum) wurde als Ganzes verworfen (`roster_after_market_plan_below_player_min`), obwohl die Pflicht nur 8 ist.
+
+**Der Entwurf (genau so gebaut):**
+1. **Eine Zahl für Planung UND Sperre:** `kaufRahmen(gameState, teamId)` in `lib/finance/vorstand-budgetfreigabe.ts` liefert `abloeseFrei` und `gehaltFrei`. `pruefeKaufGegenVorstandFreigabe` (die harte Sperre im Kaufweg) und beide KI-Planer holen sich den Rahmen dort.
+2. **Erst planen, dann kaufen:** Vor dem ersten Kauf reserviert der Plan die **Pflichtplätze bis 8** (fehlende Plätze x billigster passender Spieler, Gehalt eingeschlossen) und verteilt nur den Rest nach Bedarf. Ein Wunschkauf (auch ein Star) wird nur gewählt, wenn er plus Pflichtreserve in den Rahmen passt. Beide Planer: organischer Planer (`lib/ai/organic-squad/draft-builder.ts`) und Markt-Plan (`buildFinalBuyGate` in `ai-market-plan-apply-service.ts`).
+3. **Pflichtkader nie gesperrt:** Kauf, der ein Team auf höchstens 8 bringt (`VORSTAND_PFLICHT_KADER`), ist nie gesperrt, auch bei Identity-Minimum 5. Er zählt gegen den Topf und darf ihn überziehen (das nächste Fenster ist dann kleiner). Mensch und KI gleich.
+4. **Leiter statt Stillstand:** Scheitert ein Kandidat an der Sperre, nimmt der Plan den nächsten, billigeren; ein Team, dem nach dem Rahmen noch Pflichtplätze fehlen, bekommt die billigsten übrigen Kandidaten (Auffangnetz). Scheitert der Kauf in der Ausführung nur an der Vorstand-Sperre, wird der Kandidat übersprungen statt das Team abzubrechen. Ein Plan bricht erst unter dem Pflichtkader 8 ab, nicht mehr am Identity-Minimum.
+5. **Test:** `tests/ki-planung-toepfe.test.ts` (Eigenschaftstest über 60 Zufallsteams: Pflichtkader erreicht, jeder Kauf ab Kader 8 besteht die Sperre mit den laufenden Summen).
+
+**Rücklage ab Saison 2 nach Gehaltskosten (Chris, 18.11.: „ab season 2 sollten budgets gespart werden basierend auf den gehaltskosten“):** `Rücklage = q(Finanzwert) x Jahresgehalt des Kaders auf Soll-Größe`, ohne Boden. Saison 1 bleibt Startbudget (Rücklage halbiert), bit-gleich. Beispielwerte (C):
+
+| Finanzwert | Gehalt 40 | Gehalt 60 | Gehalt 80 |
+|---:|---:|---:|---:|
+| 1 (q 5 %) | 2,0 | 3,0 | 4,0 |
+| 5 (q 15 %) | 6,0 | 9,0 | 12,0 |
+| 10 (q 25 %) | 10,0 | 15,0 | 20,0 |
+
+Der alte Boden 0,35 x Gehalt (14 / 21 / 28) liegt **immer** darüber (q höchstens 0,25). Er entfällt als Rücklage, **wirkt aber im Topf weiter**: der Gehaltspuffer (7 Spieltage = 0,35 x Gehaltsbudget, soweit die Rücklage ihn nicht deckt) bleibt. Deshalb ändert die Umstellung die **Töpfe in der Messung nicht** (Rücklage + Puffer = max(Rücklage, 0,35 x Gehalt)); Schalter `OLY_RUECKLAGE_GEHALT_S2=0` stellt die alte Regel für den Vergleich her.
+
+**Messung (32 KI-Teams, Saison 1 voll, Kaufphase Saison 2, paarweise, eine Saat; die zweite Saat über `OLY_ORGANIC_SEED_SALT` änderte nichts, es gibt nur eine echte Saat):**
+
+| Kennzahl | vorher (Schalter aus) | nachher (alter Stand dieses PR) | nachher (neue Planung) | + Rücklage nach Gehalt |
+|---|---:|---:|---:|---:|
+| Käufe | 69 | 48 | 68 | 68 |
+| Teams unter 8 | 7 | 12 | **0** | **0** |
+| Kader Median / kleinster | 10 / 6 | 8 / 6 | 9 / 8 | 9 / 8 |
+| **Kaderstärke Median** | 44,30 | 41,90 (-5,4 %) | **43,94 (-0,8 %)** | 43,94 (-0,8 %) |
+| Negative Kassen | 0 | 0 | 0 | 0 |
+| Kasse Median nach S2-Fenster (C) | 42,9 | 63,2 | 47,6 | 47,6 |
+| Kasse in % des Startbudgets (Median) | 17,8 % | 26,3 % | 19,9 % | 19,9 % |
+| Soll-Rücklage (q(Finanzwert) x Startbudget, Median) | 14,0 % | 14,0 % | 14,0 % | 14,0 % |
+
+**Kasse in Saison 1:** Median nach dem Draft 18,2 C = 7,3 % des Startbudgets bei einem Soll von 7,0 % (halbierte Rücklage nach Finanzwert); 30 von 32 Teams liegen im Band 0,5 bis 1,5 x Soll. Dort hortet die KI nicht (das untersucht parallel ein anderer Lauf).
+
+**Kasse nach dem S2-Fenster:** 19,9 % des Startbudgets bei Soll 14 % (1,5 x Soll, vorher 1,14 x, alter Stand dieses PR 1,9 x). Gründe, mit Zahlen: (a) bei 7 von 32 Teams ist der **Gehaltstopf** der Engpass (frei unter 5 C), (b) einzelne Teams bleiben bei Kader 8 bis 9 stehen, obwohl noch rund 30 C Transferrahmen frei sind (z. B. C-C, D-P): der Markt-Plan plant dort selbst keinen weiteren Kauf (sein eigener Bedarfs-Stopp, nicht die Sperre), (c) der Standard-Anteil von 90 % lässt 10 % gewollt auf dem Konto. Eine weitere Absenkung gehört in den Planer-Stopp (Bedarf bis Opt), nicht in die Töpfe.
 
 ## 5. Offene Punkte für Chris
 

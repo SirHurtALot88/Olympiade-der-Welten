@@ -227,6 +227,7 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   bleibt dagegen **weich** (Warnung, Vertrauensverlust).
 - **Zwei Budgets wie im FM (Chris, 18.11.: „optisch und inhaltlich so bauen“):** Transfer-/Investitionstopf und
   Gehaltstopf, Konzept `docs/design/finanzkonzept-v2-budgets-18-11.md` (Abschnitt 12 = Entscheidungen). Festgelegt:
+  - **Ab Saison 2 Rücklage nach Gehaltskosten (Chris, 18.11.):** `q(Finanzwert) x Jahresgehalt des Kaders auf Soll-Größe` statt Startbudget/Kasse + Kaderwert. Der Pflichtkader 8 ist nie gesperrt (Mensch und KI), Planer und Sperre rechnen mit derselben Zahl (`kaufRahmen`).
   - **Saison 1:** Vorstands-Quote für alle 100 %; die Draft-Rücklage nach Finanzwert ist **halb so hoch** wie üblich (mehr
     Spielraum beim Draft), voll erst ab Saison 2. Startbudgets und Sponsoren bleiben unverändert.
   - **Gehaltstopf:** der Vorstand kürzt ihn höchstens auf **75 %** (nie 50 %); frei werdendes Gehalt eines verkauften

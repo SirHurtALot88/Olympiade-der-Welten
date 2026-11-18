@@ -154,6 +154,15 @@ function cheapestPriceSum(pool: OrganicPlayerView[], count: number): number {
   return sum;
 }
 
+/** Gehalt der `count` billigsten (nach Preis) Spieler: die Gehalts-Seite der Pflichtplatz-Reserve. */
+function cheapestSalarySum(pool: OrganicPlayerView[], count: number): number {
+  if (count <= 0) return 0;
+  return [...pool]
+    .sort((left, right) => price(left) - price(right))
+    .slice(0, count)
+    .reduce((sum, p) => sum + Math.max(0, p.salary), 0);
+}
+
 /** Greedy organic squad plan. Deterministic; ties broken by pool order (stable). */
 export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSquadPlanResult {
   const rosterMax = input.economy.rosterMax ?? ROSTER_MAX;
@@ -233,6 +242,10 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     // min this reserve is 0, so composition past min is fully emergent.
     const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
     const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
+    // FINANZKONZEPT V2 (Chris 18.11.): erst die Pflichtplaetze reservieren, nur den Rest nach Wunsch verteilen. Auch unter dem
+    // Minimum muss ein Wunschkauf samt Reserve der fehlenden Plaetze in den Rahmen passen; ueber den Rahmen darf nur der
+    // billigste Pflichtkauf (Auffangnetz weiter unten), der den Topf ueberziehen darf.
+    const reserveSalaryForMin = cheapestSalarySum(pool, remainingToMinAfterBuy);
     // Three-tier solvency floor. (1) Below the hard ROSTER_MIN: floor 0 — fielding a legal (≥ min) squad
     // outranks any buffer, so a cash-poor club spends down toward ~0 to reach min (else it stalls below
     // min and breaks autoprep "teams_under_7"). (2) From min UP TO opt: floor = optFillFloor (a small flat
@@ -255,8 +268,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     let bestUtility = -Infinity;
     for (const candidate of pool) {
       if (cash - price(candidate) - reserveForMin < affordFloor) continue;
-      if (!belowMin && feeCap != null && spentFee + price(candidate) > feeCap) continue;
-      if (!belowMin && salaryCap != null && spentSalary + Math.max(0, candidate.salary) > salaryCap) continue;
+      if (feeCap != null && spentFee + price(candidate) + reserveForMin > feeCap + 1e-9) continue;
+      if (salaryCap != null && spentSalary + Math.max(0, candidate.salary) + reserveSalaryForMin > salaryCap + 1e-9) continue;
       if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
       const jitter =
         input.draftSeed && ORGANIC_DRAFT_JITTER > 0
@@ -271,7 +284,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
 
     // FINANZKONZEPT V2: reicht die Kasse nicht fuer Ruecklage UND Mindestkader, gilt die alte Regel (Floor 0,
     // Mindestkader vor Ruecklage) — erst mit der Reserve fuers Minimum, dann ganz ohne (naechster Block).
-    if (!best && belowMin && affordFloor > 0) {
+    if (!best && belowMin && affordFloor > 0 && feeCap == null && salaryCap == null) {
       for (const candidate of pool) {
         if (cash - price(candidate) - reserveForMin < 0) continue;
         if (salaryCeilingActive && salaryTotal + Math.max(0, candidate.salary) > salaryCeiling!) continue;
@@ -290,7 +303,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
     // can't reach min in one go must still make PARTIAL progress (6→7 beats staying at 6 and breaking
     // autoprep). Drop the reserve and buy the single best candidate it can actually pay for (cash ≥ 0).
-    if (!best && belowMin) {
+    if (!best && belowMin && feeCap == null && salaryCap == null) {
       for (const candidate of pool) {
         if (cash - price(candidate) < 0) continue;
         const jitter =
@@ -302,6 +315,13 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
           bestUtility = utility;
           best = candidate;
         }
+      }
+    }
+
+    if (!best && belowMin && (feeCap != null || salaryCap != null)) {
+      for (const candidate of pool) {
+        if (cash - price(candidate) < 0) continue;
+        if (best == null || price(candidate) < price(best)) best = candidate;
       }
     }
 
