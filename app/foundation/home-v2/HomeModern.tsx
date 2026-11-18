@@ -103,7 +103,7 @@ function Kopf({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
         </span>
         <div style={{ minWidth: 0 }}>
           <em>{kicker}</em>
-          <h1>{p.teamName}</h1>
+          <h2 className="hm-name">{p.teamName}</h2>
           <span className="hm-lage">
             {eigene && eigene.rang != null ? <b>{eigene.rang}. in {sd?.ligaName}</b> : <b>{sd?.ligaName ?? "Liga"}</b>}
             {lage ? <> · {lage}</> : null}
