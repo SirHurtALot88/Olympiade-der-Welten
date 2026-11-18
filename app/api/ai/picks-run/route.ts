@@ -11,6 +11,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { LigaDraftLaeuftFehler, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -110,6 +111,12 @@ export async function POST(request: Request) {
    * Nur bei ausdruecklich genannten `teamIds`: ein Lauf ueber die KI-Teams der Liga soll weiter
    * gehen, er fasst menschliche Teams ohnehin nicht an (`includeManualTeams` steht dort auf false).
    */
+  // LIGA-DRAFT LAEUFT (Review #1619, A1): solange der Einzelschritt-Draft laeuft, kauft kein KI-Kaderlauf daneben —
+  // auch nicht der „Liga-Setup erneut versuchen“-Knopf oder der Auto-Finish der Shell. Schalter aus: nie.
+  if (!dryRun && freshSaveForScope && ligaDraftLaeuft(freshSaveForScope.gameState)) {
+    return NextResponse.json({ error: "liga_draft_laeuft" }, { status: 409 });
+  }
+
   const angefragteTeamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
   if (!dryRun && angefragteTeamIds && angefragteTeamIds.length > 0 && freshSaveForScope) {
     const menschlichGefuehrt = getHumanControlledTeamIds({
@@ -163,6 +170,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof LigaDraftLaeuftFehler) {
+      return NextResponse.json({ error: error.code }, { status: error.httpStatus });
+    }
     const koopKonflikt = koopSchreibkonfliktAntwort(error);
     if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(

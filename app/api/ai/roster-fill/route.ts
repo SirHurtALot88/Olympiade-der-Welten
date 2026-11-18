@@ -13,6 +13,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -71,6 +72,10 @@ export async function POST(request: Request) {
   // Stufe 0.3 (Befund B2): die Identitaet fuer den Nicht-Raum-Fall kommt serverseitig aus der
   // Sitzung (`resolveAuthoritativeWriteOwnerId`), nicht mehr aus `roomWriteContext.activeOwnerId`.
   const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  // LIGA-DRAFT LAEUFT (Review #1619, A1): kein Auto-Auffuellen neben dem Einzelschritt-Draft. Schalter aus: nie.
+  if (!dryRun && freshSaveForScope && ligaDraftLaeuft(freshSaveForScope.gameState)) {
+    return NextResponse.json({ error: "liga_draft_laeuft" }, { status: 409 });
+  }
   const scopeOwnerId = await resolveAuthoritativeWriteOwnerId();
   const callerWritableTeamIds = freshSaveForScope
     ? Array.from(

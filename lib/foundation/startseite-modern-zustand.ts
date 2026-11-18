@@ -187,6 +187,22 @@ export function baueAbgeleiteteEntscheidungen(input: {
   return aus;
 }
 
+/**
+ * Ein Eintrag je Sache: sagt ein Inbox-Eintrag dasselbe wie eine abgeleitete Entscheidung, entfällt er. Gleicher Titel reicht nicht,
+ * die Inbox nennt die leere Einsatzliste „Lineup fehlt“, die abgeleitete Zeile „Einsatzliste leer“ (Abnahme 18.11.: beides stand da).
+ */
+const SACHE_NACH_ID: Array<{ id: string; muster: RegExp }> = [
+  { id: "einsatzliste", muster: /lineup|einsatzliste/i },
+  { id: "minuskarte", muster: /minuskarte/i },
+  { id: "vertraege", muster: /vertr.*(läuft|laufen|endet)/i },
+];
+
+export function inboxEintragIstDoppelt(inboxTitel: string, abgeleitet: Array<Pick<AbgeleiteteEntscheidung, "id" | "titel">>): boolean {
+  const titel = inboxTitel.toLowerCase();
+  if (abgeleitet.some((e) => e.titel.toLowerCase() === titel)) return true;
+  return SACHE_NACH_ID.some((s) => s.muster.test(inboxTitel) && abgeleitet.some((e) => e.id === s.id));
+}
+
 /* ------------------------------------------------------------------ Spieler des Tages / der Saison, bestes Heimspiel */
 
 export type SpielerEhrung = { playerId: string; name: string; text: string };

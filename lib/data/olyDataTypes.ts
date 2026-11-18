@@ -283,6 +283,8 @@ export type PlayerFormHistoryEntry = {
   disziplinId?: string | null;
   /** Bremse: Erschoepfung (Punkte Abzug am Ziel) oder Verletzung (feste Punkte). */
   bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
+  /** Abzug durch Trainings-Ueberlastung (Regel E), Punkte > 0, sonst null. */
+  ueberlastung?: number | null;
 };
 
 /**
@@ -307,6 +309,39 @@ export type PlayerFormVerlaufEintrag = {
   b?: { a: "e" | "v"; p: number };
   /** Form davor, nur am ersten Eintrag einer Saison (sonst der Wert des Vor-Eintrags). */
   v?: number;
+  /** Abzug durch Trainings-Ueberlastung (Regel E, Punkte > 0), zusaetzlich zur Bremse. */
+  u?: number;
+};
+
+/** Ziel-Disziplin + Weg fuer das Training (Regel A). `weg` 0 = Primaerweg (Hauptattribut), 1/2 = Nebenweg. */
+export type PlayerTrainingsZiel = {
+  disziplinId: string;
+  /** Index in die drei schwersten Matrix-Attribute der Disziplin: dieses bekommt 60 %. */
+  weg: 0 | 1 | 2;
+  gesetztAm?: string;
+};
+
+/**
+ * Gespeicherter Trainings-Eintrag eines Spieltags (KOMPAKT wie der Form-Verlauf). Lesen ueber
+ * `entpackeTrainingsVerlauf` in `lib/training/spieltag-training.ts`.
+ */
+export type TrainingsSpieltagEintrag = {
+  /** Spieltag-Id. */
+  m: string;
+  /** "t" = trainiert und gebucht, "v" = verletzt (kein Zuwachs, keine Trainingslast). */
+  s: "t" | "v";
+  /** Ziel-Disziplin. */
+  d?: string;
+  /** Weg-Index (0 = Primaerweg). */
+  w?: 0 | 1 | 2;
+  /** Quelle des Ziels: "m" vom Manager gesetzt, "k" KI-Vorschlag. */
+  q?: "m" | "k";
+  /** Intensitaet. */
+  i?: "leicht" | "mittel" | "hart";
+  /** Gebuchter Zuwachs je Attribut (nur Werte ungleich 0), nach Decke. */
+  z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
+  l?: number;
 };
 
 export type PlayerFormState = {
@@ -1066,7 +1101,24 @@ export type Player = {
     modeByMatchday: Record<string, "leicht" | "mittel" | "hart">;
     accumulatedTrainingFatigue: number;
     updatedAt: string;
+    /**
+     * TRAINING JE SPIELTAG (Chris, 18.11., `lib/training/spieltag-training.ts`): je abgerechnetem
+     * Spieltag ein Eintrag — was trainiert wurde, welcher Zuwachs GEBUCHT wurde, welche Last. Ein
+     * Spieltag mit Eintrag `s: "t"` ist je Spieltag gebucht und zaehlt am Saisonende NICHT noch
+     * einmal ins Trainingsbudget. Kompakt gespeichert, lesbar ueber `entpackeTrainingsVerlauf`.
+     * Fehlt das Feld (Alt-Stand, Schalter aus), gilt die alte Saisonend-Buchung.
+     */
+    verlauf?: TrainingsSpieltagEintrag[];
+    /** Attribute vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonbilanz). */
+    startAttribute?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+    /** Disziplinwerte vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonend-Delta). */
+    startDisziplinwerte?: Record<string, number>;
   } | null;
+  /**
+   * Ziel-Disziplin + Weg (Regel A, Chris 18.11.). Vom Manager gesetzt; fehlt es, trainiert der Spieler
+   * auf den Vorschlag der KI-Logik (fuer Mensch und KI dieselbe). Wirkt ab dem naechsten Spieltag.
+   */
+  trainingsZiel?: PlayerTrainingsZiel | null;
   cost?: number;
   upkeepBase?: number;
   className: string;
@@ -3682,7 +3734,9 @@ export type LigaDraftFertigGrund =
   | "nichts_leistbar"
   | "kauf_blockiert"
   | "mensch_fertig"
-  | "draft_ende";
+  | "draft_ende"
+  /** Der Gastgeber hat den Draft abgebrochen (`/api/draft` Aktion `abbrechen`). */
+  | "abgebrochen";
 
 export type LigaDraftTeamZustand = {
   teamId: string;

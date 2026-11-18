@@ -10,7 +10,9 @@ Der alte Hintergrund-Draft bleibt **Standard**; der neue läuft nur mit `OLY_LIG
   `lib/draft/liga-draft-dienst.ts` (Aktionen, Schreiben), `lib/draft/liga-draft-ansicht.ts` (Lesesicht),
   `app/api/draft/route.ts`, Zustandstyp `LigaDraftZustand` in `lib/data/olyDataTypes.ts`.
 - Tests: `tests/liga-draft-modell.test.ts` (Regeln), `tests/liga-draft-kern.test.ts` (Integration gegen einen
-  Wegwerf-Spielstand), `tests/liga-draft-api.test.ts` (Rechte der Route).
+  Wegwerf-Spielstand), `tests/liga-draft-api.test.ts` (Rechte der Route, Schalter, `erwarteteNr`, `mein`),
+  `tests/liga-draft-sperrt-ki-kaufwege.test.ts` (kein KI-Kauf neben dem Draft), `tests/liga-draft-ki-nachruecken.test.ts`
+  (KI kauft nach, statt nach drei Fehlkäufen aufzugeben).
 - Messung: `scripts/miss-teamfinanzen-saison.ts --draft block|einzelschritt`, Auswertung
   `scripts/auswerte-liga-draft-alt-neu.ts`.
 
@@ -22,14 +24,15 @@ Der alte Hintergrund-Draft bleibt **Standard**; der neue läuft nur mit `OLY_LIG
 |---|---|
 | Jede Runde beginnt beim **schwächsten Team** | Beim Start jeder Runde: Kaderstärke = Ø über alle 20 Disziplinen der besten sechs Eignungen (fehlende Plätze zählen 20, dieselbe Formel wie `transfermarkt-kaderstaerke.ts`). Aufsteigend sortiert. Gleichstand (Runde 1: alle Kader leer): **weniger Kasse zuerst**, dann die Saat des Spielstands. `berechneRundenReihenfolge` |
 | Höchstens **16 Runden**, höchstens **14 Picks** je Team | `regeln.maxRunden`, `regeln.maxPicksJeTeam`; mit 14 Picks ist ein Team `fertig` (`max_picks`), nach Runde 16 endet der geordnete Teil (`draft_ende`) |
-| Ein Team darf einen Pick **auslassen** | Aktion `auslassen` (nur Menschen, am eigenen Zug). Wer zweimal auslässt, kommt in 16 Runden trotzdem auf 14 Picks |
+| Ein Team darf einen Pick **auslassen** | Aktion `auslassen` (nur Menschen, am eigenen Zug, nicht mit Auto-Pick an). Wer zweimal auslässt, kommt in 16 Runden trotzdem auf 14 Picks. **Grenze (Review #1619, A5):** auslassen nur, solange die restlichen Runden danach noch für die fehlenden Pflichtplätze reichen (`darfAuslassen`: `maxRunden − runde ≥ 8 − Kader`), außer es ist nichts mehr leistbar — kein Draft-Ende mit 0 Spielern durch wiederholtes Auslassen |
 | KI hört auf, wenn ihr Kader steht | Die KI steigt aus, sobald ihr Stop-Nutzen den besten Kauf schlägt (`ki_stop`), nichts mehr leistbar ist (`nichts_leistbar`) oder der Kader voll ist — genau die Abbruchgründe der bisherigen Schleife |
 | Der Draft **wartet auf Menschen**, keine Uhr | `werIstDran` liefert `automatisch: false` für einen Menschen ohne Auto-Pick; KI-Läufe halten dort an (`halt: "mensch_am_zug"`) |
 | **Auto-Pick je Mensch** einschaltbar | Aktion `auto_pick` (`an: true/false`). Für ein fremdes Team nur als Gastgeber („Auto-Pick auslösen“ für einen Abwesenden, Konzept Frage 7) |
-| **Ramona** (halbautomatisch) pickt selbst, wenn sie will, oder danach | Ein Mensch mit delegiertem Draft (`isBereichDelegiert(…, "draft")`) bekommt einen Sitz mit Auto-Pick **an**. Sie kann ihn ausschalten und selbst picken, oder mit Variante A in den Nachzug gehen |
+| **Ramona** (halbautomatisch) draftet selbst | Seit PR #1620 steht die Halbautomatik auf `draft: "selbst"`. Auto-Pick **an** bekommt ein Mensch NUR mit delegiertem Draft (`isBereichDelegiert(…, "draft")`, also `draft: "ki"`), egal ob er in der Ausschlussliste steht; alle anderen Menschen picken selbst. Auto-Pick lässt sich jederzeit umschalten, Variante A führt in den Nachzug |
 | **Überspringen** A / B | A: das Team verlässt die Reihenfolge (`status: "nachzug"`), die KI pickt fertig, danach wählt der Mensch ohne Reihenfolge aus dem Rest und meldet „fertig“ ab 8 Spielern. B: Auto-Pick an, das Team bleibt in der Reihenfolge |
-| Pflichtplätze | Ein Mensch kann nur picken, wenn danach die Kasse noch die billigsten freien Spieler für die fehlenden Pflichtplätze (bis 8) trägt; unter 8 bleibt der billigste freie Spieler immer pickbar (Mockup Abschnitt 3). „Ich bin fertig“ erst ab 8 |
-| Kein Kauf am Draft vorbei | Während der geordneten Phase lehnt `/api/transfermarkt/buy` echte Käufe mit `liga_draft_laeuft` ab (`ligaDraftSperrtMarktkauf`) |
+| Pflichtplätze | Ein Mensch kann nur picken, wenn danach die Kasse noch die billigsten freien Spieler für die fehlenden Pflichtplätze (bis 8) trägt; unter 8 bleibt der billigste freie Spieler immer pickbar (Mockup Abschnitt 3). „Ich bin fertig“ erst ab 8 — darunter nur, wenn nichts mehr leistbar ist (Grund `nichts_leistbar`) |
+| Kein Kauf am Draft vorbei | Während der geordneten Phase lehnt `/api/transfermarkt/buy` echte Käufe mit `liga_draft_laeuft` ab (`ligaDraftSperrtMarktkauf`, nur mit Schalter an). Die KI-Kaufwege neben dem Draft fragen die zentrale Funktion `ligaDraftLaeuft` (Schalter an UND Draft dieser Saison nicht `fertig`, also auch im Nachzug): Preseason-Lauf übersprungen (`liga_draft_laeuft`, ohne Lauf-Datensatz), `/api/ai/picks-run` und `/api/ai/roster-fill` antworten 409 `liga_draft_laeuft`. Schalter aus: ein liegengebliebener Draft sperrt nichts |
+| KI kauft nach | Scheitert der Kauf von Platz 1, rücken die nächsten Kandidaten nach — Rangliste aufgeweitet (Top 3 → 20 → 200), gescheiterte Spieler ausgeschlossen, unter 8 zuletzt der billigste leistbare freie Spieler (`kaufeMitNachruecken`, Review #1619 A4). Aufgegeben wird erst, wenn nichts mehr kaufbar ist (`nichts_leistbar`) oder bei einem teamweiten Grund bzw. 40 Fehlversuchen (`kauf_blockiert`) |
 | **Saison 1: Draft-Rücklage UND Gehaltspuffer halb** | Die KI-Rücklage ist `max(q × Budget, 0,35 × Zielgehalt)`; der zweite Term ist der Gehaltspuffer. Der Saison-1-Faktor `SAISON_EINS_RUECKLAGE_FAKTOR = 0,5` wirkt auf das Maximum, also auf beide Terme (`draft-adapter.ts`). Das galt schon vorher für die KI; jetzt als benannte Konstante mit Test (`liga-draft-kern.test.ts`). Für Menschen gibt es die Rücklage noch nicht als harte Grenze (sie ist laut Finanzvorgabe weich); der Budget-Dienst (Finanzkonzept V2, Stufe 2a) hängt sie in der Seite an |
 | Scouting-Nebel, Marktwert/Ablöse exakt | Die Lesesicht trägt je Spieler nur Name, Klasse, Rasse, Marktwert (= Ablöse) und Gehalt — beides exakt, keine Eignung, keine Achsen, keinen KI-Nutzwert. Werte holt die Seite genebelt aus dem Brett (`/api/transfermarkt/free-agents` + `baueSpielerSicht`) |
 | Liga-Status | Während der geordneten Phase `leagueSetupStatus: "in_progress"` (Spieltage gesperrt wie beim alten Draft), danach `"ready"` mit `leagueSetupWarnings` für Teams unter 8 — auch wenn Menschen noch im Nachzug sind (dort stand der alte Ablauf auch) |
@@ -91,6 +94,14 @@ antwortet bei Abweichung `409 draft_stand_veraltet`.
 - **`einzelschritt`:** `starteLigaDraft` legt den Zustand an (die Ausschlussliste der Aufrufer = „diese Menschen picken
   selbst“), danach fährt `laufeKiImHintergrund` die KI-Züge bis zum ersten Menschen ohne Auto-Pick (in einer reinen
   KI-Liga bis zum Ende), in Häppchen von 8 Zügen mit Pause für die Event-Loop. Von da an treibt die Seite den Draft.
+  Bricht der Hintergrundlauf ab, steht die Liga auf `leagueSetupStatus: "failed"` (Fehler wird nicht verschluckt,
+  Review #1619 A2); fortsetzen über `/api/draft` `ki_hintergrund` — jeder Draft-Schreibvorgang setzt wieder
+  `in_progress`. Der „Erneut versuchen“-Knopf der Shell läuft über `/api/ai/picks-run` und bekommt bei laufendem Draft
+  409 `liga_draft_laeuft` (er würde sonst mit `includeManualTeams` auch Menschen den Kader füllen).
+- **Anlegen nur im frischen Saison-1-Aufbau** (`ligaDraftAnlegenVerboten`, Review #1619 S1): Saison 1, kein
+  Spieltagsergebnis dieser Saison, Phase `preseason_management` ODER Saisonstart-Setup (`season_active`, Spieltag 1
+  offen — so startet ein neues Spiel tatsächlich, und nur dort darf gekauft werden). Ein laufender Draft wird
+  zurückgegeben, ein `fertig`er **nie** neu angelegt (`draft_schon_fertig`).
 
 ## 5. Schnittstelle für die Seite (Sonnet-Agent)
 
@@ -98,6 +109,12 @@ antwortet bei Abweichung `409 draft_stand_veraltet`.
 
 `GET /api/draft?saveId=…&teamId=<eigenes Team>&vorschau=6&verlauf=40` → `{ ansicht: LigaDraftAnsicht | null, hintergrundLaeuft }`.
 `ansicht` ist `null`, solange kein Draft für die laufende Saison existiert (dann: alter Ablauf).
+
+**`mein` ist privat (Review #1619, A7):** die Route füllt `mein` (Vorschlag des eigenen GM, Kasse, Pflichtreserve,
+`maxAbloese`) nur, wenn der Aufrufer für `teamId` dasselbe Schreibrecht hat wie zum Picken (`draft_pick`). Dafür
+schickt die Seite die Raumfelder **auch beim GET als Query-Parameter** mit (`roomCode`, `participantId`, `seatToken`,
+`userId`, `activeManagerTeamId` — wie `parseRoomWriteContextFromRequest` sie liest). Ohne Recht (oder ohne `teamId`)
+kommt die öffentliche Sicht mit `mein: null`, kein Fehler. Dasselbe gilt für die `ansicht` in POST-Antworten.
 
 | Feld | Für welches Element im Mockup |
 |---|---|
@@ -111,7 +128,7 @@ antwortet bei Abweichung `409 draft_stand_veraltet`.
 | `teams[]` (`art`, `ownerId`, `autoPick`, `status`, `fertigGrund`, `picks`, `auslassungen`, `kader`, `kasse`, `kaderStaerke`) | Kette, Pick-Tafel-Spalten, Sitze rechts oben (Menschen: `art: "mensch"` + `ownerId`), „fertig“-Markierung |
 | `verlauf[]` (`pickNr`, `runde`, `platz`, `teamId`, `art`, `playerId`, `quelle`, `abloese`, `gehalt`, `top3`) | Live-Ticker (letzte 7), Pick-Tafel (`verlauf=0` liefert alle) |
 | `spieler` (playerId → Name, Klasse, Rasse, `marktwert`, `gehalt`) | Karten für alle Spieler aus `naechste`/`verlauf`/`mein` — ohne verdeckte Werte |
-| `mein` (`amZug`, `darfPicken`, `darfAuslassen`, `darfFertig`, `darfUeberspringen`, `autoPick`, `kader`, `kasse`, `pflichtReserve`, `maxAbloese`, `vorschlag`, `picksBisZug`) | „Mein Draft“: Pick-Knopf, „Ich bin fertig“, Auto-Pick-Schalter, „in n Picks“, Vorschlag des eigenen GM (3 Karten), „zu teuer“ = Ablöse > `maxAbloese` |
+| `mein` (`amZug`, `darfPicken`, `darfAuslassen`, `darfFertig`, `darfUeberspringen`, `autoPick`, `kader`, `kasse`, `pflichtReserve`, `maxAbloese`, `vorschlag`, `picksBisZug`) | „Mein Draft“: Pick-Knopf, „Ich bin fertig“, Auto-Pick-Schalter, „in n Picks“, Vorschlag des eigenen GM (3 Karten), „zu teuer“ = Ablöse > `maxAbloese`. `darfAuslassen` ist `false`, sobald die Restrunden nicht mehr bis 8 reichen (A5) oder Auto-Pick an ist; `darfFertig` ab 8 oder wenn nichts mehr leistbar ist. Nur für das eigene Team (s. oben) |
 
 Das **Brett** (freie Spieler, Filter, Sortierung, Nebel) kommt unverändert aus `/api/transfermarkt/free-agents` und
 `baueSpielerSicht` (`lib/market/transfermarkt-sicht.ts`); Top-3-Spieler, die das Brett zeigt, über ihre `playerId`
@@ -119,20 +136,30 @@ verknüpfen. Pick-Tafel und Ergebnis lesen `verlauf` (alle) und `teams`.
 
 ### 5.2 Schreiben
 
-`POST /api/draft` mit `{ saveId, teamId, aktion, …, roomCode, participantId, seatToken, userId, activeManagerTeamId }`
+`POST /api/draft` mit `{ saveId, teamId, aktion, erwarteteNr, …, roomCode, participantId, seatToken, userId, activeManagerTeamId }`
 (Raumfelder wie bei der Kauf-Route, `withRoomContextBody`). Antwort: `{ success, …, ansicht }` (frische Sicht für
-`teamId`) oder `{ success: false, error }` mit Status.
+`teamId`, `mein` nur bei Schreibrecht) oder `{ success: false, error }` mit Status.
+
+**Vorbedingungen (Review #1619):**
+- **Schalter (S1):** ohne `OLY_LIGA_DRAFT_MODUS=einzelschritt` antwortet jede Aktion `409 liga_draft_modus_aus` —
+  einzige Ausnahme `abbrechen` (Ausweg für einen liegengebliebenen Draft).
+- **Laufender Draft (S1):** jede Aktion außer `starten` und `abbrechen` braucht einen Draft dieser Saison, der nicht
+  `fertig` ist (`ligaDraftLaeuft`), sonst `409 draft_laeuft_nicht`; `abbrechen` ohne Draft: `404 liga_draft_fehlt`.
+- **`erwarteteNr` ist Pflicht (A6)** für jede Aktion außer `starten` (also auch `fertig`, `ueberspringen`, `auto_pick`,
+  `ki_hintergrund`, `abbrechen`): ganze Zahl = `ansicht.stand`. Fehlt sie: `400 erwarteteNr_fehlt`; weicht sie ab:
+  `409 draft_stand_veraltet` → Sicht neu laden.
 
 | `aktion` | Felder | Wirkung | Recht |
 |---|---|---|---|
-| `ki_schritt` | `maxPicks` (Standard 1), `erwarteteNr` | fährt bis zu `maxPicks` automatische Züge; Antwort `eintraege`, `halt: "mensch_am_zug" \| "max_picks" \| "draft_vorbei"`. Tempo 1×/3× = die Seite ruft alle 2,4 s bzw. 0,8 s einen Schritt | eigenes Team (Nachweis des Sitzes) |
-| `ki_hintergrund` | — | KI fährt im Hintergrund bis zum nächsten Menschen bzw. zum Ende; Fortschritt per GET (`hintergrundLaeuft`) | eigenes Team |
+| `ki_schritt` | `maxPicks` (Standard 1, **höchstens 8**, A3), `erwarteteNr` | fährt bis zu `maxPicks` automatische Züge; Antwort `eintraege`, `halt: "mensch_am_zug" \| "max_picks" \| "draft_vorbei"`. Tempo 1×/3× = die Seite ruft alle 2,4 s bzw. 0,8 s einen Schritt | eigenes Team (Nachweis des Sitzes) |
+| `ki_hintergrund` | `erwarteteNr` | KI fährt im Hintergrund bis zum nächsten Menschen bzw. zum Ende; Fortschritt per GET (`hintergrundLaeuft`) | eigenes Team |
 | `pick` | `playerId`, `erwarteteNr`, `idempotencyKey` | Mensch-Pick am eigenen Zug oder im Nachzug | eigenes Team |
-| `auslassen` | `erwarteteNr` | lässt den eigenen Pick aus | eigenes Team |
-| `fertig` | — | „Ich bin fertig“ (ab 8 Spielern; auch im Nachzug) | eigenes Team |
-| `ueberspringen` | `variante: "A" \| "B"` | A: Nachzug, danach `ki_hintergrund` aufrufen; B: Auto-Pick an | eigenes Team |
-| `auto_pick` | `an`, optional `zielTeamId` | Auto-Pick ein/aus; für ein fremdes Team nur Gastgeber | eigenes Team / Gastgeber |
-| `starten` | — | legt den Draft an (falls keiner läuft) | Gastgeber |
+| `auslassen` | `erwarteteNr` | lässt den eigenen Pick aus — nicht mit Auto-Pick an (`auto_pick_ist_an`), nicht wenn die Restrunden dann nicht mehr bis 8 reichen (`auslassen_unter_mindestkader`) | eigenes Team |
+| `fertig` | `erwarteteNr` | „Ich bin fertig“ (ab 8 Spielern, darunter nur wenn nichts mehr leistbar ist; auch im Nachzug) | eigenes Team |
+| `ueberspringen` | `variante: "A" \| "B"`, `erwarteteNr` | A: Nachzug, danach `ki_hintergrund` aufrufen; B: Auto-Pick an | eigenes Team |
+| `auto_pick` | `an`, optional `zielTeamId`, `erwarteteNr` | Auto-Pick ein/aus; für ein fremdes Team nur Gastgeber | eigenes Team / Gastgeber |
+| `starten` | — | legt den Draft an (falls keiner läuft; nur im frischen Saison-1-Aufbau; nie über einen `fertig`en). Die menschlich geführten Teams (Raum: `teamOwnership`, sonst `controlMode: "manual"`) picken selbst; Auto-Pick nur mit delegiertem Draft | Gastgeber |
+| `abbrechen` | `erwarteteNr` | Draft → `fertig` (offene Teams `fertigGrund: "abgebrochen"`), Liga `ready` mit Warnungen für Teams unter 8, Marktsperre weg; ein laufender Hintergrundlauf hält von selbst an. Geht auch mit Schalter aus | Gastgeber |
 
 Rechte wie bei allen Schreibrouten: `authorizeServerRoomWrite` mit `resolveAuthoritativeWriteOwnerId` (nie die
 Identität aus dem Body); Team-Aktionen mit der neuen Team-Aktion `draft_pick`, Gastgeber-Aktionen mit dem host-level
@@ -142,7 +169,9 @@ an alle Teilnehmer gesendet — die Seite lädt dann die Sicht neu.
 Fehlercodes: `nicht_am_zug`, `auto_pick_ist_an`, `team_ist_ki`, `team_nicht_im_draft`, `kader_voll`,
 `kader_unter_minimum`, `spieler_vergeben`, `spieler_unbekannt`, `reserve_fuer_pflichtplaetze`,
 `nachzug_erst_nach_dem_draft`, `draft_laeuft_nicht`, `team_nicht_aktiv`, `draft_stand_veraltet`, `liga_draft_fehlt`,
-sowie die Gründe des Kaufwegs (`blockingReasons[0]`).
+`liga_draft_modus_aus`, `erwarteteNr_fehlt`, `auslassen_unter_mindestkader`, `draft_schon_fertig`, `nur_saison_1`,
+`saison_laeuft_schon`, `nur_im_saisonaufbau`, sowie die Gründe des Kaufwegs (`blockingReasons[0]`). Neuer
+`fertigGrund`: `abgebrochen`; ein KI-Pick aus der Notfall-Liste trägt `grund: "notkauf_mindestkader"`.
 
 ## 6. Messlauf alt gegen neu (32 KI-Teams)
 
@@ -244,7 +273,12 @@ Der Großteil eines Zugs ist der Schreibvorgang (~0,5 s), die KI-Bewertung ~0,2 
 - **Zwei Budgets** (Transfertopf, Gehaltsbudget mit Reserve) gibt es als Dienst noch nicht (Finanzkonzept V2, Stufe
   2a). Für Menschen prüft der Draft heute: Kaufweg (Kasse, Vorstand), Pflichtplatz-Reserve. Die Seite zeigt die
   Balken, sobald der Dienst steht.
-- **Andere KI-Kaufwege während des Drafts** (Preseason-Automatik, Auto-Auffüllen) sind nicht eigens gesperrt; sie
-  laufen im frischen Saison-1-Stand nicht, solange `leagueSetupStatus` „in_progress“ ist. Mit dem Schalter an zu prüfen.
+- **Andere KI-Kaufwege während des Drafts** — die frühere Annahme hier („laufen nicht, solange `leagueSetupStatus`
+  in_progress ist“) war falsch: der Preseason-Lauf fragte den Status nie ab, und der Auto-Finish der Shell sowie
+  „Erneut versuchen“ kauften mit `includeManualTeams` auch für Menschen. Seit Review #1619 (A1) fragen alle die zentrale
+  Funktion `ligaDraftLaeuft` (s. Abschnitt 1, „Kein Kauf am Draft vorbei“). Die Shell stößt den Preseason-Lauf bei
+  vorhandenem Liga-Draft erst an, wenn die Liga `ready` UND der Draft `fertig` ist, und der Auto-Finish-Effekt läuft bei
+  vorhandenem Liga-Draft gar nicht; ohne Liga-Draft (Schalter aus) bleibt beides wie bisher. Im Raum sagt das Schild
+  „Liga-Draft läuft“ statt „einkaufen geht bereits“, solange die geordnete Phase läuft.
 - **`gefragt`** zählt nur über die angezeigten Züge (jetzt + 6), weil eine Bewertung ~0,1–0,2 s kostet; alle 32 Teams
   je Pick wären mehrere Sekunden. Gemerkt je Draft-Stand, also nur einmal je Pick gerechnet.

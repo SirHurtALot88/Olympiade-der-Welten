@@ -21,6 +21,7 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiBulkTeamWriteScope, type AiBulkTeamWriteScopeInput } from "@/lib/room/ai-bulk-team-write-scope";
+import { istEinzelschrittDraftAktiv, ligaDraftDieserSaison, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 /**
  * DER KI-PRESEASON-LAUF (Setup-Draft in Saison 1, Kauffenster jeder Folgesaison) — als Dienst.
@@ -132,6 +133,9 @@ function getSetupRosterTarget(gameState: GameState, teamId: string) {
 
 function shouldRunSetupDraft(gameState: GameState, teamIds: string[]) {
   if (gameState.season.id !== "season-1") return false;
+  // Liga-Draft im Einzelschritt (Schalter an, Review #1619 A1): der neue Draft IST der Setup-Draft dieser Saison. Liegt
+  // einer vor — laufend oder fertig —, zieht der alte Setup-Draft nicht noch einmal ueber dieselben Kader.
+  if (istEinzelschrittDraftAktiv() && ligaDraftDieserSaison(gameState)) return false;
   if (gameState.gamePhase && gameState.gamePhase !== "preseason_management") return false;
   if (gameState.seasonState.newGameFlow?.active === false) return false;
   // GEMELDET: „nein das ist mein save und da wurden die schon wieder bei mir rein gepickt"
@@ -588,6 +592,18 @@ export async function fuehreKiPreseasonLaufAus(input: {
     const freshSave = persistence.getSaveById(saveId);
     if (!freshSave) {
       throw new KiPreseasonLaufFehler(404, `Save ${saveId} not found.`);
+    }
+
+    // LIGA-DRAFT LAEUFT (Review #1619, A1): kein KI-Kauf neben dem Draft. Bewusst OHNE Lauf-Datensatz — der Lauf ist
+    // nicht erledigt, nur verschoben; nach dem Draft stoesst ihn die Shell erneut an (sie wartet auf `fertig`).
+    if (ligaDraftLaeuft(freshSave.gameState)) {
+      return antwort({
+        ok: true,
+        skipped: true,
+        reason: "liga_draft_laeuft",
+        run: null,
+        saveVersion: currentSaveVersion(persistence, saveId),
+      });
     }
 
     const existingRun = freshSave.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
