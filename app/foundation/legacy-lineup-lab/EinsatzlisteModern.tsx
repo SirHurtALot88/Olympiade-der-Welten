@@ -732,7 +732,8 @@ export default function EinsatzlisteModern(props: Props) {
             const oy = rh + luecke - Math.abs(dy);
             if (ox <= 0.5 || oy <= 0.5) continue;
             bewegt = true;
-            if (oy <= ox) {
+            // Zuerst entlang der kleineren Überlappung schieben; stecken die Karten dabei am Rand fest, weicht es nach oben/unten aus.
+            if (oy <= ox || runde >= 12) {
               const r = (dy === 0 ? (j % 2 ? 1 : -1) : Math.sign(dy)) * (oy / 2 + 0.5);
               pos[i]!.y -= r; pos[j]!.y += r;
             } else {

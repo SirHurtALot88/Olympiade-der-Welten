@@ -9,7 +9,7 @@
 .elm .elm-work {
   flex: none;
   /* Band (~108px) + Hero (~120px) + Dock (~70px) liegen ausserhalb: die Arbeitsflaeche fuellt den Rest, ohne Seitenscroll. */
-  height: clamp(560px, calc(100vh - 314px), 1500px);
+  height: clamp(560px, calc(100vh - 342px - 2.2vh), 1500px);
   grid-template-columns: minmax(300px, clamp(430px, 22.5vw, 620px)) minmax(0, 1fr) minmax(300px, clamp(330px, 17.5vw, 480px));
   gap: clamp(12px, 0.8vw, 20px);
   padding: clamp(12px, 0.8vw, 20px) clamp(14px, 0.9vw, 22px);
