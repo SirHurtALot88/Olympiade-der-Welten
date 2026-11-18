@@ -7,7 +7,7 @@
 // Aufruf: node scripts/screenshot-arena-start-ende.mjs <disziplin> [ausgabeOrdner] [laufMs]
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
+import { existsSync, mkdirSync, createReadStream, statSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
@@ -84,6 +84,14 @@ try {
     for (const [d, score, mitte, suffix] of zeilen) console.log(`${d.padEnd(16)} Kopf "${score}"  Leiste "${mitte}"  (${suffix})`);
     console.log("Seitenfehler: " + (fehler.length ? fehler.join(" | ") : "keine"));
   } else {
+  // OLY_KADER_VARIANTE=<i> [OLY_JE_SEITE=<n>]: echter Kader aus data/generated/kaderfamilie-live-save.json
+  // statt des Demo-Kaders (dort fehlen vielen Spielern die PixelLab-Figuren, wie im Live-Spiel).
+  if (process.env.OLY_KADER_VARIANTE != null) {
+    const fam = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten;
+    const v = fam[Number(process.env.OLY_KADER_VARIANTE)];
+    const n = Number(process.env.OLY_JE_SEITE || 99);
+    await seite.evaluate((k) => window.__arena.kaderSetzen(k), { heim: v.heim.slice(0, n), gast: v.gast.slice(0, n) });
+  }
   await seite.evaluate((d) => window.__arena.setDisc(d), disziplin);
   await seite.click("#t2").catch(() => {});
   await seite.waitForTimeout(1500);

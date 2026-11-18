@@ -49227,7 +49227,17 @@
       const boxW=104, boxH=36, bx=W-14-boxW, by=H-14-boxH;
       ctx.save();
       ctx.textAlign="center";ctx.textBaseline="alphabetic";
-      if(zl){
+      // OHNE ZEITLIMIT (18.11.): statt einer Restzeit, die es nicht mehr gibt, zaehlt die Box, wie
+      // viele schon oben sind -- dieselbe Stelle, dieselbe Kastenform.
+      if(!zl){
+        const oben=LAEUFER.filter(u=>u.fertig!=null&&!u.raus).length, alle=LAEUFER.length;
+        ctx.fillStyle="rgba(17,24,35,.82)"; ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle="rgba(255,255,255,.4)"; ctx.lineWidth=1.4; ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 8.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(255,255,255,.78)";
+        ctx.fillText("OBEN",bx+boxW/2,by+12);
+        ctx.font="800 19px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#fff";
+        ctx.fillText(oben+" / "+alle,bx+boxW/2,by+31);
+      } else if(zl){
         const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
         const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
         const knapp=restEcht<=10;
@@ -50109,7 +50119,11 @@
       // beschlossenen Eichregel (Gegencheck 3.5), keine neue Zeit-/Rundenregel -- die Dauer
       // einer Climbing-Runde/eines Spieltags aendert sich dadurch nicht, nur WANN innerhalb
       // des Rennens die Uhr fuer einen einzelnen Kletterer ablaeuft.
-      zeitlimit:10.6,
+      // ZEITLIMIT ENTFERNT (18.11., Chris: "Ende bitte erst wenn ALLE im Ziel sind"): das Lead-Limit
+      // von 10,6 Sim-s (Eichung oben) beendete das Rennen, waehrend im Mittel 64 % der Kletterer noch
+      // in der Wand hingen -- sie bekamen keine Zeit, nur einen Platz nach Hoehe. Jetzt klettert jeder
+      // bis oben (Sicherheitsdeckel und Hochrechnung s. Rennende in stepSpurt()). Messung vorher/
+      // nachher: docs/design/arena-start-ende-figuren-18-11.md.
       // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11): `rastUnter` ist das vierte Feld im
       // `planWechsel()`-Vertrag (s. dort) — an einer Henkel-Exe wird zusaetzlich gerastet,
       // wenn die Reserve darunter faellt. `rastZeit` ist die zusaetzliche Stoppzeit, in der
@@ -55627,12 +55641,38 @@
     }
     kameraUpdate(dt);
     bahnBewegung(dt);
-    // ZEITLIMIT (Gegencheck 3.5, nur Climbing setzt `BA().zeitlimit`): das Rennen endet wie
-    // ein Lead-Versuch, sobald die Uhr abgelaeuft ist, auch wenn noch nicht alle oben sind
-    // -- Nicht-Angekommene bleiben `fertig==null` und werden nach Hoehe geordnet
-    // (bahnRangliste()/wert(), s. dort). Jede andere Bahn liest hier `undefined>=rennT`,
-    // also `false`, und bleibt beim alten 60-Sekunden-Deckel.
-    if(rennFertig.length>=LAEUFER.length||rennT>60||(BA().zeitlimit&&rennT>=BA().zeitlimit))done=true;
+    // ENDE ERST, WENN ALLE IM ZIEL SIND (Chris, 18.11., Live-Befund Spieltag 1, D1 Climbing,
+    // woertlich: "Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit
+    // PPs geratet werden koennen"). Bis hierher endete Climbing nach dem Lead-Zeitlimit
+    // (`zeitlimit:10.6` Sim-s, Gegencheck 3.5): gemessen 64 % der Kletterer ohne Zeit (Node-Sonde,
+    // 5 Kader x 6 Saaten), im Live-Beispiel Nukka mit "—" auf Platz 4. Jetzt laeuft jede Bahn,
+    // bis jeder Teilnehmer im Ziel (oder bei Takeshi ausgeschieden) ist -- ohne Limit kommen alle
+    // Kletterer an (Median letzter Zieleinlauf 18 Sim-s, Maximum 49 Sim-s ueber 60 Rennen).
+    //
+    // SICHERHEITSDECKEL statt Endloslauf: `BAHN_DECKEL_SEK` (der alte 60-Sekunden-Deckel, den keine
+    // Bahn ausser Climbing je erreichte). Wer dann noch unterwegs ist, bekommt eine aus seinem
+    // Fortschritt HOCHGERECHNETE Zielzeit (`bahnZeitHochrechnen`), damit jeder eine Zeit, einen
+    // Platz und damit PPs hat; die Reihenfolge entspricht der alten Ordnung nach Strecke/Hoehe.
+    // Die Staffel wird als Team gewertet und bleibt unberuehrt (dort setzt nur der Schlusslaeufer
+    // die Zeit aller sechs).
+    if(rennFertig.length>=LAEUFER.length||rennT>BAHN_DECKEL_SEK){
+      if(!BA().staffel)for(const u of LAEUFER)if(u.fertig==null)bahnZeitHochrechnen(u);
+      done=true;
+    }
+  }
+  // Sicherheitsdeckel jeder Bahn in Sim-Sekunden (s. Kommentar am Rennende in stepSpurt()).
+  const BAHN_DECKEL_SEK=60;
+  // HOCHGERECHNETE ZIELZEIT beim Sicherheitsdeckel: dieselbe Projektion wie bahnHochrechnung()
+  // (eigene Laufzeit / Fortschritt), bei Climbing auf der Hoechstmarke `u.hoch` (die zaehlt, s.
+  // bahnRangliste()). Ein Laeufer ohne jeden Fortschritt wird auf das Zwanzigfache gedeckelt statt
+  // durch null geteilt. Kommt in `rennFertig` wie ein echter Zieleinlauf. Bewusst KEIN neues Feld am
+  // Laeufer (s. CLAUDE.md, Fingerabdruck): geschaetzt ist eine Zeit genau dann, wenn das Rennen am
+  // Deckel endete und der Laeufer bis dahin nicht im Ziel war.
+  function bahnZeitHochrechnen(u){
+    const p=Math.max(0.05,Math.min(1,BA().climbing?(u.hoch??u.pos):u.pos)||0);
+    const eigen=Math.max(0,rennT-(u.startT||0));
+    u.fertig=(u.startT||0)+eigen/p;
+    rennFertig.push(u);
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT FUER DIE BAHN (PR 0.3, Opus-Plan Zehn-Disziplinen 09-10,
@@ -58829,7 +58869,27 @@
   // "bleibt aktiv bis done" (Chris 07.10.): mit dem Schlusspfiff endet die Drosselung, die
   // Tempo-Taste zeigt wieder das Wunschtempo (der Riegel selbst faellt erst mit reset()).
   const finaleDrosseltJetzt=()=>finaleAktiv&&!done&&!finaleAbgewaehlt&&finaleEchtzeitAn&&speed>1;
-  const wirksamesTempo=()=>finaleDrosseltJetzt()?1:speed;
+  // REST IM ZEITRAFFER (18.11., zu Chris' "Ende erst, wenn ALLE im Ziel sind"): ohne das Lead-Limit
+  // haengt Climbing nach dem Sieger noch bis zum letzten Kletterer -- im Median 18 statt 10,6 Sim-s,
+  // im Extrem 49 (Faktor 4,38 in Zuschauzeit). Damit die Sendung nicht ewig wird, laeuft der Rest
+  // BAHN_RESTRAFFER-fach schneller, sobald der erste oben ist und man BAHN_RESTRAFFER_NACH_SEK echte
+  // Sekunden lang seinen Moment gesehen hat. Reine Wiedergabe: mehr 1/60-Ticks je Bild, dieselbe
+  // Rechnung (wie die Tempo-Taste), am Ergebnis aendert sich nichts. Nur Climbing (die einzige Bahn,
+  // deren Dauer sich durch "alle im Ziel" verlaengert hat).
+  const BAHN_RESTRAFFER=3, BAHN_RESTRAFFER_NACH_SEK=4;
+  let bahnRafferGemeldetFuer=null;
+  function bahnRestRaffer(){
+    if(done||!istBahn(disc)||!BA().climbing)return 1;
+    let erstes=null;
+    for(const u of LAEUFER)if(u.fertig!=null&&!u.raus&&(erstes==null||u.fertig<erstes))erstes=u.fertig;
+    if(erstes==null||(rennT-erstes)*zeitFaktor()<BAHN_RESTRAFFER_NACH_SEK)return 1;
+    if(bahnRafferGemeldetFuer!==LAEUFER){
+      bahnRafferGemeldetFuer=LAEUFER;
+      try{ callout("REST IM ZEITRAFFER · "+BAHN_RESTRAFFER+"×"); }catch(e){}
+    }
+    return BAHN_RESTRAFFER;
+  }
+  const wirksamesTempo=()=>finaleDrosseltJetzt()?1:speed*bahnRestRaffer();
   function tempoAnzeigeAktualisieren(){
     const b=document.getElementById("spd"); if(!b)return;
     const drosselt=finaleDrosseltJetzt();
