@@ -27,9 +27,9 @@ Fingerabdruck **GESAMT e80babacb68c → 7c9257b4435c (75 Einträge)**, bewegt nu
 
 **Sechsunddreißigster Nachtrag 17.11. — Basketball: Benchmark-Runde (FIBA-Feld, Spacing, echter Korb).**
 Chris am 17.11.: alle laufen als Klumpen, Korb passt nicht, jede Map braucht 3er-Linie, 2er und 3er werfen. Messung:
-`docs/design/benchmark-basketball-17-11.md`. rho je Spiel 0,822 → **0,859** (Spannweite 0,111, Saison 0,909), Pp 15,6 / 16,7 → **13,6 / 16,0**
-(Node-Motor, n=48), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **9,4 %**, Ballführer mit freier Anspielstation 27 → **50 %**, gezeigt = gebucht
-0 Fehler in 828 Würfen. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 97c267e8b7c7**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix
+`docs/design/benchmark-basketball-17-11.md`. rho je Spiel 0,822 → **0,867** (Spannweite 0,086, Saison 0,923), Pp 15,6 / 16,7 → **13,6 / 16,0**
+(Node-Motor, n=48), Klumpen (≥3 Mitspieler in 45 px) 49,1 → **7,6 %**, Ballführer mit freier Anspielstation 27 → **52 %**, gezeigt = gebucht
+0 Fehler in 828 Würfen. Wertungs-Fingerabdruck **GESAMT d09e10bb872c → 4a7f5d7befee**, bewegt nur die drei `spiele basketball`-Zeilen. Matrix
 unangetastet; PPS-Referenz `data/generated/basketball-pps-referenz.json` neu gezogen (mehr Würfe, Drift-Wächter).
 
 **Fünfunddreißigster Nachtrag 17.11. — I-Spy: Knack-Motor V2 (Balken, Ortswahl, Schubsen).**
@@ -1703,7 +1703,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Football** | **Feldspiel** | **0,818** | 0,124 | **0,874** | **bestanden — s.u., 26.09.-Nachtrag** |
 | Climbing | Bahn | 0,814 | 0,214 | 0,846 | bestanden |
 | Basketball | Feldspiel | 0,769 | 0,105 | 0,923 | knapp |
-| I-Spy | Buehne | 0,756 | 0,170 | 0,909 | knapp |
+| I-Spy | Buehne | 0,756 | 0,170 | 0,923 | knapp |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,686 | 0,180 | 0,860 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,725 | 0,204 | 0,836 | knapp |
 | Mini-DM | Arena | 0,588 (07.10., P1; vorher 0,365) | 0,680 | 0,595 | durchgefallen |

@@ -34,7 +34,7 @@ Wo es eine Messung gibt, steht sie dabei.
 
 | Abnahme | Schranke | main | neu |
 |---|---|---:|---:|
-| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | **0,859** (Spannweite 0,111, Saison 0,909) |
+| rho je Spiel (`miss-alle-disziplinen.mjs 24 basketball`) | ≥ 0,75, Ziel > 0,80 | 0,822 | **0,867** (Spannweite 0,086, Saison 0,923) |
 | Pp-Abweichung (`messe-arena-einfluss.mjs basketball 48`, zwei Saatstämme) | ≤ 25, Ziel < 15 | 15,6 / 16,7 | **13,6 / 16,0** |
 | Gezeigt = gebucht (`__arena.diagGezeigtGebucht`) | 0 Abweichungen | — | **0 von 828 Würfen**, Anzeigetafel = Spielerpunkte in 8/8 Spielen |
 | Wertungs-Fingerabdruck | nur die eigene Disziplin bewegt sich | — | nur `spiele basketball 1/7/42` (Abschnitt 4) |
@@ -57,7 +57,7 @@ Wo es eine Messung gibt, steht sie dabei.
 4. **Ballflug in der Höhe.** Jeder Wurf endet im Ring (`bkBogenZ`). Danach fällt der Ball durchs Netz
    (Treffer) oder prallt zum Rebound-Punkt ab (`bkNachlauf`). Freiwürfe genauso. Alles reine Anzeige
    (`fsBall.z`), die Wertung liest nichts davon.
-5. **Spacing-Modul** (eigene Doku). Klumpen ≥3 Mitspieler 49 % → 9 %, freie Anspielstation 27 % → 50 %.
+5. **Spacing-Modul** (eigene Doku). Klumpen ≥3 Mitspieler 49 % → 8 %, freie Anspielstation 27 % → 52 %.
 6. **Wurfwahl nach Entfernung/Eignung/Freistand.** Das bestehende Wurfprofil (`SCHUSS_FERN − SCHUSS_NAH`
    bestimmt die Wunschdistanz, Bedrängnis die Wahl) bleibt. Neu: ungezwungener Wurf höchstens 8,4 m
    (`FERN_RADIUS_MAX` 170 → 140), Slots im echten Spacing (Top/Flügel 7,5 m, Ecken als echte Corner-Threes).
@@ -67,7 +67,7 @@ Wo es eine Messung gibt, steht sie dabei.
 
 1. **Wertung bewusst verändert.** Klumpen lässt sich nicht als reine Anzeige reparieren: die Positionen sind
    Spiellogik (Deckerabstand, Passlinien, Rebound). Bewegt sich nur `basketball` im Fingerabdruck, und rho
-   steigt (0,822 → 0,859). Empfehlung: so übernehmen.
+   steigt (0,822 → 0,867). Empfehlung: so übernehmen.
 2. **Ring 0,5 m statt 1,575 m vor der Grundlinie.** Die PNG-Anlage trägt das Brett direkt am Mast (35 px vor
    dem Sockel). Bei FIBA-Lage stünde der Sockel 40 px im Feld. Alle Linien sind relativ zum *Ring* FIBA-genau,
    nur dieser eine Abstand ist verkürzt. Empfehlung: bei der nächsten Korb-Bestellung einen Ausleger von
@@ -80,30 +80,30 @@ Wo es eine Messung gibt, steht sie dabei.
 5. **Kontakt-Konzept (Block/Steal).** `kontakt-persoenlichkeit-16-11.md` setzt Basketball auf Rang 6
    („kleine Dosis, erst wenn 1–5 das Muster bestätigt haben“). Diese Runde baut deshalb keinen neuen
    Kontaktkanal. Block, Steal, Doppeln, Screens und Fouls bleiben, wie sie sind. Der rho-Puffer ist mit
-   0,859 größer geworden (vorher ~0,02 laut Konzept), Platz für den späteren Piloten ist also da.
+   0,867 größer geworden (vorher ~0,02 laut Konzept), Platz für den späteren Piloten ist also da.
 
 ## 4. Messwerte vorher/nachher
 
 | Größe | main | neu | Werkzeug |
 |---|---:|---:|---|
-| rho je Spiel (Median, 5 Kader) | 0,822 | **0,859** | `miss-alle-disziplinen.mjs 24 basketball` |
-| rho Saison | 0,930 | 0,909 | dto. |
+| rho je Spiel (Median, 5 Kader) | 0,822 | **0,867** | `miss-alle-disziplinen.mjs 24 basketball` |
+| rho Saison | 0,930 | 0,923 | dto. |
 | Pp-Abweichung (zwei Saatstämme) | 15,6 / 16,7 (Chromium, 15,6 heute bestätigt) | **13,6 / 16,0** | `einflussVon("basketball",48,…,0 bzw. 10000000)` im Node-Motor (rechnet wie `messe-arena-einfluss.mjs`) |
-| ≥3 Mitspieler im 45-px-Kreis | 49,1 % | **9,4 %** | `miss-spacing.mjs basketball 6 120 45` |
+| ≥3 Mitspieler im 45-px-Kreis | 49,1 % | **7,6 %** | `miss-spacing.mjs basketball 6 120 45` |
 | ≥3 Spieler beliebig im 45-px-Kreis | 92,9 % | **61 %** | dto. |
 | mittlerer Mitspielerabstand | 112 px | **185 px** | dto. |
 | Spieler um den Ballführer (80 px) | 4,7 | **2,4** | dto. |
-| Ballführer hat freie Anspielstation | 27 % | **50 %** | dto. |
+| Ballführer hat freie Anspielstation | 27 % | **52 %** | dto. |
 | Feldwürfe je Spiel (beide Teams) | 75,8 | 103,2 | Node-Motor, 12 Saaten |
 | Dreieranteil / Quote | 44,6 % / 34 % | 47,3 % / 33 % | dto. |
 | Mitteldistanz-Anteil / Quote | 11,9 % / 30 % | 19,4 % / 32 % | dto. |
 | Dunk-Anteil / Quote | 16,4 % / 95 % | 10,7 % / 83 % | dto. |
 | Gezeigt = gebucht | — | 0 / 828 | `__arena.diagGezeigtGebucht(8)` |
 
-**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT e80babacb68c (75 Einträge)`,
-neu **`GESAMT 8e431ffe5d93 (75 Einträge)`**. Der diff betrifft genau drei Zeilen:
-`spiele basketball 1` b37fd82fb384 → 1915afd1ea82, `spiele basketball 7` e04f9806dc23 → 401674e1d307,
-`spiele basketball 42` c52a59d8d024 → 3786e4716c29. Alle 72 übrigen Zeilen sind gleich. Der Node-Vorabgleich
+**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, Chromium): main `GESAMT d09e10bb872c (75 Einträge)`,
+neu **`GESAMT 4a7f5d7befee (75 Einträge)`** (nach Review-Fix Seitenlinie und Merge von main #1564). Der diff betrifft genau drei Zeilen:
+`spiele basketball 1` b37fd82fb384 → 076bfb746272, `spiele basketball 7` e04f9806dc23 → db37a3d13314,
+`spiele basketball 42` c52a59d8d024 → 0f9d5b90711e. Alle 72 übrigen Zeilen sind gleich. Der Node-Vorabgleich
 (20 Disziplinen × Saaten 1/7/42) zeigt dasselbe: 3 von 60 anders, alle Basketball.
 
 **PPS-Referenz neu gezogen.** Mehr Würfe heißen mehr Roh-Impact je Spieler. Der Drift-Wächter
