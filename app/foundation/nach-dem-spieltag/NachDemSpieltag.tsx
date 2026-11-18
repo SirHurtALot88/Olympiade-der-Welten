@@ -30,6 +30,7 @@ const vz = (x: number) => {
   const r = Math.round(x);
   return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${Math.abs(r)}`;
 };
+const ZAHL = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const ton = (x: number) => (Math.round(x) > 0 ? "bc-plus" : Math.round(x) < 0 ? "bc-minus" : "bc-null");
 
 function Por({ url, name, klasse }: { url?: string | null; name: string; klasse: string }) {
@@ -62,6 +63,20 @@ function WarumText({ text }: { text: string }) {
   }
   if (letzte < text.length) teile.push(text.slice(letzte));
   return <>{teile}</>;
+}
+
+/** Die Anteile, die zusammen den Wert ergeben: "+21 Zug zur Mitte · \u221210 Verletzt". */
+function Anteile({ z }: { z: FormZeile }) {
+  if (z.anteile.length < 2) return null;
+  return (
+    <span className="nds-anteile" data-testid="nds-anteile" title="Alle Anteile zusammen ergeben den Wert links">
+      {z.anteile.map((a) => (
+        <span key={a.id} className={`nds-anteil ${ton(a.wert)}`}>
+          <b className="bc-t">{vz(a.wert)}</b> {a.label}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function DisziplinReiter({ d, aktiv }: { d: SpieltagsDisziplin; aktiv: boolean }) {
@@ -101,7 +116,7 @@ function Bauchbinde({ liste, spieltag, portrait }: { liste: FormZeile[]; spielta
       <div className="nds-einbl__tx">
         <em>{m.kopf}{spieltag != null ? ` · Spieltag ${spieltag}` : ""}</em>
         <b>{m.titel}</b>
-        <p><WarumText text={m.grund} /></p>
+        <p><WarumText text={m.warum} /><Anteile z={m} /></p>
       </div>
       <div className="nds-einbl__re">
         <span className="nds-einbl__pf">
@@ -197,7 +212,7 @@ export default function NachDemSpieltag(props: FoundationMatchdayResultShellHost
             data-testid="nds-form"
           >
             <div className="nds-mh" aria-hidden="true">
-              <span /><span>Spieler</span><span>Form</span><span className="bc-r">Wert</span><span>Warum</span>
+              <span /><span>Spieler</span><span>Form</span><span className="bc-r">Wert</span><span className="bc-r" title="Player Points an diesem Spieltag, Rang am Spieltag und Rang in der Saison">PP · Rang</span><span>Warum</span>
             </div>
             <div className="nds-liste">
               {daten.form.map((z) => (
@@ -208,7 +223,17 @@ export default function NachDemSpieltag(props: FoundationMatchdayResultShellHost
                     <BcFormPfeil stufe={z.stufeVorher} /><span className="nds-pfeil">→</span><BcFormPfeil stufe={z.stufeNachher} />
                   </span>
                   <span className={`nds-dz bc-t ${ton(z.delta)}`}>{vz(z.delta)}</span>
-                  <span className="nds-gr"><WarumText text={z.grund} /></span>
+                  <span className="nds-pp bc-t" data-testid="nds-pp" title={z.pp ? `Rang ${z.pp.rangTag} von ${z.pp.vonTag} am Spieltag · Saison ${ZAHL.format(z.pp.ppSaison)} PP, Rang ${z.pp.rangSaison} von ${z.pp.vonSaison}` : "Kein PP gebucht (nicht eingesetzt)"}>
+                    {z.pp ? (
+                      <>
+                        <b>{ZAHL.format(z.pp.pp)}</b>
+                        <small>#{z.pp.rangTag} Tag · #{z.pp.rangSaison} Saison</small>
+                      </>
+                    ) : (
+                      <small>kein Einsatz</small>
+                    )}
+                  </span>
+                  <span className="nds-gr"><WarumText text={z.warum} /><Anteile z={z} /></span>
                 </div>
               ))}
             </div>
@@ -217,7 +242,7 @@ export default function NachDemSpieltag(props: FoundationMatchdayResultShellHost
           <BcPanel
             className="nds-pan"
             titel="Moral"
-            aktionen={<span className="nds-hin">stärkster Grund · aktueller Stand</span>}
+            aktionen={<span className="nds-hin">{daten.moral.some((z) => z.vorher != null) ? "nur wer sich bewegt hat · vorher → nachher" : "stärkster Grund · aktueller Stand"}</span>}
             bodyClassName="nds-koerper nds-rechts"
             data-testid="nds-moral"
           >
@@ -227,7 +252,15 @@ export default function NachDemSpieltag(props: FoundationMatchdayResultShellHost
                   <div key={z.playerId} className="nds-ur" data-testid="nds-moral-zeile">
                     <Por klasse="nds-por nds-por--s" url={portrait(z.playerId)} name={z.name} />
                     <span className="nds-ul">{z.name}<span> · {z.grund}</span></span>
-                    <BcMoralGesicht wert={z.moral} groesse={20} />
+                    <span className="nds-mg">
+                      {z.vorher != null ? (
+                        <>
+                          <BcMoralGesicht wert={z.vorher} groesse={20} />
+                          <span className="nds-pfeil">→</span>
+                        </>
+                      ) : null}
+                      <BcMoralGesicht wert={z.moral} groesse={20} />
+                    </span>
                     <b className={`bc-t ${ton(z.delta ?? 0)}`}>{vz(z.delta ?? 0)}</b>
                   </div>
                 ))}

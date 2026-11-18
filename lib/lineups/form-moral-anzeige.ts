@@ -162,6 +162,8 @@ export type FormMeldung = {
   disziplinId?: string | null;
   /** Leistungs- minus Erwartungs-Perzentil (nur bei Einsatz mit Vergleich). */
   abstand?: number | null;
+  leistungPerz?: number | null;
+  erwartungPerz?: number | null;
   bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
 };
 
@@ -199,6 +201,8 @@ export function baueFormMeldungen(
       grund: formBegruendung(eintrag, eintrag.disziplinId ? disziplinName(eintrag.disziplinId) : null),
       eingesetzt: eintrag.eingesetzt,
       disziplinId: eintrag.disziplinId ?? null,
+      leistungPerz: eintrag.leistungPerz ?? null,
+      erwartungPerz: eintrag.erwartungPerz ?? null,
       abstand: eintrag.leistungPerz != null && eintrag.erwartungPerz != null ? eintrag.leistungPerz - eintrag.erwartungPerz : null,
       bremse: eintrag.bremse ?? null,
     });

@@ -7,8 +7,11 @@ import {
   baueMoralZeilen,
   baueNachDemSpieltag,
   baueSpieltagsDisziplinen,
+  baueSpielerPp,
+  verletzungsStand,
   formZeile,
   nameListe,
+  zerlegeFormAenderung,
 } from "@/lib/lineups/nach-dem-spieltag";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -73,6 +76,38 @@ describe("Nach dem Spieltag: Ableitungen", () => {
     expect(baueHinweise({ form: [], moral: [], kalt: [] })).toEqual([]);
   });
 
+  it("Anteile ergeben für JEDE Zeile genau den Wert (Summe == gerundete Änderung)", () => {
+    const faelle: Array<Partial<FormMeldung> & { vorher: number; nachher: number }> = [
+      { vorher: 55, nachher: 33, eingesetzt: true, bremse: { art: "verletzung", punkte: 10 } },
+      { vorher: 29, nachher: 40, eingesetzt: false, bremse: { art: "verletzung", punkte: 10 } },
+      { vorher: 20, nachher: 0, eingesetzt: false, bremse: { art: "verletzung", punkte: 10 } },
+      { vorher: 70, nachher: 66.4, eingesetzt: true, bremse: { art: "erschoepfung", punkte: 8.4 } },
+      { vorher: 50, nachher: 58.3, eingesetzt: true, bremse: null },
+      { vorher: 30, nachher: 34.5, eingesetzt: false, bremse: null },
+      { vorher: 50, nachher: 49.6, eingesetzt: true, bremse: null },
+      { vorher: 10, nachher: 0, eingesetzt: true, bremse: { art: "verletzung", punkte: 10 } },
+    ];
+    for (const f of faelle) {
+      const teile = zerlegeFormAenderung(f);
+      const summe = teile.reduce((a, t) => a + t.wert, 0);
+      expect(summe + 0).toBe(Math.round(f.nachher - f.vorher) + 0);
+      // über die fertige Zeile genauso
+      const z = formZeile(meldung({ playerId: "x", ...f }), () => null);
+      expect(z.anteile.reduce((a, t) => a + t.wert, 0) + 0).toBe(Math.round(z.delta) + 0);
+    }
+  });
+
+  it("Verletzt UND gespielt: Leistung und Abzug stehen beide da (kein +11 bei \"10 Punkte Abzug\")", () => {
+    // verletzt, nicht gespielt, Form 29: Zug zur Mitte +3, Abzug -10 -> Wert -7
+    const t = zerlegeFormAenderung({ vorher: 29, nachher: 22, eingesetzt: false, bremse: { art: "verletzung", punkte: 10 } });
+    expect(t.map((x) => x.id)).toEqual(["mitte", "verletzung"]);
+    expect(t.find((x) => x.id === "verletzung")!.wert).toBe(-10);
+    const g = formZeile(meldung({ playerId: "g", vorher: 55, nachher: 33, eingesetzt: true, leistungPerz: 20, erwartungPerz: 60, disziplinId: "bb", abstand: -40, bremse: { art: "verletzung", punkte: 10 } }), () => "Basketball");
+    expect(g.warum).toMatch(/Leistung 20 gegen erwartete 60/);
+    expect(g.warum).toMatch(/Verletzt: ausgefallen\. Die Form verliert zusätzlich 10 Punkte/);
+    expect(g.anteile.map((x) => x.id)).toEqual(["leistung", "verletzung"]);
+  });
+
   it("nameListe", () => {
     expect(nameListe(["A"])).toBe("A");
     expect(nameListe(["A", "B", "C"])).toBe("A, B und C");
@@ -119,7 +154,21 @@ describe("Nach dem Spieltag: gebuchte Ergebnisse und Moral", () => {
   it("Moral: nur eigene Spieler, stärkster gespeicherter Grund, kleine Gründe fallen weg", () => {
     const m = baueMoralZeilen(spiel(), "t1");
     expect(m).toHaveLength(1);
-    expect(m[0]).toMatchObject({ name: "Kati", moral: 70, grund: "Sieg in Basketball", delta: 2, wort: "zufrieden" });
+    expect(m[0]).toMatchObject({ name: "Kati", moral: 70, grund: "Sieg in Basketball", delta: 2, wort: "zufrieden", vorher: null });
+  });
+
+  it("Moral vorher → nachher aus dem gespeicherten Vorwert, nur wer sich bewegt hat", () => {
+    const gs = spiel();
+    gs.rosters.push({ playerId: "p3", teamId: "t1" } as never);
+    gs.players.push({ id: "p3", name: "Gram", fatigue: 0 } as never);
+    const st = gs.playerMoraleState!;
+    st[0] = { ...st[0], vorher: { morale: 66.5, matchdayId: "md1" } } as never;
+    st.push({ playerId: "p3", teamId: "t1", morale: 50, reasons: [], vorher: { morale: 50, matchdayId: "md1" } } as never);
+    const m = baueMoralZeilen(gs, "t1", "md1");
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ name: "Kati", vorher: 66.5, moral: 70, delta: 3.5 });
+    // Vorwert eines anderen Spieltags zählt nicht
+    expect(baueMoralZeilen(gs, "t1", "md2")[0]?.vorher ?? null).toBeNull();
   });
 
   it("ohne Verlauf: leere Meldungen, kein erfundener Wert", () => {
@@ -127,5 +176,55 @@ describe("Nach dem Spieltag: gebuchte Ergebnisse und Moral", () => {
     expect(n?.form).toEqual([]);
     expect(n?.heiss).toEqual([]);
     expect(baueNachDemSpieltag(spiel(), null, "md1")).toBeNull();
+  });
+});
+
+describe("Nach dem Spieltag: PP und Verletzung", () => {
+  function pp(): GameState {
+    const gs = spiel() as unknown as Record<string, unknown>;
+    gs.season = { id: "s1", matchdayIds: ["m1", "m2"] };
+    gs.players = ["p1", "p2", "p3"].map((id, i) => ({ id, name: `P${i + 1}`, fatigue: 0 }));
+    gs.rosters = [{ playerId: "p1", teamId: "t1" }, { playerId: "p2", teamId: "t1" }, { playerId: "p3", teamId: "t2" }];
+    gs.matchdayState = { matchdayId: "m2" };
+    const perf = (id: string, playerId: string, teamId: string, m: string, score: number) => ({
+      id, matchdayResultId: m === "m1" ? "r1" : "r2", teamId, playerId, activePlayerId: null, disciplineId: "bb", disciplineSide: "d1", slotIndex: 1,
+      baseValue: score, finalPlayerScore: score, scoreContribution: score, rankInTeam: 1, rankInDiscipline: 1, isTop10: false, isMvpCandidate: false, storyWeight: null, createdAt: "",
+    });
+    gs.seasonState = {
+      matchdayResults: [
+        { id: "r1", seasonId: "s1", matchdayId: "m1", status: "preview_applied" },
+        { id: "r2", seasonId: "s1", matchdayId: "m2", status: "preview_applied" },
+      ],
+      disciplineResults: ["r1", "r2"].flatMap((r) =>
+        ["t1", "t2"].map((t) => ({ id: `${r}-${t}`, matchdayResultId: r, teamId: t, disciplineId: "bb", disciplineSide: "d1", rank: 1, baseScore: 100, totalScore: 100, readinessStatus: "ready", warnings: [], createdAt: "" })),
+      ),
+      playerDisciplinePerformances: [
+        perf("a", "p1", "t1", "m1", 90), perf("b", "p2", "t1", "m1", 30), perf("c", "p3", "t2", "m1", 60),
+        perf("d", "p1", "t1", "m2", 20), perf("e", "p2", "t1", "m2", 80), perf("f", "p3", "t2", "m2", 50),
+      ],
+      playerAvailabilityState: [{ playerId: "p2", teamId: "t1", fatigue: 10, injuryStatus: "injured", injuredAtMatchdayId: "m1", injuryUntilMatchday: "m2" }],
+    };
+    return gs as unknown as GameState;
+  }
+
+  it("PP: Tages- und Saisonrang kommen aus demselben Ledger; nur eigene Spieler", () => {
+    const m = baueSpielerPp(pp(), "t1", "m2");
+    expect([...m.keys()].sort()).toEqual(["p1", "p2"]);
+    const p2 = m.get("p2")!;
+    expect(p2.rangTag).toBe(1);
+    expect(p2.vonTag).toBe(3);
+    expect(p2.pp).toBeGreaterThan(m.get("p1")!.pp);
+    expect(p2.ppSaison).toBeGreaterThan(p2.pp);
+    expect(p2.vonSaison).toBe(3);
+    expect(baueSpielerPp(pp(), "t1", "m1").get("p1")!.rangSaison).toBe(1);
+  });
+
+  it("Verletzt: nicht einsetzbar mit Restdauer aus der gespeicherten Sperre", () => {
+    const s = verletzungsStand(pp(), "p2", "t1");
+    expect(s).toEqual({ nichtEinsetzbar: true, nochSpieltage: 1 });
+    expect(verletzungsStand(pp(), "p1", "t1")).toEqual({ nichtEinsetzbar: false, nochSpieltage: null });
+    const z = formZeile(meldung({ playerId: "p2", vorher: 29, nachher: 22, eingesetzt: false, bremse: { art: "verletzung", punkte: 10 } }), () => null, s);
+    expect(z.kurz).toBe("verletzt \u00b7 nicht einsetzbar (noch 1 Spieltag)");
+    expect(z.warum).toMatch(/nicht einsetzbar \(noch 1 Spieltag\)/);
   });
 });

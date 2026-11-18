@@ -9,7 +9,7 @@
   --nds-name: clamp(16px, 1vw, 29px);
   --nds-zeile: clamp(50px, 3vw, 80px);
   --nds-por: clamp(40px, 2.3vw, 64px);
-  --nds-spalten: var(--nds-por) minmax(0, clamp(140px, 10vw, 270px)) clamp(92px, 5.2vw, 140px) clamp(50px, 3vw, 80px) minmax(0, 1fr);
+  --nds-spalten: var(--nds-por) minmax(0, clamp(140px, 10vw, 270px)) clamp(92px, 5.2vw, 140px) clamp(50px, 3vw, 80px) clamp(104px, 6.6vw, 180px) minmax(0, 1fr);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -295,6 +295,21 @@
   font-weight: 700;
   text-align: right;
 }
+.nds-pp {
+  display: grid;
+  justify-items: end;
+  line-height: 1.1;
+  text-align: right;
+}
+.nds-pp b {
+  font-size: 1.15em;
+  color: var(--bc-creme);
+}
+.nds-pp small {
+  font-size: 0.72em;
+  color: var(--bc-stumm);
+  white-space: nowrap;
+}
 .nds-gr {
   color: var(--bc-leise);
   line-height: 1.25;
@@ -302,6 +317,29 @@
 .nds-gr b {
   color: var(--bc-creme);
   font-weight: 600;
+}
+.nds-anteile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 3px;
+  font-size: 0.88em;
+}
+.nds-anteil {
+  color: var(--bc-stumm);
+  white-space: nowrap;
+}
+.nds .nds-anteil b {
+  font-weight: 700;
+  color: inherit;
+}
+.nds .nds-anteil {
+  font-weight: 500;
+}
+.nds-mg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .nds .nds-acht {
   color: var(--bc-acht);
@@ -558,6 +596,13 @@
   .nds-mz {
     grid-template-columns: 38px minmax(0, 1fr) auto 42px;
     row-gap: 2px;
+  }
+  .nds-pp {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    justify-content: flex-start;
   }
   .nds-gr {
     grid-column: 1 / -1;

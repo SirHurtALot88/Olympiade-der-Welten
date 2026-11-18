@@ -111,13 +111,23 @@ async function waitForServer(timeoutMs: number) {
 }
 
 async function main() {
-  await fs.rm(SQLITE_PATH, { force: true });
-  const { saveId, teamId } = await baueSave();
+  // NDS_REUSE=1: vorhandene Wegwerf-SQLite weiterverwenden (z. B. nach einem OOM-Abbruch beim Spielen).
+  let saveId: string;
+  let teamId: string;
+  if (process.env.NDS_REUSE === "1") {
+    process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
+    const aktiv = createPersistenceService().getActiveSave()!;
+    saveId = aktiv.saveId;
+    teamId = aktiv.gameState.teams[0]!.teamId;
+  } else {
+    await fs.rm(SQLITE_PATH, { force: true });
+    ({ saveId, teamId } = await baueSave());
+  }
   const server = startDevServer();
   let browser: Browser | null = null;
   try {
-    await waitForServer(180_000);
-    browser = await chromium.launch();
+    await waitForServer(540_000);
+    browser = await chromium.launch({ args: ["--disable-dev-shm-usage", "--disable-gpu"] });
     const aufnehmen = async (breite: number, hoehe: number, datei: string, ansicht: string, vorher?: (p: Page) => Promise<void>) => {
       const ctx = await browser!.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();

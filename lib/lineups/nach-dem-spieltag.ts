@@ -11,9 +11,18 @@
  * Grund mit seiner Punktwirkung, nicht "vorher -> nachher".
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { FORM_ERSCHOEPFUNG_SCHWELLE, formToStufe } from "@/lib/morale/form-moral-modifikator";
+import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import {
+  FORM_ERSCHOEPFUNG_SCHWELLE,
+  FORM_LERN_RATE,
+  FORM_MORAL_NEUTRAL,
+  FORM_RUHE_RUECKFALL,
+  FORM_VERLETZUNG_ABZUG,
+  formToStufe,
+} from "@/lib/morale/form-moral-modifikator";
 import { moralStufe } from "@/lib/morale/moral-anzeige";
-import { FORM_STUFEN_WORT, baueFormMeldungen, type FormMeldung } from "@/lib/lineups/form-moral-anzeige";
+import { FORM_STUFEN_WORT, baueFormMeldungen, formBegruendung, type FormMeldung } from "@/lib/lineups/form-moral-anzeige";
 
 export type SpieltagsDisziplin = {
   side: "d1" | "d2";
@@ -29,7 +38,29 @@ export type SpieltagsDisziplin = {
   teamPunkte: number | null;
 };
 
+/** Verletzt: nicht einsetzbar, solange die gespeicherte Sperre laeuft (Anzeige; die Spielregel liegt in der Wertung). */
+export type VerletzungsStand = { nichtEinsetzbar: boolean; nochSpieltage: number | null };
+
+export type SpielerPp = {
+  /** Player Points dieses Spieltags (Summe der gebuchten Zeilen, wie der Saison-Ledger). */
+  pp: number;
+  rangTag: number;
+  vonTag: number;
+  /** Saison-PP bis einschliesslich dieses Spieltags und Rang darin. */
+  ppSaison: number;
+  rangSaison: number;
+  vonSaison: number;
+};
+
+export type FormAnteil = { id: "leistung" | "mitte" | "erschoepfung" | "verletzung"; label: string; wert: number };
+
 export type FormZeile = FormMeldung & {
+  /** Alle Anteile, die zusammen den Wert ergeben (ganze Zahlen, Summe = gerundeter Wert). */
+  anteile: FormAnteil[];
+  /** Satz fuer die Spalte "Warum" (bei Verletzung nach Einsatz: Leistung UND Abzug). */
+  warum: string;
+  verletzung: VerletzungsStand | null;
+  pp: SpielerPp | null;
   disziplinName: string | null;
   /** Kurzzeile unter dem Namen: "Basketball +19", "kein Einsatz", "verletzt". */
   kurz: string;
@@ -46,8 +77,10 @@ export type MoralZeile = {
   moral: number;
   wort: string;
   grund: string | null;
-  /** Punktwirkung des staerksten Grundes (`valueDelta`), `null` ohne Grund. */
+  /** Veraenderung seit dem Spieltag davor (`vorher`), sonst Punktwirkung des staerksten Grundes, `null` ohne beides. */
   delta: number | null;
+  /** Gespeicherter Wert vor diesem Spieltag; `null` bei Staenden ohne das Feld. */
+  vorher: number | null;
 };
 
 export type HeissKaltEintrag = { playerId: string; name: string; form: number; formPct: number | null };
@@ -113,12 +146,51 @@ export function baueSpieltagsDisziplinen(
   });
 }
 
+/**
+ * Zerlegt die Formaenderung eines Spieltags in ihre Anteile, nach derselben Reihenfolge wie
+ * `advancePlayerFormDetail`: erst Leistung (gespielt) bzw. Zug zur Mitte (nicht gespielt), dann der
+ * Verletzungsabzug. Die Erschoepfungsbremse wirkt auf das Ziel, ihr Anteil ist `LERN_RATE * Abzug`.
+ * Was die Modelle nicht erklaeren (Begrenzung auf 0..100, Rundung) landet im Hauptanteil, damit die
+ * Summe immer genau der gebuchten Aenderung entspricht.
+ */
+export function zerlegeFormAenderung(m: Pick<FormMeldung, "vorher" | "nachher" | "eingesetzt" | "bremse">): FormAnteil[] {
+  const delta = m.nachher - m.vorher;
+  const verletzt = m.bremse?.art === "verletzung";
+  const roh: FormAnteil[] = [];
+  if (m.eingesetzt === false) {
+    const mitte = verletzt ? FORM_RUHE_RUECKFALL * (FORM_MORAL_NEUTRAL - m.vorher) : delta;
+    roh.push({ id: "mitte", label: "Zug zur Mitte", wert: mitte });
+    if (verletzt) roh.push({ id: "verletzung", label: "Verletzt (Formabzug)", wert: delta - mitte });
+  } else {
+    const erschoepfung = m.bremse?.art === "erschoepfung" ? -FORM_LERN_RATE * m.bremse.punkte : 0;
+    const verletzung = verletzt ? -FORM_VERLETZUNG_ABZUG : 0;
+    roh.push({ id: "leistung", label: "Leistung gegen Erwartung", wert: delta - erschoepfung - verletzung });
+    if (erschoepfung !== 0) roh.push({ id: "erschoepfung", label: "Erschöpfung", wert: erschoepfung });
+    if (verletzung !== 0) roh.push({ id: "verletzung", label: "Verletzt (Formabzug)", wert: verletzung });
+  }
+  // Ganze Zahlen; die Rundungsdifferenz geht an den groessten Anteil, damit Summe == Math.round(delta).
+  const ziel = Math.round(delta);
+  const ganz = roh.map((x) => ({ ...x, wert: Math.round(x.wert) }));
+  const rest = ziel - ganz.reduce((a, x) => a + x.wert, 0);
+  if (rest !== 0) {
+    const gross = ganz.reduce((best, x, i) => (Math.abs(roh[i].wert) > Math.abs(roh[best].wert) ? i : best), 0);
+    ganz[gross].wert += rest;
+  }
+  const sichtbar = ganz.filter((x) => x.wert !== 0);
+  return sichtbar.length > 0 ? sichtbar : [ganz[0]];
+}
+
 /** Eine Form-Meldung als Zeile: Disziplin, Kurzzeile, Kopf und Titel der Bauchbinde. */
-export function formZeile(m: FormMeldung, disziplinName: (id: string) => string | null): FormZeile {
+export function formZeile(m: FormMeldung, disziplinName: (id: string) => string | null, stand: VerletzungsStand | null = null, pp: SpielerPp | null = null): FormZeile {
   const dn = m.disziplinId ? disziplinName(m.disziplinId) : null;
   const erschoepfungBremse = m.bremse?.art === "erschoepfung" ? m.bremse.punkte : 0;
   let kurz: string;
-  if (m.bremse?.art === "verletzung") kurz = "verletzt";
+  const dauer = stand?.nochSpieltage != null ? ` (noch ${stand.nochSpieltage} ${stand.nochSpieltage === 1 ? "Spieltag" : "Spieltage"})` : "";
+  const sperre = stand?.nichtEinsetzbar ? `nicht einsetzbar${dauer}` : null;
+  if (m.bremse?.art === "verletzung") {
+    const leistung = m.eingesetzt !== false && dn && m.abstand != null ? `${dn} ${m.abstand > 0 ? "+" : m.abstand < 0 ? "\u2212" : "\u00b1"}${Math.abs(m.abstand)} \u00b7 ` : "";
+    kurz = `${leistung}verletzt${sperre ? ` \u00b7 ${sperre}` : ""}`;
+  }
   else if (m.eingesetzt === false) kurz = "kein Einsatz";
   else if (dn && m.abstand != null) kurz = `${dn} ${m.abstand > 0 ? "+" : m.abstand < 0 ? "−" : "±"}${Math.abs(m.abstand)}`;
   else kurz = dn ?? "Einsatz";
@@ -127,7 +199,17 @@ export function formZeile(m: FormMeldung, disziplinName: (id: string) => string 
     m.stufeNachher === m.stufeVorher
       ? `${m.name} bleibt ${FORM_STUFEN_WORT[m.stufeNachher]}`
       : `${m.name}: von ${FORM_STUFEN_WORT[m.stufeVorher]} auf ${FORM_STUFEN_WORT[m.stufeNachher]}`;
-  return { ...m, disziplinName: dn, kurz, erschoepfungBremse, kopf, titel };
+  // Verletzt: Sperre vor Formabzug. Nach einem Einsatz steht zuerst die Leistung (formBegruendung nennt sonst nur den Abzug).
+  let warum = m.grund;
+  if (m.bremse?.art === "verletzung") {
+    const sperrSatz = `Verletzt: ${sperre ?? "ausgefallen"}. Die Form verliert zusätzlich ${m.bremse.punkte} Punkte.`;
+    const leistungsSatz =
+      m.eingesetzt !== false && m.leistungPerz != null && m.erwartungPerz != null
+        ? `${formBegruendung({ seasonId: "", matchdayId: "", form: m.nachher, vorher: m.vorher, eingesetzt: true, leistungPerz: m.leistungPerz, erwartungPerz: m.erwartungPerz, disziplinId: m.disziplinId }, dn)} `
+        : "";
+    warum = `${leistungsSatz}${sperrSatz}`;
+  }
+  return { ...m, anteile: zerlegeFormAenderung(m), warum, verletzung: stand, pp, disziplinName: dn, kurz, erschoepfungBremse, kopf, titel };
 }
 
 /** Wer ist heiss, wer kalt: aus der Form NACH dem Spieltag (Stufe +1/+2 bzw. -1/-2), staerkste Ausschlaege zuerst. */
@@ -138,8 +220,12 @@ export function baueHeissKalt(zeilen: readonly FormMeldung[], anzahl = 3): { hei
   return { heiss, kalt };
 }
 
-/** Moral der eigenen Spieler: gespeicherter Wert plus staerkster gespeicherter Grund, groesste Wirkung zuerst. */
-export function baueMoralZeilen(gameState: GameState | null | undefined, teamId: string, limit = 12): MoralZeile[] {
+/**
+ * Moral der eigenen Spieler: gespeicherter Wert, Wert vor dem Spieltag (additives Feld `vorher`) und staerkster
+ * gespeicherter Grund. Mit Vorwert zaehlt, wer sich bewegt hat (>= 0,5 Punkte), groesste Bewegung zuerst.
+ * Staende ohne Vorwert zeigen wie bisher die staerksten Gruende ohne vorher -> nachher.
+ */
+export function baueMoralZeilen(gameState: GameState | null | undefined, teamId: string, matchdayId?: string, limit = 12): MoralZeile[] {
   if (!gameState) return [];
   const namen = new Map(gameState.players.map((p) => [p.id, p.name]));
   const eigene = new Set(gameState.rosters.filter((r) => r.teamId === teamId).map((r) => r.playerId));
@@ -147,17 +233,21 @@ export function baueMoralZeilen(gameState: GameState | null | undefined, teamId:
   for (const z of gameState.playerMoraleState ?? []) {
     if (!eigene.has(z.playerId)) continue;
     const grund = [...(z.reasons ?? [])].filter((r) => Math.abs(r.valueDelta) >= MORAL_GRUND_MIN).sort((a, b) => Math.abs(b.valueDelta) - Math.abs(a.valueDelta))[0] ?? null;
+    // Der Vorwert gilt nur, wenn er zu DIESEM Spieltag gehoert (sonst waere es die Bewegung eines anderen Tages).
+    const vorher = z.vorher && (!matchdayId || z.vorher.matchdayId === matchdayId) ? z.vorher.morale : null;
     zeilen.push({
       playerId: z.playerId,
       name: namen.get(z.playerId) ?? z.playerId,
       moral: z.morale,
       wort: moralStufe(z.morale).wort,
       grund: grund?.label ?? null,
-      delta: grund ? grund.valueDelta : null,
+      delta: vorher != null ? Number((z.morale - vorher).toFixed(1)) : grund ? grund.valueDelta : null,
+      vorher,
     });
   }
+  const mitVorher = zeilen.some((z) => z.vorher != null);
   return zeilen
-    .filter((z) => z.delta != null)
+    .filter((z) => (mitVorher ? z.vorher != null && Math.abs(z.delta ?? 0) >= 0.5 : z.delta != null))
     .sort((a, b) => Math.abs(b.delta ?? 0) - Math.abs(a.delta ?? 0))
     .slice(0, limit);
 }
@@ -169,6 +259,12 @@ export function baueHinweise(input: {
   kalt: readonly HeissKaltEintrag[];
 }): SpieltagsHinweis[] {
   const hinweise: SpieltagsHinweis[] = [];
+  const dauerText = (liste: readonly FormZeile[]) => {
+    const tage = liste.map((z) => z.verletzung?.nochSpieltage).filter((x): x is number => x != null);
+    if (tage.length === 0) return "";
+    const max = Math.max(...tage);
+    return liste.length > 1 ? ` (bis zu ${max} ${max === 1 ? "Spieltag" : "Spieltage"})` : ` (noch ${max} ${max === 1 ? "Spieltag" : "Spieltage"})`;
+  };
   const viele = (namen: readonly string[]) => namen.length > 1;
   const muede = input.form.filter((z) => z.erschoepfungBremse > 0 && z.nachher <= z.vorher + 0.05);
   if (muede.length > 0) {
@@ -185,7 +281,7 @@ export function baueHinweise(input: {
     hinweise.push({
       id: "verletzung",
       namen,
-      text: `${nameListe(namen)} ${viele(namen) ? "sind" : "ist"} verletzt, die Form wandert zur Mitte, bis ${viele(namen) ? "sie" : "er"} zurück ${viele(namen) ? "sind" : "ist"}.`,
+      text: `${nameListe(namen)} ${viele(namen) ? "sind" : "ist"} verletzt und nicht einsetzbar${dauerText(verletzt)}. Die Form verliert zusätzlich ${FORM_VERLETZUNG_ABZUG} Punkte.`,
     });
   }
   const bereitsGenannt = new Set([...muede, ...verletzt].map((m) => m.playerId));
@@ -198,7 +294,7 @@ export function baueHinweise(input: {
       text: `${nameListe(namen)} ${viele(namen) ? "sind" : "ist"} kalt: nicht auf Schlüsselplätze setzen, bis die Form zurück ist.`,
     });
   }
-  const unzufrieden = input.moral.filter((z) => z.moral < MORAL_UNZUFRIEDEN_BIS && (z.delta ?? 0) < 0);
+  const unzufrieden = input.moral.filter((z) => z.moral < MORAL_UNZUFRIEDEN_BIS && (z.delta ?? 0) < 0 && z.grund != null);
   if (unzufrieden.length > 0) {
     const namen = unzufrieden.map((z) => z.name);
     const grund = unzufrieden[0].grund;
@@ -211,6 +307,55 @@ export function baueHinweise(input: {
   return hinweise;
 }
 
+/** Wie lange ein Spieler noch gesperrt ist, aus der gespeicherten Verfuegbarkeit (`getPlayerAvailabilityView`, naechster Spieltag). */
+export function verletzungsStand(gameState: GameState, playerId: string, teamId: string): VerletzungsStand | null {
+  const naechster = gameState.matchdayState.matchdayId;
+  if (!naechster) return null;
+  const sicht = getPlayerAvailabilityView(gameState, playerId, teamId, naechster);
+  if (!sicht.isUnavailable) return { nichtEinsetzbar: false, nochSpieltage: null };
+  const ids = gameState.season.matchdayIds ?? [];
+  const bis = sicht.injuryUntilMatchday ? ids.indexOf(sicht.injuryUntilMatchday) : -1;
+  const jetzt = ids.indexOf(naechster);
+  return { nichtEinsetzbar: true, nochSpieltage: bis >= 0 && jetzt >= 0 && bis >= jetzt ? bis - jetzt + 1 : null };
+}
+
+const ppRunde = (x: number) => Number(x.toFixed(2));
+
+/** Rang (Wettkampf-Rang: Gleichstand teilt den Platz) von `wert` in `werte` (hoeher = besser). */
+function rangIn(werte: readonly number[], wert: number): number {
+  return 1 + werte.filter((w) => ppRunde(w) > ppRunde(wert)).length;
+}
+
+/**
+ * Player Points der eigenen Spieler an diesem Spieltag, ihr Rang an diesem Spieltag unter allen Spielern mit
+ * gebuchtem PP und ihr Saison-PP-Rang (bis einschliesslich dieses Spieltags). Quelle ist derselbe Saison-Ledger,
+ * den Saisonstand und Spieltagsergebnis lesen (`points` = Anteil + Mutator-Bonus): keine zweite PP-Rechnung.
+ */
+export function baueSpielerPp(gameState: GameState | null | undefined, teamId: string, matchdayId: string): Map<string, SpielerPp> {
+  const aus = new Map<string, SpielerPp>();
+  if (!gameState) return aus;
+  const ledger = buildSeasonPointsLedger(gameState, gameState.season.id);
+  const ids = gameState.season.matchdayIds ?? [];
+  const index = ids.indexOf(matchdayId);
+  const tag = new Map<string, number>();
+  const saison = new Map<string, number>();
+  for (const e of ledger.pointEntries) {
+    const i = e.matchdayId ? ids.indexOf(e.matchdayId) : -1;
+    if (index >= 0 && i > index) continue;
+    saison.set(e.playerId, (saison.get(e.playerId) ?? 0) + e.points);
+    if (e.matchdayId === matchdayId) tag.set(e.playerId, (tag.get(e.playerId) ?? 0) + e.points);
+  }
+  const tagWerte = [...tag.values()];
+  const saisonWerte = [...saison.values()];
+  const eigene = new Set(gameState.rosters.filter((r) => r.teamId === teamId).map((r) => r.playerId));
+  for (const [playerId, pp] of tag) {
+    if (!eigene.has(playerId)) continue;
+    const ppS = saison.get(playerId) ?? pp;
+    aus.set(playerId, { pp: ppRunde(pp), rangTag: rangIn(tagWerte, pp), vonTag: tagWerte.length, ppSaison: ppRunde(ppS), rangSaison: rangIn(saisonWerte, ppS), vonSaison: saisonWerte.length });
+  }
+  return aus;
+}
+
 export function baueNachDemSpieltag(
   gameState: GameState | null | undefined,
   teamId: string | null | undefined,
@@ -219,9 +364,12 @@ export function baueNachDemSpieltag(
   if (!gameState || !teamId) return null;
   const disziplinName = (id: string) => gameState.disciplines.find((d) => d.id === id)?.name ?? null;
   const meldungen = baueFormMeldungen(gameState, teamId, matchdayId, (id) => disziplinName(id));
-  const form = meldungen.map((m) => formZeile(m, disziplinName));
+  const pp = baueSpielerPp(gameState, teamId, matchdayId);
+  const form = meldungen.map((m) =>
+    formZeile(m, disziplinName, m.bremse?.art === "verletzung" ? verletzungsStand(gameState, m.playerId, teamId) : null, pp.get(m.playerId) ?? null),
+  );
   const { heiss, kalt } = baueHeissKalt(meldungen);
-  const moral = baueMoralZeilen(gameState, teamId);
+  const moral = baueMoralZeilen(gameState, teamId, matchdayId);
   const hinweise = baueHinweise({ form, moral, kalt });
   return { matchdayId, disziplinen: baueSpieltagsDisziplinen(gameState, teamId, matchdayId), form, moral, heiss, kalt, hinweise };
 }
