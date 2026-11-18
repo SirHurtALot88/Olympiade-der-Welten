@@ -27,13 +27,14 @@ const read = (relativePath: string) => readFileSync(join(process.cwd(), relative
 const HOST = read("app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx");
 const SCOPE = read("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 const FEED = read("lib/foundation/tabs/use-foundation-market-feed-actions.ts");
-const CLIENT = read("app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
+const MODERN = read("app/foundation/transfermarkt-modern/TransfermarktModern.tsx");
+const DATEN = read("app/foundation/transfermarkt-modern/tm-daten.ts");
+const CLIENT = `${MODERN}\n${DATEN}`;
 
 describe("Transfermarkt — Cash steht nach dem Kauf richtig", () => {
   /** DIE URSACHE, als Erwartung festgehalten: die Zahl kommt aus dem Feed, nicht aus dem Save. */
   it("die Cash-Zahl kommt aus dem Markt-Feed", () => {
-    expect(CLIENT).toContain("const marketContext = marketFeed?.teamContext ?? null;");
-    expect(CLIENT).toContain("marketContext?.teamCash");
+    expect(CLIENT).toContain("feed.teamContext?.teamCash");
   });
 
   /** Und der Feed haengt an seinem eigenen Zaehler — deshalb genuegt `loadSave` nicht. */
@@ -90,9 +91,7 @@ describe("Transfermarkt — Cash steht nach dem Kauf richtig", () => {
    * Kauf-Endpunkt mitschickt.
    */
   it("der Client reicht den mitgelieferten Folgezustand an onBuyCompleted weiter", () => {
-    expect(CLIENT).toContain(
-      "await onBuyCompleted?.({ teamId: selectedTeamId, gameStateAfter: payload.gameStateAfter ?? null });",
-    );
+expect(CLIENT).toContain("await props.onBuyCompleted?.({ teamId, gameStateAfter });");
   });
 
   /**
@@ -122,13 +121,13 @@ describe("Transfermarkt — Cash steht nach dem Kauf richtig", () => {
  */
 describe("Transfermarkt — der Kauf entwertet auch den Markt-Zwischenspeicher", () => {
   it("der Zaehler wird gegen den Stand des Zwischenspeichers gehalten", () => {
-    expect(CLIENT).toContain("marketCacheTokenRef");
-    expect(CLIENT).toContain("marketCacheTokenRef.current !== reloadToken");
+    expect(CLIENT).toContain("tokenRef");
+    expect(CLIENT).toContain("tokenRef.current !== neuLaden");
   });
 
   /** Ohne dieses `clear()` liefert der naechste Lauf denselben veralteten Feed zurueck. */
   it("bei neuem Zaehlerstand wird der Zwischenspeicher geleert", () => {
-    expect(CLIENT).toContain("marketCacheRef.current.clear()");
+    expect(CLIENT).toContain("cacheRef.current.clear()");
   });
 
   /**
@@ -136,8 +135,8 @@ describe("Transfermarkt — der Kauf entwertet auch den Markt-Zwischenspeicher",
    * haette laengst mit dem alten Feed zurueckgegeben.
    */
   it("die Entwertung steht vor der Cache-Abfrage", () => {
-    const clearIndex = CLIENT.indexOf("marketCacheRef.current.clear()");
-    const readIndex = CLIENT.indexOf("marketCacheRef.current.get(marketCacheKey)");
+    const clearIndex = CLIENT.indexOf("cacheRef.current.clear()");
+    const readIndex = CLIENT.indexOf("cacheRef.current.get(schluessel)");
     expect(clearIndex).toBeGreaterThan(-1);
     expect(readIndex).toBeGreaterThan(-1);
     expect(clearIndex).toBeLessThan(readIndex);

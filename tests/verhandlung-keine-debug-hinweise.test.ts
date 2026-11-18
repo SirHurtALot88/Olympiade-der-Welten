@@ -23,10 +23,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 
 /** Beide Stellen, die Verhandlungs-Hinweise filtern. Sie müssen sich gleich verhalten. */
-const FILTER_SITES = [
-  "lib/foundation/tabs/use-market-buy-derivations.ts",
-  "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx",
-];
+const FILTER_SITES = ["app/foundation/transfermarkt-modern/VerhandlungsTisch.tsx"];
 
 /** Hinweise über den Stand unserer eigenen Rechnung — kein Deal-Risiko. */
 const INTERNAL_NOTE_CODES = [
@@ -46,17 +43,6 @@ describe("Verhandlungsfenster zeigt keine Notizen über die eigene Rechnung", ()
     }
   });
 
-  it("beide Stellen unterdrücken dieselben Codes", () => {
-    // Sonst haengt es vom Einstiegsweg ab, ob der Hinweis erscheint.
-    const sets = FILTER_SITES.map((file) => {
-      const source = readFileSync(join(root, file), "utf8");
-      const start = source.indexOf("SUPPRESSED_NEGOTIATION_WARNING_CODES");
-      const block = source.slice(start, source.indexOf("]);", start));
-      return [...block.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]!).sort().join(",");
-    });
-    expect(sets[0]).toBe(sets[1]);
-  });
-
   it("der Abbruch-Hinweis bleibt — er IST ein Risiko", () => {
     // Gegenprobe: die Unterdrueckung darf nicht zu viel wegnehmen. Was den Spieler etwas kostet,
     // muss stehen bleiben.
@@ -74,8 +60,8 @@ describe("Verhandlungsfenster zeigt keine Notizen über die eigene Rechnung", ()
 describe("Verhandlungstexte tragen echte Umlaute", () => {
   const TEXT_SITES = [
     "lib/market/contract-negotiation-preview.ts",
-    "lib/foundation/tabs/use-market-buy-derivations.ts",
-    "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx",
+    "app/foundation/transfermarkt-modern/VerhandlungsTisch.tsx",
+    "app/foundation/transfermarkt-modern/KaderAnsichten.tsx",
     "lib/foundation/tabs/foundation-format-render-helpers.ts",
   ];
 
