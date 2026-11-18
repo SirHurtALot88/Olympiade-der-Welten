@@ -457,14 +457,15 @@ function BudgetsAnsicht({
                 ton={vz(-s.umschichten.aktuell)}
               />
             ) : null}
+            {s.kaderpflicht.text ? (
+              <Zeile
+                l={<span data-testid="fin-kaderpflicht">{s.kaderpflicht.text}</span>}
+                w={`+${zahl(s.kaderpflicht.zuschlagAbloese)} C`}
+                ton="bc-plus"
+              />
+            ) : null}
             <Zeile l="= Transferbudget" w={C(s.investition.gesamt)} sum />
           </div>
-          {s.kaderpflicht.text ? (
-            <div className="fin-txt is-acht" data-testid="fin-kaderpflicht">
-              {s.kaderpflicht.text}
-              {s.kaderpflicht.zuschlagGehalt > 0.004 ? ` · Gehalt +${zahl(s.kaderpflicht.zuschlagGehalt)} C` : ""}
-            </div>
-          ) : null}
         </div>
       </div>
 

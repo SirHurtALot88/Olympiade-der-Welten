@@ -462,7 +462,10 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   const basisFreiGehalt = gehaltFrei;
   const kpAbloese = Math.max(0, zuschlag.abloese - basisFreiAbloese);
   const kpGehalt = Math.max(0, zuschlag.gehalt - basisFreiGehalt);
-  if (kpAbloese > 0.004) transferFrei = Math.min(cash, transferFrei + kpAbloese);
+  if (kpAbloese > 0.004) {
+    transferFrei = Math.min(cash, transferFrei + kpAbloese);
+    transferGesamt += kpAbloese;
+  }
   if (kpGehalt > 0.004) gehaltFrei += kpGehalt;
   const kaderpflichtAktiv = kpAbloese > 0.004 || kpGehalt > 0.004;
   const kaderpflichtText = kaderpflichtAktiv
@@ -495,7 +498,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
       grund,
     },
     gehalt: {
-      gesamt: r2(gehaltGesamt),
+      gesamt: r2(gehaltGesamt + kpGehalt),
       ausgegeben: r2(gehaltsSumme),
       frei: r2(gehaltFrei),
       gesperrt: r2(Math.max(0, basis - gehaltBudget0)),
