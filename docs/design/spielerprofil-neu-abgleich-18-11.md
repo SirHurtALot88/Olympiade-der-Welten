@@ -49,6 +49,11 @@ Entfernt: `PlayerDetailDrawer.tsx` (4337 Zeilen), `PlayerHeroNewLook.tsx`, `Play
 - Die Verletzungs-Mechanik selbst (50 % in der Verletzungs-Disziplin gebucht) liegt auf eigenem Branch; die Anzeige liest die vorhandenen Verletzungsdaten.
 - Phone ist nicht Teil dieses Baus.
 
+## Stand der Aufnahmen
+
+Vorhanden (Wegwerf-Save, Skript `scripts/screenshot-spielerprofil-neu.ts`): alle Reiter bei **2560x1440** (Überblick Star, Überblick verletzt, Disziplinen, Leistung verletzt, Vertrag, Entwicklung, Karriere, Nebel fremder Spieler, ohne Figur), bei **1920x1080** Überblick, Überblick verletzt, Disziplinen, Leistung, Vertrag, dazu vier Gegenüberstellungen `abgleich-*.png` (links Mockup, rechts App).
+**Offen:** Entwicklung, Karriere, Nebel und ohne Figur bei 1920x1080, der ganze Satz bei 1710x1112 und die Drawer-Bilder. Der Rechner war durch parallele Dev-Server überlastet (Server stürzten ab), die Läufe laufen seit der Sperre über `flock /tmp/oly-aufnahme.lock`; das Skript setzt mit `OLY_SHOT_VORHANDENE_UEBERSPRINGEN=1` dort fort, wo es aufgehört hat. Der Drawer wird über die Kaderzeile der Teamansicht geöffnet; das Auffinden der Zeile ist im Skript noch nicht bestätigt. Die Messung unten gilt für die vorhandenen Bilder.
+
 ## Messung
 
 Je Aufnahme prüft das Skript `scrollWidth/-Height`: die Seite scrollt bei allen drei Zielbildschirmen nicht. Einzige gemeldete Überbreite ist die Pixel-Figur, die absichtlich über ihren Kasten hinausragt (durchsichtiger Rand, abgeschnitten).
