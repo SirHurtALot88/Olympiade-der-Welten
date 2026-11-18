@@ -249,6 +249,17 @@ die 5 PPs bekommen als Maximum — schau mal, dass du das gebalanced bekommst! b
 beste Spieler einer Disziplin an einem Spieltag liegt um 5 PP, nicht weit darüber. Jede Änderung an der PP-Skala muss alle
 Abnehmer kennen (Bestenliste, MVP, Saisonstand, Marktwert, Training, Moral/Form) und gezeigt = gebucht halten.
 
+## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
+
+Wörtlich: „Wichtig: wenn du neue Dinge baust, IMMER einen Abgleich machen — Screenshot schauen und vergleichen mit dem
+Mockup, dann Korrekturschleife, bis die Funktionen drin sind und die Optik so aussieht wie im Mockup.“ Ein Bau-PR ist erst
+fertig, wenn (1) Aufnahmen aus der **echten App** bei 1920×1080 und 2560×1440 neben dem Mockup liegen, (2) der Agent sie
+**selbst angesehen** und jede Abweichung behoben oder begründet hat (Liste drin / angepasst / fehlt), (3) kein
+Seitenscroll, keine Überlappung, kein abgeschnittener Text, keine doppelten Knöpfe, kein Platzhaltertext bleibt, und
+(4) bei Seiten je Disziplin **Stichproben über mehrere Disziplinen** (mindestens ein Feldspiel, eine Bahn, eine Bühne,
+Mini-DM/Spurt) gemacht sind. Code mit grünen Tests ohne Abgleich-Bilder ist kein fertiger Bau. Aufnahmen laufen unter
+`flock /tmp/oly-aufnahme.lock` (Rechner hat 15 GB RAM, ein Browser zugleich).
+
 ## Neuer Stil überall — Seite für Seite neu konzipieren, nicht mischen (Chris, 18.11.)
 
 Wörtlich: „ich denke wir haben nun einen sehr guten Style gefunden mit den neuen Mockups und genau so möchte ich das auch
