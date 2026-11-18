@@ -244,6 +244,8 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   of War ganz aus** (Testzwecke, Spielbeginn). Ränge gegen die eigene Liga, klein daneben gegen alle 32.
 - **Test- und Messläufe ohne menschliches Team:** 32 KI-Teams von Anfang an, nicht ein Preset mit menschlichem Team, das
   nachträglich auf KI umgestellt wird (sonst fehlt diesem Team z. B. der Sponsor, Messung 18.11.).
+- **Gehaltsanzeige (Chris, 18.11.):** Wo ein Gehalt in Saison- und Spieltagswert gezeigt wird, steht **groß das Gehalt je
+  Saison, klein darunter das je Spieltag.** Nie umgekehrt, nie gleich groß nebeneinander.
 - Gesamtkonzept: `docs/design/finanzkonzept-v2-18-11.md` (Chris: „gefällt mir sehr gut … genau so einbauen, nicht integrieren“).
 
 ## Player Points (PPs): Leistungsmaß, Top-Spieler um 5 je Disziplin (Chris, 18.11.)
@@ -279,6 +281,13 @@ umgesetzt haben, nicht nur integriert — das ist ganz wichtig. Der alte Stil da
 sein, sondern letztendlich müssen wir step by step die Seiten neu konzeptionieren und aufsetzen inkl. der neuen Mechaniken.“
 Jede Seite wird nach dem Mockup **neu gebaut** (eigene Komponente, eigenes CSS im Mockup-Stil), nicht in die alte Seite
 eingehängt; die alte Fassung fliegt danach raus. Reihenfolge und Stand je Seite: `docs/design/seiten-umbau-fahrplan-18-11.md`.
+
+**Schriftregel (Chris, 18.11.):** **RaniraSeason für Überschriften und Namen, Barlow Condensed für Fließtext, Zahlen und
+Labels — beide lokal** (`public/fonts/`, `@font-face` mit `font-display: swap` in `app/globals.css`, kein Google-CDN). Die App
+hängt an zwei Tokens: `--schrift-haus` (RaniraSeason, Rückfall Georgia) und `--schrift-zahl` (Barlow Condensed, Rückfall
+Roboto Condensed/Arial Narrow); `--nl-display` und `--nl-sans` zeigen darauf, in den Mockups heißen sie `--haus` und `--zahl`.
+Seiten tragen keine eigene Schrift (kein Georgia, kein `system-ui`) ein, sondern nutzen die Tokens. Ausgenommen ist die Arena
+(Canvas/SVG-Beschriftungen in `battle-mode.engine.js` und `discipline-stage/arena/`).
 
 ## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
 

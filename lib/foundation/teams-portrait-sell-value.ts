@@ -40,7 +40,7 @@ export function resolveTeamsPortraitSellValueDisplay(input: {
   const tooltip =
     `VK — erwarteter Verkaufspreis = Marktwert × Verkaufsfaktor (Brutto), in Klammern hinter dem Marktwert.` +
     (entry.buyoutCost > 0
-      ? ` Rest-Buyout ${entry.buyoutCost.toFixed(2)} Mio noch offen → Netto bei Verkauf jetzt ${entry.expectedSellValue.toFixed(2)} Mio.`
+      ? ` Rest-Buyout ${entry.buyoutCost.toFixed(2)} C noch offen → Netto bei Verkauf jetzt ${entry.expectedSellValue.toFixed(2)} Mio.`
       : ` Kein offener Buyout mehr — Netto bei Verkauf jetzt entspricht dem Brutto.`);
 
   return { vkValue, vkDeltaVsMarketValue, tooltip };
