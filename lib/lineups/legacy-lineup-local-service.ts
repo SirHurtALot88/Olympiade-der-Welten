@@ -1176,6 +1176,12 @@ function buildValidationOptions(context: LegacyLineupLoadedContext, forSubmit = 
     seasonCaptainLimit: context.captainRule?.seasonCaptainSlots ?? context.teamStatus?.captainSlots ?? SEASON_CAPTAIN_SLOTS,
     captainUsedBeforeCurrentDraft: Math.max(0, (context.teamStatus?.captainUsedCount ?? 0) - previousCaptainKeys.size),
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsedBeforeCurrentDraftSides),
+    // Ein heute Verletzter darf nur dort stehen bleiben, wo er schon stand (Validator).
+    bisherigeEintraege: (context.existingDraft?.entries ?? []).map((entry) => ({
+      playerId: entry.playerId,
+      disciplineId: entry.disciplineId,
+      disciplineSide: entry.disciplineSide,
+    })),
   };
 }
 
