@@ -179,7 +179,7 @@ export type LineupNewLookProps = Pick<
    * am aktuellen Spieltag sind"). Je Disziplin-Slot die Vierergruppe bzw. der Duell-Gegner aus dem
    * Spielplan (`getSpieltagsGegnerFuerTeam`, dieselbe Quelle wie Resolve). Leer/null = nichts zeigen.
    */
-  spieltagsGegner?: Array<{ disciplineSide: "d1" | "d2"; displayName: string; art: "pod" | "duell"; gegnerNamen: string[] }> | null;
+  spieltagsGegner?: Array<{ disciplineSide: "d1" | "d2"; displayName: string; art: "pod" | "duell"; gegnerNamen: string[]; gegnerTeamIds?: string[] }> | null;
   /**
    * STRATEGIE-VORLAGEN (Pilot Wettessen, 17.11., docs/design/strategie-templates-16-11.md 4.1): die
    * Spielweise je Disziplin-Seite. Nur gesetzt, wenn die Flagge `OLY_STRATEGIE_VORLAGEN` an ist —

@@ -13,7 +13,10 @@ export function FeldHintergrund({
   art,
   spuren,
   etiketten,
+  disziplinId = null,
 }: {
+  /** Nur für Zeichen ohne eigene `FeldArt` (Tennis): die Linien liegen per SVG über der PixelLab-Fläche. */
+  disziplinId?: string | null;
   art: FeldArt;
   /** Anzahl Bahnen bei `strecke`. */
   spuren: number;
@@ -43,8 +46,8 @@ export function FeldHintergrund({
       inhalt = (
         <>
           <rect width="800" height="500" fill="#2e2118" />
-          <rect width="400" height="500" fill={WIR} />
-          <rect x="400" width="400" height="500" fill={GEGEN} />
+          <rect className="tint" width="400" height="500" fill={WIR} />
+          <rect className="tint" x="400" width="400" height="500" fill={GEGEN} />
           <rect x="16" y="16" width="768" height="468" {...L} />
           <path d="M400 16v468" {...L} />
           <circle cx="400" cy="250" r="62" {...L} />
@@ -155,8 +158,8 @@ export function FeldHintergrund({
       inhalt = (
         <>
           <rect width="800" height="500" fill="#161d12" />
-          <rect width="400" height="500" fill={WIR} />
-          <rect x="400" width="400" height="500" fill={GEGEN} />
+          <rect className="tint" width="400" height="500" fill={WIR} />
+          <rect className="tint" x="400" width="400" height="500" fill={GEGEN} />
           {[110, 250, 390].map((y) => (
             <circle key={y} cx="400" cy={y} r="52" fill="rgba(0,0,0,.3)" stroke="rgba(244,230,196,.45)" strokeWidth="3" strokeDasharray="10 7" />
           ))}
@@ -167,8 +170,8 @@ export function FeldHintergrund({
       inhalt = (
         <>
           <rect width="800" height="500" fill="#10170f" />
-          <rect width="400" height="500" fill={WIR} />
-          <rect x="400" width="400" height="500" fill={GEGEN} />
+          <rect className="tint" width="400" height="500" fill={WIR} />
+          <rect className="tint" x="400" width="400" height="500" fill={GEGEN} />
           <path d="M400 0v500" stroke="rgba(244,230,196,.18)" strokeWidth="2" strokeDasharray="6 10" />
           {[140, 300, 460].map((x) => (
             <path key={x} d={`M${x / 1.0} 20v460`} stroke="rgba(244,230,196,.07)" strokeWidth="2" />
@@ -177,13 +180,22 @@ export function FeldHintergrund({
       );
       break;
     default:
-      inhalt = (
-        <>
-          <rect width="800" height="500" fill="#0a0f16" />
-          <rect x="20" y="170" width="760" height="160" rx="10" fill="#141b27" stroke="rgba(244,230,196,.25)" strokeWidth="2" />
-          <path d="M20 400h760" stroke="rgba(244,230,196,.15)" strokeWidth="2" />
-        </>
-      );
+      inhalt =
+        disziplinId === "tennis" ? (
+          <>
+            <rect width="800" height="500" fill="#17120e" />
+            <rect x="40" y="70" width="720" height="360" {...L} />
+            <rect x="40" y="118" width="720" height="264" {...L} />
+            <path d="M400 70v360" stroke="rgba(244,230,196,.5)" strokeWidth="4" />
+            <path d="M190 118v264M610 118v264M190 250h420" {...L} />
+          </>
+        ) : (
+          <>
+            <rect width="800" height="500" fill="#0a0f16" />
+            <rect x="20" y="170" width="760" height="160" rx="10" fill="#141b27" stroke="rgba(244,230,196,.25)" strokeWidth="2" />
+            <path d="M20 400h760" stroke="rgba(244,230,196,.15)" strokeWidth="2" />
+          </>
+        );
   }
   return (
     <svg className="elm-feld__svg" viewBox="0 0 800 500" preserveAspectRatio="none" aria-hidden="true">
