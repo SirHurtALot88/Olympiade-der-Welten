@@ -2129,3 +2129,104 @@
     .oly-battle-arena.oly-battle-arena :is(.hud-kopf,.hud-dock,.hud-karte,.hud-einblender,.hud-bedien) *{animation:none!important;transition:none!important}
     .oly-battle-arena.oly-battle-arena .hud-einblender.an{opacity:1}
   }
+
+  /* ============================================================================================
+     ARENA-VOLLFLAECHE (Chris 18.11.: "Bau alle Screens so, dass sie moeglichst viel vom Bildschirm
+     nutzen, und vor allem die Battle Arena ... die braucht ja wirklich jeden cm Breite und Hoehe" --
+     Hauptziel 4K-Monitor 2560x1440/1920x1080, Nebenziel MacBook 1710x1112, s. CLAUDE.md
+     "Zielbildschirme"). Der Host (FoundationBattleArenaHost.tsx) legt um den Motor die Huelle
+     `.oly-arena-buehne` und setzt `data-voll="1"`, solange der Arena-Reiter (#p2) offen ist und der
+     Betrachter die Vollflaeche nicht abgeschaltet hat. Dann:
+       - die Buehne liegt fest ueber dem Fenster, links bis an die Navigation (--arena-links misst der
+         Host an der Seitenleiste/Icon-Schiene), oben bis an den Rand -- App-Kopfzeilen, Breadcrumbs
+         und Statuskarten liegen darunter, eine schmale Leiste (40 px) traegt Reiter, Titel und den
+         Schalter zurueck in die Seite;
+       - die Leinwand bekommt die volle Breite; ihre Hoehe folgt dem festen Seitenverhaeltnis 1240:470.
+         Reicht die Hoehe nicht (sehr breite Fenster), rechnet der Host die Breite herunter
+         (--arena-cv-breite) und die Leinwand steht mittig vor der Buehnen-Kulisse statt vor Schwarz;
+       - Bedienzeile (Kampf starten, Tempo, Stand, Ton) teilt sich EINE Zeile mit der Kopfzeile, Ticker
+         und Wertung fuellen den Rest der Hoehe unter dem Feld (bei 16:9 ist das Feld breitenbegrenzt,
+         die Hoehe darunter waere sonst leer).
+     Reine Darstellung: Motor-Koordinaten bleiben 1240x470 (scharf gezeichnet ueber leinwandScharf()
+     im Motor), keine ID und keine DOM-Reihenfolge aendert sich. Ohne data-voll (Seitenmodus,
+     Aufstellungsreiter, Handy, Standalone-Mockup) gilt alles darueber unveraendert.
+     ============================================================================================ */
+  .oly-arena-buehne[data-voll="1"]{position:fixed;top:0;right:0;bottom:0;left:var(--arena-links,0px);z-index:60;
+    display:flex;flex-direction:column;min-width:0;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 38%,#18202c 0%,#0d1219 55%,#07090d 100%)}
+  .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-koerper{flex:1;min-height:0;display:flex;flex-direction:column}
+  .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-koerper>div{flex:1;min-height:0;display:flex;flex-direction:column;margin:0!important}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena{flex:1;min-height:0;display:flex;flex-direction:column;background:transparent}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .wrap{flex:1;min-height:0;display:flex;flex-direction:column;
+    max-width:none;margin:0;padding:0}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .wrap>.lede{display:none}
+  /* Reiterzeile = Kopfstreifen der Buehne (40 px); rechts daneben liegt die Leiste des Hosts. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .tabs{flex:none;height:40px;margin:0;padding:0 var(--arena-leiste-breite,360px) 0 8px;
+    align-items:stretch;flex-wrap:nowrap;border-bottom:1px solid var(--line-soft)}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .tab{font-size:14px;padding:0 14px;border-radius:0;display:flex;align-items:center}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena.im-spieltag .wrap{padding-top:40px}
+  /* #p2 scrollt: der Rahmen (Feld + Ticker) fuellt genau die Buehnenhoehe, Entwicklertafeln darunter
+     (#tdmEntwurfNotes u. a.) erreicht man per Scrollen, statt dass sie den Rahmen zusammendruecken. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .frame{flex:none;height:100%;min-height:0;display:grid;
+    grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);align-items:stretch;
+    border-radius:0;border-width:0;box-shadow:none;background:transparent;overflow:hidden}
+  /* Mini-DM (eigene Vier-Ecken-Buehne ohne #cv): darf in der Buehne scrollen. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .frame.mdffa-vollbreite{overflow-y:auto;grid-template-rows:auto}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .mdffa-buehne{width:min(100%,calc((100vh - 150px) * 1240 / 470));margin-inline:auto}
+  /* Kopf- und Bedienzeile in EINER Zeile: Grid ueber die direkten Kinder von .arenaHaupt. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt{display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;align-content:start;min-width:0;background:var(--surface)}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>*{grid-column:1/-1;min-width:0}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.fbar{grid-column:1;grid-row:1;border-bottom:0;white-space:nowrap}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.ctrl{grid-column:3;grid-row:1;justify-content:flex-end;flex-wrap:nowrap;
+    border-top:0;padding:5px 12px;gap:6px}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.ctrl .btn{font-size:13px;padding:5px 13px}
+  /* Die Leinwand: volle Breite, ausser die Hoehe reicht nicht (Host rechnet --arena-cv-breite). Der
+     Raum ringsum ist die Kulisse der Buehne (Hintergrund oben), nicht Schwarz. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.arenaraum{width:var(--arena-cv-breite,100%);
+    max-width:100%;justify-self:center}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.arenaraum>#cv{width:100%}
+  /* Ticker + Wertung nebeneinander im Rest der Hoehe (statt 320-px-Seitenspalte neben dem Feld). */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .frame>.untenraum{min-height:0;height:100%;
+    grid-template-columns:minmax(320px,28%) minmax(0,1fr);border-left:0;border-top:1px solid var(--line-soft);
+    padding-top:0!important;overflow:hidden;background:var(--surface)}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .untenraum>*{min-height:0}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .tickerbox{height:100%}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .tickerbox>.feed{height:auto;flex:1;min-height:0}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .wertung{height:100%;min-height:0}
+  /* Schmale Leiste des Hosts oben rechts (Titel, Paarung, Quick-Sim, zurueck in die Seite). */
+  .oly-arena-buehne-leiste{display:none}
+  .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-leiste{display:flex;position:absolute;top:0;right:var(--arena-rechts-frei,0px);
+    height:40px;z-index:2;align-items:center;gap:10px;padding:0 12px;max-width:calc(100% - 380px);
+    font-size:13px;color:#d9dee8;white-space:nowrap}
+  .oly-arena-buehne[data-voll="1"][data-spieltag="1"]>.oly-arena-buehne-leiste{left:0;max-width:none;justify-content:flex-start}
+  .oly-arena-buehne-leiste .oly-arena-buehne-titel{font-weight:800;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .oly-arena-buehne-leiste .oly-arena-buehne-paarung{color:#9aa7ba;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .oly-arena-buehne-leiste .oly-arena-buehne-luecke{flex:1}
+  .oly-arena-buehne-leiste button{min-height:28px;padding:0 12px;border-radius:8px;cursor:pointer;font:inherit;font-weight:700;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:inherit;flex:none}
+  .oly-arena-buehne-leiste button:hover{border-color:rgba(255,255,255,.36);background:rgba(255,255,255,.1)}
+  .oly-arena-buehne-leiste button.ist-akzent{border-color:#F2A03D;background:color-mix(in srgb,#F2A03D 16%,transparent)}
+  .oly-arena-buehne-leiste button[disabled]{opacity:.55;cursor:progress}
+  .oly-arena-buehne-leiste button:focus-visible{outline:2px solid #F2A03D;outline-offset:2px}
+  /* Seitenmodus: der Schalter zurueck in die Vollflaeche sitzt als kleiner Knopf ueber der Arena. */
+  .oly-arena-buehne-zurueck{display:none}
+  .oly-arena-buehne[data-voll="0"][data-arena-reiter="1"]>.oly-arena-buehne-zurueck{display:flex;justify-content:flex-end;margin:0 0 6px}
+  .oly-arena-buehne-zurueck button{min-height:30px;padding:0 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:inherit}
+  /* position:fixed braucht einen Vorfahren OHNE transform/will-change:transform -- die Einschwebe-
+     Animation des Shells (.foundation-view-enter) hinterlaesst beides und machte die Buehne sonst
+     zu einem Kasten innerhalb der Inhaltsspalte. Nur solange die Vollflaeche aktiv ist. */
+  body:has(.oly-arena-buehne[data-voll="1"]) .foundation-view-enter{animation:none!important;transform:none!important;will-change:auto!important}
+  /* Kaderleiste in EINER Zeile (die zweite Kartenzeile kostete auf 1920x1080 ~110 px Feldhoehe):
+     Kacheln teilen sich die Breite, Namen kuerzen sich wie ohnehin vorgesehen. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .kaderleiste{padding:6px 10px}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .kseite{flex-wrap:nowrap;min-width:0}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .kseite>.kk{flex:0 1 150px;min-width:0;overflow:hidden}
+  /* "Plan der KI" / Rennplaene in dieselbe Kopfzeile (Mitte, einzeilig gekuerzt; voller Text im Tooltip
+     des Motors bzw. im Ticker) -- noch eine Zeile weniger ueber dem Feld. Scorezeile etwas flacher. */
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.planzeile{grid-column:2;grid-row:1;align-self:center;
+    min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;background:transparent}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.scoreline{padding-top:6px;padding-bottom:6px}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.planzeile>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

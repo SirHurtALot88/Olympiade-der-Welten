@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArenaSpieltagAnsicht } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
 
+import ArenaVollflaecheBuehne from "@/app/foundation/battle-arena/ArenaVollflaecheBuehne";
 import FoundationBattleArenaSpriteGallery from "@/app/foundation/battle-arena/FoundationBattleArenaSpriteGallery";
 import {
   buildArenaTeam,
@@ -1248,7 +1249,28 @@ export default function FoundationBattleArenaHost({
           @keyframes olyArenaDrehen{to{transform:rotate(360deg)}}
           @media (prefers-reduced-motion:reduce){.oly-arena-spin{animation:none}}
         `}</style>
-        {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10 }} /> : null}
+        {/* VOLLFLAECHE (Chris 18.11., s. ArenaVollflaecheBuehne): im Arena-Reiter liegt der Motor als
+            Buehne ueber dem ganzen Fenster; Titel, Paarung und Quick-Sim wandern in ihre 40-px-Leiste. */}
+        <ArenaVollflaecheBuehne
+          istSpieltag
+          titel={<>Battle Arena · {spieltag.disziplinName ?? disziplin}</>}
+          paarung={podTeams ? `Vierergruppe: ${podTeams.join(", ")}` : `${heimName} gegen ${gastName}`}
+          seiteHervorheben={endeInfo != null}
+          zusatz={
+            <button
+              type="button"
+              className="ist-akzent"
+              data-testid="oly-arena-buehne-quicksim"
+              onClick={starteQuickSim}
+              disabled={!motorBereit || spultVor || endeInfo != null}
+              title="Spult das Spiel bis zum Ende vor — derselbe Verlauf wie beim Zuschauen, nur schneller."
+            >
+              {spultVor ? "⏩ spult vor …" : endeInfo ? "✓ Spiel zu Ende" : "⏩ Quick-Sim"}
+            </button>
+          }
+        >
+          {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10 }} /> : null}
+        </ArenaVollflaecheBuehne>
       </>
     );
   }
@@ -1510,9 +1532,14 @@ export default function FoundationBattleArenaHost({
           Team-Wechsel durchgaengig im DOM (React reisst ihn sonst bei jedem Zwischen-Ladezustand
           selbst ab, egal was der Mount-Effekt oben tut) — der alte Kampf laeuft sichtbar weiter,
           bis der neue Kader wirklich steht. Siehe gerenderterKader-Kommentar weiter oben. */}
-      {gerenderterKader ? (
-        <div ref={containerRef} style={{ marginTop: 14 }} />
-      ) : null}
+      <ArenaVollflaecheBuehne
+        titel="Battle Arena · Test"
+        paarung={`${teams.find((team) => team.teamId === heimTeamId)?.name ?? heimTeamId} gegen ${
+          teams.find((team) => team.teamId === gastTeamId)?.name ?? gastTeamId
+        }`}
+      >
+        {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 14 }} /> : null}
+      </ArenaVollflaecheBuehne>
 
       <section className="panel" style={{ marginTop: 14 }}>
         <p className="muted" style={{ margin: 0, fontSize: 12 }}>
@@ -1528,7 +1555,7 @@ export default function FoundationBattleArenaHost({
           Motor stehen bleiben -- der Motor haengt als eigenes <div ref={containerRef}> daneben,
           nicht darunter, dieser Block bleibt also ausserhalb seines DOM und blutet nirgendwohin. */}
       <style>{`
-        .oly-arena-live-buttons{position:fixed;right:16px;bottom:16px;z-index:40;display:flex;
+        .oly-arena-live-buttons{position:fixed;right:16px;bottom:16px;z-index:65;display:flex;
           flex-direction:column;align-items:flex-end;gap:8px}
         .oly-arena-live-knopf{min-height:40px;padding:0 16px;border-radius:999px;cursor:pointer;
           border:1px solid rgba(255,255,255,0.16);background:#262626;color:#f4f4f4;font-size:0.82rem;

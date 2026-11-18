@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Finanzen – Datenfluss (Mockup 18.11.)</title>
+<!--
+  FINANZEN: WIE DIE DATEN IM HINTERGRUND LAUFEN (Fable, 18.11.). Mockup zum Konzept docs/design/finanzkonzept-v2-18-11.md.
+  Gleiche Tokens, Schiene, Hero-Kopf und Tafeln wie finanzen-modern-17-11.html / einsatzliste-modern-17-11.html.
+  Kein App-Code, kein PixelLab (0 Generationen), alles CSS/SVG.
+  ECHT:    32 Teams (Namen, Wappen), je Team Budget, Finanz-/Ambitionswert, Sponsor-Anker, Start-/Endrang aus den Messlaeufen;
+           Ruecklage, Gehaltsdeckel, Gehalt, Sockel, Rangbonus aus scripts/rechne-finanzkonzept-v2-18-11.mjs (Lauf C, Faktor 1,0);
+           Liga-Bilanz = Mittel der Laeufe A/B/C. Alle Formeln und Startwerte wie im Konzept.
+  ERFUNDEN: Ergebnisse je Spieltag (gesaet, Summe = Siege der Rechnung), Gegner, Heim/Auswaerts-Folge, Rangverlauf,
+           Abloesen/Verkaeufe/Liga-Topf-Anteil der Folgesaison (Groessenordnung aus der Messung). Die Stimmung laeuft hier
+           je Spieltag nach den Regeln aus Abschnitt 4; Saisonsummen weichen deshalb um wenige C von Abschnitt 2.5 ab.
+  URL: ?ansicht=tag|ende|kauf|ki|liga &team=G-G &f=0.82|1|1.24 &st=1..20 &sel=<posten> &preis=ki|0|1|2|3 &kauf=<C> &bau=0|1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --p1:#e0637a; --p2:#e89a4c; --p3:#c3cf5e; --p4:#4fc7b2; --p5:#62a0f4; --p6:#ac8af2;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem; --r-s:.375rem;
+}
+/* Eine Groesse fuer alles: 16 px bei 1920 breit, 21,3 px bei 2560, 14,25 px bei 1710. */
+html{font-size:clamp(12.5px,.8333vw,26px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased;overflow:hidden}
+body{font-size:1rem}
+button,a,select{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+img{display:block}
+
+.app{display:grid;grid-template-columns:4rem minmax(0,1fr);height:100vh;background:var(--grund)}
+.rail{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.625rem 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:2.5rem;height:2.5rem;border-radius:.56rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.625rem}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:2.75rem;height:2.75rem;border-radius:.56rem;display:grid;place-items:center;font-size:1.25rem;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.625rem;top:.56rem;bottom:.56rem;width:3px;border-radius:2px;background:var(--gold)}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+/* ---------- Hero-Kopf ---------- */
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:1rem;padding:.8rem 1.25rem 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:-2rem;z-index:-2;background:url("../szenen/basketball/parkett.jpg") center 40%/cover;filter:blur(14px) saturate(1.15);opacity:.5}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.94) 0%,rgba(6,8,12,.72) 38%,rgba(6,8,12,.62) 62%,rgba(6,8,12,.93) 100%),linear-gradient(180deg,transparent 40%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:.875rem;padding-bottom:.8rem}
+.hk .crest{width:3.6rem;height:3.6rem;border-radius:.625rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 1.7rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk .sub{margin-top:.3rem;font-size:.94rem;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.tabs{display:flex;align-items:flex-end;gap:.5rem;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:19rem;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.55rem;padding:.6rem 1rem .7rem .95rem;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(.875rem 0,100% 0,calc(100% - .875rem) 100%,0 100%);color:var(--leise);transition:background .15s}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .nr{width:2.1rem;height:2.1rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.25rem;font-weight:700;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme)}
+.dtab.an .nr{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 1.18rem/1.1 var(--haus);color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hr{display:flex;align-items:center;gap:1rem;padding-bottom:.8rem}
+.wahl{display:flex;flex-direction:column;gap:.2rem}
+.wahl select{height:2.25rem;padding:0 .6rem;border-radius:.44rem;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:1rem;width:13.5rem}
+.wahl select option{background:#121824;color:#eef2f8}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.44rem;overflow:hidden;height:2.25rem}
+.seg button{padding:0 .7rem;font-weight:600;font-size:1rem;color:var(--leise);border-right:1px solid var(--linie);white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--flaeche-3);color:var(--tinte)}
+.seg button[aria-pressed=true]{background:var(--gold);color:#17120a}
+.seg.klein{height:1.9rem} .seg.klein button{font-size:.9rem;padding:0 .55rem}
+
+/* ---------- Arbeitsflaeche ---------- */
+.work{flex:1;min-height:0;display:grid;gap:.75rem;padding:.75rem .875rem}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;border-bottom:1px solid var(--linie);min-height:2.8rem}
+.pk h2{margin:0;font:400 1.2rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1}
+.pk .hin{font-size:.86rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pb{flex:1;min-height:0;padding:.7rem .75rem;display:flex;flex-direction:column;gap:.6rem}
+.marke{display:inline-flex;align-items:center;gap:.3rem;height:1.4rem;padding:0 .5rem;border-radius:999px;font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.marke.h{background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.marke.a{background:rgba(69,176,201,.16);color:var(--gast);border:1px solid rgba(69,176,201,.5)}
+.marke.k{background:rgba(244,230,196,.08);color:var(--creme);border:1px solid var(--linie-2)}
+.marke.w{background:rgba(255,96,88,.14);color:var(--warn);border:1px solid rgba(255,96,88,.5)}
+.marke.g{background:rgba(98,211,148,.14);color:var(--gut);border:1px solid rgba(98,211,148,.45)}
+
+/* Buchungsliste */
+.bl{flex:1;min-height:0;display:flex;flex-direction:column}
+.bz{flex:1 1 0;min-height:1.7rem;display:grid;grid-template-columns:.3rem minmax(0,1fr) auto 5.2rem;align-items:center;gap:.6rem;padding:0 .75rem 0 0;border-bottom:1px solid rgba(244,230,196,.06);width:100%}
+.bz:hover{background:var(--flaeche-2)}
+.bz.an{background:linear-gradient(90deg,rgba(240,195,90,.16),rgba(240,195,90,.03))}
+.bz .fb{align-self:stretch;background:var(--pc,var(--stumm))}
+.bz b{font-weight:600;font-size:1.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bz small{font-size:.9rem;color:var(--stumm);white-space:nowrap}
+.bz strong{font-size:1.32rem;font-weight:700;text-align:right}
+.bz.aus b,.bz.aus strong{color:var(--stumm)}
+.bsum{flex:none;display:grid;grid-template-columns:1fr auto;align-items:center;padding:.5rem .75rem;border-top:1px solid var(--linie-2);background:var(--flaeche-2)}
+.bsum span{font-size:.86rem;color:var(--leise)} .bsum strong{font-size:1.5rem;font-weight:700}
+
+/* Datenfluss */
+.fluss{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.4rem}
+.st{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;gap:.5rem;padding:.75rem .85rem;border-radius:var(--r-s);background:var(--flaeche-2);border:1px solid var(--linie)}
+.st:not(:last-child)::after{content:"";position:absolute;right:-1.05rem;top:50%;width:.7rem;height:.7rem;border-top:2px solid var(--gold);border-right:2px solid var(--gold);transform:translateY(-50%) rotate(45deg)}
+.st .nr{display:flex;align-items:center;gap:.45rem}
+.st .nr i{font-style:normal;width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#17120a;font-weight:700;font-size:.9rem}
+.st h3{margin:0;font:400 1.3rem/1.1 var(--haus);color:var(--creme)}
+.st p{margin:0;font-size:1.12rem;line-height:1.28;color:var(--tinte);font-weight:500}
+.st p.l{color:var(--leise);font-size:.95rem}
+.st code{display:block;font:500 1.04rem/1.4 var(--zahl);color:var(--creme);background:rgba(0,0,0,.35);border:1px solid var(--linie);border-radius:.3rem;padding:.35rem .45rem;white-space:pre-wrap}
+.st .erg{margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;padding-top:.35rem;border-top:1px dashed var(--linie)}
+.st .erg strong{font-size:2.1rem;font-weight:700;line-height:1}
+.st .erg span{font-size:.92rem;color:var(--stumm)}
+.chips{display:flex;flex-wrap:wrap;gap:.3rem}
+.chip{height:1.5rem;padding:0 .55rem;border-radius:999px;border:1px solid var(--linie-2);font-size:.9rem;font-weight:600;color:var(--creme);display:inline-flex;align-items:center;white-space:nowrap}
+.chip.g{border-color:rgba(240,195,90,.6);color:var(--gold)}
+.unten{flex:none;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:.75rem}
+.kachel{padding:.55rem .7rem;border-radius:var(--r-s);background:var(--flaeche-2);border:1px solid var(--linie);min-width:0}
+.kachel h4{margin:0 0 .35rem;font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.ha{display:grid;grid-template-columns:4.6rem minmax(0,1fr) 3.6rem;align-items:center;gap:.5rem;font-size:.95rem;font-weight:600;height:1.5rem}
+.ha .bk{position:relative;height:.7rem;background:rgba(0,0,0,.4);border-radius:.2rem}
+.ha .bk i{position:absolute;top:0;bottom:0;border-radius:.2rem}
+.ha .bk u{position:absolute;top:-.2rem;bottom:-.2rem;width:1px;background:var(--linie-2)}
+.sr{display:grid;grid-template-columns:minmax(0,1fr) 3.2rem;font-size:.95rem;font-weight:500;line-height:1.35}
+.sr span:last-child{text-align:right;font-weight:700}
+
+/* Kassenkurve */
+.kurve{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 23rem;gap:.75rem;padding:.6rem .75rem}
+.kv{min-width:0;min-height:0;display:flex;flex-direction:column}
+.kvs{flex:1;min-height:0;position:relative} .kvs svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.kv input[type=range]{width:calc((100% - 4.2rem) * 19 / 21 + 1rem);margin:.2rem 0 0 calc(2.6rem + (100% - 4.2rem) / 21 - .5rem);accent-color:var(--gold);height:1.1rem}
+.kpis{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(0,1fr);gap:.5rem;min-height:0}
+.kpi{display:flex;flex-direction:column;justify-content:center;padding:.4rem .65rem;border-radius:var(--r-s);background:var(--flaeche-2);border:1px solid var(--linie);min-height:0}
+.kpi:hover{border-color:var(--gold)} .kpi.an{border-color:var(--gold);background:linear-gradient(180deg,rgba(240,195,90,.14),var(--flaeche-2))}
+.kpi strong{font-size:1.9rem;line-height:1;font-weight:700}
+.kpi small{font-size:.8rem;color:var(--stumm);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Wasserfall / Tabellen */
+.wf{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;gap:.3rem}
+.wz{display:grid;grid-template-columns:13rem minmax(0,1fr) 5.4rem;align-items:center;gap:.75rem}
+.wz b{font-size:1.08rem;font-weight:600} .wz small{display:block;font-size:.84rem;color:var(--stumm);font-weight:500;line-height:1.2}
+.wz .bk{position:relative;height:1.7rem;background:rgba(0,0,0,.35);border-radius:.25rem}
+.wz .bk i{position:absolute;top:0;bottom:0;border-radius:.25rem}
+.wz .bk u{position:absolute;top:-.3rem;bottom:-.3rem;width:1px;background:var(--linie-2)}
+.wz strong{font-size:1.45rem;font-weight:700;text-align:right}
+.wz.sum{padding-top:.4rem;border-top:1px solid var(--linie-2)}
+table.tb{width:100%;border-collapse:collapse;font-size:1.02rem}
+table.tb th{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;text-align:right;padding:.3rem .5rem;border-bottom:1px solid var(--linie-2);white-space:nowrap}
+table.tb th:first-child,table.tb td:first-child{text-align:left}
+table.tb td{padding:.24rem .5rem;border-bottom:1px solid rgba(244,230,196,.06);text-align:right;font-weight:600;white-space:nowrap}
+table.tb td small{color:var(--stumm);font-weight:500;font-size:.84rem;margin-left:.35rem}
+table.tb tr.sum td{border-top:1px solid var(--linie-2);font-size:1.15rem;font-weight:700;background:var(--flaeche-2)}
+table.tb td.akt,table.tb th.akt{background:rgba(240,195,90,.1)}
+table.tb.gross{font-size:1.15rem} table.tb.gross td{padding:.42rem .6rem} table.tb.gross tr.sum td{font-size:1.3rem}
+table.tb tr.gr td{color:var(--leise);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;padding-top:.5rem}
+.fbp{display:inline-block;width:.6rem;height:.6rem;border-radius:2px;background:var(--pc);margin-right:.45rem}
+
+/* Schrittkette Kauf */
+.kette{flex:1;min-height:0;display:flex;flex-direction:column}
+.kz{flex:1 1 0;min-height:2rem;max-height:6rem;display:grid;grid-template-columns:1.7rem minmax(0,1fr) 5rem 6rem;align-items:center;gap:.7rem;border-bottom:1px solid rgba(244,230,196,.06)}
+.kz i{font-style:normal;width:1.5rem;height:1.5rem;border-radius:50%;display:grid;place-items:center;background:var(--flaeche-3);border:1px solid var(--linie-2);font-weight:700;font-size:.86rem;color:var(--creme)}
+.kz b{font-size:1.25rem;font-weight:600} .kz small{display:block;font-size:.95rem;color:var(--stumm);font-weight:500;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz strong{text-align:right;font-size:1.35rem;font-weight:700}
+.kz em{text-align:right;font-style:normal;font-size:1.55rem;font-weight:700;color:var(--creme)}
+.kz.ltopf{background:rgba(240,195,90,.07)} .kz.ltopf b{color:var(--gold)} .kz.ltopf i{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.kz.sturz{background:var(--flaeche-2);border-top:1px solid var(--linie-2)}
+.regler{display:grid;grid-template-columns:auto minmax(0,1fr) 4.5rem;align-items:center;gap:.7rem;font-weight:600}
+.regler input{accent-color:var(--gold);width:100%}
+.urteil{padding:.75rem .85rem;border-radius:var(--r-s);border:1px solid var(--linie-2);background:var(--flaeche-2)}
+.urteil.ok{border-color:rgba(98,211,148,.55);background:linear-gradient(180deg,rgba(98,211,148,.12),var(--flaeche-2))}
+.urteil.kr{border-color:rgba(243,181,74,.6);background:linear-gradient(180deg,rgba(243,181,74,.13),var(--flaeche-2))}
+.urteil.zw{border-color:rgba(255,96,88,.6);background:linear-gradient(180deg,rgba(255,96,88,.13),var(--flaeche-2))}
+.urteil h3{margin:0 0 .3rem;font:400 1.5rem/1.1 var(--haus);color:#fff}
+.urteil p{margin:0;font-size:1rem;line-height:1.3;color:var(--tinte);font-weight:500}
+.zr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;font-size:1.08rem;font-weight:500;padding:.3rem 0;border-bottom:1px solid rgba(244,230,196,.06)}
+.zr span:last-child{font-weight:700}
+.zr small{color:var(--stumm);font-size:.84rem;margin-left:.3rem}
+
+/* KI */
+.tg{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:.3rem}
+.tk{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.4rem;padding:.15rem .35rem;border-radius:.35rem;border:1px solid var(--linie);background:var(--flaeche-2);min-height:0;border-left:3px solid var(--pc)}
+.tk:hover{border-color:var(--gold)} .tk.an{background:rgba(240,195,90,.16);border-color:var(--gold)}
+.tk img{height:1.7rem;width:1.7rem;border-radius:.25rem;object-fit:cover}
+.tk b{font-size:1rem;font-weight:700;line-height:1.1} .tk small{display:block;font-size:.8rem;color:var(--stumm);line-height:1.1;white-space:nowrap}
+.kk{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:.6rem}
+.ks{min-height:0;display:flex;flex-direction:column;gap:.5rem;padding:.75rem .85rem;border-radius:var(--r-s);background:var(--flaeche-2);border:1px solid var(--linie)}
+.ks h3{margin:0;font:400 1.3rem/1.1 var(--haus);color:var(--creme);display:flex;align-items:center;gap:.45rem}
+.ks h3 i{font-style:normal;width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#17120a;font:700 .9rem var(--zahl)}
+.ks code{font:500 1.12rem/1.4 var(--zahl);color:var(--creme);background:rgba(0,0,0,.35);border:1px solid var(--linie);border-radius:.3rem;padding:.3rem .45rem;white-space:pre-wrap}
+.ks p{margin:0;font-size:1.05rem;line-height:1.28;color:var(--leise);font-weight:500}
+.ks .erg{margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ks .erg strong{font-size:2.1rem;font-weight:700;line-height:1}
+.ks .erg span{font-size:.95rem;color:var(--stumm)}
+.skala{position:relative;height:.55rem;border-radius:.3rem;background:linear-gradient(90deg,var(--p1),var(--acht),var(--gut));margin:.35rem 0 .2rem}
+.skala u{position:absolute;top:-.25rem;width:.2rem;height:1.05rem;background:#fff;border-radius:1px;transform:translateX(-50%)}
+.vb{display:grid;grid-template-columns:4rem minmax(0,1fr) 3.6rem;align-items:center;gap:.5rem;font-weight:600;font-size:1.08rem;height:1.7rem}
+.vb .bk{height:.75rem;background:rgba(0,0,0,.4);border-radius:.2rem;position:relative}
+.vb .bk i{position:absolute;left:0;top:0;bottom:0;border-radius:.2rem}
+.vb .bk u{position:absolute;top:-.25rem;bottom:-.25rem;width:2px;background:#fff}
+
+/* Liga-Kreislauf */
+.kreis{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:.5rem 2rem;align-items:stretch}
+.kb{display:flex;flex-direction:column;gap:.3rem;min-height:0}
+.kb h4{margin:0;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.kq{position:relative;flex:1 1 0;min-height:1.6rem;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:0 .65rem;border-radius:.35rem;background:var(--flaeche-2);border:1px solid var(--linie);border-left:3px solid var(--pc);font-weight:600}
+.kq strong{font-size:1.2rem;font-weight:700}
+.kb.ein .kq::after,.kb.mit .mitte::after{content:"";position:absolute;right:-1.35rem;top:50%;width:.7rem;height:.7rem;border-top:2px solid var(--gold);border-right:2px solid var(--gold);transform:translateY(-50%) rotate(45deg)}
+.mitte{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;border-radius:var(--r);border:1px solid var(--linie-2);background:radial-gradient(ellipse at 50% 30%,rgba(240,195,90,.16),var(--flaeche-2) 70%);text-align:center;padding:.5rem}
+.mitte strong{font-size:3rem;font-weight:700;line-height:1} .mitte span{font-size:.95rem;color:var(--leise);font-weight:500}
+.topf{grid-column:1 / -1;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.8rem;padding:.5rem .75rem;border-radius:var(--r-s);border:1px dashed rgba(240,195,90,.6);background:rgba(240,195,90,.06)}
+.topf b{font:400 1.15rem var(--haus);color:var(--gold)} .topf span{font-size:.95rem;color:var(--tinte);font-weight:500;line-height:1.25} .topf strong{font-size:1.4rem;font-weight:700;white-space:nowrap}
+.drei{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.drei div{padding:.5rem .6rem;border-radius:var(--r-s);border:1px solid var(--linie);background:var(--flaeche-2);opacity:.55}
+.drei div.an{opacity:1;border-color:var(--gold)} .drei b{display:block;font-size:1.05rem;color:var(--creme)} .drei span{font-size:.92rem;color:var(--leise);line-height:1.25;display:block;font-weight:500}
+.hinw{font-size:.9rem;color:var(--stumm);line-height:1.25;font-weight:500}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+</defs></svg>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img id="raillogo" src="../team-logos/G-G.jpg" alt=""></div>
+    <a href="#" title="Start"><svg class="i"><use href="#i-home"/></svg></a>
+    <a href="#" title="Postfach"><svg class="i"><use href="#i-post"/></svg></a>
+    <a href="#" title="Einsatzliste"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a href="#" title="Battle Arena"><svg class="i"><use href="#i-arena"/></svg></a>
+    <a href="#" title="Saisonstand"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a href="#" title="Kader"><svg class="i"><use href="#i-team"/></svg></a>
+    <a href="#" title="Training"><svg class="i"><use href="#i-train"/></svg></a>
+    <a href="#" title="Transfermarkt"><svg class="i"><use href="#i-markt"/></svg></a>
+    <a href="#" title="Scouting"><svg class="i"><use href="#i-scout"/></svg></a>
+    <span class="luecke"></span>
+    <a class="an" href="finanzen-modern-18-11.html" title="Finanzen"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Abschnitt"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work" id="work"></div>
+  </main>
+</div>
+<script>
+"use strict";
+/* Daten aus data/generated/finanzkonzept-v2-bilanz-18-11.json (Lauf C, Faktor 1,0; MITTEL = Laeufe A/B/C) */
+var FELDER=["id","liga","typ","endRang","startRang","fin","amb","vertrauen","budget","anker","gehaltIst","cashIst","quote","tragbar","planSponsor","deckel","stimmung","siege","start","gehalt","gekappt","sockel","rangbonus","vorstand"];
+var ROH=[["A-A","liga2","aggressiv",16,15,1.2,8.9,1.7,175,55.1,49.6,8.3,5.5,42.6,33.8,53.2,23.8,8,16.5,47.2,false,33.8,2.5,0],["B-B","liga2","normal",13,13,3.7,6.3,3.7,185,58,54.6,5.2,11,44.4,35.6,49.4,34.3,12.8,22.2,49.4,true,30.8,1.1,1],["B-P","liga1","normal",3,11,6.4,8,7.4,275,68.5,78.3,5.6,17,55.2,42.1,63.7,69.3,28.8,55.8,63.7,true,27.9,31.4,5],["C-C","liga2","vorsichtig",5,7,9.7,2.8,3.8,215,67.6,57.5,8.8,24.4,50.3,41.5,50.3,62.3,25.6,52.4,45.3,false,22,24.3,6],["C-S","liga1","normal",7,3,8.3,7,9,315,104.8,73.4,6.8,21.3,77.5,64.3,85.2,55.3,22.4,67,59.1,false,16.1,41,2],["D-L","liga2","normal",11,11,4.9,6.6,8.5,195,57.8,53.3,10.9,13.8,44.3,35.5,48.7,41.3,16,26.8,48.7,false,27.9,5.1,1],["D-P","liga2","normal",3,2,3.1,6,5.7,240,83.7,55.7,5.6,9.6,60.2,51.4,66.2,69.3,28.8,22.9,51.6,false,14.7,33.2,8],["G-G","liga1","normal",5,4,6.7,7.1,7.3,310,111.6,77.3,10.1,17.7,81.6,68.5,89.8,62.3,25.6,54.8,65.8,false,17.6,58.6,8],["H-R","liga1","aggressiv",4,9,2.1,8.8,5.5,285,66.2,85,7,7.4,53.8,40.6,73.2,65.8,27.2,45.6,73.2,true,25,18.3,1],["L-K","liga2","normal",4,5,7.4,7,4,225,82.7,61,8.6,19.2,59.5,50.8,65.5,65.8,27.2,43.2,51.2,false,19.1,29.4,1],["L-R","liga1","aggressiv",1,5,3,8.3,4.7,305,100.2,92.2,5.4,9.5,74.7,61.5,93.3,76.3,32,29.7,84.7,false,19.1,42.1,5],["M-M","liga1","aggressiv",11,null,5.1,8.6,3,325,109.9,99.7,7.9,14.2,80.6,67.5,100.7,41.3,16,46.1,87.7,false,11.7,51.6,1],["M-S","liga2","vorsichtig",1,1,6.8,3.9,8.5,245,89.2,65.3,6.3,17.9,63.6,54.8,63.6,76.3,32,43.8,55.1,false,13.2,49.6,6],["N-N","liga1","aggressiv",16,12,2.9,6.1,2.9,270,54.4,78.7,5.9,9.3,46.5,33.4,65.9,23.8,8,48.8,65.9,true,29.4,0,1],["N-W","liga1","normal",6,13,4.1,4.9,6.9,265,51.1,64,9,12,44.5,31.4,54.3,58.8,24,47.8,54.3,true,30.8,10.6,1],["P-C","liga2","vorsichtig",8,10,9.4,5,5.7,200,59.8,55,5,23.6,45.5,36.7,45.5,51.8,20.8,47.1,43.1,false,26.4,9.6,3],["P-S","liga1","normal",10,6,3.6,3.6,3.9,300,90,82.3,5.6,10.9,68.4,55.3,75.2,44.8,17.6,32.6,74.8,false,20.6,24.5,1],["R-C","liga2","normal",9,6,6.8,7,3.5,220,70.9,62.5,6,17.9,52.3,43.5,57.5,48.3,19.2,39.4,52.8,false,20.6,23.4,8],["R-L","liga1","aggressiv",13,7,1.7,7.7,6.4,295,88.8,75.7,7.2,6.6,67.6,54.5,84.5,34.3,12.8,24.9,71.1,false,22,21.5,3],["R-R","liga2","vorsichtig",15,16,7.3,3.9,4.6,170,55.9,45.5,6.9,19.1,43.1,34.3,43.1,27.3,9.6,32.5,38.4,false,35.2,0,3],["S-C","liga2","normal",10,9,5.6,8,6.6,205,55.3,62.9,6.5,15.2,42.7,33.9,51.1,44.8,17.6,43.6,51.1,true,25,7.1,3],["S-S","liga1","vorsichtig",15,10,7.4,4.6,7.3,280,62,69.4,5.6,19.3,51.2,38.1,54.6,27.3,9.6,64.2,54.6,true,26.4,8.8,-1],["T-C","liga2","vorsichtig",12,8,7.1,3.2,4.2,210,57.6,45.3,9.8,18.5,44.1,35.4,44.1,37.8,14.4,38.8,38.7,false,23.5,6.5,6],["T-G","liga2","aggressiv",7,4,2.6,6.3,4,230,69.6,61.2,9.1,8.6,51.5,42.7,64.3,55.3,22.4,20.3,58.1,false,17.6,16.7,4],["T-T","liga1","vorsichtig",9,14,8.9,4.8,2.4,260,54.6,61.9,6.8,22.4,46.6,33.5,48.2,48.3,19.2,63,48.2,true,32.3,8.3,-2],["U-A","liga2","normal",6,12,4.3,6,8,190,59.1,47,11.1,12.2,45,36.3,49.6,58.8,24,23.2,43.8,false,29.4,15.7,6],["V-D","liga1","normal",12,16,2.9,5,6.4,250,46.6,69.1,5.5,9.3,41.7,28.6,55.7,37.8,14.4,52.8,55.7,true,35.2,0,1],["V-V","liga2","aggressiv",2,3,3,9.2,7.1,235,72.4,67.6,7.1,9.4,53.2,44.5,66.5,72.8,30.4,22.2,63.1,false,16.1,33.7,3],["V-W","liga2","normal",14,14,3.1,4.9,8.3,180,48.8,44.1,6.9,9.7,38.7,30,42.6,30.8,11.2,17.4,41.4,false,32.3,0,1],["W-L","liga1","vorsichtig",2,8,10,5.3,4.6,290,83.3,83.1,5.7,25,64.3,51.1,64.3,72.8,30.4,72.5,63.6,false,23.5,32.5,3],["W-W","liga1","normal",14,15,7.4,6.7,6.7,255,55.5,64,6.4,19.2,47.2,34.1,52.6,30.8,11.2,50.9,52.6,true,33.8,0,-2],["Z-H","liga1","aggressiv",8,2,2,10,2.3,320,96.1,100.2,5.5,7.2,72.1,59,90.9,51.8,20.8,34.5,90.9,true,14.7,29.5,1]];
+var MITTEL={"1":{"faktor":1,"istSponsor":2088.7,"istGehalt":2133.8,"istGuv":48.2,"gehalt":1837.5,"sponsor":1393.7,"sockel":773.6,"rangbonus":620.1,"ticket":330.6,"merch":118.4,"praemie":102.4,"vorstand":93.3,"betrieb":160,"kaderpraemie":41,"einnahmen":2038.4,"ausgaben":2038.4,"guv":0,"kasseStart":1308.4,"kasseSt20":595,"kasseEnde":1308.4,"imMinusSt20":8,"imMinusEnde":0.7,"tiefsteKasseSt20":-28.1,"medianKasseSt20":20,"guvInProzentGehalt":0,"sponsorAnteil":68.4},"0.82":{"faktor":0.82,"istSponsor":1921.4,"istGehalt":2133.8,"istGuv":-119.1,"gehalt":1837.5,"sponsor":1282.1,"sockel":773.6,"rangbonus":508.5,"ticket":330.6,"merch":118.4,"praemie":102.4,"vorstand":93.3,"betrieb":160,"kaderpraemie":41,"einnahmen":1926.8,"ausgaben":2038.4,"guv":-111.6,"kasseStart":1308.4,"kasseSt20":595,"kasseEnde":1196.8,"imMinusSt20":8,"imMinusEnde":1.3,"tiefsteKasseSt20":-28.1,"medianKasseSt20":20,"guvInProzentGehalt":-6.1,"sponsorAnteil":66.5},"1.24":{"faktor":1.24,"istSponsor":2311.7,"istGehalt":2133.8,"istGuv":271.2,"gehalt":1837.5,"sponsor":1542.5,"sockel":773.6,"rangbonus":768.9,"ticket":330.6,"merch":118.4,"praemie":102.4,"vorstand":93.3,"betrieb":160,"kaderpraemie":41,"einnahmen":2187.2,"ausgaben":2038.4,"guv":148.8,"kasseStart":1308.4,"kasseSt20":595,"kasseEnde":1457.2,"imMinusSt20":8,"imMinusEnde":0.3,"tiefsteKasseSt20":-28.1,"medianKasseSt20":20,"guvInProzentGehalt":8.1,"sponsorAnteil":70.5}};
+var SIGMA=0.66726;
+
+/* ================= Stammdaten ================= */
+var NAMEN={"A-A":"Armageddon Aftermath","B-P":"Black Panthers","B-B":"Blazing Beasts","C-C":"Cash Creators","C-S":"Cold Steel","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-R":"Last Ride","P-S":"Project Suicide","L-K":"Lost Kingdom","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-W":"Natures Wrath","N-N":"Nunchuck Ninjas","P-C":"Pirate Crew","R-L":"Raging Lunatics","R-R":"Riptide Rivers","R-C":"Royal Court","S-S":"Silver Soldiers","S-C":"Stronghold Crusaders","T-T":"Terrible Teachers","T-C":"The Chantry","T-G":"The Giants","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-W":"Vigilante Wranglers","V-V":"Vigorous Vikings","W-W":"Wicked Wizards","W-L":"Wrecking Legionnaires","Z-H":"Zero Heroes"};
+var TEAMS=ROH.map(function(r){var o={};FELDER.forEach(function(k,i){o[k]=r[i]});o.name=NAMEN[o.id];o.L=o.liga==="liga1"?0:1;return o});
+var TM={};TEAMS.forEach(function(t){TM[t.id]=t});
+/* Startwerte des Konzepts (Abschnitt 2.1), Liga 1 / Liga 2 */
+var VH=[1.7,1.15], MB=[4.4,3.0], SP=[.2,.12], AB=[.45,.3], RE=[.15,.1], KADER=.4;
+var PREIS=[["günstig",.8,1.10,1.5],["normal",1,1,0],["teuer",1.2,.9,-1.5],["Topzuschlag",1.4,.78,-3]];
+var KDECK={vorsichtig:1,normal:1.1,aggressiv:1.25};
+var TYPF={vorsichtig:"--p5",normal:"--creme",aggressiv:"--p1"};
+var HEIMFOLGE="HAHAAHHAHAAHAHHAAHAH";
+var q=new URLSearchParams(location.search);
+var Z={ans:q.get("ansicht")||"tag",team:TM[q.get("team")]?q.get("team"):"G-G",f:+q.get("f")||1,st:Math.max(0,Math.min(20,+q.get("st")||0)),sel:q.get("sel")||"tic",
+       preis:q.get("preis")===null?"ki":q.get("preis"),kauf:q.get("kauf")===null?null:+q.get("kauf"),bau:q.get("bau")==="1"};
+
+/* ================= Helfer ================= */
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+function n(x,d){d=d===undefined?1:d;var p=Math.pow(10,d),a=Math.round(Math.abs(x)*p+1e-9)/p;return (x<0&&a>0?"−":"")+a.toFixed(d).replace(".",",")}
+function C(x,d){return n(x,d)+" C"}
+function Cv(x,d){d=d===undefined?1:d;var p=Math.pow(10,d),r=Math.round(x*p)/p;return (r>0?"+":r<0?"−":"±")+Math.abs(r).toFixed(d).replace(".",",")+" C"}
+function vz(x){x=Math.round(x*100)/100;return x<0?"minus":x>0?"plus":"null"}
+function pz(x){return Math.round(x*100)+" %"}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+function saat(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return function(){h+=0x6D2B79F5;var t=Math.imul(h^h>>>15,1|h);t^=t+Math.imul(t^t>>>7,61|t);return ((t^t>>>14)>>>0)/4294967296}}
+function gew(r){return Math.pow((16-r)/15,1.35)}
+
+/* ================= Rechenmodell: eine Saison, 20 Spieltage, jede Zahl ist eine Buchung ================= */
+function saison(T,f,preisWahl){
+  var rnd=saat(T.id),L=T.L,siege=Math.round(T.siege),duelle=[],i;
+  for(i=0;i<40;i++)duelle.push(i<siege?1:0);
+  for(i=39;i>0;i--){var j=Math.floor(rnd()*(i+1)),x=duelle[i];duelle[i]=duelle[j];duelle[j]=x}
+  var gegner=TEAMS.filter(function(x){return x.liga===T.liga&&x.id!==T.id}),inv=TEAMS.indexOf(T)%2===1;
+  var rb=T.rangbonus*f,S=50,kasse=T.start,serie=0,tage=[],zaehlPreis=[0,0,0,0];
+  for(var t=1;t<=20;t++){
+    var heim=(HEIMFOLGE[t-1]==="H")!==inv,w=duelle[2*t-2]+duelle[2*t-1];
+    var rang=t===20?T.endRang:kl(Math.round(T.startRang+(T.endRang-T.startRang)*Math.min(1,t/14)+(rnd()-.5)*2.4),1,16);
+    var rahmen=gew(T.endRang)>0?rb*gew(rang)/gew(T.endRang):rb;
+    rahmen=Math.min(rahmen,Math.max(rb*2.2,8));
+    var nachfrage=.3+.85*S/100,p=1;
+    if(preisWahl==="ki"){ if(S<35&&kasse>=0)p=0; else if(S>=95&&T.typ!=="vorsichtig")p=3; else if(S>=83)p=2; else if(kasse<-rahmen&&S>=45)p=2; else p=1 }
+    else p=+preisWahl;
+    var ausl=Math.min(1,nachfrage*PREIS[p][2]);
+    var b={t:t,heim:heim,gegner:gegner[(t*5+TEAMS.indexOf(T))%gegner.length],w:w,rang:rang,S0:S,rahmen:rahmen,p:p,nachfrage:nachfrage,ausl:ausl,k0:kasse};
+    if(heim)zaehlPreis[p]++;
+    b.geh=-T.gehalt/20; b.soc=T.sockel/20;
+    b.tic=heim?VH[L]*ausl*PREIS[p][1]:0;
+    b.mer=MB[L]/20*S/50*(heim?1.5:.5);
+    b.pra=w*SP[L]; b.kad=-b.pra*KADER;
+    b.bet=heim?-AB[L]:0; b.rei=heim?0:-RE[L];
+    b.zin=kasse<-rahmen?-.01*(-kasse-rahmen):0;
+    b.saldo=b.geh+b.soc+b.tic+b.mer+b.pra+b.kad+b.bet+b.rei+b.zin;
+    kasse+=b.saldo; b.k1=kasse;
+    /* Stimmung nach dem Spieltag */
+    var dE=(w===2?4:w===0?-4:0)*(heim?1.5:1);
+    serie=w===0?(serie<0?serie-1:-1):(serie>0?serie+1:1);
+    var dS=serie>=3?1:serie<=-3?-1:0, dP=heim?PREIS[p][3]:0, dM=-.08*(S-50);
+    b.dE=dE;b.dS=dS;b.dP=dP;b.dM=dM;
+    S=kl(S+dE+dS+dP+dM,0,100); b.S1=S;
+    tage.push(b);
+  }
+  var sum={};["geh","soc","tic","mer","pra","kad","bet","rei","zin","saldo"].forEach(function(k){sum[k]=tage.reduce(function(s,x){return s+x[k]},0)});
+  var ende={k20:kasse,rb:rb,vor:T.vorstand,kEnde:kasse+rb+T.vorstand,S:S};
+  var tief=Math.min.apply(null,tage.map(function(x){return x.k1}));
+  return {tage:tage,sum:sum,ende:ende,tief:tief,preise:zaehlPreis,guv:sum.saldo+rb+T.vorstand};
+}
+function plan(T){ /* Planeinnahmen zum Kaufzeitpunkt (Abschnitt 5.3) */
+  var L=T.L,a=.3+.85*.5,ticket=10*VH[L]*a,merch=MB[L],prae=20*SP[L],fix=10*AB[L]+10*RE[L]+prae*KADER;
+  return {sponsor:T.planSponsor,ticket:ticket,merch:merch,prae:prae,fix:fix,ein:T.planSponsor+ticket+merch+prae};
+}
+function erwRang(T){var l=TEAMS.filter(function(x){return x.liga===T.liga}).sort(function(a,b){return b.gehalt-a.gehalt});return l.indexOf(T)+1}
+
+/* ================= Posten: Quelle -> Formel -> Buchung -> Kasse ================= */
+var POSTEN=[
+ ["soc","Sponsor-Sockelrate","--gold","Vertrag"],["tic","Tickets","--p5","nur Heimspiel"],["mer","Merch","--p6","Heim × 1,5 · Auswärts × 0,5"],["pra","Siegprämie","--p3","je gewonnenem Duell"],
+ ["geh","Gehälter","--p1","Jahresgehalt ÷ 20"],["kad","Kaderprämie","--acht","40 % der Siegprämie"],["bet","Arena-Betrieb","--p2","nur Heimspiel"],["rei","Reise","--p2","nur Auswärtsspiel"],["zin","Überziehungszins","--leise","nur über dem Rahmen"]];
+function fluss(id,T,b,R){
+  var L=T.L,lg="Liga "+(L+1),ha=b.heim?"Heimspiel":"Auswärtsspiel",P=PREIS[b.p];
+  var o={
+   soc:{q:["Sponsor-Vertrag der Saison","Sockel nach Startrang "+T.startRang+": "+C(T.sockel)+" für die Saison. Steht beim Unterschreiben fest, unabhängig vom Ergebnis.","sponsor-liga-leiter.ts · sponsorSockelFuerStartrang"],
+        f:"Sockel ÷ 20 Spieltage\n"+n(T.sockel)+" ÷ 20 = "+n(b.soc,2)+" C",ab:["Startrang","Sponsorwahl","Ausschüttung 0,73"],wer:"Sponsorwahl vor der Kaufphase (Mensch oder KI)"},
+   tic:{q:["Arena und Fan-Stimmung","Volles Haus zum Richtpreis in "+lg+": "+C(VH[L],2)+". Stimmung vor dem Spiel: "+n(b.S0,0)+". Preisstufe: "+P[0]+".","neu · lib/finance/spieltag-ticketing"],
+        f:b.heim?"Nachfrage = 0,30 + 0,85 × "+n(b.S0,0)+" ÷ 100 = "+pz(b.nachfrage)+"\nAuslastung = min(100 %, "+pz(b.nachfrage)+" × "+n(P[2],2)+") = "+pz(b.ausl)+"\n"+n(VH[L],2)+" × "+n(b.ausl,2)+" × "+n(P[1],1)+" = "+n(b.tic,2)+" C":"Auswärtsspiel: keine Ticket-Einnahme.\nDas Geld des Spieltags geht an "+b.gegner.name+".",
+        ab:["Stimmung","Preisstufe","Arena-Stufe","Heimspiel"],wer:"Preisstufe vor jedem Heimspiel (Mensch oder KI-Regel)"},
+   mer:{q:["Stars und Fan-Stimmung","Merch-Basis "+lg+": "+C(MB[L])+" je Saison bei Stimmung 50. Fan-Shop-Stufe 0, zwei Stars im Einsatz.","neu · lib/finance/spieltag-merch"],
+        f:"Basis ÷ 20 × Stimmung ÷ 50 × "+(b.heim?"1,5 (Heim)":"0,5 (Auswärts)")+"\n"+n(MB[L])+" ÷ 20 × "+n(b.S0,0)+" ÷ 50 × "+(b.heim?"1,5":"0,5")+" = "+n(b.mer,2)+" C",ab:["Stimmung","Stars im Einsatz","Fan-Shop-Stufe","Heimspiel"],wer:"indirekt: Kader, Fan Shop"},
+   pra:{q:["Ergebnis des Spieltags","Zwei Disziplin-Duelle gegen "+b.gegner.name+": "+b.w+" gewonnen. Prämie in "+lg+": "+C(SP[L],2)+" je Sieg.","neu · gebucht nach dem Arena-Ergebnis"],
+        f:"Siege × Prämie\n"+b.w+" × "+n(SP[L],2)+" = "+n(b.pra,2)+" C",ab:["Duell-Siege","Liga"],wer:"nicht einstellbar"},
+   geh:{q:["Verträge des Kaders","Jahresgehalt aller Spieler: "+C(T.gehalt)+" (getTeamActualSalaryTotal, dieselbe Zahl wie heute am Saisonende).","sponsor-settlement-service.ts:174 · heute ein Block"],
+        f:"Jahresgehalt ÷ 20 Spieltage\n"+n(T.gehalt)+" ÷ 20 = "+n(-b.geh,2)+" C",ab:["Kader","Vertragsform"],wer:"Kauf und Verkauf"},
+   kad:{q:["Prämienstufe des Klubs","Stufe „normal“: 40 % der Siegprämie gehen an den Kader. Wirkt auf die Moral, nicht auf die Wertung.","neu · Eingang für Form/Moral"],
+        f:"Siegprämie × 40 %\n"+n(b.pra,2)+" × 0,40 = "+n(-b.kad,2)+" C",ab:["Siegprämie","Prämienstufe"],wer:"Stufe keine / normal / hoch (Mensch oder KI)"},
+   bet:{q:["Arena","Betrieb je Heimspiel in "+lg+": "+C(AB[L],2)+" × (1 + 0,2 × Arena-Stufe 0).","neu · Senke"],
+        f:b.heim?n(AB[L],2)+" × (1 + 0,2 × 0) = "+n(AB[L],2)+" C":"Auswärtsspiel: kein Arena-Betrieb.",ab:["Arena-Stufe","Heimspiel"],wer:"Arena-Ausbau"},
+   rei:{q:["Spielplan","Reise je Auswärtsspiel in "+lg+": "+C(RE[L],2)+".","neu · Senke"],
+        f:b.heim?"Heimspiel: keine Reise.":"fest je Auswärtsspiel = "+n(RE[L],2)+" C",ab:["Auswärtsspiel"],wer:"nicht einstellbar"},
+   zin:{q:["Kasse und Rahmen","Kasse vor dem Spieltag "+C(b.k0)+", Rahmen "+C(-b.rahmen)+" (erwarteter Rangbonus am Rang "+b.rang+").","neu · Zins geht in den Liga-Topf"],
+        f:b.zin<0?"1 % × (Schuld − Rahmen)\n0,01 × ("+n(-b.k0)+" − "+n(b.rahmen)+") = "+n(-b.zin,2)+" C":"Kasse liegt über dem Rahmen von "+C(-b.rahmen)+".\nKein Zins.",ab:["Kasse","aktueller Rang","Saison-Faktor"],wer:"Notverkauf, Sparen"},
+   kasse:{q:["Kontoauszug","Kasse nach Spieltag "+(b.t-1)+": "+C(b.k0)+". Jede Zeile links ist eine Buchung mit Spieltag, Posten, Formel.","neu · Buchungsliste je Team und Spieltag"],
+        f:"Kasse vorher + Summe der Buchungen\n"+n(b.k0)+" "+(b.saldo<0?"− "+n(-b.saldo,2):"+ "+n(b.saldo,2))+" = "+n(b.k1)+" C",ab:["alle Posten"],wer:"—"},
+   stim:{q:["Ergebnis, Preis, Serie","Stimmung vor dem Spieltag: "+n(b.S0,1)+". "+ha+", "+b.w+" von 2 Duellen gewonnen, Preisstufe "+P[0]+".","neu · ersetzt Beliebtheit als Treiber"],
+        f:"Ergebnis "+Cv(b.dE,1).replace(" C","")+" · Serie "+Cv(b.dS,0).replace(" C","")+" · Preis "+Cv(b.dP,1).replace(" C","")+"\nRückzug zur Mitte −0,08 × ("+n(b.S0,1)+" − 50) = "+n(b.dM,1)+"\n"+n(b.S0,1)+" → "+n(b.S1,1),ab:["Ergebnis","Heimspiel × 1,5","Serie","Ticketpreis","Stars"],wer:"Ticketpreis, Transfers"},
+   rahmen:{q:["Sponsor-Vertrag und Tabelle","Erwarteter Rangbonus am aktuellen Rang "+b.rang+" bei Saison-Faktor "+n(Z.f,2)+". Kommt am Saisonende sicher.","sponsor-liga-leiter.ts · Leiter des Vertrags"],
+        f:"Rahmen = Rangbonus(Rang "+b.rang+") × Faktor\n= "+n(b.rahmen)+" C\nKasse darf bis −"+n(b.rahmen)+" C zinsfrei sinken.",ab:["aktueller Rang","Saison-Faktor","Sponsorwahl"],wer:"—"}
+  };
+  return o[id]||o.tic;
+}
+
+/* ================= Ansichten ================= */
+var TABS=[["tag","Spieltag","Datenfluss"],["ende","Saisonende","Rangbonus"],["kauf","Folgesaison","Kauf & Kredit"],["ki","KI-Team","Kaufregeln"],["liga","Liga","Geldmenge"]];
+function kopf(T,R){
+  document.getElementById("raillogo").src="../team-logos/"+T.id+".jpg";
+  document.getElementById("hk").innerHTML='<div class="crest"><img src="../team-logos/'+T.id+'.jpg" alt=""></div><div><h1>Finanzen · Datenfluss</h1><div class="sub"><b>'+esc(T.name)+'</b> · Liga '+(T.L+1)+' · '+T.typ+' · Saison 1</div></div>';
+  document.getElementById("tabs").innerHTML=TABS.map(function(a,i){return '<button class="dtab'+(Z.ans===a[0]?" an":"")+'" data-ans="'+a[0]+'" role="tab"><span class="nr">'+(i+1)+'</span><span><em>'+a[2]+'</em><b>'+a[1]+'</b></span></button>'}).join("");
+  var opt=function(l){return TEAMS.filter(function(x){return x.L===l}).sort(function(a,b){return a.name<b.name?-1:1}).map(function(x){return '<option value="'+x.id+'"'+(x.id===T.id?" selected":"")+'>'+esc(x.name)+' · '+x.typ+'</option>'}).join("")};
+  document.getElementById("hr").innerHTML='<div class="wahl"><span class="gk">Team</span><select id="teamwahl" aria-label="Team"><optgroup label="Liga 1">'+opt(0)+'</optgroup><optgroup label="Liga 2">'+opt(1)+'</optgroup></select></div>'+
+   '<div class="wahl"><span class="gk">Saison-Faktor</span><div class="seg">'+[.82,1,1.24].map(function(f){return '<button data-f="'+f+'" aria-pressed="'+(Z.f===f)+'">'+n(f,2)+'</button>'}).join("")+'</div></div>';
+}
+function kurve(T,R,mitEnde){return '<div class="kvs" data-ende="'+(mitEnde?1:0)+'"></div>'}
+function kurveSvg(T,R,mitEnde,W,H){
+  var rem=parseFloat(getComputedStyle(document.documentElement).fontSize),fs=rem*.8,pl=rem*2.6,pr=rem*1.6,pt=rem*.7,pb=rem*1.9,pts=[T.start].concat(R.tage.map(function(x){return x.k1})).concat([R.ende.kEnde]);
+  var mn=Math.min.apply(null,pts.concat(R.tage.map(function(x){return -x.rahmen})).concat([0])),mx=Math.max.apply(null,pts);
+  var sp=(mx-mn)||1;mn-=sp*.06;mx+=sp*.08;
+  function X(i){return pl+(W-pl-pr)*i/21} function Y(v){return pt+(H-pt-pb)*(1-(v-mn)/(mx-mn))}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Kasse über 20 Spieltage" font-family="Barlow Condensed,Arial Narrow,sans-serif">';
+  var schritt=sp>120?40:sp>60?20:10;
+  for(var v=Math.ceil(mn/schritt)*schritt;v<=mx;v+=schritt)s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="rgba(244,230,196,'+(v===0?".45":".08")+')" stroke-width="1"/><text x="'+(pl-rem*.4)+'" y="'+(Y(v)+fs*.35)+'" text-anchor="end" fill="#66738a" font-size="'+fs+'">'+v+'</text>';
+  s+='<polyline fill="none" stroke="#ff6058" stroke-width="'+rem*.09+'" stroke-dasharray="'+rem*.35+' '+rem*.28+'" points="'+R.tage.map(function(x,i){return X(i+1)+","+Y(-x.rahmen)}).join(" ")+'"/>';
+  var lin=pts.slice(0,21).map(function(v,i){return X(i)+","+Y(v)}).join(" ");
+  s+='<polygon fill="rgba(240,195,90,.10)" points="'+X(0)+","+Y(0)+" "+lin+" "+X(20)+","+Y(0)+'"/>';
+  s+='<polyline fill="none" stroke="#f0c35a" stroke-width="'+rem*.16+'" stroke-linejoin="round" points="'+lin+'"/>';
+  s+='<line x1="'+X(20)+'" y1="'+Y(pts[20])+'" x2="'+X(21)+'" y2="'+Y(pts[21])+'" stroke="#62d394" stroke-width="'+rem*.16+'" stroke-dasharray="'+rem*.15+' '+rem*.22+'"/>';
+  var bw=Math.min(rem*1.5,(W-pl-pr)/21*.62);
+  R.tage.forEach(function(x,i){s+='<rect x="'+(X(i+1)-bw/2)+'" y="'+(H-pb+rem*.3)+'" width="'+bw+'" height="'+rem*.34+'" rx="2" fill="'+(x.heim?"#F2A03D":"#45B0C9")+'" opacity="'+(x.heim?1:.55)+'"/><text x="'+X(i+1)+'" y="'+(H-rem*.25)+'" text-anchor="middle" fill="'+(i+1===Z.st&&!mitEnde?"#f0c35a":"#66738a")+'" font-size="'+fs+'" font-weight="'+(i+1===Z.st&&!mitEnde?700:500)+'">'+(i+1)+'</text>'});
+  s+='<text x="'+X(21)+'" y="'+(H-rem*.25)+'" text-anchor="middle" fill="#62d394" font-size="'+fs+'" font-weight="700">Ende</text><text x="'+X(0)+'" y="'+(H-rem*.25)+'" text-anchor="middle" fill="#66738a" font-size="'+fs+'">Start</text>';
+  var ix=mitEnde?21:Z.st;
+  s+='<line x1="'+X(ix)+'" x2="'+X(ix)+'" y1="'+pt+'" y2="'+(H-pb)+'" stroke="#f4e6c4" stroke-width="1"/>';
+  s+='<circle cx="'+X(ix)+'" cy="'+Y(pts[ix])+'" r="'+rem*.36+'" fill="#f0c35a" stroke="#06080c" stroke-width="2"/>';
+  s+='<circle cx="'+X(21)+'" cy="'+Y(pts[21])+'" r="'+rem*.28+'" fill="#62d394"/>';
+  s+='<text x="'+(X(ix)+(ix>17?-rem*.6:rem*.6))+'" y="'+(Y(pts[ix])-rem*.6)+'" text-anchor="'+(ix>17?"end":"start")+'" fill="#f4e6c4" font-size="'+fs*1.25+'" font-weight="700">'+C(pts[ix])+'</text>';
+  return s+'</svg>';
+}
+function legende(){return '<span class="marke h">Heim</span><span class="marke a">Auswärts</span><span class="hin">Gold: Kasse · Rot gestrichelt: zinsfreier Rahmen · Grün: Rangbonus am Saisonende</span>'}
+
+function ansTag(T,R){
+  var b=R.tage[Z.st-1],sel=Z.sel,F=fluss(sel,T,b,R),P=POSTEN.filter(function(p){return p[0]===sel})[0];
+  var betrag=sel==="kasse"?b.saldo:sel==="stim"?b.S1-b.S0:sel==="rahmen"?-b.rahmen:b[sel];
+  var titel=P?P[1]:sel==="kasse"?"Kasse":sel==="stim"?"Fan-Stimmung":"Zinsfreier Rahmen";
+  var liste=POSTEN.map(function(p){var v=b[p[0]],aus=Math.abs(v)<.0005;return '<button class="bz'+(sel===p[0]?" an":"")+(aus?" aus":"")+'" data-sel="'+p[0]+'"><span class="fb" style="--pc:var('+p[2]+')"></span><span><b>'+p[1]+'</b></span><small>'+p[3]+'</small><strong class="t '+vz(v)+'">'+(aus?"—":Cv(v,2))+'</strong></button>'}).join("");
+  /* Heim gegen Auswaerts: Mittel der gebuchten Spieltage der Saison */
+  var hs=R.tage.filter(function(x){return x.heim}),as=R.tage.filter(function(x){return !x.heim});
+  function mit(a,k){return a.reduce(function(s,x){return s+x[k]},0)/a.length}
+  var mh=mit(hs,"saldo"),ma=mit(as,"saldo"),mxm=Math.max(Math.abs(mh),Math.abs(ma),.5);
+  function hab(lab,v,far){var w=Math.abs(v)/mxm*50;return '<div class="ha"><span style="color:var('+far+')">'+lab+'</span><span class="bk"><u style="left:50%"></u><i style="background:var('+(v<0?"--warn":"--gut")+');'+(v<0?"right:50%":"left:50%")+';width:'+w+'%"></i></span><span class="t '+vz(v)+'" style="text-align:right">'+Cv(v,2).replace(" C","")+'</span></div>'}
+  var stufen='<div class="seg klein">'+[["ki","KI-Regel"],["0","günstig"],["1","normal"],["2","teuer"],["3","Top"]].map(function(a){return '<button data-preis="'+a[0]+'" aria-pressed="'+(String(Z.preis)===a[0])+'">'+a[1]+'</button>'}).join("")+'</div>';
+  return '<div class="pan" style="grid-row:1;grid-column:1"><div class="pk"><h2>Spieltag '+b.t+'</h2><span class="marke '+(b.heim?"h":"a")+'">'+(b.heim?"Heim":"Auswärts")+'</span><span class="hin">gegen '+esc(b.gegner.name)+' · '+b.w+' : '+(2-b.w)+' Duelle</span></div>'+
+     '<div class="bl">'+liste+'</div><button class="bsum" data-sel="kasse" style="width:100%"><span>Saldo des Spieltags · Kasse '+C(b.k0)+' → <b style="color:var(--creme)">'+C(b.k1)+'</b></span><strong class="t '+vz(b.saldo)+'">'+Cv(b.saldo,2)+'</strong></button></div>'+
+   '<div class="pan" style="grid-row:1;grid-column:2"><div class="pk"><h2>Datenfluss: '+titel+'</h2><span class="hin">Zahl links oder Kachel unten anklicken</span><span class="sp"></span><span class="gk">Ticketpreis</span>'+stufen+'</div><div class="pb">'+
+     '<div class="fluss">'+
+      '<div class="st"><div class="nr"><i>1</i><h3>Quelle</h3></div><p><b>'+F.q[0]+'</b></p><p>'+F.q[1]+'</p><p class="l">Code: '+F.q[2]+'</p><div class="erg"><span>Wer stellt ein</span><span style="color:var(--creme);text-align:right">'+F.wer+'</span></div></div>'+
+      '<div class="st"><div class="nr"><i>2</i><h3>Formel</h3></div><code>'+esc(F.f)+'</code><p class="l">Hängt ab von</p><div class="chips">'+F.ab.map(function(c){return '<span class="chip">'+c+'</span>'}).join("")+'</div></div>'+
+      '<div class="st"><div class="nr"><i>3</i><h3>Buchung</h3></div><p>Eine Zeile im Kontoauszug:</p><code>Saison 1 · Spieltag '+b.t+' · '+(b.heim?"Heim":"Auswärts")+'\n'+titel+'\n'+(sel==="stim"?"Stimmung "+n(b.S0,1)+" → "+n(b.S1,1):sel==="rahmen"?"kein Geldfluss, nur Grenze":Cv(betrag,2))+'</code><p class="l">'+(sel==="stim"||sel==="rahmen"?"Wird gespeichert, damit Tickets und Zins nachrechenbar bleiben.":"Zählt in die GuV der Saison. Gezeigt = gebucht.")+'</p><div class="erg"><span>Betrag</span><strong class="t '+(sel==="stim"?vz(betrag):sel==="rahmen"?"minus":vz(betrag))+'">'+(sel==="stim"?Cv(betrag,1).replace(" C",""):sel==="rahmen"?C(betrag):Cv(betrag,2))+'</strong></div></div>'+
+      '<div class="st"><div class="nr"><i>4</i><h3>Kasse</h3></div><p>Vor dem Spieltag <b>'+C(b.k0)+'</b></p><p>Alle Buchungen des Spieltags <b class="'+vz(b.saldo)+'">'+Cv(b.saldo,2)+'</b></p><p class="l">'+(b.k1<0?(b.k1>=-b.rahmen?"Im Minus, aber im zinsfreien Rahmen von "+C(-b.rahmen)+".":"Unter dem Rahmen von "+C(-b.rahmen)+": Zins, Kaufsperre."):"Im Plus. Rahmen "+C(-b.rahmen)+" ungenutzt.")+'</p><div class="erg"><span>Kasse danach</span><strong class="t '+(b.k1<0?"minus":"")+'">'+C(b.k1)+'</strong></div></div>'+
+     '</div>'+
+     '<div class="unten"><div class="kachel"><h4>Heim gegen Auswärts · Mittel der Saison je Spieltag</h4>'+hab("Heimspiel",mh,"--heim")+hab("Auswärts",ma,"--gast")+'<div class="hinw">Heim: Tickets Ø '+Cv(mit(hs,"tic"),2)+', Merch × 1,5, Betrieb '+Cv(-AB[T.L],2)+'. Auswärts: keine Tickets, Reise '+Cv(-RE[T.L],2)+'.</div></div>'+
+     '<div class="kachel"><h4>Stimmung nach Spieltag '+b.t+'</h4><div class="sr"><span>Ergebnis '+b.w+' : '+(2-b.w)+(b.heim?" · Heim × 1,5":"")+'</span><span class="t '+vz(b.dE)+'">'+Cv(b.dE,1).replace(" C","")+'</span></div><div class="sr"><span>Serie · Ticketpreis ('+PREIS[b.p][0]+')</span><span class="t '+vz(b.dS+b.dP)+'">'+Cv(b.dS+b.dP,1).replace(" C","")+'</span></div><div class="sr"><span>Rückzug zur Mitte</span><span class="t '+vz(b.dM)+'">'+Cv(b.dM,1).replace(" C","")+'</span></div></div></div>'+
+   '</div></div>'+
+   '<div class="pan" style="grid-row:2;grid-column:1 / -1"><div class="pk"><h2>Kasse über 20 Spieltage</h2>'+legende()+'<span class="sp"></span><span class="hin">Regler oder Pfeiltasten</span></div><div class="kurve"><div class="kv">'+kurve(T,R,false)+'<input type="range" id="regler" min="1" max="20" step="1" value="'+Z.st+'" aria-label="Spieltag"></div>'+
+     '<div class="kpis">'+
+      '<button class="kpi'+(sel==="kasse"?" an":"")+'" data-sel="kasse"><span class="gk">Kasse nach Spieltag '+b.t+'</span><strong class="t '+(b.k1<0?"minus":"")+'">'+C(b.k1)+'</strong><small>Start '+C(T.start)+' · Tief '+C(R.tief)+'</small></button>'+
+      '<button class="kpi'+(sel==="rahmen"?" an":"")+'" data-sel="rahmen"><span class="gk">Zinsfreier Rahmen</span><strong class="t">'+C(-b.rahmen)+'</strong><small>Rangbonus am Rang '+b.rang+'</small></button>'+
+      '<button class="kpi'+(sel==="stim"?" an":"")+'" data-sel="stim"><span class="gk">Fan-Stimmung</span><strong class="t">'+n(b.S1,0)+'</strong><small>vorher '+n(b.S0,0)+' · Saisonende '+n(R.ende.S,0)+'</small></button>'+
+      '<button class="kpi'+(sel==="tic"?" an":"")+'" data-sel="tic"><span class="gk">Auslastung</span><strong class="t">'+(b.heim?pz(b.ausl):"—")+'</strong><small>'+(b.heim?"Preis "+PREIS[b.p][0]+" · Nachfrage "+pz(b.nachfrage):"Auswärtsspiel")+'</small></button>'+
+     '</div></div></div>';
+}
+
+function ansEnde(T,R){
+  var e=R.ende,mx=Math.max(Math.abs(e.k20),e.kEnde,T.start,1),mn=Math.min(0,e.k20,e.kEnde),sp=mx-mn;
+  function bar(von,bis,far){var a=Math.min(von,bis),b2=Math.max(von,bis);return '<span class="bk"><u style="left:'+((0-mn)/sp*100)+'%"></u><i style="left:'+((a-mn)/sp*100)+'%;width:'+Math.max(.6,(b2-a)/sp*100)+'%;background:var('+far+')"></i></span>'}
+  var s=R.sum,wf=
+   '<div class="wz"><span><b>Kasse nach dem Draft</b><small>Rücklage '+n(T.quote)+' % von '+T.budget+' C Budget</small></span>'+bar(0,T.start,"--creme")+'<strong class="t">'+C(T.start)+'</strong></div>'+
+   '<div class="wz"><span><b>20 Spieltage</b><small>10 Heim, 10 Auswärts · alle laufenden Posten</small></span>'+bar(T.start,e.k20,s.saldo<0?"--warn":"--gut")+'<strong class="t '+vz(s.saldo)+'">'+Cv(s.saldo)+'</strong></div>'+
+   '<div class="wz"><span><b>Kasse nach Spieltag 20</b><small>'+(e.k20<0?"im Minus, im Rahmen":"im Plus")+'</small></span>'+bar(0,e.k20,"--gold")+'<strong class="t '+(e.k20<0?"minus":"")+'">'+C(e.k20)+'</strong></div>'+
+   '<div class="wz"><span><b>Sponsor-Rangbonus</b><small>Endrang '+T.endRang+' · Topf × Faktor '+n(Z.f,2)+' × Gewicht(Rang)</small></span>'+bar(e.k20,e.k20+e.rb,"--gut")+'<strong class="t plus">'+Cv(e.rb)+'</strong></div>'+
+   '<div class="wz"><span><b>Vorstandsziele</b><small>Prämie oder Strafe, 3 % des Gehalts je Ziel</small></span>'+bar(e.k20+e.rb,e.kEnde,e.vor<0?"--warn":"--gut")+'<strong class="t '+vz(e.vor)+'">'+Cv(e.vor)+'</strong></div>'+
+   '<div class="wz sum"><span><b>Kasse nach der Abrechnung</b><small>geht in den Saisonwechsel</small></span>'+bar(0,e.kEnde,"--gold")+'<strong class="t '+(e.kEnde<0?"minus":"")+'">'+C(e.kEnde)+'</strong></div>';
+  var fz=[.82,1,1.24].map(function(f){var r=saison(T,f,Z.preis);return '<td class="t'+(f===Z.f?" akt":"")+'">'+C(r.ende.rb)+'</td><td class="t '+(f===Z.f?"akt ":"")+vz(r.guv)+'">'+Cv(r.guv)+'</td>'}).join("");
+  var ein=s.soc+s.tic+s.mer+s.pra+e.rb+Math.max(0,e.vor);
+  function zeile(k,lab,far,takt,v){return '<tr><td><span class="fbp" style="--pc:var('+far+')"></span>'+lab+'<small>'+takt+'</small></td><td class="t '+vz(v)+'">'+Cv(v)+'</td><td class="t">'+(v>0?Math.round(v/ein*100)+" %":"")+'</td></tr>'}
+  return '<div class="pan"><div class="pk"><h2>Saisonende-Abrechnung</h2><span class="hin">ein Buchungslauf nach Spieltag 20</span></div><div class="pb"><div class="wf">'+wf+'</div>'+
+     '<div class="kachel"><h4>Was der Saison-Faktor ändert (nur der Rangbonus hängt daran)</h4><table class="tb"><tr><th></th><th colspan="2"'+(Z.f===.82?' class="akt"':'')+'>Faktor 0,82</th><th colspan="2"'+(Z.f===1?' class="akt"':'')+'>Faktor 1,00</th><th colspan="2"'+(Z.f===1.24?' class="akt"':'')+'>Faktor 1,24</th></tr><tr><td>Rangbonus · GuV der Saison</td>'+fz+'</tr></table></div></div></div>'+
+   '<div class="pan"><div class="pk"><h2>GuV der Saison</h2><span class="hin">Summe aller Buchungen, eine Zahl überall</span></div><div class="pb"><table class="tb"><tr><th>Posten</th><th>Saison</th><th>Anteil</th></tr>'+
+     '<tr class="gr"><td colspan="3">Einnahmen</td></tr>'+zeile("soc","Sponsor-Sockel","--gold","20 Raten",s.soc)+zeile("rb","Sponsor-Rangbonus","--gold","Saisonende",e.rb)+zeile("tic","Tickets","--p5","10 Heimspiele",s.tic)+zeile("mer","Merch","--p6","20 Spieltage",s.mer)+zeile("pra","Siegprämien","--p3","je Duell-Sieg",s.pra)+zeile("vor","Vorstandsziele","--creme","Saisonende",e.vor)+
+     '<tr class="gr"><td colspan="3">Ausgaben</td></tr>'+zeile("geh","Gehälter","--p1","20 Raten",s.geh)+zeile("bet","Arena-Betrieb und Reise","--p2","je Spieltag",s.bet+s.rei)+zeile("kad","Kaderprämien","--acht","je Duell-Sieg",s.kad)+zeile("zin","Überziehungszins","--leise","→ Liga-Topf",s.zin)+
+     '<tr class="sum"><td>GuV = Änderung der Kasse</td><td class="t '+vz(R.guv)+'">'+Cv(R.guv)+'</td><td></td></tr></table>'+
+     '<div class="pan" style="flex:1;border-radius:var(--r-s)"><div class="pk" style="min-height:2.3rem"><span class="gk">Kassenverlauf mit Saisonende</span><span class="sp"></span>'+legende()+'</div><div class="kurve" style="grid-template-columns:1fr"><div class="kv">'+kurve(T,R,true)+'</div></div></div></div></div>';
+}
+
+function ansKauf(T,R){
+  var e=R.ende,P=plan(T),abl=Math.round(T.budget*.17*10)/10,verk=Math.round(T.budget*.09*10)/10;
+  var dV=kl((erwRang(T)-T.endRang)*.25,-2,2)+(e.kEnde>=0?.25:-.5)+(R.guv<-.1*T.gehalt&&T.endRang>erwRang(T)?-.5:0),ver=kl(T.vertrauen+dV,0,10);
+  var topf=Math.round(14*(.5+.5*ver/5.5)*10)/10,vor=e.kEnde+abl+verk+topf,rueck=T.start,frei=Math.max(0,vor-rueck);
+  var kiKauf=Math.max(0,Math.floor(frei-(Z.bau?10:0))),maxK=Math.round(vor+60),kauf=Z.kauf===null?kiKauf:kl(Z.kauf,0,maxK),bau=Z.bau?10:0;
+  var nach=vor-kauf-bau,kredit=nach<0?-nach+.1*T.gehalt:0,ann=kredit*.12/(1-Math.pow(1.12,-2)),rate=ann/20,dienst=ann/P.ein,ueber=dienst>.2;
+  var lauf=e.kEnde;
+  function z(nr,lab,sub,betrag,cls){lauf+=betrag;return '<div class="kz '+(cls||"")+'"><i>'+nr+'</i><span><b>'+lab+'</b><small>'+sub+'</small></span><strong class="t '+vz(betrag)+'">'+(betrag===0?"":Cv(betrag))+'</strong><em class="t'+(lauf<0?" minus":"")+'">'+C(lauf)+'</em></div>'}
+  var kette='<div class="kz"><i>0</i><span><b>Kasse nach der Saisonabrechnung</b><small>aus Abschnitt 2 · Faktor '+n(Z.f,2)+'</small></span><strong></strong><em class="t'+(e.kEnde<0?" minus":"")+'">'+C(e.kEnde)+'</em></div>'+
+    z(1,"Ablöse auslaufender Verträge","Verkaufspreis an den Klub · „ein Vertragsende ist ein Verkauf“",abl)+
+    z(2,"Verkäufe","Nettoerlös nach Abschlag · der Abschlag geht in den Liga-Topf",verk)+
+    z(3,"Liga-Topf: Saisonstart-Budget","50 % gleich, 50 % nach Vorstandsvertrauen ("+n(ver,1)+" von 10)",topf,"ltopf")+
+    z(4,"Sponsorwahl","Vertrag vor dem Kauf · bestimmt Planeinnahmen und Gehaltsdeckel",0)+
+    z(5,"Spielerkäufe","Regler rechts · KI-Regel: freie Kasse über der Rücklage",-kauf)+
+    z(6,"Gebäude",Z.bau?"Fan Shop Stufe 1 · nur aus freier Kasse":"kein Bau in dieser Kaufphase",-bau)+
+    '<div class="kz sturz"><i>7</i><span><b>Kassensturz</b><small>Schluss des Kauffensters · Apron-Linien frieren ein</small></span><strong></strong><em class="t'+(nach<0?" minus":"")+'">'+C(nach)+'</em></div>';
+  var urteil=nach>=0?
+    '<div class="urteil ok"><h3>Kein Kredit nötig</h3><p>Kasse nach den Käufen '+C(nach)+'. '+(nach>=rueck-.05?"Die Rücklage von "+C(rueck)+" bleibt stehen.":"Die Rücklage von "+C(rueck)+" ist um "+C(rueck-nach)+" angegriffen: der Vorstand wertet das am Saisonende.")+'</p></div>':
+    '<div class="urteil '+(ueber?"zw":"kr")+'"><h3>'+(ueber?"Erst verkaufen, dann Kredit":"Pflichtkredit "+C(kredit))+'</h3><p>'+(ueber?"Der Schuldendienst läge bei "+pz(dienst)+" der Planeinnahmen (Grenze 20 %). Der Vorstand verkauft Spieler, bis der Kredit im Rahmen ist; der Mensch bekommt denselben Schritt als Dialog.":"Fehlbetrag "+C(-nach)+" + 10 % des Jahresgehalts ("+C(.1*T.gehalt)+") als Puffer. Die Rate läuft ab Spieltag 1 der neuen Saison.")+'</p></div>';
+  var det=nach<0?
+    '<div class="zr"><span>Fehlbetrag am Kassensturz</span><span class="t minus">'+C(nach)+'</span></div><div class="zr"><span>Puffer 10 % des Jahresgehalts</span><span class="t">'+C(.1*T.gehalt)+'</span></div><div class="zr"><span>Kredit<small>2 Saisons · 12 % je Saison</small></span><span class="t">'+C(kredit)+'</span></div><div class="zr"><span>Rate je Spieltag<small>40 Raten, Zins → Liga-Topf</small></span><span class="t minus">'+C(-rate,2)+'</span></div><div class="zr"><span>Schuldendienst ÷ Planeinnahmen<small>'+C(ann)+' ÷ '+C(P.ein)+' · Grenze 20 %</small></span><span class="t '+(ueber?"minus":"plus")+'">'+pz(dienst)+'</span></div><div class="zr"><span>Kasse nach Auszahlung</span><span class="t plus">'+C(nach+kredit)+'</span></div>':
+    '<div class="zr"><span>Kasse am Kassensturz</span><span class="t plus">'+C(nach)+'</span></div><div class="zr"><span>Neue Rücklage (Finanzwert '+n(T.fin)+')</span><span class="t">'+C(rueck)+'</span></div><div class="zr"><span>Freie Kasse vor dem Kauf</span><span class="t">'+C(frei)+'</span></div><div class="zr"><span>Davon gekauft und gebaut</span><span class="t">'+C(kauf+bau)+'</span></div><div class="zr"><span>Planeinnahmen der neuen Saison</span><span class="t">'+C(P.ein)+'</span></div><div class="zr"><span>Offene Kredite</span><span class="t">keine</span></div>';
+  return '<div class="pan"><div class="pk"><h2>Saisonwechsel: woher das Kaufbudget kommt</h2><span class="hin">Kapital, steht neben der GuV</span><span class="sp"></span><span class="gk">Buchung</span><span class="gk" style="width:6rem;text-align:right">Kasse</span></div><div class="pb" style="padding-top:.2rem"><div class="kette">'+kette+'</div>'+
+     '<div class="hinw">Ablöse und Verkäufe sind in diesem Mockup Beispielwerte (17 % und 9 % des Budgets, gemessene Spanne der Liga: Ø 39 bis 56 C und 21 bis 31 C je Team).</div></div></div>'+
+   '<div class="pan"><div class="pk"><h2>Kreditprüfung am Kassensturz</h2><span class="hin">erst nach den Käufen</span></div><div class="pb">'+
+     '<div class="regler"><span class="gk">Spielerkäufe</span><input type="range" id="kaufregler" min="0" max="'+maxK+'" step="1" value="'+Math.round(kauf)+'" aria-label="Kaufsumme"><strong class="t" style="text-align:right;font-size:1.3rem">'+C(kauf,0)+'</strong></div>'+
+     '<div style="display:flex;gap:.6rem;align-items:center"><div class="seg klein"><button data-kauf="ki" aria-pressed="'+(Z.kauf===null)+'">KI-Regel ('+kiKauf+' C)</button><button data-kauf="'+Math.round(vor+25)+'" aria-pressed="false">Überziehen</button><button data-kauf="'+maxK+'" aria-pressed="false">Stark überziehen</button></div><div class="seg klein"><button data-bau="0" aria-pressed="'+(!Z.bau)+'">kein Gebäude</button><button data-bau="1" aria-pressed="'+Z.bau+'">Fan Shop 10 C</button></div></div>'+
+     urteil+'<div>'+det+'</div><span class="sp" style="flex:1"></span>'+
+     '<div class="drei"><div class="'+(nach>=0?"an":"")+'"><b>Kasse ≥ 0</b><span>Kein Kredit. Eine unterschrittene Rücklage wertet der Vorstand.</span></div><div class="'+(nach<0&&!ueber?"an":"")+'"><b>Kasse unter 0</b><span>Pflichtkredit: Fehlbetrag + 10 % Gehalt, 2 Saisons, 12 %.</span></div><div class="'+(nach<0&&ueber?"an":"")+'"><b>Schuldendienst über 20 %</b><span>Erst Verkauf durch den Vorstand, dann Kredit.</span></div></div>'+
+     '<div class="kachel"><h4>Regel</h4><div class="hinw" style="color:var(--tinte);font-size:.95rem">In der Saison darf die Kasse ins Minus (zinsfrei bis zum erwarteten Rangbonus). Geprüft wird einmal: am Schluss des Kauffensters der Folgesaison. Wer dann unter 0 steht, bekommt den Pflichtkredit. Kein Geld wird erschummelt, nichts auf 0 gesetzt.</div></div></div></div>';
+}
+
+function ansKi(T,R){
+  var P=plan(T),k=KDECK[T.typ],er=erwRang(T),e=R.ende,neig=T.amb-T.fin;
+  var dR=kl((er-T.endRang)*.25,-2,2),dK=e.kEnde>=0?.25:-.5,dG=(R.guv<-.1*T.gehalt&&T.endRang>er)?-.5:0,ver=kl(T.vertrauen+dR+dK+dG,0,10);
+  var folge=ver>=6?"k + 0,05, voller Anteil am Liga-Topf":ver>=4?"neutral":ver>=2.5?"k − 0,10, Rücklage + 3 Punkte":"Sparauflage: k = 1,0, Rücklage ≥ 15 %, kein Bau";
+  var rGeh=.35*T.gehalt,mxg=Math.max(T.gehaltIst,T.deckel,T.gehalt)*1.08;
+  function vb(lab,v,far,mark){return '<div class="vb"><span>'+lab+'</span><span class="bk"><i style="width:'+(v/mxg*100)+'%;background:var('+far+')"></i>'+(mark?'<u style="left:'+(mark/mxg*100)+'%"></u>':"")+'</span><span class="t" style="text-align:right">'+n(v)+'</span></div>'}
+  var liste=[0,1].map(function(l){return TEAMS.filter(function(x){return x.L===l}).sort(function(a,b){return a.startRang-b.startRang})}).reduce(function(a,b){return a.concat(b)},[])
+    .map(function(x){return '<button class="tk'+(x.id===T.id?" an":"")+'" data-team="'+x.id+'" style="--pc:var('+TYPF[x.typ]+')" title="'+esc(x.name)+'"><img src="../team-logos/'+x.id+'.jpg" alt=""><span><b>'+x.id+'</b><small>F '+n(x.fin,0)+' · A '+n(x.amb,0)+'</small></span></button>'}).join("");
+  var pr=R.preise;
+  return '<div class="pan"><div class="pk"><h2>32 Teams</h2><span class="hin">Liga 1 oben · F Finanzwert · A Ambition</span></div><div class="pb"><div class="tg">'+liste+'</div>'+
+     '<div style="display:flex;gap:.4rem;flex-wrap:wrap"><span class="chip" style="border-color:var(--p5);color:var(--p5)">vorsichtig 8</span><span class="chip">normal 15</span><span class="chip" style="border-color:var(--p1);color:var(--p1)">aggressiv 9</span></div></div></div>'+
+   '<div class="pan"><div class="pk"><h2>Warum '+esc(T.name)+' so kauft</h2><span class="hin">Reihenfolge der Kaufphase</span><span class="sp"></span><span class="marke '+(T.typ==="aggressiv"?"w":T.typ==="vorsichtig"?"a":"k")+'">'+T.typ+'</span></div><div class="pb"><div class="kk">'+
+     '<div class="ks"><h3><i>1</i>Identität → Archetyp</h3><code>Neigung = Ambition − Finanzwert\n'+n(T.amb)+' − '+n(T.fin)+' = '+Cv(neig,1).replace(" C","")+'</code><div class="skala"><u style="left:'+kl((neig+8)/17*100,0,100)+'%"></u></div><p>bis −2 vorsichtig · ab +3 aggressiv · sonst normal</p><div class="erg"><span>Gehaltsdeckel-Faktor k</span><strong class="t">'+n(k,2)+'</strong></div></div>'+
+     '<div class="ks"><h3><i>2</i>Rücklage</h3><code>q = 5 % + 20 % × ('+n(T.fin)+' − 1) ÷ 9 = '+n(T.quote)+' %\nmax( '+n(T.quote)+' % × '+T.budget+' , 0,35 × Zielgehalt )\n= max( '+n(T.quote/100*T.budget)+' , '+n(rGeh)+' )</code><p>'+(T.gekappt?"Der Deckel aus Schritt 4 lässt zusätzlich Geld liegen.":"Heute bleiben nach dem Draft nur "+C(T.cashIst)+" ("+n(T.cashIst/T.budget*100)+" %).")+'</p><div class="erg"><span>bleibt als Cash · '+n(T.start/T.budget*100)+' % des Budgets</span><strong class="t">'+C(T.start)+'</strong></div></div>'+
+     '<div class="ks"><h3><i>3</i>Sponsor → Planeinnahmen</h3><code>0,92 × Anker '+n(T.anker)+' × 0,73 ÷ 1,1 = '+n(P.sponsor)+'\n+ Tickets '+n(P.ticket)+' + Merch '+n(P.merch)+' + Prämien '+n(P.prae)+'\n− Fixkosten '+n(P.fix)+'</code><p>Der Sponsor ist vor dem Kauf unterschrieben. Der Planer bekommt ihn jetzt (heute rechnet er mit 0).</p><div class="erg"><span>tragbares Gehalt</span><strong class="t">'+C(T.tragbar)+'</strong></div></div>'+
+     '<div class="ks"><h3><i>4</i>Gehaltsdeckel</h3><code>k × tragbar + freie Kasse ÷ 3\n'+n(k,2)+' × '+n(T.tragbar)+' + '+n(Math.max(0,T.deckel-k*T.tragbar))+' = '+n(T.deckel)+' C</code>'+vb("heute",T.gehaltIst,"--stumm",T.deckel)+vb("neu",T.gehalt,T.gekappt?"--acht":"--gut",T.deckel)+'<div class="erg"><span>'+(T.gekappt?"am Deckel gekappt":"unter dem Deckel")+' · weiße Marke = Deckel</span><strong class="t">'+C(T.gehalt)+'</strong></div></div>'+
+   '</div></div></div>'+
+   '<div class="pan"><div class="pk"><h2>Was die KI in der Saison einstellt</h2></div><div class="pb">'+
+     '<div class="kachel"><h4>Ticketpreis · 10 Heimspiele nach Regel</h4><div class="zr"><span>günstig<small>Stimmung unter 35, Kasse ≥ 0</small></span><span class="t">'+pr[0]+' ×</span></div><div class="zr"><span>normal</span><span class="t">'+pr[1]+' ×</span></div><div class="zr"><span>teuer<small>Stimmung ab 83 oder Kasse unter dem Rahmen</small></span><span class="t">'+pr[2]+' ×</span></div><div class="zr"><span>Topzuschlag<small>Stimmung ab 95, nicht vorsichtig</small></span><span class="t">'+pr[3]+' ×</span></div></div>'+
+     '<div class="kachel"><h4>Saison-Ergebnis · Faktor '+n(Z.f,2)+'</h4><div class="zr"><span>Tiefste Kasse in der Saison</span><span class="t '+(R.tief<0?"minus":"")+'">'+C(R.tief)+'</span></div><div class="zr"><span>GuV</span><span class="t '+vz(R.guv)+'">'+Cv(R.guv)+'</span></div><div class="zr"><span>Kasse nach der Abrechnung</span><span class="t '+(e.kEnde<0?"minus":"")+'">'+C(e.kEnde)+'</span></div><div class="zr"><span>Kredit<small>S1: keiner · Pflicht am Kassensturz</small></span><span class="t">'+(e.kEnde<0?"droht":"nein")+'</span></div><div class="zr"><span>Gebäude<small>nur aus Kasse über der Rücklage, max. 30 %</small></span><span class="t">'+(e.kEnde-T.start>12&&ver>=2.5?"Fan Shop":"kein Bau")+'</span></div></div>'+
+     '<div class="kachel" style="flex:1;display:flex;flex-direction:column"><h4>Vorstand am Saisonende</h4><div class="zr"><span>Erwartungsrang<small>Rang der Gehaltssumme in der Liga</small></span><span class="t">'+er+'</span></div><div class="zr"><span>Endrang</span><span class="t">'+T.endRang+'</span></div><div class="zr"><span>Rang: ('+er+' − '+T.endRang+') × 0,25</span><span class="t '+vz(dR)+'">'+Cv(dR,2).replace(" C","")+'</span></div><div class="zr"><span>Kasse '+(e.kEnde>=0?"≥ 0":"< 0")+(dG?" · teuer und erfolglos":"")+'</span><span class="t '+vz(dK+dG)+'">'+Cv(dK+dG,2).replace(" C","")+'</span></div><div class="zr"><span>Vertrauen '+n(T.vertrauen,1)+' → <b>'+n(ver,1)+'</b></span><span class="t '+vz(ver-T.vertrauen)+'">'+Cv(ver-T.vertrauen,1).replace(" C","")+'</span></div><span style="flex:1"></span><div class="urteil '+(ver>=4?"ok":ver>=2.5?"kr":"zw")+'" style="padding:.5rem .7rem"><p><b>Nächste Kaufphase:</b> '+folge+'</p></div></div>'+
+   '</div></div>';
+}
+
+function ansLiga(){
+  var m=MITTEL,fs=["0.82","1","1.24"],akt=String(Z.f),M=m[akt];
+  function zl(lab,k,far,sgn){return '<tr><td>'+(far?'<span class="fbp" style="--pc:var('+far+')"></span>':"")+lab+'</td>'+fs.map(function(f){var v=typeof k==="function"?k(m[f]):m[f][k];return '<td class="t'+(f===akt?" akt":"")+'">'+n(sgn*v,0)+'</td>'}).join("")+'</tr>'}
+  return '<div class="pan"><div class="pk"><h2>Geldmengen-Bilanz der Liga</h2><span class="hin">Σ 32 Teams je Saison · gerechnet auf den Messläufen A/B/C</span></div><div class="pb"><table class="tb gross"><tr><th>Posten in C</th>'+fs.map(function(f){return '<th'+(f===akt?' class="akt"':'')+'>Faktor '+n(+f,2)+'</th>'}).join("")+'</tr>'+
+     '<tr class="gr"><td colspan="4">Einnahmen von außen</td></tr>'+zl("Sponsor-Sockel · 20 Raten","sockel","--gold",1)+zl("Sponsor-Rangbonus · Saisonende","rangbonus","--gold",1)+zl("Tickets · Heimspiele","ticket","--p5",1)+zl("Merch","merch","--p6",1)+zl("Siegprämien","praemie","--p3",1)+zl("Vorstandsziele","vorstand","--creme",1)+
+     '<tr class="sum"><td>Einnahmen</td>'+fs.map(function(f){return '<td class="t'+(f===akt?" akt":"")+'">'+n(m[f].einnahmen,0)+'</td>'}).join("")+'</tr>'+
+     '<tr class="gr"><td colspan="4">Ausgaben nach außen</td></tr>'+zl("Gehälter · 20 Raten","gehalt","--p1",-1)+zl("Arena-Betrieb und Reise","betrieb","--p2",-1)+zl("Kaderprämien","kaderpraemie","--acht",-1)+
+     '<tr class="sum"><td>Ausgaben</td>'+fs.map(function(f){return '<td class="t'+(f===akt?" akt":"")+'">'+n(-m[f].ausgaben,0)+'</td>'}).join("")+'</tr>'+
+     '<tr class="sum"><td>Änderung der Geldmenge</td>'+fs.map(function(f){return '<td class="t '+(f===akt?"akt ":"")+vz(m[f].guv)+'">'+Cv(m[f].guv,0).replace(" C","")+'</td>'}).join("")+'</tr>'+
+     '<tr><td>in % der Gehälter</td>'+fs.map(function(f){return '<td class="t'+(f===akt?" akt":"")+'">'+Cv(m[f].guvInProzentGehalt,1).replace(" C"," %")+'</td>'}).join("")+'</tr>'+
+     '<tr><td>Sponsor-Anteil an den Einnahmen</td>'+fs.map(function(f){return '<td class="t'+(f===akt?" akt":"")+'">'+n(m[f].sponsorAnteil,0)+' %</td>'}).join("")+'</tr>'+
+     '<tr class="gr"><td colspan="4">Kasse im Verlauf</td></tr>'+zl("Σ Kasse nach dem Draft (Rücklagen)","kasseStart","",1)+zl("Σ Kasse nach Spieltag 20","kasseSt20","",1)+zl("Σ Kasse nach der Abrechnung","kasseEnde","",1)+zl("Teams im Minus nach Spieltag 20","imMinusSt20","",1)+
+     '</table><div class="hinw">Heute (gemessen, Faktor 1,02 bis 1,18): Sponsor 1953 bis 2138, Gehälter 2122 bis 2142, Σ Kasse nach dem Draft 228 bis 244, Sponsor-Anteil 96 %. Der Regler SPONSOR_AUSSCHUETTUNG sinkt von 1,10 auf 0,73.</div></div></div>'+
+   '<div class="pan"><div class="pk"><h2>Zwei Kreisläufe</h2><span class="hin">Betrieb fließt je Spieltag · Kapital im Saisonwechsel</span></div><div class="pb">'+
+     '<div class="kreis"><div class="kb ein"><h4>Von außen</h4>'+
+        '<div class="kq" style="--pc:var(--gold)"><span>Sponsoren</span><strong class="t">'+n(M.sponsor,0)+'</strong></div><div class="kq" style="--pc:var(--p5)"><span>Zuschauer</span><strong class="t">'+n(M.ticket,0)+'</strong></div><div class="kq" style="--pc:var(--p6)"><span>Merch</span><strong class="t">'+n(M.merch,0)+'</strong></div><div class="kq" style="--pc:var(--p3)"><span>Liga-Prämien</span><strong class="t">'+n(M.praemie,0)+'</strong></div><div class="kq" style="--pc:var(--creme)"><span>Vorstand</span><strong class="t">'+n(M.vorstand,0)+'</strong></div></div>'+
+       '<div class="kb mit"><h4>32 Teamkassen</h4><div class="mitte"><span>Geldmenge bei Faktor '+n(Z.f,2)+'</span><strong class="t '+vz(M.guv)+'">'+Cv(M.guv,0)+'</strong><span>je Saison · Ziel bei 1,00: ±0</span><span style="margin-top:.4rem">Σ Kasse '+n(M.kasseStart,0)+' → '+n(M.kasseSt20,0)+' → '+n(M.kasseEnde,0)+'</span></div></div>'+
+       '<div class="kb"><h4>Nach außen</h4><div class="kq" style="--pc:var(--p1);flex:5"><span>Gehälter</span><strong class="t">'+n(M.gehalt,0)+'</strong></div><div class="kq" style="--pc:var(--p2)"><span>Betrieb, Reise</span><strong class="t">'+n(M.betrieb,0)+'</strong></div><div class="kq" style="--pc:var(--acht)"><span>Kaderprämien</span><strong class="t">'+n(M.kaderpraemie,0)+'</strong></div></div>'+
+       '<div class="topf"><b>Liga-Topf</b><span>Verkaufsabschlag (gemessen 125 bis 197 C), Abschlag bei Vertragsablauf (geschätzt 220 bis 320 C) und alle Zinsen fließen hinein und zu Beginn der nächsten Kaufphase an die Teams zurück. Heute verschwindet dieses Geld: Vermögen −4,4 bis −4,9 % je Saison.</span><strong class="t">~390 bis 560 C</strong></div></div>'+
+     '<div class="kachel"><h4>Kapital: Kaufbudget der Folgesaison (Σ Liga)</h4><div class="zr"><span>Ablöse auslaufender Verträge<small>gemessen · Umwälzung</small></span><span class="t">1244 bis 1796</span></div><div class="zr"><span>Verkäufe netto<small>gemessen · Umwälzung</small></span><span class="t">683 bis 993</span></div><div class="zr"><span>Liga-Topf<small>neu · Ø 12 bis 17 C je Team</small></span><span class="t">~390 bis 560</span></div><div class="zr"><span>Kasse nach der Abrechnung − neue Rücklage<small>bei Faktor 1,00</small></span><span class="t">±0</span></div><div class="zr"><span><b>frei für Käufe und Gebäude</b><small>Bedarf zum Auffüllen 1684 bis 2436</small></span><span class="t">~2300 bis 3350</span></div></div>'+
+   '</div></div>';
+}
+
+/* ================= Zeichnen + Steuerung ================= */
+function zeichne(){
+  var T=TM[Z.team],R=saison(T,Z.f,Z.preis),w=document.getElementById("work");
+  if(!Z.st)Z.st=R.tage.filter(function(x){return x.heim&&x.t>=5})[0].t;
+  kopf(T,R);
+  var raster={tag:["27rem minmax(0,1fr)","minmax(0,1fr) 19.5rem"],ende:["minmax(0,1.05fr) minmax(0,1fr)","minmax(0,1fr)"],kauf:["minmax(0,1.25fr) minmax(0,1fr)","minmax(0,1fr)"],ki:["24rem minmax(0,1fr) 27rem","minmax(0,1fr)"],liga:["minmax(0,1fr) minmax(0,1.05fr)","minmax(0,1fr)"]}[Z.ans];
+  w.style.gridTemplateColumns=raster[0];w.style.gridTemplateRows=raster[1];
+  w.innerHTML=Z.ans==="tag"?ansTag(T,R):Z.ans==="ende"?ansEnde(T,R):Z.ans==="kauf"?ansKauf(T,R):Z.ans==="ki"?ansKi(T,R):ansLiga();
+  w.querySelectorAll(".kvs").forEach(function(k){k.innerHTML=kurveSvg(T,R,k.dataset.ende==="1",k.clientWidth,k.clientHeight)});
+  var p=new URLSearchParams();p.set("ansicht",Z.ans);p.set("team",Z.team);p.set("f",Z.f);p.set("st",Z.st);p.set("sel",Z.sel);p.set("preis",Z.preis);if(Z.kauf!==null)p.set("kauf",Z.kauf);if(Z.bau)p.set("bau",1);
+  try{history.replaceState(null,"","?"+p.toString())}catch(e){}
+}
+document.addEventListener("click",function(ev){
+  var e=ev.target.closest("[data-ans],[data-sel],[data-f],[data-preis],[data-team],[data-kauf],[data-bau]");if(!e)return;
+  var d=e.dataset;
+  if(d.ans)Z.ans=d.ans; if(d.sel)Z.sel=d.sel; if(d.f)Z.f=+d.f; if(d.preis!==undefined)Z.preis=d.preis;
+  if(d.team){Z.team=d.team;Z.kauf=null} if(d.kauf!==undefined)Z.kauf=d.kauf==="ki"?null:+d.kauf; if(d.bau!==undefined)Z.bau=d.bau==="1";
+  zeichne();
+});
+document.addEventListener("input",function(ev){
+  if(ev.target.id==="regler"){Z.st=+ev.target.value;zeichne();document.getElementById("regler").focus()}
+  if(ev.target.id==="kaufregler"){Z.kauf=+ev.target.value;zeichne();document.getElementById("kaufregler").focus()}
+});
+document.addEventListener("change",function(ev){if(ev.target.id==="teamwahl"){Z.team=ev.target.value;Z.kauf=null;zeichne()}});
+document.addEventListener("keydown",function(ev){
+  if(ev.target.tagName==="INPUT"||ev.target.tagName==="SELECT"||Z.ans!=="tag")return;
+  if(ev.key==="ArrowRight"){Z.st=Math.min(20,Z.st+1);zeichne()} if(ev.key==="ArrowLeft"){Z.st=Math.max(1,Z.st-1);zeichne()}
+});
+zeichne();
+</script>
+</body>
+</html>

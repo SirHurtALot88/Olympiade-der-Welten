@@ -1,0 +1,1853 @@
+{
+ "erzeugt": "2026-11-18T09:43:32.275Z",
+ "teams": {
+  "A-A": {
+   "liga": "liga2",
+   "budget": 175,
+   "cash": 175,
+   "identity": {
+    "ambition": 8.85,
+    "finances": 1.23,
+    "harmony": 1.69,
+    "boardConfidence": 1.69,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "star_chaser",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 5,
+    "wageSensitivity": 6,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 15,
+   "sponsor": {
+    "name": "Sennheiser Audio",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 55.06,
+    "floor": 47.3,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 55.06,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 49,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 49,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "B-B": {
+   "liga": "liga2",
+   "budget": 185,
+   "cash": 185,
+   "identity": {
+    "ambition": 6.28,
+    "finances": 3.68,
+    "harmony": 3,
+    "boardConfidence": 3.68,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "risk_gambler",
+   "bias": {
+    "cashPriority": 3,
+    "starPriority": 8,
+    "wageSensitivity": 4,
+    "riskTolerance": 9,
+    "valuePriority": 5
+   },
+   "spendAggression": "high",
+   "startRank": 13,
+   "sponsor": {
+    "name": "Kuka Automation",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 1,
+    "anchor": 57.98,
+    "floor": 49.67,
+    "goalSize": 20
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 57.98,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 55.22,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 57.98,
+     "floor": 49.67,
+     "goalSize": 20
+    }
+   ]
+  },
+  "B-P": {
+   "liga": "liga1",
+   "budget": 275,
+   "cash": 275,
+   "identity": {
+    "ambition": 8,
+    "finances": 6.41,
+    "harmony": 6,
+    "boardConfidence": 7.41,
+    "playerMin": 8,
+    "playerOpt": 9
+   },
+   "gm": "elite_curator",
+   "bias": {
+    "cashPriority": 3,
+    "starPriority": 8,
+    "wageSensitivity": 4,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "high",
+   "startRank": 11,
+   "sponsor": {
+    "name": "Porsche Holding",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 1,
+    "anchor": 68.5,
+    "floor": 49.67,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 68.5,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 65.24,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "selten",
+     "term": 3,
+     "anchor": 68.5,
+     "floor": 49.67,
+     "goalSize": 20
+    }
+   ]
+  },
+  "C-C": {
+   "liga": "liga2",
+   "budget": 215,
+   "cash": 215,
+   "identity": {
+    "ambition": 2.84,
+    "finances": 9.72,
+    "harmony": 7.22,
+    "boardConfidence": 3.76,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "bargain_hunter",
+   "bias": {
+    "cashPriority": 10,
+    "starPriority": 4,
+    "wageSensitivity": 9,
+    "riskTolerance": 5,
+    "valuePriority": 10
+   },
+   "spendAggression": "medium",
+   "startRank": 7,
+   "sponsor": {
+    "name": "Hannover Rück",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 2,
+    "anchor": 67.61,
+    "floor": 47.3,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 67.61,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 60.18,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 60.18,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "C-S": {
+   "liga": "liga1",
+   "budget": 315,
+   "cash": 315,
+   "identity": {
+    "ambition": 7,
+    "finances": 8.32,
+    "harmony": 8.29,
+    "boardConfidence": 9,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "facility_architect",
+   "bias": {
+    "cashPriority": 6,
+    "starPriority": 6,
+    "wageSensitivity": 6,
+    "riskTolerance": 4,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 3,
+   "sponsor": {
+    "name": "Rewe United",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 104.82,
+    "floor": 47.3,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 104.82,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 93.29,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 93.29,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "D-L": {
+   "liga": "liga2",
+   "budget": 195,
+   "cash": 195,
+   "identity": {
+    "ambition": 6.59,
+    "finances": 4.94,
+    "harmony": 10,
+    "boardConfidence": 8.53,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "culture_keeper",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 3,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 11,
+   "sponsor": {
+    "name": "Hilti Befestigung",
+    "archetype": "security",
+    "rarity": "magisch",
+    "term": 2,
+    "anchor": 57.84,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 51.48,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 57.84,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 51.48,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "D-P": {
+   "liga": "liga2",
+   "budget": 240,
+   "cash": 240,
+   "identity": {
+    "ambition": 6,
+    "finances": 3.05,
+    "harmony": 9.35,
+    "boardConfidence": 5.7,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "culture_keeper",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 4,
+    "riskTolerance": 6,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 2,
+   "sponsor": {
+    "name": "ThyssenKrupp Stahl",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 83.7,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 87.88,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 83.7,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 74.49,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "G-G": {
+   "liga": "liga1",
+   "budget": 310,
+   "cash": 310,
+   "identity": {
+    "ambition": 7.14,
+    "finances": 6.71,
+    "harmony": 8.79,
+    "boardConfidence": 7.29,
+    "playerMin": 8,
+    "playerOpt": 13
+   },
+   "gm": "talent_builder",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 3,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 4,
+   "sponsor": {
+    "name": "Miele Hausgeraete",
+    "archetype": "security",
+    "rarity": "legendär",
+    "term": 3,
+    "anchor": 111.6,
+    "floor": 52.5,
+    "goalSize": 24
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 89.48,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 89.48,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "legendär",
+     "term": 3,
+     "anchor": 111.6,
+     "floor": 52.5,
+     "goalSize": 24
+    }
+   ]
+  },
+  "H-R": {
+   "liga": "liga1",
+   "budget": 285,
+   "cash": 285,
+   "identity": {
+    "ambition": 8.8,
+    "finances": 2.1,
+    "harmony": 3.4,
+    "boardConfidence": 5.5,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "star_chaser",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 9,
+    "wageSensitivity": 3,
+    "riskTolerance": 8,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 9,
+   "sponsor": {
+    "name": "WDR Sportpartner",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 1,
+    "anchor": 66.19,
+    "floor": 42.1,
+    "goalSize": 15
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 74.37,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 66.19,
+     "floor": 42.1,
+     "goalSize": 15
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 74.37,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "L-K": {
+   "liga": "liga2",
+   "budget": 225,
+   "cash": 225,
+   "identity": {
+    "ambition": 6.96,
+    "finances": 7.38,
+    "harmony": 8,
+    "boardConfidence": 3.96,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "talent_builder",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 6,
+    "valuePriority": 7
+   },
+   "spendAggression": "medium",
+   "startRank": 5,
+   "sponsor": {
+    "name": "Schaeffler Antrieb",
+    "archetype": "identity",
+    "rarity": "legendär",
+    "term": 1,
+    "anchor": 82.69,
+    "floor": 52.5,
+    "goalSize": 24
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 66.3,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "legendär",
+     "term": 1,
+     "anchor": 82.69,
+     "floor": 52.5,
+     "goalSize": 24
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 66.3,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "L-R": {
+   "liga": "liga1",
+   "budget": 305,
+   "cash": 305,
+   "identity": {
+    "ambition": 8.33,
+    "finances": 3.01,
+    "harmony": 4.66,
+    "boardConfidence": 4.67,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "rivalry_hawk",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 4,
+    "riskTolerance": 6,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 5,
+   "sponsor": {
+    "name": "Hella Fahrzeuglicht",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 3,
+    "anchor": 100.23,
+    "floor": 49.67,
+    "goalSize": 20
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 84.95,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 3,
+     "anchor": 100.23,
+     "floor": 49.67,
+     "goalSize": 20
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 84.95,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "M-M": {
+   "liga": "liga1",
+   "budget": 325,
+   "cash": 325,
+   "identity": {
+    "ambition": 8.64,
+    "finances": 5.13,
+    "harmony": 4.21,
+    "boardConfidence": 3,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "risk_gambler",
+   "bias": {
+    "cashPriority": 2,
+    "starPriority": 10,
+    "wageSensitivity": 3,
+    "riskTolerance": 9,
+    "valuePriority": 5
+   },
+   "spendAggression": "high",
+   "startRank": null,
+   "sponsor": null,
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 109.89,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 109.89,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 97.81,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "M-S": {
+   "liga": "liga2",
+   "budget": 245,
+   "cash": 245,
+   "identity": {
+    "ambition": 3.94,
+    "finances": 6.79,
+    "harmony": 10,
+    "boardConfidence": 8.53,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "culture_keeper",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 4,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 1,
+   "sponsor": {
+    "name": "Toom Werkstatt",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 1,
+    "anchor": 89.23,
+    "floor": 49.67,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 89.23,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 84.98,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 75.63,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "N-N": {
+   "liga": "liga1",
+   "budget": 270,
+   "cash": 270,
+   "identity": {
+    "ambition": 6.12,
+    "finances": 2.92,
+    "harmony": 2.28,
+    "boardConfidence": 2.92,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "risk_gambler",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 4,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 12,
+   "sponsor": {
+    "name": "BASF Chemie Partner",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 1,
+    "anchor": 54.35,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 54.35,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 54.35,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 54.35,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "N-W": {
+   "liga": "liga1",
+   "budget": 265,
+   "cash": 265,
+   "identity": {
+    "ambition": 4.86,
+    "finances": 4.14,
+    "harmony": 7.57,
+    "boardConfidence": 6.86,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "depth_spammer",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 5,
+    "wageSensitivity": 5,
+    "riskTolerance": 4,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 13,
+   "sponsor": {
+    "name": "Deichmann Schuhe",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 2,
+    "anchor": 51.1,
+    "floor": 42.1,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 51.1,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 51.1,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 51.1,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "P-C": {
+   "liga": "liga2",
+   "budget": 200,
+   "cash": 200,
+   "identity": {
+    "ambition": 4.97,
+    "finances": 9.35,
+    "harmony": 6.97,
+    "boardConfidence": 5.7,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "bargain_hunter",
+   "bias": {
+    "cashPriority": 7,
+    "starPriority": 4,
+    "wageSensitivity": 7,
+    "riskTolerance": 6,
+    "valuePriority": 8
+   },
+   "spendAggression": "medium",
+   "startRank": 10,
+   "sponsor": {
+    "name": "Hermes Paket",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 3,
+    "anchor": 59.82,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "legendär",
+     "term": 3,
+     "anchor": 66.4,
+     "floor": 52.5,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 59.82,
+     "floor": 47.3,
+     "goalSize": 20
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 3,
+     "anchor": 59.82,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "P-S": {
+   "liga": "liga1",
+   "budget": 300,
+   "cash": 295.37,
+   "identity": {
+    "ambition": 3.61,
+    "finances": 3.64,
+    "harmony": 4.71,
+    "boardConfidence": 3.87,
+    "playerMin": 8,
+    "playerOpt": 10
+   },
+   "gm": "star_chaser",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 6,
+   "sponsor": {
+    "name": "Conrad Elektronik",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 90.01,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 80.1,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 90.01,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 90.01,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "R-C": {
+   "liga": "liga2",
+   "budget": 220,
+   "cash": 220,
+   "identity": {
+    "ambition": 7,
+    "finances": 6.8,
+    "harmony": 3.42,
+    "boardConfidence": 3.48,
+    "playerMin": 8,
+    "playerOpt": 13
+   },
+   "gm": "rivalry_hawk",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 4,
+    "riskTolerance": 5,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 6,
+   "sponsor": {
+    "name": "Webasto Comfort",
+    "archetype": "security",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 70.89,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 3,
+     "anchor": 74.44,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 70.89,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 3,
+     "anchor": 70.89,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "R-L": {
+   "liga": "liga1",
+   "budget": 295,
+   "cash": 295,
+   "identity": {
+    "ambition": 7.72,
+    "finances": 1.72,
+    "harmony": 5.07,
+    "boardConfidence": 6.43,
+    "playerMin": 8,
+    "playerOpt": 10
+   },
+   "gm": "star_chaser",
+   "bias": {
+    "cashPriority": 3,
+    "starPriority": 9,
+    "wageSensitivity": 3,
+    "riskTolerance": 9,
+    "valuePriority": 5
+   },
+   "spendAggression": "high",
+   "startRank": 7,
+   "sponsor": {
+    "name": "Trumpf Lasertechnik",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 3,
+    "anchor": 88.79,
+    "floor": 49.67,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 3,
+     "anchor": 88.79,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 84.57,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 84.57,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "R-R": {
+   "liga": "liga2",
+   "budget": 170,
+   "cash": 170,
+   "identity": {
+    "ambition": 3.94,
+    "finances": 7.34,
+    "harmony": 5.32,
+    "boardConfidence": 4.64,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "systems_tinkerer",
+   "bias": {
+    "cashPriority": 8,
+    "starPriority": 5,
+    "wageSensitivity": 8,
+    "riskTolerance": 5,
+    "valuePriority": 9
+   },
+   "spendAggression": "medium",
+   "startRank": 16,
+   "sponsor": {
+    "name": "Montblanc Writing",
+    "archetype": "security",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 55.88,
+    "floor": 47.3,
+    "goalSize": 16
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 58.67,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 55.88,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 55.88,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "S-C": {
+   "liga": "liga2",
+   "budget": 205,
+   "cash": 205,
+   "identity": {
+    "ambition": 8,
+    "finances": 5.59,
+    "harmony": 4,
+    "boardConfidence": 6.59,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "rivalry_hawk",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 4,
+    "riskTolerance": 7,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 9,
+   "sponsor": {
+    "name": "Leica Kamera",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 1,
+    "anchor": 55.28,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 55.28,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 55.28,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 55.28,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "S-S": {
+   "liga": "liga1",
+   "budget": 280,
+   "cash": 280,
+   "identity": {
+    "ambition": 4.58,
+    "finances": 7.43,
+    "harmony": 7.43,
+    "boardConfidence": 7.29,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "talent_builder",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 5,
+    "wageSensitivity": 6,
+    "riskTolerance": 4,
+    "valuePriority": 8
+   },
+   "spendAggression": "medium",
+   "startRank": 10,
+   "sponsor": {
+    "name": "Rossmann Drogerie",
+    "archetype": "security",
+    "rarity": "gewöhnlich",
+    "term": 1,
+    "anchor": 62.02,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 62.02,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 62.02,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 62.02,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "T-C": {
+   "liga": "liga2",
+   "budget": 210,
+   "cash": 210,
+   "identity": {
+    "ambition": 3.22,
+    "finances": 7.06,
+    "harmony": 8.92,
+    "boardConfidence": 4.16,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "depth_spammer",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 3,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 8,
+   "sponsor": {
+    "name": "Dr. Oetker Gastronomie",
+    "archetype": "security",
+    "rarity": "gewöhnlich",
+    "term": 3,
+    "anchor": 57.59,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 57.59,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 57.59,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 57.59,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "T-G": {
+   "liga": "liga2",
+   "budget": 230,
+   "cash": 230,
+   "identity": {
+    "ambition": 6.28,
+    "finances": 2.64,
+    "harmony": 4.68,
+    "boardConfidence": 4,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "rivalry_hawk",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 8,
+    "wageSensitivity": 4,
+    "riskTolerance": 6,
+    "valuePriority": 5
+   },
+   "spendAggression": "medium",
+   "startRank": 4,
+   "sponsor": {
+    "name": "Fiat Automobili",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 3,
+    "anchor": 69.56,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 69.56,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 69.56,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 69.56,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "T-T": {
+   "liga": "liga1",
+   "budget": 260,
+   "cash": 260,
+   "identity": {
+    "ambition": 4.77,
+    "finances": 8.85,
+    "harmony": 4.84,
+    "boardConfidence": 2.38,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "bargain_hunter",
+   "bias": {
+    "cashPriority": 6,
+    "starPriority": 6,
+    "wageSensitivity": 7,
+    "riskTolerance": 4,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 14,
+   "sponsor": {
+    "name": "Fischer Duebelwerke",
+    "archetype": "identity",
+    "rarity": "magisch",
+    "term": 1,
+    "anchor": 54.6,
+    "floor": 47.3,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 54.6,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 48.6,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 48.6,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "U-A": {
+   "liga": "liga2",
+   "budget": 190,
+   "cash": 190,
+   "identity": {
+    "ambition": 6,
+    "finances": 4.25,
+    "harmony": 8.25,
+    "boardConfidence": 8,
+    "playerMin": 8,
+    "playerOpt": 14
+   },
+   "gm": "depth_spammer",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 5,
+    "wageSensitivity": 6,
+    "riskTolerance": 5,
+    "valuePriority": 7
+   },
+   "spendAggression": "medium",
+   "startRank": 12,
+   "sponsor": {
+    "name": "General Motors",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 1,
+    "anchor": 59.08,
+    "floor": 49.67,
+    "goalSize": 0
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 59.08,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 56.27,
+     "floor": 47.3,
+     "goalSize": 16
+    },
+    {
+     "archetype": "security",
+     "rarity": "magisch",
+     "term": 2,
+     "anchor": 56.27,
+     "floor": 47.3,
+     "goalSize": 16
+    }
+   ]
+  },
+  "V-D": {
+   "liga": "liga1",
+   "budget": 250,
+   "cash": 250,
+   "identity": {
+    "ambition": 5.03,
+    "finances": 2.92,
+    "harmony": 5.66,
+    "boardConfidence": 6.43,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "risk_gambler",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 7,
+    "wageSensitivity": 5,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 16,
+   "sponsor": {
+    "name": "Penny Markt",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 1,
+    "anchor": 46.55,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 46.55,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 46.55,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 46.55,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "V-V": {
+   "liga": "liga2",
+   "budget": 235,
+   "cash": 235,
+   "identity": {
+    "ambition": 9.2,
+    "finances": 3,
+    "harmony": 5.86,
+    "boardConfidence": 7.12,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "star_chaser",
+   "bias": {
+    "cashPriority": 4,
+    "starPriority": 8,
+    "wageSensitivity": 4,
+    "riskTolerance": 7,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 3,
+   "sponsor": {
+    "name": "Toyota Way Mobility",
+    "archetype": "security",
+    "rarity": "gewöhnlich",
+    "term": 2,
+    "anchor": 72.42,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 72.42,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 72.42,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "security",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 72.42,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "V-W": {
+   "liga": "liga2",
+   "budget": 180,
+   "cash": 180,
+   "identity": {
+    "ambition": 4.92,
+    "finances": 3.11,
+    "harmony": 7.3,
+    "boardConfidence": 8.27,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "culture_keeper",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 6,
+    "wageSensitivity": 5,
+    "riskTolerance": 5,
+    "valuePriority": 6
+   },
+   "spendAggression": "medium",
+   "startRank": 14,
+   "sponsor": {
+    "name": "Hornbach & Co",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 3,
+    "anchor": 48.79,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 48.79,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 48.79,
+     "floor": 42.1,
+     "goalSize": 15
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 48.79,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  },
+  "W-L": {
+   "liga": "liga1",
+   "budget": 290,
+   "cash": 290,
+   "identity": {
+    "ambition": 5.34,
+    "finances": 10,
+    "harmony": 8.38,
+    "boardConfidence": 4.64,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "bargain_hunter",
+   "bias": {
+    "cashPriority": 7,
+    "starPriority": 5,
+    "wageSensitivity": 7,
+    "riskTolerance": 5,
+    "valuePriority": 8
+   },
+   "spendAggression": "medium",
+   "startRank": 8,
+   "sponsor": {
+    "name": "Deutsche Bank Partner",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 1,
+    "anchor": 83.3,
+    "floor": 49.67,
+    "goalSize": 20
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "magisch",
+     "term": 1,
+     "anchor": 79.33,
+     "floor": 47.3,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 83.3,
+     "floor": 49.67,
+     "goalSize": 20
+    },
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 83.3,
+     "floor": 49.67,
+     "goalSize": 20
+    }
+   ]
+  },
+  "W-W": {
+   "liga": "liga1",
+   "budget": 255,
+   "cash": 255,
+   "identity": {
+    "ambition": 6.7,
+    "finances": 7.4,
+    "harmony": 4.8,
+    "boardConfidence": 6.7,
+    "playerMin": 8,
+    "playerOpt": 12
+   },
+   "gm": "systems_tinkerer",
+   "bias": {
+    "cashPriority": 5,
+    "starPriority": 7,
+    "wageSensitivity": 6,
+    "riskTolerance": 6,
+    "valuePriority": 7
+   },
+   "spendAggression": "medium",
+   "startRank": 15,
+   "sponsor": {
+    "name": "Chrysler Motors",
+    "archetype": "identity",
+    "rarity": "selten",
+    "term": 3,
+    "anchor": 55.54,
+    "floor": 49.67,
+    "goalSize": 20
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 55.54,
+     "floor": 49.67,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "selten",
+     "term": 3,
+     "anchor": 55.54,
+     "floor": 49.67,
+     "goalSize": 20
+    },
+    {
+     "archetype": "security",
+     "rarity": "selten",
+     "term": 1,
+     "anchor": 55.54,
+     "floor": 49.67,
+     "goalSize": 20
+    }
+   ]
+  },
+  "Z-H": {
+   "liga": "liga1",
+   "budget": 320,
+   "cash": 320,
+   "identity": {
+    "ambition": 10,
+    "finances": 2,
+    "harmony": 1.65,
+    "boardConfidence": 2.26,
+    "playerMin": 8,
+    "playerOpt": 11
+   },
+   "gm": "risk_gambler",
+   "bias": {
+    "cashPriority": 2,
+    "starPriority": 9,
+    "wageSensitivity": 2,
+    "riskTolerance": 10,
+    "valuePriority": 4
+   },
+   "spendAggression": "high",
+   "startRank": 2,
+   "sponsor": {
+    "name": "Jaguar Land Rover",
+    "archetype": "identity",
+    "rarity": "gewöhnlich",
+    "term": 2,
+    "anchor": 96.08,
+    "floor": 42.1,
+    "goalSize": 12
+   },
+   "offers": [
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 1,
+     "anchor": 96.08,
+     "floor": 42.1,
+     "goalSize": 0
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 2,
+     "anchor": 96.08,
+     "floor": 42.1,
+     "goalSize": 12
+    },
+    {
+     "archetype": "identity",
+     "rarity": "gewöhnlich",
+     "term": 3,
+     "anchor": 96.08,
+     "floor": 42.1,
+     "goalSize": 12
+    }
+   ]
+  }
+ }
+}

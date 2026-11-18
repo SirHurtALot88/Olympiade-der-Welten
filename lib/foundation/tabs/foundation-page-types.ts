@@ -74,6 +74,7 @@ export type FoundationView =
   | "matchdayArena"
   | "disciplineStage"
   | "matchdayResult"
+  | "nachDemSpieltag"
   | "teams"
   | "training"
   | "trainingCompact"

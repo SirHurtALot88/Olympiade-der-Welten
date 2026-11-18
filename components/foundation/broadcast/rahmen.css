@@ -1,0 +1,785 @@
+/*
+ * APP-RAHMEN MODERN (18.11.) — Regieband, Taktgeber, Schiene, Bauchbinde, Arena-Vollbild.
+ * Vorlage: public/mockups/app-rahmen-modern-18-11.html, Erklärung docs/design/app-rahmen-modern-18-11.md,
+ * Abgleich: docs/design/app-rahmen-bau-abgleich-18-11.md.
+ *
+ * Stil und Tokens sind die des Mockups (Gold/Creme, RaniraSeason für Namen, Barlow Condensed für Zahlen).
+ * Alle Maße des Rahmens in em, Basis `--fb-u` (wächst mit Breite UND Höhe des Fensters, Entwurfsmaß 1920×1080
+ * = 16 px). Seiteninhalt skaliert noch nicht mit (schrittweise, siehe Doku).
+ * Liegt NACH broadcast.css und überschreibt dessen „Kopfzeile in EINER Reihe“ (Statuschip etc.).
+ */
+.foundation-shell-layout {
+  --fb-u: clamp(12.5px, min(0.8333vw, 1.4815vh), 34px);
+  --fb-grund: #06080c;
+  --fb-f1: #0c1017;
+  --fb-f2: #121824;
+  --fb-f3: #1a2231;
+  --fb-linie: rgba(244, 230, 196, 0.13);
+  --fb-linie-2: rgba(244, 230, 196, 0.3);
+  --fb-creme: #f4e6c4;
+  --fb-gold: #f0c35a;
+  --fb-tinte: #eef2f8;
+  --fb-leise: #9aa7ba;
+  --fb-stumm: #66738a;
+  --fb-gut: #62d394;
+  --fb-warn: #ff6058;
+  --fb-acht: #f3b54a;
+  --fb-haus: "RaniraSeason", Georgia, "Times New Roman", serif;
+  --fb-zahl: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ── Regieband ─────────────────────────────────────────────────────────────────────────────────── */
+.foundation-shell.app-shell .foundation-shell-header.fb-band {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1.1em 1.1em;
+  min-height: 4.5em;
+  margin: 0;
+  padding: 0.5em 1em;
+  font-size: var(--fb-u);
+  font-family: var(--fb-zahl);
+  color: var(--fb-tinte);
+  background: linear-gradient(180deg, #0e131c 0%, var(--fb-grund) 100%);
+  border: 0;
+  border-bottom: 1px solid var(--fb-linie);
+  border-radius: 0;
+}
+.fb-band .fb-ort {
+  flex: none;
+  min-width: 0;
+  animation: fb-rutsch 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.fb-band .foundation-shell-breadcrumb {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05em;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  flex-wrap: nowrap;
+}
+.fb-band .foundation-shell-breadcrumb-crumb.is-root {
+  order: -1;
+  font-family: var(--fb-zahl);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fb-gold);
+  white-space: nowrap;
+}
+.fb-band .foundation-shell-breadcrumb-crumb.is-view {
+  font-family: var(--fb-haus);
+  font-size: 2em;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.05;
+  color: #fff;
+  white-space: nowrap;
+}
+.fb-band .fb-reiter {
+  flex: none;
+  min-width: 0;
+}
+.fb-band .foundation-subnav {
+  display: flex;
+  gap: 0.2em;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  overflow: visible;
+}
+.fb-band .foundation-subnav-item {
+  position: relative;
+  padding: 0.4em 0.75em;
+  font-family: var(--fb-zahl);
+  font-size: 0.95em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fb-leise);
+  background: none;
+  border: 0;
+  border-radius: 0.3em;
+  box-shadow: none;
+}
+.foundation-shell.app-shell .fb-band .foundation-subnav-item:hover {
+  color: var(--fb-tinte);
+  background: var(--fb-f2);
+}
+.foundation-shell.app-shell .fb-band .foundation-subnav-item.is-active {
+  color: var(--fb-creme);
+  background: none;
+  box-shadow: none;
+}
+.foundation-shell.app-shell .fb-band .foundation-subnav-item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0.75em;
+  right: 0.75em;
+  bottom: -0.1em;
+  height: 0.18em;
+  border-radius: 2px;
+  background: var(--fb-gold);
+}
+.fb-band .foundation-subnav-count {
+  margin-left: 0.4em;
+  color: var(--fb-gold);
+}
+.fb-band .fb-slot {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+}
+.foundation-shell.app-shell .fb-band .fb-rechts {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.55em;
+}
+
+.fb-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15em;
+  height: 2.9em;
+  padding: 0 0.9em;
+  font-family: var(--fb-zahl);
+  color: var(--fb-tinte);
+  background: rgba(14, 19, 29, 0.85);
+  border: 1px solid var(--fb-linie);
+  border-radius: 0.5em;
+  cursor: default;
+}
+button.fb-chip {
+  cursor: pointer;
+  text-align: left;
+}
+button.fb-chip:hover {
+  border-color: var(--fb-linie-2);
+}
+.fb-chip small {
+  font-size: 0.68em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fb-leise);
+  white-space: nowrap;
+}
+.fb-chip small b {
+  font-size: 1.5em;
+  letter-spacing: 0;
+  color: var(--fb-creme);
+}
+.fb-chip > b {
+  font-size: 1.3em;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--fb-creme);
+  white-space: nowrap;
+}
+.fb-striche {
+  display: flex;
+  gap: 0.14em;
+}
+.fb-striche i {
+  width: 0.34em;
+  height: 0.34em;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  transform: skewX(-14deg);
+}
+.fb-striche i.is-gespielt {
+  background: var(--fb-gold);
+}
+.fb-striche i.is-jetzt {
+  background: var(--fb-creme);
+  box-shadow: 0 0 0.4em rgba(244, 230, 196, 0.8);
+}
+.foundation-shell.app-shell .fb-band .fb-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.7em;
+  height: 2.7em;
+  min-height: 0;
+  padding: 0;
+  color: var(--fb-leise);
+  background: rgba(14, 19, 29, 0.85);
+  border: 1px solid var(--fb-linie);
+  border-radius: 0.5em;
+  cursor: pointer;
+}
+.fb-icon:hover {
+  color: var(--fb-tinte);
+  border-color: var(--fb-linie-2);
+}
+.fb-icon svg {
+  width: 1.25em;
+  height: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.foundation-shell.app-shell .fb-band .foundation-screen-action-button {
+  min-width: 0;
+  max-width: 11em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  height: 2.6em;
+  min-height: 0;
+  padding: 0 1em;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--fb-creme);
+  background: var(--fb-f3);
+  border: 1px solid var(--fb-linie-2);
+  border-radius: 0.5em;
+}
+
+/* ── Taktgeber ─────────────────────────────────────────────────────────────────────────────────── */
+.foundation-takt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.22em;
+  width: 16em;
+  flex: none;
+  margin-left: 0.25em;
+}
+.foundation-shell.app-shell .fb-band .foundation-takt-knopf {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  height: 2.6em;
+  min-height: 0;
+  padding: 0 1.3em;
+  font-family: var(--fb-zahl);
+  font-size: 1em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #17120a;
+  background: var(--fb-gold);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(0.6em 0, 100% 0, calc(100% - 0.6em) 100%, 0 100%);
+  overflow: hidden;
+  cursor: pointer;
+}
+.foundation-takt-knopf > * {
+  position: relative;
+  z-index: 1;
+}
+.foundation-takt-knopf span {
+  font-weight: 600;
+  opacity: 0.8;
+}
+.foundation-takt-knopf strong {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.foundation-takt-knopf small {
+  display: none;
+}
+.foundation-takt-knopf:hover {
+  filter: brightness(1.08);
+}
+.foundation-takt-fuell {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--fb-gold);
+  z-index: 0;
+}
+.foundation-takt-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0 0 0 0.7em;
+  font-family: var(--fb-zahl);
+  font-size: 0.8em;
+  color: var(--fb-leise);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+.foundation-takt-status:hover {
+  color: var(--fb-tinte);
+}
+.foundation-takt-status i {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--fb-gut);
+  flex: none;
+}
+.foundation-takt-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foundation-takt.is-bereit .foundation-takt-status i {
+  background: var(--fb-acht);
+}
+.foundation-takt.is-zu .foundation-takt-status i {
+  background: var(--fb-warn);
+}
+.foundation-shell.app-shell .fb-band .foundation-takt.is-zu .foundation-takt-knopf {
+  color: var(--fb-leise);
+  background: var(--fb-f3);
+  box-shadow: inset 0 0 0 1px var(--fb-linie-2);
+}
+.foundation-shell.app-shell .fb-band .foundation-takt.is-laeuft .foundation-takt-knopf {
+  color: var(--fb-creme);
+  background: var(--fb-f3);
+  cursor: progress;
+}
+.foundation-takt.is-laeuft .foundation-takt-fuell {
+  background: rgba(240, 195, 90, 0.35);
+}
+.foundation-takt.is-weiter .foundation-takt-knopf::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: fb-glanz 3.2s ease-in-out infinite;
+}
+.foundation-takt-linie {
+  position: absolute;
+  left: -1em;
+  right: -1em;
+  bottom: -0.75em;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.foundation-takt-linie::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  background: var(--fb-gold);
+  animation: fb-lauf 1.4s linear infinite;
+}
+.foundation-takt-ablauf {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5em);
+  right: 0;
+  z-index: 60;
+  width: 30em;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 0.9em 1em;
+  color: var(--fb-tinte);
+  background: var(--fb-f2);
+  border: 1px solid var(--fb-linie-2);
+  border-radius: 0.7em;
+  box-shadow: 0 1em 2.5em rgba(0, 0, 0, 0.6);
+}
+.foundation-takt-ablauf.is-offen {
+  display: block;
+}
+.foundation-takt-ablauf-titel {
+  display: block;
+  margin-bottom: 0.5em;
+  font-family: var(--fb-haus);
+  font-weight: 400;
+  font-size: 1.2em;
+  color: var(--fb-creme);
+}
+.foundation-takt-ablauf-leer {
+  margin: 0 0 0.4em;
+  font-size: 0.9em;
+  color: var(--fb-leise);
+}
+/* Die Aktivitätszeile im Aufklapper: volle Breite statt Chip im Kopf. */
+.foundation-takt-ablauf .foundation-activity-strip {
+  max-width: none;
+  margin: 0;
+  flex: 1 1 100%;
+}
+/* Läuft etwas, steht der Ablauf nicht im Weg, bis man ihn ruft. */
+@keyframes fb-glanz {
+  0%, 55% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@keyframes fb-lauf {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(340%); }
+}
+@keyframes fb-rutsch {
+  from { opacity: 0; transform: translateX(-0.8em); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fb-auf {
+  from { opacity: 0; transform: translateY(0.7em); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Seitenwechsel: Tafeln steigen gestaffelt auf (0,34 s) ──────────────────────────────────────── */
+.foundation-shell.app-shell .foundation-shell-content.foundation-view-enter {
+  animation: none;
+  will-change: auto;
+}
+.foundation-shell-content.foundation-view-enter > * {
+  animation: fb-auf 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.foundation-shell-content.foundation-view-enter > *:nth-child(2) { animation-delay: 0.04s; }
+.foundation-shell-content.foundation-view-enter > *:nth-child(3) { animation-delay: 0.08s; }
+.foundation-shell-content.foundation-view-enter > *:nth-child(n + 4) { animation-delay: 0.12s; }
+
+/* ── Schiene: Wappenkopf, gleitende Marke, Office und Flagge unten ──────────────────────────────── */
+@media (min-width: 761px) {
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar {
+    font-family: var(--fb-zahl);
+  }
+  .foundation-rail-wappen {
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    min-width: 0;
+  }
+  .foundation-rail-wappen-bild,
+  .foundation-rail-wappen img {
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: none;
+    object-fit: cover;
+    border-radius: 0.55rem;
+    border: 1px solid var(--fb-linie-2);
+  }
+  .foundation-rail-wappen-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--fb-haus);
+    font-weight: 400;
+    font-size: 1.05rem;
+    color: var(--fb-creme);
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-rail-wappen-name {
+    display: none;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-rail-wappen {
+    justify-content: center;
+  }
+  /* Eine Marke statt je einem Balken pro Punkt. */
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar .foundation-sidebar-item.is-active::before {
+    display: none;
+  }
+  .foundation-rail-marke {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: var(--fb-gold);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.2s ease,
+      opacity 0.2s ease;
+  }
+  .foundation-rail-marke.is-da {
+    opacity: 1;
+  }
+  .foundation-rail-unten {
+    margin-top: auto;
+    display: grid;
+    gap: 2px;
+    padding-bottom: 3.2em;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar[data-rail="compact"] .foundation-rail-unten .foundation-sidebar-item {
+    position: relative;
+    justify-content: center;
+    width: 44px;
+    height: 40px;
+    margin: 0 auto;
+    padding: 0;
+    border-color: transparent;
+    border-radius: 9px;
+  }
+  .foundation-rail-office svg {
+    width: 1.25em;
+    height: 1.25em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Fehler-Flagge unten in der Schiene statt über dem Inhalt. */
+  body:has(.foundation-shell-layout.is-bc-rail) .oly-bug-report-flag {
+    top: auto;
+    right: auto;
+    bottom: 10px;
+    left: 19px;
+    align-items: flex-start;
+    flex-direction: column-reverse;
+  }
+  body:has(.foundation-shell-layout.is-bc-rail.is-arena-voll) .oly-bug-report-flag {
+    display: none;
+  }
+}
+
+/* ── Meldungen: Bauchbinde unten rechts ─────────────────────────────────────────────────────────── */
+.fb-bauchbinde {
+  position: fixed;
+  right: 1.2em;
+  bottom: 1.2em;
+  z-index: 90;
+  display: grid;
+  gap: 0.15em;
+  max-width: 26em;
+  padding: 0.7em 1.1em 0.75em 1.3em;
+  font-size: var(--fb-u);
+  font-family: var(--fb-zahl);
+  text-align: left;
+  color: var(--fb-tinte);
+  background: rgba(12, 16, 23, 0.96);
+  border: 1px solid var(--fb-linie-2);
+  border-left: 0.3em solid var(--fb-gold);
+  border-radius: 0.4em;
+  box-shadow: 0 0.8em 2em rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  animation: fb-rutsch-r 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.fb-bauchbinde.is-critical { border-left-color: var(--fb-warn); }
+.fb-bauchbinde.is-info { border-left-color: var(--fb-leise); }
+.fb-bauchbinde strong {
+  font-size: 1.1em;
+  color: var(--fb-creme);
+}
+.fb-bauchbinde span {
+  font-size: 0.9em;
+  color: var(--fb-leise);
+}
+@keyframes fb-rutsch-r {
+  from { opacity: 0; transform: translateX(1.5em); }
+  to { opacity: 1; transform: none; }
+}
+.fb-meldungen-punkt {
+  position: fixed;
+  left: 0.2em;
+  top: calc(50% - 5em);
+  z-index: 91;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: var(--fb-warn);
+}
+
+/* ── Arena-Vollbild: Band und Schiene fahren weg, übrig bleibt der Griff ────────────────────────── */
+.foundation-shell.app-shell .foundation-shell-layout.is-arena-voll .foundation-shell-header.fb-band {
+  display: none;
+}
+@media (min-width: 761px) {
+  .foundation-shell-layout.is-bc-rail.is-arena-voll .foundation-sidebar {
+    transform: translateX(-102%);
+    pointer-events: none;
+    box-shadow: none !important;
+  }
+  .foundation-shell.app-shell:has(.foundation-shell-layout.is-bc-rail.is-arena-voll) {
+    margin-left: 0;
+    width: 100vw;
+  }
+  .foundation-shell-layout.is-bc-rail .foundation-sidebar {
+    transition:
+      width 0.18s ease,
+      box-shadow 0.18s ease,
+      padding 0.18s ease,
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+.fb-griff {
+  position: fixed;
+  left: 0;
+  top: calc(50% - 4em);
+  z-index: 75;
+  width: 15px;
+  height: 8em;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 16, 23, 0.7);
+  border: 1px solid var(--fb-linie-2);
+  border-left: 0;
+  border-radius: 0 0.5em 0.5em 0;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, width 0.15s ease;
+}
+.fb-griff:hover,
+.fb-griff:focus-visible {
+  opacity: 1;
+  width: 22px;
+}
+.fb-griff span {
+  width: 3px;
+  height: 2.4em;
+  border-radius: 2px;
+  background: var(--fb-gold);
+}
+.fb-wisch {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(100deg, transparent 0 20%, rgba(6, 8, 12, 0.94) 36% 64%, transparent 80% 100%);
+  animation: fb-wisch 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.fb-wisch strong {
+  font-family: var(--fb-haus);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 4.5rem;
+  color: var(--fb-gold);
+  letter-spacing: 0.04em;
+}
+@keyframes fb-wisch {
+  from { transform: translateX(-100%); }
+  45% { transform: translateX(0); }
+  60% { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-wisch {
+    display: none;
+  }
+  .fb-band .fb-ort,
+  .fb-bauchbinde,
+  .foundation-shell-content.foundation-view-enter > *,
+  .foundation-takt-knopf::after,
+  .foundation-takt-linie::after,
+  .foundation-rail-marke {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Phone: das Band bricht um; Schiene oben bleibt wie sie ist. */
+@media (max-width: 760px) {
+  .foundation-shell.app-shell .foundation-shell-header.fb-band {
+    flex-wrap: wrap;
+    position: static;
+  }
+  .fb-band .fb-slot,
+  .fb-band .fb-saison,
+  .fb-band .fb-kasse {
+    display: none;
+  }
+  .foundation-shell.app-shell .fb-band .fb-rechts {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  .foundation-takt {
+    width: 100%;
+  }
+}
+
+/* Nur-Ansicht: kleine Marke im Band statt eigenem goldenem Band. */
+.fb-hinweis {
+  padding: 0.3em 0.7em;
+  font-family: var(--fb-zahl);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fb-acht);
+  border: 1px solid rgba(243, 181, 74, 0.5);
+  border-radius: 0.3em;
+  background: rgba(243, 181, 74, 0.1);
+  white-space: nowrap;
+}
+
+/* Arena-Bühne als Vollfläche (#1578): kein Einschweben, das einen Containing Block für position:fixed bildet. */
+.foundation-shell-layout:has(.oly-arena-buehne[data-voll="1"]) .foundation-shell-content.foundation-view-enter > * {
+  animation: none;
+}
+
+/* Ablauf: Pflichtschritte mit Haken (grün), Rot (hält auf), Gelb (hält nicht auf). */
+.foundation-takt-schritte {
+  list-style: none;
+  margin: 0 0 0.6em;
+  padding: 0;
+  display: grid;
+  gap: 0.45em;
+}
+.foundation-takt-schritt {
+  display: grid;
+  grid-template-columns: 1.7em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7em;
+}
+.foundation-takt-haken {
+  display: grid;
+  place-items: center;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 50%;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #0b0f14;
+  background: var(--fb-stumm);
+}
+.foundation-takt-schritt.is-erledigt .foundation-takt-haken { background: var(--fb-gut); }
+.foundation-takt-schritt.is-jetzt .foundation-takt-haken { background: var(--fb-gold); }
+.foundation-takt-schritt.is-rot .foundation-takt-haken { background: var(--fb-warn); color: #fff; }
+.foundation-takt-schritt.is-gelb .foundation-takt-haken { background: var(--fb-acht); }
+.foundation-takt-schritt.is-offen .foundation-takt-haken { background: transparent; border: 1px solid var(--fb-linie-2); color: var(--fb-leise); }
+.foundation-takt-schritt-text { display: grid; min-width: 0; }
+.foundation-takt-schritt-text b { font-size: 0.95em; font-weight: 600; color: var(--fb-tinte); }
+.foundation-takt-schritt-text small { font-size: 0.8em; color: var(--fb-leise); }
+.foundation-takt-schritt.is-erledigt .foundation-takt-schritt-text b { color: var(--fb-leise); }
+.foundation-takt-sprung {
+  font-family: var(--fb-zahl);
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--fb-gold);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.foundation-takt-ablauf-hinweis {
+  margin: 0 0 0.6em;
+  padding-top: 0.5em;
+  border-top: 1px solid var(--fb-linie);
+  font-size: 0.8em;
+  color: var(--fb-leise);
+}
