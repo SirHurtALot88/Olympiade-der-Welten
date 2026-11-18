@@ -176,7 +176,7 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).not.toContain("Verkaufsvorschau konnte nicht geladen werden");
     // Verkaufs-Knopf gesperrt, mit erklärender Zeile:
     expect(html).toContain('data-testid="transfer-sell-disabled-reason"');
-    expect(html).toContain("Das Verkaufsfenster ist geschlossen");
+    expect(html).toContain("Das Transferfenster ist geschlossen");
   });
 
   it("Fehler: genau EINE Meldung (statt drei übereinander) plus Retry-Aktion", () => {

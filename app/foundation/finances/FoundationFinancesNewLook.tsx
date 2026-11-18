@@ -522,6 +522,29 @@ function FinanceLine({
   );
 }
 
+// --- Kaderaufbau (nur Saison 1) ------------------------------------------
+// Draft und Startkader aus dem Startbudget: KEIN Transfer (Chris 18.11.). Die Transferbilanz von Saison 1 ist leer.
+function KaderaufbauSpecialItem({ aufbau }: { aufbau: NonNullable<TeamFinancesState["kaderaufbau"]> }) {
+  return (
+    <StatChipRow className="nl-fin-kpi-hero" aria-label="Kaderaufbau aus dem Startbudget">
+      <StatChip
+        label="Startkader"
+        value={formatNlSignedMoney(-aufbau.buyTotal)}
+        tone="neutral"
+        title={`${aufbau.buyCount} Spieler im Draft/Startkader — aus dem Startbudget, kein Transfer`}
+      />
+      <StatChip
+        label="Kaderaufbau"
+        value={formatNlSignedMoney(aufbau.net)}
+        tone="neutral"
+        sub={aufbau.sellCount > 0 ? `inkl. ${aufbau.sellCount} Verkauf/Verkäufe vor Spieltag 1` : "aus dem Startbudget"}
+        title="Saison 1: der Kader wird aus dem Startbudget aufgebaut. Das ist keine Transferbilanz — die beginnt mit dem Transferfenster vor Saison 2."
+      />
+      <StatChip label="Transferbilanz" value="—" tone="neutral" sub="erst ab Saison 2" />
+    </StatChipRow>
+  );
+}
+
 // --- Transfers (Sonderposten) -------------------------------------------
 // Der Transfersaldo der laufenden Saison ist ein Einmal-Ereignis (v. a. der große Kaderaufbau in S1) und
 // gehört bewusst NICHT in die laufende Betriebs-GuV (siehe use-finances-view-model.ts). Er wird hier als
@@ -1286,14 +1309,17 @@ export function FinancesUebersichtTab({
       </NlCard>
     ) : null,
     // Transfersaldo als Sonderposten — außerhalb der laufenden Betriebs-GuV, aber sichtbar (auch in S1).
+    // Startkader und Transfers GETRENNT (Chris 18.11.): in Saison 1 ist der Draft Kaderaufbau aus dem
+    // Startbudget, keine Transferbilanz — eigene Karte, eigene Zahl.
     transfers:
-      team && team.transfer ? (
+      team && (team.transfer || team.kaderaufbau) ? (
         <NlCard
           className="nl-fin-transfer-card"
-          eyebrow="Transfers"
+          eyebrow={team.kaderaufbau ? "Kaderaufbau" : "Transfers"}
           title="Sonderposten (nicht in der GuV)"
           data-testid="nl-fin-transfer-card"
         >
+          {team.kaderaufbau ? <KaderaufbauSpecialItem aufbau={team.kaderaufbau} /> : null}
           <TransferSpecialItem team={team} />
         </NlCard>
       ) : null,

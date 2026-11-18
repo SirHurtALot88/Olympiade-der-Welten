@@ -148,15 +148,31 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     expect(nach.frei - vor.frei).toBeCloseTo(10, 2);
   });
 
-  it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben", () => {
-    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Freigegeben 70 % x (100 + 20) = 84, davon 14 aus dem Verkauf.
-    const gs = state(120, 3, [sell(20)]);
-    const st = berechneVorstandBudgetStand(gs, "A");
-    expect(st.freigegebenGesamt).toBe(84);
-    expect(st.nochFrei).toBe(84);
-    expect(st.gesperrt).toBe(36);
-    // Ohne Verkauf waeren es 70: der Verkauf schaltet genau 14 frei
-    expect(st.nochFrei - 70).toBe(14);
+  it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben (alter Ablauf)", () => {
+    // ALTER ABLAUF (`OLY_TRANSFERFENSTER_GEMEINSAM=0`). Im gemeinsamen Fenster sind Erloese zu 100 % frei
+    // (Chris 18.11.), siehe tests/transferfenster-gemeinsam.test.ts.
+    const vorher = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+    try {
+      // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Freigegeben 70 % x (100 + 20) = 84, davon 14 aus dem Verkauf.
+      const gs = state(120, 3, [sell(20)]);
+      const st = berechneVorstandBudgetStand(gs, "A");
+      expect(st.freigegebenGesamt).toBe(84);
+      expect(st.nochFrei).toBe(84);
+      expect(st.gesperrt).toBe(36);
+      // Ohne Verkauf waeren es 70: der Verkauf schaltet genau 14 frei
+      expect(st.nochFrei - 70).toBe(14);
+    } finally {
+      if (vorher === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorher;
+    }
+  });
+
+  it("im gemeinsamen Fenster ist der Verkaufserloes zu 100 % frei: 20 C bei 70 % -> 20 C frei", () => {
+    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Freigegeben 70 % x 100 + 20 = 90.
+    const st = berechneVorstandBudgetStand(state(120, 3, [sell(20)]), "A");
+    expect(st.freigegebenGesamt).toBe(90);
+    expect(st.nochFrei - 70).toBe(20);
   });
 
   it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
@@ -186,7 +202,8 @@ describe("Stufe 0 — Kontoauszug aus vorhandenen Ledgern", () => {
     } as unknown as GameState;
     const k = buildKontoauszuege(gs, "season-1");
     const a = k.get("A")!;
-    expect(a.zeilen.map((z) => z.art)).toEqual(["transfer_kauf", "transfer_verkauf", "gehalt_und_sponsor_saisonende", "apron"]);
+    // Saison 1: Kauf und Verkauf vor Spieltag 1 sind Kaderaufbau aus dem Startbudget (Chris 18.11.), keine Transfers.
+    expect(a.zeilen.map((z) => z.art)).toEqual(["kaderaufbau", "kaderaufbau", "gehalt_und_sponsor_saisonende", "apron"]);
     expect(a.saldo).toBe(-20 + 8 + 50 - 2);
     expect(a.summeAbfluss).toBe(-22);
     expect(k.get("B")!.saldo).toBe(8);

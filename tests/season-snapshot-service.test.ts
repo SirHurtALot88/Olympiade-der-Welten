@@ -355,7 +355,11 @@ describe("season snapshot service", () => {
     expect(snapshot.finalStandings[0]?.cashEnd).toBe(244.5);
     expect(snapshot.finalStandings[0]?.salaryTotalEnd).toBe(10);
     expect(snapshot.finalStandings[0]?.marketValueTotalEnd).toBe(100);
-    expect(snapshot.finalStandings[0]?.transferBuyCount).toBe(1);
+    // Saison 1: der Kauf ist Kaderaufbau aus dem Startbudget, keine Transferbilanz (Chris 18.11.,
+    // `transferbilanz-buchung.ts`) — er zaehlt im Kaderaufbau, nicht in den Transferzahlen.
+    expect(snapshot.finalStandings[0]?.transferBuyCount).toBe(0);
+    expect(snapshot.finalStandings[0]?.transferNet).toBeNull();
+    expect(snapshot.finalStandings[0]?.kaderaufbauBuyCount).toBe(1);
     expect(snapshot.playerPerformances).toHaveLength(1);
     expect(snapshot.playerPerformances[0]?.playerId).toBe("p1");
     expect(snapshot.playerPerformances[0]?.appearances).toBe(2);

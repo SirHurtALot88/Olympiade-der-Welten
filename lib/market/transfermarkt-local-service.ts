@@ -63,6 +63,7 @@ import {
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { ermittleFensterSaisonId, ermittleLetzteSpieltageJeSaison } from "@/lib/foundation/transfer-window-zuordnung";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
 import { recordFreeAgentFeed } from "@/lib/ai/transfer-window-profiler";
 import {
@@ -124,6 +125,12 @@ const LOCAL_SYSTEM_SELL_SOURCES = new Set([
 function isLocalTransferSellWindowOpen(gameState: GameState) {
   if (isTransferSellPhaseOpen(gameState)) {
     return true;
+  }
+  // EIN GEMEINSAMES FENSTER (Chris 18.11.): verkauft wird nur noch im Transferfenster der neuen Saison.
+  // Der Sonderweg „letzter Spieltag ist durch, die Saison steht aber noch auf season_active" war ein
+  // Vorlauf des Saisonende-Verkaufsfensters und faellt mit ihm weg.
+  if (istTransferfensterGemeinsam()) {
+    return false;
   }
   const phase = gameState.gamePhase ?? "season_active";
   if (phase !== "season_active") {
@@ -3430,7 +3437,7 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
   if (activePlayer && activePlayer.teamId !== params.teamId) blockingReasons.push("active_player_not_in_team");
   if (!player) blockingReasons.push("player_not_found");
   if (!isLocalTransferSellWindowOpen(gameState) && !isSystemTransferSellSource(params.transferSource)) {
-    blockingReasons.push("sell_only_at_season_end");
+    blockingReasons.push(istTransferfensterGemeinsam() ? "sell_only_in_transfer_window" : "sell_only_at_season_end");
   }
 
   const canSell = blockingReasons.length === 0;

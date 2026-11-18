@@ -8,6 +8,7 @@ import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/fou
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import type { FoundationTransferHistoryResponse, SortState } from "@/lib/foundation/tabs/cockpit-types";
 import { ordneNachTransferfenster } from "@/lib/foundation/transfer-window-zuordnung";
+import { istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 export const TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE = 50;
@@ -253,6 +254,13 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
            * bleibt davon unberuehrt und sagt weiter, WANN etwas passiert ist.
            */
           fensterSaisonId,
+          // Saison-1-Fenster = Kaderaufbau aus dem Startbudget, keine Transferbilanz (Chris 18.11.).
+          buchungsArt:
+            entry.type === "contract_exit"
+              ? ("vertragsende" as const)
+              : istKaderaufbauSaison(fensterSaisonId)
+                ? ("kaderaufbau" as const)
+                : ("transfer" as const),
           seasonLabel:
             fensterSaisonId === entry.seasonId
               ? entry.seasonLabel ?? entry.seasonId
@@ -310,6 +318,12 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
     const sellFee = sellRows.reduce((sum, row) => sum + row.fee, 0);
     const sellProfitRows = sellRows.filter((row) => row.guv != null);
     const totalProfit = sellProfitRows.reduce((sum, row) => sum + (row.guv ?? 0), 0);
+    // „Das Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.): der Draft ist Kaderaufbau, nicht Teil der
+    // Transferbilanz. Ausgaben/Einnahmen bleiben die Summen aller Zeilen; nur das Netto trennt beides.
+    const netto = (rows: typeof transferHistoryRows) =>
+      rows.reduce((sum, row) => sum + (row.type === "sell" ? row.fee : row.type === "buy" ? -row.fee : 0), 0);
+    const aufbauRows = transferHistoryRows.filter((row) => row.buchungsArt === "kaderaufbau");
+    const transferRows = transferHistoryRows.filter((row) => row.buchungsArt !== "kaderaufbau");
 
     return {
       count: transferHistoryRows.length,
@@ -317,7 +331,8 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
       sellFee,
       averageFee: transferHistoryRows.length > 0 ? totalFee / transferHistoryRows.length : null,
       averageProfit: sellProfitRows.length > 0 ? totalProfit / sellProfitRows.length : null,
-      netTransferBalance: sellFee - buyFee,
+      netTransferBalance: netto(transferRows),
+      kaderaufbauNet: aufbauRows.length > 0 ? netto(aufbauRows) : null,
     };
   }, [transferHistoryRows]);
 

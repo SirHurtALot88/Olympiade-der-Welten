@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ROOM_FLOW_MATCHDAY_CYCLE_END,
   ROOM_FLOW_MATCHDAY_CYCLE_START,
-  ROOM_FLOW_SEASON_TRANSITION_TARGET,
+  resolveRoomFlowSeasonTransitionTarget,
   describeRoomFlowButton,
   getNextRoomFlowStepId,
   roomFlowSeasonContinues,
@@ -107,7 +107,7 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     // Eigenschaft 3: der Zielschritt ist ROOM_FLOW_SEASON_TRANSITION_TARGET -- gemessen an
     // `startRoom` (E4, siehe Kommentar an der Konstante), nicht der erste Listeneintrag.
     expect(getNextRoomFlowStepId("season_transition", { seasonHasAdvanced: true })).toBe(
-      ROOM_FLOW_SEASON_TRANSITION_TARGET,
+      resolveRoomFlowSeasonTransitionTarget(),
     );
   });
 
@@ -220,7 +220,7 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
 
     expect(advanced.ok).toBe(true);
     if (!advanced.ok) return;
-    expect(advanced.room.state.roomFlowState.step).toBe(ROOM_FLOW_SEASON_TRANSITION_TARGET);
+    expect(advanced.room.state.roomFlowState.step).toBe(resolveRoomFlowSeasonTransitionTarget());
     expect(advanced.room.state.multiplayerRoom.activeSeasonId).toBe("season-2");
     expect(advanced.room.state.multiplayerRoom.activeMatchday).toBe(1);
   });
@@ -269,7 +269,7 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     expect(zweiterKlick.ok).toBe(true);
     if (!zweiterKlick.ok) return;
     expect(zweiterKlick.room.state.roomFlowState.step, "der Raum darf hier nicht kleben bleiben").toBe(
-      ROOM_FLOW_SEASON_TRANSITION_TARGET,
+      resolveRoomFlowSeasonTransitionTarget(),
     );
   });
 

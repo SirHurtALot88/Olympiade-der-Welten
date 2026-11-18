@@ -9,6 +9,9 @@ import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
 import { applyInsolvencyBackstop, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
+import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
+import { fuehreKiKassensturzAus } from "@/lib/ai/ki-kassensturz";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -335,6 +338,44 @@ async function executeAiPreseasonBackgroundWork(input: {
      * Nach dem Fuell-Lauf wird NICHT mehr geliehen: dann kaeme das Geld zu spaet und waere nur
      * Zinslast ohne Gegenwert.
      */
+    /**
+     * GEMEINSAMES TRANSFERFENSTER (Chris 18.11., „ok dann mach das so!") — die VERKAUFSRUNDE ZUERST.
+     *
+     * Bisher verkaufte die KI in der Saisonende-Kette (`runSeasonEndAiSellsIfDue`) und kaufte hier. Jetzt
+     * liegt beides im selben Fenster der neuen Saison, in dieser Reihenfolge: Ueberzaehlige und Abbau
+     * verkaufen (dieselbe organische Verkaufslogik wie bisher am Saisonende, samt Vorab-Abloesung der
+     * Kredite als Anti-Churn), dann mit den Erloesen kaufen, dann eine Nachrunde fuer offene Plaetze, am Ende
+     * der Kassensturz. Die Erloese sind sofort frei fuer die Kaeufe desselben Fensters.
+     *
+     * Schalter aus (`OLY_TRANSFERFENSTER_GEMEINSAM=0`): keine Verkaufsrunde hier, wie bisher.
+     */
+    const gemeinsamesFenster = istTransferfensterGemeinsam();
+    let fensterVerkaeufe = 0;
+    const fensterNotizen: string[] = [];
+    if (gemeinsamesFenster) {
+      try {
+        const verkaufsrunde = await runTransferWindowSession({
+          saveId,
+          seasonId,
+          persistence,
+          phase: "fenster_verkauf",
+          dryRun: false,
+          confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+          transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
+          teamScope: "all",
+          targetTeamIds: aiTeamIds,
+          allowBuys: false,
+          skipIfExistingMarketTransfers: false,
+          progressLog: false,
+        });
+        fensterVerkaeufe = verkaufsrunde.appliedSells;
+        fensterNotizen.push(`fenster_verkaufsrunde:${verkaufsrunde.appliedSells}`, ...verkaufsrunde.warnings.slice(0, 8));
+      } catch (error) {
+        // Eine gescheiterte Verkaufsrunde darf das Kaufen nicht sperren: die Teams kaufen dann aus der Kasse.
+        fensterNotizen.push(`fenster_verkaufsrunde_fehlgeschlagen:${error instanceof Error ? error.message : "unbekannt"}`);
+      }
+    }
+
     const kreditNotizen: string[] = [];
     const kreditPass = () => {
       for (const teamId of aiTeamIds) {
@@ -386,11 +427,9 @@ async function executeAiPreseasonBackgroundWork(input: {
       options: {
         includeWarningTeams: false,
         stopOnTeamFailure: false,
-        // Kauffenster der neuen Saison = reine KAUF-Phase (Chris: verkauft wird als separater
-        // Schritt am Saisonende, ueber die Saisonende-Kette). Ein Verkaufslauf hier wuerde die
-        // frisch am Saisonende verkauften Teams ein zweites Mal schrumpfen — und das Fenster
-        // ist fuer den Menschen aus demselben Grund ebenfalls kauf-only
-        // (`isEarlySeasonTransferSetup` zaehlt nur fuers Kaufen, transfer-window-policy).
+        // Der Marktlauf KAUFT nur. Verkauft wird im gemeinsamen Fenster in der eigenen Verkaufsrunde
+        // davor (organische Verkaufslogik, `fenster_verkauf`), im alten Ablauf am Saisonende. Ein
+        // zweiter Verkaufsweg hier wuerde dieselben Teams doppelt schrumpfen.
         applySellSteps: false,
       },
     });
@@ -400,6 +439,32 @@ async function executeAiPreseasonBackgroundWork(input: {
     // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
     // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
     kreditPass();
+
+    /**
+     * NACHRUNDE FUER OFFENE PLAETZE (gemeinsames Fenster): derselbe Planer noch einmal, nachdem andere Teams
+     * verkauft und gekauft haben und der zweite Kredit-Durchgang gelaufen ist. Kein Notkauf, kein Auffuellen
+     * auf ein Minimum: der Planer kauft nur, was er selbst fuer sinnvoll haelt (Chris: „niemals" Notkauf).
+     */
+    let nachrundeKaeufe = 0;
+    if (gemeinsamesFenster) {
+      const nachrunde = await applyAiMarketPlanLocally({
+        source: "sqlite",
+        saveId,
+        seasonId,
+        teamScope: "ai",
+        dryRun: false,
+        includeWarningTeams: false,
+        confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+        transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
+        options: {
+          includeWarningTeams: false,
+          stopOnTeamFailure: false,
+          applySellSteps: false,
+        },
+      });
+      nachrundeKaeufe = nachrunde.summary.appliedBuys;
+      fensterNotizen.push(`fenster_nachrunde:${nachrundeKaeufe}`);
+    }
     /*
      * FUELL-LAUF ABGESCHALTET — der organische Planer pickt.
      *
@@ -457,8 +522,20 @@ async function executeAiPreseasonBackgroundWork(input: {
      * Er steht bewusst am ENDE der Kette: erst wenn Markt, Fuellung und Verletzungs-Topup fertig
      * sind, steht der Kontostand fest, mit dem das Team in die Saison geht.
      */
-    const vorAusgleich = persistence.getSaveById(saveId);
+    const vorAusgleich = gemeinsamesFenster ? null : persistence.getSaveById(saveId);
     let notkredite: Array<{ teamId: string; principal: number }> = [];
+    if (gemeinsamesFenster) {
+      // KASSENSTURZ (gemeinsames Fenster): Ruecklage → Kredit → Notkredit → Notverkauf als letztes Mittel.
+      const kassensturz = fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds, persistence });
+      notkredite = kassensturz.notkredite.map((k) => ({ teamId: k.teamId, principal: k.betrag }));
+      kreditNotizen.push(
+        `kassensturz:minus=${kassensturz.imMinus.length}:kredite=${kassensturz.kredite.length}:notkredite=${kassensturz.notkredite.length}:notverkaeufe=${kassensturz.notverkaeufe.length}:offen=${kassensturz.nochImMinus.length}`,
+        ...kassensturz.kredite.map((k) => `ai_loan_borrow:${k.teamId}:${k.betrag}:kassensturz`),
+        ...notkredite.map((kredit) => `ai_notkredit:${kredit.teamId}:${kredit.principal}`),
+        ...kassensturz.notverkaeufe.map((v) => `ai_notverkauf:${v.teamId}:${v.playerId}:${v.erloes}`),
+        ...kassensturz.warnings,
+      );
+    }
     if (vorAusgleich) {
       const ausgleich = applyInsolvencyBackstop({ gameState: vorAusgleich.gameState, saveId });
       if (ausgleich.emergencyLoans.length > 0) {
@@ -505,9 +582,10 @@ async function executeAiPreseasonBackgroundWork(input: {
       aiTeamsCompleted: completedTeams,
       managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
       transferBuysApplied:
-        market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal,
-      transferSellsApplied: market.summary.appliedSells,
+        market.summary.appliedBuys + nachrundeKaeufe + injuryDepthTopup.playersBoughtTotal,
+      transferSellsApplied: market.summary.appliedSells + fensterVerkaeufe,
       warnings: [
+        ...fensterNotizen,
         ...managerResult.warnings,
         ...market.warnings,
         ...injuryDepthTopup.warnings,

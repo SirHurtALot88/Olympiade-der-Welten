@@ -12,6 +12,11 @@ import {
 } from "@/lib/market/contract-negotiation-preview";
 import { makeScheduleEntry, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die Verkaufsmechanik und das Verkaufsfenster am Saisonende,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 const persistenceState = {
   save: null as
     | {
