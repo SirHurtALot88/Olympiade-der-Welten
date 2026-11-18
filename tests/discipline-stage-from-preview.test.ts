@@ -263,8 +263,11 @@ describe("buildDisciplineStageTeamsFromPreview", () => {
 });
 
 describe("Same-day-Verletzung: eigene, explizite Mod-Zeile (statt im Moral-Rest zu verschwinden)", () => {
+  const basis = 80;
   const fatigueAdjusted = 60; // z.B. nach Fatigue-Malus
-  const injuryAdjusted = round1(fatigueAdjusted * INJURY_PERFORMANCE_MULTIPLIER);
+  // Seit 18.11. (Chris: „nur 50 % seiner Basisleistung"): die Engine rechnet auf der BASIS, die
+  // Verletzung ersetzt den Fatigue-Abschlag (legacy-score-engine.ts).
+  const injuryAdjusted = round1(basis * INJURY_PERFORMANCE_MULTIPLIER);
   const injuredPreview = makePreview([
     makeTeam({
       teamId: "ti",
@@ -276,7 +279,7 @@ describe("Same-day-Verletzung: eigene, explizite Mod-Zeile (statt im Moral-Rest 
         {
           playerId: "ti-p0",
           playerName: "I0",
-          baseValue: 80,
+          baseValue: basis,
           fatigueAdjustedValue: fatigueAdjusted,
           injuryApplied: true,
           injuryAdjustedValue: injuryAdjusted,
@@ -296,9 +299,14 @@ describe("Same-day-Verletzung: eigene, explizite Mod-Zeile (statt im Moral-Rest 
     expect(injuryMod!.sign).toBe(-1);
   });
 
-  it("der Betrag der Verletzungs-Mod ist exakt fatigueAdjustedValue − injuryAdjustedValue", () => {
+  it("der Betrag der Verletzungs-Mod ist exakt baseValue − injuryAdjustedValue (50 % der Basis)", () => {
     const injuryMod = injuredPlayer.mods.find((m) => m.injury === true)!;
-    expect(injuryMod.amt).toBeCloseTo(round1(fatigueAdjusted - injuryAdjusted), 1);
+    expect(injuryMod.amt).toBeCloseTo(round1(basis - injuryAdjusted), 1);
+    expect(injuryMod.amt).toBeCloseTo(round1(basis * (1 - INJURY_PERFORMANCE_MULTIPLIER)), 1);
+  });
+
+  it("zeigt fuer den Verletzten KEINE Fatigue-Zeile — der Abschlag wurde nicht gebucht", () => {
+    expect(injuredPlayer.mods.some((m) => m.k === "Fatigue")).toBe(false);
   });
 
   it("Netto trifft weiterhin exakt den Score (Invariant bleibt unter Verletzung erhalten)", () => {

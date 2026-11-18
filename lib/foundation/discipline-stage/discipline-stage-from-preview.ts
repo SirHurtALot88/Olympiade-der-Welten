@@ -107,17 +107,21 @@ export function buildDisciplineStageTeamsFromPreview(
       // Fatigue = fatigueAdjustedValue − baseValue (kann negativ sein).
       const fatigued = entry.fatigueAdjustedValue ?? entry.baseValue ?? 0;
       const fatigueDelta = round1(fatigued - (entry.baseValue ?? 0));
-      if (Math.abs(fatigueDelta) >= 0.05) {
+      // Verletzt (Chris, 18.11.): die Engine rechnet 50 % der BASIS, die Verletzung ersetzt den
+      // Fatigue-Abschlag (legacy-score-engine.ts). Dann gibt es keine eigene Fatigue-Zeile — sonst
+      // stuende ein Abzug auf der Buehne, der nicht gebucht wurde.
+      const verletztHier = Boolean(entry.injuryApplied && entry.injuryAdjustedValue != null);
+      if (!verletztHier && Math.abs(fatigueDelta) >= 0.05) {
         mods.push({ k: "Fatigue", sign: fatigueDelta < 0 ? -1 : 1, amt: Math.abs(fatigueDelta) });
       }
       // Same-day-Verletzung: eigene, EXPLIZITE Zeile (statt im "Moral"-Rest zu
       // verschwinden) — genau der Wunsch des Owners: sichtbar machen, dass ein
-      // verletzter Spieler nur INJURY_PERFORMANCE_MULTIPLIER seines Basis-/
-      // Fatigue-Anteils einbringt. `injury: true` markiert den Mod für die
+      // verletzter Spieler nur INJURY_PERFORMANCE_MULTIPLIER seiner Basis
+      // einbringt (seit 18.11. auf der Basis gerechnet, nicht mehr auf dem Fatigue-Wert). `injury: true` markiert den Mod für die
       // Arena (Bühnen-Feedback + Detektion), statt sich auf das Label-Regex
       // verlassen zu müssen.
-      if (entry.injuryApplied && entry.injuryAdjustedValue != null) {
-        const injuryDelta = round1(entry.injuryAdjustedValue - fatigued);
+      if (verletztHier && entry.injuryAdjustedValue != null) {
+        const injuryDelta = round1(entry.injuryAdjustedValue - (entry.baseValue ?? 0));
         if (Math.abs(injuryDelta) >= 0.05) {
           mods.push({
             k: `Verletzung −${INJURY_PERFORMANCE_PENALTY_UI_PERCENT} % (Basis)`,

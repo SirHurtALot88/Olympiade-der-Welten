@@ -47,6 +47,7 @@ import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
 // wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -1161,6 +1162,24 @@ export function buildLegacyMatchdayResolvePreview(
         rankInTeam: rank,
       }));
       const rankedTeam = teamResultsRanked.find((entry) => entry.teamId === context.team.id && entry.disciplineSide === side);
+      // 50 % DER BASIS AUCH FUER ARENA-PP (Chris, 18.11.: „IN der Disziplin, wo er sich verletzt hat,
+      // hat er nur 50 % seiner Basisleistung bzw. Eignung/Score"). Im PPS-Pfad steckt der Abschlag
+      // schon im `finalPlayerScore` (legacy-score-engine.ts). Die Boxscore-PP einer arena- oder
+      // pod-gewerteten Disziplin kommen dagegen aus dem Motorlauf, der von der Verletzung nichts weiss
+      // — der Verletzungswurf faellt erst mit der Buchung. Ohne diese Stelle bekam ein Spieler, der
+      // sich IN der Arena-Disziplin verletzte, seine vollen Arena-PP. EINE Funktion fuer beide Leser
+      // unten (Buehne `rankedTeam.entries` und persistierte Zeile `rawPlayerEntries`), damit
+      // gezeigt == gebucht bleibt.
+      const heuteVerletztIds = new Set(
+        score.entries
+          .filter((entry) => entry.injuryStatus === "mapped" && entry.injuryMultiplier != null && entry.injuryMultiplier < 1)
+          .map((entry) => entry.playerId),
+      );
+      const arenaPpsFuer = (playerId: string): number | null => {
+        const pps = arenaIndividualPpsForThisDiscipline?.get(playerId) ?? null;
+        if (pps == null || !heuteVerletztIds.has(playerId)) return pps;
+        return Math.round(pps * INJURY_PERFORMANCE_MULTIPLIER * 100) / 100;
+      };
 
       const distributedPoints = distributeRankPointsToPlayers({
         // REVIEW-FIX (PR #930, 14.09.): s. Kommentar an der `teamPoints`-Zuweisung oben.
@@ -1247,7 +1266,7 @@ export function buildLegacyMatchdayResolvePreview(
           const arenaIndividualPpsGueltig =
             rankedTeam.resolutionSource === "arena" ||
             (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle));
-          const arenaPps = arenaIndividualPpsGueltig ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null : null;
+          const arenaPps = arenaIndividualPpsGueltig ? arenaPpsFuer(entry.playerId) : null;
           const ppsDuellPps = ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ?? null;
           return {
             ...entry,
@@ -1295,7 +1314,7 @@ export function buildLegacyMatchdayResolvePreview(
           (rankedTeam &&
           (rankedTeam.resolutionSource === "arena" ||
             (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle)))
-            ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId)
+            ? arenaPpsFuer(entry.playerId)
             : null) ??
           ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ??
           distributedPoints.entries[index]?.points ??
@@ -1307,7 +1326,7 @@ export function buildLegacyMatchdayResolvePreview(
           rankedTeam &&
             (rankedTeam.resolutionSource === "arena" ||
               (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle))) &&
-            arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+            arenaPpsFuer(entry.playerId) != null,
         ),
         rankInTeam,
         rankInDiscipline: 0,
