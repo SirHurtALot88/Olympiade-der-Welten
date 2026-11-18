@@ -1,5 +1,7 @@
 "use client";
 
+import { geltendeFarbregel, kartenEffekt, kartenEffektText } from "@/lib/lineups/formkarten-wirkung";
+import type { FormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import dynamic from "next/dynamic";
 import { useEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -821,25 +823,37 @@ function formatFormCardValueLabel(value: number) {
   return value > 0 ? `+${formatScore(value)}` : formatScore(value);
 }
 
-function formatFormCardOptionLabel(card: LegacyFormCardOption, disciplineColor?: LegacyFormCardOption["color"] | null) {
+function formatFormCardOptionLabel(
+  card: LegacyFormCardOption,
+  disciplineColor?: LegacyFormCardOption["color"] | null,
+  regeln?: FormMoralRegeln | null,
+) {
   const polarity = card.value < 0 ? "Malus" : "Bonus";
-  const multiplier = disciplineColor && card.color === disciplineColor ? " · x2" : "";
+  // Review-Befund 2: "x2" nur bei der alten Regel; die neue zeigt alle / Farbe aus derselben Funktion wie die Wertung.
+  const multiplier = kartenEffektText(card, disciplineColor, regeln);
   return `${formCardColorIcon[card.color]} ${formatFormCardValueLabel(card.value)} Punkte · ${formatFormCardColorLabel(card.color)}${multiplier} · ${polarity}`;
 }
 
-function getFormCardEffectiveValue(card: LegacyFormCardOption | null, disciplineColor?: LegacyFormCardOption["color"] | null) {
+function getFormCardEffectiveValue(
+  card: LegacyFormCardOption | null,
+  disciplineColor?: LegacyFormCardOption["color"] | null,
+  regeln?: FormMoralRegeln | null,
+) {
   if (!card) return 0;
-  return card.value * (disciplineColor && card.color === disciplineColor ? 2 : 1);
+  return kartenEffekt(card, disciplineColor, regeln).alle;
 }
 
 function formatFormPlanImpact(
   primary: LegacyFormCardOption | null,
   secondary: LegacyFormCardOption | null,
   disciplineColor?: LegacyFormCardOption["color"] | null,
+  regeln?: FormMoralRegeln | null,
 ) {
-  const impact = getFormCardEffectiveValue(primary, disciplineColor) + getFormCardEffectiveValue(secondary, disciplineColor);
-  if (Math.abs(impact) < 0.05) return "±0";
-  return `${impact > 0 ? "+" : ""}${formatScore(impact)}`;
+  const impact = getFormCardEffectiveValue(primary, disciplineColor, regeln) + getFormCardEffectiveValue(secondary, disciplineColor, regeln);
+  const zusatz = kartenEffekt(primary, disciplineColor, regeln).traegerZusatz + kartenEffekt(secondary, disciplineColor, regeln).traegerZusatz;
+  const zusatzText = Math.abs(zusatz) >= 0.05 ? ` (+${formatScore(zusatz)} Farbträger)` : "";
+  if (Math.abs(impact) < 0.05) return `±0${zusatzText}`;
+  return `${impact > 0 ? "+" : ""}${formatScore(impact)}${zusatzText}`;
 }
 
 function sortFormCardsForDiscipline(cards: LegacyFormCardOption[], disciplineColor?: LegacyFormCardOption["color"] | null) {
@@ -5460,7 +5474,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             <option value="">Keine Karte</option>
             {getFormCardOptionsForSide(disciplineSide, "primary").map((card) => (
               <option key={card.id} value={card.id} style={formCardOptionStyle(card)}>
-                {formatFormCardOptionLabel(card, disciplineColor)}
+                {formatFormCardOptionLabel(card, disciplineColor, context?.formMoralRegeln)}
               </option>
             ))}
           </select>
@@ -5479,7 +5493,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             <option value="">Keine Karte</option>
             {getFormCardOptionsForSide(disciplineSide, "secondary").map((card) => (
               <option key={card.id} value={card.id} style={formCardOptionStyle(card)}>
-                {formatFormCardOptionLabel(card, disciplineColor)}
+                {formatFormCardOptionLabel(card, disciplineColor, context?.formMoralRegeln)}
               </option>
             ))}
           </select>
@@ -5672,7 +5686,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       <span className={`legacy-lineup-form-card-chip is-${card.color}`}>
         <span className="legacy-lineup-form-card-dot" aria-hidden="true" />
         {formatFormCardColorLabel(card.color)} {formatFormCardValueLabel(card.value)}
-        {disciplineColor === card.color ? " · x2" : ""}
+        {kartenEffektText(card, disciplineColor, context?.formMoralRegeln)}
       </span>
     );
   }
@@ -6079,7 +6093,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const plan = formCardPlanByKey.get(`${params.matchdayId}:${disciplineSide}`) ?? null;
     const toChoice = (card: LegacyFormCardOption) => ({
       id: card.id,
-      label: formatFormCardOptionLabel(card, color),
+      label: formatFormCardOptionLabel(card, color, context?.formMoralRegeln),
       // Bereichsfarbe der Karte (POW=rot, SPE=grün, MEN=blau, SOC=gelb) für die
       // farbige, etwas größere Punkte-Anzeige im Einsatzlisten-Dropdown.
       color: card.color,
@@ -6348,10 +6362,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           captainDraftRemaining={captainDraftRemaining}
           setFormPlanIntensity={setFormPlanIntensity}
           formatModifierSourceLabel={formatModifierSourceLabel}
-          formatFormPlanImpact={formatFormPlanImpact}
+          formatFormPlanImpact={(a, b, c) => formatFormPlanImpact(a, b, c, context?.formMoralRegeln)}
+          farbregelNeu={geltendeFarbregel(context?.formMoralRegeln) != null}
           formatFormCardValueLabel={formatFormCardValueLabel}
           formatFormCardColorLabel={formatFormCardColorLabel}
-          formatFormCardOptionLabel={formatFormCardOptionLabel}
+          formatFormCardOptionLabel={(card, color) => formatFormCardOptionLabel(card, color, context?.formMoralRegeln)}
           formatNullableScore={formatNullableScore}
           resolveTeamDisciplineRank={resolveTeamDisciplineRank}
           getFormCardColorForCategory={getFormCardColorForCategory}

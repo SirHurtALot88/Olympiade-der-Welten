@@ -1,0 +1,76 @@
+/* Form + Moral, Bausteine (18.11.). Tokens aus broadcast.css (--bc-*), Wurzelklasse .bc. */
+.fm-marke { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+.fm-gk { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-leise, #9aa7ba); min-width: 78px; }
+.fm-leise { color: var(--bc-leise, #9aa7ba); font-size: 12px; }
+.fm-warn { color: var(--bc-acht, #f3b54a); font-size: 12.5px; border-left: 3px solid var(--bc-acht, #f3b54a); padding: 4px 8px; background: rgba(243, 181, 74, 0.08); }
+.fm-hinweis { margin: 4px 0; }
+.fm-warum { display: grid; gap: 8px; }
+.fm-warum__zeile { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.fm-einsaetze { display: grid; gap: 4px; }
+.fm-einsatz { display: grid; grid-template-columns: minmax(0, 1fr) 90px 70px; gap: 8px; align-items: center; font-size: 12.5px; }
+.fm-balken { position: relative; height: 8px; background: var(--bc-flaeche-3, #1a2231); border-radius: 4px; }
+.fm-balken__erw { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--bc-creme, #f4e6c4); }
+.fm-balken__abst { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; }
+.fm-balken__abst.is-auf { background: var(--bc-gut, #62d394); }
+.fm-balken__abst.is-ab { background: var(--bc-warn, #ff6058); }
+.fm-ursachen { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12.5px; }
+.fm-summe { display: flex; justify-content: space-between; border-top: 1px solid var(--bc-linie, rgba(244, 230, 196, 0.13)); padding-top: 6px; }
+.fm-uebersicht { display: grid; gap: 4px; }
+.fm-team { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding-bottom: 6px; }
+.fm-team__stufen { display: inline-flex; gap: 10px; }
+.fm-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 54px; gap: 8px; align-items: center; background: none; border: 0; border-bottom: 1px solid var(--bc-linie, rgba(244, 230, 196, 0.13)); color: inherit; text-align: left; padding: 6px 2px; cursor: pointer; }
+.fm-kmarke { display: inline-flex; gap: 3px; align-items: baseline; font-size: 12px; }
+.fm-kmarke__sum { color: var(--bc-creme, #f4e6c4); }
+.fm-kmarke__fo { color: var(--bc-gut, #62d394); font-style: normal; }
+.fm-kmarke__tr { font-style: normal; }
+.fm-karten { display: grid; gap: 8px; font-size: 13px; }
+.fm-karten p { margin: 0; }
+.fm-tabelle, .fm-regel { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.fm-tabelle th, .fm-regel th { text-align: right; font-weight: 500; color: var(--bc-leise, #9aa7ba); }
+.fm-tabelle th:first-child, .fm-tabelle td:first-child, .fm-regel td:first-child { text-align: left; }
+.fm-tabelle td, .fm-regel td { text-align: right; padding: 2px 4px; }
+.fm-tabelle tr.is-traeger td:first-child { color: var(--bc-gold, #f0c35a); }
+.fm-tabelle tfoot td { border-top: 1px solid var(--bc-linie-2, rgba(244, 230, 196, 0.3)); }
+.fm-profil { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 760px) { .fm-profil { grid-template-columns: 1fr; } }
+.fm-profil h3, .fm-meldungen h3 { margin: 0 0 6px; font-size: 14px; }
+.fm-profil h4 { margin: 10px 0 4px; font-size: 12px; color: var(--bc-leise, #9aa7ba); }
+.fm-kennzahlen { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 8px; }
+.fm-kennzahlen span { display: grid; }
+.fm-kennzahlen small { color: var(--bc-leise, #9aa7ba); font-size: 11px; }
+.fm-kennzahlen b { font-size: 16px; }
+.fm-kurve { width: 100%; height: auto; max-height: 140px; }
+.fm-kurve__gitter { stroke: var(--bc-linie, rgba(244, 230, 196, 0.13)); stroke-width: 1; }
+.fm-kurve__mitte { stroke: var(--bc-linie-2, rgba(244, 230, 196, 0.3)); stroke-width: 1; stroke-dasharray: 4 3; }
+.fm-kurve__linie { stroke: var(--bc-gold, #f0c35a); stroke-width: 2; }
+.fm-kurve__punkt { fill: var(--bc-gold, #f0c35a); }
+.fm-kurve__punkt.is-hohl { fill: var(--bc-grund, #06080c); stroke: var(--bc-gold, #f0c35a); stroke-width: 1.6; }
+.fm-ldE__zeile { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.fm-meldungen ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fm-meldungen li { display: grid; grid-template-columns: 130px 70px 70px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 12.5px; }
+@media (max-width: 760px) { .fm-meldungen li { grid-template-columns: 1fr 1fr; } }
+.fm-bauchbinde { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 10px; border-left: 4px solid var(--bc-gut, #62d394); background: var(--bc-flaeche-2, #121824); }
+.fm-bauchbinde.is-ab { border-left-color: var(--bc-warn, #ff6058); }
+.fm-bauchbinde > div { display: grid; gap: 1px; min-width: 0; }
+.fm-bauchbinde small { color: var(--bc-leise, #9aa7ba); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; }
+.fm-bauchbinde__pfeile { font-size: 18px; white-space: nowrap; }
+.fm-wz { background: none; border: 0; padding: 0 2px; color: inherit; cursor: pointer; display: inline-flex; border-radius: 4px; }
+.fm-wz:hover, .fm-wz:focus-visible { background: rgba(244, 230, 196, 0.1); }
+.fm-warum .t, .fm-profil .t, .fm-karten .t, .fm-meldungen .t, .fm-uebersicht .t, .fm-kmarke.t, .fm-kmarke .t { font-variant-numeric: tabular-nums; }
+.fm-kopf { display: grid; gap: 2px; margin-right: 10px; }
+.fm-kopf__zeile { display: inline-flex; gap: 10px; align-items: center; font-size: 15px; }
+.fm-leiste { display: grid; gap: 6px; margin-top: 8px; }
+.fm-leiste__kopf { display: flex; justify-content: space-between; align-items: baseline; }
+.fm-leiste__kacheln { display: flex; flex-wrap: wrap; gap: 8px; }
+.fm-kachel { display: grid; gap: 1px; min-width: 92px; padding: 6px 9px; border: 1px solid var(--bc-linie-2, rgba(244, 230, 196, 0.3)); border-radius: 8px; background: var(--bc-flaeche-2, #121824); font-size: 12px; }
+.fm-kachel b { font-size: 20px; line-height: 1; }
+.fm-leiste__team { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.fm-leiste__team b { font-size: 22px; color: var(--bc-gold, #f0c35a); }
+.fm-vergleich { display: grid; gap: 3px; }
+.fm-vergleich__zeile { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 56px; gap: 8px; align-items: baseline; font-size: 12.5px; }
+.fm-vergleich__zeile.is-gelegt { background: rgba(240, 195, 90, 0.08); }
+@media (max-width: 1500px) { .fm-kachel { min-width: 76px; padding: 5px 7px; } .fm-kopf__zeile { gap: 7px; font-size: 14px; } .fm-vergleich__zeile { grid-template-columns: 28px minmax(0, 1fr) auto 48px; } }
+@media (min-width: 2200px) { .fm-warum, .fm-karten, .fm-uebersicht, .fm-leiste { font-size: 15px; } .fm-leiste__team b { font-size: 28px; } .fm-kachel { min-width: 120px; font-size: 14px; } .fm-kachel b { font-size: 24px; } .fm-kopf__zeile { font-size: 18px; } }
+@media (min-width: 2200px) { .fm-tabelle, .fm-regel { font-size: 15px; } .fm-karten { font-size: 15px; } .fm-vergleich__zeile { font-size: 15px; } .fm-meldungen, .fm-profil { font-size: 15px; } }
+.elm-slot__ze { flex-wrap: wrap; row-gap: 2px; min-width: 0; }
+@media (max-width: 760px) { .elm-slot__ze .fm-kmarke { display: none; } .elm-slot__ze .fm-marke { gap: 3px; font-size: 12px; } }

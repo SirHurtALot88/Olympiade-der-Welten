@@ -92,6 +92,7 @@ describe("legacy lineup form-card modifiers", () => {
       disciplineSide: "d1",
       disciplineColor: "yellow",
       playerCount: 5,
+      farbregel: null, // alte Regel festgehalten; die neue prueft tests/form-moral-bau.test.ts
       formCards: [
         {
           id: "card-8",

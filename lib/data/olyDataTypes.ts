@@ -257,6 +257,47 @@ export type PlayerMoraleState = {
  * (lib/morale/form-moral-modifikator.ts). Additiv und optional: ohne den Schalter wird das Feld
  * nie geschrieben, ältere Spielstände laden unverändert.
  */
+export type PlayerFormHistoryEntry = {
+  seasonId: string;
+  matchdayId: string;
+  /** Form nach diesem Spieltag (0..100). */
+  form: number;
+  /** Form davor. */
+  vorher: number;
+  eingesetzt: boolean;
+  /** Perzentil der tatsaechlichen Leistung / der Erwartung (0..100), nur bei Einsatz in einer Disziplin mit >=3 Teilnehmern. */
+  leistungPerz?: number | null;
+  erwartungPerz?: number | null;
+  /** Disziplin, aus der das Perzentil stammt (bei zwei Disziplinen die mit dem groesseren Abstand). */
+  disziplinId?: string | null;
+  /** Bremse: Erschoepfung (Punkte Abzug am Ziel) oder Verletzung (feste Punkte). */
+  bremse?: { art: "erschoepfung" | "verletzung"; punkte: number } | null;
+};
+
+/**
+ * Gespeicherter Verlaufs-Eintrag (KOMPAKT, Review-Befund 6: lange Schluessel und Nullfelder blaehten den
+ * Spielstand um ~670 KB nach zehn Spieltagen). Lesen ueber `entpackeFormVerlauf` (liefert
+ * `PlayerFormHistoryEntry`). Felder ohne Wert fehlen ganz.
+ */
+export type PlayerFormVerlaufEintrag = {
+  /** Spieltag-Id. */
+  m: string;
+  /** Form danach (0..100). */
+  f: number;
+  /** 1 = eingesetzt (fehlt = kein Einsatz). */
+  e?: 1;
+  /** Leistungs-Perzentil 0..100. */
+  l?: number;
+  /** Erwartungs-Perzentil 0..100. */
+  x?: number;
+  /** Disziplin des Perzentils. */
+  d?: string;
+  /** Bremse: a = "e" Erschoepfung / "v" Verletzung, p = Punkte. */
+  b?: { a: "e" | "v"; p: number };
+  /** Form davor, nur am ersten Eintrag einer Saison (sonst der Wert des Vor-Eintrags). */
+  v?: number;
+};
+
 export type PlayerFormState = {
   playerId: string;
   teamId: string;
@@ -264,6 +305,11 @@ export type PlayerFormState = {
   lastSeasonId: string;
   lastMatchdayId: string;
   appearances: number;
+  /**
+   * Verlauf der laufenden Saison (neueste zuletzt, hoechstens `FORM_VERLAUF_MAX`). Additiv und optional:
+   * Staende ohne das Feld laden unveraendert, die Kurve beginnt dann beim naechsten Spieltag.
+   */
+  verlauf?: PlayerFormVerlaufEintrag[];
 };
 
 export type PlayerRelationshipEventRecord = {
@@ -2722,6 +2768,8 @@ export type PlayerDisciplinePerformanceRecord = {
   slotIndex: number;
   baseValue: number;
   finalPlayerScore: number;
+  /** Systematischer Form-Anteil in `finalPlayerScore` (s. `formSystematisch` der Score-Engine); fehlt bei aelteren Zeilen. */
+  formSystematisch?: number | null;
   mutatorScoreBonus?: number | null;
   mutatorPpsBonus?: number | null;
   /**

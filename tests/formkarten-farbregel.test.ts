@@ -12,8 +12,10 @@ import {
 import { erzeugeFormHook } from "../scripts/lib/formkarten-farbregel-hook.mjs";
 
 describe("Formkarten-Farbregel (Prototyp, Standard AUS)", () => {
-  it("ist ohne Umgebungsvariable aus", () => {
-    expect(isFormkartenFarbregelEnabled({})).toBe(false);
+  it("ist seit 18.11. ohne Umgebungsvariable AN (neu) und mit alt/0/aus abschaltbar", () => {
+    expect(isFormkartenFarbregelEnabled({})).toBe(true);
+    expect(isFormkartenFarbregelEnabled({ OLY_FORMKARTEN_FARBREGEL: "alt" })).toBe(false);
+    expect(isFormkartenFarbregelEnabled({ OLY_FORMKARTEN_FARBREGEL: "0" })).toBe(false);
     expect(isFormkartenFarbregelEnabled({ OLY_FORMKARTEN_FARBREGEL: "neu" })).toBe(true);
   });
 
