@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import FoundationActivityStrip from "@/app/foundation/shell/FoundationActivityStrip";
 import type { FoundationActivityItem } from "@/lib/foundation/foundation-activity-types";
+import { LEERER_TAKT_PLAN, type TaktPlan, type TaktSchritt } from "@/lib/foundation/foundation-takt-plan";
+import { abonniereTaktAblauf, getTaktAblaufOffen, setTaktAblaufOffen } from "@/lib/foundation/takt-ablauf-store";
 
 export type FoundationTaktgeberProps = {
   /** Beschriftung des nächsten Schritts („Einsatzliste setzen“). */
@@ -13,7 +15,11 @@ export type FoundationTaktgeberProps = {
   statusClass: string;
   onClick: () => void;
   activities: FoundationActivityItem[];
+  /** Pflichtschritte mit Haken/Rot/Gelb und kritische Punkte (lib/foundation/foundation-takt-plan.ts). */
+  plan?: TaktPlan;
 };
+
+const SCHRITT_ZEICHEN: Record<TaktSchritt["status"], string> = { erledigt: "✓", jetzt: "●", offen: "○", rot: "!", gelb: "i" };
 
 export type TaktgeberZustand = "bereit" | "weiter" | "zu" | "laeuft";
 
@@ -29,10 +35,13 @@ export function bestimmeTaktgeberZustand(statusClass: string, activities: Founda
   return "bereit";
 }
 
-export default function FoundationTaktgeber({ label, title, statusClass, onClick, activities }: FoundationTaktgeberProps) {
-  const [ablauf, setAblauf] = useState(false);
+export default function FoundationTaktgeber({ label, title, statusClass, onClick, activities, plan = LEERER_TAKT_PLAN }: FoundationTaktgeberProps) {
+  const ablauf = useSyncExternalStore(abonniereTaktAblauf, getTaktAblaufOffen, () => false);
+  const setAblauf = (wert: boolean | ((alt: boolean) => boolean)) =>
+    setTaktAblaufOffen(typeof wert === "function" ? wert(getTaktAblaufOffen()) : wert);
+  const kritisch = plan.kritisch.length;
   const wurzel = useRef<HTMLDivElement | null>(null);
-  const zustand = bestimmeTaktgeberZustand(statusClass, activities);
+  const zustand = bestimmeTaktgeberZustand(kritisch > 0 ? "is-blocked" : statusClass, activities);
   const laufend = activities.find((activity) => activity.tone === "running") ?? null;
   const pct =
     laufend?.progressPct != null && Number.isFinite(laufend.progressPct)
@@ -60,7 +69,7 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
     zustand === "laeuft"
       ? `Aktion läuft · ${laufend?.currentLabel ?? laufend?.label ?? ""}`.replace(/ · $/, "")
       : zustand === "zu"
-        ? "Hält auf · Klick springt zum offenen Schritt"
+        ? `Hält auf · ${kritisch > 0 ? `${kritisch} kritisch` : "offener Schritt"} · Leertaste zeigt es`
         : zustand === "weiter"
           ? "Bereit zum Weiter · Leertaste"
           : "Bereit · Leertaste";
@@ -96,7 +105,36 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
       {zustand === "laeuft" ? <span className="foundation-takt-linie" aria-hidden="true" /> : null}
       <div className={`foundation-takt-ablauf${ablauf ? " is-offen" : ""}`} data-testid="foundation-takt-ablauf">
         <strong className="foundation-takt-ablauf-titel">Ablauf</strong>
-        {activities.length === 0 ? <p className="foundation-takt-ablauf-leer">{title ?? "Keine laufenden Aktionen."}</p> : null}
+        {plan.schritte.length > 0 ? (
+          <ol className="foundation-takt-schritte" data-testid="foundation-takt-schritte">
+            {plan.schritte.map((schritt) => (
+              <li key={schritt.id} className={`foundation-takt-schritt is-${schritt.status}`}>
+                <span className="foundation-takt-haken" aria-hidden="true">{SCHRITT_ZEICHEN[schritt.status]}</span>
+                <span className="foundation-takt-schritt-text">
+                  <b>{schritt.label}</b>
+                  {schritt.detail ? <small>{schritt.detail}</small> : null}
+                </span>
+                {schritt.sprung ? (
+                  <button
+                    type="button"
+                    className="foundation-takt-sprung"
+                    onClick={() => {
+                      setAblauf(false);
+                      schritt.sprung?.();
+                    }}
+                  >
+                    {schritt.status === "rot" ? "beheben ›" : "öffnen ›"}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="foundation-takt-ablauf-leer">{title ?? "Keine laufenden Aktionen."}</p>
+        )}
+        <p className="foundation-takt-ablauf-hinweis">
+          {kritisch > 0 ? "Rot hält den Spieltag auf: Leertaste noch einmal springt zum ersten roten Punkt." : "Gelb hält nicht auf. Leertaste geht zum nächsten Schritt."}
+        </p>
         <FoundationActivityStrip activities={activities} />
       </div>
     </div>

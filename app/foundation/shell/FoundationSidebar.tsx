@@ -55,7 +55,6 @@ type FoundationSidebarProps = {
   onNavigate: (view: FoundationViewId) => void;
   onPrefetchView?: (view: FoundationViewId) => void;
   attentionByViewId?: FoundationNavAttentionMap;
-  seasonContextLabel?: string | null;
   // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
   // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
   teamPicker?: ReactNode;
@@ -90,7 +89,6 @@ export default function FoundationSidebar({
   onNavigate,
   onPrefetchView,
   attentionByViewId,
-  seasonContextLabel,
   teamPicker,
   teamCrest,
   teamName,
@@ -113,12 +111,6 @@ export default function FoundationSidebar({
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
-
-  // "S1 · MD 1" → ["S1", "MD 1"]; Trennzeichen stammt aus buildSeasonContextLabel.
-  const contextParts = seasonContextLabel ? seasonContextLabel.split(" · ") : [];
-  const seasonPart = contextParts[0] ?? null;
-  const matchdayPart = contextParts[1] ?? null;
-  const canSplitContext = Boolean(seasonPart && matchdayPart);
 
   useEffect(() => {
     const savedOrder = loadFoundationSidebarOrder();
@@ -314,42 +306,6 @@ export default function FoundationSidebar({
             {APP_VERSION_BADGE.compact}
           </span>
         </div>
-        {seasonContextLabel ? (
-          canSplitContext ? (
-            <div
-              className="foundation-sidebar-context-portal"
-              data-testid="foundation-season-context"
-              role="group"
-              aria-label={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
-            >
-              <button
-                type="button"
-                className="foundation-sidebar-context-chip"
-                title={`${seasonPart} — zum Saisonstand`}
-                onClick={() => onNavigate("seasonV2")}
-              >
-                {seasonPart}
-              </button>
-              <span className="foundation-sidebar-context-sep" aria-hidden="true">·</span>
-              <button
-                type="button"
-                className="foundation-sidebar-context-chip"
-                title={`${matchdayPart} — zur Arena`}
-                onClick={() => onNavigate("matchdayArena")}
-              >
-                {matchdayPart}
-              </button>
-            </div>
-          ) : (
-            <span
-              className="foundation-sidebar-season-context"
-              data-testid="foundation-season-context"
-              title={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
-            >
-              {seasonContextLabel}
-            </span>
-          )
-        ) : null}
       </div>
       {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
       {navGroups.map((group) => (

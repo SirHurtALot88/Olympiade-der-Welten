@@ -724,3 +724,55 @@ button.fb-chip:hover {
 .foundation-shell-layout:has(.oly-arena-buehne[data-voll="1"]) .foundation-shell-content.foundation-view-enter > * {
   animation: none;
 }
+
+/* Ablauf: Pflichtschritte mit Haken (grün), Rot (hält auf), Gelb (hält nicht auf). */
+.foundation-takt-schritte {
+  list-style: none;
+  margin: 0 0 0.6em;
+  padding: 0;
+  display: grid;
+  gap: 0.45em;
+}
+.foundation-takt-schritt {
+  display: grid;
+  grid-template-columns: 1.7em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7em;
+}
+.foundation-takt-haken {
+  display: grid;
+  place-items: center;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 50%;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #0b0f14;
+  background: var(--fb-stumm);
+}
+.foundation-takt-schritt.is-erledigt .foundation-takt-haken { background: var(--fb-gut); }
+.foundation-takt-schritt.is-jetzt .foundation-takt-haken { background: var(--fb-gold); }
+.foundation-takt-schritt.is-rot .foundation-takt-haken { background: var(--fb-warn); color: #fff; }
+.foundation-takt-schritt.is-gelb .foundation-takt-haken { background: var(--fb-acht); }
+.foundation-takt-schritt.is-offen .foundation-takt-haken { background: transparent; border: 1px solid var(--fb-linie-2); color: var(--fb-leise); }
+.foundation-takt-schritt-text { display: grid; min-width: 0; }
+.foundation-takt-schritt-text b { font-size: 0.95em; font-weight: 600; color: var(--fb-tinte); }
+.foundation-takt-schritt-text small { font-size: 0.8em; color: var(--fb-leise); }
+.foundation-takt-schritt.is-erledigt .foundation-takt-schritt-text b { color: var(--fb-leise); }
+.foundation-takt-sprung {
+  font-family: var(--fb-zahl);
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--fb-gold);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.foundation-takt-ablauf-hinweis {
+  margin: 0 0 0.6em;
+  padding-top: 0.5em;
+  border-top: 1px solid var(--fb-linie);
+  font-size: 0.8em;
+  color: var(--fb-leise);
+}

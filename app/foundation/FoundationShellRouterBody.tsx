@@ -385,6 +385,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationTrainingCompactHostProps,
   foundationWarningInboxItems,
   gameFlowActionStep,
+  taktPlan,
   matchdayAdvanceStep,
   gameState,
   getTableColumnWidth,
@@ -965,7 +966,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
-        takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext }}
+        takt={{ label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }}
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}

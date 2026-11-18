@@ -199,7 +199,6 @@ export default function FoundationShell({
         onNavigate={onNavigate}
         onPrefetchView={onPrefetchView}
         attentionByViewId={attentionByViewId}
-        seasonContextLabel={seasonContextLabel}
         teamPicker={teamPicker}
         teamCrest={teamCrest}
         teamName={teamName}
