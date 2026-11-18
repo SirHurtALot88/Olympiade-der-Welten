@@ -7,6 +7,7 @@ import type { FoundationActivityItem } from "@/lib/foundation/foundation-activit
 import FoundationActivityStrip from "@/app/foundation/shell/FoundationActivityStrip";
 import FoundationSidebar from "@/app/foundation/shell/FoundationSidebar";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { useNavRailPinned } from "@/lib/ui/nav-rail-preference";
 import "@/components/foundation/broadcast/broadcast.css";
 
 type FoundationShellProps = {
@@ -47,8 +48,9 @@ type FoundationShellProps = {
   teamPicker?: ReactNode;
   /**
    * Icon-Schiene (Broadcast-Fundament, `components/foundation/broadcast/broadcast.css`): die
-   * Seitenleiste schrumpft auf 64 px und fährt bei Hover/Fokus aus. Bisher nur für die moderne
-   * Einsatzliste; die globale Navigation bleibt sonst unverändert.
+   * Seitenleiste ist 64 px schmal, zeigt nur Symbole und fährt bei Hover/Fokus als Überlagerung
+   * aus. Seit 18.11. der Standard für ALLE Ansichten; `false` stellt die breite Seitenleiste wieder
+   * her. „Beschriftung immer zeigen“ (pro Browser gespeichert) hält sie dauerhaft ausgeklappt.
    */
   compactRail?: boolean;
 };
@@ -83,15 +85,16 @@ export default function FoundationShell({
   activities = [],
   teamPicker,
   viewTitle,
-  compactRail = false,
+  compactRail = true,
 }: FoundationShellProps) {
+  const [railPinned, setRailPinned] = useNavRailPinned();
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
       ? buildSeasonContextLabel(seasonLabel, matchdayDisplayLabel, currentMatchday)
       : null;
 
   return (
-    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}${compactRail ? " is-bc-rail" : ""}`} data-testid="foundation-shell-layout">
+    <div className={`foundation-shell-layout${isPending ? " is-nav-pending" : ""}${compactRail ? " is-bc-rail" : ""}${compactRail && railPinned ? " is-rail-pinned" : ""}`} data-testid="foundation-shell-layout">
       <FoundationSidebar
         activeView={activeView}
         onNavigate={onNavigate}
@@ -99,6 +102,7 @@ export default function FoundationShell({
         attentionByViewId={attentionByViewId}
         seasonContextLabel={seasonContextLabel}
         teamPicker={teamPicker}
+        rail={compactRail ? { pinned: railPinned, onPinnedChange: setRailPinned } : undefined}
       />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         {/* Die Gliederungs-Spitze des Dokuments. Steht VOR allem anderen im Hauptbereich, damit
