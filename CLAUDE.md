@@ -327,20 +327,24 @@ nächsten Wochen hardcore verbessern!!"
   Was im Mockup erfunden war (z. B. Siegchancen ohne Datenquelle), wird ehrlich ersetzt, nicht
   stillschweigend weggelassen.
 
-## Zielbildschirme: 16:9, 15"-MacBook und 32" OLED
+## Zielbildschirme: 15"-MacBook M4 und 32"-4K-Monitor
 
 Chris, 18.11., wörtlich: „Bitte alle Layouts, Spiele etc. auf 16:9 optimiert, 15" MacBook und
-Hauptscreen ist 32" OLED, bitte merken.“ Jede Seite, jede Arena und jedes HUD wird für diese zwei
-Geräte gebaut und geprüft:
+Hauptscreen ist 32" OLED, bitte merken.“ Nachgeschärft: „MacBook M4 hat 'ne bessere Auflösung […]
+und Rechner ist 4K-Monitor!“ Jede Seite, jede Arena und jedes HUD wird für diese zwei Geräte gebaut
+und geprüft:
 
-| Gerät | Viewport zum Prüfen (CSS-px) |
-|---|---|
-| 15"-MacBook | 1440×900 (und 1512×982) |
-| 32" OLED, 4K | 2560×1440 (Nebenprobe 1920×1080) |
+| Gerät | Viewport zum Prüfen (CSS-px) | Pixeldichte |
+|---|---|---|
+| MacBook Air 15" M4 (2880×1864 nativ, Standard-Skalierung) | 1710×1112 (16:10) | 2 |
+| 32" 4K-Monitor (3840×2160) | 2560×1440 (150 %) und 1920×1080 (200 %) | 1,5 bzw. 2 |
 
-Screenshots und Sichtprüfung laufen bei 1440×900 **und** 2560×1440, Phone (412 breit) bleibt
-Nebenprobe. Bei 1440 darf nichts gequetscht, abgeschnitten oder unnötig scrollend sein; bei 2560 darf
-nichts verloren wirken (keine leeren Riesenränder, Schrift und Tafeln wachsen mit).
+Screenshots und Sichtprüfung laufen bei **1710×1112** und **2560×1440**; 1920×1080 und 3840×2160
+(100 %) sind Nebenproben, Phone (412 breit) ebenso. Das MacBook ist 16:10, der Monitor 16:9: Layouts
+müssen beide Seitenverhältnisse ohne leere Balken füllen. Auf dem MacBook darf nichts gequetscht,
+abgeschnitten oder unnötig scrollend sein; auf dem 4K-Monitor darf nichts verloren wirken (keine
+leeren Riesenränder, Schrift und Tafeln wachsen mit). Wird die genaue Skalierung eines Geräts
+bekannt, hier eintragen.
 
 ## An die Spielstände kommen
 
