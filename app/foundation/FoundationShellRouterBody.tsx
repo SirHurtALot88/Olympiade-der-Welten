@@ -126,6 +126,7 @@ import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } 
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 import { useEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
+import { useSaisonstandLook } from "@/lib/season/saisonstand-look";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -310,6 +311,7 @@ const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
   const [viewWidthMode] = useViewWidth();
   const [einsatzlisteLook] = useEinsatzlisteLook();
+  const [saisonstandLook] = useSaisonstandLook();
   const {
   activeContextMeta,
   activeContextStatusChips,
@@ -546,6 +548,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2AreaVerhaeltnisByTeamId,
   seasonV2TeamBilanzByTeamId,
   seasonV2TeamStrengthRankByTeamId,
+  seasonV2Verlauf,
+  seasonV2Matchwinner,
   seasonV2TopPlayers,
   selectedBoardConfidence,
   selectedEncyclopediaEntry,
@@ -967,7 +971,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
            bestimmt, nur zweimal verwendet (sichtbar als Krume, semantisch als h1). */
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
-        compactRail={activeView === "lineup" && einsatzlisteLook === "modern"}
+        compactRail={(activeView === "lineup" && einsatzlisteLook === "modern") || (activeView === "seasonV2" && saisonstandLook === "modern")}
         subNav={
           activeView === "marketV2" ? (
             <FoundationSubNav
@@ -2798,6 +2802,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               areaVerhaeltnisByTeamId={seasonV2AreaVerhaeltnisByTeamId}
               teamBilanzByTeamId={seasonV2TeamBilanzByTeamId}
               teamStrengthRankByTeamId={seasonV2TeamStrengthRankByTeamId}
+              verlauf={seasonV2Verlauf}
+              matchwinner={seasonV2Matchwinner}
               playerRows={seasonV2PlayerRows}
               gmRows={seasonV2GmRows}
               archiveRows={seasonV2ArchiveRows}

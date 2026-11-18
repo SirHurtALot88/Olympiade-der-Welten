@@ -131,7 +131,7 @@ export const SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER: Array<{
  * ab (Bindestrich/Unterstrich, oder ein ganz anderes Wort: "eiskunstlauf" statt "eiskunst",
  * "speed-schach" statt "schach", "takeshis-castle" statt "takeshi").
  */
-const SEASON_DISCIPLINE_KEY_TO_CATALOG_ID: Record<SeasonDisciplineKey, string> = {
+export const SEASON_DISCIPLINE_KEY_TO_CATALOG_ID: Record<SeasonDisciplineKey, string> = {
   tdm: "tdm",
   mini_dm: "mini-dm",
   gewichtheben: "gewichtheben",

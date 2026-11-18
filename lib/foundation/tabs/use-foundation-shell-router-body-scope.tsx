@@ -346,6 +346,7 @@ import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-st
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
 import { summiereSaisonBilanz } from "@/lib/standings/standings-bilanz";
+import { baueMatchwinnerListe } from "@/lib/season/saisonstand-matchwinner";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
@@ -11476,6 +11477,26 @@ export function useFoundationShellRouterBodyScope({
     const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
     return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
   }, [gameState]);
+  /**
+   * NUR die moderne Saisonstand-Ansicht (18.11.): Zeitreihe je Team aus dem Feld-Rennen-Ledger (Form,
+   * Saisonverlauf) und die Matchwinner-Bestenliste. Beides gilt nur fuer die LIVE-Saison — ein Archiv
+   * traegt weder Ledger noch Einsatz-Zeilen dieser Saison, dort fehlen Form, Verlauf und Liste ehrlich.
+   */
+  const seasonV2Verlauf = useMemo(() => {
+    if (isViewingArchivedSeason || fieldRaceLedger.matchdays.length === 0) return null;
+    const byTeamId: Record<string, Array<{ played: boolean; tagespunkte: number | null; cumulativePoints: number }>> = {};
+    for (const [teamId, eintraege] of fieldRaceLedger.rowsByTeamId) {
+      byTeamId[teamId] = eintraege.map((e) => ({ played: e.played, tagespunkte: e.tagespunkte, cumulativePoints: e.cumulativePoints }));
+    }
+    return { spieltage: fieldRaceLedger.matchdays.map((m) => ({ nummer: m.matchdayNumber, played: m.played })), byTeamId };
+  }, [fieldRaceLedger, isViewingArchivedSeason]);
+  const seasonV2Matchwinner = useMemo(() => {
+    if (isViewingArchivedSeason) return null;
+    return baueMatchwinnerListe(gameState, seasonOverviewSeasonId).map((eintrag) => {
+      const player = gameState.players.find((p) => p.id === eintrag.playerId);
+      return { ...eintrag, portraitUrl: player ? getPlayerPortraitModel(player).src : null };
+    });
+  }, [gameState, isViewingArchivedSeason, seasonOverviewSeasonId]);
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
@@ -13226,6 +13247,8 @@ export function useFoundationShellRouterBodyScope({
     seasonV2AreaVerhaeltnisByTeamId,
     seasonV2TeamBilanzByTeamId,
     seasonV2TeamStrengthRankByTeamId,
+    seasonV2Verlauf,
+    seasonV2Matchwinner,
     seasonV2TopPlayers,
     selectNewGameMode,
     selectTeamSettingsTeam,
