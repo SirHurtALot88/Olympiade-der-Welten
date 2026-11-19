@@ -88,6 +88,36 @@ export type SeasonEndProgressionBatchPreview = {
  * Pure: builds the shared economy context + O(n²)-guarded pre-computed XP map ONCE and performs no writes.
  */
 export function previewSeasonEndProgressionBatch(save: PersistedSaveGame): SeasonEndProgressionBatchPreview {
+  // L2 (19.11.): Der Dry-Run ist reine Funktion des Spielstands; eine Saisonwechsel-Anfrage rief ihn
+  // mehrfach fuer dasselbe `gameState`-Objekt auf (Vorschau + Apply, je ~60 s). Memo je Objekt-Identitaet
+  // plus saveId und updatedAt (Schutz gegen ein spaeter in place geaendertes, neu gespeichertes Objekt):
+  // wird der Stand geaendert (neues Objekt), rechnet er neu -- Ergebnis bleibt bit-gleich. Listen werden
+  // kopiert, weil Aufrufer `warnings`/`blockingReasons` weiterbefuellen.
+  const memo = progressionPreviewMemo.get(save.gameState);
+  if (memo && memo.saveId === save.saveId && memo.updatedAt === save.updatedAt) {
+    return {
+      ...memo.result,
+      teamApplies: [...memo.result.teamApplies],
+      warnings: [...memo.result.warnings],
+      blockingReasons: [...memo.result.blockingReasons],
+    };
+  }
+  const result = rechnePreviewSeasonEndProgressionBatch(save);
+  progressionPreviewMemo.set(save.gameState, { saveId: save.saveId, updatedAt: save.updatedAt, result });
+  return {
+    ...result,
+    teamApplies: [...result.teamApplies],
+    warnings: [...result.warnings],
+    blockingReasons: [...result.blockingReasons],
+  };
+}
+
+const progressionPreviewMemo = new WeakMap<
+  PersistedSaveGame["gameState"],
+  { saveId: string; updatedAt: string; result: SeasonEndProgressionBatchPreview }
+>();
+
+function rechnePreviewSeasonEndProgressionBatch(save: PersistedSaveGame): SeasonEndProgressionBatchPreview {
   const materializationSave: PersistedSaveGame = { ...save, status: "active" };
   const gameState = materializationSave.gameState;
   const completedSeasonId = gameState.season.id;
@@ -166,7 +196,7 @@ export function runSeasonEndProgressionBatch(input: {
     aiOrganicFallbackTeams,
     warnings,
     blockingReasons,
-  } = previewSeasonEndProgressionBatch(capture.getSave());
+  } = previewSeasonEndProgressionBatch(materializationSave);
 
   const beforeBatchSave = capture.getSave();
   let batchedGameState = beforeBatchSave.gameState;
