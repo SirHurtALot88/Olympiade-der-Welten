@@ -266,12 +266,11 @@ describe("new-game-setup-service", () => {
   }, 120_000);
 
   /**
-   * TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert (Wizard-Filter): ein Liga-2-Team
-   * darf als Chris-/Franky-Team niemals in einem Battle-Mode-Save ankommen, auch nicht über einen
-   * direkten Aufruf, der die UI-Sperre umgeht. R-R ist laut dem Battle-Mode-Test oben verlässlich
-   * Liga 2 (Budget-Rang 32 global, `leagueByTeamId["R-R"] === "liga2"`).
+   * 19.11. (Chris: „bitte im battle mode auch liga 2 auswählbar machen für spieler!"): die alte
+   * TASK-#155-Sperre ist aufgehoben. Ein Liga-2-Team (R-R, Budget-Rang 32) bleibt als Chris-Team
+   * erhalten, wird menschlich gesteuert und bleibt in Liga 2 -- ohne Warnung, ohne Blocker.
    */
-  it("filtert ein Liga-2-Team aus chrisTeamIds im Battle Mode heraus und blockiert ohne verbleibendes Team", () => {
+  it("laesst ein Liga-2-Team im Battle Mode als Chris-Team zu (keine Sperre mehr)", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({
       presetId: "custom",
       gameMode: "battle",
@@ -280,15 +279,14 @@ describe("new-game-setup-service", () => {
     });
 
     expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
-    expect(preview.chrisTeamIds).toEqual([]);
-    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
-    expect(preview.blockers).toContain("new_game_requires_at_least_one_chris_team");
-    // R-R landet stattdessen bei der KI, nicht als humanControlled-Team.
-    expect(preview.aiTeamIds).toContain("R-R");
-    expect(gameState.teams.find((team) => team.teamId === "R-R")?.humanControlled).toBe(false);
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+    expect(preview.aiTeamIds).not.toContain("R-R");
+    expect(gameState.teams.find((team) => team.teamId === "R-R")?.humanControlled).toBe(true);
   }, 120_000);
 
-  it("behält ein Liga-1-Team und verwirft nur das Liga-2-Team, wenn beide als chrisTeamIds übergeben werden", () => {
+  it("behaelt Liga-1- und Liga-2-Team gemeinsam als chrisTeamIds", () => {
     const { preview } = buildNewGameStateFromBaseline({
       presetId: "custom",
       gameMode: "battle",
@@ -296,9 +294,9 @@ describe("new-game-setup-service", () => {
       now: "2026-06-13T10:00:00.000Z",
     });
 
-    expect(preview.chrisTeamIds).toEqual(["M-M"]);
+    expect(preview.chrisTeamIds).toEqual(["M-M", "R-R"]);
     expect(preview.blockers).toEqual([]);
-    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+    expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
   }, 120_000);
 
   it("lässt Liga-2-Teams im Manager Mode unangetastet wählbar (keine Liga-2-Sperre ohne Battle Mode)", () => {
@@ -360,7 +358,8 @@ describe("new-game-setup-service", () => {
 
     expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
     expect(preview.warnings).toContain("battle_mode_invalid_league_assignment_ignored");
-    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+    // Seit 19.11. bleibt R-R trotzdem Chris' Team (Liga 2 ist waehlbar).
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
   }, 120_000);
 
   it("ignoriert eine leagueByTeamId im Manager Mode vollstaendig (kein Liga-Split ausserhalb Battle Mode)", () => {
@@ -381,18 +380,9 @@ describe("new-game-setup-service", () => {
   }, 120_000);
 
   /**
-   * TASK #155 — OPUS-REVIEW ZU PR #1272, FRANKY-EDGE-CASE: fallen BEIDE Preset-Teams von Franky
-   * in Liga 2, wird `frankyTeamIds` komplett leer, aber nur der Chris-Null-Teams-Fall hat einen
-   * Blocker — Franky stünde (im seltenen Fall, dass sein Preset komplett Liga-2-Teams trifft) ohne
-   * eigenes Team da, nur durch die Warnung sichtbar. Opus: kein Blocker nötig (Presets
-   * normalisieren sich im Wizard ohnehin auf "custom"), aber die Warnung muss tatsächlich
-   * ankommen — und zwar lesbar, nicht als Rohcode (dafür `formatGameFlowBlocker`,
-   * s. `tests/game-flow-blocker-incomplete-result-label.test.ts`).
-   *
-   * Die betroffenen Liga-2-Team-IDs werden hier bewusst aus der echten Zuordnung gelesen statt
-   * hart codiert — welche Team-IDs Liga 2 sind, hängt an den Startbudgets, nicht an festen Codes.
+   * 19.11.: Frankys Teams in Liga 2 bleiben Frankys Teams (frueher: Sperre mit Warnung, TASK #155).
    */
-  it("Franky-Edge-Case: fallen beide Franky-Teams in Liga 2, bleibt es ein Hinweis (kein Blocker), aber sichtbar und lesbar", () => {
+  it("Franky darf Liga-2-Teams nehmen; sie bleiben bei ihm, ohne Warnung", () => {
     const probe = buildNewGameStateFromBaseline({
       presetId: "custom",
       gameMode: "battle",
@@ -413,16 +403,10 @@ describe("new-game-setup-service", () => {
       now: "2026-06-13T10:00:00.000Z",
     });
 
-    expect(preview.frankyTeamIds).toEqual([]);
-    // Kein Blocker -- Chris hat sein Team, das reicht laut heutiger Regel zum Starten.
+    expect(preview.frankyTeamIds).toEqual(frankyLiga2Pick);
     expect(preview.blockers).toEqual([]);
     for (const teamId of frankyLiga2Pick) {
-      expect(preview.warnings).toContain(`battle_mode_liga2_team_not_selectable:${teamId}`);
-      // Und lesbar, nicht nur als Code -- das ist die eigentliche Opus-Anforderung: die Warnung
-      // darf nicht lautlos im internen Array verschwinden.
-      const label = formatGameFlowBlocker(`battle_mode_liga2_team_not_selectable:${teamId}`);
-      expect(label).toContain(teamId);
-      expect(label).toMatch(/liga 2/i);
+      expect(preview.warnings).not.toContain(`battle_mode_liga2_team_not_selectable:${teamId}`);
     }
   }, 120_000);
 });

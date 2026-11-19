@@ -6473,11 +6473,6 @@ export function useFoundationShellRouterBodyScope({
     const current = getNewGameLeagueAssignment();
     const nextTier: LeagueTier = current[teamId] === "liga2" ? "liga1" : "liga2";
     setNewGameLeagueOverride({ ...current, [teamId]: nextTier });
-    if (nextTier === "liga2") {
-      setNewGameChrisTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
-      setNewGameFrankyTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
-      setNewGameRamonaTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
-    }
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6489,13 +6484,6 @@ export function useFoundationShellRouterBodyScope({
     // den vorherigen Schritt und wuerde sonst unbeabsichtigt in einen neuen Battle-Mode-Einstieg
     // durchrutschen.
     setNewGameLeagueOverride(null);
-    if (mode === "battle") {
-      const leagueAssignment = buildInitialLeagueAssignment(gameState.teams);
-      const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
-      setNewGameChrisTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
-      setNewGameFrankyTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
-      setNewGameRamonaTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
-    }
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6511,21 +6499,7 @@ export function useFoundationShellRouterBodyScope({
   }
 
   function toggleNewGameTeam(owner: "chris" | "franky" | "ramona", teamId: string) {
-    // TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert, nicht wählbar. Die Klub-Raster
-    // rendern Liga-2-Karten im Battle-Mode-Schritt schon gar nicht als anklickbar; diese Sperre
-    // ist die zweite Verteidigungslinie, falls dieser Handler je anders aufgerufen wird. Ein
-    // Abwählen (Team ist bereits in der Liste) bleibt immer erlaubt.
-    if (newGameMode === "battle") {
-      const alreadySelected =
-        owner === "chris"
-          ? newGameChrisTeamIds.includes(teamId)
-          : owner === "franky"
-            ? newGameFrankyTeamIds.includes(teamId)
-            : newGameRamonaTeamIds.includes(teamId);
-      if (!alreadySelected && getNewGameLeagueAssignment()[teamId] === "liga2") {
-        return;
-      }
-    }
+    // 19.11.: Liga-2-Teams sind im Battle Mode wählbar (Chris), keine Sperre mehr.
     const limits = getGameModeOwnershipLimits(newGamePresetId);
     setNewGamePreview(null);
     setNewGameError(null);

@@ -379,11 +379,13 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const leagueAssignmentForNewGame = isBattleMode
     ? customLeagueAssignment ?? buildInitialLeagueAssignment(baseGameState.teams)
     : null;
-  const isLiga2TeamId = (teamId: string) => leagueAssignmentForNewGame?.[teamId] === "liga2";
-  const chrisTeamIds = rawChrisTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
-  const frankyTeamIds = rawFrankyTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
-  const ramonaTeamIds = rawRamonaTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
-  const droppedLiga2HumanTeamIds = [...rawChrisTeamIds, ...rawFrankyTeamIds, ...rawRamonaTeamIds].filter(isLiga2TeamId);
+  // 19.11., Chris: „bitte im battle mode auch liga 2 auswählbar machen für spieler!" -- die
+  // frühere Sperre (TASK #155, Liga 2 beim Anlegen nur KI) ist aufgehoben. Ein Liga-2-Team läuft
+  // als Menschen-Team ganz normal (wie bei der späteren Übernahme, tests/game-mode-ownership.test.ts).
+  const chrisTeamIds = rawChrisTeamIds;
+  const frankyTeamIds = rawFrankyTeamIds;
+  const ramonaTeamIds = rawRamonaTeamIds;
+  const droppedLiga2HumanTeamIds: string[] = [];
 
   const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds, ...ramonaTeamIds]);
   const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
