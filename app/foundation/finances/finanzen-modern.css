@@ -805,6 +805,13 @@ button.fin-tz:hover {
   .fin-herl .fin-zl small {
     display: none;
   }
+  .fin-sd > .fin-in {
+    gap: 4px;
+    padding: 8px 10px;
+  }
+  .fin-riesig {
+    font-size: clamp(24px, 1.6vw, 40px);
+  }
 }
 .fin-leiter {
   display: flex;
