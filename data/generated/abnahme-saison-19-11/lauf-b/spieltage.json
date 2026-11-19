@@ -1,0 +1,44 @@
+[
+  {
+    "wertung": {
+      "spurt:arena": 32,
+      "staffel:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-1",
+    "nr": 1,
+    "disziplinen": [
+      "spurt",
+      "staffel"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 18,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 35,
+      "polls": 2,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 0,
+    "punkteSummeNachher": 56,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-2",
+    "fehler": []
+  }
+]

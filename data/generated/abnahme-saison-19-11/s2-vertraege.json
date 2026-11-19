@@ -1,0 +1,450 @@
+{
+  "saison": "season-2",
+  "exitsGesamt": 59,
+  "proTeam": [
+    {
+      "team": "A-A",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 11,
+      "nochDa": 9,
+      "endsaisonen": {
+        "2": 4,
+        "3": 4,
+        "4": 4
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 4
+    },
+    {
+      "team": "B-B",
+      "mensch": false,
+      "kader": 11,
+      "ausS1Draft": 12,
+      "nochDa": 9,
+      "endsaisonen": {
+        "2": 4,
+        "3": 4,
+        "4": 3
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 4
+    },
+    {
+      "team": "B-P",
+      "mensch": false,
+      "kader": 9,
+      "ausS1Draft": 9,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 2,
+        "3": 4,
+        "4": 2,
+        "5": 1
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 2
+    },
+    {
+      "team": "C-C",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 8,
+      "endsaisonen": {
+        "2": 4,
+        "3": 6,
+        "4": 2
+      },
+      "vertragsende": 2,
+      "laeuftJetztAus": 4
+    },
+    {
+      "team": "C-S",
+      "mensch": false,
+      "kader": 11,
+      "ausS1Draft": 12,
+      "nochDa": 11,
+      "endsaisonen": {
+        "2": 2,
+        "3": 1,
+        "4": 6,
+        "5": 2
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 2
+    },
+    {
+      "team": "D-L",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 10,
+        "3": 1,
+        "4": 1
+      },
+      "vertragsende": 5,
+      "laeuftJetztAus": 10
+    },
+    {
+      "team": "D-P",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 12,
+      "nochDa": 11,
+      "endsaisonen": {
+        "2": 1,
+        "3": 1,
+        "4": 8,
+        "5": 2
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 1
+    },
+    {
+      "team": "G-G",
+      "mensch": false,
+      "kader": 14,
+      "ausS1Draft": 14,
+      "nochDa": 13,
+      "endsaisonen": {
+        "2": 5,
+        "4": 9
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 5
+    },
+    {
+      "team": "H-R",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 10,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 8,
+        "3": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 8
+    },
+    {
+      "team": "L-K",
+      "mensch": false,
+      "kader": 14,
+      "ausS1Draft": 14,
+      "nochDa": 12,
+      "endsaisonen": {
+        "2": 3,
+        "3": 3,
+        "4": 7,
+        "6": 1
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 3
+    },
+    {
+      "team": "L-R",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 13,
+      "nochDa": 10,
+      "endsaisonen": {
+        "2": 2,
+        "3": 6,
+        "4": 2,
+        "5": 2
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 2
+    },
+    {
+      "team": "M-M",
+      "mensch": true,
+      "kader": 11,
+      "ausS1Draft": 11,
+      "nochDa": 11,
+      "endsaisonen": {
+        "1": 11
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 11
+    },
+    {
+      "team": "M-S",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 4,
+        "3": 3,
+        "4": 5
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 4
+    },
+    {
+      "team": "N-N",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 11,
+      "nochDa": 5,
+      "endsaisonen": {
+        "2": 10,
+        "3": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 10
+    },
+    {
+      "team": "N-W",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 9,
+        "3": 3
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 9
+    },
+    {
+      "team": "P-C",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 12,
+      "nochDa": 8,
+      "endsaisonen": {
+        "2": 1,
+        "3": 7,
+        "4": 2
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 1
+    },
+    {
+      "team": "P-S",
+      "mensch": false,
+      "kader": 9,
+      "ausS1Draft": 8,
+      "nochDa": 4,
+      "endsaisonen": {
+        "2": 7,
+        "3": 1,
+        "5": 1
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 7
+    },
+    {
+      "team": "R-C",
+      "mensch": false,
+      "kader": 13,
+      "ausS1Draft": 13,
+      "nochDa": 11,
+      "endsaisonen": {
+        "2": 1,
+        "3": 11,
+        "4": 1
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 1
+    },
+    {
+      "team": "R-L",
+      "mensch": false,
+      "kader": 9,
+      "ausS1Draft": 9,
+      "nochDa": 5,
+      "endsaisonen": {
+        "2": 6,
+        "3": 3
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 6
+    },
+    {
+      "team": "R-R",
+      "mensch": false,
+      "kader": 11,
+      "ausS1Draft": 12,
+      "nochDa": 9,
+      "endsaisonen": {
+        "2": 3,
+        "3": 3,
+        "4": 5
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 3
+    },
+    {
+      "team": "S-C",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 10,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 7,
+        "3": 2,
+        "5": 1
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 7
+    },
+    {
+      "team": "S-S",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 12,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 3,
+        "3": 5,
+        "4": 1,
+        "5": 1
+      },
+      "vertragsende": 0,
+      "laeuftJetztAus": 3
+    },
+    {
+      "team": "T-C",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 5,
+      "endsaisonen": {
+        "2": 7,
+        "3": 3,
+        "4": 2
+      },
+      "vertragsende": 1,
+      "laeuftJetztAus": 7
+    },
+    {
+      "team": "T-G",
+      "mensch": false,
+      "kader": 11,
+      "ausS1Draft": 11,
+      "nochDa": 8,
+      "endsaisonen": {
+        "2": 9,
+        "3": 1,
+        "4": 1
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 9
+    },
+    {
+      "team": "T-T",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 8,
+      "endsaisonen": {
+        "2": 7,
+        "3": 3,
+        "4": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 7
+    },
+    {
+      "team": "U-A",
+      "mensch": false,
+      "kader": 12,
+      "ausS1Draft": 14,
+      "nochDa": 5,
+      "endsaisonen": {
+        "2": 8,
+        "3": 2,
+        "4": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 8
+    },
+    {
+      "team": "V-D",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 12,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 8,
+        "3": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 8
+    },
+    {
+      "team": "V-V",
+      "mensch": false,
+      "kader": 9,
+      "ausS1Draft": 9,
+      "nochDa": 6,
+      "endsaisonen": {
+        "2": 6,
+        "3": 3
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 6
+    },
+    {
+      "team": "V-W",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 13,
+      "nochDa": 4,
+      "endsaisonen": {
+        "2": 7,
+        "3": 3
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 7
+    },
+    {
+      "team": "W-L",
+      "mensch": false,
+      "kader": 9,
+      "ausS1Draft": 11,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 2,
+        "3": 5,
+        "4": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 2
+    },
+    {
+      "team": "W-W",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 12,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 8,
+        "3": 2
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 8
+    },
+    {
+      "team": "Z-H",
+      "mensch": false,
+      "kader": 10,
+      "ausS1Draft": 10,
+      "nochDa": 7,
+      "endsaisonen": {
+        "2": 3,
+        "3": 5,
+        "4": 1,
+        "5": 1
+      },
+      "vertragsende": 3,
+      "laeuftJetztAus": 3
+    }
+  ]
+}
