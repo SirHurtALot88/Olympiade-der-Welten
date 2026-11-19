@@ -232,3 +232,45 @@ describe("Hebel (b): traegt der Rahmen Opt nur mit Fuellern, senkt der GM das Zi
     expect(alt.optEntscheidung).toBeUndefined();
   });
 });
+
+describe("Feinschliff 19.11.: Plaetze ueber dem Minimum nur aus Kasse ueber der Notruecklage", () => {
+  // Kader 4 (Minimum 8), Opt 9, Kasse 80, Notruecklage 10. Ein Star (30) plus vier 12er passte in die Kasse (78) — aber nur, wenn
+  // der 9. Platz aus der Notruecklage bezahlt wird. Mit Notruecklage plant der Rahmen den 9. Platz aus Kasse ueber der Ruecklage.
+  function fallNr(notruecklage: number | undefined): OrganicSquadPlanInput {
+    const startingSquad = Array.from({ length: 4 }, (_, i) => spieler(`s${i}`, 20, 3));
+    const candidates: OrganicPlayerView[] = [
+      { ...spieler("star", 30, 3), pow: 99, spe: 99, men: 99, soc: 99, disciplineRatings: { tdm: 99, tennis: 99, spurt: 99 } },
+      ...Array.from({ length: 10 }, (_, i) => spieler(`platz${i}`, 12 + i * 0.1, 3)),
+    ];
+    const weights = deriveUtilityWeights({ ambition: 80, finances: 50, boardConfidence: 50, harmony: 50, playerOpt: 9 }, {});
+    return {
+      startingSquad,
+      candidates,
+      identityAxisWeights: AXIS,
+      disciplines: DISCIPLINES,
+      economy: {
+        cash: 80, cashBuffer: 2, salaryTotal: 12, boardRisk: 0.3, expectedPrize: 0, sponsorIncome: 0, facilityNet: 0, netTransfer: 0,
+        solvencyFloor: 2, weights, notruecklage,
+      },
+      draftSeed: "nr",
+      kaderplan: { gmOptGesenkt: true },
+    };
+  }
+
+  it("mit Notruecklage: Ziel 9 erreicht, Kasse nicht unter der Ruecklage; ohne: Star frisst den 9. Platz (Muster V-V)", () => {
+    const mit = buildOrganicSquadPlan(fallNr(10));
+    expect(mit.finalSquad.length).toBeGreaterThanOrEqual(9);
+    expect(mit.finalCash).toBeGreaterThanOrEqual(10 - 1e-9);
+    const ohne = buildOrganicSquadPlan(fallNr(undefined));
+    expect(ohne.finalSquad.map((s) => s.playerId)).toContain("star");
+    expect(ohne.finalSquad.length).toBe(8);
+  });
+
+  it("bis zum Minimum darf die Notruecklage angegriffen werden", () => {
+    const input = fallNr(10);
+    const knapp: OrganicSquadPlanInput = { ...input, economy: { ...input.economy, cash: 52 } };
+    const plan = buildOrganicSquadPlan(knapp);
+    // 4 x 12 = 48 bringt den Kader auf 8 (Minimum), Kasse 4 < Ruecklage 10 — erlaubt; der 9. Platz kommt nicht mehr.
+    expect(plan.finalSquad.length).toBe(8);
+  });
+});
