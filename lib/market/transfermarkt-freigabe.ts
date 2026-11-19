@@ -19,6 +19,8 @@ export type TransferFreigabe = {
   ausgegeben: number;
   /** Warum nur diese Quote, ein Satz („Vertrauen 3,4 · Endrang 11, erwartet 6“). */
   grund: string | null;
+  /** Kaderpflicht-Freigabe (Chris 18.11.): „Kaderpflicht: Vorstand gibt 18 C frei (Kader 6/10)“; `null`/fehlt = keine. Der Betrag steckt schon in `freigegeben`. */
+  kaderpflicht?: string | null;
 };
 
 export type FreigabeAnzeige = TransferFreigabe & {

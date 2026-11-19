@@ -11,11 +11,9 @@
  * eine GuV-Spalte in der Liga-Tabelle, Saisonarchiv-Load für Cash-Abgleich/Verlauf.
  *
  * Der Test hält beides fest: (1) die EINE-QUELLE-Invarianten am View-Model (Apron-Karte ==
- * GuV-Posten, Kreditzerlegung == Zinszeile), (2) dass jede benutzte CSS-Klasse existiert —
- * CSS-Klassen fallen still durch (Muster `tests/transferhistorie-velo-look.test.ts`).
+ * GuV-Posten, Kreditzerlegung == Zinszeile), (die Markup-Pruefungen der alten Seite sind mit ihr entfallen;
+ die neue Seite prueft `tests/finanzen-seite-modern.test.tsx`).
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -43,10 +41,7 @@ import { withCompactSeasonArchiveSentinel } from "@/lib/foundation/apply-compact
 import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 import { makePlayer, makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
-const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
 
-const MARKUP = quelle("app/foundation/finances/FoundationFinancesNewLook.tsx");
-const CSS = quelle("app/globals.css");
 
 function round1(value: number): number {
   return Number(value.toFixed(1));
@@ -266,34 +261,6 @@ describe("Apron liga-weit: jede Zeile ist die benannte Projektionszeile — nich
     expect(Math.abs(sumAbgabe - team.apron!.topf)).toBeLessThanOrEqual(toleranz);
     expect(Math.abs(sumAusgleich - team.apron!.topf)).toBeLessThanOrEqual(toleranz);
   });
-
-  it("Markup: Farben sagen die Wahrheit — Empfänger good (grün), Zahler risk (rot), nie der Akzent", () => {
-    expect(MARKUP).toMatch(/rolle === "empfaenger" \? "good" : rolle === "zahler" \? "risk" : "neutral"/);
-  });
-
-  it("Markup: das eigene Team ist markiert (is-active-row + Dein-Team-Chip), ohne die Liste zu durchsuchen", () => {
-    expect(MARKUP).toContain('rowClassName={(row) => (row.teamId === ownTeamId ? "is-active-row" : undefined)}');
-    expect(MARKUP).toContain('{row.teamId === ownTeamId ? <span className="nl-fin-league-you">Dein Team</span> : null}');
-  });
-
-  it("Markup: kollabiert kommen die Extreme zuerst, der Aufklapp-Knopf trägt die Zwischensumme", () => {
-    expect(MARKUP).toContain("APRON_LEAGUE_TOP_ZAHLER");
-    expect(MARKUP).toContain("Alle ${apron.league.length} Teams anzeigen");
-    expect(MARKUP).toContain("weitere Zahler zahlen zusammen");
-  });
-
-  it("Markup: Deckel- und Rundungshinweis stehen an der Anzeige, die Ausschüttung ist der ganze Topf", () => {
-    expect(MARKUP).toContain("Der Topf enthält nur die begrenzten Beträge");
-    expect(MARKUP).toContain("verteilt wird ungerundet");
-    // Vollständige Verteilung steht im Klartext — und KEIN Verfall-Text mehr (der Empfänger-
-    // Deckel ist zurückgebaut; die Anzeige darf keinen behaupten).
-    expect(MARKUP).toContain("teilen ihn vollständig");
-    expect(MARKUP).not.toContain("verfallen");
-    expect(MARKUP).not.toContain("Empfänger-Deckel");
-    // Der Kopfanteil je Empfänger kommt aus einer Empfänger-Zeile des View-Models (eine Quelle,
-    // keine zweite Rechnung in der UI).
-    expect(MARKUP).toContain('apron.league.find((row) => row.rolle === "empfaenger")?.ausgleich');
-  });
 });
 
 describe("Deckel: die naive Satz-Summe geht nicht auf — der Topf ist die Summe der GEDECKELTEN Abgaben", () => {
@@ -384,10 +351,6 @@ describe("Kredit-Verpflichtungen: eine Zerlegung für Karte, Ausgabenzeile und G
     expect(empty.loanCommitments.installmentTotal).toBe(0);
     expect(empty.loanCommitments.interestTotal).toBe(0);
     expect(empty.loanCommitments.principalTotal).toBe(0);
-    // Und das Markup rendert die Chip-Reihe bedingungslos (kein `rows.length > 0`-Gate um die Chips).
-    expect(MARKUP).toContain('aria-label="Kredit-Verpflichtungen"');
-    expect(MARKUP).toContain('label="davon Tilgung"');
-    expect(MARKUP).toContain('label="davon Zins"');
   });
 });
 
@@ -452,145 +415,5 @@ describe("Saisonarchiv: Finanzen lädt es nach, und solange sagt die UI „lädt
   it("archivePending unterscheidet „noch nicht geladen“ (undefined) von „geladen und leer“ ([])", () => {
     expect(readyTeam(buildGameState({ seasonSnapshots: undefined })).archivePending).toBe(true);
     expect(readyTeam(buildGameState({ seasonSnapshots: [] })).archivePending).toBe(false);
-  });
-
-  it("das Markup rendert für den Pending-Fall einen Lade-Hinweis", () => {
-    expect(MARKUP).toContain("Saisonarchiv wird geladen");
-    expect(MARKUP).toContain("team.archivePending");
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/* Markt-Audit-Befunde F1/F2/F3/F6 als Strukturaussagen                 */
-/* ------------------------------------------------------------------ */
-
-describe("Finanzen-Umbau: die Audit-Befunde bleiben behoben", () => {
-  it("F1: keine Zähler-Animation auf den Kopf-Geldzahlen (useCountUp raus)", () => {
-    // Weder importiert noch aufgerufen — die Erwähnung im Warum-Kommentar ist erlaubt.
-    expect(MARKUP).not.toMatch(/useCountUp[(,}]/);
-    expect(MARKUP).not.toMatch(/import[\s\S]{0,400}useCountUp/);
-  });
-
-  it("F2: Einnahmen grün, Ausgaben rot/orange — kein Akzent, keine Achsen-Töne im Geld", () => {
-    expect(MARKUP).not.toMatch(/tone: "accent"/);
-    expect(MARKUP).not.toMatch(/tone: "men"/);
-    expect(MARKUP).not.toMatch(/tone: "soc"/);
-    // Sponsor (größte Einnahme) ist good, Gehälter (größte Ausgabe) risk.
-    expect(MARKUP).toMatch(/key: "sponsor",[\s\S]{0,220}tone: "good"/);
-    expect(MARKUP).toMatch(/key: "salaries",[\s\S]{0,220}tone: "risk"/);
-  });
-
-  it("Kopfzahlen zeigen ihre Herkunft als Subzeile", () => {
-    expect(MARKUP).toContain("const incomeSub");
-    expect(MARKUP).toContain("sub={incomeSub}");
-    expect(MARKUP).toContain("sub={expenseSub}");
-    // GuV erklärt sich als Einnahmen − Ausgaben.
-    expect(MARKUP).toMatch(/formatNlNumber\(team\.totalIncome\)\} − \$\{formatNlNumber\(team\.totalExpenses\)/);
-  });
-
-  it("F3: die Liga-Tabelle hat EINE GuV-Spalte, Kreditraten stehen als Zusatzzeile in der Zelle", () => {
-    expect(MARKUP).not.toContain('label: "Cashflow p.a."');
-    expect(MARKUP).toContain("nach Kreditraten");
-    expect(MARKUP).toContain("nl-fin-league-guv-sub");
-    // Die Zusatzzeile nutzt exakt den vorhandenen cashFlowAnnual-Wert (keine zweite Rechnung).
-    expect(MARKUP).toMatch(/nach Kreditraten \{formatNlMoney\(row\.cashFlowAnnual\)\}/);
-  });
-
-  it("F6: Transfersaldo rechnet mit konsistenten Vorzeichen (Käufe negativ)", () => {
-    expect(MARKUP).toContain("formatNlSignedMoney(-transfer.buyTotal)");
-    expect(MARKUP).toContain("formatNlSignedMoney(transfer.net)");
-  });
-
-  it("F5: der Gehaltsfaktor ist eingedeutscht, der Tooltip nennt den englischen Begriff", () => {
-    expect(MARKUP).toContain('label="Gehaltsfaktor"');
-    expect(MARKUP).toContain("Salary Factor");
-  });
-
-  it("die Apron-Karte benennt die Bemessungsgrundlage — jetzt als DIESELBE wie die GuV", () => {
-    // BIS ZUM 13.08.2026 stand hier das Gegenteil: der Absatz musste erklaeren, warum Apron und
-    // GuV absichtlich VERSCHIEDENE Gehaltssummen zeigen (geglaettet vs. echt). Chris hat die
-    // Bemessung auf die real zu zahlende Jahressumme umgestellt — es gibt nur noch eine Zahl,
-    // und der Absatz sagt jetzt das. Die Zeile bleibt trotzdem Pflicht: sie traegt die Folge
-    // („frueh zahlen hebt die Bemessung"), die vorher die Anti-Gaming-Zusage abdeckte.
-    expect(MARKUP).toContain("nl-fin-apron-basis-note");
-    expect(MARKUP).toMatch(/real zu zahlenden/);
-    expect(MARKUP).not.toContain("Beide Zahlen sind absichtlich verschieden");
-    expect(MARKUP).toContain("actualSalaryTotal={team.expenses.salaries.total}");
-  });
-
-  it("Ehrlichkeit: Einfrier-Status und Frisch-Save-Schranke stehen dran", () => {
-    expect(MARKUP).toContain("Linien noch nicht eingefroren");
-    expect(MARKUP).toContain("apron.usedReferenceSalary");
-    expect(MARKUP).toContain("Frisch-Save");
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/* Jede benutzte Klasse existiert in globals.css (beidseitig)          */
-/* ------------------------------------------------------------------ */
-
-describe("Jede im Finanzen-Markup benutzte Klasse existiert in globals.css", () => {
-  // Reine Anker ohne eigenes Styling: Karten-Wrapper (NlCard trägt den Look) und
-  // data-testid-Marker. Sie sind bewusst unstyled — hier dokumentiert, damit ein Tippfehler in
-  // einer GESTYLTEN Klasse trotzdem auffällt.
-  const UNSTYLED_ANKER = new Set([
-    "nl-fin-header-card",
-    "nl-fin-flow-card",
-    "nl-fin-commitments-card",
-    // Karten des eigenen Apron-Reiters (Chris: „das apron thema als eigenen reiter!") — reine
-    // Anker, das Aussehen bringt NlCard mit.
-    "nl-fin-apron-card",
-    "nl-fin-apron-league-card",
-    "nl-fin-transfer-card",
-    "nl-fin-reconciliation-card",
-    "nl-fin-reconciliation-hint",
-    "nl-fin-history-card",
-    "nl-fin-history-trend",
-    "nl-fin-income-card",
-    "nl-fin-expense-card",
-    "nl-fin-league-table",
-    "nl-fin-empty",
-    "nl-fin-salary-factor-chip",
-    "nl-fin-commit-chips",
-    "nl-fin-flow-chart", // gestylt — bleibt im Check
-  ]);
-  UNSTYLED_ANKER.delete("nl-fin-flow-chart");
-
-  const tokens = new Set<string>();
-  for (const match of MARKUP.matchAll(/(?:nl-fin|velo-range-bar)[a-z0-9-]*(?<!-)/g)) {
-    if (!UNSTYLED_ANKER.has(match[0])) tokens.add(match[0]);
-  }
-
-  it.each([...tokens].sort())("%s ist in globals.css definiert", (klasse) => {
-    expect(CSS).toMatch(new RegExp(`\\.${klasse}[\\s.,:{[>)]`));
-  });
-});
-
-describe("Rückrichtung: die neuen Klassen-Namespaces sind nicht tot", () => {
-  const cssKlassen = new Set<string>();
-  for (const match of CSS.matchAll(/\.((?:nl-fin-apron|nl-fin-commit|nl-fin-league-guv)[a-z0-9-]*)(?<!-)/g)) {
-    cssKlassen.add(match[1]);
-  }
-
-  it("mindestens die Kernklassen sind definiert", () => {
-    for (const erwartet of [
-      "nl-fin-apron",
-      "nl-fin-apron-rows",
-      "nl-fin-apron-row",
-      "nl-fin-apron-meter",
-      "nl-fin-apron-projection",
-      "nl-fin-commit",
-      "nl-fin-commit-columns",
-      "nl-fin-commit-loans",
-      "nl-fin-league-guv",
-      "nl-fin-league-guv-sub",
-    ]) {
-      expect(cssKlassen, `Klasse ${erwartet} fehlt in globals.css`).toContain(erwartet);
-    }
-  });
-
-  it.each([...cssKlassen].sort())("%s wird im Markup benutzt", (klasse) => {
-    // `is-basis` u. ä. Modifikatoren hängen im Markup als eigenes Token — Basisnamen reichen.
-    expect(MARKUP).toContain(klasse);
   });
 });

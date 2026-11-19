@@ -32,6 +32,11 @@ export type TransferHistoryV2Row = {
   matchdayId?: string | null;
   phase?: string | null;
   remainingContractLength?: number | null;
+  /**
+   * Buchung nach „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.): Kaeufe/Verkaeufe des Fensters von
+   * Saison 1 sind Kaderaufbau aus dem Startbudget, keine Transferbilanz. Optional: aeltere Aufrufer setzen es nicht.
+   */
+  buchungsArt?: "kaderaufbau" | "transfer" | "vertragsende";
 };
 
 export type TransferHistoryV2ClientProps = {
@@ -50,7 +55,10 @@ export type TransferHistoryV2ClientProps = {
     sellFee: number;
     averageFee: number | null;
     averageProfit: number | null;
+    /** Erloese − Ausgaben OHNE den Kaderaufbau von Saison 1 (Chris 18.11.). */
     netTransferBalance: number;
+    /** Kaderaufbau aus dem Startbudget (nur Saison-1-Fenster), `null` wenn keiner im Ausschnitt liegt. */
+    kaderaufbauNet?: number | null;
   };
   filteredRows: TransferHistoryV2Row[];
   visibleRows: TransferHistoryV2Row[];

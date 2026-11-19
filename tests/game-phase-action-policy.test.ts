@@ -4,6 +4,11 @@ import type { GamePhase, GameState, Player, Team } from "@/lib/data/olyDataTypes
 import { evaluateGamePhaseAction, isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die Phasen-Gates mit getrennten Fenstern,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 function team(): Team {
   return {
     teamId: "M-M",

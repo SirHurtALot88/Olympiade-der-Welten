@@ -6190,6 +6190,45 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Finanzseite: Umschichten, Ruecklage anzapfen, „Alles auf eine Karte“ (Finanzkonzept V2). Gleiches Muster wie die
+   * Kredit-Aktionen: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers (Fog of War), nie ein
+   * `teamId`-Parameter; der Server prueft den Besitz ueber `authorizeServerRoomWrite`.
+   */
+  async function vorstandBudgetAktion(input: {
+    aktion: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen";
+    betrag?: number;
+  }): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/finance/vorstand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          aktion: input.aktion,
+          betrag: input.betrag,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      // Auch ein abgelehnter Antrag aendert den Spielstand (Vermerk fuer die Anzeige): immer neu laden.
+      if (payload.reason === "vorstand_lehnt_ab" || (response.ok && payload.ok)) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -13246,6 +13285,8 @@ export function useFoundationShellRouterBodyScope({
     onOpenLeagueLeaders,
     orderedDisciplines,
     originateLoanForActiveTeam,
+    vorstandBudgetAktion,
+    kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,
     passiveTeams,

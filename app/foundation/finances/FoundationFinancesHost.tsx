@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import FoundationFinancesNewLook from "@/app/foundation/finances/FoundationFinancesNewLook";
+import FinanzenModern, { type VorstandAktionFn } from "@/app/foundation/finances/FinanzenModern";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
 import { useFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
@@ -20,6 +20,10 @@ export type FoundationFinancesHostProps = {
   saveId: string;
   /** Öffnet das Teamprofil aus der Liga-Tabelle heraus (Klick auf einen Team-Namen). */
   onOpenTeam?: (teamId: string) => void;
+  /** Schreibweg der Vorstand-Entscheidungen (Umschichten, Rücklage anzapfen, „Alles auf eine Karte“). */
+  onVorstandAktion?: VorstandAktionFn;
+  /** Darf der aktive Manager dieses Team verwalten? Sonst ist die Seite nur lesbar. */
+  kannVerwalten?: boolean;
 };
 
 /**
@@ -27,13 +31,11 @@ export type FoundationFinancesHostProps = {
  * Ausnahme von "keine Callbacks": der Sprung ins Teamprofil aus der
  * Liga-Tabelle, der nichts verändert, sondern nur navigiert.
  */
-export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam }: FoundationFinancesHostProps) {
+export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, kannVerwalten }: FoundationFinancesHostProps) {
   const model = useFinancesViewModel(gameState, teamId);
   // Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — bewusst getrennt
   // vom Fog-of-War-gesperrten `model` oben, siehe `use-finances-league-table.ts`.
   const leagueTable = useFinancesLeagueTable(gameState);
-  const team = gameState.teams.find((candidate) => candidate.teamId === teamId) ?? null;
-  const teamName = team?.name ?? "Dein Team";
   // Salary Factor + Richtung (aktuell → nächste Season) aus dem kanonischen Season-Ökonomie-
   // Fenster — dieselbe Quelle wie Season-Briefing und KI (siehe salary-factor-outlook.ts).
   const salaryFactorOutlook = useMemo(
@@ -47,13 +49,15 @@ export default function FoundationFinancesHost({ gameState, teamId, saveId, onOp
   );
 
   return (
-    <FoundationFinancesNewLook
-      teamName={teamName}
-      model={model}
+    <FinanzenModern
+      gameState={gameState}
+      teamId={teamId}
+      finanzen={model}
       leagueTable={leagueTable}
-      activeManagerTeamId={teamId}
       salaryFactorOutlook={salaryFactorOutlook}
       onOpenTeam={onOpenTeam}
+      onVorstandAktion={onVorstandAktion}
+      kannVerwalten={kannVerwalten}
     />
   );
 }
