@@ -163,11 +163,14 @@ async function aufnehmen() {
       await page.getByTestId("draft-zeile").first().waitFor({ state: "visible", timeout: 30_000 });
       await foto(page, "07-nachzug-1920.png");
       for (const team of [ids.chris, ids.franky]) {
-        for (const id of billigste(8)) {
+        let gepickt = 0;
+        for (const id of billigste(60)) {
+          if (gepickt >= 8) break;
           try {
             dienst.bucheMenschPick({ persistence, saveId: ids.saveId, teamId: team, playerId: id });
-          } catch {
-            /* Kader voll oder vergeben */
+            gepickt += 1;
+          } catch (e) {
+            if (gepickt === 0) console.log("[draft-shot] pick:", String(e).slice(0, 80));
           }
         }
         try {

@@ -259,6 +259,12 @@
 
 /* ===================== Handarbeit ===================== */
 .drf .dv, .drf .tf, .drf .en { flex: 1; min-height: 0; }
+/* Live-Raster (Mockup „SEITE DRAFT“): links Am Zug / Danach, Mitte Brett, rechts Mein Draft, unten Ticker */
+.drf .dv { display: grid; grid-template-columns: calc(31 * var(--u)) minmax(0, 1fr) calc(27 * var(--u)); grid-template-rows: auto minmax(0, 1fr) calc(3.3 * var(--u)); gap: calc(.72 * var(--u)); padding: calc(.8 * var(--u)) calc(1 * var(--u)); }
+.drf .dv > .folge, .drf .tf > .folge, .drf .en > .folge { grid-column: 1 / -1; }
+.drf .lsp { display: grid; grid-template-rows: calc(25.5 * var(--u)) minmax(0, 1fr); gap: calc(.72 * var(--u)); min-height: 0; min-width: 0; }
+.drf #l-ich { grid-column: 3; grid-row: 2 / 4; }
+.drf #l-tick { grid-column: 1 / 3; grid-row: 3; }
 .drf .dv > .pan, .drf .lsp > .pan { min-height: 0; }
 .drf .rd small { white-space: nowrap; }
 .drf .kette :is(a,button) { cursor: pointer; padding: 0; }
@@ -291,6 +297,8 @@
 /* Seiten-Slot im Regieband (liegt per Portal außerhalb von .tmk) */
 .drf-kpis { display: flex; gap: .5em; align-items: center; }
 .drf-kpi { display: flex; flex-direction: column; justify-content: center; padding: .3em .9em .35em 1em; background: rgba(14,19,29,.82); border: 1px solid rgba(244,230,196,.13); clip-path: polygon(.75em 0, 100% 0, calc(100% - .75em) 100%, 0 100%); line-height: 1; white-space: nowrap; }
+.drf-kpis .knopf { height: 2.2em; padding: 0 1em; border-radius: .4em; border: 1px solid rgba(244,230,196,.22); background: #161d2a; color: #f4e6c4; font: 700 .85em "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.drf-kpis .knopf:hover { border-color: #f0c35a; color: #fff; }
 .drf-kpi span { font: 600 .62em "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #9aa7ba; }
 .drf-kpi strong { font: 700 1.5em "Barlow Condensed","Arial Narrow",sans-serif; color: #f4e6c4; font-variant-numeric: tabular-nums; }
 .drf-kpi strong small { font-weight: 500; font-size: .5em; color: #9aa7ba; }
