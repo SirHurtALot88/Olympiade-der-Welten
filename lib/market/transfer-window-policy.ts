@@ -1,4 +1,5 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 
 export const LOCAL_TRANSFER_WINDOW_PHASE = "manual_transfer_window";
 
@@ -20,6 +21,13 @@ export type LocalTransferWindowPhase = typeof LOCAL_TRANSFER_WINDOW_PHASE;
  *
  * Beide Mengen sind darum bewusst DISJUNKT, und `isEarlySeasonTransferSetup` zaehlt nur noch fuers
  * Kaufen. Ein Test haelt die Disjunktheit fest, damit die Trennung nicht wieder verwaescht.
+ *
+ * NEU SEIT 18.11. — EIN GEMEINSAMES FENSTER (Chris: „ok dann mach das so!", Schalter
+ * `istTransferfensterGemeinsam`, Standard AN): Kaufen UND Verkaufen sind in der neuen Saison vor
+ * Spieltag 1 offen, in beliebiger Reihenfolge. Das Saisonende bleibt fuer Abrechnung, Vertragsenden und
+ * Verlaengerungen (`isTransferMarketPhaseOpen` haelt dafuer die Saisonende-Stationen weiter offen), aber
+ * verkauft wird dort nicht mehr. Die Regel von oben („zwei Fenster, nie ueberschneidend") gilt nur noch
+ * mit `OLY_TRANSFERFENSTER_GEMEINSAM=0`.
  */
 const TRANSFER_SELL_PHASES = new Set<GamePhase>([
   "season_end_management",
@@ -67,10 +75,28 @@ export function isTransferMarketPhaseOpen(gameState: GameState) {
 
 export function isTransferSellPhaseOpen(gameState: GameState) {
   const phase = gameState.gamePhase ?? "season_active";
-  // KEIN `isEarlySeasonTransferSetup`: der Saisonstart ist die Kaufphase. Wer verkaufen will,
-  // tut das am Ende der Saison — das Fenster davor ist dafuer da und laesst sich nicht in die
-  // neue Saison mitnehmen.
+  if (istTransferfensterGemeinsam()) {
+    // EIN Fenster: verkauft wird dort, wo auch gekauft wird — in der neuen Saison vor Spieltag 1.
+    // Am Saisonende NICHT mehr (dort laufen nur noch Vertragsenden und Verlaengerungen).
+    return isEarlySeasonTransferSetup(gameState);
+  }
+  // ALTER ABLAUF (Schalter aus): KEIN `isEarlySeasonTransferSetup`, der Saisonstart ist die
+  // Kaufphase. Wer verkaufen will, tut das am Ende der Saison.
   return TRANSFER_SELL_PHASES.has(phase);
+}
+
+/**
+ * Die Saisonende-Stationen, in denen Vertraege verlaengert werden (und im alten Ablauf verkauft wurde).
+ * Bleibt im gemeinsamen Fenster offen fuer `renew_contract`, Training, Gebaeude und Kredite.
+ */
+export function isSeasonEndManagementOpen(gameState: GameState) {
+  const phase = gameState.gamePhase ?? "season_active";
+  return TRANSFER_SELL_PHASES.has(phase);
+}
+
+/** Ist das gemeinsame Transferfenster (Kauf UND Verkauf) gerade offen? Nur mit Schalter AN. */
+export function isGemeinsamesTransferfensterOffen(gameState: GameState) {
+  return istTransferfensterGemeinsam() && isEarlySeasonTransferSetup(gameState);
 }
 
 export function isTransferBuyPhaseOpen(gameState: GameState) {
@@ -116,9 +142,14 @@ export function getTransferWindowStatus(gameState: GameState) {
   // Beschriftung aus canSell/canBuy abgeleitet statt aus der Phase aufgezaehlt: sonst heisst
   // `preseason_management` weiter „Transferfenster offen", obwohl dort nur noch verkauft werden
   // darf — genau die Vermischung, die gemeldet wurde.
+  const gemeinsam = istTransferfensterGemeinsam();
   const label = !open
-    ? "Transferfenster geschlossen"
-    : isSeasonStartSetup
+    ? gemeinsam && isSeasonEndManagementOpen(gameState)
+      ? "Vertragsphase"
+      : "Transferfenster geschlossen"
+    : gemeinsam && canSell && canBuy
+      ? "Transferfenster offen"
+      : isSeasonStartSetup
       ? "Saisonstart-Setup"
       : canSell && !canBuy
         ? "Verkaufsfenster"
@@ -135,6 +166,8 @@ export function getTransferWindowStatus(gameState: GameState) {
     /** Neue Saison vor ihrem ersten Spieltag — die Kaufphase. Trennt die Preisbildung
      *  (`transfermarkt-sell-pricing-policy`) von der Anzeige-Beschriftung. */
     isSeasonStartSetup,
+    /** Kauf UND Verkauf im selben Fenster (Schalter `OLY_TRANSFERFENSTER_GEMEINSAM`, Standard AN). */
+    gemeinsamesFenster: gemeinsam,
     explicitWindowPhase: LOCAL_TRANSFER_WINDOW_PHASE,
     reason: open ? null : `phase_blocked:${phase}`,
   };

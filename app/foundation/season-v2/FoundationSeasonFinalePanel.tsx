@@ -22,6 +22,7 @@ import { useMemo } from "react";
 import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import type { SeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 
@@ -167,6 +168,10 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     () => evaluateGamePhaseAction(gameState, "renew_contract").allowed,
     [gameState],
   );
+  // EIN GEMEINSAMES FENSTER (Chris 18.11.): am Saisonende wird nur noch verlaengert, verkauft wird zusammen
+  // mit dem Kaufen im Transferfenster der neuen Saison. Die Texte unten sagen das, statt ein Verkaufsfenster
+  // zu versprechen, das es hier nicht mehr gibt.
+  const gemeinsamesFenster = istTransferfensterGemeinsam();
 
   // `buildSeasonReview` ist rein und liest nur den GameState — es gibt hier nichts zu
   // laden. Memoisiert, weil es die komplette Saison durchrechnet.
@@ -245,7 +250,7 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
      */
     {
       key: "transfer-window",
-      title: "Verkäufe & Verträge öffnen",
+      title: gemeinsamesFenster ? "Verträge öffnen" : "Verkäufe & Verträge öffnen",
       /*
        * BEFUND B3: hier stand „Offen — Verträge verlängern …" NEBEN dem Statuschip „erledigt".
        *
@@ -256,12 +261,18 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
        * Der Schritt ist erledigt; der Text sagt jetzt, was dadurch moeglich ist, statt den
        * Zustand des Fensters noch einmal zu benennen.
        */
-      detail: sellWindowOpen
-        ? "Freigeschaltet — du kannst jetzt Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
-        : "Verlängern und verkaufen sind bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch. Kaufen bleibt zu — das ist ein eigener Schritt in der neuen Saison.",
+      detail: gemeinsamesFenster
+        ? sellWindowOpen
+          ? "Freigeschaltet — du kannst jetzt Verträge verlängern. Kaufen und Verkaufen gehen zusammen im Transferfenster der neuen Saison, vor dem 1. Spieltag."
+          : "Verlängern ist bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch. Kaufen und Verkaufen kommen danach gemeinsam, im Transferfenster der neuen Saison."
+        : sellWindowOpen
+          ? "Freigeschaltet — du kannst jetzt Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
+          : "Verlängern und verkaufen sind bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch. Kaufen bleibt zu — das ist ein eigener Schritt in der neuen Saison.",
       state: sellWindowOpen ? "done" : readOnly ? "blocked" : busy ? "busy" : "ready",
       action:
-        sellWindowOpen || readOnly ? null : { label: "Verkäufe & Verträge öffnen", onClick: onOpenTransferWindow },
+        sellWindowOpen || readOnly
+          ? null
+          : { label: gemeinsamesFenster ? "Verträge öffnen" : "Verkäufe & Verträge öffnen", onClick: onOpenTransferWindow },
     },
     {
       key: "contracts",
@@ -274,7 +285,9 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
           ? "Kein Vertrag läuft zum Saisonende aus."
           : sellWindowOpen
             ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Im Kader kannst du verhandeln."
-            : "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht erst, wenn das Verkaufsfenster offen ist.",
+            : gemeinsamesFenster
+              ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht, sobald die Verträge offen sind."
+              : "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht erst, wenn das Verkaufsfenster offen ist.",
       state: expiringContracts === 0 ? "done" : sellWindowOpen ? "ready" : "blocked",
       // Kein Knopf ins Leere: solange gesperrt ist, was dort zu tun waere, schickt diese Zeile
       // auch niemanden hin. Der Schritt darueber ist dann der einzige, der weiterfuehrt.
@@ -314,9 +327,13 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
       title: "Neue Saison starten",
       // Sagt hier, wo das Kaufen geblieben ist. Ohne diesen Satz endet die Liste mit einem
       // gesperrten Transfermarkt und ohne Hinweis, wann er aufgeht.
-      detail: nextSeasonReady
-        ? "Alles geprüft. Der Start schreibt Entwicklung, neuen Spielplan und Formkarten — danach öffnet die Kaufphase, vor dem 1. Spieltag."
-        : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten. Gekauft wird danach, vor dem 1. Spieltag der neuen Saison.",
+      detail: gemeinsamesFenster
+        ? nextSeasonReady
+          ? "Alles geprüft. Der Start schreibt Entwicklung, neuen Spielplan und Formkarten — danach öffnet das Transferfenster: kaufen und verkaufen, vor dem 1. Spieltag."
+          : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten. Gekauft und verkauft wird danach im selben Fenster, vor dem 1. Spieltag der neuen Saison."
+        : nextSeasonReady
+          ? "Alles geprüft. Der Start schreibt Entwicklung, neuen Spielplan und Formkarten — danach öffnet die Kaufphase, vor dem 1. Spieltag."
+          : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten. Gekauft wird danach, vor dem 1. Spieltag der neuen Saison.",
       state: readOnly ? "blocked" : busy ? "busy" : "ready",
       action: readOnly
         ? null

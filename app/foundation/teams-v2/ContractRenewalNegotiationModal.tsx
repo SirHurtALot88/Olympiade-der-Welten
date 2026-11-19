@@ -91,6 +91,9 @@ function translateRenewalReason(reason: string): string {
   if (reason === "renewal_only_allowed_at_contract_end" || reason === "renewal_only_allowed_at_lz_0") {
     return "Verlängert wird in der letzten Vertragssaison — dieser Vertrag läuft noch länger.";
   }
+  if (reason === "vorstand_gehaltsbudget_nicht_freigegeben") {
+    return "Die Gehaltserhöhung passt nicht ins freigegebene Gehaltsbudget des Vorstands (Finanzen, Reiter Budgets). Gleiches oder niedrigeres Gehalt geht immer.";
+  }
   if (reason === "morale_refuses_extension") {
     return "Der Spieler lehnt eine Verlängerung aktuell ab (Moral).";
   }

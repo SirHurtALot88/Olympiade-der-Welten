@@ -176,8 +176,9 @@ describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-
     const { POST } = await import("@/app/api/ai/preseason-background/route");
     const payload = (await (await POST(baueRequest())).json()) as { run: Lauf };
 
-    // 1 aus dem Marktlauf + 0 aus dem Verletzungs-Topup. Der frueher addierte Fuell-Anteil ist weg.
-    expect(payload.run.transferBuysApplied).toBe(1);
+    // 1 aus dem Marktlauf + 1 aus der Nachrunde des gemeinsamen Transferfensters (Chris 18.11.; derselbe Planer, der
+    // Mock liefert je Aufruf einen Kauf) + 0 aus dem Verletzungs-Topup. Der frueher addierte Fuell-Anteil ist weg.
+    expect(payload.run.transferBuysApplied).toBe(2);
     expect(payload.run.warnings.some((eintrag) => eintrag.startsWith("roster_fill_auf_optimum:"))).toBe(false);
   });
 

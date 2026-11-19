@@ -2150,6 +2150,44 @@ export type TeamSeasonObjectiveRecord = {
   provisional?: boolean;
 };
 
+/**
+ * Finanzkonzept V2 (Zwei Budgets des Vorstands, 18.11.): die Entscheidungen eines Teams im laufenden Fenster.
+ * Gilt nur fuer die Saison `seasonId`; in der naechsten Saison rechnet der Vorstand beide Toepfe neu und der
+ * Zustand faellt weg (`lesVorstandZustand` in `lib/finance/vorstand-budget-zustand.ts`).
+ */
+export type AlleAufEineKarteRecord = {
+  /** Wer die Wette ausgeloest hat: Mensch (Antrag), KI (Ambition/Doktrin) oder Vorstand (Saisonziel). */
+  quelle: "mensch" | "ki" | "vorstand";
+  seit: string;
+  /** Ein Satz: warum. */
+  grund: string;
+  /** Eingefrorenes Saisonziel: Endrang bis hierhin (1 = Meister). */
+  zielRang: number;
+  erwartungsRang: number;
+  ausgangVertrauen: number | null;
+};
+
+export type VorstandBudgetProtokollEintrag = {
+  zeit: string;
+  art: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "lockerung";
+  text: string;
+  betrag?: number;
+};
+
+export type VorstandBudgetZustand = {
+  seasonId: string;
+  /** C Jahresgehalt, die vom Transfer- in den Gehaltstopf geschoben wurden (negativ: umgekehrt). */
+  umschichtung: number;
+  /** C aus dem Ruecklage-Ziel, die zusaetzlich in den Transfertopf geholt wurden (zur Quote). */
+  ruecklageAngezapft: number;
+  /** Vertrauenskosten des Anzapfens (Betrag, positiv); wirkt erst bei der naechsten Festlegung. */
+  vertrauensKosten: number;
+  alleAufEineKarte: AlleAufEineKarteRecord | null;
+  /** Letzter abgelehnter Antrag (nur Anzeige). */
+  letzterAntragAbgelehnt?: { zeit: string; grund: string } | null;
+  protokoll: VorstandBudgetProtokollEintrag[];
+};
+
 export type TeamBoardConfidenceRecord = {
   teamId: string;
   value: number;
@@ -3184,7 +3222,16 @@ export type SeasonSnapshotTeamRecord = {
   transferSellCount: number;
   transferBuyTotal?: number | null;
   transferSellTotal?: number | null;
+  /**
+   * Transferbilanz der Saison nach „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.,
+   * `lib/season/transferbilanz-buchung.ts`). `null` in Saison 1: der Draft ist Kaderaufbau, keine Transferbilanz.
+   */
   transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (Erloese − Ausgaben, negativ = ausgegeben). Optional: Altstaende. */
+  kaderaufbauNet?: number | null;
+  kaderaufbauBuyTotal?: number | null;
+  kaderaufbauSellTotal?: number | null;
+  kaderaufbauBuyCount?: number | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;
@@ -3909,6 +3956,8 @@ export type SeasonState = {
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
+  /** Finanzkonzept V2: Umschichten, Ruecklage anzapfen, "Alles auf eine Karte" je Team (siehe `VorstandBudgetZustand`). */
+  vorstandBudget?: Record<string, VorstandBudgetZustand>;
   previousSeasonBoardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];

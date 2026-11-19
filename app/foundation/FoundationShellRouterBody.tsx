@@ -479,6 +479,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   onOpenLeagueLeaders,
   orderedDisciplines,
   originateLoanForActiveTeam,
+  vorstandBudgetAktion,
+  kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
   playerBracketCounts,
@@ -3412,6 +3414,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               teamId={activeManagerTeamId}
               saveId={activeSaveId}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+              onVorstandAktion={vorstandBudgetAktion}
+              kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}
 

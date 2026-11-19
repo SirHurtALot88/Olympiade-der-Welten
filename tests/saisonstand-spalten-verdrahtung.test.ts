@@ -143,7 +143,10 @@ describe("Transfersaldo im Saisonstand", () => {
   it("zeigt fuer die Vorsaison deren eigenen Saldo, nicht den der laufenden", () => {
     const zeilen = buildTeamSeasonOverviewRows({ gameState: spielstand(), seasonId: "season-1" });
     const zeile = zeilen.find((eintrag) => eintrag.teamId === "T1");
-    // 50 verkauft − 200 gekauft = −150.
-    expect(zeile!.transferNet).toBe(-150);
+    // Saison 1 ist Kaderaufbau aus dem Startbudget, keine Transferbilanz (Chris 18.11., „das Fenster vor Saison N
+    // gehoert zu Saison N“): die Spalte bleibt „—“, der eigene Saldo der Vorsaison steht als Kaderaufbau da.
+    // 50 verkauft − 200 gekauft = −150 — und eben NICHT der Saldo der laufenden Saison (−18).
+    expect(zeile!.transferNet).toBeNull();
+    expect(zeile!.kaderaufbauNet).toBe(-150);
   });
 });

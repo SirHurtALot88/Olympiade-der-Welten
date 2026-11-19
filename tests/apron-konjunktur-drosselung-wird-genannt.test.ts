@@ -70,7 +70,7 @@ describe("Die Erklaerung haengt an EINER Quelle", () => {
     const { readFileSync } = require("node:fs") as typeof import("node:fs");
     const { join } = require("node:path") as typeof import("node:path");
     const quellen = [
-      "app/foundation/finances/FoundationFinancesNewLook.tsx",
+      "app/foundation/finances/FinanzenModern.tsx",
       "lib/finance/guv-breakdown.ts",
       "lib/finance/season-end-guv.ts",
     ];

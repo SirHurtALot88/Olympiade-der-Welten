@@ -318,6 +318,11 @@ export type TeamFinancesState = {
   expenses: TeamFinancesExpenses;
   /** Rohe Transfer-Saldo-Zahlen, geteilt zwischen Income/Expenses-Hover (siehe `FinanceTransferBalance`). */
   transfer: FinanceTransferBalance | null;
+  /**
+   * Kaderaufbau aus dem Startbudget (nur Saison 1): Draft und Startkader sind KEIN Transfer (Chris 18.11.,
+   * „das Fenster vor Saison N gehoert zu Saison N"). Eigene Zeile, nicht in `transfer`. Optional fuer Altaufrufer.
+   */
+  kaderaufbau?: FinanceTransferBalance | null;
   /** Σ real cash-wirksamer Einnahmen: Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Objective-Prämie. OHNE Preisgeld (Benchmark). */
   totalIncome: number;
   /** Σ real cash-wirksamer Ausgaben: Gehälter (`contract.salary`) + bezahlter Upkeep + Kreditraten + Transfer-Defizit + Objective-Strafe. */

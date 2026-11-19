@@ -20,6 +20,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die zwei Kredit-Durchgaenge des Kauffensters ohne Verkaufsrunde und Kassensturz,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 const applyAiMarketPlanLocally = vi.fn();
 const applyAiManagerPlan = vi.fn();
 const applyAiInjuryDepthTopup = vi.fn();
