@@ -2,6 +2,10 @@ import type { LigaDraftAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import type { DraftKaderZeile } from "./draft-liga";
 import type { SpielerSicht } from "@/lib/market/transfermarkt-sicht";
+import type { TeamVorbereitung } from "@/lib/market/transfermarkt-kaderstaerke";
+
+/** Ein Spieler des eigenen Kaders (Spielstand plus Draft-Picks) mit seinen exakten Eignungen. */
+export type DraftMeinKaderSpieler = { playerId: string; name: string; className: string; ratings: Record<string, number | null | undefined> | null | undefined };
 
 export type DraftZeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht };
 
@@ -30,6 +34,10 @@ export type DraftKontext = {
   spielerName: (playerId: string) => string;
   /** Kaderstärke je Disziplin mit Liga-Rang des eigenen Teams (live, `draft-liga.ts`); `null` ohne eigenes Team. */
   raenge: DraftKaderZeile[] | null;
+  /** Eigene Spieler (inkl. Picks, die der Spielstand noch nicht kennt) für „Mein Kader in ⟨Disziplin⟩“. */
+  meinKader: DraftMeinKaderSpieler[];
+  /** Vorbereitete Kaderrechnung des eigenen Teams (live mit allen Picks) für „Wirkung auf deinen Kader“; `null` ohne eigenes Team. */
+  vorbereitung: TeamVorbereitung | null;
   wahl: string | null;
   setWahl: (playerId: string | null) => void;
   /** Klickregel (UX 19.11.): 1. Klick wählt aus, Klick auf das Ausgewählte öffnet das Profil; Vergebenes öffnet sofort das Profil. */

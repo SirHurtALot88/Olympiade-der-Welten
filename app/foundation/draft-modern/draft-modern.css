@@ -406,8 +406,8 @@
 .drf #l-ich .buehne-f .txt { bottom: calc(.5 * var(--u)); }
 
 /* Nicht picken? — drei beschriftete Wege mit Folge, Sperrgrund sichtbar */
-.drf #l-ich .fb h4 { font: 400 calc(1.15 * var(--u))/1 var(--haus); letter-spacing: .04em; text-transform: none; color: var(--creme); margin-top: calc(.2 * var(--u)); }
-.drf #l-ich .fb h4 span { margin-left: auto; font: 700 calc(.62 * var(--u)) var(--zahl, inherit); letter-spacing: .14em; text-transform: uppercase; color: var(--stumm); }
+.drf #l-ich .fb h4 { white-space: nowrap; font: 400 calc(1.05 * var(--u))/1 var(--haus); letter-spacing: .03em; text-transform: none; color: var(--creme); margin-top: calc(.2 * var(--u)); }
+.drf #l-ich .fb h4 span { margin-left: auto; font: 700 calc(.58 * var(--u)) var(--zahl, inherit); letter-spacing: .08em; text-transform: uppercase; color: var(--stumm); }
 .drf .np { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(.4 * var(--u)); }
 .drf .np button { display: block; text-align: left; border: 1px solid var(--linie-2); border-radius: calc(.35 * var(--u)); padding: calc(.32 * var(--u)) calc(.5 * var(--u)) calc(.36 * var(--u)); background: var(--flaeche-2); cursor: pointer; }
 .drf .np button b { display: block; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-size: calc(.74 * var(--u)); color: var(--creme); }
@@ -427,4 +427,8 @@
 .drf .sopt .fakt small { display: block; font-size: calc(.6 * var(--u)); letter-spacing: .14em; color: var(--stumm); font-weight: 700; text-transform: uppercase; }
 .drf .sopt .fakt b { font-size: calc(1.3 * var(--u)); color: var(--creme); }
 .drf .sopt .fakt span { display: block; font-size: calc(.76 * var(--u)); color: var(--leise); }
+
+/* PR B: Auto-Pick als schmale Zeile unter der Kasse (Wunschliste und Kacheln entfallen, Mockup) */
+.drf .autopick-zeile { display: flex; justify-content: space-between; align-items: center; font-size: calc(.82 * var(--u)); color: var(--leise); flex: none; }
+.drf #l-ich .fb { min-height: 0; }
 .drf #l-zug .zfuss { white-space: normal; }

@@ -5,8 +5,8 @@ Chris, 19.11.: „beide mockups sind sehr gut, bitte genau so umbauen!“ Alle E
 
 | PR | Inhalt | Stand |
 |---|---|---|
-| **A (P1)** `claude/ux-klickregel-nicht-picken-19-11` | Eine Klickregel, Zustand und Hover, Picken nur in der ausgewählten Zeile, Tastatur, „Nicht picken?“ mit Rückfragen, Text rechts im Draft entfernt | dieser PR |
-| **B (P2)** `claude/ux-mein-kader-panel-19-11` | Gemeinsames Panel „Mein Kader in ⟨Disziplin⟩“, „Wirkung auf deinen Kader“ im Draft, Kasse als Zahl, Markt rechts entschlackt | folgt |
+| **A (P1)** `claude/ux-klickregel-nicht-picken-19-11` | Eine Klickregel, Zustand und Hover, Picken nur in der ausgewählten Zeile, Tastatur, „Nicht picken?“ mit Rückfragen, Text rechts im Draft entfernt | PR #1654 |
+| **B (P2)** `claude/ux-mein-kader-panel-19-11` | Gemeinsames Panel „Mein Kader in ⟨Disziplin⟩“, „Wirkung auf deinen Kader“ im Draft, Kasse als Zahl, Markt rechts entschlackt | dieser PR (gestapelt auf A) |
 
 Nur Anzeige und Klick. Wertung, Draft-Logik, Matrix, Arena und Routen sind unberührt (Fingerabdruck GESAMT `eaafed96150e`).
 
@@ -33,3 +33,18 @@ Nur Anzeige und Klick. Wertung, Draft-Logik, Matrix, Arena und Routen sind unber
 `docs/design/ux-umbau-19-11/` (1920×1080, Hauptansichten zusätzlich 1710×1112), aufgenommen mit
 `npx tsx scripts/screenshot-ux-umbau-draft-markt.ts` (Draft) und `NUR_MARKT=1 …` (Transfermarkt). Zum Vergleichen die Mockup-Bilder in
 `docs/design/ux-review-draft-markt-19-11/`.
+
+## PR B: was gebaut ist
+
+- **Gemeinsames Panel** `app/foundation/shared/MeinKaderPanel.tsx` (Daten: `mein-kader-daten.ts`, Stil: `mein-kader-panel.css`):
+  `MeinKaderListe` (eigene Spieler nach Eignung in der gewählten Disziplin, der Ausgewählte golden einsortiert als „NEU“, Trennlinie nach
+  Platz 6 „ab hier zählt die Eignung nicht mehr zur Kaderstärke“, der Verdrängte „raus aus Top 6“, Klick öffnet das Profil, Kaderzähler als
+  Streifen Pflicht · Wunsch · max.), `WirkungAufKader` („hebt N von 20 Disziplinen“, drei größte Rangsprünge), `KasseBlock` („frei jetzt“
+  und „frei nach Pick/Kauf“ als Zahl mit Balken, „reicht nicht · es fehlen N C“).
+- **Keine neue Rechnung**: Stärke, Rang und Wirkung kommen aus `lib/market/transfermarkt-kaderstaerke.ts`. Im Draft bereitet
+  `LigaDraftSeite` die Rechnung mit den Live-Picks vor (`bereiteTeamVor` über `baueDraftKaderSicht`).
+- **Scouting-Nebel**: eigene Spieler sind exakt; der ausgewählte fremde Spieler zeigt nur seine Stufe (`80-89`), sortiert wird nach der Schätzung.
+- **Draft rechts**: Kader-Kacheln und Wunschlisten-Zeilen entfallen (wie im Mockup; die Wunschliste bleibt über den Filter „★ Wunschliste“ im
+  Brett erreichbar), Auto-Pick bleibt als schmale Zeile unter der Kasse.
+- **Markt rechts (E4)**: 20 Balken, „Wege zum Erfolg“ und die Zeile „Charakter“ sind ins Profil gewandert (dort seit #1650), rechts bleiben
+  Bühne, drei Zahlen, Verhandeln, Wirkung, Mein Kader, Kasse.
