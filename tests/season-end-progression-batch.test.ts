@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -227,6 +227,30 @@ describe("runSeasonEndProgressionBatch", () => {
       for (const [attribute, previewedValue] of Object.entries(previewed.attributeValuesAfter)) {
         expect(appliedAttributes![attribute as keyof typeof appliedAttributes]).toBeCloseTo(previewedValue as number, 5);
       }
+    }
+  });
+
+  it("L2: Dry-Run rechnet je gameState-Objekt genau einmal, Ergebnis bleibt gleich", () => {
+    const save = createSave();
+    const { persistence } = createPersistence();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => {
+      logs.push(String(args[0]));
+    });
+    try {
+      const first = previewSeasonEndProgressionBatch(save);
+      const second = previewSeasonEndProgressionBatch(save);
+      runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
+      expect(logs.filter((line) => line.includes("preview ") && line.includes("teams"))).toHaveLength(1);
+      expect(second.teamApplies).toEqual(first.teamApplies);
+      // Kopien: Weiterbefuellen durch Aufrufer darf den Memo nicht verschmutzen.
+      second.warnings.push("x");
+      expect(previewSeasonEndProgressionBatch(save).warnings).not.toContain("x");
+      // Neues gameState-Objekt -> neu rechnen.
+      previewSeasonEndProgressionBatch({ ...save, gameState: { ...save.gameState } });
+      expect(logs.filter((line) => line.includes("preview ") && line.includes("teams"))).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
     }
   });
 });
