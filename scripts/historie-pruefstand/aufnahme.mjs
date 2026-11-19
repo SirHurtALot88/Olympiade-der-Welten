@@ -22,7 +22,8 @@ await build({
   platform: "browser",
   tsconfig: path.join(wurzel, "tsconfig.json"),
   loader: { ".css": "css", ".json": "json" },
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: { "process.env.NODE_ENV": '"production"', global: "globalThis" },
+  banner: { js: 'var process={env:{NODE_ENV:"production"},cwd:function(){return "/"},platform:"browser",versions:{}};' },
   logLevel: "error",
 });
 
@@ -106,7 +107,13 @@ for (const [breite, hoehe] of GROESSEN) {
   };
   const gehe = async (seite) => {
     await page.goto(`http://localhost:${PORT}/?seite=${seite}`, { waitUntil: "load" });
-    await page.waitForSelector(".hist");
+    try {
+      await page.waitForSelector(".hist", { timeout: 20000 });
+    } catch (e) {
+      console.log("HIST FEHLT:", seite, fehler.slice(0, 6));
+      await page.screenshot({ path: path.join(ausgabe, `fehler-${seite}-${breite}.png`) });
+      throw e;
+    }
     await page.waitForTimeout(500);
   };
 
