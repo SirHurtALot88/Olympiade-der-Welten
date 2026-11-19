@@ -10,7 +10,7 @@ import path from "node:path";
 const wurzel = process.cwd();
 const ausgabe = path.resolve(process.argv[2] ?? "docs/design/historie-bau-18-11");
 const arbeit = await fs.mkdtemp(path.join(os.tmpdir(), "historie-pruefstand-"));
-const PORT = 3291;
+let PORT = 0;
 
 await build({
   entryPoints: [path.join(wurzel, "scripts/historie-pruefstand/entry.tsx")],
@@ -63,7 +63,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404).end();
   }
 });
-await new Promise((ok) => server.listen(PORT, ok));
+await new Promise((ok) => server.listen(0, ok));
+PORT = server.address().port;
 await fs.mkdir(ausgabe, { recursive: true });
 
 const browser = await chromium.launch();
