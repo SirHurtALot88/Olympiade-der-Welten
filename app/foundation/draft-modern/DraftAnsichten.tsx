@@ -135,7 +135,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
       <section className="pan ek">
         <div className="pk"><h2>Mein Kader nach dem Draft</h2><span className="sp" /><span className="gk">{meine.length} Picks · Ablösen {betragC(summe)}</span></div>
         <div className="mt" style={{ ["--zeilen" as string]: Math.max(8, meine.length) }}>
-          <div className="mz kopf"><span>Pick</span><span /><span>Spieler</span><span /><span /><span /><span className="re">Ablöse</span><span className="re">je ST</span></div>
+          <div className="mz kopf"><span>Pick</span><span /><span>Spieler</span><span /><span /><span /><span className="re">Ablöse</span><span className="re">Gehalt/Saison</span></div>
           {meine.map((e) => {
             const info = a.spieler[e.playerId!];
             const bild = k.portrait(e.playerId!);
@@ -147,7 +147,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
                 <span className="nm"><b>{info?.name ?? "—"}</b><small>{info?.className ?? ""} · {info?.race ?? ""}</small></span>
                 <span /><span /><span />
                 <span className="re"><b className="t">{de(e.abloese ?? 0)}</b></span>
-                <span className="re"><b className="t">{de((e.gehalt ?? 0) / 20, 2)}</b></span>
+                <span className="re"><b className="t">{de(e.gehalt ?? 0)}</b></span>
               </div>
             );
           })}

@@ -194,7 +194,9 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     expect(kiZug.top3).toHaveLength(3);
     expect(kiZug.top3Gruende!.map((g) => g.art).every((art) => ["star", "bedarf", "preis_leistung", "kadertiefe"].includes(art))).toBe(true);
     const karte = sicht.spieler[kiZug.top3![0]!]!;
-    expect(Object.keys(karte).sort()).toEqual(["className", "gehalt", "marktwert", "name", "playerId", "race"]);
+    expect(Object.keys(karte).sort()).toEqual(["achsenGruppen", "className", "gehalt", "marktwert", "name", "playerId", "portraitUrl", "race"]);
+    // Nebel: die Achsen stehen nur als Zweier-Gruppe da, nie als Zahl oder genaue Note.
+    expect(Object.values(karte.achsenGruppen!).every((g) => ["F–E", "D–C", "B–A", "S–S+"].includes(g))).toBe(true);
   }, 120_000);
 
   it("Fehler: KI-Team kann nicht von Hand picken, Fertig erst ab dem Mindestkader", () => {
