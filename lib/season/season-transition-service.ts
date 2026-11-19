@@ -6,6 +6,7 @@ import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-se
 import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-guv-nachbuchung";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { isSeasonComplete } from "@/lib/season/season-completion-state";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -68,6 +69,16 @@ export type SeasonTransitionPreview = {
     toSeasonId: string;
   };
 };
+
+const STEP_LABELS_GEMEINSAM: Partial<Record<SeasonTransitionStepId, string>> = {
+  // Gemeinsames Transferfenster (Chris 18.11.): an diesen beiden Stationen wird nicht mehr gehandelt.
+  transfer_sell_phase: "Verträge",
+  transfer_buy_phase: "Transferfenster folgt",
+};
+
+function stepLabel(stepId: SeasonTransitionStepId): string {
+  return (istTransferfensterGemeinsam() ? STEP_LABELS_GEMEINSAM[stepId] : undefined) ?? STEP_LABELS[stepId];
+}
 
 const STEP_LABELS: Record<SeasonTransitionStepId, string> = {
   season_check: "Saison prüfen",
@@ -202,9 +213,12 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
           : "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income. Alle Formkarten wurden verbraucht.",
       player_development: `Preview berechnet die organische Saisonende-Entwicklung für ${rosterCount} aktive Spieler (identisch zum Apply, ohne Attribut-Writes bis zur Bestätigung).`,
       season_end_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
-      transfer_sell_phase: "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
-      transfer_buy_phase:
-        "Reine Durchgangsstation: am Saisonende kauft niemand mehr. Käufe (Mensch wie KI) laufen erst im Kauffenster der neuen Saison; die Verkaufserlöse sind dort das Budget.",
+      transfer_sell_phase: istTransferfensterGemeinsam()
+        ? "KI-Teams verlängern ihre Verträge; verkauft wird erst im Transferfenster der neuen Saison. Human-Teams bleiben manuell."
+        : "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
+      transfer_buy_phase: istTransferfensterGemeinsam()
+        ? "Reine Durchgangsstation: am Saisonende wird nicht gehandelt. Kaufen und Verkaufen (Mensch wie KI) laufen gemeinsam im Transferfenster der neuen Saison, vor Spieltag 1; Verkaufserlöse sind dort sofort frei."
+        : "Reine Durchgangsstation: am Saisonende kauft niemand mehr. Käufe (Mensch wie KI) laufen erst im Kauffenster der neuen Saison; die Verkaufserlöse sind dort das Budget.",
       lineup_setup: `${lineupCount} gespeicherte Lineups würden für neue Season geprüft/resetet.`,
       next_season_ready: "Neue Saison startet ueber den bestaetigten Pre-Season Workflow.",
     };
@@ -219,7 +233,7 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
     const canApply = blockingReasons.length === 0 && index === currentIndex && getPhaseAfterStep(stepId) !== null;
     return {
       stepId,
-      label: STEP_LABELS[stepId],
+      label: stepLabel(stepId),
       status:
         blockingReasons.length > 0
           ? "blocked"
@@ -773,6 +787,9 @@ async function runSeasonEndAiSellsIfDue(input: {
       // Am Saisonende wird nur verkauft. Gekauft wird in der neuen Saison — der Riegel dafuer sitzt
       // zusaetzlich in der Sitzung selbst (`isSeasonEndPhase`), hier ist er die Absicht des Aufrufs.
       allowBuys: false,
+      // GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): am Saisonende wird nur noch verlaengert. Verkauft wird im
+      // Fenster der neuen Saison, zusammen mit dem Kaufen (`fuehreKiPreseasonLaufAus`, Verkaufsrunde zuerst).
+      nurVerlaengern: istTransferfensterGemeinsam(),
       skipIfExistingMarketTransfers: false,
       progressLog: false,
     });

@@ -31,7 +31,10 @@ function transfer(input: {
 }) {
   return {
     seasonId: input.seasonId,
-    matchdayId: `${input.seasonId}-matchday-1`,
+    // Verkaeufe am Saisonende (letzter Spieltag, alter Ablauf), Kaeufe im Fenster vor Spieltag 1. Die Zuordnung
+    // „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.) liest genau diesen Spieltag.
+    matchdayId: input.type === "sell" ? `${input.seasonId}-matchday-10` : `${input.seasonId}-matchday-1`,
+    phase: "manual_transfer_window",
     transferType: input.type,
     source: input.source,
     fee: input.fee,
@@ -102,7 +105,8 @@ describe("Die Transferbilanz zaehlt die eigenen Transfers mit", () => {
   });
 
   it("laesst einen Verkauf aus DERSELBEN Saison in S2 aussen vor", () => {
-    // Die Regel lautet „Verkaeufe der VORSAISON". Ein Verkauf in S2 gehoert in die S3-Bilanz.
+    // Ein Verkauf am ENDE von S2 gehoert zum Fenster vor S3, also in die S3-Bilanz. (Ein Verkauf im gemeinsamen
+    // Fenster VOR Spieltag 1 von S2 zaehlt dagegen zu S2 — siehe tests/transferfenster-gemeinsam.test.ts.)
     const gs = {
       transferHistory: [
         transfer({ seasonId: "season-2", type: "sell", source: "manual_transfermarkt_sell", fee: 50, teamId: "V-W" }),

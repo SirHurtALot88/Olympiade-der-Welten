@@ -14,6 +14,11 @@ import {
   executeLocalTransfermarktSell,
 } from "@/lib/market/transfermarkt-local-service";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die Formkarten beim Verkauf am Saisonende,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 /**
  * Formkarten gehoeren einer KADERZUGEHOERIGKEIT, nicht einem Team-Konto: der Generator
  * (`buildGeneratedFormCardRecordsForTeam`) baut sie ausschliesslich aus `gameState.rosters` und

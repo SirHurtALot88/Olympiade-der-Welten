@@ -85,6 +85,8 @@ function buildGameState(input: {
 }
 
 /** A stressed roster of 8 players for team T-1, with a configurable previous-season injury count spread across the first two players. */
+// Gehaelter bewusst klein: ab Saison 2 sperrt der Vorstand neue Vertraege ueber dem Gehaltsbudget (hart, auch die KI-Tiefe nach Verletzungen);
+// 8 x 3 C liegen unter dem Gehaltsbudget dieses Teams ohne Sponsor, sonst waere der Test eine Gehaltsbudget-Probe.
 function buildStressedRoster(teamId: string, prevSeasonInjuryCount: number) {
   const players: Player[] = Array.from({ length: 8 }, (_, index) =>
     makePlayer({
@@ -92,8 +94,8 @@ function buildStressedRoster(teamId: string, prevSeasonInjuryCount: number) {
       name: `${teamId} Roster ${index}`,
       marketValue: 40,
       displayMarketValue: 40,
-      salaryDemand: 12,
-      displaySalary: 12,
+      salaryDemand: 3,
+      displaySalary: 3,
       injuryHistory:
         index === 0
           ? buildInjuryHistory(Math.ceil(prevSeasonInjuryCount / 2), teamId, "season-1")
@@ -107,8 +109,8 @@ function buildStressedRoster(teamId: string, prevSeasonInjuryCount: number) {
       id: `${teamId}-roster-entry-${index}`,
       teamId,
       playerId: player.id,
-      salary: 12,
-      upkeep: 12,
+      salary: 3,
+      upkeep: 3,
       contractLength: 3,
     }),
   );

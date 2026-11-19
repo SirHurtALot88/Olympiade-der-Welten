@@ -79,7 +79,7 @@ describe("Grund der Verkaufssperre", () => {
     ).toBe("Im Referenzmodus bleibt der Verkauf gesperrt.");
     expect(
       resolveSellDisabledReason({ preview: null, issueKind: "window_closed", hasIssue: true, busy: false, strongAckPending: false }),
-    ).toContain("Verkaufsfenster ist geschlossen");
+    ).toContain("Transferfenster ist geschlossen");
     expect(
       resolveSellDisabledReason({ preview: null, hasIssue: true, busy: false, strongAckPending: false }),
     ).toContain("nicht verfügbar");

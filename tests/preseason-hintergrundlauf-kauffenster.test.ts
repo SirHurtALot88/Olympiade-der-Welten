@@ -185,11 +185,12 @@ describe("Preseason-Hintergrundlauf: Kaeufe gehoeren ins Kauffenster der neuen S
 
     expect(payload.skipped).toBe(false);
     expect(payload.ok).toBe(true);
-    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(1);
-    const aufruf = applyAiMarketPlanLocally.mock.calls[0]![0] as {
-      options?: { applySellSteps?: boolean };
-    };
-    // Verkauft wurde als separater Schritt am Saisonende — der Saisonstart-Lauf kauft nur.
-    expect(aufruf.options?.applySellSteps).toBe(false);
+    // Gemeinsames Transferfenster (Chris 18.11.): der Marktlauf kauft, danach eine Nachrunde fuer offene Plaetze.
+    // Verkauft wird in der eigenen Verkaufsrunde DAVOR (organisch, `fenster_verkauf`), nie ueber die Sell-Steps
+    // des Marktlaufs — sonst schrumpften dieselben Teams doppelt.
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(2);
+    for (const [aufruf] of applyAiMarketPlanLocally.mock.calls as Array<[{ options?: { applySellSteps?: boolean } }]>) {
+      expect(aufruf.options?.applySellSteps).toBe(false);
+    }
   });
 });

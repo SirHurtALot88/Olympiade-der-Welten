@@ -11,6 +11,8 @@
  * Verkauf selbst.
  */
 
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
+
 /** Letzter Fallback: nie rohes snake_case zeigen — in lesbaren Satz wandeln. */
 function humanizeToken(token: string): string {
   const humanized = token.replace(/[_:]+/g, " ").trim();
@@ -146,6 +148,8 @@ export function translateSellBlockingReason(reason: string): string {
   switch (reason) {
     case "sell_only_at_season_end":
       return "Verkauft wird erst im Verkaufsfenster am Season-End (nach MD10) — bis dahin nur Vorschau.";
+    case "sell_only_in_transfer_window":
+      return "Verkauft wird im Transferfenster vor Spieltag 1 der neuen Saison — bis dahin nur Vorschau.";
     case "team_not_found":
       return "Teamdaten nicht gefunden — Verkauf aktuell nicht möglich.";
     case "player_not_found":
@@ -304,6 +308,35 @@ export type SellPreviewIssue = {
  * bestehenden Aufruf ohne das Argument (Manager Mode, jeder Alt-Save) bit-identisch.
  */
 function buildSellWindowClosedByPhase(totalMatchdays: number): Record<string, { message: string; hint: string }> {
+  if (istTransferfensterGemeinsam()) {
+    // EIN GEMEINSAMES FENSTER (Chris 18.11.): verkauft und gekauft wird zusammen, in der neuen Saison vor
+    // Spieltag 1. Das Saisonende ist fuer Abrechnung, Vertragsenden und Verlaengerungen da.
+    const saisonende = {
+      message: "Am Saisonende wird abgerechnet und verlängert — verkauft wird im Transferfenster der neuen Saison, vor Spieltag 1.",
+      hint: "Verlängere jetzt, wen du halten willst. Kaufen und Verkaufen gehen danach im selben Fenster.",
+    };
+    return {
+      season_active: {
+        message: `Die Saison läuft noch — nach dem Saisonende (Spieltag ${totalMatchdays}) öffnet das Transferfenster der neuen Saison, dort wird gekauft und verkauft.`,
+        hint: "Bis dahin kannst du hier alles prüfen: Marktwert und Verkaufspreis siehst du im Kader und auf dem Transfermarkt.",
+      },
+      season_completed: saisonende,
+      season_review: saisonende,
+      season_rewards: saisonende,
+      player_development: saisonende,
+      season_end_management: saisonende,
+      transfer_sell_phase: saisonende,
+      transfer_buy_phase: saisonende,
+      lineup_setup: {
+        message: "Die neue Saison wird vorbereitet — direkt danach öffnet das Transferfenster (Kaufen und Verkaufen).",
+        hint: "Starte die neue Saison, dann kannst du hier verkaufen.",
+      },
+      next_season_ready: {
+        message: "Die neue Saison steht bereit — mit ihrem Start öffnet das Transferfenster (Kaufen und Verkaufen).",
+        hint: "Starte die neue Saison, dann kannst du hier verkaufen.",
+      },
+    };
+  }
   return {
   season_active: {
     message: `Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach Spieltag ${totalMatchdays}.`,
@@ -348,10 +381,16 @@ function buildSellWindowClosedByPhase(totalMatchdays: number): Record<string, { 
 export function describeSellPreviewIssue(error: string, totalMatchdays = 10): SellPreviewIssue {
   if (error.startsWith("phase_blocked:sell_players:")) {
     const phase = error.slice("phase_blocked:sell_players:".length);
-    const copy = buildSellWindowClosedByPhase(totalMatchdays)[phase] ?? {
-      message: "Das Verkaufsfenster ist gerade geschlossen — verkauft wird am Saisonende.",
-      hint: "Du kannst die Vorschau später im Verkaufsfenster erneut öffnen.",
-    };
+    const copy = buildSellWindowClosedByPhase(totalMatchdays)[phase] ??
+      (istTransferfensterGemeinsam()
+        ? {
+            message: "Das Transferfenster ist gerade geschlossen — verkauft wird vor Spieltag 1 der neuen Saison.",
+            hint: "Du kannst die Vorschau später im Transferfenster erneut öffnen.",
+          }
+        : {
+            message: "Das Verkaufsfenster ist gerade geschlossen — verkauft wird am Saisonende.",
+            hint: "Du kannst die Vorschau später im Verkaufsfenster erneut öffnen.",
+          });
     return { kind: "window_closed", title: "Transferfenster geschlossen", ...copy };
   }
   if (error.startsWith("phase_blocked:")) {
@@ -400,7 +439,9 @@ export function resolveSellDisabledReason(input: SellDisabledReasonInput): strin
   if (input.readMetaSource === "prisma") return "Im Referenzmodus bleibt der Verkauf gesperrt.";
   if (!preview) {
     if (input.issueKind === "window_closed") {
-      return "Das Verkaufsfenster ist geschlossen — verkauft wird im Verkaufsfenster am Saisonende.";
+      return istTransferfensterGemeinsam()
+        ? "Das Transferfenster ist geschlossen — verkauft wird vor Spieltag 1 der neuen Saison."
+        : "Das Verkaufsfenster ist geschlossen — verkauft wird im Verkaufsfenster am Saisonende.";
     }
     return input.hasIssue
       ? "Die Verkaufsvorschau ist nicht verfügbar — bitte neu laden."

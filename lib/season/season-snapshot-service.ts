@@ -7,6 +7,7 @@ import type {
   SeasonSnapshotTransferRecord,
   SeasonSnapshotAwardRecord,
 } from "@/lib/data/olyDataTypes";
+import { berechneTransferbuchungJeTeam } from "@/lib/season/transferbilanz-buchung";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { isSeasonCoverageComplete } from "@/lib/season/season-completion-state";
 import { buildLeagueTierReconstruction } from "@/lib/season/league-history";
@@ -199,6 +200,12 @@ function buildSeasonSnapshotRecord(
     seasonResultIds.has(highlight.matchdayResultId),
   );
   const seasonTransfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
+  const transferBuchungJeTeam = berechneTransferbuchungJeTeam({
+    transferHistory: gameState.transferHistory,
+    seasonId,
+    teamIds: gameState.teams.map((team) => team.teamId),
+    spieltageProSaison: gameState.season.matchdayIds?.length ?? null,
+  });
   const warnings: string[] = [];
 
   if (coverage.totalMatchdays === 0) {
@@ -231,16 +238,12 @@ function buildSeasonSnapshotRecord(
         : null;
       const roster = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const teamResults = seasonDisciplineResults.filter((entry) => entry.teamId === team.teamId);
-      const teamTransfers = seasonTransfers.filter(
-        (entry) => entry.fromTeamId === team.teamId || entry.toTeamId === team.teamId,
-      );
       const teamPointSummary = seasonPointsLedger.teamSummariesByTeamId.get(team.teamId) ?? null;
-      const transferBuyCount = teamTransfers.filter(
-        (entry) => entry.transferType === "buy" && entry.toTeamId === team.teamId,
-      ).length;
-      const transferSellCount = teamTransfers.filter(
-        (entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId,
-      ).length;
+      // Anzahl und Summen aus derselben Buchung wie `transferNet` — sonst stuende im Hover von Saison 1
+      // „330 Kaeufe" neben einer leeren Transferbilanz.
+      const transferBuchungDesTeams = transferBuchungJeTeam.get(team.teamId)?.transfer ?? null;
+      const transferBuyCount = transferBuchungDesTeams?.anzahlKaeufe ?? 0;
+      const transferSellCount = transferBuchungDesTeams?.anzahlVerkaeufe ?? 0;
       const rawScoreByArea = teamResults.reduce(
         (totals, entry) => {
           const category = disciplineCategoryById.get(entry.disciplineId);
@@ -281,14 +284,14 @@ function buildSeasonSnapshotRecord(
               2,
             )
           : 0;
-      const transferBuyTotal = teamTransfers
-        .filter((entry) => entry.transferType === "buy" && entry.toTeamId === team.teamId)
-        .reduce((sum, entry) => sum + entry.fee, 0);
-      const transferSellTotal = teamTransfers
-        .filter((entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId)
-        .reduce((sum, entry) => sum + entry.fee, 0);
+      // DIE EINE BUCHUNGSREGEL (Chris 18.11., `transferbilanz-buchung.ts`): das Fenster vor Saison N gehoert zu
+      // Saison N, der Draft in Saison 1 ist Kaderaufbau. Vorher stand hier der Saldo aller Eintraege mit dieser
+      // `seasonId` — in Saison 1 also Draft gegen Saisonende-Verkaeufe, und damit fast immer tief negativ.
+      const buchung = transferBuchungJeTeam.get(team.teamId) ?? null;
+      const transferBuyTotal = buchung?.transfer?.kaeufe ?? 0;
+      const transferSellTotal = buchung?.transfer?.verkaeufe ?? 0;
       const rank = standing?.rank ?? null;
-      const transferNet = roundValue(transferSellTotal - transferBuyTotal, 2);
+      const transferNet = buchung ? buchung.transferNet : null;
 
       return {
         teamId: team.teamId,
@@ -311,12 +314,16 @@ function buildSeasonSnapshotRecord(
         salaryTotalEnd: salaryEnd,
         marketValueEnd,
         marketValueTotalEnd: marketValueEnd,
-        transferCount: teamTransfers.length,
+        transferCount: transferBuyCount + transferSellCount,
         transferBuyCount,
         transferSellCount,
         transferBuyTotal: roundValue(transferBuyTotal, 2),
         transferSellTotal: roundValue(transferSellTotal, 2),
         transferNet,
+        kaderaufbauNet: buchung?.kaderaufbauNet ?? null,
+        kaderaufbauBuyTotal: buchung?.kaderaufbau?.kaeufe ?? null,
+        kaderaufbauSellTotal: buchung?.kaderaufbau?.verkaeufe ?? null,
+        kaderaufbauBuyCount: buchung?.kaderaufbau?.anzahlKaeufe ?? null,
         cashFc: standing?.cashFc ?? null,
         startplatz: standing?.startplatz ?? null,
         rankDiff: standing?.rankDiff ?? null,
