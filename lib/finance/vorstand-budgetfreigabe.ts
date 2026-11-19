@@ -40,6 +40,7 @@ import type { GameState, VorstandBudgetZustand } from "@/lib/data/olyDataTypes";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
 import { berechneKiRuecklage, KI_RUECKLAGE_GEHALTS_FAKTOR } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
+import { verkaufserloeseFreiAnteil } from "@/lib/market/transferfenster-gemeinsam";
 
 /** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
 export const GEHALTS_QUOTE_UNTERGRENZE = 0.75;
@@ -384,12 +385,13 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   const anzapfenMax = ruecklageZiel * ANZAPFEN_MAX_ANTEIL;
   const angezapft = alle ? 0 : Math.min(Math.max(0, zustand.ruecklageAngezapft), anzapfenMax);
   const verfuegbar = alle ? Math.max(0, anfangskasse) : Math.max(0, anfangskasse - ruecklageZiel - gehaltspuffer);
-  const gesamtBei = (q: number, verk: number) => q * (verfuegbar + angezapft) + q * verk;
+  // Gemeinsames Transferfenster (Chris 18.11.): Verkaufserloese aus dem Fenster sind zu 100 % frei, die Quote gilt nur fuer die Kasse zu Fensterbeginn.
+  const gesamtBei = (q: number, verk: number) => q * (verfuegbar + angezapft) + verkaufserloeseFreiAnteil(q) * verk;
 
   // Lockerung nach Verkaeufen (Konzept 4): einbehaltener Anteil (1 - q) x Verkaufserloes >= X -> eine Stufe mehr.
   const puffer = q0 < 1 ? (LOCKERUNG_PUFFER_ANTEIL[q0] ?? 0) * basis : 0;
-  const einbehalten = (1 - q0) * verkaeufe;
-  const schwelle = q0 < 1 && puffer > 0 ? puffer / (1 - q0) : 0;
+  const einbehalten = (1 - verkaufserloeseFreiAnteil(q0)) * verkaeufe;
+  const schwelle = q0 < 1 && puffer > 0 && verkaufserloeseFreiAnteil(q0) < 1 ? puffer / (1 - q0) : 0;
   const rosterCount = gameState.rosters.filter((r) => r.teamId === teamId).length;
   const pflichtkredit = (gameState.seasonState?.loans ?? []).some(
     (l) => l.borrowerTeamId === teamId && l.status === "active" && l.originatedSeasonId === seasonId,
@@ -398,6 +400,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   if (!gedeckelt) lockerungSperre = "Saison 1: alles ist freigegeben.";
   else if (alle) lockerungSperre = "„Alles auf eine Karte“ ist aktiv.";
   else if (q0 >= 1) lockerungSperre = "Schon voll freigegeben.";
+  else if (verkaufserloeseFreiAnteil(q0) >= 1) lockerungSperre = "Im gemeinsamen Fenster sind Verkaufserlöse zu 100 % frei.";
   else if (cash < 0) lockerungSperre = "Keine Lockerung bei Kasse im Minus.";
   else if (pflichtkredit) lockerungSperre = "Keine Lockerung mit laufendem Kredit dieses Fensters.";
   else if (rosterCount < 8) lockerungSperre = "Der Kader muss über dem Minimum bleiben.";

@@ -3,6 +3,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import type { TransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 
 export type SellPricingPolicyBreakdown = {
   seasonStartDiscount: number;
@@ -122,7 +123,11 @@ function getTimingMultiplier(gameState: GameState) {
     return 1;
   }
   if (getTransferWindowStatus(gameState).isSeasonStartSetup) {
-    return 0.95;
+    // EIN GEMEINSAMES FENSTER (Chris 18.11.): der Saisonstart ist jetzt DAS Verkaufsfenster, kein
+    // verspaeteter Nachzuegler mehr. Der Abschlag fuer „zu spaet verkauft" (0.95) entfaellt; es gilt der
+    // volle Faktor der bisherigen Verkaufsphase (`transfer_sell_phase`), damit die Erloese der KI nicht
+    // allein durch die Verlegung um 5 % sinken.
+    return istTransferfensterGemeinsam() ? 1 : 0.95;
   }
   if (phase === "season_end_management") {
     return 0.98;

@@ -472,6 +472,7 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   season_not_found: "Saison wurde nicht gefunden.",
   season_not_in_save: "Saison gehört nicht zu diesem Spielstand.",
   sell_only_at_season_end: "Verkäufe sind nur zum Saisonende möglich.",
+  sell_only_in_transfer_window: "Verkäufe sind nur im Transferfenster vor Spieltag 1 möglich.",
   team_not_found: "Team wurde nicht gefunden.",
   team_readiness_would_get_worse: "Verkauf würde die Team-Bereitschaft verschlechtern.",
   team_season_state_not_found: "Saison-Daten des Teams fehlen.",

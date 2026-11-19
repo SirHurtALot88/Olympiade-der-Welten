@@ -1097,10 +1097,33 @@ async function overlayUnifiedCompareBuyPlans(input: {
     // got a real Unified plan at all. Any OTHER blocking reason (disabled AI preview, unresolved
     // negative cash, etc.) still keeps the team out of the overlay — those represent situations
     // where buying more is genuinely not safe, not an incomplete-plan artifact.
+    /**
+     * KADER UNTER DEM MINIMUM: AUCH DIE RUECKLAGEN-MELDUNG IST EIN ARTEFAKT DES LEGACY-PLANS (18.11.).
+     *
+     * Gemessen im Transferfenster S1→S2 (32 KI-Teams, `docs/design/transferfenster-gemeinsam-18-11.md`
+     * Abschnitt 6): M-M ging mit 5 Spielern und 61,5 C ins Fenster. Der Legacy-Kaufplan nahm die zwei
+     * teuersten Kandidaten (30,0 + 30,3 C), blieb damit bei 7 Spielern und 1,2 C Kasse — und meldete
+     * `cash_after_market_plan_below_reserve` NEBEN `roster_after_market_plan_below_player_min`. Wegen der
+     * zweiten Meldung schloss die Bedingung hier das Team vom Unified-Plan aus, der genau dafuer da ist
+     * (er plant so viele Schritte, wie die Luecke braucht, auch billigere). Ergebnis: kein einziger Kauf,
+     * M-M blieb bei 5.
+     *
+     * Die Rueckstellungs-Meldung beschreibt hier denselben unvollstaendigen Legacy-Plan wie die Kader-
+     * Meldung — sie entsteht nur, weil der Plan zu teuer statt zu breit gekauft hat. Unter dem Minimum
+     * zaehlt sie deshalb mit als „unvollstaendiger Plan“. Der Unified-Plan prueft Kasse und Rueckstellung
+     * selbst; jeder andere Grund (Minus-Kasse, abgeschaltete KI) haelt das Team weiter heraus.
+     */
+    const unterMinimum =
+      rosterCount != null && team.currentState.playerMin != null && rosterCount < team.currentState.playerMin;
     const blockedOnlyByIncompleteRosterFill =
       team.status === "blocked" &&
       team.blockingReasons.length > 0 &&
-      team.blockingReasons.every((reason) => reason === "roster_after_market_plan_below_player_min");
+      team.blockingReasons.every(
+        (reason) =>
+          reason === "roster_after_market_plan_below_player_min" ||
+          (unterMinimum && reason === "cash_after_market_plan_below_reserve"),
+      ) &&
+      team.blockingReasons.includes("roster_after_market_plan_below_player_min");
     if (
       steps <= 0 ||
       (rosterCount != null && playerOpt != null && rosterCount >= playerOpt) ||

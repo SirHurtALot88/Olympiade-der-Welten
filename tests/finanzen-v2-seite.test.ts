@@ -3,7 +3,7 @@
  * Ruecklage anzapfen, „Alles auf eine Karte“, KI-Entscheidung, Kontoauszug-Verlauf der Seite.
  * Gebaut auf einem kleinen Spielstand ohne Datenbank; die harte Sperre laeuft ueber dieselben Funktionen wie im Spiel.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildFinanzSeiteModell } from "@/lib/finance/finanzseite-modell";
@@ -178,7 +178,24 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
   });
 });
 
-describe("Lockerung nach Verkaeufen", () => {
+describe("Lockerung nach Verkaeufen (alter Ablauf; im gemeinsamen Fenster sind Erloese zu 100 % frei)", () => {
+  // Die Lockerung gibt es nur mit der Quote auf Verkaufserloesen, also im alten Ablauf (`OLY_TRANSFERFENSTER_GEMEINSAM=0`).
+  let fensterVorher: string | undefined;
+  beforeEach(() => {
+    fensterVorher = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+  });
+  afterEach(() => {
+    if (fensterVorher === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = fensterVorher;
+  });
+  it("im gemeinsamen Fenster entfaellt die Lockerung (Erloese zu 100 % frei)", () => {
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "1";
+    const st = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 140, history: [sell(40)] }), "A");
+    expect(st.lockerung.aktiv).toBe(false);
+    expect(st.lockerung.gesperrtGrund).toContain("100 %");
+  });
+
   it("greift erst ab der Schwelle (einbehaltener Anteil >= Puffer), eine Stufe, nie mehr als verkauft", () => {
     const basis = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 100 }), "A");
     expect(basis.lockerung.aktiv).toBe(false);

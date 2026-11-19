@@ -155,13 +155,29 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     expect(nach.frei - vor.frei).toBeCloseTo(10, 2);
   });
 
-  it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben", () => {
-    // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Der Verkauf zaehlt nur zu 70 %: 14 C kommen dazu, 6 C bleiben als Puffer.
+  it("Verkaufserloes ist nur zu X % frei: 20 C bei 70 % -> 14 C frei, 6 C bleiben (alter Ablauf)", () => {
+    // ALTER ABLAUF (`OLY_TRANSFERFENSTER_GEMEINSAM=0`). Im gemeinsamen Fenster sind Erloese zu 100 % frei (Chris 18.11.).
+    const vorher = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+    try {
+      // Anfangskasse 100, Verkauf 20 -> Kasse jetzt 120. Der Verkauf zaehlt nur zu 70 %: 14 C kommen dazu, 6 C bleiben als Puffer.
+      const ohne = berechneVorstandBudgetStand(state(100, 2), "A");
+      const st = berechneVorstandBudgetStand(state(120, 2, [sell(20)]), "A");
+      expect(st.herleitung.anfangskasse).toBeCloseTo(100, 2);
+      expect(st.nochFrei - ohne.nochFrei).toBeCloseTo(14, 2);
+      expect(st.gesperrt - ohne.gesperrt).toBeCloseTo(6, 2);
+    } finally {
+      if (vorher === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorher;
+    }
+  });
+
+  it("im gemeinsamen Fenster ist der Verkaufserloes zu 100 % frei: 20 C -> 20 C frei, keine Lockerung noetig", () => {
     const ohne = berechneVorstandBudgetStand(state(100, 2), "A");
     const st = berechneVorstandBudgetStand(state(120, 2, [sell(20)]), "A");
-    expect(st.herleitung.anfangskasse).toBeCloseTo(100, 2);
-    expect(st.nochFrei - ohne.nochFrei).toBeCloseTo(14, 2);
-    expect(st.gesperrt - ohne.gesperrt).toBeCloseTo(6, 2);
+    expect(st.nochFrei - ohne.nochFrei).toBeCloseTo(20, 2);
+    expect(st.gesperrt).toBeCloseTo(ohne.gesperrt, 2);
+    expect(st.lockerung.gesperrtGrund).toContain("100 %");
   });
 
   it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
@@ -191,7 +207,8 @@ describe("Stufe 0 — Kontoauszug aus vorhandenen Ledgern", () => {
     } as unknown as GameState;
     const k = buildKontoauszuege(gs, "season-1");
     const a = k.get("A")!;
-    expect(a.zeilen.map((z) => z.art)).toEqual(["transfer_kauf", "transfer_verkauf", "gehalt_und_sponsor_saisonende", "apron"]);
+    // Saison 1: Kauf und Verkauf vor Spieltag 1 sind Kaderaufbau aus dem Startbudget (Chris 18.11.), keine Transfers.
+    expect(a.zeilen.map((z) => z.art)).toEqual(["kaderaufbau", "kaderaufbau", "gehalt_und_sponsor_saisonende", "apron"]);
     expect(a.saldo).toBe(-20 + 8 + 50 - 2);
     expect(a.summeAbfluss).toBe(-22);
     expect(k.get("B")!.saldo).toBe(8);

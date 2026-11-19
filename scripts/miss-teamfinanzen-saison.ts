@@ -85,7 +85,8 @@ const OUT = arg("out", "");
 const LABEL = arg("label", "A");
 /** Wiederaufnahme einer abgebrochenen Messung: bestehende Wegwerf-SQLite + bereits geschriebene Rohdaten (--out) weiterverwenden. */
 const RESUME = arg("resume", "");
-/** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren. */
+/** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren.
+ *  "spieltage": nach den Spieltagen von Saison 1, vor dem Saisonabschluss (Basis fuer den Saisonwechsel-Vergleich). */
 const STOP_AFTER = arg("stop-after", "");
 /** Nur das Spiel anlegen (32 KI, Sponsoren signiert), kein Draft: Basis fuer paarweise A/B-Laeufe. */
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
@@ -462,6 +463,9 @@ async function main() {
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();
+    // Basis fuer paarweise Vergleiche des Saisonwechsels (Transferfenster, `scripts/miss-transferfenster-gemeinsam.ts`):
+    // nach den Spieltagen von Saison 1 aufhoeren, vor Abschluss und Saisonende-Kette.
+    if (STOP_AFTER === "spieltage" && saison === 1) { log("stop-after spieltage erreicht"); finish(); return; }
 
     // Saisonabschluss
     const comp = await runLocalSeasonCompletion(

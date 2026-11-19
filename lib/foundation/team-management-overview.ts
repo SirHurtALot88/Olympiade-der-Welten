@@ -13,6 +13,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+import { buildStandingsTransferBalanceByTeamId } from "@/lib/season/transfer-standings-balance";
 
 type TeamManagementSnapshotStanding = {
   rank: number | null;
@@ -53,7 +54,10 @@ type TeamManagementTransferSummary = {
   transferSellCount: number;
   transferBuyTotal: number;
   transferSellTotal: number;
-  transferNet: number;
+  /** `null` in Saison 1: der Draft ist Kaderaufbau, keine Transferbilanz (Chris 18.11.). */
+  transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (Erloese − Ausgaben). */
+  kaderaufbauNet?: number | null;
 };
 
 /**
@@ -74,6 +78,29 @@ type TeamManagementTransferSummary = {
  * ohne Saisonbezug.
  */
 function buildTransferSummaryByTeamIdFromHistory(gameState: GameState, seasonId: string | null = null) {
+  /**
+   * MIT SAISON: die EINE Buchungsregel (`transferbilanz-buchung.ts`, Chris 18.11.) — das Fenster vor Saison N
+   * gehoert zu Saison N, der Draft in Saison 1 ist Kaderaufbau und keine Transferbilanz. Vorher zaehlte hier
+   * jeder Eintrag mit `seasonId` dieser Saison, also in Saison 1 der ganze Draft als Kauf gegen die Verkaeufe am
+   * Saisonende — „immer negative Transferbilanzen in S1".
+   */
+  if (seasonId != null) {
+    const buchung = buildStandingsTransferBalanceByTeamId(gameState, seasonId);
+    return Object.fromEntries(
+      Object.entries(buchung).map(([teamId, bilanz]) => [
+        teamId,
+        {
+          transferCount: bilanz.transferCount,
+          transferBuyCount: bilanz.transferBuyCount,
+          transferSellCount: bilanz.transferSellCount,
+          transferBuyTotal: bilanz.transferBuyTotal,
+          transferSellTotal: bilanz.transferSellTotal,
+          transferNet: bilanz.transferNet,
+          kaderaufbauNet: bilanz.kaderaufbauNet,
+        } satisfies TeamManagementTransferSummary,
+      ]),
+    );
+  }
   const summary = new Map<string, TeamManagementTransferSummary>();
 
   for (const entry of gameState.transferHistory ?? []) {
@@ -167,7 +194,10 @@ export type TeamManagementSnapshotRow = {
   transferSellCount: number;
   transferBuyTotal: number;
   transferSellTotal: number;
-  transferNet: number;
+  /** `null` in Saison 1 („—"): der Draft ist Kaderaufbau, keine Transferbilanz (Chris 18.11.). */
+  transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (Erloese − Ausgaben), sonst `null`. */
+  kaderaufbauNet?: number | null;
   transfersSeasonValue: number | null;
   cashDelta: number | null;
   startplatz: number | null;
@@ -476,7 +506,11 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
     const playerMin = standing?.playerMin ?? null;
     const playerOpt = standing?.playerOpt ?? null;
     const budget = standing?.budget ?? team.budget ?? null;
-    const transferNet = standing?.transfers ?? transferSummary?.transferNet ?? 0;
+    // `standing.transfers` (alte Saisonstand-Tabelle) gilt nur, wo die Buchung keine Saison-1-Leerstelle setzt.
+    const transferNet =
+      transferSummary && transferSummary.transferNet === null
+        ? null
+        : standing?.transfers ?? transferSummary?.transferNet ?? 0;
     const cash = deriveDisplayedCash({
       teamCash: usesArchivedSnapshotValues ? standing?.cash ?? team.cash ?? null : team.cash ?? standing?.cash ?? null,
       budget,
@@ -634,6 +668,7 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
       transferSellTotal: transferSummary?.transferSellTotal ?? 0,
       transferNet,
+      kaderaufbauNet: transferSummary?.kaderaufbauNet ?? null,
       transfersSeasonValue: transferNet,
       cashDelta,
       startplatz: standing?.startplatz ?? startBudgetRank,
@@ -873,8 +908,12 @@ export function buildLightweightTeamSeasonStandRows(input: {
         transferSellCount: transferSummary?.transferSellCount ?? 0,
         transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
         transferSellTotal: transferSummary?.transferSellTotal ?? 0,
-        transferNet: transferSummary?.transferNet ?? 0,
-        transfersSeasonValue: standing?.transfers ?? transferSummary?.transferNet ?? null,
+        transferNet: transferSummary ? transferSummary.transferNet : 0,
+        kaderaufbauNet: transferSummary?.kaderaufbauNet ?? null,
+        transfersSeasonValue:
+          transferSummary && transferSummary.transferNet === null
+            ? null
+            : standing?.transfers ?? transferSummary?.transferNet ?? null,
         cashDelta: null,
         startplatz: standing?.startplatz ?? null,
         rankDiff: standing?.rankDiff ?? null,

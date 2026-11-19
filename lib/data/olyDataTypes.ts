@@ -3222,7 +3222,16 @@ export type SeasonSnapshotTeamRecord = {
   transferSellCount: number;
   transferBuyTotal?: number | null;
   transferSellTotal?: number | null;
+  /**
+   * Transferbilanz der Saison nach „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.,
+   * `lib/season/transferbilanz-buchung.ts`). `null` in Saison 1: der Draft ist Kaderaufbau, keine Transferbilanz.
+   */
   transferNet: number | null;
+  /** Nur Saison 1: Kaderaufbau aus dem Startbudget (Erloese − Ausgaben, negativ = ausgegeben). Optional: Altstaende. */
+  kaderaufbauNet?: number | null;
+  kaderaufbauBuyTotal?: number | null;
+  kaderaufbauSellTotal?: number | null;
+  kaderaufbauBuyCount?: number | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;

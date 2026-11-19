@@ -38,6 +38,7 @@ import {
   type UseMarketSellDerivationsInput,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import { SAISON_MW_ERKLAERUNG } from "@/lib/market/transfermarkt-sale-factor";
 import {
   formatPpsValue,
@@ -304,7 +305,9 @@ export default function FoundationMarketSellShellHost({
     ? "Vorschau lädt…"
     : !preview
       ? issue?.kind === "window_closed"
-        ? "Verkauf öffnet nach MD10"
+        ? istTransferfensterGemeinsam()
+          ? "Verkauf öffnet im Transferfenster"
+          : "Verkauf öffnet nach MD10"
         : "Verkauf nicht möglich"
       : !preview.canSell
         ? "Verkauf blockiert"

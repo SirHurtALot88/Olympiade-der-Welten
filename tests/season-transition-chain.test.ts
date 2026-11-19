@@ -13,6 +13,11 @@ import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-poli
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
 import { SEASON_TRANSITION_STEPS } from "@/lib/season/season-transition-steps";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft die Saisonende-Kette mit Verkaufsfenster am Saisonende,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 describe("Die Kette fuehrt vom Saisonende bis zur neuen Saison", () => {
   it("laesst keinen Schritt ohne Anschluss — ausser dem letzten", () => {
     for (const step of SEASON_TRANSITION_STEPS) {

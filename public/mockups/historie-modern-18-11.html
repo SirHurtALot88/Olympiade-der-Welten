@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Historie – modern (Mockup 18.11.)</title>
+<!--
+  HISTORIE IM NEUEN STIL (Fable, 18.11.). Drei Reiter: Saison-Archiv, Transfers, Ewige Tabelle. Dazu Spielplan und Ranks
+  als eigene Schienenpunkte in derselben Tabellen-Sprache.
+  ECHT: Teams und Wappen, Spieler mit Klasse, Marktwert und Gehalt (data/generated/oly-player-stats.json), Portraits, die
+        20 Disziplinen mit Achse und Spielerzahl (lib/data/dataAdapter.ts), die Spalten der heutigen Seiten
+        (TransferHistoryV2NewLook, AllTimeTableNewLook, FoundationRanksNewLook, FoundationDiszisNewLook), die Felder der
+        Saison-Historie (lib/persistence/foundation-season-history-projection.ts), 3 Auf- und 3 Absteiger (RELEGATION_COUNT),
+        die Buchungsregel aus PR #1634: das Fenster vor Saison N gehoert zu Saison N, der Kaderaufbau in S1 ist kein Transfer.
+  ERFUNDEN: jede Zahl, jede Platzierung, jeder Deal, welcher Mutator an welcher Disziplin haengt, die Sitze Chris / Franky / Ramona.
+        Alles wird aus einer festen Saat gerechnet, damit Tabellen, Zeitleiste, Blatt und Bilanzen zusammenpassen.
+  NEU GEGENUEBER HEUTE: Saison-Archiv als eigene Seite (heute verteilt auf Saisonstand-Auswahl, Saison-Rueckblick, Teamprofil),
+        Saison-Zeitleiste mit Fenstern und Saisons im Wechsel, Kaderaufbau getrennt von Transfers, Ligen nebeneinander,
+        Blatt rechts mit dem Verlauf eines Teams (Klick auf jedes Team), Auf-/Abstiege in der Ewigen Tabelle.
+  URL: ?seite=archiv|transfers|ewig|spielplan|ranks  ?saison=1|2|3|4|alle  ?team=V-W (Blatt)  ?spalten=sport|geld
+       ?fokus=punkte|medaillen|marktwert|kasse  ?ranks=staerke|pp  ?liga=1|2|alle  ?leer=1 (neuer Spielstand)  ?still=1 (ohne Mockup-Leiste)
+  Steht IM App-Rahmen aus app-rahmen-modern-18-11.html (Schiene, Regieband, Taktgeber: CSS unveraendert uebernommen,
+  wie in inbox-modern-18-11.html). Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  Erklaerung und offene Fragen: docs/design/historie-modern-18-11.md
+-->
+
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* VOLLE FLAECHE: Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px). Die Wurzelgroesse waechst mit Breite UND Hoehe. */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.9rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* ICON-SCHIENE: kompakt 4 rem, klappt bei Hover als Ueberlagerung aus (wie PR #1576) */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.2rem;padding:.6rem .6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover,body.navauf .rail{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem;flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .grp{height:1.1rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp,body.navauf .rail .grp{opacity:1}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n,body.navauf .rail a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;left:1.7rem;top:.2rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}
+/* HERO mit geteilter Disziplin-Kulisse */
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;padding:1.05rem 1.5rem 1rem;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr}
+.hero .kul i{background-position:center 42%;background-size:cover;filter:saturate(1.1);opacity:.62}
+.hero .kul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.hero .kul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.96) 0%,rgba(6,8,12,.72) 30%,rgba(6,8,12,.5) 55%,rgba(6,8,12,.82) 100%),linear-gradient(180deg,rgba(6,8,12,.2) 30%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:1rem}
+.hk .crest{width:5.25rem;height:5.25rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk span.lage{font-size:.97rem;color:var(--leise)} .hk span.lage b{color:var(--creme);font-weight:600}
+.kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
+.kpi{min-width:7.2rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:flex;align-items:center;gap:.4rem;font-size:2rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap;height:2rem}
+.kpi small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.kpi.zone{border-top:2px solid var(--gut)}
+.fm{display:inline-flex;gap:.18rem}
+.fm i{width:.82rem;height:.82rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)} .fm i.x{background:rgba(255,255,255,.1)}
+.kpi .fm i{width:1rem;height:1rem}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.5rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+.cta small{font-size:.82rem;color:var(--leise)}
+
+/* RASTER: fuellt die Resthoehe, nichts scrollt */
+.raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.12fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+#p-tag{grid-column:1/6;grid-row:1} #p-kad{grid-column:1/6;grid-row:2}
+#p-tab{grid-column:6/10;grid-row:1/3}
+#p-ent{grid-column:10/13;grid-row:1} #p-fin{grid-column:10/13;grid-row:2}
+#p-dis{grid-column:1/13;grid-row:3} .ticker{grid-column:1/13;grid-row:4}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a{font-size:.85rem;font-weight:600;color:var(--gold);white-space:nowrap}
+.pk .marke{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:.12rem .5rem;border-radius:.2rem;background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.pk .marke.g{background:rgba(69,176,201,.14);color:var(--gast);border-color:rgba(69,176,201,.5)}
+.pb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* KADER MIT FORM & MORAL */
+.tfk{display:flex;align-items:center;gap:1.1rem;font-size:.88rem;color:var(--leise);white-space:nowrap;flex:none;margin-bottom:.6rem;overflow:hidden}
+.tfk .zz{display:inline-flex;align-items:center;gap:.7rem;padding:.25rem .7rem;border-radius:.4rem;background:var(--flaeche-2);border:1px solid var(--linie)}
+.tfk .zz span{display:inline-flex;align-items:baseline;gap:.25rem} .tfk .zz b{font-size:1.05rem;color:var(--tinte)}
+.pfeil{font-weight:700;letter-spacing:-.12em;font-size:.82em;padding-right:.12em}
+.pfeil.s2,.pfeil.s1{color:var(--gut)} .pfeil.s0{color:var(--stumm);letter-spacing:0} .pfeil.s-1,.pfeil.s-2{color:var(--warn)}
+svg.ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
+.kk{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;flex:1;min-height:0}
+.sk{position:relative;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);background:#111;display:block;min-height:0}
+.sk:hover{border-color:var(--gold)}
+.sk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(4,6,10,.97) 80%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:.5rem;padding:.05rem .6rem .05rem .5rem;background:var(--gold);color:#17120a;font-weight:700;font-size:.88rem;clip-path:polygon(0 0,100% 0,calc(100% - .45rem) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:.5rem;right:.5rem;bottom:.45rem}
+.sk b{display:block;font:400 1.1rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:.78rem;color:var(--leise);white-space:nowrap}
+.sk .ov{display:flex;align-items:center;gap:.22rem;margin-top:.2rem;font-size:.88rem} .sk .ov strong{font-size:1.3rem;line-height:1;color:var(--creme);margin-right:auto}
+.sk .ov .mo{display:inline-flex;align-items:center;gap:.12rem;font-weight:700}
+
+/* KASSE */
+.kas{display:flex;align-items:flex-end;gap:.9rem;flex:none}
+.kas strong{font-size:2.3rem;line-height:.95;color:var(--creme)} .kas small{font-size:.85rem;color:var(--leise);padding-bottom:.15rem}
+.kurve{flex:1;min-height:1.6rem;margin:.35rem 0 .1rem;position:relative}
+.kurve svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.kx{display:flex;justify-content:space-between;font-size:.7rem;color:var(--stumm);letter-spacing:.08em;flex:none;margin-bottom:.3rem}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem;flex:none;white-space:nowrap}
+.zeile span{overflow:hidden;text-overflow:ellipsis} .zeile small{color:var(--leise);font-size:.8rem;margin-left:.35rem}
+.zeile strong{font-size:1.1rem}
+.zeile.next small{display:block;margin:0}
+.zeile.next{align-items:center;margin-top:.25rem;padding:.3rem .55rem;border:1px solid var(--linie-2);border-radius:.4rem;background:var(--flaeche-2)}
+.apr{flex:none;margin-top:.45rem;font-size:.85rem;color:var(--leise)}
+.apr .kopfz{display:flex;justify-content:space-between} .apr b{color:var(--tinte)}
+.apr .bn{position:relative;height:.5rem;background:rgba(255,255,255,.08);margin-top:.25rem;transform:skewX(-14deg)}
+.apr .bn i{display:block;height:100%;background:var(--gut)} .apr .bn u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:var(--acht)} .apr .bn u+u{background:var(--warn)}
+/* ===================== RAHMEN ===================== */
+.demo{padding-left:.9rem;position:relative;z-index:90}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+.demo a{cursor:pointer}
+.app{grid-template-rows:minmax(0,1fr);transition:grid-template-columns .22s ease}
+body.pin .app{grid-template-columns:15rem minmax(0,1fr)}
+body.arena:not(.rahmen) .app{grid-template-columns:0rem minmax(0,1fr)}
+
+/* --- Schiene --- */
+.rail{gap:.12rem;transition:width .16s ease,box-shadow .16s ease,transform .25s ease}
+body.pin .rail{width:15rem;box-shadow:none}
+body.pin .rail .grp,body.pin .rail a span.n,body.pin .rail .wer{opacity:1}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{margin:0;border-color:var(--heim);position:relative;overflow:visible}
+.rail .logo img{border-radius:.5rem}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer,body.navauf .rail .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem}
+.rail a{height:2.55rem;transition:color .12s,background .12s}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04))}
+.rail a.an::before{display:none}
+.rail .marker{position:absolute;left:0;width:.19rem;height:1.5rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7);transition:top .26s cubic-bezier(.3,1.3,.5,1)}
+.rail .zahl{top:.1rem}
+.rail a.pinan{color:var(--gold)}
+body.arena:not(.rahmen) .rail{transform:translateX(-100%);box-shadow:none}
+body.arena:not(.rahmen) .railplatz:hover .rail,body.arena.griffauf .rail{transform:none;width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.7)}
+body.arena:not(.rahmen) .railplatz:hover .rail .grp,body.arena:not(.rahmen) .railplatz:hover .rail a span.n,body.arena:not(.rahmen) .railplatz:hover .rail .wer{opacity:1}
+/* Griff: der einzige Rest des Rahmens im Arena-Vollbild */
+.griff{display:none;position:absolute;left:0;top:50%;width:.95rem;height:5.5rem;margin-top:-2.75rem;border-radius:0 .5rem .5rem 0;background:rgba(8,11,17,.78);border:1px solid var(--linie-2);border-left:0;place-items:center;color:var(--creme);font-size:.8rem}
+.griff u{position:absolute;right:-.3rem;top:-.3rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--warn);display:none}
+body.arena:not(.rahmen) .griff{display:grid}
+body.arena:not(.rahmen) .railplatz{width:.95rem}
+body.arena:not(.rahmen) .railplatz:hover .griff{display:none}
+body.arena.wartet .griff u{display:block}
+
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0;position:relative;transition:grid-template-rows .28s ease}
+body.arena .rechts{grid-template-rows:0rem minmax(0,1fr)}
+
+/* --- Regieband: EINE Zeile fuer Ort, Unterreiter, Seiten-Slot, Saison, Kasse, Suche, Inbox, Weiter --- */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);isolation:isolate;white-space:nowrap;transition:transform .28s ease,opacity .2s}
+body.arena .band{transform:translateY(-100%);opacity:0;pointer-events:none}
+.band .bkul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.band .bkul i{background-position:center 36%;background-size:cover;opacity:.5;transition:background-image .4s}
+.band .bkul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.band .bkul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.band::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.97) 0%,rgba(6,8,12,.8) 28%,rgba(6,8,12,.62) 55%,rgba(6,8,12,.9) 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.ort.neu em,.ort.neu h1{animation:hoch .3s both} .ort.neu h1{animation-delay:.04s}
+@keyframes hoch{from{opacity:0;transform:translateY(.5rem)}to{opacity:1;transform:none}}
+.reiter{display:flex;align-self:stretch;gap:.1rem;flex:none}
+.reiter a{position:relative;display:flex;align-items:flex-end;padding:0 .62rem .85rem;font-size:.9rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--leise)}
+.reiter a:hover{color:var(--tinte)}
+.reiter a.an{color:var(--creme)}
+.reiter a.an::after{content:"";position:absolute;left:.5rem;right:.5rem;bottom:-1px;height:.19rem;background:var(--gold);transform:skewX(-14deg)}
+.slot{flex:1;min-width:0;display:flex;justify-content:center;gap:.45rem;overflow:hidden}
+.slot.neu>*{animation:hoch .3s both} .slot.neu>:nth-child(2){animation-delay:.04s} .slot.neu>:nth-child(3){animation-delay:.08s} .slot.neu>:nth-child(4){animation-delay:.12s}
+.kpi.k{min-width:0;padding:.38rem 1.05rem .42rem 1.1rem}
+.kpi.k .gk{font-size:.64rem;display:block}
+.kpi.k strong{font-size:1.5rem;height:1.6rem}
+.kpi.k strong small{font-weight:500;font-size:.8rem;color:var(--leise)}
+.kpi.k .fm i{width:.82rem;height:.82rem}
+.sl{display:flex;align-items:center;gap:.5rem;padding:.4rem 1.05rem .4rem 1rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%);color:var(--leise)}
+.sl.an{background:linear-gradient(180deg,rgba(240,195,90,.22),rgba(14,19,29,.9));border-top:2px solid var(--gold);color:var(--tinte)}
+.sl u{text-decoration:none;font-weight:700;font-size:.8rem;padding:.1rem .4rem;border:1px solid var(--linie-2);border-radius:.2rem}
+.sl b{display:block;font:400 1.2rem/1 var(--haus);color:inherit}
+.sl small{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.sl strong{font-size:1.5rem;line-height:1;color:var(--creme);margin-left:.5rem}
+.regie{display:flex;align-items:center;gap:.55rem;flex:none}
+.chip{display:flex;flex-direction:column;justify-content:center;gap:.22rem;height:3rem;padding:0 .75rem;border-radius:.5rem;background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.chip:hover,.ikn:hover{border-color:var(--linie-2);background:var(--flaeche-2)}
+.chip .o{display:flex;align-items:baseline;gap:.4rem;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--leise)}
+.chip .o b{font-size:1.12rem;letter-spacing:0;color:var(--creme);font-weight:700;text-transform:none}
+.chip .o span{letter-spacing:0;text-transform:none;font-size:.82rem}
+.tk{display:flex;gap:.14rem}
+.tk i{width:.34rem;height:.5rem;transform:skewX(-14deg);background:rgba(255,255,255,.13);border-radius:1px}
+.tk i.s{background:var(--gut)} .tk i.u{background:var(--acht)} .tk i.n{background:var(--warn)}
+.tk i.j{background:var(--gold);box-shadow:0 0 .4rem var(--gold);height:.7rem;margin-top:-.1rem}
+.ikn{position:relative;width:3rem;height:3rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.2rem;color:var(--leise);background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.ikn kbd{position:absolute;right:.2rem;bottom:.12rem;font:600 .56rem/1 var(--zahl);color:var(--stumm)}
+.ikn .zahl{position:absolute;right:-.3rem;top:-.3rem;min-width:1.05rem;height:1.05rem;border-radius:.55rem;background:var(--warn);color:#fff;font:700 .7rem/1.05rem var(--zahl);text-align:center;padding:0 .2rem}
+.ikn.wack{animation:wack .5s} @keyframes wack{25%{transform:rotate(-14deg)}60%{transform:rotate(10deg)}}
+
+/* --- Taktgeber: Status + Hauptaktion in einem --- */
+.takt{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:.22rem;width:16rem;margin-left:.25rem}
+.tb{position:relative;height:2.6rem;padding:0 1.3rem;display:flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:1.02rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%);overflow:hidden;white-space:nowrap}
+.tb:hover{filter:brightness(1.08)}
+.tb .fuell{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gold);z-index:0}
+.tb>*:not(.fuell){position:relative;z-index:1}
+.ts{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--leise);padding-left:.7rem;overflow:hidden}
+.ts:hover{color:var(--tinte)}
+.ts i{width:.5rem;height:.5rem;border-radius:50%;background:var(--acht);flex:none}
+.ts b{color:var(--tinte);font-weight:600}
+.ts span{overflow:hidden;text-overflow:ellipsis}
+/* gesperrt */
+.takt.zu .tb{background:var(--flaeche-3);color:var(--leise);box-shadow:inset 0 0 0 1px var(--linie-2)}
+.takt.zu .ts i{background:var(--warn)}
+.takt.ruck .tb{animation:ruck .3s} @keyframes ruck{25%{transform:translateX(-.3rem)}75%{transform:translateX(.3rem)}}
+/* Aktion laeuft */
+.takt.laeuft .tb{background:var(--flaeche-3);color:var(--creme);cursor:progress}
+.takt.laeuft .tb .fuell{background:linear-gradient(90deg,rgba(240,195,90,.25),rgba(240,195,90,.6));transition:width .18s linear}
+.takt.laeuft .ts i{background:var(--gold);animation:blink .8s infinite alternate} @keyframes blink{to{opacity:.25}}
+.band .lauf{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden;opacity:0}
+.band .lauf::after{content:"";position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:lauf 1.1s linear infinite}
+@keyframes lauf{from{left:-30%}to{left:100%}}
+body.s-laeuft .band .lauf{opacity:1}
+/* Spieltag bereit */
+.takt.weiter .tb{animation:puls 1.6s ease-in-out infinite}
+.takt.weiter .tb::after{content:"";position:absolute;top:0;bottom:0;width:2.2rem;left:-3rem;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-20deg);animation:glanz 2.4s ease-in-out infinite}
+@keyframes glanz{0%,55%{left:-3rem}100%{left:110%}}
+@keyframes puls{50%{filter:brightness(1.18) drop-shadow(0 0 .5rem rgba(240,195,90,.8))}}
+.takt.weiter .ts i{background:var(--gut)}
+.takt.weiter::before{content:"";position:absolute;inset:-.35rem -.3rem 1rem -.3rem;z-index:-1;background:radial-gradient(closest-side,rgba(240,195,90,.35),transparent);animation:blink 1.6s infinite alternate}
+
+/* --- Aufklapper (Ablauf, Inbox) --- */
+.klapp{position:absolute;z-index:70;top:4.2rem;width:23rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 1.2rem 3rem rgba(0,0,0,.7);display:none;white-space:normal;overflow:hidden}
+.klapp.auf{display:block;animation:hoch .18s both}
+.klapp h3{margin:0;padding:.7rem .9rem .55rem;font:400 1.1rem/1 var(--haus);color:var(--creme);border-bottom:1px solid var(--linie)}
+.klapp h3 small{font:600 .72rem/1 var(--zahl);letter-spacing:.12em;text-transform:uppercase;color:var(--leise);margin-left:.5rem}
+.klapp .ent{max-height:none;min-height:3.2rem;flex:none}
+.klapp .fuss{padding:.5rem .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise)}
+#k-ablauf{right:1rem} #k-inbox{right:18rem}
+.ent.ok .tx{color:var(--leise)}
+
+/* --- Buehne und Seitenwechsel --- */
+main.buehne{display:block;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--grund)}
+.seite{position:absolute;inset:0}
+.seite:not(.an){display:none!important}
+.seite.raus{opacity:0;transform:translateY(-.35rem);transition:opacity .11s ease,transform .11s ease}
+.seite.rein>*{animation:auf .34s cubic-bezier(.2,.8,.3,1) both}
+.seite.rein>:nth-child(2){animation-delay:.03s} .seite.rein>:nth-child(3){animation-delay:.06s} .seite.rein>:nth-child(4){animation-delay:.09s}
+.seite.rein>:nth-child(5){animation-delay:.12s} .seite.rein>:nth-child(6){animation-delay:.15s} .seite.rein>:nth-child(7){animation-delay:.18s}
+@keyframes auf{from{opacity:0;transform:translateY(.9rem)}to{opacity:1;transform:none}}
+/* Sendewisch: nur beim Wechsel in die Arena und zurueck */
+.wisch{position:fixed;inset:0;z-index:200;pointer-events:none;overflow:hidden;display:none}
+.wisch.an{display:block}
+.wisch i{position:absolute;top:-10%;bottom:-10%;width:140%;left:-160%;transform:skewX(-14deg)}
+.wisch i:nth-child(1){background:var(--gold);animation:wisch .72s cubic-bezier(.6,0,.3,1) both}
+.wisch i:nth-child(2){background:#06080c;animation:wisch .72s cubic-bezier(.6,0,.3,1) .07s both}
+.wisch b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:400 4.2rem/1 var(--haus);color:var(--creme);white-space:nowrap;opacity:0;animation:wtext .72s .07s both}
+.wisch b small{display:block;text-align:center;font:700 1rem/1.6 var(--zahl);letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
+@keyframes wisch{0%{left:-160%}45%,55%{left:-20%}100%{left:120%}}
+@keyframes wtext{0%,25%{opacity:0}40%,60%{opacity:1}75%,100%{opacity:0}}
+
+/* --- Meldungen (Bauchbinden unten rechts) --- */
+.meld{position:fixed;z-index:80;right:1rem;bottom:1rem;display:flex;flex-direction:column;gap:.5rem;width:24rem}
+.mb{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.7rem;align-items:center;padding:.65rem .9rem .7rem 1rem;background:rgba(12,16,23,.97);border:1px solid var(--linie-2);border-left:.25rem solid var(--gold);border-radius:.35rem;box-shadow:0 .8rem 2rem rgba(0,0,0,.6);animation:mrein .32s cubic-bezier(.2,.8,.3,1) both;overflow:hidden}
+.mb.w{border-left-color:var(--warn)} .mb.g{border-left-color:var(--gut)}
+.mb .ic{font-size:1.4rem;color:var(--gold)} .mb.w .ic{color:var(--warn)} .mb.g .ic{color:var(--gut)}
+.mb b{display:block;font:400 1.08rem/1.15 var(--haus);color:#fff}
+.mb small{font-size:.86rem;color:var(--leise)}
+.mb a{color:var(--gold);font-weight:600;font-size:.86rem}
+.mb u{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--gold);opacity:.6;animation:ablauf 6s linear both}
+.mb.geht{animation:mraus .25s both}
+@keyframes mrein{from{opacity:0;transform:translateX(2rem)}to{opacity:1;transform:none}}
+@keyframes mraus{to{opacity:0;transform:translateX(2rem)}}
+@keyframes ablauf{from{width:100%}to{width:0}}
+body.arena .meld{display:none}
+
+/* --- Suche (Befehlspalette) --- */
+.schleier{position:fixed;inset:0;z-index:100;background:rgba(2,3,5,.72);display:none;backdrop-filter:blur(3px)}
+.schleier.auf{display:block}
+.pal{position:absolute;left:50%;top:16%;width:38rem;margin-left:-19rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 2rem 5rem rgba(0,0,0,.8);overflow:hidden;animation:hoch .18s both}
+.pal input{width:100%;height:3.4rem;padding:0 1.1rem;background:none;border:0;border-bottom:1px solid var(--linie);color:var(--tinte);font:500 1.25rem var(--zahl);outline:0}
+.pal .gk{display:block;padding:.6rem 1.1rem .2rem}
+.pal a{display:flex;align-items:center;gap:.7rem;padding:.5rem 1.1rem;font-size:1.05rem;color:var(--tinte)}
+.pal a img{width:1.8rem;height:1.8rem;border-radius:.25rem;object-fit:cover}
+.pal a svg{font-size:1.2rem;color:var(--leise);width:1.8rem}
+.pal a small{margin-left:auto;color:var(--stumm);font-size:.82rem}
+.pal a.an,.pal a:hover{background:rgba(240,195,90,.14)}
+.pal .fuss{display:flex;gap:1.2rem;padding:.5rem 1.1rem;border-top:1px solid var(--linie);font-size:.8rem;color:var(--stumm)}
+/* --- Office als Blatt --- */
+.blatt{position:absolute;right:0;top:0;bottom:0;width:30rem;background:var(--flaeche-1);border-left:1px solid var(--linie-2);box-shadow:-2rem 0 4rem rgba(0,0,0,.7);display:flex;flex-direction:column;animation:brein .26s cubic-bezier(.2,.8,.3,1) both}
+@keyframes brein{from{transform:translateX(100%)}to{transform:none}}
+.blatt .pk{height:4.5rem} .blatt .pk h2{font-size:1.6rem}
+.blatt .ents{flex:none} .blatt .ent{min-height:4.2rem;flex:none}
+.blatt p{margin:auto 1rem 1rem;font-size:.86rem;color:var(--stumm)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01s!important;animation-iteration-count:1!important;transition-duration:.01s!important}}
+/* ===================== BEREICH ENTWICKLUNG: TRAINING UND GEBAEUDE (neu, 18.11.) ===================== */
+:root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a;--reha:#9aa7ba;--z0:#62d394;--z1:#e8c34a;--z2:#f08a3c;--z3:#ff5a52}
+.reiter a small{font-size:.6rem;margin-left:.3rem;padding:.02rem .3rem;border-radius:.6rem;background:var(--warn);color:#fff;letter-spacing:0;align-self:flex-end;margin-bottom:.15rem}
+.takt.warn .ts i{background:var(--warn);animation:blink .7s infinite alternate}
+.seite{display:grid;gap:.72rem;padding:.8rem 1rem}
+.pk small{font-size:.86rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk .seg{margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden;flex:none}
+.seg a{padding:.16rem .6rem;font-size:.82rem;font-weight:700;letter-spacing:.04em;color:var(--leise);border-left:1px solid var(--linie)}
+.seg a:first-child{border-left:0}
+.seg a:hover{color:var(--tinte);background:var(--flaeche-3)}
+.seg a.an{background:var(--gold);color:#17120a}
+.seg a.an.l{background:var(--z0)} .seg a.an.h{background:var(--z2)}
+.seg a.wu{box-shadow:inset 0 -2px 0 var(--gast)}
+.mk{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.1rem .42rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap}
+.mk.p{color:var(--gut);border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.1)}
+.mk.n{color:var(--gast);border-color:rgba(69,176,201,.5);background:rgba(69,176,201,.1)}
+.mk.w{color:var(--warn);border-color:rgba(255,96,88,.55);background:rgba(255,96,88,.12)}
+.mk.a{color:var(--acht);border-color:rgba(243,181,74,.5);background:rgba(243,181,74,.1)}
+.mk.g{color:var(--gold);border-color:rgba(240,195,90,.55);background:rgba(240,195,90,.12)}
+.mk.neu{color:#c9a7ff;border-color:rgba(201,167,255,.5);background:rgba(201,167,255,.1)}
+.ax{display:inline-block;width:.55rem;height:.55rem;border-radius:1px;transform:skewX(-14deg);flex:none}
+.ax.a0{background:var(--pow)} .ax.a1{background:var(--spe)} .ax.a2{background:var(--men)} .ax.a3{background:var(--soc)}
+.dk{display:inline-block;min-width:2.3rem;text-align:center;font-weight:700;font-size:.8rem;letter-spacing:.04em;padding:.08rem .3rem;border-radius:.2rem;background:var(--flaeche-3);color:var(--creme)}
+.kn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.3rem;padding:0 1rem;font-weight:700;font-size:.92rem;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--linie-2);border-radius:.3rem;color:var(--creme);white-space:nowrap}
+.kn:hover{border-color:var(--gold);color:#fff}
+.kn.gold{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.kn.rot{background:rgba(255,96,88,.16);border-color:var(--warn);color:#ffd9d6}
+.kn.zu{opacity:.45;cursor:not-allowed}
+.hinw{font-size:.84rem;color:var(--leise);line-height:1.3}
+/* ===================== GEMEINSAME BAUSTEINE DER VIER SEITEN-MOCKUPS (18.11., fehlende Seiten) ===================== */
+:root{--chris:#F2A03D;--franky:#45B0C9;--ramona:#c9a7ff;--ki:#66738a}
+.demo{gap:.6rem}
+.demo .dg{display:inline-flex;gap:.3rem;align-items:center}
+.pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
+.pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
+.pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
+.pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
+.ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.ptr.k{width:1.9rem;height:1.9rem;border-radius:.3rem}
+.ptr.g{width:5.5rem;height:5.5rem;border-radius:.6rem}
+.lg{width:2.2rem;height:2.2rem;border-radius:.35rem;object-fit:cover;border:1px solid var(--linie-2);flex:none}
+.lg.k{width:1.5rem;height:1.5rem;border-radius:.25rem}
+/* Menschen am Tisch: Chris, Franky, Ramona, KI */
+.mn{display:inline-grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;font-weight:700;font-size:.92rem;color:#0b0e14;flex:none;background:var(--ki)}
+.mn.c{background:var(--chris)} .mn.f{background:var(--franky)} .mn.r{background:var(--ramona)} .mn.k{background:#2a3344;color:var(--leise)}
+.mn.g{width:3rem;height:3rem;font-size:1.4rem}
+.mn.s{width:1.3rem;height:1.3rem;font-size:.7rem}
+/* schraeger Balken */
+.bal{position:relative;height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);border-radius:1px;min-width:2rem}
+.bal i{display:block;height:100%;background:var(--gold);border-radius:1px}
+.bal i.g{background:var(--gut)} .bal i.w{background:var(--warn)} .bal i.a{background:var(--acht)} .bal i.b{background:var(--gast)}
+.bal u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}
+.bal s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(90deg,rgba(240,195,90,.5) 0 2px,transparent 2px 5px)}
+/* Kachel mit Zahl */
+.ka{padding:.5rem .7rem .55rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.45rem;min-width:0}
+.ka strong{display:block;font-size:1.6rem;line-height:1.05;color:var(--creme);white-space:nowrap}
+.ka strong small{font-size:.85rem;font-weight:500;color:var(--leise)}
+.ka small{font-size:.82rem;color:var(--leise)}
+.kas3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.kas2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.kas4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem}
+/* Abschnittstitel in einer Karte */
+.ab{display:flex;align-items:center;gap:.5rem;margin:.75rem 0 .4rem;flex:none}
+.ab:first-child{margin-top:0}
+.ab::after{content:"";flex:1;height:1px;background:var(--linie)}
+.ab b{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
+.ab span{font-size:.82rem;color:var(--stumm);white-space:nowrap}
+/* Schalter */
+.sw{position:relative;width:2.9rem;height:1.5rem;border-radius:.2rem;background:var(--flaeche-3);border:1px solid var(--linie-2);flex:none;transform:skewX(-14deg);transition:background .15s}
+.sw::after{content:"";position:absolute;top:.14rem;left:.14rem;width:1.1rem;height:1.1rem;background:var(--leise);border-radius:1px;transition:left .15s,background .15s}
+.sw.an{background:rgba(240,195,90,.3);border-color:var(--gold)} .sw.an::after{left:1.55rem;background:var(--gold)}
+.txt{font-size:.95rem;line-height:1.35;color:var(--leise)} .txt b{color:var(--tinte);font-weight:600}
+.neu-m{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.05rem .35rem;border-radius:.2rem;color:#c9a7ff;border:1px solid rgba(201,167,255,.5);background:rgba(201,167,255,.1);white-space:nowrap;vertical-align:.1em}
+.leer{margin:auto;text-align:center;color:var(--leise);font-size:1rem;max-width:26rem}
+.leer b{display:block;font:400 1.5rem/1.2 var(--haus);color:var(--creme);margin-bottom:.3rem}
+.leer svg{font-size:2.6rem;color:var(--gut);margin-bottom:.4rem}
+
+/* ===================== HISTORIE, SPIELPLAN, RANKS (neu, 18.11.) ===================== */
+:root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a;--l1:#f0c35a;--l2:#45B0C9}
+.seite{display:grid;gap:.72rem;padding:.8rem 1rem;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+#s-archiv{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 25rem}
+#s-transfers{grid-template-columns:24rem minmax(0,1fr) 25.5rem}
+#s-ewig{grid-template-columns:minmax(0,1fr) 37rem;grid-template-rows:minmax(0,1fr)}
+#s-spielplan{grid-template-columns:minmax(0,1fr) 35rem;grid-template-rows:minmax(0,1fr)}
+#s-ranks{grid-template-rows:minmax(0,1fr)}
+#s-ranks.pp{grid-template-columns:minmax(0,1fr) 30rem}
+.spalte{display:flex;flex-direction:column;gap:.72rem;min-height:0;min-width:0}
+.spalte>.pan{flex:1 1 0}
+.spalte>.pan.fix{flex:none}
+.voll{grid-column:1/-1}
+.pk small{font-size:.86rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pb.null{padding:0}
+
+/* --- Marken --- */
+.tg{display:inline-flex;align-items:center;gap:.25rem;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.1rem .4rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap;flex:none;line-height:1.2}
+.tg.g{color:var(--gut);border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.1)}
+.tg.w{color:var(--warn);border-color:rgba(255,96,88,.5);background:rgba(255,96,88,.1)}
+.tg.go{color:var(--gold);border-color:rgba(240,195,90,.55);background:rgba(240,195,90,.1)}
+.tg.l1{color:var(--l1);border-color:rgba(240,195,90,.45)}
+.tg.l2{color:var(--l2);border-color:rgba(69,176,201,.5)}
+.tg.voll2{color:#17120a;background:var(--gold);border-color:var(--gold)}
+/* --- Umschalter --- */
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.35rem;overflow:hidden;flex:none}
+.seg a{padding:.22rem .65rem;font-size:.86rem;font-weight:600;color:var(--leise);white-space:nowrap}
+.seg a+a{border-left:1px solid var(--linie)}
+.seg a:hover{color:var(--tinte);background:var(--flaeche-2)}
+.seg a.an{background:var(--gold);color:#17120a}
+.wahl{height:1.75rem;padding:0 .5rem;background:var(--flaeche-2);border:1px solid var(--linie-2);border-radius:.35rem;color:var(--tinte);font:600 .86rem var(--zahl);flex:none;max-width:9.5rem}
+input.wahl{width:9.5rem;outline:0} input.wahl:focus{border-color:var(--gold)}
+.kn{display:inline-flex;align-items:center;gap:.35rem;height:2.1rem;padding:0 .8rem;border:1px solid var(--linie-2);border-radius:.35rem;font-weight:700;font-size:.9rem;letter-spacing:.06em;text-transform:uppercase;color:var(--creme);white-space:nowrap}
+.kn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* --- Saison-Zeitleiste: Fenster und Saisons im Wechsel --- */
+.zl{display:flex;align-items:stretch;height:4.9rem;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.zl a{position:relative;display:flex;align-items:center;gap:.65rem;padding:0 .9rem 0 1.15rem;min-width:0;white-space:nowrap;color:var(--leise);border-top:2px solid transparent}
+.zl a+a{border-left:1px solid var(--linie)}
+.zl a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.zl.ar a.sa{flex:1 1 0} .zl.ar a.fe{flex:none;width:8.6rem} .zl.tr a.fe{flex:1 1 0} .zl.tr a.sa{flex:none} .zl a.al{flex:none;padding:0 1.1rem}
+.zl .eig span{font-size:.84rem;color:var(--leise)}
+.zl a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(14,19,29,.2));border-top-color:var(--gold);color:var(--tinte)}
+.zl a.neben{opacity:.62} .zl a.neben:hover{opacity:1}
+.zl a+a::before{content:"";position:absolute;left:-.42rem;top:50%;width:.8rem;height:.8rem;margin-top:-.4rem;transform:rotate(45deg);background:var(--flaeche-1);border-top:1px solid var(--linie);border-right:1px solid var(--linie);z-index:1}
+.zl .nr{font:400 2rem/1 var(--haus);color:var(--creme);flex:none}
+.zl .nr small{display:block;font:700 .62rem/1.3 var(--zahl);letter-spacing:.16em;text-transform:uppercase;color:var(--stumm)}
+.zl .tx{min-width:0;display:flex;flex-direction:column;gap:.1rem;overflow:hidden}
+.zl .tx small{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--stumm)}
+.zl .tx b{font-size:1rem;font-weight:600;color:var(--tinte);overflow:hidden;text-overflow:ellipsis}
+.zl .ic2{font-size:1.35rem;color:var(--stumm);flex:none}
+.zl a.an .ic2{color:var(--gold)}
+.zl .eig{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;flex:none}
+.zl .eig b{font-size:1.05rem;color:var(--creme);font-weight:700}
+.zl .eig span{display:flex;gap:.3rem;align-items:center}
+
+/* --- Tabellen-Sprache: Kopfzeile, Zeilen, Zonen --- */
+.tl{display:flex;flex-direction:column;flex:1;min-height:0}
+.tl.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
+.th,.tz{display:grid;gap:.5rem;align-items:center;padding:0 .9rem 0 .55rem;width:100%;text-align:right;white-space:nowrap}
+.th{height:1.9rem;flex:none;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--stumm);border-bottom:1px solid var(--linie);background:var(--flaeche-1)}
+.tl.sc .th{position:sticky;top:0;z-index:2}
+.th a{color:inherit} .th a:hover{color:var(--tinte)} .th a.an{color:var(--gold)}
+.th .li,.tz .li{text-align:left}
+.th .mi,.tz .mi{text-align:center}
+.tz{position:relative;flex:1 1 0;min-height:2.2rem;border-bottom:1px solid rgba(244,230,196,.06);font-size:1.02rem;cursor:pointer}
+.tl.sc .tz{flex:none;height:2.65rem}
+.tz:hover{background:var(--flaeche-2)}
+.tz.ich{background:linear-gradient(90deg,rgba(240,195,90,.17),rgba(240,195,90,.03));box-shadow:inset 0 0 0 1px rgba(240,195,90,.4)}
+.tz.gew{background:rgba(240,195,90,.1);box-shadow:inset 0 0 0 1px var(--gold)}
+.tz::before{content:"";position:absolute;left:0;top:.3rem;bottom:.3rem;width:.19rem;border-radius:0 2px 2px 0}
+.tz.zm::before{background:var(--gold)} .tz.zu::before{background:var(--gut)} .tz.zd::before{background:var(--warn)}
+.tz .rg{text-align:center;font-weight:700;font-size:1.12rem;color:var(--creme)}
+.tz .nm{display:flex;align-items:center;gap:.5rem;min-width:0;text-align:left;font-weight:600;color:var(--tinte)}
+.tz .nm>span{overflow:hidden;text-overflow:ellipsis}
+.tz .nm small{display:block;font-size:.76rem;font-weight:500;color:var(--stumm);line-height:1}
+.tz b.gr{font-size:1.18rem;color:var(--creme)}
+.tz .lz{color:var(--leise)}
+.tz .aw{font-size:.94rem;color:var(--leise)}
+.ap{color:var(--pow)!important} .as{color:var(--spe)!important} .am{color:var(--men)!important} .ao{color:var(--soc)!important}
+.trenner{flex:none;display:flex;align-items:center;gap:.6rem;height:1.7rem;padding:0 .9rem;background:var(--flaeche-2);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--leise);border-bottom:1px solid var(--linie)}
+.trenner span{color:var(--stumm);letter-spacing:.04em;text-transform:none;font-size:.82rem;font-weight:500}
+.fuss{flex:none;display:flex;align-items:center;gap:.9rem;height:2.1rem;padding:0 .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.fuss i.z{display:inline-block;width:.19rem;height:.9rem;border-radius:1px;margin-right:.35rem;vertical-align:-.15em}
+.fuss .sp{flex:1}
+.fuss a{color:var(--gold);font-weight:600}
+.hinweis{flex:none;display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;background:rgba(240,195,90,.08);border-bottom:1px solid rgba(240,195,90,.3);font-size:.92rem;color:var(--creme);white-space:normal;line-height:1.25}
+.hinweis svg{font-size:1.2rem;color:var(--gold)}
+.hinweis b{font-weight:700}
+
+/* --- Saison-Archiv: rechte Spalte --- */
+.kopfpaar{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.mei{display:flex;align-items:center;gap:.6rem;padding:.55rem .65rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.45rem;min-width:0;cursor:pointer}
+.mei:hover{border-color:var(--linie-2)}
+.mei.go{border-color:rgba(240,195,90,.55);background:linear-gradient(180deg,rgba(240,195,90,.16),var(--flaeche-2))}
+.mei img{width:2.9rem;height:2.9rem;border-radius:.4rem;object-fit:cover;flex:none}
+.mei span{min-width:0} .mei small{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise)}
+.mei b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mei em{font-style:normal;font-size:.84rem;color:var(--leise)}
+.wechsel{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem}
+.wechsel>div{padding:.45rem .6rem;border-radius:.45rem;border:1px solid var(--linie);background:var(--flaeche-2)}
+.wechsel small{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:.3rem}
+.wechsel .wr{display:flex;gap:.35rem}
+.wechsel img{width:2.1rem;height:2.1rem;border-radius:.3rem;object-fit:cover;cursor:pointer;border:1px solid var(--linie-2)}
+.wechsel img:hover{border-color:var(--gold)}
+.kz{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:.55rem;align-items:center;height:2.25rem;border-top:1px solid rgba(244,230,196,.07);font-size:.98rem;cursor:pointer;flex:none}
+.kz:hover{background:var(--flaeche-2)}
+.kz span.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.kz small{color:var(--leise);font-size:.84rem}
+.kz b{font-size:1.1rem;min-width:2.2rem;text-align:right}
+.zeug{display:flex;gap:.8rem;align-items:center}
+.zeug img{width:4rem;height:4rem;border-radius:.5rem;object-fit:cover;border:2px solid var(--heim);flex:none}
+.zeug h3{margin:0 0 .2rem;font:400 1.25rem/1.1 var(--haus);color:#fff}
+
+/* --- Transfers --- */
+.tb2{display:flex;align-items:center;gap:.45rem;padding:.45rem .9rem;border-bottom:1px solid var(--linie);flex:none;flex-wrap:nowrap;overflow:hidden}
+.tb2 .sp{flex:1}
+.tb2 .gk{font-size:.64rem}
+.bz{display:grid;grid-template-columns:auto minmax(0,1fr) 5.6rem 3.9rem;gap:.5rem;align-items:center;height:2.55rem;padding:0 .7rem 0 .6rem;border-bottom:1px solid rgba(244,230,196,.06);cursor:pointer;flex:none;font-size:.96rem;position:relative}
+.bz:hover{background:var(--flaeche-2)}
+.bz.an{background:rgba(240,195,90,.12);box-shadow:inset 0 0 0 1px var(--gold)}
+.bz.ich{background:linear-gradient(90deg,rgba(240,195,90,.17),rgba(240,195,90,.03))}
+.bz .n{min-width:0;font-weight:600;line-height:1.05} .bz .n span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bz .n small{font-size:.76rem;font-weight:500;color:var(--stumm)}
+.bz b{text-align:right;font-size:1.05rem}
+.dv{position:relative;height:.5rem;display:grid;grid-template-columns:1fr 1fr;gap:2px;transform:skewX(-14deg)}
+.dv i{display:block;height:100%;background:rgba(255,255,255,.07);position:relative}
+.dv i u{position:absolute;top:0;bottom:0;border-radius:1px}
+.dv i:first-child u{right:0;background:var(--warn)} .dv i:last-child u{left:0;background:var(--gut)}
+.bud{position:relative;height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg)}
+.bud u{position:absolute;left:0;top:0;bottom:0;background:var(--gold)}
+.weg{display:flex;align-items:center;gap:.3rem;min-width:0;text-align:left}
+.weg span{font-weight:600;font-size:.92rem;color:var(--tinte)} .weg span.m{color:var(--stumm);font-weight:500}
+.weg svg{color:var(--stumm);font-size:.9rem}
+.art{justify-self:start}
+.tz .ptr.k{width:1.95rem;height:1.95rem}
+.top{display:grid;grid-template-columns:1.2rem auto minmax(0,1fr) auto;gap:.55rem;align-items:center;height:2.6rem;border-top:1px solid rgba(244,230,196,.07);cursor:pointer;flex:none}
+.top:first-of-type{border-top:0}
+.top:hover{background:var(--flaeche-2)}
+.top i{font-style:normal;font-weight:700;color:var(--stumm);text-align:center} .top:nth-of-type(-n+3) i{color:var(--gold)}
+.top .n{min-width:0;line-height:1.1} .top .n b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .n small{font-size:.8rem;color:var(--leise)}
+.top strong{font-size:1.15rem;color:var(--creme)}
+.blick{display:flex;gap:.8rem;align-items:center;margin-bottom:.6rem}
+.blick h3{margin:0;font:400 1.4rem/1.1 var(--haus);color:#fff}
+.blick small{font-size:.88rem;color:var(--leise)}
+.wegg{display:flex;align-items:center;gap:.5rem;margin:.1rem 0 .6rem;font-size:.95rem;font-weight:600;white-space:nowrap;overflow:hidden}
+.wegg svg{color:var(--gold)}
+.spark{height:3.4rem;position:relative;margin-top:.3rem;flex:none}
+.spark svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+
+/* --- Verlaufs-Grafik --- */
+.graf{position:relative;flex:1;min-height:0}
+.graf svg{position:absolute;inset:0;width:100%;height:100%}
+.graf text{font-family:var(--zahl);fill:var(--leise);font-size:12px}
+.leg{display:flex;flex-wrap:wrap;gap:.3rem .8rem;font-size:.84rem;color:var(--leise);flex:none;margin-top:.4rem}
+.leg span{display:inline-flex;align-items:center;gap:.3rem;cursor:pointer;white-space:nowrap}
+.leg i{width:.9rem;height:.19rem;border-radius:1px;display:inline-block}
+/* Verlaufs-Kacheln je Saison (Ewige Tabelle, Blatt) */
+.vk{display:flex;gap:.22rem;justify-content:flex-end}
+.vk i{font-style:normal;width:2rem;height:1.55rem;display:grid;place-items:center;font-weight:700;font-size:.92rem;border-radius:.2rem;background:rgba(240,195,90,.14);color:var(--l1);border:1px solid rgba(240,195,90,.3);position:relative}
+.vk i.b{background:rgba(69,176,201,.12);color:var(--l2);border-color:rgba(69,176,201,.32)}
+.vk i.t{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.vk i.lf{border-style:dashed;opacity:.75}
+.vk i.auf::after,.vk i.abs::after{content:"";position:absolute;right:-.2rem;top:-.25rem;border:.24rem solid transparent}
+.vk i.auf::after{border-bottom-color:var(--gut)} .vk i.abs::after{border-top-color:var(--warn);top:auto;bottom:-.25rem}
+.gz{display:grid;grid-template-columns:5.4rem minmax(0,1fr) minmax(0,1fr);gap:.5rem;align-items:center;min-height:2.6rem;border-top:1px solid rgba(244,230,196,.07);font-size:.92rem;flex:none}
+.gz:first-of-type{border-top:0}
+.gz b{font:400 1.05rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.gz div{display:flex;align-items:center;gap:.25rem;min-width:0}
+.gz img{width:1.7rem;height:1.7rem;border-radius:.25rem;object-fit:cover;cursor:pointer;border:1px solid var(--linie-2)}
+.gz svg{font-size:.9rem}
+
+/* --- Blatt: Team-Verlauf --- */
+.schl{position:absolute;inset:0;z-index:48;background:rgba(2,3,5,.55);display:none}
+.schl.auf{display:block}
+.blatt{width:38rem;z-index:50;display:none}
+.blatt.auf{display:flex}
+.blatt .pk{gap:.8rem}
+.blatt .pk img{width:3rem;height:3rem;border-radius:.45rem;object-fit:cover;border:1px solid var(--linie-2)}
+.blatt .pk .x{margin-left:auto;font-size:1.4rem;color:var(--leise);width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:.4rem}
+.blatt .pk .x:hover{background:var(--flaeche-2);color:var(--tinte)}
+.blatt .pk div{min-width:0;line-height:1.1} .blatt .pk div small{display:block;margin-top:.15rem}
+.blatt .graf{flex:none;height:13rem}
+.blatt .tz{flex:none;height:2.4rem;cursor:default}
+.blatt .tz:hover{background:none}
+
+/* --- Spielplan --- */
+.plan{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:.5rem;flex:1;min-height:0}
+.st{display:flex;flex-direction:column;gap:.3rem;padding:.5rem .6rem;border:1px solid var(--linie);border-radius:.5rem;background:var(--flaeche-2);min-height:0;min-width:0;overflow:hidden}
+.st.heute{border-color:var(--gold);box-shadow:0 0 1rem rgba(240,195,90,.25);background:linear-gradient(180deg,rgba(240,195,90,.14),var(--flaeche-2))}
+.st.kommt{background:transparent}
+.st .ko{display:flex;align-items:center;gap:.45rem;white-space:nowrap}
+.st .ko b{font:400 1.25rem/1 var(--haus);color:var(--creme)}
+.st .ko small{font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--stumm)}
+.st .ko .erg{margin-left:auto;font-weight:700;font-size:1.05rem}
+.st .ko img{width:1.4rem;height:1.4rem;border-radius:.2rem;object-fit:cover;margin-left:auto}
+.st .ko img+.erg{margin-left:0}
+.sl2{display:flex;align-items:center;gap:.45rem;flex:1;min-height:0;padding:0 .5rem;border-radius:.3rem;background:rgba(255,255,255,.04);border-left:.22rem solid var(--ac);white-space:nowrap;overflow:hidden}
+.sl2 small{font-size:.62rem;letter-spacing:.12em;font-weight:700;color:var(--stumm)}
+.sl2 b{font-weight:600;font-size:1rem;overflow:hidden;text-overflow:ellipsis}
+.sl2 em{margin-left:auto;font-style:normal;font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--ac)}
+.st.kommt .sl2 b{color:var(--leise)}
+
+/* --- Ranks-Matrix --- */
+.mx .th,.mx .tz{gap:.18rem;padding-right:.5rem}
+.mx .th{height:2.2rem;font-size:.62rem;letter-spacing:.04em}
+.mx .th span{overflow:hidden;text-overflow:ellipsis}
+.mx .band2{display:grid;gap:.18rem;padding:0 .5rem 0 .55rem;height:1.45rem;flex:none;align-items:stretch;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;background:var(--flaeche-1)}
+.mx .band2 span{display:grid;place-items:center;border-bottom:2px solid currentColor;background:rgba(255,255,255,.03)}
+.mx .c{display:grid;place-items:center;height:1.7rem;border-radius:.2rem;font-weight:700;font-size:.98rem;color:var(--leise);background:rgba(255,255,255,.03)}
+.mx .c.r1{background:rgba(98,211,148,.3);color:#d9ffe9} .mx .c.r2{background:rgba(98,211,148,.13);color:var(--gut)}
+.mx .c.r4{background:rgba(255,96,88,.12);color:#ff9d97} .mx .c.r5{background:rgba(255,96,88,.3);color:#ffe1df}
+.mx .c.agg{font-size:1.05rem;border:1px solid var(--linie)}
+.ppz{display:grid;grid-template-columns:2rem 15rem minmax(0,1fr) 4.2rem 4.6rem;gap:.6rem;align-items:center}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-spieler" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-bau" viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M3 21h18M9 21v-7h6v7"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-karte" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-rank" viewBox="0 0 24 24"><path d="M8 21V9h8v12M2 21v-7h6M16 21v-9h6v9M1 21h22"/></symbol>
+  <symbol id="i-kal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-buero" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/></symbol>
+  <symbol id="i-flagge" viewBox="0 0 24 24"><path d="M5 21V4h13l-3 4 3 4H5"/></symbol>
+  <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-ton" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 9c1.5 1.5 1.5 4.5 0 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-rahmen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/></symbol>
+  <symbol id="i-stern" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-waage" viewBox="0 0 24 24"><path d="M12 4v16M6 20h12M4 8h16M4 8l-2 6h6zM20 8l-2 6h6z"/></symbol>
+  <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-kreuz" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8M4 5v4h4M12 8v5l3 2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18v.5"/></symbol>
+  <symbol id="i-hoch" viewBox="0 0 24 24"><path d="M12 20V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-werk" viewBox="0 0 24 24"><path d="M14 6a4 4 0 005 5l-9 9-4-4 9-9zM5 19l-2 2"/></symbol>
+  <symbol id="i-herz" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
+  <symbol id="i-ziel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></symbol>
+  <symbol id="i-ki" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M12 7V3M9 12v2M15 12v2M2 12v3M22 12v3"/></symbol>
+  <symbol id="i-g0" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-g1" viewBox="0 0 24 24"><path d="M3 18v-6h18v6M3 12V7M7 12V9h5v3M3 20v-2M21 20v-2"/></symbol>
+  <symbol id="i-g2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-g3" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-g4" viewBox="0 0 24 24"><path d="M4 9l2-5h12l2 5M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></symbol>
+  <symbol id="i-g5" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="6"/><ellipse cx="12" cy="12" rx="5" ry="2.5"/></symbol>
+  <symbol id="i-g6" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5zM6 11v5c3 3 9 3 12 0v-5M22 9v6"/></symbol>
+  <symbol id="i-g7" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-rad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-pokal" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 01-10 0zM7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4M12 14v3M8 20h8"/></symbol>
+  <symbol id="i-vertrag" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4v13H6zM14.5 3.5V8H19M9 12h6M9 15.5h4"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M12 6.5l-3.5 3a1.6 1.6 0 002.2 2.3L13 9.5l5 4.5M2.5 7L7 5l5 1.5L17 5l4.5 2M6 13l4 4a1.5 1.5 0 002.1-2.1"/></symbol>
+  <symbol id="i-zeitung" viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2h-1M7 9h7M7 12.5h7M7 16h4"/></symbol>
+  <symbol id="i-auge" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-nebel" viewBox="0 0 24 24"><path d="M4 8h13M7 12h13M4 16h10M17 16h3"/></symbol>
+  <symbol id="i-griff" viewBox="0 0 24 24"><path d="M9 6v.1M15 6v.1M9 12v.1M15 12v.1M9 18v.1M15 18v.1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H5zM8 3v6h8V3M8 21v-7h8v7"/></symbol>
+  <symbol id="i-uhr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-kopie" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></symbol>
+  <symbol id="i-muell" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-krone" viewBox="0 0 24 24"><path d="M3 18l-1-10 6 4 4-7 4 7 6-4-1 10zM3 21h18"/></symbol>
+  <symbol id="i-u" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-o" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+</defs></svg>
+
+<div class="demo" id="demo"></div>
+
+<div class="app">
+  <div class="railplatz">
+    <nav class="rail" id="rail" aria-label="Hauptnavigation">
+      <i class="marker" id="marker"></i>
+      <div class="kopf"><span class="logo" title="Aktives Team wechseln"><img src="../team-logos/V-W.jpg" alt=""></span><span class="wer"><b>Vigilante Wranglers</b><small id="r-lage"></small></span></div>
+      <div class="grp">Spieltag</div>
+      <a><svg class="i"><use href="#i-home"/></svg><span class="n">Home</span></a>
+      <a><svg class="i"><use href="#i-post"/></svg><span class="zahl">3</span><span class="n">Inbox</span></a>
+      <a><svg class="i"><use href="#i-liste"/></svg><span class="n">Einsatzliste</span></a>
+      <a><svg class="i"><use href="#i-arena"/></svg><span class="n">Arena</span></a>
+      <a><svg class="i"><use href="#i-tab"/></svg><span class="n">Saisonstand</span></a>
+      <div class="grp">Team</div>
+      <a><svg class="i"><use href="#i-team"/></svg><span class="n">Teams</span></a>
+      <a><svg class="i"><use href="#i-spieler"/></svg><span class="n">Spieler</span></a>
+      <a><svg class="i"><use href="#i-train"/></svg><span class="n">Entwicklung</span></a>
+      <div class="grp">Markt</div>
+      <a><svg class="i"><use href="#i-markt"/></svg><span class="n">Transfermarkt</span></a>
+      <a><svg class="i"><use href="#i-scout"/></svg><span class="n">Scouting</span></a>
+      <a><svg class="i"><use href="#i-geld"/></svg><span class="n">Finanzen</span></a>
+      <div class="grp">Welt</div>
+      <a data-s="ans:ranks" data-r="ranks"><svg class="i"><use href="#i-rank"/></svg><span class="n">Ranks</span></a>
+      <a data-s="ans:spielplan" data-r="spielplan"><svg class="i"><use href="#i-kal"/></svg><span class="n">Spielplan</span></a>
+      <a data-s="ans:archiv" data-r="historie"><svg class="i"><use href="#i-hist"/></svg><span class="n">Historie</span></a>
+      <span class="luecke"></span>
+      <a><svg class="i"><use href="#i-buero"/></svg><span class="n">Office</span></a>
+      <a><svg class="i"><use href="#i-rad"/></svg><span class="n">Einstellungen</span></a>
+      <a><svg class="i"><use href="#i-flagge"/></svg><span class="n">Fehler melden</span></a>
+      <a><svg class="i"><use href="#i-pin"/></svg><span class="n">Schiene anheften</span></a>
+    </nav>
+  </div>
+
+  <div class="rechts">
+    <header class="band" id="band">
+      <div class="bkul"><i style="background-image:url(../sprites/kulissen/speed-schach/zug.jpg)"></i><i style="background-image:url(../sprites/kulissen/i-spy/lostplace.jpg)"></i></div>
+      <div class="ort" id="ort"><em id="b-krume"></em><h1 id="b-titel"></h1></div>
+      <nav class="reiter" id="b-reiter"></nav>
+      <div class="slot" id="b-slot"></div>
+      <div class="regie">
+        <a class="chip" title="Spielplan" data-s="ans:spielplan"><span class="o" id="b-sai"></span><span class="tk" id="b-tk"></span></a>
+        <a class="chip" title="Finanzen"><span class="o">Kasse</span><span class="o"><b class="t" id="b-kasse"></b></span></a>
+        <a class="ikn" title="Suche"><svg class="i"><use href="#i-scout"/></svg><kbd>⌘K</kbd></a>
+        <a class="ikn" title="Meldungen"><svg class="i"><use href="#i-glocke"/></svg><span class="zahl">3</span></a>
+        <div class="takt" id="takt">
+          <button class="tb" id="tb" data-tu="takt"><span class="fuell"></span><span id="tbt"></span><svg class="i"><use href="#i-r"/></svg></button>
+          <button class="ts" id="ts"></button>
+        </div>
+      </div>
+      <i class="lauf"></i>
+    </header>
+
+    <main class="buehne" id="buehne">
+      <div class="seite" id="s-archiv"></div>
+      <div class="seite" id="s-transfers"></div>
+      <div class="seite" id="s-ewig"></div>
+      <div class="seite" id="s-spielplan"></div>
+      <div class="seite" id="s-ranks"></div>
+      <div class="schl" id="schl" data-tu="blattzu"></div>
+      <aside class="blatt" id="blatt" aria-label="Team-Verlauf"></aside>
+    </main>
+  </div>
+</div>
+<div class="meld" id="meld"></div>
+
+<script>
+"use strict";
+/* ---------- Helfer (wie app-rahmen-modern-18-11 / training-modern-18-11) ---------- */
+var q=new URLSearchParams(location.search);
+var $=function(id){return document.getElementById(id)};
+function de(x,nk){return x.toFixed(nk==null?1:nk).replace(".",",")}
+function vz(x,nk){var r=+x.toFixed(nk==null?1:nk);return (r>0?"+":r<0?"−":"±")+de(Math.abs(x),nk)}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function schluessel(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+function port(n){return "../portraits/"+schluessel(n)+".jpg"}
+function logo(k){return "../team-logos/"+k+".jpg"}
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+function pfeil(s){return '<span class="pfeil s'+s+'" title="Form">'+({"2":"▲▲","1":"▲","0":"–","-1":"▼","-2":"▼▼"})[s]+'</span>'}
+function moralFarbe(w){var R=[255,96,88],B=[243,181,74],G=[98,211,148],a=w<50?R:B,b=w<50?B:G,t=w<50?w/50:(w-50)/50;return "rgb("+[0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)}).join(",")+")"}
+function gesicht(w){var m=kl((w-50)/50,-1,1),f=moralFarbe(w),y=15+m*-1.2,c=y+m*4.2;
+  return '<svg class="ges" viewBox="0 0 24 24" aria-label="Moral '+w+'"><title>Moral '+w+'</title><circle cx="12" cy="12" r="10" fill="'+f+'" fill-opacity=".16" stroke="'+f+'" stroke-width="2"/><circle cx="8.6" cy="9.6" r="1.3" fill="'+f+'"/><circle cx="15.4" cy="9.6" r="1.3" fill="'+f+'"/><path d="M7.6 '+y.toFixed(1)+' Q12 '+c.toFixed(1)+' 16.4 '+y.toFixed(1)+'" fill="none" stroke="'+f+'" stroke-width="2" stroke-linecap="round"/></svg>'}
+function mensch(w,kl2){var m={c:"C",f:"F",r:"R",k:"KI"}[w];return '<span class="mn '+w+(kl2?" "+kl2:"")+'" title="'+({c:"Chris",f:"Franky",r:"Ramona",k:"KI"})[w]+'">'+m+'</span>'}
+var HEUTE=13;
+
+/* ---------- Rahmen: Ort, Reiter, Slot, Taktgeber, Demo-Leiste ---------- */
+var RAHMEN={rail:"",krume:"",titel:"",reiter:[],demo:[],notiz:""};
+function rahmenStart(o){RAHMEN=o;
+  var tk="",e=["s","s","n","s","u","s","n","s","s","n","s","s"];for(var i=1;i<=20;i++)tk+='<i class="'+(i<HEUTE?e[i-1]:i===HEUTE?"j":"")+'"></i>';$("b-tk").innerHTML=tk;
+  [].forEach.call(document.querySelectorAll("#rail a"),function(a){var n=a.querySelector(".n");if(n&&n.textContent===o.rail){a.classList.add("an");a.id="railan"}});
+  if(q.get("still")==="1")document.body.classList.add("still");
+  if(q.get("nav")==="auf")document.body.classList.add("navauf");
+}
+function rahmenZeichne(z){
+  $("b-krume").innerHTML=RAHMEN.krume;$("b-titel").textContent=RAHMEN.titel;
+  $("b-reiter").innerHTML=RAHMEN.reiter.map(function(r){return '<a data-s="ans:'+r[0]+'"'+(z.ans===r[0]?' class="an"':'')+'>'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</a>'}).join("");
+  $("demo").innerHTML='<b>Mockup 18.11. · '+RAHMEN.titel+'</b>'+RAHMEN.demo.map(function(g){
+    return '<span>'+g[0]+'</span><span class="dg">'+g[2].map(function(w){return '<a data-s="'+g[1]+':'+w[0]+'"'+(String(z[g[1]])===String(w[0])?' class="an"':'')+'>'+w[1]+'</a>'}).join("")+'</span><i class="tr"></i>'}).join("")+'<span>'+RAHMEN.notiz+'</span>';
+  var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px";
+  [].forEach.call(document.querySelectorAll(".seite"),function(s){s.classList.toggle("an",s.id==="s-"+z.ans)});
+}
+function takt(text,status,art,tu){var t=$("takt");t.className="takt"+(art?" "+art:"");$("tbt").textContent=text;$("ts").innerHTML='<i></i><span>'+status+'</span>';$("tb").dataset.tu=tu||"takt"}
+function slot(teile){$("b-slot").innerHTML=teile.map(function(k){return '<div class="kpi k'+(k[3]?" zone":"")+'"><span class="gk">'+k[0]+'</span><strong class="t"'+(k[2]?' style="color:'+k[2]+'"':'')+'>'+k[1]+'</strong></div>'}).join("")}
+function melde(titel,text,art){var d=document.createElement("div");d.className="mb "+(art||"");d.innerHTML='<span class="ic">'+ic(art==="w"?"warn":"check")+'</span><span><b>'+titel+'</b><small>'+text+'</small></span><u></u>';$("meld").appendChild(d);
+  setTimeout(function(){d.classList.add("geht");setTimeout(function(){d.remove()},260)},4200)}
+function urlSetzen(z,schl){var p=new URLSearchParams(location.search);schl.forEach(function(k){p.set(k[1],z[k[0]])});try{history.replaceState(null,"","?"+p.toString())}catch(e){}}
+/* Klicks: data-s="schluessel:wert" setzt Zustand, data-tu="aktion[:arg]" ruft TU[aktion](arg) */
+function klicks(z,zeichne,TU){document.addEventListener("click",function(ev){
+  var a=ev.target.closest("[data-s],[data-tu]");if(!a)return;
+  if(a.dataset.s){var i=a.dataset.s.indexOf(":"),k=a.dataset.s.slice(0,i),v=a.dataset.s.slice(i+1);z[k]=/^-?\d+$/.test(v)?+v:v;if(TU&&TU["_"+k])TU["_"+k](v);zeichne();return}
+  var t=a.dataset.tu.split(":");if(TU&&TU[t[0]]){TU[t[0]](t[1],a);zeichne()}
+})}
+window.addEventListener("resize",function(){var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px"});
+
+/* ====================================================================================================
+   HISTORIE · SPIELPLAN · RANKS
+   ECHT: Teams, Wappen, Spieler (Name, Klasse, Marktwert, Gehalt aus oly-player-stats.json), Portraits,
+         die 20 Disziplinen mit Achse und Spielerzahl, Regeln (3 Auf-/Absteiger, Fenster vor Saison N
+         gehoert zu Saison N, Kaderaufbau in S1 ist kein Transfer), Spalten der heutigen Seiten.
+   ERFUNDEN: jede Zahl und jeder Verlauf. Alles wird aus einer festen Saat gerechnet, damit Tabellen,
+         Zeitleiste, Blatt und Transferbilanzen zueinander passen.
+   ==================================================================================================== */
+var T={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"},CODES=Object.keys(T),ICH="V-W";
+var SP=[["Glimmbiss","Charger",48.2,14.5],["Vexeria","Templar",46.1,13.8],["Lamayan","Tactician",21.0,4.6],["Nyxor","Tactician",20.7,6.1],["Terratron","Warlord",13.9,2.8],["Kim","Rogue",18.2,5.3],["Butcher","Sprinter",21.3,6.7],["Mawroot Titan","Tank",14.9,4.4],["Ulfsaar","Warlord",59.5,16.6],["Clausar Heez","Bard",10.8,3.0],["Gram","Warlord",11.9,2.6],["Septunia","Bard",50.5,12.9],["Hassassin","Rogue",23.6,8.0],["Mary Slayblade","Berserker",20.2,6.0],["Mossis","Tactician",15.7,3.9],["Bronzebrow","Templar",12,3.1],["Elara","Rogue",13.3,3.9],["Abyssal","Warlord",35.4,9.1],["Gallahad","Tank",27.5,7.3],["Tempest","Berserker",22.1,7.3],["Shiro","Badass",46.8,11.1],["Micro","Berserker",19.3,4.9],["Tendril","Tactician",13.7,3.7],["Prof Noctwing","Mage",33.8,10.6],["Misty","Bard",19.2,5.3],["Kerven","Sprinter",29.3,8.8],["Drakar","Templar",20,6.0],["Volt Skyscale","Sprinter",70.0,19.8],["Violet","Overseer",29.5,9.0],["Vynaera","Hero",53.8,13.4],["Tulpia","Rogue",19.2,5.1],["Nekira","Rogue",17.6,5.7],["Hikari","Hero",15.7,5.5],["Groot","Tank",31.3,8.7],["Blazebean","Rogue",28.4,7.9],["Golden","Overseer",30.9,8.7],["Matrona","Badass",75.2,18.1],["Cassandra","Rogue",24.0,5.8],["Puppet Master","Mage",12.5,4.7],["Drogon","Charger",35.0,9.8],["Dalinya","Bard",16.6,4.2],["Morthal","Tank",19.4,4.5],["Bond","Berserker",7.5,2.9],["Charity","Tactician",38.8,8.0],["Seressa","Rogue",31.0,9.4],["Amoreus","Sprinter",20.1,4.2],["Exekutor","Rogue",12.3,4.1],["Xandrix","Overseer",22.4,6.9],["Thosch","Warlord",46.2,13.6],["Lume Dovahr","Hero",37.1,9.8],["Doombringer","Tank",14.8,5.9],["Tollim KS","Badass",32,7.4],["Gary the Keeper","Badass",13.6,3.8],["Voidseer","Charger",19.5,5.6],["Gaius","Berserker",22.6,6.6],["Vilemaw","Warlord",11.9,4.7],["Armored Wraith","Tank",25.5,7.5],["Mongrel","Sprinter",9.1,1.8],["Cpt Redeemer","Warlord",11.7,3.4],["Voidbringer","Mage",27.8,7.8],["Marla","Badass",35.7,9.3],["Cara","Berserker",12.3,3.6],["Fynra","Sprinter",13.6,5.4],["Brogdan","Tank",17.4,4.7],["Sting","Rogue",19.0,6.2],["Ragnar","Rogue",66.6,16.8],["Corsair","Mage",35.6,9.4],["Lita","Mage",19.9,7.0],["Tony Spark","Bard",18.9,6.0],["Marissa","Rogue",26.4,7.6],["Ruby Ashen","Charger",43.9,12.6],["Vortex Carnelis","Tank",34.5,9.6],["Brobot","Sprinter",16.8,4.9],["Amystheta","Mage",46.9,13.4],["Zed","Berserker",53.9,14.2],["Jasmin T","Mage",36.5,9.2],["Heskar Ruum","Mage",17.2,5.1],["Mistake","Tank",25.3,8.5],["Mindwire","Tactician",18.2,5.0],["Amumu","Badass",10.4,3.4],["Varkun","Hero",46.6,13.1],["Duck Norris","Rogue",45.9,12.7],["Executioner","Tank",15.2,5.3],["Blizzard","Templar",30.3,8.4],["Leira","Bard",19.8,4.3],["Skarath","Charger",37.5,11.5],["Mara","Overseer",19.9,5.8],["Gobo","Rogue",26.4,7.8],["Lilim","Warlord",30.0,9.5],["Shadowvision","Overseer",37.7,11.6],["Barbara","Tactician",20.1,6.0],["Mora Schleck","Bard",16.3,4.2],["Hulk","Charger",33.6,10.1],["Vexana","Sprinter",37.2,9.2],["Ivan","Warlord",11.3,2.6],["Lizard","Tank",35.0,9.4],["Galene","Tactician",49.3,10.2],["Judia Hopara","Overseer",43.4,10.1],["Emilia","Rogue",16.4,4.8],["ETPPC","Tank",12.8,3.9],["Valrik","Templar",27.4,8.3],["Schlurff","Tactician",12.2,3.5],["Astaroth","Berserker",26.8,8.1],["Velthira","Bard",23.1,7.2],["Slaughterella","Templar",18.6,6.5],["Phantomblade","Rogue",15.4,5.2],["Isuzu","Tactician",9.9,2.1],["Flintwick","Hero",18.0,5.8],["Aquarius","Bard",15.6,4.8],["Darkwing","Overseer",40.4,12.7],["Waechterbot","Berserker",15.5,4.1],["Pvt Facepalm","Berserker",9.8,2.2],["Vadash","Warlord",8.4,3.4],["Horst Schlurff","Templar",16.3,5.1],["Tidalwave","Charger",13.2,4.3],["Faith","Mage",33.4,7.7],["Kyrion","Overseer",58.2,16.4],["Shroomgator","Tank",27.6,7.4],["Lightning","Warlord",12.2,3.8],["Sethrekh","Tactician",35.6,10.6],["Malarik","Mage",24.2,7.4],["Zelvaira","Overseer",45.0,12.9],["Livia","Hero",26.2,8.6],["Rook Mareth","Mage",31.4,9.2],["Zura Shieldbelt","Tank",18.0,4.8],["Nael Deep","Tactician",11.1,2.6],["Rollo","Templar",41.5,11.5],["Myrkos","Tank",4.3,1.7],["Kebet","Berserker",25.5,5.5],["Amorhasi","Bard",27.2,6.7],["Naida","Tactician",45.4,8.4],["Tralgant","Warlord",41.3,11.5],["Nevermore","Mage",23.2,5.9],["Tartarus","Charger",26.2,7.7],["Conqueror","Charger",39.1,11.3],["Earthshaper","Tactician",36.6,7.4],["Oghren","Badass",17.3,5.1],["VIP Wal","Bard",73.9,20.2],["Tenzin","Badass",41.3,9.2],["Ironhoof","Charger",22.8,5.9],["Tidelord","Charger",28.3,6.9],["Ryuko Matoi","Rogue",14.7,5.2],["Varka","Tank",15.2,5.7],["Wavebreaker","Tank",21.0,5.9],["Molbologna","Tank",13.6,4.2],["Samsuin","Rogue",31.4,8.5],["Sylvanis","Hero",45.5,13.0],["Zari","Overseer",10.8,3.1],["Daisy","Rogue",15.3,4.9],["Fyrn","Sprinter",6.4,2.2],["Grimwhisper","Rogue",26.3,8.1],["Eshtan","Overseer",30.4,7.8],["Johnny Smoke","Templar",23.3,7.1],["Riptide","Charger",20.8,6.9],["Krosis","Tactician",12.8,3.3],["Glassfang","Badass",27.9,9.1],["Exor","Warlord",32.5,9.9],["Glutton Slice","Badass",14.2,5.6],["Emberaxe","Warlord",23.9,7.8],["Thorin","Hero",20.1,5.6],["Skull Knight","Badass",13.9,3.4],["Dughmok","Tank",10.2,3.4],["Volcano","Tank",13.6,4.5],["Asher Caligo","Tank",17.0,6.3],["Rina Firefist","Charger",38.2,12.5],["Nezhet","Tactician",20.6,5.1],["Inora the Witch","Tactician",18.2,5.2],["Sarena","Bard",16.8,5.6],["Unholy Fury","Mage",25.0,7.9],["Kragar","Berserker",23.4,7.6],["Blaze Brogan","Warlord",27.2,8.7],["Kolvir","Badass",25.8,7.0],["Lionel","Badass",48.3,10.8],["Tidesinger","Sprinter",13.9,3.4],["Stoneforge","Tank",38.4,8.9],["Lt Kai Leng","Rogue",73.0,19.1],["Iska","Sprinter",22.9,5.2],["Sepik","Sprinter",11.8,4.4],["Orlana","Templar",45.9,11.7],["Tharvox","Mage",24.7,7.9],["Vexor","Charger",26.2,7.8],["Nula","Mage",4.6,1.3],["Skeletor","Rogue",42.9,13.1],["Velza","Bard",22.8,5.2],["Ithren","Mage",14.2,4.3],["Nightshade","Badass",49.9,13.9],["Nebrauk","Charger",12.3,3.9],["Wheatley","Sprinter",32.8,7.4],["Riley Le Rogue","Rogue",8.2,2.7],["Neon Doom","Warlord",39.2,12.4],["Anwyl","Rogue",16.1,5.0],["Drazara","Berserker",28.9,8.3],["Glorpix","Sprinter",19.3,5.8],["Aurora","Mage",10.0,3.5],["Roz","Tactician",9.8,2.7],["Mimic","Charger",18.6,5.3],["Lucien Vellmoor","Overseer",34.8,12.0],["Moontail","Overseer",40.0,11.4],["Aquna","Charger",32.2,8.4],["Nyara Solenne","Bard",16.0,4.2],["Hiisi","Warlord",9.0,4.0],["Kronos","Mage",41.6,12.0],["Talizora","Mage",12.7,4.4],["Rumbarrel","Tank",12.3,3.3],["Riot","Tank",21.5,6],["The Mountain","Tank",25.1,7.5],["Angrod","Badass",42.9,12.0],["Jasper Kane","Warlord",70.6,14.0],["Samira","Rogue",21.9,5.7],["Polyforma PM","Overseer",63.7,15.2],["Jaina","Mage",19.7,6.4],["Berzerk","Charger",20.4,7.8],["Nythra","Overseer",20.2,7.3],["Sethra","Berserker",19.8,5.9],["Queen Grolthar","Warlord",39.5,12.3],["Gertrude","Badass",37.9,11.0],["Pride Lumiere","Templar",39.9,10.6],["Clarissa","Badass",35.5,9.4],["Xelara","Bard",25.2,5.8],["Lady Owen","Rogue",12.4,3.6],["Vorath","Tank",27.0,8.0],["Infernal Core","Warlord",19.4,6.5],["Seraphine","Overseer",19.6,7.1],["Ruxiliaa","Mage",14.9,3.7],["Hydra","Berserker",14.6,5.0],["Nyk Vildren","Overseer",44.5,12.4],["Mossbound","Tank",13.1,4.0],["Talon","Rogue",34.0,10.8],["Psychomantis","Rogue",42.9,10.5],["Brontus","Tank",41.9,12.6],["Mjollnir","Templar",44.7,13.3],["Elderwood","Tactician",46.9,9.5],["Venom","Berserker",13.2,4.3],["Hagina","Tactician",15.3,4.0],["Sierra","Overseer",19.2,5.3],["Jack Jazzrabbit","Sprinter",33.2,10.6],["Cerberus","Berserker",15.6,5.0],["Voryne Darkclaw","Charger",36.5,11.2],["Sylzhe","Sprinter",22.4,5.7],["Haekazura","Warlord",35.6,10.6],["Mohnia","Charger",46.6,13.3],["Calawynn","Sprinter",18.6,4.5],["Minecrawler","Sprinter",11.7,4],["Monarch Hawk","Sprinter",35.4,8.9],["Gromdor","Charger",32.9,9.7],["Reynald","Warlord",57.9,14.4],["Aliya","Templar",25.6,7.3],["Velvra","Overseer",44.5,13.2],["Zephie","Bard",13.4,3.2],["Buckbeak","Berserker",36.6,9.3],["Morkel","Tactician",62.9,14.7],["Robocop","Warlord",15.0,3.5],["Geargrinder","Tank",21.2,4.7],["Controller","Mage",28.6,9.9],["Iron Giant","Tank",13.2,4.4],["King Zurnox","Mage",18.8,6.3],["Countess Flint","Tactician",45.3,10.1],["Skybreaker","Berserker",25.1,7.8],["Liaje","Overseer",18.6,5.4],["Lord Balish","Hero",40.3,11.5],["Thalassia","Berserker",36.7,10.2],["Mercy","Berserker",48.0,13.7],["Burster","Charger",21.3,5.9],["Goro","Berserker",20.9,5.5],["Jaxson","Rogue",19.2,6.5],["Leah","Overseer",19.4,6.0],["Astrobot","Berserker",18.2,4.9],["Grumelda","Overseer",20.2,6.7],["Zorvix","Overseer",17.4,6.6],["Nemamiah","Overseer",17.4,5.5],["Todjath","Charger",43.2,11.8],["Wartusk","Berserker",50.6,13.5],["Nytharos","Berserker",31.7,9.9],["Witch Misa","Bard",28.5,8.3],["Skeleton King","Tank",25.0,8.0],["Seraphina","Badass",17.7,5.2],["Aerthalion","Mage",38.4,11.1],["Monk Ambra","Mage",17.8,3.9],["Demikas","Warlord",20.7,7.2],["Thildra","Bard",13.6,4.3],["Nicky Furious","Warlord",20.1,7.1],["Toko","Overseer",9.0,2.8],["Valira","Berserker",48.8,14.0],["Swiftstrike","Berserker",22.7,6.5],["Akali","Rogue",21.5,6.6],["Soulsinger","Tactician",29.1,8.6],["Donatello","Tactician",36.4,8.7],["Aida","Sprinter",37.3,11.1],["Carlito Suge","Charger",29.5,8.4],["Tommy Rourke","Rogue",8.3,2.8],["Zylara","Rogue",13.1,4.4],["Neos","Berserker",25.8,8.7],["Larissa","Bard",20.4,5.2],["Argentix","Rogue",11.1,3.9],["Frostweaver","Tactician",28.0,6.3],["Triangle","Templar",24.5,6.7],["Kael","Templar",54.1,13.7],["Snikka","Rogue",17.3,5.5],["Battleborn","Warlord",31.9,8.6],["Zynara","Mage",29.8,8.9],["Shirokami","Sprinter",28.2,6.3],["Chitinus","Charger",19.6,5.7],["Passion","Overseer",39.8,9.7],["Cardmaster","Bard",41.2,11.4],["Prism Leviathan","Badass",49.5,11.8],["Mokra","Charger",19.1,5.8],["Sage Mage","Mage",13.4,5.6],["Adriana","Hero",25.4,7.6],["Virexya","Hero",43.9,12.3],["Scavenger","Tank",6.7,2.8],["Etherealmind","Overseer",40.6,9.6],["Pawn","Tactician",12.9,4.2],["Sentinel","Warlord",18.8,5.8],["Slaver Drukkar","Overseer",34.2,12.2],["Talinara","Sprinter",31.0,8.3],["Ser Camelot","Hero",39.9,9.2],["Nibbin","Bard",9.8,3.3],["Nimue","Tactician",15.3,4.2],["Marin Solis","Sprinter",26.0,5.7],["Alastor","Overseer",12.9,3.3],["Bytebane","Overseer",17.5,5.2],["Ethereon","Charger",32.5,8.5],["Bubblegrim","Sprinter",24.7,6.7],["Tomahawk","Berserker",22.7,5.6],["Furomar","Rogue",9.2,2.9],["Sathor Vellari","Overseer",29.1,8.6],["Nachtschatten","Sprinter",25.7,7.2],["Garnet","Warlord",44.2,11.8],["Princess Pride","Warlord",23.0,7.2],["Depholia","Tactician",82.8,19.9],["Brunhilde","Charger",28.5,7.5],["Vraccs","Warlord",34.3,9.8],["Harleya","Overseer",24.9,7.7],["Triton","Tank",38.8,11.6],["Nazuna","Rogue",40.2,10.3],["Baroness Bella","Warlord",52.1,14.2],["Nefar Safety","Sprinter",36.0,8.7],["Pherrix","Overseer",13.5,4.9],["Dakka Dakka","Templar",19.8,5.9],["Krang","Tactician",26.8,7.7],["Diana","Rogue",22.2,6.0],["Lady Yueqin","Mage",32.7,7.8],["Kaylen","Templar",30.4,8.9],["Bladewalker","Rogue",31.9,8.4],["Titanius","Hero",45.4,12.1],["Bud Vance","Warlord",16.1,4.2],["Elvira","Badass",10.1,2.5],["Quecksilver","Badass",25.9,7.2],["Bloodspire","Warlord",21.3,7.7],["War Golem","Tank",19,6.2],["Vince Valor","Mage",49.8,15.5],["Vyrax","Charger",46.5,13.6],["Witchi Tigri","Sprinter",10.3,4.0],["Wurzelbund","Tactician",28.4,7.0],["Overlord","Hero",35.7,10.1],["Shen","Bard",51.5,13.6],["Bronny G","Bard",20.1,6.5],["Krusty","Tactician",20.7,5.2],["Bumblecrank","Berserker",23.4,6.1],["Amriel","Tactician",13.7,3.5],["Lady Gwynn","Badass",58.9,14.7],["Bylialle","Rogue",28.0,7.8],["Banished","Bard",25.7,6.2],["Darkblade","Rogue",54.0,13.6],["Grulma","Tank",19.8,6.2],["Crimson Cloak","Rogue",17.9,6.6],["Weird","Templar",12.5,4.2],["Lohat","Sprinter",28.9,8.4],["Faxtar","Berserker",27.2,7.9],["Vortex","Tactician",12.5,3.3],["Sanchez","Berserker",10.3,4.3],["Puschelix","Bard",20.5,4.9],["Flamira","Bard",9.2,1.7],["Acolyte","Mage",10.4,2.8],["Smash","Badass",29.0,8.3],["Erna Wellenlaut","Bard",35.1,8.5],["Garnis Brinemaw","Warlord",17.6,6.4],["Exsukkator","Tank",24.4,6.9],["Tessa","Bard",16.6,4.7],["Aralith","Bard",23.3,5.6],["The Thing","Tank",35.3,9.2],["Moonscourge","Charger",25.6,7.8],["Rustfang","Tank",35.4,11.0],["Gearroot","Tactician",17.4,4.5],["Fyrda","Tactician",13.3,3.3],["Fyrin","Tactician",14.0,4.1],["Chuck Spark","Bard",17.3,5.9],["Thargan","Berserker",18.8,7.1],["Lord Belqua","Bard",49.2,13.6],["Grip","Tank",15.8,4.1],["Lysira","Sprinter",28.8,8.9],["Lucien","Overseer",17.9,5.8],["Chuckles","Rogue",19.2,7.6],["Reinhold","Bard",28.2,7.5],["Steel Sentinel","Hero",54.6,13.7],["Qrythalon","Overseer",38.3,10.9],["Vespara","Bard",56.7,16.4],["Lacriel","Hero",56.2,13.0],["Jade Skull","Mage",9.0,3.0],["Corvus","Tactician",13.1,3.9],["Master Linelia","Rogue",64.9,15.9],["Nira","Berserker",44.6,13.4],["Brightpaw","Badass",25.1,6.8],["Hateblast","Warlord",16.1,5.6],["Mephisto","Warlord",27.9,9.4],["Orichalcos","Mage",13.3,4.7],["Miracle","Bard",12.5,4.3],["Eryndor","Hero",20.0,7.5],["Schlurbl","Tank",45.9,13.3],["Darkbow","Rogue",24.0,7.5],["Ashanti","Rogue",29.7,7.8],["Cornelius","Bard",34.2,8.1],["Myrth","Hero",4.5,1.9],["Kalindra","Charger",22.4,7.2],["Juggernaught","Tank",25.9,6.8],["Storm","Charger",59.3,17.2],["Krax","Rogue",28.9,8.8],["Tetora","Badass",16.9,5.2],["War Machine","Badass",16.0,4.7],["Cassian","Overseer",13.4,3.8],["Sir Pudding","Bard",22.9,6.6],["Grimgold","Tactician",17.5,5.1],["Amalur","Hero",42.5,10.5],["Yssara","Tactician",12.6,3.0],["Caldor","Bard",25.1,5.6],["Melanie Knox","Mage",23.9,6.4],["Black","Mage",26.6,8.9],["Bittersweet","Rogue",12.4,3.9],["Kohan","Berserker",14.1,3.6],["Rikar","Rogue",46.2,12.2],["Alistair","Hero",42.9,10.9],["Inquisitor","Overseer",26.1,9.3],["Faceless","Overseer",24.6,8.0],["Rawmove","Sprinter",32.7,10.0],["Westwing","Overseer",19.0,6.1],["Abysswarden","Warlord",27.3,7.5],["Poffel","Overseer",38.7,8.4],["Enchantress","Overseer",37.7,10.8],["Inge","Mage",14.9,3.7],["Tzeentch","Rogue",40.0,8.9],["ZeroOne","Templar",32.8,10.5],["Eluna","Sprinter",36.3,10.1],["Zalithar","Hero",30.2,9.1],["Goldie","Mage",11.4,3.5],["Ragetooth","Charger",18.5,6.2],["Dunehunter","Sprinter",25.3,7.3],["Karthogg","Hero",39.4,10.2],["Calamity","Tactician",48.7,12.2],["Ampelato","Charger",40.4,11.5],["Zagruassihz","Warlord",55.7,16.1],["Ardarel","Tactician",9.0,3.2],["Brontar","Tank",30.1,7.2],["Swiftshade","Sprinter",18.7,5.8],["Astkopf Baumarm","Charger",19,6.2],["Elyndra","Overseer",12.5,2.9],["Lilithara","Sprinter",21.2,5.7],["Aquiris","Sprinter",19.2,6.5],["Lithara","Bard",18.1,5],["Prince Charming","Bard",28.6,7.1],["Kesha","Sprinter",25.5,6.6],["Gas","Tank",24.6,5.9],["Sir Sonnenmut","Templar",35.7,10.9],["Tenchu","Bard",27.3,7.8],["Thorganna","Templar",38.0,10.9],["Silent","Mage",15.8,4.5],["Alaric","Sprinter",13.6,4.5],["Gorn","Tank",9.6,3.4],["Hereticus","Templar",9.8,3.2],["Callistra","Overseer",35.3,10.1],["Seeker","Templar",50.2,12.2],["Xochiquibana","Hero",20.7,6.1],["Boulderclash","Berserker",17.6,5.1],["Malakar","Tactician",40.5,10.6],["Umbros","Berserker",60.4,16.0],["Dreamseer","Bard",55.4,12.9],["Hunfrey","Tank",18.4,6.1],["Leucrota","Berserker",11.7,4.5],["Hitomi","Tactician",17.2,3.0],["Elea Cinnamora","Tactician",31.7,6.8],["Ents Wrath","Tactician",9.7,3.0],["Vladimar HR","Overseer",15.5,5.1],["Slippery Man","Tank",28.9,8.1],["Gunther","Berserker",36.0,9.3],["Towlie","Tactician",21.9,5.5],["Zarrok","Templar",34.8,10.5],["Caelathra","Templar",31.8,8.9],["Innuendo","Tactician",52.0,13.4],["Elvris","Berserker",50.9,13.8],["Munara","Tactician",16.8,5.0],["Nightbane","Overseer",27.1,8.2],["Dorothy","Bard",22.4,5.5],["Verdant Spike","Templar",65.0,15.4],["Ivory","Sprinter",15.7,4.3],["Fungor","Tank",25.1,6.1],["Galor V","Overseer",34.5,10.4],["Eldara","Mage",20.3,5.9],["Nessara","Sprinter",31.3,8.8],["Sable","Overseer",40.6,12.7],["Kargath","Berserker",58.4,14.2],["Echo","Overseer",31.7,8.1],["Orbitak","Tank",11.3,2.9],["Gearstrike","Rogue",35.3,9.6],["Ixali","Badass",24.4,6.2],["Sivatha","Tactician",22.6,6.4],["Contempt","Overseer",32.0,9.4],["Karanak","Rogue",50.9,15.6],["Braz","Berserker",17.5,5.9],["Dr Doom","Hero",55.4,13.3],["Tirion","Sprinter",55.8,12.1],["Mokalka","Charger",19.0,5.2],["Mimiix","Overseer",25.6,8.3],["Draktuzz","Templar",28.1,9.0],["Cleo","Rogue",70.7,18.6],["Herzog Pomodoro","Hero",13.7,5.2],["Skira","Sprinter",37.0,10.7],["Soulhate","Tactician",15,4.8],["Dark Cloud","Templar",14.2,6.2],["Goddess Ran","Tactician",51.3,13.5],["Ragnarok","Berserker",38.4,10.3],["Petrus","Hero",38.5,11.6],["Lyssandra Vehl","Overseer",62.1,17.0],["Goreborn Kark","Tank",23.4,7.4],["Xandir","Rogue",35.1,8.3],["Switchblade","Rogue",21.2,7.2],["Inarios","Hero",27.4,8.1],["Milchor","Rogue",53.4,15.2],["Darkveil","Overseer",30.1,8.6],["Rita Repulsa","Mage",36.1,10.8],["Fallen Angel","Charger",13.0,2.8],["Chain","Rogue",26.0,7.3],["Storyteller","Mage",27.9,8.0],["Sir Lancelot","Templar",68.3,17.1],["Sgt Attin","Tactician",14.3,3.9],["Zytheron","Tank",28.8,9.1],["Drop Dead","Rogue",21.1,5.6],["Larek","Overseer",15.7,5.2],["Bellamor","Charger",23.7,8.8],["Vireetha","Tactician",12.3,3.4],["Ferrin","Overseer",21.1,7.1],["Deadwood","Tank",9.7,3.0],["Captain Beakson","Sprinter",16.4,5.1],["Trantor","Badass",18.8,4.8],["Murkavon","Tactician",99.2,23.5],["Vixen","Mage",28.5,8.8],["Veredon","Charger",27.7,8.3],["Drifty","Bard",13.7,3.4],["Myth","Mage",19.8,4.7],["Lustmolch","Mage",22.3,9.4],["Elum Kaa","Badass",7.7,2.0],["Decay","Mage",20.6,7.2],["Skarn","Charger",42.2,11.7],["Nightflame","Overseer",30.5,9.9],["Rok Kyl","Rogue",12.9,4.0],["Seron","Sprinter",38.1,11.2],["Stone Golem","Tank",7.7,2.9],["Huggie","Tactician",50.6,11.4],["Valara","Hero",37,8.1],["Pyre Fyre","Tank",19.3,6.0],["Core","Tank",17.9,6.1],["Malakar Thorne","Berserker",20.9,5.9],["Duskwhisper","Mage",23.1,6.6],["Ember Callahan","Bard",15.4,4.9],["Brown Arrow","Berserker",16.5,4.1],["Ranya","Hero",12.9,5.5],["Dawnblade","Warlord",34.1,9.1],["Leonardo","Badass",63.8,16.1],["Shadowhunter","Rogue",52.2,14.9],["Lionfrog","Charger",18.9,5.4],["Rieze","Mage",10.4,2.8],["Yargad Coalfoot","Hero",23.2,5.8],["Phyriel","Sprinter",21.6,6.2],["Treantos","Warlord",35.5,6.9],["Lucinda","Overseer",21.2,8.2],["Visceral Host","Mage",29.3,9.3],["Fred","Tank",47.8,11.2],["Vampiria","Rogue",22.0,8.4],["Sgt Guny","Badass",23.9,6.9],["Oras Saftblut","Sprinter",28.9,6.6],["Jerome Vessel","Templar",40.5,10.8],["Mentorax","Mage",40.9,9.3],["Thornshade","Rogue",28.2,8.5],["Spinebuster","Warlord",12.8,5.1],["Lord Stark","Hero",34.9,10.9],["Chillmind","Mage",10.6,3.8],["Selene Dusk","Overseer",30.7,8.3],["Crout","Charger",10.5,4.0],["Julian","Overseer",27.6,7.7],["Amarra","Templar",56.9,15.4],["Orina the Swift","Sprinter",28.7,6.6],["Lotte Lance","Warlord",34.4,10.2],["Mortivane","Bard",51.3,12.9],["Skargath","Charger",37.3,9.8],["Thorun","Hero",24.4,6.0],["Wonder","Overseer",28.2,6.9],["Glory Stab","Templar",74.2,18.7],["Stormblade","Rogue",50.2,16.0],["Firedunk","Berserker",31.7,9.3],["Aolion","Overseer",32.9,7.7],["Bonestalker","Bard",29.0,9.4],["Rynna","Warlord",12.0,4.4],["Telthona","Mage",25.6,8.3],["Liora Somnia","Bard",33.6,6.9],["Warbeast","Charger",15.1,5.3],["Com Valsharess","Bard",44.2,13.7],["Timantha","Overseer",20.4,4.8],["Dire Wulf","Berserker",25.5,7.5],["Droskar","Tactician",36.3,8.9],["King Aethar","Bard",17.3,5.6],["Lilly","Rogue",12.3,3.6],["Hellfire","Sprinter",27.3,8.2],["Bloater","Warlord",8.0,2.4],["Xeraxis","Warlord",22.2,7],["Craden","Hero",28.0,8.0],["Dschinn","Bard",34.1,9.8],["Ragar Hoofluck","Badass",18.4,5.7],["Krixel","Sprinter",14.8,5],["Kaijo Murane","Rogue",57.7,13.7],["Lumbrak","Tank",17.8,5.6],["Velthraxis","Templar",48.7,13.7],["Natalie","Warlord",20.9,6.5]];
+var TRAITS=["Feisty","FiredUp","Loyal","Ambitious","Eloquent","Mercenary","Diligent","Flexible","Obsessive","ColdBlooded","Cool","Timid","Scandalous"];
+var DISZ=[["mini-dm","Mini DM","pow",2],["fechten","Fechten","spe",5],["speed-schach","Schach","men",2],["i-spy","I Spy","men",6],["basketball","Basketball","soc",6],["time-trial","Time Trial","spe",4],["gewichtheben","Gewichtheben","pow",6],["eiskunstlauf","Eiskunst","soc",3],["showcase","Showcase","soc",5],["hockey","Hockey","pow",5],["takeshis-castle","Takeshi","men",4],["breaking","Breaking","pow",4],["wettessen","Wettessen","men",5],["staffel","Staffel","spe",3],["battlefield","Battlefield","soc",2],["tennis","Tennis","men",3],["tdm","TDM","pow",3],["climbing","Climbing","spe",6],["football","Football","soc",4],["spurt","Spurt","spe",2]];
+var AX={pow:["POW","ap","var(--pow)"],spe:["SPE","as","var(--spe)"],men:["MEN","am","var(--men)"],soc:["SOC","ao","var(--soc)"]},AXK=["pow","spe","men","soc"];
+var MENSCH={"V-W":"Chris","T-G":"Franky","P-C":"Ramona"};
+var GESP=5;HEUTE=6;
+
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;var t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var R=rng(18112026);
+function rz(a,b){return a+R()*(b-a)}
+function ri(n){return Math.floor(R()*n)}
+function summe(a,f){return a.reduce(function(s,x){return s+(f?f(x):x)},0)}
+
+/* ---------- Saisons: zwei Ligen, 3 hoch / 3 runter ---------- */
+var L1S=["D-L","D-P","M-S","V-V","R-C","L-K","B-B","T-G","T-C","S-C","R-R","P-C","C-C","U-A","A-A","N-N"];
+var liga={},st={},FIX={1:5,2:2,3:11,4:9},SAI=[];
+CODES.forEach(function(c){liga[c]=L1S.indexOf(c)>=0?1:2;st[c]=(liga[c]===1?60:50)+rz(0,16)});
+(function(){for(var n=1;n<=4;n++){var S={n:n,laeuft:n===4,L:{},z:{},auf:[],ab:[]};
+  [1,2].forEach(function(l){var cs=CODES.filter(function(c){return liga[c]===l});
+    var start=cs.slice().sort(function(a,b){return st[b]-st[a]});
+    var pk=cs.map(function(c){return {c:c,p:st[c]*1.45+rz(-13,13)}}).sort(function(a,b){return b.p-a.p});
+    var ord=pk.map(function(x){return x.c}),pts=pk.map(function(x){return x.p*(S.laeuft?GESP/20:1)});
+    if(liga[ICH]===l){ord.splice(ord.indexOf(ICH),1);ord.splice(FIX[n]-1,0,ICH)}
+    S.L[l]=ord;
+    ord.forEach(function(c,i){var p=pts[i],w=[rz(.8,1.2),rz(.8,1.2),rz(.8,1.2),rz(.8,1.2)],ws=summe(w);
+      S.z[c]={liga:l,rank:i+1,pkt:p,start:start.indexOf(c)+1,diff:start.indexOf(c)-i,ar:w.map(function(x){return p*x/ws}),
+        kasse:rz(18,95)+(l===1?15:0),gehalt:rz(58,96)+(l===1?14:0),mw:(l===1?250:190)+st[c]*1.2+rz(-25,25)+n*9,guv:rz(-28,36),tn:null}})});
+  SAI.push(S);
+  if(n<4){S.ab=S.L[1].slice(13);S.auf=S.L[2].slice(0,3);S.ab.forEach(function(c){liga[c]=2});S.auf.forEach(function(c){liga[c]=1});
+    CODES.forEach(function(c){st[c]+=rz(-4.5,4.5)});S.auf.forEach(function(c){st[c]+=3})}}
+  var v=SAI[3];v.auf=v.L[2].slice(0,3);v.ab=v.L[1].slice(13)})();
+/* Zustand "Neuer Spielstand": nur Saison 1, sie laeuft */
+var LEER=(function(){var S=JSON.parse(JSON.stringify(SAI[0]));S.laeuft=true;CODES.forEach(function(c){var z=S.z[c];z.pkt*=GESP/20;z.ar=z.ar.map(function(x){return x*GESP/20})});S.auf=S.L[2].slice(0,3);S.ab=S.L[1].slice(13);return S})();
+
+/* ---------- Kaderaufbau (Draft S1, aus dem Startbudget) und Transferfenster ---------- */
+var PICKS=[],KADER={},BUD={},REST={},DEALS=[];
+(function(){var los=CODES.slice(),i,j,t;for(i=los.length-1;i>0;i--){j=ri(i+1);t=los[i];los[i]=los[j];los[j]=t}
+  CODES.forEach(function(c){BUD[c]=SAI[0].z[c].liga===1?rz(250,325):rz(170,245);REST[c]=rz(5,13);KADER[c]=[]});
+  var pi=0,frei=SP.slice(),GW=[2,1.62,1.36,1.16,1,.9,.8,.7,.6,.5,.36];for(var r=0;r<11;r++){var o=r%2?los.slice().reverse():los;o.forEach(function(c){var ziel=(BUD[c]-REST[c])/11*GW[r],bi=0,bd=1e9;frei.forEach(function(p,k){var d=Math.abs(p[2]-ziel);if(d<bd){bd=d;bi=k}});var sp=frei.splice(bi,1)[0];PICKS.push({nr:++pi,runde:r+1,sp:sp,team:c,preis:0})})}
+  CODES.forEach(function(c){var ps=PICKS.filter(function(p){return p.team===c}),f=(BUD[c]-REST[c])/summe(ps,function(p){return p.sp[2]});
+    ps.forEach(function(p){p.preis=p.sp[2]*f;KADER[c].push({sp:p.sp,preis:p.preis})})});
+  var id=0;
+  for(var f=2;f<=4;f++){var anz=f===4?38:Math.round(rz(46,56));
+    for(i=0;i<anz;i++){var x=R(),art=x<.42?"kauf":x<.70?"verkauf":x<.91?"wechsel":"abgang",c=CODES[ri(32)],c2=null,e,d;
+      if(i<5){c=ICH;art=["verkauf","kauf","kauf","wechsel","verkauf"][i]}
+      if(i===5){c="T-G";art="kauf"} if(i===6){c="P-C";art="verkauf"}
+      d={id:"d"+(++id),f:f,art:art,von:null,an:null,guv:null,lz:1+ri(4)};
+      if(art==="kauf"){d.sp=frei.shift();d.abl=d.sp[2]*rz(.88,1.3);d.an=c;KADER[c].push({sp:d.sp,preis:d.abl})}
+      else{var q=art==="wechsel"?CODES[ri(32)]:c;if(art==="wechsel"&&q===c)q=CODES[(CODES.indexOf(c)+7)%32];
+        if(KADER[q].length<8)continue;e=KADER[q].splice(ri(KADER[q].length),1)[0];d.sp=e.sp;d.von=q;
+        if(art==="abgang"){d.abl=0}else{d.abl=e.sp[2]*rz(.82,1.38);d.guv=d.abl-e.preis}
+        if(art==="wechsel"){d.an=c;KADER[c].push({sp:e.sp,preis:d.abl})}else frei.push(e.sp)}
+      d.mw=d.sp[2]*rz(.94,1.08);d.geh=d.sp[3]*rz(.9,1.15);
+      d.zt=R()<.14?1+ri(f===4?GESP:19):(art==="kauf"||art==="wechsel"?0:-1);
+      var wer=d.an||d.von;d.qu=art==="abgang"?"Vertragsauflösung":MENSCH[wer]?"Manuell · "+MENSCH[wer]:"KI";
+      DEALS.push(d)}}
+  DEALS.sort(function(a,b){return zk(a)-zk(b)})})();
+function zk(d){return d.f*100+(d.zt===-1?0:d.zt===0?1:d.zt+1)}
+function bilanz(f,liste){var b={};CODES.forEach(function(c){b[c]={c:c,n:0,k:0,v:0,aus:0,ein:0}});
+  (liste||DEALS).forEach(function(d){if(f!=="alle"&&d.f!==f)return;
+    if(d.an){b[d.an].n++;b[d.an].k++;b[d.an].aus+=d.abl}
+    if(d.von){b[d.von].n++;b[d.von].v++;if(d.art!=="abgang")b[d.von].ein+=d.abl}});return b}
+[2,3,4].forEach(function(f){var b=bilanz(f);CODES.forEach(function(c){SAI[f-1].z[c].tn=b[c].ein-b[c].aus})});
+
+/* ---------- Zustand ---------- */
+var Z={ans:q.get("seite")||"archiv",sai:q.get("saison")||"3",team:q.get("team")||"",sp:q.get("spalten")||"sport",
+  typ:"alle",tt:"",kl:"",qu:"",such:"",ts:"vol",hl:"kauf",deal:"",pick:0,ds:"zeit",
+  fok:q.get("fokus")||"punkte",el:"alle",es:"pkt",em:"platz",
+  pk:"alle",ps:4,rl:q.get("liga")||"1",rv:q.get("ranks")||"staerke",rb:"tot",leer:q.get("leer")==="1"?1:0};
+if(/^\d+$/.test(Z.sai))Z.sai=+Z.sai;
+function anz(){return Z.leer?1:4}
+function saison(n){return Z.leer?LEER:SAI[n-1]}
+function aktuell(){return saison(anz())}
+function fertig(){return Z.leer?[]:SAI.slice(0,3)}
+
+/* ---------- kleine Bausteine ---------- */
+function C(x){return x==null?'<span class="null">—</span>':de(x)+" C"}
+function Cv(x){return x==null?'<span class="null">—</span>':'<span class="'+(x>.05?"plus":x<-.05?"minus":"null")+'">'+vz(x)+" C</span>"}
+function lg(c,k){return '<img class="lg'+(k?" "+k:"")+'" src="'+logo(c)+'" alt="" title="'+T[c]+'">'}
+function ltag(l){return '<span class="tg l'+l+'">Liga '+l+'</span>'}
+function seg(key,opts){return '<span class="seg">'+opts.map(function(o){return '<a data-s="'+key+':'+o[0]+'"'+(String(Z[key])===String(o[0])?' class="an"':'')+'>'+o[1]+'</a>'}).join("")+'</span>'}
+function pos(z){return z.rank+(z.liga===2?16:0)}
+function ptx(p){return "L"+(p>16?2:1)+" · "+(p>16?p-16:p)+"."}
+function bew(S,c){return S.laeuft?"":S.auf.indexOf(c)>=0?'<span class="tg g">▲ Aufstieg</span>':S.ab.indexOf(c)>=0?'<span class="tg w">▼ Abstieg</span>':S.L[1][0]===c?'<span class="tg voll2">Meister</span>':""}
+function th(cols,zellen){return '<div class="th" style="grid-template-columns:'+cols+'">'+zellen.map(function(z){return typeof z==="string"?'<span>'+z+'</span>':'<span class="'+(z[1]||"")+'">'+z[0]+'</span>'}).join("")+'</div>'}
+function sortKopf(key,wert,text){return '<a data-s="'+key+':'+wert+'"'+(Z[key]===wert?' class="an"':'')+'>'+text+(Z[key]===wert?" ▾":"")+'</a>'}
+
+/* ---------- Saison-Zeitleiste ---------- */
+function zeitleiste(modus){var tr=modus==="transfers",h='<nav class="zl voll '+(tr?"tr":"ar")+'" aria-label="Saison-Zeitleiste">';
+  if(tr&&!Z.leer)h+='<a class="al'+(Z.sai==="alle"?" an":"")+'" data-s="sai:alle" title="Alle Transferfenster zusammen"><span class="tx"><small>Alle</small><b>Fenster</b></span></a>';
+  for(var n=1;n<=anz();n++){var S=saison(n),z=S.z[ICH],fa=tr&&Z.sai===n,sa=!tr&&Z.sai===n,nd=DEALS.filter(function(d){return d.f===n}).length;
+    h+='<a class="fe'+(fa?" an":tr?"":" neben")+'" '+(tr?'data-s="sai:'+n+'"':'data-tu="geh:transfers-'+n+'"')+' title="'+(n===1?"Kaderaufbau aus dem Startbudget, kein Transfer":"Transferfenster vor Saison "+n+", zählt zu Saison "+n)+'">';
+    if(!tr)h+='<span class="tx"><small>'+(n===1?"Start":"Fenster")+'</small><b class="t">'+(n===1?"Kaderaufbau":nd+" Deals")+'</b></span>';
+    else if(n===1)h+='<span class="ic2">'+ic("team")+'</span><span class="tx"><small>Kein Transfer</small><b>Kaderaufbau</b></span><span class="eig"><b class="t">'+PICKS.length+' Picks</b><span>aus dem Startbudget</span></span>';
+    else{var b=bilanz(n);h+='<span class="ic2">'+ic("markt")+'</span><span class="tx"><small>Zählt zu Saison '+n+'</small><b>Fenster vor Saison '+n+'</b></span><span class="eig"><b class="t">'+nd+' Deals</b><span class="t">dein Netto '+Cv(b[ICH].ein-b[ICH].aus)+'</span></span>'}
+    h+='</a><a class="sa'+(sa?" an":tr?" neben":"")+'" '+(tr?'data-tu="geh:archiv-'+n+'"':'data-s="sai:'+n+'"')+' title="Saison '+n+(S.laeuft?" läuft":" · Meister "+T[S.L[1][0]])+'"><span class="nr"><small>Saison</small>'+n+'</span>'+lg(S.L[1][0])+
+      (tr?"":'<span class="tx"><small>'+(S.laeuft?"läuft · vorn":"Meister")+'</small><b>'+T[S.L[1][0]]+'</b></span><span class="eig"><b class="t">'+z.rank+'.</b><span>'+ltag(z.liga)+(S.laeuft?"":S.auf.indexOf(ICH)>=0?'<span class="tg g">▲</span>':S.ab.indexOf(ICH)>=0?'<span class="tg w">▼</span>':"")+'</span></span>')+'</a>'}
+  return h+'</nav>'}
+
+/* ---------- Verlaufs-Grafik ---------- */
+function linien(ser,o){var W=o.W,H=o.H,pl=o.platz,l=o.platz?62:40,r=22,t=18,b=22,n=ser[0].w.length,mn=1e9,mx=-1e9;
+  ser.forEach(function(s){s.w.forEach(function(v){if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v)}})});
+  if(pl){mn=1;mx=32}else{var p=(mx-mn)*.1||1;mn-=p;mx+=p}
+  function X(i){var e=18;return n===1?(l+W-r)/2:l+e+i*(W-l-r-2*e)/(n-1)}
+  function Y(v){var a=(v-mn)/(mx-mn);if(!pl)a=1-a;return t+a*(H-t-b)}
+  var h='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+  if(pl){var ym=(Y(16)+Y(17))/2;
+    h+='<rect x="'+l+'" y="'+t+'" width="'+(W-l-r)+'" height="'+(ym-t)+'" fill="rgba(240,195,90,.06)"/><rect x="'+l+'" y="'+ym+'" width="'+(W-l-r)+'" height="'+(H-b-ym)+'" fill="rgba(69,176,201,.06)"/>'+
+      '<line x1="'+l+'" x2="'+(W-r)+'" y1="'+ym+'" y2="'+ym+'" stroke="rgba(244,230,196,.35)" stroke-dasharray="4 4"/>'+
+      '';
+    [[1,"Liga 1 · 1.","#f0c35a"],[16,"16.",""],[17,"Liga 2 · 1.","#45B0C9"],[32,"16.",""]].forEach(function(k){h+='<text x="'+(l-6)+'" y="'+(Y(k[0])+(k[0]===16?1:k[0]===17?9:4))+'" text-anchor="end"'+(k[2]?' style="fill:'+k[2]+';font-weight:700"':'')+'>'+k[1]+'</text>'})}
+  else[mn+(mx-mn)*.08,(mn+mx)/2,mx-(mx-mn)*.08].forEach(function(v){h+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="rgba(244,230,196,.08)"/><text x="'+(l-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+Math.round(v)+'</text>'});
+  for(var i=0;i<n;i++)h+='<line x1="'+X(i)+'" x2="'+X(i)+'" y1="'+t+'" y2="'+(H-b)+'" stroke="rgba(244,230,196,.07)"/><text x="'+X(i)+'" y="'+(H-6)+'" text-anchor="middle">S'+(i+1)+(i===n-1&&o.laeuft?" läuft":"")+'</text>';
+  ser.slice().reverse().forEach(function(s){var d="";s.w.forEach(function(v,i){d+=(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)});
+    h+='<path d="'+d+'" fill="none" stroke="'+s.f+'" stroke-width="'+(s.dick?3.2:1.6)+'" stroke-linejoin="round" stroke-linecap="round" opacity="'+(s.dick?1:.75)+'"/>';
+    s.w.forEach(function(v,i){h+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="'+(s.dick?4.5:2.6)+'" fill="'+(i===n-1&&o.laeuft?"#0c1017":s.f)+'" stroke="'+s.f+'" stroke-width="2"/>';
+      if(s.dick)h+='<text x="'+X(i)+'" y="'+(Y(v)-9)+'" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:13px">'+(pl?(v>16?v-16:v)+".":de(v,0))+'</text>'})});
+  return h+'</svg>'}
+function reihe(c,m){var l=Z.leer?[LEER]:SAI;return l.map(function(S){var z=S.z[c];return m==="platz"?pos(z):m==="pkt"?z.pkt:m==="mw"?z.mw:m==="kasse"?z.kasse:z.mw+z.kasse})}
+function kacheln(c){var l=Z.leer?[LEER]:SAI;return '<span class="vk">'+l.map(function(S){var z=S.z[c];
+  return '<i class="'+(z.liga===2?"b":"")+(S.laeuft?" lf":z.liga===1&&z.rank===1?" t":"")+(!S.laeuft&&S.auf.indexOf(c)>=0?" auf":!S.laeuft&&S.ab.indexOf(c)>=0?" abs":"")+'" title="Saison '+S.n+' · Liga '+z.liga+' · Platz '+z.rank+(S.laeuft?" (läuft)":"")+'">'+z.rank+'</i>'}).join("")+'</span>'}
+
+/* ===================== SAISON-ARCHIV ===================== */
+function ligaKarte(S,l){var geld=Z.sp==="geld",cols=geld?"2rem minmax(0,1fr) 4.7rem 4.7rem 5.1rem 4.7rem 5.4rem":"2rem minmax(0,1fr) 4.2rem 2.8rem 2.8rem 2.8rem 2.8rem 3.1rem 3rem";
+  var h='<section class="pan"><div class="pk"><h2>Liga '+l+'</h2><small>'+(S.laeuft?"Zwischenstand nach Spieltag "+GESP:"Endtabelle Saison "+S.n)+'</small><span class="sp"></span>'+seg("sp",[["sport","Sport"],["geld","Geld"]])+'</div><div class="tl">'+
+   th(cols,geld?["#",["Team","li"],"Kasse","Gehalt","Marktwert","GuV","Transfers"]:["#",["Team","li"],"Punkte",["POW","ap"],["SPE","as"],["MEN","am"],["SOC","ao"],"Start","±"]);
+  S.L[l].forEach(function(c){var z=S.z[c],zo=S.laeuft?"":l===1&&z.rank===1?" zm":l===1&&z.rank>13?" zd":l===2&&z.rank<4?" zu":"";
+    var mk=S.laeuft?"":l===1&&z.rank===1?'<span class="tg voll2">'+ic("krone")+'Meister</span>':l===2&&z.rank===1?'<span class="tg g">▲ Meister Liga 2</span>':l===2&&z.rank<4?'<span class="tg g">▲ Aufstieg</span>':l===1&&z.rank>13?'<span class="tg w">▼ Abstieg</span>':"";
+    h+='<div class="tz'+zo+(c===ICH?" ich":"")+'" style="grid-template-columns:'+cols+'" data-tu="blatt:'+c+'"><span class="rg t">'+z.rank+'</span><span class="nm">'+lg(c,"k")+'<span>'+T[c]+'</span>'+mk+'</span>'+
+     (geld?'<span class="t">'+C(z.kasse)+'</span><span class="t lz">'+C(z.gehalt)+'</span><span class="t">'+C(z.mw)+'</span><span class="t">'+Cv(z.guv)+'</span><span class="t">'+Cv(z.tn)+'</span>'
+      :'<b class="gr t">'+de(z.pkt)+'</b>'+z.ar.map(function(a){return '<span class="aw t">'+de(a,0)+'</span>'}).join("")+'<span class="t lz">'+z.start+'.</span><span class="t '+(z.diff>0?"plus":z.diff<0?"minus":"null")+'">'+(z.diff>0?"▲"+z.diff:z.diff<0?"▼"+(-z.diff):"–")+'</span>')+'</div>'});
+  return h+'</div><div class="fuss">'+(l===1?'<span><i class="z" style="background:var(--gold)"></i>Meister</span><span><i class="z" style="background:var(--warn)"></i>Platz 14 bis 16 steigen ab</span>':'<span><i class="z" style="background:var(--gut)"></i>Platz 1 bis 3 steigen auf</span>')+
+   '<span class="sp"></span><span>'+(geld?(S.n===1||Z.leer?"Saison 1: Kaderaufbau aus dem Startbudget, Transferbilanz bleibt —":"Stand zum Saisonende · Transfers = Fenster vor der Saison"):"Start = Platz nach Kaderstärke vor Spieltag 1")+'</span></div></section>'}
+function kurz(S){function mei(c,t,go){var z=S.z[c];return '<a class="mei'+(go?" go":"")+'" data-tu="blatt:'+c+'">'+lg(c)+'<span><small>'+t+'</small><b>'+T[c]+'</b><em class="t">'+de(z.pkt)+' Punkte</em></span></a>'}
+  function wr(l){return '<div class="wr">'+l.map(function(c){return '<img src="'+logo(c)+'" alt="" title="'+T[c]+'" data-tu="blatt:'+c+'">'}).join("")+'</div>'}
+  return '<section class="pan fix"><div class="pk"><h2>Saison '+S.n+' in Kürze</h2>'+(S.laeuft?'<span class="tg go">läuft</span>':"")+'</div><div class="pb"><div class="kopfpaar">'+mei(S.L[1][0],S.laeuft?"Vorn in Liga 1":"Meister",1)+mei(S.L[2][0],S.laeuft?"Vorn in Liga 2":"Meister Liga 2")+'</div>'+
+   '<div class="wechsel"><div><small class="plus">▲ '+(S.laeuft?"Auf Aufstiegsplatz":"Aufsteiger")+'</small>'+wr(S.auf)+'</div><div><small class="minus">▼ '+(S.laeuft?"Auf Abstiegsplatz":"Absteiger")+'</small>'+wr(S.ab)+'</div></div></div></section>'}
+function kletterer(S){var a=CODES.map(function(c){return {c:c,z:S.z[c]}}).sort(function(x,y){return y.z.diff-x.z.diff}),l=a.slice(0,6).concat(a.slice(-6));
+  return '<section class="pan"><div class="pk"><h2>Kletterer &amp; Absturz</h2><small>Startplatz gegen Endplatz</small></div><div class="pb sc" style="padding-top:.2rem;padding-bottom:.2rem">'+l.map(function(e,i){var z=e.z;
+    return '<a class="kz" data-tu="blatt:'+e.c+'"'+(i===6?' style="border-top:1px solid var(--linie-2)"':'')+'>'+lg(e.c,"k")+'<span class="n">'+T[e.c]+'</span><small class="t">L'+z.liga+' · '+z.start+'. → '+z.rank+'.</small><b class="t '+(z.diff>0?"plus":"minus")+'">'+(z.diff>0?"+":"−")+Math.abs(z.diff)+'</b></a>'}).join("")+'</div></section>'}
+function zeugnis(S){var z=S.z[ICH],d=z.diff;
+  return '<section class="pan fix"><div class="pk"><h2>Dein Saison-Zeugnis</h2><span class="sp"></span><a data-tu="blatt:'+ICH+'">Verlauf öffnen ›</a></div><div class="pb"><div class="zeug">'+lg(ICH)+'<div><h3>Platz '+z.rank+' in Liga '+z.liga+'</h3>'+
+   '<p class="txt" style="margin:0">Start als Nummer <b>'+z.start+'</b>, '+(S.laeuft?"aktuell":"Ende")+' auf Platz <b>'+z.rank+'</b>'+(d?' — '+Math.abs(d)+(Math.abs(d)===1?" Platz ":" Plätze ")+(d>0?"gutgemacht":"verloren"):" — Platz gehalten")+'. Kasse <b>'+de(z.kasse)+' C</b> · Transferbilanz <b>'+(z.tn==null||Z.leer?"—":vz(z.tn)+" C")+'</b>.'+(S.auf.indexOf(ICH)>=0&&!S.laeuft?' <b class="plus">Aufstieg in Liga 1.</b>':"")+'</p></div></div></div></section>'}
+function zArchiv(){var el=$("s-archiv");if(Z.sai==="alle")Z.sai=anz()>1?3:1;if(Z.sai>anz())Z.sai=anz();var S=saison(Z.sai);
+  if(Z.leer){el.innerHTML=zeitleiste("archiv")+'<section class="pan voll"><div class="pb"><div class="leer">'+ic("hist")+'<b>Noch keine abgeschlossene Saison</b>Das Archiv füllt sich mit dem Ende von Saison 1: Endtabellen beider Ligen, Meister, Auf- und Absteiger. Bis dahin steht der Zwischenstand im Saisonstand.<br><br><a class="kn">Zum Saisonstand '+ic("r")+'</a></div></div></section>';return}
+  el.innerHTML=zeitleiste("archiv")+ligaKarte(S,1)+ligaKarte(S,2)+'<div class="spalte">'+kurz(S)+kletterer(S)+zeugnis(S)+'</div>'}
+
+/* ===================== TRANSFERS ===================== */
+var ARTN={kauf:["Kauf","g"],verkauf:["Verkauf","go"],wechsel:["Wechsel","l2"],abgang:["Abgang","w"]};
+function ztx(d){return d.zt===-1?"Ende S"+(d.f-1):d.zt===0?"vor ST 1":"ST "+d.zt}
+function weg(d){function e(c){return c?lg(c,"k")+'<span>'+c+'</span>':'<span class="m">'+(d.art==="abgang"&&!c&&d.von?"vereinslos":"Markt")+'</span>'}return '<span class="weg">'+e(d.von)+ic("r")+e(d.an)+'</span>'}
+function wegLang(d){function e(c){return c?lg(c,"k")+T[c]:d.art==="abgang"?"vereinslos":"Freier Markt"}return '<div class="wegg">'+e(d.von)+ic("r")+e(d.an)+'</div>'}
+function dealSicht(ohneTeam){var s=Z.such.trim().toLowerCase();return DEALS.filter(function(d){
+  return (Z.sai==="alle"||d.f===Z.sai)&&(Z.typ==="alle"||(Z.typ==="kauf"&&d.an)||(Z.typ==="verkauf"&&d.von&&d.art!=="abgang")||(Z.typ==="abgang"&&d.art==="abgang"))&&
+    (ohneTeam||!Z.tt||d.von===Z.tt||d.an===Z.tt)&&(!Z.kl||d.sp[1]===Z.kl)&&(!Z.qu||d.qu.indexOf(Z.qu)===0)&&(!s||d.sp[0].toLowerCase().indexOf(s)>=0)})}
+function dealZeilen(){var l=dealSicht(),cols="4.5rem minmax(0,1fr) 5.2rem 10.6rem 4.7rem 4rem 4.4rem 4.9rem 7.4rem",ds=Z.ds;
+  if(ds!=="zeit")l=l.slice().sort(function(a,b){return (b[ds]==null?-1e9:b[ds])-(a[ds]==null?-1e9:a[ds])});
+  var h='<div class="th" style="grid-template-columns:'+cols+'"><span class="li">'+sortKopf("ds","zeit","Zeit")+'</span><span class="li">Spieler</span><span class="li">Art</span><span class="li">Von → An</span><span>'+sortKopf("ds","abl","Ablöse")+'</span><span>'+sortKopf("ds","geh","Gehalt")+'</span><span>'+sortKopf("ds","mw","MW")+'</span><span>'+sortKopf("ds","guv","GuV")+'</span><span class="li">Quelle</span></div>',f0=0;
+  if(!l.length)return h+'<div class="leer" style="padding:2rem 0">'+ic("scout")+'<b>Kein Deal passt</b>Filter lockern oder ein anderes Fenster wählen.</div>';
+  var sel=Z.deal||l[0].id;
+  l.forEach(function(d){if(ds==="zeit"&&Z.sai==="alle"&&d.f!==f0){f0=d.f;h+='<div class="trenner">Transferfenster vor Saison '+d.f+'<span>zählt zu Saison '+d.f+'</span></div>'}
+    h+='<div class="tz'+(d.id===sel?" gew":"")+(d.von===ICH||d.an===ICH?" ich":"")+'" style="grid-template-columns:'+cols+'" data-s="deal:'+d.id+'"><span class="li lz t">'+ztx(d)+'</span><span class="nm"><img class="ptr k" src="'+port(d.sp[0])+'" alt=""><span>'+d.sp[0]+'<small>'+d.sp[1]+'</small></span></span>'+
+     '<span class="art"><span class="tg '+ARTN[d.art][1]+'">'+ARTN[d.art][0]+'</span></span>'+weg(d)+'<b class="gr t">'+(d.art==="abgang"?'<span class="null">—</span>':de(d.abl))+'</b><span class="t lz">'+de(d.geh)+'</span><span class="t lz">'+de(d.mw)+'</span><span class="t">'+Cv(d.guv)+'</span><span class="li lz" style="font-size:.9rem;overflow:hidden;text-overflow:ellipsis">'+d.qu+'</span></div>'});
+  return h}
+function dealFuss(){var l=dealSicht(),za=l.filter(function(d){return d.art!=="abgang"}),g=l.filter(function(d){return d.guv!=null});
+  return '<span>Zeigt <b class="t">'+l.length+'</b> Deals</span><span>Ø Ablöse <b class="t">'+(za.length?de(summe(za,function(d){return d.abl})/za.length)+" C":"—")+'</b></span><span>Ø GuV bei Verkäufen <b class="t">'+(g.length?vz(summe(g,function(d){return d.guv})/g.length)+" C":"—")+'</b></span><span class="sp"></span><a data-tu="csv">CSV exportieren</a>'}
+function zDeals(el){var alle=dealSicht(true),b=bilanz("alle",alle),mx=1;CODES.forEach(function(c){mx=Math.max(mx,b[c].aus,b[c].ein)});
+  var liste=CODES.map(function(c){return b[c]}).filter(function(x){return x.n>0||x.c===ICH}).sort(function(x,y){return x.c===ICH?-1:y.c===ICH?1:Z.ts==="vol"?y.n-x.n||y.aus+y.ein-x.aus-x.ein:Z.ts==="ein"?y.ein-x.ein:(y.ein-y.aus)-(x.ein-x.aus)});
+  var h=zeitleiste("transfers")+'<section class="pan"><div class="pk"><h2>Bilanz je Team</h2><small>'+liste.length+' Teams aktiv</small></div><div class="tb2">'+seg("ts",[["vol","Volumen"],["ein","Erlös"],["net","Netto"]])+'<span class="sp"></span><span class="gk">Klick filtert</span></div><div class="tl sc">'+
+   liste.map(function(x){return '<a class="bz'+(x.c===ICH?" ich":"")+(Z.tt===x.c?" an":"")+'" data-tu="tt:'+x.c+'" title="Ausgaben '+de(x.aus)+' C · Einnahmen '+de(x.ein)+' C">'+lg(x.c,"k")+'<span class="n"><span>'+T[x.c]+'</span><small class="t">'+x.n+' Deals · '+x.k+' K / '+x.v+' V</small></span><span class="dv"><i><u style="width:'+(100*x.aus/mx)+'%"></u></i><i><u style="width:'+(100*x.ein/mx)+'%"></u></i></span><b class="t">'+Cv(x.ein-x.aus).replace(" C","")+'</b></a>'}).join("")+
+   '</div><div class="fuss"><span><i class="z" style="background:var(--warn)"></i>Ausgaben</span><span><i class="z" style="background:var(--gut)"></i>Einnahmen</span><span class="sp"></span><span>Netto in C</span></div></section>';
+  var kls=[],qus=["Manuell","KI","Vertragsauflösung"];DEALS.forEach(function(d){if(kls.indexOf(d.sp[1])<0)kls.push(d.sp[1])});kls.sort();
+  h+='<section class="pan"><div class="pk"><h2>Deals</h2><small>'+(Z.sai==="alle"?"alle Transferfenster":"Transferfenster vor Saison "+Z.sai+" · zählt zu Saison "+Z.sai)+'</small><span class="sp"></span>'+(Z.tt?'<a class="tg go" data-tu="tt:'+Z.tt+'">'+T[Z.tt]+' ✕</a>':"")+'</div>'+
+   '<div class="tb2">'+seg("typ",[["alle","Alle"],["kauf","Käufe"],["verkauf","Verkäufe"],["abgang","Abgänge"]])+
+   '<select class="wahl" data-w="kl"><option value="">Alle Klassen</option>'+kls.map(function(k){return '<option'+(Z.kl===k?" selected":"")+'>'+k+'</option>'}).join("")+'</select>'+
+   '<select class="wahl" data-w="qu"><option value="">Alle Quellen</option>'+qus.map(function(k){return '<option'+(Z.qu===k?" selected":"")+'>'+k+'</option>'}).join("")+'</select>'+
+   '<span class="sp"></span><input class="wahl" id="such" placeholder="Spieler suchen" value="'+Z.such+'"></div>'+
+   (Z.sai==="alle"?'<div class="hinweis">'+ic("waage")+'<span>Der <b>Kaderaufbau vor Saison 1</b> ist kein Transfer und zählt hier nicht mit. <a data-s="sai:1" style="color:var(--gold);font-weight:700">Kaderaufbau ansehen ›</a></span></div>':"")+
+   '<div class="tl sc" id="dl">'+dealZeilen()+'</div><div class="fuss" id="df">'+dealFuss()+'</div></section>';
+  h+='<div class="spalte">'+hoehepunkte()+blick()+'</div>';el.innerHTML=h}
+function hoehepunkte(){var l=dealSicht(),a=Z.hl==="kauf"?l.filter(function(d){return d.an}).sort(function(x,y){return y.abl-x.abl}):Z.hl==="verkauf"?l.filter(function(d){return d.von&&d.art!=="abgang"}).sort(function(x,y){return y.abl-x.abl}):l.filter(function(d){return d.guv!=null}).sort(function(x,y){return y.guv-x.guv});
+  return '<section class="pan fix"><div class="pk"><h2>Höhepunkte</h2><span class="sp"></span>'+seg("hl",[["kauf","Käufe"],["verkauf","Verkäufe"],["guv","Gewinne"]])+'</div><div class="pb" style="padding-top:.3rem;padding-bottom:.3rem">'+
+   (a.length?a.slice(0,5).map(function(d,i){var c=Z.hl==="kauf"?d.an:d.von;return '<a class="top" data-s="deal:'+d.id+'"><i class="t">'+(i+1)+'</i><img class="ptr k" src="'+port(d.sp[0])+'" alt=""><span class="n"><b>'+d.sp[0]+'</b><small>'+T[c]+' · Fenster S'+d.f+'</small></span><strong class="t">'+(Z.hl==="guv"?Cv(d.guv):de(d.abl)+" C")+'</strong></a>'}).join(""):'<p class="txt" style="margin:.6rem 0">Kein Eintrag im Filter.</p>')+'</div></section>'}
+function blick(){var l=dealSicht(),d=DEALS.filter(function(x){return x.id===Z.deal})[0]||l[0];
+  if(!d)return '<section class="pan"><div class="pk"><h2>Deal im Blick</h2></div><div class="pb"><div class="leer">Kein Deal gewählt.</div></div></section>';
+  var auf=d.abl-d.mw,w=[d.mw*.82,d.mw*.9,d.mw*.86,d.mw,d.mw*1.06,d.mw*1.12],mn=Math.min.apply(0,w),mx=Math.max.apply(0,w),p=w.map(function(v,i){return (i?"L":"M")+(i*20)+" "+(30-(v-mn)/(mx-mn)*26).toFixed(1)}).join("");
+  return '<section class="pan"><div class="pk"><h2>Deal im Blick</h2><small>'+ztx(d)+' · Fenster S'+d.f+'</small><span class="sp"></span><span class="tg '+ARTN[d.art][1]+'">'+ARTN[d.art][0]+'</span></div><div class="pb sc">'+
+   '<div class="blick"><img class="ptr g" src="'+port(d.sp[0])+'" alt=""><div><h3>'+d.sp[0]+'</h3><small>'+d.sp[1]+' · Vertrag '+d.lz+(d.lz===1?" Saison":" Saisons")+' · '+d.qu+'</small></div></div>'+wegLang(d)+
+   '<div class="kas2"><div class="ka"><small>Ablöse</small><strong class="t">'+(d.art==="abgang"?"—":de(d.abl)+" C")+'</strong><small>'+(d.art==="abgang"?"Vertrag aufgelöst":"Marktwert "+de(d.mw)+" C")+'</small></div><div class="ka"><small>GuV</small><strong class="t">'+Cv(d.guv)+'</strong><small>'+(d.guv==null?"braucht Kauf und Verkauf":"gegen den Kaufpreis")+'</small></div>'+
+   '<div class="ka"><small>Gehalt</small><strong class="t">'+de(d.geh)+' C</strong><small>je Saison</small></div><div class="ka"><small>Aufpreis</small><strong class="t">'+(d.art==="abgang"?"—":Cv(auf))+'</strong><small>Ablöse minus Marktwert</small></div></div>'+
+   '<div class="ab"><b>Marktwert-Verlauf</b><span>bis zum Deal und danach</span></div><div class="spark"><svg viewBox="0 0 100 32" preserveAspectRatio="none"><path d="'+p+'" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/><line x1="60" x2="60" y1="0" y2="32" stroke="rgba(244,230,196,.4)" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/></svg></div>'+
+   '<div style="display:flex;gap:.5rem;margin-top:.7rem;flex:none"><a class="kn" data-tu="hin:Spielerprofil">Spielerprofil '+ic("r")+'</a>'+(d.an||d.von?'<a class="kn" data-tu="blatt:'+(d.an||d.von)+'">Team-Verlauf '+ic("r")+'</a>':"")+'</div></div></section>'}
+/* Kaderaufbau: eigene Ansicht, eigene Sprache, kein Transfer */
+function zKader(el){var ps=PICKS.filter(function(p){return !Z.tt||p.team===Z.tt}),cols="3.2rem minmax(0,1fr) 13rem 5rem 4.4rem 4.8rem 5.4rem",r0=0;
+  var h=zeitleiste("transfers")+'<section class="pan"><div class="pk"><h2>Startbudget je Team</h2><small>Budget → Kader → Kasse</small></div><div class="tb2"><span class="gk">Klick filtert</span><span class="sp"></span><span class="gk">Kasse zum Start</span></div><div class="tl sc">'+
+   CODES.slice().sort(function(a,b){return a===ICH?-1:b===ICH?1:BUD[b]-BUD[a]}).map(function(c){return '<a class="bz'+(c===ICH?" ich":"")+(Z.tt===c?" an":"")+'" data-tu="tt:'+c+'">'+lg(c,"k")+'<span class="n"><span>'+T[c]+'</span><small class="t">Budget '+de(BUD[c],0)+' C · 11 Picks</small></span><span class="bud" title="Anteil des Startbudgets im Kader"><u style="width:'+(100*(BUD[c]-REST[c])/BUD[c])+'%"></u></span><b class="t">'+de(REST[c])+'</b></a>'}).join("")+
+   '</div><div class="fuss"><span><i class="z" style="background:var(--gold)"></i>im Kader gebunden</span><span class="sp"></span><span>Rest = Kasse zum Saisonstart</span></div></section>';
+  h+='<section class="pan"><div class="pk"><h2>Kaderaufbau</h2><small>vor Saison 1 · aus dem Startbudget</small><span class="sp"></span>'+(Z.tt?'<a class="tg go" data-tu="tt:'+Z.tt+'">'+T[Z.tt]+' ✕</a>':"")+'<span class="tg">kein Transfer</span></div>'+
+   '<div class="hinweis">'+ic("waage")+'<span><b>Das ist kein Transfer.</b> Jedes Team baut vor Saison 1 seinen Kader aus dem Startbudget. Diese Käufe zählen in keine Transferbilanz; für Saison 1 steht dort überall „—“. Das erste Transferfenster ist das vor Saison 2.</span></div><div class="tl sc">'+
+   th(cols,["Pick",["Spieler","li"],["Team","li"],"Preis","Gehalt","Marktwert","Preis − MW"]);
+  ps.forEach(function(p){if(p.runde!==r0){r0=p.runde;h+='<div class="trenner">Runde '+r0+'<span>'+(r0%2?"Reihenfolge wie gelost":"Schlange, umgekehrt")+'</span></div>'}
+    h+='<div class="tz'+(p.team===ICH?" ich":"")+(Z.pick===p.nr?" gew":"")+'" style="grid-template-columns:'+cols+'" data-s="pick:'+p.nr+'"><span class="rg t">'+p.nr+'</span><span class="nm"><img class="ptr k" src="'+port(p.sp[0])+'" alt=""><span>'+p.sp[0]+'<small>'+p.sp[1]+'</small></span></span><span class="nm">'+lg(p.team,"k")+'<span>'+T[p.team]+'</span></span><b class="gr t">'+de(p.preis)+'</b><span class="t lz">'+de(p.sp[3])+'</span><span class="t lz">'+de(p.sp[2])+'</span><span class="t">'+Cv(p.preis-p.sp[2])+'</span></div>'});
+  h+='</div><div class="fuss"><span>Zeigt <b class="t">'+ps.length+'</b> von '+PICKS.length+' Picks</span><span>Ø Preis <b class="t">'+de(summe(ps,function(p){return p.preis})/ps.length)+' C</b></span><span class="sp"></span><a data-tu="csv">CSV exportieren</a></div></section>';
+  var top=ps.slice().sort(function(a,b){return b.preis-a.preis}).slice(0,5),p=PICKS[(Z.pick||top[0].nr)-1];
+  h+='<div class="spalte"><section class="pan fix"><div class="pk"><h2>Teuerste Picks</h2></div><div class="pb" style="padding-top:.3rem;padding-bottom:.3rem">'+top.map(function(p,i){return '<a class="top" data-s="pick:'+p.nr+'"><i class="t">'+(i+1)+'</i><img class="ptr k" src="'+port(p.sp[0])+'" alt=""><span class="n"><b>'+p.sp[0]+'</b><small>'+T[p.team]+' · Pick '+p.nr+'</small></span><strong class="t">'+de(p.preis)+' C</strong></a>'}).join("")+'</div></section>'+
+   '<section class="pan"><div class="pk"><h2>Pick im Blick</h2><small>Runde '+p.runde+' · Pick '+p.nr+'</small></div><div class="pb sc"><div class="blick"><img class="ptr g" src="'+port(p.sp[0])+'" alt=""><div><h3>'+p.sp[0]+'</h3><small>'+p.sp[1]+'</small></div></div><div class="wegg">'+lg(p.team,"k")+T[p.team]+'</div>'+
+   '<div class="kas2"><div class="ka"><small>Preis</small><strong class="t">'+de(p.preis)+' C</strong><small>aus dem Startbudget</small></div><div class="ka"><small>Marktwert</small><strong class="t">'+de(p.sp[2])+' C</strong><small>beim Pick</small></div><div class="ka"><small>Gehalt</small><strong class="t">'+de(p.sp[3])+' C</strong><small>je Saison</small></div><div class="ka"><small>Anteil am Budget</small><strong class="t">'+de(100*p.preis/BUD[p.team],0)+' %</strong><small>von '+de(BUD[p.team],0)+' C</small></div></div>'+
+   '<div style="display:flex;gap:.5rem;margin-top:.7rem;flex:none"><a class="kn" data-tu="hin:Spielerprofil">Spielerprofil '+ic("r")+'</a><a class="kn" data-tu="blatt:'+p.team+'">Team-Verlauf '+ic("r")+'</a></div></div></section></div>';
+  el.innerHTML=h}
+function zTransfers(){if(Z.leer||Z.sai>anz())Z.sai=Z.leer?1:Z.sai;if(Z.sai===1)zKader($("s-transfers"));else zDeals($("s-transfers"))}
+
+/* ===================== EWIGE TABELLE ===================== */
+function ewig(){var l=Z.leer?[LEER]:SAI;return CODES.map(function(c){var v=l.map(function(S){return S.z[c]}),fe=v.filter(function(x,i){return !l[i].laeuft}),p=fe.map(pos),j=v[v.length-1];
+  var o={c:c,sai:v.length,liga:j.liga,pkt:summe(v,function(x){return x.pkt}),dpkt:fe.length?summe(fe,function(x){return x.pkt})/fe.length:null,drang:p.length?summe(p)/p.length:null,best:p.length?Math.min.apply(0,p):null,
+    gold:p.filter(function(x){return x===1}).length,silber:p.filter(function(x){return x===2}).length,bronze:p.filter(function(x){return x===3}).length,top5:p.filter(function(x){return x<=5}).length,top10:p.filter(function(x){return x<=10}).length,
+    auf:l.filter(function(S){return !S.laeuft&&S.auf.indexOf(c)>=0}).length,abs:l.filter(function(S){return !S.laeuft&&S.ab.indexOf(c)>=0}).length,
+    mwj:j.mw,mwp:Math.max.apply(0,v.map(function(x){return x.mw})),mww:j.mw-v[0].mw,mwz:100*(j.mw-v[0].mw)/v[0].mw,kj:j.kasse,kp:Math.max.apply(0,v.map(function(x){return x.kasse})),tw:j.mw+j.kasse};return o})
+  .sort(function(a,b){return b.pkt-a.pkt}).map(function(o,i){o.nr=i+1;return o})}
+var FOK={punkte:[["pkt","Punkte","4.8rem"],["dpkt","Ø Punkte","4.8rem"],["drang","Ø Platz","4.4rem"],["best","Bester Platz","6rem"]],
+  medaillen:[["gold","Meister","4.4rem"],["silber","Zweiter","4.4rem"],["bronze","Dritter","4.4rem"],["top5","Top 5","3.8rem"],["top10","Top 10","3.8rem"],["auf","Aufstiege","5rem"],["abs","Abstiege","5rem"]],
+  marktwert:[["mwj","MW jetzt","5.4rem"],["mwp","MW Höchst","5.6rem"],["mww","MW +/−","5.4rem"],["mwz","MW %","4.6rem"]],
+  kasse:[["kj","Kasse jetzt","5.6rem"],["kp","Kasse Höchst","6rem"],["tw","Teamwert","5.6rem"]]};
+function ezelle(o,k){var v=o[k];if(v==null)return '<span class="null">—</span>';
+  return k==="pkt"?'<b class="gr t">'+de(v)+'</b>':k==="dpkt"?de(v):k==="drang"?de(v):k==="best"?ptx(v):k==="mww"?Cv(v):k==="mwz"?'<span class="'+(v>0?"plus":"minus")+'">'+vz(v)+' %</span>':/^(mw|k|tw)/.test(k)?C(v):v?(k==="gold"?'<b class="gr t" style="color:var(--gold)">'+v+'</b>':k==="auf"?'<span class="plus">▲ '+v+'</span>':k==="abs"?'<span class="minus">▼ '+v+'</span>':v):'<span class="null">–</span>'}
+var FARBEN=["#f0c35a","#45B0C9","#c9a7ff","#62d394","#ff8f6b","#9aa7ba"];
+function zEwig(){var el=$("s-ewig"),E=ewig(),fk=FOK[Z.fok]||FOK.punkte;
+  if(Z.leer){el.innerHTML='<section class="pan voll"><div class="pk"><h2>Ewige Tabelle</h2></div><div class="pb"><div class="leer">'+ic("hist")+'<b>Noch keine abgeschlossene Saison archiviert</b>Die Ewige Tabelle zählt ab dem Ende von Saison 1. Bis dahin steht alles im Saisonstand.</div></div></section>';return}
+  if(!fk.some(function(f){return f[0]===Z.es}))Z.es=fk[0][0];
+  var asc=Z.es==="drang"||Z.es==="best",l=E.filter(function(o){return Z.el==="alle"||o.liga===+Z.el}).sort(function(a,b){var x=a[Z.es],y=b[Z.es];if(x==null)return 1;if(y==null)return -1;return asc?x-y:y-x});
+  var cols="2.4rem minmax(0,1fr) 3.6rem "+fk.map(function(f){return f[2]}).join(" ")+" 9.6rem";
+  var h='<section class="pan"><div class="pk"><h2>Ewige Tabelle</h2><small>3 Saisons abgeschlossen · Saison 4 läuft und zählt mit</small><span class="sp"></span>'+seg("el",[["alle","Alle 32"],["1","Liga 1"],["2","Liga 2"]])+'</div>'+
+   '<div class="tb2">'+seg("fok",[["punkte","Punkte &amp; Ränge"],["medaillen","Titel &amp; Auf-/Abstieg"],["marktwert","Marktwert"],["kasse","Kasse &amp; Teamwert"]])+'<span class="sp"></span><span class="gk">Klick auf ein Team öffnet den Verlauf</span></div><div class="tl sc">'+
+   '<div class="th" style="grid-template-columns:'+cols+'"><span>#</span><span class="li">Team</span><span>Saisons</span>'+fk.map(function(f){return '<span>'+sortKopf("es",f[0],f[1])+'</span>'}).join("")+'<span>S1 – S4</span></div>';
+  l.forEach(function(o){h+='<div class="tz'+(o.c===ICH?" ich":"")+(o.nr===1?" zm":"")+'" style="grid-template-columns:'+cols+'" data-tu="blatt:'+o.c+'"><span class="rg t">'+o.nr+'</span><span class="nm">'+lg(o.c,"k")+'<span>'+T[o.c]+'</span>'+ltag(o.liga)+'</span><span class="t lz">'+o.sai+'</span>'+fk.map(function(f){return '<span class="t">'+ezelle(o,f[0])+'</span>'}).join("")+kacheln(o.c)+'</div>'});
+  h+='</div><div class="fuss"><span class="vk"><i>4</i></span><span>Liga 1</span><span class="vk"><i class="b">4</i></span><span>Liga 2</span><span class="vk"><i class="t">1</i></span><span>Meister</span><span class="vk"><i class="lf">9</i></span><span>läuft</span><span class="sp"></span><span>Ø Platz und Bester Platz über beide Ligen: Liga 2 zählt ab Platz 17</span></div></section>';
+  var kopf=E.slice(0,4).map(function(o){return o.c});if(kopf.indexOf(ICH)<0)kopf.unshift(ICH);else{kopf.splice(kopf.indexOf(ICH),1);kopf.unshift(ICH)}
+  h+='<div class="spalte"><section class="pan"><div class="pk"><h2>Entwicklung</h2><small>dein Team gegen die ewige Spitze</small></div><div class="tb2">'+seg("em",[["platz","Platz"],["pkt","Punkte"],["mw","Marktwert"],["kasse","Kasse"],["tw","Teamwert"]])+'</div><div class="pb"><div class="graf">'+
+   linien(kopf.map(function(c,i){return {c:c,f:FARBEN[i],dick:i===0,w:reihe(c,Z.em)}}),{W:560,H:600,platz:Z.em==="platz",laeuft:1})+'</div><div class="leg">'+kopf.map(function(c,i){return '<span data-tu="blatt:'+c+'"><i style="background:'+FARBEN[i]+'"></i>'+T[c]+'</span>'}).join("")+'</div></div></section>'+
+   '<section class="pan fix"><div class="pk"><h2>Auf und ab</h2><small>wer die Liga gewechselt hat</small></div><div class="pb" style="padding-top:.2rem;padding-bottom:.2rem">'+fertig().map(function(S){function w(l){return l.map(function(c){return '<img src="'+logo(c)+'" alt="" title="'+T[c]+'" data-tu="blatt:'+c+'">'}).join("")}
+     return '<div class="gz"><b>S'+S.n+' → S'+(S.n+1)+'</b><div class="plus">'+ic("hoch")+w(S.auf)+'</div><div class="minus"><svg class="i" style="transform:rotate(180deg)"><use href="#i-hoch"/></svg>'+w(S.ab)+'</div></div>'}).join("")+'</div></section></div>';
+  el.innerHTML=h}
+
+/* ===================== BLATT: TEAM-VERLAUF ===================== */
+function zBlatt(){var c=Z.team,b=$("blatt");$("schl").classList.toggle("auf",!!c);b.classList.toggle("auf",!!c);if(!c||!T[c]){b.innerHTML="";return}
+  var l=Z.leer?[LEER]:SAI,o=ewig().filter(function(x){return x.c===c})[0],j=l[l.length-1].z[c],cols="3rem minmax(0,1fr) 3.2rem 4.4rem 4.8rem 5.2rem 5.6rem";
+  var ds=Z.leer?[]:DEALS.filter(function(d){return d.von===c||d.an===c}).sort(function(a,b){return b.abl-a.abl}).slice(0,3);
+  var h='<div class="pk">'+lg(c)+'<div><h2>'+T[c]+'</h2><small>aktuell Liga '+j.liga+' · Platz '+j.rank+' · ewige Tabelle #'+o.nr+(MENSCH[c]?" · "+MENSCH[c]:"")+'</small></div><a class="x" data-tu="blattzu" title="Schließen (Esc)">'+ic("x")+'</a></div><div class="pb sc">'+
+   '<div class="kas4"><div class="ka"><small>Meistertitel</small><strong class="t">'+o.gold+'</strong></div><div class="ka"><small>Aufstiege</small><strong class="t plus">'+o.auf+'</strong></div><div class="ka"><small>Abstiege</small><strong class="t minus">'+o.abs+'</strong></div><div class="ka"><small>Bester Platz</small><strong class="t">'+(o.best?ptx(o.best):"—")+'</strong></div></div>'+
+   '<div class="ab"><b>Platz über beide Ligen</b><span>Zahl am Punkt = Platz in der Liga</span></div><div class="graf">'+linien([{c:c,f:"#f0c35a",dick:1,w:reihe(c,"platz")}],{W:580,H:210,platz:1,laeuft:1})+'</div>'+
+   '<div class="ab"><b>Saison für Saison</b></div>'+th(cols,[["Saison","li"],["Liga","li"],"Platz","Punkte","Kasse","Marktwert","Transfers"])+
+   l.map(function(S){var z=S.z[c];return '<div class="tz" style="grid-template-columns:'+cols+'"><span class="li"><b style="font:400 1.05rem var(--haus);color:var(--creme)">S'+S.n+'</b></span><span class="li" style="display:flex;gap:.3rem">'+ltag(z.liga)+(S.laeuft?'<span class="tg go">läuft</span>':S.auf.indexOf(c)>=0?'<span class="tg g">▲ auf</span>':S.ab.indexOf(c)>=0?'<span class="tg w">▼ ab</span>':S.L[1][0]===c?'<span class="tg voll2">Meister</span>':'')+'</span><span class="rg t">'+z.rank+'.</span><b class="gr t">'+de(z.pkt)+'</b><span class="t">'+C(z.kasse)+'</span><span class="t">'+C(z.mw)+'</span><span class="t">'+(S.n===1?'<span class="null" title="Kaderaufbau aus dem Startbudget, kein Transfer">—</span>':Cv(z.tn))+'</span></div>'}).join("")+
+   '<p class="hinw" style="margin:.4rem 0 0;font-size:.82rem;color:var(--stumm)">Saison 1: Kaderaufbau aus dem Startbudget ('+de(BUD[c],0)+' C), deshalb keine Transferbilanz.</p>'+
+   (ds.length?'<div class="ab"><b>Größte Deals</b></div>'+ds.map(function(d,i){return '<a class="top" data-tu="deal:'+d.id+'"><i class="t">'+(i+1)+'</i><img class="ptr k" src="'+port(d.sp[0])+'" alt=""><span class="n"><b>'+d.sp[0]+'</b><small>'+(d.an===c?"geholt":"abgegeben")+' · Fenster S'+d.f+'</small></span><strong class="t">'+de(d.abl)+' C</strong></a>'}).join(""):"")+
+   '<div style="display:flex;gap:.5rem;margin-top:.9rem;flex:none"><a class="kn" data-tu="hin:Teamprofil">Teamprofil '+ic("r")+'</a><a class="kn" data-tu="teamtransfers:'+c+'">Alle Transfers '+ic("r")+'</a></div></div>';
+  b.innerHTML=h}
+
+/* ===================== SPIELPLAN ===================== */
+function plan(n){var o=[];for(var i=0;i<20;i++)o.push([DISZ[(i+n*3)%20],DISZ[(i+n*3+7)%20]]);return o}
+var ERG=["3 : 1","1 : 3","2 : 2","4 : 0","1 : 3"];
+function zSpielplan(){var el=$("s-spielplan"),n=Z.leer?1:Z.ps,S=saison(Math.min(n,anz())),P=plan(n),lf=S.laeuft,ich=S.z[ICH],geg=S.L[ich.liga].filter(function(c){return c!==ICH});
+  var h='<section class="pan"><div class="pk"><h2>Spieltage</h2><small>Saison '+n+' · '+(lf?"Spieltag "+HEUTE+" steht an":"abgeschlossen")+' · je Spieltag zwei Disziplinen</small><span class="sp"></span>'+(Z.leer?"":seg("ps",[[1,"S1"],[2,"S2"],[3,"S3"],[4,"S4 läuft"]]))+'</div><div class="pb"><div class="plan">'+
+   P.map(function(d,i){var t=i+1,zu=lf?(t<HEUTE?"":t===HEUTE?" heute":" kommt"):"",e=ERG[(i+n)%5],g=geg[(i*4+n)%15];
+     return '<div class="st'+zu+'"><div class="ko"><small>Spieltag</small><b class="t">'+t+'</b>'+(zu===" heute"?'<span class="tg voll2">heute</span>':"")+lg(g,"k")+(zu?"":'<span class="erg t '+(e[0]>e[4]?"plus":e[0]<e[4]?"minus":"acht")+'">'+e+'</span>')+'</div>'+
+      d.map(function(x,k){return '<div class="sl2" style="--ac:'+AX[x[2]][2]+'"><small>D'+(k+1)+'</small><b>'+x[1]+'</b><em>'+AX[x[2]][0]+'</em></div>'}).join("")+'</div>'}).join("")+
+   '</div></div><div class="fuss">'+AXK.map(function(a){return '<span><i class="z" style="background:'+AX[a][2]+'"></i>'+AX[a][0]+'</span>'}).join("")+'<span class="sp"></span><span>Wappen = Gegner · Zahl = Duellpunkte deines Teams</span></div></section>';
+  var l=DISZ.map(function(d,i){return {d:d,o:i+1,r:((i+n*3)%20)+1}}).filter(function(x){return Z.pk==="alle"||x.d[2]===Z.pk}).sort(function(a,b){return a.r-b.r}),cols="2.6rem minmax(0,1fr) 3.4rem 3.4rem 6.6rem 6.6rem";
+  h+='<section class="pan"><div class="pk"><h2>Disziplinen</h2><small>Reihenfolge wird je Saison neu gelost</small></div><div class="tb2">'+seg("pk",[["alle","Alle"],["pow","POW"],["spe","SPE"],["men","MEN"],["soc","SOC"]])+'</div><div class="tl sc">'+th(cols,["Nr.",["Disziplin","li"],"Achse","Spieler",["Mutator 1","li"],["Mutator 2","li"]])+
+   l.map(function(x){var m=(x.o*5+n)%13;return '<div class="tz" style="grid-template-columns:'+cols+';cursor:default"><span class="rg t">'+x.r+'</span><span class="nm"><i style="width:.22rem;height:1.3rem;background:'+AX[x.d[2]][2]+';border-radius:1px"></i><span>'+x.d[1]+'<small>Spieltag '+P.map(function(p,i){return p[0]===x.d||p[1]===x.d?i+1:0}).filter(Boolean).join(" und ")+'</small></span></span><span class="t '+AX[x.d[2]][1]+'">'+AX[x.d[2]][0]+'</span><span class="t">'+x.d[3]+'</span><span class="li lz">'+(m<9?TRAITS[m]:"—")+'</span><span class="li lz">'+(m<5?TRAITS[(m+6)%TRAITS.length]:"—")+'</span></div>'}).join("")+
+   '</div><div class="fuss"><span>Nr. = Reihenfolge dieser Saison</span></div></section>';
+  el.innerHTML=h}
+
+/* ===================== RANKS ===================== */
+var KURZ={"gewichtheben":"Gewicht","breaking":"Break","time-trial":"T-Trial","climbing":"Climb","wettessen":"Wettess.","basketball":"Basket","showcase":"Show","battlefield":"Battle","eiskunstlauf":"Eiskunst"};
+var STK=(function(){var r=rng(77),o={};CODES.forEach(function(c){o[c]=DISZ.map(function(){return st[c]+(r()-.5)*26})});return o})();
+function raenge(codes,f){var s=codes.slice().sort(function(a,b){return f(b)-f(a)}),o={};s.forEach(function(c,i){o[c]=i+1});return o}
+function rzelle(r,n,agg){var k=r<=Math.max(1,Math.round(n*.1))?"r1":r<=n*.3?"r2":r>n-Math.max(1,Math.round(n*.1))?"r5":r>n*.7?"r4":"";return '<span class="c t '+k+(agg?" agg":"")+'">'+r+'</span>'}
+function sv(c,i){return STK[c][(i+(Z.leer?4:Z.ps)*7)%20]}
+function zRanks(){var el=$("s-ranks"),S=Z.rv==="pp"?aktuell():saison(Z.leer?1:Z.ps),codes=Z.rl==="alle"?CODES.slice():S.L[+Z.rl],n=codes.length;el.classList.toggle("pp",Z.rv==="pp");
+  var grp=AXK.map(function(a){return DISZ.map(function(d,i){return {d:d,i:i}}).filter(function(x){return x.d[2]===a})});
+  if(Z.rv==="pp"){var k=Z.rb,wert=function(c){var z=S.z[c];return k==="tot"?z.pkt:z.ar[AXK.indexOf(k)]},l=codes.slice().sort(function(a,b){return wert(b)-wert(a)}),mx=wert(l[0]),f=k==="tot"?"var(--gold)":AX[k][2],ir=l.indexOf(ICH);
+    var h='<section class="pan"><div class="pk"><h2>PPs pro Bereich</h2><small>Saison '+S.n+' · nach Spieltag '+GESP+'</small><span class="sp"></span>'+seg("rl",[["1","Liga 1"],["2","Liga 2"],["alle","Beide 1–32"]])+'</div><div class="tb2">'+seg("rb",[["tot","Gesamt"],["pow","POW"],["spe","SPE"],["men","MEN"],["soc","SOC"]])+'</div><div class="tl'+(n>16?" sc":"")+'">'+
+     '<div class="th ppz"><span>#</span><span class="li">Team</span><span></span><span>PPs</span><span>zu #1</span></div>'+l.map(function(c,i){var w=wert(c);return '<div class="tz ppz'+(c===ICH?" ich":"")+'" data-tu="blatt:'+c+'"><span class="rg t">'+(i+1)+'</span><span class="nm">'+lg(c,"k")+'<span>'+T[c]+'</span></span><span class="bal"><i style="width:'+(100*w/mx)+'%;background:'+f+'"></i></span><b class="gr t">'+de(w)+'</b><span class="t lz">'+(i?"−"+de(mx-w):"–")+'</span></div>'}).join("")+'</div></section>'+
+     '<div class="spalte"><section class="pan fix"><div class="pk"><h2>Dein Team</h2></div><div class="pb">'+(ir<0?'<p class="txt" style="margin:0">Dein Team ist in dieser Liga nicht vertreten.</p>':'<div class="kas2"><div class="ka"><small>Platz</small><strong class="t">'+(ir+1)+'. <small>von '+n+'</small></strong></div><div class="ka"><small>Abstand zu #1</small><strong class="t">'+(ir?"−"+de(mx-wert(ICH)):"–")+'</strong></div><div class="ka"><small>PPs</small><strong class="t">'+de(wert(ICH))+'</strong></div><div class="ka"><small>Spannweite</small><strong class="t">'+de(mx-wert(l[n-1]))+'</strong><small>#1 bis #'+n+'</small></div></div>')+'</div></section>'+
+     '<section class="pan"><div class="pk"><h2>Noch zu vergeben</h2><small>'+(20-GESP)+' Spieltage offen</small></div><div class="pb">'+AXK.map(function(a,i){var off=[9,8,7,6][i];return '<div class="zeile"><span class="'+AX[a][1]+'" style="font-weight:700">'+AX[a][0]+'</span><strong class="t">'+off+' <small>von 10 Auftritten offen</small></strong></div><div class="bal" style="margin:.1rem 0 .5rem"><i style="width:'+(100-off*10)+'%;background:'+AX[a][2]+'"></i></div>'}).join("")+'<p class="txt" style="margin-top:auto">Jede Disziplin kommt zweimal je Saison dran. Die Balken zeigen, wie viel eines Bereichs schon gespielt ist.</p></div></section></div>';
+    el.innerHTML=h;return}
+  var agg={tot:raenge(codes,function(c){return summe(DISZ,function(d){return sv(c,DISZ.indexOf(d))})})};AXK.forEach(function(a){agg[a]=raenge(codes,function(c){return summe(DISZ,function(d){return d[2]===a?sv(c,DISZ.indexOf(d)):0})})});
+  var dr=DISZ.map(function(d,i){return raenge(codes,function(c){return sv(c,i)})}),ord=[];grp.forEach(function(g){g.forEach(function(x){ord.push(x)})});
+  var cols="2rem minmax(11rem,1fr) repeat(5,2.9rem) .5rem repeat(20,minmax(2.6rem,1fr))",l2=codes.slice().sort(function(a,b){return agg.tot[a]-agg.tot[b]});
+  var h2='<section class="pan mx"><div class="pk"><h2>Teamstärke pro Disziplin</h2><small>Saison '+S.n+' · Top 6 je Disziplin summiert, dann ligaweit gerankt</small><span class="sp"></span>'+(Z.leer?"":seg("ps",[[1,"S1"],[2,"S2"],[3,"S3"],[4,"S4 läuft"]]))+seg("rl",[["1","Liga 1"],["2","Liga 2"],["alle","Beide 1–32"]])+'</div>'+
+   '<div class="tl'+(n>16?" sc":"")+'"><div class="band2" style="grid-template-columns:'+cols+'"><span style="grid-column:1/3;border:0;background:none"></span><span style="grid-column:3/8;color:var(--creme)">Teamranks</span><span style="border:0;background:none"></span>'+grp.map(function(g,i){return '<span class="'+AX[AXK[i]][1]+'" style="grid-column:span '+g.length+'">'+AX[AXK[i]][0]+'</span>'}).join("")+'</div>'+
+   '<div class="th" style="grid-template-columns:'+cols+'"><span>#</span><span class="li">Team</span><span class="mi">TOT</span>'+AXK.map(function(a){return '<span class="mi '+AX[a][1]+'">'+AX[a][0]+'</span>'}).join("")+'<span></span>'+ord.map(function(x){return '<span class="mi" title="'+x.d[1]+'">'+(KURZ[x.d[0]]||x.d[1])+'</span>'}).join("")+'</div>'+
+   l2.map(function(c,i){return '<div class="tz'+(c===ICH?" ich":"")+'" style="grid-template-columns:'+cols+'" data-tu="blatt:'+c+'"><span class="rg t">'+(i+1)+'</span><span class="nm">'+lg(c,"k")+'<span>'+T[c]+'</span></span>'+rzelle(agg.tot[c],n,1)+AXK.map(function(a){return rzelle(agg[a][c],n,1)}).join("")+'<span></span>'+ord.map(function(x){return rzelle(dr[x.i][c],n)}).join("")+'</div>'}).join("")+
+   '</div><div class="fuss"><span class="c t r1" style="padding:0 .4rem;border-radius:.2rem;background:rgba(98,211,148,.3)">1</span><span>Spitze</span><span class="c t" style="padding:0 .4rem;border-radius:.2rem;background:rgba(255,96,88,.3)">'+n+'</span><span>Schlusslicht</span><span class="sp"></span><span>Zahl = Rang des Teams in dieser Disziplin unter '+n+' Teams · Klick auf ein Team öffnet den Verlauf</span></div></section>';
+  el.innerHTML=h2}
+
+/* ===================== RAHMEN UND AKTIONEN ===================== */
+var HIST=["archiv","transfers","ewig"];
+function zeichne(){var hist=HIST.indexOf(Z.ans)>=0,jetzt=aktuell().z[ICH];
+  if(Z.leer&&Z.sai!==1&&Z.ans!=="archiv")Z.sai=1;
+  RAHMEN.krume=hist?"Welt <span>· Gedächtnis der Liga</span>":Z.ans==="spielplan"?"Welt <span>· Saison "+anz()+"</span>":"Welt <span>· Saison "+anz()+" · nach Spieltag "+GESP+"</span>";
+  RAHMEN.titel=hist?"Historie":Z.ans==="spielplan"?"Spielplan":"Ranks";
+  RAHMEN.reiter=hist?[["archiv","Saison-Archiv"],["transfers","Transfers"],["ewig","Ewige Tabelle"]]:[];
+  [].forEach.call(document.querySelectorAll("#rail a"),function(a){var an=a.dataset.r===(hist?"historie":Z.ans);a.classList.toggle("an",an);if(an)a.id="railan";else if(a.id==="railan")a.removeAttribute("id")});
+  rahmenZeichne(Z);
+  if(Z.ans==="ranks")$("b-reiter").innerHTML=[["staerke","Teamstärke"],["pp","PPs pro Bereich"]].map(function(r){return '<a data-s="rv:'+r[0]+'"'+(Z.rv===r[0]?' class="an"':'')+'>'+r[1]+'</a>'}).join("");
+  $("r-lage").textContent=jetzt.rank+". in Liga "+jetzt.liga+" · Team wechseln ▾";
+  $("b-sai").innerHTML='Saison '+anz()+' · Spieltag <b class="t">'+HEUTE+'</b><span>/ 20</span>';$("b-kasse").textContent=de(jetzt.kasse)+" C";
+  takt("Weiter: Einsatzliste","Bereit · <b>Spieltag "+HEUTE+"</b> steht an","");
+  if(Z.ans==="archiv"){zArchiv();var S=saison(Z.sai),E=ewig(),mt=E.slice().sort(function(a,b){return b.gold-a.gold})[0];
+    slot(Z.leer?[["Abgeschlossen","0 <small>Saisons</small>"],["Läuft","Saison 1"]]:[["Abgeschlossen","3 <small>Saisons</small>"],["Rekordmeister",mt.c+" <small>"+mt.gold+"×</small>"],["Dein bester Platz",ptx(E.filter(function(o){return o.c===ICH})[0].best)],["Gewählt","Saison "+S.n,S.laeuft?"var(--gold)":null]])}
+  else if(Z.ans==="transfers"){zTransfers();
+    if(Z.sai===1)slot([["Picks",PICKS.length],["Aus dem Startbudget",de(summe(PICKS,function(p){return p.preis}),0)+" <small>C</small>"],["Ø Preis",de(summe(PICKS,function(p){return p.preis})/PICKS.length)+" <small>C</small>"],["Transferbilanz","—","var(--stumm)"]]);
+    else{var l=dealSicht(),aus=summe(l.filter(function(d){return d.an}),function(d){return d.abl}),ein=summe(l.filter(function(d){return d.von&&d.art!=="abgang"}),function(d){return d.abl}),eig=Z.tt||ICH,b=bilanz("alle",l)[eig];
+      slot([["Deals",l.length],["Umsatz",de(aus,0)+" <small>C</small>"],[(Z.tt?Z.tt:"Dein Team")+" · Ausgaben",de(b.aus)+" <small>C</small>","var(--warn)"],[(Z.tt?Z.tt:"Dein Team")+" · Einnahmen",de(b.ein)+" <small>C</small>","var(--gut)"],["Netto",vz(b.ein-b.aus)+" <small>C</small>",b.ein-b.aus>=0?"var(--gut)":"var(--warn)"]])}}
+  else if(Z.ans==="ewig"){zEwig();var E2=ewig(),t=function(k){return E2.slice().sort(function(a,b){return b[k]-a[k]})[0]};
+    slot(Z.leer?[["Abgeschlossen","0 <small>Saisons</small>"]]:[["Ewiger Leader",E2[0].c+" <small>"+de(E2[0].pkt,0)+"</small>",null,1],["Meiste Titel",t("gold").c+" <small>"+t("gold").gold+"×</small>"],["Größtes MW-Wachstum",t("mww").c+" <small>"+vz(t("mww").mww,0)+" C</small>"],["Kassen-Höchststand",t("kp").c+" <small>"+de(t("kp").kp,0)+" C</small>"]])}
+  else if(Z.ans==="spielplan"){zSpielplan();var sg=summe(DISZ,function(d){return d[3]});slot([["Disziplinen",20],["Spieler gesamt",sg],["Ø Spieler / Diszi",de(sg/20)],["Gespielt",(Z.leer||Z.ps===4?GESP:20)+" <small>/ 20</small>"]])}
+  else{zRanks();var S2=aktuell(),cs=S2.L[jetzt.liga],best=DISZ.map(function(d,i){return [d[1],raenge(cs,function(c){return STK[c][i]})[ICH]]}).sort(function(a,b){return a[1]-b[1]});
+    slot([["Teamstärke · Liga "+jetzt.liga,raenge(cs,function(c){return summe(STK[c])})[ICH]+". <small>von 16</small>"],["Stärkste Diszi",best[0][0]+" <small>"+best[0][1]+".</small>","var(--gut)"],["Schwächste Diszi",best[19][0]+" <small>"+best[19][1]+".</small>","var(--warn)"]])}
+  zBlatt();
+  urlSetzen(Z,[["ans","seite"],["sai","saison"],["team","team"],["leer","leer"]])}
+var TU={
+  blatt:function(c){Z.team=c},blattzu:function(){Z.team=""},
+  geh:function(a){var t=a.split("-");Z.ans=t[0];Z.sai=+t[1];Z.tt="";Z.deal=""},
+  tt:function(c){Z.tt=Z.tt===c?"":c;Z.deal="";Z.pick=0},
+  deal:function(id){var d=DEALS.filter(function(x){return x.id===id})[0];Z.team="";Z.ans="transfers";Z.sai=d.f;Z.deal=id;Z.tt="";Z.typ="alle";Z.kl="";Z.qu="";Z.such=""},
+  teamtransfers:function(c){Z.team="";Z.ans="transfers";Z.sai=Z.leer?1:"alle";Z.tt=c;Z.deal=""},
+  hin:function(w){melde("Öffnet: "+w,"Im Mockup endet der Weg hier.")},
+  csv:function(){melde("CSV exportiert","Die sichtbare Liste, mit allen Spalten.","g")},
+  takt:function(){melde("Weiter","Im Mockup endet der Weg hier.")},
+  _ans:function(){Z.team="";Z.tt="";Z.deal=""},_sai:function(){Z.deal="";Z.pick=0;Z.tt=""},_leer:function(){Z.team="";Z.tt="";Z.deal="";if(Z.leer)Z.sai=1;else Z.sai=3},
+  _typ:function(){Z.deal=""},_ps:function(){}
+};
+document.addEventListener("change",function(ev){var w=ev.target.dataset&&ev.target.dataset.w;if(w){Z[w]=ev.target.value;Z.deal="";zeichne()}});
+document.addEventListener("input",function(ev){if(ev.target.id==="such"){Z.such=ev.target.value;Z.deal="";$("dl").innerHTML=dealZeilen();$("df").innerHTML=dealFuss()}});
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&Z.team){Z.team="";zeichne()}});
+rahmenStart({rail:"",krume:"",titel:"Historie",reiter:[],
+  demo:[["Seite","ans",[["archiv","Saison-Archiv"],["transfers","Transfers"],["ewig","Ewige Tabelle"],["spielplan","Spielplan"],["ranks","Ranks"]]],
+        ["Saison","sai",[[1,"1 · Kaderaufbau"],[2,"2"],[3,"3"],[4,"4 läuft"],["alle","Alle"]]],
+        ["Blatt","team",[["","zu"],["V-W","Team-Verlauf"]]],
+        ["Zustand","leer",[[0,"4 Saisons"],[1,"Neuer Spielstand"]]]],
+  notiz:"Die graue Leiste gehört nicht zum UI. Teams, Wappen, Spieler, Disziplinen und Regeln echt · alle Zahlen und Verläufe erfunden."});
+klicks(Z,zeichne,TU);zeichne();
+</script>
+</body>
+</html>

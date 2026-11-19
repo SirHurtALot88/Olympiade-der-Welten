@@ -1,6 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
-import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
+import { buchungsQuelleAus, projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
 
 function stableJson(value: unknown) {
@@ -226,7 +226,9 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * die schweren Anhaenge braucht, still auf Luecken rechnen lassen. Ein eigenes Feld sagt
        * ehrlich, was es ist.
        */
-      foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
+      // Mit der Transferhistorie: die Transferbilanz alter Saisonen kommt nach der Buchungsregel vom 18.11. an
+      // (Saison 1 = Kaderaufbau, keine Transferbilanz). Das Archiv selbst bleibt unangetastet.
+      foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots, buchungsQuelleAus(gameState)),
       /**
        * Geschwister-Projektion fuers laufende Feld-Rennen — die EINZIGE, die stehen bleibt.
        *
