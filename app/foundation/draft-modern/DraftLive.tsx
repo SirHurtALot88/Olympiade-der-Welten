@@ -12,7 +12,8 @@ import { useMemo, useState } from "react";
 import type { LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
 import type { LigaDraftSpielerKarte, LigaDraftZugAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import { ACHSEN_FARBE_HEX, ACHSEN_REIHENFOLGE, DISZIPLIN_NACH_ACHSE, DISZIPLINEN_GEORDNET } from "@/lib/market/disziplin-reihenfolge";
-import { mindestNoteLabel, naechsteMindestNote } from "@/lib/market/transfermarkt-weitere-filter";
+import { erfuelltFilter, LEERE_FILTER, mindestNoteLabel, naechsteMindestNote, zaehleAktiveFilter, type WeitereFilter } from "@/lib/market/transfermarkt-weitere-filter";
+import WeitereFilterPanel from "@/app/foundation/transfermarkt-modern/WeitereFilterPanel";
 import { erfuelltAchsenMinimum, tierBereichSortWert, MARKT_ACHSEN, sortiereNachSicht, type MarktAchse } from "@/lib/market/transfermarkt-sicht";
 import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
@@ -480,6 +481,11 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
   const [nurWunsch, setNurWunsch] = useState(false);
   const [nurScouting, setNurScouting] = useState(false);
   const [achsenMin, setAchsenMin] = useState<Partial<Record<MarktAchse, number>>>({});
+  // „Weitere Filter“ (Kartenfarbe, Marktwert, Gehalt/Saison, Value, Mindestnote je Attribut): dieselbe Komponente und Logik wie im
+  // Transfermarkt (#1647, `transfermarkt-weitere-filter.ts`), hier nicht nachgebaut.
+  const [weitere, setWeitere] = useState<WeitereFilter>(LEERE_FILTER);
+  const [weitereOffen, setWeitereOffen] = useState(false);
+  const aktiveWeitere = zaehleAktiveFilter(weitere);
   const [blatt, setBlatt] = useState(0);
   const dran = Boolean(mein?.darfPicken);
   const maxAbloese = mein?.maxAbloese ?? Number.POSITIVE_INFINITY;
@@ -495,6 +501,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       for (const [x, min] of Object.entries(achsenMin) as [MarktAchse, number][]) {
         if (!erfuelltAchsenMinimum(z.sicht, x, min)) return false;
       }
+      if (aktiveWeitere > 0 && !erfuelltFilter(z.item, z.sicht, weitere)) return false;
       return true;
     });
     const schluessel = (z: DraftZeile): number | null => {
@@ -510,7 +517,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       }
     };
     return sortiereNachSicht(liste, schluessel, sort === "guenstig" ? 1 : -1);
-  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, achsenMin, sort, mein, maxAbloese, a.gefragt]);
+  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, achsenMin, weitere, aktiveWeitere, sort, mein, maxAbloese, a.gefragt]);
 
   const seiten = Math.max(1, Math.ceil(gefiltert.length / ZEILEN_JE_BLATT));
   const seite = Math.min(blatt, seiten - 1);
@@ -617,7 +624,13 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
             </button>
           );
         })}
+        <button type="button" className={`fc${weitereOffen || aktiveWeitere > 0 ? " an" : ""}`} onClick={() => setWeitereOffen((v) => !v)} aria-expanded={weitereOffen} data-testid="draft-weitere-filter">
+          Weitere Filter{aktiveWeitere > 0 ? ` · ${aktiveWeitere}` : ""} {weitereOffen ? "▾" : "▸"}
+        </button>
+        <span className="sp" />
+        <button type="button" className="fc" onClick={() => { setSuche(""); setNurLeistbar(false); setNurWunsch(false); setNurScouting(false); setAchsenMin({}); setWeitere(LEERE_FILTER); setBlatt(0); }} data-testid="draft-filter-zuruecksetzen">Filter zurücksetzen</button>
       </div>
+      {weitereOffen ? <WeitereFilterPanel filter={weitere} onChange={(f) => { setWeitere(f); setBlatt(0); }} /> : null}
       <div className="fl">
         <span className="gk" style={{ marginLeft: 0 }}>Eignung in</span>
         <span className="dk20">
