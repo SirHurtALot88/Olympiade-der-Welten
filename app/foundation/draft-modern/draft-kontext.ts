@@ -32,6 +32,10 @@ export type DraftKontext = {
   raenge: DraftKaderZeile[] | null;
   wahl: string | null;
   setWahl: (playerId: string | null) => void;
+  /** Klickregel (UX 19.11.): 1. Klick wählt aus, Klick auf das Ausgewählte öffnet das Profil; Vergebenes öffnet sofort das Profil. */
+  klick: (playerId: string) => void;
+  /** Name = Abkürzung: wählt aus (wenn noch frei) und öffnet das Profil. */
+  nameKlick: (playerId: string) => void;
   schau: string | null;
   setSchau: (teamId: string | null) => void;
 };

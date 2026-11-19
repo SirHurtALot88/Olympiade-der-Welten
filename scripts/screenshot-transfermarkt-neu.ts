@@ -192,6 +192,8 @@ async function main() {
       await page.getByTestId("tm-sort-abloese").click();
       await page.waitForTimeout(500);
       await page.locator('[data-testid="tm-zeile"]').first().click();
+      // Klickregel (19.11.): der Klick auf eine schon ausgewählte Zeile öffnet das Profil — dann Esc, die Auswahl bleibt.
+      if ((await page.locator('[role="dialog"][aria-modal="true"]').count()) > 0) await page.keyboard.press("Escape");
       await page.getByTestId("tm-verhandeln-oeffnen").click();
       await page.getByTestId("tm-tisch").waitFor({ state: "visible", timeout: 30_000 });
       await page.getByTestId("tm-verhandeln").waitFor({ state: "visible" });

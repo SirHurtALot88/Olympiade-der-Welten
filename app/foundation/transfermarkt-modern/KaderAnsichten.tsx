@@ -14,6 +14,7 @@ import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-c
 
 import { erloesFreigabe } from "@/lib/market/transfermarkt-freigabe";
 import { translateSellBlockingReason } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
+import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil, useListenTasten } from "@/app/foundation/shared/klickregel";
 import { betragC, de, jeSpieltag, rangText } from "./tm-format";
 import { postJson, schreibKontext } from "./tm-daten";
 import type { TransfermarktV2RosterRow } from "./tm-typen";
@@ -49,6 +50,8 @@ type Props = {
   kannVerkaufen: boolean;
   verkaufSperre: string | null;
   onVerlaengern: (playerId: string) => void;
+  /** Öffnet das Profil des Spielers (Klickregel 19.11.: Klick auf das Ausgewählte, Name, Enter). */
+  onProfil: (playerId: string) => void;
   onFertig: (art: "verkauf" | "verlaengerung", text: string) => Promise<void> | void;
 };
 
@@ -78,6 +81,8 @@ export default function KaderAnsichten(props: Props) {
     [rosterRows],
   );
   const gewaehlt = sortiert.find((r) => r.playerId === wahl) ?? sortiert[0] ?? null;
+  const sortiertIds = useMemo(() => sortiert.map((r) => r.playerId), [sortiert]);
+  useListenTasten({ ids: sortiertIds, gewaehlt: gewaehlt?.playerId ?? null, waehle: setWahl, profil: props.onProfil, aktiv: true });
 
   useEffect(() => {
     setBestaetigen(false);
@@ -201,7 +206,7 @@ export default function KaderAnsichten(props: Props) {
             const verletzt = props.verletzt.has(r.playerId);
             const name = (
               <span className="nm">
-                <b>{r.name}</b>
+                <b><u className="tmk-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); nameKlickAuswahlUndProfil(r.playerId, true, setWahl, props.onProfil); }} data-testid="tm-kader-profil-link">{r.name}</u></b>
                 <small>{r.className} · {r.race ?? ""}{verletzt && <span className="tag w">verletzt</span>}</small>
               </span>
             );
@@ -211,7 +216,7 @@ export default function KaderAnsichten(props: Props) {
               </span>
             );
             return (
-              <div key={r.playerId} className={`mz${gewaehlt?.playerId === r.playerId ? " an" : ""}`} onClick={() => setWahl(r.playerId)} data-testid="tm-kaderzeile">
+              <div key={r.playerId} className={`mz${gewaehlt?.playerId === r.playerId ? " an" : ""}`} onClick={() => klickAuswahlOderProfil(r.playerId, gewaehlt?.playerId ?? null, setWahl, props.onProfil)} title={gewaehlt?.playerId === r.playerId ? "Ausgewählt · nochmal klicken oder Enter öffnet das Profil" : "Klick wählt aus"} aria-selected={gewaehlt?.playerId === r.playerId} data-testid="tm-kaderzeile" data-player-id={r.playerId}>
                 {r.portraitUrl ? <img className="por" src={r.portraitUrl} alt="" loading="lazy" /> : <span className="por" />}
                 {name}
                 {kopfSpalten ? (
@@ -247,7 +252,7 @@ export default function KaderAnsichten(props: Props) {
         {gewaehlt ? (
           modus === "verkauf" ? (
             <>
-              <div className="pk"><h2>{gewaehlt.name} verkaufen</h2><span className="sp" /><span className="gk">Stamm in {stamm} Disziplinen</span></div>
+              <div className="pk"><h2>{gewaehlt.name} verkaufen</h2><span className="sp" /><button type="button" className="knopf klein" onClick={() => props.onProfil(gewaehlt.playerId)} title="Profil öffnen (Enter oder nochmal klicken)" data-testid="tm-kader-profil">Profil ›</button><span className="gk">Stamm in {stamm} Disziplinen</span></div>
               <div className="fb" style={{ overflow: "auto" }}>
                 <h4>Erlös</h4>
                 {vorschauLaedt && !vorschau && <div className="hin">Vorschau lädt …</div>}
@@ -319,7 +324,7 @@ export default function KaderAnsichten(props: Props) {
                   {auslaufend.length === 0 && <div><span>Kein Vertrag läuft aus.</span></div>}
                   {auslaufend.map((r) => (
                     <div key={r.playerId}>
-                      <span>{r.name} <small style={{ color: "var(--leise)" }}>· Stamm in {stammInDisziplinen({ spieler: props.spieler, staerken: props.staerken, teamId, disziplinIds: props.disziplinIds, playerId: r.playerId, ausgeschlossen: props.verletzt })} Disziplinen</small></span>
+                      <span><u className="tmk-pl" role="link" title="Profil öffnen" onClick={() => props.onProfil(r.playerId)}>{r.name}</u> <small style={{ color: "var(--leise)" }}>· Stamm in {stammInDisziplinen({ spieler: props.spieler, staerken: props.staerken, teamId, disziplinIds: props.disziplinIds, playerId: r.playerId, ausgeschlossen: props.verletzt })} Disziplinen</small></span>
                       <button type="button" className="knopf klein" disabled={!props.darfVerwalten} onClick={() => props.onVerlaengern(r.playerId)}>Verlängern</button>
                     </div>
                   ))}

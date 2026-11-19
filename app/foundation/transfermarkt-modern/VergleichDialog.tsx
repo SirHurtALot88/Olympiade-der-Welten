@@ -1,5 +1,6 @@
 "use client";
 
+import { useEscSchliesst } from "@/app/foundation/shared/klickregel";
 import { figurPoseUrl, getFigurSpriteForPlayer } from "@/lib/data/figurenSprites";
 import { wirkungMitKandidat, type TeamVorbereitung } from "@/lib/market/transfermarkt-kaderstaerke";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
@@ -35,6 +36,7 @@ export default function VergleichDialog(props: {
   onSchliessen: () => void;
 }) {
   const { zeilen, disziplinIds, disziplinNamen } = props;
+  useEscSchliesst(true, props.onSchliessen);
   const reihen: ReihenDef[] = [
     { schluessel: "g-kosten", gruppe: "Kosten" },
     { schluessel: "abloese", label: "Ablöse", zahl: (z) => z.item.marketValue, besser: "tief", text: (z) => betragC(z.item.marketValue) },

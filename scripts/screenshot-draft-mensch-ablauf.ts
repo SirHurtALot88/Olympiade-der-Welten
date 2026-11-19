@@ -147,6 +147,8 @@ async function main() {
     await page.getByTestId("draft-profil-zu").click();
     // 6) Wunsch-Stern + Pick
     await page.getByTestId("draft-zeile").first().click();
+    // Klickregel (19.11.): ist die Zeile schon ausgewählt (GM-Vorschlag), öffnet der Klick das Profil — dann Esc.
+    if (await page.getByTestId("draft-profil").isVisible().catch(() => false)) await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
     await page.locator('[data-testid="draft-mein"] button[title="Wunschliste"]').first().click().catch(() => undefined);
     const konflikt = async () => page.getByText("Save-Konflikt", { exact: false }).count();

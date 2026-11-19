@@ -20,6 +20,7 @@ import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild
 import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format";
 import type { DraftTempo, DraftZeig } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
+import { useListenTasten } from "@/app/foundation/shared/klickregel";
 import { auslassenSperrGrund, betragC, de, fertigGrundText, fertigSperrGrund, GRUND_TAG, GRUND_TEXT, pickHerkunft, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
 
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
@@ -37,28 +38,46 @@ export type DraftAktionen = {
 };
 
 /**
- * „Pick auslassen“ und „Ich bin fertig“: gesperrt wird STRIKT nach `darfAuslassen`/`darfFertig` der Sicht (die Route
- * rechnet beides; die Seite rechnet nichts nach). Der Tooltip sagt, warum ein Knopf gesperrt ist.
+ * „Nicht picken?“ (UX 19.11., Mockup `ux-draft-markt-19-11.html`): drei beschriftete Wege unter dem Pick-Knopf, jeder mit einer
+ * Zeile Folge. Gesperrt wird STRIKT nach `darfAuslassen`/`darfFertig`/`darfUeberspringen` der Sicht (die Route rechnet; die Seite
+ * rechnet nichts nach); der Sperrgrund steht sichtbar unter dem Knopf, nicht nur im Tooltip. Auslassen und Fertig öffnen eine
+ * Rückfrage (Dialoge in `DraftAnsichten`), Überspringen den vorhandenen Dialog.
  */
-export function AuslassenFertig({
+export function NichtPicken({
   mein,
   minKader,
-  aktionen,
+  onAuslassen,
+  onFertig,
+  onSkip,
 }: {
   mein: NonNullable<DraftKontext["ansicht"]["mein"]>;
   minKader: number;
-  aktionen: Pick<DraftAktionen, "auslassen" | "fertig">;
+  onAuslassen: () => void;
+  onFertig: () => void;
+  onSkip: () => void;
 }) {
   if (mein.art !== "mensch" || mein.status === "fertig") return null;
   const auslassenGrund = auslassenSperrGrund(mein);
   const fertigGrund = fertigSperrGrund(mein, minKader);
-  const stil = (an: boolean) => ({ color: an ? "var(--gold)" : "var(--stumm)", fontWeight: 600, opacity: an ? 1 : 0.55, cursor: an ? "pointer" : "not-allowed" });
+  const fehlend = Math.max(0, minKader - mein.kader);
   return (
-    <div className="hin" data-testid="draft-auslassen-fertig">
-      <button type="button" disabled={!mein.darfFertig} title={fertigGrund ?? "Nimmt dich aus der Reihenfolge — du pickst nicht mehr."} onClick={() => void aktionen.fertig()} style={stil(mein.darfFertig)} data-testid="draft-fertig">Ich bin fertig</button>
-      {" · "}
-      <button type="button" disabled={!mein.darfAuslassen} title={auslassenGrund ?? "Dieser Pick entfällt, in der nächsten Runde bist du wieder dran."} onClick={() => void aktionen.auslassen()} style={stil(mein.darfAuslassen)} data-testid="draft-auslassen">Pick auslassen</button>
-    </div>
+    <>
+      <h4 data-testid="draft-nicht-picken-kopf">Nicht picken? <span>drei Wege</span></h4>
+      <div className="np" data-testid="draft-nicht-picken">
+        <button type="button" className={mein.darfAuslassen ? "" : "zu"} disabled={!mein.darfAuslassen} title={auslassenGrund ?? "Dieser Pick entfällt, in der nächsten Runde bist du wieder dran."} onClick={onAuslassen} data-testid="draft-auslassen">
+          <b>Pick auslassen</b>
+          <small>{mein.darfAuslassen ? "nur diese Runde · nächste Runde wieder dran" : auslassenGrund}</small>
+        </button>
+        <button type="button" className={mein.darfFertig ? "" : "zu"} disabled={!mein.darfFertig} title={fertigGrund ?? "Nimmt dich aus der Reihenfolge — du pickst nicht mehr."} onClick={onFertig} data-testid="draft-fertig">
+          <b>Ich bin fertig</b>
+          <small>{mein.darfFertig ? `Draft für mich beenden · Kader ${mein.kader}` : fehlend > 0 ? `ab ${minKader} Spielern · noch ${fehlend} Pflichtplätze` : fertigGrund}</small>
+        </button>
+        <button type="button" className={mein.darfUeberspringen ? "" : "zu"} disabled={!mein.darfUeberspringen} title="KI fertig picken lassen oder Auto-Draft" onClick={onSkip} data-testid="draft-ueberspringen-block">
+          <b>Überspringen …</b>
+          <small>{mein.darfUeberspringen ? "KI picken lassen oder Auto-Draft" : "gerade nicht möglich"}</small>
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -174,7 +193,7 @@ export function Kopfleiste({
               </button>
             ) : null}
             {a.mein.darfUeberspringen ? (
-              <button type="button" className="knopf" onClick={onSkip} data-testid="draft-ueberspringen">Überspringen</button>
+              <button type="button" className="knopf" onClick={onSkip} title="Den ganzen Draft überspringen: KI fertig picken lassen oder Auto-Draft" data-testid="draft-ueberspringen">Draft überspringen …</button>
             ) : null}
           </>
         ) : null}
@@ -236,19 +255,23 @@ function FavKarte({
       className={`fk e${rang}${zustand ? ` ${zustand}` : ""}${konflikt ? " konf" : ""}${aktiv ? " an" : ""}`}
       data-st={zustand === "pick" && pickNr ? `PICK ${pickNr}` : undefined}
       onClick={onClick}
+      title={aktiv ? "Ausgewählt · nochmal klicken öffnet das Profil" : "Klick wählt aus"}
+      aria-pressed={aktiv ? true : undefined}
       data-testid="draft-top3-karte"
       data-player-id={playerId}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {bild ? <img className="bg" src={bild} alt="" /> : null}
       <span className="rk t">{rang}.</span>
-      {grund ? (
+      {aktiv && zustand !== "pick" ? <span className="tag go fk-schild">ausgewählt</span> : null}
+      {zustand === "pick" ? null : <span className="hv">{aktiv ? "nochmal klicken · Profil" : "Klick wählt aus"}</span>}
+      {grund && !(aktiv && zustand !== "pick") ? (
         <span className={`tag gd ${GRUND_TAG[grund.art] ?? ""}`}>
           {grund.art === "bedarf" ? `Bedarf ${DISZIPLIN_KURZ[grund.disziplinId] ?? ""}`.trim() : GRUND_TEXT[grund.art]}
         </span>
       ) : null}
       <span className="un">
-        <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(playerId); }} data-testid="draft-profil-link">{z?.item.name ?? info?.name ?? "—"}</b>
+        <b className="drf-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); k.nameKlick(playerId); }} data-testid="draft-profil-link">{z?.item.name ?? info?.name ?? "—"}</b>
         <small><KlassenFarbTag className={z?.item.className ?? info?.className} mitAchse={false} /> · {z?.item.race ?? info?.race ?? ""}</small>
         <span className="zw">
           <span>{DISZIPLIN_KURZ[k.disziplin] ?? ""} <b className={`t${z && z.sicht.stufe < 5 ? " nb" : ""}`}>{eignungText(z, k.disziplin)}</b></span>
@@ -259,7 +282,7 @@ function FavKarte({
   );
 }
 
-export function AmZug({ k, zeig, onVormerken }: { k: DraftKontext; zeig: DraftZeig | null; onVormerken: (id: string) => void }) {
+export function AmZug({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | null }) {
   const a = k.ansicht;
   const mein = a.mein;
   // Vorschau eines anderen Teams aus „Danach am Zug“.
@@ -339,7 +362,7 @@ export function AmZug({ k, zeig, onVormerken }: { k: DraftKontext; zeig: DraftZe
       <TeamKopf k={k} teamId={zug.teamId} />
       <div className="f3k">
         <span className="gk">{meinZug ? "Vorschlag deines GM" : `Top 3 für ${vorschau ? "den nächsten" : "diesen"} Pick`}</span>
-        <small>{meinZug ? "Klick merkt vor" : "Stand jetzt · ändert sich mit jedem Pick"}</small>
+        <small>{gewaehlt ? "" : "1. Klick wählt aus · 2. Klick Profil"}</small>
       </div>
       {top.length ? (
         <div className="fav3">
@@ -353,8 +376,8 @@ export function AmZug({ k, zeig, onVormerken }: { k: DraftKontext; zeig: DraftZe
               zustand={gewaehlt ? (gewaehlt === id ? "pick" : "raus") : undefined}
               pickNr={zeig?.eintrag.pickNr}
               konflikt={konflikte.has(id)}
-              aktiv={meinZug && k.wahl === id}
-              onClick={meinZug ? () => onVormerken(id) : undefined}
+              aktiv={k.wahl === id}
+              onClick={() => (gewaehlt === id ? k.profil(id) : k.klick(id))}
             />
           ))}
         </div>
@@ -363,7 +386,7 @@ export function AmZug({ k, zeig, onVormerken }: { k: DraftKontext; zeig: DraftZe
       )}
       <div className="zfuss">
         {meinZug
-          ? "Dein GM schlägt vor, was er nehmen würde."
+          ? "Dieselbe Regel gilt, wenn die KI am Zug ist: ihre Top 3 lassen sich auswählen (vormerken) und beim zweiten Klick öffnen."
           : zug.absicht === "aufhoeren"
             ? "Dieses Team würde jetzt aufhören — sein Kader steht."
             : "Die KI nimmt Rang 1."}
@@ -381,7 +404,7 @@ export function DanachAmZug({ k }: { k: DraftKontext }) {
   const folge = a.naechste.slice(1, 7);
   return (
     <section className="pan" id="l-next" data-testid="draft-danach">
-      <div className="pk"><h2>Danach am Zug</h2><span className="sp" /><span className="gk">ihre Top 3 · Stand jetzt</span></div>
+      <div className="pk"><h2>Danach am Zug</h2><span className="sp" /><span className="gk">Portrait anklicken wählt aus</span></div>
       <div className="nxl">
         {folge.length === 0 ? <div className="wart"><p>Keine weiteren Züge in Sicht.</p></div> : null}
         {folge.map((z, i) => {
@@ -396,7 +419,7 @@ export function DanachAmZug({ k }: { k: DraftKontext }) {
                 <span className="lg"><Wappen url={k.wappen(z.teamId)} kuerzel={k.teamKuerzel(z.teamId)} /></span>
                 <span className="tx">
                   <b>{ich ? `Du · ${k.teamName(z.teamId)}` : `${sitzName(z.ownerId)} · ${k.teamName(z.teamId)}`}</b>
-                  <small>{ich ? (vorgemerkt ? <>vorgemerkt: <u>{vorgemerkt}</u></> : "noch nichts vorgemerkt") : "pickt selbst · der Draft wartet"}</small>
+                  <small>{ich ? (vorgemerkt ? <>ausgewählt: <u>{vorgemerkt}</u></> : "noch nichts ausgewählt") : "pickt selbst · der Draft wartet"}</small>
                 </span>
                 <span className="tag">Mensch</span>
               </div>
@@ -426,8 +449,9 @@ export function DanachAmZug({ k }: { k: DraftKontext }) {
               <span className="pp">
                 {top.map((id) => {
                   const bild = k.portrait(id);
+                  const gewaehlt = k.wahl === id;
                   // eslint-disable-next-line @next/next/no-img-element
-                  return bild ? <img key={id} className={k.wunsch.has(id) || k.wahl === id ? "k" : ""} src={bild} title={spielerName(k, id)} alt="" /> : null;
+                  return bild ? <img key={id} className={`${k.wunsch.has(id) || gewaehlt ? "k" : ""}${gewaehlt ? " an" : ""}`} src={bild} title={`${spielerName(k, id)} · ${gewaehlt ? "ausgewählt, nochmal klicken öffnet das Profil" : "Klick wählt aus"}`} alt="" data-testid="draft-danach-portrait" data-player-id={id} onClick={(e) => { e.stopPropagation(); k.klick(id); }} /> : null;
                 })}
               </span>
             </button>
@@ -454,7 +478,7 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
           <span key={e.nr} className={`tc ${sk}${i === 0 && zeig ? " neu" : ""}`}>
             <span className="nr t">#{e.pickNr}</span>
             <Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} />
-            <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => { if (e.playerId) k.profil(e.playerId); }}>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
+            <b className="drf-pl" role="link" title="Vergeben · Klick öffnet das Profil" onClick={() => { if (e.playerId) k.profil(e.playerId); }}>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
             <small>{k.teamKuerzel(e.teamId)}</small>
             {e.top3 && e.playerId && e.top3.indexOf(e.playerId) > 0 ? <small title="Die KI wählt unter ihren Top 3 (gewichtet nach Bewertungsabstand)">nahm Platz {e.top3.indexOf(e.playerId) + 1}</small> : null}
             <em className="t">{de(e.abloese ?? 0)}</em>
@@ -471,7 +495,7 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
 
 type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt";
 
-export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAktionen }) {
+export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontext; aktionen: DraftAktionen; tastenAktiv?: boolean }) {
   const a = k.ansicht;
   const mein = a.mein;
   const [tab, setTab] = useState<"frei" | "picks">("frei");
@@ -522,6 +546,9 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
   const seiten = Math.max(1, Math.ceil(gefiltert.length / ZEILEN_JE_BLATT));
   const seite = Math.min(blatt, seiten - 1);
   const sichtbar = gefiltert.slice(seite * ZEILEN_JE_BLATT, seite * ZEILEN_JE_BLATT + ZEILEN_JE_BLATT);
+  // Tastatur (UX 19.11.): ↑/↓ bewegt die Auswahl in der Liste, Enter öffnet das Profil. Gepickt wird nie per Taste.
+  const sichtbareIds = useMemo(() => (tab === "frei" ? sichtbar.map((z) => z.item.playerId) : []), [tab, sichtbar]);
+  useListenTasten({ ids: sichtbareIds, gewaehlt: k.wahl, waehle: k.setWahl, profil: k.profil, aktiv: tastenAktiv && tab === "frei" });
 
   const picks = useMemo(() => a.verlauf.filter((e) => e.art === "pick").slice().reverse(), [a.verlauf]);
   const seitenPicks = Math.max(1, Math.ceil(picks.length / 14));
@@ -554,7 +581,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
             const bild = e.playerId ? (k.portrait(e.playerId) ?? info?.portraitUrl ?? null) : null;
             const gehalt = z?.item.salary ?? info?.gehalt ?? 0;
             return (
-              <div key={e.nr} className={`mz pz${e.teamId === mein?.teamId ? " an" : ""}`} data-testid="draft-pick-zeile">
+              <div key={e.nr} className={`mz pz${e.teamId === mein?.teamId ? " an" : ""}`} onClick={() => { if (e.playerId) k.profil(e.playerId); }} title="Vergeben · Klick öffnet das Profil" data-testid="draft-pick-zeile">
                 <b className="t" style={{ color: "var(--stumm)" }}>#{e.pickNr}</b>
                 <span className="t">{e.quelle === "nachzug" ? "N" : e.runde}</span>
                 <span className="lg"><Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} /></span>
@@ -665,13 +692,14 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
           const g = a.gefragt[it.playerId] ?? 0;
           const bild = k.portrait(it.playerId);
           const wunsch = k.wunsch.has(it.playerId);
+          const gewaehlt = k.wahl === it.playerId;
           return (
-            <div key={it.playerId} className={`mz${k.wahl === it.playerId ? " an" : ""}`} onClick={() => k.setWahl(it.playerId)} data-testid="draft-zeile" data-player-id={it.playerId}>
+            <div key={it.playerId} className={`mz${gewaehlt ? " an" : ""}`} onClick={() => k.klick(it.playerId)} title={gewaehlt ? "Ausgewählt · nochmal klicken oder Enter öffnet das Profil" : "Klick wählt aus"} aria-selected={gewaehlt} data-testid="draft-zeile" data-player-id={it.playerId}>
               <button type="button" className={`st${wunsch ? " an" : ""}`} title="Wunschliste" aria-pressed={wunsch} onClick={(e) => { e.stopPropagation(); k.toggleWunsch(it); }}>{wunsch ? "★" : "☆"}</button>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
               <span className="nm">
-                <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
+                <b className="drf-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); k.nameKlick(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
                 <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span><KlassenFarbTag className={it.className} mitAchse={false} /> · {it.race}</small>
               </span>
               <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text}`) : "unbekannt"}>
@@ -687,15 +715,21 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
               <span className={`re${teuer ? " zt" : ""}`}><b className="t">{de(it.marketValue ?? 0)}</b></span>
               <span className="re"><b className="t">{de(it.salary ?? 0)}</b></span>
               <span><span className={`gef g${Math.min(3, g)} t`}>{g ? `${g}×` : "–"}</span></span>
-              <span style={{ justifySelf: "end" }}>
-                {teuer ? (
-                  <span className="tag w" title="sprengt die Kasse samt Reserve für die Pflichtplätze">zu teuer</span>
-                ) : dran ? (
-                  <button type="button" className="knopf klein haupt" data-testid="draft-picken" onClick={(e) => { e.stopPropagation(); void aktionen.pick(it.playerId, it.name); }} title="Draft-Vertrag: 1 Saison, Gehalt wie angezeigt, Ablöse = Marktwert">Picken</button>
-                ) : k.wahl === it.playerId ? (
-                  <span className="tag go">vorgemerkt</span>
+              <span className="ak">
+                {gewaehlt ? (
+                  <>
+                    <button type="button" className="knopf klein" onClick={(e) => { e.stopPropagation(); k.profil(it.playerId); }} title="Profil öffnen (Enter oder nochmal klicken)" data-testid="draft-zeile-profil">Profil ›</button>
+                    {teuer ? (
+                      <span className="tag w" title="sprengt die Kasse samt Reserve für die Pflichtplätze">zu teuer</span>
+                    ) : dran ? (
+                      <button type="button" className="knopf klein haupt" data-testid="draft-picken" onClick={(e) => { e.stopPropagation(); void aktionen.pick(it.playerId, it.name); }} title="Draft-Vertrag: 1 Saison, Gehalt wie angezeigt, Ablöse = Marktwert">Picken</button>
+                    ) : null}
+                  </>
                 ) : (
-                  <span className="tag">vormerken</span>
+                  <>
+                    {teuer ? <span className="tag w" title="sprengt die Kasse samt Reserve für die Pflichtplätze">zu teuer</span> : null}
+                    <span className="hw">Klick wählt aus</span>
+                  </>
                 )}
               </span>
             </div>
@@ -725,7 +759,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
 // Mein Draft
 // ---------------------------------------------------------------------------------------------------------------------
 
-export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAktionen }) {
+export function MeinDraft({ k, aktionen, onAuslassen, onFertig, onSkip }: { k: DraftKontext; aktionen: DraftAktionen; onAuslassen: () => void; onFertig: () => void; onSkip: () => void }) {
   const a = k.ansicht;
   const mein = a.mein;
   if (!mein) {
@@ -760,10 +794,11 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
   return (
     <section className="pan" id="l-ich" data-testid="draft-mein">
       {z ? (
-        <div className="buehne-f" style={kulisse ? { backgroundImage: `url(${kulisse})` } : undefined}>
+        <div className="buehne-f klickbar" style={kulisse ? { backgroundImage: `url(${kulisse})` } : undefined} onClick={() => k.profil(z.item.playerId)} title="Profil öffnen" data-testid="draft-buehne">
+          <span className="tag pf">Profil ›</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {figur ? <img className="fig" src={figur} alt="" /> : bild ? <img className="por" src={bild} alt="" /> : null}
-          <div className="txt"><em><KlassenFarbTag className={z.item.className} /> · {z.item.race}</em><h3 className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(z.item.playerId)}>{z.item.name}</h3></div>
+          <div className="txt"><em>Ausgewählt · <KlassenFarbTag className={z.item.className} /> · {z.item.race}</em><h3>{z.item.name}</h3></div>
         </div>
       ) : (
         <div className="pk"><h2>Mein Draft</h2></div>
@@ -790,28 +825,26 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
                 style={{ flex: 1 }}
                 disabled={!(mein.darfPicken && !teuer)}
                 onClick={() => void aktionen.pick(z.item.playerId, z.item.name)}
+                title="Draft-Vertrag: 1 Saison, Gehalt wie angezeigt, Ablöse = Marktwert"
                 data-testid="draft-mein-picken"
               >
                 {teuer
                   ? "Sprengt die Kasse samt Reserve"
                   : mein.darfPicken
                     ? `${z.item.name} picken · ${betragC(preis)}`
-                    : `Vorgemerkt · ${mein.picksBisZug != null && mein.picksBisZug > 0 ? `du bist in ${mein.picksBisZug} Picks dran` : "du bist nicht dran"}`}
+                    : `Ausgewählt · ${mein.picksBisZug != null && mein.picksBisZug > 0 ? `du bist in ${mein.picksBisZug} Picks dran` : "du bist nicht dran"}`}
               </button>
               <button type="button" className="knopf" title="Wunschliste" onClick={() => k.toggleWunsch(z.item)}>{k.wunsch.has(z.item.playerId) ? "★" : "☆"}</button>
             </div>
+            <NichtPicken mein={mein} minKader={a.regeln.minKader} onAuslassen={onAuslassen} onFertig={onFertig} onSkip={onSkip} />
             {konkurrenz.length ? (
-              <div className="hin a"><b>Achtung:</b> {konkurrenz.map((x) => `${k.teamName(x.t.teamId)} (${x.rang}.)`).join(", ")} {konkurrenz.length > 1 ? "haben" : "hat"} ihn in den Top 3 und {konkurrenz.length > 1 ? "picken" : "pickt"} vor dir.</div>
-            ) : (
-              <div className="hin">Kein KI-Team vor dir hat ihn gerade in den Top 3.</div>
-            )}
-            <div className="hin" data-testid="draft-vertrag-hinweis">Draft-Vertrag: 1 Saison · Gehalt wie angezeigt</div>
-            <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
+              <div className="hin a" data-testid="draft-konkurrenz"><b>Achtung:</b> {konkurrenz.map((x) => `${k.teamName(x.t.teamId)} (${x.rang}.)`).join(", ")} {konkurrenz.length > 1 ? "haben" : "hat"} ihn in den Top 3 und {konkurrenz.length > 1 ? "picken" : "pickt"} vor dir.</div>
+            ) : null}
           </>
         ) : (
           <>
-            <div className="hin">Klick auf einen Spieler im Brett merkt ihn für deinen Pick vor.</div>
-            <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
+            <div className="hin">Ein Klick auf einen Spieler im Brett oder bei den Vorschlägen wählt ihn aus. Hier steht dann sein Preis und der Pick.</div>
+            <NichtPicken mein={mein} minKader={a.regeln.minKader} onAuslassen={onAuslassen} onFertig={onFertig} onSkip={onSkip} />
           </>
         )}
         <h4 title={mein.kaderOpt != null ? `Pflicht (rot): der Mindestkader. Opt (grün): die Kadergröße, die dein GM anstrebt (Optimum der GM-Identität, dieselbe Zahl wie in der KI-Kaderplanung). Ein Vorstandsziel zur Kadergröße gibt es nicht mehr.` : "Pflicht (rot): der Mindestkader."}>Mein Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>{Math.min(mein.kader, a.regeln.minKader)} von {a.regeln.minKader} Pflicht{mein.kaderOpt != null ? ` · Opt ${mein.kaderOpt}` : ""} · höchstens {a.regeln.maxPicksJeTeam}</span></h4>
@@ -826,7 +859,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             );
           })}
         </div>
-        <h4>Kasse und Pflichtplätze</h4>
+        <h4 title="Gehaltsbudget: in Saison 1 ohne Vorstandsdeckel (Finanzseite · Budgets). Der Draft prüft Kasse und Pflichtplätze; der Vorstandsrahmen gilt ab Saison 2.">Kasse und Pflichtplätze</h4>
         <div className="gf" style={{ padding: 0 }}>
           <div className="zt2">
             <div className="tk2"><span className="gk">Kasse</span><small>frei <b className="t">{betragC(mein.kasse)}</b></small></div>
@@ -844,7 +877,6 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             <span><i style={{ background: "var(--warn)" }} />Reserve für Pflichtplätze</span>
           </div>
           <div className="gz"><span>Für diesen Pick höchstens</span><b className="t">{betragC(Math.max(0, mein.maxAbloese))}</b></div>
-          <div className="vorst"><b>Gehaltsbudget:</b> in Saison 1 ohne Vorstandsdeckel (Finanzseite · Budgets)<small>Der Draft prüft Kasse und Pflichtplätze; der Vorstandsrahmen gilt ab Saison 2.</small></div>
         </div>
         <h4>
           Wunschliste
@@ -860,7 +892,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
               const weg = wegPicker(id);
               const mw = zz?.item.marketValue ?? info?.marktwert ?? 0;
               return (
-                <div key={id} onClick={() => !weg && k.setWahl(id)}>
+                <div key={id} className={k.wahl === id ? "an" : ""} onClick={() => (weg ? k.profil(id) : k.klick(id))} title={weg ? "Vergeben · Klick öffnet das Profil" : k.wahl === id ? "Ausgewählt · nochmal klicken öffnet das Profil" : "Klick wählt aus"} data-testid="draft-wunsch-zeile" data-player-id={id}>
                   <span>{i + 1}. {zz?.item.name ?? info?.name ?? id} <small>· {betragC(mw)}</small></span>
                   {weg ? (weg === mein.teamId ? <span className="tag g">gepickt</span> : <span className="tag w">weg · {k.teamKuerzel(weg)}</span>) : mw > mein.maxAbloese ? <span className="tag a">zu teuer</span> : <span className="tag g">noch frei</span>}
                 </div>

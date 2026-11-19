@@ -5,6 +5,7 @@
  * (`#s-tafel`, `#s-ende`, Dialog „Überspringen“, Ansicht „Nachzug“). Nur Anzeige: alles aus `/api/draft`.
  */
 import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
+import { useEscSchliesst } from "@/app/foundation/shared/klickregel";
 import type { DraftKontext } from "./draft-kontext";
 import { betragC, de, fertigGrundText, sitzKlasse, sitzName } from "./draft-format";
 
@@ -203,6 +204,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
 // ---------------------------------------------------------------------------------------------------------------------
 
 export function SkipDialog({ k, onZu, onWahl }: { k: DraftKontext; onZu: () => void; onWahl: (v: "A" | "B") => void }) {
+  useEscSchliesst(true, onZu);
   const ki = k.ansicht.teams.filter((t) => t.art === "ki" && t.status !== "fertig").length;
   const andere = k.ansicht.teams.filter((t) => t.art === "mensch" && t.teamId !== k.ansicht.mein?.teamId);
   return (
@@ -240,6 +242,7 @@ export function SkipDialog({ k, onZu, onWahl }: { k: DraftKontext; onZu: () => v
 // ---------------------------------------------------------------------------------------------------------------------
 
 export function AbbruchDialog({ k, busy, onZu, onJa }: { k: DraftKontext; busy: boolean; onZu: () => void; onJa: () => void }) {
+  useEscSchliesst(true, onZu);
   const offen = k.ansicht.teams.filter((t) => t.status !== "fertig");
   const unterMin = k.ansicht.teams.filter((t) => t.status !== "fertig" && t.kader < k.ansicht.regeln.minKader).length;
   return (
@@ -260,6 +263,65 @@ export function AbbruchDialog({ k, busy, onZu, onJa }: { k: DraftKontext; busy: 
           <span className="sp" />
           <button type="button" className="knopf" onClick={onZu} disabled={busy}>Weiter draften</button>
           <button type="button" className="knopf haupt" onClick={onJa} disabled={busy} data-testid="draft-abbruch-ja">Draft abbrechen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Nicht picken: „Pick auslassen“ und „Ich bin fertig“ mit Rückfrage (UX 19.11., E6) — kein `confirm()`
+// ---------------------------------------------------------------------------------------------------------------------
+
+export function AuslassenDialog({ k, busy, onZu, onJa }: { k: DraftKontext; busy: boolean; onZu: () => void; onJa: () => void }) {
+  useEscSchliesst(true, onZu);
+  const a = k.ansicht;
+  return (
+    <div className="schleier" onClick={(e) => { if (e.target === e.currentTarget) onZu(); }} data-testid="draft-auslassen-dialog">
+      <div className="dlg skip kurz" role="dialog" aria-modal="true" aria-label="Pick auslassen">
+        <div className="dk"><em>Draft · Runde {a.runde} · Pick {a.picks + 1}</em><h2>Diesen Pick auslassen?</h2><span className="sp" /><button type="button" className="zu" onClick={onZu} aria-label="Schließen">×</button></div>
+        <div className="sk2 eins">
+          <div className="sopt">
+            <p>Du nimmst in dieser Runde <b>niemanden</b>. In <b>Runde {a.runde + 1}</b> bist du wieder an deinem Platz dran. Kasse und Wunschliste bleiben, wie sie sind. Der nächste Zug läuft sofort.</p>
+          </div>
+        </div>
+        <div className="skf">
+          <span>Geht nur, wenn du am Zug bist.</span>
+          <span className="sp" />
+          <button type="button" className="knopf" onClick={onZu} disabled={busy} data-testid="draft-auslassen-zurueck">Zurück</button>
+          <button type="button" className="knopf haupt" onClick={onJa} disabled={busy} data-testid="draft-auslassen-ja">Ja, Pick auslassen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function FertigDialog({ k, busy, onZu, onJa }: { k: DraftKontext; busy: boolean; onZu: () => void; onJa: () => void }) {
+  useEscSchliesst(true, onZu);
+  const a = k.ansicht;
+  const mein = a.mein;
+  if (!mein) return null;
+  const opt = mein.kaderOpt;
+  const pflichtZeile = mein.kader >= a.regeln.minKader ? `Pflicht ${a.regeln.minKader} erfüllt` : `Pflicht ${a.regeln.minKader} · dir fehlen ${a.regeln.minKader - mein.kader}`;
+  return (
+    <div className="schleier" onClick={(e) => { if (e.target === e.currentTarget) onZu(); }} data-testid="draft-fertig-dialog">
+      <div className="dlg skip kurz" role="dialog" aria-modal="true" aria-label="Draft für dich beenden">
+        <div className="dk"><em>Draft · Runde {a.runde}</em><h2>Draft für dich beenden?</h2><span className="sp" /><button type="button" className="zu" onClick={onZu} aria-label="Schließen">×</button></div>
+        <div className="sk2 eins">
+          <div className="sopt">
+            <p>Du gehst <b>aus der Reihenfolge</b> und pickst in diesem Draft nicht mehr. Die anderen Teams picken weiter. <b>Das lässt sich nicht zurücknehmen.</b> Nachkaufen geht danach am Transfermarkt.</p>
+            <div className="fakt">
+              <div><small>Kader</small><b className="t">{mein.kader}</b><span>{pflichtZeile}</span></div>
+              <div><small>Wunschgröße deines GM</small><b className="t">{opt ?? "–"}</b><span>{opt == null ? "keine Angabe" : mein.kader < opt ? `dir fehlen ${opt - mein.kader}` : "erreicht"}</span></div>
+              <div><small>Kasse bleibt</small><b className="t">{betragC(mein.kasse)}</b><span>für den Transfermarkt</span></div>
+            </div>
+          </div>
+        </div>
+        <div className="skf">
+          <span />
+          <span className="sp" />
+          <button type="button" className="knopf" onClick={onZu} disabled={busy} data-testid="draft-fertig-zurueck">Weiter draften</button>
+          <button type="button" className="knopf haupt" onClick={onJa} disabled={busy} data-testid="draft-fertig-ja">Ja, ich bin fertig</button>
         </div>
       </div>
     </div>

@@ -43,6 +43,7 @@ import {
   zaehleAktiveFilter,
   type WeitereFilter,
 } from "@/lib/market/transfermarkt-weitere-filter";
+import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil, useListenTasten } from "@/app/foundation/shared/klickregel";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
@@ -252,9 +253,34 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     setFokusId(id);
     props.onSelectCandidate?.(id, name);
   }
+  /** Klickregel (UX 19.11.): 1. Klick wählt aus, Klick auf das Ausgewählte öffnet das Profil; der Name tut beides. */
+  function profilOeffnen(id: string) {
+    props.onOpenPlayerDetails?.({ playerId: id });
+  }
+  function zeilenKlick(z: Zeile) {
+    klickAuswahlOderProfil(z.item.playerId, fokus?.item.playerId ?? null, () => waehle(z.item.playerId, z.item.name), profilOeffnen);
+  }
+  function verhandeln(item: TransfermarktFreeAgentItem) {
+    props.onSelectCandidate?.(item.playerId, item.name);
+    props.onOpenOfferPanel?.(item.playerId);
+    setDialog({ art: "kauf", id: item.playerId });
+  }
   function pinne(id: string) {
     setPins((alt) => (alt.includes(id) ? alt.filter((x) => x !== id) : alt.length >= 3 ? [...alt.slice(1), id] : [...alt, id]));
   }
+
+  // Tastatur: ↑/↓ bewegt die Auswahl in der Liste, Enter öffnet das Profil. Gekauft wird nie per Taste.
+  const sichtbareIds = useMemo(() => sichtbar.map((z) => z.item.playerId), [sichtbar]);
+  useListenTasten({
+    ids: sichtbareIds,
+    gewaehlt: fokus?.item.playerId ?? null,
+    waehle: (id) => {
+      const z = sichtbar.find((x) => x.item.playerId === id);
+      if (z) waehle(id, z.item.name);
+    },
+    profil: profilOeffnen,
+    aktiv: ansicht === "markt" && dialog == null,
+  });
 
   // ---------------------------------------------------------------- Geld
   const teamGehalt = feed.teamContext?.teamSalary ?? null;
@@ -488,12 +514,13 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 const pp = erwartetePpSpanne(wert);
                 const teuer = cash != null && it.marketValue != null && it.marketValue > cash;
                 const bild = bildUrlVon(it);
+                const istFokus = fokus?.item.playerId === it.playerId;
                 return (
-                  <div key={it.playerId} className={`mz${fokus?.item.playerId === it.playerId ? " an" : ""}`} onClick={() => waehle(it.playerId, it.name)} data-testid="tm-zeile" data-player-id={it.playerId}>
+                  <div key={it.playerId} className={`mz${istFokus ? " an" : ""}`} onClick={() => zeilenKlick(z)} title={istFokus ? "Ausgewählt · nochmal klicken oder Enter öffnet das Profil" : "Klick wählt aus"} aria-selected={istFokus} data-testid="tm-zeile" data-player-id={it.playerId}>
                     <Stern an={merkliste.has(it.playerId)} titel="Merkliste" onClick={() => props.onToggleWishlist?.(it)} />
                     {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
                     <span className="nm">
-                      <b>{it.name}</b>
+                      <b><u className="tmk-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); nameKlickAuswahlUndProfil(it.playerId, true, () => waehle(it.playerId, it.name), profilOeffnen); }} data-testid="tm-profil-link">{it.name}</u></b>
                       <small><KlassenFarbTag className={it.className} /> · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
                     </span>
                     <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text} (Scouting-Stufe ${z.sicht.stufe}); Scouten schärft das Bild`) : "unbekannt"}>
@@ -512,7 +539,21 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     <span className={`re ${teuer ? "zt" : ""}`} title={teuer ? "über deiner Kasse" : ""}><b className="t">{de(it.marketValue ?? 0, 1)}</b></span>
                     <span className="re"><b className="t">{de(it.salary ?? 0, 1)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(jeSpieltag(it.salary) ?? 0, 2)}/Spieltag</small></span>
                     <RangAnzeige w={w} />
-                    <button type="button" className={`pinb pin${pins.includes(it.playerId) ? " an" : ""}`} onClick={(e) => { e.stopPropagation(); pinne(it.playerId); }} title="Zum Vergleich anheften">{pins.includes(it.playerId) ? "drin" : "Vgl."}</button>
+                    <span className="ak">
+                      {istFokus ? (
+                        <>
+                          <button type="button" className="knopf klein" onClick={(e) => { e.stopPropagation(); profilOeffnen(it.playerId); }} title="Profil öffnen (Enter oder nochmal klicken)" data-testid="tm-zeile-profil">Profil ›</button>
+                          {ueberKasse ? (
+                            <span className="tag w" title="über deiner Kasse">zu teuer</span>
+                          ) : (
+                            <button type="button" className={`knopf klein haupt${kannKaufen ? "" : " zu"}`} disabled={!kannKaufen} onClick={(e) => { e.stopPropagation(); verhandeln(it); }} title={kaufSperre ?? "Verhandlungstisch öffnen"} data-testid="tm-zeile-verhandeln">Verhandeln</button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="hw">Klick wählt aus</span>
+                      )}
+                      <button type="button" className={`pinb pin${pins.includes(it.playerId) ? " an" : ""}`} onClick={(e) => { e.stopPropagation(); pinne(it.playerId); }} title="Zum Vergleich anheften">{pins.includes(it.playerId) ? "drin" : "Vgl."}</button>
+                    </span>
                   </div>
                 );
               })}
@@ -549,7 +590,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 gemerkt={merkliste.has(fokus.item.playerId)}
                 angeheftet={pins.includes(fokus.item.playerId)}
                 onDisziplin={(d) => { setDisziplin(d); setBlatt(0); }}
-                onVerhandeln={() => { props.onSelectCandidate?.(fokus.item.playerId, fokus.item.name); props.onOpenOfferPanel?.(fokus.item.playerId); setDialog({ art: "kauf", id: fokus.item.playerId }); }}
+                onVerhandeln={() => verhandeln(fokus.item)}
                 onVergleichen={() => pinne(fokus.item.playerId)}
                 onErstVerkaufen={() => setAnsicht("verkauf")}
                 onDetails={() => props.onOpenPlayerDetails?.({ playerId: fokus.item.playerId })}
@@ -589,6 +630,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
           kannVerkaufen={Boolean(darfVerwalten && (transferWindow?.canSell ?? true))}
           verkaufSperre={!darfVerwalten ? "Dieses Team ist nur zum Ansehen freigegeben." : !(transferWindow?.canSell ?? true) ? `Transferfenster: ${transferWindow?.phaseLabel ?? "geschlossen"}.` : null}
           onVerlaengern={(playerId) => setDialog({ art: "verl", id: playerId })}
+          onProfil={profilOeffnen}
           onFertig={async (art, text) => {
             setHinweis(text);
             if (art === "verkauf") await props.onSellCompleted?.({ teamId });
@@ -754,14 +796,15 @@ function FokusSpieler(props: {
 
   return (
     <>
-      <div className="buehne-f" style={props.kulisse ? { backgroundImage: `url(${props.kulisse})` } : undefined}>
+      <div className="buehne-f klickbar" style={props.kulisse ? { backgroundImage: `url(${props.kulisse})` } : undefined} onClick={props.onDetails} title="Profil öffnen" data-testid="tm-buehne">
+        <span className="tag pf">Profil ›</span>
         {sprite ? <img className="fig" src={figurPoseUrl(sprite, "south")} alt="" /> : bild ? <img className="por" src={bild} alt="" /> : null}
         <div className="ov">
           {props.nebelAus ? <span className="tag go">Nebel aus (Test)</span> : (it.scoutingLevel ?? 0) >= 5 ? <span className="tag g">voll gescoutet</span> : (it.scoutingLevel ?? 0) === 0 ? <span className="tag a">ungescoutet · Nebel</span> : <span className="tag a">teilweise gescoutet · Stufe {it.scoutingLevel}</span>}
           {props.gemerkt && <span className="tag go">★ Merkliste</span>}
         </div>
         <div className="gr"><strong className="t">{potenzial}</strong><small>Potenzial (Spanne)</small></div>
-        <div className="txt"><em>{it.className} · {it.race}</em><h3>{it.name}</h3></div>
+        <div className="txt"><em>Ausgewählt · {it.className} · {it.race}</em><h3>{it.name}</h3></div>
       </div>
       <div className="fb">
         <h4>Eignung in 20 Disziplinen <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>Klick wählt die Disziplin · Stufen</span></h4>
@@ -813,7 +856,6 @@ function FokusSpieler(props: {
           {props.ueberKasse && <button type="button" className="knopf" onClick={props.onErstVerkaufen}>Erst verkaufen</button>}
           <button type="button" className="knopf" onClick={props.onVergleichen}>{props.angeheftet ? "Angeheftet" : "Vergleichen"}</button>
           <button type="button" className="knopf" onClick={props.onMerken}>{props.gemerkt ? "★ entfernen" : "★ merken"}</button>
-          <button type="button" className="knopf" onClick={props.onDetails}>Profil</button>
         </div>
       </div>
     </>
