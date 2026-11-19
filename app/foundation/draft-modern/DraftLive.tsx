@@ -26,6 +26,7 @@ export type DraftAktionen = {
   pick: (playerId: string, name: string) => Promise<boolean>;
   startWahl: (wahl: "spielen" | "selbst") => Promise<boolean>;
   kiHintergrund: (leise?: boolean) => Promise<boolean>;
+  wunsch: (playerId: string, an: boolean, eintrag: Record<string, unknown>) => Promise<boolean>;
   auslassen: () => Promise<void>;
   fertig: () => Promise<boolean>;
   autoPick: (an: boolean, zielTeamId?: string) => Promise<void>;

@@ -16,7 +16,10 @@
  */
 import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
+import { getNextWishlistPriorityRank } from "@/lib/scouting/scouting-wishlist-slots";
+import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
 import type {
+  TransferWishlistEntry,
   GameState,
   LeagueSetupTeamWarning,
   LigaDraftFertigGrund,
@@ -467,6 +470,7 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
         playerId,
         transferSource: "ai_roster_fill",
         contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT,
+        draftFestkonditionen: true,
         localRunContext: ctx,
         deferPersist: true,
       });
@@ -657,6 +661,7 @@ export function bucheMenschPick(input: {
       transferSource: "manual_transfermarkt_buy",
       idempotencyKey: input.idempotencyKey,
       contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT,
+      draftFestkonditionen: true,
       localRunContext: ctx,
       deferPersist: true,
     });
@@ -801,6 +806,62 @@ export function setzeMenschStartWahl(input: {
 /** Spielt noch irgendein Mensch den geordneten Draft mit (aktiv, ohne Auto-Pick)? Sonst muss die KI selbst durchlaufen. */
 export function spieltNochEinMensch(draft: LigaDraftZustand): boolean {
   return Object.values(draft.teams).some((team) => team.art === "mensch" && team.status === "aktiv" && !team.autoPick);
+}
+
+/**
+ * WUNSCHLISTE IM DRAFT, schmal (19.11.): der Stern schreibt NICHT den ganzen Client-Stand. Der Client haelt waehrend des Drafts
+ * einen Stand, den der Server mit jedem Pick ueberholt; sein Auto-Save lief deshalb in „Save-Konflikt erkannt“. Hier laeuft die
+ * Aenderung wie jede andere Draft-Aktion: frisch lesen, nur die Wunschliste aendern, einmal schreiben.
+ */
+export function setzeDraftWunschliste(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  teamId: string;
+  playerId: string;
+  an: boolean;
+  /** Anzeigewerte des Spielers aus dem Brett (Feed); fehlt er, nimmt der Dienst die Spielerdaten des Spielstands. */
+  eintrag?: Partial<Pick<TransferWishlistEntry, "playerName" | "className" | "race" | "marketValue" | "salary" | "bracket" | "pow" | "spe" | "men" | "soc">> | null;
+}): number {
+  return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
+    const gameState = ctx.save.gameState;
+    const vorhanden = gameState.seasonState.transferWishlist ?? [];
+    const schonDrin = vorhanden.some((e) => e.playerId === input.playerId && e.teamId === input.teamId);
+    if (input.an === schonDrin) return vorhanden.length;
+    const spieler = gameState.players.find((p) => p.id === input.playerId);
+    if (!spieler) throw new LigaDraftFehler("spieler_unbekannt", 404);
+    let naechste: TransferWishlistEntry[];
+    if (!input.an) {
+      naechste = vorhanden.filter((e) => !(e.playerId === input.playerId && e.teamId === input.teamId));
+    } else {
+      const e = input.eintrag ?? {};
+      naechste = [
+        {
+          id: `wishlist-${input.playerId}-${Date.now()}`,
+          saveId: input.saveId,
+          seasonId: gameState.season.id,
+          playerId: input.playerId,
+          playerName: e.playerName ?? spieler.name,
+          className: e.className ?? spieler.className ?? "",
+          race: e.race ?? spieler.race ?? "",
+          marketValue: e.marketValue ?? spieler.marketValue ?? spieler.displayMarketValue ?? null,
+          salary: e.salary ?? spieler.salaryDemand ?? spieler.displaySalary ?? null,
+          bracket: e.bracket ?? null,
+          pow: e.pow ?? null,
+          spe: e.spe ?? null,
+          men: e.men ?? null,
+          soc: e.soc ?? null,
+          teamId: input.teamId,
+          createdAt: new Date().toISOString(),
+          priorityRank: getNextWishlistPriorityRank(gameState, input.teamId),
+        },
+        ...vorhanden,
+      ];
+    }
+    const mitListe: GameState = { ...gameState, seasonState: { ...gameState.seasonState, transferWishlist: naechste } };
+    ctx.save = { ...ctx.save, gameState: syncWishlistToScoutingWatchlist(mitListe, input.teamId) };
+    ctx.deferredWrites += 1;
+    return naechste.length;
+  });
 }
 
 export function setzeMenschAutoPick(input: {

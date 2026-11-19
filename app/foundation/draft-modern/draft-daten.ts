@@ -210,6 +210,12 @@ export function useLigaDraft(input: {
         }
         return Boolean(antwort.success);
       },
+      /** Wunschliste schmal über `/api/draft` (Bug „Save-Konflikt“, 19.11.); der Client übernimmt danach den Serverstand. */
+      wunsch: async (playerId: string, an: boolean, eintrag: Record<string, unknown>) => {
+        const antwort = await sendeStandfest("wunschliste", { playerId, an, eintrag });
+        if (!antwort.success && !istStandKonflikt(antwort.error)) meldung("w", "Wunschliste", fehlerText(antwort.error));
+        return Boolean(antwort.success);
+      },
       auslassen: async () => {
         const antwort = await sende("auslassen");
         if (antwort.success) meldung("", "Pick ausgelassen", "Dein Team ist in dieser Runde übersprungen.");

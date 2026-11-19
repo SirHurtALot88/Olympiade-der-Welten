@@ -148,6 +148,9 @@ describe("B, D, E: spielen, Vor zu meinem Pick, Draft-Vertrag 1 Saison", () => {
     const kiRoster = gs0.rosters.find((r) => r.teamId === kiPick.teamId && r.playerId === kiPick.playerId)!;
     expect(kiRoster.contractLength).toBe(1);
     expect(kiRoster.joinedSeasonId).toBe(gs0.season.id);
+    // Festkonditionen: auch die KI bucht genau das angezeigte Gehalt (`salaryDemand`), nicht die Verhandlungsforderung.
+    const kiSpieler = gs0.players.find((p) => p.id === kiPick.playerId)!;
+    expect(kiRoster.salary).toBeCloseTo(kiSpieler.salaryDemand ?? kiSpieler.displaySalary ?? -1, 2);
 
     const sicht = ansicht.baueLigaDraftAnsicht({ gameState: gs0, saveId: s.saveId, betrachterTeamId: s.menschTeamId, vorschau: 0 })!;
     const playerId = sicht.mein!.vorschlag[0]!;
@@ -156,11 +159,27 @@ describe("B, D, E: spielen, Vor zu meinem Pick, Draft-Vertrag 1 Saison", () => {
     const eintrag = s.lade().rosters.find((r) => r.teamId === s.menschTeamId && r.playerId === playerId)!;
     expect(eintrag.contractLength).toBe(1);
     expect(eintrag.joinedSeasonId).toBe(gs0.season.id);
-    // Gehalt = die Forderung der Kauf-Vorschau (gebucht und im Verlauf identisch); Abloese = Marktwert.
-    expect(eintrag.salary).toBeCloseTo(ergebnis.gehalt ?? -1, 2);
+    // Gehalt = GENAU die angezeigte Zahl (Brett, Mein Draft, Profil), gebucht und im Verlauf identisch; Abloese = Marktwert.
+    expect(eintrag.salary).toBeCloseTo(karte.gehalt, 2);
+    expect(ergebnis.gehalt).toBeCloseTo(karte.gehalt, 2);
     expect(ergebnis.abloese).toBeCloseTo(karte.marktwert, 1);
     expect(ergebnis.draft.verlauf.at(-1)).toMatchObject({ art: "pick", quelle: "mensch", playerId });
   }, 120_000);
+
+  it("Wunschliste im Draft: schmale Server-Aktion (kein Ganzstand-Save des Clients), Draft-Zustand bleibt unberuehrt", () => {
+    const gs0 = s.lade();
+    const playerId = ansicht.baueLigaDraftAnsicht({ gameState: gs0, saveId: s.saveId, betrachterTeamId: s.menschTeamId, vorschau: 0 })!.mein!.vorschlag[0] ?? gs0.players.find((p) => !gs0.rosters.some((r) => r.playerId === p.id))!.id;
+    const verlaufVor = gs0.seasonState.ligaDraft!.verlauf.length;
+    dienst.setzeDraftWunschliste({ persistence, saveId: s.saveId, teamId: s.menschTeamId, playerId, an: true });
+    const mit = s.lade();
+    expect((mit.seasonState.transferWishlist ?? []).filter((e) => e.teamId === s.menschTeamId && e.playerId === playerId)).toHaveLength(1);
+    expect(mit.seasonState.ligaDraft!.verlauf.length).toBe(verlaufVor);
+    // Doppelt setzen aendert nichts; Entfernen nimmt ihn wieder heraus.
+    dienst.setzeDraftWunschliste({ persistence, saveId: s.saveId, teamId: s.menschTeamId, playerId, an: true });
+    expect((s.lade().seasonState.transferWishlist ?? []).filter((e) => e.playerId === playerId)).toHaveLength(1);
+    dienst.setzeDraftWunschliste({ persistence, saveId: s.saveId, teamId: s.menschTeamId, playerId, an: false });
+    expect((s.lade().seasonState.transferWishlist ?? []).some((e) => e.playerId === playerId)).toBe(false);
+  }, 60_000);
 
   it("ein normaler Marktkauf behaelt seine Laufzeit (die 1 Saison gilt nur im Draft): ohne Angabe gilt die Empfehlung, mit Angabe die Angabe", async () => {
     const { executeLocalTransfermarktBuy, previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");

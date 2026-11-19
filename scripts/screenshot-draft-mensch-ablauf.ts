@@ -75,6 +75,13 @@ async function main() {
     const browser = await chromium.launch({ args: ["--disable-dev-shm-usage", "--disable-gpu"] });
     const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
     const page: Page = await ctx.newPage();
+    // Save-Konflikt-Suche: jede 409-Antwort samt Route mitschreiben.
+    page.on("response", (res) => {
+      if (res.status() === 409) console.log(`[shot] HTTP 409 ${res.request().method()} ${res.url().slice(0, 140)}`);
+    });
+    page.on("request", (req) => {
+      if (req.method() === "PUT" && req.url().includes("/api/singleplayer-state")) console.log(`[shot] PUT ${req.url().slice(0, 120)}`);
+    });
     const schliesseBriefing = async () => {
       const laeuft = await page.getByTestId("season-briefing-backdrop").isVisible().catch(() => false);
       if (!laeuft) return;
@@ -130,14 +137,26 @@ async function main() {
     await page.getByTestId("draft-profil").waitFor({ state: "visible", timeout: 60_000 });
     await page.waitForTimeout(3500);
     await shot("06-grosses-spielerprofil-overlay.png");
+    // Kopfleiste/Nebel: nichts ueberlappt; auch bei 1710x1112 und im Reiter „Disziplinen“.
+    await page.setViewportSize({ width: 1710, height: 1112 });
+    await shot("06b-profil-overlay-1710x1112.png");
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.getByTestId("draft-profil-reiter-disciplines").click();
+    await page.waitForTimeout(2500);
+    await shot("06c-profil-disziplinen.png");
     await page.getByTestId("draft-profil-zu").click();
     // 6) Wunsch-Stern + Pick
     await page.getByTestId("draft-zeile").first().click();
     await page.waitForTimeout(500);
     await page.locator('[data-testid="draft-mein"] button[title="Wunschliste"]').first().click().catch(() => undefined);
+    const konflikt = async () => page.getByText("Save-Konflikt", { exact: false }).count();
+    await page.waitForTimeout(12_000);
+    console.log(`[shot] KONFLIKT-BANNER nach Stern: ${await konflikt()}`);
     await shot("07-gewaehlt-wunschstern-mein-draft.png");
     await page.getByTestId("draft-mein-picken").click();
     await page.waitForTimeout(2500);
+    await page.waitForTimeout(12_000);
+    console.log(`[shot] KONFLIKT-BANNER nach Pick: ${await konflikt()}`);
     await shot("08-gepickt-mein-kader-opt.png");
     // 7) Liga & Raenge
     await page.getByTestId("draft-reiter-liga").click();

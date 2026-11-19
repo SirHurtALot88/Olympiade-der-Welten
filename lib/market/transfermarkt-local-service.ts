@@ -1170,7 +1170,12 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     localNegotiationPreviewCacheApproxBytes += approxBytes;
     evictLocalNegotiationPreviewCacheToLimit();
   }
-  const contractSalary = negotiationPreview.offeredSalary ?? salary;
+  // Liga-Draft (Festkonditionen): angezeigtes Gehalt, ohne Verdikt/Zuschlag; sonst unveraendert.
+  const festkonditionen = params.draftFestkonditionen === true && salary != null;
+  const festSchedule = festkonditionen
+    ? buildFastLocalYearlySalarySchedule({ salary: salary as number, contractLength, contractShape, seasonId: gameState.season.id })
+    : null;
+  const contractSalary = festkonditionen ? (salary as number) : (negotiationPreview.offeredSalary ?? salary);
   /**
    * DAS VERDIKT ZAEHLT ERST HIER — und deshalb wird `canBuy` auch erst hier entschieden.
    *
@@ -1178,7 +1183,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
    * Verhandlungsvorschau ueberhaupt gebaut war. Ein abgelehntes Angebot konnte damit gar nicht
    * blocken: die Antwort trug `verdict: "reject_lowball"` und `canBuy: true` nebeneinander.
    */
-  const blockingReasonsMitVerdikt = [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];
+  const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];
   const canBuy = blockingReasonsMitVerdikt.length === 0;
 
   return {
@@ -1218,10 +1223,10 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     expectedSalary: negotiationPreview.expectedSalary,
     baseExpectedSalary: negotiationPreview.baseExpectedSalary,
     demandMultiplier: negotiationPreview.demandMultiplier,
-    offeredSalary: negotiationPreview.offeredSalary,
+    offeredSalary: festkonditionen ? (salary as number) : negotiationPreview.offeredSalary,
     offerRatio: negotiationPreview.offerRatio,
-    yearlySalarySchedule: negotiationPreview.yearlySalarySchedule,
-    totalSalary: negotiationPreview.totalSalary,
+    yearlySalarySchedule: festSchedule ?? negotiationPreview.yearlySalarySchedule,
+    totalSalary: festSchedule ? festSchedule.reduce((sum, row) => sum + row.salary, 0) : negotiationPreview.totalSalary,
     roundingAdjustment: negotiationPreview.roundingAdjustment,
     buyoutCost: negotiationPreview.buyoutCost,
     bracket: negotiationPreview.bracket,

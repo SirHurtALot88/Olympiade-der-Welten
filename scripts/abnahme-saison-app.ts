@@ -150,7 +150,8 @@ async function anlegen() {
     saveId,
     teamId,
     source: "sqlite",
-    control: { delegation: { stufe: "halbautomatik" } },
+    // ABNAHME_VOLLKI=1: reine KI-Liga (auch der Menschen-Sitz delegiert alles), z. B. fuer den Saisonwechsel nach dem Draft.
+    control: { delegation: { stufe: process.env.ABNAHME_VOLLKI === "1" ? "voll_ki" : "halbautomatik" } },
   });
   log(`Delegation Halbautomatik: ${deleg.status} ${JSON.stringify(deleg.json).slice(0, 160)}`);
   const g = gs(saveId);
@@ -929,6 +930,9 @@ function status() {
 async function draftApi() {
   const z = ladeZustand();
   for (let i = 0; i < 60 && !gs(z.saveId).seasonState.ligaDraft; i += 1) await delay(2000);
+  // Startwahl (19.11.): der Draft wartet bei Pick 1, bis jeder Mensch gewaehlt hat — „Draft spielen“, danach Auto-Draft.
+  const wahl = await post("/api/draft", { saveId: z.saveId, teamId: z.teamId, aktion: "startwahl", wahl: "spielen", erwarteteNr: 0 });
+  log(`Startwahl spielen: ${wahl.status} ${JSON.stringify(wahl.json).slice(0, 120)}`);
   const nrVorher = gs(z.saveId).seasonState.ligaDraft?.verlauf.length ?? 0;
   const r = await post("/api/draft", { saveId: z.saveId, teamId: z.teamId, aktion: "ueberspringen", variante: "B", erwarteteNr: nrVorher });
   log(`Ueberspringen B: ${r.status} ${JSON.stringify(r.json).slice(0, 160)}`);
@@ -1190,7 +1194,45 @@ async function entscheidung() {
   fs.writeFileSync(path.join(BILDER, "bericht.json"), `${JSON.stringify(bericht, null, 2)}\n`);
 }
 
+// ------------------------------------------------------------------------------------------------ Vertragsbilanz (Draft-Vertraege 1 Saison)
+
+/** Wie viele Vertraege laufen aus, was entscheiden KI und Mensch, wie gross sind die Kader — an jedem Stand aufrufbar. */
+async function vertragsbilanz() {
+  const z = ladeZustand();
+  const g = gs(z.saveId);
+  const sid = g.season.id;
+  const nachStatus: Record<string, number> = {};
+  for (const r of g.rosters) nachStatus[r.contractStatus ?? "?"] = (nachStatus[r.contractStatus ?? "?"] ?? 0) + 1;
+  const ereignisse = (g.seasonState.contractEvents ?? []).filter((e) => e.seasonId !== sid || true);
+  const je = (typ: string, ki: boolean | null) =>
+    ereignisse.filter((e) => e.eventType === typ && (ki == null || (e.teamId === z.teamId) !== ki)).length;
+  const ausIm = (seasonId: string) => (g.seasonState.contractEvents ?? []).filter((e) => e.seasonId === seasonId);
+  const sid1 = "season-1";
+  const e1 = ausIm(sid1);
+  const gruppen = (liste: typeof e1, ki: boolean) => {
+    const teil = liste.filter((e) => (e.teamId === z.teamId) !== ki);
+    const nach: Record<string, number> = {};
+    for (const e of teil) nach[e.eventType] = (nach[e.eventType] ?? 0) + 1;
+    return nach;
+  };
+  const kaderGroessen = g.teams.map((t) => g.rosters.filter((r) => r.teamId === t.teamId).length);
+  const schnitt = kaderGroessen.reduce((s, x) => s + x, 0) / Math.max(1, kaderGroessen.length);
+  const ergebnis = {
+    saison: sid,
+    phase: g.gamePhase,
+    rostersGesamt: g.rosters.length,
+    nachVertragsstatus: nachStatus,
+    ereignisseSaison1: { ki: gruppen(e1, true), mensch: gruppen(e1, false), gesamt: e1.length },
+    ereignisseAlle: { renewed: je("contract_renewed", null), expired: je("contract_expired", null), released: je("player_released", null), expiredExit: je("contract_expired_exit", null) },
+    kader: { min: Math.min(...kaderGroessen), durchschnitt: Math.round(schnitt * 100) / 100, max: Math.max(...kaderGroessen), unter8: g.teams.filter((t, i) => kaderGroessen[i]! < 8).map((t) => `${t.teamId}:${kaderGroessen[g.teams.indexOf(t)]}`) },
+    laufzeiten: Object.fromEntries([1, 2, 3, 4].map((n) => [n, g.rosters.filter((r) => r.contractLength === n).length])),
+  };
+  console.log(JSON.stringify(ergebnis, null, 2));
+  schreibeDaten(`vertragsbilanz-${sid}-${g.gamePhase}.json`, ergebnis);
+}
+
 const befehle: Record<string, () => unknown> = {
+  vertragsbilanz,
   status,
   wertung,
   vertraege,

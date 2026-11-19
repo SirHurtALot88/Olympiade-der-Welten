@@ -11,8 +11,9 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
-import type { PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 
 const SpielerprofilSeite = dynamic(() => import("@/app/foundation/spielerprofil/SpielerprofilSeite"), { ssr: false, loading: () => null });
@@ -33,6 +34,7 @@ export function DraftProfil({
   onZu: () => void;
 }) {
   const { gameState, activeSaveId } = hostProps;
+  const nebelAus = isScoutingNebelAus(gameState);
   const [geladen, setGeladen] = useState<{ id: string; data: PlayerDetailDrawerData } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [tab, setTab] = useState<PlayerProfileTabId>("overview");
@@ -50,6 +52,9 @@ export function DraftProfil({
           source: hostProps.readMetaSource,
           manageableTeamIds: [...hostProps.foundationManageableTeamIds],
           saveId: activeSaveId,
+          // Dieselbe Sichtstufe wie das Brett (19.11.): der globale Entwickler-Schalter zeigt sonst jeden Spieler exakt. Ein Spieler
+          // des eigenen Teams bleibt exakt (die Sichtregel kennt ihn), ebenso bei ausgeschaltetem Nebel.
+          fogErzwingen: !nebelAus,
         });
         if (abgebrochen) return;
         if (data) {
@@ -95,6 +100,14 @@ export function DraftProfil({
         ) : (
           <small>Du bist gerade nicht am Zug.</small>
         )}
+        {/* Reiter des Profils: im App-Profil stehen sie im Band der Shell, hier gehört das Band dem Draft — eigene kleine Leiste. */}
+        <nav className="drf-profil-reiter" aria-label="Profil-Reiter" data-testid="draft-profil-reiter">
+          {PLAYER_PROFILE_TABS.map((t) => (
+            <button key={t.id} type="button" className={tab === t.id ? "an" : ""} onClick={() => setTab(t.id)} data-testid={`draft-profil-reiter-${t.id}`}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </div>
       <div className="drf-profil-koerper">
         {data ? (

@@ -55,6 +55,13 @@ export type TransfermarktBuyParams = {
    * its absolute roster minimum), without weakening the cooldown for any regular buy.
    */
   bypassSoldThisSeasonCooldown?: boolean;
+  /**
+   * NUR der Liga-Draft (`lib/draft/liga-draft-dienst.ts`) setzt das (19.11., Chris: „direkt gepickt zu den Konditionen die
+   * angegeben sind, also gehalt und marktwert“): gebucht wird GENAU das angezeigte Gehalt (`salaryDemand`), ohne Verhandlungs-
+   * Verdikt und ohne Laufzeit-Zuschlag. Ablöse, Kasse, Kadergrenzen, Vorstand und alle anderen Prüfungen bleiben. Jeder andere
+   * Kaufweg lässt es weg und rechnet wie bisher.
+   */
+  draftFestkonditionen?: boolean;
   fastLocalBatch?: boolean;
   localRunContext?: unknown;
   deferPersist?: boolean;

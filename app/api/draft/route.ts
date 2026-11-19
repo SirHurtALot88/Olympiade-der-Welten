@@ -39,6 +39,7 @@ import {
   laufeKiZuege,
   LigaDraftFehler,
   setzeMenschAutoPick,
+  setzeDraftWunschliste,
   setzeMenschStartWahl,
   spieltNochEinMensch,
   starteLigaDraft,
@@ -62,6 +63,7 @@ type DraftAktion =
   | "auto_pick"
   | "starten"
   | "startwahl"
+  | "wunschliste"
   | "abbrechen";
 
 const AKTIONEN = new Set<DraftAktion>([
@@ -74,6 +76,7 @@ const AKTIONEN = new Set<DraftAktion>([
   "auto_pick",
   "starten",
   "startwahl",
+  "wunschliste",
   "abbrechen",
 ]);
 
@@ -92,6 +95,8 @@ type DraftRequestBody = {
   erwarteteNr?: number;
   /** `startwahl`: "spielen" | "selbst". */
   wahl?: string;
+  /** `wunschliste`: Anzeigewerte des Spielers aus dem Brett. */
+  eintrag?: Record<string, unknown> | null;
   idempotencyKey?: string;
   roomCode?: string | null;
   participantId?: string | null;
@@ -180,7 +185,7 @@ export async function POST(request: Request) {
      * diese Aktionen prueft der Dienst den Stand nicht; `erwarteteNr` bleibt Pflicht (A6, Protokoll), Doppelklick ist harmlos
      * (Auto-Pick/Variante B setzen denselben Zustand, Variante A und „fertig“ lehnt der Dienst beim zweiten Mal ab).
      */
-    const standFuerDienst = aktion === "ueberspringen" || aktion === "startwahl" || aktion === "auto_pick" || aktion === "fertig" ? null : erwarteteNr;
+    const standFuerDienst = aktion === "ueberspringen" || aktion === "startwahl" || aktion === "wunschliste" || aktion === "auto_pick" || aktion === "fertig" ? null : erwarteteNr;
 
     // Gastgeber-Aktionen: Draft anlegen/abbrechen, Auto-Pick fuer ein fremdes Team (Konzept Frage 7: „Auto-Pick
     // auslösen“ für einen Abwesenden, mit Rueckfrage in der Seite und Eintrag im Verlauf).
@@ -256,6 +261,33 @@ export async function POST(request: Request) {
           void laufeKiImHintergrund({ persistence, saveId, logPrefix: "[api/draft]" }).catch(() => undefined);
         }
         ergebnis = { draft };
+        break;
+      }
+      case "wunschliste": {
+        if (!body.playerId) return fehler("playerId_fehlt", 400);
+        const e = body.eintrag ?? {};
+        const text = (k: string) => (typeof e[k] === "string" ? (e[k] as string) : undefined);
+        const zahl = (k: string) => (typeof e[k] === "number" && Number.isFinite(e[k] as number) ? (e[k] as number) : null);
+        const anzahl = setzeDraftWunschliste({
+          persistence,
+          saveId,
+          teamId,
+          playerId: body.playerId,
+          an: body.an !== false,
+          eintrag: {
+            playerName: text("playerName"),
+            className: text("className"),
+            race: text("race"),
+            marketValue: zahl("marketValue"),
+            salary: zahl("salary"),
+            bracket: zahl("bracket"),
+            pow: zahl("pow"),
+            spe: zahl("spe"),
+            men: zahl("men"),
+            soc: zahl("soc"),
+          },
+        });
+        ergebnis = { wunschlisteAnzahl: anzahl };
         break;
       }
       case "auslassen":

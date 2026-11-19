@@ -197,7 +197,25 @@ export default function LigaDraftSeite({
         profil: (id) => setProfilId(id),
         spielerName: (id) => zeilenById.get(id)?.item.name ?? ansicht.spieler[id]?.name ?? spielerById.get(id)?.name ?? "—",
         wunsch,
-        toggleWunsch: (item) => hostProps.toggleTransferWishlist(item),
+        // Schmal über `/api/draft` statt über den Auto-Save des ganzen Client-Stands: der Server überholt diesen Stand mit jedem
+        // Pick, der Ganzstand-Save lief daher in „Save-Konflikt erkannt“ (19.11.). Danach den Serverstand übernehmen.
+        toggleWunsch: (item) => {
+          const an = !wunsch.has(item.playerId);
+          void aktionen
+            .wunsch(item.playerId, an, {
+              playerName: item.name,
+              className: item.className,
+              race: item.race,
+              marketValue: item.marketValue ?? null,
+              salary: item.salary ?? null,
+              bracket: item.bracket ?? null,
+              pow: item.pow ?? null,
+              spe: item.spe ?? null,
+              men: item.men ?? null,
+              soc: item.soc ?? null,
+            })
+            .then((ok) => (ok ? hostProps.loadSave(activeSaveId) : undefined));
+        },
         wahl,
         setWahl,
         schau,
@@ -269,6 +287,8 @@ export default function LigaDraftSeite({
 
   return (
     <div className="tmk drf" data-testid="liga-draft-seite" ref={wurzelRef} style={stil}>
+      {/* Solange das große Profil offen ist, gehört das Band dem Profil-Kopf (beide im Slot überlagerten sich). */}
+      {profilId ? null : (
       <FoundationBandSlot>
         <div className="tmk-bs" data-testid="draft-bandslot">
           <nav className="tmk-bs-reiter" aria-label="Draft-Ansichten">
@@ -292,6 +312,7 @@ export default function LigaDraftSeite({
           ) : null}
         </div>
       </FoundationBandSlot>
+      )}
 
       {!ansicht || !kontext ? (
         <div className="drf-leerzeile" data-testid="draft-laedt">{draft.geladen ? "Für diese Saison gibt es keinen Draft." : "Draft wird geladen …"}</div>

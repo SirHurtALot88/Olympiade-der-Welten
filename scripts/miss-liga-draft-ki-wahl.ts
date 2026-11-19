@@ -59,6 +59,8 @@ async function main() {
   const schnitt = (a: number[]) => a.reduce((s, x) => s + x, 0) / Math.max(1, a.length);
   console.log(`Kader: min ${Math.min(...groessen)} Ø ${schnitt(groessen).toFixed(2)} max ${Math.max(...groessen)} · unter 8: ${groessen.filter((g) => g < 8).length}`);
   console.log(`Kasse: min ${Math.min(...kassen).toFixed(1)} Ø ${schnitt(kassen).toFixed(1)} max ${Math.max(...kassen).toFixed(1)}`);
+  const neu = gs.rosters.filter((r) => r.joinedSeasonId === gs.season.id);
+  console.log(`Gehaltssumme neue Eintraege: ${neu.reduce((sum, r) => sum + (r.salary ?? 0), 0).toFixed(1)} (Ø ${(neu.reduce((sum, r) => sum + (r.salary ?? 0), 0) / Math.max(1, neu.length)).toFixed(2)} je Spieler)`);
   console.log(`Vertragslaufzeit 1: ${gs.rosters.filter((r) => r.joinedSeasonId === gs.season.id && r.contractLength === 1).length} von ${gs.rosters.filter((r) => r.joinedSeasonId === gs.season.id).length} neuen Eintraegen`);
 }
 
