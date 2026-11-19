@@ -58,12 +58,6 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "merkliste", label: "Merkliste", tooltip: "Gemerkte Teams und Spieler — deine Lesezeichen.", icon: "★" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
-      {
-        id: "allTimeTable",
-        label: "Ewige Tabelle",
-        tooltip: "Team-Entwicklung über alle Saisons: Punkte, MW, Cash und der ewige Leader.",
-        icon: "∑",
-      },
     ],
   },
   {
@@ -72,7 +66,6 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "marketV2", label: "Transfermarkt", tooltip: "Kaufen, verkaufen und verhandeln.", icon: "⇄" },
       { id: "scoutingCenterV2", label: "Scouting", tooltip: "Reports, Watchlist und Empfehlungen.", icon: "◐" },
-      { id: "historyV2", label: "Historie", tooltip: "Vergangene Transfers.", icon: "↺" },
       ...(CREDITS_TAB_ENABLED
         ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
         : []),
@@ -89,6 +82,12 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
         label: "Spielplan",
         tooltip: "Saison-Spielplan: welche Disziplinen an welchem Spieltag laufen — farbcodiert nach Achse.",
         icon: "≣",
+      },
+      {
+        id: "seasonArchive",
+        label: "Historie",
+        tooltip: "Gedächtnis der Liga: Saison-Archiv, Transfers und Ewige Tabelle.",
+        icon: "↺",
       },
       { id: "leagueLeaders", label: "Leaders", tooltip: "Liga-Leaders je Kategorie plus Rekorde, Trophäenschrank und legendäre Spieler.", icon: "★" },
       { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "$" },
@@ -125,7 +124,10 @@ export function isFoundationNavViewActive(activeView: FoundationViewId, itemId: 
   if (itemId === "homeV2" && activeView === "home") return true;
   if (itemId === "seasonV2" && activeView === "season") return true;
   if (itemId === "marketV2" && activeView === "market") return true;
-  if (itemId === "historyV2" && activeView === "history") return true;
+  // Ein Schienenpunkt „Historie" mit drei Reitern (Chris 18.11.): Saison-Archiv, Transfers, Ewige Tabelle.
+  if (itemId === "seasonArchive" && (activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable")) {
+    return true;
+  }
   if (itemId === "inboxV2" && activeView === "inbox") return true;
   if (itemId === "lineup" && (activeView === "lineup" || activeView === "lineupV2")) return true;
   if (itemId === "players" && (activeView === "players" || activeView === "playerProfile")) return true;

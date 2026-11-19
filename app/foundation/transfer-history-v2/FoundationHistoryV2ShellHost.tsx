@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import type { Dispatch, SetStateAction } from "react";
 
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
-import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationTransferHistoryResponse, SortState } from "@/lib/foundation/tabs/cockpit-types";
 import {
@@ -47,6 +46,9 @@ export type FoundationHistoryV2ShellHostProps = {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore: () => void;
+  /** Wechselt den Reiter der Historie (Archiv, Transfers, Ewige Tabelle). */
+  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => void;
+  onOpenSaisonstand: () => void;
 };
 
 /**
@@ -80,6 +82,8 @@ export default function FoundationHistoryV2ShellHost({
   hasMore,
   loadingMore,
   onLoadMore,
+  onWechsel,
+  onOpenSaisonstand,
 }: FoundationHistoryV2ShellHostProps) {
   const {
     allSeasonsValue,
@@ -108,7 +112,9 @@ export default function FoundationHistoryV2ShellHost({
     transferHistorySort,
     seasonFilter,
     onSeasonFilterChange,
-    teamFilter,
+    // Das Team filtert die Ansicht selbst: die Bilanz je Team muss ALLE Teams des Fensters zeigen, auch wenn eins
+    // gewaehlt ist (Mockup: „Klick filtert").
+    teamFilter: "ALL",
     typeFilter,
     classFilter,
     sourceFilter,
@@ -116,16 +122,7 @@ export default function FoundationHistoryV2ShellHost({
   });
 
   return (
-    <section className="panel" id="transfer-history">
-      <div className="panel-header">
-        <TooltipHeading
-          as="h2"
-          tooltip="Read-only Verlauf aus dem aktiven Save mit Save- und Season-Scope. Filter und Spalten bleiben direkt daneben."
-        >
-          Transferhistorie
-        </TooltipHeading>
-        <span className="pill foundation-source-pill">source: active local save</span>
-      </div>
+    <div id="transfer-history">
       <TransferHistoryV2Client
         sourceBadgeLabel={sourceBadgeLabel}
         saveName={saveName}
@@ -180,7 +177,10 @@ export default function FoundationHistoryV2ShellHost({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+        gameState={gameState}
+        onWechsel={onWechsel}
+        onOpenSaisonstand={onOpenSaisonstand}
       />
-    </section>
+    </div>
   );
 }
