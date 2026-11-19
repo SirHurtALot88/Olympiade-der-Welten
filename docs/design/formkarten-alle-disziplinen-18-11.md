@@ -109,7 +109,7 @@ die neue Farbregel mit −12…+26). „Ersatz vorher“ = Kopfwert in `data/gen
 | i-spy | Bühne | 0,831 | 0,119 | 0,958 | 0,845 | besteht |
 | football | Feldspiel | 0,818 | 0,159 | 0,888 | 0,854 | besteht |
 | showcase | Bühne | 0,812 | 0,161 | 0,965 | 0,781 | besteht |
-| climbing | Bahn | 0,789 | 0,201 | 0,806 | 0,801 (n=48) / 0,797 (n=24) | besteht, unter Ziel 0,80 (wie vorher) |
+| climbing | Bahn | 0,789 → Canyon 0,815 (n=48) | 0,201 / 0,094 | 0,806 / 0,916 | 0,801 → Canyon 0,860 | besteht (erste Zeile alter Climbing-Stand, s. Nachtrag) |
 | hockey | Feldspiel | 0,656 (Feldspieler 0,707) | 0,184 | 0,755 | 0,700 (Feldspieler 0,784) | unter 0,75 — wie vorher durch Chris' rho-Ausnahme gedeckt |
 
 Jede Bewegung liegt innerhalb der eigenen Kaderfest-Spannweite. **Hockey ist der einzige Fall zum Hinschauen:**
@@ -129,8 +129,16 @@ zurück.
 
 **Nachtrag nach Merge von main (18./19.11.):** main hat die Climbing-Mechanik geändert („Ende erst, wenn alle oben
 sind“), Fingerabdruck dort `d3a39030a3ef`. Fingerabdruck main gegen Branch im selben Lauf erneut: **beide
-`d3a39030a3ef`, alle 75 Zeilen identisch.** Climbing auf dem neuen Stand nachgemessen: rho echt **0,808** (Spannweite
-0,168, Saison 0,879), im selben Lauf mit Ersatzkarte 0,815. Dieser Wert steht in der Abnahmetabelle.
+`d3a39030a3ef`, alle 75 Zeilen identisch.** Climbing auf dem neuen Stand nachgemessen: rho echt 0,808 (Spannweite
+0,168, Saison 0,879), im selben Lauf mit Ersatzkarte 0,815.
+
+**Zweiter Merge (19.11.): Climbing „Canyon“ ist live (#1633/#1638), main-Fingerabdruck `eaafed96150e`.** Erneut main
+gegen Branch im selben Lauf: **beide `eaafed96150e`, alle 75 Zeilen identisch** (CLIMBING-STANDARD `164b3d846334` ebenso).
+Climbing (Canyon) mit echten Karten über den Node-Motor: rho **0,815** (n=48, Spannweite 0,094, Saison 0,916); im selben
+Lauf mit Ersatzkarte 0,860 (= main). Pp n=96 **16,3 / 23,8** (n=48: 16,8 / 24,7; main mit Ersatzkarte 12,3 / 16,1).
+Besteht beide Schranken, der zweite Pp-Strom liegt aber knapp unter 25 — dieselben Attribute wie schon mit Ersatzkarte
+(stamina, speed, dexterity über der Matrix), die echte Karte verstärkt das. Diese Canyon-Werte stehen in der
+Abnahmetabelle.
 
 ## D) Pp-Abweichung mit echten Karten (Budget-Methode, zwei Saatströme)
 
@@ -150,7 +158,7 @@ Ersatzkarte unter `formkarten.ersatzVorher`).
 | speed-schach | 11,3 / 11,4 | 12,1 / 11,0 | |
 | basketball | 12,6 / 12,7 | 7,5 / 13,4 | ~65 min je Strom |
 | tdm | 12,6 / 13,2 | 14,6 / 14,7 | `miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=48 --pp-je-seite=6` |
-| climbing | 14,0 / 11,7 | 12,0 / 9,5 | neuer Climbing-Stand |
+| climbing (Canyon) | 16,3 / **23,8** (n=96) | 12,3 / 16,1 (main, Canyon) | knapp; Format „Ende erst, wenn alle oben sind“ vorher 14,0 / 11,7 |
 | staffel | 14,0 / 17,3 | 13,2 / 14,0 (n=96) | n=48 |
 | football | 17,6 / 15,9 | 15,3 / 16,0 | |
 | takeshis-castle | **18,9 / 20,8** (n=96) | 18,9 / 17,7; im selben n=96-Lauf Ersatz 19,2 | bei n=48 zuerst 17,4 / **26,3** → mit n=96 nachgemessen: Rauschen, besteht |

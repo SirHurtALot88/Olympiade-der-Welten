@@ -800,23 +800,23 @@
   },
   "climbing": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.86,
-   "rhoSpannweite": 0.172,
-   "rhoSaison": 0.888,
+   "rhoJeSpiel": 0.815,
+   "rhoSpannweite": 0.094,
+   "rhoSaison": 0.916,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 climbing --node -- 18.11. Canyon live (Motor-Vorgabe climbingFormat=canyon)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 48 climbing --node -- Canyon live, Formkarten echt, 18./19.11.",
     "spiele": 48,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.3,
-    16.1
+    16.3,
+    23.8
    ],
    "ppMessung": {
-    "befehl": "node scripts/miss-climbing-canyon.mjs 48 --pp (einflussVon im Node-Motor, Saatstaemme 0 / 10000000)",
-    "laeufe": 48,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-climbing-canyon.mjs 24 --pp --pp-n=96 (einflussVon im Node-Motor, Saatstaemme 0 / 10000000)",
+    "laeufe": 96,
     "anhebung": 15,
     "mutatoren": "je-lauf",
     "saatStroeme": [
@@ -825,10 +825,25 @@
     ]
    },
    "datum": "2026-11-18",
-   "commit": "93c652b7",
+   "commit": "97034e52",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "CANYON LIVE 18.11. (Chris: 'Ja, Canyon soll live gehen', docs/design/climbing-canyon-live-18-11.md): Climbing laeuft im Format Canyon (Wand mit drei Wegen, Engstelle, Rangeln, Seilschaften; docs/design/climbing-canyon-bau-18-11.md). Abnahme im Live-Format: rho je Spiel 0,816 -> **0,860** (n=48, Spannweite 0,172; je Kader 0,794/0,866/0,904/0,732/0,860), Saison 0,881 -> 0,888; Pp 12,7/9,6 -> **12,3/16,1** (Pflicht <=25, zweiter Stamm knapp ueber dem Optimum 15: speed/dexterity 2-4 ueber der Matrix). n=24: 0,867 (Spannweite 0,155, Saison 0,916). Fingerabdruck d3a39030a3ef -> eaafed96150e, nur spiele climbing 1/7/42; das alte Format bleibt als CLIMBING-STANDARD 164b3d846334 ausserhalb von GESAMT (Rueckweg OLY_CLIMBING_FORMAT=standard). Gemessen ueber den Node-Motor (miss-alle-disziplinen --node, miss-climbing-canyon --pp). VORHER (Format standard): ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest climbing die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. Canyon mit echten Karten: rho 0,815 (n=48; im selben Lauf mit Ersatzkarte 0,860, Spannweite 0,172), Pp n=96 16,3/23,8 (n=48: 16,8/24,7; Ersatz main 12,3/16,1) -- besteht, zweiter Stamm knapp unter 25 (stamina/speed/dexterity ueber der Matrix, wie schon mit Ersatzkarte). | VORHER: CANYON LIVE 18.11. (Chris: 'Ja, Canyon soll live gehen', docs/design/climbing-canyon-live-18-11.md): Climbing laeuft im Format Canyon (Wand mit drei Wegen, Engstelle, Rangeln, Seilschaften; docs/design/climbing-canyon-bau-18-11.md). Abnahme im Live-Format: rho je Spiel 0,816 -> **0,860** (n=48, Spannweite 0,172; je Kader 0,794/0,866/0,904/0,732/0,860), Saison 0,881 -> 0,888; Pp 12,7/9,6 -> **12,3/16,1** (Pflicht <=25, zweiter Stamm knapp ueber dem Optimum 15: speed/dexterity 2-4 ueber der Matrix). n=24: 0,867 (Spannweite 0,155, Saison 0,916). Fingerabdruck d3a39030a3ef -> eaafed96150e, nur spiele climbing 1/7/42; das alte Format bleibt als CLIMBING-STANDARD 164b3d846334 ausserhalb von GESAMT (Rueckweg OLY_CLIMBING_FORMAT=standard). Gemessen ueber den Node-Motor (miss-alle-disziplinen --node, miss-climbing-canyon --pp). VORHER (Format standard): ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.86,
+     "rhoSpannweite": 0.172,
+     "rhoSaison": 0.888,
+     "pp": [
+      12.3,
+      16.1
+     ],
+     "datum": "2026-11-18",
+     "commit": "93c652b7"
+    }
+   }
   },
   "football": {
    "rhoJeSpiel": 0.818,
