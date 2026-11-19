@@ -1,6 +1,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import type {
   OlyRoomState,
   RoomFlowButtonStatus,
@@ -159,6 +160,23 @@ export const ROOM_FLOW_MATCHDAY_CYCLE_END = "standings" satisfies RoomFlowStepId
 export const ROOM_FLOW_SEASON_TRANSITION_TARGET = "training" satisfies RoomFlowStepId;
 
 /**
+ * Der Rueckweg aus `season_transition` MIT gemeinsamem Transferfenster (Chris 18.11., Schalter
+ * `OLY_TRANSFERFENSTER_GEMEINSAM`, Standard AN).
+ *
+ * Seitdem ist in der neuen Saison vor Spieltag 1 Kaufen UND Verkaufen offen (`isTransferSellPhaseOpen`
+ * deckt jetzt `isEarlySeasonTransferSetup`). Der Grund, aus dem der Raum oben direkt ins Training sprang —
+ * `sell_players` waere mit 409 gesperrt —, faellt damit weg; im Gegenteil: liefe der Raum jetzt ins
+ * Training, haette niemand im Raum das Transferfenster gesehen, das nur bis Spieltag 1 offen ist. Der Raum
+ * kehrt deshalb an den Anfang der Saisonschritte zurueck: Verkaeufe → Kaeufe → Gebaeude → Training. Der
+ * allererste Raumstart (`startRoom`) bleibt beim Training: dort ist der Draft der Kaderaufbau.
+ */
+export const ROOM_FLOW_SEASON_TRANSITION_TARGET_GEMEINSAM = "sell_players" satisfies RoomFlowStepId;
+
+export function resolveRoomFlowSeasonTransitionTarget(): RoomFlowStepId {
+  return istTransferfensterGemeinsam() ? ROOM_FLOW_SEASON_TRANSITION_TARGET_GEMEINSAM : ROOM_FLOW_SEASON_TRANSITION_TARGET;
+}
+
+/**
  * Steht in dieser Saison noch ein Spieltag aus?
  *
  * Bewusst KEINE eigene Spieltagsrechnung (`currentMatchday < totalMatchdays`), sondern
@@ -200,7 +218,7 @@ export function getNextRoomFlowStepId(
     return "season_transition";
   }
   if (stepId === "season_transition") {
-    return input?.seasonHasAdvanced ? ROOM_FLOW_SEASON_TRANSITION_TARGET : "season_transition";
+    return input?.seasonHasAdvanced ? resolveRoomFlowSeasonTransitionTarget() : "season_transition";
   }
   const index = ROOM_FLOW_STEPS.findIndex((entry) => entry.stepId === stepId);
   return ROOM_FLOW_STEPS[Math.min(index + 1, ROOM_FLOW_STEPS.length - 1)]?.stepId ?? "season_review";

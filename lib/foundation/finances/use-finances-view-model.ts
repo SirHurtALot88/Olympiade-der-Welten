@@ -1,5 +1,6 @@
 "use client";
 
+import { baueBuchungsKontext, bucheTransferEintrag, istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 import { useMemo } from "react";
 
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
@@ -202,15 +203,27 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // `TeamManagementSnapshotRow.transferNet` (das ist ALL-TIME, nicht
   // season-scoped) — mirrors `buildTransferFinanceAudit`'s
   // sell-netCashImpact-first-Regel.
-  const seasonTransfers = gameState.transferHistory.filter((entry) => entry.seasonId === gameState.season.id);
+  //
+  // BUCHUNG (Chris 18.11.): „das Fenster vor Saison N gehoert zu Saison N" (`transferbilanz-buchung.ts`). Die
+  // Saisonende-Verkaeufe des alten Ablaufs zaehlen zur Folgesaison, und in Saison 1 ist alles Kaderaufbau aus dem
+  // Startbudget — eigene Zeile `kaderaufbau`, nicht `transfer`.
+  const buchungsKontext = baueBuchungsKontext(gameState.transferHistory, gameState.season.matchdayIds?.length ?? null);
+  const seasonTransfers = gameState.transferHistory.filter(
+    (entry) =>
+      (entry.transferType === "buy" || entry.transferType === "sell") &&
+      bucheTransferEintrag(entry, buchungsKontext).saisonId === gameState.season.id,
+  );
   const buys = seasonTransfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
   const sells = seasonTransfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
   const buyTotal = round1(buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0));
   const sellTotal = round1(sells.reduce((sum, entry) => sum + (entry.netCashImpact ?? entry.fee ?? 0), 0));
-  const transfer: FinanceTransferBalance | null =
+  const bewegungen: FinanceTransferBalance | null =
     buys.length > 0 || sells.length > 0
       ? { net: round1(sellTotal - buyTotal), buyTotal, sellTotal, buyCount: buys.length, sellCount: sells.length }
       : null;
+  const aufbauSaison = istKaderaufbauSaison(gameState.season.id);
+  const transfer: FinanceTransferBalance | null = aufbauSaison ? null : bewegungen;
+  const kaderaufbau: FinanceTransferBalance | null = aufbauSaison ? bewegungen : null;
   const transferSurplus = transfer != null && transfer.net > 0 ? round1(transfer.net) : null;
   const transferDeficit = transfer != null && transfer.net < 0 ? round1(-transfer.net) : null;
 
@@ -501,6 +514,7 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
       objectivePenalty,
     },
     transfer,
+    kaderaufbau,
     totalIncome,
     totalExpenses,
     guv,

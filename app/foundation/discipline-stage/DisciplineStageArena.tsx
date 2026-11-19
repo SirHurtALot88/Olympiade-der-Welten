@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
+import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
@@ -3015,8 +3016,17 @@ export default function DisciplineStageArena({
                 gleichem Namen braucht sie dafür keine Ausnahme. */}
             {kaufphaseSchliesstMitDiesemSpieltag ? (
               <p className="arena-prematch-kaufwarnung" data-testid="arena-prematch-kaufwarnung">
-                <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
-                ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
+                {istTransferfensterGemeinsam() ? (
+                  <>
+                    <strong>Das Transferfenster ist noch offen.</strong> Dieser Spieltag schließt es für die
+                    ganze Saison — danach lässt sich kein Spieler mehr kaufen oder verkaufen, auch nicht nachträglich.
+                  </>
+                ) : (
+                  <>
+                    <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
+                    ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
+                  </>
+                )}
                 {kaufphaseSchliesstMitDiesemSpieltag.teamCount === 1
                   ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`
                   : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} C.`}
@@ -3067,7 +3077,11 @@ export default function DisciplineStageArena({
                 {/* Die Warnung steht auch AUF dem Knopf: wer die Tafel überfliegt, liest
                     trotzdem, was dieser Klick kostet. */}
                 <small className="nl-tnum">
-                  {kaufphaseSchliesstMitDiesemSpieltag ? "schließt die Kaufphase" : "Liga vollzählig bereit"}
+                  {kaufphaseSchliesstMitDiesemSpieltag
+                    ? istTransferfensterGemeinsam()
+                      ? "schließt das Transferfenster"
+                      : "schließt die Kaufphase"
+                    : "Liga vollzählig bereit"}
                 </small>
               </button>
             ) : null}

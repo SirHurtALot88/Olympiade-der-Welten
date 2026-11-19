@@ -30,6 +30,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
 import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
+import { verkaufserloeseFreiAnteil } from "@/lib/market/transferfenster-gemeinsam";
 
 /** Untergrenze der Gehalts-Quote (Chris 18.11.: der Vorstand kuerzt das Gehaltsbudget hoechstens auf 75 %). */
 export const GEHALTS_QUOTE_UNTERGRENZE = 0.75;
@@ -133,7 +134,9 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
     else if (e.transferType === "sell" && e.fromTeamId === teamId) verkaeufe += e.netCashImpact ?? e.fee;
   }
   const anfangskasse = cash + kaeufe - verkaeufe;
-  const transferGesamt = freigabe.anteil * (anfangskasse + verkaeufe);
+  // Gemeinsames Transferfenster (Chris 18.11., transfermarkt-modern-18-11.md Frage 3): Verkaufserloese aus dem
+  // Fenster sind sofort zu 100 % frei — die Quote gilt nur fuer die Anfangskasse. Schalter aus: wie bisher.
+  const transferGesamt = freigabe.anteil * anfangskasse + verkaufserloeseFreiAnteil(freigabe.anteil) * verkaeufe;
   const nochFrei = Math.max(0, Math.min(cash, transferGesamt - kaeufe));
   const gesperrt = Math.max(0, cash - nochFrei);
   const prozent = Math.round(freigabe.anteil * 100);
