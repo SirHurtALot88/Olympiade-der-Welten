@@ -458,3 +458,19 @@
 
 .tmk .mz .re.klein { font-size: calc(0.86 * var(--u)); color: var(--stumm); font-weight: 600; }
 .tmk .regler .o .ford small { display: block; font-size: calc(0.75 * var(--u)); color: var(--stumm); }
+
+/* ===== Eine Klickregel (UX 19.11.): Markt-Zeile, Name, Bühne, Kader-Zeilen ===== */
+.tmk .mk .mz { grid-template-columns: calc(1.3 * var(--u)) calc(2.3 * var(--u)) minmax(calc(8 * var(--u)), 1fr) calc(6.6 * var(--u)) calc(11.5 * var(--u)) calc(3.6 * var(--u)) calc(3.6 * var(--u)) calc(4.6 * var(--u)) calc(5.2 * var(--u)) calc(13 * var(--u)); }
+.tmk .mz .ak { display: flex; align-items: center; justify-content: flex-end; gap: calc(.35 * var(--u)); white-space: nowrap; }
+.tmk .mz .hw { font-size: calc(.68 * var(--u)); color: var(--stumm); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; opacity: 0; }
+.tmk .mz:hover .hw { opacity: 1; }
+.tmk .mz.an .por { border-color: var(--gold); }
+.tmk .mz .nm b .tmk-pl { text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; cursor: pointer; }
+.tmk .mz .nm b .tmk-pl:hover { color: var(--gold); text-decoration-style: solid; }
+.tmk .buehne-f.klickbar { cursor: pointer; }
+.tmk .buehne-f .pf { position: absolute; left: calc(.9 * var(--u)); top: calc(.55 * var(--u)); z-index: 3; }
+.tmk .buehne-f.klickbar:hover .pf { color: var(--gold); border-color: var(--gold); }
+.tmk .kt .mz.an .por, .tmk .vk .mz.an .por { border-color: var(--gold); }
+.tmk .kt .mz .nm b .tmk-pl { text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; cursor: pointer; }
+.tmk .kt .mz .nm b .tmk-pl:hover { color: var(--gold); text-decoration-style: solid; }
+.tmk .rw .tmk-pl { text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; cursor: pointer; }

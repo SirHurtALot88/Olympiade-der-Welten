@@ -28,10 +28,11 @@ import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-d
 import { DraftProfil } from "./DraftProfil";
 import { getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
-import { AbbruchDialog, Ergebnis, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
+import { AbbruchDialog, AuslassenDialog, Ergebnis, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { betragC, de, draftKopfSchluessel } from "./draft-format";
+import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil } from "@/app/foundation/shared/klickregel";
 import "@/app/foundation/transfermarkt-modern/transfermarkt-modern.css";
 import "./draft-modern.css";
 
@@ -88,6 +89,8 @@ export default function LigaDraftSeite({
   const [schau, setSchau] = useState<string | null>(null);
   const [skipOffen, setSkipOffen] = useState(false);
   const [abbruchOffen, setAbbruchOffen] = useState(false);
+  const [auslassenOffen, setAuslassenOffen] = useState(false);
+  const [fertigOffen, setFertigOffen] = useState(false);
   const [profilId, setProfilId] = useState<string | null>(null);
 
   // Liegengebliebener Hintergrundlauf (Reload, Server-Neustart, abgebrochener Lauf → Liga „failed“): niemand treibt die
@@ -218,6 +221,8 @@ export default function LigaDraftSeite({
         },
         wahl,
         setWahl,
+        klick: (id) => (gepickt.has(id) ? setProfilId(id) : klickAuswahlOderProfil(id, wahl, setWahl, setProfilId)),
+        nameKlick: (id) => nameKlickAuswahlUndProfil(id, !gepickt.has(id), setWahl, setProfilId),
         schau,
         setSchau,
       }
@@ -230,7 +235,7 @@ export default function LigaDraftSeite({
     if (ansicht.status === "fertig") return { label: "Weiter", title: "Draft abgeschlossen", statusClass: "is-ready", onClick: onWeiter };
     if (mein?.status === "nachzug" && ansicht.status === "nachzug") {
       return mein.darfFertig
-        ? { label: "Draft abschließen", title: `Kader ${mein.kader} · du kannst weiter picken`, statusClass: "is-ready", onClick: () => void aktionen.fertig() }
+        ? { label: "Draft abschließen", title: `Kader ${mein.kader} · du kannst weiter picken`, statusClass: "is-ready", onClick: () => setFertigOffen(true) }
         : { label: `Noch ${Math.max(0, ansicht.regeln.minKader - mein.kader)} Pflichtplätze`, title: "Du pickst in Ruhe", statusClass: "is-blocked", onClick: () => {} };
     }
     if (ansicht.wartetAufStart) {
@@ -334,11 +339,11 @@ export default function LigaDraftSeite({
             <Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} onVor={() => void aktionen.kiHintergrund()} zeig={draft.zeig} />
           </div>
           <div className="lsp">
-            {mein?.status === "nachzug" && !schau ? <NachzugPanel k={kontext} /> : <AmZug k={kontext} zeig={draft.zeig} onVormerken={(id) => setWahl(id)} />}
+            {mein?.status === "nachzug" && !schau ? <NachzugPanel k={kontext} /> : <AmZug k={kontext} zeig={draft.zeig} />}
             <DanachAmZug k={kontext} />
           </div>
-          <DraftBrett k={kontext} aktionen={aktionen} />
-          <MeinDraft k={kontext} aktionen={aktionen} />
+          <DraftBrett k={kontext} aktionen={aktionen} tastenAktiv={!profilId && !skipOffen && !abbruchOffen && !auslassenOffen && !fertigOffen && mein?.startWahl !== "offen"} />
+          <MeinDraft k={kontext} aktionen={aktionen} onAuslassen={() => setAuslassenOffen(true)} onFertig={() => setFertigOffen(true)} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} />
           <LiveTicker k={kontext} zeig={draft.zeig} />
         </div>
       )}
@@ -383,6 +388,30 @@ export default function LigaDraftSeite({
           onWahl={(v) => {
             setSkipOffen(false);
             void aktionen.ueberspringen(v);
+          }}
+        />
+      ) : null}
+
+      {auslassenOffen && kontext ? (
+        <AuslassenDialog
+          k={kontext}
+          busy={draft.busy}
+          onZu={() => setAuslassenOffen(false)}
+          onJa={() => {
+            setAuslassenOffen(false);
+            void aktionen.auslassen();
+          }}
+        />
+      ) : null}
+
+      {fertigOffen && kontext ? (
+        <FertigDialog
+          k={kontext}
+          busy={draft.busy}
+          onZu={() => setFertigOffen(false)}
+          onJa={() => {
+            setFertigOffen(false);
+            void aktionen.fertig();
           }}
         />
       ) : null}

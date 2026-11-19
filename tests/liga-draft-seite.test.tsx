@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { AuslassenFertig } from "@/app/foundation/draft-modern/DraftLive";
+import { NichtPicken } from "@/app/foundation/draft-modern/DraftLive";
 import { istDraftKandidat, urteilGilt } from "@/app/foundation/draft-modern/draft-tor";
 import {
   auslassenSperrGrund,
@@ -86,7 +86,7 @@ describe("Draft-Protokoll: erwarteteNr und Raumfelder", () => {
 describe("Draft-Seite: Knöpfe strikt nach darfAuslassen/darfFertig", () => {
   const mein = (teil: Partial<{ darfAuslassen: boolean; darfFertig: boolean; autoPick: boolean; amZug: boolean; status: string; kader: number }>) =>
     ({ teamId: "t7", art: "mensch", status: "aktiv", autoPick: false, amZug: true, darfPicken: true, darfAuslassen: true, darfFertig: true, darfUeberspringen: true, kader: 9, kasse: 10, pflichtReserve: 0, maxAbloese: 10, vorschlag: [], picksBisZug: 0, ...teil }) as never;
-  const html = (m: never) => renderToStaticMarkup(createElement(AuslassenFertig, { mein: m, minKader: 8, aktionen: { auslassen: async () => undefined, fertig: async () => true } }));
+  const html = (m: never) => renderToStaticMarkup(createElement(NichtPicken, { mein: m, minKader: 8, onAuslassen: () => undefined, onFertig: () => undefined, onSkip: () => undefined }));
   const knopf = (h: string, id: string) => h.match(new RegExp(`<button[^>]*data-testid="${id}"[^>]*>`))?.[0] ?? "";
 
   it("beide an", () => {

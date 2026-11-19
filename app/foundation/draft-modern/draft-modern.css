@@ -381,3 +381,50 @@
 .drf .db .mz.pz .lg img { width: 100%; height: 100%; object-fit: cover; }
 .drf .db .mz.pz .por { width: calc(2.3 * var(--u)); height: calc(2.6 * var(--u)); border-radius: calc(.3 * var(--u)); object-fit: cover; object-position: center 18%; }
 .drf .db .mz.pz .nm small { display: flex; align-items: center; gap: calc(.3 * var(--u)); white-space: nowrap; overflow: hidden; }
+
+/* ===== Eine Klickregel (UX 19.11.): ausgewählt sieht überall gleich aus, der zweite Klick steht als Knopf da ===== */
+.drf .db .mz, .drf .db .mz.pz { cursor: pointer; }
+.drf .db .mz.an { box-shadow: inset 3px 0 0 var(--gold); background: linear-gradient(90deg, rgba(240,195,90,.2), rgba(240,195,90,.05)); }
+.drf .db .mz.an .por { border-color: var(--gold); }
+.drf .db .mz .ak { display: flex; align-items: center; justify-content: flex-end; gap: calc(.35 * var(--u)); justify-self: end; white-space: nowrap; }
+.drf .db .mz .hw { font-size: calc(.68 * var(--u)); color: var(--stumm); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; opacity: 0; }
+.drf .db .mz:hover .hw { opacity: 1; }
+.drf .db .mz { grid-template-columns: calc(1.3 * var(--u)) calc(2.3 * var(--u)) minmax(calc(7 * var(--u)), 1fr) calc(8.6 * var(--u)) calc(9 * var(--u)) calc(4.4 * var(--u)) calc(3.5 * var(--u)) calc(3.3 * var(--u)) calc(9.6 * var(--u)); }
+.drf .fk .hv { position: absolute; left: 0; right: 0; top: 24%; z-index: 1; text-align: center; padding: calc(.2 * var(--u)) 0; background: rgba(6,8,12,.86); color: var(--creme); font-size: calc(.66 * var(--u)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: 0; transition: opacity .12s; border-block: 1px solid var(--linie-2); pointer-events: none; }
+.drf .fk:hover .hv { opacity: 1; }
+.drf .fk.an .hv { color: var(--gold); }
+.drf .fk .fk-schild { position: absolute; right: calc(.35 * var(--u)); top: calc(.4 * var(--u)); z-index: 1; background: var(--gold); color: #17120a; border-color: var(--gold); font-weight: 700; }
+.drf .fk.an { border: 2px solid var(--gold); box-shadow: 0 0 calc(1 * var(--u)) rgba(240,195,90,.4); }
+.drf .nx .pp img { cursor: pointer; }
+.drf .nx .pp img:hover, .drf .nx .pp img.an { border-color: var(--gold); }
+.drf .wl div { cursor: pointer; }
+.drf .wl div:hover { background: rgba(244,230,196,.045); }
+.drf .wl div.an { background: rgba(240,195,90,.14); box-shadow: inset 2px 0 0 var(--gold); }
+.drf #l-ich .buehne-f.klickbar { cursor: pointer; }
+.drf #l-ich .buehne-f .pf { position: absolute; left: calc(.9 * var(--u)); top: calc(.55 * var(--u)); z-index: 2; }
+.drf #l-ich .buehne-f.klickbar:hover .pf { color: var(--gold); border-color: var(--gold); }
+.drf #l-ich .buehne-f .txt { bottom: calc(.5 * var(--u)); }
+
+/* Nicht picken? — drei beschriftete Wege mit Folge, Sperrgrund sichtbar */
+.drf #l-ich .fb h4 { font: 400 calc(1.15 * var(--u))/1 var(--haus); letter-spacing: .04em; text-transform: none; color: var(--creme); margin-top: calc(.2 * var(--u)); }
+.drf #l-ich .fb h4 span { margin-left: auto; font: 700 calc(.62 * var(--u)) var(--zahl, inherit); letter-spacing: .14em; text-transform: uppercase; color: var(--stumm); }
+.drf .np { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(.4 * var(--u)); }
+.drf .np button { display: block; text-align: left; border: 1px solid var(--linie-2); border-radius: calc(.35 * var(--u)); padding: calc(.32 * var(--u)) calc(.5 * var(--u)) calc(.36 * var(--u)); background: var(--flaeche-2); cursor: pointer; }
+.drf .np button b { display: block; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-size: calc(.74 * var(--u)); color: var(--creme); }
+.drf .np button small { display: block; font-size: calc(.7 * var(--u)); line-height: 1.15; color: var(--leise); margin-top: calc(.1 * var(--u)); }
+.drf .np button:hover:not(:disabled) { border-color: var(--gold); }
+.drf .np button:hover:not(:disabled) b { color: var(--gold); }
+.drf .np button.zu, .drf .np button:disabled { cursor: not-allowed; border-style: dashed; border-color: var(--linie); }
+.drf .np button.zu b { color: var(--stumm); }
+.drf .np button.zu small { color: var(--warn); }
+
+/* Rückfrage-Dialoge (Pick auslassen, Ich bin fertig) */
+.drf .dlg.skip.kurz { width: calc(52 * var(--u)); }
+.drf .sk2.eins { grid-template-columns: 1fr; }
+.drf .sk2.eins .sopt p { font-size: calc(1.05 * var(--u)); }
+.drf .sopt .fakt { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(.5 * var(--u)); }
+.drf .sopt .fakt div { border: 1px solid var(--linie); border-radius: calc(.35 * var(--u)); padding: calc(.4 * var(--u)) calc(.6 * var(--u)); background: var(--flaeche-2); }
+.drf .sopt .fakt small { display: block; font-size: calc(.6 * var(--u)); letter-spacing: .14em; color: var(--stumm); font-weight: 700; text-transform: uppercase; }
+.drf .sopt .fakt b { font-size: calc(1.3 * var(--u)); color: var(--creme); }
+.drf .sopt .fakt span { display: block; font-size: calc(.76 * var(--u)); color: var(--leise); }
+.drf #l-zug .zfuss { white-space: normal; }

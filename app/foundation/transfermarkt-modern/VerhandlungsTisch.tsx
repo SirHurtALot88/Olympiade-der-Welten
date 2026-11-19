@@ -14,6 +14,7 @@ import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-c
 import { betragC, begrenze, de, jeSpieltag, rangText } from "./tm-format";
 import { freigabeKosten, freigabeSperreFuerBetrag } from "@/lib/market/transfermarkt-freigabe";
 import { postJson, schreibKontext } from "./tm-daten";
+import { useEscSchliesst } from "@/app/foundation/shared/klickregel";
 
 /**
  * VERHANDLUNGSTISCH (Mockup 18.11.): EIN Dialog für Kauf und Verlängerung. Drei Spalten — der Spieler und warum er so
@@ -377,6 +378,7 @@ export default function VerhandlungsTisch(props: TischProps) {
   const sperrGrund = (modus === "kauf" ? props.gesperrtGrund : null) ?? freigabeGrund;
   const gesperrt = sperrGrund != null;
   // Verhandeln bleibt möglich; GESPERRT ist nur der Abschluss (Chris, 18.11.).
+  useEscSchliesst(!beschaeftigt, props.onSchliessen);
   const kannVerhandeln = Boolean(stand) && !laedt && !beschaeftigt;
   const kannAbschliessen = antwort?.art === "ja" && stand?.canDo === true && !gesperrt && !beschaeftigt;
   const sliderMin = forderung != null ? forderung * 0.7 : 0;
