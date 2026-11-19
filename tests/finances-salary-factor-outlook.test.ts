@@ -118,7 +118,8 @@ describe("buildSalaryFactorOutlook (Verdrahtung auf das kanonische Season-Ökono
 // verdrahtet sein — mit Richtungs-Ton nach Spieler-Nutzen und echter saveId.
 describe("finances salary factor ui contract", () => {
   it("zeigt den Salary-Factor-Chip im Finanzen-Reiter mit Richtungs-Ton und Erklär-Tooltip", async () => {
-    const viewText = await fs.readFile(path.join(root, "app/foundation/finances/FoundationFinancesNewLook.tsx"), "utf8");
+    // Die Finanzseite wurde durch FinanzenModern ersetzt (Finanzseite V2); der Chip ist dort im Reiter GuV, mit gleichem Ton, Tooltip und Ehrlichkeitsregel.
+    const viewText = await fs.readFile(path.join(root, "app/foundation/finances/FinanzenModern.tsx"), "utf8");
     // M3 (Markt-Audit F5): Label eingedeutscht — der Tooltip nennt weiterhin den englischen
     // Begriff „Salary Factor", damit der Draht zu Season-Briefing/KI-Doku nicht abreißt.
     expect(viewText).toContain('label="Gehaltsfaktor"');

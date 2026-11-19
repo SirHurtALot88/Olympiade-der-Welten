@@ -36,7 +36,7 @@
  * Aufruf (Wegwerf-Datei!):
  *   OLY_APP_SQLITE_PATH=/pfad/wegwerf.sqlite npx tsx scripts/miss-teamfinanzen-saison.ts \
  *     [--mode battle|manager] [--seasons 2] [--out data/generated/lauf.json] [--label A]
- *     [--stop-after draft|kaufphase] [--nur-anlage] [--von-anlage <saveId>] [--draft block|einzelschritt]
+ *     [--stop-after draft|vorkauf|kaufphase] [--nur-anlage] [--von-anlage <saveId>] [--draft block|einzelschritt]
  *
  * `--draft einzelschritt` (Draft-Neubau, 18.11.): statt des Blocklaufs (`fuehreLigaSetupDraftAus`) laeuft der neue
  * Liga-Draft Pick fuer Pick (`starteLigaDraft` + `laufeKiZuege`, ein Schreibvorgang je Pick wie ueber die Route).
@@ -63,6 +63,7 @@ import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-servic
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
+import { berechneVorstandBudgetStand, SPERRE_ZAEHLER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { laufeKiZuege, starteLigaDraft } from "@/lib/draft/liga-draft-dienst";
@@ -122,6 +123,48 @@ type TeamSnap = {
   /** Kaderstaerke: Mittel der Top-6-Eignung je Disziplin (fehlende Plaetze zaehlen 0). */
   staerke: number;
 };
+
+/**
+ * Finanzseite (18.11.): Vorstand-Statistik je Team und Liga — Stand der zwei Toepfe, „Alles auf eine Karte“, Umschichten,
+ * Ruecklage anzapfen, und wie oft die harte Sperre gegriffen hat (nur mit `OLY_SPERRE_ZAEHLEN=1`, Zaehler = abgelehnte Pruefungen).
+ */
+function vorstandStatistik(gs: GameState) {
+  const jeTeam = gs.teams.map((t) => {
+    const st = berechneVorstandBudgetStand(gs, t.teamId);
+    const z = st.zustand;
+    return {
+      teamId: t.teamId,
+      stufe: st.stufe,
+      anteil: st.anteil,
+      wirksamerAnteil: st.wirksamerAnteil,
+      gedeckelt: st.gedeckelt,
+      transferGesamt: st.investition.gesamt,
+      transferAusgegeben: st.investition.ausgegeben,
+      transferFrei: st.investition.frei,
+      gebaeudeAusgegeben: st.gebaeudeAusgegeben,
+      gehaltGesamt: st.gehalt.gesamt,
+      gehaltAusgegeben: st.gehalt.ausgegeben,
+      gehaltFrei: st.gehalt.frei,
+      alleAufEineKarte: z.alleAufEineKarte ? { quelle: z.alleAufEineKarte.quelle, zielRang: z.alleAufEineKarte.zielRang, erwartungsRang: z.alleAufEineKarte.erwartungsRang } : null,
+      umschichtung: z.umschichtung,
+      ruecklageAngezapft: z.ruecklageAngezapft,
+      lockerungAktiv: st.lockerung.aktiv,
+    };
+  });
+  const zaehle = (art: keyof typeof SPERRE_ZAEHLER) => ({
+    pruefungen: Object.values(SPERRE_ZAEHLER[art]).reduce((a, b) => a + b, 0),
+    teams: Object.keys(SPERRE_ZAEHLER[art]).length,
+    jeTeam: { ...SPERRE_ZAEHLER[art] },
+  });
+  return {
+    jeTeam,
+    sperre: { kauf: zaehle("kauf"), kaufGehalt: zaehle("kauf_gehalt"), gebaeude: zaehle("gebaeude"), verlaengerung: zaehle("verlaengerung") },
+    alleAufEineKarte: jeTeam.filter((t) => t.alleAufEineKarte).length,
+    umgeschichtet: jeTeam.filter((t) => Math.abs(t.umschichtung) > 0.004).length,
+    angezapft: jeTeam.filter((t) => t.ruecklageAngezapft > 0.004).length,
+    gelockert: jeTeam.filter((t) => t.lockerungAktiv).length,
+  };
+}
 
 const STAERKE_TOP_N = 6;
 
@@ -374,12 +417,13 @@ async function main() {
       const vorKauf = get().gameState;
       phasen[`${praefix}_00_vor_kaufphase`] = { snap: snap(vorKauf) };
       const sumVor = r2(vorKauf.teams.reduce((s, t) => s + t.cash, 0));
+      if (STOP_AFTER === "vorkauf") { schreibe(); log("stop-after vorkauf erreicht (SQLite mit --keep aufheben, dann je Variante --resume <saveId> --start-season 2)"); finish(); return; }
       const ergebnis = await fuehreKiPreseasonLaufAus({ saveId, seasonId: sid, scope: { room: null, participant: null, activeOwnerId: null }, persistence });
       log(`${praefix} Kaufphase: ${ergebnis.body.reason ?? ergebnis.body.run?.status} (skipped=${ergebnis.body.skipped}) Käufe=${ergebnis.body.run?.transferBuysApplied}`);
       const nach = get().gameState;
       phasen[`${praefix}_01_nach_kaufphase`] = {
         snap: snap(nach), staerkeDetail: staerkeDetail(nach), transfers: transfers(nach, sid, transferBeginn),
-        lauf: ergebnis.body.run, sumKasseVor: sumVor, phase: nach.gamePhase,
+        lauf: ergebnis.body.run, sumKasseVor: sumVor, phase: nach.gamePhase, vorstand: vorstandStatistik(nach),
       };
       schreibe();
     }

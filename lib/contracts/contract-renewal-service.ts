@@ -56,6 +56,7 @@ import {
   type ContractNegotiationPreview,
 } from "@/lib/market/contract-negotiation-preview";
 import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
+import { pruefeVerlaengerungGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
@@ -1970,11 +1971,28 @@ export function previewContractRenewalAction(input: {
    */
   const verdiktBlockingReasons = verdiktBlocker(negotiationPreview?.verdict);
 
+  /**
+   * FINANZKONZEPT V2: Gehaltserhoehungen bei Verlaengerungen zaehlen gegen den Gehaltstopf des Vorstands. Hart, Mensch und
+   * KI gleich; gleiches oder niedrigeres Gehalt geht immer. Gerechnet wird mit dem Gehalt, das unterschrieben wuerde.
+   */
+  const vorstandBlockingReasons: string[] = [];
+  if (input.action === "renew" && rosterEntry && team) {
+    const neuesGehalt =
+      roundMoney(input.offeredSalary ?? moraleAdjustedExpectedSalary ?? negotiationPreview?.expectedSalary ?? rosterEntry.salary) ??
+      rosterEntry.salary;
+    const vorstand = pruefeVerlaengerungGegenVorstandFreigabe(input.save.gameState, input.teamId, {
+      altesGehalt: rosterEntry.salary ?? 0,
+      neuesGehalt,
+    });
+    if (!vorstand.ok && vorstand.reason) vorstandBlockingReasons.push(vorstand.reason);
+  }
+
   return {
     ok:
       blockingReasons.length === 0 &&
       (negotiationPreview?.blockingReasons.length ?? 0) === 0 &&
       moraleBlockingReasons.length === 0 &&
+      vorstandBlockingReasons.length === 0 &&
       verdiktBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
@@ -2005,6 +2023,7 @@ export function previewContractRenewalAction(input: {
         ...(negotiationPreview?.blockingReasons ?? []),
         ...moraleBlockingReasons,
         ...verdiktBlockingReasons,
+        ...vorstandBlockingReasons,
       ]),
     ),
   };

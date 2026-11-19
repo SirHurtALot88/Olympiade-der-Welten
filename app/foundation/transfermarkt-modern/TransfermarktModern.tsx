@@ -356,6 +356,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                       <b>Vorstand gibt {Math.round(freigabeAnzeige.quote * 100)} % frei.</b>
                       <small>{freigabeAnzeige.grund ?? ""} Das Geld bleibt auf dem Konto, freigegeben ist nur der Anteil zum Ausgeben, für Ablöse und Gehälter. Die Sperre ist hart; Verkaufserlöse werden nur zu {Math.round(freigabeAnzeige.quote * 100)} % frei.</small>
                     </div>
+                    {freigabeAnzeige.kaderpflicht ? <div className="vorst ok" data-testid="tm-kaderpflicht"><b>{freigabeAnzeige.kaderpflicht}</b></div> : null}
                     <div>
                       <div className="gz"><span>Kontostand</span><b className="t">{betragC(freigabeAnzeige.kontostand)}</b></div>
                       <div className="gz"><span>davon freigegeben</span><b className="t">{betragC(freigabeAnzeige.freigegeben)}</b></div>

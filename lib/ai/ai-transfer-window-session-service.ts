@@ -20,6 +20,7 @@ import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-ser
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
 import { applyEarlyPayoff, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
+import { entscheideKiVorstandMassnahmen } from "@/lib/finance/vorstand-budget-aktionen";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -499,8 +500,18 @@ async function runTeamCycle(input: {
   }
 
   function runOrganicBuyCycle() {
-    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    let save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
     if (!save) return;
+    // FINANZKONZEPT V2 (Finanzseite): die KI entscheidet einmal je Fenster, was sie mit den zwei Toepfen tut
+    // (Umschichten nach Charakter, Ruecklage anzapfen, „Alles auf eine Karte“ — selten und begruendet), BEVOR sie plant.
+    // Dieselben Funktionen und Grenzen wie beim Menschen; geschrieben wird in den Spielstand, damit die harte Sperre sie sieht.
+    const vorstandMassnahmen = entscheideKiVorstandMassnahmen(save.gameState, input.teamId);
+    if (vorstandMassnahmen.massnahmen.length > 0) {
+      const persistiert = input.persistence.saveSingleplayerState(input.saveId, vorstandMassnahmen.gameState);
+      if (input.sessionRunContext) input.sessionRunContext.save = persistiert;
+      save = persistiert;
+      for (const m of vorstandMassnahmen.massnahmen) warnings.push(`vorstand_${m.art}:${input.teamId}`);
+    }
     const gameState = save.gameState;
     const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
     if (!team) return;

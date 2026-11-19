@@ -222,17 +222,26 @@ describe("Verkaufserloese aus dem Fenster sind zu 100 % frei", () => {
     } as unknown as GameState;
   }
 
+  // Mit den zwei Toepfen (Finanzseite V2) zaehlen Ruecklage und Gehaltspuffer vor der Quote; der Erloes selbst wird verglichen:
+  // derselbe Spielstand mit und ohne den 20-C-Verkauf.
+  function ohneVerkauf(): GameState {
+    const gs = stand();
+    return { ...gs, teams: [{ teamId: "A", cash: 100 }], transferHistory: [] } as unknown as GameState;
+  }
+
   it("die Quote gilt nur fuer die Anfangskasse, nicht fuer die Erloese", () => {
-    const st = berechneVorstandBudgetStand(stand(), "A");
-    // Anfangskasse 100 (120 − 20 Erloes) × Quote + 20 voll.
-    expect(st.anteil).toBeLessThan(1);
-    expect(st.freigegebenGesamt).toBeCloseTo(100 * st.anteil + 20, 2);
+    const mit = berechneVorstandBudgetStand(stand(), "A");
+    const ohne = berechneVorstandBudgetStand(ohneVerkauf(), "A");
+    expect(mit.anteil).toBeLessThan(1);
+    // der Verkauf von 20 C macht genau 20 C mehr frei (nicht 20 x Quote)
+    expect(mit.freigegebenGesamt - ohne.freigegebenGesamt).toBeCloseTo(20, 2);
   });
 
   it("Schalter aus: Quote auch auf die Erloese (alter Stand)", () => {
     process.env[SCHALTER] = "0";
-    const st = berechneVorstandBudgetStand(stand(), "A");
-    expect(st.freigegebenGesamt).toBeCloseTo(120 * st.anteil, 2);
+    const mit = berechneVorstandBudgetStand(stand(), "A");
+    const ohne = berechneVorstandBudgetStand(ohneVerkauf(), "A");
+    expect(mit.freigegebenGesamt - ohne.freigegebenGesamt).toBeCloseTo(20 * mit.anteil, 2);
   });
 });
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
@@ -155,6 +155,18 @@ vi.mock("@/lib/persistence/persistence-service", () => ({
 }));
 
 describe("ai market plan apply service", () => {
+  // Diese Tests pruefen Doppelvergabe, Hard-No-Go und Ablaufschritte auf Fixtures ohne Sponsor und ohne Vorstandsdaten. Dort waere das
+  // Gehaltsbudget des Vorstands (Finanzkonzept V2) winzig und wuerde die Plan-Reihenfolge bestimmen, nicht die Regel unter Test.
+  // Das Zusammenspiel von Plan und Topf (Pflichtkader, Rahmen, Leiter) deckt tests/ki-planung-toepfe.test.ts ab.
+  let vorstandBudgetVorher: string | undefined;
+  beforeAll(() => {
+    vorstandBudgetVorher = process.env.OLY_VORSTAND_BUDGET;
+    process.env.OLY_VORSTAND_BUDGET = "0";
+  });
+  afterAll(() => {
+    if (vorstandBudgetVorher === undefined) delete process.env.OLY_VORSTAND_BUDGET;
+    else process.env.OLY_VORSTAND_BUDGET = vorstandBudgetVorher;
+  });
   beforeEach(() => {
     buildAiMarketPlanPreview.mockReset();
     previewLocalTransfermarktSell.mockReset();
