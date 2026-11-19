@@ -306,6 +306,26 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                     );
                   })()}
                 </td>
+                {showAvg && (
+                  <td data-label="Ø VK" className="r bd-num bd-c-avg">
+                    {(() => {
+                      const avg = lifetimeAvgVk(row);
+                      if (avg <= 0) return <span className="bd-none">—</span>;
+                      const dev = vkAbweichung(boardVk(row), avg);
+                      return (
+                        <>
+                          {eur(avg)}
+                          {dev && (
+                            <small className={`bd-dev bd-dev-${dev.trend}`} style={{ display: "block" }} title={`Dein heutiger VK liegt ${Math.abs(dev.pct).toLocaleString("de-DE", { maximumFractionDigits: 1 })} % ${dev.pct >= 0 ? "über" : "unter"} dem Durchschnitt aller bisherigen Verkäufe`}>
+                              {DEV_ARROW[dev.trend]} {dev.pct > 0 ? "+" : dev.pct < 0 ? "−" : ""}
+                              {Math.abs(Math.round(dev.pct)).toLocaleString("de-DE")} %
+                            </small>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
                 <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />
                 </td>
@@ -340,26 +360,6 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
                     </small>
                   )}
                 </td>
-                {showAvg && (
-                  <td data-label="Ø VK" className="r bd-num bd-c-avg">
-                    {(() => {
-                      const avg = lifetimeAvgVk(row);
-                      if (avg <= 0) return <span className="bd-none">—</span>;
-                      const dev = vkAbweichung(boardVk(row), avg);
-                      return (
-                        <>
-                          {eur(avg)}
-                          {dev && (
-                            <small className={`bd-dev bd-dev-${dev.trend}`} style={{ display: "block" }} title={`Dein heutiger VK liegt ${Math.abs(dev.pct).toLocaleString("de-DE", { maximumFractionDigits: 1 })} % ${dev.pct >= 0 ? "über" : "unter"} dem Durchschnitt aller bisherigen Verkäufe`}>
-                              {DEV_ARROW[dev.trend]} {dev.pct > 0 ? "+" : dev.pct < 0 ? "−" : ""}
-                              {Math.abs(Math.round(dev.pct)).toLocaleString("de-DE")} %
-                            </small>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </td>
-                )}
                 {withTask && (
                   <td data-label="Aktion" className="bd-c-act" onClick={(e) => e.stopPropagation()}>
                     {(() => {
