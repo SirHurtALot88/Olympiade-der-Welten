@@ -63,7 +63,52 @@ Jetzt (`lib/ai/organic-squad/draft-builder.ts`):
 
 ## 4. Messung (32 KI-Teams, S1 → Fenster S2, zwei Basen)
 
-MESSUNG_PLATZHALTER
+Zwei Basen, je ein neues Spiel mit 32 KI-Teams von Anfang an (`scripts/miss-teamfinanzen-saison.ts --stop-after spieltage`,
+Basis 2 mit `--mischen 7`), Liga-Draft und 20 Spieltage von Saison 1. Von jeder Basis zwei Kopien, derselbe Weg wie im Spiel
+(`scripts/miss-transferfenster-gemeinsam.ts`: Saisonabschluss → Saisonende-Kette → Saisonwechsel → KI-Lauf im Fenster):
+„alt“ mit `OLY_FENSTER_AUF_OPT=0` (Stand #1634 mit #1618/#1629), „neu“ im Standard. Wegwerf-SQLite, danach gelöscht.
+Basis 1 „neu“ zweimal gelaufen: Ergebnis gleich (121 Käufe, 50 Füller), der Lauf ist wiederholbar.
+
+**Saison 1** (nach dem Draft, unverändert — Fenster auf Opt greift erst ab Saison 2, der S3-Teil ist ohne Gehaltsgrenze wirkungslos):
+Basis 1 Kader 9×3, 10×4, 11×6, 12×8, 13×2, 14×9; Basis 2 9×4, 10×3, 11×7, 12×8, 14×10; **0 Teams unter 8**. Gehalt Median
+66,6 / 66,3, im Band 50–70: 18 / 20 Teams.
+
+**Saison 2, Fenster:**
+
+| | Basis 1 alt | **Basis 1 neu** | Basis 2 alt | **Basis 2 neu** |
+|---|---:|---:|---:|---:|
+| Teams unter Opt | 22 | **9** | 23 | **8** |
+| Teams unter **GM-Opt** | 20 | **1** (V-W 11/12) | 22 | **2** (V-W 11/12, P-C 11/12) |
+| Teams bei 8–9 ohne GM-Grund | 7 | **0** | 2 | **0** |
+| Teams unter 8 | 1 (B-B 7) | **0** | 0 | **0** |
+| Kader min / Median / Summe | 7 / 10 / 325 | **9 / 12 / 376** | 9 / 10 / 334 | **9 / 12 / 379** |
+| Kaderverteilung | 7×1, 9×8, 10×13, 11×5, 12×4, 13×1 | 9×4, 10×4, 11×7, 12×6, 13×3, 14×8 | 9×3, 10×19, 11×6, 12×2, 13×1, 14×1 | 9×5, 11×10, 12×6, 13×2, 14×9 |
+| Verkäufe im Fenster (Summe) | 33 (297,4 C) | 51 (464,9 C) | 38 (391,2 C) | 58 (587,9 C) |
+| Teams mit Verkauf / danach unter 8 | 18 / 6 | 24 / 17 | 19 / 5 | 23 / 14 |
+| Käufe im Fenster (Summe) | 52 (1349,1 C) | **121** (1671,8 C) | 66 (1523,0 C) | **131** (1847,8 C) |
+| davon Füller < 12 | 11 | **50** | 17 | **45** |
+| Notweg-Zähler (Kaderplan) | – | 0 | – | 1 (`fueller_rueckfall`) |
+| Neue Kredite / Notkredite / Notverkäufe | 9 / 0 / 0 | 5 / 0 / 0 | 10 / 0 / 0 | 3 / 0 / 0 |
+| Negative Kassen | 0 | 0 | 0 | 0 |
+| Kasse Summe / Median / min | 826,9 / 19,3 / 5,6 | 487,8 / 9,9 / 5,5 | 897,2 / 25,1 / 6,2 | 438,1 / 10,5 / 5,5 |
+| Kasse unter Notrücklage | 0 | 2 | 0 | 2 |
+| Transferbilanz S2 Median, positiv/negativ | −16,0, 6/24 | −25,5, 5/26 | −32,0, 5/26 | −29,4, 5/27 |
+| Gehalt je Team Median, im Band 50–70, min/max | 53,4, 20, 33,1/85,1 | 56,2, **22**, 37,1/93,3 | 57,9, 22, 33,2/90,5 | 58,7, **21**, 34,9/86,5 |
+| Kaderplan-Grund (opt erreicht / Tiefe vor Qualität / Rahmen erschöpft) | – | 17 / 11 / 4 | – | 13 / 14 / 5 |
+| Laufzeit KI-Lauf | 169 s | 208 s | 293 s | 289 s |
+
+Lesart:
+
+* **Ziel erreicht:** kein Team unter 8, kein Team bei 8–9 ohne Grund. Die Teams bei 9 haben Opt oder GM-Opt 9 (z. B. B-P Opt 9;
+  N-N, P-S, R-L Opt 10 mit GM-Senkung). Unter GM-Opt bleiben 1 bzw. 2 Teams um einen Spieler, beide mit Protokoll
+  „Rahmen erschöpft“ (V-W: Kasse 6,0 nach dem Fenster).
+* Die KI verkauft mehr (51/58 statt 33/38), und deutlich mehr Teams fallen in der Verkaufsrunde unter 8 (17/14 statt 6/5) —
+  alle füllt die Kaufrunde wieder auf. Kein Notkauf, kein Notkredit, kein Notverkauf, keine negative Kasse; alle Füller kamen
+  aus dem Planer (`ai_organic_squad_buy`), keiner aus dem Verletzungs-Topup.
+* **Der Preis ist die Kasse und die Füllerquote:** Käufe +69/+65, Kasse ligaweit −339/−459 C, Median rund 10 statt 19–25.
+  41 % bzw. 34 % der Käufe liegen unter dem Platzpreis 12. Das sind geplante „Tiefe vor Qualität“-Plätze (der Rahmen trägt
+  nicht alle Plätze bis Opt zum Platzpreis), keine Notwege — aber es sind Füller. Siehe offene Punkte.
+* Gehalt: Median 56–59, 21–22 Teams im Band 50–70 (vorher 20–22), Ausreißer bis 93 (H-R mit „Alles auf eine Karte“).
 
 ## 5. Tests
 
@@ -79,6 +124,25 @@ MESSUNG_PLATZHALTER
   `tests/transferfenster-gemeinsam.test.ts` — Verkaufserlöse im Fenster zu 100 % frei auch im neuen Transfertopf (Lockerung nach
   Verkäufen nur im alten Ablauf, im Fenster bleibt nichts einbehalten).
 
+Wertungs-Fingerabdruck nach dem Merge von main: `GESAMT d3a39030a3ef (75 Eintraege)` — derselbe Wert wie auf main
+(`public/` unverändert gegenüber main).
+
 ## 6. Offene Punkte
 
-OFFEN_PLATZHALTER
+1. **Füllerquote (Entscheidung für Chris).** Mit freiem Verkauf und Auffüllen bis Opt kauft die KI 45–50 Füller (< 12) je
+   Fenster (vorher 11–17). Typisch: T-C verkauft 6 Spieler (netto 46 C, 34,6 C gingen als Restgehalt-Ablösung weg) und füllt
+   mit 7 Spielern um 6,5 C auf 14 auf. Chris’ zwei Vorgaben — „nicht mit 8–9 fertig“ und „keine Füller“ — stoßen sich, sobald
+   die Kasse nicht alle Plätze zum Platzpreis trägt. Mögliche Hebel, nicht umgesetzt: (a) die Verkaufsrunde verkauft nur, wenn der
+   Nachkauf des Platzes zum Platzpreis im Rahmen bleibt (ändert die Verkaufslogik, war ausdrücklich ausgeschlossen);
+   (b) GM-Senkung stärker nutzen, wenn der Rahmen nur Füller trägt (weniger, dafür stärker); (c) Füller-Platzpreis an den
+   Markt nach dem Saisonende koppeln statt fest 12.
+2. **Kasse:** Median ~10 nach dem Fenster, 2 Teams unter der Notrücklage. Kein Minus, kein Notkredit — aber wenig Puffer für
+   die Saison.
+3. **Nicht über Transfers erklärte Kassenabflüsse im Fenster** (in beiden Ständen, im neuen größer): Kasse Ende − (Start +
+   Verkäufe − Käufe) summiert sich in Basis 1 auf −94,9 C (alt) bzw. −278,9 C (neu). Ein Teil sind Gebäude (z. B. G-G 24,7 C,
+   W-L 20,8 C), ein Rest ist im Kontoauszug nicht sichtbar (T-C −41,8 C ohne Gebäude, Kredit oder Vertragsende). Nicht von
+   dieser Änderung eingeführt (der alte Stand zeigt dasselbe Muster), aber für die Füllerfrage relevant — eigener Auftrag.
+4. Die Lockerung nach Verkäufen (#1618) greift im gemeinsamen Fenster nie, weil Erlöse dort ohnehin zu 100 % frei sind (Merge
+   #1618 × #1634). Die Finanzseite zeigt sie trotzdem an; ggf. dort ausblenden (Datei des Finanz-Agenten).
+5. Die S1-Kaderaufbau-Karte von #1634 lag in der alten Finanzseite (`FoundationFinancesNewLook.tsx`), die #1618 entfernt; sie
+   gehört in die neue Finanzseite (#1618).
