@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
@@ -1245,6 +1246,9 @@ export async function buildPreSeasonWorkflowPreview(
   const seasonEndProgressionPreview = previewSeasonEndProgressionBatch(save);
   const developmentPlayers = seasonEndProgressionPreview.teamApplies.flatMap((entry) => entry.preview.players);
   const contractPreview = previewSeasonEndContracts(save);
+  // VERLÄNGERN ODER FREIGEBEN (Chris 19.11., lib/contracts/vertragsentscheidung.ts): offene Entscheidungen menschlicher Teams
+  // sperren den Saisonwechsel — kein stilles Weiterlaufen mit `renewal_pending`.
+  const vertragsSperre = vertragsentscheidungSperrgruende(save.gameState);
   const marketPreviewWarning = "market_candidate_scan_deferred_use_transfermarkt_tab_or_ai_market_apply_service";
   const nextSeasonConfirmToken = buildConfirmToken({
     saveId: save.saveId,
@@ -1372,7 +1376,7 @@ export async function buildPreSeasonWorkflowPreview(
         contractEventsExisting: save.gameState.seasonState.contractEvents?.length ?? 0,
       },
       warnings: contractPreview.warnings,
-      blockingReasons: contractPreview.blockingReasons,
+      blockingReasons: [...contractPreview.blockingReasons, ...vertragsSperre],
       confirmToken: contractPreview.confirmToken,
     },
     {
@@ -1416,7 +1420,7 @@ export async function buildPreSeasonWorkflowPreview(
       productive: true,
       summary: { nextSeasonId, nextSeasonLabel, resetLineups: save.gameState.seasonState.lineupDrafts?.length ?? 0, resetFormCards: save.gameState.seasonState.formCards?.length ?? 0, matchday: 1, standingsReset: true },
       warnings: ["team_control_settings_preserved", "rosters_and_transfer_history_preserved"],
-      blockingReasons: [],
+      blockingReasons: vertragsSperre,
       confirmToken: nextSeasonConfirmToken,
     },
     {
@@ -1472,6 +1476,19 @@ export async function applyPreSeasonNextSeasonSetup(
       appliedStepId: null,
       auditLogId: null,
       blockingReasons: [...preview.blockingReasons, confirmToken ? "preseason_preview_stale" : "confirm_token_required"],
+    };
+  }
+  // VERLÄNGERN ODER FREIGEBEN: die Vorschau meldet es, die Buchung verweigert es auch (sonst liefe ein veralteter Knopf durch).
+  const offeneVertraege = vertragsentscheidungSperrgruende(save.gameState);
+  if (offeneVertraege.length > 0) {
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      blockingReasons: [...new Set([...preview.blockingReasons, ...offeneVertraege])],
     };
   }
   const penaltyResult = applyFormCardPenaltyToStandings(save);

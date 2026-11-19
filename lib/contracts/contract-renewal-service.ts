@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
 import {
   getContractShapeTeamContext,
   wendeLiquiditaetUndMixAn,
@@ -1041,7 +1042,12 @@ function buildPreviewRow(input: {
   rating: PlayerRatingContractRow | null;
 }): ContractRenewalPreviewRow {
   const { save, entry, player, team, rating } = input;
-  const controlMode = getTeamControlSettings(save.gameState, entry.teamId)?.controlMode ?? (team?.humanControlled ? "manual" : "ai");
+  const teamSettings = getTeamControlSettings(save.gameState, entry.teamId);
+  const grundModus = teamSettings?.controlMode ?? (team?.humanControlled ? "manual" : "ai");
+  // VERLÄNGERN ODER FREIGEBEN (Chris 19.11., lib/contracts/vertragsentscheidung.ts): hat ein Mensch „Käufe, Verkäufe und Verträge“
+  // an die KI delegiert (Voll KI), entscheidet die KI über seine auslaufenden Verträge — mit derselben Logik wie für KI-Teams.
+  // Ohne Delegation bleibt es eine Entscheidung des Menschen (`manual_decision`), die den Saisonwechsel sperrt, bis sie fällt.
+  const controlMode = grundModus === "manual" && teamSettings && isBereichDelegiert(teamSettings, "transfers") ? "ai" : grundModus;
   const tick = statusAfterSeasonTick(entry);
   const statusBeforeTick = normalizeRosterContractStatus(entry);
   const teamStrategyProfile = getTeamStrategyProfile(save.gameState, entry.teamId);
