@@ -1,9 +1,10 @@
 /**
  * CLIMBING-FORMAT "CANYON" (Bau 18.11., docs/design/climbing-canyon-bau-18-11.md) -- Node-Motor, kein Chromium.
  *
- *  1. Schalter aus bleibt Standard: ein Canyon-Lauf dazwischen hinterlaesst keinen Zustand, der den
- *     Standard-Climbing-Lauf derselben Saat veraendert (Bit-Gleichheit gegen main belegt der Fingerabdruck,
- *     `node scripts/pruefe-wertung-fingerabdruck.mjs --node`: GESAMT unveraendert).
+ *  1. Schalter: seit 18.11. ist Canyon die Vorgabe (Canyon live, docs/design/climbing-canyon-live-18-11.md). Das
+ *     alte Format "standard" bleibt erreichbar (Abschalt-Schalter, Kader-Umschlag `formatByDisciplineId`), und ein
+ *     Lauf im anderen Format dazwischen hinterlaesst keinen Zustand, der den Lauf derselben Saat veraendert
+ *     (Bit-Gleichheit belegt der Fingerabdruck, `node scripts/pruefe-wertung-fingerabdruck.mjs --node`).
  *  2. Gezeigt = gebucht: in der zuschaubaren Wiedergabe (sondenLauf, derselbe Takt wie loop()) steht jeder
  *     Kletterer in jedem abgetasteten Tick BITGLEICH dort, wo der gebuchte Lauf (bahnSpurProbe) ihn hat, und
  *     die Zeichnung setzt die Figur auf genau diesen Ort.
@@ -60,7 +61,7 @@ function canyonRennen(n: number, jeSeite?: number): CanyonMessung[] {
     });
     return roh((x.varianten || [{ spiele: x.spiele || [] }]).flatMap((v) => v.spiele.map((s) => s.canyon).filter(Boolean) as CanyonMessung[]));
   } finally {
-    A.bahnFlags({ climbingFormat: "standard" });
+    A.bahnFlags({ climbingFormat: null });
   }
 }
 
@@ -78,25 +79,44 @@ beforeAll(async () => {
 afterAll(() => kontext?.aufraeumen());
 
 describe("Climbing-Canyon: Schalter", () => {
-  it("ist im Standard aus", () => {
-    expect(A.bahnFlags().climbingFormat).toBe("standard");
+  it("ist seit 18.11. die Vorgabe (Canyon live)", () => {
+    expect(A.bahnFlags().climbingFormat).toBe("canyon");
+    expect(A.bahnFlags().climbingFormatExplizit).toBe(false);
   });
-  it("ein Canyon-Lauf dazwischen veraendert den Standard derselben Saat nicht", () => {
+  it("ein Standard-Lauf dazwischen veraendert den Canyon-Lauf derselben Saat nicht (und umgekehrt)", () => {
     const vorher = JSON.stringify(roh(A.spiele("climbing", 7)));
+    A.bahnFlags({ climbingFormat: "standard" });
+    const standard = JSON.stringify(roh(A.spiele("climbing", 7)));
     A.bahnFlags({ climbingFormat: "canyon" });
     const canyon = JSON.stringify(roh(A.spiele("climbing", 7)));
-    A.bahnFlags({ climbingFormat: "standard" });
+    A.bahnFlags({ climbingFormat: null });
     const nachher = JSON.stringify(roh(A.spiele("climbing", 7)));
-    expect(canyon).not.toBe(vorher);
+    expect(standard).not.toBe(vorher);
+    expect(canyon).toBe(vorher);
     expect(nachher).toBe(vorher);
+    expect(A.bahnFlags().climbingFormatExplizit).toBe(false);
+  });
+  it("der Kader-Umschlag (formatByDisciplineId, Host/Runner) waehlt das Format, ausdruecklich gesetzt geht vor", () => {
+    const umschlag = kontext.fenster.__olyArenaKader as { formatByDisciplineId?: { climbing: string } };
+    A.bahnFlags({ climbingFormat: "standard" });
+    const standard = JSON.stringify(roh(A.spiele("climbing", 7)));
+    A.bahnFlags({ climbingFormat: null });
+    const canyon = JSON.stringify(roh(A.spiele("climbing", 7)));
+    try {
+      umschlag.formatByDisciplineId = { climbing: "standard" };
+      expect(JSON.stringify(roh(A.spiele("climbing", 7))), "Umschlag standard").toBe(standard);
+      umschlag.formatByDisciplineId = { climbing: "canyon" };
+      expect(JSON.stringify(roh(A.spiele("climbing", 7))), "Umschlag canyon").toBe(canyon);
+      umschlag.formatByDisciplineId = { climbing: "standard" };
+      A.bahnFlags({ climbingFormat: "canyon" });
+      expect(JSON.stringify(roh(A.spiele("climbing", 7))), "ausdruecklich vor Umschlag").toBe(canyon);
+    } finally {
+      delete umschlag.formatByDisciplineId;
+      A.bahnFlags({ climbingFormat: null });
+    }
   });
   it("ist deterministisch: dieselbe Saat ergibt denselben Canyon-Lauf", () => {
-    A.bahnFlags({ climbingFormat: "canyon" });
-    try {
-      expect(JSON.stringify(roh(A.spiele("climbing", 42)))).toBe(JSON.stringify(roh(A.spiele("climbing", 42))));
-    } finally {
-      A.bahnFlags({ climbingFormat: "standard" });
-    }
+    expect(JSON.stringify(roh(A.spiele("climbing", 42)))).toBe(JSON.stringify(roh(A.spiele("climbing", 42))));
   });
 });
 
@@ -138,7 +158,7 @@ describe("Climbing-Canyon: gezeigt = gebucht", () => {
         }
         expect(verglichen).toBeGreaterThan(200);
       } finally {
-        A.bahnFlags({ climbingFormat: "standard" });
+        A.bahnFlags({ climbingFormat: null });
       }
     }, 120_000);
   }

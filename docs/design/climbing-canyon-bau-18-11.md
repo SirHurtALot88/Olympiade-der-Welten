@@ -4,6 +4,10 @@ Bau nach dem freigegebenen Mockup `public/mockups/climbing-neu-18-11.html` und d
 `docs/design/climbing-neu-18-11.md` (PR #1615). Chris' Freigabe vom 18.11. mit den Antworten auf die zehn Fragen
 gilt verbindlich (Abschnitt 1). **Der Schalter ist im Spiel aus** — Chris entscheidet nach dieser Messung.
 
+> **Nachtrag 18.11.: Canyon ist live** (Chris: „Ja, Canyon soll live gehen“). Format je Spieltag aus dem Saison-Stempel,
+> Abschalt-Schalter `OLY_CLIMBING_FORMAT=standard`, HUD-Profil und Kamera Totale/Folgen, Fingerabdruck GESAMT
+> `eaafed96150e`: `docs/design/climbing-canyon-live-18-11.md`. Die offenen Punkte 1–3 in Abschnitt 7 sind dort erledigt.
+
 - Motor: `public/mockups/battle-mode.engine.js` (`baueCanyon()`, `stepClimbingCanyon()`, `zeichneCanyon()`,
   Kalibrierwerte `CANYON_P_STANDARD`)
 - Schalter: `BAHN_FLAGS.climbingFormat` = `"standard"` (Vorgabe) | `"canyon"`; gesetzt nur über

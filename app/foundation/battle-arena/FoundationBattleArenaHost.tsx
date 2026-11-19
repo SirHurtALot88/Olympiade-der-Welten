@@ -39,6 +39,7 @@ import {
 } from "@/lib/foundation/battle-arena/arena-live-panels";
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
+import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -753,6 +754,14 @@ export default function FoundationBattleArenaHost({
       ),
     [gameState, heimTeamId, gastTeamId, arenaDisziplinSlotsThisMatchday],
   );
+  // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): dasselbe Format, das Vorlauf und
+  // Buchung (`bereiteFixturesVor`) dem Motor mitgeben -- ein im alten Format gebuchter Spieltag bleibt so auch
+  // in der Wiedergabe "standard". Immer gesetzt (auch ohne Climbing an diesem Spieltag), damit die Format-Wahl
+  // der Testansicht dieselbe ist wie im naechsten gewerteten Climbing-Spieltag.
+  const arenaFormatByDiscipline = useMemo(
+    () => arenaFormatByDisciplineId(gameState, gameState.matchdayState?.matchdayId ?? null, "climbing"),
+    [gameState],
+  );
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
   // sonst gibt es nichts, dessen Saat falsch sein koennte.
   const keinGewertetesDuell =
@@ -1060,6 +1069,8 @@ export default function FoundationBattleArenaHost({
         kulisseByDisciplineId: arenaKulisseByDisciplineId,
         // Gelesen von `strategieVorlageVon()` in battle-mode.engine.js; nur mit Vorlage gesetzt.
         ...(arenaStrategieByDisciplineId ? { strategieByDisciplineId: arenaStrategieByDisciplineId } : {}),
+        // Gelesen von `climbingFormatWaehlen()` in battle-mode.engine.js (Canyon live, 18.11.).
+        ...(arenaFormatByDiscipline ? { formatByDisciplineId: arenaFormatByDiscipline } : {}),
         // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
         mutatorenByDisciplineId,
         // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
@@ -1169,6 +1180,7 @@ export default function FoundationBattleArenaHost({
     arenaSeedByDisciplineId,
     arenaKulisseByDisciplineId,
     arenaStrategieByDisciplineId,
+    arenaFormatByDiscipline,
     mutatorenByDisciplineId,
     miniDmFfaTeams,
     miniDmFfaK,
