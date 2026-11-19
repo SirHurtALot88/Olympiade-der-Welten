@@ -102,12 +102,12 @@ def api(method, path, body=None):
                 print("    ... keine Job-Slots frei, warte 30 s", flush=True)
                 time.sleep(30)
                 continue
-            if e.code in (429, 500, 502, 503, 504) and i < 4:
+            if method != "POST" and e.code in (429, 500, 502, 503, 504) and i < 4:
                 time.sleep(10 * (i + 1))
                 continue
             raise SystemExit(f"HTTP {e.code} {method} {path}: {txt}")
         except Exception as e:  # noqa
-            if i < 4:
+            if method != "POST" and i < 4:
                 time.sleep(5 * (i + 1))
                 continue
             raise
