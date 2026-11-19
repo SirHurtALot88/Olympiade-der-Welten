@@ -23,7 +23,9 @@ import {
   kaderplanRahmen,
   type OrganicSquadPlanInput,
 } from "@/lib/ai/organic-squad/draft-builder";
+import { buildOrganicDraftFrame } from "@/lib/ai/organic-squad/draft-adapter";
 import type { CoreAxis, OrganicDiscipline, OrganicPlayerView } from "@/lib/ai/organic-squad/types";
+import { createGameStateFromSeed, loadFreshSeasonOneSeedData } from "@/lib/data/dataAdapter";
 import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 
@@ -180,5 +182,53 @@ describe("Fenster-Ablauf (Quellpruefung)", () => {
     expect(kassensturz).toContain("if (!kiTeams.has(team.teamId) || team.cash >= -0.01) continue;");
     const dienst = quelle("lib/ai/ai-preseason-background-service.ts");
     expect(dienst).toContain("fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds, persistence })");
+  });
+});
+
+describe("Hebel (b): traegt der Rahmen Opt nur mit Fuellern, senkt der GM das Ziel (hoechstens −2, nie unter Minimum + 1)", () => {
+  // Echter Saison-1-Pool, Team mit 8 Spielern (aus dem oberen Mittelfeld), Kasse unterschiedlich gross.
+  function frame(saison: string, cash: number) {
+    const gs0 = createGameStateFromSeed(loadFreshSeasonOneSeedData());
+    const team = { ...gs0.teams[0]!, cash };
+    const sortiert = [...gs0.players].sort((a, b) => (a.marketValue ?? 0) - (b.marketValue ?? 0));
+    const gs = {
+      ...gs0,
+      season: { ...gs0.season, id: saison },
+      teams: gs0.teams.map((t) => (t.teamId === team.teamId ? team : t)),
+    };
+    return buildOrganicDraftFrame({
+      gameState: gs,
+      team,
+      identity: (gs.teamIdentities ?? []).find((i) => i.teamId === team.teamId) ?? null,
+      startingSquad: sortiert.slice(sortiert.length - 200, sortiert.length - 192),
+      candidates: sortiert.slice(0, sortiert.length - 200),
+      draftSeed: "hebel-b",
+    });
+  }
+
+  it("Fenster ab Saison 2: knappe Kasse senkt das Ziel, mit Protokollgrund; reiche Kasse nicht", () => {
+    for (const name of SCHALTER) delete process.env[name];
+    const knapp = frame("season-2", 40);
+    const mittel = frame("season-2", 75);
+    const reich = frame("season-2", 500);
+    const ident = reich.optEntscheidung!.identitaetsOpt;
+    expect(reich.optTarget).toBe(ident);
+    expect(mittel.optTarget).toBeLessThan(ident);
+    expect(knapp.optTarget).toBeLessThanOrEqual(mittel.optTarget);
+    for (const f of [knapp, mittel]) {
+      expect(f.optTarget).toBeGreaterThanOrEqual(Math.max(ident - 2, Math.min(ident, 9)));
+      expect(f.optEntscheidung!.grund).toContain("nur mit Fuellern");
+      // Der Builder haelt am gesenkten Ziel an (wie bei der GM-Senkung nach Neigung).
+      expect(f.planInput.kaderplan?.gmOptGesenkt).toBe(true);
+    }
+  });
+
+  it("Saison 1 und der alte Stand (`OLY_FENSTER_AUF_OPT=0`) senken nicht", () => {
+    for (const name of SCHALTER) delete process.env[name];
+    const s1 = frame("season-1", 40);
+    expect(s1.optTarget).toBe(s1.optEntscheidung!.identitaetsOpt);
+    process.env.OLY_FENSTER_AUF_OPT = "0";
+    const alt = frame("season-2", 40);
+    expect(alt.optEntscheidung).toBeUndefined();
   });
 });

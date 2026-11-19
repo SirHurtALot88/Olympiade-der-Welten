@@ -168,7 +168,13 @@ async function main() {
     const stand = berechneVorstandBudgetStand(ende, t.teamId);
     return {
       opt: optJeTeam[t.teamId]?.opt ?? null,
-      gmOpt: optJeTeam[t.teamId]?.gmOpt ?? null,
+      // GM-Opt: das Ziel, mit dem der Planer im Fenster tatsaechlich geplant hat (Protokoll `kaderplan:<Team>:…:opt=N`, kleinster
+      // Wert: GM-Senkung nach Neigung UND Hebel (b), „Rahmen traegt nur Fueller"). Ohne Kaderplan (alter Stand) die Neigungs-Senkung.
+      gmOpt: (() => {
+        const planOpts = kaderplanZeilen.map((w) => Number(/:opt=(\d+):/.exec(w)?.[1])).filter((n) => Number.isFinite(n));
+        return planOpts.length > 0 ? Math.min(...planOpts) : optJeTeam[t.teamId]?.gmOpt ?? null;
+      })(),
+      gmGrund: laufWarn.filter((w) => w.startsWith(`kaderplan_gm:${t.teamId}:`)).pop()?.split(":").slice(2).join(":") ?? null,
       kaderplanGrund: letzteZeile.split(":")[2] ?? null,
       notwege,
       fensterFueller: fe?.fueller ?? 0,

@@ -20,7 +20,9 @@ import {
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import {
   buildOrganicSquadPlan,
+  createOrganicPlanStepState,
   istKaderplanSchalterAn,
+  kaderplanRahmen,
   type KaderplanProtokoll,
   type OrganicBuyDecision,
   type OrganicSquadPlanInput,
@@ -629,6 +631,34 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   // KADERPLAN: bewusste GM-Entscheidung „weniger, dafuer staerker" (hoechstens −2, nie unter Minimum + 1), protokolliert.
   // Mit der (standardmaessig abgeschalteten) Geld-Senkung FILLQB davor gilt die Grenze fuer BEIDE zusammen: hoechstens −2 gegen
   // den Identitaets-Opt, nie unter Minimum + 1 (Review K5).
+  // Oekonomie des Plans fuer ein gegebenes Ziel (`weights`). Eine Funktion, damit die Rahmen-Probe der Fenster-Senkung (unten)
+  // mit genau derselben Kasse, denselben Toepfen und derselben Kaderpflicht-Grenze rechnet wie der Plan selbst.
+  const economyFuer = (weights: typeof planWeights, salaryCeiling: number | undefined): OrganicSquadPlanInput["economy"] => ({
+    cash: planCash,
+    cashBuffer: planCashBuffer,
+    salaryTotal,
+    boardRisk: ctx.boardRisk,
+    expectedPrize: input.forecast?.expectedPrize ?? 0,
+    sponsorIncome: input.forecast?.sponsorIncome ?? sponsorForecast ?? 0,
+    facilityNet: input.forecast?.facilityNet ?? 0,
+    netTransfer: input.forecast?.netTransfer ?? 0,
+    weights,
+    rosterMax: ctx.rosterMax,
+    rosterMin: ROSTER_MIN,
+    salaryCeiling,
+    // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
+    // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
+    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
+    // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
+    // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
+    minFillFloor: ruecklage > 0 ? ruecklage : undefined,
+    feeCap,
+    salaryCap,
+    platzPreise: input.platzPreise,
+    platzWettbewerb: input.platzWettbewerb,
+    kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
+  });
+
   let optEntscheidung: KaderplanOptEntscheidung | undefined;
   let gmOptGesenkt = false;
   if (kaderplan) {
@@ -642,6 +672,43 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     gmOptGesenkt = anpassung.delta < 0 && opt < identitaetsOpt;
     optEntscheidung = { identitaetsOpt, optTarget: opt, gmDelta: opt - identitaetsOpt, grund: anpassung.grund };
     if (opt !== planWeights.optTarget) planWeights = { ...planWeights, optTarget: opt };
+  }
+
+  // FENSTER AUF OPT, Hebel (b) (PM-Entscheidung 19.11. im Rahmen von Chris' Regel „GM darf Opt um bis zu 2 senken, bewusst einen
+  // weniger dafuer staerker; aber nie nur bis Minimum"): traegt der Rahmen die Plaetze bis Opt nur zu Fuellerpreisen (< Platzpreis
+  // 12), senkt der GM das Ziel — hoechstens bis zur bestehenden Grenze (Identitaets-Opt − 2, nie unter Minimum + 1) — auf das groesste
+  // Ziel, das der Rahmen ganz zum Platzpreis traegt, und kauft dafuer staerkere Spieler. Nur im Fenster ab Saison 2: der
+  // Saison-1-Draft plant aus dem vollen Startbudget und bleibt unveraendert. `docs/design/fenster-auf-opt-18-11.md` Abschnitt 3a.
+  if (kaderplan && optEntscheidung && !istSaisonEins(input.gameState) && startingSquad.length < planWeights.optTarget) {
+    const identitaetsOpt = optEntscheidung.identitaetsOpt;
+    const boden = Math.max(identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
+    const traegtZumPlatzpreis = (opt: number): boolean => {
+      if (startingSquad.length >= opt) return true;
+      const probe: OrganicSquadPlanInput = {
+        startingSquad,
+        candidates,
+        identityAxisWeights: ctx.identityAxisWeights,
+        disciplines: ctx.disciplines,
+        economy: economyFuer({ ...planWeights, optTarget: opt }, undefined),
+        draftSeed: null,
+        kaderplan: { gmOptGesenkt: true },
+      };
+      return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= opt;
+    };
+    const vorher = planWeights.optTarget;
+    let opt = vorher;
+    while (opt > boden && !traegtZumPlatzpreis(opt)) opt -= 1;
+    if (opt < vorher) {
+      gmOptGesenkt = true;
+      planWeights = { ...planWeights, optTarget: opt };
+      const rahmenText = `Rahmen traegt Opt ${vorher} nur mit Fuellern: Opt ${vorher} -> ${opt}, weniger Spieler, dafuer staerker`;
+      optEntscheidung = {
+        identitaetsOpt,
+        optTarget: opt,
+        gmDelta: opt - identitaetsOpt,
+        grund: optEntscheidung.grund ? `${optEntscheidung.grund}; ${rahmenText}` : `GM ${rahmenText}`,
+      };
+    }
   }
 
   // ANPASSUNG COMPOSE (flag-gated): derive an EXPLICIT target role pyramid for this team and hand it to
@@ -741,31 +808,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     identityAxisWeights: ctx.identityAxisWeights,
     disciplines: ctx.disciplines,
     composition,
-    economy: {
-      cash: planCash,
-      cashBuffer: planCashBuffer,
-      salaryTotal,
-      boardRisk: ctx.boardRisk,
-      expectedPrize: input.forecast?.expectedPrize ?? 0,
-      sponsorIncome: input.forecast?.sponsorIncome ?? sponsorForecast ?? 0,
-      facilityNet: input.forecast?.facilityNet ?? 0,
-      netTransfer: input.forecast?.netTransfer ?? 0,
-      weights: planWeights,
-      rosterMax: ctx.rosterMax,
-      rosterMin: ROSTER_MIN,
-      salaryCeiling: salaryCeilingDebug?.salaryCeiling,
-      // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
-      // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
-      solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
-      // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
-      // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
-      minFillFloor: ruecklage > 0 ? ruecklage : undefined,
-      feeCap,
-      salaryCap,
-      platzPreise: input.platzPreise,
-      platzWettbewerb: input.platzWettbewerb,
-      kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
-    },
+    economy: economyFuer(planWeights, salaryCeilingDebug?.salaryCeiling),
     draftSeed: input.draftSeed ?? null,
     // Nur gesetzt, wenn der Kaderplan laeuft (sonst fehlt das Feld: Builder bit-gleich zum Stand davor).
     ...(kaderplan ? { kaderplan: { gmOptGesenkt } } : {}),
