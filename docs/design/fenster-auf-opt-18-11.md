@@ -61,6 +61,27 @@ Jetzt (`lib/ai/organic-squad/draft-builder.ts`):
   Notrücklage da ist. Planer und Sperre rechnen damit dieselbe Zahl.
 * Saison 1 (keine Gehaltsgrenze): unverändert, die Gehaltsreserve wird nirgends geprüft (Test „ohne Gehaltsgrenze“).
 
+## 3a. Hebel (b): weniger, dafür stärker, wenn der Rahmen nur Füller trägt (PM-Entscheidung 19.11.)
+
+Die erste Messung (Abschnitt 4, „Runde 1“) erreichte Opt, aber mit 45–50 Füllern je Fenster. Entscheidung im Rahmen von Chris’
+bestehender Regel („GM darf Opt um bis zu 2 senken, bewusst einen weniger dafür stärker; aber nie nur bis Minimum“):
+
+* `buildOrganicDraftFrame` (`lib/ai/organic-squad/draft-adapter.ts`) prüft im Fenster ab Saison 2 vor dem Plan mit
+  `kaderplanRahmen`, ob der Rahmen (Kasse, Kaderpflicht-Grenze, Ablöse **und** Gehalt) alle Plätze bis Opt zum Platzpreis trägt.
+  Wenn nicht, senkt der GM das Ziel auf das größte, das er ganz zum Platzpreis trägt — höchstens bis zur bestehenden Grenze
+  (Identitäts-Opt − 2, nie unter Minimum + 1). Trägt auch das nicht, gilt die Grenze.
+* Der Builder hält dann am gesenkten Ziel an (`gmOptGesenkt`), das Protokoll nennt den Grund
+  (`kaderplan_gm:<Team>:… Rahmen traegt Opt N nur mit Fuellern: Opt N -> M, weniger Spieler, dafuer staerker`).
+* Saison 1 bleibt unverändert (der Draft plant aus dem vollen Startbudget). Hebel (a) (Verkauf begrenzen) und (c) (Platzpreis an
+  den Markt koppeln) sind bewusst nicht umgesetzt.
+
+**Restgehalt-Ablösung beim Verkauf (Fall T-C) — gewollte Logik, kein Fehler.** Wer verkauft, zahlt das offene Restgehalt des
+Vertrags (`resolveTransfermarktSellProceeds` → `calculateOpenBuyoutCost`, Summe der offenen Vertragsjahre;
+`lib/market/contract-buyout-season-window.ts`: im Fenster vor Spieltag 1 ist das laufende Jahr noch offen und zählt mit). So steht
+es im Verkaufs-Popup („Brutto X − Buyout Y“, `docs/design/verkauf-popup.md`) und in `docs/APRON_UND_VERTRAGSFORMEN.md`. Die
+KI-Verkaufslogik rechnet mit demselben Nettowert (`planOrganicSellsForTeam` → `resolveOpenBuyoutCostForRoster`). T-C verkaufte
+6 Spieler brutto 80,9 C, Buyout 34,6 C, netto 46,3 C — die Entscheidung kannte das Netto.
+
 ## 4. Messung (32 KI-Teams, S1 → Fenster S2, zwei Basen)
 
 Zwei Basen, je ein neues Spiel mit 32 KI-Teams von Anfang an (`scripts/miss-teamfinanzen-saison.ts --stop-after spieltage`,
