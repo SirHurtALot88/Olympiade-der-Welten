@@ -120,7 +120,8 @@ describe("/api/draft", () => {
     dienst.setzeMenschAutoPick.mockReturnValue({});
     await post({ saveId: "s", teamId: "M-M", aktion: "auto_pick", zielTeamId: "F-F", an: true, erwarteteNr: 7 });
     expect(auth.authorizeServerRoomWrite).toHaveBeenCalledWith(expect.objectContaining({ teamId: null, action: "ai_picks_run_execute" }));
-    expect(dienst.setzeMenschAutoPick).toHaveBeenCalledWith(expect.objectContaining({ teamId: "F-F", an: true, erwarteteNr: 7 }));
+    // Auto-Pick ist standunabhaengig (Abnahme 19.11., F2): der Dienst prueft den Stand nicht (erwarteteNr null).
+    expect(dienst.setzeMenschAutoPick).toHaveBeenCalledWith(expect.objectContaining({ teamId: "F-F", an: true, erwarteteNr: null }));
 
     dienst.brecheLigaDraftAb.mockReturnValue({});
     await post({ saveId: "s", aktion: "abbrechen", erwarteteNr: 7 });
@@ -149,7 +150,7 @@ describe("/api/draft", () => {
   });
 
   it("S1: Schalter AUS -> keine Aktion schreibt (auch `starten` nicht), nur `abbrechen` bleibt als Ausweg", async () => {
-    delete process.env.OLY_LIGA_DRAFT_MODUS;
+    process.env.OLY_LIGA_DRAFT_MODUS = "block"; // Schalter aus = Rueckweg Blocklauf (Standard seit 19.11.: Einzelschritt)
     for (const aktion of ["starten", "ki_schritt", "ki_hintergrund", "pick", "auslassen", "fertig", "ueberspringen", "auto_pick"]) {
       const { status, json } = await post({ saveId: "s", teamId: "M-M", aktion, playerId: "p1", variante: "A", erwarteteNr: 7 });
       expect(status, aktion).toBe(409);
@@ -207,8 +208,10 @@ describe("/api/draft", () => {
     dienst.bucheMenschUeberspringen.mockReturnValue({});
     await post({ saveId: "s", teamId: "M-M", aktion: "fertig", erwarteteNr: 7 });
     await post({ saveId: "s", teamId: "M-M", aktion: "ueberspringen", variante: "B", erwarteteNr: 7 });
-    expect(dienst.bucheMenschFertig).toHaveBeenCalledWith(expect.objectContaining({ teamId: "M-M", erwarteteNr: 7 }));
-    expect(dienst.bucheMenschUeberspringen).toHaveBeenCalledWith(expect.objectContaining({ variante: "B", erwarteteNr: 7 }));
+    // Abnahme 19.11. (F2): „fertig“ und „ueberspringen“ sind standunabhaengig — Pflichtfeld ja, Standpruefung im Dienst nein.
+    // Ein Pick dagegen prueft den Stand weiter (der Spieler koennte inzwischen weg sein).
+    expect(dienst.bucheMenschFertig).toHaveBeenCalledWith(expect.objectContaining({ teamId: "M-M", erwarteteNr: null }));
+    expect(dienst.bucheMenschUeberspringen).toHaveBeenCalledWith(expect.objectContaining({ variante: "B", erwarteteNr: null }));
   });
 
   it("A7: GET liefert `mein` nur fuer ein Team mit Schreibrecht, sonst die oeffentliche Sicht", async () => {

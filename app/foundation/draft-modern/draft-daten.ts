@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LigaDraftAnsicht, LigaDraftZugAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import type { LigaDraftEintrag } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import { fehlerText, istStandKonflikt } from "./draft-format";
+import { fehlerText, istStandKonflikt, wiederholeBeiStandKonflikt } from "./draft-format";
 import { baueDraftLeseParameter, baueDraftPostKoerper, DRAFT_MAX_PICKS_JE_SCHRITT } from "./draft-protokoll";
 
 export type DraftTempo = 0 | 1 | 3;
@@ -120,6 +120,19 @@ export function useLigaDraft(input: {
     [saveId, teamId, lade],
   );
 
+  /**
+   * ABNAHME 19.11. (docs/design/abnahme-saison-19-11.md, Fehler F2): Aktionen, die nicht an einen bestimmten Spieler gebunden
+   * sind (Ueberspringen, Auto-Pick, Fertig), scheiterten still, wenn die KI zwischen Anzeige und Klick weiterpickte — der
+   * Stand-Konflikt wird bewusst ohne Meldung verschluckt, der Dialog schloss, und nichts war geschehen (der Draft wartete
+   * danach auf einen Menschen, der glaubte, sein GM picke). Fuer diese Aktionen aendert ein neuer KI-Pick nichts an der
+   * Absicht: nach dem stillen Neuladen in `sende` noch einmal mit dem frischen Stand senden. Ein Pick bleibt beim Konflikt
+   * wie bisher stehen (der Spieler koennte inzwischen weg sein).
+   */
+  const sendeStandfest = useCallback(
+    (aktion: string, extra: Record<string, unknown> = {}): Promise<PostAntwort> => wiederholeBeiStandKonflikt(() => sende(aktion, extra)),
+    [sende],
+  );
+
   // Erstes Laden, danach Nachfragen: wer nicht selbst Zug um Zug treibt, sieht so, was die anderen buchen.
   useEffect(() => {
     void lade();
@@ -191,17 +204,17 @@ export function useLigaDraft(input: {
         else if (!istStandKonflikt(antwort.error)) meldung("w", "Auslassen nicht möglich", fehlerText(antwort.error));
       },
       fertig: async () => {
-        const antwort = await sende("fertig");
+        const antwort = await sendeStandfest("fertig");
         if (antwort.success) meldung("g", "Du bist fertig", "Dein Team pickt nicht mehr.");
         else if (!istStandKonflikt(antwort.error)) meldung("w", "Fertig melden nicht möglich", fehlerText(antwort.error));
         return Boolean(antwort.success);
       },
       autoPick: async (an: boolean, zielTeamId?: string) => {
-        const antwort = await sende("auto_pick", { an, ...(zielTeamId ? { zielTeamId } : {}) });
+        const antwort = await sendeStandfest("auto_pick", { an, ...(zielTeamId ? { zielTeamId } : {}) });
         if (!antwort.success && !istStandKonflikt(antwort.error)) meldung("w", "Auto-Pick", fehlerText(antwort.error));
       },
       ueberspringen: async (variante: "A" | "B") => {
-        const antwort = await sende("ueberspringen", { variante });
+        const antwort = await sendeStandfest("ueberspringen", { variante });
         if (!antwort.success) {
           if (!istStandKonflikt(antwort.error)) meldung("w", "Überspringen nicht möglich", fehlerText(antwort.error));
           return false;
@@ -229,7 +242,7 @@ export function useLigaDraft(input: {
         return Boolean(antwort.success);
       },
     }),
-    [sende, meldung],
+    [sende, sendeStandfest, meldung],
   );
 
   return {

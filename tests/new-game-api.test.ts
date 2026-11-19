@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -76,6 +76,12 @@ describe("new-game api", () => {
     runAiPicksExecutePreview.mockReset();
     saveSingleplayerState.mockClear();
     persistenceState.saves.clear();
+    // Diese Tests pruefen den Hintergrund-Blocklauf hinter der Route. Seit der Abnahme 19.11. ist der Einzelschritt-Draft der
+    // Standard; der Blocklauf ist der Rueckweg `OLY_LIGA_DRAFT_MODUS=block` (Einzelschritt: tests/league-setup-draft-service.test.ts).
+    process.env.OLY_LIGA_DRAFT_MODUS = "block";
+  });
+  afterEach(() => {
+    delete process.env.OLY_LIGA_DRAFT_MODUS;
   });
 
   it("kicks off the whole-league AI draft in the background after creating a fresh solo save", async () => {

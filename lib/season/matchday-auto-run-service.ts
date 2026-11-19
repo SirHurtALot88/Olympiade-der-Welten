@@ -8,6 +8,8 @@ import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
 import { prepareGameStateForMatchdayResolve } from "@/lib/lineups/matchday-lineup-auto-prep";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { waehleSponsorFuerDelegierteTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -570,7 +572,17 @@ export async function runLocalMatchdayAutoRun(
     seasonId: params.seasonId,
     matchdayId: params.matchdayId,
   };
-  const prepared = prepareGameStateForMatchdayResolve(save.gameState, scope);
+  const vorbereitet = prepareGameStateForMatchdayResolve(save.gameState, scope);
+  // SAISONSTART, DELEGIERTE SPONSORWAHL (Abnahme 19.11., Fehler F5): ein menschliches Team mit `sponsor: "ki"`, das vor dem
+  // ersten gewerteten Spieltag keinen Vertrag gewaehlt hat, bekommt jetzt die Wahl der KI — nur solange die Wahl erlaubt ist
+  // (vor dem ersten Ergebnis der Saison), nie im Trockenlauf. Beruehrt die Wertung nicht (kein Arena-Eingang).
+  const sponsorWahl =
+    !dryRun && evaluateGamePhaseAction(vorbereitet.gameState, "sponsor_choice").allowed
+      ? waehleSponsorFuerDelegierteTeams(vorbereitet.gameState)
+      : null;
+  const prepared = sponsorWahl
+    ? { ...vorbereitet, gameState: sponsorWahl.gameState, warnings: [...vorbereitet.warnings, `delegierte_sponsorwahl:${sponsorWahl.teamIds.join(",")}`] }
+    : vorbereitet;
   if (prepared.warnings.length > 0 && !dryRun) {
     persistence.saveSingleplayerState(scope.saveId, prepared.gameState);
   }

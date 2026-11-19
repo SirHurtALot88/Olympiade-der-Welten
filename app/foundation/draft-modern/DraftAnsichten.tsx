@@ -174,7 +174,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
             <div className="gz"><span>Ablösen ({meine.length} Spieler)</span><b className="t">−{de(summe)} C</b></div>
             <div className="gz"><span><b style={{ color: "var(--creme)" }}>Kasse zum Saisonstart</b></span><b className="t" style={{ fontSize: "calc(1.5 * var(--u))", color: "var(--creme)" }}>{betragC(mein?.kasse ?? 0)}</b></div>
           </div>
-          <div className="vorst"><b>Gehaltsbudget und Rücklage:</b> folgen mit dem Budget-Dienst (Finanzen V2)<small>Gezeigt wird nur, was der Draft gebucht hat.</small></div>
+          <div className="vorst"><b>Gehalt und Rücklage:</b> auf der Finanzseite (Budgets, GuV)<small>Gezeigt wird hier nur, was der Draft gebucht hat.</small></div>
           <div className="akt">
             <button type="button" className="knopf haupt" onClick={onWeiter} data-testid="draft-weiter">Weiter</button>
           </div>

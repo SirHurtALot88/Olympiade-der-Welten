@@ -12,6 +12,8 @@ import {
   fertigSperrGrund,
   istStandKonflikt,
   pickHerkunft,
+  draftKopfSchluessel,
+  wiederholeBeiStandKonflikt,
 } from "@/app/foundation/draft-modern/draft-format";
 import { baueDraftLeseParameter, baueDraftPostKoerper } from "@/app/foundation/draft-modern/draft-protokoll";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
@@ -126,5 +128,50 @@ describe("Draft-Seite: Fehlertexte und Anzeige", () => {
     expect(fertigGrundText("abgebrochen")).toBe("Draft abgebrochen");
     expect(pickHerkunft({ quelle: "ki", grund: "notkauf_mindestkader" })).toBe("KI");
     expect(pickHerkunft({ quelle: "ki", grund: null })).toBe("KI");
+  });
+});
+
+describe("Draft-Seite: Überspringen/Auto-Pick/Fertig trotz weiterpickender KI (Abnahme 19.11., F2)", () => {
+  it("sendet nach einem Stand-Konflikt erneut, bis die Aktion durchgeht", async () => {
+    const antworten = [{ success: false, error: "draft_stand_veraltet" }, { success: false, error: "draft_stand_veraltet" }, { success: true }];
+    let aufrufe = 0;
+    const ergebnis = await wiederholeBeiStandKonflikt(async () => antworten[aufrufe++]!);
+    expect(ergebnis.success).toBe(true);
+    expect(aufrufe).toBe(3);
+  });
+
+  it("gibt einen echten Fehler sofort zurück und hört nach der Versuchsgrenze auf", async () => {
+    let aufrufe = 0;
+    const echt = await wiederholeBeiStandKonflikt(async () => {
+      aufrufe += 1;
+      return { success: false, error: "team_nicht_aktiv" };
+    });
+    expect(echt.error).toBe("team_nicht_aktiv");
+    expect(aufrufe).toBe(1);
+    aufrufe = 0;
+    const immer = await wiederholeBeiStandKonflikt(async () => {
+      aufrufe += 1;
+      return { success: false, error: "draft_stand_veraltet" };
+    }, 4);
+    expect(immer.success).toBe(false);
+    expect(aufrufe).toBe(4);
+  });
+
+  it("F4: der Shell-Kopf lädt nach, wenn sich der eigene Kader/die eigene Kasse ändert oder der Draft endet — nicht bei fremden Picks", () => {
+    const basis = { status: "laeuft", mein: { kader: 3, kasse: 200.5 } };
+    expect(draftKopfSchluessel(basis)).toBe(draftKopfSchluessel({ ...basis }));
+    expect(draftKopfSchluessel({ ...basis, mein: { kader: 4, kasse: 180 } })).not.toBe(draftKopfSchluessel(basis));
+    expect(draftKopfSchluessel({ ...basis, status: "fertig" })).not.toBe(draftKopfSchluessel(basis));
+    expect(draftKopfSchluessel({ ...basis, status: "nachzug" })).toBe(draftKopfSchluessel(basis));
+    const quelle = readFileSync("app/foundation/draft-modern/LigaDraftSeite.tsx", "utf8");
+    expect(quelle).toMatch(/draftKopfSchluessel\(ansicht\)/);
+    expect(quelle).toMatch(/hostProps\.loadSave\(activeSaveId\)/);
+  });
+
+  it("die Seite schickt Überspringen, Auto-Pick und Fertig über den Neuversuch", () => {
+    const quelle = readFileSync("app/foundation/draft-modern/draft-daten.ts", "utf8");
+    expect(quelle).toMatch(/sendeStandfest\("ueberspringen"/);
+    expect(quelle).toMatch(/sendeStandfest\("auto_pick"/);
+    expect(quelle).toMatch(/sendeStandfest\("fertig"\)/);
   });
 });

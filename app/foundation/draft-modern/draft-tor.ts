@@ -2,7 +2,7 @@
 
 /**
  * TOR DER DRAFT-SEITE (18.11.): entscheidet, ob die Shell an der Stelle des Schildes „Liga wird erstellt …“ die neue
- * Draft-Seite zeigt. Ohne `OLY_LIGA_DRAFT_MODUS=einzelschritt` gibt es keinen Draft-Zustand im Spielstand; die Probe
+ * Draft-Seite zeigt. Mit `OLY_LIGA_DRAFT_MODUS=block` (Rueckweg) gibt es keinen Draft-Zustand im Spielstand; die Probe
  * antwortet dann `ansicht: null` und alles bleibt wie heute (Schild, normale Ansichten).
  *
  * Die Entscheidung, wann überhaupt gefragt wird, steht in `istDraftKandidat` (rein, getestet): Liga im Aufbau

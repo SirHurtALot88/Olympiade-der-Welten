@@ -19,7 +19,7 @@
  */
 import { useMemo } from "react";
 
-import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
+import { laeuftMitDieserSaisonAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
@@ -127,10 +127,18 @@ function formatValue(value: number | string | null): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** Auslaufende Verträge des eigenen Teams — Restlaufzeit 0, also keine Saison mehr. */
-function countExpiringContracts(gameState: GameState, teamId: string | null): number {
+/**
+ * Auslaufende Verträge des eigenen Teams — Endsaison = die gerade gespielte Saison.
+ *
+ * ABNAHME 19.11., Fehler F7 (docs/design/abnahme-saison-19-11.md): hier stand der Countdown (`contractLength === 0`). Der sinkt
+ * aber erst mit der Alterung in der Saisonende-Kette („Verträge öffnen“). Direkt nach dem letzten Spieltag zeigte die Liste
+ * deshalb „Verträge — nichts läuft aus · erledigt“, obwohl alle elf Verträge des Teams ausliefen (die Startseite zeigte zur
+ * selben Zeit „11 Verträge laufen aus“). Jetzt dieselbe Wahrheit wie die Startseite: die Endsaison (`laeuftMitDieserSaisonAus`)
+ * — vor und nach der Alterung gleich, und nach einer Verlängerung (Endsaison = nächste Saison) nicht mehr auslaufend.
+ */
+export function countExpiringContracts(gameState: GameState, teamId: string | null): number {
   if (!teamId) return 0;
-  return gameState.rosters.filter((entry) => entry.teamId === teamId && vertragLaeuftAus(entry.contractLength)).length;
+  return gameState.rosters.filter((entry) => entry.teamId === teamId && laeuftMitDieserSaisonAus(entry, gameState)).length;
 }
 
 export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinalePanelProps) {

@@ -7,6 +7,7 @@ import {
   chooseSponsorOfferForAiTeams,
   ensureSeasonSponsorOffers,
   getTeamSponsorContract,
+  waehleSponsorFuerDelegierteTeams,
 } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
@@ -208,6 +209,43 @@ describe("sponsor offer service", () => {
     });
     const next = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(gameState));
     expect(getTeamSponsorContract(next, "A-A")).not.toBeNull();
+  });
+
+  /**
+   * ABNAHME 19.11., Fehler F5: ein menschliches Team in Halbautomatik (`sponsor: "ki"`) bekam nie einen Sponsor — die Inbox
+   * versprach „Die KI uebernimmt“, gewaehlt hat niemand. Zum Saisonstart waehlt jetzt die KI, ein voll selbst gefuehrtes Team
+   * bleibt unberuehrt, und der Standardaufruf (Anlage eines Spiels) waehlt fuer Menschen weiterhin nicht.
+   */
+  it("delegierte Sponsorwahl: Halbautomatik waehlt zum Saisonstart, voll selbst bleibt beim Menschen", () => {
+    const mensch = (teamId: string, stufe: "halbautomatik" | "voll_selbst") => ({
+      teamId,
+      controlMode: "manual" as const,
+      ownerId: "user_local",
+      ownerSlot: "user" as const,
+      aiLineupPreviewEnabled: false,
+      delegation: { stufe, bereiche: {}, trainingSelbstSpielerIds: [], aktualisiertAm: "2026-11-19T00:00:00.000Z" },
+    });
+    const gameState = ensureSeasonSponsorOffers(
+      createGameState({
+        teams: [
+          createTeam({ humanControlled: true, teamId: "M-M", shortCode: "M-M", name: "Halbautomatik" }),
+          createTeam({ humanControlled: true, teamId: "B-B", shortCode: "B-B", name: "Voll selbst" }),
+        ],
+        teamIdentities: [createIdentity("M-M"), createIdentity("B-B")],
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          teamControlSettings: { "M-M": mensch("M-M", "halbautomatik"), "B-B": mensch("B-B", "voll_selbst") } as never,
+        },
+      }),
+    );
+    expect(getTeamSponsorContract(chooseSponsorOfferForAiTeams(gameState), "M-M")).toBeNull();
+    const ergebnis = waehleSponsorFuerDelegierteTeams(gameState);
+    expect(ergebnis?.teamIds).toEqual(["M-M"]);
+    expect(getTeamSponsorContract(ergebnis!.gameState, "M-M")).not.toBeNull();
+    expect(getTeamSponsorContract(ergebnis!.gameState, "B-B")).toBeNull();
+    expect(waehleSponsorFuerDelegierteTeams(ergebnis!.gameState)).toBeNull();
   });
 });
 

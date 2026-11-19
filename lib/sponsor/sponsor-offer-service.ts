@@ -19,6 +19,7 @@ import { getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
 import type { TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { pickSponsorBrandForOffer, buildGlobalParentUsageFromOffers } from "@/lib/sponsor/sponsor-brand-catalog";
 import { appendSponsorBrandHistory, getRecentSponsorParentIds } from "@/lib/sponsor/sponsor-contract-lifecycle";
@@ -1311,7 +1312,18 @@ function resolveEcoIntent01(input: { seasonStrategy: AiSeasonStrategy | undefine
   return Math.max(0, Math.min(1, pressure01 + ecoRoundBonus));
 }
 
-export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?: Record<string, TeamControlSettings>): GameState {
+export function chooseSponsorOfferForAiTeams(
+  gameState: GameState,
+  settingsMap?: Record<string, TeamControlSettings>,
+  optionen?: {
+    /**
+     * DELEGIERTE SPONSORWAHL (Halbautomatik/Voll KI, docs/design/mehrspieler-delegation-18-11.md): auch menschliche Teams mit
+     * `sponsor: "ki"` waehlen — mit derselben Wahl wie ein KI-Team. Nur zum SAISONSTART setzen (erster gewerteter Spieltag,
+     * `waehleSponsorFuerDelegierteTeams`), damit der Mensch vorher selbst waehlen kann. Abnahme 19.11., Fehler F5.
+     */
+    delegierteMenschen?: boolean;
+  },
+): GameState {
   const controlSettings = settingsMap ?? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
   let nextGameState = ensureSeasonSponsorOffers(gameState);
 
@@ -1333,7 +1345,7 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     // Passive Teams werden nicht aktiv gemanagt und bekommen daher — wie echte KI-Teams —
     // automatisch das beste Angebot signiert, damit kein Team ohne Vertrag in die
     // Gehaltsabrechnung läuft (sonst Preview≠Apply beim Gehalt).
-    if (control?.controlMode === "manual") {
+    if (control?.controlMode === "manual" && !(optionen?.delegierteMenschen && isBereichDelegiert(control, "sponsor"))) {
       continue;
     }
     const offers = getTeamSponsorOffers(nextGameState, team.teamId);
@@ -1433,3 +1445,20 @@ export function createSponsorChoiceConfirmToken(teamId: string, offerId: string)
 }
 
 export { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
+
+/**
+ * SAISONSTART: menschliche Teams mit delegierter Sponsorwahl (`sponsor: "ki"`), die bis zum ersten gewerteten Spieltag keinen
+ * Vertrag gewaehlt haben, bekommen die Wahl der KI. Die Inbox verspricht genau das („Die KI uebernimmt“); vorher waehlte niemand,
+ * und das Team spielte die Saison ohne Sponsorgeld (Abnahme 19.11., Fehler F5). Gibt `null` zurueck, wenn nichts zu tun ist.
+ * Die Phasenregel (`sponsor_choice` nur vor dem ersten Ergebnis bzw. am Saisonende) prueft der Aufrufer.
+ */
+export function waehleSponsorFuerDelegierteTeams(gameState: GameState): { gameState: GameState; teamIds: string[] } | null {
+  const settings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+  const offen = gameState.teams
+    .map((team) => team.teamId)
+    .filter((teamId) => isBereichDelegiert(settings[teamId], "sponsor") && getTeamSponsorContract(gameState, teamId) == null);
+  if (offen.length === 0) return null;
+  const nach = chooseSponsorOfferForAiTeams(gameState, settings, { delegierteMenschen: true });
+  const teamIds = offen.filter((teamId) => getTeamSponsorContract(nach, teamId) != null);
+  return teamIds.length > 0 ? { gameState: nach, teamIds } : null;
+}

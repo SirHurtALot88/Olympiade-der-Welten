@@ -370,6 +370,18 @@ describe("Seitenmodell", () => {
     expect(m.lage.titel).toBeTruthy();
   });
 
+  it("Abnahme 19.11. (F8): negative Saisonende-Prognose geht vor den Gehaltsraten — kein „Solide“ bei −110 C Prognose", () => {
+    const gs = spielstand({ vertrauen: 8, cash: 90 });
+    const bereit = (guv: number) => ({ status: "ready", team: { guv, transfer: { net: 0 }, guvPosten: [] } }) as never;
+    const minus = buildFinanzSeiteModell(gs, "A", bereit(-200));
+    expect(minus.prognoseEnde).toBeCloseTo(-110, 1);
+    expect(minus.lage.titel).toBe("Saisonende im Minus");
+    expect(minus.lage.ton).toBe("warn");
+    expect(minus.lage.text).toContain("−110,0".replace("−", "-"));
+    const plus = buildFinanzSeiteModell(gs, "A", bereit(20));
+    expect(plus.lage.titel).toBe("Solide");
+  });
+
   it("OLY_VORSTAND_BUDGET=0 schaltet alles aus (nichts wird gesperrt)", () => {
     process.env.OLY_VORSTAND_BUDGET = "0";
     const gs = spielstand({ vertrauen: 1 });

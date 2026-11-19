@@ -91,6 +91,11 @@ services:
       # "standard" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder das alte Format; gebuchte
       # Spieltage bleiben, wie sie gebucht sind). Siehe deploy/hetzner/.env.example.
       OLY_CLIMBING_FORMAT: ${OLY_CLIMBING_FORMAT:-}
+      # Liga-Draft (Draft-Seite, #1619/#1623, docs/design/draft-neubau-kern-18-11.md): DIESELBE Falle wie oben -- ohne diese
+      # Durchreichung erreicht ein Wert aus deploy/hetzner/.env den Container NIE (gefunden in der Abnahme 19.11.,
+      # docs/design/abnahme-saison-19-11.md). Leer = Code-Standard (seit 19.11.: neuer Draft mit Draft-Seite); "block" = Rueckweg
+      # auf den alten Hintergrund-Draft. Wirkt nur beim Anlegen einer neuen Liga.
+      OLY_LIGA_DRAFT_MODUS: ${OLY_LIGA_DRAFT_MODUS:-}
     volumes:
       - oly-data:/app/data/persistence
       # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach

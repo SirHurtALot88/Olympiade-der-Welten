@@ -10,7 +10,7 @@
  * unter dem Scouting-Nebel sieht man nur Stufen, und sortiert wird nur über diese Stufen.
  *
  * Sie erscheint in der Foundation-Shell an der Stelle des Schildes „Liga wird erstellt …“, sobald ein Draft-Zustand
- * existiert (Schalter `OLY_LIGA_DRAFT_MODUS=einzelschritt`); ohne Schalter bleibt alles wie heute.
+ * existiert (Standard seit der Abnahme 19.11.; `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg auf den alten Hintergrund-Draft).
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
@@ -26,7 +26,7 @@ import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } fro
 import { AbbruchDialog, Ergebnis, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
-import { betragC, de } from "./draft-format";
+import { betragC, de, draftKopfSchluessel } from "./draft-format";
 import "@/app/foundation/transfermarkt-modern/transfermarkt-modern.css";
 import "./draft-modern.css";
 
@@ -92,6 +92,23 @@ export default function LigaDraftSeite({
     fortsetzGesehen.current = ansicht.stand;
     void aktionen.kiHintergrund(true);
   }, [ansicht, draft.hintergrund, draft.busy, draft.tempo, setupFehlgeschlagen, aktionen]);
+
+  // ABNAHME 19.11., Fehler F4 (docs/design/abnahme-saison-19-11.md): der Kopf der Shell (Kasse, Saisonfortschritt) liest den
+  // geladenen Spielstand, und den lud waehrend des Drafts niemand nach — nach dem Draft stand oben noch die Kasse nach dem ersten
+  // Pick (256,9 C), unten „Kasse zum Saisonstart 23,7 C“. Jetzt laedt die Seite den Spielstand nach, sobald sich der EIGENE Kader
+  // aendert (eigener Pick, Auto-Pick des GM) oder der Draft endet. Fremde Picks bewegen die eigene Kasse nicht.
+  const kopfSchluessel = ansicht ? draftKopfSchluessel(ansicht) : null;
+  const kopfGesehen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!kopfSchluessel) return;
+    if (kopfGesehen.current === null) {
+      kopfGesehen.current = kopfSchluessel;
+      return;
+    }
+    if (kopfGesehen.current === kopfSchluessel) return;
+    kopfGesehen.current = kopfSchluessel;
+    void hostProps.loadSave(activeSaveId);
+  }, [kopfSchluessel, hostProps, activeSaveId]);
 
   const feed = useMarktFeed({
     saveId: activeSaveId,
