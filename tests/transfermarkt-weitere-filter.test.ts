@@ -51,8 +51,8 @@ describe("Filter des Transfermarkts (Achsen, Kartenfarbe, Marktwert, Gehalt, Val
     expect(passt(spieler, { achsenMin: { soc: 4 } }, false)).toBe(false);
   });
 
-  it("Reihum-Schalter: aus, B, A, S, aus", () => {
-    expect([undefined, 4, 5, 6].map(naechsteMindestNote)).toEqual([4, 5, 6, undefined]);
+  it("Reihum-Schalter: aus, D, C, B, A, S, aus (Chris 19.11.: Sekundär-Achsen)", () => {
+    expect([undefined, 2, 3, 4, 5, 6].map(naechsteMindestNote)).toEqual([2, 3, 4, 5, 6, undefined]);
   });
 
   it("Kartenfarbe folgt der Klasse", () => {

@@ -113,15 +113,11 @@ describe("Scouting-Nebel des Transfermarkts: feste Stufen (18.11.)", () => {
     expect(erfuelltEignungsMinimum(s, "unbekannt", 1)).toBe(false);
   });
 
-  it("Achsen: ungescoutet nur Zweier-Gruppen, sonst die Note; nie eine Zahl", () => {
+  it("Achsen: auch ungescoutet die einzelne Note (Chris 19.11.), nie eine Zahl", () => {
     const grob = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil" }));
-    expect(grob.achsen.pow.anzeige).toBe("B–A");
-    expect(grob.achsen.soc.anzeige).toBe("D–C");
+    expect(grob.achsen.pow.anzeige).toBe("B");
     expect(grob.achsen.pow.exakt).toBe(false);
-    // Zwei verschiedene Noten derselben Gruppe sind nicht zu unterscheiden.
-    const a = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil", powTier: "A" }));
-    const b = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil", powTier: "B" }));
-    expect(a.achsen.pow).toEqual(b.achsen.pow);
+    expect(grob.achsen.pow.anzeige).not.toMatch(/\d/);
     const fein = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil", scoutingLevel: 4 }));
     expect(fein.achsen.pow.anzeige).toBe("B");
     expect(tierBereichSortWert("B–A")).toBe(4.5);

@@ -149,7 +149,10 @@ function attributRatings(item: TransfermarktFreeAgentItem): TransfermarktAttribu
 }
 
 function achseSicht(achse: MarktAchse, tier: TransfermarktRatingTier | null, stufe: number): SichtAchse {
-  const anzeige = tierAnzeige(tier, stufe);
+  // Achsen (POW/SPE/MEN/SOC) sind grobe Ueberblickswerte und auch ungescoutet als einzelne Note sichtbar (Chris 19.11.:
+  // „mir fehlen auf den ersten Blick die Erkenntnisse, wie viel POW SPE MEN SOC ein Spieler hat“ — als Zweier-Gruppe
+  // stand fast jeder Spieler auf „F–E“, Filter und Vergleich waren damit wertlos). Attribute bleiben im Nebel.
+  const anzeige = tier ?? null;
   return { achse, anzeige, sortWert: tierBereichSortWert(anzeige), exakt: stufe >= 1 };
 }
 

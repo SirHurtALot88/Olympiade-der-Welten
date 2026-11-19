@@ -12,15 +12,16 @@ const NOTEN = ["F", "E", "D", "C", "B", "A", "S", "S+"];
 
 /** Mindestnoten, die ein Filter wählen kann (Index in F,E,D,C,B,A,S,S+). */
 export const MINDEST_NOTEN = [
+  { label: "D", index: 2 },
   { label: "C", index: 3 },
   { label: "B", index: 4 },
   { label: "A", index: 5 },
   { label: "S", index: 6 },
 ] as const;
 
-/** Reihum für die Achsen-Chips: aus, B, A, S, aus. */
+/** Reihum für die Achsen-Chips: aus, D, C, B, A, S, aus (Chris 19.11.: auch Sekundär-Achsen ab D/C filtern). */
 export function naechsteMindestNote(aktuell: number | undefined): number | undefined {
-  if (aktuell == null) return 4;
+  if (aktuell == null) return MINDEST_NOTEN[0].index;
   const i = MINDEST_NOTEN.findIndex((n) => n.index === aktuell);
   return i < 0 || i + 1 >= MINDEST_NOTEN.length ? undefined : MINDEST_NOTEN[i + 1].index;
 }
