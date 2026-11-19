@@ -32,6 +32,7 @@ import { bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-diszi
 import { berechneFreigabeAnzeige, freigabeKosten, freigabeSperre } from "@/lib/market/transfermarkt-freigabe";
 
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
+import { achseDerDisziplin, ACHSEN_FARBE_HEX, DISZIPLINEN_GEORDNET } from "@/lib/market/disziplin-reihenfolge";
 import KlassenFarbTag from "@/app/foundation/KlassenFarbTag";
 import WeitereFilterPanel from "./WeitereFilterPanel";
 import {
@@ -66,7 +67,7 @@ const SORT_LABEL: Record<SortKey, string> = {
   value: "Value",
 };
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
-const DISZIPLINEN = [...officialDisciplineWeightOrder];
+const DISZIPLINEN = [...DISZIPLINEN_GEORDNET] as string[];
 
 function rangGegenLigaFuer(staerken: Record<string, Record<string, number>>, teamId: string, disziplinId: string): number {
   return rangGegenLiga(staerken, teamId, disziplinId, staerken[teamId]?.[disziplinId] ?? 20);
@@ -399,7 +400,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                   const u = bedarfUrteil({ eintrag: b, schnittVorkommen: bedarfSchnitt, rang: r, ligaGroesse: ligaTeamIds.length });
                   return (
                     <button type="button" key={d} className={`kz${d === disziplin ? " an" : ""}`} onClick={() => { setDisziplin(d); setBlatt(0); }} title={`${disziplinNamen[d]}: ${u.text}. Markt nach ${disziplinNamen[d]} ausrichten`} data-testid={`tm-disziplin-${d}`}>
-                      <span className="n"><i className={`bd ${u.art}`} />{disziplinNamen[d]}</span>
+                      <span className="n" style={staerkeSort === "liste" && achseDerDisziplin(d) ? { borderLeft: `3px solid ${ACHSEN_FARBE_HEX[achseDerDisziplin(d)!]}`, paddingLeft: "calc(.4 * var(--u))" } : undefined}><i className={`bd ${u.art}`} />{disziplinNamen[d]}</span>
                       <span className="t sz">{b ? `${b.vorkommen}×` : "–"}</span>
                       <span className="t sz">{b?.slots ?? "–"}</span>
                       <span className="bal"><i className="z" style={{ width: `${begrenze(vn - 20, 0, 70) / 0.7}%` }} /><i style={{ width: `${begrenze(v - 20, 0, 70) / 0.7}%` }} /></span>

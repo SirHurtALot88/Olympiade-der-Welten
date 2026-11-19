@@ -11,9 +11,10 @@ import { useMemo, useState } from "react";
 
 import type { LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
 import type { LigaDraftSpielerKarte, LigaDraftZugAnsicht } from "@/lib/draft/liga-draft-ansicht";
+import { ACHSEN_FARBE_HEX, ACHSEN_REIHENFOLGE, DISZIPLIN_NACH_ACHSE, DISZIPLINEN_GEORDNET } from "@/lib/market/disziplin-reihenfolge";
 import { mindestNoteLabel, naechsteMindestNote } from "@/lib/market/transfermarkt-weitere-filter";
 import { erfuelltAchsenMinimum, tierBereichSortWert, MARKT_ACHSEN, sortiereNachSicht, type MarktAchse } from "@/lib/market/transfermarkt-sicht";
-import { officialDisciplineWeightLabels, officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
+import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format";
 import type { DraftTempo, DraftZeig } from "./draft-daten";
@@ -21,7 +22,7 @@ import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { auslassenSperrGrund, betragC, de, fertigGrundText, fertigSperrGrund, GRUND_TAG, GRUND_TEXT, pickHerkunft, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
 
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
-const DISZIPLINEN = [...officialDisciplineWeightOrder];
+const DISZIPLINEN = DISZIPLINEN_GEORDNET;
 const ZEILEN_JE_BLATT = 13;
 
 export type DraftAktionen = {
@@ -608,10 +609,14 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       <div className="fl">
         <span className="gk" style={{ marginLeft: 0 }}>Eignung in</span>
         <span className="dk20">
-          {DISZIPLINEN.map((d) => (
-            <button type="button" key={d} className={k.disziplin === d ? "an" : ""} title={officialDisciplineWeightLabels[d]} onClick={() => { k.setDisziplin(d); setBlatt(0); }}>
-              {DISZIPLIN_KURZ[d] ?? d.slice(0, 3).toUpperCase()}
-            </button>
+          {ACHSEN_REIHENFOLGE.map((achse) => (
+            <span key={achse} className="dg" data-achse={achse} style={{ display: "inline-flex", gap: "calc(.16 * var(--u))", marginRight: "calc(.55 * var(--u))", paddingLeft: "calc(.3 * var(--u))", borderLeft: `2px solid ${ACHSEN_FARBE_HEX[achse]}` }}>
+              {DISZIPLIN_NACH_ACHSE[achse].map((d) => (
+                <button type="button" key={d} className={k.disziplin === d ? "an" : ""} style={k.disziplin === d ? undefined : { borderColor: ACHSEN_FARBE_HEX[achse] }} title={`${officialDisciplineWeightLabels[d]} · ${ACHSEN_LABEL[achse]}`} onClick={() => { k.setDisziplin(d); setBlatt(0); }}>
+                  {DISZIPLIN_KURZ[d] ?? d.slice(0, 3).toUpperCase()}
+                </button>
+              ))}
+            </span>
           ))}
         </span>
       </div>
