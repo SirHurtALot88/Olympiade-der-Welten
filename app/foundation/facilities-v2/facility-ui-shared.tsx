@@ -57,6 +57,8 @@ export function formatFacilityEffectText(text: string): string {
 export function formatFacilityActionReason(reason: string) {
   const mapped: Record<string, string> = {
     insufficient_cash: "Nicht genug Cash.",
+    vorstand_transferbudget_nicht_freigegeben: "Der Vorstand gibt dafür nicht genug Transferbudget frei (Budgets-Reiter in den Finanzen).",
+    vorstand_gebaeude_sparauflage: "Sparauflage: der Vorstand gibt keine Gebäude frei.",
     facility_max_level: "Max-Level erreicht.",
     facility_disabled: "Gebäude deaktiviert.",
     specialist_wing_variant_required: "Variante wählen.",

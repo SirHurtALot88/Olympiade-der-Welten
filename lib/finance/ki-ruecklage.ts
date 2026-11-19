@@ -10,6 +10,14 @@
  * Budget = Kasse + Marktwert des Kaders zu Beginn des Kaufs. In Saison 1 ist der Kader leer, dort ist das
  * schlicht das Startbudget; in den Folgesaisons "Kasse + Kaderwert" (Konzept, Abschnitt 5.2).
  *
+ * AB SAISON 2 (Chris, 18.11.: "ab season 2 sollten budgets gespart werden basierend auf den gehaltskosten ... das muss
+ * nicht mehr auf dem startbudget basieren"): die Ruecklage folgt den GEHALTSKOSTEN, nicht mehr Kasse + Kaderwert
+ * (der Kaderwert waechst mit dem Marktwert und blaehte die Ruecklage auf):
+ *
+ *   Ruecklage (S2+) = q x Zielgehalt        (kein Boden 0,35 x Zielgehalt mehr: die Basis ist schon das Gehalt)
+ *
+ * Saison 1 bleibt wie oben (Startbudget). Eine Funktion fuer Planer UND Sperre.
+ *
  * Reine Funktionen, kein Spielstand-Zugriff ausser den uebergebenen Zahlen.
  */
 
@@ -53,19 +61,32 @@ export type KiRuecklageErgebnis = {
   zielgehalt: number;
   /** Die Gehalts-Untergrenze (0,35 x Zielgehalt). */
   gehaltsUntergrenze: number;
-  /** Welche der beiden Groessen gebunden hat. */
-  bindend: "quote" | "gehalt";
+  /** Welche Groesse gebunden hat (ab Saison 2 immer "gehaltskosten"). */
+  bindend: "quote" | "gehalt" | "gehaltskosten";
 };
 
 export function berechneKiRuecklage(input: {
   finances: number | null | undefined;
   budget: number;
   zielgehalt: number;
+  /** Saison-Nummer (1, 2, ...). Ab 2 zaehlt die Gehaltsbasis; fehlt sie, gilt Saison 1 (bit-gleich zu vorher). */
+  saison?: number | null;
 }): KiRuecklageErgebnis {
   const finanzwert = normalisiereFinanzwert(input.finances);
   const quote = ruecklagenQuote(input.finances);
   const budget = Math.max(0, Number.isFinite(input.budget) ? input.budget : 0);
   const zielgehalt = Math.max(0, Number.isFinite(input.zielgehalt) ? input.zielgehalt : 0);
+  if ((input.saison ?? 1) >= 2 && process.env.OLY_RUECKLAGE_GEHALT_S2 !== "0") {
+    return {
+      ruecklage: Math.round(quote * zielgehalt * 100) / 100,
+      quote,
+      finanzwert,
+      budget,
+      zielgehalt,
+      gehaltsUntergrenze: KI_RUECKLAGE_GEHALTS_FAKTOR * zielgehalt,
+      bindend: "gehaltskosten",
+    };
+  }
   const ausQuote = quote * budget;
   const gehaltsUntergrenze = KI_RUECKLAGE_GEHALTS_FAKTOR * zielgehalt;
   const bindend = gehaltsUntergrenze > ausQuote ? "gehalt" : "quote";
@@ -98,5 +119,6 @@ export function resolveKiRuecklageFuerTeam(
     finances: eingaben.finances,
     budget: eingaben.cash + eingaben.rosterMarketValue,
     zielgehalt,
+    saison: Number(/(\d+)\s*$/.exec(gameState.season?.id ?? "")?.[1] ?? 1),
   });
 }

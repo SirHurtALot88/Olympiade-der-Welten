@@ -32,6 +32,8 @@ const PRESEASON_BLOCKER_LABELS: Record<string, string> = {
   post_market_cash_not_positive:
     "Nach dem Marktlauf wäre das Team im Minus — der Rest des Plans wurde nicht ausgeführt.",
   insufficient_cash: "Nicht genug Cash für den geplanten Kauf.",
+  vorstand_transferbudget_nicht_freigegeben: "Der Vorstand gibt dafür nicht genug Transferbudget frei.",
+  vorstand_gehaltsbudget_nicht_freigegeben: "Das Gehalt passt nicht ins freigegebene Gehaltsbudget des Vorstands.",
   buy_preview_blocked: "Die Kauf-Prüfung hat den geplanten Transfer abgelehnt.",
   roster_limit_reached: "Kader ist bereits voll — kein weiterer Zugang möglich.",
   market_value_missing: "Marktwert eines Kandidaten fehlt — der Kauf wurde übersprungen.",
