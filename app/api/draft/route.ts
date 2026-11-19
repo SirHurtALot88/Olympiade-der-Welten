@@ -38,6 +38,8 @@ import {
   laufeKiImHintergrund,
   laufeKiZuege,
   LigaDraftFehler,
+  LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS,
+  LIGA_DRAFT_VOR_JE_HAPPEN,
   setzeMenschAutoPick,
   setzeDraftWunschliste,
   setzeMenschStartWahl,
@@ -92,6 +94,8 @@ type DraftRequestBody = {
   an?: boolean;
   zielTeamId?: string;
   maxPicks?: number;
+  /** `ki_hintergrund`: Vor-Modus mit grossen Happen (Tempo, 19.11.). */
+  schnell?: boolean;
   erwarteteNr?: number;
   /** `startwahl`: "spielen" | "selbst". */
   wahl?: string;
@@ -236,7 +240,13 @@ export async function POST(request: Request) {
           throw new LigaDraftFehler("draft_stand_veraltet");
         }
         // Kehrt sofort zurueck; den Fortschritt liest die Seite ueber GET (Variante A/B: „KI pickt fertig“).
-        void laufeKiImHintergrund({ persistence, saveId, logPrefix: "[api/draft]" }).catch(() => undefined);
+        // `schnell`: „Vor zu meinem Pick“ — grosse Happen, ein Schreiben je ~1 s Picks (Dienst: LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS).
+        void laufeKiImHintergrund({
+          persistence,
+          saveId,
+          logPrefix: "[api/draft]",
+          ...(body.schnell === true ? { jeHappen: LIGA_DRAFT_VOR_JE_HAPPEN, happenBudgetMs: LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS } : {}),
+        }).catch(() => undefined);
         ergebnis = { gestartet: true };
         break;
       }

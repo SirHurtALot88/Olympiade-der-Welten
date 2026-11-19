@@ -917,6 +917,14 @@ const hintergrundAbbruch = new Set<string>();
  * Zeitbudget blockiert ein Happen hoechstens etwa einen Pick; schnelle Picks werden weiter gebuendelt geschrieben.
  */
 export const LIGA_DRAFT_HAPPEN_BUDGET_MS = 120;
+/**
+ * „Vor zu meinem Pick“ (19.11., Chris: „die KI soll wirklich im Schnelldurchlauf sein“): gemessen kostet ein KI-Pick ~110 ms
+ * Rechnen, aber jedes Schreiben des ganzen Spielstands ~360 ms (docs/design/draft-ki-tempo-19-11.md). Mit 120 ms je Happen
+ * ging die Haelfte der Zeit in ein Schreiben je Pick. Im Vor-Modus schreibt ein Happen stattdessen einmal fuer ~1 s Picks;
+ * die Event-Loop steht dabei hoechstens ~1,3 s (Messung in der Doku). Nur fuer den ausdruecklich angeforderten Vorlauf.
+ */
+export const LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS = 1000;
+export const LIGA_DRAFT_VOR_JE_HAPPEN = 40;
 
 export function istHintergrundLaufAktiv(saveId: string): boolean {
   return laufendeHintergrundLaeufe.has(saveId);
@@ -932,6 +940,8 @@ export async function laufeKiImHintergrund(input: {
   saveId: string;
   logPrefix: string;
   jeHappen?: number;
+  /** Zeitbudget je Happen in ms; Standard `LIGA_DRAFT_HAPPEN_BUDGET_MS`. Der Vor-Modus setzt `LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS`. */
+  happenBudgetMs?: number;
   /** Zusaetzliche Abbruchbedingung des Aufrufers (z. B. ein abgebrochener Anstoss), vor jedem Happen gefragt. */
   sollAbbrechen?: () => boolean;
 }): Promise<{ halt: LigaDraftKiSchrittErgebnis["halt"] | "laeuft_schon" | "abgebrochen"; picks: number }> {
@@ -947,7 +957,7 @@ export async function laufeKiImHintergrund(input: {
           persistence: input.persistence,
           saveId: input.saveId,
           maxPicks: input.jeHappen ?? 8,
-          zeitBudgetMs: LIGA_DRAFT_HAPPEN_BUDGET_MS,
+          zeitBudgetMs: input.happenBudgetMs ?? LIGA_DRAFT_HAPPEN_BUDGET_MS,
         });
         picks += ergebnis.eintraege.length;
         if (ergebnis.halt !== "max_picks") return { halt: ergebnis.halt, picks };

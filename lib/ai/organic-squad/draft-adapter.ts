@@ -61,7 +61,7 @@ import {
 import {
   buildTeamThemeCompositionRuntimeContext,
   classifyIdentityQuotaRole,
-  derivePlayerThemeTags,
+  derivePlayerThemeTagsCached,
   isQuotaScopedTarget,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
@@ -267,7 +267,7 @@ export function computeThemeFit(
 ): number | undefined {
   const target = runtimeContext.target;
   if (!target) return undefined;
-  const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
+  const tags = new Set(derivePlayerThemeTagsCached(player).playerThemeTags);
   const countMatches = (list: string[]) => list.reduce((n, tag) => (tags.has(tag) ? n + 1 : n), 0);
 
   // Harte Rassen-/Tag-Quote (S-S ~50% Construct, P-C ~50% Pirate): eine "counts"-Rolle zaehlt wie ein

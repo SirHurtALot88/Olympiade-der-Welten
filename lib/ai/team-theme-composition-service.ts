@@ -994,6 +994,37 @@ function getCachedPlayerThemeTags(player: Player) {
   return computed;
 }
 
+/**
+ * Wie `derivePlayerThemeTags`, aber nach INHALT zwischengespeichert (nicht nach Objektidentitaet): der Liga-Draft laedt den
+ * Spielstand je Pick neu, die Spielerobjekte sind dann jedes Mal neue — der Objekt-Cache oben griff nie. Die Tags haengen nur an
+ * Id, Name, Rasse, Klasse, Geschlecht, Gesinnung, Unterklassen und Eigenschaften (19.11., docs/design/draft-ki-tempo-19-11.md:
+ * ~10 s von ~30 s je Draft-Vorlauf). Die Zeile ist gemeinsam genutzt und darf nicht veraendert werden.
+ */
+const PLAYER_THEME_TAG_INHALT_CACHE = new Map<string, PlayerThemeTagRow>();
+export function derivePlayerThemeTagsCached(player: Player): PlayerThemeTagRow {
+  const byObject = PLAYER_THEME_TAG_CACHE.get(player);
+  if (byObject) return byObject;
+  const key = [
+    player.id,
+    player.name,
+    player.race,
+    player.className,
+    player.gender,
+    player.alignment,
+    player.subclasses.join("|"),
+    player.traitsPositive.join("|"),
+    player.traitsNegative.join("|"),
+  ].join("\u0001");
+  let row = PLAYER_THEME_TAG_INHALT_CACHE.get(key);
+  if (!row) {
+    row = derivePlayerThemeTags(player);
+    if (PLAYER_THEME_TAG_INHALT_CACHE.size >= 20000) PLAYER_THEME_TAG_INHALT_CACHE.clear();
+    PLAYER_THEME_TAG_INHALT_CACHE.set(key, row);
+  }
+  PLAYER_THEME_TAG_CACHE.set(player, row);
+  return row;
+}
+
 export function getTeamThemeCompositionTarget(team: Pick<Team, "teamId" | "name"> | string): TeamThemeCompositionTarget | null {
   const teamId = typeof team === "string" ? team : team.teamId;
   return THEME_TARGETS[teamId] ?? null;
