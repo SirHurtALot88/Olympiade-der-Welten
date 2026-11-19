@@ -31,6 +31,8 @@ type PostAntwort = {
 
 // 19.11. (Chris): „3x sollte standard geschwindigkeit sein“ — die frühere 3× (800 ms) ist die neue 1×; die neue 3× ist dreimal so schnell.
 const TAKT_MS: Record<1 | 3, number> = { 1: 800, 3: 270 };
+/** Nachlauf des aufgedeckten KI-Picks, bevor „Du bist dran“ (oder das Ende) die Karte übernimmt. */
+const ZEIG_NACHLAUF_MS = 1500;
 const NACHFRAGE_MS = 3000;
 const VOR_MS = 120;
 
@@ -175,9 +177,15 @@ export function useLigaDraft(input: {
       }
       if (antwort.halt === "mensch_am_zug" || antwort.halt === "draft_vorbei") setVor(false);
       const letzter = antwort.eintraege?.filter((e) => e.art === "pick").slice(-1)[0];
-      if (!vor && letzter && vorher && vorher.top3) {
+      // Chris 19.11.: der aufgedeckte KI-Pick bleibt stehen, bis der naechste ihn abloest (vorher verschwand er nach 80 % des
+      // Takts — beim neuen Standardtempo nach gut einer halben Sekunde). Nur wenn danach ein Mensch dran ist oder der Draft
+      // endet, raeumt er nach ZEIG_NACHLAUF_MS den Platz fuer „Du bist dran“.
+      if (vor) setZeig(null);
+      else if (letzter && vorher && vorher.top3) {
         setZeig({ zug: vorher, eintrag: letzter });
-        window.setTimeout(() => setZeig((z) => (z && z.eintrag.nr === letzter.nr ? null : z)), Math.round(TAKT_MS[tempo === 3 ? 3 : 1] * 0.8));
+        if (antwort.halt === "mensch_am_zug" || antwort.halt === "draft_vorbei") {
+          window.setTimeout(() => setZeig((z) => (z && z.eintrag.nr === letzter.nr ? null : z)), ZEIG_NACHLAUF_MS);
+        }
       }
     }, warte);
     return () => window.clearTimeout(id);
