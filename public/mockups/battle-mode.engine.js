@@ -44290,6 +44290,18 @@
     const zeilen=w.zeilen();
     // Bestwert je Spalte ueber BEIDE Seiten (wie bisher maxD/maxP), nur fuer top:true.
     const best={}; for(const s of w.spalten)if(s.top)best[s.id]=Math.max(0,...zeilen.map(z=>+s.wert(z)||0));
+    // ABNAHME 19.11., Fehler F6 (docs/design/abnahme-saison-19-11.md): links steht IMMER das Heimteam (Seite 0), die
+    // Ueberschriften hiessen aber fest „Eigenes Team“/„Gegner“ — spielte der Mensch auswaerts, stand sein Team unter „Gegner“.
+    // Jetzt tragen sie die Vereinsnamen aus der Kopfzeile (#tnameL/#tnameR); ohne Namen bleibt der alte Text. Reine Anzeige.
+    const wlabels=document.querySelectorAll("#p2 .wteamlabel, .wsplit .wteamlabel");
+    if(wlabels.length>=2){
+      for(const [i,id] of [[0,"tnameL"],[1,"tnameR"]]){
+        const tn=document.getElementById(id);
+        const name=tn&&tn.firstChild&&tn.firstChild.nodeType===3?String(tn.firstChild.nodeValue||"").trim():"";
+        const soll=name||(i===0?"Eigenes Team":"Gegner");
+        if(wlabels[i].textContent!==soll)wlabels[i].textContent=soll;
+      }
+    }
     tbL.textContent=""; tbR.textContent="";
     for(const seite of [0,1]){
       const tb=seite===0?tbL:tbR;

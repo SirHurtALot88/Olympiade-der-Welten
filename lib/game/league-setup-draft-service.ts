@@ -3,6 +3,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
+import { istEinzelschrittDraftAktiv } from "@/lib/draft/liga-draft-modell";
 
 /**
  * GETEILTER LIGA-SETUP-DRAFT — EIN Ort statt drei Kopien.
@@ -94,12 +95,11 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
     return null;
   }
 
-  // DRAFT-NEUBAU (18.11., docs/design/draft-neubau-kern-18-11.md): hinter dem Schalter `OLY_LIGA_DRAFT_MODUS=einzelschritt`
-  // laeuft der neue Liga-Draft Pick fuer Pick. Der Blocklauf unten bleibt der Standard und der Rueckweg, bis der neue
-  // abgenommen ist. Die Ausschlussliste bedeutet in beiden Wegen dasselbe: diese Menschen picken selbst.
-  // (Gleiche Pruefung wie `istEinzelschrittDraftAktiv` in lib/draft/liga-draft-dienst.ts; der Dienst wird erst im Zweig
-  // geladen, damit dieses Modul seinen schlanken Importgraph behaelt.)
-  if (process.env.OLY_LIGA_DRAFT_MODUS === "einzelschritt") {
+  // DRAFT-NEUBAU (18.11., docs/design/draft-neubau-kern-18-11.md): der neue Liga-Draft laeuft Pick fuer Pick. Seit der Abnahme
+  // 19.11. ist er der Standard fuer neue Ligen; der Blocklauf unten ist der Rueckweg (`OLY_LIGA_DRAFT_MODUS=block`). Die
+  // Ausschlussliste bedeutet in beiden Wegen dasselbe: diese Menschen picken selbst. (Der Schalter kommt aus dem schlanken
+  // `liga-draft-modell`; der Dienst wird erst im Zweig geladen, damit dieses Modul seinen schlanken Importgraph behaelt.)
+  if (istEinzelschrittDraftAktiv()) {
     const markiert = persistence.saveSingleplayerState(saveId, {
       ...current.gameState,
       seasonState: { ...current.gameState.seasonState, leagueSetupStatus: "in_progress" },

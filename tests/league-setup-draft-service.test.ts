@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
@@ -111,7 +111,31 @@ describe("league-setup-draft-service", () => {
     });
   });
 
-  describe("kickoffLeagueSetupDraft (Teil A: Hintergrund-Kickoff)", () => {
+  it("Abnahme 19.11.: OHNE Schalter laeuft der neue Draft (Standard fuer neue Ligen), nie der Blocklauf", async () => {
+    const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
+    const persistence = createFakePersistence([{ saveId: "save-std", gameState: buildGameState() }]);
+    const vorher = process.env.OLY_LIGA_DRAFT_MODUS;
+    delete process.env.OLY_LIGA_DRAFT_MODUS;
+    try {
+      kickoffLeagueSetupDraft({ persistence: persistence as never, saveId: "save-std", excludeTeamIds: ["A-A"], logPrefix: "[test]" });
+      await flushMicrotasks();
+      expect(starteLigaDraft).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-std", selbstPickendeTeamIds: ["A-A"] }));
+      expect(runAiPicksExecutePreview).not.toHaveBeenCalled();
+    } finally {
+      if (vorher === undefined) delete process.env.OLY_LIGA_DRAFT_MODUS;
+      else process.env.OLY_LIGA_DRAFT_MODUS = vorher;
+    }
+  });
+
+  // Rueckweg `OLY_LIGA_DRAFT_MODUS=block` (seit der Abnahme 19.11. ist der Einzelschritt der Standard): der alte Hintergrund-Draft.
+  describe("kickoffLeagueSetupDraft (Teil A: Hintergrund-Kickoff, Rueckweg OLY_LIGA_DRAFT_MODUS=block)", () => {
+    beforeEach(() => {
+      process.env.OLY_LIGA_DRAFT_MODUS = "block";
+    });
+    afterEach(() => {
+      delete process.env.OLY_LIGA_DRAFT_MODUS;
+    });
+
     it("marks the save in_progress synchronously and returns immediately (no await on the draft)", async () => {
       const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
       const persistence = createFakePersistence([{ saveId: "save-1", gameState: buildGameState() }]);

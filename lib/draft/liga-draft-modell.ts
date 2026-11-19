@@ -425,11 +425,15 @@ export function bricheLigaDraftAb(draft: LigaDraftZustand, jetzt: string): LigaD
 }
 
 /**
- * Schalter: `OLY_LIGA_DRAFT_MODUS=einzelschritt` startet beim Anlegen einer Liga den neuen Draft statt des alten. Steht
+ * Schalter: der Liga-Draft im Einzelschritt (Draft-Seite) ist seit der Abnahme 19.11. der STANDARD fuer neue Ligen (Chris hat den
+ * Draft-Neubau abgenommen, docs/design/abnahme-saison-19-11.md). `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg auf den alten
+ * Hintergrund-Draft. Laufende Spielstaende sind unberuehrt: der Schalter wirkt nur beim Anlegen einer Liga, und alle Sperren
+ * unten verlangen zusaetzlich einen Draft-Zustand dieser Saison im Spielstand (den ein Blocklauf-Spielstand nie hat). Steht
  * hier (und nicht nur im Dienst), damit die Sperren unten ihn ohne den schweren Importgraph des Dienstes lesen.
  */
+export const LIGA_DRAFT_MODUS_BLOCK = "block";
 export function istEinzelschrittDraftAktiv(): boolean {
-  return process.env.OLY_LIGA_DRAFT_MODUS === "einzelschritt";
+  return (process.env.OLY_LIGA_DRAFT_MODUS ?? "").trim().toLowerCase() !== LIGA_DRAFT_MODUS_BLOCK;
 }
 
 /** Der Draft-Zustand der laufenden Saison, falls es einen gibt (egal welcher Status). */

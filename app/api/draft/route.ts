@@ -13,8 +13,9 @@ export const dynamic = "force-dynamic";
  * optional zielTeamId: fuer ein fremdes Team nur der Gastgeber), `starten` (Gastgeber; legt den Draft an, falls keiner
  * laeuft), `abbrechen` (Gastgeber; Draft -> fertig, Marktsperre weg).
  *
- * SCHALTER (Review #1619, S1): ohne `OLY_LIGA_DRAFT_MODUS=einzelschritt` schreibt diese Route NICHTS — ausser
- * `abbrechen`, dem Ausweg fuer einen Draft, der aus einer Zeit mit Schalter an liegengeblieben ist. Alle Aktionen ausser
+ * SCHALTER (Review #1619, S1): mit `OLY_LIGA_DRAFT_MODUS=block` (Rueckweg; Standard seit der Abnahme 19.11. ist der
+ * Einzelschritt) schreibt diese Route NICHTS — ausser `abbrechen`, dem Ausweg fuer einen Draft, der aus einer Zeit mit Schalter an
+ * liegengeblieben ist. Alle Aktionen ausser
  * `starten` und `abbrechen` brauchen einen laufenden Draft dieser Saison (`ligaDraftLaeuft`), und jede ausser `starten`
  * nennt `erwarteteNr` (= `ansicht.stand`, Schutz vor Doppelklick/Wettlauf; A6).
  *

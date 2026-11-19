@@ -106,7 +106,7 @@ describe("Liga-Draft laeuft: kein KI-Kauf neben dem Draft (A1)", () => {
     // Markt fuer Menschen: nur die geordnete Phase.
     expect(ligaDraftSperrtMarktkauf(stand(draft("laeuft")))).toBe(true);
     expect(ligaDraftSperrtMarktkauf(stand(draft("nachzug")))).toBe(false);
-    delete process.env.OLY_LIGA_DRAFT_MODUS;
+    process.env.OLY_LIGA_DRAFT_MODUS = "block"; // Schalter aus = Rueckweg Blocklauf (Standard seit 19.11.: Einzelschritt)
     expect(ligaDraftLaeuft(stand(draft("laeuft")))).toBe(false);
     expect(ligaDraftSperrtMarktkauf(stand(draft("laeuft")))).toBe(false);
   });
@@ -145,7 +145,7 @@ describe("Liga-Draft laeuft: kein KI-Kauf neben dem Draft (A1)", () => {
   }, 30_000);
 
   it("Schalter AUS: ein liegengebliebener Draft sperrt die KI-Kaufwege nicht", async () => {
-    delete process.env.OLY_LIGA_DRAFT_MODUS;
+    process.env.OLY_LIGA_DRAFT_MODUS = "block"; // Schalter aus = Rueckweg Blocklauf
     store.gameState = stand(draft("laeuft"));
     runAiPicksExecutePreview.mockResolvedValue({ globalExecution: { appliedPickCount: 0 } });
     const { AI_PICKS_RUN_CONFIRM_TOKEN } = await import("@/lib/ai/ai-picks-run-contract");

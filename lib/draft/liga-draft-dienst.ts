@@ -12,7 +12,7 @@
  * (`flushLocalTransfermarktRunContext`). Trifft ein Schreibvorgang den Koop-Riegel, gilt dieselbe Antwort wie im
  * Blocklauf: frisch lesen, nochmal.
  *
- * Der alte Hintergrund-Draft bleibt der Standard (`OLY_LIGA_DRAFT_MODUS` nicht gesetzt), bis der neue abgenommen ist.
+ * Seit der Abnahme 19.11. ist dieser Draft der Standard fuer neue Ligen; `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg.
  */
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
 import type {

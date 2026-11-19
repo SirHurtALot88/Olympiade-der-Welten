@@ -149,7 +149,7 @@ describe("/api/draft", () => {
   });
 
   it("S1: Schalter AUS -> keine Aktion schreibt (auch `starten` nicht), nur `abbrechen` bleibt als Ausweg", async () => {
-    delete process.env.OLY_LIGA_DRAFT_MODUS;
+    process.env.OLY_LIGA_DRAFT_MODUS = "block"; // Schalter aus = Rueckweg Blocklauf (Standard seit 19.11.: Einzelschritt)
     for (const aktion of ["starten", "ki_schritt", "ki_hintergrund", "pick", "auslassen", "fertig", "ueberspringen", "auto_pick"]) {
       const { status, json } = await post({ saveId: "s", teamId: "M-M", aktion, playerId: "p1", variante: "A", erwarteteNr: 7 });
       expect(status, aktion).toBe(409);

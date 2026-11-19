@@ -64,6 +64,34 @@ export function istStandKonflikt(code: string | null | undefined): boolean {
   return Boolean(code && STILL_NEU_LADEN.has(code));
 }
 
+/**
+ * Wann muss die Shell den Spielstand nachladen, damit ihr Kopf (Kasse, Status) zum Draft passt? Wenn sich der EIGENE Kader oder
+ * die eigene Kasse aendert oder der Draft endet — nicht bei jedem fremden Pick (Abnahme 19.11., Fehler F4).
+ */
+export function draftKopfSchluessel(ansicht: { status: string; mein: { kader: number; kasse: number } | null }): string {
+  return `${ansicht.status === "fertig" ? "fertig" : "offen"}|${ansicht.mein?.kader ?? "-"}|${ansicht.mein?.kasse ?? "-"}`;
+}
+
+/** Wie oft eine standunabhaengige Aktion nach einem Stand-Konflikt erneut gesendet wird. */
+export const STANDFEST_VERSUCHE = 4;
+
+/**
+ * Sendet eine Aktion, die nicht an einen bestimmten Spieler gebunden ist (Ueberspringen, Auto-Pick, Fertig), nach einem
+ * Stand-Konflikt erneut — `senden` liest den frischen Stand selbst (die Seite laedt nach einem Konflikt still neu).
+ * Abnahme 19.11., Fehler F2 (docs/design/abnahme-saison-19-11.md): vorher scheiterte „Ueberspringen“ still, sobald die KI
+ * zwischen Anzeige und Klick weiterpickte.
+ */
+export async function wiederholeBeiStandKonflikt<T extends { success?: boolean; error?: string | null }>(
+  senden: () => Promise<T>,
+  versuche = STANDFEST_VERSUCHE,
+): Promise<T> {
+  let antwort = await senden();
+  for (let versuch = 1; versuch < versuche && !antwort.success && istStandKonflikt(antwort.error); versuch += 1) {
+    antwort = await senden();
+  }
+  return antwort;
+}
+
 /** Warum ein Knopf gesperrt ist — Tooltip. Die Sperre selbst kommt NUR aus `darfAuslassen`/`darfFertig` der Sicht. */
 export function auslassenSperrGrund(mein: { darfAuslassen: boolean; autoPick: boolean; amZug: boolean; status: string }): string | null {
   if (mein.darfAuslassen) return null;
