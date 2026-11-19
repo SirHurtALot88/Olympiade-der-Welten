@@ -2124,7 +2124,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
   liveRatingsById?: Map<string, PlayerRatingContractRow> | null;
   /** Siehe Feldkommentar an `PlayerDisciplineRankOverride`. */
   disciplineRankOverride?: PlayerDisciplineRankOverride | null;
+  /**
+   * Scouting-Nebel erzwingen (Liga-Draft-Overlay, 19.11.): ignoriert den globalen Entwickler-Schalter
+   * `DEBUG_FORCE_PLAYER_VISIBILITY`, der sonst jeden Spieler exakt zeigt. Alle anderen Aufrufer lassen es weg.
+   */
+  fogErzwingen?: boolean;
 }): PlayerDetailDrawerData | null {
+  const debugExakt = DEBUG_FORCE_PLAYER_VISIBILITY && !input.fogErzwingen;
   const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
   if (!player) {
     return null;
@@ -2168,6 +2174,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     manageableTeamIds: input.manageableTeamIds ?? null,
     scoutingLevel,
     isOnViewingTeamRoster: Boolean(rosterEntry && team?.teamId && rosterEntry.teamId === team.teamId),
+    ignoreDebug: input.fogErzwingen,
   });
   const traitView =
     attributeVisibility === "exact"
@@ -2326,7 +2333,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
   // hängt exaktes Potenzial am Scouting-Büro-Level ≥ 5 (frischer Save hat das nicht).
   // Sobald echter Fog-of-War zurückkommt, greift wieder das Facility-Gate.
   const revealExactOwnedPotential =
-    DEBUG_FORCE_PLAYER_VISIBILITY ||
+    debugExakt ||
     (attributeVisibility === "exact" ? ownedPotentialRevealsExact(facilityScoutingLevel) : true);
   /**
    * DER NETTO-FORECAST DES PROFILS IST DERSELBE WIE IN DER TRAININGSLISTE.
@@ -2482,7 +2489,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
   // auch die Achsen-KPI-Karten/Disziplinen-Mini-Bars im Player-Profil
   // speisen — keine zweite Datenquelle.
   const disciplineValues =
-    attributeVisibility === "scouted" && !DEBUG_FORCE_PLAYER_VISIBILITY
+    attributeVisibility === "scouted" && !debugExakt
       ? buildScoutedDisciplineValuesFromPlayer({
           gameState: input.gameState,
           player,

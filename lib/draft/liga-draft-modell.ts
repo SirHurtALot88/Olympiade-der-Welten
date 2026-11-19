@@ -68,6 +68,35 @@ export function berechneRundenReihenfolge(input: {
   return zeilen.map((zeile) => zeile.teamId);
 }
 
+/** Wartet der Draft noch auf die Startwahl mindestens eines Menschen? Dann faehrt weder KI noch Mensch einen Pick. */
+export function wartetAufStartWahl(draft: LigaDraftZustand): boolean {
+  return draft.status === "laeuft" && Object.values(draft.teams).some((team) => team.art === "mensch" && team.startWahl === "offen");
+}
+
+/**
+ * KI-WAHL UNTER DEN TOP 3 (Chris 19.11.: „AI pickt bisher immer den 1. slot“). Die KI waehlt zwischen ihren Top 3 gewichtet nach dem
+ * Bewertungsabstand: Gewicht_i = exp(−(Nutzen_1 − Nutzen_i) / T). Liegt Platz 2/3 nahe an Platz 1, ist er oft dran; liegt Platz 1
+ * klar vorne, nimmt sie fast immer Platz 1. Deterministisch aus Saat + Pick-Nummer (reproduzierbar, kein Math.random).
+ * `T` ist so gewaehlt, dass bei den gemessenen Abstaenden grob 62/25/14 herauskommt (Median-Abstand Platz 1 zu 2: 1,9 Nutzenpunkte; Messung: scripts/miss-liga-draft-ki-wahl.ts,
+ * docs/design/draft-modern-18-11.md Nachtrag 19.11.). Rueckgabe: Index in `nutzen` (0 = Platz 1).
+ */
+export const LIGA_DRAFT_KI_WAHL_T = 2;
+
+export function waehleKiPlatz(nutzen: readonly number[], saat: string, t: number = LIGA_DRAFT_KI_WAHL_T): number {
+  if (nutzen.length <= 1) return 0;
+  // Messschalter: `OLY_LIGA_DRAFT_KI_WAHL=aus` = altes Verhalten (immer Platz 1), nur fuer Vorher/Nachher-Messungen.
+  if (process.env.OLY_LIGA_DRAFT_KI_WAHL === "aus") return 0;
+  const bester = nutzen[0]!;
+  const gewichte = nutzen.map((wert) => Math.exp(-Math.max(0, bester - wert) / Math.max(1e-9, t)));
+  const summe = gewichte.reduce((s, g) => s + g, 0);
+  let ziel = draftUnit(saat) * summe;
+  for (let i = 0; i < gewichte.length; i += 1) {
+    ziel -= gewichte[i]!;
+    if (ziel < 0) return i;
+  }
+  return 0;
+}
+
 export function istTeamPickbereit(draft: LigaDraftZustand, teamId: string): boolean {
   const team = draft.teams[teamId];
   return Boolean(team && team.status === "aktiv" && team.picks < draft.regeln.maxPicksJeTeam);

@@ -170,8 +170,13 @@ async function kickoffEinzelschrittDraft(input: {
   const { persistence, saveId, logPrefix } = input;
   try {
     const { laufeKiImHintergrund, starteLigaDraft } = await import("@/lib/draft/liga-draft-dienst");
+    const { wartetAufStartWahl } = await import("@/lib/draft/liga-draft-modell");
     if (input.sollAbbrechen()) return;
-    starteLigaDraft({ persistence, saveId, selbstPickendeTeamIds: input.selbstPickendeTeamIds });
+    // 19.11. (Chris: „es wird aktuell direkt gepickt“): spielt ein Mensch mit, wird NUR der Zustand angelegt — der Draft steht
+    // bei Pick 1, bis jeder Mensch „Draft spielen“ oder „Selbst kaufen“ gewaehlt hat. Reine KI-Ligen und Menschen mit
+    // Auto-Pick laufen wie bisher sofort durch.
+    const draft = starteLigaDraft({ persistence, saveId, selbstPickendeTeamIds: input.selbstPickendeTeamIds, wahlOffen: true });
+    if (wartetAufStartWahl(draft)) return;
     // Bricht der KI-Lauf ab, bleibt der Draft an seinem letzten gespeicherten Pick stehen. Der Fehler wird NICHT
     // verschluckt (Review #1619, A2): die Liga steht dann auf "failed" — die Shell zeigt ihr Fehlerschild mit
     // „Erneut versuchen“, und `starteLigaDraft` setzt beim erneuten Anstoss den vorhandenen Draft fort statt ihn neu

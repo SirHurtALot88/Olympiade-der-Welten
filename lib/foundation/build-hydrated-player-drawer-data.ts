@@ -25,6 +25,8 @@ export async function buildHydratedPlayerDrawerData(input: {
   manageableTeamIds?: string[] | null;
   saveId?: string | null;
   liveRatingsById?: Map<string, PlayerRatingContractRow> | null;
+  /** Scouting-Nebel trotz Entwickler-Schalter erzwingen (Liga-Draft-Overlay, 19.11.). */
+  fogErzwingen?: boolean;
 }): Promise<PlayerDetailDrawerData | null> {
   const [hydratedGameState, disciplineRankOverride] = await Promise.all([
     hydrateGameStatePlayerAttributeSheet({
@@ -47,6 +49,8 @@ export async function buildHydratedPlayerDrawerData(input: {
     manageableTeamIds: input.manageableTeamIds,
     saveId: input.saveId,
     liveRatingsById: input.liveRatingsById,
-    disciplineRankOverride,
+    // Mit erzwungenem Nebel NICHT den serverseitig (exakt) gerechneten Rang-Override verwenden.
+    disciplineRankOverride: input.fogErzwingen ? null : disciplineRankOverride,
+    fogErzwingen: input.fogErzwingen,
   });
 }

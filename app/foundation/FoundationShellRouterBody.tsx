@@ -13,6 +13,7 @@ import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/co
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
+import { DraftHinweis } from "@/app/foundation/draft-modern/DraftHinweis";
 import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
 const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
@@ -936,7 +937,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <strong>{persistenceError ?? saveSyncError}</strong>
         </div>
       ) : null}
-      {leagueSetupStatus === "in_progress" && ligaDraftTor.aktiv ? null : leagueSetupStatus === "in_progress" ? (
+      {ligaDraftTor.hinweis ? (
+        // 19.11.: statt „Liga wird erstellt …“ der Draft-Hinweis — überall sichtbar, mit Rückweg und der Startwahl.
+        <DraftHinweis
+          saveId={activeSaveId}
+          teamId={activeManagerTeamId ?? null}
+          roomContext={roomContext}
+          onOeffnen={ligaDraftTor.oeffnen}
+        />
+      ) : null}
+      {(leagueSetupStatus === "in_progress" && ligaDraftTor.aktiv) || ligaDraftTor.hinweis ? null : leagueSetupStatus === "in_progress" ? (
         <div
           className="foundation-persistence-banner transfer-callout is-info"
           role="status"
@@ -971,7 +981,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             )
           ) : null}
         </div>
-      ) : leagueSetupStatus === "failed" && !ligaDraftTor.aktiv ? (
+      ) : leagueSetupStatus === "failed" && !ligaDraftTor.aktiv && !ligaDraftTor.hinweis ? (
         // Bei laufendem Liga-Draft gibt es keinen „Erneut versuchen“: der Knopf liefe über /api/ai/picks-run und bekäme
         // 409 `liga_draft_laeuft`. Die Draft-Seite setzt den Draft stattdessen über `ki_hintergrund` fort.
         <div
@@ -1258,6 +1268,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           istGastgeber={!roomContext || findOwnRoomParticipant(roomLiveState, roomContext.participantId)?.role === "host"}
           setupFehlgeschlagen={leagueSetupStatus === "failed"}
           onTakt={setDraftTakt}
+          onZumOffice={() => {
+            ligaDraftTor.schliessen();
+            navigateHomeTab("office");
+          }}
           onWeiter={() => {
             void (async () => {
               try {

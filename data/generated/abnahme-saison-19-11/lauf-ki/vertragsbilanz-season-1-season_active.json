@@ -1,0 +1,32 @@
+{
+  "saison": "season-1",
+  "phase": "season_active",
+  "rostersGesamt": 378,
+  "nachVertragsstatus": {
+    "?": 377,
+    "active": 1
+  },
+  "ereignisseSaison1": {
+    "ki": {},
+    "mensch": {},
+    "gesamt": 0
+  },
+  "ereignisseAlle": {
+    "renewed": 0,
+    "expired": 0,
+    "released": 0,
+    "expiredExit": 0
+  },
+  "kader": {
+    "min": 9,
+    "durchschnitt": 11.81,
+    "max": 14,
+    "unter8": []
+  },
+  "laufzeiten": {
+    "1": 377,
+    "2": 0,
+    "3": 0,
+    "4": 0
+  }
+}

@@ -61,10 +61,21 @@ describe("Beide Schreibwege halten sich daran", () => {
   it("der Kauf entscheidet `canBuy` erst NACH der Verhandlungsvorschau", () => {
     // Der eigentliche Fehler war die Reihenfolge: `canBuy` stand oberhalb der Vorschau, das
     // Verdikt konnte gar nicht einfliessen.
-    const indexVorschau = kauf.indexOf("const contractSalary = negotiationPreview.offeredSalary ?? salary;");
+    // Seit 19.11. bucht der Liga-Draft zu Festkonditionen (Chris: „direkt gepickt zu den Konditionen, die
+    // angegeben sind"); fuer alle anderen Kaeufe bleibt das Gehalt das der Verhandlungsvorschau.
+    const indexVorschau = kauf.indexOf("(negotiationPreview.offeredSalary ?? salary);");
     const indexCanBuy = kauf.indexOf("const canBuy = blockingReasonsMitVerdikt.length === 0;");
     expect(indexVorschau).toBeGreaterThan(0);
     expect(indexCanBuy).toBeGreaterThan(indexVorschau);
+  });
+
+  it("nur der Liga-Draft (draftFestkonditionen) darf am Verdikt vorbei kaufen", () => {
+    expect(kauf).toContain("const festkonditionen = params.draftFestkonditionen === true && salary != null;");
+    expect(kauf).toContain(
+      "const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];",
+    );
+    const setzer = ["lib/draft/liga-draft-dienst.ts", "lib/market/transfermarkt-local-service.ts"];
+    for (const datei of setzer) expect(readFileSync(join(process.cwd(), datei), "utf8")).toContain("draftFestkonditionen");
   });
 
   it("der Kauf nimmt den Verdikt-Blocker in seine Blockerliste auf", () => {

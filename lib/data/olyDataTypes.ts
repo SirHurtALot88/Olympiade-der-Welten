@@ -3821,6 +3821,13 @@ export type LigaDraftTeamZustand = {
   startKasse: number;
   /** Superstar-Lizenz, einmal zu Draft-Beginn vergeben (`null`: Komposition aus). */
   superstarLizenz: boolean | null;
+  /**
+   * Startwahl eines Menschen (19.11.): `offen` = noch nicht entschieden, der Draft steht bei Pick 1 und nichts laeuft;
+   * `spielen` = Draft spielen (Pick 1, auf Knopfdruck, mit Verhandeln); `selbst` = „Selbst kaufen“ (Ueberspringen A: die KI
+   * pickt ohne ihn fertig, danach kauft er aus dem Rest). Fehlt das Feld (aelterer Draft, Tests), gibt es keine Wahl und der
+   * Draft laeuft wie bisher.
+   */
+  startWahl?: "offen" | "spielen" | "selbst";
 };
 
 export type LigaDraftTop3Eintrag = { playerId: string; nutzen: number };

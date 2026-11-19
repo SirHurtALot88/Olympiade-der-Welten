@@ -1,0 +1,39 @@
+{
+  "saison": "season-2",
+  "phase": "season_active",
+  "rostersGesamt": 348,
+  "nachVertragsstatus": {
+    "active": 137,
+    "?": 126,
+    "expiring": 85
+  },
+  "ereignisseSaison1": {
+    "ki": {
+      "contract_renewed": 290,
+      "contract_expired_exit": 76
+    },
+    "mensch": {
+      "contract_expired_exit": 2,
+      "contract_renewed": 9
+    },
+    "gesamt": 377
+  },
+  "ereignisseAlle": {
+    "renewed": 299,
+    "expired": 0,
+    "released": 0,
+    "expiredExit": 78
+  },
+  "kader": {
+    "min": 9,
+    "durchschnitt": 10.88,
+    "max": 14,
+    "unter8": []
+  },
+  "laufzeiten": {
+    "1": 159,
+    "2": 105,
+    "3": 75,
+    "4": 8
+  }
+}

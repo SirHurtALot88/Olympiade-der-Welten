@@ -69,6 +69,10 @@ async function flushMicrotasks() {
 describe("league-setup-draft-service", () => {
   beforeEach(() => {
     runAiPicksExecutePreview.mockReset();
+    // Standard: ein Draft ohne wartenden Menschen (reine KI-Liga bzw. Mensch mit Auto-Pick) — der Kickoff faehrt die KI durch.
+    starteLigaDraft.mockReset();
+    starteLigaDraft.mockReturnValue({ status: "laeuft", teams: { "A-A": { art: "mensch", autoPick: true, startWahl: undefined } } });
+    laufeKiImHintergrund.mockClear();
   });
 
   describe("kickoffLeagueSetupDraft mit OLY_LIGA_DRAFT_MODUS=einzelschritt (Draft-Neubau)", () => {
@@ -88,6 +92,37 @@ describe("league-setup-draft-service", () => {
         expect(starteLigaDraft).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-e", selbstPickendeTeamIds: ["A-A"] }));
         expect(laufeKiImHintergrund).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-e" }));
         expect(runAiPicksExecutePreview).not.toHaveBeenCalled();
+      } finally {
+        delete process.env.OLY_LIGA_DRAFT_MODUS;
+      }
+    });
+
+    it("19.11.: spielt ein Mensch mit offener Startwahl mit, wird NUR der Draft angelegt — kein Hintergrundlauf (Start bei Pick 1)", async () => {
+      const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
+      const persistence = createFakePersistence([{ saveId: "save-w", gameState: buildGameState() }]);
+      starteLigaDraft.mockReturnValue({ status: "laeuft", teams: { "A-A": { art: "mensch", autoPick: false, startWahl: "offen" } } });
+      process.env.OLY_LIGA_DRAFT_MODUS = "einzelschritt";
+      try {
+        kickoffLeagueSetupDraft({ persistence: persistence as never, saveId: "save-w", excludeTeamIds: ["A-A"], logPrefix: "[test]" });
+        await flushMicrotasks();
+        expect(starteLigaDraft).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-w", wahlOffen: true }));
+        expect(laufeKiImHintergrund).not.toHaveBeenCalled();
+        // Die Liga bleibt bis zum Draft-Ende gesperrt (Spieltage brauchen volle Kader).
+        expect(persistence.saves.get("save-w")!.gameState.seasonState.leagueSetupStatus).toBe("in_progress");
+      } finally {
+        delete process.env.OLY_LIGA_DRAFT_MODUS;
+      }
+    });
+
+    it("19.11.: reine KI-Liga oder Mensch mit Auto-Pick (keine offene Wahl): der Hintergrundlauf faehrt wie bisher los", async () => {
+      const { kickoffLeagueSetupDraft } = await import("@/lib/game/league-setup-draft-service");
+      const persistence = createFakePersistence([{ saveId: "save-ki", gameState: buildGameState() }]);
+      starteLigaDraft.mockReturnValue({ status: "laeuft", teams: { "B-B": { art: "ki", autoPick: true } } });
+      process.env.OLY_LIGA_DRAFT_MODUS = "einzelschritt";
+      try {
+        kickoffLeagueSetupDraft({ persistence: persistence as never, saveId: "save-ki", excludeTeamIds: [], logPrefix: "[test]" });
+        await flushMicrotasks();
+        expect(laufeKiImHintergrund).toHaveBeenCalledWith(expect.objectContaining({ saveId: "save-ki" }));
       } finally {
         delete process.env.OLY_LIGA_DRAFT_MODUS;
       }

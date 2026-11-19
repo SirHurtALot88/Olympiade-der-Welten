@@ -22,6 +22,11 @@ import { baueSpielerSicht } from "@/lib/market/transfermarkt-sicht";
 import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import { useMarktFeed } from "@/app/foundation/transfermarkt-modern/tm-daten";
+import { DraftLiga } from "./DraftLiga";
+import { baueDraftKaderSicht } from "./draft-liga";
+import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
+import { DraftProfil } from "./DraftProfil";
+import { getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
 import { AbbruchDialog, Ergebnis, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
 import { useLigaDraft } from "./draft-daten";
@@ -32,7 +37,7 @@ import "./draft-modern.css";
 
 export type DraftTaktZustand = { label: string; title: string; statusClass: string; onClick: () => void };
 
-type Ansicht = "live" | "tafel" | "ende";
+type Ansicht = "live" | "tafel" | "liga" | "ende";
 
 export default function LigaDraftSeite({
   hostProps,
@@ -40,6 +45,7 @@ export default function LigaDraftSeite({
   setupFehlgeschlagen = false,
   onTakt,
   onWeiter,
+  onZumOffice,
 }: {
   hostProps: FoundationMarketV2ShellHostProps;
   /** Solo oder Raum-Gastgeber: nur dann gibt es „Draft abbrechen“ (die Route prüft es ebenfalls). */
@@ -48,6 +54,8 @@ export default function LigaDraftSeite({
   setupFehlgeschlagen?: boolean;
   onTakt: (t: DraftTaktZustand | null) => void;
   onWeiter: () => void;
+  /** „Zurück ins Office“ — der Draft pausiert (Takt läuft hier), der Zustand liegt im Spielstand. */
+  onZumOffice?: () => void;
 }) {
   const { gameState, activeSaveId, activeManagerTeamId, roomContext } = hostProps;
   const teamId = activeManagerTeamId ?? null;
@@ -80,13 +88,14 @@ export default function LigaDraftSeite({
   const [schau, setSchau] = useState<string | null>(null);
   const [skipOffen, setSkipOffen] = useState(false);
   const [abbruchOffen, setAbbruchOffen] = useState(false);
+  const [profilId, setProfilId] = useState<string | null>(null);
 
   // Liegengebliebener Hintergrundlauf (Reload, Server-Neustart, abgebrochener Lauf → Liga „failed“): niemand treibt die
   // KI-Züge. Die Shell bietet dafür kein „Erneut versuchen“ (409 `liga_draft_laeuft`), die Seite setzt den Draft selbst
   // über `ki_hintergrund` fort — einmal je Draft-Stand, leise.
   const fortsetzGesehen = useRef<number | null>(null);
   useEffect(() => {
-    if (!ansicht || ansicht.status !== "laeuft" || !ansicht.amZug?.automatisch || draft.hintergrund || draft.busy) return;
+    if (!ansicht || ansicht.status !== "laeuft" || ansicht.wartetAufStart || !ansicht.amZug?.automatisch || draft.hintergrund || draft.busy) return;
     if (!setupFehlgeschlagen && draft.tempo > 0) return; // läuft der Takt selbst (ki_schritt), nichts zu tun
     if (fortsetzGesehen.current === ansicht.stand) return;
     fortsetzGesehen.current = ansicht.stand;
@@ -128,7 +137,12 @@ export default function LigaDraftSeite({
   const spielerById = useMemo(() => new Map(gameState.players.map((p) => [p.id, p])), [gameState.players]);
   const teamsById = useMemo(() => new Map(gameState.teams.map((t) => [t.teamId, t])), [gameState.teams]);
 
-  const wunsch = useMemo(() => new Set(hostProps.transferWishlistEntriesForMarketV2.map((e) => e.playerId)), [hostProps.transferWishlistEntriesForMarketV2]);
+  // Bug J (19.11.): `transferWishlistEntriesForMarketV2` wird nur in der Transfermarkt-Ansicht gebaut — hier war die Liste leer, der
+  // Stern blieb leer, der zweite Klick entfernte wieder. Direkt aus dem Spielstand ableiten (eigenes Team).
+  const wunsch = useMemo(
+    () => new Set(teamId ? getTeamTransferWishlistEntries(gameState, teamId).map((e) => e.playerId) : []),
+    [gameState, teamId],
+  );
 
   // Vorschlag des eigenen GM als Vormerkung, solange nichts (oder etwas Vergebenes) gewählt ist.
   const vorschlag = ansicht?.mein?.vorschlag[0] ?? null;
@@ -146,6 +160,11 @@ export default function LigaDraftSeite({
       setAns("ende");
     }
   }, [ansicht?.status]);
+
+  const raenge = useMemo(
+    () => (ansicht && ansicht.mein ? baueDraftKaderSicht({ gameState, ansicht, teamId: ansicht.mein.teamId, disziplinIds: [...officialDisciplineWeightOrder] }).zeilen : null),
+    [gameState, ansicht],
+  );
 
   const kontext: DraftKontext | null = ansicht
     ? {
@@ -174,8 +193,29 @@ export default function LigaDraftSeite({
         },
         teamName: (id) => ansicht.teams.find((t) => t.teamId === id)?.name ?? teamsById.get(id)?.name ?? id,
         teamKuerzel: (id) => ansicht.teams.find((t) => t.teamId === id)?.kuerzel ?? teamsById.get(id)?.shortCode ?? id,
+        raenge,
+        profil: (id) => setProfilId(id),
+        spielerName: (id) => zeilenById.get(id)?.item.name ?? ansicht.spieler[id]?.name ?? spielerById.get(id)?.name ?? "—",
         wunsch,
-        toggleWunsch: (item) => hostProps.toggleTransferWishlist(item),
+        // Schmal über `/api/draft` statt über den Auto-Save des ganzen Client-Stands: der Server überholt diesen Stand mit jedem
+        // Pick, der Ganzstand-Save lief daher in „Save-Konflikt erkannt“ (19.11.). Danach den Serverstand übernehmen.
+        toggleWunsch: (item) => {
+          const an = !wunsch.has(item.playerId);
+          void aktionen
+            .wunsch(item.playerId, an, {
+              playerName: item.name,
+              className: item.className,
+              race: item.race,
+              marketValue: item.marketValue ?? null,
+              salary: item.salary ?? null,
+              bracket: item.bracket ?? null,
+              pow: item.pow ?? null,
+              spe: item.spe ?? null,
+              men: item.men ?? null,
+              soc: item.soc ?? null,
+            })
+            .then((ok) => (ok ? hostProps.loadSave(activeSaveId) : undefined));
+        },
         wahl,
         setWahl,
         schau,
@@ -192,6 +232,11 @@ export default function LigaDraftSeite({
       return mein.darfFertig
         ? { label: "Draft abschließen", title: `Kader ${mein.kader} · du kannst weiter picken`, statusClass: "is-ready", onClick: () => void aktionen.fertig() }
         : { label: `Noch ${Math.max(0, ansicht.regeln.minKader - mein.kader)} Pflichtplätze`, title: "Du pickst in Ruhe", statusClass: "is-blocked", onClick: () => {} };
+    }
+    if (ansicht.wartetAufStart) {
+      return mein?.startWahl === "offen"
+        ? { label: "Wahl treffen", title: "Draft spielen oder selbst kaufen — vorher läuft nichts", statusClass: "is-warning", onClick: () => {} }
+        : { label: "Warten auf Mitspieler", title: "Der Draft startet, sobald alle gewählt haben", statusClass: "is-blocked", onClick: () => {} };
     }
     if (draft.hintergrund) return { label: "KI pickt fertig …", title: "Die KI-Teams picken im Hintergrund", statusClass: "is-blocked", onClick: () => {} };
     if (mein?.darfPicken && mein.amZug) {
@@ -211,9 +256,7 @@ export default function LigaDraftSeite({
         label: "Vor zu meinem Pick",
         title: `KI pickt · Pick ${ansicht.picks + 1}${mein.picksBisZug ? ` · noch ${mein.picksBisZug} vor dir` : ""}`,
         statusClass: "is-warning",
-        onClick: () => {
-          draft.setVor(true);
-        },
+        onClick: () => void aktionen.kiHintergrund(),
       };
     }
     return null;
@@ -233,6 +276,7 @@ export default function LigaDraftSeite({
   const reiter: Array<[Ansicht, string]> = [
     ["live", mein?.status === "nachzug" && ansicht?.status === "nachzug" ? "Nachzug" : "Live"],
     ["tafel", "Pick-Tafel"],
+    ["liga", "Liga & Ränge"],
     ...(ansicht?.status === "fertig" ? ([["ende", "Ergebnis"]] as Array<[Ansicht, string]>) : []),
   ];
 
@@ -243,6 +287,8 @@ export default function LigaDraftSeite({
 
   return (
     <div className="tmk drf" data-testid="liga-draft-seite" ref={wurzelRef} style={stil}>
+      {/* Solange das große Profil offen ist, gehört das Band dem Profil-Kopf (beide im Slot überlagerten sich). */}
+      {profilId ? null : (
       <FoundationBandSlot>
         <div className="tmk-bs" data-testid="draft-bandslot">
           <nav className="tmk-bs-reiter" aria-label="Draft-Ansichten">
@@ -256,6 +302,9 @@ export default function LigaDraftSeite({
               {kpi("Picks", String(ansicht.picks), "gemacht")}
               {mein ? kpi("Kasse frei", de(mein.kasse), "C") : null}
               {mein ? kpi("Mein Kader", String(mein.kader), `/ ${ansicht.regeln.minKader} Pflicht`) : null}
+              {onZumOffice && ansicht.status !== "fertig" ? (
+                <button type="button" className="knopf" onClick={onZumOffice} title="Der Draft pausiert, bis du zurückkommst. Der Hinweis oben bringt dich zurück." data-testid="draft-zum-office">← Office</button>
+              ) : null}
               {istGastgeber && ansicht.status !== "fertig" ? (
                 <button type="button" className="knopf" onClick={() => setAbbruchOffen(true)} title="Nur der Gastgeber: beendet den Draft für alle" data-testid="draft-abbrechen">Draft abbrechen</button>
               ) : null}
@@ -263,20 +312,26 @@ export default function LigaDraftSeite({
           ) : null}
         </div>
       </FoundationBandSlot>
+      )}
 
       {!ansicht || !kontext ? (
         <div className="drf-leerzeile" data-testid="draft-laedt">{draft.geladen ? "Für diese Saison gibt es keinen Draft." : "Draft wird geladen …"}</div>
       ) : ans === "tafel" ? (
         <div className="tf drf-seite">
-          <div className="folge df"><Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} zeig={draft.zeig} /></div>
+          <div className="folge df"><Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} onVor={() => void aktionen.kiHintergrund()} zeig={draft.zeig} /></div>
           <PickTafel k={kontext} />
+        </div>
+      ) : ans === "liga" ? (
+        <div className="tf drf-seite">
+          <div className="folge df"><Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} onVor={() => void aktionen.kiHintergrund()} zeig={draft.zeig} /></div>
+          <DraftLiga k={kontext} gameState={gameState} />
         </div>
       ) : ans === "ende" && ansicht.status === "fertig" ? (
         <Ergebnis k={kontext} onWeiter={onWeiter} />
       ) : (
         <div className="dv drf-seite" data-testid="draft-live">
           <div className="folge df">
-            <Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} zeig={draft.zeig} />
+            <Kopfleiste k={kontext} tempo={draft.tempo} setTempo={draft.setTempo} setVor={draft.setVor} onSkip={() => { draft.setTempo(0); setSkipOffen(true); }} onVor={() => void aktionen.kiHintergrund()} zeig={draft.zeig} />
           </div>
           <div className="lsp">
             {mein?.status === "nachzug" && !schau ? <NachzugPanel k={kontext} /> : <AmZug k={kontext} zeig={draft.zeig} onVormerken={(id) => setWahl(id)} />}
@@ -287,6 +342,39 @@ export default function LigaDraftSeite({
           <LiveTicker k={kontext} zeig={draft.zeig} />
         </div>
       )}
+
+      {kontext && ansicht && mein?.startWahl === "offen" && ansicht.status === "laeuft" ? (
+        <div className="drf-start" role="dialog" aria-modal="true" aria-label="Draft starten" data-testid="draft-start">
+          <div className="drf-start-karte">
+            <small>Saisonstart-Draft</small>
+            <h2>Der Draft steht bei Pick 1</h2>
+            <p>Noch ist nichts gepickt. Entscheide, wie du deinen Kader aufbaust — vorher läuft kein Pick, auch nicht der der KI.</p>
+            <div className="drf-start-wahl">
+              <button type="button" className="drf-start-opt haupt" onClick={() => void aktionen.startWahl("spielen")} disabled={draft.busy} data-testid="draft-start-spielen">
+                <b>Draft spielen</b>
+                <span>Du beginnst bei Pick 1 und siehst jeden KI-Pick. Bei deinem Pick wählst du einen Spieler — Draft-Vertrag: 1 Saison, Gehalt wie angezeigt. „Vor zu meinem Pick“ überspringt die KI bis zu dir.</span>
+              </button>
+              <button type="button" className="drf-start-opt" onClick={() => void aktionen.startWahl("selbst")} disabled={draft.busy} data-testid="draft-start-selbst">
+                <b>Selbst kaufen</b>
+                <span>Die KI pickt sofort durch. Danach kaufst du frei aus dem Rest im Transfermarkt.</span>
+              </button>
+            </div>
+            {onZumOffice ? <button type="button" className="knopf" onClick={onZumOffice} data-testid="draft-start-office">← Erst ins Office</button> : null}
+            <em>Der Draft pausiert, solange du nicht hier bist. Der Hinweis im Office bringt dich zurück.</em>
+          </div>
+        </div>
+      ) : null}
+
+      {profilId && kontext ? (
+        <DraftProfil
+          hostProps={hostProps}
+          playerId={profilId}
+          darfPicken={Boolean(mein?.darfPicken && kontext.zeilenById.has(profilId))}
+          onPicken={(id, name) => void aktionen.pick(id, name)}
+          onWechsel={(id) => setProfilId(id)}
+          onZu={() => setProfilId(null)}
+        />
+      ) : null}
 
       {skipOffen && kontext ? (
         <SkipDialog

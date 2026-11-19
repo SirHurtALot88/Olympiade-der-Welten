@@ -309,6 +309,72 @@
 .drf-mb b { font: 400 17px/1.15 "RaniraSeason", Georgia, serif; color: #fff; }
 .drf-mb small { font-size: 14px; color: #9aa7ba; }
 @media (prefers-reduced-motion: reduce) { .drf *, .drf *::before, .drf *::after { animation-duration: .01s !important; transition-duration: .01s !important; } }
+
+/* ===================== 19.11.: Startwahl, Hinweis im App-Rahmen, Liga-Reiter, Profil-Links ===================== */
+
+.drf { position: relative; }
+.drf .drf-start { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(8,11,17,.78); backdrop-filter: blur(2px); }
+.drf .drf-start-karte { width: min(760px, calc(100% - 32px)); padding: 26px 30px; background: #121926; border: 1px solid rgba(240,195,90,.5); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; color: #f4e6c4; }
+.drf .drf-start-karte small { font: 600 12px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .16em; text-transform: uppercase; color: #9aa7ba; }
+.drf .drf-start-karte h2 { margin: 0; font: 700 34px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.drf .drf-start-karte p { margin: 0; font-size: 15px; color: #c9d2e0; }
+.drf .drf-start-karte em { font-style: normal; font-size: 13px; color: #9aa7ba; }
+.drf .drf-start-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.drf .drf-start-opt { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 6px; border: 1px solid rgba(244,230,196,.25); background: #161d2a; color: #f4e6c4; cursor: pointer; font: inherit; }
+.drf .drf-start-opt b { font: 700 22px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.drf .drf-start-opt span { font-size: 14px; color: #c9d2e0; line-height: 1.35; }
+.drf .drf-start-opt.haupt { border-color: #f0c35a; background: rgba(240,195,90,.1); }
+.drf .drf-start-opt:hover:not(:disabled) { border-color: #fff; }
+.drf .drf-start-karte > .knopf { align-self: flex-start; }
+
+.drf .drf-pl { cursor: pointer; text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; }
+.drf .drf-pl:hover { color: #f0c35a; text-decoration-style: solid; }
+
+.drf .drl { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: calc(.72 * var(--u)); padding: calc(.8 * var(--u)) calc(1 * var(--u)); }
+.drf .drl > .pan { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.drf .drl .pk small { margin-left: auto; color: var(--leise); font-size: calc(.8 * var(--u)); }
+.drf .drl .fb { min-height: 0; overflow: auto; }
+.drf .drl-disz { display: grid; grid-template-columns: 1fr 1fr; gap: calc(.25 * var(--u)) calc(1 * var(--u)); }
+.drf .drl-dz { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto; gap: calc(.4 * var(--u)); align-items: center; font-size: calc(.88 * var(--u)); padding: calc(.12 * var(--u)) 0; border-bottom: 1px solid rgba(244,230,196,.06); }
+.drf .drl-dz span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinte); }
+.drf .drl-dz i { height: calc(.42 * var(--u)); background: rgba(255,255,255,.08); display: block; }
+.drf .drl-dz i b { display: block; height: 100%; background: #7fb0ff; }
+.drf .drl-dz.top i b { background: var(--gut); }
+.drf .drl-dz.tief i b { background: var(--warn); }
+.drf .drl-dz em { font-style: normal; color: var(--leise); }
+.drf .drl-dz strong { min-width: 2.2em; text-align: right; color: var(--creme); }
+.drf .drl-dz.top strong { color: var(--gut); }
+.drf .drl-sp { display: flex; flex-direction: column; gap: calc(.3 * var(--u)); }
+.drf .drl-s { display: grid; grid-template-columns: calc(2.1 * var(--u)) minmax(0, 1fr) auto; gap: calc(.5 * var(--u)); align-items: center; }
+.drf .drl-s img, .drf .drl-s .ph { width: calc(2.1 * var(--u)); height: calc(2.1 * var(--u)); border-radius: 50%; object-fit: cover; background: #1b2434; }
+.drf .drl-name { background: none; border: 0; padding: 0; color: var(--tinte); font-weight: 600; font-size: calc(.95 * var(--u)); text-align: left; cursor: pointer; text-decoration: underline dotted rgba(244,230,196,.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drf .drl-top { display: flex; gap: calc(.3 * var(--u)); flex-wrap: wrap; justify-content: flex-end; }
+.drf .drl-top em { font-style: normal; font-size: calc(.78 * var(--u)); padding: 1px calc(.45 * var(--u)); border: 1px solid rgba(244,230,196,.2); border-radius: 3px; color: var(--leise); white-space: nowrap; }
+.drf .drl-top em.gut { color: var(--gut); border-color: rgba(98,211,148,.5); }
+.drf .drl-tr { display: grid; grid-template-columns: minmax(0, 2.2fr) .6fr 1fr 1fr 1.1fr 1fr; gap: calc(.4 * var(--u)); align-items: center; padding: calc(.2 * var(--u)) calc(.4 * var(--u)); font-size: calc(.9 * var(--u)); border-bottom: 1px solid rgba(244,230,196,.06); }
+.drf .drl-tr.kopf { position: sticky; top: 0; background: #121926; z-index: 1; }
+.drf .drl-tr.ich { background: rgba(240,195,90,.12); box-shadow: inset 3px 0 0 #f0c35a; }
+.drf .drl-tr .n { display: flex; align-items: center; gap: calc(.4 * var(--u)); min-width: 0; }
+.drf .drl-tr .n img { width: calc(1.6 * var(--u)); height: calc(1.6 * var(--u)); object-fit: contain; }
+.drf .drl-tr .n b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.drf .drl-tr .n small { color: var(--dritt); font-size: calc(.7 * var(--u)); text-transform: uppercase; letter-spacing: .08em; }
+.drf .drl-tr > span.t { text-align: right; }
+.drf .drl-th { background: none; border: 0; color: var(--leise); font: 700 calc(.78 * var(--u)) "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; text-align: right; padding: 0; }
+.drf .drl-th:first-child { text-align: left; }
+.drf .drl-th.an { color: #f0c35a; }
+
+/* Opt-Plätze (grün) im Platz-Raster „Mein Kader“ und das große Profil als Overlay (19.11.) */
+.drf .plaetze div.opt { border-color: rgba(98,211,148,.6); color: var(--gut); }
+.drf .drf-profil { position: absolute; inset: 0; z-index: 70; display: flex; flex-direction: column; background: #0b0f17; }
+.drf .drf-profil-leiste { display: flex; align-items: center; gap: 14px; padding: 8px 16px; border-bottom: 1px solid rgba(244,230,196,.14); background: #121926; }
+.drf .drf-profil-leiste small { color: #9aa7ba; font-size: 14px; }
+.drf .drf-profil-leiste .knopf { height: 34px; padding: 0 16px; border-radius: 5px; border: 1px solid rgba(244,230,196,.3); background: #161d2a; color: #f4e6c4; font: 700 14px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.drf .drf-profil-leiste .knopf.haupt { background: #f0c35a; border-color: #f0c35a; color: #10151f; }
+.drf .drf-profil-koerper { flex: 1; min-height: 0; overflow: auto; }
+.drf .drf-profil-reiter { display: flex; gap: 4px; margin-left: auto; }
+.drf .drf-profil-reiter button { height: 34px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: #9aa7ba; font: 700 14px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.drf .drf-profil-reiter button.an { color: #f4e6c4; border-bottom-color: #f0c35a; }
+.drf .drf-profil-reiter button:hover { color: #fff; }
 /* Alle Picks: Wappen, Portrait, Achsen-Noten, Ablöse + Gehalt wie im Transfermarkt (19.11.) */
 .drf .db .mz.pz { grid-template-columns: calc(2.4 * var(--u)) calc(2 * var(--u)) calc(2.2 * var(--u)) minmax(calc(5 * var(--u)), .9fr) calc(2.3 * var(--u)) minmax(calc(8 * var(--u)), 1.3fr) calc(9 * var(--u)) calc(4 * var(--u)) calc(4.4 * var(--u)); }
 .drf .db .mz.pz .lg { width: calc(2.2 * var(--u)); height: calc(2.2 * var(--u)); }

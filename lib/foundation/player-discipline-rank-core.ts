@@ -275,8 +275,13 @@ export function resolveAttributeVisibility(input: {
   manageableTeamIds?: string[] | null;
   scoutingLevel?: number | null;
   isOnViewingTeamRoster?: boolean;
+  /**
+   * Der Betrachter will den Nebel ausdruecklich (Liga-Draft-Overlay, 19.11.): der globale Entwickler-Schalter
+   * `DEBUG_FORCE_PLAYER_VISIBILITY` (zeigt sonst ueberall exakt) gilt dann nicht.
+   */
+  ignoreDebug?: boolean;
 }): AttributeVisibility {
-  if (DEBUG_FORCE_PLAYER_VISIBILITY) {
+  if (DEBUG_FORCE_PLAYER_VISIBILITY && !input.ignoreDebug) {
     return "exact";
   }
   if (input.manageableTeamIds && input.manageableTeamIds.length > 0) {

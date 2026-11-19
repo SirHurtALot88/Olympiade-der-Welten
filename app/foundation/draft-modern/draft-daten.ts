@@ -5,7 +5,7 @@
  * `POST /api/draft` (Schnittstelle: docs/design/draft-neubau-kern-18-11.md, Abschnitt 5). Gezeigt = gebucht: nichts hier
  * rechnet Picks oder Preise nach, jede Anzeige kommt aus der Antwort der Route.
  *
- * Tempo 1×/3× heißt: die Seite ruft im Takt `ki_schritt` (2,4 s bzw. 0,8 s). Für Menschen gibt es keine Uhr — der Takt
+ * Tempo 1×/3× heißt: die Seite ruft im Takt `ki_schritt` (0,8 s bzw. 0,27 s; seit 19.11. ist die frühere 3× die neue 1×). Für Menschen gibt es keine Uhr — der Takt
  * hält an, sobald ein Mensch ohne Auto-Pick am Zug ist, und die Seite fragt dann nur noch in Ruhe nach.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,10 +26,11 @@ type PostAntwort = {
   error?: string;
   ansicht?: LigaDraftAnsicht | null;
   eintraege?: LigaDraftEintrag[];
-  halt?: "mensch_am_zug" | "max_picks" | "draft_vorbei";
+  halt?: "mensch_am_zug" | "max_picks" | "draft_vorbei" | "wartet_auf_start";
 };
 
-const TAKT_MS: Record<1 | 3, number> = { 1: 2400, 3: 800 };
+// 19.11. (Chris): „3x sollte standard geschwindigkeit sein“ — die frühere 3× (800 ms) ist die neue 1×; die neue 3× ist dreimal so schnell.
+const TAKT_MS: Record<1 | 3, number> = { 1: 800, 3: 270 };
 const NACHFRAGE_MS = 3000;
 const VOR_MS = 120;
 
@@ -145,6 +146,7 @@ export function useLigaDraft(input: {
       mein.art === "mensch" &&
       ansicht.status === "laeuft" &&
       ansicht.amZug?.automatisch &&
+      !ansicht.wartetAufStart &&
       !hintergrund,
   );
   const taktet = kannTakten && (vor || tempo > 0);
@@ -194,8 +196,24 @@ export function useLigaDraft(input: {
         const antwort = await sende("pick", { playerId, idempotencyKey: neueSchluessel() });
         if (antwort.success) {
           setZeig(null);
-          meldung("g", `${name} gepickt`, "Der Pick ist gebucht.");
+          meldung("g", `${name} gepickt`, "Draft-Vertrag: 1 Saison, Gehalt wie angezeigt.");
         } else if (!istStandKonflikt(antwort.error)) meldung("w", "Pick nicht möglich", fehlerText(antwort.error));
+        return Boolean(antwort.success);
+      },
+      /** Startwahl (19.11.): „spielen“ = Draft spielen, „selbst“ = Selbst kaufen (KI pickt sofort durch). */
+      startWahl: async (wahl: "spielen" | "selbst") => {
+        const antwort = await sende("startwahl", { wahl });
+        if (!antwort.success) meldung("w", "Startwahl", fehlerText(antwort.error));
+        else if (wahl === "selbst") {
+          setHintergrund(true);
+          meldung("g", "Selbst kaufen", "Die KI pickt jetzt durch. Danach kaufst du aus dem Rest im Transfermarkt.");
+        }
+        return Boolean(antwort.success);
+      },
+      /** Wunschliste schmal über `/api/draft` (Bug „Save-Konflikt“, 19.11.); der Client übernimmt danach den Serverstand. */
+      wunsch: async (playerId: string, an: boolean, eintrag: Record<string, unknown>) => {
+        const antwort = await sendeStandfest("wunschliste", { playerId, an, eintrag });
+        if (!antwort.success && !istStandKonflikt(antwort.error)) meldung("w", "Wunschliste", fehlerText(antwort.error));
         return Boolean(antwort.success);
       },
       auslassen: async () => {
@@ -220,7 +238,7 @@ export function useLigaDraft(input: {
           return false;
         }
         if (variante === "A") {
-          const lauf = await sende("ki_hintergrund");
+          const lauf = await sendeStandfest("ki_hintergrund");
           if (lauf.success) {
             setHintergrund(true);
             meldung("g", "KI pickt fertig", "Danach wählst du ohne Reihenfolge aus dem Rest.");
@@ -229,7 +247,7 @@ export function useLigaDraft(input: {
         return true;
       },
       kiHintergrund: async (leise = false) => {
-        const lauf = await sende("ki_hintergrund");
+        const lauf = await sendeStandfest("ki_hintergrund");
         if (lauf.success) setHintergrund(true);
         else if (!leise && !istStandKonflikt(lauf.error)) meldung("w", "KI-Lauf", fehlerText(lauf.error));
         return Boolean(lauf.success);

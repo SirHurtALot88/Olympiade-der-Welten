@@ -16,7 +16,10 @@
  */
 import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
+import { getNextWishlistPriorityRank } from "@/lib/scouting/scouting-wishlist-slots";
+import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
 import type {
+  TransferWishlistEntry,
   GameState,
   LeagueSetupTeamWarning,
   LigaDraftFertigGrund,
@@ -44,9 +47,19 @@ import {
   darfAuslassen,
   erzeugeLigaDraft,
   setzeAutoPick,
+  waehleKiPlatz,
   werIstDran,
+  wartetAufStartWahl,
 } from "@/lib/draft/liga-draft-modell";
 import { bewerteKiPick, freieSpieler, superstarLizenzZuDraftBeginn, type LigaDraftKiBewertung } from "@/lib/draft/liga-draft-ki";
+
+/**
+ * DRAFT-VERTRAG: genau 1 Saison (Chris 19.11.: „im DRAFT also NUR im draft mode, werden alle spieler 1 jahres verträge bekommen
+ * und werden direkt gepickt zu den konditionen die angegeben sind, also gehalt und marktwert“). Gilt fuer JEDEN Pick des
+ * Liga-Drafts (Mensch, KI, Auto-Pick, Nachzug) und wird NUR hier gesetzt — normale Transfermarkt-Kaeufe, auch „Selbst kaufen“
+ * nach dem Draft und spaetere Transferfenster, behalten ihre Laufzeit. Gehalt = angezeigte Forderung, Abloese = Marktwert.
+ */
+export const LIGA_DRAFT_VERTRAGSLAUFZEIT = 1;
 
 type RunContext = ReturnType<typeof createLocalTransfermarktRunContext>;
 
@@ -175,6 +188,11 @@ export type LigaDraftStartEingabe = {
   selbstPickendeTeamIds?: readonly string[] | null;
   seed?: string;
   regeln?: Partial<LigaDraftZustand["regeln"]>;
+  /**
+   * Menschen ohne Auto-Pick bekommen die Startwahl `offen` (19.11.): der Draft steht bei Pick 1, bis jeder von ihnen
+   * „Draft spielen“ oder „Selbst kaufen“ gewaehlt hat. Standard `false` (alter Ablauf).
+   */
+  wahlOffen?: boolean;
 };
 
 /** Baut den Startzustand (Sitze, Anker, Runde 1) aus einem Spielstand. Rein bis auf die Uhrzeit. */
@@ -185,6 +203,7 @@ export function baueLigaDraftStart(input: {
   seed?: string;
   regeln?: Partial<LigaDraftZustand["regeln"]>;
   jetzt?: string;
+  wahlOffen?: boolean;
 }): LigaDraftZustand {
   const { gameState } = input;
   const selbst = new Set(input.selbstPickendeTeamIds ?? []);
@@ -209,6 +228,7 @@ export function baueLigaDraftStart(input: {
       startKaderIds: gameState.rosters.filter((r) => r.teamId === team.teamId).map((r) => r.playerId),
       startKasse: team.cash ?? 0,
       superstarLizenz: superstarLizenzZuDraftBeginn({ gameState, saveId: input.saveId, teamId: team.teamId, freiePool: pool }),
+      ...(input.wahlOffen && mensch && !autoPick ? { startWahl: "offen" as const } : {}),
     };
   });
   return erzeugeLigaDraft({
@@ -259,6 +279,7 @@ export function starteLigaDraft(input: LigaDraftStartEingabe): LigaDraftZustand 
       selbstPickendeTeamIds: input.selbstPickendeTeamIds,
       seed: input.seed,
       regeln: input.regeln,
+      wahlOffen: input.wahlOffen,
     });
     setzeDraftImKontext(ctx, draft);
     return draft;
@@ -274,7 +295,7 @@ export type LigaDraftKiSchrittErgebnis = {
   eintraege: LigaDraftZustand["verlauf"];
   draft: LigaDraftZustand;
   /** Warum der Lauf stoppte: ein Mensch ist dran, Pick-Grenze des Aufrufs, Draft vorbei. */
-  halt: "mensch_am_zug" | "max_picks" | "draft_vorbei";
+  halt: "mensch_am_zug" | "max_picks" | "draft_vorbei" | "wartet_auf_start";
 };
 
 function fertigGrundAusKind(kind: string): LigaDraftFertigGrund {
@@ -410,7 +431,8 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
     return naechster.verlauf[naechster.verlauf.length - 1]!;
   }
 
-  // Die KI nimmt Platz 1. Scheitert der Kauf (Rennen, Validierung, Vorstand), rueckt der naechste Kandidat nach — erst
+  // KI-WAHL (19.11.): die KI waehlt unter ihren Top 3 gewichtet nach dem Bewertungsabstand (`waehleKiPlatz`, deterministisch aus
+  // Saat und Pick-Nummer); die Anzeige bleibt nach Bewertung sortiert. Scheitert der Kauf (Rennen, Validierung, Vorstand), rueckt der naechste Kandidat nach — erst
   // aus der Rangliste der KI, unter dem Mindestkader zuletzt der billigste leistbare freie Spieler (`kaufeMitNachruecken`).
   const kasse = gameState.teams.find((eintrag) => eintrag.teamId === zug.teamId)?.cash ?? 0;
   const unterMinimum = kaderGroesse(gameState, zug.teamId) < draft.regeln.minKader;
@@ -418,12 +440,21 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
   // KADERPLAN (Standard im Saison-1-Draft, docs/design/ki-pick-analyse-18-11.md): kein Notweg „billigster Spieler".
   // Scheitert ein Kauf, geht es in der Rangliste der KI weiter — bis ueber den ganzen Pool —, nie nach Preis sortiert.
   const kaderplan = istKaderplanAktiv(gameState);
+  const wahlIndex = waehleKiPlatz(
+    bewertung.top.map((eintrag) => eintrag.nutzen),
+    `${draft.seed}:${saveId}:ki-wahl:${draft.verlauf.length}:${zug.teamId}`,
+  );
+  const gewaehlt = wahlIndex > 0 ? bewertung.top[wahlIndex]?.playerId ?? null : null;
   const kauf = kaufeMitNachruecken({
     topNStufen: kaderplan ? [...LIGA_DRAFT_KI_TOPN_STUFEN, Number.MAX_SAFE_INTEGER] : undefined,
-    rangliste: (topN) =>
-      topN <= bewertung.top.length || bewertung.top.length < 3
-        ? bewertung.top.slice(0, topN).map((eintrag) => eintrag.playerId)
-        : bewerteKiPick({ gameState, saveId, draft, teamId: zug.teamId, topN }).top.map((eintrag) => eintrag.playerId),
+    rangliste: (topN) => {
+      const roh =
+        topN <= bewertung.top.length || bewertung.top.length < 3
+          ? bewertung.top.slice(0, topN).map((eintrag) => eintrag.playerId)
+          : bewerteKiPick({ gameState, saveId, draft, teamId: zug.teamId, topN }).top.map((eintrag) => eintrag.playerId);
+      // Der gewaehlte Platz steht vorn, der Rest in Bewertungsreihenfolge (Nachruecken wie bisher).
+      return gewaehlt ? [gewaehlt, ...roh.filter((id) => id !== gewaehlt)] : roh;
+    },
     notfall: () =>
       unterMinimum && !kaderplan
         ? freieSpieler(gameState)
@@ -438,6 +469,8 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
         teamId: zug.teamId,
         playerId,
         transferSource: "ai_roster_fill",
+        contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT,
+        draftFestkonditionen: true,
         localRunContext: ctx,
         deferPersist: true,
       });
@@ -466,7 +499,9 @@ function fuehreAutomatischenZugAus(ctx: RunContext, saveId: string): LigaDraftZu
             : null
           : kauf.ausNotfall
             ? "notkauf_mindestkader"
-            : "platz_1_nicht_kaufbar",
+            : kauf.playerId === gewaehlt
+              ? `wahl_platz_${wahlIndex + 1}`
+              : "platz_1_nicht_kaufbar",
       jetzt,
     });
     setzeDraftImKontext(ctx, naechster);
@@ -517,6 +552,8 @@ export function laufeKiZuege(input: {
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     pruefeStand(draftAusKontext(ctx), input.erwarteteNr);
     const eintraege: LigaDraftZustand["verlauf"] = [];
+    // Startwahl offen: der Draft steht bei Pick 1, bis jeder Mensch gewaehlt hat (19.11.).
+    if (wartetAufStartWahl(draftAusKontext(ctx))) return { eintraege, draft: draftAusKontext(ctx), halt: "wartet_auf_start" as const };
     let halt: LigaDraftKiSchrittErgebnis["halt"] = "max_picks";
     while (eintraege.length < maxPicks && (frist == null || eintraege.length === 0 || Date.now() < frist)) {
       const draft = draftAusKontext(ctx);
@@ -585,6 +622,7 @@ export function bucheMenschPick(input: {
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     const draft = draftAusKontext(ctx);
     pruefeStand(draft, input.erwarteteNr);
+    if (wartetAufStartWahl(draft)) throw new LigaDraftFehler("draft_wartet_auf_start");
     const team = pruefeMenschTeam(draft, input.teamId);
     const gameState = ctx.save.gameState;
     const imNachzug = team.status === "nachzug";
@@ -622,6 +660,8 @@ export function bucheMenschPick(input: {
       playerId: input.playerId,
       transferSource: "manual_transfermarkt_buy",
       idempotencyKey: input.idempotencyKey,
+      contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT,
+      draftFestkonditionen: true,
       localRunContext: ctx,
       deferPersist: true,
     });
@@ -660,6 +700,7 @@ export function bucheMenschAuslassen(input: {
     const draft = draftAusKontext(ctx);
     pruefeStand(draft, input.erwarteteNr);
     const team = pruefeMenschTeam(draft, input.teamId);
+    if (wartetAufStartWahl(draft)) throw new LigaDraftFehler("draft_wartet_auf_start");
     const zug = werIstDran(draft);
     if (!zug || zug.teamId !== input.teamId) throw new LigaDraftFehler("nicht_am_zug");
     if (team.autoPick) throw new LigaDraftFehler("auto_pick_ist_an");
@@ -730,6 +771,96 @@ export function bucheMenschUeberspringen(input: {
     });
     setzeDraftImKontext(ctx, naechster);
     return naechster;
+  });
+}
+
+/**
+ * STARTWAHL (19.11.): „Draft spielen“ (`spielen`) oder „Selbst kaufen“ (`selbst` = Ueberspringen Variante A, dieselbe
+ * Buchung wie der Dialog: das Team geht in den Nachzug, die KI pickt ohne es fertig, danach kauft der Mensch aus dem
+ * Rest). Je Sitz; solange ein Mensch noch `offen` hat, faehrt niemand einen Pick (`wartetAufStartWahl`).
+ */
+export function setzeMenschStartWahl(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  teamId: string;
+  wahl: "spielen" | "selbst";
+}): LigaDraftZustand {
+  return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
+    const draft = draftAusKontext(ctx);
+    const team = pruefeMenschTeam(draft, input.teamId);
+    if (team.startWahl !== "offen") return draft;
+    if (draft.status !== "laeuft") throw new LigaDraftFehler("draft_laeuft_nicht");
+    let naechster: LigaDraftZustand = {
+      ...draft,
+      teams: { ...draft.teams, [input.teamId]: { ...team, startWahl: input.wahl } },
+      aktualisiertAm: jetztIso(),
+    };
+    if (input.wahl === "selbst" && team.status === "aktiv") {
+      naechster = bucheUeberspringen({ draft: naechster, gameState: ctx.save.gameState, teamId: input.teamId, variante: "A", jetzt: jetztIso() });
+    }
+    setzeDraftImKontext(ctx, naechster);
+    return naechster;
+  });
+}
+
+/** Spielt noch irgendein Mensch den geordneten Draft mit (aktiv, ohne Auto-Pick)? Sonst muss die KI selbst durchlaufen. */
+export function spieltNochEinMensch(draft: LigaDraftZustand): boolean {
+  return Object.values(draft.teams).some((team) => team.art === "mensch" && team.status === "aktiv" && !team.autoPick);
+}
+
+/**
+ * WUNSCHLISTE IM DRAFT, schmal (19.11.): der Stern schreibt NICHT den ganzen Client-Stand. Der Client haelt waehrend des Drafts
+ * einen Stand, den der Server mit jedem Pick ueberholt; sein Auto-Save lief deshalb in „Save-Konflikt erkannt“. Hier laeuft die
+ * Aenderung wie jede andere Draft-Aktion: frisch lesen, nur die Wunschliste aendern, einmal schreiben.
+ */
+export function setzeDraftWunschliste(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  teamId: string;
+  playerId: string;
+  an: boolean;
+  /** Anzeigewerte des Spielers aus dem Brett (Feed); fehlt er, nimmt der Dienst die Spielerdaten des Spielstands. */
+  eintrag?: Partial<Pick<TransferWishlistEntry, "playerName" | "className" | "race" | "marketValue" | "salary" | "bracket" | "pow" | "spe" | "men" | "soc">> | null;
+}): number {
+  return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
+    const gameState = ctx.save.gameState;
+    const vorhanden = gameState.seasonState.transferWishlist ?? [];
+    const schonDrin = vorhanden.some((e) => e.playerId === input.playerId && e.teamId === input.teamId);
+    if (input.an === schonDrin) return vorhanden.length;
+    const spieler = gameState.players.find((p) => p.id === input.playerId);
+    if (!spieler) throw new LigaDraftFehler("spieler_unbekannt", 404);
+    let naechste: TransferWishlistEntry[];
+    if (!input.an) {
+      naechste = vorhanden.filter((e) => !(e.playerId === input.playerId && e.teamId === input.teamId));
+    } else {
+      const e = input.eintrag ?? {};
+      naechste = [
+        {
+          id: `wishlist-${input.playerId}-${Date.now()}`,
+          saveId: input.saveId,
+          seasonId: gameState.season.id,
+          playerId: input.playerId,
+          playerName: e.playerName ?? spieler.name,
+          className: e.className ?? spieler.className ?? "",
+          race: e.race ?? spieler.race ?? "",
+          marketValue: e.marketValue ?? spieler.marketValue ?? spieler.displayMarketValue ?? null,
+          salary: e.salary ?? spieler.salaryDemand ?? spieler.displaySalary ?? null,
+          bracket: e.bracket ?? null,
+          pow: e.pow ?? null,
+          spe: e.spe ?? null,
+          men: e.men ?? null,
+          soc: e.soc ?? null,
+          teamId: input.teamId,
+          createdAt: new Date().toISOString(),
+          priorityRank: getNextWishlistPriorityRank(gameState, input.teamId),
+        },
+        ...vorhanden,
+      ];
+    }
+    const mitListe: GameState = { ...gameState, seasonState: { ...gameState.seasonState, transferWishlist: naechste } };
+    ctx.save = { ...ctx.save, gameState: syncWishlistToScoutingWatchlist(mitListe, input.teamId) };
+    ctx.deferredWrites += 1;
+    return naechste.length;
   });
 }
 
