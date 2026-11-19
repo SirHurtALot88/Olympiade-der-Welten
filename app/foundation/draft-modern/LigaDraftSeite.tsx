@@ -283,7 +283,7 @@ export default function LigaDraftSeite({
               {mein ? kpi("Kasse frei", de(mein.kasse), "C") : null}
               {mein ? kpi("Mein Kader", String(mein.kader), `/ ${ansicht.regeln.minKader} Pflicht`) : null}
               {onZumOffice && ansicht.status !== "fertig" ? (
-                <button type="button" className="knopf" onClick={onZumOffice} title="Der Draft pausiert, bis du zurückkommst. Der Hinweis oben bringt dich zurück." data-testid="draft-zum-office">← Zurück ins Office</button>
+                <button type="button" className="knopf" onClick={onZumOffice} title="Der Draft pausiert, bis du zurückkommst. Der Hinweis oben bringt dich zurück." data-testid="draft-zum-office">← Office</button>
               ) : null}
               {istGastgeber && ansicht.status !== "fertig" ? (
                 <button type="button" className="knopf" onClick={() => setAbbruchOffen(true)} title="Nur der Gastgeber: beendet den Draft für alle" data-testid="draft-abbrechen">Draft abbrechen</button>

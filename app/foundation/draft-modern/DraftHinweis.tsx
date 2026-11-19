@@ -87,9 +87,7 @@ export function DraftHinweis({
         ? "Die KI-Teams sind durch — du kaufst jetzt aus dem Rest."
         : dran
           ? `Du bist dran (Pick ${nr}). Kein Zeitlimit.`
-          : mein?.picksBisZug != null
-            ? `Pick ${nr} · noch ${mein.picksBisZug} Picks bis zu dir. Der Draft pausiert, solange du nicht auf der Draft-Seite bist.`
-            : `Pick ${nr} läuft.`;
+          : `Pick ${nr} · der Draft pausiert, solange du nicht auf der Draft-Seite bist — dort geht er genau hier weiter.`;
 
   return (
     <div className={`drf-hinweis${dran ? " dran" : ""}`} role="status" aria-live="polite" data-testid="draft-hinweis">

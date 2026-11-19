@@ -232,7 +232,7 @@ export function useLigaDraft(input: {
           return false;
         }
         if (variante === "A") {
-          const lauf = await sende("ki_hintergrund");
+          const lauf = await sendeStandfest("ki_hintergrund");
           if (lauf.success) {
             setHintergrund(true);
             meldung("g", "KI pickt fertig", "Danach wählst du ohne Reihenfolge aus dem Rest.");
@@ -241,7 +241,7 @@ export function useLigaDraft(input: {
         return true;
       },
       kiHintergrund: async (leise = false) => {
-        const lauf = await sende("ki_hintergrund");
+        const lauf = await sendeStandfest("ki_hintergrund");
         if (lauf.success) setHintergrund(true);
         else if (!leise && !istStandKonflikt(lauf.error)) meldung("w", "KI-Lauf", fehlerText(lauf.error));
         return Boolean(lauf.success);

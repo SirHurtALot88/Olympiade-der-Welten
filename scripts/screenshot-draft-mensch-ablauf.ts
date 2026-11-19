@@ -20,7 +20,7 @@ import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 const PORT = process.env.SCREENSHOT_PORT ?? "3217";
 const BASE_URL = `http://localhost:${PORT}`;
 const OUT = path.join(process.cwd(), "docs", "design", "draft-mensch-ablauf-19-11");
-const SQLITE_PATH = path.join(os.tmpdir(), `oly-draft-ablauf-${process.pid}.sqlite`);
+const SQLITE_PATH = process.env.SHOT_SQLITE ?? path.join(os.tmpdir(), `oly-draft-ablauf-${process.pid}.sqlite`);
 
 async function baueSave() {
   process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
@@ -63,9 +63,12 @@ async function warteAufServer() {
   throw new Error("Dev-Server nicht erreichbar");
 }
 
+// SHOT_FORTSETZEN=<saveId>: einen schon laufenden Dev-Server und Spielstand weiterverwenden (Schritte 1-3 sind dann schon aufgenommen).
+const FORTSETZEN = process.env.SHOT_FORTSETZEN ?? null;
+
 async function main() {
   await fs.mkdir(OUT, { recursive: true });
-  const { saveId, teamId } = await baueSave();
+  const { saveId, teamId } = FORTSETZEN ? { saveId: FORTSETZEN, teamId: "M-M" } : await baueSave();
   const server = startDevServer();
   try {
     await warteAufServer();
@@ -91,6 +94,7 @@ async function main() {
     await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 120_000 });
     const briefing = page.getByTestId("season-briefing-backdrop");
     if (await briefing.isVisible().catch(() => false)) await page.getByRole("button", { name: /^(Erledigt|Später)$/ }).first().click().catch(() => undefined);
+    if (!FORTSETZEN) {
     // 1) Office mit Hinweis und der Wahl
     await page.getByTestId("draft-hinweis").waitFor({ state: "visible", timeout: 180_000 });
     await page.waitForTimeout(1500);
@@ -112,10 +116,13 @@ async function main() {
     await page.getByTestId("draft-vor-zu-meinem-pick").waitFor({ state: "visible", timeout: 60_000 });
     await page.waitForTimeout(2500);
     await shot("04-draft-laeuft-vor-zu-meinem-pick.png");
+    } else {
+      await page.getByTestId("draft-vor-zu-meinem-pick").waitFor({ state: "visible", timeout: 120_000 });
+    }
     await page.getByTestId("draft-vor-zu-meinem-pick").click();
     await page.getByTestId("draft-mein-picken").or(page.getByTestId("draft-zeile").first()).first().waitFor({ state: "visible", timeout: 240_000 });
     // warten, bis man dran ist (Knopf ohne "Vorgemerkt")
-    await page.waitForFunction(() => !document.querySelector('[data-testid="draft-vor-zu-meinem-pick"]'), undefined, { timeout: 240_000 });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="draft-vor-zu-meinem-pick"]'), undefined, { timeout: 900_000 });
     await page.waitForTimeout(1500);
     await shot("05-ich-bin-dran.png");
     // 5) Profil ueber dem Draft
@@ -150,7 +157,7 @@ async function main() {
     await browser.close();
   } finally {
     try {
-      process.kill(-server.pid!, "SIGTERM");
+      if (server) process.kill(-server.pid!, "SIGTERM");
     } catch {
       /* schon weg */
     }
