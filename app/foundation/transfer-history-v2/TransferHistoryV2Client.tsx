@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-
-import TransferHistoryV2NewLook from "@/app/foundation/transfer-history-v2/TransferHistoryV2NewLook";
+import HistorieTransfers, { type HistorieTransfersProps } from "@/components/foundation/historie/HistorieTransfers";
 
 export type TransferHistoryV2Row = {
   transferId: string;
@@ -32,6 +30,11 @@ export type TransferHistoryV2Row = {
   matchdayId?: string | null;
   phase?: string | null;
   remainingContractLength?: number | null;
+  /**
+   * Buchung nach „Fenster vor Saison N gehoert zu Saison N" (Chris 18.11.): Kaeufe/Verkaeufe des Fensters von
+   * Saison 1 sind Kaderaufbau aus dem Startbudget, keine Transferbilanz. Optional: aeltere Aufrufer setzen es nicht.
+   */
+  buchungsArt?: "kaderaufbau" | "transfer" | "vertragsende";
 };
 
 export type TransferHistoryV2ClientProps = {
@@ -50,7 +53,10 @@ export type TransferHistoryV2ClientProps = {
     sellFee: number;
     averageFee: number | null;
     averageProfit: number | null;
+    /** Erloese − Ausgaben OHNE den Kaderaufbau von Saison 1 (Chris 18.11.). */
     netTransferBalance: number;
+    /** Kaderaufbau aus dem Startbudget (nur Saison-1-Fenster), `null` wenn keiner im Ausschnitt liegt. */
+    kaderaufbauNet?: number | null;
   };
   filteredRows: TransferHistoryV2Row[];
   visibleRows: TransferHistoryV2Row[];
@@ -87,143 +93,10 @@ export type TransferHistoryV2ClientProps = {
   onLoadMore?: () => void;
 };
 
-/** Länge der Top-Listen (Top-Käufe / Top-Verkäufe / beste Gewinne). */
-export const TOP_LIST_SIZE = 5;
-
-export type ActivityCard = {
-  teamId: string;
-  teamName: string;
-  shortCode: string;
-  volume: number;
-  buys: number;
-  sells: number;
-  spend: number;
-  income: number;
-  net: number;
-};
-
-function getActivitySummary(rows: TransferHistoryV2Row[], teamOptions: TransferHistoryV2ClientProps["teamOptions"]) {
-  const shortCodeById = new Map(teamOptions.map((team) => [team.teamId, team.shortCode] as const));
-  const nameById = new Map(teamOptions.map((team) => [team.teamId, team.name] as const));
-  const entries = new Map<string, ActivityCard>();
-
-  const ensureEntry = (teamId: string, fallbackName: string | null | undefined) => {
-    const existing = entries.get(teamId);
-    if (existing) return existing;
-    const next: ActivityCard = {
-      teamId,
-      teamName: nameById.get(teamId) ?? fallbackName ?? teamId,
-      shortCode: shortCodeById.get(teamId) ?? teamId,
-      volume: 0,
-      buys: 0,
-      sells: 0,
-      spend: 0,
-      income: 0,
-      net: 0,
-    };
-    entries.set(teamId, next);
-    return next;
-  };
-
-  for (const row of rows) {
-    if (row.type === "buy" && row.toTeamId) {
-      const entry = ensureEntry(row.toTeamId, row.toTeamName);
-      entry.volume += 1;
-      entry.buys += 1;
-      entry.spend += row.fee;
-      entry.net -= row.fee;
-    }
-    if ((row.type === "sell" || row.type === "contract_exit") && row.fromTeamId) {
-      const entry = ensureEntry(row.fromTeamId, row.fromTeamName);
-      entry.volume += 1;
-      entry.sells += 1;
-      entry.income += row.fee;
-      entry.net += row.fee;
-    }
-  }
-
-  return Array.from(entries.values()).sort((left, right) => {
-    if (right.income !== left.income) return right.income - left.income;
-    if (right.spend !== left.spend) return right.spend - left.spend;
-    if (right.volume !== left.volume) return right.volume - left.volume;
-    return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
-  });
-}
-
-export default function TransferHistoryV2Client(props: TransferHistoryV2ClientProps) {
-  const { filteredRows, visibleRows, teamOptions } = props;
-  const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
-
-  useEffect(() => {
-    // Nur zurücksetzen, wenn der gewählte Deal den FILTER nicht mehr passiert —
-    // nicht, wenn er bloß auf einer anderen Seite des Pagers liegt. Sonst
-    // springt ein Klick in den Top-Listen (die aus filteredRows kommen) sofort
-    // wieder auf den ersten sichtbaren Deal zurück.
-    if (!filteredRows.some((row) => row.transferId === selectedTransferId)) {
-      setSelectedTransferId(visibleRows[0]?.transferId ?? null);
-    }
-  }, [filteredRows, selectedTransferId, visibleRows]);
-
-  const activityCards = useMemo(() => getActivitySummary(filteredRows, teamOptions), [filteredRows, teamOptions]);
-  const timelineRows = useMemo(() => visibleRows, [visibleRows]);
-  const mostActiveTeam = useMemo(
-    () =>
-      [...activityCards].sort((left, right) => {
-        if (right.volume !== left.volume) return right.volume - left.volume;
-        return right.income - left.income;
-      })[0] ?? null,
-    [activityCards],
-  );
-  // Chris-Rework: echte Top-Listen statt einzelner "biggest"-Kacheln. Die
-  // Einzelwerte (biggestBuy/biggestSale/bestProfit) sind bewusst NUR noch der
-  // erste Eintrag der jeweiligen Liste — eine Quelle pro Größe.
-  const topBuys = useMemo(
-    () =>
-      filteredRows
-        .filter((row) => row.type === "buy")
-        .sort((left, right) => right.fee - left.fee)
-        .slice(0, TOP_LIST_SIZE),
-    [filteredRows],
-  );
-  const topSales = useMemo(
-    () =>
-      filteredRows
-        .filter((row) => row.type === "sell")
-        .sort((left, right) => right.fee - left.fee)
-        .slice(0, TOP_LIST_SIZE),
-    [filteredRows],
-  );
-  const topProfits = useMemo(
-    () =>
-      filteredRows
-        .filter((row) => row.type === "sell" && row.guv != null)
-        .sort((left, right) => (right.guv ?? Number.NEGATIVE_INFINITY) - (left.guv ?? Number.NEGATIVE_INFINITY))
-        .slice(0, TOP_LIST_SIZE),
-    [filteredRows],
-  );
-  const biggestBuy = topBuys[0] ?? null;
-  const biggestSale = topSales[0] ?? null;
-  const bestProfit = topProfits[0] ?? null;
-  const selectedRow =
-    timelineRows.find((row) => row.transferId === selectedTransferId) ??
-    filteredRows.find((row) => row.transferId === selectedTransferId) ??
-    timelineRows[0] ??
-    null;
-
-  return (
-    <TransferHistoryV2NewLook
-      {...props}
-      activityCards={activityCards}
-      mostActiveTeam={mostActiveTeam}
-      topBuys={topBuys}
-      topSales={topSales}
-      topProfits={topProfits}
-      biggestBuy={biggestBuy}
-      biggestSale={biggestSale}
-      bestProfit={bestProfit}
-      selectedRow={selectedRow}
-      selectedTransferId={selectedTransferId}
-      onSelectTransfer={setSelectedTransferId}
-    />
-  );
+/**
+ * Reiter „Transfers" der Historie (Mockup 18.11.). Die alte Karten-Ansicht (Timeline/Tabelle, Top-Listen, Spotlight)
+ * ist in `components/foundation/historie/HistorieTransfers.tsx` aufgegangen; die Zeilenform bleibt hier.
+ */
+export default function TransferHistoryV2Client(props: HistorieTransfersProps) {
+  return <HistorieTransfers {...props} />;
 }

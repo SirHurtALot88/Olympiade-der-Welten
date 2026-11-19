@@ -12,7 +12,15 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-// GESAMT-STAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
+//   - Climbing: seit 18.11. (Canyon live, docs/design/climbing-canyon-live-18-11.md) laeuft `spiele climbing`
+//     im Format "Canyon" (Motor-Vorgabe). Das alte Format bleibt als Rueckweg (Abschalt-Schalter
+//     OLY_CLIMBING_FORMAT=standard) geschuetzt: drei Zeilen `spiele climbing/standard 1|7|42` mit eigener Summe
+//     `CLIMBING-STANDARD ...` AUSSERHALB von GESAMT, mit window.__arena.bahnFlags({climbingFormat:"standard"})
+//     ausdruecklich gesetzt und danach auf die Vorgabe zurueck. `--node` rechnet alles ueber den Node-Motor.
+// GESAMT-STAND (18.11., Canyon live): `GESAMT eaafed96150e (75 Eintraege)`; gegenueber `d3a39030a3ef` aendern sich
+// NUR die drei Zeilen `spiele climbing 1|7|42` (58b9222c223b/b2b7c6e4bfbc/d26ad5352068 -> 310b216c1cc8/727f3c3d16ef/
+// 8f7923e36b5e, die frueheren `spiele climbing/canyon`-Zeilen aus #1633). `CLIMBING-STANDARD` traegt die alten drei.
+// VORSTAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
 // `GESAMT d3a39030a3ef (75 Eintraege)`; gegenueber `ce8fcef66028` aendern sich NUR die drei Zeilen `spiele climbing 1|7|42`.
 // VORSTAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md
 // Abschnitt 7.9): `GESAMT ce8fcef66028 (75 Eintraege)`; gegenueber main mit #1562 (`38b176d7185b`) aendern sich NUR die
@@ -74,6 +82,10 @@ const DISZIPLINEN = ["tdm", "mini-dm", "battlefield", "basketball", "football", 
 const SAATEN = [1, 7, 42];
 const KULISSEN_EFFEKT = process.argv.slice(2).find((a) => a.startsWith("--kulissen-effekt="))?.split("=")[1] ?? null;
 const KONTAKT_FLAG = process.argv.slice(2).includes("--kontakt-flag");
+// --node (Climbing-Canyon-Bau 18.11.): derselbe Abgleich ueber den Node-Motor (lib/battle/arena-node-motor.mjs,
+// scripts/lib/node-arena-seite.mjs) statt Chromium -- ohne Browser und ohne Aufnahme-Sperre; der Node-Motor
+// trifft die Chromium-Pruefsumme (s. docs/design/arena-start-ende-figuren-18-11.md).
+const NODE = process.argv.slice(2).includes("--node");
 const KONTAKT_AUS = process.argv.slice(2).includes("--kontakt-aus");
 const KONTAKT_ZWANG = process.argv.slice(2).find((a) => a.startsWith("--kontakt-zwang="))?.split("=")[1] ?? null;
 if (KONTAKT_ZWANG !== null && !["draufgaenger", "opportunist", "duellant", "schleicher", "beschuetzer", "bollwerk"].includes(KONTAKT_ZWANG)) {
@@ -94,12 +106,19 @@ const sicher = (x) => { const auf = new WeakSet(); return JSON.stringify(x, (k, 
   if (w && typeof w === "object") { if (auf.has(w)) return "[verweis]"; auf.add(w); }
   return w; }); };
 const h = (x) => createHash("sha256").update(sicher(x)).digest("hex").slice(0, 12);
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = NODE ? null : await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+let nodeSeite = null;
 try {
-  const seite = await browser.newPage();
-  await seite.addInitScript(() => { window.AudioContext = undefined; });
-  await seite.goto(SEITE);
-  await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
+  let seite;
+  if (NODE) {
+    const { oeffneNodeSeite } = await import("./lib/node-arena-seite.mjs");
+    seite = nodeSeite = await oeffneNodeSeite(path.join(WURZEL, "public", "mockups"));
+  } else {
+    seite = await browser.newPage();
+    await seite.addInitScript(() => { window.AudioContext = undefined; });
+    await seite.goto(SEITE);
+    await seite.waitForFunction(() => window.__arena && window.__arena.spiele, null, { timeout: 60000 });
+  }
   const ergebnis = await seite.evaluate(({ DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG }) => {
     const A = window.__arena;
     if (KULISSEN_EFFEKT) A.kulissePin(KULISSEN_EFFEKT);
@@ -126,12 +145,26 @@ try {
       zwang: A.kontaktPersZwang(),
       zaehler: ["spurt", "takeshis-castle"].map((d) => { A.spiele(d, 7); return [d, A.kontaktZaehler()]; }),
     } : null;
-    return { aus, kontakt };
+    // CLIMBING IM ALTEN FORMAT "STANDARD" (Rueckweg seit Canyon live, 18.11., docs/design/climbing-canyon-live-18-11.md):
+    // eigene Eintraege NACH allen anderen und AUSSERHALB von GESAMT; GESAMT rechnet Climbing im Live-Format Canyon.
+    const standard = [];
+    if (A.canyonParameter) for (const s of SAATEN) {
+      try {
+        A.bahnFlags({ climbingFormat: "standard" });
+        standard.push([`spiele climbing/standard ${s}`, A.spiele("climbing", s)]);
+      } catch (e) { standard.push([`spiele climbing/standard ${s}`, "FEHLER " + String(e)]); }
+      finally { A.bahnFlags({ climbingFormat: null }); }
+    }
+    return { aus, kontakt, standard };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
+  for (const [name, wert] of ergebnis.standard || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.standard?.length) console.log(`CLIMBING-STANDARD ${h(ergebnis.standard)} (${ergebnis.standard.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
   if (ergebnis.kontakt) console.log("KONTAKT " + JSON.stringify(ergebnis.kontakt));
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
+  if (nodeSeite) nodeSeite.schliessen();
 }
+if (NODE) process.exit(0);

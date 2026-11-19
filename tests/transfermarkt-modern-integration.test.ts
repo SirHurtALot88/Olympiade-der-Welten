@@ -22,6 +22,11 @@ import {
 } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
+// GEMEINSAMES TRANSFERFENSTER (Chris 18.11.): diese Datei prueft Kauf im Kauffenster und Verkauf im Verkaufsfenster am Saisonende,
+// also den ALTEN Ablauf. Er bleibt ueber `OLY_TRANSFERFENSTER_GEMEINSAM=0` erreichbar; der neue Standard (Kaufen
+// und Verkaufen gemeinsam vor Spieltag 1) steht in `tests/transferfenster-gemeinsam.test.ts`.
+process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+
 const SQLITE = path.join(os.tmpdir(), `oly-tm-integration-${process.pid}.sqlite`);
 let persistence: ReturnType<typeof createPersistenceService>;
 let saveId = "";

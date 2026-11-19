@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const router = readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8");
 const host = readFileSync(join(root, "app/foundation/finances/FoundationFinancesHost.tsx"), "utf8");
-const view = readFileSync(join(root, "app/foundation/finances/FoundationFinancesNewLook.tsx"), "utf8");
+const view = readFileSync(join(root, "app/foundation/finances/FinanzenModern.tsx"), "utf8");
 
 describe("Finanzen · Team öffnet das Profil", () => {
   it("reicht den Öffner vom Router an den Host", () => {
@@ -33,19 +33,20 @@ describe("Finanzen · Team öffnet das Profil", () => {
 
   it("reicht ihn vom Host an die Ansicht", () => {
     expect(host).toContain("onOpenTeam?: (teamId: string) => void");
-    expect(host).toMatch(/<FoundationFinancesNewLook[\s\S]{0,400}onOpenTeam=\{onOpenTeam\}/);
+    expect(host).toMatch(/<FinanzenModern[\s\S]{0,400}onOpenTeam=\{onOpenTeam\}/);
   });
 
   it("reicht ihn von der Ansicht bis in die Liga-Tabelle", () => {
-    expect(view).toMatch(/<FinanceLeagueTable[\s\S]{0,200}onOpenTeam=\{onOpenTeam \?\? null\}/);
-    expect(view).toMatch(/renderLeagueCell\([\s\S]{0,160}onOpenTeam\)/);
+    expect(view).toMatch(/<KontextLiga[\s\S]{0,200}onOpenTeam=\{onOpenTeam\}/);
+    expect(view).toMatch(/<ApronAnsicht[\s\S]{0,200}onOpenTeam=\{onOpenTeam\}/);
   });
 
   it("macht die Team-Zelle zum Knopf, der das Profil öffnet", () => {
-    expect(view).toMatch(/className="nl-fin-league-team is-linked"[\s\S]{0,120}onClick=\{\(\) => onOpenTeam\(row\.teamId\)\}/);
+    expect(view).toMatch(/onClick=\{\(\) => onOpenTeam\(r\.teamId\)\}/);
   });
 
   it("bleibt ohne Öffner reiner Text statt eines Knopfs ohne Wirkung", () => {
-    expect(view).toMatch(/if \(!onOpenTeam\) \{[\s\S]{0,160}<span className="nl-fin-league-team">/);
+    // Ohne Öffner wird die Zeile ein <div>, kein <button> ohne Wirkung.
+    expect(view).toMatch(/onOpenTeam \? \(\s*<button[\s\S]{0,200}\) : \(\s*<div/);
   });
 });

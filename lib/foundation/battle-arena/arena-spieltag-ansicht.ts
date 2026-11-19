@@ -41,6 +41,12 @@ export type ArenaSpieltagAnsicht = {
   gastTeamId: string;
   /** Bezugsteam fuer die Pod-Suche — immer das eigene Team. */
   podTeamId: string;
+  /**
+   * Die GEBUCHTE Vierergruppe (Reihenfolge der Buchung) -- nur beim Pod, sonst `null`. Quelle ist die
+   * Wertungszeile des eigenen Teams, nicht eine zweite Suche im Host: so kann die Anzeige (Kopf,
+   * Vorstellung, Ergebnis) nie eine andere Gruppe nennen als die, die gebucht wird.
+   */
+  podTeamIds: string[] | null;
 };
 
 export type ArenaSpieltagEntscheidung = ArenaSpieltagAnsicht & {
@@ -112,6 +118,7 @@ export function bestimmeArenaSpieltagAnsicht(input: {
       heimTeamId: fixture.homeTeamId,
       gastTeamId: fixture.awayTeamId,
       podTeamId: ownTeamId,
+      podTeamIds: null,
       eigeneZeile,
       gegnerZeile: disziplin.teamResults.find((zeile) => zeile.teamId === gegnerId) ?? null,
     };
@@ -119,17 +126,26 @@ export function bestimmeArenaSpieltagAnsicht(input: {
 
   if (eigeneZeile.resolutionSource === "mini_dm_pod" && istMotorPodQuelleClient(eigeneZeile.miniDmPod?.quelle)) {
     const pod = eigeneZeile.miniDmPod;
+    const podTeamIds = pod?.teamIds ? [...pod.teamIds] : null;
+    // WECHSEL D1 -> D2 (18.11., Chris: „obwohl ich N-N steuere, geht er auf ein anderes Spiel"): der Gegner
+    // aus dem Fixture (D1-Duell) sitzt in einer Vierergruppe NICHT zwingend mit dem eigenen Team -- Pods
+    // sind eine eigene, zur Fixture-Paarung parallele Gruppierung. Frueher stand er trotzdem als „Gast"
+    // im Kopf des Spiels und der Vorstellung. Jetzt ist der Gast immer ein Mitglied der gebuchten Gruppe.
+    const fixtureGegner = fixture ? (fixture.homeTeamId === ownTeamId ? fixture.awayTeamId : fixture.homeTeamId) : null;
     const zweites =
-      (fixture ? (fixture.homeTeamId === ownTeamId ? fixture.awayTeamId : fixture.homeTeamId) : null) ??
-      pod?.teamIds.find((teamId) => teamId !== ownTeamId) ??
-      null;
+      fixtureGegner && (!podTeamIds || podTeamIds.includes(fixtureGegner))
+        ? fixtureGegner
+        : (podTeamIds?.find((teamId) => teamId !== ownTeamId) ?? null);
     if (!zweites) return null;
+    // Das eigene Team gehoert in die gezeigte Gruppe -- sonst ist es ein fremdes Spiel.
+    if (podTeamIds && !podTeamIds.includes(ownTeamId)) return null;
     return {
       art: "pod",
       disciplineId,
       heimTeamId: ownTeamId,
       gastTeamId: zweites,
       podTeamId: ownTeamId,
+      podTeamIds,
       eigeneZeile,
       gegnerZeile: null,
     };

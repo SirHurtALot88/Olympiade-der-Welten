@@ -17,6 +17,7 @@ import {
 import { getDevelopmentWeightedFacilityUpgradeDiscount, getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
+import { pruefeGebaeudeGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -244,6 +245,11 @@ export function previewFacilityUpgrade(
     blockingReasons.push("specialist_wing_variant_switch_not_supported");
   }
   if (cashAfter != null && cashAfter < 0) blockingReasons.push("insufficient_cash");
+  // Finanzkonzept V2: Gebaeude zahlen aus dem Investitionstopf des Vorstands (hart, Mensch und KI gleich).
+  if (action === "upgrade" && team && facility && upgradeCost != null && upgradeCost > 0) {
+    const vorstand = pruefeGebaeudeGegenVorstandFreigabe(gameState, teamId, upgradeCost);
+    if (!vorstand.ok && vorstand.reason) blockingReasons.push(vorstand.reason);
+  }
 
   const confirmToken =
     blockingReasons.length === 0 && team && facility && nextLevel != null && upgradeCost != null && cashBefore != null

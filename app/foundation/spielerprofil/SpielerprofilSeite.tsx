@@ -85,13 +85,13 @@ export default function SpielerprofilSeite({
       <FoundationBandSlot>
         <div className={`bc spr-slot${modell.verletzung.verletzt ? " is-verletzt" : ""}`} data-testid="spielerprofil-kopf">
           {onClose ? (
-            <button type="button" className="spr-zurueck" onClick={onClose} data-testid="spielerprofil-zurueck">
-              <BcIcon name="links" /> Zurück
+            <button type="button" className="spr-zurueck" aria-label="Zurück" title="Zurück" onClick={onClose} data-testid="spielerprofil-zurueck">
+              <BcIcon name="links" /> <span className="spr-zurueck__text">Zurück</span>
             </button>
           ) : null}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {data.portraitUrl ? <img className="spr-kopf__port" src={data.portraitUrl} alt="" /> : <span className="spr-kopf__port" aria-hidden="true" />}
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: "9em", flex: "0 1 auto" }}>
             <h2 className="spr-kopf__name" style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
               <span className="spr-blaettern" role="group" aria-label="Im Kader blättern">
@@ -124,7 +124,7 @@ export default function SpielerprofilSeite({
             ) : null}
             {moral != null ? <BcMoralGesicht wert={moral} mitZahl={!modell.nebel} groesse={22} /> : null}
             {modell.verletzung.verletzt ? (
-              <span className="spr-marke is-rot" data-testid="spielerprofil-status-verletzt">
+              <span className="spr-marke is-rot spr-marke--band" data-testid="spielerprofil-status-verletzt" title={modell.verletzung.text ?? undefined}>
                 {modell.verletzung.text}
               </span>
             ) : data.teamId ? (

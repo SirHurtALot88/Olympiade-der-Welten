@@ -882,7 +882,8 @@ describe("team management overview", () => {
     expect(result[0]?.startplatz).toBe(5);
     expect(result[0]?.rankDiff).toBe(-1);
     expect(result[0]?.financeForm).toBe(3);
-    expect(result[0]?.transfersSeasonValue).toBe(0);
+    // Saison 1 hat keine Transferbilanz (Chris 18.11.): der Draft ist Kaderaufbau — „—" statt 0.
+    expect(result[0]?.transfersSeasonValue).toBeNull();
     expect(typeof result[0]?.cashFc).toBe("number");
     expect(typeof result[0]?.sponsorBasis).toBe("number");
     expect(typeof result[0]?.sponsorRank).toBe("number");

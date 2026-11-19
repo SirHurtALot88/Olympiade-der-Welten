@@ -28,7 +28,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
@@ -141,6 +141,18 @@ function baueRequest() {
 
 type Lauf = { transferBuysApplied: number; warnings: string[] };
 
+
+// Diese Datei prueft den Marktplan-Weg des Fensters (Stand #1634, `OLY_FENSTER_AUF_OPT=0`). Seit „Fenster auf Opt" (Standard,
+// docs/design/fenster-auf-opt-18-11.md) kaufen Kauf- und Nachrunde ueber den organischen Planer; diesen Weg pruefen
+// tests/preseason-hintergrundlauf-kauffenster.test.ts und tests/fenster-auf-opt.test.ts. Reihenfolge danach (Verletzungs-Topup,
+// Kassensturz, Snapshot) ist in beiden Wegen dieselbe Code-Strecke.
+beforeEach(() => {
+  process.env.OLY_FENSTER_AUF_OPT = "0";
+});
+afterEach(() => {
+  delete process.env.OLY_FENSTER_AUF_OPT;
+});
+
 describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-Lauf", () => {
   beforeEach(() => {
     applyAiMarketPlanLocally.mockReset();
@@ -176,8 +188,9 @@ describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-
     const { POST } = await import("@/app/api/ai/preseason-background/route");
     const payload = (await (await POST(baueRequest())).json()) as { run: Lauf };
 
-    // 1 aus dem Marktlauf + 0 aus dem Verletzungs-Topup. Der frueher addierte Fuell-Anteil ist weg.
-    expect(payload.run.transferBuysApplied).toBe(1);
+    // 1 aus dem Marktlauf + 1 aus der Nachrunde des gemeinsamen Transferfensters (Chris 18.11.; derselbe Planer, der
+    // Mock liefert je Aufruf einen Kauf) + 0 aus dem Verletzungs-Topup. Der frueher addierte Fuell-Anteil ist weg.
+    expect(payload.run.transferBuysApplied).toBe(2);
     expect(payload.run.warnings.some((eintrag) => eintrag.startsWith("roster_fill_auf_optimum:"))).toBe(false);
   });
 

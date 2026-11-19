@@ -6190,6 +6190,45 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Finanzseite: Umschichten, Ruecklage anzapfen, „Alles auf eine Karte“ (Finanzkonzept V2). Gleiches Muster wie die
+   * Kredit-Aktionen: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers (Fog of War), nie ein
+   * `teamId`-Parameter; der Server prueft den Besitz ueber `authorizeServerRoomWrite`.
+   */
+  async function vorstandBudgetAktion(input: {
+    aktion: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen";
+    betrag?: number;
+  }): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/finance/vorstand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          aktion: input.aktion,
+          betrag: input.betrag,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      // Auch ein abgelehnter Antrag aendert den Spielstand (Vermerk fuer die Anzeige): immer neu laden.
+      if (payload.reason === "vorstand_lehnt_ab" || (response.ok && payload.ok)) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -12244,7 +12283,29 @@ export function useFoundationShellRouterBodyScope({
     [activeContextMeta],
   );
 
+  /**
+   * HISTORIE (Mockup 18.11.): ein Schienenpunkt, drei Reiter. Archiv, Transfers und Ewige Tabelle bleiben eigene
+   * Ansichten (`seasonArchive`, `historyV2`, `allTimeTable`); dieser Wechsler setzt zwischen ihnen um und waehlt
+   * dabei optional das Transferfenster.
+   */
+  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => {
+    if (reiter === "transfers") {
+      if (seasonId) setHistorySeasonFilter(seasonId);
+      // „Alle Transfers" eines Teams: alle Fenster, nur dieses Team.
+      if (teamId) {
+        setHistoryTeamFilter(teamId);
+        setHistorySeasonFilter(HISTORY_ALL_SEASONS_FILTER);
+      }
+      setFoundationView("historyV2", setActiveView, { push: true });
+      return;
+    }
+    setFoundationView(reiter === "ewig" ? "allTimeTable" : "seasonArchive", setActiveView, { push: true });
+  };
+  const historieOpenSaisonstand = () => setFoundationView("seasonV2", setActiveView, { push: true });
+
   const foundationHistoryV2HostProps: FoundationHistoryV2ShellHostProps = {
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
     sourceBadgeLabel: historySourceBadgeLabel,
     activeSaveId,
     saveName: activeSaveName,
@@ -12879,10 +12940,22 @@ export function useFoundationShellRouterBodyScope({
   };
 
   const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
+    gameState,
+    ownTeamId: activeManagerTeamId ?? null,
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
     model: allTimeTableModel,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
     onOpenTeam: openTeamProfileById,
+  };
+
+  const foundationSeasonArchiveHostProps = {
+    gameState,
+    ownTeamId: activeManagerTeamId ?? null,
+    onOpenTeam: openTeamProfileById,
+    onWechsel: historieWechsel,
+    onOpenSaisonstand: historieOpenSaisonstand,
   };
 
   // Vorsaison-Podium (W1): nur relevant, wenn das PP-Board leer startet — die
@@ -13246,6 +13319,8 @@ export function useFoundationShellRouterBodyScope({
     onOpenLeagueLeaders,
     orderedDisciplines,
     originateLoanForActiveTeam,
+    vorstandBudgetAktion,
+    kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,
     passiveTeams,
@@ -13524,6 +13599,7 @@ export function useFoundationShellRouterBodyScope({
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
     foundationAllTimeTableHostProps,
+    foundationSeasonArchiveHostProps,
     foundationMerklisteHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,

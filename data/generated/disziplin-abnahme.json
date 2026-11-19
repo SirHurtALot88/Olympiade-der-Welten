@@ -3,7 +3,7 @@
  "beobachtungsliste": {
   "i-spy": "AKTUALISIERT 17.11. (Knack-Motor V2: Balken, Ortswahl, Schubsen, docs/design/ispy-knacken-ortswahl-schubsen-17-11.md): rho je Spiel 0,845 (n=48, Spannweite 0,088) -- jetzt UEBER dem Ziel 0,80 und 0,095 ueber der Mindestschranke, Pp 16,4/14,0. Bleibt vorerst auf der Liste, weil der Motor neu ist und die Pp-Zahl je Saatstrom stark streut (Kalibrierlaeufe derselben Mechanik mit kleinen Rezeptvarianten: 12,7 bis 27,3 je Strom). Bei der naechsten Nachmessung zuerst Pp auf drei Stroemen pruefen; haelt alles, von der Liste nehmen. Vorgaenger-Eintrag: AKTUALISIERT 15.11. (Task #136), BESTAETIGT BEI n=48: rho 0,779 (n=24) bzw. **0,776 (n=48, Gegenprobe)** — unter die 0,80-Schranke gefallen (vorher 0,817/0,811, bereits damals knapp) UND bei doppelter Stichprobe nicht zurueckgekehrt, anders als Climbing. I-Spy ist aktuell in ARENA_RESOLVED_DISCIPLINE_IDS gewertet — dieser Befund macht tests/disziplin-abnahme-guard.test.ts rot, bis die Menge nachgezogen wird (Entscheidung/Code-Aenderung bewusst NICHT Teil dieser reinen Mess-PR, s. Eintrag unten). Vor der naechsten Nachmessung pruefen, ob eine andere/erweiterte Kaderfamilie etwas anderes zeigt. NACHTRAG 17.11. (Mindestschranke 0,75 statt 0,80, Chris): mit 0,776 besteht I-Spy die neue Mindestschranke 0,75 jetzt REGULAER (Abstand 0,026), die rho-Ausnahme in ARENA_ABNAHME_AUSNAHMEN ist nicht mehr tragend. Liegt weiter unter dem Ziel 0,80, und die Kaderspannweite (0,199) ist breiter als der Abstand zur Mindestschranke -- bleibt deshalb auf der Liste.",
   "showcase": "NEU 15.11. (Task #136), BESTAETIGT BEI n=48: rho 0,771 (n=24) bzw. **0,781 (n=48, Gegenprobe)** — unter die 0,80-Schranke gefallen, erstmals, UND bei doppelter Stichprobe nicht zurueckgekehrt, anders als Climbing. Showcase ist aktuell in ARENA_RESOLVED_DISCIPLINE_IDS gewertet — dieser Befund macht tests/disziplin-abnahme-guard.test.ts rot, bis die Menge nachgezogen wird (Entscheidung/Code-Aenderung bewusst NICHT Teil dieser reinen Mess-PR, s. Eintrag unten). Vor der naechsten Nachmessung pruefen, ob eine andere/erweiterte Kaderfamilie etwas anderes zeigt. NACHTRAG 17.11. (Mindestschranke 0,75 statt 0,80, Chris): mit 0,781 besteht Showcase die neue Mindestschranke 0,75 jetzt REGULAER (Abstand 0,031), die rho-Ausnahme in ARENA_ABNAHME_AUSNAHMEN ist nicht mehr tragend. Liegt weiter unter dem Ziel 0,80, Kaderspannweite 0,151 -- bleibt deshalb auf der Liste.",
-  "climbing": "AKTUALISIERT 18.11. (Ende erst, wenn alle oben sind; kein Lead-Zeitlimit mehr): rho je Spiel 0,816 (n=48, Spannweite 0,174), Pp 12,7/9,6 -- 0,016 ueber dem Ziel, nicht mehr der knappste Wert im Feld. VORHER: NEU 15.11. (Task #136): rho fiel bei n=24 auf 0,797 (knapp unter die Schranke), kehrte bei der n=48-Gegenprobe aber auf **0,801** zurueck -- bestanden, aber der denkbar knappste Wert im gesamten Feld (0,001 Abstand). Anders als Showcase/I-Spy also (bisher) kein belegter Unterschrankenbefund, sondern echtes Rauschen um die Grenze. Bei der naechsten Nachmessung zuerst pruefen. NACHTRAG 17.11. (Mindestschranke 0,75 statt 0,80, Chris): 0,801 liegt jetzt 0,051 ueber der Mindestschranke, aber nur 0,001 ueber dem Ziel 0,80, bei der breitesten Kaderspannweite der knappen Disziplinen (0,209) -- bleibt auf der Liste. BREAKING (bis 17.11. auf dieser Liste, zuletzt rho 0,860/0,867, 0,11 ueber der Mindestschranke) ist mit der Senkung heruntergenommen: der Abstand ist groesser als bei jeder hier verbliebenen Disziplin."
+  "climbing": "CANYON LIVE 18.11.: rho je Spiel 0,860 (n=48, Spannweite 0,172), Pp 12,3/16,1 -- 0,06 ueber dem Ziel, bleibt auf der Liste, bis das neue Format einige echte Spieltage gelaufen ist (schwaechster Kader 0,732, zweiter Pp-Stamm 16,1 knapp ueber dem Optimum). VORHER: AKTUALISIERT 18.11. (Ende erst, wenn alle oben sind; kein Lead-Zeitlimit mehr): rho je Spiel 0,816 (n=48, Spannweite 0,174), Pp 12,7/9,6 -- 0,016 ueber dem Ziel, nicht mehr der knappste Wert im Feld. VORHER: NEU 15.11. (Task #136): rho fiel bei n=24 auf 0,797 (knapp unter die Schranke), kehrte bei der n=48-Gegenprobe aber auf **0,801** zurueck -- bestanden, aber der denkbar knappste Wert im gesamten Feld (0,001 Abstand). Anders als Showcase/I-Spy also (bisher) kein belegter Unterschrankenbefund, sondern echtes Rauschen um die Grenze. Bei der naechsten Nachmessung zuerst pruefen. NACHTRAG 17.11. (Mindestschranke 0,75 statt 0,80, Chris): 0,801 liegt jetzt 0,051 ueber der Mindestschranke, aber nur 0,001 ueber dem Ziel 0,80, bei der breitesten Kaderspannweite der knappen Disziplinen (0,209) -- bleibt auf der Liste. BREAKING (bis 17.11. auf dieser Liste, zuletzt rho 0,860/0,867, 0,11 ueber der Mindestschranke) ist mit der Senkung heruntergenommen: der Abstand ist groesser als bei jeder hier verbliebenen Disziplin."
  },
  "schranken": {
   "rhoJeSpielUeber": 0.75,
@@ -800,22 +800,22 @@
   },
   "climbing": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.808,
-   "rhoSpannweite": 0.168,
-   "rhoSaison": 0.879,
+   "rhoJeSpiel": 0.86,
+   "rhoSpannweite": 0.172,
+   "rhoSaison": 0.888,
    "rhoMessung": {
-    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 climbing -- Formkarten in allen Disziplinen, 18.11.",
-    "spiele": 24,
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 climbing --node -- 18.11. Canyon live (Motor-Vorgabe climbingFormat=canyon)",
+    "spiele": 48,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    14.0,
-    11.7
+    12.3,
+    16.1
    ],
    "ppMessung": {
-    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs climbing 48 (+ --saat-versatz=10000000)",
+    "befehl": "node scripts/miss-climbing-canyon.mjs 48 --pp (einflussVon im Node-Motor, Saatstaemme 0 / 10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -825,25 +825,10 @@
     ]
    },
    "datum": "2026-11-18",
-   "commit": "e5723684",
+   "commit": "93c652b7",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest climbing die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. Gemessen auf dem Climbing-Stand 'Ende erst, wenn alle oben sind' (main 18.11.); im selben Lauf mit Ersatzkarte 0,815. | VORHER: ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
-   "formkarten": {
-    "modus": "echt",
-    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
-    "ersatzVorher": {
-     "rhoJeSpiel": 0.816,
-     "rhoSpannweite": 0.174,
-     "rhoSaison": 0.881,
-     "pp": [
-      12.7,
-      9.6
-     ],
-     "datum": "2026-11-18",
-     "commit": "becc6634"
-    }
-   }
+   "anmerkung": "CANYON LIVE 18.11. (Chris: 'Ja, Canyon soll live gehen', docs/design/climbing-canyon-live-18-11.md): Climbing laeuft im Format Canyon (Wand mit drei Wegen, Engstelle, Rangeln, Seilschaften; docs/design/climbing-canyon-bau-18-11.md). Abnahme im Live-Format: rho je Spiel 0,816 -> **0,860** (n=48, Spannweite 0,172; je Kader 0,794/0,866/0,904/0,732/0,860), Saison 0,881 -> 0,888; Pp 12,7/9,6 -> **12,3/16,1** (Pflicht <=25, zweiter Stamm knapp ueber dem Optimum 15: speed/dexterity 2-4 ueber der Matrix). n=24: 0,867 (Spannweite 0,155, Saison 0,916). Fingerabdruck d3a39030a3ef -> eaafed96150e, nur spiele climbing 1/7/42; das alte Format bleibt als CLIMBING-STANDARD 164b3d846334 ausserhalb von GESAMT (Rueckweg OLY_CLIMBING_FORMAT=standard). Gemessen ueber den Node-Motor (miss-alle-disziplinen --node, miss-climbing-canyon --pp). VORHER (Format standard): ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
   },
   "football": {
    "rhoJeSpiel": 0.818,

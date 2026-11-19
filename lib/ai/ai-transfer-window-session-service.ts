@@ -20,6 +20,7 @@ import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-ser
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
 import { applyEarlyPayoff, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
+import { entscheideKiVorstandMassnahmen } from "@/lib/finance/vorstand-budget-aktionen";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -41,8 +42,18 @@ import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
+import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 
-export type TransferWindowPhase = "preseason" | "season_end";
+/**
+ * `season_end`      Saisonende-Kette (alte Saison): verkaufen (alter Ablauf) bzw. nur verlaengern
+ *                   (`nurVerlaengern`, gemeinsames Fenster).
+ * `fenster_verkauf` Verkaufsrunde im GEMEINSAMEN Transferfenster der neuen Saison (Chris 18.11.): dieselbe
+ *                   organische Verkaufslogik wie am Saisonende, danach die Vorab-Abloesung (Anti-Churn), aber
+ *                   KEINE Verlaengerungen mehr — die gehoeren zum Saisonende. Gekauft wird danach im selben
+ *                   Fenster (`ai-preseason-background-service`).
+ * `preseason`       Kaufrunden (Konvergenz, Skripte).
+ */
+export type TransferWindowPhase = "preseason" | "season_end" | "fenster_verkauf";
 
 // Optional per-run seed salt (env, default empty) so a FIXED base save can produce VARIED organic
 // buy/sell composition across repeated A/B comparison runs: a different salt → a different but fully
@@ -74,6 +85,12 @@ export type TransferWindowSessionInput = {
    * unit tests / diagnostics that mock the market apply layer.
    */
   preseasonBuyMode?: "s1_draft_batch" | "convergence_loop";
+  /**
+   * Nur mit `phase: "season_end"`: verlaengern, aber NICHT verkaufen und nicht vorab abloesen. Das ist die
+   * Saisonende-Station im gemeinsamen Transferfenster (Chris 18.11.) — verkauft wird erst im Fenster der neuen
+   * Saison (`phase: "fenster_verkauf"`).
+   */
+  nurVerlaengern?: boolean;
 };
 
 export type TransferWindowSessionResult = MarketPlanConvergenceResult & {
@@ -186,6 +203,16 @@ async function runTeamCycle(input: {
   teamScope: "ai" | "all";
   allowBuys: boolean;
   allowSells: boolean;
+  /** Im Verkaufszyklus: auslaufende Vertraege der Behaltenen verlaengern (Saisonende). */
+  renewInSellCycle?: boolean;
+  /** Im Verkaufszyklus: wirklich verkaufen (false = nur verlaengern, gemeinsames Fenster am Saisonende). */
+  sellInSellCycle?: boolean;
+  /**
+   * Gemeinsames Fenster, ALTER Stand (#1634, nur noch mit `OLY_FENSTER_AUF_OPT=0`): nie unter das Kader-Minimum verkaufen
+   * (max(8, playerMin)). Seit „Fenster auf Opt" (Chris 18.11.: „man darf alle Spieler verkaufen, auch unter Minimum. Die KI soll
+   * danach ja einfach auf Optimum füllen!") verkauft die KI frei; das Auffuellen bis Opt uebernimmt der Kaderplan im Kaufschritt.
+   */
+  sellNotBelowMin?: boolean;
   cycleIndex: number;
   leagueRound: number;
   excludeBuyPlayerIds: Set<string>;
@@ -385,7 +412,10 @@ async function runTeamCycle(input: {
     // and affordability/validity gate, then applyContractRenewalAction to write.
     const renewLength = resolveOrganicRenewalContractLength({ gameState, team, identity });
     let renewed = 0;
-    for (const entry of entries) {
+    // Im gemeinsamen Transferfenster (Chris 18.11.) gehoeren Verlaengerungen ans Saisonende: die
+    // Verkaufsrunde der neuen Saison (`fenster_verkauf`) verlaengert nicht mehr.
+    const renewEntries = input.renewInSellCycle === false ? [] : entries;
+    for (const entry of renewEntries) {
       if (sellPlayerIds.has(entry.player.id)) continue; // surplus/profit-flip → sold below, not renewed
       const renewalEligible =
         entry.contractLength <= 0 ||
@@ -426,8 +456,29 @@ async function runTeamCycle(input: {
 
     // (2) SELL the sellable surplus/profit-flips (unchanged execute path; ROSTER_MIN respected upstream
     // by planOrganicSellsForTeam). The remaining non-renewed, non-sold players are left to contract-exit.
+    // Gemeinsames Transferfenster: am Saisonende (`nurVerlaengern`) wird hier NICHT verkauft — die Kandidaten
+    // bleiben im Kader und kommen in der Verkaufsrunde des Fensters der neuen Saison erneut auf den Tisch.
+    if (input.sellInSellCycle === false) return;
     const activePlayerIdByPlayerId = new Map(entries.map((entry) => [entry.player.id, entry.activePlayerId]));
+    /**
+     * KEIN VERKAUF UNTER DAS MINIMUM IM GEMEINSAMEN FENSTER (18.11.).
+     *
+     * Am Saisonende durfte der Verkaufsplan bis 0 abbauen (`allowBelowMin`), weil die Kaufphase danach eine
+     * eigene, volle Runde war. Im gemeinsamen Fenster wurde das zum Loch: gemessen verkaufte W-L von 8 auf 7, und
+     * der Kaufplan desselben Fensters holte niemanden nach. Der Verkaufsplan bleibt derselbe (inkl. Upgrade-Tausch),
+     * ausgefuehrt wird aber nur, solange der Kader danach mindestens max(8, playerMin) hat.
+     */
+    let verkaufsSpielraum = Number.POSITIVE_INFINITY;
+    if (input.sellNotBelowMin) {
+      const kaderJetzt = rosterCount(gameState, input.teamId);
+      const boden = Math.max(8, identity?.playerMin ?? 0);
+      verkaufsSpielraum = Math.max(0, kaderJetzt - boden);
+      if (plan.decisions.length > verkaufsSpielraum) {
+        warnings.push(`fenster_verkauf_bis_zum_minimum:${input.teamId}:${verkaufsSpielraum}/${plan.decisions.length}`);
+      }
+    }
     for (const decision of plan.decisions) {
+      if (appliedSells >= verkaufsSpielraum) break;
       const activePlayerId = activePlayerIdByPlayerId.get(decision.playerId);
       if (!activePlayerId) continue;
       const sellResult = executeLocalTransfermarktSell({
@@ -450,8 +501,18 @@ async function runTeamCycle(input: {
   }
 
   function runOrganicBuyCycle() {
-    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    let save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
     if (!save) return;
+    // FINANZKONZEPT V2 (Finanzseite): die KI entscheidet einmal je Fenster, was sie mit den zwei Toepfen tut
+    // (Umschichten nach Charakter, Ruecklage anzapfen, „Alles auf eine Karte“ — selten und begruendet), BEVOR sie plant.
+    // Dieselben Funktionen und Grenzen wie beim Menschen; geschrieben wird in den Spielstand, damit die harte Sperre sie sieht.
+    const vorstandMassnahmen = entscheideKiVorstandMassnahmen(save.gameState, input.teamId);
+    if (vorstandMassnahmen.massnahmen.length > 0) {
+      const persistiert = input.persistence.saveSingleplayerState(input.saveId, vorstandMassnahmen.gameState);
+      if (input.sessionRunContext) input.sessionRunContext.save = persistiert;
+      save = persistiert;
+      for (const m of vorstandMassnahmen.massnahmen) warnings.push(`vorstand_${m.art}:${input.teamId}`);
+    }
     const gameState = save.gameState;
     const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
     if (!team) return;
@@ -484,6 +545,16 @@ async function runTeamCycle(input: {
     });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+    // KADERPLAN (Fenster auf Opt): Grund der Kadergroesse je Team ins Protokoll, wie im Saison-1-Draft (Chris: weniger als Opt
+    // nur bewusst und begruendet). Format wie `ai-picks-run-service`, damit Messung und Lauf-Protokoll dieselbe Zeile lesen.
+    if (plan.kaderplan) {
+      warnings.push(
+        `kaderplan:${input.teamId}:${plan.kaderplan.grund}:opt=${plan.kaderplan.optTarget}:kader=${plan.kaderplan.kader}` +
+          `:rahmen=${plan.kaderplan.rahmenPlaetze}:gm=${plan.kaderplan.optEntscheidung?.gmDelta ?? 0}` +
+          `:notwege=${plan.kaderplan.notwege.join(",") || "0"}`,
+      );
+      if (plan.kaderplan.optEntscheidung?.grund) warnings.push(`kaderplan_gm:${input.teamId}:${plan.kaderplan.optEntscheidung.grund}`);
+    }
     // Salary-Ceiling-V2 Telemetrie auch auf dem In-Season/Preseason-Pfad (S2+) surfacen — der S1-Draft-
     // Pfad (ai-picks-run-service) tut das bereits; ohne dies bleibt das Limit im Long-Run unsichtbar.
     if (plan.salaryCeilingDebug) {
@@ -521,6 +592,9 @@ async function runTeamCycle(input: {
       });
       if (!buyResult.transferCreated || !buyResult.transferId) {
         warnings.push(...buyResult.blockingReasons.slice(0, 2));
+        // Fenster auf Opt: ein geplanter, aber abgelehnter Kauf ist eine Abweichung zwischen Plan und Ausfuehrung — mit Team und
+        // Grund ins Protokoll, damit „unter Opt“ nachvollziehbar bleibt.
+        warnings.push(`fenster_kauf_abgelehnt:${input.teamId}:${decision.playerId}:${buyResult.blockingReasons[0] ?? "?"}`);
         if (applyResult !== "applied") applyResult = "hold";
         input.excludeBuyPlayerIds.add(decision.playerId); // don't re-propose an unbuyable pick next cycle
         continue;
@@ -544,7 +618,7 @@ async function runTeamCycle(input: {
   if (useOrganic) {
     await runOrganicTeamCycle();
   } else {
-    if (input.allowSells) {
+    if (input.allowSells && input.sellInSellCycle !== false) {
       await runSellPass(mandate);
     }
     const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
@@ -713,7 +787,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // this loop; each team's own sell/buy preview scoring (unchanged) is the only thing that decides
   // how much it sells or buys, which naturally produces a heterogeneous per-team result. No new
   // roster floor is introduced — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc.
-  const isSeasonEndSellPhase = input.phase === "season_end";
+  // Eine VERKAUFS-Sitzung: am Saisonende (alter Ablauf bzw. nur Verlaengerungen) oder als Verkaufsrunde im
+  // gemeinsamen Transferfenster der neuen Saison (`fenster_verkauf`). Beide laufen ueber dieselben Zyklen.
+  const isSeasonEndSellPhase = input.phase === "season_end" || input.phase === "fenster_verkauf";
+  const nurVerlaengern = input.phase === "season_end" && input.nurVerlaengern === true;
+  const renewInSellCycle = input.phase !== "fenster_verkauf";
+  const sellInSellCycle = !nurVerlaengern;
 
   /**
    * GEMELDET: „käufe erst NACH saisonübergang!!! … eigentlich müsste hier nur verkauft werden auch
@@ -738,6 +817,25 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   const isPreseasonBuyPhase = input.phase === "preseason" && !saveStehtNochInDerAltenSaison;
   if (input.phase === "preseason" && saveStehtNochInDerAltenSaison) {
     warnings.push(`ai_buys_deferred_until_after_season_transition:${liveGameStateForPhase?.gamePhase ?? "?"}`);
+  }
+  // Die Verkaufsrunde des gemeinsamen Fensters gehoert in die NEUE Saison. Steht der Spielstand noch in der
+  // Saisonende-Kette, ist das Fenster nicht offen: nichts tun, statt am Saisonende zu verkaufen.
+  if (input.phase === "fenster_verkauf" && saveStehtNochInDerAltenSaison) {
+    return {
+      phase: input.phase,
+      leagueRounds: 0,
+      teamCycles: 0,
+      passes: 0,
+      rounds: 0,
+      perTeam: [],
+      emergencyRepairTeams: [],
+      appliedBuys: 0,
+      appliedSells: 0,
+      warnings: [`fenster_verkauf_erst_in_der_neuen_saison:${liveGameStateForPhase?.gamePhase ?? "?"}`],
+      blockingReasons: [],
+      skipped: true,
+      roundHistory: [],
+    };
   }
 
   // Sell-cap mechanism removed entirely (2026-07-04, explicit user correction — see
@@ -1081,6 +1179,10 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           teamScope,
           allowBuys: allowBuysForCycle,
           allowSells: allowSellsForCycle,
+          renewInSellCycle,
+          sellInSellCycle,
+          // Fenster auf Opt (Standard): frei verkaufen; nur der alte Stand (`OLY_FENSTER_AUF_OPT=0`) begrenzt auf das Minimum.
+          sellNotBelowMin: input.phase === "fenster_verkauf" && !istFensterAufOpt(),
           cycleIndex: cycle,
           leagueRound,
           excludeBuyPlayerIds,
@@ -1267,7 +1369,9 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // reduzierte) Restschuld bereits sieht. Läuft nur in der season_end (Sell-)Session, nie im
   // dryRun (reine Vorschau darf nichts mutieren). Non-throwing: ein einzelner fehlschlagender
   // applyEarlyPayoff (z. B. Cash inzwischen anderweitig verbraucht) darf die Session nicht kippen.
-  if (isSeasonEndSellPhase && !input.dryRun) {
+  // Gemeinsames Fenster: die Vorab-Abloesung wandert mit den Verkaeufen ins Fenster der neuen Saison
+  // (`fenster_verkauf`); die Saisonende-Station, die nur verlaengert, loest nichts ab.
+  if (isSeasonEndSellPhase && !nurVerlaengern && !input.dryRun) {
     const earlyPayoffCandidateTeamIds = scopeTeam(finalSave.gameState.teams.map((team) => team.teamId)).filter(
       (teamId) => (getTeamControlSettings(finalSave!.gameState, teamId)?.controlMode ?? "ai") === "ai",
     );

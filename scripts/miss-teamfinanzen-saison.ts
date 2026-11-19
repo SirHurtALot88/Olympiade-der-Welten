@@ -36,7 +36,7 @@
  * Aufruf (Wegwerf-Datei!):
  *   OLY_APP_SQLITE_PATH=/pfad/wegwerf.sqlite npx tsx scripts/miss-teamfinanzen-saison.ts \
  *     [--mode battle|manager] [--seasons 2] [--out data/generated/lauf.json] [--label A]
- *     [--stop-after draft|kaufphase] [--nur-anlage] [--von-anlage <saveId>] [--draft block|einzelschritt]
+ *     [--stop-after draft|vorkauf|kaufphase] [--nur-anlage] [--von-anlage <saveId>] [--draft block|einzelschritt]
  *
  * `--draft einzelschritt` (Draft-Neubau, 18.11.): statt des Blocklaufs (`fuehreLigaSetupDraftAus`) laeuft der neue
  * Liga-Draft Pick fuer Pick (`starteLigaDraft` + `laufeKiZuege`, ein Schreibvorgang je Pick wie ueber die Route).
@@ -63,9 +63,15 @@ import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-servic
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
+import { berechneVorstandBudgetStand, SPERRE_ZAEHLER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { laufeKiZuege, starteLigaDraft } from "@/lib/draft/liga-draft-dienst";
+import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
+import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
+import { baueNachkaufSitzung, ermittleKiTeamIds } from "@/lib/ai/organischer-nachkauf-eingabe";
+import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
+import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getLeagueOf } from "@/lib/season/league-split";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
@@ -84,7 +90,8 @@ const OUT = arg("out", "");
 const LABEL = arg("label", "A");
 /** Wiederaufnahme einer abgebrochenen Messung: bestehende Wegwerf-SQLite + bereits geschriebene Rohdaten (--out) weiterverwenden. */
 const RESUME = arg("resume", "");
-/** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren. */
+/** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren.
+ *  "spieltage": nach den Spieltagen von Saison 1, vor dem Saisonabschluss (Basis fuer den Saisonwechsel-Vergleich). */
 const STOP_AFTER = arg("stop-after", "");
 /** Nur das Spiel anlegen (32 KI, Sponsoren signiert), kein Draft: Basis fuer paarweise A/B-Laeufe. */
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
@@ -92,6 +99,18 @@ const NUR_ANLAGE = process.argv.includes("--nur-anlage");
 const VON_ANLAGE = arg("von-anlage", "");
 /** "block" (Standard, alter Hintergrund-Draft) oder "einzelschritt" (neuer Liga-Draft Pick fuer Pick). */
 const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
+
+/**
+ * S1-KADERBAU-VARIANTEN (18.11., Messung "S1 ohne Draft"):
+ *   A  (Standard) Block-Draft wie live: fuehreLigaSetupDraftAus -> runAiPicksExecutePreview.
+ *   C  "normal einkaufen": derselbe Dienst wie der Saison-Kaufphase-Lauf der KI (preseason-background,
+ *      Season-Market-Modus): applyAiMarketPlanLocally, nur auf leeren S1-Kadern.
+ *   C2 "normal einkaufen, organisch": runTransferWindowSession (Phase preseason, derselbe Planer wie der Draft,
+ *      aber in der Kauffenster-Sitzung: Zyklen/Ligarunden) -- der Weg, den Skripte/Saisonuebergang nehmen.
+ * --mischen <zahl>: vor dem Kaderbau werden die Teams im State mit dieser Saat gemischt (Erstzugriffs-Effekt).
+ */
+const VARIANTE = arg("variante", "A") as "A" | "C" | "C2";
+const MISCHEN = arg("mischen", "");
 
 const t0 = Date.now();
 const log = (msg: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ${msg}`);
@@ -121,6 +140,48 @@ type TeamSnap = {
   /** Kaderstaerke: Mittel der Top-6-Eignung je Disziplin (fehlende Plaetze zaehlen 0). */
   staerke: number;
 };
+
+/**
+ * Finanzseite (18.11.): Vorstand-Statistik je Team und Liga — Stand der zwei Toepfe, „Alles auf eine Karte“, Umschichten,
+ * Ruecklage anzapfen, und wie oft die harte Sperre gegriffen hat (nur mit `OLY_SPERRE_ZAEHLEN=1`, Zaehler = abgelehnte Pruefungen).
+ */
+function vorstandStatistik(gs: GameState) {
+  const jeTeam = gs.teams.map((t) => {
+    const st = berechneVorstandBudgetStand(gs, t.teamId);
+    const z = st.zustand;
+    return {
+      teamId: t.teamId,
+      stufe: st.stufe,
+      anteil: st.anteil,
+      wirksamerAnteil: st.wirksamerAnteil,
+      gedeckelt: st.gedeckelt,
+      transferGesamt: st.investition.gesamt,
+      transferAusgegeben: st.investition.ausgegeben,
+      transferFrei: st.investition.frei,
+      gebaeudeAusgegeben: st.gebaeudeAusgegeben,
+      gehaltGesamt: st.gehalt.gesamt,
+      gehaltAusgegeben: st.gehalt.ausgegeben,
+      gehaltFrei: st.gehalt.frei,
+      alleAufEineKarte: z.alleAufEineKarte ? { quelle: z.alleAufEineKarte.quelle, zielRang: z.alleAufEineKarte.zielRang, erwartungsRang: z.alleAufEineKarte.erwartungsRang } : null,
+      umschichtung: z.umschichtung,
+      ruecklageAngezapft: z.ruecklageAngezapft,
+      lockerungAktiv: st.lockerung.aktiv,
+    };
+  });
+  const zaehle = (art: keyof typeof SPERRE_ZAEHLER) => ({
+    pruefungen: Object.values(SPERRE_ZAEHLER[art]).reduce((a, b) => a + b, 0),
+    teams: Object.keys(SPERRE_ZAEHLER[art]).length,
+    jeTeam: { ...SPERRE_ZAEHLER[art] },
+  });
+  return {
+    jeTeam,
+    sperre: { kauf: zaehle("kauf"), kaufGehalt: zaehle("kauf_gehalt"), gebaeude: zaehle("gebaeude"), verlaengerung: zaehle("verlaengerung") },
+    alleAufEineKarte: jeTeam.filter((t) => t.alleAufEineKarte).length,
+    umgeschichtet: jeTeam.filter((t) => Math.abs(t.umschichtung) > 0.004).length,
+    angezapft: jeTeam.filter((t) => t.ruecklageAngezapft > 0.004).length,
+    gelockert: jeTeam.filter((t) => t.lockerungAktiv).length,
+  };
+}
 
 const STAERKE_TOP_N = 6;
 
@@ -322,8 +383,21 @@ async function main() {
   if (!RESUME) {
     phasen["s1_00_nach_anlage"] = { snap: snap(get().gameState) };
     // 1) Pick-Engine / Liga-Draft
+    if (MISCHEN) {
+      const g = get().gameState;
+      let z = Number(MISCHEN) >>> 0 || 1;
+      const rnd = () => { z = (Math.imul(z, 1664525) + 1013904223) >>> 0; return z / 4294967296; };
+      const teams = [...g.teams];
+      for (let i = teams.length - 1; i > 0; i -= 1) { const j = Math.floor(rnd() * (i + 1)); [teams[i], teams[j]] = [teams[j]!, teams[i]!]; }
+      persistence.saveSingleplayerState(saveId, { ...g, teams });
+      log(`Teams gemischt (Saat ${MISCHEN})`);
+    }
+    run.variante = VARIANTE;
+    run.reihenfolge = get().gameState.teams.map((t) => t.teamId);
+    let drStatus = "n/a";
     const draftStart = Date.now();
-    if (DRAFT_ART === "einzelschritt") {
+    if (VARIANTE === "A" && DRAFT_ART === "einzelschritt") {
+      // Variante A mit dem Liga-Draft im Einzelschritt (#1619): ein Schreibvorgang je Zug wie ueber die Route.
       starteLigaDraft({ persistence, saveId });
       let halt = "max_picks";
       let zuege = 0;
@@ -332,17 +406,41 @@ async function main() {
         zuege += schritt.eintraege.length;
         halt = schritt.halt;
       }
-      log(`Liga-Draft (Einzelschritt): ${zuege} Zuege, Halt ${halt}`);
+      drStatus = `Einzelschritt ${zuege} Zuege, Halt ${halt}`;
       run.draftZuege = zuege;
-    } else {
+    } else if (VARIANTE === "A") {
       const dr = await fuehreLigaSetupDraftAus({
         persistence, saveId, seasonId: seasonId1, callerWritableTeamIds: null, excludeTeamIds: [], logPrefix: "[miss-finanzen]",
       });
-      log(`Liga-Draft: ${dr.status}`);
+      drStatus = dr.status;
+    } else if (VARIANTE === "C") {
+      const erg = await applyAiMarketPlanLocally({
+        source: "sqlite", saveId, seasonId: seasonId1, teamScope: "ai", dryRun: false, includeWarningTeams: false,
+        confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN, transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
+        options: { includeWarningTeams: false, stopOnTeamFailure: false, applySellSteps: false },
+      });
+      drStatus = `applyAiMarketPlanLocally ${erg.results.length} Ergebnisse`;
+      run.cWarnungen = (erg as { warnings?: string[] }).warnings?.slice(0, 20);
+      // Warum bleiben Teams leer? Ergebnisart und haeufigste Blockadegruende je Team zaehlen.
+      const art: Record<string, number> = {};
+      const gruende: Record<string, number> = {};
+      for (const r of erg.results as Array<{ result?: string; blockingReasons?: string[] }>) {
+        art[r.result ?? "?"] = (art[r.result ?? "?"] ?? 0) + 1;
+        for (const b of new Set(r.blockingReasons ?? [])) gruende[b] = (gruende[b] ?? 0) + 1;
+      }
+      run.cErgebnisArten = art;
+      run.cBlockadegruende = Object.fromEntries(Object.entries(gruende).sort((x, y) => y[1] - x[1]).slice(0, 15));
+    } else {
+      const g = get().gameState;
+      const sess = await runTransferWindowSession(baueNachkaufSitzung({ saveId, seasonId: seasonId1, persistence, kiTeamIds: ermittleKiTeamIds(g) }));
+      drStatus = `runTransferWindowSession Kaeufe=${sess.appliedBuys}`;
+      run.cWarnungen = sess.warnings.slice(0, 20);
     }
-    run.draftArt = DRAFT_ART;
+    const dr = { status: drStatus };
+    log(`Kaderbau ${VARIANTE}: ${dr.status}`);
+    run.draftArt = VARIANTE === "A" ? DRAFT_ART : null;
     run.draftLaufzeitMs = Date.now() - draftStart;
-    log(`Draft-Laufzeit ${(Number(run.draftLaufzeitMs) / 1000).toFixed(1)}s`);
+    log(`Kaderbau-Laufzeit ${(Number(run.draftLaufzeitMs) / 1000).toFixed(1)}s`);
     gs = get().gameState;
     run.draftAbdeckung = abdeckung(gs);
     run.ligaDraft = gs.seasonState.ligaDraft
@@ -373,12 +471,13 @@ async function main() {
       const vorKauf = get().gameState;
       phasen[`${praefix}_00_vor_kaufphase`] = { snap: snap(vorKauf) };
       const sumVor = r2(vorKauf.teams.reduce((s, t) => s + t.cash, 0));
+      if (STOP_AFTER === "vorkauf") { schreibe(); log("stop-after vorkauf erreicht (SQLite mit --keep aufheben, dann je Variante --resume <saveId> --start-season 2)"); finish(); return; }
       const ergebnis = await fuehreKiPreseasonLaufAus({ saveId, seasonId: sid, scope: { room: null, participant: null, activeOwnerId: null }, persistence });
       log(`${praefix} Kaufphase: ${ergebnis.body.reason ?? ergebnis.body.run?.status} (skipped=${ergebnis.body.skipped}) Käufe=${ergebnis.body.run?.transferBuysApplied}`);
       const nach = get().gameState;
       phasen[`${praefix}_01_nach_kaufphase`] = {
         snap: snap(nach), staerkeDetail: staerkeDetail(nach), transfers: transfers(nach, sid, transferBeginn),
-        lauf: ergebnis.body.run, sumKasseVor: sumVor, phase: nach.gamePhase,
+        lauf: ergebnis.body.run, sumKasseVor: sumVor, phase: nach.gamePhase, vorstand: vorstandStatistik(nach),
       };
       schreibe();
     }
@@ -418,6 +517,9 @@ async function main() {
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();
+    // Basis fuer paarweise Vergleiche des Saisonwechsels (Transferfenster, `scripts/miss-transferfenster-gemeinsam.ts`):
+    // nach den Spieltagen von Saison 1 aufhoeren, vor Abschluss und Saisonende-Kette.
+    if (STOP_AFTER === "spieltage" && saison === 1) { log("stop-after spieltage erreicht"); finish(); return; }
 
     // Saisonabschluss
     const comp = await runLocalSeasonCompletion(

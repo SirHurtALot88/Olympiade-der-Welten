@@ -13,8 +13,8 @@
   font-size: var(--spr-u);
   display: flex;
   flex-direction: column;
-  /* Die Shell-Kopfzeile ist in px gebaut (nicht in em dieser Seite): Höhe = Fenster minus Kopf, Rand und Panel-Polster. */
-  height: calc(100vh - var(--fb-u, 16px) * 4.5 - 46px);
+  /* Höhe = Fenster minus Regieband (4,5 Einheiten), Seitenrand, Panel-Polster (16 px) und Schalen-Fuß (48 px), gemessen bei 1920, 2560, 1710: Dokument = Fenster. */
+  height: calc(100vh - var(--fb-u, 16px) * 4.5 - 120px);
   min-height: 40em;
   gap: 0.72em;
   position: relative;
@@ -55,7 +55,8 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.8em;
+  gap: 0.5em;
+  overflow: hidden;
   line-height: 1.15;
 }
 .spr-slot .spr-kopf__port { width: 2.9em; height: 2.9em; border-radius: 0.4em; object-fit: cover; object-position: center 15%; border: 1px solid var(--bc-linie-2); flex: none; background: var(--bc-flaeche-3); }
@@ -69,10 +70,12 @@
 .spr-slot .spr-blaettern button:disabled { opacity: 0.35; cursor: default; }
 .spr-slot .spr-zurueck { font-size: 0.85em; font-weight: 600; color: var(--bc-leise); display: inline-flex; align-items: center; gap: 0.3em; }
 .spr-slot .spr-zurueck:hover { color: var(--bc-gold); }
-.spr-slot .spr-kopf__zustand { display: flex; align-items: center; gap: 0.6em; white-space: nowrap; }
+.spr-slot .spr-kopf__zustand { display: flex; align-items: center; gap: 0.4em; white-space: nowrap; }
 .spr-slot .spr-zst { display: inline-flex; align-items: center; gap: 0.3em; font-weight: 700; font-size: 1.05em; }
 .spr-slot .spr-kn { height: 2em; padding: 0 0.9em; border: 1px solid var(--bc-linie-2); border-radius: 0.4em; font-size: 0.9em; font-weight: 600; color: var(--bc-tinte); display: inline-flex; align-items: center; }
 .spr-marke { font-size: 0.72em; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; padding: 0.15em 0.55em; border-radius: 0.2em; background: rgba(242, 160, 61, 0.18); color: var(--bc-heim); border: 1px solid rgba(242, 160, 61, 0.5); white-space: nowrap; }
+.spr-slot .spr-kopf__zustand { min-width: 0; }
+.spr-marke--band { letter-spacing: 0.04em; font-size: 0.64em; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .spr-marke.is-rot { background: rgba(255, 96, 88, 0.16); color: var(--bc-warn); border-color: rgba(255, 96, 88, 0.55); }
 .spr-marke.is-gruen { background: rgba(98, 211, 148, 0.14); color: var(--bc-gut); border-color: rgba(98, 211, 148, 0.5); }
 .spr-marke.is-grau { background: none; color: var(--bc-leise); border-color: var(--bc-linie-2); }
@@ -82,6 +85,8 @@
 .spr-pfeil.s0 { color: var(--bc-stumm); letter-spacing: 0; }
 .spr-pfeil.sm1, .spr-pfeil.sm2 { color: var(--bc-warn); }
 .spr-slot.is-verletzt .spr-kopf__name { color: #ffd2cf; }
+/* Im Band ist bei Verletzung kein Platz für das Wort: nur der Pfeil, das Wort steht im Titel. */
+.spr-slot.is-verletzt .spr-zurueck__text { display: none; }
 
 /* ---------- Tafel-Gerüst ---------- */
 .spr-tab { flex: 1; min-height: 0; display: grid; gap: 0.72em; }

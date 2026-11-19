@@ -231,17 +231,25 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   dem Konto, nur X % davon dürfen für Ablösen UND Gehälter (neue Verträge, Gehaltserhöhungen) ausgegeben werden. Die Sperre
   ist **hart**: ein Kauf oder Vertrag über dem freien Betrag ist nicht möglich (Mensch und KI gleich). **Verkaufserlöse
   unterliegen derselben Quote** — bei 70 % werden von 20 C Verkauf nur 14 C ausgebbar, der Rest bleibt als gewollter Puffer
-  auf dem Konto. Stufen nach Vertrauen: ab 6 → 100 %, 4–6 → 85 %, 2,5–4 → 70 %, darunter 50 %. Die Rücklage nach Finanzwert
+  auf dem Konto. Stufen nach Vertrauen (Chris, 18.11. abends): ab 7,5 → 100 %, Standard 90 % (ab 5), 80 % unter 5, 70 % unter 3, 50 % unter 1,5. Die Rücklage nach Finanzwert
   bleibt dagegen **weich** (Warnung, Vertrauensverlust).
 - **Zwei Budgets wie im FM (Chris, 18.11.: „optisch und inhaltlich so bauen“):** Transfer-/Investitionstopf und
   Gehaltstopf, Konzept `docs/design/finanzkonzept-v2-budgets-18-11.md` (Abschnitt 12 = Entscheidungen). Festgelegt:
+  - **Ab Saison 2 Rücklage nach Gehaltskosten (Chris, 18.11.):** `q(Finanzwert) x Jahresgehalt des Kaders auf Soll-Größe` statt Startbudget/Kasse + Kaderwert. Der Pflichtkader 8 ist nie gesperrt (Mensch und KI), Planer und Sperre rechnen mit derselben Zahl (`kaufRahmen`).
   - **Saison 1:** Vorstands-Quote für alle 100 %; die Draft-Rücklage nach Finanzwert ist **halb so hoch** wie üblich (mehr
     Spielraum beim Draft), voll erst ab Saison 2. Startbudgets und Sponsoren bleiben unverändert.
   - **Gehaltstopf:** der Vorstand kürzt ihn höchstens auf **75 %** (nie 50 %); frei werdendes Gehalt eines verkauften
     Spielers fließt zu **100 %** in den Gehaltstopf zurück. Nur der Verkaufserlös unterliegt der Transfer-Quote.
   - **Gebäude** zahlen aus dem Transfer-/Investitionstopf, kein dritter Topf.
-  - **„Alles auf eine Karte“** (später): beantragt vom Menschen, gewollt von einem Top-Team oder vom Vorstand als Ziel
-    gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet Vertrauen).
+  - **„Alles auf eine Karte“** (gebaut, Finanzseite 18.11.): beantragt vom Menschen, gewollt von einem Top-Team oder vom
+    Vorstand als Ziel gefordert — dann darf bis auf **5 % Puffer** alles ausgegeben werden. Dazu „Rücklage anzapfen“ (kostet
+    Vertrauen). Regeln und Entscheidungen: `docs/design/finanzen-v2-seite-18-11.md`.
+  - **Die Finanzseite** (`app/foundation/finances/FinanzenModern.tsx`, Mockup `public/mockups/finanzen-modern-18-11.html`) ist neu
+    gebaut, die alte `FoundationFinancesNewLook` samt `.nl-fin-*` ist raus. **Gehälter stehen groß je Saison und klein je
+    Spieltag** (Chris, 18.11.), Einheit C. Gebäude (Bau und Ausbau) zahlen aus dem Investitionstopf, Gehaltserhöhungen bei
+    Verlängerungen aus dem Gehaltstopf, beides hart und für Mensch und KI gleich (`pruefeGebaeudeGegenVorstandFreigabe`,
+    `pruefeVerlaengerungGegenVorstandFreigabe` in `lib/finance/vorstand-budgetfreigabe.ts`). Geschrieben wird nur über
+    `POST /api/finance/vorstand` hinter `authorizeServerRoomWrite`.
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
@@ -691,7 +699,10 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-18.11. (Climbing „Ende erst, wenn alle oben sind“): **GESAMT d3a39030a3ef (75 Eintraege)** — absichtlich bewegt, weil
+18.11. (Canyon live): **GESAMT eaafed96150e (75 Eintraege)** — absichtlich bewegt, weil Climbing seit Chris' „Ja, Canyon
+soll live gehen“ im Format Canyon laeuft (`docs/design/climbing-canyon-live-18-11.md`); gegenueber `d3a39030a3ef` bewegen
+sich NUR die drei `spiele climbing`-Zeilen (1/7/42, jetzt die frueheren `spiele climbing/canyon`-Zeilen aus #1633). HUD-Profil
+und Kamera-Modi derselben PR sind reine Anzeige. Davor: **GESAMT d3a39030a3ef** (Climbing „Ende erst, wenn alle oben sind“) — absichtlich bewegt, weil
 Climbing kein Lead-Zeitlimit mehr hat (Chris 18.11.: „Ende bitte erst wenn ALLE im Ziel sind“; Sicherheitsdeckel 60 Sim-s
 mit hochgerechneter Zeit, `docs/design/arena-start-ende-figuren-18-11.md`); gegenueber `ce8fcef66028` bewegen sich NUR die
 drei `spiele climbing`-Zeilen (1/7/42). Die Anzeige-Commits derselben PR (kein Stand vor dem Start, Vorstellung im Pod,
@@ -711,6 +722,18 @@ NICHT veraendern; weicht sie ab, hat die Aenderung die Wertung beruehrt. Neue Fe
 Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer WeakMap bzw. in
 modulweiten Arrays halten (Muster: Render-Interpolation `viSchnappschussKF`). Absichtliche Wertungs-
 aenderung: neue Zahl hier und in `data/generated/` festhalten.
+
+**Climbing-Format „Canyon“ ist LIVE (18.11., Motor-Vorgabe `climbingFormat:"canyon"`):** GESAMT rechnet Climbing im
+Canyon. Das alte Format bleibt als Rueckweg geschuetzt: das Skript gibt nach GESAMT drei eigene Zeilen
+`spiele climbing/standard 1/7/42` und eine eigene Summe aus — **nicht in GESAMT**: `CLIMBING-STANDARD 164b3d846334`
+(Zeilen `58b9222c223b`/`b2b7c6e4bfbc`/`d26ad5352068`, die alten `spiele climbing`-Zeilen). Abschalt-Schalter
+`OLY_CLIMBING_FORMAT=standard` (deploy/hetzner/.env, compose reicht ihn an Container und Build-Arg
+`NEXT_PUBLIC_OLY_CLIMBING_FORMAT`): ab dem naechsten gewerteten Spieltag wieder das alte Format; gebuchte Spieltage
+behalten ihr Format (Wechselliste `seasonState.climbingFormat`, `lib/resolve/climbing-format.ts`). Das Format reist im
+Kader-Umschlag (`formatByDisciplineId.climbing`) zu Host, Chromium-Runner und Node-Motor (gezeigt = gebucht) und steht im
+Eingabe-Hash des Vorlaufs. `node scripts/pruefe-wertung-fingerabdruck.mjs --node` rechnet denselben Abgleich ueber den
+Node-Motor (ohne Chromium, ohne Aufnahme-Sperre); `scripts/miss-alle-disziplinen.mjs --node` ebenso fuer rho. Details:
+`docs/design/climbing-canyon-live-18-11.md`, `docs/design/climbing-canyon-bau-18-11.md`.
 
 ## CI-Weiche für Moosgrab / Kartenschmiede
 

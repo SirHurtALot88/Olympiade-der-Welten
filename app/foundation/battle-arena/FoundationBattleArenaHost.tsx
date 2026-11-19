@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArenaSpieltagAnsicht } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
+import ArenaRegieleiste, { type ArenaRegie } from "@/app/foundation/battle-arena/ArenaRegieleiste";
+import { ArenaLadebild, ArenaVorstellung, type VorraumAusblick } from "@/app/foundation/battle-arena/ArenaVorraum";
+import { baueLadeSchritte, baueVorraumTeams } from "@/lib/foundation/battle-arena/arena-vorraum";
 
 import ArenaVollflaecheBuehne from "@/app/foundation/battle-arena/ArenaVollflaecheBuehne";
 import FoundationBattleArenaSpriteGallery from "@/app/foundation/battle-arena/FoundationBattleArenaSpriteGallery";
@@ -36,6 +39,7 @@ import {
 } from "@/lib/foundation/battle-arena/arena-live-panels";
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
+import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -201,6 +205,14 @@ export default function FoundationBattleArenaHost({
    */
   spieltag?: (ArenaSpieltagAnsicht & {
     disziplinName?: string | null;
+    /** Gebuchte Vierergruppe (Reihenfolge der Buchung), nur beim Pod -- Quelle fuer Kopf und Vorstellung. */
+    podTeamIds?: string[] | null;
+    /** Regieleiste (Ort, drei Schritte, Mitspieler, "Du steuerst"). */
+    regie?: ArenaRegie | null;
+    disziplinNr?: number;
+    disziplinAnzahl?: number;
+    /** Ausblick auf Disziplin 2 im Ladebild. */
+    ausblick?: VorraumAusblick | null;
     onEnde?: ((info: { disziplin: string; sieger: 0 | 1 | null }) => void) | null;
   }) | null;
 }) {
@@ -742,6 +754,14 @@ export default function FoundationBattleArenaHost({
       ),
     [gameState, heimTeamId, gastTeamId, arenaDisziplinSlotsThisMatchday],
   );
+  // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): dasselbe Format, das Vorlauf und
+  // Buchung (`bereiteFixturesVor`) dem Motor mitgeben -- ein im alten Format gebuchter Spieltag bleibt so auch
+  // in der Wiedergabe "standard". Immer gesetzt (auch ohne Climbing an diesem Spieltag), damit die Format-Wahl
+  // der Testansicht dieselbe ist wie im naechsten gewerteten Climbing-Spieltag.
+  const arenaFormatByDiscipline = useMemo(
+    () => arenaFormatByDisciplineId(gameState, gameState.matchdayState?.matchdayId ?? null, "climbing"),
+    [gameState],
+  );
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
   // sonst gibt es nichts, dessen Saat falsch sein koennte.
   const keinGewertetesDuell =
@@ -947,6 +967,11 @@ export default function FoundationBattleArenaHost({
   onEndeRef.current = spieltag?.onEnde ?? null;
   const [spultVor, setSpultVor] = useState(false);
   const [endeInfo, setEndeInfo] = useState<{ disziplin: string; sieger: 0 | 1 | null } | null>(null);
+  // VORSTELLUNG (18.11., Mockup Screen 2): bis "Zur Arena" bzw. Quick-Sim liegt sie ueber der Buehne; mit jedem
+  // Disziplinwechsel (D1 -> D2) beginnt sie neu. Kein Spoiler: der Motor steht bis dahin am Anfang.
+  const [vorstellungFuerDisziplin, setVorstellungFuerDisziplin] = useState<string | null>(null);
+  const vorstellungErledigt = vorstellungFuerDisziplin != null && vorstellungFuerDisziplin === spieltagDisziplinId;
+  const setVorstellungErledigt = (_erledigt: boolean) => setVorstellungFuerDisziplin(spieltagDisziplinId);
 
   // Haengt den Motor nativ ein, sobald der gerenderte Kader UND die Huelle stehen — und
   // reisst ihn komplett wieder ab, sobald sich der gerenderte Kader aendert (s. Kommentar
@@ -1044,6 +1069,8 @@ export default function FoundationBattleArenaHost({
         kulisseByDisciplineId: arenaKulisseByDisciplineId,
         // Gelesen von `strategieVorlageVon()` in battle-mode.engine.js; nur mit Vorlage gesetzt.
         ...(arenaStrategieByDisciplineId ? { strategieByDisciplineId: arenaStrategieByDisciplineId } : {}),
+        // Gelesen von `climbingFormatWaehlen()` in battle-mode.engine.js (Canyon live, 18.11.).
+        ...(arenaFormatByDiscipline ? { formatByDisciplineId: arenaFormatByDiscipline } : {}),
         // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
         mutatorenByDisciplineId,
         // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
@@ -1153,6 +1180,7 @@ export default function FoundationBattleArenaHost({
     arenaSeedByDisciplineId,
     arenaKulisseByDisciplineId,
     arenaStrategieByDisciplineId,
+    arenaFormatByDiscipline,
     mutatorenByDisciplineId,
     miniDmFfaTeams,
     miniDmFfaK,
@@ -1221,15 +1249,43 @@ export default function FoundationBattleArenaHost({
     const heimName = teams.find((team) => team.teamId === heimTeamId)?.name ?? heimTeamId;
     const gastName = teams.find((team) => team.teamId === gastTeamId)?.name ?? gastTeamId;
     const disziplin = spieltag.disciplineId;
+    // Die Gruppe im Kopf kommt aus der GEBUCHTEN Gruppe (`spieltag.podTeamIds`, Wertungszeile des eigenen
+    // Teams), nicht aus Heim/Gast und nicht aus einer zweiten Pod-Suche -- Chris' D2-Befund 18.11.: der Kopf
+    // nannte "N-N vs <D1-Gegner>", die Vorstellung eine dritte Paarung. Erst ohne Buchungsangabe der
+    // Nutzlast-Rueckfall wie bisher.
     const bahnPod = bahnPodNutzlast?.[disziplin] ?? null;
-    const podTeams =
-      disziplin === "mini-dm" && miniDmFfaTeams
+    const podTeams = spieltag.podTeamIds?.length
+      ? spieltag.podTeamIds.map((id) => teams.find((team) => team.teamId === id)?.name ?? id)
+      : disziplin === "mini-dm" && miniDmFfaTeams
         ? miniDmFfaTeams.map((team) => team.name)
         : disziplin === "battlefield" && battlefieldPodNutzlast
           ? battlefieldPodNutzlast.teams.map((team) => team.name)
           : bahnPod
             ? bahnPod.teams.map((team) => team.name)
             : null;
+    const eigenesTeamId = spieltag.podTeamId;
+    const vorraumArt: "duell" | "pod" = podTeams ? "pod" : "duell";
+    const vorraumTeamIds = spieltag.podTeamIds?.length
+      ? spieltag.podTeamIds
+      : [eigenesTeamId, heimTeamId === eigenesTeamId ? gastTeamId : heimTeamId];
+    const vorraumTeams = baueVorraumTeams({
+      gameState,
+      teamIds: vorraumTeamIds,
+      ownTeamId: eigenesTeamId,
+      disciplineId: disziplin,
+    });
+    const kaderFehlt = keinHeimKader || keinGastKader;
+    const vorraumPhase: "laden" | "vorstellung" | null = kaderFehlt
+      ? null
+      : ladeKader || !motorBereit
+        ? "laden"
+        : !vorstellungErledigt && endeInfo == null
+          ? "vorstellung"
+          : null;
+    const quickSimMitStart = () => {
+      setVorstellungErledigt(true);
+      starteQuickSim();
+    };
     return (
       <>
         <style>{`
@@ -1270,18 +1326,13 @@ export default function FoundationBattleArenaHost({
               type="button"
               className="oly-arena-spieltag-knopf"
               data-testid="oly-arena-spieltag-quicksim"
-              onClick={starteQuickSim}
+              onClick={quickSimMitStart}
               disabled={!motorBereit || spultVor || endeInfo != null}
               title="Spult das Spiel bis zum Ende vor — derselbe Verlauf wie beim Zuschauen, nur schneller."
             >
               {spultVor ? "⏩ spult vor …" : endeInfo ? "✓ Spiel zu Ende" : "⏩ Quick-Sim"}
             </button>
           </div>
-          <p className="muted" style={{ margin: 0, fontSize: "0.82rem", maxWidth: "80ch" }}>
-            Das ist das Spiel, das für diesen Spieltag gewertet wird — gleiche Kader, gleiche Aufstellung,
-            gleiche Saat wie die Wertung im Hintergrund. „Kampf starten“ zum Zuschauen oder ⏩ Quick-Sim
-            direkt ans Ende; sobald es vorbei ist, wird die Disziplin gebucht.
-          </p>
           {ladeKader || !motorBereit ? (
             <div className="oly-arena-spieltag-status muted" role="status">
               <span className="oly-arena-spin" aria-hidden />
@@ -1305,15 +1356,23 @@ export default function FoundationBattleArenaHost({
             Buehne ueber dem ganzen Fenster; Titel, Paarung und Quick-Sim wandern in ihre 40-px-Leiste. */}
         <ArenaVollflaecheBuehne
           istSpieltag
-          titel={<>Battle Arena · {spieltag.disziplinName ?? disziplin}</>}
-          paarung={podTeams ? `Vierergruppe: ${podTeams.join(", ")}` : `${heimName} gegen ${gastName}`}
+          titel={
+            spieltag.regie ? (
+              <ArenaRegieleiste regie={spieltag.regie} aktuellerTitel={spieltag.disziplinName ?? disziplin} />
+            ) : (
+              <>Battle Arena · {spieltag.disziplinName ?? disziplin}</>
+            )
+          }
+          paarung={
+            spieltag.regie ? undefined : podTeams ? `Vierergruppe: ${podTeams.join(", ")}` : `${heimName} gegen ${gastName}`
+          }
           seiteHervorheben={endeInfo != null}
           zusatz={
             <button
               type="button"
               className="ist-akzent"
               data-testid="oly-arena-buehne-quicksim"
-              onClick={starteQuickSim}
+              onClick={quickSimMitStart}
               disabled={!motorBereit || spultVor || endeInfo != null}
               title="Spult das Spiel bis zum Ende vor — derselbe Verlauf wie beim Zuschauen, nur schneller."
             >
@@ -1321,6 +1380,37 @@ export default function FoundationBattleArenaHost({
             </button>
           }
         >
+          {vorraumPhase === "laden" ? (
+            <ArenaLadebild
+              disziplinName={spieltag.disziplinName ?? disziplin}
+              disziplinNr={spieltag.disziplinNr ?? 1}
+              disziplinAnzahl={spieltag.disziplinAnzahl ?? 1}
+              art={vorraumArt}
+              teams={vorraumTeams}
+              schritte={baueLadeSchritte({
+                kaderGeladen: !ladeKader,
+                aufstellungDa: gerenderterKader != null,
+                motorBereit,
+              })}
+              ausblick={spieltag.ausblick ?? null}
+            />
+          ) : vorraumPhase === "vorstellung" ? (
+            <ArenaVorstellung
+              disziplinName={spieltag.disziplinName ?? disziplin}
+              disziplinNr={spieltag.disziplinNr ?? 1}
+              disziplinAnzahl={spieltag.disziplinAnzahl ?? 1}
+              art={vorraumArt}
+              teams={vorraumTeams}
+              hinweis={
+                vorraumArt === "pod"
+                  ? "Deine Vierergruppe dieses Spieltags · gezeigt = gebucht"
+                  : "Das ist das gewertete Spiel deines Teams · gezeigt = gebucht"
+              }
+              onStart={() => setVorstellungErledigt(true)}
+              onQuickSim={quickSimMitStart}
+              quickSimGesperrt={spultVor}
+            />
+          ) : null}
           {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10 }} /> : null}
         </ArenaVollflaecheBuehne>
       </>

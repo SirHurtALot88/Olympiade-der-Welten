@@ -12,8 +12,11 @@
  */
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { baueBuchungsKontext, bucheTransferEintrag } from "@/lib/season/transferbilanz-buchung";
 
 export type KontoauszugArt =
+  /** Saison 1: Draft/Startkader aus dem Startbudget (Kauf negativ, Verkauf vor Spieltag 1 positiv) — kein Transfer. */
+  | "kaderaufbau"
   | "transfer_kauf"
   | "transfer_verkauf"
   | "vertragsende_abloese"
@@ -65,18 +68,25 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
   };
 
   // 1) Transfers (Kauf, Verkauf, Vertragsende). Verkauf nutzt die tatsaechliche Cash-Wirkung (netto).
+  //    Kaeufe/Verkaeufe des Fensters von Saison 1 sind KADERAUFBAU aus dem Startbudget, kein Transfer
+  //    (Chris 18.11., `lib/season/transferbilanz-buchung.ts`): eigene Art, damit Finanzseite und GuV sie getrennt
+  //    zeigen. Die Zeile bleibt in der Saison, in der das Geld floss.
+  const buchungsKontext = baueBuchungsKontext(gameState.transferHistory ?? [], gameState.season?.matchdayIds?.length ?? null);
   for (const e of gameState.transferHistory ?? []) {
+    const kaderaufbau =
+      (e.transferType === "buy" || e.transferType === "sell") &&
+      bucheTransferEintrag(e, buchungsKontext).art === "kaderaufbau";
     const text = `${e.playerName ?? e.playerId} (${e.source ?? "transfer"})`;
     const phase = e.matchdayId ? "saison" : "kaufphase";
     if (e.transferType === "buy") {
       add(e.toTeamId, {
         seasonId: e.seasonId, matchdayId: e.matchdayId ?? null, phase: phase === "saison" ? "saison" : "kaufphase",
-        art: "transfer_kauf", quelle: "transferHistory", text, betrag: -(e.netCashImpact ?? e.fee), zeit: e.happenedAt,
+        art: kaderaufbau ? "kaderaufbau" : "transfer_kauf", quelle: "transferHistory", text, betrag: -(e.netCashImpact ?? e.fee), zeit: e.happenedAt,
       });
     } else if (e.transferType === "sell") {
       add(e.fromTeamId, {
         seasonId: e.seasonId, matchdayId: e.matchdayId ?? null, phase: phase === "saison" ? "saison" : "kaufphase",
-        art: "transfer_verkauf", quelle: "transferHistory", text, betrag: e.netCashImpact ?? e.fee, zeit: e.happenedAt,
+        art: kaderaufbau ? "kaderaufbau" : "transfer_verkauf", quelle: "transferHistory", text, betrag: e.netCashImpact ?? e.fee, zeit: e.happenedAt,
       });
     } else if (e.transferType === "contract_exit") {
       add(e.fromTeamId, {

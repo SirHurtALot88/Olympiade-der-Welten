@@ -451,8 +451,10 @@ button.fb-chip:hover {
   animation: none;
   will-change: auto;
 }
+/* `backwards` statt `both`: nach dem Aufstieg bleibt KEIN transform am Kind stehen, sonst wird es zum Bezugsrahmen für `position: fixed` und jedes Fenster
+   (Verhandlung, Verkauf) misst die ganze Seitenhöhe und sitzt außerhalb des Bildschirms (gefunden 19.11. beim Klicktest Kurzprofil → Verlängern). */
 .foundation-shell-content.foundation-view-enter > * {
-  animation: fb-auf 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fb-auf 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 .foundation-shell-content.foundation-view-enter > *:nth-child(2) { animation-delay: 0.04s; }
 .foundation-shell-content.foundation-view-enter > *:nth-child(3) { animation-delay: 0.08s; }

@@ -35,23 +35,27 @@ function gameState(history: TransferHistoryEntry[]): GameState {
 }
 
 describe("transfer-standings-balance", () => {
-  it("ignores draft buys in season 1 and counts only end-of-season market sells", () => {
+  // Seit 18.11. (Chris): „das Fenster vor Saison N gehoert zu Saison N". Saison 1 hat keine Transferbilanz, der
+  // Draft ist Kaderaufbau aus dem Startbudget; die Verkaeufe am Ende von S1 (letzter Spieltag) zaehlen zu S2.
+  it("S1: Draft ist Kaderaufbau, Transferbilanz leer; Saisonende-Verkaeufe gehoeren zu S2", () => {
+    const historie = [
+      transfer({ id: "b", transferType: "buy", seasonId: "season-1", toTeamId: "A-A", source: "season1_autoprep_topup", fee: 200, matchdayId: "matchday-1" }),
+      transfer({ id: "s", transferType: "sell", seasonId: "season-1", fromTeamId: "A-A", source: "ai_preseason_market_sell", fee: 30, matchdayId: "matchday-10" }),
+    ];
+    const s1 = buildStandingsTransferBalanceForTeam(gameState(historie), "season-1", "A-A");
+    expect(s1.transferNet).toBeNull();
+    expect(s1.transferBuyCount).toBe(0);
+    expect(s1.transferSellCount).toBe(0);
+    expect(s1.kaderaufbauNet).toBe(-200);
+    const s2 = buildStandingsTransferBalanceForTeam(gameState(historie), "season-2", "A-A");
+    expect(s2.transferSellTotal).toBe(30);
+    expect(s2.transferNet).toBe(30);
+  });
+
+  it("ignores ai_roster_fill draft buys in season 1 (Kaderaufbau)", () => {
     const balance = buildStandingsTransferBalanceForTeam(
       gameState([
-        transfer({
-          transferType: "buy",
-          seasonId: "season-1",
-          toTeamId: "A-A",
-          source: "season1_autoprep_topup",
-          fee: 200,
-        }),
-        transfer({
-          transferType: "sell",
-          seasonId: "season-1",
-          fromTeamId: "A-A",
-          source: "ai_preseason_market_sell",
-          fee: 30,
-        }),
+        transfer({ transferType: "buy", seasonId: "season-1", toTeamId: "A-A", source: "ai_roster_fill", fee: 180, matchdayId: "matchday-1" }),
       ]),
       "season-1",
       "A-A",
@@ -59,54 +63,15 @@ describe("transfer-standings-balance", () => {
 
     expect(balance.transferBuyCount).toBe(0);
     expect(balance.transferBuyTotal).toBe(0);
-    expect(balance.transferSellCount).toBe(1);
-    expect(balance.transferSellTotal).toBe(30);
-    expect(balance.transferNet).toBe(30);
+    expect(balance.kaderaufbauBuyTotal).toBe(180);
   });
 
-  it("ignores ai_roster_fill draft buys in season 1", () => {
+  it("pairs prior-season end sells with current-season window buys from season 2 onward", () => {
     const balance = buildStandingsTransferBalanceForTeam(
       gameState([
-        transfer({
-          transferType: "buy",
-          seasonId: "season-1",
-          toTeamId: "A-A",
-          source: "ai_roster_fill",
-          fee: 180,
-        }),
-      ]),
-      "season-1",
-      "A-A",
-    );
-
-    expect(balance.transferBuyCount).toBe(0);
-    expect(balance.transferBuyTotal).toBe(0);
-  });
-
-  it("pairs prior-season end sells with current-season preseason buys from season 2 onward", () => {
-    const balance = buildStandingsTransferBalanceForTeam(
-      gameState([
-        transfer({
-          transferType: "sell",
-          seasonId: "season-1",
-          fromTeamId: "A-A",
-          source: "ai_preseason_market_sell",
-          fee: 40,
-        }),
-        transfer({
-          transferType: "buy",
-          seasonId: "season-2",
-          toTeamId: "A-A",
-          source: "preseason_roster_repair_buy",
-          fee: 120,
-        }),
-        transfer({
-          transferType: "buy",
-          seasonId: "season-2",
-          toTeamId: "A-A",
-          source: "ai_preseason_market_buy",
-          fee: 25,
-        }),
+        transfer({ id: "s", transferType: "sell", seasonId: "season-1", fromTeamId: "A-A", source: "ai_preseason_market_sell", fee: 40, matchdayId: "matchday-10" }),
+        transfer({ id: "b1", transferType: "buy", seasonId: "season-2", toTeamId: "A-A", source: "preseason_roster_repair_buy", fee: 120, matchdayId: "season-2-matchday-1" }),
+        transfer({ id: "b2", transferType: "buy", seasonId: "season-2", toTeamId: "A-A", source: "ai_preseason_market_buy", fee: 25, matchdayId: "season-2-matchday-1" }),
       ]),
       "season-2",
       "A-A",
@@ -118,19 +83,10 @@ describe("transfer-standings-balance", () => {
   });
 
   it("builds per-team maps for the active season", () => {
-    const balances = buildStandingsTransferBalanceByTeamId(
-      gameState([
-        transfer({
-          transferType: "sell",
-          seasonId: "season-1",
-          fromTeamId: "A-A",
-          source: "ai_preseason_market_sell",
-          fee: 10,
-        }),
-      ]),
-      "season-1",
-    );
-
-    expect(balances["A-A"]?.transferNet).toBe(10);
+    const historie = [
+      transfer({ transferType: "sell", seasonId: "season-1", fromTeamId: "A-A", source: "ai_preseason_market_sell", fee: 10, matchdayId: "matchday-10" }),
+    ];
+    expect(buildStandingsTransferBalanceByTeamId(gameState(historie), "season-1")["A-A"]?.transferNet).toBeNull();
+    expect(buildStandingsTransferBalanceByTeamId(gameState(historie), "season-2")["A-A"]?.transferNet).toBe(10);
   });
 });
