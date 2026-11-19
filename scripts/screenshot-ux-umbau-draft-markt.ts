@@ -202,7 +202,13 @@ async function main() {
         await page.getByTestId("draft-mein-picken").click();
         await page.waitForTimeout(6000);
         await shot("umbau-30-draft-nach-pick.png");
-        await page.getByTestId("draft-kader-spieler").first().click();
+        await page.getByTestId("draft-zeile").nth(1).click();
+        await page.waitForTimeout(600);
+        await shot("umbau-32-draft-nach-pick-ausgewaehlt-mein-kader.png");
+        await page.setViewportSize({ width: 1710, height: 1112 });
+        await shot("umbau-32b-draft-nach-pick-1710x1112.png");
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.getByTestId("mein-kader-spieler").first().click();
         await page.waitForTimeout(3500);
         await shot("umbau-31-draft-kader-klick-profil.png");
         await page.getByTestId("draft-profil-zu").click();

@@ -1,0 +1,50 @@
+/* Gemeinsames rechtes Panel (UX-Umbau 19.11., PR B): Wirkung, Mein Kader in ⟨Disziplin⟩, Kasse. Gilt in Draft (.tmk.drf) und Markt (.tmk). */
+.tmk #m-fokus .fb h4, .tmk #l-ich .fb h4 { margin: calc(.2 * var(--u)) 0 0; font: 400 calc(1.05 * var(--u))/1 var(--haus); letter-spacing: .03em; text-transform: none; color: var(--creme); white-space: nowrap; }
+.tmk #m-fokus .fb h4 span, .tmk #l-ich .fb h4 span { margin-left: auto; font: 700 calc(.58 * var(--u)) var(--zahl, inherit); letter-spacing: .08em; text-transform: uppercase; color: var(--stumm); }
+.tmk .wirk.wirk-neu div { padding: calc(.3 * var(--u)) calc(.5 * var(--u)); }
+.tmk .wirk.wirk-neu div b { font: 400 calc(.98 * var(--u))/1.1 var(--haus); color: #fff; }
+.tmk .wirk.wirk-neu .t { font-size: calc(.78 * var(--u)); color: var(--leise); }
+.tmk .wirk.wirk-neu .t i { font-style: normal; color: var(--gut); font-weight: 700; font-size: calc(.95 * var(--u)); }
+.tmk .mkl { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; flex: 0 1 auto; }
+.tmk .mkr { display: grid; grid-template-columns: calc(1.3 * var(--u)) calc(1.7 * var(--u)) minmax(0, 1fr) calc(5 * var(--u)) calc(3.4 * var(--u)); gap: calc(.4 * var(--u)); align-items: center; min-height: calc(2.05 * var(--u)); padding: 0 calc(.3 * var(--u)); border-radius: calc(.25 * var(--u)); cursor: pointer; font-size: calc(.9 * var(--u)); }
+.tmk .mkr:hover { background: rgba(244,230,196,.07); }
+.tmk .mkr:hover .n { color: var(--gold); }
+.tmk .mkr .p { color: var(--stumm); font-weight: 700; font-size: calc(.78 * var(--u)); text-align: right; }
+.tmk .mkr img, .tmk .mkr .bildleer { width: calc(1.7 * var(--u)); height: calc(1.7 * var(--u)); object-fit: cover; object-position: center 10%; border-radius: calc(.2 * var(--u)); border: 1px solid var(--linie); display: block; }
+.tmk .mkr .n { font: 400 calc(.95 * var(--u))/1 var(--haus); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tmk .mkr .n small { font: 500 calc(.7 * var(--u)) var(--zahl, inherit); color: var(--leise); margin-left: calc(.3 * var(--u)); }
+.tmk .mkr .mkbal { position: relative; display: block; height: calc(.45 * var(--u)); background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; }
+.tmk .mkr .mkbal i { display: block; height: 100%; background: var(--gold); }
+.tmk .mkr .mkbal i.z { background: var(--gut); }
+.tmk .mkr .w { font-weight: 700; color: var(--creme); text-align: right; }
+.tmk .mkr.neu { background: rgba(240,195,90,.14); box-shadow: inset 2px 0 0 var(--gold); }
+.tmk .mkr.neu .n { color: var(--gold); }
+.tmk .mkr.neu img { border-color: var(--gold); }
+.tmk .mkr.raus { opacity: .55; }
+.tmk .mkr.neu.raus { opacity: 1; }
+.tmk .mkr .rausmark { font-style: normal; color: var(--acht); }
+.tmk .mkr.leer { display: flex; justify-content: center; cursor: default; color: var(--warn); font-size: calc(.74 * var(--u)); border: 1px dashed rgba(255,96,88,.45); margin-top: calc(.2 * var(--u)); letter-spacing: .1em; font-weight: 700; text-transform: uppercase; min-height: calc(1.7 * var(--u)); }
+.tmk .mkr.leer.opt { color: var(--gut); border-color: rgba(98,211,148,.45); }
+.tmk .mkr.leer:hover { background: none; }
+.tmk .mktrenn { display: flex; align-items: center; gap: calc(.5 * var(--u)); font-size: calc(.6 * var(--u)); letter-spacing: .14em; color: var(--stumm); font-weight: 700; text-transform: uppercase; margin: calc(.12 * var(--u)) 0; }
+.tmk .mktrenn::before, .tmk .mktrenn::after { content: ""; flex: 1; border-top: 1px dashed var(--linie-2); }
+.tmk .mkzaehl { display: flex; gap: calc(.2 * var(--u)); flex: none; }
+.tmk .mkzaehl i { flex: 1; height: calc(.42 * var(--u)); border-radius: calc(.1 * var(--u)); background: var(--flaeche-3); border: 1px solid var(--linie); }
+.tmk .mkzaehl i.v { background: var(--creme); border-color: var(--creme); }
+.tmk .mkzaehl i.n { background: var(--gold); border-color: var(--gold); }
+.tmk .mkzaehl i.pf { border-color: rgba(255,96,88,.6); }
+.tmk .mkzaehl i.op { border-color: rgba(98,211,148,.5); }
+.tmk .gz2 { display: flex; justify-content: space-between; align-items: baseline; gap: calc(.4 * var(--u)); font-size: calc(.86 * var(--u)); color: var(--leise); flex: none; }
+.tmk .gz2 b { color: var(--creme); }
+.tmk .gz2 b.plus { color: var(--gut); }
+.tmk .gz2 b.minus { color: var(--warn); }
+.tmk .gz2 .stumm { color: var(--stumm); font-weight: 500; }
+.tmk .kasse-block { margin-top: auto; display: flex; flex-direction: column; gap: calc(.3 * var(--u)); flex: none; }
+.tmk .kasse-stapel { height: calc(.7 * var(--u)); }
+.tmk .kasse-stapel .fehlt { background: repeating-linear-gradient(135deg, rgba(255,96,88,.75) 0 calc(.25 * var(--u)), transparent calc(.25 * var(--u)) calc(.5 * var(--u))); }
+.tmk .kasse-stapel .res { background: repeating-linear-gradient(135deg, var(--warn) 0 calc(.25 * var(--u)), transparent calc(.25 * var(--u)) calc(.5 * var(--u))); }
+.tmk .kasse-stapel .vor { background: var(--acht); }
+
+/* Markt: die Bühne gibt Platz für Wirkung, Mein Kader und Kasse (UX 19.11., E4) */
+.tmk .mk #m-fokus .buehne-f { flex: 0 0 calc(11 * var(--u)); height: calc(11 * var(--u)); min-height: 0; max-height: none; }
+.tmk .mk #m-fokus .fb { min-height: 0; gap: calc(.4 * var(--u)); }

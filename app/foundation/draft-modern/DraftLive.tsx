@@ -21,6 +21,9 @@ import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format"
 import type { DraftTempo, DraftZeig } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { useListenTasten } from "@/app/foundation/shared/klickregel";
+import { KasseBlock, MeinKaderListe, WirkungAufKader } from "@/app/foundation/shared/MeinKaderPanel";
+import { baueKasseDraft, kandidatSpanne, type EigenerSpieler, type KandidatEintrag } from "@/app/foundation/shared/mein-kader-daten";
+import { wirkungMitKandidat, type RangWirkung } from "@/lib/market/transfermarkt-kaderstaerke";
 import { auslassenSperrGrund, betragC, de, fertigGrundText, fertigSperrGrund, GRUND_TAG, GRUND_TEXT, pickHerkunft, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
 
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
@@ -778,19 +781,22 @@ export function MeinDraft({ k, aktionen, onAuslassen, onFertig, onSkip }: { k: D
   const kulisse = einsatzlisteKulisseBild(k.disziplin);
   const meineEintraege = a.verlauf.filter((e) => e.art === "pick" && e.teamId === mein.teamId && e.playerId);
   const gepickt = meineEintraege.reduce((s, e) => s + (e.abloese ?? 0), 0);
-  const gesamt = Math.max(0.01, mein.kasse + gepickt);
-  const breite = (x: number) => `${Math.max(0, Math.min(100, (x / gesamt) * 100))}%`;
-  const frei = Math.max(0, mein.kasse - mein.pflichtReserve - (z && !teuer ? preis : 0));
   // Konkurrenz: KI-Teams vor mir, die ihn gerade in den Top 3 haben.
   const bis = mein.picksBisZug ?? 0;
   const konkurrenz =
     z && !mein.amZug
       ? a.naechste.slice(0, bis).filter((t) => t.art === "ki" && t.top3?.includes(z.item.playerId)).map((t) => ({ t, rang: (t.top3 ?? []).indexOf(z.item.playerId) + 1 }))
       : [];
-  const plaetze = Array.from({ length: 14 }, (_, i) => meineEintraege[i]?.playerId ?? (i < mein.kader ? "?" : null));
-  const wunsch = [...k.wunsch].slice(0, 4);
-  const wegPicker = (id: string) => a.verlauf.find((e) => e.art === "pick" && e.playerId === id)?.teamId ?? null;
-
+  const disziplinNamen = officialDisciplineWeightLabels as Record<string, string>;
+  // Mein Kader in der gewählten Disziplin: eigene Spieler exakt, der Ausgewählte (fremd) nach seiner Sicht (Nebel).
+  const eigene: EigenerSpieler[] = k.meinKader.map((s) => ({ playerId: s.playerId, name: s.name, className: s.className, portraitUrl: k.portrait(s.playerId), wert: s.ratings?.[k.disziplin] ?? null }));
+  const kandidatWert = z?.sicht.disziplinen[k.disziplin];
+  const kandidat: KandidatEintrag | null =
+    z && kandidatWert && kandidatWert.schaetzung != null
+      ? { playerId: z.item.playerId, name: z.item.name, className: z.item.className, portraitUrl: bild, wert: kandidatWert.schaetzung, text: kandidatWert.text }
+      : null;
+  const wirkungen: RangWirkung[] = z && k.vorbereitung ? DISZIPLINEN.map((d) => wirkungMitKandidat(k.vorbereitung!, d, kandidatSpanne(z.sicht, d))) : [];
+  const kasse = baueKasseDraft({ kasse: mein.kasse, ausgegeben: gepickt, reserve: mein.pflichtReserve, preis: z ? preis : null, maxAbloese: mein.maxAbloese });
   return (
     <section className="pan" id="l-ich" data-testid="draft-mein">
       {z ? (
@@ -847,60 +853,23 @@ export function MeinDraft({ k, aktionen, onAuslassen, onFertig, onSkip }: { k: D
             <NichtPicken mein={mein} minKader={a.regeln.minKader} onAuslassen={onAuslassen} onFertig={onFertig} onSkip={onSkip} />
           </>
         )}
-        <h4 title={mein.kaderOpt != null ? `Pflicht (rot): der Mindestkader. Opt (grün): die Kadergröße, die dein GM anstrebt (Optimum der GM-Identität, dieselbe Zahl wie in der KI-Kaderplanung). Ein Vorstandsziel zur Kadergröße gibt es nicht mehr.` : "Pflicht (rot): der Mindestkader."}>Mein Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>{Math.min(mein.kader, a.regeln.minKader)} von {a.regeln.minKader} Pflicht{mein.kaderOpt != null ? ` · Opt ${mein.kaderOpt}` : ""} · höchstens {a.regeln.maxPicksJeTeam}</span></h4>
-        <div className="plaetze">
-          {plaetze.map((id, i) => {
-            const b = id && id !== "?" ? k.portrait(id) : null;
-            return (
-              <div key={i} onClick={id && id !== "?" ? () => k.profil(id) : undefined} style={id && id !== "?" ? { cursor: "pointer" } : undefined} data-testid={id && id !== "?" ? "draft-kader-spieler" : undefined} className={id ? "voll" : i < a.regeln.minKader ? "pfl" : mein.kaderOpt != null && i < mein.kaderOpt ? "opt" : ""} title={id && id !== "?" ? spielerName(k, id) : mein.kaderOpt != null && i >= a.regeln.minKader && i < mein.kaderOpt ? "Opt: so groß will dein GM den Kader (GM-Identität)" : undefined}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {b ? <img src={b} alt="" /> : id ? null : i < a.regeln.minKader ? "Pflicht" : mein.kaderOpt != null && i < mein.kaderOpt ? "Opt" : "frei"}
-              </div>
-            );
-          })}
-        </div>
-        <h4 title="Gehaltsbudget: in Saison 1 ohne Vorstandsdeckel (Finanzseite · Budgets). Der Draft prüft Kasse und Pflichtplätze; der Vorstandsrahmen gilt ab Saison 2.">Kasse und Pflichtplätze</h4>
-        <div className="gf" style={{ padding: 0 }}>
-          <div className="zt2">
-            <div className="tk2"><span className="gk">Kasse</span><small>frei <b className="t">{betragC(mein.kasse)}</b></small></div>
-            <div className="stapel" data-testid="draft-kassenbalken">
-              <i className="aus" style={{ width: breite(gepickt) }} />
-              <i className="vor" style={{ width: breite(z && !teuer ? preis : 0) }} />
-              <i className="frei" style={{ width: breite(frei) }} />
-              <i className="res" style={{ width: breite(mein.pflichtReserve) }} />
-            </div>
-          </div>
-          <div className="leg">
-            <span><i style={{ background: "var(--stumm)" }} />gepickt</span>
-            <span><i style={{ background: "var(--acht)" }} />dieser Pick</span>
-            <span><i style={{ background: "var(--gut)" }} />frei</span>
-            <span><i style={{ background: "var(--warn)" }} />Reserve für Pflichtplätze</span>
-          </div>
-          <div className="gz"><span>Für diesen Pick höchstens</span><b className="t">{betragC(Math.max(0, mein.maxAbloese))}</b></div>
-        </div>
-        <h4>
-          Wunschliste
-          <button type="button" className={`schalter${mein.autoPick ? " an" : ""}`} style={{ marginLeft: "auto" }} onClick={() => void aktionen.autoPick(!mein.autoPick)} title="An: bist du dran, pickt dein GM für dich." data-testid="draft-autopick">
-            Auto-Pick<i />
+        {z ? <WirkungAufKader wirkungen={wirkungen} namen={disziplinNamen} /> : null}
+        <MeinKaderListe
+          disziplinName={disziplinNamen[k.disziplin] ?? k.disziplin}
+          eigene={eigene}
+          kandidat={kandidat}
+          kader={mein.kader}
+          pflicht={a.regeln.minKader}
+          wunsch={mein.kaderOpt ?? null}
+          max={a.regeln.maxPicksJeTeam}
+          onProfil={k.profil}
+        />
+        <KasseBlock kasse={kasse} hinweis="Reserve für Pflichtplätze eingerechnet" nachLabel="Pick" titelHinweis="Gehaltsbudget: in Saison 1 ohne Vorstandsdeckel (Finanzseite · Budgets). Der Draft prüft Kasse und Pflichtplätze; der Vorstandsrahmen gilt ab Saison 2." />
+        <div className="autopick-zeile">
+          <span title="An: bist du dran, pickt dein GM für dich.">Auto-Pick</span>
+          <button type="button" className={`schalter${mein.autoPick ? " an" : ""}`} onClick={() => void aktionen.autoPick(!mein.autoPick)} title="An: bist du dran, pickt dein GM für dich." data-testid="draft-autopick">
+            <i />
           </button>
-        </h4>
-        <div className="wl">
-          {wunsch.length ? (
-            wunsch.map((id, i) => {
-              const info = kartenInfo(k, id);
-              const zz = k.zeilenById.get(id);
-              const weg = wegPicker(id);
-              const mw = zz?.item.marketValue ?? info?.marktwert ?? 0;
-              return (
-                <div key={id} className={k.wahl === id ? "an" : ""} onClick={() => (weg ? k.profil(id) : k.klick(id))} title={weg ? "Vergeben · Klick öffnet das Profil" : k.wahl === id ? "Ausgewählt · nochmal klicken öffnet das Profil" : "Klick wählt aus"} data-testid="draft-wunsch-zeile" data-player-id={id}>
-                  <span>{i + 1}. {zz?.item.name ?? info?.name ?? id} <small>· {betragC(mw)}</small></span>
-                  {weg ? (weg === mein.teamId ? <span className="tag g">gepickt</span> : <span className="tag w">weg · {k.teamKuerzel(weg)}</span>) : mw > mein.maxAbloese ? <span className="tag a">zu teuer</span> : <span className="tag g">noch frei</span>}
-                </div>
-              );
-            })
-          ) : (
-            <div><span style={{ color: "var(--leise)" }}>leer · ☆ im Brett setzt einen Wunsch</span></div>
-          )}
         </div>
       </div>
     </section>

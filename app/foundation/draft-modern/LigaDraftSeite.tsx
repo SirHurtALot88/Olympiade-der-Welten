@@ -19,6 +19,7 @@ import { getTeamLogoModel, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaA
 import { figurPoseUrl, getFigurSpriteForPlayer } from "@/lib/data/figurenSprites";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { baueSpielerSicht } from "@/lib/market/transfermarkt-sicht";
+import { bereiteTeamVor } from "@/lib/market/transfermarkt-kaderstaerke";
 import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import { useMarktFeed } from "@/app/foundation/transfermarkt-modern/tm-daten";
@@ -164,9 +165,28 @@ export default function LigaDraftSeite({
     }
   }, [ansicht?.status]);
 
-  const raenge = useMemo(
-    () => (ansicht && ansicht.mein ? baueDraftKaderSicht({ gameState, ansicht, teamId: ansicht.mein.teamId, disziplinIds: [...officialDisciplineWeightOrder] }).zeilen : null),
+  const kaderSicht = useMemo(
+    () => (ansicht && ansicht.mein ? baueDraftKaderSicht({ gameState, ansicht, teamId: ansicht.mein.teamId, disziplinIds: [...officialDisciplineWeightOrder] }) : null),
     [gameState, ansicht],
+  );
+  const raenge = kaderSicht?.zeilen ?? null;
+  // „Mein Kader“ und „Wirkung auf deinen Kader“ (UX 19.11.): dieselbe Rechnung wie Transfermarkt (`transfermarkt-kaderstaerke.ts`), hier
+  // mit den Live-Picks des Drafts.
+  const vorbereitung = useMemo(
+    () =>
+      kaderSicht && ansicht?.mein
+        ? bereiteTeamVor({ spieler: kaderSicht.spieler, staerken: kaderSicht.staerken, teamId: ansicht.mein.teamId, disziplinIds: [...officialDisciplineWeightOrder] })
+        : null,
+    [kaderSicht, ansicht?.mein],
+  );
+  const meinKader = useMemo(
+    () =>
+      kaderSicht && ansicht?.mein
+        ? kaderSicht.spieler
+            .filter((s) => s.teamId === ansicht.mein!.teamId)
+            .map((s) => ({ playerId: s.playerId, name: spielerById.get(s.playerId)?.name ?? s.playerId, className: spielerById.get(s.playerId)?.className ?? "", ratings: s.ratings }))
+        : [],
+    [kaderSicht, ansicht?.mein, spielerById],
   );
 
   const kontext: DraftKontext | null = ansicht
@@ -197,6 +217,8 @@ export default function LigaDraftSeite({
         teamName: (id) => ansicht.teams.find((t) => t.teamId === id)?.name ?? teamsById.get(id)?.name ?? id,
         teamKuerzel: (id) => ansicht.teams.find((t) => t.teamId === id)?.kuerzel ?? teamsById.get(id)?.shortCode ?? id,
         raenge,
+        meinKader,
+        vorbereitung,
         profil: (id) => setProfilId(id),
         spielerName: (id) => zeilenById.get(id)?.item.name ?? ansicht.spieler[id]?.name ?? spielerById.get(id)?.name ?? "—",
         wunsch,

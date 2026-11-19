@@ -8,10 +8,8 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 import {
   baueLigaStaerken,
   bereiteTeamVor,
-  hebtInDisziplinen,
   rangGegenLiga,
   wirkungMitKandidat,
-  type KandidatRange,
   type RangWirkung,
   type StaerkeSpieler,
 } from "@/lib/market/transfermarkt-kaderstaerke";
@@ -25,7 +23,7 @@ import {
   type MarktAchse,
   type SpielerSicht,
 } from "@/lib/market/transfermarkt-sicht";
-import { officialDisciplineWeightLabels, officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
+import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 
 import { bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-disziplin-bedarf";
@@ -44,11 +42,13 @@ import {
   type WeitereFilter,
 } from "@/lib/market/transfermarkt-weitere-filter";
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil, useListenTasten } from "@/app/foundation/shared/klickregel";
+import { KasseBlock, MeinKaderListe, WirkungAufKader } from "@/app/foundation/shared/MeinKaderPanel";
+import { baueKasseMarkt, kandidatSpanne, type EigenerSpieler, type KandidatEintrag, type KasseAnsicht } from "@/app/foundation/shared/mein-kader-daten";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
 import { useMarktFeed } from "./tm-daten";
-import { ATTRIBUT_LABEL_DE, betragC, begrenze, de, jeSpieltag, rangText } from "./tm-format";
+import { betragC, begrenze, de, jeSpieltag, rangText } from "./tm-format";
 import type { TransfermarktModernProps } from "./tm-typen";
 import "./transfermarkt-modern.css";
 
@@ -76,12 +76,6 @@ function rangGegenLigaFuer(staerken: Record<string, Record<string, number>>, tea
 
 function bildUrlVon(item: TransfermarktFreeAgentItem): string | null {
   return getTransfermarktPortraitModel(item).src;
-}
-
-function kandidatSpanne(sicht: SpielerSicht, disziplinId: string): KandidatRange | null {
-  const wert = sicht.disziplinen[disziplinId];
-  if (!wert || wert.schaetzung == null || wert.von == null || wert.bis == null) return null;
-  return { von: wert.von, mitte: wert.schaetzung, bis: wert.bis };
 }
 
 function eignungText(sicht: SpielerSicht, disziplinId: string): string {
@@ -309,6 +303,20 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     if (!fokus) return [];
     return DISZIPLINEN.map((d) => wirkungMitKandidat(vorbereitung, d, kandidatSpanne(fokus.sicht, d)));
   }, [fokus, vorbereitung]);
+
+  // Mein Kader in der gewählten Disziplin und Kasse nach dem Kauf: gemeinsames Panel mit dem Draft (`app/foundation/shared`).
+  const eigeneFuerPanel = useMemo<EigenerSpieler[]>(
+    () =>
+      rosterRows
+        .filter((r) => r.teamId === teamId)
+        .map((r) => ({ playerId: r.playerId, name: r.name, className: r.className, portraitUrl: r.portraitUrl ?? null, wert: r.disciplineRatings?.[disziplin] ?? null, verletzt: verletzt.has(r.playerId) })),
+    [rosterRows, teamId, disziplin, verletzt],
+  );
+  const eigeneFuerPanelAnzahl = eigeneFuerPanel.length;
+  const kasseAnsicht = baueKasseMarkt({
+    frei: freigabeAnzeige ? freigabeAnzeige.frei : Math.max(0, cash ?? 0),
+    preis: fokus ? (freigabeAnzeige ? fokusKosten : (fokus.item.marketValue ?? null)) : null,
+  });
 
   const disziplinNamen = officialDisciplineWeightLabels as Record<string, string>;
   const disziplinReihenfolge = useMemo(() => {
@@ -595,6 +603,13 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 onErstVerkaufen={() => setAnsicht("verkauf")}
                 onDetails={() => props.onOpenPlayerDetails?.({ playerId: fokus.item.playerId })}
                 onMerken={() => props.onToggleWishlist?.(fokus.item)}
+                eigene={eigeneFuerPanel}
+                kader={kader ?? eigeneFuerPanelAnzahl}
+                kaderPflicht={kaderMin}
+                kaderWunsch={feed.teamContext?.playerOpt ?? null}
+                kaderMax={team?.rosterLimit ?? 14}
+                kasse={kasseAnsicht}
+                onProfil={profilOeffnen}
               />
             ) : (
               <div className="tmk-leer">Wähle einen Spieler in der Liste.</div>
@@ -776,22 +791,22 @@ function FokusSpieler(props: {
   onErstVerkaufen: () => void;
   onDetails: () => void;
   onMerken: () => void;
+  /** Mein Kader in der gewählten Disziplin (eigene Spieler exakt), Zähler und Kasse: gemeinsames Panel mit dem Draft. */
+  eigene: EigenerSpieler[];
+  kader: number;
+  kaderPflicht: number;
+  kaderWunsch: number | null;
+  kaderMax: number;
+  kasse: KasseAnsicht;
+  onProfil: (playerId: string) => void;
 }) {
   const { z, disziplin, disziplinNamen } = props;
   const it = z.item;
   const sprite = getFigurSpriteForPlayer(it.playerId);
   const bild = bildUrlVon(it);
   const wert = z.sicht.disziplinen[disziplin];
-  const wege = bauWege(z.sicht, disziplin);
   const pp = erwartetePpSpanne(wert);
-  const spruenge = [...props.wirkungen]
-    .filter((w) => w.nachherBest < w.vorher)
-    .sort((a, b) => b.vorher - b.nachherBest - (a.vorher - a.nachherBest))
-    .slice(0, 3);
-  const top3 = Object.entries(z.sicht.disziplinen)
-    .sort((a, b) => (b[1].schaetzung ?? 0) - (a[1].schaetzung ?? 0))
-    .slice(0, 3)
-    .map(([id]) => id);
+  const kandidat: KandidatEintrag | null = wert && wert.schaetzung != null ? { playerId: it.playerId, name: it.name, className: it.className, portraitUrl: bild, wert: wert.schaetzung, text: wert.text } : null;
   const potenzial = it.potentialRange ? `${it.potentialRange.min}–${it.potentialRange.max}` : "—";
 
   return (
@@ -807,44 +822,6 @@ function FokusSpieler(props: {
         <div className="txt"><em>Ausgewählt · {it.className} · {it.race}</em><h3>{it.name}</h3></div>
       </div>
       <div className="fb">
-        <h4>Eignung in 20 Disziplinen <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>Klick wählt die Disziplin · Stufen</span></h4>
-        <div className="d20">
-          {officialDisciplineWeightOrder.map((d) => {
-            const w = z.sicht.disziplinen[d];
-            return (
-              <button type="button" key={d} className={d === disziplin ? "an" : top3.includes(d) ? "top" : ""} onClick={() => props.onDisziplin(d)} title={`${disziplinNamen[d]} ${w ? w.text : "?"}`}>
-                <i style={{ height: `${w?.schaetzung ?? 0}%` }} />
-              </button>
-            );
-          })}
-        </div>
-        <h4>Wege zum Erfolg in <b>{disziplinNamen[disziplin]}</b></h4>
-        <div data-testid="tm-wege">
-          {wege.zeilen.map((r, i) => (
-            <div key={r.attribut} className={`weg${i === 0 ? " pri" : ""}`}>
-              <span>{ATTRIBUT_LABEL_DE[r.attribut] ?? r.attribut}</span>
-              <small className="t">{r.gewicht} %</small>
-              <span className="bal"><i className={(r.sicht?.prozent ?? 0) >= 62 ? "gutw" : (r.sicht?.prozent ?? 0) >= 45 ? "mit" : "schw"} style={{ width: `${r.sicht?.prozent ?? 0}%` }} /></span>
-              <b className="t">{r.sicht?.anzeige ?? "?"}</b>
-            </div>
-          ))}
-        </div>
-        <div className="wegurteil"><span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`}>{wege.urteil.titel}</span> {wege.urteil.text}</div>
-        <h4>Wirkung auf deinen Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>könnte {hebtInDisziplinen(props.wirkungen)} von 20 Disziplinen heben</span></h4>
-        <div className="wirk">
-          {spruenge.length > 0 ? (
-            spruenge.map((w) => (
-              <div key={w.disziplinId}><b>{disziplinNamen[w.disziplinId]}</b>Rang <RangAnzeige w={w} /></div>
-            ))
-          ) : (
-            <div style={{ gridColumn: "1 / 4" }}>Kein Rang ändert sich (auch im besten Fall nicht).</div>
-          )}
-        </div>
-        <h4>Charakter</h4>
-        <div className="rw">
-          <div><span>Stärken</span><b style={{ fontWeight: 600 }}>{it.traitsPositive.length > 0 ? it.traitsPositive.join(", ") : it.hiddenPositiveTraitCount > 0 ? `${it.hiddenPositiveTraitCount} verdeckt` : "keine"}</b></div>
-          <div><span>Schwächen</span><b style={{ fontWeight: 600 }} className={it.traitsNegative.length ? "minus" : ""}>{it.traitsNegative.length > 0 ? it.traitsNegative.join(", ") : it.hiddenNegativeTraitCount > 0 ? "verdeckt · scouten" : "keine"}</b></div>
-        </div>
         <div className="kost">
           <div><small>Ablöse</small><strong className={`t ${props.ueberKasse ? "minus" : ""}`}>{de(it.marketValue ?? 0, 1)} C</strong><em>fest = Marktwert</em></div>
           <div><small>Forderung</small><strong className="t">{de(it.salary ?? 0, 1)} C</strong><em>je Saison · {de(jeSpieltag(it.salary) ?? 0, 2)} C je Spieltag</em></div>
@@ -857,6 +834,18 @@ function FokusSpieler(props: {
           <button type="button" className="knopf" onClick={props.onVergleichen}>{props.angeheftet ? "Angeheftet" : "Vergleichen"}</button>
           <button type="button" className="knopf" onClick={props.onMerken}>{props.gemerkt ? "★ entfernen" : "★ merken"}</button>
         </div>
+        <WirkungAufKader wirkungen={props.wirkungen} namen={disziplinNamen} />
+        <MeinKaderListe
+          disziplinName={disziplinNamen[disziplin] ?? disziplin}
+          eigene={props.eigene}
+          kandidat={kandidat}
+          kader={props.kader}
+          pflicht={props.kaderPflicht}
+          wunsch={props.kaderWunsch}
+          max={props.kaderMax}
+          onProfil={props.onProfil}
+        />
+        <KasseBlock kasse={props.kasse} hinweis={props.freigabeAktiv ? "Vorstand gibt Teil frei" : "Kasse des Teams"} nachLabel="Kauf" />
       </div>
     </>
   );

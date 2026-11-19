@@ -33,7 +33,7 @@ export function baueDraftKaderSicht(input: {
   ansicht: Pick<LigaDraftAnsicht, "verlauf">;
   teamId: string;
   disziplinIds: readonly string[];
-}): { staerken: LigaStaerken; zeilen: DraftKaderZeile[] } {
+}): { staerken: LigaStaerken; zeilen: DraftKaderZeile[]; spieler: StaerkeSpieler[] } {
   const spielerById = new Map(input.gameState.players.map((p) => [p.id, p]));
   const kader = kaderMitPicks(input.gameState.rosters, input.ansicht.verlauf);
   const spieler: StaerkeSpieler[] = kader.map((r) => ({ playerId: r.playerId, teamId: r.teamId, ratings: spielerById.get(r.playerId)?.disciplineRatings }));
@@ -43,7 +43,7 @@ export function baueDraftKaderSicht(input: {
     const staerke = staerken[input.teamId]?.[disziplinId] ?? 20;
     return { disziplinId, staerke, rang: rangGegenLiga(staerken, input.teamId, disziplinId, staerke), ligaGroesse: teamIds.length };
   });
-  return { staerken, zeilen };
+  return { staerken, zeilen, spieler };
 }
 
 /** Rang eines Spielers unter ALLEN Spielern der Liga (Kader und freie) je Disziplin; die `anzahl` besten Disziplinen. */
