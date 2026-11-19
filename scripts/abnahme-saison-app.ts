@@ -41,7 +41,9 @@ const SQLITE = process.env.OLY_APP_SQLITE_PATH ?? "";
 const BASE = (process.env.ABNAHME_BASE_URL ?? "http://127.0.0.1:3217").replace(/\/$/, "");
 const ZUSTAND_DATEI = `${SQLITE}.abnahme.json`;
 const OUT_BILDER = path.join(process.cwd(), "docs", "design", "abnahme-saison-19-11");
-const OUT_DATEN = path.join(process.cwd(), "data", "generated", "abnahme-saison-19-11");
+// Zweiter Lauf (frisches Spiel nach den Fixes): `ABNAHME_LAUF=b` legt Daten unter …/lauf-b/ und Bilder mit Praefix „b-“ ab.
+const LAUF = process.env.ABNAHME_LAUF ?? "";
+const OUT_DATEN = path.join(process.cwd(), "data", "generated", "abnahme-saison-19-11", ...(LAUF ? [`lauf-${LAUF}`] : []));
 
 type Zustand = { saveId: string; teamId: string; log: string[] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -180,7 +182,7 @@ function url(z: Zustand, view?: string) {
 async function foto(page: Page, name: string) {
   fs.mkdirSync(OUT_BILDER, { recursive: true });
   await page.waitForTimeout(800);
-  await page.screenshot({ path: path.join(OUT_BILDER, name) });
+  await page.screenshot({ path: path.join(OUT_BILDER, LAUF ? `${LAUF}-${name}` : name) });
   log(`Bild ${name}`);
 }
 

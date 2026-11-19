@@ -779,7 +779,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             <span><i style={{ background: "var(--warn)" }} />Reserve für Pflichtplätze</span>
           </div>
           <div className="gz"><span>Für diesen Pick höchstens</span><b className="t">{betragC(Math.max(0, mein.maxAbloese))}</b></div>
-          <div className="vorst"><b>Gehaltsbudget:</b> folgt mit dem Budget-Dienst (Finanzen V2)<small>Der Draft prüft heute Kasse und Pflichtplätze.</small></div>
+          <div className="vorst"><b>Gehaltsbudget:</b> in Saison 1 ohne Vorstandsdeckel (Finanzseite · Budgets)<small>Der Draft prüft Kasse und Pflichtplätze; der Vorstandsrahmen gilt ab Saison 2.</small></div>
         </div>
         <h4>
           Wunschliste

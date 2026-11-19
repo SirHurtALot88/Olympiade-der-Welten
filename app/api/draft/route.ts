@@ -167,6 +167,14 @@ export async function POST(request: Request) {
     // A6: jede schreibende Aktion ausser `starten` nennt den Stand, den sie gesehen hat.
     const erwarteteNr = typeof body.erwarteteNr === "number" && Number.isInteger(body.erwarteteNr) ? body.erwarteteNr : null;
     if (aktion !== "starten" && erwarteteNr == null) return fehler("erwarteteNr_fehlt", 400);
+    /**
+     * STANDUNABHAENGIGE AKTIONEN (Abnahme 19.11., Fehler F2, docs/design/abnahme-saison-19-11.md): Ueberspringen, Auto-Pick und
+     * „Ich bin fertig“ haengen nicht am Platz im Draft. Waehrend die KI im Hintergrund pickt (0,1–0,2 s je Pick), war jeder
+     * gesehene Stand beim Eintreffen schon veraltet — „Ueberspringen“ scheiterte mehrfach still (gemessen: 3 Klicks). Fuer
+     * diese Aktionen prueft der Dienst den Stand nicht; `erwarteteNr` bleibt Pflicht (A6, Protokoll), Doppelklick ist harmlos
+     * (Auto-Pick/Variante B setzen denselben Zustand, Variante A und „fertig“ lehnt der Dienst beim zweiten Mal ab).
+     */
+    const standFuerDienst = aktion === "ueberspringen" || aktion === "auto_pick" || aktion === "fertig" ? null : erwarteteNr;
 
     // Gastgeber-Aktionen: Draft anlegen/abbrechen, Auto-Pick fuer ein fremdes Team (Konzept Frage 7: „Auto-Pick
     // auslösen“ für einen Abwesenden, mit Rueckfrage in der Seite und Eintrag im Verlauf).
@@ -229,16 +237,16 @@ export async function POST(request: Request) {
         ergebnis = { draft: bucheMenschAuslassen({ persistence, saveId, teamId, erwarteteNr }) };
         break;
       case "fertig":
-        ergebnis = { draft: bucheMenschFertig({ persistence, saveId, teamId, erwarteteNr }) };
+        ergebnis = { draft: bucheMenschFertig({ persistence, saveId, teamId, erwarteteNr: standFuerDienst }) };
         break;
       case "ueberspringen": {
         const variante = body.variante === "B" ? "B" : body.variante === "A" ? "A" : null;
         if (!variante) return fehler("variante_fehlt", 400);
-        ergebnis = { draft: bucheMenschUeberspringen({ persistence, saveId, teamId, variante, erwarteteNr }) };
+        ergebnis = { draft: bucheMenschUeberspringen({ persistence, saveId, teamId, variante, erwarteteNr: standFuerDienst }) };
         break;
       }
       case "auto_pick":
-        ergebnis = { draft: setzeMenschAutoPick({ persistence, saveId, teamId: zielTeamId, an: body.an !== false, erwarteteNr }) };
+        ergebnis = { draft: setzeMenschAutoPick({ persistence, saveId, teamId: zielTeamId, an: body.an !== false, erwarteteNr: standFuerDienst }) };
         break;
     }
 
