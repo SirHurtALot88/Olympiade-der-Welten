@@ -8,7 +8,14 @@
  * PICK UND RUNDE: der Draft speichert sie nicht (`TransferHistoryEntry` kennt weder Pick-Nummer noch Runde). Der
  * Kaderaufbau wird deshalb nach Team gruppiert und nach Zeitstempel geordnet (Chris, Frage 5: Rueckfall).
  */
-import { saisonNummer, spieltagNummer } from "@/lib/foundation/transfer-window-zuordnung";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  ermittleFensterSaisonId,
+  ermittleLetzteSpieltageJeSaison,
+  saisonNummer,
+  spieltagNummer,
+} from "@/lib/foundation/transfer-window-zuordnung";
+import { istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 
 /** Das Minimum, das die Rechnung an einer Zeile liest (passt auf `TransferHistoryV2Row`). */
 export type HistorieDealZeile = {
@@ -134,4 +141,83 @@ export function dealsAlsCsv(zeilen: readonly HistorieDealZeile[]): string {
     ].join(";"),
   );
   return [kopf.join(";"), ...zeilenText].join("\n");
+}
+
+/** Kennzahlen EINES Transferfensters aus der vollstaendigen Historie (nicht aus der geladenen Seite). */
+export type FensterKennzahlen = {
+  /** Alle Eintraege des Fensters (Kaeufe, Verkaeufe, Vertragsenden). */
+  deals: number;
+  /** Kaderaufbau (nur Fenster 1): Kaeufe und ihre Ablösesumme. */
+  kaderaufbauPicks: number;
+  kaderaufbauSumme: number;
+  /** Ohne Kaderaufbau: Transfers und Abgaenge, Umsatz = Ablösen der Kaeufe. */
+  transferDeals: number;
+  umsatz: number;
+  /** Je Team ohne Kaderaufbau: Ausgaben (Kaeufe) und Einnahmen (Verkaeufe). */
+  jeTeam: Map<string, { aus: number; ein: number }>;
+  /** Minimale Zeilen des Fensters fuer `bilanzJeTeam` (Namen setzt der Aufrufer). */
+  zeilen: Array<{
+    type: "buy" | "sell" | "contract_exit";
+    fee: number;
+    fromTeamId: string | null;
+    fromTeamName: string | null;
+    toTeamId: string | null;
+    toTeamName: string | null;
+    buchungsArt: "kaderaufbau" | "transfer" | "vertragsende";
+  }>;
+};
+
+/**
+ * ABNAHME 19.11., Fehler F9 (docs/design/abnahme-saison-19-11.md): die Historie zaehlte „Picks“, „Deals“, „Umsatz“ und die
+ * Fenster-Kacheln aus der GELADENEN Seite (die 100 neuesten Eintraege). Nach dem ersten Transferfenster stand deshalb
+ * „Saison 1: 0 Picks aus dem Startbudget“ (381 waren es) und „Deals 100“ (es waren 202). Diese Kennzahlen kommen jetzt aus der
+ * vollstaendigen Historie im Spielstand, nach derselben Fenster-Zuordnung wie Server und Liste (`ermittleFensterSaisonId`).
+ * Schluessel: Fenster-Nummer (1, 2, ...).
+ */
+export function fensterKennzahlenAusHistorie(
+  gameState: Pick<GameState, "transferHistory" | "season">,
+): Map<number, FensterKennzahlen> {
+  const eintraege = gameState.transferHistory ?? [];
+  const letzte = ermittleLetzteSpieltageJeSaison(eintraege);
+  const spieltageProSaison = gameState.season?.matchdayIds?.length ?? null;
+  const karte = new Map<number, FensterKennzahlen>();
+  for (const eintrag of eintraege) {
+    const fensterId = ermittleFensterSaisonId(eintrag, letzte, spieltageProSaison);
+    const nummer = saisonNummer(fensterId);
+    if (nummer == null) continue;
+    const k =
+      karte.get(nummer) ??
+      karte.set(nummer, { deals: 0, kaderaufbauPicks: 0, kaderaufbauSumme: 0, transferDeals: 0, umsatz: 0, jeTeam: new Map(), zeilen: [] }).get(nummer)!;
+    k.deals += 1;
+    const typ = eintrag.transferType as string;
+    const art = typ === "contract_exit" ? "vertragsende" : istKaderaufbauSaison(fensterId) ? "kaderaufbau" : "transfer";
+    k.zeilen.push({
+      type: typ === "buy" || typ === "sell" ? typ : "contract_exit",
+      fee: eintrag.fee ?? 0,
+      fromTeamId: eintrag.fromTeamId ?? null,
+      fromTeamName: null,
+      toTeamId: eintrag.toTeamId ?? null,
+      toTeamName: null,
+      buchungsArt: art,
+    });
+    if (typ !== "contract_exit" && istKaderaufbauSaison(fensterId)) {
+      if (typ === "buy") {
+        k.kaderaufbauPicks += 1;
+        k.kaderaufbauSumme += eintrag.fee ?? 0;
+      }
+      continue;
+    }
+    k.transferDeals += 1;
+    if (typ === "buy") {
+      k.umsatz += eintrag.fee ?? 0;
+      if (eintrag.toTeamId) {
+        const t = k.jeTeam.get(eintrag.toTeamId) ?? k.jeTeam.set(eintrag.toTeamId, { aus: 0, ein: 0 }).get(eintrag.toTeamId)!;
+        t.aus += eintrag.fee ?? 0;
+      }
+    } else if (typ === "sell" && eintrag.fromTeamId) {
+      const t = k.jeTeam.get(eintrag.fromTeamId) ?? k.jeTeam.set(eintrag.fromTeamId, { aus: 0, ein: 0 }).get(eintrag.fromTeamId)!;
+      t.ein += eintrag.fee ?? 0;
+    }
+  }
+  return karte;
 }

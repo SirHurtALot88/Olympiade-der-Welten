@@ -12,6 +12,8 @@ import {
   dealsAlsCsv,
   fensterNummer,
   trenneKaderaufbau,
+  fensterKennzahlenAusHistorie,
+  type FensterKennzahlen,
   zeitText,
   type DealArt,
 } from "@/lib/foundation/historie-transfers";
@@ -103,6 +105,25 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
     return alle ? [...transfers, ...abgaenge.filter((z) => z.buchungsArt !== "kaderaufbau")] : [...transfers, ...abgaenge];
   }, [filteredRows, kaderaufbauAnsicht, alle]);
   const kaderaufbauAlle = useMemo(() => trenneKaderaufbau(filteredRows).kaderaufbau, [filteredRows]);
+  // F9 (Abnahme 19.11.): Kennzahlen aus der VOLLSTAENDIGEN Historie im Spielstand statt aus der geladenen Seite.
+  const kennzahlen = useMemo(() => fensterKennzahlenAusHistorie(gameState), [gameState]);
+  const ohneFilter = teamFilter === "ALL" && typeFilter === "ALL" && classFilter === "ALL" && sourceFilter === "ALL" && !search.trim();
+  const kennzahlenSicht = useMemo(() => {
+    if (kennzahlen.size === 0) return null;
+    const fenster = alle ? [...kennzahlen.values()] : gewaehltesGlied ? [kennzahlen.get(gewaehltesGlied.nummer)].filter(Boolean) : [];
+    const summe = (f: (k: FensterKennzahlen) => number) => fenster.reduce((x, k) => x + f(k!), 0);
+    const eigen = (feld: "aus" | "ein") => summe((k) => (eigenesTeam ? k.jeTeam.get(eigenesTeam)?.[feld] ?? 0 : 0));
+    return {
+      deals: summe((k) => k.transferDeals),
+      umsatz: summe((k) => k.umsatz),
+      eigeneAus: eigen("aus"),
+      eigeneEin: eigen("ein"),
+      picks: kennzahlen.get(1)?.kaderaufbauPicks ?? 0,
+      pickSumme: kennzahlen.get(1)?.kaderaufbauSumme ?? 0,
+      // Dieselbe Trennung wie `sichtZeilen`: Kaderaufbau-Ansicht nur Kaderaufbau, sonst ohne Kaderaufbau.
+      zeilen: fenster.flatMap((k) => k!.zeilen).filter((z) => (kaderaufbauAnsicht ? z.buchungsArt === "kaderaufbau" : z.buchungsArt !== "kaderaufbau")),
+    };
+  }, [kennzahlen, alle, gewaehltesGlied, eigenesTeam, kaderaufbauAnsicht]);
 
   const teamGefiltert = useMemo(
     () => (teamFilter === "ALL" ? sichtZeilen : sichtZeilen.filter((z) => z.fromTeamId === teamFilter || z.toTeamId === teamFilter)),
@@ -120,7 +141,9 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
   }, [teamGefiltert, sortierung]);
 
   const bilanz = useMemo(() => {
-    const liste = bilanzJeTeam(sichtZeilen, namenNachId).filter((b) => b.deals > 0 || b.teamId === eigenesTeam);
+    // F9: ohne Filter die Bilanz aus der vollstaendigen Historie, nicht aus der geladenen Seite.
+    const quelle = ohneFilter && kennzahlenSicht ? kennzahlenSicht.zeilen : sichtZeilen;
+    const liste = bilanzJeTeam(quelle, namenNachId).filter((b) => b.deals > 0 || b.teamId === eigenesTeam);
     return liste.sort((a, b) => {
       if (a.teamId === eigenesTeam) return -1;
       if (b.teamId === eigenesTeam) return 1;
@@ -128,18 +151,19 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
       if (teamSort === "ein") return b.ein - a.ein;
       return b.ein - b.aus - (a.ein - a.aus);
     });
-  }, [sichtZeilen, namenNachId, eigenesTeam, teamSort]);
+  }, [sichtZeilen, namenNachId, eigenesTeam, teamSort, ohneFilter, kennzahlenSicht]);
   const bilanzMax = bilanz.reduce((max, b) => Math.max(max, b.aus, b.ein), 1);
   const bilanzNachTeam = useMemo(() => new Map(bilanz.map((b) => [b.teamId, b] as const)), [bilanz]);
 
   const dealsJeFenster = useMemo(() => {
+    if (kennzahlen.size > 0) return new Map([...kennzahlen].map(([nr, k]) => [nr, k.deals] as const));
     const karte = new Map<number, number>();
     for (const [label, anzahl] of seasonBreakdown) {
       const nr = Number(/(\d+)/.exec(label)?.[1]);
       if (Number.isFinite(nr)) karte.set(nr, (karte.get(nr) ?? 0) + anzahl);
     }
     return karte;
-  }, [seasonBreakdown]);
+  }, [seasonBreakdown, kennzahlen]);
 
   const hoehepunkte = useMemo(() => {
     const liste =
@@ -192,19 +216,24 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
       </button>
     ) : null;
 
+  // Ohne Filter gelten die Zahlen der vollstaendigen Historie; mit Filter die der Liste (sie IST dann die Auswahl).
+  const voll = ohneFilter && kennzahlenSicht ? kennzahlenSicht : null;
+  const kaderaufbauPicks = kennzahlenSicht ? kennzahlenSicht.picks : kaderaufbauAlle.filter((z) => z.type === "buy").length;
+  const bandAus = voll ? voll.eigeneAus : eigeneAus;
+  const bandEin = voll ? voll.eigeneEin : eigeneEin;
   const bandItems = kaderaufbauAnsicht
     ? [
-        { label: "Picks", wert: kaderaufbauAlle.filter((z) => z.type === "buy").length },
-        { label: "Summe", wert: fmtC(kaderaufbauAlle.filter((z) => z.type === "buy").reduce((s, z) => s + z.fee, 0), 0), klein: "C" },
+        { label: "Picks", wert: kaderaufbauPicks },
+        { label: "Summe", wert: fmtC(kennzahlenSicht ? kennzahlenSicht.pickSumme : kaderaufbauAlle.filter((z) => z.type === "buy").reduce((s, z) => s + z.fee, 0), 0), klein: "C" },
         { label: "Dein Team · Ausgaben", wert: fmtC(eigeneAus), klein: "C", ton: "minus" as const },
         { label: "Transferbilanz", wert: "—" },
       ]
     : [
-        { label: "Deals", wert: sichtZeilen.length },
-        { label: "Umsatz", wert: fmtC(umsatz, 0), klein: "C" },
-        { label: "Dein Team · Ausgaben", wert: fmtC(eigeneAus), klein: "C", ton: "minus" as const },
-        { label: "Dein Team · Einnahmen", wert: fmtC(eigeneEin), klein: "C", ton: "plus" as const },
-        { label: "Netto", wert: fmtVz(eigeneEin - eigeneAus), klein: "C", ton: eigeneEin - eigeneAus < 0 ? ("minus" as const) : ("plus" as const) },
+        { label: "Deals", wert: voll ? voll.deals : sichtZeilen.length },
+        { label: "Umsatz", wert: fmtC(voll ? voll.umsatz : umsatz, 0), klein: "C" },
+        { label: "Dein Team · Ausgaben", wert: fmtC(bandAus), klein: "C", ton: "minus" as const },
+        { label: "Dein Team · Einnahmen", wert: fmtC(bandEin), klein: "C", ton: "plus" as const },
+        { label: "Netto", wert: fmtVz(bandEin - bandAus), klein: "C", ton: bandEin - bandAus < 0 ? ("minus" as const) : ("plus" as const) },
       ];
 
   const fuss = (
@@ -275,7 +304,7 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
         }}
         onWechsel={(reiter, seasonId) => onWechsel(reiter, seasonId)}
         dealsJeFenster={dealsJeFenster}
-        kaderaufbauPicks={kaderaufbauAlle.filter((z) => z.type === "buy").length}
+        kaderaufbauPicks={kaderaufbauPicks}
         onOpenSaisonstand={onOpenSaisonstand}
       />
 

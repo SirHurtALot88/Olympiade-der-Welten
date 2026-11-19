@@ -149,9 +149,19 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
   const offen = Math.max(0, gesamt - aktuell);
   const prognoseSpanne = r2(offen * 0.3);
 
+  // ABNAHME 19.11., Fehler F8 (docs/design/abnahme-saison-19-11.md): die Lage zaehlte nur Gehaltsraten in der Kasse und hiess
+  // „Solide · Kein Handlungsdruck“, waehrend dieselbe Seite eine Prognose von −89,9 C zum Saisonende zeigte (Gehalt und Apron
+  // werden erst am Saisonende gebucht, ohne Sponsor fehlt die Einnahme). Eine negative Prognose, die noch nicht gebucht ist,
+  // geht jetzt vor: sie ist der Handlungsdruck.
   const lage: FinanzLage =
     kasse < 0
       ? { titel: "Im Minus", ton: "warn", text: "Die Kasse ist negativ. Am Kassensturz kommt der Pflichtkredit." }
+      : !saisonendeGebucht && prognoseEnde < 0
+        ? {
+            titel: "Saisonende im Minus",
+            ton: "warn",
+            text: `Die Prognose zum Saisonende liegt bei ${zahlDe(prognoseEnde)} C. Ohne Gegensteuern kommt am Kassensturz der Pflichtkredit.`,
+          }
       : gehaltsraten < 1
         ? { titel: "Knapp", ton: "acht", text: "Weniger als eine Gehaltsrate Reserve. Jeder Kauf geht auf die Rate." }
         : gehaltsraten < 2
@@ -182,4 +192,8 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
     stand,
     finanzen: f,
   };
+}
+
+function zahlDe(wert: number): string {
+  return (Math.round(wert * 10) / 10).toFixed(1).replace(".", ",");
 }

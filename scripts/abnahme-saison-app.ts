@@ -758,7 +758,7 @@ async function aufnahmen() {
     },
     { name: "historie", view: "historyV2" },
     { name: "transfermarkt", view: "marketV2" },
-    { name: "kader", view: "teamV2" },
+    { name: "kader", view: "team" },
     { name: "start", view: "home" },
   ];
   const { browser, page, fehler } = await neueSeite();
@@ -873,6 +873,32 @@ function wertung() {
   for (const [md, m] of zeilenJe) console.log(md, JSON.stringify(m));
 }
 
+/** Vertragsbilanz am Saisonwechsel: wer von den S1-Kadern ist noch da, verlaengert, per Vertragsende gegangen, verkauft. */
+function vertraege() {
+  const z = ladeZustand();
+  const g = gs(z.saveId);
+  const sid = g.season.id;
+  const nr = Number(/(\d+)$/.exec(sid)?.[1] ?? 0);
+  const exits = g.transferHistory.filter((e) => (e.transferType as string) === "contract_exit" || /contract_exit/.test(String(e.source ?? "")));
+  const proTeam = g.teams.map((t) => {
+    const k = kader(g, t.teamId);
+    const draftIds = new Set((g.seasonState.ligaDraft?.verlauf ?? []).filter((e) => e.teamId === t.teamId && e.art === "pick").map((e) => e.playerId));
+    const nochDa = k.filter((r) => draftIds.has(r.playerId));
+    return {
+      team: kuerzel(g, t.teamId),
+      mensch: t.teamId === z.teamId,
+      kader: k.length,
+      ausS1Draft: draftIds.size,
+      nochDa: nochDa.length,
+      endsaisonen: k.reduce<Record<string, number>>((m, r) => ({ ...m, [String(r.contractEndSeasonNumber ?? `len${r.contractLength}`)]: (m[String(r.contractEndSeasonNumber ?? `len${r.contractLength}`)] ?? 0) + 1 }), {}),
+      vertragsende: exits.filter((e) => e.fromTeamId === t.teamId).length,
+      laeuftJetztAus: k.filter((r) => (r.contractEndSeasonNumber ?? 99) <= nr).length,
+    };
+  });
+  console.log(JSON.stringify({ saison: sid, exitsGesamt: exits.length, exitTypen: [...new Set(exits.map((e) => `${e.transferType}/${e.source}`))], proTeam }, null, 1));
+  schreibeDaten("s2-vertraege.json", { saison: sid, exitsGesamt: exits.length, proTeam });
+}
+
 function status() {
   const z = ladeZustand();
   const g = gs(z.saveId);
@@ -886,6 +912,9 @@ function status() {
       draft: d ? { status: d.status, runde: d.runde, eintraege: d.verlauf.length, aktiv: Object.values(d.teams).filter((t) => t.status === "aktiv").length, aktualisiert: d.aktualisiertAm } : null,
       mein: d?.teams[z.teamId] ?? null,
       kiLauf: (g.seasonState.aiPreseasonAutomationRuns?.[g.season.id] as unknown as { status?: string } | undefined)?.status ?? null,
+      sponsorMensch: (g.seasonState as unknown as { sponsorContractsByTeamId?: Record<string, { offerId?: string; seasonId?: string; signedAt?: string }> }).sponsorContractsByTeamId?.[z.teamId] ?? null,
+      sponsorvertraege: Object.keys((g.seasonState as unknown as { sponsorContractsByTeamId?: Record<string, unknown> }).sponsorContractsByTeamId ?? {}).length,
+      kasseMensch: g.teams.find((t) => t.teamId === z.teamId)?.cash ?? null,
       jetzt: new Date().toISOString(),
     }),
   );
@@ -894,6 +923,7 @@ function status() {
 const befehle: Record<string, () => unknown> = {
   status,
   wertung,
+  vertraege,
   arena,
   sponsor,
   anlegen,
