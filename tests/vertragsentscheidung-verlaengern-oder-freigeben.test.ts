@@ -292,7 +292,17 @@ describe("Saisonfinale: die Pflichtliste ist verdrahtet", () => {
   });
 
   it("Verlängern öffnet die Gehaltsverhandlung, Freigeben läuft über den Vertragsweg „release“", () => {
-    expect(BODY).toMatch(/onRenewPlayer=\{\(input\) => \{[\s\S]*?props\.openContractRenewalNegotiation\(/);
-    expect(BODY).toMatch(/onReleasePlayer=\{\(input\) => \{[\s\S]*?runContractRenewalAction\(\{[\s\S]*?action: "release"/);
+    expect(BODY).toMatch(/const vertragVerlaengern = [\s\S]*?props\.openContractRenewalNegotiation\(/);
+    expect(BODY).toMatch(/const vertragFreigeben = [\s\S]*?runContractRenewalAction\(\{[\s\S]*?action: "release"/);
+    expect(BODY).toContain("onRenewPlayer={vertragVerlaengern}");
+    expect(BODY).toContain("onReleasePlayer={vertragFreigeben}");
+  });
+
+  it("Altstände: die Startseite zeigt die nachzuholenden Entscheidungen mit denselben Knöpfen", () => {
+    const KARTE = readFileSync(join(process.cwd(), "app/foundation/season-v2/VertragsentscheidungNachholen.tsx"), "utf8");
+    expect(KARTE).toContain("offeneVertragsentscheidungen(gameState, activeTeamId)");
+    expect(KARTE).toContain(".filter((eintrag) => eintrag.nachzuholen)");
+    expect(BODY).toContain('activeView === "homeV2" && !isSeasonEndPhase(gameState.gamePhase) ? (');
+    expect(BODY).toContain("<VertragsentscheidungNachholen");
   });
 });

@@ -922,6 +922,187 @@ function status() {
   );
 }
 
+// ------------------------------------------------------------------------------------------------ Draft ohne Browser
+
+/** Schneller Draft fuer Folgelaeufe (nicht Gegenstand der Messung): Ueberspringen B (Auto-Draft) ueber die Route, dann warten. */
+async function draftApi() {
+  const z = ladeZustand();
+  for (let i = 0; i < 60 && !gs(z.saveId).seasonState.ligaDraft; i += 1) await delay(2000);
+  const nrVorher = gs(z.saveId).seasonState.ligaDraft?.verlauf.length ?? 0;
+  const r = await post("/api/draft", { saveId: z.saveId, teamId: z.teamId, aktion: "ueberspringen", variante: "B", erwarteteNr: nrVorher });
+  log(`Ueberspringen B: ${r.status} ${JSON.stringify(r.json).slice(0, 160)}`);
+  const ende = Date.now() + 1_800_000;
+  let letzte = -1;
+  while (Date.now() < ende) {
+    const d = gs(z.saveId).seasonState.ligaDraft;
+    if (d?.status === "fertig") break;
+    const nr = d?.verlauf.length ?? 0;
+    log(`Draft ${d?.status} ${nr} Eintraege`);
+    // Steht der Hintergrundlauf (kein Fortschritt seit dem letzten Blick), stoesst die Seite ihn an — hier dieselbe Route.
+    if (nr === letzte) await post("/api/draft", { saveId: z.saveId, teamId: z.teamId, aktion: "ki_hintergrund", erwarteteNr: nr });
+    letzte = nr;
+    await delay(15_000);
+  }
+  const g = gs(z.saveId);
+  log(`Draft ${g.seasonState.ligaDraft?.status}, leagueSetupStatus ${g.seasonState.leagueSetupStatus}, Phase ${g.gamePhase}`);
+}
+
+// ------------------------------------------------------------------------------------------------ Verlaengern oder freigeben
+
+/**
+ * VERLAENGERN ODER FREIGEBEN (Chris 19.11.) am Saisonende von S1, durch die Oberflaeche: Abrechnung und „Verträge öffnen“
+ * wie im Finale, dann prueft der Lauf die Sperre (Vorschau und Buchung mit gueltigem Token), nimmt die Pflichtliste auf, gibt
+ * einen Spieler im Browser frei (Bestaetigen-Dialog) und verlaengert einen ueber die Gehaltsverhandlung. Den Rest entscheidet
+ * er ueber die Vertragsroute (abwechselnd), danach muss der Saisonwechsel durchgehen und S2 ohne `renewal_pending` beginnen.
+ */
+async function entscheidung() {
+  const z = ladeZustand();
+  const BILDER = path.join(process.cwd(), "docs", "design", "vertragsentscheidung-19-11");
+  const bild = async (page: Page, name: string) => {
+    fs.mkdirSync(BILDER, { recursive: true });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(BILDER, name) });
+    log(`Bild ${name}`);
+  };
+  const bericht: Record<string, unknown> = {};
+  let g = gs(z.saveId);
+  const sid1 = g.season.id;
+  const md = g.matchdayState?.matchdayId ?? g.season.matchdayIds?.[g.season.matchdayIds.length - 1] ?? "";
+  const cash = await post<{ applied?: boolean }>("/api/season/cash-prize-apply", {
+    saveId: z.saveId,
+    seasonId: sid1,
+    matchdayId: md,
+    source: "sqlite",
+    phase: "season_end",
+    dryRun: false,
+    execute: true,
+    confirm: "APPLY_LOCAL_CASH_PRIZE",
+  });
+  log(`Abrechnung: ${cash.status} applied=${cash.json.applied}`);
+  const tw = await post<{ success?: boolean }>("/api/season/transition", { saveId: z.saveId, source: "sqlite", dryRun: false, action: "open_transfer_window" });
+  log(`Verträge öffnen: ${tw.status} success=${tw.json.success}`);
+  g = gs(z.saveId);
+  const offen = () => gs(z.saveId).rosters.filter((r) => r.teamId === z.teamId && r.contractStatus === "renewal_pending");
+  bericht.phaseNachOeffnen = g.gamePhase;
+  bericht.offenAmAnfang = offen().map((r) => r.playerId);
+  log(`Phase ${g.gamePhase}, offen ${offen().length}`);
+
+  type Vorschau = { summary?: { steps?: Array<{ stepId: string; confirmToken?: string; blockingReasons?: string[] }> } };
+  const pv = async () => post<Vorschau>("/api/season/preseason-workflow", { saveId: z.saveId, source: "sqlite", dryRun: true });
+  const v1 = await pv();
+  const s1 = v1.json.summary?.steps?.find((s) => s.stepId === "next_season_setup");
+  const versuch = await post<{ success?: boolean; summary?: { applied?: boolean; blockingReasons?: string[] } }>("/api/season/preseason-workflow", {
+    saveId: z.saveId,
+    source: "sqlite",
+    dryRun: false,
+    stepId: "next_season_setup",
+    confirmToken: s1?.confirmToken,
+  });
+  bericht.sperreVorschau = s1?.blockingReasons ?? [];
+  bericht.sperreBuchung = { status: versuch.status, success: versuch.json.success, blocker: versuch.json.summary?.blockingReasons };
+  bericht.saisonNachSperrversuch = gs(z.saveId).season.id;
+  log(`Sperre: Vorschau ${JSON.stringify(s1?.blockingReasons)}; Buchung ${versuch.status} success=${versuch.json.success}`);
+
+  const kasse = () => gs(z.saveId).teams.find((t) => t.teamId === z.teamId)!.cash;
+  const { browser, page, fehler } = await neueSeite(1600, 1000);
+  try {
+    page.on("dialog", (d) => {
+      log(`Dialog: ${d.message().slice(0, 120)}`);
+      void d.accept();
+    });
+    await page.goto(url(z, "seasonV2"), { waitUntil: "domcontentloaded", timeout: 180_000 });
+    await schliesseBriefing(page);
+    const liste = page.getByTestId("season-finale-vertragsentscheidungen");
+    await liste.waitFor({ state: "visible", timeout: 180_000 });
+    await liste.scrollIntoViewIfNeeded();
+    await bild(page, "01-pflichtliste.png");
+    bericht.listeZeilen = await liste.locator("li").count();
+    bericht.startKnopfSichtbar = await page.getByRole("button", { name: "Neue Saison starten" }).isVisible().catch(() => false);
+
+    const ersteZeile = liste.locator("li").first();
+    const freiId = await ersteZeile.getAttribute("data-player");
+    const kasseVor = kasse();
+    await ersteZeile.getByTestId("season-finale-freigeben").click();
+    for (let i = 0; i < 40 && gs(z.saveId).rosters.some((r) => r.teamId === z.teamId && r.playerId === freiId); i += 1) await delay(1000);
+    const ereignis = (gs(z.saveId).seasonState.contractEvents ?? []).filter((e) => e.playerId === freiId).at(-1);
+    bericht.freigabe = {
+      playerId: freiId,
+      kasseVor,
+      kasseNach: kasse(),
+      exitValue: ereignis?.exitValue,
+      saleFactor: ereignis?.saleFactor,
+      marketValueAtExit: ereignis?.marketValueAtExit,
+      imKader: gs(z.saveId).rosters.some((r) => r.teamId === z.teamId && r.playerId === freiId),
+    };
+    log(`Freigegeben ${freiId}: Kasse ${kasseVor} -> ${kasse()}, Erlös ${ereignis?.exitValue}`);
+    await page.waitForTimeout(3000);
+    await bild(page, "02-nach-freigabe.png");
+
+    const zweite = liste.locator("li").first();
+    const verlId = await zweite.getAttribute("data-player");
+    await zweite.getByTestId("season-finale-verlaengern").click();
+    await page.waitForTimeout(5000);
+    await bild(page, "03-verhandlung.png");
+    const dialog = page.getByRole("dialog").last();
+    const bestaetigen = dialog.getByRole("button", { name: /Angebot|Unterschreib|Verlänger|Bestätig/ }).last();
+    await bestaetigen.click({ timeout: 30_000 }).catch((e) => log(`Bestätigen nicht klickbar: ${String(e).slice(0, 160)}`));
+    for (let i = 0; i < 40 && gs(z.saveId).rosters.find((r) => r.teamId === z.teamId && r.playerId === verlId)?.contractStatus === "renewal_pending"; i += 1) {
+      await delay(1000);
+    }
+    const verl = gs(z.saveId).rosters.find((r) => r.teamId === z.teamId && r.playerId === verlId);
+    bericht.verlaengerung = { playerId: verlId, status: verl?.contractStatus, laufzeit: verl?.contractLength, endSaison: verl?.contractEndSeasonNumber, gehalt: verl?.salary };
+    log(`Verlängert ${verlId}: ${JSON.stringify(bericht.verlaengerung)}`);
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(3000);
+    await bild(page, "04-nach-verlaengerung.png");
+
+    let n = 0;
+    for (const r of offen()) {
+      const action = n % 2 === 0 ? "release" : "renew";
+      const body = { saveId: z.saveId, teamId: z.teamId, playerId: r.playerId, action, contractLength: 2, source: "sqlite" };
+      const vorschau = await post<{ summary?: { confirmToken?: string } }>("/api/contracts/renewal", { ...body, dryRun: true });
+      const apply = await post<{ summary?: { applied?: boolean; blockingReasons?: string[] } }>("/api/contracts/renewal", {
+        ...body,
+        dryRun: false,
+        confirmToken: vorschau.json.summary?.confirmToken,
+      });
+      log(`${action} ${r.playerId}: applied=${apply.json.summary?.applied} ${JSON.stringify(apply.json.summary?.blockingReasons ?? [])}`);
+      n += 1;
+    }
+    bericht.offenNachRest = offen().map((r) => r.playerId);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await schliesseBriefing(page);
+    await page.locator("#season-finale").waitFor({ state: "visible", timeout: 120_000 }).catch(() => undefined);
+    const pruefen = page.getByRole("button", { name: /prüfen/ }).first();
+    if (await pruefen.isVisible().catch(() => false)) await pruefen.click();
+    await page.getByRole("button", { name: "Neue Saison starten" }).waitFor({ state: "visible", timeout: 120_000 }).catch(() => log("Start-Knopf nicht sichtbar"));
+    await page.locator("#season-finale").scrollIntoViewIfNeeded().catch(() => undefined);
+    await bild(page, "05-alles-entschieden.png");
+    bericht.browserfehler = fehler;
+  } finally {
+    await browser.close();
+  }
+
+  const v2 = await pv();
+  const s2 = v2.json.summary?.steps?.find((s) => s.stepId === "next_season_setup");
+  const start = await post<{ success?: boolean; summary?: { blockingReasons?: string[] } }>("/api/season/preseason-workflow", {
+    saveId: z.saveId,
+    source: "sqlite",
+    dryRun: false,
+    stepId: "next_season_setup",
+    confirmToken: s2?.confirmToken,
+  });
+  g = gs(z.saveId);
+  bericht.start = { status: start.status, success: start.json.success, blocker: start.json.summary?.blockingReasons, saison: g.season.id, phase: g.gamePhase };
+  bericht.s2OhneVertrag = g.rosters
+    .filter((r) => r.teamId === z.teamId && (r.contractStatus === "renewal_pending" || (r.contractLength ?? 0) <= 0))
+    .map((r) => r.playerId);
+  bericht.s2Kader = g.rosters.filter((r) => r.teamId === z.teamId).length;
+  log(`Start: ${JSON.stringify(bericht.start)}; S2 ohne Vertrag: ${JSON.stringify(bericht.s2OhneVertrag)}`);
+  fs.mkdirSync(BILDER, { recursive: true });
+  fs.writeFileSync(path.join(BILDER, "bericht.json"), `${JSON.stringify(bericht, null, 2)}\n`);
+}
+
 const befehle: Record<string, () => unknown> = {
   status,
   wertung,
@@ -933,6 +1114,8 @@ const befehle: Record<string, () => unknown> = {
   "messen-draft": messeDraft,
   spieltage,
   saisonende,
+  "draft-api": draftApi,
+  entscheidung,
   "messen-fenster": messeFenster,
   aufnahmen,
 };

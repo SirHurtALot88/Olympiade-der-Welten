@@ -76427,6 +76427,15 @@ span.nl-facility-ampel-chip {
   color: var(--nl-risk);
 }
 
+/* Nachhol-Karte auf der Startseite (Altstand ohne Vertragsentscheidung): dieselbe Zeile wie im Finale, mit Luft nach unten. */
+.nl-vertrag-nachholen {
+  margin: 0 0 var(--nl-s4, 16px);
+}
+
+.nl-vertrag-nachholen .nl-season-finale-step {
+  border-color: var(--nl-risk);
+}
+
 @media (max-width: 720px) {
   .nl-season-finale-step {
     flex-direction: column;
