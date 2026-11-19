@@ -14,6 +14,7 @@
  *
  * Seit der Abnahme 19.11. ist dieser Draft der Standard fuer neue Ligen; `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg.
  */
+import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
 import type {
   GameState,
@@ -505,13 +506,19 @@ export function laufeKiZuege(input: {
   saveId: string;
   maxPicks?: number;
   erwarteteNr?: number | null;
+  /**
+   * Hoechstens so lange (ms) rechnen, dann den Happen beenden (mindestens ein Pick). Der Hintergrundlauf setzt es, damit er die
+   * Event-Loop nie laenger als etwa einen Pick blockiert — s. `laufeKiImHintergrund`.
+   */
+  zeitBudgetMs?: number;
 }): LigaDraftKiSchrittErgebnis {
   const maxPicks = Math.max(1, Math.floor(input.maxPicks ?? 1));
+  const frist = input.zeitBudgetMs != null ? Date.now() + Math.max(0, input.zeitBudgetMs) : null;
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     pruefeStand(draftAusKontext(ctx), input.erwarteteNr);
     const eintraege: LigaDraftZustand["verlauf"] = [];
     let halt: LigaDraftKiSchrittErgebnis["halt"] = "max_picks";
-    while (eintraege.length < maxPicks) {
+    while (eintraege.length < maxPicks && (frist == null || eintraege.length === 0 || Date.now() < frist)) {
       const draft = draftAusKontext(ctx);
       const zug = werIstDran(draft);
       if (!zug) {
@@ -769,6 +776,16 @@ export function brecheLigaDraftAb(input: {
 // ---------------------------------------------------------------------------------------------------------------
 
 const laufendeHintergrundLaeufe = new Set<string>();
+/** Angeforderte Abbrueche laufender Hintergrundlaeufe (s. `meldeHintergrundArbeit`). */
+const hintergrundAbbruch = new Set<string>();
+
+/**
+ * Zeit je Happen des Hintergrundlaufs. Vorher waren es fest 8 Picks am Stueck (0,1–0,2 s je Pick, auf langsamer Hardware
+ * deutlich mehr) — mehrere Ligen im selben Prozess (Raeume, Tests) hielten die Event-Loop damit sekundenlang fest. Gefunden an
+ * #1642 (CI): ein 6-ms-Test lief nach sechs Raum-Starts in den 20-s-Timeout (lib/hintergrund/hintergrund-arbeit.ts). Mit
+ * Zeitbudget blockiert ein Happen hoechstens etwa einen Pick; schnelle Picks werden weiter gebuendelt geschrieben.
+ */
+export const LIGA_DRAFT_HAPPEN_BUDGET_MS = 120;
 
 export function istHintergrundLaufAktiv(saveId: string): boolean {
   return laufendeHintergrundLaeufe.has(saveId);
@@ -784,21 +801,34 @@ export async function laufeKiImHintergrund(input: {
   saveId: string;
   logPrefix: string;
   jeHappen?: number;
-}): Promise<{ halt: LigaDraftKiSchrittErgebnis["halt"] | "laeuft_schon"; picks: number }> {
+  /** Zusaetzliche Abbruchbedingung des Aufrufers (z. B. ein abgebrochener Anstoss), vor jedem Happen gefragt. */
+  sollAbbrechen?: () => boolean;
+}): Promise<{ halt: LigaDraftKiSchrittErgebnis["halt"] | "laeuft_schon" | "abgebrochen"; picks: number }> {
   if (laufendeHintergrundLaeufe.has(input.saveId)) return { halt: "laeuft_schon", picks: 0 };
   laufendeHintergrundLaeufe.add(input.saveId);
-  let picks = 0;
-  try {
-    for (;;) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      const ergebnis = laufeKiZuege({ persistence: input.persistence, saveId: input.saveId, maxPicks: input.jeHappen ?? 8 });
-      picks += ergebnis.eintraege.length;
-      if (ergebnis.halt !== "max_picks") return { halt: ergebnis.halt, picks };
+  const lauf = (async () => {
+    let picks = 0;
+    try {
+      for (;;) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (hintergrundAbbruch.has(input.saveId) || input.sollAbbrechen?.()) return { halt: "abgebrochen" as const, picks };
+        const ergebnis = laufeKiZuege({
+          persistence: input.persistence,
+          saveId: input.saveId,
+          maxPicks: input.jeHappen ?? 8,
+          zeitBudgetMs: LIGA_DRAFT_HAPPEN_BUDGET_MS,
+        });
+        picks += ergebnis.eintraege.length;
+        if (ergebnis.halt !== "max_picks") return { halt: ergebnis.halt, picks };
+      }
+    } catch (error) {
+      console.error(`${input.logPrefix} Liga-Draft (Einzelschritt): Hintergrundlauf abgebrochen:`, error);
+      throw error;
+    } finally {
+      laufendeHintergrundLaeufe.delete(input.saveId);
+      hintergrundAbbruch.delete(input.saveId);
     }
-  } catch (error) {
-    console.error(`${input.logPrefix} Liga-Draft (Einzelschritt): Hintergrundlauf abgebrochen:`, error);
-    throw error;
-  } finally {
-    laufendeHintergrundLaeufe.delete(input.saveId);
-  }
+  })();
+  meldeHintergrundArbeit(lauf, () => hintergrundAbbruch.add(input.saveId));
+  return lauf;
 }

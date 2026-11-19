@@ -4,6 +4,7 @@ import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-pic
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
 import { istEinzelschrittDraftAktiv } from "@/lib/draft/liga-draft-modell";
+import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 
 /**
  * GETEILTER LIGA-SETUP-DRAFT — EIN Ort statt drei Kopien.
@@ -104,7 +105,21 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
       ...current.gameState,
       seasonState: { ...current.gameState.seasonState, leagueSetupStatus: "in_progress" },
     });
-    void kickoffEinzelschrittDraft({ persistence, saveId, selbstPickendeTeamIds: [...excludeTeamIds], logPrefix });
+    // Angemeldet (lib/hintergrund/hintergrund-arbeit.ts): wer den Prozess geordnet beendet — die Tests nach jedem Fall —,
+    // kann den Lauf abbrechen und abwarten, statt dass er nach Testende die Event-Loop weiter belegt (#1642).
+    const anstoss = { abgebrochen: false };
+    meldeHintergrundArbeit(
+      kickoffEinzelschrittDraft({
+        persistence,
+        saveId,
+        selbstPickendeTeamIds: [...excludeTeamIds],
+        logPrefix,
+        sollAbbrechen: () => anstoss.abgebrochen,
+      }),
+      () => {
+        anstoss.abgebrochen = true;
+      },
+    );
     return markiert;
   }
   const seasonId = input.seasonId ?? current.gameState.season.id;
@@ -150,17 +165,19 @@ async function kickoffEinzelschrittDraft(input: {
   saveId: string;
   selbstPickendeTeamIds: string[];
   logPrefix: string;
+  sollAbbrechen: () => boolean;
 }): Promise<void> {
   const { persistence, saveId, logPrefix } = input;
   try {
     const { laufeKiImHintergrund, starteLigaDraft } = await import("@/lib/draft/liga-draft-dienst");
+    if (input.sollAbbrechen()) return;
     starteLigaDraft({ persistence, saveId, selbstPickendeTeamIds: input.selbstPickendeTeamIds });
     // Bricht der KI-Lauf ab, bleibt der Draft an seinem letzten gespeicherten Pick stehen. Der Fehler wird NICHT
     // verschluckt (Review #1619, A2): die Liga steht dann auf "failed" — die Shell zeigt ihr Fehlerschild mit
     // „Erneut versuchen“, und `starteLigaDraft` setzt beim erneuten Anstoss den vorhandenen Draft fort statt ihn neu
     // anzulegen. Fortsetzen geht auch ueber `/api/draft` (`ki_schritt`/`ki_hintergrund`); jeder weitere Draft-Schreibvorgang
     // setzt den Status wieder auf "in_progress".
-    await laufeKiImHintergrund({ persistence, saveId, logPrefix });
+    await laufeKiImHintergrund({ persistence, saveId, logPrefix, sollAbbrechen: input.sollAbbrechen });
   } catch (error) {
     console.error(`${logPrefix} Liga-Draft (Einzelschritt) angehalten:`, error);
     schreibeLigaSetupStatus(persistence, saveId, "failed", null);

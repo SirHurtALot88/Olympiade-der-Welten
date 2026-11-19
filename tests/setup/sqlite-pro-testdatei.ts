@@ -33,7 +33,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll } from "vitest";
+import { afterAll, afterEach, beforeEach } from "vitest";
+
+import { beendeHintergrundArbeit, hintergrundArbeitAbzug } from "@/lib/hintergrund/hintergrund-arbeit";
 
 const datenbankDatei = path.join(os.tmpdir(), `oly-test-${process.pid}-${randomUUID()}.sqlite`);
 
@@ -75,7 +77,25 @@ const umgebungVorher = { ...process.env };
 
 process.env.OLY_APP_SQLITE_PATH = datenbankDatei;
 
-afterAll(() => {
+/**
+ * DRITTES LECK (19.11., #1642): Hintergrundarbeit, die ein Test anstoesst und niemand abwartet — v. a. der KI-Liga-Draft nach
+ * jedem neuen Spiel (`startRoom`, Neues-Spiel-Route). Sie lief nach Testende weiter, belegte die Event-Loop des Workers und
+ * liess einen 6-ms-Test der Folge in den 20-s-Timeout laufen (tests/mehrspieler-1v1-2v2-modi.test.ts: 83 s statt 26 s).
+ * Nach jedem Test wird beendet, was IN diesem Test angestossen wurde; Arbeit aus `beforeAll` gehoert der ganzen Datei und
+ * endet in `afterAll`. Abgebrochen wird beim naechsten Happen (Draft: zwischen zwei Schreibvorgaengen), der Stand bleibt
+ * konsistent.
+ */
+let hintergrundVorDemTest: ReadonlySet<object> = new Set();
+beforeEach(() => {
+  hintergrundVorDemTest = hintergrundArbeitAbzug();
+});
+afterEach(async () => {
+  await beendeHintergrundArbeit({ ausser: hintergrundVorDemTest });
+});
+
+afterAll(async () => {
+  await beendeHintergrundArbeit();
+
   // EIGENE DATENBANKEN DER TESTDATEI (16.11.): viele Tests setzen `OLY_APP_SQLITE_PATH` selbst
   // (`/tmp/oly-arena-...-<zufall>.sqlite`) und raeumten sie nie weg -- gemessen 673 Dateien = 11 GB nach einer
   // Arbeitssitzung. Zuerst die offene Verbindung schliessen (sonst gibt Linux den Platz erst frei, wenn der GC das
