@@ -2213,6 +2213,7 @@
   .oly-arena-buehne[data-voll="1"]{position:fixed;top:0;right:0;bottom:0;left:var(--arena-links,0px);z-index:60;
     display:flex;flex-direction:column;min-width:0;overflow:hidden;
     background:radial-gradient(120% 90% at 50% 38%,#18202c 0%,#0d1219 55%,#07090d 100%)}
+  .oly-arena-buehne-koerper{position:relative}
   .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-koerper{flex:1;min-height:0;display:flex;flex-direction:column}
   .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-koerper>div{flex:1;min-height:0;display:flex;flex-direction:column;margin:0!important}
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena{flex:1;min-height:0;display:flex;flex-direction:column;background:transparent}
@@ -2223,7 +2224,7 @@
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .tabs{flex:none;height:40px;margin:0;padding:0 var(--arena-leiste-breite,360px) 0 8px;
     align-items:stretch;flex-wrap:nowrap;border-bottom:1px solid var(--line-soft)}
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena .tab{font-size:14px;padding:0 14px;border-radius:0;display:flex;align-items:center}
-  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena.im-spieltag .wrap{padding-top:40px}
+  .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena.im-spieltag .wrap{padding-top:56px}
   /* #p2 scrollt: der Rahmen (Feld + Ticker) fuellt genau die Buehnenhoehe, Entwicklertafeln darunter
      (#tdmEntwurfNotes u. a.) erreicht man per Scrollen, statt dass sie den Rahmen zusammendruecken. */
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
@@ -2259,7 +2260,28 @@
   .oly-arena-buehne[data-voll="1"]>.oly-arena-buehne-leiste{display:flex;position:absolute;top:0;right:var(--arena-rechts-frei,0px);
     height:40px;z-index:2;align-items:center;gap:10px;padding:0 12px;max-width:calc(100% - 380px);
     font-size:13px;color:#d9dee8;white-space:nowrap}
-  .oly-arena-buehne[data-voll="1"][data-spieltag="1"]>.oly-arena-buehne-leiste{left:0;max-width:none;justify-content:flex-start}
+  .oly-arena-buehne[data-voll="1"][data-spieltag="1"]>.oly-arena-buehne-leiste{left:0;max-width:none;justify-content:flex-start;
+    height:56px;background:#0d1219;border-bottom:1px solid rgba(255,255,255,.1)}
+  /* REGIELEISTE (18.11., Mockup arena-spieltag-modern-18-11): Ort links, drei Schritte in der Mitte,
+     Mitspieler und "Du steuerst" rechts; das eigene Team ist ueberall orange + goldene Marke. */
+  .oly-regie{display:flex;align-items:center;gap:18px;flex:1;min-width:0}
+  .oly-regie-ort{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+  .oly-regie-ort b{font-size:14px;letter-spacing:.04em;text-transform:uppercase}
+  .oly-regie-ort span{font-size:11px;color:#9aa7ba}
+  .oly-regie-schritte{display:flex;align-items:center;gap:6px;margin:0 auto;padding:0;list-style:none}
+  .oly-regie-schritt{display:flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid rgba(255,255,255,.14);
+    border-radius:8px;font-size:12px;font-weight:700;color:#7f8ca0;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%)}
+  .oly-regie-schritt small{display:block;font-weight:600;font-size:10.5px;letter-spacing:.02em;color:inherit;opacity:.85}
+  .oly-regie-schritt[data-status="erledigt"]{color:#5fd08a;border-color:rgba(95,208,138,.5)}
+  .oly-regie-schritt[data-status="aktuell"]{color:#F2A03D;border-color:#F2A03D;background:color-mix(in srgb,#F2A03D 14%,transparent)}
+  .oly-regie-schritt .nr{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;
+    border:1px solid currentColor}
+  .oly-regie-rechts{display:flex;align-items:center;gap:8px;min-width:0}
+  .oly-regie-raum{display:flex;gap:4px}
+  .oly-regie-raum span{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(255,255,255,.07);color:#c9d2e0;white-space:nowrap}
+  .oly-regie-raum span.ist-eigen{background:color-mix(in srgb,#F2A03D 22%,transparent);color:#F2A03D}
+  .oly-regie-du{padding:4px 10px;border-radius:8px;border:1px solid #F2A03D;color:#F2A03D;font-size:12px;font-weight:800;white-space:nowrap}
+  .oly-regie-du em{font-style:normal;color:#e8c26a;margin-right:6px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
   .oly-arena-buehne-leiste .oly-arena-buehne-titel{font-weight:800;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .oly-arena-buehne-leiste .oly-arena-buehne-paarung{color:#9aa7ba;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .oly-arena-buehne-leiste .oly-arena-buehne-luecke{flex:1}
@@ -2289,3 +2311,22 @@
     min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;background:transparent}
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.scoreline{padding-top:6px;padding-bottom:6px}
   .oly-arena-buehne[data-voll="1"] .oly-battle-arena.oly-battle-arena #p2 .arenaHaupt>.planzeile>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ENDSTAND DER VIERERGRUPPE (18.11., Mockup arena-spieltag-modern-18-11 Screen 4b): Rangfolge 1-4 + eine Tabelle mit Reitern. */
+.oly-battle-arena .epodrang{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+.oly-battle-arena .epodzeile{--tf:#3CC8D6;display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:10px;
+  border:1px solid color-mix(in srgb,var(--tf) 55%,transparent);background:color-mix(in srgb,var(--tf) 9%,transparent)}
+.oly-battle-arena .epodzeile.eigen{border:2px solid #E8C26A}
+.oly-battle-arena .epodplatz{font-size:34px;line-height:1;color:var(--tf);font-variant-numeric:tabular-nums}
+.oly-battle-arena .epodname{font-weight:800}
+.oly-battle-arena .epoddu{margin-left:8px;padding:1px 7px;border-radius:5px;background:#E8C26A;color:#17120a;font-style:normal;
+  font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
+.oly-battle-arena .epodkp{font-size:12px;opacity:.8}
+.oly-battle-arena .epodliga{font-weight:800;color:#5fd08a}
+.oly-battle-arena .epodtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.oly-battle-arena .epodtabs button{padding:4px 12px;border-radius:8px;cursor:pointer;font:inherit;font-weight:700;font-size:12px;
+  border:1px solid rgba(255,255,255,.2);background:transparent;color:inherit}
+.oly-battle-arena .epodtabs button.an{border-color:#F2A03D;color:#F2A03D;background:color-mix(in srgb,#F2A03D 14%,transparent)}
+.oly-battle-arena .epodrang:not([hidden]) ~ .etafeln{grid-template-columns:1fr}
+.oly-battle-arena .epodrang:not([hidden]) ~ .etafeln #etafelL{grid-column:1/-1}
+@media (max-width:900px){.oly-battle-arena .epodrang{grid-template-columns:repeat(2,1fr)}}
