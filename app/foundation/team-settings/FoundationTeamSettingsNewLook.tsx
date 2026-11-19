@@ -576,7 +576,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     const newGameAutomaticLeagueAssignment = buildInitialLeagueAssignment(gameState.teams);
     const newGameLeagueAssignment =
       newGameMode === "battle" ? newGameLeagueOverride ?? newGameAutomaticLeagueAssignment : null;
-    const isNewGameTeamSelectable = (teamId: string) => newGameLeagueAssignment?.[teamId] !== "liga2";
+    // 19.11., Chris: Liga-2-Teams sind im Battle Mode für Spieler wählbar.
+    const isNewGameTeamSelectable = (_teamId: string) => true;
     const newGameLeagueCounts =
       newGameMode === "battle" && newGameLeagueAssignment
         ? gameState.teams.reduce(

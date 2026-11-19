@@ -375,3 +375,9 @@
 .drf .drf-profil-reiter button { height: 34px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: #9aa7ba; font: 700 14px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .drf .drf-profil-reiter button.an { color: #f4e6c4; border-bottom-color: #f0c35a; }
 .drf .drf-profil-reiter button:hover { color: #fff; }
+/* Alle Picks: Wappen, Portrait, Achsen-Noten, Ablöse + Gehalt wie im Transfermarkt (19.11.) */
+.drf .db .mz.pz { grid-template-columns: calc(2.4 * var(--u)) calc(2 * var(--u)) calc(2.2 * var(--u)) minmax(calc(5 * var(--u)), .9fr) calc(2.3 * var(--u)) minmax(calc(8 * var(--u)), 1.3fr) calc(9 * var(--u)) calc(4 * var(--u)) calc(4.4 * var(--u)); }
+.drf .db .mz.pz .lg { width: calc(2.2 * var(--u)); height: calc(2.2 * var(--u)); }
+.drf .db .mz.pz .lg img { width: 100%; height: 100%; object-fit: cover; }
+.drf .db .mz.pz .por { width: calc(2.3 * var(--u)); height: calc(2.6 * var(--u)); border-radius: calc(.3 * var(--u)); object-fit: cover; object-position: center 18%; }
+.drf .db .mz.pz .nm small { display: flex; align-items: center; gap: calc(.3 * var(--u)); white-space: nowrap; overflow: hidden; }

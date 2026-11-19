@@ -164,27 +164,18 @@ describe("new game setup UI contract", () => {
   });
 
   /**
-   * TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert (Wizard-Filter): das Klub-Raster
-   * blendet Liga-2-Klubs im Battle-Mode-Schritt aus der Auswahl aus, und der Wechsel in den Battle
-   * Mode wirft bereits gewählte Liga-2-Teams aus Chris'/Frankys Auswahl. Der Wert-Nachweis am
-   * Spielstand (gefilterte chrisTeamIds, Warnung, AI-Übernahme) steht in
-   * tests/new-game-setup-service.test.ts.
+   * 19.11. (Chris: „bitte im battle mode auch liga 2 auswählbar machen für spieler!"): das Klub-Raster
+   * zeigt im Battle-Mode-Schritt auch Liga-2-Klubs, und weder der Modus-Wechsel noch der Klick
+   * werfen Liga-2-Teams aus der Auswahl. Die Wert-Seite steht in tests/new-game-setup-service.test.ts.
    */
-  it("blendet Liga-2-Klubs im Battle-Mode-Schritt des Klub-Rasters aus", () => {
+  it("zeigt Liga-2-Klubs im Battle-Mode-Schritt als waehlbar", () => {
     const newLookSource = fs.readFileSync(teamSettingsNewLookPath, "utf8");
     const scopeSource = fs.readFileSync(shellRouterBodyScopePath, "utf8");
 
-    expect(newLookSource).toContain("buildInitialLeagueAssignment");
-    expect(newLookSource).toContain("isNewGameTeamSelectable");
-    expect(newLookSource).toMatch(/filter\(\(team\) => isNewGameTeamSelectable\(team\.teamId\)\)/);
-    // Die Sperre greift beim Wechsel in den Battle Mode (bereits gewählte Liga-2-Teams werden
-    // verworfen) UND beim Klick selbst (toggleNewGameTeam verweigert Liga-2-Teams im Battle Mode).
-    expect(scopeSource).toContain("buildInitialLeagueAssignment");
-    expect(scopeSource).toMatch(/function selectNewGameMode[\s\S]*?isLiga2TeamId[\s\S]*?setNewGameChrisTeamIds/);
-    expect(scopeSource).toMatch(/function toggleNewGameTeam[\s\S]*?newGameMode === "battle"[\s\S]*?liga2/);
-    // Opus-Review zu PR #1272: die Warnung (z.B. wenn Frankys Preset komplett in Liga 2 fällt)
-    // muss lesbar in der Vorschau ankommen, nicht als Rohcode — die Preview-Warnungsliste läuft
-    // deshalb durch `formatCockpitReason`, nicht durch ein blosses `.join(" · ")` der Rohcodes.
+    expect(newLookSource).toContain("const isNewGameTeamSelectable = (_teamId: string) => true;");
+    expect(scopeSource).not.toMatch(/function selectNewGameMode[\s\S]*?isLiga2TeamId[\s\S]*?function toggleNewGameTeam/);
+    expect(scopeSource).not.toMatch(/function toggleNewGameTeam[\s\S]{0,600}?getNewGameLeagueAssignment\(\)\[teamId\] === "liga2"/);
+    // Warnungen der Vorschau bleiben lesbar (formatCockpitReason), nicht als Rohcode.
     expect(newLookSource).toMatch(
       /newGamePreview\.warnings\.map\(\(reason: string\) => formatCockpitReason\(reason\)\)\.join\(" · "\)/,
     );

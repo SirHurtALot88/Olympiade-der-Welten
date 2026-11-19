@@ -6,12 +6,15 @@
  * Gezeigt = gebucht: Picks, Top 3, Preise und Grenzen kommen aus `/api/draft`; das Brett aus dem Markt-Feed mit
  * Scouting-Nebel (`baueSpielerSicht`). Sortiert und gefiltert wird nur über die Sicht.
  */
+import KlassenFarbTag from "../KlassenFarbTag";
 import { useMemo, useState } from "react";
 
 import type { LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
 import type { LigaDraftSpielerKarte, LigaDraftZugAnsicht } from "@/lib/draft/liga-draft-ansicht";
-import { MARKT_ACHSEN, sortiereNachSicht, type MarktAchse } from "@/lib/market/transfermarkt-sicht";
-import { officialDisciplineWeightLabels, officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
+import { ACHSEN_FARBE_HEX, ACHSEN_REIHENFOLGE, DISZIPLIN_NACH_ACHSE, DISZIPLINEN_GEORDNET } from "@/lib/market/disziplin-reihenfolge";
+import { mindestNoteLabel, naechsteMindestNote } from "@/lib/market/transfermarkt-weitere-filter";
+import { erfuelltAchsenMinimum, tierBereichSortWert, MARKT_ACHSEN, sortiereNachSicht, type MarktAchse } from "@/lib/market/transfermarkt-sicht";
+import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format";
 import type { DraftTempo, DraftZeig } from "./draft-daten";
@@ -19,7 +22,7 @@ import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { auslassenSperrGrund, betragC, de, fertigGrundText, fertigSperrGrund, GRUND_TAG, GRUND_TEXT, pickHerkunft, sitzBuchstabe, sitzKlasse, sitzName } from "./draft-format";
 
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
-const DISZIPLINEN = [...officialDisciplineWeightOrder];
+const DISZIPLINEN = DISZIPLINEN_GEORDNET;
 const ZEILEN_JE_BLATT = 13;
 
 export type DraftAktionen = {
@@ -245,7 +248,7 @@ function FavKarte({
       ) : null}
       <span className="un">
         <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(playerId); }} data-testid="draft-profil-link">{z?.item.name ?? info?.name ?? "—"}</b>
-        <small>{z?.item.className ?? info?.className ?? ""} · {z?.item.race ?? info?.race ?? ""}</small>
+        <small><KlassenFarbTag className={z?.item.className ?? info?.className} mitAchse={false} /> · {z?.item.race ?? info?.race ?? ""}</small>
         <span className="zw">
           <span>{DISZIPLIN_KURZ[k.disziplin] ?? ""} <b className={`t${z && z.sicht.stufe < 5 ? " nb" : ""}`}>{eignungText(z, k.disziplin)}</b></span>
           <strong className="t">{de(info?.marktwert ?? z?.item.marketValue ?? 0)} C</strong>
@@ -476,7 +479,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
   const [nurLeistbar, setNurLeistbar] = useState(false);
   const [nurWunsch, setNurWunsch] = useState(false);
   const [nurScouting, setNurScouting] = useState(false);
-  const [achse, setAchse] = useState<MarktAchse | null>(null);
+  const [achsenMin, setAchsenMin] = useState<Partial<Record<MarktAchse, number>>>({});
   const [blatt, setBlatt] = useState(0);
   const dran = Boolean(mein?.darfPicken);
   const maxAbloese = mein?.maxAbloese ?? Number.POSITIVE_INFINITY;
@@ -489,12 +492,8 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       if (nurLeistbar && mein && (z.item.marketValue ?? 0) > maxAbloese + 1e-9) return false;
       if (nurWunsch && !k.wunsch.has(z.item.playerId)) return false;
       if (nurScouting && z.sicht.stufe < 1) return false;
-      if (achse) {
-        // Nur sichtbare, beobachtete/gescoutete Noten zählen; Verdecktes bleibt draußen.
-        if (!z.sicht.achsen[achse] || z.sicht.achsen[achse].sortWert == null || !z.sicht.achsen[achse].exakt) return false;
-        const werte = MARKT_ACHSEN.map((x) => z.sicht.achsen[x].sortWert);
-        if (werte.some((w) => w == null)) return false;
-        if ((werte as number[]).indexOf(Math.max(...(werte as number[]))) !== MARKT_ACHSEN.indexOf(achse)) return false;
+      for (const [x, min] of Object.entries(achsenMin) as [MarktAchse, number][]) {
+        if (!erfuelltAchsenMinimum(z.sicht, x, min)) return false;
       }
       return true;
     });
@@ -511,7 +510,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       }
     };
     return sortiereNachSicht(liste, schluessel, sort === "guenstig" ? 1 : -1);
-  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, achse, sort, mein, maxAbloese, a.gefragt]);
+  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, achsenMin, sort, mein, maxAbloese, a.gefragt]);
 
   const seiten = Math.max(1, Math.ceil(gefiltert.length / ZEILEN_JE_BLATT));
   const seite = Math.min(blatt, seiten - 1);
@@ -541,20 +540,35 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
       <section className="pan db" id="l-brett" data-testid="draft-brett">
         {kopf}
         <div className="mt" style={{ ["--zeilen" as string]: 14 }}>
-          <div className="mz pz kopf"><span>Pick</span><span>Runde</span><span /><span>Team</span><span /><span>Spieler</span><span /><span className="re">Ablöse</span><span /></div>
-          {zeilen.map((e) => (
-            <div key={e.nr} className={`mz pz${e.teamId === mein?.teamId ? " an" : ""}`}>
-              <b className="t" style={{ color: "var(--stumm)" }}>#{e.pickNr}</b>
-              <span className="t">{e.quelle === "nachzug" ? "N" : e.runde}</span>
-              <span className="lg"><Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} /></span>
-              <span className="nm"><b>{k.teamName(e.teamId)}</b><small>{pickHerkunft(e)}</small></span>
-              <span />
-              <span className="nm"><b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b><small>{e.playerId ? `${kartenInfo(k, e.playerId)?.className ?? ""} · ${kartenInfo(k, e.playerId)?.race ?? ""}` : ""}</small></span>
-              <span />
-              <span className="re"><b className="t">{de(e.abloese ?? 0)}</b></span>
-              <span />
-            </div>
-          ))}
+          <div className="mz pz kopf"><span>Pick</span><span>Runde</span><span /><span>Team</span><span /><span>Spieler</span><span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}</span><span className="re">Ablöse</span><span className="re">Gehalt</span></div>
+          {zeilen.map((e) => {
+            const info = e.playerId ? kartenInfo(k, e.playerId) : null;
+            const z = e.playerId ? k.zeilenById.get(e.playerId) : undefined;
+            const bild = e.playerId ? (k.portrait(e.playerId) ?? info?.portraitUrl ?? null) : null;
+            const gehalt = z?.item.salary ?? info?.gehalt ?? 0;
+            return (
+              <div key={e.nr} className={`mz pz${e.teamId === mein?.teamId ? " an" : ""}`} data-testid="draft-pick-zeile">
+                <b className="t" style={{ color: "var(--stumm)" }}>#{e.pickNr}</b>
+                <span className="t">{e.quelle === "nachzug" ? "N" : e.runde}</span>
+                <span className="lg"><Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} /></span>
+                <span className="nm"><b>{k.teamName(e.teamId)}</b><small>{pickHerkunft(e)}</small></span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
+                <span className="nm"><b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b><small>{e.playerId ? <><KlassenFarbTag className={z?.item.className ?? info?.className} /> · {z?.item.race ?? info?.race ?? ""}</> : ""}</small></span>
+                <span className="ax t">
+                  {MARKT_ACHSEN.map((x) => {
+                    const sicht = z?.sicht.achsen[x];
+                    if (sicht) return <i key={x} className={sicht.exakt ? (sicht.sortWert != null && sicht.sortWert >= 4.5 ? "h" : sicht.sortWert != null && sicht.sortWert >= 3.5 ? "m" : "") : "nb"}>{sicht.anzeige ?? "?"}</i>;
+                    const gruppe = info?.achsenGruppen?.[x] ?? null;
+                    const wert = gruppe ? tierBereichSortWert(gruppe) : null;
+                    return <i key={x} className={wert != null && wert >= 4.5 ? "nb h" : "nb"} title="Zweier-Gruppe (Nebel)">{gruppe ?? "?"}</i>;
+                  })}
+                </span>
+                <span className="re"><b className="t">{de(e.abloese ?? 0)}</b></span>
+                <span className="re"><b className="t">{de(gehalt)}</b><small style={{ display: "block", color: "var(--stumm)" }}>je Saison</small></span>
+              </div>
+            );
+          })}
         </div>
         <div className="mfuss">
           <span>Runde „N“ = Nachzug nach dem Überspringen.</span>
@@ -578,18 +592,43 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
         <button type="button" className={`fc${nurLeistbar ? " an" : ""}`} onClick={() => { setNurLeistbar(!nurLeistbar); setBlatt(0); }}>leistbar</button>
         <button type="button" className={`fc${nurWunsch ? " an" : ""}`} onClick={() => { setNurWunsch(!nurWunsch); setBlatt(0); }}>★ Wunschliste</button>
         <button type="button" className={`fc${nurScouting ? " an" : ""}`} onClick={() => { setNurScouting(!nurScouting); setBlatt(0); }}>mit Scouting</button>
-        <span className="gk">Achse</span>
-        {MARKT_ACHSEN.map((x) => (
-          <button type="button" key={x} className={`fc${achse === x ? " an" : ""}`} onClick={() => { setAchse(achse === x ? null : x); setBlatt(0); }}>{ACHSEN_LABEL[x]}</button>
-        ))}
+        <span className="gk">Achse mind.</span>
+        {MARKT_ACHSEN.map((x) => {
+          const min = achsenMin[x];
+          return (
+            <button
+              type="button"
+              key={x}
+              className={`fc${min != null ? " an" : ""}`}
+              title="Klick: mindestens B, dann A, dann S, dann aus. Im Nebel zählt die obere Note der Gruppe."
+              data-testid={`draft-achse-${x}`}
+              onClick={() => {
+                setAchsenMin((alt) => {
+                  const neu = { ...alt };
+                  const next = naechsteMindestNote(neu[x]);
+                  if (next == null) delete neu[x];
+                  else neu[x] = next;
+                  return neu;
+                });
+                setBlatt(0);
+              }}
+            >
+              {ACHSEN_LABEL[x]}{min != null ? ` ≥ ${mindestNoteLabel(min)}` : ""}
+            </button>
+          );
+        })}
       </div>
       <div className="fl">
         <span className="gk" style={{ marginLeft: 0 }}>Eignung in</span>
         <span className="dk20">
-          {DISZIPLINEN.map((d) => (
-            <button type="button" key={d} className={k.disziplin === d ? "an" : ""} title={officialDisciplineWeightLabels[d]} onClick={() => { k.setDisziplin(d); setBlatt(0); }}>
-              {DISZIPLIN_KURZ[d] ?? d.slice(0, 3).toUpperCase()}
-            </button>
+          {ACHSEN_REIHENFOLGE.map((achse) => (
+            <span key={achse} className="dg" data-achse={achse} style={{ display: "inline-flex", gap: "calc(.16 * var(--u))", marginRight: "calc(.55 * var(--u))", paddingLeft: "calc(.3 * var(--u))", borderLeft: `2px solid ${ACHSEN_FARBE_HEX[achse]}` }}>
+              {DISZIPLIN_NACH_ACHSE[achse].map((d) => (
+                <button type="button" key={d} className={k.disziplin === d ? "an" : ""} style={k.disziplin === d ? undefined : { borderColor: ACHSEN_FARBE_HEX[achse] }} title={`${officialDisciplineWeightLabels[d]} · ${ACHSEN_LABEL[achse]}`} onClick={() => { k.setDisziplin(d); setBlatt(0); }}>
+                  {DISZIPLIN_KURZ[d] ?? d.slice(0, 3).toUpperCase()}
+                </button>
+              ))}
+            </span>
           ))}
         </span>
       </div>
@@ -620,7 +659,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
               {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
               <span className="nm">
                 <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
-                <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span>{it.className} · {it.race}</small>
+                <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span><KlassenFarbTag className={it.className} mitAchse={false} /> · {it.race}</small>
               </span>
               <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text}`) : "unbekannt"}>
                 <b className={`t${wert && !wert.exakt ? " nb" : ""}`}>{wert ? wert.text : "?"}</b>
@@ -711,7 +750,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
         <div className="buehne-f" style={kulisse ? { backgroundImage: `url(${kulisse})` } : undefined}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {figur ? <img className="fig" src={figur} alt="" /> : bild ? <img className="por" src={bild} alt="" /> : null}
-          <div className="txt"><em>{z.item.className} · {z.item.race}</em><h3 className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(z.item.playerId)}>{z.item.name}</h3></div>
+          <div className="txt"><em><KlassenFarbTag className={z.item.className} /> · {z.item.race}</em><h3 className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(z.item.playerId)}>{z.item.name}</h3></div>
         </div>
       ) : (
         <div className="pk"><h2>Mein Draft</h2></div>
