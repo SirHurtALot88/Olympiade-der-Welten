@@ -46,10 +46,10 @@
   },
   "climbing": {
    "chassis": "bahn",
-   "spielMedian": 0.837,
-   "spielSpannweite": 0.125,
-   "saisonMedian": 0.881,
-   "saisonSpannweite": 0.117,
+   "spielMedian": 0.867,
+   "spielSpannweite": 0.155,
+   "saisonMedian": 0.916,
+   "saisonSpannweite": 0.11,
    "schranke": 0.05
   },
   "staffel": {

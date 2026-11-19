@@ -36,6 +36,7 @@ import {
   runMiniDmFfaPodFixturesNode,
 } from "@/lib/battle/arena-node-runner";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { rollMatchdayMutatorTraitsForSide } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -368,6 +369,47 @@ describe("arena-node-runner · ohne Chromium", () => {
     ).toBe(true);
   }, 300_000);
 
+  // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): der Node-Runner reicht das Format des
+  // Spieltags (`formatByDisciplineId.climbing` aus dem Saison-Stempel) an den Motor -- Canyon fuer einen neuen
+  // Spieltag, "standard" fuer einen im alten Format gestempelten. Faellt das Feld irgendwo zwischen
+  // bereiteFixturesVor(), Auftrag, Worker und ladeMotorInstanz() weg, spielt der Motor seine Vorgabe (Canyon) und
+  // der Standard-Teil hier wird rot.
+  it("climbing: der Node-Runner spielt im Format des Spieltags (Canyon live, Rueckweg standard)", async () => {
+    const disziplin = "climbing";
+    const { gameState, matchdayId } = kontext!;
+    const fixtures = fixturesFuer(disziplin).slice(0, 2);
+    const mutatoren = mutatorenFuer(disziplin);
+    expect(climbingFormatFuer(gameState, matchdayId), "neuer Spieltag nach dem Laden").toBe("canyon");
+    const gestempeltStandard = {
+      ...gameState,
+      seasonState: { ...gameState.seasonState, climbingFormat: { seasonId: gameState.seasonState.seasonId, wechsel: [{ ab: null, format: "standard" as const }] } },
+    } as GameState;
+    expect(climbingFormatFuer(gestempeltStandard, matchdayId)).toBe("standard");
+
+    const vorbereitet = bereiteFixturesVor(gameState, fixtures, undefined, disziplin);
+    expect(vorbereitet.map((f) => f.formatByDisciplineId)).toEqual(fixtures.map(() => ({ climbing: "canyon" })));
+    const skripte = ladeMotorSkripte(path.resolve(process.cwd(), "public", "mockups"));
+    const motorLauf = (format: "canyon" | "standard") =>
+      simuliereDuelle(skripte, {
+        disziplin,
+        chassis: waehleArenaChassis(disziplin),
+        mutatoren,
+        fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId }) => ({
+          heim, gast, aufstellung, seed, kulisseByDisciplineId, formatByDisciplineId: { climbing: format },
+        })),
+      }) as Promise<Array<{ seiten: [number, number]; boxscore: Array<{ wert: number }> } | null>>;
+    const kern = (r: { seiten: [number, number]; boxscore: Array<{ wert: number }> } | null) =>
+      r ? { seiten: [...r.seiten], werte: r.boxscore.map((e) => e.wert) } : null;
+    const canyon = (await motorLauf("canyon")).map(kern);
+    const standard = (await motorLauf("standard")).map(kern);
+    expect(JSON.stringify(canyon), "Canyon und Standard muessen sich unterscheiden").not.toBe(JSON.stringify(standard));
+
+    const nodeCanyon = await runArenaFixturesNode(gameState, fixtures, disziplin, { mutatoren });
+    const nodeStandard = await runArenaFixturesNode(gestempeltStandard, fixtures, disziplin, { mutatoren });
+    expect(nodeCanyon.map(kern), "Node-Runner == Motor im Format Canyon").toEqual(canyon);
+    expect(nodeStandard.map(kern), "Node-Runner == Motor im Format standard").toEqual(standard);
+  }, 300_000);
+
   it("die Formpruefung lehnt jedes Ergebnis ab, das die Wertung nicht lesen koennte", () => {
     const gut = { disziplin: "tennis", seiten: [2, 1], boxscore: [{ name: "A", wert: 1.5 }] };
     expect(pruefeRohesDuellErgebnis(gut, "t")).toBe(gut);
@@ -405,6 +447,27 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("arena-node-runner · Paritaet zu Chromium
     },
     600_000,
   );
+
+  // CLIMBING IM ALTEN FORMAT (Rueckweg OLY_CLIMBING_FORMAT=standard, Canyon live 18.11.): auch ein Spieltag, der im
+  // Format "standard" gestempelt ist, wertet in beiden Runnern gleich -- das Format reist in beiden Umschlaegen.
+  // (Das Live-Format Canyon deckt "climbing" in der Liste oben ab.)
+  it("climbing im Format standard: Node und Chromium werten identisch", async () => {
+    const disziplin = "climbing";
+    const { gameState } = kontext!;
+    const gestempelt = {
+      ...gameState,
+      seasonState: { ...gameState.seasonState, climbingFormat: { seasonId: gameState.seasonState.seasonId, wechsel: [{ ab: null, format: "standard" as const }] } },
+    } as GameState;
+    const fixtures = fixturesFuer(disziplin);
+    const mutatoren = mutatorenFuer(disziplin);
+    const chromium = await runArenaFixtures(gestempelt, fixtures, disziplin, { mutatoren });
+    const node = await runArenaFixturesNode(gestempelt, fixtures, disziplin, { mutatoren, nodeTimeoutMs: 540_000 });
+    vergleicheDuelle(disziplin, chromium, node);
+    const canyon = await runArenaFixturesNode(gameState, fixtures, disziplin, { mutatoren, nodeTimeoutMs: 540_000 });
+    expect(JSON.stringify(canyon.map((r) => r.seiten.concat(r.boxscore.map((b) => b.wert))))).not.toBe(
+      JSON.stringify(node.map((r) => r.seiten.concat(r.boxscore.map((b) => b.wert)))),
+    );
+  }, 600_000);
 
   it("mini-dm: Node und Chromium werten die Pods identisch", async () => {
     const pods = miniDmPods();

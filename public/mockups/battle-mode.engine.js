@@ -57243,6 +57243,9 @@
   }
   const canyonTotaleZ=()=>H/(CANYON_BILD.H+150);
   function canyonKamZiel(A){
+    // KAMERA-MODI (Canyon live, 18.11.): Totale und Folgen vor der Regie (s. canyonKam unten). Reine Anzeige.
+    if(canyonKam.modus==="totale")return canyonTotaleZiel();
+    if(canyonKam.modus==="folgen"){ const f=canyonFolgenZiel(); if(f)return f; }
     const E=CANYON.ereignisse;
     for(let i=E.length-1;i>=0&&rennT-E[i].t<1.6;i--)if(E[i].gross&&E[i].typ!=="ziel"&&E[i].typ!=="seil"){
       const K=CANYON.K.get(E[i].id); const p=K?canyonBildOrt(K):{x:E[i].x/2,y:E[i].y/2};
@@ -57272,7 +57275,10 @@
     const dt=A.letzteUz==null?0:Math.max(0,Math.min(.1,uz-A.letzteUz)); A.letzteUz=uz;
     const roh=A.letzteUzRoh==null?1e9:uz-A.letzteUzRoh; A.letzteUzRoh=uz;
     // Kamera (Regie: folgt den vorderen vier, haelt grosse Momente kurz; nach einem Sprung sofort dort)
-    const ziel=canyonKamZiel(A), k=roh>1.5||roh<0?1:(roh>0?1-Math.exp(-roh*2.4):(rennT<=0?1:0));
+    // Bei angehaltener Uhr (Pause, Rennende) zieht die Kamera nach Wandzeit nach -- sonst stuende ein Wechsel auf
+    // Totale/Folgen in der Pause still (Canyon live, 18.11.). Reine Anzeige.
+    const wandJetzt=wandMs(), wandDt=A.letzteWandMs==null?0:Math.max(0,Math.min(.2,(wandJetzt-A.letzteWandMs)/1000)); A.letzteWandMs=wandJetzt;
+    const ziel=canyonKamZiel(A), k=roh>1.5||roh<0?1:(roh>0?1-Math.exp(-roh*2.4):(rennT<=0?1:1-Math.exp(-wandDt*3)));
     A.kam.x+=(ziel.x-A.kam.x)*k; A.kam.y+=(ziel.y-A.kam.y)*k; A.kam.z+=(ziel.z-A.kam.z)*k;
     const hw=W/2/A.kam.z, hh=H/2/A.kam.z;
     A.kam.x=hw*2>=WB+260?WB/2:Math.max(hw-130,Math.min(WB+130-hw,A.kam.x));
@@ -57415,6 +57421,10 @@
     const seiten=[...new Set(CANYON.S.map(S=>S.seite))].sort((a,b)=>a-b);
     const txt=seiten.map(s=>CANYON.S.filter(S=>S.seite===s&&S.ziel!=null).length+"/"+CANYON.S.filter(S=>S.seite===s).length);
     const kw=170+seiten.length*34, kx=W/2-kw/2;
+    // Mit dem DOM-HUD (HUD_PROFIL.climbing, Canyon live 18.11.) stehen "Seilschaften oben" und der Wartezaehler in
+    // der Kopfleiste; der Bildkopf entfaellt dann (sonst doppelt). Ohne HUD (hudSystem(false)) bleibt er.
+    const domKopf=(()=>{ try{ return !!hudProfil()&&!!document.getElementById("hudKopf"); }catch(e){ return false; } })();
+    if(!domKopf){
     ctx.fillStyle="rgba(9,12,18,.8)"; ctx.fillRect(kx,ob,kw,22);
     setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle="#9fb3c8"; ctx.textAlign="left";
     ctx.fillText("SEILSCHAFTEN OBEN",kx+8,ob+11);
@@ -57423,6 +57433,7 @@
     const lang=alle.reduce((m,K)=>Math.max(m,K.wartet?K.warteLauf:0),0);
     setzeFont(ctx,"700 8.5px 'Barlow Condensed',sans-serif"); ctx.fillStyle=CANYON.warteJetzt>=3?"#ff9f43":"#9fb3c8"; ctx.textAlign="right";
     ctx.fillText("WARTEN "+CANYON.warteJetzt+(lang>0?" · "+(lang/CANYON_P.tempo*zeitFaktor()).toFixed(1)+" s":""),kx+kw-8,ob+11);
+    }
     // Routen-Inset: ganze Wand, drei Wege, Punkt je Kletterer, Bildausschnitt
     const ih=120, iw=ih*CANYON_BILD.B/CANYON_BILD.H, ix=W-iw-10, iy=H-ih-12, is=ih/CANYON_BILD.H;
     ctx.fillStyle="rgba(9,12,18,.78)"; ctx.fillRect(ix-4,iy-4,iw+8,ih+8);
@@ -57442,6 +57453,260 @@
     if(rx1>rx0&&ry1>ry0)ctx.strokeRect(rx0,ry0,rx1-rx0,ry1-ry0);
     ctx.restore();
   }
+  // =====================================================================================
+  // CANYON: KAMERA-MODI UND HUD-PROFIL (Canyon live, 18.11., docs/design/climbing-canyon-live-18-11.md; Mockup
+  // public/mockups/climbing-neu-18-11.html, Konzept docs/design/climbing-neu-18-11.md Abschnitt 5). REINE ANZEIGE:
+  // alles hier liest den gebuchten Canyon-Zustand (CANYON, LAEUFER, bahnRangliste(), bahnTeamstand()) und schreibt
+  // nur Modulvariablen (Kamera-Modus, Verlaufszeiger). Kein rr(), keine Felder an Laeufer- oder Kletterer-Objekten.
+  // Der Fingerabdruck bleibt dadurch unberuehrt (s. scripts/pruefe-wertung-fingerabdruck.mjs).
+  // -------------------------------------------------------------------------------------
+  // KAMERA: "regie" (folgt den vorderen vier, haelt grosse Momente), "totale" (die ganze Wand), "folgen" (ein
+  // Kletterer: Klick auf seine Leiste im Dock, Pfeiltasten, oder der Folgen-Knopf der Spielerkarte).
+  const canyonKam={modus:"regie", id:null};
+  function canyonKamSetzen(modus,id){
+    canyonKam.modus=(modus==="totale"||modus==="folgen")?modus:"regie";
+    if(id!==undefined)canyonKam.id=(id==null)?null:Number(id);
+    try{ hudBedienSig=""; }catch(e){}
+    return {...canyonKam};
+  }
+  function canyonKamFuehrenderId(){
+    if(!CANYON)return null;
+    const offen=canyonHudReihe().map(u=>CANYON.K.get(u.id)).filter(K=>K&&K.ziel==null);
+    const K=offen[0]||CANYON.K.get((LAEUFER[0]||{}).id);
+    return K?K.u.id:null;
+  }
+  function canyonKamFolgK(){
+    if(!CANYON)return null;
+    const id=canyonKam.id!=null?canyonKam.id:canyonKamFuehrenderId();
+    return id!=null?(CANYON.K.get(id)||null):null;
+  }
+  function canyonKamWeiter(){
+    const n=canyonKam.modus==="regie"?"totale":canyonKam.modus==="totale"?"folgen":"regie";
+    let id;
+    try{ id=n==="folgen"?(hudKarteId!=null?hudKarteId:canyonKamFuehrenderId()):undefined; }catch(e){ id=undefined; }
+    canyonKamSetzen(n,id);
+  }
+  function canyonKamKarte(id){
+    if(id!=null)canyonKamSetzen("folgen",id);
+    else if(canyonKam.modus==="folgen")canyonKamSetzen("regie",null);
+  }
+  function canyonKamText(){
+    if(canyonKam.modus==="folgen"){ const K=canyonKamFolgK(); return "Folgt "+(K?K.u.n:"—"); }
+    return canyonKam.modus==="totale"?"Totale":"Regie";
+  }
+  // Totale: die ganze Wand mit Wandfuss und Grat, so gross, wie Breite UND Hoehe es zulassen.
+  const canyonTotaleZiel=()=>({x:CANYON_BILD.B/2, y:CANYON_BILD.H/2-15, z:Math.min(H/(CANYON_BILD.H+150),W/(CANYON_BILD.B+260))});
+  function canyonFolgenZiel(){
+    const K=canyonKamFolgK(); if(!K)return null;
+    if(K.ziel!=null)return {x:CANYON_GLOCKE[0],y:CANYON_GLOCKE[1]+34,z:1.8};
+    const p=canyonBildOrt(K);
+    return {x:p.x,y:p.y-24,z:1.9};
+  }
+
+  // ---------- HUD-Profil "climbing" (s. HUD_PROFIL.climbing) ----------
+  const CANYON_ORT_TXT={boden:"Anlauf",wand:"Wand",kamin:"Kamin",band:"Band",block:"Engstelle",dach:"Dach",lippe:"Lippe",grat:"Grat",bruecke:"Brücke",leiter:"Leiter"};
+  const CANYON_ZUSTAND_TXT={rast:"Rast",rutsch:"Im Seil",sturz:"Im Seil",fehlgriff:"Fehlgriff",wackel:"Wankt",rangelt:"Rangelt",zieht:"Zieht",umplan:"Wechselt"};
+  const CANYON_PHASE_TXT={boden:"Einstieg",kamin:"Kamin",band:"Quergang am Band",block:"Engstelle",dach:"Überhang · Dach",lippe:"An der Lippe",grat:"Gipfelgrat",bruecke:"Seilbrücke",leiter:"Leiter"};
+  const CANYON_WEG_SATZ={
+    kraft:"Kraftweg: unter dem Dach hangeln, an der Lippe eine Kraftprobe. Kürzer, zehrt aber am meisten Puste.",
+    technik:"Technikweg: im Kamin stemmen (kostet kaum Puste), dann die Seilbrücke – eine Kopfprobe.",
+    ausdauer:"Ausdauerweg: Band bis zur Flanke, Leiter, Grat. Am längsten, keine Probe."};
+  // Verlauf: Ereignisart -> [Filter, Marke]. "probe" steht nur unter "Alle".
+  const CANYON_VERLAUF={rangel:["kampf","Rangeln"],ueberholt:["kampf","Außen"],zieht:["hilfe","Zieht"],schiebt:["hilfe","Schiebt"],
+    vorstieg:["hilfe","Vorstieg"],seil:["glocke","Seilsch."],umplan:["weg","Weg"],obenrum:["weg","Obenrum"],ziel:["glocke","Glocke"],
+    rutsch:["probe","Rutscht"],sturz:["probe","Sturz"],fehlgriff:["probe","Fehlgriff"],wackel:["probe","Wankt"],lippe:["probe","Lippe"],rast:["probe","Rast"]};
+  const canyonUhrText=(sek)=>{ const t=Math.max(0,sek); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); };
+  function canyonHudReihe(){ try{ return bahnRangliste().reihe; }catch(e){ return LAEUFER.slice(); } }
+  function canyonHudZahl(v){ return String(Math.round((+v||0)*10)/10).replace(".",","); }
+  function canyonHudPhase(){
+    if(!CANYON)return "";
+    if(done)return "Alle oben";
+    if(rennT<=0)return "Auf die Plätze";
+    const f=canyonHudReihe().map(u=>CANYON.K.get(u.id)).find(K=>K&&K.ziel==null);
+    if(!f)return "Glocke";
+    const s=f.pfad[Math.min(f.si,f.pfad.length-1)];
+    if(s.typ==="wand")return f.si<2?"Einstiegswand":"Ausstieg";
+    return CANYON_PHASE_TXT[s.typ]||"Wand";
+  }
+  // Dieselbe Zeichenkette wie #clock (updateHudBahn), dazu die Phase im Periodenfeld.
+  function canyonHudUhr(){ return {per:canyonHudPhase(), uhr:canyonUhrText(rennT*zeitFaktor())}; }
+  function canyonHudWarten(){
+    if(!CANYON||done)return null;
+    const lang=LAEUFER.reduce((m,u)=>{ const K=CANYON.K.get(u.id); return Math.max(m,K&&K.wartet?K.warteLauf:0); },0);
+    return {txt:"WARTEN "+CANYON.warteJetzt+(lang>0?" · "+(lang/CANYON_P.tempo*zeitFaktor()).toFixed(1).replace(".",",")+" s":""),eng:CANYON.warteJetzt>=3};
+  }
+  function canyonHudOrt(K){
+    if(K.ziel!=null)return "Oben";
+    if(K.pause>0&&CANYON_ZUSTAND_TXT[K.zustand])return CANYON_ZUSTAND_TXT[K.zustand];
+    if(K.zustand==="rangelt"||K.zustand==="zieht")return CANYON_ZUSTAND_TXT[K.zustand];
+    if(K.aussen)return "Außen";
+    if(K.wartet)return "Wartet";
+    const s=K.pfad[Math.min(K.si,K.pfad.length-1)];
+    return CANYON_ORT_TXT[s.typ]||"Wand";
+  }
+  function canyonHudKern(K){ return K.ziel!=null?bahnZeitText(bahnZeitAnzeige(K.u)):Math.round(canyonAnteil(K)*100)+" %"; }
+  function canyonHudSub(){
+    if(!CANYON)return "";
+    const u=canyonHudReihe()[0], K=u&&CANYON.K.get(u.id);
+    return (done?"Endstand":rennT>0?"live":"bereit")+" · Punkte nach Rang"+(K&&rennT>0?" · vorn "+u.n+" "+canyonHudKern(K):"");
+  }
+  function canyonHudOben(s){
+    if(!CANYON)return null;
+    const SS=CANYON.S.filter(S=>S.seite===s);
+    return {txt:"OBEN "+SS.filter(S=>S.ziel!=null).length+"/"+SS.length,
+      titel:"Seilschaften oben: beide Partner haben geläutet (Anzeige; gewertet wird jeder Kletterer nach Rang)"};
+  }
+  function canyonHudMomentum(){
+    const pk=[0,0], n=[0,0];
+    if(CANYON)for(const u of LAEUFER){ const K=CANYON.K.get(u.id); if(!K||(u.seite!==0&&u.seite!==1))continue; pk[u.seite]+=canyonAnteil(K); n[u.seite]++; }
+    const m=[n[0]?pk[0]/n[0]:0, n[1]?pk[1]/n[1]:0];
+    return {pk:[Math.round(m[0]*100),Math.round(m[1]*100)], anteil:Math.max(-1,Math.min(1,(m[0]-m[1])*3)), fenster:0};
+  }
+  function canyonHudEinblenderWer(o){
+    if(!CANYON)return null;
+    const E=CANYON.ereignisse;
+    for(let i=E.length-1;i>=0&&i>=E.length-10;i--){
+      const e=E[i];
+      if(e.gross&&e.seite===o.seite&&(!o.titel||e.gross===o.titel)){ const K=CANYON.K.get(e.id); return K?K.u:null; }
+    }
+    return null;
+  }
+  function canyonHudEinblenderStat(u,o){
+    const K=CANYON&&CANYON.K.get(u.id); if(!K)return "";
+    return CANYON_WEG_NAME[K.weg]+" · Puste "+Math.round(Math.max(0,Math.min(1,K.res))*100)+" %"+(o&&o.txt?" · "+o.txt:"");
+  }
+  let canyonHudRef=null, canyonHudGesehen=0;
+  function canyonHudVerlauf(){
+    if(!CANYON)return;
+    const E=CANYON.ereignisse;
+    if(canyonHudRef!==CANYON||E.length<canyonHudGesehen){
+      canyonHudRef=CANYON; canyonHudGesehen=0; hudVerlauf.length=0; hudVerlaufSig="";
+      hudZuegeRef=null;   // der naechste Feldspiel-Verlauf beginnt sauber
+    }
+    for(;canyonHudGesehen<E.length;canyonHudGesehen++){
+      const e=E[canyonHudGesehen], art=CANYON_VERLAUF[e.typ]; if(!art)continue;
+      const K=CANYON.K.get(e.id), t=e.t*zeitFaktor();
+      hudVerlauf.push({i:canyonHudGesehen, art:e.typ, kat:art[0], seite:e.seite, text:e.text, uhr:canyonUhrText(t), uhrSek:t,
+        label:art[1], gross:!!e.gross, momSeite:null, momGew:0,
+        zeigeStand:e.typ==="ziel", stand:e.typ==="ziel"&&K?"#"+(K.rang||"")+" · "+bahnZeitText(bahnSpanneAnzeige(K.ziel)):""});
+    }
+    while(hudVerlauf.length>200)hudVerlauf.shift();
+  }
+  function hudVerlaufSektionHtml(p){
+    return "<section class=\"hud-verlauf\"><h3><span>Verlauf</span><span class=\"hud-filter\" role=\"group\" aria-label=\"Ereignisfilter\">"
+      +p.verlaufFilter.map(([id,txt])=>"<button type=\"button\" data-hud-filter=\""+id+"\" aria-pressed=\""+(id===hudVerlaufFilter)+"\">"+lsEsc(txt)+"</button>").join("")
+      +"</span></h3><ol class=\"hud-vliste\" data-hf=\"vliste\" aria-live=\"off\"></ol></section>";
+  }
+  function canyonHudDockSkelett(p){
+    const leiste=(u)=>{
+      const K=CANYON.K.get(u.id), id=lsEsc(u.id);
+      return "<button type=\"button\" class=\"hud-leiste hud-cleiste "+(u.seite===0?"h":"a")+"\" data-hud-spieler=\""+id+"\" data-hf=\"l"+id+"\" "
+        +"aria-label=\""+lsEsc(u.n)+": Spielerkarte öffnen, Kamera folgt\">"
+        +"<i class=\"hud-crang t\" data-hf=\"r"+id+"\">–</i>"+hudPortraitHtml(u.n)
+        +"<span class=\"hud-lkopf\"><b class=\"hud-lname\">"+lsEsc(u.n)+"</b>"
+        +"<span class=\"hud-czeile\"><span class=\"hud-cweg\" data-hf=\"g"+id+"\" title=\"Weg\">"+(K?CANYON_WEG_KUERZEL[K.weg]:"")+"</span>"
+        +"<span class=\"hud-cort\" data-hf=\"o"+id+"\">Anlauf</span><b class=\"hud-ckern t\" data-hf=\"k"+id+"\">0 %</b></span></span>"
+        +"<span class=\"hud-cpuste\" title=\"Puste (Reserve)\"><i data-hf=\"p"+id+"\"></i></span></button>";
+    };
+    const block=(s)=>"<section class=\"hud-strip "+(s===0?"h":"a")+"\"><h3><b>"+lsEsc(hudSeitenName(s))+"</b><span>"
+      +(s===0?"Heim":"Gast")+" · Seilschaften</span></h3><div class=\"hud-seile\">"
+      +CANYON.S.filter(S=>S.seite===s).map(S=>{
+        const k="S"+S.seite+"-"+S.nr;
+        return "<div class=\"hud-seil\" data-hf=\""+k+"\"><div class=\"hud-seilkopf\"><b>Seilschaft "+S.nr+"</b>"
+          +"<span class=\"hud-sweg\" data-hf=\""+k+"w\"></span><span class=\"hud-shilfe\" data-hf=\""+k+"h\"></span>"
+          +"<span class=\"hud-szeit t\" data-hf=\""+k+"z\"></span></div><div class=\"hud-seilpaar\">"+S.m.map(leiste).join("")+"</div></div>";
+      }).join("")+"</div></section>";
+    return block(0)+hudVerlaufSektionHtml(p)+block(1);
+  }
+  function canyonHudDock(p,dock){
+    if(!CANYON)return;
+    if(!dock.classList.contains("hud-dock-canyon"))dock.classList.add("hud-dock-canyon");
+    const sig="climbing|"+CANYON.S.map(S=>S.seite+":"+S.nr+":"+S.m.map(u=>u.id).join(".")).join(",")+"|"+hudSeitenName(0)+"|"+hudSeitenName(1);
+    if(sig!==hudDockSig){ hudDockSig=sig; dock.innerHTML=canyonHudDockSkelett(p); hudVerlaufSig=""; }
+    const rang=new Map(canyonHudReihe().map((u,i)=>[u.id,i+1]));
+    for(const S of CANYON.S){
+      const k="S"+S.seite+"-"+S.nr, box=hudFeld(dock,k);
+      if(box&&box.dataset.weg!==S.weg){ box.dataset.weg=S.weg; box.style.setProperty("--wf",CANYON_WEG_FARBE[S.weg]); }
+      hudText(dock,k+"w",CANYON_WEG_NAME[S.weg]);
+      hudText(dock,k+"h",S.hilfen?"Hilfen "+S.hilfen:"");
+      hudText(dock,k+"z",S.ziel!=null?"oben "+bahnZeitText(bahnSpanneAnzeige(S.ziel)):"");
+      hudKlasse(dock,k,"oben",S.ziel!=null);
+      for(const u of S.m){
+        const K=CANYON.K.get(u.id); if(!K)continue;
+        const id=u.id, lei=hudFeld(dock,"l"+id);
+        if(lei&&lei.dataset.weg!==K.weg){ lei.dataset.weg=K.weg; lei.style.setProperty("--wf",CANYON_WEG_FARBE[K.weg]); }
+        hudText(dock,"r"+id,String(rang.get(id)||"–"));
+        hudText(dock,"g"+id,CANYON_WEG_KUERZEL[K.weg]);
+        hudText(dock,"o"+id,canyonHudOrt(K));
+        hudText(dock,"k"+id,canyonHudKern(K));
+        const bar=hudFeld(dock,"p"+id), w=Math.round(Math.max(0,Math.min(1,K.res))*100)+"%";
+        if(bar&&bar.style.width!==w)bar.style.width=w;
+        hudKlasse(dock,"l"+id,"mittel",K.ziel==null&&K.res>=.3&&K.res<.55);
+        hudKlasse(dock,"l"+id,"tief",K.ziel==null&&K.res<.3);
+        hudKlasse(dock,"l"+id,"oben",K.ziel!=null);
+        hudKlasse(dock,"l"+id,"sel",hudKarteId===id);
+      }
+    }
+  }
+  function canyonHudProfilwerte(u){
+    const P=CANYON_P;
+    return [["au","Ausdauer",canyonKanal(u,P.ausdauerMix)],["kr","Kraft",canyonKanal(u,P.wegProfil.kraft)],
+      ["te","Technik",canyonKanal(u,P.wegProfil.technik)],["ko","Kopf",canyonSk(u,"GLEICHGEWICHT")],["sn","Tempo",canyonKanal(u,P.mix.boden)]];
+  }
+  function canyonHudKarte(p,karte){
+    const K=CANYON&&CANYON.K.get(hudKarteId);
+    if(!K){ hudKarteId=null; karte.hidden=true; return; }
+    const u=K.u, {zeilen}=hudZeilen(), z=zeilen.find(x=>x.u&&x.u.id===u.id);
+    const eig=z&&z.eig!=null?Math.round(z.eig):null, form=hudForm(u.n);
+    const haupt={kraft:"kr",technik:"te",ausdauer:"au"}[K.weg];
+    const werte=canyonHudProfilwerte(u).map(([k,t,v])=>[k,t,Math.round(v)]);
+    const partner=K.seil.m.filter(x=>x!==u).map(x=>x.n);
+    const satz=CANYON_WEG_SATZ[K.weg]+(K.eigen!==K.weg?" Für "+u.n+" ein Nebenweg: das eigene Profil wäre der "+CANYON_WEG_NAME[K.eigen]+", die Seilschaft geht gemeinsam.":"");
+    const sp=(k)=>K.splits[k]!=null?bahnZeitText(bahnSpanneAnzeige(K.splits[k])):"–";
+    const splits=[["Band",sp("band")],["Engstelle",sp("eng")],["Grat",sp("grat")],["Glocke",K.ziel!=null?bahnZeitText(bahnZeitAnzeige(u)):"–"]];
+    const rang=canyonHudReihe().indexOf(u)+1, puste=Math.round(Math.max(0,Math.min(1,K.res))*100);
+    const folgt=canyonKam.modus==="folgen"&&canyonKamFolgK()===K;
+    const sig=JSON.stringify([hudKarteId,K.weg,satz,splits,rang,puste,canyonHudOrt(K),eig,form,folgt,partner]);
+    if(sig===hudKarteSig){ if(karte.hidden)karte.hidden=false; return; }
+    hudKarteSig=sig;
+    karte.className="hud-karte hud-ckarte "+(u.seite===0?"h":"a");
+    karte.style.setProperty("--wf",CANYON_WEG_FARBE[K.weg]);
+    karte.innerHTML="<div class=\"hud-kk\">"+hudPortraitHtml(u.n,"hud-por gross")
+      +"<div class=\"hud-kwer\"><em>"+lsEsc(hudSeitenName(u.seite))+" · Seilschaft "+K.seil.nr+(partner.length?" mit "+lsEsc(partner.join(" und ")):"")+"</em>"
+      +"<b>"+lsEsc(u.n)+"</b><span class=\"hud-kplk\">"
+      +"<span class=\"hud-plk\" title=\"Platz nach der gebuchten Rangliste (Glockenzeit, sonst Höhe)\">Platz <b class=\"t\">"+(rang||"–")+"</b></span>"
+      +(eig!=null?"<span class=\"hud-plk\" title=\"Eignung für Climbing (Basis + Slot + Form + Mutator + Intensität)\">Eignung <b class=\"t\">"+eig+"</b></span>":"")
+      +(form?"<span class=\"hud-plk "+(form>0?"plus":"minus")+"\" title=\"Formkarte des Spieltags\">Form "+(form>0?"+":"")+form+"</span>":"")
+      +"<span class=\"hud-plk"+(puste<30?" minus":"")+"\" title=\"Puste (Reserve)\">Puste <b class=\"t\">"+puste+" %</b></span>"
+      +"</span></div><button type=\"button\" class=\"hud-zu\" data-hud-aktion=\"zu\" aria-label=\"Spielerkarte schließen\" data-tip=\"Schließen (Esc)\">✕</button></div>"
+      +"<div class=\"hud-kwerte hud-cwerte\">"+werte.map(([k,t,v])=>"<div class=\""+(k===haupt?"haupt":"")+"\" title=\""+lsEsc(t)+" (Sub-Skills, mit denen der Motor rechnet)\"><b class=\"t\">"+v+"</b><small>"+lsEsc(t)+"</small></div>").join("")+"</div>"
+      +"<p class=\"hud-cwegsatz\"><b>Jetzt: "+lsEsc(canyonHudOrt(K))+".</b> "+lsEsc(satz)+"</p>"
+      +"<div class=\"hud-csplits\">"+splits.map(([t,v])=>"<span><small>"+lsEsc(t)+"</small><b class=\"t\">"+lsEsc(v)+"</b></span>").join("")+"</div>"
+      +"<div class=\"hud-kaktion\"><button type=\"button\" class=\"hud-knopf\" data-hud-aktion=\"vor\" data-tip=\"Voriger Kletterer (←)\">◀</button>"
+      +"<button type=\"button\" class=\"hud-knopf breit"+(folgt?" an":"")+"\" data-hud-aktion=\"folgen\" aria-pressed=\""+folgt+"\" data-tip=\"Kamera folgt diesem Kletterer\">"+(folgt?"Kamera folgt":"Kamera folgen")+"</button>"
+      +"<button type=\"button\" class=\"hud-knopf\" data-hud-aktion=\"nach\" data-tip=\"Nächster Kletterer (→)\">▶</button></div>";
+    karte.hidden=false;
+  }
+  // Lesesonde fuer Tests: was das Canyon-HUD zeigt und was gebucht ist (gezeigt = gebucht).
+  function canyonHudProbe(){
+    const p=hudProfil(), kopf=document.getElementById("hudKopf"), dock=document.getElementById("hudDock");
+    const txt=(root,key)=>{ const e=root&&root.querySelector("[data-hf=\""+key+"\"]"); return e?e.textContent:null; };
+    if(!CANYON)return {aktiv:!!p,kamera:{...canyonKam}};
+    const rang=new Map(canyonHudReihe().map((u,i)=>[u.id,i+1])), stand=bahnTeamstand().seiten;
+    return {aktiv:!!p, kamera:{...canyonKam}, kamZiel:canyonAnzeige&&canyonAnzeige.fuer===CANYON?{...canyonAnzeige.kam}:null,
+      totaleZ:canyonTotaleZiel().z,
+      gebucht:{stand:stand.map(canyonHudZahl), score:(document.getElementById("score")||{}).textContent||"", clock:(document.getElementById("clock")||{}).textContent||"",
+        spieler:LAEUFER.map(u=>{ const K=CANYON.K.get(u.id); return {id:u.id,n:u.n,rang:String(rang.get(u.id)),kern:canyonHudKern(K),ort:canyonHudOrt(K),weg:CANYON_WEG_KUERZEL[K.weg],
+          puste:Math.round(Math.max(0,Math.min(1,K.res))*100)+"%"}; }),
+        ereignisse:CANYON.ereignisse.filter(e=>CANYON_VERLAUF[e.typ]).length},
+      gezeigt:{stand:[txt(kopf,"stand0"),txt(kopf,"stand1")],uhr:txt(kopf,"uhr"),phase:txt(kopf,"per"),zusatz:txt(kopf,"zusatz"),
+        oben:[txt(kopf,"stat0"),txt(kopf,"stat1")],
+        spieler:dock?LAEUFER.map(u=>({id:u.id,rang:txt(dock,"r"+u.id),kern:txt(dock,"k"+u.id),ort:txt(dock,"o"+u.id),weg:txt(dock,"g"+u.id),
+          puste:(dock.querySelector("[data-hf=\"p"+u.id+"\"]")||{style:{}}).style.width||null})):[],
+        seilschaften:dock?dock.querySelectorAll(".hud-seil").length:0,
+        verlauf:hudVerlauf.length, karte:hudKarteId}};
+  }
+
   // Bildschirmort einer Figur fuer Schwebetexte/Einblender (laeuferXY im Canyon-Format)
   function canyonSchirmXY(u){
     const K=CANYON&&CANYON.K.get(u.id), A=canyonAnzeige&&canyonAnzeige.fuer===CANYON?canyonAnzeige:null;
@@ -61070,8 +61335,41 @@
       spieler:"wertungVon(disc) (bahnRangliste)",verlauf:"feed()",einblender:"feed(big): zieleinlauf"}),
     spurt:HUD_SKELETT("bahn",{stand:"bahnTeamstand()",uhr:"#clock",zusatz:"zeichneHyroxRangleiste() / Fegearm",
       spieler:"wertungVon(disc) (bahnRangliste)",verlauf:"feed()",einblender:"feed(big): sturz, einbruch"}),
-    climbing:HUD_SKELETT("bahn",{stand:"bahnTeamstand()",uhr:"#clock",zusatz:"Exe-Fortschritt (WAND_EXE_INDIZES)",
-      spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big): sturz"}),
+    // CLIMBING IM FORMAT CANYON (Canyon live, 18.11., docs/design/climbing-canyon-live-18-11.md, Mockup
+    // public/mockups/climbing-neu-18-11.html). Erstes Bahn-Profil: dieselben Bauteile, eigene Quellen, dazu ein
+    // eigenes Dock (Seilschaft-Kaesten statt Spielerleisten-Raster), eine eigene Karte (Profilwerte, Weg,
+    // Zwischenzeiten) und Kamera-Modi. `nurWenn`: nur im Format Canyon -- Climbing im alten Format (Abschalt-
+    // Schalter) behaelt sein altes HUD. Alle Zahlen lesen den gebuchten Zustand: Stand = bahnTeamstand() (= #score),
+    // Uhr = rennT x zeitFaktor() (= #clock), Rang = bahnRangliste(), Anteil/Puste/Ort/Weg = CANYON.K, Glockenzeit =
+    // bahnZeitAnzeige() (= Spalte "Zeit"), Verlauf/Einblender = CANYON.ereignisse (canyonMelde). Nichts schreibt.
+    climbing:{status:"fertig",chassis:"bahn",titel:"Climbing",
+      nurWenn:()=>disc==="climbing"&&bahnCanyonAktiv&&!!CANYON,
+      komponenten:HUD_KOMPONENTEN,
+      ersetzt:["kopfzeile","bbug","lauf-band","callout","kaderleiste"],
+      quellen:{stand:"bahnTeamstand().seiten (= #score, Punkte nach Rang)",uhr:"rennT x zeitFaktor() (= #clock)",
+        phase:"Kantenart des vordersten Kletterers ohne Glocke",zusatz:"CANYON.warteJetzt, laengste Wartezeit",
+        teamfeld:"Seilschaften oben (CANYON.S[].ziel)",momentum:"Mittel von canyonAnteil() je Seite",
+        spieler:"CANYON.K (Rang aus bahnRangliste(), Anteil, Glockenzeit = bahnZeitAnzeige(), Puste K.res, Ort)",
+        verlauf:"CANYON.ereignisse",einblender:"canyonMelde(gross) -> callout()"},
+      daten:{
+        stand:()=>bahnTeamstand().seiten,
+        standText:(v)=>canyonHudZahl(v),
+        uhr:()=>canyonHudUhr(),
+        zusatz:()=>canyonHudWarten(),
+        sub:()=>canyonHudSub(),
+        teamStat:(s)=>canyonHudOben(s),
+        momentum:()=>canyonHudMomentum(),
+        einblenderWer:(o)=>canyonHudEinblenderWer(o),
+        einblenderStat:(u,o)=>canyonHudEinblenderStat(u,o)
+      },
+      zusatzTitel:"Wartende an der Wand · längste Wartezeit am Stück",zusatzText:true,
+      verlaufNachfuehren:(p)=>canyonHudVerlauf(p),
+      dock:(p,dock)=>canyonHudDock(p,dock),
+      karte:(p,karte)=>canyonHudKarte(p,karte),
+      kamera:{modus:()=>canyonKam.modus, text:()=>canyonKamText(), weiter:()=>canyonKamWeiter(),
+        karte:(id)=>canyonKamKarte(id), folgen:(id)=>canyonKamSetzen("folgen",id)},
+      verlaufFilter:[["alle","Alle"],["kampf","Rangeln"],["hilfe","Seilschaft"],["weg","Wege"],["glocke","Glocke"]],
+      momentumTitel:(pk)=>"Kletterfortschritt: "+pk[0]+" % : "+pk[1]+" % (Mittel der Routenanteile je Team)"},
     "takeshis-castle":HUD_SKELETT("bahn",{stand:"bahnTeamstand() (Burgpunkte)",uhr:"#clock",zusatz:"noch N im Rennen (x.raus)",
       spieler:"wertungVon(disc)",verlauf:"feed()",einblender:"feed(big): ausgeschieden"})
   };
@@ -61087,7 +61385,9 @@
 
   function hudProfil(){
     const p=HUD_PROFIL[disc];
-    return (hudSysAn&&p&&p.status==="fertig")?p:null;
+    // `nurWenn` (Climbing, 18.11.): ein Profil, das nur fuer EIN Format einer Disziplin gilt (Canyon) -- im
+    // anderen Format behaelt die Disziplin ihr altes HUD.
+    return (hudSysAn&&p&&p.status==="fertig"&&(!p.nurWenn||p.nurWenn()))?p:null;
   }
   function hudErsetzt(teil){ const p=hudProfil(); return !!(p&&p.ersetzt.includes(teil)&&document.getElementById("hudKopf")); }
   function hudSeitenName(s){ return (VEREIN[s]&&VEREIN[s].name)||(s===0?"Heim":"Gast"); }
@@ -61194,6 +61494,7 @@
     return per.replace(". Drittel","D")+" "+m[2];
   }
   function hudVerlaufNachfuehren(p){
+    if(p.verlaufNachfuehren){ p.verlaufNachfuehren(p); return; }   // eigene Ereignisquelle (Climbing: CANYON.ereignisse)
     if(hudZuegeRef!==fsZuege||fsZeiger<hudZuegeGesehen){
       hudZuegeRef=fsZuege; hudZuegeGesehen=0; hudVerlauf.length=0; hudVerlaufSig="";
     }
@@ -61260,7 +61561,7 @@
     if(sig!==hudKopfSig){ hudKopfSig=sig; kopf.innerHTML=hudKopfSkelett(p); hudLetzterStand=[null,null]; }
     const d=p.daten, stand=d.stand();
     for(const s of [0,1]){
-      const v=String(stand[s]||0);
+      const v=d.standText?d.standText(stand[s]):String(stand[s]||0);
       hudText(kopf,"stand"+s,v);
       if(hudLetzterStand[s]!=null&&hudLetzterStand[s]!==v){
         const e=hudFeld(kopf,"stand"+s);
@@ -61274,7 +61575,7 @@
     hudText(kopf,"per",uhr.per); hudText(kopf,"uhr",uhr.uhr);
     // Unterzeile: Format aus den GEBAUTEN Kadern (statt der Planzeile, die vor dem Kaderbau "0 gegen 0" las).
     const n0=istFeldspiel(disc)?FSTEAM[0].length:0, n1=istFeldspiel(disc)?FSTEAM[1].length:0;
-    hudText(kopf,"discsub",(n0&&n1?n0+" gegen "+n1+" · ":"")+(done?"Endstand":running?"live":"bereit"));
+    hudText(kopf,"discsub",d.sub?d.sub():(n0&&n1?n0+" gegen "+n1+" · ":"")+(done?"Endstand":running?"live":"bereit"));
     const zus=d.zusatz?d.zusatz():null;
     hudText(kopf,"zusatz",zus?zus.txt:"");
     hudKlasse(kopf,"zusatz","leer",!zus);
@@ -61295,7 +61596,7 @@
       if(e.hidden===!!st)e.hidden=!st;
       if(st){ hudText(kopf,"stat"+s,st.txt); if(e.title!==(st.titel||""))e.title=st.titel||""; }
     }
-    const mom=hudMomentum(p);
+    const mom=d.momentum?d.momentum():hudMomentum(p);
     const balken=hudFeld(kopf,"momBalken");
     if(balken){
       const w=Math.round(Math.abs(mom.anteil)*50);
@@ -61332,6 +61633,8 @@
       +block(1);
   }
   function hudDockTick(p,dock){
+    if(p.dock){ p.dock(p,dock); hudVerlaufListeTick(dock); return; }   // eigenes Dock (Climbing: Seilschaft-Kaesten)
+    if(dock.classList.contains("hud-dock-canyon"))dock.classList.remove("hud-dock-canyon");
     const {w,zeilen}=hudZeilen();
     const sig=disc+"|"+zeilen.map(z=>z.side+":"+(z.u&&z.u.id)+":"+z.n).join(",");
     if(sig!==hudDockSig){ hudDockSig=sig; dock.innerHTML=hudDockSkelett(p,w,zeilen); hudVerlaufSig=""; }
@@ -61362,7 +61665,10 @@
       hudKlasse(dock,"l"+id,"hatball",traegerId!=null&&traegerId===id);
       hudKlasse(dock,"l"+id,"sel",hudKarteId===id);
     }
-    // Spielverlauf, neueste Zeile oben.
+    hudVerlaufListeTick(dock);
+  }
+  // Spielverlauf, neueste Zeile oben (gemeinsam fuer jedes Dock).
+  function hudVerlaufListeTick(dock){
     const liste=hudFeld(dock,"vliste");
     if(liste){
       const rows=hudVerlauf.filter(r=>hudVerlaufFilter==="alle"||r.kat===hudVerlaufFilter);
@@ -61374,7 +61680,7 @@
         liste.innerHTML=rows.slice(-30).reverse().map((r,k)=>"<li class=\""+(r.seite===0?"h":"a")+(r.gross?" gross":"")
           +(k===0&&neu?" neu":"")+"\" data-kat=\""+r.kat+"\"><span class=\"hud-vz t\">"+lsEsc(r.uhr)+"</span>"
           +"<span class=\"hud-vart\">"+lsEsc(r.label)+"</span>"
-          +"<span class=\"hud-vtx\">"+lsEsc(r.text)+"</span><span class=\"hud-vstand t\">"+(r.art==="treffer"?lsEsc(r.stand):"")+"</span></li>").join("")
+          +"<span class=\"hud-vtx\">"+lsEsc(r.text)+"</span><span class=\"hud-vstand t\">"+((r.art==="treffer"||r.zeigeStand)?lsEsc(r.stand):"")+"</span></li>").join("")
           ||"<li class=\"leer\"><span class=\"hud-vtx\">Noch keine Ereignisse"+(hudVerlaufFilter==="alle"?"":" in diesem Filter")+".</span></li>";
       }
     }
@@ -61383,6 +61689,7 @@
   // ---------- Spielerkarte ---------------------------------------------------------------------
   function hudKarteOeffnen(id){
     hudKarteId=(id==null||id===hudKarteId)?null:id; hudKarteSig="";
+    { const p=hudProfil(); if(p&&p.kamera)p.kamera.karte(hudKarteId); }
     const k=document.getElementById("hudKarte"), p=hudProfil();
     if(p&&k)hudKarteTick(p,k);
     const dock=document.getElementById("hudDock");
@@ -61394,10 +61701,12 @@
     if(!ids.length)return;
     const i=ids.indexOf(hudKarteId);
     hudKarteId=ids[(i<0?0:(i+r+ids.length)%ids.length)]; hudKarteSig="";
+    { const p=hudProfil(); if(p&&p.kamera)p.kamera.karte(hudKarteId); }
     const k=document.getElementById("hudKarte"), p=hudProfil(); if(p&&k)hudKarteTick(p,k);
   }
   function hudKarteTick(p,karte){
     if(hudKarteId==null){ if(!karte.hidden){ karte.hidden=true; karte.innerHTML=""; } hudKarteSig=""; return; }
+    if(p.karte){ p.karte(p,karte); return; }   // eigene Karte (Climbing: Profilwerte, Weg, Zwischenzeiten)
     const {w,zeilen}=hudZeilen();
     const z=zeilen.find(x=>x.u&&x.u.id===hudKarteId);
     if(!z){ hudKarteId=null; karte.hidden=true; return; }
@@ -61452,15 +61761,16 @@
       const z=fsZuege[i];
       if(z.art==="treffer"&&z.seite===o.seite&&z.spieler){ wer=z.spieler; pkt=z.punkte; if(i>=o.abIdx)break; }
     }
+    if(!wer&&p.daten.einblenderWer){ if(o.wer===undefined)o.wer=p.daten.einblenderWer(o)||null; wer=o.wer; }
     let statZeile="";
-    if(wer&&p.daten.einblenderStat)statZeile=p.daten.einblenderStat(wer)||"";
+    if(wer&&p.daten.einblenderStat)statZeile=p.daten.einblenderStat(wer,o)||"";
     const sig=o.nr+"|"+(wer?wer.id:"")+"|"+statZeile;
     if(sig===o.gezeichnet)return;
     const neu=!o.gezeichnet||o.gezeichnet.split("|")[0]!==String(o.nr);
     o.gezeichnet=sig;
     e.className="hud-einblender "+(o.seite===0?"h":"a");
     e.innerHTML="<div class=\"hud-eb\">"+(wer?hudPortraitHtml(wer.n,"hud-por eb"):"")
-      +"<span class=\"hud-ewort\">"+lsEsc(o.titel?o.titel+"!":"")+"</span>"
+      +"<span class=\"hud-ewort\">"+lsEsc(o.titel?String(o.titel).replace(/!+$/,"")+"!":"")+"</span>"
       +"<span class=\"hud-etxt\"><b>"+lsEsc(wer?wer.n:hudSeitenName(o.seite))+"</b>"
       +"<span>"+lsEsc(statZeile||satzOhneTitel(o.txt,o.titel)||o.txt)+"</span></span>"
       +(pkt&&wer?"<span class=\"hud-eplus t\">+"+pkt+"</span>":"")+"</div>";
@@ -61473,7 +61783,8 @@
   function hudBedienTick(bed){
     const play=document.getElementById("play"), spd=document.getElementById("spd");
     const ls=lsModus==="band"?"Band":lsModus==="tafel"?"Tafel":"aus";
-    const sig=(play?play.textContent:"")+"|"+(spd?spd.textContent:"")+"|"+ls+"|"+hudVerlaufFilter;
+    const p=hudProfil(), kam=p&&p.kamera?p.kamera.text():null;
+    const sig=(play?play.textContent:"")+"|"+(spd?spd.textContent:"")+"|"+ls+"|"+hudVerlaufFilter+"|"+kam;
     if(sig===hudBedienSig)return;
     hudBedienSig=sig;
     bed.innerHTML="<button type=\"button\" class=\"hud-tb prim\" data-hud-aktion=\"play\" data-tip=\"Start / Pause (Leertaste)\">"
@@ -61481,7 +61792,10 @@
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"tempo\" data-tip=\"Tempo umschalten (T)\">"+lsEsc(spd?spd.textContent.replace("Tempo ",""):"1×")+"<kbd>T</kbd></button>"
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"stand\" aria-pressed=\""+(ls!=="aus")+"\" data-tip=\"Live-Stand: Band → Tafel → aus (L)\">Stand: "+ls+"<kbd>L</kbd></button>"
       +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"karte\" data-tip=\"Spielerkarte öffnen und durchschalten (← →), schließen mit Esc\">Spieler<kbd>←→</kbd></button>"
-      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"filter\" data-tip=\"Spielverlauf-Filter durchschalten (F)\">Filter<kbd>F</kbd></button>";
+      +"<button type=\"button\" class=\"hud-tb\" data-hud-aktion=\"filter\" data-tip=\"Spielverlauf-Filter durchschalten (F)\">Filter<kbd>F</kbd></button>"
+      // KAMERA (Climbing, 18.11.): Regie -> Totale -> Folgen, nur wenn das Profil Kamera-Modi kennt.
+      +(kam?"<button type=\"button\" class=\"hud-tb"+(p.kamera.modus()!=="regie"?" an":"")+"\" data-hud-aktion=\"kamera\" aria-pressed=\""+(p.kamera.modus()!=="regie")
+        +"\" data-tip=\"Kamera: Regie → Totale → Folgen (K). Folgen: Klick auf eine Spielerleiste\">Kamera: "+lsEsc(kam)+"<kbd>K</kbd></button>":"");
   }
   function hudAktion(a){
     if(a==="play"){ const b=document.getElementById("play"); if(b)b.click(); }
@@ -61492,6 +61806,8 @@
     else if(a==="nach")hudKarteSchritt(1);
     else if(a==="zu")hudKarteOeffnen(null);
     else if(a==="doppeln"){ if(hudKarteId!=null)fokusUmschalten(hudKarteId); hudKarteSig=""; }
+    else if(a==="kamera"){ const p=hudProfil(); if(p&&p.kamera)p.kamera.weiter(); }
+    else if(a==="folgen"){ const p=hudProfil(); if(p&&p.kamera)p.kamera.folgen(hudKarteId); hudKarteSig=""; }
     else if(a==="filter"){
       const p=hudProfil(); if(!p)return;
       const ids=p.verlaufFilter.map(f=>f[0]);
@@ -61514,6 +61830,7 @@
     if(k===" "){ if(tag==="BUTTON"||ev.repeat)return; ev.preventDefault(); hudAktion("play"); }
     else if((k==="t"||k==="T")&&!ev.repeat){ ev.preventDefault(); hudAktion("tempo"); }
     else if((k==="f"||k==="F")&&!ev.repeat){ ev.preventDefault(); hudAktion("filter"); }
+    else if((k==="k"||k==="K")&&!ev.repeat&&hudProfil().kamera){ ev.preventDefault(); hudAktion("kamera"); }
     else if(k==="ArrowLeft"){ ev.preventDefault(); hudKarteSchritt(-1); }
     else if(k==="ArrowRight"){ ev.preventDefault(); hudKarteSchritt(1); }
     else if(k==="Escape"&&hudKarteId!=null){ ev.preventDefault(); hudKarteOeffnen(null); }
@@ -70277,6 +70594,11 @@
     },
     // Was gezeichnet wird: je Kletterer der gebuchte Ort (Motor-Welt), derselbe Ort im Wandbild (Ankertabelle),
     // die gezeichnete Position (mit Ruck/Pendeln) und der Fortschritt.
+    // KAMERA-MODI DES CANYON (Canyon live, 18.11., reine Anzeige): ("regie"|"totale"|"folgen", id?) setzt,
+    // ohne Argument nur lesen. Fuer Screenshots und Tests; im Spiel ueber die Bedienleiste (K) und die Dock-Leisten.
+    canyonKamera:(modus,id)=>modus===undefined?{...canyonKam}:canyonKamSetzen(modus,id),
+    // Was das Canyon-HUD zeigt und was gebucht ist (tests/hud-system-climbing.test.ts).
+    canyonHudProbe:()=>canyonHudProbe(),
     canyonFigurenProbe:()=>{
       if(!bahnCanyonAktiv||!CANYON)return null;
       return {rennT, laeufer:LAEUFER.map(u=>{ const K=CANYON.K.get(u.id), p=canyonSicht(K,0);

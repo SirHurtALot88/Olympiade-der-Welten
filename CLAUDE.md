@@ -683,7 +683,10 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
-18.11. (Climbing „Ende erst, wenn alle oben sind“): **GESAMT d3a39030a3ef (75 Eintraege)** — absichtlich bewegt, weil
+18.11. (Canyon live): **GESAMT eaafed96150e (75 Eintraege)** — absichtlich bewegt, weil Climbing seit Chris' „Ja, Canyon
+soll live gehen“ im Format Canyon laeuft (`docs/design/climbing-canyon-live-18-11.md`); gegenueber `d3a39030a3ef` bewegen
+sich NUR die drei `spiele climbing`-Zeilen (1/7/42, jetzt die frueheren `spiele climbing/canyon`-Zeilen aus #1633). HUD-Profil
+und Kamera-Modi derselben PR sind reine Anzeige. Davor: **GESAMT d3a39030a3ef** (Climbing „Ende erst, wenn alle oben sind“) — absichtlich bewegt, weil
 Climbing kein Lead-Zeitlimit mehr hat (Chris 18.11.: „Ende bitte erst wenn ALLE im Ziel sind“; Sicherheitsdeckel 60 Sim-s
 mit hochgerechneter Zeit, `docs/design/arena-start-ende-figuren-18-11.md`); gegenueber `ce8fcef66028` bewegen sich NUR die
 drei `spiele climbing`-Zeilen (1/7/42). Die Anzeige-Commits derselben PR (kein Stand vor dem Start, Vorstellung im Pod,
@@ -704,11 +707,17 @@ Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer 
 modulweiten Arrays halten (Muster: Render-Interpolation `viSchnappschussKF`). Absichtliche Wertungs-
 aenderung: neue Zahl hier und in `data/generated/` festhalten.
 
-**Climbing-Format „Canyon“ (18.11., Schalter `climbingFormat`, im Spiel AUS):** das Skript gibt danach drei eigene
-Zeilen `spiele climbing/canyon 1/7/42` und eine eigene Summe `CANYON …` aus — **nicht in GESAMT**, GESAMT bleibt der
-Abgleich des Standards. Canyon-Stand: `CANYON a3ffa010b879` (Saaten 1/7/42). `node scripts/pruefe-wertung-fingerabdruck.mjs --node`
-rechnet denselben Abgleich ueber den Node-Motor (ohne Chromium, ohne Aufnahme-Sperre). Details:
-`docs/design/climbing-canyon-bau-18-11.md`.
+**Climbing-Format „Canyon“ ist LIVE (18.11., Motor-Vorgabe `climbingFormat:"canyon"`):** GESAMT rechnet Climbing im
+Canyon. Das alte Format bleibt als Rueckweg geschuetzt: das Skript gibt nach GESAMT drei eigene Zeilen
+`spiele climbing/standard 1/7/42` und eine eigene Summe aus — **nicht in GESAMT**: `CLIMBING-STANDARD 164b3d846334`
+(Zeilen `58b9222c223b`/`b2b7c6e4bfbc`/`d26ad5352068`, die alten `spiele climbing`-Zeilen). Abschalt-Schalter
+`OLY_CLIMBING_FORMAT=standard` (deploy/hetzner/.env, compose reicht ihn an Container und Build-Arg
+`NEXT_PUBLIC_OLY_CLIMBING_FORMAT`): ab dem naechsten gewerteten Spieltag wieder das alte Format; gebuchte Spieltage
+behalten ihr Format (Wechselliste `seasonState.climbingFormat`, `lib/resolve/climbing-format.ts`). Das Format reist im
+Kader-Umschlag (`formatByDisciplineId.climbing`) zu Host, Chromium-Runner und Node-Motor (gezeigt = gebucht) und steht im
+Eingabe-Hash des Vorlaufs. `node scripts/pruefe-wertung-fingerabdruck.mjs --node` rechnet denselben Abgleich ueber den
+Node-Motor (ohne Chromium, ohne Aufnahme-Sperre); `scripts/miss-alle-disziplinen.mjs --node` ebenso fuer rho. Details:
+`docs/design/climbing-canyon-live-18-11.md`, `docs/design/climbing-canyon-bau-18-11.md`.
 
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
