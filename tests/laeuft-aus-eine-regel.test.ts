@@ -56,7 +56,13 @@ describe("Kein Anzeigeort rechnet die Auslauf-Schwelle selbst", () => {
       expect(inhalt, `${datei} importiert die gemeinsame Regel nicht`).toContain(
         "@/lib/contracts/vertragslaufzeit",
       );
-      expect(inhalt, `${datei} ruft \`vertragLaeuftAus\` nicht auf`).toContain("vertragLaeuftAus(");
+      // Beide Fragen kommen aus derselben gemeinsamen Regel: `vertragLaeuftAus` (Countdown) oder
+      // `laeuftMitDieserSaisonAus` (Endsaison; vor und nach der Alterung gleich, s. Abnahme 19.11. F7).
+      // Verboten bleibt nur die eigene Schwelle (Pruefung unten).
+      expect(
+        /\b(vertragLaeuftAus|laeuftMitDieserSaisonAus)\(/.test(inhalt),
+        `${datei} ruft weder \`vertragLaeuftAus\` noch \`laeuftMitDieserSaisonAus\` auf`,
+      ).toBe(true);
 
       const treffer = inhalt
         .split("\n")
