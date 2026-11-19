@@ -74,6 +74,8 @@
 .spr-slot .spr-zst { display: inline-flex; align-items: center; gap: 0.3em; font-weight: 700; font-size: 1.05em; }
 .spr-slot .spr-kn { height: 2em; padding: 0 0.9em; border: 1px solid var(--bc-linie-2); border-radius: 0.4em; font-size: 0.9em; font-weight: 600; color: var(--bc-tinte); display: inline-flex; align-items: center; }
 .spr-marke { font-size: 0.72em; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; padding: 0.15em 0.55em; border-radius: 0.2em; background: rgba(242, 160, 61, 0.18); color: var(--bc-heim); border: 1px solid rgba(242, 160, 61, 0.5); white-space: nowrap; }
+.spr-slot .spr-kopf__zustand { min-width: 0; }
+.spr-marke--band { letter-spacing: 0.04em; font-size: 0.64em; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .spr-marke.is-rot { background: rgba(255, 96, 88, 0.16); color: var(--bc-warn); border-color: rgba(255, 96, 88, 0.55); }
 .spr-marke.is-gruen { background: rgba(98, 211, 148, 0.14); color: var(--bc-gut); border-color: rgba(98, 211, 148, 0.5); }
 .spr-marke.is-grau { background: none; color: var(--bc-leise); border-color: var(--bc-linie-2); }
