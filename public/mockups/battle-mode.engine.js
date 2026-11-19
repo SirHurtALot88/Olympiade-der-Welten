@@ -61366,9 +61366,9 @@
         einblenderStat:(u,o)=>canyonHudEinblenderStat(u,o)
       },
       zusatzTitel:"Wartende an der Wand · längste Wartezeit am Stück",zusatzText:true,
-      verlaufNachfuehren:(p)=>canyonHudVerlauf(p),
-      dock:(p,dock)=>canyonHudDock(p,dock),
-      karte:(p,karte)=>canyonHudKarte(p,karte),
+      eigenerVerlauf:(p)=>canyonHudVerlauf(p),
+      eigenesDock:(p,dock)=>canyonHudDock(p,dock),
+      eigeneKarte:(p,karte)=>canyonHudKarte(p,karte),
       kamera:{modus:()=>canyonKam.modus, text:()=>canyonKamText(), weiter:()=>canyonKamWeiter(),
         karte:(id)=>canyonKamKarte(id), folgen:(id)=>canyonKamSetzen("folgen",id)},
       verlaufFilter:[["alle","Alle"],["kampf","Rangeln"],["hilfe","Seilschaft"],["weg","Wege"],["glocke","Glocke"]],
@@ -61497,7 +61497,7 @@
     return per.replace(". Drittel","D")+" "+m[2];
   }
   function hudVerlaufNachfuehren(p){
-    if(p.verlaufNachfuehren){ p.verlaufNachfuehren(p); return; }   // eigene Ereignisquelle (Climbing: CANYON.ereignisse)
+    if(p.eigenerVerlauf){ p.eigenerVerlauf(p); return; }   // eigene Ereignisquelle (Climbing: CANYON.ereignisse)
     if(hudZuegeRef!==fsZuege||fsZeiger<hudZuegeGesehen){
       hudZuegeRef=fsZuege; hudZuegeGesehen=0; hudVerlauf.length=0; hudVerlaufSig="";
     }
@@ -61636,7 +61636,7 @@
       +block(1);
   }
   function hudDockTick(p,dock){
-    if(p.dock){ p.dock(p,dock); hudVerlaufListeTick(dock); return; }   // eigenes Dock (Climbing: Seilschaft-Kaesten)
+    if(p.eigenesDock){ p.eigenesDock(p,dock); hudVerlaufListeTick(dock); return; }   // eigenes Dock (Climbing: Seilschaft-Kaesten)
     if(dock.classList.contains("hud-dock-canyon"))dock.classList.remove("hud-dock-canyon");
     const {w,zeilen}=hudZeilen();
     const sig=disc+"|"+zeilen.map(z=>z.side+":"+(z.u&&z.u.id)+":"+z.n).join(",");
@@ -61709,7 +61709,7 @@
   }
   function hudKarteTick(p,karte){
     if(hudKarteId==null){ if(!karte.hidden){ karte.hidden=true; karte.innerHTML=""; } hudKarteSig=""; return; }
-    if(p.karte){ p.karte(p,karte); return; }   // eigene Karte (Climbing: Profilwerte, Weg, Zwischenzeiten)
+    if(p.eigeneKarte){ p.eigeneKarte(p,karte); return; }   // eigene Karte (Climbing: Profilwerte, Weg, Zwischenzeiten)
     const {w,zeilen}=hudZeilen();
     const z=zeilen.find(x=>x.u&&x.u.id===hudKarteId);
     if(!z){ hudKarteId=null; karte.hidden=true; return; }

@@ -176,11 +176,11 @@ describe.skipIf(!chromiumVerfuegbar())("HUD-System Welle 1 (Arena-Motor, Chromiu
     await browser?.close();
   });
 
-  it("Profile: Basketball, Hockey und Football fertig, die anderen 17 Disziplinen als Skelett", async () => {
+  it("Profile: Basketball, Hockey, Football und Climbing (Canyon live, 18.11.) fertig, die anderen 16 Disziplinen als Skelett", async () => {
     const p = await seite.evaluate(() => (window.__arena.hudProbe() as Probe).profile);
-    for (const d of ["basketball", "hockey", "football"]) expect(p[d], d).toBe("fertig");
+    for (const d of ["basketball", "hockey", "football", "climbing"]) expect(p[d], d).toBe("fertig");
     const skelett = Object.entries(p).filter(([, v]) => v === "skelett").map(([k]) => k);
-    expect(skelett.length).toBe(17);
+    expect(skelett.length).toBe(16);
   });
 
   for (const disc of ["hockey", "football"] as const) {
