@@ -181,8 +181,9 @@ describe("Aufstellung -> Arena nimmt die Kadergroesse mit", () => {
 
   it("2 Spieler: Index 0/1 sind Siege Core und Morale Anchor (nicht Commander/Spotter)", () => {
     const aufstellung = buildArenaAufstellung(spielstand([{ slotIndex: 0, playerId: "a" }, { slotIndex: 1, playerId: "b" }]), "t1", "md-1");
-    expect(aufstellung["Name a"]).toEqual({ d: "battlefield", slot: "siegecore" });
-    expect(aufstellung["Name b"]).toEqual({ d: "battlefield", slot: "moraleanchor" });
+    // Seit 18.11. traegt jeder Battlefield-Eintrag die gespielte Formkarte (ohne Karte: form 0 / normal).
+    expect(aufstellung["Name a"]).toEqual({ d: "battlefield", slot: "siegecore", form: 0, intensitaet: "normal" });
+    expect(aufstellung["Name b"]).toEqual({ d: "battlefield", slot: "moraleanchor", form: 0, intensitaet: "normal" });
   });
 
   it("6 Spieler: derselbe Index 1 ist Field Control, Index 5 Morale Anchor", () => {

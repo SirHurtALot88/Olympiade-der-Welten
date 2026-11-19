@@ -163,6 +163,9 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.battlefieldPodSonde, null, { timeout: 60000 });
+  // P4 (18.11.): OLY_FORM_MODUS=echt misst mit einem Einsatzlisten-Szenario je Pod-Team statt der Ersatzkarte
+  // (mdffaFormkartenFuer() in battle-mode.engine.js). Ohne die Variable unveraendert.
+  if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   if (FORMAT) await seite.evaluate((f) => window.__arena.battlefieldFormat(f), FORMAT);
   if (!NUR_PP) for (const js of JE_SEITE) {
     for (const versatz of STROEME) {

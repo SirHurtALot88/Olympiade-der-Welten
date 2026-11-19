@@ -462,6 +462,35 @@ export function toBattleArenaOrganicMutatorResult<
 }
 
 /**
+ * MUTATOR = FORM (Battle-Modus, 18.11., `lib/battle/battle-mutator-organisch.ts`): legt den Formschub der
+ * Mutator-Treffer (`mutatorFormJeSpieler`) in DENSELBEN Kanal wie die Formkarten — `formByPlayerId[id].summe`
+ * (Feld `mutator`), Team-Summe `formModifier`, Mittel `formPerPlayer`. Ohne Treffer kommt `form` unveraendert
+ * zurueck. Bei der alten Farbregel (`formByPlayerId === null`) entsteht die Je-Spieler-Tabelle aus dem
+ * Seitenwert `formPerPlayer`, damit der Schub beim richtigen Spieler landet.
+ */
+export function mitMutatorForm<
+  F extends { formByPlayerId: Record<string, FormkartenZerlegung> | null; formModifier: number; formPerPlayer: number },
+>(form: F, playerIds: readonly string[], formJeSpieler: Record<string, number>): F {
+  const getroffen = playerIds.filter((id) => (formJeSpieler[id] ?? 0) !== 0);
+  if (getroffen.length === 0 || playerIds.length === 0) return form;
+  const r1 = (x: number) => Number(x.toFixed(1));
+  const basis: Record<string, FormkartenZerlegung> =
+    form.formByPlayerId ??
+    Object.fromEntries(
+      playerIds.map((id) => [id, { alle: form.formPerPlayer, traeger: 0, form: 0, summe: form.formPerPlayer, istTraeger: false }]),
+    );
+  const formByPlayerId: Record<string, FormkartenZerlegung> = {};
+  let summe = 0;
+  for (const id of playerIds) {
+    const z = basis[id] ?? { alle: 0, traeger: 0, form: 0, summe: 0, istTraeger: false };
+    const m = formJeSpieler[id] ?? 0;
+    formByPlayerId[id] = m !== 0 ? { ...z, mutator: r1(m), summe: r1(z.summe + m) } : z;
+    summe += formByPlayerId[id]!.summe;
+  }
+  return { ...form, formByPlayerId, formModifier: r1(summe), formPerPlayer: r1(summe / playerIds.length) };
+}
+
+/**
  * PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): eine Battle-Seite,
  * die ueber das PPS-Duell gewertet wird (kein Arena-Ergebnis, aber ein Fixture), behaelt den
  * Score-Anteil des Mutators (+Score — er entscheidet das Duell mit, es gibt keine Simulation, in die
@@ -1335,6 +1364,13 @@ export function calculateMvpForcedMutatorModifierForSide(input: {
 
 export function getPlayerClassColor(player: Player): FormCardColor | null {
   return CLASS_COLOR_MAP[player.className] ?? null;
+}
+
+/** Die Klassen einer Kartenfarbe (fuer den Hinweis "Farbbonus nur fuer ..."), in fester Reihenfolge. */
+export function getClassNamesForFormCardColor(color: string | null | undefined): string[] {
+  return Object.entries(CLASS_COLOR_MAP)
+    .filter(([, farbe]) => farbe === color)
+    .map(([klasse]) => klasse);
 }
 
 export function getFormCardColorForDisciplineCategory(category: string | null | undefined): FormCardColor | null {

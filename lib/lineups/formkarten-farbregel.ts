@@ -58,6 +58,11 @@ export type FormkartenZerlegung = {
   form: number;
   summe: number;
   istTraeger: boolean;
+  /**
+   * Battle-Modus (18.11., `lib/battle/battle-mutator-organisch.ts`): Formschub aus Mutator-Treffern, der ueber
+   * denselben Kanal laeuft. Steckt dann bereits in `summe`; fehlt, solange kein Mutator getroffen hat.
+   */
+  mutator?: number;
 };
 
 /** Eine Karte für EINEN Spieler, in die drei Teile der Marke zerlegt (Quelle der Wahrheit). */

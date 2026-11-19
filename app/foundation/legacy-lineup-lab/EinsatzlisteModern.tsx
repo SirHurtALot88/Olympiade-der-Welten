@@ -919,7 +919,7 @@ export default function EinsatzlisteModern(props: Props) {
               {(() => {
                 const z = kartenFuerSpieler(seite, karte?.id);
                 const w = kartenWirkungJeSeite[seite];
-                return z && w?.buchung.gebucht ? <KartenMarke alle={z.alle} traeger={z.traeger} form={z.form} farbe={w.karten[0]?.farbe ?? null} /> : null;
+                return z && w?.buchung.gebucht ? <KartenMarke alle={z.alle} traeger={z.traeger} form={z.form} farbe={w.karten[0]?.farbe ?? null} grund={w.spieler.find((s) => s.playerId === karte?.id)?.farbGrund} /> : null;
               })()}
               {risiko ? <span className={risiko.riskPercent >= 8 ? "bc-minus" : "bc-null"} title="Verletzungsrisiko dieses Einsatzes" style={{ fontSize: 12, fontWeight: 700 }}>{f1(risiko.riskPercent)}%</span> : null}
             </span>
@@ -1052,7 +1052,8 @@ export default function EinsatzlisteModern(props: Props) {
         const w = slotSeite ? kartenWirkungJeSeite[slotSeite] : null;
         const pid = rosterCardByActivePlayerId.get(z.id)?.id;
         const zer = slotSeite && pid ? kartenFuerSpieler(slotSeite, pid) : null;
-        const gebucht = zer && w?.buchung.gebucht ? ` Im Einsatz bekommt er ${vz(zer.summe)} durch Karten.` : "";
+        const grund = w?.spieler.find((s) => s.playerId === pid)?.farbGrund;
+        const gebucht = zer && w?.buchung.gebucht ? ` Im Einsatz bekommt er ${vz(zer.summe)} durch Karten${grund ? ` (${grund})` : ""}.` : "";
         if (!kk) return <span className="fm-leise" title={`Trägt keine Karte.${gebucht}`}>–</span>;
         return (
           <span

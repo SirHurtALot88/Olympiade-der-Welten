@@ -3,12 +3,13 @@
  *
  * Haelt fest:
  *   1. Fuer eine freigeschaltete Disziplin (FORMKARTEN_ECHT_DISCIPLINE_IDS: time-trial, Pilot
- *      11.11.; spurt, Welle 1 erste Disziplin, 14.11.) traegt der Aufstellungseintrag die
+ *      11.11.; spurt, Welle 1 erste Disziplin, 14.11.; seit 18.11. jede motor-gebuchte Disziplin,
+ *      s. tests/formkarten-alle-disziplinen.test.ts) traegt der Aufstellungseintrag die
  *      GESPIELTE Form (Kartenwerte, x2 bei Farbgleichheit, wie
  *      `calculateFormModifierForSide`) und die Intensitaet der Seite.
  *   2. "Plan schlaegt Entwurf" gilt auch hier (dieselbe Funktion wie die Wertung).
- *   3. Jede NICHT freigeschaltete Disziplin bekommt die Felder nicht — der Eintrag bleibt exakt
- *      `{d, slot}`, der Motor faellt auf die Ersatzkarte zurueck (bit-identisch).
+ *   3. Eine NICHT freigeschaltete Disziplin bekaeme die Felder nicht (Eintrag exakt `{d, slot}`) — seit
+ *      18.11. steht aber jede der zwanzig in der Menge (alle sind im Battle-Modus motor-gebucht).
  *   4. Der Motor liest die Werte an genau einer Stelle (`breitPunkteVon`) in jeder Baufunktion,
  *      die `formVon(p.n)+stufenWert()` verwendet; der alte Ausdruck steht nur noch als Rueckfall
  *      im Helfer. Beim Merge mit main (14.11.) kam `tdmKaempfer()` (TDM-Gefecht, PR #1387, nach
@@ -147,18 +148,9 @@ describe("P4: echte Formkarte im Aufstellungs-Rohr (alte Regel, OLY_FORMKARTEN_F
     expect(a["Name a"]).toMatchObject({ form: 8 });
   });
 
-  it("nicht freigeschaltete Disziplin (climbing): Eintrag bleibt exakt {d, slot}", () => {
-    const a = buildArenaAufstellung(
-      spielstand({
-        disciplineId: "climbing",
-        category: "speed",
-        modifiers: { d1: { primaryFormCardId: "fc-a-pos", intensity: "push" } },
-      }),
-      "t1",
-      "md-1",
-    );
-    for (const eintrag of Object.values(a)) {
-      expect(Object.keys(eintrag).sort()).toEqual(["d", "slot"]);
+  it("seit 18.11. liest jede der zwanzig Disziplinen die gespielte Karte (alle sind im Battle-Modus motor-gebucht)", () => {
+    for (const d of ["climbing", "football", "hockey", "battlefield", "mini-dm"]) {
+      expect(FORMKARTEN_ECHT_DISCIPLINE_IDS.has(d)).toBe(true);
     }
   });
 });

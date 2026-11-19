@@ -53,6 +53,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
           <span className="elm-hand__summe" data-testid="fm-leiste-team" title="Summe der gelegten Karten fürs Team in dieser Wertung">
             Karten fürs Team <strong className="bc-t">{vz(w.teamSumme, 1)}</strong>
             <small>alle {vz(alle, 1)} · Farbe {vz(farbe, 1)} · Form {vz(form, 1)} · + Tagesform ±{w.tagesformSpanne} je Spieler</small>
+            {w.farbHinweis ? <small data-testid="elm-farbhinweis">{w.farbHinweis}</small> : null}
           </span>
         ) : (
           <span className="elm-hand__summe" data-testid="fm-leiste-team" title={w.buchung.grund ?? undefined}>
@@ -76,7 +77,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
                 disabled={gesperrt || wartet || !waehlbar}
                 aria-pressed={nr != null}
                 data-testid={`elm-hka-${k.id}`}
-                title={`${FARB_NAME[k.farbe] ?? k.farbe} ${vz(k.wert)} von ${k.spielerName}: ${k.passt ? "passt zur Disziplin-Farbe" : "fremde Farbe, halber Wert"}. Im Team ${vz(k.teamSumme, 1)} Punkte${nr === "1" ? " (Primär)" : nr === "2" ? " (Sekundär)" : ""}. Klick legt oder nimmt zurück.`}
+                title={`${FARB_NAME[k.farbe] ?? k.farbe} ${vz(k.wert)} von ${k.spielerName}: ${k.passt ? "passt zur Disziplin-Farbe" : "fremde Farbe, halber Wert für alle"}; Farbbonus nur für Spieler, deren Klasse ${FARB_NAME[k.farbe] ?? k.farbe} ist. Im Team ${vz(k.teamSumme, 1)} Punkte${nr === "1" ? " (Primär)" : nr === "2" ? " (Sekundär)" : ""}. Klick legt oder nimmt zurück.`}
                 onClick={() => klick(k.id, k.wert)}
               >
                 <span className="elm-hka__fa">{FARB_NAME[k.farbe] ?? k.farbe}</span>

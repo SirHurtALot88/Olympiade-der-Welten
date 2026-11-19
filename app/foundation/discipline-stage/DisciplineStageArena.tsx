@@ -136,6 +136,7 @@ import { baueVorraumTeams } from "@/lib/foundation/battle-arena/arena-vorraum";
 import type { ArenaRegie } from "@/app/foundation/battle-arena/ArenaRegieleiste";
 import ArenaWechsel from "@/app/foundation/battle-arena/ArenaWechsel";
 import { isBattleModeSave } from "@/lib/season/game-mode";
+import { isMutatorAlsFormAktiv, MUTATOR_FORM_JE_TREFFER } from "@/lib/battle/battle-mutator-organisch";
 import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
@@ -1202,6 +1203,7 @@ export default function DisciplineStageArena({
     // `pp` ist der dem Spieler gutgeschriebene Player-Point-Anteil, `score` sein
     // Beitrag zum Team-Score (die Zahl, nach der die Arena animiert).
     const playersByTeam = new Map<string, { d1: MatchdayPanelPlayerRow[]; d2: MatchdayPanelPlayerRow[] }>();
+    const mutatorAlsFormHier = gameState != null && isBattleModeSave(gameState) && isMutatorAlsFormAktiv();
     for (const dp of preview.disciplinePreviews ?? []) {
       const side = dp.disciplineId === d1?.disciplineId ? "d1" : dp.disciplineId === d2?.disciplineId ? "d2" : null;
       if (!side) continue;
@@ -1228,6 +1230,8 @@ export default function DisciplineStageArena({
             pp: resolveAwardedPlayerPoints({ pointsAwarded: basePp, mutatorPpsBonus: mutatorPp }),
             score: e.finalPlayerScore ?? null,
             mutatorPp,
+            // MUTATOR = FORM (Battle-Modus, 18.11.): wo der Mutator getroffen hat, steht der Formschub am Spieler.
+            mutatorForm: mutatorAlsFormHier && (e.mutatorHits ?? 0) > 0 ? (e.mutatorHits ?? 0) * MUTATOR_FORM_JE_TREFFER : null,
             // Ligaweiter OVR-Rang fuer den Star-Tier-Rahmen des Chips. Quelle ist die
             // bereits vorhandene `ratingByPlayerId` — `buildPlayerRatingContractMap`
             // OHNE `playerIds`, sonst schrumpfte der Normalisierungs-/Rang-Pool auf die

@@ -228,7 +228,9 @@ export function buildArenaAufstellung(
     if (!slot) continue;
 
     aufstellung[name] = { d: eintrag.disciplineId, slot };
-    if (nutztEchteFormkarten(eintrag.disciplineId)) {
+    // Ohne gueltige Seite (alte/teilweise Staende, Messsonden) laesst sich keine Kartenwahl zuordnen:
+    // der Eintrag bleibt dann exakt das alte {d, slot} statt zu werfen.
+    if (nutztEchteFormkarten(eintrag.disciplineId) && (eintrag.disciplineSide === "d1" || eintrag.disciplineSide === "d2")) {
       const echt = echteFormDerSeite(eintrag.disciplineId, eintrag.disciplineSide);
       // Farbregel AN: Kartenwert je Spieler aus calculateFormModifierForSide (dieselbe Zahl wie Wertung
       // und Einsatzliste); AUS: der alte Seitenwert `echt.form`.

@@ -33,6 +33,8 @@ if (wert("rangeln") === "aus") param.rangeln = false;
 const familie = ladeKaderFamilieAusDatei(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json")).familie;
 const seite = await oeffneNodeSeite(path.join(WURZEL, "public/mockups"), STANDARD ? {} : { bahnFlags: { climbingFormat: "canyon" } });
 const gesetzt = STANDARD ? null : await seite.evaluate((p) => window.__arena.canyonParameter(p), param);
+// P4 (18.11.): OLY_FORM_MODUS=echt misst mit einem Einsatzlisten-Szenario je Seite statt der Ersatzkarte.
+if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
 
 const t0 = Date.now();
 const z = await disziplinMessen(seite, "climbing", { n: N, kaderFamilie: familie });

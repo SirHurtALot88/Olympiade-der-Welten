@@ -12,6 +12,7 @@ import {
   resolveEffectiveLineupModifiers,
   calculateMutatorModifierForSide,
   buildMatchdayMutatorTraitsBySide,
+  mitMutatorForm,
   toBattleArenaOrganicMutatorResult,
   toBattleDuellMutatorResult,
   getFormCardColorForDisciplineCategory,
@@ -23,6 +24,7 @@ import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-perf
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { isBattleModeSave } from "@/lib/season/game-mode";
+import { isMutatorAlsFormAktiv, mutatorFormJeSpieler } from "@/lib/battle/battle-mutator-organisch";
 import {
   baueFixtureIndex,
   berechneDuellVerhaeltnis,
@@ -542,7 +544,7 @@ export function buildLegacyMatchdayResolvePreview(
             slotRoleModifier,
             slotRoleModifierByPlayerId: slotRoleBreakdown.byPlayerId,
             ...(() => {
-          const formResult = calculateFormModifierForSide({
+          const kartenFormResult = calculateFormModifierForSide({
             // Plan schlaegt Entwurf: was im Auswahlfeld steht, wird auch gerechnet.
             modifiers: resolveEffectiveLineupModifiers({
               modifiers: draft?.modifiers,
@@ -594,11 +596,23 @@ export function buildLegacyMatchdayResolvePreview(
           // PPS-DUELL-BRUECKE: eine per PPS-Duell gewertete Battle-Seite behaelt den Score-Anteil des
           // Mutators, verliert aber den flachen PP-Nachschlag (sonst Zusatzpunkte neben 2/1/0 in der
           // Tabelle), s. `toBattleDuellMutatorResult()`.
-          const mutatorResult = arenaSimuliertDieseSeite
+          // MUTATOR = FORM (Battle-Modus, 18.11., lib/battle/battle-mutator-organisch.ts): KEIN Score- und kein
+          // PP-Aufschlag mehr auf irgendeiner Battle-Seite. Motor-Seiten tragen den Schub ohnehin im Motor;
+          // legacy-gewertete Battle-Seiten bekommen ihn als Form ueber denselben Kanal wie die Formkarten.
+          const mutatorAlsForm = isBattleModeArenaEligible && isMutatorAlsFormAktiv() && resolveOptions.modifierMode !== "mvp_forced_mutators";
+          const mutatorResult = arenaSimuliertDieseSeite || mutatorAlsForm
             ? toBattleArenaOrganicMutatorResult(rohMutatorResult)
             : istPpsDuellSeite(meta.disciplineId, context.team.id)
             ? toBattleDuellMutatorResult(rohMutatorResult)
             : rohMutatorResult;
+          const formResult =
+            mutatorAlsForm && !arenaSimuliertDieseSeite && context.mutatorSource?.effectStatus === "ready"
+              ? mitMutatorForm(
+                  kartenFormResult,
+                  sideEntries.map((entry) => entry.playerId),
+                  mutatorFormJeSpieler(rohMutatorResult.playerMutatorHits),
+                )
+              : kartenFormResult;
           const effectiveMutatorModifier =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
           const effectiveMutatorBonuses = context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
