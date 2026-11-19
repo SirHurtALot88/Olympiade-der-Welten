@@ -592,6 +592,9 @@ async function runTeamCycle(input: {
       });
       if (!buyResult.transferCreated || !buyResult.transferId) {
         warnings.push(...buyResult.blockingReasons.slice(0, 2));
+        // Fenster auf Opt: ein geplanter, aber abgelehnter Kauf ist eine Abweichung zwischen Plan und Ausfuehrung — mit Team und
+        // Grund ins Protokoll, damit „unter Opt“ nachvollziehbar bleibt.
+        warnings.push(`fenster_kauf_abgelehnt:${input.teamId}:${decision.playerId}:${buyResult.blockingReasons[0] ?? "?"}`);
         if (applyResult !== "applied") applyResult = "hold";
         input.excludeBuyPlayerIds.add(decision.playerId); // don't re-propose an unbuyable pick next cycle
         continue;
