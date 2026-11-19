@@ -4,6 +4,7 @@ import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import {
   ACHSEN,
   attributWerteAusDaten,
+  baueRangZeilen,
   berechneSpielerRaenge,
   bestimmeExperte,
   bestimmeVerletzung,
@@ -217,5 +218,63 @@ describe("Spielerprofil-Modell: Gehalt", () => {
   it("Gehalt je Spieltag ist das Jahresgehalt durch 20", () => {
     expect(gehaltJeSpieltag(40)).toBe(2);
     expect(gehaltJeSpieltag(null)).toBeNull();
+  });
+});
+
+describe("Spielerprofil-Modell: Rangzeilen der Experten-Karten", () => {
+  const ids = ["basketball"];
+
+  it("Spieler im Kader: Rang im Team und Rang in der Liga", () => {
+    const raenge = berechneSpielerRaenge(zustand(), "a2", ids, "t1");
+    const zeilen = baueRangZeilen(raenge.disziplinen.get("basketball"), raenge, false);
+    expect(zeilen).toEqual([
+      { wort: "im Kader", wert: "#2", gross: true },
+      { wort: "Liga", wert: "#3", gross: false },
+    ]);
+  });
+
+  it("Vertragsloser Spieler: „bei dir“ im Kader des Betrachters und „Alle“ unter allen Aktiven", () => {
+    const raenge = berechneSpielerRaenge(zustand(), "frei", ids, "t1");
+    expect(raenge.vertragslos).toBe(true);
+    const bb = raenge.disziplinen.get("basketball")!;
+    // 100 schlägt alle: Rang 1 im eigenen Kader (7 Spieler + er) und Rang 1 unter allen Aktiven.
+    expect(bb.beiDirRang).toBe(1);
+    expect(bb.beiDirVon).toBe(8);
+    expect(bb.freiAktivRang).toBe(1);
+    expect(baueRangZeilen(bb, raenge, false)).toEqual([
+      { wort: "bei dir", wert: "#1", gross: true },
+      { wort: "Alle", wert: "#1", gross: false },
+    ]);
+  });
+
+  it("Vertragsloser Spieler mitten im Feld: Rang zählt nur die Besseren", () => {
+    const state = zustand();
+    state.players.find((p) => p.id === "frei")!.currentDisciplineValues = { basketball: 72, hockey: 50 };
+    const bb = berechneSpielerRaenge(state, "frei", ids, "t1").disziplinen.get("basketball")!;
+    // Besser als 72: c1 99, b1 95, a1 90, a2 80 -> Rang 5 unter allen; im Kader t1 stehen a1 90, a2 80 davor -> Rang 3.
+    expect(bb.freiAktivRang).toBe(5);
+    expect(bb.beiDirRang).toBe(3);
+  });
+
+  it("ohne Betrachter-Team entfällt „bei dir“, ohne Wert entfällt alles (kein „#–“)", () => {
+    const raenge = berechneSpielerRaenge(zustand(), "frei", ids, null);
+    expect(baueRangZeilen(raenge.disziplinen.get("basketball"), raenge, false)).toEqual([{ wort: "Alle", wert: "#1", gross: false }]);
+    const state = zustand();
+    state.players.find((p) => p.id === "frei")!.currentDisciplineValues = {};
+    state.players.find((p) => p.id === "frei")!.disciplineRatings = {};
+    const leer = berechneSpielerRaenge(state, "frei", ids, "t1");
+    expect(baueRangZeilen(leer.disziplinen.get("basketball"), leer, false)).toEqual([]);
+    expect(baueRangZeilen(undefined, leer, false)).toEqual([]);
+  });
+
+  it("Nebel verrät keinen exakten Rang: Kader weg, Liga nur als Stufe", () => {
+    const raenge = berechneSpielerRaenge(zustand(), "a2", ids, "t1");
+    const zeilen = baueRangZeilen(raenge.disziplinen.get("basketball"), raenge, true);
+    expect(zeilen).toHaveLength(1);
+    expect(zeilen[0]!.wort).toBe("Liga");
+    expect(zeilen[0]!.wert).not.toMatch(/#/);
+    const frei = berechneSpielerRaenge(zustand(), "frei", ids, "t1");
+    const freiZeilen = baueRangZeilen(frei.disziplinen.get("basketball"), frei, true);
+    expect(freiZeilen.every((zeile) => !zeile.wert.includes("#"))).toBe(true);
   });
 });

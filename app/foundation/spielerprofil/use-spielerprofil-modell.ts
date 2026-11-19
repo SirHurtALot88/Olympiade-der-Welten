@@ -49,16 +49,17 @@ export type SpielerprofilModell = {
 export function useSpielerprofilModell(data: PlayerDetailDrawerData): SpielerprofilModell {
   const kontext = useFoundationStateOptional();
   const gameState = kontext?.gameState ?? null;
+  const betrachterTeamId = kontext?.activeManagerTeamId ?? null;
   return useMemo(() => {
     const nebel = hatNebel(data);
     const breite = nebelBreite(data);
     const verletzung = bestimmeVerletzung(data, gameState);
     const ids = data.disciplineValues.map((zeile) => zeile.id);
-    const raenge = gameState ? berechneSpielerRaenge(gameState, data.playerId, ids) : null;
+    const raenge = gameState ? berechneSpielerRaenge(gameState, data.playerId, ids, betrachterTeamId) : null;
     const ppReihe = gameState ? baueMatchdayPpReihe(gameState, data.playerId) : [];
     const form = gameState ? baueFormMoralAnzeige(gameState, data.playerId) : null;
     const moralGruende = gameState && !nebel ? moralUrsachen(gameState, data.playerId, data.teamId, 4) : [];
-    const experte = bestimmeExperte(data, 4);
+    const experte = bestimmeExperte(data, 6);
     const werte = attributWerteAusDaten(data);
     const beste = besteDisziplinId(data);
     const namen = new Map(data.disciplineValues.map((zeile) => [zeile.id, zeile.label] as const));
@@ -82,5 +83,5 @@ export function useSpielerprofilModell(data: PlayerDetailDrawerData): Spielerpro
       disziplinLabel: (id: string) => namen.get(id) ?? id,
       kaderIds,
     };
-  }, [data, gameState]);
+  }, [data, gameState, betrachterTeamId]);
 }
