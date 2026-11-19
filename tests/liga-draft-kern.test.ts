@@ -168,7 +168,9 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     expect(picks.length).toBe(startStand.teams.length - 1);
     for (const eintrag of picks) {
       expect(eintrag.quelle).toBe("ki");
+      // KI-Wahl (19.11.): Platz 1 bleibt der haeufigste, die KI darf aber auch Platz 2/3 nehmen — immer aus den Top 3.
       if (eintrag.grund == null) expect(eintrag.playerId).toBe(eintrag.top3![0]!.playerId);
+      else if (eintrag.grund.startsWith("wahl_platz_")) expect(eintrag.top3!.map((t) => t.playerId)).toContain(eintrag.playerId);
       const transfer = gs.transferHistory.find((t) => t.id === eintrag.transferId)!;
       expect(transfer).toMatchObject({ source: "ai_roster_fill", toTeamId: eintrag.teamId, playerId: eintrag.playerId });
       const vorher = startStand.teams.find((team) => team.teamId === eintrag.teamId)!.cash ?? 0;

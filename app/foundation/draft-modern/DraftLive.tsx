@@ -24,6 +24,8 @@ const ZEILEN_JE_BLATT = 13;
 
 export type DraftAktionen = {
   pick: (playerId: string, name: string) => Promise<boolean>;
+  startWahl: (wahl: "spielen" | "selbst") => Promise<boolean>;
+  kiHintergrund: (leise?: boolean) => Promise<boolean>;
   auslassen: () => Promise<void>;
   fertig: () => Promise<boolean>;
   autoPick: (an: boolean, zielTeamId?: string) => Promise<void>;
@@ -87,6 +89,7 @@ export function Kopfleiste({
   setTempo,
   setVor,
   onSkip,
+  onVor,
   zeig,
 }: {
   k: DraftKontext;
@@ -94,6 +97,8 @@ export function Kopfleiste({
   setTempo: (t: DraftTempo) => void;
   setVor: (v: boolean) => void;
   onSkip: () => void;
+  /** KI-Picks bis zum nächsten menschlichen Zug in einem Rutsch fahren (19.11.). */
+  onVor: () => void;
   zeig: DraftZeig | null;
 }) {
   const a = k.ansicht;
@@ -158,6 +163,11 @@ export function Kopfleiste({
               <button type="button" className={tempo === 1 ? "an" : ""} onClick={() => setTempo(1)} data-testid="draft-tempo-1">1×</button>
               <button type="button" className={tempo === 3 ? "an" : ""} onClick={() => setTempo(3)} data-testid="draft-tempo-3">3×</button>
             </div>
+            {a.status === "laeuft" && !a.wartetAufStart && !a.mein.amZug && a.amZug?.automatisch ? (
+              <button type="button" className="knopf haupt" onClick={onVor} disabled={k.hintergrund} title="Die KI-Picks laufen in einem Rutsch bis zum nächsten menschlichen Zug. Sie bleiben im Ticker und unter „Alle Picks“ sichtbar." data-testid="draft-vor-zu-meinem-pick">
+                {k.hintergrund ? "KI pickt …" : "Vor zu meinem Pick"}
+              </button>
+            ) : null}
             {a.mein.darfUeberspringen ? (
               <button type="button" className="knopf" onClick={onSkip} data-testid="draft-ueberspringen">Überspringen</button>
             ) : null}
@@ -233,7 +243,7 @@ function FavKarte({
         </span>
       ) : null}
       <span className="un">
-        <b>{z?.item.name ?? info?.name ?? "—"}</b>
+        <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(playerId); }} data-testid="draft-profil-link">{z?.item.name ?? info?.name ?? "—"}</b>
         <small>{z?.item.className ?? info?.className ?? ""} · {z?.item.race ?? info?.race ?? ""}</small>
         <span className="zw">
           <span>{DISZIPLIN_KURZ[k.disziplin] ?? ""} <b className={`t${z && z.sicht.stufe < 5 ? " nb" : ""}`}>{eignungText(z, k.disziplin)}</b></span>
@@ -439,8 +449,9 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
           <span key={e.nr} className={`tc ${sk}${i === 0 && zeig ? " neu" : ""}`}>
             <span className="nr t">#{e.pickNr}</span>
             <Wappen url={k.wappen(e.teamId)} kuerzel={k.teamKuerzel(e.teamId)} />
-            <b>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
+            <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => { if (e.playerId) k.profil(e.playerId); }}>{e.playerId ? spielerName(k, e.playerId) : "—"}</b>
             <small>{k.teamKuerzel(e.teamId)}</small>
+            {e.top3 && e.playerId && e.top3.indexOf(e.playerId) > 0 ? <small title="Die KI wählt unter ihren Top 3 (gewichtet nach Bewertungsabstand)">nahm Platz {e.top3.indexOf(e.playerId) + 1}</small> : null}
             <em className="t">{de(e.abloese ?? 0)}</em>
           </span>
         );
@@ -588,7 +599,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
           {sk("eignung", `Eignung ${DISZIPLIN_KURZ[k.disziplin] ?? ""}`)}
           <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}</span>
           {sk(sort === "abloese" ? "guenstig" : "abloese", "Ablöse", "re")}
-          <span className="re">je ST</span>
+          <span className="re" title="Jahresgehalt (je Saison)">Gehalt/Sais.</span>
           {sk("gefragt", "gefragt")}
           <span />
         </div>
@@ -607,7 +618,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
               <span className="nm">
-                <b>{it.name}</b>
+                <b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={(e) => { e.stopPropagation(); k.profil(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
                 <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span>{it.className} · {it.race}</small>
               </span>
               <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text}`) : "unbekannt"}>
@@ -621,13 +632,13 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
                 })}
               </span>
               <span className={`re${teuer ? " zt" : ""}`}><b className="t">{de(it.marketValue ?? 0)}</b></span>
-              <span className="re"><b className="t">{de((it.salary ?? 0) / 20, 2)}</b></span>
+              <span className="re"><b className="t">{de(it.salary ?? 0)}</b></span>
               <span><span className={`gef g${Math.min(3, g)} t`}>{g ? `${g}×` : "–"}</span></span>
               <span style={{ justifySelf: "end" }}>
                 {teuer ? (
                   <span className="tag w" title="sprengt die Kasse samt Reserve für die Pflichtplätze">zu teuer</span>
                 ) : dran ? (
-                  <button type="button" className="knopf klein haupt" data-testid="draft-picken" onClick={(e) => { e.stopPropagation(); void aktionen.pick(it.playerId, it.name); }}>Picken</button>
+                  <button type="button" className="knopf klein haupt" data-testid="draft-picken" onClick={(e) => { e.stopPropagation(); void aktionen.pick(it.playerId, it.name); }} title="Draft-Vertrag: 1 Saison, Gehalt wie angezeigt, Ablöse = Marktwert">Picken</button>
                 ) : k.wahl === it.playerId ? (
                   <span className="tag go">vorgemerkt</span>
                 ) : (
@@ -699,7 +710,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
         <div className="buehne-f" style={kulisse ? { backgroundImage: `url(${kulisse})` } : undefined}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {figur ? <img className="fig" src={figur} alt="" /> : bild ? <img className="por" src={bild} alt="" /> : null}
-          <div className="txt"><em>{z.item.className} · {z.item.race}</em><h3>{z.item.name}</h3></div>
+          <div className="txt"><em>{z.item.className} · {z.item.race}</em><h3 className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(z.item.playerId)}>{z.item.name}</h3></div>
         </div>
       ) : (
         <div className="pk"><h2>Mein Draft</h2></div>
@@ -709,7 +720,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
           <>
             <div className="kost">
               <div><small>Ablöse</small><strong className={`t${teuer ? " minus" : ""}`}>{de(preis)}</strong><em>C · exakt</em></div>
-              <div><small>je Spieltag</small><strong className="t">{de((z.item.salary ?? 0) / 20, 2)}</strong><em>C · {de(z.item.salary ?? 0)} je Saison</em></div>
+              <div><small>Gehalt / Saison</small><strong className="t">{de(z.item.salary ?? 0)}</strong><em>C · {de((z.item.salary ?? 0) / 20, 2)} je Spieltag</em></div>
               <div><small>{DISZIPLIN_KURZ[k.disziplin] ?? ""}</small><strong className="t">{eignungText(z, k.disziplin)}</strong><em>Eignung</em></div>
             </div>
             <div className="trl">
@@ -741,6 +752,7 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             ) : (
               <div className="hin">Kein KI-Team vor dir hat ihn gerade in den Top 3.</div>
             )}
+            <div className="hin" data-testid="draft-vertrag-hinweis">Draft-Vertrag: 1 Saison · Gehalt wie angezeigt</div>
             <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
           </>
         ) : (
@@ -749,14 +761,14 @@ export function MeinDraft({ k, aktionen }: { k: DraftKontext; aktionen: DraftAkt
             <AuslassenFertig mein={mein} minKader={a.regeln.minKader} aktionen={aktionen} />
           </>
         )}
-        <h4>Mein Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>{mein.kader} von {a.regeln.minKader} Pflicht · höchstens {a.regeln.maxPicksJeTeam}</span></h4>
+        <h4 title={mein.kaderOpt != null ? `Pflicht (rot): der Mindestkader. Opt (grün): die Kadergröße, die dein GM anstrebt (Optimum der GM-Identität, dieselbe Zahl wie in der KI-Kaderplanung). Ein Vorstandsziel zur Kadergröße gibt es nicht mehr.` : "Pflicht (rot): der Mindestkader."}>Mein Kader <span style={{ marginLeft: "auto", color: "var(--stumm)" }}>{Math.min(mein.kader, a.regeln.minKader)} von {a.regeln.minKader} Pflicht{mein.kaderOpt != null ? ` · Opt ${mein.kaderOpt}` : ""} · höchstens {a.regeln.maxPicksJeTeam}</span></h4>
         <div className="plaetze">
           {plaetze.map((id, i) => {
             const b = id && id !== "?" ? k.portrait(id) : null;
             return (
-              <div key={i} className={id ? "voll" : i < a.regeln.minKader ? "pfl" : ""} title={id && id !== "?" ? spielerName(k, id) : undefined}>
+              <div key={i} onClick={id && id !== "?" ? () => k.profil(id) : undefined} style={id && id !== "?" ? { cursor: "pointer" } : undefined} data-testid={id && id !== "?" ? "draft-kader-spieler" : undefined} className={id ? "voll" : i < a.regeln.minKader ? "pfl" : mein.kaderOpt != null && i < mein.kaderOpt ? "opt" : ""} title={id && id !== "?" ? spielerName(k, id) : mein.kaderOpt != null && i >= a.regeln.minKader && i < mein.kaderOpt ? "Opt: so groß will dein GM den Kader (GM-Identität)" : undefined}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {b ? <img src={b} alt="" /> : id ? null : i < a.regeln.minKader ? "Pflicht" : "frei"}
+                {b ? <img src={b} alt="" /> : id ? null : i < a.regeln.minKader ? "Pflicht" : mein.kaderOpt != null && i < mein.kaderOpt ? "Opt" : "frei"}
               </div>
             );
           })}

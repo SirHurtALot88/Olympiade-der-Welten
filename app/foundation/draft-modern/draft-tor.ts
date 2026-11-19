@@ -28,7 +28,7 @@ export function istDraftKandidat(eingabe: DraftKandidatEingabe): boolean {
   return ligaDraft != null && ligaDraft.saisonId === saisonId && ligaDraft.status !== "fertig";
 }
 
-type Urteil = { saveId: string; wert: "ja" | "nein"; schluessel: string };
+type Urteil = { saveId: string; wert: "ja" | "nein"; schluessel: string; wartet?: boolean };
 
 /**
  * Ein „ja“ gilt für den Spielstand, solange er geöffnet ist (kein Flackern, wenn sich der Draft-Status ändert). Ein
@@ -50,6 +50,7 @@ export function useLigaDraftTor(input: { gameState: GameState; saveId: string; l
   const schluessel = `${leagueSetupStatus ?? "-"}|${lokal?.saisonId ?? "-"}|${lokal?.status ?? "-"}`;
   const [urteil, setUrteil] = useState<Urteil | null>(null);
   const [verlassen, setVerlassen] = useState<string | null>(null);
+  const [geoeffnet, setGeoeffnet] = useState<string | null>(null);
   const bekannt = urteilGilt(urteil, saveId, schluessel);
 
   useEffect(() => {
@@ -60,8 +61,8 @@ export function useLigaDraftTor(input: { gameState: GameState; saveId: string; l
       try {
         const antwort = await fetch(`/api/draft?${new URLSearchParams({ saveId, vorschau: "0", verlauf: "1" }).toString()}`, { cache: "no-store" });
         if (antwort.ok) {
-          const daten = (await antwort.json()) as { ansicht?: unknown };
-          if (!abgebrochen) setUrteil({ saveId, wert: daten.ansicht ? "ja" : "nein", schluessel });
+          const daten = (await antwort.json()) as { ansicht?: { wartetAufStart?: boolean } | null };
+          if (!abgebrochen) setUrteil({ saveId, wert: daten.ansicht ? "ja" : "nein", schluessel, wartet: Boolean(daten.ansicht?.wartetAufStart) });
           return;
         }
       } catch {
@@ -77,7 +78,16 @@ export function useLigaDraftTor(input: { gameState: GameState; saveId: string; l
     };
   }, [kandidat, bekannt, saveId, schluessel]);
 
-  const aktiv = bekannt && urteil?.wert === "ja" && verlassen !== saveId;
+  // 19.11. (Chris: „erst seine office sachen klären dürfen“): steht der Draft noch auf der Startwahl, zeigt die Shell NICHT von
+  // selbst die Draft-Seite, sondern das Office mit Hinweis; erst „Zum Draft“ (`oeffnen`) öffnet sie.
+  const ja = bekannt && urteil?.wert === "ja";
+  const aktiv = ja && verlassen !== saveId && (!urteil?.wartet || geoeffnet === saveId);
+  // Hinweis „Draft wartet“: ein laufender Draft dieser Saison, die Seite ist gerade nicht offen.
+  const hinweis = kandidat && ja && !aktiv;
   const schliessen = useCallback(() => setVerlassen(saveId), [saveId]);
-  return { aktiv, schliessen };
+  const oeffnen = useCallback(() => {
+    setGeoeffnet(saveId);
+    setVerlassen(null);
+  }, [saveId]);
+  return { aktiv, schliessen, oeffnen, hinweis };
 }

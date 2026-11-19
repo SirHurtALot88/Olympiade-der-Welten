@@ -1,5 +1,6 @@
 import type { LigaDraftAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
+import type { DraftKaderZeile } from "./draft-liga";
 import type { SpielerSicht } from "@/lib/market/transfermarkt-sicht";
 
 export type DraftZeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht };
@@ -24,6 +25,11 @@ export type DraftKontext = {
   /** Wunschliste (Spieler-Ids) und Umschalter aus dem Scouting. */
   wunsch: Set<string>;
   toggleWunsch: (item: DraftZeile["item"]) => void;
+  /** Öffnet das Spielerprofil (Kurzprofil-Drawer) über der Draft-Seite — verlässt den Draft nicht. */
+  profil: (playerId: string) => void;
+  spielerName: (playerId: string) => string;
+  /** Kaderstärke je Disziplin mit Liga-Rang des eigenen Teams (live, `draft-liga.ts`); `null` ohne eigenes Team. */
+  raenge: DraftKaderZeile[] | null;
   wahl: string | null;
   setWahl: (playerId: string | null) => void;
   schau: string | null;

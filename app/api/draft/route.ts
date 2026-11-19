@@ -39,9 +39,11 @@ import {
   laufeKiZuege,
   LigaDraftFehler,
   setzeMenschAutoPick,
+  setzeMenschStartWahl,
+  spieltNochEinMensch,
   starteLigaDraft,
 } from "@/lib/draft/liga-draft-dienst";
-import { istEinzelschrittDraftAktiv, ligaDraftDieserSaison, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
+import { istEinzelschrittDraftAktiv, ligaDraftDieserSaison, ligaDraftLaeuft, wartetAufStartWahl } from "@/lib/draft/liga-draft-modell";
 import { baueLigaDraftAnsicht } from "@/lib/draft/liga-draft-ansicht";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
@@ -59,6 +61,7 @@ type DraftAktion =
   | "ueberspringen"
   | "auto_pick"
   | "starten"
+  | "startwahl"
   | "abbrechen";
 
 const AKTIONEN = new Set<DraftAktion>([
@@ -70,6 +73,7 @@ const AKTIONEN = new Set<DraftAktion>([
   "ueberspringen",
   "auto_pick",
   "starten",
+  "startwahl",
   "abbrechen",
 ]);
 
@@ -86,6 +90,8 @@ type DraftRequestBody = {
   zielTeamId?: string;
   maxPicks?: number;
   erwarteteNr?: number;
+  /** `startwahl`: "spielen" | "selbst". */
+  wahl?: string;
   idempotencyKey?: string;
   roomCode?: string | null;
   participantId?: string | null;
@@ -174,7 +180,7 @@ export async function POST(request: Request) {
      * diese Aktionen prueft der Dienst den Stand nicht; `erwarteteNr` bleibt Pflicht (A6, Protokoll), Doppelklick ist harmlos
      * (Auto-Pick/Variante B setzen denselben Zustand, Variante A und „fertig“ lehnt der Dienst beim zweiten Mal ab).
      */
-    const standFuerDienst = aktion === "ueberspringen" || aktion === "auto_pick" || aktion === "fertig" ? null : erwarteteNr;
+    const standFuerDienst = aktion === "ueberspringen" || aktion === "startwahl" || aktion === "auto_pick" || aktion === "fertig" ? null : erwarteteNr;
 
     // Gastgeber-Aktionen: Draft anlegen/abbrechen, Auto-Pick fuer ein fremdes Team (Konzept Frage 7: „Auto-Pick
     // auslösen“ für einen Abwesenden, mit Rueckfrage in der Seite und Eintrag im Verlauf).
@@ -231,8 +237,27 @@ export async function POST(request: Request) {
       }
       case "pick":
         if (!body.playerId) return fehler("playerId_fehlt", 400);
-        ergebnis = bucheMenschPick({ persistence, saveId, teamId, playerId: body.playerId, erwarteteNr, idempotencyKey: body.idempotencyKey });
+        ergebnis = bucheMenschPick({
+          persistence,
+          saveId,
+          teamId,
+          playerId: body.playerId,
+          erwarteteNr,
+          idempotencyKey: body.idempotencyKey,
+        });
         break;
+      case "startwahl": {
+        const wahl = body.wahl === "selbst" ? "selbst" : body.wahl === "spielen" ? "spielen" : null;
+        if (!wahl) return fehler("wahl_fehlt", 400);
+        const draft = setzeMenschStartWahl({ persistence, saveId, teamId, wahl });
+        // „Selbst kaufen“: die KI pickt sofort durch (Hintergrundlauf), sobald alle gewaehlt haben und kein Mensch mehr
+        // mitspielt. Spielt noch einer, treibt dessen Seite den Takt.
+        if (wahl === "selbst" && !wartetAufStartWahl(draft) && !spieltNochEinMensch(draft)) {
+          void laufeKiImHintergrund({ persistence, saveId, logPrefix: "[api/draft]" }).catch(() => undefined);
+        }
+        ergebnis = { draft };
+        break;
+      }
       case "auslassen":
         ergebnis = { draft: bucheMenschAuslassen({ persistence, saveId, teamId, erwarteteNr }) };
         break;

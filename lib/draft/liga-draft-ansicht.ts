@@ -14,7 +14,7 @@
  */
 import type { GameState, LigaDraftEintrag, LigaDraftZustand } from "@/lib/data/olyDataTypes";
 import { bewerteKiPick, freieSpieler, type LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
-import { darfAuslassen, kaderStaerkeFuerReihenfolge, naechsteZuege, werIstDran } from "@/lib/draft/liga-draft-modell";
+import { darfAuslassen, kaderStaerkeFuerReihenfolge, naechsteZuege, wartetAufStartWahl, werIstDran } from "@/lib/draft/liga-draft-modell";
 import { nichtsLeistbar, pflichtReserve } from "@/lib/draft/liga-draft-dienst";
 
 export type LigaDraftSpielerKarte = {
@@ -58,6 +58,14 @@ export type LigaDraftTeamAnsicht = {
   kasse: number;
   /** Ø der besten sechs je Disziplin ueber alle Disziplinen (Reihenfolge-Kriterium). */
   kaderStaerke: number;
+  /** Summe der Abloesen (Marktwerte) aller Picks dieses Teams im Draft. Marktwerte sind immer exakt sichtbar (kein Nebel). */
+  abloeseSumme: number;
+  /** Summe der Gehaelter (Jahresgehalt) der Draft-Picks. */
+  gehaltSumme: number;
+  /** Marktwert des aktuellen Kaders (Summe ueber `rosters`). */
+  kaderMarktwert: number;
+  /** Startwahl des Menschen (`offen` | `spielen` | `selbst`); `null` bei KI und aelteren Drafts. */
+  startWahl: "offen" | "spielen" | "selbst" | null;
 };
 
 export type LigaDraftAnsicht = {
@@ -70,6 +78,8 @@ export type LigaDraftAnsicht = {
   /** Laenge des Verlaufs — als `erwarteteNr` an jede POST-Aktion zurueckgeben (Schutz vor Doppelklick/Wettlauf). */
   stand: number;
   amZug: LigaDraftZugAnsicht | null;
+  /** Der Draft steht bei Pick 1, bis jeder Mensch „Draft spielen“ oder „Selbst kaufen“ gewaehlt hat (19.11.). */
+  wartetAufStart: boolean;
   /** Wartet der Draft auf einen Menschen (kein Auto-Pick)? */
   wartetAufMensch: boolean;
   /** Kette der laufenden Runde in Pick-Reihenfolge. */
@@ -108,6 +118,14 @@ export type LigaDraftAnsicht = {
     maxAbloese: number;
     /** Vorschlag des eigenen GM (Top 3 der KI-Bewertung fuer dieses Team) — nur fuer den Betrachter selbst. */
     vorschlag: string[];
+    /**
+     * Wunsch-Kadergroesse (Opt, 19.11.): `playerOpt` der GM-Identitaet des Teams (dieselbe Quelle wie die KI-Kaderplanung),
+     * sonst `rosterOptTarget` des Teams; zwischen Mindestkader und Hoechstzahl begrenzt. Eine Vorstandsvorgabe gibt es nicht
+     * mehr (das Board-Ziel „Kader-Optimum“ wurde entfernt, `team-season-objectives-service.ts`). `null`: keine Angabe.
+     */
+    kaderOpt: number | null;
+    /** Eigene Startwahl (`null`: keine Wahl noetig oder KI). */
+    startWahl: "offen" | "spielen" | "selbst" | null;
     /** Picks bis zum eigenen Zug (0 = jetzt; `null` = nicht in Sicht oder nicht in der Reihenfolge). */
     picksBisZug: number | null;
   };
@@ -130,6 +148,19 @@ function kiBewertungGemerkt(gameState: GameState, saveId: string, draft: LigaDra
   if (kiCache.size >= KI_CACHE_MAX) kiCache.delete(kiCache.keys().next().value as string);
   kiCache.set(schluessel, wert);
   return wert;
+}
+
+/** Wunsch-Kadergroesse des Teams (siehe `LigaDraftAnsicht.mein.kaderOpt`). */
+export function kaderOptFuer(
+  gameState: Pick<GameState, "teams" | "teamIdentities">,
+  teamId: string,
+  regeln: { minKader: number; maxPicksJeTeam: number },
+): number | null {
+  const identitaet = gameState.teamIdentities?.find((eintrag) => eintrag.teamId === teamId);
+  const team = gameState.teams.find((eintrag) => eintrag.teamId === teamId);
+  const roh = identitaet?.playerOpt ?? team?.rosterOptTarget ?? null;
+  if (roh == null || !Number.isFinite(roh) || roh <= 0) return null;
+  return Math.max(regeln.minKader, Math.min(regeln.maxPicksJeTeam, Math.round(roh)));
 }
 
 export function baueLigaDraftAnsicht(input: {
@@ -190,6 +221,17 @@ export function baueLigaDraftAnsicht(input: {
 
   const kaderJeTeam = new Map<string, number>();
   for (const eintrag of gameState.rosters) kaderJeTeam.set(eintrag.teamId, (kaderJeTeam.get(eintrag.teamId) ?? 0) + 1);
+  const mwJeTeam = new Map<string, number>();
+  for (const eintrag of gameState.rosters) {
+    const sp = spielerById.get(eintrag.playerId);
+    mwJeTeam.set(eintrag.teamId, (mwJeTeam.get(eintrag.teamId) ?? 0) + Math.max(0, sp?.marketValue ?? sp?.displayMarketValue ?? 0));
+  }
+  const abloeseJeTeam = new Map<string, { abloese: number; gehalt: number }>();
+  for (const e of draft.verlauf) {
+    if (e.art !== "pick") continue;
+    const alt = abloeseJeTeam.get(e.teamId) ?? { abloese: 0, gehalt: 0 };
+    abloeseJeTeam.set(e.teamId, { abloese: alt.abloese + (e.abloese ?? 0), gehalt: alt.gehalt + (e.gehalt ?? 0) });
+  }
   const teams: LigaDraftTeamAnsicht[] = gameState.teams
     .filter((team) => draft.teams[team.teamId])
     .map((team) => {
@@ -208,6 +250,10 @@ export function baueLigaDraftAnsicht(input: {
         kader: kaderJeTeam.get(team.teamId) ?? 0,
         kasse: Math.round((team.cash ?? 0) * 100) / 100,
         kaderStaerke: Math.round(kaderStaerkeFuerReihenfolge(gameState, team.teamId) * 10) / 10,
+        abloeseSumme: Math.round((abloeseJeTeam.get(team.teamId)?.abloese ?? 0) * 100) / 100,
+        gehaltSumme: Math.round((abloeseJeTeam.get(team.teamId)?.gehalt ?? 0) * 100) / 100,
+        kaderMarktwert: Math.round((mwJeTeam.get(team.teamId) ?? 0) * 100) / 100,
+        startWahl: zustand.startWahl ?? null,
       };
     });
 
@@ -256,6 +302,8 @@ export function baueLigaDraftAnsicht(input: {
       pflichtReserve: Math.round(reserve * 100) / 100,
       maxAbloese: Math.round(Math.max(kasse - reserve, kader < draft.regeln.minKader && Number.isFinite(billigster) && billigster <= kasse ? billigster : 0) * 100) / 100,
       vorschlag,
+      startWahl: betrachter.startWahl ?? null,
+      kaderOpt: kaderOptFuer(gameState, teamId, draft.regeln),
       picksBisZug: index >= 0 ? index : null,
     };
   }
@@ -268,6 +316,7 @@ export function baueLigaDraftAnsicht(input: {
     picks: draft.verlauf.filter((eintrag) => eintrag.art === "pick").length,
     stand: draft.verlauf.length,
     amZug: naechste[0] && jetzt && naechste[0].teamId === jetzt.teamId ? naechste[0] : null,
+    wartetAufStart: wartetAufStartWahl(draft),
     wartetAufMensch: Boolean(jetzt && !jetzt.automatisch),
     kette,
     naechste,

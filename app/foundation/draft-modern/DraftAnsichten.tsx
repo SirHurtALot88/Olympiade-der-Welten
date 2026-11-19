@@ -4,6 +4,7 @@
  * DRAFT: Nachzug, Pick-Tafel, Ergebnis und Überspringen-Dialog (18.11.). Vorlage: public/mockups/draft-modern-18-11.html
  * (`#s-tafel`, `#s-ende`, Dialog „Überspringen“, Ansicht „Nachzug“). Nur Anzeige: alles aus `/api/draft`.
  */
+import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import type { DraftKontext } from "./draft-kontext";
 import { betragC, de, fertigGrundText, sitzKlasse, sitzName } from "./draft-format";
 
@@ -135,7 +136,7 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
       <section className="pan ek">
         <div className="pk"><h2>Mein Kader nach dem Draft</h2><span className="sp" /><span className="gk">{meine.length} Picks · Ablösen {betragC(summe)}</span></div>
         <div className="mt" style={{ ["--zeilen" as string]: Math.max(8, meine.length) }}>
-          <div className="mz kopf"><span>Pick</span><span /><span>Spieler</span><span /><span /><span /><span className="re">Ablöse</span><span className="re">je ST</span></div>
+          <div className="mz kopf"><span>Pick</span><span /><span>Spieler</span><span /><span /><span /><span className="re">Ablöse</span><span className="re">Gehalt/Saison</span></div>
           {meine.map((e) => {
             const info = a.spieler[e.playerId!];
             const bild = k.portrait(e.playerId!);
@@ -143,11 +144,11 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
               <div key={e.nr} className="mz">
                 <span className="t" style={{ color: "var(--stumm)", fontWeight: 700 }}>{e.quelle === "nachzug" ? "N" : `R${e.runde}`} · #{e.pickNr}</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {bild ? <img className="por" src={bild} alt="" /> : <span className="por" />}
-                <span className="nm"><b>{info?.name ?? "—"}</b><small>{info?.className ?? ""} · {info?.race ?? ""}</small></span>
+                {bild ? <img className="por drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(e.playerId!)} src={bild} alt="" /> : <span className="por" />}
+                <span className="nm"><b className="drf-pl" role="link" title="Spielerprofil öffnen" onClick={() => k.profil(e.playerId!)} data-testid="draft-profil-link">{info?.name ?? "—"}</b><small>{info?.className ?? ""} · {info?.race ?? ""}</small></span>
                 <span /><span /><span />
                 <span className="re"><b className="t">{de(e.abloese ?? 0)}</b></span>
-                <span className="re"><b className="t">{de((e.gehalt ?? 0) / 20, 2)}</b></span>
+                <span className="re"><b className="t">{de(e.gehalt ?? 0)}</b></span>
               </div>
             );
           })}
@@ -164,7 +165,20 @@ export function Ergebnis({ k, onWeiter }: { k: DraftKontext; onWeiter: () => voi
           <div className="rl16 rl32" style={{ gridTemplateColumns: `repeat(${sortiert.length}, 1fr)` }}>
             {sortiert.map((t, i) => <i key={t.teamId} className={t.teamId === meinTeam?.teamId ? "an" : ""} title={`${i + 1}. ${t.name} · ${de(t.kaderStaerke)}`} />)}
           </div>
-          <div className="hin">Die Stärke je Disziplin mit Liga-Rang folgt mit dem gemeinsamen Lese-Dienst (Kader-/Transfermarkt-Plan).</div>
+          {k.raenge ? (
+            <div className="drl-disz" data-testid="draft-ergebnis-raenge" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+              {k.raenge.map((z) => (
+                <div key={z.disziplinId} className={`drl-dz${z.rang <= 5 ? " top" : z.rang > z.ligaGroesse * 0.66 ? " tief" : ""}`}>
+                  <span>{(officialDisciplineWeightLabels as Record<string, string>)[z.disziplinId] ?? z.disziplinId}</span>
+                  <i><b style={{ width: `${Math.max(4, ((z.ligaGroesse - z.rang + 1) / z.ligaGroesse) * 100)}%` }} /></i>
+                  <em className="t">{de(z.staerke)}</em>
+                  <strong className="t">{z.rang}.</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="hin">Dieses Team ist nicht im Draft — keine eigene Kaderstärke.</div>
+          )}
         </div>
       </section>
       <section className="pan">
