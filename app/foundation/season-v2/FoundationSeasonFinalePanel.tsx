@@ -108,6 +108,9 @@ export type FoundationSeasonFinalePanelProps = {
    */
   onRenewPlayer?: (input: { playerId: string; playerName: string; contractLength: number | null }) => void;
   onReleasePlayer?: (input: { playerId: string; playerName: string }) => void;
+  /** Rückmeldung des Vertragswegs (Fehler/Quittung), damit ein Klick hier nicht stumm bleibt. */
+  vertragsFehler?: string | null;
+  vertragsMeldung?: string | null;
 };
 
 /**
@@ -171,6 +174,8 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     onOpenSponsors,
     onRenewPlayer,
     onReleasePlayer,
+    vertragsFehler,
+    vertragsMeldung,
   } = props;
   const entscheidungen = useMemo(() => {
     const offen = offeneVertragsentscheidungen(gameState, activeTeamId);
@@ -312,24 +317,24 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     {
       key: "contracts",
       title:
-        expiringContracts === 0
-          ? "Verträge — nichts läuft aus"
-          : kiEntscheidetVertraege
-            ? `Auslaufende Verträge (${expiringContracts}) — die KI entscheidet`
-            : entscheidungen.length > 0
-              ? `Verlängern oder freigeben (${entscheidungen.length} offen)`
+        entscheidungen.length > 0
+          ? `Verlängern oder freigeben (${entscheidungen.length} offen)`
+          : expiringContracts === 0
+            ? "Verträge — nichts läuft aus"
+            : kiEntscheidetVertraege
+              ? `Auslaufende Verträge (${expiringContracts}) — die KI entscheidet`
               : `Auslaufende Verträge (${expiringContracts}) — entschieden`,
       detail:
-        expiringContracts === 0
-          ? "Kein Vertrag läuft zum Saisonende aus."
-          : kiEntscheidetVertraege
-            ? "Verträge sind an die KI delegiert: sie verlängert oder gibt frei, sobald die Verträge offen sind."
-            : entscheidungen.length === 0
-              ? "Über jeden auslaufenden Vertrag ist entschieden."
-              : sellWindowOpen
+        entscheidungen.length === 0
+          ? expiringContracts === 0
+            ? "Kein Vertrag läuft zum Saisonende aus."
+            : kiEntscheidetVertraege
+              ? "Verträge sind an die KI delegiert: sie verlängert oder gibt frei, sobald die Verträge offen sind."
+              : "Über jeden auslaufenden Vertrag ist entschieden."
+          : sellWindowOpen
                 ? "Pflicht vor der neuen Saison: je Spieler verlängern (Gehaltsverhandlung) oder freigeben (Verkauf zum aktuellen Verkaufspreis). Ohne Entscheidung startet keine neue Saison."
                 : "Pflicht vor der neuen Saison: erst „Verträge öffnen“, dann je Spieler verlängern oder freigeben.",
-      state: expiringContracts === 0 || entscheidungen.length === 0 ? "done" : sellWindowOpen ? "ready" : "blocked",
+      state: entscheidungen.length === 0 ? "done" : sellWindowOpen ? "ready" : "blocked",
       // Kein Knopf ins Leere: solange gesperrt ist, was dort zu tun waere, schickt diese Zeile
       // auch niemanden hin. Der Schritt darueber ist dann der einzige, der weiterfuehrt.
       action:
@@ -502,7 +507,7 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
                       <button
                         type="button"
                         className="primary-button inline-button"
-                        disabled={busy || readOnly || !sellWindowOpen}
+                        disabled={busy || readOnly || !(sellWindowOpen || eintrag.nachzuholen)}
                         onClick={() => onRenewPlayer({ playerId: eintrag.playerId, playerName: eintrag.name, contractLength: eintrag.laufzeit })}
                         data-testid="season-finale-verlaengern"
                       >
@@ -511,7 +516,7 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
                       <button
                         type="button"
                         className="inline-button"
-                        disabled={busy || readOnly || !sellWindowOpen}
+                        disabled={busy || readOnly || !(sellWindowOpen || eintrag.nachzuholen)}
                         onClick={() => onReleasePlayer({ playerId: eintrag.playerId, playerName: eintrag.name })}
                         data-testid="season-finale-freigeben"
                       >
@@ -520,6 +525,15 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {step.key === "contracts" && (vertragsFehler || vertragsMeldung) ? (
+                <p
+                  className={vertragsFehler ? "nl-season-finale-vertraege-hinweis is-error" : "nl-season-finale-vertraege-hinweis"}
+                  role={vertragsFehler ? "alert" : "status"}
+                  data-testid="season-finale-vertragshinweis"
+                >
+                  {vertragsFehler ?? vertragsMeldung}
+                </p>
               ) : null}
             </li>
           ))}

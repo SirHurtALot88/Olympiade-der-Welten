@@ -1375,8 +1375,9 @@ export async function buildPreSeasonWorkflowPreview(
         aiReleaseCandidates: contractPreview.aiReleaseCandidates,
         contractEventsExisting: save.gameState.seasonState.contractEvents?.length ?? 0,
       },
-      warnings: contractPreview.warnings,
-      blockingReasons: [...contractPreview.blockingReasons, ...vertragsSperre],
+      // Die offenen Entscheidungen sperren NICHT diesen Schritt (die Alterung muss laufen koennen), nur den Saisonwechsel unten.
+      warnings: [...contractPreview.warnings, ...vertragsSperre],
+      blockingReasons: contractPreview.blockingReasons,
       confirmToken: contractPreview.confirmToken,
     },
     {

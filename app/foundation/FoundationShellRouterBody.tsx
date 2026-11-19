@@ -531,6 +531,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   commitArenaDiscipline,
   finishMatchdayAndAdvance,
   runCockpitCashApply,
+  runContractRenewalAction,
   runPreSeasonWorkflowPreview,
   runPreSeasonNextSeasonSetup,
   runSeasonTransition,
@@ -2872,6 +2873,33 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 )?.summary?.manualPending ?? 0,
               )}
               onOpenSponsors={() => openPrizeFinanceView()}
+              /* VERLÄNGERN ODER FREIGEBEN (Chris 19.11.): Verlängern öffnet die normale Gehaltsverhandlung (Modal oben),
+                 Freigeben verkauft zum aktuellen Verkaufspreis über denselben Vertragsweg wie im Kader. Danach wird die
+                 Saisonwechsel-Vorschau neu geholt, damit die Sperre sofort stimmt. */
+              onRenewPlayer={(input) => {
+                if (!activeManagerTeamId) return;
+                void props.openContractRenewalNegotiation({
+                  teamId: activeManagerTeamId,
+                  playerId: input.playerId,
+                  playerName: input.playerName,
+                  contractLength: input.contractLength,
+                });
+              }}
+              onReleasePlayer={(input) => {
+                if (!activeManagerTeamId) return;
+                if (!window.confirm(`${input.playerName} freigeben? Er wird zum aktuellen Verkaufspreis verkauft, der Erlös wird gebucht.`)) return;
+                void (async () => {
+                  const ok = await runContractRenewalAction({
+                    teamId: activeManagerTeamId,
+                    playerId: input.playerId,
+                    playerName: input.playerName,
+                    action: "release",
+                  });
+                  if (ok) void runPreSeasonWorkflowPreview();
+                })();
+              }}
+              vertragsFehler={contractRenewalError ? String(contractRenewalError) : null}
+              vertragsMeldung={props.contractRenewalMessage ? String(props.contractRenewalMessage) : null}
             />
           ) : null}
 

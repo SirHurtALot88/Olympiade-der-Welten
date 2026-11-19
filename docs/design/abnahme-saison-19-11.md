@@ -10,7 +10,7 @@ dass die spieltage sauber durchlaufen? also man auch wirklich durch eine season 
 | **Picken S1 bestätigt** | **Ja.** Kein Team unter 8, keine 8–9 ohne GM-Grund, 0 Teams unter GM-Opt, 0 Notwege/Notkäufe, Top-20 von niemandem gekauft, 18–19/32 im Gehaltsband 50–70 (Referenz 18–21). Zwei Läufe (vor und nach den Fixes) liefern dasselbe Bild. |
 | **Picken S2 (Fenster) bestätigt** | **Ja.** 116 Käufe / 86 Verkäufe, kein Team unter 8, 0 unter GM-Opt, 0 Notwege, 0 Notverkäufe, keine negative Kasse, alle KI-Teams auf oder über der Notrücklage, Gehalt-Median 56,1 (20/32 im Band). |
 | **Saison durchspielbar** | **Ja.** 20/20 Spieltage S1 + Saisonende + Auf-/Abstieg (3/3) + Fenster + 3 Spieltage S2 ohne Fehler oder Hänger; jede der 704 Disziplin-Zeilen Arena-gewertet. |
-| **Funde** | 9 Fehler gefunden, **9 behoben** (F1–F9, je mit Test), dazu 2 Leistungsbefunde mit Ursache (L1, L2) und eine offene Entscheidung (E1). |
+| **Funde** | 9 Fehler gefunden, **9 behoben** (F1–F9, je mit Test), dazu 2 Leistungsbefunde mit Ursache (L1, L2) und eine Entscheidung (E1: kein Gehaltsdeckel in keiner Saison, Chris 19.11.). |
 | **Fingerabdruck** | `node scripts/pruefe-wertung-fingerabdruck.mjs --node` auf dem Branch (inkl. main #1616): **GESAMT eaafed96150e** (= main). |
 
 ## 1. Aufbau
@@ -180,7 +180,8 @@ Climbing-Canyon (MD8 D1, Bilder `07-canyon-md8-arena-*.png`): Vorraum „32 von 
 s. E1/F3-Befund). Die KI hat die meisten verlängert: 59 Vertragsenden ligaweit (0–5 je Team), alle KI-Kader danach mit
 Endsaison 2–6. Kein Team steht am Fenster dünn da (min 9, nur mit GM-Ziel 9). Das Mensch-Team M-M (Halbautomatik,
 Transfers selbst) hat nicht verlängert — seine 11 Verträge stehen als `renewal_pending` in S2 (Entscheidung beim Menschen,
-so gebaut: `preseason-workflow-service.ts` `buildNextSeasonGameState`).
+so gebaut: `preseason-workflow-service.ts` `buildNextSeasonGameState`). Laut Chris (19.11.) ungewollt — seither sperrt
+eine offene Entscheidung den Saisonwechsel (Verlängern oder Freigeben, s. Abschnitt 10).
 
 <details><summary>Je Team</summary>
 
@@ -264,14 +265,15 @@ mit dran); nach CLAUDE.md gehört so etwas mit unabhängigem Opus-Review gebaut.
 ist zudem verbraucht (Saison 2 läuft). Nächster Schritt: `next_season_setup` an einer Kopie eines Saisonende-Stands mit
 Zeitmessung je Schritt fahren und die mehrfache XP-Vorschau (vermutlich je Aufrufer neu gerechnet) zwischenspeichern.
 
-## 9. Offene Entscheidung
+## 9. Entscheidung
 
-**E1 — Gehaltsband in Saison 1.** Chris' „50–70“ war eine Beschreibung, wo die meisten Teams landeten, keine harte Regel
-(Rückmeldung 19.11.). Gemessen: 18/32 (Lauf A) bzw. 19/32 (Lauf B) im Band, 10–11 darüber. Ausreißer sind
-`risk_gambler`/`star_chaser` mit großem Startbudget (M-M 103,2 bei 325 C Budget = 31,7 %, Z-H 90,6, H-R 86,4). Der
-Mensch-Auto-Draft nutzt **dieselben** Planregeln wie die KI (`fuehreAutomatischenZugAus` → `bewerteKiPick` mit Kaderplan;
-Ausstieg „opt_erreicht (Zielkader 11)“); einen Gehaltsdeckel gibt es in S1 nicht (Gehaltstopf ab S2,
-`docs/design/ki-pick-analyse-18-11.md` 9.1/S3). Ob das S1-Band enger werden soll, entscheidet Chris.
+**E1 — Gehaltsband in Saison 1 — entschieden (Chris, 19.11.): kein Deckel, in keiner Saison.** Wörtlich: „es gibt für
+keine der Saisons einen Deckel“. „50–70“ ist nur ein Hinweis, wo die meisten Teams landen; mehr auszugeben ist erlaubt.
+Gemessen: 18/32 (Lauf A) bzw. 19/32 (Lauf B) im Band, 10–11 darüber. Ausreißer sind `risk_gambler`/`star_chaser` mit
+großem Startbudget (M-M 103,2 bei 325 C Budget = 31,7 %, Z-H 90,6, H-R 86,4). Der Mensch-Auto-Draft nutzt **dieselben**
+Planregeln wie die KI (`fuehreAutomatischenZugAus` → `bewerteKiPick` mit Kaderplan; Ausstieg „opt_erreicht (Zielkader
+11)“). Es wird **kein** Gehaltsdeckel gebaut; der Gehaltstopf ab S2 (`docs/design/ki-pick-analyse-18-11.md` 9.1/S3)
+bleibt eine Planungsgröße der KI, keine Sperre.
 
 **Vertragslaufzeiten S1 (geprüft, gewollt):** 354/382 Draft-Verträge laufen 1 Jahr — Regel „Season 1 Flex-Deal“ /
 „Season 1 Kaderaufbau: vor stabilem Kern keine breite Mehrjahresbindung“ in
@@ -280,9 +282,14 @@ Folge in S2: die KI verlängert die meisten (59 Vertragsenden ligaweit), kein Te
 
 ## 10. Weitere Beobachtungen (nicht behoben)
 
-* **Mensch ohne Verlängerung:** die 11 auslaufenden Verträge von M-M stehen in S2 als `renewal_pending` weiter im Kader
-  (so gebaut, die Entscheidung liegt beim Menschen). Ob ein Spieler mit abgelaufenem Vertrag in S2 spielen darf, sollte
-  Chris einmal bestätigen.
+* **Mensch ohne Verlängerung — behoben in eigenem PR (Chris, 19.11.):** „es ist nicht gewollt, dass wenn du einen
+  Vertrag nicht verlängerst, der Spieler dann bleibt … du musst entweder verlängern oder ihn freigeben.“ Seit #618 (21.08.)
+  altert der Vertrag beim Betreten der Saisonende-Phase; menschliche Teams bekamen `renewal_pending`, aber nichts verlangte
+  die Entscheidung, und weil die Alterung je Saison nur einmal läuft, gab auch der Saisonstart niemanden frei. Jetzt sperrt
+  jede offene Entscheidung „Neue Saison starten“; das Saisonfinale listet die Spieler mit „Verlängern“
+  (Gehaltsverhandlung) und „Freigeben“ (Verkauf zum aktuellen Verkaufspreis, Erlös gebucht). Bei delegierten Verträgen
+  (Voll KI) entscheidet die KI beim Altern. Altstände (Vertrag in einer früheren Saison ausgelaufen, z. B. Live-Abbild
+  `hwz8fk`, 12 Spieler von C-C) lassen sich in der laufenden Saison über die Vertragsroute nachholen.
 * **Saisonabrechnung ohne Sponsor-Gate:** der Finale-Weg (Abrechnung → Verträge → Neue Saison) läuft ohne
   `manual_sponsor_choice_pending`; das Gate sitzt nur in `runLocalSeasonCompletion` (Cockpit). Mit F5 entsteht der Fall
   bei Halbautomatik nicht mehr; bei „voll selbst“ ohne Wahl schon.

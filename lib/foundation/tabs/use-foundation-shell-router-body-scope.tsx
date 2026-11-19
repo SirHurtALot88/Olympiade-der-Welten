@@ -13303,6 +13303,7 @@ export function useFoundationShellRouterBodyScope({
     newGameSuccess,
     openContractRenewalNegotiation,
     requestContractRenewalPreview,
+    runContractRenewalAction,
     openFacilityPanel,
     openFoundationViewCommand,
     openMarketOfferPanel,

@@ -878,3 +878,82 @@ describe("pre-season workflow service", () => {
     expect(source).toContain("transfer_window_session");
   });
 });
+
+/**
+ * VERLÄNGERN ODER FREIGEBEN (Chris 19.11.): „du kannst gar nicht einfach das aussitzen, sondern du musst entweder verlängern
+ * oder ihn freigeben." Ein auslaufender Vertrag eines menschlichen Teams sperrt den Saisonwechsel, bis entschieden ist —
+ * vorher lief „Neue Saison starten“ durch, und der Spieler spielte die neue Saison ohne Vertrag (`renewal_pending`) weiter.
+ */
+describe("Saisonwechsel: auslaufende Verträge menschlicher Teams brauchen eine Entscheidung", () => {
+  function mitAuslaufendemMenschVertrag(input: { delegiert?: boolean; nachDerAlterung?: boolean } = {}): PersistedSaveGame {
+    const quelle = save();
+    const gs = quelle.gameState;
+    const settings = { ...gs.seasonState.teamControlSettings! };
+    if (input.delegiert) {
+      settings["human-1"] = { ...settings["human-1"]!, delegation: { stufe: "voll_ki", bereiche: {} } } as never;
+    }
+    return {
+      ...quelle,
+      gameState: {
+        ...gs,
+        gamePhase: input.nachDerAlterung ? "season_end_management" : gs.gamePhase,
+        seasonState: { ...gs.seasonState, teamControlSettings: settings },
+        rosters: gs.rosters.map((entry) =>
+          entry.id === "r-human"
+            ? input.nachDerAlterung
+              ? { ...entry, contractLength: 0, contractEndSeasonNumber: 1, contractStatus: "renewal_pending" as const }
+              : { ...entry, contractLength: 1 }
+            : entry,
+        ),
+      },
+    };
+  }
+
+  it("die Vorschau sperrt den Saisonwechsel und nennt Team und Anzahl", async () => {
+    const quelle = mitAuslaufendemMenschVertrag();
+    const { persistence } = persistenceMock(quelle);
+    const preview = await buildPreSeasonWorkflowPreview(quelle, persistence);
+    const schritt = preview.steps.find((step) => step.stepId === "next_season_setup");
+    expect(schritt?.blockingReasons).toContain("vertragsentscheidung_offen:human-1:1");
+    // Die Alterung selbst bleibt frei — sie muss laufen koennen, damit entschieden werden kann.
+    expect(preview.steps.find((step) => step.stepId === "contract_renewal")?.blockingReasons ?? []).not.toContain(
+      "vertragsentscheidung_offen:human-1:1",
+    );
+  });
+
+  it("die Buchung verweigert den Saisonwechsel auch mit gültigem Token und schreibt nichts", async () => {
+    const quelle = mitAuslaufendemMenschVertrag({ nachDerAlterung: true });
+    const { persistence, saveSingleplayerState } = persistenceMock(quelle);
+    const preview = await buildPreSeasonWorkflowPreview(quelle, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+    const result = await applyPreSeasonNextSeasonSetup(quelle, token, persistence);
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("vertragsentscheidung_offen:human-1:1");
+    expect(saveSingleplayerState).not.toHaveBeenCalled();
+  });
+
+  it("delegiert der Mensch die Verträge an die KI, entscheidet sie beim Altern — kein Spieler bleibt ohne Vertrag", async () => {
+    const quelle = mitAuslaufendemMenschVertrag({ delegiert: true });
+    const { persistence, saveSingleplayerState } = persistenceMock(quelle);
+    const preview = await buildPreSeasonWorkflowPreview(quelle, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+    const result = await applyPreSeasonNextSeasonSetup(quelle, token, persistence);
+    expect(result.applied).toBe(true);
+    const gespeichert = saveSingleplayerState.mock.calls.at(-1)?.[1];
+    const eintrag = gespeichert?.rosters.find((entry) => entry.id === "r-human");
+    // Entweder verlaengert (laufender Vertrag) oder freigegeben (nicht mehr im Kader) — nie „renewal_pending“.
+    if (eintrag) {
+      expect(eintrag.contractStatus).not.toBe("renewal_pending");
+      expect(eintrag.contractLength).toBeGreaterThan(0);
+    }
+  });
+
+  it("delegiert erst NACH dem Altern: der stehengebliebene Vertrag zählt weiter als offen", async () => {
+    const quelle = mitAuslaufendemMenschVertrag({ delegiert: true, nachDerAlterung: true });
+    const { persistence } = persistenceMock(quelle);
+    const preview = await buildPreSeasonWorkflowPreview(quelle, persistence);
+    expect(preview.steps.find((step) => step.stepId === "next_season_setup")?.blockingReasons).toContain(
+      "vertragsentscheidung_offen:human-1:1",
+    );
+  });
+});

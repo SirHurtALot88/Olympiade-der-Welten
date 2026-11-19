@@ -60,18 +60,33 @@ export function istVertragsentscheidungNachzuholen(
 
 /** Entscheidet der Mensch dieses Teams selbst über Verträge? (KI-Teams und delegierte „Käufe, Verkäufe und Verträge“: nein.) */
 export function entscheidetMenschUeberVertraege(gameState: Pick<GameState, "teams" | "seasonState">, teamId: string): boolean {
-  const settings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[teamId];
-  return settings?.controlMode === "manual" && !isBereichDelegiert(settings, "transfers");
+  return vertragsSteuerung(gameState, teamId) === "mensch";
 }
 
-/** Alle offenen Entscheidungen menschlicher Teams (ohne Delegation), optional nur für ein Team. */
+type VertragsSteuerung = "ki_team" | "mensch" | "delegiert";
+
+function vertragsSteuerung(gameState: Pick<GameState, "teams" | "seasonState">, teamId: string): VertragsSteuerung {
+  const settings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[teamId];
+  if (settings?.controlMode !== "manual") return "ki_team";
+  return isBereichDelegiert(settings, "transfers") ? "delegiert" : "mensch";
+}
+
+/**
+ * Alle offenen Entscheidungen menschlicher Teams, optional nur für ein Team.
+ *
+ * Delegiert ein Mensch „Käufe, Verkäufe und Verträge“, entscheidet die KI beim Altern der Verträge (wie für KI-Teams) — dann
+ * bleibt nichts offen. Steht trotzdem ein Vertrag auf `renewal_pending` (Delegation erst NACH dem Altern eingeschaltet), ist der
+ * Zeitpunkt der KI vorbei; er zählt dann wie beim Menschen als offen, statt still ohne Vertrag weiterzulaufen.
+ */
 export function offeneVertragsentscheidungen(gameState: GameState, teamId?: string | null): OffeneVertragsentscheidung[] {
-  const mensch = new Map<string, boolean>();
+  const steuerung = new Map<string, VertragsSteuerung>();
   const offen: OffeneVertragsentscheidung[] = [];
   for (const entry of gameState.rosters) {
     if (teamId && entry.teamId !== teamId) continue;
-    if (!mensch.has(entry.teamId)) mensch.set(entry.teamId, entscheidetMenschUeberVertraege(gameState, entry.teamId));
-    if (!mensch.get(entry.teamId)) continue;
+    if (!steuerung.has(entry.teamId)) steuerung.set(entry.teamId, vertragsSteuerung(gameState, entry.teamId));
+    const art = steuerung.get(entry.teamId);
+    if (art === "ki_team") continue;
+    if (art === "delegiert" && entry.contractStatus !== "renewal_pending") continue;
     if (!istVertragsentscheidungFaellig(entry, gameState)) continue;
     offen.push({
       teamId: entry.teamId,
