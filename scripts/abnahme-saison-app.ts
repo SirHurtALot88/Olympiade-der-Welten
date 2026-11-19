@@ -19,6 +19,7 @@
  *   ... messen-draft | spieltage [bis] | saisonende | messen-fenster | aufnahmen
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -949,6 +950,91 @@ async function draftApi() {
 
 // ------------------------------------------------------------------------------------------------ Verlaengern oder freigeben
 
+/** Gehaltsverhandlung wie ein Mensch: Forderung übernehmen, „Schritt 1: Angebot senden“, dann „Schritt 2: … unterschreiben“. */
+async function verhandleUndUnterschreibe(page: Page) {
+  await page.getByRole("button", { name: "Forderung übernehmen" }).click({ timeout: 30_000 }).catch(() => log("Forderung übernehmen fehlt"));
+  // Wie ein Mensch: die Vorschau nach jeder Aenderung abwarten (der grosse Live-Stand braucht dafuer Sekunden).
+  await page.waitForTimeout(10_000);
+  await page.getByRole("button", { name: /Schritt 1: Angebot senden/ }).click({ timeout: 30_000 }).catch((e) => log(`Schritt 1: ${String(e).slice(0, 160)}`));
+  await page.waitForTimeout(10_000);
+  const schritt2 = page.getByRole("button", { name: /Schritt 2: .*unterschreiben/ });
+  await schritt2.waitFor({ state: "visible", timeout: 30_000 }).catch(() => undefined);
+  await page.waitForFunction(() => !(document.querySelector('[data-testid="negotiation-confirm-button"]') as HTMLButtonElement | null)?.disabled, null, { timeout: 30_000 }).catch(() => log("Schritt 2 bleibt gesperrt"));
+  log(`Schritt 2: ${(await schritt2.textContent().catch(() => null)) ?? "—"}`);
+  await schritt2.click({ timeout: 30_000 }).catch((e) => log(`Schritt 2: ${String(e).slice(0, 160)}`));
+  // Veraltete Vorschau (die Marktwert-Einstufung rechnete beim Oeffnen noch): wie ein Mensch die Laufzeit einmal hin und her
+  // stellen (holt eine frische Vorschau) und erneut unterschreiben.
+  await page.waitForTimeout(6000);
+  if (await page.getByText("preview stale", { exact: false }).isVisible().catch(() => false)) {
+    log("Vorschau veraltet — Laufzeit 3/2 neu stellen und erneut unterschreiben");
+    const laufzeit = (n: string) => page.getByRole("dialog").getByRole("button", { name: new RegExp(`^${n}`) }).first();
+    await laufzeit("3").click().catch(() => undefined);
+    await page.waitForTimeout(8000);
+    await laufzeit("2").click().catch(() => undefined);
+    await page.waitForTimeout(10_000);
+    await page.getByRole("button", { name: /Schritt 1: Angebot senden/ }).click({ timeout: 10_000 }).catch(() => undefined);
+    await page.waitForTimeout(4000);
+    await schritt2.click({ timeout: 30_000 }).catch((e) => log(`Schritt 2 (2. Versuch): ${String(e).slice(0, 160)}`));
+  }
+}
+
+/**
+ * NACHHOLEN am Altstand (Kopie des Live-Abbilds, nie das Original): die Karte auf der Startseite zeigt die Verträge, die schon
+ * in einer früheren Saison ausliefen. Freigeben (erste Zeile) und Verlängern (Gehaltsverhandlung) mitten in der Saison.
+ * Spielstand/Team aus ABNAHME_SAVE / ABNAHME_TEAM.
+ */
+async function nachholen() {
+  const z: Zustand = { saveId: process.env.ABNAHME_SAVE ?? "", teamId: process.env.ABNAHME_TEAM ?? "", log: [] };
+  if (!z.saveId || !z.teamId) throw new Error("ABNAHME_SAVE und ABNAHME_TEAM setzen");
+  const BILDER = path.join(process.cwd(), "docs", "design", "vertragsentscheidung-19-11");
+  const offen = () => gs(z.saveId).rosters.filter((r) => r.teamId === z.teamId && r.contractStatus === "renewal_pending");
+  const bericht: Record<string, unknown> = { saison: gs(z.saveId).season.id, phase: gs(z.saveId).gamePhase, offenVorher: offen().length };
+  const { browser, page, fehler } = await neueSeite(1600, 1000);
+  try {
+    page.on("dialog", (d) => void d.accept());
+    await page.goto(url(z, "homeV2"), { waitUntil: "domcontentloaded", timeout: 180_000 });
+    const karte = page.getByTestId("vertragsentscheidung-nachholen");
+    await karte.waitFor({ state: "visible", timeout: 180_000 }).catch(async (e) => {
+      await page.screenshot({ path: path.join(os.tmpdir(), "nachholen-debug.png") });
+      log(`Karte fehlt; URL ${page.url()}; Fehler ${fehler.slice(0, 3).join(" | ")}`);
+      throw e;
+    });
+    await page.getByTestId("season-briefing-backdrop").waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
+    await schliesseBriefing(page);
+    await karte.scrollIntoViewIfNeeded();
+    fs.mkdirSync(BILDER, { recursive: true });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(BILDER, "06-nachholen-startseite.png") });
+    const erste = karte.locator("li[data-player]").first();
+    const freiId = await erste.getAttribute("data-player");
+    await erste.getByTestId("vertrag-nachholen-freigeben").click();
+    for (let i = 0; i < 60 && gs(z.saveId).rosters.some((r) => r.teamId === z.teamId && r.playerId === freiId); i += 1) await delay(1000);
+    const ereignis = (gs(z.saveId).seasonState.contractEvents ?? []).filter((e) => e.playerId === freiId).at(-1);
+    bericht.freigabe = { playerId: freiId, exitValue: ereignis?.exitValue, imKader: gs(z.saveId).rosters.some((r) => r.teamId === z.teamId && r.playerId === freiId) };
+    await page.waitForTimeout(3000);
+    const zweite = karte.locator("li[data-player]").first();
+    const verlId = await zweite.getAttribute("data-player");
+    await zweite.getByTestId("vertrag-nachholen-verlaengern").click();
+    await page.waitForTimeout(5000);
+    await page.screenshot({ path: path.join(BILDER, "07-nachholen-verhandlung.png") });
+    await verhandleUndUnterschreibe(page);
+    for (let i = 0; i < 40 && gs(z.saveId).rosters.find((r) => r.teamId === z.teamId && r.playerId === verlId)?.contractStatus === "renewal_pending"; i += 1) {
+      await delay(1000);
+    }
+    const verl = gs(z.saveId).rosters.find((r) => r.teamId === z.teamId && r.playerId === verlId);
+    bericht.verlaengerung = { playerId: verlId, status: verl?.contractStatus, laufzeit: verl?.contractLength, endSaison: verl?.contractEndSeasonNumber };
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: path.join(BILDER, "08-nachholen-danach.png") });
+    bericht.offenNachher = offen().length;
+    bericht.browserfehler = fehler;
+  } finally {
+    await browser.close();
+  }
+  log(JSON.stringify(bericht));
+  fs.writeFileSync(path.join(BILDER, "bericht-nachholen.json"), `${JSON.stringify(bericht, null, 2)}\n`);
+}
+
 /**
  * VERLAENGERN ODER FREIGEBEN (Chris 19.11.) am Saisonende von S1, durch die Oberflaeche: Abrechnung und „Verträge öffnen“
  * wie im Finale, dann prueft der Lauf die Sperre (Vorschau und Buchung mit gueltigem Token), nimmt die Pflichtliste auf, gibt
@@ -1014,6 +1100,9 @@ async function entscheidung() {
     await schliesseBriefing(page);
     const liste = page.getByTestId("season-finale-vertragsentscheidungen");
     await liste.waitFor({ state: "visible", timeout: 180_000 });
+    // Das Saison-Briefing kommt verzoegert ueber die Seite (die Shell oeffnet es erst nach dem Laden) — erst schliessen.
+    await page.getByTestId("season-briefing-backdrop").waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
+    await schliesseBriefing(page);
     await liste.scrollIntoViewIfNeeded();
     await bild(page, "01-pflichtliste.png");
     bericht.listeZeilen = await liste.locator("li").count();
@@ -1043,9 +1132,7 @@ async function entscheidung() {
     await zweite.getByTestId("season-finale-verlaengern").click();
     await page.waitForTimeout(5000);
     await bild(page, "03-verhandlung.png");
-    const dialog = page.getByRole("dialog").last();
-    const bestaetigen = dialog.getByRole("button", { name: /Angebot|Unterschreib|Verlänger|Bestätig/ }).last();
-    await bestaetigen.click({ timeout: 30_000 }).catch((e) => log(`Bestätigen nicht klickbar: ${String(e).slice(0, 160)}`));
+    await verhandleUndUnterschreibe(page);
     for (let i = 0; i < 40 && gs(z.saveId).rosters.find((r) => r.teamId === z.teamId && r.playerId === verlId)?.contractStatus === "renewal_pending"; i += 1) {
       await delay(1000);
     }
@@ -1116,6 +1203,7 @@ const befehle: Record<string, () => unknown> = {
   saisonende,
   "draft-api": draftApi,
   entscheidung,
+  nachholen,
   "messen-fenster": messeFenster,
   aufnahmen,
 };

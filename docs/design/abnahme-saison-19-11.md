@@ -289,7 +289,20 @@ Folge in S2: die KI verlängert die meisten (59 Vertragsenden ligaweit), kein Te
   jede offene Entscheidung „Neue Saison starten“; das Saisonfinale listet die Spieler mit „Verlängern“
   (Gehaltsverhandlung) und „Freigeben“ (Verkauf zum aktuellen Verkaufspreis, Erlös gebucht). Bei delegierten Verträgen
   (Voll KI) entscheidet die KI beim Altern. Altstände (Vertrag in einer früheren Saison ausgelaufen, z. B. Live-Abbild
-  `hwz8fk`, 12 Spieler von C-C) lassen sich in der laufenden Saison über die Vertragsroute nachholen.
+  `hwz8fk`, 12 Spieler von C-C) lassen sich in der laufenden Saison nachholen: Karte „Verlängern oder freigeben“ auf der
+  Startseite, die Vertragsroute lässt genau diese Fälle auch außerhalb des Saisonende-Fensters zu.
+  **Klick-Lauf 19.11.** (Produktionsbuild, Wegwerf-SQLite, Bilder und Rohdaten in `docs/design/vertragsentscheidung-19-11/`):
+  neues Battle-Spiel, S1 bis Spieltag 20 gespielt, Abrechnung → „Verträge öffnen“ → 11 offene Entscheidungen bei M-M
+  (Halbautomatik). „Neue Saison starten“ ist gesperrt: Vorschau `vertragsentscheidung_offen:M-M:11`, Buchung mit gültigem
+  Token 409, die Saison bleibt S1 (`01-pflichtliste.png`). Freigeben im Finale: Teerblut weg, Erlös 64,18 C gebucht
+  (MW 47,23 × Verkaufsfaktor 1,358, Kasse 44,7 → 108,88). Verlängern öffnet die Gehaltsverhandlung (`03-verhandlung.png`).
+  Danach alle übrigen entschieden, Saisonwechsel 200, S2 ohne einen Spieler auf `renewal_pending`. Nachholen an einer
+  KOPIE des Live-Abbilds (`hwz8fk`): die Karte zeigt die offenen Fälle (`06-nachholen-startseite.png`), Freigeben und
+  Verlängern (LZ 2, Endsaison 3) gehen mitten in Saison 2.
+  Zwei Nebenfunde: (1) Die Verhandlung startete bei einem ausgelaufenen Vertrag mit „0 Saisons unterschreiben“ (Laufzeit 0
+  als Vorgabe) — behoben, Vorgabe dann 2. (2) Auf dem großen Live-Stand scheiterte das erste „Unterschreiben“ einmal mit
+  „Contract action preview stale“, nach erneutem Stellen der Laufzeit ging es durch (nicht behoben, vorbestehend, betrifft
+  die Verhandlung allgemein).
 * **Saisonabrechnung ohne Sponsor-Gate:** der Finale-Weg (Abrechnung → Verträge → Neue Saison) läuft ohne
   `manual_sponsor_choice_pending`; das Gate sitzt nur in `runLocalSeasonCompletion` (Cockpit). Mit F5 entsteht der Fall
   bei Halbautomatik nicht mehr; bei „voll selbst“ ohne Wahl schon.

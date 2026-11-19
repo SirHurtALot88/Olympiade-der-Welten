@@ -5809,7 +5809,9 @@ export function useFoundationShellRouterBodyScope({
     const rosterEntry = gameState.rosters.find(
       (entry) => entry.teamId === input.teamId && entry.playerId === input.playerId,
     ) ?? null;
-    const startLength = input.contractLength ?? 2;
+    // Ein ausgelaufener Vertrag steht auf Laufzeit 0 — das ist kein Angebot („0 Saisons unterschreiben“, Klick-Lauf 19.11.).
+    // Dann wie ohne Angabe mit der Vorgabe 2 starten.
+    const startLength = input.contractLength != null && input.contractLength > 0 ? input.contractLength : 2;
     setContractRenewalBusy(`preview:${input.teamId}:${input.playerId}`);
     setContractRenewalError(null);
     try {
