@@ -385,14 +385,13 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   const anzapfenMax = ruecklageZiel * ANZAPFEN_MAX_ANTEIL;
   const angezapft = alle ? 0 : Math.min(Math.max(0, zustand.ruecklageAngezapft), anzapfenMax);
   const verfuegbar = alle ? Math.max(0, anfangskasse) : Math.max(0, anfangskasse - ruecklageZiel - gehaltspuffer);
-  // Gemeinsames Transferfenster (#1634, Chris 18.11.): Verkaufserloese aus dem Fenster sind sofort zu 100 % frei, die Quote gilt
-  // nur fuer die Anfangskasse. Schalter `OLY_TRANSFERFENSTER_GEMEINSAM=0`: die alte Regel (Quote auch auf die Erloese).
+  // Gemeinsames Transferfenster (Chris 18.11.): Verkaufserloese aus dem Fenster sind zu 100 % frei, die Quote gilt nur fuer die Kasse zu Fensterbeginn.
   const gesamtBei = (q: number, verk: number) => q * (verfuegbar + angezapft) + verkaufserloeseFreiAnteil(q) * verk;
 
   // Lockerung nach Verkaeufen (Konzept 4): einbehaltener Anteil (1 - q) x Verkaufserloes >= X -> eine Stufe mehr.
   const puffer = q0 < 1 ? (LOCKERUNG_PUFFER_ANTEIL[q0] ?? 0) * basis : 0;
   const einbehalten = (1 - verkaufserloeseFreiAnteil(q0)) * verkaeufe;
-  const schwelle = q0 < 1 && puffer > 0 ? puffer / (1 - q0) : 0;
+  const schwelle = q0 < 1 && puffer > 0 && verkaufserloeseFreiAnteil(q0) < 1 ? puffer / (1 - q0) : 0;
   const rosterCount = gameState.rosters.filter((r) => r.teamId === teamId).length;
   const pflichtkredit = (gameState.seasonState?.loans ?? []).some(
     (l) => l.borrowerTeamId === teamId && l.status === "active" && l.originatedSeasonId === seasonId,
@@ -401,6 +400,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   if (!gedeckelt) lockerungSperre = "Saison 1: alles ist freigegeben.";
   else if (alle) lockerungSperre = "„Alles auf eine Karte“ ist aktiv.";
   else if (q0 >= 1) lockerungSperre = "Schon voll freigegeben.";
+  else if (verkaufserloeseFreiAnteil(q0) >= 1) lockerungSperre = "Im gemeinsamen Fenster sind Verkaufserlöse zu 100 % frei.";
   else if (cash < 0) lockerungSperre = "Keine Lockerung bei Kasse im Minus.";
   else if (pflichtkredit) lockerungSperre = "Keine Lockerung mit laufendem Kredit dieses Fensters.";
   else if (rosterCount < 8) lockerungSperre = "Der Kader muss über dem Minimum bleiben.";

@@ -125,9 +125,17 @@ describe("Finanzen · Budgets nach dem Mockup", () => {
     expect(html).toContain("Rücklage-Ziel");
     expect(html).toContain("tragbares Gehalt");
   });
-  it("Umschichten, Lockerung, Vorstand, Sonderwege, was gegen welchen Topf zaehlt", () => {
+  it("Umschichten, Vorstand, Sonderwege, was gegen welchen Topf zaehlt (Lockerung nur im alten Ablauf)", () => {
     expect(html).toContain("Umschichten");
-    expect(html).toContain("Lockerung nach Verkäufen");
+    expect(html).not.toContain("Lockerung nach Verkäufen");
+    const vorher = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
+    try {
+      expect(seite("budgets")).toContain("Lockerung nach Verkäufen");
+    } finally {
+      if (vorher === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+      else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorher;
+    }
     expect(html).toContain("von 10 Vertrauen");
     expect(html).toContain("Rücklage anzapfen");
     expect(html).toContain("Alles auf eine Karte");
@@ -175,5 +183,34 @@ describe("Finanzen · Mehrspieler", () => {
       />,
     );
     expect(html).toContain("Rival City");
+  });
+});
+
+describe("Finanzen · Kaderaufbau (Saison 1) und gemeinsames Fenster", () => {
+  it("zeigt in Saison 1 die Kaderaufbau-Karte statt einer Transferbilanz", () => {
+    const mitAufbau = {
+      ...model,
+      team: model.team && { ...model.team, kaderaufbau: { net: -80, buyTotal: 80, sellTotal: 0, buyCount: 9, sellCount: 0 } },
+    } as typeof model;
+    const html = renderToStaticMarkup(
+      <FinanzenModern
+        gameState={gameState}
+        teamId="team-1"
+        finanzen={mitAufbau}
+        leagueTable={leagueTable}
+        salaryFactorOutlook={salaryFactorOutlook}
+        onVorstandAktion={async () => ({ ok: true, reason: null, meldung: "" })}
+        kannVerwalten
+        startAnsicht="uebersicht"
+        startKontext="lage"
+      />,
+    );
+    expect(html).toContain('data-testid="fin-kaderaufbau"');
+    expect(html).toContain("Kaderaufbau aus dem Startbudget");
+    expect(html).toContain("Transferbilanz");
+  });
+
+  it("im gemeinsamen Fenster gibt es keine Lockerungs-Karte (Verkaufserloese zu 100 % frei)", () => {
+    expect(seite("budgets")).not.toContain("Lockerung nach Verkäufen");
   });
 });

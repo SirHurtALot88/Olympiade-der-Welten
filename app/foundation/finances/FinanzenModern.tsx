@@ -15,6 +15,7 @@ import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinwe
 import { buildOperatingGuvHoverText } from "@/lib/finance/guv-breakdown";
 import { buildFinanzSeiteModell, type FinanzSeiteModell, type VerlaufPunkt } from "@/lib/finance/finanzseite-modell";
 import { ALLES_PUFFER_ANTEIL, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { verkaufserloeseFreiAnteil } from "@/lib/market/transferfenster-gemeinsam";
 import { vorstandFordertAlleAufEineKarte } from "@/lib/finance/vorstand-budget-aktionen";
 import { getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -244,6 +245,15 @@ function Uebersicht({ m, gew, setGew }: { m: FinanzSeiteModell; gew: number; set
           <strong className="bc-t">{C(m.prognoseEnde)}</strong>
         </div>
       </div>
+      {m.finanzen?.kaderaufbau ? (
+        <div className="fin-hinweis" data-testid="fin-kaderaufbau" title="Saison 1: der Kader wird aus dem Startbudget aufgebaut. Das ist keine Transferbilanz — die beginnt mit dem Transferfenster vor Saison 2.">
+          <b>Kaderaufbau aus dem Startbudget</b>
+          <span>
+            Startkader {Cv(-m.finanzen.kaderaufbau.buyTotal)} ({m.finanzen.kaderaufbau.buyCount} Spieler) · Kaderaufbau {Cv(m.finanzen.kaderaufbau.net)}
+            {m.finanzen.kaderaufbau.sellCount > 0 ? ` (inkl. ${m.finanzen.kaderaufbau.sellCount} Verkauf/Verkäufe vor Spieltag 1)` : ""} · Transferbilanz — (erst ab Saison 2)
+          </span>
+        </div>
+      ) : null}
       <Kassenverlauf verlauf={m.verlauf} gew={gew} onWahl={setGew} jetzt={jetzt} />
       <div className="fin-leg" style={{ paddingTop: 0 }}>
         <span>
@@ -277,6 +287,7 @@ const ART_TEXT: Record<string, string> = {
   apron: "Apron",
   vorstandsziele: "Vorstandsziele",
   notfall_kasse: "Notfall-Kasse",
+  kaderaufbau: "Kaderaufbau aus dem Startbudget",
 };
 
 function Kontoauszug({ m, gew, onZeile }: { m: FinanzSeiteModell; gew: string | null; onZeile: (id: string) => void }) {
@@ -625,7 +636,7 @@ function BudgetsAnsicht({
         </div>
       </div>
 
-      {s.anteil >= 1 || alle || !s.gedeckelt ? (
+      {verkaufserloeseFreiAnteil(s.anteil) >= 1 ? null : s.anteil >= 1 || alle || !s.gedeckelt ? (
         <div className="fin-sd is-aus">
           <div className="fin-kopf">
             Lockerung nach Verkäufen<small>nur unter 100 %</small>
@@ -667,7 +678,7 @@ function BudgetsAnsicht({
         </div>
       )}
 
-      <div className="fin-sd is-farbe" style={{ "--pc": "var(--bc-gold)" } as CSSProperties}>
+      <div className="fin-sd is-farbe" style={{ "--pc": "var(--bc-gold)", ...(verkaufserloeseFreiAnteil(s.anteil) >= 1 ? { gridColumn: "span 2" } : {}) } as CSSProperties}>
         <div className="fin-kopf">
           Sonderwege<small>kosten Vertrauen · nur im Fenster</small>
         </div>
@@ -753,7 +764,7 @@ function BudgetsAnsicht({
         <div>
           <span>
             <b>Spieler verkaufen</b>
-            <small>Erlös × {q0} % ins Transferbudget, Gehalt voll zurück</small>
+            <small>{verkaufserloeseFreiAnteil(s.anteil) >= 1 ? "Erlös zu 100 % frei (gemeinsames Fenster), Gehalt voll zurück" : `Erlös × ${q0} % ins Transferbudget, Gehalt voll zurück`}</small>
           </span>
           <span className="fin-marke is-gold">ZURÜCK</span>
         </div>

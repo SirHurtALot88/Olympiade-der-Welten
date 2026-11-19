@@ -178,16 +178,22 @@ describe("Umschichten (1 C Transfer = 1 C Jahresgehalt)", () => {
   });
 });
 
-describe("Lockerung nach Verkaeufen", () => {
-  // Die Lockerung gibt einbehaltene Verkaufserloese frei. Im gemeinsamen Transferfenster (#1634) sind Erloese ohnehin zu 100 %
-  // frei, es bleibt nichts einbehalten; die Lockerung gilt nur im alten Ablauf (`OLY_TRANSFERFENSTER_GEMEINSAM=0`).
-  const vorherFenster = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+describe("Lockerung nach Verkaeufen (alter Ablauf; im gemeinsamen Fenster sind Erloese zu 100 % frei)", () => {
+  // Die Lockerung gibt es nur mit der Quote auf Verkaufserloesen, also im alten Ablauf (`OLY_TRANSFERFENSTER_GEMEINSAM=0`).
+  let fensterVorher: string | undefined;
   beforeEach(() => {
+    fensterVorher = process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
     process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "0";
   });
   afterEach(() => {
-    if (vorherFenster === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
-    else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorherFenster;
+    if (fensterVorher === undefined) delete process.env.OLY_TRANSFERFENSTER_GEMEINSAM;
+    else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = fensterVorher;
+  });
+  it("im gemeinsamen Fenster entfaellt die Lockerung (Erloese zu 100 % frei)", () => {
+    process.env.OLY_TRANSFERFENSTER_GEMEINSAM = "1";
+    const st = berechneVorstandBudgetStand(spielstand({ vertrauen: 2, cash: 140, history: [sell(40)] }), "A");
+    expect(st.lockerung.aktiv).toBe(false);
+    expect(st.lockerung.gesperrtGrund).toContain("100 %");
   });
 
   it("greift erst ab der Schwelle (einbehaltener Anteil >= Puffer), eine Stufe, nie mehr als verkauft", () => {

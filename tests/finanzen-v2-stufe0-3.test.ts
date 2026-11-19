@@ -172,11 +172,12 @@ describe("Stufe 3 — harte Sperre, Verkaufserloese, Kontostand", () => {
     }
   });
 
-  it("im gemeinsamen Fenster ist der Verkaufserloes zu 100 % frei: 20 C bei 70 % -> 20 C frei", () => {
+  it("im gemeinsamen Fenster ist der Verkaufserloes zu 100 % frei: 20 C -> 20 C frei, keine Lockerung noetig", () => {
     const ohne = berechneVorstandBudgetStand(state(100, 2), "A");
     const st = berechneVorstandBudgetStand(state(120, 2, [sell(20)]), "A");
     expect(st.nochFrei - ohne.nochFrei).toBeCloseTo(20, 2);
-    expect(st.gesperrt - ohne.gesperrt).toBeCloseTo(0, 2);
+    expect(st.gesperrt).toBeCloseTo(ohne.gesperrt, 2);
+    expect(st.lockerung.gesperrtGrund).toContain("100 %");
   });
 
   it("bereits Ausgegebenes mindert das noch Freie, die Kasse bleibt das Maximum", () => {
