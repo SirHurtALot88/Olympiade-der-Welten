@@ -472,7 +472,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     key={a}
                     className={`fc${min != null ? " an" : ""}`}
                     data-testid={`tm-achse-${a}`}
-                    title="Klick: mindestens B, dann A, dann S, dann aus. Im Nebel zählt die obere Note der Gruppe."
+                    title="Klick: mindestens D, dann C, B, A, S, dann aus."
                     onClick={() => {
                       setFilter((alt) => {
                         const achsenMin = { ...alt.achsenMin };

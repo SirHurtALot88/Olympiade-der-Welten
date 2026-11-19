@@ -637,7 +637,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
               type="button"
               key={x}
               className={`fc${min != null ? " an" : ""}`}
-              title="Klick: mindestens B, dann A, dann S, dann aus. Im Nebel zählt die obere Note der Gruppe."
+              title="Klick: mindestens D, dann C, B, A, S, dann aus."
               data-testid={`draft-achse-${x}`}
               onClick={() => {
                 setAchsenMin((alt) => {
