@@ -11,7 +11,7 @@ import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
 import { applyInsolvencyBackstop, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { fuehreKiKassensturzAus } from "@/lib/ai/ki-kassensturz";
-import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
+import { istFensterAufOpt, istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -413,41 +413,57 @@ async function executeAiPreseasonBackgroundWork(input: {
         );
       }
     };
-    kreditPass();
-
-    const market = await applyAiMarketPlanLocally({
-      source: "sqlite",
-      saveId,
-      seasonId,
-      teamScope: "ai",
-      dryRun: false,
-      includeWarningTeams: false,
-      confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
-      transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
-      options: {
-        includeWarningTeams: false,
-        stopOnTeamFailure: false,
-        // Der Marktlauf KAUFT nur. Verkauft wird im gemeinsamen Fenster in der eigenen Verkaufsrunde
-        // davor (organische Verkaufslogik, `fenster_verkauf`), im alten Ablauf am Saisonende. Ein
-        // zweiter Verkaufsweg hier wuerde dieselben Teams doppelt schrumpfen.
-        applySellSteps: false,
-      },
-    });
-    const completedTeams = market.results.filter(
-      (team) => team.result !== "blocked" && team.result !== "failed_buy" && team.result !== "failed_sell",
-    ).length;
-    // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
-    // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
-    kreditPass();
-
     /**
-     * NACHRUNDE FUER OFFENE PLAETZE (gemeinsames Fenster): derselbe Planer noch einmal, nachdem andere Teams
-     * verkauft und gekauft haben und der zweite Kredit-Durchgang gelaufen ist. Kein Notkauf, kein Auffuellen
-     * auf ein Minimum: der Planer kauft nur, was er selbst fuer sinnvoll haelt (Chris: „niemals" Notkauf).
+     * FENSTER AUF OPT (Chris 18.11.: „Die KI soll danach ja einfach auf Optimum füllen! Die Kader können nicht einfach mit 8–9
+     * Leuten fertig sein"). Kaufrunde und Nachrunde laufen ueber DENSELBEN Planer wie der Saison-1-Draft: den organischen Planer
+     * mit Kaderplan (Platzpreis-Reservierung bis Opt fuer Ablose UND Gehalt, GM-Senkung hoechstens 2, protokolliert), in der
+     * Kauffenster-Sitzung (`runTransferWindowSession`, Phase `preseason`: Kreditprobe gegen den Kaufplan vor und nach den Zyklen,
+     * Ligarunden, Opt-Luecken-Runde). Kein Marktplan mit Kurzliste mehr, kein Notkauf, kein Auffuellen mit Billigst-Spielern.
+     * `docs/design/fenster-auf-opt-18-11.md`. Schalter `OLY_FENSTER_AUF_OPT=0`: der Marktplan-Weg darunter (Stand #1634).
      */
+    let marktKaeufe = 0;
+    let marktVerkaeufe = 0;
+    let marktWarnungen: string[] = [];
+    let marktBlocker: string[] = [];
+    let marktBlockiert = false;
+    let completedTeams = 0;
     let nachrundeKaeufe = 0;
-    if (gemeinsamesFenster) {
-      const nachrunde = await applyAiMarketPlanLocally({
+    if (gemeinsamesFenster && istFensterAufOpt()) {
+      const fensterKauf = () =>
+        runTransferWindowSession({
+          saveId,
+          seasonId,
+          persistence,
+          phase: "preseason",
+          dryRun: false,
+          confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+          transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
+          teamScope: "all",
+          targetTeamIds: aiTeamIds,
+          allowBuys: true,
+          skipIfExistingMarketTransfers: false,
+          progressLog: false,
+        });
+      const kaufrunde = await fensterKauf();
+      marktKaeufe = kaufrunde.appliedBuys;
+      marktWarnungen = kaufrunde.warnings.filter((w) => !w.startsWith("organic_squad_builder_"));
+      marktBlocker = kaufrunde.blockingReasons;
+      fensterNotizen.push(`fenster_kaufrunde_planer:${kaufrunde.appliedBuys}`);
+      // NACHRUNDE: dieselbe Sitzung noch einmal fuer Teams, die noch unter ihrem Opt stehen (andere Teams haben inzwischen gekauft,
+      // der zweite Kredit-Durchgang ist gelaufen). Teams am Ziel fasst die Sitzung nicht an.
+      const nachrunde = await fensterKauf();
+      nachrundeKaeufe = nachrunde.appliedBuys;
+      marktWarnungen.push(...nachrunde.warnings.filter((w) => !w.startsWith("organic_squad_builder_")));
+      marktBlocker = [...marktBlocker, ...nachrunde.blockingReasons];
+      fensterNotizen.push(`fenster_nachrunde:${nachrundeKaeufe}`);
+      const nachKauf = persistence.getSaveById(saveId);
+      completedTeams = nachKauf
+        ? aiTeamIds.filter((teamId) => nachKauf.gameState.rosters.some((r) => r.teamId === teamId)).length
+        : 0;
+    } else {
+      kreditPass();
+
+      const market = await applyAiMarketPlanLocally({
         source: "sqlite",
         saveId,
         seasonId,
@@ -459,11 +475,49 @@ async function executeAiPreseasonBackgroundWork(input: {
         options: {
           includeWarningTeams: false,
           stopOnTeamFailure: false,
+          // Der Marktlauf KAUFT nur. Verkauft wird im gemeinsamen Fenster in der eigenen Verkaufsrunde
+          // davor (organische Verkaufslogik, `fenster_verkauf`), im alten Ablauf am Saisonende. Ein
+          // zweiter Verkaufsweg hier wuerde dieselben Teams doppelt schrumpfen.
           applySellSteps: false,
         },
       });
-      nachrundeKaeufe = nachrunde.summary.appliedBuys;
-      fensterNotizen.push(`fenster_nachrunde:${nachrundeKaeufe}`);
+      const completedTeamsMarkt = market.results.filter(
+        (team) => team.result !== "blocked" && team.result !== "failed_buy" && team.result !== "failed_sell",
+      ).length;
+      // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
+      // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
+      kreditPass();
+
+      /**
+       * NACHRUNDE FUER OFFENE PLAETZE (gemeinsames Fenster): derselbe Planer noch einmal, nachdem andere Teams
+       * verkauft und gekauft haben und der zweite Kredit-Durchgang gelaufen ist. Kein Notkauf, kein Auffuellen
+       * auf ein Minimum: der Planer kauft nur, was er selbst fuer sinnvoll haelt (Chris: „niemals" Notkauf).
+       */
+      if (gemeinsamesFenster) {
+        const nachrunde = await applyAiMarketPlanLocally({
+          source: "sqlite",
+          saveId,
+          seasonId,
+          teamScope: "ai",
+          dryRun: false,
+          includeWarningTeams: false,
+          confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+          transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
+          options: {
+            includeWarningTeams: false,
+            stopOnTeamFailure: false,
+            applySellSteps: false,
+          },
+        });
+        nachrundeKaeufe = nachrunde.summary.appliedBuys;
+        fensterNotizen.push(`fenster_nachrunde:${nachrundeKaeufe}`);
+      }
+      marktKaeufe = market.summary.appliedBuys;
+      marktVerkaeufe = market.summary.appliedSells;
+      marktWarnungen = market.warnings;
+      marktBlocker = market.blockingReasons;
+      marktBlockiert = market.status === "blocked";
+      completedTeams = completedTeamsMarkt;
     }
     /*
      * FUELL-LAUF ABGESCHALTET — der organische Planer pickt.
@@ -577,22 +631,22 @@ async function executeAiPreseasonBackgroundWork(input: {
 
     const finalRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
-      status: market.status === "blocked" ? "failed" : "completed",
+      status: marktBlockiert ? "failed" : "completed",
       completedAt: nowIso(),
       aiTeamsCompleted: completedTeams,
       managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
       transferBuysApplied:
-        market.summary.appliedBuys + nachrundeKaeufe + injuryDepthTopup.playersBoughtTotal,
-      transferSellsApplied: market.summary.appliedSells + fensterVerkaeufe,
+        marktKaeufe + nachrundeKaeufe + injuryDepthTopup.playersBoughtTotal,
+      transferSellsApplied: marktVerkaeufe + fensterVerkaeufe,
       warnings: [
         ...fensterNotizen,
         ...managerResult.warnings,
-        ...market.warnings,
+        ...marktWarnungen,
         ...injuryDepthTopup.warnings,
         ...kreditNotizen,
         ...snapshotPatchNotiz,
       ],
-      blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
+      blockingReasons: [...managerResult.blockers, ...marktBlocker],
       actionBreakdown: buildAiActionBreakdown(managerResult.actions),
     };
     writeRunRecord(saveId, finalRecord);

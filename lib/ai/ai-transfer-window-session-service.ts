@@ -42,6 +42,7 @@ import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
+import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 
 /**
  * `season_end`      Saisonende-Kette (alte Saison): verkaufen (alter Ablauf) bzw. nur verlaengern
@@ -207,9 +208,9 @@ async function runTeamCycle(input: {
   /** Im Verkaufszyklus: wirklich verkaufen (false = nur verlaengern, gemeinsames Fenster am Saisonende). */
   sellInSellCycle?: boolean;
   /**
-   * Gemeinsames Fenster: nie unter das Kader-Minimum verkaufen (max(8, playerMin)). Die Verkaufsrunde laeuft
-   * VOR den Kaeufen desselben Fensters; ein Verkauf unter das Minimum ohne gesicherten Nachkauf ist ein Fehler
-   * (Chris 18.11.: kein Team unter 8).
+   * Gemeinsames Fenster, ALTER Stand (#1634, nur noch mit `OLY_FENSTER_AUF_OPT=0`): nie unter das Kader-Minimum verkaufen
+   * (max(8, playerMin)). Seit „Fenster auf Opt" (Chris 18.11.: „man darf alle Spieler verkaufen, auch unter Minimum. Die KI soll
+   * danach ja einfach auf Optimum füllen!") verkauft die KI frei; das Auffuellen bis Opt uebernimmt der Kaderplan im Kaufschritt.
    */
   sellNotBelowMin?: boolean;
   cycleIndex: number;
@@ -544,6 +545,16 @@ async function runTeamCycle(input: {
     });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+    // KADERPLAN (Fenster auf Opt): Grund der Kadergroesse je Team ins Protokoll, wie im Saison-1-Draft (Chris: weniger als Opt
+    // nur bewusst und begruendet). Format wie `ai-picks-run-service`, damit Messung und Lauf-Protokoll dieselbe Zeile lesen.
+    if (plan.kaderplan) {
+      warnings.push(
+        `kaderplan:${input.teamId}:${plan.kaderplan.grund}:opt=${plan.kaderplan.optTarget}:kader=${plan.kaderplan.kader}` +
+          `:rahmen=${plan.kaderplan.rahmenPlaetze}:gm=${plan.kaderplan.optEntscheidung?.gmDelta ?? 0}` +
+          `:notwege=${plan.kaderplan.notwege.join(",") || "0"}`,
+      );
+      if (plan.kaderplan.optEntscheidung?.grund) warnings.push(`kaderplan_gm:${input.teamId}:${plan.kaderplan.optEntscheidung.grund}`);
+    }
     // Salary-Ceiling-V2 Telemetrie auch auf dem In-Season/Preseason-Pfad (S2+) surfacen — der S1-Draft-
     // Pfad (ai-picks-run-service) tut das bereits; ohne dies bleibt das Limit im Long-Run unsichtbar.
     if (plan.salaryCeilingDebug) {
@@ -581,6 +592,9 @@ async function runTeamCycle(input: {
       });
       if (!buyResult.transferCreated || !buyResult.transferId) {
         warnings.push(...buyResult.blockingReasons.slice(0, 2));
+        // Fenster auf Opt: ein geplanter, aber abgelehnter Kauf ist eine Abweichung zwischen Plan und Ausfuehrung — mit Team und
+        // Grund ins Protokoll, damit „unter Opt“ nachvollziehbar bleibt.
+        warnings.push(`fenster_kauf_abgelehnt:${input.teamId}:${decision.playerId}:${buyResult.blockingReasons[0] ?? "?"}`);
         if (applyResult !== "applied") applyResult = "hold";
         input.excludeBuyPlayerIds.add(decision.playerId); // don't re-propose an unbuyable pick next cycle
         continue;
@@ -1167,7 +1181,8 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           allowSells: allowSellsForCycle,
           renewInSellCycle,
           sellInSellCycle,
-          sellNotBelowMin: input.phase === "fenster_verkauf",
+          // Fenster auf Opt (Standard): frei verkaufen; nur der alte Stand (`OLY_FENSTER_AUF_OPT=0`) begrenzt auf das Minimum.
+          sellNotBelowMin: input.phase === "fenster_verkauf" && !istFensterAufOpt(),
           cycleIndex: cycle,
           leagueRound,
           excludeBuyPlayerIds,

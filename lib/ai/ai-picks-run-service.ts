@@ -43,7 +43,8 @@ import {
 } from "@/lib/ai/market-pick-engine/execute-live-pick";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { isLongRunContext } from "@/lib/season/long-run-profile";
-import { planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { istKaderplanAktiv, kaderplanPlatzPreise, planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { istKaderplanStartpoolAktiv } from "@/lib/ai/organic-squad/draft-builder";
 import { LigaDraftLaeuftFehler, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
@@ -2982,6 +2983,8 @@ function runOrganicTeamDraftExecute(input: {
   teamWarnings: string[];
   teamBlockingReasons: string[];
   deferFlush?: boolean;
+  /** KADERPLAN: Platzpreise aus dem Pool zu Beginn des Laufs (s. `kaderplanPlatzPreise`). */
+  kaderplanPlatzPreise?: number[];
 }) {
   const {
     saveId,
@@ -3045,8 +3048,17 @@ function runOrganicTeamDraftExecute(input: {
     startingSquad,
     candidates,
     draftSeed: `${saveId}:${teamId}`,
+    platzPreise: input.kaderplanPlatzPreise,
   });
   teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
+  // KADERPLAN: Grund der Kadergroesse je Team ins Protokoll (Chris: weniger als Opt nur bewusst und begruendet).
+  if (plan.kaderplan) {
+    teamWarnings.push(
+      `kaderplan:${plan.kaderplan.grund}:opt=${plan.kaderplan.optTarget}:kader=${plan.kaderplan.kader}:rahmen=${plan.kaderplan.rahmenPlaetze}` +
+        `:gm=${plan.kaderplan.optEntscheidung?.gmDelta ?? 0}:notwege=${plan.kaderplan.notwege.join(",") || "0"}`,
+    );
+    if (plan.kaderplan.optEntscheidung?.grund) teamWarnings.push(`kaderplan_gm:${plan.kaderplan.optEntscheidung.grund}`);
+  }
   if (plan.stoppedBelowMin) {
     teamWarnings.push("organic_squad_builder_stopped_below_min");
   }
@@ -3824,6 +3836,15 @@ export async function runAiPicksExecutePreview(
     ? createLocalTransfermarktRunContext({ save: resolveStrictLocalSave(persistence, save.saveId), persistence })
     : null;
 
+  // KADERPLAN: Platzpreis aus dem Pool zu Beginn des Laufs, fuer alle Teams gleich (wie der Einzelschritt-Draft).
+  const kaderplanStartPreise = istKaderplanStartpoolAktiv()
+    ? (() => {
+        const startState = (sharedRunContext?.save ?? resolveStrictLocalSave(persistence, save.saveId)).gameState;
+        if (!istKaderplanAktiv(startState)) return undefined;
+        const vergeben = new Set(startState.rosters.map((entry) => entry.playerId));
+        return kaderplanPlatzPreise(startState.players.filter((player) => !vergeben.has(player.id)));
+      })()
+    : undefined;
   for (const previewTeam of previewTeams) {
     if (yieldBetweenTeams) {
       // See AiPicksRunParams.yieldBetweenTeams: same cooperative yield as the preview loop above.
@@ -3964,6 +3985,7 @@ export async function runAiPicksExecutePreview(
         teamWarnings,
         teamBlockingReasons,
         deferFlush: batchPersistence,
+        kaderplanPlatzPreise: kaderplanStartPreise,
       });
       continue;
     }

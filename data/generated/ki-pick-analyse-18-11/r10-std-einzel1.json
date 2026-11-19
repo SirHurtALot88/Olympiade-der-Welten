@@ -1,0 +1,7967 @@
+{
+ "label": "r10-std-einzel1",
+ "saveId": "new-game-1795040032554-du3pjj",
+ "draft": "einzelschritt",
+ "draftMs": 144719,
+ "pool": {
+  "spielerImSpielstand": 2984,
+  "frei": 2983,
+  "kaufbarMwGroesser0": 2983,
+  "mwNull": 0,
+  "preis": {
+   "min": 2.58,
+   "p10": 12.11,
+   "p25": 17.28,
+   "median": 24.98,
+   "p75": 35.58,
+   "p90": 48.43,
+   "p97": 64.95,
+   "max": 113.45
+  },
+  "stufen": {
+   "Superstar": 89,
+   "Star": 297,
+   "Core": 710,
+   "Depth": 855,
+   "Backup": 743,
+   "Reserve": 289
+  },
+  "brackets": {
+   "superstar": 65,
+   "star": 45,
+   "core": 30,
+   "depth": 20,
+   "backup": 12,
+   "reserve": 0
+  },
+  "billigste8Summe": 29.93,
+  "leistbarFuerAermstesTeam": 2983,
+  "aermsteKasse": 170,
+  "kassenSumme": 7915.37,
+  "poolWertSumme": 84108.25
+ },
+ "simulation": null,
+ "einzelschritt": {
+  "kaderplanGruende": {
+   "opt_erreicht": 19,
+   "opt_erreicht_tiefe_vor_qualitaet": 4
+  },
+  "zuege": 401,
+  "halt": "draft_vorbei",
+  "status": "fertig",
+  "runden": 14,
+  "grundZaehler": {
+   "pick:-": 378,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 9, Elite 9): Opt 10 -> 9, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 10, Elite 9): Opt 11 -> 9, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 10, Elite 9): Opt 10 -> 9, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 7, Elite 8): Opt 11 -> 10, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 10, Elite 9): Opt 12 -> 10, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 10, Elite 5): Opt 11 -> 10, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht_tiefe_vor_qualitaet (Zielkader 11 erreicht; der Rahmen trug zu Beginn nur 9 Plaetze ab 12, der Rest bewusst guenstiger besetzt (Tiefe vor Qualitaet))": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 10, Elite 9): Opt 13 -> 11, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12; GM kompakt (Star 8, Elite 7): Opt 12 -> 11, weniger Spieler, dafuer staerker)": 1,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12)": 4,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht_tiefe_vor_qualitaet (Zielkader 12 erreicht; der Rahmen trug zu Beginn nur 11 Plaetze ab 12, der Rest bewusst guenstiger besetzt (Tiefe vor Qualitaet))": 3,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12)": 4,
+   "aus:nichts_leistbar; kaderplan:opt_erreicht (Zielkader 13 erreicht, Rahmen trug alle Plaetze ab 12)": 2
+  },
+  "jeTeam": {
+   "A-A": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 3,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "B-B": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 5,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "B-P": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 9,
+    "platzRunde1": 23,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "C-C": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 11,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "C-S": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 30,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "D-L": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 7,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "D-P": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 13,
+    "platzRunde1": 16,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "G-G": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 29,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "H-R": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 10,
+    "platzRunde1": 25,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "L-K": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 13,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "L-R": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 28,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "M-M": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 32,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "M-S": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 17,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "N-N": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 22,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "N-W": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 21,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "P-C": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 8,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "P-S": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 8,
+    "platzRunde1": 1,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "R-C": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 13,
+    "platzRunde1": 12,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "R-L": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 9,
+    "platzRunde1": 27,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "R-R": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 2,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "S-C": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 10,
+    "platzRunde1": 9,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "S-S": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 24,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "T-C": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 10,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "T-G": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 14,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "T-T": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 20,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "U-A": {
+    "fertigGrund": "max_picks",
+    "picks": 14,
+    "platzRunde1": 6,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "V-D": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 18,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "V-V": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 9,
+    "platzRunde1": 15,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "V-W": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 4,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "W-L": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 11,
+    "platzRunde1": 26,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "W-W": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 12,
+    "platzRunde1": 19,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   },
+   "Z-H": {
+    "fertigGrund": "nichts_leistbar",
+    "picks": 10,
+    "platzRunde1": 31,
+    "notkaeufe": 0,
+    "nachruecker": 0
+   }
+  }
+ },
+ "teams": {
+  "A-A": {
+   "teamId": "A-A",
+   "liga": "liga2",
+   "startKasse": 175,
+   "identitaet": {
+    "finances": 1.23,
+    "ambition": 8.85,
+    "boardConfidence": 1.69,
+    "harmony": 1.69,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 1.84,
+    "spe": 15.47,
+    "men": 2.46,
+    "soc": 0.23
+   },
+   "gm": {
+    "archetype": "star_chaser",
+    "starPriority": 10,
+    "valuePriority": null,
+    "cashPriority": 1,
+    "riskTolerance": 10,
+    "rosterDepthPreference": 3,
+    "eliteSmallRosterPreference": 9
+   },
+   "themaStrenge": null,
+   "solo": {
+    "picks": [
+     "player-2882-chromasyl",
+     "player-0483-wu-tang",
+     "player-0840-rok-kyl",
+     "player-0320-ravager",
+     "player-0642-mictone",
+     "player-1336-orichalcos",
+     "player-2397-greenkraut",
+     "player-1332-breeze",
+     "player-0307-rex",
+     "player-0676-madora",
+     "player-0135-haku"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 8.03,
+    "optTarget": 11,
+    "ruecklage": 7.82,
+    "cashBuffer": 7.82,
+    "solvencyFloor": 7.82,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 2.0208838950561723,
+     "wThrift": 1.0658745947928125,
+     "wSustain": 0.25627345094509446,
+     "wAsset": 0.28339228776210956,
+     "wPatience": 0.15223079807980797,
+     "wProfit": 0.01172975075285302,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 13,
+      "optTarget": 11,
+      "gmDelta": -2,
+      "grund": "GM kompakt (Star 10, Elite 9): Opt 13 -> 11, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 39.42,
+       "gehalt": 9.83
+      },
+      {
+       "mw": 14.55,
+       "gehalt": 3.98
+      },
+      {
+       "mw": 13.37,
+       "gehalt": 4.74
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 12.97,
+       "gehalt": 4.04
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.19
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 0,
+      "Backup": 10,
+      "Reserve": 0
+     },
+     "marktwertSumme": 166.97,
+     "top1Anteil": 0.24,
+     "top2Anteil": 0.32,
+     "mwMax": 39.42,
+     "mwMedian": 12.61,
+     "mwMin": 12.09,
+     "gehalt": 45.8,
+     "kasse": 8.03,
+     "staerke": 40.11
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 22.82,
+      "gehalt": 5.31
+     },
+     {
+      "mw": 20.18,
+      "gehalt": 6.09
+     },
+     {
+      "mw": 15.54,
+      "gehalt": 4.14
+     },
+     {
+      "mw": 14.66,
+      "gehalt": 4.59
+     },
+     {
+      "mw": 14.36,
+      "gehalt": 4.78
+     },
+     {
+      "mw": 13.98,
+      "gehalt": 5.24
+     },
+     {
+      "mw": 13.65,
+      "gehalt": 4.73
+     },
+     {
+      "mw": 13.24,
+      "gehalt": 4.33
+     },
+     {
+      "mw": 13.12,
+      "gehalt": 4.67
+     },
+     {
+      "mw": 12.97,
+      "gehalt": 4.04
+     },
+     {
+      "mw": 12.02,
+      "gehalt": 3.83
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 2,
+     "Backup": 9,
+     "Reserve": 0
+    },
+    "marktwertSumme": 166.54,
+    "top1Anteil": 0.14,
+    "top2Anteil": 0.26,
+    "mwMax": 22.82,
+    "mwMedian": 13.98,
+    "mwMin": 12.02,
+    "gehalt": 51.75,
+    "kasse": 8.46,
+    "staerke": 40.29,
+    "spieler": [
+     "player-2960-knoedelsohn",
+     "player-2513-zinnik",
+     "player-0840-rok-kyl",
+     "player-0434-enoma",
+     "player-0114-waechterbot",
+     "player-2521-migraya",
+     "player-1081-tentacle",
+     "player-0304-venom",
+     "player-0464-pha-tul",
+     "player-1345-yaorenwo",
+     "player-2791-raskor"
+    ],
+    "kasseUeberRuecklage": 0.64,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "B-B": {
+   "teamId": "B-B",
+   "liga": "liga2",
+   "startKasse": 185,
+   "identitaet": {
+    "finances": 3.68,
+    "ambition": 6.28,
+    "boardConfidence": 3.68,
+    "harmony": 3,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 8.4,
+    "spe": 9.68,
+    "men": 0.96,
+    "soc": 0.96
+   },
+   "gm": {
+    "archetype": "risk_gambler",
+    "starPriority": 8,
+    "valuePriority": null,
+    "cashPriority": 2,
+    "riskTolerance": 10,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0871-neyrissa",
+     "player-0483-wu-tang",
+     "player-0642-mictone",
+     "player-2397-greenkraut",
+     "player-2519-atchu",
+     "player-0977-morgrin",
+     "player-0841-exekutor",
+     "player-2726-bronzebrow",
+     "player-0136-snow-eagle",
+     "player-0673-darkray",
+     "player-0135-haku",
+     "player-1345-yaorenwo"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 10.14,
+    "optTarget": 12,
+    "ruecklage": 10.14,
+    "cashBuffer": 10.14,
+    "solvencyFloor": 10.14,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 1.5049252349234925,
+     "wThrift": 0.9411324193752708,
+     "wSustain": 0.34072228022802276,
+     "wAsset": 0.49111902070207014,
+     "wPatience": 0.38954072740607393,
+     "wProfit": 0.5405371203787046,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 38.88,
+       "gehalt": 12.18
+      },
+      {
+       "mw": 14.55,
+       "gehalt": 3.98
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.33,
+       "gehalt": 4.12
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.7
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.01
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.52
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 0,
+      "Backup": 11,
+      "Reserve": 0
+     },
+     "marktwertSumme": 174.86,
+     "top1Anteil": 0.22,
+     "top2Anteil": 0.31,
+     "mwMax": 38.88,
+     "mwMedian": 12.16,
+     "mwMin": 12.02,
+     "gehalt": 51.82,
+     "kasse": 10.14,
+     "staerke": 39.52
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 18.33,
+      "gehalt": 5.12
+     },
+     {
+      "mw": 15.96,
+      "gehalt": 4.95
+     },
+     {
+      "mw": 15.61,
+      "gehalt": 4.99
+     },
+     {
+      "mw": 15.37,
+      "gehalt": 4.79
+     },
+     {
+      "mw": 14.66,
+      "gehalt": 5.04
+     },
+     {
+      "mw": 14.01,
+      "gehalt": 4.48
+     },
+     {
+      "mw": 13.76,
+      "gehalt": 3.72
+     },
+     {
+      "mw": 13.7,
+      "gehalt": 4.11
+     },
+     {
+      "mw": 13.65,
+      "gehalt": 4.18
+     },
+     {
+      "mw": 13.61,
+      "gehalt": 3.64
+     },
+     {
+      "mw": 13.16,
+      "gehalt": 4.03
+     },
+     {
+      "mw": 12.99,
+      "gehalt": 3.4
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 12,
+     "Reserve": 0
+    },
+    "marktwertSumme": 174.81,
+    "top1Anteil": 0.1,
+    "top2Anteil": 0.2,
+    "mwMax": 18.33,
+    "mwMedian": 14.01,
+    "mwMin": 12.99,
+    "gehalt": 52.45,
+    "kasse": 10.19,
+    "staerke": 41.54,
+    "spieler": [
+     "player-0123-cerberus",
+     "player-0115-hydra",
+     "player-1319-morphosis",
+     "player-1485-weevil",
+     "player-0973-lurker",
+     "player-0965-ultralisk",
+     "player-0823-becky",
+     "player-2833-mossbound",
+     "player-2039-molbologna",
+     "player-1878-tendril",
+     "player-1622-wispwhisker",
+     "player-1873-sarna"
+    ],
+    "kasseUeberRuecklage": 0.05,
+    "kasseAnteilStart": 0.06
+   }
+  },
+  "B-P": {
+   "teamId": "B-P",
+   "liga": "liga1",
+   "startKasse": 275,
+   "identitaet": {
+    "finances": 6.41,
+    "ambition": 8,
+    "boardConfidence": 7.41,
+    "harmony": 6,
+    "playerOpt": 9,
+    "playerMin": 8,
+    "pow": 6,
+    "spe": 3.59,
+    "men": 7.41,
+    "soc": 3
+   },
+   "gm": {
+    "archetype": "elite_curator",
+    "starPriority": 7,
+    "valuePriority": 7,
+    "cashPriority": null,
+    "riskTolerance": null,
+    "rosterDepthPreference": 3,
+    "eliteSmallRosterPreference": 10
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-0358-general-maneketh",
+     "player-1530-moses",
+     "player-2882-chromasyl",
+     "player-0389-greybeard",
+     "player-0049-skysplitter-strider",
+     "player-0528-ashanti",
+     "player-2725-ember-callahan",
+     "player-0483-wu-tang",
+     "player-0642-mictone"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 23.83,
+    "optTarget": 9,
+    "ruecklage": 23.41,
+    "cashBuffer": 23.41,
+    "solvencyFloor": 23.41,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 3,
+     "depth": 4,
+     "backup": 2,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.4333229667411185,
+     "wThrift": 0.7107041736618107,
+     "wSustain": 0.6967135115733796,
+     "wAsset": 0.39007548568190153,
+     "wPatience": 0.8154221358802548,
+     "wProfit": 0.011525285861919485,
+     "optTarget": 9
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 9,
+     "kader": 9,
+     "rahmenPlaetze": 9,
+     "notwege": [],
+     "text": "Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 9,
+      "optTarget": 9,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 9,
+     "spielerWerte": [
+      {
+       "mw": 42.84,
+       "gehalt": 10.02
+      },
+      {
+       "mw": 40.07,
+       "gehalt": 12.47
+      },
+      {
+       "mw": 39.42,
+       "gehalt": 9.83
+      },
+      {
+       "mw": 29.71,
+       "gehalt": 7.87
+      },
+      {
+       "mw": 29.58,
+       "gehalt": 6.79
+      },
+      {
+       "mw": 27.16,
+       "gehalt": 6.72
+      },
+      {
+       "mw": 15.41,
+       "gehalt": 4.92
+      },
+      {
+       "mw": 14.55,
+       "gehalt": 3.98
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 3,
+      "Depth": 3,
+      "Backup": 3,
+      "Reserve": 0
+     },
+     "marktwertSumme": 251.17,
+     "top1Anteil": 0.17,
+     "top2Anteil": 0.33,
+     "mwMax": 42.84,
+     "mwMedian": 29.58,
+     "mwMin": 12.43,
+     "gehalt": 64.73,
+     "kasse": 23.83,
+     "staerke": 50.8
+    }
+   },
+   "nachDraft": {
+    "kader": 9,
+    "spielerWerte": [
+     {
+      "mw": 42.84,
+      "gehalt": 10.02
+     },
+     {
+      "mw": 40.07,
+      "gehalt": 12.47
+     },
+     {
+      "mw": 39.42,
+      "gehalt": 9.83
+     },
+     {
+      "mw": 29.71,
+      "gehalt": 7.87
+     },
+     {
+      "mw": 29.58,
+      "gehalt": 6.79
+     },
+     {
+      "mw": 27.16,
+      "gehalt": 6.72
+     },
+     {
+      "mw": 15.45,
+      "gehalt": 4.89
+     },
+     {
+      "mw": 14.85,
+      "gehalt": 4.65
+     },
+     {
+      "mw": 12.4,
+      "gehalt": 2.96
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 3,
+     "Depth": 3,
+     "Backup": 3,
+     "Reserve": 0
+    },
+    "marktwertSumme": 251.48,
+    "top1Anteil": 0.17,
+    "top2Anteil": 0.33,
+    "mwMax": 42.84,
+    "mwMedian": 29.58,
+    "mwMin": 12.4,
+    "gehalt": 66.2,
+    "kasse": 23.52,
+    "staerke": 50.23,
+    "spieler": [
+     "player-0358-general-maneketh",
+     "player-1530-moses",
+     "player-2882-chromasyl",
+     "player-0389-greybeard",
+     "player-0049-skysplitter-strider",
+     "player-0528-ashanti",
+     "player-1328-starweaver",
+     "player-1887-desiree",
+     "player-1075-soulstorm"
+    ],
+    "kasseUeberRuecklage": 0.11,
+    "kasseAnteilStart": 0.09
+   }
+  },
+  "C-C": {
+   "teamId": "C-C",
+   "liga": "liga2",
+   "startKasse": 215,
+   "identitaet": {
+    "finances": 9.72,
+    "ambition": 2.84,
+    "boardConfidence": 3.76,
+    "harmony": 7.22,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 4,
+    "spe": 4.28,
+    "men": 4,
+    "soc": 8
+   },
+   "gm": {
+    "archetype": "bargain_hunter",
+    "starPriority": 5,
+    "valuePriority": 10,
+    "cashPriority": 9,
+    "riskTolerance": 4,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-1883-haldor",
+     "player-1096-untaught-scribe",
+     "player-0320-ravager",
+     "player-0483-wu-tang",
+     "player-2319-ayumi",
+     "player-1332-breeze",
+     "player-0642-mictone",
+     "player-0294-grimflora",
+     "player-1071-belandria",
+     "player-0135-haku",
+     "player-2519-atchu",
+     "player-0318-braugh",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 26.22,
+    "optTarget": 14,
+    "ruecklage": 26.21,
+    "cashBuffer": 26.21,
+    "solvencyFloor": 26.21,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 5,
+     "backup": 6,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.8726934485448544,
+     "wThrift": 0.735580100410041,
+     "wSustain": 0.820384920092009,
+     "wAsset": 0.6687298217821782,
+     "wPatience": 1.176633890055672,
+     "wProfit": 0.9111107110711071,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 23.01,
+       "gehalt": 5.27
+      },
+      {
+       "mw": 14.55,
+       "gehalt": 3.98
+      },
+      {
+       "mw": 14.51,
+       "gehalt": 3.31
+      },
+      {
+       "mw": 13.5,
+       "gehalt": 4.58
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.2,
+       "gehalt": 3.54
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 1,
+      "Backup": 13,
+      "Reserve": 0
+     },
+     "marktwertSumme": 188.78,
+     "top1Anteil": 0.12,
+     "top2Anteil": 0.2,
+     "mwMax": 23.01,
+     "mwMedian": 12.61,
+     "mwMin": 12.02,
+     "gehalt": 52.98,
+     "kasse": 26.22,
+     "staerke": 40.72
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 17.66,
+      "gehalt": 5.42
+     },
+     {
+      "mw": 16.95,
+      "gehalt": 5.48
+     },
+     {
+      "mw": 16.93,
+      "gehalt": 4.78
+     },
+     {
+      "mw": 14.55,
+      "gehalt": 3.98
+     },
+     {
+      "mw": 14.51,
+      "gehalt": 3.31
+     },
+     {
+      "mw": 14.07,
+      "gehalt": 4.23
+     },
+     {
+      "mw": 13.99,
+      "gehalt": 5.79
+     },
+     {
+      "mw": 13.5,
+      "gehalt": 4.58
+     },
+     {
+      "mw": 13.36,
+      "gehalt": 3.32
+     },
+     {
+      "mw": 12.75,
+      "gehalt": 4.82
+     },
+     {
+      "mw": 12.58,
+      "gehalt": 3.38
+     },
+     {
+      "mw": 12.54,
+      "gehalt": 3.47
+     },
+     {
+      "mw": 6.76,
+      "gehalt": 3.13
+     },
+     {
+      "mw": 5.88,
+      "gehalt": 2.35
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 12,
+     "Reserve": 2
+    },
+    "marktwertSumme": 186.03,
+    "top1Anteil": 0.09,
+    "top2Anteil": 0.19,
+    "mwMax": 17.66,
+    "mwMedian": 13.99,
+    "mwMin": 5.88,
+    "gehalt": 58.04,
+    "kasse": 28.97,
+    "staerke": 40.74,
+    "spieler": [
+     "player-1883-haldor",
+     "player-0642-mictone",
+     "player-2858-ash",
+     "player-0294-grimflora",
+     "player-1302-clara",
+     "player-0132-ivera",
+     "player-2660-mira-k4",
+     "player-2238-muria-sisters",
+     "player-0293-magmus",
+     "player-1874-colonys-sting",
+     "player-0301-blitzy",
+     "player-2899-fyrda",
+     "player-0341-dgash-r",
+     "player-2902-dromon"
+    ],
+    "kasseUeberRuecklage": 2.76,
+    "kasseAnteilStart": 0.13
+   }
+  },
+  "C-S": {
+   "teamId": "C-S",
+   "liga": "liga1",
+   "startKasse": 315,
+   "identitaet": {
+    "finances": 8.32,
+    "ambition": 7,
+    "boardConfidence": 9,
+    "harmony": 8.29,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 2.47,
+    "spe": 5.06,
+    "men": 7.41,
+    "soc": 5.53
+   },
+   "gm": {
+    "archetype": "facility_architect",
+    "starPriority": null,
+    "valuePriority": 7,
+    "cashPriority": 7,
+    "riskTolerance": 4,
+    "rosterDepthPreference": 6,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-1697-lyselith",
+     "player-0890-reefstrike",
+     "player-1701-catherine",
+     "player-2504-seluna",
+     "player-1473-enforcer",
+     "player-0389-greybeard",
+     "player-0439-grimma",
+     "player-2201-zhen-mu",
+     "player-1698-com-clarksson",
+     "player-0825-phantomblade",
+     "player-0977-morgrin"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 33.58,
+    "optTarget": 11,
+    "ruecklage": 33.49,
+    "cashBuffer": 33.49,
+    "solvencyFloor": 33.49,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 3,
+     "depth": 5,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 0.9357072373904056,
+     "wThrift": 0.6382337391072439,
+     "wSustain": 0.7645985985265192,
+     "wAsset": 0.4325158195819582,
+     "wPatience": 1.0336425762576258,
+     "wProfit": 0.011703437010367664,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 11,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 35.83,
+       "gehalt": 8.93
+      },
+      {
+       "mw": 31.1,
+       "gehalt": 8.6
+      },
+      {
+       "mw": 30.39,
+       "gehalt": 7.06
+      },
+      {
+       "mw": 29.58,
+       "gehalt": 6.79
+      },
+      {
+       "mw": 29.09,
+       "gehalt": 7.94
+      },
+      {
+       "mw": 28.67,
+       "gehalt": 6.96
+      },
+      {
+       "mw": 27.1,
+       "gehalt": 6.61
+      },
+      {
+       "mw": 21.86,
+       "gehalt": 6.87
+      },
+      {
+       "mw": 20.23,
+       "gehalt": 5.6
+      },
+      {
+       "mw": 15.41,
+       "gehalt": 5.15
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.7
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 3,
+      "Depth": 6,
+      "Backup": 2,
+      "Reserve": 0
+     },
+     "marktwertSumme": 281.42,
+     "top1Anteil": 0.13,
+     "top2Anteil": 0.24,
+     "mwMax": 35.83,
+     "mwMedian": 28.67,
+     "mwMin": 12.16,
+     "gehalt": 75.21,
+     "kasse": 33.58,
+     "staerke": 51.33
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 35.83,
+      "gehalt": 8.93
+     },
+     {
+      "mw": 31.1,
+      "gehalt": 8.6
+     },
+     {
+      "mw": 30.39,
+      "gehalt": 7.06
+     },
+     {
+      "mw": 29.09,
+      "gehalt": 7.94
+     },
+     {
+      "mw": 28.67,
+      "gehalt": 6.96
+     },
+     {
+      "mw": 27.1,
+      "gehalt": 6.61
+     },
+     {
+      "mw": 25.63,
+      "gehalt": 6.56
+     },
+     {
+      "mw": 24.4,
+      "gehalt": 6.04
+     },
+     {
+      "mw": 21.86,
+      "gehalt": 6.87
+     },
+     {
+      "mw": 14.02,
+      "gehalt": 3.67
+     },
+     {
+      "mw": 12.58,
+      "gehalt": 4.33
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 3,
+     "Depth": 6,
+     "Backup": 2,
+     "Reserve": 0
+    },
+    "marktwertSumme": 280.67,
+    "top1Anteil": 0.13,
+    "top2Anteil": 0.24,
+    "mwMax": 35.83,
+    "mwMedian": 27.1,
+    "mwMin": 12.58,
+    "gehalt": 73.57,
+    "kasse": 34.33,
+    "staerke": 51.24,
+    "spieler": [
+     "player-1697-lyselith",
+     "player-0890-reefstrike",
+     "player-1701-catherine",
+     "player-2504-seluna",
+     "player-0439-grimma",
+     "player-1702-thorun",
+     "player-2201-zhen-mu",
+     "player-0757-swordmaster-yamira",
+     "player-1698-com-clarksson",
+     "player-1089-pitchblack",
+     "player-1624-miracle"
+    ],
+    "kasseUeberRuecklage": 0.84,
+    "kasseAnteilStart": 0.11
+   }
+  },
+  "D-L": {
+   "teamId": "D-L",
+   "liga": "liga2",
+   "startKasse": 195,
+   "identitaet": {
+    "finances": 4.94,
+    "ambition": 6.59,
+    "boardConfidence": 8.53,
+    "harmony": 10,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 6.24,
+    "spe": 1.41,
+    "men": 2.35,
+    "soc": 10
+   },
+   "gm": {
+    "archetype": "culture_keeper",
+    "starPriority": null,
+    "valuePriority": 6,
+    "cashPriority": null,
+    "riskTolerance": 3,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-1332-breeze",
+     "player-0819-udjnyna",
+     "player-1096-untaught-scribe",
+     "player-2725-ember-callahan",
+     "player-0825-phantomblade",
+     "player-0135-haku",
+     "player-0676-madora",
+     "player-0838-shadowrunner",
+     "player-2447-illyra-fay",
+     "player-2063-bongo-skydrop",
+     "player-1625-valtheris",
+     "player-0315-rynna",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 13.43,
+    "optTarget": 14,
+    "ruecklage": 13.41,
+    "cashBuffer": 13.41,
+    "solvencyFloor": 13.41,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 5,
+     "backup": 6,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.8934502129324042,
+     "wThrift": 0.9097414737918237,
+     "wSustain": 0.6800607597648654,
+     "wAsset": 0.2767496909690969,
+     "wPatience": 0.804695769243591,
+     "wProfit": 0,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 15.91,
+       "gehalt": 4.09
+      },
+      {
+       "mw": 15.41,
+       "gehalt": 4.92
+      },
+      {
+       "mw": 15.41,
+       "gehalt": 5.15
+      },
+      {
+       "mw": 12.78,
+       "gehalt": 4.04
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.22,
+       "gehalt": 4.43
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 3.5
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 2.72
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.43
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 0,
+      "Backup": 14,
+      "Reserve": 0
+     },
+     "marktwertSumme": 181.57,
+     "top1Anteil": 0.09,
+     "top2Anteil": 0.17,
+     "mwMax": 15.91,
+     "mwMedian": 12.22,
+     "mwMin": 12.02,
+     "gehalt": 54.37,
+     "kasse": 13.43,
+     "staerke": 39.14
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 16.64,
+      "gehalt": 5.26
+     },
+     {
+      "mw": 15.47,
+      "gehalt": 3.65
+     },
+     {
+      "mw": 15.41,
+      "gehalt": 5.15
+     },
+     {
+      "mw": 14.42,
+      "gehalt": 4.59
+     },
+     {
+      "mw": 13.77,
+      "gehalt": 3.39
+     },
+     {
+      "mw": 13.65,
+      "gehalt": 4.73
+     },
+     {
+      "mw": 13.42,
+      "gehalt": 3.17
+     },
+     {
+      "mw": 13.38,
+      "gehalt": 3.2
+     },
+     {
+      "mw": 12.68,
+      "gehalt": 3.95
+     },
+     {
+      "mw": 12.22,
+      "gehalt": 4.43
+     },
+     {
+      "mw": 12.13,
+      "gehalt": 2.72
+     },
+     {
+      "mw": 12.06,
+      "gehalt": 4.43
+     },
+     {
+      "mw": 9.3,
+      "gehalt": 2.85
+     },
+     {
+      "mw": 4.91,
+      "gehalt": 1.64
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 12,
+     "Reserve": 2
+    },
+    "marktwertSumme": 179.46,
+    "top1Anteil": 0.09,
+    "top2Anteil": 0.18,
+    "mwMax": 16.64,
+    "mwMedian": 13.42,
+    "mwMin": 4.91,
+    "gehalt": 53.16,
+    "kasse": 15.54,
+    "staerke": 39.85,
+    "spieler": [
+     "player-1096-untaught-scribe",
+     "player-0315-rynna",
+     "player-1317-suzuna",
+     "player-0825-phantomblade",
+     "player-1340-eremal",
+     "player-0286-keg",
+     "player-2027-drifty",
+     "player-1855-zephie",
+     "player-1882-nimril",
+     "player-2063-bongo-skydrop",
+     "player-2502-seriel-morven",
+     "player-1625-valtheris",
+     "player-2770-sir-turlin-pfahlhut",
+     "player-2795-sereth"
+    ],
+    "kasseUeberRuecklage": 2.13,
+    "kasseAnteilStart": 0.08
+   }
+  },
+  "D-P": {
+   "teamId": "D-P",
+   "liga": "liga2",
+   "startKasse": 240,
+   "identitaet": {
+    "finances": 3.05,
+    "ambition": 6,
+    "boardConfidence": 5.7,
+    "harmony": 9.35,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 1.7,
+    "spe": 5.95,
+    "men": 2.7,
+    "soc": 9.65
+   },
+   "gm": {
+    "archetype": "culture_keeper",
+    "starPriority": null,
+    "valuePriority": 6,
+    "cashPriority": null,
+    "riskTolerance": 5,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-0483-wu-tang",
+     "player-1177-aeloria",
+     "player-1332-breeze",
+     "player-0112-jihanna",
+     "player-1289-xylaris",
+     "player-1037-sweet-dreams",
+     "player-0083-scruffy",
+     "player-2253-waxia",
+     "player-0756-zephyr",
+     "player-2447-illyra-fay",
+     "player-1345-yaorenwo",
+     "player-2519-atchu",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 11.52,
+    "optTarget": 13,
+    "ruecklage": 11.47,
+    "cashBuffer": 11.47,
+    "solvencyFloor": 11.47,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 1,
+     "depth": 7,
+     "backup": 3,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 0.9809016923914612,
+     "wThrift": 1.119563786378638,
+     "wSustain": 0.7365191081330356,
+     "wAsset": 0.26645003300330034,
+     "wPatience": 0.5725014034736807,
+     "wProfit": 0,
+     "optTarget": 13
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 13,
+     "kader": 13,
+     "rahmenPlaetze": 13,
+     "notwege": [],
+     "text": "Zielkader 13 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 13,
+      "optTarget": 13,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 13,
+     "spielerWerte": [
+      {
+       "mw": 35.48,
+       "gehalt": 7.71
+      },
+      {
+       "mw": 22.03,
+       "gehalt": 5.53
+      },
+      {
+       "mw": 21.33,
+       "gehalt": 7.2
+      },
+      {
+       "mw": 20.28,
+       "gehalt": 5.03
+      },
+      {
+       "mw": 20.17,
+       "gehalt": 6.44
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 15.94,
+       "gehalt": 3.71
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 3.5
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 5,
+      "Backup": 7,
+      "Reserve": 0
+     },
+     "marktwertSumme": 228.48,
+     "top1Anteil": 0.16,
+     "top2Anteil": 0.25,
+     "mwMax": 35.48,
+     "mwMedian": 15.94,
+     "mwMin": 12.02,
+     "gehalt": 59.38,
+     "kasse": 11.52,
+     "staerke": 44.67
+    }
+   },
+   "nachDraft": {
+    "kader": 13,
+    "spielerWerte": [
+     {
+      "mw": 35.48,
+      "gehalt": 7.71
+     },
+     {
+      "mw": 22.03,
+      "gehalt": 5.53
+     },
+     {
+      "mw": 21.33,
+      "gehalt": 7.2
+     },
+     {
+      "mw": 20.28,
+      "gehalt": 5.03
+     },
+     {
+      "mw": 18.02,
+      "gehalt": 6.3
+     },
+     {
+      "mw": 16.36,
+      "gehalt": 4.26
+     },
+     {
+      "mw": 14.99,
+      "gehalt": 4.17
+     },
+     {
+      "mw": 14.19,
+      "gehalt": 5.62
+     },
+     {
+      "mw": 14.07,
+      "gehalt": 4.7
+     },
+     {
+      "mw": 13.67,
+      "gehalt": 2.97
+     },
+     {
+      "mw": 12.58,
+      "gehalt": 3.85
+     },
+     {
+      "mw": 12.32,
+      "gehalt": 3.43
+     },
+     {
+      "mw": 12.12,
+      "gehalt": 5.01
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 1,
+     "Depth": 3,
+     "Backup": 9,
+     "Reserve": 0
+    },
+    "marktwertSumme": 227.44,
+    "top1Anteil": 0.16,
+    "top2Anteil": 0.25,
+    "mwMax": 35.48,
+    "mwMedian": 14.99,
+    "mwMin": 12.12,
+    "gehalt": 65.78,
+    "kasse": 12.56,
+    "staerke": 45.04,
+    "spieler": [
+     "player-1177-aeloria",
+     "player-1076-wingless",
+     "player-1037-sweet-dreams",
+     "player-0652-whispra",
+     "player-2253-waxia",
+     "player-0275-morgra",
+     "player-0756-zephyr",
+     "player-2137-dorya",
+     "player-2045-vireetha",
+     "player-0470-floodspirit",
+     "player-2001-phoebe",
+     "player-1997-glutton-slice",
+     "player-2005-fox"
+    ],
+    "kasseUeberRuecklage": 1.09,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "G-G": {
+   "teamId": "G-G",
+   "liga": "liga1",
+   "startKasse": 310,
+   "identitaet": {
+    "finances": 6.71,
+    "ambition": 7.14,
+    "boardConfidence": 7.29,
+    "harmony": 8.79,
+    "playerOpt": 13,
+    "playerMin": 8,
+    "pow": 1.29,
+    "spe": 5.57,
+    "men": 7.29,
+    "soc": 6.28
+   },
+   "gm": {
+    "archetype": "talent_builder",
+    "starPriority": 4,
+    "valuePriority": 8,
+    "cashPriority": null,
+    "riskTolerance": 4,
+    "rosterDepthPreference": 8,
+    "eliteSmallRosterPreference": 3
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-1713-eryndor",
+     "player-1289-xylaris",
+     "player-2413-liora-somnia",
+     "player-1473-enforcer",
+     "player-0540-auza",
+     "player-2298-alarm",
+     "player-1423-eisenherz",
+     "player-1697-lyselith",
+     "player-0284-quarris",
+     "player-2010-abyss",
+     "player-2726-bronzebrow",
+     "player-2537-grunak-crumbhand",
+     "player-0135-haku",
+     "player-1345-yaorenwo"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 27.43,
+    "optTarget": 14,
+    "ruecklage": 27.42,
+    "cashBuffer": 27.42,
+    "solvencyFloor": 27.42,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 4,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 1
+    },
+    "gewichte": {
+     "wWin": 0.8647519027902789,
+     "wThrift": 1.0112550491049104,
+     "wSustain": 0.5996548200153349,
+     "wAsset": 0.4443082481581492,
+     "wPatience": 0.8554928016134947,
+     "wProfit": 0.011996444088853288,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 33.85,
+       "gehalt": 9.87
+      },
+      {
+       "mw": 33.72,
+       "gehalt": 6.9
+      },
+      {
+       "mw": 30.39,
+       "gehalt": 7.06
+      },
+      {
+       "mw": 28.41,
+       "gehalt": 6
+      },
+      {
+       "mw": 20.38,
+       "gehalt": 4.84
+      },
+      {
+       "mw": 20.23,
+       "gehalt": 5.6
+      },
+      {
+       "mw": 20.05,
+       "gehalt": 7.46
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 13.91,
+       "gehalt": 4.28
+      },
+      {
+       "mw": 13.36,
+       "gehalt": 4.44
+      },
+      {
+       "mw": 12.14,
+       "gehalt": 3.3
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 3,
+      "Depth": 5,
+      "Backup": 6,
+      "Reserve": 0
+     },
+     "marktwertSumme": 282.57,
+     "top1Anteil": 0.12,
+     "top2Anteil": 0.24,
+     "mwMax": 33.85,
+     "mwMedian": 20.05,
+     "mwMin": 12.02,
+     "gehalt": 74.03,
+     "kasse": 27.43,
+     "staerke": 49.63
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 33.85,
+      "gehalt": 9.87
+     },
+     {
+      "mw": 33.72,
+      "gehalt": 6.9
+     },
+     {
+      "mw": 28.41,
+      "gehalt": 6
+     },
+     {
+      "mw": 27.54,
+      "gehalt": 6.89
+     },
+     {
+      "mw": 21.95,
+      "gehalt": 4.64
+     },
+     {
+      "mw": 20.23,
+      "gehalt": 5.6
+     },
+     {
+      "mw": 20.05,
+      "gehalt": 7.46
+     },
+     {
+      "mw": 15.34,
+      "gehalt": 3.71
+     },
+     {
+      "mw": 14.31,
+      "gehalt": 5.18
+     },
+     {
+      "mw": 13.93,
+      "gehalt": 3.4
+     },
+     {
+      "mw": 13.79,
+      "gehalt": 3.79
+     },
+     {
+      "mw": 13.66,
+      "gehalt": 3.83
+     },
+     {
+      "mw": 12.69,
+      "gehalt": 3.19
+     },
+     {
+      "mw": 12.54,
+      "gehalt": 4.68
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 2,
+     "Depth": 5,
+     "Backup": 7,
+     "Reserve": 0
+    },
+    "marktwertSumme": 282.01,
+    "top1Anteil": 0.12,
+    "top2Anteil": 0.24,
+    "mwMax": 33.85,
+    "mwMedian": 20.05,
+    "mwMin": 12.54,
+    "gehalt": 75.14,
+    "kasse": 27.99,
+    "staerke": 48.1,
+    "spieler": [
+     "player-1713-eryndor",
+     "player-2413-liora-somnia",
+     "player-1473-enforcer",
+     "player-0540-auza",
+     "player-1423-eisenherz",
+     "player-0276-chyros",
+     "player-2000-gary-the-keeper",
+     "player-2444-abe-lincoln",
+     "player-2003-skull-knight",
+     "player-1495-talissa",
+     "player-2249-dualis",
+     "player-1497-grimborg",
+     "player-2393-brangorr-moosbart",
+     "player-1875-inefinna"
+    ],
+    "kasseUeberRuecklage": 0.57,
+    "kasseAnteilStart": 0.09
+   }
+  },
+  "H-R": {
+   "teamId": "H-R",
+   "liga": "liga1",
+   "startKasse": 285,
+   "identitaet": {
+    "finances": 2.1,
+    "ambition": 8.8,
+    "boardConfidence": 5.5,
+    "harmony": 3.4,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 7.8,
+    "spe": 7.2,
+    "men": 5,
+    "soc": 0
+   },
+   "gm": {
+    "archetype": "star_chaser",
+    "starPriority": 10,
+    "valuePriority": null,
+    "cashPriority": 3,
+    "riskTolerance": 9,
+    "rosterDepthPreference": 2,
+    "eliteSmallRosterPreference": 9
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-2891-hellraiser",
+     "player-2405-amystheta",
+     "player-2095-ghorok",
+     "player-0775-ruthgal",
+     "player-2391-passion",
+     "player-0233-mephisto",
+     "player-0123-cerberus",
+     "player-1485-weevil",
+     "player-0479-teravolt",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 10.63,
+    "optTarget": 10,
+    "ruecklage": 10.61,
+    "cashBuffer": 10.61,
+    "solvencyFloor": 10.61,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 2,
+     "core": 2,
+     "depth": 4,
+     "backup": 2,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.9276570141458593,
+     "wThrift": 0.924184224200198,
+     "wSustain": 0.3540630138569412,
+     "wAsset": 0.33104675800913425,
+     "wPatience": 0.442899033236657,
+     "wProfit": 0.011011101110110973,
+     "optTarget": 10
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 10,
+     "kader": 10,
+     "rahmenPlaetze": 10,
+     "notwege": [],
+     "text": "Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 10,
+      "gmDelta": -2,
+      "grund": "GM kompakt (Star 10, Elite 9): Opt 12 -> 10, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 10,
+     "spielerWerte": [
+      {
+       "mw": 48.25,
+       "gehalt": 13.33
+      },
+      {
+       "mw": 47.03,
+       "gehalt": 13.39
+      },
+      {
+       "mw": 39.94,
+       "gehalt": 9.7
+      },
+      {
+       "mw": 34.3,
+       "gehalt": 10.04
+      },
+      {
+       "mw": 27.88,
+       "gehalt": 9.44
+      },
+      {
+       "mw": 21.18,
+       "gehalt": 5.8
+      },
+      {
+       "mw": 15.61,
+       "gehalt": 4.99
+      },
+      {
+       "mw": 15.37,
+       "gehalt": 4.79
+      },
+      {
+       "mw": 12.79,
+       "gehalt": 4.34
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 2,
+      "Core": 2,
+      "Depth": 2,
+      "Backup": 4,
+      "Reserve": 0
+     },
+     "marktwertSumme": 274.37,
+     "top1Anteil": 0.18,
+     "top2Anteil": 0.35,
+     "mwMax": 48.25,
+     "mwMedian": 27.88,
+     "mwMin": 12.02,
+     "gehalt": 78.95,
+     "kasse": 10.63,
+     "staerke": 52.3
+    }
+   },
+   "nachDraft": {
+    "kader": 10,
+    "spielerWerte": [
+     {
+      "mw": 48.25,
+      "gehalt": 13.33
+     },
+     {
+      "mw": 47.03,
+      "gehalt": 13.39
+     },
+     {
+      "mw": 39.94,
+      "gehalt": 9.7
+     },
+     {
+      "mw": 34.3,
+      "gehalt": 10.04
+     },
+     {
+      "mw": 27.88,
+      "gehalt": 9.44
+     },
+     {
+      "mw": 21.18,
+      "gehalt": 5.8
+     },
+     {
+      "mw": 16.87,
+      "gehalt": 6.14
+     },
+     {
+      "mw": 13.25,
+      "gehalt": 3.23
+     },
+     {
+      "mw": 12.81,
+      "gehalt": 3.56
+     },
+     {
+      "mw": 12.46,
+      "gehalt": 4.43
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 2,
+     "Core": 2,
+     "Depth": 2,
+     "Backup": 4,
+     "Reserve": 0
+    },
+    "marktwertSumme": 273.97,
+    "top1Anteil": 0.18,
+    "top2Anteil": 0.35,
+    "mwMax": 48.25,
+    "mwMedian": 27.88,
+    "mwMin": 12.46,
+    "gehalt": 79.06,
+    "kasse": 11.03,
+    "staerke": 52.27,
+    "spieler": [
+     "player-2891-hellraiser",
+     "player-2405-amystheta",
+     "player-2095-ghorok",
+     "player-0775-ruthgal",
+     "player-2391-passion",
+     "player-0233-mephisto",
+     "player-0948-cheeseburger",
+     "player-0656-lucy",
+     "player-0833-ieloma",
+     "player-0978-qafsiel"
+    ],
+    "kasseUeberRuecklage": 0.42,
+    "kasseAnteilStart": 0.04
+   }
+  },
+  "L-K": {
+   "teamId": "L-K",
+   "liga": "liga2",
+   "startKasse": 225,
+   "identitaet": {
+    "finances": 7.38,
+    "ambition": 6.96,
+    "boardConfidence": 3.96,
+    "harmony": 8,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 6,
+    "spe": 5.69,
+    "men": 8,
+    "soc": 0.31
+   },
+   "gm": {
+    "archetype": "talent_builder",
+    "starPriority": 5,
+    "valuePriority": 8,
+    "cashPriority": null,
+    "riskTolerance": 6,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": 3
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-1053-prinz-morven",
+     "player-2381-riot",
+     "player-1826-nezhet",
+     "player-1047-myth",
+     "player-1083-nrogor",
+     "player-1097-steel-sinister",
+     "player-1091-kols",
+     "player-0307-rex",
+     "player-0135-haku",
+     "player-0676-madora",
+     "player-1345-yaorenwo",
+     "player-0318-braugh",
+     "player-2726-bronzebrow",
+     "player-2519-atchu"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 21.59,
+    "optTarget": 14,
+    "ruecklage": 21.58,
+    "cashBuffer": 21.58,
+    "solvencyFloor": 21.58,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 7,
+     "backup": 4,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 1.2525014766365523,
+     "wThrift": 0.9392439648409285,
+     "wSustain": 0.4847077295285084,
+     "wAsset": 0.4214346127946128,
+     "wPatience": 0.7716775650898423,
+     "wProfit": 0.010937671544932233,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 21.56,
+       "gehalt": 6.01
+      },
+      {
+       "mw": 20.63,
+       "gehalt": 5.12
+      },
+      {
+       "mw": 20.05,
+       "gehalt": 6.55
+      },
+      {
+       "mw": 19.82,
+       "gehalt": 4.71
+      },
+      {
+       "mw": 12.62,
+       "gehalt": 3.59
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.19
+      },
+      {
+       "mw": 12.15,
+       "gehalt": 3.85
+      },
+      {
+       "mw": 12.11,
+       "gehalt": 2.53
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 3,
+      "Backup": 11,
+      "Reserve": 0
+     },
+     "marktwertSumme": 203.41,
+     "top1Anteil": 0.11,
+     "top2Anteil": 0.21,
+     "mwMax": 21.56,
+     "mwMedian": 12.15,
+     "mwMin": 12.02,
+     "gehalt": 58.04,
+     "kasse": 21.59,
+     "staerke": 42.05
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 16.31,
+      "gehalt": 5.63
+     },
+     {
+      "mw": 15.82,
+      "gehalt": 6.04
+     },
+     {
+      "mw": 15.57,
+      "gehalt": 5.14
+     },
+     {
+      "mw": 15.53,
+      "gehalt": 5.28
+     },
+     {
+      "mw": 15.38,
+      "gehalt": 5.44
+     },
+     {
+      "mw": 15.07,
+      "gehalt": 5.58
+     },
+     {
+      "mw": 14.88,
+      "gehalt": 5.9
+     },
+     {
+      "mw": 14.79,
+      "gehalt": 4.61
+     },
+     {
+      "mw": 14.69,
+      "gehalt": 5.66
+     },
+     {
+      "mw": 14.25,
+      "gehalt": 4.27
+     },
+     {
+      "mw": 13.43,
+      "gehalt": 3.9
+     },
+     {
+      "mw": 12.78,
+      "gehalt": 3.27
+     },
+     {
+      "mw": 12.33,
+      "gehalt": 4.12
+     },
+     {
+      "mw": 12.15,
+      "gehalt": 3.85
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 14,
+     "Reserve": 0
+    },
+    "marktwertSumme": 202.98,
+    "top1Anteil": 0.08,
+    "top2Anteil": 0.16,
+    "mwMax": 16.31,
+    "mwMedian": 14.88,
+    "mwMin": 12.15,
+    "gehalt": 68.69,
+    "kasse": 22.02,
+    "staerke": 42.07,
+    "spieler": [
+     "player-1083-nrogor",
+     "player-2845-rhazgul-icebound",
+     "player-2956-knisterl",
+     "player-0458-kvaltigar",
+     "player-0122-venanli",
+     "player-0461-doombringer",
+     "player-0097-tremble",
+     "player-2606-mhu-thak",
+     "player-1880-krosis",
+     "player-0305-scox",
+     "player-1334-lady-anna",
+     "player-2342-vladimar-hr",
+     "player-0841-exekutor",
+     "player-2784-ithren"
+    ],
+    "kasseUeberRuecklage": 0.44,
+    "kasseAnteilStart": 0.1
+   }
+  },
+  "L-R": {
+   "teamId": "L-R",
+   "liga": "liga1",
+   "startKasse": 305,
+   "identitaet": {
+    "finances": 3.01,
+    "ambition": 8.33,
+    "boardConfidence": 4.67,
+    "harmony": 4.66,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 6.34,
+    "spe": 1.7,
+    "men": 9.3,
+    "soc": 2.66
+   },
+   "gm": {
+    "archetype": "rivalry_hawk",
+    "starPriority": 7,
+    "valuePriority": null,
+    "cashPriority": 4,
+    "riskTolerance": 8,
+    "rosterDepthPreference": 5,
+    "eliteSmallRosterPreference": 7
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-2491-jasmin-t",
+     "player-2354-nefar-safety",
+     "player-0365-bonethrone",
+     "player-1826-nezhet",
+     "player-1526-lady-death",
+     "player-0909-bombblitzer",
+     "player-0620-drowned-mirror",
+     "player-2956-knisterl",
+     "player-2845-rhazgul-icebound",
+     "player-0461-doombringer",
+     "player-1083-nrogor",
+     "player-1097-steel-sinister"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 15.64,
+    "optTarget": 12,
+    "ruecklage": 14.44,
+    "cashBuffer": 14.44,
+    "solvencyFloor": 14.44,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 1,
+     "core": 3,
+     "depth": 5,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.55286146872465,
+     "wThrift": 0.9442665110511053,
+     "wSustain": 0.5515840480492493,
+     "wAsset": 0.38736872967296726,
+     "wPatience": 0.49623099609960997,
+     "wProfit": 0.19319749752753057,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 47.4,
+       "gehalt": 14.13
+      },
+      {
+       "mw": 36.52,
+       "gehalt": 9.16
+      },
+      {
+       "mw": 36.06,
+       "gehalt": 8.74
+      },
+      {
+       "mw": 35.27,
+       "gehalt": 11.46
+      },
+      {
+       "mw": 22.37,
+       "gehalt": 6.67
+      },
+      {
+       "mw": 21.06,
+       "gehalt": 6.92
+      },
+      {
+       "mw": 20.63,
+       "gehalt": 5.12
+      },
+      {
+       "mw": 15.53,
+       "gehalt": 5.28
+      },
+      {
+       "mw": 15.38,
+       "gehalt": 5.44
+      },
+      {
+       "mw": 14.88,
+       "gehalt": 5.9
+      },
+      {
+       "mw": 12.15,
+       "gehalt": 3.85
+      },
+      {
+       "mw": 12.11,
+       "gehalt": 2.53
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 1,
+      "Core": 3,
+      "Depth": 3,
+      "Backup": 5,
+      "Reserve": 0
+     },
+     "marktwertSumme": 289.36,
+     "top1Anteil": 0.16,
+     "top2Anteil": 0.29,
+     "mwMax": 47.4,
+     "mwMedian": 21.06,
+     "mwMin": 12.11,
+     "gehalt": 85.2,
+     "kasse": 15.64,
+     "staerke": 52.55
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 47.4,
+      "gehalt": 14.13
+     },
+     {
+      "mw": 36.52,
+      "gehalt": 9.16
+     },
+     {
+      "mw": 36.06,
+      "gehalt": 8.74
+     },
+     {
+      "mw": 35.27,
+      "gehalt": 11.46
+     },
+     {
+      "mw": 22.37,
+      "gehalt": 6.67
+     },
+     {
+      "mw": 21.06,
+      "gehalt": 6.92
+     },
+     {
+      "mw": 20.63,
+      "gehalt": 5.12
+     },
+     {
+      "mw": 17.59,
+      "gehalt": 5.67
+     },
+     {
+      "mw": 14.61,
+      "gehalt": 6.24
+     },
+     {
+      "mw": 13.39,
+      "gehalt": 4.67
+     },
+     {
+      "mw": 12.84,
+      "gehalt": 4.14
+     },
+     {
+      "mw": 12.62,
+      "gehalt": 3.59
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 1,
+     "Core": 3,
+     "Depth": 3,
+     "Backup": 5,
+     "Reserve": 0
+    },
+    "marktwertSumme": 290.36,
+    "top1Anteil": 0.16,
+    "top2Anteil": 0.29,
+    "mwMax": 47.4,
+    "mwMedian": 21.06,
+    "mwMin": 12.62,
+    "gehalt": 86.51,
+    "kasse": 14.64,
+    "staerke": 52.56,
+    "spieler": [
+     "player-2491-jasmin-t",
+     "player-2354-nefar-safety",
+     "player-0365-bonethrone",
+     "player-1826-nezhet",
+     "player-1526-lady-death",
+     "player-0909-bombblitzer",
+     "player-0620-drowned-mirror",
+     "player-0807-nekira",
+     "player-1091-kols",
+     "player-2267-steroid",
+     "player-1999-captain-hollow",
+     "player-0976-ethereal"
+    ],
+    "kasseUeberRuecklage": 0.2,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "M-M": {
+   "teamId": "M-M",
+   "liga": "liga1",
+   "startKasse": 325,
+   "identitaet": {
+    "finances": 5.13,
+    "ambition": 8.64,
+    "boardConfidence": 3,
+    "harmony": 4.21,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 6.42,
+    "spe": 8.42,
+    "men": 0.58,
+    "soc": 4.58
+   },
+   "gm": {
+    "archetype": "risk_gambler",
+    "starPriority": 9,
+    "valuePriority": null,
+    "cashPriority": 1,
+    "riskTolerance": 10,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-2307-kelektros",
+     "player-2642-bunnyblade",
+     "player-2095-ghorok",
+     "player-0609-schattenwind",
+     "player-0775-ruthgal",
+     "player-2133-eiravelle",
+     "player-1818-towlie",
+     "player-0639-amoreus",
+     "player-0960-xhya",
+     "player-2298-alarm",
+     "player-0320-ravager",
+     "player-0483-wu-tang"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 23.04,
+    "optTarget": 12,
+    "ruecklage": 23.04,
+    "cashBuffer": 23.04,
+    "solvencyFloor": 23.04,
+    "superstarLizenz": true,
+    "komposition": {
+     "superstar": 1,
+     "star": 0,
+     "core": 2,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.8327009724972498,
+     "wThrift": 0.8527091841184119,
+     "wSustain": 0.22051044557789112,
+     "wAsset": 0.42759587558755874,
+     "wPatience": 0.3590258765876588,
+     "wProfit": 0.3874103410341033,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 65.7,
+       "gehalt": 17.19
+      },
+      {
+       "mw": 39.77,
+       "gehalt": 11.77
+      },
+      {
+       "mw": 34.3,
+       "gehalt": 10.04
+      },
+      {
+       "mw": 23.3,
+       "gehalt": 5.97
+      },
+      {
+       "mw": 21.9,
+       "gehalt": 5.52
+      },
+      {
+       "mw": 21.18,
+       "gehalt": 5.8
+      },
+      {
+       "mw": 21.04,
+       "gehalt": 6.31
+      },
+      {
+       "mw": 20.18,
+       "gehalt": 4.2
+      },
+      {
+       "mw": 15.17,
+       "gehalt": 5.14
+      },
+      {
+       "mw": 13.91,
+       "gehalt": 4.28
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 1,
+      "Star": 0,
+      "Core": 2,
+      "Depth": 5,
+      "Backup": 4,
+      "Reserve": 0
+     },
+     "marktwertSumme": 301.96,
+     "top1Anteil": 0.22,
+     "top2Anteil": 0.35,
+     "mwMax": 65.7,
+     "mwMedian": 21.18,
+     "mwMin": 12.43,
+     "gehalt": 81.92,
+     "kasse": 23.04,
+     "staerke": 53.35
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 65.7,
+      "gehalt": 17.19
+     },
+     {
+      "mw": 39.77,
+      "gehalt": 11.77
+     },
+     {
+      "mw": 30.8,
+      "gehalt": 9.73
+     },
+     {
+      "mw": 26.4,
+      "gehalt": 6.95
+     },
+     {
+      "mw": 26.07,
+      "gehalt": 7.26
+     },
+     {
+      "mw": 21.04,
+      "gehalt": 6.31
+     },
+     {
+      "mw": 20.18,
+      "gehalt": 4.2
+     },
+     {
+      "mw": 17.8,
+      "gehalt": 4.91
+     },
+     {
+      "mw": 14.32,
+      "gehalt": 3.41
+     },
+     {
+      "mw": 14.09,
+      "gehalt": 3.58
+     },
+     {
+      "mw": 12.97,
+      "gehalt": 4.23
+     },
+     {
+      "mw": 12.24,
+      "gehalt": 3.81
+     }
+    ],
+    "stufen": {
+     "Superstar": 1,
+     "Star": 0,
+     "Core": 2,
+     "Depth": 4,
+     "Backup": 5,
+     "Reserve": 0
+    },
+    "marktwertSumme": 301.38,
+    "top1Anteil": 0.22,
+    "top2Anteil": 0.35,
+    "mwMax": 65.7,
+    "mwMedian": 21.04,
+    "mwMin": 12.24,
+    "gehalt": 83.35,
+    "kasse": 23.62,
+    "staerke": 52.67,
+    "spieler": [
+     "player-2307-kelektros",
+     "player-2642-bunnyblade",
+     "player-0379-number-68",
+     "player-0609-schattenwind",
+     "player-0754-chain",
+     "player-0639-amoreus",
+     "player-0404-ironreach",
+     "player-2518-bastian",
+     "player-0118-kohan",
+     "player-0140-gortash",
+     "player-0134-nautilus",
+     "player-0837-kane"
+    ],
+    "kasseUeberRuecklage": 0.58,
+    "kasseAnteilStart": 0.07
+   }
+  },
+  "M-S": {
+   "teamId": "M-S",
+   "liga": "liga2",
+   "startKasse": 245,
+   "identitaet": {
+    "finances": 6.79,
+    "ambition": 3.94,
+    "boardConfidence": 8.53,
+    "harmony": 10,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 0.47,
+    "spe": 1.41,
+    "men": 1.88,
+    "soc": 16.24
+   },
+   "gm": {
+    "archetype": "culture_keeper",
+    "starPriority": null,
+    "valuePriority": 6,
+    "cashPriority": null,
+    "riskTolerance": 3,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-1177-aeloria",
+     "player-1336-orichalcos",
+     "player-1096-untaught-scribe",
+     "player-1593-elaine",
+     "player-0589-falcon",
+     "player-0460-murky",
+     "player-2925-lumen-serene",
+     "player-0676-madora",
+     "player-1612-loli",
+     "player-2447-illyra-fay",
+     "player-2397-greenkraut",
+     "player-2519-atchu",
+     "player-2726-bronzebrow",
+     "player-1345-yaorenwo"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 21.92,
+    "optTarget": 14,
+    "ruecklage": 21.89,
+    "cashBuffer": 21.89,
+    "solvencyFloor": 21.89,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 7,
+     "backup": 5,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 0.6815761087664322,
+     "wThrift": 0.738369203364781,
+     "wSustain": 0.6453915515551555,
+     "wAsset": 0.30480153695369533,
+     "wPatience": 0.8116607584091742,
+     "wProfit": 0,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 35.48,
+       "gehalt": 7.71
+      },
+      {
+       "mw": 21.11,
+       "gehalt": 6.26
+      },
+      {
+       "mw": 20.5,
+       "gehalt": 5.13
+      },
+      {
+       "mw": 17.28,
+       "gehalt": 3.87
+      },
+      {
+       "mw": 15.24,
+       "gehalt": 4.16
+      },
+      {
+       "mw": 14.92,
+       "gehalt": 4.52
+      },
+      {
+       "mw": 13.37,
+       "gehalt": 4.74
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 3.5
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 2,
+      "Backup": 11,
+      "Reserve": 0
+     },
+     "marktwertSumme": 223.08,
+     "top1Anteil": 0.16,
+     "top2Anteil": 0.25,
+     "mwMax": 35.48,
+     "mwMedian": 13.37,
+     "mwMin": 12.02,
+     "gehalt": 60.19,
+     "kasse": 21.92,
+     "staerke": 42.94
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 31.39,
+      "gehalt": 9.02
+     },
+     {
+      "mw": 18.26,
+      "gehalt": 6.38
+     },
+     {
+      "mw": 17.32,
+      "gehalt": 5.64
+     },
+     {
+      "mw": 17.28,
+      "gehalt": 3.87
+     },
+     {
+      "mw": 16.01,
+      "gehalt": 5.66
+     },
+     {
+      "mw": 15.93,
+      "gehalt": 3.72
+     },
+     {
+      "mw": 15.12,
+      "gehalt": 4.06
+     },
+     {
+      "mw": 13.68,
+      "gehalt": 4.27
+     },
+     {
+      "mw": 13.59,
+      "gehalt": 3.37
+     },
+     {
+      "mw": 13.37,
+      "gehalt": 4.74
+     },
+     {
+      "mw": 12.97,
+      "gehalt": 4.31
+     },
+     {
+      "mw": 12.84,
+      "gehalt": 4.55
+     },
+     {
+      "mw": 12.83,
+      "gehalt": 4.71
+     },
+     {
+      "mw": 12.1,
+      "gehalt": 2.73
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 1,
+     "Depth": 0,
+     "Backup": 13,
+     "Reserve": 0
+    },
+    "marktwertSumme": 222.69,
+    "top1Anteil": 0.14,
+    "top2Anteil": 0.22,
+    "mwMax": 31.39,
+    "mwMedian": 15.12,
+    "mwMin": 12.1,
+    "gehalt": 67.03,
+    "kasse": 22.31,
+    "staerke": 42.25,
+    "spieler": [
+     "player-2611-father-slurpentine",
+     "player-1336-orichalcos",
+     "player-1612-loli",
+     "player-2123-king-aethar",
+     "player-0676-madora",
+     "player-1277-hisihida",
+     "player-1607-sylvara",
+     "player-0310-king-jarhova",
+     "player-1714-black-knight",
+     "player-1879-juto",
+     "player-1623-thildra",
+     "player-0964-metalicana",
+     "player-1620-haldra",
+     "player-1626-glitch"
+    ],
+    "kasseUeberRuecklage": 0.42,
+    "kasseAnteilStart": 0.09
+   }
+  },
+  "N-N": {
+   "teamId": "N-N",
+   "liga": "liga1",
+   "startKasse": 270,
+   "identitaet": {
+    "finances": 2.92,
+    "ambition": 6.12,
+    "boardConfidence": 2.92,
+    "harmony": 2.28,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 1.68,
+    "spe": 10.32,
+    "men": 4.72,
+    "soc": 3.28
+   },
+   "gm": {
+    "archetype": "risk_gambler",
+    "starPriority": 7,
+    "valuePriority": null,
+    "cashPriority": 3,
+    "riskTolerance": 10,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-2529-jolia-noireclair",
+     "player-2181-veza-null",
+     "player-1175-zephyra",
+     "player-0796-drop-dead",
+     "player-2281-yurei",
+     "player-0769-shadowsong",
+     "player-0483-wu-tang",
+     "player-0827-snikka",
+     "player-0294-grimflora",
+     "player-1332-breeze",
+     "player-0839-lilly"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 12.53,
+    "optTarget": 11,
+    "ruecklage": 12.51,
+    "cashBuffer": 12.51,
+    "solvencyFloor": 12.51,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 1,
+     "core": 2,
+     "depth": 5,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.6028511880521386,
+     "wThrift": 0.978976315231523,
+     "wSustain": 0.35756412814614796,
+     "wAsset": 0.4232182338233823,
+     "wPatience": 0.43368950095009495,
+     "wProfit": 0.3837022368903556,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 11,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 48.22,
+       "gehalt": 12.43
+      },
+      {
+       "mw": 37.8,
+       "gehalt": 9.24
+      },
+      {
+       "mw": 32.52,
+       "gehalt": 8.58
+      },
+      {
+       "mw": 29.04,
+       "gehalt": 6.99
+      },
+      {
+       "mw": 21.13,
+       "gehalt": 5.66
+      },
+      {
+       "mw": 20.51,
+       "gehalt": 6.4
+      },
+      {
+       "mw": 17.37,
+       "gehalt": 5.52
+      },
+      {
+       "mw": 13.5,
+       "gehalt": 4.58
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.34,
+       "gehalt": 3.57
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 1,
+      "Core": 2,
+      "Depth": 3,
+      "Backup": 5,
+      "Reserve": 0
+     },
+     "marktwertSumme": 257.47,
+     "top1Anteil": 0.19,
+     "top2Anteil": 0.33,
+     "mwMax": 48.22,
+     "mwMedian": 20.51,
+     "mwMin": 12.34,
+     "gehalt": 68.99,
+     "kasse": 12.53,
+     "staerke": 49.88
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 48.22,
+      "gehalt": 12.43
+     },
+     {
+      "mw": 37.8,
+      "gehalt": 9.24
+     },
+     {
+      "mw": 32.52,
+      "gehalt": 8.58
+     },
+     {
+      "mw": 29.04,
+      "gehalt": 6.99
+     },
+     {
+      "mw": 21.13,
+      "gehalt": 5.66
+     },
+     {
+      "mw": 20.51,
+      "gehalt": 6.4
+     },
+     {
+      "mw": 17.08,
+      "gehalt": 5.74
+     },
+     {
+      "mw": 12.96,
+      "gehalt": 5.08
+     },
+     {
+      "mw": 12.85,
+      "gehalt": 3.67
+     },
+     {
+      "mw": 12.78,
+      "gehalt": 4.04
+     },
+     {
+      "mw": 12.34,
+      "gehalt": 3.57
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 1,
+     "Core": 2,
+     "Depth": 3,
+     "Backup": 5,
+     "Reserve": 0
+    },
+    "marktwertSumme": 257.23,
+    "top1Anteil": 0.19,
+    "top2Anteil": 0.33,
+    "mwMax": 48.22,
+    "mwMedian": 20.51,
+    "mwMin": 12.34,
+    "gehalt": 71.4,
+    "kasse": 12.77,
+    "staerke": 48.44,
+    "spieler": [
+     "player-2529-jolia-noireclair",
+     "player-2181-veza-null",
+     "player-1175-zephyra",
+     "player-0796-drop-dead",
+     "player-2281-yurei",
+     "player-0769-shadowsong",
+     "player-0838-shadowrunner",
+     "player-0839-lilly",
+     "player-0821-vervain",
+     "player-0670-akame-quicktooth",
+     "player-0129-yarden"
+    ],
+    "kasseUeberRuecklage": 0.26,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "N-W": {
+   "teamId": "N-W",
+   "liga": "liga1",
+   "startKasse": 265,
+   "identitaet": {
+    "finances": 4.14,
+    "ambition": 4.86,
+    "boardConfidence": 6.86,
+    "harmony": 7.57,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 4.43,
+    "spe": 4.43,
+    "men": 5.57,
+    "soc": 5.57
+   },
+   "gm": {
+    "archetype": "depth_spammer",
+    "starPriority": null,
+    "valuePriority": 7,
+    "cashPriority": null,
+    "riskTolerance": 4,
+    "rosterDepthPreference": 10,
+    "eliteSmallRosterPreference": 1
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-2397-greenkraut",
+     "player-0842-barkwing",
+     "player-1289-xylaris",
+     "player-0460-murky",
+     "player-0589-falcon",
+     "player-2748-mr-spuck",
+     "player-1826-nezhet",
+     "player-0077-buttercup",
+     "player-0811-kyori",
+     "player-0069-leviathan",
+     "player-0835-demiora",
+     "player-0629-iska",
+     "player-2519-atchu",
+     "player-0676-madora"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 15.9,
+    "optTarget": 14,
+    "ruecklage": 15.87,
+    "cashBuffer": 15.87,
+    "solvencyFloor": 15.87,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 2,
+     "depth": 7,
+     "backup": 3,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 0.7510559375937594,
+     "wThrift": 1.2892966072607264,
+     "wSustain": 0.6861380946094608,
+     "wAsset": 0.38387646444644463,
+     "wPatience": 0.6742484001733506,
+     "wProfit": 0.011130757520196426,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 23.76,
+       "gehalt": 5.33
+      },
+      {
+       "mw": 22.89,
+       "gehalt": 5.24
+      },
+      {
+       "mw": 21.78,
+       "gehalt": 4.18
+      },
+      {
+       "mw": 21.65,
+       "gehalt": 6.78
+      },
+      {
+       "mw": 21.11,
+       "gehalt": 6.26
+      },
+      {
+       "mw": 20.63,
+       "gehalt": 5.12
+      },
+      {
+       "mw": 20.05,
+       "gehalt": 6.4
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 14.92,
+       "gehalt": 4.52
+      },
+      {
+       "mw": 13.32,
+       "gehalt": 3.63
+      },
+      {
+       "mw": 12.66,
+       "gehalt": 1.81
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 8,
+      "Backup": 6,
+      "Reserve": 0
+     },
+     "marktwertSumme": 249.1,
+     "top1Anteil": 0.1,
+     "top2Anteil": 0.19,
+     "mwMax": 23.76,
+     "mwMedian": 20.05,
+     "mwMin": 12.04,
+     "gehalt": 62.42,
+     "kasse": 15.9,
+     "staerke": 45.94
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 22.89,
+      "gehalt": 5.24
+     },
+     {
+      "mw": 22.62,
+      "gehalt": 7.09
+     },
+     {
+      "mw": 22.59,
+      "gehalt": 7.08
+     },
+     {
+      "mw": 21.78,
+      "gehalt": 4.18
+     },
+     {
+      "mw": 21.65,
+      "gehalt": 6.78
+     },
+     {
+      "mw": 21.11,
+      "gehalt": 6.26
+     },
+     {
+      "mw": 20.05,
+      "gehalt": 6.4
+     },
+     {
+      "mw": 17.72,
+      "gehalt": 4.43
+     },
+     {
+      "mw": 14.92,
+      "gehalt": 4.52
+     },
+     {
+      "mw": 13.53,
+      "gehalt": 4.92
+     },
+     {
+      "mw": 13.07,
+      "gehalt": 3.53
+     },
+     {
+      "mw": 12.66,
+      "gehalt": 1.81
+     },
+     {
+      "mw": 12.25,
+      "gehalt": 3.48
+     },
+     {
+      "mw": 12.19,
+      "gehalt": 3.14
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 7,
+     "Backup": 7,
+     "Reserve": 0
+    },
+    "marktwertSumme": 249.03,
+    "top1Anteil": 0.09,
+    "top2Anteil": 0.18,
+    "mwMax": 22.89,
+    "mwMedian": 20.05,
+    "mwMin": 12.19,
+    "gehalt": 68.86,
+    "kasse": 15.97,
+    "staerke": 45.96,
+    "spieler": [
+     "player-2397-greenkraut",
+     "player-0842-barkwing",
+     "player-0460-murky",
+     "player-0589-falcon",
+     "player-2748-mr-spuck",
+     "player-0077-buttercup",
+     "player-0629-iska",
+     "player-0811-kyori",
+     "player-2870-cauliflex",
+     "player-0608-flarewing",
+     "player-0141-skag",
+     "player-2602-schlurff",
+     "player-2807-nyrven",
+     "player-2395-pherrix"
+    ],
+    "kasseUeberRuecklage": 0.1,
+    "kasseAnteilStart": 0.06
+   }
+  },
+  "P-C": {
+   "teamId": "P-C",
+   "liga": "liga2",
+   "startKasse": 200,
+   "identitaet": {
+    "finances": 9.35,
+    "ambition": 4.97,
+    "boardConfidence": 5.7,
+    "harmony": 6.97,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 1.7,
+    "spe": 6,
+    "men": 5.65,
+    "soc": 6.65
+   },
+   "gm": {
+    "archetype": "bargain_hunter",
+    "starPriority": 3,
+    "valuePriority": 10,
+    "cashPriority": 10,
+    "riskTolerance": 4,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-0797-liluth-xilric",
+     "player-2114-yabbo",
+     "player-2858-ash",
+     "player-1289-xylaris",
+     "player-2725-ember-callahan",
+     "player-0135-haku",
+     "player-1071-belandria",
+     "player-2122-yssara",
+     "player-0834-bittersweet",
+     "player-0138-cara",
+     "player-0836-yinen",
+     "player-0318-braugh"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 23.58,
+    "optTarget": 12,
+    "ruecklage": 23.56,
+    "cashBuffer": 23.56,
+    "solvencyFloor": 23.56,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.8155080440044004,
+     "wThrift": 0.7755103050305032,
+     "wSustain": 0.9480981864853152,
+     "wAsset": 0.6816301350135013,
+     "wPatience": 1.3376136813681367,
+     "wProfit": 0.8462610261026102,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 20.17,
+       "gehalt": 6.91
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 17.66,
+       "gehalt": 5.42
+      },
+      {
+       "mw": 17.27,
+       "gehalt": 5.24
+      },
+      {
+       "mw": 15.41,
+       "gehalt": 4.92
+      },
+      {
+       "mw": 12.63,
+       "gehalt": 3
+      },
+      {
+       "mw": 12.44,
+       "gehalt": 3.91
+      },
+      {
+       "mw": 12.29,
+       "gehalt": 3.6
+      },
+      {
+       "mw": 12.22,
+       "gehalt": 3.15
+      },
+      {
+       "mw": 12.2,
+       "gehalt": 3.54
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 2,
+      "Backup": 10,
+      "Reserve": 0
+     },
+     "marktwertSumme": 176.42,
+     "top1Anteil": 0.11,
+     "top2Anteil": 0.23,
+     "mwMax": 20.17,
+     "mwMedian": 12.63,
+     "mwMin": 12.04,
+     "gehalt": 51.73,
+     "kasse": 23.58,
+     "staerke": 39.48
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 20.17,
+      "gehalt": 6.91
+     },
+     {
+      "mw": 17.27,
+      "gehalt": 5.24
+     },
+     {
+      "mw": 15.45,
+      "gehalt": 3.77
+     },
+     {
+      "mw": 15.41,
+      "gehalt": 4.92
+     },
+     {
+      "mw": 15.39,
+      "gehalt": 5.11
+     },
+     {
+      "mw": 14.29,
+      "gehalt": 4
+     },
+     {
+      "mw": 13.36,
+      "gehalt": 4.44
+     },
+     {
+      "mw": 13.26,
+      "gehalt": 3.8
+     },
+     {
+      "mw": 13.22,
+      "gehalt": 3.65
+     },
+     {
+      "mw": 12.98,
+      "gehalt": 3.95
+     },
+     {
+      "mw": 12.72,
+      "gehalt": 4.44
+     },
+     {
+      "mw": 12.09,
+      "gehalt": 3.56
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 1,
+     "Backup": 11,
+     "Reserve": 0
+    },
+    "marktwertSumme": 175.61,
+    "top1Anteil": 0.11,
+    "top2Anteil": 0.21,
+    "mwMax": 20.17,
+    "mwMedian": 14.29,
+    "mwMin": 12.09,
+    "gehalt": 53.79,
+    "kasse": 24.39,
+    "staerke": 40.39,
+    "spieler": [
+     "player-2114-yabbo",
+     "player-2725-ember-callahan",
+     "player-0135-haku",
+     "player-0797-liluth-xilric",
+     "player-0820-prototype",
+     "player-0831-crescent-moon",
+     "player-2959-weizenbert",
+     "player-2434-melancholy",
+     "player-0669-dahal",
+     "player-2010-abyss",
+     "player-1085-talizora",
+     "player-2975-parker-wayne"
+    ],
+    "kasseUeberRuecklage": 0.83,
+    "kasseAnteilStart": 0.12
+   }
+  },
+  "P-S": {
+   "teamId": "P-S",
+   "liga": "liga1",
+   "startKasse": 295.37,
+   "identitaet": {
+    "finances": 3.64,
+    "ambition": 3.61,
+    "boardConfidence": 3.87,
+    "harmony": 4.71,
+    "playerOpt": 10,
+    "playerMin": 8,
+    "pow": 8.42,
+    "spe": 2.16,
+    "men": 6,
+    "soc": 3.42
+   },
+   "gm": {
+    "archetype": "star_chaser",
+    "starPriority": 9,
+    "valuePriority": null,
+    "cashPriority": 3,
+    "riskTolerance": 8,
+    "rosterDepthPreference": 4,
+    "eliteSmallRosterPreference": 9
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-0175-king-garawall",
+     "player-2354-nefar-safety",
+     "player-2250-ampelato",
+     "player-1759-sunny",
+     "player-2891-hellraiser",
+     "player-0613-butcher",
+     "player-2621-hollowmind",
+     "player-0819-udjnyna"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 22.26,
+    "optTarget": 9,
+    "ruecklage": 16.3,
+    "cashBuffer": 16.3,
+    "solvencyFloor": 16.3,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 1,
+     "core": 3,
+     "depth": 2,
+     "backup": 2,
+     "reserve": 1
+    },
+    "gewichte": {
+     "wWin": 1.5321950511495592,
+     "wThrift": 0.7725432285450767,
+     "wSustain": 0.3420963417230611,
+     "wAsset": 0.3393250082341568,
+     "wPatience": 0.4912566473313999,
+     "wProfit": 0.011326688224377952,
+     "optTarget": 9
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 9,
+     "kader": 9,
+     "rahmenPlaetze": 9,
+     "notwege": [],
+     "text": "Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 10,
+      "optTarget": 9,
+      "gmDelta": -1,
+      "grund": "GM kompakt (Star 9, Elite 9): Opt 10 -> 9, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 9,
+     "spielerWerte": [
+      {
+       "mw": 50.78,
+       "gehalt": 11.85
+      },
+      {
+       "mw": 48.25,
+       "gehalt": 13.33
+      },
+      {
+       "mw": 40.4,
+       "gehalt": 11.47
+      },
+      {
+       "mw": 36.06,
+       "gehalt": 8.74
+      },
+      {
+       "mw": 34.31,
+       "gehalt": 7.73
+      },
+      {
+       "mw": 26.01,
+       "gehalt": 6.78
+      },
+      {
+       "mw": 21.39,
+       "gehalt": 6.7
+      },
+      {
+       "mw": 15.91,
+       "gehalt": 4.09
+      },
+      {
+       "mw": 4.63,
+       "gehalt": 1.31
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 2,
+      "Core": 3,
+      "Depth": 2,
+      "Backup": 1,
+      "Reserve": 1
+     },
+     "marktwertSumme": 277.74,
+     "top1Anteil": 0.18,
+     "top2Anteil": 0.36,
+     "mwMax": 50.78,
+     "mwMedian": 34.31,
+     "mwMin": 4.63,
+     "gehalt": 72,
+     "kasse": 22.26,
+     "staerke": 53.78
+    }
+   },
+   "nachDraft": {
+    "kader": 9,
+    "spielerWerte": [
+     {
+      "mw": 54.02,
+      "gehalt": 13.58
+     },
+     {
+      "mw": 50.78,
+      "gehalt": 11.85
+     },
+     {
+      "mw": 40.4,
+      "gehalt": 11.47
+     },
+     {
+      "mw": 34.31,
+      "gehalt": 7.73
+     },
+     {
+      "mw": 33.97,
+      "gehalt": 7.02
+     },
+     {
+      "mw": 26.01,
+      "gehalt": 6.78
+     },
+     {
+      "mw": 22.77,
+      "gehalt": 6.11
+     },
+     {
+      "mw": 16.55,
+      "gehalt": 4.45
+     },
+     {
+      "mw": 4.63,
+      "gehalt": 1.31
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 2,
+     "Core": 3,
+     "Depth": 2,
+     "Backup": 1,
+     "Reserve": 1
+    },
+    "marktwertSumme": 283.44,
+    "top1Anteil": 0.19,
+    "top2Anteil": 0.37,
+    "mwMax": 54.02,
+    "mwMedian": 33.97,
+    "mwMin": 4.63,
+    "gehalt": 70.3,
+    "kasse": 16.56,
+    "staerke": 54.43,
+    "spieler": [
+     "player-2311-nula",
+     "player-0175-king-garawall",
+     "player-1759-sunny",
+     "player-2250-ampelato",
+     "player-2194-mei-hua",
+     "player-2383-darkblade",
+     "player-2621-hollowmind",
+     "player-1472-ione-the-unbreakable",
+     "player-2259-sylith"
+    ],
+    "kasseUeberRuecklage": 0.26,
+    "kasseAnteilStart": 0.06
+   }
+  },
+  "R-C": {
+   "teamId": "R-C",
+   "liga": "liga2",
+   "startKasse": 220,
+   "identitaet": {
+    "finances": 6.8,
+    "ambition": 7,
+    "boardConfidence": 3.48,
+    "harmony": 3.42,
+    "playerOpt": 13,
+    "playerMin": 8,
+    "pow": 3.84,
+    "spe": 3.56,
+    "men": 7,
+    "soc": 5.88
+   },
+   "gm": {
+    "archetype": "rivalry_hawk",
+    "starPriority": 7,
+    "valuePriority": null,
+    "cashPriority": 5,
+    "riskTolerance": 7,
+    "rosterDepthPreference": 5,
+    "eliteSmallRosterPreference": 7
+   },
+   "themaStrenge": "soft",
+   "solo": {
+    "picks": [
+     "player-1530-moses",
+     "player-2179-prinz-faelyn",
+     "player-1332-breeze",
+     "player-0320-ravager",
+     "player-0483-wu-tang",
+     "player-1096-untaught-scribe",
+     "player-2397-greenkraut",
+     "player-0135-haku",
+     "player-2726-bronzebrow",
+     "player-1345-yaorenwo",
+     "player-0315-rynna",
+     "player-0318-braugh",
+     "player-2519-atchu"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 19.71,
+    "optTarget": 13,
+    "ruecklage": 19.68,
+    "cashBuffer": 19.68,
+    "solvencyFloor": 19.68,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 7,
+     "backup": 4,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 1.4719056839017235,
+     "wThrift": 0.637401797068596,
+     "wSustain": 0.46721721772177216,
+     "wAsset": 0.436541139447278,
+     "wPatience": 0.714244271093776,
+     "wProfit": 0.011437988243268731,
+     "optTarget": 13
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 13,
+     "kader": 13,
+     "rahmenPlaetze": 13,
+     "notwege": [],
+     "text": "Zielkader 13 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 13,
+      "optTarget": 13,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 13,
+     "spielerWerte": [
+      {
+       "mw": 42.84,
+       "gehalt": 10.02
+      },
+      {
+       "mw": 22.19,
+       "gehalt": 5.49
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.43
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 1,
+      "Backup": 11,
+      "Reserve": 0
+     },
+     "marktwertSumme": 200.29,
+     "top1Anteil": 0.21,
+     "top2Anteil": 0.32,
+     "mwMax": 42.84,
+     "mwMedian": 12.19,
+     "mwMin": 12.02,
+     "gehalt": 55.38,
+     "kasse": 19.71,
+     "staerke": 42.15
+    }
+   },
+   "nachDraft": {
+    "kader": 13,
+    "spielerWerte": [
+     {
+      "mw": 22.19,
+      "gehalt": 5.49
+     },
+     {
+      "mw": 20.22,
+      "gehalt": 4.78
+     },
+     {
+      "mw": 16.32,
+      "gehalt": 4.62
+     },
+     {
+      "mw": 16.24,
+      "gehalt": 5.23
+     },
+     {
+      "mw": 15.61,
+      "gehalt": 4.33
+     },
+     {
+      "mw": 15.58,
+      "gehalt": 5.4
+     },
+     {
+      "mw": 15.2,
+      "gehalt": 5.36
+     },
+     {
+      "mw": 14.36,
+      "gehalt": 4.49
+     },
+     {
+      "mw": 13.5,
+      "gehalt": 5.66
+     },
+     {
+      "mw": 13.14,
+      "gehalt": 4.41
+     },
+     {
+      "mw": 12.81,
+      "gehalt": 4.87
+     },
+     {
+      "mw": 12.16,
+      "gehalt": 4.19
+     },
+     {
+      "mw": 12.02,
+      "gehalt": 3.13
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 2,
+     "Backup": 11,
+     "Reserve": 0
+    },
+    "marktwertSumme": 199.35,
+    "top1Anteil": 0.11,
+    "top2Anteil": 0.21,
+    "mwMax": 22.19,
+    "mwMedian": 15.2,
+    "mwMin": 12.02,
+    "gehalt": 61.96,
+    "kasse": 20.65,
+    "staerke": 43.47,
+    "spieler": [
+     "player-2179-prinz-faelyn",
+     "player-1048-hyeliaze",
+     "player-2742-roddox-harthelm",
+     "player-1093-sage-mage",
+     "player-2464-whispersting",
+     "player-1068-mindlove",
+     "player-0486-omniclops",
+     "player-0963-venosk",
+     "player-0307-rex",
+     "player-0452-executioner",
+     "player-0843-zylara",
+     "player-1492-kara-steelheart",
+     "player-2726-bronzebrow"
+    ],
+    "kasseUeberRuecklage": 0.97,
+    "kasseAnteilStart": 0.09
+   }
+  },
+  "R-L": {
+   "teamId": "R-L",
+   "liga": "liga1",
+   "startKasse": 295,
+   "identitaet": {
+    "finances": 1.72,
+    "ambition": 7.72,
+    "boardConfidence": 6.43,
+    "harmony": 5.07,
+    "playerOpt": 10,
+    "playerMin": 8,
+    "pow": 7.57,
+    "spe": 8.71,
+    "men": 1.72,
+    "soc": 2.43
+   },
+   "gm": {
+    "archetype": "star_chaser",
+    "starPriority": 10,
+    "valuePriority": null,
+    "cashPriority": 1,
+    "riskTolerance": 9,
+    "rosterDepthPreference": 3,
+    "eliteSmallRosterPreference": 9
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0007-umbrafond",
+     "player-1119-anthraxis",
+     "player-0551-cawny",
+     "player-0012-ragnarok",
+     "player-2920-salvador-mare",
+     "player-0610-kirin",
+     "player-0424-fungor",
+     "player-0479-teravolt",
+     "player-2397-greenkraut"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 9.82,
+    "optTarget": 9,
+    "ruecklage": 9.74,
+    "cashBuffer": 9.74,
+    "solvencyFloor": 9.74,
+    "superstarLizenz": true,
+    "komposition": {
+     "superstar": 1,
+     "star": 1,
+     "core": 2,
+     "depth": 3,
+     "backup": 2,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.7596956312964631,
+     "wThrift": 0.903570183685035,
+     "wSustain": 0.27528373548465956,
+     "wAsset": 0.3013493642697603,
+     "wPatience": 0.3097062136213621,
+     "wProfit": 0.0116426309297596,
+     "optTarget": 9
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 9,
+     "kader": 9,
+     "rahmenPlaetze": 9,
+     "notwege": [],
+     "text": "Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 10,
+      "optTarget": 9,
+      "gmDelta": -1,
+      "grund": "GM kompakt (Star 10, Elite 9): Opt 10 -> 9, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 9,
+     "spielerWerte": [
+      {
+       "mw": 77.73,
+       "gehalt": 16.23
+      },
+      {
+       "mw": 48.01,
+       "gehalt": 10.59
+      },
+      {
+       "mw": 38.45,
+       "gehalt": 10.29
+      },
+      {
+       "mw": 30.95,
+       "gehalt": 8.14
+      },
+      {
+       "mw": 25.11,
+       "gehalt": 6.12
+      },
+      {
+       "mw": 21.18,
+       "gehalt": 5.4
+      },
+      {
+       "mw": 18.77,
+       "gehalt": 5.72
+      },
+      {
+       "mw": 12.79,
+       "gehalt": 4.34
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      }
+     ],
+     "stufen": {
+      "Superstar": 1,
+      "Star": 1,
+      "Core": 2,
+      "Depth": 2,
+      "Backup": 3,
+      "Reserve": 0
+     },
+     "marktwertSumme": 285.18,
+     "top1Anteil": 0.27,
+     "top2Anteil": 0.44,
+     "mwMax": 77.73,
+     "mwMedian": 25.11,
+     "mwMin": 12.19,
+     "gehalt": 69.97,
+     "kasse": 9.82,
+     "staerke": 53.23
+    }
+   },
+   "nachDraft": {
+    "kader": 9,
+    "spielerWerte": [
+     {
+      "mw": 77.73,
+      "gehalt": 16.23
+     },
+     {
+      "mw": 48.01,
+      "gehalt": 10.59
+     },
+     {
+      "mw": 38.45,
+      "gehalt": 10.29
+     },
+     {
+      "mw": 30.95,
+      "gehalt": 8.14
+     },
+     {
+      "mw": 21.18,
+      "gehalt": 5.4
+     },
+     {
+      "mw": 20.63,
+      "gehalt": 5.1
+     },
+     {
+      "mw": 18.77,
+      "gehalt": 5.72
+     },
+     {
+      "mw": 16.81,
+      "gehalt": 6.38
+     },
+     {
+      "mw": 12.24,
+      "gehalt": 4.11
+     }
+    ],
+    "stufen": {
+     "Superstar": 1,
+     "Star": 1,
+     "Core": 2,
+     "Depth": 2,
+     "Backup": 3,
+     "Reserve": 0
+    },
+    "marktwertSumme": 284.77,
+    "top1Anteil": 0.27,
+    "top2Anteil": 0.44,
+    "mwMax": 77.73,
+    "mwMedian": 21.18,
+    "mwMin": 12.24,
+    "gehalt": 71.96,
+    "kasse": 10.23,
+    "staerke": 53.39,
+    "spieler": [
+     "player-0007-umbrafond",
+     "player-1119-anthraxis",
+     "player-0551-cawny",
+     "player-0012-ragnarok",
+     "player-2920-salvador-mare",
+     "player-0610-kirin",
+     "player-2824-cerenna-garstochter",
+     "player-0647-zorath",
+     "player-2778-klaff"
+    ],
+    "kasseUeberRuecklage": 0.49,
+    "kasseAnteilStart": 0.03
+   }
+  },
+  "R-R": {
+   "teamId": "R-R",
+   "liga": "liga2",
+   "startKasse": 170,
+   "identitaet": {
+    "finances": 7.34,
+    "ambition": 3.94,
+    "boardConfidence": 4.64,
+    "harmony": 5.32,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 2.64,
+    "spe": 9.04,
+    "men": 3.6,
+    "soc": 4.72
+   },
+   "gm": {
+    "archetype": "systems_tinkerer",
+    "starPriority": 6,
+    "valuePriority": 8,
+    "cashPriority": 7,
+    "riskTolerance": 7,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": 5
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0629-iska",
+     "player-0483-wu-tang",
+     "player-0811-kyori",
+     "player-0675-delamare",
+     "player-2122-yssara",
+     "player-1725-sir-finley",
+     "player-2519-atchu",
+     "player-2045-vireetha",
+     "player-2137-dorya",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 16.25,
+    "optTarget": 11,
+    "ruecklage": 16.23,
+    "cashBuffer": 16.23,
+    "solvencyFloor": 16.23,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 2,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 1.207384234690136,
+     "wThrift": 0.8345403174095187,
+     "wSustain": 0.592279809580958,
+     "wAsset": 0.5349858793879388,
+     "wPatience": 0.9955620402040203,
+     "wProfit": 0.35765163182984955,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 11,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 22.89,
+       "gehalt": 5.24
+      },
+      {
+       "mw": 20.05,
+       "gehalt": 6.4
+      },
+      {
+       "mw": 12.63,
+       "gehalt": 3
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.2
+      },
+      {
+       "mw": 12.58,
+       "gehalt": 3.85
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.32,
+       "gehalt": 3.43
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 3.77
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 2,
+      "Backup": 9,
+      "Reserve": 0
+     },
+     "marktwertSumme": 153.75,
+     "top1Anteil": 0.15,
+     "top2Anteil": 0.28,
+     "mwMax": 22.89,
+     "mwMedian": 12.43,
+     "mwMin": 12.02,
+     "gehalt": 41.5,
+     "kasse": 16.25,
+     "staerke": 38.2
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 16.64,
+      "gehalt": 7.19
+     },
+     {
+      "mw": 16.53,
+      "gehalt": 4.67
+     },
+     {
+      "mw": 16.26,
+      "gehalt": 5.12
+     },
+     {
+      "mw": 14.84,
+      "gehalt": 5.25
+     },
+     {
+      "mw": 13.32,
+      "gehalt": 3.63
+     },
+     {
+      "mw": 13.22,
+      "gehalt": 4.31
+     },
+     {
+      "mw": 12.63,
+      "gehalt": 3
+     },
+     {
+      "mw": 12.61,
+      "gehalt": 3.2
+     },
+     {
+      "mw": 12.43,
+      "gehalt": 2.13
+     },
+     {
+      "mw": 12.16,
+      "gehalt": 3.77
+     },
+     {
+      "mw": 12.04,
+      "gehalt": 3.52
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 11,
+     "Reserve": 0
+    },
+    "marktwertSumme": 152.68,
+    "top1Anteil": 0.11,
+    "top2Anteil": 0.22,
+    "mwMax": 16.64,
+    "mwMedian": 13.22,
+    "mwMin": 12.04,
+    "gehalt": 45.79,
+    "kasse": 17.32,
+    "staerke": 37.58,
+    "spieler": [
+     "player-0483-wu-tang",
+     "player-0675-delamare",
+     "player-0618-nemenlirea",
+     "player-2033-skittermind",
+     "player-2122-yssara",
+     "player-1327-kaelith",
+     "player-0971-tidalwave",
+     "player-1725-sir-finley",
+     "player-0835-demiora",
+     "player-1331-tiklar",
+     "player-2519-atchu"
+    ],
+    "kasseUeberRuecklage": 1.09,
+    "kasseAnteilStart": 0.1
+   }
+  },
+  "S-C": {
+   "teamId": "S-C",
+   "liga": "liga2",
+   "startKasse": 205,
+   "identitaet": {
+    "finances": 5.59,
+    "ambition": 8,
+    "boardConfidence": 6.59,
+    "harmony": 4,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 9.95,
+    "spe": 1.64,
+    "men": 5.05,
+    "soc": 3.36
+   },
+   "gm": {
+    "archetype": "rivalry_hawk",
+    "starPriority": 7,
+    "valuePriority": null,
+    "cashPriority": 4,
+    "riskTolerance": 7,
+    "rosterDepthPreference": 4,
+    "eliteSmallRosterPreference": 8
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0370-the-thing",
+     "player-2293-varkon-darkheed",
+     "player-0434-enoma",
+     "player-0284-quarris",
+     "player-1096-untaught-scribe",
+     "player-0483-wu-tang",
+     "player-1097-steel-sinister",
+     "player-2726-bronzebrow",
+     "player-0135-haku",
+     "player-1345-yaorenwo"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 15.59,
+    "optTarget": 10,
+    "ruecklage": 15.58,
+    "cashBuffer": 15.58,
+    "solvencyFloor": 15.58,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 2,
+     "depth": 5,
+     "backup": 2,
+     "reserve": 1
+    },
+    "gewichte": {
+     "wWin": 1.5795612781278128,
+     "wThrift": 0.6335507051594049,
+     "wSustain": 0.4995794407440744,
+     "wAsset": 0.43038296122945624,
+     "wPatience": 0.6575732703270326,
+     "wProfit": 0.19731417586203068,
+     "optTarget": 10
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 10,
+     "kader": 10,
+     "rahmenPlaetze": 10,
+     "notwege": [],
+     "text": "Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 10,
+      "gmDelta": -1,
+      "grund": "GM kompakt (Star 7, Elite 8): Opt 11 -> 10, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 10,
+     "spielerWerte": [
+      {
+       "mw": 40.17,
+       "gehalt": 10.46
+      },
+      {
+       "mw": 35.33,
+       "gehalt": 9.2
+      },
+      {
+       "mw": 20.38,
+       "gehalt": 4.84
+      },
+      {
+       "mw": 20.18,
+       "gehalt": 6.09
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.11,
+       "gehalt": 2.53
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 2,
+      "Depth": 2,
+      "Backup": 6,
+      "Reserve": 0
+     },
+     "marktwertSumme": 189.41,
+     "top1Anteil": 0.21,
+     "top2Anteil": 0.4,
+     "mwMax": 40.17,
+     "mwMedian": 12.68,
+     "mwMin": 12.02,
+     "gehalt": 49.72,
+     "kasse": 15.59,
+     "staerke": 42.86
+    }
+   },
+   "nachDraft": {
+    "kader": 10,
+    "spielerWerte": [
+     {
+      "mw": 40.17,
+      "gehalt": 10.46
+     },
+     {
+      "mw": 35.33,
+      "gehalt": 9.2
+     },
+     {
+      "mw": 16.27,
+      "gehalt": 4.86
+     },
+     {
+      "mw": 16.21,
+      "gehalt": 3.57
+     },
+     {
+      "mw": 14.82,
+      "gehalt": 3.32
+     },
+     {
+      "mw": 14.17,
+      "gehalt": 6.18
+     },
+     {
+      "mw": 13.8,
+      "gehalt": 4.73
+     },
+     {
+      "mw": 12.99,
+      "gehalt": 3.78
+     },
+     {
+      "mw": 12.7,
+      "gehalt": 3.49
+     },
+     {
+      "mw": 12.53,
+      "gehalt": 4.2
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 2,
+     "Depth": 0,
+     "Backup": 8,
+     "Reserve": 0
+    },
+    "marktwertSumme": 188.99,
+    "top1Anteil": 0.21,
+    "top2Anteil": 0.4,
+    "mwMax": 40.17,
+    "mwMedian": 14.82,
+    "mwMin": 12.53,
+    "gehalt": 53.79,
+    "kasse": 16.01,
+    "staerke": 42.34,
+    "spieler": [
+     "player-0370-the-thing",
+     "player-2293-varkon-darkheed",
+     "player-2318-genta",
+     "player-2098-grieving-colossus",
+     "player-1488-dark-cloud",
+     "player-1616-marzipella",
+     "player-0133-taurimoth",
+     "player-2785-brakk",
+     "player-1496-weird",
+     "player-1493-lord-zedd"
+    ],
+    "kasseUeberRuecklage": 0.43,
+    "kasseAnteilStart": 0.08
+   }
+  },
+  "S-S": {
+   "teamId": "S-S",
+   "liga": "liga1",
+   "startKasse": 280,
+   "identitaet": {
+    "finances": 7.43,
+    "ambition": 4.58,
+    "boardConfidence": 7.29,
+    "harmony": 7.43,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 5.71,
+    "spe": 5,
+    "men": 7.29,
+    "soc": 2
+   },
+   "gm": {
+    "archetype": "talent_builder",
+    "starPriority": 4,
+    "valuePriority": 9,
+    "cashPriority": null,
+    "riskTolerance": 5,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": 3
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-0370-the-thing",
+     "player-0320-ravager",
+     "player-1978-voltus",
+     "player-2013-pandemonium",
+     "player-0284-quarris",
+     "player-2919-dromekar",
+     "player-2654-seraph-11",
+     "player-0754-chain",
+     "player-0625-ciacia",
+     "player-0525-elderwynn",
+     "player-2361-nestinats",
+     "player-0314-lightning"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 27.87,
+    "optTarget": 12,
+    "ruecklage": 27.01,
+    "cashBuffer": 27.01,
+    "solvencyFloor": 27.01,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 3,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 0.7402339349046015,
+     "wThrift": 0.9588701096331855,
+     "wSustain": 0.5681489184918491,
+     "wAsset": 0.4480201393472681,
+     "wPatience": 0.8801454162082876,
+     "wProfit": 0.011151559600404445,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 35.33,
+       "gehalt": 9.2
+      },
+      {
+       "mw": 31.68,
+       "gehalt": 7.11
+      },
+      {
+       "mw": 26.07,
+       "gehalt": 7.26
+      },
+      {
+       "mw": 22.31,
+       "gehalt": 5.31
+      },
+      {
+       "mw": 21.15,
+       "gehalt": 5.37
+      },
+      {
+       "mw": 20.38,
+       "gehalt": 4.84
+      },
+      {
+       "mw": 20.31,
+       "gehalt": 5.75
+      },
+      {
+       "mw": 20.11,
+       "gehalt": 4.82
+      },
+      {
+       "mw": 17.33,
+       "gehalt": 5.16
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 12.2,
+       "gehalt": 2.91
+      },
+      {
+       "mw": 12.18,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 2,
+      "Depth": 6,
+      "Backup": 4,
+      "Reserve": 0
+     },
+     "marktwertSumme": 252.13,
+     "top1Anteil": 0.14,
+     "top2Anteil": 0.27,
+     "mwMax": 35.33,
+     "mwMedian": 20.38,
+     "mwMin": 12.18,
+     "gehalt": 65.13,
+     "kasse": 27.87,
+     "staerke": 48.75
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 32.57,
+      "gehalt": 9.94
+     },
+     {
+      "mw": 31.97,
+      "gehalt": 8.65
+     },
+     {
+      "mw": 30.74,
+      "gehalt": 7.65
+     },
+     {
+      "mw": 22.31,
+      "gehalt": 5.31
+     },
+     {
+      "mw": 21.15,
+      "gehalt": 5.37
+     },
+     {
+      "mw": 20.31,
+      "gehalt": 5.75
+     },
+     {
+      "mw": 20.11,
+      "gehalt": 4.82
+     },
+     {
+      "mw": 17.33,
+      "gehalt": 5.16
+     },
+     {
+      "mw": 16.81,
+      "gehalt": 4.94
+     },
+     {
+      "mw": 13.08,
+      "gehalt": 3.57
+     },
+     {
+      "mw": 12.84,
+      "gehalt": 3.88
+     },
+     {
+      "mw": 12.17,
+      "gehalt": 4.01
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 3,
+     "Depth": 4,
+     "Backup": 5,
+     "Reserve": 0
+    },
+    "marktwertSumme": 251.39,
+    "top1Anteil": 0.13,
+    "top2Anteil": 0.26,
+    "mwMax": 32.57,
+    "mwMedian": 20.31,
+    "mwMin": 12.17,
+    "gehalt": 69.05,
+    "kasse": 28.61,
+    "staerke": 48.41,
+    "spieler": [
+     "player-0320-ravager",
+     "player-1978-voltus",
+     "player-2919-dromekar",
+     "player-2013-pandemonium",
+     "player-0200-exor",
+     "player-0625-ciacia",
+     "player-2654-seraph-11",
+     "player-0398-wayward",
+     "player-0214-battleborn",
+     "player-0641-brobot",
+     "player-0477-etppc",
+     "player-0130-terminator"
+    ],
+    "kasseUeberRuecklage": 1.6,
+    "kasseAnteilStart": 0.1
+   }
+  },
+  "T-C": {
+   "teamId": "T-C",
+   "liga": "liga2",
+   "startKasse": 210,
+   "identitaet": {
+    "finances": 7.06,
+    "ambition": 3.22,
+    "boardConfidence": 4.16,
+    "harmony": 8.92,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 3.29,
+    "spe": 1.45,
+    "men": 6.71,
+    "soc": 8.84
+   },
+   "gm": {
+    "archetype": "depth_spammer",
+    "starPriority": null,
+    "valuePriority": 7,
+    "cashPriority": null,
+    "riskTolerance": 3,
+    "rosterDepthPreference": 10,
+    "eliteSmallRosterPreference": 1
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-2021-sanctrix",
+     "player-1289-xylaris",
+     "player-2925-lumen-serene",
+     "player-0313-terratron",
+     "player-2447-illyra-fay",
+     "player-0676-madora",
+     "player-1097-steel-sinister",
+     "player-0135-haku",
+     "player-2063-bongo-skydrop",
+     "player-2726-bronzebrow",
+     "player-2519-atchu",
+     "player-1345-yaorenwo",
+     "player-0315-rynna",
+     "player-0318-braugh"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 19.4,
+    "optTarget": 14,
+    "ruecklage": 19.39,
+    "cashBuffer": 19.39,
+    "solvencyFloor": 19.39,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 5,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.7295784907379627,
+     "wThrift": 1.0109903238323832,
+     "wSustain": 0.689971360602727,
+     "wAsset": 0.4173495109510951,
+     "wPatience": 0.7463999266593325,
+     "wProfit": 0.011671611605604964,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 20.73,
+       "gehalt": 4.73
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 15.24,
+       "gehalt": 4.16
+      },
+      {
+       "mw": 13.89,
+       "gehalt": 2.79
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 3.5
+      },
+      {
+       "mw": 12.13,
+       "gehalt": 2.72
+      },
+      {
+       "mw": 12.11,
+       "gehalt": 2.53
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.43
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 2,
+      "Backup": 12,
+      "Reserve": 0
+     },
+     "marktwertSumme": 190.6,
+     "top1Anteil": 0.11,
+     "top2Anteil": 0.21,
+     "mwMax": 20.73,
+     "mwMedian": 12.11,
+     "mwMin": 12.02,
+     "gehalt": 50.11,
+     "kasse": 19.4,
+     "staerke": 40.43
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 15.67,
+      "gehalt": 3.52
+     },
+     {
+      "mw": 15.49,
+      "gehalt": 3.98
+     },
+     {
+      "mw": 15.37,
+      "gehalt": 3.54
+     },
+     {
+      "mw": 15.24,
+      "gehalt": 4.16
+     },
+     {
+      "mw": 14.02,
+      "gehalt": 4.06
+     },
+     {
+      "mw": 13.89,
+      "gehalt": 2.79
+     },
+     {
+      "mw": 13.73,
+      "gehalt": 4.07
+     },
+     {
+      "mw": 13.73,
+      "gehalt": 4.44
+     },
+     {
+      "mw": 13.7,
+      "gehalt": 4.1
+     },
+     {
+      "mw": 13.62,
+      "gehalt": 4.14
+     },
+     {
+      "mw": 13.51,
+      "gehalt": 3.34
+     },
+     {
+      "mw": 13.19,
+      "gehalt": 4.89
+     },
+     {
+      "mw": 12.13,
+      "gehalt": 3.5
+     },
+     {
+      "mw": 5.94,
+      "gehalt": 2.24
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 13,
+     "Reserve": 1
+    },
+    "marktwertSumme": 189.23,
+    "top1Anteil": 0.08,
+    "top2Anteil": 0.16,
+    "mwMax": 15.67,
+    "mwMedian": 13.73,
+    "mwMin": 5.94,
+    "gehalt": 52.77,
+    "kasse": 20.77,
+    "staerke": 39.26,
+    "spieler": [
+     "player-2925-lumen-serene",
+     "player-0313-terratron",
+     "player-2447-illyra-fay",
+     "player-2926-chonk-seraph",
+     "player-2081-whisperveil",
+     "player-2896-fyrin",
+     "player-2740-aerius-marrel",
+     "player-2004-peter-poison",
+     "player-2453-mary-estelle-wren",
+     "player-1869-aelindra",
+     "player-1722-runtha",
+     "player-2853-chronenhirte",
+     "player-1082-durosa",
+     "player-2852-glockenfresser"
+    ],
+    "kasseUeberRuecklage": 1.38,
+    "kasseAnteilStart": 0.1
+   }
+  },
+  "T-G": {
+   "teamId": "T-G",
+   "liga": "liga2",
+   "startKasse": 230,
+   "identitaet": {
+    "finances": 2.64,
+    "ambition": 6.28,
+    "boardConfidence": 4,
+    "harmony": 4.68,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 13.76,
+    "spe": 2.96,
+    "men": 3.28,
+    "soc": 0
+   },
+   "gm": {
+    "archetype": "rivalry_hawk",
+    "starPriority": 8,
+    "valuePriority": null,
+    "cashPriority": 5,
+    "riskTolerance": 9,
+    "rosterDepthPreference": 4,
+    "eliteSmallRosterPreference": 7
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0877-hulk",
+     "player-0284-quarris",
+     "player-1769-medibull",
+     "player-0642-mictone",
+     "player-0479-teravolt",
+     "player-0793-zarco",
+     "player-0069-leviathan",
+     "player-2098-grieving-colossus",
+     "player-0842-barkwing",
+     "player-2397-greenkraut",
+     "player-0977-morgrin"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 10.02,
+    "optTarget": 11,
+    "ruecklage": 9.94,
+    "cashBuffer": 9.94,
+    "solvencyFloor": 9.94,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 2,
+     "depth": 6,
+     "backup": 2,
+     "reserve": 1
+    },
+    "gewichte": {
+     "wWin": 1.5266192265448768,
+     "wThrift": 0.983490217821782,
+     "wSustain": 0.5275490037892678,
+     "wAsset": 0.42213728732873285,
+     "wPatience": 0.5300672013868053,
+     "wProfit": 0.518208309719861,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 11,
+      "gmDelta": -1,
+      "grund": "GM kompakt (Star 8, Elite 7): Opt 12 -> 11, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 40.13,
+       "gehalt": 7.73
+      },
+      {
+       "mw": 33.66,
+       "gehalt": 10.06
+      },
+      {
+       "mw": 23.76,
+       "gehalt": 5.33
+      },
+      {
+       "mw": 21.49,
+       "gehalt": 7.45
+      },
+      {
+       "mw": 20.38,
+       "gehalt": 4.84
+      },
+      {
+       "mw": 16.21,
+       "gehalt": 3.57
+      },
+      {
+       "mw": 14.55,
+       "gehalt": 3.98
+      },
+      {
+       "mw": 12.79,
+       "gehalt": 4.34
+      },
+      {
+       "mw": 12.66,
+       "gehalt": 1.81
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.7
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 2,
+      "Depth": 3,
+      "Backup": 6,
+      "Reserve": 0
+     },
+     "marktwertSumme": 219.98,
+     "top1Anteil": 0.18,
+     "top2Anteil": 0.34,
+     "mwMax": 40.13,
+     "mwMedian": 16.21,
+     "mwMin": 12.16,
+     "gehalt": 56.95,
+     "kasse": 10.02,
+     "staerke": 45.74
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 40.13,
+      "gehalt": 7.73
+     },
+     {
+      "mw": 33.66,
+      "gehalt": 10.06
+     },
+     {
+      "mw": 23.76,
+      "gehalt": 5.33
+     },
+     {
+      "mw": 21.49,
+      "gehalt": 7.45
+     },
+     {
+      "mw": 20.38,
+      "gehalt": 4.84
+     },
+     {
+      "mw": 14.58,
+      "gehalt": 5.68
+     },
+     {
+      "mw": 13.62,
+      "gehalt": 4.73
+     },
+     {
+      "mw": 13.57,
+      "gehalt": 4.49
+     },
+     {
+      "mw": 12.79,
+      "gehalt": 4.34
+     },
+     {
+      "mw": 12.16,
+      "gehalt": 4.7
+     },
+     {
+      "mw": 12.14,
+      "gehalt": 3.3
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 2,
+     "Depth": 3,
+     "Backup": 6,
+     "Reserve": 0
+    },
+    "marktwertSumme": 218.28,
+    "top1Anteil": 0.18,
+    "top2Anteil": 0.34,
+    "mwMax": 40.13,
+    "mwMedian": 14.58,
+    "mwMin": 12.14,
+    "gehalt": 62.65,
+    "kasse": 11.72,
+    "staerke": 44.38,
+    "spieler": [
+     "player-0877-hulk",
+     "player-0284-quarris",
+     "player-1769-medibull",
+     "player-0479-teravolt",
+     "player-0793-zarco",
+     "player-0069-leviathan",
+     "player-0463-volcano",
+     "player-1486-armaruk",
+     "player-2780-morb",
+     "player-0977-morgrin",
+     "player-2537-grunak-crumbhand"
+    ],
+    "kasseUeberRuecklage": 1.78,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "T-T": {
+   "teamId": "T-T",
+   "liga": "liga1",
+   "startKasse": 260,
+   "identitaet": {
+    "finances": 8.85,
+    "ambition": 4.77,
+    "boardConfidence": 2.38,
+    "harmony": 4.84,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 4.77,
+    "spe": 4.77,
+    "men": 5,
+    "soc": 5.46
+   },
+   "gm": {
+    "archetype": "bargain_hunter",
+    "starPriority": 3,
+    "valuePriority": 10,
+    "cashPriority": 10,
+    "riskTolerance": 3,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "soft",
+   "solo": {
+    "picks": [
+     "player-1289-xylaris",
+     "player-0819-udjnyna",
+     "player-2179-prinz-faelyn",
+     "player-0613-butcher",
+     "player-1049-cipher",
+     "player-0775-ruthgal",
+     "player-0460-murky",
+     "player-1584-lord-amaranth",
+     "player-2397-greenkraut",
+     "player-0676-madora",
+     "player-1345-yaorenwo",
+     "player-2519-atchu",
+     "player-0318-braugh",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 29.19,
+    "optTarget": 14,
+    "ruecklage": 29.18,
+    "cashBuffer": 29.18,
+    "solvencyFloor": 29.18,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 1,
+     "depth": 7,
+     "backup": 4,
+     "reserve": 2
+    },
+    "gewichte": {
+     "wWin": 0.9121706270627062,
+     "wThrift": 0.7511258465846585,
+     "wSustain": 0.9689511273349558,
+     "wAsset": 0.563263143647698,
+     "wPatience": 1.0842095409540953,
+     "wProfit": 0.6872227222722272,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 22.57,
+       "gehalt": 5.59
+      },
+      {
+       "mw": 22.19,
+       "gehalt": 5.49
+      },
+      {
+       "mw": 21.39,
+       "gehalt": 6.7
+      },
+      {
+       "mw": 21.18,
+       "gehalt": 5.8
+      },
+      {
+       "mw": 20.24,
+       "gehalt": 6.41
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 15.91,
+       "gehalt": 4.09
+      },
+      {
+       "mw": 14.92,
+       "gehalt": 4.52
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 4.72
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 6,
+      "Backup": 8,
+      "Reserve": 0
+     },
+     "marktwertSumme": 230.81,
+     "top1Anteil": 0.1,
+     "top2Anteil": 0.19,
+     "mwMax": 22.57,
+     "mwMedian": 15.91,
+     "mwMin": 12.02,
+     "gehalt": 63.43,
+     "kasse": 29.19,
+     "staerke": 45.14
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 30.79,
+      "gehalt": 6.63
+     },
+     {
+      "mw": 21.39,
+      "gehalt": 6.7
+     },
+     {
+      "mw": 20,
+      "gehalt": 3.76
+     },
+     {
+      "mw": 15.91,
+      "gehalt": 4.09
+     },
+     {
+      "mw": 15.73,
+      "gehalt": 5.26
+     },
+     {
+      "mw": 15.35,
+      "gehalt": 4.89
+     },
+     {
+      "mw": 15.17,
+      "gehalt": 5.14
+     },
+     {
+      "mw": 14.11,
+      "gehalt": 4.39
+     },
+     {
+      "mw": 14.03,
+      "gehalt": 2.9
+     },
+     {
+      "mw": 14.01,
+      "gehalt": 3.99
+     },
+     {
+      "mw": 13.82,
+      "gehalt": 4.05
+     },
+     {
+      "mw": 13.81,
+      "gehalt": 4.76
+     },
+     {
+      "mw": 13.39,
+      "gehalt": 3.51
+     },
+     {
+      "mw": 12.91,
+      "gehalt": 3.28
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 1,
+     "Depth": 2,
+     "Backup": 11,
+     "Reserve": 0
+    },
+    "marktwertSumme": 230.42,
+    "top1Anteil": 0.13,
+    "top2Anteil": 0.23,
+    "mwMax": 30.79,
+    "mwMedian": 15.17,
+    "mwMin": 12.91,
+    "gehalt": 63.35,
+    "kasse": 29.58,
+    "staerke": 45.2,
+    "spieler": [
+     "player-1289-xylaris",
+     "player-0819-udjnyna",
+     "player-2545-sir-percival",
+     "player-0613-butcher",
+     "player-0960-xhya",
+     "player-0466-demonicon",
+     "player-2215-stryker",
+     "player-0121-pvt-smith",
+     "player-2212-larek",
+     "player-1080-brimlina",
+     "player-1876-eldwyn",
+     "player-1337-alastor",
+     "player-2002-spiderwalker-m-iii",
+     "player-0468-kevivan-der-drollige"
+    ],
+    "kasseUeberRuecklage": 0.4,
+    "kasseAnteilStart": 0.11
+   }
+  },
+  "U-A": {
+   "teamId": "U-A",
+   "liga": "liga2",
+   "startKasse": 190,
+   "identitaet": {
+    "finances": 4.25,
+    "ambition": 6,
+    "boardConfidence": 8,
+    "harmony": 8.25,
+    "playerOpt": 14,
+    "playerMin": 8,
+    "pow": 3.5,
+    "spe": 8.5,
+    "men": 3.5,
+    "soc": 4.5
+   },
+   "gm": {
+    "archetype": "depth_spammer",
+    "starPriority": null,
+    "valuePriority": 7,
+    "cashPriority": null,
+    "riskTolerance": 4,
+    "rosterDepthPreference": 10,
+    "eliteSmallRosterPreference": 1
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0483-wu-tang",
+     "player-1332-breeze",
+     "player-0651-cyra",
+     "player-0819-udjnyna",
+     "player-1097-steel-sinister",
+     "player-1096-untaught-scribe",
+     "player-2361-nestinats",
+     "player-1083-nrogor",
+     "player-0676-madora",
+     "player-0307-rex",
+     "player-0135-haku",
+     "player-0315-rynna",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "roster_full",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 11.62,
+    "optTarget": 14,
+    "ruecklage": 11.61,
+    "cashBuffer": 11.61,
+    "solvencyFloor": 11.61,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 4,
+     "backup": 7,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.8021029702970297,
+     "wThrift": 1.2145095209520955,
+     "wSustain": 0.70156967363403,
+     "wAsset": 0.3679531753175318,
+     "wPatience": 0.7474909990999099,
+     "wProfit": 0.011750375037503709,
+     "optTarget": 14
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 14,
+     "kader": 14,
+     "rahmenPlaetze": 14,
+     "notwege": [],
+     "text": "Zielkader 14 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 14,
+      "optTarget": 14,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 14,
+     "spielerWerte": [
+      {
+       "mw": 15.91,
+       "gehalt": 4.09
+      },
+      {
+       "mw": 15.84,
+       "gehalt": 4.98
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.2,
+       "gehalt": 2.91
+      },
+      {
+       "mw": 12.16,
+       "gehalt": 4.19
+      },
+      {
+       "mw": 12.15,
+       "gehalt": 3.85
+      },
+      {
+       "mw": 12.11,
+       "gehalt": 2.53
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.43
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 0,
+      "Depth": 0,
+      "Backup": 14,
+      "Reserve": 0
+     },
+     "marktwertSumme": 178.38,
+     "top1Anteil": 0.09,
+     "top2Anteil": 0.18,
+     "mwMax": 15.91,
+     "mwMedian": 12.16,
+     "mwMin": 12.02,
+     "gehalt": 50.2,
+     "kasse": 11.62,
+     "staerke": 39.8
+    }
+   },
+   "nachDraft": {
+    "kader": 14,
+    "spielerWerte": [
+     {
+      "mw": 15.89,
+      "gehalt": 4.6
+     },
+     {
+      "mw": 15.84,
+      "gehalt": 4.98
+     },
+     {
+      "mw": 15.46,
+      "gehalt": 3.54
+     },
+     {
+      "mw": 13.97,
+      "gehalt": 4.84
+     },
+     {
+      "mw": 13.96,
+      "gehalt": 5.63
+     },
+     {
+      "mw": 13.91,
+      "gehalt": 4.28
+     },
+     {
+      "mw": 12.93,
+      "gehalt": 3.69
+     },
+     {
+      "mw": 12.61,
+      "gehalt": 3.89
+     },
+     {
+      "mw": 12.57,
+      "gehalt": 2.91
+     },
+     {
+      "mw": 12.22,
+      "gehalt": 3.15
+     },
+     {
+      "mw": 12.2,
+      "gehalt": 2.91
+     },
+     {
+      "mw": 12.11,
+      "gehalt": 2.53
+     },
+     {
+      "mw": 12.09,
+      "gehalt": 3.01
+     },
+     {
+      "mw": 2.62,
+      "gehalt": 1.39
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 13,
+     "Reserve": 1
+    },
+    "marktwertSumme": 178.38,
+    "top1Anteil": 0.09,
+    "top2Anteil": 0.18,
+    "mwMax": 15.89,
+    "mwMedian": 12.93,
+    "mwMin": 2.62,
+    "gehalt": 51.35,
+    "kasse": 11.62,
+    "staerke": 39.58,
+    "spieler": [
+     "player-1332-breeze",
+     "player-2298-alarm",
+     "player-0651-cyra",
+     "player-2087-krag-zul",
+     "player-1097-steel-sinister",
+     "player-0815-deadface",
+     "player-0481-schlurk",
+     "player-2361-nestinats",
+     "player-1335-elyndra",
+     "player-0136-snow-eagle",
+     "player-0836-yinen",
+     "player-2662-pix-e",
+     "player-2861-kloeschen",
+     "player-2797-dee"
+    ],
+    "kasseUeberRuecklage": 0.01,
+    "kasseAnteilStart": 0.06
+   }
+  },
+  "V-D": {
+   "teamId": "V-D",
+   "liga": "liga1",
+   "startKasse": 250,
+   "identitaet": {
+    "finances": 2.92,
+    "ambition": 5.03,
+    "boardConfidence": 6.43,
+    "harmony": 5.66,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 5,
+    "spe": 7,
+    "men": 2.92,
+    "soc": 5.54
+   },
+   "gm": {
+    "archetype": "risk_gambler",
+    "starPriority": 8,
+    "valuePriority": null,
+    "cashPriority": 3,
+    "riskTolerance": 9,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-0483-wu-tang",
+     "player-1550-ilirana",
+     "player-0555-nessara",
+     "player-2413-liora-somnia",
+     "player-1076-wingless",
+     "player-0083-scruffy",
+     "player-0797-liluth-xilric",
+     "player-0294-grimflora",
+     "player-1828-babuschinka",
+     "player-1256-cogfina-skyforge",
+     "player-1302-clara"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 12.15,
+    "optTarget": 11,
+    "ruecklage": 11.59,
+    "cashBuffer": 11.59,
+    "solvencyFloor": 11.59,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 3,
+     "depth": 5,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.314849760798302,
+     "wThrift": 1.083035493416008,
+     "wSustain": 0.47211188514406993,
+     "wAsset": 0.3571907020035337,
+     "wPatience": 0.5122020258692536,
+     "wProfit": 0.1864270427042705,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 11,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 33.98,
+       "gehalt": 7.43
+      },
+      {
+       "mw": 33.72,
+       "gehalt": 6.9
+      },
+      {
+       "mw": 31.4,
+       "gehalt": 8.87
+      },
+      {
+       "mw": 21.36,
+       "gehalt": 5.42
+      },
+      {
+       "mw": 20.17,
+       "gehalt": 6.44
+      },
+      {
+       "mw": 20.17,
+       "gehalt": 6.91
+      },
+      {
+       "mw": 20.1,
+       "gehalt": 6.18
+      },
+      {
+       "mw": 16.95,
+       "gehalt": 5.48
+      },
+      {
+       "mw": 14.07,
+       "gehalt": 4.7
+      },
+      {
+       "mw": 13.5,
+       "gehalt": 4.58
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 3,
+      "Depth": 4,
+      "Backup": 4,
+      "Reserve": 0
+     },
+     "marktwertSumme": 237.85,
+     "top1Anteil": 0.14,
+     "top2Anteil": 0.28,
+     "mwMax": 33.98,
+     "mwMedian": 20.17,
+     "mwMin": 12.43,
+     "gehalt": 65.04,
+     "kasse": 12.15,
+     "staerke": 48.35
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 33.98,
+      "gehalt": 7.43
+     },
+     {
+      "mw": 31.46,
+      "gehalt": 9.2
+     },
+     {
+      "mw": 31.4,
+      "gehalt": 8.87
+     },
+     {
+      "mw": 22.59,
+      "gehalt": 5.92
+     },
+     {
+      "mw": 21.36,
+      "gehalt": 5.42
+     },
+     {
+      "mw": 20.17,
+      "gehalt": 6.44
+     },
+     {
+      "mw": 20.1,
+      "gehalt": 6.18
+     },
+     {
+      "mw": 16.67,
+      "gehalt": 4.19
+     },
+     {
+      "mw": 14.92,
+      "gehalt": 3.71
+     },
+     {
+      "mw": 12.97,
+      "gehalt": 3.01
+     },
+     {
+      "mw": 12.38,
+      "gehalt": 3.58
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 3,
+     "Depth": 4,
+     "Backup": 4,
+     "Reserve": 0
+    },
+    "marktwertSumme": 238,
+    "top1Anteil": 0.14,
+    "top2Anteil": 0.27,
+    "mwMax": 33.98,
+    "mwMedian": 20.17,
+    "mwMin": 12.38,
+    "gehalt": 63.95,
+    "kasse": 12,
+    "staerke": 47.66,
+    "spieler": [
+     "player-1550-ilirana",
+     "player-0555-nessara",
+     "player-0083-scruffy",
+     "player-1256-cogfina-skyforge",
+     "player-1828-babuschinka",
+     "player-2466-rook-mareth",
+     "player-2508-ferramina",
+     "player-1609-dalinya",
+     "player-0672-lady-owen",
+     "player-1072-ruxiliaa",
+     "player-1888-hannah"
+    ],
+    "kasseUeberRuecklage": 0.41,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "V-V": {
+   "teamId": "V-V",
+   "liga": "liga2",
+   "startKasse": 235,
+   "identitaet": {
+    "finances": 3,
+    "ambition": 9.2,
+    "boardConfidence": 7.12,
+    "harmony": 5.86,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 7.06,
+    "spe": 8,
+    "men": 2.88,
+    "soc": 2.06
+   },
+   "gm": {
+    "archetype": "star_chaser",
+    "starPriority": 10,
+    "valuePriority": null,
+    "cashPriority": 2,
+    "riskTolerance": 9,
+    "rosterDepthPreference": 4,
+    "eliteSmallRosterPreference": 9
+   },
+   "themaStrenge": "hard",
+   "solo": {
+    "picks": [
+     "player-0863-moonga",
+     "player-0998-bjarnor",
+     "player-2271-garmel",
+     "player-0043-leif-eriksson",
+     "player-2223-elyna-silberblatt",
+     "player-1494-isla-frostclaw",
+     "player-0975-thorwald",
+     "player-2397-greenkraut",
+     "player-0135-haku"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 11.31,
+    "optTarget": 9,
+    "ruecklage": 11.1,
+    "cashBuffer": 11.1,
+    "solvencyFloor": 11.1,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 1,
+     "core": 2,
+     "depth": 4,
+     "backup": 2,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 1.9633781395917371,
+     "wThrift": 0.8765219855318866,
+     "wSustain": 0.30579129468502403,
+     "wAsset": 0.32774993499349936,
+     "wPatience": 0.4790944241090775,
+     "wProfit": 0.011138047138047098,
+     "optTarget": 9
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 9,
+     "kader": 9,
+     "rahmenPlaetze": 9,
+     "notwege": [],
+     "text": "Zielkader 9 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 9,
+      "gmDelta": -2,
+      "grund": "GM kompakt (Star 10, Elite 9): Opt 11 -> 9, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 9,
+     "spielerWerte": [
+      {
+       "mw": 48,
+       "gehalt": 13.04
+      },
+      {
+       "mw": 41.56,
+       "gehalt": 9.6
+      },
+      {
+       "mw": 31.56,
+       "gehalt": 8.9
+      },
+      {
+       "mw": 27.77,
+       "gehalt": 7.6
+      },
+      {
+       "mw": 24.81,
+       "gehalt": 6.49
+      },
+      {
+       "mw": 13.42,
+       "gehalt": 4.86
+      },
+      {
+       "mw": 12.29,
+       "gehalt": 4.65
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 1,
+      "Core": 2,
+      "Depth": 2,
+      "Backup": 4,
+      "Reserve": 0
+     },
+     "marktwertSumme": 223.69,
+     "top1Anteil": 0.21,
+     "top2Anteil": 0.4,
+     "mwMax": 48,
+     "mwMedian": 24.81,
+     "mwMin": 12.09,
+     "gehalt": 61.84,
+     "kasse": 11.31,
+     "staerke": 48.05
+    }
+   },
+   "nachDraft": {
+    "kader": 9,
+    "spielerWerte": [
+     {
+      "mw": 48,
+      "gehalt": 13.04
+     },
+     {
+      "mw": 41.56,
+      "gehalt": 9.6
+     },
+     {
+      "mw": 31.56,
+      "gehalt": 8.9
+     },
+     {
+      "mw": 30.55,
+      "gehalt": 8.18
+     },
+     {
+      "mw": 16.27,
+      "gehalt": 4.4
+     },
+     {
+      "mw": 15.58,
+      "gehalt": 4.99
+     },
+     {
+      "mw": 13.64,
+      "gehalt": 4.41
+     },
+     {
+      "mw": 13.42,
+      "gehalt": 4.86
+     },
+     {
+      "mw": 12.29,
+      "gehalt": 4.65
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 1,
+     "Core": 3,
+     "Depth": 0,
+     "Backup": 5,
+     "Reserve": 0
+    },
+    "marktwertSumme": 222.87,
+    "top1Anteil": 0.22,
+    "top2Anteil": 0.4,
+    "mwMax": 48,
+    "mwMedian": 16.27,
+    "mwMin": 12.29,
+    "gehalt": 63.03,
+    "kasse": 12.13,
+    "staerke": 46.97,
+    "spieler": [
+     "player-0863-moonga",
+     "player-0998-bjarnor",
+     "player-2271-garmel",
+     "player-0876-strider",
+     "player-2135-harold",
+     "player-1494-isla-frostclaw",
+     "player-0295-ukash",
+     "player-0975-thorwald",
+     "player-0126-sl-32"
+    ],
+    "kasseUeberRuecklage": 1.03,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "V-W": {
+   "teamId": "V-W",
+   "liga": "liga2",
+   "startKasse": 180,
+   "identitaet": {
+    "finances": 3.11,
+    "ambition": 4.92,
+    "boardConfidence": 8.27,
+    "harmony": 7.3,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 2.54,
+    "spe": 1.84,
+    "men": 4,
+    "soc": 12.08
+   },
+   "gm": {
+    "archetype": "culture_keeper",
+    "starPriority": null,
+    "valuePriority": 6,
+    "cashPriority": null,
+    "riskTolerance": 4,
+    "rosterDepthPreference": 7,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-1549-lyrion",
+     "player-0483-wu-tang",
+     "player-0824-elara",
+     "player-1332-breeze",
+     "player-1883-haldor",
+     "player-0842-barkwing",
+     "player-2397-greenkraut",
+     "player-0676-madora",
+     "player-2519-atchu",
+     "player-0135-haku",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 8.73,
+    "optTarget": 12,
+    "ruecklage": 8.72,
+    "cashBuffer": 8.72,
+    "solvencyFloor": 8.72,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 0,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 3
+    },
+    "gewichte": {
+     "wWin": 0.8395943523685703,
+     "wThrift": 1.1072853353335337,
+     "wSustain": 0.7661502412907957,
+     "wAsset": 0.2724967150048338,
+     "wPatience": 0.6253746597993133,
+     "wProfit": 0,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 33.3,
+       "gehalt": 10.18
+      },
+      {
+       "mw": 14.51,
+       "gehalt": 3.31
+      },
+      {
+       "mw": 13.3,
+       "gehalt": 3.87
+      },
+      {
+       "mw": 12.66,
+       "gehalt": 1.81
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.43,
+       "gehalt": 2.13
+      },
+      {
+       "mw": 12.19,
+       "gehalt": 3.14
+      },
+      {
+       "mw": 12.1,
+       "gehalt": 2.73
+      },
+      {
+       "mw": 12.09,
+       "gehalt": 3.56
+      },
+      {
+       "mw": 12.04,
+       "gehalt": 3.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 1,
+      "Depth": 0,
+      "Backup": 11,
+      "Reserve": 0
+     },
+     "marktwertSumme": 171.27,
+     "top1Anteil": 0.19,
+     "top2Anteil": 0.28,
+     "mwMax": 33.3,
+     "mwMedian": 12.43,
+     "mwMin": 12.02,
+     "gehalt": 45.1,
+     "kasse": 8.73,
+     "staerke": 38.96
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 18.01,
+      "gehalt": 4.63
+     },
+     {
+      "mw": 15.94,
+      "gehalt": 3.71
+     },
+     {
+      "mw": 15.61,
+      "gehalt": 4.63
+     },
+     {
+      "mw": 15.04,
+      "gehalt": 4.54
+     },
+     {
+      "mw": 15.03,
+      "gehalt": 4
+     },
+     {
+      "mw": 13.98,
+      "gehalt": 3.76
+     },
+     {
+      "mw": 13.59,
+      "gehalt": 4.02
+     },
+     {
+      "mw": 13.3,
+      "gehalt": 3.87
+     },
+     {
+      "mw": 13.11,
+      "gehalt": 2.81
+     },
+     {
+      "mw": 12.44,
+      "gehalt": 3.91
+     },
+     {
+      "mw": 12.42,
+      "gehalt": 3.26
+     },
+     {
+      "mw": 12.2,
+      "gehalt": 3.54
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 0,
+     "Depth": 0,
+     "Backup": 12,
+     "Reserve": 0
+    },
+    "marktwertSumme": 170.67,
+    "top1Anteil": 0.11,
+    "top2Anteil": 0.2,
+    "mwMax": 18.01,
+    "mwMedian": 13.98,
+    "mwMin": 12.2,
+    "gehalt": 46.68,
+    "kasse": 9.33,
+    "staerke": 39.71,
+    "spieler": [
+     "player-0824-elara",
+     "player-0822-remiel",
+     "player-0112-jihanna",
+     "player-2142-professor-paranoix",
+     "player-1863-necrophos",
+     "player-1071-belandria",
+     "player-0282-hargorin-todbringer",
+     "player-1627-soora-moonshadow",
+     "player-0834-bittersweet",
+     "player-2257-vaprix",
+     "player-1329-vilesoul",
+     "player-0674-fallen-angel"
+    ],
+    "kasseUeberRuecklage": 0.61,
+    "kasseAnteilStart": 0.05
+   }
+  },
+  "W-L": {
+   "teamId": "W-L",
+   "liga": "liga1",
+   "startKasse": 290,
+   "identitaet": {
+    "finances": 10,
+    "ambition": 5.34,
+    "boardConfidence": 4.64,
+    "harmony": 8.38,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 7.36,
+    "spe": 2.64,
+    "men": 6.36,
+    "soc": 3.64
+   },
+   "gm": {
+    "archetype": "bargain_hunter",
+    "starPriority": 4,
+    "valuePriority": 10,
+    "cashPriority": 10,
+    "riskTolerance": 4,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0366-orinex",
+     "player-0230-bjorn",
+     "player-0284-quarris",
+     "player-2118-malgorr",
+     "player-2919-dromekar",
+     "player-0613-butcher",
+     "player-2178-iron-warlord",
+     "player-0623-ursana",
+     "player-2298-alarm",
+     "player-0652-whispra",
+     "player-0320-ravager"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 36.48,
+    "optTarget": 11,
+    "ruecklage": 36.25,
+    "cashBuffer": 36.25,
+    "solvencyFloor": 36.25,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 3,
+     "depth": 5,
+     "backup": 3,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 0.9963874000733405,
+     "wThrift": 0.6655173517351735,
+     "wSustain": 0.810965629896323,
+     "wAsset": 0.6011827182718272,
+     "wPatience": 1.3368524452445245,
+     "wProfit": 0.9543294329432944,
+     "optTarget": 11
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 11,
+     "kader": 11,
+     "rahmenPlaetze": 11,
+     "notwege": [],
+     "text": "Zielkader 11 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 11,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 11,
+     "spielerWerte": [
+      {
+       "mw": 33.9,
+       "gehalt": 9.08
+      },
+      {
+       "mw": 32.03,
+       "gehalt": 7.98
+      },
+      {
+       "mw": 30.75,
+       "gehalt": 9.75
+      },
+      {
+       "mw": 29.56,
+       "gehalt": 8.04
+      },
+      {
+       "mw": 23.22,
+       "gehalt": 6.68
+      },
+      {
+       "mw": 21.39,
+       "gehalt": 6.7
+      },
+      {
+       "mw": 20.38,
+       "gehalt": 4.84
+      },
+      {
+       "mw": 20.31,
+       "gehalt": 5.75
+      },
+      {
+       "mw": 14.99,
+       "gehalt": 4.17
+      },
+      {
+       "mw": 13.91,
+       "gehalt": 4.28
+      },
+      {
+       "mw": 13.08,
+       "gehalt": 3.57
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 3,
+      "Depth": 5,
+      "Backup": 3,
+      "Reserve": 0
+     },
+     "marktwertSumme": 253.52,
+     "top1Anteil": 0.13,
+     "top2Anteil": 0.26,
+     "mwMax": 33.9,
+     "mwMedian": 21.39,
+     "mwMin": 13.08,
+     "gehalt": 70.84,
+     "kasse": 36.48,
+     "staerke": 49.67
+    }
+   },
+   "nachDraft": {
+    "kader": 11,
+    "spielerWerte": [
+     {
+      "mw": 33.9,
+      "gehalt": 9.08
+     },
+     {
+      "mw": 32.03,
+      "gehalt": 7.98
+     },
+     {
+      "mw": 31.83,
+      "gehalt": 8.16
+     },
+     {
+      "mw": 29.56,
+      "gehalt": 8.04
+     },
+     {
+      "mw": 23.22,
+      "gehalt": 6.68
+     },
+     {
+      "mw": 22.92,
+      "gehalt": 7.62
+     },
+     {
+      "mw": 21.9,
+      "gehalt": 5.52
+     },
+     {
+      "mw": 18.93,
+      "gehalt": 6.09
+     },
+     {
+      "mw": 14.37,
+      "gehalt": 4.71
+     },
+     {
+      "mw": 12.76,
+      "gehalt": 3.68
+     },
+     {
+      "mw": 12.18,
+      "gehalt": 3.83
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 3,
+     "Depth": 4,
+     "Backup": 4,
+     "Reserve": 0
+    },
+    "marktwertSumme": 253.6,
+    "top1Anteil": 0.13,
+    "top2Anteil": 0.26,
+    "mwMax": 33.9,
+    "mwMedian": 22.92,
+    "mwMin": 12.18,
+    "gehalt": 71.39,
+    "kasse": 36.4,
+    "staerke": 48.93,
+    "spieler": [
+     "player-0366-orinex",
+     "player-0230-bjorn",
+     "player-0231-pyro-guardian",
+     "player-2178-iron-warlord",
+     "player-0778-xuteria",
+     "player-0623-ursana",
+     "player-1818-towlie",
+     "player-0607-aeon-flux",
+     "player-0314-lightning",
+     "player-0302-robofighter",
+     "player-0316-nobunaga"
+    ],
+    "kasseUeberRuecklage": 0.15,
+    "kasseAnteilStart": 0.13
+   }
+  },
+  "W-W": {
+   "teamId": "W-W",
+   "liga": "liga1",
+   "startKasse": 255,
+   "identitaet": {
+    "finances": 7.4,
+    "ambition": 6.7,
+    "boardConfidence": 6.7,
+    "harmony": 4.8,
+    "playerOpt": 12,
+    "playerMin": 8,
+    "pow": 2,
+    "spe": 1.6,
+    "men": 14.4,
+    "soc": 2
+   },
+   "gm": {
+    "archetype": "systems_tinkerer",
+    "starPriority": 6,
+    "valuePriority": 9,
+    "cashPriority": 7,
+    "riskTolerance": 5,
+    "rosterDepthPreference": 5,
+    "eliteSmallRosterPreference": 6
+   },
+   "themaStrenge": "strong",
+   "solo": {
+    "picks": [
+     "player-0995-weaver-of-time",
+     "player-2901-dyrth",
+     "player-1332-breeze",
+     "player-1040-elythra",
+     "player-1053-prinz-morven",
+     "player-2077-velza",
+     "player-1289-xylaris",
+     "player-1096-untaught-scribe",
+     "player-1083-nrogor",
+     "player-1345-yaorenwo",
+     "player-2726-bronzebrow",
+     "player-0673-darkray"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 24.56,
+    "optTarget": 12,
+    "ruecklage": 24.51,
+    "cashBuffer": 24.51,
+    "solvencyFloor": 24.51,
+    "superstarLizenz": false,
+    "komposition": {
+     "superstar": 0,
+     "star": 0,
+     "core": 2,
+     "depth": 6,
+     "backup": 3,
+     "reserve": 1
+    },
+    "gewichte": {
+     "wWin": 1.1713982598259824,
+     "wThrift": 0.9004815672678379,
+     "wSustain": 0.8261661250569501,
+     "wAsset": 0.47864152015201517,
+     "wPatience": 1.007639113911391,
+     "wProfit": 0.17845362314009183,
+     "optTarget": 12
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 12,
+     "kader": 12,
+     "rahmenPlaetze": 12,
+     "notwege": [],
+     "text": "Zielkader 12 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 12,
+      "optTarget": 12,
+      "gmDelta": 0,
+      "grund": null
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 12,
+     "spielerWerte": [
+      {
+       "mw": 35.47,
+       "gehalt": 9.61
+      },
+      {
+       "mw": 31.09,
+       "gehalt": 7.08
+      },
+      {
+       "mw": 27.36,
+       "gehalt": 5.45
+      },
+      {
+       "mw": 22.93,
+       "gehalt": 5.24
+      },
+      {
+       "mw": 20.05,
+       "gehalt": 6.55
+      },
+      {
+       "mw": 20,
+       "gehalt": 3.76
+      },
+      {
+       "mw": 12.68,
+       "gehalt": 3.95
+      },
+      {
+       "mw": 12.61,
+       "gehalt": 3.89
+      },
+      {
+       "mw": 12.15,
+       "gehalt": 3.85
+      },
+      {
+       "mw": 12.06,
+       "gehalt": 4.52
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.83
+      },
+      {
+       "mw": 12.02,
+       "gehalt": 3.13
+      }
+     ],
+     "stufen": {
+      "Superstar": 0,
+      "Star": 0,
+      "Core": 2,
+      "Depth": 4,
+      "Backup": 6,
+      "Reserve": 0
+     },
+     "marktwertSumme": 230.44,
+     "top1Anteil": 0.15,
+     "top2Anteil": 0.29,
+     "mwMax": 35.47,
+     "mwMedian": 20,
+     "mwMin": 12.02,
+     "gehalt": 60.86,
+     "kasse": 24.56,
+     "staerke": 44.55
+    }
+   },
+   "nachDraft": {
+    "kader": 12,
+    "spielerWerte": [
+     {
+      "mw": 35.47,
+      "gehalt": 9.61
+     },
+     {
+      "mw": 31.09,
+      "gehalt": 7.08
+     },
+     {
+      "mw": 27.36,
+      "gehalt": 5.45
+     },
+     {
+      "mw": 20.05,
+      "gehalt": 6.55
+     },
+     {
+      "mw": 18.79,
+      "gehalt": 5.17
+     },
+     {
+      "mw": 16.56,
+      "gehalt": 6.64
+     },
+     {
+      "mw": 15.32,
+      "gehalt": 3.97
+     },
+     {
+      "mw": 13.83,
+      "gehalt": 4.36
+     },
+     {
+      "mw": 13.3,
+      "gehalt": 5.24
+     },
+     {
+      "mw": 13.17,
+      "gehalt": 3.94
+     },
+     {
+      "mw": 12.94,
+      "gehalt": 4.55
+     },
+     {
+      "mw": 12.55,
+      "gehalt": 3.33
+     }
+    ],
+    "stufen": {
+     "Superstar": 0,
+     "Star": 0,
+     "Core": 2,
+     "Depth": 2,
+     "Backup": 8,
+     "Reserve": 0
+    },
+    "marktwertSumme": 230.43,
+    "top1Anteil": 0.15,
+    "top2Anteil": 0.29,
+    "mwMax": 35.47,
+    "mwMedian": 16.56,
+    "mwMin": 12.55,
+    "gehalt": 65.89,
+    "kasse": 24.57,
+    "staerke": 44.48,
+    "spieler": [
+     "player-0995-weaver-of-time",
+     "player-2901-dyrth",
+     "player-1040-elythra",
+     "player-1053-prinz-morven",
+     "player-2533-maelis-virelle",
+     "player-1342-vortex",
+     "player-1079-loki",
+     "player-1857-hagina",
+     "player-1489-voidshard",
+     "player-2593-eberon-mourngrave",
+     "player-1870-corvus",
+     "player-2015-vashlon-haesslon"
+    ],
+    "kasseUeberRuecklage": 0.06,
+    "kasseAnteilStart": 0.1
+   }
+  },
+  "Z-H": {
+   "teamId": "Z-H",
+   "liga": "liga1",
+   "startKasse": 320,
+   "identitaet": {
+    "finances": 2,
+    "ambition": 10,
+    "boardConfidence": 2.26,
+    "harmony": 1.65,
+    "playerOpt": 11,
+    "playerMin": 8,
+    "pow": 6,
+    "spe": 6.52,
+    "men": 3.48,
+    "soc": 4.26
+   },
+   "gm": {
+    "archetype": "risk_gambler",
+    "starPriority": 10,
+    "valuePriority": null,
+    "cashPriority": 1,
+    "riskTolerance": 10,
+    "rosterDepthPreference": null,
+    "eliteSmallRosterPreference": null
+   },
+   "themaStrenge": "medium",
+   "solo": {
+    "picks": [
+     "player-0188-grok-na",
+     "player-2759-skye-ex30",
+     "player-0526-wheatley",
+     "player-0370-the-thing",
+     "player-0775-ruthgal",
+     "player-2309-nyxor",
+     "player-2355-kark-logistics",
+     "player-0791-darkbow",
+     "player-2920-salvador-mare",
+     "player-0479-teravolt"
+    ],
+    "abbruch": "nothing_affordable",
+    "stopNutzen": null,
+    "besterKaufNutzen": null,
+    "kasseEnde": 13.66,
+    "optTarget": 10,
+    "ruecklage": 11.56,
+    "cashBuffer": 11.56,
+    "solvencyFloor": 11.56,
+    "superstarLizenz": true,
+    "komposition": {
+     "superstar": 1,
+     "star": 1,
+     "core": 2,
+     "depth": 4,
+     "backup": 2,
+     "reserve": 0
+    },
+    "gewichte": {
+     "wWin": 2.127165525885922,
+     "wThrift": 1.0417437210387706,
+     "wSustain": 0.32433488682201556,
+     "wAsset": 0.42532150548388165,
+     "wPatience": 0.20014412041204116,
+     "wProfit": 0.5877386405307198,
+     "optTarget": 10
+    },
+    "poolGroesse": 2983,
+    "kaderplan": {
+     "grund": "opt_erreicht",
+     "optTarget": 10,
+     "kader": 10,
+     "rahmenPlaetze": 10,
+     "notwege": [],
+     "text": "Zielkader 10 erreicht, Rahmen trug alle Plaetze ab 12",
+     "optEntscheidung": {
+      "identitaetsOpt": 11,
+      "optTarget": 10,
+      "gmDelta": -1,
+      "grund": "GM kompakt (Star 10, Elite 5): Opt 11 -> 10, weniger Spieler, dafuer staerker"
+     }
+    },
+    "notwege": [],
+    "bild": {
+     "kader": 10,
+     "spielerWerte": [
+      {
+       "mw": 65.92,
+       "gehalt": 14.28
+      },
+      {
+       "mw": 46.6,
+       "gehalt": 9.86
+      },
+      {
+       "mw": 35.33,
+       "gehalt": 9.2
+      },
+      {
+       "mw": 32.81,
+       "gehalt": 7.41
+      },
+      {
+       "mw": 28.12,
+       "gehalt": 7.18
+      },
+      {
+       "mw": 24.07,
+       "gehalt": 7.5
+      },
+      {
+       "mw": 21.18,
+       "gehalt": 5.8
+      },
+      {
+       "mw": 20.75,
+       "gehalt": 6.11
+      },
+      {
+       "mw": 18.77,
+       "gehalt": 5.72
+      },
+      {
+       "mw": 12.79,
+       "gehalt": 4.34
+      }
+     ],
+     "stufen": {
+      "Superstar": 1,
+      "Star": 1,
+      "Core": 2,
+      "Depth": 4,
+      "Backup": 2,
+      "Reserve": 0
+     },
+     "marktwertSumme": 306.34,
+     "top1Anteil": 0.22,
+     "top2Anteil": 0.37,
+     "mwMax": 65.92,
+     "mwMedian": 28.12,
+     "mwMin": 12.79,
+     "gehalt": 77.4,
+     "kasse": 13.66,
+     "staerke": 54.88
+    }
+   },
+   "nachDraft": {
+    "kader": 10,
+    "spielerWerte": [
+     {
+      "mw": 65.92,
+      "gehalt": 14.28
+     },
+     {
+      "mw": 46.6,
+      "gehalt": 9.86
+     },
+     {
+      "mw": 45.04,
+      "gehalt": 13.4
+     },
+     {
+      "mw": 32.81,
+      "gehalt": 7.41
+     },
+     {
+      "mw": 28.12,
+      "gehalt": 7.18
+     },
+     {
+      "mw": 21.69,
+      "gehalt": 6.66
+     },
+     {
+      "mw": 21.07,
+      "gehalt": 5.89
+     },
+     {
+      "mw": 20.75,
+      "gehalt": 6.11
+     },
+     {
+      "mw": 13.51,
+      "gehalt": 3.86
+     },
+     {
+      "mw": 12.29,
+      "gehalt": 3.6
+     }
+    ],
+    "stufen": {
+     "Superstar": 1,
+     "Star": 2,
+     "Core": 1,
+     "Depth": 4,
+     "Backup": 2,
+     "Reserve": 0
+    },
+    "marktwertSumme": 307.8,
+    "top1Anteil": 0.21,
+    "top2Anteil": 0.37,
+    "mwMax": 65.92,
+    "mwMedian": 28.12,
+    "mwMin": 12.29,
+    "gehalt": 78.25,
+    "kasse": 12.2,
+    "staerke": 55.18,
+    "spieler": [
+     "player-0188-grok-na",
+     "player-2759-skye-ex30",
+     "player-0526-wheatley",
+     "player-0712-bloodseeker",
+     "player-2309-nyxor",
+     "player-0930-shadowwing",
+     "player-2355-kark-logistics",
+     "player-0429-wavebreaker",
+     "player-0308-shin-chan",
+     "player-0138-cara"
+    ],
+    "kasseUeberRuecklage": 0.64,
+    "kasseAnteilStart": 0.04
+   }
+  }
+ },
+ "env": {
+  "OLY_AUTO_EXPORT_SAVES": "0",
+  "OLY_APP_SQLITE_PATH": "/tmp/claude-0/kipick2/lauf.sqlite",
+  "OLY_AUTO_EXPORT_PUSH": "0",
+  "OLY_LIGA_DRAFT_MODUS": "einzelschritt"
+ },
+ "kaderplanAktiv": true
+}
