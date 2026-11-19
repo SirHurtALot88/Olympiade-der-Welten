@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { baueDisziplinBedarf, bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-disziplin-bedarf";
+import { baueDisziplinBedarf, bedarfUrteil, ersterAuftritt, schnittVorkommen, slotsKurz, spielplanKurz, spielplanLang } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import {
   berechneFreigabeAnzeige,
   erloesFreigabe,
@@ -48,6 +48,23 @@ describe("Disziplin-Bedarf aus dem Spielplan", () => {
   it("zählt Vorkommen und Slots", () => {
     expect(bedarf.hockey).toMatchObject({ vorkommen: 2, slots: 6, wichtigkeit: 12 });
     expect(bedarf.fechten).toMatchObject({ vorkommen: 1, slots: 1, wichtigkeit: 1 });
+  });
+
+  it("merkt sich, an welchem Spieltag und Slot die Disziplin drankommt", () => {
+    expect(bedarf.hockey.auftritte).toEqual([{ spieltag: 1, platz: 1, nr: 1, slots: 6 }, { spieltag: 2, platz: 1, nr: 3, slots: 6 }]);
+    expect(bedarf.fechten.auftritte).toEqual([{ spieltag: 2, platz: 2, nr: 4, slots: 1 }]);
+    expect(spielplanKurz(bedarf.hockey)).toBe("ST 1 · 2");
+    expect(spielplanKurz(undefined)).toBe("–");
+    expect(spielplanLang(bedarf.fechten, 6)).toBe("Spieltag 2, 2. Disziplin, 1 Slots (Platz 4 von 6 im Spielplan)");
+    const reihenfolge = ["fechten", "tennis", "hockey", "golf"].sort((a, b) => ersterAuftritt(bedarf[a]) - ersterAuftritt(bedarf[b]));
+    expect(reihenfolge).toEqual(["hockey", "tennis", "fechten", "golf"]);
+  });
+
+  it("Slots je Auftritt statt Mittelwert (Basketball 4 und 3, nicht gerundet 4)", () => {
+    const b = baueDisziplinBedarf([[{ disciplineId: "basketball", playerCount: 4 }], [{ disciplineId: "basketball", playerCount: 3 }]]);
+    expect(b.basketball.auftritte.map((a) => a.slots)).toEqual([4, 3]);
+    expect(slotsKurz(b.basketball)).toBe("4 · 3");
+    expect(b.basketball.wichtigkeit).toBe(7);
   });
 
   it("Hinweis: häufig, aber schwach besetzt", () => {
