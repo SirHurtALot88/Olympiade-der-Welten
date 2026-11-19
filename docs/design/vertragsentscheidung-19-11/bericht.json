@@ -1,0 +1,56 @@
+{
+  "phaseNachOeffnen": "season_end_management",
+  "offenAmAnfang": [
+    "player-2644-a-kalya",
+    "player-2469-seraphel-luxori",
+    "player-0128-stalker",
+    "player-2259-sylith",
+    "player-1730-watcher",
+    "player-2252-teerblut",
+    "player-0134-nautilus",
+    "player-0610-kirin",
+    "player-0833-ieloma",
+    "player-0914-ironhoof",
+    "player-0754-chain"
+  ],
+  "sperreVorschau": [
+    "vertragsentscheidung_offen:M-M:11"
+  ],
+  "sperreBuchung": {
+    "status": 409,
+    "success": false,
+    "blocker": [
+      "vertragsentscheidung_offen:M-M:11"
+    ]
+  },
+  "saisonNachSperrversuch": "season-1",
+  "listeZeilen": 11,
+  "startKnopfSichtbar": false,
+  "freigabe": {
+    "playerId": "player-2252-teerblut",
+    "kasseVor": 44.7,
+    "kasseNach": 108.88,
+    "exitValue": 64.18,
+    "saleFactor": 1.358,
+    "marketValueAtExit": 47.23,
+    "imKader": false
+  },
+  "verlaengerung": {
+    "playerId": "player-1730-watcher",
+    "status": "renewal_pending",
+    "laufzeit": 0,
+    "endSaison": 1,
+    "gehalt": 14.68
+  },
+  "offenNachRest": [],
+  "browserfehler": [],
+  "start": {
+    "status": 200,
+    "success": true,
+    "blocker": [],
+    "saison": "season-2",
+    "phase": "season_active"
+  },
+  "s2OhneVertrag": [],
+  "s2Kader": 5
+}

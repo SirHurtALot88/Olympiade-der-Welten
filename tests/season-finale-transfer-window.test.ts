@@ -142,8 +142,12 @@ describe("Saisonabschluss: die Checkliste verspricht nichts, was die Phase verbi
     // Der Kern der Meldung: ein Knopf, der irgendwohin fuehrt, wo die Handlung gesperrt ist.
     const text = panel();
     const zeile = text.slice(text.indexOf('key: "contracts"'), text.indexOf('key: "next-season"'));
-    expect(zeile).toContain("sellWindowOpen ? { label: \"Zum Kader\"");
-    expect(zeile).toContain("Verhandeln geht erst, wenn das Verkaufsfenster offen ist.");
+    // Seit „verlängern oder freigeben“ (19.11.) fuehrt die Zeile nur bei offenem Fenster weiter: zum Kader nur noch fuer
+    // Aufrufer ohne die Knoepfe in der Liste, die Knoepfe selbst sind bei geschlossenem Fenster abgeschaltet.
+    expect(zeile).toContain("sellWindowOpen && !(onRenewPlayer && onReleasePlayer)");
+    expect(zeile).toContain('{ label: "Zum Kader"');
+    expect(zeile).toContain("erst „Verträge öffnen“");
+    expect(text).toContain("disabled={busy || readOnly || !(sellWindowOpen || eintrag.nachzuholen)}");
   });
 
   it("die Zeile verspricht kein Kaufen mehr — und sagt, wann es dran ist", () => {

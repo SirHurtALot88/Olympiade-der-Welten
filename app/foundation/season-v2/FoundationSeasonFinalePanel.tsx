@@ -20,6 +20,7 @@
 import { useMemo } from "react";
 
 import { laeuftMitDieserSaisonAus } from "@/lib/contracts/vertragslaufzeit";
+import { entscheidetMenschUeberVertraege, offeneVertragsentscheidungen } from "@/lib/contracts/vertragsentscheidung";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { istTransferfensterGemeinsam } from "@/lib/market/transferfenster-gemeinsam";
@@ -100,6 +101,16 @@ export type FoundationSeasonFinalePanelProps = {
   sponsorChoicePending: number;
   /** Fuehrt zur Sponsorenseite (Finanzen), wo die Wahl getroffen wird. */
   onOpenSponsors: () => void;
+  /**
+   * VERLÄNGERN ODER FREIGEBEN (Chris 19.11.): je auslaufendem Vertrag eine Entscheidung. Verlängern öffnet die normale
+   * Gehaltsverhandlung, Freigeben verkauft zum aktuellen Verkaufspreis (Marktwert × Faktor, wie im Verkaufs-Popup).
+   * Fehlt einer der beiden Rückrufe (ältere Aufrufer), führt die Zeile wie bisher nur zum Kader.
+   */
+  onRenewPlayer?: (input: { playerId: string; playerName: string; contractLength: number | null }) => void;
+  onReleasePlayer?: (input: { playerId: string; playerName: string }) => void;
+  /** Rückmeldung des Vertragswegs (Fehler/Quittung), damit ein Klick hier nicht stumm bleibt. */
+  vertragsFehler?: string | null;
+  vertragsMeldung?: string | null;
 };
 
 /**
@@ -114,6 +125,7 @@ const BLOCKER_TEXTE: Record<string, string> = {
   season_not_complete: "Die Saison ist noch nicht zu Ende gespielt.",
   transfer_window_open: "Das Transferfenster ist noch offen.",
   pending_payout: "Die Sponsorenzahlung dieser Saison ist noch nicht gebucht.",
+  vertragsentscheidung_offen: "Über auslaufende Verträge ist noch nicht entschieden — je Spieler verlängern oder freigeben.",
 };
 
 function blockerText(code: string): string {
@@ -160,7 +172,27 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     workflowBlockingReasons,
     sponsorChoicePending,
     onOpenSponsors,
+    onRenewPlayer,
+    onReleasePlayer,
+    vertragsFehler,
+    vertragsMeldung,
   } = props;
+  const entscheidungen = useMemo(() => {
+    const offen = offeneVertragsentscheidungen(gameState, activeTeamId);
+    const spielerNachId = new Map(gameState.players.map((player) => [player.id, player] as const));
+    return offen.map((eintrag) => {
+      const spieler = spielerNachId.get(eintrag.playerId);
+      const roster = gameState.rosters.find((entry) => entry.id === eintrag.rosterId);
+      return {
+        ...eintrag,
+        name: spieler?.name ?? eintrag.playerId,
+        marktwert: spieler?.marketValue ?? null,
+        gehalt: roster?.salary ?? null,
+        laufzeit: roster?.contractLength ?? null,
+      };
+    });
+  }, [gameState, activeTeamId]);
+  const kiEntscheidetVertraege = activeTeamId ? !entscheidetMenschUeberVertraege(gameState, activeTeamId) : false;
 
   /**
    * Ist das VERKAUFSFENSTER offen — dieselbe Frage, die auch der Server stellt, bevor er einen
@@ -285,21 +317,30 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     {
       key: "contracts",
       title:
-        expiringContracts > 0
-          ? `Auslaufende Verträge (${expiringContracts})`
-          : "Verträge — nichts läuft aus",
+        entscheidungen.length > 0
+          ? `Verlängern oder freigeben (${entscheidungen.length} offen)`
+          : expiringContracts === 0
+            ? "Verträge — nichts läuft aus"
+            : kiEntscheidetVertraege
+              ? `Auslaufende Verträge (${expiringContracts}) — die KI entscheidet`
+              : `Auslaufende Verträge (${expiringContracts}) — entschieden`,
       detail:
-        expiringContracts === 0
-          ? "Kein Vertrag läuft zum Saisonende aus."
+        entscheidungen.length === 0
+          ? expiringContracts === 0
+            ? "Kein Vertrag läuft zum Saisonende aus."
+            : kiEntscheidetVertraege
+              ? "Verträge sind an die KI delegiert: sie verlängert oder gibt frei, sobald die Verträge offen sind."
+              : "Über jeden auslaufenden Vertrag ist entschieden."
           : sellWindowOpen
-            ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Im Kader kannst du verhandeln."
-            : gemeinsamesFenster
-              ? "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht, sobald die Verträge offen sind."
-              : "Diese Spieler verlassen dich, wenn du nicht verlängerst. Verhandeln geht erst, wenn das Verkaufsfenster offen ist.",
-      state: expiringContracts === 0 ? "done" : sellWindowOpen ? "ready" : "blocked",
+                ? "Pflicht vor der neuen Saison: je Spieler verlängern (Gehaltsverhandlung) oder freigeben (Verkauf zum aktuellen Verkaufspreis). Ohne Entscheidung startet keine neue Saison."
+                : "Pflicht vor der neuen Saison: erst „Verträge öffnen“, dann je Spieler verlängern oder freigeben.",
+      state: entscheidungen.length === 0 ? "done" : sellWindowOpen ? "ready" : "blocked",
       // Kein Knopf ins Leere: solange gesperrt ist, was dort zu tun waere, schickt diese Zeile
       // auch niemanden hin. Der Schritt darueber ist dann der einzige, der weiterfuehrt.
-      action: expiringContracts > 0 && sellWindowOpen ? { label: "Zum Kader", onClick: onOpenRoster } : null,
+      action:
+        entscheidungen.length > 0 && sellWindowOpen && !(onRenewPlayer && onReleasePlayer)
+          ? { label: "Zum Kader", onClick: onOpenRoster }
+          : null,
     },
     /**
      * Der zweite Schritt, der vorher fehlte — jetzt aber nur noch, wenn wirklich etwas klemmt.
@@ -342,8 +383,8 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
         : nextSeasonReady
           ? "Alles geprüft. Der Start schreibt Entwicklung, neuen Spielplan und Formkarten — danach öffnet die Kaufphase, vor dem 1. Spieltag."
           : "Erst prüfen lassen, was der Saisonwechsel verändert — dann starten. Gekauft wird danach, vor dem 1. Spieltag der neuen Saison.",
-      state: readOnly ? "blocked" : busy ? "busy" : "ready",
-      action: readOnly
+      state: readOnly || entscheidungen.length > 0 ? "blocked" : busy ? "busy" : "ready",
+      action: readOnly || entscheidungen.length > 0
         ? null
         : nextSeasonReady
           ? { label: "Neue Saison starten", onClick: onStartNextSeason }
@@ -451,6 +492,49 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
               ) : (
                 <span className="nl-season-finale-step-done">{step.state === "done" ? "erledigt" : "—"}</span>
               )}
+              {step.key === "contracts" && entscheidungen.length > 0 && onRenewPlayer && onReleasePlayer ? (
+                <ul className="nl-season-finale-vertraege" data-testid="season-finale-vertragsentscheidungen">
+                  {entscheidungen.map((eintrag) => (
+                    <li key={eintrag.rosterId} data-player={eintrag.playerId}>
+                      <span>
+                        <strong>{eintrag.name}</strong>
+                        <small>
+                          {eintrag.marktwert != null ? `MW ${formatValue(eintrag.marktwert)} C` : "MW —"}
+                          {eintrag.gehalt != null ? ` · Gehalt ${formatValue(eintrag.gehalt)} C` : ""}
+                          {eintrag.nachzuholen ? " · Vertrag schon ausgelaufen" : ""}
+                        </small>
+                      </span>
+                      <button
+                        type="button"
+                        className="primary-button inline-button"
+                        disabled={busy || readOnly || !(sellWindowOpen || eintrag.nachzuholen)}
+                        onClick={() => onRenewPlayer({ playerId: eintrag.playerId, playerName: eintrag.name, contractLength: eintrag.laufzeit })}
+                        data-testid="season-finale-verlaengern"
+                      >
+                        Verlängern
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-button"
+                        disabled={busy || readOnly || !(sellWindowOpen || eintrag.nachzuholen)}
+                        onClick={() => onReleasePlayer({ playerId: eintrag.playerId, playerName: eintrag.name })}
+                        data-testid="season-finale-freigeben"
+                      >
+                        Freigeben
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {step.key === "contracts" && (vertragsFehler || vertragsMeldung) ? (
+                <p
+                  className={vertragsFehler ? "nl-season-finale-vertraege-hinweis is-error" : "nl-season-finale-vertraege-hinweis"}
+                  role={vertragsFehler ? "alert" : "status"}
+                  data-testid="season-finale-vertragshinweis"
+                >
+                  {vertragsFehler ?? vertragsMeldung}
+                </p>
+              ) : null}
             </li>
           ))}
         </ol>
