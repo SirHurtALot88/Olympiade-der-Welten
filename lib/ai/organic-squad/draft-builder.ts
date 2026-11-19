@@ -189,6 +189,13 @@ export type OrganicSquadPlanInput = {
      */
     kaufGrenze?: (rosterBefore: number, spentFee: number, spentSalary: number) => { fee: number; salary: number };
     /**
+     * Fenster auf Opt, Feinschliff (19.11.): Notruecklage des Teams (`berechneVorstandBudgetStand().kaderpflicht.notruecklage`,
+     * nur gesetzt, wenn der Vorstand deckelt, also ab Saison 2). Mit Kaderplan bleibt die Kasse fuer jeden Platz UEBER dem Minimum
+     * mindestens auf dieser Hoehe — dieselbe Regel wie die Kaderpflicht-Freigabe (Plaetze bis Opt nur aus Kasse ueber der
+     * Notruecklage). Plaetze bis zum Minimum duerfen sie weiter angreifen. Fehlt der Wert, gilt nichts davon (Saison 1 bit-gleich).
+     */
+    notruecklage?: number;
+    /**
      * ANPASSUNG SALCEIL (flag-gated OLY_SALARY_CEILING_V2 — see draft-adapter.ts wiring / salary-ceiling.ts
      * computeTeamSalaryCeiling doc). Soft cap on TOTAL salary (existing roster + planned additions),
      * anchored on expected sponsor income and team value rather than the volatile cash snapshot. Enforced
@@ -503,6 +510,11 @@ export type KaderplanRahmen = {
   reserveGehalt: number;
   /** Fueller (< Platzpreis-Untergrenze) gesperrt, weil der Rahmen alle Plaetze bis Opt zum Platzpreis traegt. */
   fuellerSperre: boolean;
+  /**
+   * Kassen-Untergrenze dieses Kaufs samt Reserve: reicht der Plan ueber das Minimum hinaus, mindestens die Notruecklage
+   * (`economy.notruecklage`), sonst die normale Untergrenze.
+   */
+  untergrenze: number;
 };
 
 /**
@@ -551,9 +563,15 @@ export function kaderplanRahmen(input: OrganicSquadPlanInput, step: OrganicPlanS
       platzReserveGehalt(aktuellePaare, n, wettbewerb) + billigeReserveGehalt(aktuellePaare, m - n, wettbewerb),
     );
   const gehaltGrenze = grenze ? grenze.salary : salaryCap != null ? salaryCap - spentSalary : Infinity;
+  // Feinschliff (19.11.): Plaetze UEBER dem Minimum nur aus Kasse ueber der Notruecklage — auch dann, wenn das Team gerade noch
+  // unter dem Minimum steht und den Plan bis Opt rechnet. Sonst kaufte es am 7. Platz teuer aus der Notruecklage, und ab 8 sperrte
+  // die Kaderpflicht-Grenze die Plaetze bis Opt (gemessen: V-V 4 -> 8, GM-Opt 9, Kasse leer).
+  const notruecklage = input.economy.notruecklage;
+  const bodenFuer = (m: number) =>
+    notruecklage != null && squad.length + 1 + m > rosterMin ? Math.max(affordFloor, notruecklage) : affordFloor;
   const traegt = (n: number, m: number, kauf: number, kaufGehalt: number) => {
     const reserve = reserveFuer(n, m);
-    if (cash - kauf - reserve < affordFloor) return false;
+    if (cash - kauf - reserve < bodenFuer(m)) return false;
     if (grenze) {
       if (kauf + reserve > grenze.fee + 1e-9) return false;
     } else if (feeCap != null && spentFee + kauf + reserve > feeCap + 1e-9) return false;
@@ -582,7 +600,13 @@ export function kaderplanRahmen(input: OrganicSquadPlanInput, step: OrganicPlanS
   // Traegt der Rahmen ALLE geplanten Plaetze zum Platzpreis, gibt es keinen Grund fuer einen Fueller unter dem Platzpreis
   // (Chris: „keine filler mehr"); ein Fueller in diesem Fall ist ein Notweg (`fueller_rueckfall`).
   const fuellerSperre = kaufZumPlatzpreis && plaetzeGesamt === voll && rest === voll;
-  return { plaetze: kaufZumPlatzpreis ? squad.length + 1 + rest : squad.length, reserve, reserveGehalt, fuellerSperre };
+  return {
+    plaetze: kaufZumPlatzpreis ? squad.length + 1 + rest : squad.length,
+    reserve,
+    reserveGehalt,
+    fuellerSperre,
+    untergrenze: bodenFuer(plaetzeGesamt),
+  };
 }
 
 /**
@@ -683,6 +707,8 @@ export function organicBuyStep(
   // KADERPLAN (s. istKaderplanSchalterAn): Reserve fuer die restlichen geplanten Plaetze bis Opt (s. kaderplanRahmen).
   const kaderplan = kaderplanAn(input);
   const rahmen = kaderplan && belowOpt ? kaderplanRahmen(input, step) : null;
+  // Feinschliff (19.11.): mit Notruecklage haelt der Kauf samt Reserve die Untergrenze des Rahmens (s. `KaderplanRahmen.untergrenze`).
+  const planBoden = rahmen ? Math.max(affordFloor, rahmen.untergrenze) : affordFloor;
   const reserveForPlan = rahmen ? Math.max(reserveForMin, rahmen.reserve) : reserveForMin;
   // Review S3 (Fenster auf Opt): mit Kaderplan haelt auch der Gehaltstopf die Plaetze bis Opt frei, nicht nur die bis zum Minimum.
   const reserveSalaryForPlan = rahmen ? Math.max(reserveSalaryForMin, rahmen.reserveGehalt) : reserveSalaryForMin;
@@ -706,7 +732,7 @@ export function organicBuyStep(
 
   const hauptDurchgang = (mitFuellerSperre: boolean) => {
     for (const candidate of pool) {
-      if (cash - price(candidate) - reserveForPlan < affordFloor) continue;
+      if (cash - price(candidate) - reserveForPlan < planBoden) continue;
       if (mitFuellerSperre && price(candidate) < KADERPLAN_PLATZ_MIN_MW) continue;
       // Mit Kaderplan plant der Topf dieselben Plaetze wie die Kasse (Chris: gegen den echten Rahmen planen, nicht gegen die Kasse).
       const feeReserve = kaderplan ? reserveForPlan : reserveForMin;

@@ -657,6 +657,8 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     platzPreise: input.platzPreise,
     platzWettbewerb: input.platzWettbewerb,
     kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
+    // Feinschliff (19.11.): Notruecklage nur, wenn der Vorstand deckelt (ab Saison 2); der Builder liest sie nur mit Kaderplan.
+    notruecklage: vorstand.gedeckelt ? vorstand.kaderpflicht?.notruecklage : undefined,
   });
 
   let optEntscheidung: KaderplanOptEntscheidung | undefined;
@@ -682,18 +684,23 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   if (kaderplan && optEntscheidung && !istSaisonEins(input.gameState) && startingSquad.length < planWeights.optTarget) {
     const identitaetsOpt = optEntscheidung.identitaetsOpt;
     const boden = Math.max(identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
+    // Feinschliff (19.11.): mit EINEM Platz Luft — das Ziel gilt nur als getragen, wenn der Rahmen auch noch einen weiteren Platz
+    // zum Platzpreis traegt. Der Planer kauft vor dem letzten Platz staerkere (teurere) Spieler als die reservierten billigsten
+    // 12er; auf Kante gerechnet reichte es fuer den letzten Platz dann nur fuer einen Fueller (gemessen 3 / 5 `fueller_rueckfall`).
+    const rosterMax = ctx.rosterMax ?? ROSTER_MAX;
     const traegtZumPlatzpreis = (opt: number): boolean => {
       if (startingSquad.length >= opt) return true;
+      const mitLuft = Math.min(opt + 1, rosterMax);
       const probe: OrganicSquadPlanInput = {
         startingSquad,
         candidates,
         identityAxisWeights: ctx.identityAxisWeights,
         disciplines: ctx.disciplines,
-        economy: economyFuer({ ...planWeights, optTarget: opt }, undefined),
+        economy: economyFuer({ ...planWeights, optTarget: mitLuft }, undefined),
         draftSeed: null,
         kaderplan: { gmOptGesenkt: true },
       };
-      return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= opt;
+      return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= mitLuft;
     };
     const vorher = planWeights.optTarget;
     let opt = vorher;
