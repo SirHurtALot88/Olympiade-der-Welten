@@ -69,8 +69,9 @@ function kader(gs: GameState): Record<string, number> {
 
 /** Bewegungen, die NACH `vorher` dazukamen (Menge der IDs — die Historie ist nicht nach Zeit geordnet). */
 function bewegungen(gs: GameState, vorher: Set<string>) {
-  const je: Record<string, { kaeufe: number; kaufSumme: number; verkaeufe: number; verkaufSumme: number; fueller: number }> = {};
-  const z = (teamId: string) => (je[teamId] ??= { kaeufe: 0, kaufSumme: 0, verkaeufe: 0, verkaufSumme: 0, fueller: 0 });
+  type Je = { kaeufe: number; kaufSumme: number; verkaeufe: number; verkaufSumme: number; fueller: number; kaufListe: string[] };
+  const je: Record<string, Je> = {};
+  const z = (teamId: string) => (je[teamId] ??= { kaeufe: 0, kaufSumme: 0, verkaeufe: 0, verkaufSumme: 0, fueller: 0, kaufListe: [] });
   for (const e of gs.transferHistory) {
     if (vorher.has(e.id)) continue;
     if (e.transferType === "buy" && e.toTeamId) {
@@ -78,6 +79,7 @@ function bewegungen(gs: GameState, vorher: Set<string>) {
       z(e.toTeamId).kaufSumme = r2(z(e.toTeamId).kaufSumme + e.fee);
       // Fenster auf Opt: Fueller = Kauf unter dem Platzpreis 12 (KADERPLAN_PLATZ_MIN_MW).
       if (e.fee < 12) z(e.toTeamId).fueller += 1;
+      z(e.toTeamId).kaufListe.push(`${r2(e.fee)}:${e.source ?? e.phase ?? "?"}`);
     } else if (e.transferType === "sell" && e.fromTeamId) {
       z(e.fromTeamId).verkaeufe += 1;
       z(e.fromTeamId).verkaufSumme = r2(z(e.fromTeamId).verkaufSumme + (e.netCashImpact ?? e.fee));
@@ -170,6 +172,7 @@ async function main() {
       kaderplanGrund: letzteZeile.split(":")[2] ?? null,
       notwege,
       fensterFueller: fe?.fueller ?? 0,
+      fensterKaufListe: fe?.kaufListe ?? [],
       gehaltSumme: r2(ende.rosters.filter((r) => r.teamId === t.teamId).reduce((sum, r) => sum + (r.salary ?? 0), 0)),
       notruecklage: stand.kaderpflicht?.notruecklage ?? null,
       notverkaeufe: laufWarn.filter((w) => w.startsWith(`ai_notverkauf:${t.teamId}:`)).length,
@@ -213,6 +216,9 @@ async function main() {
       [...new Set(teams.map((x) => x.kaderEnde))].sort((a, b) => a - b).map((k) => [k, teams.filter((x) => x.kaderEnde === k).length]),
     ),
     fensterFueller: summe((x) => x.fensterFueller),
+    fuellerNachQuelle: teams
+      .flatMap((x) => x.fensterKaufListe.filter((k) => Number(k.split(":")[0]) < 12).map((k) => k.split(":").slice(1).join(":")))
+      .reduce<Record<string, number>>((m, q) => ({ ...m, [q]: (m[q] ?? 0) + 1 }), {}),
     notwegZaehler: teams.reduce((n, x) => n + x.notwege.length, 0),
     notwegeArten: teams.flatMap((x) => x.notwege).reduce<Record<string, number>>((m, n) => ({ ...m, [n]: (m[n] ?? 0) + 1 }), {}),
     notverkaeufe: summe((x) => x.notverkaeufe),
