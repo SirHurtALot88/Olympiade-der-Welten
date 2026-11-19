@@ -110,8 +110,8 @@ Pp je Attribut (Stamm 0 / Stamm 2, Matrix): stamina 26,1 / 26,3 (26), determinat
 Die drei neuen Werte sind genau die früheren `spiele climbing/canyon`-Zeilen aus #1633 (`CANYON a3ffa010b879`). Das
 alte Format steht jetzt dort, wo vorher Canyon stand: `spiele climbing/standard 1/7/42` = die drei alten Werte, Summe
 `CLIMBING-STANDARD 164b3d846334`, außerhalb von GESAMT. HUD-Profil und Kamera ändern keinen Wert (Lauf vor und nach
-dem Anzeige-Commit identisch). Der Chromium-Lauf (ohne `--node`) war bis zur Übergabe wegen der Aufnahme-Sperre
-nicht möglich; die Parität beider Motoren für Climbing belegt `tests/arena-node-runner-paritaet.test.ts` (Abschnitt 5).
+dem Anzeige-Commit identisch). Der Chromium-Lauf (ohne `--node`, unter der Aufnahme-Sperre, nach dem Merge von `main`)
+trifft dieselben Werte: GESAMT `eaafed96150e`, `CLIMBING-STANDARD 164b3d846334`.
 
 ## 4. HUD-Profil und Kamera
 
@@ -184,9 +184,7 @@ Szenen sind nicht gestellt: die Wiedergabe wird an die Zeitpunkte des gebuchten 
 1. **Wegwechsel-Ansage durch den Spieler** (optional laut Auftrag): nicht gebaut. Der Motor wechselt selbst (Gabel,
    Rastnische); ein Knopf ginge über die Rennplan-Ansage (`planWechsel`) und wäre eine Wertungsänderung mit eigener
    Abnahme.
-2. **Chromium-Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs` ohne `--node`): die Aufnahme-Sperre war
-   belegt; die Parität für Climbing in beiden Formaten belegt der Paritätstest mit Chromium.
-3. **Pp zweiter Stamm 16,1** knapp über dem Optimum 15 (Tempo-Kanäle auf dem Band), Pflicht ≤ 25 erfüllt.
-4. **Format-Chips der Testansicht**: die Aufstellungs-/Testansicht hat Format-Chips nur für Spurt; Climbing zeigt dort
+2. **Pp zweiter Stamm 16,1** knapp über dem Optimum 15 (Tempo-Kanäle auf dem Band), Pflicht ≤ 25 erfüllt.
+3. **Format-Chips der Testansicht**: die Aufstellungs-/Testansicht hat Format-Chips nur für Spurt; Climbing zeigt dort
    das Format des nächsten Spieltags. Ein Chip „Canyon / Standard“ wäre eine kleine Ergänzung.
-5. Eisfall, Kletterhalle, Abseilen, Flut: unverändert später (#1632-Assets liegen bereit).
+4. Eisfall, Kletterhalle, Abseilen, Flut: unverändert später (#1632-Assets liegen bereit).
