@@ -32,12 +32,11 @@ Entfernt: `PlayerDetailDrawer.tsx` (4337 Zeilen), `PlayerHeroNewLook.tsx`, `Play
 - Keine Kaderrolle als Wort; kein Reiter „Report“.
 - Disziplinen kompakter, mit Liga-Rang und Rang unter allen Aktiven; PP mit Liga-Rang; Kaderstärke über die besten 6.
 - Gehalt groß je Saison, klein je Spieltag (Überblick, Vertrag, Karriere, Kurzprofil).
-- Kopf (Zurück, Name, Blättern, Reiter, Zustand) steht in der Seite selbst, weil der App-Rahmen mit dem Regieband noch nicht auf `main` liegt; er wandert später in dessen Slot.
+- Kopf (Zurück, Name, Blättern, Zustand, Merken) steht im Seiten-Slot des Regiebands, die Reiter im Unterreiter-Platz (siehe „Einbau in den App-Rahmen“). Im Band ist wenig Platz: bei Verletzung steht dort nur „verletzt · N Spieltage“, der Satz „nicht einsetzbar · noch N Spieltage“ steht ausgeschrieben in der Einsatzfähigkeits-Karte und im Kurzprofil.
 - PP-Skala: nur die Markierung bei 5, die Werte sind die echten gebuchten.
 
 ## Fehlt
 
-- Regieband und Seiten-Slot (App-Rahmen nicht auf `main`).
 - Rollen je Disziplin mit „Passung“ (im Mockup erfunden; im Bau wäre es die Platzwert-Funktion der Einsatzliste).
 - Duell-Ergebnis (S/U/N) je Einsatz und Rang-Verlauf in der Leistungstabelle: die Zuordnung „er war aufgestellt“ ist noch nicht gebaut.
 - Marktwert-Verlauf je Spieltag (nur je Saison).
@@ -51,13 +50,29 @@ Entfernt: `PlayerDetailDrawer.tsx` (4337 Zeilen), `PlayerHeroNewLook.tsx`, `Play
 
 ## Einbau in den App-Rahmen (Runde 2)
 
-Der Kopf der Seite (Zurück, Porträt, Name, Blättern, Team und Liga, Form, Moral, Status, Merken) steht jetzt im **Seiten-Slot des Regiebands** (`FoundationBandSlot`), die sechs Reiter im Unterreiter-Platz des Bands (`FoundationSubNav` in der Shell). Die Seite hat keinen eigenen Kopf mehr, ihre Höhe richtet sich nach `--fb-u` und der Bandhöhe. **Alle Bilder in `spielerprofil-neu-18-11/` stammen noch aus der Zeit vor diesem Einbau** (eigener Kopf in der Seite, alter Rahmen); die Neuaufnahme im Rahmen steht aus (siehe unten).
+Der Kopf der Seite (Zurück, Porträt, Name, Blättern, Team und Liga, Form, Moral, Status, Merken) steht jetzt im **Seiten-Slot des Regiebands** (`FoundationBandSlot`), die sechs Reiter im Unterreiter-Platz des Bands (`FoundationSubNav` in der Shell). Die Seite hat keinen eigenen Kopf mehr, ihre Höhe richtet sich nach `--fb-u` und der Bandhöhe.
 
-## Stand der Aufnahmen
+**Korrektur der Höhe (19.11.):** die Neuaufnahme im Rahmen zeigte, dass die Seite 73 px zu hoch war (Dokument 1153 statt 1080 bei 1920x1080, gleiche Abweichung bei 2560 und 1710): Panel-Polster (16 px) und Schalen-Fuß (48 px) des Rahmens fehlten in der Rechnung. Jetzt `100vh - 4,5 · --fb-u - 120px`; gemessen bei 1920x1080, 2560x1440 und 1710x1112: Dokumenthöhe = Fensterhöhe, nichts scrollt.
 
-Vorhanden (Wegwerf-Save, Skript `scripts/screenshot-spielerprofil-neu.ts`): alle Reiter bei **2560x1440** (Überblick Star, Überblick verletzt, Disziplinen, Leistung verletzt, Vertrag, Entwicklung, Karriere, Nebel fremder Spieler, ohne Figur), bei **1920x1080** Überblick, Überblick verletzt, Disziplinen, Leistung, Vertrag, dazu vier Gegenüberstellungen `abgleich-*.png` (links Mockup, rechts App).
-**Offen:** Entwicklung, Karriere, Nebel und ohne Figur bei 1920x1080, der ganze Satz bei 1710x1112 und die Drawer-Bilder. Der Rechner war durch parallele Dev-Server überlastet (Server stürzten ab), die Läufe laufen seit der Sperre über `flock /tmp/oly-aufnahme.lock`; das Skript setzt mit `OLY_SHOT_VORHANDENE_UEBERSPRINGEN=1` dort fort, wo es aufgehört hat. Der Drawer wird über die Kaderzeile der Teamansicht geöffnet; das Auffinden der Zeile ist im Skript noch nicht bestätigt. Die Messung unten gilt für die vorhandenen Bilder.
+## Stand der Aufnahmen (19.11., alle im Rahmen neu)
+
+Alle Bilder in `spielerprofil-neu-18-11/` sind neu aus dem Produktionsbau der App (`OLY_SHOT_PROD=1`, deviceScaleFactor 1, Wegwerf-Battle-Save nach vier Spieltagen, Skript `scripts/screenshot-spielerprofil-neu.ts`, Save danach gelöscht, `.next` danach gelöscht):
+
+- **2560x1440 und 1920x1080:** `01` Überblick Star, `02` Überblick verletzt, `03` Disziplinen, `04` Leistung verletzt, `05` Vertrag, `06` Entwicklung, `07` Karriere, `08` Nebel fremder Spieler, `09` ohne Figur.
+- **1710x1112:** `01`, `02` Überblick (Star, verletzt).
+- **Kurzprofil:** `10` Drawer Star, `11` Drawer verletzt (2560 und 1920), `12` Überblick mit verletzter Figur (rotes Band), `13`/`14`/`15` Drawer vor Verlängern, Verkaufen, Ganzes Profil, dazu `13-aktion-verlaengern-…`, `14-aktion-verkaufen-…`, `15-aktion-ganzes-profil-…` nach dem Klick.
+- `abgleich-*.png` (links Mockup, rechts App) sind **nicht neu**: sie stammen aus der Zeit vor dem Einbau in den Rahmen und zeigen den alten eigenen Kopf.
+
+## Klicktest Kurzprofil, Verlängern, Verkaufen (19.11., echte App im Produktionsbau)
+
+Weg: Teamansicht, Kaderkarte anklicken, Kurzprofil, dann je Knopf. Gemessen mit Playwright gegen den Produktionsserver.
+
+- **Kurzprofil** öffnet über die Kaderkarte (Skript findet die Karte jetzt über `.home-v2-player-name`; die alte Suche nach Tabellenzeilen fand nichts, Kader sind Karten unter dem Falz).
+- **Ganzes Profil öffnen** wechselt auf `?view=playerProfile&tab=overview&playerId=…`, die Seite mit Rahmen-Kopf steht.
+- **Verlängern** öffnet die Gehaltsverhandlung. **Das ging zunächst nicht:** das Fenster saß außerhalb des Bildschirms (Hintergrund verwischt, kein Fenster sichtbar). Ursache: `fb-auf … both` in `components/foundation/broadcast/rahmen.css` ließ nach dem Aufstieg ein `transform` am Inhalt stehen; damit wurde `.foundation-content` zum Bezugsrahmen für `position: fixed`, der Hintergrund maß 2761 px statt 1080 px und das Fenster saß in dessen Mitte. Behoben mit `backwards` statt `both`; danach misst der Hintergrund 1080 px und das Fenster steht mittig. Betrifft jedes Fenster aus der Teamansicht, nicht nur das Profil.
+- **Das Fenster zeigt mitten in der Saison „Gehaltsverhandlung öffnet am Season-End (nach MD10) – bis dahin nur Vorschau“** und sperrt die Schritte; das ist die bestehende Regel, kein Fehler dieses Baus.
+- **Verkaufen:** der Aufruf geht raus, die Antwort ist `409 sell_only_at_season_end` (Verkauf nur zum Saisonende). Es öffnet sich kein Fenster, und in den sechs Sekunden danach war keine sichtbare Meldung zu sehen. Das ist das Verhalten des bestehenden Verkaufswegs; ob er eine sichtbare Rückmeldung geben sollte, ist eine eigene Frage und hier nicht verändert.
 
 ## Messung
 
-Je Aufnahme prüft das Skript `scrollWidth/-Height`: die Seite scrollt bei allen drei Zielbildschirmen nicht. Einzige gemeldete Überbreite ist die Pixel-Figur, die absichtlich über ihren Kasten hinausragt (durchsichtiger Rand, abgeschnitten).
+Je Aufnahme prüft das Skript `scrollWidth/-Height`. Dokumenthöhe = Fensterhöhe bei allen drei Zielbildschirmen. Im ersten Durchlauf meldeten die Seiten mit verletztem Spieler `seiteScrollt: true` über die Breitenprüfung: das Band ragte rechts über (Merken über der Saison-Uhr, „Weiter“ angeschnitten), weil Name, Zurück-Wort und der lange Status nicht nebeneinander passten. Jetzt steht im Band nur „verletzt · N Spieltage“, bei Verletzung nur der Pfeil statt „Zurück“, der Namenskasten hat eine Mindestbreite, und die Überblick-Bilder (`01`, `02`, `12`, alle drei Größen) sind danach neu aufgenommen und melden `seiteScrollt: false`. `03`–`09` stammen aus dem Durchlauf davor (anderer Wegwerf-Save, also andere Spielernamen); ihr Inhalt hat sich durch die Band-Änderung nicht verschoben, ihre Messzeile war aber noch die alte. Bei 1710x1112 wird der Name im Band noch mit „…“ gekürzt. Gemeldete Überbreite sonst nur bei der Pixel-Figur, die absichtlich über ihren Kasten hinausragt (durchsichtiger Rand, abgeschnitten).
