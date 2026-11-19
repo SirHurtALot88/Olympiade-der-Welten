@@ -12,7 +12,17 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
-import { ligaDraftSperrtMarktkauf } from "@/lib/draft/liga-draft-modell";
+import { ligaDraftDieserSaison, ligaDraftSperrtMarktkauf, werIstDran } from "@/lib/draft/liga-draft-modell";
+import { bucheMenschPick, LigaDraftFehler } from "@/lib/draft/liga-draft-dienst";
+
+/** Ist dieses Team ein Mensch, der im Liga-Draft gerade am Zug ist (ohne Auto-Pick)? */
+function menschAmZug(gameState: GameState, teamId: string): boolean {
+  const draft = ligaDraftDieserSaison(gameState);
+  if (!draft) return false;
+  const team = draft.teams[teamId];
+  if (!team || team.art !== "mensch" || team.autoPick) return false;
+  return werIstDran(draft)?.teamId === teamId;
+}
 
 type BuyRequestBody = {
   saveId?: string;
@@ -118,7 +128,10 @@ export async function POST(request: Request) {
     // Liga-Draft im Einzelschritt (docs/design/draft-neubau-kern-18-11.md): waehrend der geordneten Phase kauft niemand
     // am Draft vorbei — sonst haette ein Mensch die Reihenfolge umgangen. Gepickt wird dann ueber /api/draft. Nur mit
     // Schalter an (`ligaDraftSperrtMarktkauf` fragt ihn selbst): ein liegengebliebener Draft sperrt sonst nichts.
-    if (!dryRun && ligaDraftSperrtMarktkauf(save.gameState)) {
+    // AUSNAHME (Chris 19.11.: „der Draft geht nicht weiter, wenn ich den Vertrag abschließe“): ist dieses Menschen-Team im
+    // Draft am Zug, zaehlt der am Verhandlungstisch abgeschlossene Vertrag als sein Pick (mit den verhandelten Konditionen).
+    const draftPickAmZug = !dryRun && ligaDraftSperrtMarktkauf(save.gameState) && menschAmZug(save.gameState, teamId);
+    if (!dryRun && ligaDraftSperrtMarktkauf(save.gameState) && !draftPickAmZug) {
       return NextResponse.json(
         {
           success: false,
@@ -175,7 +188,27 @@ export async function POST(request: Request) {
     // den bisherigen vollständigen Reload zurück.
     let gameStateAfter: GameState | null = null;
     let summary: TransfermarktBuyPreview | TransfermarktBuyExecuteResult;
-    if (dryRun) {
+    if (draftPickAmZug) {
+      try {
+        const pick = bucheMenschPick({
+          persistence,
+          saveId,
+          teamId,
+          playerId,
+          idempotencyKey: params.idempotencyKey,
+          vertrag: { contractLength: params.contractLength, contractShape: params.contractShape, offeredSalary: params.offeredSalary },
+        });
+        summary = pick.kauf;
+      } catch (fehler) {
+        if (fehler instanceof LigaDraftFehler) {
+          return NextResponse.json(
+            { success: false, error: fehler.code, summary: null, warnings: [], scope: { saveId, seasonId, teamId, playerId, dryRun, source } },
+            { status: fehler.status ?? 409 },
+          );
+        }
+        throw fehler;
+      }
+    } else if (dryRun) {
       summary = previewLocalTransfermarktBuy(params);
     } else {
       const executed = executeLocalTransfermarktBuy(params);

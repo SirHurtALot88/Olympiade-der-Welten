@@ -441,8 +441,7 @@ export default function VerhandlungsTisch(props: TischProps) {
                 <div className="o">
                   <strong className="t">{angebot != null ? de(angebot ?? 0, 1) : "—"}</strong>
                   <small>C je Saison<br />{betragC(jeSpieltag(angebot ?? null), 2)} je Spieltag</small>
-                  <span className="sp" />
-                  <span className="ford">Zusage ab<b className="t">{betragC(neg.acceptThresholdSalary ?? null)}</b><small>{betragC(jeSpieltag(neg.acceptThresholdSalary ?? null), 2)} je Spieltag</small></span>
+                  {/* Keine „Zusage ab“-Zahl (Chris 19.11.: Spoiler) — die Schwelle bleibt verdeckt, sichtbar sind nur die Chancen. */}
                 </div>
                 <input
                   type="range"
