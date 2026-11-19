@@ -704,6 +704,12 @@ Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer 
 modulweiten Arrays halten (Muster: Render-Interpolation `viSchnappschussKF`). Absichtliche Wertungs-
 aenderung: neue Zahl hier und in `data/generated/` festhalten.
 
+**Climbing-Format „Canyon“ (18.11., Schalter `climbingFormat`, im Spiel AUS):** das Skript gibt danach drei eigene
+Zeilen `spiele climbing/canyon 1/7/42` und eine eigene Summe `CANYON …` aus — **nicht in GESAMT**, GESAMT bleibt der
+Abgleich des Standards. Canyon-Stand: `CANYON a3ffa010b879` (Saaten 1/7/42). `node scripts/pruefe-wertung-fingerabdruck.mjs --node`
+rechnet denselben Abgleich ueber den Node-Motor (ohne Chromium, ohne Aufnahme-Sperre). Details:
+`docs/design/climbing-canyon-bau-18-11.md`.
+
 ## CI-Weiche für Moosgrab / Kartenschmiede
 
 Chris am 18.10.: Moosgrab soll nicht jedes Mal die Oly-CI fahren. Ein Push oder PR, der **nur**
