@@ -17,6 +17,9 @@
  *      climbAnzeigeAnteil() exakt), jede Figur bleibt in ihrer eigenen Routen-Spalte, und wer laut
  *      Motor hoeher ist, wird auch hoeher gezeichnet.
  *
+ * FORMAT: das alte Climbing-Format "standard" (Rueckweg seit Canyon live, 18.11.), ausdruecklich ueber
+ * `window.__olyBahnFlags` gesetzt. Das Live-Format Canyon prueft tests/climbing-canyon.test.ts.
+ *
  * Kader: die erste Paarung aus data/generated/kaderfamilie-live-save.json (echte Spieler aus dem
  * Live-Save, dieselbe Quelle wie scripts/pruefe-wertung-fingerabdruck.mjs), nicht der Demo-Kader.
  * Chromium-Pflicht wie tests/spiele-bahn-invarianten.test.ts (das Motor-IIFE braucht DOM/Canvas).
@@ -103,6 +106,9 @@ describe.skipIf(!chromiumVerfuegbar() || !KADER_DA)("Climbing-Arena: gezeigt = g
     seite = await browser.newPage();
     await seite.addInitScript(() => {
       window.__olyArenaKader = { seedByDisciplineId: {} };
+      // Seit 18.11. ist Canyon das Live-Format (tests/climbing-canyon.test.ts prueft dort gezeigt = gebucht);
+      // diese Datei haelt das alte Format "standard" fest, das der Abschalt-Schalter OLY_CLIMBING_FORMAT zurueckholt.
+      (window as unknown as { __olyBahnFlags?: unknown }).__olyBahnFlags = { climbingFormat: "standard" };
     });
     await seite.goto(SEITEN_PFAD, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && typeof window.__arena.bahnSpurProbe === "function", null, {

@@ -308,9 +308,11 @@ describe("Altstand-Umrechnung — Anzeige nachtraeglich, Archiv unveraendert", (
 describe("Kein Team unter 8 nach dem Fenster (Messung 18.11., M-M und W-L)", () => {
   const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
 
-  it("die Verkaufsrunde des Fensters verkauft nie unter max(8, playerMin)", () => {
+  it("alter Stand (`OLY_FENSTER_AUF_OPT=0`): die Verkaufsrunde des Fensters verkauft nie unter max(8, playerMin)", () => {
+    // Seit „Fenster auf Opt" (Chris 18.11.: „man darf alle Spieler verkaufen, auch unter Minimum") gilt die Grenze nur noch im
+    // alten Stand; Standard ist der freie Verkauf, das Auffuellen bis Opt uebernimmt der Kaderplan (tests/fenster-auf-opt.test.ts).
     const sitzung = quelle("lib/ai/ai-transfer-window-session-service.ts");
-    expect(sitzung).toContain('sellNotBelowMin: input.phase === "fenster_verkauf",');
+    expect(sitzung).toContain('sellNotBelowMin: input.phase === "fenster_verkauf" && !istFensterAufOpt(),');
     expect(sitzung).toContain("const boden = Math.max(8, identity?.playerMin ?? 0);");
     expect(sitzung).toContain("if (appliedSells >= verkaufsSpielraum) break;");
   });

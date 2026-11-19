@@ -403,6 +403,7 @@ jobs:
           --exclude "**/live-stand-welle1.test.ts"
           --exclude "**/hud-system-basketball.test.ts"
           --exclude "**/hud-system-welle1.test.ts"
+          --exclude "**/hud-system-climbing.test.ts"
       # NUR auf Shard 1 (nicht auf allen vier), sonst liefe jede dieser Dateien viermal statt
       # einmal. Je ein eigener `npx vitest run`-Aufruf = ein frischer Node-Prozess je Datei, der
       # seinen Speicher beim Beenden garantiert freigibt -- s. Kopfkommentar fuer die Herleitung.
@@ -533,6 +534,11 @@ jobs:
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/hud-system-welle1.test.ts
+      # HUD-SYSTEM CLIMBING (Canyon live, 18.11.): Seilschaft-Dock, Karte, Kamera-Modi, gezeigt = gebucht -- Chromium.
+      - name: "HUD-System Climbing Canyon (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/hud-system-climbing.test.ts
 
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #

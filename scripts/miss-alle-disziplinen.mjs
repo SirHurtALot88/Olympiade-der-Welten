@@ -73,6 +73,10 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const roheArgs = process.argv.slice(2);
 const EINZELKADER = roheArgs.includes("--einzelkader");
+// --node (Canyon live, 18.11.): derselbe Messcode ueber den Node-Motor (scripts/lib/node-arena-seite.mjs,
+// lib/battle/arena-node-motor.mjs) statt Chromium -- ohne Browser und ohne Aufnahme-Sperre. Der Node-Motor ist
+// gegen Chromium bitgleich (Fingerabdruck). Additiv, ohne den Schalter unveraendert Chromium.
+const NODE = roheArgs.includes("--node");
 const BOOTSTRAP_UNSICHERHEIT = roheArgs.includes("--bootstrap-unsicherheit");
 // --je-seite=N: faehrt die kaderfeste Messung mit einer anderen Kadergroesse je Seite
 // (2/4/6 ...), zusaetzlich zur Kader-FAMILIE (fuenf Team-Paarungen). Additiv, ohne diesen
@@ -99,7 +103,7 @@ const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);
 const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(roheArgs);
 const KONTAKT_SCHALTER = kontaktSchalterAusArgs(roheArgs);   // --kontakt=..., s. rangtreue-messung.mjs
 const STRATEGIE_SCHALTER = strategieSchalterAusArgs(roheArgs);   // --strategie=..., s. rangtreue-messung.mjs
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a) && !IST_STRATEGIE_SCHALTER(a));
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--node" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a) && !IST_STRATEGIE_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -113,13 +117,20 @@ if (!EINZELKADER) {
 // Prozess hinterlassen — sonst sammeln sich Zombie-Prozesse an, die dem naechsten Lauf den
 // Speicher/die Festplatte wegnehmen (selbst beobachtet: ein abgebrochener Lauf ohne diesen
 // Block liess fuenf Chromium-Kindprozesse zurueck).
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+const browser = NODE ? null : await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+let nodeSeite = null;
 let zeilen, fehler = [], schalterGesetzt = null, staffelPaarGesetzt = null, kontaktGesetzt = null, strategieGesetzt = null;
 try {
-  const seite = await browser.newPage();
-  seite.on("pageerror", (e) => fehler.push(String(e)));
-  await seite.goto(SEITE, { waitUntil: "networkidle" });
-  await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  let seite;
+  if (NODE) {
+    const { oeffneNodeSeite } = await import("./lib/node-arena-seite.mjs");
+    seite = nodeSeite = await oeffneNodeSeite(process.env.OLY_SEITE ? path.dirname(path.resolve(process.env.OLY_SEITE)) : path.join(WURZEL, "public/mockups"));
+  } else {
+    seite = await browser.newPage();
+    seite.on("pageerror", (e) => fehler.push(String(e)));
+    await seite.goto(SEITE, { waitUntil: "networkidle" });
+    await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  }
   // P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem
   // Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
   if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
@@ -154,7 +165,8 @@ try {
     }
   }
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
+  if (nodeSeite) nodeSeite.schliessen();
 }
 
 const titel = EINZELKADER

@@ -12,6 +12,9 @@ import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/n
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
+import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
+const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
 import { abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
 import {
@@ -216,6 +219,10 @@ const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-ti
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
 });
+const FoundationSeasonArchiveHost = dynamic(() => import("@/app/foundation/historie/FoundationSeasonArchiveHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Saison-Archiv wird geladen…" />,
+});
 const FoundationMerklisteHost = dynamic(() => import("@/app/foundation/merkliste-v2/FoundationMerklisteHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Merkliste wird geladen…" />,
@@ -393,6 +400,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationRanksHostProps,
   foundationLeagueLeadersHostProps,
   foundationAllTimeTableHostProps,
+  foundationSeasonArchiveHostProps,
   foundationMerklisteHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
@@ -655,6 +663,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   visibleInboxItems,
   } = props;
 
+  // Draft-Neubau (18.11.): mit `OLY_LIGA_DRAFT_MODUS=einzelschritt` zeigt die Shell statt des Schildes
+  // „Liga wird erstellt …“ die Draft-Seite; ohne Schalter antwortet die Probe „kein Draft“ und nichts ändert sich.
+  const ligaDraftTor = useLigaDraftTor({ gameState, saveId: activeSaveId, leagueSetupStatus });
+  const [draftTakt, setDraftTakt] = useState<DraftTaktZustand | null>(null);
+
   // Rivalen-Hervorhebung (additiv): Team-IDs aller Rivalen des aktiven Teams.
   // Leeres Set, wenn kein aktives Team oder keine Rivalität existiert (graceful).
   const activeTeamRivalIds = getActiveTeamRivalTeamIds(gameState, activeManagerTeamId);
@@ -890,7 +903,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <strong>{persistenceError ?? saveSyncError}</strong>
         </div>
       ) : null}
-      {leagueSetupStatus === "in_progress" ? (
+      {leagueSetupStatus === "in_progress" && ligaDraftTor.aktiv ? null : leagueSetupStatus === "in_progress" ? (
         <div
           className="foundation-persistence-banner transfer-callout is-info"
           role="status"
@@ -925,7 +938,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             )
           ) : null}
         </div>
-      ) : leagueSetupStatus === "failed" ? (
+      ) : leagueSetupStatus === "failed" && !ligaDraftTor.aktiv ? (
+        // Bei laufendem Liga-Draft gibt es keinen „Erneut versuchen“: der Knopf liefe über /api/ai/picks-run und bekäme
+        // 409 `liga_draft_laeuft`. Die Draft-Seite setzt den Draft stattdessen über `ki_hintergrund` fort.
         <div
           className="foundation-persistence-banner transfer-callout is-warning"
           role="alert"
@@ -999,9 +1014,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
         takt={
-          einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
-            ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan }
-            : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
+          ligaDraftTor.aktiv && draftTakt
+            ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick }
+            : einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
+              ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan }
+              : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
         }
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
@@ -1071,6 +1088,24 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   syncFoundationViewInUrl("playerProfile", id, playerProfileData.playerId);
                 }
               }}
+            />
+          ) : activeView === "seasonArchive" || activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable" ? (
+            // Historie (Mockup 18.11.): drei Reiter im Regieband statt zwei Schienenpunkten unter Markt und Team.
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "archiv", label: "Saison-Archiv" },
+                { id: "transfers", label: "Transfers" },
+                { id: "ewig", label: "Ewige Tabelle" },
+              ]}
+              activeId={activeView === "seasonArchive" ? "archiv" : activeView === "allTimeTable" ? "ewig" : "transfers"}
+              onSelect={(id) =>
+                setFoundationView(
+                  id === "ewig" ? "allTimeTable" : id === "transfers" ? "historyV2" : "seasonArchive",
+                  setActiveView,
+                  { push: true },
+                )
+              }
             />
           ) : activeView === "lineup" || activeView === "lineupV2" ? (
             <FoundationSubNav
@@ -1182,6 +1217,26 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         }
       >
 
+      {ligaDraftTor.aktiv ? (
+        <LigaDraftSeite
+          hostProps={foundationMarketV2ShellHostProps}
+          // Gastgeber = Solo oder eigener Sitz mit Rolle „host“; unbekannte Rolle (Schnappschuss fehlt) zeigt den
+          // Abbrechen-Knopf nicht — die Route lehnt Nicht-Gastgeber ohnehin ab.
+          istGastgeber={!roomContext || findOwnRoomParticipant(roomLiveState, roomContext.participantId)?.role === "host"}
+          setupFehlgeschlagen={leagueSetupStatus === "failed"}
+          onTakt={setDraftTakt}
+          onWeiter={() => {
+            void (async () => {
+              try {
+                await foundationMarketV2ShellHostProps.loadSave(activeSaveId);
+              } finally {
+                ligaDraftTor.schliessen();
+              }
+            })();
+          }}
+        />
+      ) : (
+      <>
       {foundationSecondaryViews.some((view) => view.id === activeView) ? (
         <div className="foundation-utility-strip">
           <span className="pill foundation-utility-label">Technische Ansicht</span>
@@ -3290,6 +3345,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
+          {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
 
           {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 
@@ -3408,6 +3464,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "debug" ? <FoundationDebugGameStatePanel gameState={gameState} /> : null}
 
       </div>
+      </>
+      )}
       </FoundationShell>
     </main>
   )

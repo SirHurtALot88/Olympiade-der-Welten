@@ -113,6 +113,8 @@ type DuellAuftrag = {
     kulisseByDisciplineId: Record<string, string>;
     /** Strategie-Vorlage je Disziplin [Heim, Gast]; fehlt bei neutral/Flagge aus (s. `bereiteFixturesVor`). */
     strategieByDisciplineId?: Record<string, [string | null, string | null]>;
+    /** Climbing-Format des Spieltags (Canyon live, 18.11.); nur fuer Climbing gesetzt (s. `bereiteFixturesVor`). */
+    formatByDisciplineId?: { climbing: "standard" | "canyon" };
   }>;
 };
 
@@ -336,13 +338,14 @@ export async function runArenaFixturesNode(
       chassis,
       mutatoren,
       ...(options.buehneFlags ? { buehneFlags: { ...options.buehneFlags } } : {}),
-      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId, strategieByDisciplineId }) => ({
+      fixtures: vorbereitet.map(({ heim, gast, aufstellung, seed, kulisseByDisciplineId, strategieByDisciplineId, formatByDisciplineId }) => ({
         heim,
         gast,
         aufstellung,
         seed,
         kulisseByDisciplineId,
         ...(strategieByDisciplineId ? { strategieByDisciplineId } : {}),
+        ...(formatByDisciplineId ? { formatByDisciplineId } : {}),
       })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),

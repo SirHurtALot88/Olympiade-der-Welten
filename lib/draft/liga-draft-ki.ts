@@ -18,14 +18,24 @@
  * Reihenfolge; Test `liga-draft-kern.test.ts`), aber ohne dessen 0,5–0,8 s je Aufruf.
  */
 import type { GameState, LigaDraftZustand, Player, Team } from "@/lib/data/olyDataTypes";
-import { buildOrganicDraftFrame, toOrganicPlayerView } from "@/lib/ai/organic-squad/draft-adapter";
+import {
+  buildOrganicDraftFrame,
+  istKaderplanAktiv,
+  kaderplanPlatzPreise,
+  toOrganicPlayerView,
+  type KaderplanOptEntscheidung,
+} from "@/lib/ai/organic-squad/draft-adapter";
 import { computeDisciplineNeeds } from "@/lib/ai/organic-squad/discipline-need";
 import { SOLIDE_THRESHOLD, type OrganicPlayerView } from "@/lib/ai/organic-squad/types";
 import { buildLeagueMarketBrackets, type LeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   applyOrganicBuyStep,
   createOrganicPlanStepState,
+  istKaderplanStartpoolAktiv,
+  kaderplanProtokoll,
   organicBuyStep,
+  type KaderplanNotweg,
+  type KaderplanProtokoll,
   type OrganicBuyStepResult,
 } from "@/lib/ai/organic-squad/draft-builder";
 
@@ -62,7 +72,21 @@ export type LigaDraftKiBewertung = {
   /** Die Rücklage, mit der das Team plant (Saison 1: halb), und sein Zielkader. */
   ruecklage: number;
   optTarget: number;
+  /**
+   * KADERPLAN: Grund der Kadergroesse beim Stand VOR diesem Schritt (nur mit Kaderplan). Gilt fuer jeden Ausstieg: den, den die
+   * KI waehlt (`kind !== "buy"`), und den, bei dem der Kauf selbst scheitert (Review S4).
+   */
+  kaderplan?: KaderplanProtokoll & { optEntscheidung?: KaderplanOptEntscheidung };
+  /** KADERPLAN: Rueckfall, der Platz 1 geliefert hat (soll nie vorkommen; im Verlauf als `notweg:` gezaehlt). Ohne Kaderplan nie. */
+  notweg?: KaderplanNotweg;
 };
+
+/** KADERPLAN: Platzpreise aus dem Pool zu DRAFT-BEGINN (alle Spieler ohne Startkader eines Draft-Teams). */
+function platzPreiseZuDraftBeginn(gameState: GameState, draft: LigaDraftZustand): number[] {
+  const startKader = new Set<string>();
+  for (const team of Object.values(draft.teams)) for (const id of team.startKaderIds) startKader.add(id);
+  return kaderplanPlatzPreise((gameState.players ?? []).filter((spieler) => !startKader.has(spieler.id)));
+}
 
 /** Spieler ohne Kader in Spielstand-Reihenfolge (= Feed des Blocklaufs im frischen Saison-1-Stand). */
 export function freieSpieler(gameState: Pick<GameState, "players" | "rosters">): Player[] {
@@ -99,6 +123,17 @@ function spielstandZuDraftBeginn(gameState: GameState, draft: LigaDraftZustand, 
   };
 }
 
+/** KADERPLAN: die Notwege, die die bisherigen Picks des Teams im Verlauf gemeldet haben (`notweg:<art>`). */
+function bisherigeNotwege(draft: LigaDraftZustand, teamId: string): KaderplanNotweg[] {
+  const notwege: KaderplanNotweg[] = [];
+  for (const eintrag of draft.verlauf) {
+    if (eintrag.teamId !== teamId || eintrag.art !== "pick") continue;
+    const treffer = /^notweg:([a-z_]+)$/.exec(eintrag.grund ?? "");
+    if (treffer) notwege.push(treffer[1] as KaderplanNotweg);
+  }
+  return notwege;
+}
+
 export function draftSaatFuerTeam(saveId: string, teamId: string): string {
   // Dieselbe Saat wie im Blocklauf (`runOrganicTeamDraftExecute`: `${saveId}:${teamId}`) — gleicher Jitter je Spieler.
   return `${saveId}:${teamId}`;
@@ -117,6 +152,7 @@ export function bewerteKiPick(input: {
   freiePool?: Player[];
 }): LigaDraftKiBewertung {
   const { gameState, draft, teamId } = input;
+  const kaderplanAn = istKaderplanAktiv(gameState);
   const draftTeam = draft.teams[teamId];
   if (!draftTeam) throw new Error(`liga_draft_team_unbekannt:${teamId}`);
   const startStand = spielstandZuDraftBeginn(gameState, draft, teamId);
@@ -135,6 +171,11 @@ export function bewerteKiPick(input: {
     candidates: input.freiePool ?? freieSpieler(gameState),
     draftSeed: draftSaatFuerTeam(input.saveId, teamId),
     superstarLizenz: draftTeam.superstarLizenz ?? undefined,
+    platzPreise: kaderplanAn && istKaderplanStartpoolAktiv() ? platzPreiseZuDraftBeginn(gameState, draft) : undefined,
+    // Wettbewerb um die billigen Plaetze: alle Teams, die noch in der Reihenfolge picken (ohne Nachzug und fertige).
+    platzWettbewerb: kaderplanAn
+      ? Math.max(1, Object.values(draft.teams).filter((eintrag) => eintrag.status === "aktiv").length)
+      : undefined,
   });
 
   // Bisherige Draft-Picks als Käufe dieses Plans einspielen (gleiche Sicht wie im Rahmen: ohne Theme-Fit, mit Potenzial).
@@ -149,6 +190,15 @@ export function bewerteKiPick(input: {
   schritt.cash = gameState.teams.find((eintrag) => eintrag.teamId === teamId)?.cash ?? schritt.cash;
 
   const ergebnis = organicBuyStep(frame.planInput, schritt, { topN: Math.max(1, input.topN ?? 3) });
+  // Review S4: das Protokoll auch beim Kauf, denn scheitert der Kauf im Dienst (`kaufeMitNachruecken`), ist DAS der Ausstieg.
+  // Die Notwege der bisherigen Picks dieses Teams (im Verlauf als `notweg:` gebucht) zaehlen ins Protokoll, damit es dieselbe Liste
+  // fuehrt wie der Blocklauf und einen gemeldeten Fueller nicht doppelt zaehlt.
+  const kaderplan = kaderplanAn
+    ? {
+        ...kaderplanProtokoll(frame.planInput, createOrganicPlanStepState(frame.planInput), schritt, bisherigeNotwege(draft, teamId)),
+        optEntscheidung: frame.optEntscheidung,
+      }
+    : undefined;
   const offeneDisziplinen = computeDisciplineNeeds(schritt.squad, frame.planInput.identityAxisWeights, frame.planInput.disciplines)
     .filter((bedarf) => bedarf.coveredCount === 0)
     .sort((a, b) => b.needWeight - a.needWeight)
@@ -169,6 +219,9 @@ export function bewerteKiPick(input: {
     stopNutzen: ergebnis.stopUtility == null ? null : Math.round(ergebnis.stopUtility * 100) / 100,
     ruecklage: frame.ruecklage,
     optTarget: frame.optTarget,
+    kaderplan,
+    // Review K3: nur mit Kaderplan (der Builder setzt `notweg` ohnehin nur dann).
+    notweg: kaderplanAn && ergebnis.kind === "buy" ? ergebnis.notweg : undefined,
   };
 }
 

@@ -15,6 +15,7 @@ import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
 import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
+import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
 import {
   buildArenaStrategieBeide,
   type ArenaStrategieByDisciplineId,
@@ -484,6 +485,12 @@ export type VorbereitetesFixture = {
    * ist oder beide Seiten neutral sind — dann ist der Umschlag Zeichen fuer Zeichen der alte.
    */
   strategieByDisciplineId?: ArenaStrategieByDisciplineId;
+  /**
+   * CLIMBING-FORMAT DES SPIELTAGS (Canyon live, 18.11., lib/resolve/climbing-format.ts): `{ climbing: "canyon" |
+   * "standard" }`, nur fuer Climbing gesetzt -- derselbe Umschlag-Teil, den der Host fuer die Anzeige setzt
+   * (gezeigt = gebucht). Fehlt fuer jede andere Disziplin, deren Umschlag damit Zeichen fuer Zeichen der alte bleibt.
+   */
+  formatByDisciplineId?: { climbing: "standard" | "canyon" };
 };
 
 /**
@@ -625,6 +632,7 @@ export function bereiteFixturesVor(
           [disziplin],
         )
       : null;
+    const format = arenaFormatByDisciplineId(gameState, fixture.matchdayId ?? gameState.matchdayState?.matchdayId ?? null, disziplin);
     return {
       ...fixture,
       seed,
@@ -633,6 +641,7 @@ export function bereiteFixturesVor(
       aufstellung,
       kulisseByDisciplineId: kulisse && disziplin ? { [disziplin]: kulisse.id } : {},
       ...(strategie ? { strategieByDisciplineId: strategie } : {}),
+      ...(format ? { formatByDisciplineId: format } : {}),
     };
   });
 }
@@ -676,6 +685,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
+    formatByDisciplineId?: { climbing: "standard" | "canyon" };
   }[];
   disziplin: string;
   /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
@@ -716,6 +726,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
+    formatByDisciplineId?: { climbing: "standard" | "canyon" };
   }) => {
     fenster.__olyArenaKader = {
       heim: kader.heim,
@@ -725,6 +736,7 @@ async function simuliereFixturesImBrowser(payload: {
       kulisseByDisciplineId: kader.kulisseByDisciplineId,
       // Nur mit Vorlage gesetzt (Spread), sonst exakt der alte Umschlag.
       ...(kader.strategieByDisciplineId ? { strategieByDisciplineId: kader.strategieByDisciplineId } : {}),
+      ...(kader.formatByDisciplineId ? { formatByDisciplineId: kader.formatByDisciplineId } : {}),
     };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
@@ -969,19 +981,21 @@ export async function runArenaFixtures(
       mutatoren,
       kulisseByDisciplineId: vorbereitet[0].kulisseByDisciplineId,
       ...(vorbereitet[0].strategieByDisciplineId ? { strategieByDisciplineId: vorbereitet[0].strategieByDisciplineId } : {}),
+      ...(vorbereitet[0].formatByDisciplineId ? { formatByDisciplineId: vorbereitet[0].formatByDisciplineId } : {}),
     });
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const chassis = waehleArenaChassis(disziplin);
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
-      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung, kulisseByDisciplineId, strategieByDisciplineId }) => ({
+      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung, kulisseByDisciplineId, strategieByDisciplineId, formatByDisciplineId }) => ({
         heim,
         gast,
         seed,
         aufstellung,
         kulisseByDisciplineId,
         ...(strategieByDisciplineId ? { strategieByDisciplineId } : {}),
+        ...(formatByDisciplineId ? { formatByDisciplineId } : {}),
       })),
       disziplin,
       mutatoren,

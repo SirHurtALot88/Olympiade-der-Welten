@@ -17,6 +17,9 @@ services:
         # damit Server und Browser nie auseinanderlaufen. Leer = Standard (neue Skala), nichts aendert sich.
         NEXT_PUBLIC_OLY_PP_SKALA: ${NEXT_PUBLIC_OLY_PP_SKALA:-${OLY_PP_SKALA:-}}
         NEXT_PUBLIC_OLY_ERGEBNIS_SKALA: ${NEXT_PUBLIC_OLY_ERGEBNIS_SKALA:-${OLY_ERGEBNIS_SKALA:-}}
+        # Climbing-Format (Canyon live, 18.11., lib/resolve/climbing-format.ts): derselbe Weg wie oben, ohne
+        # eigenen Wert gilt der Server-Schalter OLY_CLIMBING_FORMAT. Leer = Canyon.
+        NEXT_PUBLIC_OLY_CLIMBING_FORMAT: ${NEXT_PUBLIC_OLY_CLIMBING_FORMAT:-${OLY_CLIMBING_FORMAT:-}}
     restart: unless-stopped
     # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
     # Chromium braucht beides, nicht nur eins von beiden.
@@ -84,6 +87,10 @@ services:
       # Leer = Code-Standard (neue Skala an). Siehe deploy/hetzner/.env.example.
       OLY_PP_SKALA: ${OLY_PP_SKALA:-}
       OLY_ERGEBNIS_SKALA: ${OLY_ERGEBNIS_SKALA:-}
+      # Climbing-Format (Canyon live, 18.11., docs/design/climbing-canyon-live-18-11.md): leer = Canyon,
+      # "standard" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder das alte Format; gebuchte
+      # Spieltage bleiben, wie sie gebucht sind). Siehe deploy/hetzner/.env.example.
+      OLY_CLIMBING_FORMAT: ${OLY_CLIMBING_FORMAT:-}
     volumes:
       - oly-data:/app/data/persistence
       # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach

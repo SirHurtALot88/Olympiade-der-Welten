@@ -145,13 +145,15 @@ describe.skipIf(!chromiumVerfuegbar())("HUD-System Basketball (Arena-Motor, Chro
     await browser?.close();
   });
 
-  it("Profile: Basketball, Hockey und Football fertig (Welle 1), die anderen 17 Disziplinen als Skelett", async () => {
+  // Climbing (Canyon live, 18.11.) ist fertig, gilt aber nur im Format Canyon (tests/hud-system-climbing.test.ts).
+  it("Profile: Basketball, Hockey, Football (Welle 1) und Climbing fertig, die anderen 16 Disziplinen als Skelett", async () => {
     const p = await seite.evaluate(() => (window.__arena.hudProbe() as Probe).profile);
     expect(p.basketball).toBe("fertig");
+    expect(p.climbing).toBe("fertig");
     const skelett = Object.entries(p).filter(([, v]) => v === "skelett").map(([k]) => k);
-    expect(skelett.length).toBe(17);
+    expect(skelett.length).toBe(16);
     for (const d of ["tdm", "battlefield", "mini-dm", "fechten", "tennis", "speed-schach", "breaking",
-      "eiskunstlauf", "showcase", "gewichtheben", "wettessen", "i-spy", "staffel", "time-trial", "spurt", "climbing", "takeshis-castle"]) {
+      "eiskunstlauf", "showcase", "gewichtheben", "wettessen", "i-spy", "staffel", "time-trial", "spurt", "takeshis-castle"]) {
       expect(skelett, d).toContain(d);
     }
   });

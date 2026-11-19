@@ -11,7 +11,7 @@
  * und zerbrach, obwohl das Verhalten stimmte.
  *
  * Die Zusicherungen stehen jetzt auf exportierten WERTEN (`NL_STANDINGS_DEFAULT_MODE`,
- * `NL_STANDINGS_MODE_ITEMS`, `TRANSFER_HISTORY_*`) — dieselbe Mechanik, die dieses
+ * `NL_STANDINGS_MODE_ITEMS`) — dieselbe Mechanik, die dieses
  * Repo schon bei `MATCHDAY_PANEL_DEFAULT_SORT` benutzt.
  */
 import path from "node:path";
@@ -23,11 +23,11 @@ import {
   NL_STANDINGS_DEFAULT_MODE,
   NL_STANDINGS_MODE_ITEMS,
 } from "@/app/foundation/season-v2/SeasonStandingsNewLook";
-import {
-  TRANSFER_HISTORY_DEFAULT_LAYOUT,
-  TRANSFER_HISTORY_LAYOUT_ITEMS,
-} from "@/app/foundation/transfer-history-v2/TransferHistoryV2NewLook";
 
+/**
+ * HINWEIS (18.11., Historie modern): der Umschalter „Timeline/Tabelle" der Transferhistorie ist mit dem Mockup
+ * entfallen (eine Liste je Fenster, `docs/design/historie-modern-18-11.md` Abschnitt 2). Sein Test ist mitgegangen.
+ */
 describe("season standings v2 ui contract", () => {
   it("öffnet in der Datenansicht — nicht im Board und nicht bei den Vereinen", () => {
     expect(NL_STANDINGS_DEFAULT_MODE).toBe("daten");
@@ -68,14 +68,6 @@ describe("season standings v2 ui contract", () => {
     expect(body).toContain("FoundationSeasonV2Panel");
     expect(body).not.toContain('{ id: "gms", label: "Manager" }');
     expect(body).not.toContain('{ id: "cards", label: "Karten" }');
-  });
-
-  it("der Deal-Strom lässt sich zwischen Timeline und Tabelle umschalten und startet auf Timeline", () => {
-    expect(TRANSFER_HISTORY_DEFAULT_LAYOUT).toBe("timeline");
-    expect(TRANSFER_HISTORY_LAYOUT_ITEMS.map((item) => item.id)).toEqual(["timeline", "table"]);
-    expect(TRANSFER_HISTORY_LAYOUT_ITEMS.map((item) => item.id)).toContain(
-      TRANSFER_HISTORY_DEFAULT_LAYOUT,
-    );
   });
 });
 

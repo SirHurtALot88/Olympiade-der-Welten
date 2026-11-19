@@ -20,6 +20,10 @@ import {
 } from "@/lib/ai/organic-squad/marquee-eligibility";
 import {
   buildOrganicSquadPlan,
+  createOrganicPlanStepState,
+  istKaderplanSchalterAn,
+  kaderplanRahmen,
+  type KaderplanProtokoll,
   type OrganicBuyDecision,
   type OrganicSquadPlanInput,
 } from "@/lib/ai/organic-squad/draft-builder";
@@ -40,7 +44,8 @@ import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/org
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
-import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { GM_OPT_SENKUNG_MAX, getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
+import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   istKiRuecklageV2Aktiv,
@@ -384,7 +389,25 @@ export type OrganicDraftPlanInput = {
    * Kader ALLER Teams), und ein Team könnte seine Lizenz mitten im Draft verlieren. `undefined` = wie bisher rechnen.
    */
   superstarLizenz?: boolean;
+  /**
+   * KADERPLAN (s. `istKaderplanAktiv`): Preise des Pools zu DRAFT-BEGINN (aufsteigend, s. `kaderplanPlatzPreise`),
+   * damit Block und Einzelschritt mit demselben Platzpreis planen. Fehlt sie, gilt der aktuelle Pool.
+   */
+  platzPreise?: number[];
+  /** KADERPLAN: Teams, die im Einzelschritt-Draft noch reihum picken (s. `economy.platzWettbewerb`). */
+  platzWettbewerb?: number;
 };
+
+/**
+ * KADERPLAN: Platzpreis-Liste aus einem Pool (Marktwert > 0, aufsteigend). Aufrufer reichen den Pool zu Beginn des
+ * Drafts bzw. des Kauffensters herein, nicht den Restpool.
+ */
+export function kaderplanPlatzPreise(pool: readonly Player[]): number[] {
+  return pool
+    .map((player) => Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0))
+    .filter((wert) => wert > 0)
+    .sort((left, right) => left - right);
+}
 
 export type OrganicDraftPlanResult = {
   decisions: OrganicBuyDecision[];
@@ -406,6 +429,8 @@ export type OrganicDraftPlanResult = {
   vorstandDebug?: VorstandBudgetStand;
   /** Finanzkonzept V2 Stufe 2: der in den Forecast eingespeiste erwartete Sponsor (C). */
   sponsorForecast?: number;
+  /** KADERPLAN: Grund der Kadergroesse (nur mit Kaderplan, s. `istKaderplanAktiv`), mit der GM-Entscheidung zum Opt. */
+  kaderplan?: KaderplanProtokoll & { optEntscheidung?: KaderplanOptEntscheidung };
 };
 
 /**
@@ -471,7 +496,11 @@ function buildOrganicPlanContext(input: {
  * lässt die Schleife darauf laufen; der Liga-Draft im Einzelschritt (lib/draft/liga-draft-ki.ts) baut ihn je Pick neu
  * und macht nur EINEN Schritt (`organicBuyStep`). Eine Quelle für beide Wege.
  */
+/** KADERPLAN: Ziel-Kader aus Identitaet (Blatt + GM-Tiefe) und die bewusste GM-Senkung (s. gmKaderOptAnpassung). */
+export type KaderplanOptEntscheidung = { identitaetsOpt: number; optTarget: number; gmDelta: number; grund: string | null };
+
 export type OrganicDraftFrame = {
+  optEntscheidung?: KaderplanOptEntscheidung;
   planInput: OrganicSquadPlanInput;
   optTarget: number;
   /** Die Ruecklage, mit der geplant wird (in Saison 1 halbiert, s. unten). */
@@ -496,6 +525,21 @@ export function istSaisonEins(gameState: Pick<GameState, "season">): boolean {
   return /(\d+)\s*$/.exec(gameState.season?.id ?? "")?.[1] === "1";
 }
 
+/**
+ * KADERPLAN (docs/design/ki-pick-analyse-18-11.md): im Saison-1-Setup-Draft Standard AN (`OLY_KI_KADERPLAN=0` schaltet ab).
+ *
+ * Ab Saison 2 im gemeinsamen Transferfenster ebenfalls AN (`docs/design/fenster-auf-opt-18-11.md`, Schalter `istFensterAufOpt`,
+ * `OLY_FENSTER_AUF_OPT=0` stellt „nur Saison 1" her). Die fruehere Begrenzung auf Saison 1 (Review S3: die Gehaltsseite der
+ * Plaetze bis Opt war im Gehaltstopf nicht reserviert) ist aufgehoben: `kaderplanRahmen` reserviert seit dem 18.11. Ablose UND
+ * Gehalt der Plaetze bis Opt gegen die Kaderpflicht-Grenze (`kaufRahmen().grenzeFuer`) bzw. die Toepfe.
+ * Ab Saison 2 kauft die KI nur im Fenster; jeder Aufruf des Planers ab Saison 2 ist ein Fenster-Kauf (Kaufrunde, Nachrunde,
+ * Kreditprobe, „KI picken").
+ */
+export function istKaderplanAktiv(gameState: Pick<GameState, "season">): boolean {
+  if (!istKaderplanSchalterAn()) return false;
+  return istSaisonEins(gameState) || istFensterAufOpt();
+}
+
 /** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
 export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDraftPlanResult {
   const frame = buildOrganicDraftFrame(input);
@@ -511,6 +555,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     ruecklageDebug: frame.ruecklageDebug,
     vorstandDebug: frame.vorstandDebug,
     sponsorForecast: frame.sponsorForecast,
+    kaderplan: result.kaderplan ? { ...result.kaderplan, optEntscheidung: frame.optEntscheidung } : undefined,
   };
 }
 
@@ -570,13 +615,99 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   // trim optTarget by up to 2 (never below ROSTER_MIN) so per-slot budget rises and Depth becomes
   // affordable — fewer, better bodies instead of a Reserve tail. Rich clubs get strain 0 (untouched).
   let planWeights = ctx.weights;
+  const kaderplan = istKaderplanAktiv(input.gameState);
   if (FILLQ_B_ENABLED) {
     const slotsToFill = Math.max(1, ctx.weights.optTarget - startingSquad.length);
     const budgetPerSlot = (planCash - ORGANIC_CASH_BUFFER) / slotsToFill;
     const strain = Math.min(1, Math.max(0, 1 - budgetPerSlot / DEPTH_REF_COST));
-    const trimmedOpt = Math.max(ROSTER_MIN, ctx.weights.optTarget - Math.round(2 * strain));
+    // Review K5: mit Kaderplan nie unter Minimum + 1 (Chris: „es wird nie nur bis zum Minimum gepickt"); ohne wie bisher.
+    const untergrenze = kaderplan ? Math.min(ctx.weights.optTarget, ROSTER_MIN + 1) : ROSTER_MIN;
+    const trimmedOpt = Math.max(untergrenze, ctx.weights.optTarget - Math.round(2 * strain));
     if (trimmedOpt !== ctx.weights.optTarget) {
       planWeights = { ...ctx.weights, optTarget: trimmedOpt };
+    }
+  }
+
+  // KADERPLAN: bewusste GM-Entscheidung „weniger, dafuer staerker" (hoechstens −2, nie unter Minimum + 1), protokolliert.
+  // Mit der (standardmaessig abgeschalteten) Geld-Senkung FILLQB davor gilt die Grenze fuer BEIDE zusammen: hoechstens −2 gegen
+  // den Identitaets-Opt, nie unter Minimum + 1 (Review K5).
+  // Oekonomie des Plans fuer ein gegebenes Ziel (`weights`). Eine Funktion, damit die Rahmen-Probe der Fenster-Senkung (unten)
+  // mit genau derselben Kasse, denselben Toepfen und derselben Kaderpflicht-Grenze rechnet wie der Plan selbst.
+  const economyFuer = (weights: typeof planWeights, salaryCeiling: number | undefined): OrganicSquadPlanInput["economy"] => ({
+    cash: planCash,
+    cashBuffer: planCashBuffer,
+    salaryTotal,
+    boardRisk: ctx.boardRisk,
+    expectedPrize: input.forecast?.expectedPrize ?? 0,
+    sponsorIncome: input.forecast?.sponsorIncome ?? sponsorForecast ?? 0,
+    facilityNet: input.forecast?.facilityNet ?? 0,
+    netTransfer: input.forecast?.netTransfer ?? 0,
+    weights,
+    rosterMax: ctx.rosterMax,
+    rosterMin: ROSTER_MIN,
+    salaryCeiling,
+    // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
+    // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
+    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
+    // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
+    // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
+    minFillFloor: ruecklage > 0 ? ruecklage : undefined,
+    feeCap,
+    salaryCap,
+    platzPreise: input.platzPreise,
+    platzWettbewerb: input.platzWettbewerb,
+    kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
+  });
+
+  let optEntscheidung: KaderplanOptEntscheidung | undefined;
+  let gmOptGesenkt = false;
+  if (kaderplan) {
+    const anpassung = gmKaderOptAnpassung({
+      bias: getTeamGeneralManager(input.gameState, input.team.teamId)?.profile?.bias ?? null,
+      opt: planWeights.optTarget,
+      rosterMin: ROSTER_MIN,
+    });
+    const identitaetsOpt = ctx.weights.optTarget;
+    const opt = Math.max(anpassung.opt, identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
+    gmOptGesenkt = anpassung.delta < 0 && opt < identitaetsOpt;
+    optEntscheidung = { identitaetsOpt, optTarget: opt, gmDelta: opt - identitaetsOpt, grund: anpassung.grund };
+    if (opt !== planWeights.optTarget) planWeights = { ...planWeights, optTarget: opt };
+  }
+
+  // FENSTER AUF OPT, Hebel (b) (PM-Entscheidung 19.11. im Rahmen von Chris' Regel „GM darf Opt um bis zu 2 senken, bewusst einen
+  // weniger dafuer staerker; aber nie nur bis Minimum"): traegt der Rahmen die Plaetze bis Opt nur zu Fuellerpreisen (< Platzpreis
+  // 12), senkt der GM das Ziel — hoechstens bis zur bestehenden Grenze (Identitaets-Opt − 2, nie unter Minimum + 1) — auf das groesste
+  // Ziel, das der Rahmen ganz zum Platzpreis traegt, und kauft dafuer staerkere Spieler. Nur im Fenster ab Saison 2: der
+  // Saison-1-Draft plant aus dem vollen Startbudget und bleibt unveraendert. `docs/design/fenster-auf-opt-18-11.md` Abschnitt 3a.
+  if (kaderplan && optEntscheidung && !istSaisonEins(input.gameState) && startingSquad.length < planWeights.optTarget) {
+    const identitaetsOpt = optEntscheidung.identitaetsOpt;
+    const boden = Math.max(identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
+    const traegtZumPlatzpreis = (opt: number): boolean => {
+      if (startingSquad.length >= opt) return true;
+      const probe: OrganicSquadPlanInput = {
+        startingSquad,
+        candidates,
+        identityAxisWeights: ctx.identityAxisWeights,
+        disciplines: ctx.disciplines,
+        economy: economyFuer({ ...planWeights, optTarget: opt }, undefined),
+        draftSeed: null,
+        kaderplan: { gmOptGesenkt: true },
+      };
+      return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= opt;
+    };
+    const vorher = planWeights.optTarget;
+    let opt = vorher;
+    while (opt > boden && !traegtZumPlatzpreis(opt)) opt -= 1;
+    if (opt < vorher) {
+      gmOptGesenkt = true;
+      planWeights = { ...planWeights, optTarget: opt };
+      const rahmenText = `Rahmen traegt Opt ${vorher} nur mit Fuellern: Opt ${vorher} -> ${opt}, weniger Spieler, dafuer staerker`;
+      optEntscheidung = {
+        identitaetsOpt,
+        optTarget: opt,
+        gmDelta: opt - identitaetsOpt,
+        grund: optEntscheidung.grund ? `${optEntscheidung.grund}; ${rahmenText}` : `GM ${rahmenText}`,
+      };
     }
   }
 
@@ -677,30 +808,10 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     identityAxisWeights: ctx.identityAxisWeights,
     disciplines: ctx.disciplines,
     composition,
-    economy: {
-      cash: planCash,
-      cashBuffer: planCashBuffer,
-      salaryTotal,
-      boardRisk: ctx.boardRisk,
-      expectedPrize: input.forecast?.expectedPrize ?? 0,
-      sponsorIncome: input.forecast?.sponsorIncome ?? sponsorForecast ?? 0,
-      facilityNet: input.forecast?.facilityNet ?? 0,
-      netTransfer: input.forecast?.netTransfer ?? 0,
-      weights: planWeights,
-      rosterMax: ctx.rosterMax,
-      rosterMin: ROSTER_MIN,
-      salaryCeiling: salaryCeilingDebug?.salaryCeiling,
-      // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
-      // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
-      solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
-      // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
-      // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
-      minFillFloor: ruecklage > 0 ? ruecklage : undefined,
-      feeCap,
-      salaryCap,
-      kaufGrenze: kaufRahmenFuerPlan.gedeckelt ? kaufRahmenFuerPlan.grenzeFuer : undefined,
-    },
+    economy: economyFuer(planWeights, salaryCeilingDebug?.salaryCeiling),
     draftSeed: input.draftSeed ?? null,
+    // Nur gesetzt, wenn der Kaderplan laeuft (sonst fehlt das Feld: Builder bit-gleich zum Stand davor).
+    ...(kaderplan ? { kaderplan: { gmOptGesenkt } } : {}),
   };
 
   return {
@@ -708,6 +819,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     optTarget: planWeights.optTarget,
     ruecklage,
     superstarLizenz,
+    optEntscheidung,
     salaryCeilingDebug,
     ruecklageDebug,
     vorstandDebug: vorstand,

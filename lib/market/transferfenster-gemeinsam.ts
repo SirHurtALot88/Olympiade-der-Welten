@@ -38,3 +38,21 @@ export function istTransferfensterGemeinsam(): boolean {
 export function verkaufserloeseFreiAnteil(vorstandsQuote: number): number {
   return istTransferfensterGemeinsam() ? 1 : vorstandsQuote;
 }
+
+/**
+ * FENSTER AUF OPT (Chris 18.11., wörtlich: „Nein, man darf alle Spieler verkaufen, auch unter Minimum. Die KI soll danach
+ * ja einfach auf Optimum füllen! Die Kader können nicht einfach mit 8–9 Leuten fertig sein, dann sind die Roster zu
+ * star-lastig.“). Volle Herleitung: `docs/design/fenster-auf-opt-18-11.md`.
+ *
+ * Im gemeinsamen Fenster (ab Saison 2, vor Spieltag 1):
+ *  - die Verkaufsrunde verkauft frei nach der bestehenden Verkaufslogik, auch unter das Minimum (keine Grenze max(8, playerMin));
+ *  - Kaufrunde und Nachrunde laufen ueber den organischen Planer MIT Kaderplan (Platzpreis-Reservierung bis Opt, Ablose UND
+ *    Gehalt, GM-Senkung hoechstens 2) — derselbe Kaufweg wie der Saison-1-Draft, nicht mehr der Marktplan mit Kurzliste.
+ *
+ * STANDARD AN (nur zusammen mit dem gemeinsamen Fenster). `OLY_FENSTER_AUF_OPT=0` stellt den Stand von #1634 her:
+ * Verkauf nur bis max(8, playerMin), Kauf ueber den Marktplan, Kaderplan nur in Saison 1.
+ */
+export function istFensterAufOpt(): boolean {
+  if (!istTransferfensterGemeinsam()) return false;
+  return !istAus(process.env.OLY_FENSTER_AUF_OPT);
+}

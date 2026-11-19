@@ -12,6 +12,7 @@ import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSee
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 import { BATTLEFIELD_POD_FORMAT } from "@/lib/battle/arena-resolved-disciplines";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 
 /**
  * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
@@ -109,7 +110,10 @@ export function berechneArenaEingabeHash(input: {
   const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
 
   return createHash("sha256")
-    .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash(), ...ppSkalaTeil(input.gameState, input.matchdayId) }))
+    .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash(), ...ppSkalaTeil(input.gameState, input.matchdayId),
+      // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): nur fuer Climbing, damit ein
+      // Formatwechsel nach dem Vorlauf die Vorberechnung verwirft; jede andere Disziplin behaelt ihren Hash.
+      ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}) }))
     .digest("hex");
 }
 

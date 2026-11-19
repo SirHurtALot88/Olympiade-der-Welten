@@ -20,6 +20,7 @@ const applyAiInjuryDepthTopup = vi.fn();
 const runAiPicksExecutePreview = vi.fn();
 const runAutoRosterFillForMatchdaySetup = vi.fn();
 const saveSingleplayerState = vi.fn();
+const runTransferWindowSession = vi.fn();
 
 vi.mock("@/lib/ai/ai-market-plan-apply-service", () => ({
   applyAiMarketPlanLocally,
@@ -35,6 +36,12 @@ vi.mock("@/lib/ai/ai-injury-depth-topup-service", () => ({
 
 vi.mock("@/lib/ai/ai-picks-run-service", () => ({
   runAiPicksExecutePreview,
+}));
+
+// Verkaufsrunde, Kaufrunde und Nachrunde des gemeinsamen Fensters laufen ueber die Kauffenster-Sitzung; was sie je Team tut,
+// pruefen tests/ai-transfer-window-session.test.ts und tests/fenster-auf-opt.test.ts. Hier zaehlt nur, WELCHER Weg gerufen wird.
+vi.mock("@/lib/ai/ai-transfer-window-session-service", () => ({
+  runTransferWindowSession,
 }));
 
 // Der Kader-Fuell-Lauf haengt hier nur als Nachbar mit drin; sein echter Modulbaum ist gross genug,
@@ -147,6 +154,17 @@ describe("Preseason-Hintergrundlauf: Kaeufe gehoeren ins Kauffenster der neuen S
     runAiPicksExecutePreview.mockReset();
     runAutoRosterFillForMatchdaySetup.mockReset();
     saveSingleplayerState.mockReset();
+    runTransferWindowSession.mockReset();
+    runTransferWindowSession.mockResolvedValue({
+      phase: "preseason",
+      appliedBuys: 0,
+      appliedSells: 0,
+      perTeam: [],
+      warnings: [],
+      blockingReasons: [],
+      skipped: false,
+    });
+    delete process.env.OLY_FENSTER_AUF_OPT;
     runAutoRosterFillForMatchdaySetup.mockResolvedValue({ summary: { appliedBuys: 0 }, teams: [] });
     applyAiManagerPlan.mockReturnValue({ actions: [], warnings: [], blockers: [] });
     applyAiInjuryDepthTopup.mockReturnValue({ playersBoughtTotal: 0, warnings: [] });
@@ -176,7 +194,25 @@ describe("Preseason-Hintergrundlauf: Kaeufe gehoeren ins Kauffenster der neuen S
     expect(saveSingleplayerState).not.toHaveBeenCalled();
   });
 
-  it("laeuft im Kauffenster der neuen Saison als reiner KAUF-Lauf (applySellSteps: false)", async () => {
+  it("Fenster auf Opt (Standard): Verkaufsrunde, dann Kauf- und Nachrunde ueber den organischen Planer, kein Marktplan", async () => {
+    store.gameState = baueGameState("season_active");
+
+    const { POST } = await import("@/app/api/ai/preseason-background/route");
+    const response = await POST(baueRequest());
+    const payload = (await response.json()) as { ok: boolean; skipped: boolean };
+
+    expect(payload.skipped).toBe(false);
+    expect(payload.ok).toBe(true);
+    const phasen = (runTransferWindowSession.mock.calls as Array<[{ phase: string; allowBuys?: boolean }]>).map(([a]) => a.phase);
+    expect(phasen).toEqual(["fenster_verkauf", "preseason", "preseason"]);
+    for (const [aufruf] of runTransferWindowSession.mock.calls as Array<[{ phase: string; allowBuys?: boolean }]>) {
+      if (aufruf.phase === "preseason") expect(aufruf.allowBuys).toBe(true);
+    }
+    expect(applyAiMarketPlanLocally).not.toHaveBeenCalled();
+  });
+
+  it("laeuft im Kauffenster der neuen Saison als reiner KAUF-Lauf (applySellSteps: false) — alter Stand `OLY_FENSTER_AUF_OPT=0`", async () => {
+    process.env.OLY_FENSTER_AUF_OPT = "0";
     store.gameState = baueGameState("season_active");
 
     const { POST } = await import("@/app/api/ai/preseason-background/route");
@@ -192,5 +228,6 @@ describe("Preseason-Hintergrundlauf: Kaeufe gehoeren ins Kauffenster der neuen S
     for (const [aufruf] of applyAiMarketPlanLocally.mock.calls as Array<[{ options?: { applySellSteps?: boolean } }]>) {
       expect(aufruf.options?.applySellSteps).toBe(false);
     }
+    delete process.env.OLY_FENSTER_AUF_OPT;
   });
 });

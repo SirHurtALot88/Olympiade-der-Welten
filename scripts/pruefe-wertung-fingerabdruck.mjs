@@ -12,10 +12,15 @@
 //     "klassisch"; ohne diese Eintraege waeren Hatz und HYROX gegen Motoraenderungen UNGESCHUETZT.
 //     Die Zusatz-Eintraege stehen ans ENDE der Liste: die 69 aelteren Zeilen behalten Reihenfolge und
 //     Einzel-Hashes, nur GESAMT aendert sich (69 -> 75 Eintraege).
-//   - Climbing im Format "Canyon" (18.11., docs/design/climbing-canyon-bau-18-11.md): drei Zeilen
-//     `spiele climbing/canyon 1|7|42` mit eigener Summe `CANYON ...` AUSSERHALB von GESAMT (GESAMT bleibt der
-//     Standard-Abgleich). `--node` rechnet alles ueber den Node-Motor statt Chromium.
-// GESAMT-STAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
+//   - Climbing: seit 18.11. (Canyon live, docs/design/climbing-canyon-live-18-11.md) laeuft `spiele climbing`
+//     im Format "Canyon" (Motor-Vorgabe). Das alte Format bleibt als Rueckweg (Abschalt-Schalter
+//     OLY_CLIMBING_FORMAT=standard) geschuetzt: drei Zeilen `spiele climbing/standard 1|7|42` mit eigener Summe
+//     `CLIMBING-STANDARD ...` AUSSERHALB von GESAMT, mit window.__arena.bahnFlags({climbingFormat:"standard"})
+//     ausdruecklich gesetzt und danach auf die Vorgabe zurueck. `--node` rechnet alles ueber den Node-Motor.
+// GESAMT-STAND (18.11., Canyon live): `GESAMT eaafed96150e (75 Eintraege)`; gegenueber `d3a39030a3ef` aendern sich
+// NUR die drei Zeilen `spiele climbing 1|7|42` (58b9222c223b/b2b7c6e4bfbc/d26ad5352068 -> 310b216c1cc8/727f3c3d16ef/
+// 8f7923e36b5e, die frueheren `spiele climbing/canyon`-Zeilen aus #1633). `CLIMBING-STANDARD` traegt die alten drei.
+// VORSTAND (18.11., Climbing "Ende erst, wenn alle oben sind", docs/design/arena-start-ende-figuren-18-11.md):
 // `GESAMT d3a39030a3ef (75 Eintraege)`; gegenueber `ce8fcef66028` aendern sich NUR die drei Zeilen `spiele climbing 1|7|42`.
 // VORSTAND (18.11., Basketball Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md
 // Abschnitt 7.9): `GESAMT ce8fcef66028 (75 Eintraege)`; gegenueber main mit #1562 (`38b176d7185b`) aendern sich NUR die
@@ -140,23 +145,22 @@ try {
       zwang: A.kontaktPersZwang(),
       zaehler: ["spurt", "takeshis-castle"].map((d) => { A.spiele(d, 7); return [d, A.kontaktZaehler()]; }),
     } : null;
-    // CLIMBING-FORMAT "CANYON" (Bau 18.11., docs/design/climbing-canyon-bau-18-11.md): eigene Eintraege
-    // NACH allen anderen und AUSSERHALB von GESAMT -- GESAMT bleibt der Abgleich des Standards (Schalter aus)
-    // und damit vergleichbar mit allen frueheren Staenden; die Canyon-Zeilen haben ihre eigene Summe.
-    const canyon = [];
+    // CLIMBING IM ALTEN FORMAT "STANDARD" (Rueckweg seit Canyon live, 18.11., docs/design/climbing-canyon-live-18-11.md):
+    // eigene Eintraege NACH allen anderen und AUSSERHALB von GESAMT; GESAMT rechnet Climbing im Live-Format Canyon.
+    const standard = [];
     if (A.canyonParameter) for (const s of SAATEN) {
       try {
-        A.bahnFlags({ climbingFormat: "canyon" });
-        canyon.push([`spiele climbing/canyon ${s}`, A.spiele("climbing", s)]);
-      } catch (e) { canyon.push([`spiele climbing/canyon ${s}`, "FEHLER " + String(e)]); }
-      finally { A.bahnFlags({ climbingFormat: "standard" }); }
+        A.bahnFlags({ climbingFormat: "standard" });
+        standard.push([`spiele climbing/standard ${s}`, A.spiele("climbing", s)]);
+      } catch (e) { standard.push([`spiele climbing/standard ${s}`, "FEHLER " + String(e)]); }
+      finally { A.bahnFlags({ climbingFormat: null }); }
     }
-    return { aus, kontakt, canyon };
+    return { aus, kontakt, standard };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
-  for (const [name, wert] of ergebnis.canyon || []) console.log(`${h(wert)}  ${name}`);
-  if (ergebnis.canyon?.length) console.log(`CANYON ${h(ergebnis.canyon)} (${ergebnis.canyon.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.standard || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.standard?.length) console.log(`CLIMBING-STANDARD ${h(ergebnis.standard)} (${ergebnis.standard.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
   if (ergebnis.kontakt) console.log("KONTAKT " + JSON.stringify(ergebnis.kontakt));
 } finally {
