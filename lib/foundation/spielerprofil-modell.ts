@@ -263,6 +263,14 @@ export type DisziplinRang = {
   kaderVon: number;
   /** Zählt der Spieler zu den besten 6 seines Kaders in dieser Disziplin (Kaderstärke-Bezug)? */
   inBesten6: boolean;
+  /**
+   * Nur für Spieler ohne Vertrag (Draft, Transfermarkt): Rang, den er unter allen Aktiven hätte (er selbst zählt
+   * nicht mit, `aktivVon` bleibt die Zahl der Aktiven), und der Rang, den er im Kader des Betrachters hätte.
+   * Sonst null.
+   */
+  freiAktivRang: number | null;
+  beiDirRang: number | null;
+  beiDirVon: number;
   /** PP der laufenden Saison in dieser Disziplin (gebucht) und Rang in der Liga. */
   ppSaison: number | null;
   ppLigaRang: number | null;
@@ -272,6 +280,8 @@ export type DisziplinRang = {
 export type SpielerRaenge = {
   ligaAktiv: boolean;
   ligaName: string | null;
+  /** Der Spieler steht in keinem Kader (vertragslos). */
+  vertragslos: boolean;
   disziplinen: Map<string, DisziplinRang>;
   /** PP der Saison insgesamt (gebucht) und Rang in der Liga. */
   ppGesamt: number | null;
@@ -294,10 +304,26 @@ export function mittelBeste6(werte: ReadonlyArray<number | null | undefined>): n
   return beste.reduce((summe, wert) => summe + wert, 0) / beste.length;
 }
 
+/** Rang, den `wert` in `ids` hätte, ohne dass der Spieler selbst in `ids` stehen muss (1 + Zahl der Besseren). */
+export function hypothetischerRang(
+  wert: number | null,
+  ids: readonly string[],
+  wertVon: (id: string) => number | null,
+): number | null {
+  if (wert == null) return null;
+  let besser = 0;
+  for (const id of ids) {
+    const andere = wertVon(id);
+    if (andere != null && andere > wert) besser += 1;
+  }
+  return besser + 1;
+}
+
 export function berechneSpielerRaenge(
   gameState: GameState,
   playerId: string,
   disziplinIds: readonly string[],
+  betrachterTeamId: string | null = null,
 ): SpielerRaenge {
   const rosterByPlayer = new Map(gameState.rosters.map((eintrag) => [eintrag.playerId, eintrag.teamId] as const));
   const ligaAktiv = isLeagueSplitActive(gameState);
@@ -312,6 +338,8 @@ export function berechneSpielerRaenge(
     return team != null && getLeagueOf(gameState, team) === eigeneLiga;
   });
   const kaderIds = teamId ? aktiveIds.filter((id) => rosterByPlayer.get(id) === teamId) : [];
+  const vertragslos = teamId == null;
+  const betrachterKader = vertragslos && betrachterTeamId ? aktiveIds.filter((id) => rosterByPlayer.get(id) === betrachterTeamId) : [];
 
   const ledger = buildSeasonPointsLedger(gameState);
   const ppJeDisziplin = new Map<string, Map<string, number>>();
@@ -342,12 +370,10 @@ export function berechneSpielerRaenge(
     const ppMap = ppJeDisziplin.get(disziplinId) ?? new Map<string, number>();
     const ppLiga = rangVon(ligaIds, (id) => (ppMap.has(id) ? Math.round((ppMap.get(id) ?? 0) * 10) / 10 : null));
     const eigenKaderRang = kader.map.get(playerId) ?? null;
+    const eignungWert = wertVon(playerId);
     disziplinen.set(disziplinId, {
       disziplinId,
-      wert: (() => {
-        const player = playerById.get(playerId);
-        return player ? eignungVon(player, disziplinId) : null;
-      })(),
+      wert: eignungWert,
       ligaRang: liga.map.get(playerId) ?? null,
       ligaVon: liga.von,
       aktivRang: aktiv.map.get(playerId) ?? null,
@@ -355,6 +381,9 @@ export function berechneSpielerRaenge(
       kaderRang: eigenKaderRang,
       kaderVon: kader.von,
       inBesten6: eigenKaderRang != null && eigenKaderRang <= 6,
+      freiAktivRang: vertragslos ? hypothetischerRang(eignungWert, aktiveIds, wertVon) : null,
+      beiDirRang: vertragslos && betrachterTeamId ? hypothetischerRang(eignungWert, betrachterKader, wertVon) : null,
+      beiDirVon: vertragslos && betrachterTeamId && eignungWert != null ? betrachterKader.filter((id) => wertVon(id) != null).length + 1 : 0,
       ppSaison: ppMap.has(playerId) ? Math.round((ppMap.get(playerId) ?? 0) * 10) / 10 : null,
       ppLigaRang: ppLiga.map.get(playerId) ?? null,
       ppLigaVon: ppLiga.von,
@@ -366,12 +395,44 @@ export function berechneSpielerRaenge(
   return {
     ligaAktiv: eigeneLiga != null,
     ligaName: eigeneLiga ?? null,
+    vertragslos,
     disziplinen,
     ppGesamt: ppGesamtJeSpieler.has(playerId) ? Math.round((ppGesamtJeSpieler.get(playerId) ?? 0) * 10) / 10 : null,
     ppGesamtLigaRang: ppGesamt.map.get(playerId) ?? null,
     ppGesamtLigaVon: ppGesamt.von,
     kaderStaerkeBeste6,
   };
+}
+
+/* ------------------------------------------------------------------ Rangzeile der Experten-Karten */
+
+export type RangZeile = { wort: string; wert: string; gross: boolean };
+
+/**
+ * Die zwei Ränge, die eine Karte in „Hier ist er stark“ nennt (Chris 19.11.): Rang im Team und Rang in der Liga.
+ * - Spieler im Kader: „#N im Kader“ und „Liga #N“ (ohne Liga-Split heißt die ganze Aktivenschaft Liga).
+ * - Vertragslos: „bei dir #N“ (Rang im Kader des Betrachters) und „Alle #N“; fehlt ein Rang, entfällt die Angabe.
+ * - Nebel: kein exakter Teamrang; die Liga nur als grobe Stufe („obere Gruppe“).
+ */
+export function baueRangZeilen(rang: DisziplinRang | null | undefined, raenge: Pick<SpielerRaenge, "vertragslos"> | null | undefined, nebel: boolean): RangZeile[] {
+  if (!rang || !raenge) return [];
+  const zeilen: RangZeile[] = [];
+  if (raenge.vertragslos) {
+    if (nebel) {
+      const stufe = grobeRangStufe(rang.freiAktivRang, rang.aktivVon + 1);
+      return stufe ? [{ wort: "Alle", wert: stufe, gross: false }] : [];
+    }
+    if (rang.beiDirRang != null) zeilen.push({ wort: "bei dir", wert: `#${rang.beiDirRang}`, gross: true });
+    if (rang.freiAktivRang != null) zeilen.push({ wort: "Alle", wert: `#${rang.freiAktivRang}`, gross: false });
+    return zeilen;
+  }
+  if (nebel) {
+    const stufe = grobeRangStufe(rang.ligaRang, rang.ligaVon);
+    return stufe ? [{ wort: "Liga", wert: stufe, gross: false }] : [];
+  }
+  if (rang.kaderRang != null) zeilen.push({ wort: "im Kader", wert: `#${rang.kaderRang}`, gross: true });
+  if (rang.ligaRang != null) zeilen.push({ wort: "Liga", wert: `#${rang.ligaRang}`, gross: false });
+  return zeilen;
 }
 
 /* ------------------------------------------------------------------ PP je Spieltag */

@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import { BcFormPfeil, BcMoralGesicht } from "@/components/foundation/broadcast";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { moralStufe } from "@/lib/morale/moral-anzeige";
@@ -9,7 +11,9 @@ import {
   PP_ZIELLINIE,
   gehaltJeSpieltag,
   grobBereich,
+  baueRangZeilen,
   type ExperteIn,
+  type RangZeile,
 } from "@/lib/foundation/spielerprofil-modell";
 import {
   FigurBuehne,
@@ -23,6 +27,8 @@ import {
   zahl,
 } from "./bausteine";
 import type { SpielerprofilModell } from "./use-spielerprofil-modell";
+
+const EXPERTEN_ANZAHL = 6;
 
 function vorzeichen(wert: number, stellen = 1): string {
   const text = zahl(Math.abs(wert), stellen);
@@ -193,41 +199,56 @@ export function EinsatzKarte({ data, modell }: { data: PlayerDetailDrawerData; m
 
 /* ------------------------------------------------------------------ Attribute und Experte */
 
-function AttributeTafel({ data, modell }: { data: PlayerDetailDrawerData; modell: SpielerprofilModell }) {
+export function AttributeTafel({ data, modell }: { data: PlayerDetailDrawerData; modell: SpielerprofilModell }) {
   const zeilen = new Map(data.attributeStats.map((zeile) => [zeile.key, zeile] as const));
-  const nummerisch = data.attributeStats.map((zeile) => zeile.value).filter((wert): wert is number => wert != null);
-  const schwelle = [...nummerisch].sort((a, b) => b - a)[2] ?? Number.POSITIVE_INFINITY;
+  const potenzial = !modell.nebel && data.potential != null ? data.potential : null;
+  const gesamt = !modell.nebel && data.ovr != null && data.ovr > 0 ? data.ovr : null;
   return (
-    <Tafel titel="Attribute" klein="zwölf Werte in vier Achsen" testId="spielerprofil-attribute">
+    <Tafel
+      titel="Attribute"
+      rechts={
+        gesamt != null ? (
+          <small className="spr-atk" data-testid="spielerprofil-attribute-kopf">
+            Gesamt <b className="spr-t">{zahl(gesamt, 1)}</b>
+            {potenzial != null ? (
+              <>
+                {" · "}Potenzial <b className="spr-t is-pot">{zahl(potenzial, 1)}</b>
+              </>
+            ) : null}
+          </small>
+        ) : null
+      }
+      klein={gesamt == null ? "zwölf Werte in vier Achsen" : undefined}
+      testId="spielerprofil-attribute"
+    >
       <div className="spr-atg">
-      {ACHSEN.map((achse) => {
-        const karte = data.axisCards.find((eintrag) => eintrag.id === achse.id);
-        return (
-          <div key={achse.id} className={`spr-ag ${achseKlasse(achse.id)}`}>
-            <h4>
-              {achse.label}
-              <b>{modell.nebel ? "?" : zahl(karte?.value ?? null, 0)}</b>
-            </h4>
-            {achse.attribute.map((attribut) => {
-              const zeile = zeilen.get(attribut);
-              const wert = zeile?.value ?? null;
-              const anzeige = wert != null ? zahl(wert, 0) : (zeile?.rangeLabel ?? zeile?.ratingLabel ?? "?");
-              return (
-                <div key={attribut} className={`spr-at${wert != null && wert >= schwelle ? " is-top" : ""}`}>
-                  <span>{ATTRIBUT_LABEL[attribut]}</span>
-                  <b className="spr-t">
-                    {anzeige}
-                    {wert != null && zeile?.ratingLabel ? <small style={{ color: "var(--bc-leise)", fontSize: "0.7em", marginLeft: "0.3em" }}>{zeile.ratingLabel}</small> : null}
-                  </b>
-                  <div className="spr-bn">
-                    <i style={{ width: `${wert != null ? Math.min(100, wert) : 0}%` }} />
+        {ACHSEN.map((achse) => {
+          const karte = data.axisCards.find((eintrag) => eintrag.id === achse.id);
+          return (
+            <div key={achse.id} className={`spr-ag ${achseKlasse(achse.id)}`}>
+              <h4>
+                {achse.label}
+                <b className="spr-t">{modell.nebel ? "?" : zahl(karte?.value ?? null, 0)}</b>
+              </h4>
+              {achse.attribute.map((attribut) => {
+                const zeile = zeilen.get(attribut);
+                const wert = zeile?.value ?? null;
+                const note = wert != null ? (zeile?.ratingLabel ?? null) : null;
+                const anzeige = wert != null ? zahl(wert, 0) : (zeile?.rangeLabel ?? zeile?.ratingLabel ?? "?");
+                return (
+                  <div key={attribut} className="spr-at" data-attribut={attribut}>
+                    <span>{ATTRIBUT_LABEL[attribut]}</span>
+                    {note ? <em className={note.startsWith("S") ? "is-top" : ""}>{note}</em> : <em className="is-leer" aria-hidden="true" />}
+                    <b className="spr-t">{anzeige}</b>
+                    <div className="spr-bn">
+                      <i style={{ width: `${wert != null ? Math.min(100, wert) : 0}%` }} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </Tafel>
   );
@@ -253,29 +274,33 @@ function WegText({ experte }: { experte: ExperteIn }) {
   );
 }
 
-function ExperteTafel({ data, modell, onOpenDisziplin }: { data: PlayerDetailDrawerData; modell: SpielerprofilModell; onOpenDisziplin: (id: string) => void }) {
+export function ExperteTafel({ data, modell, onOpenDisziplin }: { data: PlayerDetailDrawerData; modell: SpielerprofilModell; onOpenDisziplin: (id: string) => void }) {
   if (modell.nebel) {
-    const grob = data.disciplineValues.slice(0, 4);
+    const grob = data.disciplineValues.slice(0, EXPERTEN_ANZAHL);
     return (
       <Tafel titel="Hier ist er stark" klein="grob gescoutet" testId="spielerprofil-experte">
-        <div className="spr-exp">
-          {grob.map((zeile) => (
-            <div key={zeile.id} className={`spr-ex ${achseKlasse(kategorieAchse(zeile.category))}`} style={kulisseStil(zeile.id)}>
-              <b className="n">{zeile.label}</b>
-              <strong>{grobBereich(zeile.value, modell.nebelBreite) ?? "?"}</strong>
-              <span className="spr-weg">Bereich statt Wert, Weg unbekannt</span>
-            </div>
-          ))}
+        <div className="spr-exp" style={{ "--n": Math.max(grob.length, 1) } as CSSProperties}>
+          {grob.map((zeile) => {
+            const rangZeilen = baueRangZeilen(modell.raenge?.disziplinen.get(zeile.id), modell.raenge, true);
+            return (
+              <div key={zeile.id} className={`spr-ex ${achseKlasse(kategorieAchse(zeile.category))}`} style={kulisseStil(zeile.id)}>
+                <b className="n">{zeile.label}</b>
+                <strong>{grobBereich(zeile.value, modell.nebelBreite) ?? "?"}</strong>
+                <span className="spr-weg">Bereich statt Wert, Weg unbekannt</span>
+                <RangReihe zeilen={rangZeilen} />
+              </div>
+            );
+          })}
           {grob.length === 0 ? <div className="spr-leer">Noch nichts über seine Stärken bekannt.</div> : null}
         </div>
       </Tafel>
     );
   }
   return (
-    <Tafel titel="Hier ist er stark" klein="beste vier Disziplinen" testId="spielerprofil-experte">
-      <div className="spr-exp">
+    <Tafel titel="Hier ist er stark" klein={`beste ${modell.experte.length || EXPERTEN_ANZAHL} Disziplinen`} testId="spielerprofil-experte">
+      <div className="spr-exp" style={{ "--n": Math.max(modell.experte.length, 1) } as CSSProperties}>
         {modell.experte.map((experte) => {
-          const rang = modell.raenge?.disziplinen.get(experte.disziplinId);
+          const rangZeilen = baueRangZeilen(modell.raenge?.disziplinen.get(experte.disziplinId), modell.raenge, false);
           return (
             <button
               key={experte.disziplinId}
@@ -284,23 +309,39 @@ function ExperteTafel({ data, modell, onOpenDisziplin }: { data: PlayerDetailDra
               style={kulisseStil(experte.disziplinId)}
               onClick={() => onOpenDisziplin(experte.disziplinId)}
               title="Zur Disziplin"
+              data-disziplin={experte.disziplinId}
             >
               <b className="n">{experte.label}</b>
               <strong className="spr-t">{zahl(experte.wert, 0)}</strong>
               <WegText experte={experte} />
-              <span className="spr-weg">
-                {rang ? (
-                  <>
-                    Liga <b>#{rang.ligaRang ?? "—"}</b> · Alle <b>#{rang.aktivRang ?? "—"}</b> · Kader <b>#{rang.kaderRang ?? "—"}</b>
-                  </>
-                ) : null}
-              </span>
+              <RangReihe zeilen={rangZeilen} />
             </button>
           );
         })}
         {modell.experte.length === 0 ? <div className="spr-leer">Noch keine Eignungswerte.</div> : null}
       </div>
     </Tafel>
+  );
+}
+
+function RangReihe({ zeilen }: { zeilen: RangZeile[] }) {
+  if (zeilen.length === 0) return null;
+  return (
+    <span className="spr-rang" data-testid="spielerprofil-experte-rang">
+      {zeilen.map((zeile) => (
+        <span key={zeile.wort} className={zeile.gross ? "is-gross" : undefined}>
+          {zeile.gross ? (
+            <>
+              <b className="spr-t">{zeile.wert}</b> {zeile.wort}
+            </>
+          ) : (
+            <>
+              {zeile.wort} <b className="spr-t">{zeile.wert}</b>
+            </>
+          )}
+        </span>
+      ))}
+    </span>
   );
 }
 
