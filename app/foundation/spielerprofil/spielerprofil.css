@@ -13,8 +13,8 @@
   font-size: var(--spr-u);
   display: flex;
   flex-direction: column;
-  /* Die Shell-Kopfzeile ist in px gebaut (nicht in em dieser Seite): Höhe = Fenster minus Kopf, Rand und Panel-Polster. */
-  height: calc(100vh - var(--fb-u, 16px) * 4.5 - 46px);
+  /* Höhe = Fenster minus Regieband (4,5 Einheiten), Seitenrand, Panel-Polster (16 px) und Schalen-Fuß (48 px), gemessen bei 1920, 2560, 1710: Dokument = Fenster. */
+  height: calc(100vh - var(--fb-u, 16px) * 4.5 - 120px);
   min-height: 40em;
   gap: 0.72em;
   position: relative;

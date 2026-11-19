@@ -268,7 +268,8 @@ async function main() {
       await briefingZu(page);
       await page.waitForTimeout(4000);
       const spielerName = gewaehlt.namen[spielerId];
-      const finde = () => page.locator(`tr[title="${spielerName} öffnen"], button.nl-teams-playerlink:has-text("${spielerName}")`).first();
+      // Kader-Karten der Teamansicht liegen unter dem Falz (Überschrift „Kader“); Name = anklickbare Karte.
+      const finde = () => page.locator(`.home-v2-player-name:has-text("${spielerName}"), tr[title="${spielerName} öffnen"], button.nl-teams-playerlink:has-text("${spielerName}")`).first();
       let zeile = finde();
       if (!(await zeile.isVisible().catch(() => false))) {
         // Kader-Reiter anwählen, falls die Teamansicht mit einem anderen Reiter beginnt.
