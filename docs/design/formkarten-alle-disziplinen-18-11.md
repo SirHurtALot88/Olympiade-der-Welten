@@ -127,7 +127,42 @@ zurück.
 | Takeshi-Pod (210 Gruppen × 6) | 0,883 / 0,877 | 79 % | besteht |
 | Mini-DM-FFA (210 Gruppen × 6) | Event 0,709 / 0,704, Runde 0,800 / 0,800 | 79 % | vorher 0,608–0,686 je Event, Chris' Stern-/Paartreue-Freigabe (24.10.) gilt weiter; Star/Paare unverändert gut |
 
-**Pp-Abweichung mit echten Karten:** s. Abschnitt D.
+**Nachtrag nach Merge von main (18./19.11.):** main hat die Climbing-Mechanik geändert („Ende erst, wenn alle oben
+sind“), Fingerabdruck dort `d3a39030a3ef`. Fingerabdruck main gegen Branch im selben Lauf erneut: **beide
+`d3a39030a3ef`, alle 75 Zeilen identisch.** Climbing auf dem neuen Stand nachgemessen: rho echt **0,808** (Spannweite
+0,168, Saison 0,879), im selben Lauf mit Ersatzkarte 0,815. Dieser Wert steht in der Abnahmetabelle.
+
+## D) Pp-Abweichung mit echten Karten (Budget-Methode, zwei Saatströme)
+
+`OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs <d> 48 [--saat-versatz=10000000]` (Ausnahmen in der Spalte
+Befehl). Schranke ≤ 25 in beiden Strömen. Alle Werte stehen in `data/generated/disziplin-abnahme.json` (Kopfwerte echt,
+Ersatzkarte unter `formkarten.ersatzVorher`).
+
+| Disziplin | Pp echt (Strom 0 / 10 000 000) | Ersatz vorher | Befehl/Bemerkung |
+|---|---|---|---|
+| gewichtheben | 7,9 / 5,2 | 8,5 / 10,0 | |
+| tennis | 7,8 / 6,4 | 6,2 / 5,5 | |
+| showcase | 10,2 / 9,7 | 11,1 / 12,7 | |
+| breaking | 10,2 / 10,9 | 12,5 / 10,2 | |
+| wettessen | 10,6 / 9,8 | 8,7 / 10,0 | |
+| eiskunstlauf | 10,7 / 12,4 | 10,6 / 12,0 | |
+| fechten | 11,4 / 10,7 | 12,7 / 13,3 | |
+| speed-schach | 11,3 / 11,4 | 12,1 / 11,0 | |
+| basketball | 12,6 / 12,7 | 7,5 / 13,4 | ~65 min je Strom |
+| tdm | 12,6 / 13,2 | 14,6 / 14,7 | `miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=48 --pp-je-seite=6` |
+| climbing | 14,0 / 11,7 | 12,0 / 9,5 | neuer Climbing-Stand |
+| staffel | 14,0 / 17,3 | 13,2 / 14,0 (n=96) | n=48 |
+| football | 17,6 / 15,9 | 15,3 / 16,0 | |
+| takeshis-castle | **18,9 / 20,8** (n=96) | 18,9 / 17,7; im selben n=96-Lauf Ersatz 19,2 | bei n=48 zuerst 17,4 / **26,3** → mit n=96 nachgemessen: Rauschen, besteht |
+| i-spy | 23,7 / 15,1 | 16,4 / 14,0 | knapp, besteht |
+| hockey | **19,9 / 20,3** (gepoolt) | 13,9 / 21,8 | Hockey-Methodik: zwei Pools aus je drei Roh-Strömen (Roh 28,2/25,5/24,6 und 20,6/37,8/35,7), `poole-arena-einfluss.mjs` |
+
+**Alle sechzehn bestehen Pp ≤ 25.** Pods (Battlefield, Staffel-/Takeshi-Pod, Mini-DM) sind nur auf rho gemessen (Abschnitt
+C); ihre Pp-Sonden laufen über die Pod-Skripte und sind ein offener Nachtrag.
+
+**Hockey deutlich vermerkt:** rho je Spiel fällt mit echten Karten von **0,700 auf 0,656** (nur Feldspieler 0,784 → 0,707).
+Hockey lag schon mit Ersatzkarte unter der Mindestschranke 0,75; Chris' rho-Ausnahme (`ARENA_ABNAHME_AUSNAHMEN`) deckt das
+weiter. Pp besteht gepoolt (19,9 / 20,3). Rückweg ohne Code-Arbeit: Zeile `"hockey"` aus `FORMKARTEN_ECHT_DISCIPLINE_IDS`.
 
 **Tests:** `tests/formkarten-alle-disziplinen.test.ts` (neu), `formkarten-echt-motor`, `form-moral-bau`,
 `formkarten-farbregel`, `staffel-wechsel-paar-bonus-service` und `battlefield-rollen-je-kadergroesse` (Erwartung um

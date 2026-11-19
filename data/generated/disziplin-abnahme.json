@@ -13,19 +13,22 @@
  "disziplinen": {
   "basketball": {
    "chassis": "feldspiel",
-   "rhoJeSpiel": 0.862,
-   "rhoSpannweite": 0.136,
-   "rhoSaison": 0.881,
+   "rhoJeSpiel": 0.864,
+   "rhoSpannweite": 0.131,
+   "rhoSaison": 0.888,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 basketball -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 basketball -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
-   "pp": [7.5, 13.4],
+   "pp": [
+    12.6,
+    12.7
+   ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs basketball 48 (+ --saat-versatz=10000000) -- Opus-Review-Nachmessung 26.10. (Protokollstandard n=48 statt der urspruenglichen n=12-PR-Werte)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs basketball 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "saatStroeme": [
      0,
@@ -33,61 +36,113 @@
     ]
    },
    "datum": "2026-11-18",
-   "commit": "91aabc6f",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "ZUSAMMENFUEHRUNG 18.11. (Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md Abschnitt 7.9): Runde 2 (f49eb82e) auf main mit #1562 (91aabc6f) gemergt, gemessen am Merge-Stand; Commit-Feld = main-Elternteil; von zwei Feldbegrenzungen nur die Feld-Grenze (feldGrenze) behalten, die Ziel-Begrenzung in spacingMitspielerZiel (#1562) entfernt. Gemessen je allein am selben Stand: Feld-Grenze rho 0,862 (Spannweite 0,136, Saison 0,881), Pp n=16 11,1/16,0, 0 von 3,32 Mio. Proben ausserhalb; Ziel-Begrenzung rho 0,853 (Spannweite 0,090, Saison 0,902), Pp n=16 13,0/20,5, 4792 von 3,27 Mio. Proben ausserhalb. Endstand rho 0,862 (miss-alle-disziplinen.mjs 24 basketball, Chromium), Pp 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 38b176d7185b (main) -> ce8fcef66028 nur spiele basketball 1/7/42. -- BENCHMARK-RUNDE 2 17.11. abends (docs/design/benchmark-basketball-17-11.md Abschnitt 7): LAUFWEG-MODUL + Feld-Grenze bewegen die Wertung -- rho 0,859 -> 0,862 (Spannweite 0,136, Saison 0,881; Node-Motor wie miss-alle-disziplinen.mjs 24, 5 Kader), Pp 13,6/16,0 -> 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 97c267e8b7c7 -> 004f26374565 nur spiele basketball 1/7/42. Kamera/Effekte/Teamfoul-Anzeige rein kosmetisch. Foul ohne Wurf (Reach-in) gemessen 0,841/0,853 und ausgeschaltet. -- Davor: REVIEW-FIX #1562 (18.11.): Spacing-Ziel bleibt im Spielfeld (vorher 46/51912 Proben ausserhalb der Seitenlinie, jetzt 0/17352); rho 0,859 -> 0,867 (Spannweite 0,086, Saison 0,923), Fingerabdruck GESAMT 97cccd6017fb -> 38b176d7185b (nur spiele basketball 1/7/42), Pp nach dem Fix nur mit n=16 je Saatstamm nachgemessen (Node-Motor, n=48 braucht >50 min je Stamm): 20,4 / 22,1, beide <=25; die Werte 13,6 / 16,0 im Feld pp sind die n=48-Messung VOR dem Fix. -- Davor: BENCHMARK-RUNDE 17.11. (docs/design/benchmark-basketball-17-11.md): FIBA-Feld + Feld-Metrik + SPACING-MODUL bewegen die Wertung bewusst -- rho 0,822 -> 0,859 (Spannweite 0,111, Saison 0,909), Pp 15,6/16,7 -> 13,6/16,0 (Node-Motor, einflussVon n=48, Saat 0/10000000), Fingerabdruck nur spiele basketball 1/7/42. Commit-Feld noch vom 15.11. -- NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest basketball die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: ZUSAMMENFUEHRUNG 18.11. (Runde 2 + Review-Fix-Stand #1562, docs/design/benchmark-basketball-17-11.md Abschnitt 7.9): Runde 2 (f49eb82e) auf main mit #1562 (91aabc6f) gemergt, gemessen am Merge-Stand; Commit-Feld = main-Elternteil; von zwei Feldbegrenzungen nur die Feld-Grenze (feldGrenze) behalten, die Ziel-Begrenzung in spacingMitspielerZiel (#1562) entfernt. Gemessen je allein am selben Stand: Feld-Grenze rho 0,862 (Spannweite 0,136, Saison 0,881), Pp n=16 11,1/16,0, 0 von 3,32 Mio. Proben ausserhalb; Ziel-Begrenzung rho 0,853 (Spannweite 0,090, Saison 0,902), Pp n=16 13,0/20,5, 4792 von 3,27 Mio. Proben ausserhalb. Endstand rho 0,862 (miss-alle-disziplinen.mjs 24 basketball, Chromium), Pp 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 38b176d7185b (main) -> ce8fcef66028 nur spiele basketball 1/7/42. -- BENCHMARK-RUNDE 2 17.11. abends (docs/design/benchmark-basketball-17-11.md Abschnitt 7): LAUFWEG-MODUL + Feld-Grenze bewegen die Wertung -- rho 0,859 -> 0,862 (Spannweite 0,136, Saison 0,881; Node-Motor wie miss-alle-disziplinen.mjs 24, 5 Kader), Pp 13,6/16,0 -> 7,5/13,4 (einflussVon n=48, Saat 0/10000000, Node-Motor), Fingerabdruck 97c267e8b7c7 -> 004f26374565 nur spiele basketball 1/7/42. Kamera/Effekte/Teamfoul-Anzeige rein kosmetisch. Foul ohne Wurf (Reach-in) gemessen 0,841/0,853 und ausgeschaltet. -- Davor: REVIEW-FIX #1562 (18.11.): Spacing-Ziel bleibt im Spielfeld (vorher 46/51912 Proben ausserhalb der Seitenlinie, jetzt 0/17352); rho 0,859 -> 0,867 (Spannweite 0,086, Saison 0,923), Fingerabdruck GESAMT 97cccd6017fb -> 38b176d7185b (nur spiele basketball 1/7/42), Pp nach dem Fix nur mit n=16 je Saatstamm nachgemessen (Node-Motor, n=48 braucht >50 min je Stamm): 20,4 / 22,1, beide <=25; die Werte 13,6 / 16,0 im Feld pp sind die n=48-Messung VOR dem Fix. -- Davor: BENCHMARK-RUNDE 17.11. (docs/design/benchmark-basketball-17-11.md): FIBA-Feld + Feld-Metrik + SPACING-MODUL bewegen die Wertung bewusst -- rho 0,822 -> 0,859 (Spannweite 0,111, Saison 0,909), Pp 15,6/16,7 -> 13,6/16,0 (Node-Motor, einflussVon n=48, Saat 0/10000000), Fingerabdruck nur spiele basketball 1/7/42. Commit-Feld noch vom 15.11. -- NACHGEMESSEN 15.11. (Task #136, alle 20 Disziplinen frisch): rho 0,832 -> 0,822 (Spannweite 0,091), Saison 0,930 -- Bewegung 0,010, klar innerhalb der eigenen Kaderrauschen-Spannweite, keine Regression, nur die frisch gezogene Kaderfamilie (live-save 15.11., Save unveraendert zum 14.11.-Stand). Pp nicht neu gemessen in dieser Runde (kein Rezept-Code seit 26.10. angefasst) -- 15,6/16,7 bleibt gueltig. Vorherige Historie: Task #194 Teil 2 (letzter Blocker geschlossen): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE Disziplin, NICHT 20/20 wie die urspruengliche PR-Beschreibung faelschlich behauptete (sechs bleiben draussen: Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM). OPUS-REVIEW-KORREKTUR (26.10.): die urspruenglich eingetragenen Pp-Werte 22,9/17,6 stammten von n=12 auf genau den zwei Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- methodisch fragwuerdig (das Handbuch schreibt n=48 vor; ein frischer dritter n=12-Strom riss die Schranke mit 27,7). Die hier eingetragenen 15,6/16,7 sind die unabhaengig nachgemessenen n=48-Werte und bestehen klar und robust. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.862,
+     "rhoSpannweite": 0.136,
+     "rhoSaison": 0.881,
+     "pp": [
+      7.5,
+      13.4
+     ],
+     "datum": "2026-11-18",
+     "commit": "91aabc6f"
+    }
+   }
   },
   "hockey": {
    "chassis": "feldspiel",
-   "rhoJeSpiel": 0.700,
-   "rhoSpannweite": 0.266,
-   "rhoSaison": 0.888,
+   "rhoJeSpiel": 0.656,
+   "rhoSpannweite": 0.184,
+   "rhoSaison": 0.755,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 hockey -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 hockey -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    13.9,
-    21.8
+    19.9,
+    20.3
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=N (3x je Pool) + node scripts/poole-arena-einfluss.mjs (poolt)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=0|1e7|2e7 bzw. 3e7|4e7|5e7 --rohdaten=... + node scripts/poole-arena-einfluss.mjs (zwei Pools aus je drei Roh-Stroemen)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
     "methodik": "Hockey-spezifisch (docs/design/hockey-pp-messbasis-10-11.md): ein einzelner n=48-Strom hat einen Rauschboden von 35-40 Pp, auch bei perfekter Mechanik -- abnahmefaehig ist erst der ueber drei unabhaengige Roh-Stroeme GEPOOLTE Wert (poole-arena-einfluss.mjs). Die zwei Zahlen in 'pp' sind deshalb selbst schon je ein Pool aus drei Roh-Saatstroemen (n_gesamt=144 je Pool, 288 Laeufe insgesamt), nicht zwei einzelne n=48-Laeufe -- genau die 'zwei unabhaengigen Saatstroeme' aus CLAUDE.md, nur mit Hockeys eigener Pool-Definition von 'Strom'.",
-    "saatStroeme": [[0, 10000000, 20000000], [30000000, 40000000, 50000000]],
-    "rohPpJePool": [[31.9, 24.1, 27.4], [14.1, 50.5, 15.1]]
+    "saatStroeme": [
+     [
+      0,
+      10000000,
+      20000000
+     ],
+     [
+      30000000,
+      40000000,
+      50000000
+     ]
+    ],
+    "rohPpJePool": [
+     [
+      28.2,
+      25.5,
+      24.6
+     ],
+     [
+      20.6,
+      37.8,
+      35.7
+     ]
+    ]
    },
-   "datum": "2026-11-15",
-   "commit": "d13f7164a",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
    "rhoJeSpielNurFeldspieler": 0.784,
-   "anmerkung": "NACHGEMESSEN 16./17.11. (Task #136, auf main 2bd05a17, Fingerabdruck GESAMT e80babacb68c unveraendert): rho je Spiel 0,700 (nur Feldspieler 0,784), Saison 0,888 (0,874), Spannweite 0,266 -- bit-identisch zur Erstmessung. Pp: Pool 1 (Saatversatz 0 / 10000000 / 20000000, je n=48, --rohdaten) VOLLSTAENDIG neu gemessen: Roh-Pp 31,9 / 24,1 / 27,4, Attributgewinne bit-identisch zu den Rohdaten von d13f7164a, gepoolt (poole-arena-einfluss.mjs) wieder exakt 13,9. Pool 2 (3e7/4e7/5e7, je ca. 40 min) NICHT erneut gefahren -- Saaten deterministisch, Fingerabdruck und Pool 1 bit-identisch, also unveraendert 21,8 (aus der Erstmessung uebernommen, nicht frisch). Ein EINZELNER n=48-Strom liegt methodisch (hockey-pp-messbasis-10-11.md) im Rauschboden und ist nicht abnahmefaehig, massgeblich bleibt der Pool (13,9 / 21,8, regulaer unter 25). Keine neue Bewegung, kein Rezept-/Matrixcode angefasst. Vorherige Anmerkung: KORREKTUR 15.11. (Task #136, Rho/Pp-Rundumfrische): die oberen rhoJeSpiel/rhoSpannweite/rhoSaison-Felder dieses Eintrags trugen bis hierher noch 0,64/0,222/0,797 (Task #195, 25.10.) -- veraltet gegenueber dem Text direkt unten, der schon seit der Pp-Pool-Korrektur vom selben Tag 0,700/0,888 nennt. Frisch gegengemessen (node scripts/miss-alle-disziplinen.mjs 24 hockey, frische Kaderfamilie 15.11.): 0,700 (Spannweite 0,266) / Saison 0,888 (Spannweite 0,259), nur Feldspieler 0,784 (Spannweite 0,226) / Saison 0,874 -- bestaetigt exakt den Anmerkungstext, die oberen Felder sind jetzt nachgezogen. Keine neue Bewegung, reine Dokukonsistenz. Separater Punkt, 15.11.2026 (Chris' Top-Prio-Auftrag 'Hockey/Football ueber die echte Simulation'): die alte Zahl (38,5/81,5, Task #195, 25.10.) war mit n=24 auf zwei einzelnen, UNGEPOOLTEN Stroemen gemessen -- genau der Messfehler, den die eigene spaetere Diagnose (docs/design/hockey-pp-messbasis-10-11.md, 10.11.) aufdeckte: ein einzelner Hockey-Strom hat wegen der geringen Ereignisdichte je Attributhebung einen Rauschboden von 35-40 Pp, selbst bei einer Mechanik, die die Matrix exakt trifft -- erst der ueber drei unabhaengige Roh-Stroeme GEPOOLTE Wert ist aussagekraeftig. Ein paralleler Opus-/Fable-Review (PR #1475, docs/design/hockey-matrix-verbesserungsvorschlaege-15-11.md) vermutete genau das ('der heute gueltige Pp-Wert ist wahrscheinlich nah an 10,4, aber nicht neu verifiziert') und riet von einer vollen Sinkhorn-Budget-Rezeptumstellung ausdruecklich AB: zweimal zuvor durchgerechnet, beide Male verschlechterte sie rho (0,582/0,755 bzw. 0,595/0,769 gegen die committete 0,647/0,860-Basis, s. hockey-rezept-ursache.md/hockey-ueber-080-versuch2.md), weil sie Hockeys fuehrendes, am staerksten mit der Eignung korrelierendes Attribut (power) gegen schwach/negativ korrelierende Attribute (spirit, speed) tauscht -- ein Verstoss gegen CLAUDE.mds eigene Vorrangregel (rho vor Pp-Optimierung). DIESE RUNDE AENDERT DESHALB KEINE ZEILE DES REZEPTS (public/mockups/battle-mode.rezepte.js unveraendert), nur die Messmethode: zwei unabhaengige GEPOOLTE Stroeme nach genau der in hockey-pp-messbasis-10-11.md festgelegten Vorschrift. ERGEBNIS: Pool 1 (Saaten 0/1e7/2e7) 13,9 Pp, Pool 2 (Saaten 3e7/4e7/5e7) 21,8 Pp -- BEIDE unter der 25-Pp-Schranke; Pool 2 liegt nahe am per Simulation vorhergesagten Median (22,5) fuer n=144 und zeigt, dass der Abstand zur Schranke real, aber nicht gross ist (ein dritter Pool koennte laut derselben Simulation im 90-%-Quantil ueber 25 liegen). rho bleibt bei 0,700 je Spiel / 0,784 (nur Feldspieler, Median ueber 5 Kader-Varianten, live-save 14.11.) -- unveraendert unter der 0,80-Schranke, weiterhin durch Chris' bestehende Ausnahme (ARENA_ABNAHME_AUSNAHMEN, deckt nur rho) gedeckt. Hockey besteht damit erstmals BEIDE Pflichtkriterien (Pp regulaer, rho per Ausnahme) und steht ab dieser Runde in ARENA_RESOLVED_DISCIPLINE_IDS. Volle Einzelstrom-Anteile je Attribut: s. rohPpJePool und die Scratchpad-Rohdaten dieser Runde."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest hockey die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. rho mit echten Karten 0,700 -> 0,656 (Feldspieler 0,784 -> 0,707), weiter durch Chris' rho-Ausnahme gedeckt. Pp gepoolt 19,9/20,3 (Roh 28,2/25,5/24,6 und 20,6/37,8/35,7). | VORHER: NACHGEMESSEN 16./17.11. (Task #136, auf main 2bd05a17, Fingerabdruck GESAMT e80babacb68c unveraendert): rho je Spiel 0,700 (nur Feldspieler 0,784), Saison 0,888 (0,874), Spannweite 0,266 -- bit-identisch zur Erstmessung. Pp: Pool 1 (Saatversatz 0 / 10000000 / 20000000, je n=48, --rohdaten) VOLLSTAENDIG neu gemessen: Roh-Pp 31,9 / 24,1 / 27,4, Attributgewinne bit-identisch zu den Rohdaten von d13f7164a, gepoolt (poole-arena-einfluss.mjs) wieder exakt 13,9. Pool 2 (3e7/4e7/5e7, je ca. 40 min) NICHT erneut gefahren -- Saaten deterministisch, Fingerabdruck und Pool 1 bit-identisch, also unveraendert 21,8 (aus der Erstmessung uebernommen, nicht frisch). Ein EINZELNER n=48-Strom liegt methodisch (hockey-pp-messbasis-10-11.md) im Rauschboden und ist nicht abnahmefaehig, massgeblich bleibt der Pool (13,9 / 21,8, regulaer unter 25). Keine neue Bewegung, kein Rezept-/Matrixcode angefasst. Vorherige Anmerkung: KORREKTUR 15.11. (Task #136, Rho/Pp-Rundumfrische): die oberen rhoJeSpiel/rhoSpannweite/rhoSaison-Felder dieses Eintrags trugen bis hierher noch 0,64/0,222/0,797 (Task #195, 25.10.) -- veraltet gegenueber dem Text direkt unten, der schon seit der Pp-Pool-Korrektur vom selben Tag 0,700/0,888 nennt. Frisch gegengemessen (node scripts/miss-alle-disziplinen.mjs 24 hockey, frische Kaderfamilie 15.11.): 0,700 (Spannweite 0,266) / Saison 0,888 (Spannweite 0,259), nur Feldspieler 0,784 (Spannweite 0,226) / Saison 0,874 -- bestaetigt exakt den Anmerkungstext, die oberen Felder sind jetzt nachgezogen. Keine neue Bewegung, reine Dokukonsistenz. Separater Punkt, 15.11.2026 (Chris' Top-Prio-Auftrag 'Hockey/Football ueber die echte Simulation'): die alte Zahl (38,5/81,5, Task #195, 25.10.) war mit n=24 auf zwei einzelnen, UNGEPOOLTEN Stroemen gemessen -- genau der Messfehler, den die eigene spaetere Diagnose (docs/design/hockey-pp-messbasis-10-11.md, 10.11.) aufdeckte: ein einzelner Hockey-Strom hat wegen der geringen Ereignisdichte je Attributhebung einen Rauschboden von 35-40 Pp, selbst bei einer Mechanik, die die Matrix exakt trifft -- erst der ueber drei unabhaengige Roh-Stroeme GEPOOLTE Wert ist aussagekraeftig. Ein paralleler Opus-/Fable-Review (PR #1475, docs/design/hockey-matrix-verbesserungsvorschlaege-15-11.md) vermutete genau das ('der heute gueltige Pp-Wert ist wahrscheinlich nah an 10,4, aber nicht neu verifiziert') und riet von einer vollen Sinkhorn-Budget-Rezeptumstellung ausdruecklich AB: zweimal zuvor durchgerechnet, beide Male verschlechterte sie rho (0,582/0,755 bzw. 0,595/0,769 gegen die committete 0,647/0,860-Basis, s. hockey-rezept-ursache.md/hockey-ueber-080-versuch2.md), weil sie Hockeys fuehrendes, am staerksten mit der Eignung korrelierendes Attribut (power) gegen schwach/negativ korrelierende Attribute (spirit, speed) tauscht -- ein Verstoss gegen CLAUDE.mds eigene Vorrangregel (rho vor Pp-Optimierung). DIESE RUNDE AENDERT DESHALB KEINE ZEILE DES REZEPTS (public/mockups/battle-mode.rezepte.js unveraendert), nur die Messmethode: zwei unabhaengige GEPOOLTE Stroeme nach genau der in hockey-pp-messbasis-10-11.md festgelegten Vorschrift. ERGEBNIS: Pool 1 (Saaten 0/1e7/2e7) 13,9 Pp, Pool 2 (Saaten 3e7/4e7/5e7) 21,8 Pp -- BEIDE unter der 25-Pp-Schranke; Pool 2 liegt nahe am per Simulation vorhergesagten Median (22,5) fuer n=144 und zeigt, dass der Abstand zur Schranke real, aber nicht gross ist (ein dritter Pool koennte laut derselben Simulation im 90-%-Quantil ueber 25 liegen). rho bleibt bei 0,700 je Spiel / 0,784 (nur Feldspieler, Median ueber 5 Kader-Varianten, live-save 14.11.) -- unveraendert unter der 0,80-Schranke, weiterhin durch Chris' bestehende Ausnahme (ARENA_ABNAHME_AUSNAHMEN, deckt nur rho) gedeckt. Hockey besteht damit erstmals BEIDE Pflichtkriterien (Pp regulaer, rho per Ausnahme) und steht ab dieser Runde in ARENA_RESOLVED_DISCIPLINE_IDS. Volle Einzelstrom-Anteile je Attribut: s. rohPpJePool und die Scratchpad-Rohdaten dieser Runde.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.7,
+     "rhoSpannweite": 0.266,
+     "rhoSaison": 0.888,
+     "pp": [
+      13.9,
+      21.8
+     ],
+     "datum": "2026-11-15",
+     "commit": "d13f7164a"
+    }
+   }
   },
   "gewichtheben": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.892,
-   "rhoSpannweite": 0.039,
-   "rhoSaison": 0.944,
+   "rhoJeSpiel": 0.887,
+   "rhoSpannweite": 0.053,
+   "rhoSaison": 0.93,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 gewichtheben -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 gewichtheben -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    8.5,
-    10.0
+    7.9,
+    5.2
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs gewichtheben (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs gewichtheben 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -96,30 +151,45 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,865 -> 0,892 (Spannweite 0,039, deutlich enger als vorher), Saison unveraendert 0,944 -- Bewegung 0,027, innerhalb der alten Spannweite (0,143), keine Regression, nur Kaderrauschen aus der frischen Kaderfamilie. Die parallel kalibrierte Silo-kg-Variante (Weg C, Abschnitt 15 in stand-aller-disziplinen.md) bleibt hinter BUEHNE_FLAGS.gewichthebenSandsack=0 (aus) -- Produktion laeuft weiterhin ueber die sechs Hantel-Duelle, dieselbe Mechanik wie bei der letzten Pp-Messung (16.10.). Pp deshalb nicht neu gemessen, 8,5/10,0 bleibt gueltig."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest gewichtheben die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 15.11. (Task #136): rho 0,865 -> 0,892 (Spannweite 0,039, deutlich enger als vorher), Saison unveraendert 0,944 -- Bewegung 0,027, innerhalb der alten Spannweite (0,143), keine Regression, nur Kaderrauschen aus der frischen Kaderfamilie. Die parallel kalibrierte Silo-kg-Variante (Weg C, Abschnitt 15 in stand-aller-disziplinen.md) bleibt hinter BUEHNE_FLAGS.gewichthebenSandsack=0 (aus) -- Produktion laeuft weiterhin ueber die sechs Hantel-Duelle, dieselbe Mechanik wie bei der letzten Pp-Messung (16.10.). Pp deshalb nicht neu gemessen, 8,5/10,0 bleibt gueltig.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.892,
+     "rhoSpannweite": 0.039,
+     "rhoSaison": 0.944,
+     "pp": [
+      8.5,
+      10.0
+     ],
+     "datum": "2026-11-15",
+     "commit": "984da6e18"
+    }
+   }
   },
   "speed-schach": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.904,
-   "rhoSpannweite": 0.077,
-   "rhoSaison": 0.972,
+   "rhoJeSpiel": 0.918,
+   "rhoSpannweite": 0.088,
+   "rhoSaison": 0.979,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 speed-schach -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 speed-schach -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.1,
-    11.0
+    11.3,
+    11.4
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs speed-schach (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs speed-schach 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -128,30 +198,45 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,910 -> 0,904 (Spannweite 0,077), Saison 0,986 -> 0,972 -- Bewegung 0,006/0,014, klar innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 12,1/11,0 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest speed-schach die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 15.11. (Task #136): rho 0,910 -> 0,904 (Spannweite 0,077), Saison 0,986 -> 0,972 -- Bewegung 0,006/0,014, klar innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 12,1/11,0 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.904,
+     "rhoSpannweite": 0.077,
+     "rhoSaison": 0.972,
+     "pp": [
+      12.1,
+      11.0
+     ],
+     "datum": "2026-11-15",
+     "commit": "984da6e18"
+    }
+   }
   },
   "showcase": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.781,
-   "rhoSpannweite": 0.151,
-   "rhoSaison": 0.972,
+   "rhoJeSpiel": 0.812,
+   "rhoSpannweite": 0.161,
+   "rhoSaison": 0.965,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 showcase -- Task #136, frische Kaderfamilie 15.11., n=48 nach n=24-Grenzfall (0,771) zur Absicherung verdoppelt",
-    "spiele": 48,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 showcase -- Formkarten in allen Disziplinen, 18.11.",
+    "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    11.1,
-    12.7
+    10.2,
+    9.7
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs showcase (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs showcase 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -160,30 +245,45 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 (Standardlauf, Teil des 20-Disziplinen-Sweeps) ergab 0,771 -- jetzt unter der 0,80-Schranke (vorher 0,835, bestanden). Weil die Bewegung (0,064) kleiner als die eigene Spannweite (0,135) war, folgte zur Absicherung ein zweiter Lauf mit n=48 (doppelte Spielzahl je Paarung): **0,781** (Spannweite 0,151, Saison 0,972) -- KONVERGIERT NAHE DEM n=24-WERT statt sich der 0,80-Schranke anzunaehern. Das spricht GEGEN reines Abtast-Rauschen und FUER einen echten, wenn auch kleinen Abstand zur Schranke bei der aktuellen Kaderfamilie -- anders als bei Climbing (das bei n=48 auf 0,801 stieg, s. dort). Showcase ist in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) gewertet; dieser Befund macht `tests/disziplin-abnahme-guard.test.ts` ROT, bis entweder die Menge nachgezogen wird oder eine neue Messung/Kaderfamilie etwas anderes zeigt -- das ist die vom Waechter selbst dokumentierte Reaktion auf eine durchfallende Neumessung, keine neue Regel. Diese PR aendert arena-resolved-disciplines.ts bewusst NICHT (reine Mess-/Doku-Aktualisierung, Abstimmung mit der parallel laufenden Football-Session noetig). Pp nicht neu gemessen, 11,1/12,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest showcase die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 (Standardlauf, Teil des 20-Disziplinen-Sweeps) ergab 0,771 -- jetzt unter der 0,80-Schranke (vorher 0,835, bestanden). Weil die Bewegung (0,064) kleiner als die eigene Spannweite (0,135) war, folgte zur Absicherung ein zweiter Lauf mit n=48 (doppelte Spielzahl je Paarung): **0,781** (Spannweite 0,151, Saison 0,972) -- KONVERGIERT NAHE DEM n=24-WERT statt sich der 0,80-Schranke anzunaehern. Das spricht GEGEN reines Abtast-Rauschen und FUER einen echten, wenn auch kleinen Abstand zur Schranke bei der aktuellen Kaderfamilie -- anders als bei Climbing (das bei n=48 auf 0,801 stieg, s. dort). Showcase ist in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) gewertet; dieser Befund macht `tests/disziplin-abnahme-guard.test.ts` ROT, bis entweder die Menge nachgezogen wird oder eine neue Messung/Kaderfamilie etwas anderes zeigt -- das ist die vom Waechter selbst dokumentierte Reaktion auf eine durchfallende Neumessung, keine neue Regel. Diese PR aendert arena-resolved-disciplines.ts bewusst NICHT (reine Mess-/Doku-Aktualisierung, Abstimmung mit der parallel laufenden Football-Session noetig). Pp nicht neu gemessen, 11,1/12,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.781,
+     "rhoSpannweite": 0.151,
+     "rhoSaison": 0.972,
+     "pp": [
+      11.1,
+      12.7
+     ],
+     "datum": "2026-11-15",
+     "commit": "984da6e18"
+    }
+   }
   },
   "eiskunstlauf": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.927,
-   "rhoSpannweite": 0.021,
-   "rhoSaison": 0.965,
+   "rhoJeSpiel": 0.926,
+   "rhoSpannweite": 0.044,
+   "rhoSaison": 0.972,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf -- Budget-Konservierung 15.11., Rezept nach Zeilenschritt",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    10.6,
-    12.0
+    10.7,
+    12.4
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs eiskunstlauf (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs eiskunstlauf 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -197,30 +297,45 @@
      "hinweis": "Stand 15.11., VOR dem Scharfschalten des Kontakts (17.11.). Ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
     }
    },
-   "datum": "2026-11-15",
-   "commit": "fbcdc6fab",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher dexterity 24,5 % gegen Matrix 18, charisma 23,8 % gegen 28, speed 5,5 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,8/19,8 -> 10,6/12,0, Gegenprobe auf dem ungesehenen Strom 20 000 000: 11,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,912 -> 0,927 (Spannweite 0,021, Saison 0,965) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,866 -> 0,912 (Spannweite 0,046, deutlich enger), Saison 0,986 -> 0,951 -- Bewegung 0,046/0,035, innerhalb der alten Spannweite, keine Regression, eher komfortabler. Pp nicht neu gemessen, 18,8/19,8 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest eiskunstlauf die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher dexterity 24,5 % gegen Matrix 18, charisma 23,8 % gegen 28, speed 5,5 % gegen 10). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 18,8/19,8 -> 10,6/12,0, Gegenprobe auf dem ungesehenen Strom 20 000 000: 11,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,912 -> 0,927 (Spannweite 0,021, Saison 0,965) -- verbessert. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,866 -> 0,912 (Spannweite 0,046, deutlich enger), Saison 0,986 -> 0,951 -- Bewegung 0,046/0,035, innerhalb der alten Spannweite, keine Regression, eher komfortabler. Pp nicht neu gemessen, 18,8/19,8 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.927,
+     "rhoSpannweite": 0.021,
+     "rhoSaison": 0.965,
+     "pp": [
+      10.6,
+      12.0
+     ],
+     "datum": "2026-11-15",
+     "commit": "fbcdc6fab"
+    }
+   }
   },
   "breaking": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.86,
-   "rhoSpannweite": 0.169,
-   "rhoSaison": 0.923,
+   "rhoJeSpiel": 0.853,
+   "rhoSpannweite": 0.171,
+   "rhoSaison": 0.881,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking -- Budget-Konservierung 15.11., Rezept mit intelligence in NERVEN",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 breaking -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.5,
-    10.2
+    10.2,
+    10.9
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs breaking (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs breaking 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -229,30 +344,45 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "fbcdc6fab",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest breaking die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.86,
+     "rhoSpannweite": 0.169,
+     "rhoSaison": 0.923,
+     "pp": [
+      12.5,
+      10.2
+     ],
+     "datum": "2026-11-15",
+     "commit": "fbcdc6fab"
+    }
+   }
   },
   "wettessen": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.905,
-   "rhoSpannweite": 0.190,
-   "rhoSaison": 0.958,
+   "rhoJeSpiel": 0.921,
+   "rhoSpannweite": 0.125,
+   "rhoSaison": 0.965,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 wettessen -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 wettessen -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    8.7,
-    10.0
+    10.6,
+    9.8
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs wettessen (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs wettessen 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -261,30 +391,45 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,91 -> 0,905 (Spannweite 0,190, etwas breiter), Saison 0,937 -> 0,958 -- Bewegung 0,005, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 8,7/10,0 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest wettessen die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 15.11. (Task #136): rho 0,91 -> 0,905 (Spannweite 0,190, etwas breiter), Saison 0,937 -> 0,958 -- Bewegung 0,005, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 8,7/10,0 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.905,
+     "rhoSpannweite": 0.19,
+     "rhoSaison": 0.958,
+     "pp": [
+      8.7,
+      10.0
+     ],
+     "datum": "2026-11-15",
+     "commit": "984da6e18"
+    }
+   }
   },
   "tennis": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.885,
-   "rhoSpannweite": 0.060,
-   "rhoSaison": 0.958,
+   "rhoJeSpiel": 0.861,
+   "rhoSpannweite": 0.067,
+   "rhoSaison": 0.965,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 tennis -- Task #136, frische Kaderfamilie 15.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 tennis -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    6.2,
-    5.5
+    7.8,
+    6.4
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs tennis (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs tennis 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -293,31 +438,46 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "2bb12fd0a",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "kulissenHinweis": "Mit Oberflaechen-Effekt (Tennis-Pilot, PR #1354), ungepinnt = Hash-Wahl der Variante je Spiel; ohne Effekt (--kulisse=aus) Pp 6,9 auf Strom 0. Je Variante s. docs/design/oberflaechen-effekte-tennis-pilot-08-11.md und scripts/miss-kulisse-abnahme.mjs",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. nach Merge von main in den Tennis-Pilot (Oberflaechen-Effekte, PR #1354): rho 0,890 (main, ohne Effekt) -> 0,885 mit Effekt (Spannweite 0,060), Saison 0,965 -> 0,958 -- Bewegung 0,005, weit innerhalb der Spannweite. Pp 6,2/5,5 auf beiden Stroemen frisch gemessen (ohne Effekt 6,9 auf Strom 0)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest tennis die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 15.11. nach Merge von main in den Tennis-Pilot (Oberflaechen-Effekte, PR #1354): rho 0,890 (main, ohne Effekt) -> 0,885 mit Effekt (Spannweite 0,060), Saison 0,965 -> 0,958 -- Bewegung 0,005, weit innerhalb der Spannweite. Pp 6,2/5,5 auf beiden Stroemen frisch gemessen (ohne Effekt 6,9 auf Strom 0).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.885,
+     "rhoSpannweite": 0.06,
+     "rhoSaison": 0.958,
+     "pp": [
+      6.2,
+      5.5
+     ],
+     "datum": "2026-11-15",
+     "commit": "2bb12fd0a"
+    }
+   }
   },
   "fechten": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.876,
-   "rhoSpannweite": 0.045,
-   "rhoSaison": 0.979,
+   "rhoJeSpiel": 0.87,
+   "rhoSpannweite": 0.056,
+   "rhoSaison": 0.958,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 fechten -- Budget-Konservierung 15.11., Rezept nach Zeilenschritt",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 fechten -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.7,
-    13.3
+    11.4,
+    10.7
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs fechten (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs fechten 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -331,62 +491,45 @@
      "hinweis": "ungesehener Strom (der Zeilenschritt wurde aus Strom 0/10 000 000 berechnet)"
     }
    },
-   "datum": "2026-11-15",
-   "commit": "fbcdc6fab",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher determination 1,3 % gegen Matrix 6, torment 20,4 % gegen 25, speed 20,2 % gegen 16, health 7,5 % gegen 4). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 20,1/20,7 -> 12,7/13,3, Gegenprobe auf dem ungesehenen Strom 20 000 000: 13,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,877 -> 0,876 (Spannweite 0,045, Saison 0,979) -- gehalten. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,86 -> 0,877 (Spannweite 0,037, enger), Saison 0,937 -> 0,972 -- Bewegung 0,017, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 20,1/20,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest fechten die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): ein multiplikativer Zeilenschritt ueber alle sieben Rollen gegen die gemessenen Anteile (jede Zelle eines Attributs mal (Matrix/Ist)^0,6, je Rolle auf 100 normiert; vorher determination 1,3 % gegen Matrix 6, torment 20,4 % gegen 25, speed 20,2 % gegen 16, health 7,5 % gegen 4). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 20,1/20,7 -> 12,7/13,3, Gegenprobe auf dem ungesehenen Strom 20 000 000: 13,2 -- damit unter dem angestrebten Optimum <15. rho je Spiel 0,877 -> 0,876 (Spannweite 0,045, Saison 0,979) -- gehalten. Vorher: NACHGEMESSEN 15.11. (Task #136): rho 0,86 -> 0,877 (Spannweite 0,037, enger), Saison 0,937 -> 0,972 -- Bewegung 0,017, innerhalb der alten Spannweite, keine Regression. Pp nicht neu gemessen, 20,1/20,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.876,
+     "rhoSpannweite": 0.045,
+     "rhoSaison": 0.979,
+     "pp": [
+      12.7,
+      13.3
+     ],
+     "datum": "2026-11-15",
+     "commit": "fbcdc6fab"
+    }
+   }
   },
   "staffel": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.957,
-   "rhoSpannweite": 0.019,
+   "rhoJeSpiel": 0.958,
+   "rhoSpannweite": 0.032,
    "rhoSaison": 0.986,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel -- Ganze Runde/Puste wirkt, 17.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 staffel -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    13.2,
-    14.0
+    14.0,
+    17.3
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs staffel 96 (+ --saat-versatz=10000000)",
-    "laeufe": 96,
-    "anhebung": 15,
-    "mutatoren": "je-lauf",
-    "saatStroeme": [
-     0,
-     10000000
-    ]
-   },
-   "datum": "2026-11-17",
-   "commit": "9ddacb6e",
-   "rhoFrisch": true,
-   "ppFrisch": true,
-   "anmerkung": "GANZE RUNDE, PUSTE WIRKT (17.11., Chris: 'jeder laeuft eine ganze runde! Und dort ist puste anscheinend irrelevant'). Gemessen auf main 9ddacb6e plus Block 2 (docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2): jedes Bein eine Runde, Puste auf eine 400-m-Runde geeicht (BAHN_ART.staffel.rundePuste: kraftBasis 60, kraftMix 0,45, zehrKoeff 4, zehrExponent 5, zehrFaktor 2,0, Fade unter 35 % bis 0,72), Renneinteilung nach eigener Puste statt nach Slot. Duell VORHER rho 0,924 (Spannweite 0,083), Pp 22,0/21,6 (n=96); NACHHER rho 0,957 (0,019), Saison 0,986, Pp 13,2/14,0. REVIEW-NACHTRAG (Abschnitt 2.7): Puste-Verbrauch und -Erholung je Bein statt je Sekunde (staffelRundeMass = nb/6; vorher brachen bei k=4 88 %, bei k=2 100 % ein, jetzt 16 %/25 %), Rennplan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN nachgezogen (nur Pod; die Pp-Sonde des Pods lief vorher immer mit k=6, bei echtem k=4 lag schon main bei 34,0/37,4 Pp). Pod (210 Gruppen, zwei Stroeme, Pp n=48 bei derselben k): rho k=2..6 0,943/0,956/0,957/0,951/0,957, Pp 17,0/16,8 · 11,5/11,5 · 8,0/9,7 · 6,8/6,0 · 5,7/7,5; Duell bit-identisch. Wertungs-Fingerabdruck d09e10bb872c -> 8bbc6ea215f6 (Block 2, vier Staffel-Eintraege) -> 97cccd6017fb (Review, nur spieleBahnPod staffel). Vorheriger Stand (16.11., Task #150): rho 0,924, Pp 21,6/21,4."
-  },
-  "takeshis-castle": {
-   "chassis": "bahn",
-   "rhoJeSpiel": 0.838,
-   "rhoSpannweite": 0.143,
-   "rhoSaison": 0.979,
-   "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 takeshis-castle -- Task #136, frische Kaderfamilie 15.11.",
-    "spiele": 24,
-    "kaderVarianten": 5,
-    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "Median ueber die Kader-Familie"
-   },
-   "pp": [
-    18.9,
-    17.7
-   ],
-   "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs takeshis-castle (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs staffel 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -395,15 +538,77 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "984da6e18",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "NACHGEMESSEN 15.11. (Task #136): rho 0,898 -> 0,838 (Spannweite 0,143, deutlich breiter als vorher), Saison 0,986 -> 0,979 -- Bewegung 0,060, knapp innerhalb der alten Spannweite (0,062) -- die groesste Bewegung unter den bereits bestandenen Bahn-/Buehnen-Disziplinen dieser Runde, bei naechster Nachmessung im Auge behalten, aber (noch) kein belegter Regress. Pp nicht neu gemessen, 18,9/17,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst). TASK #150, SAEULE 'SPEED' (16.11., UNTERSUCHT, REZEPT UNVERAENDERT): Speed sitzt nur in ANTRITT und misst 3,8 %/0,0 % gegen Matrix 4 -- ein Strom buchstaeblich null. ZWEI Reparaturversuche verworfen: (a) Speed zusaetzlich in ENDTEMPO -> 0,8 %/0,0 %, ein Strom blieb bei Null; (b) Speed zusaetzlich in WENDIGKEIT (einer von Takeshis fuenf Fallen-lesenden Sub-Skills) -> 2 %/0 %, der zweite Strom blieb WIEDER bei Null und der erste wurde schlechter (Gesamt-Pp 18,9 -> 20,3). Befund: welcher Sub-Skill es traegt, ist nicht die Ursache -- Speed hat schon vorher ein betraechtliches Rezept-Gewicht (28 in ANTRITT) bei winzigem Matrixgewicht (4), dieselbe Zaehler/Nenner-Selbstkuerzung in f=eigW/mean(w) (art.mengeAusEignung), die im alten Staffel-Speed/Spirit-Bug (Task #40) dokumentiert ist. Eine echte Schliessung braeuchte entweder Speed GANZ aus jedem Sub-Skill zu entfernen (dann nur ueber eigW, wie der Health-Fix bei Staffel -- aber ANTRITT/ENDTEMPO brauchen Speed fachlich) oder eine Aenderung an der f-Formel selbst, die alle Bahn-Rezepte beruehrt -- beides ausserhalb des Rahmens dieser Aufgabe. Pp/rho bewusst UNVERAENDERT gelassen (kein Code-Risiko eingegangen fuer einen nicht belegten Gewinn), volle Messreihe im PR-Bericht Task #150."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest staffel die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: GANZE RUNDE, PUSTE WIRKT (17.11., Chris: 'jeder laeuft eine ganze runde! Und dort ist puste anscheinend irrelevant'). Gemessen auf main 9ddacb6e plus Block 2 (docs/design/vier-teams-staffel-battlefield-17-11.md Abschnitt 2): jedes Bein eine Runde, Puste auf eine 400-m-Runde geeicht (BAHN_ART.staffel.rundePuste: kraftBasis 60, kraftMix 0,45, zehrKoeff 4, zehrExponent 5, zehrFaktor 2,0, Fade unter 35 % bis 0,72), Renneinteilung nach eigener Puste statt nach Slot. Duell VORHER rho 0,924 (Spannweite 0,083), Pp 22,0/21,6 (n=96); NACHHER rho 0,957 (0,019), Saison 0,986, Pp 13,2/14,0. REVIEW-NACHTRAG (Abschnitt 2.7): Puste-Verbrauch und -Erholung je Bein statt je Sekunde (staffelRundeMass = nb/6; vorher brachen bei k=4 88 %, bei k=2 100 % ein, jetzt 16 %/25 %), Rennplan nach echter Beinzahl, Pod-Rezept ENDTEMPO/STEHEN nachgezogen (nur Pod; die Pp-Sonde des Pods lief vorher immer mit k=6, bei echtem k=4 lag schon main bei 34,0/37,4 Pp). Pod (210 Gruppen, zwei Stroeme, Pp n=48 bei derselben k): rho k=2..6 0,943/0,956/0,957/0,951/0,957, Pp 17,0/16,8 · 11,5/11,5 · 8,0/9,7 · 6,8/6,0 · 5,7/7,5; Duell bit-identisch. Wertungs-Fingerabdruck d09e10bb872c -> 8bbc6ea215f6 (Block 2, vier Staffel-Eintraege) -> 97cccd6017fb (Review, nur spieleBahnPod staffel). Vorheriger Stand (16.11., Task #150): rho 0,924, Pp 21,6/21,4.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.957,
+     "rhoSpannweite": 0.019,
+     "rhoSaison": 0.986,
+     "pp": [
+      13.2,
+      14.0
+     ],
+     "datum": "2026-11-17",
+     "commit": "9ddacb6e"
+    }
+   }
+  },
+  "takeshis-castle": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.844,
+   "rhoSpannweite": 0.098,
+   "rhoSaison": 0.963,
+   "rhoMessung": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 takeshis-castle -- Formkarten in allen Disziplinen, 18.11.",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    18.9,
+    20.8
+   ],
+   "ppMessung": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs takeshis-castle 96 (+ --saat-versatz=10000000)",
+    "laeufe": 96,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-11-18",
+   "commit": "e5723684",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest takeshis-castle die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. Pp bei n=48 zuerst 17,4/26,3 -- der zweite Strom ueber 25; bei n=96 (Ersatz gleicher Lauf 19,2) 18,9/20,8, die 26,3 war Rauschen. | VORHER: NACHGEMESSEN 15.11. (Task #136): rho 0,898 -> 0,838 (Spannweite 0,143, deutlich breiter als vorher), Saison 0,986 -> 0,979 -- Bewegung 0,060, knapp innerhalb der alten Spannweite (0,062) -- die groesste Bewegung unter den bereits bestandenen Bahn-/Buehnen-Disziplinen dieser Runde, bei naechster Nachmessung im Auge behalten, aber (noch) kein belegter Regress. Pp nicht neu gemessen, 18,9/17,7 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst). TASK #150, SAEULE 'SPEED' (16.11., UNTERSUCHT, REZEPT UNVERAENDERT): Speed sitzt nur in ANTRITT und misst 3,8 %/0,0 % gegen Matrix 4 -- ein Strom buchstaeblich null. ZWEI Reparaturversuche verworfen: (a) Speed zusaetzlich in ENDTEMPO -> 0,8 %/0,0 %, ein Strom blieb bei Null; (b) Speed zusaetzlich in WENDIGKEIT (einer von Takeshis fuenf Fallen-lesenden Sub-Skills) -> 2 %/0 %, der zweite Strom blieb WIEDER bei Null und der erste wurde schlechter (Gesamt-Pp 18,9 -> 20,3). Befund: welcher Sub-Skill es traegt, ist nicht die Ursache -- Speed hat schon vorher ein betraechtliches Rezept-Gewicht (28 in ANTRITT) bei winzigem Matrixgewicht (4), dieselbe Zaehler/Nenner-Selbstkuerzung in f=eigW/mean(w) (art.mengeAusEignung), die im alten Staffel-Speed/Spirit-Bug (Task #40) dokumentiert ist. Eine echte Schliessung braeuchte entweder Speed GANZ aus jedem Sub-Skill zu entfernen (dann nur ueber eigW, wie der Health-Fix bei Staffel -- aber ANTRITT/ENDTEMPO brauchen Speed fachlich) oder eine Aenderung an der f-Formel selbst, die alle Bahn-Rezepte beruehrt -- beides ausserhalb des Rahmens dieser Aufgabe. Pp/rho bewusst UNVERAENDERT gelassen (kein Code-Risiko eingegangen fuer einen nicht belegten Gewinn), volle Messreihe im PR-Bericht Task #150.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.838,
+     "rhoSpannweite": 0.143,
+     "rhoSaison": 0.979,
+     "pp": [
+      18.9,
+      17.7
+     ],
+     "datum": "2026-11-15",
+     "commit": "984da6e18"
+    }
+   }
   },
   "time-trial": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.930,
+   "rhoJeSpiel": 0.93,
    "rhoSpannweite": 0.047,
    "rhoSaison": 0.937,
    "rhoMessung": {
@@ -432,7 +637,17 @@
    "formkarten": {
     "modus": "echt",
     "quelle": "docs/design/formkarten-motor-p4-11-11.md",
-    "ersatzVorher": { "rhoJeSpiel": 0.943, "rhoSpannweite": 0.049, "rhoSaison": 0.951, "pp": [11.4, 12.5], "datum": "2026-10-16", "commit": "ace43062" }
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.943,
+     "rhoSpannweite": 0.049,
+     "rhoSaison": 0.951,
+     "pp": [
+      11.4,
+      12.5
+     ],
+     "datum": "2026-10-16",
+     "commit": "ace43062"
+    }
    },
    "rhoFrisch": true,
    "ppFrisch": true,
@@ -585,22 +800,22 @@
   },
   "climbing": {
    "chassis": "bahn",
-   "rhoJeSpiel": 0.816,
-   "rhoSpannweite": 0.174,
-   "rhoSaison": 0.881,
+   "rhoJeSpiel": 0.808,
+   "rhoSpannweite": 0.168,
+   "rhoSaison": 0.879,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 climbing -- 18.11. nach 'Ende erst, wenn alle oben sind' (kein Lead-Zeitlimit mehr)",
-    "spiele": 48,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 climbing -- Formkarten in allen Disziplinen, 18.11.",
+    "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    12.7,
-    9.6
+    14.0,
+    11.7
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs climbing (+ --saat-versatz=10000000)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs climbing 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -610,29 +825,44 @@
     ]
    },
    "datum": "2026-11-18",
-   "commit": "becc6634",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest climbing die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. Gemessen auf dem Climbing-Stand 'Ende erst, wenn alle oben sind' (main 18.11.); im selben Lauf mit Ersatzkarte 0,815. | VORHER: ALLE IM ZIEL 18.11. (Chris: 'Ende bitte erst wenn ALLE im Ziel sind, damit die Spieler auch entsprechend mit PPs geratet werden koennen'): BAHN_ART.climbing.zeitlimit (10,6 Sim-s) entfernt, Sicherheitsdeckel 60 Sim-s mit hochgerechneter Zeit (gemessen nie erreicht, letzter Zieleinlauf max. 49 Sim-s). Vorher hatten im Mittel 64 % der Kletterer keine Zeit (Platz nur nach Hoehe). rho je Spiel 0,801 -> **0,816** (Spannweite 0,209 -> 0,174), Saison 0,881 -> 0,881; Pp 12,0/9,5 -> 12,7/9,6 (Saatstaemme 0/10000000, n=48). Fingerabdruck ce8fcef66028 -> d3a39030a3ef, nur spiele climbing 1/7/42. Gemessen ueber den Node-Motor mit demselben Messcode (disziplinMessen/einflussVon); Kontrolle am Vorstand traf 0,801/0,881 und Pp 12,0/9,5 exakt. Details: docs/design/arena-start-ende-figuren-18-11.md. VORGESCHICHTE: NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,797 -- knapp unter der 0,80-Schranke (vorher 0,833, bestanden). Weil die Bewegung (0,036) kleiner als die eigene Spannweite (0,191) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,801** (Spannweite 0,209, Saison 0,881) -- **bestanden, wenn auch extrem knapp**. Anders als Showcase/I-Spy (die bei n=48 NICHT ueber die Schranke zurueckkehrten) bestaetigt die groessere Stichprobe hier eher die alte 'bestanden'-Einordnung als die kurzzeitige n=24-Unterschreitung -- Climbing bleibt deshalb unveraendert in `ARENA_RESOLVED_DISCIPLINE_IDS`. Trotzdem: 0,801 ist der denkbar knappste bestandene Wert im gesamten Feld, bleibt auf der Beobachtungsliste. Pp nicht neu gemessen, 12,0/9,5 bleibt gueltig (kein Rezept-Code seit 16.10. angefasst).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.816,
+     "rhoSpannweite": 0.174,
+     "rhoSaison": 0.881,
+     "pp": [
+      12.7,
+      9.6
+     ],
+     "datum": "2026-11-18",
+     "commit": "becc6634"
+    }
+   }
   },
   "football": {
-   "rhoJeSpiel": 0.854,
-   "rhoSpannweite": 0.179,
-   "rhoSaison": 0.937,
+   "rhoJeSpiel": 0.818,
+   "rhoSpannweite": 0.159,
+   "rhoSaison": 0.888,
    "rhoSaisonSpannweite": 0.098,
    "pp": [
-    15.3,
-    16.0
+    17.6,
+    15.9
    ],
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 football -- Task #136 Nachmessung 16./17.11. auf main 2bd05a17 (Erstmessung 15.11., NFL-Motorrunde; n=24: 0,874 / Spannweite 0,175)",
-    "spiele": 48,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 football -- Formkarten in allen Disziplinen, 18.11.",
+    "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs football 48 --saat-versatz=0 bzw. --saat-versatz=10000000 --rohdaten=<datei> -- Task #136 Nachmessung 16./17.11. auf main 2bd05a17 (Erstmessung 15.11., NFL-Motorrunde)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs football 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -641,43 +871,73 @@
      10000000
     ]
    },
-   "datum": "2026-11-17",
+   "datum": "2026-11-18",
    "quelle": "docs/design/football-opus-review-nfl-15-11.md",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "commit": "2bd05a17",
-   "anmerkung": "NACHGEMESSEN 16./17.11. (Task #136) auf main 2bd05a17 (nach den Anzeige-/Performance-PRs #1521, #1523, #1526, #1527, #1530; Wertungs-Fingerabdruck pruefe-wertung-fingerabdruck.mjs unveraendert GESAMT e80babacb68c): rho je Spiel 0,854 (Spannweite 0,179), Saison 0,937 (Spannweite 0,098), n=48, frische Kaderfamilie 15.11. -- bit-identisch zur Erstmessung. Pp 15,3 (Saatversatz 0) / 16,0 (Saatversatz 10000000), n=48 -- ebenfalls bit-identisch. Beide Pflichtkriterien regulaer bestanden, kein Rezept-/Matrixcode angefasst. Erstmessung: NFL-MOTORRUNDE 15.11. (Chris: TEAMGEIST zu stark, BALLSICHERHEIT 0, Staerke/Tackling fehlen -- und Football diesmal zu Ende bringen). Der in der vorigen Anmerkung (rho 0,525 nach dem Rezept-Fix #1483) geforderte MOTOR-Kanal ist gebaut: Linien-Duelle je Snap fuer jeden nicht ballfuehrenden Spieler (PASSSCHUTZ gegen ABWEHR_PASS/ABWEHR_LAUF), Tackling mit Yards nach Kontakt und gebrochenen Tackles, Fumbles bei jedem Kontakt plus umkaempfter Fang (BALLSICHERHEIT mechanisch 0 % -> 13,6 %), Money Downs (TEAMGEIST 52,7 % -> 14,5 %), Ermuedung in der Linie (AUSDAUER erstmals mit Live-Kanal, stamina im Pp-Einfluss 0 % -> 7,7/7,4 %). Rezept per Budget-Methode neu gebaut (baue-feldspiel-rezept.mjs --kaderfamilie, Zeilen = gesperrte Matrix, Spalten = neue Sondierung; Matrix unangetastet). rho je Spiel 0,854 (n=48, Saison 0,937; n=24 0,874; je-seite=4 0,846; je-seite=2 0,775), Star Rang 1 in 70 %, erste zwei 83 %, Paare >=15 Punkte 97,5 % richtig. Pp 15,3/16,0 (n=48, zwei Saatstroeme). BEIDE Pflichtkriterien regulaer bestanden, keine Ausnahme noetig. Uebrige 19 Disziplinen bit-identisch (pruefe-wertung-fingerabdruck.mjs). PPS-Referenz gegen den neuen Motor neu gezogen. Seit dieser Runde in ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS und ARENA_RESOLVED_DISCIPLINE_IDS."
+   "commit": "e5723684",
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest football die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: NACHGEMESSEN 16./17.11. (Task #136) auf main 2bd05a17 (nach den Anzeige-/Performance-PRs #1521, #1523, #1526, #1527, #1530; Wertungs-Fingerabdruck pruefe-wertung-fingerabdruck.mjs unveraendert GESAMT e80babacb68c): rho je Spiel 0,854 (Spannweite 0,179), Saison 0,937 (Spannweite 0,098), n=48, frische Kaderfamilie 15.11. -- bit-identisch zur Erstmessung. Pp 15,3 (Saatversatz 0) / 16,0 (Saatversatz 10000000), n=48 -- ebenfalls bit-identisch. Beide Pflichtkriterien regulaer bestanden, kein Rezept-/Matrixcode angefasst. Erstmessung: NFL-MOTORRUNDE 15.11. (Chris: TEAMGEIST zu stark, BALLSICHERHEIT 0, Staerke/Tackling fehlen -- und Football diesmal zu Ende bringen). Der in der vorigen Anmerkung (rho 0,525 nach dem Rezept-Fix #1483) geforderte MOTOR-Kanal ist gebaut: Linien-Duelle je Snap fuer jeden nicht ballfuehrenden Spieler (PASSSCHUTZ gegen ABWEHR_PASS/ABWEHR_LAUF), Tackling mit Yards nach Kontakt und gebrochenen Tackles, Fumbles bei jedem Kontakt plus umkaempfter Fang (BALLSICHERHEIT mechanisch 0 % -> 13,6 %), Money Downs (TEAMGEIST 52,7 % -> 14,5 %), Ermuedung in der Linie (AUSDAUER erstmals mit Live-Kanal, stamina im Pp-Einfluss 0 % -> 7,7/7,4 %). Rezept per Budget-Methode neu gebaut (baue-feldspiel-rezept.mjs --kaderfamilie, Zeilen = gesperrte Matrix, Spalten = neue Sondierung; Matrix unangetastet). rho je Spiel 0,854 (n=48, Saison 0,937; n=24 0,874; je-seite=4 0,846; je-seite=2 0,775), Star Rang 1 in 70 %, erste zwei 83 %, Paare >=15 Punkte 97,5 % richtig. Pp 15,3/16,0 (n=48, zwei Saatstroeme). BEIDE Pflichtkriterien regulaer bestanden, keine Ausnahme noetig. Uebrige 19 Disziplinen bit-identisch (pruefe-wertung-fingerabdruck.mjs). PPS-Referenz gegen den neuen Motor neu gezogen. Seit dieser Runde in ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS und ARENA_RESOLVED_DISCIPLINE_IDS.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.854,
+     "rhoSpannweite": 0.179,
+     "rhoSaison": 0.937,
+     "pp": [
+      15.3,
+      16.0
+     ],
+     "datum": "2026-11-17",
+     "commit": "2bd05a17"
+    }
+   }
   },
   "i-spy": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.845,
-   "rhoSpannweite": 0.088,
-   "rhoSaison": 0.923,
+   "rhoJeSpiel": 0.831,
+   "rhoSpannweite": 0.119,
+   "rhoSaison": 0.958,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 i-spy -- Knack-Motor V2 (Balken, Ortswahl, Schubsen), 17.11., Kaderfamilie 15.11.",
-    "spiele": 48,
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 i-spy -- Formkarten in allen Disziplinen, 18.11.",
+    "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    16.4,
-    14.0
+    23.7,
+    15.1
    ],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs i-spy 48 (+ --saat-versatz=10000000) -- Knack-Motor V2, 17.11.",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs i-spy 48 (+ --saat-versatz=10000000)",
     "laeufe": 48,
     "saatStroeme": [
      0,
      10000000
     ]
    },
-   "datum": "2026-11-17",
+   "datum": "2026-11-18",
    "quelle": "docs/design/ispy-knacken-ortswahl-schubsen-17-11.md (Messwerte, Kalibrierung, alter Stand); Historie: docs/design/baseline-alle-20-disziplinen-15-11.md, docs/design/organisch-tdm-battlefield-ispy-27-10.md",
-   "commit": "0c39221f",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "KNACK-MOTOR V2 17.11. (Chris: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern laenger als 1 Stern, ein Besserer fuellt den Balken deutlich schneller). Gemessen auf main 0c39221f plus der (zum Messzeitpunkt uncommitteten) Motor-Aenderung; Wertungs-Fingerabdruck GESAMT e80babacb68c -> b47c1228ac2c, NUR die drei i-spy-Eintraege geaendert. rho je Spiel 0,776 -> 0,845 (n=48; n=24: 0,779 -> 0,853), Spannweite 0,199 -> 0,088, Saison 0,888 -> 0,923; Star Rang 1 47,5 -> 51,7 %, Top 2 76,7 -> 78,8 %, Paartreue >=15 Punkte 94,9 -> 98,6 % (miss-star-paartreue.mjs 48). Schubsen gepaart abgeschaltet (--kontakt=i-spy:0): 0,866 -- der Kontakt kostet 0,021 rho, 4 von 5 Paarungen innerhalb -0,03, Star mit Kontakt besser (Rang 1 50,0 -> 51,7 %). Pp 14,6/15,0 -> 16,4/14,0 (dritter Strom --saat-versatz=20000000: alt 21,8, neu 19,2); groesste Abweichung weiter intelligence (+4,9/+4,0). Kadergroessen 2..5 je Seite (n=24): 0,900/0,855/0,885/0,870 (alt 0,767/0,787/0,747/0,770). Spiegeltest 480 Laeufe 236:243 (alt 247:231). Matrix unangetastet; Rezept nur um DURCHSETZEN (torment 65, spirit 20, will 15) ergaenzt. Rueckweg: window.__arena.ispyMotor(\"alt\") rechnet bit-identisch wie vorher (Fingerabdruck dann wieder e80babacb68c). PPS-Referenz data/generated/i-spy-pps-referenz.json neu gezogen. Vorgaenger-Anmerkung (15.11.): NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,779 -- unter der 0,80-Schranke (vorher 0,817/0,811, bereits damals knapp). Weil die Bewegung (0,038) kleiner als die eigene Spannweite (0,212) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,776** (Spannweite 0,199, Saison 0,888) -- KONVERGIERT NAHE DEM n=24-WERT statt sich der 0,80-Schranke anzunaehern, genau wie Showcase. Das spricht GEGEN reines Abtast-Rauschen und FUER einen echten, wenn auch kleinen Abstand zur Schranke bei der aktuellen Kaderfamilie -- anders als bei Climbing (das bei n=48 auf 0,801 stieg). I-Spy ist in `ARENA_RESOLVED_DISCIPLINE_IDS` gewertet; dieser Befund macht `tests/disziplin-abnahme-guard.test.ts` ROT, bis entweder die Menge nachgezogen wird oder eine neue Messung/Kaderfamilie etwas anderes zeigt -- das ist die vom Waechter selbst dokumentierte Reaktion auf eine durchfallende Neumessung, keine neue Regel. Diese PR aendert arena-resolved-disciplines.ts bewusst NICHT (reine Mess-/Doku-Aktualisierung, Abstimmung mit der parallel laufenden Football-Session noetig). I-Spy stand schon vorher auf der Beobachtungsliste (zweiter Strom nur 0,011 ueber der Schranke) -- bleibt dort, Text s. 'beobachtungsliste' oben. Pp nicht neu gemessen, 14,6/15,0 bleibt gueltig (kein Rezept-Code seit 27.10. angefasst). Historie: Gemessen auf origin/main 14b15d3e plus der Kalibrierrunde 3 dieses PRs (BUEHNE_ART['i-spy'].rundenN 8 -> 32, rundenDauer mitskaliert, ISPY_PUNKTWERT[3] 60 -> 45). Vorher (gleiche Sonden): rho je Spiel 0,749 / 0,710 (zwei Stroeme, n=48), Pp 16,6 / 12,8. Nachher: rho 0,817 / 0,811, 5 von 5 Paarungen auf beiden Stroemen besser; Saison 0,888 / 0,895; Star Rang 1 54,2 % / 52,1 %, erste zwei 84,2 % / 81,7 %, letzter 0 %, Paartreue (>=15) 96,8 % / 96,6 %. Kadergroessen je Seite 2/3/4/5 (n=24): 0,854 / 0,842 / 0,877 / 0,859. Spiegeltest (miss-arena-buehne-spiegel.mjs 480 i-spy) 247:231, Punkte 0,1 % auseinander. Pp-Profil beide Stroeme: intelligence +5,2/+5,0 die groesste Einzelabweichung, kein Matrixattribut bei 0 %. Chassis spieleBuehneAuftritt() (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), PPS-Referenz data/generated/i-spy-pps-referenz.json."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest i-spy die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher. Pp 23,7 knapp unter 25. | VORHER: KNACK-MOTOR V2 17.11. (Chris: Schubsen/Tackeln einbauen, Unterlegene suchen sich einen neuen Ort, 3 Sterne dauern laenger als 1 Stern, ein Besserer fuellt den Balken deutlich schneller). Gemessen auf main 0c39221f plus der (zum Messzeitpunkt uncommitteten) Motor-Aenderung; Wertungs-Fingerabdruck GESAMT e80babacb68c -> b47c1228ac2c, NUR die drei i-spy-Eintraege geaendert. rho je Spiel 0,776 -> 0,845 (n=48; n=24: 0,779 -> 0,853), Spannweite 0,199 -> 0,088, Saison 0,888 -> 0,923; Star Rang 1 47,5 -> 51,7 %, Top 2 76,7 -> 78,8 %, Paartreue >=15 Punkte 94,9 -> 98,6 % (miss-star-paartreue.mjs 48). Schubsen gepaart abgeschaltet (--kontakt=i-spy:0): 0,866 -- der Kontakt kostet 0,021 rho, 4 von 5 Paarungen innerhalb -0,03, Star mit Kontakt besser (Rang 1 50,0 -> 51,7 %). Pp 14,6/15,0 -> 16,4/14,0 (dritter Strom --saat-versatz=20000000: alt 21,8, neu 19,2); groesste Abweichung weiter intelligence (+4,9/+4,0). Kadergroessen 2..5 je Seite (n=24): 0,900/0,855/0,885/0,870 (alt 0,767/0,787/0,747/0,770). Spiegeltest 480 Laeufe 236:243 (alt 247:231). Matrix unangetastet; Rezept nur um DURCHSETZEN (torment 65, spirit 20, will 15) ergaenzt. Rueckweg: window.__arena.ispyMotor(\"alt\") rechnet bit-identisch wie vorher (Fingerabdruck dann wieder e80babacb68c). PPS-Referenz data/generated/i-spy-pps-referenz.json neu gezogen. Vorgaenger-Anmerkung (15.11.): NACHGEMESSEN 15.11. (Task #136), ZWEI STUFEN: n=24 ergab 0,779 -- unter der 0,80-Schranke (vorher 0,817/0,811, bereits damals knapp). Weil die Bewegung (0,038) kleiner als die eigene Spannweite (0,212) war, folgte zur Absicherung ein zweiter Lauf mit n=48: **0,776** (Spannweite 0,199, Saison 0,888) -- KONVERGIERT NAHE DEM n=24-WERT statt sich der 0,80-Schranke anzunaehern, genau wie Showcase. Das spricht GEGEN reines Abtast-Rauschen und FUER einen echten, wenn auch kleinen Abstand zur Schranke bei der aktuellen Kaderfamilie -- anders als bei Climbing (das bei n=48 auf 0,801 stieg). I-Spy ist in `ARENA_RESOLVED_DISCIPLINE_IDS` gewertet; dieser Befund macht `tests/disziplin-abnahme-guard.test.ts` ROT, bis entweder die Menge nachgezogen wird oder eine neue Messung/Kaderfamilie etwas anderes zeigt -- das ist die vom Waechter selbst dokumentierte Reaktion auf eine durchfallende Neumessung, keine neue Regel. Diese PR aendert arena-resolved-disciplines.ts bewusst NICHT (reine Mess-/Doku-Aktualisierung, Abstimmung mit der parallel laufenden Football-Session noetig). I-Spy stand schon vorher auf der Beobachtungsliste (zweiter Strom nur 0,011 ueber der Schranke) -- bleibt dort, Text s. 'beobachtungsliste' oben. Pp nicht neu gemessen, 14,6/15,0 bleibt gueltig (kein Rezept-Code seit 27.10. angefasst). Historie: Gemessen auf origin/main 14b15d3e plus der Kalibrierrunde 3 dieses PRs (BUEHNE_ART['i-spy'].rundenN 8 -> 32, rundenDauer mitskaliert, ISPY_PUNKTWERT[3] 60 -> 45). Vorher (gleiche Sonden): rho je Spiel 0,749 / 0,710 (zwei Stroeme, n=48), Pp 16,6 / 12,8. Nachher: rho 0,817 / 0,811, 5 von 5 Paarungen auf beiden Stroemen besser; Saison 0,888 / 0,895; Star Rang 1 54,2 % / 52,1 %, erste zwei 84,2 % / 81,7 %, letzter 0 %, Paartreue (>=15) 96,8 % / 96,6 %. Kadergroessen je Seite 2/3/4/5 (n=24): 0,854 / 0,842 / 0,877 / 0,859. Spiegeltest (miss-arena-buehne-spiegel.mjs 480 i-spy) 247:231, Punkte 0,1 % auseinander. Pp-Profil beide Stroeme: intelligence +5,2/+5,0 die groesste Einzelabweichung, kein Matrixattribut bei 0 %. Chassis spieleBuehneAuftritt() (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), PPS-Referenz data/generated/i-spy-pps-referenz.json.",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.845,
+     "rhoSpannweite": 0.088,
+     "rhoSaison": 0.923,
+     "pp": [
+      16.4,
+      14.0
+     ],
+     "datum": "2026-11-17",
+     "commit": "0c39221f"
+    }
+   }
   },
   "battlefield": {
    "format": "4-Team-Pod, Gefecht je Ort (gewertet; bfffaGefecht, BATTLEFIELD_POD_VORLAUF_AKTIV)",
@@ -773,9 +1033,9 @@
   },
   "tdm": {
    "chassis": "kampf",
-   "rhoJeSpiel": 0.839,
-   "rhoSpannweite": 0.346,
-   "rhoSaison": 0.913,
+   "rhoJeSpiel": 0.9,
+   "rhoSpannweite": 0.068,
+   "rhoSaison": 0.958,
    "rhoJeGefechtMedianJeK": {
     "2": [
      0.82,
@@ -799,18 +1059,18 @@
     ]
    },
    "rhoMessung": {
-    "befehl": "node scripts/miss-tdm-gefecht-abnahme.mjs 24 --je-seite=2..6 --pp=48 --pp-je-seite=6 --stroeme=0,10000000",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 tdm -- Formkarten in allen Disziplinen, 18.11.",
     "spiele": 24,
     "kaderVarianten": 10,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
     "statistik": "k=6 (Standard-Motorfeldgroesse ARENA_ART.tdm.jeSeite), Saatstrom 0, wie bisher; Median ueber k=2..6 beider Stroeme liegt bei 0,801-0,839 (rhoJeGefechtMedianJeK)"
    },
    "pp": [
-    14.6,
-    14.7
+    12.6,
+    13.2
    ],
    "ppMessung": {
-    "befehl": "dieselbe Messung, --pp=48 --pp-je-seite=6 (Protokollstandard n=48 statt der bisherigen n=24)",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=48 --pp-je-seite=6",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -819,11 +1079,26 @@
      10000000
     ]
    },
-   "datum": "2026-11-15",
-   "commit": "2d4153b4b",
+   "datum": "2026-11-18",
+   "commit": "e5723684",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BUDGET-KONSERVIERUNG 15.11. (Task #135, 'Budget-Konformitaet verifizieren'): frisch auf main 2d4153b4b nachgemessen, erstmals Pp mit dem Protokollstandard n=48 statt n=24. rho je Gefecht 0,801-0,839 bei jedem k=2..6 in beiden Saatstroemen (Saison 0,854-0,922) -- ueber der 0,80-Schranke, Kopfwert k=6/Strom 0 0,839 (vorher 0,813). Pp 14,6/14,7 (vorher 16,8/14,2 bei n=24) -- damit unter dem angestrebten Optimum <15 in beiden Stroemen, OHNE Code- oder Rezeptaenderung (die alte Zahl war das hoehere Rauschen von n=24). Budget-Konformitaet per Bauart: tdmGefecht() hat kein Sub-Skill-Rezept, es liest die Matrixgewichte BASIS_JE_DISC.tdm direkt als Kanalstaerken (TDM_GEFECHT, dieselbe Gefecht-Bauweise wie Battlefields BF_FFA_GRUND). Ist-Anteile k=6, Strom 0: power 25,7 (Matrix 28), health 16,2 (20), charisma 14,5 (10), spirit 12,9 (12), stamina 12,9 (14), intelligence 6,5 (6), determination 5,9 (6), awareness 3,4 (2), torment 2,0 (2). Groesste Einzelabweichung charisma +4,5 / health -3,8 -- keine Nachjustierung, weil sie nur ueber die TDM_GEFECHT-Hebel ginge und CLAUDE.md-Vorrang rho > Pp-Optimierung gilt. Vorherige Historie: TDM-Gefecht-Verdrahtung 11.11., tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324)."
+   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest tdm die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #135, 'Budget-Konformitaet verifizieren'): frisch auf main 2d4153b4b nachgemessen, erstmals Pp mit dem Protokollstandard n=48 statt n=24. rho je Gefecht 0,801-0,839 bei jedem k=2..6 in beiden Saatstroemen (Saison 0,854-0,922) -- ueber der 0,80-Schranke, Kopfwert k=6/Strom 0 0,839 (vorher 0,813). Pp 14,6/14,7 (vorher 16,8/14,2 bei n=24) -- damit unter dem angestrebten Optimum <15 in beiden Stroemen, OHNE Code- oder Rezeptaenderung (die alte Zahl war das hoehere Rauschen von n=24). Budget-Konformitaet per Bauart: tdmGefecht() hat kein Sub-Skill-Rezept, es liest die Matrixgewichte BASIS_JE_DISC.tdm direkt als Kanalstaerken (TDM_GEFECHT, dieselbe Gefecht-Bauweise wie Battlefields BF_FFA_GRUND). Ist-Anteile k=6, Strom 0: power 25,7 (Matrix 28), health 16,2 (20), charisma 14,5 (10), spirit 12,9 (12), stamina 12,9 (14), intelligence 6,5 (6), determination 5,9 (6), awareness 3,4 (2), torment 2,0 (2). Groesste Einzelabweichung charisma +4,5 / health -3,8 -- keine Nachjustierung, weil sie nur ueber die TDM_GEFECHT-Hebel ginge und CLAUDE.md-Vorrang rho > Pp-Optimierung gilt. Vorherige Historie: TDM-Gefecht-Verdrahtung 11.11., tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324).",
+   "formkarten": {
+    "modus": "echt",
+    "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
+    "ersatzVorher": {
+     "rhoJeSpiel": 0.839,
+     "rhoSpannweite": 0.346,
+     "rhoSaison": 0.913,
+     "pp": [
+      14.6,
+      14.7
+     ],
+     "datum": "2026-11-15",
+     "commit": "2d4153b4b"
+    }
+   }
   },
   "mini-dm": {
    "format": "4-Team-FFA (gespielt), 4 Rollenrunden je Event",
