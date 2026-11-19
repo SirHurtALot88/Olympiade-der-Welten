@@ -132,13 +132,12 @@ describe("Scouting-Nebel des Transfermarkts: feste Stufen (18.11.)", () => {
     expect(Object.values(s4.attribute).every((a) => a.anzeige === null || /^[FEDCBAS+]{1,2}$/.test(a.anzeige))).toBe(true);
   });
 
-  it("Wege zum Erfolg: nur aufgedeckte Attribute zählen, sonst offen", () => {
+  it("Wege zum Erfolg: Attribut-Noten auch ungescoutet sichtbar (Chris 19.11.), nie eine Zahl", () => {
     const fremd = baueSpielerSicht(eintrag({ playerId: "p", name: "Fina" }));
     const wege = bauWege(fremd, "hockey");
     expect(wege.zeilen.length).toBeGreaterThan(0);
-    const verdeckt = Object.values(fremd.attribute).filter((a) => !a.aufgedeckt);
-    expect(verdeckt.length).toBe(8);
-    expect(verdeckt.every((a) => a.anzeige === null && a.prozent === null)).toBe(true);
+    const mitNote = Object.values(fremd.attribute).filter((a) => a.anzeige != null);
+    expect(mitNote.every((a) => !/\d/.test(a.anzeige!))).toBe(true);
     const voll = baueSpielerSicht(eintrag({ playerId: "p", name: "Fina", scoutingLevel: 5 }));
     expect(Object.values(voll.attribute).every((a) => a.aufgedeckt)).toBe(true);
     expect(["primaer", "neben", "kein"]).toContain(bauWege(voll, "hockey").urteil.art);
