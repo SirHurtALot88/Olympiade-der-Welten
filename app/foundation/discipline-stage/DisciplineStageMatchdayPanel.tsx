@@ -132,6 +132,8 @@ export type MatchdayPanelPlayerRow = {
   score: number | null;
   /** Mutator-Anteil an den PP (separat ausgewiesen, weil er dem Spieler gehoert). */
   mutatorPp: number | null;
+  /** Battle-Modus (18.11.): Formschub aus Mutator-Treffern statt PP — der Mutator gibt dort keine Punkte mehr. */
+  mutatorForm?: number | null;
   /**
    * Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens am Chip (Diamant/Gold/
    * Silber/Bronze fuer die Top 3/10/25/50, `lib/foundation/player-star-tier.ts`).
@@ -1479,6 +1481,8 @@ export default function DisciplineStageMatchdayPanel({
                                 title={`${entry.name} · ${entry.pp != null ? `${entry.pp.toFixed(1)} PP` : "keine PP"}${
                                   entry.score != null ? ` · Score ${entry.score.toFixed(1)}` : ""
                                 }${entry.mutatorPp ? ` · davon ◆ ${entry.mutatorPp.toFixed(1)} Mutator` : ""}${
+                                  entry.mutatorForm ? ` · ◆ Mutator getroffen: Form +${entry.mutatorForm.toFixed(1)} (keine Punkte)` : ""
+                                }${
                                   starTitle ? ` · ${starTitle}` : ""
                                 }`}
                                 style={{
@@ -1499,8 +1503,10 @@ export default function DisciplineStageMatchdayPanel({
                                 {entry.score != null ? (
                                   <em style={{ fontStyle: "normal", color: "var(--nl-mut)" }}>({entry.score.toFixed(1)})</em>
                                 ) : null}
-                                {entry.mutatorPp ? (
-                                  <em style={{ fontStyle: "normal", color: "var(--nl-warn)", fontWeight: 700 }}>◆</em>
+                                {entry.mutatorPp || entry.mutatorForm ? (
+                                  <em style={{ fontStyle: "normal", color: "var(--nl-warn)", fontWeight: 700 }}>
+                                    ◆{entry.mutatorForm ? ` Form +${entry.mutatorForm.toFixed(1)}` : ""}
+                                  </em>
                                 ) : null}
                               </span>
                             );

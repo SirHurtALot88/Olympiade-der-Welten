@@ -38,3 +38,43 @@ export function describeBattleArenaOrganicMutatorEffect(): string {
     "fuer diesen Spieltag, die Mehrleistung entsteht im Spiel selbst (kein +6 Score, keine +0,3 PP)."
   );
 }
+
+/**
+ * MUTATOR = FORM, KEINE PUNKTE (Chris 18.11.): "Mutator-Punkte zählen nicht mehr für Team-Punkte, also
+ * keine 2,3 für einen Sieg oder so, das gibt es in dem Modus nicht mehr! Mutatoren sorgen nur noch für
+ * eine bessere Form der Spieler, wo es triggert."
+ *
+ * Im Battle-Modus bucht ein Mutator-Treffer deshalb NIE mehr Score (+6) oder Spieler-PP (+0,3) — auf
+ * keinem Pfad, auch nicht auf der PPS-Duell-Bruecke oder in der Einsatzlisten-Vorschau. Stattdessen
+ * bekommt der getroffene Spieler einen Formschub in dieser Disziplin:
+ *   - Motor-gebuchte Seiten (Duelle, Pods): wie seit 29.09. im Motor selbst, +3,5 auf jedes Attribut je
+ *     Treffer = +3,5 Eignungspunkte (Matrixgewichte summieren sich auf 100). Unveraendert, darum bleiben
+ *     Fingerabdruck, rho und Pp dort gleich.
+ *   - Legacy-gewertete Seiten (PPS-Duell-Bruecke, Rueckfall ohne Arena-Ergebnis) und die Vorschau: ueber
+ *     DENSELBEN Kanal wie die Formkarten (`formByPlayerId[...].summe`, Feld `mutator`), dieselbe Hoehe
+ *     `MUTATOR_FORM_JE_TREFFER` = 3,5 je Treffer statt +6 Score und +0,3 PP.
+ * Manager-Modus: unveraendert (+6 Score / +0,3 PP).
+ *
+ * Schalter: `OLY_MUTATOR_ALS_FORM=0` (bzw. aus/off/false/alt) stellt den alten Battle-Weg wieder her.
+ * Bereits gebuchte Spieltage bleiben, wie sie gebucht sind: Score und PP stehen in den Ergebnis- und
+ * Leistungsdatensaetzen und werden nie neu gerechnet; die Regel greift ab dem naechsten gewerteten Spieltag.
+ */
+export const MUTATOR_FORM_JE_TREFFER = BATTLE_MUTATOR_ATTRIBUT_BONUS_JE_TREFFER;
+
+export function isMutatorAlsFormAktiv(env: Record<string, string | undefined> = lieseUmgebung()): boolean {
+  const roh = (env.OLY_MUTATOR_ALS_FORM ?? "").trim().toLowerCase();
+  return !(roh === "0" || roh === "alt" || roh === "aus" || roh === "off" || roh === "false");
+}
+
+function lieseUmgebung(): Record<string, string | undefined> {
+  return typeof process !== "undefined" && process.env ? process.env : {};
+}
+
+/** Formschub je Spieler aus den Mutator-Treffern (0/1/2 je Spieler), eine Dezimale. */
+export function mutatorFormJeSpieler(trefferJeSpieler: Record<string, number> | null | undefined): Record<string, number> {
+  const aus: Record<string, number> = {};
+  for (const [playerId, treffer] of Object.entries(trefferJeSpieler ?? {})) {
+    if (Number.isFinite(treffer) && treffer > 0) aus[playerId] = Number((treffer * MUTATOR_FORM_JE_TREFFER).toFixed(1));
+  }
+  return aus;
+}

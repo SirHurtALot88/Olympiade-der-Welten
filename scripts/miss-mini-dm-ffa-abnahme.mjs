@@ -209,6 +209,9 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.miniDmFfaEvent, null, { timeout: 60000 });
+  // P4 (18.11.): OLY_FORM_MODUS=echt misst mit einem Einsatzlisten-Szenario je Pod-Team statt der Ersatzkarte
+  // (mdffaFormkartenFuer() in battle-mode.engine.js). Ohne die Variable unveraendert.
+  if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   const hatSonde = await seite.evaluate(() => typeof window.__arena.miniDmFfaSonde === "function");
   const gewichte = await seite.evaluate(() => window.__arena.matrix("mini-dm"));
   const kader = eignungNeu(roheKader, gewichte);

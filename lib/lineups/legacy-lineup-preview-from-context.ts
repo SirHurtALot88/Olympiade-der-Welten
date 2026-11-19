@@ -8,7 +8,11 @@ import {
   getFormCardColorForDisciplineCategory,
   normalizeLineupDraftModifiers,
   buildMatchdayMutatorTraitsBySide,
+  mitMutatorForm,
+  toBattleArenaOrganicMutatorResult,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import { isMutatorAlsFormAktiv, mutatorFormJeSpieler } from "@/lib/battle/battle-mutator-organisch";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
 import { SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
@@ -148,7 +152,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       disciplineSide === "d1"
         ? context.matchdayContract?.discipline1 ?? null
         : context.matchdayContract?.discipline2 ?? null;
-    const formResult = calculateFormModifierForSide({
+    const kartenFormResult = calculateFormModifierForSide({
       modifiers: previewModifiers,
       disciplineSide,
       disciplineColor: getFormCardColorForDisciplineCategory(disciplineMeta?.category),
@@ -162,13 +166,21 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       }),
       farbregel: farbregelAusRegeln(context.formMoralRegeln),
     });
-    const mutatorResult = calculateMutatorModifierForSide({
+    const rohMutatorResult = calculateMutatorModifierForSide({
       modifiers: previewModifiers,
       disciplineSide,
       entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
       rosterPlayers: context.rosterPlayers,
       matchdayMutatorTraits: matchdayMutatorTraitsBySide[disciplineSide],
     });
+    // MUTATOR = FORM (Battle-Modus, 18.11.): dieselbe Regel wie der Resolve — kein +6 Score / +0,3 PP,
+    // sondern Form fuer den getroffenen Spieler ueber den Formkarten-Kanal (lib/battle/battle-mutator-organisch.ts).
+    const mutatorAlsForm =
+      resolvedGameState != null && isBattleModeSave(resolvedGameState) && isMutatorAlsFormAktiv() && context.mutatorSource?.effectStatus === "ready";
+    const mutatorResult = mutatorAlsForm ? toBattleArenaOrganicMutatorResult(rohMutatorResult) : rohMutatorResult;
+    const formResult = mutatorAlsForm
+      ? mitMutatorForm(kartenFormResult, sideEntries.map((entry) => entry.playerId), mutatorFormJeSpieler(rohMutatorResult.playerMutatorHits))
+      : kartenFormResult;
     const teamPowerResult = calculateTeamPowerModifierForSide({
       modifiers: previewModifiers,
       disciplineSide,

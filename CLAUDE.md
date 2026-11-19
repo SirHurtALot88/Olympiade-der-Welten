@@ -199,6 +199,14 @@ Seit 18.11. im Spiel aktiv, jeweils per Umgebungsvariable abschaltbar (Details u
 (`lib/lineups/formkarten-wirkung.ts`), Arena-Aufstellungsadapter und KI-Kartenplan lesen genau diese Funktion; ein Pfad, der selbst
 x2 rechnet, ist ein Fehler. **Gezeigt = gebucht:** `formkartenBuchung` sagt, ob die gespielte Karte in dieser Disziplin gebucht wird
 (Battle-Modus: nur `FORMKARTEN_ECHT_DISCIPLINE_IDS`, sonst Ersatzkarte); die Einsatzliste verspricht dort sonst keine Punkte.
+**Seit 18.11. zählt die gelegte Karte in allen zwanzig Disziplinen** (alle in `FORMKARTEN_ECHT_DISCIPLINE_IDS`, auch die Pods
+Battlefield, Mini-DM-FFA und Bahn-Pod; Mini-DM über `FORM_POD` im Motor). Der Wächter `tests/formkarten-alle-disziplinen.test.ts`
+wird rot, wenn eine motor-gebuchte Disziplin (`wirdAusMotorGebucht`) fehlt. **Farbbonus = Klassenfarbe des Spielers gleich
+Kartenfarbe** (nicht Disziplinfarbe, nicht Rolle); die Disziplinfarbe entscheidet nur „alle“ voll oder halb. Messung und
+Erklärung: `docs/design/formkarten-alle-disziplinen-18-11.md`.
+**Mutator = Form, keine Punkte (Chris, 18.11.):** im Battle-Modus bucht ein Mutator-Treffer nie mehr Score (+6) oder PP (+0,3);
+Motor-Seiten tragen den Schub im Motor (+3,5 Attribut je Treffer), legacy-gewertete Battle-Seiten und die Vorschau bekommen
++3,5 Form je Treffer über den Formkarten-Kanal (`mitMutatorForm`). Abschalten: `OLY_MUTATOR_ALS_FORM=0`. Manager-Modus unverändert.
 **Moral wird als Gesicht in Farbe (grün bis rot) plus Zahl gezeigt** (`BcMoralGesicht`, Stufen 80/60/40/20: sehr zufrieden, zufrieden,
 neutral, unzufrieden, verärgert), nicht als Herz und nicht als Emoji. Der Form-Verlauf liegt je Spieler in `playerFormState[].verlauf`
 (Saison-Reset zur Mitte beim Saisonwechsel). Wertungs-Fingerabdruck blieb bei `ce8fcef66028`, weil die Engine nicht angefasst wurde.

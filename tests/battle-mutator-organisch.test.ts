@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   BATTLE_MUTATOR_ATTRIBUT_BONUS_JE_TREFFER,
   BATTLE_MUTATOR_ORGANISCH_ART,
+  MUTATOR_FORM_JE_TREFFER,
 } from "@/lib/battle/battle-mutator-organisch";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSpielplanMutatorSummaries } from "@/lib/foundation/spielplan-mutator-summary";
@@ -260,12 +261,31 @@ describe("Resolve: organischer Mutator ersetzt +6/+0,3 nur auf arena-simulierten
     expect(seite?.entries.find((entry) => entry.playerId === "A-A-d1-0")?.mutatorHits).toBe(1);
   });
 
-  it("dieselbe Vorschau: die NICHT simulierte Battle-Disziplin behaelt +6/+0,3", () => {
+  // MUTATOR = FORM (Chris 18.11.): "Mutator-Punkte zählen nicht mehr für Team-Punkte [...] nur noch eine bessere
+  // Form der Spieler, wo es triggert." Bis dahin behielt die nicht simulierte Battle-Seite +6 Score / +0,3 PP.
+  it("dieselbe Vorschau: die NICHT simulierte Battle-Disziplin bucht keine +6/+0,3 mehr, sondern Form +3,5 am Getroffenen", () => {
     const preview = vorschau("battle", ["A-A", "B-B"]);
     const getroffen = eintrag(preview, PPS_DISZIPLIN, "A-A-d2-0");
     expect(getroffen.mutatorHits).toBe(1);
-    expect(getroffen.mutatorBonus).toBe(6);
-    expect(getroffen.mutatorPpsBonus).toBe(0.3);
+    expect(getroffen.mutatorBonus ?? 0).toBe(0);
+    expect(getroffen.mutatorPpsBonus ?? 0).toBe(0);
+    expect(getroffen.formSystematisch).toBe(MUTATOR_FORM_JE_TREFFER);
+    const seite = preview.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === PPS_DISZIPLIN)
+      ?.teamResults.find((team) => team.teamId === "A-A");
+    expect(seite?.mutatorModifier).toBe(0);
+  });
+
+  it("Schalter OLY_MUTATOR_ALS_FORM=0: der alte Battle-Weg (+6/+0,3 auf der nicht simulierten Seite) kommt zurueck", () => {
+    process.env.OLY_MUTATOR_ALS_FORM = "0";
+    try {
+      const preview = vorschau("battle", ["A-A", "B-B"]);
+      const getroffen = eintrag(preview, PPS_DISZIPLIN, "A-A-d2-0");
+      expect(getroffen.mutatorBonus).toBe(6);
+      expect(getroffen.mutatorPpsBonus).toBe(0.3);
+    } finally {
+      delete process.env.OLY_MUTATOR_ALS_FORM;
+    }
   });
 
   it("Manager-Modus: unveraendert +6/+0,3, auch wenn (faelschlich) Arena-Maps mitkommen", () => {
@@ -276,11 +296,12 @@ describe("Resolve: organischer Mutator ersetzt +6/+0,3 nur auf arena-simulierten
     expect(getroffen.mutatorHits).toBe(1);
   });
 
-  it("Battle, aber Arena-Lauf fuer dieses Team ausgefallen (kein Override): PPS-Rueckfall mit +6/+0,3", () => {
+  it("Battle, aber Arena-Lauf fuer dieses Team ausgefallen (kein Override): Rueckfall ohne Punkte, mit Form", () => {
     const preview = vorschau("battle", ["B-B"]);
     const ohneSimulation = eintrag(preview, ARENA_DISZIPLIN, "A-A-d1-0");
-    expect(ohneSimulation.mutatorBonus).toBe(6);
-    expect(ohneSimulation.mutatorPpsBonus).toBe(0.3);
+    expect(ohneSimulation.mutatorBonus ?? 0).toBe(0);
+    expect(ohneSimulation.mutatorPpsBonus ?? 0).toBe(0);
+    expect(ohneSimulation.formSystematisch).toBe(MUTATOR_FORM_JE_TREFFER);
     const simuliert = eintrag(preview, ARENA_DISZIPLIN, "B-B-d1-0");
     expect(simuliert.mutatorBonus ?? 0).toBe(0);
     expect(simuliert.mutatorPpsBonus ?? 0).toBe(0);
