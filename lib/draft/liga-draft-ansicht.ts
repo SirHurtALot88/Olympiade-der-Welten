@@ -12,6 +12,7 @@
  * `vorschau` Folgezuege (Standard 6 = „Danach am Zug“ im Mockup) und merkt sich das Ergebnis je Draft-Stand.
  * „gefragt“ zaehlt deshalb ueber diese Teams, nicht ueber alle 32.
  */
+import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, LigaDraftEintrag, LigaDraftZustand } from "@/lib/data/olyDataTypes";
 import { bewerteKiPick, freieSpieler, type LigaDraftPickGrund } from "@/lib/draft/liga-draft-ki";
 import { darfAuslassen, kaderStaerkeFuerReihenfolge, naechsteZuege, werIstDran } from "@/lib/draft/liga-draft-modell";
@@ -26,7 +27,20 @@ export type LigaDraftSpielerKarte = {
   marktwert: number;
   /** Gehaltsforderung, exakt. */
   gehalt: number;
+  /** Portrait, falls der Spieler eines hat (gebuchte Picks stehen nicht mehr im Brett-Feed). */
+  portraitUrl?: string | null;
+  /** POW/SPE/MEN/SOC nur als Zweier-Gruppe („B–A“), nie als Zahl oder genaue Note (Nebel). */
+  achsenGruppen?: { pow: string; spe: string; men: string; soc: string } | null;
 };
+
+const ACHSEN_GRUPPEN = ["F–E", "D–C", "B–A", "S–S+"] as const;
+
+/** Zweier-Gruppe der Note, die zu den Punkten gehoert (Schwellen wie `getTransfermarktTierFromPoints`). */
+function achsenGruppe(punkte: number | null | undefined): string {
+  if (typeof punkte !== "number" || !Number.isFinite(punkte)) return "?";
+  const index = punkte >= 88 ? 7 : punkte >= 82 ? 6 : punkte >= 76 ? 5 : punkte >= 70 ? 4 : punkte >= 64 ? 3 : punkte >= 58 ? 2 : punkte >= 52 ? 1 : 0;
+  return ACHSEN_GRUPPEN[Math.floor(index / 2)];
+}
 
 export type LigaDraftZugAnsicht = {
   teamId: string;
@@ -157,6 +171,15 @@ export function baueLigaDraftAnsicht(input: {
       race: spieler.race ?? null,
       marktwert: Math.max(0, spieler.marketValue ?? spieler.displayMarketValue ?? 0),
       gehalt: Math.max(0, spieler.salaryDemand ?? spieler.displaySalary ?? 0),
+      portraitUrl: getPlayerPortraitBrowserUrl(spieler.id, spieler.portraitUrl, spieler.portraitPath),
+      achsenGruppen: spieler.coreStats
+        ? {
+            pow: achsenGruppe(spieler.coreStats.pow),
+            spe: achsenGruppe(spieler.coreStats.spe),
+            men: achsenGruppe(spieler.coreStats.men),
+            soc: achsenGruppe(spieler.coreStats.soc),
+          }
+        : null,
     };
   };
 

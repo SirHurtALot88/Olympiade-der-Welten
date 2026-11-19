@@ -309,3 +309,9 @@
 .drf-mb b { font: 400 17px/1.15 "RaniraSeason", Georgia, serif; color: #fff; }
 .drf-mb small { font-size: 14px; color: #9aa7ba; }
 @media (prefers-reduced-motion: reduce) { .drf *, .drf *::before, .drf *::after { animation-duration: .01s !important; transition-duration: .01s !important; } }
+/* Alle Picks: Wappen, Portrait, Achsen-Noten, Ablöse + Gehalt wie im Transfermarkt (19.11.) */
+.drf .db .mz.pz { grid-template-columns: calc(2.4 * var(--u)) calc(2 * var(--u)) calc(2.2 * var(--u)) minmax(calc(5 * var(--u)), .9fr) calc(2.3 * var(--u)) minmax(calc(8 * var(--u)), 1.3fr) calc(9 * var(--u)) calc(4 * var(--u)) calc(4.4 * var(--u)); }
+.drf .db .mz.pz .lg { width: calc(2.2 * var(--u)); height: calc(2.2 * var(--u)); }
+.drf .db .mz.pz .lg img { width: 100%; height: 100%; object-fit: cover; }
+.drf .db .mz.pz .por { width: calc(2.3 * var(--u)); height: calc(2.6 * var(--u)); border-radius: calc(.3 * var(--u)); object-fit: cover; object-position: center 18%; }
+.drf .db .mz.pz .nm small { display: flex; align-items: center; gap: calc(.3 * var(--u)); white-space: nowrap; overflow: hidden; }

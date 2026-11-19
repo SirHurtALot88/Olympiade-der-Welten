@@ -32,6 +32,16 @@ import { bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-diszi
 import { berechneFreigabeAnzeige, freigabeKosten, freigabeSperre } from "@/lib/market/transfermarkt-freigabe";
 
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
+import KlassenFarbTag from "@/app/foundation/KlassenFarbTag";
+import WeitereFilterPanel from "./WeitereFilterPanel";
+import {
+  erfuelltFilter,
+  LEERE_FILTER,
+  mindestNoteLabel,
+  naechsteMindestNote,
+  zaehleAktiveFilter,
+  type WeitereFilter,
+} from "@/lib/market/transfermarkt-weitere-filter";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
@@ -138,7 +148,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const [nurBezahlbar, setNurBezahlbar] = useState(false);
   const [nurHebt, setNurHebt] = useState(false);
   const [nurMerkliste, setNurMerkliste] = useState(false);
-  const [achsenFilter, setAchsenFilter] = useState<MarktAchse | null>(null);
+  const [filter, setFilter] = useState<WeitereFilter>(LEERE_FILTER);
+  const [weitereOffen, setWeitereOffen] = useState(false);
   const [sortierung, setSortierung] = useState<SortKey>("eignung");
   const [blatt, setBlatt] = useState(0);
   const [fokusId, setFokusId] = useState<string | null>(props.initialPlayerId ?? null);
@@ -212,7 +223,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
       return w ? w.nachherBest < w.vorher : false;
     });
     if (nurMerkliste) liste = liste.filter((z) => merkliste.has(z.item.playerId));
-    if (achsenFilter) liste = liste.filter((z) => (z.sicht.achsen[achsenFilter].sortWert ?? -1) >= 3.5);
+    if (zaehleAktiveFilter(filter) > 0) liste = liste.filter((z) => erfuelltFilter(z.item, z.sicht, filter));
     const schluessel = (z: Zeile): number | null => {
       switch (sortierung) {
         case "eignung": return z.sicht.disziplinen[disziplin]?.schaetzung ?? null;
@@ -228,8 +239,9 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     };
     const aufsteigend = sortierung === "abloese" || sortierung === "gehalt";
     return sortiereNachSicht(liste, schluessel, aufsteigend ? 1 : -1);
-  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, achsenFilter, sortierung, disziplin, cash, wirkungJeZeile, merkliste]);
+  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, filter, sortierung, disziplin, cash, wirkungJeZeile, merkliste]);
 
+  const aktiveWeitere = zaehleAktiveFilter(filter);
   const seiten = Math.max(1, Math.ceil(gefiltert.length / SEITE));
   const seite = begrenze(blatt, 0, seiten - 1);
   const sichtbar = gefiltert.slice(seite * SEITE, seite * SEITE + SEITE);
@@ -416,17 +428,42 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
               <button type="button" className="knopf klein" onClick={() => setDialog({ art: "vergleich" })} disabled={pins.length < 1} data-testid="tm-vergleich-oeffnen">Vergleich ({pins.length})</button>
             </div>
             <div className="fl">
-              <span className="gk">Achse ≥ B</span>
-              {MARKT_ACHSEN.map((a) => (
-                <button type="button" key={a} className={`fc${achsenFilter === a ? " an" : ""}`} onClick={() => { setAchsenFilter((alt) => (alt === a ? null : a)); setBlatt(0); }}>{ACHSEN_LABEL[a]}</button>
-              ))}
+              <span className="gk">Achse mind.</span>
+              {MARKT_ACHSEN.map((a) => {
+                const min = filter.achsenMin[a];
+                return (
+                  <button
+                    type="button"
+                    key={a}
+                    className={`fc${min != null ? " an" : ""}`}
+                    data-testid={`tm-achse-${a}`}
+                    title="Klick: mindestens B, dann A, dann S, dann aus. Im Nebel zählt die obere Note der Gruppe."
+                    onClick={() => {
+                      setFilter((alt) => {
+                        const achsenMin = { ...alt.achsenMin };
+                        const next = naechsteMindestNote(achsenMin[a]);
+                        if (next == null) delete achsenMin[a];
+                        else achsenMin[a] = next;
+                        return { ...alt, achsenMin };
+                      });
+                      setBlatt(0);
+                    }}
+                  >
+                    {ACHSEN_LABEL[a]}{min != null ? ` ≥ ${mindestNoteLabel(min)}` : ""}
+                  </button>
+                );
+              })}
+              <button type="button" className={`fc${weitereOffen || aktiveWeitere > 0 ? " an" : ""}`} onClick={() => setWeitereOffen((v) => !v)} aria-expanded={weitereOffen} data-testid="tm-weitere-filter">
+                Weitere Filter{aktiveWeitere > 0 ? ` · ${aktiveWeitere}` : ""} {weitereOffen ? "▾" : "▸"}
+              </button>
               <span className="gk">Sortierung</span>
               {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
                 <button type="button" key={k} className={`fc${sortierung === k ? " an" : ""}`} onClick={() => { setSortierung(k); setBlatt(0); }} data-testid={`tm-sort-${k}`}>{SORT_LABEL[k]}</button>
               ))}
               <span className="sp" />
-              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setAchsenFilter(null); setSortierung("eignung"); setBlatt(0); }}>Filter zurücksetzen</button>
+              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFilter(LEERE_FILTER); setSortierung("eignung"); setBlatt(0); }}>Filter zurücksetzen</button>
             </div>
+            {weitereOffen ? <WeitereFilterPanel filter={filter} onChange={(f) => { setFilter(f); setBlatt(0); }} /> : null}
             <div className="mt" style={{ ["--zeilen" as string]: SEITE }} data-testid="tm-tabelle">
               <div className="mz kopf">
                 <span /><span />
@@ -456,7 +493,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
                     <span className="nm">
                       <b>{it.name}</b>
-                      <small>{it.className} · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
+                      <small><KlassenFarbTag className={it.className} /> · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
                     </span>
                     <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text} (Scouting-Stufe ${z.sicht.stufe}); Scouten schärft das Bild`) : "unbekannt"}>
                       <b className="t">{eignungText(z.sicht, disziplin)}</b>
