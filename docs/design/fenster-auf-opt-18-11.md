@@ -3,7 +3,7 @@
 Chris am 18.11., wörtlich: „Nein, man darf alle Spieler verkaufen, auch unter Minimum. Die KI soll danach ja einfach auf
 Optimum füllen! Die Kader können nicht einfach mit 8–9 Leuten fertig sein, dann sind die Roster zu star-lastig.“
 
-Baut auf **#1618** (Kaderpflicht-Freigabe, `kaufRahmen`), **#1629** (Kaderplan im organischen Planer) und **#1634**
+Enthält **#1629** (Kaderplan im organischen Planer); baut auf **#1618** (Kaderpflicht-Freigabe, `kaufRahmen`) und **#1634**
 (gemeinsames Transferfenster) auf.
 
 ## 1. Was sich ändert
@@ -82,60 +82,61 @@ es im Verkaufs-Popup („Brutto X − Buyout Y“, `docs/design/verkauf-popup.md
 KI-Verkaufslogik rechnet mit demselben Nettowert (`planOrganicSellsForTeam` → `resolveOpenBuyoutCostForRoster`). T-C verkaufte
 6 Spieler brutto 80,9 C, Buyout 34,6 C, netto 46,3 C — die Entscheidung kannte das Netto.
 
-## 4. Messung (32 KI-Teams, S1 → Fenster S2, zwei Basen)
+## 4. Messung (32 KI-Teams, S1 → Fenster S2, zwei Basen, Merge-Stand mit #1618 auf main, #1629 und Hebel (b))
 
 Zwei Basen, je ein neues Spiel mit 32 KI-Teams von Anfang an (`scripts/miss-teamfinanzen-saison.ts --stop-after spieltage`,
-Basis 2 mit `--mischen 7`), Liga-Draft und 20 Spieltage von Saison 1. Von jeder Basis zwei Kopien, derselbe Weg wie im Spiel
-(`scripts/miss-transferfenster-gemeinsam.ts`: Saisonabschluss → Saisonende-Kette → Saisonwechsel → KI-Lauf im Fenster):
-„alt“ mit `OLY_FENSTER_AUF_OPT=0` (Stand #1634 mit #1618/#1629), „neu“ im Standard. Wegwerf-SQLite, danach gelöscht.
-Basis 1 „neu“ zweimal gelaufen: Ergebnis gleich (121 Käufe, 50 Füller), der Lauf ist wiederholbar.
+Basis 2 mit `--mischen 7`), Liga-Draft und 20 Spieltage von Saison 1, gebaut auf dem Merge-Stand. Von jeder Basis zwei Kopien,
+derselbe Weg wie im Spiel (`scripts/miss-transferfenster-gemeinsam.ts`: Saisonabschluss → Saisonende-Kette → Saisonwechsel →
+KI-Lauf im Fenster): „alt“ mit `OLY_FENSTER_AUF_OPT=0`, „neu“ im Standard. Wegwerf-SQLite, danach gelöscht.
+„GM-Opt“ = das Ziel, mit dem der Planer im Fenster tatsächlich plante (Protokoll `kaderplan:<Team>:…:opt=N`), höchstens Opt.
 
-**Saison 1** (nach dem Draft, unverändert — Fenster auf Opt greift erst ab Saison 2, der S3-Teil ist ohne Gehaltsgrenze wirkungslos):
-Basis 1 Kader 9×3, 10×4, 11×6, 12×8, 13×2, 14×9; Basis 2 9×4, 10×3, 11×7, 12×8, 14×10; **0 Teams unter 8**. Gehalt Median
-66,6 / 66,3, im Band 50–70: 18 / 20 Teams.
+**Saison 1** (nach dem Draft; Fenster auf Opt und Hebel (b) greifen erst ab Saison 2): Basis 1 Kader 9×4, 10×4, 11×5, 12×8,
+13×3, 14×8; Basis 2 9×4, 10×4, 11×6, 12×6, 13×3, 14×9; **0 Teams unter 8**. Gehalt Median 65,8 / 67,5, im Band 50–70: 20 / 19.
 
 **Saison 2, Fenster:**
 
 | | Basis 1 alt | **Basis 1 neu** | Basis 2 alt | **Basis 2 neu** |
 |---|---:|---:|---:|---:|
-| Teams unter Opt | 22 | **9** | 23 | **8** |
-| Teams unter **GM-Opt** | 20 | **1** (V-W 11/12) | 22 | **2** (V-W 11/12, P-C 11/12) |
-| Teams bei 8–9 ohne GM-Grund | 7 | **0** | 2 | **0** |
-| Teams unter 8 | 1 (B-B 7) | **0** | 0 | **0** |
-| Kader min / Median / Summe | 7 / 10 / 325 | **9 / 12 / 376** | 9 / 10 / 334 | **9 / 12 / 379** |
-| Kaderverteilung | 7×1, 9×8, 10×13, 11×5, 12×4, 13×1 | 9×4, 10×4, 11×7, 12×6, 13×3, 14×8 | 9×3, 10×19, 11×6, 12×2, 13×1, 14×1 | 9×5, 11×10, 12×6, 13×2, 14×9 |
-| Verkäufe im Fenster (Summe) | 33 (297,4 C) | 51 (464,9 C) | 38 (391,2 C) | 58 (587,9 C) |
-| Teams mit Verkauf / danach unter 8 | 18 / 6 | 24 / 17 | 19 / 5 | 23 / 14 |
-| Käufe im Fenster (Summe) | 52 (1349,1 C) | **121** (1671,8 C) | 66 (1523,0 C) | **131** (1847,8 C) |
-| davon Füller < 12 | 11 | **50** | 17 | **45** |
-| Notweg-Zähler (Kaderplan) | – | 0 | – | 1 (`fueller_rueckfall`) |
-| Neue Kredite / Notkredite / Notverkäufe | 9 / 0 / 0 | 5 / 0 / 0 | 10 / 0 / 0 | 3 / 0 / 0 |
+| Teams unter 8 | 0 | **0** | 0 | **0** |
+| Teams unter GM-Opt | 21 | **2** (P-C 9/10, V-W 9/10) | 18 | **0** |
+| Teams bei 8–9 ohne GM-Grund | 8 | **2** (dieselben) | 4 | **0** |
+| Kader min / Median / Summe | 8 / 10 / 328 | 9 / 11,5 / 358 | 8 / 11 / 346 | 9 / 11 / 366 |
+| Verkäufe im Fenster (Summe) | 34 (392,9 C) | 64 (772,6 C) | 43 (437,6 C) | 66 (586,5 C) |
+| Teams mit Verkauf / danach unter 8 | 16 / 8 | 24 / 18 | 18 / 7 | 23 / 13 |
+| Käufe im Fenster (Summe) | 60 (1418,9 C) | 120 (1873,3 C) | 73 (1722,8 C) | 116 (2035,1 C) |
+| davon Füller < 12 | 14 | **19** | 19 | **20** |
+| Notwege (`fueller_rueckfall`) | – | 3 | – | 5 |
+| Neue Kredite / Notkredite / Notverkäufe | 9 / 0 / 0 | 4 / 0 / 0 | 6 / 0 / 0 | 4 / 0 / 0 |
 | Negative Kassen | 0 | 0 | 0 | 0 |
-| Kasse Summe / Median / min | 826,9 / 19,3 / 5,6 | 487,8 / 9,9 / 5,5 | 897,2 / 25,1 / 6,2 | 438,1 / 10,5 / 5,5 |
-| Kasse unter Notrücklage | 0 | 2 | 0 | 2 |
-| Transferbilanz S2 Median, positiv/negativ | −16,0, 6/24 | −25,5, 5/26 | −32,0, 5/26 | −29,4, 5/27 |
-| Gehalt je Team Median, im Band 50–70, min/max | 53,4, 20, 33,1/85,1 | 56,2, **22**, 37,1/93,3 | 57,9, 22, 33,2/90,5 | 58,7, **21**, 34,9/86,5 |
-| Kaderplan-Grund (opt erreicht / Tiefe vor Qualität / Rahmen erschöpft) | – | 17 / 11 / 4 | – | 13 / 14 / 5 |
-| Laufzeit KI-Lauf | 169 s | 208 s | 293 s | 289 s |
+| Kasse Summe / Median / min | 924,7 / 27,1 / 4,8 | 468,9 / 10,6 / 5,2 | 757,4 / 18,5 / 7,4 | 531,5 / 12,6 / 5,2 |
+| Kasse unter Notrücklage | 2 | **0** | 1 | 2 |
+| Transferbilanz S2 Median, positiv/negativ | −22,4, 6/26 | −15,1, 5/27 | −23,1, 8/24 | −26,4, 8/24 |
+| Gehalt je Team Median, im Band 50–70, min/max | 55,7, 15, 30,6/89,3 | 58,6, **20**, 36,0/90,5 | 58,4, 18, 42,2/82,2 | 59,2, **22**, 38,7/85,3 |
+| Kaderplan-Grund (opt erreicht / Rahmen erschöpft) | – | 27 / 5 | – | 30 / 2 |
 
 Lesart:
 
-* **Ziel erreicht:** kein Team unter 8, kein Team bei 8–9 ohne Grund. Die Teams bei 9 haben Opt oder GM-Opt 9 (z. B. B-P Opt 9;
-  N-N, P-S, R-L Opt 10 mit GM-Senkung). Unter GM-Opt bleiben 1 bzw. 2 Teams um einen Spieler, beide mit Protokoll
-  „Rahmen erschöpft“ (V-W: Kasse 6,0 nach dem Fenster).
-* Die KI verkauft mehr (51/58 statt 33/38), und deutlich mehr Teams fallen in der Verkaufsrunde unter 8 (17/14 statt 6/5) —
-  alle füllt die Kaufrunde wieder auf. Kein Notkauf, kein Notkredit, kein Notverkauf, keine negative Kasse; alle Füller kamen
-  aus dem Planer (`ai_organic_squad_buy`), keiner aus dem Verletzungs-Topup.
-* **Der Preis ist die Kasse und die Füllerquote:** Käufe +69/+65, Kasse ligaweit −339/−459 C, Median rund 10 statt 19–25.
-  41 % bzw. 34 % der Käufe liegen unter dem Platzpreis 12. Das sind geplante „Tiefe vor Qualität“-Plätze (der Rahmen trägt
-  nicht alle Plätze bis Opt zum Platzpreis), keine Notwege — aber es sind Füller. Siehe offene Punkte.
-* Gehalt: Median 56–59, 21–22 Teams im Band 50–70 (vorher 20–22), Ausreißer bis 93 (H-R mit „Alles auf eine Karte“).
+* **0 Teams unter 8** in allen vier Läufen. Unter GM-Opt bleiben 2 (Basis 1) bzw. 0 Teams; die beiden (P-C, V-W) hat Hebel (b) auf
+  10 gesenkt, sie enden mit „Rahmen erschöpft“ bei 9.
+* **Füller deutlich runter:** 19 / 20 statt 45–50 in der ersten Fassung (Runde 1, Tabelle unten) und praktisch auf dem Niveau des
+  alten Stands (14 / 19) — bei doppelt so vielen Käufen.
+* Hebel (b) bringt dafür **Notwege** (`fueller_rueckfall` 3 / 5): der gesenkte Opt wird genau so gewählt, dass der Rahmen alle
+  Plätze zum Platzpreis trägt; kauft der Planer davor stärkere (teurere) Spieler als die reservierten billigsten 12er, reicht es für
+  den letzten Platz nur noch für einen Füller. Kein Notkauf, aber laut Protokoll ein Plan, der seine Reserve nicht ganz hielt.
+* Kasse: kein Minus, kein Notkredit, kein Notverkauf. Median rund 11–13 statt 18–27; unter der Notrücklage 0 bzw. 2 Teams.
+* Gehalt: Median 58–59, 20 / 22 Teams im Band 50–70 (alt 15 / 18).
+
+**Runde 1 (vor Hebel (b), Stand vor dem Merge von #1618 auf main):** Basis 1 / 2 neu: 0 unter 8, unter GM-Opt 1 / 2, aber
+**50 / 45 Füller** (alt 11 / 17), 0 / 1 Notwege, Kasse Median 9,9 / 10,5. Auslöser für Hebel (b).
+**Runde 2 (Hebel (b), vor dem Merge):** Basis 1 / 2 neu: Füller 9 / 19, Notwege 1 / 0, unter GM-Opt V-V 8/9 / keins.
 
 ## 5. Tests
 
 * `tests/fenster-auf-opt.test.ts` — Schalter; S3: Gehaltsrahmen für vier Plätze → kein Star, der die Plätze auffrisst, Kader 12,
   keine Füller, Rahmen gehalten (für Topf und Kaderpflicht-Grenze; ohne die Reservierung rot); der Rahmen meldet das
   reservierte Gehalt; ohne Gehaltsgrenze ändert sich nichts; Quellprüfung Verkaufsrunde, Kaufweg, Kassensturz.
+  Hebel (b) auf dem echten Saison-1-Pool: knappe Kasse senkt das Ziel (höchstens −2, nie unter Minimum + 1, mit Protokollgrund),
+  reiche nicht; Saison 1 und der alte Stand senken nicht.
 * `tests/preseason-hintergrundlauf-kauffenster.test.ts` — Standard: Verkaufsrunde, Kaufrunde, Nachrunde über die Sitzung, kein
   Marktplan; alter Stand per Schalter wie bisher.
 * Angepasst (begründet): `tests/ki-kaderplan-prototyp.test.ts` (Kaderplan ab Saison 2 an, mit Schalter aus),
@@ -150,20 +151,18 @@ Wertungs-Fingerabdruck nach dem Merge von main: `GESAMT d3a39030a3ef (75 Eintrae
 
 ## 6. Offene Punkte
 
-1. **Füllerquote (Entscheidung für Chris).** Mit freiem Verkauf und Auffüllen bis Opt kauft die KI 45–50 Füller (< 12) je
-   Fenster (vorher 11–17). Typisch: T-C verkauft 6 Spieler (netto 46 C, 34,6 C gingen als Restgehalt-Ablösung weg) und füllt
-   mit 7 Spielern um 6,5 C auf 14 auf. Chris’ zwei Vorgaben — „nicht mit 8–9 fertig“ und „keine Füller“ — stoßen sich, sobald
-   die Kasse nicht alle Plätze zum Platzpreis trägt. Mögliche Hebel, nicht umgesetzt: (a) die Verkaufsrunde verkauft nur, wenn der
-   Nachkauf des Platzes zum Platzpreis im Rahmen bleibt (ändert die Verkaufslogik, war ausdrücklich ausgeschlossen);
-   (b) GM-Senkung stärker nutzen, wenn der Rahmen nur Füller trägt (weniger, dafür stärker); (c) Füller-Platzpreis an den
-   Markt nach dem Saisonende koppeln statt fest 12.
-2. **Kasse:** Median ~10 nach dem Fenster, 2 Teams unter der Notrücklage. Kein Minus, kein Notkredit — aber wenig Puffer für
-   die Saison.
-3. **Nicht über Transfers erklärte Kassenabflüsse im Fenster** (in beiden Ständen, im neuen größer): Kasse Ende − (Start +
-   Verkäufe − Käufe) summiert sich in Basis 1 auf −94,9 C (alt) bzw. −278,9 C (neu). Ein Teil sind Gebäude (z. B. G-G 24,7 C,
-   W-L 20,8 C), ein Rest ist im Kontoauszug nicht sichtbar (T-C −41,8 C ohne Gebäude, Kredit oder Vertragsende). Nicht von
-   dieser Änderung eingeführt (der alte Stand zeigt dasselbe Muster), aber für die Füllerfrage relevant — eigener Auftrag.
-4. Die Lockerung nach Verkäufen (#1618) greift im gemeinsamen Fenster nie, weil Erlöse dort ohnehin zu 100 % frei sind (Merge
-   #1618 × #1634). Die Finanzseite zeigt sie trotzdem an; ggf. dort ausblenden (Datei des Finanz-Agenten).
-5. Die S1-Kaderaufbau-Karte von #1634 lag in der alten Finanzseite (`FoundationFinancesNewLook.tsx`), die #1618 entfernt; sie
-   gehört in die neue Finanzseite (#1618).
+1. **Notwege durch Hebel (b)** (3 / 5 `fueller_rueckfall` je Fenster): der gesenkte Opt ist auf Kante gerechnet. Möglicher Feinschliff:
+   beim Senken einen Platz Luft lassen (das größte Ziel wählen, das der Rahmen mit Reserve für einen teureren Kauf trägt) oder den
+   Rahmen mit dem Median statt den billigsten Preisen ab 12 rechnen. Nicht umgesetzt (PM: „nichts Weiteres anfangen“).
+2. **Unter GM-Opt bei 9** (Basis 1: P-C, V-W; Runde 2: V-V 8/9). Muster V-V (Runde 2, am Spielstand verfolgt): Kader 6, verkauft 2
+   auf 4, kauft bis 8, dann ist die Kasse leer. Unter dem Minimum deckt die Kaderpflicht-Grenze (`kaufRahmen().grenzeFuer`, #1618)
+   nur die Plätze bis zum Minimum; der Kaderplan reserviert am 7. Platz deshalb nichts mehr für den 9., kauft einen 21-C-Spieler,
+   und ab 8 sperrt die Notrücklage die Plätze bis Opt. Lösung wäre, dass der Rahmen unter dem Minimum die Plätze Minimum → Ziel
+   gegen die Grenze „ab Minimum“ (Kasse − Notrücklage) mitplant; Planer- und Finanzfrage, nicht umgesetzt.
+3. **Kasse:** Median ~11–13 nach dem Fenster (alt 18–27). Kein Minus, kein Notkredit — aber wenig Puffer für die Saison.
+4. **Nicht über Transfers erklärte Kassenabflüsse im Fenster** (in beiden Ständen): Kasse Ende − (Start + Verkäufe − Käufe) war in
+   Runde 1 bei Basis 1 −94,9 C (alt) bzw. −278,9 C (neu). Ein Teil sind Gebäude (z. B. G-G 24,7 C, W-L 20,8 C), ein Rest ist im
+   Kontoauszug nicht sichtbar (T-C −41,8 C ohne Gebäude, Kredit oder Vertragsende). Nicht von dieser Änderung eingeführt — eigener
+   Auftrag.
+5. Die S1-Kaderaufbau-Karte von #1634 lag in der alten Finanzseite; ob die neue Finanzseite (#1618, main) sie zeigt, ist Sache der
+   Finanzseite.
