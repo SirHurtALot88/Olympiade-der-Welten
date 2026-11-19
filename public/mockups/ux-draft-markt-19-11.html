@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UX-Review Draft und Transfermarkt (Mockup 19.11.)</title>
+<!--
+  UX-REVIEW DRAFT + TRANSFERMARKT (Fable, 19.11.). Erklaerung: docs/design/ux-review-draft-markt-19-11.md
+  Zeigt EINE Klickregel fuer alle drei Spalten beider Seiten und das gemeinsame Panel "Mein Kader" rechts.
+  Stil: Tokens und Klassen aus draft-modern-18-11.html / transfermarkt-modern-18-11.html (Designsystem vom 17.11.).
+  ECHT: Spielernamen, Portraits, Wappen, Kulisse. ERFUNDEN: alle Zahlen (Eignung, Abloese, Gehalt, Raenge, Kasse).
+  Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  URL: #draft  #markt  #regel
+  Tasten: Pfeil hoch/runter = Auswahl in der Liste, Enter = Profil, Esc = schliessen, im Profil Pfeil links/rechts = blaettern.
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+.t{font-variant-numeric:tabular-nums}
+.app{height:100vh;display:grid;grid-template-rows:auto 1fr;gap:.6rem;padding:.7rem .9rem .8rem}
+
+/* Regieband */
+.band{display:flex;align-items:center;gap:1.4rem;padding:.2rem .3rem .5rem;border-bottom:1px solid var(--linie)}
+.band .ti em{display:block;font-style:normal;font-size:.68rem;letter-spacing:.18em;color:var(--gold);font-weight:700;text-transform:uppercase}
+.band .ti h1{margin:0;font:400 1.9rem/1 var(--haus);color:#fff}
+.band nav{display:flex;gap:1.3rem;align-self:flex-end;padding-bottom:.15rem}
+.band nav button{font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.86rem;color:var(--leise);padding:.3rem 0;border-bottom:2px solid transparent}
+.band nav button.an{color:var(--gold);border-color:var(--gold)}
+.band .sp{flex:1}
+.kpi{padding:.3rem .8rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-1)}
+.kpi small{display:block;font-size:.6rem;letter-spacing:.16em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.kpi b{font-size:1.25rem;font-weight:700;color:var(--creme)}
+.kpi b i{font-style:normal;font-size:.75rem;color:var(--leise);font-weight:600}
+.tasten{display:flex;gap:.9rem;font-size:.8rem;color:var(--leise);align-items:center}
+kbd{display:inline-block;min-width:1.5rem;text-align:center;padding:.05rem .35rem;border:1px solid var(--linie-2);border-bottom-width:2px;border-radius:.3rem;background:var(--flaeche-2);font:600 .78rem var(--zahl);color:var(--creme)}
+
+/* Drei Spalten */
+.drei{display:grid;grid-template-columns:26.5rem minmax(0,1fr) 27rem;gap:.7rem;min-height:0}
+.spl{display:grid;gap:.7rem;min-height:0;grid-template-rows:auto minmax(0,1fr)}
+.pan{background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.pk{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem .45rem}
+.pk h2{margin:0;font:400 1.3rem/1 var(--haus);color:#fff}
+.pk .sp{flex:1}
+.gk{font-size:.64rem;letter-spacing:.16em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.tag{display:inline-block;padding:.05rem .4rem;border:1px solid var(--linie-2);border-radius:.2rem;font-size:.64rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);white-space:nowrap}
+.tag.go{color:var(--gold);border-color:rgba(240,195,90,.6)} .tag.g{color:var(--gut);border-color:rgba(98,211,148,.55)}
+.tag.w{color:var(--warn);border-color:rgba(255,96,88,.55)} .tag.a{color:var(--acht);border-color:rgba(243,181,74,.55)}
+.tag.voll{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.knopf{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.42rem .9rem;border:1px solid var(--linie-2);border-radius:.3rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:.8rem;color:var(--creme);white-space:nowrap}
+.knopf:hover{border-color:var(--gold);color:var(--gold)}
+.knopf.haupt{background:var(--gold);border-color:var(--gold);color:#17120a;clip-path:polygon(.5rem 0,100% 0,calc(100% - .5rem) 100%,0 100%);padding-inline:1.2rem}
+.knopf.haupt:hover{color:#17120a;filter:brightness(1.08)}
+.knopf.klein{padding:.22rem .55rem;font-size:.7rem}
+.knopf.haupt.klein{padding-inline:.85rem}
+
+/* Links: Team-Kopf und Top-3-Karten */
+.tkopf{display:flex;align-items:center;gap:.7rem;padding:.2rem .9rem .5rem}
+.tkopf img{width:3rem;height:3rem;border-radius:.4rem;border:1px solid var(--linie-2);object-fit:cover}
+.tkopf b{display:block;font:400 1.35rem/1.05 var(--haus);color:#fff}
+.tkopf small{color:var(--leise);font-size:.8rem}
+.f3k{display:flex;justify-content:space-between;align-items:baseline;padding:0 .9rem .3rem}
+.f3k small{font-size:.72rem;color:var(--leise)}
+.fav3{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;padding:0 .9rem;height:13.4rem}
+.fk{position:relative;border-radius:.5rem;overflow:hidden;border:1px solid var(--linie-2);background:#0b0e14;isolation:isolate;cursor:pointer;display:block;transition:transform .12s,border-color .12s}
+.fk:hover{border-color:var(--gold)}
+.fk img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 15%;z-index:-2}
+.fk::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,8,12,.05) 30%,rgba(6,8,12,.97) 76%)}
+.fk .rk{position:absolute;left:0;top:.45rem;padding:.05rem .7rem .05rem .5rem;background:var(--flaeche-3);color:var(--creme);font-weight:700;font-size:.9rem;clip-path:polygon(0 0,100% 0,calc(100% - .4rem) 100%,0 100%)}
+.fk.e1 .rk{background:var(--gold);color:#17120a}
+.fk .un{position:absolute;left:.5rem;right:.5rem;bottom:.45rem}
+.fk .un b{display:block;font:400 1.05rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fk .un small{display:block;font-size:.74rem;color:var(--leise)}
+.fk .un .zw{display:flex;justify-content:space-between;align-items:baseline;margin-top:.2rem;font-size:.72rem;color:var(--leise)}
+.fk .un .zw strong{font-size:1.05rem;color:var(--creme)}
+.fk.an{border:2px solid var(--gold);box-shadow:0 0 1rem rgba(240,195,90,.4);transform:translateY(-.15rem)}
+.fk .mk{position:absolute;right:.35rem;top:.4rem}
+.fk .hv{position:absolute;left:0;right:0;top:24%;text-align:center;padding:.22rem 0;background:rgba(6,8,12,.86);color:var(--creme);font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:0;transition:opacity .12s;border-block:1px solid var(--linie-2)}
+.fk:hover .hv{opacity:1}
+.fk.an .hv{color:var(--gold)}
+.zfuss{padding:.5rem .9rem .6rem;font-size:.78rem;color:var(--leise)}
+.zfuss b{color:var(--creme)}
+.nxl{overflow:hidden}
+.nx{display:grid;grid-template-columns:2.3rem 2.2rem 1fr auto;gap:.5rem;align-items:center;padding:.42rem .9rem;border-top:1px solid var(--linie)}
+.nx .nr{color:var(--stumm);font-weight:700;font-size:.82rem}
+.nx img.lg{width:2rem;height:2rem;border-radius:.3rem;object-fit:cover}
+.nx b{display:block;font:400 1rem/1.1 var(--haus);color:#fff}
+.nx small{font-size:.72rem;color:var(--leise)}
+.nx.ich{background:linear-gradient(90deg,rgba(242,160,61,.16),transparent);box-shadow:inset 3px 0 0 var(--heim)}
+.nx .mp{display:flex;gap:.15rem}
+.nx .mp img{width:1.7rem;height:1.9rem;object-fit:cover;border-radius:.2rem;border:1px solid var(--linie);cursor:pointer}
+.nx .mp img:hover,.nx .mp img.an{border-color:var(--gold)}
+
+/* Mitte: Liste */
+.fz{display:flex;gap:.4rem;align-items:center;padding:0 .9rem .45rem;flex-wrap:wrap}
+.such{flex:0 0 11rem;padding:.35rem .6rem;border:1px solid var(--linie-2);border-radius:.3rem;color:var(--stumm);font-size:.82rem}
+.fc{padding:.28rem .65rem;border:1px solid var(--linie-2);border-radius:1rem;font-size:.76rem;font-weight:600;color:var(--leise)}
+.fc.an{background:var(--gold);border-color:var(--gold);color:#17120a}
+.dz{display:flex;gap:.22rem;align-items:center;padding:0 .9rem .5rem}
+.dz button{padding:.2rem .42rem;border:1px solid var(--linie);border-radius:.2rem;font-size:.66rem;font-weight:700;letter-spacing:.06em;color:var(--leise)}
+.dz button.an{background:var(--gold);border-color:var(--gold);color:#17120a}
+.mt{flex:1;min-height:0;display:flex;flex-direction:column}
+.mz{display:grid;grid-template-columns:1.6rem 2.5rem minmax(9rem,1.5fr) 9.5rem 9rem 4.2rem 4.2rem 13.5rem;gap:.6rem;align-items:center;padding:0 .9rem;flex:1;min-height:0;max-height:3.9rem;border-top:1px solid var(--linie);cursor:pointer;position:relative}
+.mz.kopf{flex:0 0 1.7rem;cursor:default;font-size:.62rem;letter-spacing:.14em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.mz:not(.kopf):hover{background:rgba(244,230,196,.045)}
+.mz.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.05));box-shadow:inset 3px 0 0 var(--gold)}
+.mz .st{color:var(--stumm);font-size:1rem;text-align:center}
+.mz .st.an{color:var(--gold)}
+.mz img.por{width:2.5rem;height:2.9rem;object-fit:cover;object-position:center 12%;border-radius:.25rem;border:1px solid var(--linie)}
+.mz.an img.por{border-color:var(--gold)}
+.mz .nm b{display:block;font:400 1.12rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mz .nm b u{text-decoration:underline dotted rgba(244,230,196,.45);text-underline-offset:3px}
+.mz .nm b u:hover{color:var(--gold);text-decoration-style:solid}
+.mz .nm small{font-size:.74rem;color:var(--leise)}
+.mz .eg{display:flex;align-items:center;gap:.5rem}
+.mz .eg b{font-size:1.1rem;font-weight:700;color:var(--creme);min-width:1.6rem}
+.bal{flex:1;height:.34rem;background:var(--flaeche-3);border-radius:.2rem;position:relative;overflow:hidden}
+.bal i{position:absolute;left:0;top:0;bottom:0;background:var(--gold);border-radius:.2rem}
+.bal i.z{background:var(--gut)}
+.mz .ax{display:flex;gap:.25rem}
+.mz .ax i{font-style:normal;flex:1;text-align:center;font-size:.76rem;font-weight:600;padding:.08rem 0;border-radius:.15rem;background:var(--flaeche-2);color:var(--leise)}
+.mz .ax i.h{background:rgba(240,195,90,.85);color:#17120a} .mz .ax i.m{background:rgba(240,195,90,.28);color:var(--creme)}
+.mz .re{text-align:right;font-size:1.02rem;font-weight:700;color:var(--creme)}
+.mz .re.zt{color:var(--warn)}
+.mz .ak{display:flex;justify-content:flex-end;align-items:center;gap:.35rem}
+.mz .hw{font-size:.68rem;color:var(--stumm);letter-spacing:.1em;text-transform:uppercase;font-weight:700;opacity:0}
+.mz:hover .hw{opacity:1}
+.mfuss{display:flex;gap:1rem;align-items:center;padding:.4rem .9rem;border-top:1px solid var(--linie);font-size:.76rem;color:var(--leise)}
+.mfuss .sp{flex:1}
+.mfuss b{color:var(--gold)}
+
+/* Rechts: Auswahl + Mein Kader */
+.buehne-f{position:relative;height:8.6rem;background:#0b0e14 center 60%/cover;flex:none;cursor:pointer}
+.buehne-f::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,8,12,.94) 0,rgba(6,8,12,.55) 55%,rgba(6,8,12,.15) 100%)}
+.buehne-f img{position:absolute;right:.7rem;top:.5rem;bottom:.5rem;height:calc(100% - 1rem);aspect-ratio:.82;object-fit:cover;object-position:center 12%;border-radius:.3rem;border:1px solid var(--linie-2);z-index:1}
+.buehne-f .txt{position:absolute;left:.9rem;bottom:.5rem;z-index:1}
+.buehne-f .txt em{display:block;font-style:normal;font-size:.66rem;letter-spacing:.16em;color:var(--gold);font-weight:700;text-transform:uppercase}
+.buehne-f .txt h3{margin:0;font:400 1.7rem/1.05 var(--haus);color:#fff}
+.buehne-f .pf{position:absolute;left:.9rem;top:.55rem;z-index:1}
+.buehne-f:hover .pf{color:var(--gold);border-color:var(--gold)}
+.fb{padding:.55rem .9rem .7rem;display:flex;flex-direction:column;gap:.5rem;min-height:0;flex:1}
+.kost{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.kost small{display:block;font-size:.6rem;letter-spacing:.14em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.kost strong{font-size:1.45rem;font-weight:700;color:var(--creme);line-height:1}
+.kost em{display:block;font-style:normal;font-size:.7rem;color:var(--leise)}
+.akt{display:flex;gap:.4rem}
+.hin{font-size:.76rem;color:var(--leise)}
+.hin b{color:var(--acht)}
+h4{margin:.25rem 0 0;display:flex;align-items:baseline;gap:.5rem;font:400 1rem/1 var(--haus);color:var(--creme);letter-spacing:.04em}
+h4 span{margin-left:auto;font:700 .62rem var(--zahl);letter-spacing:.14em;color:var(--stumm);text-transform:uppercase}
+.wk{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.wk div{border:1px solid var(--linie);border-radius:.35rem;padding:.3rem .5rem;background:var(--flaeche-2)}
+.wk b{display:block;font:400 .95rem/1.1 var(--haus);color:#fff}
+.wk small{font-size:.78rem;color:var(--leise)}
+.wk small i{font-style:normal;color:var(--gut);font-weight:700;font-size:.95rem}
+.wk small i.gl{color:var(--stumm)}
+.kl{display:flex;flex-direction:column;min-height:0}
+.kr{display:grid;grid-template-columns:1.3rem 1.7rem 1fr 6rem 2rem;gap:.45rem;align-items:center;height:1.95rem;padding:0 .3rem;border-radius:.25rem;cursor:pointer;font-size:.9rem}
+.kr:hover{background:rgba(244,230,196,.07)}
+.kr:hover .n{color:var(--gold)}
+.kr .p{color:var(--stumm);font-weight:700;font-size:.78rem;text-align:right}
+.kr img{width:1.7rem;height:1.7rem;object-fit:cover;object-position:center 10%;border-radius:.2rem;border:1px solid var(--linie)}
+.kr .n{font:400 .95rem/1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kr .n small{font:500 .7rem var(--zahl);color:var(--leise);margin-left:.3rem}
+.kr .w{font-weight:700;color:var(--creme);text-align:right}
+.kr.neu{background:rgba(240,195,90,.14);box-shadow:inset 2px 0 0 var(--gold)}
+.kr.neu .n{color:var(--gold)}
+.kr.raus{opacity:.55}
+.kr.leer{cursor:default;color:var(--warn);font-size:.74rem;border:1px dashed rgba(255,96,88,.45);margin-top:.2rem;display:flex;justify-content:center;letter-spacing:.1em;font-weight:700;text-transform:uppercase;height:1.7rem}
+.kr.leer.opt{color:var(--gut);border-color:rgba(98,211,148,.45)}
+.kr.leer:hover{background:none}
+.trenn{display:flex;align-items:center;gap:.5rem;font-size:.6rem;letter-spacing:.14em;color:var(--stumm);font-weight:700;text-transform:uppercase;margin:.12rem 0}
+.trenn::before,.trenn::after{content:"";flex:1;border-top:1px dashed var(--linie-2)}
+.stapel{display:flex;height:.6rem;border-radius:.2rem;overflow:hidden;background:var(--flaeche-3)}
+.stapel i{display:block;height:100%}
+.gz{display:flex;justify-content:space-between;font-size:.86rem;color:var(--leise)}
+.gz b{color:var(--creme)} .gz b.plus{color:var(--gut)}
+.zaehl{display:flex;gap:.2rem}
+.zaehl i{flex:1;height:.42rem;border-radius:.1rem;background:var(--flaeche-3);border:1px solid var(--linie)}
+.zaehl i.v{background:var(--creme);border-color:var(--creme)} .zaehl i.n{background:var(--gold);border-color:var(--gold)}
+.zaehl i.pf{border-color:rgba(255,96,88,.6)} .zaehl i.op{border-color:rgba(98,211,148,.5)}
+
+/* Nicht picken: Auslassen, Fertig, Ueberspringen */
+.np{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.np button{display:block;border:1px solid var(--linie-2);border-radius:.35rem;padding:.32rem .5rem .36rem;background:var(--flaeche-2)}
+.np button b{display:block;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:.74rem;color:var(--creme)}
+.np button small{display:block;font-size:.7rem;line-height:1.15;color:var(--leise);margin-top:.1rem}
+.np button:hover{border-color:var(--gold)} .np button:hover b{color:var(--gold)}
+.np button.zu{cursor:not-allowed;border-style:dashed;border-color:var(--linie)} .np button.zu b{color:var(--stumm)} .np button.zu small{color:var(--warn)}
+.np button.zu:hover{border-color:var(--linie)} .np button.zu:hover b{color:var(--stumm)}
+.dlg{width:44rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);padding:1.1rem 1.4rem 1.2rem;box-shadow:0 2rem 5rem rgba(0,0,0,.7)}
+.dlg.breit{width:58rem}
+.dlg em{font-style:normal;font-size:.68rem;letter-spacing:.18em;color:var(--gold);font-weight:700;text-transform:uppercase}
+.dlg h2{margin:.1rem 0 .6rem;font:400 1.9rem/1 var(--haus);color:#fff}
+.dlg p{margin:0 0 .7rem;color:var(--leise);font-size:1rem;line-height:1.35} .dlg p b{color:var(--creme)}
+.dlg .fakt{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.9rem}
+.dlg .fakt div{border:1px solid var(--linie);border-radius:.35rem;padding:.4rem .6rem;background:var(--flaeche-2)}
+.dlg .fakt small{display:block;font-size:.6rem;letter-spacing:.14em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.dlg .fakt b{font-size:1.3rem;color:var(--creme)} .dlg .fakt span{display:block;font-size:.76rem;color:var(--leise)}
+.dlg .fuss{display:flex;gap:.6rem;justify-content:flex-end;align-items:center}
+.dlg .fuss small{margin-right:auto;color:var(--stumm);font-size:.8rem}
+.dlg .zwei{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.9rem}
+.dlg .zwei>div{border:1px solid var(--linie);border-radius:.4rem;padding:.7rem .9rem;background:var(--flaeche-2);display:flex;flex-direction:column;gap:.4rem}
+.dlg .zwei h3{margin:0;font:400 1.2rem/1.1 var(--haus);color:#fff}
+.dlg .zwei p{font-size:.9rem;margin:0;flex:1}
+.schalt{display:flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden}
+.schalt button{padding:.3rem .6rem;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--leise)}
+.schalt button.an{background:var(--flaeche-3);color:var(--gold)}
+
+/* Markt links */
+.gross{display:flex;align-items:baseline;gap:.7rem;padding:0 .9rem}
+.gross strong{font-size:2.3rem;font-weight:700;color:var(--creme);line-height:1}
+.gross small{color:var(--leise);font-size:.8rem}
+.ks{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 .5rem .4rem}
+.kz{display:grid;grid-template-columns:1fr 5.5rem 2.2rem 3.6rem;gap:.5rem;align-items:center;flex:1;min-height:0;padding:0 .4rem;border-radius:.2rem;font-size:.9rem;color:var(--tinte)}
+.kz.kopf{flex:0 0 1.4rem;font-size:.6rem;letter-spacing:.14em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.kz.an{background:rgba(240,195,90,.16);box-shadow:inset 2px 0 0 var(--gold)}
+.kz .r{text-align:right;font-weight:700} .kz .r.schl{color:var(--warn)} .kz .r.gutr{color:var(--gut)}
+.kz .w{font-weight:700;color:var(--gut);font-size:.84rem} .kz .w.gl{color:var(--stumm)}
+
+/* Profil-Attrappe */
+.schleier{position:fixed;inset:0;background:rgba(2,3,5,.78);display:none;align-items:center;justify-content:center;z-index:50}
+.schleier.auf{display:flex}
+.profil{width:62rem;height:38rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);display:grid;grid-template-columns:22rem 1fr;overflow:hidden;box-shadow:0 2rem 5rem rgba(0,0,0,.7)}
+.profil .bild{position:relative;background:#0b0e14}
+.profil .bild img{width:100%;height:100%;object-fit:cover;object-position:center 10%}
+.profil .bild::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(6,8,12,.95))}
+.profil .bild div{position:absolute;left:1.2rem;bottom:1rem;z-index:1}
+.profil .bild em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;color:var(--gold);font-weight:700;text-transform:uppercase}
+.profil .bild h3{margin:0;font:400 2.4rem/1 var(--haus);color:#fff}
+.profil .in{padding:1.1rem 1.4rem;display:flex;flex-direction:column;gap:.8rem}
+.profil .lei{display:flex;gap:.6rem;align-items:center}
+.profil .lei .sp{flex:1}
+.profil p{margin:0;color:var(--leise);font-size:.95rem;line-height:1.35}
+.profil p b{color:var(--creme)}
+.att{display:grid;grid-template-columns:1fr 1fr;gap:.35rem 1.4rem}
+.att div{display:grid;grid-template-columns:5.5rem 1fr 2rem;gap:.5rem;align-items:center;font-size:.9rem;color:var(--leise)}
+.att div b{color:var(--creme);text-align:right}
+
+/* Regel-Blatt */
+.regel{overflow:auto;padding:.4rem 1.2rem 1.2rem;display:grid;grid-template-columns:1.25fr 1fr;gap:1.4rem;align-content:start}
+.regel h3{margin:.6rem 0 .5rem;font:400 1.5rem/1 var(--haus);color:#fff}
+.regel table{width:100%;border-collapse:collapse;font-size:.98rem}
+.regel th{text-align:left;font-size:.64rem;letter-spacing:.14em;color:var(--stumm);text-transform:uppercase;padding:.35rem .5rem;border-bottom:1px solid var(--linie-2)}
+.regel td{padding:.42rem .5rem;border-bottom:1px solid var(--linie);vertical-align:top;color:var(--tinte)}
+.regel td small{display:block;color:var(--leise);font-size:.8rem}
+.regel td.neu{color:var(--gold);font-weight:600}
+.merk{border:1px solid rgba(240,195,90,.5);border-radius:var(--r);padding:.9rem 1.1rem;background:rgba(240,195,90,.07);font-size:1.1rem;line-height:1.35}
+.merk b{color:var(--gold)}
+.regel li{margin:.3rem 0;color:var(--leise);line-height:1.35} .regel li b{color:var(--creme)}
+
+.toast{position:fixed;left:50%;bottom:3.4rem;transform:translateX(-50%);padding:.45rem 1rem;border:1px solid var(--linie-2);border-radius:2rem;background:rgba(12,16,23,.95);font-size:.86rem;color:var(--creme);z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.auf{opacity:1}
+.toast b{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="band">
+    <div class="ti"><em id="b-ober"></em><h1 id="b-titel"></h1></div>
+    <nav>
+      <button data-ans="draft">Draft · Live</button>
+      <button data-ans="markt">Transfermarkt · Markt</button>
+      <button data-ans="regel">Die Klickregel</button>
+    </nav>
+    <span class="sp"></span>
+    <div class="schalt" id="b-schalt" title="Nur im Mockup: zwei Kaderstände zum Ansehen"><button data-g="0">Kader 3</button><button data-g="1">Kader 9</button></div>
+    <div class="tasten"><span><kbd>↑</kbd> <kbd>↓</kbd> Auswahl</span><span><kbd>Enter</kbd> Profil</span><span><kbd>Esc</kbd> schließen</span></div>
+    <div class="kpi"><small>Kasse frei</small><b class="t" id="b-kasse"></b></div>
+    <div class="kpi"><small>Mein Kader</small><b class="t" id="b-kader"></b></div>
+  </header>
+  <main id="haupt" style="min-height:0;display:grid"></main>
+</div>
+<div class="schleier" id="schleier"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* Mockup-Logik. Alle Zahlen sind Attrappe. Die Klickregel ist echt umgesetzt: siehe klick(). */
+function $(id){return document.getElementById(id)}
+function de(x,nk){return x.toFixed(nk==null?1:nk).replace(".",",")}
+function slug(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")}
+function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return ((h>>>0)%10000)/10000}
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+var DK=["TDM","MDM","BF","GEW","CLI","STA","TT","SPU","TEN","HOC","SHO","SCH","TAK","BRK","WET","BAS","FOO","EIS","FEC","SPY"];
+var DN=["TDM","Mini DM","Battlefield","Gewichtheben","Climbing","Staffel","Time Trial","Spurt","Tennis","Hockey","Showcase","Speed-Schach","Takeshi","Breaking","Wettessen","Basketball","Football","Eiskunstlauf","Fechten","I-Spy"];
+function P(n,k,r,ov,mw,geh){return {n:n,s:slug(n),k:k,r:r,ov:ov,mw:mw,geh:geh}}
+var FREI=[P("Lyranael","Templar","Divine",91,113.5,27.6),P("Severiel","Hero","Divine",90,112.5,26.1),P("Citrine Miri","Warlord","Demon",84,82.8,21.7),
+  P("Dante Wickmore","Rogue","Human",83,89.3,21.4),P("Fleshbreed","Templar","Demon",82,80.3,21.6),P("Gor'Than Prime","Templar","Animal",81,76.9,22.3),
+  P("Ivy Sentinel","Tank","Divine",80,82.7,19.6),P("Jasper Kane","Warlord","Alien",78,70.6,14.1),P("Jump & Slash","Charger","Animal",77,68.1,18.6),
+  P("Kargath","Berserker","Human",74,58.5,14.2),P("Keldrim","Overseer","Elf",73,83.1,20.1),P("Kelektros","Charger","Dragon",72,65.7,17.2),
+  P("Leomon","Hero","Animal",70,81.2,18.5),P("Watcher","Rogue","Lizard",66,67.1,16.0)];
+var KADER_MARKT=[P("Umbrafond","Berserker","Plant",79,48,10.6),P("Malagor","Templar","Demon",77,71,17.8),P("Varric Frankenstein","Tank","Human",74,46,9.8),
+  P("Galactus","Templar","Voidborn",72,51.6,14),P("Steel Sentinel","Hero","Construct",70,54.6,13.8),P("Darkblade","Rogue","Voidborn",68,54,13.6),
+  P("Mavra","Charger","Orc",66,41.4,11.8),P("Kaijo Murane","Rogue","Aqua",64,57.7,13.6),P("Treantos","Warlord","Construct",61,35.5,6.8),P("Brontar","Tank","Construct",58,30.1,7.2)];
+var KADER_DRAFT=[P("Malagor","Templar","Demon",77,71,17.8),P("Darkblade","Rogue","Voidborn",68,54,13.6),P("Treantos","Warlord","Construct",61,35.5,6.8)];
+var ALLE={};FREI.concat(KADER_MARKT).forEach(function(p){ALLE[p.s]=p});
+function eig(p,d){return kl(Math.round(p.ov-9+(hash(p.n+"#"+d)-.5)*34+(d===9?9:0)),22,99)}
+function achsen(p){return ["POW","SPE","MEN","SOC"].map(function(a){return kl(Math.round(p.ov-8+(hash(p.n+a)-.5)*44),30,97)})}
+/* Liga-Attrappe: Staerken der 15 anderen Teams je Disziplin (Ø der besten 6). */
+function liga(d,draft){var a=[];for(var i=0;i<15;i++)a.push((draft?52:57)+hash("liga"+i+"/"+d)*(draft?22:22));return a}
+
+var S={ans:"draft",d:9,wahl:null,stern:{"lyranael":1},zuletzt:null,profil:null,gross:false,dlg:false};
+function kader(){return S.ans==="markt"?KADER_MARKT:S.gross?KADER_MARKT.slice(0,9):KADER_DRAFT}
+function kasse(){return S.ans==="markt"?94.6:S.gross?96.0:214.5}
+function frei(){return FREI.slice().sort(function(a,b){return eig(b,S.d)-eig(a,S.d)}).slice(0,12)}
+function staerke(liste,d){var w=liste.map(function(p){return eig(p,d)}).sort(function(a,b){return b-a}).slice(0,6);while(w.length<6)w.push(20);return w.reduce(function(s,x){return s+x},0)/6}
+function rang(liste,d){var st=staerke(liste,d);return 1+liga(d,S.ans==="draft").filter(function(x){return x>st}).length}
+function por(p){return '../portraits/'+p.s+'.jpg'}
+
+function toast(html){var t=$("toast");t.innerHTML=html;t.classList.add("auf");clearTimeout(toast.z);toast.z=setTimeout(function(){t.classList.remove("auf")},2200)}
+
+/* ================= DIE KLICKREGEL =================
+   Etwas, das man auswaehlen kann (Vorschlag, Listenzeile, Wunschliste): 1. Klick waehlt aus, Klick auf das Ausgewaehlte oeffnet das Profil.
+   Etwas, das man nicht auswaehlen kann (eigener Kader, vergebene Spieler): der Klick oeffnet sofort das Profil.
+   Der Name ist ueberall die Abkuerzung: waehlt aus UND oeffnet das Profil. Knoepfe (Stern, Picken, Vergleich) tun nur ihre eigene Sache. */
+function klick(s){
+  if(S.wahl===s){profil(s);return}
+  S.wahl=s;render();toast('Ausgewählt: <b>'+ALLE[s].n+'</b> · nochmal klicken öffnet das Profil');
+}
+function nameKlick(s,ev){ev.stopPropagation();if(ALLE[s]&&frei().some(function(p){return p.s===s}))S.wahl=s;render();profil(s)}
+function kaderKlick(s){profil(s)}
+function stern(s,ev){ev.stopPropagation();S.stern[s]=!S.stern[s];render()}
+function nix(ev,text){ev.stopPropagation();toast(text)}
+
+function profil(s){S.profil=s;zeichneProfil()}
+function zu(){S.profil=null;S.dlg=false;$("schleier").classList.remove("auf")}
+function dialog(html){S.dlg=true;$("schleier").innerHTML=html;$("schleier").classList.add("auf")}
+/* ---------- Nicht picken: drei Wege, jeder mit Folge und Bestaetigung ---------- */
+function dlgAuslassen(){dialog('<div class="dlg" role="dialog" aria-modal="true" data-dlg="auslassen"><em>Draft · Runde 4 · Pick 33</em><h2>Diesen Pick auslassen?</h2>'+
+  '<p>Du nimmst in dieser Runde <b>niemanden</b>. In <b>Runde 5</b> bist du wieder an deinem Platz dran. Kasse und Wunschliste bleiben, wie sie sind.</p>'+
+  '<div class="fuss"><small>Geht nur, wenn du am Zug bist.</small><button class="knopf" onclick="zu()">Zurück</button><button class="knopf haupt" onclick="zu();toast(\'(Attrappe) Pick 33 ausgelassen · weiter mit Riptide Rivers\')">Ja, Pick auslassen</button></div></div>')}
+function dlgFertig(){var k=kader().length,kas=kasse();dialog('<div class="dlg" role="dialog" aria-modal="true" data-dlg="fertig"><em>Draft · Runde 4</em><h2>Draft für dich beenden?</h2>'+
+  '<p>Du gehst <b>aus der Reihenfolge</b> und pickst in diesem Draft nicht mehr. Die anderen Teams picken weiter. <b>Das lässt sich nicht zurücknehmen.</b> Nachkaufen geht danach am Transfermarkt.</p>'+
+  '<div class="fakt"><div><small>Kader</small><b class="t">'+k+'</b><span>Pflicht 8 erfüllt</span></div><div><small>Wunschgröße deines GM</small><b class="t">11</b><span>'+(k<11?'dir fehlen '+(11-k):'erreicht')+'</span></div><div><small>Kasse bleibt</small><b class="t">'+de(kas)+' C</b><span>für den Transfermarkt</span></div></div>'+
+  '<div class="fuss"><button class="knopf" onclick="zu()">Weiter draften</button><button class="knopf haupt" onclick="zu();toast(\'(Attrappe) Du bist fertig · der Draft läuft ohne dich weiter\')">Ja, ich bin fertig</button></div></div>')}
+function dlgSkip(){dialog('<div class="dlg breit" role="dialog" aria-modal="true" data-dlg="skip"><em>Draft · Runde 4</em><h2>Draft überspringen</h2>'+
+  '<p>Für alle, die nicht jeden Pick selbst machen wollen. Beide Wege füllen deinen Kader mindestens bis zur Pflicht.</p>'+
+  '<div class="zwei"><div><em>Variante A</em><h3>KI fertig picken lassen, ich picke danach</h3><p>Die KI-Teams picken im Hintergrund zu Ende. Du wählst danach <b>ohne Reihenfolge und ohne Zeitlimit</b> aus dem Rest. Die begehrtesten Spieler sind dann weg.</p><button class="knopf haupt" onclick="zu();toast(\'(Attrappe) Variante A\')">KI fertig picken lassen</button></div>'+
+  '<div><em>Variante B</em><h3>Auto-Draft: mein GM pickt für mich</h3><p>Dein Team bleibt in der Reihenfolge. Dein GM pickt nach <b>Bedarf und Kasse</b> und hält die Pflichtplätze frei. Du entscheidest nicht selbst.</p><button class="knopf haupt" onclick="zu();toast(\'(Attrappe) Variante B\')">Auto-Draft starten</button></div></div>'+
+  '<div class="fuss"><small>Unverändert der heutige Dialog; neu ist nur, dass er auch rechts bei „Mein Draft“ steht.</small><button class="knopf" onclick="zu()">Zurück zum Draft</button></div></div>')}
+function nichtPicken(){var k=kader().length,darf=k>=8;
+  return '<h4>Nicht picken? <span>drei Wege</span></h4><div class="np">'+
+    '<button data-np="auslassen" onclick="dlgAuslassen()" title="Dieser Pick entfällt, in der nächsten Runde bist du wieder dran."><b>Pick auslassen</b><small>nur diese Runde · nächste Runde wieder dran</small></button>'+
+    '<button data-np="fertig" class="'+(darf?'':'zu')+'" onclick="'+(darf?'dlgFertig()':'toast(\'Erst ab 8 Spielern · dir fehlen noch <b>'+(8-k)+' Pflichtplätze</b>\')')+'" title="'+(darf?'Nimmt dich aus der Reihenfolge, du pickst nicht mehr.':'Geht erst mit vollem Pflichtkader (8).')+'"><b>Ich bin fertig</b><small>'+(darf?'Draft für mich beenden · Kader '+k:'ab 8 Spielern · noch '+(8-k)+' Pflichtplätze')+'</small></button>'+
+    '<button data-np="skip" onclick="dlgSkip()" title="KI fertig picken lassen oder Auto-Draft"><b>Überspringen …</b><small>KI picken lassen oder Auto-Draft</small></button></div>';
+}
+function blaettern(r){var l=frei(),i=l.findIndex(function(p){return p.s===S.profil});if(i<0)return;var p=l[kl(i+r,0,l.length-1)];S.wahl=p.s;S.profil=p.s;render();zeichneProfil()}
+function zeichneProfil(){
+  var p=ALLE[S.profil],eigen=kader().some(function(x){return x.s===p.s}),ax=achsen(p);
+  var top=DK.map(function(k,i){return [i,eig(p,i)]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6);
+  $("schleier").innerHTML='<div class="profil" role="dialog" aria-modal="true">'+
+    '<div class="bild"><img src="'+por(p)+'" alt=""><div><em>'+p.k+' · '+p.r+'</em><h3>'+p.n+'</h3></div></div>'+
+    '<div class="in"><div class="lei"><button class="knopf" onclick="zu()">← Zurück</button>'+
+      (eigen?'<span class="tag g">in deinem Kader</span>':'<button class="knopf haupt" onclick="zu();toast(\'(Attrappe) '+(S.ans==="draft"?"Pick":"Verhandlung")+' gestartet\')">'+(S.ans==="draft"?"Picken · "+de(p.mw)+" C":"Verhandeln")+'</button>')+
+      '<span class="sp"></span>'+(eigen?'':'<span class="tasten"><span><kbd>←</kbd> <kbd>→</kbd> nächster in der Liste</span></span>')+'<span class="tasten"><span><kbd>Esc</kbd></span></span></div>'+
+    '<p><b>Attrappe.</b> In der App öffnet sich hier das große Spielerprofil aus #1650 (Attribute untereinander, sechs Top-Disziplinen mit Rang im Team und in der Liga). Neu wäre nur: <b>Esc</b> schließt überall, <b>←/→</b> blättert durch die Liste, aus der man kam, und die Auswahl dahinter wandert mit.</p>'+
+    '<h4>Vier Achsen</h4><div class="att">'+["Power","Speed","Mental","Social"].map(function(a,i){return '<div><span>'+a+'</span><span class="bal"><i style="width:'+ax[i]+'%"></i></span><b class="t">'+ax[i]+'</b></div>'}).join("")+'</div>'+
+    '<h4>Sechs Top-Disziplinen</h4><div class="att">'+top.map(function(x){return '<div><span>'+DN[x[0]]+'</span><span class="bal"><i style="width:'+x[1]+'%"></i></span><b class="t">'+x[1]+'</b></div>'}).join("")+'</div>'+
+    '</div></div>';
+  $("schleier").classList.add("auf");
+}
+
+/* ---------- Bausteine ---------- */
+function zeile(p,i,markt){
+  var an=S.wahl===p.s,e=eig(p,S.d),ax=achsen(p),teuer=p.mw>kasse();
+  var ak=an
+    ? '<button class="knopf klein" onclick="event.stopPropagation();profil(\''+p.s+'\')" title="Profil öffnen (Enter oder nochmal klicken)">Profil ›</button>'+
+      (teuer?'<span class="tag w">zu teuer</span>':'<button class="knopf klein haupt" onclick="nix(event,\'(Attrappe) '+(markt?"Verhandlungstisch":"Pick")+': '+p.n.replace(/'/g,"")+'\')">'+(markt?"Verhandeln":"Picken")+'</button>')
+    : (teuer?'<span class="tag w">zu teuer</span>':'')+'<span class="hw">Klick wählt aus</span>';
+  return '<div class="mz'+(an?' an':'')+'" data-zeile="'+p.s+'" onclick="klick(\''+p.s+'\')" title="'+(an?'Ausgewählt · nochmal klicken oder Enter öffnet das Profil':'Klick wählt aus')+'">'+
+    '<button class="st'+(S.stern[p.s]?' an':'')+'" onclick="stern(\''+p.s+'\',event)" title="Wunschliste">'+(S.stern[p.s]?'★':'☆')+'</button>'+
+    '<img class="por" src="'+por(p)+'" alt="">'+
+    '<span class="nm"><b><u onclick="nameKlick(\''+p.s+'\',event)" title="Name = direkt ins Profil">'+p.n+'</u></b><small>'+p.k+' · '+p.r+'</small></span>'+
+    '<span class="eg"><b class="t">'+e+'</b><span class="bal"><i style="width:'+e+'%"></i></span></span>'+
+    '<span class="ax t">'+ax.map(function(x){return '<i class="'+(x>=85?'h':x>=72?'m':'')+'">'+x+'</i>'}).join("")+'</span>'+
+    '<span class="re t'+(teuer?' zt':'')+'">'+de(p.mw)+'</span><span class="re t">'+de(p.geh)+'</span>'+
+    '<span class="ak">'+ak+'</span></div>';
+}
+function brett(markt){
+  var l=frei();
+  return '<section class="pan"><div class="pk"><h2>'+(markt?'Markt':'Draft-Brett')+'</h2><span class="gk">'+(markt?'36 Spieler':'Freie Spieler · 2952')+'</span><span class="sp"></span><span class="gk">Eignung in <b style="color:var(--gold)">'+DN[S.d]+'</b></span></div>'+
+    '<div class="fz"><span class="such">Name oder Klasse</span><span class="fc">'+(markt?'bezahlbar':'leistbar')+'</span><span class="fc">'+(markt?'hebt meinen Rang':'mit Scouting')+'</span><span class="fc">★ Wunschliste</span><span class="fc">Weitere Filter</span></div>'+
+    '<div class="dz">'+DK.map(function(k,i){return '<button class="'+(i===S.d?'an':'')+'" onclick="S.d='+i+';render()" title="'+DN[i]+'">'+k+'</button>'}).join("")+'</div>'+
+    '<div class="mt"><div class="mz kopf"><span></span><span></span><span>Spieler</span><span>Eignung '+DK[S.d]+'</span><span>POW · SPE · MEN · SOC</span><span style="text-align:right">Ablöse</span><span style="text-align:right">Gehalt</span><span></span></div>'+
+    l.map(function(p,i){return zeile(p,i,markt)}).join("")+'</div>'+
+    '<div class="mfuss"><span><b>1. Klick</b> wählt aus · <b>Klick auf den Ausgewählten</b> oder <b>Enter</b> öffnet das Profil · <b>Name</b> geht direkt ins Profil</span><span class="sp"></span><span>‹ Blatt 1 / '+(markt?3:228)+' ›</span></div></section>';
+}
+function rechts(markt){
+  var k=kader(),p=S.wahl?ALLE[S.wahl]:null,mit=p?k.concat([p]):k,d=S.d;
+  var pfl=8,opt=11,max=14,kas=kasse(),teuer=p&&p.mw>kas;
+  var h='<section class="pan">';
+  if(p){
+    h+='<div class="buehne-f" style="background-image:url(../sprites/kulissen/hockey/eis.jpg)" onclick="profil(\''+p.s+'\')" title="Profil öffnen"><span class="tag pf">Profil ›</span><img src="'+por(p)+'" alt=""><div class="txt"><em>Ausgewählt · '+p.k+' · '+p.r+'</em><h3>'+p.n+'</h3></div></div>';
+  }else{
+    h+='<div class="pk"><h2>'+(markt?'Mein Team':'Mein Draft')+'</h2><span class="sp"></span><span class="gk">nichts ausgewählt</span></div>';
+  }
+  h+='<div class="fb">';
+  if(p){
+    h+='<div class="kost"><div><small>Ablöse</small><strong class="t" style="'+(teuer?'color:var(--warn)':'')+'">'+de(p.mw)+'</strong><em>C</em></div><div><small>Gehalt / Saison</small><strong class="t">'+de(p.geh)+'</strong><em>C · '+de(p.geh/20,2)+' je Spieltag</em></div><div><small>'+DK[d]+'</small><strong class="t">'+eig(p,d)+'</strong><em>Eignung</em></div></div>'+
+      '<div class="akt"><button class="knopf haupt" style="flex:1" onclick="toast(\'(Attrappe) '+(markt?'Verhandlungstisch geöffnet':'Pick gebucht')+'\')">'+(teuer?'Über der Kasse':(markt?'Verhandeln':p.n+' picken · '+de(p.mw)+' C'))+'</button><button class="knopf" onclick="stern(\''+p.s+'\',event)">'+(S.stern[p.s]?'★':'☆')+'</button></div>';
+    if(!markt)h+=nichtPicken()+'<div class="hin">'+(hash(p.n+"konk")>.6?'<b>Achtung:</b> Riptide Rivers (2.) pickt vor dir und hat ihn in den Top 3.':'Kein Team vor dir hat ihn in den Top 3.')+'</div>';
+    /* Wirkung: die drei Disziplinen mit dem groessten Rangsprung */
+    var wk=DK.map(function(x,i){return {i:i,v:rang(k,i),n:rang(mit,i)}}).sort(function(a,b){return (b.v-b.n)-(a.v-a.n)}).slice(0,3);
+    var hebt=DK.filter(function(x,i){return rang(mit,i)<rang(k,i)}).length;
+    h+='<h4>Wirkung auf deinen Kader <span>hebt '+hebt+' von 20 Disziplinen</span></h4><div class="wk">'+wk.map(function(w){return '<div><b>'+DN[w.i]+'</b><small class="t">Rang '+w.v+'. → <i class="'+(w.n<w.v?'':'gl')+'">'+w.n+'.</i></small></div>'}).join("")+'</div>';
+  }else{
+    h+='<div class="hin">Ein Klick auf einen Vorschlag links oder eine Zeile in der Mitte wählt aus. Hier steht dann, was der Spieler in deinem Kader ändert.</div>';
+    if(!markt)h+=nichtPicken();
+  }
+  /* Mein Kader in der gewaehlten Disziplin, Kandidat einsortiert */
+  var sortiert=mit.slice().sort(function(a,b){return eig(b,d)-eig(a,d)});
+  h+='<h4>Mein Kader in '+DN[d]+' <span>Klick öffnet das Profil</span></h4><div class="kl">';
+  sortiert.forEach(function(x,i){
+    var neu=p&&x.s===p.s,raus=p&&i===6&&sortiert.length>6;
+    if(i===6)h+='<div class="trenn">ab hier zählt die Eignung nicht mehr zur Kaderstärke</div>';
+    h+='<div class="kr'+(neu?' neu':'')+(i>=6?' raus':'')+'" '+(neu?'':'data-platz="'+x.s+'" ')+'onclick="'+(neu?'profil':'kaderKlick')+'(\''+x.s+'\')" title="Profil öffnen"><span class="p t">'+(i+1)+'.</span><img src="'+por(x)+'" alt=""><span class="n">'+x.n+'<small>'+(neu?'NEU · '+x.k:(raus?'<i style="font-style:normal;color:var(--acht)">raus aus Top 6</i>':x.k))+'</small></span><span class="bal"><i class="'+(neu?'':'z')+'" style="width:'+eig(x,d)+'%"></i></span><span class="w t">'+eig(x,d)+'</span></div>';
+  });
+  var nachher=k.length+(p?1:0);
+  if(nachher<pfl)h+='<div class="kr leer">noch '+(pfl-nachher)+' Pflichtplätze offen</div>';
+  else if(nachher<opt)h+='<div class="kr leer opt">noch '+(opt-nachher)+' bis zur Wunschgröße deines GM</div>';
+  h+='</div>';
+  h+='<div class="zaehl" title="Pflicht 8 · Wunschgröße 11 · höchstens 14">';
+  for(var i=0;i<max;i++)h+='<i class="'+(i<k.length?'v':(p&&i===k.length?'n':(i<pfl?'pf':i<opt?'op':'')))+'"></i>';
+  h+='</div><div class="gz"><span>Kader</span><b class="t">'+k.length+(p?' → '+nachher:'')+' <span style="color:var(--stumm);font-weight:500">· Pflicht '+pfl+' · Wunsch '+opt+' · max. '+max+'</span></b></div>';
+  /* Kasse */
+  var res=markt?40.4:Math.max(0,(pfl-nachher))*9.5,ausg=markt?0:S.gross?279:160.5,ges=kas+ausg,nach=kas-(p&&!teuer?p.mw:0);
+  h+='<h4 style="margin-top:auto">Kasse <span>'+(markt?'Vorstand gibt 70 % frei':'Reserve für Pflichtplätze eingerechnet')+'</span></h4>'+
+    '<div class="stapel"><i style="width:'+(ausg/ges*100)+'%;background:var(--stumm)"></i><i style="width:'+((p&&!teuer?p.mw:0)/ges*100)+'%;background:var(--acht)"></i><i style="width:'+(Math.max(0,nach-res)/ges*100)+'%;background:var(--gut)"></i><i style="width:'+(res/ges*100)+'%;background:repeating-linear-gradient(135deg,var(--warn) 0 .25rem,transparent .25rem .5rem)"></i></div>'+
+    '<div class="gz"><span>frei jetzt</span><b class="t">'+de(kas)+' C</b></div>'+
+    (p?'<div class="gz"><span>frei nach '+(markt?'Kauf':'Pick')+'</span><b class="t '+(teuer?'':'plus')+'" style="'+(teuer?'color:var(--warn)':'')+'">'+(teuer?'reicht nicht · es fehlen '+de(p.mw-kas)+' C':de(nach)+' C'+(res?' · davon '+de(res)+' C gebunden':''))+'</b></div>':'');
+  h+='</div></section>';
+  return h;
+}
+function favKarte(p,i){
+  var an=S.wahl===p.s;
+  return '<div class="fk e'+(i+1)+(an?' an':'')+'" data-fav="'+p.s+'" onclick="klick(\''+p.s+'\')" title="'+(an?'Ausgewählt · nochmal klicken öffnet das Profil':'Klick wählt aus')+'">'+
+    '<img class="bg" src="'+por(p)+'" alt=""><span class="rk t">'+(i+1)+'.</span>'+(an?'<span class="tag voll mk">ausgewählt</span>':'')+
+    '<span class="hv">'+(an?'nochmal klicken · Profil':'Klick wählt aus')+'</span>'+
+    '<span class="un"><b>'+p.n+'</b><small>'+p.k+' · '+p.r+'</small><span class="zw"><span>'+DK[S.d]+' <b class="t">'+eig(p,S.d)+'</b></span><strong class="t">'+de(p.mw)+' C</strong></span></span></div>';
+}
+function draftLinks(){
+  var v=[ALLE["kelektros"],ALLE["watcher"],ALLE["jump-slash"]];
+  var nx=[["#34","R-R","Riptide Rivers",["lyranael","severiel","keldrim"]],["#35","U-A","Undercover Agents",["citrine-miri","fleshbreed","kargath"]],["#36","D-L","Dire Legion",["dante-wickmore","leomon","ivy-sentinel"]],["#37","S-S","Silver Soldiers",["jasper-kane","gor-than-prime","watcher"]],["#38","C-C","Cash Creators",["severiel","kelektros","keldrim"]]];
+  return '<div class="spl"><section class="pan"><div class="pk"><h2>Am Zug</h2><span class="sp"></span><span class="tag go">Du bist dran · kein Zeitlimit</span></div>'+
+    '<div class="tkopf"><img src="../team-logos/M-M.jpg" alt=""><div><b>Mayhem Mavericks</b><small>Chris · pickt selbst · Kader '+kader().length+'</small></div></div>'+
+    '<div class="f3k"><span class="gk">Vorschlag deines GM</span><small>1. Klick wählt aus · 2. Klick Profil</small></div>'+
+    '<div class="fav3">'+v.map(favKarte).join("")+'</div>'+
+    '<div class="zfuss">Dieselbe Regel gilt, wenn die KI am Zug ist: ihre Top 3 lassen sich auswählen (vormerken) und beim zweiten Klick öffnen.</div></section>'+
+    '<section class="pan"><div class="pk"><h2>Danach am Zug</h2><span class="sp"></span><span class="gk">Portrait anklicken wählt aus</span></div><div class="nxl">'+
+    '<div class="nx ich"><span class="nr t">#33</span><img class="lg" src="../team-logos/M-M.jpg" alt=""><span><b>Du · Mayhem Mavericks</b><small>'+(S.wahl?'ausgewählt: '+ALLE[S.wahl].n:'noch nichts ausgewählt')+'</small></span><span class="tag">Mensch</span></div>'+
+    nx.map(function(z){return '<div class="nx"><span class="nr t">'+z[0]+'</span><img class="lg" src="../team-logos/'+z[1]+'.jpg" alt=""><span><b>'+z[2]+'</b><small>'+z[3].map(function(s,j){return (j+1)+'. '+ALLE[s].n}).join(" · ")+'</small></span><span class="mp">'+z[3].map(function(s){return '<img class="'+(S.wahl===s?'an':'')+'" src="'+por(ALLE[s])+'" alt="" title="'+ALLE[s].n+'" onclick="klick(\''+s+'\')">'}).join("")+'</span></div>'}).join("")+
+    '</div></section></div>';
+}
+function marktLinks(){
+  var k=KADER_MARKT,p=S.wahl?ALLE[S.wahl]:null,mit=p?k.concat([p]):k;
+  var z=DK.map(function(x,i){return i}).sort(function(a,b){return hash("wichtig"+b)-hash("wichtig"+a)});
+  return '<div class="spl"><section class="pan"><div class="pk"><h2>Geld &amp; Freigabe</h2><span class="sp"></span><span class="gk">Finanzen ›</span></div>'+
+    '<div class="gross"><strong class="t">94,6 C</strong><small>frei für Transfers<br>von 135,0 C Kasse · Vorstand gibt 70 % frei</small></div>'+
+    '<div class="zfuss">'+(p?'Nach dem Kauf von <b>'+p.n+'</b>: '+(p.mw>94.6?'<b style="color:var(--warn)">reicht nicht</b>':'<b>'+de(94.6-p.mw)+' C</b> frei')+' · Gehalt je Spieltag '+de(4.06+p.geh/20,2)+' C':'Gehalt je Spieltag 4,06 C · Kader 10 / 14')+'</div></section>'+
+    '<section class="pan"><div class="pk"><h2>Kaderstärke</h2><span class="sp"></span><span class="gk">Liga 2 · 16 Teams</span></div><div class="ks">'+
+    '<div class="kz kopf"><span>Disziplin · Ø beste 6</span><span></span><span style="text-align:right">Rang</span><span>'+(p?'mit ihm':'')+'</span></div>'+
+    z.map(function(i){var v=rang(k,i),n=rang(mit,i),st=staerke(k,i),sn=staerke(mit,i);
+      return '<button class="kz'+(i===S.d?' an':'')+'" onclick="S.d='+i+';render()"><span>'+DN[i]+'</span><span class="bal"><i class="z" style="width:'+sn+'%"></i><i style="width:'+st+'%"></i></span><span class="r t '+(v<=4?'gutr':v>=12?'schl':'')+'">'+v+'.</span><span class="w t '+(n<v?'':'gl')+'">'+(p?(n<v?'▲ '+n+'.':'·'):'')+'</span></button>'}).join("")+
+    '</div></section></div>';
+}
+function regel(){
+  var z=[
+    ["Links","Vorschläge / Top 3 (eigener Zug)","auswählen","Profil","wählt aus; zweiter Klick tut nichts"],
+    ["Links","Top 3 der KI, Portraits unter „Danach am Zug“","auswählen (vormerken)","Profil","Karte tot, nur der Name ist ein Link"],
+    ["Mitte","Zeile im Draft-Brett / im Markt","auswählen","Profil","Draft: wählt aus, zweiter Klick tut nichts. Markt: ebenso, Name ist kein Link"],
+    ["Mitte","Zeile unter „Alle Picks“ (vergeben)","Profil","–","nur der Name ist ein Link"],
+    ["Mitte","Eigener Kader unter Verkauf / Verträge","auswählen (Verkaufsvorschau)","Profil","kein Weg ins Profil"],
+    ["Rechts","Bühne des Ausgewählten","Profil","–","Draft: nur der Name. Markt: Knopf „Profil“ als fünfter von fünf"],
+    ["Rechts","Mein Kader (Zeile)","Profil","–","Draft: Kachel ohne Namen öffnet das Profil. Markt: Kader nicht zu sehen"],
+    ["Rechts","Wunschliste (noch frei)","auswählen","Profil","wählt aus; zweiter Klick tut nichts"],
+    ["Unten","Live-Ticker, vergebene Spieler","Profil","–","nur der Name ist ein Link"]];
+  return '<section class="pan"><div class="pk"><h2>Die Klickregel</h2><span class="sp"></span><span class="gk">gilt für Draft und Transfermarkt</span></div><div class="regel"><div>'+
+    '<div class="merk"><b>Ein Klick wählt aus. Ein Klick auf das Ausgewählte öffnet das Profil.</b><br>Wo es nichts auszuwählen gibt (eigener Kader, vergebene Spieler), öffnet schon der erste Klick das Profil.</div>'+
+    '<h3>Je Spalte</h3><table><tr><th>Spalte</th><th>Element</th><th>1. Klick</th><th>Klick auf Ausgewähltes</th><th>Heute</th></tr>'+
+    z.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td class="neu">'+r[2]+'</td><td class="neu">'+r[3]+'</td><td><small>'+r[4]+'</small></td></tr>'}).join("")+'</table></div><div>'+
+    '<h3>Immer gleich</h3><ul>'+
+    '<li><b>Name</b> (gepunktet unterstrichen) ist überall die Abkürzung: wählt aus und öffnet das Profil in einem Klick.</li>'+
+    '<li><b>Knöpfe in der Zeile</b> (★, Picken, Verhandeln, Vergleich) tun nur ihre Sache und ändern die Auswahl nicht.</li>'+
+    '<li><b>Picken / Verhandeln</b> steht nur in der ausgewählten Zeile, daneben <b>Profil ›</b>. Damit ist der zweite Klick sichtbar und ein Fehlklick pickt nicht.</li>'+
+    '<li><b>Ausgewählt</b> sieht überall gleich aus: goldene Kante links, goldener Rahmen am Portrait, auf Karten das Schild „ausgewählt“.</li>'+
+    '<li><b>Hover</b> sagt, was der Klick tut: „Klick wählt aus“ bzw. „nochmal klicken · Profil“.</li></ul>'+
+    '<h3>Nicht picken (Draft)</h3><table><tr><th>Aktion</th><th>Wann</th><th>Was passiert</th></tr>'+
+    '<tr><td class="neu">Pick auslassen</td><td>nur wenn du am Zug bist</td><td>dieser Pick entfällt, nächste Runde wieder dran<small>Bestätigung: kurz</small></td></tr>'+
+    '<tr><td class="neu">Ich bin fertig</td><td>ab 8 Spielern (Pflicht)<small>darunter gesperrt: „noch N Pflichtplätze“</small></td><td>raus aus der Reihenfolge, endgültig<small>Bestätigung mit Kader, Wunschgröße, Kasse</small></td></tr>'+
+    '<tr><td class="neu">Überspringen …</td><td>jederzeit</td><td>A: KI pickt fertig, du danach · B: Auto-Draft<small>Dialog wie heute</small></td></tr></table>'+
+    '<h3>Tastatur</h3><table>'+
+    '<tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Auswahl in der Liste der Mitte bewegen</td></tr>'+
+    '<tr><td><kbd>Enter</kbd></td><td>Profil des Ausgewählten öffnen</td></tr>'+
+    '<tr><td><kbd>Esc</kbd></td><td>Profil, Dialog, Vergleich schließen</td></tr>'+
+    '<tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>im Profil: voriger / nächster Spieler der Liste</td></tr>'+
+    '<tr><td colspan="2"><small>Gepickt und gekauft wird bewusst nie per Taste.</small></td></tr></table>'+
+    '</div></div></section>';
+}
+
+function render(){
+  var m=S.ans==="markt";
+  document.querySelectorAll(".band nav button").forEach(function(b){b.classList.toggle("an",b.dataset.ans===S.ans)});
+  $("b-ober").textContent=S.ans==="regel"?"UX-Review 19.11.":m?"Markt · Transferfenster Saison 2":"Spieltag 1 · Runde 4 von 16";
+  $("b-titel").textContent=S.ans==="regel"?"Draft & Transfermarkt":m?"Transfermarkt":"Draft";
+  $("b-kasse").innerHTML=de(kasse())+' <i>C</i>';$("b-kader").innerHTML=kader().length+' <i>/ 8 Pflicht</i>';
+  $("b-schalt").style.display=S.ans==="draft"?"":"none";
+  document.querySelectorAll("#b-schalt button").forEach(function(b){b.classList.toggle("an",(b.dataset.g==="1")===S.gross)});
+  if(S.ans==="regel"){$("haupt").innerHTML=regel();return}
+  $("haupt").innerHTML='<div class="drei">'+(m?marktLinks():draftLinks())+brett(m)+rechts(m)+'</div>';
+}
+function geh(ans){S.ans=ans;S.wahl=ans==="draft"?"kelektros":ans==="markt"?frei()[0].s:null;S.profil=null;$("schleier").classList.remove("auf");if(location.hash!=="#"+ans)history.replaceState(null,"","#"+ans);render()}
+document.querySelectorAll(".band nav button").forEach(function(b){b.onclick=function(){geh(b.dataset.ans)}});
+document.querySelectorAll("#b-schalt button").forEach(function(b){b.onclick=function(){S.gross=b.dataset.g==="1";render()}});
+window.addEventListener("hashchange",function(){geh((location.hash||"#draft").slice(1))});
+$("schleier").addEventListener("click",function(e){if(e.target===this)zu()});
+window.addEventListener("keydown",function(e){
+  if(S.dlg){if(e.key==="Escape")zu();return}
+  if(S.ans==="regel")return;
+  if(S.profil){
+    if(e.key==="Escape")zu();
+    else if(e.key==="ArrowRight")blaettern(1);
+    else if(e.key==="ArrowLeft")blaettern(-1);
+    return;
+  }
+  var l=frei(),i=l.findIndex(function(p){return p.s===S.wahl});
+  if(e.key==="ArrowDown"){e.preventDefault();S.wahl=l[kl(i+1,0,l.length-1)].s;render()}
+  else if(e.key==="ArrowUp"){e.preventDefault();S.wahl=l[kl(i<0?0:i-1,0,l.length-1)].s;render()}
+  else if(e.key==="Enter"&&S.wahl){e.preventDefault();profil(S.wahl)}
+});
+var start=(location.hash||"#draft").slice(1);geh(["draft","markt","regel"].indexOf(start)>=0?start:"draft");
+</script>
+</body>
+</html>
