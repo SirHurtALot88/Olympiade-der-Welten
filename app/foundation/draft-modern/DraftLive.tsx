@@ -553,7 +553,7 @@ export function DraftBrett({ k, aktionen }: { k: DraftKontext; aktionen: DraftAk
                   })}
                 </span>
                 <span className="re"><b className="t">{de(e.abloese ?? 0)}</b></span>
-                <span className="re"><b className="t">{de(gehalt / 20, 2)}</b><small style={{ display: "block", color: "var(--stumm)" }}>je ST</small></span>
+                <span className="re"><b className="t">{de(gehalt)}</b><small style={{ display: "block", color: "var(--stumm)" }}>je Saison</small></span>
               </div>
             );
           })}
