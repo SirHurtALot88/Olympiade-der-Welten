@@ -130,6 +130,51 @@ Lesart:
 **50 / 45 Füller** (alt 11 / 17), 0 / 1 Notwege, Kasse Median 9,9 / 10,5. Auslöser für Hebel (b).
 **Runde 2 (Hebel (b), vor dem Merge):** Basis 1 / 2 neu: Füller 9 / 19, Notwege 1 / 0, unter GM-Opt V-V 8/9 / keins.
 
+## 4b. Feinschliff (19.11.): Hebel (b) mit einem Platz Luft, Plätze über dem Minimum nur über der Notrücklage
+
+Ziele des PM: 0 Teams bei 8–9 ohne GM-Grund, 0 Notwege, Kasse nie unter Notrücklage, Füller ≤ ~20.
+
+* **Hebel (b) mit Luft** (`draft-adapter.ts`): ein Ziel gilt nur als getragen, wenn der Rahmen auch noch einen weiteren Platz
+  zum Platzpreis trägt. Der Planer kauft vor dem letzten Platz stärkere Spieler als die reservierten billigsten 12er; auf Kante
+  gerechnet blieb dann nur ein Füller (`fueller_rueckfall`).
+* **Notrücklage für die Plätze über dem Minimum** (`draft-builder.ts`, `economy.notruecklage`, nur ab Saison 2 gesetzt):
+  `kaderplanRahmen` rechnet jeden Plan, der über das Minimum hinausreicht, mit Kasse ≥ Notrücklage (dieselbe Regel wie die
+  Kaderpflicht-Freigabe aus #1618); die Plätze bis zum Minimum dürfen die Notrücklage weiter angreifen. Damit kauft ein Team unter
+  dem Minimum nicht mehr am 7. Platz teuer aus der Notrücklage, um danach ab 8 gesperrt zu sein (Muster V-V).
+* Saison 1 unverändert (beides nur mit gedeckeltem Vorstand bzw. ab Saison 2). Kassenabflüsse außerhalb der Transfers: nicht
+  angefasst (offener Punkt).
+
+Messung wie oben (neue Basen, gleicher Weg; „alt“ = `OLY_FENSTER_AUF_OPT=0`). S1 nach dem Draft: 0 Teams unter 8 (beide Basen),
+Gehalt Median 65,9 / 66,0, im Band 50–70: 18 / 19.
+
+| S2 | B1 alt | **B1 neu** | B2 alt | **B2 neu** |
+|---|---:|---:|---:|---:|
+| Teams unter 8 | 0 | **0** | 0 | **0** |
+| Teams unter GM-Opt | 21 | **0** | 24 | **0** |
+| Teams bei 8–9 ohne GM-Grund | 3 | **0** | 9 | **0** |
+| Teams unter Opt (Identität) | 23 | 23 | 27 | 24 |
+| Kader Summe / Verteilung | 333 | 357 (9×4, 10×8, 11×7, 12×8, 13×2, 14×3) | 316 | 347 (9×7, 10×4, 11×9, 12×11, 13×1) |
+| Verkäufe / Käufe | 43 / 62 | 59 / 102 | 45 / 57 | 71 / 114 |
+| Füller < 12 | 16 | **16** | 14 | **26** |
+| Notwege (`fueller_rueckfall`) | – | **0** | – | **2** (R-L, V-V) |
+| Notkredite / Notverkäufe / negative Kassen | 0 | 0 | 0 | 0 |
+| Kasse Summe / Median | 854,8 / 21,6 | 479,3 / 10,9 | 931,3 / 25,7 | 410,3 / 10,8 |
+| Kasse unter Notrücklage | 1 | **0** | 2 | **3** (S-C −0,4, V-D −0,3, Z-H −0,5) |
+| Gehalt Median, im Band 50–70 | 54,9, 16 | 56,3, 19 | 56,0, 20 | 55,6, 20 |
+| Transferbilanz S2 Median, positiv/negativ | −27,8, 10/21 | −22,3, 9/23 | −28,6, 6/24 | −25,1, 9/23 |
+
+Lesart:
+
+* Basis 1 erfüllt alle Ziele. Basis 2: 0 unter GM-Opt und 0 bei 8–9 ohne Grund; offen bleiben 2 Notwege und 26 Füller.
+* **Kasse unter Notrücklage in Basis 2 nur knapp** (−0,3 bis −0,5 C): S-C und V-D planten mit der Notrücklage zu Beginn; die wächst
+  mit dem Kaderwert der gekauften Spieler (`berechneKiRuecklage`: Budget = Kasse + Kaderwert) und liegt am Ende etwas höher.
+  Z-H fiel durch den Verletzungs-Topup nach dem Fenster (6,44 C) darunter, nicht durch den Planer.
+* Die beiden Notwege (R-L, V-V) betreffen Teams, die mit 6 ins Fenster gingen und einen weiteren Spieler verkauften: bis zum
+  Minimum kaufen sie aus der ganzen Kasse (inkl. Notrücklage), den 9. Platz musste ein Füller besetzen.
+* **Preis der Luft:** mehr GM-Senkungen, daher bleibt „unter Opt (Identität)“ bei 23 / 24 (Runde 3: 20 / 14) — alle diese Teams
+  stehen auf ihrem protokollierten GM-Opt. Kader ligaweit 357 / 347 (Runde 3: 358 / 366). Das Gesamtbild ist besser: keine
+  Unterschreitung des GM-Opt, Notwege 0 / 2 statt 3 / 5, Kasse unter der Notrücklage nur noch im Rundungsbereich.
+
 ## 5. Tests
 
 * `tests/fenster-auf-opt.test.ts` — Schalter; S3: Gehaltsrahmen für vier Plätze → kein Star, der die Plätze auffrisst, Kader 12,
@@ -146,15 +191,15 @@ Lesart:
   `tests/transferfenster-gemeinsam.test.ts` — Verkaufserlöse im Fenster zu 100 % frei auch im neuen Transfertopf (Lockerung nach
   Verkäufen nur im alten Ablauf, im Fenster bleibt nichts einbehalten).
 
-Wertungs-Fingerabdruck nach dem Merge von main: `GESAMT d3a39030a3ef (75 Eintraege)` — derselbe Wert wie auf main
+Wertungs-Fingerabdruck (Feinschliff, auf main mit Canyon #1638): `GESAMT eaafed96150e` — derselbe Wert wie auf main
 (`public/` unverändert gegenüber main).
 
 ## 6. Offene Punkte
 
-1. **Notwege durch Hebel (b)** (3 / 5 `fueller_rueckfall` je Fenster): der gesenkte Opt ist auf Kante gerechnet. Möglicher Feinschliff:
+1. *(Feinschliff 19.11., Abschnitt 4b: umgesetzt, Notwege 0 / 2.)* **Notwege durch Hebel (b)** (3 / 5 `fueller_rueckfall` je Fenster): der gesenkte Opt ist auf Kante gerechnet. Möglicher Feinschliff:
    beim Senken einen Platz Luft lassen (das größte Ziel wählen, das der Rahmen mit Reserve für einen teureren Kauf trägt) oder den
    Rahmen mit dem Median statt den billigsten Preisen ab 12 rechnen. Nicht umgesetzt (PM: „nichts Weiteres anfangen“).
-2. **Unter GM-Opt bei 9** (Basis 1: P-C, V-W; Runde 2: V-V 8/9). Muster V-V (Runde 2, am Spielstand verfolgt): Kader 6, verkauft 2
+2. *(Feinschliff 19.11., Abschnitt 4b: umgesetzt, 0 Teams unter GM-Opt.)* **Unter GM-Opt bei 9** (Basis 1: P-C, V-W; Runde 2: V-V 8/9). Muster V-V (Runde 2, am Spielstand verfolgt): Kader 6, verkauft 2
    auf 4, kauft bis 8, dann ist die Kasse leer. Unter dem Minimum deckt die Kaderpflicht-Grenze (`kaufRahmen().grenzeFuer`, #1618)
    nur die Plätze bis zum Minimum; der Kaderplan reserviert am 7. Platz deshalb nichts mehr für den 9., kauft einen 21-C-Spieler,
    und ab 8 sperrt die Notrücklage die Plätze bis Opt. Lösung wäre, dass der Rahmen unter dem Minimum die Plätze Minimum → Ziel
