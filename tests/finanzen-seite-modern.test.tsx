@@ -137,8 +137,12 @@ describe("Finanzen · Budgets nach dem Mockup", () => {
       else process.env.OLY_TRANSFERFENSTER_GEMEINSAM = vorher;
     }
     expect(html).toContain("von 10 Vertrauen");
-    expect(html).toContain("Rücklage anzapfen");
+    // Office 21.11: Rücklage anzapfen und „Alles auf eine Karte“ laufen nur noch im Vorstandsgespräch; hier steht der Weg dorthin.
+    expect(html).not.toContain("Rücklage anzapfen");
     expect(html).toContain("Alles auf eine Karte");
+    expect(html).toContain("Mit dem Vorstand sprechen");
+    expect(html).toContain('data-testid="fin-zum-gespraech"');
+    expect(html).not.toMatch(/>Beantragen<\/button>/);
     expect(html).toContain("Pflichtkader (8 Spieler)");
     expect(html).toContain("Gebäude bauen");
   });
@@ -147,8 +151,8 @@ describe("Finanzen · Budgets nach dem Mockup", () => {
   });
   it("ohne Verwaltungsrecht sind Regler und Knoepfe gesperrt (Mehrspieler: kein Schreiben ins fremde Team)", () => {
     const gesperrt = seite("budgets", { kannVerwalten: false });
-    expect(gesperrt.match(/class="fin-regler"[^>]*disabled/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(gesperrt).toMatch(/<button[^>]*disabled[^>]*>Beantragen<\/button>/);
+    // Nur noch der Umschicht-Regler liegt auf dieser Seite; Anzapfen und „Alles auf eine Karte“ sind ins Gespräch gewandert.
+    expect(gesperrt.match(/class="fin-regler"[^>]*disabled/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 });
 

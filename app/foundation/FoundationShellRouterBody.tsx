@@ -1804,6 +1804,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <FoundationHomeV2Panel
             active
             tab={homeV2Tab}
+            officeModern={{
+              gameState,
+              teamId: activeManagerTeamId,
+              onVorstandAktion: vorstandBudgetAktion,
+              kannVerwalten: kannVerwaltenAktivesTeam,
+            }}
             overview={{
               teamName: selectedTeam?.name ?? "Kein Team",
               teamCode: selectedTeam?.shortCode ?? "—",
@@ -3317,6 +3323,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               saveId={activeSaveId}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onVorstandAktion={vorstandBudgetAktion}
+              onOpenOffice={() => navigateHomeTab("office")}
               kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}

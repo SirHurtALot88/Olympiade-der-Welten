@@ -146,6 +146,24 @@ die Eignung. Damit bleibt die Rangtreue der Disziplinen unberührt, und die Matr
    bleiben sie dort zusätzlich? Empfehlung vom 18.11. gilt weiter: das Gespräch ersetzt sie, Umschichten bleibt als
    Schieber.
 
+## Entscheidungen Chris 21.11.
+
+Chris am 21.11., wörtlich: „ja überall deine empfehlungen nehmen, bau das so“. Damit gelten für alle neun offenen Fragen aus
+Abschnitt 5 die dort genannten Empfehlungen:
+
+| # | Frage | Entscheidung |
+|---|---|---|
+| 1 | Ein Office mit drei Reitern? | **Ja.** „Vorstand und Ziele“, „Gespräch“, „Prämien“. Die schon bestehende Ansicht (Kapitän, Front Office) bleibt als Reiter „Kabine“. Ein Reiter „Sponsor“ gibt es im Office nicht: der Sponsor lebt auf der eigenen Seite Sponsoren und bleibt dort (offener Punkt). |
+| 2 | „Laufzeit-Quoten“ | **Beides.** Ziele tragen eine eigene Laufzeit (mehrere Saisons möglich) UND es gibt ein Ziel zu den Vertragslaufzeiten des Kaders („höchstens 3 von 10 Verträgen enden zugleich“). |
+| 3 | Lieblingsspieler | **Bester Spieler nach PP der Vorsaison** (in Saison 1 nach aktueller PP), fest für eine Saison. |
+| 4 | Preis des Lieblings | **Verkauf −1,0 Vertrauen, Verlängerung +0,3.** |
+| 5 | Widersprüche | **Beides:** bei der Vergabe geprüft, und der Mensch darf im Gespräch ein Ziel tauschen (verbraucht ein Gespräch). |
+| 6 | Prämien | **Ja, aus dem Gehaltstopf** (hart gesperrt über dem freien Gehaltstopf), kein dritter Topf. |
+| 7 | Welche zuerst | **Siegprämie und Treueprämie bei Verlängerung.** Klauseln später. |
+| 8 | KI und Prämien | **Noch nicht.** Erst nach einer Messung mit 32 KI-Teams. |
+| 9 | Finanzseite | **Das Gespräch ersetzt „Rücklage anzapfen“ und „Alles auf eine Karte“** dort (jetzt nur noch Lesen und Link ins Office); „Umschichten“ bleibt als Schieber. |
+| 10 | Keine Geldstrafen | Das Altfeld `penaltyCash` darf weder gebucht noch gezeigt werden. Befund und Behebung: `docs/design/office-vorstand-bau-21-11.md`, Abschnitt Fund. |
+
 ## 6. Prüfung
 
 Alle acht Zustände in beiden Größen angesehen: kein Seitenscroll, keine Überlappung, kein abgeschnittener Text, drei

@@ -36,6 +36,7 @@ import {
   resolveMatchdayPreviewToBook,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
+import { bucheSiegpraemien } from "@/lib/finance/vorstand-praemien";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 import {
   listStaffelTeamsThatRan,
@@ -904,7 +905,7 @@ export class LegacyMatchdayResultApplyService {
      */
     const gameStateMitLinien = ensureSeasonApronLinesFrozen(save.gameState);
     const seasonState = gameStateMitLinien.seasonState;
-    const nextGameState = {
+    const nextGameStateOhnePraemien = {
       ...gameStateMitLinien,
       seasonState: {
         ...seasonState,
@@ -933,6 +934,8 @@ export class LegacyMatchdayResultApplyService {
         resultAuditLogs: [...(seasonState.resultAuditLogs ?? []), nextAuditLog],
       },
     };
+    // Siegprämien (Office 21.11): Nachbuchung aus dem Gehaltstopf, nur für Teams von Menschen mit Plan; ohne Plan ein No-Op.
+    const nextGameState = bucheSiegpraemien(nextGameStateOhnePraemien, matchdayResultId);
     /**
      * DIE GEBUCHTE RECHNUNG WIRD GESTEMPELT — damit die Buehne danach SIE zeigt und nicht neu
      * rechnet.

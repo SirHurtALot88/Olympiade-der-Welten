@@ -2155,6 +2155,14 @@ export type TeamSeasonObjectiveRecord = {
    * Spielstände führen das Feld nicht; fehlend bedeutet "steht fest".
    */
   provisional?: boolean;
+  /**
+   * Laufzeit des Ziels in Saisons (Office 21.11.): `vonSaisonNr` bis `bisSaisonNr` einschliesslich. Fehlt das Feld,
+   * gilt das Ziel nur diese Saison. Ein Ziel mit Laufzeit wird in jeder Saison der Laufzeit neu vergeben und
+   * einzeln abgerechnet.
+   */
+  laufzeit?: { vonSaisonNr: number; bisSaisonNr: number };
+  /** Bei der Vergabe verworfenes Ziel, das dieses ersetzt (Widerspruchspruefung, Office 21.11.). */
+  ersetzt?: { label: string; weil: string };
 };
 
 /**
@@ -2193,6 +2201,65 @@ export type VorstandBudgetZustand = {
   /** Letzter abgelehnter Antrag (nur Anzeige). */
   letzterAntragAbgelehnt?: { zeit: string; grund: string } | null;
   protokoll: VorstandBudgetProtokollEintrag[];
+  /** Vorstandsgespraech (Office 21.11): Anzahl Quotenstufen, die der Vorstand fuer diese Saison anhebt (0 oder 1). */
+  stufenAnhebung?: number;
+  /** Vorstandsgespraech: einmaliges Sonderbudget in C Jahresgehalt, aus dem Vorbehalt in den Gehaltstopf. */
+  sonderGehalt?: number;
+};
+
+/** Eine Zusage des Spielers im Vorstandsgespraech. */
+export type VorstandZusageArt = "zielhoch" | "deckel" | "vertrauen" | "binden";
+/** Worum der Spieler im Vorstandsgespraech bittet. */
+export type VorstandBitteArt = "stufe" | "sonder" | "anzapf" | "alles" | "ziel" | "liebling";
+
+export type VorstandGespraechProtokollEintrag = {
+  zeit: string;
+  bitte: VorstandBitteArt;
+  zusagen: VorstandZusageArt[];
+  ausgang: "zustimmung" | "gegenangebot" | "ablehnung" | "zurueckgezogen";
+  text: string;
+  gewicht: number;
+  verlangt: number;
+  runde: number;
+};
+
+/** Ein offenes Gegenangebot des Vorstands (nur ein Gespraech zugleich). */
+export type VorstandGespraechOffen = {
+  bitte: VorstandBitteArt;
+  betrag?: number;
+  zielId?: string;
+  zusagen: VorstandZusageArt[];
+  vorschlag: VorstandZusageArt[];
+  runde: number;
+  gewicht: number;
+  verlangt: number;
+};
+
+/** Zustand der Gespraeche eines Teams in einer Saison (Office 21.11). */
+export type VorstandGespraechZustand = {
+  seasonId: string;
+  /** Verbrauchte Gespraeche (hoechstens 2 je Saison). */
+  genutzt: number;
+  offen: VorstandGespraechOffen | null;
+  /** Gebundene Zusagen dieser Saison (wirken als Vorstandsziele bzw. Sperren). */
+  zusagen: Array<{ art: VorstandZusageArt; seit: string; zielRang?: number; playerId?: string }>;
+  /** Der Lieblingsspieler darf ohne Vertrauensverlust verkauft werden. */
+  lieblingFreigegeben: boolean;
+  protokoll: VorstandGespraechProtokollEintrag[];
+};
+
+/** Praemienplan eines Teams (Office 21.11, Reiter Praemien). Stufen 0 = aus bis 3. */
+export type VorstandPraemienPlan = {
+  seasonId: string;
+  siegStufe: number;
+  treueStufe: number;
+  /** In dieser Saison aus dem Gehaltstopf gebucht (C Jahresgehalt-Gegenwert). */
+  siegGebucht: number;
+  treueGebucht: number;
+  /** Siege, die bereits praemiert wurden (Spieltag-Ids), damit nichts doppelt gebucht wird. */
+  praemierteSpieltage: string[];
+  praemierteVerlaengerungen: string[];
+  protokoll: Array<{ zeit: string; art: "sieg" | "treue" | "plan"; text: string; betrag?: number }>;
 };
 
 export type TeamBoardConfidenceRecord = {
@@ -3974,6 +4041,10 @@ export type SeasonState = {
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   /** Finanzkonzept V2: Umschichten, Ruecklage anzapfen, "Alles auf eine Karte" je Team (siehe `VorstandBudgetZustand`). */
   vorstandBudget?: Record<string, VorstandBudgetZustand>;
+  /** Vorstandsgespraeche je Team (Office 21.11). */
+  vorstandGespraeche?: Record<string, VorstandGespraechZustand>;
+  /** Praemienplaene je Team (Office 21.11). */
+  vorstandPraemien?: Record<string, VorstandPraemienPlan>;
   previousSeasonBoardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];

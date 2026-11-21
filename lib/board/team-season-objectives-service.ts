@@ -10,6 +10,15 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
+import {
+  bereichDesZiels,
+  baueGespraechZusageZiele,
+  baueLieblingsspielerZiel,
+  baueVertragslaufzeitZiel,
+  ersterWiderspruch,
+  kaderUnterSoll,
+  type ZielKontext,
+} from "@/lib/board/vorstand-ziele-erweitert";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -132,6 +141,10 @@ type ObjectiveDraft = {
    * das Ziel nicht „verfehlt" sein — siehe `capProvisionalObjectiveStatus`.
    */
   provisional?: boolean;
+  /** Laufzeit in Saisons (Office 21.11); fehlt = nur diese Saison. */
+  laufzeit?: { vonSaisonNr: number; bisSaisonNr: number };
+  /** Bei der Vergabe verworfenes Ziel, das dieses ersetzt (Widerspruchspruefung). */
+  ersetzt?: { label: string; weil: string };
 };
 
 type AxisKey = "pow" | "spe" | "men" | "soc";
@@ -1824,13 +1837,26 @@ export function selectBoardObjectiveDrafts(input: {
   profile: TeamStrategyProfile | null;
   identity: TeamIdentity | null;
   slateSize?: number;
+  /** Office 21.11: Kontext der Widerspruchspruefung (Kader unter Soll). Ohne Angabe gelten nur die kontextfreien Regeln. */
+  kontext?: ZielKontext;
+  /** Vom Vorstand schon festgelegte Ziele (Lieblingsspieler, Vertragslaufzeiten), gegen die ebenfalls geprueft wird. */
+  festeZiele?: ObjectiveDraft[];
 }) {
   // F4: slate size is dynamic under V2 (3–5 by disposition); defaults to the legacy fixed 4.
   const slateSize = input.slateSize ?? 4;
   const picked: ObjectiveDraft[] = [];
+  // Widerspruchspruefung (Chris 21.11.): verlangt ein Ziel, was ein anderes verbietet, fliegt es raus und das naechste rueckt nach.
+  let verworfen: { label: string; weil: string } | null = null;
   const add = (objective: ObjectiveDraft | null) => {
     if (!objective || picked.some((entry) => entry.objectiveId === objective.objectiveId)) return;
-    if (picked.length < slateSize) picked.push(objective);
+    if (picked.length >= slateSize) return;
+    const weil = ersterWiderspruch([...picked, ...(input.festeZiele ?? [])], objective, input.kontext ?? {});
+    if (weil) {
+      verworfen = verworfen ?? { label: objective.label, weil };
+      return;
+    }
+    picked.push(verworfen ? { ...objective, ersetzt: verworfen } : objective);
+    verworfen = null;
   };
 
   // Slot 1 (primary sport goal): the expectation-rank objective — "beat the finish your squad
@@ -1851,6 +1877,13 @@ export function selectBoardObjectiveDrafts(input: {
     pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "finance-salary-ratio" && objective.status !== "completed") ??
     pickUrgentObjective(input.objectives, "finance");
   add(urgentEconomy);
+  // Wurde das Finanzziel wegen eines Widerspruchs verworfen, rueckt das naechste Finanzziel nach (Office 21.11: „wird ersetzt").
+  if (verworfen && !picked.some((entry) => entry.category === "finance")) {
+    for (const kandidat of input.objectives.filter((entry) => entry.category === "finance")) {
+      add(kandidat);
+      if (picked.some((entry) => entry.category === "finance")) break;
+    }
+  }
 
   add(
     pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "roster-form-color-cover") ??
@@ -2205,11 +2238,20 @@ function buildTeamObjectives(input: {
       getRebuildCashObjective({ team, row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
     ].filter((objective): objective is ObjectiveDraft => Boolean(objective));
+  // Office 21.11: neue Zielarten des Vorstands (Lieblingsspieler, Vertragslaufzeiten). Sie kommen ZUSAETZLICH zum kompakten Slate
+  // (wie die Sponsor- und Budget-Ziele), damit die bestehende Auswahl und die KI-Neigung unveraendert bleiben; bei der Auswahl
+  // der uebrigen Ziele werden sie gegen Widersprueche geprueft.
+  const festeVorstandZiele = [
+    baueLieblingsspielerZiel(gameState, team.teamId),
+    baueVertragslaufzeitZiel(gameState, team.teamId),
+  ].filter((ziel): ziel is ObjectiveDraft => Boolean(ziel));
   const objectiveDrafts = selectBoardObjectiveDrafts({
     identity,
     profile,
     slateSize,
     objectives: candidateDrafts,
+    kontext: { kaderUnterSoll: kaderUnterSoll(gameState, team.teamId) },
+    festeZiele: festeVorstandZiele,
   });
   const sponsorDrafts = buildSponsorObjectiveDrafts({ gameState, team, row });
 
@@ -2219,18 +2261,18 @@ function buildTeamObjectives(input: {
     if (!team.humanControlled || isInitialSeason) return null;
     const storedConfidence = gameState.seasonState.boardConfidence?.[team.teamId]?.value ?? null;
     if (storedConfidence == null || storedConfidence >= 5.0) return null;
-    const penaltyCash = Math.round(Math.max(2, Math.min(10, (5.0 - storedConfidence) * 3.3)));
     const currentPct = roundValue(storedConfidence * 10, 0);
     return {
       objectiveId: "board-confidence-budget-cut",
       category: "finance",
       label: "Vorstandsvertrauen wiederherstellen",
       detail: `Board Confidence ${currentPct}% — Ziel ≥ 50%. Fehlgeschlagene Saisonziele haben das Vertrauen des Vorstands geschwächt.`,
-      actionHint: `Der Vorstand kürzt das Budget um ${penaltyCash}M. Erfülle deine Saisonziele, um den Druck zu reduzieren.`,
+      // Chris 18.11.: der Vorstand verhaengt keine Geldstrafen. Bei geschwaechtem Vertrauen gibt er weniger Budget frei
+      // (Quote, siehe `resolveVorstandFreigabe`); das Geld bleibt auf dem Konto.
+      actionHint: "Der Vorstand gibt weniger Budget frei, solange das Vertrauen niedrig ist. Erfülle deine Saisonziele, um es zurückzuholen.",
       targetValue: 5.0,
       currentValue: storedConfidence,
       status: "failed",
-      penaltyCash,
       boardConfidenceDelta: 0,
       source: "human_board_confidence_penalty",
     };
@@ -2253,6 +2295,8 @@ function buildTeamObjectives(input: {
     ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []),
     ...sponsorDrafts,
     ...buildVorstandBudgetObjectiveDrafts({ gameState, team, row }),
+    ...festeVorstandZiele,
+    ...baueGespraechZusageZiele(gameState, team.teamId, row.rank ?? null),
   ];
 
   return {
@@ -2622,7 +2666,12 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       captainLeadershipScore,
     });
     boardConfidence[team.teamId] = board;
-    aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives: teamObjectives, board });
+    // Die neuen Vorstandsziele (Office 21.11) steuern die KI-Kaeufe nicht mit: erst nach einer Messung mit 32 KI-Teams.
+    aiBiasByTeamId[team.teamId] = buildAiBias({
+      teamId: team.teamId,
+      objectives: teamObjectives.filter((o) => !/^(board-lieblingsspieler|board-vertragslaufzeiten|vorstand-gespraech-)/.test(o.objectiveId)),
+      board,
+    });
   }
 
   const overview = {
@@ -2646,13 +2695,9 @@ export function buildTeamSeasonObjectiveSettlement(gameState: GameState): TeamSe
     // gebucht. Hier NUR die Board-Confidence-Wirkung behalten, cashDelta = 0, sonst käme Sponsorgeld ~2×
     // an (und verfehlte Rangziele würden doppelt bestraft). Nicht-Sponsor-Board-Ziele zahlen normal.
     const isSponsorContractMirror = (objective.source ?? "").includes("sponsor_v2_contract");
-    const cashDelta = isSponsorContractMirror
-      ? 0
-      : objective.status === "completed"
-        ? objective.rewardCash ?? 0
-        : objective.status === "failed"
-          ? -(objective.penaltyCash ?? 0)
-          : 0;
+    // KEINE GELDSTRAFEN (Chris 18.11.): ein erfuelltes Ziel bringt Geld, ein verfehltes kostet nur Vertrauen. `penaltyCash`
+    // bleibt als totes Altfeld an den Datensaetzen und wird weder gebucht noch gezeigt (Fund 21.11.: hier wurde es abgezogen).
+    const cashDelta = isSponsorContractMirror ? 0 : objective.status === "completed" ? objective.rewardCash ?? 0 : 0;
     const boardConfidenceDelta =
       objective.status === "completed" || objective.status === "failed" || objective.status === "at_risk"
         ? objective.boardConfidenceDelta ?? 0
@@ -2917,5 +2962,86 @@ export function refreshTeamObjectiveState(gameState: GameState): GameState {
         ...overview.boardConfidence,
       },
     },
+  };
+}
+
+/* ===================================================================== Office 21.11: Zieltausch im Vorstandsgespraech */
+
+/** Der volle Kandidaten-Pool eines Teams (nicht nur der vergebene Slate). Reine Rechnung auf dem GameState. */
+export function getTeamObjectivePool(gameState: GameState, teamId: string): TeamSeasonObjectiveRecord[] {
+  const rows = buildTeamSeasonOverviewRows({ gameState });
+  const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  const row = rowsByTeamId.get(teamId);
+  if (!team || !row) return [];
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const profile = getTeamStrategyProfile(gameState, teamId);
+  return buildTeamObjectives({ gameState, team, row, rowsByTeamId, identity, profile }).pool;
+}
+
+/** Ziele, die der Mensch im Gespraech tauschen darf: vom Vorstand frei vergebene, noch nicht entschiedene Saisonziele. */
+export function istZielTauschbar(objective: TeamSeasonObjectiveRecord): boolean {
+  if (objective.status === "completed" || objective.status === "failed") return false;
+  if (/^(board-|vorstand-|sponsor-)/.test(objective.objectiveId)) return false;
+  const source = objective.source ?? "";
+  if (/sponsor_v2|vorstand_|status_stale|human_board_confidence_penalty/.test(source)) return false;
+  return true;
+}
+
+export type ZielTauschErgebnis = {
+  ok: boolean;
+  reason: string | null;
+  meldung: string;
+  gameState: GameState;
+  alt?: { objectiveId: string; label: string };
+  neu?: { objectiveId: string; label: string };
+};
+
+/**
+ * Tauscht ein Saisonziel gegen das naechste Ziel desselben Bereichs, das keinem der uebrigen Ziele widerspricht.
+ * Der Aufrufer (Vorstandsgespraech) verbraucht das Gespraech; hier steht nur die Wirkung.
+ */
+export function tauscheVorstandsZiel(gameState: GameState, teamId: string, objectiveId: string): ZielTauschErgebnis {
+  const stored = (gameState.seasonState.teamSeasonObjectives ?? []).filter(
+    (o) => o.seasonId === gameState.season.id && o.teamId === teamId,
+  );
+  const alt = stored.find((o) => o.objectiveId === objectiveId);
+  const fehler = (reason: string, meldung: string): ZielTauschErgebnis => ({ ok: false, reason, meldung, gameState });
+  if (!alt) return fehler("ziel_unbekannt", "Dieses Ziel gibt es nicht.");
+  if (!istZielTauschbar(alt)) return fehler("ziel_nicht_tauschbar", "Dieses Ziel kann nicht getauscht werden.");
+  const bereich = bereichDesZiels(alt);
+  const uebrige = stored.filter((o) => o.objectiveId !== objectiveId);
+  const pool = getTeamObjectivePool(gameState, teamId);
+  const kontext = { kaderUnterSoll: kaderUnterSoll(gameState, teamId) };
+  const vorhanden = new Set(stored.map((o) => o.objectiveId));
+  const taugt = (kandidat: TeamSeasonObjectiveRecord) =>
+    !vorhanden.has(kandidat.objectiveId) &&
+    istZielTauschbar(kandidat) &&
+    kandidat.status !== "failed" &&
+    !ersterWiderspruch(uebrige, kandidat, kontext);
+  const gleicheKategorie = pool.filter((k) => k.category === alt.category && taugt(k));
+  const gleicherBereich = pool.filter((k) => bereichDesZiels(k) === bereich && taugt(k));
+  const neu = gleicheKategorie[0] ?? gleicherBereich[0];
+  if (!neu) return fehler("kein_ersatz", "Der Vorstand hat für diesen Bereich kein anderes Ziel, das zu den übrigen passt.");
+  const ersatz: TeamSeasonObjectiveRecord = {
+    ...neu,
+    source: `${neu.source}+gespraech_tausch`,
+    ersetzt: { label: alt.label, weil: "Im Gespräch mit dem Vorstand getauscht." },
+  };
+  const teamZiele = stored.map((o) => (o.objectiveId === objectiveId ? ersatz : o));
+  const andere = (gameState.seasonState.teamSeasonObjectives ?? []).filter(
+    (o) => !(o.seasonId === gameState.season.id && o.teamId === teamId),
+  );
+  const next: GameState = {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, teamSeasonObjectives: [...andere, ...teamZiele] },
+  };
+  return {
+    ok: true,
+    reason: null,
+    meldung: `Ziel getauscht: „${alt.label}“ gegen „${ersatz.label}“.`,
+    gameState: next,
+    alt: { objectiveId: alt.objectiveId, label: alt.label },
+    neu: { objectiveId: ersatz.objectiveId, label: ersatz.label },
   };
 }
