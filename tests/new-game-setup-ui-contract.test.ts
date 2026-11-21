@@ -188,10 +188,13 @@ describe("new game setup UI contract", () => {
       path.join(process.cwd(), "lib/foundation/tabs/use-foundation-persist.ts"),
       "utf8",
     );
-    const source = `${shellRouterBodyText}\n${scopeSource}\n${persistSource}`;
+    // Saison-Info im neuen Stil (21.11.): Backdrop, Ladehinweis und Erledigt-Knopf sitzen in SaisonInfoModern.
+    const saisonInfoSource = fs.readFileSync(path.join(process.cwd(), "app/foundation/season-briefing/SaisonInfoModern.tsx"), "utf8");
+    const source = `${shellRouterBodyText}\n${scopeSource}\n${persistSource}\n${saisonInfoSource}`;
 
     expect(source).toContain("completeSeasonBriefingAndContinue");
-    expect(source).toMatch(/onClick=\{completeSeasonBriefingAndContinue\}[\s\S]*?>\s*Erledigt\s*<\/button>/);
+    expect(source).toContain("onErledigt={completeSeasonBriefingAndContinue}");
+    expect(saisonInfoSource).toMatch(/onClick=\{p\.onErledigt\}[\s\S]*?>\s*Erledigt\s*<\/button>/);
     expect(source).toContain('closeSeasonBriefing(false)');
     expect(source).toContain("seasonBriefingDismissedRef");
     expect(source).toContain("writeSeasonBriefingDismissedToStorage");
