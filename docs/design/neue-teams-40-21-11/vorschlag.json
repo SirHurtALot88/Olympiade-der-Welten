@@ -1,0 +1,2711 @@
+{
+  "meta": {
+    "stand": "2026-11-21",
+    "status": "VORSCHLAG, nicht in data/source eingetragen",
+    "hinweis": "teams, teamIdentities und teamFitMatrix haben exakt das Format der drei Quelldateien (Zeilen anhaengen). Die ersten 8 Eintraege sind der Hauptvorschlag (40 Teams), die letzten 2 (H-H, P-P) Reserve.",
+    "hauptTeams": [
+      "L-L",
+      "T-H",
+      "O-D",
+      "Q-Q",
+      "J-J",
+      "B-H",
+      "W-H",
+      "G-A"
+    ],
+    "reserveTeams": [
+      "H-H",
+      "P-P"
+    ],
+    "ziele": {
+      "teams": "data/source/teams.json (cash/budget sind wie bei den 32 nur Platzhalter in der bisherigen Reihe; die Spielbudgets kommen aus seasonManagementRows.Startbudget)",
+      "teamIdentities": "data/source/team-identities.json",
+      "teamFitMatrix": "data/source/team-fit-matrix.json -> races.rows / subclasses.rows (Tokens unveraendert; wie bei den 32 ohne Undead/Cyborg bzw. Humanoid/Demonic/Tauren/Aquatic)",
+      "seasonManagementRows": "references/sheets/season-management.csv (Startbudget entscheidet den Startrang und damit die Liga)",
+      "strategyProfiles": "lib/foundation/team-strategy-profiles.ts -> strategySeedsByTeamId (createProfile-Eingabe)",
+      "themeTargets": "lib/ai/team-theme-composition-service.ts -> THEME_TARGETS",
+      "relationships": "lib/rivalries/team-rivalries.ts -> TEAM_RELATIONSHIP_CSV (nur Werte ungleich 0, Richtung neues Team -> anderes Team, Skala -5..+5; Gegenrichtung beim Einbau spiegeln oder von Chris setzen lassen)"
+    }
+  },
+  "teams": [
+    {
+      "teamId": "L-L",
+      "shortCode": "L-L",
+      "name": "Little Legends",
+      "cash": 845000,
+      "budget": 1610000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "T-H",
+      "shortCode": "T-H",
+      "name": "Thunder Horde",
+      "cash": 860000,
+      "budget": 1630000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "O-D",
+      "shortCode": "O-D",
+      "name": "Obsidian Dragons",
+      "cash": 875000,
+      "budget": 1650000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "Q-Q",
+      "shortCode": "Q-Q",
+      "name": "Quiet Quasars",
+      "cash": 890000,
+      "budget": 1670000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "J-J",
+      "shortCode": "J-J",
+      "name": "Jolly Jesters",
+      "cash": 905000,
+      "budget": 1690000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "B-H",
+      "shortCode": "B-H",
+      "name": "Broken Halos",
+      "cash": 920000,
+      "budget": 1710000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "W-H",
+      "shortCode": "W-H",
+      "name": "The Wild Hunt",
+      "cash": 935000,
+      "budget": 1730000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "G-A",
+      "shortCode": "G-A",
+      "name": "Grey Archivists",
+      "cash": 950000,
+      "budget": 1750000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "H-H",
+      "shortCode": "H-H",
+      "name": "Heavy Hitters",
+      "cash": 965000,
+      "budget": 1770000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    },
+    {
+      "teamId": "P-P",
+      "shortCode": "P-P",
+      "name": "Peak Performers",
+      "cash": 980000,
+      "budget": 1790000,
+      "rosterLimit": 10,
+      "humanControlled": false
+    }
+  ],
+  "teamIdentities": [
+    {
+      "teamId": "L-L",
+      "playerType": "C",
+      "pow": 3,
+      "spe": 5,
+      "men": 8,
+      "soc": 4,
+      "ambition": 7,
+      "finances": 6.5,
+      "boardConfidence": 6,
+      "harmony": 8.5,
+      "manners": 6,
+      "popularity": 7.5,
+      "cooperation": 9,
+      "playerMin": 10,
+      "playerOpt": 13,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "T-H",
+      "playerType": "F",
+      "pow": 11,
+      "spe": 0,
+      "men": 2,
+      "soc": 7,
+      "ambition": 7.5,
+      "finances": 3,
+      "boardConfidence": 8,
+      "harmony": 8,
+      "manners": 2.5,
+      "popularity": 5,
+      "cooperation": 4.5,
+      "playerMin": 10,
+      "playerOpt": 14,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "O-D",
+      "playerType": "F",
+      "pow": 10,
+      "spe": 2,
+      "men": 7,
+      "soc": 1,
+      "ambition": 9.5,
+      "finances": 9,
+      "boardConfidence": 3,
+      "harmony": 3.5,
+      "manners": 3,
+      "popularity": 6.5,
+      "cooperation": 2,
+      "playerMin": 7,
+      "playerOpt": 11,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "Q-Q",
+      "playerType": "C",
+      "pow": 0,
+      "spe": 7,
+      "men": 11,
+      "soc": 2,
+      "ambition": 4,
+      "finances": 5.5,
+      "boardConfidence": 9.5,
+      "harmony": 9.5,
+      "manners": 7,
+      "popularity": 2,
+      "cooperation": 9.5,
+      "playerMin": 9,
+      "playerOpt": 12,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "J-J",
+      "playerType": "C",
+      "pow": 2,
+      "spe": 5,
+      "men": 3,
+      "soc": 10,
+      "ambition": 3.5,
+      "finances": 2.5,
+      "boardConfidence": 5,
+      "harmony": 6.5,
+      "manners": 4,
+      "popularity": 9.5,
+      "cooperation": 6,
+      "playerMin": 9,
+      "playerOpt": 13,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "B-H",
+      "playerType": "F",
+      "pow": 6,
+      "spe": 2,
+      "men": 4,
+      "soc": 8,
+      "ambition": 9,
+      "finances": 4,
+      "boardConfidence": 2,
+      "harmony": 4,
+      "manners": 5.5,
+      "popularity": 7,
+      "cooperation": 3,
+      "playerMin": 8,
+      "playerOpt": 11,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "W-H",
+      "playerType": "F",
+      "pow": 5,
+      "spe": 8,
+      "men": 6,
+      "soc": 1,
+      "ambition": 6.5,
+      "finances": 5,
+      "boardConfidence": 6.5,
+      "harmony": 6,
+      "manners": 3.5,
+      "popularity": 4.5,
+      "cooperation": 5.5,
+      "playerMin": 8,
+      "playerOpt": 11,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "G-A",
+      "playerType": "F",
+      "pow": 1,
+      "spe": 0,
+      "men": 14,
+      "soc": 5,
+      "ambition": 2.5,
+      "finances": 7.5,
+      "boardConfidence": 7,
+      "harmony": 7.5,
+      "manners": 9.5,
+      "popularity": 3,
+      "cooperation": 8,
+      "playerMin": 9,
+      "playerOpt": 12,
+      "sourceNote": "vorschlag-neue-teams-21-11"
+    },
+    {
+      "teamId": "H-H",
+      "playerType": "C",
+      "pow": 8,
+      "spe": 3,
+      "men": 0,
+      "soc": 9,
+      "ambition": 8,
+      "finances": 6,
+      "boardConfidence": 4,
+      "harmony": 3,
+      "manners": 1.5,
+      "popularity": 9,
+      "cooperation": 2.5,
+      "playerMin": 8,
+      "playerOpt": 11,
+      "sourceNote": "vorschlag-neue-teams-21-11 (reserve)"
+    },
+    {
+      "teamId": "P-P",
+      "playerType": "F",
+      "pow": 6,
+      "spe": 8,
+      "men": 4,
+      "soc": 2,
+      "ambition": 8.5,
+      "finances": 5,
+      "boardConfidence": 7,
+      "harmony": 7,
+      "manners": 8.5,
+      "popularity": 5.5,
+      "cooperation": 7,
+      "playerMin": 9,
+      "playerOpt": 12,
+      "sourceNote": "vorschlag-neue-teams-21-11 (reserve)"
+    }
+  ],
+  "teamFitMatrix": {
+    "races": {
+      "tokens": [
+        "Human",
+        "Demon",
+        "Construct",
+        "Elf",
+        "Undead",
+        "Animal",
+        "Divine",
+        "Cyborg",
+        "Lizard",
+        "Fish",
+        "Dwarf",
+        "Orc",
+        "Alien",
+        "Mutant",
+        "Voidborn",
+        "Goblin",
+        "Gnom",
+        "Dragon",
+        "Plant",
+        "Tauren"
+      ],
+      "rows": [
+        {
+          "teamId": "L-L",
+          "playerGroup": "C",
+          "fits": {
+            "Human": 1,
+            "Demon": -5,
+            "Construct": 2,
+            "Elf": -3,
+            "Animal": 2,
+            "Divine": -2,
+            "Lizard": -3,
+            "Fish": -3,
+            "Dwarf": 5,
+            "Orc": -5,
+            "Alien": 0,
+            "Mutant": -2,
+            "Voidborn": -10,
+            "Goblin": 5,
+            "Gnom": 5,
+            "Dragon": -20,
+            "Plant": 1,
+            "Tauren": -20
+          },
+          "sum": -52
+        },
+        {
+          "teamId": "T-H",
+          "playerGroup": "F",
+          "fits": {
+            "Human": -2,
+            "Demon": 1,
+            "Construct": -10,
+            "Elf": -10,
+            "Animal": 4,
+            "Divine": -5,
+            "Lizard": 2,
+            "Fish": -5,
+            "Dwarf": -3,
+            "Orc": 5,
+            "Alien": -5,
+            "Mutant": 2,
+            "Voidborn": -5,
+            "Goblin": 4,
+            "Gnom": -5,
+            "Dragon": 2,
+            "Plant": 0,
+            "Tauren": 5
+          },
+          "sum": -25
+        },
+        {
+          "teamId": "O-D",
+          "playerGroup": "F",
+          "fits": {
+            "Human": -3,
+            "Demon": 2,
+            "Construct": -5,
+            "Elf": 1,
+            "Animal": -4,
+            "Divine": -2,
+            "Lizard": 5,
+            "Fish": 1,
+            "Dwarf": -20,
+            "Orc": -1,
+            "Alien": -2,
+            "Mutant": -5,
+            "Voidborn": 2,
+            "Goblin": -10,
+            "Gnom": -10,
+            "Dragon": 5,
+            "Plant": -3,
+            "Tauren": 1
+          },
+          "sum": -48
+        },
+        {
+          "teamId": "Q-Q",
+          "playerGroup": "C",
+          "fits": {
+            "Human": -3,
+            "Demon": -5,
+            "Construct": 3,
+            "Elf": 0,
+            "Animal": -5,
+            "Divine": -10,
+            "Lizard": 1,
+            "Fish": 2,
+            "Dwarf": -4,
+            "Orc": -5,
+            "Alien": 5,
+            "Mutant": 5,
+            "Voidborn": 5,
+            "Goblin": -2,
+            "Gnom": 1,
+            "Dragon": -3,
+            "Plant": 2,
+            "Tauren": -5
+          },
+          "sum": -18
+        },
+        {
+          "teamId": "J-J",
+          "playerGroup": "C",
+          "fits": {
+            "Human": 3,
+            "Demon": 1,
+            "Construct": 1,
+            "Elf": 2,
+            "Animal": 4,
+            "Divine": -5,
+            "Lizard": 2,
+            "Fish": 0,
+            "Dwarf": 2,
+            "Orc": 1,
+            "Alien": 2,
+            "Mutant": 5,
+            "Voidborn": -10,
+            "Goblin": 4,
+            "Gnom": 4,
+            "Dragon": -3,
+            "Plant": 1,
+            "Tauren": 3
+          },
+          "sum": 17
+        },
+        {
+          "teamId": "B-H",
+          "playerGroup": "F",
+          "fits": {
+            "Human": 2,
+            "Demon": 3,
+            "Construct": -5,
+            "Elf": 2,
+            "Animal": -3,
+            "Divine": 5,
+            "Lizard": -3,
+            "Fish": -2,
+            "Dwarf": -1,
+            "Orc": -2,
+            "Alien": -1,
+            "Mutant": 1,
+            "Voidborn": 4,
+            "Goblin": -4,
+            "Gnom": -3,
+            "Dragon": 2,
+            "Plant": -2,
+            "Tauren": -2
+          },
+          "sum": -9
+        },
+        {
+          "teamId": "W-H",
+          "playerGroup": "F",
+          "fits": {
+            "Human": 4,
+            "Demon": -10,
+            "Construct": -3,
+            "Elf": 5,
+            "Animal": 1,
+            "Divine": -2,
+            "Lizard": -5,
+            "Fish": -3,
+            "Dwarf": 3,
+            "Orc": 2,
+            "Alien": -5,
+            "Mutant": -10,
+            "Voidborn": -20,
+            "Goblin": 0,
+            "Gnom": 0,
+            "Dragon": -20,
+            "Plant": -1,
+            "Tauren": 1
+          },
+          "sum": -63
+        },
+        {
+          "teamId": "G-A",
+          "playerGroup": "F",
+          "fits": {
+            "Human": 4,
+            "Demon": -5,
+            "Construct": 4,
+            "Elf": 5,
+            "Animal": -10,
+            "Divine": 2,
+            "Lizard": -2,
+            "Fish": -2,
+            "Dwarf": 2,
+            "Orc": -5,
+            "Alien": 2,
+            "Mutant": -4,
+            "Voidborn": -3,
+            "Goblin": -1,
+            "Gnom": 4,
+            "Dragon": 1,
+            "Plant": 1,
+            "Tauren": -10
+          },
+          "sum": -17
+        },
+        {
+          "teamId": "H-H",
+          "playerGroup": "C",
+          "fits": {
+            "Human": 4,
+            "Demon": 2,
+            "Construct": 0,
+            "Elf": -4,
+            "Animal": 1,
+            "Divine": -3,
+            "Lizard": 2,
+            "Fish": -3,
+            "Dwarf": 0,
+            "Orc": 5,
+            "Alien": 1,
+            "Mutant": 3,
+            "Voidborn": -5,
+            "Goblin": -2,
+            "Gnom": -10,
+            "Dragon": 1,
+            "Plant": -5,
+            "Tauren": 5
+          },
+          "sum": -8
+        },
+        {
+          "teamId": "P-P",
+          "playerGroup": "F",
+          "fits": {
+            "Human": 5,
+            "Demon": -4,
+            "Construct": -20,
+            "Elf": 3,
+            "Animal": -3,
+            "Divine": -5,
+            "Lizard": 1,
+            "Fish": 2,
+            "Dwarf": 1,
+            "Orc": 2,
+            "Alien": -2,
+            "Mutant": -20,
+            "Voidborn": -10,
+            "Goblin": -1,
+            "Gnom": -1,
+            "Dragon": -5,
+            "Plant": -2,
+            "Tauren": 2
+          },
+          "sum": -57
+        }
+      ]
+    },
+    "subclasses": {
+      "tokens": [
+        "Warrior",
+        "Mage",
+        "Wayfarer",
+        "Knight",
+        "Isolated",
+        "Swashbuckler",
+        "Humanoid",
+        "Beast",
+        "Jungle",
+        "Guardian",
+        "Giant",
+        "Agent",
+        "Bot",
+        "Assassin",
+        "Viking",
+        "Pirate",
+        "Amazoness",
+        "Vigilante",
+        "Lord",
+        "Servant",
+        "Hunter",
+        "Destroyer",
+        "Maniac",
+        "Pet Master",
+        "Ninja",
+        "Rebel",
+        "Trickster",
+        "Spec Ops",
+        "Royalty",
+        "Angel",
+        "Fallen Angel",
+        "Warlock",
+        "Dragon",
+        "Wraith",
+        "Cleric",
+        "Monk",
+        "Ambassador",
+        "Demonic",
+        "Apparition",
+        "Druid",
+        "Whore",
+        "God",
+        "Vampire",
+        "Tauren",
+        "Prime Evil",
+        "Alchemist",
+        "Succubus",
+        "Shaman",
+        "Aquatic",
+        "Strategist",
+        "Engineer",
+        "Executioner",
+        "Augmented",
+        "Undead",
+        "Healer",
+        "Controller",
+        "Scout",
+        "Drainer"
+      ],
+      "rows": [
+        {
+          "teamId": "L-L",
+          "playerGroup": "C",
+          "fits": {
+            "Warrior": 3,
+            "Mage": 2,
+            "Wayfarer": 2,
+            "Knight": 3,
+            "Isolated": 0,
+            "Swashbuckler": 2,
+            "Beast": -3,
+            "Jungle": -1,
+            "Guardian": 4,
+            "Giant": -20,
+            "Agent": 2,
+            "Bot": 1,
+            "Assassin": 0,
+            "Viking": -1,
+            "Pirate": 0,
+            "Amazoness": -2,
+            "Vigilante": 1,
+            "Lord": -1,
+            "Servant": 4,
+            "Hunter": 3,
+            "Destroyer": -4,
+            "Maniac": -2,
+            "Pet Master": 3,
+            "Ninja": 0,
+            "Rebel": 4,
+            "Trickster": 5,
+            "Spec Ops": -1,
+            "Royalty": -2,
+            "Angel": -2,
+            "Fallen Angel": -4,
+            "Warlock": -1,
+            "Dragon": -5,
+            "Wraith": -3,
+            "Cleric": 1,
+            "Monk": 1,
+            "Ambassador": 1,
+            "Apparition": -3,
+            "Druid": 1,
+            "Whore": -3,
+            "God": -4,
+            "Vampire": -4,
+            "Prime Evil": -10,
+            "Alchemist": 5,
+            "Succubus": -3,
+            "Shaman": 1,
+            "Strategist": 3,
+            "Engineer": 5,
+            "Executioner": -2,
+            "Augmented": 0,
+            "Undead": -5,
+            "Healer": 2,
+            "Controller": 0,
+            "Scout": 4,
+            "Drainer": -4
+          },
+          "sum": null
+        },
+        {
+          "teamId": "T-H",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": 5,
+            "Mage": -2,
+            "Wayfarer": 2,
+            "Knight": -1,
+            "Isolated": 1,
+            "Swashbuckler": 0,
+            "Beast": 4,
+            "Jungle": 3,
+            "Guardian": 3,
+            "Giant": 4,
+            "Agent": -3,
+            "Bot": -10,
+            "Assassin": -1,
+            "Viking": 2,
+            "Pirate": 0,
+            "Amazoness": 2,
+            "Vigilante": 0,
+            "Lord": 1,
+            "Servant": 1,
+            "Hunter": 4,
+            "Destroyer": 5,
+            "Maniac": 3,
+            "Pet Master": 4,
+            "Ninja": -2,
+            "Rebel": 3,
+            "Trickster": -1,
+            "Spec Ops": -3,
+            "Royalty": -4,
+            "Angel": -5,
+            "Fallen Angel": -4,
+            "Warlock": 1,
+            "Dragon": 1,
+            "Wraith": -2,
+            "Cleric": -2,
+            "Monk": 0,
+            "Ambassador": -3,
+            "Apparition": -2,
+            "Druid": 2,
+            "Whore": -4,
+            "God": -3,
+            "Vampire": -3,
+            "Prime Evil": 0,
+            "Alchemist": -1,
+            "Succubus": -4,
+            "Shaman": 5,
+            "Strategist": 0,
+            "Engineer": -4,
+            "Executioner": 3,
+            "Augmented": -5,
+            "Undead": -2,
+            "Healer": 1,
+            "Controller": -1,
+            "Scout": 2,
+            "Drainer": -3
+          },
+          "sum": null
+        },
+        {
+          "teamId": "O-D",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": 2,
+            "Mage": 3,
+            "Wayfarer": -3,
+            "Knight": 2,
+            "Isolated": 2,
+            "Swashbuckler": -3,
+            "Beast": 1,
+            "Jungle": 0,
+            "Guardian": 3,
+            "Giant": 3,
+            "Agent": -2,
+            "Bot": -4,
+            "Assassin": 0,
+            "Viking": -1,
+            "Pirate": -4,
+            "Amazoness": -1,
+            "Vigilante": -4,
+            "Lord": 5,
+            "Servant": 1,
+            "Hunter": 0,
+            "Destroyer": 4,
+            "Maniac": -1,
+            "Pet Master": -5,
+            "Ninja": -2,
+            "Rebel": -3,
+            "Trickster": -4,
+            "Spec Ops": -2,
+            "Royalty": 5,
+            "Angel": -2,
+            "Fallen Angel": 1,
+            "Warlock": 4,
+            "Dragon": 5,
+            "Wraith": 0,
+            "Cleric": -1,
+            "Monk": 0,
+            "Ambassador": -1,
+            "Apparition": 0,
+            "Druid": 0,
+            "Whore": -5,
+            "God": 4,
+            "Vampire": 1,
+            "Prime Evil": 2,
+            "Alchemist": 1,
+            "Succubus": -3,
+            "Shaman": 1,
+            "Strategist": 3,
+            "Engineer": -4,
+            "Executioner": 3,
+            "Augmented": -3,
+            "Undead": -2,
+            "Healer": -2,
+            "Controller": 2,
+            "Scout": -1,
+            "Drainer": 1
+          },
+          "sum": null
+        },
+        {
+          "teamId": "Q-Q",
+          "playerGroup": "C",
+          "fits": {
+            "Warrior": -1,
+            "Mage": 3,
+            "Wayfarer": 0,
+            "Knight": -1,
+            "Isolated": 5,
+            "Swashbuckler": -3,
+            "Beast": -2,
+            "Jungle": -2,
+            "Guardian": 1,
+            "Giant": -1,
+            "Agent": 3,
+            "Bot": 3,
+            "Assassin": 2,
+            "Viking": -4,
+            "Pirate": -4,
+            "Amazoness": -2,
+            "Vigilante": 0,
+            "Lord": -1,
+            "Servant": 1,
+            "Hunter": 1,
+            "Destroyer": -2,
+            "Maniac": -3,
+            "Pet Master": -3,
+            "Ninja": 1,
+            "Rebel": -1,
+            "Trickster": 0,
+            "Spec Ops": 2,
+            "Royalty": -3,
+            "Angel": -5,
+            "Fallen Angel": -4,
+            "Warlock": 2,
+            "Dragon": -1,
+            "Wraith": 2,
+            "Cleric": -5,
+            "Monk": 2,
+            "Ambassador": 1,
+            "Apparition": 5,
+            "Druid": 0,
+            "Whore": -5,
+            "God": -10,
+            "Vampire": -3,
+            "Prime Evil": -4,
+            "Alchemist": 3,
+            "Succubus": -4,
+            "Shaman": 0,
+            "Strategist": 4,
+            "Engineer": 3,
+            "Executioner": -2,
+            "Augmented": 4,
+            "Undead": -2,
+            "Healer": 2,
+            "Controller": 5,
+            "Scout": 4,
+            "Drainer": 4
+          },
+          "sum": null
+        },
+        {
+          "teamId": "J-J",
+          "playerGroup": "C",
+          "fits": {
+            "Warrior": 0,
+            "Mage": 2,
+            "Wayfarer": 4,
+            "Knight": -3,
+            "Isolated": 0,
+            "Swashbuckler": 5,
+            "Beast": 4,
+            "Jungle": 2,
+            "Guardian": -1,
+            "Giant": 3,
+            "Agent": -2,
+            "Bot": 0,
+            "Assassin": 1,
+            "Viking": 0,
+            "Pirate": 2,
+            "Amazoness": 4,
+            "Vigilante": -1,
+            "Lord": -4,
+            "Servant": 2,
+            "Hunter": 2,
+            "Destroyer": -2,
+            "Maniac": 4,
+            "Pet Master": 5,
+            "Ninja": 3,
+            "Rebel": 3,
+            "Trickster": 5,
+            "Spec Ops": -3,
+            "Royalty": -5,
+            "Angel": -4,
+            "Fallen Angel": -1,
+            "Warlock": 1,
+            "Dragon": 0,
+            "Wraith": -1,
+            "Cleric": -3,
+            "Monk": 0,
+            "Ambassador": 3,
+            "Apparition": 2,
+            "Druid": 1,
+            "Whore": 3,
+            "God": -5,
+            "Vampire": 1,
+            "Prime Evil": -5,
+            "Alchemist": 3,
+            "Succubus": 1,
+            "Shaman": 1,
+            "Strategist": -3,
+            "Engineer": -1,
+            "Executioner": -4,
+            "Augmented": 1,
+            "Undead": -2,
+            "Healer": 1,
+            "Controller": -2,
+            "Scout": 0,
+            "Drainer": -2
+          },
+          "sum": null
+        },
+        {
+          "teamId": "B-H",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": 1,
+            "Mage": 2,
+            "Wayfarer": 2,
+            "Knight": 3,
+            "Isolated": 4,
+            "Swashbuckler": 2,
+            "Beast": -2,
+            "Jungle": -2,
+            "Guardian": 1,
+            "Giant": -2,
+            "Agent": 0,
+            "Bot": -4,
+            "Assassin": 3,
+            "Viking": -1,
+            "Pirate": -1,
+            "Amazoness": 0,
+            "Vigilante": 5,
+            "Lord": -3,
+            "Servant": -4,
+            "Hunter": 0,
+            "Destroyer": 1,
+            "Maniac": 1,
+            "Pet Master": -3,
+            "Ninja": 0,
+            "Rebel": 5,
+            "Trickster": 1,
+            "Spec Ops": -1,
+            "Royalty": -5,
+            "Angel": 3,
+            "Fallen Angel": 5,
+            "Warlock": 4,
+            "Dragon": -2,
+            "Wraith": 4,
+            "Cleric": -5,
+            "Monk": 1,
+            "Ambassador": 1,
+            "Apparition": 3,
+            "Druid": -1,
+            "Whore": 0,
+            "God": -10,
+            "Vampire": 2,
+            "Prime Evil": -4,
+            "Alchemist": -1,
+            "Succubus": 3,
+            "Shaman": -1,
+            "Strategist": 0,
+            "Engineer": -3,
+            "Executioner": 2,
+            "Augmented": -3,
+            "Undead": -2,
+            "Healer": 2,
+            "Controller": -2,
+            "Scout": 0,
+            "Drainer": 3
+          },
+          "sum": null
+        },
+        {
+          "teamId": "W-H",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": 3,
+            "Mage": 0,
+            "Wayfarer": 4,
+            "Knight": 2,
+            "Isolated": 3,
+            "Swashbuckler": 1,
+            "Beast": -4,
+            "Jungle": 4,
+            "Guardian": 2,
+            "Giant": -3,
+            "Agent": 1,
+            "Bot": -2,
+            "Assassin": 3,
+            "Viking": 2,
+            "Pirate": 0,
+            "Amazoness": 3,
+            "Vigilante": 4,
+            "Lord": -1,
+            "Servant": 0,
+            "Hunter": 5,
+            "Destroyer": -2,
+            "Maniac": -2,
+            "Pet Master": 4,
+            "Ninja": 2,
+            "Rebel": 1,
+            "Trickster": 0,
+            "Spec Ops": 3,
+            "Royalty": -2,
+            "Angel": -1,
+            "Fallen Angel": -3,
+            "Warlock": -2,
+            "Dragon": -5,
+            "Wraith": -5,
+            "Cleric": 1,
+            "Monk": 1,
+            "Ambassador": -1,
+            "Apparition": -4,
+            "Druid": 2,
+            "Whore": -3,
+            "God": -3,
+            "Vampire": -5,
+            "Prime Evil": -20,
+            "Alchemist": 3,
+            "Succubus": -4,
+            "Shaman": 1,
+            "Strategist": 2,
+            "Engineer": 1,
+            "Executioner": 5,
+            "Augmented": -1,
+            "Undead": -10,
+            "Healer": 0,
+            "Controller": -1,
+            "Scout": 5,
+            "Drainer": -4
+          },
+          "sum": null
+        },
+        {
+          "teamId": "G-A",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": -2,
+            "Mage": 3,
+            "Wayfarer": 1,
+            "Knight": 1,
+            "Isolated": 2,
+            "Swashbuckler": -1,
+            "Beast": -4,
+            "Jungle": -2,
+            "Guardian": 2,
+            "Giant": -3,
+            "Agent": 3,
+            "Bot": 2,
+            "Assassin": -1,
+            "Viking": -3,
+            "Pirate": -4,
+            "Amazoness": -1,
+            "Vigilante": 0,
+            "Lord": 3,
+            "Servant": 3,
+            "Hunter": 0,
+            "Destroyer": -10,
+            "Maniac": -5,
+            "Pet Master": -3,
+            "Ninja": 0,
+            "Rebel": -2,
+            "Trickster": -1,
+            "Spec Ops": 0,
+            "Royalty": 2,
+            "Angel": 1,
+            "Fallen Angel": -2,
+            "Warlock": 1,
+            "Dragon": -3,
+            "Wraith": -1,
+            "Cleric": 4,
+            "Monk": 5,
+            "Ambassador": 5,
+            "Apparition": 1,
+            "Druid": 2,
+            "Whore": -4,
+            "God": 0,
+            "Vampire": -2,
+            "Prime Evil": -5,
+            "Alchemist": 4,
+            "Succubus": -3,
+            "Shaman": 1,
+            "Strategist": 5,
+            "Engineer": 3,
+            "Executioner": -4,
+            "Augmented": 1,
+            "Undead": -3,
+            "Healer": 3,
+            "Controller": 4,
+            "Scout": 4,
+            "Drainer": -2
+          },
+          "sum": null
+        },
+        {
+          "teamId": "H-H",
+          "playerGroup": "C",
+          "fits": {
+            "Warrior": 4,
+            "Mage": -3,
+            "Wayfarer": -1,
+            "Knight": 1,
+            "Isolated": -2,
+            "Swashbuckler": 2,
+            "Beast": 3,
+            "Jungle": 1,
+            "Guardian": 2,
+            "Giant": 5,
+            "Agent": -2,
+            "Bot": -1,
+            "Assassin": -3,
+            "Viking": 3,
+            "Pirate": 2,
+            "Amazoness": 4,
+            "Vigilante": 3,
+            "Lord": 2,
+            "Servant": 0,
+            "Hunter": -1,
+            "Destroyer": 5,
+            "Maniac": 5,
+            "Pet Master": 0,
+            "Ninja": 1,
+            "Rebel": 3,
+            "Trickster": 3,
+            "Spec Ops": -3,
+            "Royalty": 3,
+            "Angel": 0,
+            "Fallen Angel": 1,
+            "Warlock": -2,
+            "Dragon": 1,
+            "Wraith": -1,
+            "Cleric": -4,
+            "Monk": -2,
+            "Ambassador": -5,
+            "Apparition": -3,
+            "Druid": -1,
+            "Whore": 2,
+            "God": 0,
+            "Vampire": 1,
+            "Prime Evil": 0,
+            "Alchemist": -3,
+            "Succubus": 2,
+            "Shaman": 1,
+            "Strategist": -5,
+            "Engineer": -4,
+            "Executioner": 4,
+            "Augmented": 0,
+            "Undead": 1,
+            "Healer": -2,
+            "Controller": -5,
+            "Scout": -4,
+            "Drainer": -4
+          },
+          "sum": null
+        },
+        {
+          "teamId": "P-P",
+          "playerGroup": "F",
+          "fits": {
+            "Warrior": 4,
+            "Mage": -1,
+            "Wayfarer": 3,
+            "Knight": 4,
+            "Isolated": 0,
+            "Swashbuckler": 2,
+            "Beast": -1,
+            "Jungle": 1,
+            "Guardian": 5,
+            "Giant": 0,
+            "Agent": 2,
+            "Bot": -3,
+            "Assassin": -3,
+            "Viking": 3,
+            "Pirate": -1,
+            "Amazoness": 3,
+            "Vigilante": 2,
+            "Lord": 1,
+            "Servant": 2,
+            "Hunter": 4,
+            "Destroyer": -2,
+            "Maniac": -4,
+            "Pet Master": 0,
+            "Ninja": 2,
+            "Rebel": 1,
+            "Trickster": -2,
+            "Spec Ops": 3,
+            "Royalty": 0,
+            "Angel": 0,
+            "Fallen Angel": -4,
+            "Warlock": -2,
+            "Dragon": -2,
+            "Wraith": -3,
+            "Cleric": 1,
+            "Monk": 5,
+            "Ambassador": 1,
+            "Apparition": -3,
+            "Druid": 1,
+            "Whore": -3,
+            "God": -2,
+            "Vampire": -4,
+            "Prime Evil": -10,
+            "Alchemist": -5,
+            "Succubus": -4,
+            "Shaman": 0,
+            "Strategist": 4,
+            "Engineer": 2,
+            "Executioner": -1,
+            "Augmented": -10,
+            "Undead": -5,
+            "Healer": 3,
+            "Controller": -1,
+            "Scout": 5,
+            "Drainer": -5
+          },
+          "sum": null
+        }
+      ]
+    }
+  },
+  "seasonManagementRows": [
+    {
+      "Name": "Little Legends",
+      "Player": "C",
+      "Power": 3,
+      "Speed": 5,
+      "Mental": 8,
+      "Social": 4,
+      "Ambition": 7,
+      "Finances": 6.5,
+      "Board Confidence": 6,
+      "Harmony": 8.5,
+      "Manners": 6,
+      "Popularity": 7.5,
+      "Cooperation": 9,
+      "Startbudget": 267,
+      "Player Min": 10,
+      "Player Opt": 13
+    },
+    {
+      "Name": "Thunder Horde",
+      "Player": "F",
+      "Power": 11,
+      "Speed": 0,
+      "Mental": 2,
+      "Social": 7,
+      "Ambition": 7.5,
+      "Finances": 3,
+      "Board Confidence": 8,
+      "Harmony": 8,
+      "Manners": 2.5,
+      "Popularity": 5,
+      "Cooperation": 4.5,
+      "Startbudget": 222,
+      "Player Min": 10,
+      "Player Opt": 14
+    },
+    {
+      "Name": "Obsidian Dragons",
+      "Player": "F",
+      "Power": 10,
+      "Speed": 2,
+      "Mental": 7,
+      "Social": 1,
+      "Ambition": 9.5,
+      "Finances": 9,
+      "Board Confidence": 3,
+      "Harmony": 3.5,
+      "Manners": 3,
+      "Popularity": 6.5,
+      "Cooperation": 2,
+      "Startbudget": 312,
+      "Player Min": 7,
+      "Player Opt": 11
+    },
+    {
+      "Name": "Quiet Quasars",
+      "Player": "C",
+      "Power": 0,
+      "Speed": 7,
+      "Mental": 11,
+      "Social": 2,
+      "Ambition": 4,
+      "Finances": 5.5,
+      "Board Confidence": 9.5,
+      "Harmony": 9.5,
+      "Manners": 7,
+      "Popularity": 2,
+      "Cooperation": 9.5,
+      "Startbudget": 207,
+      "Player Min": 9,
+      "Player Opt": 12
+    },
+    {
+      "Name": "Jolly Jesters",
+      "Player": "C",
+      "Power": 2,
+      "Speed": 5,
+      "Mental": 3,
+      "Social": 10,
+      "Ambition": 3.5,
+      "Finances": 2.5,
+      "Board Confidence": 5,
+      "Harmony": 6.5,
+      "Manners": 4,
+      "Popularity": 9.5,
+      "Cooperation": 6,
+      "Startbudget": 177,
+      "Player Min": 9,
+      "Player Opt": 13
+    },
+    {
+      "Name": "Broken Halos",
+      "Player": "F",
+      "Power": 6,
+      "Speed": 2,
+      "Mental": 4,
+      "Social": 8,
+      "Ambition": 9,
+      "Finances": 4,
+      "Board Confidence": 2,
+      "Harmony": 4,
+      "Manners": 5.5,
+      "Popularity": 7,
+      "Cooperation": 3,
+      "Startbudget": 242,
+      "Player Min": 8,
+      "Player Opt": 11
+    },
+    {
+      "Name": "The Wild Hunt",
+      "Player": "F",
+      "Power": 5,
+      "Speed": 8,
+      "Mental": 6,
+      "Social": 1,
+      "Ambition": 6.5,
+      "Finances": 5,
+      "Board Confidence": 6.5,
+      "Harmony": 6,
+      "Manners": 3.5,
+      "Popularity": 4.5,
+      "Cooperation": 5.5,
+      "Startbudget": 257,
+      "Player Min": 8,
+      "Player Opt": 11
+    },
+    {
+      "Name": "Grey Archivists",
+      "Player": "F",
+      "Power": 1,
+      "Speed": 0,
+      "Mental": 14,
+      "Social": 5,
+      "Ambition": 2.5,
+      "Finances": 7.5,
+      "Board Confidence": 7,
+      "Harmony": 7.5,
+      "Manners": 9.5,
+      "Popularity": 3,
+      "Cooperation": 8,
+      "Startbudget": 287,
+      "Player Min": 9,
+      "Player Opt": 12
+    },
+    {
+      "Name": "Heavy Hitters",
+      "Player": "C",
+      "Power": 8,
+      "Speed": 3,
+      "Mental": 0,
+      "Social": 9,
+      "Ambition": 8,
+      "Finances": 6,
+      "Board Confidence": 4,
+      "Harmony": 3,
+      "Manners": 1.5,
+      "Popularity": 9,
+      "Cooperation": 2.5,
+      "Startbudget": 272,
+      "Player Min": 8,
+      "Player Opt": 11
+    },
+    {
+      "Name": "Peak Performers",
+      "Player": "F",
+      "Power": 6,
+      "Speed": 8,
+      "Mental": 4,
+      "Social": 2,
+      "Ambition": 8.5,
+      "Finances": 5,
+      "Board Confidence": 7,
+      "Harmony": 7,
+      "Manners": 8.5,
+      "Popularity": 5.5,
+      "Cooperation": 7,
+      "Startbudget": 232,
+      "Player Min": 9,
+      "Player Opt": 12
+    }
+  ],
+  "strategyProfiles": {
+    "L-L": {
+      "strategySummary": "Kleinvolk-Kollektiv aus Zwergen, Gnomen und Goblins. Tüftelei, Absprachen und Kaderbreite schlagen Körpergröße; Riesen sind Erzfeind und Tabu.",
+      "buyStyle": "Kauft kleine, kluge und flinke Profile mit Werkstatt-Fit; lieber drei solide Tüftler als ein teurer Hüne.",
+      "sellStyle": "Verkauft Egos und Einzelgänger früh, hält treue Kernspieler auch über ein Formtief.",
+      "contractStyle": "Mittlere bis lange Laufzeiten für den Dorfkern, kurze Probeverträge für Zugereiste.",
+      "rosterStyle": "Breiter 12-13er Kader ohne Superstar-Gehalt, viel Rotation.",
+      "preferredArchetypes": [
+        "tinkerer",
+        "underdog scout",
+        "clever small defender",
+        "alchemist"
+      ],
+      "avoidedArchetypes": [
+        "towering bruiser",
+        "ego star"
+      ],
+      "preferredRaces": [
+        "dwarf",
+        "gnom",
+        "goblin"
+      ],
+      "avoidedRaces": [
+        "tauren",
+        "dragon",
+        "orc",
+        "voidborn"
+      ],
+      "hardNoGos": [
+        "giant fit",
+        "locker-room bully"
+      ],
+      "bias": {
+        "cashPriority": 6,
+        "valuePriority": 8,
+        "starPriority": 3,
+        "riskTolerance": 4,
+        "wageSensitivity": 7,
+        "sellForProfitAggression": 4,
+        "shortContractPreference": 4,
+        "longContractPreference": 7,
+        "loyaltyBias": 9,
+        "harmonyStrictness": 8,
+        "rosterDepthPreference": 9,
+        "eliteSmallRosterPreference": 2
+      },
+      "preferredClasses": [
+        "Rogue",
+        "Tactician",
+        "Sprinter",
+        "Overseer"
+      ],
+      "avoidedClasses": [
+        "Berserker",
+        "Charger"
+      ],
+      "preferredTraits": [
+        "Resourceful",
+        "Loyal",
+        "Diligent",
+        "Flexible"
+      ],
+      "dislikedTraits": [
+        "Egomaniac",
+        "Diva",
+        "Lazy",
+        "Cruel"
+      ]
+    },
+    "T-H": {
+      "strategySummary": "Steppenhorde aus Orks und Tauren unter einer Schamanin. Clan-Treue und rohe Kraft; Masse, Trommeln und Zusammenhalt statt Finesse.",
+      "buyStyle": "Kauft kräftige Stammeskrieger, Schamanen und Bestienreiter; viele günstige Körper statt eines teuren Stars.",
+      "sellStyle": "Verkauft fast nie aus Profitgründen; wer den Stamm verrät, fliegt sofort.",
+      "contractStyle": "Lange Bindungen, niedrige Gehälter, Treue zählt mehr als Marktwert.",
+      "rosterStyle": "Großer 13-14er Kader, robust gegen Verletzungen.",
+      "preferredArchetypes": [
+        "war shaman",
+        "clan bruiser",
+        "beast rider",
+        "war drummer"
+      ],
+      "avoidedArchetypes": [
+        "court darling",
+        "machine specialist"
+      ],
+      "preferredRaces": [
+        "orc",
+        "tauren",
+        "goblin",
+        "animal"
+      ],
+      "avoidedRaces": [
+        "construct",
+        "elf",
+        "gnom",
+        "alien"
+      ],
+      "hardNoGos": [
+        "clan traitor",
+        "machine body"
+      ],
+      "bias": {
+        "cashPriority": 3,
+        "valuePriority": 6,
+        "starPriority": 4,
+        "riskTolerance": 6,
+        "wageSensitivity": 8,
+        "sellForProfitAggression": 2,
+        "shortContractPreference": 2,
+        "longContractPreference": 9,
+        "loyaltyBias": 10,
+        "harmonyStrictness": 7,
+        "rosterDepthPreference": 10,
+        "eliteSmallRosterPreference": 1
+      },
+      "preferredClasses": [
+        "Warlord",
+        "Berserker",
+        "Tank",
+        "Charger"
+      ],
+      "avoidedClasses": [
+        "Mage",
+        "Overseer",
+        "Tactician"
+      ],
+      "preferredTraits": [
+        "Loyal",
+        "FiredUp",
+        "Fearless",
+        "Motivated"
+      ],
+      "dislikedTraits": [
+        "Timid",
+        "FaintHearted",
+        "Manipulative",
+        "Diva"
+      ]
+    },
+    "O-D": {
+      "strategySummary": "Uralte Drachendynastie mit dem größten Hort. Wenige teure Schwergewichte, Blutlinie vor Sympathie, zweiter Platz gilt als Schande.",
+      "buyStyle": "Kauft Drachen, Echsen und alte Adelslinien mit hoher POW-/MEN-Decke; zahlt für Stars auch über Marktwert.",
+      "sellStyle": "Verkauft enttäuschende Stars ohne Sentiment, aber nie unter Wert.",
+      "contractStyle": "Lange, teure Verträge für die Blutlinie; alle anderen bleiben Leihkräfte.",
+      "rosterStyle": "Kleiner 8-10er Elitekern mit zwei bis drei Superstars.",
+      "preferredArchetypes": [
+        "dragon lord",
+        "ancient tyrant",
+        "scaled juggernaut",
+        "arcane elder"
+      ],
+      "avoidedArchetypes": [
+        "hoard thief",
+        "pet handler",
+        "street trickster"
+      ],
+      "preferredRaces": [
+        "dragon",
+        "lizard"
+      ],
+      "avoidedRaces": [
+        "dwarf",
+        "goblin",
+        "gnom",
+        "construct"
+      ],
+      "hardNoGos": [
+        "hoard thief",
+        "public humiliation"
+      ],
+      "bias": {
+        "cashPriority": 3,
+        "valuePriority": 4,
+        "starPriority": 10,
+        "riskTolerance": 7,
+        "wageSensitivity": 2,
+        "sellForProfitAggression": 5,
+        "shortContractPreference": 3,
+        "longContractPreference": 8,
+        "loyaltyBias": 4,
+        "harmonyStrictness": 3,
+        "rosterDepthPreference": 2,
+        "eliteSmallRosterPreference": 10
+      },
+      "preferredClasses": [
+        "Warlord",
+        "Tank",
+        "Mage",
+        "Overseer",
+        "Badass"
+      ],
+      "avoidedClasses": [
+        "Bard",
+        "Rogue"
+      ],
+      "preferredTraits": [
+        "Ambitious",
+        "Fearless",
+        "Cool",
+        "Disciplined"
+      ],
+      "dislikedTraits": [
+        "FaintHearted",
+        "Timid",
+        "Lazy",
+        "Gambler"
+      ]
+    },
+    "Q-Q": {
+      "strategySummary": "Außenweltler-Kollektiv aus Aliens, Voidborn und Mutanten. Lautlose Abstimmung, Kopf und Tempo, keine Show und keine Egos.",
+      "buyStyle": "Kauft ruhige, kluge und schnelle Profile mit Fremdwelt-Fit; Charisma ist kein Kaufgrund.",
+      "sellStyle": "Trennt sich geräuschlos von allem, was das Kollektiv stört, auch von Stars.",
+      "contractStyle": "Gleichmäßige mittlere Laufzeiten, flache Gehaltsstruktur.",
+      "rosterStyle": "Homogener 11-12er Kader ohne Gefälle.",
+      "preferredArchetypes": [
+        "hive strategist",
+        "void scout",
+        "silent controller",
+        "psionic"
+      ],
+      "avoidedArchetypes": [
+        "showboat",
+        "preacher",
+        "brawler"
+      ],
+      "preferredRaces": [
+        "alien",
+        "voidborn",
+        "mutant"
+      ],
+      "avoidedRaces": [
+        "divine",
+        "animal",
+        "orc",
+        "tauren"
+      ],
+      "hardNoGos": [
+        "showboat ego",
+        "divine preacher"
+      ],
+      "bias": {
+        "cashPriority": 5,
+        "valuePriority": 7,
+        "starPriority": 3,
+        "riskTolerance": 3,
+        "wageSensitivity": 6,
+        "sellForProfitAggression": 5,
+        "shortContractPreference": 5,
+        "longContractPreference": 6,
+        "loyaltyBias": 6,
+        "harmonyStrictness": 10,
+        "rosterDepthPreference": 6,
+        "eliteSmallRosterPreference": 4
+      },
+      "preferredClasses": [
+        "Overseer",
+        "Mage",
+        "Tactician",
+        "Sprinter",
+        "Rogue"
+      ],
+      "avoidedClasses": [
+        "Berserker",
+        "Bard",
+        "Badass"
+      ],
+      "preferredTraits": [
+        "Cool",
+        "Disciplined",
+        "Flexible",
+        "Diligent",
+        "Relaxed"
+      ],
+      "dislikedTraits": [
+        "Feisty",
+        "Diva",
+        "Scandalous",
+        "Egomaniac"
+      ]
+    },
+    "J-J": {
+      "strategySummary": "Wanderzirkus als Olympiade-Team. Tricks, Tempo und Publikumsliebe; offen für jede Kuriosität, chronisch knapp bei Kasse.",
+      "buyStyle": "Kauft günstige Publikumslieblinge, Artisten und Dompteure; nimmt gern, was andere als Freak abweisen.",
+      "sellStyle": "Verkauft Attraktionen, wenn die Kasse leer ist, und holt sie später gern zurück.",
+      "contractStyle": "Kurze, billige Verträge von Saison zu Saison.",
+      "rosterStyle": "Bunter 12-13er Kader, viele Spezialnummern.",
+      "preferredArchetypes": [
+        "acrobat",
+        "beast tamer",
+        "knife thrower",
+        "crowd favorite",
+        "strongman"
+      ],
+      "avoidedArchetypes": [
+        "grim enforcer",
+        "stiff aristocrat"
+      ],
+      "preferredRaces": [
+        "mutant",
+        "goblin",
+        "gnom",
+        "animal"
+      ],
+      "avoidedRaces": [
+        "voidborn",
+        "divine"
+      ],
+      "preferredTraits": [
+        "FanFavorite",
+        "Eloquent",
+        "Flexible",
+        "Sexy",
+        "Relaxed"
+      ],
+      "dislikedTraits": [
+        "ColdBlooded",
+        "Cruel",
+        "Paranoid",
+        "Timid"
+      ],
+      "hardNoGos": [
+        "crowd killer",
+        "joyless enforcer"
+      ],
+      "bias": {
+        "cashPriority": 8,
+        "valuePriority": 8,
+        "starPriority": 4,
+        "riskTolerance": 8,
+        "wageSensitivity": 9,
+        "sellForProfitAggression": 7,
+        "shortContractPreference": 9,
+        "longContractPreference": 2,
+        "loyaltyBias": 5,
+        "harmonyStrictness": 5,
+        "rosterDepthPreference": 8,
+        "eliteSmallRosterPreference": 2
+      },
+      "preferredClasses": [
+        "Bard",
+        "Rogue",
+        "Sprinter",
+        "Badass",
+        "Charger"
+      ],
+      "avoidedClasses": [
+        "Templar",
+        "Overseer",
+        "Tank"
+      ]
+    },
+    "B-H": {
+      "strategySummary": "Verstoßene Engel und Lichtwesen als Rebellen-Team. Charisma, Trotz und Einzelkönner; wollen ohne Segen gewinnen und nehmen jeden Rausgeworfenen.",
+      "buyStyle": "Kauft gefallene Stars, Rebellen und Außenseiter mit großem Auftritt, oft unter Marktwert nach einem Skandal.",
+      "sellStyle": "Verkauft Angepasste und Mitläufer; wer aufbegehrt, darf bleiben.",
+      "contractStyle": "Kurz bis mittel, niemand lässt sich hier gern binden.",
+      "rosterStyle": "Schlanker 10-11er Kader mit zwei, drei Gesichtern.",
+      "preferredArchetypes": [
+        "fallen angel",
+        "charismatic rebel",
+        "exiled champion",
+        "dark paladin"
+      ],
+      "avoidedArchetypes": [
+        "obedient servant",
+        "company man",
+        "preacher"
+      ],
+      "preferredRaces": [
+        "divine",
+        "demon",
+        "voidborn"
+      ],
+      "avoidedRaces": [
+        "construct",
+        "goblin"
+      ],
+      "preferredTraits": [
+        "Ambitious",
+        "Fearless",
+        "Eloquent",
+        "Cool"
+      ],
+      "dislikedTraits": [
+        "Timid",
+        "FaintHearted",
+        "Lazy",
+        "Cheater"
+      ],
+      "hardNoGos": [
+        "blind obedience",
+        "board informant"
+      ],
+      "bias": {
+        "cashPriority": 4,
+        "valuePriority": 7,
+        "starPriority": 8,
+        "riskTolerance": 9,
+        "wageSensitivity": 5,
+        "sellForProfitAggression": 5,
+        "shortContractPreference": 7,
+        "longContractPreference": 3,
+        "loyaltyBias": 5,
+        "harmonyStrictness": 3,
+        "rosterDepthPreference": 3,
+        "eliteSmallRosterPreference": 8
+      },
+      "preferredClasses": [
+        "Hero",
+        "Badass",
+        "Templar",
+        "Bard",
+        "Rogue"
+      ],
+      "avoidedClasses": [
+        "Overseer",
+        "Tank"
+      ]
+    },
+    "W-H": {
+      "strategySummary": "Gilde der Monsterjäger. Fährtenleser mit Tempo, Wahrnehmung und Präzision; die Beute von gestern wird nie Teamkollege.",
+      "buyStyle": "Kauft Jäger, Späher und abgeklärte Spezialisten; scoutet gründlich und zahlt nur für nachgewiesene Leistung.",
+      "sellStyle": "Verkauft sachlich nach Leistung, ohne Drama.",
+      "contractStyle": "Mittlere Laufzeiten mit klarer Leistungslogik.",
+      "rosterStyle": "Kleiner 10-11er Kader aus eingespielten Rotten.",
+      "preferredArchetypes": [
+        "tracker",
+        "marksman",
+        "trapper",
+        "monster slayer",
+        "hound master"
+      ],
+      "avoidedArchetypes": [
+        "monster",
+        "showman",
+        "court mage"
+      ],
+      "preferredRaces": [
+        "human",
+        "elf",
+        "dwarf"
+      ],
+      "avoidedRaces": [
+        "dragon",
+        "voidborn",
+        "demon",
+        "mutant"
+      ],
+      "preferredTraits": [
+        "Diligent",
+        "Disciplined",
+        "Fearless",
+        "Resourceful",
+        "Cool"
+      ],
+      "dislikedTraits": [
+        "FaintHearted",
+        "Timid",
+        "Diva",
+        "Scandalous",
+        "Lazy"
+      ],
+      "hardNoGos": [
+        "monster teammate",
+        "trophy thief"
+      ],
+      "bias": {
+        "cashPriority": 5,
+        "valuePriority": 7,
+        "starPriority": 5,
+        "riskTolerance": 4,
+        "wageSensitivity": 6,
+        "sellForProfitAggression": 5,
+        "shortContractPreference": 5,
+        "longContractPreference": 5,
+        "loyaltyBias": 6,
+        "harmonyStrictness": 5,
+        "rosterDepthPreference": 4,
+        "eliteSmallRosterPreference": 7
+      },
+      "preferredClasses": [
+        "Rogue",
+        "Sprinter",
+        "Tactician",
+        "Charger",
+        "Warlord"
+      ],
+      "avoidedClasses": [
+        "Bard",
+        "Mage"
+      ]
+    },
+    "G-A": {
+      "strategySummary": "Chronisten-Orden der Olympiade. Nicht-magische Kopfarbeit, perfekte Vorbereitung und Manieren; kennt jede Schwäche aus dem Archiv.",
+      "buyStyle": "Kauft Strategen, Mönche, Gelehrte und Diplomaten mit hoher MEN-Decke; scoutet länger als jeder andere.",
+      "sellStyle": "Verkauft ungern und selten, dann aber sauber dokumentiert zum fairen Preis.",
+      "contractStyle": "Lange, ordentliche Verträge ohne Sonderklauseln.",
+      "rosterStyle": "Geordneter 11-12er Kader, jede Rolle doppelt besetzt.",
+      "preferredArchetypes": [
+        "strategist",
+        "chronicler",
+        "scholar monk",
+        "diplomat",
+        "analyst"
+      ],
+      "avoidedArchetypes": [
+        "berserker",
+        "vandal",
+        "loudmouth"
+      ],
+      "preferredRaces": [
+        "human",
+        "elf",
+        "gnom",
+        "construct"
+      ],
+      "avoidedRaces": [
+        "animal",
+        "tauren",
+        "orc",
+        "demon"
+      ],
+      "preferredTraits": [
+        "Diligent",
+        "Disciplined",
+        "Fair",
+        "Eloquent",
+        "Caring"
+      ],
+      "dislikedTraits": [
+        "Feisty",
+        "Gambler",
+        "Cheater",
+        "Scandalous",
+        "Cruel"
+      ],
+      "hardNoGos": [
+        "book burner",
+        "record forger"
+      ],
+      "bias": {
+        "cashPriority": 7,
+        "valuePriority": 7,
+        "starPriority": 4,
+        "riskTolerance": 2,
+        "wageSensitivity": 6,
+        "sellForProfitAggression": 3,
+        "shortContractPreference": 2,
+        "longContractPreference": 9,
+        "loyaltyBias": 8,
+        "harmonyStrictness": 8,
+        "rosterDepthPreference": 7,
+        "eliteSmallRosterPreference": 4
+      },
+      "preferredClasses": [
+        "Overseer",
+        "Tactician",
+        "Mage",
+        "Templar",
+        "Bard"
+      ],
+      "avoidedClasses": [
+        "Berserker",
+        "Charger",
+        "Badass"
+      ]
+    },
+    "H-H": {
+      "strategySummary": "Showkampf-Promotion mit Champions, Fehden und Einlaufmusik. Kraft plus Bühnenpräsenz; füllt jede Halle, streitet in jeder Kabine.",
+      "buyStyle": "Kauft Zugpferde: große Namen, große Körper, große Klappe. Zahlt für Popularität Aufpreis.",
+      "sellStyle": "Verkauft, wenn ein Gimmick durch ist, gern mit lautem Abgang.",
+      "contractStyle": "Kurze, teure Star-Verträge mit Auftrittsbonus.",
+      "rosterStyle": "10-11er Kader um zwei Hauptkämpfer.",
+      "preferredArchetypes": [
+        "heavyweight champion",
+        "heel",
+        "crowd favorite",
+        "masked brawler"
+      ],
+      "avoidedArchetypes": [
+        "quiet analyst",
+        "support healer"
+      ],
+      "preferredRaces": [
+        "orc",
+        "tauren",
+        "human",
+        "mutant"
+      ],
+      "avoidedRaces": [
+        "gnom",
+        "plant",
+        "voidborn",
+        "elf"
+      ],
+      "preferredTraits": [
+        "FanFavorite",
+        "FiredUp",
+        "Sexy",
+        "Fearless"
+      ],
+      "dislikedTraits": [
+        "Timid",
+        "FaintHearted",
+        "Paranoid"
+      ],
+      "hardNoGos": [
+        "no charisma",
+        "refuses the spotlight"
+      ],
+      "bias": {
+        "cashPriority": 5,
+        "valuePriority": 3,
+        "starPriority": 10,
+        "riskTolerance": 8,
+        "wageSensitivity": 3,
+        "sellForProfitAggression": 6,
+        "shortContractPreference": 8,
+        "longContractPreference": 3,
+        "loyaltyBias": 3,
+        "harmonyStrictness": 2,
+        "rosterDepthPreference": 3,
+        "eliteSmallRosterPreference": 8
+      },
+      "preferredClasses": [
+        "Badass",
+        "Berserker",
+        "Tank",
+        "Warlord",
+        "Hero"
+      ],
+      "avoidedClasses": [
+        "Overseer",
+        "Tactician",
+        "Mage"
+      ]
+    },
+    "P-P": {
+      "strategySummary": "Profisportler ohne Fantasy-Abkürzung. Training, Disziplin und Fairness; Tempo und Kraft aus eigener Arbeit, null Toleranz für Tricks.",
+      "buyStyle": "Kauft gesunde, fleißige Athleten mit sauberem Ruf; Traits zählen mehr als Herkunft.",
+      "sellStyle": "Verkauft Trainingsfaule und Skandalnudeln sofort.",
+      "contractStyle": "Mittlere Laufzeiten mit Leistungsstaffel.",
+      "rosterStyle": "Ausgeglichener 11-12er Kader, gute Fitness, kaum Ausfälle.",
+      "preferredArchetypes": [
+        "pro athlete",
+        "endurance runner",
+        "team captain",
+        "clean sprinter"
+      ],
+      "avoidedArchetypes": [
+        "doped freak",
+        "machine body",
+        "lazy talent"
+      ],
+      "preferredRaces": [
+        "human",
+        "elf",
+        "fish"
+      ],
+      "avoidedRaces": [
+        "construct",
+        "mutant",
+        "voidborn"
+      ],
+      "preferredTraits": [
+        "Healthy",
+        "Disciplined",
+        "Diligent",
+        "Motivated",
+        "Fair"
+      ],
+      "dislikedTraits": [
+        "Lazy",
+        "Cheater",
+        "Gambler",
+        "Scandalous",
+        "Diva"
+      ],
+      "hardNoGos": [
+        "cheater",
+        "augmented body"
+      ],
+      "bias": {
+        "cashPriority": 5,
+        "valuePriority": 7,
+        "starPriority": 5,
+        "riskTolerance": 3,
+        "wageSensitivity": 6,
+        "sellForProfitAggression": 4,
+        "shortContractPreference": 4,
+        "longContractPreference": 6,
+        "loyaltyBias": 7,
+        "harmonyStrictness": 7,
+        "rosterDepthPreference": 6,
+        "eliteSmallRosterPreference": 5
+      },
+      "preferredClasses": [
+        "Sprinter",
+        "Charger",
+        "Tank",
+        "Tactician",
+        "Hero"
+      ],
+      "avoidedClasses": [
+        "Mage",
+        "Badass"
+      ]
+    }
+  },
+  "themeTargets": {
+    "L-L": {
+      "teamId": "L-L",
+      "primaryThemeTags": [
+        "Dwarf",
+        "Gnome",
+        "Goblin",
+        "Tiny",
+        "Small"
+      ],
+      "secondaryThemeTags": [
+        "Trader",
+        "Scholar",
+        "Rogue"
+      ],
+      "softPreferredTags": [
+        "Efficient",
+        "Allrounder",
+        "Fair"
+      ],
+      "allowedOutsiderTags": [
+        "Human",
+        "Construct",
+        "Animal"
+      ],
+      "avoidTags": [
+        "Giant",
+        "Colossus",
+        "Titan",
+        "Tall",
+        "Dragon",
+        "Tauren"
+      ],
+      "targetShare": 0.7,
+      "minimumShare": 0.5,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 16,
+      "raceQuotaScoped": {
+        "races": [
+          "dwarf",
+          "gnom",
+          "goblin"
+        ]
+      },
+      "notes": "Little Legends: mindestens 50% Dwarf/Gnom/Goblin (Ziel 70%); nichts Uebergrosses."
+    },
+    "T-H": {
+      "teamId": "T-H",
+      "primaryThemeTags": [
+        "Orc",
+        "Tauren",
+        "Ogre",
+        "Warlord"
+      ],
+      "secondaryThemeTags": [
+        "Goblin",
+        "Beast",
+        "Raider",
+        "Strength"
+      ],
+      "softPreferredTags": [
+        "Wild",
+        "Power",
+        "Brutal"
+      ],
+      "allowedOutsiderTags": [
+        "Animal",
+        "Lizard",
+        "Mutant"
+      ],
+      "avoidTags": [
+        "Robot",
+        "Machine",
+        "Android",
+        "Construct",
+        "Elf",
+        "Court",
+        "Noble"
+      ],
+      "targetShare": 0.75,
+      "minimumShare": 0.55,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 16,
+      "raceQuotaScoped": {
+        "races": [
+          "orc",
+          "tauren",
+          "goblin"
+        ]
+      },
+      "notes": "Thunder Horde: mindestens 55% Orc/Tauren/Goblin (Ziel 75%), keine Maschinen."
+    },
+    "O-D": {
+      "teamId": "O-D",
+      "primaryThemeTags": [
+        "Dragon",
+        "Lizard"
+      ],
+      "secondaryThemeTags": [
+        "Lord",
+        "Royal",
+        "Noble",
+        "Titan"
+      ],
+      "softPreferredTags": [
+        "Star",
+        "Elite",
+        "Power",
+        "Magic"
+      ],
+      "allowedOutsiderTags": [
+        "Demon",
+        "Elf",
+        "Void"
+      ],
+      "avoidTags": [
+        "Dwarf",
+        "Goblin",
+        "Gnome",
+        "Pirate",
+        "Pet",
+        "Tiny"
+      ],
+      "targetShare": 0.6,
+      "minimumShare": 0.4,
+      "strictness": "strong",
+      "exceptionPolicy": "only_if_major_upgrade",
+      "qualityOverrideThreshold": 18,
+      "raceQuotaScoped": {
+        "races": [
+          "dragon",
+          "lizard"
+        ]
+      },
+      "notes": "Obsidian Dragons: mindestens 40% Dragon/Lizard (Ziel 60%); Rest alte Blutlinien, keine Hort-Diebe."
+    },
+    "Q-Q": {
+      "teamId": "Q-Q",
+      "primaryThemeTags": [
+        "Alien",
+        "Void",
+        "Mutant"
+      ],
+      "secondaryThemeTags": [
+        "Mystic",
+        "Mental",
+        "Calm",
+        "Efficient"
+      ],
+      "softPreferredTags": [
+        "Stealth",
+        "Scholar",
+        "Cyborg",
+        "Augmented"
+      ],
+      "allowedOutsiderTags": [
+        "Construct",
+        "Android",
+        "Fish",
+        "Plant"
+      ],
+      "avoidTags": [
+        "Divine",
+        "Angel",
+        "Faith",
+        "Church",
+        "Showboat",
+        "Beast"
+      ],
+      "targetShare": 0.65,
+      "minimumShare": 0.45,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 15,
+      "raceQuotaScoped": {
+        "races": [
+          "alien",
+          "voidborn",
+          "mutant"
+        ]
+      },
+      "notes": "Quiet Quasars: mindestens 45% Alien/Voidborn/Mutant (Ziel 65%); nichts Goettliches, nichts Lautes."
+    },
+    "J-J": {
+      "teamId": "J-J",
+      "primaryThemeTags": [
+        "Showboat",
+        "Bard",
+        "Pet",
+        "Rogue",
+        "Mutant"
+      ],
+      "secondaryThemeTags": [
+        "Agile",
+        "Charisma",
+        "Swashbuckler",
+        "Goblin",
+        "Gnome"
+      ],
+      "softPreferredTags": [
+        "Social",
+        "Wild",
+        "Animal"
+      ],
+      "allowedOutsiderTags": [
+        "Human",
+        "Elf",
+        "Dwarf",
+        "Orc",
+        "Tauren",
+        "Alien"
+      ],
+      "avoidTags": [
+        "Royal",
+        "Court",
+        "Executioner",
+        "Void",
+        "Church"
+      ],
+      "targetShare": 0.55,
+      "minimumShare": 0.35,
+      "strictness": "medium",
+      "exceptionPolicy": "normal_quality_fit_allowed",
+      "qualityOverrideThreshold": 10,
+      "notes": "Jolly Jesters: offenes Team; mindestens ein Drittel echte Manegen-Fits (Showboat/Bard/Pet/Rogue/Mutant)."
+    },
+    "B-H": {
+      "teamId": "B-H",
+      "primaryThemeTags": [
+        "Angel",
+        "Divine",
+        "Outcast"
+      ],
+      "secondaryThemeTags": [
+        "Hero",
+        "Vigilante",
+        "Shadow",
+        "Demon"
+      ],
+      "softPreferredTags": [
+        "Star",
+        "Charisma",
+        "Will",
+        "NoQuit"
+      ],
+      "allowedOutsiderTags": [
+        "Human",
+        "Elf",
+        "Void",
+        "Dragon"
+      ],
+      "avoidTags": [
+        "Church",
+        "Faith",
+        "Royal",
+        "Court",
+        "Robot",
+        "Machine"
+      ],
+      "targetShare": 0.6,
+      "minimumShare": 0.4,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 14,
+      "themeTagQuotaScoped": {
+        "tags": [
+          "Angel",
+          "Divine",
+          "Outcast"
+        ]
+      },
+      "notes": "Broken Halos: mindestens 40% Angel/Divine/Outcast-Tags (Ziel 60%); keine Obrigkeits-Fits."
+    },
+    "W-H": {
+      "teamId": "W-H",
+      "primaryThemeTags": [
+        "Agile",
+        "Stealth",
+        "Bounty",
+        "Executioner",
+        "Pet"
+      ],
+      "secondaryThemeTags": [
+        "Human",
+        "Elf",
+        "Dwarf",
+        "Forest",
+        "Jungle"
+      ],
+      "softPreferredTags": [
+        "Efficient",
+        "Resilience",
+        "Calm"
+      ],
+      "allowedOutsiderTags": [
+        "Orc",
+        "Tauren",
+        "Animal"
+      ],
+      "avoidTags": [
+        "Dragon",
+        "Demon",
+        "Undead",
+        "Void",
+        "Mutant",
+        "Monster",
+        "PrimeEvil",
+        "Vampire"
+      ],
+      "targetShare": 0.6,
+      "minimumShare": 0.4,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 14,
+      "notes": "The Wild Hunt: Jaeger/Spaeher-Kern (mindestens 40%), klassische Beute-Rassen nur als begruendete Ausnahme."
+    },
+    "G-A": {
+      "teamId": "G-A",
+      "primaryThemeTags": [
+        "Scholar",
+        "Mental",
+        "Monk",
+        "Codex",
+        "Ambassador"
+      ],
+      "secondaryThemeTags": [
+        "Calm",
+        "Fair",
+        "Teacher",
+        "Overseer"
+      ],
+      "softPreferredTags": [
+        "Efficient",
+        "Neutral",
+        "Peace"
+      ],
+      "allowedOutsiderTags": [
+        "Human",
+        "Elf",
+        "Gnome",
+        "Construct",
+        "Dwarf"
+      ],
+      "avoidTags": [
+        "Berserker",
+        "Brutal",
+        "Wild",
+        "Beast",
+        "Chaos",
+        "Lunatic"
+      ],
+      "targetShare": 0.65,
+      "minimumShare": 0.45,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 14,
+      "themeTagQuotaScoped": {
+        "tags": [
+          "Scholar",
+          "Mental",
+          "Monk",
+          "Codex",
+          "Ambassador"
+        ]
+      },
+      "notes": "Grey Archivists: mindestens 45% Gelehrten-/Mental-Tags (Ziel 65%); keine Zerstoerer."
+    },
+    "H-H": {
+      "teamId": "H-H",
+      "primaryThemeTags": [
+        "Showboat",
+        "Champion",
+        "Strength",
+        "Power",
+        "Star"
+      ],
+      "secondaryThemeTags": [
+        "Masked",
+        "Brutal",
+        "Charisma",
+        "Giant",
+        "Orc",
+        "Tauren"
+      ],
+      "softPreferredTags": [
+        "Berserker",
+        "Tank",
+        "Closer"
+      ],
+      "allowedOutsiderTags": [
+        "Human",
+        "Mutant",
+        "Lizard",
+        "Demon"
+      ],
+      "avoidTags": [
+        "Scholar",
+        "Calm",
+        "Stealth",
+        "Healer",
+        "Tiny"
+      ],
+      "targetShare": 0.6,
+      "minimumShare": 0.4,
+      "strictness": "medium",
+      "exceptionPolicy": "normal_quality_fit_allowed",
+      "qualityOverrideThreshold": 12,
+      "notes": "Heavy Hitters (Reserve): Zugpferde mit Kraft und Auftritt, mindestens 40% Show-/Champion-Fits."
+    },
+    "P-P": {
+      "teamId": "P-P",
+      "primaryThemeTags": [
+        "Human",
+        "Agile",
+        "Efficient",
+        "Fair",
+        "Resilience"
+      ],
+      "secondaryThemeTags": [
+        "Allrounder",
+        "TwoWay",
+        "Leader",
+        "Calm"
+      ],
+      "softPreferredTags": [
+        "Elf",
+        "Winner",
+        "Soldier"
+      ],
+      "allowedOutsiderTags": [
+        "Elf",
+        "Dwarf",
+        "Orc",
+        "Fish",
+        "Tauren"
+      ],
+      "avoidTags": [
+        "Robot",
+        "Machine",
+        "Android",
+        "Augmented",
+        "Cyborg",
+        "Mutant",
+        "Magic"
+      ],
+      "targetShare": 0.65,
+      "minimumShare": 0.45,
+      "strictness": "strong",
+      "exceptionPolicy": "audit_required",
+      "qualityOverrideThreshold": 14,
+      "notes": "Peak Performers (Reserve): saubere Athleten, mindestens 45% Human/Agile/Fair-Fits; keine Maschinen, keine Mutanten."
+    }
+  },
+  "relationships": {
+    "L-L": {
+      "T-G": -5,
+      "O-D": -4,
+      "T-H": -2,
+      "S-S": 2,
+      "W-L": 1,
+      "T-T": 2,
+      "G-A": 2
+    },
+    "T-H": {
+      "S-S": -4,
+      "R-C": -3,
+      "V-V": 3,
+      "B-B": 2,
+      "L-L": -2,
+      "G-A": -3,
+      "D-L": -4,
+      "H-H": 2
+    },
+    "O-D": {
+      "L-L": -5,
+      "Z-H": -3,
+      "P-C": -4,
+      "R-C": 2,
+      "T-G": 1,
+      "W-H": -5,
+      "M-M": -2,
+      "C-C": -2
+    },
+    "Q-Q": {
+      "T-C": -4,
+      "G-G": -3,
+      "R-R": 3,
+      "S-S": 2,
+      "A-A": 1,
+      "J-J": -2,
+      "H-H": -3,
+      "G-A": 2,
+      "W-H": -3
+    },
+    "J-J": {
+      "R-C": -3,
+      "D-L": -4,
+      "P-C": 3,
+      "V-D": 2,
+      "Q-Q": -2,
+      "H-H": -3,
+      "T-T": 1,
+      "M-S": 2,
+      "S-C": -2
+    },
+    "B-H": {
+      "G-G": -5,
+      "T-C": -5,
+      "H-R": 1,
+      "P-S": 3,
+      "V-W": 2,
+      "R-C": -3,
+      "D-P": 1,
+      "S-C": -3,
+      "Z-H": 1
+    },
+    "W-H": {
+      "O-D": -5,
+      "B-B": -4,
+      "R-L": -4,
+      "H-R": -3,
+      "L-R": -3,
+      "L-K": -3,
+      "V-D": 2,
+      "N-W": -2,
+      "U-A": 2,
+      "Q-Q": -3
+    },
+    "G-A": {
+      "W-W": -3,
+      "T-T": 3,
+      "R-C": 2,
+      "T-C": 2,
+      "B-B": -3,
+      "R-L": -4,
+      "T-H": -3,
+      "L-L": 2,
+      "Q-Q": 2,
+      "U-A": -2,
+      "H-H": -4
+    },
+    "H-H": {
+      "T-G": -3,
+      "J-J": -3,
+      "G-A": -4,
+      "Q-Q": -3,
+      "T-H": 2,
+      "M-M": -2,
+      "V-W": -2,
+      "B-B": 1
+    },
+    "P-P": {
+      "S-S": -4,
+      "Z-H": -3,
+      "C-S": 3,
+      "G-G": 2,
+      "T-T": 2,
+      "J-J": -1,
+      "W-W": -2,
+      "M-M": -1
+    }
+  }
+}
