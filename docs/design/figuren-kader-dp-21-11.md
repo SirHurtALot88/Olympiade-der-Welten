@@ -158,9 +158,12 @@ weiter das alte Bild aus `.figuren-cache`. Der Zeitstempel steht jetzt im Cache-
 neue Streifen zeigt stattdessen einen blauen Lichtring an der Uhr, der im Bild bleibt.
 
 **Offen / Restbefund:**
-- Zyra Angriff Nord dreht im Axtschwung weiter ins Profil (Rücken und Seite, das Gesicht zeigt nicht mehr zur
-  Kamera). Nicht erneut bestellt.
-- Zynara Treffer Süd (roter Hieb-Effekt im zweiten Bild) ist unverändert, das ist ein Effekt, keine Drehung.
+- Zyra Angriff Nord: nach dem ersten Reparaturlauf drehte sie im Axtschwung noch ins Profil. Ein weiterer Versuch
+  (2 Generationen, Hieb über den Kopf statt seitlicher Schwung, „shoulders stay square to the camera, head does not
+  turn“) zeigt jetzt in allen 17 Bildern den Rücken. Preis: die Axt verschwindet beim Niederschlag hinter dem
+  Körper, der Hieb wirkt dadurch zurückhaltender als in Süd und Ost. Damit insgesamt **29 Generationen**,
+  Guthaben nachher **313,54**.
+- Zynara Treffer Süd (roter Hieb-Effekt im zweiten Bild) bleibt so, das ist ein Effekt, keine Drehung (so entschieden).
 
 **Bilder:** neue Kontaktbögen `figuren-kader-dp-21-11/<slug>-bogen.png` (alle sechs, jetzt mit Zeilenbeschriftung)
 und je Figur ein animiertes GIF `figuren-kader-dp-21-11/<slug>-animation.gif` (4×, Spalten

@@ -226,5 +226,17 @@
   "text": "is pierced through the chest: she drops her single spear, her wings spasm and fold, blood runs down her armor, she falls to her knees and collapses forward with the wings draped over her body, lying still",
   "generations": 1.0,
   "status": "completed"
+ },
+ {
+  "slug": "zyra",
+  "art": "angriff",
+  "richtung": "north",
+  "gid": "555c8ecd-2a80-4f9e-a685-a988f6076926",
+  "jobs": [
+   "6c8c1203-3b93-4449-8bd7-df5966e84b17"
+  ],
+  "text": "strict back view for every frame, her back and long black hair face the camera the whole time, shoulders stay square to the camera, her torso does not rotate, her head does not turn to the side, no profile, face never visible: she lifts the big battle axe straight up over her head with both arms and chops it down in front of her, away from the camera toward the top of the picture, only her arms and the axe move, then lifts it back and returns to the starting pose",
+  "generations": 2.0,
+  "status": "completed"
  }
 ]
