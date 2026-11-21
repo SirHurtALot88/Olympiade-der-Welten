@@ -19,6 +19,7 @@ import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
 import { getNextWishlistPriorityRank } from "@/lib/scouting/scouting-wishlist-slots";
 import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
 import type {
+  ContractShape,
   TransferWishlistEntry,
   GameState,
   LeagueSetupTeamWarning,
@@ -27,6 +28,7 @@ import type {
   LigaDraftZustand,
 } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import type { TransfermarktBuyExecuteResult } from "@/lib/market/transfermarkt-buy-service";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -608,6 +610,18 @@ export type LigaDraftMenschPickErgebnis = {
   transferId: string;
   abloese: number | null;
   gehalt: number | null;
+  /** Das Kaufergebnis (ohne Spielstand), damit die Markt-Route dem Verhandlungstisch dieselbe Antwort geben kann. */
+  kauf: Omit<TransfermarktBuyExecuteResult, "gameStateAfter">;
+};
+
+/**
+ * Verhandelter Vertrag fuer einen Draft-Pick aus dem Verhandlungstisch des Transfermarkts (Chris 19.11.: „beim Picken
+ * finde ich es doch gut, wenn man verhandeln kann“). Fehlt er, bucht der Pick wie bisher zu Festkonditionen.
+ */
+export type LigaDraftVerhandelterVertrag = {
+  contractLength?: number;
+  contractShape?: ContractShape;
+  offeredSalary?: number;
 };
 
 /** Mensch-Pick: am eigenen Platz (geordnete Phase) oder im Nachzug. Kauf ueber den Produktionsweg der Kauf-Route. */
@@ -618,6 +632,7 @@ export function bucheMenschPick(input: {
   playerId: string;
   erwarteteNr?: number | null;
   idempotencyKey?: string;
+  vertrag?: LigaDraftVerhandelterVertrag | null;
 }): LigaDraftMenschPickErgebnis {
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     const draft = draftAusKontext(ctx);
@@ -660,14 +675,16 @@ export function bucheMenschPick(input: {
       playerId: input.playerId,
       transferSource: "manual_transfermarkt_buy",
       idempotencyKey: input.idempotencyKey,
-      contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT,
-      draftFestkonditionen: true,
+      ...(input.vertrag
+        ? { contractLength: input.vertrag.contractLength, contractShape: input.vertrag.contractShape, offeredSalary: input.vertrag.offeredSalary }
+        : { contractLength: LIGA_DRAFT_VERTRAGSLAUFZEIT, draftFestkonditionen: true }),
       localRunContext: ctx,
       deferPersist: true,
     });
     if (!kauf.transferCreated || !kauf.transferId) {
       throw new LigaDraftFehler(kauf.blockingReasons[0] ?? "kauf_nicht_moeglich");
     }
+    const { gameStateAfter: _ohneStand, ...kaufOhneStand } = kauf;
     const naechster = bucheDraftPick({
       draft,
       gameState: ctx.save.gameState,
@@ -681,7 +698,13 @@ export function bucheMenschPick(input: {
       jetzt: jetztIso(),
     });
     setzeDraftImKontext(ctx, naechster);
-    return { draft: naechster, transferId: kauf.transferId, abloese: kauf.purchasePrice ?? preis, gehalt: kauf.offeredSalary ?? kauf.salary ?? null };
+    return {
+      draft: naechster,
+      transferId: kauf.transferId,
+      abloese: kauf.purchasePrice ?? preis,
+      gehalt: kauf.offeredSalary ?? kauf.salary ?? null,
+      kauf: kaufOhneStand,
+    };
   });
 }
 

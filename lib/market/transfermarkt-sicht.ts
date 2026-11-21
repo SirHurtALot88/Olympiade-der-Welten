@@ -124,7 +124,7 @@ export function tierBereichSortWert(anzeige: string | null | undefined): number 
 }
 
 /** Eine Note unter dem Nebel: ungescoutet nur die Zweier-Gruppe, sonst die Note selbst. */
-function tierAnzeige(tier: TransfermarktRatingTier | null | undefined, stufe: number): string | null {
+export function tierAnzeige(tier: TransfermarktRatingTier | null | undefined, stufe: number): string | null {
   if (!tier) return null;
   if (stufe >= 1) return tier;
   const index = TIER_INDEX.get(tier);
@@ -149,7 +149,10 @@ function attributRatings(item: TransfermarktFreeAgentItem): TransfermarktAttribu
 }
 
 function achseSicht(achse: MarktAchse, tier: TransfermarktRatingTier | null, stufe: number): SichtAchse {
-  const anzeige = tierAnzeige(tier, stufe);
+  // Achsen (POW/SPE/MEN/SOC) sind grobe Ueberblickswerte und auch ungescoutet als einzelne Note sichtbar (Chris 19.11.:
+  // „mir fehlen auf den ersten Blick die Erkenntnisse, wie viel POW SPE MEN SOC ein Spieler hat“ — als Zweier-Gruppe
+  // stand fast jeder Spieler auf „F–E“, Filter und Vergleich waren damit wertlos). Attribute bleiben im Nebel.
+  const anzeige = tier ?? null;
   return { achse, anzeige, sortWert: tierBereichSortWert(anzeige), exakt: stufe >= 1 };
 }
 
@@ -185,7 +188,9 @@ export function baueSpielerSicht(item: TransfermarktFreeAgentItem, optionen?: { 
   const attribute: Record<string, SichtAttribut> = {};
   for (const reihe of reihen) {
     // Welche Attribute aufgedeckt sind, bestimmt der bestehende Aufdeck-Plan; die ANZEIGE kennt nur Stufen.
-    const anzeige = reihe.revealed ? tierAnzeige(ratings[reihe.key], stufe) : null;
+    // Chris 19.11.: „Attribute müssen auch mit S B E etc. da stehen“ — die Note je Attribut ist immer sichtbar (auch
+    // ungescoutet), sonst greifen die Attribut-Filter ins Leere. Genaue Zahlen gibt es weiterhin nicht.
+    const anzeige = ratings[reihe.key] ?? null;
     const sortWert = tierBereichSortWert(anzeige);
     attribute[reihe.key] = {
       key: reihe.key,
