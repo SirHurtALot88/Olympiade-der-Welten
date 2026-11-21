@@ -6,6 +6,7 @@ import type {
   TeamSeasonObjectiveRecord,
   TransferWishlistEntry,
 } from "@/lib/data/olyDataTypes";
+import type { ProfilHost } from "@/app/foundation/shared/GrossesProfil";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import type { DisziplinBedarf } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import type { TransferFreigabe } from "@/lib/market/transfermarkt-freigabe";
@@ -82,6 +83,8 @@ export type TransfermarktModernProps = {
   wishlistEntries?: TransferWishlistEntry[];
   wishlistPlayerIds?: string[];
   boardObjectiveHighlights?: TeamSeasonObjectiveRecord[];
+  /** Was das große Spielerprofil braucht (wie im Draft); fehlt es, fällt die Seite auf `onOpenPlayerDetails` zurück. */
+  profilHost?: ProfilHost | null;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   onOpenHistory?: (() => void) | null;
   /** Heutiger Draft-Weg (Platzhalter-Reiter zeigt dorthin, bis der Draft-Neubau kommt). */

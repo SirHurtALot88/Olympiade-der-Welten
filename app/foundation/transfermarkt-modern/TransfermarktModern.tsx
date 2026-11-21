@@ -44,6 +44,10 @@ import {
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil, useListenTasten } from "@/app/foundation/shared/klickregel";
 import { KasseBlock, MeinKaderListe, WirkungAufKader } from "@/app/foundation/shared/MeinKaderPanel";
 import { baueKasseMarkt, kandidatSpanne, type EigenerSpieler, type KandidatEintrag, type KasseAnsicht } from "@/app/foundation/shared/mein-kader-daten";
+import { usePortraetVorschau, type VorschauDaten } from "@/app/foundation/shared/PortraetVorschau";
+import SpaltenGriff from "@/app/foundation/shared/SpaltenGriff";
+import { useSpaltenLayout, type SpaltenDef } from "@/app/foundation/shared/spalten-layout";
+import { GrossesProfil } from "@/app/foundation/shared/GrossesProfil";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
@@ -70,6 +74,20 @@ const SORT_LABEL: Record<SortKey, string> = {
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
 const DISZIPLINEN = [...DISZIPLINEN_GEORDNET] as string[];
 
+/** Spalten der Markt-Liste (Breiten in u); per Ziehen anpassbar und je Benutzer gespeichert (Chris 19.11.). */
+export const TM_SPALTEN: SpaltenDef[] = [
+  { id: "stern", standard: 1.3, min: 1.3, max: 1.3, fest: true },
+  { id: "por", standard: 2.3, min: 1.6, max: 9 },
+  { id: "nm", standard: 8, min: 5, max: 24, flex: true },
+  { id: "eg", standard: 6.6, min: 4.5, max: 12 },
+  { id: "ax", standard: 11.5, min: 8, max: 20 },
+  { id: "abl", standard: 3.6, min: 2.8, max: 9 },
+  { id: "geh", standard: 4.6, min: 3.6, max: 10 },
+  { id: "rang", standard: 5.2, min: 4, max: 10 },
+  { id: "ak", standard: 3.2, min: 3.2, max: 14 },
+];
+const TM_DEF = Object.fromEntries(TM_SPALTEN.map((d) => [d.id, d]));
+
 function rangGegenLigaFuer(staerken: Record<string, Record<string, number>>, teamId: string, disziplinId: string): number {
   return rangGegenLiga(staerken, teamId, disziplinId, staerken[teamId]?.[disziplinId] ?? 20);
 }
@@ -81,6 +99,19 @@ function bildUrlVon(item: TransfermarktFreeAgentItem): string | null {
 function eignungText(sicht: SpielerSicht, disziplinId: string): string {
   const wert = sicht.disziplinen[disziplinId];
   return wert ? wert.text : "—";
+}
+
+function vorschauDaten(it: TransfermarktFreeAgentItem, sicht: SpielerSicht, bild: string | null): VorschauDaten {
+  return {
+    bild,
+    name: it.name,
+    klasse: it.className,
+    rasse: it.race,
+    achsen: MARKT_ACHSEN.map((a) => {
+      const s = sicht.achsen[a];
+      return { label: ACHSEN_LABEL[a], anzeige: s.anzeige, exakt: s.exakt, stufe: s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : "" };
+    }),
+  };
 }
 
 function Stern({ an, onClick, titel }: { an: boolean; onClick: () => void; titel: string }) {
@@ -146,6 +177,9 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const [nurMerkliste, setNurMerkliste] = useState(false);
   const [filter, setFilter] = useState<WeitereFilter>(LEERE_FILTER);
   const [weitereOffen, setWeitereOffen] = useState(false);
+  const spalten = useSpaltenLayout("transfermarkt", TM_SPALTEN);
+  const vorschau = usePortraetVorschau();
+  const griff = (id: string) => <SpaltenGriff layout={spalten} def={TM_DEF[id]} />;
   const [sortierung, setSortierung] = useState<SortKey>("eignung");
   // Chris 19.11.: Spaltenköpfe sortieren wieder; ein zweiter Klick auf dieselbe Spalte dreht die Richtung um.
   const [umgekehrt, setUmgekehrt] = useState(false);
@@ -259,8 +293,11 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     props.onSelectCandidate?.(id, name);
   }
   /** Klickregel (UX 19.11.): 1. Klick wählt aus, Klick auf das Ausgewählte öffnet das Profil; der Name tut beides. */
+  // Chris 19.11.: das große Profil wie im Draft statt der schmalen Seitenleiste.
+  const [profilId, setProfilId] = useState<string | null>(null);
   function profilOeffnen(id: string) {
-    props.onOpenPlayerDetails?.({ playerId: id });
+    if (props.profilHost) setProfilId(id);
+    else props.onOpenPlayerDetails?.({ playerId: id });
   }
   function zeilenKlick(z: Zeile) {
     klickAuswahlOderProfil(z.item.playerId, fokus?.item.playerId ?? null, () => waehle(z.item.playerId, z.item.name), profilOeffnen);
@@ -361,6 +398,18 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
 
   return (
     <div className="tmk" data-testid="transfermarkt-modern" ref={wurzelRef} style={hoehe != null ? ({ ["--tmk-hoehe" as string]: `${hoehe}px` } as React.CSSProperties) : undefined}>
+      {profilId && props.profilHost ? (
+        <GrossesProfil
+          hostProps={props.profilHost}
+          playerId={profilId}
+          darfPicken={false}
+          onWechsel={(id) => setProfilId(id)}
+          onZu={() => setProfilId(null)}
+          zuLabel="← Zurück zum Transfermarkt"
+          testidPrefix="tm-profil"
+          aktionHinweis="Kauf, Verkauf und Verlängerung laufen im Transfermarkt."
+        />
+      ) : null}
       {/* Reiter und Fenster-Status wohnen im Seiten-Slot des Regierbands (App-Rahmen); die Seite hat keine eigene Kopfzeile. */}
       <FoundationBandSlot>
         <div className="tmk-bs" data-testid="tm-bandslot">
@@ -507,20 +556,21 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 <button type="button" key={k} className={`fc${sortierung === k ? " an" : ""}`} onClick={() => sortiereNach(k)} data-testid={`tm-sort-${k}`}>{SORT_LABEL[k]}{kopfPfeil(k)}</button>
               ))}
               <span className="sp" />
+              <button type="button" className={`fc${spalten.angepasst ? " an" : ""}`} onClick={spalten.zuruecksetzen} title="Spaltenbreiten und Porträtgröße auf Standard" data-testid="tm-spalten-zuruecksetzen">Spalten zurücksetzen</button>
               <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFilter(LEERE_FILTER); setSortierung("eignung"); setUmgekehrt(false); setBlatt(0); }}>Filter zurücksetzen</button>
             </div>
             {weitereOffen ? <WeitereFilterPanel filter={filter} onChange={(f) => { setFilter(f); setBlatt(0); }} /> : null}
-            <div className="mt" style={{ ["--zeilen" as string]: SEITE }} data-testid="tm-tabelle">
+            <div className={`mt sl${spalten.zeilenMin > 0 ? " pg" : ""}`} style={{ ["--zeilen" as string]: SEITE, ["--spalten" as string]: spalten.vorlage, ["--minbreite" as string]: `calc(${spalten.minBreite} * var(--u))`, ["--zmin" as string]: spalten.zeilenMin > 0 ? `calc(${spalten.zeilenMin} * var(--u))` : "0px", ["--pw" as string]: spalten.breiten.por }} data-testid="tm-tabelle">
               <div className="mz kopf">
-                <span /><span />
-                <span>Spieler · Weg in {disziplinNamen[disziplin]}</span>
-                <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}</span>
-                <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[a]}</i>)}</span>
-                <span title="erwartete Player Points je Einsatz (Näherung aus der Eignung) · Klick sortiert nach Eignung" style={{ cursor: "pointer" }} role="button" onClick={() => sortiereNach("eignung")}>≈ PP</span>
-                <span className={`re ${sortierung === "abloese" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("abloese")} data-testid="tm-kopf-abloese">Ablöse{kopfPfeil("abloese")}</span>
-                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("gehalt")} data-testid="tm-kopf-gehalt">Gehalt/Saison{kopfPfeil("gehalt")}</span>
-                <span className={sortierung === "hebt" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("hebt")} data-testid="tm-kopf-kaderrang">Kaderrang{kopfPfeil("hebt")}</span>
                 <span />
+                <span>{griff("por")}</span>
+                <span>Spieler · Weg in {disziplinNamen[disziplin]}{griff("nm")}</span>
+                <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}{griff("eg")}</span>
+                <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[a]}</i>)}{griff("ax")}</span>
+                <span className={`re ${sortierung === "abloese" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("abloese")} data-testid="tm-kopf-abloese">Ablöse{kopfPfeil("abloese")}{griff("abl")}</span>
+                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("gehalt")} data-testid="tm-kopf-gehalt">Gehalt/Saison{kopfPfeil("gehalt")}{griff("geh")}</span>
+                <span className={sortierung === "hebt" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("hebt")} data-testid="tm-kopf-kaderrang">Kaderrang{kopfPfeil("hebt")}{griff("rang")}</span>
+                <span>{griff("ak")}</span>
               </div>
               {feed.busy && sichtbar.length === 0 && <div className="tmk-leer">Transfermarkt wird geladen …</div>}
               {feed.fehler && <div className="tmk-leer w">{feed.fehler}</div>}
@@ -530,14 +580,13 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 const wert = z.sicht.disziplinen[disziplin];
                 const w = wirkungJeZeile.get(it.playerId)!;
                 const wege = bauWege(z.sicht, disziplin);
-                const pp = erwartetePpSpanne(wert);
                 const teuer = cash != null && it.marketValue != null && it.marketValue > cash;
                 const bild = bildUrlVon(it);
                 const istFokus = fokus?.item.playerId === it.playerId;
                 return (
                   <div key={it.playerId} className={`mz${istFokus ? " an" : ""}`} onClick={() => zeilenKlick(z)} title={istFokus ? "Ausgewählt · nochmal klicken oder Enter öffnet das Profil" : "Klick wählt aus"} aria-selected={istFokus} data-testid="tm-zeile" data-player-id={it.playerId}>
                     <Stern an={merkliste.has(it.playerId)} titel="Merkliste" onClick={() => props.onToggleWishlist?.(it)} />
-                    {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
+                    {bild ? <img className="por" src={bild} alt="" loading="lazy" data-testid="tm-portrait" onMouseEnter={(e) => vorschau.zeige(e.currentTarget, vorschauDaten(it, z.sicht, bild))} onMouseLeave={vorschau.verstecke} /> : <span className="por" />}
                     <span className="nm">
                       <b><u className="tmk-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); nameKlickAuswahlUndProfil(it.playerId, true, () => waehle(it.playerId, it.name), profilOeffnen); }} data-testid="tm-profil-link">{it.name}</u></b>
                       <small><KlassenFarbTag className={it.className} /> · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
@@ -554,7 +603,6 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                         return <i key={a} className={s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : ""} title={s.exakt ? "Note (beobachtet/gescoutet)" : "Zweier-Gruppe (ungescoutet)"}>{s.anzeige ?? "?"}</i>;
                       })}
                     </span>
-                    <span className="ppz t" title="erwartete Player Points je Einsatz, grobe Näherung aus der Eignungs-Stufe">{pp ? pp.text : "—"}</span>
                     <span className={`re ${teuer ? "zt" : ""}`} title={teuer ? "über deiner Kasse" : ""}><b className="t">{de(it.marketValue ?? 0, 1)}</b></span>
                     <span className="re"><b className="t">{de(it.salary ?? 0, 1)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(jeSpieltag(it.salary) ?? 0, 2)}/Spieltag</small></span>
                     <RangAnzeige w={w} />
@@ -577,6 +625,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 );
               })}
             </div>
+            {vorschau.karte}
             <div className="mfuss">
               <span><b className="t" style={{ color: "var(--tinte)" }}>{gefiltert.length}</b> von {feed.total} Spielern{feed.nachladen ? " · lädt weiter …" : ""}</span>
               <span>Fremde Werte stehen als Stufen: 10er ungescoutet, 5er beobachtet, exakt erst gescoutet</span>
@@ -612,7 +661,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 onVerhandeln={() => verhandeln(fokus.item)}
                 onVergleichen={() => pinne(fokus.item.playerId)}
                 onErstVerkaufen={() => setAnsicht("verkauf")}
-                onDetails={() => props.onOpenPlayerDetails?.({ playerId: fokus.item.playerId })}
+                onDetails={() => profilOeffnen(fokus.item.playerId)}
                 onMerken={() => props.onToggleWishlist?.(fokus.item)}
                 eigene={eigeneFuerPanel}
                 kader={kader ?? eigeneFuerPanelAnzahl}

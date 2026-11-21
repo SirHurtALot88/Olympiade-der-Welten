@@ -21,6 +21,9 @@ import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format"
 import type { DraftTempo, DraftZeig } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { useListenTasten } from "@/app/foundation/shared/klickregel";
+import { usePortraetVorschau, type VorschauDaten } from "@/app/foundation/shared/PortraetVorschau";
+import SpaltenGriff from "@/app/foundation/shared/SpaltenGriff";
+import { useSpaltenLayout, type SpaltenDef } from "@/app/foundation/shared/spalten-layout";
 import { KasseBlock, MeinKaderListe, WirkungAufKader } from "@/app/foundation/shared/MeinKaderPanel";
 import { baueKasseDraft, kandidatSpanne, type EigenerSpieler, type KandidatEintrag } from "@/app/foundation/shared/mein-kader-daten";
 import { wirkungMitKandidat, type RangWirkung } from "@/lib/market/transfermarkt-kaderstaerke";
@@ -498,6 +501,33 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
 
 type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt";
 
+/** Spalten des Draft-Bretts (Breiten in u); per Ziehen anpassbar und je Benutzer gespeichert, getrennt vom Transfermarkt. */
+export const DRAFT_SPALTEN: SpaltenDef[] = [
+  { id: "stern", standard: 1.3, min: 1.3, max: 1.3, fest: true },
+  { id: "por", standard: 2.3, min: 1.6, max: 9 },
+  { id: "nm", standard: 7, min: 5, max: 24, flex: true },
+  { id: "eg", standard: 8.6, min: 5, max: 14 },
+  { id: "ax", standard: 9, min: 7, max: 18 },
+  { id: "abl", standard: 4.4, min: 3, max: 9 },
+  { id: "geh", standard: 3.5, min: 3, max: 9 },
+  { id: "gef", standard: 3.3, min: 2.6, max: 8 },
+  { id: "ak", standard: 5.4, min: 4, max: 14 },
+];
+const DRAFT_DEF = Object.fromEntries(DRAFT_SPALTEN.map((d) => [d.id, d]));
+
+function vorschauDaten(it: DraftZeile["item"], sicht: DraftZeile["sicht"], bild: string | null): VorschauDaten {
+  return {
+    bild,
+    name: it.name,
+    klasse: it.className,
+    rasse: it.race,
+    achsen: MARKT_ACHSEN.map((x) => {
+      const s = sicht.achsen[x];
+      return { label: ACHSEN_LABEL[x], anzeige: s.anzeige, exakt: s.exakt, stufe: s.exakt ? (s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : "") : "" };
+    }),
+  };
+}
+
 export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontext; aktionen: DraftAktionen; tastenAktiv?: boolean }) {
   const a = k.ansicht;
   const mein = a.mein;
@@ -514,6 +544,9 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
   const [weitereOffen, setWeitereOffen] = useState(false);
   const aktiveWeitere = zaehleAktiveFilter(weitere);
   const [blatt, setBlatt] = useState(0);
+  const spalten = useSpaltenLayout("draft-brett", DRAFT_SPALTEN);
+  const vorschau = usePortraetVorschau();
+  const griff = (id: string) => <SpaltenGriff layout={spalten} def={DRAFT_DEF[id]} />;
   const dran = Boolean(mein?.darfPicken);
   const maxAbloese = mein?.maxAbloese ?? Number.POSITIVE_INFINITY;
   const zuTeuer = (z: DraftZeile) => (z.item.marketValue ?? 0) > maxAbloese + 1e-9;
@@ -658,6 +691,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           Weitere Filter{aktiveWeitere > 0 ? ` · ${aktiveWeitere}` : ""} {weitereOffen ? "▾" : "▸"}
         </button>
         <span className="sp" />
+        <button type="button" className={`fc${spalten.angepasst ? " an" : ""}`} onClick={spalten.zuruecksetzen} title="Spaltenbreiten und Porträtgröße auf Standard" data-testid="draft-spalten-zuruecksetzen">Spalten zurücksetzen</button>
         <button type="button" className="fc" onClick={() => { setSuche(""); setNurLeistbar(false); setNurWunsch(false); setNurScouting(false); setAchsenMin({}); setWeitere(LEERE_FILTER); setBlatt(0); }} data-testid="draft-filter-zuruecksetzen">Filter zurücksetzen</button>
       </div>
       {weitereOffen ? <WeitereFilterPanel filter={weitere} onChange={(f) => { setWeitere(f); setBlatt(0); }} /> : null}
@@ -675,16 +709,17 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           ))}
         </span>
       </div>
-      <div className="mt" style={{ ["--zeilen" as string]: ZEILEN_JE_BLATT }} data-testid="draft-tabelle">
+      <div className={`mt sl${spalten.zeilenMin > 0 ? " pg" : ""}`} style={{ ["--zeilen" as string]: ZEILEN_JE_BLATT, ["--spalten" as string]: spalten.vorlage, ["--minbreite" as string]: `calc(${spalten.minBreite} * var(--u))`, ["--zmin" as string]: spalten.zeilenMin > 0 ? `calc(${spalten.zeilenMin} * var(--u))` : "0px", ["--pw" as string]: spalten.breiten.por }} data-testid="draft-tabelle">
         <div className="mz kopf">
-          <span /><span />
-          <span>Spieler</span>
-          {sk("eignung", `Eignung ${DISZIPLIN_KURZ[k.disziplin] ?? ""}`)}
-          <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}</span>
-          {sk(sort === "abloese" ? "guenstig" : "abloese", "Ablöse", "re")}
-          <span className="re" title="Jahresgehalt (je Saison)">Gehalt/Sais.</span>
-          {sk("gefragt", "gefragt")}
           <span />
+          <span>{griff("por")}</span>
+          <span>Spieler{griff("nm")}</span>
+          <span>{sk("eignung", `Eignung ${DISZIPLIN_KURZ[k.disziplin] ?? ""}`)}{griff("eg")}</span>
+          <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}{griff("ax")}</span>
+          <span className="re">{sk(sort === "abloese" ? "guenstig" : "abloese", "Ablöse", "re")}{griff("abl")}</span>
+          <span className="re" title="Jahresgehalt (je Saison)">Gehalt/Sais.{griff("geh")}</span>
+          <span>{sk("gefragt", "gefragt")}{griff("gef")}</span>
+          <span>{griff("ak")}</span>
         </div>
         {k.feedBusy && sichtbar.length === 0 ? <div className="drf-leerzeile">Draft-Brett wird geladen …</div> : null}
         {k.feedFehler ? <div className="drf-leerzeile w">{k.feedFehler}</div> : null}
@@ -700,7 +735,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
             <div key={it.playerId} className={`mz${gewaehlt ? " an" : ""}`} onClick={() => k.klick(it.playerId)} title={gewaehlt ? "Ausgewählt · nochmal klicken oder Enter öffnet das Profil" : "Klick wählt aus"} aria-selected={gewaehlt} data-testid="draft-zeile" data-player-id={it.playerId}>
               <button type="button" className={`st${wunsch ? " an" : ""}`} title="Wunschliste" aria-pressed={wunsch} onClick={(e) => { e.stopPropagation(); k.toggleWunsch(it); }}>{wunsch ? "★" : "☆"}</button>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {bild ? <img className="por" src={bild} alt="" loading="lazy" /> : <span className="por" />}
+              {bild ? <img className="por" src={bild} alt="" loading="lazy" data-testid="draft-portrait" onMouseEnter={(e) => vorschau.zeige(e.currentTarget, vorschauDaten(it, z.sicht, bild))} onMouseLeave={vorschau.verstecke} /> : <span className="por" />}
               <span className="nm">
                 <b className="drf-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); k.nameKlick(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
                 <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span><KlassenFarbTag className={it.className} mitAchse={false} /> · {it.race}</small>
@@ -740,6 +775,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
         })}
         {!k.feedBusy && !k.feedFehler && sichtbar.length === 0 ? <div className="drf-leerzeile">Keine Spieler für diese Filter.</div> : null}
       </div>
+      {vorschau.karte}
       <div className="mfuss">
         <span>
           {k.nebelAus ? (

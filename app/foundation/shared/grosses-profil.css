@@ -1,0 +1,12 @@
+/* Großes Spielerprofil als Overlay (Draft und Transfermarkt); füllt den nächsten positionierten Vorfahren (.drf / .tmk). */
+.drf-profil { position: absolute; inset: 0; z-index: 70; display: flex; flex-direction: column; background: #0b0f17; }
+.drf-profil-leiste { display: flex; align-items: center; gap: 14px; padding: 8px 16px; border-bottom: 1px solid rgba(244,230,196,.14); background: #121926; }
+.drf-profil-leiste small { color: #9aa7ba; font-size: 14px; }
+.drf-profil-leiste .knopf { height: 34px; padding: 0 16px; border-radius: 5px; border: 1px solid rgba(244,230,196,.3); background: #161d2a; color: #f4e6c4; font: 700 14px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.drf-profil-leiste .knopf.haupt { background: #f0c35a; border-color: #f0c35a; color: #10151f; }
+.drf-profil-koerper { flex: 1; min-height: 0; overflow: auto; }
+.drf-profil-reiter { display: flex; gap: 4px; margin-left: auto; }
+.drf-profil-reiter button { height: 34px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: #9aa7ba; font: 700 14px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.drf-profil-reiter button.an { color: #f4e6c4; border-bottom-color: #f0c35a; }
+.drf-profil-reiter button:hover { color: #fff; }
+.gp-leerzeile { padding: 32px 16px; text-align: center; color: #9aa7ba; font-size: 17px; }
