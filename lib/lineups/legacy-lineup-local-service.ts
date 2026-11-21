@@ -22,6 +22,7 @@ import { computeTeamDisciplineRankTable, computeTeamDisciplineRanks } from "@/li
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import type { FormCardPlanRecord, GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type {
+  LegacyBelastungsBasisRef,
   LegacyInjuryRiskProjectionRef,
   LegacyLineupContextLoadResult,
   LegacyLineupDraft,
@@ -35,11 +36,16 @@ import type {
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { getFatiguePerformanceMultiplier } from "@/lib/fatigue/fatigue-calibration";
 import {
+  buildBelastungsPauseRef,
   getPlayerActiveRecoveryCredit,
+  getPlayerFatigueLoadTraitMultiplier,
   getInjuryRiskBand,
   getPlayerAvailabilityView,
+  INTENSITY_FATIGUE_MULT,
+  MATCHDAY_FATIGUE_LOAD,
   projectMatchdayInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
+import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
@@ -700,6 +706,15 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         projectMatchdayInjuryRisk({ player, currentFatigue: fatigue ?? 0, intensity, activeRecovery }),
       ]),
     ) as LegacyInjuryRiskProjectionRef;
+    // Belastungsregel v2: die Last haengt am Platz. Die Einsatzliste rechnet sie je Platz mit
+    // `berechneEinsatzLast` (lib/fatigue/belastung-regel.ts) — derselben Formel wie die Buchung —
+    // und braucht dafuer nur diese Faktoren des Spielers.
+    const belastungsBasis: LegacyBelastungsBasisRef = {
+      traitMultiplikator: getPlayerFatigueLoadTraitMultiplier(player),
+      einsatzMultiplikator: { ...INTENSITY_FATIGUE_MULT },
+      aktiveErholung: activeRecovery,
+      altGrundlast: MATCHDAY_FATIGUE_LOAD,
+    };
     return {
       id: player.id,
       name: player.name,
@@ -720,6 +735,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
       injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
       injuryRiskProjection,
+      belastungsBasis,
       availabilityBlocker: availability.blocker,
       form: player.form ?? null,
       traitsPositive: player.traitsPositive ?? [],
@@ -762,6 +778,8 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       // selectTeamCaptain are gated on context.gameState), diverging from the
       // preview path which receives the game state via gameStateOverride.
       gameState: normalizedGameState,
+      belastungsRegel: belastungsRegelFuer(normalizedGameState),
+      belastungsPause: buildBelastungsPauseRef(normalizedGameState, params.teamId),
       lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(

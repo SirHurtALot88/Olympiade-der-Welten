@@ -17,19 +17,43 @@ import {
   type OfficialDisciplineWeightId,
   type PlayerGeneratorAttributeKey,
 } from "@/lib/player-generator/official-discipline-weights";
+import { calculateFormMoralSignal, FORM_MORAL_STANDARD_DOSIS_PCT } from "@/lib/morale/form-moral-modifikator";
+import {
+  MORAL_SKALA_FAKTOR,
+  MORAL_UEBERTRAG_GLEICHE_SAISON,
+} from "@/lib/morale/morale-konstanten";
 import {
   UEBERLASTUNG_LIMIT,
   UEBERLASTUNG_SCHWELLE,
   baueTrainingsZielKontext,
   bestimmeAusfallSpielerFuerSpieltag,
+  berechneSpieltagsZuwachs,
   bestimmeTrainingsZiel,
   schwersteMatrixAttribute,
   trainingsProfilFuerZiel,
   wegeFuerDisziplin,
+  type SpieltagsTransparenz,
+  type TransparenzAttribut,
   type TrainingsProfilEintrag,
   type TrainingsZielKontext,
 } from "@/lib/training/spieltag-training";
-import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
+import {
+  WUNSCH_DRUCK_FAKTOR_LEICHT,
+  WUNSCH_DRUCK_FAKTOR_SCHWER,
+  evaluateTrainingModeDemandDelta,
+  getTrainingModeDemandTerms,
+  resolveTrainingModeDemandStatus,
+} from "@/lib/training/training-mode-demand-service";
+import { getAttributesForAxis } from "@/lib/scouting/player-attribute-ceiling-service";
+import { DEVELOPMENT_MAX_ATTRIBUTE_VALUE } from "@/lib/training/training-levelup-service";
+import {
+  ORGANIC_GAP_ACCEL_CAP,
+  ORGANIC_GAP_ACCEL_NEUTRAL,
+  ORGANIC_GAP_ACCEL_SLOPE,
+  ORGANIC_PO_STEEP_DIVISOR,
+  TRAINING_SPILLOVER_SHARE,
+} from "@/lib/training/organic-season-progression";
+import { FATIGUE_LOAD_BY_MODE, getTrainingSetpointsJeSpieltag } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 /* ------------------------------------------------------------------ Stationen der Halle */
@@ -121,7 +145,21 @@ export type TrainingZeile = {
   potenzialRest: number | null;
   /** Netto-Zuwachs bis Saisonende laut Engine (Setpoints). */
   netto: number;
+  /** Transparenz des nächsten Spieltags (Potenzial-Beschleuniger, Deckel-Bremse), `null` bei Verletzung/ohne Ziel. */
+  transparenz: SpieltagsTransparenz | null;
   wunsch: PlayerTrainingMode | null;
+  /** Zahlen zum Wunsch (Moral, Spieltag), `null` ohne Wunsch. Quelle: `trainingDemand` der Zeile. */
+  wunschDaten: WunschDaten | null;
+};
+
+export type WunschDaten = {
+  moraleReward: number;
+  /** Negativ (wie in der Engine: −5 bzw. −10). */
+  moralePenalty: number;
+  /** Spieltag-Index im Spielplan (steuert, wann ein offener Wunsch zu Druck wird), `null` unbekannt. */
+  spieltag: number | null;
+  /** Spieltage der Saison (für „bis Saisonende"), `null` unbekannt. */
+  saisonSpieltage?: number | null;
 };
 
 export function zielLabel(disziplinId: string): string {
@@ -143,6 +181,8 @@ export function baueTrainingZeilen(input: {
   const ausfall = input.ausfall ?? (matchdayId ? bestimmeAusfallSpielerFuerSpieltag(gameState, matchdayId) : new Set<string>());
   const kontext = input.kontext ?? baueTrainingsZielKontext(gameState, matchdayId, ausfall);
   const spieler = new Map(gameState.players.map((p) => [p.id, p] as const));
+  const spieltagIndex =
+    gameState.seasonState?.disciplineSchedule?.find((e) => e.matchdayId === matchdayId)?.matchdayIndex ?? null;
   return input.rows.map((row) => {
     const player: Player | undefined = spieler.get(row.player.id);
     const bestimmt = player ? bestimmeTrainingsZiel(kontext, player) : null;
@@ -183,7 +223,19 @@ export function baueTrainingZeilen(input: {
       potenzial,
       potenzialRest: gesamt != null && potenzial != null ? Math.max(0, potenzial - gesamt) : null,
       netto: row.organicForecast.netSetpoints,
+      transparenz:
+        player && bestimmt && !verletzt
+          ? (berechneSpieltagsZuwachs({ gameState, player, ziel: bestimmt.ziel, quelle: bestimmt.quelle, modus: row.mode })?.transparenz ?? null)
+          : null,
       wunsch: row.trainingDemand?.preferredMode ?? null,
+      wunschDaten: row.trainingDemand
+        ? {
+            moraleReward: row.trainingDemand.moraleReward,
+            moralePenalty: row.trainingDemand.moralePenalty,
+            spieltag: spieltagIndex,
+            saisonSpieltage: gameState.season?.matchdayIds?.length ?? null,
+          }
+        : null,
     } satisfies TrainingZeile;
   });
 }
@@ -191,13 +243,19 @@ export function baueTrainingZeilen(input: {
 /* ------------------------------------------------------------------ Sortierung (jede Tabelle) */
 
 export type SortRichtung = "auf" | "ab";
-export type KaderSortSchluessel = "name" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt";
+export type KaderSortSchluessel = "name" | "wunsch" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt";
 
 const MODUS_REIHE: Record<PlayerTrainingMode, number> = {
   leicht: 0,
   mittel: 1,
   hart: 2,
 };
+
+/** Sortierwert der Wunsch-Spalte: offen (2) vor erfüllt (1) vor kein Wunsch (0). */
+function wunschRang(z: Pick<TrainingZeile, "wunsch" | "modus">): number {
+  if (!z.wunsch) return 0;
+  return z.wunsch === z.modus ? 1 : 2;
+}
 
 function sortWert(z: TrainingZeile, schluessel: KaderSortSchluessel): number | string {
   switch (schluessel) {
@@ -207,6 +265,8 @@ function sortWert(z: TrainingZeile, schluessel: KaderSortSchluessel): number | s
       return z.verletzt ? "~" : (z.zielLabel ?? "~").toLocaleLowerCase("de");
     case "modus":
       return MODUS_REIHE[z.modus];
+    case "wunsch":
+      return wunschRang(z);
     case "netto":
       return z.netto;
     case "potenzial":
@@ -267,6 +327,9 @@ export type KaderKennzahlen = {
   ueberlastet: number;
   verletzt: number;
   anzahl: number;
+  /** Spieler mit Trainingswunsch, davon (noch) nicht erfüllt. */
+  wuenscheGesamt: number;
+  wuenscheOffen: number;
 };
 
 export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKennzahlen {
@@ -278,7 +341,261 @@ export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKenn
     ueberlastet: zeilen.filter((z) => !z.verletzt && istUeberlastet(z.fatigue)).length,
     verletzt: zeilen.filter((z) => z.verletzt).length,
     anzahl,
+    wuenscheGesamt: zeilen.filter((z) => z.wunsch).length,
+    wuenscheOffen: zeilen.filter((z) => wunschOffen(z)).length,
   };
+}
+
+/* ------------------------------------------------------------------ Trainingswunsch (leicht/mittel/hart) */
+
+export function wunschOffen(z: Pick<TrainingZeile, "wunsch" | "modus">): boolean {
+  return z.wunsch != null && z.wunsch !== z.modus;
+}
+
+/**
+ * Moral-Folge eines Wunsches bei Intensität `modus` — dieselbe Rechnung wie die Engine
+ * (`evaluateTrainingModeDemandDelta`, Status je Spieltag; Abzug je Abweichung von `modus` aus
+ * `getTrainingModeDemandTerms`). Die Dringlichkeit der Forderung (1,15) greift im Moral-Dienst NICHT auf Intensitäts-
+ * wünsche (`evaluateDemandDelta` reicht deren Wert unverändert durch). `null` ohne Wunsch.
+ *
+ *  - `delta`: Wirkung des Wunsches im Moral-Dienst, auf eine Stelle gerundet wie dort, vor der Streckung.
+ *  - `punkte`: dasselbe auf der Moralskala 0 bis 100 (x `MORAL_SKALA_FAKTOR`) — die Zahl, die die Moral
+ *    verschiebt. Sie ist ein ZUSTAND: solange der Wunsch so steht, gilt sie bei jeder Neuberechnung der Moral
+ *    (je Spieltag) erneut, sie summiert sich nicht auf.
+ */
+export function wunschFolge(
+  z: Pick<TrainingZeile, "wunsch" | "wunschDaten">,
+  modus: PlayerTrainingMode,
+  spieltag?: number | null,
+): {
+  delta: number;
+  punkte: number;
+  ergebnis: "erfuellt" | "druck" | "verfehlt" | "offen";
+  text: string;
+} | null {
+  if (!z.wunsch || !z.wunschDaten) return null;
+  const konditionen = getTrainingModeDemandTerms(modus, z.wunsch);
+  const status = resolveTrainingModeDemandStatus({
+    currentMode: modus,
+    preferredMode: z.wunsch,
+    mismatchSeverity: konditionen.mismatchSeverity,
+    matchdayIndex: spieltag === undefined ? z.wunschDaten.spieltag : spieltag,
+  });
+  const erg = evaluateTrainingModeDemandDelta({
+    demand: {
+      preferredMode: z.wunsch,
+      currentMode: modus,
+      status,
+      moraleReward: z.wunschDaten.moraleReward,
+      moralePenalty: konditionen.moralePenalty,
+      mismatchSeverity: konditionen.mismatchSeverity,
+    },
+    activeMode: modus,
+  });
+  const delta = Number(erg.delta.toFixed(1));
+  const punkte = Number((delta * MORAL_SKALA_FAKTOR).toFixed(1));
+  const ergebnis = erg.outcome === "fulfilled" ? "erfuellt" : erg.outcome === "pressure" ? "druck" : erg.outcome === "failed" ? "verfehlt" : "offen";
+  const text =
+    ergebnis === "erfuellt"
+      ? "Wunsch erfüllt"
+      : ergebnis === "verfehlt"
+        ? "Wunsch verfehlt"
+        : ergebnis === "druck"
+          ? "Wunsch unter Druck"
+          : "Wunsch offen, noch ohne Folge";
+  return { delta, punkte, ergebnis, text };
+}
+
+/* ------------------------------------------------------------------ Moral: Verlauf und Einheit */
+
+export type MoralStufe = {
+  /** Von diesem Spieltag an (1-basiert) bis `bis`. */
+  ab: number;
+  bis: number;
+  ergebnis: "erfuellt" | "druck" | "verfehlt" | "offen";
+  label: string;
+  /** Moralpunkte (0..100-Skala), die die Neuberechnung der Moral in dieser Stufe verschiebt. */
+  punkte: number;
+  /** Aktuelle Stufe (laut Spieltag der Zeile). */
+  aktuell: boolean;
+};
+
+export type MoralErklaerung = {
+  /** Wirkung im Moral-Dienst je Neuberechnung (Zustand), nicht je Spieltag aufsummiert. */
+  zustandPunkte: number;
+  stufen: MoralStufe[];
+  /** Anteil des Zielwertes, der nach 1, 2, 3, 5 Spieltagen erreicht ist (Moral zieht jeden Spieltag um den Rest nach). */
+  anlauf: Array<{ spieltage: number; anteil: number }>;
+  /** Arena-Eignung in Prozent bei der Endstufe (Standarddosis), gegenüber Moral 50. */
+  eignungProzent: number;
+  /** Letzte Stufe (Zielwert am Saisonende) in Moralpunkten. */
+  saisonendePunkte: number;
+};
+
+/** Anteil des Zielwertes nach n Spieltagen: je Spieltag zieht die Moral um 45 % der Restlücke nach (55 % bleiben). */
+export function moralAnlauf(spieltage: number): number {
+  return Math.round((1 - MORAL_UEBERTRAG_GLEICHE_SAISON ** Math.max(0, spieltage)) * 1000) / 1000;
+}
+
+/**
+ * Zeitverlauf eines Wunsches bei gleichbleibender Intensität `modus`: welche Stufe wann greift, wie viel Moral
+ * (0..100) sie verschiebt, wie schnell die Moral dem folgt und was das in der Arena heißt. Alles aus denselben
+ * Funktionen wie die Buchung (`wunschFolge`). `null` ohne Wunsch.
+ */
+export function moralErklaerung(
+  z: Pick<TrainingZeile, "wunsch" | "wunschDaten">,
+  modus: PlayerTrainingMode,
+): MoralErklaerung | null {
+  if (!z.wunsch || !z.wunschDaten) return null;
+  const n = Math.max(1, z.wunschDaten.saisonSpieltage ?? 20);
+  const jetzt = z.wunschDaten.spieltag;
+  const stufen: MoralStufe[] = [];
+  for (let tag = 1; tag <= n; tag++) {
+    const f = wunschFolge(z, modus, tag);
+    if (!f) continue;
+    const letzte = stufen[stufen.length - 1];
+    if (letzte && letzte.ergebnis === f.ergebnis && letzte.punkte === f.punkte) {
+      letzte.bis = tag;
+      continue;
+    }
+    stufen.push({
+      ab: tag,
+      bis: tag,
+      ergebnis: f.ergebnis,
+      label: f.ergebnis === "erfuellt" ? "erfüllt" : f.ergebnis === "druck" ? "unter Druck" : f.ergebnis === "verfehlt" ? "verfehlt" : "folgenlos",
+      punkte: f.punkte,
+      aktuell: false,
+    });
+  }
+  for (const stufe of stufen) stufe.aktuell = jetzt != null && jetzt >= stufe.ab && jetzt <= stufe.bis;
+  const jetztFolge = wunschFolge(z, modus);
+  const ende = stufen[stufen.length - 1]?.punkte ?? 0;
+  const moralPct = (morale: number) => calculateFormMoralSignal({ morale, dosisPct: FORM_MORAL_STANDARD_DOSIS_PCT }).moralePct;
+  return {
+    zustandPunkte: jetztFolge?.punkte ?? 0,
+    stufen,
+    anlauf: [1, 2, 3, 5].map((spieltage) => ({ spieltage, anteil: moralAnlauf(spieltage) })),
+    eignungProzent: Math.round((moralPct(50 + ende) - moralPct(50)) * 100) / 100,
+    saisonendePunkte: ende,
+  };
+}
+
+function vorzeichenZahl(wert: number, stellen = 1): string {
+  return `${wert > 0 ? "+" : wert < 0 ? "−" : ""}${Math.abs(wert).toFixed(stellen).replace(".", ",")}`;
+}
+
+/** Kurzform mit Einheit und Zeitbezug, wie die Engine ihn anwendet: „−12,0 Moral, solange verfehlt". */
+export function moralZustandText(folge: { punkte: number; ergebnis: "erfuellt" | "druck" | "verfehlt" | "offen" }): string {
+  if (folge.ergebnis === "offen") return "noch keine Moral-Folge";
+  const bedingung = folge.ergebnis === "erfuellt" ? "solange erfüllt" : folge.ergebnis === "druck" ? "solange unter Druck" : "solange verfehlt";
+  return `${vorzeichenZahl(folge.punkte)} Moral ${bedingung}`;
+}
+
+/** Tooltip-Text zum Verlauf (ein Absatz, ohne Zeilenumbrüche). */
+export function moralTipp(z: Pick<TrainingZeile, "wunsch" | "wunschDaten">, modus: PlayerTrainingMode): string | null {
+  const m = moralErklaerung(z, modus);
+  if (!m) return null;
+  const stufe = (e: MoralStufe["ergebnis"]) => m.stufen.find((x) => x.ergebnis === e);
+  const teile: string[] = [];
+  const ok = stufe("erfuellt");
+  if (ok) {
+    teile.push(`Erfüllt: ${vorzeichenZahl(ok.punkte)} Moral, solange die Intensität passt.`);
+  } else {
+    const offen = stufe("offen");
+    const druck = stufe("druck");
+    const verfehlt = stufe("verfehlt");
+    if (offen) teile.push(`Spieltag ${offen.ab}${offen.bis > offen.ab ? ` bis ${offen.bis}` : ""}: folgenlos.`);
+    if (druck) teile.push(`Ab Spieltag ${druck.ab}: unter Druck, ${vorzeichenZahl(druck.punkte)} Moral.`);
+    if (verfehlt) teile.push(`Ab Spieltag ${verfehlt.ab}: verfehlt, ${vorzeichenZahl(verfehlt.punkte)} Moral.`);
+    teile.push(
+      `Das ist ein Zustand, kein Abzug je Spieltag: Er gilt bei jeder Neuberechnung der Moral erneut und summiert sich nicht auf. Die Moral zieht ihm je Spieltag um 45 % der Restlücke nach (nach 3 Spieltagen ${Math.round(moralAnlauf(3) * 100)} %).`,
+    );
+    teile.push(`Skala 0 bis 100, neutral 50. In der Arena kosten ${vorzeichenZahl(m.saisonendePunkte)} Moral etwa ${vorzeichenZahl(m.eignungProzent, 2)} % Eignung.`);
+  }
+  return teile.join(" ");
+}
+
+/* ------------------------------------------------------------------ Potenzial und Maximum: Zahlen und Texte */
+
+export const MAXIMUM_ATTRIBUT = DEVELOPMENT_MAX_ATTRIBUTE_VALUE;
+
+const zahlDe = (wert: number, stellen = 2) => wert.toFixed(stellen).replace(".", ",");
+
+/** Der Beschleuniger als Text: „Zuwachs × 1,16 (Rest 15 bis Potenzial 58,0)". */
+export function potenzialKurz(t: SpieltagsTransparenz | null): string | null {
+  if (!t || t.beschleuniger.potenzial == null) return null;
+  const b = t.beschleuniger;
+  return `Zuwachs × ${zahlDe(b.faktor)} (Rest ${Math.round(b.luecke)} bis Potenzial ${zahlDe(b.potenzial as number, 1)})`;
+}
+
+export function potenzialTipp(t: SpieltagsTransparenz | null): string {
+  const b = t?.beschleuniger;
+  const regel = `Potenzial wirkt nur als Beschleuniger, nie als Bremse: Bis ${ORGANIC_GAP_ACCEL_NEUTRAL} Punkte Abstand zwischen Stärke und Potenzial gilt × 1,00, darüber +${zahlDe(ORGANIC_GAP_ACCEL_SLOPE * 100, 0)} % je Punkt (höchstens × ${zahlDe(ORGANIC_GAP_ACCEL_CAP)}); ab Potenzial 70 kommt je Punkt +${zahlDe(100 / ORGANIC_PO_STEEP_DIVISOR, 1)} % dazu. Je näher ein Spieler am Potenzial ist, desto kleiner der Faktor, bis × 1,00.`;
+  if (!b || b.potenzial == null) return `${regel} Für diesen Spieler liegt kein Potenzial vor, es gilt × 1,00.`;
+  return `${regel} Hier: Stärke ${zahlDe(b.aktuell ?? 0, 1)}, Potenzial ${zahlDe(b.potenzial, 1)}, Abstand ${zahlDe(b.luecke, 1)} ⇒ × ${zahlDe(b.gapAccel)} (Abstand) × ${zahlDe(b.poSteep)} (Höhe) = × ${zahlDe(b.faktor)}.`;
+}
+
+export function bremsGrundText(a: TransparenzAttribut): string {
+  const name = attributLabel(a.attribute);
+  switch (a.grund) {
+    case "maximum":
+      return `${name} steht am Maximum ${MAXIMUM_ATTRIBUT}: kein Zuwachs mehr möglich`;
+    case "limit":
+      return `${name} am individuellen Limit (Rest unter 1): Zuwachs × 0,05`;
+    case "eng":
+      return `${name} nahe am individuellen Limit (Rest ${a.rest != null ? Math.max(1, Math.round(a.rest)) : "wenige"}): Zuwachs × 0,45`;
+    case "achse": {
+      // Dieselbe Zuordnung wie die Engine (`getCombinedAttributeTrainingMultiplier`): erste Achse, die das Attribut enthält.
+      const achseId = (["pow", "spe", "men", "soc"] as const).find((x) => getAttributesForAxis(x).includes(a.attribute)) ?? "pow";
+      return `${name}: die Achse ${stationDef(achseId).name} ist fast am Sterne-Potenzial, Zuwachs × ${zahlDe(a.faktor)}`;
+    }
+    default:
+      return `${name}: keine Bremse`;
+  }
+}
+
+export type BremseKurz = {
+  /** 0..1, Anteil des Weg-Zuwachses, der verloren geht. */
+  verlustAnteil: number;
+  verlustProzent: number;
+  /** Bremsende Attribute, stärkster Verlust zuerst. */
+  attribute: TransparenzAttribut[];
+  /** Davon als Nebeneffekt auf andere Attribute umgeleitet (Zuwachs-Punkte je Spieltag). */
+  umgeleitet: number;
+  /** `true`, wenn mindestens ein Attribut am Maximum 99 steht. */
+  mitMaximum: boolean;
+  text: string;
+};
+
+/** Ab diesem Anteil zeigt die Tabelle ein Warnzeichen. */
+export const BREMSE_WARNSCHWELLE = 0.1;
+
+export function bremseKurz(t: SpieltagsTransparenz | null): BremseKurz | null {
+  if (!t) return null;
+  const attribute = t.attribute.filter((a) => a.verlust > 0.0005).sort((l, r) => r.verlust - l.verlust);
+  if (attribute.length === 0 || t.verlustAnteil <= 0.0005) return null;
+  const prozent = Math.round(t.verlustAnteil * 100);
+  const namen = attribute.map((a) => attributLabel(a.attribute)).join(", ");
+  const mitMaximum = attribute.some((a) => a.amMaximum);
+  return {
+    verlustAnteil: t.verlustAnteil,
+    verlustProzent: prozent,
+    attribute,
+    umgeleitet: t.umgeleitet,
+    mitMaximum,
+    text: `−${prozent} % Zuwachs (${namen} ${mitMaximum ? "am Maximum" : "gebremst"})`,
+  };
+}
+
+/** Was „Wünsche erfüllen" setzt: je Spieler mit offenem Wunsch (nicht verletzt) die gewünschte Intensität; leer, wenn nichts offen ist. */
+export function wuenscheErfuellen(zeilen: readonly TrainingZeile[], entwurf: Record<string, { modus?: PlayerTrainingMode }>): Record<string, PlayerTrainingMode> {
+  const aus: Record<string, PlayerTrainingMode> = {};
+  for (const z of zeilen) {
+    if (!z.wunsch || z.verletzt) continue;
+    const aktuell = entwurf[z.playerId]?.modus ?? z.modus;
+    if (aktuell !== z.wunsch) aus[z.playerId] = z.wunsch;
+  }
+  return aus;
 }
 
 export function stationenBelegung(zeilen: readonly TrainingZeile[]): Array<{ id: StationId; zeilen: TrainingZeile[] }> {
@@ -363,3 +680,46 @@ export function zielGleich(a: ZielWahl | null, b: ZielWahl | null): boolean {
 }
 
 export { ACHSEN };
+
+/* ------------------------------------------------------------------ Legende „So rechnet die Entwicklung" */
+
+export type LegendeEintrag = { id: "potenzial" | "maximum" | "moral" | "intensitaet"; titel: string; text: string };
+
+/**
+ * Vier Sätze für die aufklappbare Legende, jede Zahl aus den Konstanten bzw. Funktionen, mit denen gebucht wird.
+ * Moral-Beispiel: schwere Abweichung (zwei Stufen daneben) = −10 x Skala 1,2.
+ */
+export function baueLegende(): LegendeEintrag[] {
+  const schwer = getTrainingModeDemandTerms("leicht", "hart");
+  const leicht = getTrainingModeDemandTerms("mittel", "hart");
+  const schwerPunkte = schwer.moralePenalty * MORAL_SKALA_FAKTOR;
+  const schwerDruck = Number((schwer.moralePenalty * WUNSCH_DRUCK_FAKTOR_SCHWER).toFixed(1)) * MORAL_SKALA_FAKTOR;
+  const leichtDruck = Number((leicht.moralePenalty * WUNSCH_DRUCK_FAKTOR_LEICHT).toFixed(1)) * MORAL_SKALA_FAKTOR;
+  const [lL, lM, lH] = (["leicht", "mittel", "hart"] as const).map((m) => ({
+    sp: getTrainingSetpointsJeSpieltag(m),
+    last: FATIGUE_LOAD_BY_MODE[m],
+  }));
+  const p = (w: number) => vorzeichenZahl(Number(w.toFixed(1)), 1);
+  return [
+    {
+      id: "potenzial",
+      titel: "Potenzial",
+      text: `Beschleuniger, nie Bremse: bis ${ORGANIC_GAP_ACCEL_NEUTRAL} Punkte Abstand zwischen Stärke und Potenzial gilt × 1,00, darüber +${zahlDe(ORGANIC_GAP_ACCEL_SLOPE * 100, 0)} % je Punkt (höchstens × ${zahlDe(ORGANIC_GAP_ACCEL_CAP)}); über Potenzial 70 kommt +${zahlDe(100 / ORGANIC_PO_STEEP_DIVISOR, 1)} % je Punkt dazu.`,
+    },
+    {
+      id: "maximum",
+      titel: "Maximum und Limit",
+      text: `Jedes Attribut hat ein verdecktes Limit (höchstens ${MAXIMUM_ATTRIBUT}). Rest bis 5: Zuwachs × 0,45, Rest bis 1: × 0,05; ist die Achse fast am Sterne-Potenzial, × 0,55 bzw. × 0,10. Was das Attribut nicht aufnimmt, geht verloren, nur ${Math.round(TRAINING_SPILLOVER_SHARE * 100)} % des gebremsten Anteils fließen als Nebeneffekt in andere Attribute.`,
+    },
+    {
+      id: "moral",
+      titel: "Moral",
+      text: `Skala 0 bis 100, neutral 50. Ein verfehlter Wunsch ist ein Zustand, kein Abzug je Spieltag: schwere Abweichung ${p(schwerPunkte)} Moral (−${Math.abs(schwer.moralePenalty)} × ${zahlDe(MORAL_SKALA_FAKTOR)}), unter Druck ${p(schwerDruck)}, leichte Abweichung nur ${p(leichtDruck)}. Die Moral zieht dem Zustand je Spieltag um ${Math.round((1 - MORAL_UEBERTRAG_GLEICHE_SAISON) * 100)} % der Restlücke nach.`,
+    },
+    {
+      id: "intensitaet",
+      titel: "Intensität",
+      text: `Leicht ${zahlDe(lL!.sp, 3)}, Mittel ${zahlDe(lM!.sp, 3)}, Hart ${zahlDe(lH!.sp, 3)} SP Grundbudget je Spieltag (vor Potenzial, Trait, Gebäude). Belastung je Training: +${lL!.last} / +${lM!.last} / +${lH!.last}; ab ${UEBERLASTUNG_SCHWELLE} überlastet, das drückt die Form leicht.`,
+    },
+  ];
+}

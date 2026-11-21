@@ -7,7 +7,7 @@ import {
   type FormCardSeasonPlan,
   type FormCardSeasonPlanSlot,
 } from "@/lib/ai/ai-form-card-season-plan";
-import { buildAiLegacyLineupPreview, getMarginalRankPointSwing } from "@/lib/ai/ai-legacy-lineup-engine";
+import { buildAiLegacyLineupPreview, getMarginalRankPointSwing, ordneKiSpielerAufPlaetze } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { FormCardColor, GameState, LineupDraft, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import type { AiLegacyLineupPreview, AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
@@ -33,6 +33,7 @@ import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } fro
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
+import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -1931,6 +1932,8 @@ export function buildDelegatedLineupPreview(
 
   const filled = buildAiLegacyLineupPreviewWithModifiers(reducedContext, "sqlite");
 
+  const belastungsRegel = context.belastungsRegel ?? (context.gameState ? belastungsRegelFuer(context.gameState) : "alt");
+  const belastungsKontext = belastungsRegel === "v2" ? context : null;
   // Freie Slot-Nummern je Seite in aufsteigender Reihenfolge an die KI-Eintraege vergeben.
   const merged: LegacyLineupEntryInput[] = [...locked];
   for (const side of ["d1", "d2"] as const) {
@@ -1940,16 +1943,35 @@ export function buildDelegatedLineupPreview(
     const aiSideEntries = filled.preview.entries
       .filter((entry) => entry.disciplineSide === side)
       .sort((left, right) => left.slotIndex - right.slotIndex);
-    for (const entry of aiSideEntries) {
+    const freiePlaetze: number[] = [];
+    for (let i = 0; i < aiSideEntries.length; i += 1) {
       while (used.has(nextSlot)) nextSlot += 1;
       used.add(nextSlot);
+      freiePlaetze.push(nextSlot);
+    }
+    // Belastungsregel v2: die KI hat ihre Plaetze gegen ein verkleinertes Team gewaehlt. Auf den echten freien
+    // Plaetzen (Rollen der vollen Kaderzahl) neu verteilen, damit Platzwert und Last zum tatsaechlichen Platz passen.
+    let reihe = aiSideEntries;
+    const disciplineId = sideDisciplines[side];
+    if (belastungsKontext && disciplineId && aiSideEntries.length > 1) {
+      const ordnung = ordneKiSpielerAufPlaetze({
+        context: belastungsKontext,
+        disciplineId,
+        slotCount: capacityOf(side),
+        playerIds: aiSideEntries.map((entry) => entry.playerId ?? ""),
+        platzNummern: freiePlaetze,
+      });
+      const byId = new Map(aiSideEntries.map((entry) => [entry.playerId ?? "", entry] as const));
+      reihe = ordnung.map((playerId) => byId.get(playerId)!);
+    }
+    reihe.forEach((entry, index) => {
       merged.push({
         ...entry,
-        slotIndex: nextSlot,
+        slotIndex: freiePlaetze[index]!,
         // Eine Kapitaensbinde je Seite: hat der Mensch sie vergeben, bleibt sie bei ihm.
         isCaptain: humanCaptainOnSide ? false : Boolean(entry.isCaptain),
       });
-    }
+    });
   }
   merged.sort((left, right) =>
     left.disciplineSide === right.disciplineSide

@@ -53,6 +53,11 @@ export type PlayerSeasonTrainingForecastCell = {
   performance: number;
   /** Gegenposten (Alterung/Marktwertdruck) — immer ≤ 0. */
   regression: number;
+  /**
+   * Davon festgelegter, aber noch NICHT gebuchter Trainingszuwachs (Spieltag erst halb gewertet, `o` im
+   * Verlauf). Steckt in `training`/`cumulative`, steht aber noch nicht auf dem Attribut.
+   */
+  offen: number;
 };
 
 export type PlayerSeasonTrainingForecast = {
@@ -78,6 +83,8 @@ export type PlayerSeasonTrainingForecast = {
   spilloverTotal: number;
   performanceTotal: number;
   regressionTotal: number;
+  /** Teil von `trainingTotal`, der festgelegt, aber noch offen ist (s. `PlayerSeasonTrainingForecastCell.offen`). */
+  offenTotal: number;
   attributes: PlayerSeasonTrainingForecastCell[];
 };
 
@@ -129,9 +136,15 @@ export function buildPlayerSeasonTrainingForecast(input: {
   // Training je Spieltag (18.11.): gebuchte Spieltage stecken schon in den Attributen; ihr Zuwachs kommt
   // exakt aus dem Verlauf (gezeigt = gebucht), die Projektion rechnet nur noch die ungebuchten.
   const jeSpieltag = isTrainingJeSpieltagAktiv();
+  // Ein OFFENER Zuwachs (`o`, Arena-Teilbuchung nach D1) ist schon festgelegt, aber noch nicht auf den
+  // Attributen: er geht mit seinen exakten Zahlen in die Prognose ein (nicht noch einmal ueber das
+  // Budget) und wird als `offen` ausgewiesen statt als gebucht.
   const gebuchteIds = jeSpieltag ? getMatchdayBookedTrainingIds(accumulator, seasonId) : new Set<string>();
+  const offeneIds = new Set(
+    jeSpieltag ? (accumulator.verlauf ?? []).filter((e) => e.s === "t" && e.o).map((e) => e.m) : [],
+  );
   const subsetModes: Record<string, PlayerTrainingMode> = {};
-  for (const id of playedMatchdayIds) if (!gebuchteIds.has(id)) subsetModes[id] = modeByMatchday[id];
+  for (const id of playedMatchdayIds) if (!gebuchteIds.has(id) && !offeneIds.has(id)) subsetModes[id] = modeByMatchday[id];
   const accInputs = resolveSeasonTrainingAccumulatorInputs({
     accumulator: {
       seasonId,
@@ -179,6 +192,10 @@ export function buildPlayerSeasonTrainingForecast(input: {
     regressionByAttr[entry.attribute] = entry.regression ?? 0;
   }
   let gebuchtTotal = 0;
+  let offenTotal = 0;
+  const offenByAttr = Object.fromEntries(
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
+  ) as Record<PlayerGeneratorAttributeName, number>;
   if (jeSpieltag) {
     for (const eintrag of accumulator.verlauf ?? []) {
       if (eintrag.s !== "t" || !eintrag.z) continue;
@@ -186,6 +203,10 @@ export function buildPlayerSeasonTrainingForecast(input: {
         cumulativeByAttr[attribute] = (cumulativeByAttr[attribute] ?? 0) + wert;
         trainingByAttr[attribute] = (trainingByAttr[attribute] ?? 0) + wert;
         gebuchtTotal += wert;
+        if (eintrag.o) {
+          offenByAttr[attribute] = (offenByAttr[attribute] ?? 0) + wert;
+          offenTotal += wert;
+        }
       }
     }
   }
@@ -203,6 +224,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
       training: round1(trainingByAttr[attribute]),
       performance: round1(performanceByAttr[attribute]),
       regression: round1(regressionByAttr[attribute]),
+      offen: round1(offenByAttr[attribute]),
     };
   });
   const netCumulative = round1(attributes.reduce((sum, cell) => sum + cell.cumulative, 0));
@@ -229,6 +251,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
     spilloverTotal: round1(spilloverTotal),
     performanceTotal: round1(performanceTotal),
     regressionTotal: round1(regressionTotal),
+    offenTotal: round1(offenTotal),
     attributes,
   };
 }

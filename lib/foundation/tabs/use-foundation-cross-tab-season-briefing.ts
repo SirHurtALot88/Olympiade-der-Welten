@@ -193,6 +193,7 @@ const EMPTY_SEASON_BRIEFING_DATA = {
     matchdayId: string;
     label: string;
     disciplines: Array<{
+      id?: string | null;
       name: string | null | undefined;
       playerCount: number | null | undefined;
       category: string | null | undefined;
@@ -549,6 +550,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         disciplines: [entry.discipline1, entry.discipline2]
           .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot))
           .map((slot) => ({
+            id: slot.disciplineId ?? null,
             name: slot.displayName,
             playerCount: slot.playerCount ?? null,
             category: slot.category,

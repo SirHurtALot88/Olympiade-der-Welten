@@ -1,0 +1,246 @@
+/*
+ * SAISON-EINSTIEG modern (21.11.). Tokens aus components/foundation/broadcast/broadcast.css (Wurzelklasse `bc`).
+ * Groessen skalieren mit clamp(): 1920x1080 und 2560x1440 fuellen die Flaeche, schmale Fenster stapeln die Spalten.
+ */
+.sai-backdrop {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: clamp(10px, 1.6vw, 36px);
+  background: rgba(3, 5, 8, 0.78);
+  backdrop-filter: blur(6px);
+}
+.sai {
+  --sai-text: clamp(14px, 0.78vw, 22px);
+  --sai-klein: clamp(12px, 0.64vw, 17px);
+  --sai-zahl: clamp(34px, 2.5vw, 66px);
+  display: flex;
+  flex-direction: column;
+  width: min(100%, clamp(1100px, 78vw, 2000px));
+  max-height: 100%;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: calc(var(--bc-r) + 4px);
+  background: var(--bc-grund);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  font-size: var(--sai-text);
+}
+.sai-kopf {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(16px, 1.3vw, 30px) clamp(18px, 1.6vw, 36px);
+  border-bottom: 1px solid var(--bc-linie);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--bc-team) 22%, var(--bc-flaeche-1)) 0%, var(--bc-flaeche-1) 62%);
+}
+.sai-eyebrow {
+  display: block;
+  font-size: var(--sai-klein);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bc-gold);
+  font-weight: 700;
+}
+.sai-titel {
+  margin: 2px 0 4px;
+  font-family: var(--bc-haus);
+  font-size: clamp(30px, 2.4vw, 62px);
+  line-height: 1.05;
+  color: var(--bc-creme);
+}
+.sai-lead {
+  margin: 0;
+  color: var(--bc-leise);
+  font-size: var(--sai-text);
+}
+.sai-koerper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: clamp(14px, 1.1vw, 26px) clamp(18px, 1.6vw, 36px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1vw, 24px);
+}
+.sai-kacheln {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(8px, 0.7vw, 16px);
+}
+.sai-kachel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: clamp(10px, 0.9vw, 20px) clamp(12px, 1.1vw, 24px);
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  background: var(--bc-flaeche-2);
+  animation: sai-auf 0.4s ease both;
+  animation-delay: calc(var(--sai-i, 0) * 45ms);
+}
+.sai-kachel.is-gold { border-color: color-mix(in srgb, var(--bc-gold) 55%, transparent); }
+.sai-kachel.is-gut { border-color: color-mix(in srgb, var(--bc-gut) 45%, transparent); }
+.sai-kachel__label {
+  font-size: var(--sai-klein);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bc-stumm);
+  font-weight: 600;
+}
+.sai-kachel__wert {
+  font-family: var(--bc-zahl);
+  font-size: var(--sai-zahl);
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--bc-creme);
+  font-variant-numeric: tabular-nums;
+}
+.sai-kachel.is-gold .sai-kachel__wert { color: var(--bc-gold); }
+.sai-kachel.is-gut .sai-kachel__wert { color: var(--bc-gut); }
+.sai-kachel__wert--achsen { font-size: calc(var(--sai-zahl) * 0.72); letter-spacing: 0.02em; }
+.sai-kachel__sub { font-size: var(--sai-klein); color: var(--bc-leise); }
+
+.sai-spalten {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr);
+  gap: clamp(10px, 0.9vw, 22px);
+  align-items: start;
+}
+.sai-seite { display: flex; flex-direction: column; gap: clamp(10px, 0.9vw, 22px); }
+.sai-tafel {
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  background: var(--bc-flaeche-1);
+  padding: clamp(10px, 0.9vw, 20px);
+}
+.sai-tafel__kopf h2 {
+  margin: 0;
+  font-family: var(--bc-haus);
+  font-size: clamp(18px, 1.15vw, 30px);
+  color: var(--bc-creme);
+}
+.sai-tafel__kopf p { margin: 2px 0 10px; color: var(--bc-leise); font-size: var(--sai-klein); }
+
+.sai-plan {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(6px, 0.5vw, 12px);
+}
+.sai-tag {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(8px, 0.7vw, 16px);
+  padding: clamp(8px, 0.7vw, 14px);
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r-s);
+  background: var(--bc-flaeche-2);
+  animation: sai-auf 0.4s ease both;
+  animation-delay: calc(var(--sai-i, 0) * 35ms);
+}
+.sai-tag.has-same { border-color: color-mix(in srgb, var(--bc-acht) 50%, transparent); }
+.sai-tag.has-heavy { border-color: color-mix(in srgb, var(--bc-warn) 50%, transparent); }
+.sai-tag__nr {
+  font-family: var(--bc-zahl);
+  font-weight: 700;
+  font-size: clamp(30px, 2.1vw, 56px);
+  line-height: 1;
+  color: var(--bc-linie-2);
+  min-width: 1.4ch;
+  text-align: right;
+}
+.sai-tag__label { font-size: var(--sai-klein); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-stumm); font-weight: 600; }
+.sai-tag__diszis { display: flex; flex-direction: column; gap: 4px; margin-top: 3px; }
+.sai-diszi {
+  --sai-ton: var(--bc-leise);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 6px;
+  border-left: 3px solid var(--sai-ton);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sai-ton) 10%, transparent);
+}
+.sai-diszi.is-pow, .sai-liste li.is-pow { --sai-ton: var(--bc-p1); }
+.sai-diszi.is-spe, .sai-liste li.is-spe { --sai-ton: var(--bc-p3); }
+.sai-diszi.is-men, .sai-liste li.is-men { --sai-ton: var(--bc-p5); }
+.sai-diszi.is-soc, .sai-liste li.is-soc { --sai-ton: var(--bc-gold); }
+.sai-icon { width: clamp(30px, 2vw, 48px); height: clamp(30px, 2vw, 48px); object-fit: contain; flex: none; }
+.sai-icon--leer { display: grid; place-items: center; border-radius: 6px; background: var(--bc-flaeche-3); font-weight: 700; }
+.sai-diszi__text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.sai-diszi__text b { color: var(--bc-tinte); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sai-diszi__text small { color: var(--bc-leise); font-size: var(--sai-klein); }
+.sai-vier {
+  font-style: normal;
+  font-family: var(--bc-zahl);
+  font-weight: 700;
+  font-size: var(--sai-klein);
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--bc-gast);
+  color: var(--bc-gast);
+  white-space: nowrap;
+}
+.sai-marke { display: inline-block; margin-top: 5px; font-size: var(--sai-klein); font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.sai-marke.is-warn { color: var(--bc-acht); border: 1px solid color-mix(in srgb, var(--bc-acht) 55%, transparent); }
+.sai-marke.is-risk { color: var(--bc-warn); border: 1px solid color-mix(in srgb, var(--bc-warn) 55%, transparent); }
+
+.sai-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sai-liste li {
+  --sai-ton: var(--bc-leise);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--sai-ton);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sai-ton) 8%, transparent);
+}
+.sai-liste li.is-warn { --sai-ton: var(--bc-acht); }
+.sai-liste li span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.sai-liste li b { color: var(--bc-tinte); }
+.sai-liste li small { color: var(--bc-leise); font-size: var(--sai-klein); }
+.sai-liste li em { font-style: normal; font-family: var(--bc-zahl); font-weight: 700; font-size: clamp(20px, 1.3vw, 34px); color: var(--bc-creme); }
+.sai-liste li em small { font-size: var(--sai-klein); font-weight: 500; }
+.sai-faktoren { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sai-faktoren span { display: flex; flex-direction: column; padding: 4px 10px; border: 1px solid var(--bc-linie); border-radius: var(--bc-r-s); }
+.sai-faktoren small { color: var(--bc-stumm); font-size: var(--sai-klein); }
+.sai-faktoren b { font-family: var(--bc-zahl); color: var(--bc-gold); font-size: clamp(18px, 1.1vw, 28px); }
+.sai-leer { margin: 0; color: var(--bc-leise); font-size: var(--sai-text); }
+
+.sai-fuss {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: clamp(10px, 0.8vw, 18px) clamp(18px, 1.6vw, 36px);
+  border-top: 1px solid var(--bc-linie);
+  background: var(--bc-flaeche-1);
+}
+.sai-btn {
+  font: inherit;
+  font-weight: 700;
+  color: var(--bc-tinte);
+  background: var(--bc-flaeche-3);
+  border: 1px solid var(--bc-linie-2);
+  border-radius: var(--bc-r-s);
+  padding: 0.5em 1.2em;
+  cursor: pointer;
+}
+.sai-btn:hover { border-color: var(--bc-gold); }
+.sai-btn.is-primaer { background: var(--bc-gold); border-color: var(--bc-gold); color: #1b1305; }
+
+@keyframes sai-auf {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sai-kachel, .sai-tag { animation: none; }
+}
+@media (max-width: 1100px) {
+  .sai-kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sai-spalten { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .sai-plan { grid-template-columns: 1fr; }
+}

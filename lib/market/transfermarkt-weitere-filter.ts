@@ -6,7 +6,7 @@
 import { getClassColorToken } from "@/app/foundation/classVisuals";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { TRANSFERMARKT_ATTRIBUTE_KEYS, type TransfermarktAttributeKey } from "@/lib/market/transfermarkt-attribute-filter";
-import { erfuelltAchsenMinimum, type MarktAchse, type SpielerSicht } from "@/lib/market/transfermarkt-sicht";
+import { achsenSchwelle, erfuelltAchsenMinimum, type MarktAchse, type SpielerSicht } from "@/lib/market/transfermarkt-sicht";
 
 const NOTEN = ["F", "E", "D", "C", "B", "A", "S", "S+"];
 
@@ -28,6 +28,11 @@ export function naechsteMindestNote(aktuell: number | undefined): number | undef
 
 export function mindestNoteLabel(index: number | undefined): string {
   return MINDEST_NOTEN.find((n) => n.index === index)?.label ?? "";
+}
+
+/** Achsen-Chip als Zahl (Chris 21.11.): Anzeige und Filter laufen über dieselbe Summe, z. B. Index 4 (B) -> „70“. */
+export function mindestAchsenZahlLabel(index: number | undefined): string {
+  return index == null ? "" : String(achsenSchwelle(index));
 }
 
 const FARBE_ZU_ACHSE: Record<string, MarktAchse> = { red: "pow", green: "spe", blue: "men", yellow: "soc" };

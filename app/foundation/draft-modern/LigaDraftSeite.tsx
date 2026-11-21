@@ -27,6 +27,7 @@ import { DraftLiga } from "./DraftLiga";
 import { baueDraftKaderSicht } from "./draft-liga";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
 import { DraftProfil } from "./DraftProfil";
+import { useHistorienUnterzustand } from "@/lib/foundation/history-unterzustand";
 import { getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
 import { AbbruchDialog, AuslassenDialog, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
@@ -34,6 +35,7 @@ import { ErgebnisSeite } from "./DraftErgebnis";
 import { baueDraftErgebnis } from "./draft-ergebnis";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
+import { filterSchluessel, useGemerkterFilter } from "@/app/foundation/shared/filter-gedaechtnis";
 import { betragC, de, draftKopfSchluessel } from "./draft-format";
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil } from "@/app/foundation/shared/klickregel";
 import "@/app/foundation/transfermarkt-modern/transfermarkt-modern.css";
@@ -88,7 +90,7 @@ export default function LigaDraftSeite({
   }, []);
 
   const [ans, setAns] = useState<Ansicht>("live");
-  const [disziplin, setDisziplin] = useState("hockey");
+  const [disziplin, setDisziplin] = useGemerkterFilter(filterSchluessel("draft-brett", activeSaveId, "disziplin"), "hockey");
   const [wahl, setWahl] = useState<string | null>(null);
   const [schau, setSchau] = useState<string | null>(null);
   const [skipOffen, setSkipOffen] = useState(false);
@@ -96,6 +98,9 @@ export default function LigaDraftSeite({
   const [auslassenOffen, setAuslassenOffen] = useState(false);
   const [fertigOffen, setFertigOffen] = useState(false);
   const [profilId, setProfilId] = useState<string | null>(null);
+  // 21.11.: Zurück/Vor (Maustasten 4/5) führen aus dem Profilblatt und zwischen den Reitern, nicht aus der ganzen Draft-Seite.
+  useHistorienUnterzustand("draftProfil", profilId, setProfilId, { leer: null });
+  useHistorienUnterzustand("draftReiter", ans, setAns, { leer: "live" as Ansicht, jedeAenderungPusht: true });
 
   // Liegengebliebener Hintergrundlauf (Reload, Server-Neustart, abgebrochener Lauf → Liga „failed“): niemand treibt die
   // KI-Züge. Die Shell bietet dafür kein „Erneut versuchen“ (409 `liga_draft_laeuft`), die Seite setzt den Draft selbst
@@ -200,6 +205,7 @@ export default function LigaDraftSeite({
 
   const kontext: DraftKontext | null = ansicht
     ? {
+        saveId: activeSaveId,
         ansicht,
         hintergrund: draft.hintergrund,
         zeilen,

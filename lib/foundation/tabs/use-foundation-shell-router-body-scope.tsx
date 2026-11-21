@@ -217,6 +217,8 @@ import {
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { shouldAutoOpenSeasonBriefing, type GameFlowView } from "@/lib/foundation/game-flow-controller";
 import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
+import { holeTaktRegistrierung } from "@/lib/foundation/takt-klick-store";
+import { ligaAufbauAktivitaetStatus } from "@/lib/foundation/takt-auswahl";
 import { baueTaktPlan, entscheideLeertaste } from "@/lib/foundation/foundation-takt-plan";
 import { getTaktAblaufOffen, setTaktAblaufOffen } from "@/lib/foundation/takt-ablauf-store";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
@@ -7834,12 +7836,15 @@ export function useFoundationShellRouterBodyScope({
       // Arena-Entwurf gelten, sonst bleibt genau diese eine Ansicht die Luecke.
       const activeViewHandlesOwnSpace =
         activeView === "lineup" || activeView === "lineupV2" || activeView === "matchdayArena" || activeView === "battleArena";
+      // Die Leertaste ruft die Aktion des SICHTBAREN Taktgebers (Draft, Einsatzliste, global) — nicht blind den globalen Flow.
+      const takt = holeTaktRegistrierung();
+      const anzahlKritisch = takt ? takt.kritisch : taktPlan.kritisch.length;
       const entscheidung = entscheideLeertaste({
         textZiel: Boolean(isTextTarget),
         dialogOffen: modalOpen,
         eigeneLeertaste: activeViewHandlesOwnSpace,
-        deaktiviert: globalNextDisabled,
-        anzahlKritisch: taktPlan.kritisch.length,
+        deaktiviert: takt ? takt.gesperrt : globalNextDisabled,
+        anzahlKritisch,
         ablaufOffen: getTaktAblaufOffen(),
       });
       if (entscheidung === "ignorieren") return;
@@ -7850,7 +7855,11 @@ export function useFoundationShellRouterBodyScope({
       }
       if (entscheidung === "springen") {
         setTaktAblaufOffen(false);
-        taktPlan.kritisch[0]?.sprung?.();
+        (takt?.springeZumKritischen ?? taktPlan.kritisch[0]?.sprung)?.();
+        return;
+      }
+      if (takt) {
+        takt.ausloesen();
         return;
       }
       void triggerGlobalNext();
@@ -12278,8 +12287,12 @@ export function useFoundationShellRouterBodyScope({
     showIdleReady: gameState.season.id !== "loading",
     fetchSlowWarning,
     // Der laufende Liga-Draft — dieselbe Quelle, aus der auch das Banner
-    // „Liga wird erstellt …" in FoundationShellRouterBody liest.
-    leagueSetupStatus,
+    // „Liga wird erstellt …" in FoundationShellRouterBody liest. Mit Draft-Zustand dieser Saison traegt der Draft den Aufbau
+    // selbst (Seite/Hinweis) — dann kein „Aktion laeuft“ am Taktgeber (takt-auswahl.ts).
+    leagueSetupStatus: ligaAufbauAktivitaetStatus(
+      leagueSetupStatus,
+      gameState.seasonState.ligaDraft?.saisonId === gameState.season.id,
+    ),
     /**
      * Saison läuft bereits: exakt das Gegenstück zum Preseason-Kauffenster
      * (`isEarlySeasonTransferSetup` in transfer-window-policy.ts — offen nur bei
@@ -13274,6 +13287,7 @@ export function useFoundationShellRouterBodyScope({
     getViewClass,
     globalNextLabel,
     globalNextStatusClass,
+    globalNextDisabled,
     globalNextTitle,
     handleFormCardPlanSaved,
     handleHumanLineupSaved,

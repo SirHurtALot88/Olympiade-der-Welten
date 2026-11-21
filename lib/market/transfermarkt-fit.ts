@@ -217,3 +217,60 @@ export function calculateTransfermarktFit(
     teamFit: Number(teamFit.toFixed(2)),
   };
 }
+
+/**
+ * Die Marktregel für den Team-Fit (alter Markt, `transfermarkt-read-service`, unverändert übernommen): Ein freier Spieler mit
+ * NEGATIVEM Fit zum gewählten Team wird standardmäßig nicht eingeblendet. Sichtbar sind Fit ≥ 0 und Mercenaries (die sind
+ * von der Regel ausgenommen). Ohne Team (kein Fit gerechnet) bleibt alles sichtbar. `negativEinblenden` hebt die Regel auf —
+ * der Schalter in Transfermarkt und Draft-Brett.
+ */
+export function istFitSichtbar(
+  spieler: { fit: number | null | undefined; mercenary: boolean | null | undefined },
+  negativEinblenden = false,
+): boolean {
+  if (negativEinblenden) return true;
+  if (spieler.mercenary) return true;
+  if (spieler.fit == null) return true;
+  return spieler.fit >= 0;
+}
+
+/** Wie viele der Spieler die Regel ausblendet (für die Zahl am Schalter). */
+export function zaehleFitAusgeblendet(
+  spieler: ReadonlyArray<{ fit: number | null | undefined; mercenary: boolean | null | undefined }>,
+): number {
+  let n = 0;
+  for (const s of spieler) if (!istFitSichtbar(s, false)) n += 1;
+  return n;
+}
+
+/** Stufen des Fit-Schwellenfilters „Fit > X“ (Chris, 21.11.): aus, > 0, > 5, > 10, > 15, > 20. */
+export const FIT_SCHWELLEN = [0, 5, 10, 15, 20] as const;
+
+/** „aus“ als Zahl (das Filter-Gedächtnis kennt keine `null`-Startwerte). */
+export const FIT_AUS = -1;
+
+/** Reihum für den Stufen-Knopf: aus, > 0, > 5, … > 20, aus. */
+export function naechsteFitSchwelle(aktuell: number | null | undefined): number {
+  if (aktuell == null || aktuell < 0) return FIT_SCHWELLEN[0];
+  const i = FIT_SCHWELLEN.findIndex((x) => x === aktuell);
+  return i < 0 || i + 1 >= FIT_SCHWELLEN.length ? FIT_AUS : FIT_SCHWELLEN[i + 1];
+}
+
+/**
+ * Fit-Schwelle: der Fit muss GRÖSSER als die Schwelle sein. Mercenaries bleiben wie bei der Sichtbarkeitsregel Ausnahme
+ * (sie tragen "Merc" statt einer Fit-Zahl-Pflicht); ohne gerechneten Fit (kein Team) greift die Schwelle nicht.
+ */
+export function erfuelltFitSchwelle(
+  spieler: { fit: number | null | undefined; mercenary: boolean | null | undefined },
+  schwelle: number | null | undefined,
+): boolean {
+  if (schwelle == null || schwelle < 0) return true;
+  if (spieler.mercenary) return true;
+  if (spieler.fit == null) return true;
+  return spieler.fit > schwelle;
+}
+
+/** Sortierschlüssel der Fit-Spalte: Mercenaries ohne Fit-Zahl und Spieler ohne Fit ans Ende. */
+export function fitSortWert(spieler: { fit: number | null | undefined }): number | null {
+  return typeof spieler.fit === "number" && Number.isFinite(spieler.fit) ? spieler.fit : null;
+}

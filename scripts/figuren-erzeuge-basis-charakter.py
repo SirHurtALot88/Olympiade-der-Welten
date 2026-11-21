@@ -225,7 +225,7 @@ def main():
         print(f"{args.slug}: {art:8} NEU {DIRS} frames={frames}", flush=True)
         rr = api("POST", "/characters/animations", body)
         gid = rr.get("animation_group_id")
-        print(f"    {args.slug}/{art} -> gid={gid} status={rr.get('status')} jobs={len(rr.get('background_job_ids', []))}", flush=True)
+        print(f"    {args.slug}/{art} -> gid={gid} status={rr.get('status')} jobs={len(rr.get('background_job_ids', []))} usage={rr.get('usage')} job_ids={rr.get('background_job_ids')}", flush=True)
         bestellt.append((art, gid, frames))
 
     print("\nZusammenfassung:")

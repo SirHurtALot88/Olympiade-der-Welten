@@ -13,6 +13,7 @@ import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/s
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
+import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
 import {
   LEAGUE_SIZE,
   buildInitialLeagueAssignment,
@@ -651,7 +652,11 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const baseGameStateWithSponsorSystem: GameState = withSeededSeasonEconomyFactorsForNewGame(
     // WERTUNGSSKALEN (18.11., lib/resolve/wertungs-skalen.ts): ein neues Spiel rechnet ab Saison 1 mit
     // der PP-Skala C2 und der Ergebnisskala E1 (Rueckweg: OLY_PP_SKALA=aus / OLY_ERGEBNIS_SKALA=aus).
-    stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+    // BELASTUNGSREGEL (21.11.): ein neues Battle-Spiel (20 Spieltage) rechnet ab Saison 1 mit Last je
+    // Platz, Resistenz, Pause nach Spieltag 10 und aktiver Erholung 4,0.
+    stempleBelastungsRegelBeimAnlegen(
+      stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+    ),
     input.saveId,
   );
 

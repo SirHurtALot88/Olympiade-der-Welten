@@ -19,6 +19,10 @@ import { seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
+import { ordneSpielerAufPlaetze } from "@/lib/ai/ai-belastung-platzwahl";
+import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
+import { MATCHDAY_FATIGUE_LOAD } from "@/lib/fatigue/fatigue-injury-service";
+import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
 
 type CaptainSuggestionCandidate = {
   disciplineId: string;
@@ -702,12 +706,47 @@ function allocatePlayersAcrossSides(input: {
   return { d1: d1Picked, d2: d2Picked };
 }
 
+/**
+ * Belastungsregel v2: verteilt die von der KI gewählten Spieler einer Seite auf Plätze (Platzwert − 0,25 × Last).
+ * `platzNummern` = die echten (freien) Plätze bei Teil-Delegation; Rollen kommen immer aus der vollen Kaderzahl.
+ * Rückgabe: Spieler-IDs in der Reihenfolge der Plätze.
+ */
+export function ordneKiSpielerAufPlaetze(input: {
+  context: LegacyLineupLoadedContext;
+  disciplineId: string;
+  slotCount: number;
+  playerIds: readonly string[];
+  platzNummern?: readonly number[];
+}): string[] {
+  const rosterById = new Map((input.context.rosterPlayers ?? []).map((player) => [player.id, player] as const));
+  return ordneSpielerAufPlaetze({
+    disciplineId: input.disciplineId,
+    disciplineName: getDisciplineName(input.context, input.disciplineId),
+    slotCount: input.slotCount,
+    altGrundlast: MATCHDAY_FATIGUE_LOAD,
+    platzNummern: input.platzNummern,
+    spieler: input.playerIds.map((playerId) => {
+      const roster = rosterById.get(playerId);
+      return {
+        playerId,
+        attributeStats: roster?.attributeStats ?? null,
+        lastFaktor: getPlayerFatigueLoadMultiplier({
+          traitsPositive: roster?.traitsPositive ?? [],
+          traitsNegative: roster?.traitsNegative ?? [],
+        }),
+      };
+    }),
+  });
+}
+
 // Ordnet die per DP gewählten Spieler einer Seite in Slot-Reihenfolge (bester zuerst) und
 // erzeugt Warnings/Reasoning im selben Format wie zuvor (Konsumenten filtern per "D1"/"D2").
 function buildSideResult(input: {
   plan: SideAllocationPlan;
   pickedCandidates: SideCandidate[];
   lineupStrategy: AiLineupStrategy;
+  /** Nur unter Belastungsregel v2: Plätze nach Platzwert + leicht gewichteter Last besetzen. */
+  belastungsKontext?: LegacyLineupLoadedContext | null;
 }): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[] } {
   const { plan, lineupStrategy } = input;
   if (!plan.disciplineId) {
@@ -731,6 +770,17 @@ function buildSideResult(input: {
     }
     return left.playerId.localeCompare(right.playerId);
   });
+
+  if (input.belastungsKontext && picked.length > 1) {
+    const reihenfolge = ordneKiSpielerAufPlaetze({
+      context: input.belastungsKontext,
+      disciplineId,
+      slotCount: plan.playerCount,
+      playerIds: picked.map((player) => player.playerId),
+    });
+    const byId = new Map(picked.map((player) => [player.playerId, player] as const));
+    picked.splice(0, picked.length, ...reihenfolge.map((id) => byId.get(id)!));
+  }
 
   return {
     entries: picked.map((player, index) => ({
@@ -816,12 +866,16 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
   });
 
   const candidateByPlayerId = new Map(allocationPlayers.map((player) => [player.playerId, player]));
+  // Belastungsregel v2 (Saison-Stempel): die KI kennt die Resistenz. Alte Regel: null, alles wie bisher.
+  const belastungsRegel = context.belastungsRegel ?? (context.gameState ? belastungsRegelFuer(context.gameState) : "alt");
+  const belastungsKontext = belastungsRegel === "v2" ? context : null;
   const d1 = buildSideResult({
     plan: d1Plan,
     pickedCandidates: allocation.d1
       .map((playerId) => candidateByPlayerId.get(playerId)?.d1)
       .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
     lineupStrategy,
+    belastungsKontext,
   });
   const d2 = buildSideResult({
     plan: d2Plan,
@@ -829,6 +883,7 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
       .map((playerId) => candidateByPlayerId.get(playerId)?.d2)
       .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
     lineupStrategy,
+    belastungsKontext,
   });
 
   // Audit-Zeile für die globale Zuteilung (bewusst NICHT mit "D1"/"D2" beginnend, damit die

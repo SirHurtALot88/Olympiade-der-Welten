@@ -9,7 +9,9 @@
  * (`in_progress`/`failed`) ODER ein Draft dieser Saison, der noch nicht `fertig` ist — auch bei `ready` (Reload im
  * Nachzug, 18.11.: der Spieler muss wieder auf der Draft-Seite landen, solange er noch picken darf).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { leseUnterzustand, schreibeUnterzustand } from "@/lib/foundation/history-unterzustand";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -82,6 +84,23 @@ export function useLigaDraftTor(input: { gameState: GameState; saveId: string; l
   // selbst die Draft-Seite, sondern das Office mit Hinweis; erst „Zum Draft“ (`oeffnen`) öffnet sie.
   const ja = bekannt && urteil?.wert === "ja";
   const aktiv = ja && verlassen !== saveId && (!urteil?.wartet || geoeffnet === saveId);
+  const aktivRef = useRef(aktiv);
+  aktivRef.current = aktiv;
+  // 21.11. (Maus Zurück/Vor): der History-Eintrag, auf dem die Draft-Seite offen war, wird markiert. Zurück aus dem Office dorthin
+  // öffnet den Draft wieder; Vor in den Eintrag ohne Marke (Office) schließt ihn wieder. Das Profilblatt/der Reiter hängen
+  // am selben Eintrag (history-unterzustand.ts) und erben die Marke.
+  useEffect(() => {
+    if (aktiv && leseUnterzustand<string>("draftOffen") !== saveId) schreibeUnterzustand("draftOffen", saveId, "replace");
+  }, [aktiv, saveId]);
+  useEffect(() => {
+    const aufPopstate = () => {
+      const offen = leseUnterzustand<string>("draftOffen") === saveId;
+      if (offen) setVerlassen((alt) => (alt === saveId ? null : alt));
+      else if (aktivRef.current) setVerlassen(saveId);
+    };
+    window.addEventListener("popstate", aufPopstate);
+    return () => window.removeEventListener("popstate", aufPopstate);
+  }, [saveId]);
   // Hinweis „Draft wartet“: ein laufender Draft dieser Saison, die Seite ist gerade nicht offen.
   const hinweis = kandidat && ja && !aktiv;
   const schliessen = useCallback(() => setVerlassen(saveId), [saveId]);

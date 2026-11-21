@@ -1180,3 +1180,276 @@
     display: none;
   }
 }
+
+/* ---- Trainingswunsch (21.11): Marke am Intensitäts-Knopf, Zeile mit Folge, Kennzahl, Sammel-Knopf ---- */
+.te .bc-seg button {
+  position: relative;
+}
+.te .bc-seg button.is-marke::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bc-acht);
+  box-shadow: 0 0 0 1px rgba(18, 24, 36, 0.85);
+}
+.te .bc-seg button[aria-pressed="true"].is-marke::after {
+  background: var(--bc-gut);
+}
+.te-kennzahlen > div.is-wunsch {
+  border-top-color: var(--bc-acht);
+}
+.te-pl > span.te-wunsch--klein:not(.te-med) {
+  flex: none;
+  padding: 0 5px;
+  font-size: var(--te-klein);
+  white-space: nowrap;
+}
+.te-art--wunsch {
+  border-color: var(--bc-acht);
+  background: rgba(240, 195, 90, 0.14);
+  color: var(--bc-acht);
+}
+.te-wunschzeile {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--bc-acht);
+  border-radius: 4px;
+  background: rgba(240, 195, 90, 0.08);
+  color: var(--bc-tinte);
+  font-size: var(--te-klein);
+  line-height: 1.35;
+}
+.te-wunschzeile.is-ok {
+  border-color: rgba(98, 211, 148, 0.5);
+  background: rgba(98, 211, 148, 0.08);
+}
+.te-wunschzeile .bc-icon {
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  margin-top: 1px;
+}
+.te-wunschleiste {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--bc-linie);
+}
+.te-wunschleiste small {
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-btn.te-btn--klein {
+  flex: none;
+  height: auto;
+  padding: 4px 10px;
+  font-size: var(--te-klein);
+  white-space: nowrap;
+}
+
+/* ---- Transparenz (21.11): Potenzial-Faktor, Maximum-Bremse, Moral-Verlauf, Legende ---- */
+.te-tipp {
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dotted var(--bc-leise);
+}
+.te-tipp:focus-visible {
+  outline: 1px solid var(--bc-gold);
+  outline-offset: 2px;
+}
+.te-tipp__box {
+  position: fixed;
+  z-index: 60;
+  padding: 8px 10px;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: var(--bc-r-s);
+  background: var(--bc-flaeche-3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  color: var(--bc-tinte);
+  font: 500 var(--te-klein) / 1.4 var(--bc-zahl);
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.te-trans {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r-s);
+  background: rgba(255, 255, 255, 0.03);
+}
+.te-trans__zeile {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.te-trans__zeile .te-gk {
+  display: inline;
+}
+.te-trans__faktor {
+  font-size: 1.25em;
+  color: var(--bc-gold);
+}
+.te-trans__zeile.is-bremse .te-trans__faktor {
+  color: var(--bc-warn);
+}
+.te-trans small {
+  color: var(--bc-leise);
+  font-size: var(--te-klein);
+}
+.te-marke {
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px solid var(--bc-acht);
+  border-radius: 3px;
+  color: var(--bc-acht);
+  font: 700 0.78em var(--bc-zahl);
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.te-marke.is-voll {
+  border-color: var(--bc-warn);
+  color: var(--bc-warn);
+}
+.te-brems {
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--bc-acht);
+  border-radius: 3px;
+  color: var(--bc-acht);
+  font: 700 var(--te-klein) var(--bc-zahl);
+  white-space: nowrap;
+  cursor: help;
+}
+.te-brems.is-max {
+  border-color: var(--bc-warn);
+  color: var(--bc-warn);
+}
+.te-pot__faktor {
+  flex: none;
+  font-style: normal;
+  color: var(--bc-gold);
+  font-size: var(--te-klein);
+  margin-left: 2px;
+}
+.te-weg__bremse {
+  color: var(--bc-warn);
+  font-style: normal;
+}
+.te-moralzahl {
+  white-space: nowrap;
+}
+.te-moralverlauf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.te-stufe {
+  padding: 0 6px;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: 3px;
+  color: var(--bc-leise);
+  font-size: var(--te-klein);
+  white-space: nowrap;
+}
+.te-stufe b {
+  color: var(--bc-tinte);
+  font-weight: 600;
+}
+.te-stufe.is-druck b {
+  color: var(--bc-acht);
+}
+.te-stufe.is-verfehlt b {
+  color: var(--bc-warn);
+}
+.te-stufe.is-jetzt {
+  border-color: var(--bc-gold);
+  background: rgba(240, 195, 90, 0.12);
+  color: var(--bc-tinte);
+}
+.te-legendeknopf {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 2px 9px;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: 4px;
+  background: none;
+  color: var(--bc-leise);
+  font: 600 var(--te-klein) var(--bc-zahl);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.te-legendeknopf .bc-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+.te-legendeknopf:hover,
+.te-legendeknopf.is-an {
+  color: var(--bc-gold);
+  border-color: var(--bc-gold);
+}
+.te-legende {
+  position: absolute;
+  z-index: 50;
+  top: 6px;
+  right: 8px;
+  width: min(46em, calc(100% - 16px));
+  padding: 10px 14px 12px;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: var(--bc-r);
+  background: var(--bc-flaeche-2);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+.te-legende header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.te-legende h2 {
+  margin: 0;
+  font: italic 700 1.3em var(--bc-haus);
+  color: var(--bc-creme);
+}
+.te-legende dl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.te-legende dt {
+  font: 600 var(--te-klein) var(--bc-zahl);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bc-gold);
+}
+.te-legende dd {
+  margin: 1px 0 0;
+  color: var(--bc-tinte);
+  font-size: var(--te-text);
+  line-height: 1.35;
+}

@@ -61,6 +61,8 @@ export function useFoundationKeyboardNavigation({
       }
 
       if (event.key === "BrowserBack") {
+        // preventDefault: sonst geht der Browser selbst noch einen Schritt zurueck (Doppelsprung neben `onBack`).
+        event.preventDefault();
         onBack();
       }
     }

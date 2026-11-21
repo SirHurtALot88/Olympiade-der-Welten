@@ -27,7 +27,7 @@ import {
   type TransfermarktAttributeRatings,
 } from "@/lib/market/transfermarkt-scouting";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
-import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
+import { getTransfermarktTierFromPoints, type TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import {
   officialDisciplineWeightMatrix,
   type OfficialDisciplineWeightId,
@@ -62,7 +62,9 @@ export type SichtWert = {
 
 export type SichtAchse = {
   achse: MarktAchse;
-  /** „B–A“ (unbekannt), „B“ (beobachtet/gescoutet); `null`: verdeckt. */
+  /** Achsen-Summe als ZAHL (Chris, 21.11.: offen, auch ungescoutet); `null`, wenn der Feed keine liefert. */
+  summe: number | null;
+  /** Angezeigter Text: die Summe als Zahl (ohne Notenstufe daneben); nur ohne Summe die Note. `null`: verdeckt. */
   anzeige: string | null;
   /** Sortierschlüssel 0..7 (Mitte der Stufe), `null` = verdeckt. */
   sortWert: number | null;
@@ -148,12 +150,17 @@ function attributRatings(item: TransfermarktFreeAgentItem): TransfermarktAttribu
   };
 }
 
-function achseSicht(achse: MarktAchse, tier: TransfermarktRatingTier | null, stufe: number): SichtAchse {
+function achseSicht(achse: MarktAchse, tier: TransfermarktRatingTier | null, stufe: number, summe?: number | null): SichtAchse {
   // Achsen (POW/SPE/MEN/SOC) sind grobe Ueberblickswerte und auch ungescoutet als einzelne Note sichtbar (Chris 19.11.:
   // „mir fehlen auf den ersten Blick die Erkenntnisse, wie viel POW SPE MEN SOC ein Spieler hat“ — als Zweier-Gruppe
   // stand fast jeder Spieler auf „F–E“, Filter und Vergleich waren damit wertlos). Attribute bleiben im Nebel.
-  const anzeige = tier ?? null;
-  return { achse, anzeige, sortWert: tierBereichSortWert(anzeige), exakt: stufe >= 1 };
+  // Chris 21.11.: „die POW SPE MEN SOC Stats in Summe dürfen gezeigt werden“ — die Achsen-Summe steht als Zahl da, auch
+  // ungescoutet; die Notenstufe (nur für Farbe und Mindest-Filter) wird aus derselben Zahl abgeleitet, damit Anzeige,
+  // Sortierung und Filter nie auseinanderlaufen. Einzelattribute bleiben im Nebel.
+  const zahl = typeof summe === "number" && Number.isFinite(summe) ? Math.round(summe) : null;
+  const note = zahl != null ? getTransfermarktTierFromPoints(zahl) : tier;
+  const anzeige = zahl != null ? String(zahl) : (note ?? null);
+  return { achse, summe: zahl, anzeige, sortWert: tierBereichSortWert(note ?? null), exakt: zahl != null || stufe >= 1 };
 }
 
 /**
@@ -173,10 +180,10 @@ export function baueSpielerSicht(item: TransfermarktFreeAgentItem, optionen?: { 
   for (const [id, wert] of Object.entries(schaetzungen)) disziplinen[id] = baueSichtWert(wert, stufe);
 
   const achsen = {
-    pow: achseSicht("pow", item.powTier, stufe),
-    spe: achseSicht("spe", item.speTier, stufe),
-    men: achseSicht("men", item.menTier, stufe),
-    soc: achseSicht("soc", item.socTier, stufe),
+    pow: achseSicht("pow", item.powTier, stufe, item.pow),
+    spe: achseSicht("spe", item.speTier, stufe, item.spe),
+    men: achseSicht("men", item.menTier, stufe, item.men),
+    soc: achseSicht("soc", item.socTier, stufe, item.soc),
   } satisfies Record<MarktAchse, SichtAchse>;
 
   const ratings = attributRatings(item);
@@ -252,10 +259,20 @@ export function erfuelltEignungsMinimum(sicht: SpielerSicht, disziplinId: string
   return wert.bis >= minimum;
 }
 
+/** Untergrenze der Noten in Achsen-Punkten (F,E,D,C,B,A,S,S+), gespiegelt aus `getTransfermarktTierFromPoints`. */
+export const ACHSEN_NOTEN_SCHWELLE = [0, 52, 58, 64, 70, 76, 82, 88] as const;
+
+/** Mindest-Schwelle (Punkte) zu einem Noten-Index des Filters, z. B. 4 (B) -> 70. */
+export function achsenSchwelle(mindestTierIndex: number): number {
+  return ACHSEN_NOTEN_SCHWELLE[Math.max(0, Math.min(7, mindestTierIndex))];
+}
+
 export function erfuelltAchsenMinimum(sicht: SpielerSicht, achse: MarktAchse, mindestTierIndex: number): boolean {
-  const sortWert = sicht.achsen[achse].sortWert;
-  if (sortWert == null) return false;
-  return Math.ceil(sortWert) >= mindestTierIndex;
+  const a = sicht.achsen[achse];
+  // Mit Summe zählt die Zahl (konsistent zur Anzeige), sonst die Noten-Stufe.
+  if (a.summe != null) return a.summe >= achsenSchwelle(mindestTierIndex);
+  if (a.sortWert == null) return false;
+  return Math.ceil(a.sortWert) >= mindestTierIndex;
 }
 
 // ---------------------------------------------------------------------------------------------

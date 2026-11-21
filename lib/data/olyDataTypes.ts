@@ -342,6 +342,12 @@ export type TrainingsSpieltagEintrag = {
   z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
   l?: number;
+  /**
+   * Zuwachs `z` steht fest, ist aber noch NICHT auf die Attribute gebucht: der Spieltag ist erst halb
+   * gewertet (Arena-Teilbuchung nach D1). Gebucht wird er mit dem Abschluss-Commit (D2), damit sich
+   * Kader und Arena-Eingabe zwischen D1 und D2 nicht aendern (s. `accumulateMatchdayTrainingProgress`).
+   */
+  o?: true;
 };
 
 export type PlayerFormState = {
@@ -4017,6 +4023,20 @@ export type SeasonState = {
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
   /**
+   * BELASTUNGSREGEL DIESER SAISON (21.11., lib/fatigue/belastung-regel-stempel.ts): "v2" = Last je Platz
+   * aus Stufe und Resistenz, Pause nach Spieltag 10, aktive Erholung 4,0. Gesetzt beim Anlegen und beim
+   * Saisonwechsel (nur Battle-Doppelsaisons), nie mitten in der Saison. Fehlt der Stempel oder gehoert er
+   * zu einer anderen Saison, gilt die alte Regel (16 je Einsatz, keine Pause).
+   */
+  belastungsRegel?: { seasonId: string; version: "v2" } | null;
+  /**
+   * DIE GEBUCHTE PAUSE nach Spieltag 10 (v2-Saison): je Spieler der Konto-Stand davor und danach. Steht
+   * hier, damit ein erneutes Buchen von Spieltag 10 (forceReplace) die Pause exakt zuruecknehmen kann
+   * (`restorePreMatchdayAvailability`) und die Einsatzliste sie zeigen kann. Zaehlt NICHT als Spieltag
+   * (Sperren, Trainingsschicht).
+   */
+  belastungsPause?: BelastungsPauseRecord | null;
+  /**
    * CLIMBING-FORMAT DIESER SAISON (Canyon live, 18.11., lib/resolve/climbing-format.ts): Wechselliste
    * "standard"/"canyon" je Spieltag, gesetzt beim Laden. Gebuchte Spieltage behalten ihr Format.
    */
@@ -4197,6 +4217,22 @@ export type MatchdayState = {
 };
 
 export type LineupDisciplineSide = "d1" | "d2";
+
+export type BelastungsPauseRecord = {
+  seasonId: string;
+  /** Der Spieltag, nach dem die Pause liegt (Spieltag 10). */
+  nachMatchdayId: string;
+  eintraege: Array<{
+    playerId: string;
+    teamId: string;
+    /** Konto-Stand (Match-Fatigue ohne Trainingsschicht) vor der Pause. */
+    fatigueVorher: number;
+    /** Gutgeschriebene Erholung: Bank-Erholung (28 + Reha) x Trainingsmodus, Verletzte entsprechend. */
+    erholung: number;
+    fatigueNachher: number;
+    verletzt?: boolean;
+  }>;
+};
 
 export type LineupDraftEntry = {
   disciplineId: string;

@@ -9,10 +9,12 @@ import {
   playerGeneratorAttributeKeys,
 } from "@/lib/player-generator/official-discipline-weights";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
-import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
+import { accumulateMatchdayTrainingProgress, schliesseOffeneTrainingsZuwaechse } from "@/lib/training/matchday-training-accumulator";
+import { buildPlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import { prognostiziereDisziplinTraining } from "@/lib/training/disziplin-trainings-prognose";
 import {
   buildProjectedSeasonTrainingAccumulatorOverrides,
+  getMatchdayBookedTrainingIds,
   resolveSeasonEndTrainingAccumulatorOverrides,
   resolveSeasonTrainingAccumulatorInputs,
 } from "@/lib/training/organic-season-progression";
@@ -159,6 +161,139 @@ describe("Je-Spieltag-Buchung", () => {
     expect(spieler(gs1).attributeSheetStats).toEqual(spieler(BASIS).attributeSheetStats);
     expect(spieler(gs1).seasonTrainingAccumulator?.verlauf).toBeUndefined();
     expect(spieler(gs1).seasonTrainingAccumulator?.modeByMatchday["md-1"]).toBe("mittel");
+  });
+});
+
+describe("Halber Spieltag (Arena-Teilbuchung nach D1): Zuwachs erst mit D2", () => {
+  // Befund 21.11. (docs/design/arena-fluss-21-11.md): buchte der D1-Commit den Zuwachs auf die Attribute,
+  // aenderte sich die Arena-Eingabe mitten im Spieltag -- Motor-Neuaufbau nach D1 (Endstand weg) und
+  // `arena_eingabe_divergenz` fuer D2.
+  function bucheTeil(gs: GameState, matchdayId: string): GameState {
+    return accumulateMatchdayTrainingProgress({
+      gameState: gs,
+      seasonId: gs.season.id,
+      matchdayId,
+      ausfallSpielerIds: new Set(),
+      spieltagOffen: true,
+    });
+  }
+
+  it("D1-Commit: Attribute und Disziplinwerte bleiben, Zuwachs steht offen im Verlauf", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const gs1 = bucheTeil(gs0, "md-1");
+    expect(spieler(gs1).attributeSheetStats).toEqual(spieler(gs0).attributeSheetStats);
+    for (const p of gs1.players) expect(p.disciplineRatings).toEqual(gs0.players.find((q) => q.id === p.id)!.disciplineRatings);
+    const eintrag = spieler(gs1).seasonTrainingAccumulator?.verlauf?.find((e) => e.m === "md-1");
+    expect(eintrag?.o).toBe(true);
+    expect(Object.keys(eintrag?.z ?? {}).length).toBeGreaterThan(0);
+    // Trainingslast und Modus zaehlen wie bisher schon beim ersten Commit.
+    expect(spieler(gs1).seasonTrainingAccumulator?.modeByMatchday["md-1"]).toBe("mittel");
+  });
+
+  it("Teil + Abschluss == ein voller Commit (Attribute, Verlauf, Disziplinwerte)", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const voll = buche(gs0, "md-1");
+    const teil = bucheTeil(gs0, "md-1");
+    const nochmalTeil = bucheTeil(teil, "md-1");
+    expect(nochmalTeil.players.map((p) => p.attributeSheetStats)).toEqual(teil.players.map((p) => p.attributeSheetStats));
+    const abschluss = buche(nochmalTeil, "md-1");
+    for (const p of voll.players) {
+      const q = abschluss.players.find((x) => x.id === p.id)!;
+      expect(q.attributeSheetStats).toEqual(p.attributeSheetStats);
+      expect(q.disciplineRatings).toEqual(p.disciplineRatings);
+      expect(q.seasonTrainingAccumulator?.verlauf).toEqual(p.seasonTrainingAccumulator?.verlauf);
+      expect(q.seasonTrainingAccumulator?.matchdaysCounted).toBe(p.seasonTrainingAccumulator?.matchdaysCounted);
+    }
+    expect(entpackeTrainingsVerlauf(abschluss, SPIELER_ID)).toEqual(entpackeTrainingsVerlauf(voll, SPIELER_ID));
+  });
+
+  it("Moduswechsel zwischen D1 und D2: offener Zuwachs wird nicht abgezogen, der neue gebucht", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const hart = { ...teil, players: teil.players.map((p) => (p.id === SPIELER_ID ? { ...p, trainingMode: "hart" as const } : p)) };
+    const abschluss = buche(hart, "md-1");
+    const [zeile] = entpackeTrainingsVerlauf(abschluss, SPIELER_ID);
+    expect(zeile!.modus).toBe("hart");
+    for (const a of PROGRESSION_ATTRIBUTE_ORDER) {
+      expect(attr(spieler(abschluss), a) - attr(spieler(BASIS), a)).toBeCloseTo(zeile!.zuwachs[a] ?? 0, 6);
+    }
+    expect(spieler(abschluss).seasonTrainingAccumulator?.verlauf?.some((e) => e.o)).toBe(false);
+  });
+});
+
+describe("Offener Zuwachs: Kaderwechsel, Saisonende, Anzeige (Review 21.11.)", () => {
+  function bucheTeil(gs: GameState, matchdayId: string): GameState {
+    return accumulateMatchdayTrainingProgress({
+      gameState: gs,
+      seasonId: gs.season.id,
+      matchdayId,
+      ausfallSpielerIds: new Set(),
+      spieltagOffen: true,
+    });
+  }
+  const ohneKader = (gs: GameState, id: string): GameState => ({ ...gs, rosters: gs.rosters.filter((r) => r.playerId !== id) });
+
+  it("Spieler verlaesst zwischen D1 und D2 den Kader: der Abschluss-Commit bucht seinen offenen Zuwachs trotzdem", () => {
+    const voll = buche(BASIS, "md-1");
+    const teil = bucheTeil(BASIS, "md-1");
+    expect(spieler(teil).seasonTrainingAccumulator?.verlauf?.find((e) => e.m === "md-1")?.o).toBe(true);
+    const abschluss = buche(ohneKader(teil, SPIELER_ID), "md-1");
+    const p = spieler(abschluss);
+    expect(p.attributeSheetStats).toEqual(spieler(voll).attributeSheetStats);
+    expect(p.seasonTrainingAccumulator?.verlauf).toEqual(spieler(voll).seasonTrainingAccumulator?.verlauf);
+    expect(getMatchdayBookedTrainingIds(p.seasonTrainingAccumulator, abschluss.season.id).has("md-1")).toBe(true);
+    // Keine Last fuer den, der nicht mehr im Kader steht: nur der festgelegte Zuwachs wird nachgeholt.
+    expect(p.fatigue).toBe(spieler(teil).fatigue);
+    // Ein weiterer halber Commit laesst ihn in Ruhe.
+    expect(spieler(bucheTeil(ohneKader(teil, SPIELER_ID), "md-1")).seasonTrainingAccumulator).toEqual(spieler(teil).seasonTrainingAccumulator);
+  });
+
+  it("schliesseOffeneTrainingsZuwaechse bucht exakt die festgelegten Zahlen (Verkauf/Saisonende-Pfad)", () => {
+    const voll = buche(BASIS, "md-1");
+    const teil = bucheTeil(BASIS, "md-1");
+    const zu = schliesseOffeneTrainingsZuwaechse(teil, { playerIds: [SPIELER_ID] });
+    expect(spieler(zu).attributeSheetStats).toEqual(spieler(voll).attributeSheetStats);
+    expect(spieler(zu).seasonTrainingAccumulator?.verlauf?.some((e) => e.o)).toBe(false);
+    // Andere Spieler bleiben offen; ohne offene Eintraege derselbe Stand.
+    expect(zu.players.some((p) => p.id !== SPIELER_ID && p.seasonTrainingAccumulator?.verlauf?.some((e) => e.o))).toBe(true);
+    expect(schliesseOffeneTrainingsZuwaechse(voll)).toBe(voll);
+  });
+
+  it("offener Eintrag zaehlt nicht als gebucht: am Saisonende faellt der Spieltag ins Budget (nicht verloren, nicht doppelt)", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const akku = spieler(teil).seasonTrainingAccumulator;
+    expect(getMatchdayBookedTrainingIds(akku, teil.season.id).has("md-1")).toBe(false);
+    const offen = resolveSeasonEndTrainingAccumulatorOverrides({ accumulator: akku, seasonId: teil.season.id, totalMatchdays: 20, jeSpieltag: true });
+    expect(offen.accumulatedBaseTrainingBudget).toBeCloseTo(TRAINING_SETPOINTS_BY_MODE.mittel / 20, 6);
+    const gebucht = buche(teil, "md-1");
+    const zu = resolveSeasonEndTrainingAccumulatorOverrides({
+      accumulator: spieler(gebucht).seasonTrainingAccumulator,
+      seasonId: teil.season.id,
+      totalMatchdays: 20,
+      jeSpieltag: true,
+    });
+    expect(zu.accumulatedBaseTrainingBudget).toBe(0);
+  });
+
+  it("Anzeige: Verlauf, Saisonsumme und Prognose kennzeichnen den offenen Zuwachs", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const [zeile] = entpackeTrainingsVerlauf(teil, SPIELER_ID);
+    expect(zeile!.offen).toBe(true);
+    expect(zeile!.summe).toBeGreaterThan(0);
+    const summeOffen = trainingsSaisonSumme(teil, SPIELER_ID);
+    expect(summeOffen.summe).toBe(0);
+    expect(summeOffen.offenSumme).toBe(zeile!.summe);
+    const prognoseOffen = buildPlayerSeasonTrainingForecast({ gameState: teil, player: spieler(teil) })!;
+    expect(prognoseOffen.offenTotal).toBeGreaterThan(0);
+
+    const abschluss = buche(teil, "md-1");
+    const [gebucht] = entpackeTrainingsVerlauf(abschluss, SPIELER_ID);
+    expect(gebucht!.offen).toBe(false);
+    expect(trainingsSaisonSumme(abschluss, SPIELER_ID).summe).toBe(summeOffen.offenSumme);
+    expect(trainingsSaisonSumme(abschluss, SPIELER_ID).offenSumme).toBe(0);
+    const prognose = buildPlayerSeasonTrainingForecast({ gameState: abschluss, player: spieler(abschluss) })!;
+    expect(prognose.offenTotal).toBe(0);
+    // Derselbe Zuwachs, nur einmal gezaehlt: offen und gebucht ergeben dieselbe Trainingssumme.
+    expect(prognose.trainingTotal).toBeCloseTo(prognoseOffen.trainingTotal, 1);
   });
 });
 
@@ -369,5 +504,44 @@ describe("Trainings-Forecast je Disziplin (Modell fuer Profil und Entwicklung)",
     const p = prognostiziereDisziplinTraining({ gameState: gs, playerId: SPIELER_ID, spieltage: 3 })!;
     expect(p.spieltageVerletzt).toBe(1);
     expect(p.spieltageTrainiert).toBe(2);
+  });
+});
+
+describe("Transparenz des Spieltagszuwachses (gezeigt = gebucht)", () => {
+  it("die Zerlegung stammt aus der buchenden Rechnung: gebucht == Zuwachs der Profil-Attribute, Beschleuniger >= 1", () => {
+    const gs = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const v = prognostiziereSpieltagsTraining({ gameState: { ...gs, matchdayState: { ...gs.matchdayState, matchdayId: "md-1" } }, playerId: SPIELER_ID });
+    expect(v && !v.verletzt).toBe(true);
+    if (!v || v.verletzt) return;
+    const t = v.transparenz;
+    expect(t.attribute.map((a) => a.attribute)).toEqual(v.profil.map((e) => e.attribute));
+    for (const a of t.attribute) {
+      expect(a.gebucht).toBe(v.zuwachs[a.attribute] ?? 0);
+      expect(a.verlust).toBeGreaterThanOrEqual(0);
+      expect(a.anteil).toBeGreaterThan(0);
+    }
+    expect(t.beschleuniger.faktor).toBeGreaterThanOrEqual(1);
+    expect(t.verlustAnteil).toBeGreaterThanOrEqual(0);
+    expect(t.verlustAnteil).toBeLessThanOrEqual(1);
+  });
+
+  it("ein Attribut am Maximum 99 bringt keinen Zuwachs: der Anteil geht als Verlust in die Anzeige", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const haupt = trainingsProfilFuerZiel({ disziplinId: "gewichtheben", weg: 0 })[0]!.attribute;
+    const voll = {
+      ...gs0,
+      players: gs0.players.map((p) =>
+        p.id === SPIELER_ID ? { ...p, attributeSheetStats: { ...p.attributeSheetStats, [haupt]: 99 } as Player["attributeSheetStats"] } : p,
+      ),
+      matchdayState: { ...gs0.matchdayState, matchdayId: "md-1" },
+    };
+    const v = prognostiziereSpieltagsTraining({ gameState: voll, playerId: SPIELER_ID });
+    if (!v || v.verletzt) throw new Error("keine Vorschau");
+    const a = v.transparenz.attribute.find((x) => x.attribute === haupt)!;
+    expect(a.amMaximum).toBe(true);
+    expect(a.grund).toBe("maximum");
+    expect(a.gebucht).toBe(0);
+    expect(a.verlust).toBeGreaterThan(0);
+    expect(v.transparenz.verlustAnteil).toBeGreaterThan(0.4);
   });
 });

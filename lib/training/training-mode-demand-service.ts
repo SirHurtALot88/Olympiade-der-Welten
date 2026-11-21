@@ -98,7 +98,7 @@ export function getTrainingModeMismatchSeverity(
   return gap >= 2 ? 2 : 1;
 }
 
-function resolveTrainingModeDemandStatus(input: {
+export function resolveTrainingModeDemandStatus(input: {
   currentMode: PlayerTrainingMode;
   preferredMode: PlayerTrainingMode;
   mismatchSeverity: 0 | 1 | 2;
@@ -111,6 +111,21 @@ function resolveTrainingModeDemandStatus(input: {
   if (input.matchdayIndex != null && input.matchdayIndex >= 5) return "failed";
   if (input.matchdayIndex != null && input.matchdayIndex >= 2) return "at_risk";
   return "open";
+}
+
+/**
+ * Konditionen eines Intensitaetswunsches fuer eine gegebene aktuelle Intensitaet: Abweichung, Zuschlag/Abzug
+ * und Dringlichkeit. Eine Quelle fuer die Forderung (`buildTrainingModeDemand`) und fuer die Vorschau
+ * „was waere bei Intensitaet X" (Entwicklung).
+ */
+export function getTrainingModeDemandTerms(currentMode: PlayerTrainingMode, preferredMode: PlayerTrainingMode) {
+  const mismatchSeverity = getTrainingModeMismatchSeverity(currentMode, preferredMode);
+  return {
+    mismatchSeverity,
+    moraleReward: preferredMode === "leicht" ? 4 : 5,
+    moralePenalty: mismatchSeverity === 2 ? -10 : -5,
+    priority: (mismatchSeverity === 2 ? "high" : "medium") as "high" | "medium",
+  };
 }
 
 export function buildTrainingModeDemand(input: {
@@ -154,10 +169,7 @@ export function buildTrainingModeDemand(input: {
     status,
     label: preferredMode === "leicht" ? "Leichteres Training" : "Haerteres Training",
     detail,
-    moraleReward: preferredMode === "leicht" ? 4 : 5,
-    moralePenalty: mismatchSeverity === 2 ? -10 : -5,
-    priority: mismatchSeverity === 2 ? "high" : "medium",
-    mismatchSeverity,
+    ...getTrainingModeDemandTerms(currentMode, preferredMode),
   };
 }
 
@@ -211,6 +223,10 @@ export function buildTrainingModeDemandMap(gameState: GameState, teamId: string)
   );
 }
 
+/** „Unter Druck": Anteil des Abzugs, der schon vor dem Verfehlen greift (schwere Abweichung / leichte). */
+export const WUNSCH_DRUCK_FAKTOR_SCHWER = 0.45;
+export const WUNSCH_DRUCK_FAKTOR_LEICHT = 0.25;
+
 export function evaluateTrainingModeDemandDelta(input: {
   demand: Pick<TrainingModeDemandView, "preferredMode" | "currentMode" | "status" | "moraleReward" | "moralePenalty" | "mismatchSeverity">;
   activeMode: PlayerTrainingMode;
@@ -223,7 +239,7 @@ export function evaluateTrainingModeDemandDelta(input: {
   }
   if (input.demand.status === "at_risk") {
     return {
-      delta: input.demand.moralePenalty * (input.demand.mismatchSeverity === 2 ? 0.45 : 0.25),
+      delta: input.demand.moralePenalty * (input.demand.mismatchSeverity === 2 ? WUNSCH_DRUCK_FAKTOR_SCHWER : WUNSCH_DRUCK_FAKTOR_LEICHT),
       outcome: "pressure" as const,
     };
   }
