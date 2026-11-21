@@ -243,7 +243,7 @@ const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
  * Hilfe, damit "nebenbei trainierte" Stats etwas Regression abfangen, ohne den Fokus zu ersetzen.
  * Bewusst klein gehalten (30%), damit die Klassenwahl weiter das Wichtigste bleibt.
  */
-const TRAINING_SPILLOVER_SHARE = 0.3;
+export const TRAINING_SPILLOVER_SHARE = 0.3;
 /** Deterministische ±-Variation je Empfänger-Attribut, damit sich die Streuung leicht unterscheidet. */
 const TRAINING_SPILLOVER_JITTER = 0.1;
 
@@ -594,7 +594,25 @@ export function getPerformanceGapAccelerator(potentialTrainingMultiplier: number
   );
 }
 
-function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
+export type PotenzialBeschleunigerErklaerung = {
+  /** Potenzial-Score aus dem Record, `null` ohne Record (dann neutral 1,0). */
+  potenzial: number | null;
+  /** Aktuelle Staerke (`player.rating`), Rueckfall: das Potenzial selbst (Luecke 0). */
+  aktuell: number | null;
+  luecke: number;
+  /** Teil aus der Luecke: 1,0 bis `ORGANIC_GAP_ACCEL_NEUTRAL`, danach linear, gedeckelt. */
+  gapAccel: number;
+  /** Teil aus der Hoehe des Potenzials (ab PO 70). */
+  poSteep: number;
+  /** Gesamtfaktor auf das Trainingsbudget (>= 1, nie eine Bremse). */
+  faktor: number;
+};
+
+/**
+ * Zerlegung des Potenzial-Beschleunigers. Eine Rechnung fuer Engine und Anzeige:
+ * `getPotentialTrainingMultiplierFromRecord` ist genau `.faktor` davon.
+ */
+export function erklaerePotenzialBeschleuniger(gameState: GameState, player: Player): PotenzialBeschleunigerErklaerung {
   // NUR der Potenzial-Record zählt (eine Quelle). Der frühere Fallback auf das Import-Altfeld
   // `player.potential` bedeutete: je nachdem, ob ein Record existierte, rechnete das Training
   // mit einer ANDEREN Zahl als die PO-Anzeige — am Live-Spielstand nachgemessen wichen beide
@@ -602,7 +620,7 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
   // von der Quellenwahl ab, Delta bis 0,45). Ohne Record gibt es keine erfundene Ersatzzahl,
   // sondern neutral 1,0.
   const potential = resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id });
-  if (potential == null) return 1;
+  if (potential == null) return { potenzial: null, aktuell: null, luecke: 0, gapAccel: 1, poSteep: 1, faktor: 1 };
   const currentAbility = isFiniteNumber(player.rating) ? player.rating : potential;
   const gap = Math.max(0, potential - currentAbility);
   // Reiner Beschleuniger: 1,0 bis zur neutralen Lücke, danach linear mit der Lücke, gedeckelt. Nie < 1,0.
@@ -612,7 +630,11 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
   );
   // Höheres Potenzial pusht bei gleicher Lücke zusätzlich (ab PO 70) — auch das nur nach oben (≥ 1,0).
   const poSteep = 1 + Math.max(0, potential - 70) / ORGANIC_PO_STEEP_DIVISOR;
-  return roundValue(gapAccel * poSteep, 3);
+  return { potenzial: potential, aktuell: currentAbility, luecke: gap, gapAccel, poSteep, faktor: roundValue(gapAccel * poSteep, 3) };
+}
+
+function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
+  return erklaerePotenzialBeschleuniger(gameState, player).faktor;
 }
 
 /**

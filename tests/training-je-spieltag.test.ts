@@ -506,3 +506,42 @@ describe("Trainings-Forecast je Disziplin (Modell fuer Profil und Entwicklung)",
     expect(p.spieltageTrainiert).toBe(2);
   });
 });
+
+describe("Transparenz des Spieltagszuwachses (gezeigt = gebucht)", () => {
+  it("die Zerlegung stammt aus der buchenden Rechnung: gebucht == Zuwachs der Profil-Attribute, Beschleuniger >= 1", () => {
+    const gs = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const v = prognostiziereSpieltagsTraining({ gameState: { ...gs, matchdayState: { ...gs.matchdayState, matchdayId: "md-1" } }, playerId: SPIELER_ID });
+    expect(v && !v.verletzt).toBe(true);
+    if (!v || v.verletzt) return;
+    const t = v.transparenz;
+    expect(t.attribute.map((a) => a.attribute)).toEqual(v.profil.map((e) => e.attribute));
+    for (const a of t.attribute) {
+      expect(a.gebucht).toBe(v.zuwachs[a.attribute] ?? 0);
+      expect(a.verlust).toBeGreaterThanOrEqual(0);
+      expect(a.anteil).toBeGreaterThan(0);
+    }
+    expect(t.beschleuniger.faktor).toBeGreaterThanOrEqual(1);
+    expect(t.verlustAnteil).toBeGreaterThanOrEqual(0);
+    expect(t.verlustAnteil).toBeLessThanOrEqual(1);
+  });
+
+  it("ein Attribut am Maximum 99 bringt keinen Zuwachs: der Anteil geht als Verlust in die Anzeige", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const haupt = trainingsProfilFuerZiel({ disziplinId: "gewichtheben", weg: 0 })[0]!.attribute;
+    const voll = {
+      ...gs0,
+      players: gs0.players.map((p) =>
+        p.id === SPIELER_ID ? { ...p, attributeSheetStats: { ...p.attributeSheetStats, [haupt]: 99 } as Player["attributeSheetStats"] } : p,
+      ),
+      matchdayState: { ...gs0.matchdayState, matchdayId: "md-1" },
+    };
+    const v = prognostiziereSpieltagsTraining({ gameState: voll, playerId: SPIELER_ID });
+    if (!v || v.verletzt) throw new Error("keine Vorschau");
+    const a = v.transparenz.attribute.find((x) => x.attribute === haupt)!;
+    expect(a.amMaximum).toBe(true);
+    expect(a.grund).toBe("maximum");
+    expect(a.gebucht).toBe(0);
+    expect(a.verlust).toBeGreaterThan(0);
+    expect(v.transparenz.verlustAnteil).toBeGreaterThan(0.4);
+  });
+});

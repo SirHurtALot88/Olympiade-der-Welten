@@ -15,6 +15,12 @@ import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-per
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
+import {
+  MORAL_FORDERUNGEN_OBERGRENZE,
+  MORAL_FORDERUNGEN_UNTERGRENZE,
+  MORAL_SKALA_FAKTOR,
+  MORAL_UEBERTRAG_GLEICHE_SAISON,
+} from "@/lib/morale/morale-konstanten";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
 import { LEAGUE_SIZE, TEAM_COUNT_TOTAL, getLeagueOf, getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
@@ -529,7 +535,7 @@ function applyPlayerDemandMoraleImpact(input: {
     }
   }
 
-  const cappedDelta = roundValue(clamp(rawDelta, -18, 12), 1);
+  const cappedDelta = roundValue(clamp(rawDelta, MORAL_FORDERUNGEN_UNTERGRENZE, MORAL_FORDERUNGEN_OBERGRENZE), 1);
   if (cappedDelta < 0) {
     const teamCaptain = selectTeamCaptain(input.gameState, input.team.teamId);
     const buffer = teamCaptain ? roundValue(Math.min(Math.abs(cappedDelta), teamCaptain.effects.moraleBuffer ?? 0), 1) : 0;
@@ -707,7 +713,7 @@ function normalizeCarryOverMorale(stored: PlayerMoraleState, seasonId: string, c
   if (stored.lastUpdatedSeasonId === seasonId) {
     return {
       morale: stored.morale,
-      carryWeight: 0.55,
+      carryWeight: MORAL_UEBERTRAG_GLEICHE_SAISON,
     };
   }
 
@@ -1044,7 +1050,7 @@ function computePlayerMorale(input: {
     }
   }
 
-  morale = roundValue(clamp(50 + (morale - 50) * 1.2, 0, 100));
+  morale = roundValue(clamp(50 + (morale - 50) * MORAL_SKALA_FAKTOR, 0, 100));
   const visibleMood = getVisibleMood(morale);
   const contractIntent = getContractIntent(morale, player);
   const moraleSalaryModifier = getMoraleSalaryModifier({
