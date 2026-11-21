@@ -31,6 +31,12 @@ import {
   normalizeRosterContractStatus,
 } from "@/lib/contracts/roster-contract-status";
 import { endSaisonFuerNeuenVertrag } from "@/lib/contracts/vertragslaufzeit";
+import {
+  gesamtSpieltage,
+  gespielteSpieltage,
+  istInSaisonModus,
+  pruefeInSaisonVerlaengerung,
+} from "@/lib/contracts/verlaengerung-in-saison";
 import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
 import {
   applyAiContractDissolutions,
@@ -158,8 +164,24 @@ export type ContractActionPreview = {
   negotiationPreview: ContractNegotiationPreview | null;
   morale: ContractRenewalPreviewRow["morale"];
   moraleAdjustedExpectedSalary: number | null;
+  /** Nur bei einer Verlaengerung mitten in der Saison: ab wann, bis wann, alt gegen neu. */
+  inSaison?: ContractInSaisonVorschau | null;
   warnings: string[];
   blockingReasons: string[];
+};
+
+export type ContractInSaisonVorschau = {
+  /** Der neue Vertrag gilt ab diesem Spieltag (1-basiert, der naechste noch nicht gebuchte). */
+  abSpieltag: number;
+  gesamtSpieltage: number;
+  /** Letzte gebundene Saison (Nummer) und ihr Label. */
+  endSaisonNummer: number | null;
+  endSaisonLabel: string | null;
+  /** Gehalt je Saison (gross) und je Spieltag (klein): vorher und nachher. */
+  altesGehaltSaison: number;
+  neuesGehaltSaison: number;
+  altesGehaltProSpieltag: number;
+  neuesGehaltProSpieltag: number;
 };
 
 type ContractExitValue = {
@@ -1353,6 +1375,27 @@ export function previewSeasonEndContracts(save: PersistedSaveGame): ContractSeas
   };
 }
 
+/**
+ * KI-Entscheidung ueber einzelne Vertraege — DIESELBE Zeile wie im Saisonende-Tick (`previewSeasonEndContracts`),
+ * nur fuer ausgewaehlte Eintraege. Fuer die Verlaengerung mitten in der Saison (`ki-verlaengerung-in-saison.ts`):
+ * keine eigene Heuristik, nur der Zeitpunkt ist ein anderer.
+ */
+export function bewerteVertraegeFuerKi(save: PersistedSaveGame, entries: RosterEntry[]): ContractRenewalPreviewRow[] {
+  if (entries.length === 0) return [];
+  const ratingMap = getSeasonDerivations({ gameState: save.gameState, saveId: save.saveId }).ratingsById;
+  const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
+  const teamsById = new Map(save.gameState.teams.map((team) => [team.teamId, team] as const));
+  return entries.map((entry) =>
+    buildPreviewRow({
+      save,
+      entry,
+      player: playersById.get(entry.playerId) ?? null,
+      team: teamsById.get(entry.teamId) ?? null,
+      rating: ratingMap.get(entry.playerId) ?? null,
+    }),
+  );
+}
+
 function buildContractEvent(input: Omit<ContractEventRecord, "eventId" | "timestamp">): ContractEventRecord {
   return {
     ...input,
@@ -1866,6 +1909,108 @@ function buildContractActionToken(input: {
   });
 }
 
+/**
+ * Der Rosterzeile nach der Unterschrift — EINE Stelle fuer Vorschau (Gehalt je Spieltag) und Schreibweg.
+ * `inSaison` ist der Vermerk einer Verlaengerung mitten in der Saison (sonst `null`).
+ */
+function baueErneuertenEintrag(
+  gameState: GameState,
+  entry: RosterEntry,
+  input: {
+    newSalary: number | null;
+    nextLength: number;
+    shape: ContractShape;
+    schedule: RosterEntry["yearlySalarySchedule"];
+    inSaison: RosterEntry["inSaisonVerlaengerung"];
+  },
+): RosterEntry {
+  const { newSalary, nextLength, shape, schedule, inSaison } = input;
+  return {
+        ...entry,
+        salary: newSalary ?? entry.salary,
+        upkeep: newSalary ?? entry.upkeep,
+        // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
+        negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
+        contractLength: nextLength,
+        /**
+         * DIE ENDSAISON — ab hier die Wahrheit ueber die Laufzeit.
+         *
+         * GEMELDET VON CHRIS: „ich will sie ja eine season verlängern bis ende season 2
+         * das muss sauber sein." Sein Vertrag war richtig, das Etikett nicht: der
+         * Countdown wird am Ende einer Saison gesenkt, waehrend diese noch die laufende
+         * ist — danach heisst eine 1 „noch eine volle Saison", die Statusregel las sie
+         * aber weiter als „letzte Saison".
+         *
+         * Die Endsaison kennt dieses Problem nicht: sie ist eine Tatsache und wird nicht
+         * fortgeschrieben. `endSaisonFuerNeuenVertrag` weiss dabei, dass eine Unterschrift
+         * im Saisonende-Fenster ab der KOMMENDEN Saison deckt.
+         */
+        contractEndSeasonNumber:
+          endSaisonFuerNeuenVertrag(gameState, nextLength) ?? entry.contractEndSeasonNumber,
+        contractShape: shape,
+        yearlySalarySchedule: schedule,
+        inSaisonVerlaengerung: inSaison ?? entry.inSaisonVerlaengerung ?? null,
+        /**
+         * DAS GESPEICHERTE STATUS-FELD FOLGT DER ENDSAISON, NICHT DEM COUNTDOWN.
+         *
+         * `nextLength === 1 ? "expiring" : "active"` war die letzte Stelle, an der Chris'
+         * Fall noch falsch herauskam: eine Ein-Saison-Verlaengerung AM SAISONENDE deckt die
+         * kommende Saison ab, ist also aktiv — der Countdown allein kann das nicht wissen.
+         * Gemessen an seinem Spielstand schrieb diese Zeile „expiring", waehrend die
+         * Endsaison daneben korrekt auf 2 stand.
+         */
+        contractStatus: (() => {
+          const ende = endSaisonFuerNeuenVertrag(gameState, nextLength);
+          const laufend = getCurrentSeasonNumber(gameState);
+          if (ende == null || laufend == null) {
+            return nextLength === 1 ? ("expiring" as const) : ("active" as const);
+          }
+          return ende <= laufend ? ("expiring" as const) : ("active" as const);
+        })(),
+      } as RosterEntry;
+}
+
+/** Vorschau-Block „gilt ab Spieltag N, laeuft bis Ende Saison X“ samt altem und neuem Gehalt (Saison gross, Spieltag klein). */
+function baueInSaisonVorschau(input: {
+  gameState: GameState;
+  entry: RosterEntry;
+  player: Player | null;
+  newSalary: number;
+  nextLength: number;
+  shape: ContractShape;
+}): ContractInSaisonVorschau {
+  const { gameState, entry, player } = input;
+  const gesamt = Math.max(1, gesamtSpieltage(gameState));
+  const gespielt = gespielteSpieltage(gameState);
+  const schedule = buildContractSalarySchedule({
+    annualSalary: input.newSalary,
+    contractLength: input.nextLength,
+    shape: input.shape,
+    seasonIdBase: gameState.season.id,
+    seasonLabelBase: getSeasonLabel(gameState),
+  }).yearlySalarySchedule;
+  const neuerEintrag = baueErneuertenEintrag(gameState, entry, {
+    newSalary: input.newSalary,
+    nextLength: input.nextLength,
+    shape: input.shape,
+    schedule,
+    inSaison: null,
+  });
+  const alt = resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? entry.salary ?? 0;
+  const neu = resolvePlayerEconomyContract({ player, rosterEntry: neuerEintrag }).salary ?? input.newSalary;
+  const ende = neuerEintrag.contractEndSeasonNumber ?? null;
+  return {
+    abSpieltag: Math.min(gesamt, gespielt + 1),
+    gesamtSpieltage: gesamt,
+    endSaisonNummer: ende,
+    endSaisonLabel: ende != null ? `Saison ${ende}` : null,
+    altesGehaltSaison: roundMoney(alt) ?? 0,
+    neuesGehaltSaison: roundMoney(neu) ?? 0,
+    altesGehaltProSpieltag: roundMoney(alt / gesamt, 3) ?? 0,
+    neuesGehaltProSpieltag: roundMoney(neu / gesamt, 3) ?? 0,
+  };
+}
+
 export function previewContractRenewalAction(input: {
   save: PersistedSaveGame;
   teamId: string;
@@ -1978,14 +2123,24 @@ export function previewContractRenewalAction(input: {
   const verdiktBlockingReasons = verdiktBlocker(negotiationPreview?.verdict);
 
   /**
+   * VERLAENGERUNG MITTEN IN DER SAISON (Chris 21.11.): Mindestlaufzeit 2, einmal je Spieler und Saison, keine
+   * Saison-1-Draft-Picks, nicht nach dem letzten Spieltag, Rueckweg `OLY_VERLAENGERUNG_IN_SAISON=0`. Dieselben Regeln
+   * fuer Mensch und KI, weil beide hier durchlaufen.
+   */
+  const inSaisonBlockingReasons =
+    input.action === "renew" && rosterEntry ? pruefeInSaisonVerlaengerung(input.save.gameState, rosterEntry, contractLength) : [];
+
+  /**
    * FINANZKONZEPT V2: Gehaltserhoehungen bei Verlaengerungen zaehlen gegen den Gehaltstopf des Vorstands. Hart, Mensch und
    * KI gleich; gleiches oder niedrigeres Gehalt geht immer. Gerechnet wird mit dem Gehalt, das unterschrieben wuerde.
    */
   const vorstandBlockingReasons: string[] = [];
+  const neuesGehalt =
+    rosterEntry != null
+      ? (roundMoney(input.offeredSalary ?? moraleAdjustedExpectedSalary ?? negotiationPreview?.expectedSalary ?? rosterEntry.salary) ??
+        rosterEntry.salary)
+      : 0;
   if (input.action === "renew" && rosterEntry && team) {
-    const neuesGehalt =
-      roundMoney(input.offeredSalary ?? moraleAdjustedExpectedSalary ?? negotiationPreview?.expectedSalary ?? rosterEntry.salary) ??
-      rosterEntry.salary;
     const vorstand = pruefeVerlaengerungGegenVorstandFreigabe(input.save.gameState, input.teamId, {
       altesGehalt: rosterEntry.salary ?? 0,
       neuesGehalt,
@@ -1999,6 +2154,7 @@ export function previewContractRenewalAction(input: {
       (negotiationPreview?.blockingReasons.length ?? 0) === 0 &&
       moraleBlockingReasons.length === 0 &&
       vorstandBlockingReasons.length === 0 &&
+      inSaisonBlockingReasons.length === 0 &&
       verdiktBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
@@ -2022,6 +2178,10 @@ export function previewContractRenewalAction(input: {
         }
       : null,
     moraleAdjustedExpectedSalary,
+    inSaison:
+      input.action === "renew" && rosterEntry && istInSaisonModus(input.save.gameState)
+        ? baueInSaisonVorschau({ gameState: input.save.gameState, entry: rosterEntry, player, newSalary: neuesGehalt, nextLength: contractLength, shape: input.contractShape ?? "balanced" })
+        : null,
     warnings: Array.from(new Set(warnings)),
     blockingReasons: Array.from(
       new Set([
@@ -2030,6 +2190,7 @@ export function previewContractRenewalAction(input: {
         ...moraleBlockingReasons,
         ...verdiktBlockingReasons,
         ...vorstandBlockingReasons,
+        ...inSaisonBlockingReasons,
       ]),
     ),
   };
@@ -2108,6 +2269,32 @@ export function applyContractRenewalAction(input: {
         }).yearlySalarySchedule
       : [];
   const player = input.save.gameState.players.find((candidate) => candidate.id === input.playerId) ?? null;
+  /**
+   * VERLAENGERUNG MITTEN IN DER SAISON: das neue Gehalt gilt ab dem naechsten Spieltag. Gebucht wird die Saison am
+   * Ende in einer Summe — der Vermerk haelt fest, wie viele Spieltage noch zum alten Gehalt liefen, damit nichts
+   * rueckwirkend und nichts doppelt gebucht wird (`mischeSaisongehalt` in `getTeamActualSalaryTotal`).
+   */
+  const inSaisonVermerk: RosterEntry["inSaisonVerlaengerung"] =
+    input.action === "renew" && istInSaisonModus(input.save.gameState)
+      ? (() => {
+          const vorschau = baueInSaisonVorschau({
+            gameState: input.save.gameState,
+            entry: rosterEntry,
+            player,
+            newSalary: newSalary ?? rosterEntry.salary,
+            nextLength,
+            shape: nextContractShape,
+          });
+          return {
+            seasonId: input.save.gameState.season.id,
+            spieltageAlt: gespielteSpieltage(input.save.gameState),
+            spieltageGesamt: vorschau.gesamtSpieltage,
+            altesGehalt: vorschau.altesGehaltSaison,
+            neuesGehalt: vorschau.neuesGehaltSaison,
+            endSaisonNummer: vorschau.endSaisonNummer,
+          };
+        })()
+      : null;
   const exit = input.action === "release" ? buildContractExitValue(input.save.gameState, player, rosterEntry) : null;
   const event = buildContractEvent({
     seasonId: input.save.gameState.season.id,
@@ -2123,54 +2310,20 @@ export function applyContractRenewalAction(input: {
     newSalary,
     oldLength: normalizeLength(rosterEntry.contractLength),
     newLength: input.action === "renew" ? nextLength : 0,
+    decisionReason: inSaisonVermerk ? `in_season_renewal:ab_spieltag_${inSaisonVermerk.spieltageAlt + 1}` : undefined,
     source: input.source,
   });
   const nextRosters: RosterEntry[] =
     input.action === "renew"
       ? input.save.gameState.rosters.map((entry) =>
           entry.id === rosterEntry.id
-            ? {
-                ...entry,
-                salary: newSalary ?? entry.salary,
-                upkeep: newSalary ?? entry.upkeep,
-                // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
-                negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
-                contractLength: nextLength,
-                /**
-                 * DIE ENDSAISON — ab hier die Wahrheit ueber die Laufzeit.
-                 *
-                 * GEMELDET VON CHRIS: „ich will sie ja eine season verlängern bis ende season 2
-                 * das muss sauber sein." Sein Vertrag war richtig, das Etikett nicht: der
-                 * Countdown wird am Ende einer Saison gesenkt, waehrend diese noch die laufende
-                 * ist — danach heisst eine 1 „noch eine volle Saison", die Statusregel las sie
-                 * aber weiter als „letzte Saison".
-                 *
-                 * Die Endsaison kennt dieses Problem nicht: sie ist eine Tatsache und wird nicht
-                 * fortgeschrieben. `endSaisonFuerNeuenVertrag` weiss dabei, dass eine Unterschrift
-                 * im Saisonende-Fenster ab der KOMMENDEN Saison deckt.
-                 */
-                contractEndSeasonNumber:
-                  endSaisonFuerNeuenVertrag(input.save.gameState, nextLength) ?? entry.contractEndSeasonNumber,
-                contractShape: nextContractShape,
-                yearlySalarySchedule: nextContractSchedule,
-                /**
-                 * DAS GESPEICHERTE STATUS-FELD FOLGT DER ENDSAISON, NICHT DEM COUNTDOWN.
-                 *
-                 * `nextLength === 1 ? "expiring" : "active"` war die letzte Stelle, an der Chris'
-                 * Fall noch falsch herauskam: eine Ein-Saison-Verlaengerung AM SAISONENDE deckt die
-                 * kommende Saison ab, ist also aktiv — der Countdown allein kann das nicht wissen.
-                 * Gemessen an seinem Spielstand schrieb diese Zeile „expiring", waehrend die
-                 * Endsaison daneben korrekt auf 2 stand.
-                 */
-                contractStatus: (() => {
-                  const ende = endSaisonFuerNeuenVertrag(input.save.gameState, nextLength);
-                  const laufend = getCurrentSeasonNumber(input.save.gameState);
-                  if (ende == null || laufend == null) {
-                    return nextLength === 1 ? ("expiring" as const) : ("active" as const);
-                  }
-                  return ende <= laufend ? ("expiring" as const) : ("active" as const);
-                })(),
-              }
+            ? baueErneuertenEintrag(input.save.gameState, entry, {
+                newSalary,
+                nextLength,
+                shape: nextContractShape,
+                schedule: nextContractSchedule,
+                inSaison: inSaisonVermerk,
+              })
             : entry,
         )
       : input.save.gameState.rosters.filter((entry) => entry.id !== rosterEntry.id);

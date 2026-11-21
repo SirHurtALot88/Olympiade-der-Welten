@@ -2484,6 +2484,27 @@ export type RosterEntry = {
   roleTag: "starter" | "bench" | "prospect";
   promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;
+  /**
+   * Verlaengerung WAEHREND der Saison (21.11., docs/design/verlaengerung-in-saison-21-11.md).
+   *
+   * Das neue Gehalt gilt ab dem naechsten Spieltag, gebucht wird die Saison aber in EINER Summe am Saisonende:
+   * damit nichts rueckwirkend teurer (oder billiger) wird, haelt dieser Vermerk fest, wie viele Spieltage dieser Saison
+   * noch zum ALTEN Gehalt liefen. `getTeamActualSalaryTotal` mischt daraus die Saisonsumme. Zugleich der Beleg
+   * „einmal je Spieler und Saison“.
+   */
+  inSaisonVerlaengerung?: {
+    seasonId: string;
+    /** Spieltage, die beim Unterschreiben schon gebucht waren (alt gerechnet). */
+    spieltageAlt: number;
+    /** Spieltage der ganzen Saison. */
+    spieltageGesamt: number;
+    /** Saisongehalt (`contract.salary`) VOR der Unterschrift. */
+    altesGehalt: number;
+    /** Saisongehalt NACH der Unterschrift. */
+    neuesGehalt: number;
+    /** Letzte gebundene Saison (Nummer). */
+    endSaisonNummer: number | null;
+  } | null;
 };
 
 export type ContractYearSalary = {

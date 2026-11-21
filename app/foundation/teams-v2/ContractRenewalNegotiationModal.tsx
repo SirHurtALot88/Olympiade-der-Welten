@@ -81,7 +81,22 @@ const PREVIEW_DEBOUNCE_MS = 350;
 /** Bekannte Server-Codes → verständliches Deutsch (unbekannte Codes bleiben roh sichtbar). */
 function translateRenewalReason(reason: string): string {
   if (reason.startsWith("phase_blocked:renew_contract")) {
-    return "Gehaltsverhandlung öffnet am Season-End (nach MD10) — bis dahin nur Vorschau.";
+    return "Verlängern ist gerade nicht freigegeben — es geht zwischen den Spieltagen und im Saisonende-Fenster.";
+  }
+  if (reason === "in_season_renewal_min_length_2") {
+    return "Mitten in der Saison zählt die laufende Saison mit — eine Verlängerung braucht mindestens 2 Saisons Laufzeit.";
+  }
+  if (reason === "in_season_renewal_already_done") {
+    return "Dieser Spieler wurde in dieser Saison schon verlängert — einmal je Spieler und Saison.";
+  }
+  if (reason === "in_season_renewal_draft_s1") {
+    return "Draft-Picks haben in Saison 1 feste Konditionen — verhandelt wird erst am Ende von Saison 1.";
+  }
+  if (reason === "in_season_renewal_season_over") {
+    return "Alle Spieltage sind gespielt — die Entscheidung fällt im Saisonende-Fenster.";
+  }
+  if (reason === "in_season_renewal_disabled") {
+    return "Verlängern mitten in der Saison ist abgeschaltet — es geht im Saisonende-Fenster.";
   }
   // Der Code hiess bis zum gemeldeten Fehler `renewal_only_allowed_at_lz_0` und der Satz sprach von
   // „LZ 0". Beides war falsch: entschieden wird in der LETZTEN Vertragssaison (LZ 1), auf 0 faellt
@@ -429,6 +444,7 @@ export default function ContractRenewalNegotiationModal({
     (warning) => warning !== "preview_only_contract_negotiation" && warning !== "confirm_required_before_contract_write",
   );
   const lengthLimit = morale?.contractLengthLimit ?? null;
+  const inSaison = summary?.inSaison ?? null;
   const offerRatio = negotiation?.offerRatio ?? null;
   const acceptChance = negotiation?.acceptChance ?? null;
   const counterChance = negotiation?.counterChance ?? null;
@@ -510,6 +526,40 @@ export default function ContractRenewalNegotiationModal({
           </div>
         ) : null}
 
+        {inSaison ? (
+          <section className="nl-negotiation-insaison" aria-label="Verlängerung mitten in der Saison" data-testid="negotiation-in-season">
+            <div className="nl-negotiation-insaison-when">
+              <span className="nl-negotiation-insaison-kicker">Mitten in der Saison</span>
+              <strong>
+                Gilt ab Spieltag {formatNlNumber(inSaison.abSpieltag, 0)}
+                {inSaison.endSaisonLabel ? ` · läuft bis Ende ${inSaison.endSaisonLabel}` : ""}
+              </strong>
+              <small>
+                Die laufende Saison zählt als erstes Vertragsjahr mit. Gebucht wird anteilig: die bereits gespielten Spieltage
+                zum alten, alle weiteren zum neuen Gehalt — nichts rückwirkend.
+              </small>
+            </div>
+            <dl className="nl-negotiation-insaison-pay">
+              <div>
+                <dt>Bisher</dt>
+                <dd>
+                  <b>{formatNlMoney(inSaison.altesGehaltSaison)}</b>
+                  <small>je Saison</small>
+                  <small>{formatNlMoney(inSaison.altesGehaltProSpieltag)} je Spieltag</small>
+                </dd>
+              </div>
+              <div className="is-neu">
+                <dt>Neu</dt>
+                <dd>
+                  <b>{formatNlMoney(inSaison.neuesGehaltSaison)}</b>
+                  <small>je Saison</small>
+                  <small>{formatNlMoney(inSaison.neuesGehaltProSpieltag)} je Spieltag</small>
+                </dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
+
         {error ? (
           <div className="transfer-feedback-banner is-error">
             <strong>Verlängerung blockiert</strong>
@@ -549,7 +599,8 @@ export default function ContractRenewalNegotiationModal({
               <span>Laufzeit (Seasons)</span>
               <div className="nl-negotiation-choice-row" role="group" aria-label="Laufzeit wählen">
                 {CONTRACT_LENGTHS.map((length) => {
-                  const overLimit = lengthLimit != null && length > lengthLimit;
+                  // Mitten in der Saison zählt die laufende Saison mit: Laufzeit 1 wäre keine Verlängerung.
+                  const overLimit = (lengthLimit != null && length > lengthLimit) || (inSaison != null && length < 2);
                   /**
                    * DER STERN SASS AUF EINER LAUFZEIT, DIE DAS FENSTER DANN VERWEIGERTE.
                    *
@@ -574,7 +625,9 @@ export default function ContractRenewalNegotiationModal({
                       className={`nl-negotiation-choice${draftLength === length ? " is-active" : ""}${overLimit ? " is-limited" : ""}`}
                       title={
                         overLimit
-                          ? `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Saisons — ${formatNlNumber(length, 0)} ist nicht unterschreibbar.`
+                          ? inSaison != null && length < 2
+                            ? "Mitten in der Saison zählt die laufende Saison mit — mindestens 2 Saisons."
+                            : `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Saisons — ${formatNlNumber(length, 0)} ist nicht unterschreibbar.`
                           : istWunsch
                             ? "Wunschlaufzeit des Spielers."
                             : undefined

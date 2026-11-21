@@ -1,6 +1,7 @@
 import { advancePlayerFormState, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { bauKiRehaBeiSpieltagsabschluss } from "@/lib/ai/ai-reha-bau-service";
+import { fuehreKiVerlaengerungenInSaisonAus } from "@/lib/contracts/ki-verlaengerung-in-saison";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { ueberlastungsAbzuegeFuerSpieltag } from "@/lib/training/spieltag-training";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
@@ -418,6 +419,14 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     // (und jedes Menschen-Team mit delegiertem Bereich Gebaeude) hoechstens EINE Recovery-Center-Stufe je Spieltag.
     try {
       bauKiRehaBeiSpieltagsabschluss({ saveId: save.saveId, persistence });
+    } catch {
+      // Wie oben: ein Fehlschlag kippt den bereits persistierten Spieltagswechsel nicht.
+    }
+    // KI-VERLAENGERUNG IM LAUFENDEN SPIEL (21.11., docs/design/verlaengerung-in-saison-21-11.md): dieselbe Entscheidung wie im
+    // Saisonende-Tick, nur fuer Vertraege mit Laufzeit 1, einmal je Spieler und Saison, an einem festen Spieltag je Spieler.
+    // Das neue Gehalt gilt ab dem naechsten Spieltag; gebucht wird am Saisonende anteilig (`inSaisonVerlaengerung`).
+    try {
+      fuehreKiVerlaengerungenInSaisonAus({ saveId: save.saveId, persistence });
     } catch {
       // Wie oben: ein Fehlschlag kippt den bereits persistierten Spieltagswechsel nicht.
     }

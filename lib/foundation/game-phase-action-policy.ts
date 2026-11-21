@@ -1,4 +1,5 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
+import { verlaengerungInSaisonAktiv } from "@/lib/contracts/verlaengerung-in-saison";
 import { hasFinalMatchdayResult } from "@/lib/season/season-completion-state";
 import {
   getTransferWindowStatus,
@@ -97,6 +98,13 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     action === "credit_early_payoff"
   ) {
     allowed = isPreseasonManagementOpen(gameState) || isEarlySeasonSetup(gameState);
+    // Verlaengern auch zwischen den Spieltagen (Chris 21.11., docs/design/verlaengerung-in-saison-21-11.md). Die
+    // Einzelregeln (Mindestlaufzeit, einmal je Saison, S1-Draft) prueft der Vertragsdienst; Rueckweg
+    // `OLY_VERLAENGERUNG_IN_SAISON=0`.
+    if (!allowed && action === "renew_contract" && phase === "season_active" && verlaengerungInSaisonAktiv()) {
+      allowed = true;
+      warnings.push("in_season_renewal_window");
+    }
     reason = allowed ? null : `phase_blocked:${action}:${phase}`;
   } else if (action === "set_lineup") {
     allowed = phase === "season_active" || phase === "lineup_setup" || phase === "next_season_ready";
