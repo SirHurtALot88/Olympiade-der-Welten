@@ -706,6 +706,39 @@ function allocatePlayersAcrossSides(input: {
   return { d1: d1Picked, d2: d2Picked };
 }
 
+/**
+ * Belastungsregel v2: verteilt die von der KI gewählten Spieler einer Seite auf Plätze (Platzwert − 0,25 × Last).
+ * `platzNummern` = die echten (freien) Plätze bei Teil-Delegation; Rollen kommen immer aus der vollen Kaderzahl.
+ * Rückgabe: Spieler-IDs in der Reihenfolge der Plätze.
+ */
+export function ordneKiSpielerAufPlaetze(input: {
+  context: LegacyLineupLoadedContext;
+  disciplineId: string;
+  slotCount: number;
+  playerIds: readonly string[];
+  platzNummern?: readonly number[];
+}): string[] {
+  const rosterById = new Map((input.context.rosterPlayers ?? []).map((player) => [player.id, player] as const));
+  return ordneSpielerAufPlaetze({
+    disciplineId: input.disciplineId,
+    disciplineName: getDisciplineName(input.context, input.disciplineId),
+    slotCount: input.slotCount,
+    altGrundlast: MATCHDAY_FATIGUE_LOAD,
+    platzNummern: input.platzNummern,
+    spieler: input.playerIds.map((playerId) => {
+      const roster = rosterById.get(playerId);
+      return {
+        playerId,
+        attributeStats: roster?.attributeStats ?? null,
+        lastFaktor: getPlayerFatigueLoadMultiplier({
+          traitsPositive: roster?.traitsPositive ?? [],
+          traitsNegative: roster?.traitsNegative ?? [],
+        }),
+      };
+    }),
+  });
+}
+
 // Ordnet die per DP gewählten Spieler einer Seite in Slot-Reihenfolge (bester zuerst) und
 // erzeugt Warnings/Reasoning im selben Format wie zuvor (Konsumenten filtern per "D1"/"D2").
 function buildSideResult(input: {
@@ -739,23 +772,11 @@ function buildSideResult(input: {
   });
 
   if (input.belastungsKontext && picked.length > 1) {
-    const rosterById = new Map((input.belastungsKontext.rosterPlayers ?? []).map((player) => [player.id, player] as const));
-    const reihenfolge = ordneSpielerAufPlaetze({
+    const reihenfolge = ordneKiSpielerAufPlaetze({
+      context: input.belastungsKontext,
       disciplineId,
-      disciplineName: getDisciplineName(input.belastungsKontext, disciplineId),
       slotCount: plan.playerCount,
-      altGrundlast: MATCHDAY_FATIGUE_LOAD,
-      spieler: picked.map((player) => {
-        const roster = rosterById.get(player.playerId);
-        return {
-          playerId: player.playerId,
-          attributeStats: roster?.attributeStats ?? null,
-          lastFaktor: getPlayerFatigueLoadMultiplier({
-            traitsPositive: roster?.traitsPositive ?? [],
-            traitsNegative: roster?.traitsNegative ?? [],
-          }),
-        };
-      }),
+      playerIds: picked.map((player) => player.playerId),
     });
     const byId = new Map(picked.map((player) => [player.playerId, player] as const));
     picked.splice(0, picked.length, ...reihenfolge.map((id) => byId.get(id)!));

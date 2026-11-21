@@ -684,6 +684,11 @@ export default function EinsatzlisteModern(props: Props) {
     return karte;
   }, [gs, rosterCardByActivePlayerId, seite, context?.matchdayContract, context?.formMoralRegeln]);
   const fmVon = (aid: string | null | undefined) => (aid ? formMoralVon.get(aid) ?? null : null);
+  const warumFormMoral = (id: string) => {
+    setWarumId(id);
+    setKontextTab("formmoral");
+    setBlatt("kontext");
+  };
   const disziplinNameVon = (id: string) => (gs?.disciplines ?? []).find((d) => d.id === id)?.name ?? id;
   const ursachenVon = (aid: string): UrsachenZeile[] => {
     const k = rosterCardByActivePlayerId.get(aid);
@@ -1125,9 +1130,17 @@ export default function EinsatzlisteModern(props: Props) {
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.formVerfuegbar ? (
-          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form">
+          // Kein <button>: die Kaderzeile (BcTable mit onZeile) ist selbst ein <button>, verschachtelt bricht die Hydration.
+          <span
+            role="button"
+            tabIndex={0}
+            className="fm-wz"
+            onClick={(event) => { event.stopPropagation(); warumFormMoral(z.id); }}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); warumFormMoral(z.id); } }}
+            title="Warum? Form"
+          >
             <FormMoralMarke a={a} nurForm />
-          </button>
+          </span>
         ) : null;
       },
     },
@@ -1138,9 +1151,17 @@ export default function EinsatzlisteModern(props: Props) {
       render: (z) => {
         const a = fmVon(z.id);
         return a && a.moral != null ? (
-          <button type="button" className="fm-wz" onClick={(event) => { event.stopPropagation(); setWarumId(z.id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Moral">
+          // Kein <button>: die Kaderzeile (BcTable mit onZeile) ist selbst ein <button>, verschachtelt bricht die Hydration.
+          <span
+            role="button"
+            tabIndex={0}
+            className="fm-wz"
+            onClick={(event) => { event.stopPropagation(); warumFormMoral(z.id); }}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); warumFormMoral(z.id); } }}
+            title="Warum? Moral"
+          >
             <FormMoralMarke a={a} nurMoral />
-          </button>
+          </span>
         ) : null;
       },
     },

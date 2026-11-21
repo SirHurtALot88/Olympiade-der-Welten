@@ -97,17 +97,24 @@ export function ordneSpielerAufPlaetze(input: {
   spieler: PlatzwahlSpieler[];
   altGrundlast: number;
   lastGewicht?: number;
+  /**
+   * Echte Platznummern, auf die die Spieler verteilt werden (aufsteigend, Länge = Spielerzahl). Fehlt es: 0..n-1.
+   * Gebraucht bei Teil-Delegation: der Mensch hat einige Plätze selbst besetzt, die KI füllt nur die freien — die
+   * Rollen kommen dann aus der vollen Kaderzahl (`slotCount`) an genau diesen Plätzen, nicht aus einem verkleinerten Team.
+   */
+  platzNummern?: readonly number[];
 }): string[] {
   const n = input.spieler.length;
   if (n <= 1 || n > 7) return input.spieler.map((s) => s.playerId);
+  const plaetze = input.platzNummern && input.platzNummern.length === n ? input.platzNummern : Array.from({ length: n }, (_, i) => i);
   const roles = resolveSlotRolesForDiscipline(
     input.disciplineId,
     input.disciplineName ?? input.disciplineId,
-    Math.max(input.slotCount, n),
+    Math.max(input.slotCount, n, ...plaetze.map((platz) => platz + 1)),
   );
   const matrix = input.spieler.map((spieler) =>
     Array.from({ length: n }, (_, slot) =>
-      kiPlatzwert({ role: roles[slot] ?? null, spieler, altGrundlast: input.altGrundlast, lastGewicht: input.lastGewicht }).wert,
+      kiPlatzwert({ role: roles[plaetze[slot]!] ?? null, spieler, altGrundlast: input.altGrundlast, lastGewicht: input.lastGewicht }).wert,
     ),
   );
   let beste: number[] | null = null;
