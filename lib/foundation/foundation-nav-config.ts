@@ -30,6 +30,13 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "homeV2", label: "Home", tooltip: "Manager-Dashboard mit KPIs, Top-Spielern und Flow.", icon: "⌂" },
       { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
+      // Spielplan zur Spieltagsfolge (21.11.): erst sehen, was wann läuft, dann aufstellen, spielen, auswerten.
+      {
+        id: "diszis",
+        label: "Spielplan",
+        tooltip: "Saison-Spielplan: welche Disziplinen an welchem Spieltag laufen — farbcodiert nach Achse.",
+        icon: "≣",
+      },
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag live: Disziplinen mit echten Save-Werten (Wert/Fatigue/Form) durchspielen.", icon: "◉" },
       { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
@@ -77,12 +84,6 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     label: "Welt",
     items: [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
-      {
-        id: "diszis",
-        label: "Spielplan",
-        tooltip: "Saison-Spielplan: welche Disziplinen an welchem Spieltag laufen — farbcodiert nach Achse.",
-        icon: "≣",
-      },
       {
         id: "seasonArchive",
         label: "Historie",

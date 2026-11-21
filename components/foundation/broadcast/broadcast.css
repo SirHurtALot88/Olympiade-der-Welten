@@ -159,7 +159,8 @@
 }
 
 /* ---------- Tooltip: ein Muster für alles (data-bc-tip) ---------- */
-.bc [data-bc-tip] {
+/* :where hält die Spezifität bei 0: eine Seitenklasse mit eigener `position` (absolute, fixed, sticky) behält ihr Layout. */
+.bc :where([data-bc-tip]) {
   position: relative;
 }
 .bc [data-bc-tip]:hover::after,

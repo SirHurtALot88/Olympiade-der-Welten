@@ -67,7 +67,7 @@ describe("foundation v2-only ui contract", () => {
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
 
-  it("trennt Spielerprofil (Seite mit sechs Reitern) und Kurzprofil (Drawer ohne Reiter) in zwei Bauteile", async () => {
+  it("trennt Spielerprofil (Seite mit sechs Reitern) und Kurzprofil (Drawer mit kompakten Reitern) in zwei Bauteile", async () => {
     const seite = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerprofilSeite.tsx`, "utf8");
     const kurz = await fs.readFile(`${root}/app/foundation/spielerprofil/SpielerKurzprofil.tsx`, "utf8");
     const dienst = await fs.readFile(`${root}/lib/foundation/player-profile-service.ts`, "utf8");
@@ -78,7 +78,7 @@ describe("foundation v2-only ui contract", () => {
     expect(seite).toContain("FoundationBandSlot");
     expect(dienst.match(/\{ id: "/g)?.length).toBe(6);
     expect(dienst).not.toContain('id: "report"');
-    // Der Drawer hat keine Reiter, aber den Knopf „Ganzes Profil öffnen“.
+    // Der Drawer hat eigene kompakte Reiter (nicht die der Seite) und den Knopf „Ganzes Profil öffnen“.
     expect(kurz).not.toContain("PLAYER_PROFILE_TABS");
     expect(kurz).toContain("Ganzes Profil öffnen");
   });

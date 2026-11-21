@@ -1,3 +1,4 @@
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type {
   ArenaAusfall,
   DisciplineHighlightCandidate,
@@ -76,6 +77,8 @@ export type DisciplineResultWritePayload = {
   arenaMatchSeed?: string | null;
   /** "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A) -- s. Kommentar an `DisciplineTeamResolvePreview.momente`. */
   momente?: ArenaMomentEintrag[] | null;
+  /** ANZEIGE-ZAHL (21.11.): s. `ErgebnisAnzeigeZahl`. */
+  ergebnisAnzeige?: ErgebnisAnzeigeZahl | null;
   /** SICHTBARE ARENA-AUSFÄLLE -- s. Kommentar an `DisciplineTeamResolvePreview.arenaAusfall`. */
   arenaAusfall?: ArenaAusfall | null;
   /**
@@ -269,6 +272,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
           momente: teamResult.momente,
+          ...(teamResult.ergebnisAnzeige ? { ergebnisAnzeige: teamResult.ergebnisAnzeige } : {}),
           // SICHTBARE ARENA-AUSFÄLLE: additiv wie `verhaeltnis` zwei Zeilen weiter unten -- der
           // Schlüssel erscheint nur, wenn die Preview-Zeile tatsächlich einen Ausfall trägt. Ein
           // unbedingtes `arenaAusfall: teamResult.arenaAusfall ?? null` (wie zuvor hier) hätte

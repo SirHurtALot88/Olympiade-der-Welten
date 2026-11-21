@@ -29,7 +29,7 @@ export type HistorieTransfersProps = TransferHistoryV2ClientProps & {
   onOpenSaisonstand: () => void;
 };
 
-type Sortierung = "zeit" | "abl" | "geh" | "mw" | "guv";
+type Sortierung = "zeit" | "abl" | "geh" | "mw" | "guv" | "spieler" | "art" | "vonan" | "quelle";
 type Hoehepunkte = "kauf" | "verkauf" | "guv";
 type TeamSortierung = "vol" | "ein" | "net";
 
@@ -84,6 +84,7 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
   const { saisons, live } = useHistorieDaten(gameState);
   const glieder = useMemo(() => baueZeitleistenGlieder(saisons, live), [saisons, live]);
   const [sortierung, setSortierung] = useState<Sortierung>("zeit");
+  const [sortUmgekehrt, setSortUmgekehrt] = useState(false);
   const [teamSort, setTeamSort] = useState<TeamSortierung>("vol");
   const [hoehe, setHoehe] = useState<Hoehepunkte>("kauf");
   const [gewaehlterDeal, setGewaehlterDeal] = useState<string | null>(null);
@@ -132,13 +133,27 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
 
   const zeilen = useMemo(() => {
     const liste = [...teamGefiltert];
+    // Zeit und Text-Spalten laufen zuerst aufsteigend (alt zuerst, A–Z), Zahlen absteigend; ein zweiter Klick dreht.
+    const textwert = (z: TransferHistoryV2Row) =>
+      sortierung === "spieler"
+        ? z.playerName
+        : sortierung === "art"
+          ? ART_TEXT[dealArt(z)][0]
+          : sortierung === "vonan"
+            ? `${z.fromTeamName ?? ""} ${z.toTeamName ?? ""}`
+            : z.sourceLabel;
+    let ergebnis: TransferHistoryV2Row[];
     if (sortierung === "zeit") {
-      return liste.sort((a, b) => Date.parse(a.happenedAt) - Date.parse(b.happenedAt));
+      ergebnis = liste.sort((a, b) => Date.parse(a.happenedAt) - Date.parse(b.happenedAt));
+    } else if (sortierung === "spieler" || sortierung === "art" || sortierung === "vonan" || sortierung === "quelle") {
+      ergebnis = liste.sort((a, b) => textwert(a).localeCompare(textwert(b), "de") || Date.parse(a.happenedAt) - Date.parse(b.happenedAt));
+    } else {
+      const schluessel = (z: TransferHistoryV2Row) =>
+        sortierung === "abl" ? z.fee : sortierung === "geh" ? z.salary : sortierung === "mw" ? z.marketValue : (z.guv ?? Number.NEGATIVE_INFINITY);
+      ergebnis = liste.sort((a, b) => schluessel(b) - schluessel(a));
     }
-    const schluessel = (z: TransferHistoryV2Row) =>
-      sortierung === "abl" ? z.fee : sortierung === "geh" ? z.salary : sortierung === "mw" ? z.marketValue : (z.guv ?? Number.NEGATIVE_INFINITY);
-    return liste.sort((a, b) => schluessel(b) - schluessel(a));
-  }, [teamGefiltert, sortierung]);
+    return sortUmgekehrt ? ergebnis.reverse() : ergebnis;
+  }, [teamGefiltert, sortierung, sortUmgekehrt]);
 
   const bilanz = useMemo(() => {
     // F9: ohne Filter die Bilanz aus der vollstaendigen Historie, nicht aus der geladenen Seite.
@@ -198,7 +213,18 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
       }));
   }, [filteredRows, blattTeam]);
 
-  const spaltenKopf = (text: string, key: Sortierung) => ({ text, onKlick: () => setSortierung(key), aktiv: sortierung === key });
+  const spaltenKopf = (text: string, key: Sortierung) => ({
+    text,
+    onKlick: () => {
+      if (key === sortierung) setSortUmgekehrt((u) => !u);
+      else {
+        setSortierung(key);
+        setSortUmgekehrt(false);
+      }
+    },
+    aktiv: sortierung === key,
+    auf: (key === "zeit" || key === "spieler" || key === "art" || key === "vonan" || key === "quelle") !== sortUmgekehrt,
+  });
   const exportieren = () => {
     const blob = new Blob(["﻿", dealsAlsCsv(zeilen)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -487,14 +513,14 @@ export default function HistorieTransfers(props: HistorieTransfersProps) {
               raster={DEAL_COLS}
               spalten={[
                 { ...spaltenKopf("Zeit", "zeit"), links: true },
-                { text: "Spieler", links: true },
-                { text: "Art", links: true },
-                { text: "Von → An", links: true },
+                { ...spaltenKopf("Spieler", "spieler"), links: true },
+                { ...spaltenKopf("Art", "art"), links: true },
+                { ...spaltenKopf("Von → An", "vonan"), links: true },
                 spaltenKopf("Ablöse", "abl"),
                 spaltenKopf("Gehalt", "geh"),
                 spaltenKopf("MW", "mw"),
                 spaltenKopf("GuV", "guv"),
-                { text: "Quelle", links: true },
+                { ...spaltenKopf("Quelle", "quelle"), links: true },
               ]}
             />
           )}

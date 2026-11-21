@@ -116,6 +116,7 @@
  * von `spieleBuehneHeben()` im Motor). Fuer jede Disziplin OHNE `gesamtKg` (Basketball) bleibt
  * ein Punktegleichstand ein echtes Unentschieden -- unveraendertes Basketball-Verhalten.
  */
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import { freemem } from "node:os";
 
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -1044,6 +1045,8 @@ export type ArenaTeamPointsOverride = {
    * Chassis (Gewichtheben, Buehne, Bahn) -- unveraendertes Verhalten dort.
    */
   momente?: ArenaMomentEintrag[];
+  /** ANZEIGE-ZAHL (21.11.): Zeitsumme bzw. besiegte Gegner, aus Sicht DIESES Teams `[dieses Team, Gegner]`. */
+  anzeige?: ErgebnisAnzeigeZahl;
 };
 
 /**
@@ -1147,6 +1150,7 @@ export function computeArenaTeamPointsFromFixtureResults(
       seiten: result.seiten,
       outcome: heimOutcome,
       ...(result.momente ? { momente: result.momente } : {}),
+      ...(result.anzeige ? { anzeige: result.anzeige } : {}),
     });
     overridesByTeamId.set(result.awayTeamId, {
       teamPoints: gastPunkte,
@@ -1155,6 +1159,9 @@ export function computeArenaTeamPointsFromFixtureResults(
       seiten: [result.seiten[1], result.seiten[0]],
       outcome: gastOutcome,
       ...(result.momente ? { momente: result.momente } : {}),
+      ...(result.anzeige
+        ? { anzeige: { art: result.anzeige.art, werte: [result.anzeige.werte[1], result.anzeige.werte[0]] as [number, number] } }
+        : {}),
     });
   }
   return overridesByTeamId;

@@ -185,25 +185,38 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
   const { saisons } = useHistorieDaten(gameState);
   const [fokus, setFokus] = useState<Fokus>("punkte");
   const [ligaFilter, setLigaFilter] = useState<LigaFilter>("alle");
-  const [sortKey, setSortKey] = useState<SpaltenKey>("pkt");
+  const [sortKey, setSortKey] = useState<SpaltenKey | "team">("pkt");
+  // Zweiter Klick auf dieselbe Spalte dreht die Richtung (Designregel 21.11.).
+  const [umgekehrt, setUmgekehrt] = useState(false);
+  const klickSpalte = (key: SpaltenKey | "team") => {
+    if (key === sortKey) setUmgekehrt((u) => !u);
+    else {
+      setSortKey(key);
+      setUmgekehrt(false);
+    }
+  };
   const [metrik, setMetrik] = useState<Metrik>("platz");
   const [blattTeam, setBlattTeam] = useState<string | null>(null);
 
   const zeilen = useMemo(() => (model ? baueEwigZeilen(model) : []), [model]);
   const spalten = FOKUS[fokus];
-  const aktiveSpalte = spalten.some(([key]) => key === sortKey) ? sortKey : spalten[0]![0];
+  const aktiveSpalte: SpaltenKey | "team" = sortKey === "team" || spalten.some(([key]) => key === sortKey) ? sortKey : spalten[0]![0];
   const sortiert = useMemo(() => {
-    const aufsteigend = AUFSTEIGEND.has(aktiveSpalte);
-    return zeilen
-      .filter((zeile) => ligaFilter === "alle" || zeile.liga === Number(ligaFilter))
-      .sort((a, b) => {
-        const x = a[aktiveSpalte] as number | null;
-        const y = b[aktiveSpalte] as number | null;
-        if (x == null) return 1;
-        if (y == null) return -1;
-        return aufsteigend ? x - y : y - x;
-      });
-  }, [zeilen, ligaFilter, aktiveSpalte]);
+    const gefiltert = zeilen.filter((zeile) => ligaFilter === "alle" || zeile.liga === Number(ligaFilter));
+    if (aktiveSpalte === "team") {
+      const alpha = gefiltert.sort((a, b) => a.row.teamName.localeCompare(b.row.teamName, "de"));
+      return umgekehrt ? alpha.reverse() : alpha;
+    }
+    // Rang 1 ist immer der beste: Rangspalten (und Best-Platz) laufen zuerst aufsteigend.
+    const aufsteigend = AUFSTEIGEND.has(aktiveSpalte) !== umgekehrt;
+    return gefiltert.sort((a, b) => {
+      const x = a[aktiveSpalte] as number | null;
+      const y = b[aktiveSpalte] as number | null;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return aufsteigend ? x - y : y - x;
+    });
+  }, [zeilen, ligaFilter, aktiveSpalte, umgekehrt]);
 
   const verlauf = useMemo(() => (blattTeam ? baueTeamVerlauf(saisons, blattTeam) : null), [saisons, blattTeam]);
   const eigene = zeilen.find((zeile) => zeile.row.teamId === ownTeamId) ?? null;
@@ -308,9 +321,9 @@ export default function HistorieEwigeTabelle({ gameState, ownTeamId, model, onOp
             raster={cols}
             spalten={[
               { text: "#" },
-              { text: "Team", links: true },
+              { text: "Team", links: true, onKlick: () => klickSpalte("team"), aktiv: aktiveSpalte === "team", auf: !umgekehrt },
               { text: "Saisons" },
-              ...spalten.map(([key, text]) => ({ text, onKlick: () => setSortKey(key), aktiv: aktiveSpalte === key })),
+              ...spalten.map(([key, text]) => ({ text, onKlick: () => klickSpalte(key), aktiv: aktiveSpalte === key, auf: AUFSTEIGEND.has(key) !== umgekehrt })),
               { text: `S1 – S${model.archivedSeasonCount}` },
             ]}
           />

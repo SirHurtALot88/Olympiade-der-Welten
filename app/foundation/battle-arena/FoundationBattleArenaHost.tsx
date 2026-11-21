@@ -1364,7 +1364,7 @@ export default function FoundationBattleArenaHost({
             </h3>
             <span className="muted" style={{ fontSize: "0.85rem" }}>
               {podTeams ? (
-                <>Vierergruppe: {podTeams.map((name, index) => (
+                <><strong data-testid="oly-arena-podmarke" title="Vierergruppe: vier Teams gleichzeitig in einer Arena">4 Teams · Pod</strong> · Vierergruppe: {podTeams.map((name, index) => (
                   <span key={name + index}>{index > 0 ? ", " : ""}<strong>{name}</strong></span>
                 ))}</>
               ) : (
@@ -1413,7 +1413,7 @@ export default function FoundationBattleArenaHost({
             )
           }
           paarung={
-            spieltag.regie ? undefined : podTeams ? `Vierergruppe: ${podTeams.join(", ")}` : `${heimName} gegen ${gastName}`
+            spieltag.regie ? undefined : podTeams ? `4 Teams · Pod · ${podTeams.join(", ")}` : `${heimName} gegen ${gastName}`
           }
           seiteHervorheben={endeInfo != null}
           zusatz={

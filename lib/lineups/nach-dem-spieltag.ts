@@ -10,8 +10,8 @@
  * ueberschrieben). Die Moral-Tafel zeigt deshalb den heutigen Wert und den staerksten gespeicherten
  * Grund mit seiner Punktwirkung, nicht "vorher -> nachher".
  */
-import { ergebnisMitSkalaText } from "@/lib/resolve/ergebnis-skala";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import { duellErgebnisAnzeige, duellErgebnisText, gruppenWertText } from "@/lib/foundation/ergebnis-anzeige";
+import type { DisciplineResultRecord, GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import {
@@ -103,12 +103,21 @@ const FORM_STUFE_KALT = -1;
 const MORAL_UNZUFRIEDEN_BIS = 40;
 const MORAL_GRUND_MIN = 1;
 
-const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1).replace(".", ","));
 
 /** "Kati, Aerin und Gram" */
 export function nameListe(namen: readonly string[]): string {
   if (namen.length <= 1) return namen[0] ?? "";
   return `${namen.slice(0, -1).join(", ")} und ${namen[namen.length - 1]}`;
+}
+
+/** "von 4 · Zielzeit 3:12,4 · Wertung 8": Platz-Zusatz einer Vierergruppe aus der gebuchten Zeile (Zeit bei der Staffel, Punkte sonst). */
+function podDetail(z: DisciplineResultRecord): string {
+  const teile = ["von 4"];
+  const gruppenWert = gruppenWertText(z.disciplineId, z.miniDmPod?.teamWert);
+  if (gruppenWert) teile.push(`${z.disciplineId === "staffel" ? "Zielzeit" : "Punkte"} ${gruppenWert}`);
+  // ERGEBNISSKALA (18.11.): der gebuchte 0-10-Wert des Teams in seiner Vierergruppe.
+  if (z.ergebnisSkala === "e1" && typeof z.miniDmPod?.wert === "number") teile.push(`Wertung ${z.miniDmPod.wert}`);
+  return teile.join(" · ");
 }
 
 /** Ergebnis je Disziplin des eigenen Teams aus den GEBUCHTEN Zeilen (Sieg/Remis/Niederlage bzw. Platz). */
@@ -132,7 +141,7 @@ export function baueSpieltagsDisziplinen(
     const punkte = typeof z.teamPoints === "number" ? z.teamPoints : null;
     if (z.miniDmPod) {
       // ERGEBNISSKALA (18.11.): der gebuchte 0-10-Wert des Teams in seiner Vierergruppe.
-      return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "pod", ausgang: null, wort: `Platz ${z.miniDmPod.platz}`, detail: z.ergebnisSkala === "e1" && typeof z.miniDmPod.wert === "number" ? `von 4 · Wertung ${z.miniDmPod.wert}` : "von 4", gegnerName: null, teamPunkte: punkte };
+      return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "pod", ausgang: null, wort: `Platz ${z.miniDmPod.platz}`, detail: podDetail(z), gegnerName: null, teamPunkte: punkte };
     }
     if (z.opponentTeamId) {
       const gegner = zeilen.find((x) => x.teamId === z.opponentTeamId && x.disciplineSide === z.disciplineSide) ?? null;
@@ -143,11 +152,15 @@ export function baueSpieltagsDisziplinen(
       const wort = ausgang === "sieg" ? "Sieg" : ausgang === "niederlage" ? "Niederlage" : ausgang === "remis" ? "Remis" : "Ergebnis";
       // ERGEBNISSKALA (18.11.): native Zahl und gebuchte Skala, "87 : 79 → 7 : 4" (lib/resolve/ergebnis-skala.ts).
       // Nur bei E1-Zeilen mit Skala; Zeilen der laufenden (alten) Saison zeigen wie vor E1 nur die native Zahl.
-      const stand = z.ergebnisSkala === "e1"
-        ? ergebnisMitSkalaText({ seiten: z.duellSeiten ?? null, skala: z.ergebnisNormiert ?? null })
-        : z.duellSeiten
-          ? `${fmt(z.duellSeiten[0])} : ${fmt(z.duellSeiten[1])}`
-          : "";
+      // ANZEIGE (21.11.): Zeitfahren/Staffel zeigen die Zeiten, Breaking die besiegten Gegner statt "1 : 0".
+      const stand = duellErgebnisText(
+        duellErgebnisAnzeige({
+          disciplineId: z.disciplineId,
+          seiten: z.duellSeiten ?? null,
+          anzeige: z.ergebnisAnzeige ?? null,
+          skala: z.ergebnisSkala === "e1" ? z.ergebnisNormiert ?? null : null,
+        }),
+      );
       return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "duell", ausgang, wort, detail: stand || `gegen ${teamName(z.opponentTeamId)}`, gegnerName: teamName(z.opponentTeamId), teamPunkte: punkte };
     }
     return { side: z.disciplineSide, disciplineId: z.disciplineId, name, art: "platz", ausgang: null, wort: `Platz ${z.rank}`, detail: `von ${gleiche.length}`, gegnerName: null, teamPunkte: punkte };

@@ -19,6 +19,7 @@ const lies = (relativerPfad: string) => fs.readFile(path.join(process.cwd(), rel
 
 const SEITE = await lies("app/foundation/spielerprofil/SpielerprofilSeite.tsx");
 const KURZ = await lies("app/foundation/spielerprofil/SpielerKurzprofil.tsx");
+const KURZ_TABS = await lies("app/foundation/spielerprofil/SpielerKurzprofilTabs.tsx");
 const HOST = await lies("app/foundation/spielerprofil/SpielerKurzprofilHost.tsx");
 const T_UEBERBLICK = await lies("app/foundation/spielerprofil/TabUeberblick.tsx");
 const T_DISZI = await lies("app/foundation/spielerprofil/TabDisziplinen.tsx");
@@ -114,7 +115,7 @@ describe("Spielerprofil-Seite (neu)", () => {
     }
     expect(T_DISZI).toContain("grobBereich");
     expect(T_DISZI).toContain("grobeRangStufe");
-    expect(KURZ).toContain("grobBereich");
+    expect(KURZ_TABS).toContain("grobBereich");
   });
 
   it("Marktwert bleibt auch bei fremden, ungescouteten Spielern exakt (Chris 18.11.), Gehalt und Kaufpreis bleiben verdeckt", async () => {
@@ -137,7 +138,7 @@ describe("Spielerprofil-Seite (neu)", () => {
   });
 });
 
-describe("Kurzprofil (Drawer ohne Reiter)", () => {
+describe("Kurzprofil (Drawer mit kompakten Reitern)", () => {
   it("ist ein eigenes Bauteil, alle Listen öffnen es, „Ganzes Profil öffnen“ führt auf die Seite", () => {
     expect(SCOPE_ONLY).toContain("oeffneSpielerKurzprofil({ playerId, activePlayerId })");
     expect(SURFACE).toContain("<SpielerKurzprofilHost");
@@ -146,10 +147,28 @@ describe("Kurzprofil (Drawer ohne Reiter)", () => {
   });
 
   it("zeigt alle 20 Disziplinen als Kacheln mit Eignung und Liga-Rang, Statuszeile und Form/Moral", () => {
-    expect(KURZ).toContain("spielerkurzprofil-disziplinen");
+    expect(KURZ_TABS).toContain("spielerkurzprofil-disziplinen");
     expect(KURZ).toContain("spielerkurzprofil-status");
     expect(KURZ).toContain("BcMoralGesicht");
-    expect(KURZ).toContain("Liga #");
+    expect(KURZ_TABS).toContain("BcMoralGesicht");
+    expect(KURZ_TABS).toContain("Liga #");
+  });
+
+  it("hat dieselben sechs Reiter wie das ganze Profil, je mit „Voller Bericht ›“ in den passenden Reiter", () => {
+    for (const id of ["overview", "disciplines", "development", "performance", "contract", "career"]) {
+      expect(KURZ_TABS).toContain(`voll: "${id}"`);
+      expect(KURZ_TABS).toContain(`voll="${id}"`);
+    }
+    expect(KURZ_TABS).toContain("Voller Bericht ›");
+  });
+
+  it("Entwicklung liest die Trainingsrechnung der Seite (keine Zweitrechnung), Porträt und Figur stehen nebeneinander", () => {
+    expect(KURZ).toContain("baueKurzEntwicklung");
+    expect(KURZ).toContain("PortraetRahmen");
+    expect(KURZ).toContain("ohnePortrait");
+    expect(KURZ_TABS).toContain("spielerkurzprofil-potenzialfaktor");
+    expect(KURZ_TABS).toContain("spielerkurzprofil-bremse");
+    expect(KURZ_TABS).toContain("spielerkurzprofil-kachel-mvs");
   });
 });
 

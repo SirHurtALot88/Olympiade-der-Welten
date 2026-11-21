@@ -176,7 +176,7 @@ describe("Spieltagswertung neu: Filter und Worte", () => {
   it("beschreibt Duell und Gruppe in Worten", () => {
     const zeile = baueWertungsZeilen(eingabe()).find((z) => z.teamId === "a")!;
     const name = (id: string) => (id === "b" ? "Team B" : null);
-    expect(beschreibeWertungsErgebnis(zeile.d1.ergebnis, name)).toBe("Sieg 78 : 71 gegen Team B");
+    expect(beschreibeWertungsErgebnis(zeile.d1.ergebnis, name)).toBe("Sieg 78 : 71 (+7) gegen Team B");
     expect(beschreibeWertungsErgebnis(zeile.d2.ergebnis, name)).toBe("Platz 2 von 4 · Gruppenwert 88");
     expect(wertungsMarke(zeile.d1.ergebnis)).toEqual({ text: "S", ton: "s" });
     expect(wertungsMarke(zeile.d2.ergebnis)).toEqual({ text: "2.", ton: "z" });
