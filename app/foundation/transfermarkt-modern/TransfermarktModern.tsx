@@ -147,6 +147,17 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const [filter, setFilter] = useState<WeitereFilter>(LEERE_FILTER);
   const [weitereOffen, setWeitereOffen] = useState(false);
   const [sortierung, setSortierung] = useState<SortKey>("eignung");
+  // Chris 19.11.: Spaltenköpfe sortieren wieder; ein zweiter Klick auf dieselbe Spalte dreht die Richtung um.
+  const [umgekehrt, setUmgekehrt] = useState(false);
+  const sortiereNach = (k: SortKey) => {
+    if (k === sortierung) setUmgekehrt((u) => !u);
+    else {
+      setSortierung(k);
+      setUmgekehrt(false);
+    }
+    setBlatt(0);
+  };
+  const kopfPfeil = (k: SortKey) => (sortierung === k ? ((sortierung === "abloese" || sortierung === "gehalt") !== umgekehrt ? " ▲" : " ▼") : "");
   const [blatt, setBlatt] = useState(0);
   const [fokusId, setFokusId] = useState<string | null>(props.initialPlayerId ?? null);
   const [pins, setPins] = useState<string[]>([]);
@@ -233,9 +244,9 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
         case "value": return z.item.marketValueSalaryRatio;
       }
     };
-    const aufsteigend = sortierung === "abloese" || sortierung === "gehalt";
+    const aufsteigend = (sortierung === "abloese" || sortierung === "gehalt") !== umgekehrt;
     return sortiereNachSicht(liste, schluessel, aufsteigend ? 1 : -1);
-  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, filter, sortierung, disziplin, cash, wirkungJeZeile, merkliste]);
+  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, filter, sortierung, umgekehrt, disziplin, cash, wirkungJeZeile, merkliste]);
 
   const aktiveWeitere = zaehleAktiveFilter(filter);
   const seiten = Math.max(1, Math.ceil(gefiltert.length / SEITE));
@@ -493,22 +504,22 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
               </button>
               <span className="gk">Sortierung</span>
               {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                <button type="button" key={k} className={`fc${sortierung === k ? " an" : ""}`} onClick={() => { setSortierung(k); setBlatt(0); }} data-testid={`tm-sort-${k}`}>{SORT_LABEL[k]}</button>
+                <button type="button" key={k} className={`fc${sortierung === k ? " an" : ""}`} onClick={() => sortiereNach(k)} data-testid={`tm-sort-${k}`}>{SORT_LABEL[k]}{kopfPfeil(k)}</button>
               ))}
               <span className="sp" />
-              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFilter(LEERE_FILTER); setSortierung("eignung"); setBlatt(0); }}>Filter zurücksetzen</button>
+              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFilter(LEERE_FILTER); setSortierung("eignung"); setUmgekehrt(false); setBlatt(0); }}>Filter zurücksetzen</button>
             </div>
             {weitereOffen ? <WeitereFilterPanel filter={filter} onChange={(f) => { setFilter(f); setBlatt(0); }} /> : null}
             <div className="mt" style={{ ["--zeilen" as string]: SEITE }} data-testid="tm-tabelle">
               <div className="mz kopf">
                 <span /><span />
                 <span>Spieler · Weg in {disziplinNamen[disziplin]}</span>
-                <span className={sortierung === "eignung" ? "so" : ""}>Eignung</span>
+                <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}</span>
                 <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[a]}</i>)}</span>
-                <span title="erwartete Player Points je Einsatz (Näherung aus der Eignung)">≈ PP</span>
-                <span className={`re ${sortierung === "abloese" ? "so" : ""}`}>Ablöse</span>
-                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`}>Gehalt/Saison</span>
-                <span className={sortierung === "hebt" ? "so" : ""}>Kaderrang</span>
+                <span title="erwartete Player Points je Einsatz (Näherung aus der Eignung) · Klick sortiert nach Eignung" style={{ cursor: "pointer" }} role="button" onClick={() => sortiereNach("eignung")}>≈ PP</span>
+                <span className={`re ${sortierung === "abloese" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("abloese")} data-testid="tm-kopf-abloese">Ablöse{kopfPfeil("abloese")}</span>
+                <span className={`re ${sortierung === "gehalt" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("gehalt")} data-testid="tm-kopf-gehalt">Gehalt/Saison{kopfPfeil("gehalt")}</span>
+                <span className={sortierung === "hebt" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("hebt")} data-testid="tm-kopf-kaderrang">Kaderrang{kopfPfeil("hebt")}</span>
                 <span />
               </div>
               {feed.busy && sichtbar.length === 0 && <div className="tmk-leer">Transfermarkt wird geladen …</div>}
