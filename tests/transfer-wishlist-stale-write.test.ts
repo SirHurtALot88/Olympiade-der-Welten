@@ -61,7 +61,7 @@ describe("Wunschliste — entfernte Spieler bleiben entfernt", () => {
   it("Entfernen und Umsortieren laufen funktional", () => {
     const tail = SCOPE.slice(SCOPE.indexOf("function removeTransferWishlistEntry("));
     expect(tail).toContain(
-      "saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== playerId));",
+      "saveTransferWishlist((entries) => entries.filter((entry) => entry.ki || entry.playerId !== playerId));",
     );
     expect(tail).toContain(
       "saveTransferWishlist((entries) => reorderTeamTransferWishlist(entries, teamId, playerId, targetIndex));",
@@ -74,6 +74,6 @@ describe("Wunschliste — entfernte Spieler bleiben entfernt", () => {
    * scheinbar von selbst füllt.
    */
   it("Hinzufuegen legt denselben Spieler nicht doppelt ab", () => {
-    expect(BLOCK).toContain("entries.some((entry) => entry.playerId === item.playerId) ? entries :");
+    expect(BLOCK).toContain("entries.some((entry) => entry.playerId === item.playerId && !entry.ki) ? entries :");
   });
 });

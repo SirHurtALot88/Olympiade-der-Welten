@@ -10,7 +10,7 @@
  *    neue (ungelesene) Meldung.
  *
  * Interesse an einem Spieler (KI-Merkliste, 21.11.): ein KI-Team hat einen Spieler dieses Teams auf seine Merkliste gesetzt
- *    (`seasonState.kiMerkliste`, `lib/ai/ki-merkliste.ts`; bewertet mit derselben Kaufnutzen-Funktion wie die KI-Käufe). Die Stufe
+ *    (`seasonState.transferWishlist`-Eintraege mit `ki`, `lib/ai/ki-merkliste.ts`; bewertet mit derselben Kaufnutzen-Funktion wie die KI-Käufe). Die Stufe
  *    steckt in der Kennung: steigt sie, ist es eine neue (ungelesene) Meldung; bleibt sie, bleibt es dieselbe, nie je Spieltag
  *    eine neue. Reine Info (Im Blick behalten), hält nie einen Spieltag auf. Sie nennt nur das KI-Team, den Grund seines Bedarfs
  *    und die Stufe, keine verdeckten Werte fremder Spieler (die Meldung betrifft einen eigenen Spieler).
@@ -18,7 +18,7 @@
  * Reine Funktionen, kein React. Aufgerufen von `buildTeamTasks` in `game-inbox-service.ts`.
  */
 import type { GameInboxItem, GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { KI_MERKLISTE_STUFE_WORT, kiInteresseAnSpieler, kiMerklisteGrund } from "@/lib/ai/ki-merkliste-lesen";
+import { hatKiMerkliste, KI_MERKLISTE_STUFE_WORT, kiInteresseAnSpieler, kiMerklisteGrund } from "@/lib/ai/ki-merkliste-lesen";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { VORSTAND_STUFEN, resolveVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { klemmeMoral, moralStufe } from "@/lib/morale/moral-anzeige";
@@ -138,7 +138,7 @@ const KI_INTERESSE_MELDUNGEN_MAX = 5;
 
 /** Ein KI-Team hat einen Spieler dieses Teams auf der Merkliste. Je Spieler und KI-Team eine Meldung. */
 export function buildKiInteresseMeldungen(input: NeueMeldungenInput): GameInboxItem[] {
-  if (!input.gameState.seasonState.kiMerkliste) return [];
+  if (!hatKiMerkliste(input.gameState)) return [];
   const gefunden: Array<{ item: GameInboxItem; stufe: number }> = [];
   for (const entry of input.roster) {
     const spieler = input.playerById.get(entry.playerId);
