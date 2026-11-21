@@ -1,0 +1,41 @@
+{
+  "note": "MD4 trotz aller Punkte hat sich im Ranking mit Platz 2 für M-S das Ranking angeblich nicht geändert im saisonstand -> 15 auf 15 das kann nicht stimmen da sie 20,8 punkte erhalten haben!",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3440,
+    "height": 1271
+  },
+  "clientTime": "2026-08-04T13:18:59.692Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T13-18-59-798Z-vlsakj",
+  "createdAt": "2026-08-04T13:18:59.798Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "active",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 4,
+    "matchdayId": "matchday-4",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

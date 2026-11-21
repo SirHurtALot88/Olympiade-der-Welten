@@ -1,0 +1,41 @@
+{
+  "note": "attribut ranges fehlen noch da reichen 50-70 etc also große ranges wenn man nicht scoutet \nund links müsste ich ja zwischen draft liste und den stats in meinem team umschalten können, das war in der letzten version noch drin",
+  "view": "prize",
+  "path": "/foundation",
+  "tab": "sponsors",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=prize&tab=sponsors&team=D-P&saveId=new-game-1795114260527-nzr0z9",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1186
+  },
+  "clientTime": "2026-11-19T20:49:49.729Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-11-19T20-49-49-793Z-2s6iv2",
+  "createdAt": "2026-11-19T20:49:49.793Z",
+  "page": {
+    "path": "/foundation",
+    "view": "prize",
+    "tab": "sponsors",
+    "label": "Welt · Sponsoren"
+  },
+  "game": {
+    "saveId": "new-game-1795114260527-nzr0z9",
+    "saveName": "Oly New Game Custom 19.11.2026, 19:51:00",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "D-P"
+    ]
+  }
+}

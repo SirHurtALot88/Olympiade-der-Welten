@@ -1,0 +1,41 @@
+{
+  "note": "durhc die fehlenden attributschätzungen fehlen auch für die filter die Ratings >B ist gar nicht möglich weil klein spieler ein rating hat in dem attribut\nund die achsen sollte man nicht nur ab B sondern wengistens ab C und D auch noch nach oben filtern können, man möchte das ja vllt als sekundärstats haben\n\nmir fehlen auf den ersten blick die erkenntnisse wie viel POW SPE MEN SOC ein spieler hat,",
+  "view": "prize",
+  "path": "/foundation",
+  "tab": "sponsors",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=prize&tab=sponsors&team=D-P&saveId=new-game-1795114260527-nzr0z9",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1186
+  },
+  "clientTime": "2026-11-19T20:53:09.137Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-11-19T20-53-09-194Z-rx8f21",
+  "createdAt": "2026-11-19T20:53:09.194Z",
+  "page": {
+    "path": "/foundation",
+    "view": "prize",
+    "tab": "sponsors",
+    "label": "Welt · Sponsoren"
+  },
+  "game": {
+    "saveId": "new-game-1795114260527-nzr0z9",
+    "saveName": "Oly New Game Custom 19.11.2026, 19:51:00",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "D-P"
+    ]
+  }
+}
