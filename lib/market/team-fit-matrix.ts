@@ -66,12 +66,29 @@ function buildRowsByTeamId(rows: TeamFitMatrixRow[]) {
 const raceRowsByTeamId = buildRowsByTeamId(typedSource.races.rows);
 const subclassRowsByTeamId = buildRowsByTeamId(typedSource.subclasses.rows);
 
+/**
+ * Die Fit-Matrix (Google-Sheet) und der Spielerpool benennen zwei Tokens verschieden: die Rasse heißt in
+ * der Matrix `Fish`, im Pool `Aqua` (106 Spieler); die Subklasse heißt in der Matrix `Giant`, im Pool
+ * `Behemoth` (211 Spieler). Ohne Alias griff die Spalte für diese Spieler nie — z. B. D-P −10 auf
+ * Fisch-Spieler oder The Giants +5 auf Riesen (Fund 21.11. beim 40-Teams-Mockup). Die Matrix bleibt
+ * unverändert; nur das Nachschlagen übersetzt den Pool-Namen auf den Matrix-Namen.
+ */
+const POOL_ZU_MATRIX_TOKEN: Record<string, string> = {
+  aqua: "fish",
+  behemoth: "giant",
+};
+
 function getTokenFit(entry: NormalizedFitRow | null | undefined, token: string | null | undefined) {
   if (!entry || !token) {
     return null;
   }
 
-  return entry.fitsByNormalizedKey.get(normalizeMatrixToken(token)) ?? null;
+  const normalized = normalizeMatrixToken(token);
+  return (
+    entry.fitsByNormalizedKey.get(normalized) ??
+    (POOL_ZU_MATRIX_TOKEN[normalized] ? entry.fitsByNormalizedKey.get(POOL_ZU_MATRIX_TOKEN[normalized]) : undefined) ??
+    null
+  );
 }
 
 export function getTeamRaceFit(input: { teamId?: string | null; race?: string | null }) {
