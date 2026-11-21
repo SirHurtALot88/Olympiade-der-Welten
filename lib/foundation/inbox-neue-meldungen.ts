@@ -160,7 +160,7 @@ export function buildKiInteresseMeldungen(input: NeueMeldungenInput): GameInboxI
           title: `Interesse an ${spieler.name}: ${kiTeam.name}`,
           description: `${kiTeam.name} hat ${spieler.name} auf der Merkliste (${stufeWort}${seit ? `, seit ${seit}` : ""}): ${kiMerklisteGrund(input.gameState, eintrag)}. Ein Hinweis, kein Angebot — es liegt nichts zur Entscheidung vor.`,
           ctaLabel: "Spieler ansehen",
-          targetView: "trainingCompact",
+          targetView: "playerProfile",
           targetParams: { team: input.team.teamId, player: entry.playerId },
           source: "ki_interesse",
         },

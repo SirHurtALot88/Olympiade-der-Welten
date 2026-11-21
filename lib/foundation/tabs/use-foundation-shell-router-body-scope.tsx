@@ -7553,6 +7553,11 @@ export function useFoundationShellRouterBodyScope({
     } else if (resolvedView === "marketV2") {
       setMarketFocusPlayerId(null);
     }
+    if (resolvedView === "playerProfile" && focusPlayerId) {
+      setShowGameFlowPanel(false);
+      void openPlayerProfileById(focusPlayerId, null, { push: true });
+      return;
+    }
     if (resolvedView === "prize") {
       navigateToPrizeFinanceViewFromRouting(panel, false);
       setShowGameFlowPanel(false);

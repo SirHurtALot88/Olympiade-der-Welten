@@ -857,9 +857,6 @@ function Brief({
           </button>
         ) : null}
         <span className="ibx-sp" />
-        <span className="ibx-gk" style={{ opacity: 0.7 }}>
-          {item.source}
-        </span>
         <button type="button" className="ibx-kn ibx-gold" onClick={onNaechste} data-testid="postfach-brief-naechste">
           Nächste
           <Sym name="rechts" />
