@@ -9,11 +9,12 @@ import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, Foundatio
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
 import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/nl-format";
-import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
 import { DraftHinweis } from "@/app/foundation/draft-modern/DraftHinweis";
+import SaisonInfoModern from "@/app/foundation/season-briefing/SaisonInfoModern";
+import { waehleTaktQuelle } from "@/lib/foundation/takt-auswahl";
 import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
 const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
@@ -315,10 +316,6 @@ const FoundationDebugGameStatePanel = dynamic(
 // by design (see foundation-shell-router-body-props.ts, Phase 5.8 boundary).
 type SeasonBriefingScope = ReturnType<typeof useFoundationCrossTabSeasonBriefing>;
 type SeasonBriefingData = SeasonBriefingScope["seasonBriefingData"];
-type SeasonBriefingMatchdayEntry = SeasonBriefingData["firstMatchdays"][number];
-type SeasonBriefingDisciplineEntry = SeasonBriefingMatchdayEntry["disciplines"][number];
-type SeasonBriefingBigDisciplineSlot = SeasonBriefingData["bigDisciplines"][number];
-type SeasonBriefingFactorEntry = SeasonBriefingData["futureFactors"][number];
 type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 
 // W1 · Ranks-Matrix: Tooltips der Aggregat-Spalten. Die Disziplin-Spalten
@@ -424,6 +421,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   getViewClass,
   globalNextLabel,
   globalNextStatusClass,
+  globalNextDisabled,
   globalNextTitle,
   handleFormCardPlanSaved,
   handleHumanLineupSaved,
@@ -1056,13 +1054,25 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         nurAnsicht={readOnlyBannerMessage ? String(readOnlyBannerMessage) : null}
-        takt={
-          ligaDraftTor.aktiv && draftTakt
-            ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick }
-            : einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
-              ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, busy: einsatzlisteAbgabe.busy, plan: taktPlan }
-              : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
-        }
+        takt={(() => {
+          const quelle = waehleTaktQuelle({
+            draftSeiteOffen: ligaDraftTor.aktiv,
+            draftMeldetTakt: draftTakt != null,
+            draftHinweis: ligaDraftTor.hinweis,
+            einsatzlisteAnsicht: activeView === "lineup" || activeView === "lineupV2",
+            einsatzlisteMeldetAbgabe: einsatzlisteAbgabe != null,
+          });
+          if (quelle === "draft" && draftTakt) {
+            return { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick };
+          }
+          if (quelle === "draft-hinweis") {
+            return { label: "Zum Draft", title: "Der Draft wartet auf dich", statusClass: "is-ready", onClick: ligaDraftTor.oeffnen };
+          }
+          if (quelle === "einsatzliste" && einsatzlisteAbgabe) {
+            return { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, busy: einsatzlisteAbgabe.busy, plan: taktPlan };
+          }
+          return { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan, gesperrt: globalNextDisabled, istGlobal: true };
+        })()}
         onSearch={() => setShowCommandPalette(true)}
         kasseLabel={selectedStandingRow?.cash != null ? formatNlCoins(selectedStandingRow.cash) : null}
         onOpenSeason={() => setFoundationView("seasonV2", setActiveView, { push: true })}
@@ -1474,230 +1484,27 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       ) : null}
 
       {seasonBriefingOpen ? (
-        <div
-          className="foundation-modal-backdrop season-briefing-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="season-briefing-title"
-          data-testid="season-briefing-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              closeSeasonBriefing(false);
-            }
+        <SaisonInfoModern
+          saisonName={gameState.season.name}
+          bereit={seasonBriefingScheduleReady}
+          faktor={seasonBriefingData.currentFactor}
+          spieltage={seasonBriefingData.scheduleCount}
+          teamAchsen={seasonBriefingTeamAxes}
+          teamKuerzel={selectedTeam?.shortCode ?? null}
+          cash={formatTransfermarktCurrency(seasonBriefingTeamCash)}
+          plan={seasonBriefingData.firstMatchdays}
+          grosse={seasonBriefingData.bigDisciplines}
+          doppelungen={seasonBriefingData.sameColorMatchdays}
+          kuenftigeFaktoren={seasonBriefingData.futureFactors}
+          kategorieLabel={formatDisciplineCategoryLabel}
+          zahl={formatLocalePoints}
+          onSpaeter={() => closeSeasonBriefing(false)}
+          onDiszis={() => {
+            closeSeasonBriefing(false);
+            setFoundationView("diszis", setActiveView);
           }}
-        >
-          <section className="foundation-modal season-briefing-page" data-testid="season-briefing-page">
-            <header className="season-briefing-header nl-reveal" style={{ "--nl-reveal-i": 0 } as CSSProperties}>
-              <div className="season-briefing-hero">
-                <span className="season-briefing-eyebrow">Season-Einstieg</span>
-                <h1 id="season-briefing-title" className="season-briefing-title">{gameState.season.name}</h1>
-                <p className="season-briefing-lead">Lies die Saison-Vorschau durch und markiere sie danach als erledigt.</p>
-              </div>
-              <button className="nl-sb-btn is-ghost" type="button" onClick={() => closeSeasonBriefing(false)}>
-                Später
-              </button>
-            </header>
-            <div className="season-briefing-body">
-              {!seasonBriefingScheduleReady ? (
-                <p className="season-briefing-loading" data-testid="season-briefing-loading">
-                  Diszi-Plan und Saison-Faktoren werden geladen …
-                </p>
-              ) : null}
-              <div
-                className="season-briefing-kpis nl-reveal"
-                role="group"
-                aria-label="Season-Faktoren"
-                style={{ "--nl-reveal-i": 1 } as CSSProperties}
-              >
-                <article className={joinClassNames("season-briefing-kpi", nlToneClass("accent"))}>
-                  <span className="season-briefing-kpi-label">Salary Factor</span>
-                  <NlCountUpValue
-                    className="season-briefing-kpi-value nl-tnum"
-                    value={seasonBriefingData.currentFactor}
-                    format={(v) => `${formatLocalePoints(v, 2)}x`}
-                  />
-                  <span className="season-briefing-kpi-sub">Basis für Gehälter, Sponsoren und Forecast</span>
-                </article>
-                <article className={joinClassNames("season-briefing-kpi", nlToneClass("neutral"))}>
-                  <span className="season-briefing-kpi-label">Matchdays</span>
-                  <NlCountUpValue
-                    className="season-briefing-kpi-value nl-tnum"
-                    value={seasonBriefingData.scheduleCount}
-                    format={(v) => formatLocalePoints(v, 0)}
-                  />
-                  <span className="season-briefing-kpi-sub">Diszi-Paare in dieser Season</span>
-                </article>
-                <article className={joinClassNames("season-briefing-kpi", nlToneClass("men"))}>
-                  <span className="season-briefing-kpi-label">POW / SPE / MEN / SOC</span>
-                  <span className="season-briefing-kpi-value nl-tnum">{seasonBriefingTeamAxes}</span>
-                  <span className="season-briefing-kpi-sub">{selectedTeam ? `${selectedTeam.shortCode} Team-Identity` : "Team wählen"}</span>
-                </article>
-                <article className={joinClassNames("season-briefing-kpi", nlToneClass("good"))}>
-                  <span className="season-briefing-kpi-label">Cash</span>
-                  <NlCountUpValue
-                    className="season-briefing-kpi-value nl-tnum"
-                    value={seasonBriefingTeamCash}
-                    format={(v) => formatTransfermarktCurrency(v)}
-                  />
-                  <span className="season-briefing-kpi-sub">Startbudget für Transfers</span>
-                </article>
-              </div>
-
-              <section className="season-briefing-section nl-reveal" style={{ "--nl-reveal-i": 2 } as CSSProperties}>
-                <div className="season-briefing-section-head">
-                  <h3 className="season-briefing-section-title">Spieltags-Reihenfolge</h3>
-                  <p className="season-briefing-section-lead">
-                    Alle Diszi-Paare der Season — Farb-Dopplungen und Spieltage mit 11–12 Slots sind markiert.
-                  </p>
-                </div>
-                <div className="season-briefing-matchday-grid">
-                  {seasonBriefingScheduleReady ? (
-                    seasonBriefingData.firstMatchdays.map((entry: SeasonBriefingMatchdayEntry, index: number) => (
-                      <article
-                        key={`season-briefing-md-${entry.matchdayId}`}
-                        className={joinClassNames(
-                          "season-briefing-matchday nl-reveal",
-                          entry.sameColor && "has-same-color",
-                          entry.isHeavyRoster && "has-heavy-roster",
-                        )}
-                        style={{ "--nl-reveal-i": Math.min(index + 2, 12) } as CSSProperties}
-                      >
-                        <span className="season-briefing-md-label">{entry.label}</span>
-                        <div className="season-briefing-discipline-row">
-                          {entry.disciplines.map((discipline: SeasonBriefingDisciplineEntry) => {
-                            const tone: NlTone =
-                              discipline.color === "red"
-                                ? "pow"
-                                : discipline.color === "green"
-                                  ? "spe"
-                                  : discipline.color === "blue"
-                                    ? "men"
-                                    : discipline.color === "yellow"
-                                      ? "soc"
-                                      : "neutral";
-                            return (
-                              <span
-                                key={`season-briefing-md-${entry.matchdayId}-${discipline.name}`}
-                                className={joinClassNames("season-briefing-diszi-chip", nlToneClass(tone))}
-                              >
-                                <b className="season-briefing-diszi-name">{discipline.name}</b>
-                                <small className="season-briefing-diszi-meta">
-                                  {discipline.playerCount ?? "—"} Slots · {formatDisciplineCategoryLabel(discipline.category)}
-                                </small>
-                              </span>
-                            );
-                          })}
-                        </div>
-                        {entry.isHeavySameColor ? (
-                          <span className={joinClassNames("season-briefing-badge is-combo", nlToneClass("risk"))}>
-                            Farb-Dopplung + Kaderdruck · {entry.totalSlots} Slots
-                          </span>
-                        ) : entry.sameColor ? (
-                          <span className={joinClassNames("season-briefing-badge", nlToneClass("warn"))}>
-                            Farb-Dopplung · gleiche Kategorie am selben Spieltag
-                          </span>
-                        ) : entry.isHeavyRoster ? (
-                          <span className={joinClassNames("season-briefing-badge", nlToneClass("risk"))}>
-                            Kaderdruck · {entry.totalSlots} Slots
-                          </span>
-                        ) : null}
-                      </article>
-                    ))
-                  ) : (
-                    <p className="season-briefing-empty">Spieltags-Paare erscheinen, sobald der Diszi-Plan geladen ist.</p>
-                  )}
-                </div>
-              </section>
-
-              <div className="season-briefing-two-col nl-reveal" style={{ "--nl-reveal-i": 3 } as CSSProperties}>
-                <NlCard eyebrow="Slots" title="Große Diszis">
-                  <p className="season-briefing-card-lead">Nach Slotgröße sortiert; die Spieltags-Reihenfolge steht oben.</p>
-                  <div className="season-briefing-chip-list">
-                    {seasonBriefingScheduleReady ? (
-                      seasonBriefingData.bigDisciplines.map((slot: SeasonBriefingBigDisciplineSlot) => {
-                        const tone: NlTone =
-                          slot.color === "red"
-                            ? "pow"
-                            : slot.color === "green"
-                              ? "spe"
-                              : slot.color === "blue"
-                                ? "men"
-                                : slot.color === "yellow"
-                                  ? "soc"
-                                  : "neutral";
-                        return (
-                          <span
-                            key={`season-briefing-big-${slot.matchdayId}-${slot.disciplineId}`}
-                            className={joinClassNames("season-briefing-diszi-chip is-big", nlToneClass(tone))}
-                          >
-                            <b className="season-briefing-diszi-name">{slot.displayName}</b>
-                            <small className="season-briefing-diszi-meta">{slot.matchdayLabel} · {slot.playerCount ?? "—"} Slots</small>
-                          </span>
-                        );
-                      })
-                    ) : (
-                      <p className="season-briefing-empty">Slot-Größen folgen mit dem Diszi-Plan.</p>
-                    )}
-                  </div>
-                </NlCard>
-                <NlCard eyebrow="Kollisionen" title="Farb-Dopplungen">
-                  {!seasonBriefingScheduleReady ? (
-                    <p className="season-briefing-empty">Farb-Kollisionen werden nach dem Laden des Diszi-Plans angezeigt.</p>
-                  ) : seasonBriefingData.sameColorMatchdays.length > 0 ? (
-                    <div className="season-briefing-chip-list">
-                      {seasonBriefingData.sameColorMatchdays.map((entry: SeasonBriefingMatchdayEntry) => (
-                        <span
-                          key={`season-briefing-double-${entry.matchdayId}`}
-                          className={joinClassNames("season-briefing-diszi-chip", nlToneClass("warn"))}
-                        >
-                          <b className="season-briefing-diszi-name">{entry.label}</b>
-                          <small className="season-briefing-diszi-meta">
-                            {entry.disciplines.map((discipline: SeasonBriefingDisciplineEntry) => discipline.name).join(" / ")}
-                          </small>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="season-briefing-empty">
-                      In dieser Season keine gleiche Farbe doppelt am selben Spieltag. Breiter Kader wird etwas entspannter.
-                    </p>
-                  )}
-                  {seasonBriefingData.futureFactors.length > 0 ? (
-                    <div className="season-briefing-factor-row">
-                      {seasonBriefingData.futureFactors.map((entry: SeasonBriefingFactorEntry) => (
-                        <StatChip
-                          key={`season-briefing-factor-${entry.label}`}
-                          label={entry.label}
-                          value={`${formatLocalePoints(entry.factor, 2)}x`}
-                          tone="accent"
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </NlCard>
-              </div>
-            </div>
-            <div className="foundation-modal-actions">
-              <button
-                className="nl-sb-btn is-ghost"
-                type="button"
-                onClick={() => {
-                  closeSeasonBriefing(false);
-                  setFoundationView("diszis", setActiveView);
-                }}
-              >
-                Diszis ansehen
-              </button>
-              <button
-                className="nl-sb-btn is-primary"
-                type="button"
-                onClick={completeSeasonBriefingAndContinue}
-              >
-                Erledigt
-              </button>
-            </div>
-          </section>
-        </div>
+          onErledigt={completeSeasonBriefingAndContinue}
+        />
       ) : null}
 
       {/* Slim status line only — Save-Name + "AKTIVES TEAM" leben jetzt kompakt

@@ -212,7 +212,14 @@ export function writeFoundationUrlState(state: FoundationUrlState, mode: "push" 
 
   const currentSearch = new URL(window.location.href).searchParams;
   const href = buildFoundationHref(state, "/foundation", { preserveRoomParamsFrom: currentSearch });
-  const historyState = { [HISTORY_STATE_KEY]: state };
+  // Ersetzen betrifft denselben Eintrag: seine Unterzustaende (Draft-Profil, Reiter …, history-unterzustand.ts) bleiben erhalten.
+  const rest: Record<string, unknown> = {};
+  if (mode === "replace" && window.history.state && typeof window.history.state === "object") {
+    for (const [name, wert] of Object.entries(window.history.state as Record<string, unknown>)) {
+      if (name.startsWith("olySub:")) rest[name] = wert;
+    }
+  }
+  const historyState = { ...rest, [HISTORY_STATE_KEY]: state };
 
   if (mode === "push") {
     window.history.pushState(historyState, "", href);
