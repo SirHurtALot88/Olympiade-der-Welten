@@ -1110,6 +1110,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
   for (const objective of objectiveOverview.objectives) {
     if (!visibleTeamIds.has(objective.teamId)) continue;
     if (objective.status !== "at_risk" && objective.status !== "failed") continue;
+    // „Ruecklage angezapft" ist ein Kostenvermerk (Vertrauensabzug bei der naechsten Festlegung), kein verfehltes Ziel: keine Meldung.
+    if (objective.objectiveId === "vorstand-ruecklage-angezapft") continue;
     items.push(
       createItem({
         itemId: `board_objective_${objective.status}:${input.saveId}:${objective.seasonId}:${objective.teamId}:${objective.objectiveId}`,

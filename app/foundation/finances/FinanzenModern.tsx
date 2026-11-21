@@ -28,10 +28,8 @@ import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 import "./finanzen-modern.css";
 
-export type VorstandAktionFn = (input: {
-  aktion: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen";
-  betrag?: number;
-}) => Promise<{ ok: boolean; reason: string | null; meldung: string }>;
+export type { VorstandAktionFn } from "@/lib/finance/vorstand-aktion-typen";
+import type { VorstandAktionFn } from "@/lib/finance/vorstand-aktion-typen";
 
 export type FinanzenModernProps = {
   gameState: GameState;
@@ -42,6 +40,8 @@ export type FinanzenModernProps = {
   onOpenTeam?: (teamId: string) => void;
   /** Schreibweg (laeuft serverseitig durch den Raum-Schreibschutz). Fehlt er oder darf der Manager nicht, ist die Seite nur lesbar. */
   onVorstandAktion?: VorstandAktionFn;
+  /** Springt ins Office (Reiter Gespräch): dort laufen Rücklage anzapfen und „Alles auf eine Karte“ jetzt. */
+  onOpenOffice?: () => void;
   kannVerwalten?: boolean;
   /** Reiter, mit dem die Seite aufgeht (Tests und Sprunglinks); sonst die Übersicht. */
   startAnsicht?: FinanzenAnsicht;
@@ -383,18 +383,19 @@ function BudgetsAnsicht({
   m,
   gameState,
   onAktion,
+  onOpenOffice,
   kannSchreiben,
 }: {
   m: FinanzSeiteModell;
   gameState: GameState;
   onAktion?: VorstandAktionFn;
+  onOpenOffice?: () => void;
   kannSchreiben: boolean;
 }) {
   const s = m.stand;
   const fenster = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
   const nGes = m.spieltageGesamt;
   const [draft, setDraft] = useState<number | null>(null);
-  const [anzapf, setAnzapf] = useState<number | null>(null);
   const [meldung, setMeldung] = useState<{ ton: "gut" | "acht"; text: string } | null>(null);
   const [bitte, setBitte] = useState(false);
   const fordert = vorstandFordertAlleAufEineKarte(gameState, m.teamId);
@@ -417,7 +418,6 @@ function BudgetsAnsicht({
     } finally {
       setBitte(false);
       setDraft(null);
-      setAnzapf(null);
     }
   };
   const stufenText: Array<[number, string]> = [
@@ -430,8 +430,6 @@ function BudgetsAnsicht({
   const tGes = Math.max(s.investition.gesamt, s.investition.ausgegeben, 0.01);
   const gGes = Math.max(h.tragbaresGehalt, s.gehalt.ausgegeben, s.gehalt.gesamt, 0.01);
   const lo = s.lockerung;
-  const anzapfWert = anzapf ?? s.ruecklageAnzapfen.bereitsAngezapft;
-  const anzapfMax = s.ruecklageAnzapfen.bereitsAngezapft + s.ruecklageAnzapfen.moeglich;
   return (
     <div className="fin-gr" style={{ gridTemplateRows: "auto minmax(0, 1fr) auto" }} data-testid="fin-budgets">
       <div className="fin-sd is-farbe" style={{ "--pc": "var(--bc-gut)" } as CSSProperties}>
@@ -717,33 +715,18 @@ function BudgetsAnsicht({
 
       <div className="fin-sd is-farbe" style={{ "--pc": "var(--bc-gold)", ...(verkaufserloeseFreiAnteil(s.anteil) >= 1 ? { gridColumn: "span 2" } : {}) } as CSSProperties}>
         <div className="fin-kopf">
-          Sonderwege<small>kosten Vertrauen · nur im Fenster</small>
+          Sonderwege<small>jetzt im Gespräch mit dem Vorstand</small>
         </div>
         <div className="fin-in">
           <div className="fin-rek">
             <span>
-              <b>Rücklage anzapfen</b>
+              <b>Rücklage</b>
               <small>
-                bis {zahl(anzapfMax)} C (50 % des Ziels) zusätzlich in den Transfertopf · Vertrauen −{zahl(s.ruecklageAnzapfen.vertrauenskosten)} bisher
+                {s.ruecklageAnzapfen.bereitsAngezapft > 0.004
+                  ? `${zahl(s.ruecklageAnzapfen.bereitsAngezapft)} C angezapft · Vertrauen −${zahl(s.ruecklageAnzapfen.vertrauenskosten)} bisher`
+                  : "Bis zur Hälfte des Rücklage-Ziels lässt sich im Gespräch mit dem Vorstand freigeben."}
               </small>
             </span>
-          </div>
-          <input
-            type="range"
-            className="fin-regler"
-            min={0}
-            max={Math.max(0.5, anzapfMax)}
-            step={0.5}
-            value={Math.min(anzapfWert, Math.max(0.5, anzapfMax))}
-            disabled={!s.gedeckelt || alle || !fenster || !kannSchreiben || bitte || anzapfMax < 0.5}
-            aria-label="Rücklage anzapfen"
-            onChange={(e) => setAnzapf(Number(e.target.value))}
-            onPointerUp={() => anzapf != null && schreib({ aktion: "ruecklage_anzapfen", betrag: anzapf })}
-            onKeyUp={() => anzapf != null && schreib({ aktion: "ruecklage_anzapfen", betrag: anzapf })}
-          />
-          <div className="fin-zl">
-            <span>Angezapft</span>
-            <strong className="bc-t">{C(anzapfWert)}</strong>
           </div>
           <div className="fin-rek">
             <span>
@@ -753,21 +736,30 @@ function BudgetsAnsicht({
                   ? `Aktiv (${s.alleAufEineKarte.zustand?.quelle === "ki" ? "KI" : s.alleAufEineKarte.zustand?.quelle === "vorstand" ? "Vorstand" : "Antrag"}): Ziel Platz ${s.alleAufEineKarte.zustand?.zielRang} oder besser.`
                   : fordert
                     ? "Der Vorstand fordert die Wette von deinem Team: Ziel Top-Platz."
-                    : `Alles bis auf ${Math.round(ALLES_PUFFER_ANTEIL * 100)} % Puffer ausgeben. Verfehlt das Team das Ziel, sinkt das Vertrauen.`}
+                    : "Beantragen geht im Gespräch mit dem Vorstand."}
               </small>
             </span>
             {alle ? (
               <span className="fin-marke is-gold">AKTIV</span>
-            ) : (
+            ) : fordert ? (
               <button
                 type="button"
-                className={`fin-btn is-klein ${fordert ? "is-ja" : "is-warn"}`}
+                className="fin-btn is-klein is-ja"
                 disabled={!s.gedeckelt || !fenster || !kannSchreiben || bitte}
-                onClick={() => schreib({ aktion: fordert ? "vorstand_fordert_annehmen" : "alles_auf_eine_karte" })}
+                onClick={() => schreib({ aktion: "vorstand_fordert_annehmen" })}
               >
-                {fordert ? "Annehmen" : "Beantragen"}
+                Annehmen
               </button>
-            )}
+            ) : null}
+          </div>
+          <div className="fin-rek">
+            <span>
+              <b>Mit dem Vorstand sprechen</b>
+              <small>Freigabe anheben, Sonderbudget, Rücklage, „Alles auf eine Karte“, Ziel tauschen: zwei Gespräche je Saison im Office.</small>
+            </span>
+            <button type="button" className="fin-btn is-klein" onClick={onOpenOffice} disabled={!onOpenOffice} data-testid="fin-zum-gespraech">
+              Zum Gespräch
+            </button>
           </div>
           {s.zustand.letzterAntragAbgelehnt && !alle ? <div className="fin-meldung">{s.zustand.letzterAntragAbgelehnt.grund}</div> : null}
           {meldung ? <div className={`fin-meldung${meldung.ton === "gut" ? " is-gut" : ""}`}>{meldung.text}</div> : null}
@@ -1306,6 +1298,7 @@ export default function FinanzenModern({
   salaryFactorOutlook,
   onOpenTeam,
   onVorstandAktion,
+  onOpenOffice,
   kannVerwalten = false,
   startAnsicht = "uebersicht",
   startKontext = "lage",
@@ -1441,7 +1434,7 @@ export default function FinanzenModern({
             {ansicht === "uebersicht" ? <Uebersicht m={m} gew={gew} setGew={wahlStation} /> : null}
             {ansicht === "kontoauszug" ? <Kontoauszug m={m} gew={gewZeile} onZeile={setGewZeile} /> : null}
             {ansicht === "budgets" ? (
-              <BudgetsAnsicht m={m} gameState={gameState} onAktion={onVorstandAktion} kannSchreiben={kannVerwalten} />
+              <BudgetsAnsicht m={m} gameState={gameState} onAktion={onVorstandAktion} onOpenOffice={onOpenOffice} kannSchreiben={kannVerwalten} />
             ) : null}
             {ansicht === "sponsor" ? <SponsorAnsicht m={m} gameState={gameState} /> : null}
             {ansicht === "guv" ? <GuvAnsicht m={m} salaryFactorOutlook={salaryFactorOutlook} /> : null}

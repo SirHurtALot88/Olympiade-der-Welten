@@ -16,6 +16,7 @@ import {
   lesVorstandZustand,
   type VorstandBudgetStand,
 } from "@/lib/finance/vorstand-budgetfreigabe";
+import { lesVorstandGespraech } from "@/lib/finance/vorstand-gespraech-zustand";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 
@@ -64,6 +65,10 @@ export function setzeUmschichtung(gameState: GameState, teamId: string, betrag: 
   const vorher = berechneVorstandBudgetStand(gameState, teamId);
   if (!vorher.gedeckelt) return fehler(gameState, "nicht_aktiv", "Umschichten gibt es erst ab Saison 2: vorher ist alles freigegeben.");
   const wert = r2(betrag);
+  // Zusage aus dem Vorstandsgespraech (Office 21.11): ein Gehaltsdeckel verbietet es, Geld ins Gehalt zu schieben.
+  if (wert > vorher.umschichten.aktuell && lesVorstandGespraech(gameState, teamId).zusagen.some((x) => x.art === "deckel")) {
+    return fehler(gameState, "gehaltsdeckel_zugesagt", "Du hast dem Vorstand einen Gehaltsdeckel zugesagt: kein Umschichten ins Gehalt in dieser Saison.");
+  }
   if (wert < 0 && !fenster(gameState)) {
     return fehler(gameState, "nur_im_fenster", "Gehalt in den Transfertopf schieben geht nur im Transferfenster.");
   }

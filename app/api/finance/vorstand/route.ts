@@ -5,9 +5,15 @@ import { NextResponse } from "next/server";
 import {
   beantrageAlleAufEineKarte,
   setzeUmschichtung,
-  zapfeRuecklageAn,
   type VorstandAktionErgebnis,
 } from "@/lib/finance/vorstand-budget-aktionen";
+import {
+  nimmGegenangebotAn,
+  stelleGespraechAntrag,
+  ziehGegenangebotZurueck,
+  type GespraechAntrag,
+} from "@/lib/finance/vorstand-gespraech";
+import { setzePraemienPlan } from "@/lib/finance/vorstand-praemien";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -18,8 +24,16 @@ type VorstandBody = {
   saveId?: string;
   seasonId?: string;
   teamId?: string;
-  /** "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen" */
+  /**
+   * "umschichten" | "vorstand_fordert_annehmen" | "gespraech_antrag" | "gespraech_annehmen" | "gespraech_zurueckziehen" | "praemien_setzen".
+   * „ruecklage_anzapfen" und „alles_auf_eine_karte" gibt es fuer den Menschen nur noch im Vorstandsgespraech (Office 21.11).
+   */
   aktion?: string;
+  /** Vorstandsgespraech: Bitte, Betrag, Ziel und Zusagen (siehe `GespraechAntrag`). */
+  antrag?: GespraechAntrag;
+  /** Praemien: Stufen 0 bis 2. */
+  siegStufe?: number;
+  treueStufe?: number;
   /** Betrag in C (Umschichten: + Transfer -> Gehalt; Anzapfen: Gesamtbetrag). */
   betrag?: number;
   source?: "sqlite" | "prisma";
@@ -83,10 +97,29 @@ export async function POST(request: Request) {
     let ergebnis: VorstandAktionErgebnis;
     if (aktion === "umschichten") {
       ergebnis = setzeUmschichtung(save.gameState, teamId, typeof body.betrag === "number" ? body.betrag : NaN);
-    } else if (aktion === "ruecklage_anzapfen") {
-      ergebnis = zapfeRuecklageAn(save.gameState, teamId, typeof body.betrag === "number" ? body.betrag : NaN);
-    } else if (aktion === "alles_auf_eine_karte") {
-      ergebnis = beantrageAlleAufEineKarte(save.gameState, teamId, "mensch");
+    } else if (aktion === "ruecklage_anzapfen" || aktion === "alles_auf_eine_karte") {
+      return NextResponse.json(
+        { ok: false, reason: "nur_im_gespraech", meldung: "Das geht nur noch im Gespräch mit dem Vorstand (Office, Reiter Gespräch)." },
+        { status: 400 },
+      );
+    } else if (aktion === "gespraech_antrag" || aktion === "gespraech_annehmen" || aktion === "gespraech_zurueckziehen") {
+      const g =
+        aktion === "gespraech_antrag"
+          ? body.antrag && typeof body.antrag.bitte === "string"
+            ? stelleGespraechAntrag(save.gameState, teamId, { ...body.antrag, zusagen: Array.isArray(body.antrag.zusagen) ? body.antrag.zusagen : [] })
+            : null
+          : aktion === "gespraech_annehmen"
+            ? nimmGegenangebotAn(save.gameState, teamId)
+            : ziehGegenangebotZurueck(save.gameState, teamId);
+      if (!g) return NextResponse.json({ ok: false, reason: "missing_fields", meldung: "Angaben fehlen." }, { status: 400 });
+      if (!g.ok) return NextResponse.json({ ok: false, reason: g.reason, meldung: g.meldung }, { status: 400 });
+      ergebnis = { ok: true, reason: g.ausgang, meldung: g.meldung, gameState: g.gameState, stand: null };
+    } else if (aktion === "praemien_setzen") {
+      const p = setzePraemienPlan(save.gameState, teamId, {
+        siegStufe: typeof body.siegStufe === "number" ? body.siegStufe : NaN,
+        treueStufe: typeof body.treueStufe === "number" ? body.treueStufe : NaN,
+      });
+      ergebnis = { ok: p.ok, reason: p.reason, meldung: p.meldung, gameState: p.gameState, stand: null };
     } else if (aktion === "vorstand_fordert_annehmen") {
       ergebnis = beantrageAlleAufEineKarte(save.gameState, teamId, "vorstand");
     } else {

@@ -809,6 +809,7 @@ import {
   EMPTY_FEATURE_AUDIT_MATRIX,
   EMPTY_MULTI_SEASON_BALANCE_DASHBOARD,
 } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
+import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -6313,10 +6314,7 @@ export function useFoundationShellRouterBodyScope({
    * Kredit-Aktionen: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers (Fog of War), nie ein
    * `teamId`-Parameter; der Server prueft den Besitz ueber `authorizeServerRoomWrite`.
    */
-  async function vorstandBudgetAktion(input: {
-    aktion: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen";
-    betrag?: number;
-  }): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+  async function vorstandBudgetAktion(input: VorstandAktionEingabe): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
     if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
       return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
@@ -6335,6 +6333,9 @@ export function useFoundationShellRouterBodyScope({
           teamId: activeManagerTeamId,
           aktion: input.aktion,
           betrag: input.betrag,
+          antrag: input.antrag,
+          siegStufe: input.siegStufe,
+          treueStufe: input.treueStufe,
           source: readMeta.source,
         })),
       });

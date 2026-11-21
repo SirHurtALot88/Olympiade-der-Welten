@@ -151,6 +151,11 @@ export type ManagerOfficeClientProps = {
   onOpenTeam: (teamId: string) => void;
   onNavigateInboxItem: (item: GameInboxItem) => void;
   seasonReadinessChecklist?: SeasonReadinessChecklist | null;
+  /**
+   * Office 21.11: der Vorstands-Kontext (Vertrauen, Ziele, Druck) lebt jetzt im Reiter „Vorstand und Ziele" des neuen Office.
+   * Als Reiter „Kabine" zeigt diese Ansicht nur noch Kapitän und Front Office (kein zweiter Kopf, kein zweiter Board-Kasten).
+   */
+  ohneVorstandBlock?: boolean;
 };
 
 export function ManagerOfficeClient({
@@ -176,6 +181,7 @@ export function ManagerOfficeClient({
   onNavigate,
   onOpenTeam,
   seasonReadinessChecklist,
+  ohneVorstandBlock = false,
 }: ManagerOfficeClientProps) {
   const [draftCaptainPlayerId, setDraftCaptainPlayerId] = useState<string | null>(selectedTeamCaptainPlayerId);
 
@@ -219,6 +225,7 @@ export function ManagerOfficeClient({
 
   return (
     <section className="foundation-hq-panel" data-testid="foundation-hq" id="foundation-hq">
+      {!ohneVorstandBlock ? (
       <div className="foundation-hq-hero">
         <button
           className="foundation-home-team-card foundation-hq-team-card"
@@ -273,6 +280,7 @@ export function ManagerOfficeClient({
           </div>
         </button>
       </div>
+      ) : null}
       {seasonReadinessChecklist ? (
         <section className="foundation-hq-readiness-checklist" data-testid="foundation-season-readiness-checklist" aria-label={seasonReadinessChecklist.title}>
           <div className="foundation-hq-readiness-head">
@@ -303,7 +311,7 @@ export function ManagerOfficeClient({
           </div>
         </section>
       ) : null}
-      {selectedTeamGeneralManager && selectedHqGmStory && !isSeasonOnePreseasonNeutralBoard(gameState as GameState) ? (
+      {!ohneVorstandBlock && selectedTeamGeneralManager && selectedHqGmStory && !isSeasonOnePreseasonNeutralBoard(gameState as GameState) ? (
         <div
           className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}
           data-testid="foundation-hq-gm-story"
@@ -317,6 +325,7 @@ export function ManagerOfficeClient({
         </div>
       ) : null}
 
+      {!ohneVorstandBlock ? (
       <VeloImpactStrip
         className="foundation-hq-board-impact-strip"
         items={[
@@ -342,6 +351,7 @@ export function ManagerOfficeClient({
           },
         ]}
       />
+      ) : null}
 
       <section
         className="foundation-hq-captain-picker"

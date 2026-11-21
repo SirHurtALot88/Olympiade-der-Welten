@@ -3034,7 +3034,7 @@ function FoundationTeamsDetailPanel({
                               </span>
                             ) : null}
                             {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
-                            {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
+                            {objective.penaltyCash != null && (objective.source ?? "").includes("sponsor_v2") ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
                           </div>
                         </article>
                       ))}
