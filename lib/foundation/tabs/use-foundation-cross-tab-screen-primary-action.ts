@@ -77,7 +77,7 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
         ? `${input.selectedTeam.name} ist nicht dein steuerbares Team. Anschauen ja, Kaufen/Verkaufen/Verlängern nein.`
         : seasonEndRosterActionsActive
           ? "Season-End-Phase aktiv: Verkaufen ist freigegeben, auslaufende Verträge können verlängert werden."
-          : "Verkaufen und Verlängern öffnen erst am Season-End. Während der laufenden Season bleibt der Kader gesperrt.";
+          : "Verkaufen öffnet erst am Season-End. Verlängern geht auch zwischen den Spieltagen (Verträge, die mit dieser Saison auslaufen).";
 
   const screenPrimaryAction = useMemo<FoundationScreenPrimaryAction | null>(() => {
     if (input.activeView === "homeV2") {

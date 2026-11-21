@@ -73945,6 +73945,93 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
+/* Verlängerung mitten in der Saison (21.11.): „gilt ab Spieltag N, läuft bis Ende Saison X", Gehalt alt gegen neu
+   (groß je Saison, klein je Spieltag). */
+.is-new-look .nl-negotiation-insaison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+  border-radius: var(--nl-r-md);
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel));
+}
+
+.is-new-look .nl-negotiation-insaison-when {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-negotiation-insaison-when strong {
+  font-family: var(--schrift-haus, Georgia, serif);
+  font-size: 17px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-negotiation-insaison-when small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-insaison-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-negotiation-insaison-pay {
+  margin: 0;
+  display: flex;
+  gap: 18px;
+}
+
+.is-new-look .nl-negotiation-insaison-pay > div {
+  display: grid;
+  gap: 1px;
+  justify-items: end;
+  min-width: 120px;
+}
+
+.is-new-look .nl-negotiation-insaison-pay dt {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-negotiation-insaison-pay dd {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+  justify-items: end;
+}
+
+.is-new-look .nl-negotiation-insaison-pay b {
+  font-family: var(--schrift-zahl, "Barlow Condensed", sans-serif);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-negotiation-insaison-pay .is-neu b {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-negotiation-insaison-pay small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 960px) {
+  .is-new-look .nl-negotiation-insaison {
+    grid-template-columns: 1fr;
+  }
+}
+
 .is-new-look .nl-negotiation-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

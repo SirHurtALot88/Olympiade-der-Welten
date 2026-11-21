@@ -1,5 +1,6 @@
 "use client";
 
+import { istVerlaengernInSaisonOffen } from "@/lib/contracts/verlaengerung-in-saison";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildExpectedSellValueByPlayerId,
@@ -223,6 +224,8 @@ export type FoundationTeamsNewLookProps = {
   formatMoney: (value: number) => string;
   formatDisplayMoney: (value: number | null | undefined) => string;
   selectedTeamRosterActionsAvailable: boolean;
+  /** Darf der Nutzer dieses Team steuern? (Für „Verlängern“ zwischen den Spieltagen.) */
+  selectedTeamCanManage?: boolean;
   selectedTeamRosterActionHint: string | null;
   /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
   marketSellBusy: boolean;
@@ -705,6 +708,7 @@ export default function FoundationTeamsNewLook({
   getRosterEntrySalaryDelta,
   formatDisplayMoney,
   selectedTeamRosterActionsAvailable,
+  selectedTeamCanManage,
   selectedTeamRosterActionHint,
   marketSellBusy,
   contractRenewalBusy,
@@ -1407,7 +1411,11 @@ export default function FoundationTeamsNewLook({
       : TEMP_FORCE_ROSTER_ACTIONS
         ? "Test-Modus: Aktion freigeschaltet. Verkauf öffnet regulär am Season-End (nach MD10)."
         : "Verkauf öffnet am Season-End (nach MD10).";
-    const renewActionTitle = selectedTeamRosterActionsAvailable
+    const renewInSaisonOffen = Boolean(selectedTeamCanManage) && istVerlaengernInSaisonOffen(gameState);
+    const renewEnabled = rosterActionsEnabled || renewInSaisonOffen;
+    const renewActionTitle = renewInSaisonOffen && !selectedTeamRosterActionsAvailable
+      ? "Verlängern — gilt ab dem nächsten Spieltag, die laufende Saison zählt mit"
+      : selectedTeamRosterActionsAvailable
       ? "Verlängern — öffnet die Gehaltsverhandlung"
       : TEMP_FORCE_ROSTER_ACTIONS
         ? "Test-Modus: Aktion freigeschaltet. Gehaltsverhandlung öffnet regulär am Season-End (nach MD10)."
@@ -1553,7 +1561,7 @@ export default function FoundationTeamsNewLook({
                       <button
                         type="button"
                         className="nl-teams-action"
-                        disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                        disabled={!renewEnabled || contractRenewalBusy != null}
                         title={renewActionTitle}
                         aria-label={`${player.name} verlängern`}
                         onClick={() =>

@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { mischeSaisongehalt } from "@/lib/contracts/verlaengerung-in-saison";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
   normalizeEconomyMoney,
@@ -52,7 +53,10 @@ export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): 
       // diese Anzeige um Faktor 100 von dem trennen, was der Saisonende-Apply abbucht. Am Abbild
       // aller fünf Spielstände (1 689 Rosterverträge) liegt kein einziger über der Schwelle — der
       // Zweig war also toter, aber falscher Code.
-      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
+      // Verlaengerung WAEHREND der Saison: das neue Gehalt gilt ab dem naechsten Spieltag, nicht rueckwirkend — die
+      // Saisonsumme mischt altes und neues Gehalt nach Spieltagen (`mischeSaisongehalt`, ohne Vermerk = unveraendert).
+      const salary = resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0;
+      return sum + mischeSaisongehalt(entry, gameState.season?.id ?? "", salary);
     }, 0);
   return round1(total);
 }
