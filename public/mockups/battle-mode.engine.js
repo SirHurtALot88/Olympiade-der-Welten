@@ -5010,7 +5010,10 @@
     // unteren Drittel gefasst, das laengere Stueck ragt nach vorn ueber die Faust hinaus.
     const x1=x-ux*laenge*0.35, y1=y-uy*laenge*0.35;
     const x2=x+ux*laenge*0.65, y2=y+uy*laenge*0.65;
-    ctx.strokeStyle="#c8401c"; ctx.lineWidth=Math.max(1,3.2*s); ctx.lineCap="round";
+    // 21.11.: dunkle Unterlage, damit der Stab auf Rasen und Bahn als Gegenstand lesbar bleibt.
+    ctx.strokeStyle="rgba(20,12,8,.75)"; ctx.lineWidth=Math.max(2,4.8*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.strokeStyle="#e0502a"; ctx.lineWidth=Math.max(1,3.2*s);
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
     // Griffband am Ankerpunkt, wie bei Hantel/Hockeyschlaeger.
     ctx.fillStyle="#e8e2d0";
@@ -7151,7 +7154,9 @@
   function zeichneGesichtsMarke(ctx,u,x,yMitte,Z){
     const e=battlePortraitBild(u);
     if(!e.geladen||e.fehler)return;
-    const r=Math.max(5.5,8*Z);
+    // 21.11.: groesser (vorher 8*Z) und mit Teamfarbe im Ring -- die Marke ist das EINZIGE, woran man einen Spieler ohne
+    // PixelLab-Figur (rund 88 % der Spieler, s. ohneEigeneFigur) von seinen Nachbarn unterscheidet.
+    const r=Math.max(7,11*Z);
     ctx.save();
     ctx.beginPath(); ctx.arc(x,yMitte,r,0,Math.PI*2); ctx.closePath();
     ctx.fillStyle="rgba(8,10,14,.85)"; ctx.fill();
@@ -7159,8 +7164,9 @@
     ctx.imageSmoothingEnabled=true;
     ctx.drawImage(e.im,x-r,yMitte-r,2*r,2*r);
     ctx.restore();
-    ctx.lineWidth=Math.max(1,1.3*Z);
-    ctx.strokeStyle="rgba(242,233,216,.9)";
+    ctx.lineWidth=Math.max(1.5,2*Z);
+    const seite=u.side!=null?u.side:u.seite;
+    ctx.strokeStyle=seite===0?"#f0a04a":seite===1?"#4cc3d9":"rgba(242,233,216,.9)";
     ctx.stroke();
     ctx.restore();
   }
@@ -45575,7 +45581,7 @@
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
     // "BEREIT" VOR DEM ANPFIFF (Broadcast-Audit Runde 2, Punkt 12, 30.09.): dieselbe
     // Ergaenzung wie in den anderen drei updateHud*()-Funktionen.
-    document.getElementById("phase").textContent=done?"beendet":!running?"bereit":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
+    document.getElementById("phase").textContent=done?"beendet":!running?"bereit":(t>KAMPF_SUDDEN_DEATH_T&&!tdmReplayAktiv()?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
@@ -45592,7 +45598,8 @@
     const sd=document.querySelector(".hpbars .sd");
     if(sd){
       const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
-      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+      // TDM-Gefecht hat kein Sudden Death auf der Uhr (Kampf bis zum Ende, s. TDM_GEFECHT_GRUND).
+      sd.textContent=tdmReplayAktiv()?"":"Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
     }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
@@ -51730,6 +51737,20 @@
   // heisst an beiden Zonen schlicht: die Bildschirm-Y-Achse. Genau deshalb funktioniert die
   // Auffaecherung der Wartenden unten an beiden Wechselzonen mit derselben Rechnung.
   const ovalAmZiel=(anteil)=>{const f=(((anteil%1)+1)%1); return f<0.25||f>0.75;};
+  // STAFFEL-UEBERGABE, REINE ANZEIGE (21.11., s. ovalPunkt): wer als NAECHSTER dran ist (Vordermann laeuft,
+  // er selbst hat noch nicht uebernommen) steht an der Linie auf seiner Spur; wer gerade abgegeben hat, geht
+  // von der Linie ins Innenfeld. Der Zeitpunkt der Uebergabe liegt in einer WeakMap NEBEN dem Laeufer
+  // (kein neues Feld am Laeufer -> Wertungs-Fingerabdruck bleibt gleich). Nichts davon wird je geschrieben
+  // ausser vom Anzeige-Schritt stepStaffel.
+  const STAFFEL_WARTE_VORSPRUNG_PX=18;
+  const STAFFEL_GEBER_ABGANG_S=1.2;
+  const staffelUebergabeZeit=new WeakMap();
+  let staffelSichtUhr=0;   // Zuschauer-Sekunden seit dem ersten Staffel-Schritt (waechst nur in stepStaffel)
+  function staffelNaechsterAmStart(o){
+    if(!BA().staffel||o.aktiv||o.fertig!=null||o.durch)return false;
+    const vor=LAEUFER.find(q=>q.seite===o.seite&&q.bein===o.bein-1);
+    return !!(vor&&vor.aktiv);
+  }
   function ovalPunkt(u){
     const platz=rennFertig.indexOf(u);
     // GESTUERZTER/STOLPERNDER LAEUFER BLEIBT AUCH OPTISCH STEHEN (Chris' Meldung, s.
@@ -51791,6 +51812,7 @@
       // Ziellinie. Massgeblich ist die ZONE, und die sagt `ovalAmZiel()` — genau die
       // Funktion, die den Ganzzahl-/Halbrunden-Unterschied wegrechnet.
       const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null
+          &&!staffelNaechsterAmStart(o)
           &&ovalAmZiel(ovalAnteil(o))===ovalAmZiel(anteil))
         .sort((a,b)=>(a.bein??0)-(b.bein??0));
       const idx=Math.max(0,wartende.indexOf(u));
@@ -51844,8 +51866,29 @@
         bahnR+=(ovalSpurR(OVAL_SPUR0+u.bahnZ)-bahnR)*zug;
         vx*=(1-0.75*zug);
       }
+      // UEBERGABE-ANZEIGE (Chris, Live 19./20.11.: "die Uebergabe findet nicht statt, der Stab fliegt
+      // herum"): der NAECHSTE Laeufer wartet nicht mehr irgendwo im Innenfeld, sondern an Start/Ziel
+      // auf seiner EIGENEN Spur, knapp VOR der Linie (Laufrichtung), und tritt bis zur Uebergabe an
+      // sie heran (vizAnlauf 0..1). Beim Wechsel steht er dadurch schon exakt dort, wo sein Bein
+      // beginnt -- kein Sprung mehr aus dem Innenfeld, und der Stab hat nur eine Handbreit zu fliegen.
+      // Reine Zeichenposition: u.pos/u.aktiv/u.durch werden nur gelesen.
+      if(staffelNaechsterAmStart(u)){
+        bahnR=ovalSpurR(OVAL_SPUR0+u.bahnZ);
+        vx=STAFFEL_WARTE_VORSPRUNG_PX*(1-Math.min(1,u.vizAnlauf||0));
+      }
     }
+    // GEBER NACH DER UEBERGABE: bleibt an der Linie und geht dann ueber ~1,2 s ins Innenfeld zu den
+    // uebrigen Wartenden (vorher sprang er im selben Bild dorthin), s. staffelUebergabeZeit.
     const p=bahnPunkt(anteil,bahnR);
+    const geberT=(u.durch&&u.fertig==null&&!u.aktiv&&platz<0)?staffelUebergabeZeit.get(u):undefined;
+    if(geberT!=null){
+      const w=Math.max(0,Math.min(1,(staffelSichtUhr-geberT)/STAFFEL_GEBER_ABGANG_S));
+      if(w<1){
+        const e=w*w*(3-2*w);
+        const bahn=bahnPunkt(anteil,ovalSpurR(OVAL_SPUR0+u.bahnZ));
+        return {x:bahn.x+(p.x+vx-bahn.x)*e, y:bahn.y+(p.y+vy-bahn.y)*e};
+      }
+    }
     return {x:p.x+vx, y:p.y+vy};
   }
 
@@ -56319,7 +56362,11 @@
   //     zu iterieren) — ein reiner Lesevergleich, kein zweiter Zufallszug.
   const STAFFEL_ANLAUF_AB=0.86;       // ab wie viel Vordermann-Fortschritt der Naechste anzieht
   const STAFFEL_ANLAUF_JE_MARKE={absichern:0.92, normal:0.86, angreifen:0.78};  // B4.1, nur mit Marke
-  const STAFFEL_UEBERGABE_DAUER=0.55; // Sekunden, die der Stab sichtbar zwischen den Haenden unterwegs ist
+  // ECHTE SEKUNDEN, nicht Simulationssekunden (Fix 21.11., Chris live: "der Stab fliegt herum"): stepStaffel zaehlt
+  // sie mit `dtSicht` herunter. Vorher lief der Timer mit der Simulations-`dt`, und die ist bei ZEIT_DEHNUNG.staffel=14,65
+  // rund 15-mal kuerzer als die Uhr des Zuschauers -- aus 0,55 s wurden gut acht echte Sekunden, in denen der Stab
+  // hinter dem davonlaufenden Nehmer her durchs Innenfeld segelte. Reine Anzeige (Wertung liest den Timer nie).
+  const STAFFEL_UEBERGABE_DAUER=0.35;
   // BAHN_SCHRITT_PX: dieselbe Schrittlaenge/Herleitung wie ZF_SCHRITT_PX bei stepZeitfahren
   // weiter unten (46 px, s. dortiger Kommentar fuer die volle Rechnung mit v~110-135 ->
   // ~170 Schritte/Minute) — eigener Name statt Wiederverwendung von ZF_SCHRITT_PX, weil
@@ -56329,6 +56376,20 @@
   // Simulationssekunde, s. stepSpurt: `u.pos+=u.v*dt/strecke`).
   const BAHN_SCHRITT_PX=46;
   let staffelStartschussAn=false;     // rein praesentational; s. reset() fuer den N1-Fix (PR #879-Muster)
+  // UEBERGABE SICHTBAR MACHEN (21.11.): die Wechselzone liegt auf der oberen Geraden, und dort steht das
+  // Staffel-HUD (#bahnHud, top:15%) genau ueber der Bahn -- Geber, Nehmer und Stab waren bei jedem Wechsel
+  // verdeckt, "es passiert nichts". Rund um den Wechsel wird das HUD deshalb durchsichtig (nur DOM-Deckkraft,
+  // kein Eingriff in Simulation oder Zeichnung); danach kehrt es von selbst zurueck.
+  let staffelHudDurchsicht=false;
+  function staffelHudDurchsichtSetzen(an){
+    if(an===staffelHudDurchsicht)return;
+    staffelHudDurchsicht=an;
+    try{
+      if(typeof document==="undefined")return;
+      const h=document.getElementById("bahnHud");
+      if(h){ h.style.transition="opacity .3s"; if(an)h.style.setProperty("opacity","0.16","important"); else h.style.removeProperty("opacity"); }
+    }catch(e){}
+  }
   function stepStaffel(dt,art){
     // STARTSCHUSS: einmal je Rennen, beim allerersten Aufruf nach bau(). Modul-Flagge statt
     // eines Laeufer-Feldes, dasselbe Muster wie hebenPublikumAn/takeshiPublikumAn/
@@ -56352,6 +56413,7 @@
     // VERTRAG: neues, rein praesentationales viz*-Feld, niemals rr(), niemals u.pos/u.v
     // selbst gelesen fuer irgendetwas ausser dieser Anzeige.
     const dtSicht=dt*zeitFaktor();
+    staffelSichtUhr+=dtSicht;
     for(const u of LAEUFER){
       if(u.vizInitDone==null){
         u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
@@ -56395,6 +56457,7 @@
       // den Uebergang einmalig fest, genau wie vizAktuell es in stepKuer fuer u.aktuell tut.
       if(u.durch && !u.vizDurchGesehen){
         u.vizDurchGesehen=true;
+        staffelUebergabeZeit.set(u,staffelSichtUhr);
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
         if(naechster){
           naechster.vizUebergabeT=STAFFEL_UEBERGABE_DAUER;
@@ -56403,7 +56466,7 @@
           staffelFeierUebergabe(u,naechster);   // TEAM-FEIER 3.3, s. dort; liest nur
         }
       }
-      if(u.vizUebergabeT>0)u.vizUebergabeT=Math.max(0,u.vizUebergabeT-dt);
+      if(u.vizUebergabeT>0)u.vizUebergabeT=Math.max(0,u.vizUebergabeT-dtSicht);
       // ---- 3. ZIEL. Genau EIN Laeufer je Seite durchlaeuft in stepSpurt den Zielcheck (der
       // Schlusslaeufer, Bein art.jeSeite-1) — derselbe, dessen u.fertig dort tatsaechlich NEU
       // gesetzt wird; die uebrigen fuenf werden im selben Tick nur MITgesetzt (s. ":19979").
@@ -56414,6 +56477,8 @@
         staffelFeierZiel(u,art);              // TEAM-FEIER 3.3, s. dort; liest nur
       }
     }
+    // HUD rund um den Wechsel durchsichtig (s. staffelHudDurchsichtSetzen)
+    staffelHudDurchsichtSetzen(LAEUFER.some(o=>(staffelNaechsterAmStart(o)&&(o.vizAnlauf||0)>0.3)||(staffelUebergabeZeit.has(o)&&staffelSichtUhr-staffelUebergabeZeit.get(o)<2.2)));
   }
 
   // ================== TEAM-FEIER STAFFEL (Feiermomente-Konzept 3.3, Phase 2, 11.10.) ==================
@@ -57873,7 +57938,8 @@
       // AN DER ZIELLINIE WARTEND (nur Staffel, Abschnitt 3 des Recherche-Dokuments):
       // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
       // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
-      const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      // Der NAECHSTE am Start (s. staffelNaechsterAmStart) steht startklar in voller Groesse und Farbe.
+      const wartet=BA().staffel && !u.aktiv && u.fertig==null && !staffelNaechsterAmStart(u);
       // AUSGESCHIEDEN: GEDIMMT UND ENTSAETTIGT STATT WIE EIN AKTIVER LAEUFER (Opus-Review
       // 27.09.). `u.raus` (exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt
       // ":30329") blieb hier bisher ungeprueft -- ein Ausgeschiedener stand seither an
@@ -58194,9 +58260,11 @@
             // Formel wie ovalPunkt() fuer einen aktiven Laeufer nimmt, statt der
             // Innenfeld-Sonderbehandlung fuer Wartende). Reine Zeichenkorrektur -- liest nur
             // bestehende Felder, schreibt nichts, aendert nichts an wert()/rho.
-            const gp=bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
-            const gwartet=!geber.aktiv && geber.fertig==null;
-            const gsk=gwartet?sk0*0.88:sk0;
+            // 21.11. (Chris, Live: "der Stab fliegt herum"): der Stab startet jetzt an der HAND des
+            // Gebers dort, wo der gerade GEZEICHNET wird (er bleibt nach der Uebergabe an der Linie
+            // stehen und geht dann ins Innenfeld, s. ovalPunkt), statt an einem errechneten Bahnpunkt.
+            const gp=(istOval()?laeuferXY(geber):null)||bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
+            const gsk=sk0;
             // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
             // beim Nehmer oben) -- fuer den Geber war sie schon richtig, jetzt aus derselben
             // einen Quelle statt zweimal von Hand nachgebaut.
@@ -65122,6 +65190,7 @@
     // ertoent der Startschuss nur im allerersten Staffel-Rennen der Session.
     staffelPublikumAn=false;
     staffelStartschussAn=false;
+    staffelHudDurchsichtSetzen(false);
     // DASSELBE N1-MUSTER FUER SPURT (Ziel 11, A4, Opus-Plan Top-Zehn-ueber-90 16.09.
     // Abschnitt 5.2): ohne diese Zeile bliebe der Startschuss ab dem zweiten Spurt-Rennen
     // der Session stumm, aus demselben Grund wie bei staffelStartschussAn zwei Zeilen
@@ -66719,13 +66788,18 @@
   // Treffer, Ausdauer), `kappaWege` fuer die taktischen Kanaele (Deckung, Schwachstelle, Atem,
   // Befehl) — dieselbe Aufteilung wie bei Battlefield.
   const TDM_GEFECHT_GRUND=Object.freeze({
-    takte:20, kappa:0.12, kappaWege:0.25, spreizung:3,
+    // KAMPF BIS ZUM ENDE (Chris, 21.11.): "keine Respawns, EIN Kampf, der bis zum Ende gefuehrt wird (bis ein Team
+    // ausgeschaltet ist), nicht nach Zeit 0:0 abbrechen". Bisher brach das Gefecht nach 20 Takten ab -- in 32-39 %
+    // der Gefechte stand dann noch auf beiden Seiten jemand (docs/design/tdm-gefecht-abnahme-10-11.md), im
+    // Extremfall 0:0 "nach Zeit". `takte` ist jetzt nur noch eine Notbremse; ab `suddenAb` waechst die Wucht je Takt
+    // um `suddenPlus`, damit der Kampf sicher VOR ihr zu Ende geht (Messung: scripts/miss-tdm-gefecht-abnahme.mjs).
+    takte:80, suddenAb:30, suddenPlus:0.06, kappa:0.12, kappaWege:0.25, spreizung:3,
     stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
     schwachstelle:{basis:0.4, bonus:0.25},
     deckung:{basis:0.1},
     atem:{basis:0.1},
     befehl:{basis:1},
-    wertung:{ko:15, takt:2},
+    wertung:{ko:15, takt:0.5},
     hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4},
     // ANZEIGE-TAKT (Verdrahtung 11.11., s. tdmReplaySchritt() weiter unten): reine
     // Sekunden-pro-Takt-Vorgabe fuer die Live-Wiedergabe, beeinflusst tdmSchlagwechsel()
@@ -66733,7 +66807,7 @@
     // BFFFA.taktSek fuer Battlefields Replay. Additiv: kein bestehender Leser dieses Objekts
     // (tdmGefechtEinfluss/-Sonde/-Parameter) liest `taktSek`, die schon gemessenen rho-/
     // Pp-Zahlen bleiben deshalb unberuehrt.
-    taktSek:4
+    taktSek:1.7
   });
   const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
   let TDM_GEFECHT=tdmGefechtGrund();
@@ -66817,7 +66891,7 @@
         const {A,ziel,schwach}=x;
         A.st.schlaege++;
         if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx}); continue; }
-        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung);
+        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung)*(t>P.suddenAb?1+P.suddenPlus*(t-P.suddenAb):1);
         ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
         const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
         ereignisse.push({typ:schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, wucht:Math.round(dmg*10)/10});

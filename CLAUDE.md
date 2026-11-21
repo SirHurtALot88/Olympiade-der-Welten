@@ -720,7 +720,16 @@ gelaufen.
 ## Wertungs-Fingerabdruck der Arena-Engine
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
-Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus. Stand
+Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus.
+**Stand 21.11. (Arena-Livefehler): GESAMT eaafed96150e bleibt unveraendert** — Staffel-Uebergabe (Stab-Timer in Zuschauer-
+statt Simulationssekunden, Naechster wartet an der Linie, HUD wird beim Wechsel durchsichtig) und Spieler-ohne-Figur-Marke sind
+reine Anzeige. **TDM-Gefecht „Kampf bis zum Ende“ (Chris 21.11.: keine Respawns, EIN Kampf bis ein Team ausgeschaltet ist) bewegt
+GESAMT NICHT**, weil `spiele tdm`/`disziplinProbe tdm` das alte Echtzeit-Duell rechnen und die Buchung ueber `spieleTdmGefecht()`
+laeuft; der Fingerabdruck fuehrt dafuer seit 21.11. eigene Zeilen `spieleTdmGefecht 1|7|42` mit Summe **`TDM-GEFECHT`
+AUSSERHALB von GESAMT**: **4f5a6af94a46** (vorher `45f3c5f3bc4a` mit takte 20, ko 15, takt 2). Aenderung: `TDM_GEFECHT_GRUND`
+takte 20→80 (nur Notbremse) + Sudden-Death-Eskalation ab Takt 30, `wertung.takt` 2→0,5, Anzeige-Takt 4→1,7 s; 100 % der Gefechte
+enden durch Ausscheiden einer Seite (vorher 60–68 %). Abnahme (`OLY_FORM_MODUS=echt`, `scripts/miss-tdm-gefecht-abnahme.mjs`):
+rho je Gefecht Median 0,816–0,852 bei k=2..6 (Strom 0/1), Pp-Abweichung 13,1–16,5 (k=6: 13,4/13,6). Stand
 18.11. (Canyon live): **GESAMT eaafed96150e (75 Eintraege)** — absichtlich bewegt, weil Climbing seit Chris' „Ja, Canyon
 soll live gehen“ im Format Canyon laeuft (`docs/design/climbing-canyon-live-18-11.md`); gegenueber `d3a39030a3ef` bewegen
 sich NUR die drei `spiele climbing`-Zeilen (1/7/42, jetzt die frueheren `spiele climbing/canyon`-Zeilen aus #1633). HUD-Profil
