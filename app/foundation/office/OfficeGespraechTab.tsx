@@ -253,7 +253,7 @@ export function OfficeGespraechTab({
                   Die Freigabe steht bei {prozent(s.wirksamerAnteil)}. Wenn du mehr brauchst, sag, wofür, und was du dafür zusagst.
                 </div>
               ) : null}
-              {bitte && phase !== "bitte" ? (
+              {bitte && phase === "zusagen" ? (
                 <div className="off-blase is-du">
                   <small>Du</small>
                   {BITTE_SATZ[bitte]}

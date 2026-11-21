@@ -104,7 +104,7 @@ export function OfficePraemienTab({
       <BcPanel titel="Mannschaftsprämien" className="off-pan" bodyClassName="off-pan__k">
         <section className="off-praemie">
           <h3><BcIcon name="krone" /> Siegprämie</h3>
-          <p>Für jeden gewonnenen Vergleich bekommt jeder eingesetzte Spieler einen festen Betrag. Gebucht je Spieltag. Ein Sieg ist eine Disziplin in der oberen Hälfte der Liga.</p>
+          <p>Für jede gewonnene Begegnung bekommt jeder auf dieser Seite eingesetzte Spieler einen festen Betrag. Gebucht je Disziplin-Seite (D1, D2). Im Duell zählt der Sieg über den Gegner, im Vierer-Pod nur Platz 1.</p>
           <div className="off-seg3" role="group" aria-label="Siegprämie">
             {SIEG_STUFEN.map((st, i) => (
               <button key={st.titel} type="button" aria-pressed={sieg === i} disabled={!darf} onClick={() => setSieg(i)} data-testid={`office-sieg-${i}`}>

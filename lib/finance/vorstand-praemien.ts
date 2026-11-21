@@ -8,11 +8,16 @@
  *    Die Eignungsmatrix und die Rangtreue der Disziplinen bleiben unberuehrt.
  *  - Der Vorstand verhaengt keine Geldstrafen; Praemien bewegen sein Vertrauen nicht.
  *
- * Definition „Sieg" (Chris hat sie nicht festgelegt, Annahme): ein Disziplin-Ergebnis des Spieltags in der oberen Haelfte
- * der Liga des Teams. Eingesetzt ist, wer in diesem Spieltag eine gewertete Zeile hat.
+ * Definition „Sieg": eine gewonnene Begegnung. Duell: das eigene Ergebnis ist hoeher als das des Gegners (`ergebnisNormiert`,
+ * sonst `verhaeltnis`, sonst `duellSeiten`; `marge` ist ein Betrag ohne Vorzeichen und taugt nicht). Pod mit vier Teams: nur
+ * Platz 1 ist ein Sieg (Entscheidung der Hauptsitzung 21.11.). Nur fuer alte Zeilen ohne diese Felder gilt als Rueckfall die obere
+ * Haelfte der Liga nach Rang.
+ *
+ * Gebucht wird je SEITE (D1/D2): die Arena bucht gestaffelt, beide Commits tragen dieselbe `matchdayResultId`. Eingesetzt ist je
+ * Seite, wer auf DIESER Seite eine gewertete Zeile hat. Jede gezahlte Praemie steht ungekuerzt im Log `vorstandPraemienLogs`.
  */
 
-import type { GameState, PlayerMoraleState, VorstandPraemienPlan } from "@/lib/data/olyDataTypes";
+import type { DisciplineResultRecord, GameState, PlayerMoraleState, VorstandPraemienLogEintrag, VorstandPraemienPlan } from "@/lib/data/olyDataTypes";
 import { restlaufzeit } from "@/lib/contracts/vertragslaufzeit";
 import { berechneVorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
@@ -129,7 +134,7 @@ export function setzePraemienPlan(gameState: GameState, teamId: string, input: {
   return { ok: true, reason: null, meldung: `${text}. Fest geplant ${v.fest.toFixed(2).replace(".", ",")} C aus dem Gehaltstopf.`, gameState: next };
 }
 
-function hebeMoral(gameState: GameState, spielerIds: Set<string>, teamId: string, punkte: number, label: string): GameState {
+function hebeMoral(gameState: GameState, spielerIds: Set<string>, teamId: string, punkte: number, label: string, reasonId: string): GameState {
   if (punkte <= 0 || spielerIds.size === 0) return gameState;
   const states = gameState.playerMoraleState;
   if (!states) return gameState;
@@ -138,63 +143,117 @@ function hebeMoral(gameState: GameState, spielerIds: Set<string>, teamId: string
       ? {
           ...m,
           morale: Math.min(100, Math.round((m.morale + punkte) * 10) / 10),
-          reasons: [...m.reasons, { reasonId: `praemie:${gameState.season.id}:${m.reasons.length}`, label, valueDelta: punkte, source: "vorstand_praemie" }].slice(-12),
+          // Kollisionsfreie Kennung aus Quelle + Spieltag + Seite (bzw. Vertrag), nicht aus der Laenge der Liste.
+          reasons: [...m.reasons, { reasonId, label, valueDelta: punkte, source: "vorstand_praemie" }].slice(-12),
         }
       : m,
   );
   return { ...gameState, playerMoraleState: next };
 }
 
+function logge(gameState: GameState, eintrag: VorstandPraemienLogEintrag): GameState {
+  const alle = gameState.seasonState.vorstandPraemienLogs ?? {};
+  return {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, vorstandPraemienLogs: { ...alle, [eintrag.teamId]: [...(alle[eintrag.teamId] ?? []), eintrag] } },
+  };
+}
+
+/** Ungekuerztes Praemien-Log eines Teams (alle Saisons; mit `seasonId` auf eine Saison eingrenzbar). */
+export function lesPraemienLog(gameState: GameState, teamId: string, seasonId?: string): VorstandPraemienLogEintrag[] {
+  const log = gameState.seasonState?.vorstandPraemienLogs?.[teamId] ?? [];
+  return seasonId ? log.filter((e) => e.seasonId === seasonId) : log;
+}
+
+/** Ist diese Begegnung gewonnen? Siehe Kopfkommentar fuer die Definition. */
+export function istGewonnen(r: DisciplineResultRecord, ligaGroesse: number): boolean {
+  if (r.miniDmPod) return r.miniDmPod.platz === 1;
+  if (r.ergebnisNormiert) return r.ergebnisNormiert[0] > r.ergebnisNormiert[1];
+  if (typeof r.verhaeltnis === "number") return r.verhaeltnis > 0;
+  if (r.duellSeiten) return r.duellSeiten[0] > r.duellSeiten[1];
+  return r.rank <= Math.floor(ligaGroesse / 2);
+}
+
+function seitenSchluessel(matchdayResultId: string, side: "d1" | "d2"): string {
+  return `${matchdayResultId}:${side}`;
+}
+
+function istSeitePraemiert(plan: VorstandPraemienPlan, matchdayResultId: string, side: "d1" | "d2"): boolean {
+  return plan.praemierteSpieltage.includes(seitenSchluessel(matchdayResultId, side)) || plan.praemierteSpieltage.includes(matchdayResultId);
+}
+
 /**
  * Siegpraemien eines gebuchten Spieltags (aufgerufen vom Spieltags-Buchungsweg, nur eine billige Pruefung ohne Plan).
- * Idempotent je Spieltag-Ergebnis. Zahlt nur, was der freie Gehaltstopf noch hergibt.
+ * Idempotent je `${matchdayResultId}:${side}`. `neueSeiten`: die Seiten, die dieser Commit NEU geschrieben hat (gestaffelt D1, dann D2);
+ * ohne Angabe zaehlen alle Seiten mit Ergebniszeilen. Zahlt nur, was der freie Gehaltstopf noch hergibt.
  */
-export function bucheSiegpraemien(gameState: GameState, matchdayResultId: string): GameState {
+export function bucheSiegpraemien(gameState: GameState, matchdayResultId: string, neueSeiten?: ReadonlyArray<"d1" | "d2">): GameState {
   const plaene = gameState.seasonState?.vorstandPraemien;
   if (!plaene) return gameState;
   let gs = gameState;
+  const seiten: Array<"d1" | "d2"> = (neueSeiten ?? ["d1", "d2"]).filter((x, i, a) => a.indexOf(x) === i);
   for (const [teamId, plan] of Object.entries(plaene)) {
     if (plan.seasonId !== gameState.season.id || plan.siegStufe <= 0) continue;
-    if (plan.praemierteSpieltage.includes(matchdayResultId)) continue;
     const team = gs.teams.find((t) => t.teamId === teamId);
     if (!team?.humanControlled) continue;
-    const ergebnisse = (gs.seasonState.disciplineResults ?? []).filter((r) => r.matchdayResultId === matchdayResultId && r.teamId === teamId);
-    if (ergebnisse.length === 0) continue;
-    const split = isLeagueSplitActive(gs);
-    const tier = split ? getLeagueOf(gs, teamId) : null;
-    const ligaGroesse = gs.teams.filter((t) => !tier || getLeagueOf(gs, t.teamId) === tier).length;
-    const siege = ergebnisse.filter((r) => r.rank <= Math.floor(ligaGroesse / 2)).length;
-    const eingesetzt = new Set(
-      (gs.seasonState.playerDisciplinePerformances ?? []).filter((p) => p.matchdayResultId === matchdayResultId && p.teamId === teamId).map((p) => p.playerId),
-    );
     const stufe = SIEG_STUFEN[plan.siegStufe]!;
-    const kosten = r2(siege * eingesetzt.size * stufe.satz);
-    const aktuell = lesPraemienPlan(gs, teamId);
-    let neuerPlan: VorstandPraemienPlan = { ...aktuell, praemierteSpieltage: [...aktuell.praemierteSpieltage, matchdayResultId] };
-    if (kosten > 0) {
-      const frei = berechneVorstandBudgetStand(gs, teamId).gehalt.frei;
-      if (kosten > frei + 1e-9) {
-        neuerPlan = { ...neuerPlan, protokoll: [...neuerPlan.protokoll, { zeit: new Date().toISOString(), art: "sieg" as const, text: `Siegprämie ${kosten.toFixed(2).replace(".", ",")} C nicht gezahlt: der Gehaltstopf gibt nur ${frei.toFixed(2).replace(".", ",")} C frei.` }].slice(-12) };
-        gs = schreibe(gs, teamId, neuerPlan);
-        continue;
+    for (const side of seiten) {
+      const aktuell = lesPraemienPlan(gs, teamId);
+      if (istSeitePraemiert(aktuell, matchdayResultId, side)) continue;
+      const ergebnisse = (gs.seasonState.disciplineResults ?? []).filter(
+        (r) => r.matchdayResultId === matchdayResultId && r.teamId === teamId && r.disciplineSide === side,
+      );
+      // Noch keine Zeile dieser Seite: bleibt offen, der spaetere Commit holt sie nach.
+      if (ergebnisse.length === 0) continue;
+      const split = isLeagueSplitActive(gs);
+      const tier = split ? getLeagueOf(gs, teamId) : null;
+      const ligaGroesse = gs.teams.filter((t) => !tier || getLeagueOf(gs, t.teamId) === tier).length;
+      const siege = ergebnisse.filter((r) => istGewonnen(r, ligaGroesse)).length;
+      // Eingesetzt: nur wer auf DIESER Seite eine gewertete Zeile hat.
+      const eingesetzt = new Set(
+        (gs.seasonState.playerDisciplinePerformances ?? [])
+          .filter((p) => p.matchdayResultId === matchdayResultId && p.teamId === teamId && p.disciplineSide === side)
+          .map((p) => p.playerId),
+      );
+      const kosten = r2(siege * eingesetzt.size * stufe.satz);
+      let neuerPlan: VorstandPraemienPlan = { ...aktuell, praemierteSpieltage: [...aktuell.praemierteSpieltage, seitenSchluessel(matchdayResultId, side)] };
+      if (kosten > 0) {
+        const frei = berechneVorstandBudgetStand(gs, teamId).gehalt.frei;
+        if (kosten > frei + 1e-9) {
+          neuerPlan = { ...neuerPlan, protokoll: [...neuerPlan.protokoll, { zeit: new Date().toISOString(), art: "sieg" as const, text: `Siegprämie ${kosten.toFixed(2).replace(".", ",")} C nicht gezahlt: der Gehaltstopf gibt nur ${frei.toFixed(2).replace(".", ",")} C frei.` }].slice(-12) };
+          gs = schreibe(gs, teamId, neuerPlan);
+          continue;
+        }
+        gs = {
+          ...gs,
+          teams: gs.teams.map((t) => (t.teamId === teamId ? { ...t, cash: r2((t.cash ?? 0) - kosten) } : t)),
+        };
+        gs = logge(gs, {
+          id: `praemie:${gs.season.id}:sieg:${seitenSchluessel(matchdayResultId, side)}:${teamId}`,
+          seasonId: gs.season.id,
+          teamId,
+          art: "sieg",
+          cashDelta: -kosten,
+          zeit: new Date().toISOString(),
+          matchdayResultId,
+          side,
+          siege,
+          eingesetzte: eingesetzt.size,
+        });
+        neuerPlan = {
+          ...neuerPlan,
+          siegGebucht: r2(neuerPlan.siegGebucht + kosten),
+          protokoll: [...neuerPlan.protokoll, { zeit: new Date().toISOString(), art: "sieg" as const, text: `Siegprämie ${side.toUpperCase()}: ${siege} Sieg(e) × ${eingesetzt.size} Spieler`, betrag: kosten }].slice(-12),
+        };
+        gs = hebeMoral(gs, eingesetzt, teamId, stufe.moral * siege, "Siegprämie", `praemie:${gs.season.id}:sieg:${seitenSchluessel(matchdayResultId, side)}`);
       }
-      gs = {
-        ...gs,
-        teams: gs.teams.map((t) => (t.teamId === teamId ? { ...t, cash: r2((t.cash ?? 0) - kosten) } : t)),
-      };
-      neuerPlan = {
-        ...neuerPlan,
-        siegGebucht: r2(neuerPlan.siegGebucht + kosten),
-        protokoll: [...neuerPlan.protokoll, { zeit: new Date().toISOString(), art: "sieg" as const, text: `Siegprämie: ${siege} Sieg(e) × ${eingesetzt.size} Spieler`, betrag: kosten }].slice(-12),
-      };
-      gs = hebeMoral(gs, eingesetzt, teamId, stufe.moral * siege, "Siegprämie");
+      gs = schreibe(gs, teamId, neuerPlan);
     }
-    gs = schreibe(gs, teamId, neuerPlan);
   }
   return gs;
 }
 
-/** Treuepraemie bei einer Verlaengerung durch den Menschen: Anteil des neuen Jahresgehalts, aus dem Gehaltstopf. */
+/** Treuepraemie bei einer Verlaengerung (Mensch oder in seinem Auftrag die KI): Anteil des neuen Jahresgehalts, aus dem Gehaltstopf. */
 export function bucheTreuepraemie(gameState: GameState, teamId: string, playerId: string, neuesGehalt: number | null | undefined, kennung: string): GameState {
   const plan = lesPraemienPlan(gameState, teamId);
   if (plan.treueStufe <= 0 || !(neuesGehalt && neuesGehalt > 0)) return gameState;
@@ -215,11 +274,21 @@ export function bucheTreuepraemie(gameState: GameState, teamId: string, playerId
     ...gameState,
     teams: gameState.teams.map((t) => (t.teamId === teamId ? { ...t, cash: r2((t.cash ?? 0) - kosten) } : t)),
   };
+  gs = logge(gs, {
+    id: `praemie:${gs.season.id}:treue:${kennung}`,
+    seasonId: gs.season.id,
+    teamId,
+    art: "treue",
+    cashDelta: -kosten,
+    zeit: new Date().toISOString(),
+    contractId: kennung,
+    playerId,
+  });
   gs = schreibe(gs, teamId, {
     ...plan,
     treueGebucht: r2(plan.treueGebucht + kosten),
     praemierteVerlaengerungen: [...plan.praemierteVerlaengerungen, kennung],
     protokoll: [...plan.protokoll, { zeit: new Date().toISOString(), art: "treue" as const, text: "Treueprämie bei Verlängerung", betrag: kosten }].slice(-12),
   });
-  return hebeMoral(gs, new Set([playerId]), teamId, stufe.moral, "Treueprämie");
+  return hebeMoral(gs, new Set([playerId]), teamId, stufe.moral, "Treueprämie", `praemie:${gs.season.id}:treue:${kennung}`);
 }

@@ -14,8 +14,8 @@
  * Die KI fuehrt keine Gespraeche; sie ruft weiter dieselben Wirkfunktionen direkt (`entscheideKiVorstandMassnahmen`).
  */
 
-import { getTeamObjectivePool, istZielTauschbar, tauscheVorstandsZiel } from "@/lib/board/team-season-objectives-service";
-import { lieblingFuerSaison } from "@/lib/board/vorstand-ziele-erweitert";
+import { getTeamObjectivePool, istZielTauschbar, tauscheVorstandsZiel, zielTauschZeitfenster } from "@/lib/board/team-season-objectives-service";
+import { lieblingFuerSaison, verlaengertDieseSaison } from "@/lib/board/vorstand-ziele-erweitert";
 import type {
   GameState,
   VorstandBitteArt,
@@ -51,7 +51,7 @@ export const ZUSAGE_WERT: Record<VorstandZusageArt, Record<GespraechCharakter, n
 export const ZUSAGE_TEXT: Record<VorstandZusageArt, { titel: string; kurz: string }> = {
   zielhoch: { titel: "Höheres Saisonziel", kurz: "Das verbindliche Ziel einen Platz besser. Verfehlt: −0,5 Vertrauen." },
   deckel: { titel: "Gehaltsdeckel", kurz: "Das Gehaltsbudget wächst diese Saison nicht mit: kein Umschichten ins Gehalt." },
-  vertrauen: { titel: "Vertrauen einsetzen", kurz: "Sofort −0,25 Vertrauen, gebucht bei der nächsten Festlegung." },
+  vertrauen: { titel: "Vertrauen einsetzen", kurz: "−0,25 Vertrauen, gebucht bei der nächsten Festlegung." },
   binden: { titel: "Lieblingsspieler verlängern", kurz: "Bis Saisonende verlängern, sonst −0,5 Vertrauen." },
 };
 
@@ -176,6 +176,8 @@ function bitteSperre(gameState: GameState, teamId: string, stand: VorstandBudget
       if (stand.vertrauen == null || stand.vertrauen < 4) return `Unter Vertrauen 4 traut der Vorstand dem Team die Wette nicht zu (jetzt ${stand.vertrauen == null ? "—" : stand.vertrauen.toFixed(1).replace(".", ",")}).`;
       return null;
     case "ziel": {
+      const zeitFenster = zielTauschZeitfenster(gameState);
+      if (!zeitFenster.erlaubt) return zeitFenster.grund;
       if (!antrag.zielId) return "Bitte das Ziel wählen, das getauscht werden soll.";
       const ziel = (gameState.seasonState.teamSeasonObjectives ?? []).find(
         (o) => o.seasonId === gameState.season.id && o.teamId === teamId && o.objectiveId === antrag.zielId,
@@ -183,7 +185,7 @@ function bitteSperre(gameState: GameState, teamId: string, stand: VorstandBudget
       if (!ziel) return "Dieses Ziel gibt es nicht.";
       if (!istZielTauschbar(ziel)) return "Dieses Ziel ist entschieden oder gehört nicht dem Vorstand und lässt sich nicht tauschen.";
       const alternativen = getTeamObjectivePool(gameState, teamId).filter(
-        (k) => k.objectiveId !== ziel.objectiveId && !(gameState.seasonState.teamSeasonObjectives ?? []).some((o) => o.seasonId === gameState.season.id && o.teamId === teamId && o.objectiveId === k.objectiveId),
+        (k) => k.objectiveId !== ziel.objectiveId && k.status !== "completed" && k.status !== "failed" && !(gameState.seasonState.teamSeasonObjectives ?? []).some((o) => o.seasonId === gameState.season.id && o.teamId === teamId && o.objectiveId === k.objectiveId),
       );
       if (alternativen.length === 0) return "Der Vorstand hat kein anderes Ziel zur Hand.";
       return null;
@@ -217,6 +219,7 @@ function zusageSperre(gameState: GameState, teamId: string, antrag: GespraechAnt
     case "binden": {
       const l = lieblingFuerSaison(gameState, teamId);
       if (!l || !gameState.rosters.some((r) => r.teamId === teamId && r.playerId === l.playerId)) return "Es gibt keinen Lieblingsspieler im Kader.";
+      if (verlaengertDieseSaison(gameState, teamId, l.playerId)) return "Der Lieblingsspieler ist in dieser Saison schon verlängert: das lässt sich nicht noch einmal zusagen.";
       if (antrag.bitte === "liebling") return "Widerspricht der Bitte: du willst ihn ja freigeben.";
       return null;
     }
@@ -395,11 +398,32 @@ function ergebnis(gameState: GameState, ok: boolean, reason: string | null, meld
   return { ok, reason, meldung, ausgang, gameState };
 }
 
+/**
+ * Formal ungueltiger Antrag (fehlender Betrag, fehlende oder unbekannte Ziel-Id, unbekannte Bitte): das ist ein Bedienfehler, keine
+ * Verhandlung. Er verbraucht kein Gespraech und aendert nichts am Spielstand.
+ */
+export function formalFehlerImAntrag(gameState: GameState, teamId: string, antrag: GespraechAntrag): string | null {
+  if (!(antrag.bitte in BITTE_TEXT)) return "Diese Bitte gibt es nicht.";
+  if (antrag.bitte === "sonder" || antrag.bitte === "anzapf") {
+    if (!(typeof antrag.betrag === "number" && Number.isFinite(antrag.betrag) && antrag.betrag > 0)) return "Es fehlt der Betrag.";
+  }
+  if (antrag.bitte === "ziel") {
+    if (!antrag.zielId) return "Es fehlt das Ziel, das getauscht werden soll.";
+    const da = (gameState.seasonState.teamSeasonObjectives ?? []).some(
+      (o) => o.seasonId === gameState.season.id && o.teamId === teamId && o.objectiveId === antrag.zielId,
+    );
+    if (!da) return "Dieses Ziel gibt es nicht.";
+  }
+  return null;
+}
+
 /** Der Antrag: verbraucht ein Gespraech (ausser in Runde 2 eines Gegenangebots) und wendet bei Zustimmung die Wirkung an. */
 export function stelleGespraechAntrag(gameState: GameState, teamId: string, antrag: GespraechAntrag): GespraechErgebnis {
   const stand = berechneVorstandBudgetStand(gameState, teamId);
   const z0 = lesVorstandGespraech(gameState, teamId);
   if (!stand.gedeckelt) return ergebnis(gameState, false, "nicht_aktiv", "Vor Saison 2 ist alles freigegeben: es gibt nichts zu verhandeln.", null);
+  const formal = formalFehlerImAntrag(gameState, teamId, antrag);
+  if (formal) return ergebnis(gameState, false, "antrag_unvollstaendig", formal, null);
   if (z0.offen && (z0.offen.bitte !== antrag.bitte)) {
     return ergebnis(gameState, false, "gespraech_offen", "Ein Gegenangebot ist offen: erst annehmen, nachbessern oder zurückziehen.", null);
   }

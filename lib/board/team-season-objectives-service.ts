@@ -16,6 +16,7 @@ import {
   baueLieblingsspielerZiel,
   baueVertragslaufzeitZiel,
   ersterWiderspruch,
+  GESPRAECH_VERTRAUEN_ID,
   kaderUnterSoll,
   type ZielKontext,
 } from "@/lib/board/vorstand-ziele-erweitert";
@@ -50,6 +51,7 @@ import {
   statusForLeagueRank,
 } from "@/lib/board/board-objective-league-calibration";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { rangAnzahlAnteilig, rangRaumDesTeams, rangSchwelleOben, rangSchwelleUnten } from "@/lib/season/rang-schwelle";
 
 export type TeamObjectiveAiBias = {
@@ -307,6 +309,8 @@ function getSalaryRatio(row: TeamManagementSnapshotRow): number | null {
 function buildSalaryPressureObjective(input: {
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  /** Fuer den Ligavergleich: nur die eigene Liga zaehlt (Rang 1 von 16, nicht von 32). */
+  gameState?: GameState | null;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   /** `false` = die Einnahmen der Saison sind noch nicht gebucht, der Wert ist eine Hochrechnung. */
@@ -317,7 +321,7 @@ function buildSalaryPressureObjective(input: {
   const demand = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   const standing = buildLeagueMetricStanding({
     teamId: input.row.teamId,
-    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: getSalaryRatio(row) })),
+    values: [...resolveLeagueScopedRows({ gameState: input.gameState, teamId: input.row.teamId, rowsByTeamId: input.rowsByTeamId }).values()].map((row) => ({ teamId: row.teamId, value: getSalaryRatio(row) })),
     direction: "lower_is_better",
   });
   const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand });
@@ -603,9 +607,6 @@ export function getExpectationRankObjective(input: {
     input.targetRankOverride != null
       ? clamp(Math.round(input.targetRankOverride), 1, expectation.teamCount)
       : clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
-  // Für den Detail-Text: der tatsächlich geforderte Vorsprung. Ohne Override identisch zu
-  // overachieveGap (V1 unverändert), mit Override das echte Delta zum kalibrierten V2-Ziel.
-  const detailGap = input.targetRankOverride != null ? Math.max(0, expectation.expectedRank - targetRank) : overachieveGap;
   const currentRank = input.row.rank ?? null;
   const status = statusForRank(currentRank, targetRank);
 
@@ -620,7 +621,11 @@ export function getExpectationRankObjective(input: {
     objectiveId: "expectation-rank",
     category: "sport",
     label: `Übertreffe die Erwartung (Top ${targetRank})`,
-    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${detailGap} Plätze besser abschneiden.`,
+    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: ${
+      expectation.expectedRank - targetRank <= 0
+        ? `Rang ${targetRank} halten.`
+        : `mindestens ${expectation.expectedRank - targetRank} ${expectation.expectedRank - targetRank === 1 ? "Platz" : "Plätze"} besser abschneiden.`
+    }`,
     actionHint: "Transfers und Aufstellung so priorisieren, dass die Erwartung der Kaderstärke übertroffen wird.",
     targetValue: `Top ${targetRank}`,
     currentValue: currentRank ?? "offen",
@@ -709,6 +714,8 @@ export function getTransferSpendCeilingObjective(input: {
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  /** Fuer den Ligavergleich: nur die eigene Liga zaehlt (Rang 1 von 16, nicht von 32). */
+  gameState?: GameState | null;
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   if (cashPriority < 7) return null;
@@ -726,7 +733,7 @@ export function getTransferSpendCeilingObjective(input: {
   const netSpend = Math.max(0, -(input.row.transferNet ?? 0));
   const standing = buildLeagueMetricStanding({
     teamId: input.row.teamId,
-    values: [...input.rowsByTeamId.values()].map((row) => ({
+    values: [...resolveLeagueScopedRows({ gameState: input.gameState, teamId: input.row.teamId, rowsByTeamId: input.rowsByTeamId }).values()].map((row) => ({
       teamId: row.teamId,
       value: Math.max(0, -(row.transferNet ?? 0)),
     })),
@@ -1022,6 +1029,8 @@ export function getNetTransferBalanceObjective(input: {
   team: Team;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  /** Fuer den Ligavergleich: nur die eigene Liga zaehlt (Rang 1 von 16, nicht von 32). */
+  gameState?: GameState | null;
   profile: TeamStrategyProfile | null;
   seasonNum: number;
 }): ObjectiveDraft {
@@ -1070,7 +1079,7 @@ export function getNetTransferBalanceObjective(input: {
   const current = roundValue(input.row.transferNet ?? 0, 1);
   const standing = buildLeagueMetricStanding({
     teamId: input.row.teamId,
-    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: row.transferNet ?? 0 })),
+    values: [...resolveLeagueScopedRows({ gameState: input.gameState, teamId: input.row.teamId, rowsByTeamId: input.rowsByTeamId }).values()].map((row) => ({ teamId: row.teamId, value: row.transferNet ?? 0 })),
     // Höhere (weniger negative) Netto-Bilanz ist die bessere Wirtschaftsführung.
     direction: "higher_is_better",
   });
@@ -1346,7 +1355,9 @@ function getFormColorObjective(input: {
   // Teams ohne Eintrag haben noch keine Karte gespielt — das ist eine 0, keine Lücke: sie hatten
   // dieselbe Gelegenheit wie alle anderen.
   const valueByTeamId = new Map<string, number>(
-    input.gameState.teams.map((team) => [team.teamId, bonusByTeamId.get(team.teamId)?.total ?? 0]),
+    input.gameState.teams
+      .filter((team) => !isLeagueSplitActive(input.gameState) || getLeagueOf(input.gameState, team.teamId) === getLeagueOf(input.gameState, input.team.teamId))
+      .map((team) => [team.teamId, bonusByTeamId.get(team.teamId)?.total ?? 0]),
   );
   const gespielteKarten = [...bonusByTeamId.values()].reduce((sum, entry) => sum + entry.cards, 0);
 
@@ -1639,6 +1650,8 @@ function getRebuildCashObjective(input: {
   team: Team;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  /** Fuer den Ligavergleich: nur die eigene Liga zaehlt (Rang 1 von 16, nicht von 32). */
+  gameState?: GameState | null;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   /** `false` = die Einnahmen der Saison sind noch nicht gebucht, der Wert ist eine Hochrechnung. */
@@ -1654,7 +1667,7 @@ function getRebuildCashObjective(input: {
   // die LIGA gemessen: wer im Vergleich zu den anderen 31 Teams liquide dasteht, hat den Puffer.
   const standing = buildLeagueMetricStanding({
     teamId: input.row.teamId,
-    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: row.cash ?? null })),
+    values: [...resolveLeagueScopedRows({ gameState: input.gameState, teamId: input.row.teamId, rowsByTeamId: input.rowsByTeamId }).values()].map((row) => ({ teamId: row.teamId, value: row.cash ?? null })),
     direction: "higher_is_better",
   });
   const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand: cashPriority });
@@ -2202,13 +2215,13 @@ function buildTeamObjectives(input: {
         gameState,
       }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
-      getTransferSpendCeilingObjective({ team, identity, profile, row, rowsByTeamId }),
+      getTransferSpendCeilingObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
       // From the balancing branch: V2 replaces the tautological "cash > 0" with a real
       // net-transfer-balance goal; V1 keeps the plain cash-positive objective (so no duplicate with the
       // standalone cash-positive that origin/main added — this conditional subsumes it).
       boardV2
-        ? getNetTransferBalanceObjective({ team, row, rowsByTeamId, profile, seasonNum })
+        ? getNetTransferBalanceObjective({ team, row, rowsByTeamId, profile, seasonNum, gameState })
         : {
             objectiveId: "finance-cash-positive",
             category: "finance",
@@ -2220,7 +2233,7 @@ function buildTeamObjectives(input: {
             boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
             source: "active_local_team_cash",
           },
-      buildSalaryPressureObjective({ row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
+      buildSalaryPressureObjective({ row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked, gameState }),
       transferObjective,
       // From the balancing branch: V2 adds a composition-quality (non-reserve share) roster goal. The old
       // V1 "roster >= N" objective (getRosterTarget) was removed on origin/main, so V1 now has no roster
@@ -2235,7 +2248,7 @@ function buildTeamObjectives(input: {
       getPlayerTop20Objective({ gameState, team, identity, profile }),
       getPlayerTop50Objective({ gameState, team, identity, profile }),
       getTopPlayerObjective({ gameState, team, identity, profile }),
-      getRebuildCashObjective({ team, row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
+      getRebuildCashObjective({ team, row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked, gameState }),
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
     ].filter((objective): objective is ObjectiveDraft => Boolean(objective));
   // Office 21.11: neue Zielarten des Vorstands (Lieblingsspieler, Vertragslaufzeiten). Sie kommen ZUSAETZLICH zum kompakten Slate
@@ -2417,7 +2430,9 @@ function mergeStoredTeamObjectives(input: {
       label: optional && !generatedLabel.endsWith(" (optional)") ? `${generatedLabel} (optional)` : generatedLabel,
       targetValue: generatedObjective.targetValue,
       rewardCash: generatedObjective.rewardCash,
-      penaltyCash: optional ? undefined : generatedObjective.penaltyCash,
+      // Keine Geldstrafen (Chris 18.11.): `penaltyCash` ist ein totes Altfeld und wird nicht mehr fortgeschrieben. Nur die
+      // Sponsor-Spiegelziele tragen den Malus ihres Vertrags weiter (andere Quelle, gebucht im Sponsor-Settlement).
+      penaltyCash: (generatedObjective.source ?? "").includes("sponsor_v2") && !optional ? generatedObjective.penaltyCash : undefined,
       detail: generatedObjective.detail ?? storedObjective.detail ?? null,
       actionHint: generatedObjective.actionHint ?? storedObjective.actionHint ?? null,
       currentValue: generatedObjective.currentValue,
@@ -2487,7 +2502,11 @@ export function calculateBoardConfidence(input: {
   } else {
     base = identitySeed;
   }
-  const delta = input.objectives.reduce((sum, objective) => sum + (objective.boardConfidenceDelta ?? 0), 0);
+  // Die Zusage „Vertrauen einsetzen" (Office 21.11) wirkt erst bei der naechsten Festlegung (Abrechnung), nicht sofort.
+  const delta = input.objectives.reduce(
+    (sum, objective) => sum + (objective.objectiveId === GESPRAECH_VERTRAUEN_ID ? 0 : objective.boardConfidenceDelta ?? 0),
+    0,
+  );
   // Optionale Zusatzziele (herabgestufte Rang-Ziele) erzeugen keinen Druck: Der Vorstand hat sie
   // nicht verlangt, also darf ihr Verfehlen weder Vertrauen kosten noch die Pressure hochtreiben.
   const bindingObjectives = input.objectives.filter((objective) => !objective.optional);
@@ -2699,7 +2718,7 @@ export function buildTeamSeasonObjectiveSettlement(gameState: GameState): TeamSe
     // bleibt als totes Altfeld an den Datensaetzen und wird weder gebucht noch gezeigt (Fund 21.11.: hier wurde es abgezogen).
     const cashDelta = isSponsorContractMirror ? 0 : objective.status === "completed" ? objective.rewardCash ?? 0 : 0;
     const boardConfidenceDelta =
-      objective.status === "completed" || objective.status === "failed" || objective.status === "at_risk"
+      objective.status === "completed" || objective.status === "failed" || objective.status === "at_risk" || objective.objectiveId === GESPRAECH_VERTRAUEN_ID
         ? objective.boardConfidenceDelta ?? 0
         : 0;
     const visibleResult = cashDelta > 0 || boardConfidenceDelta > 0 ? "plus" : cashDelta < 0 || boardConfidenceDelta < 0 ? "minus" : "neutral";
@@ -2988,6 +3007,24 @@ export function istZielTauschbar(objective: TeamSeasonObjectiveRecord): boolean 
   return true;
 }
 
+/** Der Tausch ist bis einschliesslich Spieltag 10 (Saisonmitte) oder im Transferfenster erlaubt, danach nicht mehr. */
+export const ZIELTAUSCH_LETZTER_SPIELTAG = 10;
+
+export function zielTauschZeitfenster(gameState: GameState): { erlaubt: boolean; grund: string | null } {
+  const gespielt = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((e) => e.seasonId === gameState.season.id)
+      .map((e) => e.matchdayId)
+      .filter(Boolean),
+  ).size;
+  if (gespielt <= ZIELTAUSCH_LETZTER_SPIELTAG) return { erlaubt: true, grund: null };
+  if (evaluateGamePhaseAction(gameState, "credit_borrow").allowed) return { erlaubt: true, grund: null };
+  return {
+    erlaubt: false,
+    grund: `Ziele lassen sich nur bis Spieltag ${ZIELTAUSCH_LETZTER_SPIELTAG} (Saisonmitte) oder im Transferfenster tauschen: danach wäre ein schon halb gewonnenes Ziel ein billiger Ausweg.`,
+  };
+}
+
 export type ZielTauschErgebnis = {
   ok: boolean;
   reason: string | null;
@@ -3009,6 +3046,8 @@ export function tauscheVorstandsZiel(gameState: GameState, teamId: string, objec
   const fehler = (reason: string, meldung: string): ZielTauschErgebnis => ({ ok: false, reason, meldung, gameState });
   if (!alt) return fehler("ziel_unbekannt", "Dieses Ziel gibt es nicht.");
   if (!istZielTauschbar(alt)) return fehler("ziel_nicht_tauschbar", "Dieses Ziel kann nicht getauscht werden.");
+  const zeit = zielTauschZeitfenster(gameState);
+  if (!zeit.erlaubt) return fehler("tausch_zu_spaet", zeit.grund ?? "Der Tausch ist jetzt nicht mehr möglich.");
   const bereich = bereichDesZiels(alt);
   const uebrige = stored.filter((o) => o.objectiveId !== objectiveId);
   const pool = getTeamObjectivePool(gameState, teamId);
@@ -3017,7 +3056,9 @@ export function tauscheVorstandsZiel(gameState: GameState, teamId: string, objec
   const taugt = (kandidat: TeamSeasonObjectiveRecord) =>
     !vorhanden.has(kandidat.objectiveId) &&
     istZielTauschbar(kandidat) &&
+    // Ein schon erfuelltes (oder verfehltes) Kandidatenziel waere ein geschenkter Erfolg bzw. ein Schlupfloch.
     kandidat.status !== "failed" &&
+    kandidat.status !== "completed" &&
     !ersterWiderspruch(uebrige, kandidat, kontext);
   const gleicheKategorie = pool.filter((k) => k.category === alt.category && taugt(k));
   const gleicherBereich = pool.filter((k) => bereichDesZiels(k) === bereich && taugt(k));

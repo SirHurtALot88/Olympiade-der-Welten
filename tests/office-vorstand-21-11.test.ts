@@ -2,15 +2,20 @@
  * Office 21.11: Vorstandsziele (Laufzeit, Lieblingsspieler, Widerspruchspruefung), Gespraech, Praemien, keine Geldstrafe,
  * Mehrspieler. Fixture: Saison 3, zwei menschliche Teams (H-1, H-2) und ein KI-Team (K-1).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
+  getTeamObjectivePool,
+  istZielTauschbar,
   refreshTeamObjectiveState,
   selectBoardObjectiveDrafts,
+  tauscheVorstandsZiel,
+  zielTauschZeitfenster,
 } from "@/lib/board/team-season-objectives-service";
 import {
+  baueGespraechZusageZiele,
   baueLieblingsspielerZiel,
   baueVertragslaufzeitZiel,
   ermittleLieblingsspieler,
@@ -20,7 +25,10 @@ import {
   type ZielEntwurf,
 } from "@/lib/board/vorstand-ziele-erweitert";
 import type { GameState, Player, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
-import { berechneVorstandBudgetStand, resolveVorstandFreigabe, stufeFuerVertrauen } from "@/lib/finance/vorstand-budgetfreigabe";
+import { berechneVorstandBudgetStand, lesVorstandZustand, resolveVorstandFreigabe, stufeFuerVertrauen } from "@/lib/finance/vorstand-budgetfreigabe";
+import { buildTeamKontoauszug } from "@/lib/finance/kontoauszug";
+import { buildGameInboxItems } from "@/lib/foundation/game-inbox-service";
+import { buildTransferFinanceAudit } from "@/lib/season/transfer-finance-audit";
 import { setzeUmschichtung } from "@/lib/finance/vorstand-budget-aktionen";
 import {
   beurteileGespraech,
@@ -30,7 +38,7 @@ import {
 } from "@/lib/finance/vorstand-gespraech";
 import { lesVorstandGespraech } from "@/lib/finance/vorstand-gespraech-zustand";
 import { buildOfficeModell } from "@/lib/finance/office-modell";
-import { bucheSiegpraemien, bucheTreuepraemie, lesPraemienPlan, setzePraemienPlan } from "@/lib/finance/vorstand-praemien";
+import { bucheSiegpraemien, bucheTreuepraemie, lesPraemienLog, lesPraemienPlan, setzePraemienPlan } from "@/lib/finance/vorstand-praemien";
 
 function team(teamId: string, partial: Partial<Team> = {}): Team {
   return {
@@ -381,22 +389,12 @@ describe("Lieblingsspieler des Vorstands", () => {
     } as GameState;
     expect(baueLieblingsspielerZiel(frei, "H-1")!.boardConfidenceDelta).toBe(0);
 
-    // KI-Team: ausgewertet, Strafe erst nach der Messung.
+    // KI-Team: bis zur Messung mit 32 KI-Teams gibt es das Ziel dort gar nicht (kein Delta, kein Druck, keine Zaehlung).
     const kiGs = mitPp(fixture());
     kiGs.seasonState.seasonSnapshots = [
       { seasonId: "season-2", playerPerformances: [{ playerId: "K-1-p2", pps: 70, appearances: 10 }] },
     ] as never;
-    const kiZiel = baueLieblingsspielerZiel(kiGs, "K-1")!;
-    const kiWeg = baueLieblingsspielerZiel(
-      {
-        ...kiGs,
-        rosters: kiGs.rosters.filter((r) => r.playerId !== "K-1-p2"),
-        seasonState: { ...kiGs.seasonState, teamSeasonObjectives: [{ ...kiZiel, seasonId: "season-3", teamId: "K-1", source: "vorstand_lieblingsspieler" }] },
-      } as GameState,
-      "K-1",
-    )!;
-    expect(kiWeg.status).toBe("failed");
-    expect(kiWeg.boardConfidenceDelta).toBe(0);
+    expect(baueLieblingsspielerZiel(kiGs, "K-1")).toBeNull();
   });
 
   it("Bitte „Lieblingsspieler freigeben“ im Gespraech setzt die Freigabe", () => {
@@ -423,8 +421,8 @@ describe("Laufzeit-Ziel: Vertragslaufzeiten", () => {
     const verfehlt = baueVertragslaufzeitZiel(ende, "H-1")!;
     expect(verfehlt.status).toBe("failed");
     expect(verfehlt.boardConfidenceDelta).toBe(-0.4);
-    // KI-Team: ausgewertet, ohne Strafe.
-    expect(baueVertragslaufzeitZiel(ende, "K-1")!.boardConfidenceDelta).toBe(0);
+    // KI-Team: das Ziel gibt es dort bis zur Messung nicht.
+    expect(baueVertragslaufzeitZiel(ende, "K-1")).toBeNull();
 
     const gestreut = baueVertragslaufzeitZiel(fixture({ enden: [4, 5, 6, 4, 5, 6, 7, 8, 4, 5] }), "H-1")!;
     expect(gestreut.status).toBe("completed");
@@ -517,15 +515,15 @@ describe("Praemien", () => {
         ...gs1.seasonState,
         matchdayResults: [{ id: "res-1", seasonId: "season-3", matchdayId: "md-1" }],
         disciplineResults: [
-          { id: "d1", matchdayResultId: "res-1", teamId: "H-1", disciplineId: "a", disciplineSide: "d1", rank: 1 },
-          { id: "d2", matchdayResultId: "res-1", teamId: "H-1", disciplineId: "b", disciplineSide: "d2", rank: 3 },
-          { id: "d3", matchdayResultId: "res-1", teamId: "H-2", disciplineId: "a", disciplineSide: "d1", rank: 1 },
+          { id: "d1", matchdayResultId: "res-1", teamId: "H-1", disciplineId: "a", disciplineSide: "d1", rank: 1, ergebnisNormiert: [7, 4] },
+          { id: "d2", matchdayResultId: "res-1", teamId: "H-1", disciplineId: "b", disciplineSide: "d2", rank: 3, ergebnisNormiert: [3, 8] },
+          { id: "d3", matchdayResultId: "res-1", teamId: "H-2", disciplineId: "a", disciplineSide: "d1", rank: 1, ergebnisNormiert: [7, 4] },
         ],
-        playerDisciplinePerformances: ["p0", "p1", "p2", "p3"].map((p, i) => ({ id: `pp${i}`, matchdayResultId: "res-1", teamId: "H-1", playerId: `H-1-${p}` })),
+        playerDisciplinePerformances: ["p0", "p1", "p2", "p3"].map((p, i) => ({ id: `pp${i}`, matchdayResultId: "res-1", teamId: "H-1", playerId: `H-1-${p}`, disciplineSide: "d1" })),
       },
     } as unknown as GameState;
     const nach = bucheSiegpraemien(gs, "res-1");
-    // Liga mit 3 Teams: obere Haelfte = Rang 1; 1 Sieg x 4 Eingesetzte x 0,02 = 0,08 C.
+    // D1 gewonnen, D2 verloren: 1 Sieg x 4 Eingesetzte (auf D1) x 0,02 = 0,08 C.
     expect(lesPraemienPlan(nach, "H-1").siegGebucht).toBeCloseTo(0.08, 5);
     expect(nach.teams.find((t) => t.teamId === "H-1")!.cash).toBeCloseTo(90 - 0.08, 5);
     expect(nach.playerMoraleState!.find((p) => p.playerId === "H-1-p0")!.morale).toBe(62);
@@ -565,5 +563,341 @@ describe("Mehrspieler: je Team getrennt", () => {
     const k = buildOfficeModell(gs, "K-1")!;
     expect(k.raenge.gehaltskosten?.rang).toBe(1);
     expect(buildTeamObjectiveOverview(gs).objectives.length).toBeGreaterThan(0);
+  });
+});
+
+/* ====================================================================================================================
+ * Review-Funde 21.11. und Behebung (Doku: docs/design/office-vorstand-bau-21-11.md)
+ * ================================================================================================================== */
+
+/** Zeilen fuer die Praemien-Tests: H-1 spielt, je Seite eigene Eingesetzte. */
+function spieltagMitZeilen(
+  gs: GameState,
+  zeilen: Array<{ id: string; side: "d1" | "d2"; extra: Record<string, unknown>; spieler: string[] }>,
+  resultId = "res-1",
+): GameState {
+  return {
+    ...gs,
+    seasonState: {
+      ...gs.seasonState,
+      matchdayResults: [...(gs.seasonState.matchdayResults ?? []).filter((r) => r.id !== resultId), { id: resultId, seasonId: "season-3", matchdayId: "md-1" }],
+      disciplineResults: [
+        ...(gs.seasonState.disciplineResults ?? []).filter((r) => r.matchdayResultId !== resultId),
+        ...zeilen.map((z) => ({ id: `${resultId}-${z.id}`, matchdayResultId: resultId, teamId: "H-1", disciplineId: z.id, disciplineSide: z.side, rank: 16, ...z.extra })),
+      ],
+      playerDisciplinePerformances: [
+        ...(gs.seasonState.playerDisciplinePerformances ?? []).filter((r) => r.matchdayResultId !== resultId),
+        ...zeilen.flatMap((z) => z.spieler.map((p, i) => ({ id: `${resultId}-${z.id}-${i}`, matchdayResultId: resultId, teamId: "H-1", playerId: p, disciplineSide: z.side }))),
+      ],
+    },
+  } as unknown as GameState;
+}
+
+describe("Review 21.11: Praemien", () => {
+  const d1 = { id: "a", side: "d1" as const, extra: { ergebnisNormiert: [7, 4] }, spieler: ["H-1-p0", "H-1-p1"] };
+  const d2 = { id: "b", side: "d2" as const, extra: { ergebnisNormiert: [6, 3] }, spieler: ["H-1-p2", "H-1-p3", "H-1-p4"] };
+
+  it("gestaffelter Commit: D1 zahlt bei D1, D2 zahlt spaeter bei D2; Replay zahlt nie doppelt", () => {
+    const plan = setzePraemienPlan(fixture(), "H-1", { siegStufe: 2, treueStufe: 0 }).gameState;
+    // Commit 1: nur D1 liegt vor.
+    const nachD1 = bucheSiegpraemien(spieltagMitZeilen(plan, [d1]), "res-1", ["d1"]);
+    expect(lesPraemienPlan(nachD1, "H-1").siegGebucht).toBeCloseTo(0.04, 5);
+    // Commit 2 (dieselbe matchdayResultId): D2 kommt dazu, nur D2 ist neu.
+    const nachD2 = bucheSiegpraemien(spieltagMitZeilen(nachD1, [d1, d2]), "res-1", ["d2"]);
+    expect(lesPraemienPlan(nachD2, "H-1").siegGebucht).toBeCloseTo(0.04 + 0.06, 5);
+    expect(nachD2.teams.find((t) => t.teamId === "H-1")!.cash).toBeCloseTo(90 - 0.1, 5);
+    // Je Seite zahlen nur die auf dieser Seite Eingesetzten: p0 (nur D1) und p2 (nur D2) je einmal +2.
+    expect(nachD2.playerMoraleState!.find((p) => p.playerId === "H-1-p0")!.morale).toBe(62);
+    expect(nachD2.playerMoraleState!.find((p) => p.playerId === "H-1-p2")!.morale).toBe(62);
+    expect(nachD2.playerMoraleState!.find((p) => p.playerId === "H-1-p9")!.morale).toBe(60);
+    // Replay beider Commits: nichts mehr.
+    const replay = bucheSiegpraemien(bucheSiegpraemien(nachD2, "res-1", ["d1"]), "res-1", ["d2"]);
+    expect(lesPraemienPlan(replay, "H-1").siegGebucht).toBeCloseTo(0.1, 5);
+    expect(replay.teams.find((t) => t.teamId === "H-1")!.cash).toBeCloseTo(90 - 0.1, 5);
+    // Ohne Seitenangabe (Voll-Re-Apply) zaehlt ebenfalls nur, was noch offen ist.
+    expect(lesPraemienPlan(bucheSiegpraemien(nachD2, "res-1"), "H-1").siegGebucht).toBeCloseTo(0.1, 5);
+  });
+
+  it("Sieg heisst gewonnene Begegnung: Duell-Niederlage auf Rang 1 zaehlt nicht, im Pod nur Platz 1", () => {
+    const plan = setzePraemienPlan(fixture(), "H-1", { siegStufe: 1, treueStufe: 0 }).gameState;
+    const gebucht = (zeile: { id: string; side: "d1" | "d2"; extra: Record<string, unknown>; spieler: string[] }) =>
+      lesPraemienPlan(bucheSiegpraemien(spieltagMitZeilen(plan, [zeile]), "res-1", ["d1"]), "H-1").siegGebucht;
+    expect(gebucht({ id: "a", side: "d1", extra: { rank: 1, ergebnisNormiert: [4, 7] }, spieler: ["H-1-p0"] })).toBe(0);
+    expect(gebucht({ id: "a", side: "d1", extra: { rank: 1, ergebnisNormiert: [5, 5] }, spieler: ["H-1-p0"] })).toBe(0);
+    expect(gebucht({ id: "a", side: "d1", extra: { rank: 16, verhaeltnis: 3 }, spieler: ["H-1-p0"] })).toBeCloseTo(0.01, 5);
+    const pod = (platz: number) => ({
+      id: "a",
+      side: "d1" as const,
+      extra: { rank: platz === 1 ? 16 : 1, miniDmPod: { podId: "p", platz, teamIds: ["H-1", "H-2", "K-1", "X"], wert: 5 } },
+      spieler: ["H-1-p0"],
+    });
+    expect(gebucht(pod(1))).toBeCloseTo(0.01, 5);
+    expect(gebucht(pod(2))).toBe(0);
+    // Alte Zeile ohne diese Felder: Rueckfall auf die obere Haelfte nach Rang (3 Teams: Rang 1 gewinnt).
+    expect(gebucht({ id: "a", side: "d1", extra: { rank: 1 }, spieler: ["H-1-p0"] })).toBeCloseTo(0.01, 5);
+    expect(gebucht({ id: "a", side: "d1", extra: { rank: 3 }, spieler: ["H-1-p0"] })).toBe(0);
+  });
+
+  it("ungekuerztes Geld-Log: alle Zahlungen stehen drin, auch wenn das Anzeige-Protokoll kuerzt; Moral-Kennungen sind eindeutig", () => {
+    let gs = setzePraemienPlan(fixture(), "H-1", { siegStufe: 1, treueStufe: 2 }).gameState;
+    for (let i = 1; i <= 15; i += 1) {
+      gs = spieltagMitZeilen(gs, [{ ...d1, spieler: ["H-1-p0"] }], `res-${i}`);
+      gs = bucheSiegpraemien(gs, `res-${i}`, ["d1"]);
+    }
+    gs = bucheTreuepraemie(gs, "H-1", "H-1-p1", 6, "ev-1");
+    const plan = lesPraemienPlan(gs, "H-1");
+    expect(plan.protokoll.length).toBeLessThanOrEqual(12);
+    const log = lesPraemienLog(gs, "H-1");
+    expect(log.length).toBe(16);
+    expect(log.filter((e) => e.art === "sieg").length).toBe(15);
+    const summe = log.reduce((a, e) => a + e.cashDelta, 0);
+    expect(summe).toBeCloseTo(-(plan.siegGebucht + plan.treueGebucht), 5);
+    expect(gs.teams.find((t) => t.teamId === "H-1")!.cash).toBeCloseTo(90 + summe, 5);
+    // H-2 hat nichts gezahlt: eigenes Log je Team.
+    expect(lesPraemienLog(gs, "H-2").length).toBe(0);
+    const ids = gs.playerMoraleState!.find((p) => p.playerId === "H-1-p0")!.reasons.map((r) => r.reasonId);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Ein Saisonwechsel loescht das Log nicht: es bleibt je Saison lesbar.
+    const naechste = { ...gs, season: { ...gs.season, id: "season-4", name: "Season 4" } } as GameState;
+    expect(lesPraemienLog(naechste, "H-1").length).toBe(16);
+    expect(lesPraemienLog(naechste, "H-1", "season-3").length).toBe(16);
+    expect(lesPraemienLog(naechste, "H-1", "season-4").length).toBe(0);
+  });
+
+  it("Finanz-Audit fuehrt die Praemien als eigenen Kanal und der Kontoauszug zeigt sie", () => {
+    let gs = setzePraemienPlan(fixture(), "H-1", { siegStufe: 2, treueStufe: 0 }).gameState;
+    gs = bucheSiegpraemien(spieltagMitZeilen(gs, [d1, d2]), "res-1");
+    const log = lesPraemienLog(gs, "H-1");
+    expect(log.length).toBe(2);
+    const summe = log.reduce((a, e) => a + e.cashDelta, 0);
+    expect(summe).toBeLessThan(0);
+    const audit = buildTransferFinanceAudit(gs);
+    const zeile = audit.rows.find((r) => r.teamId === "H-1" && r.seasonId === "season-3");
+    expect(zeile?.netPraemienCash).toBeCloseTo(summe, 5);
+    const konto = buildTeamKontoauszug(gs, "H-1");
+    expect(konto.jeArt.vorstand_praemien).toBeCloseTo(summe, 5);
+  });
+});
+
+describe("Review 21.11: KI bleibt bis zur Messung neutral", () => {
+  it("die neuen Zielarten gibt es nur bei Menschen: kein Eintrag, kein Delta, kein Druck bei KI-Teams", () => {
+    const gs = refreshTeamObjectiveState(mitPp(fixture({ enden: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5] })));
+    const ids = (teamId: string) => (gs.seasonState.teamSeasonObjectives ?? []).filter((o) => o.teamId === teamId).map((o) => o.objectiveId);
+    expect(ids("H-1")).toContain("board-lieblingsspieler");
+    expect(ids("H-1")).toContain("board-vertragslaufzeiten");
+    expect(ids("K-1")).not.toContain("board-lieblingsspieler");
+    expect(ids("K-1")).not.toContain("board-vertragslaufzeiten");
+    // Auch nach dem Saisonende: nichts fuer die KI in der Abrechnung.
+    const ende = { ...gs, seasonState: { ...gs.seasonState, matchdayResults: ["md-1", "md-2", "md-3"].map((m) => ({ id: `r-${m}`, seasonId: "season-3", matchdayId: m })) } } as GameState;
+    const abrechnung = buildTeamSeasonObjectiveSettlement(refreshTeamObjectiveState(ende));
+    expect(abrechnung.rows.filter((r) => r.teamId === "K-1" && /board-(lieblingsspieler|vertragslaufzeiten)/.test(r.objectiveId)).length).toBe(0);
+  });
+
+  it("Mensch symmetrisch: Bonus und Malus gelten, Vertragslaufzeit zahlt dort wie die uebrigen Vorstandsziele Geld", () => {
+    const gestreut = baueVertragslaufzeitZiel(fixture({ enden: [4, 5, 6, 4, 5, 6, 7, 8, 4, 5] }), "H-1")!;
+    expect(gestreut.boardConfidenceDelta).toBe(0.3);
+    expect(gestreut.rewardCash).toBe(2);
+    const ende = fixture({ enden: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5] });
+    ende.seasonState.matchdayResults = ["md-1", "md-2", "md-3"].map((m) => ({ id: `r-${m}`, seasonId: "season-3", matchdayId: m })) as never;
+    expect(baueVertragslaufzeitZiel(ende, "H-1")!.boardConfidenceDelta).toBe(-0.4);
+  });
+
+  it("aktuelle PP ohne Ergebnisse dieser Saison ist leer, nicht die Summe aller Saisons", () => {
+    const gs = fixture();
+    gs.seasonState.matchdayResults = [];
+    gs.seasonState.playerDisciplinePerformances = [{ id: "alt", matchdayResultId: "aus-der-vorsaison", teamId: "H-1", playerId: "H-1-p4", scoreContribution: 30 }] as never;
+    expect(ermittleLieblingsspieler(gs, "H-1")).toBeNull();
+  });
+});
+
+describe("Review 21.11: Zieltausch", () => {
+  const mitZielen = () => refreshTeamObjectiveState(fixture({ vertrauen: { "H-1": 6, "H-2": 3, "K-1": 5 } }));
+
+  it("ein bereits erfuelltes oder verfehltes Kandidatenziel ist kein Ersatz", () => {
+    // H-1 steht auf Rang 1: das Rang-Ziel im Pool ist erfuellt und darf nie als Ersatz eingetauscht werden.
+    const basis = mitZielen();
+    const rang1 = {
+      ...basis,
+      seasonState: { ...basis.seasonState, standings: { "K-1": { points: 80, rank: 3 }, "H-2": { points: 90, rank: 2 }, "H-1": { points: 100, rank: 1 } } },
+    } as unknown as GameState;
+    const pool = getTeamObjectivePool(rang1, "H-1");
+    const erledigt = pool.filter((k) => k.status === "completed" || k.status === "failed").map((k) => k.objectiveId);
+    expect(erledigt.length).toBeGreaterThan(0);
+    for (const ziel of (rang1.seasonState.teamSeasonObjectives ?? []).filter((o) => o.teamId === "H-1" && istZielTauschbar(o))) {
+      const r = tauscheVorstandsZiel(rang1, "H-1", ziel.objectiveId);
+      if (r.ok) expect(erledigt).not.toContain(r.neu!.objectiveId);
+    }
+  });
+
+  it("nur bis Spieltag 10 oder im Transferfenster; danach gesperrt mit Begruendung", () => {
+    const gs = mitZielen();
+    const probe = (gs.seasonState.teamSeasonObjectives ?? []).find((o) => o.teamId === "H-1" && istZielTauschbar(o))!;
+    const matchdayIds = Array.from({ length: 20 }, (_, i) => `md-${i + 1}`);
+    const spaet = (n: number, phase: string) =>
+      ({
+        ...gs,
+        gamePhase: phase,
+        season: { ...gs.season, matchdayIds },
+        seasonState: { ...gs.seasonState, matchdayResults: matchdayIds.slice(0, n).map((m) => ({ id: `r-${m}`, seasonId: "season-3", matchdayId: m })) },
+      }) as unknown as GameState;
+    expect(zielTauschZeitfenster(spaet(10, "season_active")).erlaubt).toBe(true);
+    expect(zielTauschZeitfenster(spaet(11, "season_active")).erlaubt).toBe(false);
+    expect(zielTauschZeitfenster(spaet(11, "season_end_management")).erlaubt).toBe(true);
+    const zu = tauscheVorstandsZiel(spaet(12, "season_active"), "H-1", probe.objectiveId);
+    expect(zu.ok).toBe(false);
+    expect(zu.reason).toBe("tausch_zu_spaet");
+    // Die Bitte im Gespraech ist gesperrt, mit Begruendung (die UI zeigt sie am Knopf), und das Office-Modell bietet nichts an.
+    const e = beurteileGespraech(spaet(12, "season_active"), "H-1", { bitte: "ziel", zielId: probe.objectiveId, zusagen: [] });
+    expect(e.sperre).toMatch(/Spieltag 10/);
+    expect(buildOfficeModell(spaet(12, "season_active"), "H-1")!.ziele.some((z) => z.tauschbar)).toBe(false);
+  });
+});
+
+describe("Review 21.11: Zusagen und Antraege", () => {
+  it("Zusage „Vertrauen einsetzen“: kein verfehltes/gefaehrdetes Ziel, kein Druck, keine Inbox-Meldung, Kosten erst bei der naechsten Festlegung", () => {
+    const gs0 = fixture({ vertrauen: { "H-1": 8, "H-2": 3.4, "K-1": 5 } });
+    const vorher = refreshTeamObjectiveState(gs0);
+    const wertVorher = vorher.seasonState.boardConfidence!["H-1"]!.value;
+    const druckVorher = vorher.seasonState.boardConfidence!["H-1"]!.pressure;
+    const mitZusage = {
+      ...vorher,
+      seasonState: {
+        ...vorher.seasonState,
+        vorstandGespraeche: { ...(vorher.seasonState.vorstandGespraeche ?? {}), "H-1": { ...lesVorstandGespraech(vorher, "H-1"), zusagen: [{ art: "vertrauen", seit: "x" }] } },
+      },
+    } as unknown as GameState;
+    const nach = refreshTeamObjectiveState(mitZusage);
+    const z = (nach.seasonState.teamSeasonObjectives ?? []).find((o) => o.teamId === "H-1" && o.objectiveId === "vorstand-gespraech-vertrauen")!;
+    expect(z).toBeDefined();
+    expect(z.status).toBe("open");
+    expect(nach.seasonState.boardConfidence!["H-1"]!.value).toBe(wertVorher);
+    expect(nach.seasonState.boardConfidence!["H-1"]!.pressure).toBe(druckVorher);
+    expect(nach.seasonState.boardConfidence!["H-1"]!.warnings).toEqual(vorher.seasonState.boardConfidence!["H-1"]!.warnings);
+    expect(resolveVorstandFreigabe(nach, "H-1").vertrauen).toBe(wertVorher);
+    // Keine Inbox-Meldung „Board-Ziel verfehlt/gefaehrdet" fuer die Zusage.
+    const inbox = buildGameInboxItems({ gameState: nach, saveId: "s", activeTeamId: "H-1" });
+    expect(inbox.some((i) => /Zusage an den Vorstand/.test(i.title ?? ""))).toBe(false);
+    // Die Kosten werden erst bei der naechsten Festlegung (Abrechnung) gebucht.
+    const abrechnung = buildTeamSeasonObjectiveSettlement(nach);
+    const zeile = abrechnung.rows.find((r) => r.teamId === "H-1" && r.objectiveId === "vorstand-gespraech-vertrauen")!;
+    expect(zeile.boardConfidenceDelta).toBe(-0.25);
+  });
+
+  it("Kostenvermerk „Ruecklage angezapft“ ist kein verfehltes Ziel und loest keine Inbox-Meldung aus", () => {
+    const gs0 = fixture({ vertrauen: { "H-1": 8, "H-2": 3.4, "K-1": 5 } });
+    const gs = refreshTeamObjectiveState({
+      ...gs0,
+      seasonState: { ...gs0.seasonState, vorstandBudget: { "H-1": { ...lesVorstandZustand(gs0, "H-1"), ruecklageAngezapft: 1, vertrauensKosten: 0.25 } } },
+    } as unknown as GameState);
+    expect((gs.seasonState.teamSeasonObjectives ?? []).some((o) => o.teamId === "H-1" && o.objectiveId === "vorstand-ruecklage-angezapft")).toBe(true);
+    const inbox = buildGameInboxItems({ gameState: gs, saveId: "s", activeTeamId: "H-1" });
+    expect(inbox.some((i) => /angezapft/i.test(i.title ?? ""))).toBe(false);
+  });
+
+  it("Zusage „Lieblingsspieler verlaengern“ ist gesperrt, wenn er diese Saison schon verlaengert ist; keine doppelte +0,3", () => {
+    const gs = mitPp(fixture({ vertrauen: { "H-1": 5, "H-2": 3, "K-1": 5 } }));
+    const verlaengert = {
+      ...gs,
+      seasonState: { ...gs.seasonState, contractEvents: [{ eventId: "e", seasonId: "season-3", teamId: "H-1", playerId: "H-1-p2", eventType: "contract_renewed" }] },
+    } as unknown as GameState;
+    const e = beurteileGespraech(verlaengert, "H-1", { bitte: "stufe", zusagen: ["binden"] });
+    expect(e.zusagenVerfuegbar.binden).toMatch(/schon verlängert/);
+    expect(beurteileGespraech(gs, "H-1", { bitte: "stufe", zusagen: [] }).zusagenVerfuegbar.binden).toBeNull();
+    // Hat der Mensch die Verlaengerung zugesagt UND wird verlaengert, zahlt nur die Zusage die +0,3.
+    const zugesagt = {
+      ...verlaengert,
+      seasonState: {
+        ...verlaengert.seasonState,
+        vorstandGespraeche: { "H-1": { ...lesVorstandGespraech(verlaengert, "H-1"), zusagen: [{ art: "binden", playerId: "H-1-p2", seit: "x" }] } },
+      },
+    } as unknown as GameState;
+    expect(baueLieblingsspielerZiel(zugesagt, "H-1")!.boardConfidenceDelta).toBe(0);
+    const zusageZiel = baueGespraechZusageZiele(zugesagt, "H-1", 3).find((z) => z.objectiveId === "vorstand-gespraech-binden")!;
+    expect(zusageZiel.boardConfidenceDelta).toBe(0.3);
+    expect(baueLieblingsspielerZiel(verlaengert, "H-1")!.boardConfidenceDelta).toBe(0.3);
+  });
+
+  it("fehlerhafter Antrag (Betrag oder Ziel fehlt) verbraucht kein Gespraech", () => {
+    const gs = fixture({ vertrauen: { "H-1": 8, "H-2": 3, "K-1": 5 } });
+    for (const antrag of [
+      { bitte: "sonder" as const, zusagen: [] },
+      { bitte: "anzapf" as const, betrag: 0, zusagen: [] },
+      { bitte: "ziel" as const, zusagen: [] },
+      { bitte: "ziel" as const, zielId: "gibt-es-nicht", zusagen: [] },
+    ]) {
+      const r = stelleGespraechAntrag(gs, "H-1", antrag);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toBe("antrag_unvollstaendig");
+      expect(lesVorstandGespraech(r.gameState, "H-1").genutzt).toBe(0);
+      expect(r.gameState).toBe(gs);
+    }
+  });
+});
+
+describe("Review 21.11: Geldstrafe, Freigabe", () => {
+  it("penaltyCash wird beim Fortschreiben nicht mehr mitgefuehrt (ausser Sponsor-Spiegel)", () => {
+    const gs = refreshTeamObjectiveState(fixture({ vertrauen: { "H-1": 2, "H-2": 2, "K-1": 2 } }));
+    // Saisonende: viele Ziele sind verfehlt und tragen im Generator ein Altfeld penaltyCash.
+    const ende = {
+      ...gs,
+      seasonState: { ...gs.seasonState, matchdayResults: ["md-1", "md-2", "md-3"].map((m) => ({ id: `r-${m}`, seasonId: "season-3", matchdayId: m })) },
+    } as GameState;
+    const pool = [...getTeamObjectivePool(ende, "H-1"), ...getTeamObjectivePool(ende, "H-2")];
+    // Der Generator selbst kennt das Altfeld noch (sonst prueft der Test nichts) ...
+    expect(pool.some((o) => o.penaltyCash != null)).toBe(true);
+    // ... das Fortschreiben des gespeicherten Bestands fuehrt es aber nicht mehr mit.
+    const vorhanden = new Set((ende.seasonState.teamSeasonObjectives ?? []).filter((o) => o.teamId === "H-1").map((o) => o.objectiveId));
+    const mitAltfeld = getTeamObjectivePool(ende, "H-1").filter((o) => o.penaltyCash != null && !vorhanden.has(o.objectiveId));
+    expect(mitAltfeld.length).toBeGreaterThan(0);
+    const bestand = { ...ende, seasonState: { ...ende.seasonState, teamSeasonObjectives: [...(ende.seasonState.teamSeasonObjectives ?? []), ...mitAltfeld] } } as GameState;
+    const nochmal = refreshTeamObjectiveState(bestand);
+    const eigene = (nochmal.seasonState.teamSeasonObjectives ?? []).filter((o) => !/sponsor_v2/.test(o.source ?? ""));
+    expect(eigene.length).toBeGreaterThan(0);
+    for (const o of eigene) {
+      if (/status_stale/.test(o.source ?? "")) continue;
+      expect(o.penaltyCash, `${o.objectiveId}`).toBeUndefined();
+    }
+  });
+
+  it("Stufen-Anhebung und Lockerung durch Verkaeufe stapeln nicht (altes Fenster, in dem die Lockerung gilt)", () => {
+    // Im gemeinsamen Fenster (Standard) sind Verkaufserloese zu 100 % frei, die Lockerung ruht. Sie gilt nur im alten Ablauf.
+    vi.stubEnv("OLY_TRANSFERFENSTER_GEMEINSAM", "0");
+    try {
+      const basis = fixture({ vertrauen: { "H-1": 4, "H-2": 3, "K-1": 5 } });
+      const verkaeufe = [{ seasonId: "season-3", transferType: "sell", fromTeamId: "H-1", toTeamId: "X", fee: 80, netCashImpact: 80, playerId: "H-1-p0" }];
+      const ohne = berechneVorstandBudgetStand(basis, "H-1");
+      // Nur Lockerung: eine Stufe mehr als die Ausgangsquote.
+      const nurLockerung = berechneVorstandBudgetStand({ ...basis, transferHistory: verkaeufe } as unknown as GameState, "H-1");
+      expect(nurLockerung.lockerung.aktiv).toBe(true);
+      expect(nurLockerung.wirksamerAnteil).toBeGreaterThan(ohne.anteil);
+      // Nur Anhebung: ebenfalls genau eine Stufe mehr.
+      const angehoben = {
+        ...basis,
+        seasonState: { ...basis.seasonState, vorstandBudget: { "H-1": { ...lesVorstandZustand(basis, "H-1"), stufenAnhebung: 1 } } },
+      } as unknown as GameState;
+      const nurAnhebung = berechneVorstandBudgetStand(angehoben, "H-1");
+      expect(nurAnhebung.anteil).toBeGreaterThan(ohne.anteil);
+      // Beides zugleich: es gilt die hoehere der beiden, nie beide; hoechstens 100 %.
+      const beides = berechneVorstandBudgetStand({ ...angehoben, transferHistory: verkaeufe } as unknown as GameState, "H-1");
+      expect(beides.wirksamerAnteil).toBeCloseTo(Math.max(nurAnhebung.wirksamerAnteil, nurLockerung.wirksamerAnteil), 9);
+      expect(beides.wirksamerAnteil).toBeLessThanOrEqual(1);
+      expect(beides.lockerung.aktiv).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("Review 21.11: Anzeigefehler", () => {
+  it("Rang-Ziele nennen sinnvolle Plaetze und den Rang in der eigenen Liga", () => {
+    const gs = fixture({ vertrauen: { "H-1": 6, "H-2": 3, "K-1": 5 } });
+    const liga = { ...gs, seasonState: { ...gs.seasonState, leagueByTeamId: { "H-1": "L1", "H-2": "L1", "K-1": "L2" } } } as unknown as GameState;
+    const pool = getTeamObjectivePool(liga, "H-1");
+    const erwartung = pool.find((o) => o.objectiveId === "expectation-rank");
+    expect(erwartung?.detail ?? "").not.toMatch(/mindestens 0 Plätze/);
+    expect(erwartung?.detail ?? "").not.toMatch(/mindestens 1 Plätze/);
+    const quote = pool.find((o) => o.objectiveId === "finance-salary-ratio");
+    // In der Liga L1 gibt es zwei Teams: der Rang steht nie von 3.
+    if (quote?.detail) expect(quote.detail).not.toMatch(/von 3\b/);
   });
 });

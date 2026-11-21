@@ -46,6 +46,8 @@ export const GESPRAECH_VERTRAUEN_ID = "vorstand-gespraech-vertrauen";
 /** Verkauf des Lieblingsspielers kostet, eine Verlaengerung bringt Vertrauen (Chris 21.11.). */
 export const LIEBLING_VERKAUF_VERTRAUEN = -1.0;
 export const LIEBLING_VERLAENGERUNG_VERTRAUEN = 0.3;
+/** Kosten der Zusage „Vertrauen einsetzen" (negativ), gebucht bei der naechsten Festlegung. */
+export const VERTRAUEN_ZUSAGE_KOSTEN = -0.25;
 /** Hoechstens so viel Anteil der Vertraege darf in derselben Saison enden. */
 export const VERTRAGSLAUFZEIT_MAX_ANTEIL = 0.3;
 /** Das Vertragslaufzeit-Ziel gilt zwei Saisons. */
@@ -99,7 +101,8 @@ function aktuellePp(gameState: GameState): Map<string, number> {
   );
   const map = new Map<string, number>();
   for (const e of gameState.seasonState.playerDisciplinePerformances ?? []) {
-    if (ids.size > 0 && !ids.has(e.matchdayResultId)) continue;
+    // Ohne Ergebnisse dieser Saison ist die Menge leer: nicht auf alle Saisons ausweichen (sonst zaehlte die PP der Vorjahre).
+    if (!ids.has(e.matchdayResultId)) continue;
     map.set(e.playerId, (map.get(e.playerId) ?? 0) + (e.scoreContribution ?? 0));
   }
   return map;
@@ -151,14 +154,21 @@ export function lieblingFuerSaison(gameState: GameState, teamId: string): Liebli
   return ermittleLieblingsspieler(gameState, teamId);
 }
 
-function verlaengertDieseSaison(gameState: GameState, teamId: string, playerId: string): boolean {
+export function verlaengertDieseSaison(gameState: GameState, teamId: string, playerId: string): boolean {
   return (gameState.seasonState.contractEvents ?? []).some(
     (e) => e.seasonId === gameState.season.id && e.teamId === teamId && e.playerId === playerId && e.eventType === "contract_renewed",
   );
 }
 
+/** Hat dieses Team einen Menschen am Steuer? Die neuen Zielarten wirken bis zur Messung mit 32 KI-Teams nur dort. */
+function istMensch(gameState: GameState, teamId: string): boolean {
+  return Boolean(gameState.teams.find((t) => t.teamId === teamId)?.humanControlled);
+}
+
 export function baueLieblingsspielerZiel(gameState: GameState, teamId: string): ZielEntwurf | null {
-  const mensch = Boolean(gameState.teams.find((t) => t.teamId === teamId)?.humanControlled);
+  // KI-Teams: bis zu einer Messung mit 32 KI-Teams (Chris 21.11.) gibt es das Ziel dort gar nicht. Ein Ziel mit Delta 0 wuerde
+  // trotzdem als verfehlt/gefaehrdet zaehlen (Druck, GM-Entlassung, KI-Panik); deshalb ist es fuer die KI schlicht nicht vorhanden.
+  if (!istMensch(gameState, teamId)) return null;
   const liebling = lieblingFuerSaison(gameState, teamId);
   if (!liebling) return null;
   const imKader = gameState.rosters.some((r) => r.teamId === teamId && r.playerId === liebling.playerId);
@@ -169,11 +179,12 @@ export function baueLieblingsspielerZiel(gameState: GameState, teamId: string): 
   let delta: number;
   if (!imKader) {
     status = freigegeben ? "completed" : "failed";
-    // KI-Teams: das Ziel wird ausgewertet, die Strafe greift erst nach einer Messung mit 32 KI-Teams (Chris 21.11.).
-    delta = freigegeben || !mensch ? 0 : LIEBLING_VERKAUF_VERTRAUEN;
+    delta = freigegeben ? 0 : LIEBLING_VERKAUF_VERTRAUEN;
   } else if (verlaengert) {
     status = "completed";
-    delta = LIEBLING_VERLAENGERUNG_VERTRAUEN;
+    // Hat der Mensch die Verlaengerung im Gespraech zugesagt, zahlt die Zusage die +0,3: dieselbe Verlaengerung zaehlt nur einmal.
+    const zugesagt = lesVorstandGespraech(gameState, teamId).zusagen.some((x) => x.art === "binden" && x.playerId === liebling.playerId);
+    delta = zugesagt ? 0 : LIEBLING_VERLAENGERUNG_VERTRAUEN;
   } else {
     status = "open";
     delta = 0;
@@ -213,7 +224,8 @@ export function vertragslaufzeitGrenze(kaderGroesse: number): number {
 }
 
 export function baueVertragslaufzeitZiel(gameState: GameState, teamId: string): ZielEntwurf | null {
-  const mensch = Boolean(gameState.teams.find((t) => t.teamId === teamId)?.humanControlled);
+  // KI-Teams: siehe `baueLieblingsspielerZiel` (neutral bis zur Messung, also gar nicht vorhanden).
+  if (!istMensch(gameState, teamId)) return null;
   const nr = saisonNr(gameState);
   if (nr == null || nr < 2) return null;
   const kader = gameState.rosters.filter((r) => r.teamId === teamId).length;
@@ -250,8 +262,7 @@ export function baueVertragslaufzeitZiel(gameState: GameState, teamId: string): 
     currentValue: hoechst,
     status,
     rewardCash: status === "completed" ? 2 : undefined,
-    // KI-Teams: ausgewertet, Strafe erst nach einer Messung (die KI plant Vertragsenden noch nicht).
-    boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" && mensch ? -0.4 : 0,
+    boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" ? -0.4 : 0,
     source: "vorstand_vertragslaufzeiten",
     laufzeit,
   };
@@ -289,9 +300,11 @@ export function baueGespraechZusageZiele(gameState: GameState, teamId: string, r
         detail: "Im Gespräch zugesagt: 0,25 Vertrauen wurden eingesetzt. Die Buchung folgt wie jede Vertrauensänderung bei der nächsten Festlegung.",
         targetValue: "eingesetzt",
         currentValue: "eingesetzt",
-        // „gefaehrdet" statt „verfehlt": die Zusage wurde nicht verfehlt, sie wird bei der naechsten Festlegung gebucht (kein Alarm in der Inbox).
-        status: "at_risk",
-        boardConfidenceDelta: -0.25,
+        // Eine Zusage ist nie ein verfehltes oder gefaehrdetes Ziel: Status „offen" (kein Druck, keine Inbox-Meldung). Das Vertrauen
+        // wird erst bei der naechsten Festlegung gebucht (Abrechnung, `buildTeamSeasonObjectiveSettlement`); bis dahin zaehlt der
+        // Wert ohne die Kosten (`calculateBoardConfidence` laesst dieses Ziel in der laufenden Summe aus).
+        status: "open",
+        boardConfidenceDelta: VERTRAUEN_ZUSAGE_KOSTEN,
         source: "vorstand_gespraech_zusage",
         laufzeit: { vonSaisonNr: nr, bisSaisonNr: nr },
       });

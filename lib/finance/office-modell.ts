@@ -6,7 +6,7 @@
  * sie nur fuer die Oberflaeche und rechnet Raenge (Rang 1 ist immer der beste; bei Kosten das guenstigste Team).
  */
 
-import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
+import { buildTeamObjectiveOverview, istZielTauschbar, zielTauschZeitfenster } from "@/lib/board/team-season-objectives-service";
 import {
   bereichDesZiels,
   kaderUnterSoll,
@@ -156,6 +156,7 @@ export function buildOfficeModell(gameState: GameState, teamId: string): OfficeM
   const alle = overview.objectives.filter((o) => o.teamId === teamId && o.seasonId === gameState.season.id);
   const sichtbar = alle.filter((o) => !/sponsor_v2/.test(o.source ?? "") && !o.objectiveId.startsWith("sponsor-"));
   const neuIds = new Set(["board-lieblingsspieler", "board-vertragslaufzeiten", "vorstand-gespraech-zielhoch", "vorstand-gespraech-binden", "vorstand-gespraech-vertrauen"]);
+  const tauschFenster = zielTauschZeitfenster(gameState);
   const ziele: OfficeZiel[] = sichtbar.map((o) => {
     const laufzeit = o.laufzeit;
     const mehrjaehrig = Boolean(laufzeit && laufzeit.bisSaisonNr > laufzeit.vonSaisonNr);
@@ -171,7 +172,7 @@ export function buildOfficeModell(gameState: GameState, teamId: string): OfficeM
       status: o.status,
       ist: wert(o.currentValue),
       soll: wert(o.targetValue),
-      plus: r2(o.status === "failed" ? 0 : plusRoh > 0 ? plusRoh : 0.3),
+      plus: r2(o.status === "failed" || o.objectiveId === "vorstand-gespraech-vertrauen" ? 0 : plusRoh > 0 ? plusRoh : 0.3),
       minus: r2(o.status === "failed" ? Math.abs(Math.min(0, delta)) : o.optional ? 0 : Math.abs(Math.min(0, delta)) || 0.3),
       rewardCash: o.rewardCash ?? 0,
       laufzeitText: laufzeit
@@ -182,7 +183,7 @@ export function buildOfficeModell(gameState: GameState, teamId: string): OfficeM
       mehrjaehrig,
       neu: neuIds.has(o.objectiveId),
       ersetzt: o.ersetzt ?? null,
-      tauschbar: o.status !== "completed" && o.status !== "failed" && !/^(board-|vorstand-)/.test(o.objectiveId) && !/vorstand_|status_stale/.test(o.source ?? ""),
+      tauschbar: tauschFenster.erlaubt && istZielTauschbar(o),
       quelle: o.source ?? "",
     };
   });

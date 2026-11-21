@@ -409,6 +409,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   let lockerungSperre: string | null = null;
   if (!gedeckelt) lockerungSperre = "Saison 1: alles ist freigegeben.";
   else if (alle) lockerungSperre = "„Alles auf eine Karte“ ist aktiv.";
+  else if ((zustand.stufenAnhebung ?? 0) > 0) lockerungSperre = "Die Freigabe wurde im Gespräch angehoben: eine Lockerung durch Verkäufe stapelt sich nicht darauf (es gilt die höhere der beiden).";
   else if (q0 >= 1) lockerungSperre = "Schon voll freigegeben.";
   else if (verkaufserloeseFreiAnteil(q0) >= 1) lockerungSperre = "Im gemeinsamen Fenster sind Verkaufserlöse zu 100 % frei.";
   else if (cash < 0) lockerungSperre = "Keine Lockerung bei Kasse im Minus.";

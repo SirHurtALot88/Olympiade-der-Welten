@@ -2219,9 +2219,10 @@ export function applyContractRenewalAction(input: {
     teamId: input.teamId,
     playerId: input.playerId,
   });
-  // Treueprämie (Office 21.11): nur bei einer Verlängerung durch den Menschen, aus dem Gehaltstopf; ohne Plan passiert nichts.
+  // Treueprämie (Office 21.11): bei einer Verlängerung durch den Menschen ODER in seinem Auftrag durch die KI (Halbautomatik/Voll KI:
+  // der Mensch hat den Plan gesetzt), aus dem Gehaltstopf. Reine KI-Teams haben keinen Plan, ohne Plan passiert nichts.
   const gameStateOhneEntwurf =
-    input.action === "renew" && input.source === "manual_contract_renewal"
+    input.action === "renew" && (input.source === "manual_contract_renewal" || input.source === "ai_contract_renewal")
       ? bucheTreuepraemie(gameStateOhneEntwurf0, input.teamId, input.playerId, newSalary, event.eventId)
       : gameStateOhneEntwurf0;
 

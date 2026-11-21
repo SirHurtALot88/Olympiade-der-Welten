@@ -935,7 +935,11 @@ export class LegacyMatchdayResultApplyService {
       },
     };
     // Siegprämien (Office 21.11): Nachbuchung aus dem Gehaltstopf, nur für Teams von Menschen mit Plan; ohne Plan ein No-Op.
-    const nextGameState = bucheSiegpraemien(nextGameStateOhnePraemien, matchdayResultId);
+    // Gestaffelte Buchung (D1, dann D2 mit derselben matchdayResultId): nur die in DIESEM Commit neu geschriebenen Seiten zaehlen.
+    const neuGeschriebeneSeiten = [
+      ...new Set(writePayload.disciplineResultPayloads.filter((p) => !frozenSides.has(p.disciplineSide)).map((p) => p.disciplineSide)),
+    ];
+    const nextGameState = bucheSiegpraemien(nextGameStateOhnePraemien, matchdayResultId, neuGeschriebeneSeiten);
     /**
      * DIE GEBUCHTE RECHNUNG WIRD GESTEMPELT — damit die Buehne danach SIE zeigt und nicht neu
      * rechnet.

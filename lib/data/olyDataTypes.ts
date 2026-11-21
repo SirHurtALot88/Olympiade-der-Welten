@@ -2256,10 +2256,34 @@ export type VorstandPraemienPlan = {
   /** In dieser Saison aus dem Gehaltstopf gebucht (C Jahresgehalt-Gegenwert). */
   siegGebucht: number;
   treueGebucht: number;
-  /** Siege, die bereits praemiert wurden (Spieltag-Ids), damit nichts doppelt gebucht wird. */
+  /**
+   * Seiten, die bereits praemiert wurden, damit nichts doppelt gebucht wird. Schluessel `${matchdayResultId}:${side}`
+   * (D1 und D2 werden gestaffelt gebucht); ein Schluessel ohne `:d1`/`:d2` (aeltere Staende) gilt fuer beide Seiten.
+   */
   praemierteSpieltage: string[];
   praemierteVerlaengerungen: string[];
   protokoll: Array<{ zeit: string; art: "sieg" | "treue" | "plan"; text: string; betrag?: number }>;
+};
+
+/**
+ * UNGEKUERZTES Geld-Log der Vorstands-Praemien (Office 21.11): jede gezahlte Praemie ein Eintrag, je Team, ueber alle Saisons.
+ * `plan.protokoll` ist nur die gekuerzte Anzeige; Finanz-Audit und Kontoauszug lesen dieses Log.
+ */
+export type VorstandPraemienLogEintrag = {
+  id: string;
+  seasonId: string;
+  teamId: string;
+  art: "sieg" | "treue";
+  /** Cash-Wirkung auf das Team (negativ = gezahlt). */
+  cashDelta: number;
+  zeit: string;
+  matchdayResultId?: string;
+  side?: "d1" | "d2";
+  contractId?: string;
+  /** Treuepraemie: der Spieler; Siegpraemie: leer (Summe ueber die Eingesetzten). */
+  playerId?: string;
+  siege?: number;
+  eingesetzte?: number;
 };
 
 export type TeamBoardConfidenceRecord = {
@@ -4045,6 +4069,8 @@ export type SeasonState = {
   vorstandGespraeche?: Record<string, VorstandGespraechZustand>;
   /** Praemienplaene je Team (Office 21.11). */
   vorstandPraemien?: Record<string, VorstandPraemienPlan>;
+  /** Ungekuerztes Geld-Log der Vorstands-Praemien je Team (alle Saisons, Saisonwechsel loescht nichts). */
+  vorstandPraemienLogs?: Record<string, VorstandPraemienLogEintrag[]>;
   previousSeasonBoardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];
