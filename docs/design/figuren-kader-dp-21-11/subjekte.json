@@ -1,0 +1,45 @@
+{
+  "zyra": {
+    "beschreibung": "Zyra, a Charger of race Demon. Muscular female demon warrior with red-brown skin, pointed ears, long wavy black hair, two huge curled orange-brown ram horns and a small orange horn on the forehead, heavy dark blackened plate armor with large spiked pauldrons and glowing ember cracks, holding a big dark double-bladed battle axe on a long shaft. No wings. Full body pixel art character.",
+    "subjekt": "a muscular female demon warrior with red-brown skin, long black hair, huge curled orange ram horns, heavy black plate armor with spiked pauldrons, holding a big dark long-shafted battle axe",
+    "konzeptbild": "public/portraits/zyra.jpg",
+    "angriff": "lowers her horns, charges a step forward and swings the big battle axe in a wide heavy arc at an enemy in front, then returns to the starting pose",
+    "tod": "is cut down: she drops the battle axe, clutches her chest as dark red blood spills out, falls to her knees and crashes face down into a pool of blood, lying still"
+  },
+  "zynara": {
+    "beschreibung": "Zynara, a Mage of race Lizard. Female serpent-lizard sorceress with a dark grey-black scaled reptile head, glowing purple eyes, a crest of dark spines, a large cobra-like hood lined with glowing purple runes, slim humanoid torso in black scale armor set with purple gems, pale belly scales, clawed hands, lower body is a thick coiled dark snake tail instead of legs, holding a dark wooden staff, purple arcane glow. Full body pixel art character.",
+    "subjekt": "a female serpent-lizard sorceress with a dark scaled reptile head, glowing purple eyes, purple rune-lined cobra hood, black scale armor with purple gems, a coiled snake tail instead of legs, holding a dark staff",
+    "konzeptbild": "public/portraits/zynara.jpg",
+    "walk": "slithers forward on her coiled snake tail with a smooth swaying motion, staff held upright, then returns to the starting pose",
+    "angriff": "raises one clawed hand, conjures a swirling purple arcane orb and hurls it at an enemy in front, then returns to the starting pose",
+    "tod": "the purple glow in her eyes and gems flickers and goes out, her hood folds, she drops the staff, her body goes slack and she sinks down into her own snake coils, lying still and dark"
+  },
+  "emilia": {
+    "beschreibung": "Emilia, a Rogue of race Demon. Athletic female demon with long wild dark red hair, two dark curved horns, large black feathered wings, tanned skin, black spiked leather armor top and tattered black skirt with bare midriff, black thigh-high boots, bright orange flames burning in both open hands, no weapon. Full body pixel art character.",
+    "subjekt": "an athletic female demon with long wild dark red hair, dark curved horns, large black feathered wings, black spiked leather armor and tattered black skirt, bright orange flames burning in both hands",
+    "konzeptbild": "public/portraits/emilia.jpg",
+    "angriff": "darts a step forward and thrusts both burning hands out, unleashing a burst of orange fire at an enemy in front, then returns to the starting pose",
+    "tod": "the flames in her hands gutter out, her own fire turns on her and her black wings burn away into embers, she drops to her knees and collapses to the ground as a charred smoking body, lying still"
+  },
+  "queen-loriana": {
+    "beschreibung": "Queen Loriana, a Bard of race Human. Tall muscular warrior queen with very long flowing white hair, pale skin, two small black horns like a dark crown, black steel breastplate with fur collar, spiked black pauldrons, bare toned midriff, black armored skirt, black gauntlets and plated boots, a dark cloak, holding a long steel sword in each hand pointed down. Full body pixel art character.",
+    "subjekt": "a tall muscular warrior queen with very long flowing white hair, small black horn crown, black steel breastplate with fur collar, bare midriff, black armored skirt and plated boots, a steel sword in each hand",
+    "konzeptbild": "public/portraits/queen-loriana.jpg",
+    "angriff": "strides forward and slashes both steel swords in a fast crossing double cut at an enemy in front, then returns to the starting pose",
+    "tod": "is run through: one sword slips from her hand, she drives the other into the ground to hold herself up, sinks to one knee as blood runs down her armor, then falls sideways to the ground, lying still"
+  },
+  "conan": {
+    "beschreibung": "Conan, a Mage of race Human. Small boy detective, child with short messy black hair and big round black glasses, navy blue blazer over a white shirt with a red bow tie, grey-blue shorts, bare legs, grey sneakers, a glowing blue wristwatch gadget on one wrist, no weapon. Full body pixel art character.",
+    "subjekt": "a small boy detective with short messy black hair, big round black glasses, navy blue blazer, white shirt, red bow tie, grey-blue shorts and grey sneakers, a glowing blue wristwatch gadget",
+    "konzeptbild": "public/portraits/conan.jpg",
+    "angriff": "raises his wrist, aims the glowing blue wristwatch gadget and fires a bright blue energy bolt at an enemy in front, then returns to the starting pose",
+    "tod": "is hit by a tiny dart in the neck, goes dizzy, his glasses slip down his nose, he wobbles on his feet and slumps to the ground knocked out cold, lying still"
+  },
+  "amarie": {
+    "beschreibung": "Amarie, a Charger of race Divine. Slender female dark winged warrior with very long straight black hair, pale skin, pointed ears, two large black curved horns, big dark bat-like wings with red-tinted membranes, a thin black tail, sleek black spiked plate armor with small red glowing accents, black thigh-high armored boots, holding a long jagged black spear. Full body pixel art character.",
+    "subjekt": "a slender female dark winged warrior with very long straight black hair, pale skin, large black curved horns, big dark bat-like wings, sleek black spiked armor with red accents, holding a long jagged black spear",
+    "konzeptbild": "public/portraits/amarie.jpg",
+    "angriff": "spreads her wings, lunges forward and thrusts the long jagged black spear at an enemy in front, then returns to the starting pose",
+    "tod": "is pierced through the chest: she drops the spear, her wings spasm and fold, blood runs down her armor, she falls to her knees and collapses forward with the wings draped over her body, lying still"
+  }
+}
