@@ -1,4 +1,5 @@
 "use client";
+import { getBelastungsPauseMatchdayId } from "@/lib/fatigue/fatigue-injury-service";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import { buildInitialLeagueAssignment, type LeagueTier } from "@/lib/season/league-split";
 import { buildSpieltagsUebersicht, istSpieltagsModusVerfuegbar } from "@/lib/foundation/season-matchday-fixtures-overview";
@@ -11544,7 +11545,7 @@ export function useFoundationShellRouterBodyScope({
    */
   const seasonV2Spieltage = useMemo(() => {
     if (!istSpieltagsModusVerfuegbar(gameState)) {
-      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, getUebersicht: () => null };
+      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, pause: null, getUebersicht: () => null };
     }
     const matchdayIdByResultId = new Map<string, string>();
     for (const result of gameState.seasonState.matchdayResults ?? []) {
@@ -11578,6 +11579,14 @@ export function useFoundationShellRouterBodyScope({
       verfuegbar: true as const,
       matchdayOptions,
       defaultMatchdayId,
+      // Saisonpause nach Spieltag 10 (Belastungsregel v2): Marke zwischen Spieltag 10 und 11 im Saisonstand.
+      pause: (() => {
+        const pauseMatchdayId = getBelastungsPauseMatchdayId(gameState);
+        if (!pauseMatchdayId) return null;
+        const gebucht = gameState.seasonState.belastungsPause?.seasonId === gameState.season.id
+          && gameState.seasonState.belastungsPause?.nachMatchdayId === pauseMatchdayId;
+        return { nachSpieltag: gameState.season.matchdayIds.indexOf(pauseMatchdayId) + 1, gebucht };
+      })(),
       // OPUS-REVIEW PR #1297: `saveId` fuer die Mini-DM-Vierergruppen VOR dem Resolve -- derselbe
       // Pod-Seed wie Resolve-Engine und Spielplan-Tab (s. `buildMiniDmPodsForSlot`).
       getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId, { saveId: activeSaveId }),

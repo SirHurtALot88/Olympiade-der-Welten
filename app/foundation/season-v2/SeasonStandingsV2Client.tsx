@@ -33,6 +33,8 @@ export type SeasonV2SpieltageBundle = {
   verfuegbar: boolean;
   matchdayOptions: Array<{ id: string; index: number; label: string; gespielt: boolean }>;
   defaultMatchdayId: string | null;
+  /** Saisonpause (Belastungsregel v2): liegt nach diesem Spieltag; `gebucht`, sobald die Erholung gebucht ist. */
+  pause?: { nachSpieltag: number; gebucht: boolean } | null;
   getUebersicht: (matchdayId: string) => SpieltagsUebersicht | null;
 };
 
