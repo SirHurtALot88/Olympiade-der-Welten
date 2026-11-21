@@ -45,6 +45,8 @@ import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/
 import { uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
+import { baueSlotBelastungsVorschau, slotEinsatzProjektion, type SlotBelastungsVorschau } from "@/lib/lineups/einsatzliste-belastung";
+import { BELASTUNGS_STUFEN_TEXT } from "@/lib/fatigue/belastung-regel";
 
 import type { LineupNewLookProps } from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
 import { EinsatzlisteKartenHand, FORM_HEX } from "@/app/foundation/legacy-lineup-lab/EinsatzlisteKartenHand";
@@ -100,6 +102,20 @@ function Por({ url, name, klasse }: { url?: string | null; name: string; klasse:
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFehler(true)} />
       ) : null}
+    </span>
+  );
+}
+
+/** Last-Zahl mit Farbton der Resistenz (grün ab der Schwelle, gelb knapp darunter, rot nahe am Deckel). */
+function LastZahl({ b, gross }: { b: SlotBelastungsVorschau | null; gross?: boolean }) {
+  if (!b) return null;
+  const titel =
+    b.regel === "v2" && b.teile
+      ? `Last ${ZAHL.format(b.last)}: Grundlast ${ZAHL.format(b.teile.grundlast)} (Belastung ${BELASTUNGS_STUFEN_TEXT[b.teile.stufe]}, Schwelle ${b.teile.schwelle})${b.zusatzText ? `, ${b.zusatzText}` : ""}. Erschöpfung ${Math.round(b.fatigueVorher)} → ${Math.round(b.fatigueNachher)}, Verletzungsrisiko ${ZAHL.format(b.risikoProzent)} %.`
+      : `Last ${ZAHL.format(b.last)} (für jeden Platz gleich). Erschöpfung ${Math.round(b.fatigueVorher)} → ${Math.round(b.fatigueNachher)}, Verletzungsrisiko ${ZAHL.format(b.risikoProzent)} %.`;
+  return (
+    <span className={`elm-lz is-${b.ton}${gross ? " is-gross" : ""} bc-t`} title={titel} data-testid="elm-last-zahl">
+      {ZAHL.format(b.last)}
     </span>
   );
 }
@@ -217,7 +233,7 @@ export default function EinsatzlisteModern(props: Props) {
   const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung" | "formmoral" | "karten">("rolle");
   const [blatt, setBlatt] = useState<null | "kader" | "kontext">(null);
   const [steuerungOffen, setSteuerungOffen] = useState(false);
-  const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name">("platz");
+  const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name" | "res" | "lasthier">("platz");
   const [kaderFilter, setKaderFilter] = useState<"alle" | "frei" | "gesetzt" | "gesperrt">("alle");
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [profilBlatt, setProfilBlatt] = useState<string | null>(null);
@@ -383,6 +399,30 @@ export default function EinsatzlisteModern(props: Props) {
     [slots, verletzte, platzWert, captainSeite],
   );
 
+  /* ---------------- Belastung je Platz (Last-Vorschau, gezeigt = gebucht) ---------------- */
+  const belastungsRegel = context?.belastungsRegel ?? "alt";
+  const rosterRefJeAktiv = useMemo(() => {
+    const jeSpieler = new Map((context?.rosterPlayers ?? []).map((ref) => [ref.id, ref] as const));
+    return new Map((context?.activePlayers ?? []).map((aktiv) => [aktiv.id, jeSpieler.get(aktiv.playerId) ?? null] as const));
+  }, [context?.rosterPlayers, context?.activePlayers]);
+  const belastungFuer = useCallback(
+    (id: string | null | undefined, slotKey: string | null | undefined): SlotBelastungsVorschau | null => {
+      if (!id || !slotKey) return null;
+      const slot = slots.find((entry) => entry.key === slotKey);
+      const ref = rosterRefJeAktiv.get(id);
+      if (!slot || !ref) return null;
+      return baueSlotBelastungsVorschau({
+        regel: belastungsRegel,
+        role: slotRoleByKey.get(slotKey) ?? null,
+        attributeStats: ref.attributeStats as Partial<Record<string, number | null>> | null,
+        basis: ref.belastungsBasis ?? null,
+        intensitaet: getDisciplineIntensity(slot.disciplineSide),
+        aktuelleFatigue: ref.fatigue ?? 0,
+      });
+    },
+    [slots, rosterRefJeAktiv, belastungsRegel, slotRoleByKey, getDisciplineIntensity],
+  );
+
   /* ---------------- Aktionen ---------------- */
   const setzeAuf = useCallback(
     (slotKey: string, id: string) => {
@@ -484,6 +524,8 @@ export default function EinsatzlisteModern(props: Props) {
     disz: number | null;
     last: number | null;
     gold: boolean;
+    /** Last-Vorschau dieses Spielers auf dem gewählten Platz (Resistenz, Last hier). */
+    hier: SlotBelastungsVorschau | null;
   };
   const kaderZeilen = useMemo<KaderZeile[]>(() => {
     const gesehen = new Map<string, KaderZeile>();
@@ -505,11 +547,12 @@ export default function EinsatzlisteModern(props: Props) {
           disz: fokusSlot ? eignung(id, fokusSlot.disciplineSide) : null,
           last: eintrag.player.fatigueCount ?? null,
           gold: fokusSlot ? (gold.kostenVon(id, fokusSlot.key) ?? Infinity) <= GOLD_TOLERANZ : false,
+          hier: fokusSlot ? belastungFuer(id, fokusSlot.key) : null,
         });
       }
     }
     return [...gesehen.values()];
-  }, [candidateGroups, fokusSlot, fokusWert, fokusBesetzer, platzVonSpieler, platzWert, eignung, gold]);
+  }, [candidateGroups, fokusSlot, fokusWert, fokusBesetzer, platzVonSpieler, platzWert, eignung, gold, belastungFuer]);
 
   const sichtbar = useMemo(() => {
     const suche = playerFilter.trim().toLowerCase();
@@ -517,7 +560,8 @@ export default function EinsatzlisteModern(props: Props) {
     if (kaderFilter === "frei") liste = liste.filter((z) => !z.platz && !z.sperre);
     if (kaderFilter === "gesetzt") liste = liste.filter((z) => z.platz);
     if (kaderFilter === "gesperrt") liste = liste.filter((z) => z.sperre);
-    const zahl = (z: KaderZeile) => (sortKey === "disz" ? z.disz : sortKey === "last" ? z.last : z.wert);
+    const zahl = (z: KaderZeile) =>
+      sortKey === "disz" ? z.disz : sortKey === "last" ? z.last : sortKey === "res" ? z.hier?.resistenz ?? null : sortKey === "lasthier" ? z.hier?.last ?? null : z.wert;
     return [...liste].sort((a, b) => {
       if (a.sperre && !b.sperre) return 1;
       if (!a.sperre && b.sperre) return -1;
@@ -527,11 +571,13 @@ export default function EinsatzlisteModern(props: Props) {
       if (x == null && y == null) return 0;
       if (x == null) return 1;
       if (y == null) return -1;
-      return sortKey === "last" ? x - y : y - x;
+      return sortKey === "last" || sortKey === "lasthier" ? x - y : y - x;
     });
   }, [kaderZeilen, playerFilter, kaderFilter, sortKey]);
 
   const hoverZeile = hoverId ? kaderZeilen.find((z) => z.id === hoverId) ?? null : null;
+  /** Wessen Werte die Plätze gerade als Vorschau zeigen: der gezogene Spieler, sonst der unter der Maus im Kader. */
+  const vorschauId = zieht?.id ?? hoverId ?? null;
 
   /* ---------------- Waage ---------------- */
   const waage = useMemo(() => {
@@ -846,7 +892,6 @@ export default function EinsatzlisteModern(props: Props) {
     const farbe = slotFarbe(slot.slotIndex);
     const meta = id ? getSelectedOptionMeta(id) : null;
     const last = meta?.fatigueCount ?? karte?.fatigueCount ?? null;
-    const risiko = meta?.injuryRiskProjection?.[stufe] ?? null;
     const issues = slotIssuesByKey.get(slot.key) ?? [];
     const hatFehler = issues.some((i) => i.tone === "blocked" && i.label !== "Hier weiter" && i.label !== "Offen") || (id !== "" && verletzte.has(id));
     const kosten = id ? gold.kostenVon(id, slot.key) : null;
@@ -856,7 +901,17 @@ export default function EinsatzlisteModern(props: Props) {
     const bester = !id ? slotCandidateSummaryByKey.get(slot.key)?.topCandidates[0] ?? null : null;
     const ist = fokusSlot?.key === slot.key;
     const paar = staffelPaar.get(slot.key);
-    const klassen = ["elm-slot", id ? "" : "is-offen", ist ? "is-gew" : "", zieht && kannBedienen ? "is-ziel" : "", hatFehler ? "is-fehl" : ""].filter(Boolean).join(" ");
+    const eigeneLast = id ? belastungFuer(id, slot.key) : null;
+    // Unter v2 hängt das Risiko am Platz (gezeigt = gebucht), sonst die platzunabhängige Projektion.
+    const risiko =
+      belastungsRegel === "v2" && eigeneLast
+        ? { riskPercent: eigeneLast.risikoProzent }
+        : meta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+    const vsKarte = vorschauId ? rosterCardByActivePlayerId.get(vorschauId) ?? null : null;
+    const vsLast = vorschauId ? belastungFuer(vorschauId, slot.key) : null;
+    const vsWert = vorschauId ? platzWert(vorschauId, slot.key) : null;
+    const vsSpielbar = vorschauId ? kannSpielen(vorschauId, slot.key) : false;
+    const klassen = ["elm-slot", id ? "" : "is-offen", ist ? "is-gew" : "", zieht && kannBedienen ? "is-ziel" : "", hatFehler ? "is-fehl" : "", vorschauId ? "has-vs" : ""].filter(Boolean).join(" ");
     return (
       <div
         key={slot.key}
@@ -913,6 +968,7 @@ export default function EinsatzlisteModern(props: Props) {
               <strong>{f1(vorschau?.projected.totalProjected)}</strong>
               {glyphe ? <span className={`pg ${GLYPHEN_TON[glyphe]}`} title="Rollenpassung (Aufschlag der Rolle in Punkten)">{glyphe}</span> : null}
               {last != null ? <BcLast wert={last} titel={`Erschöpfung ${Math.round(last)} von 100`} /> : null}
+              {eigeneLast ? <LastZahl b={eigeneLast} /> : null}
               {fmVon(id) ? (
                 <button type="button" className="fm-wz" data-testid={`fm-marke-${slot.key}`} onClick={(event) => { event.stopPropagation(); setWarumId(id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form und Moral dieses Spielers">
                   <FormMoralMarke a={fmVon(id)!} />
@@ -961,6 +1017,25 @@ export default function EinsatzlisteModern(props: Props) {
             )}
           </>
         )}
+        {vorschauId && vsKarte && vorschauId !== id ? (
+          <span
+            className={`elm-vs${vsSpielbar ? "" : " is-aus"}`}
+            data-testid={`elm-vs-${slot.key}`}
+            title={`${vsKarte.name} auf ${slotName(slot.key)}${vsSpielbar ? `: Stärke ${f1(vsWert)}, Last ${vsLast ? ZAHL.format(vsLast.last) : "–"}${vsLast?.zusatzText ? ` (${vsLast.zusatzText})` : ""}` : ": nicht einsetzbar"}`}
+          >
+            {vsSpielbar ? (
+              <>
+                <span className="elm-vs__w bc-t"><small>Stärke</small>{f1(vsWert)}</span>
+                <span className="elm-vs__l bc-t"><small>Last</small><LastZahl b={vsLast} /></span>
+                {vsLast?.teile && vsLast.teile.zusatz !== 0 ? (
+                  <span className={`elm-vs__t is-${vsLast.ton} bc-t`}>{vz(vsLast.teile.zusatz)}</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="elm-vs__t">nicht einsetzbar</span>
+            )}
+          </span>
+        ) : null}
       </div>
     );
   };
@@ -1001,6 +1076,33 @@ export default function EinsatzlisteModern(props: Props) {
       onKopf: () => setSortKey("disz"),
       aktiv: sortKey === "disz",
       render: (z) => <span className="elm-kz__dz bc-t">{f0(z.disz)}</span>,
+    },
+    {
+      key: "res",
+      kopf: "Res.",
+      breite: "30px",
+      rechts: true,
+      onKopf: () => setSortKey("res"),
+      aktiv: sortKey === "res",
+      render: (z) =>
+        z.hier && z.hier.resistenz != null ? (
+          <span
+            className={`elm-kz__res is-${z.hier.ton} bc-t`}
+            title={`Resistenz: ${attrName(z.hier.strainAttribute ?? "")} ${Math.round(z.hier.resistenz)}${z.hier.teile ? ` (Schwelle ${z.hier.teile.schwelle}${z.hier.zusatzText ? `, ${z.hier.zusatzText}` : ""})` : ""}`}
+          >
+            {Math.round(z.hier.resistenz)}
+            {z.hier.teile ? <small>{z.hier.teile.abstand >= 0 ? `+${Math.round(z.hier.teile.abstand)}` : `−${Math.round(-z.hier.teile.abstand)}`}</small> : null}
+          </span>
+        ) : null,
+    },
+    {
+      key: "lasthier",
+      kopf: "Last",
+      breite: "40px",
+      rechts: true,
+      onKopf: () => setSortKey("lasthier"),
+      aktiv: sortKey === "lasthier",
+      render: (z) => (z.sperre ? <span className="bc-null">–</span> : <LastZahl b={z.hier} />),
     },
     {
       key: "platz",
@@ -1070,7 +1172,7 @@ export default function EinsatzlisteModern(props: Props) {
     },
     {
       key: "last",
-      kopf: "Last",
+      kopf: "Ersch.",
       breite: "34px",
       rechts: true,
       onKopf: () => setSortKey("last"),
@@ -1095,7 +1197,17 @@ export default function EinsatzlisteModern(props: Props) {
     rolle,
   );
   const fokusMeta = fokusKarte?.activePlayerId ? getSelectedOptionMeta(fokusKarte.activePlayerId) : null;
-  const fokusRisiko = fokusMeta?.injuryRiskProjection?.[stufe] ?? null;
+  const fokusRisiko =
+    (fokusSlot
+      ? slotEinsatzProjektion({
+          context,
+          activePlayerId: fokusKarte?.activePlayerId ?? null,
+          role: slotRoleByKey.get(fokusSlot.key) ?? null,
+          intensitaet: stufe,
+        })
+      : null) ??
+    fokusMeta?.injuryRiskProjection?.[stufe] ??
+    null;
   const belastung = fokusVorschau?.slotStrainLoad ?? (rolle ? ({ low: "niedrig", medium: "mittel", high: "hoch" } as const)[rolle.fatigueProfile] : null);
   const werteAttr = (key: string): number | null => {
     const wert = fokusKarte?.attributeStats?.[key];
@@ -1171,7 +1283,42 @@ export default function EinsatzlisteModern(props: Props) {
         })}
       </div>
 
-      {rolle ? (
+      {rolle && belastungsRegel === "v2" ? (() => {
+        const zeigId = fokusBesetzer || hoverZeile?.id || null;
+        const b = belastungFuer(zeigId, fokusSlot.key);
+        const name = zeigId ? spielerName(zeigId) : null;
+        const teile = b?.teile ?? null;
+        const stufeText = BELASTUNGS_STUFEN_TEXT[(rolle.fatigueProfile as keyof typeof BELASTUNGS_STUFEN_TEXT)] ?? rolle.fatigueProfile;
+        return (
+          <div className="elm-ab" data-testid="elm-belastung-v2">
+            <span className="bc-gk">
+              <span>Belastung {stufeText}</span>
+              <span>verschleißt {attrName(rolle.strainAttribute)}{teile ? ` · Schwelle ${teile.schwelle}` : ""}</span>
+            </span>
+            {b && teile ? (
+              <div className="elm-rw bc-t" title="Rechenweg der Last — dieselbe Rechnung wie die Buchung">
+                <span>Grundlast (Stufe {stufeText})</span><b>{f1(teile.grundlast)}</b>
+                <span>{name}: {attrName(rolle.strainAttribute)} {teile.resistenz != null ? Math.round(teile.resistenz) : "–"}{teile.abstand < 0 ? `, fehlen ${Math.round(-teile.abstand)}` : teile.abstand > 0 ? `, ${Math.round(teile.abstand)} über der Schwelle` : ""}</span>
+                <b className={teile.zusatz > 0 ? "bc-minus" : teile.zusatz < 0 ? "bc-plus" : "bc-null"}>{vz(teile.zusatz)}{teile.amDeckel ? " (Deckel)" : ""}</b>
+                <span>Einsatz {STUFEN.find((st) => st.id === getDisciplineIntensity(fokusSlot.disciplineSide))?.label ?? ""} und Trait</span><b>× {ZAHL.format(Number((b.last / (teile.grundlast + teile.zusatz || 1)).toFixed(2)))}</b>
+                <i />
+                <span className="gr">Last dieses Einsatzes</span><b className="gr"><LastZahl b={b} gross /></b>
+                <span>aktive Erholung</span><b className="bc-plus">−{f1(b.aktiveErholung)}</b>
+                <i />
+                <span className="gr">Erschöpfung</span><b className="gr">{f0(b.fatigueVorher)} → {f0(b.fatigueNachher)}</b>
+                <span>Verletzungsrisiko bei {f0(b.fatigueNachher)}</span><b className={b.risikoProzent > 3 ? "bc-minus" : b.risikoProzent > 0 ? "" : "bc-plus"}>{f1(b.risikoProzent)} %</b>
+              </div>
+            ) : (
+              <p style={{ color: "var(--bc-leise)", fontSize: 14 }}>Setze einen Spieler oder fahre im Kader über einen Namen: hier steht, welche Last er auf diesem Platz trägt.</p>
+            )}
+            <p className="elm-rw-note">
+              Resistenz ändert nur die Erschöpfung. Das Verletzungsrisiko folgt allein aus der Erschöpfung danach.
+            </p>
+          </div>
+        );
+      })() : null}
+
+      {rolle && belastungsRegel !== "v2" ? (
         <div className="elm-ab">
           <span className="bc-gk">Belastung</span>
           <div className="elm-belast">
@@ -1457,6 +1604,74 @@ export default function EinsatzlisteModern(props: Props) {
 
         {/* ------------ Feld ------------ */}
         <BcPanel className="elm-feld" data-testid="elm-feld">
+          {vorschauId && rosterCardByActivePlayerId.get(vorschauId) ? (
+            <div className="elm-vsl" data-testid="elm-vorschau-leiste">
+              <span className="elm-vsl__k">
+                <Por klasse="elm-vsl__por" url={rosterCardByActivePlayerId.get(vorschauId)?.portraitUrl} name={spielerName(vorschauId)} />
+                <span>
+                  <b>{spielerName(vorschauId)}</b>
+                  <small>Stärke · Last auf jedem Platz</small>
+                </span>
+              </span>
+              {SEITEN.map((s) => {
+                const d = disziplin(s);
+                if (!d) return null;
+                return (
+                  <span key={s} className="elm-vsl__d">
+                    <em>{s.toUpperCase()} · {d.displayName}</em>
+                    <span className="elm-vsl__ps">
+                      {slotsJeSeite[s].map((slot) => {
+                        const ok = kannSpielen(vorschauId, slot.key);
+                        const b = belastungFuer(vorschauId, slot.key);
+                        return (
+                          <span
+                            key={slot.key}
+                            className={`elm-vsl__p${ok ? "" : " is-aus"}${selections[slot.key] === vorschauId ? " is-hier" : ""}`}
+                            title={`${slotName(slot.key)}: ${ok ? `Stärke ${f1(platzWert(vorschauId, slot.key))}, Last ${b ? ZAHL.format(b.last) : "–"}${b?.zusatzText ? ` (${b.zusatzText})` : ""}` : "nicht einsetzbar"}`}
+                          >
+                            <BcMarke farbe={slotFarbe(slot.slotIndex)}>{kuerzelJeSlot.get(slot.key) ?? "–"}</BcMarke>
+                            <b className="bc-t">{ok ? f1(platzWert(vorschauId, slot.key)) : "–"}</b>
+                            {ok ? <LastZahl b={b} /> : null}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+          {(() => {
+            const pause = context?.belastungsPause ?? null;
+            if (!pause) return null;
+            const md = context.matchday.index;
+            // Vorher: Ankündigung bis Spieltag 10. Danach: der Rückblick an den zwei Spieltagen nach der Pause.
+            if (pause.gebucht ? md > pause.nachSpieltag + 2 : md > pause.nachSpieltag) return null;
+            const schnitt =
+              pause.gebucht && pause.eintraege && pause.eintraege.length
+                ? pause.eintraege.reduce((a, e) => a + (e.fatigueVorher - e.fatigueNachher), 0) / pause.eintraege.length
+                : null;
+            return (
+              <div className={`elm-pause${pause.gebucht ? " is-gebucht" : ""}`} data-testid="elm-pause">
+                <span className="elm-pause__t">
+                  <b>Pause nach Spieltag {pause.nachSpieltag}</b>
+                  {pause.gebucht ? (
+                    <> · alle haben einen spielfreien Spieltag regeneriert{schnitt != null ? <>, im Kader <b className="bc-plus bc-t">Ø −{f1(schnitt)}</b> Erschöpfung</> : null}. Zählte nicht als Spieltag (Sperren, Training).</>
+                  ) : (
+                    <> · alle regenerieren einen spielfreien Spieltag (Bank-Erholung mit Reha-Zentrum und Trainingsmodus{md <= pause.nachSpieltag ? `, noch ${pause.nachSpieltag - md + 1} Spieltag${pause.nachSpieltag - md + 1 === 1 ? "" : "e"} bis dahin` : ""}). Zählt nicht als Spieltag für Sperren und Training.</>
+                  )}
+                </span>
+                <span className="elm-pause__leiste" aria-hidden="true">
+                  {Array.from({ length: pause.spieltageGesamt }, (_, i) => (
+                    <span key={i} className="elm-pause__z">
+                      {i === pause.nachSpieltag ? <u>P</u> : null}
+                      <i className={i + 1 < md ? "v" : i + 1 === md ? "j" : ""} />
+                    </span>
+                  ))}
+                </span>
+              </div>
+            );
+          })()}
           <div className="elm-fk">
             <div className="elm-waage" data-testid="elm-waage">
               <div className="elm-waage__z bc-t">

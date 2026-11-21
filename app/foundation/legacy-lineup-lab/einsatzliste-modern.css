@@ -1292,3 +1292,318 @@ button.elm-pr:hover {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ================= Belastung / Resistenz (21.11.) ================= */
+/* Last-Zahl: grün ab der Schwelle, gelb knapp darunter, rot nahe am Deckel, neutral bei alter Regel. */
+.elm-lz {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--bc-tinte);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--bc-linie);
+}
+.elm-lz.is-gut {
+  color: var(--bc-gut);
+  border-color: rgba(98, 211, 148, 0.45);
+  background: rgba(98, 211, 148, 0.1);
+}
+.elm-lz.is-mittel {
+  color: var(--bc-acht);
+  border-color: rgba(243, 181, 74, 0.45);
+  background: rgba(243, 181, 74, 0.1);
+}
+.elm-lz.is-schwach {
+  color: var(--bc-warn);
+  border-color: rgba(255, 96, 88, 0.5);
+  background: rgba(255, 96, 88, 0.1);
+}
+.elm-lz.is-gross {
+  font-size: 18px;
+  padding: 2px 7px;
+}
+
+/* Vorschau im Platz: was der gezogene / überfahrene Spieler hier hätte. */
+/* Schwebt als Etikett über der Platzkarte, damit beim Ziehen nichts im Feld verrutscht. */
+.elm-slot.has-vs {
+  z-index: 5;
+}
+.elm-vs {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: calc(100% + 3px);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px dashed var(--bc-gold);
+  background: rgba(14, 12, 6, 0.96);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+  font-size: 12.5px;
+  color: var(--bc-tinte);
+  line-height: 1.1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.elm-vs.is-aus {
+  border-color: var(--bc-linie-2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--bc-stumm);
+}
+.elm-vs__nm {
+  font: italic 700 12.5px/1 var(--bc-haus);
+  color: var(--bc-gold);
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.elm-vs__w,
+.elm-vs__l {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bc-creme);
+}
+.elm-vs small,
+.elm-vsl small {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+}
+.elm-vs__t {
+  font-size: 12px;
+  color: var(--bc-leise);
+}
+.elm-vs__t.is-gut {
+  color: var(--bc-gut);
+}
+.elm-vs__t.is-mittel {
+  color: var(--bc-acht);
+}
+.elm-vs__t.is-schwach {
+  color: var(--bc-warn);
+}
+
+/* Leiste über dem Feld: beide Disziplinen, jeder Platz. */
+/* Liegt als Überlagerung oben im Feld-Panel (über Pausenband und Waage), verschiebt nichts. */
+.elm-feld {
+  position: relative;
+}
+.elm-vsl {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--bc-gold);
+  background: #120f08;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.elm-vsl__k {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.elm-vsl__k span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.elm-vsl__k b {
+  font: italic 700 15px/1.1 var(--bc-haus);
+  color: #fff;
+}
+.elm-vsl__por {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: #111;
+  border: 1px solid var(--bc-linie-2);
+  color: var(--bc-leise);
+  font-size: 13px;
+}
+.elm-vsl__por img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.elm-vsl__d {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.elm-vsl__d em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+}
+.elm-vsl__ps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.elm-vsl__p {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--bc-flaeche-2);
+  border: 1px solid var(--bc-linie);
+}
+.elm-vsl__p b {
+  font-size: 14px;
+  color: var(--bc-creme);
+}
+.elm-vsl__p.is-hier {
+  border-color: var(--bc-gold);
+}
+.elm-vsl__p.is-aus {
+  opacity: 0.45;
+}
+
+/* Kader: Resistenz und Last hier */
+.elm-kz__res {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 700;
+  line-height: 1;
+}
+.elm-kz__res small {
+  font-size: 10.5px;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.elm-kz__res.is-gut {
+  color: var(--bc-gut);
+}
+.elm-kz__res.is-mittel {
+  color: var(--bc-acht);
+}
+.elm-kz__res.is-schwach {
+  color: var(--bc-warn);
+}
+
+/* Rechenweg der Last in der Rollenkarte */
+.elm-rw {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 14px;
+  color: var(--bc-leise);
+}
+.elm-rw b {
+  color: var(--bc-tinte);
+  font-weight: 700;
+  text-align: right;
+}
+.elm-rw .gr {
+  color: var(--bc-creme);
+  font-weight: 700;
+}
+.elm-rw i {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--bc-linie);
+}
+.elm-rw-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--bc-stumm);
+}
+
+/* Pause nach Spieltag 10 */
+.elm-pause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 0 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(69, 176, 201, 0.5);
+  background: rgba(69, 176, 201, 0.09);
+  font-size: 13.5px;
+  color: var(--bc-tinte);
+}
+.elm-pause b {
+  color: #fff;
+}
+.elm-pause.is-gebucht {
+  border-color: rgba(98, 211, 148, 0.5);
+  background: rgba(98, 211, 148, 0.08);
+}
+.elm-pause__t {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.elm-pause__leiste {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.elm-pause__z {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.elm-pause__z i {
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.elm-pause__z i.v {
+  background: var(--bc-leise);
+}
+.elm-pause__z i.j {
+  background: var(--bc-gold);
+}
+.elm-pause__z u {
+  text-decoration: none;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #062530;
+  background: var(--bc-gast);
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+@media (max-width: 760px) {
+  .elm-vsl__d {
+    flex-basis: 100%;
+  }
+  .elm-pause__leiste {
+    display: none;
+  }
+}

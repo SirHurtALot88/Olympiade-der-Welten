@@ -1,4 +1,5 @@
 import type { FormMoralRegeln } from "@/lib/morale/form-moral-regeln";
+import type { BelastungsRegelVersion } from "@/lib/fatigue/belastung-regel";
 import type {
   AiLineupStrategy,
   DisciplineCategory,
@@ -75,6 +76,28 @@ export type LegacyInjuryRiskProjectionRef = Record<
   }
 >;
 
+export type LegacyBelastungsPauseRef = {
+  /** Spieltags-Index (1-basiert), nach dem die Pause liegt. */
+  nachSpieltag: number;
+  nachMatchdayId: string;
+  spieltageGesamt: number;
+  gebucht: boolean;
+  /** Nur wenn gebucht: Erholung dieses Teams im Schnitt und je Spieler. */
+  eintraege?: Array<{ playerId: string; fatigueVorher: number; erholung: number; fatigueNachher: number; verletzt?: boolean }>;
+};
+
+/**
+ * Was die Einsatzliste braucht, um die Last je Platz SELBST mit `berechneEinsatzLast` zu rechnen
+ * (gezeigt = gebucht): Trait-Multiplikator, Einsatz-Multiplikatoren und aktive Erholung des Spielers.
+ */
+export type LegacyBelastungsBasisRef = {
+  traitMultiplikator: number;
+  einsatzMultiplikator: Record<"conserve" | "normal" | "push", number>;
+  aktiveErholung: number;
+  /** Grundlast der alten Regel (MATCHDAY_FATIGUE_LOAD). */
+  altGrundlast: number;
+};
+
 export type LegacyRosterPlayerRef = {
   id: string;
   name: string;
@@ -99,6 +122,7 @@ export type LegacyRosterPlayerRef = {
   injuryRiskBand?: string | null;
   injuryRiskLabel?: string | null;
   injuryRiskProjection?: LegacyInjuryRiskProjectionRef | null;
+  belastungsBasis?: LegacyBelastungsBasisRef | null;
   availabilityBlocker?: "player_injured_unavailable" | null;
   form?: number | null;
   traitsPositive?: string[];
@@ -376,6 +400,13 @@ export type LegacyLineupContextMeta = LegacyLineupKeyParams & {
 
 export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   gameState?: GameState;
+  /**
+   * BELASTUNGSREGEL DIESER SAISON (21.11., lib/fatigue/belastung-regel-stempel.ts): "v2" = Last je Platz aus
+   * Stufe und Resistenz. Fehlt = "alt" (16 je Einsatz). Die Einsatzliste rechnet damit die Slot-Vorschau.
+   */
+  belastungsRegel?: BelastungsRegelVersion;
+  /** Pause nach Spieltag 10 (nur v2): wann sie liegt und ob sie schon gebucht ist. */
+  belastungsPause?: LegacyBelastungsPauseRef | null;
   lineupStrategy?: AiLineupStrategy;
   save: {
     id: string;

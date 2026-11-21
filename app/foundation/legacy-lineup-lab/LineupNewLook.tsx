@@ -31,6 +31,7 @@ import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/l
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import type { LineupKulisseAnzeige } from "@/lib/lineups/lineup-kulisse";
 import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
+import { slotEinsatzProjektion } from "@/lib/lineups/einsatzliste-belastung";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -2169,8 +2170,18 @@ export default function LineupNewLook({
             // Der Einsatz-Verletzungsrisiko-Wurf steht schon hier — und er traegt die ECHTE
             // Spieltagslast. Deshalb wird er zuerst geholt: die Nach-Spieltag-Belastung darunter
             // liest ihn mit.
+            // Belastungsregel v2: die Last hängt am Platz — dieselbe Rechnung wie die Buchung
+            // (`slotEinsatzProjektion`, lib/lineups/einsatzliste-belastung.ts). Alte Regel: null,
+            // dann gilt die platzunabhängige Projektion des Servers wie bisher.
             const injuryProjectionForSlot =
-              selectedMeta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+              slotEinsatzProjektion({
+                context,
+                activePlayerId: selectedId,
+                role,
+                intensitaet: getDisciplineIntensity(slot.disciplineSide),
+              }) ??
+              selectedMeta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ??
+              null;
             /**
              * NACH-SPIELTAG-BELASTUNG — jetzt aus dem Modell, das auch bucht.
              *
