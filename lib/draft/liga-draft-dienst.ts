@@ -906,7 +906,10 @@ export function setzeMenschAutoPick(input: {
 }
 
 /**
- * Gastgeber bricht den Draft ab (Review #1619, A2): Draft `fertig` (alle offenen Teams `abgebrochen`), damit
+ * Gastgeber bricht den Draft ab (Review #1619, A2). STANDUNABHAENGIG (21.11., Chris: „der Draft laesst sich egal auf welchem
+ * Weg nicht abbrechen“): waehrend die KI im Hintergrund pickt, ist der Stand, den die Seite sah, beim Eintreffen des Klicks
+ * schon ueberholt — mit `erwarteteNr` scheiterte der Abbruch still (die Seite verschluckt Stand-Konflikte). Der Abbruch haengt
+ * nicht am Platz im Draft; die Route reicht `erwarteteNr` deshalb nicht mehr durch. Draft `fertig` (alle offenen Teams `abgebrochen`), damit
  * `leagueSetupStatus: "ready"` mit den Warnungen fuer Teams unter 8 und die Marktsperre aufgehoben. Ein laufender
  * Hintergrundlauf haelt beim naechsten Happen von selbst an (kein Zug mehr offen).
  */
@@ -918,6 +921,9 @@ export function brecheLigaDraftAb(input: {
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     const draft = draftAusKontext(ctx);
     pruefeStand(draft, input.erwarteteNr);
+    // Ein laufender Hintergrundlauf haelt nach seinem Happen an (kein Zug mehr offen); dieses Zeichen beendet ihn zusaetzlich,
+    // falls ein Mensch vor dem Abbruch noch im Nachzug war.
+    if (laufendeHintergrundLaeufe.has(input.saveId)) hintergrundAbbruch.add(input.saveId);
     if (draft.status === "fertig") return draft;
     const naechster = bricheLigaDraftAb(draft, jetztIso());
     setzeDraftImKontext(ctx, naechster);
@@ -940,6 +946,17 @@ const hintergrundAbbruch = new Set<string>();
  * Zeitbudget blockiert ein Happen hoechstens etwa einen Pick; schnelle Picks werden weiter gebuendelt geschrieben.
  */
 export const LIGA_DRAFT_HAPPEN_BUDGET_MS = 120;
+/**
+ * „Vor zu meinem Pick“ und „Selbst kaufen“ (19.11./21.11., Chris: „die KI soll wirklich im Schnelldurchlauf sein … nur rechnen,
+ * nichts anzeigen“): ALLE KI-Picks bis zum naechsten Menschen laufen in EINEM Happen mit EINEM Schreiben des Spielstands.
+ * Gemessen (docs/design/draft-tempo-abbruch-21-11.md) kostet ein KI-Pick ~40 ms Rechnen, das Schreiben des ganzen Spielstands
+ * aber ~0,6 s; je Pick geschrieben waren es 31 Schreibvorgaenge. Die Event-Loop steht dabei einmal ~2 s (31 Picks) — danach
+ * ist der Spielstand fertig, und die Seite zeigt ihn. `LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS` ist nur die Sicherung: eine sehr langsame
+ * Maschine oder eine grosse Liga teilt den Lauf nach dieser Zeit in einen zweiten Happen, statt die Event-Loop minutenlang zu
+ * halten. Nur fuer den ausdruecklich angeforderten Vorlauf; der Standard-Hintergrundlauf bleibt bei 120 ms.
+ */
+export const LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS = 8000;
+export const LIGA_DRAFT_VOR_JE_HAPPEN = 1000;
 
 export function istHintergrundLaufAktiv(saveId: string): boolean {
   return laufendeHintergrundLaeufe.has(saveId);
@@ -955,6 +972,8 @@ export async function laufeKiImHintergrund(input: {
   saveId: string;
   logPrefix: string;
   jeHappen?: number;
+  /** Zeitbudget je Happen in ms; Standard `LIGA_DRAFT_HAPPEN_BUDGET_MS`. Der Vor-Modus setzt `LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS`. */
+  happenBudgetMs?: number;
   /** Zusaetzliche Abbruchbedingung des Aufrufers (z. B. ein abgebrochener Anstoss), vor jedem Happen gefragt. */
   sollAbbrechen?: () => boolean;
 }): Promise<{ halt: LigaDraftKiSchrittErgebnis["halt"] | "laeuft_schon" | "abgebrochen"; picks: number }> {
@@ -970,7 +989,7 @@ export async function laufeKiImHintergrund(input: {
           persistence: input.persistence,
           saveId: input.saveId,
           maxPicks: input.jeHappen ?? 8,
-          zeitBudgetMs: LIGA_DRAFT_HAPPEN_BUDGET_MS,
+          zeitBudgetMs: input.happenBudgetMs ?? LIGA_DRAFT_HAPPEN_BUDGET_MS,
         });
         picks += ergebnis.eintraege.length;
         if (ergebnis.halt !== "max_picks") return { halt: ergebnis.halt, picks };

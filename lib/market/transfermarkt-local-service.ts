@@ -1019,10 +1019,33 @@ function getLocalMarketContextKey(save: ReturnType<typeof resolveLocalSave>["sav
   return cacheKey;
 }
 
-function buildLocalMarketContext(save: ReturnType<typeof resolveLocalSave>["save"]): LocalMarketContext {
+/**
+ * Schluessel je Spielstand-OBJEKT statt je Inhalt (Liga-Draft, 19.11., docs/design/draft-ki-tempo-19-11.md): der Inhaltsschluessel
+ * (`getLocalMarketContextKey`) summiert und sortiert die Daten aller ~3000 Spieler und kostete ~70 ms je KI-Pick — gut die
+ * Haelfte der Rechenzeit eines Picks. Im Draft bringt jeder Kauf einen neuen Spielstand mit neuem Inhalt, der Zwischenspeicher
+ * trifft also nie; ein je Objekt eindeutiger Schluessel liefert dieselben Ergebnisse (Treffer nur fuer genau diesen Stand, wie
+ * der Inhaltsschluessel) und der Kontext landet nicht im Zwischenspeicher.
+ */
+const localRunContextKeyCache = new WeakMap<GameState, string>();
+let localRunContextKeyCounter = 0;
+function getLocalRunContextKey(save: ReturnType<typeof resolveLocalSave>["save"]) {
+  let key = localRunContextKeyCache.get(save.gameState);
+  if (!key) {
+    localRunContextKeyCounter += 1;
+    key = `${save.saveId}:lauf:${localRunContextKeyCounter}`;
+    localRunContextKeyCache.set(save.gameState, key);
+  }
+  return key;
+}
+
+function buildLocalMarketContext(
+  save: ReturnType<typeof resolveLocalSave>["save"],
+  options?: { ohneInhaltsSchluessel?: boolean },
+): LocalMarketContext {
   const gameState = save.gameState;
-  const cacheKey = getLocalMarketContextKey(save);
-  const cached = localMarketContextCache.get(cacheKey);
+  const ohneZwischenspeicher = options?.ohneInhaltsSchluessel === true;
+  const cacheKey = ohneZwischenspeicher ? getLocalRunContextKey(save) : getLocalMarketContextKey(save);
+  const cached = ohneZwischenspeicher ? undefined : localMarketContextCache.get(cacheKey);
   if (cached) {
     // LRU-Touch: bei einem Treffer an die juengste Position verschieben (Delete+Set aendert bei
     // einer Map die Iterationsreihenfolge), damit ein wiederholt genutzter Save nicht verdraengt
@@ -1081,6 +1104,7 @@ function buildLocalMarketContext(save: ReturnType<typeof resolveLocalSave>["save
     teamContextsById,
     cacheKey,
   };
+  if (ohneZwischenspeicher) return context;
   const approxBytes = estimateLocalMarketContextApproxBytes(cacheKey, gameState);
   localMarketContextCache.set(cacheKey, { context, approxBytes });
   localMarketContextCacheApproxBytes += approxBytes;
@@ -1336,7 +1360,8 @@ function resolveControlAwareBuyAffordabilityCash(input: {
 function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): LocalTransfermarktBuyContext {
   const runContext = getLocalRunContext(params);
   const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
-  const marketContext = buildLocalMarketContext(save);
+  // Draft-Kaeufe (Festkonditionen) im Laufkontext: Schluessel je Objekt statt je Inhalt, s. `getLocalRunContextKey`.
+  const marketContext = buildLocalMarketContext(save, { ohneInhaltsSchluessel: runContext != null && params.draftFestkonditionen === true });
   const { gameState } = marketContext;
   const teamContext = marketContext.teamContextsById.get(params.teamId) ?? null;
   const team = teamContext?.team ?? null;
