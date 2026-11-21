@@ -239,3 +239,22 @@ describe("vkAbweichung", () => {
     expect(lifetimeAvgVk({ windows: {}, avgVkRealized: 0 })).toBe(0);
   });
 });
+
+import { cardmarketHint } from "./board";
+
+describe("cardmarketHint", () => {
+  it("nennt Seltenheit und Versionszahl", () => {
+    const h = cardmarketHint({ nameRaw: "Yu-Gi-Oh! RA02-DE026 Donnerritter des Zwielichts Ultra Rare NM 1st", market: { range: { min: 1, max: 5, variants: 4 } } as never });
+    expect(h.rarity).toBe("Ultra Rare");
+    expect(h.variants).toBe(4);
+    expect(h.multi).toBe(true);
+  });
+  it("eindeutig: keine Warnung", () => {
+    const h = cardmarketHint({ nameRaw: "Yu-Gi-Oh! BETB-DE055 Barians siebentes Untopia Secret Rare NM 1st", market: { range: null } as never });
+    expect(h.multi).toBe(false);
+    expect(h.variants).toBeNull();
+  });
+  it("ohne Marktdaten", () => {
+    expect(cardmarketHint({ nameRaw: "Yu-Gi-Oh! XYZ-DE001 Test Common NM", market: null as never }).multi).toBe(false);
+  });
+});

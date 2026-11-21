@@ -735,3 +735,6 @@ a.mover .meta, a.mover .meta span { color: var(--muted); }
 .bd-dev-hoch, .bd-dev-hoch_leicht { color: var(--good); }
 .bd-dev-runter, .bd-dev-runter_leicht { color: var(--crit); }
 .bd-dev-gleich { color: var(--muted); }
+
+/* Cardmarket-Link mit mehreren Versionen: auffaellig, damit die Seltenheit nicht uebersehen wird */
+.bd-cm-multi { border-color: var(--warn); color: var(--warn); font-weight: 700; }
