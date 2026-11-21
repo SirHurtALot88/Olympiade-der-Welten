@@ -2,7 +2,7 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/lib/facilities/facility-effects";
-import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import { getCachedPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import {
   MATCHDAY_FATIGUE_LOAD,
   getInjuryRiskPercent,
@@ -454,7 +454,7 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
   const teamBaselineMode = trainingIntensityToMode(input.teamBaselineIntensity);
   const rosterEntries = input.gameState.rosters.filter((entry) => entry.teamId === input.teamId);
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  const performanceMap = buildPlayerSeasonPerformanceMap(input.gameState);
+  const performanceMap = getCachedPlayerSeasonPerformanceMap(input.gameState);
   const completedMatchdays = countCompletedMatchdays(input.gameState);
   const rosterRankByPlayerId = buildRosterRankMap(input.gameState, input.teamId, rosterEntries);
   const facilities = getTeamFacilityState(input.gameState, input.teamId);

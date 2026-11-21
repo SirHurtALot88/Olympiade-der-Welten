@@ -364,7 +364,27 @@ export function calculatePlayerBaselineChecksum(baseline: PlayerBaselineRecord) 
   return stableHash(buildChecksumPayload(baseline));
 }
 
+/**
+ * Jede Speicherung normalisiert ALLE rund 3000 Baselines samt reiner JS-SHA-256-Pruefsumme neu — gemessen am
+ * Live-Abbild (21.11.) rund 4 s je KI-Aufstellungslauf, obwohl sich kein Baseline-Satz geaendert hat. Das Ergebnis haengt nur am
+ * Eingabe-Objekt und den drei Optionen; dasselbe Objekt liefert deshalb dasselbe Ergebnis. Rueckgabe ist eine
+ * flache Kopie, damit kein Aufrufer den Zwischenspeicher am Spitzenwert veraendern kann.
+ */
+const normalisierteBaselines = new WeakMap<PlayerBaselineRecord, { schluessel: string; ergebnis: PlayerBaselineRecord }>();
+
 export function normalizePlayerBaselineRecord(
+  baseline: PlayerBaselineRecord,
+  options?: { createdAt?: string; importedAt?: string; sourceFile?: string | null },
+): PlayerBaselineRecord {
+  const schluessel = `${options?.createdAt ?? ""}|${options?.importedAt ?? ""}|${options?.sourceFile ?? ""}`;
+  const gemerkt = normalisierteBaselines.get(baseline);
+  if (gemerkt && gemerkt.schluessel === schluessel) return { ...gemerkt.ergebnis };
+  const ergebnis = normalizePlayerBaselineRecordUngemerkt(baseline, options);
+  normalisierteBaselines.set(baseline, { schluessel, ergebnis });
+  return { ...ergebnis };
+}
+
+function normalizePlayerBaselineRecordUngemerkt(
   baseline: PlayerBaselineRecord,
   options?: { createdAt?: string; importedAt?: string; sourceFile?: string | null },
 ): PlayerBaselineRecord {

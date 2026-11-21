@@ -411,13 +411,35 @@ export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPoin
   return summaryMap;
 }
 
-const playerSeasonPerformanceMapCache = new WeakMap<GameState, ReturnType<typeof buildPlayerSeasonPerformanceMap>>();
+/**
+ * Die Leistungskarte haengt nur an den gebuchten Ergebnissen der Saison. Ein KI-Aufstellungslauf fuer
+ * 32 Teams fragt sie je Spieler und Team immer wieder an (Ruhebedarf aus der Trainingslast, Moral) —
+ * gemessen am Live-Abbild (21.11.) 17 von 29 s Batch, weil jedes Mal der ganze Punkte-Ledger neu
+ * gebaut wurde.
+ *
+ * Schluessel sind NICHT das GameState-Objekt (Teilablaeufe bauen je Team eine eigene Huelle um dieselben Listen),
+ * sondern Identitaet und Laenge der Ergebnis-Listen plus Saison: wer sie an Ort und Stelle fortschreibt (push),
+ * bekommt eine frische Karte. Wenige Eintraege, juengster zuerst — die Karte ist gross.
+ */
+type PlayerSeasonPerformanceMap = ReturnType<typeof buildPlayerSeasonPerformanceMap>;
+const PERFORMANCE_CACHE_MAX = 3;
+const playerSeasonPerformanceMapCache: Array<{ signatur: string; refs: unknown[]; map: PlayerSeasonPerformanceMap }> = [];
 
-function getCachedPlayerSeasonPerformanceMap(gameState: GameState): ReturnType<typeof buildPlayerSeasonPerformanceMap> {
-  const cached = playerSeasonPerformanceMapCache.get(gameState);
-  if (cached) return cached;
+export function getCachedPlayerSeasonPerformanceMap(gameState: GameState): PlayerSeasonPerformanceMap {
+  const seasonState = gameState.seasonState;
+  const refs = [seasonState.matchdayResults, seasonState.disciplineResults, seasonState.playerDisciplinePerformances, gameState.disciplines];
+  const signatur = `${gameState.season.id}|${refs.map((r) => (Array.isArray(r) ? r.length : -1)).join(",")}`;
+  const index = playerSeasonPerformanceMapCache.findIndex(
+    (entry) => entry.signatur === signatur && entry.refs.every((r, i) => r === refs[i]),
+  );
+  if (index >= 0) {
+    const [treffer] = playerSeasonPerformanceMapCache.splice(index, 1);
+    playerSeasonPerformanceMapCache.unshift(treffer!);
+    return treffer!.map;
+  }
   const map = buildPlayerSeasonPerformanceMap(gameState);
-  playerSeasonPerformanceMapCache.set(gameState, map);
+  playerSeasonPerformanceMapCache.unshift({ signatur, refs, map });
+  if (playerSeasonPerformanceMapCache.length > PERFORMANCE_CACHE_MAX) playerSeasonPerformanceMapCache.length = PERFORMANCE_CACHE_MAX;
   return map;
 }
 

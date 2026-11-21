@@ -1069,7 +1069,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             return { label: "Zum Draft", title: "Der Draft wartet auf dich", statusClass: "is-ready", onClick: ligaDraftTor.oeffnen };
           }
           if (quelle === "einsatzliste" && einsatzlisteAbgabe) {
-            return { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan };
+            return { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, busy: einsatzlisteAbgabe.busy, plan: taktPlan };
           }
           return { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan, gesperrt: globalNextDisabled, istGlobal: true };
         })()}

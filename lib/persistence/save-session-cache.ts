@@ -5,7 +5,11 @@ type SaveSessionCacheEntry = {
   contentSignature: string;
   save: PersistedSaveGame;
   approxBytes: number;
+  /** Schreibvorgaenge seit der letzten echten Vermessung (siehe `writeSaveSessionCache`). */
+  schreibenSeitMessung: number;
 };
+
+const SAVE_BYTES_NEU_MESSEN = 25;
 
 const saveSessionCache = new Map<string, SaveSessionCacheEntry>();
 const DEFAULT_MAX_SAVE_SESSION_CACHE_ENTRIES = 8;
@@ -110,12 +114,21 @@ export function writeSaveSessionCache(save: PersistedSaveGame, contentSignature?
   if (existing) {
     totalApproxBytes -= existing.approxBytes;
   }
-  const approxBytes = estimateApproxBytes(save);
+  // `JSON.stringify` ueber den ganzen Save kostete gemessen (Live-Abbild, 21.11.) 150-300 ms je Schreibvorgang und
+  // war bei einem KI-Aufstellungslauf ein Zehntel der Zeit. Der Wert dient nur der Verdraengung: ein bereits
+  // vermessener Save behaelt seine Schaetzung und wird nur alle SAVE_BYTES_NEU_MESSEN Schreibvorgaenge neu vermessen.
+  let approxBytes: number;
+  if (existing && existing.schreibenSeitMessung < SAVE_BYTES_NEU_MESSEN) {
+    approxBytes = existing.approxBytes;
+  } else {
+    approxBytes = estimateApproxBytes(save);
+  }
   saveSessionCache.set(save.saveId, {
     updatedAt: save.updatedAt,
     contentSignature: contentSignature?.trim() || save.updatedAt,
     save,
     approxBytes,
+    schreibenSeitMessung: existing && existing.schreibenSeitMessung < SAVE_BYTES_NEU_MESSEN ? existing.schreibenSeitMessung + 1 : 0,
   });
   totalApproxBytes += approxBytes;
   trimSaveSessionCache();

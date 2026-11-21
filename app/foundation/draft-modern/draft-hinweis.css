@@ -11,3 +11,21 @@
 .drf-hinweis-knopf.haupt { background: #f0c35a; border-color: #f0c35a; color: #10151f; }
 .drf-hinweis-knopf:hover:not(:disabled) { filter: brightness(1.12); }
 .drf-hinweis-knopf:disabled { opacity: .5; cursor: default; }
+
+/* Startwahl-Dialog (21.11.): modal über der ganzen App, solange die Wahl offen ist. */
+.drf-wahl-schleier { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 24px; background: rgba(6,9,14,.82); backdrop-filter: blur(3px); font-family: "Barlow", "Segoe UI", sans-serif; }
+.drf-wahl-karte { width: min(860px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 30px 34px; display: flex; flex-direction: column; gap: 14px; background: #121926; border: 1px solid rgba(240,195,90,.6); border-top: 4px solid #f0c35a; border-radius: 8px; color: #f4e6c4; box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.drf-wahl-karte small { font: 600 13px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #9aa7ba; }
+.drf-wahl-karte h2 { margin: 0; font: 700 42px/1.05 "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.drf-wahl-karte p { margin: 0; font-size: 16px; line-height: 1.4; color: #c9d2e0; }
+.drf-wahl-optionen { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px; }
+.drf-wahl-opt { text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border-radius: 6px; border: 1px solid rgba(244,230,196,.28); background: #161d2a; color: #f4e6c4; cursor: pointer; font: inherit; }
+.drf-wahl-opt.haupt { border-color: #f0c35a; background: linear-gradient(180deg, rgba(240,195,90,.16), #161d2a); }
+.drf-wahl-opt b { font: 700 28px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.drf-wahl-opt span { font-size: 15px; line-height: 1.4; color: #dbe3ef; }
+.drf-wahl-opt em { font-style: normal; font-size: 13px; color: #9aa7ba; }
+.drf-wahl-opt:hover:not(:disabled) { filter: brightness(1.12); }
+.drf-wahl-opt:disabled { opacity: .55; cursor: default; }
+.drf-wahl-fehler { color: #f3b54a !important; }
+.drf-wahl-spaeter { align-self: flex-start; background: none; border: 0; padding: 4px 0; color: #9aa7ba; font: 600 14px "Barlow", "Segoe UI", sans-serif; text-decoration: underline; cursor: pointer; }
+@media (max-width: 720px) { .drf-wahl-optionen { grid-template-columns: 1fr; } .drf-wahl-karte h2 { font-size: 32px; } }
