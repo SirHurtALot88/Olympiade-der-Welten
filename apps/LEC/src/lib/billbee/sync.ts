@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { loadAliasMap } from "../pipeline/aliases";
 import { buildImportPlan } from "../pipeline/importPlan";
 import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
+import { recordPurchases } from "./purchases";
 import { loadActiveCostSettings } from "../dashboard/queries";
 import { BillbeeClient, type BillbeeConfig } from "./client";
 import { loadBillbeeConfig } from "./credentials";
@@ -37,6 +38,8 @@ export interface BillbeeSyncReport {
   sales: number;
   /** Artikel, bei denen Billbee eine eBay-Artikelnummer geliefert hat. */
   ebayItemIds: number;
+  /** Aus Bestandszuwaechsen erkannte Einkaeufe in diesem Lauf. */
+  purchasesDetected: number;
   /** Stammartikel, die nach der Namens-Normalisierung denselben Artikel ergeben (z. B. Einzelkarte und Playset). */
   duplicateMasters: number;
   /** Artikel, bei denen Billbee einen Mindest-/Meldebestand liefert (0 = Feld nicht gepflegt oder nicht geliefert). */
@@ -106,7 +109,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   progress(78, "Verkaufszahlen speichern …");
   await persistImportPlan(prisma, plan);
   progress(86, "Artikel und Bestand speichern …");
-  await persistBillbeeArtikel(
+  const artikelPersist = await persistBillbeeArtikel(
     prisma,
     masters.map((m) => m.row)
   );
@@ -154,6 +157,8 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   });
   await prisma.sale.deleteMany({ where: { source: "billbee-api" } });
   for (let i = 0; i < saleRows.length; i += 500) await prisma.sale.createMany({ data: saleRows.slice(i, i + 500) });
+  // Einkaeufe aus Bestandszuwaechsen erkennen (nach dem Neuaufbau der Verkaeufe, damit zwischenzeitlich verkaufte Stueck mitzaehlen).
+  const purchasesDetected = await recordPurchases(prisma, artikelPersist.stockIncreases, artikelPersist.previousApiRunAt, now);
 
   // Pokemon-Karten gehoeren nicht ins Sortiment (Chris, 13.11.): ausblenden, die Verkaeufe bleiben in den Shop-Summen erhalten.
   const pokemon = articleRows.filter((a) => isPokemonArticleName(a.nameRaw)).map((a) => a.id);
@@ -189,6 +194,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     orders: orders.length,
     sales: saleRows.length,
     ebayItemIds: ebayIds,
+    purchasesDetected,
     duplicateMasters,
     minStockCount,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),

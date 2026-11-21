@@ -506,7 +506,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           {detail && (
             <>
               <p className="bd-dt-sum" title="Summe der importierten Einkäufe dieses Artikels.">
-                {detail.purchases.length === 0 ? "Keine Einkäufe importiert" : `Eingekauft: ${bought} Stk · ${eur(boughtCost)} · Ø ${eur(boughtCost / Math.max(1, bought))}`}
+                {detail.purchases.length === 0 ? "Noch keine Einkäufe erkannt (LEC erkennt sie, wenn der Bestand beim Billbee-Abgleich steigt)" : `Eingekauft: ${bought} Stk · ${eur(boughtCost)} · Ø ${eur(boughtCost / Math.max(1, bought))}`}
               </p>
               {moves.length === 0 ? (
                 <p className="bd-none" title="Änderungen werden ab dem nächsten Billbee-Abgleich festgehalten.">Noch keine Bewegungen · Start {row.stock} Stk</p>

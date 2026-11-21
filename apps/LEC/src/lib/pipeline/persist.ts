@@ -157,6 +157,10 @@ export async function persistImportPlan(
 export interface PersistBillbeeArtikelResult {
   upserted: number;
   activeCount: number;
+  /** Bestandszuwaechse seit dem vorigen API-Abgleich (Grundlage fuer erkannte Einkaeufe, siehe billbee/purchases.ts). */
+  stockIncreases: { articleId: string; before: number; after: number; ek: number }[];
+  /** Zeitpunkt des vorigen API-Abgleichs; null beim ersten Lauf. */
+  previousApiRunAt: Date | null;
 }
 
 /**
@@ -181,7 +185,9 @@ export async function persistBillbeeArtikel(
   }
   // Erster Abgleich ueber die API = Startbestand: der alte Stand stammt aus einem Datei-Import und waere
   // kein verlaesslicher Vergleich. Bewegungen werden erst ab dem zweiten API-Abgleich mitgeschrieben.
-  const hadApiRun = (await prisma.importBatch.count({ where: { kind: "billbee_artikel", fileName: "Billbee-API" } })) > 0;
+  const lastApiRun = await prisma.importBatch.findFirst({ where: { kind: "billbee_artikel", fileName: "Billbee-API" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  const hadApiRun = lastApiRun !== null;
+  const stockIncreases: PersistBillbeeArtikelResult["stockIncreases"] = [];
   // Gleicher Name nach Normalisierung (z. B. "3x Foo" und "Foo") ist ein Artikel: nur die erste Zeile zaehlt,
   // sonst entstuende bei jedem Lauf eine Phantom-Bewegung.
   const seen = new Set<string>();
@@ -191,6 +197,9 @@ export async function persistBillbeeArtikel(
     const prev = before.get(row.nameNormalized);
     if (hadApiRun && prev && prev.active && prev.stock !== row.stock) {
       await prisma.stockMovement.create({ data: { articleId: prev.id, before: prev.stock, after: row.stock } });
+      if (row.stock > prev.stock && row.currentEk !== null && row.currentEk > 0) {
+        stockIncreases.push({ articleId: prev.id, before: prev.stock, after: row.stock, ek: row.currentEk });
+      }
     }
     // VK-Aenderung mitschreiben (nur wenn beide Staende bekannt sind; der erste Stand ist nur Ausgangswert).
     if (hadApiRun && prev && prev.vk !== null && row.currentVk !== null && Math.abs(prev.vk - row.currentVk) > 0.004) {
@@ -226,5 +235,5 @@ export async function persistBillbeeArtikel(
     });
     upserted++;
   }
-  return { upserted, activeCount: rows.length };
+  return { upserted, activeCount: rows.length, stockIncreases, previousApiRunAt: lastApiRun?.createdAt ?? null };
 }
