@@ -36,6 +36,7 @@ import {
   resolveMatchdayPreviewToBook,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
+import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 import {
   listStaffelTeamsThatRan,
   updateStaffelWechselPaareAfterMatchday,
@@ -990,6 +991,12 @@ export class LegacyMatchdayResultApplyService {
           commitThroughSide,
         });
 
+    // OFFEN bleibt der Spieltag nur, wenn nach DIESEM Commit noch eine geplante Seite ungewertet ist.
+    // Ein Spieltag ohne D2 im Spielplan (`discipline2 = null`) ist mit dem D1-Commit fertig — haengte
+    // die Frage allein an `commitThroughSide`, bliebe sein Zuwachs ewig offen (Review 21.11.).
+    const spieltagOffen =
+      isPartialCommit && getMatchdayScoringProgress(nextGameStateMitBeleg, params.matchdayId).completion === "partial";
+
     // Anti-cheese Teil B (B.4): record this matchday's per-player training mode and advance the
     // per-matchday training-fatigue share AFTER the injury roll (never inside `fatigueBeforeRoll`).
     const accumulatedGameState = accumulateMatchdayTrainingProgress({
@@ -1003,7 +1010,7 @@ export class LegacyMatchdayResultApplyService {
       ausfallSpielerIds,
       // Halber Spieltag (D1): Zuwachs festhalten, aber erst mit D2 auf die Attribute buchen — sonst
       // aendert sich die Arena-Eingabe mitten im Spieltag (Motor-Neuaufbau nach D1, D2-Vorlauf veraltet).
-      spieltagOffen: isPartialCommit,
+      spieltagOffen,
     });
 
     // STAFFEL O7 "EINGESPIELTE PAARE" (11.10., lib/season/staffel-wechsel-paar-bonus-service.ts):

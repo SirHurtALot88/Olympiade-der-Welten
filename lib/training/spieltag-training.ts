@@ -590,8 +590,16 @@ export type TrainingsVerlaufZeile = {
   weg: TrainingsWeg | null;
   quelle: "manager" | "ki" | null;
   modus: PlayerTrainingMode | null;
-  /** Gebuchter Zuwachs je Attribut (genau das, was auf die Attribute aufgeschlagen wurde). */
+  /**
+   * Zuwachs je Attribut: gebucht (genau das, was auf die Attribute aufgeschlagen wurde) oder — bei
+   * `offen` — festgelegt und mit dem Abschluss des Spieltags zu buchen.
+   */
   zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Der Spieltag ist erst halb gewertet (Arena-Teilbuchung nach D1): `zuwachs` steht fest, ist aber
+   * noch NICHT auf den Attributen (`o` im Verlauf). Die Anzeige kennzeichnet ihn als „offen".
+   */
+  offen: boolean;
   summe: number;
   /** Trainingslast dieses Spieltags (Fatigue-Punkte). */
   last: number;
@@ -629,6 +637,7 @@ export function entpackeTrainingsVerlauf(gameState: GameState, playerId: string)
       quelle: e.q === "m" ? "manager" : e.q === "k" ? "ki" : null,
       modus: e.i ?? null,
       zuwachs,
+      offen: e.o === true,
       summe: rund(Object.values(zuwachs).reduce((a, b) => a + (b ?? 0), 0)),
       last: e.l ?? 0,
       formAbzug,
@@ -640,8 +649,12 @@ export function entpackeTrainingsVerlauf(gameState: GameState, playerId: string)
 export type TrainingsSaisonSumme = {
   spieltageTrainiert: number;
   spieltageVerletzt: number;
+  /** Gebuchter Zuwachs (ohne offene Spieltage). */
   zuwachsJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>>;
   summe: number;
+  /** Festgelegter, aber noch nicht gebuchter Zuwachs (halb gewerteter Spieltag, `offen`). */
+  offenJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  offenSumme: number;
   /** Groesster Zuwachs in einem Attribut (der Schwerpunkt). */
   schwerpunkt: { attribute: PlayerGeneratorAttributeName; zuwachs: number } | null;
   formAbzugGesamt: number;
@@ -652,11 +665,13 @@ export type TrainingsSaisonSumme = {
 export function trainingsSaisonSumme(gameState: GameState, playerId: string): TrainingsSaisonSumme {
   const zeilen = entpackeTrainingsVerlauf(gameState, playerId);
   const zuwachsJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  const offenJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   let formAbzugGesamt = 0;
   let lastGesamt = 0;
   for (const z of zeilen) {
+    const ziel = z.offen ? offenJeAttribut : zuwachsJeAttribut;
     for (const [attribute, wert] of Object.entries(z.zuwachs) as Array<[PlayerGeneratorAttributeName, number]>) {
-      zuwachsJeAttribut[attribute] = rund((zuwachsJeAttribut[attribute] ?? 0) + wert);
+      ziel[attribute] = rund((ziel[attribute] ?? 0) + wert);
     }
     formAbzugGesamt += z.formAbzug;
     lastGesamt += z.last;
@@ -670,6 +685,8 @@ export function trainingsSaisonSumme(gameState: GameState, playerId: string): Tr
     spieltageVerletzt: zeilen.filter((z) => z.status === "verletzt").length,
     zuwachsJeAttribut,
     summe: rund(Object.values(zuwachsJeAttribut).reduce((a, b) => a + (b ?? 0), 0)),
+    offenJeAttribut,
+    offenSumme: rund(Object.values(offenJeAttribut).reduce((a, b) => a + (b ?? 0), 0)),
     schwerpunkt,
     formAbzugGesamt: rund(formAbzugGesamt, 1),
     lastGesamt: rund(lastGesamt, 2),

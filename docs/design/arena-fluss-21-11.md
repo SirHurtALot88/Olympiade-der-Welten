@@ -79,7 +79,38 @@ Nicht angefasst: `public/mockups/battle-mode.engine.js` (Wertungslogik), Ausrich
 Der Wechsel zu D2 bleibt ein Klick (`arena-wechsel-weiter`); mit gleicher Nutzlast stellt er den
 laufenden Motor per `setDisc` um, ohne Neuaufbau.
 
+### 2.1 Review-Auflagen (21.11., „mergebar mit Auflagen")
+
+1. **Spieltag ohne D2.** `spieltagOffen` hängt nicht mehr nur an `commitThroughSide !== "d2"`, sondern
+   daran, ob nach diesem Commit noch eine Pflichtseite ungewertet ist
+   (`getMatchdayScoringProgress(...).completion === "partial"`). Ein Spieltag mit `discipline2 = null`
+   ist mit dem D1-Commit fertig und bucht den Zuwachs sofort.
+2. **Kaderwechsel zwischen D1 und D2.** Der Abschluss-Commit bucht offene Zuwächse dieses Spieltags für
+   ALLE Spieler mit offenem Eintrag, auch für die, die den Kader inzwischen verlassen haben (ohne neue
+   Last, ohne neuen Eintrag — nur die festgelegten Zahlen). `schliesseOffeneTrainingsZuwaechse` steht für
+   Pfade bereit, die einen Spieltag nicht mehr abschließen. `getMatchdayBookedTrainingIds` zählt einen
+   offenen Eintrag (`o`) nicht als gebucht: bliebe einer bis zum Saisonende offen, fiele sein Spieltag
+   ins Saisonende-Budget — einmal gebucht, nie doppelt, nie verloren.
+3. **Neuaufbau-Regel nachgeschärft.** `entscheideMotorNeuaufbau` kennt den Spieltag (anderer Spieltag →
+   immer neu, auch bei gleicher Disziplin) und den Spielteil (`spielteilSignatur`: Paarung, Plätze der
+   Aufstellung, Saat, Mutatoren, Format, Strategie, Pod der aktuellen Disziplin — ohne Kader-Werte).
+   Aufgeschoben wird nur, wenn sich allein Kader-Werte geändert haben; eine neue Saat oder ein anderer
+   Pod während des angeschauten Spiels baut neu auf (sonst liefe die alte Saat, gebucht würde die neue).
+   Ende und Vorstellung tragen den Spieltag im Schlüssel und werden beim Spieltagswechsel zurückgesetzt.
+4. **Anzeige.** `entpackeTrainingsVerlauf` liefert `offen`, `trainingsSaisonSumme` trennt `summe`
+   (gebucht) von `offenSumme`, die Saisonprognose weist `offen`/`offenTotal` aus (der offene Zuwachs
+   steckt mit seinen exakten Zahlen in der Prognose, nicht noch einmal im Budget).
+
 ## 3. Prüfung
+
+- `tests/arena-fluss-training-buchungsweg.test.ts` (Review-Auflage 5): über
+  `LegacyMatchdayResultApplyService` „d1" dann „d2" == ein voller Commit (Attribute, Disziplinwerte,
+  Verlauf, Zähler), Arena-Eingabe-Hash der D2-Disziplin nach D1 unverändert, zurückgestellte D2-Spieler
+  erst mit D2 gebucht; Spieltag ohne D2 schließt mit dem D1-Commit ab.
+- `tests/training-je-spieltag.test.ts`, Block „Offener Zuwachs": Kaderaustritt zwischen D1 und D2,
+  `schliesseOffeneTrainingsZuwaechse`, Saisonende-Budget, Anzeige `offen`.
+- `tests/arena-motor-neuaufbau.test.ts`: Spieltagswechsel bei gleicher Disziplin, echte Spieländerung
+  während des Spiels, `spielteilSignatur` (Kader-Werte zählen nicht, Saat/Mutatoren/Pod/Plätze schon).
 
 - `tests/arena-motor-neuaufbau.test.ts` (6 Fälle der Neuaufbau-Regel).
 - `tests/training-je-spieltag.test.ts`, neuer Block „Halber Spieltag": D1-Commit lässt Attribute und

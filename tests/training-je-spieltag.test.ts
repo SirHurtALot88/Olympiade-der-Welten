@@ -9,10 +9,12 @@ import {
   playerGeneratorAttributeKeys,
 } from "@/lib/player-generator/official-discipline-weights";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
-import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
+import { accumulateMatchdayTrainingProgress, schliesseOffeneTrainingsZuwaechse } from "@/lib/training/matchday-training-accumulator";
+import { buildPlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import { prognostiziereDisziplinTraining } from "@/lib/training/disziplin-trainings-prognose";
 import {
   buildProjectedSeasonTrainingAccumulatorOverrides,
+  getMatchdayBookedTrainingIds,
   resolveSeasonEndTrainingAccumulatorOverrides,
   resolveSeasonTrainingAccumulatorInputs,
 } from "@/lib/training/organic-season-progression";
@@ -215,6 +217,83 @@ describe("Halber Spieltag (Arena-Teilbuchung nach D1): Zuwachs erst mit D2", () 
       expect(attr(spieler(abschluss), a) - attr(spieler(BASIS), a)).toBeCloseTo(zeile!.zuwachs[a] ?? 0, 6);
     }
     expect(spieler(abschluss).seasonTrainingAccumulator?.verlauf?.some((e) => e.o)).toBe(false);
+  });
+});
+
+describe("Offener Zuwachs: Kaderwechsel, Saisonende, Anzeige (Review 21.11.)", () => {
+  function bucheTeil(gs: GameState, matchdayId: string): GameState {
+    return accumulateMatchdayTrainingProgress({
+      gameState: gs,
+      seasonId: gs.season.id,
+      matchdayId,
+      ausfallSpielerIds: new Set(),
+      spieltagOffen: true,
+    });
+  }
+  const ohneKader = (gs: GameState, id: string): GameState => ({ ...gs, rosters: gs.rosters.filter((r) => r.playerId !== id) });
+
+  it("Spieler verlaesst zwischen D1 und D2 den Kader: der Abschluss-Commit bucht seinen offenen Zuwachs trotzdem", () => {
+    const voll = buche(BASIS, "md-1");
+    const teil = bucheTeil(BASIS, "md-1");
+    expect(spieler(teil).seasonTrainingAccumulator?.verlauf?.find((e) => e.m === "md-1")?.o).toBe(true);
+    const abschluss = buche(ohneKader(teil, SPIELER_ID), "md-1");
+    const p = spieler(abschluss);
+    expect(p.attributeSheetStats).toEqual(spieler(voll).attributeSheetStats);
+    expect(p.seasonTrainingAccumulator?.verlauf).toEqual(spieler(voll).seasonTrainingAccumulator?.verlauf);
+    expect(getMatchdayBookedTrainingIds(p.seasonTrainingAccumulator, abschluss.season.id).has("md-1")).toBe(true);
+    // Keine Last fuer den, der nicht mehr im Kader steht: nur der festgelegte Zuwachs wird nachgeholt.
+    expect(p.fatigue).toBe(spieler(teil).fatigue);
+    // Ein weiterer halber Commit laesst ihn in Ruhe.
+    expect(spieler(bucheTeil(ohneKader(teil, SPIELER_ID), "md-1")).seasonTrainingAccumulator).toEqual(spieler(teil).seasonTrainingAccumulator);
+  });
+
+  it("schliesseOffeneTrainingsZuwaechse bucht exakt die festgelegten Zahlen (Verkauf/Saisonende-Pfad)", () => {
+    const voll = buche(BASIS, "md-1");
+    const teil = bucheTeil(BASIS, "md-1");
+    const zu = schliesseOffeneTrainingsZuwaechse(teil, { playerIds: [SPIELER_ID] });
+    expect(spieler(zu).attributeSheetStats).toEqual(spieler(voll).attributeSheetStats);
+    expect(spieler(zu).seasonTrainingAccumulator?.verlauf?.some((e) => e.o)).toBe(false);
+    // Andere Spieler bleiben offen; ohne offene Eintraege derselbe Stand.
+    expect(zu.players.some((p) => p.id !== SPIELER_ID && p.seasonTrainingAccumulator?.verlauf?.some((e) => e.o))).toBe(true);
+    expect(schliesseOffeneTrainingsZuwaechse(voll)).toBe(voll);
+  });
+
+  it("offener Eintrag zaehlt nicht als gebucht: am Saisonende faellt der Spieltag ins Budget (nicht verloren, nicht doppelt)", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const akku = spieler(teil).seasonTrainingAccumulator;
+    expect(getMatchdayBookedTrainingIds(akku, teil.season.id).has("md-1")).toBe(false);
+    const offen = resolveSeasonEndTrainingAccumulatorOverrides({ accumulator: akku, seasonId: teil.season.id, totalMatchdays: 20, jeSpieltag: true });
+    expect(offen.accumulatedBaseTrainingBudget).toBeCloseTo(TRAINING_SETPOINTS_BY_MODE.mittel / 20, 6);
+    const gebucht = buche(teil, "md-1");
+    const zu = resolveSeasonEndTrainingAccumulatorOverrides({
+      accumulator: spieler(gebucht).seasonTrainingAccumulator,
+      seasonId: teil.season.id,
+      totalMatchdays: 20,
+      jeSpieltag: true,
+    });
+    expect(zu.accumulatedBaseTrainingBudget).toBe(0);
+  });
+
+  it("Anzeige: Verlauf, Saisonsumme und Prognose kennzeichnen den offenen Zuwachs", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const [zeile] = entpackeTrainingsVerlauf(teil, SPIELER_ID);
+    expect(zeile!.offen).toBe(true);
+    expect(zeile!.summe).toBeGreaterThan(0);
+    const summeOffen = trainingsSaisonSumme(teil, SPIELER_ID);
+    expect(summeOffen.summe).toBe(0);
+    expect(summeOffen.offenSumme).toBe(zeile!.summe);
+    const prognoseOffen = buildPlayerSeasonTrainingForecast({ gameState: teil, player: spieler(teil) })!;
+    expect(prognoseOffen.offenTotal).toBeGreaterThan(0);
+
+    const abschluss = buche(teil, "md-1");
+    const [gebucht] = entpackeTrainingsVerlauf(abschluss, SPIELER_ID);
+    expect(gebucht!.offen).toBe(false);
+    expect(trainingsSaisonSumme(abschluss, SPIELER_ID).summe).toBe(summeOffen.offenSumme);
+    expect(trainingsSaisonSumme(abschluss, SPIELER_ID).offenSumme).toBe(0);
+    const prognose = buildPlayerSeasonTrainingForecast({ gameState: abschluss, player: spieler(abschluss) })!;
+    expect(prognose.offenTotal).toBe(0);
+    // Derselbe Zuwachs, nur einmal gezaehlt: offen und gebucht ergeben dieselbe Trainingssumme.
+    expect(prognose.trainingTotal).toBeCloseTo(prognoseOffen.trainingTotal, 1);
   });
 });
 

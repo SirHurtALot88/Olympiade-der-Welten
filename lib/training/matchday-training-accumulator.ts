@@ -151,7 +151,18 @@ export function accumulateMatchdayTrainingProgress(input: {
   let mutated = false;
   let attributeChanged = false;
   const nextPlayers = gameState.players.map((player) => {
-    if (!rosteredPlayerIds.has(player.id)) return player;
+    if (!rosteredPlayerIds.has(player.id)) {
+      // OFFENER ZUWACHS OHNE KADER (Review 21.11.): wer zwischen D1 und D2 den Kader verlassen hat
+      // (Verkauf, Entlassung), traegt noch den beim D1-Commit festgehaltenen Zuwachs (`o`). Der
+      // Abschluss-Commit bucht ihn auch fuer ihn — sonst bliebe er ewig offen. Keine Last, kein
+      // neuer Eintrag: nur das schon Festgelegte wird gebucht.
+      if (spieltagOffen) return player;
+      const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now });
+      if (!abgeschlossen) return player;
+      if (abgeschlossen.attributeChanged) attributeChanged = true;
+      mutated = true;
+      return abgeschlossen.player;
+    }
     // Sein Spieltag ist noch nicht gebucht — weder Last noch Erholung, `player.fatigue` ist
     // nicht die reine Match-Fatigue. Hier anzusetzen hiesse, die Trainingsschicht ein zweites
     // Mal aufzuschlagen. Er kommt beim Commit seiner eigenen Disziplin-Seite dran.
@@ -185,24 +196,13 @@ export function accumulateMatchdayTrainingProgress(input: {
       const relayered = clampFatigue((player.fatigue ?? 0) + previousAccumulator.accumulatedTrainingFatigue);
       // Abschluss-Commit nach einer Teilbuchung: der beim D1-Commit festgelegte Zuwachs (`o: true`)
       // landet jetzt auf den Attributen — dieselben Zahlen, kein neues Ziel, kein neuer Wurf.
-      if (!spieltagOffen && priorEintrag?.o && previousAccumulator.verlauf) {
-        const { neu, gebucht } = bucheZuwachsAufAttribute(player.attributeSheetStats, priorEintrag.z ?? {});
-        const abgeschlossen: TrainingsSpieltagEintrag = { ...priorEintrag };
-        delete abgeschlossen.o;
-        if (Object.keys(gebucht).length > 0) abgeschlossen.z = gebucht;
-        else delete abgeschlossen.z;
-        if (neu) attributeChanged = true;
-        mutated = true;
-        return {
-          ...player,
-          ...(neu ? { attributeSheetStats: neu } : {}),
-          seasonTrainingAccumulator: {
-            ...previousAccumulator,
-            verlauf: previousAccumulator.verlauf.map((e) => (e.m === matchdayId ? abgeschlossen : e)),
-            updatedAt: now,
-          },
-          fatigue: relayered,
-        };
+      if (!spieltagOffen && priorEintrag?.o) {
+        const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now });
+        if (abgeschlossen) {
+          if (abgeschlossen.attributeChanged) attributeChanged = true;
+          mutated = true;
+          return { ...abgeschlossen.player, fatigue: relayered };
+        }
       }
       if (relayered === (player.fatigue ?? 0)) return player;
       mutated = true;
@@ -335,6 +335,75 @@ function bucheZuwachsAufAttribute(
     gebucht[attribute] = differenz;
   }
   return Object.keys(gebucht).length > 0 ? { neu, gebucht } : { neu: null, gebucht };
+}
+
+/**
+ * Offene Zuwaechse (`o: true`, festgehalten beim D1-Teil-Commit) eines Spielers auf die Attribute buchen
+ * und den Eintrag abschliessen. Mit `matchdayId` nur der Eintrag dieses Spieltags, sonst alle offenen der
+ * Saison. `null`, wenn nichts offen ist. Disziplinwerte leitet der Aufrufer danach ligaweit neu ab.
+ */
+function schliesseOffeneZuwaechseEinesSpielers(
+  player: Player,
+  input: { seasonId: string; matchdayId?: string | null; now: string },
+): { player: Player; attributeChanged: boolean } | null {
+  const akku = player.seasonTrainingAccumulator;
+  if (!akku || akku.seasonId !== input.seasonId || !akku.verlauf) return null;
+  const betroffen = (e: TrainingsSpieltagEintrag) => e.o === true && (input.matchdayId == null || e.m === input.matchdayId);
+  if (!akku.verlauf.some(betroffen)) return null;
+  let stats = player.attributeSheetStats;
+  let attributeChanged = false;
+  const verlauf = akku.verlauf.map((e) => {
+    if (!betroffen(e)) return e;
+    const { neu, gebucht } = bucheZuwachsAufAttribute(stats, e.z ?? {});
+    const abgeschlossen: TrainingsSpieltagEintrag = { ...e };
+    delete abgeschlossen.o;
+    if (Object.keys(gebucht).length > 0) abgeschlossen.z = gebucht;
+    else delete abgeschlossen.z;
+    if (neu) {
+      stats = neu;
+      attributeChanged = true;
+    }
+    return abgeschlossen;
+  });
+  return {
+    player: {
+      ...player,
+      ...(stats !== player.attributeSheetStats ? { attributeSheetStats: stats } : {}),
+      seasonTrainingAccumulator: { ...akku, verlauf, updatedAt: input.now },
+    },
+    attributeChanged,
+  };
+}
+
+/**
+ * Alle noch offenen Trainingszuwaechse (`o: true`) der laufenden Saison buchen — fuer die angegebenen
+ * Spieler oder alle. Fuer Pfade, die einen Spieler zwischen D1- und D2-Commit aus dem Kader nehmen
+ * oder eine Saison abschliessen, ohne dass der Abschluss-Commit des Spieltags noch kommt. Ohne offene
+ * Eintraege: derselbe Stand (Referenz).
+ */
+export function schliesseOffeneTrainingsZuwaechse(
+  gameState: GameState,
+  input?: { playerIds?: Iterable<string> | null; matchdayId?: string | null },
+): GameState {
+  const nur = input?.playerIds ? new Set(input.playerIds) : null;
+  const now = new Date().toISOString();
+  let mutated = false;
+  let attributeChanged = false;
+  const players = gameState.players.map((player) => {
+    if (nur && !nur.has(player.id)) return player;
+    const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, {
+      seasonId: gameState.season.id,
+      matchdayId: input?.matchdayId ?? null,
+      now,
+    });
+    if (!abgeschlossen) return player;
+    mutated = true;
+    if (abgeschlossen.attributeChanged) attributeChanged = true;
+    return abgeschlossen.player;
+  });
+  if (!mutated) return gameState;
+  const naechster: GameState = { ...gameState, players };
+  return attributeChanged ? withRefreshedDisciplineRatings(naechster) : naechster;
 }
 
 function pickAttributes(stats: NonNullable<Player["attributeSheetStats"]>): Partial<Record<PlayerGeneratorAttributeName, number>> {
