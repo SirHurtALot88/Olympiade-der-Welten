@@ -55,6 +55,7 @@ type FoundationSidebarProps = {
   onNavigate: (view: FoundationViewId) => void;
   onPrefetchView?: (view: FoundationViewId) => void;
   attentionByViewId?: FoundationNavAttentionMap;
+  zahlByViewId?: Partial<Record<string, number>>;
   // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
   // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
   teamPicker?: ReactNode;
@@ -89,6 +90,7 @@ export default function FoundationSidebar({
   onNavigate,
   onPrefetchView,
   attentionByViewId,
+  zahlByViewId,
   teamPicker,
   teamCrest,
   teamName,
@@ -393,7 +395,11 @@ export default function FoundationSidebar({
                     <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span>
                   ) : null}
                   <span className="foundation-sidebar-item-label">{item.label}</span>
-                  {rail && needsAttention ? (
+                  {rail && (zahlByViewId?.[item.id] ?? 0) > 0 ? (
+                    <span className="foundation-rail-zahl" data-testid={`foundation-nav-zahl-${item.id}`} aria-hidden="true">
+                      {Math.min(zahlByViewId?.[item.id] ?? 0, 99)}
+                    </span>
+                  ) : rail && needsAttention ? (
                     <span className="foundation-rail-zahl" data-testid={`foundation-nav-attention-${item.id}`} aria-hidden="true">
                       !
                     </span>

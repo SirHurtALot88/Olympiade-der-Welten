@@ -130,6 +130,8 @@ import type { SeasonOverviewOption } from "@/lib/foundation/tabs/use-season-v2-p
 import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+import { gelesenIdsFuer, inboxBesitzerFuerTeam } from "@/lib/foundation/inbox-gelesen";
+import { zaehleUngelesenFuerTeams } from "@/lib/foundation/inbox-postfach";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { disziplinReihenfolgeAusSpielplan } from "@/lib/season/saisonstand-modern-logik";
@@ -179,7 +181,7 @@ const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-c
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Scouting wird geladen…" />,
 });
-const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), {
+const PostfachModern = dynamic(() => import("@/app/foundation/inbox-v2/PostfachModern"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Inbox wird geladen…" />,
 });
@@ -445,7 +447,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   inboxCategoryFilter,
   inboxIncludeDismissed,
   inboxIncludeDone,
-  inboxV2Items,
   inboxV2SelectedItemId,
   isMarketSellPanelOpen,
   isPending,
@@ -476,6 +477,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   navigateHomeTab,
   navigateToGameFlowStep,
   navigateToInboxItem,
+  markiereInboxGelesen,
+  gameInboxItems,
   navigateToPrizeFinanceViewFromRouting,
   navigateToTeamPicker,
   openFacilityPanel,
@@ -667,6 +670,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   visibleFoundationCommandItems,
   visibleInboxItems,
   } = props;
+
+  // Zahl an der Icon-Schiene = ungelesene Meldungen über alle eigenen Teams (Chris 21.11., Entscheidung 6); die Glocke bleibt
+  // beim „hält den Spieltag auf“. Sie erscheint dort, wo das Postfach ohnehin berechnet wird.
+  const inboxSchienenZahl = (() => {
+    const besitzer = inboxBesitzerFuerTeam(gameState, activeManagerTeamId);
+    if (!besitzer || !Array.isArray(gameInboxItems) || gameInboxItems.length === 0) {
+      return 0;
+    }
+    const settingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+    const eigeneTeamIds = gameState.teams
+      .filter((team: Team) => settingsMap[team.teamId]?.controlMode === "manual" && settingsMap[team.teamId]?.ownerId === besitzer)
+      .map((team: Team) => team.teamId);
+    return zaehleUngelesenFuerTeams(gameInboxItems as GameInboxItem[], eigeneTeamIds, gelesenIdsFuer(gameState, besitzer));
+  })();
 
   /**
    * VERLÄNGERN ODER FREIGEBEN (Chris 19.11.), für Saisonfinale und Nachhol-Karte: Verlängern öffnet die normale
@@ -1042,6 +1059,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       <FoundationShell
         activeView={activeView as FoundationViewId}
         attentionByViewId={foundationNavAttention}
+        zahlByViewId={inboxSchienenZahl > 0 ? { inboxV2: inboxSchienenZahl } : undefined}
         seasonLabel={canonicalSeasonLabel}
         matchdayDisplayLabel={currentMatchdayDisplayLabel}
         currentMatchday={gameState.season.currentMatchday}
@@ -2233,70 +2251,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           <section className={`panel foundation-inbox-v2-panel${getViewClass("inboxV2")}`}>
             {activeView === "inboxV2" && selectedTeam ? (
-              <InboxV2Client
-                items={inboxV2Items}
-                selectedItemId={inboxV2SelectedItemId ?? inboxV2Items[0]?.id ?? null}
-                onSelectItem={setInboxV2SelectedItemId}
-                // F4-Regel „eine Quelle pro Größe": derselbe Zähler wie auf Home
-                // (`homeOpenTaskCount` = `activeTeamDecisionInboxItems.length`) —
-                // „offen" meint, was zu TUN ist; Berichte zählen nicht mit.
-                openCount={activeTeamDecisionInboxItems.length}
-                criticalCount={activeTeamCriticalInboxItems.length}
-                teamLabel={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
-                categoryFilter={inboxCategoryFilter}
-                onCategoryFilterChange={setInboxCategoryFilter}
-                hideCategoryFilters
-                includeDone={inboxIncludeDone}
-                onIncludeDoneChange={setInboxIncludeDone}
-                includeDismissed={inboxIncludeDismissed}
-                onIncludeDismissedChange={setInboxIncludeDismissed}
-                /**
-                 * GEMELDET: „ich wollte zu training über die inbox message und wurde zur team
-                 * ansicht weitergeleitet".
-                 *
-                 * Der Handler bekam die `itemId` der angeklickten Karte — und warf sie weg
-                 * (`_itemId`). Stattdessen schlug er den gerade AUSGEWAEHLTEN Eintrag nach, und
-                 * ohne Auswahl schlicht den ERSTEN der Liste. Die CTA-Knoepfe rufen aber
-                 * `stopPropagation()`, setzen die Auswahl also gar nicht auf ihre eigene Karte:
-                 * Beim ersten Oeffnen der Inbox landete jeder Klick deterministisch beim ersten
-                 * Eintrag. Und diese Liste ist NICHT nach Dringlichkeit sortiert — Kapitaen,
-                 * Sponsor und Vertragsaufloesung (alle mit Ziel `teams`) stehen dort oft vor den
-                 * Trainings-Eintraegen. Wer „Training öffnen" klickte, landete im Kader.
-                 *
-                 * Der frühere Fix e574215 konnte das nicht heilen: Er hat die ZIELE in
-                 * `game-inbox-service.ts` berichtigt. Die sind seitdem korrekt — sie wurden hier
-                 * nur nie gelesen.
-                 *
-                 * Richtig verdrahtet gibt es das laengst, in `FoundationInboxV2Host.tsx:96-104`.
-                 * Nur wird die Komponente, die diesen Host rendert, nirgends verwendet.
-                 */
-                onOpenItem={(itemId) => {
-                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
-                  if (sourceItem) {
-                    navigateToInboxItem(sourceItem);
-                  }
+              <PostfachModern
+                gameState={gameState}
+                items={gameInboxItems}
+                aktivesTeamId={selectedTeam.teamId}
+                onWaehleTeam={(teamId: string) => setActiveManagerTeam(teamId)}
+                onGelesen={(teamId: string, itemIds: string[], gelesen: boolean) => {
+                  void markiereInboxGelesen(teamId, itemIds, gelesen);
                 }}
-                onRunChoice={(itemId, choiceId) => {
-                  if (choiceId !== "open-target") {
-                    return;
-                  }
-                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
-                  if (sourceItem) {
-                    navigateToInboxItem(sourceItem);
-                  }
-                }}
-                onMarkDone={(itemId) => {
-                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
-                  if (sourceItem) {
-                    updateInboxItemStatus(sourceItem, "done");
-                  }
-                }}
-                onDismiss={(itemId) => {
-                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
-                  if (sourceItem) {
-                    updateInboxItemStatus(sourceItem, "dismissed");
-                  }
-                }}
+                onTrainingModus={(playerId: string, modus: "leicht" | "mittel" | "hart") => setPlayerTrainingMode(playerId, modus)}
+                onStatus={updateInboxItemStatus}
+                onOeffne={navigateToInboxItem}
+                schreibgeschuetzt={readMeta.readOnly || !selectedTeamCanManage}
               />
             ) : null}
           </section>

@@ -20,19 +20,13 @@ describe("foundation training compact UI contract", () => {
     expect(foundationSource).toContain("useFoundationCrossTabTraining");
     expect(trainingCrossTabSource).toContain("buildTeamPlayerTrainingLoadPlanMap");
     expect(trainingCrossTabSource).toContain("recommendedTrainingMode");
-    const inboxHostSource = readFileSync(join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8");
-    const inboxDerivationsSource = readFileSync(
-      join(root, "lib/foundation/tabs/use-inbox-v2-derivations.ts"),
-      "utf8",
-    );
-    expect(inboxHostSource).toContain("applyInboxQuickAction");
-    expect(inboxDerivationsSource).toContain("mapInboxQuickActionsToChoices");
+    const postfachSource = readFileSync(join(root, "app/foundation/inbox-v2/PostfachModern.tsx"), "utf8");
+    // Trainingswunsch: die Inbox setzt die Intensität über denselben Weg wie die Entwicklungsseite (`onTrainingModus`).
+    expect(postfachSource).toContain("onTrainingModus(item.playerId, wunsch.wunsch)");
+    expect(postfachSource).toContain("getInboxQuickActions");
     expect(foundationSource).toContain("seasonReadinessChecklist");
     expect(trainingShared).toContain('data-testid="training-ai-recommendation"');
     expect(officeSource).toContain('data-testid="foundation-season-readiness-checklist"');
-    expect(
-      readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8") +
-        readFileSync(join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx"), "utf8"),
-    ).toContain('data-testid="inbox-v2-quick-actions"');
+    expect(postfachSource).toContain("data-testid={`postfach-option-${aktion.id}`}");
   });
 });

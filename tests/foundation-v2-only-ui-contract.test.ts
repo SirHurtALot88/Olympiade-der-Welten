@@ -54,16 +54,17 @@ describe("foundation v2-only ui contract", () => {
         "utf8",
       ),
       fs.readFile(`${root}/lib/foundation/foundation-nav-config.ts`, "utf8"),
-      fs.readFile(`${root}/app/foundation/inbox-v2/FoundationInboxV2Host.tsx`, "utf8"),
+      fs.readFile(`${root}/app/foundation/inbox-v2/PostfachModern.tsx`, "utf8"),
     ]);
 
     expect(navText).toContain('"inboxV2"');
     expect(navText).toContain("Offene Aufgaben & Warnungen");
     expect(foundationText).toContain('activeView === "inboxV2"');
-    expect(foundationText).toContain("FoundationShellRouterInboxV2");
+    expect(foundationText).toContain("<PostfachModern");
     expect(commandPaletteText).toContain('label: "Entscheidungen"');
     expect(commandPaletteText).toContain('label: "Chronik"');
-    expect(inboxHostText).toContain("hideCategoryFilters");
+    // Das Postfach filtert nach Absender in der Seite selbst, nicht in einem äußeren Reiter.
+    expect(inboxHostText).toContain("postfach-absender-");
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
 

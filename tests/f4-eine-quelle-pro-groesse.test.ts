@@ -47,10 +47,10 @@ describe("Fall 1: Home und Inbox zählen dieselbe Entscheidungsliste", () => {
     expect(scope).not.toContain('item.category === "task" || item.category === "warning" || item.severity === "critical"');
   });
 
-  it("die Inbox zählt dieselbe Liste", () => {
-    expect(quelle("app/foundation/inbox-v2/FoundationInboxV2Host.tsx")).toContain(
-      "openCount={activeTeamDecisionInboxItems.length}",
-    );
+  it("die Inbox (Postfach) bekommt dieselbe Meldungsliste und rechnet ihre Bahnen daraus", () => {
+    // Seit 21.11. zählt das Postfach selbst (Handeln, Info, Ungelesen) aus den Meldungen des Teams, statt eine Zahl zu bekommen.
+    expect(quelle("app/foundation/FoundationShellRouterBody.tsx")).toContain("items={gameInboxItems}");
+    expect(quelle("app/foundation/inbox-v2/PostfachModern.tsx")).toContain("baueModell(");
   });
 
   it("das Home-Markup rendert den vollen Zähler und benennt den gekappten Rest", () => {

@@ -10,7 +10,7 @@ export { default as PlayerGeneratorPanel } from "@/app/foundation/PlayerGenerato
 export { default as FoundationPlayerPortraitPreview } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 export { default as FacilitiesV2Client } from "@/app/foundation/facilities-v2/FacilitiesV2Client";
 export { default as FoundationHomeV2Panel } from "@/app/foundation/home-v2/FoundationHomeV2Panel";
-export { default as InboxV2Client } from "@/app/foundation/inbox-v2/InboxV2Client";
+export { default as PostfachModern } from "@/app/foundation/inbox-v2/PostfachModern";
 export { default as FoundationLineupPanel } from "@/app/foundation/legacy-lineup-lab/FoundationLineupPanel";
 export { default as ScoutingCenterV2Client } from "@/app/foundation/scouting-center-v2/ScoutingCenterV2Client";
 export { default as FoundationSeasonV2Panel } from "@/app/foundation/season-v2/FoundationSeasonV2Panel";

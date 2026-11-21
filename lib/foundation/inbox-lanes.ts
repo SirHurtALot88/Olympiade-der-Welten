@@ -71,6 +71,9 @@ const WATCH_ONLY_SOURCES = new Set<string>([
   "facility_catalog_cash_check",
   "facility_condition_forecast",
   "team_season_objectives",
+  // Postfach 21.11.: reine Information, hält nie einen Spieltag auf.
+  "vorstand_freigabe",
+  "moral_gekippt",
 ]);
 
 /**

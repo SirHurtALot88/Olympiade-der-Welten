@@ -18,6 +18,8 @@ type FoundationShellProps = {
   onNavigate: (view: FoundationViewId) => void;
   onPrefetchView?: (view: FoundationViewId) => void;
   attentionByViewId?: FoundationNavAttentionMap;
+  /** Zahl an einem Schienenpunkt (Postfach: ungelesene Meldungen); ohne Eintrag oder bei 0 bleibt es beim Ausrufezeichen. */
+  zahlByViewId?: Partial<Record<string, number>>;
   seasonLabel?: string | null;
   matchdayDisplayLabel?: string | null;
   currentMatchday?: number | null;
@@ -100,6 +102,7 @@ export default function FoundationShell({
   onNavigate,
   onPrefetchView,
   attentionByViewId,
+  zahlByViewId,
   seasonLabel,
   matchdayDisplayLabel,
   currentMatchday,
@@ -199,6 +202,7 @@ export default function FoundationShell({
         onNavigate={onNavigate}
         onPrefetchView={onPrefetchView}
         attentionByViewId={attentionByViewId}
+        zahlByViewId={zahlByViewId}
         teamPicker={teamPicker}
         teamCrest={teamCrest}
         teamName={teamName}

@@ -4165,6 +4165,11 @@ export type SeasonState = {
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
   trainingIntensityConfirmations?: Record<string, TrainingIntensityConfirmationRecord>;
+  /**
+   * Postfach (21.11.): welche Meldungen ein Manager schon gelesen hat, je Besitzer (`ownerId`), nicht je Spielstand —
+   * sonst liest Franky Chris' Post „weg“. Nur Kennungen (`GameInboxItem.itemId`), geschrieben über `/api/inbox/gelesen`.
+   */
+  inboxGelesen?: Record<string, string[]>;
   aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiManagerSellStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiLifecyclePhaseRuns?: AiLifecyclePhaseRunRecord[];
