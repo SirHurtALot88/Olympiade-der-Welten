@@ -1633,10 +1633,8 @@ function getPlayerTop20Objective(input: {
       summary.bestRank == null
         ? "offen"
         : wantsRepeatPeak
-          ? `${summary.maxTop20ByPlayer}/${target}, bestes Rank #${summary.bestRank}`
-          : summary.top20Count > 0
-            ? `erfuellt, bestes Rank #${summary.bestRank}`
-            : `bestes Rank #${summary.bestRank}`,
+          ? `${summary.maxTop20ByPlayer}/${target} · Rang ${summary.bestRank}`
+          : `Rang ${summary.bestRank}`,
     status,
     rewardCash: status === "completed" ? (wantsRepeatPeak ? 5 : 3) : undefined,
     penaltyCash: status === "failed" ? (wantsRepeatPeak ? 2 : 1) : undefined,

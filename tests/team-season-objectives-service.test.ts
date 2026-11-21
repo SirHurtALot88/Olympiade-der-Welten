@@ -1073,7 +1073,7 @@ describe("team season objectives service", () => {
     const top20Goal = overview.objectives.find((objective) => objective.teamId === "R-R" && objective.objectiveId === "player-top20-breakthrough");
 
     expect(top20Goal?.status).toBe("completed");
-    expect(top20Goal?.currentValue).toContain("erfuellt");
+    expect(top20Goal?.currentValue).toBe("Rang 18");
   });
 
   it("counts every played matchday for the 3x-Top-20 goal, also on the compact browser payload", () => {
@@ -1114,7 +1114,7 @@ describe("team season objectives service", () => {
     const vollesZiel = findeZiel(gameState);
     const kompaktesZiel = findeZiel(compactFoundationInitialGameState(gameState));
 
-    expect(vollesZiel?.currentValue).toBe("2/3, bestes Rank #5");
+    expect(vollesZiel?.currentValue).toBe("2/3 · Rang 5");
     expect(kompaktesZiel?.currentValue).toBe(vollesZiel?.currentValue);
     expect(kompaktesZiel?.status).toBe(vollesZiel?.status);
   });
