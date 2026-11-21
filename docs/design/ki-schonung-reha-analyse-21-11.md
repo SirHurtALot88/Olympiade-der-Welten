@@ -325,4 +325,8 @@ Das Abbild steht spät in der Saison (viele müde Spieler); die Zahlen gelten ab
 
 Diagnose an `neu.sqlite` (Skript `scripts/diag-ki-reha.ts`): Die Vorstands-Freigabe war nicht der Grund (Saison 1, nicht gedeckelt; `previewFacilityUpgrade` ok bei 30 von 32 Teams). Bedarf war da (C-S, D-L, W-L: Stufe 2 gewünscht). Es scheiterte am freien Geld nach Rücklage: Die Rücklage rechnete in Saison 1 mit Budget = Kasse + Marktwert des Kaders, mitten in der Saison also fast die ganze Kasse (C-S: Kasse 35,7, frei 1,2 C; W-L: 41,5 / 3,5; N-N: 19,1 / 6,1). Das war ein Fehler im Gate: In Saison 1 ist das Budget der Rücklage das Startbudget.
 
-Behoben in `lib/ai/ai-reha-bau-service.ts` (Saison 1: Kaderwert 0 in der Rücklage; Test in `tests/ki-schonung-reha.test.ts`). Nachrechnung am selben Stand: frei C-S 22,3, W-L 27,9, B-P 8,0, D-L 7,6; 12 von 32 Teams würden bauen. Nicht bauen können Teams knapp über der Rücklage 0,35 x Zielgehalt (R-L, H-R, Z-H, D-P): gewollte Rücklage nach Finanzwert. Ein Nachher-Lauf mit der Korrektur (4 Spieltage) war beim Schreiben noch nicht fertig.
+Behoben in `lib/ai/ai-reha-bau-service.ts` (Saison 1: Kaderwert 0 in der Rücklage; Test in `tests/ki-schonung-reha.test.ts`). Nachrechnung am selben Stand: frei C-S 22,3, W-L 27,9, B-P 8,0, D-L 7,6; 12 von 32 Teams würden bauen. Nicht bauen können Teams knapp über der Rücklage 0,35 x Zielgehalt (R-L, H-R, Z-H, D-P): gewollte Rücklage nach Finanzwert.
+
+### Nachher-Lauf mit korrigierter Rücklage (4 Spieltage ab ST12, `neu2.out`)
+
+Reha-Bauten 9 von 32 Teams (Stufe 1, 63 C), Push 3,8 %, Schonen 30,1 %, Einsätze mit Fatigue >= 65 15,7 %, 48 Verletzungen (erwartet 56,3), Hochrechnung je 20 Spieltage 240 gewürfelt / 281 erwartet. Die Reha wirkt in so wenigen Spieltagen noch kaum (Bau erst nach den ersten Spieltagen), der Effekt zeigt sich über eine ganze Saison.
