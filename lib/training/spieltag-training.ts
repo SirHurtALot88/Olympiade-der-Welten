@@ -43,7 +43,7 @@ import {
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
-import { getAttributeHeadroom } from "@/lib/scouting/player-attribute-ceiling-service";
+import { getAttributeHeadroom, type AttributeHeadroomState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
 import { buildSeasonDisciplinePlayerCountMap, getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
@@ -51,7 +51,11 @@ import {
   ATTRIBUTE_FALLBACK_AXIS,
   buildOrganicSeasonProgression,
   didPlayerAttributesFallBackToAxes,
+  erklaerePotenzialBeschleuniger,
+  getOrganicGrowthMultiplier,
+  type PotenzialBeschleunigerErklaerung,
 } from "@/lib/training/organic-season-progression";
+import { DEVELOPMENT_MAX_ATTRIBUTE_VALUE } from "@/lib/training/training-levelup-service";
 import { getTrainingSetpointsJeSpieltag } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -171,6 +175,46 @@ export type SpieltagsZuwachs = {
   summe: number;
   /** Attribute, an denen die Decke bremst (Zustand "capped" oder "closing"). */
   deckeBremst: PlayerGeneratorAttributeName[];
+  /** Transparenz: was der Weg je Attribut wirklich bringt (dieselbe Rechnung, die bucht). */
+  transparenz: SpieltagsTransparenz;
+};
+
+/** Warum ein Attribut weniger zulegt als sein Anteil am Budget hergibt. */
+export type BremsGrund = "maximum" | "limit" | "eng" | "achse";
+
+export type TransparenzAttribut = {
+  attribute: PlayerGeneratorAttributeName;
+  anteil: number;
+  /** Wert vor diesem Spieltag. */
+  vorher: number;
+  /** Individuelle Obergrenze (hoechstens 99), `null` ohne bekannte Decke. */
+  deckel: number | null;
+  /** Abstand zur Decke, `null` ohne Decke. */
+  rest: number | null;
+  zustand: AttributeHeadroomState;
+  /** Steht am Maximum 99 (Wachstum dort immer 0). */
+  amMaximum: boolean;
+  /** Anteil am Budget ohne Bremse (Budget x Anteil x Affinitaet). */
+  ungebremst: number;
+  /** Tatsaechlich gebucht (Fokus). */
+  gebucht: number;
+  /** `ungebremst - gebucht`, nie negativ. */
+  verlust: number;
+  /** Wirksamer Faktor der Bremse (Zuwachs vor Decken-Klemme / ungebremst), 1 = keine Bremse. */
+  faktor: number;
+  grund: BremsGrund | null;
+};
+
+export type SpieltagsTransparenz = {
+  /** Potenzial-Beschleuniger: Zerlegung des Faktors auf das Trainingsbudget (>= 1). */
+  beschleuniger: PotenzialBeschleunigerErklaerung;
+  attribute: TransparenzAttribut[];
+  ungebremstSumme: number;
+  verlustSumme: number;
+  /** Anteil des Weg-Zuwachses, der durch Decke/Maximum verloren geht (0..1). */
+  verlustAnteil: number;
+  /** Davon als Nebeneffekt auf andere Attribute umgeleitet (Summe der Spillover-Zuwaechse). */
+  umgeleitet: number;
 };
 
 function normalizeMode(mode: Player["trainingMode"]): PlayerTrainingMode {
@@ -225,10 +269,35 @@ export function berechneSpieltagsZuwachs(input: {
     if (delta > 0) zuwachs[zeile.attribute] = delta;
     if (zeile.spillover > 0 && delta > 0) nebeneffekt[zeile.attribute] = rund(Math.min(delta, zeile.spillover));
   }
+  const transparenzAttribute: TransparenzAttribut[] = [];
   for (const eintrag of profil) {
-    const zustand = getAttributeHeadroom({ player: input.player, attribute: eintrag.attribute, record }).state;
+    const kopf = getAttributeHeadroom({ player: input.player, attribute: eintrag.attribute, record });
+    const zustand = kopf.state;
     if (zustand !== "open") deckeBremst.push(eintrag.attribute);
+    const zeile = ergebnis.attributeBreakdown.find((e) => e.attribute === eintrag.attribute);
+    const vorher = zeile?.before ?? 0;
+    const nominal = ergebnis.trainingSetpoints * eintrag.anteil;
+    const ungebremst = nominal * getOrganicGrowthMultiplier(zeile?.affinity ?? "neutral");
+    const gebucht = zuwachs[eintrag.attribute] ?? 0;
+    const amMaximum = vorher >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE - 0.05;
+    const faktor = nominal > 0 && zeile ? Math.min(1, zeile.training / ungebremst) : 1;
+    transparenzAttribute.push({
+      attribute: eintrag.attribute,
+      anteil: eintrag.anteil,
+      vorher: rund(vorher, 2),
+      deckel: typeof kopf.ceiling === "number" ? Math.min(DEVELOPMENT_MAX_ATTRIBUTE_VALUE, kopf.ceiling) : null,
+      rest: kopf.headroom,
+      zustand,
+      amMaximum,
+      ungebremst: rund(ungebremst, 4),
+      gebucht,
+      verlust: rund(Math.max(0, ungebremst - gebucht), 4),
+      faktor: rund(faktor, 3),
+      grund: amMaximum ? "maximum" : zustand === "capped" ? "limit" : zustand === "closing" ? "eng" : faktor < 0.99 ? "achse" : null,
+    });
   }
+  const ungebremstSumme = rund(transparenzAttribute.reduce((a, e) => a + e.ungebremst, 0), 4);
+  const verlustSumme = rund(transparenzAttribute.reduce((a, e) => a + e.verlust, 0), 4);
   return {
     ziel: input.ziel,
     quelle: input.quelle,
@@ -240,6 +309,14 @@ export function berechneSpieltagsZuwachs(input: {
     nebeneffekt,
     summe: rund(Object.values(zuwachs).reduce((a, b) => a + (b ?? 0), 0)),
     deckeBremst,
+    transparenz: {
+      beschleuniger: erklaerePotenzialBeschleuniger(input.gameState, input.player),
+      attribute: transparenzAttribute,
+      ungebremstSumme,
+      verlustSumme,
+      verlustAnteil: ungebremstSumme > 0 ? rund(Math.min(1, verlustSumme / ungebremstSumme), 3) : 0,
+      umgeleitet: rund(Object.values(nebeneffekt).reduce((a, b) => a + (b ?? 0), 0), 4),
+    },
   };
 }
 

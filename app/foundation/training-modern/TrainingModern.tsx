@@ -9,7 +9,7 @@
  * `?training=klassisch` erreichbar (`lib/training/training-look.ts`).
  */
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { createContext, useContext, useMemo, useState, type CSSProperties } from "react";
 
 import PlayerPixelSprite from "@/app/foundation/PlayerPixelSprite";
 import type { TrainingCompactClientProps } from "@/app/foundation/training-compact/TrainingCompactClient";
@@ -26,6 +26,7 @@ import {
   prognostiziereSpieltagsTraining,
   wegeFuerDisziplin,
 } from "@/lib/training/spieltag-training";
+import type { SpieltagsTransparenz, TransparenzAttribut } from "@/lib/training/spieltag-training";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import {
   STATIONEN,
@@ -33,8 +34,17 @@ import {
   attributLabel,
   baueDisziplinKarten,
   baueKaderKennzahlen,
+  baueLegende,
   baueTrainingZeilen,
   belastungNachTraining,
+  bremseKurz,
+  bremsGrundText,
+  BREMSE_WARNSCHWELLE,
+  moralErklaerung,
+  moralTipp,
+  moralZustandText,
+  potenzialKurz,
+  potenzialTipp,
   wunschFolge,
   wuenscheErfuellen,
   belastungsZone,
@@ -48,6 +58,7 @@ import {
   zielLabel,
   zonenText,
   type DisziplinKarte,
+  type BremseKurz,
   type KaderSortSchluessel,
   type SortRichtung,
   type TrainingZeile,
@@ -157,30 +168,48 @@ function ModusSeg({
   );
 }
 
-/** „wünscht Leicht – erfüllt/nicht erfüllt, Folge: Moral …" für Intensität `modus`; nichts ohne Wunsch. */
-function WunschZeile({ zeile, modus, vorher }: { zeile: TrainingZeile; modus: PlayerTrainingMode; vorher?: PlayerTrainingMode }) {
+/**
+ * „wünscht Leicht, nicht erfüllt, Folge: −12,0 Moral, solange verfehlt" für Intensität `modus`; nichts ohne Wunsch.
+ * Die Zahl ist ein ZUSTAND auf der Moralskala 0 bis 100 (siehe `wunschFolge`), kein Abzug je Spieltag.
+ */
+function WunschZeile({
+  zeile,
+  modus,
+  vorher,
+  rechts,
+}: {
+  zeile: TrainingZeile;
+  modus: PlayerTrainingMode;
+  vorher?: PlayerTrainingMode;
+  rechts?: boolean;
+}) {
   if (!zeile.wunsch) return null;
   const folge = wunschFolge(zeile, modus);
   const name = MODI.find((m) => m.id === zeile.wunsch)?.name ?? zeile.wunsch;
   const erfuellt = zeile.wunsch === modus;
   const alt = vorher ? wunschFolge(zeile, vorher) : null;
+  const tipp = moralTipp(zeile, modus);
   return (
-    <p className={`te-wunschzeile ${erfuellt ? "is-ok" : "is-offen"}`} data-testid="training-wunschzeile" title={zeile.row.trainingDemand?.detail}>
+    <p className={`te-wunschzeile ${erfuellt ? "is-ok" : "is-offen"}`} data-testid="training-wunschzeile">
       <BcIcon name={erfuellt ? "check" : "info"} />
       <span>
         wünscht <b>{name}</b> · {erfuellt ? "erfüllt" : "nicht erfüllt"}
         {folge ? (
           <>
             {" "}
-            · Folge: Moral{" "}
-            {alt && alt.delta !== folge.delta ? (
+            · Folge:{" "}
+            {alt && alt.punkte !== folge.punkte ? (
               <>
-                <b className="bc-t">{vz(alt.delta, 1)}</b> → <b className={`bc-t ${ton(folge.delta)}`}>{vz(folge.delta, 1)}</b>
+                <b className="bc-t">{vz(alt.punkte, 1)}</b> →{" "}
               </>
-            ) : (
-              <b className={`bc-t ${ton(folge.delta)}`}>{vz(folge.delta, 1)}</b>
-            )}{" "}
-            <small>({folge.text})</small>
+            ) : null}
+            <Tipp text={tipp ?? ""} rechts={rechts}>
+              <b className={`bc-t te-moralzahl ${ton(folge.punkte)}`}>{vz(folge.punkte, 1)} Moral</b>
+            </Tipp>{" "}
+            <small>
+              {folge.ergebnis === "offen" ? "(noch ohne Folge)" : `(${moralZustandText(folge).replace(/^[^ ]+ Moral /, "")})`}
+            </small>
+            {erfuellt ? null : <MoralVerlauf zeile={zeile} modus={modus} />}
           </>
         ) : null}
       </span>
@@ -212,13 +241,187 @@ function Belastung({ fatigue, naechste }: { fatigue: number; naechste?: number }
   );
 }
 
-function AttributBalken({ eintraege }: { eintraege: TrainingZeile["profil"] }) {
+/** Schalter der Legende „So rechnet die Entwicklung": Knopf in den Tafelköpfen, Panel an der Seite. */
+const LegendeCtx = createContext<{ offen: boolean; umschalten: () => void }>({
+  offen: false,
+  umschalten: () => undefined,
+});
+
+function LegendeKnopf() {
+  const { offen, umschalten } = useContext(LegendeCtx);
+  return (
+    <button
+      type="button"
+      className={`te-legendeknopf${offen ? " is-an" : ""}`}
+      aria-expanded={offen}
+      data-testid="training-legende-knopf"
+      onClick={umschalten}
+    >
+      <BcIcon name="info" /> So rechnet’s
+    </button>
+  );
+}
+
+/** Kurzmarke eines gebremsten Attributs im Wegbalken: „voll" am Maximum, „Limit", „eng" oder „Achse". */
+const BREMSE_MARKE: Record<NonNullable<TransparenzAttribut["grund"]>, string> = {
+  maximum: "voll",
+  limit: "Limit",
+  eng: "eng",
+  achse: "Achse",
+};
+
+function AttributBalken({
+  eintraege,
+  transparenz,
+}: {
+  eintraege: TrainingZeile["profil"];
+  /** Zeigt je Attribut, wenn es am Maximum/Limit steht („Will 60 · voll"). */
+  transparenz?: SpieltagsTransparenz | null;
+}) {
   return (
     <span className="te-prof">
-      {eintraege.map((p) => (
-        <span key={p.attribute} style={{ "--af": achsenFarbe(p.attribute) } as CSSProperties}>
-          <i />
-          {p.label} <b className="bc-t">{Math.round(p.anteil * 100)}</b>
+      {eintraege.map((p) => {
+        const t = transparenz?.attribute.find((a) => a.attribute === p.attribute);
+        const marke = t?.grund ? BREMSE_MARKE[t.grund] : null;
+        return (
+          <span key={p.attribute} style={{ "--af": achsenFarbe(p.attribute) } as CSSProperties}>
+            <i />
+            {p.label} <b className="bc-t">{Math.round(p.anteil * 100)}</b>
+            {t && marke ? (
+              <em className={`te-marke${t.grund === "maximum" || t.grund === "limit" ? " is-voll" : ""}`} title={bremsGrundText(t)}>
+                {marke}
+              </em>
+            ) : null}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
+ * Erklärung zum Anfassen: Hover oder Fokus öffnet das Feld (auch per Tastatur), nichts davon ist Dauertext. Das Feld ist
+ * `position: fixed` und wird an den Bildschirm geklemmt, damit scrollende Tafeln es nicht abschneiden.
+ */
+function Tipp({ text, children }: { text: string; children: React.ReactNode; rechts?: boolean }) {
+  const [pos, setPos] = useState<{
+    left: number;
+    top?: number;
+    bottom?: number;
+    width: number;
+  } | null>(null);
+  const oeffne = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const width = Math.min(440, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    const unten = window.innerHeight - r.bottom;
+    setPos(unten > 190 || unten > r.top ? { left, top: r.bottom + 6, width } : { left, bottom: window.innerHeight - r.top + 6, width });
+  };
+  return (
+    <span
+      className="te-tipp"
+      tabIndex={0}
+      onMouseEnter={(e) => oeffne(e.currentTarget)}
+      onFocus={(e) => oeffne(e.currentTarget)}
+      onMouseLeave={() => setPos(null)}
+      onBlur={() => setPos(null)}
+    >
+      {children}
+      {pos ? (
+        <span className="te-tipp__box" role="tooltip" style={pos}>
+          {text}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/** Warnzeichen für die Tabelle: nur, wenn der Weg wegen Maximum/Limit spürbar weniger bringt. */
+function BremseZeichen({ bremse }: { bremse: BremseKurz | null }) {
+  if (!bremse || bremse.verlustAnteil < BREMSE_WARNSCHWELLE) return null;
+  const grund = bremse.attribute.slice(0, 3).map(bremsGrundText).join(". ");
+  return (
+    <span
+      className={`te-brems${bremse.mitMaximum ? " is-max" : ""}`}
+      data-testid="training-bremse-zeichen"
+      title={`${bremse.text}. ${grund}. Davon fließen ${zahl(bremse.umgeleitet, 2)} SP als Nebeneffekt in andere Attribute.`}
+    >
+      ▲ −{bremse.verlustProzent} %
+    </span>
+  );
+}
+
+/** Potenzial-Beschleuniger und Maximum-Bremse des nächsten Spieltags, aus derselben Rechnung wie die Buchung. */
+function TransparenzBlock({ t, rechts }: { t: SpieltagsTransparenz | null; rechts?: boolean }) {
+  if (!t) return null;
+  const kurz = potenzialKurz(t);
+  const bremse = bremseKurz(t);
+  const b = t.beschleuniger;
+  return (
+    <div className="te-trans" data-testid="training-transparenz">
+      <div className="te-trans__zeile">
+        <Tipp text={potenzialTipp(t)} rechts={rechts}>
+          <span className="te-gk">Potenzial</span>
+        </Tipp>
+        {kurz ? (
+          <>
+            <b className="bc-t te-trans__faktor">× {zahl(b.faktor, 2)}</b>
+            <small>
+              Rest {zahl(b.luecke, 0)} bis Potenzial {zahl(b.potenzial, 1)}
+            </small>
+          </>
+        ) : (
+          <small>kein Potenzial hinterlegt, × 1,00</small>
+        )}
+      </div>
+      <div className={`te-trans__zeile${bremse ? " is-bremse" : ""}`}>
+        <Tipp
+          text={
+            bremse
+              ? `${bremse.attribute.map(bremsGrundText).join(". ")}. Der Weg bringt ${bremse.verlustProzent} % weniger als ohne Bremse; nur ${zahl(bremse.umgeleitet, 2)} SP davon fließen als Nebeneffekt in andere Attribute.`
+              : "Alle Attribute des Weges haben noch Luft bis zu ihrem Limit und zum Maximum 99: keine Bremse."
+          }
+          rechts={rechts}
+        >
+          <span className="te-gk">Maximum</span>
+        </Tipp>
+        {bremse ? (
+          <>
+            <b className="bc-t te-trans__faktor bc-minus">−{bremse.verlustProzent} %</b>
+            <small>
+              {bremse.attribute
+                .slice(0, 3)
+                .map(
+                  (a) =>
+                    `${attributLabel(a.attribute)} ${a.amMaximum ? "am Maximum" : a.grund === "achse" ? "Achse gebremst" : a.grund === "limit" ? "am Limit" : "nahe am Limit"}`,
+                )
+                .join(" · ")}
+            </small>
+          </>
+        ) : (
+          <small>keine Bremse, alle Weg-Attribute haben Luft</small>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Verlauf des Wunsches als Chips: ab wann folgenlos, unter Druck, verfehlt, mit Moralpunkten (0..100). */
+function MoralVerlauf({ zeile, modus }: { zeile: TrainingZeile; modus: PlayerTrainingMode }) {
+  const m = moralErklaerung(zeile, modus);
+  if (!m || m.stufen.length === 0) return null;
+  return (
+    <span className="te-moralverlauf" data-testid="training-moral-verlauf">
+      {m.stufen.map((st) => (
+        <span key={st.ab} className={`te-stufe is-${st.ergebnis}${st.aktuell ? " is-jetzt" : ""}`}>
+          {st.ab === st.bis
+            ? `Sp. ${st.ab}`
+            : st.ab === 1
+              ? `bis Sp. ${st.bis}`
+              : st.bis >= (zeile.wunschDaten?.saisonSpieltage ?? 20)
+                ? `ab Sp. ${st.ab}`
+                : `Sp. ${st.ab}–${st.bis}`}{" "}
+          <b className="bc-t">{st.ergebnis === "offen" ? "folgenlos" : `${st.label} ${vz(st.punkte, 1)}`}</b>
         </span>
       ))}
     </span>
@@ -378,7 +581,8 @@ function KaderTabelle({
           <span className="te-ziel">
             <b className="te-kurz">{zielLabel(z.ziel.disziplinId).slice(0, 3).toUpperCase()}</b>
             <ArtMarke art={z.art} />
-            <AttributBalken eintraege={z.profil.slice(0, 2)} />
+            <AttributBalken eintraege={z.profil.slice(0, 2)} transparenz={z.transparenz} />
+            <BremseZeichen bremse={bremseKurz(z.transparenz)} />
           </span>
         ) : (
           <span className="bc-null">kein Ziel</span>
@@ -388,9 +592,7 @@ function KaderTabelle({
       key: "modus",
       breite: "7.4em",
       ...kopf("modus", "Intensität", "auf"),
-      render: (z) => (
-        <ModusSeg wert={z.modus} wunsch={z.wunsch} onWahl={(m) => onModus(z.playerId, m)} gesperrt={gesperrt || z.verletzt} />
-      ),
+      render: (z) => <ModusSeg wert={z.modus} wunsch={z.wunsch} onWahl={(m) => onModus(z.playerId, m)} gesperrt={gesperrt || z.verletzt} />,
     },
     {
       key: "netto",
@@ -401,11 +603,14 @@ function KaderTabelle({
     },
     {
       key: "potenzial",
-      breite: "9.2em",
-      ...kopf("potenzial", "Potenzial-Rest"),
+      breite: "11.4em",
+      ...kopf("potenzial", "Potenzial ×"),
       render: (z) =>
         z.gesamt != null && z.potenzial != null ? (
-          <span className="te-pot" title={`Gesamtwert ${zahl(z.gesamt, 1)} von Potenzial ${zahl(z.potenzial, 1)}`}>
+          <span
+            className="te-pot"
+            title={`Gesamtwert ${zahl(z.gesamt, 1)} von Potenzial ${zahl(z.potenzial, 1)}.${z.transparenz?.beschleuniger.potenzial != null ? ` Potenzial-Beschleuniger auf den Zuwachs: × ${zahl(z.transparenz.beschleuniger.faktor, 2)}. ${potenzialTipp(z.transparenz)}` : ""}`}
+          >
             <span className="te-pot__bar">
               <i
                 style={{
@@ -415,6 +620,11 @@ function KaderTabelle({
             </span>
             <b className="bc-t">{zahl(z.gesamt)}</b>
             <small className="bc-t"> / {zahl(z.potenzial)}</small>
+            {z.transparenz?.beschleuniger.potenzial != null ? (
+              <em className="te-pot__faktor bc-t" data-testid="training-potenzial-faktor">
+                ×{zahl(z.transparenz.beschleuniger.faktor, 2)}
+              </em>
+            ) : null}
           </span>
         ) : (
           <span className="bc-null">—</span>
@@ -449,6 +659,7 @@ function KaderTabelle({
           {zeilen.length} Spieler
           {diszFilter ? ` · Filter: ${zielLabel(diszFilter)}` : ""} · Spaltenkopf klicken sortiert, zweiter Klick dreht
         </span>
+        <LegendeKnopf />
       </header>
       <BcTable
         className="te-tbl"
@@ -575,9 +786,14 @@ function ImBlick({
         <div className="te-blick__plan">
           <div className="te-blick__zeile">
             <span className="te-gk">Plan</span>
-            <ModusSeg wert={zeile.modus} wunsch={zeile.wunsch} onWahl={(m) => onModus(zeile.playerId, m)} gesperrt={gesperrt || zeile.verletzt} />
+            <ModusSeg
+              wert={zeile.modus}
+              wunsch={zeile.wunsch}
+              onWahl={(m) => onModus(zeile.playerId, m)}
+              gesperrt={gesperrt || zeile.verletzt}
+            />
           </div>
-          <WunschZeile zeile={zeile} modus={zeile.modus} />
+          <WunschZeile zeile={zeile} modus={zeile.modus} rechts />
           {zeile.verletzt ? (
             <p className="te-hinweis is-warn">Nicht einsetzbar, das Training ruht bis zur Rückkehr.</p>
           ) : zeile.ziel ? (
@@ -587,7 +803,8 @@ function ImBlick({
                 <ArtMarke art={zeile.art} />
                 <small>{zeile.ziel.quelle === "ki" ? "Vorschlag der KI" : "von dir gesetzt"}</small>
               </div>
-              <AttributBalken eintraege={zeile.profil} />
+              <AttributBalken eintraege={zeile.profil} transparenz={zeile.transparenz} />
+              <TransparenzBlock t={zeile.transparenz} rechts />
             </>
           ) : (
             <p className="te-hinweis">Kein Ziel gesetzt.</p>
@@ -1002,7 +1219,13 @@ function PlanAnsicht({
         for (const modus of ["leicht", "mittel", "hart"] as const) {
           karte.set(
             `${disziplinId}:${weg}:${modus}`,
-            prognostiziereSpieltagsTraining({ gameState, playerId: vorschauPlayerId, ziel: { disziplinId, weg }, modus, kontext }),
+            prognostiziereSpieltagsTraining({
+              gameState,
+              playerId: vorschauPlayerId,
+              ziel: { disziplinId, weg },
+              modus,
+              kontext,
+            }),
           );
         }
       }
@@ -1121,6 +1344,7 @@ function PlanAnsicht({
               Änderung verwerfen
             </button>
           ) : null}
+          <LegendeKnopf />
         </header>
         {zeile.verletzt ? (
           <p className="te-hinweis is-warn te-pad">Nicht einsetzbar: das Training ruht, Ziel und Intensität gelten ab Rückkehr.</p>
@@ -1198,12 +1422,24 @@ function PlanAnsicht({
                       label: attributLabel(e.attribute),
                       anteil: e.anteil,
                     }))}
+                    transparenz={p?.transparenz}
                   />
                   <span className="te-weg__fuss">
                     {p ? (
                       <>
                         Zuwachs je Spieltag <b className="bc-t bc-plus">{vz(p.summe, 3)}</b> SP
-                        {p.deckeBremst.length > 0 ? <em> · Decke bremst: {p.deckeBremst.map(attributLabel).join(", ")}</em> : null}
+                        {(() => {
+                          const br = bremseKurz(p.transparenz);
+                          return br ? (
+                            <em
+                              className="te-weg__bremse"
+                              title={p.deckeBremst.length > 0 || br ? br.attribute.map(bremsGrundText).join(". ") : undefined}
+                            >
+                              {" "}
+                              · {br.text}
+                            </em>
+                          ) : null;
+                        })()}
                       </>
                     ) : (
                       "keine Prognose"
@@ -1258,7 +1494,9 @@ function PlanAnsicht({
                   {zeile.wunsch ? (
                     <span className="te-kv">
                       <span>Moral durch den Wunsch</span>
-                      <b className={`bc-t ${ton(wunschFolge(zeile, m.id)?.delta)}`}>{vz(wunschFolge(zeile, m.id)?.delta, 1)}</b>
+                      <b className={`bc-t ${ton(wunschFolge(zeile, m.id)?.punkte)}`} title={moralTipp(zeile, m.id) ?? undefined}>
+                        {vz(wunschFolge(zeile, m.id)?.punkte, 1)} Moral
+                      </b>
                     </span>
                   ) : null}
                 </button>
@@ -1309,8 +1547,28 @@ function PlanAnsicht({
             <div className="te-kv" data-testid="training-vorschau-wunsch">
               <span>Moral durch den Wunsch</span>
               <b className="bc-t">
-                {vz(wunschFolge(zeile, zeile.modus)?.delta, 1)} →{" "}
-                <span className={ton(wunschFolge(zeile, aktModus)?.delta)}>{vz(wunschFolge(zeile, aktModus)?.delta, 1)}</span>
+                {vz(wunschFolge(zeile, zeile.modus)?.punkte, 1)} →{" "}
+                <span className={ton(wunschFolge(zeile, aktModus)?.punkte)}>{vz(wunschFolge(zeile, aktModus)?.punkte, 1)}</span> Moral
+              </b>
+            </div>
+          ) : null}
+          {neu ? (
+            <div className="te-kv" data-testid="training-vorschau-potenzial">
+              <span>Potenzial-Beschleuniger</span>
+              <b className="bc-t" title={potenzialTipp(neu.transparenz)}>
+                {jetzt ? `× ${zahl(jetzt.transparenz.beschleuniger.faktor, 2)} → ` : ""}× {zahl(neu.transparenz.beschleuniger.faktor, 2)}
+              </b>
+            </div>
+          ) : null}
+          {neu ? (
+            <div className="te-kv" data-testid="training-vorschau-bremse">
+              <span>Bremse durch Limit/Maximum</span>
+              <b
+                className={`bc-t ${bremseKurz(neu.transparenz) ? "bc-minus" : "bc-null"}`}
+                title={bremseKurz(neu.transparenz)?.attribute.map(bremsGrundText).join(". ") ?? "Keine Bremse"}
+              >
+                {jetzt ? `${bremseKurz(jetzt.transparenz) ? `−${bremseKurz(jetzt.transparenz)!.verlustProzent} %` : "keine"} → ` : ""}
+                {bremseKurz(neu.transparenz) ? `−${bremseKurz(neu.transparenz)!.verlustProzent} %` : "keine"}
               </b>
             </div>
           ) : null}
@@ -1365,6 +1623,7 @@ export default function TrainingModern(props: TrainingModernProps) {
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [diszFilter, setDiszFilter] = useState<string | null>(null);
   const [entwurf, setEntwurf] = useState<Entwurf>({});
+  const [legendeOffen, setLegendeOffen] = useState(false);
 
   const matchdayId = gameState.matchdayState?.matchdayId ?? null;
   const ausfall = useMemo(
@@ -1372,6 +1631,7 @@ export default function TrainingModern(props: TrainingModernProps) {
     [gameState, matchdayId],
   );
   const kontext = useMemo(() => baueTrainingsZielKontext(gameState, matchdayId, ausfall), [gameState, matchdayId, ausfall]);
+  const legende = useMemo(() => baueLegende(), []);
   const zeilen = useMemo(
     () => baueTrainingZeilen({ gameState, rows: playerRows, kontext, ausfall }),
     [gameState, playerRows, kontext, ausfall],
@@ -1422,123 +1682,148 @@ export default function TrainingModern(props: TrainingModernProps) {
     ["plan", "Plan"],
   ];
   return (
-    <div className="bc te" data-testid="training-modern">
-      <FoundationBandSlot>
-        <div className="bc te-slot" data-testid="training-kopf">
-          <div className="te-reiter" role="tablist">
-            {reiter.map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={ansicht === id}
-                className={ansicht === id ? "is-an" : ""}
-                onClick={() => setAnsicht(id)}
-              >
-                {label}
+    <LegendeCtx.Provider
+      value={{
+        offen: legendeOffen,
+        umschalten: () => setLegendeOffen((o) => !o),
+      }}
+    >
+      <div className="bc te" data-testid="training-modern">
+        <FoundationBandSlot>
+          <div className="bc te-slot" data-testid="training-kopf">
+            <div className="te-reiter" role="tablist">
+              {reiter.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={ansicht === id}
+                  className={ansicht === id ? "is-an" : ""}
+                  onClick={() => setAnsicht(id)}
+                >
+                  {label}
+                </button>
+              ))}
+              {onOpenFacilities ? (
+                <button type="button" role="tab" aria-selected={false} onClick={onOpenFacilities} title="Gebäude öffnen">
+                  Gebäude
+                </button>
+              ) : null}
+              <button type="button" role="tab" aria-selected={false} disabled title="kommt: Vergleich mit den KI-Teams">
+                Liga <small>kommt</small>
               </button>
-            ))}
-            {onOpenFacilities ? (
-              <button type="button" role="tab" aria-selected={false} onClick={onOpenFacilities} title="Gebäude öffnen">
-                Gebäude
+            </div>
+            <div className="te-kennzahlen">
+              <div>
+                <em>Kader netto</em>
+                <strong className={`bc-t ${ton(kenn.nettoSumme)}`}>{vz(kenn.nettoSumme, 1)}</strong>
+                <small>SP bis Saisonende</small>
+              </div>
+              <div>
+                <em>Belastung Ø</em>
+                <strong className="bc-t">{kenn.belastungMittel}</strong>
+                <small>von 100</small>
+              </div>
+              <div className={kenn.ueberlastet > 0 ? "is-warn" : ""}>
+                <em>Überlastet</em>
+                <strong className="bc-t">{kenn.ueberlastet}</strong>
+                <small>über 50</small>
+              </div>
+              <div className={kenn.wuenscheOffen > 0 ? "is-wunsch" : ""} data-testid="training-kennzahl-wuensche">
+                <em>Wünsche offen</em>
+                <strong className="bc-t">{kenn.wuenscheOffen}</strong>
+                <small>von {kenn.wuenscheGesamt}</small>
+              </div>
+              <div>
+                <em>Verletzt</em>
+                <strong className="bc-t">{kenn.verletzt}</strong>
+                <small>in Reha</small>
+              </div>
+              <div>
+                <em>Trainingszentrum</em>
+                <strong className="bc-t">{summary.trainingXpModifierPct > 0 ? `+${zahl(summary.trainingXpModifierPct)} %` : "—"}</strong>
+                <small>aufs Budget</small>
+              </div>
+            </div>
+          </div>
+        </FoundationBandSlot>
+        {managementLockedReason ? <p className="te-sperre">{managementLockedReason}</p> : null}
+        {legendeOffen ? (
+          <aside className="te-legende" data-testid="training-legende" aria-label="So rechnet die Entwicklung">
+            <header>
+              <h2>So rechnet die Entwicklung</h2>
+              <button type="button" className="te-link" onClick={() => setLegendeOffen(false)}>
+                Schließen ✕
               </button>
-            ) : null}
-            <button type="button" role="tab" aria-selected={false} disabled title="kommt: Vergleich mit den KI-Teams">
-              Liga <small>kommt</small>
-            </button>
-          </div>
-          <div className="te-kennzahlen">
-            <div>
-              <em>Kader netto</em>
-              <strong className={`bc-t ${ton(kenn.nettoSumme)}`}>{vz(kenn.nettoSumme, 1)}</strong>
-              <small>SP bis Saisonende</small>
-            </div>
-            <div>
-              <em>Belastung Ø</em>
-              <strong className="bc-t">{kenn.belastungMittel}</strong>
-              <small>von 100</small>
-            </div>
-            <div className={kenn.ueberlastet > 0 ? "is-warn" : ""}>
-              <em>Überlastet</em>
-              <strong className="bc-t">{kenn.ueberlastet}</strong>
-              <small>über 50</small>
-            </div>
-            <div className={kenn.wuenscheOffen > 0 ? "is-wunsch" : ""} data-testid="training-kennzahl-wuensche">
-              <em>Wünsche offen</em>
-              <strong className="bc-t">{kenn.wuenscheOffen}</strong>
-              <small>von {kenn.wuenscheGesamt}</small>
-            </div>
-            <div>
-              <em>Verletzt</em>
-              <strong className="bc-t">{kenn.verletzt}</strong>
-              <small>in Reha</small>
-            </div>
-            <div>
-              <em>Trainingszentrum</em>
-              <strong className="bc-t">{summary.trainingXpModifierPct > 0 ? `+${zahl(summary.trainingXpModifierPct)} %` : "—"}</strong>
-              <small>aufs Budget</small>
-            </div>
-          </div>
-        </div>
-      </FoundationBandSlot>
-      {managementLockedReason ? <p className="te-sperre">{managementLockedReason}</p> : null}
-      <div className="te-work">
-        {ansicht === "kader" ? (
-          <div className="te-kader-raster">
-            <div className="te-kader-links">
-              <Halle
-                zeilen={zeilen}
-                gewaehlt={aktiv?.playerId ?? null}
-                onWahl={wahlSpieler}
-                trainingsZentrumPct={summary.trainingXpModifierPct}
-                ueberlastet={kenn.ueberlastet}
-              />
-              <KaderTabelle
-                zeilen={zeilen}
-                gewaehlt={aktiv?.playerId ?? null}
-                onWahl={wahlSpieler}
+            </header>
+            <dl>
+              {legende.map((e) => (
+                <div key={e.id}>
+                  <dt>{e.titel}</dt>
+                  <dd>{e.text}</dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
+        ) : null}
+        <div className="te-work">
+          {ansicht === "kader" ? (
+            <div className="te-kader-raster">
+              <div className="te-kader-links">
+                <Halle
+                  zeilen={zeilen}
+                  gewaehlt={aktiv?.playerId ?? null}
+                  onWahl={wahlSpieler}
+                  trainingsZentrumPct={summary.trainingXpModifierPct}
+                  ueberlastet={kenn.ueberlastet}
+                />
+                <KaderTabelle
+                  zeilen={zeilen}
+                  gewaehlt={aktiv?.playerId ?? null}
+                  onWahl={wahlSpieler}
+                  onModus={onSetTrainingMode}
+                  gesperrt={gesperrt}
+                  diszFilter={diszFilter}
+                />
+                <Radar karten={radarKarten} zeilen={zeilen} filter={diszFilter} onFilter={setDiszFilter} />
+              </div>
+              <ImBlick
+                wirkung={wirkung}
+                zeile={aktiv}
+                index={aktivIndex}
+                anzahl={zeilen.length}
                 onModus={onSetTrainingMode}
                 gesperrt={gesperrt}
-                diszFilter={diszFilter}
+                onDetails={details}
+                onPlan={() => setAnsicht("plan")}
               />
-              <Radar karten={radarKarten} zeilen={zeilen} filter={diszFilter} onFilter={setDiszFilter} />
             </div>
-            <ImBlick
-              wirkung={wirkung}
-              zeile={aktiv}
-              index={aktivIndex}
-              anzahl={zeilen.length}
-              onModus={onSetTrainingMode}
-              gesperrt={gesperrt}
-              onDetails={details}
-              onPlan={() => setAnsicht("plan")}
+          ) : null}
+          {ansicht === "spieler" ? <SpielerAnsicht zeile={aktiv} gameState={gameState} onDetails={details} /> : null}
+          {ansicht === "plan" ? (
+            <PlanAnsicht
+              zeilen={zeilen}
+              gewaehlt={aktiv?.playerId ?? null}
+              onWahl={wahlSpieler}
+              gameState={gameState}
+              teamId={selectedTeam.teamId}
+              entwurf={entwurf}
+              setEntwurf={setEntwurf}
+              onUebernehmen={uebernehmen}
+              gesperrt={gesperrt || !onSetTrainingsZiele}
             />
-          </div>
-        ) : null}
-        {ansicht === "spieler" ? <SpielerAnsicht zeile={aktiv} gameState={gameState} onDetails={details} /> : null}
-        {ansicht === "plan" ? (
-          <PlanAnsicht
-            zeilen={zeilen}
-            gewaehlt={aktiv?.playerId ?? null}
-            onWahl={wahlSpieler}
-            gameState={gameState}
-            teamId={selectedTeam.teamId}
-            entwurf={entwurf}
-            setEntwurf={setEntwurf}
-            onUebernehmen={uebernehmen}
-            gesperrt={gesperrt || !onSetTrainingsZiele}
-          />
+          ) : null}
+        </div>
+        {onZurKlassik ? (
+          <footer className="te-fuss">
+            <button type="button" className="te-link" onClick={onZurKlassik}>
+              Klassische Trainingsseite
+            </button>
+            <span>Einheit SP = Setpoints · Zuwächse sind Prognosen der Engine, gebucht wird je Spieltag</span>
+          </footer>
         ) : null}
       </div>
-      {onZurKlassik ? (
-        <footer className="te-fuss">
-          <button type="button" className="te-link" onClick={onZurKlassik}>
-            Klassische Trainingsseite
-          </button>
-          <span>Einheit SP = Setpoints · Zuwächse sind Prognosen der Engine, gebucht wird je Spieltag</span>
-        </footer>
-      ) : null}
-    </div>
+    </LegendeCtx.Provider>
   );
 }
 
