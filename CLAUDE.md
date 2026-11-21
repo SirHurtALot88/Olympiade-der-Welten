@@ -311,6 +311,11 @@ sein, sondern letztendlich müssen wir step by step die Seiten neu konzeptionier
 Jede Seite wird nach dem Mockup **neu gebaut** (eigene Komponente, eigenes CSS im Mockup-Stil), nicht in die alte Seite
 eingehängt; die alte Fassung fliegt danach raus. Reihenfolge und Stand je Seite: `docs/design/seiten-umbau-fahrplan-18-11.md`.
 
+**Rangregel (Chris, 21.11.): Rang 1 ist immer der beste.** Bei Kosten (Gehalt, Ablöse, Schulden) ist das günstigste Team 1.,
+nicht das teuerste; bei Kasse, Stärke, Punkten das höchste. Gilt für alle Ranglisten, Vergleiche und Rangbalken der App.
+**Weitere Designregeln (21.11.):** alle Tabellen sortierbar; steht eine Zahl, keine Notenstufe daneben; Klassen immer in
+Klassenfarbe, wo Platz ist mit Klassen-/Rassen-Icon (`docs/design/oly-seiten-modern-17-11.md`).
+
 **Schriftregel (Chris, 18.11.):** **RaniraSeason für Überschriften und Namen, Barlow Condensed für Fließtext, Zahlen und
 Labels — beide lokal** (`public/fonts/`, `@font-face` mit `font-display: swap` in `app/globals.css`, kein Google-CDN). Die App
 hängt an zwei Tokens: `--schrift-haus` (RaniraSeason, Rückfall Georgia) und `--schrift-zahl` (Barlow Condensed, Rückfall
@@ -390,6 +395,23 @@ zwischen den Disziplinen: vor einer neuen Arena prüfen, ob eine verwandte Diszi
 ↔ Spurt ↔ Staffel ↔ Takeshi) sichtbar moderner aussähe, und diese gleich mitziehen. Dazu: mehrere
 verschiedene Arenen/Varianten je Disziplin mit eigenen Assets (z. B. Takeshi), nicht eine Karte mit
 Umfärbung.
+
+## Eigener Kader: immer alle Figuren — Animationsfehler sofort beheben, alles lokal speichern (Chris, 21.11.)
+
+Wörtlich: „mein Kader sollte auf jeden Fall immer alle Figuren generiert haben + die Basis-Animationen“. **Freigabe ohne
+Rückfrage:** Hat ein Spieler im Kader des menschlichen Teams keine PixelLab-Figur (Index `data/generated/figuren-sprites.json`),
+wird sie mit den Basis-Animationen (walk/angriff/treffer/tod, Süd/Ost/Nord, Kanon in `scripts/figuren-bestelle-animationen.py`)
+erzeugt — auch bei neu verpflichteten Spielern. Für andere Teams gilt weiter die Sperre oben. Erste Runde 21.11.: sechs Figuren
+für Death Peaches, 147 Generationen (`docs/design/figuren-kader-dp-21-11.md`).
+
+Wörtlich: „wenn die Figuren von hinten sich nach vorne drehen, ist das IMMER ein Grund es zu fixen! … solche Bugs musst du nicht
+beschreiben, sondern wenn du sie findest fixen … für Fixes hast du immer ne Freigabe, weil ich erwarte, dass die Animationen, die
+wir haben, wenigstens sauber sind und runtergeladen werden und bei uns auf dem Server auch gespeichert werden“. **Reparaturen an
+bestehenden Animationen** (falsche Richtung, Drehung zur Kamera in Nord-Animationen, doppelte Waffen, Effekt in falsche Richtung,
+fehlende/kaputte Frames) **brauchen keine Rückfrage** — gefunden heißt nachbestellen (nur die fehlerhafte Richtung, an dieselbe
+Gruppe, gleiche Framezahl), nicht beschreiben. Es gelten die Bestellregeln (flock, ein POST, Reserve 150, `usage.generations`
+protokollieren). **Jede Animation liegt vollständig lokal** unter `public/sprites/figuren/<slug>/` im Repo (und damit auf dem
+Server); nichts darf zur Laufzeit von PixelLab nachgeladen werden.
 
 ## Nur noch PixelLab-Assets — für alle zwanzig Disziplinen
 
