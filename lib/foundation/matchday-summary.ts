@@ -9,6 +9,7 @@ import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-lab
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { baueSpieltagsPunkteJeSpieltag } from "@/lib/foundation/season-matchday-points";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
+import { ligaVonAusSpielstand, rangJeLiga } from "@/lib/season/liga-raenge";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
 
@@ -300,11 +301,19 @@ export function buildMatchdaySummary(
   const beforePoints = sumOverMatchdays(requiredMatchdayIds.filter((id) => id !== matchdayId));
   const afterPoints = sumOverMatchdays(requiredMatchdayIds);
   const matchdayPoints = new Map(punkteJeSpieltag.get(matchdayId ?? "") ?? new Map<string, number>());
-  const rankBefore = rankTeams(
+  // Saison-Rang vor/nach je Liga (21.11., `lib/season/liga-raenge.ts`): mit Liga-Split ist der
+  // Saisonstand ligalokal, ein Vorher/Nachher über alle 32 Teams wäre ein anderer Maßstab. Der
+  // Tagesrang (`matchdayRank`) bleibt bewusst über alle Teams — er trägt das Spieltags-Podest.
+  const ligaVon = ligaVonAusSpielstand(gameState);
+  const rankBefore = rangJeLiga(
     gameState.teams.map((team) => ({ teamId: team.teamId, teamName: team.name, points: beforePoints.get(team.teamId) ?? 0 })),
+    ligaVon,
+    rankTeams,
   );
-  const rankAfter = rankTeams(
+  const rankAfter = rangJeLiga(
     gameState.teams.map((team) => ({ teamId: team.teamId, teamName: team.name, points: afterPoints.get(team.teamId) ?? 0 })),
+    ligaVon,
+    rankTeams,
   );
   const matchdayRank = rankTeams(
     gameState.teams.map((team) => ({ teamId: team.teamId, teamName: team.name, points: matchdayPoints.get(team.teamId) ?? null })),

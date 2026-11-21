@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Einsatzliste mit Lastvorschau – Belastung &amp; Resistenz v2 (Mockup 21.11.)</title>
+<!--
+  EINSATZLISTE MIT LASTVORSCHAU (Fable, 21.11., v2). Erklaerung, Haertetest und Zahlen: belastung-resistenz-v2-21-11.md
+  ECHT (Spielstand new-game-1795114260527-nzr0z9, Death Peaches, Spieltag 12): Kader, Klassen, Rassen, Attribute, Disziplinwerte,
+        Erschoepfung (Konto + Trainingsschicht), Trainingsmodus, Verletzungsstatus; Plaetze mit Stufe und Belastungs-Attribut
+        (lib/lineups/matchday-slot-roles.ts); Einsatz x0,75 / x1,0 / x1,4; aktive Erholung 4,5 und Bank-Erholung 28, beide mal
+        Trainingsmodus (leicht x1,2, mittel x1,0, hart x0,75) plus Reha-Zentrum; Risikokurve (lib/fatigue/*).
+  VORSCHLAG (noch nicht im Code): Last je Platz aus Stufe und Resistenz, Pause nach Spieltag 10.
+  ERFUNDEN: die Startaufstellung. Resistenz aendert NUR die Erschoepfung; das Risiko folgt allein aus der Erschoepfung danach.
+  Stellschrauben: Objekt REGELN im Skript.
+  URL: ?d=0|1 ?platz=0..5 ?vorschau=<slug> ?setze=<slug> ?tab=platz|pause|test ?modus=heute|mild|hart ?einsatz=schonen|normal|vollgas ?still=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a; --blau:#7fb0ff;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px); die Wurzel waechst mit Breite UND Hoehe (2560 x 1440 = 21,3 px). */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,th:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.sp{flex:1}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.7rem;padding:0 .9rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+body.still .demo{display:none}
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* Icon-Schiene */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.12rem;padding:.6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--heim);flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp{opacity:1}
+.rail a{position:relative;height:2.55rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.5rem;bottom:.5rem;width:.19rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7)}
+.rail .zahl{position:absolute;left:1.7rem;top:.1rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0}
+/* Regieband */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);white-space:nowrap;background:linear-gradient(90deg,#0a0d13 0%,#101622 45%,#0b0e15 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.kpis{display:flex;gap:.45rem;min-width:0}
+.kpi{min-width:6.6rem;padding:.38rem 1.05rem .42rem 1.15rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.7rem 0,100% 0,calc(100% - .7rem) 100%,0 100%);line-height:1.05}
+.kpi span{display:block;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.kpi strong{font-size:1.55rem;font-weight:700;color:var(--creme)}
+.kpi strong small{font-size:.8rem;font-weight:500;color:var(--leise)}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.4rem;overflow:hidden;height:2.2rem;flex:none}
+.seg button{padding:0 .95rem;font-size:.95rem;font-weight:600;color:var(--leise);display:flex;align-items:center;gap:.4rem}
+.seg button+button{border-left:1px solid var(--linie)}
+.seg button.an{background:var(--gold);color:#17120a;font-weight:700}
+.seg button:not(.an):hover{background:var(--flaeche-2);color:var(--tinte)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:2.7rem;padding:0 1.5rem;font-size:1.05rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+/* Panels */
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.6rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pb{padding:.7rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+/* Tabellen (Designsystem-Regel 21.11.: jede Tabelle sortierbar, Klick auf den Kopf, zweiter Klick dreht) */
+table.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{position:sticky;top:0;z-index:2;height:1.9rem;padding:0 .4rem;background:#0f141d;border-bottom:1px solid var(--linie-2);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise);text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+.tb th:hover{color:var(--creme)}
+.tb th.re,.tb td.re{text-align:right} .tb th.mi,.tb td.mi{text-align:center}
+.tb th.so{color:var(--gold)}
+.tb th.so::after{content:"▾";margin-left:.2rem;font-size:.8rem;letter-spacing:0}
+.tb th.so.auf::after{content:"▴"}
+.tb td{padding:0 .4rem;border-bottom:1px solid rgba(244,230,196,.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.98rem}
+.tb tbody tr:hover{background:rgba(255,255,255,.035)}
+.tb tr.ich{background:linear-gradient(90deg,rgba(242,160,61,.16),rgba(242,160,61,.03))}
+.tb tfoot td{background:#0f141d;border-top:1px solid var(--linie-2);border-bottom:0;color:var(--creme);font-weight:700}
+.por{width:2.1rem;height:2.1rem;border-radius:.35rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.nm{display:flex;align-items:center;gap:.5rem;min-width:0}
+.nm div{min-width:0;line-height:1.08}
+.nm b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis}
+.nm small{display:block;font-size:.76rem;color:var(--leise);overflow:hidden;text-overflow:ellipsis}
+/* Notenstufen */
+.no{display:inline-block;width:1.25rem;height:1.25rem;line-height:1.25rem;border-radius:.2rem;text-align:center;font-weight:700;font-size:.82rem;color:#0b0e14;vertical-align:middle}
+.no.S{background:#f0c35a}.no.A{background:#62d394}.no.B{background:#8fd0a8}.no.C{background:#7fb0ff}.no.D{background:#9aa7ba}.no.E{background:#c98a6a}.no.F{background:#ff6058}
+.ax{display:inline-flex;align-items:center;gap:.3rem}
+.ax b{font-weight:600;min-width:1.2rem;text-align:right}
+.rl16{display:grid;gap:.1rem;height:.7rem}
+.rl16 i{background:rgba(255,255,255,.08);transform:skewX(-14deg)}
+.rl16 i.o{background:rgba(98,211,148,.22)} .rl16 i.u{background:rgba(255,96,88,.2)}
+.rl16 i.an{background:var(--heim);box-shadow:0 0 .4rem var(--heim)}
+
+/* ===================== EINSATZLISTE v2 ===================== */
+.kr{--kf:#9aa7ba}
+.kr.rot{--kf:#ff7b6e;--kb:rgba(211,83,72,.22)} .kr.gruen{--kf:#9fe88d;--kb:rgba(109,176,105,.2)} .kr.blau{--kf:#8fbfff;--kb:rgba(91,145,218,.22)} .kr.gelb{--kf:#f5c65b;--kb:rgba(235,181,76,.2)}
+.kl{display:inline-flex;align-items:center;gap:.25rem;height:1.15rem;padding:0 .4rem 0 .2rem;border-radius:.2rem;background:var(--kb,rgba(255,255,255,.08));color:var(--kf);font-size:.76rem;font-weight:700;letter-spacing:.02em;border:1px solid color-mix(in srgb,var(--kf) 45%,transparent);white-space:nowrap}
+.kl img{width:.95rem;height:.95rem;object-fit:contain}
+.ra{display:inline-flex;align-items:center;gap:.2rem;font-size:.76rem;color:var(--leise);white-space:nowrap}
+.ra img{width:1rem;height:1rem;object-fit:contain;opacity:.9}
+.por.kr{border:0;box-shadow:inset 0 0 0 0 transparent;outline:2px solid var(--kf);outline-offset:-2px}
+.tabsd{display:flex;gap:.5rem;align-self:flex-end;height:3.6rem}
+.td{display:grid;grid-template-columns:auto auto;column-gap:1.1rem;align-items:center;padding:.35rem 1.4rem .3rem 1.3rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(.8rem 0,100% 0,calc(100% - .8rem) 100%,0 100%);line-height:1.05;min-width:13.5rem}
+.td.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.95));box-shadow:inset 0 .19rem 0 var(--gold)}
+.td em{font-style:normal;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;display:block}
+.td b{font:400 1.3rem/1.05 var(--haus);color:#fff;display:block}
+.td strong{font-size:1.55rem;font-weight:700;color:var(--creme);text-align:right;display:block}
+.td small{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);display:block;text-align:right}
+.pause{display:flex;align-items:center;gap:.7rem;height:2.9rem;padding:0 .9rem 0 .7rem;border:1px solid rgba(69,176,201,.55);border-radius:.45rem;background:linear-gradient(90deg,rgba(69,176,201,.18),rgba(69,176,201,.05));min-width:0}
+.pause:hover{border-color:var(--gast)}
+.pause svg{font-size:1.35rem;color:var(--gast)}
+.pause div{line-height:1.1} .pause b{display:block;color:#fff;font-weight:700;font-size:.98rem} .pause small{color:var(--leise);font-size:.8rem}
+.tage{display:flex;align-items:center;gap:.14rem;margin-left:.3rem}
+.tage i{width:.5rem;height:1.05rem;transform:skewX(-14deg);background:rgba(255,255,255,.12)}
+.tage i.v{background:var(--stumm)} .tage i.j{background:var(--gold);box-shadow:0 0 .5rem var(--gold)}
+.tage u{width:1.4rem;height:1.4rem;border-radius:50%;border:1px solid var(--gast);color:var(--gast);font-size:.7rem;font-weight:700;text-decoration:none;display:grid;place-items:center;margin:0 .2rem;background:rgba(69,176,201,.15)}
+.el{display:grid;grid-template-columns:33.5rem minmax(0,1fr) 27.5rem;grid-template-rows:minmax(0,1fr) 3.5rem;gap:.72rem;padding:.8rem 1rem .7rem;min-height:0}
+.tbw{flex:1;min-height:0;overflow:auto}
+/* Kader */
+.hin{display:flex;align-items:center;gap:.5rem;height:2.2rem;padding:0 .9rem;border-bottom:1px solid var(--linie);font-size:.9rem;color:var(--leise);flex:none;white-space:nowrap;background:rgba(240,195,90,.06)}
+.hin b{color:var(--creme);font-weight:600}
+.ab{display:inline-grid;place-items:center;min-width:1.55rem;height:1.2rem;padding:0 .25rem;border-radius:.2rem;font-size:.7rem;font-weight:700;letter-spacing:.04em;color:#0b0e14;background:var(--leise)}
+.ab.s0{background:var(--gut)} .ab.s1{background:var(--acht)} .ab.s2{background:var(--warn)}
+#kader td{height:4.05rem;cursor:pointer;vertical-align:middle}
+#kader tr.wahl{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.03))}
+#kader tr.wahl td:first-child{box-shadow:inset .19rem 0 0 var(--gold)}
+#kader tr.aus td{opacity:.42;cursor:not-allowed}
+#kader .nm b{font-size:1rem}
+#kader .por{width:2.7rem;height:2.7rem}
+.zl{display:flex;align-items:center;gap:.35rem;margin-top:.22rem}
+.wo{font-size:.66rem;font-weight:700;letter-spacing:.06em;padding:.05rem .3rem;border-radius:.2rem;background:var(--flaeche-3);color:var(--creme);border:1px solid var(--linie-2)}
+.wo.bank{color:var(--stumm);border-color:var(--linie)} .wo.sperr{color:var(--warn);border-color:rgba(255,96,88,.5)}
+.lh{display:inline-block;min-width:3.1rem;padding:.12rem .4rem;border-radius:.25rem;font-weight:700;font-size:1.08rem;text-align:right}
+.lh.g{color:var(--gut);background:rgba(98,211,148,.12)} .lh.m{color:var(--creme);background:rgba(244,230,196,.07)} .lh.s{color:var(--warn);background:rgba(255,96,88,.14)}
+.klein{display:block;font-size:.74rem;color:var(--leise);line-height:1.1}
+.eb{position:relative;height:.55rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block;margin-bottom:.22rem}
+.eb b{position:absolute;left:0;top:0;bottom:0;background:var(--stumm)}
+.eb u{position:absolute;top:0;bottom:0;background:var(--acht)} .eb u.r{background:var(--warn)} .eb u.g{background:var(--gut)} .eb u.e{background:var(--gast);opacity:.85}
+.eb s{position:absolute;left:25%;top:-.15rem;bottom:-.15rem;width:1px;background:var(--creme);opacity:.6}
+.ez{font-size:.84rem;color:var(--leise)} .ez b{color:var(--tinte)}
+/* Mitte */
+.mitte{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0}
+.sumr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;padding:.6rem .8rem;border-bottom:1px solid var(--linie)}
+.su{padding:.4rem .7rem .45rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);line-height:1.08;min-width:0}
+.su span{display:block;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
+.su strong{font-size:1.6rem;font-weight:700;color:var(--creme)} .su strong em{font-style:normal;font-size:.95rem;font-weight:600;margin-left:.35rem}
+.su small{display:block;font-size:.78rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feld{position:relative;display:flex;flex-wrap:wrap;align-content:space-evenly;align-items:flex-start;justify-content:center;gap:1.3rem .7rem;padding:1.2rem 1rem;margin:.7rem .8rem;border:1px solid var(--linie-2);border-radius:.6rem;background:radial-gradient(ellipse at 50% 55%,rgba(240,195,90,.10),transparent 62%),linear-gradient(180deg,#141a27,#0d121b);overflow:hidden;min-height:0}
+.feld::before{content:"";position:absolute;left:50%;top:50%;width:15rem;height:15rem;margin:-7.5rem 0 0 -7.5rem;border:1px solid rgba(244,230,196,.14);border-radius:50%}
+.feld::after{content:"";position:absolute;left:.5rem;right:.5rem;top:.5rem;bottom:.5rem;border:1px solid rgba(244,230,196,.1);border-radius:.4rem;pointer-events:none}
+.sk{position:relative;width:calc((100% - 1.4rem)/3);z-index:2;border:1px solid var(--linie-2);border-radius:.5rem;background:rgba(10,13,19,.94);box-shadow:0 .5rem 1.2rem rgba(0,0,0,.5);line-height:1.1;display:block}
+.sk:hover{border-color:var(--creme)}
+.sk.an{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 1.4rem rgba(240,195,90,.35)}
+.sk .ko{display:flex;align-items:center;gap:.4rem;height:1.75rem;padding:0 .5rem;border-bottom:1px solid var(--linie);background:rgba(255,255,255,.03)}
+.sk .ko em{font-style:normal;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--creme);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{margin-left:auto;white-space:nowrap;display:inline-flex;align-items:center;gap:.3rem;height:1.15rem;padding:0 .4rem;border-radius:.2rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;flex:none}
+.st::before{content:"";width:.42rem;height:.42rem;border-radius:50%;background:currentColor}
+.st.s0{color:var(--gut);background:rgba(98,211,148,.12)} .st.s1{color:var(--acht);background:rgba(243,181,74,.13)} .st.s2{color:var(--warn);background:rgba(255,96,88,.13)}
+.sk .in{display:grid;grid-template-columns:2.7rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.5rem .55rem .35rem}
+.sk .in .por{width:2.7rem;height:2.7rem}
+.sk .in h4{margin:0;font:400 1.08rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk .res{font-size:.8rem;color:var(--leise);white-space:nowrap;margin-top:.18rem} .sk .res b{color:var(--tinte)}
+.sk .la{text-align:right} .sk .la span{display:block;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700}
+.sk .la strong{font-size:1.6rem;font-weight:700;line-height:1}
+.sk .fu{padding:0 .55rem .5rem}
+/*v*/.sk .vs{display:flex;align-items:center;gap:.35rem;margin:0 .3rem .35rem;padding:.28rem .4rem;overflow:hidden;border-radius:.3rem;border:1px dashed var(--gold);background:rgba(240,195,90,.1);font-size:.8rem;color:var(--creme);white-space:nowrap}
+.sk .vs img{width:1.5rem;height:1.5rem;border-radius:.25rem;object-fit:cover;object-position:center 18%}
+.sk .vs b{font-weight:700} .sk .vs i{font-style:normal;margin-left:auto;font-weight:700}
+.sk.leer .in{grid-template-columns:minmax(0,1fr);color:var(--stumm);font-size:.9rem;height:4rem}
+.c-g{color:var(--gut)} .c-m{color:var(--creme)} .c-s{color:var(--warn)}
+.unten{display:flex;align-items:center;gap:.8rem;padding:.55rem .8rem;border-top:1px solid var(--linie);white-space:nowrap}
+.btn.klein{height:2.2rem;padding:0 .9rem;font-size:.92rem;border:1px solid var(--linie-2);border-radius:.4rem;color:var(--creme)}
+.btn.klein:hover{background:var(--flaeche-2)} .btn.klein.gold{border-color:var(--gold);color:var(--gold)}
+.legende{display:flex;gap:.9rem;font-size:.8rem;color:var(--leise);margin-left:auto}
+.legende i{display:inline-block;width:.6rem;height:.6rem;border-radius:.15rem;margin-right:.3rem;vertical-align:-.02em}
+.vb{flex:0 0 100%;min-width:0;max-width:100%;overflow:hidden;display:flex;align-items:center;gap:.9rem;min-height:4.6rem;padding:.55rem .9rem;border:1px dashed var(--linie-2);border-radius:.5rem;background:rgba(10,13,19,.8);z-index:2;white-space:nowrap;position:relative}
+.vb.an{border-color:var(--gold);background:linear-gradient(90deg,rgba(240,195,90,.16),rgba(10,13,19,.9) 70%)}
+.vb img.por{width:3.2rem;height:3.2rem}
+.vb h4{margin:0;font:400 1.25rem/1.1 var(--haus);color:#fff} .vb small{display:block;font-size:.86rem;color:var(--leise);margin-top:.15rem} .vb small b{color:var(--creme)}
+.vb>div:nth-child(2){min-width:0;flex:1;overflow:hidden} .vb h4,.vb small{overflow:hidden;text-overflow:ellipsis}
+.vb .zw{display:flex;gap:1.2rem;margin-left:auto;flex:none}
+.vb .zw div{text-align:right;line-height:1.05} .vb .zw span{display:block;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--leise);font-weight:700}
+.vb .zw strong{font-size:1.45rem;font-weight:700} .vb .zw em{font-style:normal;font-size:.9rem;font-weight:700;margin-left:.3rem}
+.vb.leer{color:var(--leise);font-size:.98rem;justify-content:center}
+/* rechts */
+.tabs{display:flex;height:2.6rem;border-bottom:1px solid var(--linie);flex:none}
+.tabs button{flex:1;font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--leise);text-align:center;border-bottom:.16rem solid transparent}
+.tabs button.an{color:var(--gold);border-bottom-color:var(--gold)} .tabs button:hover{color:var(--creme)}
+.rp{padding:.75rem .9rem;display:flex;flex-direction:column;gap:.65rem;min-height:0;flex:1;overflow:hidden}
+.rk{padding:.6rem .7rem;border:1px solid var(--linie);border-radius:.45rem;background:var(--flaeche-2);line-height:1.15}
+.rk h3{margin:.1rem 0 .2rem;font:400 1.55rem/1.05 var(--haus);color:#fff}
+.rk p{margin:0;font-size:.9rem;color:var(--leise);white-space:normal} .rk p b{color:var(--creme);font-weight:600}
+.skala{position:relative;height:3.9rem;margin:.2rem .5rem 0}
+.skala .bahn{position:absolute;left:0;right:0;top:1.55rem;height:.75rem;transform:skewX(-14deg);background:linear-gradient(90deg,rgba(255,96,88,.55),rgba(243,181,74,.5) 50%,rgba(98,211,148,.6));opacity:.5}
+.skala .sw{position:absolute;top:.15rem;bottom:0;width:0;border-left:1px dashed var(--linie-2)}
+.skala .sw span{position:absolute;top:0;left:.25rem;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--stumm);white-space:nowrap}
+.skala .sw b{position:absolute;bottom:0;left:.25rem;font-size:.8rem;color:var(--leise);white-space:nowrap}
+.skala .sw.an{border-left:2px solid var(--gold)} .skala .sw.an span,.skala .sw.an b{color:var(--gold)}
+.skala .pk2{position:absolute;top:1.02rem;width:1.8rem;height:1.8rem;margin-left:-.9rem;border-radius:50%;background:#0b0e14;border:2px solid var(--creme);display:grid;place-items:center;font-weight:700;font-size:.86rem;z-index:2}
+.skala .pk2.v{border-style:dashed;border-color:var(--gold);color:var(--gold)}
+.rw{display:grid;grid-template-columns:minmax(0,1fr) auto;row-gap:.22rem;column-gap:.6rem;font-size:.95rem}
+.rw span{color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .rw b{text-align:right;font-weight:700;white-space:nowrap}
+.rw .li{grid-column:1/-1;height:1px;background:var(--linie)}
+.rw .gr{font-size:1.2rem;color:#fff} .rw span.gr{color:var(--creme)}
+.note{font-size:.84rem;color:var(--leise);line-height:1.25;padding:.45rem .6rem;border-left:.19rem solid var(--gast);background:rgba(69,176,201,.08);border-radius:0 .3rem .3rem 0;white-space:normal}
+.note b{color:var(--creme);font-weight:600}
+#kand td,#ptab td,#ttab td{height:2.4rem}
+#kand td{cursor:pointer}
+#kand .por,#ptab .por{width:1.8rem;height:1.8rem}
+#ttab td{font-size:.92rem} #ttab tr.emp{background:linear-gradient(90deg,rgba(98,211,148,.16),rgba(98,211,148,.02))}
+#ttab td:first-child{white-space:normal;line-height:1.1}
+.fuss{grid-column:1/-1;display:flex;align-items:center;gap:1.1rem;padding:0 1rem;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);white-space:nowrap;min-width:0}
+.fuss .lamp{width:.7rem;height:.7rem;border-radius:50%;background:var(--gut);box-shadow:0 0 .6rem var(--gut);flex:none}
+.fuss b{color:var(--creme)} .fuss .tr{width:1px;height:1.4rem;background:var(--linie-2)}
+.fuss span{font-size:.95rem;color:var(--leise)}
+</style>
+</head>
+<body>
+<div class="demo"><b>Mockup</b> Einsatzliste mit Lastvorschau 21.11. <i class="tr"></i> Rechnung:
+  <a href="#" data-modus="heute">Heute (Resistenz wirkungslos)</a><a href="#" data-modus="mild">Vorschlag „mild“ (Empfehlung)</a><a href="#" data-modus="hart">„hart“ (v1: Deckel +6)</a>
+  <i class="tr"></i> Platz anklicken, dann Spieler anklicken: er wird gesetzt, alle Zahlen rechnen mit. Maus über einen Spieler zeigt die Vorschau.</div>
+<div class="app">
+<div class="railplatz"><nav class="rail" aria-label="Hauptnavigation">
+  <div class="kopf"><span class="logo"><img src="../team-logos/D-P.jpg" alt=""></span><span class="wer"><b>Death Peaches</b><small>Liga 2 · Chris</small></span></div>
+  <span class="grp">Saison</span>
+  <a href="#" title="Start"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="n">Start</span></a>
+  <a href="#" class="an" title="Einsatzliste"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="n">Einsatzliste</span></a>
+  <a href="#" title="Arena"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h14v5a7 7 0 0 1-14 0zM9 20h6M12 16v4M5 6H2v2a3 3 0 0 0 3 3M19 6h3v2a3 3 0 0 1-3 3"/></svg><span class="n">Arena</span></a>
+  <a href="#" title="Tabelle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><span class="n">Tabelle</span></a>
+  <span class="grp">Team</span>
+  <a href="#" title="Kader"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.500 7 6M17 5a3 3 0 0 1 0 6M22 19c0-2.500-1.500-4.300-4-5"/></svg><span class="n">Kader</span></a>
+  <a href="#" title="Training"><svg class="i" viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg><span class="n">Training</span></a>
+  <a href="#" class="" title="Draft"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h7M17 13l3 3-3 3M14 16h6"/></svg><span class="n">Draft</span></a>
+  <a href="#" title="Transfermarkt"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span class="n">Transfermarkt</span></a>
+  <span class="grp">Verein</span>
+  <a href="#" title="Finanzen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9a3.200 3.200 0 0 0-3-1.500c-1.800 0-3 .900-3 2.200 0 3 6 1.500 6 4.600 0 1.300-1.300 2.200-3 2.200A3.400 3.400 0 0 1 9 15M12 5.500v13"/></svg><span class="n">Finanzen</span></a>
+  <a href="#" title="Inbox"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5"/></svg><span class="zahl">3</span><span class="n">Inbox</span></a>
+  <span class="luecke"></span>
+  <a href="#" title="Einstellungen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="n">Einstellungen</span></a>
+</nav></div>
+
+<div class="rechts">
+  <header class="band">
+    <div class="ort"><em>Spieltag 12 von 20 <span>· Saison 1 · Death Peaches</span></em><h1>Einsatzliste</h1></div>
+    <div class="tabsd" id="dtabs"></div>
+    <span class="sp"></span>
+    <button class="pause" id="pausebtn" title="Pause ansehen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <div><b>Pause nach Spieltag 10</b><small>jeder regeneriert einen Spieltag, individuell</small></div>
+      <span class="tage" id="tage"></span></button>
+    <div class="seg" id="einsatz"><button data-e="schonen">Schonen ×0,75</button><button data-e="normal">Normal</button><button data-e="vollgas">Vollgas ×1,4</button></div>
+  </header>
+  <main class="el">
+    <section class="pan">
+      <div class="pk"><h2>Kader</h2><span class="sp"></span><span class="gk" id="kadinfo"></span></div>
+      <div class="hin" id="hin"></div>
+      <div class="tbw"><table class="tb" id="kader"><colgroup><col><col style="width:3.3rem"><col style="width:4.6rem"><col style="width:4.4rem"><col style="width:8.6rem"></colgroup>
+        <thead><tr><th data-k="n">Spieler</th><th class="re" data-k="w">Wert</th><th class="re" data-k="res" id="thres">Resist.</th><th class="re" data-k="last">Last hier</th><th data-k="nach">Erschöpfung → danach</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="pan mitte">
+      <div class="sumr" id="sumr"></div>
+      <div class="feld" id="feld"></div>
+      <div class="unten">
+        <button class="btn klein gold" id="opt"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg> Plätze nach Last tauschen</button>
+        <button class="btn klein" id="reset">Zurück zur Startaufstellung</button>
+        <span class="legende"><span><i style="background:var(--gut)"></i>Resistenz über der Schwelle</span><span><i style="background:var(--creme)"></i>knapp darunter</span><span><i style="background:var(--warn)"></i>zu schwach: Zusatzlast</span></span>
+      </div>
+    </section>
+    <section class="pan">
+      <div class="tabs" id="tabs"><button data-t="platz">Platz</button><button data-t="pause">Pause</button><button data-t="test">Härtetest</button></div>
+      <div class="rp" id="rp"></div>
+    </section>
+    <footer class="fuss" id="fuss"></footer>
+  </main>
+</div>
+</div>
+<script>
+const DAT={"md":12,"d":[{"id":"mini-dm","name":"Mini DM","roles":[{"l":"Frontliner","p":"high","s":"stamina","major":"health"},{"l":"Finisher","p":"medium","s":"will","major":"torment"},{"l":"Trick Fighter","p":"medium","s":"health","major":"dexterity"},{"l":"Iron Guard","p":"high","s":"torment","major":"health"},{"l":"Chaos Driver","p":"high","s":"stamina","major":"torment"}]},{"id":"basketball","name":"Basketball","roles":[{"l":"Floor General","p":"low","s":"speed","major":"spirit"},{"l":"Rim Pressure","p":"high","s":"spirit","major":"awareness"},{"l":"Perimeter","p":"medium","s":"power","major":"intelligence"}]}],"p":[{"n":"Queen Loriana","s":"queen-loriana","k":"Bard","r":"Human","a":{"power":19,"health":7,"stamina":9,"intelligence":73,"awareness":73,"determination":53,"speed":65,"dexterity":69,"charisma":87,"will":66,"spirit":84,"torment":7},"w":[17,72],"f":76.5,"t":3.6,"m":"leicht","tm":1,"st":"fit"},{"n":"Amarie","s":"amarie","k":"Charger","r":"Divine","a":{"power":81,"health":66,"stamina":54,"intelligence":40,"awareness":61,"determination":49,"speed":68,"dexterity":64,"charisma":45,"will":13,"spirit":19,"torment":59},"w":[45,40],"f":65.24,"t":10.8,"m":"leicht","tm":1,"st":"fit"},{"n":"Brightpaw","s":"brightpaw","k":"Badass","r":"Animal","a":{"power":55,"health":22,"stamina":64,"intelligence":27,"awareness":56,"determination":20,"speed":61,"dexterity":36,"charisma":82,"will":67,"spirit":87,"torment":41},"w":[39,60],"f":34.2,"t":3.6,"m":"leicht","tm":1,"st":"fit"},{"n":"Lilithara","s":"lilithara","k":"Sprinter","r":"Demon","a":{"power":7,"health":17,"stamina":41,"intelligence":55,"awareness":68,"determination":41,"speed":86,"dexterity":70,"charisma":52,"will":31,"spirit":72,"torment":22},"w":[19,56],"f":24.5,"t":8.7,"m":"mittel","tm":1,"st":"fit"},{"n":"Conan","s":"conan","k":"Mage","r":"Human","a":{"power":16,"health":33,"stamina":37,"intelligence":97,"awareness":91,"determination":67,"speed":29,"dexterity":33,"charisma":45,"will":70,"spirit":38,"torment":22},"w":[25,44],"f":37.64,"t":11.6,"m":"hart","tm":1,"st":"fit"},{"n":"Emilia","s":"emilia","k":"Rogue","r":"Demon","a":{"power":21,"health":5,"stamina":29,"intelligence":36,"awareness":63,"determination":42,"speed":89,"dexterity":75,"charisma":34,"will":3,"spirit":74,"torment":49},"w":[19,48],"f":10.64,"t":10.5,"m":"hart","tm":1,"st":"zurueck"},{"n":"Maru","s":"maru","k":"Sprinter","r":"Human","a":{"power":43,"health":49,"stamina":67,"intelligence":29,"awareness":52,"determination":61,"speed":78,"dexterity":81,"charisma":33,"will":55,"spirit":39,"torment":27},"w":[40,37],"f":48.2,"t":9.2,"m":"hart","tm":0.94,"st":"fit"},{"n":"Zyra","s":"zyra","k":"Charger","r":"Demon","a":{"power":70,"health":36,"stamina":58,"intelligence":29,"awareness":33,"determination":59,"speed":60,"dexterity":42,"charisma":48,"will":50,"spirit":35,"torment":80},"w":[46,33],"f":65.24,"t":10.8,"m":"leicht","tm":1,"st":"fit"},{"n":"Zynara","s":"zynara","k":"Mage","r":"Lizard","a":{"power":31,"health":15,"stamina":28,"intelligence":88,"awareness":44,"determination":77,"speed":76,"dexterity":25,"charisma":63,"will":88,"spirit":46,"torment":61},"w":[34,47],"f":60.86,"t":11.6,"m":"hart","tm":1,"st":"gesperrt"},{"n":"Aeon Flux","s":"aeon-flux","k":"Sprinter","r":"Elf","a":{"power":44,"health":45,"stamina":56,"intelligence":50,"awareness":60,"determination":20,"speed":90,"dexterity":80,"charisma":10,"will":1,"spirit":35,"torment":64},"w":[40,43],"f":15.14,"t":11.1,"m":"mittel","tm":1,"st":"fit"}]};
+/* ===== Stellschrauben ===== */
+const REGELN={
+  heute:null,
+  mild:{name:"mild",schwelle:{low:45,medium:60,high:75},grund:{low:12.5,medium:15,high:17.5},jePunktDrunter:.15,deckel:4,jePunktDrueber:.05,bonus:2},
+  hart:{name:"hart",schwelle:{low:45,medium:60,high:75},grund:{low:11,medium:14,high:17},jePunktDrunter:.25,deckel:6,jePunktDrueber:.10,bonus:3}
+};
+const EINSATZ={schonen:.75,normal:1,vollgas:1.4}, MODUS_F={leicht:1.2,mittel:1,hart:.75}, GRUND_HEUTE=16, AKTIV=4.5, BANK=28;
+const ANKER=[[0,0],[25,0],[50,3],[80,25],[100,33]];
+const KFARBE={Berserker:"rot",Warlord:"rot",Tank:"rot",Sprinter:"gruen",Rogue:"gruen",Charger:"gruen",Mage:"blau",Overseer:"blau",Templar:"blau",Bard:"gelb",Hero:"gelb",Badass:"gelb",Tactician:"gelb"};
+const ATTR={power:"Power",health:"Health",stamina:"Stamina",intelligence:"Intelligence",awareness:"Awareness",determination:"Determination",speed:"Speed",dexterity:"Dexterity",charisma:"Charisma",will:"Will",spirit:"Spirit",torment:"Torment"};
+const STUFE={low:["niedrig","s0"],medium:["mittel","s1"],high:["hoch","s2"]};
+const q=new URLSearchParams(location.search);
+if(q.get("still"))document.body.classList.add("still");
+const P=DAT.p, DZ=DAT.d;
+const START=[[7,1,6,9,4],[0,2,3]]; /* erfunden: Zyra, Amarie, Maru, Aeon Flux, Conan | Queen Loriana, Brightpaw, Lilithara */
+const Z={d:+(q.get("d")||0),platz:q.has("platz")?+q.get("platz"):3,modus:q.get("modus")||"mild",tab:q.get("tab")||"platz",einsatz:["normal","normal"],vor:null,bes:START.map(a=>a.slice()),sort:{k:"last",auf:true},psort:{k:"vor",auf:false}};
+if(q.get("einsatz"))Z.einsatz[Z.d]=q.get("einsatz");
+const kl=v=>Math.max(0,Math.min(100,v)), f1=v=>v.toFixed(1).replace(".",","), vz=v=>(v>0?"+":v<0?"−":"±")+f1(Math.abs(v));
+const risiko=f=>{f=kl(f);for(let i=0;i<4;i++){const[a,ra]=ANKER[i],[b,rb]=ANKER[i+1];if(f>=a&&f<=b)return ra+(rb-ra)*(f-a)/(b-a)}return 33};
+const kurz=l=>l.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2).padEnd(2,l[1].toUpperCase());
+function teile(p,rolle,modus){ /* Grundlast, Zusatz, Resistenz, Schwelle */
+  const R=REGELN[modus], res=p.a[rolle.s];
+  if(!R)return{grund:GRUND_HEUTE,zus:0,res,schw:null,diff:0};
+  const schw=R.schwelle[rolle.p], diff=res-schw;
+  const zus=diff<0?Math.min(R.deckel,R.jePunktDrunter*-diff):-Math.min(R.bonus,R.jePunktDrueber*diff);
+  return{grund:R.grund[rolle.p],zus,res,schw,diff};
+}
+function last(p,rolle,einsatz,modus){const t=teile(p,rolle,modus||Z.modus);return (t.grund+t.zus)*p.tm*EINSATZ[einsatz]}
+const aktiv=p=>AKTIV*MODUS_F[p.m], bank=p=>BANK*MODUS_F[p.m];
+const jetzt=p=>kl(p.f+p.t);
+const nachEinsatz=(p,L)=>kl(kl(p.f+L-aktiv(p))+p.t), nachBank=p=>kl(kl(p.f-bank(p))+p.t);
+const farbe=t=>t.schw==null?"m":t.diff>=0?"g":t.zus>=(REGELN[Z.modus].deckel*.6)?"s":"m";
+function wo(i){for(let d=0;d<2;d++){const k=Z.bes[d].indexOf(i);if(k>=0)return{d,k}}return null}
+function setze(i,d,k){ /* Spieler i auf Platz (d,k); steht er schon woanders, tauschen die beiden */
+  if(P[i].st==="gesperrt")return; const alt=wo(i), dort=Z.bes[d][k];
+  if(alt&&alt.d===d&&alt.k===k)return;
+  Z.bes[d][k]=i; if(alt)Z.bes[alt.d][alt.k]=dort;
+}
+function summe(bes,modus){let L=0,n=0,nach=0,ueber=0,rs=0;const drin=new Set();
+  bes.forEach((a,d)=>a.forEach((i,k)=>{if(i==null)return;const p=P[i],l=last(p,DZ[d].roles[k],Z.einsatz[d],modus);const e=nachEinsatz(p,l);L+=l;n++;drin.add(i);nach+=e;if(e>25)ueber++;rs+=risiko(e)}));
+  let alle=nach;P.forEach((p,i)=>{if(!drin.has(i))alle+=nachBank(p)});
+  return{L,n,ueber,rs,schnitt:alle/P.length,schnittJetzt:P.reduce((s,p)=>s+jetzt(p),0)/P.length}}
+function optimal(d){const a=Z.bes[d].slice(),n=a.length,rollen=DZ[d].roles;let best=null,bv=1e9;
+  const rec=(k,arr,sum)=>{if(sum>=bv)return;if(k===n){bv=sum;best=arr.slice();return}
+    for(let j=k;j<n;j++){[arr[k],arr[j]]=[arr[j],arr[k]];rec(k+1,arr,sum+last(P[arr[k]],rollen[k],Z.einsatz[d]));[arr[k],arr[j]]=[arr[j],arr[k]]}};
+  rec(0,a,0);return{best,bv}}
+const klchip=p=>`<span class="kl kr ${KFARBE[p.k]||""}"><img src="../class-icons/${p.k}.png" alt="">${p.k}</span>`;
+const rasse=p=>`<span class="ra" title="${p.r}"><img src="../race-icons/${p.r}.png" alt="${p.r}"></span>`;
+const por=(p,c)=>`<img class="por kr ${KFARBE[p.k]||""} ${c||""}" src="../portraits/${p.s}.jpg" alt="">`;
+function balken(von,nach,art){const a=Math.min(von,nach),b=Math.max(von,nach);
+  return `<span class="eb"><b style="width:${a}%"></b><u class="${art}" style="left:${a}%;width:${b-a}%"></u><s></s></span>`}
+
+function zeichne(){
+  const rollen=DZ[Z.d].roles, rolle=rollen[Z.platz], ein=Z.einsatz[Z.d], R=REGELN[Z.modus];
+  document.querySelectorAll(".demo a[data-modus]").forEach(a=>a.classList.toggle("an",a.dataset.modus===Z.modus));
+  document.querySelectorAll("#einsatz button").forEach(b=>b.classList.toggle("an",b.dataset.e===ein));
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("an",b.dataset.t===Z.tab));
+  const S=summe(Z.bes,Z.modus), SH=summe(Z.bes,"heute");
+  /* Disziplin-Tabs */
+  dtabs.innerHTML=DZ.map((d,i)=>{let L=0;Z.bes[i].forEach((pi,k)=>L+=last(P[pi],d.roles[k],Z.einsatz[i]));
+    return `<button class="td ${i===Z.d?"an":""}" data-d="${i}"><span><em>D${i+1} · ${d.roles.length} Plätze</em><b>${d.name}</b></span><span><strong class="t">${f1(L)}</strong><small>Last gesamt</small></span></button>`}).join("");
+  tage.innerHTML=Array.from({length:20},(_,i)=>(i===10?"<u>P</u>":"")+`<i class="${i<11?"v":i===11?"j":""}"></i>`).join("");
+  /* Kader */
+  kadinfo.textContent=`${P.length} Spieler · ${S.n} im Einsatz`;
+  hin.innerHTML=`<span class="ab ${STUFE[rolle.p][1]}">${kurz(rolle.l)}</span> Zahlen für <b>${rolle.l}</b> · Belastung ${STUFE[rolle.p][0]}`+(R?` · verschleißt <b>${ATTR[rolle.s]}</b>, Schwelle <b>${R.schwelle[rolle.p]}</b>`:` · heute für alle gleich`)+` · Klick setzt`;
+  thres.textContent=ATTR[rolle.s].slice(0,7);
+  const zeilen=P.map((p,i)=>{const t=teile(p,rolle,Z.modus),L=last(p,rolle,ein),w=wo(i);
+    const drin=!!w, eigL=drin?last(p,DZ[w.d].roles[w.k],Z.einsatz[w.d]):0;
+    return{p,i,t,L,w,n:p.n,wert:p.w[Z.d],res:t.res,last:L,jetzt:jetzt(p),nach:drin?nachEinsatz(p,eigL):nachBank(p),hier:nachEinsatz(p,L)}});
+  const k=Z.sort.k; zeilen.sort((a,b)=>{const x=k==="n"?a.n.localeCompare(b.n):k==="w"?a.wert-b.wert:a[k]-b[k];return Z.sort.auf?x:-x});
+  zeilen.sort((a,b)=>(a.p.st==="gesperrt")-(b.p.st==="gesperrt"));
+  document.querySelectorAll("#kader th").forEach(th=>{th.classList.toggle("so",th.dataset.k===k);th.classList.toggle("auf",th.dataset.k===k&&Z.sort.auf)});
+  document.querySelector("#kader tbody").innerHTML=zeilen.map(z=>{const p=z.p,sp=p.st==="gesperrt";
+    const ort=sp?`<span class="wo sperr">gesperrt</span>`:z.w?`<span class="wo">D${z.w.d+1} ${kurz(DZ[z.w.d].roles[z.w.k].l)}</span>`:`<span class="wo bank">Bank</span>`;
+    const hierSitzt=z.w&&z.w.d===Z.d&&z.w.k===Z.platz;
+    const art=z.w?(risiko(z.nach)>3?"r":""):"e";
+    return `<tr data-i="${z.i}" class="${hierSitzt?"wahl":""} ${sp?"aus":""}"><td><div class="nm">${por(p)}<div><b>${p.n}</b><div class="zl">${klchip(p)}${rasse(p)}${ort}</div></div></div></td>
+      <td class="re t"><b>${z.wert}</b></td><td class="re t ${sp?"":"c-"+farbe(z.t)}"><b>${z.res}</b>${z.t.schw!=null&&!sp?`<span class="klein">${z.t.diff>=0?"+":"−"}${Math.abs(z.t.diff)}</span>`:""}</td>
+      <td class="re t">${sp?"–":`<span class="lh ${farbe(z.t)}">${f1(z.L)}</span>`}</td>
+      <td>${balken(z.jetzt,z.nach,art)}<span class="ez t">${Math.round(z.jetzt)} → <b>${Math.round(z.nach)}</b> ${sp?"· Sperre, erholt sich":z.w?`· Risiko ${f1(risiko(z.nach))} %`:"· Bank"}</span></td></tr>`}).join("");
+  /* Kennzahlen */
+  const o=R?optimal(Z.d):null; let Ld=0;Z.bes[Z.d].forEach((pi,kk)=>Ld+=last(P[pi],rollen[kk],ein));
+  const spar=o?Ld-o.bv:0;
+  sumr.innerHTML=`<div class="su"><span>Last beider Disziplinen</span><strong class="t">${f1(S.L)}<em class="${S.L<=SH.L?"plus":"minus"}">${R?vz(S.L-SH.L):""}</em></strong><small>${R?`alte Rechnung: ${f1(SH.L)} (16 je Einsatz)`:"16 je Einsatz, für jeden gleich"}</small></div>
+    <div class="su"><span>Durch Tauschen noch drin</span><strong class="t ${spar>.05?"acht":"plus"}">${R?(spar>.05?"−"+f1(spar):"0,0"):"–"}</strong><small>${R?(spar>.05?`in ${DZ[Z.d].name}, dieselben Spieler`:"Plätze sind lastoptimal besetzt"):"heute bringt Tauschen nichts"}</small></div>
+    <div class="su"><span>Team-Erschöpfung danach</span><strong class="t">${f1(S.schnitt)}<em class="null">Ø</em></strong><small>vor dem Spieltag Ø ${f1(S.schnittJetzt)} · Bank erholt sich mit</small></div>
+    <div class="su"><span>In der Risikozone (über 25)</span><strong class="t ${S.ueber>S.n/2?"minus":""}">${S.ueber}<em class="null">von ${S.n}</em></strong><small>erwartete Verletzungen ${f1(S.rs/100)}</small></div>`;
+  /* Feld */
+  const POS={5:[[21,23],[50,23],[79,23],[35,72],[65,72]],3:[[22,30],[50,68],[78,30]],6:[[21,23],[50,23],[79,23],[21,72],[50,72],[79,72]],4:[[30,25],[70,25],[30,72],[70,72]],2:[[30,48],[70,48]]}[rollen.length];
+  const vp=Z.vor!=null&&P[Z.vor].st!=="gesperrt"?P[Z.vor]:null;
+  let vb=`<div class="vb leer"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-2 6z"/></svg> Maus über einen Spieler im Kader: hier steht, was der Wechsel auf <b style="color:var(--creme);margin:0 .3rem">${rolle.l}</b> an Last kostet oder spart. Klick setzt ihn.</div>`;
+  if(vp&&vp!==P[Z.bes[Z.d][Z.platz]]){const alt=Z.bes.map(a=>a.slice());setze(Z.vor,Z.d,Z.platz);const N=summe(Z.bes,Z.modus);const sitz=P[alt[Z.d][Z.platz]],w0=(()=>{for(let d=0;d<2;d++){const k=alt[d].indexOf(Z.vor);if(k>=0)return{d,k}}return null})();Z.bes=alt;
+    const t2=teile(vp,rolle,Z.modus),L1=last(sitz,rolle,ein),L2=last(vp,rolle,ein),dL=N.L-S.L,dV=(N.rs-S.rs)/100;
+    vb=`<div class="vb an">${por(vp)}<div><h4>${vp.n} auf ${rolle.l}</h4><small>${R?`${ATTR[rolle.s]} <b class="c-${farbe(t2)}">${t2.res}</b> · ${t2.diff>=0?`${t2.diff} über der Schwelle ${t2.schw}`:`${-t2.diff} unter der Schwelle ${t2.schw}, Zusatzlast ${vz(t2.zus)}${t2.zus>=R.deckel?" (Deckel)":""}`}`:"heute gleiche Last für jeden"}</small><small>${w0?`${sitz.n} wechselt dafür auf ${DZ[w0.d].roles[w0.k].l}`:`${sitz.n} geht dafür auf die Bank`}</small></div>
+      <div class="zw t"><div><span>Last hier</span><strong>${f1(L1)} → <b class="c-${farbe(t2)}">${f1(L2)}</b></strong></div><div><span>Last gesamt</span><strong>${f1(N.L)}<em class="${dL<-.05?"plus":dL>.05?"minus":"null"}">${vz(dL)}</em></strong></div><div><span>erw. Verletzungen</span><strong>${f1(N.rs/100)}<em class="${dV<-.005?"plus":dV>.005?"minus":"null"}">${vz(dV)}</em></strong></div></div></div>`}
+  feld.innerHTML=vb+rollen.map((r,kk)=>{const p=P[Z.bes[Z.d][kk]],t=teile(p,r,Z.modus),L=last(p,r,ein),e=nachEinsatz(p,L),fb=farbe(t);
+    let vs="";
+    if(vp&&kk===Z.platz&&vp!==p){const t2=teile(vp,r,Z.modus),L2=last(vp,r,ein),d=L2-L;
+      vs=`<div class="vs"><img src="../portraits/${vp.s}.jpg" alt=""><span><b>${vp.n.split(" ").pop()}</b>: Last <b class="t">${f1(L)} → ${f1(L2)}</b></span><i class="${d<-.05?"plus":d>.05?"minus":"null"} t">${vz(d)}</i></div>
+      <div class="vs" style="margin-top:-.2rem;border-style:solid;border-color:var(--linie);background:none;color:var(--leise)">${ATTR[r.s]} <b class="c-${farbe(t2)}">${t2.res}</b>${t2.schw!=null?(t2.diff>=0?` · +${t2.diff}`:` · fehlen ${-t2.diff}`):""}<i class="t" style="color:var(--tinte)">Ersch. ${Math.round(jetzt(vp))} → ${Math.round(nachEinsatz(vp,L2))}</i></div>`}
+    return `<button class="sk ${kk===Z.platz?"an":""}" data-k="${kk}"><span class="ko"><span class="ab ${STUFE[r.p][1]}">${kurz(r.l)}</span><em>${r.l}</em><span class="st ${STUFE[r.p][1]}">${STUFE[r.p][0]}${t.schw!=null?" · ab "+t.schw:""}</span></span>
+      <span class="in">${por(p)}<span><h4>${p.n}</h4><span class="res">${ATTR[r.s]} <b class="c-${fb}">${t.res}</b>${t.schw!=null?(t.diff>=0?` · <span class="plus">+${t.diff}</span>`:` · <span class="${fb==="s"?"minus":"acht"}">fehlen ${-t.diff}</span>`):""}</span></span>
+      <span class="la"><span>Last</span><strong class="t c-${fb}">${f1(L)}</strong></span></span>
+      <span class="fu" style="display:block">${balken(jetzt(p),e,risiko(e)>3?"r":"")}<span class="ez t">Erschöpfung ${Math.round(jetzt(p))} → <b>${Math.round(e)}</b> · Risiko ${f1(risiko(e))} %</span></span>${vs}</button>`}).join("");
+  /* rechts */
+  if(Z.tab==="platz")zeichnePlatz(rolle,ein,R,zeilen); else if(Z.tab==="pause")zeichnePause(); else zeichneTest();
+  fuss.innerHTML=`<i class="lamp"></i><span><b>Abgabebereit</b> · beide Disziplinen vollständig</span><i class="tr"></i><span>Zynara ist bis Spieltag 12 gesperrt · Emilia ist zurück</span><span class="sp"></span><span>Resistenz ändert nur die Erschöpfung. Das Verletzungsrisiko folgt allein aus der Erschöpfung danach.</span><button class="btn haupt">Aufstellung abgeben</button>`;
+}
+function zeichnePlatz(rolle,ein,R,zeilen){
+  const p=P[Z.vor!=null&&P[Z.vor].st!=="gesperrt"?Z.vor:Z.bes[Z.d][Z.platz]], sitzt=P[Z.bes[Z.d][Z.platz]], t=teile(p,rolle,Z.modus), L=last(p,rolle,ein), e=nachEinsatz(p,L);
+  const sw=R?["low","medium","high"].map(s=>`<i class="sw ${s===rolle.p?"an":""}" style="left:${R.schwelle[s]}%"><span>${STUFE[s][0]}</span><b>ab ${R.schwelle[s]}</b></i>`).join(""):"";
+  const kand=zeilen.filter(z=>z.p.st!=="gesperrt").slice().sort((a,b)=>a.L-b.L);
+  rp.innerHTML=`<div class="rk"><span class="gk"><span class="ab ${STUFE[rolle.p][1]}">${kurz(rolle.l)}</span> Platz ${Z.platz+1} · ${DZ[Z.d].name}</span><h3>${rolle.l}</h3>
+      <p>Belastung <b>${STUFE[rolle.p][0]}</b> · verschleißt <b>${ATTR[rolle.s]}</b>${R?` · Schwelle <b>${R.schwelle[rolle.p]}</b> · Grundlast <b>${f1(R.grund[rolle.p])}</b>`:" · heute ohne Wirkung"}</p>
+      <div class="skala"><i class="bahn"></i>${sw}${p!==sitzt?`<i class="pk2 t" style="left:${teile(sitzt,rolle,Z.modus).res}%">${teile(sitzt,rolle,Z.modus).res}</i>`:""}<i class="pk2 t ${p!==sitzt?"v":""}" style="left:${t.res}%">${t.res}</i></div></div>
+    <div class="rk"><span class="gk">Rechenweg · ${p.n}${p!==sitzt?" (Vorschau)":""}</span>
+      <div class="rw t" style="margin-top:.35rem"><span>Grundlast ${R?"Stufe "+STUFE[rolle.p][0]:"(für alle Plätze)"}</span><b>${f1(t.grund)}</b>
+      <span>${R?(t.diff>=0?`${ATTR[rolle.s]} ${t.res} · ${t.diff} über der Schwelle`:`${ATTR[rolle.s]} ${t.res} · ${-t.diff} unter der Schwelle${t.zus>=R.deckel?" (Deckel)":""}`):ATTR[rolle.s]+" "+t.res+" · zählt heute nicht"}</span><b class="${t.zus>0?"minus":t.zus<0?"plus":"null"}">${vz(t.zus)}</b>
+      <span>Einsatz ${ein[0].toUpperCase()+ein.slice(1)}${p.tm!==1?" · Trait ×"+String(p.tm).replace(".",","):""}</span><b>× ${String(EINSATZ[ein]).replace(".",",")}</b>
+      <i class="li"></i><span class="gr">Last dieses Einsatzes</span><b class="gr c-${farbe(t)}">${f1(L)}</b>
+      <span>aktive Erholung (Training ${p.m})</span><b class="plus">−${f1(aktiv(p))}</b>
+      <i class="li"></i><span class="gr">Erschöpfung</span><b class="gr">${Math.round(jetzt(p))} → ${Math.round(e)}</b>
+      <span>Verletzungsrisiko bei ${Math.round(e)}</span><b class="${risiko(e)>3?"minus":risiko(e)>0?"acht":"plus"}">${f1(risiko(e))} %</b></div></div>
+    <div class="rk" style="padding:.2rem 0 0;flex:1;min-height:0;display:flex;flex-direction:column"><span class="gk" style="padding:.3rem .7rem">Wer trägt diesen Platz am leichtesten · Klick setzt</span>
+      <div class="tbw"><table class="tb" id="kand"><colgroup><col><col style="width:3rem"><col style="width:3.6rem"><col style="width:4.2rem"></colgroup><thead><tr><th>Spieler</th><th class="re">Wert</th><th class="re">${ATTR[rolle.s].slice(0,6)}</th><th class="re so auf">Last</th></tr></thead><tbody>
+      ${kand.map(z=>`<tr data-i="${z.i}"><td><div class="nm">${por(z.p)}<div><b style="font-size:.95rem">${z.p.n}</b><small><span class="kr ${KFARBE[z.p.k]||""}" style="color:var(--kf);font-weight:700">${z.p.k}</span> · ${z.p.r}</small></div></div></td><td class="re t">${z.wert}</td><td class="re t c-${farbe(z.t)}">${z.res}</td><td class="re t"><span class="lh ${farbe(z.t)}" style="font-size:.98rem">${f1(z.L)}</span></td></tr>`).join("")}</tbody></table></div></div>`;
+}
+function zeichnePause(){
+  const bsp=P.map(p=>({p,vor:jetzt(p),erh:bank(p),nach:nachBank(p),txt:p.st==="gesperrt"?"verletzt · erholt sich wie die Bank":"Training "+p.m,kn:`<span class="kr ${KFARBE[p.k]||""}" style="color:var(--kf);font-weight:700">${p.k}</span> · `}));
+  const k=Z.psort.k;bsp.sort((a,b)=>{const x=k==="n"?a.p.n.localeCompare(b.p.n):a[k]-b[k];return Z.psort.auf?x:-x});
+  rp.innerHTML=`<div class="rk"><span class="gk">Vorschlag · zwischen Spieltag 10 und 11</span><h3>Pause: ein Ruhe-Spieltag</h3>
+    <p>Jeder Spieler bekommt genau die Erholung, die ihm ein <b>spielfreier Spieltag</b> heute gibt: <b>(28 + Reha-Zentrum) × Trainingsmodus</b>. Leicht ×1,2, mittel ×1,0, hart ×0,75. Verletzte erholen sich gleich schnell.</p></div>
+    <div class="rk" style="padding:.2rem 0 0;flex:1;min-height:0;display:flex;flex-direction:column"><span class="gk" style="padding:.3rem .7rem">Death Peaches · mit dem Stand von heute gerechnet</span>
+    <div class="tbw"><table class="tb" id="ptab"><colgroup><col><col style="width:3.2rem"><col style="width:4.2rem"><col style="width:3.6rem"></colgroup><thead><tr><th data-k="n">Spieler</th><th class="re" data-k="vor">Vorher</th><th class="re" data-k="erh">Erholung</th><th class="re" data-k="nach">Danach</th></tr></thead><tbody>
+    ${bsp.map(z=>`<tr><td><div class="nm">${por(z.p)}<div><b style="font-size:.95rem">${z.p.n}</b><small>${z.kn}${z.txt}</small></div></div></td><td class="re t">${Math.round(z.vor)}</td><td class="re t plus">−${f1(z.erh)}</td><td class="re t"><b>${Math.round(z.nach)}</b></td></tr>`).join("")}
+    </tbody><tfoot><tr><td>Beispiel: Reha-Zentrum Stufe 2, leicht</td><td class="re t">70</td><td class="re t plus">−43,2</td><td class="re t">27</td></tr></tfoot></table></div></div>
+    <div class="note">Die Trainingsschicht bleibt stehen (bei Conan 12 Punkte), deshalb fällt niemand ganz auf 0. Im Härtetest senkt die Pause allein die Verletzungen von 191 auf 137 je Saison. <b>Damit der Korridor 150 bis 200 hält, sinkt die aktive Erholung von 4,5 auf 4,0.</b></div>`;
+  document.querySelectorAll("#ptab th").forEach(th=>{th.classList.toggle("so",th.dataset.k===k);th.classList.toggle("auf",th.dataset.k===k&&Z.psort.auf)});
+}
+function zeichneTest(){
+  const T=[["Heute, ohne Pause","16,1","191","16,0 / 16,0","–",""],["Heute + Pause","16,1","137","16,0 / 16,0","–",""],["Heute + Pause, akt. Erholung 4,0","16,1","155","16,0 / 16,0","–",""],
+   ["mild + Pause, akt. Erholung 4,5","16,6","154","19,0 / 12,8","",""],["mild + Pause, akt. Erholung 4,0","16,6","168","19,0 / 12,8","−45 %","emp"],["hart (v1: 45/60/75, +6) + Pause, 4,0","16,3","159","20,0 / 10,6","−52 %",""],["40/55/70, Deckel +4 + Pause, 4,0","15,7","138","18,7 / 11,0","−44 %",""],["45/60/75, Deckel +8 + Pause, 4,0","16,9","178","21,2 / 10,6","−53 %",""]];
+  rp.innerHTML=`<div class="rk"><span class="gk">32 Teams · 20 Spieltage · echter Spielstand</span><h3>Härtetest</h3>
+    <p>Kader, Attribute, Plätze und Trainingsmodi aus Chris’ Spielstand. Die KI besetzt die Plätze wie heute nach Platzwert, <b>ohne</b> auf die Resistenz zu achten. 10 bis 24 Saisons je Zeile. Zielkorridor: <b>150 bis 200 Verletzungen</b> je Saison.</p></div>
+    <div class="rk" style="padding:.2rem 0 0"><div class="tbw"><table class="tb" id="ttab"><colgroup><col><col style="width:3.2rem"><col style="width:3rem"><col style="width:6.2rem"><col style="width:3.9rem"></colgroup><thead><tr><th>Variante</th><th class="re">Ø Last</th><th class="re">Verl.</th><th class="re">schw. / stark</th><th class="re">Mensch</th></tr></thead><tbody>
+    ${T.map(r=>`<tr class="${r[5]}"><td>${r[0]}</td><td class="re t">${r[1]}</td><td class="re t"><b class="${+r[2]<150?"acht":""}">${r[2]}</b></td><td class="re t">${r[3]}</td><td class="re t plus">${r[4]}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="note"><b>Schwach / stark:</b> Last je Einsatz bei Resistenz 10 unter bzw. 10 über der Schwelle. <b>Mensch:</b> so viel weniger Verletzungen hat ein Team, das dieselben Spieler nach Last statt nach Platzwert auf die Plätze verteilt. Das kostet rund 2 Punkte Platzwert je Spieler.</div>
+    <div class="note" style="border-color:var(--acht);background:rgba(243,181,74,.08)"><b>Vorsicht:</b> Würden alle 32 Teams nach Last besetzen, fiele die Liga auf 114 (mild) bzw. 86 (hart) Verletzungen. Die KI darf die Resistenz also nur leicht gewichten, sonst muss neu geeicht werden.</div>`;
+}
+/* Bedienung */
+document.addEventListener("click",ev=>{const z=ev.target.closest("[data-modus],[data-e],[data-t],[data-d],[data-k],tr[data-i],#opt,#reset,#pausebtn,th[data-k]");if(!z)return;ev.preventDefault();
+  if(z.dataset.modus)Z.modus=z.dataset.modus;
+  else if(z.dataset.e)Z.einsatz[Z.d]=z.dataset.e;
+  else if(z.dataset.t)Z.tab=z.dataset.t;
+  else if(z.dataset.d!=null){Z.d=+z.dataset.d;Z.platz=0;Z.vor=null}
+  else if(z.tagName==="TH"){const S=z.closest("#ptab")?Z.psort:Z.sort;if(S.k===z.dataset.k)S.auf=!S.auf;else{S.k=z.dataset.k;S.auf=z.dataset.k==="n"||z.dataset.k==="last"}}
+  else if(z.dataset.k!=null){Z.platz=+z.dataset.k;Z.tab="platz"}
+  else if(z.dataset.i!=null){setze(+z.dataset.i,Z.d,Z.platz);Z.vor=null}
+  else if(z.id==="opt"){if(REGELN[Z.modus])Z.bes[Z.d]=optimal(Z.d).best}
+  else if(z.id==="reset"){Z.bes=START.map(a=>a.slice())}
+  else if(z.id==="pausebtn")Z.tab="pause";
+  zeichne()});
+let vt=null;
+document.addEventListener("mouseover",ev=>{const tr=ev.target.closest("#kader tr[data-i],#kand tr[data-i]");const i=tr?+tr.dataset.i:null;if(i===Z.vor)return;
+  if(tr&&tr.closest("#kand")&&Z.vor!=null)return; clearTimeout(vt);vt=setTimeout(()=>{if(Z.vor!==i){Z.vor=i;zeichneOhneKader()}},40)});
+function zeichneOhneKader(){const tb=document.querySelector("#kader tbody"),alt=tb.innerHTML,sc=document.querySelector("#kader").parentNode.scrollTop;zeichne();}
+const slug=s=>P.findIndex(p=>p.s===s);
+if(q.get("setze")){setze(slug(q.get("setze")),Z.d,Z.platz)}
+if(q.get("vorschau"))Z.vor=slug(q.get("vorschau"));
+zeichne();
+</script>
+</body>
+</html>

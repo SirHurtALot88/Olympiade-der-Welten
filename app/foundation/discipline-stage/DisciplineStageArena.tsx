@@ -95,6 +95,7 @@ import {
   setMatchdayArenaBaseBundle,
 } from "@/lib/foundation/matchday-arena-session-cache";
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
+import { baueGewertetenEinsatz } from "@/app/foundation/discipline-stage/hover-gewerteter-einsatz";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 import {
@@ -1124,7 +1125,13 @@ export default function DisciplineStageArena({
       results.some((r) => canonicalStandings[r.teamId]?.matchdayBaselineId === matchdayId);
     const baselineRankPairByTeam = bookedForThisMatchday
       ? buildStandingsMatchdayRankPair(
-          (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name })),
+          // Liga je Team: Vorher-Rang je Liga wie der kanonische Nachher-Rang (`standings.rank`) —
+          // sonst „26. → 12." (Vorher über 32 Teams, Nachher ligalokal), 21.11.
+          (gameState.teams ?? []).map((team) => ({
+            teamId: team.teamId,
+            teamName: team.name,
+            league: gameState.seasonState?.leagueByTeamId?.[team.teamId] ?? null,
+          })),
           canonicalStandings,
         )
       : null;
@@ -2009,6 +2016,18 @@ export default function DisciplineStageArena({
     matchdayPanel &&
       (scoringProgress?.d2.scored ||
         Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId))),
+  );
+  // Team-Hover: gewerteter Einsatz je Team aus denselben Zeilen wie die Spieltagswertung (21.11.).
+  const gewerteterEinsatzByTeam = useMemo(
+    () =>
+      baueGewertetenEinsatz({
+        playersByTeam: matchdayPanel?.playersByTeam,
+        d1: matchdayPanel?.d1,
+        d2: matchdayPanel?.d2,
+        d1Revealed: panelD1Revealed,
+        d2Revealed: panelD2Revealed,
+      }),
+    [matchdayPanel, panelD1Revealed, panelD2Revealed],
   );
 
   /**
@@ -4145,6 +4164,10 @@ export default function DisciplineStageArena({
       liveResultsByTeam={liveResultsByTeam}
       // PP zusätzlich erst nach Abschluss der Disziplin — vorher wäre die Vergabe ein Spoiler.
       ppByPlayerId={arenaEnded ? ppByPlayerId : null}
+      // Gewertete Seiten des Spieltags je Team (21.11.): Score/PP je Spieler statt „noch offen" für
+      // jedes Team, das nicht gerade in der Arena läuft. Nur aufgedeckte Seiten (kein Spoiler).
+      gewerteterEinsatzByTeam={gewerteterEinsatzByTeam}
+      aktuelleDisziplinId={disciplineId}
     />
     </>
   );

@@ -1,4 +1,5 @@
 import type { StandingRecord } from "@/lib/data/olyDataTypes";
+import { rangJeLiga } from "@/lib/season/liga-raenge";
 
 /**
  * Rang-Bewegung gegenüber der LETZTEN Wertung — direkt aus `seasonState.standings`.
@@ -37,6 +38,12 @@ export type StandingsRankDeltaTeam = {
   teamId: string;
   /** Nur für den Gleichstand-Vergleich — identisch zum Ledger (`localeCompare`, "de"). */
   teamName: string;
+  /**
+   * Liga des Teams (`seasonState.leagueByTeamId`). Gesetzt = Vorher- und Nachher-Rang zählen NUR
+   * innerhalb dieser Liga (21.11., `lib/season/liga-raenge.ts`) — derselbe Maßstab wie
+   * `standings[team].rank`. Ohne Angabe (kein Liga-Split) eine gemeinsame Tabelle wie bisher.
+   */
+  league?: string | null;
 };
 
 /**
@@ -117,8 +124,12 @@ export function buildStandingsMatchdayRankPair(
     );
   }
 
-  const currentRanks = rankTeamsByPoints(teams, currentPoints);
-  const previousRanks = rankTeamsByPoints(teams, previousPoints);
+  // Je Liga gerankt, sobald irgendein Team eine Liga trägt — sonst stand „26. → 12.“ in einer
+  // 16er-Liga (Vorher über alle 32, Nachher aus dem ligalokalen Saisonstand).
+  const leagueByTeamId = new Map(teams.map((team) => [team.teamId, team.league ?? null] as const));
+  const ligaVon = teams.some((team) => team.league != null) ? (teamId: string) => leagueByTeamId.get(teamId) ?? null : null;
+  const currentRanks = rangJeLiga(teams, ligaVon, (gruppe) => rankTeamsByPoints(gruppe, currentPoints));
+  const previousRanks = rangJeLiga(teams, ligaVon, (gruppe) => rankTeamsByPoints(gruppe, previousPoints));
 
   for (const team of teams) {
     const before = previousRanks.get(team.teamId);

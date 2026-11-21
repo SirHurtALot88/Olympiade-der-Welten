@@ -61,7 +61,8 @@ import {
 import {
   buildTeamThemeCompositionRuntimeContext,
   classifyIdentityQuotaRole,
-  derivePlayerThemeTags,
+  derivePlayerThemeTagsCached,
+  themeTagSet,
   isQuotaScopedTarget,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
@@ -259,6 +260,25 @@ const THEME_QUOTA_VIOLATE_PENALTY = 0.6;
  * subclass/gender/trait/alignment) — no reinvented theme rules. Callers build `runtimeContext` ONCE
  * per team and pass it in per candidate. Returns undefined when the team has no theme target.
  */
+/**
+ * Treffer einer Tag-Liste in der (gemeinsam genutzten) Tag-Menge eines Spielers, je Menge und Liste gemerkt: die Ziel-Listen
+ * der Teams sind feste Arrays, der Draft fragt dieselbe Paarung je KI-Pick und Kandidat erneut (Draft-Tempo 21.11.).
+ */
+const THEME_TREFFER_CACHE = new WeakMap<Set<string>, WeakMap<string[], number>>();
+function zaehleThemeTreffer(tags: Set<string>, list: string[]): number {
+  let jeListe = THEME_TREFFER_CACHE.get(tags);
+  if (!jeListe) {
+    jeListe = new WeakMap();
+    THEME_TREFFER_CACHE.set(tags, jeListe);
+  }
+  let n = jeListe.get(list);
+  if (n == null) {
+    n = list.reduce((summe, tag) => (tags.has(tag) ? summe + 1 : summe), 0);
+    jeListe.set(list, n);
+  }
+  return n;
+}
+
 export function computeThemeFit(
   gameState: GameState,
   team: Pick<Team, "teamId" | "name">,
@@ -267,8 +287,8 @@ export function computeThemeFit(
 ): number | undefined {
   const target = runtimeContext.target;
   if (!target) return undefined;
-  const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
-  const countMatches = (list: string[]) => list.reduce((n, tag) => (tags.has(tag) ? n + 1 : n), 0);
+  const tags = themeTagSet(derivePlayerThemeTagsCached(player));
+  const countMatches = (list: string[]) => zaehleThemeTreffer(tags, list);
 
   // Harte Rassen-/Tag-Quote (S-S ~50% Construct, P-C ~50% Pirate): eine "counts"-Rolle zaehlt wie ein
   // Primary-Treffer (so wird der Top-/Bestpick garantiert quota-fit), ein "violates"-Kandidat wird

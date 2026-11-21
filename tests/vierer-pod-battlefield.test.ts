@@ -4,8 +4,8 @@
  *   (a) Mini-DMs Pod-IDs sind unveraendert; die Gruppen kommen seit 11.11. aus den Duell-Paaren
  *       des Spieltags (Spieltagsmodell-Kopplung, tests/spieltagsmodell-pod-duell-kopplung.test.ts),
  *       ohne Spielplan bleibt der alte Seed byte-identisch.
- *   (b) Battlefield bekommt EIGENE, frisch geloste Gruppen (Seed traegt die Disziplin-ID) -- auch
- *       am selben Spieltag/Vorkommen wie Mini-DM (Chris' Entscheidung 2).
+ *   (b) Battlefield bekommt EIGENE, frisch geloste Gruppen (Seed traegt die Disziplin-ID); seit 21.11.
+ *       aber am selben Spieltag wie Mini-DM DIESELBEN Gruppen (D1 ist Leitdisziplin).
  *   (c) Nicht-Pod-Disziplinen bekommen nie Pods.
  *   (d) Resolve: Battlefield wird als Vierergruppe mit 2-1-0-0 gewertet, nicht als Zweier-Duell
  *       gegen den Fixture-Gegner; Spieler-PP bleibt rein leistungsbasiert.
@@ -124,13 +124,20 @@ describe("getPodsForMatchday (verallgemeinerte Gruppenbildung)", () => {
     expect(getMiniDmPodsForMatchday(gs, "md1", { saveId: SAVE_ID })).toEqual([]);
   });
 
-  it("(b) Mini-DM und Battlefield am SELBEN Spieltag und Vorkommen: verschiedene Gruppen (frisch gelost je Disziplin)", () => {
+  // SEIT 21.11. (Chris: "Die 2. Disziplin eines Spieltags findet mit anderen Teams statt als die erste"):
+  // zwei Pod-Disziplinen DESSELBEN Spieltags spielen in denselben Gruppen, D1 ist Leitdisziplin
+  // (tests/spieltag-gleiche-paarungen-d1-d2.test.ts). "Frisch gelost je Disziplin" gilt weiter ueber die
+  // Spieltage hinweg, nicht mehr innerhalb eines Spieltags.
+  it("(b) Mini-DM und Battlefield am SELBEN Spieltag: dieselben Gruppen (Leitdisziplin D1), eigene Pod-IDs", () => {
     const gs = buildScheduleState(slot("mini-dm", "Mini DM", 1), slot("battlefield", "Battlefield", 1));
     const miniDm = getPodsForMatchday(gs, "md1", "mini-dm", { saveId: SAVE_ID });
     const battlefield = getPodsForMatchday(gs, "md1", "battlefield", { saveId: SAVE_ID });
     expect(miniDm).toHaveLength(4);
     expect(battlefield).toHaveLength(4);
-    expect(gruppenSchluessel(miniDm.map((pod) => pod.teamIds))).not.toEqual(gruppenSchluessel(battlefield.map((pod) => pod.teamIds)));
+    expect(battlefield.map((pod) => pod.teamIds)).toEqual(miniDm.map((pod) => pod.teamIds));
+    expect(gruppenSchluessel(miniDm.map((pod) => pod.teamIds))).toEqual(
+      gruppenSchluessel(buildPodGroupsFromFixturePairs(fixturePaare(gs), `${SAVE_ID}:s1:mini-dm-pods-v1:legacy-pool:spielplan-kopplung-v2`, 1)),
+    );
     expect(new Set([...miniDm, ...battlefield].map((pod) => pod.id)).size).toBe(8);
     expect(getPodDisciplineSlotsForMatchday(gs, "md1", { saveId: SAVE_ID })).toEqual([
       { disciplineId: "mini-dm", displayName: "Mini DM", disciplineSide: "d1" },

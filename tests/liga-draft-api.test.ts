@@ -126,7 +126,8 @@ describe("/api/draft", () => {
     dienst.brecheLigaDraftAb.mockReturnValue({});
     await post({ saveId: "s", aktion: "abbrechen", erwarteteNr: 7 });
     expect(auth.authorizeServerRoomWrite).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: null, action: "ai_picks_run_execute" }));
-    expect(dienst.brecheLigaDraftAb).toHaveBeenCalledWith(expect.objectContaining({ saveId: "s", erwarteteNr: 7 }));
+    // Abbruch ist standunabhaengig (21.11.): die Route reicht keinen erwarteten Stand an den Dienst.
+    expect(dienst.brecheLigaDraftAb).toHaveBeenCalledWith({ persistence: expect.anything(), saveId: "s" });
 
     dienst.starteLigaDraft.mockReturnValue({});
     stand.gameState = spielstand(null);
@@ -195,11 +196,14 @@ describe("/api/draft", () => {
   });
 
   it("A6: `erwarteteNr` ist Pflicht fuer jede schreibende Aktion ausser `starten`", async () => {
-    for (const aktion of ["ki_schritt", "ki_hintergrund", "pick", "auslassen", "fertig", "ueberspringen", "auto_pick", "abbrechen"]) {
+    for (const aktion of ["ki_schritt", "ki_hintergrund", "pick", "auslassen", "fertig", "ueberspringen", "auto_pick"]) {
       const { status, json } = await post({ saveId: "s", teamId: "M-M", aktion, playerId: "p1", variante: "A" });
       expect(status, aktion).toBe(400);
       expect(json.error, aktion).toBe("erwarteteNr_fehlt");
     }
+    // `abbrechen` braucht keinen Stand (21.11.): die KI pickt im Hintergrund, der gesehene Stand ist beim Klick veraltet.
+    dienst.brecheLigaDraftAb.mockReturnValue({});
+    expect((await post({ saveId: "s", aktion: "abbrechen" })).status).toBe(200);
     // `ki_hintergrund` prueft den Stand selbst, bevor es anstoesst.
     const veraltet = await post({ saveId: "s", teamId: "M-M", aktion: "ki_hintergrund", erwarteteNr: 3 });
     expect(veraltet.json.error).toBe("draft_stand_veraltet");

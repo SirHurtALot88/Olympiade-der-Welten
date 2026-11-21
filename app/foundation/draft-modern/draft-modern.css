@@ -422,3 +422,11 @@
 .drf .autopick-zeile { display: flex; justify-content: space-between; align-items: center; font-size: calc(.82 * var(--u)); color: var(--leise); flex: none; }
 .drf #l-ich .fb { min-height: 0; }
 .drf #l-zug .zfuss { white-space: normal; }
+
+/* KI rechnet (21.11.): nur ein Hinweis, solange der Server alle KI-Picks in einem Rutsch rechnet. */
+.drf .drf-rechnet { position: absolute; inset: 0; z-index: 55; display: grid; place-items: center; background: rgba(8,11,17,.62); backdrop-filter: blur(1px); }
+.drf .drf-rechnet-karte { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 34px; background: #121926; border: 1px solid rgba(240,195,90,.5); border-radius: 8px; color: #f4e6c4; text-align: center; max-width: min(460px, calc(100% - 32px)); }
+.drf .drf-rechnet-karte b { font: 700 28px "Barlow Condensed","Arial Narrow",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.drf .drf-rechnet-karte span:not(.drf-rechnet-dreh) { font-size: 14px; color: #c9d2e0; }
+.drf .drf-rechnet-dreh { width: 28px; height: 28px; border-radius: 50%; border: 3px solid rgba(240,195,90,.25); border-top-color: #f0c35a; animation: drf-dreh .9s linear infinite; }
+@keyframes drf-dreh { to { transform: rotate(360deg); } }

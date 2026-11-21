@@ -394,6 +394,22 @@ export default function LigaDraftSeite({
         </div>
       ) : null}
 
+      {draft.hintergrund && ansicht && ansicht.status !== "fertig" ? (
+        // 21.11. (Chris: „die KI soll nur rechnen, nichts anzeigen“): „Vor zu meinem Pick“, „Selbst kaufen“ und Überspringen A
+        // rechnen alle KI-Picks in einem Rutsch auf dem Server (~2 s); bis dahin steht hier nur dieser Hinweis, danach der fertige Stand.
+        <div className="drf-rechnet" role="status" aria-live="polite" data-testid="draft-rechnet">
+          <div className="drf-rechnet-karte">
+            <span className="drf-rechnet-dreh" aria-hidden />
+            <b>KI rechnet …</b>
+            <span>
+              {mein?.picksBisZug
+                ? `${mein.picksBisZug} KI-Picks bis zu deinem Pick — gleich siehst du den fertigen Stand.`
+                : "Die KI-Teams picken durch — gleich siehst du den fertigen Stand."}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       {profilId && kontext ? (
         <DraftProfil
           hostProps={hostProps}

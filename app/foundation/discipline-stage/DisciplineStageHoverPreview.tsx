@@ -21,6 +21,7 @@ import PlayerStarFrame from "@/components/foundation/player-portrait-card/Player
 import { getPlayerStarTier, getPlayerStarTierLabel } from "@/lib/foundation/player-star-tier";
 import { hasVisibleMutatorPoints, resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { fmt1 } from "./stage-format";
+import { zeigeLiveEinsatz, type GewerteterEinsatzBlock } from "./hover-gewerteter-einsatz";
 
 export type DisciplineStageHoverTarget =
   | { kind: "player"; id: string; x: number; y: number }
@@ -48,6 +49,15 @@ export type DisciplineStageHoverPreviewProps = {
    * nur für Spieler, die `liveResultsByTeam` ohnehin schon aufgedeckt hat.
    */
   ppByPlayerId?: Map<string, { pp: number | null; score: number; mutatorPp?: number | null }> | null;
+  /**
+   * GEWERTETER EINSATZ je Team (21.11., `hover-gewerteter-einsatz.ts`): die bereits aufgedeckten
+   * Disziplin-Seiten des Spieltags mit Score und PP je Spieler — aus derselben Resolve-Preview wie
+   * die Spieltagswertung. Ohne diese Quelle stand beim Hover in der Wertung bei jedem Team, das nicht
+   * gerade in der Arena lief, „noch offen".
+   */
+  gewerteterEinsatzByTeam?: Map<string, GewerteterEinsatzBlock[]> | null;
+  /** Die Disziplin, die gerade in der Arena steht (für die Live-Liste). */
+  aktuelleDisziplinId?: string | null;
 };
 
 const PLAYER_W = 184;
@@ -157,7 +167,55 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
   );
 }
 
-function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId }: {
+/** Ein gewerteter Disziplin-Block der Team-Karte: Spieler mit Score und gutgeschriebenen PP. */
+export function GewerteterEinsatz({ block, gameState, fallbackColor }: { block: GewerteterEinsatzBlock; gameState: GameState; fallbackColor: string }) {
+  return (
+    <div style={{ marginTop: 10, borderTop: "1px solid var(--nl-line)", paddingTop: 8 }} data-testid={`hover-gewertet-${block.seite}`}>
+      <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>
+        Eingesetzt · {block.titel}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        {block.spieler.map((sp) => {
+          const player = gameState.players?.find((p) => p.id === sp.playerId) ?? null;
+          const portraitUrl =
+            sp.portraitUrl ?? (player ? getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null) : null);
+          const mutatorPp = sp.mutatorPp ?? null;
+          return (
+            <div key={sp.playerId} style={{ display: "flex", alignItems: "center", gap: 8, fontVariantNumeric: "tabular-nums" }}>
+              {portraitUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
+              ) : (
+                <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: fallbackColor }} />
+              )}
+              <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {sp.name}
+                {sp.isCaptain ? <span style={{ marginLeft: 4, fontSize: 10, color: "var(--nl-mut)" }}>C</span> : null}
+              </span>
+              {sp.score != null ? (
+                <span title={`Finaler Score ${fmt1(sp.score)}`} style={{ fontSize: 11.5, fontWeight: 800, color: "var(--nl-mut)", flex: "none" }}>
+                  {fmt1(sp.score)}
+                </span>
+              ) : null}
+              <span
+                title={
+                  hasVisibleMutatorPoints(mutatorPp)
+                    ? `${fmt1(sp.pp)} Player-Points · darin ${fmt1(mutatorPp!)} aus Disziplin-Mutatoren`
+                    : `${sp.pp != null ? fmt1(sp.pp) : "–"} Player-Points`
+                }
+                style={{ fontSize: 12, fontWeight: 900, color: "var(--nl-accent)", flex: "none" }}
+              >
+                {sp.pp != null ? `${fmt1(sp.pp)} PP` : "–"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTeam, liveResultsByTeam, ppByPlayerId, gewerteterEinsatz, aktuelleDisziplinId }: {
   gameState: GameState;
   target: { id: string; x: number; y: number };
   /** Kanonische Ratings — liefert OVR und Liga-Rang fuer die Top-3-Zeile. */
@@ -166,6 +224,8 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
   liveResultsByTeam?: StageLiveResultsByTeam;
   /** Vergebene Player-Points je Spieler — null, solange die Disziplin noch läuft. */
   ppByPlayerId?: Map<string, { pp: number | null; score: number; mutatorPp?: number | null }> | null;
+  gewerteterEinsatz?: GewerteterEinsatzBlock[] | null;
+  aktuelleDisziplinId?: string | null;
 }) {
   const team = gameState.teams?.find((t) => t.teamId === target.id) ?? null;
   if (!team) return null;
@@ -312,7 +372,10 @@ function TeamPreview({ gameState, target, ratingByPlayerId, fieldedPlayerIdsByTe
           </div>
         </div>
       ) : null}
-      {fielded.length > 0 ? (
+      {(gewerteterEinsatz ?? []).map((block) => (
+        <GewerteterEinsatz key={block.seite} block={block} gameState={gameState} fallbackColor={color.primary} />
+      ))}
+      {fielded.length > 0 && zeigeLiveEinsatz(gewerteterEinsatz, aktuelleDisziplinId) ? (
         <div style={{ marginTop: 10, borderTop: "1px solid var(--nl-line)", paddingTop: 8 }}>
           <div style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 6 }}>
             Eingesetzt
@@ -411,6 +474,8 @@ export default function DisciplineStageHoverPreview({
   fieldedPlayerIdsByTeam,
   liveResultsByTeam,
   ppByPlayerId,
+  gewerteterEinsatzByTeam,
+  aktuelleDisziplinId,
 }: DisciplineStageHoverPreviewProps): React.JSX.Element | null {
   // Erst nach dem Mount in document.body portalen (SSR-fest) — so kann kein
   // ancestor-`transform` die `position:fixed`-Verankerung kapern (analog zum Drawer).
@@ -428,6 +493,8 @@ export default function DisciplineStageHoverPreview({
         fieldedPlayerIdsByTeam={fieldedPlayerIdsByTeam}
         liveResultsByTeam={liveResultsByTeam}
         ppByPlayerId={ppByPlayerId}
+        gewerteterEinsatz={gewerteterEinsatzByTeam?.get(target.id) ?? null}
+        aktuelleDisziplinId={aktuelleDisziplinId ?? null}
       />
     );
   // WICHTIG: `is-new-look` MUSS am Portal-Wurzelknoten hängen. Die --nl-*-Tokens sind

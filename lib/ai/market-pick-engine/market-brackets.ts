@@ -39,9 +39,15 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function quantilePrice(values: Array<number | null | undefined>, ratio: number) {
-  const finite = values
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)
-    .sort((left, right) => left - right);
+  return quantileSortiert(
+    values
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)
+      .sort((left, right) => left - right),
+    ratio,
+  );
+}
+
+function quantileSortiert(finite: number[], ratio: number) {
   if (finite.length === 0) return 0;
   const index = clamp(Math.floor((finite.length - 1) * ratio), 0, finite.length - 1);
   return finite[index] ?? 0;
@@ -52,8 +58,10 @@ export function buildLeagueMarketBrackets(prices: Array<number | null | undefine
     (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0,
   );
   const result = {} as LeagueMarketBrackets;
+  // Einmal sortieren statt je Bracket (Draft-Tempo 21.11.: ~3000 Preise je KI-Pick); Ergebnis identisch.
+  const sortiert = [...finite].sort((left, right) => left - right);
   for (const definition of MARKET_BRACKET_DEFINITIONS) {
-    const percentileFloor = definition.minPercentile > 0 ? quantilePrice(prices, definition.minPercentile) : 0;
+    const percentileFloor = definition.minPercentile > 0 ? quantileSortiert(sortiert, definition.minPercentile) : 0;
     const floorMw = round(definition.minMw);
     let ceilingMw = definition.ceilingMw;
     if (ceilingMw != null) {

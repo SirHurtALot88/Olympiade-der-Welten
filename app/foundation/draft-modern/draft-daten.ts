@@ -30,11 +30,40 @@ type PostAntwort = {
 };
 
 // 19.11. (Chris): „3x sollte standard geschwindigkeit sein“ — die frühere 3× (800 ms) ist die neue 1×; die neue 3× ist dreimal so schnell.
-const TAKT_MS: Record<1 | 3, number> = { 1: 800, 3: 270 };
+const TAKT_MS: Record<1 | 3, number> = { 1: 800, 3: 60 };
+/**
+ * 3x (19.11., Chris: „3x ist immer noch langsam“): gemessen war der Takt nicht der Engpass, sondern die Server-Rundreise je
+ * `ki_schritt` (~0,5 s mit Schreiben des Spielstands). Seit dem Tempo-Umbau holt ein Schritt bei 3x mehrere Picks auf einmal
+ * (ein Schreiben fuer alle) und deckt nur den letzten auf; zwischen den Schritten wartet die Seite nur noch kurz.
+ */
+const PICKS_JE_SCHRITT: Record<1 | 3, number> = { 1: 1, 3: 6 };
 /** Nachlauf des aufgedeckten KI-Picks, bevor „Du bist dran“ (oder das Ende) die Karte übernimmt. */
 const ZEIG_NACHLAUF_MS = 1500;
 const NACHFRAGE_MS = 3000;
+const HINTERGRUND_NACHFRAGE_MS = 300;
 const VOR_MS = 120;
+
+/**
+ * Der aufzudeckende Zug eines Schritts mit mehreren Picks. Bei einem Pick ist es der Zug VOR dem Schritt (wie bisher). Bei
+ * mehreren ist der letzte Pick schon in der Vorschau der alten Sicht (`naechste`, 7 Zuege) enthalten; die Karten seiner Top 3
+ * kommen aus den alten `spieler` und werden in die neue Sicht uebernommen, damit die Karten sich zeigen lassen.
+ */
+export function zugFuerAufdeckung(
+  alt: LigaDraftAnsicht | null,
+  ersterZug: LigaDraftZugAnsicht,
+  eintraege: LigaDraftEintrag[],
+  letzter: LigaDraftEintrag,
+  neu: LigaDraftAnsicht | null,
+): { zug: LigaDraftZugAnsicht; spieler: LigaDraftAnsicht | null } {
+  const index = eintraege.indexOf(letzter);
+  if (index <= 0 || !alt || !neu) return { zug: ersterZug, spieler: null };
+  const vorschau = alt.naechste[index];
+  if (!vorschau || vorschau.teamId !== letzter.teamId || !vorschau.top3) return { zug: ersterZug, spieler: null };
+  const echt = letzter.top3?.map((e) => e.playerId) ?? null;
+  const top3 = echt && echt.length > 0 && echt.every((id) => alt.spieler[id] || neu.spieler[id]) ? echt : vorschau.top3;
+  const zug: LigaDraftZugAnsicht = { ...vorschau, top3, top3Gruende: top3 === vorschau.top3 ? vorschau.top3Gruende : null };
+  return { zug, spieler: { ...neu, spieler: { ...alt.spieler, ...neu.spieler } } };
+}
 
 function neueSchluessel(): string {
   try {
@@ -167,8 +196,11 @@ export function useLigaDraft(input: {
     if (!taktet || busy) return undefined;
     const warte = vor ? VOR_MS : TAKT_MS[tempo === 3 ? 3 : 1];
     const id = window.setTimeout(async () => {
-      const vorher = ansichtRef.current?.amZug ?? null;
-      const maxPicks = vor ? Math.max(1, Math.min(DRAFT_MAX_PICKS_JE_SCHRITT, naechsterIndex ?? 1)) : 1;
+      const vorherAnsicht = ansichtRef.current;
+      const vorher = vorherAnsicht?.amZug ?? null;
+      const maxPicks = vor
+        ? Math.max(1, Math.min(DRAFT_MAX_PICKS_JE_SCHRITT, naechsterIndex ?? 1))
+        : Math.max(1, Math.min(PICKS_JE_SCHRITT[tempo === 3 ? 3 : 1], naechsterIndex ?? 1));
       const antwort = await sende("ki_schritt", { maxPicks });
       if (!antwort.success) {
         setVor(false);
@@ -182,7 +214,13 @@ export function useLigaDraft(input: {
       // endet, raeumt er nach ZEIG_NACHLAUF_MS den Platz fuer „Du bist dran“.
       if (vor) setZeig(null);
       else if (letzter && vorher && vorher.top3) {
-        setZeig({ zug: vorher, eintrag: letzter });
+        const zeigZug = zugFuerAufdeckung(vorherAnsicht, vorher, antwort.eintraege ?? [], letzter, antwort.ansicht ?? null);
+        if (zeigZug.spieler) {
+          // Die Karten der Top 3 stammen aus der Sicht VOR dem Schritt; die neue Sicht kennt sie nicht mehr (Spieler weg).
+          ansichtRef.current = zeigZug.spieler;
+          setAnsicht(zeigZug.spieler);
+        }
+        setZeig({ zug: zeigZug.zug, eintrag: letzter });
         if (antwort.halt === "mensch_am_zug" || antwort.halt === "draft_vorbei") {
           window.setTimeout(() => setZeig((z) => (z && z.eintrag.nr === letzter.nr ? null : z)), ZEIG_NACHLAUF_MS);
         }
@@ -194,7 +232,9 @@ export function useLigaDraft(input: {
   // Der Hintergrundlauf (Überspringen A, reine KI-Liga) kündigt sein Ende nur über GET an.
   useEffect(() => {
     if (!hintergrund) return undefined;
-    const id = window.setInterval(() => void lade(), 1500);
+    // 19.11.: 300 statt 1500 ms — der Vor-Lauf schreibt in grossen Happen (~1 s), die Seite soll jeden sofort zeigen und das Ende
+    // ohne Wartezeit bemerken. Die Antwort ist klein (vorschau 6, verlauf 0).
+    const id = window.setInterval(() => void lade(), HINTERGRUND_NACHFRAGE_MS);
     return () => window.clearInterval(id);
   }, [hintergrund, lade]);
 
@@ -246,7 +286,7 @@ export function useLigaDraft(input: {
           return false;
         }
         if (variante === "A") {
-          const lauf = await sendeStandfest("ki_hintergrund");
+          const lauf = await sendeStandfest("ki_hintergrund", { schnell: true });
           if (lauf.success) {
             setHintergrund(true);
             meldung("g", "KI pickt fertig", "Danach wählst du ohne Reihenfolge aus dem Rest.");
@@ -255,7 +295,7 @@ export function useLigaDraft(input: {
         return true;
       },
       kiHintergrund: async (leise = false) => {
-        const lauf = await sendeStandfest("ki_hintergrund");
+        const lauf = await sendeStandfest("ki_hintergrund", { schnell: true });
         if (lauf.success) setHintergrund(true);
         else if (!leise && !istStandKonflikt(lauf.error)) meldung("w", "KI-Lauf", fehlerText(lauf.error));
         return Boolean(lauf.success);
