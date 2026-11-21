@@ -928,6 +928,22 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     setSpieltagModus(modus);
     if (modus === "ansetzungen" && naechsterSpieltag) setSpieltagId(naechsterSpieltag.id);
   };
+  // Saisonpause: kleine Marke zwischen Spieltag 10 und 11, hervorgehoben an den zwei Spieltagen daneben.
+  const pauseInfo = spieltage?.verfuegbar ? spieltage.pause ?? null : null;
+  const pauseNaehe = pauseInfo != null && spieltagId != null && (() => {
+    const nr = spieltagListe.findIndex((o) => o.id === spieltagId) + 1;
+    return nr === pauseInfo.nachSpieltag || nr === pauseInfo.nachSpieltag + 1;
+  })();
+  const pauseMarke = pauseInfo ? (
+    <div className={`ssm-pause${pauseInfo.gebucht ? " is-gebucht" : ""}${pauseNaehe ? " is-nah" : ""}`} data-testid="ssm-pause">
+      <span className="ssm-pause__p" aria-hidden="true">P</span>
+      <span className="ssm-pause__t">
+        <b>Pause · Regeneration</b> zwischen Spieltag {pauseInfo.nachSpieltag} und {pauseInfo.nachSpieltag + 1}
+        {pauseInfo.gebucht ? " — gebucht: alle haben einen spielfreien Spieltag erholt." : " — alle erholen sich einen spielfreien Spieltag."}
+        {" "}Kein Spieltag, keine Wertung.
+      </span>
+    </div>
+  ) : null;
   const spieltageAnsicht = !spieltage?.verfuegbar ? (
     <BcPanel className="ssm-tafel" titel="Spieltage"><div className="ssm-leer" data-testid="ssm-spieltage-leer">Für diesen Spielstand gibt es keinen Spielplan mit Duellen.</div></BcPanel>
   ) : (
@@ -945,6 +961,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       aktionen={<BcSeg ariaLabel="Spieltag-Modus" wert={spieltagModus} onWahl={waehleSpieltagModus} optionen={[{ id: "ergebnisse", label: "Ergebnisse" }, { id: "ansetzungen", label: "Ansetzungen" }]} />}
       bodyClassName="ssm-spieltage"
     >
+      {pauseMarke}
       {!uebersicht ? (
         <div className="ssm-leer">Kein Spieltag gewählt.</div>
       ) : (
@@ -1067,7 +1084,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     <BcHero
       wappen={eigene?.logoUrl ?? null}
       wappenAlt={eigene?.teamName}
-      dachzeile={<>Saisonstand · {selectedSeasonLabel}{isArchived ? " · Archiv" : ""}{gesamtSpieltage > 0 ? ` · ${isSeasonEnded || (gesamtSpieltage > 0 && gespielteAnzahl >= gesamtSpieltage) ? "Endstand" : gespielteAnzahl === 0 ? `vor Spieltag 1 von ${gesamtSpieltage}` : `nach Spieltag ${gespielteAnzahl} von ${gesamtSpieltage}`}` : ""}</>}
+      dachzeile={<>Saisonstand · {selectedSeasonLabel}{isArchived ? " · Archiv" : ""}{gesamtSpieltage > 0 ? ` · ${isSeasonEnded || (gesamtSpieltage > 0 && gespielteAnzahl >= gesamtSpieltage) ? "Endstand" : gespielteAnzahl === 0 ? `vor Spieltag 1 von ${gesamtSpieltage}` : `nach Spieltag ${gespielteAnzahl} von ${gesamtSpieltage}${spieltage?.pause && gespielteAnzahl === spieltage.pause.nachSpieltag ? " · Pause · Regeneration" : ""}`}` : ""}</>}
       titel={eigene?.teamName ?? "Saisonstand"}
       untertitel={<>{lage ? <b>{lage}</b> : null}{titelKampf ? <> · {titelKampf}</> : null}</>}
       mitte={

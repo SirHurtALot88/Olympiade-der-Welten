@@ -202,6 +202,11 @@
 /* Spieltage */
 .ssm-spieltage { padding: 12px; }
 .ssm-tagwahl { display: inline-flex; gap: 4px; }
+.ssm-pause { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 6px 10px; border: 1px dashed var(--bc-linie); border-radius: 8px; background: var(--bc-flaeche-2); color: var(--bc-stumm); font: 500 15px/1.25 var(--schrift-zahl); }
+.ssm-pause b { color: var(--bc-creme); font-family: var(--schrift-haus); font-style: italic; font-weight: 700; }
+.ssm-pause__p { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--bc-linie); font: 700 14px/1 var(--schrift-zahl); color: var(--bc-creme); }
+.ssm-pause.is-nah { border-style: solid; border-color: var(--bc-heim); color: var(--bc-tinte); }
+.ssm-pause.is-nah .ssm-pause__p { border-color: var(--bc-heim); background: color-mix(in srgb, var(--bc-heim) 25%, transparent); }
 .ssm-spalten { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .ssm-spalten.is-zwei { grid-template-columns: 1fr 1fr; }
 .ssm-spalte { display: flex; flex-direction: column; gap: 8px; min-width: 0; }

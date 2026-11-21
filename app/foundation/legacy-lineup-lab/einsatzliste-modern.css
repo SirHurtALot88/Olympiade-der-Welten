@@ -1607,3 +1607,6 @@ button.elm-pr:hover {
     display: none;
   }
 }
+.elm-pause .elm-pause__bald {
+  color: #f0c35a;
+}
