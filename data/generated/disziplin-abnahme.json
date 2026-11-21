@@ -1038,24 +1038,24 @@
    "rhoSaison": 0.958,
    "rhoJeGefechtMedianJeK": {
     "2": [
-     0.82,
-     0.821
+     0.816,
+     0.837
     ],
     "3": [
-     0.819,
-     0.801
+     0.825,
+     0.852
     ],
     "4": [
-     0.818,
-     0.832
+     0.826,
+     0.829
     ],
     "5": [
-     0.82,
-     0.824
+     0.843,
+     0.822
     ],
     "6": [
-     0.839,
-     0.828
+     0.844,
+     0.818
     ]
    },
    "rhoMessung": {
@@ -1063,14 +1063,14 @@
     "spiele": 24,
     "kaderVarianten": 10,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "k=6 (Standard-Motorfeldgroesse ARENA_ART.tdm.jeSeite), Saatstrom 0, wie bisher; Median ueber k=2..6 beider Stroeme liegt bei 0,801-0,839 (rhoJeGefechtMedianJeK)"
+    "statistik": "rho je Gefecht (kaderfest, 30 Paare, 4 Gefechte je Paar, OLY_FORM_MODUS=echt node scripts/miss-tdm-gefecht-abnahme.mjs 4 --je-seite=2..6): Median 0,816-0,852 bei jedem k=2..6 in beiden Saatstroemen; 100 % der Gefechte enden durch Ausscheiden einer Seite (vorher 60-68 %), mittlere Dauer 19,7-20,5 Takte. Kopfwert rhoJeSpiel/rhoSaison unveraendert aus miss-alle-disziplinen (disziplinProbe, 0,901/0,958)."
    },
    "pp": [
-    12.6,
-    13.2
+    13.4,
+    13.6
    ],
    "ppMessung": {
-    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=48 --pp-je-seite=6",
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-tdm-gefecht-abnahme.mjs --nur-pp --pp=48 --pp-je-seite=2..6",
     "laeufe": 48,
     "anhebung": 15,
     "mutatoren": "je-lauf",
@@ -1079,11 +1079,11 @@
      10000000
     ]
    },
-   "datum": "2026-11-18",
-   "commit": "e5723684",
+   "datum": "2026-11-21",
+   "commit": "arena-livefehler-21-11",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "FORMKARTEN ECHT (18.11.): seit diesem Stand liest tdm die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #135, 'Budget-Konformitaet verifizieren'): frisch auf main 2d4153b4b nachgemessen, erstmals Pp mit dem Protokollstandard n=48 statt n=24. rho je Gefecht 0,801-0,839 bei jedem k=2..6 in beiden Saatstroemen (Saison 0,854-0,922) -- ueber der 0,80-Schranke, Kopfwert k=6/Strom 0 0,839 (vorher 0,813). Pp 14,6/14,7 (vorher 16,8/14,2 bei n=24) -- damit unter dem angestrebten Optimum <15 in beiden Stroemen, OHNE Code- oder Rezeptaenderung (die alte Zahl war das hoehere Rauschen von n=24). Budget-Konformitaet per Bauart: tdmGefecht() hat kein Sub-Skill-Rezept, es liest die Matrixgewichte BASIS_JE_DISC.tdm direkt als Kanalstaerken (TDM_GEFECHT, dieselbe Gefecht-Bauweise wie Battlefields BF_FFA_GRUND). Ist-Anteile k=6, Strom 0: power 25,7 (Matrix 28), health 16,2 (20), charisma 14,5 (10), spirit 12,9 (12), stamina 12,9 (14), intelligence 6,5 (6), determination 5,9 (6), awareness 3,4 (2), torment 2,0 (2). Groesste Einzelabweichung charisma +4,5 / health -3,8 -- keine Nachjustierung, weil sie nur ueber die TDM_GEFECHT-Hebel ginge und CLAUDE.md-Vorrang rho > Pp-Optimierung gilt. Vorherige Historie: TDM-Gefecht-Verdrahtung 11.11., tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324).",
+   "anmerkung": "KAMPF BIS ZUM ENDE (21.11., Chris: keine Respawns, EIN Kampf bis ein Team ausgeschaltet ist, nicht nach Zeit abbrechen): TDM_GEFECHT takte 20->80 (Notbremse) mit Sudden-Death-Eskalation ab Takt 30 (+6 %/Takt Wucht), wertung.takt 2->0,5 (Ueberlebensbonus, hielt rho nach dem laengeren Kampf unten), taktSek 4->1,7 (Anzeige). rho je Gefecht Median 0,816-0,852 (vorher 0,801-0,839), Pp 13,1-16,5 bei k=2..6 (k=6: 13,4/13,6; vorher 12,6/13,2). Die zwei Kopfzahlen rhoJeSpiel/rhoSaison stammen aus disziplinProbe und bewegen sich nicht. | VORHER: FORMKARTEN ECHT (18.11.): seit diesem Stand liest tdm die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #135, 'Budget-Konformitaet verifizieren'): frisch auf main 2d4153b4b nachgemessen, erstmals Pp mit dem Protokollstandard n=48 statt n=24. rho je Gefecht 0,801-0,839 bei jedem k=2..6 in beiden Saatstroemen (Saison 0,854-0,922) -- ueber der 0,80-Schranke, Kopfwert k=6/Strom 0 0,839 (vorher 0,813). Pp 14,6/14,7 (vorher 16,8/14,2 bei n=24) -- damit unter dem angestrebten Optimum <15 in beiden Stroemen, OHNE Code- oder Rezeptaenderung (die alte Zahl war das hoehere Rauschen von n=24). Budget-Konformitaet per Bauart: tdmGefecht() hat kein Sub-Skill-Rezept, es liest die Matrixgewichte BASIS_JE_DISC.tdm direkt als Kanalstaerken (TDM_GEFECHT, dieselbe Gefecht-Bauweise wie Battlefields BF_FFA_GRUND). Ist-Anteile k=6, Strom 0: power 25,7 (Matrix 28), health 16,2 (20), charisma 14,5 (10), spirit 12,9 (12), stamina 12,9 (14), intelligence 6,5 (6), determination 5,9 (6), awareness 3,4 (2), torment 2,0 (2). Groesste Einzelabweichung charisma +4,5 / health -3,8 -- keine Nachjustierung, weil sie nur ueber die TDM_GEFECHT-Hebel ginge und CLAUDE.md-Vorrang rho > Pp-Optimierung gilt. Vorherige Historie: TDM-Gefecht-Verdrahtung 11.11., tdmGefecht() ersetzt die alte PPS-Duell-Bruecke (rho 0,324).",
    "formkarten": {
     "modus": "echt",
     "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
