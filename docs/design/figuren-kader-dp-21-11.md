@@ -123,7 +123,7 @@ das Gesicht zur Kamera).
 | Amarie angriff / tod Nord | Vorderseite | 4 |
 | Amarie Süd-Grundpose (`edit-image-pixen`) | zweiten Speer entfernen | 1 |
 | Amarie walk / angriff / treffer / tod Süd | hingen an der Grundpose, trugen alle zwei Speere | 4 |
-| **Summe** | 19 Streifen neu (einer davon zweimal), eine Grundpose | **27** |
+| **Summe** | 18 Streifen neu (13 Nord, 5 Süd; Conan Angriff Süd zweimal bestellt, also 19 Bestellungen), eine Grundpose | **27** |
 
 Guthaben vorher **342,54**, nachher **315,54** (Differenz 27,0, deckt sich mit `usage.generations` der Jobs).
 Reserve 150 unberührt. Job-IDs und Bestelltexte je Streifen: `figuren-kader-dp-21-11/reparatur-bestellungen.json`.
