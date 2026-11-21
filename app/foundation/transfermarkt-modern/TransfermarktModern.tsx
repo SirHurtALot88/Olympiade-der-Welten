@@ -27,7 +27,7 @@ import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 
 import { bedarfUrteil, schnittVorkommen, sortiereDisziplinen, slotsKurz, spielplanKurz, spielplanLang } from "@/lib/market/transfermarkt-disziplin-bedarf";
-import { istFitSichtbar, zaehleFitAusgeblendet } from "@/lib/market/transfermarkt-fit";
+import { erfuelltFitSchwelle, FIT_AUS, fitSortWert, istFitSichtbar, naechsteFitSchwelle, zaehleFitAusgeblendet } from "@/lib/market/transfermarkt-fit";
 import { berechneFreigabeAnzeige, freigabeKosten, freigabeSperre } from "@/lib/market/transfermarkt-freigabe";
 
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
@@ -37,7 +37,7 @@ import WeitereFilterPanel from "./WeitereFilterPanel";
 import {
   erfuelltFilter,
   LEERE_FILTER,
-  mindestNoteLabel,
+  mindestAchsenZahlLabel,
   naechsteMindestNote,
   zaehleAktiveFilter,
   type WeitereFilter,
@@ -50,7 +50,7 @@ import { usePortraetVorschau, type VorschauDaten } from "@/app/foundation/shared
 import SpaltenGriff from "@/app/foundation/shared/SpaltenGriff";
 import { useSpaltenLayout, type SpaltenDef } from "@/app/foundation/shared/spalten-layout";
 import { GrossesProfil } from "@/app/foundation/shared/GrossesProfil";
-import { FitMarke } from "@/app/foundation/shared/FitMarke";
+import { FitZelle } from "@/app/foundation/shared/FitMarke";
 import KaderAnsichten from "./KaderAnsichten";
 import VergleichDialog from "./VergleichDialog";
 import VerhandlungsTisch from "./VerhandlungsTisch";
@@ -62,7 +62,7 @@ import "./transfermarkt-modern.css";
 export type { TransfermarktModernProps } from "./tm-typen";
 
 type Ansicht = "markt" | "verkauf" | "vertraege" | "draft";
-type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value";
+type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value" | "pow" | "spe" | "men" | "soc" | "fit";
 type Zeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht };
 
 const SEITE = 15;
@@ -73,7 +73,14 @@ const SORT_LABEL: Record<SortKey, string> = {
   gehalt: "Gehalt",
   potenzial: "Potenzial",
   value: "Value",
+  pow: "POW",
+  spe: "SPE",
+  men: "MEN",
+  soc: "SOC",
+  fit: "Fit",
 };
+/** Nur diese Sortierungen stehen als Knopf in der Filterzeile; Achsen und Fit sortiert man über die Spaltenköpfe. */
+const SORT_KNOEPFE: SortKey[] = ["eignung", "hebt", "abloese", "gehalt", "potenzial", "value", "fit"];
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
 const DISZIPLINEN = [...DISZIPLINEN_GEORDNET] as string[];
 /** Sortierung der Kaderstärke-Liste: Wichtigkeit, Reihenfolge im Spielplan (Chris, 19.11.) oder feste Matrix-Reihenfolge. */
@@ -93,6 +100,7 @@ export const TM_SPALTEN: SpaltenDef[] = [
   { id: "nm", standard: 8, min: 5, max: 24, flex: true },
   { id: "eg", standard: 6.6, min: 4.5, max: 12 },
   { id: "ax", standard: 9.5, min: 8, max: 20 },
+  { id: "fit", standard: 3.6, min: 3, max: 8 },
   { id: "abl", standard: 3.6, min: 2.8, max: 9 },
   { id: "geh", standard: 4.6, min: 3.6, max: 10 },
   { id: "rang", standard: 5.2, min: 4, max: 10 },
@@ -191,6 +199,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const [nurMerkliste, setNurMerkliste] = useGemerkterFilter(fk("merkliste"), false);
   // Team-Fit (Marktregel wie im alten Markt): negativer Fit ist standardmäßig ausgeblendet, Mercenaries bleiben sichtbar.
   const [fitNegativ, setFitNegativ] = useGemerkterFilter(fk("fitNegativ"), false);
+  // Fit-Schwelle „Fit > X“ (Chris 21.11.): kombinierbar mit dem Schalter; `FIT_AUS` (-1) = aus.
+  const [fitMin, setFitMin] = useGemerkterFilter<number>(fk("fitMin"), FIT_AUS);
   const [filter, setFilter] = useGemerkterFilter<WeitereFilter>(fk("weitere"), LEERE_FILTER);
   const [weitereOffen, setWeitereOffen] = useState(false);
   const spalten = useSpaltenLayout("transfermarkt", TM_SPALTEN);
@@ -281,6 +291,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     });
     if (nurMerkliste) liste = liste.filter((z) => merkliste.has(z.item.playerId));
     if (!fitNegativ) liste = liste.filter((z) => istFitSichtbar(z.item, false));
+    if (fitMin >= 0) liste = liste.filter((z) => erfuelltFitSchwelle(z.item, fitMin));
     if (zaehleAktiveFilter(filter) > 0) liste = liste.filter((z) => erfuelltFilter(z.item, z.sicht, filter));
     const schluessel = (z: Zeile): number | null => {
       switch (sortierung) {
@@ -293,11 +304,13 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
         case "gehalt": return z.item.salary;
         case "potenzial": return z.item.potentialRange ? (z.item.potentialRange.min + z.item.potentialRange.max) / 2 : null;
         case "value": return z.item.marketValueSalaryRatio;
+        case "pow": case "spe": case "men": case "soc": return z.sicht.achsen[sortierung].summe ?? z.sicht.achsen[sortierung].sortWert;
+        case "fit": return fitSortWert(z.item);
       }
     };
     const aufsteigend = (sortierung === "abloese" || sortierung === "gehalt") !== umgekehrt;
     return sortiereNachSicht(liste, schluessel, aufsteigend ? 1 : -1);
-  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, fitNegativ, filter, sortierung, umgekehrt, disziplin, cash, wirkungJeZeile, merkliste]);
+  }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, fitNegativ, fitMin, filter, sortierung, umgekehrt, disziplin, cash, wirkungJeZeile, merkliste]);
 
   const fitAusgeblendet = useMemo(() => zaehleFitAusgeblendet(feed.items), [feed.items]);
   const aktiveWeitere = zaehleAktiveFilter(filter);
@@ -549,6 +562,9 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
               <button type="button" className={`fc${fitNegativ ? " an" : ""}`} onClick={() => { setFitNegativ((v) => !v); setBlatt(0); }} aria-pressed={fitNegativ} title="Standard: nur Spieler mit passendem Team-Fit (0 oder besser) und Mercenaries. Der Schalter blendet auch die mit negativem Fit ein." data-testid="tm-fit-negativ">
                 Negativer Fit {fitNegativ ? "eingeblendet" : "ausgeblendet"}{!fitNegativ && fitAusgeblendet > 0 ? ` · ${fitAusgeblendet}` : ""}
               </button>
+              <button type="button" className={`fc${fitMin >= 0 ? " an" : ""}`} onClick={() => { setFitMin((v) => naechsteFitSchwelle(v)); setBlatt(0); }} title="Klick: Fit größer als 0, 5, 10, 15, 20, dann aus. Mercenaries bleiben als Ausnahme sichtbar." data-testid="tm-fit-min">
+                Fit{fitMin >= 0 ? ` > ${fitMin}` : " > X"}
+              </button>
               <span className="sp" />
               <button type="button" className="knopf klein" onClick={() => setDialog({ art: "vergleich" })} disabled={pins.length < 1} data-testid="tm-vergleich-oeffnen">Vergleich ({pins.length})</button>
             </div>
@@ -562,7 +578,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     key={a}
                     className={`fc${min != null ? " an" : ""}`}
                     data-testid={`tm-achse-${a}`}
-                    title="Klick: mindestens D, dann C, B, A, S, dann aus."
+                    title="Klick: mindestens 58, 64, 70, 76, 82 Punkte, dann aus."
                     onClick={() => {
                       setFilter((alt) => {
                         const achsenMin = { ...alt.achsenMin };
@@ -574,7 +590,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                       setBlatt(0);
                     }}
                   >
-                    {ACHSEN_LABEL[a]}{min != null ? ` ≥ ${mindestNoteLabel(min)}` : ""}
+                    {ACHSEN_LABEL[a]}{min != null ? ` ≥ ${mindestAchsenZahlLabel(min)}` : ""}
                   </button>
                 );
               })}
@@ -582,12 +598,12 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 Weitere Filter{aktiveWeitere > 0 ? ` · ${aktiveWeitere}` : ""} {weitereOffen ? "▾" : "▸"}
               </button>
               <span className="gk">Sortierung</span>
-              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              {SORT_KNOEPFE.map((k) => (
                 <button type="button" key={k} className={`fc${sortierung === k ? " an" : ""}`} onClick={() => sortiereNach(k)} data-testid={`tm-sort-${k}`}>{SORT_LABEL[k]}{kopfPfeil(k)}</button>
               ))}
               <span className="sp" />
               <button type="button" className={`fc${spalten.angepasst ? " an" : ""}`} onClick={spalten.zuruecksetzen} title="Spaltenbreiten und Porträtgröße auf Standard" data-testid="tm-spalten-zuruecksetzen">Spalten ↺</button>
-              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFitNegativ(false); setFilter(LEERE_FILTER); setSortierung("eignung"); setUmgekehrt(false); setBlatt(0); }}>Filter zurücksetzen</button>
+              <button type="button" className="fc" onClick={() => { setSuche(""); setNurBezahlbar(false); setNurHebt(false); setNurMerkliste(false); setFitNegativ(false); setFitMin(FIT_AUS); setFilter(LEERE_FILTER); setSortierung("eignung"); setUmgekehrt(false); setBlatt(0); }}>Filter zurücksetzen</button>
             </div>
             {weitereOffen ? <WeitereFilterPanel filter={filter} onChange={(f) => { setFilter(f); setBlatt(0); }} /> : null}
             <div className={`mt sl${spalten.zeilenMin > 0 ? " pg" : ""}`} style={{ ["--zeilen" as string]: SEITE, ["--spalten" as string]: spalten.vorlage, ["--minbreite" as string]: `calc(${spalten.minBreite} * var(--u))`, ["--zmin" as string]: spalten.zeilenMin > 0 ? `calc(${spalten.zeilenMin} * var(--u))` : "0px", ["--pw" as string]: spalten.breiten.por }} data-testid="tm-tabelle">
@@ -596,7 +612,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 <span>{griff("por")}</span>
                 <span>Spieler · Weg in {disziplinNamen[disziplin]}{griff("nm")}</span>
                 <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}{griff("eg")}</span>
-                <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[a]}</i>)}{griff("ax")}</span>
+                <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} role="button" title="Achsen-Summe · Klick sortiert, nochmal klicken dreht die Richtung" className={sortierung === a ? "so" : ""} style={{ fontStyle: "normal", cursor: "pointer" }} onClick={() => sortiereNach(a)} data-testid={`tm-kopf-${a}`}>{ACHSEN_LABEL[a]}{kopfPfeil(a)}</i>)}{griff("ax")}</span>
+                <span className={sortierung === "fit" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Team-Fit zu deinem Kader · Klick sortiert, nochmal klicken dreht die Richtung" onClick={() => sortiereNach("fit")} data-testid="tm-kopf-fit">Fit{kopfPfeil("fit")}{griff("fit")}</span>
                 <span className={`re ${sortierung === "abloese" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("abloese")} data-testid="tm-kopf-abloese">Ablöse{kopfPfeil("abloese")}{griff("abl")}</span>
                 <span className={`re ${sortierung === "gehalt" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("gehalt")} data-testid="tm-kopf-gehalt">Gehalt/Saison{kopfPfeil("gehalt")}{griff("geh")}</span>
                 <span className={sortierung === "hebt" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("hebt")} data-testid="tm-kopf-kaderrang">Kaderrang{kopfPfeil("hebt")}{griff("rang")}</span>
@@ -619,7 +636,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     {bild ? <img className="por" src={bild} alt="" loading="lazy" data-testid="tm-portrait" onMouseEnter={(e) => vorschau.zeige(e.currentTarget, vorschauDaten(it, z.sicht, bild))} onMouseLeave={vorschau.verstecke} /> : <span className="por" />}
                     <span className="nm">
                       <b><u className="tmk-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); nameKlickAuswahlUndProfil(it.playerId, true, () => waehle(it.playerId, it.name), profilOeffnen); }} data-testid="tm-profil-link">{it.name}</u></b>
-                      <small><KlassenFarbTag className={it.className} /> · {it.race} <FitMarke item={it} /> <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
+                      <small><KlassenFarbTag className={it.className} /> · {it.race} <span className={`tag ${wege.urteil.art === "primaer" ? "g" : wege.urteil.art === "neben" ? "go" : wege.urteil.art === "kein" ? "w" : ""}`} title={wege.urteil.text}>{wege.urteil.titel}</span></small>
                     </span>
                     <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text} (Scouting-Stufe ${z.sicht.stufe}); Scouten schärft das Bild`) : "unbekannt"}>
                       <b className="t">{eignungText(z.sicht, disziplin)}</b>
@@ -630,9 +647,10 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                     <span className="ax t">
                       {MARKT_ACHSEN.map((a) => {
                         const s = z.sicht.achsen[a];
-                        return <i key={a} className={s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : ""} title={s.exakt ? "Note (beobachtet/gescoutet)" : "Zweier-Gruppe (ungescoutet)"}>{s.anzeige ?? "?"}</i>;
+                        return <i key={a} className={s.sortWert != null && s.sortWert >= 4.5 ? "h" : s.sortWert != null && s.sortWert >= 3.5 ? "m" : ""} title={`${ACHSEN_LABEL[a]}-Summe`}>{s.anzeige ?? "?"}</i>;
                       })}
                     </span>
+                    <FitZelle item={it} />
                     <span className={`re ${teuer ? "zt" : ""}`} title={teuer ? "über deiner Kasse" : ""}><b className="t">{de(it.marketValue ?? 0, 1)}</b></span>
                     <span className="re"><b className="t">{de(it.salary ?? 0, 1)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(jeSpieltag(it.salary) ?? 0, 2)}/Spieltag</small></span>
                     <RangAnzeige w={w} />
@@ -768,6 +786,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
             controlMode={controlMode}
             roomContext={props.roomContext}
             playerId={z.item.playerId}
+            fit={z.item.fit ?? null}
+            mercenary={Boolean(z.item.mercenary)}
             name={z.item.name}
             klasse={z.item.className}
             rasse={z.item.race}

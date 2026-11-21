@@ -37,6 +37,9 @@ export type TischProps = {
   controlMode: string | null;
   roomContext: FoundationRoomContext | null | undefined;
   playerId: string;
+  /** Team-Fit zum eigenen Kader (Zahl) und Mercenary-Ausnahme; wirkt auf Wechselwille und Forderung. */
+  fit?: number | null;
+  mercenary?: boolean;
   name: string;
   klasse: string;
   rasse: string;
@@ -226,6 +229,8 @@ export default function VerhandlungsTisch(props: TischProps) {
   }, [modus, saveId, seasonId, teamId, playerId, laenge, form, manuell ? gehalt : null, nachlauf, source, kontext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const neg = stand?.neg ?? {};
+  // Der Fit wirkt wirklich auf die Verhandlung (Wechselwille, Forderung): die Punkte stehen im Vorschau-Aufschlüssel `team_fit`.
+  const fitPunkte = (neg.negotiationScoreBreakdown ?? []).find((e) => e.key === "team_fit")?.points ?? null;
   const forderung = neg.expectedSalary ?? null;
   const angebot = gehalt ?? neg.offeredSalary ?? forderung;
   const wunschLaenge = neg.contractPreference?.idealLength ?? null;
@@ -406,6 +411,20 @@ export default function VerhandlungsTisch(props: TischProps) {
                 <em>{props.klasse} · {props.rasse}</em>
                 <h3>{name}</h3>
                 <small>{props.eignungText ?? ""}</small>
+              </div>
+            </div>
+            <div className="dsp">
+              <h4>Team-Fit</h4>
+              <div className="gz" data-testid="tisch-fit" title="Der Fit zu deinem Kader fließt in den Wechselwillen und bei negativem Fit in die Forderung ein.">
+                <span>Fit zu {props.teamKuerzel || "deinem Team"}{props.mercenary ? " · Mercenary" : ""}</span>
+                {props.fit == null ? (
+                  <b className="t">{props.mercenary ? "Merc" : "—"}</b>
+                ) : (
+                  <b className="t" style={{ color: props.fit > 0 ? "var(--gut)" : props.fit < 0 ? "var(--warn)" : undefined }}>
+                    {props.fit > 0 ? "+" : ""}{de(props.fit, 1)}
+                    {fitPunkte != null ? <small>{fitPunkte > 0 ? "+" : ""}{de(fitPunkte, 1)} Wechselwille</small> : null}
+                  </b>
+                )}
               </div>
             </div>
             <div className="dsp">

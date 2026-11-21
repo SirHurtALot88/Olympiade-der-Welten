@@ -37,7 +37,8 @@ describe("Transfermarkt neu: Vorgaben von Chris (18.11.)", () => {
 
   it("Fit, Value als Chip, Bracket und gespeicherte Suchen entfallen (Value nur als Sortierung)", () => {
     // „market_bracket_factor_preview_pending" ist ein unterdrückter Server-Code, kein Bedienelement.
-    expect(alle.replace(/market_bracket_factor_preview_pending/g, "")).not.toMatch(/fitDisplay|\.fit\b|bracket|Gespeicherte|filterPresets|Bracket/);
+    // Der Fit selbst ist seit dem 21.11. ausdrücklich gewollt (eigene Spalte, Schwellenfilter, Verhandlungstisch); `fitDisplay` bleibt draußen.
+    expect(alle.replace(/market_bracket_factor_preview_pending/g, "")).not.toMatch(/fitDisplay|bracket|Gespeicherte|filterPresets|Bracket/);
     expect(modern).toContain('value: "Value"');
   });
 

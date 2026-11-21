@@ -166,7 +166,8 @@
 .drf .fl .dk20 :is(a,button).an { background:var(--gold);border-color:var(--gold);color:#17120a }
 .drf .mz.kopf :is(a,button) { color:inherit;cursor:pointer }
 .drf .mz.kopf :is(a,button):hover { color:var(--tinte) }
-.drf .mz.kopf :is(a,button).so { color:var(--gold) }
+.drf .mz.kopf :is(a,button,i).so { color:var(--gold) }
+.drf .mz .ft { display:flex;flex-direction:column;align-items:center;gap:calc(.1 * var(--u));line-height:1.05 }
 .drf .mz.kopf :is(a,button).re { text-align:right }
 .drf .ltick { -webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent) }
 .drf .blat { display:inline-flex;gap:calc(.3 * var(--u));align-items:center }

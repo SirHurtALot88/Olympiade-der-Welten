@@ -53,7 +53,7 @@ export default function VergleichDialog(props: {
     ...MARKT_ACHSEN.map<ReihenDef>((a) => ({
       schluessel: `achse-${a}`,
       label: a.toUpperCase(),
-      zahl: (z) => z.sicht.achsen[a].sortWert,
+      zahl: (z) => z.sicht.achsen[a].summe ?? z.sicht.achsen[a].sortWert,
       besser: "hoch",
       text: (z) => z.sicht.achsen[a].anzeige ?? "?",
     })),

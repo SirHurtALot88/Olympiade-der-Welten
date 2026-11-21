@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { filterSchluessel, liesGemerkt, schreibeGemerkt } from "@/app/foundation/shared/filter-gedaechtnis";
-import { istFitSichtbar, zaehleFitAusgeblendet } from "@/lib/market/transfermarkt-fit";
+import { erfuelltFitSchwelle, FIT_AUS, fitSortWert, istFitSichtbar, naechsteFitSchwelle, zaehleFitAusgeblendet } from "@/lib/market/transfermarkt-fit";
 import { baueDisziplinBedarf, sortiereDisziplinen } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import { LEERE_FILTER, type WeitereFilter } from "@/lib/market/transfermarkt-weitere-filter";
 
@@ -45,6 +45,61 @@ describe("Team-Fit-Regel (Markt und Draft-Brett, wie der alte Markt)", () => {
     ];
     expect(zaehleFitAusgeblendet(pool)).toBe(2);
     expect(pool.filter((s) => istFitSichtbar(s)).length).toBe(3);
+  });
+});
+
+describe("Fit-Schwellenfilter „Fit > X“ (Markt und Draft-Brett)", () => {
+  const pool = [
+    { id: "a", fit: 12, mercenary: false },
+    { id: "b", fit: 5, mercenary: false },
+    { id: "c", fit: 0, mercenary: false },
+    { id: "d", fit: -3, mercenary: false },
+    { id: "e", fit: -9, mercenary: true },
+    { id: "f", fit: null, mercenary: false },
+  ];
+  const ids = (schwelle: number) => pool.filter((s) => erfuelltFitSchwelle(s, schwelle)).map((s) => s.id);
+
+  it("aus lässt alles durch", () => {
+    expect(ids(FIT_AUS)).toEqual(["a", "b", "c", "d", "e", "f"]);
+  });
+
+  it("> X heißt strikt größer; Mercenaries und fit-lose Zeilen bleiben Ausnahme", () => {
+    expect(ids(0)).toEqual(["a", "b", "e", "f"]);
+    expect(ids(5)).toEqual(["a", "e", "f"]);
+    expect(ids(10)).toEqual(["a", "e", "f"]);
+    expect(ids(15)).toEqual(["e", "f"]);
+  });
+
+  it("kombinierbar mit dem Schalter für negativen Fit", () => {
+    const sichtbar = pool.filter((s) => istFitSichtbar(s, false) && erfuelltFitSchwelle(s, 0)).map((s) => s.id);
+    expect(sichtbar).toEqual(["a", "b", "e", "f"]);
+    const mitNegativ = pool.filter((s) => istFitSichtbar(s, true) && erfuelltFitSchwelle(s, 5)).map((s) => s.id);
+    expect(mitNegativ).toEqual(["a", "e", "f"]);
+  });
+
+  it("der Stufen-Knopf geht reihum: aus, 0, 5, 10, 15, 20, aus", () => {
+    const reihe: number[] = [];
+    let w: number = FIT_AUS;
+    for (let i = 0; i < 6; i += 1) {
+      w = naechsteFitSchwelle(w);
+      reihe.push(w);
+    }
+    expect(reihe).toEqual([0, 5, 10, 15, 20, FIT_AUS]);
+  });
+
+  it("Sortierschlüssel der Fit-Spalte: Zahl, sonst ans Ende", () => {
+    expect(fitSortWert({ fit: -2.5 })).toBe(-2.5);
+    expect(fitSortWert({ fit: null })).toBeNull();
+  });
+
+  it("die Schwelle überlebt im Filter-Gedächtnis; „aus“ räumt den Eintrag auf", () => {
+    const s = speicher();
+    schreibeGemerkt("k:fitMin", 10, FIT_AUS, s);
+    expect(liesGemerkt("k:fitMin", FIT_AUS, s)).toBe(10);
+    schreibeGemerkt("k:fitMin", 0, FIT_AUS, s);
+    expect(liesGemerkt("k:fitMin", FIT_AUS, s)).toBe(0);
+    schreibeGemerkt("k:fitMin", FIT_AUS, FIT_AUS, s);
+    expect(s.daten.has("k:fitMin")).toBe(false);
   });
 });
 

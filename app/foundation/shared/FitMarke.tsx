@@ -12,3 +12,17 @@ export function FitMarke({ item }: { item: { fit?: number | null; mercenary?: bo
     </>
   );
 }
+
+/** Eigene Fit-Spalte (Chris 21.11.): die Zahl, grün positiv, rot negativ; Mercenaries tragen „Merc“. */
+export function FitZelle({ item }: { item: { fit?: number | null; mercenary?: boolean | null } }) {
+  const merc = item.mercenary ? <span className="tag go" title="Mercenary: von der Fit-Regel ausgenommen">Merc</span> : null;
+  if (item.fit == null) return <span className="ft" data-testid="fit-zelle">{merc ?? <b className="t" style={{ color: "var(--stumm)" }}>—</b>}</span>;
+  const farbe = item.fit > 0 ? "var(--gut, #5fd68a)" : item.fit < 0 ? "var(--warn, #ff7a6e)" : "var(--stumm)";
+  const zahl = `${item.fit > 0 ? "+" : ""}${de(item.fit, 1)}`;
+  return (
+    <span className="ft" data-testid="fit-zelle" title={`Team-Fit zu deinem Kader: ${zahl}. Wirkt auf Wechselwille und Forderung in der Verhandlung.`}>
+      <b className="t" style={{ color: farbe }}>{zahl}</b>
+      {merc}
+    </span>
+  );
+}
