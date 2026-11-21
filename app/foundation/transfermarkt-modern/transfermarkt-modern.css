@@ -388,7 +388,7 @@
 .tmk .reiter button.an::after { content: ""; position: absolute; left: calc(0.5 * var(--u)); right: calc(0.5 * var(--u)); bottom: -1px; height: calc(0.19 * var(--u)); background: var(--gold); transform: skewX(-14deg); }
 .tmk .akt { flex-wrap: wrap; }
 .tmk .akt .knopf { height: calc(2.1 * var(--u)); padding: 0 calc(0.8 * var(--u)); }
-.tmk .kz { grid-template-columns: minmax(0, 1fr) calc(2.3 * var(--u)) calc(1.8 * var(--u)) calc(3.2 * var(--u)) calc(2.2 * var(--u)) calc(3.2 * var(--u)); }
+.tmk .kz { grid-template-columns: minmax(0, 1fr) calc(2.7 * var(--u)) calc(2.6 * var(--u)) calc(2.6 * var(--u)) calc(2.2 * var(--u)) calc(3.2 * var(--u)); }
 .tmk .kz > :nth-child(2), .tmk .kz > :nth-child(3) { text-align: right; }
 .tmk .kz > :nth-child(5), .tmk .kz > :nth-child(6) { text-align: right; }
 .tmk .kz .sz { color: var(--leise); font-size: calc(0.86 * var(--u)); }
@@ -474,3 +474,14 @@
 .tmk .kt .mz .nm b .tmk-pl { text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; cursor: pointer; }
 .tmk .kt .mz .nm b .tmk-pl:hover { color: var(--gold); text-decoration-style: solid; }
 .tmk .rw .tmk-pl { text-decoration: underline dotted rgba(244,230,196,.45); text-underline-offset: 3px; cursor: pointer; }
+
+/* Kaderstärke: Sortierwahl (Wichtigkeit / Spielplan / Matrix) und Slots als 6er-Balken (Chris, 19.11.) */
+.tmk .sortwahl { display: inline-flex; gap: 1px; border: 1px solid rgba(244, 230, 196, 0.14); border-radius: calc(0.3 * var(--u)); overflow: hidden; }
+.tmk .sortwahl button { font-size: calc(0.7 * var(--u)); letter-spacing: 0.06em; text-transform: uppercase; padding: calc(0.18 * var(--u)) calc(0.5 * var(--u)); color: var(--leise); background: transparent; border: 0; cursor: pointer; }
+.tmk .sortwahl button:hover { color: var(--tinte); background: var(--flaeche-2); }
+.tmk .sortwahl button.an { color: #1a1408; background: var(--gold); font-weight: 700; }
+.tmk .kz .slotpips { display: flex; flex-direction: column; gap: 2px; align-self: center; }
+.tmk .kz .slotpips .reihe { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; height: calc(0.36 * var(--u)); }
+.tmk .kz .slotpips i { height: 100%; background: rgba(255, 255, 255, 0.08); border-radius: 1px; }
+.tmk .kz .slotpips i.voll { background: var(--creme); }
+.tmk .kz.an .slotpips i.voll { background: var(--gold); }

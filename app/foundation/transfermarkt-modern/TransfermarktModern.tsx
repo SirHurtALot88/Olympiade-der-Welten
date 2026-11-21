@@ -26,7 +26,7 @@ import {
 import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 
-import { bedarfUrteil, schnittVorkommen } from "@/lib/market/transfermarkt-disziplin-bedarf";
+import { bedarfUrteil, ersterAuftritt, schnittVorkommen, slotsKurz, spielplanKurz, spielplanLang } from "@/lib/market/transfermarkt-disziplin-bedarf";
 import { berechneFreigabeAnzeige, freigabeKosten, freigabeSperre } from "@/lib/market/transfermarkt-freigabe";
 
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
@@ -73,6 +73,15 @@ const SORT_LABEL: Record<SortKey, string> = {
 };
 const ACHSEN_LABEL: Record<MarktAchse, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
 const DISZIPLINEN = [...DISZIPLINEN_GEORDNET] as string[];
+/** Sortierung der Kaderstärke-Liste: Wichtigkeit, Reihenfolge im Spielplan (Chris, 19.11.) oder feste Matrix-Reihenfolge. */
+type StaerkeSort = "wichtigkeit" | "spielplan" | "liste";
+const STAERKE_SORTEN: Array<{ id: StaerkeSort; text: string; titel: string }> = [
+  { id: "wichtigkeit", text: "Wichtigkeit", titel: "Wichtigste zuerst (Auftritte × Slots)" },
+  { id: "spielplan", text: "Spielplan", titel: "In der Reihenfolge, in der die Disziplinen in dieser Saison drankommen" },
+  { id: "liste", text: "Matrix", titel: "Feste Reihenfolge nach Achsen (POW, SPE, MEN, SOC)" },
+];
+/** Mehr als 6 Einsatz-Slots je Disziplin gibt es nicht; 6 = Balken voll. */
+const SLOTS_MAX = 6;
 
 /** Spalten der Markt-Liste (Breiten in u); per Ziehen anpassbar und je Benutzer gespeichert (Chris 19.11.). */
 export const TM_SPALTEN: SpaltenDef[] = [
@@ -198,7 +207,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const [dialog, setDialog] = useState<null | { art: "kauf" | "vergleich" | "verl"; id?: string }>(null);
   const [neuLaden, setNeuLaden] = useState(0);
   const [hinweis, setHinweis] = useState<string | null>(null);
-  const [staerkeSort, setStaerkeSort] = useState<"liste" | "wichtigkeit">("wichtigkeit");
+  const [staerkeSort, setStaerkeSort] = useState<StaerkeSort>("wichtigkeit");
 
   const feed = useMarktFeed({
     saveId: defaultSaveId,
@@ -333,6 +342,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const freigabeAnzeige = useMemo(() => berechneFreigabeAnzeige(cash, props.freigabe), [cash, props.freigabe]);
   const bedarf = props.disziplinBedarf ?? {};
   const bedarfSchnitt = schnittVorkommen(bedarf);
+  const slotsGesamt = Object.values(bedarf).reduce((m, e) => Math.max(m, ...e.auftritte.map((a) => a.nr)), 0);
   const fokusAblöse = fokus?.item.marketValue ?? null;
   const kannKaufen = Boolean(darfVerwalten && (transferWindow?.canBuy ?? true) && source === "sqlite");
   const kaufSperre = !darfVerwalten
@@ -369,6 +379,9 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const disziplinNamen = officialDisciplineWeightLabels as Record<string, string>;
   const disziplinReihenfolge = useMemo(() => {
     if (staerkeSort === "liste") return DISZIPLINEN;
+    if (staerkeSort === "spielplan") {
+      return [...DISZIPLINEN].sort((a, b) => ersterAuftritt(bedarf[a]) - ersterAuftritt(bedarf[b]) || DISZIPLINEN.indexOf(a) - DISZIPLINEN.indexOf(b));
+    }
     return [...DISZIPLINEN].sort(
       (a, b) => (bedarf[b]?.wichtigkeit ?? 0) - (bedarf[a]?.wichtigkeit ?? 0) || DISZIPLINEN.indexOf(a) - DISZIPLINEN.indexOf(b),
     );
@@ -481,10 +494,14 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
             </section>
             <section className="pan voll" id="g-stark" aria-label="Kaderstärke je Disziplin">
               <div className="pk"><h2>Kaderstärke</h2><span className="sp" />
-                <button type="button" onClick={() => setStaerkeSort((v) => (v === "wichtigkeit" ? "liste" : "wichtigkeit"))} title="Sortierung der Disziplinen" data-testid="tm-staerke-sort">{staerkeSort === "wichtigkeit" ? "nach Wichtigkeit" : "Reihenfolge Matrix"}</button>
+                <span className="sortwahl" role="group" aria-label="Sortierung der Disziplinen" data-testid="tm-staerke-sort">
+                  {STAERKE_SORTEN.map((o) => (
+                    <button type="button" key={o.id} className={staerkeSort === o.id ? "an" : ""} aria-pressed={staerkeSort === o.id} title={o.titel} onClick={() => setStaerkeSort(o.id)} data-testid={`tm-staerke-sort-${o.id}`}>{o.text}</button>
+                  ))}
+                </span>
               </div>
               <div className="ks">
-                <div className="kz kopf"><span title="Stärke = Ø der besten 6">Disziplin</span><span title="Auftritte in dieser Saison">Saison</span><span title="Einsatz-Slots je Auftritt">Slots</span><span /><span>Rang</span><span>{fokus ? "mit ihm" : ""}</span></div>
+                <div className="kz kopf"><span title="Stärke = Ø der besten 6">Disziplin</span><span title="An welchen Spieltagen die Disziplin in dieser Saison drankommt">Spieltag</span><span title="Einsatz-Slots je Auftritt (höchstens 6)">Slots</span><span title="Kaderstärke: Ø der besten 6, grün = mit dem gewählten Spieler">Stärke</span><span>Rang</span><span>{fokus ? "mit ihm" : ""}</span></div>
                 {disziplinReihenfolge.map((d) => {
                   const w = fokusWirkungen.find((x) => x.disziplinId === d);
                   const v = eigeneKaderStaerken[d] ?? 20;
@@ -493,10 +510,16 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                   const b = bedarf[d];
                   const u = bedarfUrteil({ eintrag: b, schnittVorkommen: bedarfSchnitt, rang: r, ligaGroesse: ligaTeamIds.length });
                   return (
-                    <button type="button" key={d} className={`kz${d === disziplin ? " an" : ""}`} onClick={() => { setDisziplin(d); setBlatt(0); }} title={`${disziplinNamen[d]}: ${u.text}. Markt nach ${disziplinNamen[d]} ausrichten`} data-testid={`tm-disziplin-${d}`}>
+                    <button type="button" key={d} className={`kz${d === disziplin ? " an" : ""}`} onClick={() => { setDisziplin(d); setBlatt(0); }} title={`${disziplinNamen[d]}: ${spielplanLang(b, slotsGesamt)}. ${u.text}. Markt nach ${disziplinNamen[d]} ausrichten`} data-testid={`tm-disziplin-${d}`}>
                       <span className="n" style={staerkeSort === "liste" && achseDerDisziplin(d) ? { borderLeft: `3px solid ${ACHSEN_FARBE_HEX[achseDerDisziplin(d)!]}`, paddingLeft: "calc(.4 * var(--u))" } : undefined}><i className={`bd ${u.art}`} />{disziplinNamen[d]}</span>
-                      <span className="t sz">{b ? `${b.vorkommen}×` : "–"}</span>
-                      <span className="t sz">{b?.slots ?? "–"}</span>
+                      <span className="t sz">{spielplanKurz(b).replace(/^ST /, "")}</span>
+                      <span className="slotpips" aria-label={`Slots je Auftritt: ${slotsKurz(b)}`}>
+                        {(b?.auftritte.length ? b.auftritte : [{ nr: 0, slots: null }]).map((a) => (
+                          <span key={a.nr} className="reihe">
+                            {Array.from({ length: SLOTS_MAX }, (_, i) => <i key={i} className={a.slots != null && i < a.slots ? "voll" : ""} />)}
+                          </span>
+                        ))}
+                      </span>
                       <span className="bal"><i className="z" style={{ width: `${begrenze(vn - 20, 0, 70) / 0.7}%` }} /><i style={{ width: `${begrenze(v - 20, 0, 70) / 0.7}%` }} /></span>
                       <span className={`r t ${r <= 4 ? "gutr" : r >= 12 ? "schl" : ""}`}>{r}.</span>
                       <span className={`w t ${w && w.nachherBest < w.vorher ? "auf" : w && w.nachherSchlecht > w.vorher ? "ab" : "gl"}`}>
@@ -507,7 +530,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 })}
               </div>
               <div className="mfuss" data-testid="tm-bedarf-hinweis">
-                <span><b>{disziplinNamen[disziplin]}</b>: {bedarf[disziplin] ? `${bedarf[disziplin].vorkommen}× in dieser Saison, ${bedarf[disziplin].slots ?? "?"} Slots` : "nicht im Spielplan"} · Rang {fokusWirkungen.find((x) => x.disziplinId === disziplin)?.vorher ?? "–"}. {fokusBedarf.text}</span>
+                <span><b>{disziplinNamen[disziplin]}</b>: {spielplanLang(bedarf[disziplin], slotsGesamt)} · Rang {fokusWirkungen.find((x) => x.disziplinId === disziplin)?.vorher ?? "–"}. {fokusBedarf.text}</span>
               </div>
             </section>
           </div>
@@ -515,7 +538,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
           <section className="pan" id="m-liste" aria-label="Markt">
             <div className="fl">
               <input placeholder="Name, Klasse, Rasse" value={suche} onChange={(e) => { setSuche(e.target.value); setBlatt(0); }} aria-label="Suche" data-testid="tm-suche" />
-              <span className="diszi" title={fokusBedarf.text}><small>Disziplin</small>{disziplinNamen[disziplin]}<small style={{ color: "var(--leise)" }}>{bedarf[disziplin] ? `${bedarf[disziplin].vorkommen}× · ${bedarf[disziplin].slots ?? "?"} Slots` : ""}</small></span>
+              <span className="diszi" title={fokusBedarf.text}><small>Disziplin</small>{disziplinNamen[disziplin]}<small style={{ color: "var(--leise)" }}>{bedarf[disziplin] ? `${spielplanKurz(bedarf[disziplin])} · Slots ${slotsKurz(bedarf[disziplin])}` : ""}</small></span>
               <button type="button" className={`fc${nurBezahlbar ? " an" : ""}`} onClick={() => { setNurBezahlbar((v) => !v); setBlatt(0); }}>bezahlbar</button>
               <button type="button" className={`fc${nurHebt ? " an" : ""}`} onClick={() => { setNurHebt((v) => !v); setBlatt(0); }} title="Könnte den Kaderrang heben (obere Grenze der sichtbaren Spanne)">kann meinen Rang heben</button>
               <button type="button" className={`fc${nurMerkliste ? " an" : ""}`} onClick={() => { setNurMerkliste((v) => !v); setBlatt(0); }}>★ Merkliste</button>
