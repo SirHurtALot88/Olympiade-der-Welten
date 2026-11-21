@@ -1,3 +1,4 @@
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -386,6 +387,8 @@ export type ArenaFixtureResult = {
   gesamtKg?: [number, number];
   /** S. `ArenaMomentEintrag` — nur fuer das Feldspiel-Chassis gesetzt, sonst `undefined`. */
   momente?: ArenaMomentEintrag[];
+  /** S. `ErgebnisAnzeigeZahl` — [heim, gast]; nur Zeitfahren/Staffel (Zeit) und Breaking (besiegt). */
+  anzeige?: ErgebnisAnzeigeZahl;
 };
 
 /**
@@ -663,6 +666,8 @@ export type RoherBrowserFixtureErgebnis = {
   gesamtKg?: [number, number];
   /** Nur fuer `spieleFeldspiel()` gesetzt, s. `ArenaMomentEintrag`. */
   momente?: RoherBrowserMomentEintrag[];
+  /** Nur Zeitfahren/Staffel (`spieleBahn`) und Breaking (`spieleBuehneGauntlet`), s. `ErgebnisAnzeigeZahl`. */
+  anzeige?: ErgebnisAnzeigeZahl;
 };
 
 /**
@@ -874,6 +879,7 @@ export function baueArenaFixtureErgebnisse(
       boxscore,
       ...(ergebnis.gesamtKg ? { gesamtKg: ergebnis.gesamtKg } : {}),
       ...(momente ? { momente } : {}),
+      ...(ergebnis.anzeige ? { anzeige: ergebnis.anzeige } : {}),
     };
   });
 }

@@ -1108,6 +1108,8 @@ export function buildLegacyMatchdayResolvePreview(
         arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
         // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): s. `ArenaMomentEintrag`-Kommentar.
         momente: arenaOverride?.momente ?? null,
+        // ANZEIGE-ZAHL (21.11.): nur gesetzt, wenn der Motor sie geliefert hat -- sonst fehlt der Schluessel.
+        ...(arenaOverride?.anzeige ? { ergebnisAnzeige: arenaOverride.anzeige } : {}),
         // Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
         // sequenziell+Reveal): die Gegner-Team-ID dieses Zwei-Team-Duells, nur gesetzt bei
         // `resolutionSource === "arena"` -- die Bühne braucht sie, um Boards paarweise zu

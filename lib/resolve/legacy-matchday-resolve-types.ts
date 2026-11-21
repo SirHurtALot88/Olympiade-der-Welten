@@ -1,3 +1,4 @@
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { LegacyMutatorSlotEffect, LegacyResolveMutatorMode } from "@/lib/lineups/legacy-lineup-types";
 import type { TeamPowerEffectType, TeamPowerTargetMode } from "@/lib/data/olyDataTypes";
 // S. Kommentar an diesem Import in legacy-lineup-types.ts -- `import type` zieht keine
@@ -233,6 +234,8 @@ export type DisciplineTeamResolvePreview = {
    * `ArenaMomentEintrag`, lib/battle/arena-headless-runner.ts), fuer Heim UND Gast identisch.
    */
   momente?: ArenaMomentEintrag[] | null;
+  /** ANZEIGE-ZAHL (21.11., Spieltagswertung): Zeitsumme bzw. besiegte Gegner, s. `ErgebnisAnzeigeZahl`. */
+  ergebnisAnzeige?: ErgebnisAnzeigeZahl | null;
   /**
    * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
    * sequenziell+Reveal, Chris 13.10.): wie `arenaMatchSeed` nur gesetzt, wenn

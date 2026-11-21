@@ -1,4 +1,4 @@
-import { ergebnisMitSkalaText } from "@/lib/resolve/ergebnis-skala";
+import { duellErgebnisAnzeige, duellErgebnisText } from "@/lib/foundation/ergebnis-anzeige";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   DisciplineTeamResolvePreview,
@@ -233,11 +233,10 @@ export function beschreibeGebuchtesArenaErgebnis(
   // "87 : 79 → 7 : 4" -- beides aus derselben gebuchten Zeile.
   // Nur bei einer E1-Zeile: eine Zeile der laufenden (alten) Saison zeigt exakt wie vor E1 nur die native Zahl.
   const skala = eigen.ergebnisSkala === "e1" && Array.isArray(eigen.ergebnisNormiert) ? eigen.ergebnisNormiert : null;
-  const stand = skala
-    ? ` ${ergebnisMitSkalaText({ seiten, skala })}`
-    : seiten
-      ? ` ${fmt(seiten[0])} : ${fmt(seiten[1])}`
-      : "";
+  // ANZEIGE (21.11.): Zeitfahren/Staffel zeigen die Zeiten, Breaking die besiegten Gegner statt des Siegmarkers "1 : 0".
+  const anzeige = duellErgebnisAnzeige({ disciplineId: eigen.disciplineId, seiten, anzeige: eigen.ergebnisAnzeige ?? null, skala });
+  const text0 = duellErgebnisText(anzeige);
+  const stand = text0 ? ` ${text0}` : "";
   return { ausgang, text: `${wort} gegen ${gegnerName}${stand}${punkteText}` };
 }
 
