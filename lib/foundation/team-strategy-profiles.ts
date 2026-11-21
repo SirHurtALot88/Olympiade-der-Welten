@@ -306,7 +306,7 @@ const strategySeedsByTeamId: Record<string, StrategySeed> = {
     rosterStyle: "Fish-Kern mit Value-Bank, ein bis zwei teureren Ratio-Ankern und bewusster Cash-Reserve.",
     preferredArchetypes: ["fish core", "alien river scout", "salary value fish", "siren", "aqua mage"],
     avoidedArchetypes: ["heavy metal bruiser", "rigid crusader"],
-    preferredRaces: ["fish", "alien", "aquatic"],
+    preferredRaces: ["aqua", "alien", "aquatic"],
     hardNoGos: ["hard anti-fish vibe"],
     bias: {
       cashPriority: 9,

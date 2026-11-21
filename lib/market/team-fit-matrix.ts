@@ -67,14 +67,14 @@ const raceRowsByTeamId = buildRowsByTeamId(typedSource.races.rows);
 const subclassRowsByTeamId = buildRowsByTeamId(typedSource.subclasses.rows);
 
 /**
- * Die Fit-Matrix (Google-Sheet) und der Spielerpool benennen zwei Tokens verschieden: die Rasse heißt in
- * der Matrix `Fish`, im Pool `Aqua` (106 Spieler); die Subklasse heißt in der Matrix `Giant`, im Pool
- * `Behemoth` (211 Spieler). Ohne Alias griff die Spalte für diese Spieler nie — z. B. D-P −10 auf
- * Fisch-Spieler oder The Giants +5 auf Riesen (Fund 21.11. beim 40-Teams-Mockup). Die Matrix bleibt
- * unverändert; nur das Nachschlagen übersetzt den Pool-Namen auf den Matrix-Namen.
+ * Fund 21.11. beim 40-Teams-Mockup: Matrix und Spielerpool benannten zwei Tokens verschieden, die Spalte
+ * griff für diese Spieler nie (z. B. D-P −10 auf Aqua-Spieler, The Giants +5 auf Behemoths).
+ * - Rasse: Chris „fish = aqua“ — die Matrix heißt seitdem selbst `Aqua` (auch der Sheet-Abgleich
+ *   übersetzt). `fish` bleibt hier nur als Rückfall für Altdaten (ein Spieler im Pool trägt noch „Fish“).
+ * - Subklasse: Matrix `Giant`, Pool `Behemoth` (211 Spieler) — Übersetzung beim Nachschlagen.
  */
 const POOL_ZU_MATRIX_TOKEN: Record<string, string> = {
-  aqua: "fish",
+  fish: "aqua",
   behemoth: "giant",
 };
 
