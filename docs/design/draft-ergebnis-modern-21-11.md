@@ -59,3 +59,10 @@ Freigabe 85 %, 20 Spieltage.
 2. Liga-Übersicht: dürfen Gehalt und Kasse der anderen Teams offen stehen, oder gilt dort der Nebel?
 3. Optionale „besten 6“ unter der Kaderstärke: behalten oder weg?
 4. Restbudget: soll bei 0 C ein Hinweis stehen, was den Topf öffnet (Verkäufe, Rücklage anzapfen)?
+
+## Entscheidung Chris (21.11.) — Freigabe „kannst du so bauen“
+
+- Abgenommen, mit einer Änderung: in der Kadertabelle **keine Noten-Kästchen (S/A/B/C…) neben POW/SPE/MEN/SOC**, die absoluten Zahlen reichen.
+- Kaderstärke in der Mitte zeigt den Rang **in der eigenen Liga** (wie rechts), nicht unter 32.
+- Gehalt und Kasse der anderen Teams in der Liga-Übersicht: offen (kein Nebel).
+- „Meine besten 6“ unter der Kaderstärke: **behalten**.

@@ -88,3 +88,11 @@ Wegen Punkt 1 bis 5 gehört der Bau unter ein unabhängiges Review (Opus), mit S
 4. **Pause:** volle Bank-Erholung 28 für alle, mit Gebäudebonus? Und gilt sie auch in einer Saison mit 10 Spieltagen
    (dann am Saisonende wirkungslos)?
 5. Soll die KI die Resistenz von Anfang an mitrechnen, oder erst der Mensch testen?
+
+## Antworten Chris (21.11.)
+
+- Resistenz = Belastungs-Attribut des Platzes: korrekt.
+- Resistenz wirkt **nur auf die Erschöpfung**, nicht auf das Verletzungsrisiko.
+- Härte 45/60/75 / Deckel +6: erst mit einem Härtetest über eine Saison belegen.
+- Pause nach Spieltag 10: jeder Spieler regeneriert **einen Spieltag**, individuell (Verletzung, Gebäudestand …), nicht pauschal −28.
+- Kernwunsch: Die Last in der Einsatzlisten-Vorschau soll sich ändern, wenn man einen Spieler mit hoher Resistenz auf den Platz setzt → Vorschlag v2 als Mockup.
