@@ -195,6 +195,7 @@ import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -1316,6 +1317,9 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   let torwartReferenz: ArenaPpsReferenzFeldgroesse | null = null;
   const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const ppsByPlayerId = new Map<string, number>();
+  // PP-TAGESANKER (Prototyp 21.11., Standard AUS, lib/resolve/pp-tagesanker.ts): ungedeckelt rechnen und
+  // danach ueber ALLE Spieler beider Ligen dieses Spieltags verteilen. Aus = bit-identisch zu vorher.
+  const tagesanker = ppTagesankerAktiv(ppSkala);
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {
       if (eintrag.playerId === null) continue;
@@ -1345,6 +1349,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
                   : disciplineId === "breaking" && regel === "alt"
                     ? "gauntletAlt"
                     : undefined,
+            ...(tagesanker ? { deckel: false } : {}),
           }),
         );
         continue;
@@ -1361,7 +1366,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
       }
     }
   }
-  return ppsByPlayerId;
+  return tagesanker ? verteilePpNachTagesanker(ppsByPlayerId) : ppsByPlayerId;
 }
 
 /**

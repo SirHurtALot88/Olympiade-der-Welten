@@ -18,6 +18,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
+import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -168,11 +169,24 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k, variante: format === "orte3" ? "orte3" : undefined })
+          ? ppAusKurveSkaliert({
+              disciplineId: BATTLEFIELD_DISCIPLINE_ID,
+              wert: eintrag.wertung,
+              referenz,
+              modus: ppSkala,
+              playerCount: k,
+              variante: format === "orte3" ? "orte3" : undefined,
+              ...(ppTagesankerAktiv(ppSkala) ? { deckel: false } : {}),
+            })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings };
+  // PP-TAGESANKER (Prototyp 21.11., Standard AUS): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: ppTagesankerAktiv(ppSkala) ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    warnings,
+  };
 }
