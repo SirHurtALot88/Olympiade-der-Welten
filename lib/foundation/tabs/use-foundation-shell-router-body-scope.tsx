@@ -281,6 +281,7 @@ import {
   buildTeamHistoryDisciplineValuesFromSnapshot,
 } from "@/lib/season/season-discipline-area-groups";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
+import { setzeTrainingsZiel } from "@/lib/training/spieltag-training";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   appendRoomContextToParams,
@@ -2164,13 +2165,77 @@ export function useFoundationShellRouterBodyScope({
   const pendingTrainingModesRef = useRef<Map<string, TrainingModeDraft>>(new Map());
   const trainingModeFlushRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Ziel-Disziplin + Weg (Entwicklung, Plan-Editor) laufen durch DIESELBE Sammel-Schleuse wie die Modi,
+  // damit ein „Plan übernehmen" mit Modus- UND Zieländerungen genau einmal aus dem aktuellen Stand baut.
+  const pendingTrainingsZieleRef = useRef<Map<string, { disziplinId: string; weg: number } | null>>(new Map());
+
+  async function persistPlayerTrainingsZielInRoom(
+    playerId: string,
+    ziel: { disziplinId: string; weg: number } | null,
+    teamId: string | null,
+  ) {
+    if (!teamId) {
+      setFoundationActionFeedback({ tone: "warning", title: "Trainingsziel nicht gespeichert", detail: "Kein Team für diesen Spieler gefunden." });
+      return;
+    }
+    try {
+      const response = await fetch("/api/training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({ saveId: activeSaveId, teamId, playerId, trainingsZiel: ziel })),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Trainingsziel nicht gespeichert",
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Trainingsziel konnte nicht gespeichert werden.",
+        });
+        return;
+      }
+      const nextGameState: GameState = {
+        ...setzeTrainingsZiel(gameState, playerId, ziel),
+        saveVersion: payload.saveVersion ?? gameState.saveVersion,
+      };
+      setGameState(nextGameState);
+      void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
+    } catch (error) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Trainingsziel nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Trainingsziel konnte nicht gespeichert werden.",
+      });
+    }
+  }
+
+  function setPlayerTrainingsZiele(aenderungen: Array<{ playerId: string; ziel: { disziplinId: string; weg: number } | null }>) {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+    for (const { playerId, ziel } of aenderungen) {
+      pendingTrainingsZieleRef.current.set(playerId, ziel);
+    }
+    if (trainingModeFlushRef.current) {
+      clearTimeout(trainingModeFlushRef.current);
+    }
+    trainingModeFlushRef.current = setTimeout(() => {
+      void flushPendingTrainingModes();
+    }, 0);
+  }
+
   async function flushPendingTrainingModes() {
     trainingModeFlushRef.current = null;
     const changes = pendingTrainingModesRef.current;
-    if (changes.size === 0) {
+    const zielChanges = pendingTrainingsZieleRef.current;
+    if (changes.size === 0 && zielChanges.size === 0) {
       return;
     }
     pendingTrainingModesRef.current = new Map();
+    pendingTrainingsZieleRef.current = new Map();
 
     // In einem Online-Room ist der Ganz-Stand-PUT gesperrt (409
     // room_save_generic_write_forbidden); jede gesammelte Änderung geht stattdessen
@@ -2181,13 +2246,30 @@ export function useFoundationShellRouterBodyScope({
         const pendingTeamId = gameState.rosters.find((entry) => entry.playerId === pendingPlayerId)?.teamId ?? null;
         await persistPlayerTrainingModeInRoom(pendingPlayerId, pendingMode, pendingTeamId);
       }
+      for (const [pendingPlayerId, pendingZiel] of zielChanges) {
+        const pendingTeamId = gameState.rosters.find((entry) => entry.playerId === pendingPlayerId)?.teamId ?? null;
+        await persistPlayerTrainingsZielInRoom(pendingPlayerId, pendingZiel, pendingTeamId);
+      }
       return;
     }
 
     const teamId = gameState.rosters.find((entry) => changes.has(entry.playerId))?.teamId ?? null;
+    let gameStateMitZielen: GameState = gameState;
+    try {
+      for (const [zielPlayerId, zielWert] of zielChanges) {
+        gameStateMitZielen = setzeTrainingsZiel(gameStateMitZielen, zielPlayerId, zielWert);
+      }
+    } catch (error) {
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Trainingsziel nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Trainingsziel konnte nicht gespeichert werden.",
+      });
+      return;
+    }
     const nextGameState: GameState = {
-      ...gameState,
-      players: gameState.players.map((player) =>
+      ...gameStateMitZielen,
+      players: gameStateMitZielen.players.map((player) =>
         changes.has(player.id) ? { ...player, trainingMode: changes.get(player.id)! } : player,
       ),
       seasonState: teamId
@@ -2207,7 +2289,7 @@ export function useFoundationShellRouterBodyScope({
     };
 
     setGameState(nextGameState);
-    for (const playerId of changes.keys()) {
+    for (const playerId of new Set([...changes.keys(), ...zielChanges.keys()])) {
       void refreshOpenPlayerProfileAfterTrainingChange(nextGameState, playerId);
     }
     try {
@@ -13028,6 +13110,7 @@ export function useFoundationShellRouterBodyScope({
     onSetTrainingClass: (playerId, trainingClass) => {
       void setPlayerTrainingClass(playerId, trainingClass);
     },
+    onSetTrainingsZiele: (aenderungen) => setPlayerTrainingsZiele(aenderungen),
     onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId),
     onOpenFacilities: () => setFoundationView("trainingV2", setActiveView),
     onOpenTeams: () => setFoundationView("teams", setActiveView),
