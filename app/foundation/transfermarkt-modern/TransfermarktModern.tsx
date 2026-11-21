@@ -369,6 +369,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
   const kannKaufen = Boolean(darfVerwalten && (transferWindow?.canBuy ?? true) && source === "sqlite");
   const kaufSperre = !darfVerwalten
     ? "Dieses Team ist nur zum Ansehen freigegeben."
+    : props.ligaDraftLaeuft
+      ? "Der Liga-Draft läuft: gepickt wird auf der Draft-Seite — fester Vertrag über 1 Saison, ohne Verhandlung."
     : !(transferWindow?.canBuy ?? true)
       ? `Transferfenster: ${transferWindow?.phaseLabel ?? "geschlossen"}. Gekauft wird im Kauffenster.`
       : source !== "sqlite"

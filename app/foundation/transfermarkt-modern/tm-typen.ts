@@ -89,6 +89,11 @@ export type TransfermarktModernProps = {
   onOpenHistory?: (() => void) | null;
   /** Heutiger Draft-Weg (Platzhalter-Reiter zeigt dorthin, bis der Draft-Neubau kommt). */
   onOpenDraft?: (() => void) | null;
+  /**
+   * Läuft gerade der Liga-Draft (geordnete Phase)? Dann wird am Markt nicht verhandelt (Chris 21.11.: „im Draft wird immer
+   * 1 Jahr gepickt“) — gepickt wird auf der Draft-Seite zu Festkonditionen, der Verhandlungstisch bleibt zu.
+   */
+  ligaDraftLaeuft?: boolean;
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
   scoutingWatchPlayerIds?: string[];

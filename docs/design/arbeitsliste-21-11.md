@@ -34,7 +34,7 @@ Animationen. Ränge (Tabelle, Kaderstärke) je Liga; PP und Marktwert/VK über b
 | 2.1 | Transfermarkt: Hover-Bild, PP-Spalte weg, Spaltenbreiten, großes Profil (WIP `claude/tm-spalten-ziehen-hover-19-11`) |
 | 2.2 | Verhandlung: Liste = Startforderung, eigenwillige Spieler trait-basiert (Diagnose auf `claude/tm-verhandlung-fix-19-11`) |
 | 2.3 | Kaderstärke: Spieltage, Slots je Auftritt, Sortierung Spielplan (`claude/tm-diszi-spielplan-19-11`, Layout zu eng) |
-| 2.4 | Draft: verhandeln auch über „Picken“; KI wählt Laufzeit/Gehalt frei |
+| 2.4 | ~~Draft: verhandeln über „Picken“~~ — **entfällt (Chris 21.11.)**: im Draft wird immer fest 1 Saison gepickt, Mensch und KI, ohne Verhandlung; verhandelt wird erst bei Verlängerungen am Ende von S1. Der Markt-Verhandlungstisch ist während des Drafts zu. |
 | 2.5 | Team-Fit: positive Fits + Mercs standardmäßig, negative per Schalter (alte Marktregel) |
 | 2.6 | Filter bleiben beim Reiterwechsel stehen (Markt + Draft) |
 | 2.7 | Draft-Brett links: Umschalter Draftliste ↔ Stats meines Teams (In-Game-Meldung, gab es früher) |

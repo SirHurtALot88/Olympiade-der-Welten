@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import type { Dispatch, SetStateAction } from "react";
 
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
+import { ligaDraftDieserSaison } from "@/lib/draft/liga-draft-modell";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import type {
   Discipline,
@@ -237,6 +238,7 @@ export default function FoundationMarketV2ShellHost({
         leagueTeamCount: gameState.teams.length,
         leagueTeamIds,
         nebelAus: isScoutingNebelAus(gameState),
+        ligaDraftLaeuft: ligaDraftDieserSaison(gameState)?.status === "laeuft",
         injuredPlayerIds,
         disziplinBedarf,
         // Vorstand-Freigabe: Datenvertrag `TransferFreigabe` (lib/market/transfermarkt-freigabe.ts). Die Zahlen liefert die

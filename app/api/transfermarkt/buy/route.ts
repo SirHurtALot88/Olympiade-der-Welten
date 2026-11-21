@@ -196,7 +196,6 @@ export async function POST(request: Request) {
           teamId,
           playerId,
           idempotencyKey: params.idempotencyKey,
-          vertrag: { contractLength: params.contractLength, contractShape: params.contractShape, offeredSalary: params.offeredSalary },
         });
         summary = pick.kauf;
       } catch (fehler) {

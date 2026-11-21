@@ -223,20 +223,17 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     const gs = lade();
     const sicht = ansicht.baueLigaDraftAnsicht({ gameState: gs, saveId, betrachterTeamId: menschTeamId, vorschau: 0 })!;
     const playerId = sicht.mein!.vorschlag[0]!;
-    // Chris 19.11.: im Draft wird wieder verhandelt — ein am Verhandlungstisch abgeschlossener Vertrag zaehlt als Pick,
-    // mit SEINER Laufzeit (nicht der festen 1 Saison). Grosszuegiges Angebot, damit das Verdikt sicher zusagt.
-    const forderung = gs.players.find((p) => p.id === playerId)?.salaryDemand ?? 1;
     const ergebnis = dienst.bucheMenschPick({
       persistence,
       saveId,
       teamId: menschTeamId,
       playerId,
       erwarteteNr: sicht.stand,
-      vertrag: { contractLength: 3, contractShape: "balanced", offeredSalary: Math.max(1, forderung * 2) },
     });
     expect(ergebnis.kauf.transferCreated).toBe(true);
     const nachher = lade();
-    expect(nachher.rosters.find((r) => r.teamId === menschTeamId && r.playerId === playerId)?.contractLength).toBe(3);
+    // Chris 21.11.: im Draft immer fester 1-Jahres-Vertrag, keine Verhandlung.
+    expect(nachher.rosters.find((r) => r.teamId === menschTeamId && r.playerId === playerId)?.contractLength).toBe(1);
     expect(nachher.transferHistory.find((t) => t.id === ergebnis.transferId)).toMatchObject({
       source: "manual_transfermarkt_buy",
       toTeamId: menschTeamId,
