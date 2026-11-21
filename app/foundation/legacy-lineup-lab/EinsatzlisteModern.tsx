@@ -114,7 +114,7 @@ function LastZahl({ b, gross }: { b: SlotBelastungsVorschau | null; gross?: bool
       ? `Last ${ZAHL.format(b.last)}: Grundlast ${ZAHL.format(b.teile.grundlast)} (Belastung ${BELASTUNGS_STUFEN_TEXT[b.teile.stufe]}, Schwelle ${b.teile.schwelle})${b.zusatzText ? `, ${b.zusatzText}` : ""}. Erschöpfung ${Math.round(b.fatigueVorher)} → ${Math.round(b.fatigueNachher)}, Verletzungsrisiko ${ZAHL.format(b.risikoProzent)} %.`
       : `Last ${ZAHL.format(b.last)} (für jeden Platz gleich). Erschöpfung ${Math.round(b.fatigueVorher)} → ${Math.round(b.fatigueNachher)}, Verletzungsrisiko ${ZAHL.format(b.risikoProzent)} %.`;
   return (
-    <span className={`elm-lz is-${b.ton}${gross ? " is-gross" : ""} bc-t`} title={titel} data-testid="elm-last-zahl">
+    <span className={`elm-lz is-${b.ton}${gross ? " is-gross" : ""} bc-t`} data-bc-tip={titel} data-testid="elm-last-zahl">
       {ZAHL.format(b.last)}
     </span>
   );
@@ -155,7 +155,7 @@ function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang
   const hauptText = rang.liga != null ? `Liga ${rang.ligaName?.slice(-1) ?? ""}` : "alle Teams";
   const titel = `Unser Rang in dieser Disziplin (${quelle === "Saison" ? "Saisonwertung nach Teampunkten" : "nach Kaderstärke: Summe der sechs besten Eignungen, noch keine Wertung"}): ${rang.liga != null ? `${rang.liga}. in ${rang.ligaName}, ` : ""}${rang.gesamt}. von ${rang.gesamtVon} Teams${rang.abstandVordermann != null ? `. ${rang.abstandVordermann} Punkte bis zum Vordermann` : ""}.`;
   return (
-    <span className="elm-rang" title={titel}>
+    <span className="elm-rang" data-bc-tip={titel}>
       <span className="elm-rang__ko">{seite.toUpperCase()} · Rang · {quelle}</span>
       <span className="elm-rang__za">
         <b className="bc-t">{haupt}.</b>
@@ -233,7 +233,13 @@ export default function EinsatzlisteModern(props: Props) {
   const [kontextTab, setKontextTab] = useState<"rolle" | "gegner" | "pruefung" | "formmoral" | "karten">("rolle");
   const [blatt, setBlatt] = useState<null | "kader" | "kontext">(null);
   const [steuerungOffen, setSteuerungOffen] = useState(false);
-  const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name" | "res" | "lasthier">("platz");
+  const [sortKey, setSortKey] = useState<"platz" | "disz" | "last" | "name" | "res" | "lasthier" | "form" | "moral" | "karte">("platz");
+  /** Zweiter Klick auf dieselbe Spalte dreht die Richtung (Designregel: alle Tabellen sortierbar). */
+  const [sortUmgekehrt, setSortUmgekehrt] = useState(false);
+  const klickSort = (key: typeof sortKey) => {
+    if (key === sortKey) setSortUmgekehrt((u) => !u);
+    else { setSortKey(key); setSortUmgekehrt(false); }
+  };
   const [kaderFilter, setKaderFilter] = useState<"alle" | "frei" | "gesetzt" | "gesperrt">("alle");
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [profilBlatt, setProfilBlatt] = useState<string | null>(null);
@@ -554,7 +560,7 @@ export default function EinsatzlisteModern(props: Props) {
     return [...gesehen.values()];
   }, [candidateGroups, fokusSlot, fokusWert, fokusBesetzer, platzVonSpieler, platzWert, eignung, gold, belastungFuer]);
 
-  const sichtbar = useMemo(() => {
+  const sichtbarBasis = useMemo(() => {
     const suche = playerFilter.trim().toLowerCase();
     let liste = kaderZeilen.filter((zeile) => !suche || zeile.karte.name.toLowerCase().includes(suche));
     if (kaderFilter === "frei") liste = liste.filter((z) => !z.platz && !z.sperre);
@@ -737,6 +743,29 @@ export default function EinsatzlisteModern(props: Props) {
     }
     return karten;
   }, [kartenWirkungJeSeite]);
+  /** Sortierung nach Form, Moral, Karte und Richtungswechsel; gesperrte Spieler bleiben unten. */
+  const sichtbar = useMemo(() => {
+    const frei = sichtbarBasis.filter((z) => !z.sperre);
+    const gesperrt = sichtbarBasis.filter((z) => z.sperre);
+    if (sortKey === "form" || sortKey === "moral" || sortKey === "karte") {
+      const wertVon = (z: KaderZeile): number | null =>
+        sortKey === "form"
+          ? formMoralVon.get(z.id)?.form ?? null
+          : sortKey === "moral"
+            ? formMoralVon.get(z.id)?.moral ?? null
+            : spielerKarten.get(z.karte.name)?.wert ?? null;
+      frei.sort((a, b) => {
+        const x = wertVon(a);
+        const y = wertVon(b);
+        if (x == null && y == null) return 0;
+        if (x == null) return 1;
+        if (y == null) return -1;
+        return y - x;
+      });
+    }
+    if (sortUmgekehrt) frei.reverse();
+    return [...frei, ...gesperrt];
+  }, [sichtbarBasis, sortKey, sortUmgekehrt, formMoralVon, spielerKarten]);
   const kartenFuerSpieler = (sd: Seite, playerId: string | undefined) =>
     playerId ? kartenWirkungJeSeite[sd]?.spieler.find((x) => x.playerId === playerId)?.zerlegung ?? null : null;
 
@@ -956,11 +985,11 @@ export default function EinsatzlisteModern(props: Props) {
           }
         }}
       >
-        {istGold ? <i className="elm-slot__raute" title="Bestbesetzung: Hier steht, wo die beste Verteilung des ganzen Kaders ihn hinstellt." /> : null}
-        {verschenkt ? <i className="elm-slot__raute is-leer" title={`Bestbesetzung verschenkt: Diese Besetzung kostet die Gesamtverteilung ${f1(kosten)}.`} /> : null}
+        {istGold ? <i className="elm-slot__raute" data-bc-tip="Bestbesetzung: Hier steht, wo die beste Verteilung des ganzen Kaders ihn hinstellt." /> : null}
+        {verschenkt ? <i className="elm-slot__raute is-leer" data-bc-tip={`Bestbesetzung verschenkt: Diese Besetzung kostet die Gesamtverteilung ${f1(kosten)}.`} /> : null}
         {karte ? <FeldFigur spielerId={karte.id} blick="east" klasse="elm-slot__fig" /> : null}
-        {id && captains[slot.disciplineSide] === id ? <span className="elm-slot__cap" title="Captain">C</span> : null}
-        {paar ? <span className="elm-slot__lf" title={`Übernimmt den Stab von ${paar.geber}`}>{paar.spiele}× eingespielt</span> : null}
+        {id && captains[slot.disciplineSide] === id ? <span className="elm-slot__cap" data-bc-tip="Captain">C</span> : null}
+        {paar ? <span className="elm-slot__lf" data-bc-tip={`Übernimmt den Stab von ${paar.geber}`}>{paar.spiele}× eingespielt</span> : null}
         <span className="elm-slot__ro">
           <BcMarke farbe={farbe}>{kuerzelJeSlot.get(slot.key) ?? "–"}</BcMarke>
           <span>{rollenZeile(slot.key)}</span>
@@ -968,14 +997,14 @@ export default function EinsatzlisteModern(props: Props) {
         {karte ? (
           <>
             <Por klasse="elm-slot__por" url={karte.portraitUrl} name={karte.name} />
-            <span className="elm-slot__nm" title={karte.name}>{karte.name}</span>
+            <span className="elm-slot__nm" data-bc-tip={karte.name}>{karte.name}</span>
             <span className="elm-slot__ze bc-t">
               <strong>{f1(vorschau?.projected.totalProjected)}</strong>
-              {glyphe ? <span className={`pg ${GLYPHEN_TON[glyphe]}`} title="Rollenpassung (Aufschlag der Rolle in Punkten)">{glyphe}</span> : null}
+              {glyphe ? <span className={`pg ${GLYPHEN_TON[glyphe]}`} data-bc-tip="Rollenpassung (Aufschlag der Rolle in Punkten)">{glyphe}</span> : null}
               {last != null ? <BcLast wert={last} titel={`Erschöpfung ${Math.round(last)} von 100`} /> : null}
               {eigeneLast ? <LastZahl b={eigeneLast} /> : null}
               {fmVon(id) ? (
-                <button type="button" className="fm-wz" data-testid={`fm-marke-${slot.key}`} onClick={(event) => { event.stopPropagation(); setWarumId(id); setKontextTab("formmoral"); setBlatt("kontext"); }} title="Warum? Form und Moral dieses Spielers">
+                <button type="button" className="fm-wz" data-testid={`fm-marke-${slot.key}`} onClick={(event) => { event.stopPropagation(); setWarumId(id); setKontextTab("formmoral"); setBlatt("kontext"); }} data-bc-tip="Warum? Form und Moral dieses Spielers">
                   <FormMoralMarke a={fmVon(id)!} />
                 </button>
               ) : null}
@@ -984,7 +1013,7 @@ export default function EinsatzlisteModern(props: Props) {
                 const w = kartenWirkungJeSeite[seite];
                 return z && w?.buchung.gebucht ? <KartenMarke alle={z.alle} traeger={z.traeger} form={z.form} farbe={w.karten[0]?.farbe ?? null} grund={w.spieler.find((s) => s.playerId === karte?.id)?.farbGrund} /> : null;
               })()}
-              {risiko ? <span className={risiko.riskPercent >= 8 ? "bc-minus" : "bc-null"} title="Verletzungsrisiko dieses Einsatzes" style={{ fontSize: 12, fontWeight: 700 }}>{f1(risiko.riskPercent)}%</span> : null}
+              {risiko ? <span className={risiko.riskPercent >= 8 ? "bc-minus" : "bc-null"} data-bc-tip="Verletzungsrisiko dieses Einsatzes" style={{ fontSize: 12, fontWeight: 700 }}>{f1(risiko.riskPercent)}%</span> : null}
             </span>
             {kannBedienen ? (
               <button
@@ -1009,7 +1038,7 @@ export default function EinsatzlisteModern(props: Props) {
                 type="button"
                 className="elm-slot__tipp"
                 disabled={!kannBedienen}
-                title={bester.fitDetail}
+                data-bc-tip={bester.fitDetail}
                 onClick={(event) => {
                   event.stopPropagation();
                   onAssignPlayer(slot.key, bester.activePlayerId);
@@ -1026,7 +1055,7 @@ export default function EinsatzlisteModern(props: Props) {
           <span
             className={`elm-vs${vsSpielbar ? "" : " is-aus"}`}
             data-testid={`elm-vs-${slot.key}`}
-            title={`${vsKarte.name} auf ${slotName(slot.key)}${vsSpielbar ? `: Stärke ${f1(vsWert)}, Last ${vsLast ? ZAHL.format(vsLast.last) : "–"}${vsLast?.zusatzText ? ` (${vsLast.zusatzText})` : ""}` : ": nicht einsetzbar"}`}
+            data-bc-tip={`${vsKarte.name} auf ${slotName(slot.key)}${vsSpielbar ? `: Stärke ${f1(vsWert)}, Last ${vsLast ? ZAHL.format(vsLast.last) : "–"}${vsLast?.zusatzText ? ` (${vsLast.zusatzText})` : ""}` : ": nicht einsetzbar"}`}
           >
             {vsSpielbar ? (
               <>
@@ -1056,7 +1085,7 @@ export default function EinsatzlisteModern(props: Props) {
       key: "name",
       kopf: "Spieler",
       breite: "minmax(0,1fr)",
-      onKopf: () => setSortKey("name"),
+      onKopf: () => klickSort("name"),
       aktiv: sortKey === "name",
       render: (z) => (
         <span className="elm-kz__nm">
@@ -1068,7 +1097,7 @@ export default function EinsatzlisteModern(props: Props) {
                 {z.platz.startsWith("d1") ? "D1" : "D2"} {kuerzelJeSlot.get(z.platz) ?? ""}
               </BcMarke>
             ) : null}
-            {z.karte.className ? <span className="elm-kl" style={{ "--kl": klassenFarbeVon(z.karte.className) ?? "var(--bc-stumm)" } as React.CSSProperties} title={`Klasse ${z.karte.className}`}>{z.karte.className}</span> : null}
+            {z.karte.className ? <span className="elm-kl" style={{ "--kl": klassenFarbeVon(z.karte.className) ?? "var(--bc-stumm)" } as React.CSSProperties} data-bc-tip={`Klasse ${z.karte.className}`}>{z.karte.className}</span> : null}
           </span>
         </span>
       ),
@@ -1078,7 +1107,7 @@ export default function EinsatzlisteModern(props: Props) {
       kopf: "Eig.",
       breite: "38px",
       rechts: true,
-      onKopf: () => setSortKey("disz"),
+      onKopf: () => klickSort("disz"),
       aktiv: sortKey === "disz",
       render: (z) => <span className="elm-kz__dz bc-t">{f0(z.disz)}</span>,
     },
@@ -1087,13 +1116,13 @@ export default function EinsatzlisteModern(props: Props) {
       kopf: "Res.",
       breite: "30px",
       rechts: true,
-      onKopf: () => setSortKey("res"),
+      onKopf: () => klickSort("res"),
       aktiv: sortKey === "res",
       render: (z) =>
         z.hier && z.hier.resistenz != null ? (
           <span
             className={`elm-kz__res is-${z.hier.ton} bc-t`}
-            title={`Resistenz: ${attrName(z.hier.strainAttribute ?? "")} ${Math.round(z.hier.resistenz)}${z.hier.teile ? ` (Schwelle ${z.hier.teile.schwelle}${z.hier.zusatzText ? `, ${z.hier.zusatzText}` : ""})` : ""}`}
+            data-bc-tip={`Resistenz: ${attrName(z.hier.strainAttribute ?? "")} ${Math.round(z.hier.resistenz)}${z.hier.teile ? ` (Schwelle ${z.hier.teile.schwelle}${z.hier.zusatzText ? `, ${z.hier.zusatzText}` : ""})` : ""}`}
           >
             {Math.round(z.hier.resistenz)}
             {z.hier.teile ? <small>{z.hier.teile.abstand >= 0 ? `+${Math.round(z.hier.teile.abstand)}` : `−${Math.round(-z.hier.teile.abstand)}`}</small> : null}
@@ -1105,7 +1134,7 @@ export default function EinsatzlisteModern(props: Props) {
       kopf: "Last",
       breite: "40px",
       rechts: true,
-      onKopf: () => setSortKey("lasthier"),
+      onKopf: () => klickSort("lasthier"),
       aktiv: sortKey === "lasthier",
       render: (z) => (z.sperre ? <span className="bc-null">–</span> : <LastZahl b={z.hier} />),
     },
@@ -1114,7 +1143,7 @@ export default function EinsatzlisteModern(props: Props) {
       kopf: "Platz",
       breite: "52px",
       rechts: true,
-      onKopf: () => setSortKey("platz"),
+      onKopf: () => klickSort("platz"),
       aktiv: sortKey === "platz",
       render: (z) => (
         <span className="elm-kz__sw bc-t">
@@ -1126,6 +1155,8 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "form",
       kopf: "Form",
+      onKopf: () => klickSort("form"),
+      aktiv: sortKey === "form",
       breite: "24px",
       render: (z) => {
         const a = fmVon(z.id);
@@ -1137,7 +1168,7 @@ export default function EinsatzlisteModern(props: Props) {
             className="fm-wz"
             onClick={(event) => { event.stopPropagation(); warumFormMoral(z.id); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); warumFormMoral(z.id); } }}
-            title="Warum? Form"
+            data-bc-tip="Warum? Form"
           >
             <FormMoralMarke a={a} nurForm />
           </span>
@@ -1147,6 +1178,8 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "moral",
       kopf: "Moral",
+      onKopf: () => klickSort("moral"),
+      aktiv: sortKey === "moral",
       breite: "44px",
       render: (z) => {
         const a = fmVon(z.id);
@@ -1158,7 +1191,7 @@ export default function EinsatzlisteModern(props: Props) {
             className="fm-wz"
             onClick={(event) => { event.stopPropagation(); warumFormMoral(z.id); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); warumFormMoral(z.id); } }}
-            title="Warum? Moral"
+            data-bc-tip="Warum? Moral"
           >
             <FormMoralMarke a={a} nurMoral />
           </span>
@@ -1168,6 +1201,8 @@ export default function EinsatzlisteModern(props: Props) {
     {
       key: "karte",
       kopf: "Karte",
+      onKopf: () => klickSort("karte"),
+      aktiv: sortKey === "karte",
       breite: "42px",
       rechts: true,
       render: (z) => {
@@ -1179,12 +1214,12 @@ export default function EinsatzlisteModern(props: Props) {
         const zer = slotSeite && pid ? kartenFuerSpieler(slotSeite, pid) : null;
         const grund = w?.spieler.find((s) => s.playerId === pid)?.farbGrund;
         const gebucht = zer && w?.buchung.gebucht ? ` Im Einsatz bekommt er ${vz(zer.summe)} durch Karten${grund ? ` (${grund})` : ""}.` : "";
-        if (!kk) return <span className="fm-leise" title={`Trägt keine Karte.${gebucht}`}>–</span>;
+        if (!kk) return <span className="fm-leise" data-bc-tip={`Trägt keine Karte.${gebucht}`}>–</span>;
         return (
           <span
             className={`elm-kz__kk bc-t${kk.gewaehlt ? " is-gew" : ""}${kk.wert < 0 ? " is-neg" : ""}`}
             style={{ "--kf": FORM_HEX[kk.farbe] ?? "#9aa7ba" } as React.CSSProperties}
-            title={`Karte ${FARBE_NAME[kk.farbe] ?? kk.farbe} ${vz(kk.wert)}${kk.passt ? "" : " (fremde Farbe, halber Wert)"}${kk.gewaehlt ? ", gelegt" : ""}.${gebucht}`}
+            data-bc-tip={`Karte ${FARBE_NAME[kk.farbe] ?? kk.farbe} ${vz(kk.wert)}${kk.passt ? "" : " (fremde Farbe, halber Wert)"}${kk.gewaehlt ? ", gelegt" : ""}.${gebucht}`}
           >
             {vz(kk.wert)}
           </span>
@@ -1196,7 +1231,7 @@ export default function EinsatzlisteModern(props: Props) {
       kopf: "Ersch.",
       breite: "34px",
       rechts: true,
-      onKopf: () => setSortKey("last"),
+      onKopf: () => klickSort("last"),
       aktiv: sortKey === "last",
       render: (z) =>
         z.last != null ? (
@@ -1261,7 +1296,7 @@ export default function EinsatzlisteModern(props: Props) {
               </div>
             </div>
             {fokusVorschau ? (
-              <div className="elm-rech bc-t" title="Rechenweg des Platzwerts">
+              <div className="elm-rech bc-t" data-bc-tip="Rechenweg des Platzwerts">
                 <div><small>Eignung</small><strong>{f1(fokusVorschau.baseScore)}</strong></div>
                 <div><small>Rolle</small><strong>{vz(fokusVorschau.roleModifier ?? 0)}</strong></div>
                 <div><small>Einsatz</small><strong>{vz((fokusVorschau.intensityModifier ?? 0) + (fokusVorschau.rivalryPressureModifier ?? 0))}</strong></div>
@@ -1290,13 +1325,13 @@ export default function EinsatzlisteModern(props: Props) {
                 {z.rolle ? (
                   <span
                     className="elm-abz"
-                    title={z.rolle === "schwerpunkt" ? "Schwerpunkt dieses Platzes: bringt hier den Rollen-Bonus." : "Nebenfokus dieses Platzes: bringt hier einen kleineren Rollen-Bonus."}
+                    data-bc-tip={z.rolle === "schwerpunkt" ? "Schwerpunkt dieses Platzes: bringt hier den Rollen-Bonus." : "Nebenfokus dieses Platzes: bringt hier einen kleineren Rollen-Bonus."}
                   >
                     {z.rolle === "schwerpunkt" ? "Schwerpunkt" : "Nebenfokus"}
                   </span>
                 ) : null}
               </span>
-              <span className="gw bc-t" title="Gewicht in der Disziplin-Matrix">{f0(z.gewichtPct)} %</span>
+              <span className="gw bc-t" data-bc-tip="Gewicht in der Disziplin-Matrix">{f0(z.gewichtPct)} %</span>
               <span className="wt bc-t">{f0(wert)}</span>
               <span className="elm-attr__bn"><i style={{ width: `${Math.max(0, Math.min(100, wert ?? 0))}%` }} /></span>
             </div>
@@ -1317,7 +1352,7 @@ export default function EinsatzlisteModern(props: Props) {
               <span>verschleißt {attrName(rolle.strainAttribute)}{teile ? ` · Schwelle ${teile.schwelle}` : ""}</span>
             </span>
             {b && teile ? (
-              <div className="elm-rw bc-t" title="Rechenweg der Last — dieselbe Rechnung wie die Buchung">
+              <div className="elm-rw bc-t" data-bc-tip="Rechenweg der Last — dieselbe Rechnung wie die Buchung">
                 <span>Grundlast (Stufe {stufeText})</span><b>{f1(teile.grundlast)}</b>
                 <span>{name}: {attrName(rolle.strainAttribute)} {teile.resistenz != null ? Math.round(teile.resistenz) : "–"}{teile.abstand < 0 ? `, fehlen ${Math.round(-teile.abstand)}` : teile.abstand > 0 ? `, ${Math.round(teile.abstand)} über der Schwelle` : ""}</span>
                 <b className={teile.zusatz > 0 ? "bc-minus" : teile.zusatz < 0 ? "bc-plus" : "bc-null"}>{vz(teile.zusatz)}{teile.amDeckel ? " (Deckel)" : ""}</b>
@@ -1360,7 +1395,7 @@ export default function EinsatzlisteModern(props: Props) {
         <span className="bc-gk">Beste Kandidaten</span>
         {topKandidaten.length === 0 ? <p style={{ color: "var(--bc-leise)", fontSize: 14 }}>Keine Kandidaten.</p> : null}
         {topKandidaten.map((k, index) => (
-          <button key={k.activePlayerId} type="button" className="elm-kand" disabled={!kannBedienen} onClick={() => setzeAuf(fokusSlot.key, k.activePlayerId)} title={k.fitDetail}>
+          <button key={k.activePlayerId} type="button" className="elm-kand" disabled={!kannBedienen} onClick={() => setzeAuf(fokusSlot.key, k.activePlayerId)} data-bc-tip={k.fitDetail}>
             <span className="bc-t bc-null">{index + 1}</span>
             <Por klasse="por" url={rosterCardByActivePlayerId.get(k.activePlayerId)?.portraitUrl} name={k.name} />
             <b>{k.name}</b>
@@ -1648,7 +1683,7 @@ export default function EinsatzlisteModern(props: Props) {
                           <span
                             key={slot.key}
                             className={`elm-vsl__p${ok ? "" : " is-aus"}${selections[slot.key] === vorschauId ? " is-hier" : ""}`}
-                            title={`${slotName(slot.key)}: ${ok ? `Stärke ${f1(platzWert(vorschauId, slot.key))}, Last ${b ? ZAHL.format(b.last) : "–"}${b?.zusatzText ? ` (${b.zusatzText})` : ""}` : "nicht einsetzbar"}`}
+                            data-bc-tip={`${slotName(slot.key)}: ${ok ? `Stärke ${f1(platzWert(vorschauId, slot.key))}, Last ${b ? ZAHL.format(b.last) : "–"}${b?.zusatzText ? ` (${b.zusatzText})` : ""}` : "nicht einsetzbar"}`}
                           >
                             <BcMarke farbe={slotFarbe(slot.slotIndex)}>{kuerzelJeSlot.get(slot.key) ?? "–"}</BcMarke>
                             <b className="bc-t">{ok ? f1(platzWert(vorschauId, slot.key)) : "–"}</b>
@@ -1716,7 +1751,7 @@ export default function EinsatzlisteModern(props: Props) {
                 })()}
                 <div className="elm-waage__txt">
                   <span>
-                    {gegner.status === "geschaetzt" ? <>gegen <b>{gegner.gegnerName}</b></> : <span title={gegner.grund}>Gegner noch unbekannt</span>}
+                    {gegner.status === "geschaetzt" ? <>gegen <b>{gegner.gegnerName}</b></> : <span data-bc-tip={gegner.grund}>Gegner noch unbekannt</span>}
                   </span>
                   <span>
                     {waage.vorschau != null && hoverZeile ? <span className="elm-vor">Vorschau: {hoverZeile.karte.name} auf {kuerzelJeSlot.get(fokusSlot?.key ?? "")}</span> : "Schraffur = Unsicherheit der Schätzung"}
@@ -1755,7 +1790,7 @@ export default function EinsatzlisteModern(props: Props) {
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
                     if (!platz?.gegner || !g || (!g.spielerName && !geteiltFeld)) return null;
                     return (
-                      <div key={`g-${slot.key}`} data-gsk={slot.key} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
+                      <div key={`g-${slot.key}`} data-gsk={slot.key} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} data-bc-tip="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
                         <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
                         <b>{g.spielerName ?? "Gegner ?"}</b>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}
@@ -1813,7 +1848,7 @@ export default function EinsatzlisteModern(props: Props) {
                 <select
                   className="elm-capwahl"
                   aria-label={`${seite.toUpperCase()} Team-Power wählen`}
-                  title={powerSteuerung.title}
+                  data-bc-tip={powerSteuerung.title}
                   disabled={!kannBedienen}
                   value={powerSteuerung.selectedId ?? ""}
                   onChange={(e) => onAssignTeamPower?.(seite, e.target.value || null)}

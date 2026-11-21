@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerPortraitBrowserUrl, getPlayerPortraitInitials, getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
+import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { baueGruppenStand, duellStand, spannenMitte, type GruppenEingang } from "@/lib/lineups/einsatzliste-gegner-vergleich";
 import { schaetzeGegnerAufstellung, type GegnerSchaetzung, type GegnerSeite } from "@/lib/lineups/gegner-schaetzung";
@@ -147,6 +148,17 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
     return baueGruppenStand(eingang);
   }, [gruppenGegner, p.eigenesTeamId, p.eigenerTeamName, eigenSchnitt, seite]);
 
+  // Formpunkte (Karten-Tank der Saison): noch nicht eingesetzte Pluskarten / alle Pluskarten. Gleiche Quelle wie der Saisonstand.
+  const formPunkte = useMemo(() => {
+    if (!gameState?.seasonState) return new Map<string, { rest: number; pool: number; minus: number }>();
+    try {
+      const m = buildSeasonFormCardBonusByTeamId(gameState, p.seasonId);
+      return new Map([...m].filter(([, e]) => e.poolCards > 0).map(([id, e]) => [id, { rest: e.remainingPositive, pool: e.poolPositive, minus: e.remainingNegative }] as const));
+    } catch {
+      return new Map<string, { rest: number; pool: number; minus: number }>();
+    }
+  }, [gameState, p.seasonId]);
+
   const geschaetzt = gegner.status === "geschaetzt" ? gegner : null;
   const stufe = geschaetzt?.stufe ?? 0;
   const istPod = gruppe?.art === "pod";
@@ -181,6 +193,34 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
           <span className={`bc-marke${geschaetzt.quelle === "prognose" ? " is-gelb" : ""}`}>{geschaetzt.quelle === "prognose" ? "PROGNOSE" : geschaetzt.quelle === "ki-muster" ? "MUSTER" : "VERDECKT"}</span>
           {QUELLE_TEXT[geschaetzt.quelle]}
         </p>
+      ) : null}
+
+      {geschaetzt && (formPunkte.get(p.eigenesTeamId) || formPunkte.get(geschaetzt.gegnerTeamId)) ? (
+        <section className="gg-block" data-testid="elm-gegner-formpunkte">
+          <span className="bc-gk"><span>Formpunkte</span><span>noch nicht eingesetzt</span></span>
+          {[
+            { id: p.eigenesTeamId, name: p.eigenerTeamName, wir: true },
+            { id: geschaetzt.gegnerTeamId, name: geschaetzt.gegnerName, wir: false },
+            ...gruppenGegner.filter((g) => g.teamId !== geschaetzt.gegnerTeamId).map((g) => ({ id: g.teamId, name: g.name, wir: false })),
+          ].map((z) => {
+            const f = formPunkte.get(z.id);
+            return (
+              <div key={z.id} className={`gg-grp${z.wir ? " is-wir" : ""}`}>
+                <span className="gg-grp__n" aria-hidden="true" />
+                <TeamLogo teamId={z.id} name={z.name} />
+                <span className="gg-grp__nm"><b>{z.name}</b><small>{z.wir ? "Dein Team" : "Gegner"}</small></span>
+                <span
+                  className="gg-grp__w bc-t"
+                  title={f ? `${ZAHL.format(f.rest)} von ${ZAHL.format(f.pool)} Pluspunkten der Saison noch ungespielt${f.minus < 0 ? `; offene Minuskarten ${ZAHL.format(f.minus)} kosten am Saisonende Punkte` : ""}` : "Keine Formkarten in dieser Saison"}
+                >
+                  <strong>{f ? ZAHL.format(f.rest) : "–"}</strong>
+                  {f ? <small>/ {ZAHL.format(f.pool)}</small> : null}
+                </span>
+              </div>
+            );
+          })}
+          <p className="gg-fuss">Ungespielte Pluskarten verfallen am Saisonende. Wer viel übrig hat, kann noch zulegen, verschenkt aber Punkte, wenn er sie nicht einsetzt.</p>
+        </section>
       ) : null}
 
       {gegnerSeite && !istPod ? (

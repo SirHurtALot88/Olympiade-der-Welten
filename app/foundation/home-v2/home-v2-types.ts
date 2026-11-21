@@ -201,6 +201,8 @@ export type HomeV2ClientProps = {
   onOpenTraining: () => void;
   onOpenOffice: () => void;
   onOpenFacilities?: () => void;
+  /** Finanzseite (Kachel „Finanzen“ auf der Startseite). */
+  onOpenFinances?: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
   onCompleteInboxItem?: (itemId: string) => void;

@@ -85,7 +85,7 @@ export function ThZeile({
   spalten,
   raster,
 }: {
-  spalten: ReadonlyArray<{ text: ReactNode; links?: boolean; onKlick?: () => void; aktiv?: boolean }>;
+  spalten: ReadonlyArray<{ text: ReactNode; links?: boolean; onKlick?: () => void; aktiv?: boolean; /** Aufsteigend sortiert (Pfeil nach oben). */ auf?: boolean }>;
   raster: string;
 }) {
   return (
@@ -93,9 +93,14 @@ export function ThZeile({
       {spalten.map((spalte, index) => (
         <span key={index} className={spalte.links ? "li" : undefined} role="columnheader">
           {spalte.onKlick ? (
-            <button type="button" className={spalte.aktiv ? "an" : undefined} onClick={spalte.onKlick}>
+            <button
+              type="button"
+              className={spalte.aktiv ? "an" : undefined}
+              onClick={spalte.onKlick}
+              title="Klick sortiert, nochmal klicken dreht die Richtung"
+            >
               {spalte.text}
-              {spalte.aktiv ? " ▾" : ""}
+              {spalte.aktiv ? (spalte.auf ? " ▴" : " ▾") : ""}
             </button>
           ) : (
             spalte.text

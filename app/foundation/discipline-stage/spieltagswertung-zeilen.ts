@@ -33,7 +33,7 @@ import { teileNachLiga } from "@/lib/season/liga-raenge";
 export type WertungsSeite = "d1" | "d2";
 export type WertungsLiga = "liga1" | "liga2";
 export type WertungsFilter = "beide" | "liga2" | "liga1" | "alle" | "gruppe" | "mensch";
-export type WertungsSortierung = "ges" | "pkt" | "form" | "cap" | "mut" | "sai" | "d1" | "d2";
+export type WertungsSortierung = "ges" | "pkt" | "form" | "cap" | "mut" | "sai" | "d1" | "d2" | "name";
 
 /** Eine Disziplin-Seite eines Teams, so wie Tabelle und Blatt sie brauchen. */
 export type WertungsSeitenWerte = {
@@ -238,6 +238,8 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
 }
 
 const SORT_WERT: Record<WertungsSortierung, (z: WertungsZeile) => number> = {
+  // „name“ sortiert alphabetisch (siehe `sortiereWertungsZeilen`); der Wert hier ist nur der Gleichstand-Rückfall.
+  name: (z) => z.gesamt,
   ges: (z) => z.gesamt,
   pkt: (z) => z.punkte,
   form: (z) => z.form,
@@ -250,15 +252,21 @@ const SORT_WERT: Record<WertungsSortierung, (z: WertungsZeile) => number> = {
 };
 
 /** Absteigend nach dem Schlüssel; Gleichstand nach Gesamt, dann Tagesrang, dann Name (stabil, deterministisch). */
-export function sortiereWertungsZeilen(zeilen: WertungsZeile[], schluessel: WertungsSortierung): WertungsZeile[] {
+export function sortiereWertungsZeilen(
+  zeilen: WertungsZeile[],
+  schluessel: WertungsSortierung,
+  umgekehrt = false,
+): WertungsZeile[] {
   const wert = SORT_WERT[schluessel];
-  return [...zeilen].sort(
-    (a, b) =>
-      wert(b) - wert(a) ||
-      b.gesamt - a.gesamt ||
-      (a.tagesRang ?? 999) - (b.tagesRang ?? 999) ||
-      a.name.localeCompare(b.name, "de"),
+  const sortiert = [...zeilen].sort((a, b) =>
+    schluessel === "name"
+      ? a.name.localeCompare(b.name, "de")
+      : wert(b) - wert(a) ||
+        b.gesamt - a.gesamt ||
+        (a.tagesRang ?? 999) - (b.tagesRang ?? 999) ||
+        a.name.localeCompare(b.name, "de"),
   );
+  return umgekehrt ? sortiert.reverse() : sortiert;
 }
 
 /** Die vier Teams der Vierergruppe des eigenen Teams (aus `miniDmPod`), `null` wenn es keine gibt. */
@@ -320,6 +328,7 @@ export function gruppiereNachLiga(
   zeilen: WertungsZeile[],
   ownTeamId: string | null,
   schluessel: WertungsSortierung = "ges",
+  umgekehrt = false,
 ): WertungsLigaBlock[] {
   const eigene = zeilen.find((z) => z.teamId === ownTeamId)?.liga ?? null;
   const reihenfolge: Array<WertungsLiga | null> = eigene === "liga2" ? ["liga2", "liga1", null] : ["liga1", "liga2", null];
@@ -331,6 +340,7 @@ export function gruppiereNachLiga(
       zeilen: sortiereWertungsZeilen(
         zeilen.filter((z) => z.liga === liga),
         schluessel,
+        umgekehrt,
       ),
     }))
     .filter((b) => b.zeilen.length > 0);
