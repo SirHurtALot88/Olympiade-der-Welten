@@ -187,7 +187,9 @@ export async function PUT(request: Request) {
         seasonId: params.seasonId,
         matchdayId: params.matchdayId,
         dryRun: false,
-        includeWarningTeams: false,
+        // `true` wie frueher der zweite Client-Batch nach dem Speichern (entfaellt seit 21.11.):
+        // auch KI-Teams mit Vorschau-Status "warning" bekommen ihre Aufstellung sofort.
+        includeWarningTeams: true,
         overwriteExisting: false,
       });
     } catch {

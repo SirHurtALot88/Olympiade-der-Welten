@@ -155,13 +155,13 @@ export type LineupNewLookProps = Pick<
   | "onOpenNachDemSpieltag"
   | "disciplineTacticPreviewBySide"
 > & {
+  /** Die Abgabe (PUT der Einsatzliste) laeuft gerade — Sofort-Rueckmeldung am Abgabe-Knopf. */
+  isSavingLineup?: boolean;
   /**
    * Mehrere Plaetze in einem Schritt neu belegen (nur die moderne Einsatzliste nutzt das; die
    * klassische ignoriert es). Slot -> activePlayerId, "" = leer. Der Client prueft jede Belegung
    * mit derselben Sperrlogik wie `updateSelection` und legt einen Undo-Punkt an.
    */
-  /** Die Abgabe (PUT der Einsatzliste) laeuft gerade — Sofort-Rueckmeldung am Abgabe-Knopf. */
-  isSavingLineup?: boolean;
   onApplyAssignments?: (nextSelections: Record<string, string>, label: string, detail: string) => void;
   /** Slot, der gerade real zugewiesen wurde (Client-State, ~900ms Lebenszeit). */
   recentlyAssignedSlotKey: string | null;
