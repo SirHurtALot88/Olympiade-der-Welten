@@ -27,6 +27,7 @@ import { DraftLiga } from "./DraftLiga";
 import { baueDraftKaderSicht } from "./draft-liga";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
 import { DraftProfil } from "./DraftProfil";
+import { useHistorienUnterzustand } from "@/lib/foundation/history-unterzustand";
 import { getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
 import { AbbruchDialog, AuslassenDialog, Ergebnis, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
@@ -93,6 +94,9 @@ export default function LigaDraftSeite({
   const [auslassenOffen, setAuslassenOffen] = useState(false);
   const [fertigOffen, setFertigOffen] = useState(false);
   const [profilId, setProfilId] = useState<string | null>(null);
+  // 21.11.: Zurück/Vor (Maustasten 4/5) führen aus dem Profilblatt und zwischen den Reitern, nicht aus der ganzen Draft-Seite.
+  useHistorienUnterzustand("draftProfil", profilId, setProfilId, { leer: null });
+  useHistorienUnterzustand("draftReiter", ans, setAns, { leer: "live" as Ansicht, jedeAenderungPusht: true });
 
   // Liegengebliebener Hintergrundlauf (Reload, Server-Neustart, abgebrochener Lauf → Liga „failed“): niemand treibt die
   // KI-Züge. Die Shell bietet dafür kein „Erneut versuchen“ (409 `liga_draft_laeuft`), die Seite setzt den Draft selbst
