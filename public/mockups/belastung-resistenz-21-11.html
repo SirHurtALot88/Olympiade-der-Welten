@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Belastung &amp; Resistenz – Einsatzliste (Mockup 21.11.)</title>
+<!--
+  BELASTUNG / RESISTENZ IN DER EINSATZLISTE (Fable, 21.11.). Erklaerung und Zahlenvorschlag: belastung-resistenz-21-11.md
+  ECHT: Spieler, Portraits, zwoelf Attribute mit Notenstufen (data/generated/oly-player-stats.json); die sechs Basketball-Plaetze
+        mit Belastungsstufe und Belastungsattribut (lib/lineups/matchday-slot-roles.ts); Grundlast 16, Einsatz x0,75 / x1,0 / x1,4,
+        Bank-Erholung 28, Risikokurve 0 % bis 25, 3 % bei 50, 25 % bei 80, 33 % bei 100 (lib/fatigue/*).
+  VORSCHLAG (noch nicht im Code): Grundlast und Schwelle je Stufe, Zusatz/Bonus aus der Resistenz, Risikofaktor, Pause nach Spieltag 10.
+  ERFUNDEN: aktuelle Erschoepfung der Spieler, Besetzung, Spieltag.
+  Alle Stellschrauben stehen im Skript ganz oben im Objekt REGEL.
+  URL: ?platz=FG|RP|PE|HD|CS|FB  ?spieler=emilia  ?einsatz=schonen|normal|vollgas  ?modus=heute|neu  ?still=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a; --blau:#7fb0ff;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px); die Wurzel waechst mit Breite UND Hoehe (2560 x 1440 = 21,3 px). */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,th:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.sp{flex:1}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.7rem;padding:0 .9rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+body.still .demo{display:none}
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* Icon-Schiene */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.12rem;padding:.6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--heim);flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp{opacity:1}
+.rail a{position:relative;height:2.55rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.5rem;bottom:.5rem;width:.19rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7)}
+.rail .zahl{position:absolute;left:1.7rem;top:.1rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0}
+/* Regieband */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);white-space:nowrap;background:linear-gradient(90deg,#0a0d13 0%,#101622 45%,#0b0e15 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.kpis{display:flex;gap:.45rem;min-width:0}
+.kpi{min-width:6.6rem;padding:.38rem 1.05rem .42rem 1.15rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.7rem 0,100% 0,calc(100% - .7rem) 100%,0 100%);line-height:1.05}
+.kpi span{display:block;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.kpi strong{font-size:1.55rem;font-weight:700;color:var(--creme)}
+.kpi strong small{font-size:.8rem;font-weight:500;color:var(--leise)}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.4rem;overflow:hidden;height:2.2rem;flex:none}
+.seg button{padding:0 .95rem;font-size:.95rem;font-weight:600;color:var(--leise);display:flex;align-items:center;gap:.4rem}
+.seg button+button{border-left:1px solid var(--linie)}
+.seg button.an{background:var(--gold);color:#17120a;font-weight:700}
+.seg button:not(.an):hover{background:var(--flaeche-2);color:var(--tinte)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:2.7rem;padding:0 1.5rem;font-size:1.05rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+/* Panels */
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.6rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pb{padding:.7rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+/* Tabellen (Designsystem-Regel 21.11.: jede Tabelle sortierbar, Klick auf den Kopf, zweiter Klick dreht) */
+table.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{position:sticky;top:0;z-index:2;height:1.9rem;padding:0 .4rem;background:#0f141d;border-bottom:1px solid var(--linie-2);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise);text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+.tb th:hover{color:var(--creme)}
+.tb th.re,.tb td.re{text-align:right} .tb th.mi,.tb td.mi{text-align:center}
+.tb th.so{color:var(--gold)}
+.tb th.so::after{content:"▾";margin-left:.2rem;font-size:.8rem;letter-spacing:0}
+.tb th.so.auf::after{content:"▴"}
+.tb td{padding:0 .4rem;border-bottom:1px solid rgba(244,230,196,.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.98rem}
+.tb tbody tr:hover{background:rgba(255,255,255,.035)}
+.tb tr.ich{background:linear-gradient(90deg,rgba(242,160,61,.16),rgba(242,160,61,.03))}
+.tb tfoot td{background:#0f141d;border-top:1px solid var(--linie-2);border-bottom:0;color:var(--creme);font-weight:700}
+.por{width:2.1rem;height:2.1rem;border-radius:.35rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.nm{display:flex;align-items:center;gap:.5rem;min-width:0}
+.nm div{min-width:0;line-height:1.08}
+.nm b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis}
+.nm small{display:block;font-size:.76rem;color:var(--leise);overflow:hidden;text-overflow:ellipsis}
+/* Notenstufen */
+.no{display:inline-block;width:1.25rem;height:1.25rem;line-height:1.25rem;border-radius:.2rem;text-align:center;font-weight:700;font-size:.82rem;color:#0b0e14;vertical-align:middle}
+.no.S{background:#f0c35a}.no.A{background:#62d394}.no.B{background:#8fd0a8}.no.C{background:#7fb0ff}.no.D{background:#9aa7ba}.no.E{background:#c98a6a}.no.F{background:#ff6058}
+.ax{display:inline-flex;align-items:center;gap:.3rem}
+.ax b{font-weight:600;min-width:1.2rem;text-align:right}
+.rl16{display:grid;gap:.1rem;height:.7rem}
+.rl16 i{background:rgba(255,255,255,.08);transform:skewX(-14deg)}
+.rl16 i.o{background:rgba(98,211,148,.22)} .rl16 i.u{background:rgba(255,96,88,.2)}
+.rl16 i.an{background:var(--heim);box-shadow:0 0 .4rem var(--heim)}
+
+/* ===================== SEITE BELASTUNG ===================== */
+.pause{display:flex;align-items:center;gap:.8rem;height:2.9rem;padding:0 1rem 0 .8rem;border:1px solid rgba(69,176,201,.55);border-radius:.45rem;background:linear-gradient(90deg,rgba(69,176,201,.18),rgba(69,176,201,.05));min-width:0}
+.pause svg{font-size:1.4rem;color:var(--gast)}
+.pause div{line-height:1.1} .pause b{display:block;color:#fff;font-weight:700;font-size:1rem} .pause small{color:var(--leise);font-size:.8rem}
+.tage{display:flex;align-items:center;gap:.16rem;margin-left:.4rem}
+.tage i{width:.62rem;height:1.1rem;transform:skewX(-14deg);background:rgba(255,255,255,.12)}
+.tage i.v{background:var(--stumm)} .tage i.j{background:var(--gold);box-shadow:0 0 .5rem var(--gold)}
+.tage u{width:1.5rem;height:1.5rem;border-radius:50%;border:1px solid var(--gast);color:var(--gast);font-size:.72rem;font-weight:700;text-decoration:none;display:grid;place-items:center;margin:0 .25rem;background:rgba(69,176,201,.15)}
+.bl{display:grid;grid-template-columns:34.5rem minmax(0,1fr) 28.5rem;gap:.72rem;padding:.8rem 1rem;min-height:0}
+.tbw{flex:1;min-height:0;overflow:auto}
+#kader td{height:3.05rem;cursor:pointer}
+#kader .nm b{font-size:.96rem}
+#kader tr.wahl{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.03))}
+#kader tr.wahl td:first-child{box-shadow:inset .19rem 0 0 var(--gold)}
+.pz{font-size:.72rem;font-weight:700;padding:.08rem .35rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise)}
+.eb{position:relative;height:.6rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block;margin-bottom:.2rem}
+.eb b{position:absolute;left:0;top:0;bottom:0;background:var(--stumm)}
+.eb u{position:absolute;top:0;bottom:0;background:var(--acht)} .eb u.r{background:var(--warn)} .eb u.g{background:var(--gut)}
+.eb s{position:absolute;left:25%;top:-.15rem;bottom:-.15rem;width:1px;background:var(--creme);opacity:.6}
+.ez{font-size:.82rem;color:var(--leise)} .ez b{color:var(--tinte)}
+.mitte{display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:.72rem;min-width:0;min-height:0}
+/* Plaetze */
+.plz{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.45rem;padding:.65rem .9rem .75rem}
+.sl{position:relative;display:block;padding:.45rem .55rem .5rem;border:1px solid var(--linie);border-radius:.45rem;background:var(--flaeche-2);line-height:1.12;min-width:0}
+.sl:hover{border-color:var(--linie-2)} .sl.an{border-color:var(--gold);background:linear-gradient(180deg,rgba(240,195,90,.16),rgba(240,195,90,.03))}
+.sl em{display:block;font-style:normal;font:400 .9rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl small{display:block;font-size:.76rem;color:var(--leise);white-space:nowrap;margin:.12rem 0 .3rem}
+.sl .wer{display:flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--tinte);margin-top:.35rem;white-space:nowrap;overflow:hidden}
+.sl .wer img{width:1.5rem;height:1.5rem;border-radius:.25rem;object-fit:cover;object-position:center 18%}
+.st{white-space:nowrap;display:inline-flex;align-items:center;gap:.3rem;height:1.2rem;padding:0 .4rem;border-radius:.2rem;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.st::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor}
+.st.s0{color:var(--gut);background:rgba(98,211,148,.12)} .st.s1{color:var(--acht);background:rgba(243,181,74,.13)} .st.s2{color:var(--warn);background:rgba(255,96,88,.13)}
+/* Probe */
+.probe{padding:.75rem .9rem .85rem;display:grid;grid-template-columns:minmax(0,1fr);gap:.7rem}
+.pkopf{display:flex;align-items:center;gap:.8rem}
+.pkopf img{width:3.4rem;height:3.4rem;border-radius:.5rem;object-fit:cover;object-position:center 18%;border:2px solid var(--gold)}
+.pkopf h3{margin:0;font:400 1.5rem/1.05 var(--haus);color:#fff}
+.pkopf small{font-size:.9rem;color:var(--leise)} .pkopf small b{color:var(--creme)}
+.urteil{margin-left:auto;text-align:right;line-height:1.1;white-space:nowrap;flex:none}
+.pkopf>div:nth-child(2){min-width:0;white-space:nowrap}
+.urteil strong{display:block;font-size:1.15rem;font-weight:700} .urteil small{font-size:.82rem}
+.skala{position:relative;height:4.3rem;margin:0 .4rem}
+.skala .bahn{position:absolute;left:0;right:0;top:1.75rem;height:.8rem;transform:skewX(-14deg);background:linear-gradient(90deg,rgba(255,96,88,.5),rgba(243,181,74,.5) 45%,rgba(98,211,148,.5) 75%,rgba(98,211,148,.75));opacity:.55}
+.skala .sw{position:absolute;top:.2rem;bottom:0;width:0;border-left:1px dashed var(--linie-2)}
+.skala .sw span{position:absolute;top:0;left:.3rem;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--stumm);white-space:nowrap}
+.skala .sw b{position:absolute;bottom:0;left:.3rem;font-size:.85rem;color:var(--leise);white-space:nowrap}
+.skala .sw.an{border-left:2px solid var(--gold)} .skala .sw.an span,.skala .sw.an b{color:var(--gold)}
+.skala .ich{position:absolute;top:1.25rem;width:1.8rem;height:1.8rem;margin-left:-.9rem;border-radius:50%;border:2px solid #fff;background:#0b0e14;display:grid;place-items:center;font-weight:700;font-size:.9rem;box-shadow:0 0 .8rem rgba(0,0,0,.8);transition:left .25s}
+.skala .lk{position:absolute;top:2.05rem;height:.2rem;background:#fff;transition:all .25s}
+.rw{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.4rem}
+.rw div{padding:.4rem .55rem .45rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);line-height:1.1;min-width:0}
+.rw small{display:block;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.rw strong{font-size:1.55rem;color:var(--creme)} .rw em{display:block;font-style:normal;font-size:.76rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rw div.erg{border-color:var(--linie-2);background:var(--flaeche-3)}
+.alt{display:flex;gap:.6rem;align-items:center;font-size:.88rem;color:var(--leise);padding:.35rem .6rem;border:1px dashed var(--linie-2);border-radius:.4rem}
+.alt b{color:var(--tinte)}
+body.heute .nurneu{opacity:.28;filter:grayscale(1)}
+/* Diagramme */
+.dia{flex:1;min-height:0;margin:.4rem .7rem .5rem}
+.dia{position:relative} .dia svg{position:absolute;inset:0;width:100%;height:100%}
+.dia text{font-family:var(--zahl);fill:var(--leise);font-size:13px} .dia text.k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.legende{display:flex;gap:.9rem;font-size:.8rem;color:var(--leise);white-space:nowrap}
+.legende i{display:inline-block;width:1rem;height:.2rem;vertical-align:middle;margin-right:.3rem}
+.rechtsp{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:.72rem;min-width:0;min-height:0}
+#bsp td{height:2.05rem;font-size:.94rem}
+#bsp tr.tr3 td{border-bottom-color:var(--linie-2)}
+.regeln{padding:.6rem .9rem .7rem;font-size:.9rem;color:var(--leise);line-height:1.32}
+.regeln b{color:var(--tinte)} .regeln div{display:grid;grid-template-columns:1.2rem minmax(0,1fr);gap:.3rem;padding:.12rem 0}
+.regeln div>span:first-child{color:var(--gold);font-weight:700}
+</style>
+</head>
+<body>
+<div class="demo"><b>Mockup</b> Belastung &amp; Resistenz 21.11. <i class="tr"></i> Rechnung:
+  <a data-m="heute">Heute (Resistenz wirkungslos)</a><a data-m="neu">Vorschlag</a>
+  <i class="tr"></i><span>Platz, Spieler und Einsatz anklicken – alle Zahlen rechnen mit. Tabellen: Klick auf den Kopf sortiert, zweiter Klick dreht.</span></div>
+<div class="app">
+<div class="railplatz"><nav class="rail" aria-label="Hauptnavigation">
+  <div class="kopf"><span class="logo"><img src="../team-logos/D-P.jpg" alt=""></span><span class="wer"><b>Death Peaches</b><small>Liga 2 · Chris</small></span></div>
+  <span class="grp">Saison</span>
+  <a href="#" title="Start"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="n">Start</span></a>
+  <a href="#" class="an" title="Einsatzliste"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="n">Einsatzliste</span></a>
+  <a href="#" title="Arena"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h14v5a7 7 0 0 1-14 0zM9 20h6M12 16v4M5 6H2v2a3 3 0 0 0 3 3M19 6h3v2a3 3 0 0 1-3 3"/></svg><span class="n">Arena</span></a>
+  <a href="#" title="Tabelle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><span class="n">Tabelle</span></a>
+  <span class="grp">Team</span>
+  <a href="#" title="Kader"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.500 7 6M17 5a3 3 0 0 1 0 6M22 19c0-2.500-1.500-4.300-4-5"/></svg><span class="n">Kader</span></a>
+  <a href="#" title="Training"><svg class="i" viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg><span class="n">Training</span></a>
+  <a href="#" class="" title="Draft"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h7M17 13l3 3-3 3M14 16h6"/></svg><span class="n">Draft</span></a>
+  <a href="#" title="Transfermarkt"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span class="n">Transfermarkt</span></a>
+  <span class="grp">Verein</span>
+  <a href="#" title="Finanzen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9a3.200 3.200 0 0 0-3-1.500c-1.800 0-3 .900-3 2.200 0 3 6 1.500 6 4.600 0 1.300-1.300 2.200-3 2.200A3.400 3.400 0 0 1 9 15M12 5.500v13"/></svg><span class="n">Finanzen</span></a>
+  <a href="#" title="Inbox"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5"/></svg><span class="zahl">3</span><span class="n">Inbox</span></a>
+  <span class="luecke"></span>
+  <a href="#" title="Einstellungen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="n">Einstellungen</span></a>
+</nav></div>
+
+<div class="rechts">
+  <header class="band">
+    <div class="ort"><em>Einsatzliste <span>· Spieltag 7 von 20 · D1 Basketball</span></em><h1>Belastung &amp; Resistenz</h1></div>
+    <div class="pause" title="Geplant: nach Spieltag 10 bekommt jeder Spieler einmal die Erholung eines Bank-Spieltags">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 2M17 3v4h4"/></svg>
+      <div><b>Pause nach Spieltag 10: alle regenerieren</b><small>jeder Spieler −28 Erschöpfung (ein Spieltag Erholung), auch wer gespielt hat · noch 3 Spieltage</small></div>
+      <div class="tage" id="tage"></div>
+    </div>
+    <span class="sp"></span>
+    <div class="seg" id="einsatz"><button data-e="schonen">Schonen ×0,75</button><button data-e="normal">Normal</button><button data-e="vollgas">Vollgas ×1,4</button></div>
+  </header>
+  <div class="bl">
+    <section class="pan">
+      <div class="pk"><h2>Kader im Test</h2><span class="sp"></span><span class="gk" id="kopf-l"></span></div>
+      <div class="tbw"><table class="tb" id="kader"></table></div>
+    </section>
+    <div class="mitte">
+      <section class="pan">
+        <div class="pk"><h2>Plätze und ihre Stufen</h2><span class="sp"></span>
+          <span class="st s0">niedrig ab <b id="s0"></b></span><span class="st s1">mittel ab <b id="s1"></b></span><span class="st s2">hoch ab <b id="s2"></b></span></div>
+        <div class="plz" id="plz"></div>
+      </section>
+      <section class="pan"><div class="probe" id="probe"></div></section>
+      <section class="pan">
+        <div class="pk"><h2>Last je Einsatz nach Resistenz</h2><span class="sp"></span>
+          <span class="legende"><span><i style="background:var(--gut)"></i>niedrig</span><span><i style="background:var(--acht)"></i>mittel</span><span><i style="background:var(--warn)"></i>hoch</span><span><i style="background:var(--stumm)"></i>heute: 16 für alle</span></span></div>
+        <div class="dia" id="dia1"></div>
+      </section>
+    </div>
+    <div class="rechtsp">
+      <section class="pan">
+        <div class="pk"><h2>Zahlenvorschlag</h2><span class="sp"></span><span class="gk" id="kopf-r"></span></div>
+        <div><table class="tb" id="bsp"></table></div>
+      </section>
+      <section class="pan">
+        <div class="pk"><h2>Saisonverlauf mit Pause</h2><span class="sp"></span>
+          <span class="legende"><span><i style="background:var(--gold)"></i>Vorschlag</span><span><i style="background:var(--stumm)"></i>heute</span></span></div>
+        <div class="dia" id="dia2"></div>
+      </section>
+      <section class="pan">
+        <div class="regeln">
+          <div><span>1</span><span><b>Stufe = Schwelle und Grundlast.</b> niedrig 45 / 11 · mittel 60 / 14 · hoch 75 / 17. Wer die Schwelle erreicht, trägt nur die Grundlast.</span></div>
+          <div><span>2</span><span><b>Darunter kostet es:</b> +0,25 Erschöpfung je fehlendem Punkt (höchstens +6) und bis zu 50 % mehr Verletzungsrisiko.</span></div>
+          <div><span>3</span><span><b>Darüber lohnt es:</b> −0,10 je Punkt (höchstens −3) und bis zu 30 % weniger Risiko.</span></div>
+          <div><span>4</span><span><b>Bleibt:</b> 0 % Risiko bis Erschöpfung 25, Deckel 33 %, Bank −28, Pause nach Spieltag 10 für alle −28.</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+var SP=[{"n":"Kelektros","s":"kelektros","k":"Charger","r":"Dragon","o":67.9,"mv":65.66,"g":17.18,"c":[74,87,61,46],"d":[63,76,44,62,96,65,81,98,48,94,43,63,62,74,72,47,59,38,93,60],"a":[88,72,70,59,66,81,95,64,12,69,24,73],"ar":["S","A","A","B","A","S","S+","B","F","A","E","A"],"tp":["FiredUp","Healthy"],"tn":["Mercenary","Cruel","Obsessive"],"pot":71.9},{"n":"Brightpaw","s":"brightpaw","k":"Badass","r":"Animal","o":43.3,"mv":25.13,"g":6.8,"c":[40,43,39,52],"d":[43,37,48,44,37,68,40,36,43,43,49,34,41,36,33,59,52,53,34,43],"a":[54,21,64,27,56,20,61,36,82,67,87,40],"ar":["B","E","B","E","B","E","B","D","S","A","S","D"],"tp":["Caring","Loyal"],"tn":["Timid"],"pot":47.3},{"n":"Emilia","s":"emilia","k":"Rogue","r":"Demon","o":31.8,"mv":16.35,"g":4.76,"c":[19,42,29,38],"d":[19,19,27,18,25,51,50,35,46,27,40,34,20,12,9,48,25,48,48,37],"a":[21,5,29,36,63,42,89,73,34,3,74,48],"ar":["E","F","E","D","B","C","S","A","D","F","A","C"],"tp":["Sexy","FiredUp"],"tn":["Diva"],"pot":35.8},{"n":"Elion","s":"elion","k":"Bard","r":"Elf","o":36.6,"mv":19.05,"g":6.15,"c":[29,34,45,45],"d":[35,28,44,30,34,43,43,25,54,26,45,44,42,28,40,47,40,48,26,44],"a":[20,40,57,72,46,42,29,66,60,51,73,21],"ar":["E","D","B","A","C","C","E","A","B","C","A","E"],"tp":["Motivated","Eloquent","FanFavorite"],"tn":["Gambler"],"pot":40.6},{"n":"Seraphina","s":"seraphina","k":"Badass","r":"Human","o":34.7,"mv":17.7,"g":5.19,"c":[28,36,31,45],"d":[35,22,42,37,32,52,43,25,45,30,50,32,26,17,19,48,32,55,28,32],"a":[40,19,50,39,45,43,60,59,71,23,82,15],"ar":["D","E","C","D","C","C","B","B","A","E","S","F"],"tp":["Sexy"],"tn":[],"pot":38.7},{"n":"Knisterl","s":"knisterl","k":"Sprinter","r":"Plant","o":29.5,"mv":15.33,"g":5.43,"c":[21,48,34,25],"d":[9,37,23,8,33,40,63,39,43,24,15,40,25,26,21,37,18,32,63,41],"a":[1,3,69,57,74,16,66,71,18,22,14,99],"ar":[null,null,null,null,null,null,null,null,null,null,null,null],"tp":[],"tn":["Cruel","Obsessive","Scandalous"],"pot":33.5},{"n":"Auraclystis","s":"auraclystis","k":"Berserker","r":"Demon","o":37.7,"mv":19.58,"g":6.19,"c":[35,46,34,41],"d":[34,39,39,33,34,51,56,40,43,42,40,35,26,28,24,48,34,45,47,42],"a":[43,39,48,50,51,6,79,73,46,38,58,50],"ar":["C","D","C","C","C","F","S","A","C","D","B","C"],"tp":["FiredUp","Flexible"],"tn":["Feisty","Timid","Manipulative"],"pot":41.7},{"n":"Jinrai","s":"jinrai","k":"Berserker","r":"Human","o":26.5,"mv":10.08,"g":3.09,"c":[30,30,24,25],"d":[40,32,19,30,43,24,34,25,30,26,33,20,22,24,31,24,21,26,25,18],"a":[52,29,77,31,8,79,17,75,20,11,56,24],"ar":["C","E","A","D","F","S","F","A","E","F","B","E"],"tp":["Diligent","Cool"],"tn":[],"pot":30.5},{"n":"Britney","s":"britney","k":"Berserker","r":"Human","o":26.4,"mv":9.96,"g":3.97,"c":[38,28,22,19],"d":[39,43,18,33,36,20,24,32,18,34,20,17,22,41,37,18,23,17,28,18],"a":[67,34,73,21,9,50,38,27,19,37,28,63],"ar":["A","D","A","E","F","C","D","E","E","D","E","B"],"tp":["Diligent"],"tn":["Feisty","Renegade"],"pot":30.4},{"n":"Bone","s":"bone","k":"Tank","r":"Human","o":20.4,"mv":7.82,"g":2.32,"c":[35,23,14,10],"d":[42,42,8,26,41,17,20,19,11,37,10,8,8,28,34,9,13,9,19,8],"a":[62,69,96,1,1,38,37,20,1,1,21,41],"ar":["B","A","S+","F","F","D","D","E","F","F","E","D"],"tp":[],"tn":["Lazy","Paranoid"],"pot":24.4},{"n":"Thressa","s":"thressa","k":"Badass","r":"Dwarf","o":52.7,"mv":40.11,"g":11.72,"c":[55,50,46,61],"d":[63,54,63,46,55,73,42,41,55,65,46,35,44,48,54,64,81,49,41,44],"a":[51,69,92,25,76,23,36,42,68,68,93,47],"ar":["C","A","S+","E","A","E","D","C","A","A","S+","C"],"tp":["Motivated","Healthy"],"tn":["Gambler","Feisty","Scandalous"],"pot":56.7},{"n":"Ironclaw","s":"ironclaw","k":"Charger","r":"Animal","o":47.8,"mv":31.08,"g":8.23,"c":[55,52,42,42],"d":[56,53,43,52,60,51,48,55,40,64,42,40,42,48,48,42,47,38,48,40],"a":[71,74,71,41,52,51,75,44,42,46,38,55],"ar":["A","A","A","D","C","C","A","C","C","C","D","B"],"tp":["Loyal","Eloquent"],"tn":[],"pot":51.8},{"n":"Glimps","s":"glimps","k":"Sprinter","r":"Plant","o":41.6,"mv":30.75,"g":7.45,"c":[27,59,52,40],"d":[25,26,26,23,58,74,76,44,76,38,36,61,42,25,41,53,34,50,44,42],"a":[9,38,64,58,89,54,81,85,22,49,61,5],"ar":[null,null,null,null,null,null,null,null,null,null,null,null],"tp":["Resourceful","Flexible","Disciplined"],"tn":["FaintHearted","Paranoid"],"pot":45.6},{"n":"Battleborn","s":"battleborn","k":"Warlord","r":"Construct","o":45.6,"mv":31.92,"g":8.64,"c":[69,41,33,29],"d":[53,78,27,65,42,23,24,68,12,64,31,24,41,83,55,18,48,19,50,35],"a":[98,90,24,12,10,56,55,39,24,83,20,90],"ar":["S+","S+","E","F","F","B","B","D","E","S","E","S+"],"tp":["FiredUp","Altruistic"],"tn":["Scandalous","Renegade","Feisty"],"pot":49.6}];
+/* ================= STELLSCHRAUBEN DES VORSCHLAGS ================= */
+var REGEL={
+  stufe:[{n:"niedrig",grund:11,schwelle:45},{n:"mittel",grund:14,schwelle:60},{n:"hoch",grund:17,schwelle:75}],
+  zusatzJePunkt:.25, zusatzMax:6,      // unter der Schwelle
+  bonusJePunkt:.10,  bonusMax:3,       // ueber der Schwelle
+  risikoMehrJePunkt:.02, risikoMehrMax:1.5,
+  risikoWenigerJePunkt:.015, risikoWenigerMin:.7,
+  einsatz:{schonen:.75,normal:1,vollgas:1.4},   // unveraendert (INTENSITY_FATIGUE_MULT)
+  heuteLast:16, bank:28, pauseNach:10, pauseErholung:28, risikoDeckel:33,
+  kurve:[[0,0],[25,0],[50,3],[80,25],[100,33]]     // unveraendert (FATIGUE_INJURY_RISK_ANCHORS)
+};
+var AT=["power","health","stamina","intelligence","awareness","determination","speed","dexterity","charisma","will","spirit","torment"];
+var ATN=["Power","Health","Stamina","Intelligence","Awareness","Determination","Speed","Dexterity","Charisma","Will","Spirit","Torment"];
+var PL=[{k:"FG",n:"Floor General",at:6,st:0},{k:"RP",n:"Rim Pressure",at:10,st:2},{k:"PE",n:"Perimeter",at:0,st:1},{k:"HD",n:"Help Defense",at:6,st:1},{k:"CS",n:"Clutch Shot",at:4,st:1},{k:"FB",n:"Fast Break",at:2,st:2}];
+var ERM={kelektros:22,brightpaw:8,emilia:0,elion:34,seraphina:12,knisterl:46,auraclystis:18,jinrai:0,britney:62,bone:5,thressa:27,ironclaw:38,glimps:14,battleborn:9};
+var BESETZT={FG:"brightpaw",RP:"kelektros",PE:"elion",HD:"glimps",CS:"seraphina",FB:"emilia"};
+SP.forEach(function(p){p.e=ERM[p.s]||0;p.ar=p.ar.map(function(r,i){var v=p.a[i];return r||(v>=85?"S":v>=70?"A":v>=56?"B":v>=42?"C":v>=30?"D":v>=18?"E":"F")})});
+var Q=new URLSearchParams(location.search);
+var Z={platz:PL.find(function(x){return x.k===Q.get("platz")})||PL[5],spieler:SP.find(function(p){return p.s===(Q.get("spieler")||"emilia")}),einsatz:Q.get("einsatz")||"normal",modus:Q.get("modus")==="heute"?"heute":"neu"};
+if(Q.get("still"))document.body.classList.add("still");
+function de(n,st){return n.toLocaleString("de-DE",{minimumFractionDigits:st==null?1:st,maximumFractionDigits:st==null?1:st})}
+function $(s){return document.querySelector(s)}
+function kurve(f){f=Math.max(0,Math.min(100,f));var k=REGEL.kurve;for(var i=0;i<k.length-1;i++)if(f<=k[i+1][0])return k[i][1]+(k[i+1][1]-k[i][1])*(f-k[i][0])/(k[i+1][0]-k[i][0]);return 33}
+/* DIE EINE RECHNUNG: Resistenz, Stufe, Einsatz, aktuelle Erschoepfung -> Last, Stand danach, Risiko */
+function rechne(res,st,einsatz,jetzt,modus){
+  var S=REGEL.stufe[st], m=REGEL.einsatz[einsatz], d=res-S.schwelle, zus=0, rf=1, grund=S.grund;
+  if(modus==="heute"){grund=REGEL.heuteLast;d=0}
+  else if(d<0){zus=Math.min(REGEL.zusatzMax,-d*REGEL.zusatzJePunkt);rf=Math.min(REGEL.risikoMehrMax,1-d*REGEL.risikoMehrJePunkt)}
+  else{zus=-Math.min(REGEL.bonusMax,d*REGEL.bonusJePunkt);rf=Math.max(REGEL.risikoWenigerMin,1-d*REGEL.risikoWenigerJePunkt)}
+  var last=(grund+zus)*m, nach=Math.min(100,jetzt+last);
+  return {d:res-S.schwelle,grund:grund,zus:zus,m:m,last:last,nach:nach,rf:rf,risiko:Math.min(REGEL.risikoDeckel,kurve(nach)*rf)};
+}
+function ton(r){return r.risiko>=8?"minus":r.risiko>0?"acht":"plus"}
+
+/* ---------- sortierbare Tabelle ---------- */
+function tabelle(el,sp,zeilen,opt){
+  var st={k:opt.start,auf:!!opt.startAuf};
+  function mal(){
+    var s=sp.find(function(x){return x.k===st.k});
+    var z=zeilen().slice().sort(function(a,b){var x=s.w(a),y=s.w(b);var r=typeof x==="string"?x.localeCompare(y,"de"):x-y;return st.auf?r:-r});
+    el.innerHTML="<colgroup>"+sp.map(function(x){return '<col style="width:'+(x.b||"auto")+'">'}).join("")+"</colgroup><thead><tr>"+
+      sp.map(function(x){return '<th tabindex="0" data-k="'+x.k+'" class="'+(x.a||"")+(x.k===st.k?" so"+(st.auf?" auf":""):"")+'" title="'+(x.tt||x.t)+' – sortieren">'+x.t+"</th>"}).join("")+"</tr></thead><tbody>"+
+      z.map(function(r){return '<tr data-id="'+(r.s||"")+'" class="'+(opt.kl?opt.kl(r):"")+'">'+sp.map(function(x){return '<td class="'+(x.a||"")+'">'+x.z(r)+"</td>"}).join("")+"</tr>"}).join("")+"</tbody>";
+    el.querySelectorAll("th").forEach(function(th){
+      function klick(){var k=th.dataset.k;if(st.k===k)st.auf=!st.auf;else{st.k=k;st.auf=!!sp.find(function(x){return x.k===k}).erstAuf}mal()}
+      th.onclick=klick;th.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();klick()}}});
+    if(opt.nach)opt.nach();
+  }
+  mal();return mal;
+}
+function R(p){return rechne(p.a[Z.platz.at],Z.platz.st,Z.einsatz,p.e,Z.modus)}
+var kaderMal=tabelle($("#kader"),[
+  {k:"n",t:"Spieler",erstAuf:true,w:function(p){return p.n},z:function(p){var pz=Object.keys(BESETZT).find(function(k){return BESETZT[k]===p.s});
+    return '<span class="nm"><img class="por" src="../portraits/'+p.s+'.jpg" alt=""><div><b>'+p.n+"</b><small>"+p.k+(pz?' · <span style="color:var(--gold)">'+pz+"</span>":"")+"</small></div></span>"}},
+  {k:"res",t:"Resistenz",b:"4.9rem",a:"mi",tt:"Wert im Belastungs-Attribut des gewählten Platzes",w:function(p){return p.a[Z.platz.at]},
+    z:function(p){var v=p.a[Z.platz.at],g=p.ar[Z.platz.at].charAt(0);return '<span class="ax"><span class="no '+g+'">'+p.ar[Z.platz.at]+'</span><b class="t">'+v+"</b></span>"}},
+  {k:"d",t:"Abstand",b:"4rem",a:"re",tt:"Abstand zur Schwelle der Stufe",w:function(p){return R(p).d},z:function(p){var d=R(p).d;return '<b class="t '+(d>=0?"plus":"minus")+' nurneu">'+(d>=0?"+":"−")+Math.abs(d)+"</b>"}},
+  {k:"last",t:"Last",b:"3.5rem",a:"re",tt:"Erschöpfung, die dieser Einsatz kostet",w:function(p){return R(p).last},z:function(p){return '<b class="t">+'+de(R(p).last)+"</b>"}},
+  {k:"nach",t:"Erschöpfung → danach",b:"8.8rem",tt:"Erschöpfung vor und nach dem Einsatz (Strich: Schutzzone bis 25)",w:function(p){return R(p).nach},z:function(p){var r=R(p);
+    return '<span class="eb"><b style="width:'+p.e+'%"></b><u class="'+(r.nach>=50?"r":r.nach<=25?"g":"")+'" style="left:'+p.e+"%;width:"+(r.nach-p.e)+'%"></u><s></s></span><span class="ez t">'+Math.round(p.e)+" → <b>"+de(r.nach)+"</b></span>"}},
+  {k:"ri",t:"Risiko",b:"4rem",a:"re",tt:"Verletzungsrisiko dieses Einsatzes",w:function(p){return R(p).risiko},z:function(p){var r=R(p);return '<b class="t '+ton(r)+'">'+de(r.risiko)+" %</b>"}}
+],function(){return SP},{start:"res",kl:function(p){return p===Z.spieler?"wahl":""},nach:function(){
+  document.querySelectorAll("#kader tbody tr").forEach(function(tr){tr.onclick=function(){Z.spieler=SP.find(function(p){return p.s===tr.dataset.id});alles()}})}});
+
+/* ---------- Beispielspieler ---------- */
+var BSP=[];[["schwach",40],["mittel",60],["stark",80]].forEach(function(b,i){[0,1,2].forEach(function(st){BSP.push({typ:b[0],res:b[1],st:st,i:i})})});
+function B(z){var r=rechne(z.res,z.st,Z.einsatz,0,Z.modus),r3=rechne(z.res,z.st,Z.einsatz,r.last*2,Z.modus);return {r:r,r3:r3}}
+var bspMal=tabelle($("#bsp"),[
+  {k:"typ",t:"Resistenz",b:"5.4rem",erstAuf:true,w:function(z){return z.i*10+z.st},z:function(z){return "<b>"+z.typ+'</b> <span class="t null">'+z.res+"</span>"}},
+  {k:"st",t:"Stufe",b:"5.2rem",erstAuf:true,w:function(z){return z.st*10+z.i},z:function(z){return '<span class="st s'+z.st+'">'+REGEL.stufe[z.st].n+"</span>"}},
+  {k:"d",t:"Abst.",b:"3.3rem",a:"re",tt:"Abstand zur Schwelle",w:function(z){return z.res-REGEL.stufe[z.st].schwelle},z:function(z){var d=z.res-REGEL.stufe[z.st].schwelle;return '<span class="t '+(d>=0?"plus":"minus")+'">'+(d>=0?"+":"−")+Math.abs(d)+"</span>"}},
+  {k:"l",t:"Last",b:"3.3rem",a:"re",tt:"Erschöpfung je Einsatz",w:function(z){return B(z).r.last},z:function(z){return '<b class="t">'+de(B(z).r.last)+"</b>"}},
+  {k:"e3",t:"nach 3 Eins.",a:"re",tt:"Erschöpfung nach drei Einsätzen in Folge, ohne Bank",w:function(z){return B(z).r3.nach},z:function(z){return '<span class="t">'+de(B(z).r3.nach)+"</span>"}},
+  {k:"r3",t:"Risiko",b:"4.2rem",a:"re",tt:"Verletzungsrisiko im dritten Einsatz in Folge",w:function(z){return B(z).r3.risiko},z:function(z){var x=B(z).r3;return '<b class="t '+ton(x)+'">'+de(x.risiko)+" %</b>"}}
+],function(){return BSP},{start:"typ",startAuf:true,kl:function(z){return z.st===2?"tr3":""}});
+
+/* ---------- Plaetze ---------- */
+function plaetze(){
+  $("#plz").innerHTML=PL.map(function(x){var p=SP.find(function(q){return q.s===BESETZT[x.k]}),r=rechne(p.a[x.at],x.st,Z.einsatz,p.e,Z.modus);
+    return '<a class="sl'+(x===Z.platz?" an":"")+'" data-k="'+x.k+'"><em>'+x.n+"</em><small>braucht "+ATN[x.at]+'</small><span class="st s'+x.st+'">'+REGEL.stufe[x.st].n+" · "+REGEL.stufe[x.st].schwelle+'</span><span class="wer"><img src="../portraits/'+p.s+'.jpg" alt="">'+p.n+' <b class="t '+(r.d>=0?"plus":"minus")+' nurneu" style="margin-left:auto">'+p.a[x.at]+"</b></span></a>"}).join("");
+  document.querySelectorAll(".sl").forEach(function(a){a.onclick=function(){Z.platz=PL.find(function(x){return x.k===a.dataset.k});Z.spieler=SP.find(function(q){return q.s===BESETZT[Z.platz.k]});alles()}});
+}
+/* ---------- Probe ---------- */
+function probe(){
+  var p=Z.spieler,x=Z.platz,res=p.a[x.at],r=R(p),S=REGEL.stufe[x.st],h=rechne(res,x.st,Z.einsatz,p.e,"heute");
+  var urteil=r.d>=0?['plus',"Hält die Stufe "+S.n,"kein Zusatz, "+(r.zus<0?de(-r.zus)+" Erschöpfung gespart":"genau an der Schwelle")]:r.d>=-10?['acht',"Knapp unter der Schwelle","+"+de(r.zus)+" Erschöpfung, Risiko ×"+de(r.rf,2)]:['minus',"Für diese Stufe zu schwach","+"+de(r.zus)+" Erschöpfung, Risiko ×"+de(r.rf,2)];
+  if(Z.modus==="heute")urteil=['null',"Heute: Resistenz wirkungslos","jeder Platz kostet 16, jedes Attribut ist egal"];
+  var lo=Math.min(res,S.schwelle),hi=Math.max(res,S.schwelle);
+  $("#probe").innerHTML=
+   '<div class="pkopf"><img src="../portraits/'+p.s+'.jpg" alt=""><div><h3>'+p.n+" auf "+x.n+'</h3><small><span class="st s'+x.st+'">Belastung '+S.n+"</span> &nbsp;verschleißt <b>"+ATN[x.at]+"</b> · verlangt <b>"+S.schwelle+"</b> · "+p.n+" hat <b>"+res+" ("+p.ar[x.at]+")</b></small></div>"+
+   '<div class="urteil"><strong class="'+urteil[0]+'">'+urteil[1]+'</strong><small class="null">'+urteil[2]+"</small></div></div>"+
+   '<div class="skala nurneu"><div class="bahn"></div>'+REGEL.stufe.map(function(s,i){return '<div class="sw'+(i===x.st?" an":"")+'" style="left:'+s.schwelle+'%"><span>'+s.n+"</span><b>ab "+s.schwelle+"</b></div>"}).join("")+
+   '<div class="lk" style="left:'+lo+"%;width:"+(hi-lo)+"%;background:"+(r.d>=0?"var(--gut)":"var(--warn)")+'"></div><div class="ich t" style="left:'+res+"%;border-color:"+(r.d>=0?"var(--gut)":"var(--warn)")+'">'+res+"</div></div>"+
+   '<div class="rw"><div><small>Grundlast '+(Z.modus==="heute"?"(alle Plätze)":S.n)+'</small><strong class="t">'+de(r.grund,0)+'</strong><em>'+(Z.modus==="heute"?"heute fest 16":"11 · 14 · 17 je Stufe")+"</em></div>"+
+   '<div class="nurneu"><small>Resistenz '+(r.d>=0?"Bonus":"Zusatz")+'</small><strong class="t '+(r.zus>0?"minus":r.zus<0?"plus":"")+'">'+(r.zus>0?"+":r.zus<0?"−":"±")+de(Math.abs(r.zus))+"</strong><em>"+(r.d>=0?r.d+" drüber × 0,10"+(-r.zus>=REGEL.bonusMax?", Deckel":""):(-r.d)+" drunter × 0,25"+(r.zus>=REGEL.zusatzMax?", Deckel":""))+"</em></div>"+
+   '<div><small>Einsatz</small><strong class="t">× '+de(r.m,2)+"</strong><em>"+(Z.einsatz==="schonen"?"Schonen":Z.einsatz==="vollgas"?"Vollgas":"Normal")+"</em></div>"+
+   '<div class="erg"><small>Erschöpfung</small><strong class="t">'+Math.round(p.e)+" → "+de(r.nach)+'</strong><em>Last +'+de(r.last)+" · danach −"+de(Math.min(25,r.nach/80*25))+" % Leistung</em></div>"+
+   '<div class="erg"><small>Verletzungsrisiko</small><strong class="t '+ton(r)+'">'+de(r.risiko)+" %</strong><em>"+(r.nach<=25?"Schutzzone bis 25":"Kurve "+de(kurve(r.nach))+" % × "+de(r.rf,2))+"</em></div></div>"+
+   (Z.modus==="neu"?'<div class="alt"><span class="gk">Zum Vergleich heute</span><span>Erschöpfung <b class="t">'+Math.round(p.e)+" → "+de(h.nach)+'</b>, Risiko <b class="t">'+de(h.risiko)+" %</b> – gleich für jeden Spieler auf jedem Platz, ob "+ATN[x.at]+" 20 oder 95.</span></div>":
+    '<div class="alt"><span class="gk">Das Problem</span><span>Stufe und Belastungs-Attribut stehen nur in der Anzeige. Gebucht wird <b>16 × Einsatz</b> für alle – oben auf „Vorschlag“ umschalten.</span></div>');
+}
+/* ---------- Diagramme: Zeichenflaeche = gemessene Flaeche, Schrift in rem ---------- */
+function flaeche(id){var e=$(id),rem=parseFloat(getComputedStyle(document.documentElement).fontSize);e.innerHTML="";return {W:e.clientWidth,H:e.clientHeight,u:rem}}
+function dia1(){
+  var F=flaeche("#dia1"),W=F.W,H=F.H,u=F.u,l=2.6*u,r=1*u,t=1.6*u,b=2.6*u,x0=20,x1=100,m=REGEL.einsatz[Z.einsatz],y0=6*m,y1=26*m;
+  function X(v){return l+(v-x0)/(x1-x0)*(W-l-r)} function Y(v){return H-b-(v-y0)/(y1-y0)*(H-t-b)}
+  var farbe=["#62d394","#f3b54a","#ff6058"],fs='font-size:'+(.8*u)+'px',s='<svg viewBox="0 0 '+W+" "+H+'">';
+  for(var g=Math.ceil(y0/4)*4;g<=y1+.01;g+=4)s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(g)+'" y2="'+Y(g)+'" stroke="rgba(244,230,196,.09)"/><text x="'+(l-.5*u)+'" y="'+(Y(g)+.28*u)+'" text-anchor="end" style="'+fs+'">'+g+"</text>";
+  for(var v=20;v<=100;v+=10)s+='<text x="'+X(v)+'" y="'+(H-b+1.1*u)+'" text-anchor="middle" style="'+fs+'">'+v+"</text>";
+  s+='<text class="k" x="'+(W-r)+'" y="'+(H-.35*u)+'" text-anchor="end" style="font-size:'+(.68*u)+'px">Resistenz = Wert im Belastungs-Attribut des Platzes</text><text class="k" x="'+l+'" y="'+(.9*u)+'" style="font-size:'+(.68*u)+'px">Erschöpfung je Einsatz</text>';
+  s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(16*m)+'" y2="'+Y(16*m)+'" stroke="#66738a" stroke-width="2" stroke-dasharray="6 5"/>';
+  if(Z.modus==="neu"){REGEL.stufe.forEach(function(S,i){var pt=[];for(var v=x0;v<=x1;v++)pt.push(X(v)+","+Y(rechne(v,i,Z.einsatz,0,"neu").last));
+    s+='<polyline fill="none" stroke="'+farbe[i]+'" stroke-width="'+(i===Z.platz.st?.24*u:.11*u)+'" opacity="'+(i===Z.platz.st?1:.6)+'" points="'+pt.join(" ")+'"/><circle cx="'+X(S.schwelle)+'" cy="'+Y(S.grund*m)+'" r="'+(.33*u)+'" fill="#0b0e14" stroke="'+farbe[i]+'" stroke-width="2"/><text x="'+X(S.schwelle)+'" y="'+(Y(S.grund*m)-.65*u)+'" text-anchor="middle" style="fill:'+farbe[i]+';font-weight:700;'+fs+'">Schwelle '+S.schwelle+"</text>"});}
+  var res=Z.spieler.a[Z.platz.at],rr=R(Z.spieler),xx=X(Math.max(x0,res)),li=res>70;
+  s+='<line x1="'+xx+'" x2="'+xx+'" y1="'+t+'" y2="'+(H-b)+'" stroke="#fff" stroke-dasharray="3 4" opacity=".6"/><circle cx="'+xx+'" cy="'+Y(rr.last)+'" r="'+(.45*u)+'" fill="#f0c35a" stroke="#0b0e14" stroke-width="2"/>';
+  s+='<text x="'+(xx+(li?-.8:.8)*u)+'" y="'+(Y(rr.last)+1.7*u)+'" text-anchor="'+(li?"end":"start")+'" style="fill:#fff;font-size:'+(1*u)+'px;font-weight:700">'+Z.spieler.n+" · "+ATN[Z.platz.at]+" "+res+" → +"+de(rr.last)+"</text></svg>";
+  $("#dia1").innerHTML=s;
+}
+/* Saison mit Pause. Muster: zwei Einsaetze, dann ein Spieltag Bank. */
+function dia2(){
+  var F=flaeche("#dia2"),W=F.W,H=F.H,u=F.u,l=2.2*u,r=4.4*u,t=2.3*u,b=2.5*u,n=20,fs='font-size:'+(.72*u)+'px';
+  function X(i){return l+i/(n+.6)*(W-l-r)} function Y(v){return H-b-v/100*(H-t-b)}
+  function lauf(modus){var e=0,pt=[[0,0]],res=Z.spieler.a[Z.platz.at];for(var i=1;i<=n;i++){
+      if(i%3===0)e=Math.max(0,e-REGEL.bank);else e=Math.min(100,e+rechne(res,Z.platz.st,Z.einsatz,e,modus).last);
+      pt.push([i+(i>REGEL.pauseNach?.6:0),e]);if(i===REGEL.pauseNach){e=Math.max(0,e-REGEL.pauseErholung);pt.push([i+.6,e])}}return pt}
+  var s='<svg viewBox="0 0 '+W+" "+H+'">';
+  [[0,25,"rgba(98,211,148,.10)","0 %"],[25,50,"rgba(243,181,74,.07)","bis 3 %"],[50,80,"rgba(255,96,88,.08)","bis 25 %"],[80,100,"rgba(255,96,88,.17)","bis 33 %"]].forEach(function(z){
+    s+='<rect x="'+l+'" y="'+Y(z[1])+'" width="'+(W-l-r)+'" height="'+(Y(z[0])-Y(z[1]))+'" fill="'+z[2]+'"/><text x="'+(W-r+.4*u)+'" y="'+((Y(z[0])+Y(z[1]))/2+.25*u)+'" style="font-size:'+(.7*u)+'px;fill:#9aa7ba">Risiko '+z[3]+"</text>"});
+  [0,25,50,80,100].forEach(function(v){s+='<text x="'+(l-.4*u)+'" y="'+(Y(v)+.25*u)+'" text-anchor="end" style="'+fs+'">'+v+"</text>"});
+  for(var i=1;i<=n;i++)s+='<text x="'+X(i+(i>REGEL.pauseNach?.6:0))+'" y="'+(H-b+1*u)+'" text-anchor="middle" style="'+fs+(i%3===0?";fill:#45B0C9;font-weight:700":"")+'">'+i+"</text>";
+  var pa=X(REGEL.pauseNach),pb=X(REGEL.pauseNach+.6);
+  s+='<rect x="'+pa+'" y="'+(t-.2*u)+'" width="'+(pb-pa)+'" height="'+(H-t-b+.2*u)+'" fill="rgba(69,176,201,.3)"/><text class="k" x="'+((pa+pb)/2)+'" y="'+(t-.55*u)+'" text-anchor="middle" style="fill:#45B0C9;font-size:'+(.7*u)+'px">Pause · alle −28</text>';
+  s+='<text class="k" x="'+l+'" y="'+(H-.4*u)+'" style="font-size:'+(.66*u)+'px">Spieltag · Muster: 2 Einsätze, dann Bank (blau, −28)</text>';
+  [["heute","#66738a",.12*u],[Z.modus,"#f0c35a",.2*u]].forEach(function(c){s+='<polyline fill="none" stroke="'+c[1]+'" stroke-width="'+c[2]+'" stroke-linejoin="round" points="'+lauf(c[0]).map(function(p){return X(p[0])+","+Y(p[1])}).join(" ")+'"/>'});
+  var ende=lauf(Z.modus),mx=Math.max.apply(null,ende.map(function(p){return p[1]}));
+  s+='<text x="'+l+'" y="'+(.95*u)+'" style="fill:#f0c35a;font-size:'+(.86*u)+'px;font-weight:700">'+Z.spieler.n+" auf "+Z.platz.n+" · Spitze "+de(mx,0)+"</text></svg>";
+  $("#dia2").innerHTML=s;
+}
+function alles(){
+  document.body.classList.toggle("heute",Z.modus==="heute");
+  document.querySelectorAll("[data-m]").forEach(function(a){a.classList.toggle("an",a.dataset.m===Z.modus)});
+  document.querySelectorAll("#einsatz button").forEach(function(a){a.classList.toggle("an",a.dataset.e===Z.einsatz)});
+  $("#kopf-l").textContent=Z.platz.n+" · "+REGEL.stufe[Z.platz.st].n+" · "+ATN[Z.platz.at]+" ab "+REGEL.stufe[Z.platz.st].schwelle;
+  $("#kopf-r").textContent="aus dem Stand · "+(Z.einsatz==="schonen"?"Schonen":Z.einsatz==="vollgas"?"Vollgas":"Normal");
+  plaetze();probe();kaderMal();bspMal();dia1();dia2();
+}
+[0,1,2].forEach(function(i){$("#s"+i).textContent=REGEL.stufe[i].schwelle});
+$("#tage").innerHTML=Array.from({length:20},function(_,i){return '<i class="'+(i<6?"v":i===6?"j":"")+'" title="Spieltag '+(i+1)+'"></i>'+(i===9?'<u title="Pause">P</u>':"")}).join("");
+document.querySelectorAll("[data-m]").forEach(function(a){a.onclick=function(){Z.modus=a.dataset.m;alles()}});
+document.querySelectorAll("#einsatz button").forEach(function(a){a.onclick=function(){Z.einsatz=a.dataset.e;alles()}});
+alles();
+window.addEventListener("resize",function(){dia1();dia2()});window.addEventListener("load",function(){dia1();dia2()});if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){dia1();dia2()});
+</script>
+</body>
+</html>
