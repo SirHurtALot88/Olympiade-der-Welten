@@ -9,6 +9,8 @@ import {
   sortiereKader,
   stationFuerZeile,
   stationenBelegung,
+  wuenscheErfuellen,
+  wunschFolge,
   zielGleich,
   zielLabel,
   zonenText,
@@ -35,6 +37,7 @@ function zeile(teil: Partial<TrainingZeile> & { playerId: string; name: string }
     potenzialRest: 10,
     netto: 1,
     wunsch: null,
+    wunschDaten: null,
     ...teil,
   };
 }
@@ -101,5 +104,50 @@ describe("Entwicklung: Datenaufbereitung", () => {
     expect(wege[0]?.art).toBe("primaer");
     expect(wege.length).toBeGreaterThan(1);
     expect(wege[1]?.art).toBe("neben");
+  });
+});
+
+describe("Trainingswunsch", () => {
+  const daten = { moraleReward: 4, moralePenalty: -5, spieltag: 1 };
+
+  it("zählt offene Wünsche nur dort, wo Wunsch und Intensität abweichen", () => {
+    const zeilen = [
+      zeile({ playerId: "a", name: "A", wunsch: "leicht", modus: "mittel" }),
+      zeile({ playerId: "b", name: "B", wunsch: "hart", modus: "hart" }),
+      zeile({ playerId: "c", name: "C", wunsch: null }),
+    ];
+    const k = baueKaderKennzahlen(zeilen);
+    expect(k.wuenscheGesamt).toBe(2);
+    expect(k.wuenscheOffen).toBe(1);
+  });
+
+  it("sortiert die Wunsch-Spalte: offen vor erfüllt vor kein Wunsch", () => {
+    const zeilen = [
+      zeile({ playerId: "a", name: "A", wunsch: null }),
+      zeile({ playerId: "b", name: "B", wunsch: "hart", modus: "hart" }),
+      zeile({ playerId: "c", name: "C", wunsch: "leicht", modus: "mittel" }),
+    ];
+    expect(sortiereKader(zeilen, "wunsch", "ab").map((z) => z.playerId)).toEqual(["c", "b", "a"]);
+  });
+
+  it("Folge folgt der Engine: erfüllt gibt Belohnung, früh offen keine Folge, später Druck", () => {
+    const z = zeile({ playerId: "a", name: "A", wunsch: "leicht", wunschDaten: daten });
+    expect(wunschFolge(z, "leicht")).toMatchObject({ delta: 4, ergebnis: "erfuellt" });
+    expect(wunschFolge(z, "mittel")).toMatchObject({ delta: 0, ergebnis: "offen" });
+    const spaet = zeile({ playerId: "a", name: "A", wunsch: "leicht", wunschDaten: { ...daten, spieltag: 3 } });
+    expect(wunschFolge(spaet, "mittel")).toMatchObject({ ergebnis: "druck" });
+    expect(wunschFolge(spaet, "mittel")!.delta).toBeLessThan(0);
+    expect(wunschFolge(zeile({ playerId: "x", name: "X" }), "leicht")).toBeNull();
+  });
+
+  it("Wünsche erfüllen setzt die gewünschte Intensität nur bei offenen, nicht verletzten Spielern", () => {
+    const zeilen = [
+      zeile({ playerId: "a", name: "A", wunsch: "leicht", modus: "mittel" }),
+      zeile({ playerId: "b", name: "B", wunsch: "hart", modus: "hart" }),
+      zeile({ playerId: "c", name: "C", wunsch: "hart", modus: "leicht", verletzt: true }),
+      zeile({ playerId: "d", name: "D", wunsch: "hart", modus: "leicht" }),
+    ];
+    expect(wuenscheErfuellen(zeilen, {})).toEqual({ a: "leicht", d: "hart" });
+    expect(wuenscheErfuellen(zeilen, { a: { modus: "leicht" } })).toEqual({ d: "hart" });
   });
 });

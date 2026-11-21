@@ -29,6 +29,11 @@ import {
   type TrainingsProfilEintrag,
   type TrainingsZielKontext,
 } from "@/lib/training/spieltag-training";
+import {
+  evaluateTrainingModeDemandDelta,
+  getTrainingModeMismatchSeverity,
+  resolveTrainingModeDemandStatus,
+} from "@/lib/training/training-mode-demand-service";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -122,6 +127,16 @@ export type TrainingZeile = {
   /** Netto-Zuwachs bis Saisonende laut Engine (Setpoints). */
   netto: number;
   wunsch: PlayerTrainingMode | null;
+  /** Zahlen zum Wunsch (Moral, Spieltag), `null` ohne Wunsch. Quelle: `trainingDemand` der Zeile. */
+  wunschDaten: WunschDaten | null;
+};
+
+export type WunschDaten = {
+  moraleReward: number;
+  /** Negativ (wie in der Engine: −5 bzw. −10). */
+  moralePenalty: number;
+  /** Spieltag-Index im Spielplan (steuert, wann ein offener Wunsch zu Druck wird), `null` unbekannt. */
+  spieltag: number | null;
 };
 
 export function zielLabel(disziplinId: string): string {
@@ -143,6 +158,8 @@ export function baueTrainingZeilen(input: {
   const ausfall = input.ausfall ?? (matchdayId ? bestimmeAusfallSpielerFuerSpieltag(gameState, matchdayId) : new Set<string>());
   const kontext = input.kontext ?? baueTrainingsZielKontext(gameState, matchdayId, ausfall);
   const spieler = new Map(gameState.players.map((p) => [p.id, p] as const));
+  const spieltagIndex =
+    gameState.seasonState?.disciplineSchedule?.find((e) => e.matchdayId === matchdayId)?.matchdayIndex ?? null;
   return input.rows.map((row) => {
     const player: Player | undefined = spieler.get(row.player.id);
     const bestimmt = player ? bestimmeTrainingsZiel(kontext, player) : null;
@@ -184,6 +201,13 @@ export function baueTrainingZeilen(input: {
       potenzialRest: gesamt != null && potenzial != null ? Math.max(0, potenzial - gesamt) : null,
       netto: row.organicForecast.netSetpoints,
       wunsch: row.trainingDemand?.preferredMode ?? null,
+      wunschDaten: row.trainingDemand
+        ? {
+            moraleReward: row.trainingDemand.moraleReward,
+            moralePenalty: row.trainingDemand.moralePenalty,
+            spieltag: spieltagIndex,
+          }
+        : null,
     } satisfies TrainingZeile;
   });
 }
@@ -191,13 +215,19 @@ export function baueTrainingZeilen(input: {
 /* ------------------------------------------------------------------ Sortierung (jede Tabelle) */
 
 export type SortRichtung = "auf" | "ab";
-export type KaderSortSchluessel = "name" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt";
+export type KaderSortSchluessel = "name" | "wunsch" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt";
 
 const MODUS_REIHE: Record<PlayerTrainingMode, number> = {
   leicht: 0,
   mittel: 1,
   hart: 2,
 };
+
+/** Sortierwert der Wunsch-Spalte: offen (2) vor erfüllt (1) vor kein Wunsch (0). */
+function wunschRang(z: Pick<TrainingZeile, "wunsch" | "modus">): number {
+  if (!z.wunsch) return 0;
+  return z.wunsch === z.modus ? 1 : 2;
+}
 
 function sortWert(z: TrainingZeile, schluessel: KaderSortSchluessel): number | string {
   switch (schluessel) {
@@ -207,6 +237,8 @@ function sortWert(z: TrainingZeile, schluessel: KaderSortSchluessel): number | s
       return z.verletzt ? "~" : (z.zielLabel ?? "~").toLocaleLowerCase("de");
     case "modus":
       return MODUS_REIHE[z.modus];
+    case "wunsch":
+      return wunschRang(z);
     case "netto":
       return z.netto;
     case "potenzial":
@@ -267,6 +299,9 @@ export type KaderKennzahlen = {
   ueberlastet: number;
   verletzt: number;
   anzahl: number;
+  /** Spieler mit Trainingswunsch, davon (noch) nicht erfüllt. */
+  wuenscheGesamt: number;
+  wuenscheOffen: number;
 };
 
 export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKennzahlen {
@@ -278,7 +313,67 @@ export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKenn
     ueberlastet: zeilen.filter((z) => !z.verletzt && istUeberlastet(z.fatigue)).length,
     verletzt: zeilen.filter((z) => z.verletzt).length,
     anzahl,
+    wuenscheGesamt: zeilen.filter((z) => z.wunsch).length,
+    wuenscheOffen: zeilen.filter((z) => wunschOffen(z)).length,
   };
+}
+
+/* ------------------------------------------------------------------ Trainingswunsch (leicht/mittel/hart) */
+
+export function wunschOffen(z: Pick<TrainingZeile, "wunsch" | "modus">): boolean {
+  return z.wunsch != null && z.wunsch !== z.modus;
+}
+
+/**
+ * Moral-Folge eines Wunsches bei Intensität `modus` — dieselbe Rechnung wie die Engine
+ * (`evaluateTrainingModeDemandDelta`, Status je Spieltag). `null` ohne Wunsch.
+ * Hinweis: Die Engine gewichtet zusätzlich mit der Dringlichkeit des Wunsches; angezeigt wird der Grundwert.
+ */
+export function wunschFolge(
+  z: Pick<TrainingZeile, "wunsch" | "wunschDaten">,
+  modus: PlayerTrainingMode,
+): { delta: number; ergebnis: "erfuellt" | "druck" | "verfehlt" | "offen"; text: string } | null {
+  if (!z.wunsch || !z.wunschDaten) return null;
+  const schwere = getTrainingModeMismatchSeverity(modus, z.wunsch);
+  const status = resolveTrainingModeDemandStatus({
+    currentMode: modus,
+    preferredMode: z.wunsch,
+    mismatchSeverity: schwere,
+    matchdayIndex: z.wunschDaten.spieltag,
+  });
+  const erg = evaluateTrainingModeDemandDelta({
+    demand: {
+      preferredMode: z.wunsch,
+      currentMode: modus,
+      status,
+      moraleReward: z.wunschDaten.moraleReward,
+      moralePenalty: z.wunschDaten.moralePenalty,
+      mismatchSeverity: schwere,
+    },
+    activeMode: modus,
+  });
+  const delta = Math.round(erg.delta * 10) / 10;
+  const ergebnis = erg.outcome === "fulfilled" ? "erfuellt" : erg.outcome === "pressure" ? "druck" : erg.outcome === "failed" ? "verfehlt" : "offen";
+  const text =
+    ergebnis === "erfuellt"
+      ? "Wunsch erfüllt"
+      : ergebnis === "verfehlt"
+        ? "Wunsch verfehlt"
+        : ergebnis === "druck"
+          ? "Wunsch unter Druck"
+          : "Wunsch offen, noch ohne Folge";
+  return { delta, ergebnis, text };
+}
+
+/** Was „Wünsche erfüllen" setzt: je Spieler mit offenem Wunsch (nicht verletzt) die gewünschte Intensität; leer, wenn nichts offen ist. */
+export function wuenscheErfuellen(zeilen: readonly TrainingZeile[], entwurf: Record<string, { modus?: PlayerTrainingMode }>): Record<string, PlayerTrainingMode> {
+  const aus: Record<string, PlayerTrainingMode> = {};
+  for (const z of zeilen) {
+    if (!z.wunsch || z.verletzt) continue;
+    const aktuell = entwurf[z.playerId]?.modus ?? z.modus;
+    if (aktuell !== z.wunsch) aus[z.playerId] = z.wunsch;
+  }
+  return aus;
 }
 
 export function stationenBelegung(zeilen: readonly TrainingZeile[]): Array<{ id: StationId; zeilen: TrainingZeile[] }> {

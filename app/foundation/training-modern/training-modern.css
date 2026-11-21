@@ -1180,3 +1180,77 @@
     display: none;
   }
 }
+
+/* ---- Trainingswunsch (21.11): Marke am Intensitäts-Knopf, Zeile mit Folge, Kennzahl, Sammel-Knopf ---- */
+.te .bc-seg button {
+  position: relative;
+}
+.te .bc-seg button.is-marke::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bc-acht);
+  box-shadow: 0 0 0 1px rgba(18, 24, 36, 0.85);
+}
+.te .bc-seg button[aria-pressed="true"].is-marke::after {
+  background: var(--bc-gut);
+}
+.te-kennzahlen > div.is-wunsch {
+  border-top-color: var(--bc-acht);
+}
+.te-pl > span.te-wunsch--klein:not(.te-med) {
+  flex: none;
+  padding: 0 5px;
+  font-size: var(--te-klein);
+  white-space: nowrap;
+}
+.te-art--wunsch {
+  border-color: var(--bc-acht);
+  background: rgba(240, 195, 90, 0.14);
+  color: var(--bc-acht);
+}
+.te-wunschzeile {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--bc-acht);
+  border-radius: 4px;
+  background: rgba(240, 195, 90, 0.08);
+  color: var(--bc-tinte);
+  font-size: var(--te-klein);
+  line-height: 1.35;
+}
+.te-wunschzeile.is-ok {
+  border-color: rgba(98, 211, 148, 0.5);
+  background: rgba(98, 211, 148, 0.08);
+}
+.te-wunschzeile .bc-icon {
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  margin-top: 1px;
+}
+.te-wunschleiste {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--bc-linie);
+}
+.te-wunschleiste small {
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-btn.te-btn--klein {
+  flex: none;
+  height: auto;
+  padding: 4px 10px;
+  font-size: var(--te-klein);
+  white-space: nowrap;
+}

@@ -89,6 +89,7 @@ const ACT_SOURCES = new Set<string>([
   "sponsor_v2_choice_pending",
   "team_captain_missing",
   "player_training_mode",
+  "player_training_wish",
   "room_flow_state",
   "game_flow_controller",
   "game_phase",
