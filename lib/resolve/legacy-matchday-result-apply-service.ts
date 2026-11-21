@@ -1001,6 +1001,9 @@ export class LegacyMatchdayResultApplyService {
       // Match-Fatigue. Sonst schlaegt die Trainingsschicht bei ihm zweimal auf.
       deferredPlayerIds: injuryResult.deferredPlayerIds,
       ausfallSpielerIds,
+      // Halber Spieltag (D1): Zuwachs festhalten, aber erst mit D2 auf die Attribute buchen — sonst
+      // aendert sich die Arena-Eingabe mitten im Spieltag (Motor-Neuaufbau nach D1, D2-Vorlauf veraltet).
+      spieltagOffen: isPartialCommit,
     });
 
     // STAFFEL O7 "EINGESPIELTE PAARE" (11.10., lib/season/staffel-wechsel-paar-bonus-service.ts):

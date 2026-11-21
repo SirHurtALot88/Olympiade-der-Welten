@@ -40,6 +40,7 @@ import {
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
 import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
+import { entscheideMotorNeuaufbau } from "@/lib/foundation/battle-arena/arena-motor-neuaufbau";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -972,6 +973,15 @@ export default function FoundationBattleArenaHost({
   const [vorstellungFuerDisziplin, setVorstellungFuerDisziplin] = useState<string | null>(null);
   const vorstellungErledigt = vorstellungFuerDisziplin != null && vorstellungFuerDisziplin === spieltagDisziplinId;
   const setVorstellungErledigt = (_erledigt: boolean) => setVorstellungFuerDisziplin(spieltagDisziplinId);
+  // Fuer den Mount-Effekt (s. `entscheideMotorNeuaufbau`): was steht gerade auf der Buehne? Refs statt
+  // Abhaengigkeiten, damit ein Spielende allein keinen Effektlauf ausloest. Nachgezogen in einem Effekt,
+  // der VOR dem Mount-Effekt steht (Effekte laufen in Deklarationsreihenfolge).
+  const endeDisziplinRef = useRef<string | null>(null);
+  const angeschauteDisziplinRef = useRef<string | null>(null);
+  useEffect(() => {
+    endeDisziplinRef.current = endeInfo?.disziplin ?? null;
+    angeschauteDisziplinRef.current = vorstellungFuerDisziplin;
+  }, [endeInfo, vorstellungFuerDisziplin]);
 
   // Haengt den Motor nativ ein, sobald der gerenderte Kader UND die Huelle stehen — und
   // reisst ihn komplett wieder ab, sobald sich der gerenderte Kader aendert (s. Kommentar
@@ -1079,13 +1089,19 @@ export default function FoundationBattleArenaHost({
       // Spieltags-Ansicht: steht schon ein Motor mit genau dieser Nutzlast, bleibt er stehen (s.
       // `gemounteteSignaturRef`). Die Anzeige-Meta (Tabellenplatz, Punkte) zaehlt dafuer nicht.
       const signatur = istSpieltag ? JSON.stringify(umschlag) : null;
-      if (
-        signatur != null &&
-        signatur === gemounteteSignaturRef.current &&
-        container.querySelector(".oly-battle-arena")
-      ) {
-        return;
-      }
+      // ENDSTAND BLEIBT STEHEN (21.11.): eine nach dem Zuschauen geaenderte Nutzlast (z. B. ein neuer
+      // Spielstand nach der Buchung) baut die gerade gezeigte Disziplin NICHT neu auf -- erst der
+      // naechste Disziplinwechsel (s. `spieltagDisziplinId` in den Abhaengigkeiten). Vorher verschwand
+      // genau hier der D1-Endstand hinter dem Ladebild, s. `entscheideMotorNeuaufbau`.
+      const entscheidung = entscheideMotorNeuaufbau({
+        signatur,
+        gemounteteSignatur: gemounteteSignaturRef.current,
+        motorSteht: container.querySelector(".oly-battle-arena") != null,
+        aktuelleDisziplin: aktuelleDisziplinRef.current,
+        endeDisziplin: endeDisziplinRef.current,
+        angeschauteDisziplin: angeschauteDisziplinRef.current,
+      });
+      if (entscheidung !== "neu") return;
 
       huelle.stylesheetHrefs.forEach(sicherstelleStylesheet);
       // Alte Motor-Instanz beenden, BEVOR ihr DOM verschwindet (sonst Zombie-Schleife, s. `stopp`).
@@ -1189,6 +1205,8 @@ export default function FoundationBattleArenaHost({
     battlefieldPodNutzlast,
     bahnPodNutzlast,
     istSpieltag,
+    // Ein aufgeschobener Neuaufbau (s. `entscheideMotorNeuaufbau`) holt der Disziplinwechsel nach.
+    spieltagDisziplinId,
   ]);
 
   // SPIELTAGS-ANSICHT: Disziplinwechsel (D1 -> D2) stellt den LAUFENDEN Motor um, statt ihn neu

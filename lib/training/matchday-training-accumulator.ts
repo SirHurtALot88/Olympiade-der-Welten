@@ -98,8 +98,23 @@ export function accumulateMatchdayTrainingProgress(input: {
   ausfallSpielerIds?: ReadonlySet<string> | null;
   /** Zuwachs je Spieltag buchen (Standard: Schalter `OLY_TRAINING_JE_SPIELTAG`). Fatigue-Simulationen schalten ab. */
   mitZuwachs?: boolean;
+  /**
+   * DER SPIELTAG IST ERST HALB GEWERTET (Arena-Teilbuchung nach D1, Befund 21.11.,
+   * docs/design/arena-fluss-21-11.md). Der Zuwachs wird dann wie sonst bestimmt und im Verlauf
+   * festgehalten (`o: true`), aber NICHT auf die Attribute gebucht — das holt der Abschluss-Commit
+   * (D2) mit genau diesen Zahlen nach.
+   *
+   * Grund: Attribute und (ligaweit neu abgeleitete) Disziplinwerte sind Eingabe der Arena. Buchte schon
+   * der D1-Commit den Zuwachs, aenderte sich mitten im Spieltag der Kader: die Buehne baute den Motor
+   * mit dem gerade gezeigten D1-Endstand neu auf, und der Vorlauf-Fingerabdruck fuer D2 kippte
+   * (`arena_eingabe_divergenz`) — D2 wartete beim Buchen auf einen neuen Vorlauf und haette mit anderen
+   * Eingaben gebucht, als die Buehne zeigte. Trainingslast, Modus und Ausfall-Entscheidung bleiben
+   * unveraendert beim ersten Commit.
+   */
+  spieltagOffen?: boolean;
 }): GameState {
   const { gameState, seasonId, matchdayId } = input;
+  const spieltagOffen = input.spieltagOffen === true;
   const deferredPlayerIds = input.deferredPlayerIds ?? null;
   const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
   if (rosteredPlayerIds.size === 0) return gameState;
@@ -168,6 +183,27 @@ export function accumulateMatchdayTrainingProgress(input: {
       : priorMode === mode && (priorEintrag == null || priorEintrag.s === "t");
     if (unveraendert && previousAccumulator) {
       const relayered = clampFatigue((player.fatigue ?? 0) + previousAccumulator.accumulatedTrainingFatigue);
+      // Abschluss-Commit nach einer Teilbuchung: der beim D1-Commit festgelegte Zuwachs (`o: true`)
+      // landet jetzt auf den Attributen — dieselben Zahlen, kein neues Ziel, kein neuer Wurf.
+      if (!spieltagOffen && priorEintrag?.o && previousAccumulator.verlauf) {
+        const { neu, gebucht } = bucheZuwachsAufAttribute(player.attributeSheetStats, priorEintrag.z ?? {});
+        const abgeschlossen: TrainingsSpieltagEintrag = { ...priorEintrag };
+        delete abgeschlossen.o;
+        if (Object.keys(gebucht).length > 0) abgeschlossen.z = gebucht;
+        else delete abgeschlossen.z;
+        if (neu) attributeChanged = true;
+        mutated = true;
+        return {
+          ...player,
+          ...(neu ? { attributeSheetStats: neu } : {}),
+          seasonTrainingAccumulator: {
+            ...previousAccumulator,
+            verlauf: previousAccumulator.verlauf.map((e) => (e.m === matchdayId ? abgeschlossen : e)),
+            updatedAt: now,
+          },
+          fatigue: relayered,
+        };
+      }
       if (relayered === (player.fatigue ?? 0)) return player;
       mutated = true;
       return { ...player, fatigue: relayered };
@@ -186,7 +222,8 @@ export function accumulateMatchdayTrainingProgress(input: {
       matchdaysCounted -= 1;
       delete modeByMatchday[matchdayId];
     }
-    if (priorEintrag?.s === "t" && priorEintrag.z && attributeSheetStats) {
+    // Ein noch offener Zuwachs (`o`) steht nicht auf den Attributen — dann gibt es nichts zurueckzunehmen.
+    if (priorEintrag?.s === "t" && priorEintrag.z && !priorEintrag.o && attributeSheetStats) {
       const zurueck = { ...attributeSheetStats } as NonNullable<Player["attributeSheetStats"]>;
       for (const [attribute, wert] of Object.entries(priorEintrag.z) as Array<[PlayerGeneratorAttributeName, number]>) {
         const aktuell = zurueck[attribute];
@@ -229,22 +266,16 @@ export function accumulateMatchdayTrainingProgress(input: {
           l: roundValue(fatigueShare, 3),
         };
         if (zuwachs && attributeSheetStats && Object.keys(zuwachs.zuwachs).length > 0) {
-          const neu = { ...attributeSheetStats } as NonNullable<Player["attributeSheetStats"]>;
-          const gebucht: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
-          for (const [attribute, wert] of Object.entries(zuwachs.zuwachs) as Array<[PlayerGeneratorAttributeName, number]>) {
-            const vorher = neu[attribute];
-            if (typeof vorher !== "number") continue;
-            const nachher = roundValue(vorher + wert, 3);
-            // Gezeigt = gebucht: gespeichert wird die tatsaechliche Differenz.
-            const differenz = roundValue(nachher - vorher, 3);
-            if (differenz <= 0) continue;
-            neu[attribute] = nachher;
-            gebucht[attribute] = differenz;
-          }
-          if (Object.keys(gebucht).length > 0) {
-            attributeSheetStats = neu;
+          const { neu, gebucht } = bucheZuwachsAufAttribute(attributeSheetStats, zuwachs.zuwachs);
+          if (neu) {
             eintrag.z = gebucht;
-            attributeChanged = true;
+            if (spieltagOffen) {
+              // Halber Spieltag: Zuwachs festhalten, Attribute erst mit dem Abschluss-Commit (s. Eingabe).
+              eintrag.o = true;
+            } else {
+              attributeSheetStats = neu;
+              attributeChanged = true;
+            }
           }
         }
       }
@@ -281,6 +312,29 @@ export function accumulateMatchdayTrainingProgress(input: {
   if (!mutated) return gameState;
   const naechsterStand: GameState = { ...gameState, players: nextPlayers };
   return attributeChanged ? withRefreshedDisciplineRatings(naechsterStand) : naechsterStand;
+}
+
+/**
+ * Zuwachs auf einen Attributbogen legen. Gespeichert wird die tatsaechliche Differenz nach Rundung
+ * (gezeigt = gebucht); `neu` ist `null`, wenn kein Attribut wirklich steigt.
+ */
+function bucheZuwachsAufAttribute(
+  stats: Player["attributeSheetStats"],
+  zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>>,
+): { neu: NonNullable<Player["attributeSheetStats"]> | null; gebucht: Partial<Record<PlayerGeneratorAttributeName, number>> } {
+  if (!stats) return { neu: null, gebucht: {} };
+  const neu = { ...stats } as NonNullable<Player["attributeSheetStats"]>;
+  const gebucht: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  for (const [attribute, wert] of Object.entries(zuwachs) as Array<[PlayerGeneratorAttributeName, number]>) {
+    const vorher = neu[attribute];
+    if (typeof vorher !== "number") continue;
+    const nachher = roundValue(vorher + wert, 3);
+    const differenz = roundValue(nachher - vorher, 3);
+    if (differenz <= 0) continue;
+    neu[attribute] = nachher;
+    gebucht[attribute] = differenz;
+  }
+  return Object.keys(gebucht).length > 0 ? { neu, gebucht } : { neu: null, gebucht };
 }
 
 function pickAttributes(stats: NonNullable<Player["attributeSheetStats"]>): Partial<Record<PlayerGeneratorAttributeName, number>> {

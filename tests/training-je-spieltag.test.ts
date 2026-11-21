@@ -162,6 +162,62 @@ describe("Je-Spieltag-Buchung", () => {
   });
 });
 
+describe("Halber Spieltag (Arena-Teilbuchung nach D1): Zuwachs erst mit D2", () => {
+  // Befund 21.11. (docs/design/arena-fluss-21-11.md): buchte der D1-Commit den Zuwachs auf die Attribute,
+  // aenderte sich die Arena-Eingabe mitten im Spieltag -- Motor-Neuaufbau nach D1 (Endstand weg) und
+  // `arena_eingabe_divergenz` fuer D2.
+  function bucheTeil(gs: GameState, matchdayId: string): GameState {
+    return accumulateMatchdayTrainingProgress({
+      gameState: gs,
+      seasonId: gs.season.id,
+      matchdayId,
+      ausfallSpielerIds: new Set(),
+      spieltagOffen: true,
+    });
+  }
+
+  it("D1-Commit: Attribute und Disziplinwerte bleiben, Zuwachs steht offen im Verlauf", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const gs1 = bucheTeil(gs0, "md-1");
+    expect(spieler(gs1).attributeSheetStats).toEqual(spieler(gs0).attributeSheetStats);
+    for (const p of gs1.players) expect(p.disciplineRatings).toEqual(gs0.players.find((q) => q.id === p.id)!.disciplineRatings);
+    const eintrag = spieler(gs1).seasonTrainingAccumulator?.verlauf?.find((e) => e.m === "md-1");
+    expect(eintrag?.o).toBe(true);
+    expect(Object.keys(eintrag?.z ?? {}).length).toBeGreaterThan(0);
+    // Trainingslast und Modus zaehlen wie bisher schon beim ersten Commit.
+    expect(spieler(gs1).seasonTrainingAccumulator?.modeByMatchday["md-1"]).toBe("mittel");
+  });
+
+  it("Teil + Abschluss == ein voller Commit (Attribute, Verlauf, Disziplinwerte)", () => {
+    const gs0 = setzeTrainingsZiel(BASIS, SPIELER_ID, { disziplinId: "gewichtheben", weg: 0 });
+    const voll = buche(gs0, "md-1");
+    const teil = bucheTeil(gs0, "md-1");
+    const nochmalTeil = bucheTeil(teil, "md-1");
+    expect(nochmalTeil.players.map((p) => p.attributeSheetStats)).toEqual(teil.players.map((p) => p.attributeSheetStats));
+    const abschluss = buche(nochmalTeil, "md-1");
+    for (const p of voll.players) {
+      const q = abschluss.players.find((x) => x.id === p.id)!;
+      expect(q.attributeSheetStats).toEqual(p.attributeSheetStats);
+      expect(q.disciplineRatings).toEqual(p.disciplineRatings);
+      expect(q.seasonTrainingAccumulator?.verlauf).toEqual(p.seasonTrainingAccumulator?.verlauf);
+      expect(q.seasonTrainingAccumulator?.matchdaysCounted).toBe(p.seasonTrainingAccumulator?.matchdaysCounted);
+    }
+    expect(entpackeTrainingsVerlauf(abschluss, SPIELER_ID)).toEqual(entpackeTrainingsVerlauf(voll, SPIELER_ID));
+  });
+
+  it("Moduswechsel zwischen D1 und D2: offener Zuwachs wird nicht abgezogen, der neue gebucht", () => {
+    const teil = bucheTeil(BASIS, "md-1");
+    const hart = { ...teil, players: teil.players.map((p) => (p.id === SPIELER_ID ? { ...p, trainingMode: "hart" as const } : p)) };
+    const abschluss = buche(hart, "md-1");
+    const [zeile] = entpackeTrainingsVerlauf(abschluss, SPIELER_ID);
+    expect(zeile!.modus).toBe("hart");
+    for (const a of PROGRESSION_ATTRIBUTE_ORDER) {
+      expect(attr(spieler(abschluss), a) - attr(spieler(BASIS), a)).toBeCloseTo(zeile!.zuwachs[a] ?? 0, 6);
+    }
+    expect(spieler(abschluss).seasonTrainingAccumulator?.verlauf?.some((e) => e.o)).toBe(false);
+  });
+});
+
 describe("Regel B: Verletzte trainieren nicht", () => {
   it("Ausfall-Spieltag: kein Zuwachs, keine Trainingslast, Modus nicht gezaehlt", () => {
     const gs1 = buche(BASIS, "md-1");
