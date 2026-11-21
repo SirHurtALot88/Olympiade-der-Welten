@@ -64,7 +64,13 @@ export function bewerteKiRehaFuerTeam(
   const ruecklage = resolveKiRuecklageFuerTeam(gameState, teamId, {
     cash: team.cash ?? 0,
     rosterSalaryTotal: rosterEntries.reduce((sum, entry) => sum + (entry.salary ?? 0), 0),
-    rosterMarketValue: players.reduce((sum, player) => sum + Math.max(0, player?.marketValue ?? player?.displayMarketValue ?? 0), 0),
+    // Saison 1: Budget der Ruecklage ist das Startbudget (Kasse), nicht Kasse + Kaderwert - der Kader war beim Kauf leer.
+    // Mit Kaderwert lag die Ruecklage mitten in der Saison fast auf der ganzen Kasse (Messung 21.11.: 34,5 von 35,7 C).
+    // Ab Saison 2 zaehlt ohnehin nur das Zielgehalt.
+    rosterMarketValue:
+      saisonNummer(gameState) <= 1
+        ? 0
+        : players.reduce((sum, player) => sum + Math.max(0, player?.marketValue ?? player?.displayMarketValue ?? 0), 0),
     finances: identity?.finances,
   }).ruecklage;
   const ruecklageEffektiv = saisonNummer(gameState) <= 1 ? ruecklage * KI_REHA_RUECKLAGE_S1_FAKTOR : ruecklage;

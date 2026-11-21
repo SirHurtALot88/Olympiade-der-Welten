@@ -303,3 +303,26 @@ Teams: P-S, B-P, R-L, Z-H, H-R (5 von 31) tragen 43 von 90 KI-Verletzungen (47.8
 | Reha 2 | 15.6 | -53 % | 18.5 | -56 % |
 | Kein Pushen + Schonen >50 | 8.3 | -75 % | 22.1 | -48 % |
 
+
+## Messung nach dem Bau (21.11.)
+
+Skript `scripts/miss-ki-schonung-lauf.ts`: Kopie des Live-Abbilds, alle 32 Teams KI, 8 Spieltage ab ST12 komplett gespielt (Node-Motor). Rohausgaben: `docs/design/ki-schonung-reha-mess-21-11/base.out` (vorher, main) und `neu.out` (nachher, Branch).
+
+| Kennzahl (8 Spieltage) | Vorher | Nachher |
+|---|---:|---:|
+| Push-Anteil der Einsätze | 17,2 % | 4,4 % |
+| Schon-Anteil der Einsätze | 0,1 % | 25,0 % |
+| Einsätze bei Fatigue >= 65 am Wurf | 22,1 % | 12,2 % |
+| Einsätze bei Fatigue >= 40 | 58,6 % | 53,6 % |
+| Verletzungen | 130 | 95 |
+| erwartete Verletzungen (Summe Risiko) | 143,8 | 99,5 (-31 %) |
+| Hochrechnung je 20 Spieltage (gewürfelt / erwartet) | 325 / 359 | 238 / 249 |
+| Reha-Bauten | 0 | 1 (7 C) |
+
+Das Abbild steht spät in der Saison (viele müde Spieler); die Zahlen gelten ab ST12 und liegen über dem Saisonschnitt der Analyse.
+
+### Reha-Befund: warum nur 1 Bau
+
+Diagnose an `neu.sqlite` (Skript `scripts/diag-ki-reha.ts`): Die Vorstands-Freigabe war nicht der Grund (Saison 1, nicht gedeckelt; `previewFacilityUpgrade` ok bei 30 von 32 Teams). Bedarf war da (C-S, D-L, W-L: Stufe 2 gewünscht). Es scheiterte am freien Geld nach Rücklage: Die Rücklage rechnete in Saison 1 mit Budget = Kasse + Marktwert des Kaders, mitten in der Saison also fast die ganze Kasse (C-S: Kasse 35,7, frei 1,2 C; W-L: 41,5 / 3,5; N-N: 19,1 / 6,1). Das war ein Fehler im Gate: In Saison 1 ist das Budget der Rücklage das Startbudget.
+
+Behoben in `lib/ai/ai-reha-bau-service.ts` (Saison 1: Kaderwert 0 in der Rücklage; Test in `tests/ki-schonung-reha.test.ts`). Nachrechnung am selben Stand: frei C-S 22,3, W-L 27,9, B-P 8,0, D-L 7,6; 12 von 32 Teams würden bauen. Nicht bauen können Teams knapp über der Rücklage 0,35 x Zielgehalt (R-L, H-R, Z-H, D-P): gewollte Rücklage nach Finanzwert. Ein Nachher-Lauf mit der Korrektur (4 Spieltage) war beim Schreiben noch nicht fertig.

@@ -1,0 +1,38 @@
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-12 per Node in 45166 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-13 per Node in 10491 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-14 per Node in 14240 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-15 per Node in 22139 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-16 per Node in 12624 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-17 per Node in 42798 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-18 per Node in 19993 ms (Chromium-Lauf ueberholt).
+[arena-vorlauf] quick-sim: new-game-1795114260527-nzr0z9/matchday-19 per Node in 16590 ms (Chromium-Lauf ueberholt).
+{
+  "start": "matchday-12",
+  "gespielteSpieltage": 8,
+  "seiten": 512,
+  "seitenAnteil": {
+    "conserve": "0.2 %",
+    "normal": "83.8 %",
+    "push": "16.0 %"
+  },
+  "einsaetze": 1944,
+  "einsatzAnteil": {
+    "conserve": "0.1 %",
+    "normal": "82.7 %",
+    "push": "17.2 %"
+  },
+  "wuerfe": 1944,
+  "fatigueAb40": "58.6 %",
+  "fatigueAb65": "22.1 %",
+  "verletzungen": 130,
+  "erwarteteVerletzungen": 143.8,
+  "verletzungenJe20Spieltage": 325,
+  "erwartetJe20Spieltage": 359,
+  "rehaBauten": 0,
+  "rehaKosten": 0,
+  "rehaStufenVerteilung": {
+    "0": 32
+  },
+  "kaderMitDuenn": 8,
+  "kaderMittel": 11.75
+}

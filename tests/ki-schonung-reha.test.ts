@@ -471,6 +471,15 @@ describe("KI-Schonung R4: Reha-Bau im laufenden Spiel", () => {
     expect(lies().seasonState.teamFacilities?.["KI-D"]?.facilities.recovery_center?.level ?? 0).toBe(0);
   });
 
+  it("rechnet die Ruecklage in Saison 1 aus der Kasse, nicht aus Kasse plus Kaderwert", () => {
+    const gs = rehaSpielstand({ teams: [{ id: "KI-D", modus: "ai", kader: 9, cash: 20 }] });
+    for (const player of gs.players) (player as unknown as { marketValue: number }).marketValue = 30;
+    const { persistence, lies } = speicher(gs);
+    const ergebnis = bauKiRehaBeiSpieltagsabschluss({ saveId: "save-reha", persistence });
+    expect(ergebnis.gebaut.map((b) => b.teamId)).toEqual(["KI-D"]);
+    expect(lies().seasonState.teamFacilities?.["KI-D"]?.facilities.recovery_center?.level).toBe(1);
+  });
+
   it("fasst Menschen-Teams nur bei delegiertem Bereich Gebaeude an", () => {
     const { persistence, lies } = speicher(
       rehaSpielstand({
