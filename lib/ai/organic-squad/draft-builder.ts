@@ -464,7 +464,7 @@ export function createOrganicPlanStepState(input: OrganicSquadPlanInput): Organi
   };
 }
 
-function buildStepTeamState(input: OrganicSquadPlanInput, step: OrganicPlanStepState): OrganicTeamState {
+export function buildStepTeamState(input: OrganicSquadPlanInput, step: OrganicPlanStepState): OrganicTeamState {
   const cashBuffer = input.economy.cashBuffer;
   const disciplineNeeds = computeDisciplineNeeds(step.squad, input.identityAxisWeights, input.disciplines);
   const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);

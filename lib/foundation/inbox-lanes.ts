@@ -74,6 +74,7 @@ const WATCH_ONLY_SOURCES = new Set<string>([
   // Postfach 21.11.: reine Information, hält nie einen Spieltag auf.
   "vorstand_freigabe",
   "moral_gekippt",
+  "ki_interesse",
 ]);
 
 /**

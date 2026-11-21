@@ -37,7 +37,7 @@ export const POSTFACH_ABSENDER: ReadonlyArray<{ id: PostfachAbsenderId; label: s
 const KABINE_QUELLEN = new Set(["player_training_wish", "player_training_mode", "moral_gekippt", "contract_dissolution_offer", "team_captain_missing", "team_captain_upgrade"]);
 const VORSTAND_QUELLEN = new Set(["team_season_objectives", "vorstand_freigabe", "facility_finance_forecast"]);
 const VERTRAG_QUELLEN = new Set(["roster_contracts", "roster_value_contract_cash"]);
-const MARKT_QUELLEN = new Set(["scout_intel_pipeline", "roster_cash_transfer_window", "transfer_history"]);
+const MARKT_QUELLEN = new Set(["scout_intel_pipeline", "roster_cash_transfer_window", "transfer_history", "ki_interesse"]);
 
 /** Wer „schreibt“ diese Meldung. Rein aus Quelle und Kategorie, kein neues Datum. */
 export function absenderFuerMeldung(item: GameInboxItem): PostfachAbsenderId {

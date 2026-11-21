@@ -1948,7 +1948,7 @@ export const INBOX_DECISION_CATEGORIES = [
 export const INBOX_CHRONICLE_CATEGORIES = ["news", "result"] as const;
 
 /** Reine Information (Postfach 21.11.): zählt nicht als offene Aufgabe, steht in der Info-Bahn. */
-const INBOX_INFO_ONLY_SOURCES = new Set(["vorstand_freigabe", "moral_gekippt", "player_return"]);
+const INBOX_INFO_ONLY_SOURCES = new Set(["vorstand_freigabe", "moral_gekippt", "player_return", "ki_interesse"]);
 
 export function isGameInboxDecisionItem(item: GameInboxItem) {
   if (isGameInboxChronicleOnlySource(item.source) || INBOX_INFO_ONLY_SOURCES.has(item.source)) {

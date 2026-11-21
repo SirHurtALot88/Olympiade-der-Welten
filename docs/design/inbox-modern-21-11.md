@@ -164,11 +164,11 @@ Aufnahmen (echte App, Kopie des live-save-Abbilds, Death Peaches, Aufbau mit `sc
 | Später (Wiedervorlage) | fehlt: kein Wiedervorlage-Zustand; Ablehnen eines Wunsches legt nach „Erledigt“ |
 | Ungelesen / Nächste im Brief | drin; dazu „Zurück in den Posteingang“ bei Erledigtem |
 | Vorstand: Freigabe für Saison 2 | drin als „Vorstand: Freigabe N %“, nur ab Saison 2 und unter 100 % (Saison 1 gibt der Vorstand immer voll frei); auf dem Live-Stand (Saison 1) nicht aufnehmbar, durch Test belegt |
-| Interesse an Jorund | fehlt, siehe offene Punkte |
+| Interesse an Jorund | drin seit 21.11. (KI-Merkliste): „Interesse an X: Team“, Info-Bahn, Absender Markt & Scouting; Quelle `ki_interesse`, siehe `docs/design/ki-merkliste-21-11.md` |
 | Zahl an der Schiene | drin; erscheint auf Seiten, auf denen das Postfach ohnehin berechnet wird |
 
 ### Offene Punkte
 
-- **Interesse an einem Spieler:** nicht gebaut. Die KI führt keine Vormerkliste fremder Spieler, aus der sich das ehrlich ableiten ließe; eine Heuristik wäre erfunden. Braucht eine Entscheidung, ob die KI-Kaderplanung eine solche Liste bekommt.
+- **Interesse an einem Spieler:** gebaut (21.11., Chris: „KI soll eine Merkliste fremder Spieler bekommen“). Die KI-Merkliste ist aus der Kaufbewertung der KI-Kaderplanung abgeleitet, keine neue Heuristik; Details in `docs/design/ki-merkliste-21-11.md`. Aufnahmen: `docs/design/ki-merkliste-21-11/`.
 - Meldungstexte älterer Quellen (z. B. „Transfer gekauft“ mit roher Spieler-Kennung) sind unverändert aus dem Dienst und wären ein eigenes Aufräumen.
 - Die Glocke im Band wurde nicht angefasst.

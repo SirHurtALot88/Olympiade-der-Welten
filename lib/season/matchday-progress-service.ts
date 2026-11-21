@@ -10,6 +10,7 @@ import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save"
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { aktualisiereKiMerkliste } from "@/lib/ai/ki-merkliste";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
 
@@ -74,6 +75,19 @@ type PreparedMatchdayProgress = {
   standingsApplied: boolean;
   cashApplied: boolean;
 };
+
+/**
+ * KI-Merkliste (21.11.): beim Spieltagsabschluss neu rechnen. Eine reine Info-Liste darf den Abschluss nie aufhalten; scheitert die
+ * Rechnung, bleibt die alte Liste stehen und die Warnung steht im Log.
+ */
+function berechneKiMerklisteBeimAbschluss(gameState: GameState): GameState {
+  try {
+    return aktualisiereKiMerkliste(gameState);
+  } catch (error) {
+    console.warn("[ki-merkliste] Neuberechnung beim Spieltagsabschluss uebersprungen:", error);
+    return gameState;
+  }
+}
 
 function normalizeSource(source?: string) {
   return source === "prisma" ? "prisma" : "sqlite";
@@ -359,13 +373,14 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   // season_completed-State berechnet (noch OHNE frozenValuationSnapshot → Gates rechnen live) und
   // sorgt dafür, dass spätere Verkäufe/Roster-Änderungen die Werte der übrigen Spieler nicht mehr
   // verschieben.
+  const gameStateMitMerkliste = berechneKiMerklisteBeimAbschluss(nextGameState);
   const finalGameState: GameState = prepared.nextMatchdayId
-    ? nextGameState
+    ? gameStateMitMerkliste
     : {
-        ...nextGameState,
+        ...gameStateMitMerkliste,
         seasonState: {
-          ...nextGameState.seasonState,
-          frozenValuationSnapshot: buildFrozenValuationSnapshot(nextGameState),
+          ...gameStateMitMerkliste.seasonState,
+          frozenValuationSnapshot: buildFrozenValuationSnapshot(gameStateMitMerkliste),
         },
       };
 

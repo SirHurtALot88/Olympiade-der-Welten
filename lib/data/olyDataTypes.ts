@@ -189,6 +189,26 @@ export type GameInboxCategory =
 export type GameInboxSeverity = "info" | "warning" | "critical";
 export type GameInboxStatus = "open" | "done" | "dismissed";
 
+/** Interesse-Stufe einer KI-Merkliste: 1 = beobachtet, 2 = interessiert, 3 = Wunschziel. */
+export type KiMerklisteStufe = 1 | 2 | 3;
+
+export type KiMerklisteEintrag = {
+  playerId: string;
+  /** Team, dem der Spieler beim letzten Abgleich gehoerte. */
+  besitzerTeamId: string;
+  stufe: KiMerklisteStufe;
+  /** Vorsprung des Kaufnutzens vor dem Stop-Nutzen (Rangfolge, nicht anzeigen). */
+  vorsprung: number;
+  /** Disziplin, in der der Spieler dem Team am meisten bringen wuerde (Bedarf x Wert). */
+  disziplinId: string | null;
+  /** Wie viele Spieler des KI-Teams diese Disziplin bereits solide (> 60) abdecken. */
+  abgedeckt: number;
+  /** Spieltag, an dem der Spieler auf die Liste kam (bleibt, solange er drauf steht). */
+  seit: string | null;
+  /** Letzter Abgleich. */
+  stand: string | null;
+};
+
 export type GameInboxItem = {
   itemId: string;
   saveId: string;
@@ -4170,6 +4190,13 @@ export type SeasonState = {
    * sonst liest Franky Chris' Post „weg“. Nur Kennungen (`GameInboxItem.itemId`), geschrieben über `/api/inbox/gelesen`.
    */
   inboxGelesen?: Record<string, string[]>;
+  /**
+   * KI-MERKLISTE (21.11., lib/ai/ki-merkliste.ts): je KI-Team die fremden Spieler, die seine Kaderplanung (`buyUtility` gegen
+   * `stopUtility`, dieselbe Bewertung wie beim Kauf) ankaufen wuerde. Hoechstens `KI_MERKLISTE_MAX` je Team, absteigend.
+   * Neu berechnet beim Spieltagsabschluss; `kiMerklisteStand` sagt, wann zuletzt.
+   */
+  kiMerkliste?: Record<string, KiMerklisteEintrag[]>;
+  kiMerklisteStand?: { seasonId: string; matchdayId: string | null } | null;
   aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiManagerSellStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiLifecyclePhaseRuns?: AiLifecyclePhaseRunRecord[];

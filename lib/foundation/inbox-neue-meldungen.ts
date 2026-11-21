@@ -9,12 +9,16 @@
  *  - Vorstand-Freigabe: `resolveVorstandFreigabe`; die Prozentzahl steckt in der Kennung, ändert sich die Stufe, ist es eine
  *    neue (ungelesene) Meldung.
  *
- * „Interesse an einem Spieler" (KI-Team merkt einen fremden Spieler vor) gibt es bewusst NICHT: die KI führt heute keine
- * Vormerkliste, aus der sich das ehrlich ableiten ließe; eine erfundene Heuristik wäre gezeigt ≠ gebucht.
+ * Interesse an einem Spieler (KI-Merkliste, 21.11.): ein KI-Team hat einen Spieler dieses Teams auf seine Merkliste gesetzt
+ *    (`seasonState.kiMerkliste`, `lib/ai/ki-merkliste.ts`; bewertet mit derselben Kaufnutzen-Funktion wie die KI-Käufe). Die Stufe
+ *    steckt in der Kennung: steigt sie, ist es eine neue (ungelesene) Meldung; bleibt sie, bleibt es dieselbe, nie je Spieltag
+ *    eine neue. Reine Info (Im Blick behalten), hält nie einen Spieltag auf. Sie nennt nur das KI-Team, den Grund seines Bedarfs
+ *    und die Stufe, keine verdeckten Werte fremder Spieler (die Meldung betrifft einen eigenen Spieler).
  *
  * Reine Funktionen, kein React. Aufgerufen von `buildTeamTasks` in `game-inbox-service.ts`.
  */
 import type { GameInboxItem, GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import { KI_MERKLISTE_STUFE_WORT, kiInteresseAnSpieler, kiMerklisteGrund } from "@/lib/ai/ki-merkliste-lesen";
 import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { VORSTAND_STUFEN, resolveVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { klemmeMoral, moralStufe } from "@/lib/morale/moral-anzeige";
@@ -129,7 +133,47 @@ export function buildVorstandFreigabeMeldung(input: NeueMeldungenInput): GameInb
   ];
 }
 
+/** Höchstzahl Interesse-Meldungen je Team, damit ein begehrter Kader das Postfach nicht flutet. */
+const KI_INTERESSE_MELDUNGEN_MAX = 5;
+
+/** Ein KI-Team hat einen Spieler dieses Teams auf der Merkliste. Je Spieler und KI-Team eine Meldung. */
+export function buildKiInteresseMeldungen(input: NeueMeldungenInput): GameInboxItem[] {
+  if (!input.gameState.seasonState.kiMerkliste) return [];
+  const gefunden: Array<{ item: GameInboxItem; stufe: number }> = [];
+  for (const entry of input.roster) {
+    const spieler = input.playerById.get(entry.playerId);
+    if (!spieler) continue;
+    for (const { teamId, eintrag } of kiInteresseAnSpieler(input.gameState, entry.playerId)) {
+      if (teamId === input.team.teamId) continue;
+      const kiTeam = input.gameState.teams.find((team) => team.teamId === teamId);
+      if (!kiTeam) continue;
+      const stufeWort = KI_MERKLISTE_STUFE_WORT[eintrag.stufe];
+      const seit = spieltagLabel(input.gameState, eintrag.seit);
+      gefunden.push({
+        stufe: eintrag.stufe,
+        item: {
+          ...basis(input),
+          itemId: `ki_interesse:${input.saveId}:${input.gameState.season.id}:${input.team.teamId}:${entry.playerId}:${teamId}:${eintrag.stufe}`,
+          playerId: entry.playerId,
+          category: "transfer",
+          severity: "info",
+          title: `Interesse an ${spieler.name}: ${kiTeam.name}`,
+          description: `${kiTeam.name} hat ${spieler.name} auf der Merkliste (${stufeWort}${seit ? `, seit ${seit}` : ""}): ${kiMerklisteGrund(input.gameState, eintrag)}. Ein Hinweis, kein Angebot — es liegt nichts zur Entscheidung vor.`,
+          ctaLabel: "Spieler ansehen",
+          targetView: "trainingCompact",
+          targetParams: { team: input.team.teamId, player: entry.playerId },
+          source: "ki_interesse",
+        },
+      });
+    }
+  }
+  return gefunden
+    .sort((a, b) => b.stufe - a.stufe || (a.item.itemId < b.item.itemId ? -1 : 1))
+    .slice(0, KI_INTERESSE_MELDUNGEN_MAX)
+    .map((zeile) => zeile.item);
+}
+
 export function buildNeueMeldungenFuerTeam(input: NeueMeldungenInput): GameInboxItem[] {
   if (input.controlMode !== "manual") return [];
-  return [...buildWiederEinsetzbarMeldungen(input), ...buildMoralGekippt(input), ...buildVorstandFreigabeMeldung(input)];
+  return [...buildWiederEinsetzbarMeldungen(input), ...buildMoralGekippt(input), ...buildVorstandFreigabeMeldung(input), ...buildKiInteresseMeldungen(input)];
 }
