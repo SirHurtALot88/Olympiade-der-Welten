@@ -228,6 +228,8 @@ export type TeamWriteAction =
   | "credit_borrow"
   | "credit_early_payoff"
   | "vorstand_budget_update"
+  /** Postfach: Gelesen-Markierung je Manager (21.11.). */
+  | "inbox_gelesen"
   | "player_generator_commit"
   | "team_identity_update"
   | "team_control_update"

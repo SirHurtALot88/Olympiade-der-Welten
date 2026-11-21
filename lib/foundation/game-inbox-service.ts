@@ -42,6 +42,7 @@ import {
   PLAYER_HEALTH_BUNDLE_PREFIX,
   bundleInboxItems,
 } from "@/lib/foundation/inbox-bundling";
+import { buildNeueMeldungenFuerTeam } from "@/lib/foundation/inbox-neue-meldungen";
 
 /**
  * Fruehere Fassung war eine EIGENE, handgepflegte Liste — und darum falsch: sie enthielt den
@@ -582,7 +583,8 @@ function buildPlayerHealthInboxTasks(input: {
       const wunschWort = { leicht: "leichtes", mittel: "mittleres", hart: "hartes" }[wunschModus];
       items.push(
         createItem({
-          itemId: `player_training_wish:${input.saveId}:${seasonId}:${input.team.teamId}:${plan.playerId}`,
+          // Der Wunsch steckt in der Kennung: eine abgelehnte oder erfüllte Meldung verdeckt keinen späteren, anderen Wunsch.
+          itemId: `player_training_wish:${input.saveId}:${seasonId}:${input.team.teamId}:${plan.playerId}:${wunschModus}`,
           saveId: input.saveId,
           seasonId,
           matchday: matchdayId,
@@ -593,7 +595,7 @@ function buildPlayerHealthInboxTasks(input: {
           title: `Trainingswunsch: ${wunschModus}`,
           description: `${plan.playerName} wünscht ${wunschWort} Training (aktuell ${aktuellerModus}). Ein erfüllter Wunsch hebt die Moral, ein verfehlter senkt sie.`,
           targetView: "trainingCompact",
-          targetParams: { team: input.team.teamId, player: plan.playerId },
+          targetParams: { team: input.team.teamId, player: plan.playerId, wunsch: wunschModus, aktuell: aktuellerModus },
           ctaLabel: "Training steuern",
           source: "player_training_wish",
           createdAt: input.createdAt,
@@ -1088,6 +1090,16 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         gameState: input.gameState,
         team,
         roster,
+        controlMode,
+        createdAt,
+      }),
+      // Postfach 21.11.: Wieder einsetzbar, Moral gekippt, Vorstand-Freigabe.
+      ...buildNeueMeldungenFuerTeam({
+        saveId: input.saveId,
+        gameState: input.gameState,
+        team,
+        roster,
+        playerById,
         controlMode,
         createdAt,
       }),
@@ -1935,8 +1947,11 @@ export const INBOX_DECISION_CATEGORIES = [
 
 export const INBOX_CHRONICLE_CATEGORIES = ["news", "result"] as const;
 
+/** Reine Information (Postfach 21.11.): zählt nicht als offene Aufgabe, steht in der Info-Bahn. */
+const INBOX_INFO_ONLY_SOURCES = new Set(["vorstand_freigabe", "moral_gekippt", "player_return"]);
+
 export function isGameInboxDecisionItem(item: GameInboxItem) {
-  if (isGameInboxChronicleOnlySource(item.source)) {
+  if (isGameInboxChronicleOnlySource(item.source) || INBOX_INFO_ONLY_SOURCES.has(item.source)) {
     return false;
   }
   if (item.source.startsWith("player_health_")) {

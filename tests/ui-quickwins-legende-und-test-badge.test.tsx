@@ -78,12 +78,6 @@ describe("Battle Arena in der Sidebar", () => {
 describe("Inbox-Tonrand und Training-Chips (Nachmessung im Browser)", () => {
   const css = read("app/globals.css");
 
-  it("der Tonrand der Inbox-Karten schlägt die Team-Theme-Regel `.nl-card { border-color }`", () => {
-    // Ohne diese Regel war der linke Rand bei JEDER Karte der Team-Akzent (Spezifität 0,3,0 gegen 0,2,0).
-    expect(css).toContain(".is-new-look[data-team-theme] .nl-inbox-card {\n  border-left-color: var(--nl-tone);");
-    expect(css).toContain(".is-new-look[data-team-theme] .nl-inbox-card.is-critical");
-  });
-
   it("Training: Vorschlag (Stern) und passt bereits (Haken) tragen verschiedene Farben", () => {
     expect(css).toContain(".is-new-look .nl-training-chip.is-class-match");
     const text = read("app/foundation/training-compact/TrainingCompactNewLook.tsx");

@@ -26,7 +26,7 @@ const panelPrefetchByView: Partial<Record<FoundationViewId, () => Promise<unknow
   trainingV2: () => import("@/app/foundation/facilities-v2/FacilitiesV2Client"),
   facilitiesOverviewV2: () => import("@/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client"),
   scoutingCenterV2: () => import("@/app/foundation/scouting-center-v2/ScoutingCenterV2Client"),
-  inboxV2: () => import("@/app/foundation/inbox-v2/InboxV2Client"),
+  inboxV2: () => import("@/app/foundation/inbox-v2/PostfachModern"),
   historyV2: () => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"),
 };
 

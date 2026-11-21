@@ -15,7 +15,7 @@ const navConfigPath = path.join(root, "lib/foundation/foundation-nav-config.ts")
 const viewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
 const facilitiesOverviewV2Path = path.join(root, "app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx");
 const scoutingHubV2Path = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx");
-const inboxV2Path = path.join(root, "app/foundation/inbox-v2/InboxV2Client.tsx");
+const inboxV2Path = path.join(root, "app/foundation/inbox-v2/PostfachModern.tsx");
 const globalsPath = path.join(root, "app/globals.css");
 
 // Neuer Look: the *Client.tsx surfaces are thin data/logic wrappers that render
@@ -27,7 +27,6 @@ const facilitiesOverviewV2NewLookPath = path.join(
   "app/foundation/facilities-overview-v2/FacilitiesOverviewV2NewLook.tsx",
 );
 const scoutingHubV2NewLookPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx");
-const inboxV2NewLookPath = path.join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx");
 
 async function readConcat(...paths: string[]) {
   const parts = await Promise.all(paths.map((p) => fs.readFile(p, "utf8")));
@@ -158,10 +157,7 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(pageTypesText).toContain('| "scoutingCenterV2"');
     expect(pageTypesText).toContain('| "inboxV2"');
     expect(shellText).toContain("<ScoutingCenterV2Client");
-    expect(routerText).toContain("FoundationShellRouterInboxV2");
-    expect(
-      (await fs.readFile(path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8")),
-    ).toContain("<InboxV2Client");
+    expect(shellText).toContain("<PostfachModern");
     expect(navText).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(moduleHelpersText).toContain('label: "Scouting Hub"');
     expect(scopeText).toContain("getTransfermarktScoutingVisibilityBuckets");
@@ -187,11 +183,12 @@ describe("foundation ui v2 roadmap contract", () => {
   });
 
   it("keeps inbox v2 as the canonical compact inbox", async () => {
-    const fileText = await readConcat(inboxV2Path, inboxV2NewLookPath);
+    const fileText = await readConcat(inboxV2Path);
 
-    expect(fileText).toContain('data-testid="foundation-inbox-v2"');
-    expect(fileText).toContain('className="nl-inbox"');
-    expect(fileText).toContain("Entscheidungen");
+    expect(fileText).toContain('data-testid="postfach"');
+    expect(fileText).toContain('className="bc ibx"');
+    expect(fileText).toContain("Handeln");
+    expect(fileText).not.toContain("nl-inbox");
     expect(fileText).not.toContain("Inbox Classic");
   });
 
