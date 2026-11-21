@@ -110,6 +110,12 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
     );
   const wert = gespeichert + (kostenImWert ? zustand!.vertrauensKosten ?? 0 : 0);
   const { stufe, anteil } = stufeFuerVertrauen(wert);
+  // Vorstandsgespraech (Office 21.11): „Freigabe anheben" gilt fuer die Saison und hebt die Quote um eine Stufe.
+  if (zustand && zustand.seasonId === gameState.season?.id && (zustand.stufenAnhebung ?? 0) > 0) {
+    const hoeher = naechsteQuote(anteil);
+    const neueStufe = VORSTAND_STUFEN.find((x) => Math.abs(x.anteil - hoeher) < 1e-9)?.stufe ?? stufe;
+    return { teamId, stufe: neueStufe, anteil: hoeher, vertrauen: wert, grund: "vertrauen" };
+  }
   return { teamId, stufe, anteil, vertrauen: wert, grund: "vertrauen" };
 }
 
@@ -349,8 +355,12 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   const ausgegebenTransfer = kaeufe + gebaeude;
 
   // Gehaltstopf: Basis = max(erwarteter Sponsor, Zielgehalt bei Soll-Kader) = „tragbares Gehalt“.
-  const gehaltsSumme = gameState.rosters.filter((r) => r.teamId === teamId).reduce((x, r) => x + (r.salary ?? 0), 0);
-  const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme });
+  const gehaltsSumme0 = gameState.rosters.filter((r) => r.teamId === teamId).reduce((x, r) => x + (r.salary ?? 0), 0);
+  // Praemien (Office 21.11) zahlen aus dem Gehaltstopf und zaehlen deshalb als ausgegeben.
+  const praemienPlan = gameState.seasonState?.vorstandPraemien?.[teamId];
+  const praemienGebucht = praemienPlan && praemienPlan.seasonId === seasonId ? (praemienPlan.siegGebucht ?? 0) + (praemienPlan.treueGebucht ?? 0) : 0;
+  const gehaltsSumme = gehaltsSumme0 + praemienGebucht;
+  const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme0 });
   const sponsor = erwarteterSponsorFuerPlanung(gameState, teamId);
   const basis = Math.max(sponsor, zielgehalt);
   const gehaltsQuote = alle || freigabe.anteil >= 1 ? 1 : Math.max(GEHALTS_QUOTE_UNTERGRENZE, freigabe.anteil);
@@ -399,6 +409,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   let lockerungSperre: string | null = null;
   if (!gedeckelt) lockerungSperre = "Saison 1: alles ist freigegeben.";
   else if (alle) lockerungSperre = "„Alles auf eine Karte“ ist aktiv.";
+  else if ((zustand.stufenAnhebung ?? 0) > 0) lockerungSperre = "Die Freigabe wurde im Gespräch angehoben: eine Lockerung durch Verkäufe stapelt sich nicht darauf (es gilt die höhere der beiden).";
   else if (q0 >= 1) lockerungSperre = "Schon voll freigegeben.";
   else if (verkaufserloeseFreiAnteil(q0) >= 1) lockerungSperre = "Im gemeinsamen Fenster sind Verkaufserlöse zu 100 % frei.";
   else if (cash < 0) lockerungSperre = "Keine Lockerung bei Kasse im Minus.";
@@ -444,7 +455,9 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
         : "Kein Vertrauenswert vorhanden: der Vorstand gibt das gesamte Budget frei.";
 
   // Gehaltstopf.
-  const gehaltGesamt = gedeckelt ? gehaltBudget0 + umschicht : Math.max(basis, gehaltsSumme);
+  // Sonderbudget aus dem Gespraech (einmalig, aus dem Vorbehalt): hoechstens das, was ueber der Quote gesperrt blieb.
+  const sonderGehalt = gedeckelt ? Math.max(0, Math.min(zustand.sonderGehalt ?? 0, Math.max(0, basis - gehaltBudget0))) : 0;
+  const gehaltGesamt = gedeckelt ? gehaltBudget0 + umschicht + sonderGehalt : Math.max(basis, gehaltsSumme);
   let gehaltFrei = Math.max(0, gehaltGesamt - gehaltsSumme);
   const gehaltGrund = !gedeckelt
     ? "Saison 1: Gehaltsbudget voll freigegeben."
@@ -504,7 +517,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
       gesamt: r2(gehaltGesamt + kpGehalt),
       ausgegeben: r2(gehaltsSumme),
       frei: r2(gehaltFrei),
-      gesperrt: r2(Math.max(0, basis - gehaltBudget0)),
+      gesperrt: r2(Math.max(0, basis - gehaltBudget0 - sonderGehalt)),
       quote: gehaltsQuote,
       grund: gehaltGrund,
     },

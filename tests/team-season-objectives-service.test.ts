@@ -323,7 +323,8 @@ describe("team season objectives service", () => {
   it("generates a compact four-objective board slate per team", () => {
     const overview = buildTeamObjectiveOverview(createGameState());
     const teamObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M");
-    const coreObjectives = teamObjectives.filter((objective) => objective.category !== "sponsor");
+    // Die festen Vorstandsziele des Office (Lieblingsspieler, Vertragslaufzeiten) kommen zusaetzlich zum kompakten Slate.
+    const coreObjectives = teamObjectives.filter((objective) => objective.category !== "sponsor" && !/^(board-|vorstand-)/.test(objective.objectiveId));
     const categories = new Set(coreObjectives.map((objective) => objective.category));
 
     expect(coreObjectives).toHaveLength(4);
@@ -953,7 +954,7 @@ describe("team season objectives service", () => {
     const formColor = overview.objectives.find((objective) => objective.objectiveId === "roster-form-color-cover");
     const matchdayTop10 = overview.objectives.find((objective) => objective.objectiveId === "sport-next-matchday-top10");
 
-    expect(overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor")).toHaveLength(4);
+    expect(overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor" && !/^(board-lieblingsspieler|board-vertragslaufzeiten)$/.test(objective.objectiveId))).toHaveLength(4);
     expect(formColor?.status).toBe("completed");
     if (matchdayTop10) {
       expect(matchdayTop10.label).toContain("Climbing/Football");
@@ -1072,7 +1073,7 @@ describe("team season objectives service", () => {
     const top20Goal = overview.objectives.find((objective) => objective.teamId === "R-R" && objective.objectiveId === "player-top20-breakthrough");
 
     expect(top20Goal?.status).toBe("completed");
-    expect(top20Goal?.currentValue).toContain("erfuellt");
+    expect(top20Goal?.currentValue).toBe("Rang 18");
   });
 
   it("counts every played matchday for the 3x-Top-20 goal, also on the compact browser payload", () => {
@@ -1113,7 +1114,7 @@ describe("team season objectives service", () => {
     const vollesZiel = findeZiel(gameState);
     const kompaktesZiel = findeZiel(compactFoundationInitialGameState(gameState));
 
-    expect(vollesZiel?.currentValue).toBe("2/3, bestes Rank #5");
+    expect(vollesZiel?.currentValue).toBe("2/3 · Rang 5");
     expect(kompaktesZiel?.currentValue).toBe(vollesZiel?.currentValue);
     expect(kompaktesZiel?.status).toBe(vollesZiel?.status);
   });
@@ -1393,8 +1394,9 @@ describe("human board pressure + C-C eco rules", () => {
 
     expect(penalty).toBeDefined();
     expect(penalty?.status).toBe("failed");
-    // confidence=3.5 → (5.0 - 3.5) * 3.3 = 4.95 → rounds to 5
-    expect(penalty?.penaltyCash).toBe(5);
+    // Chris 18.11.: keine Geldstrafen. Der Vorstand gibt bei geschwaechtem Vertrauen weniger frei und kuerzt nichts.
+    expect(penalty?.penaltyCash).toBeUndefined();
+    expect(penalty?.actionHint ?? "").not.toMatch(/kürzt das Budget/);
     expect(penalty?.category).toBe("finance");
   });
 
@@ -1434,7 +1436,7 @@ describe("human board pressure + C-C eco rules", () => {
     expect(penalty).toBeUndefined();
   });
 
-  it("caps board-confidence-budget-cut penaltyCash at 10 (confidence=2.0)", () => {
+  it("never books a cash penalty for board-confidence-budget-cut, however low the confidence (2.0)", () => {
     const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
     const gameState = createGameState({
       teams: [team],
@@ -1449,7 +1451,9 @@ describe("human board pressure + C-C eco rules", () => {
     const overview = buildTeamObjectiveOverview(gameState);
     const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
 
-    expect(penalty?.penaltyCash).toBe(10);
+    expect(penalty?.penaltyCash).toBeUndefined();
+    const abrechnung = buildTeamSeasonObjectiveSettlement(gameState);
+    expect(abrechnung.rows.filter((row) => row.teamId === "H-T").every((row) => row.cashDelta >= 0)).toBe(true);
   });
 
   it("C-C gets transfer target 15 in season 3", () => {

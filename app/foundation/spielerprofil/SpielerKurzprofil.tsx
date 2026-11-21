@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BcFormPfeil, BcIcon, BcMoralGesicht } from "@/components/foundation/broadcast";
+import { KI_MERKLISTE_STUFE_WORT, kiInteresseAnSpieler } from "@/lib/ai/ki-merkliste-lesen";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import { baueKurzEntwicklung } from "@/lib/foundation/spielerprofil-kurz-entwicklung";
@@ -74,6 +75,15 @@ export default function SpielerKurzprofil({ data, onClose, onOpenFull, aktionen,
     [reiter, eigener, nebel, gameState, data.playerId],
   );
 
+  // KI-Merkliste (21.11.): nur beim eigenen Spieler, nur Team und Stufe (keine Werte), wie die Postfach-Meldung.
+  const kiInteresse = useMemo(() => {
+    if (!eigener || !gameState) return [];
+    return kiInteresseAnSpieler(gameState, data.playerId).flatMap(({ teamId, eintrag }) => {
+      const name = gameState.teams.find((team) => team.teamId === teamId)?.name;
+      return name ? [{ name, wort: KI_MERKLISTE_STUFE_WORT[eintrag.stufe] }] : [];
+    });
+  }, [eigener, gameState, data.playerId]);
+
   return (
     <>
       <div className="spr-schleier" onClick={onClose} aria-hidden="true" data-testid="spielerkurzprofil-schleier" />
@@ -119,6 +129,14 @@ export default function SpielerKurzprofil({ data, onClose, onOpenFull, aktionen,
           ) : null}
           {moral != null ? <BcMoralGesicht wert={moral} mitZahl={!nebel} groesse={20} /> : null}
         </div>
+
+        {kiInteresse.length > 0 ? (
+          <div className="spr-dr-status" data-testid="spielerkurzprofil-ki-interesse">
+            <span>
+              Auf der Merkliste von {kiInteresse.map((zeile) => `${zeile.name} (${zeile.wort})`).join(", ")}
+            </span>
+          </div>
+        ) : null}
 
         <Kennzahlen data={data} modell={modell} />
 

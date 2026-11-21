@@ -58,6 +58,7 @@ import {
 } from "@/lib/market/contract-negotiation-preview";
 import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { pruefeVerlaengerungGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
+import { bucheTreuepraemie } from "@/lib/finance/vorstand-praemien";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
@@ -2214,10 +2215,16 @@ export function applyContractRenewalAction(input: {
    * der Entwurf sonst anrichtet, steht in `verhandlungs-entwuerfe.ts` — kurz: er redet in die
    * naechste Verhandlung hinein und steht als Vorschauzeile in der Vertraege-Tabelle.
    */
-  const gameStateOhneEntwurf = entferneEntwurfNachUnterschrift(gameState, {
+  const gameStateOhneEntwurf0 = entferneEntwurfNachUnterschrift(gameState, {
     teamId: input.teamId,
     playerId: input.playerId,
   });
+  // Treueprämie (Office 21.11): bei einer Verlängerung durch den Menschen ODER in seinem Auftrag durch die KI (Halbautomatik/Voll KI:
+  // der Mensch hat den Plan gesetzt), aus dem Gehaltstopf. Reine KI-Teams haben keinen Plan, ohne Plan passiert nichts.
+  const gameStateOhneEntwurf =
+    input.action === "renew" && (input.source === "manual_contract_renewal" || input.source === "ai_contract_renewal")
+      ? bucheTreuepraemie(gameStateOhneEntwurf0, input.teamId, input.playerId, newSalary, event.eventId)
+      : gameStateOhneEntwurf0;
 
   saveGameStateWithContractEvents(input.save, gameStateOhneEntwurf, input.persistence);
   return {

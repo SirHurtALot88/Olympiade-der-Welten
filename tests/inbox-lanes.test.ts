@@ -124,38 +124,17 @@ describe("Die Räume sind auch wirklich verdrahtet", () => {
   const root = process.cwd();
   const read = (relative: string) => readFileSync(join(root, relative), "utf8");
 
-  it("der Host schaltet die Räume ein", () => {
-    expect(read("app/foundation/inbox-v2/FoundationInboxV2Host.tsx")).toContain("laneLayout: true");
+  it("das Postfach legt die Bahnen aus resolveInboxLane an (Handeln | Info = Im Blick behalten + Berichte)", () => {
+    const modell = read("lib/foundation/inbox-postfach.ts");
+    expect(modell).toContain("resolveInboxLane(");
+    expect(modell).toContain('lane === "act" ? "handeln" : "info"');
   });
 
-  it("die Ableitung haengt Raum UND Sprungziel an jede Karte", () => {
-    const source = read("lib/foundation/tabs/use-inbox-v2-derivations.ts");
-    expect(source).toContain("lane: resolveInboxLane(item)");
-    expect(source).toContain("targetLabel: resolveInboxTargetLabel(item)");
-  });
-
-  it("in der Raeume-Ansicht wird NICHT mehr nach Modus vorgefiltert", () => {
-    /**
-     * Der wichtigste Punkt: `filterInboxItemsByMode` liesse nur eine Haelfte durch. Mit drei
-     * gleichzeitig sichtbaren Raeumen waere der Berichte-Raum dann dauerhaft leer — und der Umbau
-     * saehe aus wie ein Fehler.
-     */
-    const source = read("lib/foundation/tabs/use-inbox-v2-derivations.ts");
-    expect(source).toContain("laneLayout ? activeTeamInboxItems : filterInboxItemsByMode");
-  });
-
-  it("die Ansicht gruppiert nach Dringlichkeit (Nachfolger des Spaltenrasters)", () => {
-    /**
-     * S2-Umbau (Mockup inboxV2.html): Aus den drei Räumen wurden Dringlichkeits-GRUPPEN
-     * untereinander (Kritisch → Heute sinnvoll → Kann warten → Berichte → Erledigt).
-     * Die Raum-Zuordnung (`resolveInboxLane`) bleibt die Datenbasis — sie speist jetzt
-     * `resolveInboxUrgencyGroup` statt eines Spaltenrasters. Details prüft
-     * `inbox-dringlichkeit-velo-look.test.ts`.
-     */
-    const source = read("app/foundation/inbox-v2/InboxV2NewLook.tsx");
-    expect(source).toContain("groupInboxItemsByUrgency");
-    expect(source).toContain("INBOX_URGENCY_GROUPS.map");
-    // Der tote Ein-Tab-Modus-Umschalter erscheint nur noch, wenn ihn ein Mount bedienen kann.
-    expect(source).toContain("{onModeChange ? (");
+  it("die Ansicht zeigt beide Bahnen gleichzeitig und kennt keinen Modus-Umschalter mehr", () => {
+    const source = read("app/foundation/inbox-v2/PostfachModern.tsx");
+    expect(source).toContain('data-testid="postfach-bahn-handeln"');
+    expect(source).toContain('data-testid="postfach-bahn-info"');
+    expect(source).not.toContain("onModeChange");
+    expect(source).not.toContain("filterInboxItemsByMode");
   });
 });

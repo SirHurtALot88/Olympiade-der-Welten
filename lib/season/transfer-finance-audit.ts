@@ -29,6 +29,8 @@ export type TransferFinanceTeamSeasonRow = {
    * rekonstruierbar (siehe `getSeasonObjectiveRewardCashByTeam`).
    */
   netObjectiveRewardCash: number;
+  /** Vorstands-Praemien (Siegpraemie, Treuepraemie) der Saison aus dem ungekuerzten Log `vorstandPraemienLogs` (negativ = gezahlt). */
+  netPraemienCash: number;
   buyCount: number;
   draftBuyCount: number;
   marketBuyCount: number;
@@ -277,6 +279,22 @@ function getSeasonObjectiveRewardCashByTeam(gameState: GameState, seasonId: stri
   return map;
 }
 
+/**
+ * Vorstands-Praemien (Office 21.11) einer Saison, pro Team: Siegpraemie und Treuepraemie werden direkt auf `team.cash` gebucht
+ * (aus dem Gehaltstopf) und stehen im ungekuerzten Log `vorstandPraemienLogs` (nicht im gekuerzten `plan.protokoll`). Ein eigener
+ * Kanal, damit die Abstimmung nicht als Rest-Delta mitlaeuft.
+ */
+function getSeasonPraemienCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const [teamId, eintraege] of Object.entries(gameState.seasonState.vorstandPraemienLogs ?? {})) {
+    for (const e of eintraege) {
+      if (e.seasonId !== seasonId) continue;
+      map.set(teamId, round((map.get(teamId) ?? 0) + e.cashDelta));
+    }
+  }
+  return map;
+}
+
 export function buildBuyEconomics(gameState: GameState) {
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
   return gameState.transferHistory
@@ -316,6 +334,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const sponsorEventCashByTeam = getSeasonSponsorEventCashByTeam(gameState, seasonId);
     const apronCashByTeam = getSeasonApronCashByTeam(gameState, seasonId);
     const objectiveRewardCashByTeam = getSeasonObjectiveRewardCashByTeam(gameState, seasonId);
+    const praemienCashByTeam = getSeasonPraemienCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
@@ -340,6 +359,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netSponsorEventCash = sponsorEventCashByTeam.get(teamId) ?? 0;
       const netApronCash = apronCashByTeam.get(teamId) ?? 0;
       const netObjectiveRewardCash = objectiveRewardCashByTeam.get(teamId) ?? 0;
+      const netPraemienCash = praemienCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
         cashEndByTeam.get(teamId) ??
@@ -366,7 +386,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
                 netApronCash -
                 netLoanCash -
                 netFacilityCash -
-                netObjectiveRewardCash,
+                netObjectiveRewardCash -
+                netPraemienCash,
             )
           : null;
 
@@ -387,6 +408,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         netLoanCash,
         netFacilityCash,
         netObjectiveRewardCash,
+        netPraemienCash,
         buyCount: marketBuys.length,
         draftBuyCount: draftBuys.length,
         marketBuyCount: marketBuys.length,

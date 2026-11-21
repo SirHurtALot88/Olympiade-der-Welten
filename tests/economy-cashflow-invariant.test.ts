@@ -17,6 +17,8 @@ import {
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { applyLoanSettlement, originateLoan } from "@/lib/finance/loan-service";
 import { applyFacilityMaintenance, previewFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
+import { berechneVorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { bucheSiegpraemien, bucheTreuepraemie, lesPraemienLog, setzePraemienPlan } from "@/lib/finance/vorstand-praemien";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply, previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 
 /**
@@ -259,6 +261,13 @@ type SimulationRun = {
     delta: number;
     maintenanceCost: number;
     loggedCost: number;
+  };
+  phase5b: {
+    teamId: string;
+    delta: number;
+    loggedDelta: number;
+    siegEintraege: number;
+    treueEintraege: number;
   };
   phase6: {
     cashBeforePrize: Map<string, number>;
@@ -695,6 +704,51 @@ beforeAll(async () => {
   bookings.push({ teamId: facilityTeamId, amount: -facilityEvent.cost, system: "facility_upkeep", note: facilityEvent.eventId });
 
   // ---------------------------------------------------------------------------------------------
+  // Phase 5b: Vorstands-Praemien (Office 21.11) — Siegpraemie und Treuepraemie bewegen echtes Team-Cash und stehen im
+  // UNGEKUERZTEN Log `vorstandPraemienLogs` (nicht im gekuerzten `plan.protokoll`). Nur Teams von Menschen haben einen Plan; das Team
+  // wird dafuer kurz als Mensch gefuehrt und danach zurueckgestellt, damit Phase 6 unveraendert mit KI-Teams rechnet.
+  // Die Spieltags-Ergebnisse stammen aus dem echten Auto-Run von Phase 1 (Zeilen mit Rang, ohne Duell-Felder: Rueckfall obere Haelfte).
+  // ---------------------------------------------------------------------------------------------
+  const prePraemienSave = persistence.getSaveById(saveId)!;
+  // Das Team mit dem meisten freien Gehaltstopf (ohne die in anderen Phasen genutzten Teams): nur dort wird die Praemie auch gezahlt.
+  const praemienBelegt = new Set([buyTeamId, sellTeamId, sponsorTeamId, bankBorrowerId, lenderTeamId, teamBorrowerId, facilityTeamId]);
+  const praemienTeamId = [...prePraemienSave.gameState.teams]
+    .filter((team) => !praemienBelegt.has(team.teamId))
+    .map((team) => ({ teamId: team.teamId, frei: berechneVorstandBudgetStand(prePraemienSave.gameState, team.teamId).gehalt.frei }))
+    .sort((a, b) => b.frei - a.frei)[0]!.teamId;
+  let praemienGs: GameState = {
+    ...prePraemienSave.gameState,
+    teams: prePraemienSave.gameState.teams.map((team) => (team.teamId === praemienTeamId ? { ...team, humanControlled: true } : team)),
+  };
+  const praemienPlan = setzePraemienPlan(praemienGs, praemienTeamId, { siegStufe: 2, treueStufe: 2 });
+  if (!praemienPlan.ok) {
+    throw new Error(`Praemienplan nicht gesetzt: ${praemienPlan.reason ?? "unbekannt"}`);
+  }
+  praemienGs = praemienPlan.gameState;
+  const praemienCashBefore = praemienGs.teams.find((team) => team.teamId === praemienTeamId)!.cash;
+  const praemienResultIds = [
+    ...new Set(
+      (praemienGs.seasonState.disciplineResults ?? []).filter((row) => row.teamId === praemienTeamId).map((row) => row.matchdayResultId),
+    ),
+  ];
+  for (const resultId of praemienResultIds) {
+    praemienGs = bucheSiegpraemien(praemienGs, resultId);
+  }
+  const praemienSpieler = praemienGs.rosters.find((entry) => entry.teamId === praemienTeamId)!.playerId;
+  praemienGs = bucheTreuepraemie(praemienGs, praemienTeamId, praemienSpieler, 8, "invariant-treue");
+  const praemienLog = lesPraemienLog(praemienGs, praemienTeamId);
+  const praemienLoggedDelta = Number(praemienLog.reduce((sum, entry) => sum + entry.cashDelta, 0).toFixed(4));
+  const praemienCashAfter = praemienGs.teams.find((team) => team.teamId === praemienTeamId)!.cash;
+  praemienGs = {
+    ...praemienGs,
+    teams: praemienGs.teams.map((team) => (team.teamId === praemienTeamId ? { ...team, humanControlled: false } : team)),
+  };
+  persistence.saveSingleplayerState(saveId, praemienGs);
+  for (const entry of praemienLog) {
+    bookings.push({ teamId: praemienTeamId, amount: entry.cashDelta, system: "vorstand_praemien", note: entry.id });
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // Phase 6: Preisgeld (Cash-Prize-Apply) — dokumentierte Verifikations-Lücke: CASH_PRIZE_BENCHMARK_ONLY
   // ist aktuell `true`, d. h. dieser Schritt bewegt laut Produktionscode absichtlich KEIN echtes Cash.
   // Wir prüfen das hier explizit, statt es zu ignorieren — falls jemand später echten Cash-Payout
@@ -881,6 +935,13 @@ beforeAll(async () => {
       maintenanceCost: facilityPreview.maintenanceCost,
       loggedCost: facilityEvent.cost,
     },
+    phase5b: {
+      teamId: praemienTeamId,
+      delta: Number((praemienCashAfter - praemienCashBefore).toFixed(4)),
+      loggedDelta: praemienLoggedDelta,
+      siegEintraege: praemienLog.filter((entry) => entry.art === "sieg").length,
+      treueEintraege: praemienLog.filter((entry) => entry.art === "treue").length,
+    },
     phase6: {
       cashBeforePrize,
       cashAfterPrize,
@@ -948,6 +1009,12 @@ describe("Geldfluss-Invariante — simulierte Mini-Saison", () => {
   it("Phase 5 (Gebäude-Upkeep): Cash-Delta entspricht exakt den negativen facilityEvents-Kosten", () => {
     expect(run.phase5.maintenanceCost).toBeGreaterThan(0);
     expect(Math.abs(run.phase5.delta - -run.phase5.loggedCost)).toBeLessThanOrEqual(SINGLE_BOOKING_TOLERANCE);
+  });
+
+  it("Phase 5b (Vorstands-Praemien): Cash-Delta entspricht exakt der Summe des ungekuerzten Praemien-Logs", () => {
+    expect(run.phase5b.treueEintraege).toBe(1);
+    expect(run.phase5b.loggedDelta).toBeLessThan(0);
+    expect(Math.abs(run.phase5b.delta - run.phase5b.loggedDelta)).toBeLessThanOrEqual(SINGLE_BOOKING_TOLERANCE);
   });
 
   it("Phase 6 (Saisonende): Cash-Änderung entspricht exakt den protokollierten Sponsor- und Gebäude-Buchungen — Preisgeld bleibt draußen", () => {

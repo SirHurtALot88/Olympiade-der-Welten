@@ -333,6 +333,23 @@ describe("transfer-finance-audit", () => {
           "M-M": { points: 140, rank: 1 },
           "A-A": { points: 10, rank: 32 },
         },
+        // Seit 21.11. bucht ein verfehltes Ziel keine Geldstrafe mehr (Chris 18.11.): der Reward-Kanal entsteht aus einem
+        // erfuellten Ziel mit Praemie, nicht mehr aus der Strafe des verfehlten Medaillenziels.
+        teamSeasonObjectives: [
+          {
+            seasonId: "season-3",
+            teamId: "M-M",
+            objectiveId: "test-erfuelltes-ziel",
+            category: "finance",
+            label: "Erfuelltes Testziel",
+            targetValue: 1,
+            currentValue: 1,
+            status: "completed",
+            rewardCash: 4,
+            boardConfidenceDelta: 0.3,
+            source: "test_fixture",
+          },
+        ],
       },
       matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
       teams,

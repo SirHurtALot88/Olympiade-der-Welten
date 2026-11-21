@@ -14,9 +14,6 @@ import FoundationTeamsViewPanel from "@/app/foundation/teams-v2/FoundationTeamsV
 import FoundationCockpitHost, {
   type FoundationCockpitHostProps,
 } from "@/app/foundation/cockpit-v2/FoundationCockpitHost";
-import FoundationInboxV2Host, {
-  type FoundationInboxV2HostProps,
-} from "@/app/foundation/inbox-v2/FoundationInboxV2Host";
 import FoundationSeasonV2Host, {
   type FoundationSeasonV2HostProps,
 } from "@/app/foundation/season-v2/FoundationSeasonV2Host";
@@ -204,26 +201,6 @@ export function FoundationShellRouterCockpit({ active, hostProps }: FoundationSh
   return (
     <FoundationTabActiveHost active={active}>
       <FoundationShellRouterCockpitContent hostProps={hostProps} />
-    </FoundationTabActiveHost>
-  );
-}
-
-export type FoundationShellRouterInboxV2Props = {
-  active: boolean;
-  hostProps: FoundationInboxV2HostProps;
-};
-
-/**
- * Incremental Phase 5.3 shell slice: Inbox V2 route with unmount gate.
- */
-export function FoundationShellRouterInboxV2({ active, hostProps }: FoundationShellRouterInboxV2Props) {
-  if (!active) {
-    return null;
-  }
-
-  return (
-    <FoundationTabActiveHost active={active}>
-      <FoundationInboxV2Host {...hostProps} />
     </FoundationTabActiveHost>
   );
 }

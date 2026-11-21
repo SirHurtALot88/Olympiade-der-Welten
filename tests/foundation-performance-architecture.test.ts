@@ -553,7 +553,6 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationText).toContain("bindFoundationNavigationStart");
     expect(foundationSurfaceText).toContain("FoundationShellRouterTeams");
     expect(foundationSurfaceText).toContain("FoundationShellRouterCockpit");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterInboxV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterPrize");
     // Der Router-Baustein für die Einsatzliste hatte keinen Aufrufer mehr (nachgezählt: 0 Stellen
@@ -784,12 +783,9 @@ describe("foundation performance architecture helpers", () => {
     expect(prefetchText).toContain("prefetchMatchdayArenaBase");
     expect(prefetchText).toContain("matchday-arena-session-cache");
     expect(foundationText).toContain("marketSellBusy,");
-    const inboxHostText = await fs.readFile(
-      path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"),
-      "utf8",
-    );
-    expect(inboxHostText).toContain("use-inbox-v2-derivations");
-    expect(inboxHostText).toContain("<InboxV2Client");
+    const inboxText = await fs.readFile(path.join(root, "app/foundation/inbox-v2/PostfachModern.tsx"), "utf8");
+    expect(inboxText).toContain("baueModell");
+    expect(foundationSurfaceText).toContain("<PostfachModern");
     expect(teamsText).toContain("marketSellBusy?: boolean");
     expect(teamsText).toContain("marketSellBusy = false");
     expect(teamsText).toContain("teamsHydrationPhase");

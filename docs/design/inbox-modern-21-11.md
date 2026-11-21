@@ -122,3 +122,53 @@ Beide Größen angesehen: kein Seitenscroll, keine Überlappung, kein abgeschnit
 (vier Spalten über die volle Breite). Klassen stehen in Klassenfarbe mit Icon, neben keiner Zahl steht eine
 Notenstufe, Gehälter stehen groß je Saison und klein je Spieltag. Die Seite läuft ohne JavaScript-Fehler.
 Nicht geprüft: 1710×1112 (MacBook) und Phone.
+
+
+## 6. Entscheidungen Chris 21.11.
+
+Chris, 21.11.: „ja überall deine empfehlungen nehmen, bau das so“. Damit gilt zu Abschnitt 4:
+
+1. Zwei Bahnen nebeneinander, Handeln | Info (Info = „Im Blick behalten“ + „Berichte“).
+2. Gelesen/ungelesen je Manager (je Besitzer, im Spielstand: `seasonState.inboxGelesen[ownerId]`; Schreibweg `POST /api/inbox/gelesen` hinter `authorizeServerRoomWrite`).
+3. Trainingswünsche direkt erfüllen (Intensität setzen, derselbe Weg wie die Entwicklungsseite) oder ablehnen. Abgelehnt: die Meldung wandert nach „Erledigt“, der Wunsch bleibt beim Spieler bestehen und wirkt weiter auf die Moral (Moral-Logik unverändert).
+4. Neue Meldungsarten: Wieder einsetzbar, Moral gekippt, Vorstand-Freigabe gebaut; „Interesse an einem Spieler“ **nicht** gebaut (siehe Offene Punkte).
+5. Trainingswünsche halten den Spieltag nie auf.
+6. Zahl an der Icon-Schiene = ungelesen, die Glocke bleibt beim „hält den Spieltag auf“.
+7. Meldungen aus an die KI delegierten Bereichen (`isBereichDelegiert`) erscheinen als Bericht „KI hat erledigt“.
+
+## 7. Bau (21.11.)
+
+Neu: `app/foundation/inbox-v2/PostfachModern.tsx` + `postfach-modern.css` (Klassen `ibx-*`), Modell `lib/foundation/inbox-postfach.ts`, Gelesen `lib/foundation/inbox-gelesen.ts`, neue Meldungen `lib/foundation/inbox-neue-meldungen.ts`, Route `app/api/inbox/gelesen/route.ts`. Entfernt: `InboxV2NewLook`, `InboxV2Client`, `FoundationInboxV2Host`, `inbox-v2-types`, `use-inbox-v2-derivations`, `inbox-urgency-groups`, alle `.nl-inbox*` in `globals.css`. Tests: `tests/postfach-inbox.test.tsx` (neu), Vertragstests auf das Postfach umgestellt.
+
+Aufnahmen (echte App, Kopie des live-save-Abbilds, Death Peaches, Aufbau mit `scripts/inbox-bau-21-11-aufbau.ts`): `docs/design/inbox-bau-21-11/app-*.png` bei 1920x1080 und 2560x1440; Bildpaare Mockup oben, App unten: `paar-*.jpg`. Kein Seitenscroll, 1710x1112 ebenfalls gemessen (kein Scroll).
+
+### Abgleich Mockup gegen App
+
+| Mockup-Feature | Stand |
+|---|---|
+| Vier Spalten Postfach, Handeln, Info, Brief | drin |
+| Band mit Ungelesen, Handeln, Hält auf, Info | drin (Seiten-Slot des Regiebands) |
+| Ordner Posteingang/Erledigt mit Zählern | drin |
+| Absender-Filter mit Zählern | drin |
+| Sortierung Dringend/Neueste/Absender | drin; „Neueste“ sortiert nach Spieltag, Meldungen eines Spieltags haben dieselbe Zeit |
+| „Nur ungelesene“ | drin |
+| Meine Teams mit Umschalter und Ungelesen-Zahl | drin (nur eigene Teams des Managers) |
+| Checkliste des Spieltags | angepasst: nur die Zeilen, die das Spiel führt (Lineup gesetzt/bestätigt, Formkarten, Training, Kapitän, Sponsor); „Kein Verletzter aufgestellt“ fehlt (keine Datenquelle) |
+| Am Tisch (Franky, Ramona) | drin: Name, Team, Delegations-Stufe, ohne ihre Meldungen; auf dem Live-Stand gibt es nur Chris, deshalb nicht im Bild |
+| Abschnitte „Hält den Spieltag auf“, „Vor dem Spieltag entscheiden“, „Im Blick behalten“, „Berichte & Momente“ | drin |
+| Zeile mit Absender, Art, Marken, Zeit, Aktion | drin; die lila „neue Meldungsart“-Marken waren Entwurfs-Anmerkung und sind weggelassen |
+| Brief mit Kopf, Text, drei Kacheln, Optionen mit Folgen | drin; Kacheln und Folgen aus echten Daten/Funktionen (`getTrainingModeDemandTerms`, Moral, Verfügbarkeit, Vorstand) |
+| Klasse in Klassenfarbe mit Icon | drin |
+| Empfohlene Option „Krolach für Kaylen einsetzen“ | fehlt: keine Ersatz-Empfehlung im Spiel; die Verletzung bietet „Lineup prüfen“ |
+| „Franky anstupsen“ | fehlt: kein Anstups-Weg im Spiel |
+| Später (Wiedervorlage) | fehlt: kein Wiedervorlage-Zustand; Ablehnen eines Wunsches legt nach „Erledigt“ |
+| Ungelesen / Nächste im Brief | drin; dazu „Zurück in den Posteingang“ bei Erledigtem |
+| Vorstand: Freigabe für Saison 2 | drin als „Vorstand: Freigabe N %“, nur ab Saison 2 und unter 100 % (Saison 1 gibt der Vorstand immer voll frei); auf dem Live-Stand (Saison 1) nicht aufnehmbar, durch Test belegt |
+| Interesse an Jorund | drin seit 21.11. (KI-Merkliste): „Interesse an X: Team“, Info-Bahn, Absender Markt & Scouting; Quelle `ki_interesse`, siehe `docs/design/ki-merkliste-21-11.md` |
+| Zahl an der Schiene | drin; erscheint auf Seiten, auf denen das Postfach ohnehin berechnet wird |
+
+### Offene Punkte
+
+- **Interesse an einem Spieler:** gebaut (21.11., Chris: „KI soll eine Merkliste fremder Spieler bekommen“). Die KI-Merkliste ist aus der Kaufbewertung der KI-Kaderplanung abgeleitet, keine neue Heuristik; Details in `docs/design/ki-merkliste-21-11.md`. Aufnahmen: `docs/design/ki-merkliste-21-11/`.
+- Meldungstexte älterer Quellen (z. B. „Transfer gekauft“ mit roher Spieler-Kennung) sind unverändert aus dem Dienst und wären ein eigenes Aufräumen.
+- Die Glocke im Band wurde nicht angefasst.

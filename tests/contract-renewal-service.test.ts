@@ -428,6 +428,46 @@ describe("contract renewal service", () => {
     expect(entry?.negotiatedAnnualSalary).toBeLessThan(schedule[0]?.salary ?? 0);
   });
 
+  it("Treueprämie (Office 21.11): auch bei einer Verlängerung, die die KI im Auftrag des Menschen macht (delegiert); ein reines KI-Team zahlt keine", () => {
+    const renew = (humanControlled: boolean) => {
+      const team = createTeam({ teamId: "H-H", shortCode: "H-H", humanControlled, cash: 300 });
+      const player = createPlayer("p1", { rating: 88 });
+      const gameState = createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [createRosterEntry("p1", { teamId: team.teamId, contractLength: 0, contractStatus: "renewal_pending", salary: 6 })],
+      });
+      gameState.seasonState.vorstandPraemien = {
+        "H-H": { seasonId: "season-2", siegStufe: 0, treueStufe: 2, siegGebucht: 0, treueGebucht: 0, praemierteSpieltage: [], praemierteVerlaengerungen: [], protokoll: [] },
+      };
+      const save = createSave(gameState);
+      const persistence = createPersistenceMock();
+      const preview = previewContractRenewalAction({ save, teamId: team.teamId, playerId: "p1", action: "renew", contractLength: 3, offeredSalary: 9.5 });
+      applyContractRenewalAction({
+        save,
+        teamId: team.teamId,
+        playerId: "p1",
+        action: "renew",
+        contractLength: 3,
+        offeredSalary: 9.5,
+        confirmToken: preview.confirmToken,
+        persistence,
+        source: "ai_contract_renewal",
+      });
+      return vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1] as GameState;
+    };
+    const delegiert = renew(true);
+    const log = delegiert.seasonState.vorstandPraemienLogs?.["H-H"] ?? [];
+    expect(log.length).toBe(1);
+    expect(log[0]!.art).toBe("treue");
+    expect(log[0]!.cashDelta).toBeLessThan(0);
+    expect(delegiert.teams[0]!.cash).toBeCloseTo(300 + log[0]!.cashDelta, 5);
+    // Ein KI-Team hat keinen Plan und zahlt nichts.
+    const ki = renew(false);
+    expect(ki.seasonState.vorstandPraemienLogs?.["H-H"] ?? []).toHaveLength(0);
+    expect(ki.teams[0]!.cash).toBe(300);
+  });
+
   it("Unterschriftspfad Vertragsaktion (Mensch wie KI): schreibt das angebotene Jahresgehalt fest", () => {
     const team = createTeam({ teamId: "H-H", shortCode: "H-H", humanControlled: true, cash: 300 });
     const player = createPlayer("p1", { rating: 88 });

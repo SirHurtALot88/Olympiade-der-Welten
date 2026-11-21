@@ -22,6 +22,8 @@ export type FoundationFinancesHostProps = {
   onOpenTeam?: (teamId: string) => void;
   /** Schreibweg der Vorstand-Entscheidungen (Umschichten, Rücklage anzapfen, „Alles auf eine Karte“). */
   onVorstandAktion?: VorstandAktionFn;
+  /** Sprung ins Office (Vorstandsgespräch). */
+  onOpenOffice?: () => void;
   /** Darf der aktive Manager dieses Team verwalten? Sonst ist die Seite nur lesbar. */
   kannVerwalten?: boolean;
 };
@@ -31,7 +33,7 @@ export type FoundationFinancesHostProps = {
  * Ausnahme von "keine Callbacks": der Sprung ins Teamprofil aus der
  * Liga-Tabelle, der nichts verändert, sondern nur navigiert.
  */
-export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, kannVerwalten }: FoundationFinancesHostProps) {
+export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, onOpenOffice, kannVerwalten }: FoundationFinancesHostProps) {
   const model = useFinancesViewModel(gameState, teamId);
   // Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — bewusst getrennt
   // vom Fog-of-War-gesperrten `model` oben, siehe `use-finances-league-table.ts`.
@@ -57,6 +59,7 @@ export default function FoundationFinancesHost({ gameState, teamId, saveId, onOp
       salaryFactorOutlook={salaryFactorOutlook}
       onOpenTeam={onOpenTeam}
       onVorstandAktion={onVorstandAktion}
+      onOpenOffice={onOpenOffice}
       kannVerwalten={kannVerwalten}
     />
   );

@@ -24,6 +24,7 @@ export type KontoauszugArt =
   | "gehalt_und_sponsor_saisonende"
   | "apron"
   | "vorstandsziele"
+  | "vorstand_praemien"
   | "notfall_kasse";
 
 export type KontoauszugZeile = {
@@ -119,6 +120,16 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
       add(teamId, {
         seasonId: l.seasonId, matchdayId: null, phase: "saisonende", art: "vorstandsziele", quelle: "objectiveRewardApplyLogs",
         text: "Vorstandsziele", betrag: delta, zeit: l.createdAt,
+      });
+    }
+  }
+
+  // 4b) Vorstands-Praemien (Office 21.11): Siege und Treue, ungekuerztes Log je Team.
+  for (const [teamId, eintraege] of Object.entries(gameState.seasonState.vorstandPraemienLogs ?? {})) {
+    for (const e of eintraege) {
+      add(teamId, {
+        seasonId: e.seasonId, matchdayId: null, phase: "saison", art: "vorstand_praemien", quelle: "vorstandPraemienLogs",
+        text: e.art === "sieg" ? `Siegprämie ${e.side?.toUpperCase() ?? ""}`.trim() : "Treueprämie", betrag: e.cashDelta, zeit: e.zeit,
       });
     }
   }

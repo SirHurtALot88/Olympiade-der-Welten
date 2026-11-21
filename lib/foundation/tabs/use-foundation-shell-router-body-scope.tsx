@@ -244,6 +244,7 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
+import { inboxBesitzerFuerTeam, setzeInboxGelesen } from "@/lib/foundation/inbox-gelesen";
 import type {
   GameMode,
   SeasonSnapshotRecord,
@@ -808,6 +809,7 @@ import {
   EMPTY_FEATURE_AUDIT_MATRIX,
   EMPTY_MULTI_SEASON_BALANCE_DASHBOARD,
 } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
+import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -873,7 +875,6 @@ const FacilitiesOverviewV2Client = dynamic(
 const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-center-v2/ScoutingCenterV2Client"), {
   ssr: false,
 });
-const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), { ssr: false });
 const FoundationDebugGameStatePanel = dynamic(
   () => import("@/app/foundation/debug/FoundationDebugGameStatePanel"),
   { ssr: false },
@@ -2156,6 +2157,38 @@ export function useFoundationShellRouterBodyScope({
         title: "Training nicht gespeichert",
         detail: error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.",
       });
+    }
+  }
+
+  /**
+   * Postfach (21.11.): Gelesen-Marke je Manager. Läuft immer über die Route `/api/inbox/gelesen` (im Raum die einzige
+   * erlaubte Schreibform, außerhalb des Raums dieselbe, damit der Server die Besitz-Prüfung macht). Lokal wird sofort
+   * umgesetzt, damit die Zahl springt; der Server liefert danach nur noch die neue `saveVersion`.
+   */
+  async function markiereInboxGelesen(teamId: string, itemIds: string[], gelesen: boolean) {
+    if (readMeta.readOnly || readMeta.source === "prisma" || itemIds.length === 0) {
+      return;
+    }
+    const besitzer = inboxBesitzerFuerTeam(gameState, teamId);
+    if (!besitzer) {
+      return;
+    }
+    setGameState((current) => setzeInboxGelesen(current, besitzer, itemIds, gelesen));
+    try {
+      const response = await fetch("/api/inbox/gelesen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({ saveId: activeSaveId, teamId, itemIds, gelesen })),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (response.ok && payload.success && payload.saveVersion != null) {
+        setGameState((current) => ({ ...current, saveVersion: payload.saveVersion }));
+      }
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -6281,10 +6314,7 @@ export function useFoundationShellRouterBodyScope({
    * Kredit-Aktionen: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers (Fog of War), nie ein
    * `teamId`-Parameter; der Server prueft den Besitz ueber `authorizeServerRoomWrite`.
    */
-  async function vorstandBudgetAktion(input: {
-    aktion: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "vorstand_fordert_annehmen";
-    betrag?: number;
-  }): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+  async function vorstandBudgetAktion(input: VorstandAktionEingabe): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
     if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
       return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
@@ -6303,6 +6333,9 @@ export function useFoundationShellRouterBodyScope({
           teamId: activeManagerTeamId,
           aktion: input.aktion,
           betrag: input.betrag,
+          antrag: input.antrag,
+          siegStufe: input.siegStufe,
+          treueStufe: input.treueStufe,
           source: readMeta.source,
         })),
       });
@@ -7520,6 +7553,11 @@ export function useFoundationShellRouterBodyScope({
       setMarketFocusPlayerId(focusPlayerId);
     } else if (resolvedView === "marketV2") {
       setMarketFocusPlayerId(null);
+    }
+    if (resolvedView === "playerProfile" && focusPlayerId) {
+      setShowGameFlowPanel(false);
+      void openPlayerProfileById(focusPlayerId, null, { push: true });
+      return;
     }
     if (resolvedView === "prize") {
       navigateToPrizeFinanceViewFromRouting(panel, false);
@@ -11067,7 +11105,7 @@ export function useFoundationShellRouterBodyScope({
     [selectedTeamFacilityState],
   );
   // EIN Filtersystem (Audit I1): die Kategorie filtert nur noch in der Ansicht selbst
-  // (`InboxV2NewLook`, Pills mit echten Zählern). Hier wird deshalb NICHT mehr nach Kategorie
+  // (`PostfachModern`, Absender-Filter mit echten Zählern). Hier wird deshalb NICHT mehr nach Kategorie
   // vorgefiltert — sonst könnte die Ansicht die Zähler der übrigen Kategorien nicht kennen und
   // ein leerer Filter würde wieder als „Alles erledigt" neben „11 offen" stehen (Audit I2).
   const visibleInboxItems = useMemo(
@@ -11078,29 +11116,6 @@ export function useFoundationShellRouterBodyScope({
       }),
     [activeTeamInboxItems, inboxIncludeDismissed, inboxIncludeDone],
   );
-  const inboxV2Items = useMemo(
-    () =>
-      visibleInboxItems.map((item) => ({
-        id: item.itemId,
-        category: item.category.toUpperCase(),
-        title: item.title,
-        detail: item.description,
-        severity: item.severity,
-        status: item.status,
-        choices:
-          item.ctaLabel && item.targetView
-            ? [{ id: "open-target", label: item.ctaLabel, detail: describeInboxTargetDestination(item) }]
-            : undefined,
-        // Dringlichkeits-Gruppierung + Ziel-Chip + Konsequenz-Zeile — dieselben Ableitungen
-        // wie in `use-inbox-v2-derivations` (FoundationInboxV2Host), damit beide Mounts
-        // identisch gruppieren.
-        lane: resolveInboxLane(item),
-        targetLabel: resolveInboxTargetLabel(item),
-        source: item.source,
-      })),
-    [visibleInboxItems],
-  );
-
   const sortedSeasonStandRows = useMemo(
     () => {
       if (!shouldBuildSortedSeasonStandRows(activeView as FoundationViewId)) {
@@ -13322,7 +13337,6 @@ export function useFoundationShellRouterBodyScope({
     inboxCategoryFilter,
     inboxIncludeDismissed,
     inboxIncludeDone,
-    inboxV2Items,
     inboxV2SelectedItemId,
     isFoundationBootstrapState,
     isMarketSellPanelOpen,
@@ -13734,6 +13748,8 @@ export function useFoundationShellRouterBodyScope({
     transferWishlistEntriesForMarketV2,
     triggerGlobalNext,
     updateInboxItemStatus,
+    markiereInboxGelesen,
+    gameInboxItems,
     updateTeamControlDraft,
     updateTeamIdentityDraft,
     updateTeamStrategyDraft,
@@ -13775,7 +13791,6 @@ export {
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
   HISTORY_ALL_SEASONS_FILTER,
-  InboxV2Client,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
   PLAYER_PROFILE_TABS,

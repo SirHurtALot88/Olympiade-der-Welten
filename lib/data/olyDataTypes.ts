@@ -189,6 +189,26 @@ export type GameInboxCategory =
 export type GameInboxSeverity = "info" | "warning" | "critical";
 export type GameInboxStatus = "open" | "done" | "dismissed";
 
+/** Interesse-Stufe einer KI-Merkliste: 1 = beobachtet, 2 = interessiert, 3 = Wunschziel. */
+export type KiMerklisteStufe = 1 | 2 | 3;
+
+export type KiMerklisteEintrag = {
+  playerId: string;
+  /** Team, dem der Spieler beim letzten Abgleich gehoerte. */
+  besitzerTeamId: string;
+  stufe: KiMerklisteStufe;
+  /** Vorsprung des Kaufnutzens vor dem Stop-Nutzen (Rangfolge, nicht anzeigen). */
+  vorsprung: number;
+  /** Disziplin, in der der Spieler dem Team am meisten bringen wuerde (Bedarf x Wert). */
+  disziplinId: string | null;
+  /** Wie viele Spieler des KI-Teams diese Disziplin bereits solide (> 60) abdecken. */
+  abgedeckt: number;
+  /** Spieltag, an dem der Spieler auf die Liste kam (bleibt, solange er drauf steht). */
+  seit: string | null;
+  /** Letzter Abgleich. */
+  stand: string | null;
+};
+
 export type GameInboxItem = {
   itemId: string;
   saveId: string;
@@ -2155,6 +2175,14 @@ export type TeamSeasonObjectiveRecord = {
    * Spielstände führen das Feld nicht; fehlend bedeutet "steht fest".
    */
   provisional?: boolean;
+  /**
+   * Laufzeit des Ziels in Saisons (Office 21.11.): `vonSaisonNr` bis `bisSaisonNr` einschliesslich. Fehlt das Feld,
+   * gilt das Ziel nur diese Saison. Ein Ziel mit Laufzeit wird in jeder Saison der Laufzeit neu vergeben und
+   * einzeln abgerechnet.
+   */
+  laufzeit?: { vonSaisonNr: number; bisSaisonNr: number };
+  /** Bei der Vergabe verworfenes Ziel, das dieses ersetzt (Widerspruchspruefung, Office 21.11.). */
+  ersetzt?: { label: string; weil: string };
 };
 
 /**
@@ -2193,6 +2221,89 @@ export type VorstandBudgetZustand = {
   /** Letzter abgelehnter Antrag (nur Anzeige). */
   letzterAntragAbgelehnt?: { zeit: string; grund: string } | null;
   protokoll: VorstandBudgetProtokollEintrag[];
+  /** Vorstandsgespraech (Office 21.11): Anzahl Quotenstufen, die der Vorstand fuer diese Saison anhebt (0 oder 1). */
+  stufenAnhebung?: number;
+  /** Vorstandsgespraech: einmaliges Sonderbudget in C Jahresgehalt, aus dem Vorbehalt in den Gehaltstopf. */
+  sonderGehalt?: number;
+};
+
+/** Eine Zusage des Spielers im Vorstandsgespraech. */
+export type VorstandZusageArt = "zielhoch" | "deckel" | "vertrauen" | "binden";
+/** Worum der Spieler im Vorstandsgespraech bittet. */
+export type VorstandBitteArt = "stufe" | "sonder" | "anzapf" | "alles" | "ziel" | "liebling";
+
+export type VorstandGespraechProtokollEintrag = {
+  zeit: string;
+  bitte: VorstandBitteArt;
+  zusagen: VorstandZusageArt[];
+  ausgang: "zustimmung" | "gegenangebot" | "ablehnung" | "zurueckgezogen";
+  text: string;
+  gewicht: number;
+  verlangt: number;
+  runde: number;
+};
+
+/** Ein offenes Gegenangebot des Vorstands (nur ein Gespraech zugleich). */
+export type VorstandGespraechOffen = {
+  bitte: VorstandBitteArt;
+  betrag?: number;
+  zielId?: string;
+  zusagen: VorstandZusageArt[];
+  vorschlag: VorstandZusageArt[];
+  runde: number;
+  gewicht: number;
+  verlangt: number;
+};
+
+/** Zustand der Gespraeche eines Teams in einer Saison (Office 21.11). */
+export type VorstandGespraechZustand = {
+  seasonId: string;
+  /** Verbrauchte Gespraeche (hoechstens 2 je Saison). */
+  genutzt: number;
+  offen: VorstandGespraechOffen | null;
+  /** Gebundene Zusagen dieser Saison (wirken als Vorstandsziele bzw. Sperren). */
+  zusagen: Array<{ art: VorstandZusageArt; seit: string; zielRang?: number; playerId?: string }>;
+  /** Der Lieblingsspieler darf ohne Vertrauensverlust verkauft werden. */
+  lieblingFreigegeben: boolean;
+  protokoll: VorstandGespraechProtokollEintrag[];
+};
+
+/** Praemienplan eines Teams (Office 21.11, Reiter Praemien). Stufen 0 = aus bis 3. */
+export type VorstandPraemienPlan = {
+  seasonId: string;
+  siegStufe: number;
+  treueStufe: number;
+  /** In dieser Saison aus dem Gehaltstopf gebucht (C Jahresgehalt-Gegenwert). */
+  siegGebucht: number;
+  treueGebucht: number;
+  /**
+   * Seiten, die bereits praemiert wurden, damit nichts doppelt gebucht wird. Schluessel `${matchdayResultId}:${side}`
+   * (D1 und D2 werden gestaffelt gebucht); ein Schluessel ohne `:d1`/`:d2` (aeltere Staende) gilt fuer beide Seiten.
+   */
+  praemierteSpieltage: string[];
+  praemierteVerlaengerungen: string[];
+  protokoll: Array<{ zeit: string; art: "sieg" | "treue" | "plan"; text: string; betrag?: number }>;
+};
+
+/**
+ * UNGEKUERZTES Geld-Log der Vorstands-Praemien (Office 21.11): jede gezahlte Praemie ein Eintrag, je Team, ueber alle Saisons.
+ * `plan.protokoll` ist nur die gekuerzte Anzeige; Finanz-Audit und Kontoauszug lesen dieses Log.
+ */
+export type VorstandPraemienLogEintrag = {
+  id: string;
+  seasonId: string;
+  teamId: string;
+  art: "sieg" | "treue";
+  /** Cash-Wirkung auf das Team (negativ = gezahlt). */
+  cashDelta: number;
+  zeit: string;
+  matchdayResultId?: string;
+  side?: "d1" | "d2";
+  contractId?: string;
+  /** Treuepraemie: der Spieler; Siegpraemie: leer (Summe ueber die Eingesetzten). */
+  playerId?: string;
+  siege?: number;
+  eingesetzte?: number;
 };
 
 export type TeamBoardConfidenceRecord = {
@@ -3974,6 +4085,12 @@ export type SeasonState = {
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   /** Finanzkonzept V2: Umschichten, Ruecklage anzapfen, "Alles auf eine Karte" je Team (siehe `VorstandBudgetZustand`). */
   vorstandBudget?: Record<string, VorstandBudgetZustand>;
+  /** Vorstandsgespraeche je Team (Office 21.11). */
+  vorstandGespraeche?: Record<string, VorstandGespraechZustand>;
+  /** Praemienplaene je Team (Office 21.11). */
+  vorstandPraemien?: Record<string, VorstandPraemienPlan>;
+  /** Ungekuerztes Geld-Log der Vorstands-Praemien je Team (alle Saisons, Saisonwechsel loescht nichts). */
+  vorstandPraemienLogs?: Record<string, VorstandPraemienLogEintrag[]>;
   previousSeasonBoardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];
@@ -4165,6 +4282,18 @@ export type SeasonState = {
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
   trainingIntensityConfirmations?: Record<string, TrainingIntensityConfirmationRecord>;
+  /**
+   * Postfach (21.11.): welche Meldungen ein Manager schon gelesen hat, je Besitzer (`ownerId`), nicht je Spielstand —
+   * sonst liest Franky Chris' Post „weg“. Nur Kennungen (`GameInboxItem.itemId`), geschrieben über `/api/inbox/gelesen`.
+   */
+  inboxGelesen?: Record<string, string[]>;
+  /**
+   * KI-MERKLISTE (21.11., lib/ai/ki-merkliste.ts): je KI-Team die fremden Spieler, die seine Kaderplanung (`buyUtility` gegen
+   * `stopUtility`, dieselbe Bewertung wie beim Kauf) ankaufen wuerde. Hoechstens `KI_MERKLISTE_MAX` je Team, absteigend.
+   * Neu berechnet beim Spieltagsabschluss; `kiMerklisteStand` sagt, wann zuletzt.
+   */
+  kiMerkliste?: Record<string, KiMerklisteEintrag[]>;
+  kiMerklisteStand?: { seasonId: string; matchdayId: string | null } | null;
   aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiManagerSellStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiLifecyclePhaseRuns?: AiLifecyclePhaseRunRecord[];

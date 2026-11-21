@@ -75,25 +75,21 @@ describe("Inbox-Klick — der angeklickte Eintrag entscheidet", () => {
 });
 
 /**
- * Die Regel muss auch wirklich im gerenderten Handler stehen. Der bisherige Vertragstest prüfte nur,
- * ob der Name `FoundationShellRouterInboxV2` irgendwo im Quelltext vorkommt — das erfüllte schon die
- * tote Import-Zeile, und genau deshalb ist der Fehler durchgerutscht.
+ * Die Regel muss auch wirklich im gerenderten Handler stehen (Postfach seit 21.11.): die Zeile ruft die Aktion mit IHRER Meldung
+ * auf, nie mit der gerade gewählten, und die Navigation bekommt die Meldung selbst, nicht eine Kennung zum Nachschlagen.
  */
 describe("Inbox-Klick — die Regel steht im gerenderten Handler", () => {
   const body = readFileSync(join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8");
+  const postfach = readFileSync(join(process.cwd(), "app/foundation/inbox-v2/PostfachModern.tsx"), "utf8");
 
-  it("der Handler benutzt die übergebene itemId", () => {
-    expect(body).toContain("onRunChoice={(itemId, choiceId) => {");
-    // Die Gegenprobe ist der eigentliche Test: der verworfene Parameter darf nicht zurückkommen.
-    expect(body).not.toContain("onRunChoice={(_itemId");
+  it("die Navigation bekommt die angeklickte Meldung selbst", () => {
+    expect(body).toContain("onOeffne={navigateToInboxItem}");
+    expect(postfach).toContain("onOeffne(item)");
   });
 
-  it("der alte Rückfall auf den ersten Eintrag ist weg", () => {
+  it("der Knopf einer Zeile führt die Aktion DIESER Zeile aus", () => {
+    expect(postfach).toContain("fuehreAus(eintrag, erste)");
+    // Die Gegenprobe: kein Nachschlagen über die gewählte Kennung wie im alten Handler.
     expect(body).not.toContain("inboxV2Items.find((item: InboxV2Item) => item.id === (inboxV2SelectedItemId");
-  });
-
-  /** Ohne `onOpenItem` wählt ein Klick auf die Karte nur aus, statt zu navigieren. */
-  it("ein Klick auf die Karte selbst navigiert ebenfalls", () => {
-    expect(body).toContain("onOpenItem={(itemId) => {");
   });
 });

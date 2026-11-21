@@ -53,9 +53,7 @@ describe("game inbox UI contract", () => {
      * egal wer sie rendert.)
      */
     expect(source).toContain('activeView === "inboxV2" && selectedTeam ? (');
-    expect(source).toContain("<InboxV2Client");
-    const inboxHostSource = readFileSync(join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8");
-    expect(inboxHostSource).toContain("<InboxV2Client");
+    expect(source).toContain("<PostfachModern");
     expect(routingSource).toContain('if (view === "inbox") return "inboxV2"');
     /**
      * Gleiche Lage wie bei der Inbox oben: `FoundationShellRouterHomeV2` stand zuletzt nur noch
@@ -107,15 +105,9 @@ describe("game inbox UI contract", () => {
       readFileSync(join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8") +
         readFileSync(join(root, "app/foundation/home-v2/HomeModern.tsx"), "utf8"),
     ).toContain("onOpenInbox");
-    expect(
-      readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8") +
-        readFileSync(join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx"), "utf8"),
-    ).toContain('data-inbox-mode={mode}');
+    expect(readFileSync(join(root, "app/foundation/inbox-v2/PostfachModern.tsx"), "utf8")).toContain('data-ordner={ordner}');
     expect(readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8")).toContain("Entscheidungen öffnen");
-    expect(inboxHostSource).toContain("applyInboxQuickAction");
-    expect(
-      readFileSync(join(root, "lib/foundation/tabs/use-inbox-v2-derivations.ts"), "utf8"),
-    ).toContain("mapInboxQuickActionsToChoices");
+    expect(readFileSync(join(root, "app/foundation/inbox-v2/PostfachModern.tsx"), "utf8")).toContain("getInboxQuickActions");
     expect(source).toContain("seasonReadinessChecklist");
   });
 
