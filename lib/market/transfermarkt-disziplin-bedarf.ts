@@ -86,7 +86,20 @@ export function ersterAuftritt(eintrag: BedarfEintrag | undefined): number {
   return eintrag?.auftritte[0]?.nr ?? Number.POSITIVE_INFINITY;
 }
 
-export type BedarfUrteil = { art: "luecke" | "solide" | "stark" | "selten" | "offen"; text: string };
+export type StaerkeSortModus = "wichtigkeit" | "spielplan" | "liste";
+
+/**
+ * Reihenfolge der Disziplinen in der Kaderstärke: `liste` = feste Matrix-Reihenfolge, `spielplan` = in der Reihenfolge, in der
+ * sie drankommen (nicht im Spielplan ans Ende), `wichtigkeit` = Summe der Slots, Gleichstand nach Matrix-Reihenfolge.
+ */
+export function sortiereDisziplinen(modus: StaerkeSortModus, bedarf: DisziplinBedarf, ids: readonly string[]): string[] {
+  const pos = (d: string) => ids.indexOf(d);
+  if (modus === "liste") return [...ids];
+  if (modus === "spielplan") return [...ids].sort((a, b) => ersterAuftritt(bedarf[a]) - ersterAuftritt(bedarf[b]) || pos(a) - pos(b));
+  return [...ids].sort((a, b) => (bedarf[b]?.wichtigkeit ?? 0) - (bedarf[a]?.wichtigkeit ?? 0) || pos(a) - pos(b));
+}
+
+export type BedarfUrteil ={ art: "luecke" | "solide" | "stark" | "selten" | "offen"; text: string };
 
 /**
  * Bedarfs-Hinweis aus Häufigkeit und eigenem Liga-Rang. `ligaGroesse` = Teams der Liga.

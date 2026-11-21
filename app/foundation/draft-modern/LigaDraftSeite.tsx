@@ -32,6 +32,7 @@ import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } fro
 import { AbbruchDialog, AuslassenDialog, Ergebnis, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
+import { filterSchluessel, useGemerkterFilter } from "@/app/foundation/shared/filter-gedaechtnis";
 import { betragC, de, draftKopfSchluessel } from "./draft-format";
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil } from "@/app/foundation/shared/klickregel";
 import "@/app/foundation/transfermarkt-modern/transfermarkt-modern.css";
@@ -85,7 +86,7 @@ export default function LigaDraftSeite({
   }, []);
 
   const [ans, setAns] = useState<Ansicht>("live");
-  const [disziplin, setDisziplin] = useState("hockey");
+  const [disziplin, setDisziplin] = useGemerkterFilter(filterSchluessel("draft-brett", activeSaveId, "disziplin"), "hockey");
   const [wahl, setWahl] = useState<string | null>(null);
   const [schau, setSchau] = useState<string | null>(null);
   const [skipOffen, setSkipOffen] = useState(false);
@@ -191,6 +192,7 @@ export default function LigaDraftSeite({
 
   const kontext: DraftKontext | null = ansicht
     ? {
+        saveId: activeSaveId,
         ansicht,
         hintergrund: draft.hintergrund,
         zeilen,

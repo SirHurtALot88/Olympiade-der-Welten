@@ -217,3 +217,28 @@ export function calculateTransfermarktFit(
     teamFit: Number(teamFit.toFixed(2)),
   };
 }
+
+/**
+ * Die Marktregel für den Team-Fit (alter Markt, `transfermarkt-read-service`, unverändert übernommen): Ein freier Spieler mit
+ * NEGATIVEM Fit zum gewählten Team wird standardmäßig nicht eingeblendet. Sichtbar sind Fit ≥ 0 und Mercenaries (die sind
+ * von der Regel ausgenommen). Ohne Team (kein Fit gerechnet) bleibt alles sichtbar. `negativEinblenden` hebt die Regel auf —
+ * der Schalter in Transfermarkt und Draft-Brett.
+ */
+export function istFitSichtbar(
+  spieler: { fit: number | null | undefined; mercenary: boolean | null | undefined },
+  negativEinblenden = false,
+): boolean {
+  if (negativEinblenden) return true;
+  if (spieler.mercenary) return true;
+  if (spieler.fit == null) return true;
+  return spieler.fit >= 0;
+}
+
+/** Wie viele der Spieler die Regel ausblendet (für die Zahl am Schalter). */
+export function zaehleFitAusgeblendet(
+  spieler: ReadonlyArray<{ fit: number | null | undefined; mercenary: boolean | null | undefined }>,
+): number {
+  let n = 0;
+  for (const s of spieler) if (!istFitSichtbar(s, false)) n += 1;
+  return n;
+}

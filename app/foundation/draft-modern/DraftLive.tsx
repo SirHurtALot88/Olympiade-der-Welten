@@ -20,6 +20,9 @@ import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild
 import { DISZIPLIN_KURZ } from "@/app/foundation/transfermarkt-modern/tm-format";
 import type { DraftTempo, DraftZeig } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
+import { filterSchluessel, useGemerkterFilter } from "@/app/foundation/shared/filter-gedaechtnis";
+import { istFitSichtbar, zaehleFitAusgeblendet } from "@/lib/market/transfermarkt-fit";
+import { FitMarke } from "@/app/foundation/shared/FitMarke";
 import { useListenTasten } from "@/app/foundation/shared/klickregel";
 import { usePortraetVorschau, type VorschauDaten } from "@/app/foundation/shared/PortraetVorschau";
 import SpaltenGriff from "@/app/foundation/shared/SpaltenGriff";
@@ -511,7 +514,7 @@ export const DRAFT_SPALTEN: SpaltenDef[] = [
   { id: "abl", standard: 4.4, min: 3, max: 9 },
   { id: "geh", standard: 3.5, min: 3, max: 9 },
   { id: "gef", standard: 3.3, min: 2.6, max: 8 },
-  { id: "ak", standard: 5.4, min: 4, max: 14 },
+  { id: "ak", standard: 9.5, min: 6, max: 16 },
 ];
 const DRAFT_DEF = Object.fromEntries(DRAFT_SPALTEN.map((d) => [d.id, d]));
 
@@ -532,17 +535,22 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
   const a = k.ansicht;
   const mein = a.mein;
   const [tab, setTab] = useState<"frei" | "picks">("frei");
-  const [suche, setSuche] = useState("");
-  const [sort, setSort] = useState<SortKey>("eignung");
-  const [nurLeistbar, setNurLeistbar] = useState(false);
-  const [nurWunsch, setNurWunsch] = useState(false);
-  const [nurScouting, setNurScouting] = useState(false);
-  const [achsenMin, setAchsenMin] = useState<Partial<Record<MarktAchse, number>>>({});
+  // Filter bleiben beim Reiterwechsel (Live / Pick-Tafel / Liga & Ränge) stehen (Chris 21.11.): `filter-gedaechtnis.ts`.
+  const fk = (feld: string) => filterSchluessel("draft-brett", k.saveId, feld);
+  const [suche, setSuche] = useGemerkterFilter(fk("suche"), "");
+  const [sort, setSort] = useGemerkterFilter<SortKey>(fk("sort"), "eignung");
+  const [nurLeistbar, setNurLeistbar] = useGemerkterFilter(fk("leistbar"), false);
+  const [nurWunsch, setNurWunsch] = useGemerkterFilter(fk("wunsch"), false);
+  const [nurScouting, setNurScouting] = useGemerkterFilter(fk("scouting"), false);
+  // Team-Fit: dieselbe Marktregel wie im Transfermarkt (`istFitSichtbar`): negativer Fit ausgeblendet, Mercenaries bleiben.
+  const [fitNegativ, setFitNegativ] = useGemerkterFilter(fk("fitNegativ"), false);
+  const [achsenMin, setAchsenMin] = useGemerkterFilter<Partial<Record<MarktAchse, number>>>(fk("achsenMin"), {});
   // „Weitere Filter“ (Kartenfarbe, Marktwert, Gehalt/Saison, Value, Mindestnote je Attribut): dieselbe Komponente und Logik wie im
   // Transfermarkt (#1647, `transfermarkt-weitere-filter.ts`), hier nicht nachgebaut.
-  const [weitere, setWeitere] = useState<WeitereFilter>(LEERE_FILTER);
+  const [weitere, setWeitere] = useGemerkterFilter<WeitereFilter>(fk("weitere"), LEERE_FILTER);
   const [weitereOffen, setWeitereOffen] = useState(false);
   const aktiveWeitere = zaehleAktiveFilter(weitere);
+  const fitAusgeblendet = useMemo(() => zaehleFitAusgeblendet(k.zeilen.map((z) => z.item)), [k.zeilen]);
   const [blatt, setBlatt] = useState(0);
   const spalten = useSpaltenLayout("draft-brett", DRAFT_SPALTEN);
   const vorschau = usePortraetVorschau();
@@ -558,6 +566,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
       if (nurLeistbar && mein && (z.item.marketValue ?? 0) > maxAbloese + 1e-9) return false;
       if (nurWunsch && !k.wunsch.has(z.item.playerId)) return false;
       if (nurScouting && z.sicht.stufe < 1) return false;
+      if (!istFitSichtbar(z.item, fitNegativ)) return false;
       for (const [x, min] of Object.entries(achsenMin) as [MarktAchse, number][]) {
         if (!erfuelltAchsenMinimum(z.sicht, x, min)) return false;
       }
@@ -577,7 +586,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
       }
     };
     return sortiereNachSicht(liste, schluessel, sort === "guenstig" ? 1 : -1);
-  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, achsenMin, weitere, aktiveWeitere, sort, mein, maxAbloese, a.gefragt]);
+  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, fitNegativ, achsenMin, weitere, aktiveWeitere, sort, mein, maxAbloese, a.gefragt]);
 
   const seiten = Math.max(1, Math.ceil(gefiltert.length / ZEILEN_JE_BLATT));
   const seite = Math.min(blatt, seiten - 1);
@@ -662,6 +671,9 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
         <button type="button" className={`fc${nurLeistbar ? " an" : ""}`} onClick={() => { setNurLeistbar(!nurLeistbar); setBlatt(0); }}>leistbar</button>
         <button type="button" className={`fc${nurWunsch ? " an" : ""}`} onClick={() => { setNurWunsch(!nurWunsch); setBlatt(0); }}>★ Wunschliste</button>
         <button type="button" className={`fc${nurScouting ? " an" : ""}`} onClick={() => { setNurScouting(!nurScouting); setBlatt(0); }}>mit Scouting</button>
+        <button type="button" className={`fc${fitNegativ ? " an" : ""}`} onClick={() => { setFitNegativ((v) => !v); setBlatt(0); }} aria-pressed={fitNegativ} title="Standard: nur Spieler mit passendem Team-Fit (0 oder besser) und Mercenaries. Der Schalter blendet auch die mit negativem Fit ein." data-testid="draft-fit-negativ">
+          Negativer Fit {fitNegativ ? "eingeblendet" : "ausgeblendet"}{!fitNegativ && fitAusgeblendet > 0 ? ` · ${fitAusgeblendet}` : ""}
+        </button>
         <span className="gk">Achse mind.</span>
         {MARKT_ACHSEN.map((x) => {
           const min = achsenMin[x];
@@ -690,9 +702,6 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
         <button type="button" className={`fc${weitereOffen || aktiveWeitere > 0 ? " an" : ""}`} onClick={() => setWeitereOffen((v) => !v)} aria-expanded={weitereOffen} data-testid="draft-weitere-filter">
           Weitere Filter{aktiveWeitere > 0 ? ` · ${aktiveWeitere}` : ""} {weitereOffen ? "▾" : "▸"}
         </button>
-        <span className="sp" />
-        <button type="button" className={`fc${spalten.angepasst ? " an" : ""}`} onClick={spalten.zuruecksetzen} title="Spaltenbreiten und Porträtgröße auf Standard" data-testid="draft-spalten-zuruecksetzen">Spalten zurücksetzen</button>
-        <button type="button" className="fc" onClick={() => { setSuche(""); setNurLeistbar(false); setNurWunsch(false); setNurScouting(false); setAchsenMin({}); setWeitere(LEERE_FILTER); setBlatt(0); }} data-testid="draft-filter-zuruecksetzen">Filter zurücksetzen</button>
       </div>
       {weitereOffen ? <WeitereFilterPanel filter={weitere} onChange={(f) => { setWeitere(f); setBlatt(0); }} /> : null}
       <div className="fl">
@@ -708,6 +717,9 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
             </span>
           ))}
         </span>
+        <span className="sp" />
+        <button type="button" className={`fc${spalten.angepasst ? " an" : ""}`} onClick={spalten.zuruecksetzen} title="Spaltenbreiten und Porträtgröße auf Standard" data-testid="draft-spalten-zuruecksetzen">Spalten ↺</button>
+        <button type="button" className="fc" onClick={() => { setSuche(""); setNurLeistbar(false); setNurWunsch(false); setNurScouting(false); setFitNegativ(false); setAchsenMin({}); setWeitere(LEERE_FILTER); setBlatt(0); }} data-testid="draft-filter-zuruecksetzen"title="Alle Filter zurücksetzen">Filter ↺</button>
       </div>
       <div className={`mt sl${spalten.zeilenMin > 0 ? " pg" : ""}`} style={{ ["--zeilen" as string]: ZEILEN_JE_BLATT, ["--spalten" as string]: spalten.vorlage, ["--minbreite" as string]: `calc(${spalten.minBreite} * var(--u))`, ["--zmin" as string]: spalten.zeilenMin > 0 ? `calc(${spalten.zeilenMin} * var(--u))` : "0px", ["--pw" as string]: spalten.breiten.por }} data-testid="draft-tabelle">
         <div className="mz kopf">
@@ -738,7 +750,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
               {bild ? <img className="por" src={bild} alt="" loading="lazy" data-testid="draft-portrait" onMouseEnter={(e) => vorschau.zeige(e.currentTarget, vorschauDaten(it, z.sicht, bild))} onMouseLeave={vorschau.verstecke} /> : <span className="por" />}
               <span className="nm">
                 <b className="drf-pl" role="link" title="Name: wählt aus und öffnet das Profil" onClick={(e) => { e.stopPropagation(); k.nameKlick(it.playerId); }} data-testid="draft-profil-link">{it.name}</b>
-                <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span><KlassenFarbTag className={it.className} mitAchse={false} /> · {it.race}</small>
+                <small><span className={`scp ${scouteKlasse(z)}`}><i /><i /></span><KlassenFarbTag className={it.className} mitAchse={false} /> · {it.race} <FitMarke item={it} /></small>
               </span>
               <span className="eg" title={wert ? (wert.exakt ? "Eignung (gescoutet)" : `Eignung als Stufe ${wert.text}`) : "unbekannt"}>
                 <b className={`t${wert && !wert.exakt ? " nb" : ""}`}>{wert ? wert.text : "?"}</b>

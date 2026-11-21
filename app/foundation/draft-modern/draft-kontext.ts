@@ -11,6 +11,8 @@ export type DraftZeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht
 
 /** Was jede Teil-Ansicht der Draft-Seite braucht. Alles nur lesend; geschrieben wird über `aktionen`. */
 export type DraftKontext = {
+  /** Spielstand-Id: Schlüssel für die gemerkten Filter des Draft-Bretts. */
+  saveId: string;
   ansicht: LigaDraftAnsicht;
   hintergrund: boolean;
   /** Freie Spieler des Bretts (Feed minus gebuchte Picks), mit Scouting-Sicht. */
