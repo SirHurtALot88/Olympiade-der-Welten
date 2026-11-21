@@ -815,15 +815,16 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "training",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
-        const trainingPanel = page.getByTestId("foundation-training-compact");
+        // Seit 21.11. ist die moderne Seite „Entwicklung“ Standard (`training-modern`); die alte
+        // (`foundation-training-compact`) bleibt per ?training=klassisch erreichbar.
+        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "training-modern");
+        const trainingPanel = page.getByTestId("training-modern");
         await trainingPanel.waitFor({ state: "visible", timeout: viewTimeoutMs });
-        await page.locator("#foundation-training-compact").scrollIntoViewIfNeeded().catch(() => undefined);
-        const text = await trainingPanel.innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
-        assertStep(step, hasAny(text, ["Training", "Trainings-Setpoints", "Regeneration"]), "Training-Reiter lädt.");
-        assertStep(step, hasAny(text, ["Entwicklung", "Setpoints", "Performance"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
-        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader", "Wächst", "Rückschritt-Risiko", "Netto-Forecast"]), "Spieler-Forecast ist sichtbar.");
-        assertStep(step, hasAny(text, ["Gebäude", "Facility", "Leicht", "Hart"]), "Training-Kontext inkl. Facility/Modus ist sichtbar.");
+        const text = await page.locator("body").innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
+        assertStep(step, hasAny(text, ["Trainingshalle", "Training"]), "Training-Seite lädt.");
+        assertStep(step, hasAny(text, ["Entwicklung", "Netto", "Potenzial"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
+        assertStep(step, hasAny(text, ["wer trainiert was", "Im Blick", "Kein aktiver Kader"]), "Kader-Tabelle/Spieler-Fokus ist sichtbar.");
+        assertStep(step, hasAny(text, ["Gebäude", "Belastung", "Leicht", "Hart"]), "Training-Kontext inkl. Gebäude/Belastung ist sichtbar.");
       },
     }));
 
@@ -833,8 +834,8 @@ async function main() {
       page,
       screenshots: args.screenshots,
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
-        await page.getByTestId("foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
+        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "training-modern");
+        await page.getByTestId("training-modern").waitFor({ state: "visible", timeout: viewTimeoutMs });
         const trainingProfileSelector =
           ".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button, [data-testid=\"training-player-profile-button\"]";
         let profileButtons = await page.locator(trainingProfileSelector).count();

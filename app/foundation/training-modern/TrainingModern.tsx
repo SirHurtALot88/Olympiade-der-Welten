@@ -505,7 +505,12 @@ function ImBlick({
           {index + 1} von {anzahl}
         </span>
         {onDetails ? (
-          <button type="button" className="te-link" onClick={() => onDetails(zeile.playerId, zeile.row.entryId)}>
+          <button
+            type="button"
+            className="te-link"
+            data-testid="training-player-profile-button"
+            onClick={() => onDetails(zeile.playerId, zeile.row.entryId)}
+          >
             Voller Bericht ›
           </button>
         ) : null}
