@@ -88,3 +88,38 @@ export function berechneDisziRang(gs: GameState, teamId: string, disciplineId: s
     return null;
   }
 }
+
+export type GegnerRangZeile = {
+  teamId: string;
+  name: string;
+  kuerzel: string;
+  /** Rang in der Liga DES GEGNERS (Rang 1 = bester); null ohne Liga-Split. */
+  liga: number | null;
+  ligaName: string | null;
+  gesamt: number | null;
+  gesamtVon: number | null;
+  quelle: "kader" | "saison" | null;
+};
+
+/**
+ * RANG DER GEGNER IN EINER DISZIPLIN (Einsatzliste, Kopf, 21.11.): je Gegner der Rang in seiner Liga
+ * (klein dahinter der Rang unter allen), mit derselben Quelle wie der eigene Rang
+ * (Saisonwertung, sonst Kaderstärke). Bei Duell ein Eintrag, bei der Vierergruppe alle drei.
+ * Rang 1 ist immer der beste. Reine Anzeige.
+ */
+export function berechneGegnerRaenge(gs: GameState, gegnerTeamIds: readonly string[], disciplineId: string): GegnerRangZeile[] {
+  const teams = new Map(gs.teams.map((t) => [t.teamId, t] as const));
+  return gegnerTeamIds.map((teamId) => {
+    const rang = berechneDisziRang(gs, teamId, disciplineId);
+    return {
+      teamId,
+      name: teams.get(teamId)?.name ?? teamId,
+      kuerzel: teams.get(teamId)?.shortCode ?? teamId.slice(0, 3).toUpperCase(),
+      liga: rang?.liga ?? null,
+      ligaName: rang?.ligaName ?? null,
+      gesamt: rang?.gesamt ?? null,
+      gesamtVon: rang?.gesamtVon ?? null,
+      quelle: rang?.quelle ?? null,
+    };
+  });
+}

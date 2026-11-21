@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { berechneDisziRang } from "@/lib/lineups/einsatzliste-diszi-rang";
 import { teamfarbeInGruppe } from "@/lib/foundation/battle-arena/arena-regie";
 
 /**
@@ -14,6 +15,11 @@ export type VorraumTeam = {
   name: string;
   kuerzel: string;
   rang: number | null;
+  /**
+   * Rang in DIESER Disziplin (21.11.): Liga-Rang des Teams (Rang 1 = bester; Saisonwertung, vor der
+   * ersten Wertung die Kaderstaerke), klein dahinter der Rang unter allen. `null` ohne Daten.
+   */
+  diszRang: { liga: number | null; ligaName: string | null; gesamt: number; gesamtVon: number; quelle: "kader" | "saison" } | null;
   punkte: number | null;
   /** Mittel der besten 6 in dieser Disziplin, gerundet; `null`, wenn nicht ableitbar. */
   kaderStaerke: number | null;
@@ -38,6 +44,15 @@ export function groberMarke(wert: number | null, alle: ReadonlyArray<number | nu
   const max = Math.max(...zahlen);
   if (!(max > min)) return 3;
   return 1 + Math.round(((wert - min) / (max - min)) * 4);
+}
+
+function diszRangVon(gameState: GameState, teamId: string, disciplineId: string): VorraumTeam["diszRang"] {
+  try {
+    const r = berechneDisziRang(gameState, teamId, disciplineId);
+    return r ? { liga: r.liga, ligaName: r.ligaName, gesamt: r.gesamt, gesamtVon: r.gesamtVon, quelle: r.quelle } : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -73,6 +88,7 @@ export function baueVorraumTeams(input: {
       name: team?.name ?? teamId,
       kuerzel: team?.shortCode ?? teamId.slice(0, 3).toUpperCase(),
       rang: typeof eintrag?.rank === "number" ? eintrag.rank : null,
+      diszRang: diszRangVon(gameState, teamId, disciplineId),
       punkte: typeof eintrag?.points === "number" ? eintrag.points : null,
       kaderStaerke: staerke == null ? null : Math.round(staerke),
       marke: groberMarke(staerke, staerken),
