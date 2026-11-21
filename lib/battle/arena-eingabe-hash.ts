@@ -12,6 +12,7 @@ import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSee
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 import { BATTLEFIELD_POD_FORMAT } from "@/lib/battle/arena-resolved-disciplines";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerAktiv } from "@/lib/resolve/pp-tagesanker";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 
 /**
@@ -20,8 +21,12 @@ import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
  * lib/resolve/wertungs-skalen.ts), ist die Vorberechnung veraltet und wird neu gerechnet. In einer
  * alten Saison bleibt der Hash Zeichen fuer Zeichen der alte (kein neuer Schluessel).
  */
-function ppSkalaTeil(gameState: GameState, matchdayId: string): { ppSkala?: "c2" } {
-  return ppSkalaModus(gameState, matchdayId) === "an" ? { ppSkala: "c2" } : {};
+function ppSkalaTeil(gameState: GameState, matchdayId: string): { ppSkala?: "c2"; ppTagesanker?: "t1" } {
+  const modus = ppSkalaModus(gameState, matchdayId);
+  if (modus !== "an") return {};
+  // PP-TAGESANKER (Prototyp 21.11., Standard AUS, lib/resolve/pp-tagesanker.ts): nur bei aktivem Schalter
+  // ein eigener Schluessel -- ohne Schalter bleibt der Hash Zeichen fuer Zeichen der bisherige.
+  return ppTagesankerAktiv(modus) ? { ppSkala: "c2", ppTagesanker: "t1" } : { ppSkala: "c2" };
 }
 
 /**

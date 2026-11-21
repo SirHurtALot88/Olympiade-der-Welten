@@ -27,6 +27,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runMiniDmFfaPodFixtures,
@@ -190,7 +191,14 @@ function berechnePlayerPpsAusMotorErgebnis(
       eintrag.playerId,
       // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
       ppSkala !== "aus"
-        ? ppAusKurveSkaliert({ disciplineId: MINI_DM_DISCIPLINE_ID, wert: eintrag.beitrag, referenz, modus: ppSkala, playerCount: k })
+        ? ppAusKurveSkaliert({
+            disciplineId: MINI_DM_DISCIPLINE_ID,
+            wert: eintrag.beitrag,
+            referenz,
+            modus: ppSkala,
+            playerCount: k,
+            ...(ppTagesankerAktiv(ppSkala) ? { deckel: false } : {}),
+          })
         : ppAusMiniDmFfaBeitrag(eintrag.beitrag, referenz),
     );
   }
@@ -293,5 +301,11 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings };
+  // PP-TAGESANKER (Prototyp 21.11., Standard AUS): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  const ppSkalaTag = ppSkalaModus(input.gameState, input.matchdayId);
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: ppTagesankerAktiv(ppSkalaTag) ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    warnings,
+  };
 }

@@ -114,13 +114,23 @@ export function skaliereUngedeckelt(
   disciplineId: string,
   ungedeckelt: number,
   zuschlag = 0,
-  optionen: { modus?: PpSkalaModus; playerCount?: number | null } = {},
+  optionen: {
+    modus?: PpSkalaModus;
+    playerCount?: number | null;
+    /**
+     * PP-TAGESANKER (Prototyp 21.11., lib/resolve/pp-tagesanker.ts): `false` liefert den C2-Wert OHNE
+     * den Deckel 5 und ohne Rundung -- die Eingabe fuer `verteilePpNachTagesanker()`. Standard `true`:
+     * unveraendert.
+     */
+    deckel?: boolean;
+  } = {},
 ): number {
   const modus = optionen.modus ?? "an";
   const basis = Math.max(0, ungedeckelt);
   if (modus === "roh") return runde2(basis + zuschlag);
   const anker = ppSkalaAnker(disciplineId, optionen.playerCount);
   const neu = anker ? (basis <= 0 ? 0 : PP_SKALA_MAX * Math.pow(basis / anker.rTop, anker.exponent)) : basis;
+  if (optionen.deckel === false) return neu + zuschlag;
   return runde2(Math.min(PP_SKALA_MAX, neu + zuschlag));
 }
 
@@ -140,9 +150,11 @@ export function ppAusKurveSkaliert(input: {
   modus?: PpSkalaModus;
   /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
   playerCount?: number | null;
+  /** `false`: ungedeckelt und ungerundet (PP-Tagesanker, s. `skaliereUngedeckelt()`). Standard `true`. */
+  deckel?: boolean;
 }): number {
   const { referenz } = input;
-  const optionen = { modus: input.modus, playerCount: input.playerCount };
+  const optionen = { modus: input.modus, playerCount: input.playerCount, deckel: input.deckel };
   const zuschlag = input.zuschlag ?? 0;
   const max = input.max ?? PP_SKALA_ALT_MAX;
   const anteilMitte = input.anteilMitte ?? PP_SKALA_ALT_ANTEIL_MITTE;

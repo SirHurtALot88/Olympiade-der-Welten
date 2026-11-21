@@ -14,6 +14,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -130,6 +131,8 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);
   const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
+  // PP-TAGESANKER (Prototyp 21.11., Standard AUS): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  const tagesanker = ppTagesankerAktiv(ppSkala);
   const rohdatenByPodId = new Map<string, BahnPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
@@ -153,11 +156,16 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz, modus: ppSkala, playerCount: k })
+          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz, modus: ppSkala, playerCount: k, ...(tagesanker ? { deckel: false } : {}) })
           : ppAusBahnPodWert(eintrag.wert, referenz),
       );
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings, playerCount: k };
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    warnings,
+    playerCount: k,
+  };
 }
