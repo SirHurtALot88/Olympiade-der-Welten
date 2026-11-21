@@ -76,6 +76,8 @@ Die 24 neuen Animationsgruppen stehen mit ihrer Art in `data/generated/figuren-s
 
 ## Auffälligkeiten
 
+- **Behoben am selben Tag, siehe Abschnitt „Reparatur“ unten:** die drei folgenden Punkte (Nord-Drehung,
+  Amaries zweiter Speer, Conans Strahl).
 - **Nord-Animationen drehen teils nach vorn.** Bekannte pixminimax-Schwäche: in einzelnen Nord-Streifen
   zeigt die Figur mitten in der Bewegung die Vorderseite statt des Rückens. Betroffen: Queen Loriana
   (walk, angriff, tod), Conan (treffer, tod), Zynara (walk, angriff, treffer, tod), Amarie (angriff, tod),
@@ -96,3 +98,78 @@ Die 24 neuen Animationsgruppen stehen mit ihrer Art in `data/generated/figuren-s
 - `npx vitest run tests/arena-pixel-figuren.test.ts tests/battlefield-aufklaerungsnebel-bug69.test.ts`: 21 von 21 grün.
 - Alle 96 exportierten PNGs geöffnet und vollständig dekodiert, beide JSON-Dateien gültig (nach dem
   Platten-Engpass um 16:40 ausdrücklich geprüft).
+
+## Reparatur (21.11., zweiter Lauf)
+
+**Freigabe:** Chris am 21.11., wörtlich: „wenn die Figuren von hinten sich nach vorne drehen ist das IMMER
+ein Grund es zu fixen! … solche Bugs musst du nicht beschreiben, sondern wenn du sie findest fixen … für
+Fixes hast du immer ne Freigabe, weil ich erwarte, dass die Animationen, die wir haben, wenigstens sauber
+sind“. Gilt für Reparaturen bestehender Animationen (fehlerhafte Richtung neu bestellen), nicht für neue
+Figuren oder neue Animationsarten.
+
+Alle 24 Nord-Streifen der sechs Figuren Bild für Bild angesehen. Emilia ist sauber, ebenso alle Nord-Streifen,
+die unten nicht stehen. Über die bekannte Liste hinaus gefunden: **Zyra Angriff Nord** (drehte im Schwung
+das Gesicht zur Kamera).
+
+| Bestellung | Was | Generationen |
+|---|---|---:|
+| Conan treffer Nord (Probe) | drehte sich komplett nach vorn | 1 |
+| Conan tod Nord | drehte sich nach vorn, lag mit Gesicht zur Kamera | 1 |
+| Conan angriff Süd | Strahl lief nach unten aus dem Bild | 1 |
+| Conan angriff Süd, zweiter Versuch | erster Versuch hatte wieder einen Strahl nach unten | 1 |
+| Queen Loriana walk / angriff / tod Nord | alle drei zeigten die Vorderseite | 3 |
+| Zyra angriff / tod Nord | Gesicht bzw. Vorderseite sichtbar | 4 |
+| Zynara walk / angriff / treffer / tod Nord | Vorderseite ab dem zweiten Bild | 7 |
+| Amarie angriff / tod Nord | Vorderseite | 4 |
+| Amarie Süd-Grundpose (`edit-image-pixen`) | zweiten Speer entfernen | 1 |
+| Amarie walk / angriff / treffer / tod Süd | hingen an der Grundpose, trugen alle zwei Speere | 4 |
+| **Summe** | 18 Streifen neu (13 Nord, 5 Süd; Conan Angriff Süd zweimal bestellt, also 19 Bestellungen), eine Grundpose | **27** |
+
+Guthaben vorher **342,54**, nachher **315,54** (Differenz 27,0, deckt sich mit `usage.generations` der Jobs).
+Reserve 150 unberührt. Job-IDs und Bestelltexte je Streifen: `figuren-kader-dp-21-11/reparatur-bestellungen.json`.
+
+**Weg:** `scripts/figuren-repariere-richtung.py` (neu): Richtung löschen
+(`DELETE /characters/<cid>/animations/<gid>/directions/<richtung>`, sonst lehnt PixelLab mit 409 ab), dann mit
+derselben Framezahl an dieselbe Gruppe neu bestellen, auf die Jobs warten, `usage.generations` ausgeben. Jeder
+POST ging genau einmal raus, alles unter `flock /tmp/pixellab-bestell.lock`.
+
+```sh
+PIXELLAB_API_KEY=dummy flock /tmp/pixellab-bestell.lock python3 -I scripts/figuren-repariere-richtung.py auftraege.json --protokoll protokoll.json
+```
+
+**Was bei Nord geholfen hat** (alle 13 Nord-Streifen saßen im ersten Versuch): nicht nur „seen from behind, back
+to the camera the whole time, never turns around, face never visible“ im Aktionstext, sondern auch ein
+**Rücken-Subjekt** (`subject_description` beschreibt Haare, Umhang, Rückseite der Haube statt Gesicht, Brille,
+Brust) und `initial_pose` „standing with her back to the camera“. Ziele heißen „an enemy beyond her at the top of
+the picture“ statt „in front“, Stürze „forward away from the camera, face down“. Das alte Subjekt nannte bei jeder
+Figur Merkmale der Vorderseite, und pixminimax hat sie dann auch gezeigt.
+
+**Amarie:** `edit-image-pixen` hat den aufrechten Speer entfernt, dabei aber den gesenkten Speer flach auf den
+Boden gelegt. Die neue Grundpose ist deshalb zusammengesetzt: links (x < 44) das Original mit dem gehaltenen,
+gesenkten Speer, rechts das bearbeitete Bild mit freiem Flügel. Mit `POST /save-to-asset`
+(`character:<cid>:south`, kostenlos) in die PixelLab-Figur zurückgeschrieben, danach die vier Süd-Streifen neu.
+Ost und Nord hatten immer nur einen Speer und blieben unberührt.
+
+**Export-Fehler dabei gefunden und behoben:** `figuren-sprites-export.py` bildete den Cache-Namen ohne den
+Zeitstempel `?t=` der Rotations-URL. Eine überschriebene Grundpose behält ihre URL, der Export lieferte also
+weiter das alte Bild aus `.figuren-cache`. Der Zeitstempel steht jetzt im Cache-Namen der Rotationen.
+
+**Conan Angriff Süd:** ein Strahl „nach vorn“ läuft in der Süd-Ansicht zwangsläufig nach unten aus dem Bild. Der
+neue Streifen zeigt stattdessen einen blauen Lichtring an der Uhr, der im Bild bleibt.
+
+**Offen / Restbefund:**
+- Zyra Angriff Nord: nach dem ersten Reparaturlauf drehte sie im Axtschwung noch ins Profil. Ein weiterer Versuch
+  (2 Generationen, Hieb über den Kopf statt seitlicher Schwung, „shoulders stay square to the camera, head does not
+  turn“) zeigt jetzt in allen 17 Bildern den Rücken. Preis: die Axt verschwindet beim Niederschlag hinter dem
+  Körper, der Hieb wirkt dadurch zurückhaltender als in Süd und Ost. Damit insgesamt **29 Generationen**,
+  Guthaben nachher **313,54**.
+- Zynara Treffer Süd (roter Hieb-Effekt im zweiten Bild) bleibt so, das ist ein Effekt, keine Drehung (so entschieden).
+
+**Bilder:** neue Kontaktbögen `figuren-kader-dp-21-11/<slug>-bogen.png` (alle sechs, jetzt mit Zeilenbeschriftung)
+und je Figur ein animiertes GIF `figuren-kader-dp-21-11/<slug>-animation.gif` (4×, Spalten
+walk/angriff/treffer/tod, Zeilen Süd/Ost/Nord).
+
+**Prüfung:** Fingerabdruck **GESAMT eaafed96150e (75 Einträge)**, unverändert.
+`npx vitest run tests/arena-pixel-figuren.test.ts`: 14 von 14 grün. `node scripts/baue-arena-figuren.mjs` ohne
+Änderung an `battle-mode.figuren.js`; im Index hat sich nur die Reihenfolge zweier Gruppen (Conan, Queen Loriana)
+geändert.
