@@ -28,6 +28,7 @@ import {
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import type { MatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
+import { teileNachLiga } from "@/lib/season/liga-raenge";
 
 export type WertungsSeite = "d1" | "d2";
 export type WertungsLiga = "liga1" | "liga2";
@@ -209,12 +210,19 @@ export function baueWertungsZeilen(eingabe: WertungsEingabe): WertungsZeile[] {
     sum: z.gesamt,
     projectedRank: z.nachRang,
   }));
-  applySeasonRankColumn(rankInput);
+  // Saison-Rang je Liga (21.11.): der abgeleitete Nachher-Rang (`applySeasonRankColumn`) zählt mit
+  // Ligatrennung nur innerhalb der eigenen Liga — wie der Vorher-Rang aus dem Saisonstand. Über alle
+  // 32 Teams gerechnet stand sonst „26. → 12." in einer 16er-Liga.
+  const mitLigen = hatLigaTrennung(zeilen);
+  const ligaById = new Map(zeilen.map((z) => [z.teamId, z.liga] as const));
+  for (const gruppe of teileNachLiga(rankInput, mitLigen ? (teamId) => ligaById.get(teamId) ?? null : null)) {
+    applySeasonRankColumn(gruppe);
+  }
   const nachById = new Map(rankInput.map((r) => [r.teamId, r.projectedRank]));
   const etwasGewertet = eingabe.d1Revealed || eingabe.d2Revealed;
   // Rang je Liga: dieselbe Funktion, nur über die Teams EINER Liga (Teams ohne Zuordnung bilden eine eigene Gruppe).
   const ligaRaenge = new Map<string, number>();
-  if (hatLigaTrennung(zeilen)) {
+  if (mitLigen) {
     for (const liga of ["liga1", "liga2", null] as const) {
       const r = resolveMatchdayRanks(zeilen.filter((z) => z.liga === liga).map((z) => ({ teamId: z.teamId, total: z.gesamt })));
       r.forEach((rang, id) => ligaRaenge.set(id, rang));

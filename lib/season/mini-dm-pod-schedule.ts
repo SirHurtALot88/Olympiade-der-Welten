@@ -170,8 +170,9 @@ function getMiniDmTeamPools(gameState: GameState): Array<{ tier: LeagueTier | nu
  *
  * Die Rotation ueber die Saison bleibt die des Spielplans: jeder Spieltag hat eine andere
  * Round-Robin-Runde, also andere Paare und damit andere Gruppen. Welche zwei Paare zusammenkommen,
- * entscheidet ein Seed aus Disziplin, Liga und dem Paar-Satz selbst (kanonisch sortiert) -- zwei
- * Pod-Disziplinen desselben Spieltags losen dadurch unabhaengig. Fallen beide Saison-Vorkommen auf
+ * entscheidet ein Seed aus Disziplin, Liga und dem Paar-Satz selbst (kanonisch sortiert). ZWEI
+ * Pod-Disziplinen desselben Spieltags losen seit 21.11. NICHT mehr unabhaengig: D2 nimmt den Seed
+ * von D1 (`findPodLeitDisziplin`), beide spielen in denselben Gruppen. Fallen beide Saison-Vorkommen auf
  * denselben Paar-Satz (Doppel-Rundenplan: Hin- und Rueckrunde haben dieselben Paare), verschmilzt
  * Vorkommen 2 versetzt (Paar 1+2, 3+4, ..., 7+0 statt 0+1, 2+3, ...): dann teilt kein Pod von
  * Vorkommen 2 seine Zusammensetzung mit einem von Vorkommen 1.
@@ -301,6 +302,45 @@ function findPodDisciplineOccurrenceForMatchday(gameState: GameState, matchdayId
 }
 
 /**
+ * EINE GRUPPENBILDUNG JE SPIELTAG (21.11., Chris: "Die 2. Disziplin eines Spieltags findet mit
+ * anderen Teams statt als die erste -- bekannter Bug"). Stehen an einem Spieltag ZWEI Pod-Disziplinen
+ * (D1 und D2, z. B. Battlefield + Mini-DM oder Takeshi + Staffel), spielen beide in DENSELBEN
+ * Vierergruppen. Leitdisziplin ist D1: D2 uebernimmt deren Seed und Saison-Vorkommen. Vorher loste
+ * jede Pod-Disziplin mit ihrer eigenen Disziplin-ID im Seed, die zweite Disziplin hatte deshalb
+ * (gemessen im Live-Save, Spieltag 2 und 10) fuer 28 bzw. 32 von 32 Teams eine andere Gruppe.
+ *
+ * Nur die Gruppen-ZUSAMMENSETZUNG folgt D1, die Pod-ID bleibt disziplineigen (`battlefield-pod:`,
+ * `minidm-pod:` ...) -- Match-Saaten und Vorlauf-Schluessel unterscheiden die Disziplinen weiter.
+ * Ein Spieltag mit nur EINER Pod-Disziplin (der Normalfall) ist unveraendert: Leitdisziplin ist die
+ * Pod-Disziplin selbst, Seed byte-identisch. Gemischte Spieltage (Pod + Duell) sind per Konstruktion
+ * konsistent: der Pod entsteht aus zwei Duell-Paaren des Spieltags (Spieltagsmodell-Kopplung).
+ * Begruendung: docs/design/spielplan-raenge-fix-21-11.md Abschnitt 1.
+ */
+function findPodLeitDisziplin(
+  gameState: GameState,
+  matchdayId: string,
+  disciplineId: string,
+): { disciplineId: string; occurrenceInSeason: 1 | 2; partnerDisciplineId: string | null } | null {
+  const entry = getSeasonDisciplineSchedule(gameState).find((candidate) => candidate.matchdayId === matchdayId);
+  if (!entry) {
+    return null;
+  }
+  const podSlots = [entry.discipline1, entry.discipline2].filter(
+    (candidate): candidate is NonNullable<typeof candidate> => candidate != null && isViererPodDiscipline(candidate.disciplineId),
+  );
+  if (!podSlots.some((candidate) => candidate.disciplineId === disciplineId)) {
+    return null;
+  }
+  const leit = podSlots[0]!;
+  const partner = podSlots.find((candidate) => candidate.disciplineId !== disciplineId) ?? null;
+  return {
+    disciplineId: leit.disciplineId,
+    occurrenceInSeason: leit.occurrenceInSeason ?? 1,
+    partnerDisciplineId: partner?.disciplineId ?? null,
+  };
+}
+
+/**
  * Seed und Pod-ID je Pod-Disziplin. MINI-DM BLEIBT BYTE-IDENTISCH zum Stand vor der
  * Verallgemeinerung (01.11.): `mini-dm-pods-v1` ohne weiteren Disziplin-Teil und das Praefix
  * `minidm-pod:` -- bestehende Spielstaende kuendigen fuer kommende Mini-DM-Spieltage also exakt
@@ -345,6 +385,28 @@ export function getPodsForMatchday(
 
   const saveId = options?.saveId ?? "normalized-local-save";
   const seasonId = gameState.season.id;
+
+  // Eine Gruppenbildung je Spieltag (s. `findPodLeitDisziplin`): ist die Partner-Pod-Disziplin
+  // desselben Spieltags schon gebucht, spielt diese Disziplin in genau deren Gruppen -- auch wenn
+  // die Partnerdisziplin noch nach der alten, disziplineigenen Losung gewertet wurde.
+  const leit = findPodLeitDisziplin(gameState, matchdayId, disciplineId);
+  if (leit?.partnerDisciplineId) {
+    const partnerOccurrence = findPodDisciplineOccurrenceForMatchday(gameState, matchdayId, leit.partnerDisciplineId) ?? 1;
+    const partnerGebucht = getBookedPods(gameState, matchdayId, leit.partnerDisciplineId, partnerOccurrence);
+    if (partnerGebucht.length > 0) {
+      const partnerPraefix = `${podIdPraefix(leit.partnerDisciplineId)}:`;
+      return partnerGebucht.map((pod) => ({
+        ...pod,
+        id: pod.id.startsWith(partnerPraefix)
+          ? `${podIdPraefix(disciplineId)}:${pod.id.slice(partnerPraefix.length)}`
+          : `${podIdPraefix(disciplineId)}:${pod.id}`,
+        disciplineId,
+        occurrenceInSeason,
+      }));
+    }
+  }
+  const seedDisziplin = leit?.disciplineId ?? disciplineId;
+  const seedOccurrence = leit?.occurrenceInSeason ?? occurrenceInSeason;
   const pods: MiniDmPod[] = [];
 
   for (const pool of getMiniDmTeamPools(gameState)) {
@@ -358,12 +420,12 @@ export function getPodsForMatchday(
     const groups = fixturePairs
       ? buildPodGroupsFromFixturePairs(
           fixturePairs,
-          `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:spielplan-kopplung-v2`,
-          occurrenceInSeason,
+          `${saveId}:${seasonId}:${podSeedTeil(seedDisziplin)}:${tierLabel}:spielplan-kopplung-v2`,
+          seedOccurrence,
         )
       : buildMiniDmPodGroups(
           pool.teamIds,
-          `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:occurrence-${occurrenceInSeason}`,
+          `${saveId}:${seasonId}:${podSeedTeil(seedDisziplin)}:${tierLabel}:occurrence-${seedOccurrence}`,
         );
     groups.forEach((teamIds, podIndex) => {
       pods.push({

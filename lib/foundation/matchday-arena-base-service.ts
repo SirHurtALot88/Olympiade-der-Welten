@@ -21,6 +21,7 @@ import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save"
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { readStandingsPreviewCache, writeStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
+import { ligaVonAusSpielstand, rangJeLiga } from "@/lib/season/liga-raenge";
 
 export type ArenaBriefingStandings = {
   items: Array<{ teamId: string; currentRank: number | null; projectedRank: number | null }>;
@@ -48,8 +49,10 @@ function buildArenaBriefingStandings(save: PersistedSaveGame): ArenaBriefingStan
   // Vor dem ersten Spieltag stehen alle bei 0 Punkten — dann ist ein Rang
   // bedeutungslos. Erst ranken, wenn die Liga ueberhaupt Punkte hat.
   const hasLeaguePoints = ranked.some((entry) => (entry.points ?? 0) > 0);
+  // Je Liga (21.11., `lib/season/liga-raenge.ts`): mit Liga-Split zählt der Saison-Rang nur in der
+  // eigenen Liga — `ranked` ist bereits sortiert, die Gruppen behalten diese Reihenfolge.
   const rankByTeamId = hasLeaguePoints
-    ? new Map(ranked.map((entry, index) => [entry.teamId, index + 1] as const))
+    ? rangJeLiga(ranked, ligaVonAusSpielstand(save.gameState), (gruppe) => new Map(gruppe.map((entry, index) => [entry.teamId, index + 1] as const)))
     : new Map<string, number>();
   return {
     items: save.gameState.teams.map((team) => ({
